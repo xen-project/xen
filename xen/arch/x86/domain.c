@@ -869,11 +869,13 @@ int construct_dom0(struct domain *p,
 
     set_bit(DF_CONSTRUCTED, &p->flags);
 
-#if 0 /* XXXXX DO NOT CHECK IN ENABLED !!! (but useful for testing so leave) */
-    shadow_mode_enable(&p->mm, SHM_test); 
-#endif
-
     new_thread(p, dsi.v_kernentry, vstack_end, vstartinfo_start);
+
+#if 0 /* XXXXX DO NOT CHECK IN ENABLED !!! (but useful for testing so leave) */
+    shadow_lock(&p->mm);
+    shadow_mode_enable(p, SHM_test); 
+    shadow_unlock(&p->mm);
+#endif
 
     return 0;
 }

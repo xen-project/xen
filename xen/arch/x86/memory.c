@@ -1707,6 +1707,36 @@ void ptwr_reconnect_disconnected(void)
         MEM_LOG("ptwr: Could not update pte at %p\n", writable_pte);
         domain_crash();
     }
+
+    if ( unlikely(current->mm.shadow_mode) )
+    {
+	unsigned long spte;
+	unsigned long sstat = 
+	    get_shadow_status(&current->mm, 
+			      ptwr_info[cpu].disconnected_pte >> PAGE_SHIFT);
+
+	if ( sstat & PSH_shadowed ) 
+	{ 
+	    int i;
+	    unsigned long spfn = sstat & PSH_pfn_mask;
+	    l1_pgentry_t *sl1e = map_domain_mem( spfn << PAGE_SHIFT );
+	    
+	    for( i = 0; i < ENTRIES_PER_L1_PAGETABLE; i++ ) {
+		l1pte_no_fault( &current->mm, 
+				&l1_pgentry_val(
+				    ptwr_info[cpu].disconnected_page[i]),
+				&l1_pgentry_val(sl1e[i]) );
+	    }
+	    unmap_domain_mem( sl1e );
+	    put_shadow_status(&current->mm);
+	} 
+
+	l1pte_no_fault( &current->mm,
+			&pte, &spte );
+	__put_user(spte, (unsigned long *)&shadow_linear_pg_table
+		   [ptwr_info[cpu].disconnected_l1va>>PAGE_SHIFT] );
+    }
+
     __flush_tlb_one(ptwr_info[cpu].disconnected_l1va);
     PTWR_PRINTK(PP_A, ("[A] disconnected_l1va at %p now %08lx\n",
                        writable_pte, pte));
@@ -1752,6 +1782,37 @@ void ptwr_flush_inactive(void)
         MEM_LOG("ptwr: Could not update pte at %p\n", writable_pte);
         domain_crash();
     }
+
+    if ( unlikely(current->mm.shadow_mode) )
+    {
+	unsigned long spte;
+	unsigned long sstat = 
+	    get_shadow_status(&current->mm, 
+			      ptwr_info[cpu].writable_pte >> PAGE_SHIFT);
+
+	if ( sstat & PSH_shadowed ) 
+	{ 
+	    int i;
+	    unsigned long spfn = sstat & PSH_pfn_mask;
+	    l1_pgentry_t *sl1e = map_domain_mem( spfn << PAGE_SHIFT );
+	    
+	    for( i = 0; i < ENTRIES_PER_L1_PAGETABLE; i++ ) {
+		l1pte_no_fault( &current->mm, 
+				&l1_pgentry_val(
+				    ptwr_info[cpu].writable_page[i]),
+				&l1_pgentry_val(sl1e[i]) );
+					       
+	    }
+	    unmap_domain_mem( sl1e );
+	    put_shadow_status(&current->mm);
+	} 
+
+	l1pte_no_fault( &current->mm,
+			&pte, &spte );
+	__put_user(spte, (unsigned long *)&shadow_linear_pg_table
+		   [ptwr_info[cpu].writable_l1va>>PAGE_SHIFT] );
+    }
+
     __flush_tlb_one(ptwr_info[cpu].writable_l1va);
     PTWR_PRINTK(PP_I, ("[I] disconnected_l1va at %p now %08lx\n",
                        writable_pte, pte));
@@ -1778,6 +1839,9 @@ int ptwr_do_page_fault(unsigned long addr)
          (__get_user(pte, (unsigned long *)
                      &linear_pg_table[addr >> PAGE_SHIFT]) == 0) )
     {
+	if( (pte & _PAGE_RW) && (pte & _PAGE_PRESENT) )
+	    return 0; /* we can't help. Maybe shadow mode can? */
+
         pfn = pte >> PAGE_SHIFT;
 #if 0
         PTWR_PRINTK(PP_ALL, ("check pte %08lx = pfn %08lx for va %08lx\n", pte,
@@ -1862,7 +1926,11 @@ int ptwr_do_page_fault(unsigned long addr)
                         &linear_pg_table[addr>>PAGE_SHIFT]);
                 domain_crash();
             }
-            return 1;
+
+	    if( unlikely(current->mm.shadow_mode) )
+		return 0;  /* fall through to shadow mode to propagate */
+	    else
+		return 1;
         }
     }
     return 0;

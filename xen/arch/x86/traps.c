@@ -121,9 +121,29 @@ void show_guest_stack()
     
 }
 
-void show_stack(unsigned long *esp)
+void show_trace(unsigned long *esp)
 {
     unsigned long *stack, addr;
+    int i;
+
+    printk("Call Trace from ESP=%p: ", esp);
+    stack = esp;
+    i = 0;
+    while (((long) stack & (STACK_SIZE-1)) != 0) {
+        addr = *stack++;
+        if (kernel_text_address(addr)) {
+            if (i && ((i % 6) == 0))
+                printk("\n   ");
+            printk("[<%08lx>] ", addr);
+            i++;
+        }
+    }
+    printk("\n");
+}
+
+void show_stack(unsigned long *esp)
+{
+    unsigned long *stack;
     int i;
 
     printk("Stack trace from ESP=%p:\n", esp);
@@ -142,19 +162,7 @@ void show_stack(unsigned long *esp)
     }
     printk("\n");
 
-    printk("Call Trace from ESP=%p: ", esp);
-    stack = esp;
-    i = 0;
-    while (((long) stack & (STACK_SIZE-1)) != 0) {
-        addr = *stack++;
-        if (kernel_text_address(addr)) {
-            if (i && ((i % 6) == 0))
-                printk("\n   ");
-            printk("[<%08lx>] ", addr);
-            i++;
-        }
-    }
-    printk("\n");
+    show_trace( esp );
 }
 
 void show_registers(struct pt_regs *regs)

@@ -118,13 +118,18 @@ static inline int __mark_dirty( struct mm_struct *m, unsigned int mfn )
     }
     else
     {
-        extern void show_traceX(void);
         SH_LOG("mark_dirty OOR! mfn=%x pfn=%x max=%x (mm %p)",
                mfn, pfn, m->shadow_dirty_bitmap_size, m );
-        SH_LOG("dom=%u caf=%08x taf=%08x\n", 
-               frame_table[mfn].u.inuse.domain->domain,
+        SH_LOG("dom=%p caf=%08x taf=%08x\n", 
+               frame_table[mfn].u.inuse.domain,
                frame_table[mfn].count_info, 
                frame_table[mfn].u.inuse.type_info );
+		{
+			extern void show_trace(unsigned long *esp);		
+			unsigned long *esp;
+			__asm__ __volatile__ ("movl %%esp,%0" : "=r" (esp) : );
+			show_trace(esp);
+		}
     }
 
     return rc;
@@ -134,7 +139,7 @@ static inline int __mark_dirty( struct mm_struct *m, unsigned int mfn )
 static inline int mark_dirty( struct mm_struct *m, unsigned int mfn )
 {
     int rc;
-    ASSERT(local_irq_is_enabled());
+    //ASSERT(local_irq_is_enabled());
     //if(spin_is_locked(&m->shadow_lock)) printk("+");
     shadow_lock(m);
     rc = __mark_dirty( m, mfn );
@@ -388,7 +393,7 @@ static inline unsigned long get_shadow_status( struct mm_struct *m,
        independnetly. 
     */
 
-    ASSERT(local_irq_is_enabled());
+    //ASSERT(local_irq_is_enabled());
     //if(spin_is_locked(&m->shadow_lock)) printk("*");
     shadow_lock(m);
 
@@ -585,7 +590,7 @@ static inline void shadow_mk_pagetable( struct mm_struct *mm )
 
     if ( unlikely(mm->shadow_mode) )
     {
-        ASSERT(local_irq_is_enabled());
+        //ASSERT(local_irq_is_enabled());
         shadow_lock(mm);
         __shadow_mk_pagetable(mm);
         shadow_unlock(mm);

@@ -660,14 +660,14 @@ int shadow_fault( unsigned long va, long error_code )
     // write back updated gpte
     // XXX watch out for read-only L2 entries! (not used in Linux)
     if ( unlikely( __put_user( gpte, (unsigned long*)&linear_pg_table[va>>PAGE_SHIFT])) )
-        BUG();  // fixme!
+        domain_crash();  // fixme!
 
     if ( unlikely( __put_user( spte, (unsigned long*)&shadow_linear_pg_table[va>>PAGE_SHIFT])) )
     { 
         // failed:
         //  the L1 may not be shadowed, or the L2 entry may be insufficient
 
-        unsigned long gpde, spde, gl1pfn, sl1pfn;
+        unsigned long gpde, spde, gl1pfn, sl1pfn, sl1ss;
 
         SH_VVLOG("3: not shadowed or l2 insufficient gpte=%08lx  spte=%08lx",gpte,spte );
 
@@ -675,8 +675,8 @@ int shadow_fault( unsigned long va, long error_code )
 
         gl1pfn = gpde>>PAGE_SHIFT;
 
-        
-        if ( ! (sl1pfn=__shadow_status(&current->mm, gl1pfn) ) )
+        sl1ss = __shadow_status(&current->mm, gl1pfn);
+        if ( ! (sl1ss & PSH_shadowed) )
         {
             // this L1 is NOT already shadowed so we need to shadow it
             struct pfn_info *sl1pfn_info;
@@ -719,6 +719,7 @@ int shadow_fault( unsigned long va, long error_code )
 
             SH_VVLOG("4b: was shadowed, l2 missing ( %08lx )",sl1pfn);
 
+            sl1pfn = sl1ss & PSH_pfn_mask;
             l2pde_general( m, &gpde, &spde, sl1pfn );
 
             linear_l2_table[va>>L2_PAGETABLE_SHIFT] = mk_l2_pgentry(gpde);
