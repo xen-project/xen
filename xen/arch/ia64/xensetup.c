@@ -309,7 +309,8 @@ printk("CONSTRUCTING DOMAIN0 CLONE #%d\n",i+1);
     /* The stash space for the initial kernel image can now be freed up. */
     init_domheap_pages(ia64_boot_param->initrd_start,
 		       ia64_boot_param->initrd_start + ia64_boot_param->initrd_size);
-    scrub_heap_pages();
+    if (!running_on_sim)  // slow on ski and pages are pre-initialized to zero
+	scrub_heap_pages();
 
 printk("About to call init_trace_bufs()\n");
     init_trace_bufs();

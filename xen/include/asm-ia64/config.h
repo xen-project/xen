@@ -2,6 +2,7 @@
 #undef CLONE_DOMAIN0
 //#define CLONE_DOMAIN0 5
 #define DOMU_BUILD_STAGING
+#define VHPT_GLOBAL
 
 // manufactured from component pieces
 

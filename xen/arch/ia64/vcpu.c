@@ -1491,10 +1491,27 @@ void vcpu_itc_no_srlz(VCPU *vcpu, UINT64 IorD, UINT64 vaddr, UINT64 pte, UINT64 
 
 	// FIXME: validate ifa here (not in Xen space), COULD MACHINE CHECK!
 	// FIXME, must be inlined or potential for nested fault here!
+	if ((vcpu->domain==dom0) && (logps < PAGE_SHIFT)) {
+		printf("vcpu_itc_no_srlz: domain0 use of smaller page size!\n");
+		//FIXME: kill domain here
+		while(1);
+	}
 	psr = ia64_clear_ic();
 	ia64_itc(IorD,vaddr,pte,ps); // FIXME: look for bigger mappings
 	ia64_set_psr(psr);
 	// ia64_srlz_i(); // no srls req'd, will rfi later
+#ifdef VHPT_GLOBAL
+	if (vcpu->domain==dom0 && ((vaddr >> 61) == 7)) {
+		// FIXME: this is dangerous... vhpt_flush_address ensures these
+		// addresses never get flushed.  More work needed if this
+		// ever happens.
+//printf("vhpt_insert(%p,%p,%p)\n",vaddr,pte,1L<<logps);
+		vhpt_insert(vaddr,pte,logps<<2);
+	}
+	// even if domain pagesize is larger than PAGE_SIZE, just put
+	// PAGE_SIZE mapping in the vhpt for now, else purging is complicated
+	else vhpt_insert(vaddr,pte,PAGE_SHIFT<<2);
+#endif
 	if (IorD & 0x4) return;  // don't place in 1-entry TLB
 	if (IorD & 0x1) {
 		vcpu_set_tr_entry(&PSCB(vcpu,itlb),pte,ps<<2,vaddr);
@@ -1613,6 +1630,9 @@ IA64FAULT vcpu_ptc_e(VCPU *vcpu, UINT64 vadr)
 	//  base = stride1 = stride2 = 0, count0 = count 1 = 1
 
 	// FIXME: When VHPT is in place, flush that too!
+#ifdef VHPT_GLOBAL
+	vhpt_flush();	// FIXME: This is overdoing it
+#endif
 	local_flush_tlb_all();
 	// just invalidate the "whole" tlb
 	vcpu_purge_tr_entry(&PSCB(vcpu,dtlb));
@@ -1632,6 +1652,9 @@ IA64FAULT vcpu_ptc_ga(VCPU *vcpu,UINT64 vadr,UINT64 addr_range)
 	// FIXME: validate not flushing Xen addresses
 	// if (Xen address) return(IA64_ILLOP_FAULT);
 	// FIXME: ??breaks if domain PAGE_SIZE < Xen PAGE_SIZE
+#ifdef VHPT_GLOBAL
+	vhpt_flush_address(vadr,addr_range);
+#endif
 	ia64_global_tlb_purge(vadr,vadr+addr_range,PAGE_SHIFT);
 	vcpu_purge_tr_entry(&PSCB(vcpu,dtlb));
 	vcpu_purge_tr_entry(&PSCB(vcpu,itlb));
