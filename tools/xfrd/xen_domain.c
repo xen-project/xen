@@ -136,9 +136,16 @@ int xen_domain_rcv(IOStream *io, uint32_t *dom, char **vmconfig, int *vmconfig_n
 }
 
 #include <curl/curl.h>
+#include "http.h"
 
+/** Flag indicating whether we need to initialize libcurl. 
+ */
 static int do_curl_global_init = 1;
 
+/** Get a curl handle, initializing libcurl if needed.
+ *
+ * @return curl handle
+ */
 static CURL *curlinit(void){
     if(do_curl_global_init){
         do_curl_global_init = 0;
@@ -150,37 +157,136 @@ static CURL *curlinit(void){
     return curl_easy_init();
 }
 
+/** Curl debug function.
+ */
 int curldebug(CURL *curl, curl_infotype ty, char *buf, size_t buf_n, void *data){
     printf("%*s\n", buf_n, buf);
     return 0;
 }
 
-/** Configure a new domain. Talk to xend using libcurl.
+/** Setup a curl handle with a url.
+ * Creates the url by formatting 'fmt' and the remaining arguments.
+ *
+ * @param pcurl return parameter for the curl handle
+ * @param url url buffer
+ * @param url_n size of url
+ * @param fmt url format string, followed by parameters
+ * @return 0 on success, error code otherwise
  */
-int xen_domain_configure(uint32_t dom, char *vmconfig, int vmconfig_n){
+static int curlsetup(CURL **pcurl, char *url, int url_n, char *fmt, ...){
     int err = 0;
+    va_list args;
     CURL *curl = NULL;
-    CURLcode curlcode = 0;
-    char domainurl[128] = {};
-    int domainurl_n = sizeof(domainurl) - 1;
-    int n;
-    struct curl_httppost *form = NULL, *last = NULL;
-    CURLFORMcode formcode = 0;
+    int n = 0;
 
-    dprintf("> dom=%u\n", dom);
     curl = curlinit();
     if(!curl){
         eprintf("> Could not init libcurl\n");
         err = -ENOMEM;
         goto exit;
     }
-    n = snprintf(domainurl, domainurl_n,
-                 "http://localhost:%d/xend/domain/%u", XEND_PORT, dom);
-    if(n <= 0 || n >= domainurl_n){
+    url_n -= 1;
+    va_start(args, fmt);
+    n = vsnprintf(url, url_n, fmt, args);
+    va_end(args);
+    if(n <= 0 || n >= url_n){
         err = -ENOMEM;
-        eprintf("Out of memory in url.\n");
+        eprintf("> Out of memory in url\n");
         goto exit;
     }
+    dprintf("> url=%s\n", url);
+#if DEBUG
+    // Verbose.
+    curl_easy_setopt(curl, CURLOPT_VERBOSE, 1);
+    // Call the debug function on data received.
+    curl_easy_setopt(curl, CURLOPT_DEBUGFUNCTION, curldebug);
+#else
+    // No progress meter.
+    curl_easy_setopt(curl, CURLOPT_NOPROGRESS, 1);
+    // Completely quiet.
+    curl_easy_setopt(curl, CURLOPT_MUTE, 1);
+#endif
+    // Set the URL.
+    curl_easy_setopt(curl, CURLOPT_URL, url);
+  exit:
+    if(err && curl){
+        curl_easy_cleanup(curl);
+        curl = NULL;
+    }
+    *pcurl = curl;
+    return err;
+}
+
+/** Make the http request stored in the curl handle and get
+ *  the result code from the curl code and the http return code.
+ *
+ * @param curl curl handle
+ * @return 0 for success, error code otherwise
+ */
+int curlresult(CURL *curl){
+    int err = 0;
+    CURLcode curlcode = 0;
+    long httpcode = 0;
+
+    curlcode = curl_easy_perform(curl);
+    if(curlcode){
+        eprintf("> curlcode=%d\n", curlcode);
+        err = -EINVAL;
+        goto exit;
+    }
+    curl_easy_getinfo(curl, CURLINFO_HTTP_CODE, &httpcode);
+    if(httpcode != HTTP_OK){
+        eprintf("> httpcode=%d\n", (int)httpcode);
+        err = -EINVAL;
+        goto exit;
+    }
+  exit:
+    return err;
+}
+
+/** Get xend to list domains.
+ * We use this to force xend to refresh its domain list.
+ *
+ * @return 0 on success, error code otherwise
+ */
+int xen_domain_ls(void){
+    int err = 0;
+    CURL *curl = NULL;
+    char url[128] = {};
+    int url_n = sizeof(url);
+
+    dprintf(">\n");
+    err = curlsetup(&curl, url, url_n, "http://localhost:%d/xend/domain", XEND_PORT);
+    if(err) goto exit;
+    err = curlresult(curl);
+  exit:
+    if(curl) curl_easy_cleanup(curl);
+    dprintf("< err=%d\n", err);
+    return err;
+}
+
+/** Get xend to configure a new domain.
+ *
+ * @param dom domain id
+ * @param vmconfig configuration string
+ * @param vmconfig_n length of vmconfig
+ * @return 0 on success, error code otherwise
+ */
+int xen_domain_configure(uint32_t dom, char *vmconfig, int vmconfig_n){
+    int err = 0;
+    CURL *curl = NULL;
+    char url[128] = {};
+    int url_n = sizeof(url);
+    struct curl_httppost *form = NULL, *last = NULL;
+    CURLFORMcode formcode = 0;
+
+    dprintf("> dom=%u\n", dom);
+    // List domains so that xend will update its domain list and notice the new domain.
+    xen_domain_ls();
+
+    err = curlsetup(&curl, url, url_n, "http://localhost:%d/xend/domain/%u", XEND_PORT, dom);
+    if(err) goto exit;
+
     // Config field - set from vmconfig.
     formcode = curl_formadd(&form, &last,
                             CURLFORM_COPYNAME,     "config",
@@ -201,36 +307,15 @@ int xen_domain_configure(uint32_t dom, char *vmconfig, int vmconfig_n){
 
     if(formcode){
         eprintf("> Error adding op field.\n");
+        err = -EINVAL;
         goto exit;
     }
-    curl_easy_setopt(curl, CURLOPT_VERBOSE, 1);
-    curl_easy_setopt(curl, CURLOPT_DEBUGFUNCTION, curldebug);
-    // No progress meter.
-    //curl_easy_setopt(curl, CURLOPT_NOPROGRESS, 1);
-    // Completely quiet.
-    //curl_easy_setopt(curl, CURLOPT_MUTE, 1);
-    // Set the URL.
-    curl_easy_setopt(curl, CURLOPT_URL, domainurl);
     // POST the form.
     curl_easy_setopt(curl, CURLOPT_HTTPPOST, form);
-    dprintf("> curl perform...\n");
-#if 0 && defined(_XEN_XFR_STUB_)
-    dprintf("> _XEN_XFR_STUB_ defined - not calling xend\n");
-    curlcode = 0;
-#else
-    curlcode = curl_easy_perform(curl);
-#endif
+    err = curlresult(curl);
   exit:
     if(curl) curl_easy_cleanup(curl);
     if(form) curl_formfree(form);
-    if(formcode){
-        dprintf("> formcode=%d\n", formcode);
-        err = -EINVAL;
-    }
-    if(curlcode){
-        dprintf("> curlcode=%d\n", curlcode);
-        err = -EINVAL;
-    }
     dprintf("< err=%d\n", err);
     return err;
 }

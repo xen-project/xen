@@ -366,9 +366,11 @@ class XendDomain:
         @param config: configuration
         @return: deferred
         """
-        dominfo = self.domain_get(id)
-        if not dominfo:
-            raise XendError("Invalid domain: " + str(id))
+        print 'domain_configure>', id, config
+        dominfo = self.domain_lookup(id)
+        print 'domain_configure>', 'dominfo=', dominfo
+        for dinfo in self.domain_by_id.values():
+            print 'domain', dinfo.id, dinfo.name
         log.debug('domain_configure> id=%s config=%s', id, str(config))
         if dominfo.config:
             raise XendError("Domain already configured: " + dominfo.name)
