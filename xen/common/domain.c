@@ -164,6 +164,8 @@ void domain_crash(void)
     BUG();
 }
 
+extern void trap_to_xendbg(void);
+
 void domain_shutdown(u8 reason)
 {
     struct domain *d;
@@ -172,6 +174,8 @@ void domain_shutdown(u8 reason)
     {
         extern void machine_restart(char *);
         extern void machine_halt(void);
+
+	trap_to_xendbg();
 
         if ( reason == 0 ) 
         {

@@ -27,6 +27,8 @@ def __recv_from_sock(sock):
     while not stop:
         try:
             data = sock.recv(1024)
+            if len(data) == 0:
+                stop = True
             os.write(1, data)
         except socket.error, error:
             if error[0] != errno.EINTR:

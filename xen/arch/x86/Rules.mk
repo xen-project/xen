@@ -4,13 +4,19 @@
 CC := gcc
 LD := ld
 
-CFLAGS  := -nostdinc -fno-builtin -fno-common -fno-strict-aliasing -O3
-CFLAGS  += -iwithprefix include -Wall -Werror -fomit-frame-pointer -pipe
+CFLAGS  := -nostdinc -fno-builtin -fno-common -fno-strict-aliasing
+CFLAGS  += -iwithprefix include -Wall -Werror -pipe
 CFLAGS  += -I$(BASEDIR)/include -Wno-pointer-arith -Wredundant-decls
 
 ifeq ($(TARGET_SUBARCH),x86_32)
 CFLAGS  += -m32 -march=i686
 LDFLAGS := --oformat elf32-i386 
+endif
+
+ifeq ($(debugger),y)
+CFLAGS += -O2
+else
+CFLAGS += -O3 -fomit-frame-pointer
 endif
 
 ifeq ($(TARGET_SUBARCH),x86_64)

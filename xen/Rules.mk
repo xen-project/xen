@@ -48,7 +48,7 @@ CFLAGS += -DVERBOSE
 endif
 
 ifeq ($(debugger),y)
-CFLAGS += -DXEN_DEBUGGER
+CFLAGS += -DXEN_DEBUGGER -g
 endif
 
 ifeq ($(perfc),y)

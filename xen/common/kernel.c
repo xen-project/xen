@@ -64,6 +64,8 @@ int opt_ignorebiostables=0;
 int opt_watchdog=0;
 /* opt_pdb: Name of serial port for Xen pervasive debugger (and enable pdb) */
 unsigned char opt_pdb[10] = "none";
+/* opt_pdb: Name of serial port for Xen debugger (and enable xendbg) */
+unsigned char opt_xendbg[10] = "none";
 /* opt_tbuf_size: trace buffer size (in pages) */
 unsigned int opt_tbuf_size = 10;
 /* opt_sched: scheduler - default to Borrowed Virtual Time */
@@ -124,9 +126,12 @@ static struct {
     { "xenheap_megabytes", OPT_UINT, V(opt_xenheap_megabytes) },
     { "nmi",               OPT_STR,  V(opt_nmi) },
     { "badpage",           OPT_STR,  V(opt_badpage) },
+    { "xendbg",            OPT_STR,  V(opt_xendbg) },
     { NULL,                0,        NULL, 0 }
 };
 
+
+void initialize_xendbg(void);
 
 void cmain(multiboot_info_t *mbi)
 {
@@ -185,6 +190,8 @@ void cmain(multiboot_info_t *mbi)
     serial_init_stage1();
 
     init_console();
+
+    initialize_xendbg();
 
     /* HELLO WORLD --- start-of-day banner text. */
     printk(XEN_BANNER);

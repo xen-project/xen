@@ -10,7 +10,11 @@
  * linux & i386 dependent code. bleech.
  */
 
+#include <xen/slab.h>
 #include <asm/pdb.h>
+
+extern unsigned char pdb_x86_bkpt;
+extern int pdb_x86_bkpt_length;
 
 /* offset to the first instruction in the linux system call code
    where we can safely set a breakpoint */
@@ -92,9 +96,25 @@ pdb_linux_syscall_exit_bkpt (struct pt_regs *regs, struct pdb_context *pdb_ctx)
        debugger when re-entering user space */
     pdb_system_call_next_addr = *(unsigned long *)(regs->esp + 
 						 pdb_linux_syscall_eip_offset);
-    pdb_linux_get_values (&pdb_system_call_leave_instr, 1, 
-			  pdb_system_call_next_addr,
-			  pdb_ctx->process, pdb_ctx->ptbr);
-    pdb_linux_set_values ("cc", 1, pdb_system_call_next_addr,
-			  pdb_ctx->process, pdb_ctx->ptbr);
+
+    /* set a breakpoint when we exit */
+    {
+        pdb_bwcpoint_p bwc;
+
+	bwc = (pdb_bwcpoint_p) xmalloc(sizeof(pdb_bwcpoint_t));
+	if (!bwc)
+	{
+	    printk ("pdb error: can't allocate bwc %d\n", __LINE__);
+	}
+
+	bwc->address = pdb_system_call_next_addr;
+	bwc->length = 1;
+	bwc->type = PDB_BP_SOFTWARE;
+	bwc->user_type = PDB_BP_SOFTWARE;
+	bwc->action = PDB_BWC_DELETE;
+	bwc->comments = "pdb linux syscall exit";
+	memcpy (&bwc->context, pdb_ctx, sizeof(pdb_context_t));
+
+	pdb_set_breakpoint(bwc);
+    }
 }
