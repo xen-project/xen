@@ -253,6 +253,8 @@
 410a94a4KT6I6X0LVc7djB39tRDp4g linux-2.6.10-rc2-xen-sparse/mm/page_alloc.c
 41505c572m-s9ATiO1LiD1GPznTTIg linux-2.6.10-rc2-xen-sparse/net/core/skbuff.c
 4149ec79wMpIHdvbntxqVGLRZZjPxw linux-2.6.10-rc2-xen-sparse/net/ipv4/raw.c
+41ab6fa06JdF7jxUsuDcjN3UhuIAxg linux-2.6.9-xen-sparse/arch/xen/kernel/devmem.c
+41af4017PDMuSmMWtSRU5UC9Vylw5g linux-2.6.9-xen-sparse/include/asm-xen/balloon.h
 413cb1e4zst25MDYjg63Y-NGC5_pLg netbsd-2.0-xen-sparse/Makefile
 413cb1e5c_Mkxf_X0zimEhTKI_l4DA netbsd-2.0-xen-sparse/mkbuildtree
 413cb1e5kY_Zil7-b0kI6hvCIxBEYg netbsd-2.0-xen-sparse/nbconfig-xen
@@ -378,6 +380,7 @@
 3f5ef5a2dTZP0nnsFoeq2jRf3mWDDg tools/misc/xen-clone.README
 405eedf6_nnNhFQ1I85lhCkLK6jFGA tools/misc/xencons
 40c9c4697z76HDfkCLdMhmaEwzFoNQ tools/misc/xend
+41adc641dV-0cDLSyzMs5BT8nL7v3Q tools/misc/xenperf.c
 4107986eMWVdBoz4tXYoOscpN_BCYg tools/misc/xensv
 4056f5155QYZdsk-1fLdjsZPFTnlhg tools/misc/xensymoops
 40cf2937dqM1jWW87O5OoOYND8leuA tools/misc/xm

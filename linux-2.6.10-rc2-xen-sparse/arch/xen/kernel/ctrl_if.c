@@ -35,6 +35,7 @@
 #include <linux/errno.h>
 #include <linux/irq.h>
 #include <linux/interrupt.h>
+#include <linux/module.h>
 #include <asm-xen/ctrl_if.h>
 #include <asm-xen/evtchn.h>
 
@@ -539,3 +540,10 @@ void ctrl_if_discard_responses(void)
     ctrl_if_tx_resp_cons = get_ctrl_if()->tx_resp_prod;
 }
 
+EXPORT_SYMBOL(ctrl_if_send_message_noblock);
+EXPORT_SYMBOL(ctrl_if_send_message_block);
+EXPORT_SYMBOL(ctrl_if_send_message_and_get_response);
+EXPORT_SYMBOL(ctrl_if_enqueue_space_callback);
+EXPORT_SYMBOL(ctrl_if_send_response);
+EXPORT_SYMBOL(ctrl_if_register_receiver);
+EXPORT_SYMBOL(ctrl_if_unregister_receiver);

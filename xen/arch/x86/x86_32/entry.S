@@ -341,6 +341,7 @@ process_guest_exception_and_events:
         leal DOMAIN_trap_bounce(%ebx),%edx
         testb $TBF_EXCEPTION,TRAPBOUNCE_flags(%edx)
         jz   test_all_events
+        cli  # create_bounce_frame needs CLI for pre-exceptions to work
         call create_bounce_frame
         jmp  test_all_events
 

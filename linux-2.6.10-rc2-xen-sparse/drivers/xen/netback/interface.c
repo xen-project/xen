@@ -35,8 +35,8 @@ static void __netif_disconnect_complete(void *arg)
 
     /*
      * These can't be done in netif_disconnect() because at that point there
-     * may be outstanding requests at the disc whose asynchronous responses
-     * must still be notified to the remote driver.
+     * may be outstanding requests in the network stack whose asynchronous
+     * responses must still be notified to the remote driver.
      */
     unbind_evtchn_from_irq(netif->evtchn);
     vfree(netif->tx); /* Frees netif->rx as well. */
@@ -84,7 +84,7 @@ void netif_create(netif_be_create_t *create)
     unsigned int       handle = create->netif_handle;
     struct net_device *dev;
     netif_t          **pnetif, *netif;
-    char               name[IFNAMSIZ] = {};
+    char               name[IFNAMSIZ];
 
     snprintf(name, IFNAMSIZ - 1, "vif%u.%u", domid, handle);
     dev = alloc_netdev(sizeof(netif_t), name, ether_setup);
@@ -116,7 +116,7 @@ void netif_create(netif_be_create_t *create)
         {
             DPRINTK("Could not create netif: already exists\n");
             create->status = NETIF_BE_STATUS_INTERFACE_EXISTS;
-            kfree(dev);
+            free_netdev(dev);
             return;
         }
         pnetif = &(*pnetif)->hash_next;
@@ -137,7 +137,7 @@ void netif_create(netif_be_create_t *create)
         DPRINTK("Could not register new net device %s: err=%d\n",
                 dev->name, err);
         create->status = NETIF_BE_STATUS_OUT_OF_MEMORY;
-        kfree(dev);
+        free_netdev(dev);
         return;
     }
 
@@ -176,7 +176,7 @@ void netif_destroy(netif_be_destroy_t *destroy)
  destroy:
     *pnetif = netif->hash_next;
     unregister_netdev(netif->dev);
-    kfree(netif->dev);
+    free_netdev(netif->dev);
     destroy->status = NETIF_BE_STATUS_OKAY;
 }
 

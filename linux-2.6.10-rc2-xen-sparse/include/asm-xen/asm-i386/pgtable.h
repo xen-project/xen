@@ -424,14 +424,13 @@ extern pte_t *lookup_address(unsigned long address);
 #define ptep_set_access_flags(__vma, __address, __ptep, __entry, __dirty) \
 	do {								  \
 		if (__dirty) {						  \
-			if (likely(vma->vm_mm == current->mm)) {	  \
-			    xen_flush_page_update_queue();		  \
-			    HYPERVISOR_update_va_mapping(address>>PAGE_SHIFT, \
-							 entry, UVMF_INVLPG); \
-			} else {					  \
-			    xen_l1_entry_update((__ptep), (__entry).pte_low); \
-			    flush_tlb_page(__vma, __address);	          \
-			}						  \
+		        if ( likely((__vma)->vm_mm == current->mm) ) {    \
+			    xen_flush_page_update_queue();                \
+			    HYPERVISOR_update_va_mapping((__address)>>PAGE_SHIFT, (__entry), UVMF_INVLPG); \
+			} else {                                          \
+                            xen_l1_entry_update((__ptep), (__entry).pte_low); \
+			    flush_tlb_page((__vma), (__address));         \
+			}                                                 \
 		}							  \
 	} while (0)
 
@@ -461,20 +460,31 @@ void make_page_writable(void *va);
 void make_pages_readonly(void *va, unsigned int nr);
 void make_pages_writable(void *va, unsigned int nr);
 
-static inline unsigned long arbitrary_virt_to_machine(void *va)
-{
-	pgd_t *pgd = pgd_offset_k((unsigned long)va);
-	pmd_t *pmd = pmd_offset(pgd, (unsigned long)va);
-	pte_t *pte = pte_offset_kernel(pmd, (unsigned long)va);
-	unsigned long pa = (*(unsigned long *)pte) & PAGE_MASK;
-	return pa | ((unsigned long)va & (PAGE_SIZE-1));
-}
+#define arbitrary_virt_to_machine(__va)					\
+({									\
+	pgd_t *__pgd = pgd_offset_k((unsigned long)(__va));		\
+	pmd_t *__pmd = pmd_offset(__pgd, (unsigned long)(__va));	\
+	pte_t *__pte = pte_offset_kernel(__pmd, (unsigned long)(__va));	\
+	unsigned long __pa = (*(unsigned long *)__pte) & PAGE_MASK;	\
+	__pa | ((unsigned long)(__va) & (PAGE_SIZE-1));			\
+})
 
 #endif /* !__ASSEMBLY__ */
 
 #ifndef CONFIG_DISCONTIGMEM
 #define kern_addr_valid(addr)	(1)
 #endif /* !CONFIG_DISCONTIGMEM */
+
+int direct_remap_area_pages(struct mm_struct *mm,
+                            unsigned long address, 
+                            unsigned long machine_addr,
+                            unsigned long size, 
+                            pgprot_t prot,
+                            domid_t  domid);
+int __direct_remap_area_pages(struct mm_struct *mm,
+			      unsigned long address, 
+			      unsigned long size, 
+			      mmu_update_t *v);
 
 #define io_remap_page_range(vma,from,phys,size,prot) \
 	direct_remap_area_pages(vma->vm_mm,from,phys,size,prot,DOMID_IO)

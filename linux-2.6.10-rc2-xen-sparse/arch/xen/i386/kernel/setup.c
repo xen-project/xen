@@ -52,6 +52,9 @@
 #include "setup_arch_pre.h"
 #include <bios_ebda.h>
 
+/* Allows setting of maximum possible memory size  */
+static unsigned long xen_override_max_pfn;
+
 int disable_pse __initdata = 0;
 
 /*
@@ -718,8 +721,13 @@ static void __init parse_cmdline_early (char ** cmdline_p)
 				unsigned long long mem_size;
  
 				mem_size = memparse(from+4, &from);
+#if 0
 				limit_regions(mem_size);
 				userdef=1;
+#else
+				xen_override_max_pfn =
+					(unsigned long)(mem_size>>PAGE_SHIFT);
+#endif
 			}
 		}
 
@@ -857,6 +865,7 @@ static void __init parse_cmdline_early (char ** cmdline_p)
 	}
 }
 
+#if 0 /* !XEN */
 /*
  * Callback for efi_memory_walk.
  */
@@ -872,7 +881,6 @@ efi_find_max_pfn(unsigned long start, unsigned long end, void *arg)
 	}
 	return 0;
 }
-
 
 /*
  * Find the highest page frame number we have available
@@ -900,6 +908,15 @@ void __init find_max_pfn(void)
 			max_pfn = end;
 	}
 }
+#else
+/* We don't use the fake e820 because we need to respond to user override. */
+void __init find_max_pfn(void)
+{
+	if ( xen_override_max_pfn < xen_start_info.nr_pages )
+		xen_override_max_pfn = xen_start_info.nr_pages;
+	max_pfn = xen_override_max_pfn;
+}
+#endif /* XEN */
 
 /*
  * Determine low and high memory ranges:
@@ -1413,6 +1430,21 @@ void __init setup_arch(char **cmdline_p)
 	smp_alloc_memory(); /* AP processor realmode stacks in low memory*/
 #endif
 	paging_init();
+
+	/* Make sure we have a large enough P->M table. */
+	if (max_pfn > xen_start_info.nr_pages) {
+		phys_to_machine_mapping = alloc_bootmem_low_pages(
+			max_pfn * sizeof(unsigned long));
+		memset(phys_to_machine_mapping, ~0,
+			max_pfn * sizeof(unsigned long));
+		memcpy(phys_to_machine_mapping,
+			(unsigned long *)xen_start_info.mfn_list,
+			xen_start_info.nr_pages * sizeof(unsigned long));
+		free_bootmem(
+			__pa(xen_start_info.mfn_list), 
+			PFN_PHYS(PFN_UP(xen_start_info.nr_pages *
+			sizeof(unsigned long))));
+	}
 
 	pfn_to_mfn_frame_list = alloc_bootmem_low_pages(PAGE_SIZE);
 	for ( i=0, j=0; i < max_pfn; i+=(PAGE_SIZE/sizeof(unsigned long)), j++ )

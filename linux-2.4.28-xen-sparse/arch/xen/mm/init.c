@@ -213,23 +213,16 @@ static void __init fixrange_init (unsigned long start,
 
 static void __init pagetable_init (void)
 {
-    unsigned long vaddr, end;
+    unsigned long vaddr, end, ram_end;
     pgd_t *kpgd, *pgd, *pgd_base;
     int i, j, k;
     pmd_t *kpmd, *pmd;
     pte_t *kpte, *pte, *pte_base;
 
-    /* create tables only for boot_pfn frames.  max_low_pfn may be sized for
-     * pages yet to be allocated from the hypervisor, or it may be set
-     * to override the xen_start_info amount of memory
-     */
-    int boot_pfn = min(xen_start_info.nr_pages,max_low_pfn);
-
-    /*
-     * This can be zero as well - no problem, in that case we exit
-     * the loops anyway due to the PTRS_PER_* conditions.
-     */
-    end = (unsigned long)__va(boot_pfn *PAGE_SIZE);
+    end     = (unsigned long)__va(max_low_pfn * PAGE_SIZE);
+    ram_end = (unsigned long)__va(xen_start_info.nr_pages * PAGE_SIZE);
+    if ( ram_end > end )
+        ram_end = end;
 
     pgd_base = init_mm.pgd;
     i = __pgd_offset(PAGE_OFFSET);
@@ -237,12 +230,12 @@ static void __init pagetable_init (void)
 
     for (; i < PTRS_PER_PGD; pgd++, i++) {
         vaddr = i*PGDIR_SIZE;
-        if (end && (vaddr >= end))
+        if (vaddr >= end)
             break;
         pmd = (pmd_t *)pgd;
         for (j = 0; j < PTRS_PER_PMD; pmd++, j++) {
             vaddr = i*PGDIR_SIZE + j*PMD_SIZE;
-            if (end && (vaddr >= end))
+            if (vaddr >= end)
                 break;
 
             /* Filled in for us already? */
@@ -250,10 +243,11 @@ static void __init pagetable_init (void)
                 continue;
 
             pte_base = pte = (pte_t *) alloc_bootmem_low_pages(PAGE_SIZE);
+            clear_page(pte_base);
 
             for (k = 0; k < PTRS_PER_PTE; pte++, k++) {
                 vaddr = i*PGDIR_SIZE + j*PMD_SIZE + k*PAGE_SIZE;
-                if (end && (vaddr >= end))
+                if (vaddr >= ram_end)
                     break;
                 *pte = mk_pte_phys(__pa(vaddr), PAGE_KERNEL);
             }
@@ -329,28 +323,14 @@ static inline int page_is_ram (unsigned long pagenr)
     return 1;
 }
 
-static inline int page_kills_ppro(unsigned long pagenr)
-{
-    return 0;
-}
-
 #ifdef CONFIG_HIGHMEM
-void __init one_highpage_init(struct page *page, int pfn, int bad_ppro)
+void __init one_highpage_init(struct page *page, int free_page)
 {
-    if (!page_is_ram(pfn)) {
-        SetPageReserved(page);
-        return;
-    }
-	
-    if (bad_ppro && page_kills_ppro(pfn)) {
-        SetPageReserved(page);
-        return;
-    }
-	
     ClearPageReserved(page);
     set_bit(PG_highmem, &page->flags);
     atomic_set(&page->count, 1);
-    __free_page(page);
+    if ( free_page )
+        __free_page(page);
     totalhigh_pages++;
 }
 #endif /* CONFIG_HIGHMEM */
@@ -392,8 +372,9 @@ static int __init free_pages_init(void)
             reservedpages++;
     }
 #ifdef CONFIG_HIGHMEM
-    for (pfn = xen_start_info.nr_pages-1; pfn >= highstart_pfn; pfn--)
-        one_highpage_init((struct page *) (mem_map + pfn), pfn, bad_ppro);
+    for (pfn = highend_pfn-1; pfn >= highstart_pfn; pfn--)
+        one_highpage_init((struct page *) (mem_map + pfn), pfn,
+                          (pfn < xen_start_info.nr_pages));
     totalram_pages += totalhigh_pages;
 #endif
     return reservedpages;

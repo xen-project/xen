@@ -54,13 +54,6 @@ void xen_cpu_idle (void);
 /* arch/xen/i386/kernel/hypervisor.c */
 void do_hypervisor_callback(struct pt_regs *regs);
 
-/* arch/xen/i386/mm/init.c */
-/* NOTE: caller must call flush_page_update_queue() */
-#define PROT_ON  1
-#define PROT_OFF 0
-void /* __init */ protect_page(pgd_t *dpgd, void *page, int mode);
-void /* __init */ protect_pagetable(pgd_t *dpgd, pgd_t *spgd, int mode);
-
 /* arch/xen/i386/kernel/head.S */
 void lgdt_finish(void);
 
@@ -109,8 +102,6 @@ void MULTICALL_flush_page_update_queue(void);
 #ifdef CONFIG_XEN_PHYSDEV_ACCESS
 /* Allocate a contiguous empty region of low memory. Return virtual start. */
 unsigned long allocate_empty_lowmem_region(unsigned long pages);
-/* Deallocate a contiguous region of low memory. Return it to the allocator. */
-void deallocate_lowmem_region(unsigned long vstart, unsigned long pages);
 #endif
 
 /*

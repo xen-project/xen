@@ -11,16 +11,18 @@
 #include <linux/vmalloc.h>
 #include <linux/init.h>
 #include <linux/slab.h>
+#include <linux/module.h>
 #include <asm/io.h>
 #include <asm/fixmap.h>
 #include <asm/cacheflush.h>
 #include <asm/tlbflush.h>
 #include <asm/pgtable.h>
+#include <asm/pgalloc.h>
 
 #ifndef CONFIG_XEN_PHYSDEV_ACCESS
 
 void * __ioremap(unsigned long phys_addr, unsigned long size,
-		 unsigned long flags)
+		unsigned long flags)
 {
 	return NULL;
 }
@@ -57,86 +59,6 @@ static inline int is_local_lowmem(unsigned long address)
 	unsigned long mfn = address >> PAGE_SHIFT;
 	unsigned long pfn = mfn_to_pfn(mfn);
 	return ((pfn < max_low_pfn) && (pfn_to_mfn(pfn) == mfn));
-}
-
-static inline void remap_area_pte(pte_t * pte, unsigned long address, unsigned long size,
-	unsigned long phys_addr, unsigned long flags)
-{
-	unsigned long end;
-	unsigned long pfn;
-
-	address &= ~PMD_MASK;
-	end = address + size;
-	if (end > PMD_SIZE)
-		end = PMD_SIZE;
-	if (address >= end)
-		BUG();
-	pfn = phys_addr >> PAGE_SHIFT;
-	do {
-		if (!pte_none(*pte)) {
-			printk("remap_area_pte: page already exists\n");
-			BUG();
-		}
-		set_pte(pte, pfn_pte_ma(pfn, __pgprot(_PAGE_PRESENT | _PAGE_RW | 
-					_PAGE_DIRTY | _PAGE_ACCESSED | flags)));
-		address += PAGE_SIZE;
-		pfn++;
-		pte++;
-	} while (address && (address < end));
-}
-
-static inline int remap_area_pmd(pmd_t * pmd, unsigned long address, unsigned long size,
-	unsigned long phys_addr, unsigned long flags)
-{
-	unsigned long end;
-
-	address &= ~PGDIR_MASK;
-	end = address + size;
-	if (end > PGDIR_SIZE)
-		end = PGDIR_SIZE;
-	phys_addr -= address;
-	if (address >= end)
-		BUG();
-	do {
-		pte_t * pte = pte_alloc_kernel(&init_mm, pmd, address);
-		if (!pte)
-			return -ENOMEM;
-		remap_area_pte(pte, address, end - address, address + phys_addr, flags);
-		address = (address + PMD_SIZE) & PMD_MASK;
-		pmd++;
-	} while (address && (address < end));
-	return 0;
-}
-
-static int remap_area_pages(unsigned long address, unsigned long phys_addr,
-				 unsigned long size, unsigned long flags)
-{
-	int error;
-	pgd_t * dir;
-	unsigned long end = address + size;
-
-	phys_addr -= address;
-	dir = pgd_offset(&init_mm, address);
-	flush_cache_all();
-	if (address >= end)
-		BUG();
-	spin_lock(&init_mm.page_table_lock);
-	do {
-		pmd_t *pmd;
-		pmd = pmd_alloc(&init_mm, dir, address);
-		error = -ENOMEM;
-		if (!pmd)
-			break;
-		if (remap_area_pmd(pmd, address, end - address,
-					 phys_addr + address, flags))
-			break;
-		error = 0;
-		address = (address + PGDIR_SIZE) & PGDIR_MASK;
-		dir++;
-	} while (address && (address < end));
-	spin_unlock(&init_mm.page_table_lock);
-	flush_tlb_all();
-	return error;
 }
 
 /*
@@ -201,7 +123,7 @@ void __iomem * __ioremap(unsigned long phys_addr, unsigned long size, unsigned l
 		return NULL;
 	area->phys_addr = phys_addr;
 	addr = (void __iomem *) area->addr;
-	if (remap_area_pages((unsigned long) addr, phys_addr, size, flags)) {
+	if (direct_remap_area_pages(&init_mm, (unsigned long) addr, phys_addr, size, __pgprot(_PAGE_PRESENT | _PAGE_RW | _PAGE_DIRTY | _PAGE_ACCESSED | flags), DOMID_IO)) {
 		vunmap((void __force *) addr);
 		return NULL;
 	}
@@ -406,7 +328,9 @@ static inline int direct_remap_area_pmd(struct mm_struct *mm,
 	if (address >= end)
 		BUG();
 	do {
-		pte_t *pte = pte_alloc_map(mm, pmd, address);
+		pte_t *pte = (mm == &init_mm) ? 
+			pte_alloc_kernel(mm, pmd, address) :
+			pte_alloc_map(mm, pmd, address);
 		if (!pte)
 			return -ENOMEM;
 		direct_remap_area_pte(pte, address, end - address, v);
@@ -426,7 +350,6 @@ int __direct_remap_area_pages(struct mm_struct *mm,
 	unsigned long end = address + size;
 
 	dir = pgd_offset(mm, address);
-	flush_cache_all();
 	if (address >= end)
 		BUG();
 	spin_lock(&mm->page_table_lock);
@@ -440,7 +363,6 @@ int __direct_remap_area_pages(struct mm_struct *mm,
 
 	} while (address && (address < end));
 	spin_unlock(&mm->page_table_lock);
-	flush_tlb_all();
 	return 0;
 }
 
@@ -464,16 +386,18 @@ int direct_remap_area_pages(struct mm_struct *mm,
 
 	start_address = address;
 
-	for(i = 0; i < size; i += PAGE_SIZE) {
+	flush_cache_all();
+
+	for (i = 0; i < size; i += PAGE_SIZE) {
 		if ((v - u) == MAX_DIRECTMAP_MMU_QUEUE) {
 			/* Fill in the PTE pointers. */
 			__direct_remap_area_pages(mm,
 						  start_address, 
 						  address-start_address, 
 						  w);
-	    
+	
 			if (HYPERVISOR_mmu_update(u, v - u, NULL) < 0)
-				return -EFAULT;	    
+				return -EFAULT;
 			v = w;
 			start_address = address;
 		}
@@ -494,10 +418,14 @@ int direct_remap_area_pages(struct mm_struct *mm,
 		__direct_remap_area_pages(mm,
 					  start_address, 
 					  address-start_address, 
-					  w);	 
+					  w);
 		if (unlikely(HYPERVISOR_mmu_update(u, v - u, NULL) < 0))
-			return -EFAULT;	    
+			return -EFAULT;	
 	}
-    
+
+	flush_tlb_all();
+
 	return 0;
 }
+
+EXPORT_SYMBOL(direct_remap_area_pages);

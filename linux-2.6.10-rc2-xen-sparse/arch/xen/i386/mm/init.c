@@ -77,6 +77,7 @@ static pte_t * __init one_page_table_init(pmd_t *pmd)
 {
 	if (pmd_none(*pmd)) {
 		pte_t *page_table = (pte_t *) alloc_bootmem_low_pages(PAGE_SIZE);
+		make_page_readonly(page_table);
 		set_pmd(pmd, __pmd(__pa(page_table) | _PAGE_TABLE));
 		if (page_table != pte_offset_kernel(pmd, 0))
 			BUG();	
@@ -125,41 +126,6 @@ static void __init page_table_range_init (unsigned long start, unsigned long end
 	}
 }
 
-void __init protect_page(pgd_t *pgd, void *page, int mode)
-{
-	pmd_t *pmd;
-	pte_t *pte;
-	unsigned long addr;
-
-	addr = (unsigned long)page;
-	pgd += pgd_index(addr);
-	pmd = pmd_offset(pgd, addr);
-	pte = pte_offset_kernel(pmd, addr);
-	if (!pte_present(*pte))
-		return;
-	queue_l1_entry_update(pte, mode ? pte_val_ma(*pte) & ~_PAGE_RW :
-					pte_val_ma(*pte) | _PAGE_RW);
-}
-
-void __init protect_pagetable(pgd_t *dpgd, pgd_t *spgd, int mode)
-{
-	pmd_t *pmd;
-	pte_t *pte;
-	int pgd_idx, pmd_idx;
-
-	protect_page(dpgd, spgd, mode);
-
-	for (pgd_idx = 0; pgd_idx < PTRS_PER_PGD_NO_HV; spgd++, pgd_idx++) {
-		pmd = pmd_offset(spgd, 0);
-		if (pmd_none(*pmd))
-			continue;
-		for (pmd_idx = 0; pmd_idx < PTRS_PER_PMD; pmd++, pmd_idx++) {
-			pte = pte_offset_kernel(pmd, 0);
-			protect_page(dpgd, pte, mode);
-		}
-	}
-}
-
 static inline int is_kernel_text(unsigned long addr)
 {
 	if (addr >= (unsigned long)_stext && addr <= (unsigned long)__init_end)
@@ -179,6 +145,10 @@ static void __init kernel_physical_mapping_init(pgd_t *pgd_base)
 	pmd_t *pmd;
 	pte_t *pte;
 	int pgd_idx, pmd_idx, pte_ofs;
+
+	unsigned long max_ram_pfn = xen_start_info.nr_pages;
+	if (max_ram_pfn > max_low_pfn)
+		max_ram_pfn = max_low_pfn;
 
 	pgd_idx = pgd_index(PAGE_OFFSET);
 	pgd = pgd_base + pgd_idx;
@@ -207,7 +177,10 @@ static void __init kernel_physical_mapping_init(pgd_t *pgd_base)
 				pte = one_page_table_init(pmd);
 
 				pte += pte_ofs;
-				for (; pte_ofs < PTRS_PER_PTE && pfn < max_low_pfn; pte++, pfn++, pte_ofs++) {
+				/* XEN: Only map initial RAM allocation. */
+				for (; pte_ofs < PTRS_PER_PTE && pfn < max_ram_pfn; pte++, pfn++, pte_ofs++) {
+						if (pte_present(*pte))
+							continue;
 						if (is_kernel_text(address))
 							set_pte(pte, pfn_pte(pfn, PAGE_KERNEL_EXEC));
 						else
@@ -311,7 +284,8 @@ void __init one_highpage_init(struct page *page, int pfn, int bad_ppro)
 		ClearPageReserved(page);
 		set_bit(PG_highmem, &page->flags);
 		set_page_count(page, 1);
-		__free_page(page);
+		if (pfn < xen_start_info.nr_pages)
+			__free_page(page);
 		totalhigh_pages++;
 	} else
 		SetPageReserved(page);
@@ -347,7 +321,8 @@ extern void __init remap_numa_kva(void);
 static void __init pagetable_init (void)
 {
 	unsigned long vaddr;
-	pgd_t *pgd_base = swapper_pg_dir;
+	pgd_t *old_pgd = (pgd_t *)xen_start_info.pt_base;
+	pgd_t *new_pgd = swapper_pg_dir;
 
 #ifdef CONFIG_X86_PAE
 	int i;
@@ -368,7 +343,22 @@ static void __init pagetable_init (void)
 		__PAGE_KERNEL_EXEC |= _PAGE_GLOBAL;
 	}
 
-	kernel_physical_mapping_init(pgd_base);
+	/*
+	 * Switch to proper mm_init page directory. Initialise from the current
+	 * page directory, write-protect the new page directory, then switch to
+	 * it. We clean up by write-enabling and then freeing the old page dir.
+	 */
+	memcpy(new_pgd, old_pgd, PTRS_PER_PGD_NO_HV*sizeof(pgd_t));
+	make_page_readonly(new_pgd);
+	queue_pgd_pin(__pa(new_pgd));
+	load_cr3(new_pgd);
+	queue_pgd_unpin(__pa(old_pgd));
+	__flush_tlb_all(); /* implicit flush */
+	make_page_writable(old_pgd);
+	flush_page_update_queue();
+	free_bootmem(__pa(old_pgd), PAGE_SIZE);
+
+	kernel_physical_mapping_init(new_pgd);
 	remap_numa_kva();
 
 	/*
@@ -376,9 +366,9 @@ static void __init pagetable_init (void)
 	 * created - mappings will be set by set_fixmap():
 	 */
 	vaddr = __fix_to_virt(__end_of_fixed_addresses - 1) & PMD_MASK;
-	page_table_range_init(vaddr, 0, pgd_base);
+	page_table_range_init(vaddr, 0, new_pgd);
 
-	permanent_kmaps_init(pgd_base);
+	permanent_kmaps_init(new_pgd);
 
 #ifdef CONFIG_X86_PAE
 	/*
@@ -388,7 +378,7 @@ static void __init pagetable_init (void)
 	 * All user-space mappings are explicitly cleared after
 	 * SMP startup.
 	 */
-	pgd_base[0] = pgd_base[USER_PTRS_PER_PGD];
+	new_pgd[0] = new_pgd[USER_PTRS_PER_PGD];
 #endif
 }
 
@@ -545,8 +535,6 @@ out:
  */
 void __init paging_init(void)
 {
-	pgd_t *old_pgd = (pgd_t *)xen_start_info.pt_base;
-	pgd_t *new_pgd = swapper_pg_dir;
 #ifdef CONFIG_XEN_PHYSDEV_ACCESS
 	int i;
 #endif
@@ -558,25 +546,6 @@ void __init paging_init(void)
 #endif
 
 	pagetable_init();
-
-	/*
-	 * Write-protect both page tables within both page tables.
-	 * That's three ops, as the old p.t. is already protected
-	 * within the old p.t. Then pin the new table, switch tables,
-	 * and unprotect the old table.
-	 */
-	protect_pagetable(new_pgd, old_pgd, PROT_ON);
-	protect_pagetable(new_pgd, new_pgd, PROT_ON);
-	protect_pagetable(old_pgd, new_pgd, PROT_ON);
-	queue_pgd_pin(__pa(new_pgd));
-	load_cr3(new_pgd);
-	queue_pgd_unpin(__pa(old_pgd));
-	__flush_tlb_all(); /* implicit flush */
-	protect_pagetable(new_pgd, old_pgd, PROT_OFF);
-	flush_page_update_queue();
-
-	/* Completely detached from old tables, so free them. */
-	free_bootmem(__pa(old_pgd), xen_start_info.nr_pt_frames << PAGE_SHIFT);
 
 #ifdef CONFIG_X86_PAE
 	/*

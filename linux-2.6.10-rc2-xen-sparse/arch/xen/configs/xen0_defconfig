@@ -1,7 +1,7 @@
 #
 # Automatically generated make config: don't edit
 # Linux kernel version: 2.6.10-rc2-xen0
-# Fri Nov 19 20:16:38 2004
+# Wed Dec  1 09:22:49 2004
 #
 CONFIG_XEN=y
 CONFIG_ARCH_XEN=y
@@ -152,10 +152,10 @@ CONFIG_DEBUG_KERNEL=y
 CONFIG_EARLY_PRINTK=y
 # CONFIG_DEBUG_STACKOVERFLOW is not set
 # CONFIG_DEBUG_STACK_USAGE is not set
-# CONFIG_DEBUG_SLAB is not set
+CONFIG_DEBUG_SLAB=y
 CONFIG_MAGIC_SYSRQ=y
 # CONFIG_DEBUG_SPINLOCK is not set
-# CONFIG_DEBUG_PAGEALLOC is not set
+CONFIG_DEBUG_PAGEALLOC=y
 # CONFIG_DEBUG_INFO is not set
 # CONFIG_DEBUG_SPINLOCK_SLEEP is not set
 # CONFIG_FRAME_POINTER is not set
