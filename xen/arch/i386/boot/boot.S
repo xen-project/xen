@@ -1,4 +1,5 @@
 #include <xeno/config.h>
+#include <hypervisor-ifs/hypervisor-if.h>
 #include <asm/page.h>
 
 #define  SECONDARY_CPU_FLAG 0xA5A5A5A5
@@ -229,26 +230,27 @@ SYMBOL_NAME(idt):
 
         .word   0
 gdt_descr:
-	.word	(2*NR_CPUS+8)*8-1
+	.word	(LAST_RESERVED_GDT_ENTRY*8)+7
 SYMBOL_NAME(gdt):       
         .long   SYMBOL_NAME(gdt_table)	/* gdt base */
 
         .word   0
 nopaging_gdt_descr:
-        .word   (2*NR_CPUS+8)*8-1
+        .word   (LAST_RESERVED_GDT_ENTRY*8)+7
         .long   SYMBOL_NAME(gdt_table)-__PAGE_OFFSET
         
         ALIGN
 /* NB. Rings != 0 get access up to 0xFC400000. This allows access to the */
 /*     machine->physical mapping table. Ring 0 can access all memory.    */
 ENTRY(gdt_table)
-        .quad 0x0000000000000000     /* 0x0000 NULL descriptor */
-        .quad 0x00cf9a000000ffff     /* 0x0008 ring 0 4.00GB code at 0x0 */
-        .quad 0x00cf92000000ffff     /* 0x0010 ring 0 4.00GB data at 0x0 */
-        .quad 0x00cfba000000c3ff     /* 0x0019 ring 1 3.95GB code at 0x0 */
-        .quad 0x00cfb2000000c3ff     /* 0x0021 ring 1 3.95GB data at 0x0 */
-        .quad 0x00cffa000000c3ff     /* 0x002b ring 3 3.95GB code at 0x0 */
-        .quad 0x00cff2000000c3ff     /* 0x0033 ring 3 3.95GB data at 0x0 */
+        .fill FIRST_RESERVED_GDT_ENTRY,8,0
+        .quad 0x0000000000000000     /* unused */
+        .quad 0x00cf9a000000ffff     /* 0x0808 ring 0 4.00GB code at 0x0 */
+        .quad 0x00cf92000000ffff     /* 0x0810 ring 0 4.00GB data at 0x0 */
+        .quad 0x00cfba000000c3ff     /* 0x0819 ring 1 3.95GB code at 0x0 */
+        .quad 0x00cfb2000000c3ff     /* 0x0821 ring 1 3.95GB data at 0x0 */
+        .quad 0x00cffa000000c3ff     /* 0x082b ring 3 3.95GB code at 0x0 */
+        .quad 0x00cff2000000c3ff     /* 0x0833 ring 3 3.95GB data at 0x0 */
         .quad 0x0000000000000000     /* unused                           */
         .fill 2*NR_CPUS,8,0          /* space for TSS and LDT per CPU    */
 

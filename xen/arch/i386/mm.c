@@ -188,7 +188,7 @@ long do_set_gdt(unsigned long *frame_list, unsigned int entries)
     long ret = -EINVAL;
     struct pfn_info *page;
 
-    if ( (entries < FIRST_DOMAIN_GDT_ENTRY) || (entries > 8192) ) 
+    if ( (entries <= LAST_RESERVED_GDT_ENTRY) || (entries > 8192) ) 
         return -EINVAL;
 
     if ( copy_from_user(frames, frame_list, nr_pages * sizeof(unsigned long)) )
@@ -249,8 +249,10 @@ long do_set_gdt(unsigned long *frame_list, unsigned int entries)
 
     local_flush_tlb();
 
-    /* Copy over first entries of the new GDT. */
-    memcpy((void *)GDT_VIRT_START, gdt_table, FIRST_DOMAIN_GDT_ENTRY*8);
+    /* Copy reserved GDT entries to the new GDT. */
+    memcpy((struct desc_struct *)GDT_VIRT_START + FIRST_RESERVED_GDT_ENTRY, 
+           gdt_table + FIRST_RESERVED_GDT_ENTRY, 
+           NR_RESERVED_GDT_ENTRIES*8);
     
     SET_GDT_ADDRESS(current, GDT_VIRT_START);
     SET_GDT_ENTRIES(current, (entries*8)-1);
@@ -284,9 +286,10 @@ long do_update_descriptor(
     switch ( (page->flags & PG_type_mask) )
     {
     case PGT_gdt_page:
-        /* Disallow updates of Xen-private descriptors in the current GDT. */
+        /* Disallow updates of Xen-reserved descriptors in the current GDT. */
         if ( (l1_pgentry_to_pagenr(current->mm.perdomain_pt[0]) == pfn) &&
-             (((pa&(PAGE_SIZE-1))>>3) < FIRST_DOMAIN_GDT_ENTRY) )
+             (((pa&(PAGE_SIZE-1))>>3) >= FIRST_RESERVED_GDT_ENTRY) &&
+             (((pa&(PAGE_SIZE-1))>>3) <= LAST_RESERVED_GDT_ENTRY) )
             goto out;
     case PGT_ldt_page:
     case PGT_writeable_page:

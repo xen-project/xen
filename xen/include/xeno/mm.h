@@ -149,7 +149,7 @@ int check_descriptor(unsigned long a, unsigned long b);
 /* Part of the domain API. */
 int do_process_page_updates(page_update_request_t *updates, int count);
 
-#define DEFAULT_GDT_ENTRIES     ((FIRST_DOMAIN_GDT_ENTRY*8)-1)
+#define DEFAULT_GDT_ENTRIES     ((LAST_RESERVED_GDT_ENTRY*8)+7)
 #define DEFAULT_GDT_ADDRESS     ((unsigned long)gdt_table)
 
 #endif /* __XENO_MM_H__ */

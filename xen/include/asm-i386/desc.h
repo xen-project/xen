@@ -3,8 +3,8 @@
 
 #define LDT_ENTRY_SIZE 8
 
-#define __FIRST_TSS_ENTRY 8
-#define __FIRST_LDT_ENTRY (__FIRST_TSS_ENTRY+1)
+#define __FIRST_TSS_ENTRY (FIRST_RESERVED_GDT_ENTRY + 8)
+#define __FIRST_LDT_ENTRY (__FIRST_TSS_ENTRY + 1)
 
 #define __TSS(n) (((n)<<1) + __FIRST_TSS_ENTRY)
 #define __LDT(n) (((n)<<1) + __FIRST_LDT_ENTRY)
@@ -14,14 +14,18 @@
 /*
  * Guest OS must provide its own code selectors, or use the one we provide.
  * The RPL must be 1, as we only create bounce frames to ring 1.
+ * Any LDT selector value is okay.
  */
-#define VALID_CODESEL(_s)                                                  \
-    (((((_s)>>2) >= FIRST_DOMAIN_GDT_ENTRY) || ((_s) == FLAT_RING1_CS)) && \
+
+#define VALID_SEL(_s)                                                      \
+    (((((_s)>>3) < FIRST_RESERVED_GDT_ENTRY) ||                            \
+      (((_s)>>3) >  LAST_RESERVED_GDT_ENTRY) ||                            \
+      ((_s)&4)) &&                                                         \
      (((_s)&3) == 1))
 
-#define VALID_DATASEL(_s)                                                  \
-    (((((_s)>>2) >= FIRST_DOMAIN_GDT_ENTRY) || ((_s) == FLAT_RING1_DS)) && \
-     (((_s)&3) == 1))
+#define VALID_CODESEL(_s) ((_s) == FLAT_RING1_CS || VALID_SEL(_s))
+
+#define VALID_DATASEL(_s) ((_s) == FLAT_RING1_DS || VALID_SEL(_s))
 
 /* These are bitmasks for the first 32 bits of a descriptor table entry. */
 #define _SEGMENT_TYPE    (15<< 8)

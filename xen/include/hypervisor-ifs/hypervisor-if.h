@@ -10,17 +10,29 @@
 /*
  * SEGMENT DESCRIPTOR TABLES
  */
-/* The first few GDT entries are reserved by Xen. */
-#define FIRST_DOMAIN_GDT_ENTRY	40
 /*
- * These flat segments are in the Xen-private section of every GDT. Since 
- * these are also present in the initial GDT, many OSes will be able to avoid 
+ * A number of GDT entries are reserved by Xen. These are not situated at the
+ * start of the GDT because some stupid OSes export hard-coded selector values
+ * in their ABI. These hard-coded values are always near the start of the GDT,
+ * so Xen places itself out of the way.
+ * 
+ * NB. The reserved range is inclusive (that is, both FIRST_RESERVED_GDT_ENTRY
+ * and LAST_RESERVED_GDT_ENTRY are reserved).
+ */
+#define NR_RESERVED_GDT_ENTRIES         40
+#define FIRST_RESERVED_GDT_ENTRY	256
+#define LAST_RESERVED_GDT_ENTRY         \
+  (FIRST_RESERVED_GDT_ENTRY + NR_RESERVED_GDT_ENTRIES - 1)
+
+/*
+ * These flat segments are in the Xen-private section of every GDT. Since these
+ * are also present in the initial GDT, many OSes will be able to avoid
  * installing their own GDT.
  */
-#define FLAT_RING1_CS		0x0019
-#define FLAT_RING1_DS		0x0021
-#define FLAT_RING3_CS		0x002b
-#define FLAT_RING3_DS		0x0033
+#define FLAT_RING1_CS		0x0819
+#define FLAT_RING1_DS		0x0821
+#define FLAT_RING3_CS		0x082b
+#define FLAT_RING3_DS		0x0833
 
 
 /*

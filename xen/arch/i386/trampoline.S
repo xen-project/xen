@@ -16,6 +16,7 @@
  */
 
 #include <xeno/config.h>
+#include <hypervisor-ifs/hypervisor-if.h>
 #include <asm/page.h>
 
 #ifdef CONFIG_SMP
@@ -49,8 +50,8 @@ idt_48:
 	.word	0, 0			# idt base = 0L
 
 gdt_48:
-	.word	0x0800			# gdt limit = 2048, 256 GDT entries
-	.long	gdt_table-__PAGE_OFFSET	# gdt base = gdt (first SMP CPU)
+	.word	(LAST_RESERVED_GDT_ENTRY*8)+7
+	.long	gdt_table-__PAGE_OFFSET
 
 .globl SYMBOL_NAME(trampoline_end)
 SYMBOL_NAME_LABEL(trampoline_end)

@@ -127,8 +127,8 @@
 
 #define barrier() __asm__ __volatile__("": : :"memory")
 
-#define __HYPERVISOR_CS 0x0008
-#define __HYPERVISOR_DS 0x0010
+#define __HYPERVISOR_CS 0x0808
+#define __HYPERVISOR_DS 0x0810
 
 #define NR_syscalls 256
 
