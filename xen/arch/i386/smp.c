@@ -284,10 +284,15 @@ void new_tlbflush_clock_period(void)
     if ( unlikely(!spin_trylock(&synchronous_ipi_lock)) )
         return;
 
-    flush_cpumask = tlbflush_mask & ~(1 << smp_processor_id());
-    if ( unlikely(flush_cpumask != 0) )
+    /* Someone may acquire the lock and execute the flush before us. */
+    if ( ((tlbflush_clock+1) & TLBCLOCK_EPOCH_MASK) != 0 )
+        goto out;
+
+    if ( smp_num_cpus > 1 )
     {
-        send_IPI_mask(flush_cpumask, INVALIDATE_TLB_VECTOR);
+        /* Flush everyone else. We definitely flushed just before entry. */
+        flush_cpumask = ((1 << smp_num_cpus) - 1) & ~(1 << smp_processor_id());
+        send_IPI_allbutself(INVALIDATE_TLB_VECTOR);
         while ( flush_cpumask != 0 )
         {
             rep_nop();
@@ -295,11 +300,10 @@ void new_tlbflush_clock_period(void)
         }
     }
 
-    /* No need for cmpxchg updates here: we are protected by tlbstate lock. */
-    tlbflush_mask = (1 << smp_num_cpus) - 1;
-    wmb(); /* Reset the mask before allowing the clock to continue ticking. */
+    /* No need for atomicity: we are the only possible updater. */
     tlbflush_clock++;
 
+ out:
     spin_unlock(&synchronous_ipi_lock);
 }
 

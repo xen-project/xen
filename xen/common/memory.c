@@ -153,7 +153,7 @@ static int alloc_l2_table(struct pfn_info *page);
 static int alloc_l1_table(struct pfn_info *page);
 static int get_page_from_pagenr(unsigned long page_nr, int check_level);
 static int get_page_and_type_from_pagenr(unsigned long page_nr, 
-                                         unsigned int type,
+                                         u32 type,
                                          int check_level);
 #define CHECK_STRICT 0 /* Subject domain must own the page                  */
 #define CHECK_ANYDOM 1 /* Any domain may own the page (if subject is priv.) */
@@ -299,7 +299,7 @@ static int get_page_from_pagenr(unsigned long page_nr, int check_level)
 {
     struct task_struct *p = current;
     struct pfn_info *page = &frame_table[page_nr];
-    unsigned long y, x, nx;
+    u32 y, x, nx;
 
     if ( unlikely(!pfn_is_ram(page_nr)) )
     {
@@ -345,7 +345,7 @@ static int get_page_from_pagenr(unsigned long page_nr, int check_level)
 
 
 static int get_page_and_type_from_pagenr(unsigned long page_nr, 
-                                         unsigned int type,
+                                         u32 type,
                                          int check_level)
 {
     struct pfn_info *page = &frame_table[page_nr];
@@ -355,7 +355,7 @@ static int get_page_and_type_from_pagenr(unsigned long page_nr,
 
     if ( unlikely(!get_page_type(page, type)) )
     {
-        MEM_LOG("Bad page type for pfn %08lx (%08lx)", 
+        MEM_LOG("Bad page type for pfn %08lx (%08x)", 
                 page_nr, page->type_and_flags);
         put_page(page);
         return 0;
@@ -379,7 +379,7 @@ static int get_page_and_type_from_pagenr(unsigned long page_nr,
  */
 static int get_linear_pagetable(l2_pgentry_t l2e, unsigned long pfn)
 {
-    unsigned long x, y;
+    u32 x, y;
     struct pfn_info *page;
 
     if ( (l2_pgentry_val(l2e) & _PAGE_RW) )
@@ -1207,7 +1207,7 @@ void __audit_page(unsigned long pfn) {
     page = &frame_table[pfn];
     page_addr = pfn << PAGE_SHIFT;
 
-    printk("audit page: pfn=%lx info: cf=%lx tf=%lx ts=%lx dom=%lx\n", pfn,
+    printk("audit page: pfn=%lx info: cf=%x tf=%x ts=%x dom=%lx\n", pfn,
            page->count_and_flags, page->type_and_flags,
            page->tlbflush_timestamp, (unsigned long)page->u.domain);
 
@@ -1234,7 +1234,7 @@ void __audit_page(unsigned long pfn) {
                     continue;
                 if ( l1_pgentry_to_pagenr(l1e) == pfn )
                 {
-                    printk("  pte_pfn=%06lx cf=%08lx tf=%08lx dom=%08lx\n", 
+                    printk("  pte_pfn=%06lx cf=%08x tf=%08x dom=%08lx\n", 
                            i, frame_table[i].count_and_flags,
                            frame_table[i].type_and_flags,
                            (unsigned long)frame_table[i].u.domain);
@@ -1311,7 +1311,7 @@ void audit_all_pages(u_char key, void *dev_id, struct pt_regs *regs)
         if ( ((frame_table[i].count_and_flags & PGC_count_mask) != 0) &&
              ((frame_table[i].count_and_flags & PGC_zombie) != 0) )
         { 
-            printk("zombie: pfn=%08lx cf=%08lx tf=%08lx dom=%08lx\n", 
+            printk("zombie: pfn=%08lx cf=%08x tf=%08x dom=%08lx\n", 
                    i, frame_table[i].count_and_flags,
                    frame_table[i].type_and_flags,
                    (unsigned long)frame_table[i].u.domain);
@@ -1356,7 +1356,7 @@ void audit_all_pages(u_char key, void *dev_id, struct pt_regs *regs)
             if ( (frame_table[i].count_and_flags & PGC_count_mask) 
                  != ref_count )
             {
-                printk("refcount error: pfn=%06lx cf=%08lx refcount=%lx\n",
+                printk("refcount error: pfn=%06lx cf=%08x refcount=%lx\n",
                        i, frame_table[i].count_and_flags, ref_count);
                 __audit_page(i);
                 printk("\n");

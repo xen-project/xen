@@ -553,7 +553,7 @@ void deliver_packet(struct sk_buff *skb, net_vif_t *vif)
 	unsigned long *sptr = map_domain_mem( (spte_pfn<<PAGE_SHIFT) |
 			(((unsigned long)ptep)&~PAGE_MASK) );
 
-        // avoid the fault later
+        /* Avoid the fault later. */
 	*sptr = new_pte;
 
 	unmap_domain_mem(sptr);
@@ -2086,13 +2086,11 @@ static void get_rx_bufs(net_vif_t *vif)
         pte_pfn  = rx.addr >> PAGE_SHIFT;
         pte_page = &frame_table[pte_pfn];
 
-	//printk("MMM %08lx ", rx.addr);
-            
         /* The address passed down must be to a valid PTE. */
         if ( unlikely(pte_pfn >= max_page) ||
              unlikely(!get_page_and_type(pte_page, p, PGT_l1_page_table)) )
         {
-            DPRINTK("Bad page frame for ppte %llu,%08lx,%08lx,%08lx\n",
+            DPRINTK("Bad page frame for ppte %llu,%08lx,%08lx,%08x\n",
                     p->domain, pte_pfn, max_page, pte_page->type_and_flags);
             make_rx_response(vif, rx.id, 0, RING_STATUS_BAD_PAGE, 0);
             continue;
@@ -2100,7 +2098,7 @@ static void get_rx_bufs(net_vif_t *vif)
         
         ptep = map_domain_mem(rx.addr);
         pte  = *ptep;
-	//printk("%08lx\n",pte);        
+
         /* We must be passed a valid writeable mapping to swizzle. */
         if ( unlikely((pte & (_PAGE_PRESENT|_PAGE_RW)) != 
                       (_PAGE_PRESENT|_PAGE_RW)) ||
@@ -2143,7 +2141,7 @@ static void get_rx_bufs(net_vif_t *vif)
             make_rx_response(vif, rx.id, 0, RING_STATUS_BAD_PAGE, 0);
             goto rx_unmap_and_continue;
 
-	    // XXX IAP should SHADOW_CONFIG do something here?
+	    /* XXX IAP should SHADOW_CONFIG do something here? */
         }
 
         /*
@@ -2155,7 +2153,7 @@ static void get_rx_bufs(net_vif_t *vif)
                               0) != 
                       (PGC_allocated | PGC_tlb_flush_on_type_change | 2)) )
         {
-            DPRINTK("Page held more than once %08lx\n", 
+            DPRINTK("Page held more than once %08x\n", 
                     buf_page->count_and_flags);
             if ( !get_page_type(buf_page, PGT_writeable_page) )
                 put_page(buf_page);

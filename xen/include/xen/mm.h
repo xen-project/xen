@@ -63,11 +63,11 @@ struct pfn_info
         unsigned long _unused;
     } u;
     /* Reference count and various PGC_xxx flags and fields. */
-    unsigned long       count_and_flags;
+    u32 count_and_flags;
     /* Type reference count and various PGT_xxx flags and fields. */
-    unsigned long       type_and_flags;
+    u32 type_and_flags;
     /* Timestamp from 'TLB clock', used to reduce need for safety flushes. */
-    unsigned long       tlbflush_timestamp;
+    u32 tlbflush_timestamp;
 };
 
  /* The following page types are MUTUALLY EXCLUSIVE. */
@@ -136,7 +136,7 @@ void free_page_type(struct pfn_info *page, unsigned int type);
 
 static inline void put_page(struct pfn_info *page)
 {
-    unsigned long nx, x, y = page->count_and_flags;
+    u32 nx, x, y = page->count_and_flags;
 
     do {
         x  = y;
@@ -152,7 +152,7 @@ static inline void put_page(struct pfn_info *page)
 static inline int get_page(struct pfn_info *page,
                            struct task_struct *domain)
 {
-    unsigned long x, nx, y = page->count_and_flags;
+    u32 x, nx, y = page->count_and_flags;
     struct task_struct *p, *np = page->u.domain;
 
     do {
@@ -164,7 +164,7 @@ static inline int get_page(struct pfn_info *page,
              unlikely(x & PGC_zombie) ||             /* Zombie? */
              unlikely(p != domain) )                 /* Wrong owner? */
         {
-            DPRINTK("Error pfn %08lx: ed=%p,sd=%p,caf=%08lx\n",
+            DPRINTK("Error pfn %08lx: ed=%p,sd=%p,caf=%08x\n",
                     page_to_pfn(page), domain, p, x);
             return 0;
         }
@@ -182,7 +182,7 @@ static inline int get_page(struct pfn_info *page,
 
 static inline void put_page_type(struct pfn_info *page)
 {
-    unsigned long nx, x, y = page->type_and_flags;
+    u32 nx, x, y = page->type_and_flags;
 
  again:
     do {
@@ -214,9 +214,9 @@ static inline void put_page_type(struct pfn_info *page)
 }
 
 
-static inline int get_page_type(struct pfn_info *page, unsigned long type)
+static inline int get_page_type(struct pfn_info *page, u32 type)
 {
-    unsigned long nx, x, y = page->type_and_flags;
+    u32 nx, x, y = page->type_and_flags;
  again:
     do {
         x  = y;
@@ -239,7 +239,7 @@ static inline int get_page_type(struct pfn_info *page, unsigned long type)
         }
         else if ( unlikely((x & PGT_type_mask) != type) )
         {
-            DPRINTK("Unexpected type (saw %08lx != exp %08lx) for pfn %08lx\n",
+            DPRINTK("Unexpected type (saw %08x != exp %08x) for pfn %08lx\n",
                     x & PGT_type_mask, type, page_to_pfn(page));
             return 0;
         }
@@ -261,7 +261,7 @@ static inline int get_page_type(struct pfn_info *page, unsigned long type)
         /* Try to validate page type; drop the new reference on failure. */
         if ( unlikely(!alloc_page_type(page, type)) )
         {
-            DPRINTK("Error while validating pfn %08lx for type %08lx\n",
+            DPRINTK("Error while validating pfn %08lx for type %08x\n",
                     page_to_pfn(page), type);
             put_page_type(page);
             return 0;
@@ -282,7 +282,7 @@ static inline void put_page_and_type(struct pfn_info *page)
 
 static inline int get_page_and_type(struct pfn_info *page,
                                     struct task_struct *domain,
-                                    unsigned int type)
+                                    u32 type)
 {
     int rc = get_page(page, domain);
 

@@ -11,21 +11,18 @@
 #include <xen/sched.h>
 #include <asm/flushtlb.h>
 
-unsigned long tlbflush_mask;
-unsigned long tlbflush_clock;
-unsigned long tlbflush_time[NR_CPUS];
+u32 tlbflush_clock;
+u32 tlbflush_time[NR_CPUS];
 
 static inline void tlb_clocktick(unsigned int cpu)
 {
-    unsigned long x, nx, y, ny;
-    
-    clear_bit(cpu, &tlbflush_mask);
+    u32 y, ny;
 
     /* Tick the clock. 'y' contains the current time after the tick. */
     ny = tlbflush_clock;
     do {
 #ifdef CONFIG_SMP
-        if ( unlikely(((y = ny+1) & (GLOBAL_FLUSH_PERIOD - 1)) == 0) )
+        if ( unlikely(((y = ny+1) & TLBCLOCK_EPOCH_MASK) == 0) )
         {
             new_tlbflush_clock_period();
             y = tlbflush_clock;
@@ -37,13 +34,8 @@ static inline void tlb_clocktick(unsigned int cpu)
     }
     while ( unlikely((ny = cmpxchg(&tlbflush_clock, y-1, y)) != y-1) );
 
-    /* Update cpu's timestamp to current time, unless someone else beats us. */
-    nx = tlbflush_time[cpu];
-    do { 
-        if ( unlikely((x = nx) >= y) )
-            break;
-    }
-    while ( unlikely((nx = cmpxchg(&tlbflush_time[cpu], x, y)) != x) );
+    /* Update cpu's timestamp to new time. */
+    tlbflush_time[cpu] = y;
 }
 
 void write_cr3_counted(unsigned long pa)

@@ -13,23 +13,35 @@
 #include <xen/smp.h>
 
 /*
- * Every GLOBAL_FLUSH_PERIOD ticks of the tlbflush clock, every TLB in the
- * system is guaranteed to have been flushed.
+ * Every time the TLB clock passes an "epoch", every CPU's TLB is flushed.
+ * Therefore, if the current TLB time and a previously-read timestamp differ
+ * in their significant bits (i.e., ~TLBCLOCK_EPOCH_MASK), then the TLB clock
+ * has wrapped at least once and every CPU's TLB is guaranteed to have been
+ * flushed meanwhile.
+ * This allows us to deal gracefully with a bounded (a.k.a. wrapping) clock.
  */
-#define GLOBAL_FLUSH_PERIOD (1<<16)
+#define TLBCLOCK_EPOCH_MASK ((1U<<16)-1)
 
 /*
- * '_cpu_stamp' is the current timestamp for the CPU we are testing.
- * '_lastuse_stamp' is a timestamp taken when the PFN we are testing was last 
+ * 'cpu_stamp' is the current timestamp for the CPU we are testing.
+ * 'lastuse_stamp' is a timestamp taken when the PFN we are testing was last 
  * used for a purpose that may have caused the CPU's TLB to become tainted.
  */
-#define NEED_FLUSH(_cpu_stamp, _lastuse_stamp) \
- (((_cpu_stamp) <= (_lastuse_stamp)) &&        \
-  (((_lastuse_stamp) - (_cpu_stamp)) <= (2*GLOBAL_FLUSH_PERIOD)))
+static inline int NEED_FLUSH(u32 cpu_stamp, u32 lastuse_stamp)
+{
+    /*
+     * Why does this work?
+     *  1. XOR sets high-order bits determines if stamps from differing epochs.
+     *  2. Subtraction sets high-order bits if 'cpu_stamp > lastuse_stamp'.
+     * In either case a flush is unnecessary: we therefore OR the results from
+     * (1) and (2), mask the high-order bits, and return the inverse.
+     */
+    return !(((lastuse_stamp^cpu_stamp)|(lastuse_stamp-cpu_stamp)) & 
+             ~TLBCLOCK_EPOCH_MASK);
+}
 
-extern unsigned long tlbflush_mask;
-extern unsigned long tlbflush_clock;
-extern unsigned long tlbflush_time[NR_CPUS];
+extern u32 tlbflush_clock;
+extern u32 tlbflush_time[NR_CPUS];
 
 extern void new_tlbflush_clock_period(void);
 
