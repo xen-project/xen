@@ -45,7 +45,7 @@ class SrvDomainDir(SrvDir):
         errmsg = ''
         try:
             configstring = req.args.get('config')[0]
-            print 'config:', configstring
+            #print 'op_create>', 'config:', configstring
             pin = sxp.Parser()
             pin.input(configstring)
             pin.input_eof()
