@@ -68,7 +68,7 @@ include/xen/compile.h: include/xen/compile.h.in include/xen/banner.h
 	    -e 's!@@changeset@@!$(shell bk changes -nd':D: :T: :REV: :MD5KEY:' -r+ 2>/dev/null || echo information unavailable)!g' \
 	    < include/xen/compile.h.in > $@.new
 	cat include/xen/banner.h >> $@.new
-	mv $@.new $@
+	mv -f $@.new $@
 
 tools/figlet/figlet: tools/figlet/figlet.o
 	$(CC) -o $@ $<
@@ -77,7 +77,7 @@ tools/figlet/figlet.o: tools/figlet/figlet.c
 
 include/xen/banner.h: tools/figlet/figlet tools/figlet/xen.flf
 	tools/figlet/figlet -d tools/figlet Xen $(XEN_VERSION).$(XEN_SUBVERSION)$(XEN_EXTRAVERSION) > $@.new
-	mv $@.new $@
+	mv -f $@.new $@
 
 include/asm-$(TARGET_ARCH)/asm-offsets.h: arch/$(TARGET_ARCH)/asm-offsets.s
 	@(set -e; \
