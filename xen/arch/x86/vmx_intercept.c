@@ -29,6 +29,8 @@
 #include <xen/sched.h>
 #include <asm/current.h>
 
+#ifdef CONFIG_VMX
+
 /* for intercepting io request after vm_exit, return value: 0--not handle; 1--handled */
 int vmx_io_intercept(ioreq_t *p)
 {
@@ -264,3 +266,5 @@ void vmx_hooks_assist(struct exec_domain *d)
     }
 
 }
+
+#endif /* CONFIG_VMX */

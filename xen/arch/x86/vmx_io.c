@@ -387,11 +387,11 @@ void vmx_intr_assist(struct exec_domain *d)
 
 void vmx_do_resume(struct exec_domain *d) 
 {
-    if ( d->arch.guest_vtable )
+    if ( test_bit(VMX_CPU_STATE_PG_ENABLED, &d->arch.arch_vmx.cpu_state) )
         __vmwrite(GUEST_CR3, pagetable_val(d->arch.shadow_table));
     else
-        // we haven't switched off the 1:1 pagetable yet...
-        __vmwrite(GUEST_CR3, pagetable_val(d->arch.guest_table));
+        // paging is not enabled in the guest
+        __vmwrite(GUEST_CR3, pagetable_val(d->arch.phys_table));
 
     __vmwrite(HOST_CR3, pagetable_val(d->arch.monitor_table));
     __vmwrite(HOST_ESP, (unsigned long)get_stack_bottom());

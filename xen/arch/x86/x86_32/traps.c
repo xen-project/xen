@@ -96,7 +96,7 @@ void show_registers(struct xen_regs *regs)
     const char *context;
 
 #ifdef CONFIG_VMX
-    if ( current->arch.arch_vmx.flags && (regs->eflags == 0) )
+    if ( VMX_DOMAIN(current) && (regs->eflags == 0) )
     {
         __vmread(GUEST_EIP, &eip);
         __vmread(GUEST_ESP, &esp);

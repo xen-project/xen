@@ -69,7 +69,7 @@ extern unsigned long shadow_l2_table(
     struct domain *d, unsigned long gmfn);
   
 static inline void shadow_invalidate(struct exec_domain *ed) {
-    if ( !ed->arch.arch_vmx.flags )
+    if ( !VMX_DOMAIN(ed) )
         BUG();
     memset(ed->arch.shadow_vtable, 0, PAGE_SIZE);
 }
@@ -766,7 +766,7 @@ static inline void __update_pagetables(struct exec_domain *ed)
             }
         }
 
-        if ( ed->arch.arch_vmx.flags )
+        if ( VMX_DOMAIN(ed) )
         {
             // Why is VMX mode doing this?
             shadow_invalidate(ed);
@@ -780,20 +780,22 @@ static inline void __update_pagetables(struct exec_domain *ed)
 
 static inline void update_pagetables(struct exec_domain *ed)
 {
-    if ( unlikely(shadow_mode_enabled(ed->domain)) )
+    struct domain *d = ed->domain;
+
+    if ( unlikely(shadow_mode_enabled(d)) )
     {
-        shadow_lock(ed->domain);
+        shadow_lock(d);
         __update_pagetables(ed);
-        shadow_unlock(ed->domain);
+        shadow_unlock(d);
     }
-    if ( !shadow_mode_external(ed->domain) )
+    if ( !shadow_mode_external(d) )
     {
 #ifdef __x86_64__
         if ( !(ed->arch.flags & TF_kernel_mode) )
             ed->arch.monitor_table = ed->arch.guest_table_user;
         else
 #endif
-        if ( shadow_mode_enabled(ed->domain) )
+        if ( shadow_mode_enabled(d) )
             ed->arch.monitor_table = ed->arch.shadow_table;
         else
             ed->arch.monitor_table = ed->arch.guest_table;

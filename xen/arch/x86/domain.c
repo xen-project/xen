@@ -723,9 +723,6 @@ void switch_to(struct exec_domain *prev_p, struct exec_domain *next_p)
     struct tss_struct *tss = init_tss + smp_processor_id();
     execution_context_t *stack_ec = get_execution_context();
     int i;
-#ifdef CONFIG_VMX
-    unsigned long vmx_domain = next_p->arch.arch_vmx.flags; 
-#endif
 
     __cli();
 
@@ -758,7 +755,7 @@ void switch_to(struct exec_domain *prev_p, struct exec_domain *next_p)
         }
 
 #ifdef CONFIG_VMX
-        if ( vmx_domain )
+        if ( VMX_DOMAIN(next_p) )
         {
             /* Switch page tables. */
             write_ptbase(next_p);

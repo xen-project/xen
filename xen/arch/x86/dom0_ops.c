@@ -349,8 +349,9 @@ void arch_getdomaininfo_ctxt(
 { 
     int i;
 #ifdef __i386__  /* Remove when x86_64 VMX is implemented */
-    unsigned long vmx_domain;
+#ifdef CONFIG_VMX
     extern void save_vmx_execution_context(execution_context_t *);
+#endif
 #endif
 
     c->flags = 0;
@@ -359,9 +360,10 @@ void arch_getdomaininfo_ctxt(
            sizeof(ed->arch.user_ctxt));
 
 #ifdef __i386__
-    vmx_domain = ed->arch.arch_vmx.flags;
-    if (vmx_domain)
+#ifdef CONFIG_VMX
+    if ( VMX_DOMAIN(ed) )
         save_vmx_execution_context(&c->cpu_ctxt);
+#endif
 #endif
 
     if ( test_bit(EDF_DONEFPUINIT, &ed->ed_flags) )
