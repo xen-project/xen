@@ -122,7 +122,7 @@ def lookup_raw_partn(partition):
         if line:
             return [ { 'device' : blkdev_name_to_number(drive),
                        'start_sector' : 0,
-                       'nr_sectors' : string.atol(line) * 2,
+                       'nr_sectors' : int(line) * 2,
                        'type' : 'Disk' } ]
         return None
 
@@ -136,8 +136,8 @@ def lookup_raw_partn(partition):
                        'size=\s*([0-9]+), Id=\s*(\S+).*$', line)
         if m:
             return [ { 'device' : blkdev_name_to_number(drive),
-                       'start_sector' : string.atol(m.group(1)),
-                       'nr_sectors' : string.atol(m.group(2)),
+                       'start_sector' : int(m.group(1)),
+                       'nr_sectors' : int(m.group(2)),
                        'type' : m.group(3) } ]
     
     return None
