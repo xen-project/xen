@@ -383,7 +383,7 @@ static void network_alloc_rx_buffers(struct net_device *dev)
         rx_pfn_array[i] = virt_to_machine(skb->head) >> PAGE_SHIFT;
 
 	/* Remove this page from pseudo phys map before passing back to Xen. */
-	phys_to_machine_mapping[virt_to_phys(skb->head) >> PAGE_SHIFT] 
+	phys_to_machine_mapping[__pa(skb->head) >> PAGE_SHIFT] 
 	    = INVALID_P2M_ENTRY;
 
         rx_mcl[i].op = __HYPERVISOR_update_va_mapping;

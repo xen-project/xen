@@ -1,5 +1,6 @@
---- linux-2.6.8.1/drivers/char/drm/ati_pcigart.h	2004-08-14 11:56:14.000000000 +0100
-+++ linux-2.6.8.1-xen0/drivers/char/drm/ati_pcigart.h	2004-09-05 06:14:51.751782846 +0100
+diff -ur linux-2.6.9/drivers/char/drm/ati_pcigart.h linux-2.6.9-new/drivers/char/drm/ati_pcigart.h
+--- linux-2.6.9/drivers/char/drm/ati_pcigart.h	2004-10-18 22:55:07.000000000 +0100
++++ linux-2.6.9-new/drivers/char/drm/ati_pcigart.h	2004-11-28 19:42:41.000000000 +0000
 @@ -158,7 +158,7 @@
  	ret = 1;
  
