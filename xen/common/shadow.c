@@ -26,6 +26,28 @@ hypercall lock anyhow (at least initially).
 
 ********/
 
+int shadow_mode_control( struct task_struct *p, unsigned int op )
+{
+	if (p->mm.shadow_mode && op == DOM0_SHADOW_CONTROL_OP_OFF )
+    {
+		shadow_mode_disable(p);
+	}
+	else if (p->mm.shadow_mode && op == DOM0_SHADOW_CONTROL_OP_ENABLE_TEST )
+	{
+        shadow_mode_disable(p);
+        shadow_mode_enable(p, SHM_test);
+	}	
+	else if (p->mm.shadow_mode && op == DOM0_SHADOW_CONTROL_OP_FLUSH )
+    {
+		//shadow_mode_flush(p);
+    }
+	else
+    {
+		return -EINVAL;
+    }
+
+	return 0;
+}
 
 int shadow_mode_enable( struct task_struct *p, unsigned int mode )
 {

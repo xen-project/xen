@@ -22,6 +22,7 @@
 #define shadow_linear_pg_table ((l1_pgentry_t *)SH_LINEAR_PT_VIRT_START)
 #define shadow_linear_l2_table ((l2_pgentry_t *)(SH_LINEAR_PT_VIRT_START+(SH_LINEAR_PT_VIRT_START>>(L2_PAGETABLE_SHIFT-L1_PAGETABLE_SHIFT))))
 
+extern int shadow_mode_control( struct task_struct *p, unsigned int op );
 extern pagetable_t shadow_mk_pagetable( struct task_struct *p, 
 										unsigned long gptbase);
 extern int shadow_fault( unsigned long va, long error_code );
