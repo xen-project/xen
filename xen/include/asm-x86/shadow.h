@@ -377,6 +377,52 @@ update_hl2e(struct exec_domain *ed, unsigned long va)
     }
 }
 
+static inline void shadow_drop_references(
+    struct domain *d, struct pfn_info *page)
+{
+    if ( likely(!shadow_mode_enabled(d)) ||
+         ((page->u.inuse.type_info & PGT_count_mask) == 0) )
+        return;
+
+    /* XXX This needs more thought... */
+    printk("%s: needing to call shadow_remove_all_access for mfn=%p\n",
+           __func__, page_to_pfn(page));
+    printk("Before: mfn=%p c=%p t=%p\n", page_to_pfn(page),
+           page->count_info, page->u.inuse.type_info);
+
+    shadow_lock(d);
+    shadow_remove_all_access(d, page_to_pfn(page));
+    shadow_unlock(d);
+
+    printk("After:  mfn=%p c=%p t=%p\n", page_to_pfn(page),
+           page->count_info, page->u.inuse.type_info);
+}
+
+static inline void shadow_sync_and_drop_references(
+    struct domain *d, struct pfn_info *page)
+{
+    if ( likely(!shadow_mode_enabled(d)) )
+        return;
+
+    /* XXX Needs more thought. Neither pretty nor fast: a place holder. */
+    shadow_lock(d);
+
+    if ( page_out_of_sync(page) )
+        __shadow_sync_mfn(d, page_to_pfn(page));
+
+    shadow_remove_all_access(d, page_to_pfn(page));
+
+    if ( page->count_info != 1 )
+    {
+        printk("free_dom_mem in shadow mode didn't release page "
+               "mfn=%p c=%p\n", page_to_pfn(page), page->count_info);
+        shadow_unlock(d);
+        audit_domain(d);
+        BUG();
+    }
+
+    shadow_unlock(d);
+}
 
 /************************************************************************/
 

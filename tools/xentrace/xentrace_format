@@ -75,8 +75,6 @@ try:
 except getopt.GetoptError:
     usage()
 
-print mhz
-
 signal.signal(signal.SIGTERM, sighand)
 signal.signal(signal.SIGHUP,  sighand)
 signal.signal(signal.SIGINT,  sighand)
@@ -84,8 +82,6 @@ signal.signal(signal.SIGINT,  sighand)
 interrupted = 0
 
 defs = read_defs(arg[0])
-
-print defs
 
 # structure of trace record + prepended CPU id (as output by xentrace):
 # CPU(I) TSC(Q) EVENT(L) D1(L) D2(L) D3(L) D4(L) D5(L)

@@ -27,8 +27,8 @@
 
 #include <xen/config.h>
 #include <xen/sched.h>
-#include <asm/mm.h>
-#include <asm/shadow.h>
+#include <xen/shadow.h>
+#include <xen/mm.h>
 
 #define PIN_FAIL(_lbl, _rc, _f, _a...)   \
     do {                           \
