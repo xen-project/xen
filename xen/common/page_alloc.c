@@ -254,8 +254,6 @@ void __init init_page_allocator(unsigned long min, unsigned long max)
     min += PAGE_OFFSET;
     max += PAGE_OFFSET;
 
-    printk("Initialising Xen allocator with %luMB memory\n", range >> 20);
-
     p         = min;
     remaining = range;
     while ( remaining != 0 )
