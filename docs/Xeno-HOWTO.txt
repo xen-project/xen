@@ -253,12 +253,6 @@ Make sure you have successfully configured at least one
 physical network interface. Then:
 
 # xen_nat_enable
-# xen_read_console &
-
-When new  domains are created and  started, they will  send output via
-UDP packets to  the local virtual network. Those  packets are received
-by xen_read_console running in Domain  0 and output are printed out to
-the standard output.
 
 The xc_dom_create.py program is useful for starting Xen domains.
 You can specify configuration files using the -f switch on the command
@@ -269,8 +263,14 @@ You can override the settings in a configuration file using command
 line arguments to xc_dom_create.py.  However, you may find it simplest
 to create a separate configuration file for each domain you start.
 
-When you start domains, you should be able to see XenoLinux boot
-message on standard output with each line prepended with [domain_id].
+xc_dom_create.py will print the local TCP port to which you should
+connect to perform console I/O. A suitable console client is provided
+by the Python module xend.console_client: running this module from the
+command line with <host> and <port> parameters will start a terminal
+session. An alternative is to specify '-c' to xc_dom_create.py, or add
+'auto_console=True' to the defaults file. This will cause
+xc_dom_create.py to automatically become teh console terminal after
+starting the domain.
 
 
 Manage Running Domains
