@@ -41,17 +41,14 @@
 #include <linux/bitops.h>
 #include <net/sock.h>
 #include <net/pkt_sched.h>
+#include <net/arp.h>
+#include <net/route.h>
 #include <asm/io.h>
 #include <asm-xen/evtchn.h>
 #include <asm-xen/ctrl_if.h>
 #include <asm-xen/xen-public/io/netif.h>
 #include <asm-xen/balloon.h>
 #include <asm/page.h>
-
-#include <net/arp.h>
-#include <net/route.h>
-
-#define DEBUG 0
 
 #ifndef __GFP_NOWARN
 #define __GFP_NOWARN 0
@@ -63,7 +60,7 @@
         atomic_set(&(skb_shinfo(_skb)->dataref), 1);  \
         skb_shinfo(_skb)->nr_frags = 0;               \
         skb_shinfo(_skb)->frag_list = NULL;           \
-    } while ( 0 )
+    } while (0)
 
 /* Allow headroom on each rx pkt for Ethernet header, alignment padding, ... */
 #define RX_HEADROOM 200
@@ -171,10 +168,9 @@ static struct net_device *find_dev_by_handle(unsigned int handle)
 {
     struct list_head *ent;
     struct net_private *np;
-    list_for_each ( ent, &dev_list )
-    {
+    list_for_each (ent, &dev_list) {
         np = list_entry(ent, struct net_private, list);
-        if ( np->handle == handle )
+        if (np->handle == handle)
             return np->dev;
     }
     return NULL;
@@ -203,7 +199,7 @@ static void netctrl_init(void)
  */
 static int netctrl_err(int err)
 {
-    if ( (err < 0) && !netctrl.err )
+    if ((err < 0) && !netctrl.err)
         netctrl.err = err;
     return netctrl.err;
 }
@@ -216,9 +212,9 @@ static int netctrl_connected(void)
 {
     int ok;
 
-    if ( netctrl.err )
+    if (netctrl.err)
         ok = netctrl.err;
-    else if ( netctrl.up == NETIF_DRIVER_STATUS_UP )
+    else if (netctrl.up == NETIF_DRIVER_STATUS_UP)
         ok = (netctrl.connected_n == netctrl.interface_n);
     else
         ok = 0;
@@ -266,14 +262,14 @@ static int send_fake_arp(struct net_device *dev)
     src_ip = inet_select_addr(dev, dst_ip, RT_SCOPE_LINK);
 
     /* No IP? Then nothing to do. */
-    if ( src_ip == 0 )
+    if (src_ip == 0)
         return 0;
 
     skb = arp_create(ARPOP_REPLY, ETH_P_ARP,
                      dst_ip, dev, src_ip,
                      /*dst_hw*/ NULL, /*src_hw*/ NULL, 
                      /*target_hw*/ dev->dev_addr);
-    if ( skb == NULL )
+    if (skb == NULL)
         return -ENOMEM;
 
     return dev_queue_xmit(skb);
@@ -302,15 +298,14 @@ static void network_tx_buf_gc(struct net_device *dev)
     struct net_private *np = netdev_priv(dev);
     struct sk_buff *skb;
 
-    if ( np->backend_state != BEST_CONNECTED )
+    if (np->backend_state != BEST_CONNECTED)
         return;
 
     do {
         prod = np->tx->resp_prod;
         rmb(); /* Ensure we see responses up to 'rp'. */
 
-        for ( i = np->tx_resp_cons; i != prod; i++ )
-        {
+        for (i = np->tx_resp_cons; i != prod; i++) {
             id  = np->tx->ring[MASK_NETIF_TX_IDX(i)].resp.id;
             skb = np->tx_skbs[id];
             ADD_ID_TO_FREELIST(np->tx_skbs, id);
@@ -330,14 +325,11 @@ static void network_tx_buf_gc(struct net_device *dev)
         np->tx->event = 
             prod + ((np->tx->req_prod - prod) >> 1) + 1;
         mb();
-    }
-    while ( prod != np->tx->resp_prod );
+    } while (prod != np->tx->resp_prod);
 
-    if ( np->tx_full && 
-         ((np->tx->req_prod - prod) < NETIF_TX_RING_SIZE) )
-    {
+    if (np->tx_full && ((np->tx->req_prod - prod) < NETIF_TX_RING_SIZE)) {
         np->tx_full = 0;
-        if ( np->user_state == UST_OPEN )
+        if (np->user_state == UST_OPEN)
             netif_wake_queue(dev);
     }
 }
@@ -351,7 +343,7 @@ static void network_alloc_rx_buffers(struct net_device *dev)
     int i, batch_target;
     NETIF_RING_IDX req_prod = np->rx->req_prod;
 
-    if ( unlikely(np->backend_state != BEST_CONNECTED) )
+    if (unlikely(np->backend_state != BEST_CONNECTED))
         return;
 
     /*
@@ -361,20 +353,18 @@ static void network_alloc_rx_buffers(struct net_device *dev)
      * ourself and for other kernel subsystems.
      */
     batch_target = np->rx_target - (req_prod - np->rx_resp_cons);
-    for ( i = skb_queue_len(&np->rx_batch); i < batch_target; i++ )
-    {
-        if ( unlikely((skb = alloc_xen_skb(dev->mtu + RX_HEADROOM)) == NULL) )
+    for (i = skb_queue_len(&np->rx_batch); i < batch_target; i++) {
+        if (unlikely((skb = alloc_xen_skb(dev->mtu + RX_HEADROOM)) == NULL))
             break;
         __skb_queue_tail(&np->rx_batch, skb);
     }
 
     /* Is the batch large enough to be worthwhile? */
-    if ( i < (np->rx_target/2)  )
+    if (i < (np->rx_target/2))
         return;
 
-    for ( i = 0; ; i++ )
-    {
-        if ( (skb = __skb_dequeue(&np->rx_batch)) == NULL )
+    for (i = 0; ; i++) {
+        if ((skb = __skb_dequeue(&np->rx_batch)) == NULL)
             break;
 
         skb->dev = dev;
@@ -421,15 +411,15 @@ static void network_alloc_rx_buffers(struct net_device *dev)
     (void)HYPERVISOR_multicall(rx_mcl, i+1);
 
     /* Check return status of HYPERVISOR_dom_mem_op(). */
-    if ( unlikely(rx_mcl[i].args[5] != i) )
+    if (unlikely(rx_mcl[i].args[5] != i))
         panic("Unable to reduce memory reservation\n");
 
     /* Above is a suitable barrier to ensure backend will see requests. */
     np->rx->req_prod = req_prod + i;
 
     /* Adjust our floating fill target if we risked running out of buffers. */
-    if ( ((req_prod - np->rx->resp_prod) < (np->rx_target / 4)) &&
-         ((np->rx_target *= 2) > RX_MAX_TARGET) )
+    if (((req_prod - np->rx->resp_prod) < (np->rx_target / 4)) &&
+         ((np->rx_target *= 2) > RX_MAX_TARGET))
         np->rx_target = RX_MAX_TARGET;
 }
 
@@ -441,18 +431,16 @@ static int network_start_xmit(struct sk_buff *skb, struct net_device *dev)
     netif_tx_request_t *tx;
     NETIF_RING_IDX i;
 
-    if ( unlikely(np->tx_full) )
-    {
+    if (unlikely(np->tx_full)) {
         printk(KERN_ALERT "%s: full queue wasn't stopped!\n", dev->name);
         netif_stop_queue(dev);
         goto drop;
     }
 
-    if ( unlikely((((unsigned long)skb->data & ~PAGE_MASK) + skb->len) >=
-                  PAGE_SIZE) )
-    {
+    if (unlikely((((unsigned long)skb->data & ~PAGE_MASK) + skb->len) >=
+                  PAGE_SIZE)) {
         struct sk_buff *nskb;
-        if ( unlikely((nskb = alloc_xen_skb(skb->len)) == NULL) )
+        if (unlikely((nskb = alloc_xen_skb(skb->len)) == NULL))
             goto drop;
         skb_put(nskb, skb->len);
         memcpy(nskb->data, skb->data, skb->len);
@@ -463,8 +451,7 @@ static int network_start_xmit(struct sk_buff *skb, struct net_device *dev)
     
     spin_lock_irq(&np->tx_lock);
 
-    if ( np->backend_state != BEST_CONNECTED )
-    {
+    if (np->backend_state != BEST_CONNECTED) {
         spin_unlock_irq(&np->tx_lock);
         goto drop;
     }
@@ -485,8 +472,7 @@ static int network_start_xmit(struct sk_buff *skb, struct net_device *dev)
 
     network_tx_buf_gc(dev);
 
-    if ( (i - np->tx_resp_cons) == (NETIF_TX_RING_SIZE - 1) )
-    {
+    if ((i - np->tx_resp_cons) == (NETIF_TX_RING_SIZE - 1)) {
         np->tx_full = 1;
         netif_stop_queue(dev);
     }
@@ -498,7 +484,7 @@ static int network_start_xmit(struct sk_buff *skb, struct net_device *dev)
 
     /* Only notify Xen if we really have to. */
     mb();
-    if ( np->tx->TX_TEST_IDX == i )
+    if (np->tx->TX_TEST_IDX == i)
         notify_via_evtchn(np->evtchn);
 
     return 0;
@@ -508,7 +494,6 @@ static int network_start_xmit(struct sk_buff *skb, struct net_device *dev)
     dev_kfree_skb(skb);
     return 0;
 }
-
 
 static irqreturn_t netif_int(int irq, void *dev_id, struct pt_regs *ptregs)
 {
@@ -520,8 +505,7 @@ static irqreturn_t netif_int(int irq, void *dev_id, struct pt_regs *ptregs)
     network_tx_buf_gc(dev);
     spin_unlock_irqrestore(&np->tx_lock, flags);
 
-    if ( (np->rx_resp_cons != np->rx->resp_prod) &&
-         (np->user_state == UST_OPEN) )
+    if ((np->rx_resp_cons != np->rx->resp_prod) && (np->user_state == UST_OPEN))
         netif_rx_schedule(dev);
 
     return IRQ_HANDLED;
@@ -542,33 +526,30 @@ static int netif_poll(struct net_device *dev, int *pbudget)
 
     spin_lock(&np->rx_lock);
 
-    if ( np->backend_state != BEST_CONNECTED )
-    {
+    if (np->backend_state != BEST_CONNECTED) {
         spin_unlock(&np->rx_lock);
         return 0;
     }
 
     skb_queue_head_init(&rxq);
 
-    if ( (budget = *pbudget) > dev->quota )
+    if ((budget = *pbudget) > dev->quota)
         budget = dev->quota;
 
     rp = np->rx->resp_prod;
     rmb(); /* Ensure we see queued responses up to 'rp'. */
 
-    for ( i = np->rx_resp_cons, work_done = 0; 
-          (i != rp) && (work_done < budget); 
-          i++, work_done++ )
-    {
+    for (i = np->rx_resp_cons, work_done = 0; 
+		    (i != rp) && (work_done < budget);
+		    i++, work_done++) {
         rx = &np->rx->ring[MASK_NETIF_RX_IDX(i)].resp;
 
         /*
          * An error here is very odd. Usually indicates a backend bug,
          * low-memory condition, or that we didn't have reservation headroom.
          */
-        if ( unlikely(rx->status <= 0) )
-        {
-            if ( net_ratelimit() )
+        if (unlikely(rx->status <= 0)) {
+            if (net_ratelimit())
                 printk(KERN_WARNING "Bad rx buffer (memory squeeze?).\n");
             np->rx->ring[MASK_NETIF_RX_IDX(np->rx->req_prod)].req.id = rx->id;
             wmb();
@@ -608,8 +589,7 @@ static int netif_poll(struct net_device *dev, int *pbudget)
     balloon_update_driver_allowance(-work_done);
 
     /* Do all the remapping work, and M->P updates, in one big hypercall. */
-    if ( likely((mcl - rx_mcl) != 0) )
-    {
+    if (likely((mcl - rx_mcl) != 0)) {
         mcl->op = __HYPERVISOR_mmu_update;
         mcl->args[0] = (unsigned long)rx_mmu;
         mcl->args[1] = mmu - rx_mmu;
@@ -618,33 +598,29 @@ static int netif_poll(struct net_device *dev, int *pbudget)
         (void)HYPERVISOR_multicall(rx_mcl, mcl - rx_mcl);
     }
 
-    while ( (skb = __skb_dequeue(&rxq)) != NULL )
-    {
+    while ((skb = __skb_dequeue(&rxq)) != NULL) {
         /*
          * Enough room in skbuff for the data we were passed? Also, Linux 
          * expects at least 16 bytes headroom in each receive buffer.
          */
-        if ( unlikely(skb->tail > skb->end) ||
-             unlikely((skb->data - skb->head) < 16) )
-        {
+        if (unlikely(skb->tail > skb->end) || 
+			unlikely((skb->data - skb->head) < 16)) {
             nskb = NULL;
 
             /* Only copy the packet if it fits in the current MTU. */
-            if ( skb->len <= (dev->mtu + ETH_HLEN) )
-            {
-                if ( (skb->tail > skb->end) && net_ratelimit() )
+            if (skb->len <= (dev->mtu + ETH_HLEN)) {
+                if ((skb->tail > skb->end) && net_ratelimit())
                     printk(KERN_INFO "Received packet needs %d bytes more "
                            "headroom.\n", skb->tail - skb->end);
 
-                if ( (nskb = alloc_xen_skb(skb->len + 2)) != NULL )
-                {
+                if ((nskb = alloc_xen_skb(skb->len + 2)) != NULL) {
                     skb_reserve(nskb, 2);
                     skb_put(nskb, skb->len);
                     memcpy(nskb->data, skb->data, skb->len);
                     nskb->dev = skb->dev;
                 }
             }
-            else if ( net_ratelimit() )
+            else if (net_ratelimit())
                 printk(KERN_INFO "Received packet too big for MTU "
                        "(%d > %d)\n", skb->len - ETH_HLEN, dev->mtu);
 
@@ -655,7 +631,7 @@ static int netif_poll(struct net_device *dev, int *pbudget)
             dev_kfree_skb(skb);
 
             /* Switch old for new, if we copied the buffer. */
-            if ( (skb = nskb) == NULL )
+            if ((skb = nskb) == NULL)
                 continue;
         }
         
@@ -674,8 +650,8 @@ static int netif_poll(struct net_device *dev, int *pbudget)
 
     /* If we get a callback with very few responses, reduce fill target. */
     /* NB. Note exponential increase, linear decrease. */
-    if ( ((np->rx->req_prod - np->rx->resp_prod) > ((3*np->rx_target) / 4)) &&
-         (--np->rx_target < RX_MIN_TARGET) )
+    if (((np->rx->req_prod - np->rx->resp_prod) > ((3*np->rx_target) / 4)) &&
+         (--np->rx_target < RX_MIN_TARGET))
         np->rx_target = RX_MIN_TARGET;
 
     network_alloc_rx_buffers(dev);
@@ -683,16 +659,14 @@ static int netif_poll(struct net_device *dev, int *pbudget)
     *pbudget   -= work_done;
     dev->quota -= work_done;
 
-    if ( work_done < budget )
-    {
+    if (work_done < budget) {
         local_irq_save(flags);
 
         np->rx->event = i + 1;
     
         /* Deal with hypervisor racing our resetting of rx_event. */
         mb();
-        if ( np->rx->resp_prod == i )
-        {
+        if (np->rx->resp_prod == i) {
             __netif_rx_complete(dev);
             more_to_do = 0;
         }
@@ -755,10 +729,8 @@ static void network_connect(struct net_device *dev,
      * to avoid this but maybe it doesn't matter so much given the
      * interface has been down.
      */
-    for ( requeue_idx = 0, i = 1; i <= NETIF_TX_RING_SIZE; i++ )
-    {
-            if ( (unsigned long)np->tx_skbs[i] >= __PAGE_OFFSET )
-            {
+    for (requeue_idx = 0, i = 1; i <= NETIF_TX_RING_SIZE; i++) {
+            if ((unsigned long)np->tx_skbs[i] >= __PAGE_OFFSET) {
                 struct sk_buff *skb = np->tx_skbs[i];
                 
                 tx = &np->tx->ring[requeue_idx++].req;
@@ -775,8 +747,8 @@ static void network_connect(struct net_device *dev,
     np->tx->req_prod = requeue_idx;
 
     /* Rebuild the RX buffer freelist and the RX ring itself. */
-    for ( requeue_idx = 0, i = 1; i <= NETIF_RX_RING_SIZE; i++ )
-        if ( (unsigned long)np->rx_skbs[i] >= __PAGE_OFFSET )
+    for (requeue_idx = 0, i = 1; i <= NETIF_RX_RING_SIZE; i++)
+        if ((unsigned long)np->rx_skbs[i] >= __PAGE_OFFSET)
             np->rx->ring[requeue_idx++].req.id = i;
     wmb();                
     np->rx->req_prod = requeue_idx;
@@ -791,7 +763,7 @@ static void network_connect(struct net_device *dev,
     notify_via_evtchn(status->evtchn);  
     network_tx_buf_gc(dev);
 
-    if ( np->user_state == UST_OPEN )
+    if (np->user_state == UST_OPEN)
         netif_start_queue(dev);
 
     spin_unlock(&np->rx_lock);
@@ -917,9 +889,7 @@ static void vif_disconnect(struct net_private *np)
  * is initiated by a special "RESET" message - disconnect could
  * just mean we're not allowed to use this interface any more.
  */
-static void 
-vif_reset(
-    struct net_private *np)
+static void vif_reset(struct net_private *np)
 {
     IPRINTK("Attempting to reconnect network interface: handle=%u\n",
             np->handle);    
@@ -932,9 +902,8 @@ vif_reset(
  * Sets the mac and event channel from the message.
  * Binds the irq to the event channel.
  */
-static void
-vif_connect(
-    struct net_private *np, netif_fe_interface_status_t *status)
+static void 
+vif_connect(struct net_private *np, netif_fe_interface_status_t *status)
 {
     struct net_device *dev = np->dev;
     memcpy(dev->dev_addr, status->mac, ETH_ALEN);
@@ -959,8 +928,7 @@ static int create_netdev(int handle, struct net_device **val)
     struct net_device *dev = NULL;
     struct net_private *np = NULL;
 
-    if ( (dev = alloc_etherdev(sizeof(struct net_private))) == NULL )
-    {
+    if ((dev = alloc_etherdev(sizeof(struct net_private))) == NULL) {
         printk(KERN_WARNING "%s> alloc_etherdev failed.\n", __FUNCTION__);
         err = -ENOMEM;
         goto exit;
@@ -978,9 +946,9 @@ static int create_netdev(int handle, struct net_device **val)
     np->rx_target = RX_MIN_TARGET;
 
     /* Initialise {tx,rx}_skbs to be a free chain containing every entry. */
-    for ( i = 0; i <= NETIF_TX_RING_SIZE; i++ )
+    for (i = 0; i <= NETIF_TX_RING_SIZE; i++)
         np->tx_skbs[i] = (void *)(i+1);
-    for ( i = 0; i <= NETIF_RX_RING_SIZE; i++ )
+    for (i = 0; i <= NETIF_RX_RING_SIZE; i++)
         np->rx_skbs[i] = (void *)(i+1);
 
     dev->open            = network_open;
@@ -990,8 +958,7 @@ static int create_netdev(int handle, struct net_device **val)
     dev->poll            = netif_poll;
     dev->weight          = 64;
     
-    if ( (err = register_netdev(dev)) != 0 )
-    {
+    if ((err = register_netdev(dev)) != 0) {
         printk(KERN_WARNING "%s> register_netdev err=%d\n", __FUNCTION__, err);
         goto exit;
     }
@@ -999,9 +966,9 @@ static int create_netdev(int handle, struct net_device **val)
     list_add(&np->list, &dev_list);
 
   exit:
-    if ( (err != 0) && (dev != NULL ) )
+    if ((err != 0) && (dev != NULL ))
         kfree(dev);
-    else if ( val != NULL )
+    else if (val != NULL)
         *val = dev;
     return err;
 }
@@ -1015,36 +982,34 @@ static int create_netdev(int handle, struct net_device **val)
  * @return 0 on success, error code otherwise
  */
 static int 
-target_vif(
-    netif_fe_interface_status_t *status, struct net_private **np)
+target_vif(netif_fe_interface_status_t *status, struct net_private **np)
 {
     int err = 0;
     struct net_device *dev;
 
     DPRINTK("> handle=%d\n", status->handle);
-    if ( status->handle < 0 )
-    {
+    if (status->handle < 0) {
         err = -EINVAL;
         goto exit;
     }
 
-    if ( (dev = find_dev_by_handle(status->handle)) != NULL )
+    if ((dev = find_dev_by_handle(status->handle)) != NULL)
         goto exit;
 
-    if ( status->status == NETIF_INTERFACE_STATUS_CLOSED )
+    if (status->status == NETIF_INTERFACE_STATUS_CLOSED)
         goto exit;
-    if ( status->status == NETIF_INTERFACE_STATUS_CHANGED )
+    if (status->status == NETIF_INTERFACE_STATUS_CHANGED)
         goto exit;
 
     /* It's a new interface in a good state - create it. */
     DPRINTK("> create device...\n");
-    if ( (err = create_netdev(status->handle, &dev)) != 0 )
+    if ((err = create_netdev(status->handle, &dev)) != 0)
         goto exit;
 
     netctrl.interface_n++;
 
   exit:
-    if ( np != NULL )
+    if (np != NULL)
         *np = ((dev && !err) ? netdev_priv(dev) : NULL);
     DPRINTK("< err=%d\n", err);
     return err;
@@ -1059,23 +1024,19 @@ static void netif_interface_status(netif_fe_interface_status_t *status)
     DPRINTK("> status=%s handle=%d\n",
             status_name[status->status], status->handle);
 
-    if ( (err = target_vif(status, &np)) != 0 )
-    {
+    if ((err = target_vif(status, &np)) != 0) {
         WPRINTK("Invalid netif: handle=%u\n", status->handle);
         return;
     }
 
-    if ( np == NULL )
-    {
+    if (np == NULL) {
         DPRINTK("> no vif\n");
         return;
     }
 
-    switch ( status->status )
-    {
+    switch (status->status) {
     case NETIF_INTERFACE_STATUS_CLOSED:
-        switch ( np->backend_state )
-        {
+        switch (np->backend_state) {
         case BEST_CLOSED:
         case BEST_DISCONNECTED:
         case BEST_CONNECTED:
@@ -1085,8 +1046,7 @@ static void netif_interface_status(netif_fe_interface_status_t *status)
         break;
 
     case NETIF_INTERFACE_STATUS_DISCONNECTED:
-        switch ( np->backend_state )
-        {
+        switch (np->backend_state) {
         case BEST_CLOSED:
             vif_disconnect(np);
             break;
@@ -1098,8 +1058,7 @@ static void netif_interface_status(netif_fe_interface_status_t *status)
         break;
 
     case NETIF_INTERFACE_STATUS_CONNECTED:
-        switch ( np->backend_state )
-        {
+        switch (np->backend_state) {
         case BEST_CLOSED:
             WPRINTK("Unexpected netif status %s in state %s\n",
                     status_name[status->status],
@@ -1141,20 +1100,17 @@ static void netif_driver_status(netif_fe_driver_status_t *status)
 static void netif_ctrlif_rx(ctrl_msg_t *msg, unsigned long id)
 {
 
-    switch ( msg->subtype )
-    {
+    switch (msg->subtype) {
     case CMSG_NETIF_FE_INTERFACE_STATUS:
-        if ( msg->length != sizeof(netif_fe_interface_status_t) )
+        if (msg->length != sizeof(netif_fe_interface_status_t))
             goto error;
-        netif_interface_status((netif_fe_interface_status_t *)
-                               &msg->msg[0]);
+        netif_interface_status((netif_fe_interface_status_t *) &msg->msg[0]);
         break;
 
     case CMSG_NETIF_FE_DRIVER_STATUS:
-        if ( msg->length != sizeof(netif_fe_driver_status_t) )
+        if (msg->length != sizeof(netif_fe_driver_status_t))
             goto error;
-        netif_driver_status((netif_fe_driver_status_t *)
-                            &msg->msg[0]);
+        netif_driver_status((netif_fe_driver_status_t *) &msg->msg[0]);
         break;
 
     error:
@@ -1179,8 +1135,7 @@ static int probe_interfaces(void)
 
     DPRINTK(">\n");
 
-    for ( wait_i = 0; wait_i < wait_n; wait_i++)
-    { 
+    for (wait_i = 0; wait_i < wait_n; wait_i++) { 
         DPRINTK("> wait_i=%d\n", wait_i);
         conn = netctrl_connected();
         if(conn) break;
@@ -1190,8 +1145,7 @@ static int probe_interfaces(void)
     }
 
     DPRINTK("> wait finished...\n");
-    if ( conn <= 0 )
-    {
+    if (conn <= 0) {
         err = netctrl_err(-ENETDOWN);
         WPRINTK("Failed to connect all virtual interfaces: err=%d\n", err);
     }
@@ -1223,8 +1177,7 @@ static int probe_interfaces(void)
     DPRINTK(">\n");
 
     netctrl.interface_n = 0;
-    for ( wait_i = 0; wait_i < wait_n; wait_i++ )
-    { 
+    for (wait_i = 0; wait_i < wait_n; wait_i++) { 
         DPRINTK("> wait_i=%d query=%d\n", wait_i, query);
         msg.handle = query;
         memcpy(cmsg.msg, &msg, sizeof(msg));
@@ -1236,7 +1189,7 @@ static int probe_interfaces(void)
         DPRINTK("> err=%d\n", err);
         if(err) goto exit;
         DPRINTK("> rmsg=%p msg=%p, reply=%p\n", &rmsg, rmsg.msg, reply);
-        if((int)reply->handle < 0){
+        if((int)reply->handle < 0) {
             // No more interfaces.
             break;
         }
@@ -1246,8 +1199,7 @@ static int probe_interfaces(void)
     }
 
   exit:
-    if ( err )
-    {
+    if (err) {
         err = netctrl_err(-ENETDOWN);
         WPRINTK("Connecting virtual network interfaces failed: err=%d\n", err);
     }
@@ -1262,22 +1214,20 @@ static int probe_interfaces(void)
  * We use this notifier to send out a fake ARP reply to reset switches and
  * router ARP caches when an IP interface is brought up on a VIF.
  */
-static int inetdev_notify(struct notifier_block *this, 
-                          unsigned long event, 
-                          void *ptr)
+static int 
+inetdev_notify(struct notifier_block *this, unsigned long event, void *ptr)
 {
     struct in_ifaddr  *ifa = (struct in_ifaddr *)ptr; 
     struct net_device *dev = ifa->ifa_dev->dev;
     struct list_head  *ent;
     struct net_private *np;
 
-    if ( event != NETDEV_UP )
+    if (event != NETDEV_UP)
         goto out;
 
-    list_for_each ( ent, &dev_list )
-    {
+    list_for_each (ent, &dev_list) {
         np = list_entry(ent, struct net_private, list);
-        if ( np->dev == dev )
+        if (np->dev == dev)
             (void)send_fake_arp(dev);
     }
         
@@ -1295,7 +1245,7 @@ static int __init netif_init(void)
 {
     int err = 0;
 
-    if ( xen_start_info.flags & SIF_INITDOMAIN )
+    if (xen_start_info.flags & SIF_INITDOMAIN)
         return 0;
 
     IPRINTK("Initialising virtual ethernet driver.\n");
@@ -1306,7 +1256,7 @@ static int __init netif_init(void)
                                     CALLBACK_IN_BLOCKING_CONTEXT);
     send_driver_status(1);
     err = probe_interfaces();
-    if ( err )
+    if (err)
         ctrl_if_unregister_receiver(CMSG_NETIF_FE, netif_ctrlif_rx);
 
     DPRINTK("< err=%d\n", err);
@@ -1338,8 +1288,7 @@ void netif_suspend(void)
     struct list_head *ent;
     struct net_private *np;
     
-    list_for_each ( ent, &dev_list )
-    {
+    list_for_each (ent, &dev_list) {
         np = list_entry(ent, struct net_private, list);
         vif_suspend(np);
     }
@@ -1350,8 +1299,7 @@ void netif_resume(void)
     struct list_head *ent;
     struct net_private *np;
 
-    list_for_each ( ent, &dev_list )
-    {
+    list_for_each (ent, &dev_list) {
         np = list_entry(ent, struct net_private, list);
         vif_resume(np);
     }

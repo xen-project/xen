@@ -1594,10 +1594,26 @@ int do_update_va_mapping(unsigned long va,
             &shadow_linear_pg_table[l1_linear_offset(va)])))) )
         {
             /*
-             * Since L2's are guranteed RW, failure indicates the page was not 
-             * shadowed, so ignore.
+             * Since L2's are guranteed RW, failure indicates either that the
+             * page was not shadowed, or that the L2 entry has not yet been
+             * updated to reflect the shadow.
              */
-            perfc_incrc(shadow_update_va_fail);
+            unsigned l2_idx = page_nr >> (L2_PAGETABLE_SHIFT - L1_PAGETABLE_SHIFT);
+            l2_pgentry_t gpde = linear_l2_table[l2_idx];
+            unsigned long gpfn = l2_pgentry_val(gpde) >> PAGE_SHIFT;
+
+            if (get_shadow_status(&d->mm, gpfn))
+            {
+                unsigned long *gl1e = map_domain_mem(gpfn << PAGE_SHIFT);
+                unsigned l1_idx = page_nr & (ENTRIES_PER_L1_PAGETABLE - 1);
+                gl1e[l1_idx] = sval;
+                unmap_domain_mem(gl1e);
+                put_shadow_status(&d->mm);
+
+                perfc_incrc(shadow_update_va_fail1);
+            }
+            else
+                perfc_incrc(shadow_update_va_fail2);
         }
 
         /*
@@ -2259,7 +2275,7 @@ void audit_domain(struct domain *d)
             scan_for_pfn( e, xpfn );            
     }   
 
-    int i;
+    int i, l1, l2;
     unsigned long pfn;
     struct list_head *list_ent;
     struct pfn_info *page;
@@ -2318,8 +2334,8 @@ void audit_domain(struct domain *d)
 
 
     /* PHASE 1 */
-
-    adjust(&frame_table[pagetable_val(d->exec_domain[0]->arch.pagetable)>>PAGE_SHIFT], -1, 1);
+    if( pagetable_val(d->exec_domain[0]->arch.pagetable) )
+	adjust(&frame_table[pagetable_val(d->exec_domain[0]->arch.pagetable)>>PAGE_SHIFT], -1, 1);
 
     list_ent = d->page_list.next;
     for ( i = 0; (list_ent != &d->page_list); i++ )
@@ -2500,6 +2516,7 @@ void audit_domain(struct domain *d)
 
     /* PHASE 3 */
     list_ent = d->page_list.next;
+    l1 = l2 = 0;
     for ( i = 0; (list_ent != &d->page_list); i++ )
     {
         unsigned long *pt;
@@ -2509,6 +2526,7 @@ void audit_domain(struct domain *d)
         switch ( page->u.inuse.type_info & PGT_type_mask )
         {
         case PGT_l2_page_table:
+	    l2++;
             if ( (page->u.inuse.type_info & PGT_pinned) == PGT_pinned )
                 adjust( page, 1, 1 );          
 
@@ -2535,6 +2553,7 @@ void audit_domain(struct domain *d)
             break;
 
         case PGT_l1_page_table:
+	    l1++;
             if ( (page->u.inuse.type_info & PGT_pinned) == PGT_pinned )
                 adjust( page, 1, 1 );
 
@@ -2572,10 +2591,10 @@ void audit_domain(struct domain *d)
 
     spin_unlock(&d->page_alloc_lock);
 
-    adjust(&frame_table[pagetable_val(
-        d->exec_domain[0]->arch.pagetable)>>PAGE_SHIFT], 1, 1);
+    if( pagetable_val(d->exec_domain[0]->arch.pagetable) )
+	adjust(&frame_table[pagetable_val(d->exec_domain[0]->arch.pagetable)>>PAGE_SHIFT], 1, 1);
 
-    printk("Audit %d: Done. ctot=%d ttot=%d\n", d->id, ctot, ttot );
+    printk("Audit %d: Done. pages=%d l1=%d l2=%d ctot=%d ttot=%d\n", d->id, i, l1, l2, ctot, ttot );
 
     if ( d != current->domain )
         domain_unpause(d);
