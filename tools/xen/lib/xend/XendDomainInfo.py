@@ -272,22 +272,23 @@ def vm_recreate(config, info):
         d.callback(vm)
     return d
 
-def vm_restore(src, config, progress=0):
+def vm_restore(src, progress=0):
     """Restore a VM from a disk image.
 
     src      saved state to restore
-    config   configuration
     progress progress reporting flag
     returns  deferred
     raises   VmError for invalid configuration
     """
     vm = XendDomainInfo()
-    vm.config = config
-    ostype = "linux" #todo set from config
+    ostype = "linux" #todo Set from somewhere (store in the src?).
     restorefn = getattr(xc, "%s_restore" % ostype)
-    dom = restorefn(state_file=src, progress=progress)
+    d = restorefn(state_file=src, progress=progress)
+    dom = int(d['dom'])
     if dom < 0:
         raise VMError('restore failed')
+    vmconfig = sxp.from_string(d['vmconfig'])
+    vm.config = sxp.child_value(vmconfig, 'config')
     deferred = vm.dom_configure(dom)
     def vifs_cb(val, vm):
         vif_up(vm.ipaddrs)
@@ -855,9 +856,7 @@ def vm_field_vfr(vm, config, val, index):
         if not ip:
             raise VmError('vfr: missing ip address')
         ipaddrs.append(ip);
-        #Don't do this in new i/o model.
-        #print 'vm_field_vfr> add rule', 'dom=', vm.dom, 'vif=', vif, 'ip=', ip
-        #xenctl.ip.setup_vfr_rules_for_vif(vm.dom, vif, ip)
+        # todo: Configure the ipaddrs.
     vm.ipaddrs = ipaddrs
 
 def vnet_bridge(vnet, vmac, dom, idx):

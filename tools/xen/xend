@@ -13,8 +13,8 @@
 
    xend stop
 
-   Unfortunately restarting it upsets the channel to dom0 and
-   domain management stops working - needs a reboot to fix.
+   The daemon should reconnect to device control interfaces
+   and recover its state when restarted.
 """
 import os
 import sys

@@ -235,7 +235,7 @@ class XendDomain:
     def domain_get(self, id):
         id = str(id)
         self.refresh_domain(id)
-        return self.domain[id]
+        return self.domain.get(id)
     
     def domain_unpause(self, id):
         """(Re)start domain running.
@@ -278,22 +278,26 @@ class XendDomain:
         """
         # Need a cancel too?
         pass
-    
+
     def domain_save(self, id, dst, progress=0):
         """Save domain state to file, destroy domain.
         """
         dom = int(id)
+        dominfo = self.domain_get(id)
+        if not dominfo:
+            return -1
+        vmconfig = sxp.to_string(dominfo.sxpr())
         self.domain_pause(id)
         eserver.inject('xend.domain.save', id)
-        rc = xc.linux_save(dom=dom, state_file=dst, progress=progress)
+        rc = xc.linux_save(dom=dom, state_file=dst, vmconfig=vmconfig, progress=progress)
         if rc == 0:
             self.domain_destroy(id)
         return rc
     
-    def domain_restore(self, src, config, progress=0):
+    def domain_restore(self, src, progress=0):
         """Restore domain from file.
         """
-        dominfo = XendDomainInfo.dom_restore(dom, config)
+        dominfo = XendDomainInfo.vm_restore(src, progress=progress)
         self._add_domain(dominfo.id, dominfo)
         return dominfo
     
