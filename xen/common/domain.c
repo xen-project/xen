@@ -58,6 +58,8 @@ struct task_struct *do_createdomain(domid_t dom_id, unsigned int cpu)
 
     atomic_set(&p->refcnt, 1);
 
+    spin_lock_init(&p->mm.shadow_lock);
+
     p->domain    = dom_id;
     p->processor = cpu;
     p->create_time = NOW();
