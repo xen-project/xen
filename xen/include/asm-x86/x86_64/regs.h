@@ -36,4 +36,6 @@ struct xen_regs
 #define RING_2(_r)    (((_r)->cs & 3) == 2)
 #define RING_3(_r)    (((_r)->cs & 3) == 3)
 
+#define GUESTOS_FAULT(_r) (!VM86_MODE(_r) && RING_3(_r))
+
 #endif

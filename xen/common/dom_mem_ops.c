@@ -122,7 +122,7 @@ free_dom_mem(struct domain *d,
 long
 do_dom_mem_op(unsigned long  op, 
               unsigned long *extent_list, 
-              unsigned long  nr_extents,
+              unsigned int   nr_extents,
               unsigned int   extent_order,
               domid_t        domid)
 {
@@ -133,8 +133,7 @@ do_dom_mem_op(unsigned long  op,
     start_extent  = op >> START_EXTENT_SHIFT;
     op           &= (1 << START_EXTENT_SHIFT) - 1;
 
-    if ( unlikely(start_extent > nr_extents) || 
-         unlikely(nr_extents > ~0U) ) /* can pack into a uint? */
+    if ( unlikely(start_extent > nr_extents) )
         return -EINVAL;
 
     if ( likely(domid == DOMID_SELF) )
@@ -150,13 +149,11 @@ do_dom_mem_op(unsigned long  op,
     {
     case MEMOP_increase_reservation:
         rc = alloc_dom_mem(
-            d, extent_list, start_extent, 
-            (unsigned int)nr_extents, extent_order);
+            d, extent_list, start_extent, nr_extents, extent_order);
         break;
     case MEMOP_decrease_reservation:
         rc = free_dom_mem(
-            d, extent_list, start_extent, 
-            (unsigned int)nr_extents, extent_order);
+            d, extent_list, start_extent, nr_extents, extent_order);
         break;
     default:
         rc = -ENOSYS;

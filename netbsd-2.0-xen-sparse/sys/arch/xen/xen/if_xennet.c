@@ -580,7 +580,7 @@ xennet_rx_push_buffer(struct xennet_softc *sc, int id)
 		INVALID_P2M_ENTRY;
 
 	rx_mcl[nr_pfns].op = __HYPERVISOR_update_va_mapping;
-	rx_mcl[nr_pfns].args[0] = sc->sc_rx_bufa[id].xb_rx.xbrx_va >> PAGE_SHIFT;
+	rx_mcl[nr_pfns].args[0] = sc->sc_rx_bufa[id].xb_rx.xbrx_va;
 	rx_mcl[nr_pfns].args[1] = 0;
 	rx_mcl[nr_pfns].args[2] = 0;
 
@@ -679,7 +679,7 @@ xen_network_handler(void *arg)
 		mmu->val  = (pa - XPMAP_OFFSET) >> PAGE_SHIFT;
 		mmu++;
 		mcl->op = __HYPERVISOR_update_va_mapping;
-		mcl->args[0] = sc->sc_rx_bufa[rx->id].xb_rx.xbrx_va >> PAGE_SHIFT;
+		mcl->args[0] = sc->sc_rx_bufa[rx->id].xb_rx.xbrx_va;
 		mcl->args[1] = (rx->addr & PG_FRAME) | PG_V|PG_KW;
 		mcl->args[2] = UVMF_FLUSH_TLB; // 0;
 		mcl++;
@@ -872,7 +872,7 @@ network_alloc_rx_buffers(struct xennet_softc *sc)
 			INVALID_P2M_ENTRY;
 
 		rx_mcl[nr_pfns].op = __HYPERVISOR_update_va_mapping;
-		rx_mcl[nr_pfns].args[0] = va >> PAGE_SHIFT;
+		rx_mcl[nr_pfns].args[0] = va;
 		rx_mcl[nr_pfns].args[1] = 0;
 		rx_mcl[nr_pfns].args[2] = 0;
 

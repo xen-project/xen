@@ -1,8 +1,8 @@
 /* -*-  Mode:C; c-basic-offset:4; tab-width:4; indent-tabs-mode:nil -*- */
 /******************************************************************************
- * arch/x86/memory.c
+ * arch/x86/mm.c
  * 
- * Copyright (c) 2002-2004 K A Fraser
+ * Copyright (c) 2002-2005 K A Fraser
  * Copyright (c) 2004 Christian Limpach
  * 
  * This program is free software; you can redistribute it and/or modify
@@ -277,8 +277,8 @@ int map_ldt_shadow_page(unsigned int off)
     if ( unlikely(in_irq()) )
         BUG();
 
-    __get_user(l1e, (unsigned long *)&linear_pg_table[(ed->arch.ldt_base >> 
-                                                       PAGE_SHIFT) + off]);
+    __get_user(l1e, (unsigned long *)
+               &linear_pg_table[l1_linear_offset(ed->arch.ldt_base) + off]);
 
     if ( unlikely(!(l1e & _PAGE_PRESENT)) ||
          unlikely(!get_page_and_type(&frame_table[l1e >> PAGE_SHIFT], 
@@ -1552,7 +1552,7 @@ int do_mmu_update(
 }
 
 
-int do_update_va_mapping(unsigned long page_nr, 
+int do_update_va_mapping(unsigned long va,
                          unsigned long val, 
                          unsigned long flags)
 {
@@ -1564,7 +1564,7 @@ int do_update_va_mapping(unsigned long page_nr,
 
     perfc_incrc(calls_to_update_va);
 
-    if ( unlikely(page_nr >= (HYPERVISOR_VIRT_START >> PAGE_SHIFT)) )
+    if ( unlikely(!__addr_ok(va)) )
         return -EINVAL;
 
     LOCK_BIGLOCK(d);
@@ -1576,7 +1576,7 @@ int do_update_va_mapping(unsigned long page_nr,
      * the case of updating L2 entries.
      */
 
-    if ( unlikely(!mod_l1_entry(&linear_pg_table[page_nr], 
+    if ( unlikely(!mod_l1_entry(&linear_pg_table[l1_linear_offset(va)],
                                 mk_l1_pgentry(val))) )
         err = -EINVAL;
 
@@ -1587,7 +1587,7 @@ int do_update_va_mapping(unsigned long page_nr,
         l1pte_propagate_from_guest(d, &val, &sval);
 
         if ( unlikely(__put_user(sval, ((unsigned long *)(
-            &shadow_linear_pg_table[page_nr])))) )
+            &shadow_linear_pg_table[l1_linear_offset(va)])))) )
         {
             /*
              * Since L2's are guranteed RW, failure indicates the page was not 
@@ -1602,7 +1602,7 @@ int do_update_va_mapping(unsigned long page_nr,
          * for this.
          */
         if ( d->arch.shadow_mode == SHM_logdirty )
-            mark_dirty(d, va_to_l1mfn(page_nr << PAGE_SHIFT));  
+            mark_dirty(d, va_to_l1mfn(va));
   
         check_pagetable(d, ed->arch.pagetable, "va"); /* debug */
     }
@@ -1614,7 +1614,7 @@ int do_update_va_mapping(unsigned long page_nr,
          unlikely(flags & UVMF_FLUSH_TLB) )
         local_flush_tlb();
     else if ( unlikely(flags & UVMF_INVLPG) )
-        __flush_tlb_one(page_nr << PAGE_SHIFT);
+        __flush_tlb_one(va);
 
     if ( unlikely(deferred_ops & DOP_RELOAD_LDT) )
         (void)map_ldt_shadow_page(0);
@@ -1624,7 +1624,7 @@ int do_update_va_mapping(unsigned long page_nr,
     return err;
 }
 
-int do_update_va_mapping_otherdomain(unsigned long page_nr, 
+int do_update_va_mapping_otherdomain(unsigned long va,
                                      unsigned long val, 
                                      unsigned long flags,
                                      domid_t domid)
@@ -1643,7 +1643,7 @@ int do_update_va_mapping_otherdomain(unsigned long page_nr,
         return -ESRCH;
     }
 
-    rc = do_update_va_mapping(page_nr, val, flags);
+    rc = do_update_va_mapping(va, val, flags);
 
     put_domain(d);
     percpu_info[cpu].foreign = NULL;
@@ -1993,6 +1993,10 @@ int ptwr_do_page_fault(unsigned long addr)
     l2_pgentry_t    *pl2e;
     int              which, cpu = smp_processor_id();
     u32              l2_idx;
+
+#ifdef __x86_64__
+    return 0; /* Writable pagetables need fixing for x86_64. */
+#endif
 
     /*
      * Attempt to read the PTE that maps the VA being accessed. By checking for
