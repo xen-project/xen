@@ -223,6 +223,7 @@ typedef struct {
 typedef struct { 
     /* IN */
     domid_t    domid;         /*  0: Domain attached to new interface.   */
+    u16        __pad;
     u32        blkif_handle;  /*  4: Domain-specific interface handle.   */
     /* OUT */
     u32        status;        /*  8 */
@@ -237,6 +238,7 @@ typedef struct {
 typedef struct { 
     /* IN */
     domid_t    domid;         /*  0: Identify interface to be destroyed. */
+    u16        __pad;
     u32        blkif_handle;  /*  4: ...ditto...                         */
     /* OUT */
     u32        status;        /*  8 */
@@ -251,6 +253,7 @@ typedef struct {
 typedef struct { 
     /* IN */
     domid_t    domid;         /*  0: Domain attached to new interface.   */
+    u16        __pad;
     u32        blkif_handle;  /*  4: Domain-specific interface handle.   */
     memory_t   shmem_frame;   /*  8: Page cont. shared comms window.     */
     MEMORY_PADDING;
@@ -268,6 +271,7 @@ typedef struct {
 typedef struct { 
     /* IN */
     domid_t    domid;         /*  0: Domain attached to new interface.   */
+    u16        __pad;
     u32        blkif_handle;  /*  4: Domain-specific interface handle.   */
     /* OUT */
     u32        status;        /*  8 */
@@ -277,6 +281,7 @@ typedef struct {
 typedef struct { 
     /* IN */
     domid_t    domid;         /*  0: Identify blkdev interface.          */
+    u16        __pad;
     u32        blkif_handle;  /*  4: ...ditto...                         */
     blkif_vdev_t vdevice;     /*  8: Interface-specific id for this VBD. */
     u16        readonly;      /* 10: Non-zero -> VBD isn't writeable.    */
@@ -288,9 +293,10 @@ typedef struct {
 typedef struct {
     /* IN */
     domid_t    domid;         /*  0: Identify blkdev interface.          */
+    u16        __pad0;        /*  2 */
     u32        blkif_handle;  /*  4: ...ditto...                         */
     blkif_vdev_t vdevice;     /*  8: Interface-specific id of the VBD.   */
-    u16        __pad;         /* 10 */
+    u16        __pad1;        /* 10 */
     /* OUT */
     u32        status;        /* 12 */
 } PACKED blkif_be_vbd_destroy_t; /* 16 bytes */
@@ -299,10 +305,11 @@ typedef struct {
 typedef struct { 
     /* IN */
     domid_t    domid;         /*  0: Identify blkdev interface.          */
+    u16        __pad0;        /*  2 */
     u32        blkif_handle;  /*  4: ...ditto...                         */
     blkif_extent_t extent;    /*  8: Physical extent to append to VBD.   */
     blkif_vdev_t vdevice;     /* 28: Interface-specific id of the VBD.   */
-    u16        __pad;         /* 30 */
+    u16        __pad1;        /* 30 */
     /* OUT */
     u32        status;        /* 32 */
 } PACKED blkif_be_vbd_grow_t; /* 36 bytes */
@@ -311,9 +318,10 @@ typedef struct {
 typedef struct { 
     /* IN */
     domid_t    domid;         /*  0: Identify blkdev interface.          */
+    u16        __pad0;        /*  2 */
     u32        blkif_handle;  /*  4: ...ditto...                         */
     blkif_vdev_t vdevice;     /*  8: Interface-specific id of the VBD.   */
-    u16        __pad;         /* 10 */
+    u16        __pad1;        /* 10 */
     /* OUT */
     u32        status;        /* 12 */
 } PACKED blkif_be_vbd_shrink_t; /* 16 bytes */
@@ -451,9 +459,10 @@ typedef struct {
 typedef struct { 
     /* IN */
     domid_t    domid;         /*  0: Domain attached to new interface.   */
+    u16        __pad0;        /*  2 */
     u32        netif_handle;  /*  4: Domain-specific interface handle.   */
     u8         mac[6];        /*  8 */
-    u16        __pad;         /* 14 */
+    u16        __pad1;        /* 14 */
     /* OUT */
     u32        status;        /* 16 */
 } PACKED netif_be_create_t; /* 20 bytes */
@@ -467,6 +476,7 @@ typedef struct {
 typedef struct { 
     /* IN */
     domid_t    domid;         /*  0: Identify interface to be destroyed. */
+    u16        __pad;
     u32        netif_handle;  /*  4: ...ditto...                         */
     /* OUT */
     u32   status;             /*  8 */
@@ -481,13 +491,14 @@ typedef struct {
 typedef struct { 
     /* IN */
     domid_t    domid;          /*  0: Domain attached to new interface.   */
+    u16        __pad0;         /*  2 */
     u32        netif_handle;   /*  4: Domain-specific interface handle.   */
     memory_t   tx_shmem_frame; /*  8: Page cont. tx shared comms window.  */
     MEMORY_PADDING;
     memory_t   rx_shmem_frame; /* 16: Page cont. rx shared comms window.  */
     MEMORY_PADDING;
     u16        evtchn;         /* 24: Event channel for notifications.    */
-    u16        __pad;          /* 26 */
+    u16        __pad1;         /* 26 */
     /* OUT */
     u32        status;         /* 28 */
 } PACKED netif_be_connect_t; /* 32 bytes */
@@ -501,6 +512,7 @@ typedef struct {
 typedef struct { 
     /* IN */
     domid_t    domid;         /*  0: Domain attached to new interface.   */
+    u16        __pad;
     u32        netif_handle;  /*  4: Domain-specific interface handle.   */
     /* OUT */
     u32        status;        /*  8 */

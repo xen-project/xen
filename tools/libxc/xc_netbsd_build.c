@@ -254,7 +254,7 @@ int xc_netbsd_build(int xc_handle,
     op.u.getdomaininfo.domain = (domid_t)domid;
     op.u.getdomaininfo.ctxt = ctxt;
     if ( (do_dom0_op(xc_handle, &op) < 0) || 
-         ((u32)op.u.getdomaininfo.domain != domid) )
+         ((u16)op.u.getdomaininfo.domain != domid) )
     {
         PERROR("Could not get info on domain");
         goto error_out;

@@ -155,7 +155,7 @@ struct domain
 extern struct domain idle0_task;
 
 extern struct domain *idle_task[NR_CPUS];
-#define IDLE_DOMAIN_ID   (0x7FFFFFFFU)
+#define IDLE_DOMAIN_ID   (0x7FFFU)
 #define is_idle_task(_p) (test_bit(DF_IDLETASK, &(_p)->flags))
 
 void free_domain_struct(struct domain *d);

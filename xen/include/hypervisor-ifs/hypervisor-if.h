@@ -193,9 +193,9 @@
 
 #ifndef __ASSEMBLY__
 
-typedef u32 domid_t;
+typedef u16 domid_t;
 /* DOMID_SELF is used in certain contexts to refer to oneself. */
-#define DOMID_SELF (0x7FFFFFFEU)
+#define DOMID_SELF (0x7FFEU)
 
 /*
  * Send an array of these to HYPERVISOR_mmu_update().

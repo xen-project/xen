@@ -19,7 +19,7 @@
  * This makes sure that old versions of dom0 tools will stop working in a
  * well-defined way (rather than crashing the machine, for instance).
  */
-#define DOM0_INTERFACE_VERSION   0xAAAA0010
+#define DOM0_INTERFACE_VERSION   0xAAAA0011
 
 #define MAX_DOMAIN_NAME    16
 
@@ -29,7 +29,8 @@
 typedef struct {
     /* IN variables. */
     domid_t       domain;             /*  0 */
-    u32           __pad;
+    u16           __pad0;
+    u32           __pad1;
     memory_t      max_pfns;           /*  8 */
     MEMORY_PADDING;
     void         *buffer;             /* 16 */
@@ -54,10 +55,11 @@ typedef struct {
     MEMORY_PADDING;
     u8           name[MAX_DOMAIN_NAME]; /*  8 */
     u32          cpu;                 /* 24 */
-    u32          __pad;               /* 28 */
+    u32          __pad0;              /* 28 */
     /* IN/OUT parameters. */
     /* If 0, domain is allocated. If non-zero use it unless in use. */
     domid_t      domain;              /* 32 */
+    u16          __pad1;
     /* OUT parameters. */
 } PACKED dom0_createdomain_t; /* 36 bytes */
 
@@ -65,24 +67,28 @@ typedef struct {
 typedef struct {
     /* IN variables. */
     domid_t      domain;              /*  0 */
+    u16          __pad;
 } PACKED dom0_destroydomain_t; /* 4 bytes */
 
 #define DOM0_PAUSEDOMAIN      10
 typedef struct {
     /* IN parameters. */
     domid_t domain;                   /*  0 */
+    u16     __pad;
 } PACKED dom0_pausedomain_t; /* 4 bytes */
 
 #define DOM0_UNPAUSEDOMAIN    11
 typedef struct {
     /* IN parameters. */
     domid_t domain;                   /*  0 */
+    u16     __pad;
 } PACKED dom0_unpausedomain_t; /* 4 bytes */
 
 #define DOM0_GETDOMAININFO    12
 typedef struct {
     /* IN variables. */
     domid_t  domain;                  /*  0 */ /* NB. IN/OUT variable. */
+    u16     __pad;
     /* OUT variables. */
 #define DOMFLAGS_DYING     (1<<0) /* Domain is scheduled to die.             */
 #define DOMFLAGS_CRASHED   (1<<1) /* Crashed domain; frozen for postmortem.  */
@@ -111,7 +117,8 @@ typedef struct {
 typedef struct {
     /* IN variables. */
     domid_t                 domain;   /*  0 */
-    u32                     __pad;    /*  4 */
+    u16                     __pad0;   /*  2 */
+    u32                     __pad1;   /*  4 */
     /* IN/OUT parameters */
     full_execution_context_t *ctxt;   /*  8 */
     MEMORY_PADDING;
@@ -120,6 +127,7 @@ typedef struct {
 #define DOM0_IOPL             14
 typedef struct {
     domid_t domain;                   /*  0 */
+    u16     __pad;
     u32     iopl;                     /*  4 */
 } PACKED dom0_iopl_t; /* 8 bytes */
 
@@ -140,17 +148,17 @@ typedef struct {
 typedef struct {
     /* IN variables. */
     domid_t domain;                   /*  0 */
-    u8  opcode;                       /*  4 */
-    u8  __pad0, __pad1, __pad2;
-    u32 in1;                          /*  8 */
-    u32 in2;                          /* 12 */
-    u32 in3;                          /* 16 */
-    u32 in4;                          /* 20 */
+    u8  opcode;                       /*  2 */
+    u8  __pad;
+    u32 in1;                          /*  4 */
+    u32 in2;                          /*  8 */
+    u32 in3;                          /* 12 */
+    u32 in4;                          /* 16 */
     /* OUT variables. */
-    u32 status;                       /* 24 */
-    u32 out1;                         /* 28 */
-    u32 out2;                         /* 32 */
-} PACKED dom0_debug_t; /* 36 bytes */
+    u32 status;                       /* 20 */
+    u32 out1;                         /* 24 */
+    u32 out2;                         /* 28 */
+} PACKED dom0_debug_t; /* 32 bytes */
 
 /*
  * Set clock such that it would read <secs,usecs> after 00:00:00 UTC,
@@ -177,6 +185,7 @@ typedef struct {
     memory_t pfn;          /*  0: Machine page frame number to query.       */
     MEMORY_PADDING;
     domid_t domain;        /*  8: To which domain does the frame belong?    */
+    u16     __pad;
     /* OUT variables. */
     /* Is the page PINNED to a type? */
     u32 type;              /* 12: see above type defs */
@@ -200,6 +209,7 @@ typedef struct {
 typedef struct {
     /* IN variables. */
     domid_t      domain;              /*  0 */
+    u16          __pad;
     s32          cpu;                 /*  4: -1 implies unpin */
 } PACKED dom0_pincpudomain_t; /* 8 bytes */
 
@@ -234,6 +244,7 @@ typedef struct {
 typedef struct {
     /* IN variables. */
     domid_t      domain;              /*  0 */
+    u16          __pad;
     u32          bus;                 /*  4 */
     u32          dev;                 /*  8 */
     u32          func;                /* 12 */
@@ -274,6 +285,7 @@ typedef struct dom0_shadow_control
 typedef struct {
     /* IN variables. */
     domid_t        domain;            /*  0 */
+    u16            __pad;
     u32            op;                /*  4 */
     unsigned long *dirty_bitmap;      /*  8: pointer to locked buffer */
     MEMORY_PADDING;
@@ -289,6 +301,7 @@ typedef struct {
 typedef struct {
     /* IN variables. */
     domid_t  domain;                  /*  0 */
+    u16      __pad;
     u8       name[MAX_DOMAIN_NAME];   /*  4 */
 } PACKED dom0_setdomainname_t; /* 20 bytes */
 
@@ -296,7 +309,8 @@ typedef struct {
 typedef struct {
     /* IN variables. */
     domid_t     domain;               /*  0 */
-    u32         __pad;
+    u16         __pad0;
+    u32         __pad1;
     memory_t    initial_memkb;        /*  8 */
     MEMORY_PADDING;
 } PACKED dom0_setdomaininitialmem_t; /* 16 bytes */
@@ -305,7 +319,8 @@ typedef struct {
 typedef struct {
     /* IN variables. */
     domid_t     domain;               /*  0 */
-    u32         __pad;
+    u16         __pad0;
+    u32         __pad1;
     memory_t    max_memkb;            /*  8 */
     MEMORY_PADDING;
 } PACKED dom0_setdomainmaxmem_t; /* 16 bytes */
@@ -314,7 +329,8 @@ typedef struct {
 typedef struct {
     /* IN variables. */
     domid_t  domain;                  /*  0 */
-    u32         __pad;
+    u16      __pad0;
+    u32      __pad1;
     memory_t num;                     /*  8 */
     MEMORY_PADDING;
     /* IN/OUT variables. */
