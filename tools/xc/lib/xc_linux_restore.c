@@ -116,8 +116,6 @@ int xc_linux_restore(int xc_handle,
 
     if ( (*readerfn)(readerst, name,                  sizeof(name)) ||
          (*readerfn)(readerst, &nr_pfns,              sizeof(unsigned long)) ||
-         (*readerfn)(readerst, &ctxt,                 sizeof(ctxt)) ||
-         (*readerfn)(readerst, shared_info,           PAGE_SIZE) ||
          (*readerfn)(readerst, pfn_to_mfn_frame_list, PAGE_SIZE) )
     {
         ERROR("Error when reading from state file");
@@ -181,10 +179,7 @@ int xc_linux_restore(int xc_handle,
     if ( (pm_handle = init_pfn_mapper((domid_t)dom)) < 0 )
         goto out;
 
-    /* Copy saved contents of shared-info page. No checking needed. */
-    ppage = map_pfn_writeable(pm_handle, shared_info_frame);
-    memcpy(ppage, shared_info, PAGE_SIZE);
-    unmap_pfn(pm_handle, ppage);
+
 
     /* Build the pfn-to-mfn table. We choose MFN ordering returned by Xen. */
     if ( get_pfn_list(xc_handle, dom, pfn_to_mfn_table, nr_pfns) != nr_pfns )
@@ -403,6 +398,15 @@ int xc_linux_restore(int xc_handle,
 
     verbose_printf("\b\b\b\b100%%\nMemory reloaded.\n");
 
+
+    if ( (*readerfn)(readerst, &ctxt,                 sizeof(ctxt)) ||
+         (*readerfn)(readerst, shared_info,           PAGE_SIZE) )
+    {
+        ERROR("Error when reading from state file");
+        goto out;
+    }
+
+
     /* Uncanonicalise the suspend-record frame number and poke resume rec. */
     pfn = ctxt.cpu_ctxt.esi;
     if ( (pfn >= nr_pfns) || (pfn_type[pfn] != NONE) )
@@ -445,9 +449,13 @@ int xc_linux_restore(int xc_handle,
     }
     ctxt.pt_base = pfn_to_mfn_table[pfn] << PAGE_SHIFT;
 
+    /* Copy saved contents of shared-info page. No checking needed. */
+    ppage = map_pfn_writeable(pm_handle, shared_info_frame);
+    memcpy(ppage, shared_info, PAGE_SIZE);
+    unmap_pfn(pm_handle, ppage);
+
+
     /* Uncanonicalise the pfn-to-mfn table frame-number list. */
-
-
     if ( (mapper_handle1 = mfn_mapper_init(xc_handle, dom,
 					   1024*1024, PROT_WRITE )) 
 	 == NULL )
