@@ -1,5 +1,5 @@
---- /home/djm/src/xen/xeno-ia64.bk/xen/linux-2.6.7/include/asm-ia64/system.h	2005-01-23 13:23:36.000000000 -0700
-+++ /home/djm/src/xen/xeno-ia64.bk/xen/include/asm-ia64/system.h	2004-09-17 18:27:22.000000000 -0600
+--- ../../linux-2.6.7/include/asm-ia64/system.h	2005-01-31 11:15:23.000000000 -0700
++++ include/asm-ia64/system.h	2005-03-14 11:31:12.000000000 -0700
 @@ -24,8 +24,16 @@
   * 0xa000000000000000+2*PERCPU_PAGE_SIZE
   * - 0xa000000000000000+3*PERCPU_PAGE_SIZE remain unmapped (guard page)
@@ -35,9 +35,9 @@
  #else
  # define switch_to(prev,next,last)	__switch_to(prev, next, last)
  #endif
-+#ifdef XEN
-+#undef switch_to
-+#endif
++//#ifdef XEN
++//#undef switch_to
++//#endif
  
  /*
   * On IA-64, we don't want to hold the runqueue's lock during the low-level context-switch,

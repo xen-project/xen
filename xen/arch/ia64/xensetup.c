@@ -389,7 +389,7 @@ printk("About to call init_trace_bufs()\n");
     console_endboot(cmdline && strstr(cmdline, "tty0"));
 #endif
 
-    domain_unpause_by_systemcontroller(current);
+    domain_unpause_by_systemcontroller(current->domain);
 #ifdef CLONE_DOMAIN0
     {
     int i;
