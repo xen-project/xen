@@ -22,7 +22,7 @@ void vhpt_flush(void)
 	struct vhpt_lf_entry *v = (void *)VHPT_ADDR;
 	int i;
 
-	for (i = 0; i < VHPT_CACHE_NUM_ENTRIES; i++, v++) {
+	for (i = 0; i < VHPT_NUM_ENTRIES; i++, v++) {
 		v->itir = 0;
 		v->CChain = 0;
 		v->page_flags = 0;
