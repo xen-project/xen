@@ -14,19 +14,6 @@
 #include <asm/bitops.h>
 
 /*
- * GENERIC SCHEDULING CALLBACK MECHANISMS
- */
-
-/* Schedule an asynchronous callback for the specified domain. */
-static inline void guest_async_callback(struct domain *d)
-{
-    int running = test_bit(DF_RUNNING, &d->flags);
-    domain_unblock(d);
-    if ( running )
-        smp_send_event_check_cpu(d->processor);
-}
-
-/*
  * EVENT-CHANNEL NOTIFICATIONS
  * NB. On x86, the atomic bit operations also act as memory barriers. There
  * is therefore sufficiently strict ordering for this architecture -- others
@@ -36,13 +23,29 @@ static inline void guest_async_callback(struct domain *d)
 static inline void evtchn_set_pending(struct domain *d, int port)
 {
     shared_info_t *s = d->shared_info;
+    int            running;
+
+    /* These three operations must happen in strict order. */
     if ( !test_and_set_bit(port,    &s->evtchn_pending[0]) &&
          !test_bit        (port,    &s->evtchn_mask[0])    &&
          !test_and_set_bit(port>>5, &s->evtchn_pending_sel) )
     {
         /* The VCPU pending flag must be set /after/ update to evtchn-pend. */
-        s->vcpu_data[0].evtchn_upcall_pending = 1;
-        guest_async_callback(d);
+        set_bit(0, &s->vcpu_data[0].evtchn_upcall_pending);
+
+        /*
+         * NB1. 'flags' and 'processor' must be checked /after/ update of
+         * pending flag. These values may fluctuate (after all, we hold no
+         * locks) but the key insight is that each change will cause
+         * evtchn_upcall_pending to be polled.
+         * 
+         * NB2. We save DF_RUNNING across the unblock to avoid a needless
+         * IPI for domains that we IPI'd to unblock.
+         */
+        running = test_bit(DF_RUNNING, &d->flags);
+        domain_unblock(d);
+        if ( running )
+            smp_send_event_check_cpu(d->processor);
     }
 }
 
