@@ -48,7 +48,7 @@
  */
 static spinlock_t update_lock = SPIN_LOCK_UNLOCKED;
 
-#define QUEUE_SIZE 1 /*128*/
+#define QUEUE_SIZE 128
 #if LINUX_VERSION_CODE < KERNEL_VERSION(2,6,0)
 #define pte_offset_kernel pte_offset
 #define pud_t pgd_t
