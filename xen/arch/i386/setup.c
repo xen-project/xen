@@ -25,6 +25,9 @@ struct task_struct *idle_task[NR_CPUS] = { &idle0_task };
 /* for asm/domain_page.h, map_domain_page() */
 unsigned long *mapcache[NR_CPUS];
 
+int phys_proc_id[NR_CPUS];
+int logical_proc_id[NR_CPUS];
+
 /* Standard macro to see if a specific flag is changeable */
 static inline int flag_is_changeable_p(u32 flag)
 {
@@ -79,9 +82,45 @@ void __init get_cpu_vendor(struct cpuinfo_x86 *c)
 
 static void __init init_intel(struct cpuinfo_x86 *c)
 {
+    extern int opt_noht, opt_noacpi;
+
     /* SEP CPUID bug: Pentium Pro reports SEP but doesn't have it */
     if ( c->x86 == 6 && c->x86_model < 3 && c->x86_mask < 3 )
         clear_bit(X86_FEATURE_SEP, &c->x86_capability);
+
+    if ( opt_noht )
+    {
+        opt_noacpi = 1; /* Virtual CPUs only appear in ACPI tables. */
+        clear_bit(X86_FEATURE_HT, &c->x86_capability[0]);
+    }
+
+#ifdef CONFIG_SMP
+    if ( test_bit(X86_FEATURE_HT, &c->x86_capability) )
+    {
+        u32     eax, ebx, ecx, edx;
+        int     initial_apic_id, siblings, cpu = smp_processor_id();
+        
+        cpuid(1, &eax, &ebx, &ecx, &edx);
+        siblings = (ebx & 0xff0000) >> 16;
+        
+        if ( siblings <= 1 )
+        {
+            printk(KERN_INFO  "CPU#%d: Hyper-Threading is disabled\n", cpu);
+        } 
+        else if ( siblings > 2 )
+        {
+            panic("We don't support more than two logical CPUs per package!");
+        }
+        else
+        {
+            initial_apic_id = ebx >> 24 & 0xff;
+            phys_proc_id[cpu]    = initial_apic_id >> 1;
+            logical_proc_id[cpu] = initial_apic_id & 1;
+            printk(KERN_INFO  "CPU#%d: Physical ID: %d, Logical ID: %d\n",
+                   cpu, phys_proc_id[cpu], logical_proc_id[cpu]);
+        }
+    }
+#endif
 }
 
 static void __init init_amd(struct cpuinfo_x86 *c)
@@ -104,9 +143,11 @@ static void __init init_amd(struct cpuinfo_x86 *c)
  */
 void __init identify_cpu(struct cpuinfo_x86 *c)
 {
-    extern int opt_noht, opt_noacpi;
-    int junk, i;
+    int junk, i, cpu = smp_processor_id();
     u32 xlvl, tfms;
+
+    phys_proc_id[cpu]    = cpu;
+    logical_proc_id[cpu] = 0;
 
     c->x86_vendor = X86_VENDOR_UNKNOWN;
     c->cpuid_level = -1;	/* CPUID not detected */
@@ -166,12 +207,6 @@ void __init identify_cpu(struct cpuinfo_x86 *c)
         panic("Only support Intel processors (P6+)\n");
     }
 	
-    if ( opt_noht )
-    {
-        opt_noacpi = 1; /* Virtual CPUs only appear in ACPI tables. */
-        clear_bit(X86_FEATURE_HT, &c->x86_capability[0]);
-    }
-
     printk("CPU caps: %08x %08x %08x %08x\n",
            c->x86_capability[0],
            c->x86_capability[1],

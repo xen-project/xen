@@ -381,6 +381,9 @@ void __init smp_callin(void)
      */
     smp_store_cpu_info(cpuid);
 
+    if (nmi_watchdog == NMI_LOCAL_APIC)
+        setup_apic_nmi_watchdog();
+
     /*
      * Allow the master to continue.
      */
