@@ -60,10 +60,15 @@ static void __do_suspend(void)
     suspend_record_t *suspend_record;
 
     /* Hmmm... a cleaner interface to suspend/resume blkdevs would be nice. */
+	/* XXX SMH: yes it would :-( */	
+#ifdef CONFIG_XEN_BLKDEV_FRONTEND
     extern void blkdev_suspend(void);
     extern void blkdev_resume(void);
+#endif
+#ifdef CONFIG_XEN_NETIF_FRONTEND
     extern void netif_suspend(void);
     extern void netif_resume(void);    
+#endif
     extern void time_suspend(void);
     extern void time_resume(void);
     extern unsigned long max_pfn;
@@ -77,9 +82,13 @@ static void __do_suspend(void)
 
     __cli();
 
+#ifdef CONFIG_XEN_NETIF_FRONTEND
     netif_suspend();
+#endif
 
+#ifdef CONFIG_XEN_BLKDEV_FRONTEND
     blkdev_suspend();
+#endif
 
     time_suspend();
 
@@ -130,9 +139,13 @@ static void __do_suspend(void)
 
     time_resume();
 
+#ifdef CONFIG_XEN_BLKDEV_FRONTEND
     blkdev_resume();
+#endif
 
+#ifdef CONFIG_XEN_NETIF_FRONTEND
     netif_resume();
+#endif
 
     __sti();
 
