@@ -1,7 +1,7 @@
 /******************************************************************************
  * event_channel.c
  * 
- * Event channels between domains.
+ * Event notifications from VIRQs, PIRQs, and other domains.
  * 
  * Copyright (c) 2003-2004, K A Fraser.
  * 

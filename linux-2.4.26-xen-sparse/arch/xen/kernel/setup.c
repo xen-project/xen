@@ -1155,7 +1155,7 @@ static void shutdown_handler(ctrl_msg_t *msg, unsigned long id)
 
 static int __init setup_shutdown_event(void)
 {
-    ctrl_if_register_receiver(CMSG_SUSPEND, shutdown_handler, 0);
+    ctrl_if_register_receiver(CMSG_SHUTDOWN, shutdown_handler, 0);
     return 0;
 }
 
