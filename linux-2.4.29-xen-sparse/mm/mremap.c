@@ -119,11 +119,9 @@ static int move_page_tables(struct mm_struct * mm,
 	 * the old page tables)
 	 */
 oops_we_failed:
-	XEN_flush_page_update_queue();
 	flush_cache_range(mm, new_addr, new_addr + len);
 	while ((offset += PAGE_SIZE) < len)
 		move_one_page(mm, new_addr + offset, old_addr + offset);
-	XEN_flush_page_update_queue();
 	zap_page_range(mm, new_addr, len);
 	return -1;
 }

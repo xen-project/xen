@@ -407,7 +407,6 @@ extern void noexec_setup(const char *str);
 	do {								  \
 		if (__dirty) {						  \
 		        if ( likely((__vma)->vm_mm == current->mm) ) {    \
-			    xen_flush_page_update_queue();                \
 			    HYPERVISOR_update_va_mapping((__address), (__entry), UVMF_INVLPG); \
 			} else {                                          \
                             xen_l1_entry_update((__ptep), (__entry).pte_low); \
@@ -426,7 +425,6 @@ do {				  					\
 #define ptep_establish_new(__vma, __address, __ptep, __entry)		\
 do {				  					\
 	if (likely((__vma)->vm_mm == current->mm)) {			\
-		xen_flush_page_update_queue();				\
 		HYPERVISOR_update_va_mapping((__address),		\
 					     __entry, 0);		\
 	} else {							\

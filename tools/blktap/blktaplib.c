@@ -248,12 +248,21 @@ static void apply_rsp_hooks(blkif_response_t *rsp)
     }
 }
 
+static pthread_mutex_t push_mutex = PTHREAD_MUTEX_INITIALIZER;
+
 void blktap_inject_response(blkif_response_t *rsp)
 {
+    
     apply_rsp_hooks(rsp);
+    
     write_rsp_to_fe_ring(rsp);
+    
+    pthread_mutex_lock(&push_mutex);
+    
     RING_PUSH_RESPONSES(&fe_ring);
     ioctl(fd, BLKTAP_IOCTL_KICK_FE);
+    
+    pthread_mutex_unlock(&push_mutex);
 }
 
 /*-----[ Polling fd listeners ]------------------------------------------*/
@@ -449,7 +458,9 @@ int blktap_listen(void)
             }
             /* Using this as a unidirectional ring. */
             ctrl_ring.req_cons = ctrl_ring.rsp_prod_pvt = i;
+pthread_mutex_lock(&push_mutex);
             RING_PUSH_RESPONSES(&ctrl_ring);
+pthread_mutex_unlock(&push_mutex);
             
             /* empty the fe_ring */
             notify_fe = 0;
@@ -517,14 +528,18 @@ int blktap_listen(void)
 
             if (notify_be) {
                 DPRINTF("notifying be\n");
+pthread_mutex_lock(&push_mutex);
                 RING_PUSH_REQUESTS(&be_ring);
                 ioctl(fd, BLKTAP_IOCTL_KICK_BE);
+pthread_mutex_unlock(&push_mutex);
             }
 
             if (notify_fe) {
                 DPRINTF("notifying fe\n");
+pthread_mutex_lock(&push_mutex);
                 RING_PUSH_RESPONSES(&fe_ring);
                 ioctl(fd, BLKTAP_IOCTL_KICK_FE);
+pthread_mutex_unlock(&push_mutex);
             }
         }        
     }

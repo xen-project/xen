@@ -14,7 +14,8 @@
 #define NOTHREADS
 #endif
 
-#define READ_POOL_SIZE 128
+//#define READ_POOL_SIZE 128
+#define READ_POOL_SIZE 8
 
 /* per-thread identifier */
 pthread_key_t tid_key;

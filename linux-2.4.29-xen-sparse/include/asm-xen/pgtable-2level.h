@@ -34,9 +34,19 @@ static inline int pgd_bad(pgd_t pgd)		{ return 0; }
 static inline int pgd_present(pgd_t pgd)	{ return 1; }
 #define pgd_clear(xp)				do { } while (0)
 
-#define set_pte(pteptr, pteval) queue_l1_entry_update(pteptr, (pteval).pte_low)
-#define set_pte_atomic(pteptr, pteval) queue_l1_entry_update(pteptr, (pteval).pte_low)
-#define set_pmd(pmdptr, pmdval) queue_l2_entry_update((pmdptr), (pmdval))
+/*
+ * Certain architectures need to do special things when PTEs
+ * within a page table are directly modified.  Thus, the following
+ * hook is made available.
+ */
+#define set_pte(pteptr, pteval) (*(pteptr) = pteval)
+#define set_pte_atomic(pteptr, pteval) (*(pteptr) = pteval)
+
+/*
+ * (pmds are folded into pgds so this doesnt get actually called,
+ * but the define is needed for a generic inline function.)
+ */
+#define set_pmd(pmdptr, pmdval) xen_l2_entry_update((pmdptr), (pmdval))
 #define set_pgd(pgdptr, pgdval) ((void)0)
 
 #define pgd_page(pgd) \
@@ -47,6 +57,7 @@ static inline pmd_t * pmd_offset(pgd_t * dir, unsigned long address)
 	return (pmd_t *) dir;
 }
 
+#define ptep_get_and_clear(xp)	__pte_ma(xchg(&(xp)->pte_low, 0))
 #define pte_same(a, b)		((a).pte_low == (b).pte_low)
 
 /*                                 
@@ -82,22 +93,5 @@ static inline pmd_t * pmd_offset(pgd_t * dir, unsigned long address)
 
 #define pte_none(x)		(!(x).pte_low)
 #define __mk_pte(page_nr,pgprot) __pte(((page_nr) << PAGE_SHIFT) | pgprot_val(pgprot))
-
-/*
- * A note on implementation of this atomic 'get-and-clear' operation.
- * This is actually very simple because XenoLinux can only run on a single
- * processor. Therefore, we cannot race other processors setting the 'accessed'
- * or 'dirty' bits on a page-table entry.
- * Even if pages are shared between domains, that is not a problem because
- * each domain will have separate page tables, with their own versions of
- * accessed & dirty state.
- */
-static inline pte_t ptep_get_and_clear(pte_t *xp)
-{
-    pte_t pte = *xp;
-    if ( !pte_none(pte) )
-        queue_l1_entry_update(xp, 0);
-    return pte;
-}
 
 #endif /* _I386_PGTABLE_2LEVEL_H */

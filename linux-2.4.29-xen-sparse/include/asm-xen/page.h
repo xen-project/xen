@@ -85,23 +85,18 @@ typedef struct { unsigned long pgprot; } pgprot_t;
 static inline unsigned long pmd_val(pmd_t x)
 {
     unsigned long ret = x.pmd;
-    if ( (ret & 1) ) ret = machine_to_phys(ret);
+    if ( ret ) ret = machine_to_phys(ret) | 1;
     return ret;
 }
 #define pmd_val_ma(x)   ((x).pmd)
 #define pgd_val(x)	({ BUG(); (unsigned long)0; })
 #define pgprot_val(x)	((x).pgprot)
 
-static inline pte_t __pte(unsigned long x)
-{
-    if ( (x & 1) ) x = phys_to_machine(x);
-    return ((pte_t) { (x) });
-}
-static inline pmd_t __pmd(unsigned long x)
-{
-    if ( (x & 1) ) x = phys_to_machine(x);
-    return ((pmd_t) { (x) });
-}
+#define __pte(x) ({ unsigned long _x = (x); \
+    (((_x)&1) ? ((pte_t) {phys_to_machine(_x)}) : ((pte_t) {(_x)})); })
+#define __pte_ma(x)     ((pte_t) { (x) } )
+#define __pmd(x) ({ unsigned long _x = (x); \
+    (((_x)&1) ? ((pmd_t) {phys_to_machine(_x)}) : ((pmd_t) {(_x)})); })
 #define __pgd(x) ({ BUG(); (pgprot_t) { 0 }; })
 #define __pgprot(x)	((pgprot_t) { (x) } )
 

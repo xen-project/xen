@@ -117,8 +117,6 @@ void _flush_page_update_queue(void);
     if (per_cpu(mmu_update_queue_idx, smp_processor_id()))	\
 	_flush_page_update_queue();				\
 } while (0)
-#define xen_flush_page_update_queue() (_flush_page_update_queue())
-#define XEN_flush_page_update_queue() (_flush_page_update_queue())
 void MULTICALL_flush_page_update_queue(void);
 
 #ifdef CONFIG_XEN_PHYSDEV_ACCESS

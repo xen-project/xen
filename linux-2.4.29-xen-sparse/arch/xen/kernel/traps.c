@@ -623,6 +623,7 @@ void __init trap_init(void)
     set_call_gate(&default_ldt[0],lcall7);
     set_call_gate(&default_ldt[4],lcall27);
     __make_page_readonly(&default_ldt[0]);
+    flush_page_update_queue();
 
     cpu_init();
 }

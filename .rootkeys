@@ -167,7 +167,6 @@
 3e5a4e66rw65CxyolW9PKz4GG42RcA linux-2.4.29-xen-sparse/drivers/char/tty_io.c
 40c9c0c1pPwYE3-4i-oI3ubUu7UgvQ linux-2.4.29-xen-sparse/drivers/scsi/aic7xxx/Makefile
 41f97f64nW0wmgLxhwzPTzkF4E5ERA linux-2.4.29-xen-sparse/drivers/usb/hcd.c
-3e5a4e669uzIE54VwucPYtGwXLAbzA linux-2.4.29-xen-sparse/fs/exec.c
 3e5a4e66wbeCpsJgVf_U8Jde-CNcsA linux-2.4.29-xen-sparse/include/asm-xen/bugs.h
 3e5a4e66HdSkvIV6SJ1evG_xmTmXHA linux-2.4.29-xen-sparse/include/asm-xen/desc.h
 3e5a4e66SYp_UpAVcF8Lc1wa3Qtgzw linux-2.4.29-xen-sparse/include/asm-xen/fixmap.h
@@ -205,8 +204,6 @@
 3f108af5VxPkLv13tXpXgoRKALQtXQ linux-2.4.29-xen-sparse/mm/mprotect.c
 3e5a4e681xMPdF9xCMwpyfuYMySU5g linux-2.4.29-xen-sparse/mm/mremap.c
 409ba2e7akOFqQUg6Qyg2s28xcXiMg linux-2.4.29-xen-sparse/mm/page_alloc.c
-3e5a4e683HKVU-sxtagrDasRB8eBVw linux-2.4.29-xen-sparse/mm/swapfile.c
-41180721bNns9Na7w1nJ0ZVt8bhUNA linux-2.4.29-xen-sparse/mm/vmalloc.c
 41505c57WAd5l1rlfCLNSCpx9J13vA linux-2.4.29-xen-sparse/net/core/skbuff.c
 40f562372u3A7_kfbYYixPHJJxYUxA linux-2.6.11-xen-sparse/arch/xen/Kconfig
 40f56237utH41NPukqHksuNf29IC9A linux-2.6.11-xen-sparse/arch/xen/Kconfig.drivers

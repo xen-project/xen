@@ -296,7 +296,6 @@ vmalloc_fault:
 		if (!pmd_present(*pmd_k))
 			goto no_context;
 		set_pmd(pmd, *pmd_k);
-                XEN_flush_page_update_queue(); /* flush PMD update */
 
 		pte_k = pte_offset(pmd_k, address);
 		if (!pte_present(*pte_k))
