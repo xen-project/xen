@@ -9,7 +9,6 @@ import sys
 from twisted.internet import defer
 
 import xen.ext.xc; xc = xen.ext.xc.new()
-import xenctl.ip
 
 import sxp
 import XendRoot
@@ -336,9 +335,9 @@ class XendDomain:
         if not dominfo: return None
         return dominfo.get_device_by_index(vif)
 
-    def domain_vif_ip_add(self, dom, vif, ip):
-        dom = int(dom)
-        return xenctl.ip.setup_vfr_rules_for_vif(dom, vif, ip)
+##     def domain_vif_ip_add(self, dom, vif, ip):
+##         dom = int(dom)
+##         return xenctl.ip.setup_vfr_rules_for_vif(dom, vif, ip)
 
     def domain_vbd_ls(self, dom):
         dominfo = self.domain_get(dom)

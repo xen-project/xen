@@ -17,7 +17,7 @@ import os
 from twisted.internet import defer
 
 import xen.ext.xc; xc = xen.ext.xc.new()
-import xenctl.ip
+import xen.util.ip
 
 import sxp
 
@@ -167,14 +167,14 @@ def vif_up(iplist):
         print >> open(IP_NONLOCAL_BIND, 'w'), str(v)
 
     def link_local(ip):
-        return xenctl.ip.check_subnet(ip, '169.254.0.0', '255.255.0.0')
+        return xen.util.ip.check_subnet(ip, '169.254.0.0', '255.255.0.0')
 
     def arping(ip, gw):
         cmd = '/usr/sbin/arping -A -b -I eth0 -c 1 -s %s %s' % (ip, gw)
         print cmd
         os.system(cmd)
         
-    gateway = xenctl.ip.get_current_ipgw() or '255.255.255.255'
+    gateway = xen.util.ip.get_current_ipgw() or '255.255.255.255'
     nlb = get_ip_nonlocal_bind()
     if not nlb: set_ip_nonlocal_bind(1)
     try:

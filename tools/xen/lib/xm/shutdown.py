@@ -6,7 +6,7 @@ import sys
 import time
 
 from xen.xend.XendClient import server
-from xen.xend.xm.opts import *
+from xen.xm.opts import *
 
 gopts = Opts(use="""[options] [DOM]
 
