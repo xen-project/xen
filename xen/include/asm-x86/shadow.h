@@ -70,7 +70,7 @@ static inline void shadow_mode_disable(struct domain *d)
 }
 
 extern unsigned long shadow_l2_table( 
-    struct domain *d, unsigned long gpfn);
+    struct domain *d, unsigned long gmfn);
   
 static inline void shadow_invalidate(struct exec_domain *ed) {
     if ( !shadow_mode_translate(ed->domain))
@@ -657,7 +657,7 @@ static inline void set_shadow_status(
 #ifdef CONFIG_VMX
 
 static inline void vmx_update_shadow_state(
-    struct exec_domain *ed, unsigned long gpfn, unsigned long smfn)
+    struct exec_domain *ed, unsigned long gmfn, unsigned long smfn)
 {
 
     l2_pgentry_t *mpl2e = 0;
@@ -681,7 +681,7 @@ static inline void vmx_update_shadow_state(
     __flush_tlb_one(SH_LINEAR_PT_VIRT_START);
 
     spl2e = (l2_pgentry_t *)map_domain_mem(smfn << PAGE_SHIFT);
-    gpl2e = (l2_pgentry_t *)map_domain_mem(gpfn << PAGE_SHIFT);
+    gpl2e = (l2_pgentry_t *)map_domain_mem(gmfn << PAGE_SHIFT);
     memset(spl2e, 0, L2_PAGETABLE_ENTRIES * sizeof(l2_pgentry_t));
 
     ed->arch.shadow_vtable = spl2e;
@@ -729,16 +729,19 @@ static inline unsigned long gva_to_gpa(unsigned long gva)
 static inline void __update_pagetables(struct exec_domain *ed)
 {
     struct domain *d = ed->domain;
-    unsigned long gpfn = pagetable_val(ed->arch.guest_table) >> PAGE_SHIFT;
-    unsigned long smfn = __shadow_status(d, gpfn) & PSH_pfn_mask;
+    unsigned long gmfn = pagetable_val(ed->arch.guest_table) >> PAGE_SHIFT;
 
-    SH_VVLOG("0: __update_pagetables(gpfn=%p, smfn=%p)", gpfn, smfn);
+    // mafetter: BUG: __shadow_status() should take a gpfn, not a gmfn...
+    // WHY DOES THIS WORK?
+    unsigned long smfn = __shadow_status(d, gmfn) & PSH_pfn_mask;
+
+    SH_VVLOG("0: __update_pagetables(gmfn=%p, smfn=%p)", gmfn, smfn);
 
     if ( unlikely(smfn == 0) )
-        smfn = shadow_l2_table(d, gpfn);
+        smfn = shadow_l2_table(d, gmfn);
 #ifdef CONFIG_VMX
     else if ( shadow_mode_translate(ed->domain) )
-        vmx_update_shadow_state(ed, gpfn, smfn);
+        vmx_update_shadow_state(ed, gmfn, smfn);
 #endif
 
     ed->arch.shadow_table = mk_pagetable(smfn<<PAGE_SHIFT);

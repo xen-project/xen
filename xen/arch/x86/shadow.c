@@ -465,15 +465,15 @@ void vmx_shadow_clear_state(struct domain *d)
 
 
 unsigned long shadow_l2_table( 
-    struct domain *d, unsigned long gpfn)
+    struct domain *d, unsigned long gmfn)
 {
     struct pfn_info *spfn_info;
     unsigned long    spfn;
-    unsigned long guest_gpfn;
+    unsigned long    gpfn;
 
-    guest_gpfn = __mfn_to_gpfn(d, gpfn);
+    gpfn = __mfn_to_gpfn(d, gmfn);
 
-    SH_VVLOG("shadow_l2_table( %p )", gpfn);
+    SH_VVLOG("shadow_l2_table( %p )", gmfn);
 
     perfc_incrc(shadow_l2_table_count);
 
@@ -485,14 +485,14 @@ unsigned long shadow_l2_table(
 
     spfn = spfn_info - frame_table;
   /* Mark pfn as being shadowed; update field to point at shadow. */
-    set_shadow_status(d, guest_gpfn, spfn | PSH_shadowed);
+    set_shadow_status(d, gpfn, spfn | PSH_shadowed);
  
 #ifdef __i386__
     /* Install hypervisor and 2x linear p.t. mapings. */
     if ( shadow_mode_translate(d) )
     {
 #ifdef CONFIG_VMX
-        vmx_update_shadow_state(d->exec_domain[0], gpfn, spfn);
+        vmx_update_shadow_state(d->exec_domain[0], gmfn, spfn);
 #else
         panic("Shadow Full 32 not yet implemented without VMX\n");
 #endif
@@ -514,19 +514,19 @@ unsigned long shadow_l2_table(
                &idle_pg_table[DOMAIN_ENTRIES_PER_L2_PAGETABLE],
                HYPERVISOR_ENTRIES_PER_L2_PAGETABLE * sizeof(l2_pgentry_t));
         spl2e[LINEAR_PT_VIRT_START >> L2_PAGETABLE_SHIFT] =
-            mk_l2_pgentry((gpfn << PAGE_SHIFT) | __PAGE_HYPERVISOR);
+            mk_l2_pgentry((gmfn << PAGE_SHIFT) | __PAGE_HYPERVISOR);
         spl2e[SH_LINEAR_PT_VIRT_START >> L2_PAGETABLE_SHIFT] =
             mk_l2_pgentry((spfn << PAGE_SHIFT) | __PAGE_HYPERVISOR);
         spl2e[PERDOMAIN_VIRT_START >> L2_PAGETABLE_SHIFT] =
             mk_l2_pgentry(__pa(page_get_owner(
-                &frame_table[gpfn])->arch.mm_perdomain_pt) |
+                &frame_table[gmfn])->arch.mm_perdomain_pt) |
                           __PAGE_HYPERVISOR);
 
         unmap_domain_mem(spl2e);
     }
 #endif
 
-    SH_VLOG("shadow_l2_table( %p -> %p)", gpfn, spfn);
+    SH_VLOG("shadow_l2_table( %p -> %p)", gmfn, spfn);
     return spfn;
 }
 
