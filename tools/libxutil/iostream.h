@@ -1,14 +1,34 @@
-#ifndef _XC_LINUX_SAVE_H_
-#define _XC_LINUX_SAVE_H_
+/*
+ * Copyright (C) 2001 - 2004 Mike Wray <mike.wray@hp.com>
+ *
+ * This library is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU Lesser General Public License as published by
+ * the Free Software Foundation; either version 2.1 of the License, or
+ * (at your option) any later version.
+ *
+ * This library is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU Lesser General Public License for more details.
+ *
+ * You should have received a copy of the GNU Lesser General Public License
+ * along with this library; if not, write to the Free Software
+ * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+ */
+
+#ifndef _XUTIL_IOSTREAM_H_
+#define _XUTIL_IOSTREAM_H_
 
 #include <stdarg.h>
-#include <stdint.h>
-#include <stddef.h>
 
 #ifdef __KERNEL__
+#include <linux/config.h>
+#include <linux/types.h>
 #include <linux/errno.h>
 #else
 #include <errno.h>
+#include <stdint.h>
+#include <stddef.h>
 #endif
 
 #include "allocate.h"
@@ -240,4 +260,4 @@ static inline int IOStream_get_written(IOStream *stream){
 }
 
 
-#endif /* ! _XC_LINUX_SAVE_H_ */
+#endif /* ! _XUTIL_IOSTREAM_H_ */
