@@ -258,9 +258,21 @@ s_time_t get_s_time(void)
 {
     s_time_t now;
     unsigned long flags;
+
     read_lock_irqsave(&xtime_lock, flags);
+
     now = stime_irq + get_time_delta();
+
+    /* Ensure that the returned system time is monotonically increasing. */
+    {
+        static s_time_t prev_now = 0;
+        if ( unlikely(now < prev_now) )
+            now = prev_now;
+        prev_now = now;
+    }
+
     read_unlock_irqrestore(&xtime_lock, flags);
+
     return now; 
 }
 
@@ -334,16 +346,6 @@ int __init init_xeno_time()
     cpu_ghz = (unsigned int)(cpu_freq / 1000000000ULL);
     for ( rdtsc_bitshift = 0; cpu_ghz != 0; rdtsc_bitshift++, cpu_ghz >>= 1 )
         continue;
-
-    /*
-     * We actually adjust cpu_freq to be 0.001% slower than the real
-     * frequenecy. This makes time run a little bit slower when interpolating
-     * the passage of time between periodic interrupts, so we expect a little
-     * jump in time whenever an interrupt comes in (roughly 100ns every 10ms).
-     * However, this should avoid us considtently running too fast and jumping
-     * _backwards_ on each interrupt, which would be much worse!
-     */
-    cpu_freq = cpu_freq - (cpu_freq / 100000ULL);
 
     scale  = 1000000000LL << (32 + rdtsc_bitshift);
     scale /= cpu_freq;

@@ -79,10 +79,19 @@ static s64 shadow_system_time;
 static u32 shadow_time_version;
 static struct timeval shadow_tv;
 
+/*
+ * We use this to ensure that gettimeofday() is monotonically increasing. We
+ * only break this guarantee if the wall clock jumps backwards "a long way".
+ */
+static struct timeval last_seen_tv = {0,0};
+
 #ifdef CONFIG_XENO_PRIV
-/* Periodically propagate synchronised time to the RTC and to Xen. */
-static long last_rtc_update, last_xen_update;
+/* Periodically propagate synchronised time base to the RTC and to Xen. */
+static long last_update_to_rtc, last_update_to_xen;
 #endif
+
+/* Periodically take synchronised time base from Xen, if we need it. */
+static long last_update_from_xen;
 
 static u64 processed_system_time;
 
@@ -232,11 +241,13 @@ void do_gettimeofday(struct timeval *tv)
 
  again:
     read_lock_irqsave(&xtime_lock, flags);
+
     _tv.tv_usec = get_time_delta_usecs();
     if ( (lost = (jiffies - wall_jiffies)) != 0 )
         _tv.tv_usec += lost * (1000000 / HZ);
     _tv.tv_sec   = xtime.tv_sec;
     _tv.tv_usec += xtime.tv_usec;
+
     if ( unlikely(!TIME_VALUES_UP_TO_DATE) )
     {
         /*
@@ -250,9 +261,17 @@ void do_gettimeofday(struct timeval *tv)
         write_unlock_irqrestore(&xtime_lock, flags);
         goto again;
     }
-    read_unlock_irqrestore(&xtime_lock, flags);
 
     HANDLE_USEC_OVERFLOW(_tv);
+
+    /* Ensure that time-of-day is monotonically increasing. */
+    if ( (_tv.tv_sec < last_seen_tv.tv_sec) ||
+         ((_tv.tv_sec == last_seen_tv.tv_sec) &&
+          (_tv.tv_usec < last_seen_tv.tv_usec)) )
+        _tv = last_seen_tv;
+    last_seen_tv = _tv;
+
+    read_unlock_irqrestore(&xtime_lock, flags);
 
     *tv = _tv;
 }
@@ -292,11 +311,15 @@ void do_settimeofday(struct timeval *tv)
     time_maxerror = NTP_PHASE_LIMIT;
     time_esterror = NTP_PHASE_LIMIT;
 
+    /* Reset all our running time counts. They make no sense now. */
+    last_seen_tv.tv_sec = 0;
+    last_update_from_xen = 0;
+
 #ifdef CONFIG_XENO_PRIV
     if ( start_info.dom_id == 0 )
     {
         dom0_op_t op;
-        last_rtc_update = last_xen_update = 0;
+        last_update_to_rtc = last_update_to_xen = 0;
         op.cmd = DOM0_SETTIME;
         op.u.settime.secs        = newtv.tv_sec;
         op.u.settime.usecs       = newtv.tv_usec;
@@ -335,6 +358,7 @@ static inline void do_timer_interrupt(int irq, void *dev_id,
                                       struct pt_regs *regs)
 {
     s64 delta;
+    long sec_diff;
 
     get_time_values_from_xen();
 
@@ -351,21 +375,43 @@ static inline void do_timer_interrupt(int irq, void *dev_id,
         processed_system_time += NS_PER_TICK;
     }
     
-    if ( !independent_wallclock && ((time_status & STA_UNSYNC) != 0) )
+    /*
+     * Take synchronised time from Xen once a minute if we're not
+     * synchronised ourselves, and we haven't chosen to keep an independent
+     * time base.
+     */
+    if ( !independent_wallclock && 
+         ((time_status & STA_UNSYNC) != 0) &&
+         (xtime.tv_sec > (last_update_from_xen + 60)) )
     {
         /* Adjust shadow timeval for jiffies that haven't updated xtime yet. */
         shadow_tv.tv_usec -= (jiffies - wall_jiffies) * (1000000/HZ);
         HANDLE_USEC_UNDERFLOW(shadow_tv);
 
+        /*
+         * Reset our running time counts if they are invalidated by a warp
+         * backwards of more than 500ms.
+         */
+        sec_diff = xtime.tv_sec - shadow_tv.tv_sec;
+        if ( unlikely(abs(sec_diff) > 1) ||
+             unlikely(((sec_diff * 1000000) + 
+                       xtime.tv_usec - shadow_tv.tv_usec) > 500000) )
+        {
+            last_update_to_rtc = last_update_to_xen = 0;
+            last_seen_tv.tv_sec = 0;
+        }
+
         /* Update our unsynchronised xtime appropriately. */
         xtime = shadow_tv;
+
+        last_update_from_xen = xtime.tv_sec;
     }
 
 #ifdef CONFIG_XENO_PRIV
 	if ( (start_info.dom_id == 0) && ((time_status & STA_UNSYNC) == 0) )
     {
         /* Send synchronised time to Xen approximately every minute. */
-        if ( xtime.tv_sec > (last_xen_update + 60) )
+        if ( xtime.tv_sec > (last_update_to_xen + 60) )
         {
             dom0_op_t op;
             struct timeval tv = xtime;
@@ -379,7 +425,7 @@ static inline void do_timer_interrupt(int irq, void *dev_id,
             op.u.settime.system_time = shadow_system_time;
             HYPERVISOR_dom0_op(&op);
 
-            last_xen_update = xtime.tv_sec;
+            last_update_to_xen = xtime.tv_sec;
         }
 
         /*
@@ -387,14 +433,14 @@ static inline void do_timer_interrupt(int irq, void *dev_id,
          * clock accordingly every ~11 minutes. Set_rtc_mmss() has to be called
          * as close as possible to 500 ms before the new second starts.
          */
-        if ( (xtime.tv_sec > (last_rtc_update + 660)) &&
+        if ( (xtime.tv_sec > (last_update_to_rtc + 660)) &&
              (xtime.tv_usec >= (500000 - ((unsigned) tick) / 2)) &&
              (xtime.tv_usec <= (500000 + ((unsigned) tick) / 2)) )
         {
             if ( set_rtc_mmss(xtime.tv_sec) == 0 )
-                last_rtc_update = xtime.tv_sec;
+                last_update_to_rtc = xtime.tv_sec;
             else
-                last_rtc_update = xtime.tv_sec - 600;
+                last_update_to_rtc = xtime.tv_sec - 600;
         }
     }
 #endif
