@@ -626,7 +626,7 @@ class XendDomainInfo:
         """Set configuration flags if the vm is a backend for netif of blkif.
         """
         for c in sxp.children(self.config, 'backend'):
-            name = sxp.name(c)
+            name = sxp.name(sxp.child0(c))
             if name == 'blkif':
                 self.blkif_backend = 1
             elif name == 'netif':
