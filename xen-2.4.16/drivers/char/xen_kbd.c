@@ -1,4 +1,5 @@
 #include <asm-i386/io.h>
+#include <xeno/sched.h>    /* this has request_irq() proto for some reason */
 
 #define KEYBOARD_IRQ 1
 
@@ -21,9 +22,11 @@
 #define kbd_read_status() inb(KBD_STATUS_REG)
 
 
+
 static void
 dispatch_scancode (unsigned char scancode)
 {
+
     /*
      * we could be a bit more clever here, but why?
      * just add a jump to your debug routine for the appropriate character.
@@ -98,14 +101,9 @@ static void keyboard_interrupt(int irq, void *dev_id, void *regs)
 }
 
 
-extern int request_irq(unsigned int, 
-		       void (*handler)(int, void *, struct pt_regs *),
-		       unsigned long, const char *, void *);
-
-
 void initialize_keyboard()
 {
-    if(!request_irq(KEYBOARD_IRQ, keyboard_interrupt, 0, "keyboard", NULL))
+    if(request_irq(KEYBOARD_IRQ, keyboard_interrupt, 0, "keyboard", NULL))
 	printk("initialize_keyboard: failed to alloc IRQ %d\n", KEYBOARD_IRQ); 
 
     return; 

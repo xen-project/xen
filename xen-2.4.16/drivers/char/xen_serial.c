@@ -1,4 +1,6 @@
 #include <asm-i386/io.h>
+#include <xeno/sched.h>    /* this has request_irq() proto for some reason */
+
 
 /* Register offsets */
 #define NS16550_RBR	0x00	/* receive buffer	*/
@@ -38,42 +40,86 @@
 #define NS16550_MCR_LOOP	0x10	/* Loop			*/
 
 #define SERIAL_BASE 0x3f8  /* XXX SMH: horrible hardwired COM1   */
-#define SERAIL_ECHO 0      /* XXX SMH: set to 1 for 'echo' on rx */
+
+
+
+/* 
+** We keep an array of 'handlers' for each key code between 0 and 255; 
+** this is intended to allow very simple debugging routines (toggle 
+** debug flag, dump registers, reboot, etc) to be hooked in in a slightly
+** nicer fashion than just editing this file :-) 
+*/
+
+#define KEY_MAX 256
+typedef void key_handler(u_char key); 
+
+static key_handler *key_table[KEY_MAX]; 
+    
+void add_key_handler(u_char key, key_handler *handler) 
+{
+    if(key_table[key] != NULL) 
+	printk("Warning: overwriting handler for key 0x%x\n", key); 
+
+    key_table[key] = handler; 
+    return; 
+}
+
+
+
+static int serial_echo = 0;   /* default is not to echo; change with 'e' */
+
+void toggle_echo(u_char key) 
+{
+    serial_echo = !serial_echo; 
+    return; 
+}
+
+
+void halt_machine(u_char key) 
+{
+    /* This is 'debug me please' => just dump info and halt machine */
+    printk("serial_rx_int: got EOT => halting machine.\n"); 
+    printk("<not actually halting for now>\n"); 
+    return; 
+}
 
 
 
 static void serial_rx_int(int irq, void *dev_id, struct pt_regs *regs)
 {
-    int c; 
+    u_char c; 
 
     /* XXX SMH: should probably check this is an RX interrupt :-) */
 
     /* clear the interrupt by reading the character */
     c = inb(SERIAL_BASE + NS16550_RBR );
 
-    if (c==0x04) {
-	/* This is 'debug me please' => just dump info and halt machine */
-	printk("serial_rx_int: got EOT => halting machine.\n"); 
-	printk("<not actually halting for now>\n"); 
-    }
+    /* if there's a handler, call it: we trust it won't screw us too badly */
+    if(key_table[c]) 
+	(*key_table[c])(c); 
 
-#ifdef SERIAL_ECHO
-    printk("%c", c); 
-#endif
+    if(serial_echo) 
+	printk("%c", c); 
 
     return; 
 }
 
 
-extern int request_irq(unsigned int, 
-		       void (*handler)(int, void *, struct pt_regs *),
-		       unsigned long, const char *, void *);
-
-
 void initialize_serial() 
 {
-    int fifo = 1;  /* must be a ns16550a at least, surely? */
+    int i, fifo, rc; 
 
+    /* first initialize key handler table */
+    for(i = 0; i < KEY_MAX; i++) 
+	key_table[i] = (key_handler *)NULL; 
+
+    /* setup own handlers */
+    add_key_handler(0x01, toggle_echo);    /* <esc> to toggle echo */
+    add_key_handler(0x04, halt_machine);   /* CTRL-D to 'halt' */
+
+    
+    /* Should detect this, but must be a ns16550a at least, surely? */
+    fifo = 1;  
     if(fifo) {
 	/* Clear FIFOs, enable, trigger at 1 byte */
 	outb(NS16550_FCR_TRG1 | NS16550_FCR_ENABLE |
@@ -84,10 +130,11 @@ void initialize_serial()
     outb(NS16550_IER_ERDAI, SERIAL_BASE + NS16550_IER ); /* Setup interrupts */
 
     /* XXX SMH: this is a hack; probably is IRQ4 but grab both anyway */
-    if(!request_irq(4, serial_rx_int, 0, "serial", 0x1234))
-	printk("initialize_serial: failed to get IRQ4 :-(\n"); 
-    if(!request_irq(3, serial_rx_int, 0, "serial", 0x5678))
-	printk("initialize_serial: failed to get IRQ3 :-(\n"); 
+    if((rc = request_irq(4, serial_rx_int, 0, "serial", (void *)0x1234)))
+	printk("initialize_serial: failed to get IRQ4, rc=%d\n", rc); 
+
+    if((rc = request_irq(3, serial_rx_int, 0, "serial", (void *)0x1234)))
+	printk("initialize_serial: failed to get IRQ3, rc=%d\n", rc); 
     
     return; 
 }
