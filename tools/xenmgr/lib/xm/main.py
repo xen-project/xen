@@ -1,4 +1,8 @@
-#!/usr/bin/python
+# Copyright (C) 2004 Mike Wray <mike.wray@hp.com>
+"""Grand unified management application for Xen.
+"""
+import os
+import os.path
 import sys
 
 from xenmgr import PrettyPrint
@@ -17,6 +21,8 @@ class Xm:
         sys.exit(1)
 
     def main(self, args):
+        """Main entry point. Dispatches to the xm_ methods.
+        """
         self.prog = args[0]
         if len(args) < 2:
             self.err("Missing command\nTry '%s help' for more information."
@@ -33,10 +39,16 @@ class Xm:
         return 0
 
     def unknown(self, help, args):
-        self.err("Unknown command: %s\nTry '%s help' for more information."
-                 % (args[0], self.prog))
+        if help and len(args) == 1:
+            self.xm_help(help, args)
+        else:
+            self.err("Unknown command: %s\nTry '%s help' for more information."
+                     % (args[0], self.prog))
 
     def help(self, meth, args):
+        """Print help on an xm_ method.
+        Uses the method documentation string if there is one.
+        """
         name = meth[3:]
         f = getattr(self, meth)
         print "%-14s %s" % (name, f.__doc__ or '')
@@ -53,24 +65,36 @@ class Xm:
         create.main(args)
 
     def xm_save(self, help, args):
-        """Save domain state to file."""
+        """Save domain state (and config) to file."""
         if help:
-            print args[0], "DOM FILE"
-            print "\nSave domain with id DOM to FILE."
+            print args[0], "DOM FILE [CONFIG]"
+            print """\nSave domain with id DOM to FILE.
+            Optionally save config to CONFIG."""
             return
         if len(args) < 3: self.err("%s: Missing arguments" % args[0])
         dom = args[1]
-        filename = args[2]
-        server.xend_domain_save(dom, filename)
-
+        savefile = os.path.abspath(args[2])
+        configfile = None
+        if len(args) == 4:
+            configfile = os.path.abspath(args[3])
+        if configfile:
+            out = file(configfile, 'w')
+            config = server.xend_domain(dom)
+            PrettyPrint.prettyprint(config, out=out)
+            out.close()
+        server.xend_domain_save(dom, savefile)
+            
     def xm_restore(self, help, args):
         """Create a domain from a saved state."""
         if help:
-            print args[0], "FILE"
-            print "\nRestore a domain from FILE."
-        if len(args) < 2: self.err("%s: Missing file" % args[0])
-        filename = args[1]
-        server.xend_domain_restore(None, filename)
+            print args[0], "FILE CONFIG"
+            print "\nRestore a domain from FILE using configuration CONFIG."
+            return
+        if len(args) < 3: self.err("%s: Missing arguments" % args[0])
+        savefile =  os.path.abspath(args[1])
+        configfile = os.path.abspath(args[2])
+        info = server.xend_domain_restore(savefile, configfile)
+        PrettyPrint.prettyprint(info)
 
     def xm_domains(self, help, args):
         """List domains."""

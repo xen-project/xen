@@ -518,11 +518,11 @@ typedef struct {
 
 
 /******************************************************************************
- * CONSOLE DEFINITIONS
+ * SHUTDOWN DEFINITIONS
  */
 
 /*
- * Subtypes for console messages.
+ * Subtypes for shutdown messages.
  */
 #define CMSG_SHUTDOWN_POWEROFF  0   /* Clean shutdown (SHUTDOWN_poweroff).   */
 #define CMSG_SHUTDOWN_REBOOT    1   /* Clean shutdown (SHUTDOWN_reboot).     */

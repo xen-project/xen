@@ -41,11 +41,25 @@ class ChannelFactory:
 
     def domChannel(self, dom):
         """Get the channel for the given domain.
+        Construct if necessary.
         """
         for chan in self.channels.values():
+            if not isinstance(chan, Channel): continue
             if chan.dom == dom:
                 return chan
         chan = Channel(self, dom)
+        self.addChannel(chan)
+        return chan
+
+    def virqChannel(self, virq):
+        """Get the channel for the given virq.
+        Construct if necessary.
+        """
+        for chan in self.channels.values():
+            if not isinstance(chan, VirqChannel): continue
+            if chan.virq == virq:
+                return chan
+        chan = VirqChannel(self, virq)
         self.addChannel(chan)
         return chan
 
@@ -70,27 +84,126 @@ def channelFactory():
         inst = ChannelFactory()
     return inst
 
-class Channel:
+class BaseChannel:
+    """Abstract superclass for channels.
+
+    The subclass constructor must set idx to the port to use.
+    """
+
+    def __init__(self, factory):
+        self.factory = factory
+        self.idx = -1
+        self.closed = 0
+
+    def getIndex(self):
+        """Get the channel index.
+        """
+        return self.idx
+
+    def notificationReceived(self, type):
+        """Called when a notification is received.
+        Closes the channel on error, otherwise calls
+        handleNotification(type), which should be defined
+        in a subclass.
+        """
+        #print 'notificationReceived> type=', type, self
+        if self.closed: return
+        if type == self.factory.notifier.EXCEPTION:
+            print 'notificationReceived> EXCEPTION'
+            info = xc.evtchn_status(self.idx)
+            if info['status'] == 'unbound':
+                print 'notificationReceived> EXCEPTION closing...'
+                self.close()
+                return
+        self.handleNotification(type)
+
+    def close(self):
+        """Close the channel. Calls channelClosed() on the factory.
+        Override in subclass.
+        """
+        self.factory.channelClosed(self)
+
+    def handleNotification(self, type):
+        """Handle notification.
+        Define in subclass.
+        """
+        pass
+        
+
+class VirqChannel(BaseChannel):
+    """A channel for handling a virq.
+    """
+    
+    def __init__(self, factory, virq):
+        """Create a channel for the given virq using the given factory.
+
+        Do not call directly, use virqChannel on the factory.
+        """
+        BaseChannel.__init__(self, factory)
+        self.virq = virq
+        # Notification port (int).
+        self.port = xc.evtchn_bind_virq(virq)
+        self.idx = port
+        # Clients to call when a virq arrives.
+        self.clients = []
+
+    def __repr__(self):
+        return ('<VirqChannel virq=%d port=%d>'
+                % (self.virq, self.port))
+
+    def getVirq(self):
+        """Get the channel's virq.
+        """
+        return self.virq
+
+    def close(self):
+        """Close the channel. Calls lostChannel(self) on all its clients and
+        channelClosed() on the factory.
+        """
+        for c in self.clients:
+            c.lostChannel(self)
+        del self.clients
+        BaseChannel.close(self)
+
+    def registerClient(self, client):
+        """Register a client. The client will be called with
+        client.virqReceived(virq) when a virq is received.
+        The client will be called with client.lostChannel(self) if the
+        channel is closed.
+        """
+        self.clients.append(client)
+
+    def handleNotification(self, type):
+        for c in self.clients:
+            c.virqReceived(self.virq)
+
+    def notify(self):
+        xc.evtchn_send(self.port)
+
+
+class Channel(BaseChannel):
     """A control channel to a domain. Messages for the domain device controllers
     are multiplexed over the channel (console, block devs, net devs).
     """
 
     def __init__(self, factory, dom):
         """Create a channel to the given domain using the given factory.
-        """
-        self.factory = factory
-        self.dom = dom
-        self.port = self.factory.createPort(dom)
-        self.idx = self.port.local_port
-        self.devs = []
-        self.devs_by_type = {}
-        self.closed = 0
-        self.queue = []
 
-    def getIndex(self):
-        """Get the channel index.
+        Do not call directly, use domChannel on the factory.
         """
-        return self.idx
+        BaseChannel.__init__(self, factory)
+        # Domain.
+        self.dom = dom
+        # Domain port (object).
+        self.port = self.factory.createPort(dom)
+        # Channel port (int).
+        self.idx = self.port.local_port
+        # Registered devices.
+        self.devs = []
+        # Devices indexed by the message types they handle.
+        self.devs_by_type = {}
+        # Output queue.
+        self.queue = []
 
     def getLocalPort(self):
         """Get the local port.
@@ -153,23 +266,13 @@ class Channel:
                    self.port.local_port,
                    self.port.remote_port))
 
-    def notificationReceived(self, type):
-        #print 'notificationReceived> type=', type, self
-        if self.closed: return
-        if type == self.factory.notifier.EXCEPTION:
-            print 'notificationReceived> EXCEPTION'
-            info = xc.evtchn_status(self.idx)
-            if info['status'] == 'unbound':
-                print 'notificationReceived> EXCEPTION closing...'
-                self.close()
-                return
+    def handleNotification(self, type):
         work = 0
         work += self.handleRequests()
         work += self.handleResponses()
         work += self.handleWrites()
         if work:
             self.notify()
-        #print 'notificationReceived<', work
 
     def notify(self):
         self.port.notify()

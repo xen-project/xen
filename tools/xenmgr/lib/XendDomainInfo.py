@@ -350,6 +350,8 @@ def xen_domain_create(config, ostype, name, memory, kernel, ramdisk, cmdline, vi
     buildfn = getattr(xc, '%s_build' % ostype)
     
     print 'xen_domain_create> build ', ostype, dom, kernel, cmdline, ramdisk
+    if len(cmdline) >= 256:
+        print 'Warning: kernel cmdline too long'
     err = buildfn(dom            = dom,
                   image          = kernel,
                   control_evtchn = console.port2,
@@ -433,7 +435,6 @@ def vm_create(config):
     """
     # todo - add support for scheduling params?
     print 'vm_create>'
-    xenctl.vdisk.VBD_EXPERT_MODE = 0
     vm = None
     try:
         name = sxp.child_value(config, 'name')
