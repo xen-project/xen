@@ -386,11 +386,11 @@ asmlinkage int do_page_fault(struct xen_regs *regs)
 
     if ( likely(VM_ASSIST(d, VMASST_TYPE_writable_pagetables)) )
     {
+        LOCK_BIGLOCK(d);
         if ( unlikely(ptwr_info[cpu].ptinfo[PTWR_PT_ACTIVE].l1va) &&
              unlikely((addr >> L2_PAGETABLE_SHIFT) ==
                       ptwr_info[cpu].ptinfo[PTWR_PT_ACTIVE].l2_idx) )
         {
-            LOCK_BIGLOCK(d);
             ptwr_flush(PTWR_PT_ACTIVE);
             UNLOCK_BIGLOCK(d);
             return EXCRET_fault_fixed;
@@ -402,8 +402,10 @@ asmlinkage int do_page_fault(struct xen_regs *regs)
         {
             if ( unlikely(ed->mm.shadow_mode) )
                 (void)shadow_fault(addr, regs->error_code);
+            UNLOCK_BIGLOCK(d);
             return EXCRET_fault_fixed;
         }
+        UNLOCK_BIGLOCK(d);
     }
 
     if ( unlikely(ed->mm.shadow_mode) && 

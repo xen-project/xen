@@ -1761,9 +1761,7 @@ int ptwr_do_page_fault(unsigned long addr)
     l2_pgentry_t    *pl2e;
     int              which, cpu = smp_processor_id();
     u32              l2_idx;
-    struct domain   *d = current->domain;
 
-    LOCK_BIGLOCK(d);
     /*
      * Attempt to read the PTE that maps the VA being accessed. By checking for
      * PDE validity in the L2 we avoid many expensive fixups in __get_user().
@@ -1772,7 +1770,6 @@ int ptwr_do_page_fault(unsigned long addr)
            _PAGE_PRESENT) ||
          __get_user(pte, (unsigned long *)&linear_pg_table[addr>>PAGE_SHIFT]) )
     {
-        UNLOCK_BIGLOCK(d);
         return 0;
     }
 
@@ -1783,7 +1780,6 @@ int ptwr_do_page_fault(unsigned long addr)
     if ( ((pte & (_PAGE_RW | _PAGE_PRESENT)) != _PAGE_PRESENT) ||
          ((page->u.inuse.type_info & PGT_type_mask) != PGT_l1_page_table) )
     {
-        UNLOCK_BIGLOCK(d);
         return 0;
     }
     
@@ -1791,7 +1787,6 @@ int ptwr_do_page_fault(unsigned long addr)
     l2_idx = page->u.inuse.type_info & PGT_va_mask;
     if ( unlikely(l2_idx >= PGT_va_unknown) )
     {
-        UNLOCK_BIGLOCK(d);
         domain_crash(); /* Urk! This L1 is mapped in multiple L2 slots! */
     }
     l2_idx >>= PGT_va_shift;
@@ -1870,12 +1865,9 @@ int ptwr_do_page_fault(unsigned long addr)
         /* Toss the writable pagetable state and crash. */
         unmap_domain_mem(ptwr_info[cpu].ptinfo[which].pl1e);
         ptwr_info[cpu].ptinfo[which].l1va = 0;
-        UNLOCK_BIGLOCK(d);
         domain_crash();
     }
     
-    UNLOCK_BIGLOCK(d);
-
     return EXCRET_fault_fixed;
 }
 
