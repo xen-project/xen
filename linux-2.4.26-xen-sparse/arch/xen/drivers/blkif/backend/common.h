@@ -26,6 +26,9 @@
 #define DPRINTK(_f, _a...) ((void)0)
 #endif
 
+#define PRINTK(_f, _a...) printk(KERN_ALERT "(file=%s, line=%d) " _f, \
+                           __FILE__ , __LINE__ , ## _a )
+
 typedef struct blkif_st {
     /* Unique identifier for this interface. */
     domid_t          domid;

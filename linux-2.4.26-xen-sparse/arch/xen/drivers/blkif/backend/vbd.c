@@ -18,7 +18,7 @@ void vbd_create(blkif_be_vbd_create_t *create)
     blkif = blkif_find_by_handle(create->domid, create->blkif_handle);
     if ( unlikely(blkif == NULL) )
     {
-        DPRINTK("vbd_create attempted for non-existent blkif (%u,%u)\n", 
+        PRINTK("vbd_create attempted for non-existent blkif (%u,%u)\n", 
                 create->domid, create->blkif_handle); 
         create->status = BLKIF_BE_STATUS_INTERFACE_NOT_FOUND;
         return;
@@ -41,7 +41,7 @@ void vbd_create(blkif_be_vbd_create_t *create)
         }
         else
         {
-            DPRINTK("vbd_create attempted for already existing vbd\n");
+            PRINTK("vbd_create attempted for already existing vbd\n");
             create->status = BLKIF_BE_STATUS_VBD_EXISTS;
             goto out;
         }
@@ -49,7 +49,7 @@ void vbd_create(blkif_be_vbd_create_t *create)
 
     if ( unlikely((vbd = kmalloc(sizeof(vbd_t), GFP_KERNEL)) == NULL) )
     {
-        DPRINTK("vbd_create: out of memory\n");
+        PRINTK("vbd_create: out of memory\n");
         create->status = BLKIF_BE_STATUS_OUT_OF_MEMORY;
         goto out;
     }
@@ -85,7 +85,7 @@ void vbd_grow(blkif_be_vbd_grow_t *grow)
     blkif = blkif_find_by_handle(grow->domid, grow->blkif_handle);
     if ( unlikely(blkif == NULL) )
     {
-        DPRINTK("vbd_grow attempted for non-existent blkif (%u,%u)\n", 
+        PRINTK("vbd_grow attempted for non-existent blkif (%u,%u)\n", 
                 grow->domid, grow->blkif_handle); 
         grow->status = BLKIF_BE_STATUS_INTERFACE_NOT_FOUND;
         return;
@@ -107,7 +107,7 @@ void vbd_grow(blkif_be_vbd_grow_t *grow)
 
     if ( unlikely(vbd == NULL) || unlikely(vbd->vdevice != vdevice) )
     {
-        DPRINTK("vbd_grow: attempted to append extent to non-existent VBD.\n");
+        PRINTK("vbd_grow: attempted to append extent to non-existent VBD.\n");
         grow->status = BLKIF_BE_STATUS_VBD_NOT_FOUND;
         goto out;
     } 
@@ -115,7 +115,7 @@ void vbd_grow(blkif_be_vbd_grow_t *grow)
     if ( unlikely((x = kmalloc(sizeof(blkif_extent_le_t), 
                                GFP_KERNEL)) == NULL) )
     {
-        DPRINTK("vbd_grow: out of memory\n");
+        PRINTK("vbd_grow: out of memory\n");
         grow->status = BLKIF_BE_STATUS_OUT_OF_MEMORY;
         goto out;
     }
@@ -127,7 +127,7 @@ void vbd_grow(blkif_be_vbd_grow_t *grow)
     
     if( !blk_size[MAJOR(x->extent.device)] )
     {
-        DPRINTK("vbd_grow: device %08x doesn't exist.\n", x->extent.device);
+        PRINTK("vbd_grow: device %08x doesn't exist.\n", x->extent.device);
 	grow->status = BLKIF_BE_STATUS_EXTENT_NOT_FOUND;
 	goto out;
     }
@@ -135,9 +135,16 @@ void vbd_grow(blkif_be_vbd_grow_t *grow)
     /* convert blocks (1KB) to sectors */
     sz = blk_size[MAJOR(x->extent.device)][MINOR(x->extent.device)] * 2;    
     
+    if ( sz == 0 )
+    {
+        PRINTK("vbd_grow: device %08x zero size!\n", x->extent.device);
+	grow->status = BLKIF_BE_STATUS_EXTENT_NOT_FOUND;
+	goto out;
+    }
+
     if ( x->extent.sector_start > 0 )
     {
-        DPRINTK("vbd_grow: device %08x start not zero!\n", x->extent.device);
+        PRINTK("vbd_grow: device %08x start not zero!\n", x->extent.device);
 	grow->status = BLKIF_BE_STATUS_EXTENT_NOT_FOUND;
 	goto out;
     }
@@ -237,7 +244,7 @@ void vbd_destroy(blkif_be_vbd_destroy_t *destroy)
     blkif = blkif_find_by_handle(destroy->domid, destroy->blkif_handle);
     if ( unlikely(blkif == NULL) )
     {
-        DPRINTK("vbd_destroy attempted for non-existent blkif (%u,%u)\n", 
+        PRINTK("vbd_destroy attempted for non-existent blkif (%u,%u)\n", 
                 destroy->domid, destroy->blkif_handle); 
         destroy->status = BLKIF_BE_STATUS_INTERFACE_NOT_FOUND;
         return;
