@@ -56,62 +56,6 @@ static mmu_update_t update_queue[QUEUE_SIZE];
 unsigned int mmu_update_queue_idx = 0;
 #define idx mmu_update_queue_idx
 
-#if MMU_UPDATE_DEBUG > 0
-page_update_debug_t update_debug_queue[QUEUE_SIZE] = {{0}};
-#undef queue_l1_entry_update
-#undef queue_l2_entry_update
-#endif
-#if MMU_UPDATE_DEBUG > 3
-static void DEBUG_allow_pt_reads(void)
-{
-    pte_t *pte;
-    mmu_update_t update;
-    int i;
-    for ( i = idx-1; i >= 0; i-- )
-    {
-        pte = update_debug_queue[i].ptep;
-        if ( pte == NULL ) continue;
-        update_debug_queue[i].ptep = NULL;
-        update.ptr = virt_to_machine(pte);
-        update.val = update_debug_queue[i].pteval;
-        HYPERVISOR_mmu_update(&update, 1, NULL);
-    }
-}
-static void DEBUG_disallow_pt_read(unsigned long va)
-{
-    pte_t *pte;
-    pmd_t *pmd;
-    pgd_t *pgd;
-    unsigned long pteval;
-    /*
-     * We may fault because of an already outstanding update.
-     * That's okay -- it'll get fixed up in the fault handler.
-     */
-    mmu_update_t update;
-    pgd = pgd_offset_k(va);
-    pmd = pmd_offset(pgd, va);
-    pte = pte_offset_kernel(pmd, va); /* XXXcl */
-    update.ptr = virt_to_machine(pte);
-    pteval = *(unsigned long *)pte;
-    update.val = pteval & ~_PAGE_PRESENT;
-    HYPERVISOR_mmu_update(&update, 1, NULL);
-    update_debug_queue[idx].ptep = pte;
-    update_debug_queue[idx].pteval = pteval;
-}
-#endif
-
-#if MMU_UPDATE_DEBUG > 1
-#undef queue_pt_switch
-#undef queue_tlb_flush
-#undef queue_invlpg
-#undef queue_pgd_pin
-#undef queue_pgd_unpin
-#undef queue_pte_pin
-#undef queue_pte_unpin
-#undef queue_set_ldt
-#endif
-
-
 /*
  * MULTICALL_flush_page_update_queue:
  *   This is a version of the flush which queues as part of a multicall.
@@ -123,13 +67,6 @@ void MULTICALL_flush_page_update_queue(void)
     spin_lock_irqsave(&update_lock, flags);
     if ( (_idx = idx) != 0 ) 
     {
-#if MMU_UPDATE_DEBUG > 1
-	    if (idx > 1)
-        printk("Flushing %d entries from pt update queue\n", idx);
-#endif
-#if MMU_UPDATE_DEBUG > 3
-        DEBUG_allow_pt_reads();
-#endif
         idx = 0;
         wmb(); /* Make sure index is cleared first to avoid double updates. */
         queue_multicall3(__HYPERVISOR_mmu_update, 
@@ -143,13 +80,6 @@ void MULTICALL_flush_page_update_queue(void)
 static inline void __flush_page_update_queue(void)
 {
     unsigned int _idx = idx;
-#if MMU_UPDATE_DEBUG > 1
-    if (idx > 1)
-    printk("Flushing %d entries from pt update queue\n", idx);
-#endif
-#if MMU_UPDATE_DEBUG > 3
-    DEBUG_allow_pt_reads();
-#endif
     idx = 0;
     wmb(); /* Make sure index is cleared first to avoid double updates. */
     if ( unlikely(HYPERVISOR_mmu_update(update_queue, _idx, NULL) < 0) )
@@ -183,9 +113,6 @@ void queue_l1_entry_update(pte_t *ptr, unsigned long val)
 {
     unsigned long flags;
     spin_lock_irqsave(&update_lock, flags);
-#if MMU_UPDATE_DEBUG > 3
-    DEBUG_disallow_pt_read((unsigned long)ptr);
-#endif
     update_queue[idx].ptr = virt_to_machine(ptr);
     update_queue[idx].val = val;
     increment_index();
@@ -303,9 +230,6 @@ void xen_l1_entry_update(pte_t *ptr, unsigned long val)
 {
     unsigned long flags;
     spin_lock_irqsave(&update_lock, flags);
-#if MMU_UPDATE_DEBUG > 3
-    DEBUG_disallow_pt_read((unsigned long)ptr);
-#endif
     update_queue[idx].ptr = virt_to_machine(ptr);
     update_queue[idx].val = val;
     increment_index_and_flush();
