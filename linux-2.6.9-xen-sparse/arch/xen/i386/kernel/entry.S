@@ -86,8 +86,10 @@ VM_MASK		= 0x00020000
 #define XEN_GET_VCPU_INFO(reg)	movl TI_cpu(%ebp),reg			; \
 				shl  $sizeof_vcpu_shift,reg		; \
     				addl HYPERVISOR_shared_info,reg
+#define GET_THREAD_INFO_IF_SMP(reg) GET_THREAD_INFO(reg)
 #else
 #define XEN_GET_VCPU_INFO(reg)	movl HYPERVISOR_shared_info,reg
+#define GET_THREAD_INFO_IF_SMP(reg)
 #endif
 
 #define XEN_BLOCK_EVENTS(reg)	movb $1,evtchn_upcall_mask(reg)
@@ -114,7 +116,8 @@ VM_MASK		= 0x00020000
 	pushl %ebx; \
 	movl $(__USER_DS), %edx; \
 	movl %edx, %ds; \
-	movl %edx, %es
+	movl %edx, %es; \
+	GET_THREAD_INFO_IF_SMP(%ebp); 
 
 #define SAVE_ALL \
 	SAVE_ALL_NO_EVENTMASK; \
@@ -465,6 +468,7 @@ error_code:
 	movl $(__USER_DS), %edx
 	movl %edx, %ds
 	movl %edx, %es
+	GET_THREAD_INFO_IF_SMP(%ebp) 
 	XEN_GET_VCPU_INFO(%esi)
 	movb evtchn_upcall_mask(%esi), %dl
 	movb %dl, EVENT_MASK+8(%esp)
@@ -750,7 +754,6 @@ ENTRY(page_fault)
 	decl %eax			/* eax = -1 */
 	pushl %ecx
 	pushl %ebx
-	GET_THREAD_INFO(%ebp)
 	cld
 	movl %es,%ecx
 	movl ORIG_EAX(%esp), %esi	/* get the error code */
@@ -764,6 +767,7 @@ ENTRY(page_fault)
 	movl $(__KERNEL_DS),%edx
 	movl %edx,%ds
 	movl %edx,%es
+	GET_THREAD_INFO_IF_SMP(%ebp) 
 	XEN_GET_VCPU_INFO(%esi)
 	movb evtchn_upcall_mask(%esi), %dl
 	movb %dl, EVENT_MASK+12(%esp)
