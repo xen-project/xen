@@ -421,4 +421,6 @@ void __init start_of_day(void)
         barrier();
     }
 #endif
+
+    watchdog_on = 1;
 }
