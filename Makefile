@@ -17,7 +17,8 @@
 # that appropriate versions of the build tools are already installed in
 # the initial system setup.
 
-all:
+all:	
+	bk -r co
 	$(MAKE) -C xen
 	$(MAKE) -C tools/balloon
 	$(MAKE) -C tools/domain_builder
