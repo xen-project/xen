@@ -46,6 +46,7 @@ public:
   ~bx_dma_c(void);
 
   virtual void     init(void);
+  virtual void     bios_init(void);
   virtual void     reset(unsigned type);
   virtual void     raise_HLDA(void);
   virtual void     set_DRQ(unsigned channel, bx_bool val);
