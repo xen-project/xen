@@ -592,13 +592,14 @@ class XendDomain:
         except Exception, ex:
             raise XendError(str(ex))
 
-    def domain_cpu_bvt_set(self, id, mcuadv, warp, warpl, warpu):
+    def domain_cpu_bvt_set(self, id, mcuadv, warpback, warpvalue, warpl, warpu):
         """Set BVT (Borrowed Virtual Time) scheduler parameters for a domain.
         """
         dominfo = self.domain_lookup(id)
         try:
             return xc.bvtsched_domain_set(dom=dominfo.dom, mcuadv=mcuadv,
-                                          warp=warp, warpl=warpl, warpu=warpu)
+                                          warpback=warpback, warpvalue=warpvalue, 
+                                          warpl=warpl, warpu=warpu)
         except Exception, ex:
             raise XendError(str(ex))
 

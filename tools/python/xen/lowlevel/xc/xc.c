@@ -435,18 +435,23 @@ static PyObject *pyxc_bvtsched_domain_set(PyObject *self,
 {
     XcObject *xc = (XcObject *)self;
 
-    u32           dom;
-    unsigned long mcuadv, warp, warpl, warpu;
+    u32 dom;
+    u32 mcuadv;
+    int warpback; 
+    s32 warpvalue;
+    long long warpl;
+    long long warpu;
 
-    static char *kwd_list[] = { "dom", "mcuadv", "warp", "warpl",
-                                "warpu", NULL };
+    static char *kwd_list[] = { "dom", "mcuadv", "warpback", "warpvalue",
+                                "warpl", "warpu", NULL };
 
-    if ( !PyArg_ParseTupleAndKeywords(args, kwds, "illll", kwd_list,
-                                      &dom, &mcuadv, &warp, &warpl, &warpu) )
+    if ( !PyArg_ParseTupleAndKeywords(args, kwds, "iiiill", kwd_list,
+                                      &dom, &mcuadv, &warpback, &warpvalue, 
+                                      &warpl, &warpu) )
         return NULL;
 
     if ( xc_bvtsched_domain_set(xc->xc_handle, dom, mcuadv, 
-                                warp, warpl, warpu) != 0 )
+                                warpback, warpvalue, warpl, warpu) != 0 )
         return PyErr_SetFromErrno(xc_error);
     
     Py_INCREF(zero);
@@ -459,23 +464,28 @@ static PyObject *pyxc_bvtsched_domain_get(PyObject *self,
 {
     XcObject *xc = (XcObject *)self;
     u32 dom;
-    unsigned long mcuadv, warp, warpl, warpu;
+    u32 mcuadv;
+    int warpback; 
+    s32 warpvalue;
+    long long warpl;
+    long long warpu;
     
     static char *kwd_list[] = { "dom", NULL };
 
     if ( !PyArg_ParseTupleAndKeywords(args, kwds, "i", kwd_list, &dom) )
         return NULL;
     
-    if ( xc_bvtsched_domain_get(xc->xc_handle, dom, &mcuadv, &warp,
-                                &warpl, &warpu) != 0 )
+    if ( xc_bvtsched_domain_get(xc->xc_handle, dom, &mcuadv, &warpback,
+                            &warpvalue, &warpl, &warpu) != 0 )
         return PyErr_SetFromErrno(xc_error);
 
     return Py_BuildValue("{s:i,s:l,s:l,s:l,s:l}",
                          "domain", dom,
                          "mcuadv", mcuadv,
-                         "warp",   warp,
-                         "warpl",  warpl,
-                         "warpu",  warpu);
+                         "warpback", warpback,
+                         "warpvalue", warpvalue,
+                         "warpl", warpl,
+                         "warpu", warpu);
 }
 
 static PyObject *pyxc_fbvtsched_global_set(PyObject *self,
@@ -1040,12 +1050,13 @@ static PyMethodDef pyxc_methods[] = {
       (PyCFunction)pyxc_bvtsched_domain_set,
       METH_VARARGS | METH_KEYWORDS, "\n"
       "Set per-domain tuning parameters for Borrowed Virtual Time scheduler.\n"
-      " dom    [int]: Identifier of domain to be tuned.\n"
-      " mcuadv [int]: Proportional to the inverse of the domain's weight.\n"
-      " warp   [int]: How far to warp domain's EVT on unblock.\n"
-      " warpl  [int]: How long the domain can run warped.\n"
-      " warpu  [int]: How long before the domain can warp again.\n\n"
-      "Returns: [int] 0 on success; -1 on error.\n" },
+      " dom       [int]: Identifier of domain to be tuned.\n"
+      " mcuadv    [int]: Proportional to the inverse of the domain's weight.\n"
+      " warpback  [int]: Warp ? \n"
+      " warpvalue [int]: How far to warp domain's EVT on unblock.\n"
+      " warpl     [int]: How long the domain can run warped.\n"
+      " warpu     [int]: How long before the domain can warp again.\n\n"
+      "Returns:   [int] 0 on success; -1 on error.\n" },
 
     { "bvtsched_domain_get",
       (PyCFunction)pyxc_bvtsched_domain_get,

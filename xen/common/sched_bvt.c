@@ -32,15 +32,17 @@ struct bvt_dom_info
 {
     struct domain       *domain;          /* domain this info belongs to */
     struct list_head    run_list;         /* runqueue list pointers */
-    unsigned long       mcu_advance;      /* inverse of weight */
+    u32                 mcu_advance;      /* inverse of weight */
     u32                 avt;              /* actual virtual time */
     u32                 evt;              /* effective virtual time */
     int                 warpback;         /* warp?  */
-    long                warp;             /* virtual time warp */
-    long                warpl;            /* warp limit */
-    long                warpu;            /* unwarp time requirement */
-    s_time_t            warped;           /* time it ran warped last time */
-    s_time_t            uwarped;          /* time it ran unwarped last time */
+    int                 warp;             /* warp set and within the warp 
+                                                                     limits*/
+    s32                 warp_value;       /* virtual time warp */
+    s_time_t            warpl;            /* warp limit */
+    struct ac_timer     warp_timer;       /* deals with warpl */
+    s_time_t            warpu;            /* unwarp time requirement */
+    struct ac_timer     unwarp_timer;     /* deals with warpu */
 };
 
 struct bvt_cpu_info
@@ -91,6 +93,43 @@ static inline int __task_on_runqueue(struct domain *d)
     return (RUNLIST(d))->next != NULL;
 }
 
+
+/* Warp/unwarp timer functions */
+static void warp_timer_fn(unsigned long pointer)
+{
+    struct bvt_dom_info *inf = (struct bvt_dom_info *)pointer;
+
+printk("--> Warp timer fired for %d\n", inf->domain->domain);
+    inf->warp = 0;
+    /* unwarp equal to zero => stop warping */
+    if(inf->warpu == 0)
+    {
+        inf->warpback = 0;
+        goto reschedule;
+    }
+    
+    /* set unwarp timer */
+    inf->unwarp_timer.expires = NOW() + inf->warpu;
+    add_ac_timer(&inf->unwarp_timer);
+
+reschedule:
+    cpu_raise_softirq(inf->domain->processor, SCHEDULE_SOFTIRQ);   
+}
+
+static void unwarp_timer_fn(unsigned long pointer)
+{
+     struct bvt_dom_info *inf = (struct bvt_dom_info *)pointer;
+
+printk("---> UnWarp timer fired for %d\n", inf->domain->domain);
+    if(inf->warpback)
+    {
+        inf->warp = 1;
+        cpu_raise_softirq(inf->domain->processor, SCHEDULE_SOFTIRQ);   
+    }
+}
+
+
+
 static inline u32 calc_avt(struct domain *d, s_time_t now)
 {
     u32 ranfor, mcus;
@@ -112,8 +151,8 @@ static inline u32 calc_evt(struct domain *d, u32 avt)
    struct bvt_dom_info *inf = BVT_INFO(d);
    /* TODO The warp routines need to be rewritten GM */
  
-    if ( inf->warpback ) 
-        return avt - inf->warp;
+    if ( inf->warp ) 
+        return avt - inf->warp_value;
     else 
         return avt;
 }
@@ -144,6 +183,21 @@ void bvt_add_task(struct domain *p)
 
     inf->mcu_advance = MCU_ADVANCE;
     inf->domain = p;
+    inf->warpback    = 0;
+    /* Set some default values here. */
+    inf->warp        = 0;
+    inf->warp_value  = 0;
+    inf->warpl       = MILLISECS(2000);
+    inf->warpu       = MILLISECS(1000);
+    /* initialise the timers */
+    init_ac_timer(&inf->warp_timer);
+    inf->warp_timer.cpu = p->processor;
+    inf->warp_timer.data = (unsigned long)inf;
+    inf->warp_timer.function = &warp_timer_fn;
+    init_ac_timer(&inf->unwarp_timer);
+    inf->unwarp_timer.cpu = p->processor;
+    inf->unwarp_timer.data = (unsigned long)inf;
+    inf->unwarp_timer.function = &unwarp_timer_fn;
     
     if ( p->domain == IDLE_DOMAIN_ID )
     {
@@ -154,12 +208,7 @@ void bvt_add_task(struct domain *p)
         /* Set avt and evt to system virtual time. */
         inf->avt         = CPU_SVT(p->processor);
         inf->evt         = CPU_SVT(p->processor);
-        /* Set some default values here. */
-        inf->warpback    = 0;
-        inf->warp        = 0;
-        inf->warpl       = 0;
-        inf->warpu       = 0;
-    }
+   }
 
     return;
 }
@@ -274,7 +323,7 @@ void bvt_free_task(struct domain *p)
  */
 static void bvt_do_block(struct domain *p)
 {
-    BVT_INFO(p)->warpback = 0; 
+    // TODO what when blocks? BVT_INFO(p)->warpback = 0; 
 }
 
 /* Control the scheduler. */
@@ -303,16 +352,17 @@ int bvt_adjdom(struct domain *p,
 
     if ( cmd->direction == SCHED_INFO_PUT )
     {
-        unsigned long mcu_adv = params->mcu_adv,
-            warp  = params->warp,
-            warpl = params->warpl,
-            warpu = params->warpu;
+        u32 mcu_adv = params->mcu_adv;
+        u32 warpback  = params->warpback;
+        s32 warpvalue = params->warpvalue;
+        s_time_t warpl = params->warpl;
+        s_time_t warpu = params->warpu;
         
         struct bvt_dom_info *inf = BVT_INFO(p);
         
-        DPRINTK("Get domain %u bvt mcu_adv=%ld, warp=%ld, "
+        DPRINTK("Get domain %u bvt mcu_adv=%u, warpback=%d, warpvalue=%d"
                 "warpl=%ld, warpu=%ld\n",
-                p->domain, inf->mcu_advance, inf->warp,
+                p->domain, inf->mcu_advance, inf->warpback, inf->warpvalue,
                 inf->warpl, inf->warpu );
 
         /* Sanity -- this can avoid divide-by-zero. */
@@ -321,13 +371,15 @@ int bvt_adjdom(struct domain *p,
         
         spin_lock_irqsave(&CPU_INFO(p->processor)->run_lock, flags);   
         inf->mcu_advance = mcu_adv;
-        inf->warp = warp;
+        inf->warpback = warpback; // TODO - temporary 
+        inf->warp = 1;
+        inf->warp_value = warpvalue;
         inf->warpl = warpl;
         inf->warpu = warpu;
 
-        DPRINTK("Set domain %u bvt mcu_adv=%ld, warp=%ld, "
+        DPRINTK("Get domain %u bvt mcu_adv=%u, warpback=%d, warpvalue=%d"
                 "warpl=%ld, warpu=%ld\n",
-                p->domain, inf->mcu_advance, inf->warp,
+                p->domain, inf->mcu_advance, inf->warpback, inf->warpvalue,
                 inf->warpl, inf->warpu );
 
         spin_unlock_irqrestore(&CPU_INFO(p->processor)->run_lock, flags);
@@ -337,10 +389,11 @@ int bvt_adjdom(struct domain *p,
         struct bvt_dom_info *inf = BVT_INFO(p);
 
         spin_lock_irqsave(&CPU_INFO(p->processor)->run_lock, flags);   
-        params->mcu_adv = inf->mcu_advance;
-        params->warp    = inf->warp;
-        params->warpl   = inf->warpl;
-        params->warpu   = inf->warpu;
+        params->mcu_adv     = inf->mcu_advance;
+        params->warpvalue   = inf->warp_value;
+        params->warpback    = inf->warpback;
+        params->warpl       = inf->warpl;
+        params->warpu       = inf->warpu;
         spin_unlock_irqrestore(&CPU_INFO(p->processor)->run_lock, flags);
     }
     
@@ -380,7 +433,8 @@ static task_slice_t bvt_do_schedule(s_time_t now)
     {
         prev_inf->avt = calc_avt(prev, now);
         prev_inf->evt = calc_evt(prev, prev_inf->avt);
-        
+       
+        rem_ac_timer(&prev_inf->warp_timer);
         __del_from_runqueue(prev);
         
         if ( domain_runnable(prev) )
@@ -489,6 +543,13 @@ static task_slice_t bvt_do_schedule(s_time_t now)
     ASSERT(r_time >= ctx_allow);
 
  sched_done:
+    if(next_inf->warp && next_inf->warpl > 0) // TODO - already added?
+    {
+        /* Set the timer up */ 
+        next_inf->warp_timer.expires = now + next_inf->warpl;
+        /* Add it to the heap */
+        add_ac_timer(&next_inf->warp_timer);
+    }
     ret.task = next;
     ret.time = r_time;
     return ret;
@@ -499,7 +560,7 @@ static void bvt_dump_runq_el(struct domain *p)
 {
     struct bvt_dom_info *inf = BVT_INFO(p);
     
-    printk("mcua=0x%04lX ev=0x%08X av=0x%08X ",
+    printk("mcua=%d ev=0x%08X av=0x%08X ",
            inf->mcu_advance, inf->evt, inf->avt);
 }
 
@@ -540,8 +601,8 @@ static void bvt_dump_cpu_state(int i)
 
 /* We use cache to create the bvt_dom_infos 
    this functions makes sure that the run_list
-   is initialised properly. The new domain needs
-   NOT to appear as to be on the runqueue */
+   is initialised properly.
+   Call to __task_on_runqueue needs to return false */
 static void cache_constructor(void *arg1, xmem_cache_t *arg2, unsigned long arg3)
 {
     struct bvt_dom_info *dom_inf = (struct bvt_dom_info*)arg1;

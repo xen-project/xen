@@ -40,10 +40,11 @@ int xc_bvtsched_global_get(int xc_handle,
 
 int xc_bvtsched_domain_set(int xc_handle,
                            u32 domid,
-                           unsigned long mcuadv,
-                           unsigned long warp,
-                           unsigned long warpl,
-                           unsigned long warpu)
+                           u32 mcuadv,
+                           int warpback,
+                           s32 warpvalue,
+                           long long warpl,
+                           long long warpu)
 {
     dom0_op_t op;
     struct bvt_adjdom *bvtadj = &op.u.adjustdom.u.bvt;
@@ -53,20 +54,22 @@ int xc_bvtsched_domain_set(int xc_handle,
     op.u.adjustdom.sched_id = SCHED_BVT;
     op.u.adjustdom.direction = SCHED_INFO_PUT;
 
-    bvtadj->mcu_adv = mcuadv;
-    bvtadj->warp    = warp;
-    bvtadj->warpl   = warpl;
-    bvtadj->warpu   = warpu;
+    bvtadj->mcu_adv     = mcuadv;
+    bvtadj->warpback    = warpback;
+    bvtadj->warpvalue   = warpvalue;
+    bvtadj->warpl       = warpl;
+    bvtadj->warpu       = warpu;
     return do_dom0_op(xc_handle, &op);
 }
 
 
 int xc_bvtsched_domain_get(int xc_handle,
                            u32 domid,
-                           unsigned long *mcuadv,
-                           unsigned long *warp,
-                           unsigned long *warpl,
-                           unsigned long *warpu)
+                           u32 *mcuadv,
+                           int *warpback,
+                           s32 *warpvalue,
+                           long long *warpl,
+                           long long *warpu)
 {
     
     dom0_op_t op;
@@ -80,9 +83,10 @@ int xc_bvtsched_domain_get(int xc_handle,
 
     ret = do_dom0_op(xc_handle, &op);
 
-    *mcuadv = adjptr->mcu_adv;
-    *warp   = adjptr->warp;
-    *warpl  = adjptr->warpl;
-    *warpu  = adjptr->warpu;
+    *mcuadv     = adjptr->mcu_adv;
+    *warpback   = adjptr->warpback;
+    *warpvalue  = adjptr->warpvalue;
+    *warpl      = adjptr->warpl;
+    *warpu      = adjptr->warpu;
     return ret;
 }

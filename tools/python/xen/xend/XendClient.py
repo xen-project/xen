@@ -490,13 +490,14 @@ class Xend:
                              {'op'      : 'pincpu',
                               'cpu'     : cpu })
 
-    def xend_domain_cpu_bvt_set(self, id, mcuadv, warp, warpl, warpu):
+    def xend_domain_cpu_bvt_set(self, id, mcuadv, warpback, warpvalue, warpl, warpu):
         return self.xendPost(self.domainurl(id),
-                             {'op'      : 'cpu_bvt_set',
-                              'mcuadv'  : mcuadv,
-                              'warp'    : warp,
-                              'warpl'   : warpl,
-                              'warpu'   : warpu })
+                             {'op'       : 'cpu_bvt_set',
+                              'mcuadv'   : mcuadv,
+                              'warpback' : warpback,
+                              'warpvalue': warpvalue,
+                              'warpl'    : warpl,
+                              'warpu'    : warpu })
 
     def xend_domain_cpu_fbvt_set(self, id, mcuadv, warp, warpl, warpu):
         return self.xendPost(self.domainurl(id),

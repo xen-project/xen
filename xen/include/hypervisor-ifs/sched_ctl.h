@@ -56,10 +56,11 @@ struct sched_adjdom_cmd
     union {                           /* 16 */
         struct bvt_adjdom
         {
-            u32 mcu_adv;    /* 16: mcu advance: inverse of weight */
-            u32 warp;       /* 20: time warp */
-            u32 warpl;      /* 24: warp limit */
-            u32 warpu;      /* 28: unwarp time requirement */
+            u32 mcu_adv;            /* 16: mcu advance: inverse of weight */
+            u32 warpback;           /* 20: warp? */
+            s32 warpvalue;          /* 24: warp value */
+            long long warpl;        /* 32: warp limit */
+            long long warpu;        /* 40: unwarp time requirement */
         } PACKED bvt;
 
         struct fbvt_adjdom

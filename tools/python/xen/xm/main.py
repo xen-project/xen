@@ -492,12 +492,12 @@ class ProgBvt(Prog):
     info = """Set BVT scheduler parameters."""
     
     def help(self, args):
-        print args[0], "DOM MCUADV WARP WARPL WARPU"
+        print args[0], "DOM MCUADV WARPBACK WARPVALUE WARPL WARPU"
         print '\nSet Borrowed Virtual Time scheduler parameters.'
 
     def main(self, args):
-        if len(args) != 6: self.err("%s: Invalid argument(s)" % args[0])
-        v = map(int, args[1:6])
+        if len(args) != 7: self.err("%s: Invalid argument(s)" % args[0])
+        v = map(int, args[1:7])
         server.xend_domain_cpu_bvt_set(*v)
 
 xm.prog(ProgBvt)

@@ -110,7 +110,8 @@ class SrvDomain(SrvDir):
         fn = FormFn(self.xd.domain_cpu_bvt_set,
                     [['dom', 'str'],
                      ['mcuadv', 'int'],
-                     ['warp', 'int'],
+                     ['warpback', 'int'],
+                     ['warpvalue', 'int'],
                      ['warpl', 'int'],
                      ['warpu', 'int']])
         val = fn(req.args, {'dom': self.dom.name})
