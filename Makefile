@@ -119,6 +119,8 @@ linux26:
 	$(MAKE) LINUX_RELEASE=2.6 mk-linux-trees
 	$(MAKE) LINUX_RELEASE=2.6 config-xenU
 	$(MAKE) LINUX_RELEASE=2.6 linux-xenU
+	$(MAKE) LINUX_RELEASE=2.6 config-xen0
+	$(MAKE) LINUX_RELEASE=2.6 linux-xen0
 
 
 clean: delete-symlinks
