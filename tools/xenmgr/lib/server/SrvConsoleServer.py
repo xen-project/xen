@@ -21,6 +21,8 @@ from twisted.internet import protocol
 from twisted.internet import abstract
 from twisted.internet import defer
 
+import Xc; xc = Xc.new()
+
 import xend.utils
 
 from xenmgr import sxp
@@ -559,6 +561,16 @@ class Daemon:
         reactor.diconnectAll()
         sys.exit(0)
 
+    def blkif_set_control_domain(self, dom):
+        """Set the block device backend control domain.
+        """
+        return self.blkifCF.setControlDomain(dom)
+    
+    def blkif_get_control_domain(self, dom):
+        """Get the block device backend control domain.
+        """
+        return self.blkifCF.getControlDomain()
+    
     def blkif_create(self, dom):
         """Create a block device interface controller.
         
@@ -579,6 +591,16 @@ class Daemon:
         d = ctrl.attach_device(vdev, mode, segment)
         return d
 
+    def netif_set_control_domain(self, dom):
+        """Set the network interface backend control domain.
+        """
+        return self.netifCF.setControlDomain(dom)
+
+    def netif_get_control_domain(self, dom):
+        """Get the network interface backend control domain.
+        """
+        return self.netifCF.getControlDomain()
+    
     def netif_create(self, dom):
         """Create a network interface controller.
         
@@ -621,6 +643,28 @@ class Daemon:
             raise ValueError('Invalid console id')
         if console.conn:
             console.conn.loseConnection()
+
+    def domain_start(self, id):
+        """Start domain running.
+        """
+        dom = int(id)
+        if dom <= 0: return 0
+        return xc.domain_start(dom=dom)
+        
+    def domain_stop(self, id):
+        """Stop domain running.
+        """
+        dom = int(id)
+        if dom <= 0: return 0 
+        xc.domain_stop(dom=dom)
+
+    def domain_destroy(self, id, force=0):
+        """Destroy a domain. Shutdown if force=0, terminate immediately if force=1.
+        """
+        dom = int(id)
+        if dom <= 0: return 0 
+        return xc.domain_destroy(dom=dom, force=0)
+    
 
 def instance():
     global inst

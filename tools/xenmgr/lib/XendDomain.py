@@ -251,21 +251,6 @@ class XendDomain:
         self._add_domain(dominfo.id, dominfo)
         return dominfo
     
-    def domain_device_add(self, id, info):
-        """Add a device to a domain.
-        """
-        pass
-    
-    def domain_device_remove(self, id, dev):
-        """Delete a device from a domain.
-        """
-        pass
-    
-    def domain_device_configure(self, id, dev, info):
-        """Configure a domain device.
-        """
-        pass
-
     #============================================================================
     # Backward compatibility stuff from here on.
 
@@ -301,22 +286,9 @@ class XendDomain:
         if not dominfo: return None
         return dominfo.get_device_by_index(vif)
 
-    def domain_vif_stats(self, dom, vif):
-        dom = int(dom)
-        return xc.vif_stats_get(dom=dom, vif=vif)
-
     def domain_vif_ip_add(self, dom, vif, ip):
         dom = int(dom)
         return xenctl.ip.setup_vfr_rules_for_vif(dom, vif, ip)
-
-    def domain_vif_scheduler_set(self, dom, vif, bytes, usecs):
-        dom = int(dom)
-        return xc.xc_vif_scheduler_set(dom=dom, vif=vif,
-                                       credit_bytes=bytes, credit_usecs=usecs)
-
-    def domain_vif_scheduler_get(self, dom, vif):
-        dom = int(dom)
-        return xc.vif_scheduler_get(dom=dom, vif=vif)
 
     def domain_vbd_ls(self, dom):
         dominfo = self.domain_get(dom)
@@ -332,19 +304,6 @@ class XendDomain:
             if sxp.child_value(v, 'dev') == vbd:
                 return v
         return None
-
-##     def domain_vbd_add(self, dom, uname, dev, mode):
-##         dom = int(dom)
-##         vbd = vm.make_disk(dom, uname, dev, mode)
-##         return vbd
-
-##     def domain_vbd_remove(self, dom, dev):
-##         dom = int(dom)
-##         vbd = xenctl.vdisk.blkdev_name_to_number(dev)
-##         if vbd < 0: return vbd
-##         err = xc.vbd_destroy(dom, vbd)
-##         if err < 0: return err
-##         return vbd
 
     def domain_shadow_control(self, dom, op):
         dom = int(dom)
