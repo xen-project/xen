@@ -5,34 +5,8 @@
 #include <asm/bitops.h>
 
 struct task_struct;
-extern void FASTCALL(__switch_to(struct task_struct *prev, 
-                                 struct task_struct *next));
-
-#define prepare_to_switch()	do { } while(0)
-#define switch_to(prev,next) do {					\
-	asm volatile("pushl %%ebp\n\t"					\
-                     "pushl %%ebx\n\t"                                  \
-                     "pushl %%esi\n\t"                                  \
-                     "pushl %%edi\n\t"                                  \
-		     "movl %%esp,%0\n\t"	/* save ESP */		\
-                     "cli\n\t"                                          \
-		     "movl %2,%%esp\n\t"	/* restore ESP */	\
-                     "movl %6,%%cr3\n\t"        /* restore pagetables */\
-                     "sti\n\t"                                          \
-		     "movl $1f,%1\n\t"		/* save EIP */		\
-		     "pushl %3\n\t"		/* restore EIP */	\
-		     "jmp __switch_to\n"				\
-		     "1:\t"     					\
-		     "popl %%edi\n\t"					\
-		     "popl %%esi\n\t"					\
-		     "popl %%ebx\n\t"					\
-		     "popl %%ebp\n\t"					\
-		     :"=m" (prev->thread.esp),"=m" (prev->thread.eip)	\
-		     :"m" (next->thread.esp),"m" (next->thread.eip),	\
-		      "a" (prev), "d" (next),				\
-                      "c" (pagetable_val(next->mm.pagetable))		\
-                     :"memory");                                        \
-} while (0)
+extern void switch_to(struct task_struct *prev, 
+                      struct task_struct *next);
 
 /* Clear and set 'TS' bit respectively */
 #define clts() __asm__ __volatile__ ("clts")

@@ -186,6 +186,27 @@ typedef struct
     unsigned long args[7];
 } multicall_entry_t;
 
+typedef struct
+{
+    unsigned long ebx;
+    unsigned long ecx;
+    unsigned long edx;
+    unsigned long esi;
+    unsigned long edi;
+    unsigned long ebp;
+    unsigned long eax;
+    unsigned long ds;
+    unsigned long es;
+    unsigned long fs;
+    unsigned long gs;
+    unsigned long _unused;
+    unsigned long eip;
+    unsigned long cs;
+    unsigned long eflags;
+    unsigned long esp;
+    unsigned long ss;
+} execution_context_t;
+
 /*
  * Xen/guestos shared data -- pointer provided in start_info.
  * NB. We expect that this struct is smaller than a page.
@@ -240,6 +261,8 @@ typedef struct shared_info_st {
      * allow this to happen.
      */
     net_idx_t net_idx[MAX_DOMAIN_VIFS];
+
+    execution_context_t execution_context;
 
 } shared_info_t;
 

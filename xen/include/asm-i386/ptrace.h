@@ -46,7 +46,6 @@ enum EFLAGS {
 
 #ifdef __KERNEL__
 #define user_mode(regs) ((3 & (regs)->xcs))
-extern void show_regs(struct pt_regs *);
 #endif
 
 #endif

@@ -69,7 +69,7 @@ hal_entry:
         
         call    start_paging
         lidt    idt_descr                        
-        jmp     initialize_secondary
+        jmp     start_secondary
 #endif
         
 continue_boot_cpu:
@@ -212,7 +212,7 @@ bad_cpu:
 /*** STACK LOCATION ***/
         
 ENTRY(stack_start)
-        .long SYMBOL_NAME(idle0_task_union)+8192-__PAGE_OFFSET
+        .long SYMBOL_NAME(cpu0_stack) + 4000 - __PAGE_OFFSET
         .long __HYPERVISOR_DS
         
 /*** DESCRIPTOR TABLES ***/
@@ -258,7 +258,7 @@ ENTRY(gdt_table)
         .org 0x1000
 ENTRY(idle0_pg_table)
         .org 0x2000
-ENTRY(idle0_task_union)
-        .org 0x4000
+ENTRY(cpu0_stack)
+        .org 0x3000
 ENTRY(stext)
 ENTRY(_stext)

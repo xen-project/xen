@@ -16,6 +16,7 @@
 #include <xeno/time.h>
 #include <xeno/ac_timer.h>
 #include <xeno/delay.h>
+#include <xeno/slab.h>
 
 #define MAX_DOMAIN_NAME 16
 
@@ -209,21 +210,21 @@ struct task_struct
     next_task:   &(_t)           \
 }
 
+extern struct task_struct idle0_task;
+
 extern struct task_struct *idle_task[NR_CPUS];
 #define IDLE_DOMAIN_ID   (~0)
 #define is_idle_task(_p) ((_p)->domain == IDLE_DOMAIN_ID)
 
-#ifndef IDLE0_TASK_SIZE
-#define IDLE0_TASK_SIZE 2048*sizeof(long)
-#endif
+#define STACK_SIZE PAGE_SIZE
 
-union task_union {
-    struct task_struct task;
-    unsigned long stack[IDLE0_TASK_SIZE/sizeof(long)];
-};
-
-extern union task_union idle0_task_union;
-extern struct task_struct first_task_struct;
+extern kmem_cache_t *task_struct_cachep;
+#define alloc_task_struct()  \
+  ((struct task_struct *)kmem_cache_alloc(task_struct_cachep,GFP_KERNEL))
+#define put_task_struct(_p) \
+  if ( atomic_dec_and_test(&(_p)->refcnt) ) release_task(_p)
+#define get_task_struct(_p)  \
+  atomic_inc(&(_p)->refcnt)
 
 extern struct task_struct *do_newdomain(unsigned int dom_id, unsigned int cpu);
 extern int setup_guestos(
@@ -292,7 +293,11 @@ static inline long schedule_timeout(long timeout)
 void domain_init(void);
 
 int idle_cpu(int cpu); /* Is CPU 'cpu' idle right now? */
-void cpu_idle(void);   /* Idle loop. */
+
+void startup_cpu_idle_loop(void);
+void continue_cpu_idle_loop(void);
+
+void continue_nonidle_task(void);
 
 /* This hash table is protected by the tasklist_lock. */
 #define TASK_HASH_SIZE 256

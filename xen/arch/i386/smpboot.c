@@ -395,18 +395,20 @@ void __init smp_callin(void)
     synchronize_tsc_ap();
 }
 
-int cpucount;
+static int cpucount;
 
 /*
  * Activate a secondary processor.
  */
-int __init start_secondary(void *unused)
+void __init start_secondary(void)
 {
-    unsigned int cpu = smp_processor_id();
+    unsigned int cpu = cpucount;
     /* 6 bytes suitable for passing to LIDT instruction. */
     unsigned char idt_load[6];
 
     extern void cpu_init(void);
+
+    set_current(idle_task[cpu]);
 
     /*
      * Dont put anything before smp_callin(), SMP
@@ -435,34 +437,13 @@ int __init start_secondary(void *unused)
      */
     local_flush_tlb();
 
-    cpu_idle();
+    startup_cpu_idle_loop();
+
     BUG();
-
-    return 0;
-}
-
-/*
- * Everything has been set up for the secondary
- * CPUs - they just need to reload everything
- * from the task structure
- * This function must not return.
- */
-void __init initialize_secondary(void)
-{
-    /*
-     * We don't actually need to load the full TSS,
-     * basically just the stack pointer and the eip.
-     */
-    asm volatile(
-        "movl %0,%%esp\n\t"
-        "jmp *%1"
-        :
-        :"r" (current->thread.esp),"r" (current->thread.eip));
 }
 
 extern struct {
-    void * esp;
-    unsigned short ss;
+    unsigned long esp, ss;
 } stack_start;
 
 /* which physical APIC ID maps to which logical CPU number */
@@ -688,9 +669,7 @@ static void __init do_boot_cpu (int apicid)
     l2_pgentry_t *pagetable;
 
     cpu = ++cpucount;
-    /*
-     * We can't use kernel_thread since we must avoid to reschedule the child.
-     */
+
     if ( (idle = do_newdomain(IDLE_DOMAIN_ID, cpu)) == NULL )
         panic("failed 'newdomain' for CPU %d", cpu);
  
@@ -701,9 +680,6 @@ static void __init do_boot_cpu (int apicid)
 
     map_cpu_to_boot_apicid(cpu, apicid);
 
-    idle->thread.esp = idle->thread.esp0 = (unsigned long)idle + THREAD_SIZE;
-    idle->thread.eip = (unsigned long) start_secondary;
-
     SET_DEFAULT_FAST_TRAP(&idle->thread);
 
     idle_task[cpu] = idle;
@@ -713,7 +689,7 @@ static void __init do_boot_cpu (int apicid)
 
     /* So we see what's up   */
     printk("Booting processor %d/%d eip %lx\n", cpu, apicid, start_eip);
-    stack_start.esp = (void *) (1024+PAGE_SIZE+(char *)idle-__PAGE_OFFSET);
+    stack_start.esp = __pa(get_free_page(GFP_KERNEL)) + 4000;
 
     /*
      * This grunge runs the startup process for
@@ -735,7 +711,8 @@ static void __init do_boot_cpu (int apicid)
     /*
      * Be paranoid about clearing APIC errors.
      */
-    if (APIC_INTEGRATED(apic_version[apicid])) {
+    if ( APIC_INTEGRATED(apic_version[apicid]) )
+    {
         apic_read_around(APIC_SPIV);
         apic_write(APIC_ESR, 0);
         apic_read(APIC_ESR);
@@ -774,8 +751,8 @@ static void __init do_boot_cpu (int apicid)
             printk("CPU%d has booted.\n", cpu);
         } else {
             boot_error= 1;
-            if (*((volatile unsigned char *)phys_to_virt(8192))
-                == 0xA5)
+            if (*((volatile unsigned long *)phys_to_virt(start_eip))
+                == 0xA5A5A5A5)
 				/* trampoline started but...? */
                 printk("Stuck ??\n");
             else
@@ -794,9 +771,6 @@ static void __init do_boot_cpu (int apicid)
         clear_bit(cpu, &cpu_online_map);  /* was set in smp_callin() */
         cpucount--;
     }
-
-    /* mark "stuck" area as not stuck */
-    *((volatile unsigned long *)phys_to_virt(8192)) = 0;
 }
 
 

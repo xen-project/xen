@@ -46,7 +46,7 @@ typedef struct schedule_data_st
 {
     spinlock_t          lock;           /* lock for protecting this */
     struct list_head    runqueue;       /* runqueue */
-    struct task_struct *prev, *curr;    /* previous and current task */
+    struct task_struct *curr;           /* current task */
     struct task_struct *idle;           /* idle task for this cpu */
     u32                 svt;            /* system virtual time. per CPU??? */
     struct ac_timer     s_timer;        /* scheduling timer  */
@@ -254,7 +254,7 @@ void reschedule(struct task_struct *p)
     unsigned long flags;
     s_time_t now, min_time;
 
-    if (p->has_cpu)
+    if ( p->has_cpu )
         return;
 
     spin_lock_irqsave(&schedule_data[cpu].lock, flags);
@@ -264,25 +264,25 @@ void reschedule(struct task_struct *p)
     /* domain should run at least for ctx_allow */
     min_time = curr->lastschd + ctx_allow;
 
-    if ( is_idle_task(curr) || (min_time <= now) ) {
+    if ( is_idle_task(curr) || (min_time <= now) )
+    {
         /* reschedule */
         set_bit(_HYP_EVENT_NEED_RESCHED, &curr->hyp_events);
 
         spin_unlock_irqrestore(&schedule_data[cpu].lock, flags);
 
-        if (cpu != smp_processor_id())
+        if ( cpu != smp_processor_id() )
             smp_send_event_check_cpu(cpu);
+
         return;
     }
 
     /* current hasn't been running for long enough -> reprogram timer.
      * but don't bother if timer would go off soon anyway */
-    if (schedule_data[cpu].s_timer.expires > min_time + TIME_SLOP) {
+    if ( schedule_data[cpu].s_timer.expires > min_time + TIME_SLOP )
         mod_ac_timer(&schedule_data[cpu].s_timer, min_time);
-    }
     
     spin_unlock_irqrestore(&schedule_data[cpu].lock, flags);
-    return;
 }
 
 
@@ -304,9 +304,7 @@ asmlinkage void schedule(void)
     s32                 mcus;
     u32                 next_evt, next_prime_evt, min_avt;
 
-    perfc_incrc(sched_run1);
- need_resched_back:
-    perfc_incrc(sched_run2);
+    perfc_incrc(sched_run);
 
     prev = current;
     next = NULL;
@@ -325,7 +323,7 @@ asmlinkage void schedule(void)
     ASSERT(!in_interrupt());
     ASSERT(__task_on_runqueue(prev));
 
-    if (is_idle_task(prev)) 
+    if ( is_idle_task(prev) ) 
         goto deschedule_done;
 
     /* do some accounting */
@@ -343,9 +341,12 @@ asmlinkage void schedule(void)
 
     /* dequeue */
     __del_from_runqueue(prev);
-    switch (prev->state) {
+    
+    switch ( prev->state )
+    {
     case TASK_INTERRUPTIBLE:
-        if (signal_pending(prev)) {
+        if ( signal_pending(prev) )
+        {
             prev->state = TASK_RUNNING; /* but has events pending */
             break;
         }
@@ -362,7 +363,6 @@ asmlinkage void schedule(void)
     /* requeue */
     __add_to_runqueue_tail(prev);
     
-
  deschedule_done:
     clear_bit(_HYP_EVENT_NEED_RESCHED, &prev->hyp_events);
 
@@ -456,7 +456,6 @@ asmlinkage void schedule(void)
     prev->has_cpu = 0;
     next->has_cpu = 1;
 
-    schedule_data[this_cpu].prev = prev;
     schedule_data[this_cpu].curr = next;
 
     next->lastschd = now;
@@ -472,7 +471,8 @@ asmlinkage void schedule(void)
     {
         /* We won't go through the normal tail, so do this by hand */
         prev->policy &= ~SCHED_YIELD;
-        goto same_process;
+        update_dom_time(prev->shared_info);
+        return;
     }
 
     perfc_incrc(sched_ctx);
@@ -489,23 +489,17 @@ asmlinkage void schedule(void)
     }
 #endif
 
-
-    prepare_to_switch();
     switch_to(prev, next);
-    prev = schedule_data[this_cpu].prev;
     
     prev->policy &= ~SCHED_YIELD;
     if ( prev->state == TASK_DYING ) 
         put_task_struct(prev);
 
- same_process:
-    /* update the domains notion of time  */
-    update_dom_time(current->shared_info);
+    update_dom_time(next->shared_info);
 
-    if ( test_bit(_HYP_EVENT_NEED_RESCHED, &current->hyp_events) ) {
-        goto need_resched_back;
-    }
-    return;
+    schedule_tail(next);
+
+    BUG();
 }
 
 /* No locking needed -- pointer comparison is safe :-) */
@@ -566,7 +560,6 @@ void __init scheduler_init(void)
     {
         INIT_LIST_HEAD(&schedule_data[i].runqueue);
         spin_lock_init(&schedule_data[i].lock);
-        schedule_data[i].prev = &idle0_task;
         schedule_data[i].curr = &idle0_task;
         
         /* a timer for each CPU  */

@@ -120,10 +120,6 @@ extern char _stext, _etext;
 #define IRQ_NAME2(nr) nr##_interrupt(void)
 #define IRQ_NAME(nr) IRQ_NAME2(IRQ##nr)
 
-#define GET_CURRENT \
-	"movl %esp, %ebx\n\t" \
-	"andl $-8192, %ebx\n\t"
-
 /*
  *	SMP has a few special interrupts for IPI messages
  */

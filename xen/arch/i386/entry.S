@@ -194,11 +194,12 @@ NT_MASK		= 0x00004000
 	.long 5b,10b;	             \
 .previous
 
-#define GET_CURRENT(reg)  \
-	movl $-8192, reg; \
-	andl %esp, reg
+#define GET_CURRENT(reg)   \
+	movl $4096-4, reg; \
+        orl  %esp, reg;    \
+        movl (reg),reg     \
 
-ENTRY(ret_from_newdomain)
+ENTRY(continue_nonidle_task)
 	GET_CURRENT(%ebx)
 	jmp test_all_events
 

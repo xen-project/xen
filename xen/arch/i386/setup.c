@@ -254,7 +254,7 @@ void __init cpu_init(void)
 
     /* Set up and load the per-CPU TSS and LDT. */
     t->ss0  = __HYPERVISOR_DS;
-    t->esp0 = current->thread.esp0;
+    t->esp0 = get_stack_top();
     set_tss_desc(nr,t);
     load_TR(nr);
     __asm__ __volatile__("lldt %%ax"::"a" (0));
@@ -414,14 +414,11 @@ void __init start_of_day(void)
     check_nmi_watchdog();
 
     zap_low_mappings();
-    kmem_cache_init();
-    kmem_cache_sizes_init(max_page);
+
 #ifdef CONFIG_PCI
     pci_init();
 #endif
     do_initcalls();
-
-
     initialize_serial();   /* setup serial 'driver' (for debugging) */
     initialize_keyboard(); /* setup keyboard (also for debugging)   */
 

@@ -2,12 +2,7 @@
 #include <xeno/sched.h>
 #include <asm/desc.h>
 
-/*
- * Initial task structure. XXX KAF: To get this 8192-byte aligned without
- * linker tricks I copy it into aligned BSS area at boot time.
- * Actual name idle0_task_union now declared in boot.S.
- */
-struct task_struct first_task_struct = IDLE0_TASK(idle0_task_union.task);
+struct task_struct idle0_task = IDLE0_TASK(idle0_task);
 
 /*
  * per-CPU TSS segments. Threads are completely 'soft' on Linux,

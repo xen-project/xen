@@ -110,12 +110,9 @@ void show_trace(unsigned long * stack)
     int i;
     unsigned long addr;
 
-    if (!stack)
-        stack = (unsigned long*)&stack;
-
     printk("Call Trace: ");
     i = 1;
-    while (((long) stack & (THREAD_SIZE-1)) != 0) {
+    while (((long) stack & (STACK_SIZE-1)) != 0) {
         addr = *stack++;
         if (kernel_text_address(addr)) {
             if (i && ((i % 6) == 0))
@@ -127,30 +124,17 @@ void show_trace(unsigned long * stack)
     printk("\n");
 }
 
-void show_trace_task(struct task_struct *tsk)
-{
-    unsigned long esp = tsk->thread.esp;
-
-    /* User space on another CPU? */
-    if ((esp ^ (unsigned long)tsk) & (PAGE_MASK<<1))
-        return;
-    show_trace((unsigned long *)esp);
-}
-
-void show_stack(unsigned long * esp)
+void show_stack(unsigned long *esp)
 {
     unsigned long *stack;
     int i;
-
-    if ( esp == NULL )
-        esp = (unsigned long *)&esp;
 
     printk("Stack trace from ESP=%p:\n", esp);
 
     stack = esp;
     for ( i = 0; i < kstack_depth_to_print; i++ )
     {
-        if ( ((long)stack & (THREAD_SIZE-1)) == 0 )
+        if ( ((long)stack & (STACK_SIZE-1)) == 0 )
             break;
         if ( i && ((i % 8) == 0) )
             printk("\n       ");

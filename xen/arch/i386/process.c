@@ -31,11 +31,6 @@
 #include <xeno/irq.h>
 #include <xeno/event.h>
 
-#define GET_SYSCALL_REGS(_p) \
-    (((struct pt_regs *)(THREAD_SIZE + (unsigned long)(_p))) - 1)
-
-asmlinkage void ret_from_newdomain(void) __asm__("ret_from_newdomain");
-
 int hlt_counter;
 
 void disable_hlt(void)
@@ -63,16 +58,21 @@ static void default_idle(void)
     }
 }
 
-/*
- * The idle thread. There's no useful work to be
- * done, so just try to conserve power and have a
- * low exit latency (ie sit in a loop waiting for
- * somebody to say that they'd like to reschedule)
- */
-void cpu_idle (void)
+void continue_cpu_idle_loop(void)
 {
     int cpu = smp_processor_id();
+    for ( ; ; )
+    {
+        irq_stat[cpu].idle_timestamp = jiffies;
+        while (!current->hyp_events && !softirq_pending(cpu))
+            default_idle();
+        do_hyp_events();
+        do_softirq();
+    }
+}
 
+void startup_cpu_idle_loop(void)
+{
     /* Just some sanity to ensure that the scheduler is set up okay. */
     ASSERT(current->domain == IDLE_DOMAIN_ID);
     (void)wake_up(current);
@@ -85,14 +85,7 @@ void cpu_idle (void)
     smp_mb();
     init_idle();
 
-    for ( ; ; )
-    {
-        irq_stat[cpu].idle_timestamp = jiffies;
-        while (!current->hyp_events && !softirq_pending(cpu))
-            default_idle();
-        do_hyp_events();
-        do_softirq();
-    }
+    continue_cpu_idle_loop();
 }
 
 static long no_idt[2];
@@ -186,43 +179,6 @@ void machine_power_off(void)
     machine_restart(0);
 }
 
-extern void show_trace(unsigned long* esp);
-
-void show_regs(struct pt_regs * regs)
-{
-    unsigned long cr0 = 0L, cr2 = 0L, cr3 = 0L, cr4 = 0L;
-
-    printk("\n");
-    printk("EIP: %04x:[<%08lx>] CPU: %d",0xffff & regs->xcs,regs->eip, smp_processor_id());
-    if (regs->xcs & 3)
-        printk(" ESP: %04x:%08lx",0xffff & regs->xss,regs->esp);
-    printk(" EFLAGS: %08lx\n",regs->eflags);
-    printk("EAX: %08lx EBX: %08lx ECX: %08lx EDX: %08lx\n",
-           regs->eax,regs->ebx,regs->ecx,regs->edx);
-    printk("ESI: %08lx EDI: %08lx EBP: %08lx",
-           regs->esi, regs->edi, regs->ebp);
-    printk(" DS: %04x ES: %04x FS: %04x GS: %04x\n",
-           0xffff & regs->xds, 0xffff & regs->xes,
-           0xffff & regs->xfs, 0xffff & regs->xgs);
-
-    __asm__("movl %%cr0, %0": "=r" (cr0));
-    __asm__("movl %%cr2, %0": "=r" (cr2));
-    __asm__("movl %%cr3, %0": "=r" (cr3));
-    /* This could fault if %cr4 does not exist */
-    __asm__("1: movl %%cr4, %0		\n"
-            "2:				\n"
-            ".section __ex_table,\"a\"	\n"
-            ".long 1b,2b			\n"
-            ".previous			\n"
-            : "=r" (cr4): "0" (0));
-    printk("CR0: %08lx CR2: %08lx CR3: %08lx CR4: %08lx\n", cr0, cr2, cr3, cr4);
-    show_trace(&regs->esp);
-}
-
-
-/*
- * Free current thread data structures etc..
- */
 void exit_thread(void)
 {
     /* nothing to do ... */
@@ -249,8 +205,7 @@ void new_thread(struct task_struct *p,
                 unsigned long start_stack,
                 unsigned long start_info)
 {
-    struct pt_regs *regs = GET_SYSCALL_REGS(p);
-    memset(regs, 0, sizeof(*regs));
+    execution_context_t *ec = &p->shared_info->execution_context;
 
     /*
      * Initial register values:
@@ -260,20 +215,14 @@ void new_thread(struct task_struct *p,
      *          ESI = start_info
      *  [EAX,EBX,ECX,EDX,EDI,EBP are zero]
      */
-    p->thread.fs = p->thread.gs = FLAT_RING1_DS;
-    regs->xds = regs->xes = regs->xfs = regs->xgs = regs->xss = FLAT_RING1_DS;
-    regs->xcs = FLAT_RING1_CS;
-    regs->eip = start_pc;
-    regs->esp = start_stack;
-    regs->esi = start_info;
+    ec->ds = ec->es = ec->fs = ec->gs = ec->ss = FLAT_RING1_DS;
+    ec->cs = FLAT_RING1_CS;
+    ec->eip = start_pc;
+    ec->esp = start_stack;
+    ec->esi = start_info;
 
-    p->thread.esp = (unsigned long) regs;
-    p->thread.esp0 = (unsigned long) (regs+1);
-
-    p->thread.eip = (unsigned long) ret_from_newdomain;
-
-    __save_flags(regs->eflags);
-    regs->eflags |= X86_EFLAGS_IF;
+    __save_flags(ec->eflags);
+    ec->eflags |= X86_EFLAGS_IF;
 
     /* No fast trap at start of day. */
     SET_DEFAULT_FAST_TRAP(&p->thread);
@@ -288,34 +237,21 @@ void new_thread(struct task_struct *p,
 			: /* no output */ \
 			:"r" (thread->debugreg[register]))
 
-/*
- *	switch_to(x,yn) should switch tasks from x to y.
- *
- * We fsave/fwait so that an exception goes off at the right time
- * (as a call from the fsave or fwait in effect) rather than to
- * the wrong process. Lazy FP saving no longer makes any sense
- * with modern CPU's, and this simplifies a lot of things (SMP
- * and UP become the same).
- *
- * NOTE! We used to use the x86 hardware context switching. The
- * reason for not using it any more becomes apparent when you
- * try to recover gracefully from saved state that is no longer
- * valid (stale segment register values in particular). With the
- * hardware task-switch, there is no way to fix up bad state in
- * a reasonable manner.
- *
- * The fact that Intel documents the hardware task-switching to
- * be slow is a fairly red herring - this code is not noticeably
- * faster. However, there _is_ some room for improvement here,
- * so the performance issues may eventually be a valid point.
- * More important, however, is the fact that this allows us much
- * more flexibility.
- */
-/* NB. prev_p passed in %eax, next_p passed in %edx */
-void __switch_to(struct task_struct *prev_p, struct task_struct *next_p)
+void switch_to(struct task_struct *prev_p, struct task_struct *next_p)
 {
     struct thread_struct *next = &next_p->thread;
     struct tss_struct *tss = init_tss + smp_processor_id();
+    execution_context_t *stack_ec = get_execution_context();
+
+    __cli();
+
+    /* Switch guest general-register state. */
+    memcpy(&prev_p->shared_info->execution_context, 
+           stack_ec, 
+           sizeof(*stack_ec));
+    memcpy(stack_ec,
+           &next_p->shared_info->execution_context,
+           sizeof(*stack_ec));
 
     unlazy_fpu(prev_p);
 
@@ -323,18 +259,22 @@ void __switch_to(struct task_struct *prev_p, struct task_struct *next_p)
     CLEAR_FAST_TRAP(&prev_p->thread);
     SET_FAST_TRAP(&next_p->thread);
 
-    tss->esp0 = next->esp0;
+    /* Switch the guest OS ring-1 stack. */
     tss->esp1 = next->esp1;
     tss->ss1  = next->ss1;
+
+    /* Switch page tables.  */
+    __write_cr3_counted(pagetable_val(next_p->mm.pagetable));
+
+    set_current(next_p);
 
     /* Switch GDT and LDT. */
     __asm__ __volatile__ ("lgdt %0" : "=m" (*next_p->mm.gdt));
     load_LDT();
 
-    /*
-     * Now maybe reload the debug registers
-     */
-    if (next->debugreg[7]){
+    /* Maybe switch the debug registers. */
+    if ( next->debugreg[7] )
+    {
         loaddebug(next, 0);
         loaddebug(next, 1);
         loaddebug(next, 2);
@@ -344,13 +284,14 @@ void __switch_to(struct task_struct *prev_p, struct task_struct *next_p)
         loaddebug(next, 7);
     }
 
+    __sti();
 }
 
 
 /* XXX Currently the 'domain' field is ignored! XXX */
 long do_iopl(unsigned int domain, unsigned int new_io_pl)
 {
-    struct pt_regs *regs = GET_SYSCALL_REGS(current);
-    regs->eflags = (regs->eflags & 0xffffcfff) | ((new_io_pl&3) << 12);
+    execution_context_t *ec = get_execution_context();
+    ec->eflags = (ec->eflags & 0xffffcfff) | ((new_io_pl&3) << 12);
     return 0;
 }

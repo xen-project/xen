@@ -340,16 +340,9 @@ struct tss_struct {
 };
 
 struct thread_struct {
-    unsigned long	esp0; /* top of the stack */
-    unsigned long	eip;  /* in kernel space, saved on task switch */
-    unsigned long	esp;  /* "" */
-    unsigned long	fs;   /* "" (NB. DS/ES constant in mon, so no save) */
-    unsigned long	gs;   /* "" ("") */
     unsigned long esp1, ss1;
 /* Hardware debugging registers */
     unsigned long	debugreg[8];  /* %%db0-7 debug registers */
-/* fault info */
-    unsigned long	cr2, trap_no, error_code;
 /* floating point info */
     union i387_union	i387;
 /* Trap info. */
@@ -376,10 +369,8 @@ extern struct desc_struct *idt_tables[];
      &((_p)->fast_trap_desc), 8))
 
 #define INIT_THREAD  {						\
-	sizeof(idle0_stack) + (long) &idle0_stack, /* esp0 */   \
-	0, 0, 0, 0, 0, 0,		      			\
+	0, 0,		      					\
 	{ [0 ... 7] = 0 },	/* debugging registers */	\
-	0, 0, 0,						\
 	{ { 0, }, },		/* 387 state */			\
 	0x20, { 0, 0 },		/* DEFAULT_FAST_TRAP */		\
 	{ {0} }			/* io permissions */		\
@@ -387,8 +378,8 @@ extern struct desc_struct *idt_tables[];
 
 #define INIT_TSS  {						\
 	0,0, /* back_link, __blh */				\
-	sizeof(idle0_stack) + (long) &idle0_stack, /* esp0 */	\
-	__HYPERVISOR_DS, 0, /* ss0 */				\
+	0, /* esp0 */						\
+	0, 0, /* ss0 */						\
 	0,0,0,0,0,0, /* stack1, stack2 */			\
 	0, /* cr3 */						\
 	0,0, /* eip,eflags */					\
@@ -416,28 +407,9 @@ extern int kernel_thread(int (*fn)(void *), void * arg, unsigned long flags);
 extern void copy_segments(struct task_struct *p, struct mm_struct * mm);
 extern void release_segments(struct mm_struct * mm);
 
-/*
- * Return saved PC of a blocked thread.
- */
-static inline unsigned long thread_saved_pc(struct thread_struct *t)
-{
-    return ((unsigned long *)t->esp)[3];
-}
-
 unsigned long get_wchan(struct task_struct *p);
 #define KSTK_EIP(tsk)	(((unsigned long *)(4096+(unsigned long)(tsk)))[1019])
 #define KSTK_ESP(tsk)	(((unsigned long *)(4096+(unsigned long)(tsk)))[1022])
-
-#define THREAD_SIZE (2*PAGE_SIZE)
-#define alloc_task_struct()  \
-  ((struct task_struct *) __get_free_pages(GFP_KERNEL,1))
-#define put_task_struct(_p) \
-  if ( atomic_dec_and_test(&(_p)->refcnt) ) release_task(_p)
-#define get_task_struct(_p)  \
-  atomic_inc(&(_p)->refcnt)
-
-#define idle0_task	(idle0_task_union.task)
-#define idle0_stack	(idle0_task_union.stack)
 
 struct microcode {
     unsigned int hdrver;

@@ -30,6 +30,8 @@
 #include <xeno/console.h>
 #include <xeno/net_headers.h>
 
+kmem_cache_t *task_struct_cachep;
+
 static int xpos, ypos;
 static volatile unsigned char *video;
 
@@ -176,7 +178,7 @@ void cmain (unsigned long magic, multiboot_info_t *mbi)
         for ( ; ; ) ;
     }
 
-    memcpy(&idle0_task_union, &first_task_struct, sizeof(first_task_struct));
+    set_current(&idle0_task);
 
     max_page = (mbi->mem_upper+1024) >> (PAGE_SHIFT - 10);
     init_frametable(max_page);
@@ -189,6 +191,16 @@ void cmain (unsigned long magic, multiboot_info_t *mbi)
     current->shared_info = (void *)get_free_page(GFP_KERNEL);
     memset(current->shared_info, 0, sizeof(shared_info_t));
     set_fs(USER_DS);
+
+    /* Initialise the slab allocator. */
+    kmem_cache_init();
+    kmem_cache_sizes_init(max_page);
+
+    task_struct_cachep = kmem_cache_create(
+        "task_struct_cache", sizeof(struct task_struct),
+        0, SLAB_HWCACHE_ALIGN, NULL, NULL);
+    if ( task_struct_cachep == NULL )
+        panic("No slab cache for task structs.");
 
     start_of_day();
 
@@ -215,7 +227,7 @@ void cmain (unsigned long magic, multiboot_info_t *mbi)
     update_dom_time(new_dom->shared_info);
     wake_up(new_dom);
 
-    cpu_idle();
+    startup_cpu_idle_loop();
 }
 
 
