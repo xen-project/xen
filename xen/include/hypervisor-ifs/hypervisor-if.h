@@ -39,6 +39,7 @@
 #define __HYPERVISOR_xen_version          22
 #define __HYPERVISOR_console_io           23
 #define __HYPERVISOR_physdev_op           24
+#define __HYPERVISOR_update_va_mapping_otherdomain 25
 
 /*
  * MULTICALLS

@@ -100,8 +100,8 @@ int netif_be_start_xmit(struct sk_buff *skb, struct net_device *dev)
     netif_t *netif = (netif_t *)dev->priv;
     s8 status = NETIF_RSP_OKAY;
     u16 size=0, id;
-    mmu_update_t mmu[6];
-    pgd_t *pgd; pmd_t *pmd; pte_t *pte;
+    mmu_update_t mmu[4];
+    multicall_entry_t mcl[2];
     unsigned long vdata, mdata=0, new_mfn;
 
     /* Drop the packet if the target domain has no receive buffers. */
@@ -148,40 +148,47 @@ int netif_be_start_xmit(struct sk_buff *skb, struct net_device *dev)
 
     new_mfn = get_new_mfn();
 
-    pgd = pgd_offset_k(   (vdata & PAGE_MASK));
-    pmd = pmd_offset(pgd, (vdata & PAGE_MASK));
-    pte = pte_offset(pmd, (vdata & PAGE_MASK));
+    mmu[0].ptr  = (new_mfn << PAGE_SHIFT) | MMU_MACHPHYS_UPDATE;
+    mmu[0].val  = __pa(vdata) >> PAGE_SHIFT;
 
-    mmu[0].val  = (unsigned long)(netif->domid<<16) & ~0xFFFFUL;
-    mmu[0].ptr  = (unsigned long)(netif->domid<< 0) & ~0xFFFFUL;
-    mmu[1].val  = (unsigned long)(netif->domid>>16) & ~0xFFFFUL;
-    mmu[1].ptr  = (unsigned long)(netif->domid>>32) & ~0xFFFFUL;
-    mmu[0].ptr |= MMU_EXTENDED_COMMAND;
-    mmu[0].val |= MMUEXT_SET_SUBJECTDOM_L;
+    mmu[1].val  = (unsigned long)(netif->domid<<16) & ~0xFFFFUL;
+    mmu[1].ptr  = (unsigned long)(netif->domid<< 0) & ~0xFFFFUL;
+    mmu[2].val  = (unsigned long)(netif->domid>>16) & ~0xFFFFUL;
+    mmu[2].ptr  = (unsigned long)(netif->domid>>32) & ~0xFFFFUL;
     mmu[1].ptr |= MMU_EXTENDED_COMMAND;
-    mmu[1].val |= MMUEXT_SET_SUBJECTDOM_H;
+    mmu[1].val |= MMUEXT_SET_SUBJECTDOM_L;
+    mmu[2].ptr |= MMU_EXTENDED_COMMAND;
+    mmu[2].val |= MMUEXT_SET_SUBJECTDOM_H;
 
-    mmu[2].ptr  = (mdata & PAGE_MASK) | MMU_EXTENDED_COMMAND;
-    mmu[2].val  = MMUEXT_REASSIGN_PAGE;
+    mmu[3].ptr  = (mdata & PAGE_MASK) | MMU_EXTENDED_COMMAND;
+    mmu[3].val  = MMUEXT_REASSIGN_PAGE;
 
-    mmu[3].ptr  = MMU_EXTENDED_COMMAND;
-    mmu[3].val  = MMUEXT_RESET_SUBJECTDOM;
+    mcl[0].op = __HYPERVISOR_mmu_update;
+    mcl[0].args[0] = (unsigned long)mmu;
+    mcl[0].args[1] = 4;
+    mcl[1].op = __HYPERVISOR_update_va_mapping;
+    mcl[1].args[0] = vdata >> PAGE_SHIFT;
+    mcl[1].args[1] = (new_mfn << PAGE_SHIFT) | __PAGE_KERNEL;
+    mcl[1].args[2] = UVMF_INVLPG;
 
-    mmu[4].ptr  = virt_to_machine(pte);
-    mmu[4].val  = (new_mfn << PAGE_SHIFT) | __PAGE_KERNEL;
-
-    mmu[5].ptr  = (new_mfn << PAGE_SHIFT) | MMU_MACHPHYS_UPDATE;
-    mmu[5].val  = __pa(vdata) >> PAGE_SHIFT;
-
-    if ( unlikely(HYPERVISOR_mmu_update(mmu, 6) < 0) )
+    (void)HYPERVISOR_multicall(mcl, 2);
+    if ( mcl[0].args[5] != 0 )
     {
         DPRINTK("Failed MMU update transferring to DOM%llu\n", netif->domid);
+        (void)HYPERVISOR_update_va_mapping(
+            vdata >> PAGE_SHIFT,
+            (pte_t) { (mdata & PAGE_MASK) | __PAGE_KERNEL },
+            UVMF_INVLPG);
         dealloc_mfn(new_mfn);
         status = NETIF_RSP_ERROR;
         goto out;
     }
 
     phys_to_machine_mapping[__pa(vdata) >> PAGE_SHIFT] = new_mfn;
+
+    atomic_set(&(skb_shinfo(skb)->dataref), 1);
+    skb_shinfo(skb)->nr_frags = 0;
+    skb_shinfo(skb)->frag_list = NULL;
 
     netif->stats.rx_bytes += size;
     netif->stats.rx_packets++;
@@ -261,7 +268,6 @@ static void net_tx_action(unsigned long unused)
     netif_tx_request_t txreq;
     u16 pending_idx;
     NETIF_RING_IDX i;
-    pgprot_t prot = __pgprot(_PAGE_PRESENT|_PAGE_DIRTY|_PAGE_ACCESSED);
     struct page *page;
 
     while ( (NR_PENDING_REQS < MAX_PENDING_REQS) &&
@@ -334,10 +340,10 @@ static void net_tx_action(unsigned long unused)
 
         pending_idx = pending_ring[MASK_PEND_IDX(pending_cons)];
 
-        if ( direct_remap_area_pages(&init_mm,
-                                     MMAP_VADDR(pending_idx),
-                                     txreq.addr & PAGE_MASK,
-                                     PAGE_SIZE, prot, netif->domid) != 0 )
+        if ( HYPERVISOR_update_va_mapping_otherdomain(
+            MMAP_VADDR(pending_idx) >> PAGE_SHIFT,
+            (pte_t) { (txreq.addr & PAGE_MASK) | __PAGE_KERNEL },
+            0, netif->domid) != 0 )
         {
             DPRINTK("Bad page frame\n");
             make_tx_response(netif, txreq.id, NETIF_RSP_ERROR);
@@ -352,7 +358,8 @@ static void net_tx_action(unsigned long unused)
             DPRINTK("Can't allocate a skb in start_xmit.\n");
             make_tx_response(netif, txreq.id, NETIF_RSP_ERROR);
             netif_put(netif);
-            vmfree_area_pages(MMAP_VADDR(pending_idx), PAGE_SIZE);
+            HYPERVISOR_update_va_mapping(MMAP_VADDR(pending_idx) >> PAGE_SHIFT,
+                                         (pte_t) { 0 }, UVMF_INVLPG);
             break;
         }
         
@@ -401,7 +408,8 @@ static void netif_page_release(struct page *page)
 
     netif = pending_netif[pending_idx];
 
-    vmfree_area_pages(MMAP_VADDR(pending_idx), PAGE_SIZE);
+    HYPERVISOR_update_va_mapping(MMAP_VADDR(pending_idx) >> PAGE_SHIFT,
+                                 (pte_t) { 0 }, UVMF_INVLPG);
         
     spin_lock(&netif->tx_lock);
     make_tx_response(netif, pending_id[pending_idx], NETIF_RSP_OKAY);

@@ -183,20 +183,22 @@ do_multicall:
 multicall_loop:
         pushl %ecx
 multicall_fault1: 
-        pushl 20(%ebx)
+        pushl 20(%ebx)      # args[4]
 multicall_fault2: 
-        pushl 16(%ebx)
+        pushl 16(%ebx)      # args[3]
 multicall_fault3: 
-        pushl 12(%ebx)
+        pushl 12(%ebx)      # args[2]
 multicall_fault4: 
-        pushl 8(%ebx)
+        pushl 8(%ebx)       # args[1]
 multicall_fault5: 
-        pushl 4(%ebx)
+        pushl 4(%ebx)       # args[0]
 multicall_fault6: 
-        movl  (%ebx),%eax
+        movl  (%ebx),%eax   # op
         andl  $255,%eax
         call  *SYMBOL_NAME(hypervisor_call_table)(,%eax,4)
 multicall_return_from_call:
+multicall_fault7:
+        movl  %eax,24(%ebx) # args[5] == result
         addl  $20,%esp
         popl  %ecx
         addl  $(ARGS_PER_MULTICALL_ENTRY*4),%ebx
@@ -245,10 +247,6 @@ restore_all_guest:
         movsl
         movsl
         movsl
-        # Third, reenable interrupts. They will definitely be reenabled by IRET
-        # in any case. They could be disabled here if we are returning from an
-        # interrupt. We need interrupts enabled if we take a fault.
-        sti
         # Finally, restore guest registers -- faults will cause failsafe
         popl %ebx
 	popl %ecx
@@ -539,11 +537,14 @@ error_code:
 	movl  %edx,%es
 	movl  %edx,%fs
 	movl  %edx,%gs
-	movl  EFLAGS(%esp),%edx
-	testl $0x200,%edx               # Is IF asserted in saved EFLAGS?
-	jz    1f                        # Don't STI if it isn't.
+        # We force a STI here. In most cases it is illegal to fault with
+        # interrupts disabled, so no need to check EFLAGS. There is one
+        # case when it /is/ valid -- on final return to guest context, we
+        # CLI so we can atomically check for events to notify guest about and
+        # return, all in one go. If we fault it is necessary to STI and the
+        # worst that will happen is that our return code is no longer atomic.
+        # This will do -- noone will ever notice. :-)
 	sti
-1:	movl  %esp,%edx
 	pushl %esi			# push the error code
 	pushl %edx			# push the pt_regs pointer
 	GET_CURRENT(%ebx)
@@ -745,6 +746,7 @@ ENTRY(hypervisor_call_table)
         .long SYMBOL_NAME(do_xen_version)
         .long SYMBOL_NAME(do_console_io)
         .long SYMBOL_NAME(do_physdev_op)
+        .long SYMBOL_NAME(do_update_va_mapping_otherdomain) /* 25 */
         .rept NR_syscalls-((.-hypervisor_call_table)/4)
         .long SYMBOL_NAME(do_ni_syscall)
         .endr

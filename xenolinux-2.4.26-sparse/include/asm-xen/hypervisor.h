@@ -459,4 +459,18 @@ static inline int HYPERVISOR_physdev_op(void *physdev_op)
     return ret;
 }
 
+static inline int HYPERVISOR_update_va_mapping_otherdomain(
+    unsigned long page_nr, pte_t new_val, unsigned long flags, domid_t domid)
+{
+    int ret;
+    __asm__ __volatile__ (
+        TRAP_INSTR
+        : "=a" (ret) : "0" (__HYPERVISOR_update_va_mapping_otherdomain), 
+        "b" (page_nr), "c" ((new_val).pte_low), "d" (flags),
+        "S" ((unsigned long)domid), "D" ((unsigned long)(domid>>32)) : 
+        "memory" );
+    
+    return ret;
+}
+
 #endif /* __HYPERVISOR_H__ */

@@ -171,16 +171,6 @@ static void network_tx_buf_gc(struct net_device *dev)
 }
 
 
-static inline pte_t *get_ppte(void *addr)
-{
-    pgd_t *pgd; pmd_t *pmd; pte_t *pte;
-    pgd = pgd_offset_k(   (unsigned long)addr);
-    pmd = pmd_offset(pgd, (unsigned long)addr);
-    pte = pte_offset(pmd, (unsigned long)addr);
-    return pte;
-}
-
-
 static void network_alloc_rx_buffers(struct net_device *dev)
 {
     unsigned short id;
@@ -190,7 +180,6 @@ static void network_alloc_rx_buffers(struct net_device *dev)
     dom_mem_op_t op;
     unsigned long pfn_array[NETIF_RX_RING_SIZE];
     int ret, nr_pfns = 0;
-    pte_t *pte;
 
     /* Make sure the batch is large enough to be worthwhile (1/2 ring). */
     if ( unlikely((i - np->rx_resp_cons) > (NETIF_RX_RING_SIZE/2)) || 
@@ -212,9 +201,9 @@ static void network_alloc_rx_buffers(struct net_device *dev)
 
         np->rx->ring[MASK_NET_RX_IDX(i)].req.id = id;
         
-        pte = get_ppte(skb->head);
-        pfn_array[nr_pfns++] = pte->pte_low >> PAGE_SHIFT;
-        queue_l1_entry_update(pte, 0);
+        pfn_array[nr_pfns++] = virt_to_machine(skb->head) >> PAGE_SHIFT;
+        HYPERVISOR_update_va_mapping((unsigned long)skb->head >> PAGE_SHIFT,
+                                     (pte_t) { 0 }, UVMF_INVLPG);
     }
     while ( (++i - np->rx_resp_cons) != NETIF_RX_RING_SIZE );
 
@@ -309,8 +298,7 @@ static void netif_int(int irq, void *dev_id, struct pt_regs *ptregs)
     struct sk_buff *skb;
     netif_rx_response_t *rx;
     NETIF_RING_IDX i;
-    mmu_update_t mmu[2];
-    pte_t *pte;
+    mmu_update_t mmu;
 
     spin_lock_irqsave(&np->tx_lock, flags);
     network_tx_buf_gc(dev);
@@ -334,13 +322,14 @@ static void netif_int(int irq, void *dev_id, struct pt_regs *ptregs)
         }
 
         /* Remap the page. */
-        pte = get_ppte(skb->head);
-        mmu[0].ptr  = virt_to_machine(pte);
-        mmu[0].val  = (rx->addr & PAGE_MASK) | __PAGE_KERNEL;
-        mmu[1].ptr  = (rx->addr & PAGE_MASK) | MMU_MACHPHYS_UPDATE;
-        mmu[1].val  = __pa(skb->head) >> PAGE_SHIFT;
-        if ( HYPERVISOR_mmu_update(mmu, 2) != 0 )
+        mmu.ptr  = (rx->addr & PAGE_MASK) | MMU_MACHPHYS_UPDATE;
+        mmu.val  = __pa(skb->head) >> PAGE_SHIFT;
+        if ( HYPERVISOR_mmu_update(&mmu, 1) != 0 )
             BUG();
+        HYPERVISOR_update_va_mapping((unsigned long)skb->head >> PAGE_SHIFT,
+                                     (pte_t) { (rx->addr & PAGE_MASK) | 
+                                                   __PAGE_KERNEL },
+                                     0);
         phys_to_machine_mapping[__pa(skb->head) >> PAGE_SHIFT] = 
             rx->addr >> PAGE_SHIFT;
 
@@ -352,9 +341,6 @@ static void netif_int(int irq, void *dev_id, struct pt_regs *ptregs)
         atomic_set(&(skb_shinfo(skb)->dataref), 1);
         skb_shinfo(skb)->nr_frags = 0;
         skb_shinfo(skb)->frag_list = NULL;
-                                
-        phys_to_machine_mapping[virt_to_phys(skb->head) >> PAGE_SHIFT] =
-            (*(unsigned long *)get_ppte(skb->head)) >> PAGE_SHIFT;
 
         skb->data = skb->tail = skb->head + (rx->addr & ~PAGE_MASK);
         skb_put(skb, rx->status);
