@@ -19,6 +19,7 @@ public class ParseDomainNew extends CommandParser {
         int vifs = getIntParameter(args, 'v', d.domainVIFs);
         String bargs = getStringParameter(args, 'a', d.args) + " ";
         String root_dev = getStringParameter(args, 'd', d.rootDevice);
+        String root_args = getStringParameter(args, 't', d.rootArgs);
         String usr_dev = getStringParameter(args, 'u', d.usrDevice);
         String nfs_root_path = getStringParameter(args, 'f', d.nwNFSRoot);
         String nw_ip = getStringParameter(args, '4', d.nwIP);
@@ -39,6 +40,7 @@ public class ParseDomainNew extends CommandParser {
                 vifs,
                 bargs,
                 root_dev,
+                root_args,
                 nfs_root_path,
                 nw_ip,
                 nw_gw,
@@ -78,7 +80,7 @@ public class ParseDomainNew extends CommandParser {
     }
 
     public String getUsage() {
-        return "[-n<domain_name>] [-k<size>] [-i<image>] [-v<num_vifs>] [-r<initrd>] [-d<root_device>] [-u<usr_device>] [-f<nfs_root>] [-s<nfs_boot_server>] [-4<ipv4_boot_address>] [-g<ipv4_boot_gateway>] [-m<ipv4_boot_netmask>] [-h<hostname>] [-a<args>]";
+        return "[-n<domain_name>] [-k<size>] [-i<image>] [-v<num_vifs>] [-r<initrd>] [-d<root_device>] [-t<root_mount_args>] [-u<usr_device>] [-f<nfs_root>] [-s<nfs_boot_server>] [-4<ipv4_boot_address>] [-g<ipv4_boot_gateway>] [-m<ipv4_boot_netmask>] [-h<hostname>] [-a<args>]";
     }
 
     public String getHelpText() {
@@ -93,6 +95,7 @@ public class ParseDomainNew extends CommandParser {
             + "  -v  Number of VIFs                           domain_vifs\n"
             + "  -r  InitRD (if required)                     domain_init_rd\n"
             + "  -d  Root device (e.g /dev/nfs, /dev/hda3)    root_device\n"
+            + "  -t  Root mount args (e.g ro)                 root_args\n"
             + "  -u  Usr dev/path (e.g /dev/hda3, server:path)usr_device\n"
             + "  -a  Additional boot parameters               args\n"
             + "\n"

@@ -6,6 +6,7 @@
 <domain_image>./image</domain_image>
 <domain_vifs>1</domain_vifs>
 <root_device>/dev/nfs</root_device>
+<root_args>ro</root_args>
 <nw_ip>=+</nw_ip>
 <nw_gw>=</nw_gw>
 <nw_mask>=</nw_mask>

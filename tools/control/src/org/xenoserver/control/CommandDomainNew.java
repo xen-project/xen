@@ -32,6 +32,8 @@ public class CommandDomainNew extends Command {
     private String bargs;
     /** Root device */
     private String root_dev;
+    /** Root mount args */
+    private String root_args;
     /** Usr device */
     private String usr_dev;
     /** NFS root path */
@@ -91,13 +93,14 @@ public class CommandDomainNew extends Command {
         int vifs,
         String bargs,
         String root_dev,
+        String root_args,
         String nfs_root_path,
         String nw_ip,
         String nw_gw,
         String nw_mask,
         String nw_nfs_server,
         String nw_host) {
-        this(d,name,size,image,initrd,vifs,bargs,root_dev,nfs_root_path,nw_ip,nw_gw,nw_mask,nw_nfs_server,nw_host,null);
+        this(d,name,size,image,initrd,vifs,bargs,root_dev,root_args,nfs_root_path,nw_ip,nw_gw,nw_mask,nw_nfs_server,nw_host,null);
     }
     
     public CommandDomainNew(
@@ -109,6 +112,7 @@ public class CommandDomainNew extends Command {
         int vifs,
         String bargs,
         String root_dev,
+        String root_args,
         String nfs_root_path,
         String nw_ip,
         String nw_gw,
@@ -124,6 +128,7 @@ public class CommandDomainNew extends Command {
             this.vifs = vifs;
             this.bargs = bargs;
             this.root_dev = root_dev;
+            this.root_args = root_args;
             this.nfs_root_path = nfs_root_path;
             this.nw_ip = nw_ip;
             this.nw_gw = nw_gw;
@@ -219,7 +224,7 @@ public class CommandDomainNew extends Command {
                     }
                     bargs =
                         (bargs
-                            + " root=/dev/nfs "
+                            + " root=/dev/nfs " + root_args + " " 
                             + "nfsroot="
                             + StringPattern.parse(nfs_root_path).resolve(
                                 domain_id)
@@ -229,7 +234,7 @@ public class CommandDomainNew extends Command {
                         (bargs
                             + " root="
                             + StringPattern.parse(root_dev).resolve(domain_id)
-                            + " ro ");
+                            + " " + root_args + " ");
 
                 }
                 
