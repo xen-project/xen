@@ -831,6 +831,14 @@ class XendDomainInfo:
             self.config.remove(['device', dev_config])
         dev.destroy()
 
+    def configure_memory(self):
+        """Configure vm memory limit.
+        """
+        maxmem = sxp.get_child_value(self.config, "maxmem")
+        if maxmem is None:
+            maxmem = self.memory
+        xc.domain_setmaxmem(self.dom, maxmem_kb = maxmem * 1024)
+
     def configure_console(self):
         """Configure the vm console port.
         """
@@ -1140,10 +1148,27 @@ def vm_field_ignore(vm, config, val, index):
 
     @param vm:        virtual machine
     @param config:    vm config
-    @param val:       vfr field
+    @param val:       config field
     @param index:     field index
     """
     pass
+
+def vm_field_maxmem(vm, config, val, index):
+    """Configure vm memory limit.
+
+    @param vm:        virtual machine
+    @param config:    vm config
+    @param val:       config field
+    @param index:     field index
+    """
+    maxmem = sxp.child0(val)
+    if maxmem is None:
+        maxmem = vm.memory
+    try:
+        maxmem = int(maxmem)
+    except:
+        raise VmError("invalid maxmem: " + str(maxmem))
+    xc.domain_setmaxmem(vm.dom, maxmem_kb = maxmem * 1024)
 
 # Register image handlers.
 add_image_handler('linux',  vm_image_linux)
@@ -1165,3 +1190,4 @@ add_config_handler('device',     vm_field_ignore)
 add_config_handler('backend',    vm_field_ignore)
 
 # Register other config handlers.
+add_config_handler('maxmem',     vm_field_maxmem)

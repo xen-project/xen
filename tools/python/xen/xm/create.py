@@ -99,6 +99,10 @@ gopts.var('memory', val='MEMORY',
           fn=set_int, default=128,
           use="Domain memory in MB.")
 
+gopts.var('maxmem', val='MEMORY',
+          fn=set_int, default=None,
+          use="Maximum domain memory in MB.")
+
 gopts.var('cpu', val='CPU',
           fn=set_int, default=None,
           use="CPU to run the domain on.")
@@ -310,6 +314,8 @@ def make_config(vals):
     config = ['vm',
               ['name', vals.name ],
               ['memory', vals.memory ]]
+    if vals.maxmem:
+        config.append(['maxmem', vals.maxmem])
     if vals.cpu is not None:
         config.append(['cpu', vals.cpu])
     if vals.cpu_weight is not None:
