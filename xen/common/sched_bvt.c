@@ -170,7 +170,6 @@ void bvt_wake_up(struct task_struct *p)
 static void bvt_do_block(struct task_struct *p)
 {
     BVT_INFO(p)->warpback = 0; 
-	__del_from_runqueue(p);
 }
 
 /* Control the scheduler. */
@@ -206,10 +205,10 @@ int bvt_adjdom(struct task_struct *p,
         
         struct bvt_dom_info *inf = BVT_INFO(p);
         
-
-		printk("Get domain %lld bvt mcu_adv=%ld, warp=%ld, warpl=%ld, warpu=%ld\n",
-			   p->domain, inf->mcu_advance, inf->warp,
-			   inf->warpl, inf->warpu );
+        DPRINTK("Get domain %lld bvt mcu_adv=%ld, warp=%ld, warpl=%ld,"
+                " warpu=%ld\n",
+                p->domain, inf->mcu_advance, inf->warp,
+                inf->warpl, inf->warpu );
 
         /* Sanity -- this can avoid divide-by-zero. */
         if ( mcu_adv == 0 )
@@ -221,9 +220,10 @@ int bvt_adjdom(struct task_struct *p,
         inf->warpl = warpl;
         inf->warpu = warpu;
 
-		printk("Set domain %lld bvt mcu_adv=%ld, warp=%ld, warpl=%ld, warpu=%ld\n",
-			   p->domain, inf->mcu_advance, inf->warp,
-			   inf->warpl, inf->warpu );
+        DPRINTK("Set domain %lld bvt mcu_adv=%ld, warp=%ld, warpl=%ld,"
+                " warpu=%ld\n",
+                p->domain, inf->mcu_advance, inf->warp,
+                inf->warpl, inf->warpu );
 
         spin_unlock_irqrestore(&schedule_lock[p->processor], flags);
     }
@@ -277,8 +277,7 @@ static task_slice_t bvt_do_schedule(s_time_t now)
         
         __calc_evt(prev_inf);
         
-        if( __task_on_runqueue(prev))
-			__del_from_runqueue(prev);
+        __del_from_runqueue(prev);
         
         if ( likely(prev->state == TASK_RUNNING) )
             __add_to_runqueue_tail(prev);
