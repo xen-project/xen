@@ -119,7 +119,7 @@ struct task_struct
 				       the process can do raw access
 				       to. */
     spinlock_t physdev_lock;
-    vbd_t *vbd_list[XEN_MAX_VBDS];
+    vbd_t *vbdtab[VBD_HTAB_SZ];     // mapping from 16bit vdevices to vbds
 
     /* VM */
     struct mm_struct mm;

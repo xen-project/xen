@@ -1,41 +1,11 @@
 #ifndef __HYP_IFS_VBD_H__
 #define __HYP_IFS_VBD_H__
 
-#define XEN_MAX_VBDS 100     /* total number of vbds across all doms */
-
-#define XEN_VBD_UNUSED 0          /* bzero default */
-#define XEN_DISK_READ_WRITE  1
-#define XEN_DISK_READ_ONLY   2
-#define XEN_VBD_RO XEN_DISK_READ_ONLY
-#define XEN_VBD_RW XEN_DISK_READ_WRITE
-
-/*
- *
- * virtual disk (vhd) structures, used by XEN_BLOCK_VBD_{CREATE, DELETE}
- *
- */
-
-typedef struct xv_extent
-{
-  int disk;                                          /* physical disk number */
-  unsigned long offset;               /* offset in blocks into physical disk */
-  unsigned long size;                                      /* size in blocks */
-} xv_extent_t;
-
-#define XEN_VBD_KEYSIZE 10
-
-typedef struct xv_disk
-{
-  int mode;                     /* XEN_DISK_READ_WRITE or XEN_DISK_READ_ONLY */
-  int domain;                   /* domain */
-  int vbd;                      /* segment number */
-  char key[XEN_VBD_KEYSIZE];    /* key for benefit of dom0 userspace */
-  int ext_count;                /* number of xv_extent_t to follow */
-  xv_extent_t extents[XEN_MAX_DISK_COUNT];    /* arbitrary reuse of constant */
-} xv_disk_t;
 
 #define PHYSDISK_MODE_R 1
 #define PHYSDISK_MODE_W 2
+
+#if 0
 typedef struct xp_disk
 {
   int mode; /* 0 -> revoke existing access, otherwise bitmask of
@@ -60,42 +30,52 @@ typedef struct {
     unsigned mode;
   } entries[PHYSDISK_MAX_ACES_PER_REQUEST];
 } physdisk_probebuf_t;
-
-
-typedef struct xen_vbd_info
-{
-    int count;
-    struct {
-        unsigned domain;
-        unsigned seg_nr;
-        char key[XEN_VBD_KEYSIZE];
-        unsigned short mode;             /* UNUSED, RO, or RW. */
-    } vbds[XEN_MAX_VBDS];
-} xen_vbd_info_t;
-
+#endif
 
 
 /* Block I/O trap operations and associated structures.
  */
 
 #define BLOCK_IO_OP_SIGNAL      0    /* let xen know we have work to do */ 
-#define BLOCK_IO_OP_ATTACH_VBD  1    /* attach a VBD to a given domain */
-#define BLOCK_IO_OP_RESET       2    /* reset ring indexes on quiescent i/f */
+#define BLOCK_IO_OP_RESET       1    /* reset ring indexes on quiescent i/f */
+#define BLOCK_IO_OP_VBD_CREATE  2    /* create a new VBD for a given domain */
+#define BLOCK_IO_OP_VBD_ADD     3    /* add an extent to a given VBD */
+#define BLOCK_IO_OP_VBD_REMOVE  4    /* remove an extent from a given VBD */
+#define BLOCK_IO_OP_VBD_DELETE  5    /* delete a VBD */
 
-typedef struct _extent { 
-    u16       raw_device; 
+
+typedef struct _xen_extent { 
+    u16       device; 
     ulong     start_sector; 
     ulong     nr_sectors;
-} extent_t; 
+    u16       mode; 
+} xen_extent_t; 
 
-    
-typedef struct _vbd_attach { 
-    int       domain; 
-    u16       mode;                  /* read-only or read-write */ 
-    u16       device;                /* how this domain refers to this VBD */
-    int       nr_extents;            /* number of extents in the VBD */
-    extent_t *extents;               /* pointer to /array/ of extents */
-} vbd_attach_t; 
+  
+typedef struct _vbd_create { 
+    unsigned  domain; 
+    u16       vdevice; 
+} vbd_create_t; 
+
+
+typedef struct _vbd_add { 
+    unsigned     domain; 
+    u16          vdevice; 
+    xen_extent_t extent; 
+} vbd_add_t; 
+
+typedef struct _vbd_remove { 
+    unsigned     domain; 
+    u16          vdevice; 
+    xen_extent_t extent; 
+} vbd_remove_t; 
+
+
+typedef struct _vbd_delete { 
+    unsigned  domain; 
+    u16       vdevice; 
+} vbd_delete_t; 
+
 
 
 typedef struct block_io_op_st
@@ -104,7 +84,10 @@ typedef struct block_io_op_st
     union
     {
         /* no entry for BLOCK_IO_OP_SIGNAL */
-	vbd_attach_t attach_info; 
+	vbd_create_t  create_info; 
+	vbd_add_t     add_info; 
+	vbd_remove_t  remove_info; 
+	vbd_delete_t  delete_info; 
         /* no entry for BLOCK_IO_OP_RESET  */
     }
     u;

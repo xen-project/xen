@@ -132,8 +132,10 @@ void __kill_domain(struct task_struct *p)
 
     unlink_blkdev_info(p);
 
+#if 0
     for ( i = 0; i < XEN_MAX_VBDS; i++ )
 	xen_vbd_delete(p, i);
+#endif
 
     for ( i = 0; i < MAX_DOMAIN_VIFS; i++ )
         unlink_net_vif(p->net_vif_list[i]);
@@ -305,8 +307,10 @@ void release_task(struct task_struct *p)
      */
     destroy_blkdev_info(p);
 
+#if 0
     /* Free up the physdisk access control info */
     destroy_physdisk_aces(p);
+#endif
 
     /* Free all memory associated with this domain. */
     free_page((unsigned long)p->mm.perdomain_pt);

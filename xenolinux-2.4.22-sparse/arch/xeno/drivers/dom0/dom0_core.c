@@ -61,6 +61,7 @@ static int privcmd_ioctl(struct inode *inode, struct file *file,
             TRAP_INSTR "; "
             "popl %%edi; popl %%esi; popl %%edx; popl %%ecx; popl %%ebx"
             : "=a" (ret) : "0" (&hypercall) : "memory" );
+
     }
     break;
 
@@ -99,25 +100,10 @@ static int privcmd_ioctl(struct inode *inode, struct file *file,
     }
     break;
     
-    case IOCTL_PRIVCMD_LINDEV_TO_XENDEV:
-    {
-        ret = (int)xldev_to_physdev((kdev_t)data);
-    }
-    break;
-
-    case IOCTL_PRIVCMD_XENDEV_TO_LINDEV:
-    {
-        ret = (int)physdev_to_xldev((unsigned short)data);
-    }
-    break;
-
     default:
-    {
         ret = -EINVAL;
-    }
-    break;
-    }
-
+    	break;
+	}
     return ret;
 }
 
