@@ -27,6 +27,8 @@
 #include <xen/config.h>
 #include <public/grant_table.h>
 
+#define GRANT_DEBUG 1
+
 /* Active grant entry - used for shadowing GTF_permit_access grants. */
 typedef struct {
     u32           pin;    /* Reference count information.  */

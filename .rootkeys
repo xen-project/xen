@@ -542,6 +542,7 @@
 3fbba6dbasJQV-MVElDC0DGSHMiL5w tools/libxc/xc_domain.c
 40278d99BLsfUv3qxv0I8C1sClZ0ow tools/libxc/xc_elf.h
 403e0977Bjsm_e82pwvl9VvaJxh8Gg tools/libxc/xc_evtchn.c
+4227c129ZKjJPNYooHVzBCyinf7Y6Q tools/libxc/xc_gnttab.c
 40e03333Eegw8czSWvHsbKxrRZJjRA tools/libxc/xc_io.c
 40e03333vrWGbLAhyJjXlqCHaJt7eA tools/libxc/xc_io.h
 3fbba6dbNCU7U6nsMYiXzKkp3ztaJg tools/libxc/xc_linux_build.c

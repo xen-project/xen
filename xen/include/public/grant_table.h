@@ -207,6 +207,19 @@ typedef struct {
 } PACKED gnttab_setup_table_t; /* 16 bytes */
 
 /*
+ * GNTTABOP_dump_table: Dump the contents of the grant table to the
+ * xen console. Debugging use only.
+ */
+#define GNTTABOP_dump_table           3
+typedef struct {
+    /* IN parameters. */
+    domid_t     dom;                  /*  0 */
+    /* OUT parameters. */
+    s16         status;               /* 2: GNTST_* */
+} PACKED gnttab_dump_table_t; /* 4 bytes */
+
+
+/*
  * Bitfield values for update_pin_status.flags.
  */
  /* Map the grant entry for access by I/O devices. */
@@ -247,5 +260,15 @@ typedef struct {
     "permission denied"                         \
 }
         
+                                                                                       
+typedef struct {
+    union {                           /*  0 */
+        gnttab_map_grant_ref_t    map_grant_ref;
+        gnttab_unmap_grant_ref_t  unmap_grant_ref;
+        gnttab_setup_table_t      setup_table;
+        gnttab_dump_table_t       dump_table;
+        u8                        __dummy[24];
+    } PACKED u;
+} PACKED gnttab_op_t; /* 32 bytes */
 
 #endif /* __XEN_PUBLIC_GRANT_TABLE_H__ */

@@ -465,10 +465,10 @@ int vmx_identify(void)
 {
     int eax, ecx;
 
-    __asm__ __volatile__ ("cpuid" 
+    __asm__ __volatile__ ("pushl %%ebx; cpuid; popl %%ebx" 
 			  : "=a" (eax), "=c" (ecx) 
 			  : "0" (1) 
-			  : "bx", "dx");
+			  : "dx");
     if (!(ecx & VMX_FEATURE_FLAG)) {
         return -1;
     }

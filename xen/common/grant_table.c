@@ -110,6 +110,8 @@ __gnttab_map_grant_ref(
         (void)__put_user(GNTST_no_device_space, &uop->handle);
         return;
     }
+    DPRINTK("Mapping grant ref (%hu) for domain (%hu) with flags (%x)\n",
+            ref, dom, flags);
 
     act = &rd->grant_table->active[ref];
     sha = &rd->grant_table->shared[ref];
@@ -324,6 +326,8 @@ __gnttab_unmap_grant_ref(
         (void)__put_user(GNTST_bad_domain, &uop->status);
         return;
     }
+    DPRINTK("Unmapping grant ref (%hu) for domain (%hu) with handle (%hu)\n",
+            ref, dom, handle);
 
     act = &rd->grant_table->active[ref];
     sha = &rd->grant_table->shared[ref];
@@ -423,7 +427,7 @@ gnttab_setup_table(
     {
         ASSERT(d->grant_table != NULL);
         (void)put_user(GNTST_okay, &uop->status);
-        (void)put_user(virt_to_phys(d->grant_table) >> PAGE_SHIFT,
+        (void)put_user(virt_to_phys(d->grant_table->shared) >> PAGE_SHIFT,
                        &uop->frame_list[0]);
     }
 
@@ -431,14 +435,99 @@ gnttab_setup_table(
     return 0;
 }
 
+#ifdef GRANT_DEBUG
+static int
+gnttab_dump_table(gnttab_dump_table_t *uop)
+{
+    grant_table_t        *gt;
+    gnttab_dump_table_t   op;
+    struct domain        *d;
+    u32                   shared_mfn;
+    active_grant_entry_t *act;
+    grant_entry_t         sha_copy;
+    grant_mapping_t      *maptrack;
+    int                   i;
+
+
+    if ( unlikely(copy_from_user(&op, uop, sizeof(op)) != 0) )
+    {
+        DPRINTK("Fault while reading gnttab_dump_table_t.\n");
+        return -EFAULT;
+    }
+
+    if ( op.dom == DOMID_SELF )
+    {
+        op.dom = current->domain->id;
+    }
+
+    if ( unlikely((d = find_domain_by_id(op.dom)) == NULL) )
+    {
+        DPRINTK("Bad domid %d.\n", op.dom);
+        (void)put_user(GNTST_bad_domain, &uop->status);
+        return 0;
+    }
+
+    ASSERT(d->grant_table != NULL);
+    gt = d->grant_table;
+    (void)put_user(GNTST_okay, &uop->status);
+
+    shared_mfn = virt_to_phys(d->grant_table->shared);
+
+    DPRINTK("Grant table for dom (%hu) MFN (%x)\n",
+            op.dom, shared_mfn);
+
+    spin_lock(&gt->lock);
+
+    ASSERT(d->grant_table->active != NULL);
+    ASSERT(d->grant_table->shared != NULL);
+
+    for ( i = 0; i < NR_GRANT_ENTRIES; i++ )
+    {
+        act      = &gt->active[i];
+        sha_copy =  gt->shared[i];
+
+        if ( act->pin || act->domid || act->frame ||
+             sha_copy.flags || sha_copy.domid || sha_copy.frame )
+        {
+            DPRINTK("Grant: dom (%hu) ACTIVE (%d) pin:(%x) dom:(%hu) frame:(%u)\n",
+                    op.dom, i, act->pin, act->domid, act->frame);
+            DPRINTK("Grant: dom (%hu) SHARED (%d) flags:(%hx) dom:(%hu) frame:(%u)\n",
+                    op.dom, i, sha_copy.flags, sha_copy.domid, sha_copy.frame);
+
+        }
+
+    }
+
+    ASSERT(d->grant_table->maptrack != NULL);
+
+    for ( i = 0; i < NR_MAPTRACK_ENTRIES; i++ )
+    {
+        maptrack = &gt->maptrack[i];
+
+        if ( maptrack->ref_and_flags & MAPTRACK_GNTMAP_MASK )
+        {
+            DPRINTK("Grant: dom (%hu) MAP (%d) ref:(%hu) flags:(%x) dom:(%hu)\n",
+                    op.dom, i,
+                    maptrack->ref_and_flags >> MAPTRACK_REF_SHIFT,
+                    maptrack->ref_and_flags & MAPTRACK_GNTMAP_MASK,
+                    maptrack->domid);
+        }
+    }
+
+    spin_unlock(&gt->lock);
+
+    put_domain(d);
+    return 0;
+}
+#endif
+
 long 
 do_grant_table_op(
     unsigned int cmd, void *uop, unsigned int count)
 {
     long rc;
 
-    /* XXX stubbed out XXX */
-    return -ENOSYS;
+    DPRINTK("Grant: table operation (%u) count: (%u)\n", cmd, count);
 
     if ( count > 512 )
         return -EINVAL;
@@ -462,6 +551,11 @@ do_grant_table_op(
     case GNTTABOP_setup_table:
         rc = gnttab_setup_table((gnttab_setup_table_t *)uop, count);
         break;
+#ifdef GRANT_DEBUG
+    case GNTTABOP_dump_table:
+        rc = gnttab_dump_table((gnttab_dump_table_t *)uop);
+        break;
+#endif
     default:
         rc = -ENOSYS;
         break;
@@ -607,6 +701,72 @@ grant_table_create(
     return -ENOMEM;
 }
 
+static void
+gnttab_release_all_mappings(grant_table_t *gt)
+{
+    grant_mapping_t        *map;
+    domid_t                 dom;
+    grant_ref_t             ref;
+    u16                     handle, i;
+    struct domain          *ld, *rd;
+    unsigned long           frame;
+    active_grant_entry_t   *act;
+    grant_entry_t          *sha;
+
+    ld = current->domain;
+
+    for ( handle = 0; handle < NR_MAPTRACK_ENTRIES; handle++ )
+    {
+        map = &gt->maptrack[handle];
+                                                                                        
+        if ( map->ref_and_flags & MAPTRACK_GNTMAP_MASK )
+        {
+            dom = map->domid;
+            ref = map->ref_and_flags >> MAPTRACK_REF_SHIFT;
+
+            DPRINTK("Grant release (%hu) ref:(%hu) flags:(%x) dom:(%hu)\n",
+                    handle, ref,
+                    map->ref_and_flags & MAPTRACK_GNTMAP_MASK, dom);
+
+            if ( unlikely((rd = find_domain_by_id(dom)) == NULL) ||
+                 unlikely(ld == rd) )
+            {
+                if ( rd != NULL )
+                    put_domain(rd);
+                /* TODO: need to be able to handle domains destroyed
+                 *       with active mappings.
+                 */
+                DPRINTK("Grant release: Could not find domain %d\n", dom);
+                continue;
+            }
+
+            act = &rd->grant_table->active[ref];
+            sha = &rd->grant_table->shared[ref];
+
+            spin_lock(&rd->grant_table->lock);
+
+            frame = act->frame;
+
+            for ( i = ((act->pin & GNTPIN_hstw_mask) >> GNTPIN_hstw_shift) +
+                      ((act->pin & GNTPIN_devw_mask) >> GNTPIN_devw_shift);
+                  i > 0; i-- )
+            {
+                put_page_type(&frame_table[frame]);
+            }
+            act->pin = 0;
+
+            put_page(&frame_table[frame]);
+
+            clear_bit(_GTF_reading, &sha->flags);
+            clear_bit(_GTF_writing, &sha->flags);
+
+            spin_unlock(&rd->grant_table->lock);
+
+            put_domain(rd);
+        }
+    }
+}
+
 void
 grant_table_destroy(
     struct domain *d)
@@ -615,6 +775,9 @@ grant_table_destroy(
 
     if ( (t = d->grant_table) != NULL )
     {
+        if ( t->maptrack != NULL )
+            gnttab_release_all_mappings(t);
+
         /* Free memory relating to this grant table. */
         d->grant_table = NULL;
         free_xenheap_page((unsigned long)t->shared);
@@ -629,6 +792,7 @@ grant_table_init(
     void)
 {
     /* Nothing. */
+    DPRINTK("Grant table init\n");
 }
 
 /*
