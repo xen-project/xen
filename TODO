@@ -6,7 +6,8 @@ Known limitations and work in progress
 The "xenctl" tool used for controling domains is still rather clunky
 and not very user friendly. In particular, it should have an option to
 create and start a domain with all the necessary parameters set from a
-named xml file.
+named xml file. Update: the 'xenctl script' functionality combined
+with the '-i' option to 'domain new' sort of does this.
 
 The java xenctl tool is really just a frontend for a bunch of C tools
 named xi_* that do the actual work of talking to Xen and setting stuff
@@ -17,26 +18,32 @@ than xenctl but its arguably clearer what's going on.
 There's also a nice web based interface for controlling domains that
 uses apache/tomcat. Unfortunately, this has fallen out of sync with
 respect to the underlying tools, so is currently not built by default
-and needs fixing. 
+and needs fixing. It shouldn't be hard to bring it up to date.
 
-The current Virtual Firewall Router (VFR) implementation in the
-snapshot tree is very rudimentary, and in particular, lacks the IP
-port-space sharing across domains that we've proposed that promises to
-provide a better alternative to NAT.  There's a complete new
-implementation under development which also supports much better
-logging and auditing support.  The current network scheduler is just
-simple round-robin between domains, without any rate limiting or rate
-guarantees. Dropping in a new scheduler should be straightforward, and
-is planned as part of the VFRv2 work package.
+The current Xen Virtual Firewall Router (VFR) implementation in the
+snapshot tree is very rudimentary, and in particular, lacks the RSIP
+IP port-space sharing across domains that provides a better
+alternative to NAT.  There's a complete new implementation under
+development which also supports much better logging and auditing
+support. For now, if you want NAT, see the xen_nat_enable scripts and
+get domain0 to do it for you.
+
+The current network scheduler is just simple round-robin between
+domains, without any rate limiting or rate guarantees. Dropping in a
+new scheduler is straightforward, and is planned as part of the
+VFRv2 work package.
 
 Another area that needs further work is the interface between Xen and
 domain0 user space where the various XenoServer control daemons run.
 The current interface is somewhat ad-hoc, making use of various
 /proc/xeno entries that take a random assortment of arguments. We
 intend to reimplement this to provide a consistent means of feeding
-back accounting and logging information to the control daemon. Also,
-we should provide all domains with a read/write virtual console
-interface -- currently for domains >1 it is output only.
+back accounting and logging information to the control daemon, and
+enabling control instructions to be sent the other way (e.g. domain 3:
+reduce your memory footprint to 10000 pages. You have 1s to comply.)
+We should also use the same interface to provide domains with a
+read/write virtual console interface. The current implemenation is
+output only, though domain0 can use the VGA console read/write.
 
 There's also a number of memory management hacks that didn't make this
 release: We have plans for a "universal buffer cache" that enables
@@ -58,7 +65,8 @@ We have the equivalent of balloon driver functionality to control
 domain's memory usage, enabling a domain to give back unused pages to
 Xen. This needs properly documenting, and perhaps a way of domain0
 signalling to a domain that it requires it to reduce its memory
-footprint, rather than just the domain volunteering.
+footprint, rather than just the domain volunteering (see section on
+the improved control interface).
 
 The current disk scheduler is rather simplistic (batch round robin),
 and could be replaced by e.g. Cello if we have QoS isolation
@@ -82,3 +90,22 @@ page directory to a write-able page, we must ensure that no other CPU
 still has the page in its TLB to ensure memory system integrity.  One
 other issue for supporting MP guests is that we'll need some sort of
 CPU gang scheduler, which will require some research.
+
+Currently, the privileged domain0 can request access to the underlying
+hardware. This is how we enable the VGA console and Xserver to run in
+domain0. We are planning on extending this functionality to enable
+other device drivers for 'low performance' devices to be run in
+domain0, and then virtualized to other domains by domain0. This will
+enable random PCMCIA and USB devices to be used that we're unlikely to
+ever get around to writing a Xen driver for.
+
+We'd also like to experiment moving the network and block device
+drivers out of Xen, and each into their own special domains that are
+given access to the specific set of h/w resources they need to
+operate.  This will provide some isolation against faulty device
+drivers, potentially allowing them to be restarted on failure. There
+may be more context switches incurred, but due to Xen's pipelined
+asynchronous i/o interface we expect this overhead to be amortised.
+This architecture would also allow device drivers to be easily
+upgraded independent of Xen, which is necessary for our vision of Xen
+as a next-gen BIOS replacement.

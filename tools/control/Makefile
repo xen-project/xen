@@ -8,7 +8,7 @@ clean: clean-cmdline clean-web
 
 examples: FORCE
 	mkdir -p ../../../install/etc
-	cp examples/xen* examples/grub.conf* ../../../install/etc/
+	cp examples/xen* examples/*example ../../../install/etc/
 
 cmdline: FORCE
 	ant -buildfile build-cmdline.xml dist

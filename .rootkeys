@@ -17,6 +17,7 @@
 3f0d61da3O5gkcntbIOdUmN2-RcZbQ tools/control/doc/INSTALL-cmdline
 3eca6a96a31IwaKtkEa4jmzwTWlm8Q tools/control/doc/INSTALL-web
 3f0d61daCTHGCpQK0Brz3PAp80d_2Q tools/control/doc/USAGE-cmdline
+3f77f25c4zdCalc5d0YnMGEnc9By-Q tools/control/etc.exports-example
 3f776bd12y6bW-wtcs6rD2qhdpT_Rw tools/control/examples/grub.conf-example
 3f776bd1RBu7Gnce6Bq9328QFUZBsw tools/control/examples/xen-mynewdom
 3eb781fcabCKRogwxJA3-jJKstw9Vg tools/control/examples/xenctl.xml

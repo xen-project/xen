@@ -1,0 +1,20 @@
+/local/roots/root1	169.254.1.1(rw,no_root_squash)
+/local/roots/root2      169.254.1.2(rw,no_root_squash)
+/local/roots/root3      169.254.1.3(rw,no_root_squash)
+/local/roots/root4      169.254.1.4(rw,no_root_squash)
+/local/roots/root5      169.254.1.5(rw,no_root_squash)
+/local/roots/root6      169.254.1.6(rw,no_root_squash)
+/local/roots/root7      169.254.1.7(rw,no_root_squash)
+/local/roots/root8      169.254.1.8(rw,no_root_squash)
+
+#/usr			169.254.1/24(ro,no_root_squash)
+
+/local/usrs/usr1	169.254.1.1(rw,no_root_squash)
+/local/usrs/usr2        169.254.1.2(rw,no_root_squash)
+/local/usrs/usr3        169.254.1.3(rw,no_root_squash)
+/local/usrs/usr4        169.254.1.4(rw,no_root_squash)
+/local/usrs/usr5        169.254.1.5(rw,no_root_squash)
+/local/usrs/usr6        169.254.1.6(rw,no_root_squash)
+/local/usrs/usr7        169.254.1.7(rw,no_root_squash)
+/local/usrs/usr8        169.254.1.8(rw,no_root_squash)
+
