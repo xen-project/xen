@@ -8,12 +8,17 @@
 # Specifying the empty string '' allows all connections.
 (xend-address      '')
 
+## Use the following if VIF traffic is routed.
+# The script used to start/stop networking for xend.
+#(network-script     network-route)
+# The default script used to control virtual interfaces.
+#(vif-script         vif-route)
+
+## Use the following if VIF traffic is bridged.
 # The script used to start/stop networking for xend.
 (network-script    network)
-
 # The default bridge that virtual interfaces should be connected to.
 (vif-bridge        xen-br0)
-
 # The default script used to control virtual interfaces.
 (vif-script        vif-bridge)
 

@@ -1,0 +1,19 @@
+#!/bin/sh
+#============================================================================
+# Default Xen network start/stop script.
+# Xend calls a network script when it starts.
+# The script name to use is defined in /etc/xen/xend-config.sxp
+# in the network-script field.
+#
+# Usage:
+#
+# network-route (start|stop|status) {VAR=VAL}*
+#
+# Vars:
+#
+# netdev     The gateway interface (default eth0).
+# antispoof  Whether to use iptables to prevent spoofing (default yes).
+#
+#============================================================================
+
+echo 1 >/proc/sys/net/ipv4/ip_forward

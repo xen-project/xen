@@ -325,7 +325,9 @@
 40278d94cIUWl2eRgnwZtr4hTyWT1Q tools/examples/init.d/xendomains
 41dde8afTUuvdtFUlOx0ZRusKxyd8w tools/examples/mem-map.sxp
 40ee75a9xFz6S05sDKu-JCLqyVTkDA tools/examples/network
+41e661e1giIEKbJ25qfiP-ke8u8hFA tools/examples/network-route
 40ee75a967sxgcRY4Q7zXoVUaJ4flA tools/examples/vif-bridge
+41e661e1ooiRKlOfwumG6wwzc0PdhQ tools/examples/vif-route
 40ee75a93cqxHp6MiYXxxwR5j2_8QQ tools/examples/xend-config.sxp
 41dde8af6M2Pm1Rrv_f5jEFC_BIOIA tools/examples/xmexample.vmx
 41090ec8Pj_bkgCBpg2W7WfmNkumEA tools/examples/xmexample1
