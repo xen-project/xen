@@ -1,0 +1,45 @@
+
+some notes on configuring xenctl...
+
+to build:
+
+ # edit xeno.bk/tools/control/build.properties
+ # change manger.url to your xenoserver: mousetrap-0.xeno.cl.cam.ac.uk
+ # change build.home to your xeno.bk path
+ export PATH=/usr/groups/xeno/build_tools/bin:${PATH}
+ # this next step has already been done.
+ # cp $CATALINA_HOME/server/lib/catalina-ant.jar $ANT_HOME/lib
+ cd xeno.bk/tools/control
+ make
+ cd xeno.bk/tools/internal
+ make
+
+to setup:
+
+ ## expand the jakarta (aka catalina) tree somewhere accessible by dom0
+ export ROOTDIR=/anfs/scratch/labyrinth/ach61
+ cd $ROOTDIR
+ tar zxf /usr/groups/xeno/archive/tomcat-4.1.24.tar.gz 
+ export CATALINA_HOME=$ROOTDIR/jakarta-tomcat-4.1.24
+ export JAVA_HOME=/usr/groups/xeno/build_tools/java-1.4.1
+
+ ## edit $CATALINA_HOME/conf/server.xml, change port 8080 to port 80
+ cp $CATALINA_HOME/conf/server.xml $CATALINA_HOME/conf/server.orig
+ sed 's/8080/80/g' $CATALINA_HOME/conf/server.orig > $CATALINA_HOME/conf/server.xml 
+
+ ## install the xenctl web archive
+ cp xeno.bk/tools/control/dist/xenctl-0.1-dev.war $CATALINA_HOME/webapps/xenctl.war
+ cp xeno.bk/tools/control/domctl.xml /var/lib/xen
+
+ ## either edit xi_tools_dir in domctl.xml or copy the binaries
+ # find xeno.bk/tools/internal -perm +111 -type f -exec cp {} /usr/local/bin \;
+
+to run:
+ $CATALINA_HOME/bin/startup.sh
+ # point your browser at hostname-0.xeno.cl.cam.ac.uk:80/xenctl
+
+
+for development:
+ ## to "make install" in xeno.bk/tools/control  instead of copying the war file
+ cp $CATALINA_HOME/conf/tomcat-users.xml $CATALINA_HOME/conf/tomcat-users.orig
+ sed -e 's/<tomcat-users>/<tomcat-users>\  <role rolename="standard"\/>\  <role rolename="manager"\/>\  <user username="hobbes" password="tiger" roles="standard,manager"\/>/' $CATALINA_HOME/conf/tomcat-users.orig > $CATALINA_HOME/conf/tomcat-users.xml

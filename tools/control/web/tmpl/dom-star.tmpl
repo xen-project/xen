@@ -21,12 +21,21 @@ INCLUDE&dommenu.tmpl
 
   String domains[] = hsrw.getParameterValues("dom");
 
-  for (int i = 0; i < domains.length; i++)
+  if (domains == null || domains.length == 0)
   {
 %>
-result <%= domains[i] %> =
- <%= command_start.executeCommand(d, Integer.parseInt(domains[i])) %> <br>
+Error: no domain specified.<br>
 <%
+  }
+  else
+  {
+    for (int i = 0; i < domains.length; i++)
+    {
+%>
+result <%= domains[i] %> =<br>
+<%= command_start.executeCommand(d, Integer.parseInt(domains[i])) %> <br>
+<%
+    }
   }
 %>
 

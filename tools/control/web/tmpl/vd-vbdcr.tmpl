@@ -15,20 +15,61 @@ INCLUDE&vdmenu.tmpl
 
 <%
   HttpServletRequestWrapper hsrw = new HttpServletRequestWrapper(request);
+
+  if (hsrw.getParameter("vd") == null ||
+      hsrw.getParameter("vd").trim().equals(""))
+  {
 %>
-output = <%= root.doCreateVirtualBlockDevice(hsrw.getParameter("vd"),
-                    Integer.decode(hsrw.getParameter("domain")).intValue(),
-                    Integer.decode(hsrw.getParameter("vbd")).intValue(),
-                                             hsrw.getParameter("mode"))
-         %>
-<br>
-vd = <%= hsrw.getParameter("vd") %>
-<br>
-domain = <%= hsrw.getParameter("domain") %>
-<br>
-vbd = <%= hsrw.getParameter("vbd") %>
-<br>
-mode = <%= hsrw.getParameter("mode") %>
+Error: No virtual disk chosen.<br>
+<%
+  }
+  else if (hsrw.getParameter("domain") == null ||
+           hsrw.getParameter("domain").trim().equals(""))
+  {
+%>
+Error: No domain specified.<br>
+<%
+  }
+  else if (hsrw.getParameter("vbd") == null ||
+           hsrw.getParameter("vbd").trim().equals(""))
+  {
+%>
+Error: No virtual block device number specified.<br>
+<%
+  }
+  else
+  {
+    int domain = -1;
+    int vbd = -1;
+
+    try
+    {
+      domain = Integer.decode(hsrw.getParameter("domain")).intValue();
+      vbd = Integer.decode(hsrw.getParameter("vbd")).intValue();
+%>
+output =<br>
+<%= root.doCreateVirtualBlockDevice(hsrw.getParameter("vd"),
+                                    domain, vbd,
+                                     hsrw.getParameter("mode"))  %>
+<%
+    }
+    catch (NumberFormatException e)
+    {
+      if (domain == -1)
+      {
+%>
+Error: invalid domain specification.<br>
+<%
+      }
+      else
+      {
+%>
+Error: invalid virtual block device number specification.<br>
+<%
+      }
+    }
+  }
+%>
 
 <%
   root.doFlushState();

@@ -1,4 +1,4 @@
-Refresh Virtual Disk Results
+Refresh Virtual Disk
 SECTION&XenoServers
 BREADCRUMB&Virtual Disk Manager&vd.jsp
 
@@ -14,34 +14,43 @@ INCLUDE&vdmenu.tmpl
   HttpServletRequestWrapper hsrw = new HttpServletRequestWrapper(request);
 
   String vds[] = hsrw.getParameterValues("vd");
-  long expiry = Long.decode(hsrw.getParameter("expiry")).longValue(); 
+  long expiry;
 
-  /* not perfect, but good enough for now... */
-    if ( hsrw.getParameter("expiryunits").equals("d"))
+  if (vds == null || vds.length == 0)
   {
-    expiry *= 24 * 60 * 60 * 1000;
-  }
-  else if ( hsrw.getParameter("expiryunits").equals("w"))
-  {
-    expiry *= 24 * 60 * 60 * 1000 * 7;
-  }
-  else if ( hsrw.getParameter("expiryunits").equals("m"))
-  {
-    expiry *= 24 * 60 * 60 * 1000 * 30;
-  }
-  else if ( hsrw.getParameter("expiryunits").equals("y"))
-  {
-    expiry *= 24 * 60 * 60 * 1000 * 365;
-  }
-
-  if (vds == null)
-  { 
 %>
-no virtual disks selected.
+Error: No virtual disk chosen.<br>
+<%
+  }
+  else if (hsrw.getParameter("expiry") == null ||
+           hsrw.getParameter("expiry").trim().equals(""))
+  {
+%>
+Error: expiry time not specified.<br>
 <%
   }
   else
   {
+    expiry = Long.decode(hsrw.getParameter("expiry")).longValue(); 
+
+    /* not perfect, but good enough for now... */
+    if ( hsrw.getParameter("expiryunits").equals("d"))
+    {
+      expiry *= 24 * 60 * 60 * 1000;
+    }
+    else if ( hsrw.getParameter("expiryunits").equals("w"))
+    {
+      expiry *= 24 * 60 * 60 * 1000 * 7;
+    }
+    else if ( hsrw.getParameter("expiryunits").equals("m"))
+    {
+      expiry *= 24 * 60 * 60 * 1000 * 30;
+    }
+    else if ( hsrw.getParameter("expiryunits").equals("y"))
+    {
+      expiry *= 24 * 60 * 60 * 1000 * 365;
+    }
+
     for (int i = 0; i < vds.length; i++)
     {
 %>
@@ -50,12 +59,6 @@ vd = <%= root.doRefreshVirtualDisk(vds[i], expiry) %> <br>
     }
   }
 %>
-
-<br>
-expiry = <%= hsrw.getParameter("expiry") %>
-<br>
-expiryunits = <%= hsrw.getParameter("expiryunits") %>
-<br>
 
 <%
   root.doFlushState();

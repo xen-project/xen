@@ -22,13 +22,22 @@ INCLUDE&dommenu.tmpl
   String domains[] = hsrw.getParameterValues("dom");
   boolean force = hsrw.getParameter("force").equals("true");
 
-  for (int i = 0; i < domains.length; i++)
+  if (domains == null || domains.length == 0)
   {
+%>
+Error: no domain specified.<br>
+<%
+  }
+  else
+  {
+    for (int i = 0; i < domains.length; i++)
+    {
 %>
 result <%= domains[i] %> =
  <%= command_destroy.executeCommand(d, Integer.parseInt(domains[i]),
                                     force) %> <br>
 <%
+    }
   }
 %>
 

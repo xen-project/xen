@@ -7,6 +7,7 @@
 3e6377d6eiFjF1hHIS6JEIOFk62xSA tools/balloon/README
 3e6377dbGcgnisKw16DPCaND7oGO3Q tools/balloon/balloon.c
 3eb781edFwm_pW9FwnQACIe68viLOw tools/control/Makefile
+3eca6a96a31IwaKtkEa4jmzwTWlm8Q tools/control/README-xenctl
 3eb781fcTp_LPQwaot3SSSehkaf4eg tools/control/build-dom.xml
 3ec41f7cWCxQ8pdH8ZWqhhv-38qQ1w tools/control/build-xen.xml
 3ec41f7ca6IBXDSe0HVcMPp3PPloOQ tools/control/build.properties

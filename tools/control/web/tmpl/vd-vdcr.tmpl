@@ -16,39 +16,64 @@ INCLUDE&vdmenu.tmpl
 
 <%
   HttpServletRequestWrapper hsrw = new HttpServletRequestWrapper(request);
-  String size = hsrw.getParameter("size").trim() +
-                hsrw.getParameter("sizeunits").trim();
-  long expiry = Long.decode(hsrw.getParameter("expiry")).longValue(); 
+  String size = null;
+  String expiry_string = null;
+  long expiry = 0;
 
-  /* not perfect, but good enough for now... */
-    if ( hsrw.getParameter("expiryunits").equals("d"))
+  if (hsrw.getParameter("size") == null ||
+      hsrw.getParameter("size").trim().equals(""))
   {
-    expiry *= 24 * 60 * 60 * 1000;
-  }
-  else if ( hsrw.getParameter("expiryunits").equals("w"))
-  {
-    expiry *= 24 * 60 * 60 * 1000 * 7;
-  }
-  else if ( hsrw.getParameter("expiryunits").equals("m"))
-  {
-    expiry *= 24 * 60 * 60 * 1000 * 30;
-  }
-  else if ( hsrw.getParameter("expiryunits").equals("y"))
-  {
-    expiry *= 24 * 60 * 60 * 1000 * 365;
-  }
-
 %>
-output = <%= root.doCreateVirtualDisk( hsrw.getParameter("name"),
-                                       size, expiry)
-         %>
+Error: size not specified.<br>
+<%
+  }
+  else if (hsrw.getParameter("expiry") == null ||
+           hsrw.getParameter("expiry").trim().equals(""))
+  {
+%>
+Error: expiry time not specified.<br>
+<%
+  }
+  else
+  {
+    size = hsrw.getParameter("size").trim() +
+           hsrw.getParameter("sizeunits").trim();
+
+    try
+    {
+      expiry = Long.decode(hsrw.getParameter("expiry")).longValue(); 
+
+      /* not perfect, but good enough for now... */
+      if ( hsrw.getParameter("expiryunits").equals("d"))
+      {
+        expiry *= 24 * 60 * 60 * 1000;
+      }
+      else if ( hsrw.getParameter("expiryunits").equals("w"))
+      {
+        expiry *= 24 * 60 * 60 * 1000 * 7;
+      }
+      else if ( hsrw.getParameter("expiryunits").equals("m"))
+      {
+        expiry *= 24 * 60 * 60 * 1000 * 30;
+      }
+      else if ( hsrw.getParameter("expiryunits").equals("y"))
+      {
+        expiry *= 24 * 60 * 60 * 1000 * 365;
+      }
+%>
+output =<br>
+<%= root.doCreateVirtualDisk( hsrw.getParameter("name"), size, expiry) %>
 <br>
-size = <%= size %>
-<br>
-expiry = <%= hsrw.getParameter("expiry") %>
-<br>
-expiryunits = <%= hsrw.getParameter("expiryunits") %>
-<br>
+<%
+    }
+    catch (NumberFormatException e)
+    {
+%>
+Error: invalid expiry time specification.<br>
+<%
+    }
+  }
+%>
 
 <%
   root.doFlushState();

@@ -64,6 +64,12 @@ Library
   {
     String substring = size;
     int    suffix = 1;
+    long   value = 0;
+
+    if (size == null)
+    {
+      return 0;
+    }
 
     if ((substring = check(size, 'm')) != null)
     {
@@ -94,7 +100,16 @@ Library
       substring = size;
     }
 
-    return Long.decode(substring).longValue() * suffix;
+    try
+    {
+      value = Long.decode(substring).longValue() * suffix;
+    }
+    catch (NumberFormatException e)
+    {
+      value = 0;
+    }
+
+    return value;
   }
 
   static String

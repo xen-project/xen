@@ -71,14 +71,19 @@ RootBean
     Partition p = pm.get_partition(partition);
     String result="done";
     int loop;
+    long size;
 
     if (p == null)
     {
       return (" eh? what partition: " + partition);
     }
 
-    vdm.add_xeno_partition(p, 
-			   Library.parse_size(chunksize)/default_sector_size);
+    size = Library.parse_size(chunksize) / default_sector_size;
+    if (size == 0)
+    {
+      return ("error: invalid chunk size");
+    }
+    vdm.add_xeno_partition(p, size);
     pm.add_xeno_partition(p);
 
     /*    return pm.dump(true); */
@@ -110,9 +115,15 @@ RootBean
   {
     VirtualDisk vd;
     Date date = new Date();
+    long parse_size;
 
-    vd = vdm.create_virtual_disk(name,
-				 Library.parse_size(size)/default_sector_size,
+
+    parse_size = Library.parse_size(size)/default_sector_size;
+    if (parse_size == 0)
+    {
+      return ("error: invalid size");
+    }
+    vd = vdm.create_virtual_disk(name, parse_size,
 				 new Date(date.getTime() + expiry));
 
     return ("Virtual Disk created with key: " + vd.get_key());
@@ -122,6 +133,11 @@ RootBean
   public String
   doDeleteVirtualDisk (String key)
   {
+    if (key == null ||
+	key.trim().equals(""))
+    {
+      return ("error: no virtual disk specified");
+    }
     vdm.delete_virtual_disk(key);
 
     return ("okay");

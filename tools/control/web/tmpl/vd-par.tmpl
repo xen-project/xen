@@ -17,22 +17,34 @@ INCLUDE&vdmenu.tmpl
   HttpServletRequestWrapper hsrw = new HttpServletRequestWrapper(request);
 
   String partitions[] = hsrw.getParameterValues("p");
-  String size = hsrw.getParameter("chunk").trim() +
-                hsrw.getParameter("chunkunits").trim();
+  String size = null;
 
-  for (int i = 0; i < partitions.length; i++)
+  if (partitions == null || partitions.length == 0)
   {
 %>
-p = <%= root.doAddPartition(partitions[i], size) %> <br>
+Error: No partitions chosen.<br>
 <%
   }
+  else if (hsrw.getParameter("chunk") == null ||
+           hsrw.getParameter("chunk").trim().equals(""))
+  {
 %>
-chunk = <%= hsrw.getParameter("chunk") %>
-<br>
-chunkunits = <%= hsrw.getParameter("chunkunits") %>
-<br>
-size = <%= size %>
-<br>
+Error: chunk size not specified.<br>
+<%
+  }
+  else
+  {
+    size = hsrw.getParameter("chunk").trim() +
+           hsrw.getParameter("chunkunits").trim();
+    for (int i = 0; i < partitions.length; i++)
+    {
+%>
+output[<%= i %>] =<br>
+<%= root.doAddPartition(partitions[i], size) %> <br>
+<%
+    }
+  }
+%>
 
 
 <%
