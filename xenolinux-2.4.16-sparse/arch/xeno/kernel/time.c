@@ -337,7 +337,6 @@ void __init time_init(void)
 
 	do_gettimeofday(&xtime);
 	last_irq = (((long long)xtime.tv_sec) * 1000000) + xtime.tv_usec;
-	printk("last: %lld\n", last_irq);
 
     setup_irq(TIMER_IRQ, &irq_timer);
 

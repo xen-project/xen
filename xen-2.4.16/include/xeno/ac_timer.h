@@ -20,7 +20,7 @@
 #ifndef _AC_TIMER_H_
 #define _AC_TIMER_H_
 
-#include <time.h> /* include notion of time */
+#include <xeno/time.h> /* include notion of time */
 
 /*
  * The Xen Hypervisor provides two types of timers:

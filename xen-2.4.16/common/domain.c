@@ -224,7 +224,6 @@ int final_setup_guestos(struct task_struct * p, dom_meminfo_t * meminfo)
     l1_pgentry_t * l1tab;
     start_info_t * virt_startinfo_addr;
     unsigned long virt_stack_addr;
-    unsigned long long time;
     unsigned long phys_l2tab;
     net_ring_t *net_ring;
     net_vif_t *net_vif;
@@ -357,9 +356,7 @@ int setup_guestos(struct task_struct *p, dom0_newdomain_t *params)
     unsigned long phys_l1tab, phys_l2tab;
     unsigned long cur_address, alloc_address;
     unsigned long virt_load_address, virt_stack_address, virt_shinfo_address;
-    unsigned long virt_ftable_start, virt_ftable_end, ft_mapping;
     start_info_t  *virt_startinfo_address;
-    unsigned long long time;
     unsigned long count;
     unsigned long alloc_index;
     l2_pgentry_t *l2tab, *l2start;
