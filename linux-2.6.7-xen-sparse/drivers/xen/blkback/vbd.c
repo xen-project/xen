@@ -145,16 +145,20 @@ void vbd_grow(blkif_be_vbd_grow_t *grow)
     }
     /* XXXcl maybe bd_claim? */
 
-    if ( (x->bdev->bd_disk == NULL) || (x->bdev->bd_part == NULL) )
+    if ( (x->bdev->bd_disk == NULL) )
     {
         DPRINTK("vbd_grow: device %08x doesn't exist.\n", x->extent.device);
         grow->status = BLKIF_BE_STATUS_EXTENT_NOT_FOUND;
         blkdev_put(x->bdev);
         goto out;
     }
-   
-    /* get size in sectors */
-    sz = x->bdev->bd_part->nr_sects;
+
+    /* get size in sectors */   
+    if ( x->bdev->bd_part )
+	 sz = x->bdev->bd_part->nr_sects;
+    else
+	 sz = x->bdev->bd_disk->capacity;
+
 #else
     if( !blk_size[MAJOR(x->extent.device)] )
     {
