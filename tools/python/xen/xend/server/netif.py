@@ -198,6 +198,8 @@ class NetDev(controller.SplitDev):
             val.append(['evtchn',
                         self.evtchn['port1'],
                         self.evtchn['port2']])
+        if self.index is not None:
+            val.append(['index', self.index])
         return val
 
     def get_vifname(self):

@@ -81,7 +81,8 @@ class SrvDomain(SrvDir):
         fn = FormFn(self.xd.domain_migrate,
                     [['dom', 'str'],
                      ['destination', 'str'],
-                     ['live', 'int']])
+                     ['live', 'int'],
+                     ['resource', 'int']])
         deferred = fn(req.args, {'dom': self.dom.id})
         print 'op_migrate>', deferred
         deferred.addCallback(self._op_migrate_cb, req)

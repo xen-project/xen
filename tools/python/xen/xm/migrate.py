@@ -26,6 +26,10 @@ gopts.opt('live', short='l',
           fn=set_true, default=0,
           use="Use live migration.")
 
+gopts.opt('resource', short='r',
+          fn=set_int, default=0,
+          use="Set level of resource usage for migration.")
+
 def help(argv):
     gopts.argv = argv
     gopts.usage()
@@ -42,5 +46,5 @@ def main(argv):
     dst = args[1]
     if dom in [DOM0_NAME, DOM0_ID]:
         opts.err('Cannot migrate ' + dom)
-    server.xend_domain_migrate(dom, dst, opts.vals.live)
+    server.xend_domain_migrate(dom, dst, opts.vals.live, opts.vals.resource)
         

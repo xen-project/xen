@@ -10,7 +10,7 @@
 extern int xen_domain_snd(Conn *xend, IOStream *io,
                           uint32_t dom,
                           char *vmconfig, int vmconfig_n,
-                          int live);
+                          int live, int resource);
 extern int xen_domain_rcv(IOStream *io,
                           uint32_t *dom,
                           char **vmconfig, int *vmconfig_n,

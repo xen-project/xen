@@ -60,7 +60,7 @@ void xcfini(void){
 int xen_domain_snd(Conn *xend, IOStream *io,
                    uint32_t dom,
                    char *vmconfig, int vmconfig_n,
-                   int live){
+                   int live, int resource){
     int err = 0;
 #ifdef _XEN_XFR_STUB_
     char buf[1024];
@@ -99,6 +99,7 @@ int xen_domain_snd(Conn *xend, IOStream *io,
     if(live){
         ioctxt->flags |= XCFLAGS_LIVE;
     }
+    ioctxt->resource = resource;
     err = xc_linux_save(xcinit(), ioctxt);
 #endif   
     dprintf("< err=%d\n", err);

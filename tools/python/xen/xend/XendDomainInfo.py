@@ -33,8 +33,6 @@ xend = server.SrvDaemon.instance()
 
 from XendError import VmError
 
-from server.blkif import blkdev_name_to_number
-
 """The length of domain names that Xen can handle.
 The names stored in Xen itself are not used for much, and
 xend can handle domain names of any length.
@@ -92,24 +90,6 @@ def shutdown_reason(code):
     """
     return shutdown_reasons.get(code, "?")
 
-def make_disk(vm, config, uname, dev, mode, recreate=0):
-    """Create a virtual disk device for a domain.
-
-    @param vm:       vm
-    @param uname:    device to export
-    @param dev:      device name in domain
-    @param mode:     read/write mode
-    @param recreate: recreate flag (after xend restart)
-    @return: deferred
-    """
-    idx = vm.next_device_index('vbd')
-    # todo: The 'dev' should be looked up in the context of the domain.
-    vdev = blkdev_name_to_number(dev)
-    if not vdev:
-        raise VmError("vbd: Device not found: uname=%s dev=%s" % (uname, dev))
-    ctrl = xend.blkif_create(vm.dom, recreate=recreate)
-    return ctrl.attachDevice(idx, config, uname, vdev, mode, recreate=recreate)
-        
 def vif_up(iplist):
     """send an unsolicited ARP reply for all non link-local IP addresses.
 
@@ -222,6 +202,7 @@ def vm_recreate(savedinfo, info):
     """
     vm = XendDomainInfo()
     vm.recreate = 1
+    vm.savedinfo = savedinfo
     vm.setdom(info['dom'])
     #vm.name = info['name']
     vm.memory = info['mem_kb']/1024
@@ -239,6 +220,7 @@ def vm_recreate(savedinfo, info):
         vm.name = sxp.child_value(savedinfo, 'name')
         d = defer.succeed(vm)
     vm.recreate = 0
+    vm.savedinfo = None
     return d
 
 def vm_restore(src, progress=0):
@@ -288,6 +270,18 @@ def append_deferred(dlist, v):
     if isinstance(v, defer.Deferred):
         dlist.append(v)
 
+def dlist_err(val):
+    """Error callback suitable for a deferred list.
+    In a deferred list the error callback is called with with Failure((error, index)).
+    This callback extracts the error and returns it.
+
+    @param val: Failure containing (error, index)
+    @type val: twisted.internet.failure.Failure 
+    """
+    
+    (error, index) = val.value
+    return error
+
 class XendDomainInfo:
     """Virtual machine object."""
 
@@ -324,6 +318,7 @@ class XendDomainInfo:
         self.restart_state = None
         self.restart_time = None
         self.console_port = None
+        self.savedinfo = None
 
     def setdom(self, dom):
         """Set the domain id.
@@ -385,8 +380,19 @@ class XendDomainInfo:
             sxpr.append(['restart_state', self.restart_state])
         if self.restart_time:
             sxpr.append(['restart_time', str(self.restart_time)])
+        devs = self.sxpr_devices()
+        if devs:
+            sxpr.append(devs)
         if self.config:
             sxpr.append(['config', self.config])
+        return sxpr
+
+    def sxpr_devices(self):
+        sxpr = ['devices']
+        for devs in self.devices.values():
+            for dev in devs:
+                if hasattr(dev, 'sxpr'):
+                    sxpr.append(dev.sxpr())
         return sxpr
 
     def check_name(self, name):
@@ -572,6 +578,25 @@ class XendDomainInfo:
                 return d
         return None
 
+    def get_device_savedinfo(self, type, index):
+        val = None
+        if self.savedinfo is None:
+            return val
+        index = str(index)
+        devinfo = sxp.child(self.savedinfo, 'devices')
+        if devinfo is None:
+            return val
+        for d in sxp.children(devinfo, type):
+            dindex = sxp.child_value(d, 'index')
+            if dindex is None: continue
+            if str(dindex) == index:
+                val = d
+                break
+        return val
+
+    def get_device_recreate(self, type, index):
+        return self.get_device_savedinfo(type, index) or self.recreate
+
     def add_config(self, val):
         """Add configuration data to a virtual machine.
 
@@ -699,6 +724,10 @@ class XendDomainInfo:
         """Build the domain boot image.
         """
         if self.recreate or self.restore: return
+        if not os.path.isfile(kernel):
+            raise VmError('Kernel image does not exist: %s' % kernel)
+        if ramdisk and not os.path.isfile(ramdisk):
+            raise VmError('Kernel ramdisk does not exist: %s' % ramdisk)
         if len(cmdline) >= 256:
             log.warning('kernel cmdline too long, domain %d', self.dom)
         dom = self.dom
@@ -724,11 +753,6 @@ class XendDomainInfo:
         @param ramdisk: kernel ramdisk
         @param cmdline: kernel commandline
         """
-        if not self.recreate:
-            if not os.path.isfile(kernel):
-                raise VmError('Kernel image does not exist: %s' % kernel)
-            if ramdisk and not os.path.isfile(ramdisk):
-                raise VmError('Kernel ramdisk does not exist: %s' % ramdisk)
         #self.init_domain()
         if self.console:
             self.console.registerChannel()
@@ -761,6 +785,7 @@ class XendDomainInfo:
             append_deferred(dlist, v)
             index[dev_name] = dev_index + 1
         deferred = defer.DeferredList(dlist, fireOnOneErrback=1)
+        deferred.addErrback(dlist_err)
         return deferred
 
     def device_create(self, dev_config):
@@ -826,7 +851,7 @@ class XendDomainInfo:
     def configure_memory(self):
         """Configure vm memory limit.
         """
-        maxmem = sxp.get_child_value(self.config, "maxmem")
+        maxmem = sxp.child_value(self.config, "maxmem")
         if maxmem is None:
             maxmem = self.memory
         xc.domain_setmaxmem(self.dom, maxmem_kb = maxmem * 1024)
@@ -992,6 +1017,7 @@ class XendDomainInfo:
                 log.warning("Unknown config field %s", field_name)
             index[field_name] = field_index + 1
         d = defer.DeferredList(dlist, fireOnOneErrback=1)
+        d.addErrback(dlist_err)
         return d
 
 
@@ -1005,7 +1031,7 @@ def vm_image_linux(vm, image):
     """
     kernel = sxp.child_value(image, "kernel")
     cmdline = ""
-    ip = sxp.child_value(image, "ip", "dhcp")
+    ip = sxp.child_value(image, "ip", None)
     if ip:
         cmdline += " ip=" + ip
     root = sxp.child_value(image, "root")
@@ -1030,9 +1056,11 @@ def vm_dev_vif(vm, val, index, change=0):
     vmac = sxp.child_value(val, "mac")
     ctrl = xend.netif_create(vm.dom, recreate=vm.recreate)
     log.debug("Creating vif dom=%d vif=%d mac=%s", vm.dom, vif, str(vmac))
-    defer = ctrl.attachDevice(vif, val, recreate=vm.recreate)
+    recreate = vm.get_device_recreate('vif', index)
+    defer = ctrl.attachDevice(vif, val, recreate=recreate)
     def cbok(dev):
         dev.vifctl('up', vmname=vm.name)
+        dev.setIndex(index)
         vm.add_device('vif', dev)
         if change:
             dev.interfaceChanged()
@@ -1048,23 +1076,19 @@ def vm_dev_vbd(vm, val, index, change=0):
     @param index:     vbd index
     @return: deferred
     """
+    idx = vm.next_device_index('vbd')
     uname = sxp.child_value(val, 'uname')
-    if not uname:
-        raise VmError('vbd: Missing uname')
-    dev = sxp.child_value(val, 'dev')
-    if not dev:
-        raise VmError('vbd: Missing dev')
-    mode = sxp.child_value(val, 'mode', 'r')
-    log.debug("Creating vbd dom=%d uname=%s dev=%s", vm.dom, uname, dev)
-    defer = make_disk(vm, val, uname, dev, mode, vm.recreate)
-    def fn(vbd):
-        vbd.dev = dev
-        vbd.uname = uname
-        vm.add_device('vbd', vbd)
+    log.debug("Creating vbd dom=%d uname=%s", vm.dom, uname)
+    ctrl = xend.blkif_create(vm.dom, recreate=vm.recreate)
+    recreate = vm.get_device_recreate('vbd', index)
+    defer = ctrl.attachDevice(idx, val, recreate=recreate)
+    def cbok(dev):
+        dev.setIndex(index)
+        vm.add_device('vbd', dev)
         if change:
-            vbd.interfaceChanged()
-        return vbd
-    defer.addCallback(fn)
+            dev.interfaceChanged()
+        return dev
+    defer.addCallback(cbok)
     return defer
 
 def parse_pci(val):
