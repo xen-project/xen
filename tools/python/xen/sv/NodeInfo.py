@@ -44,7 +44,7 @@ class NodeDmesgTab( PreTab ):
 
     def __init__( self ):
     	try:
-            dmesg = server.xend_node_dmesg()
+            dmesg = server.xend_node_get_dmesg()
         except:
             dmesg = "Error getting node information: XenD not running?"
         PreTab.__init__( self, dmesg )
@@ -57,8 +57,8 @@ class NodeActionTab( ActionTab ):
         
     def op_shutdown( self, request ):
     	print ">NodeShutDown"
-    	#server.xend_node_shutdown()
+    	server.xend_node_shutdown()
     
     def op_reboot( self, request ):
     	print ">NodeReboot"
-        #server.xend_node_reboot()
+        server.xend_node_reboot()
