@@ -22,6 +22,11 @@
 #include <asm-xen/ctrl_if.h>
 #include <asm-xen/hypervisor.h>
 
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,0)
+EXPORT_SYMBOL(force_evtchn_callback);
+EXPORT_SYMBOL(evtchn_do_upcall);
+#endif
+
 /*
  * This lock protects updates to the following mapping and reference-count
  * arrays. The lock does not need to be acquired to read the mapping tables.
@@ -93,9 +98,6 @@ void evtchn_do_upcall(struct pt_regs *regs)
 
     local_irq_restore(flags);
 }
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,0)
-EXPORT_SYMBOL(evtchn_do_upcall);
-#endif
 
 static int find_unbound_irq(void)
 {
