@@ -81,7 +81,7 @@ typedef struct {
 
 /* These are used by both front-end and back-end drivers. */
 #define blkif_vdev_t   u16
-#define blkif_pdev_t   u16
+#define blkif_pdev_t   u32
 #define blkif_sector_t u64
 
 /*
@@ -183,7 +183,6 @@ typedef struct {
     blkif_sector_t sector_start;   /*  0 */
     blkif_sector_t sector_length;  /*  8 */
     blkif_pdev_t   device;         /* 16 */
-    u16            __pad;          /* 18 */
 } PACKED blkif_extent_t; /* 20 bytes */
 
 /* Non-specific 'okay' return. */
