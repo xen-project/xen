@@ -28,7 +28,7 @@ $(XI_DESTROY).o: $(XI_DESTROY).c dom0_ops.h dom0_defs.h
 	$(CC) -c $(XI_DESTROY).c 
 
 install: all
-	cp -a $(XI_CREATE) $(XI_BUILD) $(XI_START) $(XI_STOP) $(XI_DESTROY) ../../../install/bin
+	cp -a xi_list xi_vifinit $(XI_CREATE) $(XI_BUILD) $(XI_START) $(XI_STOP) $(XI_DESTROY) ../../../install/bin
 
 clean:
 	$(RM) *.o $(XI_CREATE) $(XI_START) $(XI_STOP) $(XI_DESTROY) $(XI_BUILD)
