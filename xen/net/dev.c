@@ -2100,6 +2100,7 @@ static void get_rx_bufs(net_vif_t *vif)
             if ( cmpxchg(ptep, pte & ~_PAGE_PRESENT, pte) != 
                  (pte & ~_PAGE_PRESENT) )
                 put_page_and_type(buf_page);
+            put_page_and_type(pte_page);
             make_rx_response(vif, rx.id, 0, RING_STATUS_BAD_PAGE, 0);
             goto rx_unmap_and_continue;
         }
@@ -2115,10 +2116,12 @@ static void get_rx_bufs(net_vif_t *vif)
         {
             DPRINTK("Page held more than once %08lx\n", 
                     buf_page->count_and_flags);
-            if ( get_page_type(buf_page, PGT_writeable_page) &&
-                 (cmpxchg(ptep, pte & ~_PAGE_PRESENT, pte) !=
-                  (pte & ~_PAGE_PRESENT)) )
+            if ( !get_page_type(buf_page, PGT_writeable_page) )
+                put_page(buf_page);
+            else if ( cmpxchg(ptep, pte & ~_PAGE_PRESENT, pte) !=
+                      (pte & ~_PAGE_PRESENT) )
                 put_page_and_type(buf_page);
+            put_page_and_type(pte_page);
             /* NB. If we fail to remap the page, we should probably flag it. */
             make_rx_response(vif, rx.id, 0, RING_STATUS_BAD_PAGE, 0);
             goto rx_unmap_and_continue;
