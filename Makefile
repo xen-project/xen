@@ -31,26 +31,27 @@ all: dist
 
 # install everything into the standard system directories
 # NB: install explicitly does not check that everything is up to date!
-install: xen.install tools.install kernels docs.install
+install: install-tools install-xen install-kernels install-docs
 
-kernels.install:
+install-xen:
+	$(MAKE) -C xen install
+
+install-tools:
+	$(MAKE) -C tools install
+
+install-kernels:
 	cp -a $(INSTALL_DIR)/boot/* /boot/
 	cp -a $(INSTALL_DIR)/lib/modules/* /lib/modules/
 	cp -dR $(INSTALL_DIR)/boot/*$(LINUX_VER)* $(prefix)/boot/
 	cp -dR $(INSTALL_DIR)/lib/modules/* $(prefix)/lib/modules/
 
-docs.install:
+install-docs:
+	sh ./docs/check_pkgs && $(MAKE) -C docs install || true
 	sh ./docs/check_pkgs
 	-$(MAKE) -C docs install
 
-xen.install tools.install: %.install:
-	$(MAKE) -C $* install
-
-xen.dist tools.dist: %.dist:
-	$(MAKE) -C $* dist
-
 # build and install everything into local dist directory
-dist: xen.dist tools.dist kernels docs.install
+dist: xen tools kernels docs
 	$(INSTALL_DIR) $(DIST_DIR)/check
 	$(INSTALL_DATA) ./COPYING $(DIST_DIR)
 	$(INSTALL_DATA) ./README $(DIST_DIR)
@@ -63,7 +64,8 @@ xen:
 tools:
 	$(MAKE) dist=yes -C tools install
 
-kernels: $(addsuffix -build,$(XKERNELS))
+kernels:
+	for i in $(XKERNELS) ; do $(MAKE) $$i-build ; done
 
 docs:
 	sh ./docs/check_pkgs
@@ -73,13 +75,17 @@ docs:
 kbuild: kernels
 
 # Delete the kernel build trees entirely
-kdelete: $(addsuffix -clean,$(XKERNELS))
+kdelete:
+	for i in $(XKERNELS) ; do $(MAKE) $$i-delete ; done
 
 # Clean the kernel build trees
-kclean: $(addsuffix -clean,$(XKERNELS))
+kclean:
+	for i in $(XKERNELS) ; do $(MAKE) $$i-clean ; done
 
 # Make patches from kernel sparse trees
-mkpatches: $(addsuffix -xen.patch,$(ALLSPARSETREES))
+mkpatches:
+	for i in $(ALLSPARSETREES) ; do $(MAKE) $$i-xen.patch ; done
+
 
 # build xen, the tools, and a domain 0 plus unprivileged linux-xen images,
 # and place them in the install directory. 'make install' should then
@@ -90,14 +96,16 @@ world:
 	$(MAKE) dist
 
 # clean doesn't do a kclean
-clean: xen.clean tools.clean docs.clean
-
-xen.clean tools.clean docs.clean: %.clean:
-	$(MAKE) -C $* clean
+clean: 
+	$(MAKE) -C xen clean
+	$(MAKE) -C tools clean
+	$(MAKE) -C docs clean
 
 # clean, but blow away kernel build tree plus tar balls
-mrproper: clean $(addsuffix -delete,$(ALLKERNELS)) $(addsuffix -mrproper,$(ALLSPARSETREES))
+mrproper: clean
 	rm -rf dist patches/tmp
+	for i in $(ALLKERNELS) ; do $(MAKE) $$i-delete ; done
+	for i in $(ALLSPARSETREES) ; do $(MAKE) $$i-mrproper ; done
 
 install-twisted:
 	wget http://www.twistedmatrix.com/products/get-current.epy
@@ -159,8 +167,13 @@ uninstall:
 	rm -rf "/usr/lib/python2.?/site-packages/xen* /usr/lib/libxc* /usr/lib/python2.?/site-packages/Xc*"
 
 # Legacy targets for compatibility
-linux24: linux-2.4-xen0-build linux-2.4-xenU-build
+linux24:
+	$(MAKE) linux-2.4-xen0-build
+	$(MAKE) linux-2.4-xenU-build
 
-linux26: linux-2.6-xen0-build linux-2.6-xenU-build
+linux26:
+	$(MAKE) linux-2.6-xen0-build
+	$(MAKE) linux-2.6-xenU-build
 
-netbsd20: netbsd-2.0-xenU-build
+netbsd20:
+	$(MAKE) netbsd-2.0-xenU-build
