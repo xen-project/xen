@@ -288,8 +288,8 @@ typedef struct vcpu_info_st
     u8 evtchn_upcall_pending;
     u8 evtchn_upcall_mask;
     u8 pad0, pad1;
-    u32 evtchn_pending_sel;             /* 132 */
-} PACKED vcpu_info_t;
+    u32 evtchn_pending_sel;             /* 4 */
+} PACKED vcpu_info_t;                   /* 8 */
 
 /*
  * Xen/guestos shared data -- pointer provided in start_info.
