@@ -172,7 +172,6 @@ unsigned int free_pfns;
 static struct {
 #define DOP_FLUSH_TLB   (1<<0) /* Flush the TLB.                 */
 #define DOP_RELOAD_LDT  (1<<1) /* Reload the LDT shadow mapping. */
-#define DOP_RESTORE_CR0 (1<<2) /* Set the WP bit in CR0.         */
     unsigned long flags;
     unsigned long cr0;
 } deferred_op[NR_CPUS] __cacheline_aligned;
@@ -316,7 +315,7 @@ static int get_page_from_pagenr(unsigned long page_nr)
     }
 
     if ( unlikely(!get_page(page, current)) &&
-         ((current->domain != 0) || !dom0_get_page(page)) )
+         unlikely((current->domain != 0) || !dom0_get_page(page)) )
     {
         MEM_LOG("Could not get page reference for pfn %08lx\n", page_nr);
         return 0;
@@ -372,12 +371,10 @@ static int get_page_from_l1e(l1_pgentry_t l1e)
 {
     ASSERT(l1_pgentry_val(l1e) & _PAGE_PRESENT);
 
-    if ( unlikely((l1_pgentry_val(l1e) &
-                   (_PAGE_GLOBAL|_PAGE_PAT))) )
+    if ( unlikely((l1_pgentry_val(l1e) & (_PAGE_GLOBAL|_PAGE_PAT))) )
     {
         MEM_LOG("Bad L1 page type settings %04lx",
-                l1_pgentry_val(l1e) &
-                (_PAGE_GLOBAL|_PAGE_PAT));
+                l1_pgentry_val(l1e) & (_PAGE_GLOBAL|_PAGE_PAT));
         return 0;
     }
 
@@ -388,14 +385,10 @@ static int get_page_from_l1e(l1_pgentry_t l1e)
             return 0;
         set_bit(_PGC_tlb_flush_on_type_change, 
                 &frame_table[l1_pgentry_to_pagenr(l1e)].count_and_flags);
-    }
-    else
-    {
-        if ( unlikely(!get_page_from_pagenr(l1_pgentry_to_pagenr(l1e))) )
-            return 0;
+        return 1;
     }
 
-    return 1;
+    return get_page_from_pagenr(l1_pgentry_to_pagenr(l1e));
 }
 
 
@@ -412,9 +405,8 @@ static int get_page_from_l2e(l2_pgentry_t l2e, unsigned long pfn)
     }
 
     if ( unlikely(!get_page_and_type_from_pagenr(
-        l2_pgentry_to_pagenr(l2e), PGT_l1_page_table)) &&
-         unlikely(!check_linear_pagetable(l2e, pfn)) )
-        return 0;
+        l2_pgentry_to_pagenr(l2e), PGT_l1_page_table)) )
+        return check_linear_pagetable(l2e, pfn);
 
     return 1;
 }
@@ -422,11 +414,9 @@ static int get_page_from_l2e(l2_pgentry_t l2e, unsigned long pfn)
 
 static void put_page_from_l1e(l1_pgentry_t l1e)
 {
-    struct pfn_info *page;
+    struct pfn_info *page = &frame_table[l1_pgentry_to_pagenr(l1e)];
 
     ASSERT(l1_pgentry_val(l1e) & _PAGE_PRESENT);
-
-    page = &frame_table[l1_pgentry_to_pagenr(l1e)];
 
     if ( l1_pgentry_val(l1e) & _PAGE_RW )
     {
@@ -613,34 +603,30 @@ static int mod_l2_entry(l2_pgentry_t *pl2e,
     if ( l2_pgentry_val(nl2e) & _PAGE_PRESENT )
     {
         /* Differ in mapping (bits 12-31) or presence (bit 0)? */
-        if ( ((l2_pgentry_val(ol2e) ^ l2_pgentry_val(nl2e)) & ~0xffe) != 0 )
-        {
-            if ( unlikely(!get_page_from_l2e(nl2e, pfn)) )
-                return 0;
+        if ( ((l2_pgentry_val(ol2e) ^ l2_pgentry_val(nl2e)) & ~0xffe) == 0 )
+            return update_l2e(pl2e, ol2e, nl2e);
 
-            if ( unlikely(!update_l2e(pl2e, ol2e, nl2e)) )
-            {
-                put_page_from_l2e(nl2e, pfn);
-                return 0;
-            }
-
-            if ( l2_pgentry_val(ol2e) & _PAGE_PRESENT )
-                put_page_from_l2e(ol2e, pfn);
-        }
-        else if ( unlikely(!update_l2e(pl2e, ol2e, nl2e)) )
-        {
+        if ( unlikely(!get_page_from_l2e(nl2e, pfn)) )
             return 0;
-        }
-    }
-    else
-    {
+        
         if ( unlikely(!update_l2e(pl2e, ol2e, nl2e)) )
+        {
+            put_page_from_l2e(nl2e, pfn);
             return 0;
-
+        }
+        
         if ( l2_pgentry_val(ol2e) & _PAGE_PRESENT )
             put_page_from_l2e(ol2e, pfn);
+        
+        return 1;
     }
-    
+
+    if ( unlikely(!update_l2e(pl2e, ol2e, nl2e)) )
+        return 0;
+
+    if ( l2_pgentry_val(ol2e) & _PAGE_PRESENT )
+        put_page_from_l2e(ol2e, pfn);
+
     return 1;
 }
 
@@ -652,26 +638,15 @@ static inline int update_l1e(l1_pgentry_t *pl1e,
     unsigned long o = l1_pgentry_val(ol1e);
     unsigned long n = l1_pgentry_val(nl1e);
 
-    while ( unlikely(cmpxchg_user(pl1e, o, n) != 0) )
+    if ( unlikely(cmpxchg_user(pl1e, o, n) != 0) ||
+         unlikely(o != l1_pgentry_val(ol1e)) )
     {
-        unsigned int cpu = smp_processor_id();
-        /* The CMPXCHG faulted -- maybe we need to clear the WP bit. */
-        if ( deferred_op[cpu].flags & DOP_RESTORE_CR0 )
-        {
-            MEM_LOG("cmpxchg fault despite WP bit cleared\n");
-            return 0;
-        }
-        deferred_op[cpu].cr0 = read_cr0();
-        write_cr0(deferred_op[cpu].cr0 & ~X86_CR0_WP);
-        deferred_op[cpu].flags |= DOP_RESTORE_CR0;
-    }
-
-    if ( o != l1_pgentry_val(ol1e))
         MEM_LOG("Failed to update %08lx -> %08lx: saw %08lx\n",
                 l1_pgentry_val(ol1e), l1_pgentry_val(nl1e), o);
+        return 0;
+    }
 
-    /* The swap was successful if the old value we saw is equal to ol1e. */
-    return (o == l1_pgentry_val(ol1e));
+    return 1;
 }
 
 
@@ -691,37 +666,30 @@ static int mod_l1_entry(l1_pgentry_t *pl1e, l1_pgentry_t nl1e)
 
     if ( l1_pgentry_val(nl1e) & _PAGE_PRESENT )
     {
-        /*
-         * Differ in mapping (bits 12-31), writeable (bit 1), or
-         * presence (bit 0)?
-         */
-        if ( ((l1_pgentry_val(ol1e) ^ l1_pgentry_val(nl1e)) & ~0xffc) != 0 )
-        {
-            if ( unlikely(!get_page_from_l1e(nl1e)) )
-                return 0;
+        /* Differ in mapping (bits 12-31), r/w (bit 1), or presence (bit 0)? */
+        if ( ((l1_pgentry_val(ol1e) ^ l1_pgentry_val(nl1e)) & ~0xffc) == 0 )
+            return update_l1e(pl1e, ol1e, nl1e);
 
-            if ( unlikely(!update_l1e(pl1e, ol1e, nl1e)) )
-            {
-                put_page_from_l1e(nl1e);
-                return 0;
-            }
-
-            if ( l1_pgentry_val(ol1e) & _PAGE_PRESENT )
-                put_page_from_l1e(ol1e);
-        }
-        else if ( unlikely(!update_l1e(pl1e, ol1e, nl1e)) )
-        {
+        if ( unlikely(!get_page_from_l1e(nl1e)) )
             return 0;
-        }
-    }
-    else 
-    {
+        
         if ( unlikely(!update_l1e(pl1e, ol1e, nl1e)) )
+        {
+            put_page_from_l1e(nl1e);
             return 0;
-
+        }
+        
         if ( l1_pgentry_val(ol1e) & _PAGE_PRESENT )
             put_page_from_l1e(ol1e);
+        
+        return 1;
     }
+
+    if ( unlikely(!update_l1e(pl1e, ol1e, nl1e)) )
+        return 0;
+    
+    if ( l1_pgentry_val(ol1e) & _PAGE_PRESENT )
+        put_page_from_l1e(ol1e);
 
     return 1;
 }
@@ -738,12 +706,16 @@ int alloc_page_type(struct pfn_info *page, unsigned int type)
          * NB. 'p' may no longer be valid by time we dereference it, so
          * p->processor might be garbage. We clamp it, just in case.
          */
-        if ( !test_bit(_PGC_zombie, &page->count_and_flags) &&
-             unlikely(NEED_FLUSH(tlbflush_time[(p->processor)&(NR_CPUS-1)], 
-                                 page->tlbflush_timestamp)) )
+        if ( likely(!test_bit(_PGC_zombie, &page->count_and_flags)) )
         {
-            perfc_incr(need_flush_tlb_flush);
-            flush_tlb_cpu(p->processor);
+            unsigned int cpu = p->processor;
+            if ( likely(cpu <= smp_num_cpus) &&
+                 unlikely(NEED_FLUSH(tlbflush_time[cpu],
+                                     page->tlbflush_timestamp)) )
+            {
+                perfc_incr(need_flush_tlb_flush);
+                flush_tlb_cpu(cpu);
+            }
         }
     }
 
@@ -1053,9 +1025,6 @@ int do_mmu_update(mmu_update_t *ureqs, int count)
     if ( flags & DOP_RELOAD_LDT )
         (void)map_ldt_shadow_page(0);
 
-    if ( unlikely(flags & DOP_RESTORE_CR0) )
-        write_cr0(deferred_op[cpu].cr0);
-
     return rc;
 }
 
@@ -1087,9 +1056,6 @@ int do_update_va_mapping(unsigned long page_nr,
 
     if ( unlikely(defer_flags & DOP_RELOAD_LDT) )
         (void)map_ldt_shadow_page(0);
-
-    if ( unlikely(defer_flags & DOP_RESTORE_CR0) )
-        write_cr0(deferred_op[cpu].cr0);
-
+    
     return err;
 }
