@@ -298,6 +298,7 @@
 4022a73cEKvrYe_DVZW2JlAxobg9wg tools/misc/nsplitd/Makefile
 4022a73cKms4Oq030x2JBzUB426lAQ tools/misc/nsplitd/nsplitd.c
 3f870808_8aFBAcZbWiWGdgrGQyIEw tools/misc/p4perf.h
+4113d1afyPjO8m8-9E1pVBDHzGe1jQ tools/misc/setdomainmaxmem
 3f5ef5a2ir1kVAthS14Dc5QIRCEFWg tools/misc/xen-clone
 3f5ef5a2dTZP0nnsFoeq2jRf3mWDDg tools/misc/xen-clone.README
 3f870808zS6T6iFhqYPGelroZlVfGQ tools/misc/xen_cpuperf.c
