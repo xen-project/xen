@@ -418,7 +418,7 @@ class XendDomain:
                     print >>sys.stderr, "Delayed exception restarting domain: ", err
                 deferred = self.domain_create(config)
                 deferred.addCallback(cbok)
-                deferred.addCallback(cberr)
+                deferred.addErrback(cberr)
             except:
                 print >>sys.stderr, "XendDomain> Exception restarting domain"
                 traceback.print_exc(sys.stderr)
