@@ -200,6 +200,10 @@ static int dom_map_mem(unsigned int dom, unsigned long pfn, int tot_pages)
 
 	printk(KERN_ALERT "bd240 debug: dom_map_mem invoked, xeno_base %lx, subdir %lx\n", xeno_base, xeno_base->subdir);
  
+	printk(KERN_ALERT "bd240 debug: dom_map_mem, pd %lx\n", pd);
+	printk(KERN_ALERT "bd240 debug: dom_map_mem, pd data %lx\n", pd->data);
+	printk(KERN_ALERT "bd240 debug: dom_map_mem, pd %lx\n", ((dom_procdata_t *)pd->data)->domain);
+
     while(pd != NULL){
 
 		printk(KERN_ALERT "bd240 debug: dom_map: proc %d\n", ((dom_procdata_t *)pd->data)->domain);
