@@ -410,7 +410,8 @@ static void net_tx_action(unsigned long unused)
         spin_unlock(&netif->tx_lock);
         
         pending_ring[MASK_PEND_IDX(pending_prod++)] = pending_idx;
-        
+
+#if 0        
         /*
          * Scheduling checks must happen after the above response is posted.
          * This avoids a possible race with a guest OS on another CPU.
@@ -419,6 +420,7 @@ static void net_tx_action(unsigned long unused)
         if ( (netif->tx_req_cons != netif->tx->req_prod) &&
              ((netif->tx_req_cons-netif->tx_resp_prod) != NETIF_TX_RING_SIZE) )
             add_to_net_schedule_list_tail(netif);
+#endif
         
         netif_put(netif);
 
@@ -444,10 +446,18 @@ static void net_tx_action(unsigned long unused)
             netif_put(netif);
             continue;
         }
-        rmb(); /* Ensure that we see the request. */
+
+        netif->tx->req_cons = ++netif->tx_req_cons;
+
+        /*
+         * 1. Ensure that we see the request when we copy it.
+         * 2. Ensure that frontend sees updated req_cons before we check
+         *    for more work to schedule.
+         */
+        mb();
+
         memcpy(&txreq, &netif->tx->ring[MASK_NETIF_TX_IDX(i)].req, 
                sizeof(txreq));
-        netif->tx_req_cons++;
 
 #if 0
         /* Credit-based scheduling. */

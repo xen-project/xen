@@ -55,11 +55,15 @@ typedef struct {
     /*
      * Frontend places packets into ring at tx_req_prod.
      * Frontend receives event when tx_resp_prod passes tx_event.
+     * 'req_cons' is a shadow of the backend's request consumer -- the frontend
+     * may use it to determine if all queued packets have been seen by the
+     * backend.
      */
     NETIF_RING_IDX req_prod;       /*  0 */
-    NETIF_RING_IDX resp_prod;      /*  4 */
-    NETIF_RING_IDX event;          /*  8 */
-    union {                        /* 12 */
+    NETIF_RING_IDX req_cons;       /*  4 */
+    NETIF_RING_IDX resp_prod;      /*  8 */
+    NETIF_RING_IDX event;          /* 12 */
+    union {                        /* 16 */
         netif_tx_request_t  req;
         netif_tx_response_t resp;
     } PACKED ring[NETIF_TX_RING_SIZE];

@@ -409,8 +409,14 @@ static int network_start_xmit(struct sk_buff *skb, struct net_device *dev)
     np->stats.tx_packets++;
 
     /* Only notify Xen if there are no outstanding responses. */
+    /*
+     * KAF (16/9/04): Checking outstanding responses is unsafe, as pending work
+     * may be dependent on packets not yet seen by the backend (e.g., he may
+     * have a partially-assembled fragmented IP packet). For now, the check is
+     * more conservative -- has the backend seen all previous requests?
+     */
     mb();
-    if ( np->tx->resp_prod == i )
+    if ( np->tx->req_cons/*resp_prod*/ == i )
         notify_via_evtchn(np->evtchn);
 
     return 0;
