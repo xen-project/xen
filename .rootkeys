@@ -404,7 +404,6 @@
 3ddb79c4R4iVwqIIeychVQYmIH4FUg xen/include/scsi/scsi_ioctl.h
 3ddb79c4yw_mfd4Uikn3v_IOPRpa1Q xen/include/scsi/scsicam.h
 3ddb79c4HKPMLvDBP9LxzPi_szVxGA xen/include/scsi/sg.h
-3e450943xQztorJxTGW3BPZ4LhRHbw xen/include/stdarg.h
 3e397e66m2tO3s-J8Jnr7Ws_tGoPTg xen/include/xeno/ac_timer.h
 3ddb79c0nTsjSpVK4ZVTI9WwN24xtQ xen/include/xeno/blk.h
 3ddb79c0dVhTHLsv6CPTf4baKix4mA xen/include/xeno/blkdev.h

@@ -641,11 +641,11 @@ ENTRY(nmi)
         jne   nmi_io_err
         movl  %eax,%ebx
         
-        # Okay, it's almost a normal NMI tick. We can only process it if:
-        #  1. We're the outermost Xen activation (in which case we have
+        # Okay, its almost a normal NMI tick. We can only process it if:
+        #  1. We are the outermost Xen activation (in which case we have
         #     the selectors safely saved on our stack)
         #  2. DS-GS all contain sane Xen values.
-        # In all other cases we bail without touching DS-GS, as we've
+        # In all other cases we bail without touching DS-GS, as we have
         # interrupted an enclosing Xen activation in tricky prologue or
         # epilogue code.
         movb  CS(%esp),%al

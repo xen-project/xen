@@ -286,7 +286,7 @@ void continue_nonidle_task(void);
 /* This hash table is protected by the tasklist_lock. */
 #define TASK_HASH_SIZE 256
 #define TASK_HASH(_id) ((_id)&(TASK_HASH_SIZE-1))
-struct task_struct *task_hash[TASK_HASH_SIZE];
+extern struct task_struct *task_hash[TASK_HASH_SIZE];
 
 #define REMOVE_LINKS(p) do { \
         (p)->next_task->prev_task = (p)->prev_task; \
