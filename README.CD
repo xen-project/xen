@@ -46,22 +46,27 @@ of RAM (256MB+).
 
 To try out the Demo, boot from CD (you may need to change your BIOS
 configuration to do this), hit a key on either the keyboard or serial
-line to pull up the Grub boot menu, then select one of the three boot
+line to pull up the Grub boot menu, then select one of the four boot
 options:
 
  Xen / linux-2.4.22 
  Xen / linux-2.4.22 using cmdline IP configuration
+ Xen ? linux-2.4.22 in "safe mode"
  linux-2.4.22
 
 The last option is a plain linux kernel that runs on the bare machine,
 and is included simply to help diagnose driver compatibility
-problems. If you are going for a command line IP config, hit "e" at
+problems. The "safe mode" boot option might be useful if you're having
+problems getting Xen to work with your hardware, as it disables various
+features such as SMP, and enables some debugging.
+
+If you are going for a command line IP config, hit "e" at
 the grub menu, then edit the "ip=" parameters to reflect your setup
 e.g. "ip=<ipaddr>::<gateway>:<netmask>::eth0:off". It shouldn't be
 necessary to set either the nfs server or hostname
 parameters. Alternatively, once XenoLinux has booted you can login and
 setup networking with 'dhclient' or 'ifconfig' and 'route' in the
-normal way.
+normal way. 
 
 To make things easier for yourself, it's worth trying to arrange for an
 IP address which is the first in a sequential range of free IP
