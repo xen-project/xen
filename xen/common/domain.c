@@ -9,6 +9,7 @@
 #include <xen/delay.h>
 #include <xen/event.h>
 #include <xen/time.h>
+#include <xen/shadow.h>
 #include <hypervisor-ifs/dom0_ops.h>
 #include <asm/io.h>
 #include <asm/domain_page.h>
@@ -332,12 +333,14 @@ void free_domain_page(struct pfn_info *page)
         if ( !(page->count_and_flags & PGC_zombie) )
         {
             page->tlbflush_timestamp = tlbflush_clock;
-            page->u.cpu_mask = 1 << p->processor;
-
-            spin_lock(&p->page_list_lock);
-            list_del(&page->list);
-            p->tot_pages--;
-            spin_unlock(&p->page_list_lock);
+	    if (p)
+	    {
+                page->u.cpu_mask = 1 << p->processor;
+                spin_lock(&p->page_list_lock);
+		list_del(&page->list);
+		p->tot_pages--;
+		spin_unlock(&p->page_list_lock);
+	    }
         }
 
         page->count_and_flags = 0;
@@ -845,6 +848,10 @@ int setup_guestos(struct task_struct *p, dom0_createdomain_t *params,
     physdev_init_dom0(p);
 
     set_bit(PF_CONSTRUCTED, &p->flags);
+
+#if 0 // XXXXX DO NOT CHECK IN ENBALED !!! (but useful for testing so leave) 
+    shadow_mode_enable(p, SHM_test); 
+#endif
 
     new_thread(p, 
                (unsigned long)virt_load_address, 

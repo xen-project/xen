@@ -29,9 +29,9 @@
 #include <asm/i387.h>
 #include <asm/mpspec.h>
 #include <asm/ldt.h>
-
 #include <xen/irq.h>
 #include <xen/event.h>
+#include <xen/shadow.h>
 
 int hlt_counter;
 
@@ -281,7 +281,13 @@ void switch_to(struct task_struct *prev_p, struct task_struct *next_p)
     }
 
     /* Switch page tables.  */
-    write_cr3_counted(pagetable_val(next_p->mm.pagetable));
+    if( next_p->mm.shadow_mode )
+      {
+	check_pagetable( next_p, next_p->mm.pagetable, "switch" );
+	write_cr3_counted(pagetable_val(next_p->mm.shadow_table));
+      }
+    else
+      write_cr3_counted(pagetable_val(next_p->mm.pagetable));
 
     set_current(next_p);
 
