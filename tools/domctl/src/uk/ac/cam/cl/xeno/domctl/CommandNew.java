@@ -13,7 +13,7 @@ public class CommandNew extends Command
     String image = getStringParameter(args, 'i', d.domainImage);
     String initrd = getStringParameter (args, 'r', d.domainInitRD);
     int vifs = getIntParameter(args, 'v', d.domainVIFs);
-    String bargs = getStringParameter (args, 'a', "");
+    String bargs = getStringParameter (args, 'a', "") + " ";
     String root_dev = getStringParameter (args, 'd', d.rootDevice);
     String nfs_root_path = getStringParameter (args, 'f', d.NWNFSRoot);
     String nw_ip = getStringParameter (args, '4', d.NWIP);
@@ -23,11 +23,12 @@ public class CommandNew extends Command
     String nw_host = getStringParameter (args, 'h', d.NWHost);
     String domain_ip = "";
     int rc = 0;
-    int domain_id;
+    int domain_id = -1;
     DataInputStream dis;
     int idx;
     int i;
 
+    d.describe ();
 
     try
       {
@@ -60,20 +61,25 @@ public class CommandNew extends Command
 	  return reportError ("Cannot configure more than " + 
 			      d.MaxDomainNumber + " domains");
 	}
-	
-	/* Set up boot parameters to pass to xi_build. */
-	bargs = "";
 
+	/* Set up boot parameters to pass to xi_build. */
 	if (root_dev.equals ("/dev/nfs")) {
 	  if (vifs == 0) {
 	    return reportError ("Cannot use NFS root without VIFs configured");
+	  }
+	  if (nfs_root_path == null) {
+	    return reportError ("No NFS root specified");
+	  }
+	  if (nw_nfs_server == null) {
+	    return reportError ("No NFS server specified");
 	  }
 	  bargs = (bargs + 
 		   "root=/dev/nfs " +
 		   "nfsroot=" + StringPattern.parse(nfs_root_path).resolve(domain_id) +
 		   " ");
 	} else {
-	  bargs = ("root=" + StringPattern.parse(root_dev).resolve(domain_id) +
+	  bargs = (bargs + 
+		   "root=" + StringPattern.parse(root_dev).resolve(domain_id) +
 		   " ");
 
 	}
@@ -89,10 +95,10 @@ public class CommandNew extends Command
 	    
 	  }
 	  bargs = ("ip=" + domain_ip +
-		   ":" + InetAddressPattern.parse(nw_nfs_server).resolve(domain_id) +
-		   ":" + InetAddressPattern.parse(nw_gw).resolve(domain_id) + 
-		   ":" + InetAddressPattern.parse(nw_mask).resolve(domain_id) +
-		   ":" + nw_host + 
+		   ":" + ((nw_nfs_server == null) ? "" : (InetAddressPattern.parse(nw_nfs_server).resolve(domain_id))) +
+		   ":" + ((nw_gw == null) ? "" : (InetAddressPattern.parse(nw_gw).resolve(domain_id))) + 
+		   ":" + ((nw_mask == null) ? "" : InetAddressPattern.parse(nw_mask).resolve(domain_id)) +
+		   ":" + ((nw_host == null) ? "" : nw_host) + 
 		   ":eth0:off " + bargs);
 	}
 	
@@ -151,6 +157,10 @@ public class CommandNew extends Command
 	e.printStackTrace ();
 	rc = -1;
       }
+
+    if (rc == 0) {
+      System.out.println ("Created domain " + domain_id);
+    }
 
     return rc;
   }

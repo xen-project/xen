@@ -24,7 +24,7 @@ public class Defaults
   String NWNFSServer;
   String NWNFSRoot;
 
-  int MaxDomainNumber;
+  int MaxDomainNumber = Integer.MAX_VALUE;
 
   String XIToolsDir;
 
@@ -33,7 +33,6 @@ public class Defaults
   public Defaults ()
   {
     File f = Settings.getDefaultsFile ();
-    System.out.println ("f=" + f);
 
     try
       {
@@ -50,21 +49,23 @@ public class Defaults
 	e.printStackTrace();
 	System.exit(1);
       }
+  }
 
+  public void describe () {
     System.out.println ("Domain defaults:");
-    System.out.println ("   name        " + domainName);
-    System.out.println ("   size        " + domainSizeKB);
-    System.out.println ("   vifs        " + domainVIFs);
-    System.out.println ("   domainImage " + domainImage);
-    System.out.println ("   domainInitRD " + domainInitRD);
-    System.out.println ("   rootDevice " + rootDevice);
-    System.out.println ("   NWIP " + NWIP);
-    System.out.println ("   NWGW " + NWGW);
-    System.out.println ("   NWMask " + NWMask);
+    System.out.println ("   name            " + domainName);
+    System.out.println ("   size            " + domainSizeKB);
+    System.out.println ("   vifs            " + domainVIFs);
+    System.out.println ("   domainImage     " + domainImage);
+    System.out.println ("   domainInitRD    " + domainInitRD);
+    System.out.println ("   rootDevice      " + rootDevice);
+    System.out.println ("   NWIP            " + NWIP);
+    System.out.println ("   NWGW            " + NWGW);
+    System.out.println ("   NWMask          " + NWMask);
     System.out.println ("   MaxDomainNumber " + MaxDomainNumber);
-    System.out.println ("   NWNFSServer " + NWNFSServer);
-    System.out.println ("   NWNFSRoot " + NWNFSRoot);
-    System.out.println ("   XIToolsDir " + XIToolsDir);
+    System.out.println ("   NWNFSServer     " + NWNFSServer);
+    System.out.println ("   NWNFSRoot       " + NWNFSRoot);
+    System.out.println ("   XIToolsDir      " + XIToolsDir);
   }
 
   /***********************************************************************/
