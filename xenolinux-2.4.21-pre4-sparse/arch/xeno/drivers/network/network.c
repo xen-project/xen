@@ -66,6 +66,17 @@ struct net_private
 };
 
  
+static void dbg_network_int(int irq, void *dev_id, struct pt_regs *ptregs)
+{
+  struct net_device *dev = (struct net_device *)dev_id;
+  struct net_private *np = dev->priv;
+  printk(KERN_ALERT "tx_full = %d, tx_entries = %d, tx_idx = %d, tx_cons = %d, tx_prod = %d, tx_event = %d, state=%d\n",
+	 np->tx_full, np->tx_entries, np->tx_idx, 
+	 np->net_ring->tx_cons,np->net_ring->tx_prod,np->net_ring->tx_event,
+	 test_bit(__LINK_STATE_XOFF, &dev->state));
+}
+
+
 static int network_open(struct net_device *dev)
 {
     struct net_private *np = dev->priv;
@@ -122,6 +133,11 @@ static int network_open(struct net_device *dev)
         network_free_rx_buffers(dev);
         goto fail;
     }
+
+#if 1
+    request_irq( _EVENT_DEBUG, dbg_network_int, SA_SHARED, "debug", dev);    
+#endif
+
 
     printk("XenoLinux Virtual Network Driver installed as %s\n", dev->name);
 
@@ -268,7 +284,7 @@ static int network_start_xmit(struct sk_buff *skb, struct net_device *dev)
     else
     {
         /* Avoid unnecessary tx interrupts. */
-        np->net_ring->tx_event = TX_RING_INC(np->net_ring->tx_prod);
+        np->net_ring->tx_event = np->net_ring->tx_prod;
     }
     spin_unlock_irq(&np->tx_lock);
 
