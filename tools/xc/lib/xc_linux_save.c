@@ -399,7 +399,7 @@ int xc_linux_save(int xc_handle, XcIOContext *ioctxt)
     if( live ){ 
         if ( xc_shadow_control( xc_handle, domid, 
                                 DOM0_SHADOW_CONTROL_OP_ENABLE_LOGDIRTY,
-                                NULL, 0, NULL ) < 0 )
+                                NULL, 0, NULL ) < 0 ) {
             xcio_error(ioctxt, "Couldn't enable shadow mode");
             goto out;
         }
@@ -544,23 +544,24 @@ int xc_linux_save(int xc_handle, XcIOContext *ioctxt)
             {
                 int n = permute(N, nr_pfns, order_nr );
 
-                if ( 0 && debug )
+                if ( 0 && debug ) {
                     fprintf(stderr,"%d pfn= %08lx mfn= %08lx %d  "
                             " [mfn]= %08lx\n",
-                            iter, n, live_pfn_to_mfn_table[n],
+                            iter, (unsigned long)n, live_pfn_to_mfn_table[n],
                             test_bit(n,to_send),
                             live_mfn_to_pfn_table[live_pfn_to_mfn_table[n]&
                                                  0xFFFFF]);
+                }
 
                 if ( !last_iter && 
                      test_bit(n, to_send) && 
-                     test_bit(n, to_skip) )
+                     test_bit(n, to_skip) ) {
                     skip_this_iter++; /* stats keeping */
                 }
 
                 if ( !((test_bit(n, to_send) && !test_bit(n, to_skip)) ||
                        (test_bit(n, to_send) && last_iter) ||
-                       (test_bit(n, to_fix)  && last_iter)) )
+                       (test_bit(n, to_fix)  && last_iter)) ) {
                     continue;
                 }
 

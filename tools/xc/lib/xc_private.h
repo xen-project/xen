@@ -205,4 +205,9 @@ void * mfn_mapper_queue_entry(mfn_mapper_t *t, int offset,
 long long  xc_domain_get_cpu_usage( int xc_handle, domid_t domid );
 
 #include "xc_io.h"
+
+int xc_domain_getfullinfo(int xc_handle,
+                          u32 domid,
+                          dom0_op_t *op,
+                          full_execution_context_t *ctxt );
 #endif /* __XC_PRIVATE_H__ */

@@ -529,7 +529,7 @@ def to_string(sxpr):
     returns string
     """
     io = StringIO()
-    sxp.show(sxpr, io)
+    show(sxpr, io)
     io.seek(0)
     val = io.getvalue()
     io.close()
