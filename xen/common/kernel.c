@@ -22,7 +22,6 @@
 #include <xen/shadow.h>
 #include <xen/trace.h>
 #include <asm/io.h>
-#include <asm/msr.h>
 #include <asm/uaccess.h>
 #include <asm/domain_page.h>
 #include <hypervisor-ifs/dom0_ops.h>

@@ -69,7 +69,7 @@ void pdb_do_debug (dom0_op_t *op)
 	    struct domain *d;
 
 	    d = find_domain_by_id(op->u.debug.domain);
-	    if ( d->mm.shadow_mode )
+	    if ( shadow_mode(d) )
 	      cr3 = pagetable_val(d->mm.shadow_table);
 	    else
 	      cr3 = pagetable_val(d->mm.pagetable);

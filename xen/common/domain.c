@@ -15,7 +15,6 @@
 #include <asm/io.h>
 #include <asm/domain_page.h>
 #include <asm/flushtlb.h>
-#include <asm/msr.h>
 #include <asm/i387.h>
 #include <hypervisor-ifs/dom0_ops.h>
 
@@ -57,7 +56,7 @@ struct domain *do_createdomain(domid_t dom_id, unsigned int cpu)
     atomic_set(&d->refcnt, 1);
     atomic_set(&d->pausecnt, 0);
 
-    spin_lock_init(&d->mm.shadow_lock);
+    shadow_lock_init(d);
 
     d->domain    = dom_id;
     d->processor = cpu;
@@ -335,7 +334,7 @@ void domain_relinquish_memory(struct domain *d)
         write_ptbase(&current->mm);
 
     /* Exit shadow mode before deconstructing final guest page table. */
-    if ( d->mm.shadow_mode )
+    if ( shadow_mode(d) )
         shadow_mode_disable(d);
 
     /* Drop the in-use reference to the page-table base. */
