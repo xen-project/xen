@@ -501,7 +501,7 @@ static task_slice_t bvt_do_schedule(s_time_t now)
      * Work out how long 'next' can run till its evt is greater than
      * 'next_prime's evt. Take context switch allowance into account.
      */
-    ASSERT(next_prime_inf->evt >= next_inf->evt);
+    ASSERT(next_prime_einf->evt >= next_einf->evt);
     
     r_time = ((next_prime_einf->evt - next_einf->evt)/next_einf->inf->mcu_advance)
         + ctx_allow;
