@@ -138,6 +138,11 @@ int proc_write_bdt(struct file *file, const char *buffer,
   sscanf(local, "%c %i %i %i", 
 	 &opcode, &block_number, &block_size, &device);
 
+  if (data)
+  {
+    kfree(data);
+  }
+
   if (opcode == 'r' || opcode == 'R')
   {
     meta.operation = XEN_BLOCK_READ;
@@ -151,6 +156,31 @@ int proc_write_bdt(struct file *file, const char *buffer,
     meta.operation = XEN_BLOCK_DEBUG;
     block_size = 10000;
   }
+  else if (opcode == 'c' || opcode == 'C')
+  {
+    xv_disk_t *xvd;
+    int loop;
+
+    meta.operation = XEN_BLOCK_SEG_CREATE;
+    data = kmalloc (sizeof(xv_disk_t), GFP_KERNEL);
+    if (data == NULL)
+    {
+      kfree(local);
+      return -ENOMEM;
+    }
+    
+    xvd = (xv_disk_t *)data;
+    xvd->mode = XEN_DISK_READ_WRITE;
+    xvd->domain = block_number;
+    xvd->segment = block_size;
+    xvd->ext_count = device;
+    for (loop = 0; loop < xvd->ext_count; loop++)
+    {
+      xvd->extents[loop].disk = block_number + 1;                  /* random */
+      xvd->extents[loop].offset = block_size + 1;
+      xvd->extents[loop].size = device + 1;
+    }
+  }
   else
   {
     printk(KERN_ALERT 
@@ -158,15 +188,14 @@ int proc_write_bdt(struct file *file, const char *buffer,
     return -EINVAL;
   }
 
-  if (data)
-  {
-    kfree(data);
-  }
-  data = kmalloc(block_size * sizeof(char), GFP_KERNEL);
   if (data == NULL)
   {
-    kfree(local);
-    return -ENOMEM;
+    data = kmalloc(block_size * sizeof(char), GFP_KERNEL);
+    if (data == NULL)
+    {
+      kfree(local);
+      return -ENOMEM;
+    }
   }
 
   meta.block_number = block_number;

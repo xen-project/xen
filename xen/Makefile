@@ -39,3 +39,5 @@ TAGS:
 	find include -type d \( -name "asm-*" -o -name config \) -prune -o -name '*.h' -print | xargs etags -a
 	find $(SUBDIRS) -name '*.[ch]' | xargs etags -a
 
+MAP:
+	nm image | grep -v '\(compiled\)\|\(\.o$$\)\|\( [aUw] \)\|\(\.\.ng$$\)\|\(LASH[RL]DI\)' | sort > System.map

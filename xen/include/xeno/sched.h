@@ -55,6 +55,7 @@ extern struct mm_struct init_mm;
 
 #include <xeno/vif.h>
 #include <xeno/block.h>
+#include <xeno/segment.h>
 
 struct task_struct {
 
@@ -79,6 +80,8 @@ struct task_struct {
     unsigned int blk_req_cons; /* request consumer */
     struct list_head blkdev_list;
     spinlock_t blk_ring_lock;
+    segment_t *segment_list[XEN_MAX_SEGMENTS];                        /* vhd */
+    int segment_count;
 
     int has_cpu, policy, counter;
 
