@@ -984,7 +984,6 @@ static int do_extended_command(unsigned long ptr, unsigned long val)
         if ( unlikely(!okay) )
         {
             MEM_LOG("Error while pinning pfn %08lx", pfn);
-            put_page(page);
             break;
         }
 

@@ -4,7 +4,7 @@
 #
 # Author:       Keir Fraser <keir.fraser@cl.cam.ac.uk>
 #
-# chkconfig: 2345 99 00
+# chkconfig: 2345 98 01
 # description: Starts and stops the Xen control daemon.
 
 case "$1" in

@@ -1313,7 +1313,7 @@ void __init setup_arch(char **cmdline_p)
 		efi_enabled = 1;
 #endif
 
- 	ROOT_DEV = old_decode_dev(ORIG_ROOT_DEV);
+ 	ROOT_DEV = MKDEV(RAMDISK_MAJOR,0); /*old_decode_dev(ORIG_ROOT_DEV);*/
  	drive_info = DRIVE_INFO;
  	screen_info = SCREEN_INFO;
 	edid_info = EDID_INFO;

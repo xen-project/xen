@@ -358,7 +358,7 @@ static int network_start_xmit(struct sk_buff *skb, struct net_device *dev)
     {
         printk(KERN_ALERT "%s: full queue wasn't stopped!\n", dev->name);
         netif_stop_queue(dev);
-        return -ENOBUFS;
+        goto drop;
     }
 
     if ( unlikely((((unsigned long)skb->data & ~PAGE_MASK) + skb->len) >=
@@ -366,7 +366,7 @@ static int network_start_xmit(struct sk_buff *skb, struct net_device *dev)
     {
         struct sk_buff *new_skb;
         if ( unlikely((new_skb = alloc_skb_page()) == NULL) )
-            return 1;
+            goto drop;
         skb_put(new_skb, skb->len);
         memcpy(new_skb->data, skb->data, skb->len);
         dev_kfree_skb(skb);
@@ -378,7 +378,7 @@ static int network_start_xmit(struct sk_buff *skb, struct net_device *dev)
     if ( np->backend_state != BEST_CONNECTED )
     {
         spin_unlock_irq(&np->tx_lock);
-        return 1;
+        goto drop;
     }
 
     i = np->tx->req_prod;
@@ -414,6 +414,11 @@ static int network_start_xmit(struct sk_buff *skb, struct net_device *dev)
     if ( np->tx->resp_prod != i )
         notify_via_evtchn(np->evtchn);
 
+    return 0;
+
+ drop:
+    np->stats.tx_dropped++;
+    dev_kfree_skb(skb);
     return 0;
 }
 
@@ -531,7 +536,7 @@ static int netif_poll(struct net_device *dev, int *pbudget)
         skb->protocol = eth_type_trans(skb, dev);
 
         /* Pass it up. */
-        netif_rx(skb);
+        netif_receive_skb(skb);
         dev->last_rx = jiffies;
     }
 

@@ -310,6 +310,7 @@
 401d7e160vaxMBAUSLSicuZ7AQjJ3w tools/examples/Makefile
 401d7e16UgeqroJQTIhwkrDVkoWgZQ tools/examples/README
 405ff55dawQyCHFEnJ067ChPRoXBBA tools/examples/init.d/xend
+40278d94cIUWl2eRgnwZtr4hTyWT1Q tools/examples/init.d/xendomains
 40ee75a9xFz6S05sDKu-JCLqyVTkDA tools/examples/network
 40ee75a967sxgcRY4Q7zXoVUaJ4flA tools/examples/vif-bridge
 40ee75a93cqxHp6MiYXxxwR5j2_8QQ tools/examples/xend-config.sxp

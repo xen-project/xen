@@ -22,7 +22,7 @@ import os
 import sys
 import re
 
-from xen.xend.server.params import PID_FILE as XEND_PID_FILE
+from xen.xend.server.params import XEND_PID_FILE
 
 class CheckError(ValueError):
     pass
