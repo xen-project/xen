@@ -220,10 +220,7 @@ void rr_wake(struct domain *d)
     curr = schedule_data[cpu].curr;
     spin_unlock_irqrestore(&schedule_data[cpu].schedule_lock, flags);
  
-    /* Currently-running domain should run at least for ctx_allow. */
-    min_time = curr->lastschd + curr->min_slice;
-    
-    if ( is_idle_task(curr) || (min_time <= now) )
+    if ( is_idle_task(curr) )
         cpu_raise_softirq(cpu, SCHEDULE_SOFTIRQ);
     else if ( schedule_data[cpu].s_timer.expires > (min_time + TIME_SLOP) )
         mod_ac_timer(&schedule_data[cpu].s_timer, min_time);

@@ -91,34 +91,31 @@ static inline int __task_on_runqueue(struct domain *d)
     return (RUNLIST(d))->next != NULL;
 }
 
+static inline u32 calc_avt(struct domain *d, s_time_t now)
+{
+    u32 ranfor, mcus;
+    struct bvt_dom_info *inf = BVT_INFO(d);
+    
+    ranfor = (u32)(now - d->lastschd);
+    mcus = (ranfor + MCU - 1)/MCU;
+
+    return inf->avt + mcus;
+}
+
+
 /*
  * Calculate the effective virtual time for a domain. Take into account 
  * warping limits
  */
-static void __calc_evt(struct bvt_dom_info *inf)
+static inline u32 calc_evt(struct domain *d, u32 avt)
 {
-    s_time_t now = NOW();
-
+   struct bvt_dom_info *inf = BVT_INFO(d);
+   /* TODO The warp routines need to be rewritten GM */
+ 
     if ( inf->warpback ) 
-    {
-        if ( ((now - inf->warped) < inf->warpl) &&
-             ((now - inf->uwarped) > inf->warpu) )
-        {
-            /* allowed to warp */
-            inf->evt = inf->avt - inf->warp;
-        } 
-        else 
-        {
-            /* warped for too long -> unwarp */
-            inf->evt      = inf->avt;
-            inf->uwarped  = now;
-            inf->warpback = 0;
-        }
-    } 
+        return avt - inf->warp;
     else 
-    {
-        inf->evt = inf->avt;
-    }
+        return avt;
 }
 
 /**
@@ -191,8 +188,9 @@ void bvt_wake(struct domain *d)
     unsigned long       flags;
     struct bvt_dom_info *inf = BVT_INFO(d);
     struct domain       *curr;
-    s_time_t            now, min_time;
+    s_time_t            now, r_time;
     int                 cpu = d->processor;
+    u32                 curr_evt;
 
     /* The runqueue accesses must be protected */
     spin_lock_irqsave(&CPU_INFO(cpu)->run_lock, flags);
@@ -215,24 +213,29 @@ void bvt_wake(struct domain *d)
         inf->avt = CPU_SVT(cpu);
 
     /* Deal with warping here. */
-    inf->warpback  = 1;
-    inf->warped    = now;
-    __calc_evt(inf);
+    // TODO rewrite
+    //inf->warpback  = 1;
+    //inf->warped    = now;
+    inf->evt = calc_evt(d, inf->avt);
     spin_unlock_irqrestore(&CPU_INFO(cpu)->run_lock, flags);
     
     /* Access to schedule_data protected by schedule_lock */
     spin_lock_irqsave(&schedule_data[cpu].schedule_lock, flags);
     
     curr = schedule_data[cpu].curr;
+    curr_evt = calc_evt(curr, calc_avt(curr, now));
+    /* Calculate the time the current domain would run assuming
+       the second smallest evt is of the newly woken domain */
+    r_time = curr->lastschd +
+             ((inf->evt - curr_evt) / BVT_INFO(curr)->mcu_advance) +
+             ctx_allow;
 
-    /* Currently-running domain should run at least for ctx_allow. */
-    min_time = curr->lastschd + curr->min_slice;
 
     spin_unlock_irqrestore(&schedule_data[cpu].schedule_lock, flags);   
-    if ( is_idle_task(curr) || (min_time <= now) )
+    if ( is_idle_task(curr) || (inf->evt <= curr_evt) )
         cpu_raise_softirq(cpu, SCHEDULE_SOFTIRQ);
-    else if ( schedule_data[cpu].s_timer.expires > (min_time + TIME_SLOP) )
-        mod_ac_timer(&schedule_data[cpu].s_timer, min_time);
+    else if ( schedule_data[cpu].s_timer.expires > r_time )
+        mod_ac_timer(&schedule_data[cpu].s_timer, r_time);
 
 }
 
@@ -360,8 +363,6 @@ static task_slice_t bvt_do_schedule(s_time_t now)
     struct list_head   *tmp;
     int                 cpu = prev->processor;
     s32                 r_time;     /* time for new dom to run */
-    s32                 ranfor;     /* assume we never run longer than 2.1s! */
-    s32                 mcus;
     u32                 next_evt, next_prime_evt, min_avt;
     struct bvt_dom_info *prev_inf       = BVT_INFO(prev),
                         *p_inf          = NULL,
@@ -378,12 +379,8 @@ static task_slice_t bvt_do_schedule(s_time_t now)
 
     if ( likely(!is_idle_task(prev)) ) 
     {
-        ranfor = (s32)(now - prev->lastschd);
-        /* Calculate mcu and update avt. */
-        mcus = (ranfor + MCU - 1) / MCU;
-        prev_inf->avt += mcus * prev_inf->mcu_advance;
-        
-        __calc_evt(prev_inf);
+        prev_inf->avt = calc_avt(prev, now);
+        prev_inf->evt = calc_evt(prev, prev_inf->avt);
         
         __del_from_runqueue(prev);
         
@@ -493,7 +490,6 @@ static task_slice_t bvt_do_schedule(s_time_t now)
     ASSERT(r_time >= ctx_allow);
 
  sched_done:
-    next->min_slice = ctx_allow;
     ret.task = next;
     ret.time = r_time;
     return ret;

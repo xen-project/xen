@@ -274,7 +274,7 @@ static void fbvt_wake(struct domain *d)
     curr = schedule_data[cpu].curr;
  
     /* Currently-running domain should run at least for ctx_allow. */
-    min_time = curr->lastschd + curr->min_slice;
+    min_time = curr->lastschd + ctx_allow;
     
     spin_unlock_irqrestore(&schedule_data[cpu].schedule_lock, flags);   
     
@@ -587,7 +587,6 @@ static task_slice_t fbvt_do_schedule(s_time_t now)
  sched_done:
     R_TIME(cpu) = r_time / MCU;
     TRACE_3D(TRC_SCHED_FBVT_DO_SCHED, next->domain, r_time, LAST_VTB(cpu));
-    next->min_slice = ctx_allow;
     ret.task = next;
     ret.time = r_time;
     return ret;

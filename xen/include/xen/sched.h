@@ -107,7 +107,6 @@ struct domain
     s_time_t         cpu_time;      /* total CPU time received till now */
     s_time_t         wokenup;       /* time domain got woken up */
     struct ac_timer  timer;         /* one-shot timer for timeout values */
-    s_time_t         min_slice;     /* minimum time before reschedule */
     void            *sched_priv;    /* scheduler-specific data */
 
     struct mm_struct mm;
