@@ -659,6 +659,13 @@ int reprogram_ac_timer(s_time_t timeout)
     s_time_t	expire;
     u64			apic_tmict;
 
+    if (timeout  == 0) {
+        /* XXX RN: not sure if this disables it or cause interruptto 
+         * go off imediately */
+        apic_tmict = 0;
+        goto reprogram;
+    }
+
     now = NOW();
     expire = timeout - now;	/* value from now */
 
@@ -680,6 +687,7 @@ int reprogram_ac_timer(s_time_t timeout)
         return 0;
     }
 
+ reprogram:
     /* programm timer */
     apic_write(APIC_TMICT, (unsigned long)apic_tmict);
 

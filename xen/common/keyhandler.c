@@ -19,18 +19,18 @@ void add_key_handler(u_char key, key_handler *handler, char *desc)
     char *str; 
 
     if(key_table[key].handler != NULL) 
-	printk("Warning: overwriting handler for key 0x%x\n", key); 
+    printk("Warning: overwriting handler for key 0x%x\n", key); 
 
     key_table[key].handler = handler; 
 
     str = key_table[key].desc; 
     for(i = 0; i < STR_MAX; i++) {
-	if(*desc) 
-	    *str++ = *desc++; 
-	else break; 
+    if(*desc) 
+        *str++ = *desc++; 
+    else break; 
     }
     if (i == STR_MAX) 
-	key_table[key].desc[STR_MAX-1] = '\0'; 
+    key_table[key].desc[STR_MAX-1] = '\0'; 
 
     return; 
 }
@@ -47,10 +47,10 @@ void show_handlers(u_char key, void *dev_id, struct pt_regs *regs)
 
     printk("'%c' pressed -> showing installed handlers\n", key); 
     for(i=0; i < KEY_MAX; i++) 
-	if(key_table[i].handler) 
-	    printk(" key '%c' (ascii '%02x') => %s\n", 
-			(i<33 || i>126)?(' '):(i),i,
-			key_table[i].desc);
+    if(key_table[i].handler) 
+        printk(" key '%c' (ascii '%02x') => %s\n", 
+            (i<33 || i>126)?(' '):(i),i,
+            key_table[i].desc);
     return; 
 }
 
@@ -94,20 +94,24 @@ void do_task_queues(u_char key, void *dev_id, struct pt_regs *regs)
     p = &idle0_task;
     do {
         printk("Xen: DOM %d, CPU %d [has=%c], state = %s, "
-	       "hyp_events = %08x\n", 
-	       p->domain, p->processor, p->has_cpu ? 'T':'F', 
-	       task_states[p->state], p->hyp_events); 
-	s = p->shared_info; 
-	if(!is_idle_task(p)) {
-	    printk("Guest: events = %08lx, event_enable = %08lx\n", 
-		   s->events, s->events_enable); 
-	    printk("Notifying guest...\n"); 
-	    set_bit(_EVENT_DEBUG, &s->events); 
-	}
+           "hyp_events = %08x\n", 
+           p->domain, p->processor, p->has_cpu ? 'T':'F', 
+           task_states[p->state], p->hyp_events); 
+    s = p->shared_info; 
+    if(!is_idle_task(p)) {
+        printk("Guest: events = %08lx, event_enable = %08lx\n", 
+           s->events, s->events_enable); 
+        printk("Notifying guest...\n"); 
+        set_bit(_EVENT_DEBUG, &s->events); 
+    }
     } while ( (p = p->next_task) != &idle0_task );
 
     read_unlock_irqrestore(&tasklist_lock, flags); 
 }
+
+
+extern void dump_timerq(u_char key, void *dev_id, struct pt_regs *regs);
+extern void dump_runq(u_char key, void *dev_id, struct pt_regs *regs);
 
 
 void initialize_keytable() 
@@ -116,14 +120,16 @@ void initialize_keytable()
 
     /* first initialize key handler table */
     for(i = 0; i < KEY_MAX; i++) 
-	key_table[i].handler = (key_handler *)NULL; 
-	
+    key_table[i].handler = (key_handler *)NULL; 
+    
     /* setup own handlers */
+    add_key_handler('a', dump_timerq,    "dump ac_timer queues");
     add_key_handler('d', dump_registers, "dump registers"); 
-    add_key_handler('h', show_handlers, "show this message");
+    add_key_handler('h', show_handlers,  "show this message");
     add_key_handler('p', perfc_printall, "print performance counters"); 
     add_key_handler('q', do_task_queues, "dump task queues + guest state");
-    add_key_handler('R', halt_machine, "reboot machine ungracefully"); 
+    add_key_handler('r', dump_runq,      "dump run queue"); 
+    add_key_handler('R', halt_machine,   "reboot machine ungracefully"); 
     
     return; 
 }
