@@ -128,14 +128,31 @@ CONFIG_XENOLINUX_BLOCK=y
 # CONFIG_BLK_DEV_HD is not set
 
 #
+# Console drivers
+#
+CONFIG_VGA_CONSOLE=y
+# CONFIG_VIDEO_SELECT is not set
+CONFIG_DUMMY_CONSOLE=y
+
+
+#
 # Character devices
 #
 CONFIG_XEN_CONSOLE=y
 CONFIG_VT=y
-CONFIG_VGA_CONSOLE=y
-CONFIG_DUMMY_CONSOLE=y
-# CONFIG_PSMOUSE is not set
+CONFIG_VT_CONSOLE=y
 # CONFIG_UNIX98_PTYS is not set
+
+#
+# Mice
+#
+# CONFIG_BUSMOUSE is not set
+CONFIG_MOUSE=y
+CONFIG_PSMOUSE=y
+# CONFIG_82C710_MOUSE is not set
+# CONFIG_PC110_PAD is not set
+# CONFIG_MK712_MOUSE is not set
+
 
 #
 # File systems

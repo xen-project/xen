@@ -26,6 +26,26 @@
 
 #define XENO_TTY_MINOR 123
 
+/*** useful function for console debugging -- goes straight to Xen ****/
+
+asmlinkage int xprintk(const char *fmt, ...)
+{
+        va_list args;
+        unsigned long flags;
+        int printed_len;
+        static char printk_buf[1024];
+
+        /* Emit the output into the temporary buffer */
+        va_start(args, fmt);
+        printed_len = vsnprintf(printk_buf, sizeof(printk_buf), fmt, args);
+        va_end(args);
+
+        // Useful Hack if things are going wrong very early in the day
+        (void)HYPERVISOR_console_write(printk_buf, sizeof(printk_buf));
+}
+
+
+
 /******************** Kernel console driver ********************************/
 
 static void xen_console_write(struct console *co, const char *s, unsigned count)
@@ -72,6 +92,7 @@ static struct console xen_console_info = {
 
 void xen_console_init(void)
 {
+  xprintk("xen_console_init\n");
   register_console(&xen_console_info);
 }
 

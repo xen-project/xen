@@ -2238,13 +2238,14 @@ void __init console_init(void)
 	disable_early_printk(); 
 #endif
 
+#ifdef CONFIG_XEN_CONSOLE
+        xen_console_init();
+#endif
+
 #ifdef CONFIG_VT
 	con_init();
 #endif
 
-#ifdef CONFIG_XEN_CONSOLE
-	xen_console_init();
-#endif
 #ifdef CONFIG_AU1000_SERIAL_CONSOLE
 	au1000_serial_console_init();
 #endif

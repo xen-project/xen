@@ -49,9 +49,7 @@ static unsigned long VGA_MAP_MEM(unsigned long x)
 	return 0;
 }
 
-static inline unsigned char vga_readb(unsigned char * x) { 
-xprintk("vr %p\n",x);return (*(x)); }
-static void vga_writeb(unsigned char x, unsigned char *y) {
-xprintk("vw %02x %p\n",x,y); *(y) = (x); }
+static inline unsigned char vga_readb(unsigned char * x) { return (*(x)); }
+static inline void vga_writeb(unsigned char x, unsigned char *y) { *(y) = (x); }
 
 #endif
