@@ -398,39 +398,37 @@ typedef struct my_ethhdr {
     unsigned short  h_proto;        
 } my_ethhdr_t; 
 
-
+/*
+ * Function written by ek247. Exports console output from all domains upwards 
+ * to domain0, by stuffing it into a fake network packet.
+ */
 int console_export(char *str, int len)
 {
-    /* Function written by ek247
-     * Exports console output from all domains upwards
-     * to domain0, by stuffing it into a fake network
-     * packet
-     */
-    struct sk_buff *console_packet;
+    struct sk_buff *skb;
     struct my_iphdr *iph = NULL;  
     struct my_udphdr *udph = NULL; 
     struct my_ethhdr *ethh = NULL; 
     int hdr_size = sizeof(struct my_iphdr) + sizeof(struct my_udphdr); 
     u8 *skb_data;
 
-    // Prepare console packet - the grim + 20 in the alloc is for headroom.
-    console_packet = dev_alloc_skb(sizeof(struct my_ethhdr) + hdr_size + len + 20);
-    if (!console_packet) return 0;
-//console_packet->security = 9; // hack to trace these packets.
-    console_packet->dev = the_dev;
-    skb_data = map_domain_mem((unsigned long)console_packet->head);
-    skb_reserve(console_packet, 2); // ip header alignment.
-//printk("Eth is: %d\n", console_packet->data - console_packet->head);
-    ethh   = (struct my_ethhdr *) skb_data + (console_packet->data - console_packet->head);
-    skb_reserve(console_packet, sizeof(struct my_ethhdr)); 
+    skb = dev_alloc_skb(sizeof(struct my_ethhdr) + 
+                                   hdr_size + len + 20);
+    if ( skb == NULL ) return 0;
 
-    skb_put(console_packet, hdr_size + len); 
-//printk("IP is: %d\n", console_packet->data - console_packet->head);
-    iph  = (struct my_iphdr *)skb_data + (console_packet->data - console_packet->head); 
+    skb->dev = the_dev;
+    skb_data = (u8 *)map_domain_mem((skb->pf - frame_table) << PAGE_SHIFT);
+    skb_reserve(skb, 2);
+
+    /* Get a pointer to each header. */
+    ethh = (struct my_ethhdr *) 
+        (skb_data + (skb->data - skb->head));
+    iph  = (struct my_iphdr *)(ethh + 1);
     udph = (struct my_udphdr *)(iph + 1); 
-    memcpy((char *)(udph + 1), str, len); 
 
-    // Build IP header
+    skb_reserve(skb, sizeof(struct my_ethhdr)); 
+    skb_put(skb, hdr_size + len); 
+
+    /* Build IP header. */
     iph->version = 4;
     iph->ihl     = 5;
     iph->frag_off= 0;
@@ -440,33 +438,31 @@ int console_export(char *str, int len)
     iph->daddr   = htonl(opt_ipbase);
     iph->saddr   = htonl(0xa9fe0001); 
     iph->tot_len = htons(hdr_size + len); 
-
-    // Calculating IP checksum
     iph->check	 = 0;
     iph->check   = compute_cksum((__u16 *)iph, sizeof(struct my_iphdr)/2); 
 
+    /* Build UDP header. */
+    udph->source = htons(current->domain);
+    udph->dest   = htons(666);
+    udph->len    = htons(sizeof(struct my_udphdr) + len);
+    udph->check  = 0;
 
-    // Build UDP header
-    udph->source    = htons(current->domain);
-    udph->dest      = htons(666);
-    udph->len       = htons(sizeof(struct my_udphdr) + len);
-    udph->check     = 0;
-		
-    // Fix Ethernet header
-    memcpy(ethh->h_source, "000000", 6);
-    memcpy(ethh->h_dest, "000000", 6);
+    /* Build the UDP payload. */
+    memcpy((char *)(udph + 1), str, len); 
+
+    /* Fix Ethernet header. */
+    memset(ethh->h_source, 0, ETH_ALEN);
+    memset(ethh->h_dest,   0, ETH_ALEN);
     ethh->h_proto = htons(ETH_P_IP);
-    console_packet->mac.ethernet= (struct ethhdr *)ethh;
+    skb->mac.ethernet= (struct ethhdr *)ethh;
 
-    // Make the packet appear to come off the external NIC so that the 
-    // tables code doesn't get too confused.
-    console_packet->src_vif = VIF_PHYSICAL_INTERFACE;
-    console_packet->dst_vif = 0;
+    /* Keep the net rule tables happy. */
+    skb->src_vif = VIF_PHYSICAL_INTERFACE;
+    skb->dst_vif = 0;
     
     unmap_domain_mem(skb_data);
     
-    // Pass the packet to netif_rx
-    (void)netif_rx(console_packet);
+    (void)netif_rx(skb);
 
     return 1;
 }

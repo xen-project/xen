@@ -356,20 +356,18 @@ int __net_get_target_vif(u8 *data, unsigned int len, int src_vif)
     switch ( ntohs(*(unsigned short *)(data + 12)) )
     {
     case ETH_P_ARP:
-//printk("ARP!\n");
         if ( len < 28 ) goto drop;
         target = net_find_rule((u8)ETH_P_ARP, 0, ntohl(*(u32 *)(nh_raw + 14)),
                         ntohl(*(u32 *)(nh_raw + 24)), 0, 0, 
                         src_vif);
         break;
+
     case ETH_P_IP:
-//printk("IP\n");
         if ( len < 20 ) goto drop;
         h_raw =  data + ((*(unsigned char *)(nh_raw)) & 0x0f) * 4;
         switch ( *(unsigned char *)(nh_raw + 9) )
         {
         case IPPROTO_UDP:
-//printk("UDP!\n");
         case IPPROTO_TCP:
             target = net_find_rule((u8)ETH_P_IP,  *(u8 *)(nh_raw + 9),
                     ntohl(*(u32 *)(nh_raw + 12)),
@@ -378,8 +376,8 @@ int __net_get_target_vif(u8 *data, unsigned int len, int src_vif)
                     ntohs(*(u16 *)(h_raw + 2)), 
                     src_vif);
             break;
+
         default: // ip-based protocol where we don't have ports.
-//printk("Other IP!\n");
             target = net_find_rule((u8)ETH_P_IP,  *(u8 *)(data + 9),
                     ntohl(*(u32 *)(nh_raw + 12)),
                     ntohl(*(u32 *)(nh_raw + 16)),
@@ -388,6 +386,7 @@ int __net_get_target_vif(u8 *data, unsigned int len, int src_vif)
                     src_vif);
         }
         break;
+
     }
     return target;
     

@@ -46,8 +46,6 @@ static void cleanup_module(void);
 
 static struct list_head dev_list;
 
-static unsigned int net_countx;
-
 /*
  * RX RING:   RX_IDX <= rx_cons <= rx_prod
  * TX RING:   TX_IDX <= tx_cons <= tx_prod
@@ -171,15 +169,14 @@ static void network_tx_buf_gc(struct net_device *dev)
 
 inline unsigned long get_ppte(unsigned long addr)
 {
-    unsigned long ppte = 0xdeadbeef;
+    unsigned long ppte;
     pgd_t *pgd; pmd_t *pmd; pte_t *ptep;
     pgd = pgd_offset_k(addr);
 
-    if (pgd_none(*pgd) || pgd_bad(*pgd)) BUG();
+    if ( pgd_none(*pgd) || pgd_bad(*pgd) ) BUG();
         
     pmd = pmd_offset(pgd, addr);
-    if (pmd_none(*pmd)) BUG(); 
-    if (pmd_bad(*pmd)) BUG();
+    if ( pmd_none(*pmd) || pmd_bad(*pmd) ) BUG(); 
         
     ptep = pte_offset(pmd, addr);
     ppte = (unsigned long)phys_to_machine(virt_to_phys(ptep));
@@ -202,7 +199,7 @@ static void network_alloc_rx_buffers(struct net_device *dev)
         skb->dev = dev;
         skb_reserve(skb, 2); /* word align the IP header */
         np->rx_skb_ring[i] = skb;
-        np->net_ring->rx_ring[i].addr = get_ppte(skb->head); 
+        np->net_ring->rx_ring[i].addr = get_ppte((unsigned long)skb->head); 
         np->net_ring->rx_ring[i].size = RX_BUF_SIZE - 16; /* arbitrary */
     }
 
@@ -310,11 +307,10 @@ static void network_rx_int(int irq, void *dev_id, struct pt_regs *ptregs)
         skb->protocol = eth_type_trans(skb, dev);
 
         /*
-         * Set up shinfo -- from alloc_skb This was particularily nasty:  the 
-         * shared info is hidden at the back of the data area (presumably so 
-         * it can be shared), but on page flip it gets very spunked.
+         * Set up shinfo -- from alloc_skb This was particularily nasty:  the
+         * shared info is hidden at the back of the data area (presumably so it
+         * can be shared), but on page flip it gets very spunked.
          */
-
         atomic_set(&(skb_shinfo(skb)->dataref), 1);
         skb_shinfo(skb)->nr_frags = 0;
         skb_shinfo(skb)->frag_list = NULL;
