@@ -73,10 +73,7 @@ static void __refresh_mfn_list(void)
     int ret = HYPERVISOR_dom_mem_op(MEMOP_increase_reservation,
                                     mfn_list, MAX_MFN_ALLOC);
     if ( unlikely(ret != MAX_MFN_ALLOC) )
-    {
-        printk(KERN_ALERT "Unable to increase memory reservation (%d)\n", ret);
         BUG();
-    }
     alloc_index = MAX_MFN_ALLOC;
 }
 
@@ -97,8 +94,8 @@ static void dealloc_mfn(unsigned long mfn)
     spin_lock_irqsave(&mfn_lock, flags);
     if ( alloc_index != MAX_MFN_ALLOC )
         mfn_list[alloc_index++] = mfn;
-    else
-        (void)HYPERVISOR_dom_mem_op(MEMOP_decrease_reservation, &mfn, 1);
+    else if ( HYPERVISOR_dom_mem_op(MEMOP_decrease_reservation, &mfn, 1) != 1 )
+        BUG();
     spin_unlock_irqrestore(&mfn_lock, flags);
 }
 
@@ -238,7 +235,8 @@ static void net_rx_action(unsigned long unused)
         return;
 
     mcl[-2].args[2] = UVMF_FLUSH_TLB;
-    (void)HYPERVISOR_multicall(rx_mcl, mcl - rx_mcl);
+    if ( unlikely(HYPERVISOR_multicall(rx_mcl, mcl - rx_mcl) != 0) )
+        BUG();
 
     mcl = rx_mcl;
     mmu = rx_mmu;
@@ -260,6 +258,10 @@ static void net_rx_action(unsigned long unused)
 
         netif->stats.rx_bytes += size;
         netif->stats.rx_packets++;
+
+        /* The update_va_mapping() must not fail. */
+        if ( unlikely(mcl[0].args[5] != 0) )
+            BUG();
 
         /* Check the reassignment error code. */
         status = NETIF_RSP_OKAY;
@@ -372,14 +374,15 @@ static void net_tx_action(unsigned long unused)
     NETIF_RING_IDX i;
     struct page *page;
     multicall_entry_t *mcl;
+    PEND_RING_IDX dc, dp;
 
-    if ( (i = dealloc_cons) == dealloc_prod )
+    if ( (dc = dealloc_cons) == (dp = dealloc_prod) )
         goto skip_dealloc;
 
     mcl = tx_mcl;
-    while ( i != dealloc_prod )
+    while ( dc != dp )
     {
-        pending_idx = dealloc_ring[MASK_PEND_IDX(i++)];
+        pending_idx = dealloc_ring[MASK_PEND_IDX(dc++)];
         mcl[0].op = __HYPERVISOR_update_va_mapping;
         mcl[0].args[0] = MMAP_VADDR(pending_idx) >> PAGE_SHIFT;
         mcl[0].args[1] = 0;
@@ -388,10 +391,16 @@ static void net_tx_action(unsigned long unused)
     }
 
     mcl[-1].args[2] = UVMF_FLUSH_TLB;
-    (void)HYPERVISOR_multicall(tx_mcl, mcl - tx_mcl);
+    if ( unlikely(HYPERVISOR_multicall(tx_mcl, mcl - tx_mcl) != 0) )
+        BUG();
 
-    while ( dealloc_cons != dealloc_prod )
+    mcl = tx_mcl;
+    while ( dealloc_cons != dp )
     {
+        /* The update_va_mapping() must not fail. */
+        if ( unlikely(mcl[0].args[5] != 0) )
+            BUG();
+
         pending_idx = dealloc_ring[MASK_PEND_IDX(dealloc_cons++)];
 
         netif = pending_tx_info[pending_idx].netif;
@@ -413,6 +422,8 @@ static void net_tx_action(unsigned long unused)
             add_to_net_schedule_list_tail(netif);
         
         netif_put(netif);
+
+        mcl++;
     }
 
  skip_dealloc:
@@ -521,7 +532,8 @@ static void net_tx_action(unsigned long unused)
     if ( mcl == tx_mcl )
         return;
 
-    (void)HYPERVISOR_multicall(tx_mcl, mcl - tx_mcl);
+    if ( unlikely(HYPERVISOR_multicall(tx_mcl, mcl - tx_mcl) != 0) )
+        BUG();
 
     mcl = tx_mcl;
     while ( (skb = __skb_dequeue(&tx_queue)) != NULL )
