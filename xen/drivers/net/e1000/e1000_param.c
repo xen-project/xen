@@ -1,7 +1,7 @@
 /*******************************************************************************
 
   
-  Copyright(c) 1999 - 2002 Intel Corporation. All rights reserved.
+  Copyright(c) 1999 - 2003 Intel Corporation. All rights reserved.
   
   This program is free software; you can redistribute it and/or modify it 
   under the terms of the GNU General Public License as published by the Free 
@@ -63,9 +63,10 @@ MODULE_PARM_DESC(X, S);
 /* Transmit Descriptor Count
  *
  * Valid Range: 80-256 for 82542 and 82543 gigabit ethernet controllers
- * Valid Range: 80-4096 for 82544
+ * Valid Range: 80-4096 for 82544 and newer
  *
- * Default Value: 256
+ * Default Value: 256 for 82542 and 82543 gigabit ethernet controllers
+ * Default Value: 1024 for 82544 and newer
  */
 
 E1000_PARAM(TxDescriptors, "Number of transmit descriptors");
@@ -73,9 +74,9 @@ E1000_PARAM(TxDescriptors, "Number of transmit descriptors");
 /* Receive Descriptor Count
  *
  * Valid Range: 80-256 for 82542 and 82543 gigabit ethernet controllers
- * Valid Range: 80-4096 for 82544
+ * Valid Range: 80-4096 for 82544 and newer
  *
- * Default Value: 80
+ * Default Value: 256
  */
 
 E1000_PARAM(RxDescriptors, "Number of receive descriptors");
@@ -140,7 +141,7 @@ E1000_PARAM(FlowControl, "Flow Control setting");
  * Valid Range: 0, 1
  *  - 0 - disables all checksum offload
  *  - 1 - enables receive IP/TCP/UDP checksum offload
- *        on 82543 based NICs
+ *        on 82543 and newer -based NICs
  *
  * Default Value: 1
  */
@@ -169,7 +170,7 @@ E1000_PARAM(TxAbsIntDelay, "Transmit Absolute Interrupt Delay");
  *
  * Valid Range: 0-65535
  *
- * Default Value: 0/128
+ * Default Value: 0
  */
 
 E1000_PARAM(RxIntDelay, "Receive Interrupt Delay");
@@ -183,6 +184,15 @@ E1000_PARAM(RxIntDelay, "Receive Interrupt Delay");
 
 E1000_PARAM(RxAbsIntDelay, "Receive Absolute Interrupt Delay");
 
+/* Interrupt Throttle Rate (interrupts/sec)
+ *
+ * Valid Range: 100-100000 (0=off, 1=dynamic)
+ *
+ * Default Value: 1
+ */
+
+E1000_PARAM(InterruptThrottleRate, "Interrupt Throttling Rate");
+
 #define AUTONEG_ADV_DEFAULT  0x2F
 #define AUTONEG_ADV_MASK     0x2F
 #define FLOW_CONTROL_DEFAULT FLOW_CONTROL_FULL
@@ -191,8 +201,9 @@ E1000_PARAM(RxAbsIntDelay, "Receive Absolute Interrupt Delay");
 #define MAX_TXD                      256
 #define MIN_TXD                       80
 #define MAX_82544_TXD               4096
+#define DEFAULT_82544_TXD           1024
 
-#define DEFAULT_RXD                   80
+#define DEFAULT_RXD                  256
 #define MAX_RXD                      256
 #define MIN_RXD                       80
 #define MAX_82544_RXD               4096
@@ -212,6 +223,10 @@ E1000_PARAM(RxAbsIntDelay, "Receive Absolute Interrupt Delay");
 #define DEFAULT_TADV                  64
 #define MAX_TXABSDELAY            0xFFFF
 #define MIN_TXABSDELAY                 0
+
+#define DEFAULT_ITR                    1
+#define MAX_ITR                   100000
+#define MIN_ITR                      100
 
 struct e1000_option {
 	enum { enable_option, range_option, list_option } type;
@@ -307,12 +322,15 @@ e1000_check_options(struct e1000_adapter *adapter)
 		struct e1000_option opt = {
 			.type = range_option,
 			.name = "Transmit Descriptors",
-			.err  = "using default of " __MODULE_STRING(DEFAULT_TXD),
-			.def  = DEFAULT_TXD,
 			.arg  = { .r = { .min = MIN_TXD }}
 		};
 		struct e1000_desc_ring *tx_ring = &adapter->tx_ring;
 		e1000_mac_type mac_type = adapter->hw.mac_type;
+		opt.err = mac_type < e1000_82544 ?
+			"using default of " __MODULE_STRING(DEFAULT_TXD) :
+			"using default of " __MODULE_STRING(DEFAULT_82544_TXD);
+		opt.def = mac_type < e1000_82544 ?
+			DEFAULT_TXD : DEFAULT_82544_TXD;
 		opt.arg.r.max = mac_type < e1000_82544 ?
 			MAX_TXD : MAX_82544_TXD;
 
@@ -362,7 +380,8 @@ e1000_check_options(struct e1000_adapter *adapter)
 			.name = "Flow Control",
 			.err  = "reading default settings from EEPROM",
 			.def  = e1000_fc_default,
-			.arg  = { .l = { .nr = ARRAY_SIZE(fc_list), .p = fc_list }}
+			.arg  = { .l = { .nr = ARRAY_SIZE(fc_list),
+					 .p = fc_list }}
 		};
 
 		int fc = FlowControl[bd];
@@ -370,60 +389,81 @@ e1000_check_options(struct e1000_adapter *adapter)
 		adapter->hw.fc = adapter->hw.original_fc = fc;
 	}
 	{ /* Transmit Interrupt Delay */
-		char *tidv = "using default of " __MODULE_STRING(DEFAULT_TIDV);
 		struct e1000_option opt = {
 			.type = range_option,
 			.name = "Transmit Interrupt Delay",
-			.arg  = { .r = { .min = MIN_TXDELAY, .max = MAX_TXDELAY }}
+			.err  = "using default of " __MODULE_STRING(DEFAULT_TIDV),
+			.def  = DEFAULT_TIDV,
+			.arg  = { .r = { .min = MIN_TXDELAY,
+					 .max = MAX_TXDELAY }}
 		};
-		opt.def = DEFAULT_TIDV;
-		opt.err = tidv;
 
 		adapter->tx_int_delay = TxIntDelay[bd];
 		e1000_validate_option(&adapter->tx_int_delay, &opt);
 	}
 	{ /* Transmit Absolute Interrupt Delay */
-		char *tadv = "using default of " __MODULE_STRING(DEFAULT_TADV);
 		struct e1000_option opt = {
 			.type = range_option,
 			.name = "Transmit Absolute Interrupt Delay",
-			.arg  = { .r = { .min = MIN_TXABSDELAY, .max = MAX_TXABSDELAY }}
+			.err  = "using default of " __MODULE_STRING(DEFAULT_TADV),
+			.def  = DEFAULT_TADV,
+			.arg  = { .r = { .min = MIN_TXABSDELAY,
+					 .max = MAX_TXABSDELAY }}
 		};
-		opt.def = DEFAULT_TADV;
-		opt.err = tadv;
 
 		adapter->tx_abs_int_delay = TxAbsIntDelay[bd];
 		e1000_validate_option(&adapter->tx_abs_int_delay, &opt);
 	}
 	{ /* Receive Interrupt Delay */
-		char *rdtr = "using default of " __MODULE_STRING(DEFAULT_RDTR);
 		struct e1000_option opt = {
 			.type = range_option,
 			.name = "Receive Interrupt Delay",
-			.arg  = { .r = { .min = MIN_RXDELAY, .max = MAX_RXDELAY }}
+			.err  = "using default of " __MODULE_STRING(DEFAULT_RDTR),
+			.def  = DEFAULT_RDTR,
+			.arg  = { .r = { .min = MIN_RXDELAY,
+					 .max = MAX_RXDELAY }}
 		};
-		opt.def = DEFAULT_RDTR;
-		opt.err = rdtr;
 
 		adapter->rx_int_delay = RxIntDelay[bd];
 		e1000_validate_option(&adapter->rx_int_delay, &opt);
 	}
 	{ /* Receive Absolute Interrupt Delay */
-		char *radv = "using default of " __MODULE_STRING(DEFAULT_RADV);
 		struct e1000_option opt = {
 			.type = range_option,
 			.name = "Receive Absolute Interrupt Delay",
-			.arg  = { .r = { .min = MIN_RXABSDELAY, .max = MAX_RXABSDELAY }}
+			.err  = "using default of " __MODULE_STRING(DEFAULT_RADV),
+			.def  = DEFAULT_RADV,
+			.arg  = { .r = { .min = MIN_RXABSDELAY,
+					 .max = MAX_RXABSDELAY }}
 		};
-		opt.def = DEFAULT_RADV;
-		opt.err = radv;
 
 		adapter->rx_abs_int_delay = RxAbsIntDelay[bd];
 		e1000_validate_option(&adapter->rx_abs_int_delay, &opt);
 	}
-	
+	{ /* Interrupt Throttling Rate */
+		struct e1000_option opt = {
+			.type = range_option,
+			.name = "Interrupt Throttling Rate (ints/sec)",
+			.err  = "using default of " __MODULE_STRING(DEFAULT_ITR),
+			.def  = DEFAULT_ITR,
+			.arg  = { .r = { .min = MIN_ITR,
+					 .max = MAX_ITR }}
+		};
+
+		adapter->itr = InterruptThrottleRate[bd];
+		if(adapter->itr == 0) {
+			printk(KERN_INFO "%s turned off\n", opt.name);
+		} else if(adapter->itr == 1 || adapter->itr == -1) {
+			/* Dynamic mode */
+			adapter->itr = 1;
+		} else {
+			e1000_validate_option(&adapter->itr, &opt);
+		}
+	}
+
 	switch(adapter->hw.media_type) {
 	case e1000_media_type_fiber:
+	case e1000_media_type_internal_serdes:
 		e1000_check_fiber_options(adapter);
 		break;
 	case e1000_media_type_copper:
@@ -486,7 +526,8 @@ e1000_check_copper_options(struct e1000_adapter *adapter)
 			.name = "Speed",
 			.err  = "parameter ignored",
 			.def  = 0,
-			.arg  = { .l = { .nr = ARRAY_SIZE(speed_list), .p = speed_list }}
+			.arg  = { .l = { .nr = ARRAY_SIZE(speed_list),
+					 .p = speed_list }}
 		};
 
 		speed = Speed[bd];
@@ -502,7 +543,8 @@ e1000_check_copper_options(struct e1000_adapter *adapter)
 			.name = "Duplex",
 			.err  = "parameter ignored",
 			.def  = 0,
-			.arg  = { .l = { .nr = ARRAY_SIZE(dplx_list), .p = dplx_list }}
+			.arg  = { .l = { .nr = ARRAY_SIZE(dplx_list),
+					 .p = dplx_list }}
 		};
 
 		dplx = Duplex[bd];
@@ -554,7 +596,8 @@ e1000_check_copper_options(struct e1000_adapter *adapter)
 			.name = "AutoNeg",
 			.err  = "parameter ignored",
 			.def  = AUTONEG_ADV_DEFAULT,
-			.arg  = { .l = { .nr = ARRAY_SIZE(an_list), .p = an_list }}
+			.arg  = { .l = { .nr = ARRAY_SIZE(an_list),
+					 .p = an_list }}
 		};
 
 		int an = AutoNeg[bd];
@@ -564,7 +607,7 @@ e1000_check_copper_options(struct e1000_adapter *adapter)
 
 	switch (speed + dplx) {
 	case 0:
-		adapter->hw.autoneg = 1;
+		adapter->hw.autoneg = adapter->fc_autoneg = 1;
 		if(Speed[bd] != OPTION_UNSET || Duplex[bd] != OPTION_UNSET)
 			printk(KERN_INFO
 			       "Speed and duplex autonegotiation enabled\n");
@@ -572,14 +615,14 @@ e1000_check_copper_options(struct e1000_adapter *adapter)
 	case HALF_DUPLEX:
 		printk(KERN_INFO "Half Duplex specified without Speed\n");
 		printk(KERN_INFO "Using Autonegotiation at Half Duplex only\n");
-		adapter->hw.autoneg = 1;
+		adapter->hw.autoneg = adapter->fc_autoneg = 1;
 		adapter->hw.autoneg_advertised = ADVERTISE_10_HALF |
 		                                 ADVERTISE_100_HALF;
 		break;
 	case FULL_DUPLEX:
 		printk(KERN_INFO "Full Duplex specified without Speed\n");
 		printk(KERN_INFO "Using Autonegotiation at Full Duplex only\n");
-		adapter->hw.autoneg = 1;
+		adapter->hw.autoneg = adapter->fc_autoneg = 1;
 		adapter->hw.autoneg_advertised = ADVERTISE_10_FULL |
 		                                 ADVERTISE_100_FULL |
 		                                 ADVERTISE_1000_FULL;
@@ -587,38 +630,38 @@ e1000_check_copper_options(struct e1000_adapter *adapter)
 	case SPEED_10:
 		printk(KERN_INFO "10 Mbps Speed specified without Duplex\n");
 		printk(KERN_INFO "Using Autonegotiation at 10 Mbps only\n");
-		adapter->hw.autoneg = 1;
+		adapter->hw.autoneg = adapter->fc_autoneg = 1;
 		adapter->hw.autoneg_advertised = ADVERTISE_10_HALF |
 		                                 ADVERTISE_10_FULL;
 		break;
 	case SPEED_10 + HALF_DUPLEX:
 		printk(KERN_INFO "Forcing to 10 Mbps Half Duplex\n");
-		adapter->hw.autoneg = 0;
+		adapter->hw.autoneg = adapter->fc_autoneg = 0;
 		adapter->hw.forced_speed_duplex = e1000_10_half;
 		adapter->hw.autoneg_advertised = 0;
 		break;
 	case SPEED_10 + FULL_DUPLEX:
 		printk(KERN_INFO "Forcing to 10 Mbps Full Duplex\n");
-		adapter->hw.autoneg = 0;
+		adapter->hw.autoneg = adapter->fc_autoneg = 0;
 		adapter->hw.forced_speed_duplex = e1000_10_full;
 		adapter->hw.autoneg_advertised = 0;
 		break;
 	case SPEED_100:
 		printk(KERN_INFO "100 Mbps Speed specified without Duplex\n");
 		printk(KERN_INFO "Using Autonegotiation at 100 Mbps only\n");
-		adapter->hw.autoneg = 1;
+		adapter->hw.autoneg = adapter->fc_autoneg = 1;
 		adapter->hw.autoneg_advertised = ADVERTISE_100_HALF |
 		                                 ADVERTISE_100_FULL;
 		break;
 	case SPEED_100 + HALF_DUPLEX:
 		printk(KERN_INFO "Forcing to 100 Mbps Half Duplex\n");
-		adapter->hw.autoneg = 0;
+		adapter->hw.autoneg = adapter->fc_autoneg = 0;
 		adapter->hw.forced_speed_duplex = e1000_100_half;
 		adapter->hw.autoneg_advertised = 0;
 		break;
 	case SPEED_100 + FULL_DUPLEX:
 		printk(KERN_INFO "Forcing to 100 Mbps Full Duplex\n");
-		adapter->hw.autoneg = 0;
+		adapter->hw.autoneg = adapter->fc_autoneg = 0;
 		adapter->hw.forced_speed_duplex = e1000_100_full;
 		adapter->hw.autoneg_advertised = 0;
 		break;
@@ -626,20 +669,20 @@ e1000_check_copper_options(struct e1000_adapter *adapter)
 		printk(KERN_INFO "1000 Mbps Speed specified without Duplex\n");
 		printk(KERN_INFO
 		       "Using Autonegotiation at 1000 Mbps Full Duplex only\n");
-		adapter->hw.autoneg = 1;
+		adapter->hw.autoneg = adapter->fc_autoneg = 1;
 		adapter->hw.autoneg_advertised = ADVERTISE_1000_FULL;
 		break;
 	case SPEED_1000 + HALF_DUPLEX:
 		printk(KERN_INFO "Half Duplex is not supported at 1000 Mbps\n");
 		printk(KERN_INFO
 		       "Using Autonegotiation at 1000 Mbps Full Duplex only\n");
-		adapter->hw.autoneg = 1;
+		adapter->hw.autoneg = adapter->fc_autoneg = 1;
 		adapter->hw.autoneg_advertised = ADVERTISE_1000_FULL;
 		break;
 	case SPEED_1000 + FULL_DUPLEX:
 		printk(KERN_INFO
 		       "Using Autonegotiation at 1000 Mbps Full Duplex only\n");
-		adapter->hw.autoneg = 1;
+		adapter->hw.autoneg = adapter->fc_autoneg = 1;
 		adapter->hw.autoneg_advertised = ADVERTISE_1000_FULL;
 		break;
 	default:

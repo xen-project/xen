@@ -1,7 +1,7 @@
 /*******************************************************************************
 
   
-  Copyright(c) 1999 - 2002 Intel Corporation. All rights reserved.
+  Copyright(c) 1999 - 2003 Intel Corporation. All rights reserved.
   
   This program is free software; you can redistribute it and/or modify it 
   under the terms of the GNU General Public License as published by the Free 
@@ -50,7 +50,7 @@
 #include <linux/timer.h>
 #include <linux/slab.h>
 #include <linux/interrupt.h>
-//#include <linux/string.h>
+#include <linux/string.h>
 //#include <linux/pagemap.h>
 #include <asm/bitops.h>
 #include <asm/io.h>
@@ -63,9 +63,18 @@
 //#include <net/pkt_sched.h>
 #include <linux/list.h>
 #include <linux/reboot.h>
-#include <linux/tqueue.h>
+#ifdef NETIF_F_TSO
+#include <net/checksum.h>
+#endif
+#ifdef SIOCGMIIPHY
+#include <linux/mii.h>
+#endif
+#ifdef SIOCETHTOOL
 #include <linux/ethtool.h>
+#endif
+#ifdef NETIF_F_HW_VLAN_TX
 #include <linux/if_vlan.h>
+#endif
 
 #define BAR_0		0
 #define BAR_1		1
@@ -73,11 +82,9 @@
 #define PCI_DMA_64BIT	0xffffffffffffffffULL
 #define PCI_DMA_32BIT	0x00000000ffffffffULL
 
+#include "kcompat.h"
 
 struct e1000_adapter;
-
-// XEN XXX
-// #define DBG 1
 
 #include "e1000_hw.h"
 
@@ -97,6 +104,15 @@ struct e1000_adapter;
 #define E1000_RXBUFFER_8192  8192
 #define E1000_RXBUFFER_16384 16384
 
+/* SmartSpeed delimiters */
+#define E1000_SMARTSPEED_DOWNSHIFT 3
+#define E1000_SMARTSPEED_MAX       15
+
+/* Packet Buffer allocations */
+#define E1000_TX_FIFO_SIZE_SHIFT 0xA
+#define E1000_TX_HEAD_ADDR_SHIFT 7
+#define E1000_PBA_TX_MASK 0xFFFF0000
+
 /* Flow Control High-Watermark: 43464 bytes */
 #define E1000_FC_HIGH_THRESH 0xA9C8
 
@@ -109,13 +125,15 @@ struct e1000_adapter;
 /* How many Tx Descriptors do we need to call netif_wake_queue ? */
 #define E1000_TX_QUEUE_WAKE	16
 /* How many Rx Buffers do we bundle into one write to the hardware ? */
-#define E1000_RX_BUFFER_WRITE	16
-
-#define E1000_JUMBO_PBA      0x00000028
-#define E1000_DEFAULT_PBA    0x00000030
+#define E1000_RX_BUFFER_WRITE	16	/* Must be power of 2 */
 
 #define AUTO_ALL_MODES       0
-#define E1000_EEPROM_APME    4
+#define E1000_EEPROM_APME    0x0400
+
+#ifndef E1000_MASTER_SLAVE
+/* Switch to override PHY master/slave setting */
+#define E1000_MASTER_SLAVE	e1000_ms_hw_default
+#endif
 
 /* only works for sizes that are powers of 2 */
 #define E1000_ROUNDUP(i, size) ((i) = (((i) + (size) - 1) & ~((size) - 1)))
@@ -127,6 +145,7 @@ struct e1000_buffer {
 	uint64_t dma;
 	unsigned long length;
 	unsigned long time_stamp;
+	unsigned int next_to_watch;
 };
 
 struct e1000_desc_ring {
@@ -147,7 +166,8 @@ struct e1000_desc_ring {
 };
 
 #define E1000_DESC_UNUSED(R) \
-((((R)->next_to_clean + (R)->count) - ((R)->next_to_use + 1)) % ((R)->count))
+	((((R)->next_to_clean > (R)->next_to_use) ? 0 : (R)->count) + \
+	(R)->next_to_clean - (R)->next_to_use - 1)
 
 #define E1000_GET_DESC(R, i, type)	(&(((struct type *)((R).desc))[i]))
 #define E1000_RX_DESC(R, i)		E1000_GET_DESC(R, i, e1000_rx_desc)
@@ -157,29 +177,40 @@ struct e1000_desc_ring {
 /* board specific private data structure */
 
 struct e1000_adapter {
+	struct timer_list tx_fifo_stall_timer;
 	struct timer_list watchdog_timer;
 	struct timer_list phy_info_timer;
+#ifdef NETIF_F_HW_VLAN_TX
 	struct vlan_group *vlgrp;
-	char *id_string;
+#endif
 	uint32_t bd_number;
 	uint32_t rx_buffer_len;
 	uint32_t part_num;
 	uint32_t wol;
+	uint32_t smartspeed;
 	uint16_t link_speed;
 	uint16_t link_duplex;
 	spinlock_t stats_lock;
 	atomic_t irq_sem;
-	struct tq_struct tx_timeout_task;
+	struct work_struct tx_timeout_task;
+    	uint8_t fc_autoneg;
 
+#ifdef ETHTOOL_PHYS_ID
 	struct timer_list blink_timer;
 	unsigned long led_status;
+#endif
 
 	/* TX */
 	struct e1000_desc_ring tx_ring;
 	uint32_t txd_cmd;
 	uint32_t tx_int_delay;
 	uint32_t tx_abs_int_delay;
-	int max_data_per_txd;
+	uint32_t gotcl;
+	uint32_t tx_fifo_head;
+	uint32_t tx_head_addr;
+	uint32_t tx_fifo_size;
+	atomic_t tx_fifo_stall;
+	boolean_t pcix_82544;
 
 	/* RX */
 	struct e1000_desc_ring rx_ring;
@@ -188,6 +219,10 @@ struct e1000_adapter {
 	uint32_t rx_int_delay;
 	uint32_t rx_abs_int_delay;
 	boolean_t rx_csum;
+	uint32_t gorcl;
+
+	/* Interrupt Throttle Rate */
+	uint32_t itr;
 
 	/* OS defined structs */
 	struct net_device *netdev;
@@ -200,10 +235,25 @@ struct e1000_adapter {
 	struct e1000_phy_info phy_info;
 	struct e1000_phy_stats phy_stats;
 
-	uint32_t pci_state[16];
-	char ifname[IFNAMSIZ];
+#ifdef ETHTOOL_TEST
+	uint32_t test_icr;
+	struct e1000_desc_ring test_tx_ring;
+	struct e1000_desc_ring test_rx_ring;
+#endif
 
-	/* All new definitions should go below this point! */
-	spinlock_t tx_lock;
+#ifdef E1000_COUNT_ICR
+	uint64_t icr_txdw;
+	uint64_t icr_txqe;
+	uint64_t icr_lsc;
+	uint64_t icr_rxseq;
+	uint64_t icr_rxdmt;
+	uint64_t icr_rxo;
+	uint64_t icr_rxt;
+	uint64_t icr_mdac;
+	uint64_t icr_rxcfg;
+	uint64_t icr_gpi;
+#endif
+
+	uint32_t pci_state[16];
 };
 #endif /* _E1000_H_ */
