@@ -1,3 +1,5 @@
+/* -*-  Mode:C; c-basic-offset:4; tab-width:4; indent-tabs-mode:nil -*- */
+
 #ifndef __SCHED_H__
 #define __SCHED_H__
 
@@ -70,11 +72,7 @@ struct exec_domain
 
 #ifdef ARCH_HAS_EXEC_DOMAIN_MM_PTR
     struct mm_struct *mm;
-#else
-    struct mm_struct mm;
 #endif
-
-    struct thread_struct thread;
 
     struct ac_timer  timer;         /* one-shot timer for timeout values */
 
@@ -89,8 +87,8 @@ struct exec_domain
     u16 virq_to_evtchn[NR_VIRQS];
 
     atomic_t pausecnt;
-    arch_exec_domain_t arch;
 
+    struct arch_exec_domain arch;
 };
 
 /*
@@ -107,7 +105,8 @@ struct exec_domain
 #define UNLOCK_BIGLOCK(_d) spin_unlock_recursive(&(_d)->big_lock)
 #endif
 
-struct domain {
+struct domain
+{
     domid_t          id;
     s_time_t         create_time;
 
@@ -115,8 +114,6 @@ struct domain {
     spinlock_t       time_lock;
 
     spinlock_t       big_lock;
-
-    l1_pgentry_t    *mm_perdomain_pt;
 
     spinlock_t       page_alloc_lock; /* protects all the following fields  */
     struct list_head page_list;       /* linked list, of size tot_pages     */
@@ -157,7 +154,8 @@ struct domain {
     atomic_t refcnt;
 
     struct exec_domain *exec_domain[MAX_VIRT_CPUS];
-    arch_domain_t arch;
+
+    struct arch_domain arch;
 };
 
 struct domain_setup_info

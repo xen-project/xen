@@ -172,21 +172,21 @@ int physdev_pci_access_modify(
 
     /* Now, setup access to the IO ports and memory regions for the device. */
 
-    if ( ed->thread.io_bitmap == NULL )
+    if ( ed->arch.io_bitmap == NULL )
     {
-        if ( (ed->thread.io_bitmap = xmalloc_array(u8, IOBMP_BYTES)) == NULL )
+        if ( (ed->arch.io_bitmap = xmalloc_array(u8, IOBMP_BYTES)) == NULL )
         {
             rc = -ENOMEM;
             goto out;
         }
-        memset(ed->thread.io_bitmap, 0xFF, IOBMP_BYTES);
+        memset(ed->arch.io_bitmap, 0xFF, IOBMP_BYTES);
 
-        ed->thread.io_bitmap_sel = ~0ULL;
+        ed->arch.io_bitmap_sel = ~0ULL;
 
         for_each_exec_domain(p, edc) {
             if (edc == ed)
                 continue;
-            edc->thread.io_bitmap = ed->thread.io_bitmap;
+            edc->arch.io_bitmap = ed->arch.io_bitmap;
         }
     }
 
@@ -204,8 +204,8 @@ int physdev_pci_access_modify(
                  "for device %s\n", dom, r->start, r->end, pdev->slot_name);
             for ( j = r->start; j < r->end + 1; j++ )
             {
-                clear_bit(j, ed->thread.io_bitmap);
-                clear_bit(j / IOBMP_BITS_PER_SELBIT, &ed->thread.io_bitmap_sel);
+                clear_bit(j, ed->arch.io_bitmap);
+                clear_bit(j / IOBMP_BITS_PER_SELBIT, &ed->arch.io_bitmap_sel);
             }
         }
 
@@ -215,7 +215,7 @@ int physdev_pci_access_modify(
     for_each_exec_domain(p, edc) {
         if (edc == ed)
             continue;
-        edc->thread.io_bitmap_sel = ed->thread.io_bitmap_sel;
+        edc->arch.io_bitmap_sel = ed->arch.io_bitmap_sel;
     }
 
  out:

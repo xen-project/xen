@@ -1,3 +1,4 @@
+/* -*-  Mode:C; c-basic-offset:4; tab-width:4; indent-tabs-mode:nil -*- */
 /*
  *	x86 SMP booting functions
  *
@@ -662,7 +663,7 @@ static void __init do_boot_cpu (int apicid)
 
     set_bit(DF_IDLETASK, &idle->d_flags);
 
-    ed->mm.pagetable = mk_pagetable(__pa(idle_pg_table));
+    ed->arch.pagetable = mk_pagetable(__pa(idle_pg_table));
 
     map_cpu_to_boot_apicid(cpu, apicid);
 

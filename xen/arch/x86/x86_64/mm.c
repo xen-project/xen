@@ -1,3 +1,4 @@
+/* -*-  Mode:C; c-basic-offset:4; tab-width:4; indent-tabs-mode:nil -*- */
 /******************************************************************************
  * arch/x86/x86_64/mm.c
  * 
@@ -220,7 +221,7 @@ static void __synchronise_pagetables(void *mask)
     struct exec_domain *ed = current;
     if ( ((unsigned long)mask & (1 << ed->processor)) &&
          is_idle_task(ed->domain) )
-        write_ptbase(&ed->mm);
+        write_ptbase(ed);
 }
 void synchronise_pagetables(unsigned long cpu_mask)
 {
@@ -232,8 +233,8 @@ long do_stack_switch(unsigned long ss, unsigned long esp)
 {
     if ( (ss & 3) != 3 )
         return -EPERM;
-    current->thread.guestos_ss = ss;
-    current->thread.guestos_sp = esp;
+    current->arch.guestos_ss = ss;
+    current->arch.guestos_sp = esp;
     return 0;
 }
 
@@ -346,9 +347,9 @@ void destroy_gdt(struct exec_domain *ed)
 
     for ( i = 0; i < 16; i++ )
     {
-        if ( (pfn = l1_pgentry_to_pagenr(ed->mm.perdomain_ptes[i])) != 0 )
+        if ( (pfn = l1_pgentry_to_pagenr(ed->arch.perdomain_ptes[i])) != 0 )
             put_page_and_type(&frame_table[pfn]);
-        ed->mm.perdomain_ptes[i] = mk_l1_pgentry(0);
+        ed->arch.perdomain_ptes[i] = mk_l1_pgentry(0);
     }
 }
 
@@ -402,7 +403,7 @@ long set_gdt(struct exec_domain *ed,
 
     /* Install the new GDT. */
     for ( i = 0; i < nr_pages; i++ )
-        ed->mm.perdomain_ptes[i] =
+        ed->arch.perdomain_ptes[i] =
             mk_l1_pgentry((frames[i] << PAGE_SHIFT) | __PAGE_HYPERVISOR);
 
     SET_GDT_ADDRESS(ed, GDT_VIRT_START(ed));
@@ -432,7 +433,7 @@ long do_set_gdt(unsigned long *frame_list, unsigned int entries)
     if ( (ret = set_gdt(current, frames, entries)) == 0 )
     {
         local_flush_tlb();
-        __asm__ __volatile__ ("lgdt %0" : "=m" (*current->mm.gdt));
+        __asm__ __volatile__ ("lgdt %0" : "=m" (*current->arch.gdt));
     }
 
     return ret;
@@ -461,7 +462,7 @@ long do_update_descriptor(
     {
     case PGT_gdt_page:
         /* Disallow updates of Xen-reserved descriptors in the current GDT. */
-        if ( (l1_pgentry_to_pagenr(current->mm.perdomain_ptes[0]) == pfn) &&
+        if ( (l1_pgentry_to_pagenr(current->arch.perdomain_ptes[0]) == pfn) &&
              (((pa&(PAGE_SIZE-1))>>3) >= FIRST_RESERVED_GDT_ENTRY) &&
              (((pa&(PAGE_SIZE-1))>>3) <= LAST_RESERVED_GDT_ENTRY) )
             goto out;

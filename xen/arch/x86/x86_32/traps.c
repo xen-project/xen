@@ -1,3 +1,4 @@
+/* -*-  Mode:C; c-basic-offset:4; tab-width:4; indent-tabs-mode:nil -*- */
 
 #include <xen/config.h>
 #include <xen/init.h>
@@ -208,8 +209,8 @@ long set_fast_trap(struct exec_domain *p, int idx)
     if ( idx == 0 )
     {
         if ( p == current )
-            CLEAR_FAST_TRAP(&p->thread);
-        SET_DEFAULT_FAST_TRAP(&p->thread);
+            CLEAR_FAST_TRAP(&p->arch);
+        SET_DEFAULT_FAST_TRAP(&p->arch);
         return 0;
     }
 
@@ -221,7 +222,7 @@ long set_fast_trap(struct exec_domain *p, int idx)
     if ( (idx != 0x80) && ((idx < 0x20) || (idx > 0x2f)) ) 
         return -1;
 
-    ti = p->thread.traps + idx;
+    ti = p->arch.traps + idx;
 
     /*
      * We can't virtualise interrupt gates, as there's no way to get
@@ -231,15 +232,15 @@ long set_fast_trap(struct exec_domain *p, int idx)
         return -1;
 
     if ( p == current )
-        CLEAR_FAST_TRAP(&p->thread);
+        CLEAR_FAST_TRAP(&p->arch);
 
-    p->thread.fast_trap_idx    = idx;
-    p->thread.fast_trap_desc.a = (ti->cs << 16) | (ti->address & 0xffff);
-    p->thread.fast_trap_desc.b = 
+    p->arch.fast_trap_idx    = idx;
+    p->arch.fast_trap_desc.a = (ti->cs << 16) | (ti->address & 0xffff);
+    p->arch.fast_trap_desc.b = 
         (ti->address & 0xffff0000) | 0x8f00 | (TI_GET_DPL(ti)&3)<<13;
 
     if ( p == current )
-        SET_FAST_TRAP(&p->thread);
+        SET_FAST_TRAP(&p->arch);
 
     return 0;
 }

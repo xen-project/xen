@@ -1,3 +1,4 @@
+/* -*-  Mode:C; c-basic-offset:4; tab-width:4; indent-tabs-mode:nil -*- */
 
 #include <xen/config.h>
 #include <xen/init.h>
@@ -308,7 +309,7 @@ void __init cpu_init(void)
     /* Set up GDT and IDT. */
     SET_GDT_ENTRIES(current, DEFAULT_GDT_ENTRIES);
     SET_GDT_ADDRESS(current, DEFAULT_GDT_ADDRESS);
-    __asm__ __volatile__ ( "lgdt %0" : "=m" (*current->mm.gdt) );
+    __asm__ __volatile__ ( "lgdt %0" : "=m" (*current->arch.gdt) );
     __asm__ __volatile__ ( "lidt %0" : "=m" (idt_descr) );
 
     /* No nested task. */
@@ -338,7 +339,7 @@ void __init cpu_init(void)
     percpu_traps_init();
 
     /* Install correct page table. */
-    write_ptbase(&current->mm);
+    write_ptbase(current);
 
     init_idle_task();
 }

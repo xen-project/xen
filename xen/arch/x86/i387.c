@@ -1,3 +1,4 @@
+/* -*-  Mode:C; c-basic-offset:4; tab-width:4; indent-tabs-mode:nil -*- */
 /*
  *  linux/arch/i386/kernel/i387.c
  *
@@ -24,10 +25,10 @@ static inline void __save_init_fpu( struct exec_domain *tsk )
 {
     if ( cpu_has_fxsr ) {
         asm volatile( "fxsave %0 ; fnclex"
-                      : "=m" (tsk->thread.i387) );
+                      : "=m" (tsk->arch.i387) );
     } else {
         asm volatile( "fnsave %0 ; fwait"
-                      : "=m" (tsk->thread.i387) );
+                      : "=m" (tsk->arch.i387) );
     }
     clear_bit(EDF_USEDFPU, &tsk->ed_flags);
 }
@@ -48,9 +49,9 @@ void restore_fpu( struct exec_domain *tsk )
 {
     if ( cpu_has_fxsr ) {
         asm volatile( "fxrstor %0"
-                      : : "m" (tsk->thread.i387) );
+                      : : "m" (tsk->arch.i387) );
     } else {
         asm volatile( "frstor %0"
-                      : : "m" (tsk->thread.i387) );
+                      : : "m" (tsk->arch.i387) );
     }
 }

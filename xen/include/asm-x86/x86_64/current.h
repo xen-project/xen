@@ -1,3 +1,5 @@
+/* -*-  Mode:C; c-basic-offset:4; tab-width:4; indent-tabs-mode:nil -*- */
+
 #ifndef _X86_64_CURRENT_H
 #define _X86_64_CURRENT_H
 
@@ -44,6 +46,6 @@ static inline unsigned long get_stack_top(void)
         "movq %0,%%rsp; jmp "STR(__fn)                            \
         : : "r" (get_execution_context()) )
 
-#define schedule_tail(_d) ((_d)->thread.schedule_tail)(_d)
+#define schedule_tail(_ed) ((_ed)->arch.schedule_tail)(_ed)
 
 #endif /* !(_X86_64_CURRENT_H) */
