@@ -1,5 +1,5 @@
 /******************************************************************************
- * xend_utils.c
+ * utils.c
  * 
  * Copyright (c) 2004, K A Fraser
  */
@@ -409,7 +409,7 @@ static PyObject *xu_port_write_request(PyObject *self, PyObject *args)
 
     if ( !PyObject_TypeCheck((PyObject *)xum, &xu_message_type) )
     {
-        PyErr_SetString(PyExc_TypeError, "expected a xend_utils.message");
+        PyErr_SetString(PyExc_TypeError, "expected a xend.utils.message");
         return NULL;        
     }
 
@@ -467,7 +467,7 @@ static PyObject *xu_port_write_response(PyObject *self, PyObject *args)
 
     if ( !PyObject_TypeCheck((PyObject *)xum, &xu_message_type) )
     {
-        PyErr_SetString(PyExc_TypeError, "expected a xend_utils.message");
+        PyErr_SetString(PyExc_TypeError, "expected a xend.utils.message");
         return NULL;        
     }
 
@@ -994,13 +994,13 @@ static PyMethodDef xu_methods[] = {
     { NULL, NULL, 0, NULL }
 };
 
-PyMODINIT_FUNC initxend_utils(void)
+PyMODINIT_FUNC initutils(void)
 {
     PyObject *m, *d;
 
-    m = Py_InitModule("xend_utils", xu_methods);
+    m = Py_InitModule("xend.utils", xu_methods);
 
     d = PyModule_GetDict(m);
-    port_error = PyErr_NewException("xend_utils.PortError", NULL, NULL);
+    port_error = PyErr_NewException("xend.utils.PortError", NULL, NULL);
     PyDict_SetItemString(d, "PortError", port_error);
 }

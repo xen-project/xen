@@ -89,9 +89,12 @@
 3fbd4bd6GtGwZGxYUJPOheYIR7bPaA tools/xc/py/XenoUtil.py
 3fbd0a40yT6G3M9hMpaz5xTUdl0E4g tools/xc/py/setup.py
 40431ac64Hj4ixUnKmlugZKhXPFE_Q tools/xend/Makefile
+4055ad95Se-FqttgxollqOAAHB94zA tools/xend/lib/__init__.py
+4055ad97wMLUj0BZT0e_T0EwQN0Bvw tools/xend/lib/console.py
+4054a301VEag2GwrBrFBna5U1BGlLA tools/xend/lib/main.py
+4055ad9ah9IuC3sJT2c_gYIFY5Tw_g tools/xend/lib/manager.py
+40431ac8wrUEj-XM7B8smFtx_HA7lQ tools/xend/lib/utils.c
 4054a2fdkdATEnRw-U7AUlgu-6JiUA tools/xend/setup.py
-4054a301VEag2GwrBrFBna5U1BGlLA tools/xend/xend.py
-40431ac8wrUEj-XM7B8smFtx_HA7lQ tools/xend/xend_utils.c
 403a3edbrr8RE34gkbR40zep98SXbg tools/xentrace/Makefile
 4050c413PhhLNAYk3TEwP37i_iLw9Q tools/xentrace/xentrace.8
 403a3edbVpV2E_wq1zeEkJ_n4Uu2eg tools/xentrace/xentrace.c
