@@ -308,3 +308,25 @@ int final_setup_guestos(struct domain *p, dom0_builddomain_t *builddomain)
         xfree(c);
     return rc;
 }
+
+long vm_assist(struct domain *p, unsigned int cmd, unsigned int type)
+{
+    if ( type > MAX_VMASST_TYPE )
+        return -EINVAL;
+
+    switch ( cmd )
+    {
+    case VMASST_CMD_enable:
+        set_bit(type, &p->vm_assist);
+        if (vm_assist_info[type].enable)
+            (*vm_assist_info[type].enable)(p);
+        return 0;
+    case VMASST_CMD_disable:
+        clear_bit(type, &p->vm_assist);
+        if (vm_assist_info[type].disable)
+            (*vm_assist_info[type].disable)(p);
+        return 0;
+    }
+
+    return -ENOSYS;
+}

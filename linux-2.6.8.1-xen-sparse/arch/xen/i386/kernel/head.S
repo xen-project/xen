@@ -1,9 +1,15 @@
 
+#include <linux/config.h>
+
 .section __xen_guest
-	.asciz "GUEST_OS=linux,GUEST_VER=2.6,XEN_VER=2.0"
+	.ascii	"GUEST_OS=linux,GUEST_VER=2.6,XEN_VER=2.0"
+	.ascii	",LOADER=generic"
+#ifdef CONFIG_XEN_WRITABLE_PAGETABLES
+	.ascii	",PT_MODE_WRITABLE"
+#endif
+	.byte	0
 
 .text
-#include <linux/config.h>
 #include <linux/threads.h>
 #include <linux/linkage.h>
 #include <asm/segment.h>

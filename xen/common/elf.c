@@ -18,10 +18,7 @@ static inline int is_loadable_phdr(Elf_Phdr *phdr)
 
 int parseelfimage(char *elfbase, 
                   unsigned long elfsize,
-                  unsigned long *pvirtstart,
-                  unsigned long *pkernstart,
-                  unsigned long *pkernend,
-                  unsigned long *pkernentry)
+                  struct domain_setup_info *dsi)
 {
     Elf_Ehdr *ehdr = (Elf_Ehdr *)elfbase;
     Elf_Phdr *phdr;
@@ -109,13 +106,16 @@ int parseelfimage(char *elfbase,
         return -EINVAL;
     }
 
-    *pvirtstart = kernstart;
+    dsi->v_start = kernstart;
     if ( (p = strstr(guestinfo, "VIRT_BASE=")) != NULL )
-        *pvirtstart = simple_strtoul(p+10, &p, 0);
+        dsi->v_start = simple_strtoul(p+10, &p, 0);
 
-    *pkernstart = kernstart;
-    *pkernend   = kernend;
-    *pkernentry = ehdr->e_entry;
+    if ( (p = strstr(guestinfo, "PT_MODE_WRITABLE")) != NULL )
+        dsi->use_writable_pagetables = 1;
+
+    dsi->v_kernstart = kernstart;
+    dsi->v_kernend   = kernend;
+    dsi->v_kernentry = ehdr->e_entry;
 
     return 0;
 }

@@ -363,8 +363,8 @@ int memguard_is_guarded(void *p);
 
 
 typedef struct {
-    void	(*enable)(void);
-    void	(*disable)(void);
+    void	(*enable)(struct domain *);
+    void	(*disable)(struct domain *);
 } vm_assist_info_t;
 extern vm_assist_info_t vm_assist_info[];
 

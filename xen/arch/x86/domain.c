@@ -557,10 +557,7 @@ int construct_dom0(struct domain *p,
      * *_start address are page-aligned, except v_start (and v_end) which are 
      * superpage-aligned.
      */
-    unsigned long v_start;
-    unsigned long vkern_start;
-    unsigned long vkern_entry;
-    unsigned long vkern_end;
+    struct domain_setup_info dsi;
     unsigned long vinitrd_start;
     unsigned long vinitrd_end;
     unsigned long vphysmap_start;
@@ -584,6 +581,8 @@ int construct_dom0(struct domain *p,
     if ( test_bit(DF_CONSTRUCTED, &p->flags) ) 
         BUG();
 
+    memset(&dsi, 0, sizeof(struct domain_setup_info));
+
     printk("*** LOADING DOMAIN 0 ***\n");
 
     /*
@@ -598,12 +597,11 @@ int construct_dom0(struct domain *p,
      * We'll have to revisit this if we ever support PAE (64GB).
      */
 
-    rc = parseelfimage(image_start, image_len, &v_start,
-                       &vkern_start, &vkern_end, &vkern_entry);
+    rc = parseelfimage(image_start, image_len, &dsi);
     if ( rc != 0 )
         return rc;
 
-    if ( (v_start & (PAGE_SIZE-1)) != 0 )
+    if ( (dsi.v_start & (PAGE_SIZE-1)) != 0 )
     {
         printk("Initial guest OS must load to a page boundary.\n");
         return -EINVAL;
@@ -618,7 +616,7 @@ int construct_dom0(struct domain *p,
      */
     for ( nr_pt_pages = 2; ; nr_pt_pages++ )
     {
-        vinitrd_start    = round_pgup(vkern_end);
+        vinitrd_start    = round_pgup(dsi.v_kernend);
         vinitrd_end      = vinitrd_start + initrd_len;
         vphysmap_start   = round_pgup(vinitrd_end);
         vphysmap_end     = vphysmap_start + (nr_pages * sizeof(unsigned long));
@@ -631,7 +629,7 @@ int construct_dom0(struct domain *p,
         v_end            = (vstack_end + (1<<22)-1) & ~((1<<22)-1);
         if ( (v_end - vstack_end) < (512 << 10) )
             v_end += 1 << 22; /* Add extra 4MB to get >= 512kB padding. */
-        if ( (((v_end - v_start + ((1<<L2_PAGETABLE_SHIFT)-1)) >> 
+        if ( (((v_end - dsi.v_start + ((1<<L2_PAGETABLE_SHIFT)-1)) >> 
                L2_PAGETABLE_SHIFT) + 1) <= nr_pt_pages )
             break;
     }
@@ -651,20 +649,20 @@ int construct_dom0(struct domain *p,
            " Start info:    %08lx->%08lx\n"
            " Boot stack:    %08lx->%08lx\n"
            " TOTAL:         %08lx->%08lx\n",
-           vkern_start, vkern_end, 
+           dsi.v_kernstart, dsi.v_kernend, 
            vinitrd_start, vinitrd_end,
            vphysmap_start, vphysmap_end,
            vpt_start, vpt_end,
            vstartinfo_start, vstartinfo_end,
            vstack_start, vstack_end,
-           v_start, v_end);
-    printk(" ENTRY ADDRESS: %08lx\n", vkern_entry);
+           dsi.v_start, v_end);
+    printk(" ENTRY ADDRESS: %08lx\n", dsi.v_kernentry);
 
-    if ( (v_end - v_start) > (nr_pages * PAGE_SIZE) )
+    if ( (v_end - dsi.v_start) > (nr_pages * PAGE_SIZE) )
     {
         printk("Initial guest OS requires too much space\n"
                "(%luMB is greater than %luMB limit)\n",
-               (v_end-v_start)>>20, (nr_pages<<PAGE_SHIFT)>>20);
+               (v_end-dsi.v_start)>>20, (nr_pages<<PAGE_SHIFT)>>20);
         return -ENOMEM;
     }
 
@@ -672,7 +670,7 @@ int construct_dom0(struct domain *p,
      * Protect the lowest 1GB of memory. We use a temporary mapping there
      * from which we copy the kernel and ramdisk images.
      */
-    if ( v_start < (1<<30) )
+    if ( dsi.v_start < (1<<30) )
     {
         printk("Initial loading isn't allowed to lowest 1GB of memory.\n");
         return -EINVAL;
@@ -691,7 +689,7 @@ int construct_dom0(struct domain *p,
         p->tot_pages++; p->max_pages++;
     }
 
-    mpt_alloc = (vpt_start - v_start) + alloc_start;
+    mpt_alloc = (vpt_start - dsi.v_start) + alloc_start;
 
     SET_GDT_ENTRIES(p, DEFAULT_GDT_ENTRIES);
     SET_GDT_ADDRESS(p, DEFAULT_GDT_ADDRESS);
@@ -715,9 +713,9 @@ int construct_dom0(struct domain *p,
         mk_l2_pgentry(__pa(p->mm.perdomain_pt) | __PAGE_HYPERVISOR);
     p->mm.pagetable = mk_pagetable((unsigned long)l2start);
 
-    l2tab += l2_table_offset(v_start);
+    l2tab += l2_table_offset(dsi.v_start);
     mfn = alloc_start >> PAGE_SHIFT;
-    for ( count = 0; count < ((v_end-v_start)>>PAGE_SHIFT); count++ )
+    for ( count = 0; count < ((v_end-dsi.v_start)>>PAGE_SHIFT); count++ )
     {
         if ( !((unsigned long)l1tab & (PAGE_SIZE-1)) )
         {
@@ -726,7 +724,7 @@ int construct_dom0(struct domain *p,
             *l2tab++ = mk_l2_pgentry((unsigned long)l1start | L2_PROT);
             clear_page(l1tab);
             if ( count == 0 )
-                l1tab += l1_table_offset(v_start);
+                l1tab += l1_table_offset(dsi.v_start);
         }
         *l1tab++ = mk_l1_pgentry((mfn << PAGE_SHIFT) | L1_PROT);
         
@@ -762,7 +760,7 @@ int construct_dom0(struct domain *p,
             page->u.inuse.type_info &= ~PGT_type_mask;
             page->u.inuse.type_info |= PGT_l1_page_table;
 	    page->u.inuse.type_info |= 
-		((v_start>>L2_PAGETABLE_SHIFT)+(count-1))<<PGT_va_shift;
+		((dsi.v_start>>L2_PAGETABLE_SHIFT)+(count-1))<<PGT_va_shift;
 
             get_page(page, p); /* an extra ref because of readable mapping */
         }
@@ -770,6 +768,10 @@ int construct_dom0(struct domain *p,
         if( !((unsigned long)l1tab & (PAGE_SIZE - 1)) )
             l1start = l1tab = (l1_pgentry_t *)l2_pgentry_to_phys(*l2tab);
     }
+
+    /* Set up domain options */
+    if (dsi.use_writable_pagetables)
+        vm_assist(p, VMASST_CMD_enable, VMASST_TYPE_writable_pagetables);
 
     /* Set up shared-info area. */
     update_dom_time(p->shared_info);
@@ -804,7 +806,7 @@ int construct_dom0(struct domain *p,
     {
         mfn = pfn + (alloc_start>>PAGE_SHIFT);
 #ifndef NDEBUG
-#define REVERSE_START ((v_end - v_start) >> PAGE_SHIFT)
+#define REVERSE_START ((v_end - dsi.v_start) >> PAGE_SHIFT)
         if ( pfn > REVERSE_START )
             mfn = (alloc_end>>PAGE_SHIFT) - (pfn - REVERSE_START);
 #endif
@@ -854,7 +856,7 @@ int construct_dom0(struct domain *p,
     shadow_mode_enable(&p->mm, SHM_test); 
 #endif
 
-    new_thread(p, vkern_entry, vstack_end, vstartinfo_start);
+    new_thread(p, dsi.v_kernentry, vstack_end, vstartinfo_start);
 
     return 0;
 }

@@ -525,8 +525,6 @@ typedef struct {
 #endif
 
 extern int loadelfimage(char *);
-extern int parseelfimage(
-    char *, unsigned long, unsigned long *,
-    unsigned long *, unsigned long *, unsigned long *);
+extern int parseelfimage(char *, unsigned long, struct domain_setup_info *);
 
 #endif /* __XEN_ELF_H__ */

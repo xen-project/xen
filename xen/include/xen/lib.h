@@ -14,10 +14,13 @@
 #define reserve_bootmem(_p,_l) \
 printk("Memory Reservation 0x%lx, %lu bytes\n", (_p), (_l))
 
+struct domain;
+
 /* kernel.c */
 #define printk printf
 void printf(const char *format, ...);
 void panic(const char *format, ...);
+long vm_assist(struct domain *, unsigned int, unsigned int);
 
 /* vsprintf.c */
 extern int sprintf(char * buf, const char * fmt, ...)

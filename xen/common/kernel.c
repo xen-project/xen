@@ -365,24 +365,7 @@ long do_xen_version(int cmd)
 
 long do_vm_assist(unsigned int cmd, unsigned int type)
 {
-    if ( type > MAX_VMASST_TYPE )
-        return -EINVAL;
-
-    switch ( cmd )
-    {
-    case VMASST_CMD_enable:
-        set_bit(type, &current->vm_assist);
-        if (vm_assist_info[type].enable)
-            (*vm_assist_info[type].enable)();
-        return 0;
-    case VMASST_CMD_disable:
-        clear_bit(type, &current->vm_assist);
-        if (vm_assist_info[type].disable)
-            (*vm_assist_info[type].disable)();
-        return 0;
-    }
-
-    return -ENOSYS;
+    return vm_assist(current, cmd, type);
 }
 
 long do_ni_hypercall(void)
