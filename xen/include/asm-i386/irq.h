@@ -8,6 +8,7 @@
 
 #define SA_INTERRUPT    0x20000000
 #define SA_SHIRQ        0x04000000
+#define SA_NOPROFILE	0x02000000
 
 #define SA_SAMPLE_RANDOM  0   /* Linux driver compatibility */
 
