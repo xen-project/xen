@@ -70,7 +70,7 @@ shadow_promote(struct domain *d, unsigned long gpfn, unsigned long gmfn,
         min_type = PGT_l1_shadow;
         max_type = PGT_l1_shadow;
     }
-    FSH_LOG("shadow_promote gpfn=%p gmfn=%p nt=%p min=%p max=%p\n",
+    FSH_LOG("shadow_promote gpfn=%p gmfn=%p nt=%p min=%p max=%p",
             gmfn, gmfn, new_type, min_type, max_type);
 
     if ( min_type <= max_type )
@@ -388,7 +388,12 @@ release_out_of_sync_entry(struct domain *d, struct out_of_sync_entry *entry)
     // Only use entries that have low bits clear...
     //
     if ( !(entry->writable_pl1e & (sizeof(l1_pgentry_t)-1)) )
+    {
         put_shadow_ref(entry->writable_pl1e >> PAGE_SHIFT);
+        entry->writable_pl1e = -2;
+    }
+    else
+        ASSERT( entry->writable_pl1e == -1 );
 
     // Free the snapshot
     //
@@ -399,38 +404,63 @@ static void remove_out_of_sync_entries(struct domain *d, unsigned long gmfn)
 {
     struct out_of_sync_entry *entry = d->arch.out_of_sync;
     struct out_of_sync_entry **prev = &d->arch.out_of_sync;
+    struct out_of_sync_entry *found = NULL;
 
+    // NB: Be careful not to call something that manipulates this list
+    //     while walking it.  Collect the results into a separate list
+    //     first, then walk that list.
+    //
     while ( entry )
     {
         if ( entry->gmfn == gmfn )
         {
-            release_out_of_sync_entry(d, entry);
-            *prev = entry = entry->next;
+            // remove from out of sync list
+            *prev = entry->next;
+
+            // add to found list
+            entry->next = found;
+            found = entry;
+
+            entry = *prev;
             continue;
         }
         prev = &entry->next;
         entry = entry->next;
+    }
+
+    prev = NULL;
+    entry = found;
+    while ( entry )
+    {
+        release_out_of_sync_entry(d, entry);
+
+        prev = &entry->next;
+        entry = entry->next;
+    }
+
+    // Add found list to free list
+    if ( prev )
+    {
+        *prev = d->arch.out_of_sync_free;
+        d->arch.out_of_sync_free = found;
     }
 }
 
 static void free_out_of_sync_state(struct domain *d)
 {
     struct out_of_sync_entry *entry;
-    struct out_of_sync_entry **tail = NULL;
 
-    // Add the list of out-of-sync entries to the free list of entries.
-    // Not the smartest code.  But it works.
+    // NB: Be careful not to call something that manipulates this list
+    //     while walking it.  Remove one item at a time, and always
+    //     restart from start of list.
     //
-    for ( entry = d->arch.out_of_sync; entry; entry = entry->next)
+    while ( (entry = d->arch.out_of_sync) )
     {
+        d->arch.out_of_sync = entry->next;
         release_out_of_sync_entry(d, entry);
-        tail = &entry->next;
-    }
-    if ( tail )
-    {
-        *tail = d->arch.out_of_sync_free;
-        d->arch.out_of_sync_free = d->arch.out_of_sync;
-        d->arch.out_of_sync = NULL;
+
+        entry->next = d->arch.out_of_sync_free;
+        d->arch.out_of_sync_free = entry;
     }
 }
 
@@ -1515,7 +1545,7 @@ static u32 remove_all_write_access_in_ptpage(
                 put_page_from_l1e(mk_l1_pgentry(old), d);
 
             FSH_LOG("removed write access to mfn=%p in smfn=%p entry %x "
-                    "is_l1_shadow=%d\n",
+                    "is_l1_shadow=%d",
                     readonly_mfn, pt_mfn, i, is_l1_shadow);
         }
     }

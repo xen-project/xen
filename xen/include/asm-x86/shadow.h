@@ -375,8 +375,9 @@ put_shadow_ref(unsigned long smfn)
 
     if ( unlikely(x == 0) )
     {
-        printk("put_shadow_ref underflow, gmfn=%p smfn=%p\n",
-               frame_table[smfn].u.inuse.type_info & PGT_mfn_mask, smfn);
+        printk("put_shadow_ref underflow, oc=%p t=%p\n",
+               frame_table[smfn].count_info,
+               frame_table[smfn].u.inuse.type_info);
         BUG();
     }
 
@@ -745,6 +746,9 @@ static void shadow_audit(struct domain *d, int print)
         BUG();
     }
 #endif
+
+    // XXX ought to add some code to audit the out-of-sync entries, too.
+    //
 }
 #else
 #define shadow_audit(p, print) ((void)0)
@@ -1041,6 +1045,7 @@ static inline void set_shadow_status(
     {
         if ( x->gpfn_and_flags == key )
         {
+            BUG();
             x->smfn = smfn;
             goto done;
         }
