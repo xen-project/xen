@@ -361,7 +361,13 @@ int main(int argc, char **argv)
         return 1;
     }
 
-    domain_id = atol(argv[1]);
+    domain_id = atoi(argv[1]);
+    if ( domain_id == 0 )
+    {
+        ERROR("Did you really mean domain 0?");
+        return 1;
+    }
+
     if ( (tot_pages = get_tot_pages(domain_id)) < 0 )
     {
         PERROR("Could not find total pages for domain");
