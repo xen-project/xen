@@ -540,7 +540,7 @@ mcl_queue_pt_update(vm_offset_t va, vm_paddr_t ma)
     MCL_QUEUE[MCL_IDX].op = __HYPERVISOR_update_va_mapping;
     MCL_QUEUE[MCL_IDX].args[0] = (unsigned long)va;
     MCL_QUEUE[MCL_IDX].args[1] = (unsigned long)ma;
-    MCL_QUEUE[MCL_IDX].args[2] = UVMF_INVLPG_LOCAL;
+    MCL_QUEUE[MCL_IDX].args[2] = UVMF_INVLPG|UVMF_LOCAL;
     mcl_increment_idx();
 }
 

@@ -388,7 +388,7 @@ static void network_alloc_rx_buffers(struct net_device *dev)
     }
 
     /* After all PTEs have been zapped we blow away stale TLB entries. */
-    rx_mcl[i-1].args[2] = UVMF_TLB_FLUSH_ALL;
+    rx_mcl[i-1].args[2] = UVMF_TLB_FLUSH|UVMF_ALL;
 
     /* Give away a batch of pages. */
     rx_mcl[i].op = __HYPERVISOR_dom_mem_op;

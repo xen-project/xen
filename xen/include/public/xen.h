@@ -135,11 +135,11 @@
  * linear_addr: Linear address to be flushed from the local TLB.
  * 
  * cmd: MMUEXT_TLB_FLUSH_MULTI
- * cpuset: Set of VCPUs to be flushed.
+ * cpuset: Pointer to bitmap of VCPUs to be flushed.
  * 
  * cmd: MMUEXT_INVLPG_MULTI
  * linear_addr: Linear address to be flushed.
- * cpuset: Set of VCPUs to be flushed.
+ * cpuset: Pointer to bitmap of VCPUs to be flushed.
  * 
  * cmd: MMUEXT_TLB_FLUSH_ALL
  * No additional arguments. Flushes all VCPUs' TLBs.
@@ -188,17 +188,21 @@ struct mmuext_op {
         /* SET_LDT */
         unsigned int nr_ents;
         /* TLB_FLUSH_MULTI, INVLPG_MULTI */
-        unsigned long cpuset;
+        void *cpuset;
     };
 };
 #endif
 
 /* These are passed as 'flags' to update_va_mapping. They can be ORed. */
-#define UVMF_TLB_FLUSH_LOCAL    1 /* Flush local CPU's TLB.          */
-#define UVMF_INVLPG_LOCAL       2 /* Flush VA from local CPU's TLB.  */
-#define UVMF_TLB_FLUSH_ALL      3 /* Flush all TLBs.                 */
-#define UVMF_INVLPG_ALL         4 /* Flush VA from all TLBs.         */
-#define UVMF_FLUSH_MASK         7
+/* When specifying UVMF_MULTI, also OR in a pointer to a CPU bitmap.   */
+/* UVMF_LOCAL is merely UVMF_MULTI with a NULL bitmap pointer.         */
+#define UVMF_NONE               (0UL)    /* No flushing at all.   */
+#define UVMF_TLB_FLUSH          (1UL<<0) /* Flush entire TLB(s).  */
+#define UVMF_INVLPG             (2UL<<0) /* Flush only one entry. */
+#define UVMF_FLUSHTYPE_MASK     (3UL<<0)
+#define UVMF_MULTI              (0UL<<1) /* Flush subset of TLBs. */
+#define UVMF_LOCAL              (0UL<<2) /* Flush local TLB.      */
+#define UVMF_ALL                (1UL<<2) /* Flush all TLBs.       */
 
 /*
  * Commands to HYPERVISOR_sched_op().

@@ -1329,6 +1329,25 @@ static int set_foreigndom(unsigned int cpu, domid_t domid)
     return okay;
 }
 
+static inline unsigned long vcpuset_to_pcpuset(
+    struct domain *d, unsigned long vset)
+{
+    unsigned int  vcpu;
+    unsigned long pset = 0;
+    struct exec_domain *ed;
+
+    while ( vset != 0 )
+    {
+        vcpu = find_first_set_bit(vset);
+        vset &= ~(1UL << vcpu);
+        if ( (vcpu < MAX_VIRT_CPUS) &&
+             ((ed = d->exec_domain[vcpu]) != NULL) )
+            pset |= 1UL << ed->processor;
+    }
+
+    return pset;
+}
+
 int do_mmuext_op(
     struct mmuext_op *uops,
     unsigned int count,
@@ -1478,19 +1497,17 @@ int do_mmuext_op(
         case MMUEXT_TLB_FLUSH_MULTI:
         case MMUEXT_INVLPG_MULTI:
         {
-            unsigned long inset = op.cpuset, outset = 0;
-            while ( inset != 0 )
+            unsigned long vset, pset;
+            if ( unlikely(get_user(vset, (unsigned long *)op.cpuset)) )
             {
-                unsigned int vcpu = find_first_set_bit(inset);
-                inset &= ~(1UL<<vcpu);
-                if ( (vcpu < MAX_VIRT_CPUS) &&
-                     ((ed = d->exec_domain[vcpu]) != NULL) )
-                    outset |= 1UL << ed->processor;
+                okay = 0;
+                break;
             }
+            pset = vcpuset_to_pcpuset(d, vset);
             if ( op.cmd == MMUEXT_TLB_FLUSH_MULTI )
-                flush_tlb_mask(outset & d->cpuset);
+                flush_tlb_mask(pset & d->cpuset);
             else
-                flush_tlb_one_mask(outset & d->cpuset, op.linear_addr);
+                flush_tlb_one_mask(pset & d->cpuset, op.linear_addr);
             break;
         }
 
@@ -1999,6 +2016,7 @@ int do_update_va_mapping(unsigned long va,
     struct exec_domain *ed  = current;
     struct domain      *d   = ed->domain;
     unsigned int        cpu = ed->processor;
+    unsigned long       vset, pset, bmap_ptr;
     int                 rc = 0;
 
     perfc_incrc(calls_to_update_va);
@@ -2013,11 +2031,6 @@ int do_update_va_mapping(unsigned long va,
 
     cleanup_writable_pagetable(d);
 
-    /*
-     * XXX When we make this support 4MB superpages we should also deal with 
-     * the case of updating L2 entries.
-     */
-
     if ( unlikely(!mod_l1_entry(&linear_pg_table[l1_linear_offset(va)],
                                 mk_l1_pgentry(val))) )
         rc = -EINVAL;
@@ -2025,21 +2038,42 @@ int do_update_va_mapping(unsigned long va,
     if ( unlikely(shadow_mode_enabled(d)) )
         update_shadow_va_mapping(va, val, ed, d);
 
-    switch ( flags & UVMF_FLUSH_MASK )
+    switch ( flags & UVMF_FLUSHTYPE_MASK )
     {
-    case UVMF_TLB_FLUSH_LOCAL:
-        local_flush_tlb();
-        percpu_info[cpu].deferred_ops &= ~DOP_FLUSH_TLB;
+    case UVMF_TLB_FLUSH:
+        switch ( (bmap_ptr = flags & ~UVMF_FLUSHTYPE_MASK) )
+        {
+        case UVMF_LOCAL:
+            local_flush_tlb();
+            break;
+        case UVMF_ALL:
+            flush_tlb_mask(d->cpuset);
+            break;
+        default:
+            if ( unlikely(get_user(vset, (unsigned long *)bmap_ptr)) )
+                rc = -EFAULT;
+            pset = vcpuset_to_pcpuset(d, vset);
+            flush_tlb_mask(pset & d->cpuset);
+            break;
+        }
         break;
-    case UVMF_TLB_FLUSH_ALL:
-        flush_tlb_mask(d->cpuset);
-        percpu_info[cpu].deferred_ops &= ~DOP_FLUSH_TLB;
-        break;
-    case UVMF_INVLPG_LOCAL:
-        local_flush_tlb_one(va);
-        break;
-    case UVMF_INVLPG_ALL:
-        flush_tlb_one_mask(d->cpuset, va);
+
+    case UVMF_INVLPG:
+        switch ( (bmap_ptr = flags & ~UVMF_FLUSHTYPE_MASK) )
+        {
+        case UVMF_LOCAL:
+            local_flush_tlb_one(va);
+            break;
+        case UVMF_ALL:
+            flush_tlb_one_mask(d->cpuset, va);
+            break;
+        default:
+            if ( unlikely(get_user(vset, (unsigned long *)bmap_ptr)) )
+                rc = -EFAULT;
+            pset = vcpuset_to_pcpuset(d, vset);
+            flush_tlb_one_mask(pset & d->cpuset, va);
+            break;
+        }
         break;
     }
 
