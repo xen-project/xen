@@ -371,11 +371,15 @@ extern vm_assist_info_t vm_assist_info[];
 
 /* Writable Pagetables */
 typedef struct {
-    long disconnected_pteidx;
-    l1_pgentry_t disconnected_page[ENTRIES_PER_L1_PAGETABLE];
     unsigned long disconnected_l1va;
+    l1_pgentry_t *disconnected_page;
+    long disconnected_pteidx;
+    unsigned long disconnected_pte;
+    l1_pgentry_t *disconnected_pl1e;
     unsigned long writable_l1va;
-    l1_pgentry_t writable_page[ENTRIES_PER_L1_PAGETABLE];
+    l1_pgentry_t *writable_page;
+    unsigned long writable_pte;
+    l1_pgentry_t *writable_pl1e;
 } __cacheline_aligned ptwr_info_t;
 
 extern ptwr_info_t ptwr_info[];
