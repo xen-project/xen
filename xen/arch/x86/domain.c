@@ -45,13 +45,18 @@
 static int opt_noreboot = 0;
 boolean_param("noreboot", opt_noreboot);
 
+struct percpu_ctxt {
+    struct exec_domain *curr_ed;
+} __cacheline_aligned;
+static struct percpu_ctxt percpu_ctxt[NR_CPUS];
+
 static void default_idle(void)
 {
-    __cli();
+    local_irq_disable();
     if ( !softirq_pending(smp_processor_id()) )
         safe_halt();
     else
-        __sti();
+        local_irq_enable();
 }
 
 static __attribute_used__ void idle_loop(void)
@@ -73,6 +78,8 @@ void startup_cpu_idle_loop(void)
 {
     /* Just some sanity to ensure that the scheduler is set up okay. */
     ASSERT(current->domain->id == IDLE_DOMAIN_ID);
+    percpu_ctxt[smp_processor_id()].curr_ed = current;
+    set_bit(smp_processor_id(), &current->domain->cpuset);
     domain_unpause_by_systemcontroller(current->domain);
     raise_softirq(SCHEDULE_SOFTIRQ);
     do_softirq();
@@ -110,7 +117,7 @@ void machine_restart(char * __unused)
             safe_halt();
     }
 
-    __sti();
+    local_irq_enable();
 
     /* Ensure we are the boot CPU. */
     if ( GET_APIC_ID(apic_read(APIC_ID)) != boot_cpu_physical_apicid )
@@ -307,10 +314,10 @@ unsigned long alloc_monitor_pagetable(struct exec_domain *ed)
     struct pfn_info *mmfn_info;
     struct domain *d = ed->domain;
 
-    ASSERT(!pagetable_val(ed->arch.monitor_table)); /* we should only get called once */
+    ASSERT(pagetable_val(ed->arch.monitor_table) == 0);
 
     mmfn_info = alloc_domheap_page(NULL);
-    ASSERT( mmfn_info ); 
+    ASSERT(mmfn_info != NULL); 
 
     mmfn = (unsigned long) (mmfn_info - frame_table);
     mpl2e = (l2_pgentry_t *) map_domain_mem(mmfn << PAGE_SHIFT);
@@ -326,7 +333,7 @@ unsigned long alloc_monitor_pagetable(struct exec_domain *ed)
 
     ed->arch.monitor_vtable = mpl2e;
 
-    // map the phys_to_machine map into the Read-Only MPT space for this domain
+    /* Map the p2m map into the Read-Only MPT space for this domain. */
     mpl2e[l2_table_offset(RO_MPT_VIRT_START)] =
         mk_l2_pgentry(pagetable_val(ed->arch.phys_table) | __PAGE_HYPERVISOR);
 
@@ -578,18 +585,9 @@ void toggle_guest_mode(struct exec_domain *ed)
         : "=r" (__r) : "r" (value), "0" (__r) );\
     __r; })
 
-static void switch_segments(
-    struct xen_regs *regs, struct exec_domain *p, struct exec_domain *n)
+static void load_segments(struct exec_domain *p, struct exec_domain *n)
 {
     int all_segs_okay = 1;
-
-    if ( !is_idle_task(p->domain) )
-    {
-        __asm__ __volatile__ ( "movl %%ds,%0" : "=m" (p->arch.user_ctxt.ds) );
-        __asm__ __volatile__ ( "movl %%es,%0" : "=m" (p->arch.user_ctxt.es) );
-        __asm__ __volatile__ ( "movl %%fs,%0" : "=m" (p->arch.user_ctxt.fs) );
-        __asm__ __volatile__ ( "movl %%gs,%0" : "=m" (p->arch.user_ctxt.gs) );
-    }
 
     /* Either selector != 0 ==> reload. */
     if ( unlikely(p->arch.user_ctxt.ds |
@@ -654,7 +652,8 @@ static void switch_segments(
 
     if ( unlikely(!all_segs_okay) )
     {
-        unsigned long *rsp =
+        struct xen_regs *regs = get_execution_context();
+        unsigned long   *rsp =
             (n->arch.flags & TF_kernel_mode) ?
             (unsigned long *)regs->rsp : 
             (unsigned long *)n->arch.kernel_sp;
@@ -689,6 +688,24 @@ static void switch_segments(
     }
 }
 
+static void save_segments(struct exec_domain *p)
+{
+    __asm__ __volatile__ ( "movl %%ds,%0" : "=m" (p->arch.user_ctxt.ds) );
+    __asm__ __volatile__ ( "movl %%es,%0" : "=m" (p->arch.user_ctxt.es) );
+    __asm__ __volatile__ ( "movl %%fs,%0" : "=m" (p->arch.user_ctxt.fs) );
+    __asm__ __volatile__ ( "movl %%gs,%0" : "=m" (p->arch.user_ctxt.gs) );
+}
+
+static void clear_segments(void)
+{
+    __asm__ __volatile__ (
+        "movl %0,%%ds; "
+        "movl %0,%%es; "
+        "movl %0,%%fs; "
+        "movl %0,%%gs; swapgs; movl %0,%%gs"
+        : : "r" (0) );
+}
+
 long do_switch_to_user(void)
 {
     struct xen_regs       *regs = get_execution_context();
@@ -720,80 +737,96 @@ long do_switch_to_user(void)
 
 #elif defined(__i386__)
 
-#define switch_segments(_r, _p, _n) ((void)0)
+#define load_segments(_p, _n) ((void)0)
+#define save_segments(_p)     ((void)0)
+#define clear_segments()      ((void)0)
 
 #endif
 
-/*
- * This special macro can be used to load a debugging register
- */
 #define loaddebug(_ed,_reg) \
-		__asm__("mov %0,%%db" #_reg  \
-			: /* no output */ \
-			:"r" ((_ed)->debugreg[_reg]))
+	__asm__ __volatile__ ("mov %0,%%db" #_reg : : "r" ((_ed)->debugreg[_reg]))
 
-void context_switch(struct exec_domain *prev_p, struct exec_domain *next_p)
+static void __context_switch(void)
 {
-#ifdef __i386__
-    struct tss_struct *tss = init_tss + smp_processor_id();
-#endif
     execution_context_t *stack_ec = get_execution_context();
+    unsigned int         cpu = smp_processor_id();
+    struct exec_domain  *p = percpu_ctxt[cpu].curr_ed;
+    struct exec_domain  *n = current;
 
-    __cli();
-
-    /* Switch guest general-register state. */
-    if ( !is_idle_task(prev_p->domain) )
+    if ( !is_idle_task(p->domain) )
     {
-        memcpy(&prev_p->arch.user_ctxt,
+        memcpy(&p->arch.user_ctxt,
                stack_ec, 
                sizeof(*stack_ec));
-        unlazy_fpu(prev_p);
-        CLEAR_FAST_TRAP(&prev_p->arch);
+        unlazy_fpu(p);
+        CLEAR_FAST_TRAP(&p->arch);
+        save_segments(p);
     }
 
-    if ( !is_idle_task(next_p->domain) )
+    memcpy(stack_ec,
+           &n->arch.user_ctxt,
+           sizeof(*stack_ec));
+
+    /* Maybe switch the debug registers. */
+    if ( unlikely(n->arch.debugreg[7]) )
     {
-        memcpy(stack_ec,
-               &next_p->arch.user_ctxt,
-               sizeof(*stack_ec));
+        loaddebug(&n->arch, 0);
+        loaddebug(&n->arch, 1);
+        loaddebug(&n->arch, 2);
+        loaddebug(&n->arch, 3);
+        /* no 4 and 5 */
+        loaddebug(&n->arch, 6);
+        loaddebug(&n->arch, 7);
+    }
 
-        /* Maybe switch the debug registers. */
-        if ( unlikely(next_p->arch.debugreg[7]) )
-        {
-            loaddebug(&next_p->arch, 0);
-            loaddebug(&next_p->arch, 1);
-            loaddebug(&next_p->arch, 2);
-            loaddebug(&next_p->arch, 3);
-            /* no 4 and 5 */
-            loaddebug(&next_p->arch, 6);
-            loaddebug(&next_p->arch, 7);
-        }
-
-        if ( !VMX_DOMAIN(next_p) )
-        {
-            SET_FAST_TRAP(&next_p->arch);
+    if ( !VMX_DOMAIN(n) )
+    {
+        SET_FAST_TRAP(&n->arch);
 
 #ifdef __i386__
+        {
             /* Switch the kernel ring-1 stack. */
-            tss->esp1 = next_p->arch.kernel_sp;
-            tss->ss1  = next_p->arch.kernel_ss;
-#endif
+            struct tss_struct *tss = &init_tss[cpu];
+            tss->esp1 = n->arch.kernel_sp;
+            tss->ss1  = n->arch.kernel_ss;
         }
-
-        /* Switch page tables. */
-        write_ptbase(next_p);
+#endif
     }
 
-    set_current(next_p);
+    set_bit(cpu, &n->domain->cpuset);
+    write_ptbase(n);
+    clear_bit(cpu, &p->domain->cpuset);
 
-    __asm__ __volatile__ ("lgdt %0" : "=m" (*next_p->arch.gdt));
+    __asm__ __volatile__ ( "lgdt %0" : "=m" (*n->arch.gdt) );
 
-    __sti();
+    percpu_ctxt[cpu].curr_ed = n;
+}
 
-    if ( !VMX_DOMAIN(next_p) )
+
+void context_switch(struct exec_domain *prev, struct exec_domain *next)
+{
+    struct exec_domain *realprev;
+
+    local_irq_disable();
+
+    set_current(next);
+
+    if ( ((realprev = percpu_ctxt[smp_processor_id()]. curr_ed) == next) || 
+         is_idle_task(next->domain) )
     {
-        load_LDT(next_p);
-        switch_segments(stack_ec, prev_p, next_p);
+        local_irq_enable();
+    }
+    else
+    {
+        __context_switch();
+
+        local_irq_enable();
+        
+        if ( !VMX_DOMAIN(next) )
+        {
+            load_LDT(next);
+            load_segments(realprev, next);
+        }
     }
 
     /*
@@ -802,11 +835,25 @@ void context_switch(struct exec_domain *prev_p, struct exec_domain *next_p)
      * 'prev' (after this point, a dying domain's info structure may be freed
      * without warning). 
      */
-    clear_bit(EDF_RUNNING, &prev_p->ed_flags);
+    clear_bit(EDF_RUNNING, &prev->ed_flags);
 
-    schedule_tail(next_p);
+    schedule_tail(next);
 
     BUG();
+}
+
+static void __synchronise_lazy_execstate(void *unused)
+{
+    if ( percpu_ctxt[smp_processor_id()].curr_ed != current )
+    {
+        __context_switch();
+        load_LDT(current);
+        clear_segments();
+    }
+}
+void synchronise_lazy_execstate(unsigned long cpuset)
+{
+    smp_subset_call_function(__synchronise_lazy_execstate, NULL, 1, cpuset);
 }
 
 unsigned long __hypercall_create_continuation(
@@ -947,12 +994,10 @@ void domain_relinquish_memory(struct domain *d)
 {
     struct exec_domain *ed;
 
-    /* Ensure that noone is running over the dead domain's page tables. */
-    synchronise_pagetables(~0UL);
+    BUG_ON(d->cpuset != 0);
 
     /* Release device mappings of other domains */
     gnttab_release_dev_mappings( d->grant_table );
-
 
     /* Exit shadow mode before deconstructing final guest page table. */
     shadow_mode_disable(d);

@@ -384,7 +384,6 @@ int shadow_mode_control(struct domain *d, dom0_shadow_control_t *sc)
     }   
 
     domain_pause(d);
-    synchronise_pagetables(~0UL);
 
     shadow_lock(d);
 

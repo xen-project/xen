@@ -266,7 +266,6 @@ long do_dom0_op(dom0_op_t *u_dom0_op)
         else
         {
             exec_domain_pause(ed);
-            synchronise_pagetables(~0UL);
             if ( ed->processor != (cpu % smp_num_cpus) )
                 set_bit(EDF_MIGRATED, &ed->ed_flags);
             set_bit(EDF_CPUPINNED, &ed->ed_flags);

@@ -192,7 +192,6 @@ void sched_add_domain(struct exec_domain *ed)
 
 void sched_rem_domain(struct exec_domain *ed) 
 {
-
     rem_ac_timer(&ed->timer);
     SCHED_OP(rem_task, ed);
     TRACE_3D(TRC_SCHED_DOM_REM, ed->domain->id, ed->eid, ed);

@@ -59,9 +59,7 @@
  */
 
 /*
- * the following functions deal with sending IPIs between CPUs.
- *
- * We use 'broadcast', CPU->CPU IPIs and self-IPIs too.
+ * The following functions deal with sending IPIs between CPUs.
  */
 
 static inline int __prepare_ICR (unsigned int shortcut, int vector)
@@ -82,22 +80,22 @@ static inline void __send_IPI_shortcut(unsigned int shortcut, int vector)
      * of the value read we use an atomic rmw access to avoid costly
      * cli/sti.  Otherwise we use an even cheaper single atomic write
      * to the APIC.
-	 */
+     */
     unsigned int cfg;
 
     /*
-	 * Wait for idle.
-	 */
+     * Wait for idle.
+     */
     apic_wait_icr_idle();
 
     /*
-	 * No need to touch the target chip field
-	 */
+     * No need to touch the target chip field
+     */
     cfg = __prepare_ICR(shortcut, vector);
 
     /*
-	 * Send the IPI. The write to APIC_ICR fires this off.
-	 */
+     * Send the IPI. The write to APIC_ICR fires this off.
+     */
     apic_write_around(APIC_ICR, cfg);
 }
 
@@ -111,105 +109,43 @@ static inline void send_IPI_mask(int mask, int vector)
     unsigned long cfg;
     unsigned long flags;
 
-    __save_flags(flags);
-    __cli();
+    local_irq_save(flags);
 
-		
     /*
      * Wait for idle.
      */
     apic_wait_icr_idle();
-		
+
     /*
      * prepare target chip field
      */
     cfg = __prepare_ICR2(mask);
     apic_write_around(APIC_ICR2, cfg);
-		
+
     /*
      * program the ICR 
      */
     cfg = __prepare_ICR(0, vector);
-			
+
     /*
      * Send the IPI. The write to APIC_ICR fires this off.
      */
     apic_write_around(APIC_ICR, cfg);
 
-    __restore_flags(flags);
+    local_irq_restore(flags);
 }
 
 static inline void send_IPI_allbutself(int vector)
 {
     /*
-     * if there are no other CPUs in the system then
-     * we get an APIC send error if we try to broadcast.
-     * thus we have to avoid sending IPIs in this case.
+     * If there are no other CPUs in the system then we get an APIC send error 
+     * if we try to broadcast. thus we have to avoid sending IPIs in this case.
      */
-    if (!(smp_num_cpus > 1))
+    if ( smp_num_cpus <= 1 )
         return;
 
     __send_IPI_shortcut(APIC_DEST_ALLBUT, vector);
 }
-
-/*
- * ********* XEN NOTICE **********
- * I've left the following comments lying around as they look liek they might
- * be useful to get multiprocessor guest OSes going. However, I suspect the
- * issues we face will be quite different so I've ripped out all the
- * TLBSTATE logic (I didn't understand it anyway :-). These comments do
- * not apply to Xen, therefore! -- Keir (8th Oct 2003).
- */
-/*
- *	Smarter SMP flushing macros. 
- *		c/o Linus Torvalds.
- *
- *	These mean you can really definitely utterly forget about
- *	writing to user space from interrupts. (Its not allowed anyway).
- *
- *	Optimizations Manfred Spraul <manfred@colorfullife.com>
- *
- * The flush IPI assumes that a thread switch happens in this order:
- * [cpu0: the cpu that switches]
- * 1) switch_mm() either 1a) or 1b)
- * 1a) thread switch to a different mm
- * 1a1) clear_bit(cpu, &old_mm.cpu_vm_mask);
- * 	Stop ipi delivery for the old mm. This is not synchronized with
- * 	the other cpus, but smp_invalidate_interrupt ignore flush ipis
- * 	for the wrong mm, and in the worst case we perform a superflous
- * 	tlb flush.
- * 1a2) set cpu_tlbstate to TLBSTATE_OK
- * 	Now the smp_invalidate_interrupt won't call leave_mm if cpu0
- *	was in lazy tlb mode.
- * 1a3) update cpu_tlbstate[].active_mm
- * 	Now cpu0 accepts tlb flushes for the new mm.
- * 1a4) set_bit(cpu, &new_mm.cpu_vm_mask);
- * 	Now the other cpus will send tlb flush ipis.
- * 1a4) change cr3.
- * 1b) thread switch without mm change
- *	cpu_tlbstate[].active_mm is correct, cpu0 already handles
- *	flush ipis.
- * 1b1) set cpu_tlbstate to TLBSTATE_OK
- * 1b2) test_and_set the cpu bit in cpu_vm_mask.
- * 	Atomically set the bit [other cpus will start sending flush ipis],
- * 	and test the bit.
- * 1b3) if the bit was 0: leave_mm was called, flush the tlb.
- * 2) switch %%esp, ie current
- *
- * The interrupt must handle 2 special cases:
- * - cr3 is changed before %%esp, ie. it cannot use current->{active_,}mm.
- * - the cpu performs speculative tlb reads, i.e. even if the cpu only
- *   runs in kernel space, the cpu could load tlb entries for user space
- *   pages.
- *
- * The good news is that cpu_tlbstate is local to each cpu, no
- * write/read ordering problems.
- *
- * TLB flush IPI:
- *
- * 1) Flush the tlb entries if the cpu uses the mm that's being flushed.
- * 2) Leave the mm if we are in the lazy tlb mode.
- */
 
 static spinlock_t flush_lock = SPIN_LOCK_UNLOCKED;
 static unsigned long flush_cpumask;
@@ -226,21 +162,19 @@ void flush_tlb_mask(unsigned long mask)
 {
     ASSERT(local_irq_is_enabled());
     
-    if ( mask & (1 << smp_processor_id()) )
+    if ( mask & (1UL << smp_processor_id()) )
     {
         local_flush_tlb();
-        mask &= ~(1 << smp_processor_id());
+        mask &= ~(1UL << smp_processor_id());
     }
 
     if ( mask != 0 )
     {
         spin_lock(&flush_lock);
-
         flush_cpumask = mask;
         send_IPI_mask(mask, INVALIDATE_TLB_VECTOR);
         while ( flush_cpumask != 0 )
             cpu_relax();
-
         spin_unlock(&flush_lock);
     }
 }
@@ -254,7 +188,8 @@ void new_tlbflush_clock_period(void)
     if ( smp_num_cpus > 1 )
     {
         spin_lock(&flush_lock);
-        flush_cpumask = ((1 << smp_num_cpus) - 1) & ~(1 << smp_processor_id());
+        flush_cpumask  = (1UL << smp_num_cpus) - 1;
+        flush_cpumask &= ~(1UL << smp_processor_id());
         send_IPI_allbutself(INVALIDATE_TLB_VECTOR);
         while ( flush_cpumask != 0 )
             cpu_relax();
@@ -266,124 +201,138 @@ void new_tlbflush_clock_period(void)
     tlbflush_clock++;
 }
 
-static void flush_tlb_all_pge_ipi(void* info)
+static void flush_tlb_all_pge_ipi(void *info)
 {
     __flush_tlb_pge();
 }
 
 void flush_tlb_all_pge(void)
 {
-    smp_call_function (flush_tlb_all_pge_ipi,0,1,1);
+    smp_call_function(flush_tlb_all_pge_ipi, 0, 1, 1);
     __flush_tlb_pge();
 }
 
 void smp_send_event_check_mask(unsigned long cpu_mask)
 {
-    cpu_mask &= ~(1<<smp_processor_id());
+    cpu_mask &= ~(1UL << smp_processor_id());
     if ( cpu_mask != 0 )
         send_IPI_mask(cpu_mask, EVENT_CHECK_VECTOR);
 }
 
 /*
- * Structure and data for smp_call_function(). This is designed to minimise
- * static memory requirements. It also looks cleaner.
+ * Structure and data for smp_call_function().
  */
-static spinlock_t call_lock = SPIN_LOCK_UNLOCKED;
 
 struct call_data_struct {
     void (*func) (void *info);
     void *info;
-    atomic_t started;
-    atomic_t finished;
+    unsigned long started;
+    unsigned long finished;
     int wait;
 };
 
-static struct call_data_struct * call_data;
+static spinlock_t call_lock = SPIN_LOCK_UNLOCKED;
+static struct call_data_struct *call_data;
 
 /*
- * this function sends a 'generic call function' IPI to all other CPUs
- * in the system.
+ * Run a function on all other CPUs.
+ *  @func: The function to run. This must be fast and non-blocking.
+ *  @info: An arbitrary pointer to pass to the function.
+ *  @wait: If true, spin until function has completed on other CPUs.
+ *  Returns: 0 on success, else a negative status code.
  */
-
-int smp_call_function (void (*func) (void *info), void *info, int nonatomic,
-                       int wait)
-/*
- * [SUMMARY] Run a function on all other CPUs.
- * <func> The function to run. This must be fast and non-blocking.
- * <info> An arbitrary pointer to pass to the function.
- * <nonatomic> currently unused.
- * <wait> If true, wait (atomically) until function has completed on other CPUs.
- * [RETURNS] 0 on success, else a negative status code. Does not return until
- * remote CPUs are nearly ready to execute <<func>> or are or have executed.
- *
- * You must not call this function with disabled interrupts or from a
- * hardware interrupt handler, or bottom halfs.
- */
+int smp_call_function(
+    void (*func) (void *info), void *info, int unused, int wait)
 {
     struct call_data_struct data;
-    int cpus = smp_num_cpus-1;
+    unsigned long cpuset;
 
-    if (!cpus)
+    ASSERT(local_irq_is_enabled());
+
+    cpuset = ((1UL << smp_num_cpus) - 1) & ~(1UL << smp_processor_id());
+    if ( cpuset == 0 )
         return 0;
 
     data.func = func;
     data.info = info;
-    atomic_set(&data.started, 0);
+    data.started = data.finished = 0;
     data.wait = wait;
-    if (wait)
-        atomic_set(&data.finished, 0);
-
-    ASSERT(local_irq_is_enabled());
 
     spin_lock(&call_lock);
 
     call_data = &data;
     wmb();
-    /* Send a message to all other CPUs and wait for them to respond */
+
     send_IPI_allbutself(CALL_FUNCTION_VECTOR);
 
-    /* Wait for response */
-    while (atomic_read(&data.started) != cpus)
-        barrier();
-
-    if (wait)
-        while (atomic_read(&data.finished) != cpus)
-            barrier();
+    while ( (wait ? data.finished : data.started) != cpuset )
+        cpu_relax();
 
     spin_unlock(&call_lock);
 
     return 0;
 }
 
-static void stop_this_cpu (void * dummy)
+/* Run a function on a subset of CPUs (may include local CPU). */
+int smp_subset_call_function(
+    void (*func) (void *info), void *info, int wait, unsigned long cpuset)
 {
-    /*
-     * Remove this CPU:
-     */
-    clear_bit(smp_processor_id(), &cpu_online_map);
-    __cli();
-    disable_local_APIC();
-    for(;;) __asm__("hlt");
+    struct call_data_struct data;
+
+    ASSERT(local_irq_is_enabled());
+
+    if ( cpuset & (1UL << smp_processor_id()) )
+    {
+        local_irq_disable();
+        (*func)(info);
+        local_irq_enable();
+    }
+
+    cpuset &= ((1UL << smp_num_cpus) - 1) & ~(1UL << smp_processor_id());
+    if ( cpuset == 0 )
+        return 0;
+
+    data.func = func;
+    data.info = info;
+    data.started = data.finished = 0;
+    data.wait = wait;
+
+    spin_lock(&call_lock);
+
+    call_data = &data;
+    wmb();
+
+    send_IPI_mask(cpuset, CALL_FUNCTION_VECTOR);
+
+    while ( (wait ? data.finished : data.started) != cpuset )
+        cpu_relax();
+
+    spin_unlock(&call_lock);
+
+    return 0;
 }
 
-/*
- * this function calls the 'stop' function on all other CPUs in the system.
- */
+static void stop_this_cpu (void *dummy)
+{
+    clear_bit(smp_processor_id(), &cpu_online_map);
+
+    disable_local_APIC();
+
+    for ( ; ; )
+        __asm__ __volatile__ ( "hlt" );
+}
 
 void smp_send_stop(void)
 {
+    /* Stop all other CPUs in the system. */
     smp_call_function(stop_this_cpu, NULL, 1, 0);
     smp_num_cpus = 1;
 
-    __cli();
+    local_irq_disable();
     disable_local_APIC();
-    __sti();
+    local_irq_enable();
 }
 
-/*
- * Nothing to do, as all the work is done automatically when
- * we return from the interrupt.
- */
 asmlinkage void smp_event_check_interrupt(void)
 {
     ack_APIC_irq();
@@ -394,23 +343,20 @@ asmlinkage void smp_call_function_interrupt(void)
 {
     void (*func) (void *info) = call_data->func;
     void *info = call_data->info;
-    int wait = call_data->wait;
 
     ack_APIC_irq();
     perfc_incrc(ipis);
 
-    /*
-     * Notify initiating CPU that I've grabbed the data and am
-     * about to execute the function
-     */
-    mb();
-    atomic_inc(&call_data->started);
-    /*
-     * At this point the info structure may be out of scope unless wait==1
-     */
-    (*func)(info);
-    if (wait) {
+    if ( call_data->wait )
+    {
+        (*func)(info);
         mb();
-        atomic_inc(&call_data->finished);
+        set_bit(smp_processor_id(), &call_data->finished);
+    }
+    else
+    {
+        mb();
+        set_bit(smp_processor_id(), &call_data->started);
+        (*func)(info);
     }
 }

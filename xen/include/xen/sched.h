@@ -143,6 +143,9 @@ struct domain
 
     struct exec_domain *exec_domain[MAX_VIRT_CPUS];
 
+    /* Bitmask of CPUs on which this domain is running. */
+    unsigned long cpuset;
+
     struct arch_domain arch;
 };
 
@@ -250,6 +253,12 @@ void init_idle_task(void);
 void domain_wake(struct exec_domain *d);
 void domain_sleep(struct exec_domain *d);
 
+/*
+ * Force loading of currently-executing domain state on the specified set
+ * of CPUs. This is used to counteract lazy state switching where required.
+ */
+void synchronise_lazy_execstate(unsigned long cpuset);
+
 extern void context_switch(
     struct exec_domain *prev, 
     struct exec_domain *next);
@@ -330,14 +339,21 @@ static inline void exec_domain_pause(struct exec_domain *ed)
     ASSERT(ed != current);
     atomic_inc(&ed->pausecnt);
     domain_sleep(ed);
+    synchronise_lazy_execstate(ed->domain->cpuset & (1UL << ed->processor));
 }
 
 static inline void domain_pause(struct domain *d)
 {
     struct exec_domain *ed;
 
-    for_each_exec_domain(d, ed)
-        exec_domain_pause(ed);
+    for_each_exec_domain( d, ed )
+    {
+        ASSERT(ed != current);
+        atomic_inc(&ed->pausecnt);
+        domain_sleep(ed);
+    }
+
+    synchronise_lazy_execstate(d->cpuset);
 }
 
 static inline void exec_domain_unpause(struct exec_domain *ed)
@@ -351,7 +367,7 @@ static inline void domain_unpause(struct domain *d)
 {
     struct exec_domain *ed;
 
-    for_each_exec_domain(d, ed)
+    for_each_exec_domain( d, ed )
         exec_domain_unpause(ed);
 }
 
@@ -361,30 +377,26 @@ static inline void exec_domain_unblock(struct exec_domain *ed)
         domain_wake(ed);
 }
 
-static inline void domain_unblock(struct domain *d)
-{
-    struct exec_domain *ed;
-
-    for_each_exec_domain(d, ed)
-        exec_domain_unblock(ed);
-}
-
 static inline void domain_pause_by_systemcontroller(struct domain *d)
 {
     struct exec_domain *ed;
 
-    for_each_exec_domain(d, ed) {
+    for_each_exec_domain ( d, ed )
+    {
         ASSERT(ed != current);
         if ( !test_and_set_bit(EDF_CTRLPAUSE, &ed->ed_flags) )
             domain_sleep(ed);
     }
+
+    synchronise_lazy_execstate(d->cpuset);
 }
 
 static inline void domain_unpause_by_systemcontroller(struct domain *d)
 {
     struct exec_domain *ed;
 
-    for_each_exec_domain(d, ed) {
+    for_each_exec_domain ( d, ed )
+    {
         if ( test_and_clear_bit(EDF_CTRLPAUSE, &ed->ed_flags) )
             domain_wake(ed);
     }

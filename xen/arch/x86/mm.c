@@ -1147,16 +1147,13 @@ int get_page_type(struct pfn_info *page, u32 type)
                  * may be unnecessary (e.g., page was GDT/LDT) but those
                  * circumstances should be very rare.
                  */
-                struct exec_domain *ed;
-                unsigned long mask = 0;
-                for_each_exec_domain ( page_get_owner(page), ed )
-                    mask |= 1 << ed->processor;
-                mask = tlbflush_filter_cpuset(mask, page->tlbflush_timestamp);
+                unsigned long cpuset = tlbflush_filter_cpuset(
+                    page_get_owner(page)->cpuset, page->tlbflush_timestamp);
 
-                if ( unlikely(mask != 0) )
+                if ( unlikely(cpuset != 0) )
                 {
                     perfc_incrc(need_flush_tlb_flush);
-                    flush_tlb_mask(mask);
+                    flush_tlb_mask(cpuset);
                 }
 
                 /* We lose existing type, back pointer, and validity. */
@@ -2842,7 +2839,7 @@ void audit_domain(struct domain *d)
 
     if ( d != current->domain )
         domain_pause(d);
-    synchronise_pagetables(~0UL);
+    synchronise_lazy_execstate(~0UL);
 
     printk("pt base=%lx sh_info=%x\n",
            pagetable_val(d->exec_domain[0]->arch.guest_table)>>PAGE_SHIFT,

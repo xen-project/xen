@@ -124,11 +124,11 @@
  *   ptr[:2]  -- Machine address of new page-table base to install in MMU
  *               when in user space.
  * 
- *   val[7:0] == MMUEXT_TLB_FLUSH:
- *   No additional arguments.
+ *   val[7:0] == MMUEXT_TLB_FLUSH_LOCAL:
+ *   No additional arguments. Flushes local TLB.
  * 
- *   val[7:0] == MMUEXT_INVLPG:
- *   ptr[:2]  -- Linear address to be flushed from the TLB.
+ *   val[7:0] == MMUEXT_INVLPG_LOCAL:
+ *   ptr[:2]  -- Linear address to be flushed from the local TLB.
  * 
  *   val[7:0] == MMUEXT_FLUSH_CACHE:
  *   No additional arguments. Writes back and flushes cache contents.
@@ -154,6 +154,12 @@
  *   val[7:0] == MMUEXT_REASSIGN_PAGE:
  *   ptr[:2]  -- A machine address within the page to be reassigned to the FD.
  *               (NB. page must currently belong to the calling domain).
+ * 
+ *   val[7:0] == MMUEXT_TLB_FLUSH_MULTI:
+ *   Flush TLBs of VCPUs specified in @mask.
+ * 
+ *   val[7:0] == MMUEXT_INVLPG_MULTI:
+ *   ptr[:2]  -- Linear address to be flushed from TLB of VCPUs in @mask.
  */
 #define MMU_NORMAL_PT_UPDATE     0 /* checked '*ptr = val'. ptr is MA.       */
 #define MMU_MACHPHYS_UPDATE      2 /* ptr = MA of frame to modify entry for  */
@@ -164,8 +170,8 @@
 #define MMUEXT_PIN_L4_TABLE      3 /* ptr = MA of frame to pin               */
 #define MMUEXT_UNPIN_TABLE       4 /* ptr = MA of frame to unpin             */
 #define MMUEXT_NEW_BASEPTR       5 /* ptr = MA of new pagetable base         */
-#define MMUEXT_TLB_FLUSH         6 /* ptr = NULL                             */
-#define MMUEXT_INVLPG            7 /* ptr = VA to invalidate                 */
+#define MMUEXT_TLB_FLUSH_LOCAL   6 /* ptr = NULL                             */
+#define MMUEXT_INVLPG_LOCAL      7 /* ptr = VA to invalidate                 */
 #define MMUEXT_FLUSH_CACHE       8
 #define MMUEXT_SET_LDT           9 /* ptr = VA of table; val = # entries     */
 #define MMUEXT_SET_FOREIGNDOM   10 /* val[31:16] = dom                       */
@@ -173,6 +179,8 @@
 #define MMUEXT_TRANSFER_PAGE    12 /* ptr = MA of frame; val[31:16] = dom    */
 #define MMUEXT_REASSIGN_PAGE    13
 #define MMUEXT_NEW_USER_BASEPTR 14
+#define MMUEXT_TLB_FLUSH_MULTI  15 /* ptr = NULL; mask = VCPUs to flush      */
+#define MMUEXT_INVLPG_MULTI     16 /* ptr = VA to inval.; mask = VCPUs       */
 #define MMUEXT_CMD_MASK        255
 #define MMUEXT_CMD_SHIFT         8
 
@@ -180,6 +188,9 @@
 #define UVMF_FLUSH_TLB          1 /* Flush entire TLB. */
 #define UVMF_INVLPG             2 /* Flush the VA mapping being updated. */
 
+/* Backwards source compatibility. */
+#define MMUEXT_TLB_FLUSH        MMUEXT_TLB_FLUSH_LOCAL
+#define MMUEXT_INVLPG           MMUEXT_INVLPG_LOCAL
 
 /*
  * Commands to HYPERVISOR_sched_op().
@@ -257,8 +268,9 @@ typedef u16 domid_t;
  */
 typedef struct
 {
-    memory_t ptr;    /* Machine address of PTE. */
-    memory_t val;    /* New contents of PTE.    */
+    memory_t ptr;       /* Machine address of PTE. */
+    memory_t val;       /* New contents of PTE.    */
+    /*unsigned long mask;*/ /* VCPU mask (certain extended commands). */
 } PACKED mmu_update_t;
 
 /*

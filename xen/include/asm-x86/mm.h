@@ -206,12 +206,6 @@ static inline int get_page_and_type(struct pfn_info *page,
 int check_descriptor(struct desc_struct *d);
 
 /*
- * Use currently-executing domain's pagetables on the specified CPUs.
- * i.e., stop borrowing someone else's tables if you are the idle domain.
- */
-void synchronise_pagetables(unsigned long cpu_mask);
-
-/*
  * The MPT (machine->physical mapping table) is an array of word-sized
  * values, indexed on machine frame number. It is expected that guest OSes
  * will use it to store a "physical" frame number to give the appearance of

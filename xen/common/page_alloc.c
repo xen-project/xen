@@ -534,8 +534,6 @@ void free_domheap_pages(struct pfn_info *pg, unsigned int order)
 {
     int            i, drop_dom_ref;
     struct domain *d = page_get_owner(pg);
-    struct exec_domain *ed;
-    int cpu_mask = 0;
 
     ASSERT(!in_irq());
 
@@ -557,14 +555,11 @@ void free_domheap_pages(struct pfn_info *pg, unsigned int order)
         /* NB. May recursively lock from domain_relinquish_memory(). */
         spin_lock_recursive(&d->page_alloc_lock);
 
-        for_each_exec_domain ( d, ed )
-            cpu_mask |= 1 << ed->processor;
-
         for ( i = 0; i < (1 << order); i++ )
         {
             ASSERT((pg[i].u.inuse.type_info & PGT_count_mask) == 0);
             pg[i].tlbflush_timestamp  = tlbflush_current_time();
-            pg[i].u.free.cpu_mask     = cpu_mask;
+            pg[i].u.free.cpu_mask     = d->cpuset;
             list_del(&pg[i].list);
         }
 
