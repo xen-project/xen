@@ -1,6 +1,7 @@
 *.a
 *.d
 *.o
+*.opic
 *.pyc
 *.so
 *.so.*
