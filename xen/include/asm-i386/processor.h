@@ -426,8 +426,10 @@ struct mm_struct {
     struct shadow_status *shadow_ht;
     struct shadow_status *shadow_ht_free;
     struct shadow_status *shadow_ht_extras; // extra allocation units
+    unsigned int *shadow_dirty_bitmap;
     unsigned int shadow_page_count;
     unsigned int shadow_max_page_count;
+    unsigned int shadow_extras_count;
 
     /* Current LDT details. */
     unsigned long ldt_base, ldt_ents, shadow_ldt_mapcnt;

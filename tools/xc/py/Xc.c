@@ -914,6 +914,28 @@ static PyObject *pyxc_rrobin_global_set(PyObject *self,
     return zero;
 }
 
+static PyObject *pyxc_shadow_control(PyObject *self,
+                                     PyObject *args,
+                                     PyObject *kwds)
+{
+    XcObject *xc = (XcObject *)self;
+
+    u64 dom;
+    int op=0;
+
+    static char *kwd_list[] = { "dom", "op", NULL };
+
+    if ( !PyArg_ParseTupleAndKeywords(args, kwds, "L|i", kwd_list, 
+                                      &dom, &op) )
+        return NULL;
+
+    if ( xc_shadow_control(xc->xc_handle, dom, op) != 0 )
+        return PyErr_SetFromErrno(xc_error);
+    
+    Py_INCREF(zero);
+    return zero;
+}
+
 
 static PyMethodDef pyxc_methods[] = {
     { "domain_create", 
@@ -1210,6 +1232,15 @@ static PyMethodDef pyxc_methods[] = {
       "Get information about the physical host machine\n"
       "Returns [dict]: information about the hardware"
       "        [None]: on failure.\n" },
+
+    { "shadow_control", 
+      (PyCFunction)pyxc_shadow_control, 
+      METH_VARARGS | METH_KEYWORDS, "\n"
+      "Set parameter for shadow pagetable interface\n"
+      " dom [long]:    Identifier of domain.\n"
+      " op [int, 0]: operation\n\n"
+      "Returns: [int] 0 on success; -1 on error.\n" },
+
 
     { NULL, NULL, 0, NULL }
 };

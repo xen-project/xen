@@ -15,10 +15,10 @@
 #define PSH_pfn_mask	((1<<21)-1)
 
 /* Shadow PT operation mode : shadowmode variable in mm_struct */
-#define SHM_test        (1<<0) /* just run domain on shadow PTs */
-#define SHM_logdirty    (1<<1) /* log pages that are dirtied */
-#define SHM_cow         (1<<2) /* copy on write all dirtied pages */
-#define SHM_translate   (1<<3) /* lookup machine pages in translation table */
+#define SHM_test        (1) /* just run domain on shadow PTs */
+#define SHM_logdirty    (2) /* log pages that are dirtied */
+#define SHM_cow         (3) /* copy on write all dirtied pages */
+#define SHM_translate   (4) /* lookup machine pages in translation table */
 
 #define shadow_linear_pg_table ((l1_pgentry_t *)SH_LINEAR_PT_VIRT_START)
 #define shadow_linear_l2_table ((l2_pgentry_t *)(SH_LINEAR_PT_VIRT_START+(SH_LINEAR_PT_VIRT_START>>(L2_PAGETABLE_SHIFT-L1_PAGETABLE_SHIFT))))
@@ -30,7 +30,7 @@ extern void shadow_l1_normal_pt_update( unsigned long pa, unsigned long gpte,
 										l1_pgentry_t **prev_spl1e_ptr  );
 extern void shadow_l2_normal_pt_update( unsigned long pa, unsigned long gpte );
 extern void unshadow_table( unsigned long gpfn, unsigned int type );
-extern int shadow_mode_enable( struct mm_struct *m, unsigned int mode );
+extern int shadow_mode_enable( struct task_struct *p, unsigned int mode );
 extern unsigned long shadow_l2_table( 
                      struct mm_struct *m, unsigned long gpfn );
 
@@ -81,26 +81,33 @@ static void shadow_audit(struct mm_struct *m, int print)
 	
     for(j=0;j<shadow_ht_buckets;j++)
     {
-        a = &p->mm.shadow_ht[j];        
-		if(a->pfn) live++;
-        while(a->next && live<9999)
+        a = &m->shadow_ht[j];        
+		if(a->pfn){live++; ASSERT(a->spfn_and_flags&PSH_pfn_mask);}
+		ASSERT((a->pfn&0xf0000000)==0);
+		ASSERT(a->pfn<0x00100000);
+		a=a->next;
+        while(a && live<9999)
 		{ 
 			live++; 
-			if(a->pfn == 0)
+			if(a->pfn == 0 || a->spfn_and_flags == 0)
 			{
 				printk("XXX live=%d pfn=%08lx sp=%08lx next=%p\n",
 					   live, a->pfn, a->spfn_and_flags, a->next);
 				BUG();
 			}
+			ASSERT(a->pfn);
+			ASSERT((a->pfn&0xf0000000)==0);
+			ASSERT(a->pfn<0x00100000);
+			ASSERT(a->spfn_and_flags&PSH_pfn_mask);
 			a=a->next; 
 		}
 		ASSERT(live<9999);
 	}
 
-    a = p->mm.shadow_ht_free;
+    a = m->shadow_ht_free;
     while(a) { free++; a=a->next; }
 
-    if(print) printk("live=%d free=%d\n",live,free);
+    if(print) printk("Xlive=%d free=%d\n",live,free);
 
 	abs=(perfc_value(shadow_l1_pages)+perfc_value(shadow_l2_pages))-live;
 	if( abs < -1 || abs > 1 )
@@ -214,6 +221,8 @@ static inline void delete_shadow_status( struct mm_struct *m,
 
 			b->next = b->next->next;
 			D->next = m->shadow_ht_free;
+			D->pfn = 0;
+			D->spfn_and_flags = 0;
 			m->shadow_ht_free = D;
 		}
 		else
@@ -224,6 +233,7 @@ static inline void delete_shadow_status( struct mm_struct *m,
 
 #if SHADOW_HASH_DEBUG
 		if( __shadow_status(m,gpfn) ) BUG();  
+		shadow_audit(m,0);
 #endif
 		return;
     }
@@ -246,6 +256,7 @@ static inline void delete_shadow_status( struct mm_struct *m,
 #if SHADOW_HASH_DEBUG
 			if( __shadow_status(m,gpfn) ) BUG();
 #endif
+			shadow_audit(m,0);
 			return;
 		}
 
@@ -268,8 +279,10 @@ static inline void set_shadow_status( struct mm_struct *m,
 	B = b = hash_bucket( m, gpfn );
    
     ASSERT(gpfn);
-    ASSERT(s);
+    //ASSERT(s);
+    //ASSERT(s&PSH_pfn_mask);
     SH_VVLOG("set gpfn=%08x s=%08lx bucket=%p(%p)", gpfn, s, b, b->next );
+
     shadow_audit(m,0);
 
 	do
@@ -277,6 +290,7 @@ static inline void set_shadow_status( struct mm_struct *m,
 		if ( b->pfn == gpfn )			
 		{
 			b->spfn_and_flags = s;
+			shadow_audit(m,0);
 			return;
 		}
 
@@ -294,6 +308,7 @@ static inline void set_shadow_status( struct mm_struct *m,
         ASSERT( B->next == 0 );
 		B->pfn = gpfn;
 		B->spfn_and_flags = s;
+		shadow_audit(m,0);
 		return;
 	}
 
@@ -309,6 +324,8 @@ static inline void set_shadow_status( struct mm_struct *m,
 
 	    memset( extra, 0, sizeof(void*) + (shadow_ht_extra_size * 
 							   sizeof(struct shadow_status)) );
+
+        m->shadow_extras_count++;
 	
         // add extras to free list
 	    fptr = &m->shadow_ht_free;
@@ -319,7 +336,7 @@ static inline void set_shadow_status( struct mm_struct *m,
 	    }
 	    *fptr = NULL;
 
-	    *((struct shadow_status ** ) &m->shadow_ht[shadow_ht_extra_size]) = 
+	    *((struct shadow_status ** ) &extra[shadow_ht_extra_size]) = 
                                             m->shadow_ht_extras;
         m->shadow_ht_extras = extra;
 
@@ -332,6 +349,8 @@ static inline void set_shadow_status( struct mm_struct *m,
 	b->pfn = gpfn;
 	b->next = B->next;
 	B->next = b;
+
+	shadow_audit(m,0);
 
 	return;
 }

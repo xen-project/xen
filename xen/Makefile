@@ -22,6 +22,9 @@ install: $(TARGET)
 	mkdir -p $(prefix)/boot
 	install -m0644 $(TARGET).gz $(prefix)/boot
 
+dist: $(TARGET)
+	$(MAKE) prefix=`pwd`/../../install dist=yes install
+
 clean: delete-links
 	$(MAKE) -C tools clean
 	$(MAKE) -C common clean

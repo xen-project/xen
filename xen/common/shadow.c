@@ -26,21 +26,107 @@ hypercall lock anyhow (at least initially).
 
 ********/
 
-static inline void free_shadow_page( struct mm_struct *m, unsigned int pfn )
+static inline void free_shadow_page( struct mm_struct *m, 
+									 struct pfn_info *pfn_info )
 {
     unsigned long flags;
+	unsigned long type = pfn_info->type_and_flags & PGT_type_mask;
 
 	m->shadow_page_count--;
 
+	if (type == PGT_l1_page_table)
+		perfc_decr(shadow_l1_pages);
+    else if (type == PGT_l2_page_table)
+		perfc_decr(shadow_l2_pages);
+	else printk("Free shadow weird page type pfn=%08x type=%08lx\n",
+				frame_table-pfn_info, pfn_info->type_and_flags);
+				
+
+	pfn_info->type_and_flags = 0;
+
     spin_lock_irqsave(&free_list_lock, flags);
-    list_add(&frame_table[pfn].list, &free_list);
+    list_add(&pfn_info->list, &free_list);
     free_pfns++;
     spin_unlock_irqrestore(&free_list_lock, flags);
 }
 
 static void __free_shadow_table( struct mm_struct *m )
 {
-	int j;
+	int j, free=0;
+	struct shadow_status *a,*next;
+	
+	// the code assumes you're not using the page tables i.e.
+    // the domain is stopped and cr3 is something else!!
+
+    // walk the hash table and call free_shadow_page on all pages
+
+	shadow_audit(m,1);
+
+    for(j=0;j<shadow_ht_buckets;j++)
+    {
+        a = &m->shadow_ht[j];        
+        if (a->pfn)
+        {
+            free_shadow_page( m, 
+                          &frame_table[a->spfn_and_flags & PSH_pfn_mask] );
+            a->pfn = 0;
+            a->spfn_and_flags = 0;
+            free++;
+        }
+        next=a->next;
+        a->next=NULL;
+        a=next;
+        while(a)
+		{ 
+            struct shadow_status *next = a->next;
+
+            free_shadow_page( m, 
+                          &frame_table[a->spfn_and_flags & PSH_pfn_mask] );
+            a->pfn = 0;
+            a->spfn_and_flags = 0;
+            free++;
+            a->next = m->shadow_ht_free;           
+            m->shadow_ht_free = a;
+            a=next;
+		}
+	shadow_audit(m,0);
+	}
+   SH_LOG("Free shadow table. Freed= %d",free);
+}
+
+static inline int shadow_page_op( struct mm_struct *m, unsigned int op,
+                                   struct pfn_info *spfn_info )
+{
+    int work = 0;
+    unsigned int spfn = spfn_info-frame_table;
+
+    switch( op )
+    {
+        case DOM0_SHADOW_CONTROL_OP_CLEAN:
+        {
+            int i;
+            if ( (spfn_info->type_and_flags & PGT_type_mask) == 
+                                                      PGT_l1_page_table )
+            {
+                unsigned long * spl1e = map_domain_mem( spfn<<PAGE_SHIFT );
+
+                for (i=0;i<ENTRIES_PER_L1_PAGETABLE;i++)
+                {                    
+                    if ( spl1e[i] & _PAGE_RW )
+                    {
+                        work++;
+                        spl1e[i] &= ~_PAGE_RW;
+                    }
+                }
+                unmap_domain_mem( spl1e );
+            }
+        }
+    }
+    return work;
+}
+static void __scan_shadow_table( struct mm_struct *m, unsigned int op )
+{
+	int j, work=0;
 	struct shadow_status *a;
 	
 	// the code assumes you're not using the page tables i.e.
@@ -48,32 +134,30 @@ static void __free_shadow_table( struct mm_struct *m )
 
     // walk the hash table and call free_shadow_page on all pages
 
+	shadow_audit(m,1);
+
     for(j=0;j<shadow_ht_buckets;j++)
     {
         a = &m->shadow_ht[j];        
         if (a->pfn)
         {
-            free_shadow_page( m, a->spfn_and_flags & PSH_pfn_mask );
-            a->pfn = 0;
-            a->spfn_and_flags = 0;
+            work += shadow_page_op( m, op, &frame_table[a->spfn_and_flags & PSH_pfn_mask] );
         }
         a=a->next;
         while(a)
 		{ 
-            struct shadow_status *next = a->next;
-            free_shadow_page( m, a->spfn_and_flags & PSH_pfn_mask );
-            a->pfn = 0;
-            a->spfn_and_flags = 0;
-            a->next = m->shadow_ht_free;
-            m->shadow_ht_free = a;
-            a=next;
+            work += shadow_page_op( m, op, &frame_table[a->spfn_and_flags & PSH_pfn_mask] );
+            a=a->next;
 		}
+	shadow_audit(m,0);
 	}
+   SH_LOG("Scan shadow table. Work=%d l1=%d l2=%d", work, perfc_value(shadow_l1_pages), perfc_value(shadow_l2_pages));
 }
 
 
-int shadow_mode_enable( struct mm_struct *m, unsigned int mode )
+int shadow_mode_enable( struct task_struct *p, unsigned int mode )
 {
+    struct mm_struct *m = &p->mm;
 	struct shadow_status **fptr;
 	int i;
 
@@ -102,6 +186,8 @@ int shadow_mode_enable( struct mm_struct *m, unsigned int mode )
 
 	memset( m->shadow_ht_extras, 0, sizeof(void*) + (shadow_ht_extra_size * 
 							   sizeof(struct shadow_status)) );
+
+    m->shadow_extras_count++;
 	
     // add extras to free list
 	fptr = &m->shadow_ht_free;
@@ -113,6 +199,13 @@ int shadow_mode_enable( struct mm_struct *m, unsigned int mode )
 	*fptr = NULL;
 	*((struct shadow_status ** ) 
         &m->shadow_ht_extras[shadow_ht_extra_size]) = NULL;
+
+    if ( mode == SHM_logdirty )
+    {
+        m->shadow_dirty_bitmap = kmalloc( p->max_pages/8, GFP_KERNEL );
+        if( !m->shadow_dirty_bitmap  ) goto nomem;
+        memset(m->shadow_dirty_bitmap,0,p->max_pages/8);
+    }
 
 	spin_unlock(&m->shadow_lock);
 
@@ -126,16 +219,43 @@ nomem:
 	return -ENOMEM;
 }
 
-static void shadow_mode_disable( struct mm_struct *m )
+static void shadow_mode_disable( struct task_struct *p )
 {
+    struct mm_struct *m = &p->mm;
+	struct shadow_status *next;
 
-    // free the hash buckets as you go
+    spin_lock(&m->shadow_lock);
+	__free_shadow_table( m );
+	m->shadow_mode = 0;
+	spin_unlock(&m->shadow_lock);
+
+	SH_LOG("freed tables count=%d l1=%d l2=%d",
+		   m->shadow_page_count, perfc_value(shadow_l1_pages), perfc_value(shadow_l2_pages));
+
+	next = m->shadow_ht_extras;
+	while( next )
+    {
+		struct shadow_status * this = next;
+		m->shadow_extras_count--;
+		next = *((struct shadow_status **)(&next[shadow_ht_extra_size]));
+		kfree( this );
+	}
+
+	SH_LOG("freed extras, now %d", m->shadow_extras_count);
+
+    if( m->shadow_dirty_bitmap  )
+    {
+        kfree( m->shadow_dirty_bitmap );
+		m->shadow_dirty_bitmap = 0;
+    }
 
     // free the hashtable itself
+	kfree( &m->shadow_ht[0] );
 }
 
-static void shadow_mode_flush( struct mm_struct *m )
+static void shadow_mode_table_op( struct task_struct *p, unsigned int op )
 {
+	struct mm_struct *m = &p->mm;
 
     // since Dom0 did the hypercall, we should be running with it's page
     // tables right now. Calling flush on yourself would be really
@@ -147,9 +267,31 @@ static void shadow_mode_flush( struct mm_struct *m )
         return;
     }
    
+
     spin_lock(&m->shadow_lock);
-	__free_shadow_table( m );
+
+    SH_LOG("shadow mode table op %08lx %08lx count %d",pagetable_val( m->pagetable),pagetable_val(m->shadow_table), m->shadow_page_count);
+
+    shadow_audit(m,1);
+
+    switch(op)
+    {
+    case DOM0_SHADOW_CONTROL_OP_FLUSH:
+	    __free_shadow_table( m );
+        break;
+   
+    case DOM0_SHADOW_CONTROL_OP_CLEAN:
+       __scan_shadow_table( m, op );
+       if( m->shadow_dirty_bitmap )
+           memset(m->shadow_dirty_bitmap,0,p->max_pages/8);
+       break;
+    }
+
 	spin_unlock(&m->shadow_lock);
+
+    SH_LOG("shadow mode table op : page count %d", m->shadow_page_count);
+
+    shadow_audit(m,1);
 
     // call shadow_mk_pagetable
     shadow_mk_pagetable( m );
@@ -164,28 +306,30 @@ int shadow_mode_control( struct task_struct *p, unsigned int op )
     // don't call if already shadowed...
 
 	// sychronously stop domain
-    if( !(p->state & TASK_STOPPED) && !(p->state & TASK_PAUSED))
+    if( 0 && !(p->state & TASK_STOPPED) && !(p->state & TASK_PAUSED))
     {
+        printk("about to pause domain\n");
 	    sched_pause_sync(p);
         printk("paused domain\n");
         we_paused = 1;
     }
 
-	if (p->mm.shadow_mode && op == DOM0_SHADOW_CONTROL_OP_OFF )
+	if ( p->mm.shadow_mode && op == DOM0_SHADOW_CONTROL_OP_OFF )
     {
-		shadow_mode_disable(&p->mm);
+		shadow_mode_disable(p);
 	}
-	else if (p->mm.shadow_mode && op == DOM0_SHADOW_CONTROL_OP_ENABLE_TEST )
+	else if ( op == DOM0_SHADOW_CONTROL_OP_ENABLE_TEST )
 	{
-        shadow_mode_disable(&p->mm);
-        shadow_mode_enable(&p->mm, SHM_test);
+        if(p->mm.shadow_mode) shadow_mode_disable(p);
+        shadow_mode_enable(p, SHM_test);
 	}	
-	else if (p->mm.shadow_mode && op == DOM0_SHADOW_CONTROL_OP_FLUSH )
+	else if ( p->mm.shadow_mode && op >= DOM0_SHADOW_CONTROL_OP_FLUSH && op<=DOM0_SHADOW_CONTROL_OP_CLEAN )
     {
-		shadow_mode_flush(&p->mm);
+		shadow_mode_table_op(p, op);
     }
 	else
     {
+        if ( we_paused ) wake_up(p);
 		return -EINVAL;
     }
 
@@ -220,6 +364,7 @@ void unshadow_table( unsigned long gpfn, unsigned int type )
     // this CPU was the one that cmpxchg'ed the page to invalid
 
 	spfn = __shadow_status(&current->mm, gpfn) & PSH_pfn_mask;
+
 	delete_shadow_status(&current->mm, gpfn);
 
 #if 0 // XXX leave as might be useful for later debugging
@@ -235,12 +380,7 @@ void unshadow_table( unsigned long gpfn, unsigned int type )
 	}
 #endif
 
-	if (type == PGT_l1_page_table)
-		perfc_decr(shadow_l1_pages);
-    else
-		perfc_decr(shadow_l2_pages);
-
-	free_shadow_page( &current->mm, spfn );
+	free_shadow_page( &current->mm, &frame_table[spfn] );
 
 }
 
@@ -256,7 +396,6 @@ unsigned long shadow_l2_table(
 	SH_VVLOG("shadow_l2_table( %08lx )",gpfn);
 
 	perfc_incrc(shadow_l2_table_count);
-	perfc_incr(shadow_l2_pages);
 
     // XXX in future, worry about racing in SMP guests 
     //      -- use cmpxchg with PSH_pending flag to show progress (and spin)
@@ -264,6 +403,9 @@ unsigned long shadow_l2_table(
 	spfn_info = alloc_shadow_page(m);
 
     ASSERT( spfn_info ); // XXX deal with failure later e.g. blow cache
+
+	spfn_info->type_and_flags = PGT_l2_page_table;
+	perfc_incr(shadow_l2_pages);
 
 	spfn = (unsigned long) (spfn_info - frame_table);
 
@@ -434,7 +576,9 @@ int shadow_fault( unsigned long va, long error_code )
             struct pfn_info *sl1pfn_info;
             unsigned long *gpl1e, *spl1e;
             int i;
-            sl1pfn_info = alloc_domain_page( NULL ); // XXX account properly! 
+            sl1pfn_info = alloc_shadow_page( &current->mm ); 
+  	        sl1pfn_info->type_and_flags = PGT_l1_page_table;
+
             sl1pfn = sl1pfn_info - frame_table;
 
             SH_VVLOG("4a: l1 not shadowed ( %08lx )",sl1pfn);
