@@ -123,8 +123,19 @@ typedef struct net_rule_st
 typedef struct vif_query_st
 {
     unsigned int    domain;
-    char            *buf;   /* reply buffer -- guest virtual address */
+    int             *buf;   /* reply buffer -- guest virtual address */
 } vif_query_t;
+
+typedef struct vif_getinfo_st
+{
+    unsigned int        domain;
+    unsigned int        vif;
+    /* domain & vif are supplied by dom0, the rest are response fields */
+    long long           total_bytes_sent;
+    long long           total_bytes_received;
+    long long           total_packets_sent;
+    long long           total_packets_received;
+} vif_getinfo_t;
 
 /* Network trap operations and associated structure. 
  * This presently just handles rule insertion and deletion, but will
@@ -135,6 +146,7 @@ typedef struct vif_query_st
 #define NETWORK_OP_DELETERULE   1
 #define NETWORK_OP_GETRULELIST  2
 #define NETWORK_OP_VIFQUERY     3
+#define NETWORK_OP_VIFGETINFO   4
 
 typedef struct network_op_st 
 {
@@ -143,6 +155,7 @@ typedef struct network_op_st
     {
         net_rule_t net_rule;
         vif_query_t vif_query;
+        vif_getinfo_t vif_getinfo;
     }
     u;
 } network_op_t;

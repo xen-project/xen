@@ -211,29 +211,67 @@ void unlink_net_vif(net_vif_t *vif)
 /* vif_query - Call from the proc file system to get a list of indexes
  * in use by a particular domain.
  */
-void vif_query(vif_query_t *vq)
+int vif_query(vif_query_t *vq)
 {
     net_vif_t *vif;
     struct task_struct *p;
-    char buf[128];
+    int buf[32];
     int i;
+    int count = 0;
 
-    if ( !(p = find_domain_by_id(vq->domain)) ) 
-        return;
-
-    *buf = '\0';
+    if ( !(p = find_domain_by_id(vq->domain)) ) {
+        buf[0] = -1;
+        copy_to_user(vq->buf, buf, sizeof(int));
+        return -ENOSYS;
+    }
 
     for ( i = 0; i < MAX_DOMAIN_VIFS; i++ )
     {
         vif = p->net_vif_list[i];
         if ( vif == NULL ) continue;
-        sprintf(buf + strlen(buf), "%d\n", i);
+        buf[++count] = i;
     }
 
-    copy_to_user(vq->buf, buf, strlen(buf) + 1);
+    buf[0] = count;
+
+    copy_to_user(vq->buf, buf, (buf[0] + 1) * sizeof(int));
     
     put_task_struct(p);
+
+    return 0;
 }
+
+/* vif_getinfo - Call from the proc file system to get info about a specific
+ * vif in use by a particular domain.
+ */
+int vif_getinfo(vif_getinfo_t *info)
+{
+    struct task_struct *p;
+    net_vif_t *vif;
+
+    info->total_bytes_sent =
+    info->total_bytes_received =
+    info->total_packets_sent =
+    info->total_packets_received = -1;
+
+    if ( !(p = find_domain_by_id(info->domain)) )
+        return -ENOSYS;
+
+    vif = p->net_vif_list[info->vif];
+
+    if(vif == NULL)
+        return -ENOSYS;
+
+    info->total_bytes_sent              = vif->total_bytes_sent;
+    info->total_bytes_received          = vif->total_bytes_received;
+    info->total_packets_sent            = vif->total_packets_sent;
+    info->total_packets_received        = vif->total_packets_received;
+
+    put_task_struct(p);
+
+    return 0;
+}
+
         
 /* ----[ Net Rule Functions ]-----------------------------------------------*/
 
@@ -517,9 +555,16 @@ long do_network_op(network_op_t *u_network_op)
     }
     break;
 
+    case NETWORK_OP_VIFGETINFO:
+    {
+        ret = vif_getinfo(&op.u.vif_getinfo);
+        copy_to_user(u_network_op, &op, sizeof(op));
+    }
+    break;
+
     case NETWORK_OP_VIFQUERY:
     {
-        vif_query(&op.u.vif_query);
+        ret = vif_query(&op.u.vif_query);
     }
     
     default:

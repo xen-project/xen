@@ -66,6 +66,12 @@ typedef struct net_vif_st {
     unsigned int tx_req_cons;
     unsigned int tx_resp_prod; /* private version of shared variable */
 
+    /* Usage accounting */
+    long long total_bytes_sent;
+    long long total_bytes_received;
+    long long total_packets_sent;
+    long long total_packets_received;
+
     /* Miscellaneous private stuff. */
     struct task_struct *domain;
     unsigned int idx; /* index within domain */

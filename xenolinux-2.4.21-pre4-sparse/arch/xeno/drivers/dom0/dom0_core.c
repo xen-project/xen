@@ -82,7 +82,8 @@ static int cmd_read_proc(char *page, char **start, off_t off,
 
 static ssize_t dom_vif_read(struct file * file, char * buff, size_t size, loff_t * off)
 {
-    char hyp_buf[128];
+    int hyp_buf[32];
+    char buf[128];
     network_op_t op;
     static int finished = 0;
 
@@ -93,20 +94,30 @@ static ssize_t dom_vif_read(struct file * file, char * buff, size_t size, loff_t
     }
     
     op.cmd = NETWORK_OP_VIFQUERY;
-    op.u.vif_query.domain = (unsigned int) ((struct proc_dir_entry *)file->f_dentry->d_inode->u.generic_ip)->data;
+    op.u.vif_query.domain = (unsigned int)
+        ((struct proc_dir_entry *)file->f_dentry->d_inode->u.generic_ip)->data;
     op.u.vif_query.buf = hyp_buf;
 
-    strcpy(hyp_buf, "Error getting domain's vif list from hypervisor.\n"); // This will be replaced if everything works.
+    (void) HYPERVISOR_network_op(&op);
 
-    (void)HYPERVISOR_network_op(&op);
+    if(hyp_buf[0] < 0) {
+        strcpy(buf, "Error getting domain's vif list from hypervisor.\n");
+    } else {
+        int i;
+        int len = 0;
+        strcpy(buf, "No vif found");
 
-    if (*off >= (strlen(hyp_buf)+1)) return 0;
+        for(i = 1; i <= hyp_buf[0] && len < 127; i++)
+            len += snprintf(buf + len, 127 - len, "%d\n", hyp_buf[i]);
+    }
+
+    if (*off >= (strlen(buf)+1)) return 0;
     
-    copy_to_user(buff, hyp_buf, strlen(hyp_buf));
+    copy_to_user(buff, buf, strlen(buf));
     
     finished = 1;
     
-    return strlen(hyp_buf)+1;
+    return strlen(buf)+1;
 }
 
 struct file_operations dom_vif_ops = {
@@ -115,8 +126,12 @@ struct file_operations dom_vif_ops = {
 
 static ssize_t dom_usage_read(struct file * file, char * buff, size_t size, loff_t * off)
 {
-    char hyp_buf[128];
+    char str[256];
+    int vifs[32];
     dom0_op_t op;
+    network_op_t netop;
+    int i, end;
+    unsigned int domain;
     static int finished = 0;
 
     if ( finished )
@@ -125,21 +140,46 @@ static ssize_t dom_usage_read(struct file * file, char * buff, size_t size, loff
         return 0;
     }
 
-    op.cmd = DOM0_GETDOMAININFO;
-    op.u.getdominfo.domain = (unsigned int)
+    domain = (unsigned int)
         ((struct proc_dir_entry *)file->f_dentry->d_inode->u.generic_ip)->data;
+    op.cmd = DOM0_GETDOMAININFO;
 
-    (void)HYPERVISOR_dom0_op(&op);
+    op.u.getdominfo.domain = domain;
 
-    snprintf(hyp_buf, 128, "cpu: %lld\n", op.u.getdominfo.cpu_time);
+    (void) HYPERVISOR_dom0_op(&op);
 
-    if (*off >= (strlen(hyp_buf) + 1)) return 0;
+    end = snprintf(str, 256, "cpu: %lld\n", op.u.getdominfo.cpu_time);
+
+    netop.cmd = NETWORK_OP_VIFQUERY;
+    netop.u.vif_query.domain = domain;
+    netop.u.vif_query.buf = vifs;
+
+    (void) HYPERVISOR_network_op(&netop);
+
+    for(i = 1; i <= vifs[0]; i++) {
+        netop.cmd = NETWORK_OP_VIFGETINFO;
+        netop.u.vif_getinfo.domain = domain;
+        netop.u.vif_getinfo.vif = vifs[i];
+
+        (void) HYPERVISOR_network_op(&netop);
+
+        end += snprintf(str + end, 255 - end,
+                "vif%d: sent %lld bytes (%lld packets) "
+                "received %lld bytes (%lld packets)\n",
+                vifs[i],
+                netop.u.vif_getinfo.total_bytes_sent,
+                netop.u.vif_getinfo.total_packets_sent,
+                netop.u.vif_getinfo.total_bytes_received,
+                netop.u.vif_getinfo.total_packets_received);
+    }
+
+    if (*off >= end + 1) return 0;
     
-    copy_to_user(buff, hyp_buf, strlen(hyp_buf));
+    copy_to_user(buff, str, end);
 
     finished = 1;
 
-    return strlen(hyp_buf) + 1;
+    return end + 1;
 }
 
 struct file_operations dom_usage_ops = {
