@@ -35,10 +35,13 @@ int main(int argc, char *argv[])
       break;
 
     for (x = 0; x < buf.n_aces; x++) {
-      printf("%x %x %x %x\n", buf.entries[x].device,
+      char read = ( buf.entries[x].mode & 1 ? 'r' : ' ' );
+      char write = ( buf.entries[x].mode & 2 ? 'w' : ' ' );
+      printf("%x %x %x %c%c\n", buf.entries[x].device,
 	     buf.entries[x].start_sect,
 	     buf.entries[x].n_sectors,
-	     buf.entries[x].mode);
+	     read,
+	     write);
     }
     buf.start_ind += buf.n_aces;
   } while (buf.n_aces == PHYSDISK_MAX_ACES_PER_REQUEST);
