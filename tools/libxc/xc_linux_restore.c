@@ -603,7 +603,7 @@ int xc_linux_restore(int xc_handle, XcIOContext *ioctxt)
      *  4. fast_trap_idx is checked by Xen.
      *  5. ldt base must be page-aligned, no more than 8192 ents, ...
      *  6. gdt already done, and further checking is done by Xen.
-     *  7. check that guestos_ss is safe.
+     *  7. check that kernel_ss is safe.
      *  8. pt_base is already done.
      *  9. debugregs are checked by Xen.
      *  10. callback code selectors need checking.
@@ -612,14 +612,14 @@ int xc_linux_restore(int xc_handle, XcIOContext *ioctxt)
     {
         ctxt.trap_ctxt[i].vector = i;
         if ( (ctxt.trap_ctxt[i].cs & 3) == 0 )
-            ctxt.trap_ctxt[i].cs = FLAT_GUESTOS_CS;
+            ctxt.trap_ctxt[i].cs = FLAT_KERNEL_CS;
     }
-    if ( (ctxt.guestos_ss & 3) == 0 )
-        ctxt.guestos_ss = FLAT_GUESTOS_DS;
+    if ( (ctxt.kernel_ss & 3) == 0 )
+        ctxt.kernel_ss = FLAT_KERNEL_DS;
     if ( (ctxt.event_callback_cs & 3) == 0 )
-        ctxt.event_callback_cs = FLAT_GUESTOS_CS;
+        ctxt.event_callback_cs = FLAT_KERNEL_CS;
     if ( (ctxt.failsafe_callback_cs & 3) == 0 )
-        ctxt.failsafe_callback_cs = FLAT_GUESTOS_CS;
+        ctxt.failsafe_callback_cs = FLAT_KERNEL_CS;
     if ( ((ctxt.ldt_base & (PAGE_SIZE - 1)) != 0) ||
          (ctxt.ldt_ents > 8192) ||
          (ctxt.ldt_base > HYPERVISOR_VIRT_START) ||

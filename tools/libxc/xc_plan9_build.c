@@ -133,7 +133,7 @@ static int
 #define L2_PROT (_PAGE_PRESENT|_PAGE_RW|_PAGE_ACCESSED|_PAGE_DIRTY|_PAGE_USER)
 
 static int
-setup_guestos(int xc_handle,
+setup_guest(int xc_handle,
 	      u32 dom,
 	      gzFile kernel_gfd,
 	      unsigned long tot_pages,
@@ -483,7 +483,7 @@ xc_plan9_build(int xc_handle,
 	}
 
 	DPRINTF(("xc_get_tot_pages returns %ld pages\n", tot_pages));
-	if (setup_guestos(xc_handle, domid, kernel_gfd, tot_pages,
+	if (setup_guest(xc_handle, domid, kernel_gfd, tot_pages,
 			  &virt_startinfo_addr,
 			  &load_addr, &st_ctxt, cmdline,
 			  op.u.getdomaininfo.shared_info_frame,
@@ -502,19 +502,19 @@ xc_plan9_build(int xc_handle,
 
 	/*
 	 * Initial register values:
-	 *  DS,ES,FS,GS = FLAT_GUESTOS_DS
-	 *       CS:EIP = FLAT_GUESTOS_CS:start_pc
-	 *       SS:ESP = FLAT_GUESTOS_DS:start_stack
+	 *  DS,ES,FS,GS = FLAT_KERNEL_DS
+	 *       CS:EIP = FLAT_KERNEL_CS:start_pc
+	 *       SS:ESP = FLAT_KERNEL_DS:start_stack
 	 *          ESI = start_info
 	 *  [EAX,EBX,ECX,EDX,EDI,EBP are zero]
 	 *       EFLAGS = IF | 2 (bit 1 is reserved and should always be 1)
 	 */
-	ctxt->cpu_ctxt.ds = FLAT_GUESTOS_DS;
-	ctxt->cpu_ctxt.es = FLAT_GUESTOS_DS;
-	ctxt->cpu_ctxt.fs = FLAT_GUESTOS_DS;
-	ctxt->cpu_ctxt.gs = FLAT_GUESTOS_DS;
-	ctxt->cpu_ctxt.ss = FLAT_GUESTOS_DS;
-	ctxt->cpu_ctxt.cs = FLAT_GUESTOS_CS;
+	ctxt->cpu_ctxt.ds = FLAT_KERNEL_DS;
+	ctxt->cpu_ctxt.es = FLAT_KERNEL_DS;
+	ctxt->cpu_ctxt.fs = FLAT_KERNEL_DS;
+	ctxt->cpu_ctxt.gs = FLAT_KERNEL_DS;
+	ctxt->cpu_ctxt.ss = FLAT_KERNEL_DS;
+	ctxt->cpu_ctxt.cs = FLAT_KERNEL_CS;
 	ctxt->cpu_ctxt.eip = load_addr;
 	ctxt->cpu_ctxt.eip = 0x80100020;
 	/* put stack at top of second page */
@@ -530,7 +530,7 @@ xc_plan9_build(int xc_handle,
 	/* Virtual IDT is empty at start-of-day. */
 	for (i = 0; i < 256; i++) {
 		ctxt->trap_ctxt[i].vector = i;
-		ctxt->trap_ctxt[i].cs = FLAT_GUESTOS_CS;
+		ctxt->trap_ctxt[i].cs = FLAT_KERNEL_CS;
 	}
 	ctxt->fast_trap_idx = 0;
 
@@ -542,16 +542,16 @@ xc_plan9_build(int xc_handle,
 
 	/* Ring 1 stack is the initial stack. */
 	/* put stack at top of second page */
-	ctxt->guestos_ss = FLAT_GUESTOS_DS;
-	ctxt->guestos_esp = ctxt->cpu_ctxt.esp;
+	ctxt->kernel_ss = FLAT_KERNEL_DS;
+	ctxt->kernel_esp = ctxt->cpu_ctxt.esp;
 
 	/* No debugging. */
 	memset(ctxt->debugreg, 0, sizeof (ctxt->debugreg));
 
 	/* No callback handlers. */
-	ctxt->event_callback_cs = FLAT_GUESTOS_CS;
+	ctxt->event_callback_cs = FLAT_KERNEL_CS;
 	ctxt->event_callback_eip = 0;
-	ctxt->failsafe_callback_cs = FLAT_GUESTOS_CS;
+	ctxt->failsafe_callback_cs = FLAT_KERNEL_CS;
 	ctxt->failsafe_callback_eip = 0;
 
 	memset(&launch_op, 0, sizeof (launch_op));

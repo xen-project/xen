@@ -317,7 +317,7 @@ construct_init_vmcs_guest(execution_context_t *context,
     shadow_cr = host_env->cr0;
     shadow_cr &= ~(X86_CR0_PE | X86_CR0_PG);
     error |= __vmwrite(CR0_READ_SHADOW, shadow_cr);
-    /* CR3 is set in vmx_final_setup_guestos */
+    /* CR3 is set in vmx_final_setup_guest */
     error |= __vmwrite(GUEST_CR4, host_env->cr4);
     shadow_cr = host_env->cr4;
     shadow_cr &= ~(X86_CR4_PGE | X86_CR4_VMXE);

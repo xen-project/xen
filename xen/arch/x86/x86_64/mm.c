@@ -233,8 +233,8 @@ long do_stack_switch(unsigned long ss, unsigned long esp)
 {
     if ( (ss & 3) != 3 )
         return -EPERM;
-    current->arch.guestos_ss = ss;
-    current->arch.guestos_sp = esp;
+    current->arch.kernel_ss = ss;
+    current->arch.kernel_sp = esp;
     return 0;
 }
 

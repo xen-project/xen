@@ -288,7 +288,7 @@ void arch_do_createdomain(struct exec_domain *ed)
             mk_l3_pgentry(__pa(d->arch.mm_perdomain_l2) | __PAGE_HYPERVISOR);
 #endif
 
-        ed->arch.flags = TF_guestos_mode;
+        ed->arch.flags = TF_kernel_mode;
     }
 }
 
@@ -298,7 +298,7 @@ void arch_do_boot_vcpu(struct exec_domain *ed)
     ed->arch.schedule_tail = d->exec_domain[0]->arch.schedule_tail;
     ed->arch.perdomain_ptes = 
         d->arch.mm_perdomain_pt + (ed->eid << PDPT_VCPU_SHIFT);
-    ed->arch.flags = TF_guestos_mode;
+    ed->arch.flags = TF_kernel_mode;
 }
 
 #ifdef CONFIG_VMX
@@ -384,7 +384,7 @@ static void monitor_rm_pagetable(struct exec_domain *ed)
     ed->arch.monitor_table = mk_pagetable(0);
 }
 
-static int vmx_final_setup_guestos(struct exec_domain *ed,
+static int vmx_final_setup_guest(struct exec_domain *ed,
                                    full_execution_context_t *full_context)
 {
     int error;
@@ -439,7 +439,7 @@ out:
 }
 #endif
 
-int arch_final_setup_guestos(
+int arch_final_setup_guest(
     struct exec_domain *d, full_execution_context_t *c)
 {
     unsigned long phys_basetab;
@@ -449,9 +449,9 @@ int arch_final_setup_guestos(
     if ( c->flags & ECF_I387_VALID )
         set_bit(EDF_DONEFPUINIT, &d->ed_flags);
 
-    d->arch.flags &= ~TF_guestos_mode;
-    if ( c->flags & ECF_IN_GUESTOS )
-        d->arch.flags |= TF_guestos_mode;
+    d->arch.flags &= ~TF_kernel_mode;
+    if ( c->flags & ECF_IN_KERNEL )
+        d->arch.flags |= TF_kernel_mode;
 
     memcpy(&d->arch.user_ctxt,
            &c->cpu_ctxt,
@@ -485,8 +485,8 @@ int arch_final_setup_guestos(
     d->arch.ldt_base = c->ldt_base;
     d->arch.ldt_ents = c->ldt_ents;
 
-    d->arch.guestos_ss = c->guestos_ss;
-    d->arch.guestos_sp = c->guestos_esp;
+    d->arch.kernel_ss = c->kernel_ss;
+    d->arch.kernel_sp = c->kernel_esp;
 
     for ( i = 0; i < 8; i++ )
         (void)set_debugreg(d, i, c->debugreg[i]);
@@ -517,7 +517,7 @@ int arch_final_setup_guestos(
 
 #ifdef CONFIG_VMX
     if (c->flags & ECF_VMX_GUEST)
-        return vmx_final_setup_guestos(d, c);
+        return vmx_final_setup_guest(d, c);
 #endif
 
     return 0;
@@ -532,15 +532,15 @@ void new_thread(struct exec_domain *d,
 
     /*
      * Initial register values:
-     *  DS,ES,FS,GS = FLAT_GUESTOS_DS
-     *       CS:EIP = FLAT_GUESTOS_CS:start_pc
-     *       SS:ESP = FLAT_GUESTOS_SS:start_stack
+     *  DS,ES,FS,GS = FLAT_KERNEL_DS
+     *       CS:EIP = FLAT_KERNEL_CS:start_pc
+     *       SS:ESP = FLAT_KERNEL_SS:start_stack
      *          ESI = start_info
      *  [EAX,EBX,ECX,EDX,EDI,EBP are zero]
      */
-    ec->ds = ec->es = ec->fs = ec->gs = FLAT_GUESTOS_DS;
-    ec->ss = FLAT_GUESTOS_SS;
-    ec->cs = FLAT_GUESTOS_CS;
+    ec->ds = ec->es = ec->fs = ec->gs = FLAT_KERNEL_DS;
+    ec->ss = FLAT_KERNEL_SS;
+    ec->cs = FLAT_KERNEL_CS;
     ec->eip = start_pc;
     ec->esp = start_stack;
     ec->esi = start_info;
@@ -625,8 +625,8 @@ void switch_to(struct exec_domain *prev_p, struct exec_domain *next_p)
 
 #ifdef __i386__
         /* Switch the guest OS ring-1 stack. */
-        tss->esp1 = next_p->arch.guestos_sp;
-        tss->ss1  = next_p->arch.guestos_ss;
+        tss->esp1 = next_p->arch.kernel_sp;
+        tss->ss1  = next_p->arch.kernel_ss;
 #endif
 
         /* Switch page tables. */
@@ -738,15 +738,15 @@ void switch_to(struct exec_domain *prev_p, struct exec_domain *next_p)
               next_p->arch.user_ctxt.gs_base_app>>32);
 
     /* If in guest-OS mode, switch the GS bases around. */
-    if ( next_p->arch.flags & TF_guestos_mode )
+    if ( next_p->arch.flags & TF_kernel_mode )
         __asm__ __volatile__ ( "swapgs" );
 
     if ( unlikely(!all_segs_okay) )
     {
         unsigned long *rsp =
-            (next_p->arch.flags & TF_guestos_mode) ?
+            (next_p->arch.flags & TF_kernel_mode) ?
             (unsigned long *)stack_ec->rsp : 
-            (unsigned long *)next_p->arch.guestos_sp;
+            (unsigned long *)next_p->arch.kernel_sp;
 
         if ( put_user(stack_ec->ss,     rsp- 1) |
              put_user(stack_ec->rsp,    rsp- 2) |
@@ -764,9 +764,9 @@ void switch_to(struct exec_domain *prev_p, struct exec_domain *next_p)
             domain_crash();
         }
 
-        if ( !(next_p->arch.flags & TF_guestos_mode) )
+        if ( !(next_p->arch.flags & TF_kernel_mode) )
         {
-            next_p->arch.flags |= TF_guestos_mode;
+            next_p->arch.flags |= TF_kernel_mode;
             __asm__ __volatile__ ( "swapgs" );
             /* XXX switch page tables XXX */
         }

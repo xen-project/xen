@@ -49,15 +49,15 @@
 #define FLAT_RING3_SS32 0x082b  /* GDT index 262 */
 #define FLAT_RING3_SS64 0x082b  /* GDT index 262 */
 
-#define FLAT_GUESTOS_DS64 FLAT_RING3_DS64
-#define FLAT_GUESTOS_DS32 FLAT_RING3_DS32
-#define FLAT_GUESTOS_DS   FLAT_GUESTOS_DS64
-#define FLAT_GUESTOS_CS64 FLAT_RING3_CS64
-#define FLAT_GUESTOS_CS32 FLAT_RING3_CS32
-#define FLAT_GUESTOS_CS   FLAT_GUESTOS_CS64
-#define FLAT_GUESTOS_SS64 FLAT_RING3_SS64
-#define FLAT_GUESTOS_SS32 FLAT_RING3_SS32
-#define FLAT_GUESTOS_SS   FLAT_GUESTOS_SS64
+#define FLAT_KERNEL_DS64 FLAT_RING3_DS64
+#define FLAT_KERNEL_DS32 FLAT_RING3_DS32
+#define FLAT_KERNEL_DS   FLAT_KERNEL_DS64
+#define FLAT_KERNEL_CS64 FLAT_RING3_CS64
+#define FLAT_KERNEL_CS32 FLAT_RING3_CS32
+#define FLAT_KERNEL_CS   FLAT_KERNEL_CS64
+#define FLAT_KERNEL_SS64 FLAT_RING3_SS64
+#define FLAT_KERNEL_SS32 FLAT_RING3_SS32
+#define FLAT_KERNEL_SS   FLAT_KERNEL_SS64
 
 #define FLAT_USER_DS64 FLAT_RING3_DS64
 #define FLAT_USER_DS32 FLAT_RING3_DS32
@@ -149,14 +149,14 @@ typedef u64 tsc_timestamp_t; /* RDTSC timestamp */
 typedef struct {
 #define ECF_I387_VALID (1<<0)
 #define ECF_VMX_GUEST  (1<<1)
-#define ECF_IN_GUESTOS (1<<2)
+#define ECF_IN_KERNEL (1<<2)
     unsigned long flags;
     execution_context_t cpu_ctxt;           /* User-level CPU registers     */
     char          fpu_ctxt[512];            /* User-level FPU registers     */
     trap_info_t   trap_ctxt[256];           /* Virtual IDT                  */
     unsigned long ldt_base, ldt_ents;       /* LDT (linear address, # ents) */
     unsigned long gdt_frames[16], gdt_ents; /* GDT (machine frames, # ents) */
-    unsigned long guestos_ss, guestos_esp;  /* Virtual TSS (only SS1/ESP1)  */
+    unsigned long kernel_ss, kernel_esp;  /* Virtual TSS (only SS1/ESP1)  */
     unsigned long pt_base;                  /* CR3 (pagetable base)         */
     unsigned long debugreg[8];              /* DB0-DB7 (debug registers)    */
     unsigned long event_callback_cs;        /* CS:EIP of event callback     */

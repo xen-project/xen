@@ -18,7 +18,7 @@
       (((_s)>>3) >  LAST_RESERVED_GDT_ENTRY) ||                            \
       ((_s)&4)) &&                                                         \
      (((_s)&3) == 1))
-#define VALID_CODESEL(_s) ((_s) == FLAT_GUESTOS_CS || VALID_SEL(_s))
+#define VALID_CODESEL(_s) ((_s) == FLAT_KERNEL_CS || VALID_SEL(_s))
 
 /* These are bitmasks for the high 32 bits of a descriptor table entry. */
 #define _SEGMENT_TYPE    (15<< 8)

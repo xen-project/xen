@@ -222,7 +222,7 @@ extern int construct_dom0(struct domain *d,
                           unsigned long image_start, unsigned long image_len, 
                           unsigned long initrd_start, unsigned long initrd_len,
                           char *cmdline);
-extern int final_setup_guestos(struct domain *d, dom0_builddomain_t *);
+extern int final_setup_guest(struct domain *d, dom0_builddomain_t *);
 
 struct domain *find_domain_by_id(domid_t dom);
 struct domain *find_last_domain(void);

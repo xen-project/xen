@@ -41,7 +41,7 @@ loadelfsymtab(
     char *elfbase, int xch, u32 dom, unsigned long *parray,
     struct domain_setup_info *dsi);
 
-static int setup_guestos(int xc_handle,
+static int setup_guest(int xc_handle,
                          u32 dom,
                          char *image, unsigned long image_size,
                          gzFile initrd_gfd, unsigned long initrd_len,
@@ -384,7 +384,7 @@ int xc_linux_build(int xc_handle,
         goto error_out;
     }
 
-    if ( setup_guestos(xc_handle, domid, image, image_size, 
+    if ( setup_guest(xc_handle, domid, image, image_size, 
                        initrd_gfd, initrd_size, nr_pages, 
                        &vstartinfo_start, &vkern_entry,
                        ctxt, cmdline,
@@ -406,19 +406,19 @@ int xc_linux_build(int xc_handle,
 
     /*
      * Initial register values:
-     *  DS,ES,FS,GS = FLAT_GUESTOS_DS
-     *       CS:EIP = FLAT_GUESTOS_CS:start_pc
-     *       SS:ESP = FLAT_GUESTOS_DS:start_stack
+     *  DS,ES,FS,GS = FLAT_KERNEL_DS
+     *       CS:EIP = FLAT_KERNEL_CS:start_pc
+     *       SS:ESP = FLAT_KERNEL_DS:start_stack
      *          ESI = start_info
      *  [EAX,EBX,ECX,EDX,EDI,EBP are zero]
      *       EFLAGS = IF | 2 (bit 1 is reserved and should always be 1)
      */
-    ctxt->cpu_ctxt.ds = FLAT_GUESTOS_DS;
-    ctxt->cpu_ctxt.es = FLAT_GUESTOS_DS;
-    ctxt->cpu_ctxt.fs = FLAT_GUESTOS_DS;
-    ctxt->cpu_ctxt.gs = FLAT_GUESTOS_DS;
-    ctxt->cpu_ctxt.ss = FLAT_GUESTOS_DS;
-    ctxt->cpu_ctxt.cs = FLAT_GUESTOS_CS;
+    ctxt->cpu_ctxt.ds = FLAT_KERNEL_DS;
+    ctxt->cpu_ctxt.es = FLAT_KERNEL_DS;
+    ctxt->cpu_ctxt.fs = FLAT_KERNEL_DS;
+    ctxt->cpu_ctxt.gs = FLAT_KERNEL_DS;
+    ctxt->cpu_ctxt.ss = FLAT_KERNEL_DS;
+    ctxt->cpu_ctxt.cs = FLAT_KERNEL_CS;
     ctxt->cpu_ctxt.eip = vkern_entry;
     ctxt->cpu_ctxt.esp = vstartinfo_start + 2*PAGE_SIZE;
     ctxt->cpu_ctxt.esi = vstartinfo_start;
@@ -431,7 +431,7 @@ int xc_linux_build(int xc_handle,
     for ( i = 0; i < 256; i++ )
     {
         ctxt->trap_ctxt[i].vector = i;
-        ctxt->trap_ctxt[i].cs     = FLAT_GUESTOS_CS;
+        ctxt->trap_ctxt[i].cs     = FLAT_KERNEL_CS;
     }
     ctxt->fast_trap_idx = 0;
 
@@ -442,16 +442,16 @@ int xc_linux_build(int xc_handle,
     ctxt->gdt_ents = 0;
 
     /* Ring 1 stack is the initial stack. */
-    ctxt->guestos_ss  = FLAT_GUESTOS_DS;
-    ctxt->guestos_esp = vstartinfo_start + 2*PAGE_SIZE;
+    ctxt->kernel_ss  = FLAT_KERNEL_DS;
+    ctxt->kernel_esp = vstartinfo_start + 2*PAGE_SIZE;
 
     /* No debugging. */
     memset(ctxt->debugreg, 0, sizeof(ctxt->debugreg));
 
     /* No callback handlers. */
-    ctxt->event_callback_cs     = FLAT_GUESTOS_CS;
+    ctxt->event_callback_cs     = FLAT_KERNEL_CS;
     ctxt->event_callback_eip    = 0;
-    ctxt->failsafe_callback_cs  = FLAT_GUESTOS_CS;
+    ctxt->failsafe_callback_cs  = FLAT_KERNEL_CS;
     ctxt->failsafe_callback_eip = 0;
 
     memset( &launch_op, 0, sizeof(launch_op) );

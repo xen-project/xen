@@ -299,7 +299,7 @@ typedef struct
 } PACKED vcpu_info_t;                   /* 8 + arch */
 
 /*
- * Xen/guestos shared data -- pointer provided in start_info.
+ * Xen/kernel shared data -- pointer provided in start_info.
  * NB. We expect that this struct is smaller than a page.
  */
 typedef struct shared_info_st

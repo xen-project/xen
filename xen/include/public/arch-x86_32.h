@@ -54,9 +54,9 @@
 #define FLAT_RING3_DS 0x0833    /* GDT index 262 */
 #define FLAT_RING3_SS 0x0833    /* GDT index 262 */
 
-#define FLAT_GUESTOS_CS FLAT_RING1_CS
-#define FLAT_GUESTOS_DS FLAT_RING1_DS
-#define FLAT_GUESTOS_SS FLAT_RING1_SS
+#define FLAT_KERNEL_CS FLAT_RING1_CS
+#define FLAT_KERNEL_DS FLAT_RING1_DS
+#define FLAT_KERNEL_SS FLAT_RING1_SS
 #define FLAT_USER_CS    FLAT_RING3_CS
 #define FLAT_USER_DS    FLAT_RING3_DS
 #define FLAT_USER_SS    FLAT_RING3_SS
@@ -133,7 +133,7 @@ typedef u64 tsc_timestamp_t; /* RDTSC timestamp */
 typedef struct {
 #define ECF_I387_VALID (1<<0)
 #define ECF_VMX_GUEST  (1<<1)
-#define ECF_IN_GUESTOS (1<<2)
+#define ECF_IN_KERNEL (1<<2)
     unsigned long flags;
     execution_context_t cpu_ctxt;           /* User-level CPU registers     */
     char          fpu_ctxt[256];            /* User-level FPU registers     */
@@ -141,7 +141,7 @@ typedef struct {
     unsigned int  fast_trap_idx;            /* "Fast trap" vector offset    */
     unsigned long ldt_base, ldt_ents;       /* LDT (linear address, # ents) */
     unsigned long gdt_frames[16], gdt_ents; /* GDT (machine frames, # ents) */
-    unsigned long guestos_ss, guestos_esp;  /* Virtual TSS (only SS1/ESP1)  */
+    unsigned long kernel_ss, kernel_esp;  /* Virtual TSS (only SS1/ESP1)  */
     unsigned long pt_base;                  /* CR3 (pagetable base)         */
     unsigned long debugreg[8];              /* DB0-DB7 (debug registers)    */
     unsigned long event_callback_cs;        /* CS:EIP of event callback     */

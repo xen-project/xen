@@ -10,6 +10,6 @@
 #define RING_2(_r)    (((_r)->cs & 3) == 2)
 #define RING_3(_r)    (((_r)->cs & 3) == 3)
 
-#define GUESTOS_MODE(_e, _r) (!VM86_MODE(_r) && RING_1(_r))
+#define KERNEL_MODE(_e, _r) (!VM86_MODE(_r) && RING_1(_r))
 
 #endif

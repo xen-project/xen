@@ -45,8 +45,8 @@ struct arch_domain
 
 struct arch_exec_domain
 {
-    unsigned long      guestos_sp;
-    unsigned long      guestos_ss;
+    unsigned long      kernel_sp;
+    unsigned long      kernel_ss;
 
     unsigned long      flags; /* TF_ */
 

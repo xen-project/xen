@@ -202,8 +202,8 @@ long do_stack_switch(unsigned long ss, unsigned long esp)
     if ( (ss & 3) == 0 )
         return -EPERM;
 
-    current->arch.guestos_ss = ss;
-    current->arch.guestos_sp = esp;
+    current->arch.kernel_ss = ss;
+    current->arch.kernel_sp = esp;
     t->ss1  = ss;
     t->esp1 = esp;
 
@@ -224,7 +224,7 @@ int check_descriptor(struct desc_struct *d)
     /*
      * We don't allow a DPL of zero. There is no legitimate reason for 
      * specifying DPL==0, and it gets rather dangerous if we also accept call 
-     * gates (consider a call gate pointing at another guestos descriptor with 
+     * gates (consider a call gate pointing at another kernel descriptor with 
      * DPL 0 -- this would get the OS ring-0 privileges).
      */
     if ( (b & _SEGMENT_DPL) == 0 )

@@ -10,6 +10,6 @@
 #define RING_2(_r)    (((_r)->cs & 3) == 2)
 #define RING_3(_r)    (((_r)->cs & 3) == 3)
 
-#define GUESTOS_MODE(_e, _r) ((_e)->arch.flags & TF_guestos_mode)
+#define KERNEL_MODE(_e, _r) ((_e)->arch.flags & TF_kernel_mode)
 
 #endif

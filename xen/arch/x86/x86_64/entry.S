@@ -152,10 +152,10 @@ process_softirqs:
 create_bounce_frame:
         /* Push new frame at existing %rsp if already in guest-OS mode. */
         movq  XREGS_rsp+8(%rsp),%rsi
-        testb $TF_guestos_mode,EDOMAIN_thread_flags(%rbx)
+        testb $TF_kernel_mode,EDOMAIN_thread_flags(%rbx)
         jnz   1f
         /* Push new frame at registered guest-OS stack top. */
-        movq  EDOMAIN_guestos_sp(%rbx),%rsi
+        movq  EDOMAIN_kernel_sp(%rbx),%rsi
 1:      movq  $HYPERVISOR_VIRT_START,%rax
         cmpq  %rax,%rsi
         jb    1f                        # In +ve address space? Then okay.
@@ -203,9 +203,9 @@ FLT15:  movq  %rax,(%rsi)               # RCX
         /* Rewrite our stack frame and return to guest-OS mode. */
         /* IA32 Ref. Vol. 3: TF, VM, RF and NT flags are cleared on trap. */
         movb  $0,TRAPBOUNCE_flags(%rdx)
-        testb $TF_guestos_mode,EDOMAIN_thread_flags(%rbx)
+        testb $TF_kernel_mode,EDOMAIN_thread_flags(%rbx)
         jnz   1f
-        orb   $TF_guestos_mode,EDOMAIN_thread_flags(%rbx)
+        orb   $TF_kernel_mode,EDOMAIN_thread_flags(%rbx)
         swapgs
         /* XXX switch page tables XXX */
 1:      movl  $TRAP_syscall,XREGS_entry_vector+8(%rsp)

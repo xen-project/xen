@@ -118,7 +118,7 @@ long do_dom0_op(dom0_op_t *u_dom0_op)
         ret = -EINVAL;
         if ( d != NULL )
         {
-            ret = final_setup_guestos(d, &op->u.builddomain);
+            ret = final_setup_guest(d, &op->u.builddomain);
             put_domain(d);
         }
     }

@@ -355,8 +355,8 @@ void arch_getdomaininfo_ctxt(
            sizeof(ed->arch.user_ctxt));
     if ( test_bit(EDF_DONEFPUINIT, &ed->ed_flags) )
         c->flags |= ECF_I387_VALID;
-    if ( GUESTOS_MODE(ed, &ed->arch.user_ctxt) )
-        c->flags |= ECF_IN_GUESTOS;
+    if ( KERNEL_MODE(ed, &ed->arch.user_ctxt) )
+        c->flags |= ECF_IN_KERNEL;
     memcpy(&c->fpu_ctxt,
            &ed->arch.i387,
            sizeof(ed->arch.i387));
@@ -381,8 +381,8 @@ void arch_getdomaininfo_ctxt(
                 l1_pgentry_to_pfn(ed->arch.perdomain_ptes[i]);
         c->gdt_ents = GET_GDT_ENTRIES(ed);
     }
-    c->guestos_ss  = ed->arch.guestos_ss;
-    c->guestos_esp = ed->arch.guestos_sp;
+    c->kernel_ss  = ed->arch.kernel_ss;
+    c->kernel_esp = ed->arch.kernel_sp;
     c->pt_base   = 
         pagetable_val(ed->arch.pagetable);
     memcpy(c->debugreg, 

@@ -131,7 +131,7 @@
 
 /* arch_exec_domain' flags values */
 #define TF_failsafe_return     1
-#define TF_guestos_mode        2
+#define TF_kernel_mode        2
 
 #ifndef __ASSEMBLY__
 

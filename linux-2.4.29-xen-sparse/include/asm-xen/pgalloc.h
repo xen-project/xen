@@ -227,7 +227,7 @@ static inline void flush_tlb_range(struct mm_struct *mm,
 }
 
 #else
-#error no guestos SMP support yet...
+#error no kernel SMP support yet...
 #include <asm/smp.h>
 
 #define local_flush_tlb() \

@@ -522,7 +522,7 @@ asmlinkage int do_general_protection(struct xen_regs *regs)
 
     /* Emulate some simple privileged instructions when exec'ed in ring 1. */
     if ( (regs->error_code == 0) &&
-         GUESTOS_MODE(ed, regs) &&
+         KERNEL_MODE(ed, regs) &&
          emulate_privileged_op(regs) )
         return 0;
 

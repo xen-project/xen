@@ -225,11 +225,11 @@ int construct_dom0(struct domain *d,
      * We're basically forcing default RPLs to 1, so that our "what privilege
      * level are we returning to?" logic works.
      */
-    ed->arch.failsafe_selector = FLAT_GUESTOS_CS;
-    ed->arch.event_selector    = FLAT_GUESTOS_CS;
-    ed->arch.guestos_ss = FLAT_GUESTOS_SS;
+    ed->arch.failsafe_selector = FLAT_KERNEL_CS;
+    ed->arch.event_selector    = FLAT_KERNEL_CS;
+    ed->arch.kernel_ss = FLAT_KERNEL_SS;
     for ( i = 0; i < 256; i++ ) 
-        ed->arch.traps[i].cs = FLAT_GUESTOS_CS;
+        ed->arch.traps[i].cs = FLAT_KERNEL_CS;
 
     /* WARNING: The new domain must have its 'processor' field filled in! */
     phys_to_page(mpt_alloc)->u.inuse.type_info = PGT_l4_page_table;

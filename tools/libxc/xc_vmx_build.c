@@ -108,7 +108,7 @@ static void build_e820map(struct mem_map *mem_mapp, unsigned long mem_size)
     mem_mapp->nr_map = nr_map;
 }
 
-static int setup_guestos(int xc_handle,
+static int setup_guest(int xc_handle,
                          u32 dom, int memsize,
                          char *image, unsigned long image_size,
                          gzFile initrd_gfd, unsigned long initrd_len,
@@ -510,7 +510,7 @@ int xc_vmx_build(int xc_handle,
         goto error_out;
     }
 
-    if ( setup_guestos(xc_handle, domid, memsize, image, image_size, 
+    if ( setup_guest(xc_handle, domid, memsize, image, image_size, 
                        initrd_gfd, initrd_size, nr_pages, 
                        ctxt, cmdline,
                        op.u.getdomaininfo.shared_info_frame,
@@ -535,7 +535,7 @@ int xc_vmx_build(int xc_handle,
     for ( i = 0; i < 256; i++ )
     {
         ctxt->trap_ctxt[i].vector = i;
-        ctxt->trap_ctxt[i].cs     = FLAT_GUESTOS_CS;
+        ctxt->trap_ctxt[i].cs     = FLAT_KERNEL_CS;
     }
     ctxt->fast_trap_idx = 0;
 
@@ -547,16 +547,16 @@ int xc_vmx_build(int xc_handle,
 
     /* Ring 1 stack is the initial stack. */
 /*
-    ctxt->guestos_ss  = FLAT_GUESTOS_DS;
-    ctxt->guestos_esp = vstartinfo_start;
+    ctxt->kernel_ss  = FLAT_KERNEL_DS;
+    ctxt->kernel_esp = vstartinfo_start;
 */
     /* No debugging. */
     memset(ctxt->debugreg, 0, sizeof(ctxt->debugreg));
 
     /* No callback handlers. */
-    ctxt->event_callback_cs     = FLAT_GUESTOS_CS;
+    ctxt->event_callback_cs     = FLAT_KERNEL_CS;
     ctxt->event_callback_eip    = 0;
-    ctxt->failsafe_callback_cs  = FLAT_GUESTOS_CS;
+    ctxt->failsafe_callback_cs  = FLAT_KERNEL_CS;
     ctxt->failsafe_callback_eip = 0;
 
     memset( &launch_op, 0, sizeof(launch_op) );

@@ -879,7 +879,7 @@ static int __init do_boot_cpu(int apicid)
 	for ( i = 0; i < 256; i++ )
 	{
 		ctxt.trap_ctxt[i].vector = i;
-		ctxt.trap_ctxt[i].cs     = FLAT_GUESTOS_CS;
+		ctxt.trap_ctxt[i].cs     = FLAT_KERNEL_CS;
 	}
 	ctxt.fast_trap_idx = smp_trap_init(ctxt.trap_ctxt);
 
@@ -901,8 +901,8 @@ static int __init do_boot_cpu(int apicid)
 	}
 
 	/* Ring 1 stack is the initial stack. */
-	ctxt.guestos_ss  = __KERNEL_DS;
-	ctxt.guestos_esp = idle->thread.esp;
+	ctxt.kernel_ss  = __KERNEL_DS;
+	ctxt.kernel_esp = idle->thread.esp;
 
 	/* Callback handlers. */
 	ctxt.event_callback_cs     = __KERNEL_CS;
