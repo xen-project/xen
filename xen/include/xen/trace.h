@@ -80,7 +80,7 @@ static inline int trace(u32 event, u32 d1, u32 d2, u32 d3, u32 d4, u32 d5)
 
     buf->head_ptr++;
     buf->head++;
-    if ( buf->head_ptr == (buf->vdata + (buf->size-1)) )
+    if ( buf->head_ptr == (buf->vdata + buf->size) )
         buf->head_ptr = buf->vdata;
 
     local_irq_restore(flags);

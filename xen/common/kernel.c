@@ -59,7 +59,7 @@ int opt_watchdog=0;
 /* opt_pdb: Name of serial port for Xen pervasive debugger (and enable pdb) */
 unsigned char opt_pdb[10] = "none";
 /* opt_tbuf_size: trace buffer size (in pages) */
-unsigned int opt_tbuf_size = 1;
+unsigned int opt_tbuf_size = 10;
 /* opt_sched: scheduler - default to Borrowed Virtual Time */
 char opt_sched[10] = "bvt";
 /* opt_physdev_dom0_hide: list of PCI slots to hide from domain 0. */
