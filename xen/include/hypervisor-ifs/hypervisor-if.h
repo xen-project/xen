@@ -190,6 +190,7 @@
 #define VMASST_TYPE_4gb_segments         0
 #define VMASST_TYPE_4gb_segments_notify  1
 #define VMASST_TYPE_writeable_pagetables 2
+#define MAX_VMASST_TYPE 2
 
 #ifndef __ASSEMBLY__
 

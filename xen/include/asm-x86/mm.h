@@ -330,13 +330,20 @@ int memguard_is_guarded(void *p);
 #endif
 
 
+typedef struct {
+    void	(*enable)(void);
+    void	(*disable)(void);
+} vm_assist_info_t;
+extern vm_assist_info_t vm_assist_info[];
+
+
 /* Writable Pagetables */
 #define	PTWR_NR_WRITABLES 1
 typedef struct {
     unsigned long disconnected;
     l1_pgentry_t disconnected_page[ENTRIES_PER_L1_PAGETABLE];
-    unsigned long *writable_l1;
-    unsigned long *writables[PTWR_NR_WRITABLES];
+    unsigned long writable_l1;
+    unsigned long writables[PTWR_NR_WRITABLES];
     int writable_idx;
     l1_pgentry_t writable_page[PTWR_NR_WRITABLES][ENTRIES_PER_L1_PAGETABLE];
 #ifdef PTWR_TRACK_DOMAIN

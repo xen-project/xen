@@ -32,7 +32,7 @@
 #include <asm/pgtable.h>
 #include <asm/uaccess.h>
 
-#if 1
+#if 0
 #define ASSERT(_p) \
     if ( !(_p) ) { printk("Assertion '%s' failed, line %d, file %s", #_p , \
     __LINE__, __FILE__); *(int*)0=0; }
@@ -44,14 +44,13 @@
 #define DPRINTK(_f, _a...) ((void)0)
 #endif
 
-static char            *fixup_buf;
+static unsigned char *fixup_buf;
 #define FIXUP_BUF_USER  PAGE_SIZE
 #define FIXUP_BUF_ORDER 1
 #define FIXUP_BUF_SIZE  (PAGE_SIZE<<FIXUP_BUF_ORDER)
 #define PATCH_LEN       5
 
 struct fixup_entry {
-    unsigned long  patch_addr; /* XXX */
     unsigned char  patched_code[20];
     unsigned short patched_code_len;
     unsigned short fixup_idx;
@@ -77,9 +76,9 @@ static inline int FIXUP_HASH(char *b)
 
 /* Helpful codes for the main decode routine. */
 #define CODE_MASK         (3<<6)
-#define PUSH              (0<<6) /* PUSH onto stack */
-#define POP               (1<<6) /* POP from stack */
-#define JMP               (2<<6) /* 8-bit relative JMP */
+#define PUSH              (1<<6) /* PUSH onto stack */
+#define POP               (2<<6) /* POP from stack */
+#define JMP               (3<<6) /* 8-bit relative JMP */
 
 /* Short forms for the table. */
 #define X  0 /* invalid for some random reason */
@@ -117,7 +116,7 @@ static unsigned char insn_decode[256] = {
     O|M|1, O|M|4, O|M|1, O|M|1, O|M, O|M, O|M, O|M,
     O|M, O|M, O|M, O|M, O|M, O|M, O|M, O|M|POP, 
     /* 0x90 - 0x9F */
-    O, O, O, O, O, O, O, O,
+    O, O, O, O, S, O, O, O,
     O, O, X, O, O, O, O, O,
     /* 0xA0 - 0xAF */
     O|1, O|4, O|1, O|4, O, O, O, O,
@@ -139,9 +138,9 @@ static unsigned char insn_decode[256] = {
     O, O, O, O, O, O, O|M, X
 };
 
-static unsigned int get_insn_len(unsigned char *insn, 
-                                 unsigned char *p_opcode,
-                                 unsigned char *p_decode)
+static unsigned int parse_insn(unsigned char *insn, 
+                               unsigned char *p_opcode,
+                               unsigned char *p_decode)
 {
     unsigned char b, d, *pb, mod, rm;
 
@@ -159,10 +158,7 @@ static unsigned int get_insn_len(unsigned char *insn,
 
     /* 2. Ensure we have a valid opcode byte. */
     if ( !(d & OPCODE_BYTE) )
-    {
-        printk(KERN_ALERT " *** %02x %02x %02x\n", pb[0], pb[1], pb[2]);
         return 0;
-    }
 
     /* 3. Process Mod/RM if there is one. */
     if ( d & HAS_MODRM )
@@ -188,10 +184,11 @@ static unsigned int get_insn_len(unsigned char *insn,
         }
     }
 
-    /* 4. All done. Result is all byte sstepped over, plus any immediates. */
+    /* 4. All done. Result is all bytes stepped over, plus any immediates. */
     return ((pb - insn) + 1 + (d & INSN_SUFFIX_BYTES));
 }
 
+/* Bitmap of faulting instructions that we can handle. */
 static unsigned char handleable_code[32] = {
     0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
     0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
@@ -201,13 +198,25 @@ static unsigned char handleable_code[32] = {
     0x80, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
 };
 
+/* Bitmap of opcodes that use a register operand specified by Mod/RM. */
+static unsigned char opcode_uses_reg[32] = {
+    /* 0x00 - 0x3F */
+    0x0F, 0x0F, 0x0F, 0x0F, 0x0F, 0x0F, 0x0F, 0x0F,
+    /* 0x40 - 0x7F */
+    0x00, 0x00, 0x00, 0x00, 0x0C, 0x0A, 0x00, 0x00,
+    /* 0x80 - 0xBF */
+    0xF0, 0x2F, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+    /* 0xC0 - 0xFF */
+    0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+};
+
 asmlinkage void do_fixup_4gb_segment(struct pt_regs *regs, long error_code)
 {
     static unsigned int fixup_idx = 0;
     unsigned int fi;
-    int save_indirect_reg, hash;
+    int save_indirect_reg, hash, i;
     unsigned int insn_len = (unsigned int)error_code, new_insn_len;
-    unsigned char b[20], modrm, mod, reg, rm, patch[PATCH_LEN], opcode, decode;
+    unsigned char b[20], modrm, mod, reg, rm, sib, patch[20], opcode, decode;
     unsigned long eip = regs->eip - insn_len;
     struct fixup_entry *fe;
     pte_t *pte;
@@ -227,20 +236,14 @@ asmlinkage void do_fixup_4gb_segment(struct pt_regs *regs, long error_code)
         DPRINTK("User executing out of kernel space?!");
         return;
     }
-    
-    if ( unlikely(((eip ^ (eip+PATCH_LEN)) & PAGE_MASK) != 0) )
-    {
-        DPRINTK("Patch instruction would straddle a page boundary.");
-        return;
-    }
 
     /*
-     * Check that the page to be patched is part of a read-only VMA. This 
+     * Check that the page to be patched is part of a private VMA. This 
      * means that our patch will never erroneously get flushed to disc.
      */
     if ( eip > (FIXUP_BUF_USER + FIXUP_BUF_SIZE) ) /* don't check fixup area */
     {
-        /* [SMP] Need to the mmap_sem semaphore. */
+        /* [SMP] Need to grab the mmap_sem semaphore. */
         struct vm_area_struct *vma = find_vma(current->mm, eip);
         if ( (vma == NULL) || (vma->vm_flags & VM_MAYSHARE) )
         {
@@ -255,19 +258,16 @@ asmlinkage void do_fixup_4gb_segment(struct pt_regs *regs, long error_code)
         return;
     }
 
-    /* Already created a fixup for this address and code sequence? */
+    /* Already created a fixup for this code sequence? */
     hash = FIXUP_HASH(b);
-    for ( fe = fixup_hash[hash];
-          fe != NULL; fe = fe->next )
+    for ( fe = fixup_hash[hash]; fe != NULL; fe = fe->next )
     {
-        if ( eip != fe->patch_addr )
-            continue; /* XXX */
         if ( memcmp(fe->patched_code, b, fe->patched_code_len) == 0 )
             goto do_the_patch;
     }
 
     /* Guaranteed enough room to patch? */
-    if ( unlikely((fi = fixup_idx) > (FIXUP_BUF_SIZE-32)) )
+    if ( unlikely((fi = fixup_idx) > (FIXUP_BUF_SIZE-64)) )
     {
         static int printed = 0;
         if ( !printed )
@@ -324,12 +324,18 @@ asmlinkage void do_fixup_4gb_segment(struct pt_regs *regs, long error_code)
     if ( save_indirect_reg )
         fixup_buf[fi++] = 0x50 + rm;
 
+    /* pushf */
+    fixup_buf[fi++] = 0x9c;
+
     /* add %gs:0,<r32> */
     fixup_buf[fi++] = 0x65;
     fixup_buf[fi++] = 0x03;
     fixup_buf[fi++] = 0x05 | (rm << 3);
     *(unsigned long *)&fixup_buf[fi] = 0;
     fi += 4;
+
+    /* popf */
+    fixup_buf[fi++] = 0x9d;
 
     /* Relocate the faulting instruction, minus the GS override. */
     memcpy(&fixup_buf[fi], &b[1], error_code - 1);
@@ -350,7 +356,7 @@ asmlinkage void do_fixup_4gb_segment(struct pt_regs *regs, long error_code)
 
         /* Bail if can't decode the following instruction. */
         if ( unlikely((new_insn_len =
-                       get_insn_len(&b[insn_len], &opcode, &decode)) == 0) )
+                       parse_insn(&b[insn_len], &opcode, &decode)) == 0) )
         {
             DPRINTK("Could not decode following instruction.");
             return;
@@ -358,63 +364,183 @@ asmlinkage void do_fixup_4gb_segment(struct pt_regs *regs, long error_code)
 
         if ( (decode & CODE_MASK) == JMP )
         {
-            return;
+            long off;
 
             memcpy(&fixup_buf[fi], &b[insn_len], new_insn_len - 1);
             fi += new_insn_len - 1;
             
             /* Patch the 8-bit relative offset. */
             fixup_buf[fi++] = 1;
-
+            
             insn_len += new_insn_len;
             ASSERT(insn_len >= PATCH_LEN);
         
             /* ret */
             fixup_buf[fi++] = 0xc3;
 
-            /* jmp <rel32> */
-            fixup_buf[fi++] = 0xe9;
-            fi += 4;
-            *(unsigned long *)&fixup_buf[fi-4] = 
-                (eip + insn_len + (long)(char)b[insn_len-1]) - 
-                (FIXUP_BUF_USER + fi);
-            
-            break;
-        }
-        else if ( opcode == 0xe9 )
-        {
-            return;
+            /* pushf */
+            fixup_buf[fi++] = 0x9c;
 
-            memcpy(&fixup_buf[fi], &b[insn_len], new_insn_len - 4);
-            fi += new_insn_len - 4;
-            
-            insn_len += new_insn_len;
-            ASSERT(insn_len >= PATCH_LEN);
-        
-            /* Patch the 32-bit relative offset. */
-            fi += 4;
-            *(unsigned long *)&fixup_buf[fi-4] = 
-                (eip + insn_len + *(long *)&b[insn_len-4]) - 
-                (FIXUP_BUF_USER + fi);
+            off = (insn_len - PATCH_LEN) + (long)(char)b[insn_len-1];
+            if ( unlikely(off > 127) )
+            {
+                /* add <imm32>,4(%esp) */
+                fixup_buf[fi++] = 0x81;
+                fixup_buf[fi++] = 0x44;
+                fixup_buf[fi++] = 0x24;
+                fixup_buf[fi++] = 0x04;
+                fi += 4;
+                *(long *)&fixup_buf[fi-4] = off;
+            }
+            else
+            {
+                /* add <imm8>,4(%esp) [sign-extended] */
+                fixup_buf[fi++] = 0x83;
+                fixup_buf[fi++] = 0x44;
+                fixup_buf[fi++] = 0x24;
+                fixup_buf[fi++] = 0x04;
+                fixup_buf[fi++] = (char)(off & 0xff);
+            }
+
+            /* popf */
+            fixup_buf[fi++] = 0x9d;
 
             /* ret */
             fixup_buf[fi++] = 0xc3;
 
             break;
         }
-        else if ( (decode & CODE_MASK) == PUSH )
+        else if ( opcode == 0xe9 ) /* jmp <rel32> */
         {
-            return;
+            insn_len += new_insn_len;
+            ASSERT(insn_len >= PATCH_LEN);
+        
+            /* pushf */
+            fixup_buf[fi++] = 0x9c;
+
+            /* add <imm32>,4(%esp) */
+            fixup_buf[fi++] = 0x81;
+            fixup_buf[fi++] = 0x44;
+            fixup_buf[fi++] = 0x24;
+            fixup_buf[fi++] = 0x04;
+            fi += 4;
+            *(long *)&fixup_buf[fi-4] = 
+                (insn_len - PATCH_LEN) + *(long *)&b[insn_len-4];
+
+            /* popf */
+            fixup_buf[fi++] = 0x9d;
+
+            /* ret */
+            fixup_buf[fi++] = 0xc3;
+
+            break;
         }
-        else if ( (decode & CODE_MASK) == POP )
+        else if ( opcode == 0xc3 ) /* ret */
         {
-            return;
+            /* pop -4(%esp) [doesn't affect EFLAGS] */
+            fixup_buf[fi++] = 0x8f;
+            fixup_buf[fi++] = 0x44;
+            fixup_buf[fi++] = 0x24;
+            fixup_buf[fi++] = 0xfc;
         }
         else
         {
-            /* Relocate the instruction verbatim. */
-            memcpy(&fixup_buf[fi], &b[insn_len], new_insn_len);
-            fi += new_insn_len;
+            int stack_addon = 4;
+
+            if ( (decode & CODE_MASK) == PUSH )
+            {
+                stack_addon = 8;
+                /* push (%esp) */
+                fixup_buf[fi++] = 0xff;
+                fixup_buf[fi++] = 0x34;
+                fixup_buf[fi++] = 0x24;
+            }
+            else if ( (decode & CODE_MASK) == POP )
+            {
+                stack_addon = 8;
+                /* push 4(%esp) */
+                fixup_buf[fi++] = 0xff;
+                fixup_buf[fi++] = 0x74;
+                fixup_buf[fi++] = 0x24;
+                fixup_buf[fi++] = 0x04;
+            }
+
+            /* Check for EA calculations involving ESP, and skip return addr */
+            if ( decode & HAS_MODRM )
+            {
+                do { new_insn_len--; }
+                while ( (fixup_buf[fi++] = b[insn_len++]) != opcode );
+
+                modrm = fixup_buf[fi++] = b[insn_len++];
+                new_insn_len--;
+                mod   = (modrm >> 6) & 3;
+                reg   = (modrm >> 3) & 7;
+                rm    = (modrm >> 0) & 7;
+
+                if ( (reg == 4) &&
+                     test_bit(opcode, (unsigned long *)opcode_uses_reg) )
+                {
+                    DPRINTK("Data movement to ESP unsupported.");
+                    return;
+                }
+
+                if ( rm == 4 )
+                {
+                    if ( mod == 3 )
+                    {
+                        DPRINTK("Data movement to ESP is unsupported.");
+                        return;
+                    }
+
+                    sib = fixup_buf[fi++] = b[insn_len++];
+                    new_insn_len--;
+                    if ( (sib & 7) == 4 )
+                    {
+                        switch ( mod )
+                        {
+                        case 0:
+                            mod = 1;
+                            fixup_buf[fi-2] |= 0x40;
+                            fixup_buf[fi++] = stack_addon;
+                            break;
+                        case 1:
+                            fixup_buf[fi++] = b[insn_len++] + stack_addon;
+                            new_insn_len--;
+                            break;
+                        case 2:
+                            *(long *)&fixup_buf[fi] = 
+                                *(long *)&b[insn_len] + stack_addon;
+                            fi += 4;
+                            insn_len += 4;
+                            new_insn_len -= 4;
+                            break;
+                        }
+                    }
+                }
+            }
+
+            /* Relocate the (remainder of) the instruction. */
+            if ( new_insn_len != 0 )
+            {
+                memcpy(&fixup_buf[fi], &b[insn_len], new_insn_len);
+                fi += new_insn_len;
+            }
+
+            if ( (decode & CODE_MASK) == PUSH )
+            {
+                /* pop 4(%esp) */
+                fixup_buf[fi++] = 0x8f;
+                fixup_buf[fi++] = 0x44;
+                fixup_buf[fi++] = 0x24;
+                fixup_buf[fi++] = 0x04;
+            }
+            else if ( (decode & CODE_MASK) == POP )
+            {
+                /* pop (%esp) */
+                fixup_buf[fi++] = 0x8f;
+                fixup_buf[fi++] = 0x04;
+                fixup_buf[fi++] = 0x24;
+            }
         }
 
         if ( (insn_len += new_insn_len) > 20 )
@@ -424,7 +550,7 @@ asmlinkage void do_fixup_4gb_segment(struct pt_regs *regs, long error_code)
         }
 
         /* Can't have a RET in the middle of a patch sequence. */
-        if ( (opcode == 0xc4) && (insn_len < PATCH_LEN) )
+        if ( (opcode == 0xc3) && (insn_len < PATCH_LEN) )
         {
             DPRINTK("RET in middle of patch seq!\n");
             return;
@@ -438,12 +564,11 @@ asmlinkage void do_fixup_4gb_segment(struct pt_regs *regs, long error_code)
         DPRINTK("Not enough memory to allocate a fixup_entry.");
         return;
     }
-    fe->patch_addr = eip; /* XXX */
     fe->patched_code_len = insn_len;
     memcpy(fe->patched_code, b, insn_len);
     fe->fixup_idx = fixup_idx;
     fe->return_idx = 
-        fixup_idx + error_code + 6 + 4/**/ + (save_indirect_reg ? 2 : 0);
+        fixup_idx + error_code + (save_indirect_reg ? 14 : 12);
     fe->next = fixup_hash[hash];
     fixup_hash[hash] = fe;
 
@@ -451,39 +576,22 @@ asmlinkage void do_fixup_4gb_segment(struct pt_regs *regs, long error_code)
     fixup_idx = fi;
 
  do_the_patch:
-#if 1
-    /* Create the patching instruction in a temporary buffer. */
+
+    if ( unlikely(((eip ^ (eip + fe->patched_code_len)) & PAGE_MASK) != 0) )
+    {
+        DPRINTK("Patch instruction would straddle a page boundary.");
+        return;
+    }
+
+    /* Create the patching instructions in a temporary buffer. */
     patch[0] = 0x67;
     patch[1] = 0xff;
     patch[2] = 0x16; /* call <r/m16> */
     *(u16 *)&patch[3] = FIXUP_BUF_USER + fe->fixup_idx;
-#else
-    patch[0] = 0x9a;
-    *(u32 *)&patch[1] = FIXUP_BUF_USER + fe->fixup_idx + 4;
-    *(u16 *)&patch[5] = __USER_CS;
-#endif
+    for ( i = 5; i < fe->patched_code_len; i++ )
+        patch[i] = 0x90; /* nop */
 
-#if 1
-    {
-        int iii;
-        printk(KERN_ALERT "EIP == %08lx; USER_EIP == %08lx\n",
-               eip, FIXUP_BUF_USER + fe->fixup_idx);
-        printk(KERN_ALERT " .byte ");
-        for ( iii = 0; iii < insn_len; iii++ )
-            printk("0x%02x,", b[iii]);
-        printk("!!\n");
-        printk(KERN_ALERT " .byte ");
-        for ( iii = fe->fixup_idx; iii < fi; iii++ )
-            printk("0x%02x,", (unsigned char)fixup_buf[iii]);
-        printk("!!\n");
-        printk(KERN_ALERT " .byte ");
-        for ( iii = 0; iii < 7; iii++ )
-            printk("0x%02x,", (unsigned char)patch[iii]);
-        printk("!!\n");
-    }
-#endif
-
-    if ( put_user(eip + insn_len, (unsigned long *)regs->esp - 1) != 0 )
+    if ( put_user(eip + PATCH_LEN, (unsigned long *)regs->esp - 1) != 0 )
     {
         DPRINTK("Failed to place return address on user stack.");
         return;
@@ -498,7 +606,7 @@ asmlinkage void do_fixup_4gb_segment(struct pt_regs *regs, long error_code)
     pmd = pmd_offset(pgd, eip);
     pte = pte_offset_kernel(pmd, eip);
     veip = kmap(pte_page(*pte));
-    memcpy((char *)veip + (eip & ~PAGE_MASK), patch, PATCH_LEN);
+    memcpy((char *)veip + (eip & ~PAGE_MASK), patch, fe->patched_code_len);
     kunmap(pte_page(*pte));
 
     return;
@@ -512,7 +620,7 @@ static int __init fixup_init(void)
     struct page *_pages[1<<FIXUP_BUF_ORDER], **pages=_pages;
     int i;
 
-    /*if ( nosegfixup )*/
+    if ( nosegfixup )
         return 0;
 
     HYPERVISOR_vm_assist(VMASST_CMD_enable,

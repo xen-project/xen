@@ -241,6 +241,8 @@ void netif_connect(netif_be_connect_t *connect)
     netif->status         = CONNECTED;
     netif_get(netif);
 
+    netif->tx->resp_prod = netif->rx->resp_prod = 0;
+
     rtnl_lock();
     (void)dev_open(netif->dev);
     rtnl_unlock();
