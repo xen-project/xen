@@ -2099,6 +2099,12 @@ static void tg3_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 	{
 	  int budget = 1000;
 	  tg3_poll( dev, &budget );
+
+	  tw32_mailbox(MAILBOX_INTERRUPT_0 + TG3_64BIT_REG_LOW,
+		       0x00000000);
+	  tr32(MAILBOX_INTERRUPT_0 + TG3_64BIT_REG_LOW);
+
+
 	}
 #endif
 
