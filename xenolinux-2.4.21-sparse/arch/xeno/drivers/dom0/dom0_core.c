@@ -189,7 +189,7 @@ static int dom0_cmd_write(struct file *file, const char *buffer, size_t size,
 
 static dom0_op_t proc_domains_op;
 static int proc_domains_finished;
-static rwlock_t proc_xeno_domains_lock = RW_LOCK_UNLOCKED;
+static DECLARE_MUTEX(proc_xeno_domains_lock);
 
 static void *xeno_domains_next(struct seq_file *s, void *v, loff_t *pos)
 {
@@ -213,7 +213,7 @@ static void *xeno_domains_start(struct seq_file *s, loff_t *ppos)
 { 
     loff_t pos = *ppos;
   
-    write_lock (&proc_xeno_domains_lock);
+    down (&proc_xeno_domains_lock);
     proc_domains_op.cmd = DOM0_GETDOMAININFO;
     proc_domains_op.u.getdominfo.domain = 0;
     (void)HYPERVISOR_dom0_op(&proc_domains_op);
@@ -229,7 +229,7 @@ static void *xeno_domains_start(struct seq_file *s, loff_t *ppos)
 
 static void xeno_domains_stop(struct seq_file *s, void *v)
 { 
-    write_unlock (&proc_xeno_domains_lock);
+    up(&proc_xeno_domains_lock);
 }
 
 static int xeno_domains_show(struct seq_file *s, void *v)
@@ -327,7 +327,6 @@ static unsigned long handle_dom0_cmd_mapdommem(unsigned long data)
     return -EFAULT;
   /* This seems to be assuming that the root of the page table is in
      the first frame of the new domain's physical memory? */
-  /* XXX what happens if userspace forgets to do the unmap? */
 
   addr = direct_mmap(argbuf.start_pfn << PAGE_SHIFT,
 		     argbuf.tot_pages << PAGE_SHIFT,
@@ -357,14 +356,14 @@ static int handle_dom0_cmd_dopgupdates(unsigned long data)
     return -EFAULT;
 
   /* argbuf.pgt_update_arr had better be direct mapped... */
-  return HYPERVISOR_pt_update(argbuf.pgt_update_arr,
+  /* XXX check this */
+  return HYPERVISOR_pt_update((void *)argbuf.pgt_update_arr,
 			      argbuf.num_pgt_updates);
 }
 
 static int dom0_cmd_ioctl(struct inode *inode, struct file *file,
 			  unsigned int cmd, unsigned long data)
 {
-  printk("dom0_cmd ioctl command %x\n", cmd);
   switch (cmd) {
   case IOCTL_DOM0_CREATEDOMAIN:
     return handle_dom0_cmd_createdomain(data);
@@ -375,8 +374,10 @@ static int dom0_cmd_ioctl(struct inode *inode, struct file *file,
   case IOCTL_DOM0_DOPGUPDATES:
     return handle_dom0_cmd_dopgupdates(data);
   default:
-    printk("Unknown dom0_cmd ioctl!\n");
-    return -EINVAL;
+    return -ENOTTY; /* It isn't obvious why this is the correct error
+		       code when an ioctl isn't recognised, but it
+		       does appear to be what's used in the rest of
+		       the kernel. */
   }
 }
 
