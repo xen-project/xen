@@ -23,12 +23,14 @@ asmlinkage void do_softirq()
 {
     unsigned int i, pending, cpu = smp_processor_id();
 
-    while ( (pending = softirq_pending(cpu)) != 0 )
-    {
+    pending = softirq_pending(cpu);
+    ASSERT(pending != 0);
+
+    do {
         i = find_first_set_bit(pending);
         clear_bit(i, &softirq_pending(cpu));
         (*softirq_handlers[i])();
-    }
+    } while ( (pending = softirq_pending(cpu)) != 0 );
 }
 
 void open_softirq(int nr, softirq_handler handler)
