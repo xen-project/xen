@@ -409,6 +409,7 @@
 3ddb79berPStE_-ILQHgcl1BLDLywA xen/drivers/scsi/scsi_lib.c
 3ddb79beRXjB7_nNUbJMIRyjDmeByQ xen/drivers/scsi/scsi_merge.c
 3e56412a_O2cnz-e36volrKvofGe-Q xen/drivers/scsi/scsi_module.c.inc
+3faf8290uGugKdeePovsS2MCkm6NYw xen/drivers/scsi/scsi_obsolete.c
 3ddb79beQgG_st0eBZUX8AQI7kBkHA xen/drivers/scsi/scsi_obsolete.h
 3ddb79beK65cNRldY0CFGXjZ3-A74Q xen/drivers/scsi/scsi_proc.c
 3ddb79beeIuwGDE0Ldl8wy6mt86Bag xen/drivers/scsi/scsi_queue.c

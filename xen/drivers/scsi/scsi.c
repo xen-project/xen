@@ -153,7 +153,6 @@ const char *const scsi_device_types[MAX_SCSI_DEVICE_CODE] =
 extern void scsi_times_out(Scsi_Cmnd * SCpnt);
 void scsi_build_commandblocks(Scsi_Device * SDpnt);
 
-#if 0
 /*
  * These are the interface to the old error handling code.  It should go away
  * someday soon.
@@ -161,7 +160,6 @@ void scsi_build_commandblocks(Scsi_Device * SDpnt);
 extern void scsi_old_done(Scsi_Cmnd * SCpnt);
 extern void scsi_old_times_out(Scsi_Cmnd * SCpnt);
 extern int scsi_old_reset(Scsi_Cmnd *SCpnt, unsigned int flag);
-#endif
 
 /* 
  * Private interface into the new error handling code.
@@ -696,10 +694,8 @@ int scsi_dispatch_cmd(Scsi_Cmnd * SCpnt)
     if (host->hostt->use_new_eh_code) {
         scsi_add_timer(SCpnt, SCpnt->timeout_per_command, scsi_times_out);
     } else {
-#if 0
         scsi_add_timer(SCpnt, SCpnt->timeout_per_command,
                        scsi_old_times_out);
-#endif
     }
     
     /*
@@ -751,7 +747,6 @@ int scsi_dispatch_cmd(Scsi_Cmnd * SCpnt)
              * Before we queue this command, check if the command
              * length exceeds what the host adapter can handle.
              */
-#if 0
             if (CDB_SIZE(SCpnt) <= SCpnt->host->max_cmd_len) {
                 spin_lock_irqsave(&io_request_lock, flags);
                 host->hostt->queuecommand(SCpnt, scsi_old_done);
@@ -765,7 +760,6 @@ int scsi_dispatch_cmd(Scsi_Cmnd * SCpnt)
                 spin_unlock_irqrestore(&io_request_lock, flags);
                 rtn = 1;
             }
-#endif
             
         }
     } else {
@@ -790,9 +784,7 @@ int scsi_dispatch_cmd(Scsi_Cmnd * SCpnt)
         if (host->hostt->use_new_eh_code) {
             scsi_done(SCpnt);
         } else {
-#if 0
             scsi_old_done(SCpnt);
-#endif
         }
         spin_unlock_irqrestore(&io_request_lock, flags);
     }
@@ -2951,13 +2943,11 @@ scsi_reset_provider(Scsi_Device *dev, int flag)
 	if (dev->host->hostt->use_new_eh_code) {
 		rtn = scsi_new_reset(SCpnt, flag);
 	} else {
-#if 0
 		unsigned long flags;
 
 		spin_lock_irqsave(&io_request_lock, flags);
 		rtn = scsi_old_reset(SCpnt, flag);
 		spin_unlock_irqrestore(&io_request_lock, flags);
-#endif
                 rtn= 0; 
 	}
 
