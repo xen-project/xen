@@ -19,11 +19,11 @@ import controller
 from messages import *
 
 class NetifBackendController(controller.BackendController):
-    """Handler for the 'back-end' channel to a device driver domain.
+    """Handler for the 'back-end' channel to a network device driver domain.
     """
     
-    def __init__(self, ctrl, dom, handle):
-        controller.BackendController.__init__(self, ctrl, dom, handle)
+    def __init__(self, ctrl, dom):
+        controller.BackendController.__init__(self, ctrl, dom)
         self.addMethod(CMSG_NETIF_BE,
                        CMSG_NETIF_BE_DRIVER_STATUS_CHANGED,
                        self.recv_be_driver_status_changed)
@@ -33,33 +33,56 @@ class NetifBackendController(controller.BackendController):
         val = unpackMsg('netif_be_driver_status_changed_t', msg)
         status = val['status']
 
-class NetifControllerFactory(controller.ControllerFactory):
+class NetifBackendInterface(controller.BackendInterface):
+    """Handler for the 'back-end' channel to a network device driver domain
+    on behalf of a front-end domain.
+
+    Each network device is handled separately, so we add no functionality
+    here.
+    """
+
+    pass
+
+class NetifControllerFactory(controller.SplitControllerFactory):
     """Factory for creating network interface controllers.
     """
 
     def __init__(self):
-        controller.ControllerFactory.__init__(self)
+        controller.SplitControllerFactory.__init__(self)
 
-    def createInstance(self, dom, recreate=0):
-        """Create or find the network interface controller for a domain.
+    def createController(self, dom):
+        """Create a network interface controller for a domain.
 
         @param dom:      domain
-        @param recreate: if true this is a recreate (xend restarted)
         @return: netif controller
         """
-        netif = self.getInstanceByDom(dom)
-        if netif is None:
-            netif = NetifController(self, dom)
-            self.addInstance(netif)
-        return netif
+        return NetifController(self, dom)
+
+    def createBackendController(self, dom):
+        """Create a network device backend controller.
+
+        @param dom: backend domain
+        @return: backend controller
+        """
+        return NetifBackendController(self, dom)
+    
+    def createBackendInterface(self, ctrl, dom, handle):
+        """Create a network device backend interface.
+
+        @param ctrl: controller
+        @param dom: backend domain
+        @param handle: interface handle
+        @return: backend interface
+        """
+        return NetifBackendInterface(ctrl, dom, handle)
 
     def getDomainDevices(self, dom):
-        """Get the network device controllers for a domain.
+        """Get the network devices for a domain.
 
         @param dom:  domain
         @return: netif controller list
         """
-        netif = self.getInstanceByDom(dom)
+        netif = self.getControllerByDom(dom)
         return (netif and netif.getDevices()) or []
 
     def getDomainDevice(self, dom, vif):
@@ -69,7 +92,7 @@ class NetifControllerFactory(controller.ControllerFactory):
         @param vif: virtual interface index
         @return: NetDev
         """
-        netif = self.getInstanceByDom(dom)
+        netif = self.getControllerByDom(dom)
         return (netif and netif.getDevice(vif)) or None
         
 class NetDev(controller.SplitDev):
@@ -179,7 +202,7 @@ class NetDev(controller.SplitDev):
                       { 'domid'        : self.controller.dom,
                         'netif_handle' : self.vif,
                         'mac'          : self.mac })
-        self.getBackend().writeRequest(msg, response=d)
+        self.getBackendInterface().writeRequest(msg, response=d)
         return d
 
     def respond_be_create(self, msg):
@@ -193,6 +216,7 @@ class NetDev(controller.SplitDev):
         """
         def cb_destroy(val):
             self.send_be_destroy()
+            self.getBackendInterface().close()
         log.debug("Destroying vif domain=%d vif=%d", self.controller.dom, self.vif)
         self.vifctl('down')
         d = self.send_be_disconnect()
@@ -203,7 +227,7 @@ class NetDev(controller.SplitDev):
         msg = packMsg('netif_be_disconnect_t',
                       { 'domid'        : self.controller.dom,
                         'netif_handle' : self.vif })
-        self.getBackend().writeRequest(msg, response=d)
+        self.getBackendInterface().writeRequest(msg, response=d)
         return d
 
     def send_be_destroy(self, response=None):
@@ -211,7 +235,7 @@ class NetDev(controller.SplitDev):
                       { 'domid'        : self.controller.dom,
                         'netif_handle' : self.vif })
         self.controller.delDevice(self.vif)
-        self.getBackend().writeRequest(msg, response=response)
+        self.getBackendInterface().writeRequest(msg, response=response)
     
     def recv_fe_interface_connect(self, val, req):
         if not req: return
@@ -224,7 +248,7 @@ class NetDev(controller.SplitDev):
                         'rx_shmem_frame' : val['rx_shmem_frame'] })
         d = defer.Deferred()
         d.addCallback(self.respond_be_connect)
-        self.getBackend().writeRequest(msg, response=d)
+        self.getBackendInterface().writeRequest(msg, response=d)
         
     def respond_be_connect(self, msg):
         val = unpackMsg('netif_be_connect_t', msg)
@@ -261,9 +285,6 @@ class NetifController(controller.SplitController):
                        CMSG_NETIF_FE_INTERFACE_CONNECT,
                        self.recv_fe_interface_connect)
         self.registerChannel()
-
-    def createBackend(self, dom, handle):
-        return NetifBackendController(self, dom, handle)
 
     def sxpr(self):
         val = ['netif', ['dom', self.dom]]

@@ -10,30 +10,14 @@ class DomainControllerFactory(controller.ControllerFactory):
     """Factory for creating domain controllers.
     """
 
-    def createInstance(self, dom):
+    def createController(self, dom):
         """Create a domain controller.
 
         dom domain
 
         returns domain controller
         """
-        d = DomainController(self, dom)
-        self.addInstance(d)
-        return d
-    
-    def getInstanceByDom(self, dom):
-        """Get a domain controller for a domain, creating if necessary.
-
-        dom domain
-
-        returns domain controller
-        """
-        for inst in self.instances.values():
-            if inst.dom == dom:
-                return inst
-        inst = self.createInstance(dom)
-        return inst
-
+        return DomainController(self, dom)
 
 class DomainController(controller.Controller):
     """Generic controller for a domain.

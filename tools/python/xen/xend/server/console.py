@@ -81,14 +81,14 @@ class ConsoleControllerFactory(controller.ControllerFactory):
     """Factory for creating console controllers.
     """
 
-    def createInstance(self, dom, console_port=None):
+    def createController(self, dom, console_port=None):
         if console_port is None:
             console_port = CONSOLE_PORT_BASE + dom
-        for c in self.getInstances():
+        for c in self.getControllers():
             if c.console_port == console_port:
                 raise XendError('console port in use: ' + str(console_port))
         console = ConsoleController(self, dom, console_port)
-        self.addInstance(console)
+        self.addController(console)
         log.info("Created console id=%s domain=%d port=%d",
                  console.idx, console.dom, console.console_port)
         eserver.inject('xend.console.create',
@@ -98,7 +98,7 @@ class ConsoleControllerFactory(controller.ControllerFactory):
     def consoleClosed(self, console):
         log.info("Closed console id=%s", console.idx)
         eserver.inject('xend.console.close', console.idx)
-        self.delInstance(console)
+        self.delController(console)
 
 class ConsoleController(controller.Controller):
     """Console controller for a domain.

@@ -274,72 +274,80 @@ class CtrlMsgRcvr:
             
 class ControllerFactory:
     """Abstract class for factories creating controllers for a domain.
-    Maintains a table of instances.
+    Maintains a table of controllers.
 
-    @ivar instances: mapping of index to controller instance
-    @type instances: {String: Controller}
+    @ivar controllers: mapping of index to controller instance
+    @type controllers: {String: Controller}
     @ivar dom: domain
     @type dom: int
     """
 
     def __init__(self):
-        self.instances = {}
-        self.backends = {}
-        self.dom = 0
+        self.controllers = {}
         
-    def addInstance(self, instance):
+    def addController(self, controller):
         """Add a controller instance (under its index).
         """
-        self.instances[instance.idx] = instance
+        self.controllers[controller.idx] = controller
 
-    def getInstance(self, idx):
-        """Get a controller instance from its index.
+    def getControllers(self):
+        """Get a list of all controllers.
         """
-        return self.instances.get(idx)
+        return self.controllers.values()
 
-    def getInstances(self):
-        """Get a list of all controller instances.
+    def getControllerByIndex(self, idx):
+        """Get a controller from its index.
         """
-        return self.instances.values()
+        return self.controllers.get(idx)
 
-    def getInstanceByDom(self, dom):
-        """Get the controller instance for the given domain.
+    def getControllerByDom(self, dom):
+        """Get the controller for the given domain.
 
         @param dom: domain id
         @type  dom: int
         @return: controller or None
         """
-        for inst in self.instances.values():
+        for inst in self.controllers.values():
             if inst.dom == dom:
                 return inst
         return None
 
-    def delInstance(self, instance):
-        """Delete a controller instance from the table.
+    def getController(self, dom):
+        """Create or find the controller for a domain.
 
-        @param instance: controller instance
+        @param dom:      domain
+        @return: controller
         """
-        if instance.idx in self.instances:
-            del self.instances[instance.idx]
-
-    def createInstance(self, dom, recreate=0):
-        """Create an instance. Define in a subclass.
+        ctrl = self.getControllerByDom(dom)
+        if ctrl is None:
+            ctrl = self.createController(dom)
+            self.addController(ctrl)
+        return ctrl
+    
+    def createController(self, dom):
+        """Create a controller. Define in a subclass.
 
         @param dom: domain
         @type  dom: int
-        @param recreate: true if the instance is being recreated (after xend restart)
-        @type  recreate: int
         @return: controller instance
         @rtype:  Controller (or subclass)
         """
         raise NotImplementedError()
 
-    def instanceClosed(self, instance):
-        """Callback called when an instance is closed (usually by the instance).
-        
-        @param instance: controller instance
+    def delController(self, controller):
+        """Delete a controller instance from the table.
+
+        @param controller: controller instance
         """
-        self.delInstance(instance)
+        if controller.idx in self.controllers:
+            del self.controllers[controller.idx]
+
+    def controllerClosed(self, controller):
+        """Callback called when a controller is closed (usually by the controller).
+        
+        @param controller: controller instance
+        """
+        self.delController(controller)
 
 class Controller(CtrlMsgRcvr):
     """Abstract class for a device controller attached to a domain.
@@ -370,91 +378,204 @@ class Controller(CtrlMsgRcvr):
         """The controller channel has been lost.
         """
         self.deregisterChannel()
-        self.factory.instanceClosed(self)
+        self.factory.controllerClosed(self)
 
-class BackendController(CtrlMsgRcvr):
+class SplitControllerFactory(ControllerFactory):
+    """Abstract class for factories creating split controllers for a domain.
+    Maintains a table of backend controllers.
+    """
+
+    def __init__(self):
+        ControllerFactory.__init__(self)
+        self.backendControllers = {}
+
+    def getBackendControllers(self):
+        return self.backendControllers.values()
+
+    def getBackendControllerByDomain(self, dom):
+        """Get the backend controller for a domain if there is one.
+
+        @param dom: backend domain
+        @return: backend controller
+        """
+        return self.backendControllers.get(dom)
+
+    def getBackendController(self, dom):
+        """Get the backend controller for a domain, creating
+        if necessary.
+
+        @param dom: backend domain
+        @return: backend controller
+        """
+        b = self.getBackendControllerByDomain(dom)
+        if b is None:
+            b = self.createBackendController(dom)
+            self.backendControllers[b.dom] = b
+        return b
+
+    def createBackendController(self, dom):
+        """Create a backend controller. Define in a subclass.
+
+        @param dom: backend domain
+        @return: backend controller
+        """
+        raise NotImplementedError()
+
+    def delBackendController(self, ctrlr):
+        """Remove a backend controller.
+
+        @param ctrlr: backend controller
+        """
+        if ctrlr.dom in self.backendControllers:
+            del self.backendControllers[ctrlr.dom]
+
+    def backendControllerClosed(self, ctrlr):
+        """Callback called when a backend is closed.
+        """
+        self.delBackendController(ctrlr)
+        
+    def createBackendInterface(self, ctrl, dom, handle):
+        """Create a backend interface. Define in a subclass.
+
+        @param ctrl: frontend controller
+        @param dom: backend domain
+        @return: backend interface
+        """
+        raise NotImplementedError()
+
+class BackendController(Controller):
     """Abstract class for a backend device controller attached to a domain.
 
-    @ivar controller: frontend controller
-    @type controller: Controller
-    @ivar dom:     domain
+    @ivar factory: backend controller factory
+    @type factory: BackendControllerFactory
+    @ivar dom:     backend domain
     @type dom:     int
     @ivar channel: channel to the domain
     @type channel: Channel
     """
 
     
-    def __init__(self, controller, dom, handle):
+    def __init__(self, factory, dom):
         CtrlMsgRcvr.__init__(self)
-        self.controller = controller
+        self.factory = factory
         self.dom = int(dom)
-        self.handle = handle
         self.channel = None
+        self.backendInterfaces = {}
         
     def close(self):
         self.lostChannel()
 
     def lostChannel(self):
         self.deregisterChannel()
-        self.controller.backendClosed(self)
+        self.backend.backendClosed(self)
+
+    def registerInterface(self, intf):
+        key = intf.getInterfaceKey()
+        self.backendInterfaces[key] = intf
+
+    def deregisterInterface(self, intf):
+        key = intf.getInterfaceKey()
+        if key in self.backendInterfaces:
+            del self.backendInterfaces[key]
+
+    def getInterface(self, dom, handle):
+        key = (dom, handle)
+        return self.backendInterfaces.get(key)
+
+        
+    def createBackendInterface(self, ctrl, dom, handle):
+        """Create a backend interface. Define in a subclass.
+
+        @param ctrl: controller
+        @param dom: backend domain
+        @param handle: backend handle
+        """
+        raise NotImplementedError()
+
+    
+class BackendInterface:
+    """Abstract class for a domain's interface onto a backend controller.
+    """
+
+    def __init__(self, controller, dom, handle):
+        """
+
+        @param controller: front-end controller
+        @param dom:        back-end domain
+        @param handle:     back-end interface handle
+        """
+        self.factory = controller.factory
+        self.controller = controller
+        self.dom = int(dom)
+        self.handle = handle
+        self.backend = self.getBackendController()
+
+    def registerInterface(self):
+        self.backend.registerInterface(self)
+
+    def getInterfaceKey(self):
+        return (self.controller.dom, self.handle)
+
+    def getBackendController(self):
+        return self.factory.getBackendController(self.dom)
+
+    def writeRequest(self, msg, response=None):
+        return self.backend.writeRequest(msg, response=response)
+
+    def close(self):
+        self.backend.deregisterInterface(self)
+        self.controller.backendInterfaceClosed(self)
         
 class SplitController(Controller):
     """Abstract class for a device controller attached to a domain.
-    A SplitController manages a BackendController for each backend domain
+    A SplitController manages a BackendInterface for each backend domain
     it has at least one device for.
     """
 
     def __init__(self, factory, dom):
         Controller.__init__(self, factory, dom)
-        self.backends = {}
+        self.backendInterfaces = {}
         self.backendHandle = 0
         
-    def getBackends(self):
-        return self.backends.values()
+    def getBackendInterfaces(self):
+        return self.backendInterfaces.values()
 
-    def getBackendByHandle(self, handle):
-        for b in self.getBackends():
+    def getBackendInterfaceByHandle(self, handle):
+        for b in self.getBackendInterfaces():
             if b.handle == handle:
                 return b
         return None
 
-    def getBackendByDomain(self, dom):
-        return self.backends.get(dom)
+    def getBackendInterfaceByDomain(self, dom):
+        return self.backendInterfaces.get(dom)
 
-    def getBackend(self, dom):
-        """Get the backend controller for a domain.
+    def getBackendInterface(self, dom):
+        """Get the backend interface for a domain.
 
         @param dom: domain
         @return: backend controller
         """
-        b = self.getBackendByDomain(dom)
+        b = self.getBackendInterfaceByDomain(dom)
         if b is None:
             handle = self.backendHandle
             self.backendHandle += 1
-            b = self.createBackend(dom, handle)
-            self.backends[b.dom] = b
+            b = self.factory.createBackendInterface(self, dom, handle)
+            b.registerInterface()
+            self.backendInterfaces[b.dom] = b
         return b
 
-    def createBackend(self, dom, handle):
-        """Create a backend controller. Define in a subclass.
-
-        @param dom: domain
-        @param handle: controller handle
-        """
-        raise NotImplementedError()
-
-    def delBackend(self, ctrlr):
+    def delBackendInterface(self, ctrlr):
         """Remove a backend controller.
 
         @param ctrlr: backend controller
         """
-        if ctrlr.dom in self.backends:
-            del self.backends[ctrlr.dom]
+        if ctrlr.dom in self.backendInterfaces:
+            del self.backendInterfaces[ctrlr.dom]
 
-    def backendClosed(self, ctrlr):
+    def backendInterfaceClosed(self, ctrlr):
         """Callback called when a backend is closed.
         """
-        self.delBackend(ctrlr)
+        self.delBackendInterface(ctrlr)
         
 class Dev:
     """Abstract class for a device attached to a device controller.
@@ -502,8 +623,8 @@ class SplitDev(Dev):
         Dev.__init__(self, idx, controller)
         self.backendDomain = 0
 
-    def getBackend(self):
-        return self.controller.getBackend(self.backendDomain)
+    def getBackendInterface(self):
+        return self.controller.getBackendInterface(self.backendDomain)
 
 
 

@@ -14,23 +14,15 @@ import controller
 from messages import *
 
 class BlkifBackendController(controller.BackendController):
-    """ Handler for the 'back-end' channel to a device driver domain.
-    Must be connected using connect() before it can be used.
-    Do not create directly - use getBackend() on the BlkifController.
+    """ Handler for the 'back-end' channel to a block device driver domain.
     """
 
-    def __init__(self, ctrl, dom, handle):
-        controller.BackendController.__init__(self, ctrl, dom, handle)
-        self.connected = 0
-        self.evtchn = None
-        self.handle = handle
+    def __init__(self, factory, dom):
+        controller.BackendController.__init__(self, factory, dom)
         self.addMethod(CMSG_BLKIF_BE,
                        CMSG_BLKIF_BE_DRIVER_STATUS_CHANGED,
                        self.recv_be_driver_status_changed)
         self.registerChannel()
-
-    def __str__(self):
-        return '<BlkifBackendController %d %d>' % (self.controller.dom, self.dom)
 
     def recv_be_driver_status_changed(self, msg, req):
         """Request handler for be_driver_status_changed messages.
@@ -43,8 +35,23 @@ class BlkifBackendController(controller.BackendController):
         val = unpackMsg('blkif_be_driver_status_changed_t', msg)
         status = val['status']
 
+class BlkifBackendInterface(controller.BackendInterface):
+    """ Handler for the 'back-end' channel to a block device driver domain
+    on behalf of a front-end domain.
+    Must be connected using connect() before it can be used.
+    Do not create directly - use getBackendInterface() on the BlkifController.
+    """
+
+    def __init__(self, ctrl, dom, handle):
+        controller.BackendInterface.__init__(self, ctrl, dom, handle)
+        self.connected = 0
+        self.evtchn = None
+
+    def __str__(self):
+        return '<BlkifBackendInterface %d %d>' % (self.controller.dom, self.dom)
+
     def connect(self, recreate=0):
-        """Connect the controller to the blkif control interface.
+        """Connect to the blkif control interface.
 
         @param recreate: true if after xend restart
         @return: deferred
@@ -76,6 +83,7 @@ class BlkifBackendController(controller.BackendController):
         """
         def cb_destroy(val):
             self.send_be_destroy()
+            self.close()
         d = defer.Deferred()
         d.addCallback(cb_destroy)
         self.send_be_disconnect(response=d)
@@ -125,14 +133,14 @@ class BlkifBackendController(controller.BackendController):
                         'evtchn' : self.evtchn['port2'] })
         self.controller.writeRequest(msg, response=response)
         
-class BlkifControllerFactory(controller.ControllerFactory):
+class BlkifControllerFactory(controller.SplitControllerFactory):
     """Factory for creating block device interface controllers.
     """
 
     def __init__(self):
-        controller.ControllerFactory.__init__(self)
+        controller.SplitControllerFactory.__init__(self)
 
-    def createInstance(self, dom, recreate=0):
+    def createController(self, dom, recreate=0):
         """Create a block device controller for a domain.
 
         @param dom: domain
@@ -142,11 +150,29 @@ class BlkifControllerFactory(controller.ControllerFactory):
         @return: block device controller
         @rtype: BlkifController
         """
-        blkif = self.getInstanceByDom(dom)
+        blkif = self.getControllerByDom(dom)
         if blkif is None:
             blkif = BlkifController(self, dom)
-            self.addInstance(blkif)
+            self.addController(blkif)
         return blkif
+
+    def createBackendController(self, dom):
+        """Create a block device backend controller.
+
+        @param dom: backend domain
+        @return: backend controller
+        """
+        return BlkifBackendController(self, dom)
+
+    def createBackendInterface(self, ctrl, dom, handle):
+        """Create a block device backend interface.
+
+        @param ctrl: controller
+        @param dom: backend domain
+        @param handle: interface handle
+        @return: backend interface
+        """
+        return BlkifBackendInterface(ctrl, dom, handle)
 
     def getDomainDevices(self, dom):
         """Get the block devices for a domain.
@@ -156,7 +182,7 @@ class BlkifControllerFactory(controller.ControllerFactory):
         @return: devices
         @rtype:  [device]
         """
-        blkif = self.getInstanceByDom(dom)
+        blkif = self.getControllerByDom(dom)
         return (blkif and blkif.getDevices()) or []
 
     def getDomainDevice(self, dom, vdev):
@@ -169,7 +195,7 @@ class BlkifControllerFactory(controller.ControllerFactory):
         @return: device
         @rtype:  device
         """
-        blkif = self.getInstanceByDom(dom)
+        blkif = self.getControllerByDom(dom)
         return (blkif and blkif.getDevice(vdev)) or None
 
 class BlkDev(controller.SplitDev):
@@ -214,7 +240,7 @@ class BlkDev(controller.SplitDev):
         """Attach the device to its controller.
 
         """
-        backend = self.getBackend()
+        backend = self.getBackendInterface()
         d1 = backend.connect()
         d2 = defer.Deferred()
         d2.addCallback(self.send_be_vbd_create)
@@ -224,7 +250,7 @@ class BlkDev(controller.SplitDev):
     def send_be_vbd_create(self, val):
         d = defer.Deferred()
         d.addCallback(self.respond_be_vbd_create)
-        backend = self.getBackend()
+        backend = self.getBackendInterface()
         msg = packMsg('blkif_be_vbd_create_t',
                       { 'domid'        : self.controller.dom,
                         'blkif_handle' : backend.handle,
@@ -247,7 +273,7 @@ class BlkDev(controller.SplitDev):
     
     def send_be_vbd_grow(self):
         d = defer.Deferred()
-        backend = self.getBackend()
+        backend = self.getBackendInterface()
         msg = packMsg('blkif_be_vbd_grow_t',
                       { 'domid'                : self.controller.dom,
                         'blkif_handle'         : backend.handle,
@@ -274,7 +300,7 @@ class BlkDev(controller.SplitDev):
     def send_be_vbd_destroy(self, response=None):
         log.debug('>BlkDev>send_be_vbd_destroy> dom=%d vdev=%d',
                   self.controller.dom, self.vdev)
-        backend = self.getBackend()
+        backend = self.getBackendInterface()
         msg = packMsg('blkif_be_vbd_destroy_t',
                       { 'domid'                : self.controller.dom,
                         'blkif_handle'         : backend.handle,
@@ -290,7 +316,7 @@ class BlkifController(controller.SplitController):
     
     def __init__(self, factory, dom):
         """Create a block device controller.
-        Do not call directly - use createInstance() on the factory instead.
+        Do not call directly - use createController() on the factory instead.
         """
         controller.SplitController.__init__(self, factory, dom)
         self.devices = {}
@@ -305,9 +331,6 @@ class BlkifController(controller.SplitController):
     def sxpr(self):
         val = ['blkif', ['dom', self.dom]]
         return val
-
-    def createBackend(self, dom, handle):
-        return BlkifBackendController(self, dom, handle)
 
     def getDevices(self):
         return self.devices.values()
@@ -373,7 +396,7 @@ class BlkifController(controller.SplitController):
             dev.destroy()
 
     def destroyBackends(self):
-        for backend in self.getBackends():
+        for backend in self.getBackendInterfaces():
             backend.destroy()
 
     def recv_fe_driver_status_changed(self, msg, req):
@@ -390,7 +413,7 @@ class BlkifController(controller.SplitController):
     def recv_fe_interface_connect(self, msg, req):
         val = unpackMsg('blkif_fe_interface_connect_t', msg)
         handle = val['handle']
-        backend = self.getBackendByHandle(handle)
+        backend = self.getBackendInterfaceByHandle(handle)
         if backend:
             backend.connectInterface(val)
         else:
