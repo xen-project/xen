@@ -378,9 +378,9 @@ class XendDomain:
     
     def domain_shutdown(self, id, reason='poweroff'):
         """Shutdown domain (nicely).
-         - poweroff: domain will restart if has autorestart set.
-         - reboot: domain will restart.
-         - halt: domain will not restart (even if has autorestart set).
+         - poweroff: restart according to exit code and restart mode
+         - reboot:   restart on exit
+         - halt:     do not restart
 
          Returns immediately.
 
@@ -388,12 +388,13 @@ class XendDomain:
         @param reason: shutdown type: poweroff, reboot, suspend, halt
         """
         dom = int(id)
+        id = str(id)
         if dom <= 0:
             return 0
         if reason == 'halt':
             self.domain_restart_cancel(id)
         else:
-            self.domain_restart_schedule(id, reason)
+            self.domain_restart_schedule(id, reason, set=1)
         eserver.inject('xend.domain.shutdown', [id, reason])
         if reason == 'halt':
             reason = 'poweroff'
@@ -401,21 +402,24 @@ class XendDomain:
         self.refresh_schedule()
         return val
 
-    def domain_restart_schedule(self, id, reason):
+    def domain_restart_schedule(self, id, reason, set=0):
         """Schedule a restart for a domain if it needs one.
 
         @param id:     domain id
         @param reason: shutdown reason
         """
+        print 'domain_restart_schedule>', id, reason, set
         dominfo = self.domain.get(id)
-        if not dominfo or id in self.restarts:
-            # Don't schedule if unknown or already there.
+        if not dominfo:
             return
-        restart = ((reason == 'reboot') or
-                   (reason == 'poweroff' and dominfo.autorestart))
+        if id in self.restarts:
+            return
+        if set and reason == 'reboot':
+            dominfo.restart_mode = XendDomainInfo.RESTART_ALWAYS
+        restart = dominfo.restart_needed(reason)
         if restart:
-            # Clear autorestart flag to avoid multiple restarts.
-            dominfo.autorestart = 0
+            # Avoid multiple restarts.
+            dominfo.restart_mode = XendDomainInfo.RESTART_NEVER
             self.restarts[id] = dominfo.config
             print 'Scheduling restart for domain:', id, dominfo.name
             self.domain_restarts_schedule()
@@ -427,7 +431,7 @@ class XendDomain:
         """
         dominfo = self.domain.get(id)
         if dominfo:
-            dominfo.autorestart = 0
+            dominfo.restart_mode = XendDomainInfo.RESTART_NEVER
         if id in self.restarts:
             del self.restarts[id]
 
@@ -474,13 +478,18 @@ class XendDomain:
             val = xc.domain_destroy(dom=dom)
         return val       
 
-    def domain_destroy(self, id):
+    def domain_destroy(self, id, reason='halt'):
         """Terminate domain immediately.
-        Cancels any restart for the domain.
+        - halt:   cancel any restart for the domain
+        - reboot  schedule a restart for the domain
 
         @param id: domain id
         """
-        self.domain_restart_cancel(id)
+        id = str(id)
+        if reason == 'halt':
+            self.domain_restart_cancel(id)
+        elif reason == 'reboot':
+            self.domain_restart_schedule(id, reason, set=1)
         val = self.final_domain_destroy(id)
         self.refresh_schedule()
         return val

@@ -94,8 +94,10 @@ extra = "4 VMID=%d bootdev=xennet0" % vmid
 
 
 #----------------------------------------------------------------------------
-# Set according to whether you want the domain  restarted when it exits.
-# The default is False.
-#autorestart = True
-
+# Set according to whether you want the domain restarted when it exits.
+# The default is 'onreboot', which restarts the domain when it shuts down
+# with exit code reboot.
+# Other values are 'always', and 'never'.
+#
+#restart = 'onreboot'
 #============================================================================

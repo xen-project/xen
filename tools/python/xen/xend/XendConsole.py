@@ -154,8 +154,8 @@ class XendConsole:
         self.refresh()
         return self.console.values()
     
-    def console_create(self, dom):
-        consinfo = daemon.console_create(dom)
+    def console_create(self, dom, console_port=None):
+        consinfo = daemon.console_create(dom, console_port=console_port)
         info = self._new_console(consinfo)
         return info
     

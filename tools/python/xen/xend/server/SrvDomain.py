@@ -50,7 +50,10 @@ class SrvDomain(SrvDir):
         return val
 
     def op_destroy(self, op, req):
-        val = self.xd.domain_destroy(self.dom.id)
+        fn = FormFn(self.xd.domain_destroy,
+                    [['dom', 'int'],
+                     ['reason', 'str']])
+        val = fn(req.args, {'dom': self.dom.id})
         req.setHeader("Location", "%s/.." % req.prePathURL())
         return val
 
@@ -220,7 +223,12 @@ class SrvDomain(SrvDir):
         req.write('<form method="post" action="%s">' % url)
         req.write('<input type="submit" name="op" value="unpause">')
         req.write('<input type="submit" name="op" value="pause">')
+        req.write('</form>')
+
+        req.write('<form method="post" action="%s">' % url)
         req.write('<input type="submit" name="op" value="destroy">')
+        req.write('<input type="radio" name="reason" value="halt" checked>Halt')
+        req.write('<input type="radio" name="reason" value="reboot">Reboot')
         req.write('</form>')
 
         req.write('<form method="post" action="%s">' % url)

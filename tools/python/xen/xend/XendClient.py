@@ -256,9 +256,10 @@ class Xend:
                          {'op'      : 'shutdown',
                           'reason'  : reason })
 
-    def xend_domain_destroy(self, id):
+    def xend_domain_destroy(self, id, reason):
         return xend_call(self.domainurl(id),
-                         {'op'      : 'destroy' })
+                         {'op'      : 'destroy',
+                          'reason'  : reason })
 
     def xend_domain_save(self, id, filename):
         return xend_call(self.domainurl(id),
