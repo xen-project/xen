@@ -3,10 +3,22 @@
 # Port xend should use for the HTTP interface.
 (xend-port         8000)
 
-# Address xend should listen on.
+# Port xend should use for the event interface.
+(xend-event-port   8001)
+
+# Address xend should listen on for HTTP connections.
 # Specifying 'localhost' prevents remote connections.
 # Specifying the empty string '' allows all connections.
 (xend-address      '')
+
+# The port xend should start from when allocating a port
+# for a domain console.
+(console-port-base 9600)
+
+# Address xend should listen on for console connections.
+# Specifying 'localhost' prevents remote connections.
+# Specifying the empty string '' allows all connections.
+(console-address   '')
 
 ## Use the following if VIF traffic is routed.
 # The script used to start/stop networking for xend.
