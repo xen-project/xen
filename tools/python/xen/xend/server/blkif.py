@@ -16,6 +16,46 @@ import channel
 import controller
 from messages import *
 
+
+def blkdev_name_to_number(name):
+    """Take the given textual block-device name (e.g., '/dev/sda1',
+    'hda') and return the device number used by the OS. """
+
+    if re.match( '^/dev/', name ):
+	n = name
+    else:
+	n = '/dev/' + name
+    
+    try:
+	return os.stat(n).st_rdev
+    except Exception, ex:
+        log.debug("exception looking up device number for %s: %s", name, ex)
+	pass
+
+    # see if this is a hex device number
+    if re.match( '^(0x)?[0-9a-fA-F]+$', name ):
+	return string.atoi(name,16)
+	
+    return None
+
+def blkdev_segment(name):
+    """Take the given block-device name (e.g. '/dev/sda1', 'hda')
+    and return a dictionary { device, start_sector,
+    nr_sectors, type }
+        device:       Device number of the given partition
+        start_sector: Index of first sector of the partition
+        nr_sectors:   Number of sectors comprising this partition
+        type:         'Disk' or identifying name for partition type
+    """
+    val = None
+    n = blkdev_name_to_number(name)
+    if n:
+	val = { 'device' : n,
+                'start_sector' : long(0),
+                'nr_sectors' : long(1L<<63),
+                'type' : 'Disk' }
+    return val
+
 class BlkifBackendController(controller.BackendController):
     """ Handler for the 'back-end' channel to a block device driver domain.
     """
@@ -231,26 +271,70 @@ class BlkDev(controller.SplitDev):
     """Info record for a block device.
     """
 
-    def __init__(self, idx, ctrl, config, vdev, mode, segment):
+    def __init__(self, idx, ctrl, config):
         controller.SplitDev.__init__(self, idx, ctrl)
-        self.config = config
         self.dev = None
         self.uname = None
-        self.vdev = vdev
-        self.mode = mode
-        self.device = segment['device']
-        self.start_sector = segment['start_sector']
-        self.nr_sectors = segment['nr_sectors']
+        self.vdev = None
+        self.mode = None
+        self.type = None
+        self.params = None
+        self.node = None
+        self.device = None
+        self.start_sector = None
+        self.nr_sectors = None
+        self.configure(config)
+
+    def configure(self, config):
+        self.config = config
+        self.uname = sxp.child_value(config, 'uname')
+        if not self.uname:
+            raise VmError('vbd: Missing uname')
+        # Split into type and type-specific params (which are passed to the
+        # type-specific control script).
+        (self.type, self.params) = string.split(self.uname, ':', 1)
+        self.dev = sxp.child_value(config, 'dev')
+        if not self.dev:
+            raise VmError('vbd: Missing dev')
+        self.mode = sxp.child_value(config, 'mode', 'r')
+        # todo: The 'dev' should be looked up in the context of the domain.
+        self.vdev = blkdev_name_to_number(self.dev)
+        if not self.vdev:
+            raise VmError('vbd: Device not found: %s' % self.dev)
         try:
             self.backendDomain = int(sxp.child_value(config, 'backend', '0'))
         except:
             raise XendError('invalid backend domain')
 
+    def recreate(self, savedinfo):
+        node = sxp.child_value(savedinfo, 'node')
+        self.setNode(node)
+
+    def attach(self):
+        node = Blkctl.block('bind', self.type, self.params)
+        self.setNode(node)
+        return self.attachBackend()
+
+    def unbind(self):
+        if self.node is None: return
+        log.debug("Unbinding vbd (type %s) from %s"
+                  % (self.type, self.node))
+        Blkctl.block('unbind', self.type, self.node)
+
+    def setNode(self, node):
+        segment = blkdev_segment(node)
+        if not segment:
+            raise VmError("vbd: Segment not found: uname=%s" % self.uname)
+        self.node = node
+        self.device = segment['device']
+        self.start_sector = segment['start_sector']
+        self.nr_sectors = segment['nr_sectors']
+
     def readonly(self):
         return 'w' not in self.mode
 
     def sxpr(self):
-        val = ['blkdev',
+        val = ['vbd',
                ['idx', self.idx],
                ['vdev', self.vdev],
                ['device', self.device],
@@ -259,12 +343,11 @@ class BlkDev(controller.SplitDev):
             val.append(['dev', self.dev])
         if self.uname:
             val.append(['uname', self.uname])
+        if self.node:
+            val.append(['node', self.node])
+        if self.index is not None:
+            val.append(['index', self.index])
         return val
-
-    def unbind(self):
-        log.debug("Unbinding block dev (type %s) from %s"
-                  % (self.type, self.node))
-        Blkctl.block('unbind', self.type, self.node)
 
     def destroy(self, change=0):
         """Destroy the device. If 'change' is true notify the front-end interface.
@@ -283,7 +366,7 @@ class BlkDev(controller.SplitDev):
         """
         self.getBackendInterface().interfaceChanged()
 
-    def attach(self):
+    def attachBackend(self):
         """Attach the device to its controller.
 
         """
@@ -356,46 +439,6 @@ class BlkDev(controller.SplitDev):
         return d
         
 
-def blkdev_name_to_number(name):
-    """Take the given textual block-device name (e.g., '/dev/sda1',
-    'hda') and return the device number used by the OS. """
-
-    if not re.match( '^/dev/', name ):
-	n = '/dev/' + name
-    else:
-	n = name
-    
-    try:
-	return os.stat(n).st_rdev
-    except Exception, e:
-        print "blkdev_name_to_number> exception looking up device number for %s: %s" % (name, e)
-	pass
-
-    # see if this is a hex device number
-    if re.match( '^(0x)?[0-9a-fA-F]+$', name ):
-	return string.atoi(name,16)
-	
-    return None
-
-def lookup_raw_partn(name):
-    """Take the given block-device name (e.g., '/dev/sda1', 'hda')
-    and return a dictionary { device, start_sector,
-    nr_sectors, type }
-        device:       Device number of the given partition
-        start_sector: Index of first sector of the partition
-        nr_sectors:   Number of sectors comprising this partition
-        type:         'Disk' or identifying name for partition type
-    """
-
-    n = blkdev_name_to_number(name)
-    if n:
-	return [ { 'device' : n,
-		   'start_sector' : long(0),
-		   'nr_sectors' : long(1L<<63),
-		   'type' : 'Disk' } ]
-    else:
-	return None
-
 class BlkifController(controller.SplitController):
     """Block device interface controller. Handles all block devices
     for a domain.
@@ -418,65 +461,37 @@ class BlkifController(controller.SplitController):
         val = ['blkif', ['dom', self.dom]]
         return val
 
-    def addDevice(self, idx, config, vdev, mode, segment):
+    def addDevice(self, idx, config):
         """Add a device to the device table.
 
         @param vdev:     device index
         @type  vdev:     int
-        @param mode:     read/write mode
-        @type  mode:     string
-        @param segment:  segment
-        @type  segment:  int
+        @param config: device configuration
         @return: device
         @rtype:  BlkDev
         """
         if idx in self.devices:
             raise XendError('device exists: ' + str(idx))
-        dev = BlkDev(idx, self, config, vdev, mode, segment)
+        dev = BlkDev(idx, self, config )
         self.devices[idx] = dev
         return dev
 
-    def attachDevice(self, idx, config, uname, vdev, mode, recreate=0):
+    def attachDevice(self, idx, config, recreate=0):
         """Attach a device to the specified interface.
         On success the returned deferred will be called with the device.
 
         @param idx:      device id
         @param config:   device configuration
-        @param vdev:     device index
-        @type  vdev:     int
-        @param mode:     read/write mode
-        @type  mode:     string
-        @param segment:  segment
-        @type  segment:  int
         @param recreate: if true it's being recreated (after xend restart)
         @type  recreate: bool
         @return: deferred
         @rtype:  Deferred
         """
-        if not recreate:
-            # Split into type and type-specific details (which are passed to the
-            # type-specific control script).
-            type, dets = string.split(uname, ':', 1)
-            # Special case: don't bother calling a script for phy.  Could
-            # alternatively provide a "do nothing" script for phy devices...
-            node = Blkctl.block('bind', type, dets)
-
-        segments = lookup_raw_partn(node)
-
-        if not segments:
-            raise VmError("vbd: Segments not found: uname=%s" % uname)
-        if len(segments) > 1:
-            raise VmError("vbd: Multi-segment vdisk: uname=%s" % uname)
-
-        segment = segments[0]            
-
-        dev = self.addDevice(idx, config, vdev, mode, segment)
-            
+        dev = self.addDevice(idx, config)
         if recreate:
+            dev.recreate(recreate)
             d = defer.succeed(dev)
         else:
-            dev.node = node
-            dev.type = type
             d = dev.attach()
         return d
 
