@@ -21,6 +21,7 @@ struct irqaction
 #define IRQ_PENDING	4	/* IRQ pending - replay on enable */
 #define IRQ_REPLAY	8	/* IRQ has been replayed but not acked yet */
 #define IRQ_GUEST       16      /* IRQ is handled by guest OS(es) */
+#define IRQ_PER_CPU     256     /* IRQ is per CPU */
 
 /*
  * Interrupt controller descriptor. This is all we need
