@@ -434,7 +434,9 @@ void unshadow_table(unsigned long gpfn, unsigned int type)
 void vmx_shadow_clear_state(struct domain *d)
 {
     SH_VVLOG("vmx_clear_shadow_state:");
+    shadow_lock(d);
     clear_shadow_state(d);
+    shadow_unlock(d);
 }
 #endif
 
@@ -887,8 +889,7 @@ void check_pagetable(struct domain *d, pagetable_t pt, char *s)
   
     if ( ! (ss & PSH_shadowed) )
     {
-        printk("%s-PT %p not shadowed\n", s, gptbase);
-
+        /*printk("%s-PT %p not shadowed\n", s, gptbase);*/
         if ( ss != 0 )
             BUG();
         return;

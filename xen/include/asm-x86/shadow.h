@@ -384,12 +384,14 @@ static void shadow_audit(struct domain *d, int print)
         printk("Xlive=%d free=%d\n",live,free);
 
     abs = (perfc_value(shadow_l1_pages) + perfc_value(shadow_l2_pages)) - live;
+#ifdef PERF_COUNTERS
     if ( (abs < -1) || (abs > 1) )
     {
         printk("live=%d free=%d l1=%d l2=%d\n",live,free,
                perfc_value(shadow_l1_pages), perfc_value(shadow_l2_pages) );
         BUG();
     }
+#endif
 }
 #else
 #define shadow_audit(p, print) ((void)0)
