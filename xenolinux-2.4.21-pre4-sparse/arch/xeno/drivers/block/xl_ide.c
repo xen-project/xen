@@ -2,7 +2,6 @@
  * xl_ide.c
  * 
  * Xenolinux virtual IDE block-device driver.
- * 
  */
 
 #include "xl_block.h"
@@ -10,9 +9,8 @@
 #define MAJOR_NR XLIDE_MAJOR 
 #include <linux/blk.h>
 
-/* We support up to 16 devices of up to 16 partitions each. */
 #define XLIDE_MAX         256
-#define XLIDE_MAJOR_NAME "xhd"
+#define XLIDE_MAJOR_NAME "hd"
 static int xlide_blksize_size[XLIDE_MAX];
 static int xlide_hardsect_size[XLIDE_MAX];
 static int xlide_max_sectors[XLIDE_MAX];
@@ -45,7 +43,9 @@ int xlide_init(xen_disk_info_t *xdi)
     units = 0;
     for ( i = 0; i < xdi->count; i++ )
         if ( IS_IDE_XENDEV(xdi->disks[i].device) &&
-             ((xdi->disks[i].device & XENDEV_IDX_MASK) < 16) ) units++;
+             ((xdi->disks[i].device & XENDEV_IDX_MASK) <
+              XLIDE_DEVS_PER_MAJOR) ) 
+            units++;
     if ( units == 0 ) return 0;
 
     SET_MODULE_OWNER(&xlide_block_fops);
@@ -112,8 +112,9 @@ int xlide_init(xen_disk_info_t *xdi)
 	minor = disk << XLIDE_PARTN_SHIFT; 
 
 
-        /* We can use the first 16 IDE devices. */
-        if ( !IS_IDE_XENDEV(xdi->disks[i].device) || (disk >= 16) ) continue;
+        if ( !IS_IDE_XENDEV(xdi->disks[i].device) || 
+             (disk >= XLIDE_DEVS_PER_MAJOR) ) 
+            continue;
 
         ((xl_disk_t *)gd->real_devices)[disk].capacity =
             xdi->disks[i].capacity;

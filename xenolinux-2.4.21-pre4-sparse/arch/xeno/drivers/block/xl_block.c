@@ -10,8 +10,6 @@
 
 typedef unsigned char byte; /* from linux/ide.h */
 
-#define XLBLK_MAX 32
-
 #define XLBLK_RESPONSE_IRQ _EVENT_BLK_RESP
 #define DEBUG_IRQ          _EVENT_DEBUG 
 
