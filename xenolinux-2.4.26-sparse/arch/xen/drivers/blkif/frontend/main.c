@@ -16,6 +16,8 @@
 #include <scsi/scsi.h>
 #include <asm/ctrl_if.h>
 
+
+
 typedef unsigned char byte; /* from linux/ide.h */
 
 #define BLKIF_STATE_CLOSED       0
@@ -30,6 +32,15 @@ static blkif_response_t blkif_control_rsp;
 static blkif_ring_t *blk_ring;
 static BLK_RING_IDX resp_cons; /* Response consumer for comms ring. */
 static BLK_RING_IDX req_prod;  /* Private request producer.         */
+
+
+static blkif_ring_t *blk_ring_rec; /* Private copy of requests, used for
+                                    * recovery.  Responses not stored here. */
+static BLK_RING_IDX resp_cons_rec; /* Copy of response consumer, used for
+                                    * recovery */
+static int recovery = 0;           /* "Recovery in progress" flag.  Protected
+                                    * by the io_request_lock */
+
 
 /* We plug the I/O ring if the driver is suspended or if the ring is full. */
 #define RING_PLUGGED (((req_prod - resp_cons) == BLK_RING_SIZE) || \
@@ -352,6 +363,11 @@ static int blkif_queue_request(unsigned long   id,
                 sg_next_sect += nr_sectors;
             else
                 DISABLE_SCATTERGATHER();
+
+            /* Update the copy of the request in the recovery ring. */
+            blk_ring_rec->ring[MASK_BLK_IDX(blk_ring_rec->req_prod - 1)].req
+                = *req;
+
             return 0;
         }
         else if ( RING_PLUGGED )
@@ -379,6 +395,10 @@ static int blkif_queue_request(unsigned long   id,
     req->nr_segments   = 1;
     req->frame_and_sects[0] = buffer_ma | (fsect<<3) | lsect;
     req_prod++;
+
+    /* Keep a private copy so we can reissue requests when recovering. */
+    blk_ring_rec->ring[MASK_BLK_IDX(blk_ring_rec->req_prod)].req = *req;
+    blk_ring_rec->req_prod++;
 
     return 0;
 }
@@ -485,10 +505,17 @@ static void blkif_int(int irq, void *dev_id, struct pt_regs *ptregs)
     unsigned long flags; 
     struct buffer_head *bh, *next_bh;
     
-    if ( unlikely(blkif_state == BLKIF_STATE_CLOSED) )
-        return;
-    
+//    printk(KERN_ALERT "blkif_int\n");
+
     spin_lock_irqsave(&io_request_lock, flags);     
+
+    if ( unlikely(blkif_state == BLKIF_STATE_CLOSED || recovery) )
+    {
+        printk("Bailed out\n");
+        
+        spin_unlock_irqrestore(&io_request_lock, flags);
+        return;
+    }
 
     for ( i = resp_cons; i != blk_ring->resp_prod; i++ )
     {
@@ -519,6 +546,7 @@ static void blkif_int(int irq, void *dev_id, struct pt_regs *ptregs)
     }
     
     resp_cons = i;
+    resp_cons_rec = i;
 
     kick_pending_request_queues();
 
@@ -546,6 +574,8 @@ void blkif_control_send(blkif_request_t *req, blkif_response_t *rsp)
 
     DISABLE_SCATTERGATHER();
     memcpy(&blk_ring->ring[MASK_BLK_IDX(req_prod)].req, req, sizeof(*req));
+    memcpy(&blk_ring_rec->ring[MASK_BLK_IDX(blk_ring_rec->req_prod++)].req,
+           req, sizeof(*req));
     req_prod++;
     flush_requests();
 
@@ -586,7 +616,19 @@ static void blkif_status_change(blkif_fe_interface_status_changed_t *status)
         {
             printk(KERN_WARNING "Unexpected blkif-DISCONNECTED message"
                    " in state %d\n", blkif_state);
-            break;
+
+            printk(KERN_INFO "VBD driver recovery in progress\n");
+            
+            /* Prevent new requests being issued until we've fixed things up. */
+            spin_lock_irq(&io_request_lock);
+            recovery = 1;
+            blkif_state = BLKIF_STATE_DISCONNECTED;
+            spin_unlock_irq(&io_request_lock);
+
+            /* Free resources associated with old device channel. */
+            free_page((unsigned long)blk_ring);
+            free_irq(blkif_irq, NULL);
+            unbind_evtchn_from_irq(blkif_evtchn);
         }
 
         /* Move from CLOSED to DISCONNECTED state. */
@@ -617,16 +659,55 @@ static void blkif_status_change(blkif_fe_interface_status_changed_t *status)
         blkif_evtchn = status->evtchn;
         blkif_irq = bind_evtchn_to_irq(blkif_evtchn);
         (void)request_irq(blkif_irq, blkif_int, 0, "blkif", NULL);
-        
-        /* Probe for discs that are attached to the interface. */
-        xlvbd_init();
-        
+
+        if ( recovery )
+        {
+            int i;
+
+	    /* Shouldn't need the io_request_lock here - the device is
+	     * plugged and the recovery flag prevents the interrupt handler
+	     * changing anything. */
+
+            /* Reissue requests from the private block ring. */
+            for ( i = 0;
+		  resp_cons_rec < blk_ring_rec->req_prod;
+                  resp_cons_rec++, i++ )
+            {
+                blk_ring->ring[i].req
+                    = blk_ring_rec->ring[MASK_BLK_IDX(resp_cons_rec)].req;
+            }
+
+            /* Reset the private block ring to match the new ring. */
+            memcpy(blk_ring_rec, blk_ring, sizeof(*blk_ring));
+            resp_cons_rec = 0;
+
+            /* blk_ring->req_prod will be set when we flush_requests().*/
+            blk_ring_rec->req_prod = req_prod = i;
+
+            wmb();
+
+            /* Switch off recovery mode, using a memory barrier to ensure that
+             * it's seen before we flush requests - we don't want to miss any
+             * interrupts. */
+            recovery = 0;
+            wmb();
+
+            /* Kicks things back into life. */
+            flush_requests();
+        }
+        else
+        {
+            /* Probe for discs that are attached to the interface. */
+            xlvbd_init();
+        }
+
         blkif_state = BLKIF_STATE_CONNECTED;
         
         /* Kick pending requests. */
         spin_lock_irq(&io_request_lock);
         kick_pending_request_queues();
         spin_unlock_irq(&io_request_lock);
+
         break;
 
     default:
@@ -671,8 +752,14 @@ int __init xlblk_init(void)
     ctrl_msg_t                       cmsg;
     blkif_fe_driver_status_changed_t st;
 
-    if ( start_info.flags & SIF_INITDOMAIN )
+    if ( (start_info.flags & SIF_INITDOMAIN) 
+        || (start_info.flags & SIF_BLK_BE_DOMAIN) )
         return 0;
+
+    printk(KERN_INFO "Initialising Xen virtual block device\n");
+
+    blk_ring_rec = (blkif_ring_t *)__get_free_page(GFP_KERNEL);
+    memset(blk_ring_rec, 0, sizeof(*blk_ring_rec));
 
     (void)ctrl_if_register_receiver(CMSG_BLKIF_FE, blkif_ctrlif_rx,
                                     CALLBACK_IN_BLOCKING_CONTEXT);

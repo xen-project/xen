@@ -72,6 +72,8 @@ def daemon_loop():
     # Note that console messages don't come our way (actually, only driver
     # back-ends should use the DOM0 control interface).
     dom0_port = xend.utils.port(0)
+    xend.netif.be_port = dom0_port
+    xend.blkif_be_port = dom0_port
     notifier.bind(dom0_port.local_port)
     port_list[dom0_port.local_port] = dom0_port
 
@@ -197,7 +199,7 @@ def daemon_loop():
                     con_if.ctrlif_rx_req(port, msg)
                 elif type == CMSG_BLKIF_FE and blk_if:
                     blk_if.ctrlif_rx_req(port, msg)
-                elif type == CMSG_BLKIF_BE and port == dom0_port:
+                elif type == CMSG_BLKIF_BE and port == xend.blkif.be_port:
                     xend.blkif.backend_rx_req(port, msg)
                 elif type == CMSG_NETIF_FE and net_if:
                     net_if.ctrlif_rx_req(port, msg)
@@ -211,7 +213,7 @@ def daemon_loop():
                 msg = port.read_response()
                 work_done = True
                 type = (msg.get_header())['type']
-                if type == CMSG_BLKIF_BE and port == dom0_port:
+                if type == CMSG_BLKIF_BE and port == xend.blkif.be_port:
                     xend.blkif.backend_rx_rsp(port, msg)
                 elif type == CMSG_NETIF_BE and port == xend.netif.be_port:
                     xend.netif.backend_rx_rsp(port, msg)
