@@ -1020,12 +1020,12 @@ struct irq_routing_table * __devinit pcibios_get_irq_routing_table(void)
 		"xor %%ah, %%ah\n"
 		"1:"
 		: "=a" (ret),
-		  "=b" (map),
-		  "+m" (opt)
+		  "=b" (map)
 		: "0" (PCIBIOS_GET_ROUTING_OPTIONS),
 		  "1" (0),
-		  "D" ((long) &opt),
-		  "S" (&pci_indirect));
+		  "D" (&opt),
+		  "S" (&pci_indirect)
+                : "memory");
 	DBG("OK  ret=%d, size=%d, map=%x\n", ret, opt.size, map);
 	if (ret & 0xff00)
 		printk(KERN_ERR "PCI: Error %02x when fetching IRQ routing table.\n", (ret >> 8) & 0xff);

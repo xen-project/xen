@@ -16,6 +16,15 @@
 #include <asm/domain_page.h>
 #include <asm/pdb.h>
 
+extern void init_IRQ(void);
+extern void trap_init(void);
+extern void time_init(void);
+extern void ac_timer_init(void);
+extern void initialize_keytable();
+extern int opt_nosmp, opt_watchdog, opt_noacpi;
+extern int opt_ignorebiostables, opt_noht;
+extern int do_timer_lists_from_pit;
+
 char ignore_irq13;		/* set if exception 16 works */
 struct cpuinfo_x86 boot_cpu_data = { 0, 0, 0, 0, -1 };
 
@@ -96,8 +105,6 @@ void __init get_cpu_vendor(struct cpuinfo_x86 *c)
 
 static void __init init_intel(struct cpuinfo_x86 *c)
 {
-    extern int opt_noht, opt_noacpi;
-
     /* SEP CPUID bug: Pentium Pro reports SEP but doesn't have it */
     if ( c->x86 == 6 && c->x86_model < 3 && c->x86_mask < 3 )
         clear_bit(X86_FEATURE_SEP, &c->x86_capability);
@@ -300,13 +307,6 @@ unsigned long pci_mem_start = 0x10000000;
 
 void __init start_of_day(void)
 {
-    extern void init_IRQ(void);
-    extern void trap_init(void);
-    extern void time_init(void);
-    extern void ac_timer_init(void);
-    extern void initialize_keytable();
-    extern int opt_nosmp, opt_watchdog, opt_noacpi, opt_ignorebiostables;
-    extern int do_timer_lists_from_pit;
     unsigned long low_mem_size;
     
 #ifdef MEMORY_GUARD

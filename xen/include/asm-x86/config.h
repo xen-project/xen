@@ -62,7 +62,6 @@
 #define SLACK_DOMAIN_MEM_KILOBYTES 2048
 
 /* Linkage for x86 */
-#define FASTCALL(x)     x __attribute__((regparm(3)))
 #define asmlinkage        __attribute__((regparm(0)))
 #define __ALIGN .align 16,0x90
 #define __ALIGN_STR ".align 16,0x90"
