@@ -32,7 +32,7 @@ typedef unsigned char byte; /* from linux/ide.h */
 static unsigned int blkif_state = BLKIF_STATE_CLOSED;
 static unsigned int blkif_evtchn, blkif_irq;
 
-static int blkif_control_rsp_valid;
+static volatile int blkif_control_rsp_valid;
 static blkif_response_t blkif_control_rsp;
 
 static blkif_ring_t *blk_ring;
@@ -1125,16 +1125,20 @@ static void blkif_status_change(blkif_fe_interface_status_changed_t *status)
             recovery = 0;
             wmb();
 
+	    blkif_state = BLKIF_STATE_CONNECTED;
+
             /* Kicks things back into life. */
             flush_requests();
         }
         else
         {
+	    /* transtion to connected in case we need to do a 
+	       a partion probe on a whole disk */
+	    blkif_state = BLKIF_STATE_CONNECTED;
+
             /* Probe for discs that are attached to the interface. */
             xlvbd_init();
         }
-
-        blkif_state = BLKIF_STATE_CONNECTED;
         
         /* Kick pending requests. */
         spin_lock_irq(&blkif_io_lock);
