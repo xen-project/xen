@@ -26,11 +26,30 @@ extern int pdb_page_fault;
 
 extern void initialize_pdb(void);
 
-/* Get/set values from generic debug interface. */
-extern int pdb_set_values(u_char *buffer, int length,
-                          unsigned long cr3, unsigned long addr);
-extern int pdb_get_values(u_char *buffer, int length,
-                          unsigned long cr3, unsigned long addr);
+/*
+ * pdb debug context 
+ */
+typedef struct pdb_context
+{
+    int valid;
+    int domain;
+    int process;
+    int system_call;              /* 0x01 break on enter, 0x02 break on exit */
+    unsigned long ptbr;
+} pdb_context_t, *pdb_context_p;
+
+extern pdb_context_t pdb_ctx;
+
+/* read / write memory */
+extern int pdb_read_memory (unsigned long addr, int length, 
+			    unsigned char *data, pdb_context_p ctx);
+extern int pdb_write_memory (unsigned long addr, int length, 
+			     unsigned char *data, pdb_context_p ctx);
+
+extern int pdb_read_page (u_char *buffer, int length,
+			  unsigned long cr3, unsigned long addr);
+extern int pdb_write_page (u_char *buffer, int length,
+			   unsigned long cr3, unsigned long addr);
 
 /* External entry points. */
 extern int pdb_handle_exception(int exceptionVector,
@@ -38,29 +57,47 @@ extern int pdb_handle_exception(int exceptionVector,
 extern int pdb_serial_input(u_char c, struct pt_regs *regs);
 extern void pdb_do_debug(dom0_op_t *op);
 
-/* PDB Context. */
-struct pdb_context
+typedef enum pdb_generic_action
 {
-    int valid;
-    int domain;
-    int process;
-    int system_call;              /* 0x01 break on enter, 0x02 break on exit */
-    unsigned long ptbr;
-};
-extern struct pdb_context pdb_ctx;
+  __PDB_GET,
+  __PDB_SET,
+  __PDB_CLEAR
+} pdb_generic_action;
 
-/* Breakpoints. */
-struct pdb_breakpoint
+/*
+ * breakpoint, watchpoint, & catchpoint
+ * note: numbers must match GDB remote serial protocol Z command numbers
+ */
+enum pdb_bwcpoint_type
 {
-    struct list_head list;
-    unsigned long address;
-    unsigned long cr3;
-    domid_t domain;
+  PDB_BP_SOFTWARE = 0,
+  PDB_BP_HARDWARE = 1,
+  PDB_WP_WRITE    = 2,
+  PDB_WP_READ     = 3,
+  PDB_WP_ACCESS   = 4
 };
-extern void pdb_bkpt_add (unsigned long cr3, unsigned long address);
-extern struct pdb_breakpoint* pdb_bkpt_search (unsigned long cr3, 
-					       unsigned long address);
-extern int pdb_bkpt_remove (unsigned long cr3, unsigned long address);
+
+typedef struct pdb_bwcpoint
+{
+  struct list_head list;
+  unsigned long address;
+  int length;
+  enum pdb_bwcpoint_type type;                            /* how implemented */
+  enum pdb_bwcpoint_type user_type;                    /* what was requested */
+  pdb_context_t context;
+
+  /* original value for breakpoint, one byte for x86 */
+  unsigned char original;
+} pdb_bwcpoint_t, *pdb_bwcpoint_p;
+
+void pdb_bwc_list_add (pdb_bwcpoint_p bwc);
+void pdb_bwc_list_remove (pdb_bwcpoint_p bwc);
+pdb_bwcpoint_p pdb_bwcpoint_search (unsigned long cr3, unsigned long address);
+
+int pdb_set_breakpoint (pdb_bwcpoint_p bwc);
+int pdb_clear_breakpoint (unsigned long address, int length, 
+			  pdb_context_p ctx);
+
 
 /* Conversions. */
 extern int   hex (char);
@@ -84,5 +121,11 @@ void pdb_linux_syscall_enter_bkpt (struct pt_regs *regs, long error_code,
 				   trap_info_t *ti);
 void pdb_linux_syscall_exit_bkpt (struct pt_regs *regs, 
 				  struct pdb_context *pdb_ctx);
+
+/* tracing */
+extern int pdb_trace;
+#define PDBTRC(_lvl_, _blahblah_) if (_lvl_ & pdb_trace) {_blahblah_;}
+#define PDBTRC2(_lvl_, _blahblah_) \
+  if (_lvl_ & pdb_trace) {printk("[%s:%d]",__FILE__,__LINE__); _blahblah_;}
 
 #endif  /* __PDB_H__ */

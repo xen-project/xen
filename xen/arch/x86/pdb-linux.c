@@ -10,7 +10,11 @@
  * linux & i386 dependent code. bleech.
  */
 
+#include <xen/slab.h>
 #include <asm/pdb.h>
+
+extern unsigned char pdb_x86_bkpt;
+extern int pdb_x86_bkpt_length;
 
 /* offset to the first instruction in the linux system call code
    where we can safely set a breakpoint */
@@ -92,9 +96,25 @@ pdb_linux_syscall_exit_bkpt (struct pt_regs *regs, struct pdb_context *pdb_ctx)
        debugger when re-entering user space */
     pdb_system_call_next_addr = *(unsigned long *)(regs->esp + 
 						 pdb_linux_syscall_eip_offset);
-    pdb_linux_get_values (&pdb_system_call_leave_instr, 1, 
-			  pdb_system_call_next_addr,
-			  pdb_ctx->process, pdb_ctx->ptbr);
-    pdb_linux_set_values ("cc", 1, pdb_system_call_next_addr,
-			  pdb_ctx->process, pdb_ctx->ptbr);
+
+    /* set a breakpoint when we exit */
+    {
+        pdb_bwcpoint_p bwc = (pdb_bwcpoint_p) kmalloc(sizeof(pdb_bwcpoint_t));
+
+	bwc->address = pdb_system_call_next_addr;
+	bwc->length = 1;
+	bwc->type = PDB_BP_SOFTWARE;
+	bwc->user_type = PDB_BP_SOFTWARE;
+	bwc->original = pdb_system_call_leave_instr;
+	memcpy (&bwc->context, pdb_ctx, sizeof(pdb_context_t));
+
+	/* this is always in a process context */
+	pdb_read_memory (pdb_system_call_next_addr, 1, 
+			 &pdb_system_call_leave_instr,
+			 (pdb_context_p) pdb_ctx);
+	pdb_write_memory (pdb_system_call_next_addr, pdb_x86_bkpt_length,
+			  &pdb_x86_bkpt, (pdb_context_p) pdb_ctx);
+
+	pdb_bwc_list_add (bwc);
+    }
 }
