@@ -2,6 +2,7 @@ import os
 import re
 import socket
 import struct
+import errno
 
 def _readlines(fd):
     """Version of readlines safe against EINTR.
