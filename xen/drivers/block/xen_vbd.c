@@ -31,7 +31,7 @@ extern int scsi_probe_devices(xen_disk_info_t *xdi);
 #endif
 
 /* XXX SMH: crappy 'hash function' .. fix when care. */
-#define HSH(_x) (((_x) >> 6) & (VBD_HTAB_SZ - 1))
+#define HSH(_x) ((_x) & (VBD_HTAB_SZ - 1))
 
 /* 
 ** Create a new VBD; all this involves is adding an entry to the domain's
@@ -73,7 +73,7 @@ long vbd_create(vbd_create_t *create)
     new_vbd->vdevice = create->vdevice; 
     new_vbd->mode    = create->mode; 
     new_vbd->extents = (xen_extent_le_t *)NULL; 
-    new_vbd->next    = (vbd_t *)NULL; 
+    new_vbd->next    = *pv; 
 
     *pv = new_vbd;
 
