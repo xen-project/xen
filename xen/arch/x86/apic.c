@@ -445,7 +445,7 @@ void __init init_apic_mappings(void)
      * simulate the local APIC and another one for the IO-APIC.
      */
     if (!smp_found_config && detect_init_APIC()) {
-        apic_phys = get_free_page(GFP_KERNEL);
+        apic_phys = get_free_page();
         apic_phys = __pa(apic_phys);
     } else
         apic_phys = mp_lapic_addr;

@@ -578,7 +578,7 @@ static void acpi_create_identity_pmd (void)
 	pgd_t *pgd;
 	int i;
 
-	ptep = (pte_t*)__get_free_page(GFP_KERNEL);
+	ptep = (pte_t*)__get_free_page();
 
 	/* fill page with low mapping */
 	for (i = 0; i < PTRS_PER_PTE; i++)

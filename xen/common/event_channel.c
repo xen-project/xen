@@ -48,7 +48,7 @@ static int get_free_port(struct domain *d)
         
         max *= 2;
         
-        chn = kmalloc(max * sizeof(event_channel_t), GFP_KERNEL);
+        chn = kmalloc(max * sizeof(event_channel_t));
         if ( unlikely(chn == NULL) )
             return -ENOMEM;
 
@@ -483,8 +483,7 @@ long do_event_channel_op(evtchn_op_t *uop)
 int init_event_channels(struct domain *d)
 {
     spin_lock_init(&d->event_channel_lock);
-    d->event_channel = kmalloc(INIT_EVENT_CHANNELS * sizeof(event_channel_t), 
-                               GFP_KERNEL);
+    d->event_channel = kmalloc(INIT_EVENT_CHANNELS * sizeof(event_channel_t));
     if ( unlikely(d->event_channel == NULL) )
         return -ENOMEM;
     d->max_event_channel = INIT_EVENT_CHANNELS;

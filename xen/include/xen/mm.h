@@ -17,31 +17,16 @@
 #include <hypervisor-ifs/hypervisor-if.h>
 
 /*
- * These are for compatibility with calls to the Linux memory allocators.
- */
-
-#define __GFP_DMA       0x01
-#define GFP_DMA         __GFP_DMA
-#define __GFP_WAIT      0x10    /* Can wait and reschedule? */
-#define __GFP_HIGH      0x20    /* Should access emergency pools? */
-#define __GFP_IO        0x40    /* Can start low memory physical IO? */
-#define __GFP_HIGHIO    0x80    /* Can start high mem physical IO? */
-#define __GFP_FS        0x100   /* Can call down to low-level FS? */
-#define GFP_ATOMIC      (__GFP_HIGH)
-#define GFP_KERNEL      (__GFP_HIGH | __GFP_WAIT | __GFP_IO | \
-                         __GFP_HIGHIO | __GFP_FS)
-
-/*
  * The following is for page_alloc.c.
  */
 
 void init_page_allocator(unsigned long min, unsigned long max);
-unsigned long __get_free_pages(int mask, int order);
+unsigned long __get_free_pages(int order);
 void __free_pages(unsigned long p, int order);
-#define get_free_page(_m) (__get_free_pages((_m),0))
-#define __get_free_page(_m) (__get_free_pages((_m),0))
+#define get_free_page()   (__get_free_pages(0))
+#define __get_free_page() (__get_free_pages(0))
 #define free_pages(_p,_o) (__free_pages(_p,_o))
-#define free_page(_p) (__free_pages(_p,0))
+#define free_page(_p)     (__free_pages(_p,0))
 
 
 /*

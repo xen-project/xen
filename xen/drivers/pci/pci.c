@@ -1126,7 +1126,7 @@ static struct pci_bus * __devinit pci_alloc_bus(void)
 {
 	struct pci_bus *b;
 
-	b = kmalloc(sizeof(*b), GFP_KERNEL);
+	b = kmalloc(sizeof(*b));
 	if (b) {
 		memset(b, 0, sizeof(*b));
 		INIT_LIST_HEAD(&b->children);
@@ -1351,7 +1351,7 @@ struct pci_dev * __devinit pci_scan_device(struct pci_dev *temp)
 	if (l == 0xffffffff || l == 0x00000000 || l == 0x0000ffff || l == 0xffff0000)
 		return NULL;
 
-	dev = kmalloc(sizeof(*dev), GFP_KERNEL);
+	dev = kmalloc(sizeof(*dev));
 	if (!dev)
 		return NULL;
 
@@ -1424,14 +1424,14 @@ unsigned int __devinit pci_do_scan_bus(struct pci_bus *bus)
 {
 	unsigned int devfn, max, pass;
 	struct list_head *ln;
-	/* XEN MODIFICATION: Allocate 'dev0' on heap to avoid stack overflow. */
+	/* XEN MODIFICATION: Allocate dev0 on heap to avoid stack overflow. */
 	struct pci_dev *dev, *dev0;
 
 	DBG("Scanning bus %02x\n", bus->number);
 	max = bus->secondary;
 
 	/* Create a device template */
-	dev0 = kmalloc(sizeof(struct pci_dev), GFP_KERNEL);
+	dev0 = kmalloc(sizeof(struct pci_dev));
 	if(!dev0) {
 	  panic("Out of memory scanning PCI bus!\n");
 	}

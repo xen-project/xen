@@ -254,7 +254,7 @@ int pirq_guest_bind(struct domain *p, int irq, int will_share)
             goto out;
         }
 
-        action = kmalloc(sizeof(irq_guest_action_t), GFP_KERNEL);
+        action = kmalloc(sizeof(irq_guest_action_t));
         if ( (desc->action = (struct irqaction *)action) == NULL )
         {
             DPRINTK("Cannot bind IRQ %d to guest. Out of memory.\n", irq);

@@ -318,7 +318,7 @@ long do_dom0_op(dom0_op_t *u_dom0_op)
 
         if ( op->u.getdomaininfo.ctxt != NULL )
         {
-            if ( (c = kmalloc(sizeof(*c), GFP_KERNEL)) == NULL )
+            if ( (c = kmalloc(sizeof(*c))) == NULL )
             {
                 ret = -ENOMEM;
                 put_domain(d);

@@ -688,7 +688,7 @@ static struct hw_interrupt_type ioapic_level_irq_type = {
 void __init setup_IO_APIC_irqs(void)
 {
 	struct IO_APIC_route_entry entry;
-	int apic, pin, idx, irq, first_notcon = 1, vector;
+	int apic, pin, idx, irq, vector;
 	unsigned long flags;
 
 	printk(KERN_DEBUG "init IO_APIC IRQs\n");
@@ -707,14 +707,8 @@ void __init setup_IO_APIC_irqs(void)
 		entry.dest.logical.logical_dest = target_cpus();
 
 		idx = find_irq_entry(apic,pin,mp_INT);
-		if (idx == -1) {
-			if (first_notcon) {
-				printk(KERN_DEBUG " IO-APIC (apicid-pin) %d-%d", mp_ioapics[apic].mpc_apicid, pin);
-				first_notcon = 0;
-			} else
-				printk(", %d-%d", mp_ioapics[apic].mpc_apicid, pin);
+		if (idx == -1)
 			continue;
-		}
 
 		entry.trigger = irq_trigger(idx);
 		entry.polarity = irq_polarity(idx);
@@ -758,9 +752,6 @@ void __init setup_IO_APIC_irqs(void)
 		spin_unlock_irqrestore(&ioapic_lock, flags);
 	}
 	}
-
-	if (!first_notcon)
-		printk(" not connected.\n");
 }
 
 /*

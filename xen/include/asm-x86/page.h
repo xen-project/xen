@@ -33,9 +33,6 @@ typedef struct { unsigned long pt_lo; } pagetable_t;
 #define l2_pgentry_val(_x) ((_x).l2_lo)
 #define pagetable_val(_x)  ((_x).pt_lo)
 
-#define alloc_l1_pagetable()  ((l1_pgentry_t *)get_free_page(GFP_KERNEL))
-#define alloc_l2_pagetable()  ((l2_pgentry_t *)get_free_page(GFP_KERNEL))
-
 /* Add type to a table entry. */
 #define mk_l1_pgentry(_x)  ( (l1_pgentry_t) { (_x) } )
 #define mk_l2_pgentry(_x)  ( (l2_pgentry_t) { (_x) } )

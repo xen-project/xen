@@ -505,13 +505,13 @@ static inline void set_shadow_status( struct mm_struct *m,
         SH_LOG("allocate more shadow hashtable blocks");
 
         // we need to allocate more space
-        extra = kmalloc( sizeof(void*) + (shadow_ht_extra_size * 
-                                          sizeof(struct shadow_status)), GFP_KERNEL );
+        extra = kmalloc(sizeof(void*) + (shadow_ht_extra_size * 
+                                         sizeof(struct shadow_status)));
 
         if( ! extra ) BUG(); // should be more graceful here....
 
-        memset( extra, 0, sizeof(void*) + (shadow_ht_extra_size * 
-                                           sizeof(struct shadow_status)) );
+        memset(extra, 0, sizeof(void*) + (shadow_ht_extra_size * 
+                                          sizeof(struct shadow_status)));
 
         m->shadow_extras_count++;
 

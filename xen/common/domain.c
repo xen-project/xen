@@ -84,13 +84,13 @@ struct domain *do_createdomain(domid_t dom_id, unsigned int cpu)
         INIT_LIST_HEAD(&p->page_list);
         p->max_pages = p->tot_pages = 0;
 
-        p->shared_info = (void *)get_free_page(GFP_KERNEL);
+        p->shared_info = (void *)get_free_page();
         memset(p->shared_info, 0, PAGE_SIZE);
         SHARE_PFN_WITH_DOMAIN(virt_to_page(p->shared_info), p);
         machine_to_phys_mapping[virt_to_phys(p->shared_info) >> 
                                PAGE_SHIFT] = 0x80000000UL;  /* debug */
 
-        p->mm.perdomain_pt = (l1_pgentry_t *)get_free_page(GFP_KERNEL);
+        p->mm.perdomain_pt = (l1_pgentry_t *)get_free_page();
         memset(p->mm.perdomain_pt, 0, PAGE_SIZE);
         machine_to_phys_mapping[virt_to_phys(p->mm.perdomain_pt) >> 
                                PAGE_SHIFT] = 0x0fffdeadUL;  /* debug */
@@ -474,7 +474,7 @@ int final_setup_guestos(struct domain *p, dom0_builddomain_t *builddomain)
     int i, rc = 0;
     full_execution_context_t *c;
 
-    if ( (c = kmalloc(sizeof(*c), GFP_KERNEL)) == NULL )
+    if ( (c = kmalloc(sizeof(*c))) == NULL )
         return -ENOMEM;
 
     if ( test_bit(DF_CONSTRUCTED, &p->flags) )

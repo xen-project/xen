@@ -59,7 +59,7 @@ void init_trace_bufs(void)
     nr_pages = smp_num_cpus * opt_tbuf_size;
     order    = get_order(nr_pages * PAGE_SIZE);
     
-    if ( (rawbuf = (char *)__get_free_pages(GFP_KERNEL, order)) == NULL )
+    if ( (rawbuf = (char *)__get_free_pages(order)) == NULL )
     {
         printk("Xen trace buffers: memory allocation failed\n");
         return;

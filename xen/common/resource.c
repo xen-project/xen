@@ -220,7 +220,7 @@ int allocate_resource(struct resource *root, struct resource *new,
  */
 struct resource * __request_region(struct resource *parent, unsigned long start, unsigned long n, const char *name)
 {
-	struct resource *res = kmalloc(sizeof(*res), GFP_KERNEL);
+	struct resource *res = kmalloc(sizeof(*res));
 
 	if (res) {
 		memset(res, 0, sizeof(*res));

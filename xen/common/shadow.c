@@ -242,22 +242,18 @@ int shadow_mode_enable( struct domain *p, unsigned int mode )
     m->shadow_mode = mode;
  
     // allocate hashtable
-    m->shadow_ht = kmalloc( shadow_ht_buckets * 
-                            sizeof(struct shadow_status), GFP_KERNEL );
-    if( ! m->shadow_ht )
+    m->shadow_ht = kmalloc(shadow_ht_buckets * 
+                           sizeof(struct shadow_status));
+    if( m->shadow_ht == NULL )
         goto nomem;
 
-    memset( m->shadow_ht, 0, shadow_ht_buckets * 
-            sizeof(struct shadow_status) );
-
+    memset(m->shadow_ht, 0, shadow_ht_buckets * sizeof(struct shadow_status));
 
     // allocate space for first lot of extra nodes
-    m->shadow_ht_extras = kmalloc( sizeof(void*) + 
-								   (shadow_ht_extra_size * 
-									sizeof(struct shadow_status)),
-								   GFP_KERNEL );
-
-    if( ! m->shadow_ht_extras )
+    m->shadow_ht_extras = kmalloc(sizeof(void*) + 
+                                  (shadow_ht_extra_size * 
+                                   sizeof(struct shadow_status)));
+    if( m->shadow_ht_extras == NULL )
         goto nomem;
 
     memset( m->shadow_ht_extras, 0, sizeof(void*) + (shadow_ht_extra_size * 
@@ -280,9 +276,8 @@ int shadow_mode_enable( struct domain *p, unsigned int mode )
     {
         m->shadow_dirty_bitmap_size = (p->max_pages+63)&(~63);
         m->shadow_dirty_bitmap = 
-            kmalloc( m->shadow_dirty_bitmap_size/8, GFP_KERNEL );
-
-        if( !m->shadow_dirty_bitmap  )
+            kmalloc( m->shadow_dirty_bitmap_size/8);
+        if( m->shadow_dirty_bitmap == NULL )
         {
             m->shadow_dirty_bitmap_size = 0;
             goto nomem;

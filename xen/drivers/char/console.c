@@ -300,7 +300,7 @@ long do_console_io(int cmd, int count, char *buffer)
     case CONSOLEIO_write:
         if ( count > (PAGE_SIZE-1) )
             count = PAGE_SIZE-1;
-        if ( (kbuf = (char *)get_free_page(GFP_KERNEL)) == NULL )
+        if ( (kbuf = (char *)get_free_page()) == NULL )
             return -ENOMEM;
         kbuf[count] = '\0';
         rc = count;

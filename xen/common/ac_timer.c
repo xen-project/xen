@@ -130,10 +130,9 @@ static int add_entry(struct ac_timer **heap, struct ac_timer *t)
     if ( unlikely(sz == GET_HEAP_LIMIT(heap)) )
     {
         int i, limit = (GET_HEAP_LIMIT(heap)+1) << 1;
-        struct ac_timer **new_heap = kmalloc(
-            limit * sizeof(struct ac_timer *), GFP_KERNEL);
+        struct ac_timer **new_heap = kmalloc(limit*sizeof(struct ac_timer *));
         if ( new_heap == NULL ) BUG();
-        memcpy(new_heap, heap, (limit>>1) * sizeof(struct ac_timer *));
+        memcpy(new_heap, heap, (limit>>1)*sizeof(struct ac_timer *));
         for ( i = 0; i < smp_num_cpus; i++ )
             if ( ac_timers[i].heap == heap )
                 ac_timers[i].heap = new_heap;
@@ -280,7 +279,7 @@ void __init ac_timer_init(void)
     for ( i = 0; i < smp_num_cpus; i++ )
     {
         ac_timers[i].heap = kmalloc(
-            (DEFAULT_HEAP_LIMIT+1) * sizeof(struct ac_timer *), GFP_KERNEL);
+            (DEFAULT_HEAP_LIMIT+1) * sizeof(struct ac_timer *));
         if ( ac_timers[i].heap == NULL ) BUG();
         SET_HEAP_SIZE(ac_timers[i].heap, 0);
         SET_HEAP_LIMIT(ac_timers[i].heap, DEFAULT_HEAP_LIMIT);

@@ -836,7 +836,7 @@ struct pdb_breakpoint breakpoints;
 
 void pdb_bkpt_add (unsigned long cr3, unsigned long address)
 {
-    struct pdb_breakpoint *bkpt = kmalloc(sizeof(*bkpt), GFP_KERNEL);
+    struct pdb_breakpoint *bkpt = kmalloc(sizeof(*bkpt));
     bkpt->cr3 = cr3;
     bkpt->address = address;
     list_add(&bkpt->list, &breakpoints.list);

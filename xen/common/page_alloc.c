@@ -263,7 +263,7 @@ void __init init_page_allocator(unsigned long min, unsigned long max)
 
 
 /* Allocate 2^@order contiguous pages. Returns a VIRTUAL address. */
-unsigned long __get_free_pages(int mask, int order)
+unsigned long __get_free_pages(int order)
 {
     int i, attempts = 0;
     chunk_head_t *alloc_ch, *spare_ch;
@@ -321,7 +321,7 @@ retry:
         
     if ( attempts++ < 8 )
     {
-        kmem_cache_reap(0);
+        kmem_cache_reap();
         goto retry;
     }
 

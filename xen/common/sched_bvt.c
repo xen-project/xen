@@ -96,7 +96,7 @@ static void __calc_evt(struct bvt_dom_info *inf)
  */
 int bvt_alloc_task(struct domain *p)
 {
-    if ( (BVT_INFO(p) = kmem_cache_alloc(dom_info_cache,GFP_KERNEL)) == NULL )
+    if ( (BVT_INFO(p) = kmem_cache_alloc(dom_info_cache)) == NULL )
         return -1;
     
     return 0;
@@ -410,8 +410,7 @@ int bvt_init_scheduler()
 
     for ( i = 0; i < NR_CPUS; i++ )
     {
-        CPU_INFO(i) = kmalloc(sizeof(struct bvt_cpu_info), GFP_KERNEL);
-
+        CPU_INFO(i) = kmalloc(sizeof(struct bvt_cpu_info));
         if ( CPU_INFO(i) == NULL )
         {
             printk("Failed to allocate BVT scheduler per-CPU memory!\n");

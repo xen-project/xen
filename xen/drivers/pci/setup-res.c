@@ -171,7 +171,7 @@ pdev_sort_resources(struct pci_dev *dev, struct resource_list *head)
 					ln->res->start;
 			}
 			if (r_align > align) {
-				tmp = kmalloc(sizeof(*tmp), GFP_KERNEL);
+				tmp = kmalloc(sizeof(*tmp));
 				if (!tmp)
 					panic("pdev_sort_resources(): "
 					      "kmalloc() failed!\n");

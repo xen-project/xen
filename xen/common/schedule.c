@@ -110,7 +110,7 @@ struct domain *alloc_domain_struct(void)
 {
     struct domain *d;
 
-    if ( (d = kmem_cache_alloc(domain_struct_cachep,GFP_KERNEL)) == NULL )
+    if ( (d = kmem_cache_alloc(domain_struct_cachep)) == NULL )
         return NULL;
     
     memset(d, 0, sizeof(*d));

@@ -528,8 +528,7 @@ static int at_init_scheduler()
     
     for ( i = 0; i < NR_CPUS; i++ )
     {
-        schedule_data[i].sched_priv = kmalloc(sizeof(struct at_cpu_info),
-                                              GFP_KERNEL);
+        schedule_data[i].sched_priv = kmalloc(sizeof(struct at_cpu_info));
         if ( schedule_data[i].sched_priv == NULL )
             return -1;
         WAITQ(i)->next = WAITQ(i);
@@ -592,7 +591,7 @@ static int at_alloc_task(struct domain *p)
 {
     ASSERT(p != NULL);
 
-    p->sched_priv = kmem_cache_alloc(dom_info_cache, GFP_KERNEL);
+    p->sched_priv = kmem_cache_alloc(dom_info_cache);
     if( p->sched_priv == NULL )
         return -1;
 
