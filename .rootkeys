@@ -9,11 +9,9 @@
 3eb781edFwm_pW9FwnQACIe68viLOw tools/control/Makefile
 3eca6a96a31IwaKtkEa4jmzwTWlm8Q tools/control/README-xenctl
 3eb781fceEYkUi1XHKf2V0KX7si2JA tools/control/build-cmdline.xml
-3eb781fcTp_LPQwaot3SSSehkaf4eg tools/control/build-dom.xml
 3ec41f7cWCxQ8pdH8ZWqhhv-38qQ1w tools/control/build-xen.xml
 3ec41f7ca6IBXDSe0HVcMPp3PPloOQ tools/control/build.properties
 3ec4ebe0g_MI1VqkbbyNB8gt6m0Adg tools/control/docs/empty_dir
-3eb781fcXf-WczEdAhnTpWfbR55jqA tools/control/domctl
 3eb781fcabCKRogwxJA3-jJKstw9Vg tools/control/domctl.xml
 3f042c35FzVap5QW0UBPnZ2ZM0l3QA tools/control/src/org/xenoserver/cmdline/CommandParser.java
 3eb781fdNQvEJW3tNvovjqoN7GlePA tools/control/src/org/xenoserver/cmdline/Main.java
