@@ -58,9 +58,6 @@
 #define TRC_SCHED_DOM_TIMER_FN        0x0001000C
 #define TRC_SCHED_FALLBACK_TIMER_FN   0x0001000D
 
-#define _HIGH32(_x) (_x >> 32)
-#define _LOW32(_x)  ((u32)_x )
-
 /* Various timer handlers. */
 static void s_timer_fn(unsigned long unused);
 static void t_timer_fn(unsigned long unused);
@@ -147,14 +144,14 @@ void sched_add_domain(struct domain *d)
 
     SCHED_OP(add_task, d);
 
-    TRACE_3D(TRC_SCHED_DOM_ADD, _HIGH32(d->domain), _LOW32(d->domain), d);
+    TRACE_2D(TRC_SCHED_DOM_ADD, d->domain, d);
 }
 
 void sched_rem_domain(struct domain *d) 
 {
     rem_ac_timer(&d->timer);
     SCHED_OP(rem_task, d);
-    TRACE_3D(TRC_SCHED_DOM_REM, _HIGH32(d->domain), _LOW32(d->domain), d);
+    TRACE_2D(TRC_SCHED_DOM_REM, d->domain, d);
 }
 
 void init_idle_task(void)
@@ -207,7 +204,7 @@ void domain_wake(struct domain *d)
 
     if ( likely(domain_runnable(d)) && likely(!__task_on_runqueue(d)) )
     {
-        TRACE_3D(TRC_SCHED_WAKE, _HIGH32(d->domain), _LOW32(d->domain), d);
+        TRACE_2D(TRC_SCHED_WAKE,d->domain, d);
         SCHED_OP(wake_up, d);
 #ifdef WAKE_HISTO
         p->wokenup = NOW();
@@ -296,8 +293,7 @@ long do_set_timer_op(unsigned long timeout_hi, unsigned long timeout_lo)
         add_ac_timer(&p->timer);
     }
 
-    TRACE_5D(TRC_SCHED_SET_TIMER, _HIGH32(p->domain), _LOW32(p->domain),
-             p, timeout_hi, timeout_lo);
+    TRACE_4D(TRC_SCHED_SET_TIMER, p->domain, p, timeout_hi, timeout_lo);
 
     return 0;
 }
@@ -335,7 +331,7 @@ long sched_adjdom(struct sched_adjdom_cmd *cmd)
     if( p == NULL )
         return -ESRCH;
 
-    TRACE_2D(TRC_SCHED_ADJDOM, _HIGH32(p->domain), _LOW32(p->domain));
+    TRACE_1D(TRC_SCHED_ADJDOM, p->domain);
 
     SCHED_OP(adjdom, p, cmd);
 

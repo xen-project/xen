@@ -311,7 +311,7 @@ int monitor_tbufs(FILE *logfile)
 /*	    printf("XX%d: cons=%ld head=%ld  %p\n", i,
 		   cons[i], meta[i]->head, data[i] + (cons[i] % size_in_recs) );
 		   */
-	    while( cons[i] < meta[i]->head )
+	    while( cons[i] != meta[i]->head )
 	    {
 /*
 		if( (cons[i] % 6  ) == 0 )
