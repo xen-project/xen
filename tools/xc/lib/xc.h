@@ -28,6 +28,7 @@ typedef struct {
     int           has_cpu;
     int           stopped;
     unsigned long nr_pages;
+    unsigned long shared_info_frame;
     u64           cpu_time;
 #define XC_DOMINFO_MAXNAME 16
     char          name[XC_DOMINFO_MAXNAME];

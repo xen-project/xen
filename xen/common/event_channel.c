@@ -138,6 +138,10 @@ static long event_channel_open(evtchn_open_t *open)
     p2->event_channel[port2].remote_port = (u16)port1;
     p2->event_channel[port2].state       = ECS_CONNECTED;
 
+    /* Ensure that the disconnect signal is not asserted. */
+    clear_bit(port1, &p1->shared_info->event_channel_disc[0]);
+    clear_bit(port2, &p2->shared_info->event_channel_disc[0]);
+
     cpu_mask  = set_event_pending(p1, port1);
     cpu_mask |= set_event_pending(p2, port2);
     guest_event_notify(cpu_mask);

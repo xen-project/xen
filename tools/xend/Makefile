@@ -1,7 +1,7 @@
 
 CC       = gcc
 CFLAGS   = -Wall -O3 
-CFLAGS  += -I../../xen/include -I../../xenolinux-sparse/include
+CFLAGS  += -I../xc/lib
 
 HDRS     = $(wildcard *.h)
 OBJS     = $(patsubst %.c,%.o,$(wildcard *.c))
@@ -24,7 +24,7 @@ clean:
 	$(RM) *.a *.so *.o *.rpm $(BIN)
 
 $(BIN): $(OBJS)
-	$(CC) $(CFLAGS) -o $@ $^ -L../xc/lib -lxc
+	$(CC) -o $@ $^ -L../xc/lib -lxc
 
 %.o: %.c $(HDRS) Makefile
 	$(CC) $(CFLAGS) -c -o $@ $<

@@ -91,6 +91,7 @@ int xc_domain_getinfo(int xc_handle,
         info->has_cpu = op.u.getdomaininfo.has_cpu;
         info->stopped = (op.u.getdomaininfo.state == DOMSTATE_STOPPED);
         info->nr_pages = op.u.getdomaininfo.tot_pages;
+        info->shared_info_frame = op.u.getdomaininfo.shared_info_frame;
         info->cpu_time = op.u.getdomaininfo.cpu_time;
         strncpy(info->name, op.u.getdomaininfo.name, XC_DOMINFO_MAXNAME);
         info->name[XC_DOMINFO_MAXNAME-1] = '\0';
