@@ -123,7 +123,7 @@ static full_execution_context_t ctxt;
 /* --------------------- */
 
 static void *
-map_domain_va(unsigned long domid, void * guest_va)
+map_domain_va(unsigned long domid, void * guest_va, int perm)
 {
     unsigned long pde, page;
     unsigned long va = (unsigned long)guest_va;
@@ -134,6 +134,8 @@ map_domain_va(unsigned long domid, void * guest_va)
     static unsigned long *pde_virt;
     static unsigned long page_phys;
     static unsigned long *page_virt;
+    
+    static int prev_perm;
     if (!regs_valid) 
     {
 	int retval = xc_domain_getfullinfo(xc_handle, domid, 0, NULL, &ctxt);
@@ -166,17 +168,19 @@ map_domain_va(unsigned long domid, void * guest_va)
     }
     if ((page = pde_virt[vtopti(va)]) == 0)
 	goto error_out;
-    if (page != page_phys) 
+    if (page != page_phys || perm != prev_perm) 
     {
 	page_phys = page;
 	if (page_virt)
 	    munmap(page_virt, PAGE_SIZE);
 	if ((page_virt = xc_map_foreign_range(xc_handle, domid, PAGE_SIZE,
-					     PROT_READ|PROT_WRITE,
+					     perm,
 					      page_phys >> PAGE_SHIFT)) == NULL) {
 	    printf("cr3 %lx pde %lx page %lx pti %lx\n", cr3, pde, page, vtopti(va));
+	    page_phys = 0;
 	    goto error_out;
 	}
+	prev_perm = perm;
     }	
     return (void *)(((unsigned long)page_virt) | (va & BSD_PAGE_MASK));
 
@@ -247,17 +251,21 @@ xc_ptrace(enum __ptrace_request request, pid_t pid, void *addr, void *data)
     switch (request) {	
     case PTRACE_PEEKTEXT:
     case PTRACE_PEEKDATA:
-    case PTRACE_POKETEXT:
-    case PTRACE_POKEDATA:
-	if ((guest_va = (unsigned long *)map_domain_va(pid, addr)) == NULL) {
+	if ((guest_va = (unsigned long *)map_domain_va(pid, addr, PROT_READ)) == NULL) {
 	    status = EFAULT;
 	    goto done;
 	}
 
-	if (request == PTRACE_PEEKTEXT || request == PTRACE_PEEKDATA)
-	    retval = *guest_va;
-	else
-	    *guest_va = (unsigned long)data;
+	retval = *guest_va;
+	break;
+    case PTRACE_POKETEXT:
+    case PTRACE_POKEDATA:
+	if ((guest_va = (unsigned long *)map_domain_va(pid, addr, PROT_READ|PROT_WRITE)) == NULL) {
+	    status = EFAULT;
+	    goto done;
+	}
+
+	*guest_va = (unsigned long)data;
 	break;
     case PTRACE_GETREGS:
     case PTRACE_GETFPREGS:
