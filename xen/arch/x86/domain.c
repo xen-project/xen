@@ -783,6 +783,7 @@ void domain_relinquish_memory(struct domain *d)
         if ( pagetable_val(ed->arch.pagetable) != 0 )
             put_page_and_type(&frame_table[pagetable_val(ed->arch.pagetable) >>
                                            PAGE_SHIFT]);
+        ed->arch.pagetable = mk_pagetable(0);
     }
 
 #ifdef CONFIG_VMX

@@ -828,7 +828,7 @@ asmlinkage void vmx_vmexit_handler(struct xen_regs regs)
     case EXIT_REASON_EXTERNAL_INTERRUPT: 
     {
         extern int vector_irq[];
-        extern asmlinkage void do_IRQ(struct xen_regs);
+        extern asmlinkage void do_IRQ(struct xen_regs *);
         extern void smp_apic_timer_interrupt(struct xen_regs *);
         extern void timer_interrupt(int, void *, struct xen_regs *);
         unsigned int    vector;
@@ -845,7 +845,7 @@ asmlinkage void vmx_vmexit_handler(struct xen_regs regs)
         } else {
             regs.entry_vector = (vector == FIRST_DEVICE_VECTOR?
                      0 : vector_irq[vector]);
-            do_IRQ(regs);
+            do_IRQ(&regs);
         }
         break;
     }
