@@ -479,13 +479,20 @@ void console_force_lock(void)
 static unsigned char *debugtrace_buf; /* Debug-trace buffer */
 static unsigned int   debugtrace_prd; /* Producer index     */
 static unsigned int   debugtrace_kilobytes = 128, debugtrace_bytes;
+static spinlock_t debugtrace_lock = SPIN_LOCK_UNLOCKED;
 integer_param("debugtrace", debugtrace_kilobytes);
-#define DEBUGTRACE_MASK(_p) ((_p) & (debugtrace_bytes-1))
 
 void debugtrace_reset(void)
 {
+    unsigned long  flags;
+
+    spin_lock_irqsave(&debugtrace_lock, flags);
+
     if ( debugtrace_bytes != 0 )
         memset(debugtrace_buf, '\0', debugtrace_bytes);
+    debugtrace_prd = 0;
+
+    spin_unlock_irqrestore(&debugtrace_lock, flags);
 }
 
 void debugtrace_dump(void)
@@ -498,23 +505,25 @@ void debugtrace_dump(void)
     /* Watchdog can trigger if we print a really large buffer. */
     watchdog_on = 0;
 
+    spin_lock(&debugtrace_lock);
+
     /* Print oldest portion of the ring. */
-    serial_puts(sercon_handle,
-                &debugtrace_buf[DEBUGTRACE_MASK(debugtrace_prd)]);
+    serial_puts(sercon_handle, &debugtrace_buf[debugtrace_prd]);
 
     /* Print youngest portion of the ring. */
-    debugtrace_buf[DEBUGTRACE_MASK(debugtrace_prd)] = '\0';
-    serial_puts(sercon_handle,
-                &debugtrace_buf[0]);
+    debugtrace_buf[debugtrace_prd] = '\0';
+    serial_puts(sercon_handle, &debugtrace_buf[0]);
 
-    debugtrace_reset();
+    memset(debugtrace_buf, '\0', debugtrace_bytes);
+    debugtrace_prd = 0;
+
+    spin_unlock(&debugtrace_lock);
 
     watchdog_on = _watchdog_on;
 }
 
 void debugtrace_printk(const char *fmt, ...)
 {
-    static spinlock_t _lock = SPIN_LOCK_UNLOCKED;
     static char       buf[1024];
 
     va_list       args;
@@ -524,16 +533,22 @@ void debugtrace_printk(const char *fmt, ...)
     if ( debugtrace_bytes == 0 )
         return;
 
-    spin_lock_irqsave(&_lock, flags);
+    spin_lock_irqsave(&debugtrace_lock, flags);
 
     va_start(args, fmt);
     (void)vsnprintf(buf, sizeof(buf), fmt, args);
     va_end(args);        
 
     for ( p = buf; *p != '\0'; p++ )
-        debugtrace_buf[DEBUGTRACE_MASK(debugtrace_prd++)] = *p;
+    {
+        debugtrace_buf[debugtrace_prd++] = *p;
 
-    spin_unlock_irqrestore(&_lock, flags);
+        /* always leave a null byte at the end of the buffer */
+        if (debugtrace_prd == debugtrace_bytes-1)
+            debugtrace_prd = 0;
+    }
+
+    spin_unlock_irqrestore(&debugtrace_lock, flags);
 }
 
 static int __init debugtrace_init(void)
