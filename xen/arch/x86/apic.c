@@ -724,7 +724,7 @@ int reprogram_ac_timer(s_time_t timeout)
 
 unsigned int apic_timer_irqs [NR_CPUS];
 
-void smp_apic_timer_interrupt(struct pt_regs * regs)
+void smp_apic_timer_interrupt(struct xen_regs * regs)
 {
     ack_APIC_irq();
 

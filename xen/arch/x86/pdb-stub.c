@@ -12,7 +12,7 @@
 
 #include <xen/lib.h>
 #include <xen/sched.h>
-#include <asm/ptrace.h>
+#include <asm/regs.h>
 #include <xen/keyhandler.h> 
 #include <asm/apic.h>
 #include <asm/domain_page.h>                           /* [un]map_domain_mem */
@@ -234,7 +234,7 @@ pdb_process_query (char *ptr)
 }
 
 void
-pdb_x86_to_gdb_regs (char *buffer, struct pt_regs *regs)
+pdb_x86_to_gdb_regs (char *buffer, struct xen_regs *regs)
 {
     int idx = 0;
 
@@ -273,7 +273,7 @@ pdb_x86_to_gdb_regs (char *buffer, struct pt_regs *regs)
 
 /* at this point we allow any register to be changed, caveat emptor */
 void
-pdb_gdb_to_x86_regs (struct pt_regs *regs, char *buffer)
+pdb_gdb_to_x86_regs (struct xen_regs *regs, char *buffer)
 {
     hex2mem(buffer, (char *)&regs->eax, sizeof(regs->eax));
     buffer += sizeof(regs->eax) * 2;
@@ -309,7 +309,7 @@ pdb_gdb_to_x86_regs (struct pt_regs *regs, char *buffer)
 }
 
 int
-pdb_process_command (char *ptr, struct pt_regs *regs, unsigned long cr3,
+pdb_process_command (char *ptr, struct xen_regs *regs, unsigned long cr3,
 		     int sigval)
 {
     int length;
@@ -1081,7 +1081,7 @@ void pdb_get_packet(char *buffer)
  */
 
 int pdb_handle_exception(int exceptionVector,
-			 struct pt_regs *xen_regs)
+			 struct xen_regs *xen_regs)
 {
     int signal = 0;
     struct pdb_breakpoint* bkpt;
@@ -1215,7 +1215,7 @@ int pdb_handle_exception(int exceptionVector,
 
 void pdb_key_pressed(unsigned char key)
 {
-    struct pt_regs *regs = (struct pt_regs *)get_execution_context();
+    struct xen_regs *regs = (struct xen_regs *)get_execution_context();
     pdb_handle_exception(KEYPRESS_EXCEPTION, regs);
 }
 

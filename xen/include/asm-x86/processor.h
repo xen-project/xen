@@ -356,7 +356,7 @@ struct guest_trap_bounce {
 };
 extern struct guest_trap_bounce guest_trap_bounce[];
 
-extern int gpf_emulate_4gb(struct pt_regs *regs);
+extern int gpf_emulate_4gb(struct xen_regs *regs);
 
 struct mm_struct {
     /*

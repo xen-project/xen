@@ -519,7 +519,7 @@ error_code:
 	movl  %edx,%gs
 	movl  %esp,%edx
 	pushl %esi			# push the error code
-	pushl %edx			# push the pt_regs pointer
+	pushl %edx			# push the xen_regs pointer
 	GET_CURRENT(%ebx)
 	call  *%edi
         addl  $8,%esp

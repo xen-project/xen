@@ -3,12 +3,12 @@
 
 #include <xen/config.h>
 #include <xen/spinlock.h>
-#include <asm/ptrace.h>
+#include <asm/regs.h>
 #include <asm/hardirq.h>
 
 struct irqaction
 {
-    void (*handler)(int, void *, struct pt_regs *);
+    void (*handler)(int, void *, struct xen_regs *);
     const char *name;
     void *dev_id;
 };
@@ -62,7 +62,7 @@ extern int setup_irq(unsigned int, struct irqaction *);
 extern void free_irq(unsigned int);
 
 extern hw_irq_controller no_irq_type;
-extern void no_action(int cpl, void *dev_id, struct pt_regs *regs);
+extern void no_action(int cpl, void *dev_id, struct xen_regs *regs);
 
 struct domain;
 extern int pirq_guest_unmask(struct domain *p);

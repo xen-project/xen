@@ -32,7 +32,7 @@
 #include <xen/errno.h>
 #include <xen/mm.h>
 #include <xen/console.h>
-#include <asm/ptrace.h>
+#include <asm/regs.h>
 #include <xen/delay.h>
 #include <xen/event.h>
 #include <xen/spinlock.h>
@@ -163,7 +163,7 @@ void show_stack(unsigned long *esp)
     show_trace( esp );
 }
 
-void show_registers(struct pt_regs *regs)
+void show_registers(struct xen_regs *regs)
 {
     unsigned long esp;
     unsigned short ss;
@@ -192,7 +192,7 @@ void show_registers(struct pt_regs *regs)
 
 spinlock_t die_lock = SPIN_LOCK_UNLOCKED;
 
-void die(const char *str, struct pt_regs * regs, long err)
+void die(const char *str, struct xen_regs * regs, long err)
 {
     unsigned long flags;
     spin_lock_irqsave(&die_lock, flags);
@@ -204,7 +204,7 @@ void die(const char *str, struct pt_regs * regs, long err)
 
 
 static inline void do_trap(int trapnr, char *str,
-                           struct pt_regs *regs, 
+                           struct xen_regs *regs, 
                            long error_code, int use_error_code)
 {
     struct domain *p = current;
@@ -241,13 +241,13 @@ static inline void do_trap(int trapnr, char *str,
 }
 
 #define DO_ERROR_NOCODE(trapnr, str, name) \
-asmlinkage void do_##name(struct pt_regs * regs, long error_code) \
+asmlinkage void do_##name(struct xen_regs * regs, long error_code) \
 { \
     do_trap(trapnr, str, regs, error_code, 0); \
 }
 
 #define DO_ERROR(trapnr, str, name) \
-asmlinkage void do_##name(struct pt_regs * regs, long error_code) \
+asmlinkage void do_##name(struct xen_regs * regs, long error_code) \
 { \
     do_trap(trapnr, str, regs, error_code, 1); \
 }
@@ -265,7 +265,7 @@ DO_ERROR(17, "alignment check", alignment_check)
 DO_ERROR_NOCODE(18, "machine check", machine_check)
 DO_ERROR_NOCODE(19, "simd error", simd_coprocessor_error)
 
-asmlinkage void do_int3(struct pt_regs *regs, long error_code)
+asmlinkage void do_int3(struct xen_regs *regs, long error_code)
 {
     struct domain *p = current;
     struct guest_trap_bounce *gtb = guest_trap_bounce+smp_processor_id();
@@ -327,7 +327,7 @@ asmlinkage void do_double_fault(void)
     for ( ; ; ) ;
 }
 
-asmlinkage void do_page_fault(struct pt_regs *regs, long error_code)
+asmlinkage void do_page_fault(struct xen_regs *regs, long error_code)
 {
     struct guest_trap_bounce *gtb = guest_trap_bounce+smp_processor_id();
     trap_info_t *ti;
@@ -433,7 +433,7 @@ asmlinkage void do_page_fault(struct pt_regs *regs, long error_code)
           smp_processor_id(), error_code, addr);
 }
 
-asmlinkage void do_general_protection(struct pt_regs *regs, long error_code)
+asmlinkage void do_general_protection(struct xen_regs *regs, long error_code)
 {
     struct domain *d = current;
     struct guest_trap_bounce *gtb = guest_trap_bounce+smp_processor_id();
@@ -516,7 +516,7 @@ asmlinkage void do_general_protection(struct pt_regs *regs, long error_code)
     die("general protection fault", regs, error_code);
 }
 
-asmlinkage void mem_parity_error(struct pt_regs *regs)
+asmlinkage void mem_parity_error(struct xen_regs *regs)
 {
     console_force_unlock();
 
@@ -536,7 +536,7 @@ asmlinkage void mem_parity_error(struct pt_regs *regs)
     for ( ; ; ) ;
 }
 
-asmlinkage void io_check_error(struct pt_regs *regs)
+asmlinkage void io_check_error(struct xen_regs *regs)
 {
     console_force_unlock();
 
@@ -556,14 +556,14 @@ asmlinkage void io_check_error(struct pt_regs *regs)
     for ( ; ; ) ;
 }
 
-static void unknown_nmi_error(unsigned char reason, struct pt_regs * regs)
+static void unknown_nmi_error(unsigned char reason, struct xen_regs * regs)
 {
     printk("Uhhuh. NMI received for unknown reason %02x.\n", reason);
     printk("Dazed and confused, but trying to continue\n");
     printk("Do you have a strange power saving mode enabled?\n");
 }
 
-asmlinkage void do_nmi(struct pt_regs * regs, unsigned long reason)
+asmlinkage void do_nmi(struct xen_regs * regs, unsigned long reason)
 {
     ++nmi_count(smp_processor_id());
 
@@ -592,7 +592,7 @@ static void nmi_softirq(void)
     put_domain(d);
 }
 
-asmlinkage void math_state_restore(struct pt_regs *regs, long error_code)
+asmlinkage void math_state_restore(struct xen_regs *regs, long error_code)
 {
     /* Prevent recursion. */
     clts();
@@ -616,7 +616,7 @@ asmlinkage void math_state_restore(struct pt_regs *regs, long error_code)
 }
 
 #ifdef XEN_DEBUGGER
-asmlinkage void do_pdb_debug(struct pt_regs *regs, long error_code)
+asmlinkage void do_pdb_debug(struct xen_regs *regs, long error_code)
 {
     unsigned int condition;
     struct domain *tsk = current;
@@ -638,7 +638,7 @@ asmlinkage void do_pdb_debug(struct pt_regs *regs, long error_code)
 }
 #endif
 
-asmlinkage void do_debug(struct pt_regs *regs, long error_code)
+asmlinkage void do_debug(struct xen_regs *regs, long error_code)
 {
     unsigned int condition;
     struct domain *tsk = current;
@@ -681,7 +681,7 @@ asmlinkage void do_debug(struct pt_regs *regs, long error_code)
 }
 
 
-asmlinkage void do_spurious_interrupt_bug(struct pt_regs * regs,
+asmlinkage void do_spurious_interrupt_bug(struct xen_regs * regs,
                                           long error_code)
 { /* nothing */ }
 

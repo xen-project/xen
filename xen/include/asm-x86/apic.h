@@ -2,7 +2,7 @@
 #define __ASM_APIC_H
 
 #include <xen/config.h>
-#include <asm/ptrace.h>
+#include <asm/regs.h>
 #include <asm/apicdef.h>
 #include <asm/system.h>
 
@@ -74,10 +74,10 @@ extern void sync_Arb_IDs (void);
 extern void init_bsp_APIC (void);
 extern void setup_local_APIC (void);
 extern void init_apic_mappings (void);
-extern void smp_local_timer_interrupt (struct pt_regs * regs);
+extern void smp_local_timer_interrupt (struct xen_regs * regs);
 extern void setup_APIC_clocks (void);
 extern void setup_apic_nmi_watchdog (void);
-extern inline void nmi_watchdog_tick (struct pt_regs * regs);
+extern inline void nmi_watchdog_tick (struct xen_regs * regs);
 extern int APIC_init_uniprocessor (void);
 extern void disable_APIC_timer(void);
 extern void enable_APIC_timer(void);

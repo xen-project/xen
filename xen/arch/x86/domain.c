@@ -18,7 +18,7 @@
 #include <xen/smp.h>
 #include <xen/delay.h>
 #include <xen/softirq.h>
-#include <asm/ptrace.h>
+#include <asm/regs.h>
 #include <asm/mc146818rtc.h>
 #include <asm/system.h>
 #include <asm/io.h>

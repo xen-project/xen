@@ -259,7 +259,7 @@ int fixup_seg(u16 seg, int positive_access)
 }
 
 /* Decode Reg field of a ModRM byte: return a pointer into a register block. */
-void *decode_reg(struct pt_regs *regs, u8 b)
+void *decode_reg(struct xen_regs *regs, u8 b)
 {
     switch ( b & 7 )
     {
@@ -282,7 +282,7 @@ void *decode_reg(struct pt_regs *regs, u8 b)
  * we assume that the instruction itself is paged into memory (the CPU
  * must have triggered this in order to decode the instruction itself).
  */
-int gpf_emulate_4gb(struct pt_regs *regs)
+int gpf_emulate_4gb(struct xen_regs *regs)
 {
     struct domain *d = current;
     trap_info_t   *ti;
