@@ -627,6 +627,8 @@ void __init time_init(void)
 	wall_to_monotonic.tv_nsec = -xtime.tv_nsec;
 	processed_system_time = shadow_system_time;
 
+	if (cur_timer->init(NULL) != 0)
+		BUG();
 	printk(KERN_INFO "Using %s for high-res timesource\n",cur_timer->name);
 
 	time_irq = bind_virq_to_irq(VIRQ_TIMER);
