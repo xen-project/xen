@@ -51,9 +51,7 @@ check-for-zlib:
 
 install: all
 	mkdir -p $(prefix)/usr/lib
-	mkdir -p $(prefix)/usr/include
 	install -m0755 $(LIB) $(prefix)/usr/lib
-	install -m0644 xc.h $(prefix)/usr/include
 
 clean:
 	$(RM) *.a *.so *.o *.rpm $(LIB)
