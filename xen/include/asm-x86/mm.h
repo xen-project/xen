@@ -116,6 +116,8 @@ struct pfn_info
         spin_unlock(&(_dom)->page_alloc_lock);                              \
     } while ( 0 )
 
+#define INVALID_P2M_ENTRY (~0UL)
+
 extern struct pfn_info *frame_table;
 extern unsigned long frame_table_size;
 extern unsigned long max_page;

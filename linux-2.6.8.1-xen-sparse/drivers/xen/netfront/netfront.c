@@ -208,16 +208,14 @@ static int vif_wake(struct net_device *dev)
 {
     struct sk_buff *skb;
     u32             src_ip, dst_ip;
-    unsigned char   dst_hw[ETH_ALEN];
-
-    memset(dst_hw, 0xff, ETH_ALEN);
 
     dst_ip = INADDR_BROADCAST;
     src_ip = inet_select_addr(dev, dst_ip, RT_SCOPE_LINK);
 
-    skb = arp_create(ARPOP_REQUEST, ETH_P_ARP,
+    skb = arp_create(ARPOP_REPLY, ETH_P_ARP,
                      dst_ip, dev, src_ip,
-                     dst_hw, dev->dev_addr, NULL);
+                     /*dst_hw*/ NULL, /*src_hw*/ NULL, 
+                     /*target_hw*/ dev->dev_addr);
     if ( skb == NULL )
         return -ENOMEM;
 
