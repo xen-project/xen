@@ -212,7 +212,7 @@ long sched_adjdom(int dom, unsigned long mcu_adv, unsigned long warp,
  ****************************************************************************/
 void reschedule(struct task_struct *p)
 {
-    int cpu = p->processor;;
+    int cpu = p->processor;
     struct task_struct *curr;
     unsigned long flags;
     s_time_t now, min_time;
