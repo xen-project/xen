@@ -56,6 +56,14 @@ Virtual console for other domains
  rc.local):
   # /usr/sbin/xend start
 
+ Alternatively, Redhat- and LSB-compatible Linux installations can use
+ the provided init.d script. To integrate startup and shutdown of xend
+ in such a system, you will need to run a few configuration commands:
+  # chkconfig --add xend
+  # chkconfig --level 35 on
+  # chkconfig --level 01246 off
+ This will avoid the need to run xend manually from rc.local, for example.
+
  Note that, when a domain is created using xc_dom_create.py, xend MUST
  be running. If everything is set up correctly then xc_dom_create will
  print the local TCP port to which you should connect to perform

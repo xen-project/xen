@@ -46,12 +46,13 @@
 401d7e16UgeqroJQTIhwkrDVkoWgZQ tools/examples/README
 401d7e16GS8YesM1zateRbaOoI6YLQ tools/examples/defaults
 401d7e16NoWaBGC1RXbBcqAOr5Uaag tools/examples/democd
+405ff55dawQyCHFEnJ067ChPRoXBBA tools/examples/init.d/xend
+40278d94cIUWl2eRgnwZtr4hTyWT1Q tools/examples/init.d/xendomains
 40278d91ZjLhxdjjrGe8HEdwHLj5xQ tools/examples/netbsd
 401d7e16NpnVrFSsR7lKKKfTwCYvWA tools/examples/xc_dom_control.py
 401d7e16RJj-lbtsVEjua6HYAIiKiA tools/examples/xc_dom_create.py
 403b7cf7J7FsSSoEPGhx6gXR4pIdZg tools/examples/xc_physinfo.py
 401d7e16X4iojyKopo_j63AyzYZd2A tools/examples/xc_vd_tool.py
-40278d94cIUWl2eRgnwZtr4hTyWT1Q tools/examples/xendomains
 3f776bd2Xd-dUcPKlPN2vG89VGtfvQ tools/misc/Makefile
 3f6dc136ZKOjd8PIqLbFBl_v-rnkGg tools/misc/miniterm/Makefile
 3f6dc140C8tAeBfroAF24VrmCS4v_w tools/misc/miniterm/README

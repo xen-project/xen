@@ -26,7 +26,7 @@ def __recv_from_sock(sock):
     stop = False
     while not stop:
         try:
-            data = sock.recv(1)
+            data = sock.recv(1024)
             os.write(1, data)
         except socket.error, error:
             if error[0] != errno.EINTR:
@@ -35,7 +35,7 @@ def __recv_from_sock(sock):
 
 def __send_to_sock(sock):
     while 1:
-        data = os.read(0,1)
+        data = os.read(0,1024)
         if ord(data[0]) == ord(']')-64:
             break
         try:

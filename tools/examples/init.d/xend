@@ -1,0 +1,33 @@
+#!/bin/bash
+#
+# xend		Script to start and stop the Xen control daemon.
+#
+# Author:       Keir Fraser <keir.fraser@cl.cam.ac.uk>
+#
+# chkconfig: 2345 99 00
+# description: Starts and stops the Xen control daemon.
+
+. /etc/init.d/functions
+
+case "$1" in
+  start)
+	xend start
+	exit $?
+	;;
+  stop)
+	xend stop
+	exit $?
+	;;
+  status)
+	;;
+  restart|reload)
+	;;
+  *)
+	# do not advertise unreasonable commands that there is no reason
+	# to use with this device
+	echo $"Usage: $0 {start|stop|status|restart|reload}"
+	exit 1
+esac
+
+exit 0
+
