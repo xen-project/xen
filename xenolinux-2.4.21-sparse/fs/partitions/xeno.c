@@ -6,8 +6,12 @@
 #include <linux/slab.h>
 #include <linux/genhd.h>
 #include <asm/hypervisor-ifs/block.h>
+#include <linux/pagemap.h>
 
+#include "check.h"
 #include "xeno.h"
+
+extern int xenolinux_control_msg(int operration, char *buffer, int size);
 
 /* Grab the physdisk partitions list from the hypervisor. */
 int xeno_partition(struct gendisk *hd,
@@ -27,7 +31,7 @@ int xeno_partition(struct gendisk *hd,
   buf->start_ind = 0;
   buf->n_aces = PHYSDISK_MAX_ACES_PER_REQUEST;
 
-  xenolinux_control_msg(XEN_BLOCK_PHYSDEV_PROBE, buf,
+  xenolinux_control_msg(XEN_BLOCK_PHYSDEV_PROBE, (char *)buf,
 			sizeof(*buf));
   if (buf->n_aces == 0) {
     kfree(buf);
