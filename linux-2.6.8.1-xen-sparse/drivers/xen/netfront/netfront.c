@@ -31,22 +31,6 @@
 
 #define DEBUG 0
 
-#if DEBUG
-#define DPRINTK(fmt, args...) \
-    printk(KERN_INFO "[XEN] %s" fmt, __FUNCTION__, ##args)
-#else
-#define DPRINTK(fmt, args...) ((void)0)
-#endif
-
-#define IPRINTK(fmt, args...) \
-    printk(KERN_INFO "[XEN]" fmt, ##args)
-
-#define WPRINTK(fmt, args...) \
-    printk(KERN_WARNING "[XEN]" fmt, ##args)
-
-#define EPRINTK(fmt, args...) \
-    printk(KERN_ERROR "[XEN]" fmt, ##args)
-
 #ifndef __GFP_NOWARN
 #define __GFP_NOWARN 0
 #endif
@@ -114,30 +98,18 @@ struct net_private
 #define UST_OPEN          1
     unsigned int user_state;
 
+    /* Receive-ring batched refills. */
+#define RX_MIN_TARGET 8
+#define RX_MAX_TARGET NETIF_RX_RING_SIZE
+    int rx_target;
+    struct sk_buff_head rx_batch;
+
     /*
      * {tx,rx}_skbs store outstanding skbuffs. The first entry in each
      * array is an index into a chain of free entries.
      */
     struct sk_buff *tx_skbs[NETIF_TX_RING_SIZE+1];
     struct sk_buff *rx_skbs[NETIF_RX_RING_SIZE+1];
-};
-
-char * status_name[] = {
-    [NETIF_INTERFACE_STATUS_CLOSED]       = "closed",
-    [NETIF_INTERFACE_STATUS_DISCONNECTED] = "disconnected",
-    [NETIF_INTERFACE_STATUS_CONNECTED]    = "connected",
-    [NETIF_INTERFACE_STATUS_CHANGED]      = "changed",
-};
-
-char * be_state_name[] = {
-    [BEST_CLOSED]       = "closed",
-    [BEST_DISCONNECTED] = "disconnected",
-    [BEST_CONNECTED]    = "connected",
-};
-
-char * user_state_name[] = {
-    [UST_CLOSED] = "closed",
-    [UST_OPEN]   = "open",
 };
 
 /* Access macros for acquiring freeing slots in {tx,rx}_skbs[]. */
@@ -148,6 +120,30 @@ char * user_state_name[] = {
  ({ unsigned long _id = (unsigned long)(_list)[0]; \
     (_list)[0]  = (_list)[_id];                    \
     (unsigned short)_id; })
+
+static char *status_name[] = {
+    [NETIF_INTERFACE_STATUS_CLOSED]       = "closed",
+    [NETIF_INTERFACE_STATUS_DISCONNECTED] = "disconnected",
+    [NETIF_INTERFACE_STATUS_CONNECTED]    = "connected",
+    [NETIF_INTERFACE_STATUS_CHANGED]      = "changed",
+};
+
+static char *be_state_name[] = {
+    [BEST_CLOSED]       = "closed",
+    [BEST_DISCONNECTED] = "disconnected",
+    [BEST_CONNECTED]    = "connected",
+};
+
+#if DEBUG
+#define DPRINTK(fmt, args...) \
+    printk(KERN_ALERT "[XEN] (%s:%d) " fmt, __FUNCTION__, __LINE__, ##args)
+#else
+#define DPRINTK(fmt, args...) ((void)0)
+#endif
+#define IPRINTK(fmt, args...) \
+    printk(KERN_INFO "[XEN] " fmt, ##args)
+#define WPRINTK(fmt, args...) \
+    printk(KERN_WARNING "[XEN] " fmt, ##args)
 
 static struct net_device *find_dev_by_handle(unsigned int handle)
 {
@@ -185,9 +181,8 @@ static void netctrl_init(void)
  */
 static int netctrl_err(int err)
 {
-    if ( (err < 0) && !netctrl.err ){
+    if ( (err < 0) && !netctrl.err )
         netctrl.err = err;
-    }
     return netctrl.err;
 }
 
@@ -197,13 +192,15 @@ static int netctrl_err(int err)
  */
 static int netctrl_connected(void)
 {
-    int ok = 0;
+    int ok;
 
-    if(netctrl.err){
+    if ( netctrl.err )
         ok = netctrl.err;
-    } else if(netctrl.up == NETIF_DRIVER_STATUS_UP){
+    else if ( netctrl.up == NETIF_DRIVER_STATUS_UP )
         ok = (netctrl.connected_n == netctrl.interface_n);
-    }
+    else
+        ok = 0;
+
     return ok;
 }
 
@@ -222,9 +219,8 @@ static int netctrl_connected_count(void)
     
     list_for_each(ent, &dev_list) {
         np = list_entry(ent, struct net_private, list);
-        if (np->backend_state == BEST_CONNECTED){
+        if (np->backend_state == BEST_CONNECTED)
             connected++;
-        }
     }
 
     netctrl.connected_n = connected;
@@ -326,16 +322,33 @@ static void network_alloc_rx_buffers(struct net_device *dev)
     unsigned short id;
     struct net_private *np = dev->priv;
     struct sk_buff *skb;
-    NETIF_RING_IDX i = np->rx->req_prod;
-    int nr_pfns = 0;
+    int i, batch_target;
+    NETIF_RING_IDX req_prod = np->rx->req_prod;
 
-    /* Make sure the batch is large enough to be worthwhile (1/2 ring). */
-    if ( unlikely((i - np->rx_resp_cons) > (NETIF_RX_RING_SIZE/2)) || 
-         unlikely(np->backend_state != BEST_CONNECTED) )
+    if ( unlikely(np->backend_state != BEST_CONNECTED) )
         return;
 
-    do {
+    /*
+     * Allocate skbuffs greedily, even though we batch updates to the
+     * receive ring. This creates a less bursty demand on the memory allocator,
+     * so should reduce the chance of failed allocation requests both for
+     * ourself and for other kernel subsystems.
+     */
+    batch_target = np->rx_target - (req_prod - np->rx_resp_cons);
+    for ( i = skb_queue_len(&np->rx_batch); i < batch_target; i++ )
+    {
         if ( unlikely((skb = alloc_xen_skb(dev->mtu + RX_HEADROOM)) == NULL) )
+            break;
+        __skb_queue_tail(&np->rx_batch, skb);
+    }
+
+    /* Is the batch large enough to be worthwhile? */
+    if ( i < (np->rx_target/2)  )
+        return;
+
+    for ( i = 0; ; i++ )
+    {
+        if ( (skb = __skb_dequeue(&np->rx_batch)) == NULL )
             break;
 
         skb->dev = dev;
@@ -344,25 +357,19 @@ static void network_alloc_rx_buffers(struct net_device *dev)
 
         np->rx_skbs[id] = skb;
         
-        np->rx->ring[MASK_NETIF_RX_IDX(i)].req.id = id;
+        np->rx->ring[MASK_NETIF_RX_IDX(req_prod + i)].req.id = id;
         
-        rx_pfn_array[nr_pfns] = virt_to_machine(skb->head) >> PAGE_SHIFT;
+        rx_pfn_array[i] = virt_to_machine(skb->head) >> PAGE_SHIFT;
 
 	/* Remove this page from pseudo phys map before passing back to Xen. */
 	phys_to_machine_mapping[virt_to_phys(skb->head) >> PAGE_SHIFT] 
 	    = INVALID_P2M_ENTRY;
 
-        rx_mcl[nr_pfns].op = __HYPERVISOR_update_va_mapping;
-        rx_mcl[nr_pfns].args[0] = (unsigned long)skb->head >> PAGE_SHIFT;
-        rx_mcl[nr_pfns].args[1] = 0;
-        rx_mcl[nr_pfns].args[2] = 0;
-
-        nr_pfns++;
+        rx_mcl[i].op = __HYPERVISOR_update_va_mapping;
+        rx_mcl[i].args[0] = (unsigned long)skb->head >> PAGE_SHIFT;
+        rx_mcl[i].args[1] = 0;
+        rx_mcl[i].args[2] = 0;
     }
-    while ( (++i - np->rx_resp_cons) != NETIF_RX_RING_SIZE );
-
-    if ( unlikely(nr_pfns == 0) )
-        return;
 
     /*
      * We may have allocated buffers which have entries outstanding in the page
@@ -371,25 +378,30 @@ static void network_alloc_rx_buffers(struct net_device *dev)
     flush_page_update_queue();
 
     /* After all PTEs have been zapped we blow away stale TLB entries. */
-    rx_mcl[nr_pfns-1].args[2] = UVMF_FLUSH_TLB;
+    rx_mcl[i-1].args[2] = UVMF_FLUSH_TLB;
 
     /* Give away a batch of pages. */
-    rx_mcl[nr_pfns].op = __HYPERVISOR_dom_mem_op;
-    rx_mcl[nr_pfns].args[0] = MEMOP_decrease_reservation;
-    rx_mcl[nr_pfns].args[1] = (unsigned long)rx_pfn_array;
-    rx_mcl[nr_pfns].args[2] = (unsigned long)nr_pfns;
-    rx_mcl[nr_pfns].args[3] = 0;
-    rx_mcl[nr_pfns].args[4] = DOMID_SELF;
+    rx_mcl[i].op = __HYPERVISOR_dom_mem_op;
+    rx_mcl[i].args[0] = MEMOP_decrease_reservation;
+    rx_mcl[i].args[1] = (unsigned long)rx_pfn_array;
+    rx_mcl[i].args[2] = (unsigned long)i;
+    rx_mcl[i].args[3] = 0;
+    rx_mcl[i].args[4] = DOMID_SELF;
 
     /* Zap PTEs and give away pages in one big multicall. */
-    (void)HYPERVISOR_multicall(rx_mcl, nr_pfns+1);
+    (void)HYPERVISOR_multicall(rx_mcl, i+1);
 
     /* Check return status of HYPERVISOR_dom_mem_op(). */
-    if ( rx_mcl[nr_pfns].args[5] != nr_pfns )
+    if ( unlikely(rx_mcl[i].args[5] != i) )
         panic("Unable to reduce memory reservation\n");
 
     /* Above is a suitable barrier to ensure backend will see requests. */
-    np->rx->req_prod = i;
+    np->rx->req_prod = req_prod + i;
+
+    /* Adjust our floating fill target if we risked running out of buffers. */
+    if ( ((req_prod - np->rx->resp_prod) < (np->rx_target / 4)) &&
+         ((np->rx_target *= 2) > RX_MAX_TARGET) )
+        np->rx_target = RX_MAX_TARGET;
 }
 
 
@@ -627,6 +639,12 @@ static int netif_poll(struct net_device *dev, int *pbudget)
 
     np->rx_resp_cons = i;
 
+    /* If we get a callback with very few responses, reduce fill target. */
+    /* NB. Note exponential increase, linear decrease. */
+    if ( ((np->rx->req_prod - np->rx->resp_prod) > ((3*np->rx_target) / 4)) &&
+         (--np->rx_target < RX_MIN_TARGET) )
+        np->rx_target = RX_MIN_TARGET;
+
     network_alloc_rx_buffers(dev);
 
     *pbudget   -= work_done;
@@ -755,10 +773,10 @@ static void vif_show(struct net_private *np)
 {
 #if DEBUG
     if (np) {
-        IPRINTK(" <vif handle=%u %s(%s) evtchn=%u irq=%u tx=%p rx=%p>\n",
+        IPRINTK("<vif handle=%u %s(%s) evtchn=%u irq=%u tx=%p rx=%p>\n",
                np->handle,
                be_state_name[np->backend_state],
-               user_state_name[np->user_state],
+               np->user_state ? "open" : "closed",
                np->evtchn,
                np->irq,
                np->tx,
@@ -806,13 +824,13 @@ static int send_driver_status(int ok)
 
 /* Stop network device and free tx/rx queues and irq.
  */
-static void vif_release(struct net_private *np){
-
+static void vif_release(struct net_private *np)
+{
     /* Stop old i/f to prevent errors whilst we rebuild the state. */
     spin_lock_irq(&np->tx_lock);
     spin_lock(&np->rx_lock);
     netif_stop_queue(np->dev);
-    //np->backend_state = BEST_DISCONNECTED;
+    /* np->backend_state = BEST_DISCONNECTED; */
     spin_unlock(&np->rx_lock);
     spin_unlock_irq(&np->tx_lock);
     
@@ -827,18 +845,18 @@ static void vif_release(struct net_private *np){
         np->tx = NULL;
         np->rx = NULL;
     }
-
 }
 
 /* Release vif resources and close it down completely.
  */
-static void vif_close(struct net_private *np){
+static void vif_close(struct net_private *np)
+{
     DPRINTK(">\n"); vif_show(np);
-    WPRINTK(" Unexpected netif-CLOSED message in state %s\n",
+    WPRINTK("Unexpected netif-CLOSED message in state %s\n",
             be_state_name[np->backend_state]);
     vif_release(np);
     np->backend_state = BEST_CLOSED;
-    //todo: take dev down and free.
+    /* todo: take dev down and free. */
     vif_show(np); DPRINTK("<\n");
 }
 
@@ -873,11 +891,13 @@ static void vif_disconnect(struct net_private *np){
  * is initiated by a special "RESET" message - disconnect could
  * just mean we're not allowed to use this interface any more.
  */
-static void vif_reset(struct net_private *np){
+static void 
+vif_reset(
+    struct net_private *np)
+{
     DPRINTK(">\n");
-    IPRINTK(" Attempting to reconnect network interface: handle=%u\n",
-            np->handle);
-    
+    IPRINTK("Attempting to reconnect network interface: handle=%u\n",
+            np->handle);    
     vif_release(np);
     vif_disconnect(np);
     vif_show(np); DPRINTK("<\n");
@@ -887,7 +907,10 @@ static void vif_reset(struct net_private *np){
  * Sets the mac and event channel from the message.
  * Binds the irq to the event channel.
  */
-static void vif_connect(struct net_private *np, netif_fe_interface_status_t *status){
+static void
+vif_connect(
+    struct net_private *np, netif_fe_interface_status_t *status)
+{
     struct net_device *dev = np->dev;
     DPRINTK(">\n");
     memcpy(dev->dev_addr, status->mac, ETH_ALEN);
@@ -927,13 +950,14 @@ static int create_netdev(int handle, struct net_device **val)
     spin_lock_init(&np->tx_lock);
     spin_lock_init(&np->rx_lock);
 
+    skb_queue_head_init(&np->rx_batch);
+    np->rx_target = RX_MIN_TARGET;
+
     /* Initialise {tx,rx}_skbs to be a free chain containing every entry. */
-    for ( i = 0; i <= NETIF_TX_RING_SIZE; i++ ){
+    for ( i = 0; i <= NETIF_TX_RING_SIZE; i++ )
         np->tx_skbs[i] = (void *)(i+1);
-    }
-    for ( i = 0; i <= NETIF_RX_RING_SIZE; i++ ){
+    for ( i = 0; i <= NETIF_RX_RING_SIZE; i++ )
         np->rx_skbs[i] = (void *)(i+1);
-    }
 
     dev->open            = network_open;
     dev->hard_start_xmit = network_start_xmit;
@@ -951,11 +975,10 @@ static int create_netdev(int handle, struct net_device **val)
     list_add(&np->list, &dev_list);
 
   exit:
-    if ( (err != 0) && (dev != NULL ) ){
+    if ( (err != 0) && (dev != NULL ) )
         kfree(dev);
-    } else if ( val != NULL ) {
+    else if ( val != NULL )
         *val = dev;
-    }
     return err;
 }
 
@@ -967,42 +990,40 @@ static int create_netdev(int handle, struct net_device **val)
  * @param np return parameter for interface state
  * @return 0 on success, error code otherwise
  */
-static int target_vif(netif_fe_interface_status_t *status, struct net_private **np)
+static int 
+target_vif(
+    netif_fe_interface_status_t *status, struct net_private **np)
 {
     int err = 0;
     struct net_device *dev;
 
     DPRINTK("> handle=%d\n", status->handle);
-    if(status->handle < 0) {
+    if ( status->handle < 0 )
+    {
         err = -EINVAL;
         goto exit;
     }
-    dev = find_dev_by_handle(status->handle);
-    DPRINTK("> dev=%p\n", dev);
-    if(dev) goto exit;
-    // No good - give up.
-    if(status->status == NETIF_INTERFACE_STATUS_CLOSED) goto exit;
-    if(status->status == NETIF_INTERFACE_STATUS_CHANGED) goto exit;
-    // It's a new interface in a good state - create it.
+
+    if ( (dev = find_dev_by_handle(status->handle)) != NULL )
+        goto exit;
+
+    if ( status->status == NETIF_INTERFACE_STATUS_CLOSED )
+        goto exit;
+    if ( status->status == NETIF_INTERFACE_STATUS_CHANGED )
+        goto exit;
+
+    /* It's a new interface in a good state - create it. */
     DPRINTK("> create device...\n");
-    err = create_netdev(status->handle, &dev);
-    if(err) goto exit;
+    if ( (err = create_netdev(status->handle, &dev)) != 0 )
+        goto exit;
+
     netctrl.interface_n++;
+
   exit:
-    if(np){
+    if ( np != NULL )
         *np = ((dev && !err) ? dev->priv : NULL);
-    }
     DPRINTK("< err=%d\n", err);
     return err;
-}
-
-/* Warn about an unexpected status. */
-static void unexpected(struct net_private *np,
-                       netif_fe_interface_status_t *status)
-{
-    WPRINTK(" Unexpected netif status %s in state %s\n",
-            status_name[status->status],
-            be_state_name[np->backend_state]);
 }
 
 /* Handle an interface status message. */
@@ -1012,22 +1033,25 @@ static void netif_interface_status(netif_fe_interface_status_t *status)
     struct net_private *np = NULL;
     
     DPRINTK(">\n");
-    DPRINTK("> status=%s handle=%d\n", status_name[status->status], status->handle);
+    DPRINTK("> status=%s handle=%d\n",
+            status_name[status->status], status->handle);
 
-    err = target_vif(status, &np);
-    if(err){
-        WPRINTK(" Invalid netif: handle=%u\n", status->handle);
+    if ( (err = target_vif(status, &np)) != 0 )
+    {
+        WPRINTK("Invalid netif: handle=%u\n", status->handle);
         return;
     }
-    if(np == NULL){
+
+    if ( np == NULL )
+    {
         DPRINTK("> no vif\n");
         return;
     }
 
     DPRINTK(">\n"); vif_show(np);
 
-    switch (status->status) {
-
+    switch ( status->status )
+    {
     case NETIF_INTERFACE_STATUS_CLOSED:
         switch ( np->backend_state )
         {
@@ -1056,7 +1080,9 @@ static void netif_interface_status(netif_fe_interface_status_t *status)
         switch ( np->backend_state )
         {
         case BEST_CLOSED:
-            unexpected(np, status);
+            WPRINTK("Unexpected netif status %s in state %s\n",
+                    status_name[status->status],
+                    be_state_name[np->backend_state]);
             vif_disconnect(np);
             vif_connect(np, status);
             break;
@@ -1074,7 +1100,7 @@ static void netif_interface_status(netif_fe_interface_status_t *status)
         break;
 
     default:
-        WPRINTK(" Invalid netif status code %d\n", status->status);
+        WPRINTK("Invalid netif status code %d\n", status->status);
         break;
     }
     vif_show(np);
@@ -1135,7 +1161,8 @@ static int probe_interfaces(void)
 
     DPRINTK(">\n");
 
-    for ( wait_i = 0; wait_i < wait_n; wait_i++) { 
+    for ( wait_i = 0; wait_i < wait_n; wait_i++)
+    { 
         DPRINTK("> wait_i=%d\n", wait_i);
         conn = netctrl_connected();
         if(conn) break;
@@ -1145,9 +1172,10 @@ static int probe_interfaces(void)
     }
 
     DPRINTK("> wait finished...\n");
-    if ( conn <= 0 ) {
+    if ( conn <= 0 )
+    {
         err = netctrl_err(-ENETDOWN);
-        WPRINTK(" Failed to connect all virtual interfaces: err=%d\n", err);
+        WPRINTK("Failed to connect all virtual interfaces: err=%d\n", err);
     }
 
     DPRINTK("< err=%d\n", err);
@@ -1177,7 +1205,8 @@ static int probe_interfaces(void)
     DPRINTK(">\n");
 
     netctrl.interface_n = 0;
-    for (wait_i = 0; wait_i < wait_n; wait_i++) { 
+    for ( wait_i = 0; wait_i < wait_n; wait_i++ )
+    { 
         DPRINTK("> wait_i=%d query=%d\n", wait_i, query);
         msg.handle = query;
         memcpy(cmsg.msg, &msg, sizeof(msg));
@@ -1199,9 +1228,10 @@ static int probe_interfaces(void)
     }
 
   exit:
-    if (err) {
+    if ( err )
+    {
         err = netctrl_err(-ENETDOWN);
-        WPRINTK(" Connecting virtual network interfaces failed: err=%d\n", err);
+        WPRINTK("Connecting virtual network interfaces failed: err=%d\n", err);
     }
 
     DPRINTK("< err=%d\n", err);
@@ -1218,7 +1248,7 @@ static int __init netif_init(void)
          (start_info.flags & SIF_NET_BE_DOMAIN) )
         return 0;
 
-    IPRINTK(" Initialising virtual ethernet driver.\n");
+    IPRINTK("Initialising virtual ethernet driver.\n");
     INIT_LIST_HEAD(&dev_list);
     netctrl_init();
     (void)ctrl_if_register_receiver(CMSG_NETIF_FE, netif_ctrlif_rx,
@@ -1277,7 +1307,8 @@ void netif_resume(void)
     struct net_private *np;
 
     DPRINTK(">\n");
-    list_for_each(ent, &dev_list){
+    list_for_each ( ent, &dev_list )
+    {
         np = list_entry(ent, struct net_private, list);
         vif_resume(np);
     }
