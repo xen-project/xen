@@ -85,6 +85,39 @@
 #define X86_CR4_OSXMMEXCPT	0x0400	/* enable unmasked SSE exceptions */
 
 /*
+ * Trap/fault mnemonics.
+ */
+#define TRAP_divide_error     0
+#define TRAP_debug            1
+#define TRAP_nmi              2
+#define TRAP_int3             3
+#define TRAP_overflow         4
+#define TRAP_bounds           5
+#define TRAP_invalid_op       6
+#define TRAP_no_device        7
+#define TRAP_double_fault     8
+#define TRAP_copro_seg        9
+#define TRAP_invalid_tss     10
+#define TRAP_no_segment      11
+#define TRAP_stack_error     12
+#define TRAP_gp_fault        13
+#define TRAP_page_fault      14
+#define TRAP_spurious_int    15
+#define TRAP_copro_error     16
+#define TRAP_alignment_check 17
+#define TRAP_machine_check   18
+#define TRAP_simd_error      19
+
+/*
+ * Non-fatal fault/trap handlers return an error code to the caller. If the
+ * code is non-zero, it means that either the exception was not due to a fault
+ * (i.e., it was a trap) or that the fault has been fixed up so the instruction
+ * replay ought to succeed.
+ */
+#define EXCRET_not_a_fault 1 /* It was a trap. No instruction replay needed. */
+#define EXCRET_fault_fixed 1 /* It was fault that we fixed: try a replay. */
+
+/*
  * 'trap_bounce' flags values.
  */
 #define TBF_TRAP        1
