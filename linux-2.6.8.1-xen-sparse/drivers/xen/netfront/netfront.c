@@ -29,12 +29,29 @@
 #include <net/arp.h>
 #include <net/route.h>
 
-#if 0
+#define DEBUG 0
+
+#if DEBUG
+
 #define DPRINTK(fmt, args...) \
     printk(KERN_INFO "[XEN] %s" fmt, __FUNCTION__, ##args)
+
 #else
+
 #define DPRINTK(fmt, args...) ((void)0)
+
 #endif
+
+#define IPRINTK(fmt, args...) \
+    printk(KERN_INFO "[XEN]" fmt, ##args)
+
+#define WPRINTK(fmt, args...) \
+    printk(KERN_WARNING "[XEN]" fmt, ##args)
+
+#define EPRINTK(fmt, args...) \
+    printk(KERN_ERROR "[XEN]" fmt, ##args)
+
+
 
 #ifndef __GFP_NOWARN
 #define __GFP_NOWARN 0
@@ -101,6 +118,24 @@ struct net_private
     struct sk_buff *rx_skbs[NETIF_RX_RING_SIZE+1];
 };
 
+static char * status_name[] = {
+    [NETIF_INTERFACE_STATUS_CLOSED]       = "closed",
+    [NETIF_INTERFACE_STATUS_DISCONNECTED] = "disconnected",
+    [NETIF_INTERFACE_STATUS_CONNECTED]    = "connected",
+    [NETIF_INTERFACE_STATUS_CHANGED]      = "changed",
+};
+
+static char * be_state_name[] = {
+    [BEST_CLOSED]       = "closed",
+    [BEST_DISCONNECTED] = "disconnected",
+    [BEST_CONNECTED]    = "connected",
+};
+
+static char * user_state_name[] = {
+    [UST_CLOSED] = "closed",
+    [UST_OPEN]   = "open",
+};
+
 /* Access macros for acquiring freeing slots in {tx,rx}_skbs[]. */
 #define ADD_ID_TO_FREELIST(_list, _id)             \
     (_list)[(_id)] = (_list)[0];                   \
@@ -131,6 +166,7 @@ struct netif_ctrl {
     int connected_n;
     /** Error code. */
     int err;
+    int up;
 };
 
 static struct netif_ctrl netctrl;
@@ -138,15 +174,16 @@ static struct netif_ctrl netctrl;
 static void netctrl_init(void)
 {
     memset(&netctrl, 0, sizeof(netctrl));
-    netctrl.interface_n = -1;
+    netctrl.up = NETIF_DRIVER_STATUS_DOWN;
 }
 
 /** Get or set a network interface error.
  */
 static int netctrl_err(int err)
 {
-    if ( (err < 0) && !netctrl.err )
+    if ( (err < 0) && !netctrl.err ){
         netctrl.err = err;
+    }
     return netctrl.err;
 }
 
@@ -157,8 +194,12 @@ static int netctrl_err(int err)
 static int netctrl_connected(void)
 {
     int ok = 0;
-    ok = (netctrl.err ? netctrl.err :
-          (netctrl.connected_n == netctrl.interface_n));
+
+    if(netctrl.err){
+        ok = netctrl.err;
+    } else if(netctrl.up == NETIF_DRIVER_STATUS_UP){
+        ok = (netctrl.connected_n == netctrl.interface_n);
+    }
     return ok;
 }
 
@@ -175,11 +216,11 @@ static int netctrl_connected_count(void)
 
     connected = 0;
     
-    list_for_each(ent, &dev_list)
-    {
+    list_for_each(ent, &dev_list) {
         np = list_entry(ent, struct net_private, list);
-        if ( np->backend_state == BEST_CONNECTED )
+        if (np->backend_state == BEST_CONNECTED){
             connected++;
+        }
     }
 
     netctrl.connected_n = connected;
@@ -589,7 +630,7 @@ static struct net_device_stats *network_get_stats(struct net_device *dev)
 
 
 static void network_connect(struct net_device *dev,
-                            netif_fe_interface_status_changed_t *status)
+                            netif_fe_interface_status_t *status)
 {
     struct net_private *np;
     int i, requeue_idx;
@@ -647,8 +688,8 @@ static void network_connect(struct net_device *dev,
     wmb();                
     np->rx->req_prod = requeue_idx;
 
-printk(KERN_ALERT"Netfront recovered tx=%d rxfree=%d\n",
-       np->tx->req_prod,np->rx->req_prod);
+    printk(KERN_ALERT "[XEN] Netfront recovered tx=%d rxfree=%d\n",
+           np->tx->req_prod,np->rx->req_prod);
 
 
     /* Step 3: All public and private state should now be sane.  Get
@@ -668,129 +709,154 @@ printk(KERN_ALERT"Netfront recovered tx=%d rxfree=%d\n",
     spin_unlock_irq(&np->rx_lock);
 }
 
-static void netif_status_change(netif_fe_interface_status_changed_t *status)
-{
-    ctrl_msg_t                   cmsg;
-    netif_fe_interface_connect_t up;
-    struct net_device *dev;
-    struct net_private *np;
-    
-    DPRINTK(">\n");
-    DPRINTK("> status=%d handle=%d mac=%02x:%02x:%02x:%02x:%02x:%02x\n",
-           status->status,
-           status->handle,
-           status->mac[0], status->mac[1], status->mac[2],
-           status->mac[3], status->mac[4], status->mac[5]);
-
-    if ( netctrl.interface_n <= 0 )
-    {
-        printk(KERN_WARNING "Status change: no interfaces\n");
-        return;
+static void vif_show(struct net_private *np){
+#if DEBUG
+    if(np){
+        IPRINTK(" <vif handle=%u %s(%s) evtchn=%u irq=%u tx=%p rx=%p>\n",
+               np->handle,
+               be_state_name[np->backend_state],
+               user_state_name[np->user_state],
+               np->evtchn,
+               np->irq,
+               np->tx,
+               np->rx);
+    } else {
+        IPRINTK("<vif NULL>\n");
     }
-
-    dev = find_dev_by_handle(status->handle);
-    if(!dev){
-        printk(KERN_WARNING "Status change: invalid netif handle %u\n",
-               status->handle);
-         return;
-    }
-    np  = dev->priv;
-    
-    switch ( status->status )
-    {
-    case NETIF_INTERFACE_STATUS_DESTROYED:
-        printk(KERN_WARNING "Unexpected netif-DESTROYED message in state %d\n",
-               np->backend_state);
-        break;
-
-    case NETIF_INTERFACE_STATUS_DISCONNECTED:
-        if ( np->backend_state != BEST_CLOSED )
-        {
-            printk(KERN_WARNING "Unexpected netif-DISCONNECTED message"
-                   " in state %d\n", np->backend_state);
-	    printk(KERN_INFO "Attempting to reconnect network interface\n");
-
-            /* Begin interface recovery.
-	     *
-	     * NB. Whilst we're recovering, we turn the carrier state off.  We
-	     * take measures to ensure that this device isn't used for
-	     * anything.  We also stop the queue for this device.  Various
-	     * different approaches (e.g. continuing to buffer packets) have
-	     * been tested but don't appear to improve the overall impact on
-             * TCP connections.
-	     *
-             * TODO: (MAW) Change the Xend<->Guest protocol so that a recovery
-             * is initiated by a special "RESET" message - disconnect could
-             * just mean we're not allowed to use this interface any more.
-             */
-
-            /* Stop old i/f to prevent errors whilst we rebuild the state. */
-            spin_lock_irq(&np->tx_lock);
-            spin_lock(&np->rx_lock);
-            netif_stop_queue(dev);
-            np->backend_state = BEST_DISCONNECTED;
-            spin_unlock(&np->rx_lock);
-            spin_unlock_irq(&np->tx_lock);
-
-            /* Free resources. */
-            free_irq(np->irq, dev);
-            unbind_evtchn_from_irq(np->evtchn);
-	    free_page((unsigned long)np->tx);
-            free_page((unsigned long)np->rx);
-        }
-
-        /* Move from CLOSED to DISCONNECTED state. */
-        np->tx = (netif_tx_interface_t *)__get_free_page(GFP_KERNEL);
-        np->rx = (netif_rx_interface_t *)__get_free_page(GFP_KERNEL);
-        memset(np->tx, 0, PAGE_SIZE);
-        memset(np->rx, 0, PAGE_SIZE);
-        np->backend_state = BEST_DISCONNECTED;
-
-        /* Construct an interface-CONNECT message for the domain controller. */
-        cmsg.type      = CMSG_NETIF_FE;
-        cmsg.subtype   = CMSG_NETIF_FE_INTERFACE_CONNECT;
-        cmsg.length    = sizeof(netif_fe_interface_connect_t);
-        up.handle      = status->handle;
-        up.tx_shmem_frame = virt_to_machine(np->tx) >> PAGE_SHIFT;
-        up.rx_shmem_frame = virt_to_machine(np->rx) >> PAGE_SHIFT;
-        memcpy(cmsg.msg, &up, sizeof(up));
-        
-        /* Tell the controller to bring up the interface. */
-        ctrl_if_send_message_block(&cmsg, NULL, 0, TASK_UNINTERRUPTIBLE);
-        break;
-
-    case NETIF_INTERFACE_STATUS_CONNECTED:
-        if ( np->backend_state == BEST_CLOSED )
-        {
-            printk(KERN_WARNING "Unexpected netif-CONNECTED message"
-                   " in state %d\n", np->backend_state);
-            break;
-        }
-
-        memcpy(dev->dev_addr, status->mac, ETH_ALEN);
-
-        network_connect(dev, status);
-
-        np->evtchn = status->evtchn;
-        np->irq = bind_evtchn_to_irq(np->evtchn);
-        (void)request_irq(np->irq, netif_int, SA_SAMPLE_RANDOM, 
-                          dev->name, dev);
-        netctrl_connected_count();
-        vif_wake(dev);
-        break;
-
-    case NETIF_INTERFACE_STATUS_CHANGED:
-        /* The domain controller is notifying us that a device has been
-        * added or removed.
-        */
-        break;
-
-    default:
-        printk(KERN_WARNING "Status change to unknown value %d\n", 
-               status->status);
-        break;
-    }
+#endif
 }
+
+/* Send a connect message to xend to tell it to bring up the interface.
+ */
+static void send_interface_connect(struct net_private *np){
+    ctrl_msg_t cmsg = {
+        .type    = CMSG_NETIF_FE,
+        .subtype = CMSG_NETIF_FE_INTERFACE_CONNECT,
+        .length  = sizeof(netif_fe_interface_connect_t),
+    };
+    netif_fe_interface_connect_t *msg = (void*)cmsg.msg;
+
+    DPRINTK(">\n"); vif_show(np); 
+    msg->handle = np->handle;
+    msg->tx_shmem_frame = (virt_to_machine(np->tx) >> PAGE_SHIFT);
+    msg->rx_shmem_frame = (virt_to_machine(np->rx) >> PAGE_SHIFT);
+        
+    ctrl_if_send_message_block(&cmsg, NULL, 0, TASK_UNINTERRUPTIBLE);
+    DPRINTK("<\n");
+}
+
+/* Send a driver status notification to the domain controller. */
+static int send_driver_status(int ok)
+{
+    int err = 0;
+    ctrl_msg_t cmsg = {
+        .type    = CMSG_NETIF_FE,
+        .subtype = CMSG_NETIF_FE_DRIVER_STATUS,
+        .length  = sizeof(netif_fe_driver_status_t),
+    };
+    netif_fe_driver_status_t *msg = (void*)cmsg.msg;
+
+    msg->status = (ok ? NETIF_DRIVER_STATUS_UP : NETIF_DRIVER_STATUS_DOWN);
+    err = ctrl_if_send_message_block(&cmsg, NULL, 0, TASK_UNINTERRUPTIBLE);
+    return err;
+}
+
+/* Stop network device and free tx/rx queues and irq.
+ */
+static void vif_release(struct net_private *np){
+
+    /* Stop old i/f to prevent errors whilst we rebuild the state. */
+    spin_lock_irq(&np->tx_lock);
+    spin_lock(&np->rx_lock);
+    netif_stop_queue(np->dev);
+    //np->backend_state = BEST_DISCONNECTED;
+    spin_unlock(&np->rx_lock);
+    spin_unlock_irq(&np->tx_lock);
+    
+    /* Free resources. */
+    if(np->tx != NULL){
+        free_irq(np->irq, np->dev);
+        unbind_evtchn_from_irq(np->evtchn);
+        free_page((unsigned long)np->tx);
+        free_page((unsigned long)np->rx);
+        np->irq = 0;
+        np->evtchn = 0;
+        np->tx = NULL;
+        np->rx = NULL;
+    }
+
+}
+
+/* Release vif resources and close it down completely.
+ */
+static void vif_close(struct net_private *np){
+    DPRINTK(">\n"); vif_show(np);
+    WPRINTK(" Unexpected netif-CLOSED message in state %s\n",
+            be_state_name[np->backend_state]);
+    vif_release(np);
+    np->backend_state = BEST_CLOSED;
+    //todo: take dev down and free.
+    vif_show(np); DPRINTK("<\n");
+}
+
+/* Move the vif into disconnected state.
+ * Allocates tx/rx pages.
+ * Sends connect message to xend.
+ */
+static void vif_disconnect(struct net_private *np){
+    DPRINTK(">\n");
+    if(np->tx) free_page((unsigned long)np->tx);
+    if(np->rx) free_page((unsigned long)np->rx);
+    // Before this np->tx and np->rx had better be null.
+    np->tx = (netif_tx_interface_t *)__get_free_page(GFP_KERNEL);
+    np->rx = (netif_rx_interface_t *)__get_free_page(GFP_KERNEL);
+    memset(np->tx, 0, PAGE_SIZE);
+    memset(np->rx, 0, PAGE_SIZE);
+    np->backend_state = BEST_DISCONNECTED;
+    send_interface_connect(np);
+    vif_show(np); DPRINTK("<\n");
+}
+
+/* Begin interface recovery.
+ *
+ * NB. Whilst we're recovering, we turn the carrier state off.  We
+ * take measures to ensure that this device isn't used for
+ * anything.  We also stop the queue for this device.  Various
+ * different approaches (e.g. continuing to buffer packets) have
+ * been tested but don't appear to improve the overall impact on
+ * TCP connections.
+ *
+ * TODO: (MAW) Change the Xend<->Guest protocol so that a recovery
+ * is initiated by a special "RESET" message - disconnect could
+ * just mean we're not allowed to use this interface any more.
+ */
+static void vif_reset(struct net_private *np){
+    DPRINTK(">\n");
+    IPRINTK(" Attempting to reconnect network interface: handle=%u\n",
+            np->handle);
+    
+    vif_release(np);
+    vif_disconnect(np);
+    vif_show(np); DPRINTK("<\n");
+}
+
+/* Move the vif into connected state.
+ * Sets the mac and event channel from the message.
+ * Binds the irq to the event channel.
+ */
+static void vif_connect(struct net_private *np, netif_fe_interface_status_t *status){
+    struct net_device *dev = np->dev;
+    DPRINTK(">\n");
+    memcpy(dev->dev_addr, status->mac, ETH_ALEN);
+    network_connect(dev, status);
+    np->evtchn = status->evtchn;
+    np->irq = bind_evtchn_to_irq(np->evtchn);
+    (void)request_irq(np->irq, netif_int, SA_SAMPLE_RANDOM, dev->name, dev);
+    netctrl_connected_count();
+    vif_wake(dev);
+    vif_show(np); DPRINTK("<\n");
+}
+
 
 /** Create a network device.
  * @param handle device handle
@@ -819,10 +885,12 @@ static int create_netdev(int handle, struct net_device **val)
     spin_lock_init(&np->rx_lock);
 
     /* Initialise {tx,rx}_skbs to be a free chain containing every entry. */
-    for ( i = 0; i <= NETIF_TX_RING_SIZE; i++ )
+    for ( i = 0; i <= NETIF_TX_RING_SIZE; i++ ){
         np->tx_skbs[i] = (void *)(i+1);
-    for ( i = 0; i <= NETIF_RX_RING_SIZE; i++ )
+    }
+    for ( i = 0; i <= NETIF_RX_RING_SIZE; i++ ){
         np->rx_skbs[i] = (void *)(i+1);
+    }
 
     dev->open            = network_open;
     dev->hard_start_xmit = network_start_xmit;
@@ -840,58 +908,172 @@ static int create_netdev(int handle, struct net_device **val)
     list_add(&np->list, &dev_list);
 
   exit:
-    if ( (err != 0) && (dev != NULL ) )
+    if ( (err != 0) && (dev != NULL ) ){
         kfree(dev);
-    else if ( val != NULL )
+    } else if ( val != NULL ) {
         *val = dev;
+    }
     return err;
 }
 
-/*
- * Initialize the network control interface. Set the number of network devices
- * and create them.
+/* Get the target interface for a status message.
+ * Creates the interface when it makes sense.
+ * The returned interface may be null when there is no error.
+ *
+ * @param status status message
+ * @param np return parameter for interface state
+ * @return 0 on success, error code otherwise
  */
-
-static void netif_driver_status_change(
-    netif_fe_driver_status_changed_t *status)
+static int target_vif(netif_fe_interface_status_t *status, struct net_private **np)
 {
     int err = 0;
-    int i;
+    struct net_device *dev;
 
-    DPRINTK("> max_handle=%d\n", status->max_handle);
-
-    /* XXX FIXME: Abuse of 'max_handle' as interface count. */
-    netctrl.interface_n = status->max_handle;
-    netctrl.connected_n = 0;
-
-    for ( i = 0; i < netctrl.interface_n; i++ )
-    {
-        if ( (err = create_netdev(i, NULL)) != 0 )
-        {
-            netctrl_err(err);
-            break;
-        }
+    DPRINTK("> handle=%d\n", status->handle);
+    if(status->handle < 0) {
+        err = -EINVAL;
+        goto exit;
     }
+    dev = find_dev_by_handle(status->handle);
+    DPRINTK("> dev=%p\n", dev);
+    if(dev) goto exit;
+    // No good - give up.
+    if(status->status == NETIF_INTERFACE_STATUS_CLOSED) goto exit;
+    if(status->status == NETIF_INTERFACE_STATUS_CHANGED) goto exit;
+    // It's a new interface in a good state - create it.
+    DPRINTK("> create device...\n");
+    err = create_netdev(status->handle, &dev);
+    if(err) goto exit;
+    netctrl.interface_n++;
+  exit:
+    if(np){
+        *np = ((dev && !err) ? dev->priv : NULL);
+    }
+    DPRINTK("< err=%d\n", err);
+    return err;
 }
 
+/* Warn about an unexpected status. */
+static void unexpected(struct net_private *np,
+                       netif_fe_interface_status_t *status)
+{
+    WPRINTK(" Unexpected netif status %s in state %s\n",
+            status_name[status->status],
+            be_state_name[np->backend_state]);
+}
+
+/* Handle an interface status message. */
+static void netif_interface_status(netif_fe_interface_status_t *status)
+{
+    int err = 0;
+    struct net_private *np = NULL;
+    
+    DPRINTK(">\n");
+    DPRINTK("> status=%s handle=%d\n", status_name[status->status], status->handle);
+
+    err = target_vif(status, &np);
+    if(err){
+        WPRINTK(" Invalid netif: handle=%u\n", status->handle);
+        return;
+    }
+    if(np == NULL){
+        DPRINTK("> no vif\n");
+        return;
+    }
+
+    DPRINTK(">\n"); vif_show(np);
+
+    switch (status->status) {
+
+    case NETIF_INTERFACE_STATUS_CLOSED:
+        switch(np->backend_state){
+
+        case BEST_CLOSED:
+        case BEST_DISCONNECTED:
+        case BEST_CONNECTED:
+            vif_close(np);
+            break;
+        }
+        break;
+
+    case NETIF_INTERFACE_STATUS_DISCONNECTED:
+        switch(np->backend_state){
+
+        case BEST_CLOSED:
+            vif_disconnect(np);
+            break;
+
+        case BEST_DISCONNECTED:
+        case BEST_CONNECTED:
+            vif_reset(np);
+            break;
+        }
+        break;
+
+    case NETIF_INTERFACE_STATUS_CONNECTED:
+        switch(np->backend_state){
+
+        case BEST_CLOSED:
+            unexpected(np, status);
+            vif_disconnect(np);
+            vif_connect(np, status);
+            break;
+
+        case BEST_DISCONNECTED:
+            vif_connect(np, status);
+            break;
+
+        case BEST_CONNECTED:
+            //todo Do what?
+            unexpected(np, status);
+            break;
+        }
+        break;
+
+    case NETIF_INTERFACE_STATUS_CHANGED:
+        /* The domain controller is notifying us that a device has been
+        * added or removed.
+        */
+        break;
+
+    default:
+        WPRINTK(" Invalid netif status code %d\n", status->status);
+        break;
+    }
+    vif_show(np);
+    DPRINTK("<\n");
+}
+
+/*
+ * Initialize the network control interface. 
+ */
+static void netif_driver_status(netif_fe_driver_status_t *status)
+{
+    DPRINTK("> status=%d\n", status->status);
+    netctrl.up = status->status;
+    //netctrl.interface_n = status->max_handle;
+    //netctrl.connected_n = 0;
+    netctrl_connected_count();
+}
+
+/* Receive handler for control messages. */
 static void netif_ctrlif_rx(ctrl_msg_t *msg, unsigned long id)
 {
-    int respond = 1;
 
     switch ( msg->subtype )
     {
-    case CMSG_NETIF_FE_INTERFACE_STATUS_CHANGED:
-        if ( msg->length != sizeof(netif_fe_interface_status_changed_t) )
+    case CMSG_NETIF_FE_INTERFACE_STATUS:
+        if ( msg->length != sizeof(netif_fe_interface_status_t) )
             goto error;
-        netif_status_change((netif_fe_interface_status_changed_t *)
-                            &msg->msg[0]);
+        netif_interface_status((netif_fe_interface_status_t *)
+                               &msg->msg[0]);
         break;
 
-    case CMSG_NETIF_FE_DRIVER_STATUS_CHANGED:
-        if ( msg->length != sizeof(netif_fe_driver_status_changed_t) )
+    case CMSG_NETIF_FE_DRIVER_STATUS:
+        if ( msg->length != sizeof(netif_fe_driver_status_t) )
             goto error;
-        netif_driver_status_change((netif_fe_driver_status_changed_t *)
-                                   &msg->msg[0]);
+        netif_driver_status((netif_fe_driver_status_t *)
+                            &msg->msg[0]);
         break;
 
     error:
@@ -900,156 +1082,170 @@ static void netif_ctrlif_rx(ctrl_msg_t *msg, unsigned long id)
         break;
     }
 
-    if ( respond )
-        ctrl_if_send_response(msg);
+    ctrl_if_send_response(msg);
 }
 
 
-/* Wait for all interfaces to be connected. */
-static int wait_for_interfaces(void)
+#if 1
+/* Wait for all interfaces to be connected.
+ *
+ * This works OK, but we'd like to use the probing mode (see below).
+ */
+static int probe_interfaces(void)
 {
     int err = 0, conn = 0;
     int wait_i, wait_n = 100;
 
     DPRINTK(">\n");
 
-    for ( wait_i = 0; wait_i < wait_n; wait_i++)
-    { 
+    for ( wait_i = 0; wait_i < wait_n; wait_i++) { 
         DPRINTK("> wait_i=%d\n", wait_i);
         conn = netctrl_connected();
         if(conn) break;
+        DPRINTK("> schedule_timeout...\n");
         set_current_state(TASK_INTERRUPTIBLE);
         schedule_timeout(10);
     }
 
-    if ( conn <= 0 )
-    {
+    DPRINTK("> wait finished...\n");
+    if ( conn <= 0 ) {
         err = netctrl_err(-ENETDOWN);
-        printk(KERN_WARNING "[XEN] Failed to connect all virtual interfaces: "
-               "err=%d\n", err);
+        WPRINTK(" Failed to connect all virtual interfaces: err=%d\n", err);
     }
 
     DPRINTK("< err=%d\n", err);
 
     return err;
 }
+#else
+/* Probe for interfaces until no more are found.
+ *
+ * This is the mode we'd like to use, but at the moment it panics the kernel.
+*/
+static int probe_interfaces(void)
+{
+    int err = 0;
+    int wait_i, wait_n = 100;
+    ctrl_msg_t cmsg = {
+        .type    = CMSG_NETIF_FE,
+        .subtype = CMSG_NETIF_FE_INTERFACE_STATUS,
+        .length  = sizeof(netif_fe_interface_status_t),
+    };
+    netif_fe_interface_status_t msg = {};
+    ctrl_msg_t rmsg = {};
+    netif_fe_interface_status_t *reply = (void*)rmsg.msg;
+    int state = TASK_UNINTERRUPTIBLE;
+    u32 query = -1;
+
+    DPRINTK(">\n");
+
+    netctrl.interface_n = 0;
+    for (wait_i = 0; wait_i < wait_n; wait_i++) { 
+        DPRINTK("> wait_i=%d query=%d\n", wait_i, query);
+        msg.handle = query;
+        memcpy(cmsg.msg, &msg, sizeof(msg));
+        DPRINTK("> set_current_state...\n");
+        set_current_state(state);
+        DPRINTK("> rmsg=%p msg=%p, reply=%p\n", &rmsg, rmsg.msg, reply);
+        DPRINTK("> sending...\n");
+        err = ctrl_if_send_message_and_get_response(&cmsg, &rmsg, state);
+        DPRINTK("> err=%d\n", err);
+        if(err) goto exit;
+        DPRINTK("> rmsg=%p msg=%p, reply=%p\n", &rmsg, rmsg.msg, reply);
+        if((int)reply->handle < 0){
+            // No more interfaces.
+            break;
+        }
+        query = -reply->handle - 2;
+        DPRINTK(">netif_interface_status ...\n");
+        netif_interface_status(reply);
+    }
+
+  exit:
+    if (err) {
+        err = netctrl_err(-ENETDOWN);
+        WPRINTK(" Connecting virtual network interfaces failed: err=%d\n", err);
+    }
+
+    DPRINTK("< err=%d\n", err);
+    return err;
+}
+
+#endif
 
 static int __init netif_init(void)
 {
-    ctrl_msg_t                       cmsg;
-    netif_fe_driver_status_changed_t st;
     int err = 0;
 
     if ( (start_info.flags & SIF_INITDOMAIN) ||
          (start_info.flags & SIF_NET_BE_DOMAIN) )
         return 0;
 
-    printk(KERN_INFO "Initialising Xen virtual ethernet frontend driver.\n");
-
+    IPRINTK(" Initialising virtual ethernet driver.\n");
     INIT_LIST_HEAD(&dev_list);
-
     netctrl_init();
-
     (void)ctrl_if_register_receiver(CMSG_NETIF_FE, netif_ctrlif_rx,
                                     CALLBACK_IN_BLOCKING_CONTEXT);
-
-    /* Send a driver-UP notification to the domain controller. */
-    cmsg.type      = CMSG_NETIF_FE;
-    cmsg.subtype   = CMSG_NETIF_FE_DRIVER_STATUS_CHANGED;
-    cmsg.length    = sizeof(netif_fe_driver_status_changed_t);
-    st.status      = NETIF_DRIVER_STATUS_UP;
-    st.max_handle  = 0;
-    memcpy(cmsg.msg, &st, sizeof(st));
-    ctrl_if_send_message_block(&cmsg, NULL, 0, TASK_UNINTERRUPTIBLE);
-
-    err = wait_for_interfaces();
+    send_driver_status(1);
+    err = probe_interfaces();
     if ( err )
         ctrl_if_unregister_receiver(CMSG_NETIF_FE, netif_ctrlif_rx);
 
+    DPRINTK("< err=%d\n", err);
     return err;
+}
+
+static void vif_suspend(struct net_private *np)
+{
+    // Avoid having tx/rx stuff happen until we're ready.
+    DPRINTK(">\n");
+    free_irq(np->irq, np->dev);
+    unbind_evtchn_from_irq(np->evtchn);
+    DPRINTK("<\n");
+}
+
+static void vif_resume(struct net_private *np)
+{
+    // Connect regardless of whether IFF_UP flag set.
+    // Stop bad things from happening until we're back up.
+    DPRINTK(">\n");
+    np->backend_state = BEST_DISCONNECTED;
+    memset(np->tx, 0, PAGE_SIZE);
+    memset(np->rx, 0, PAGE_SIZE);
+    
+    send_interface_connect(np);
+    DPRINTK("<\n");
 }
 
 void netif_suspend(void)
 {
 #if 1 /* XXX THIS IS TEMPORARY */
-    struct net_device *dev = NULL;
-    struct net_private *np = NULL;
-    int i;
-
-/* avoid having tx/rx stuff happen until we're ready */
-
-    for(i=0;i<netctrl.interface_n;i++)
-    {
-	char name[32];
-
-	sprintf(name,"eth%d",i);
-	dev = __dev_get_by_name(name);
-
-	if ( dev )
-	{
-	    np  = dev->priv;
-	    free_irq(np->irq, dev);
-            unbind_evtchn_from_irq(np->evtchn);
-	}    
+    struct list_head *ent;
+    struct net_private *np;
+    
+    DPRINTK(">\n");
+    list_for_each(ent, &dev_list){
+        np = list_entry(ent, struct net_private, list);
+        vif_suspend(np);
     }
+    DPRINTK("<\n");
 #endif
 }
 
 void netif_resume(void)
 {
-    ctrl_msg_t                   cmsg;
-    netif_fe_interface_connect_t up;
-    struct net_device *dev = NULL;
-    struct net_private *np = NULL;
-    int i;
-
 #if 1
     /* XXX THIS IS TEMPORARY */
+    struct list_head *ent;
+    struct net_private *np;
 
-    for(i=0;i<netctrl.interface_n;i++)    
-    {
-	char name[32];
-
-	sprintf(name,"eth%d",i);
-	dev = __dev_get_by_name(name);
-
-	if ( dev ) // connect regardless of whether IFF_UP flag set
-	{
-	    np  = dev->priv;
-
-	    // stop bad things from happening until we're back up
-	    np->backend_state = BEST_DISCONNECTED;
-	    
-	    memset(np->tx,0,PAGE_SIZE);
-	    memset(np->rx,0,PAGE_SIZE);
-
-	    cmsg.type      = CMSG_NETIF_FE;
-	    cmsg.subtype   = CMSG_NETIF_FE_INTERFACE_CONNECT;
-	    cmsg.length    = sizeof(netif_fe_interface_connect_t);
-	    up.handle      = np->handle;
-	    up.tx_shmem_frame = virt_to_machine(np->tx) >> PAGE_SHIFT;
-	    up.rx_shmem_frame = virt_to_machine(np->rx) >> PAGE_SHIFT;
-	    memcpy(cmsg.msg, &up, sizeof(up));
-
-	    /* Tell the controller to bring up the interface. */
-	    ctrl_if_send_message_block(&cmsg, NULL, 0, TASK_UNINTERRUPTIBLE);
-	}
+    DPRINTK(">\n");
+    list_for_each(ent, &dev_list){
+        np = list_entry(ent, struct net_private, list);
+        vif_resume(np);
     }
+    DPRINTK("<\n");
 #endif	    
-
-
-#if 0
-    /* Send a driver-UP notification to the domain controller. */
-    cmsg.type      = CMSG_NETIF_FE;
-    cmsg.subtype   = CMSG_NETIF_FE_DRIVER_STATUS_CHANGED;
-    cmsg.length    = sizeof(netif_fe_driver_status_changed_t);
-    st.status      = NETIF_DRIVER_STATUS_UP;
-    st.max_handle  = 0;
-    memcpy(cmsg.msg, &st, sizeof(st));
-    ctrl_if_send_message_block(&cmsg, NULL, 0, TASK_UNINTERRUPTIBLE);
-#endif
-
-
 }
 
 

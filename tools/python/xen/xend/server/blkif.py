@@ -19,19 +19,19 @@ class BlkifBackendController(controller.BackendController):
     def __init__(self, factory, dom):
         controller.BackendController.__init__(self, factory, dom)
         self.addMethod(CMSG_BLKIF_BE,
-                       CMSG_BLKIF_BE_DRIVER_STATUS_CHANGED,
-                       self.recv_be_driver_status_changed)
+                       CMSG_BLKIF_BE_DRIVER_STATUS,
+                       self.recv_be_driver_status)
         self.registerChannel()
 
-    def recv_be_driver_status_changed(self, msg, req):
-        """Request handler for be_driver_status_changed messages.
+    def recv_be_driver_status(self, msg, req):
+        """Request handler for be_driver_status messages.
         
         @param msg: message
         @type  msg: xu message
         @param req: request flag (true if the msg is a request)
         @type  req: bool
         """
-        val = unpackMsg('blkif_be_driver_status_changed_t', msg)
+        val = unpackMsg('blkif_be_driver_status_t', msg)
         status = val['status']
 
 class BlkifBackendInterface(controller.BackendInterface):
@@ -45,9 +45,22 @@ class BlkifBackendInterface(controller.BackendInterface):
         controller.BackendInterface.__init__(self, ctrl, dom, handle)
         self.connected = 0
         self.evtchn = None
+        self.status = BLKIF_INTERFACE_STATUS_DISCONNECTED
 
     def __str__(self):
         return '<BlkifBackendInterface %d %d>' % (self.controller.dom, self.dom)
+
+    def getEventChannelBackend(self):
+        val = 0
+        if self.evtchn:
+            val = self.evtchn['port1']
+        return val
+
+    def getEventChannelFrontend(self):
+        val = 0
+        if self.evtchn:
+            val = self.evtchn['port2']
+        return val
 
     def connect(self, recreate=0):
         """Connect to the blkif control interface.
@@ -105,7 +118,7 @@ class BlkifBackendInterface(controller.BackendInterface):
         msg = packMsg('blkif_be_connect_t',
                       { 'domid'        : self.controller.dom,
                         'blkif_handle' : self.handle,
-                        'evtchn'       : self.evtchn['port1'],
+                        'evtchn'       : self.getEventChannelBackend(),
                         'shmem_frame'  : val['shmem_frame'] })
         d = defer.Deferred()
         d.addCallback(self.respond_be_connect)
@@ -118,31 +131,29 @@ class BlkifBackendInterface(controller.BackendInterface):
         @type  msg: xu message
         """
         val = unpackMsg('blkif_be_connect_t', msg)
-        self.send_fe_interface_status_changed()
+        self.status = BLKIF_INTERFACE_STATUS_CONNECTED
+        self.send_fe_interface_status()
             
-    def send_fe_interface_status_changed(self, response=None):
-        msg = packMsg('blkif_fe_interface_status_changed_t',
+    def send_fe_interface_status(self, response=None):
+        msg = packMsg('blkif_fe_interface_status_t',
                       { 'handle' : self.handle,
-                        'status' : BLKIF_INTERFACE_STATUS_CONNECTED,
+                        'status' : self.status,
                         'domid'  : self.dom,
-                        'evtchn' : self.evtchn['port2'] })
+                        'evtchn' : self.getEventChannelFrontend() })
         self.controller.writeRequest(msg, response=response)
 
     def interfaceDisconnected(self):
-        msg = packMsg('blkif_fe_interface_status_changed_t',
-                      { 'handle' : self.handle,
-                        'status' : BLKIF_INTERFACE_STATUS_DISCONNECTED,
-                        'domid'  : self.dom,
-                        'evtchn' : 0 })
-        self.controller.writeRequest(msg)
+        self.status = BLKIF_INTERFACE_STATUS_DISCONNECTED
+        #todo?: Do this: self.evtchn = None
+        self.send_fe_interface_status()
         
     def interfaceChanged(self):
         """Notify the front-end that devices have been added or removed.
         The front-end should then probe for devices.
         """
-        msg = packMsg('blkif_fe_interface_status_changed_t',
+        msg = packMsg('blkif_fe_interface_status_t',
                       { 'handle' : self.handle,
-                        'status' : BLKIF_INTERFACE_STATUS_CHANGED,
+                        'status' : BLKIF_INTERFACE_STATUS,
                         'domid'  : self.dom,
                         'evtchn' : 0 })
         self.controller.writeRequest(msg)
@@ -199,25 +210,25 @@ class BlkifControllerFactory(controller.SplitControllerFactory):
         blkif = self.getControllerByDom(dom)
         return (blkif and blkif.getDevices()) or []
 
-    def getDomainDevice(self, dom, vdev):
+    def getDomainDevice(self, dom, idx):
         """Get a block device from a domain.
 
         @param dom: domain
         @type  dom: int
-        @param vdev: device index
-        @type  vdev: int
+        @param idx: device index
+        @type  idx: int
         @return: device
         @rtype:  device
         """
         blkif = self.getControllerByDom(dom)
-        return (blkif and blkif.getDevice(vdev)) or None
+        return (blkif and blkif.getDevice(idx)) or None
 
 class BlkDev(controller.SplitDev):
     """Info record for a block device.
     """
 
-    def __init__(self, ctrl, config, vdev, mode, segment):
-        controller.SplitDev.__init__(self,  segment['device'], ctrl)
+    def __init__(self, idx, ctrl, config, vdev, mode, segment):
+        controller.SplitDev.__init__(self, idx, ctrl)
         self.config = config
         self.dev = None
         self.uname = None
@@ -251,7 +262,7 @@ class BlkDev(controller.SplitDev):
 
         @param change: change flag
         """
-        log.debug("Destroying vbd domain=%d vdev=%d", self.controller.dom, self.vdev)
+        log.debug("Destroying vbd domain=%d idx=%s", self.controller.dom, self.idx)
         d = self.send_be_vbd_destroy()
         if change:
             d.addCallback(lambda val: self.interfaceChanged())
@@ -345,10 +356,9 @@ class BlkifController(controller.SplitController):
         Do not call directly - use createController() on the factory instead.
         """
         controller.SplitController.__init__(self, factory, dom)
-        self.devices = {}
         self.addMethod(CMSG_BLKIF_FE,
-                       CMSG_BLKIF_FE_DRIVER_STATUS_CHANGED,
-                       self.recv_fe_driver_status_changed)
+                       CMSG_BLKIF_FE_DRIVER_STATUS,
+                       self.recv_fe_driver_status)
         self.addMethod(CMSG_BLKIF_FE,
                        CMSG_BLKIF_FE_INTERFACE_CONNECT,
                        self.recv_fe_interface_connect)
@@ -358,13 +368,7 @@ class BlkifController(controller.SplitController):
         val = ['blkif', ['dom', self.dom]]
         return val
 
-    def getDevices(self):
-        return self.devices.values()
-
-    def getDevice(self, vdev):
-        return self.devices.get(vdev)
-
-    def addDevice(self, config, vdev, mode, segment):
+    def addDevice(self, idx, config, vdev, mode, segment):
         """Add a device to the device table.
 
         @param vdev:     device index
@@ -376,20 +380,18 @@ class BlkifController(controller.SplitController):
         @return: device
         @rtype:  BlkDev
         """
-        if vdev in self.devices:
-            raise XendError('device exists: ' + str(vdev))
-        dev = BlkDev(self, config, vdev, mode, segment)
-        self.devices[vdev] = dev
+        if idx in self.devices:
+            raise XendError('device exists: ' + str(idx))
+        dev = BlkDev(idx, self, config, vdev, mode, segment)
+        self.devices[idx] = dev
         return dev
 
-    def delDevice(self, vdev):
-        if vdev in self.devices:
-            del self.devices[vdev]
-
-    def attachDevice(self, config, vdev, mode, segment, recreate=0):
+    def attachDevice(self, idx, config, vdev, mode, segment, recreate=0):
         """Attach a device to the specified interface.
         On success the returned deferred will be called with the device.
 
+        @param idx:      device id
+        @param config:   device configuration
         @param vdev:     device index
         @type  vdev:     int
         @param mode:     read/write mode
@@ -401,7 +403,7 @@ class BlkifController(controller.SplitController):
         @return: deferred
         @rtype:  Deferred
         """
-        dev = self.addDevice(config, vdev, mode, segment)
+        dev = self.addDevice(idx, config, vdev, mode, segment)
         if recreate:
             d = defer.succeed(dev)
         else:
@@ -425,8 +427,9 @@ class BlkifController(controller.SplitController):
         for backend in self.getBackendInterfaces():
             backend.destroy()
 
-    def recv_fe_driver_status_changed(self, msg, req):
-        val = unpackMsg('blkif_fe_driver_status_changed_t', msg)
+    def recv_fe_driver_status(self, msg, req):
+        val = unpackMsg('blkif_fe_driver_status_t', msg)
+        print 'recv_fe_driver_status>', val
         for backend in self.getBackendInterfaces():
             backend.interfaceDisconnected()
 
@@ -438,6 +441,7 @@ class BlkifController(controller.SplitController):
             backend.connectInterface(val)
         else:
             log.error('interface connect on unknown interface: handle=%d', handle)
+
 
     
 

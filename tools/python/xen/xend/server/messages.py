@@ -29,70 +29,106 @@ msg_formats.update(console_formats)
 CMSG_BLKIF_BE = 1
 CMSG_BLKIF_FE = 2
 
-CMSG_BLKIF_FE_INTERFACE_STATUS_CHANGED =  0
-CMSG_BLKIF_FE_DRIVER_STATUS_CHANGED    = 32
-CMSG_BLKIF_FE_INTERFACE_CONNECT        = 33
-CMSG_BLKIF_FE_INTERFACE_DISCONNECT     = 34
+CMSG_BLKIF_FE_INTERFACE_STATUS      =  0
+CMSG_BLKIF_FE_DRIVER_STATUS         = 32
+CMSG_BLKIF_FE_INTERFACE_CONNECT     = 33
+CMSG_BLKIF_FE_INTERFACE_DISCONNECT  = 34
+CMSG_BLKIF_FE_INTERFACE_QUERY       = 35
 
-CMSG_BLKIF_BE_CREATE      = 0
-CMSG_BLKIF_BE_DESTROY     = 1
-CMSG_BLKIF_BE_CONNECT     = 2
-CMSG_BLKIF_BE_DISCONNECT  = 3
-CMSG_BLKIF_BE_VBD_CREATE  = 4
-CMSG_BLKIF_BE_VBD_DESTROY = 5
-CMSG_BLKIF_BE_VBD_GROW    = 6
-CMSG_BLKIF_BE_VBD_SHRINK  = 7
-CMSG_BLKIF_BE_DRIVER_STATUS_CHANGED    = 32
+CMSG_BLKIF_BE_CREATE                =  0
+CMSG_BLKIF_BE_DESTROY               =  1
+CMSG_BLKIF_BE_CONNECT               =  2
+CMSG_BLKIF_BE_DISCONNECT            =  3
+CMSG_BLKIF_BE_VBD_CREATE            =  4
+CMSG_BLKIF_BE_VBD_DESTROY           =  5
+CMSG_BLKIF_BE_VBD_GROW              =  6
+CMSG_BLKIF_BE_VBD_SHRINK            =  7
+CMSG_BLKIF_BE_DRIVER_STATUS         = 32
 
-BLKIF_DRIVER_STATUS_DOWN  = 0
-BLKIF_DRIVER_STATUS_UP    = 1
+BLKIF_DRIVER_STATUS_DOWN            =  0
+BLKIF_DRIVER_STATUS_UP              =  1
 
-BLKIF_INTERFACE_STATUS_DESTROYED    = 0 #/* Interface doesn't exist.    */
-BLKIF_INTERFACE_STATUS_DISCONNECTED = 1 #/* Exists but is disconnected. */
-BLKIF_INTERFACE_STATUS_CONNECTED    = 2 #/* Exists and is connected.    */
-BLKIF_INTERFACE_STATUS_CHANGED      = 3 #/* A device has been added or removed. */
+BLKIF_INTERFACE_STATUS_CLOSED       =  0 #/* Interface doesn't exist.    */
+BLKIF_INTERFACE_STATUS_DISCONNECTED =  1 #/* Exists but is disconnected. */
+BLKIF_INTERFACE_STATUS_CONNECTED    =  2 #/* Exists and is connected.    */
+BLKIF_INTERFACE_STATUS_CHANGED      =  3 #/* A device has been added or removed. */
 
-BLKIF_BE_STATUS_OKAY                = 0
-BLKIF_BE_STATUS_ERROR               = 1
-BLKIF_BE_STATUS_INTERFACE_EXISTS    = 2
-BLKIF_BE_STATUS_INTERFACE_NOT_FOUND = 3
-BLKIF_BE_STATUS_INTERFACE_CONNECTED = 4
-BLKIF_BE_STATUS_VBD_EXISTS          = 5
-BLKIF_BE_STATUS_VBD_NOT_FOUND       = 6
-BLKIF_BE_STATUS_OUT_OF_MEMORY       = 7
-BLKIF_BE_STATUS_EXTENT_NOT_FOUND    = 8
-BLKIF_BE_STATUS_MAPPING_ERROR       = 9
+BLKIF_BE_STATUS_OKAY                =  0
+BLKIF_BE_STATUS_ERROR               =  1
+BLKIF_BE_STATUS_INTERFACE_EXISTS    =  2
+BLKIF_BE_STATUS_INTERFACE_NOT_FOUND =  3
+BLKIF_BE_STATUS_INTERFACE_CONNECTED =  4
+BLKIF_BE_STATUS_VBD_EXISTS          =  5
+BLKIF_BE_STATUS_VBD_NOT_FOUND       =  6
+BLKIF_BE_STATUS_OUT_OF_MEMORY       =  7
+BLKIF_BE_STATUS_EXTENT_NOT_FOUND    =  8
+BLKIF_BE_STATUS_MAPPING_ERROR       =  9
 
 blkif_formats = {
     'blkif_be_connect_t':
     (CMSG_BLKIF_BE, CMSG_BLKIF_BE_CONNECT),
+    # Connect be to fe (in response to blkif_fe_interface_connect_t).
 
     'blkif_be_create_t':
     (CMSG_BLKIF_BE, CMSG_BLKIF_BE_CREATE),
+    # Create be.
 
     'blkif_be_disconnect_t':
     (CMSG_BLKIF_BE, CMSG_BLKIF_BE_DISCONNECT),
+    # Disconnect be from fe.
 
     'blkif_be_destroy_t':
     (CMSG_BLKIF_BE, CMSG_BLKIF_BE_DESTROY),
+    # Destroy be (after disconnect).
+    # Make be do this even if no disconnect (and destroy all vbd too).
 
     'blkif_be_vbd_create_t':
     (CMSG_BLKIF_BE, CMSG_BLKIF_BE_VBD_CREATE),
+    # Create a vbd device.
 
     'blkif_be_vbd_grow_t':
     (CMSG_BLKIF_BE, CMSG_BLKIF_BE_VBD_GROW),
+    # Change the size of a vbd device. Remove?
+    # Do in one go in blkif_be_vbd_create_t.
 
     'blkif_be_vbd_destroy_t':
     (CMSG_BLKIF_BE, CMSG_BLKIF_BE_VBD_DESTROY),
+    # Destroy a vbd.
 
-    'blkif_fe_interface_status_changed_t':
-    (CMSG_BLKIF_FE, CMSG_BLKIF_FE_INTERFACE_STATUS_CHANGED),
+    # Add message to query be for state and vbds.
 
-    'blkif_fe_driver_status_changed_t':
-    (CMSG_BLKIF_FE, CMSG_BLKIF_FE_DRIVER_STATUS_CHANGED),
+    'blkif_fe_interface_status_t':
+    (CMSG_BLKIF_FE, CMSG_BLKIF_FE_INTERFACE_STATUS),
+    # Notify device status to fe.
+    # Also used to notify 'any' device change with status BLKIF_INTERFACE_STATUS_CHANGED.
+    # Rename to blkif_fe_interface_status.
+
+    'blkif_fe_driver_status_t':
+    (CMSG_BLKIF_FE, CMSG_BLKIF_FE_DRIVER_STATUS),
+    # Comes from fe, treated as notifying that fe has come up/changed.
+    # Xend sets be(s) to BLKIF_INTERFACE_STATUS_DISCONNECTED,
+    # sends blkif_fe_interface_status_t to fe (from each be).
+    #
+    # Rename to blkif_fe_driver_status.
+    # Reply with i/f count.
+    # The i/f sends probes (using -ve trick), we reply with the info.
 
     'blkif_fe_interface_connect_t':
     (CMSG_BLKIF_FE, CMSG_BLKIF_FE_INTERFACE_CONNECT),
+    # Comes from fe, passing shmem frame to use for be.
+    # fe sends when gets blkif_fe_interface_status_t with state NETIF_INTERFACE_STATUS_DISCONNECTED.
+    # Xend creates event channel and notifies be.
+    # Then notifies fe of event channel with blkif_fe_interface_status_t.
+
+    # Add message to kick fe to probe for devices.
+    # Just report new devices to fe?
+
+    # 
+    # Add message for fe to probe a device.
+    # And probing with id -1 should return first.
+    # And probing with id -n should return first device with id > n.
+    
+    # Add message to query fe for state and vbds.
 }
 
 msg_formats.update(blkif_formats)
@@ -104,24 +140,25 @@ msg_formats.update(blkif_formats)
 CMSG_NETIF_BE = 3
 CMSG_NETIF_FE = 4
 
-CMSG_NETIF_FE_INTERFACE_STATUS_CHANGED =  0
-CMSG_NETIF_FE_DRIVER_STATUS_CHANGED    = 32
-CMSG_NETIF_FE_INTERFACE_CONNECT        = 33
-CMSG_NETIF_FE_INTERFACE_DISCONNECT     = 34
+CMSG_NETIF_FE_INTERFACE_STATUS      =  0
+CMSG_NETIF_FE_DRIVER_STATUS         = 32
+CMSG_NETIF_FE_INTERFACE_CONNECT     = 33
+CMSG_NETIF_FE_INTERFACE_DISCONNECT  = 34
+CMSG_NETIF_FE_INTERFACE_QUERY       = 35
 
-CMSG_NETIF_BE_CREATE      = 0
-CMSG_NETIF_BE_DESTROY     = 1
-CMSG_NETIF_BE_CONNECT     = 2
-CMSG_NETIF_BE_DISCONNECT  = 3
-CMSG_NETIF_BE_DRIVER_STATUS_CHANGED    = 32
+CMSG_NETIF_BE_CREATE                =  0
+CMSG_NETIF_BE_DESTROY               =  1
+CMSG_NETIF_BE_CONNECT               =  2
+CMSG_NETIF_BE_DISCONNECT            =  3
+CMSG_NETIF_BE_DRIVER_STATUS         = 32
 
-NETIF_INTERFACE_STATUS_DESTROYED    = 0 #/* Interface doesn't exist.    */
-NETIF_INTERFACE_STATUS_DISCONNECTED = 1 #/* Exists but is disconnected. */
-NETIF_INTERFACE_STATUS_CONNECTED    = 2 #/* Exists and is connected.    */
-NETIF_INTERFACE_STATUS_CHANGED      = 3 #/* A device has been added or removed. */
+NETIF_INTERFACE_STATUS_CLOSED       =  0 #/* Interface doesn't exist.    */
+NETIF_INTERFACE_STATUS_DISCONNECTED =  1 #/* Exists but is disconnected. */
+NETIF_INTERFACE_STATUS_CONNECTED    =  2 #/* Exists and is connected.    */
+NETIF_INTERFACE_STATUS_CHANGED      =  3 #/* A device has been added or removed. */
 
-NETIF_DRIVER_STATUS_DOWN   = 0
-NETIF_DRIVER_STATUS_UP     = 1
+NETIF_DRIVER_STATUS_DOWN            =  0
+NETIF_DRIVER_STATUS_UP              =  1
 
 netif_formats = {
     'netif_be_connect_t':
@@ -136,17 +173,17 @@ netif_formats = {
     'netif_be_destroy_t':
     (CMSG_NETIF_BE, CMSG_NETIF_BE_DESTROY),
 
-    'netif_be_driver_status_changed_t':
-    (CMSG_NETIF_BE, CMSG_NETIF_BE_DRIVER_STATUS_CHANGED),
+    'netif_be_driver_status_t':
+    (CMSG_NETIF_BE, CMSG_NETIF_BE_DRIVER_STATUS),
 
-    'netif_fe_driver_status_changed_t':
-    (CMSG_NETIF_FE, CMSG_NETIF_FE_DRIVER_STATUS_CHANGED),
+    'netif_fe_driver_status_t':
+    (CMSG_NETIF_FE, CMSG_NETIF_FE_DRIVER_STATUS),
 
     'netif_fe_interface_connect_t':
     (CMSG_NETIF_FE, CMSG_NETIF_FE_INTERFACE_CONNECT),
 
-    'netif_fe_interface_status_changed_t':
-    (CMSG_NETIF_FE, CMSG_NETIF_FE_INTERFACE_STATUS_CHANGED),
+    'netif_fe_interface_status_t':
+    (CMSG_NETIF_FE, CMSG_NETIF_FE_INTERFACE_STATUS),
     }
 
 msg_formats.update(netif_formats)
@@ -241,13 +278,15 @@ def unpackMsg(ty, msg):
         macs = []
         for (k, v) in args.items():
             if k.startswith('mac['):
-                macs += k
+                macs.append(k)
                 i = int(k[4:5])
                 mac[i] = v
             else:
                 pass
         if macs:
             args['mac'] = mac
+            print 'macs=', macs
+            print 'args=', args
             for k in macs:
                 del args[k]
     if DEBUG:
