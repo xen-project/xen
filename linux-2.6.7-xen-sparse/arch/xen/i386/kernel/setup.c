@@ -1243,12 +1243,15 @@ void __init setup_arch(char **cmdline_p)
 #endif
 #endif
 	} else {
+#ifdef CONFIG_XEN_PRIVILEGED_GUEST
+		extern const struct consw xennull_con;
+		extern int console_use_vt;
 #if defined(CONFIG_VGA_CONSOLE)
 		/* disable VGA driver */
 		ORIG_VIDEO_ISVGA = VIDEO_TYPE_VLFB;
 #endif
-#if defined(CONFIG_DUMMY_CONSOLE)
-		conswitchp = &dummy_con;
+		conswitchp = &xennull_con;
+		console_use_vt = 0;
 #endif
 	}
 }

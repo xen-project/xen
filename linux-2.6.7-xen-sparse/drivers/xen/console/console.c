@@ -164,14 +164,7 @@ void xen_console_init(void)
     else
     {
         if ( xc_mode == XC_DEFAULT )
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,0) && defined(CONFIG_VT)
-            /* On a kernel built with VT support, default to serial
-             * console because the VT driver has already allocated the
-             * /dev/tty device nodes */
-            xc_mode = XC_SERIAL;
-#else
             xc_mode = XC_TTY;
-#endif
         kcons_info.write = kcons_write;
     }
 
@@ -597,6 +590,44 @@ static struct tty_operations xencons_ops = {
     .unthrottle = xencons_unthrottle,
     .wait_until_sent = xencons_wait_until_sent,
 };
+
+#ifdef CONFIG_XEN_PRIVILEGED_GUEST
+static const char *xennullcon_startup(void)
+{
+    return NULL;
+}
+
+static int xennullcon_dummy(void)
+{
+    return 0;
+}
+
+#define DUMMY	(void *)xennullcon_dummy
+
+/*
+ *  The console `switch' structure for the dummy console
+ *
+ *  Most of the operations are dummies.
+ */
+
+const struct consw xennull_con = {
+    .owner =		THIS_MODULE,
+    .con_startup =	xennullcon_startup,
+    .con_init =		DUMMY,
+    .con_deinit =	DUMMY,
+    .con_clear =	DUMMY,
+    .con_putc =		DUMMY,
+    .con_putcs =	DUMMY,
+    .con_cursor =	DUMMY,
+    .con_scroll =	DUMMY,
+    .con_bmove =	DUMMY,
+    .con_switch =	DUMMY,
+    .con_blank =	DUMMY,
+    .con_font_op =	DUMMY,
+    .con_set_palette =	DUMMY,
+    .con_scrolldelta =	DUMMY,
+};
+#endif
 #endif
 
 static int __init xencons_init(void)
