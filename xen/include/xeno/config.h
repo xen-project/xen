@@ -85,6 +85,12 @@
 #define IOREMAP_VIRT_START    (MAPCACHE_VIRT_END)
 #define IOREMAP_VIRT_END      (IOREMAP_VIRT_START + (4*1024*1024))
 
+/*
+ * Amount of slack domain memory to leave in system, in megabytes.
+ * Prevents a hard out-of-memory crunch for thinsg like network receive.
+ */
+#define SLACK_DOMAIN_MEM_KILOBYTES 1024
+
 /* Linkage for x86 */
 #define FASTCALL(x)     x __attribute__((regparm(3)))
 #define asmlinkage        __attribute__((regparm(0)))

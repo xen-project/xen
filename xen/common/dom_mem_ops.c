@@ -29,14 +29,24 @@ static long alloc_dom_mem(struct task_struct *p, balloon_def_op_t bop)
     unsigned long     i;
     unsigned long     flags;
 
-    /* POLICY DECISION: Each domain has a page limit. */
-    if( (p->tot_pages + bop.size) > p->max_pages )
+    /*
+     * POLICY DECISION: Each domain has a page limit.
+     * NB. The first part of test is because bop.size could be so big that
+     * tot_pages + bop.size overflows a u_long.
+     */
+    if( (bop.size > p->max_pages) ||
+        ((p->tot_pages + bop.size) > p->max_pages) )
         return -ENOMEM;
 
-    if ( free_pfns < bop.size ) 
-        return -ENOMEM;
-    
     spin_lock_irqsave(&free_list_lock, flags);
+
+    if ( free_pfns < (bop.size + (SLACK_DOMAIN_MEM_KILOBYTES << 
+                                  (PAGE_SHIFT-10))) ) 
+    {
+        spin_unlock_irqrestore(&free_list_lock, flags);
+        return -ENOMEM;
+    }
+
     spin_lock(&p->page_lock);
     
     temp = free_list.next;

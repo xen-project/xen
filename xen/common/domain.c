@@ -161,8 +161,13 @@ unsigned int alloc_new_dom_mem(struct task_struct *p, unsigned int kbytes)
     spin_lock_irqsave(&free_list_lock, flags);
     
     /* is there enough mem to serve the request? */   
-    if ( req_pages > free_pfns ) return -1;
-    
+    if ( (req_pages + (SLACK_DOMAIN_MEM_KILOBYTES << (PAGE_SHIFT-10))) >
+         free_pfns )
+    {
+        spin_unlock_irqrestore(&free_list_lock, flags);
+        return -1;
+    }
+
     /* allocate pages and build a thread through frame_table */
     temp = free_list.next;
     for ( alloc_pfns = 0; alloc_pfns < req_pages; alloc_pfns++ )
