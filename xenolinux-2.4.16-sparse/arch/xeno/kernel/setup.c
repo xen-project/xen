@@ -46,6 +46,8 @@
 
 shared_info_t *HYPERVISOR_shared_info;
 
+unsigned long *phys_to_machine_mapping;
+
 /*
  * Machine setup..
  */
@@ -143,6 +145,7 @@ void __init setup_arch(char **cmdline_p)
 {
     unsigned long start_pfn, max_pfn, max_low_pfn;
     unsigned long bootmap_size;
+    unsigned long i;
 
     extern void hypervisor_callback(void);
     extern void failsafe_callback(void);
@@ -254,11 +257,23 @@ void __init setup_arch(char **cmdline_p)
         {
             unsigned long pgde = *pgd++;
             if ( !(pgde & 1) ) continue;
-            pte = (pgde & PAGE_MASK) - start_info.phys_base;
+            pte = machine_to_phys(pgde & PAGE_MASK);
             reserve_bootmem(pte, PAGE_SIZE);
         }
     }
     cur_pgd = init_mm.pgd = (pgd_t *)start_info.pt_base;
+
+    /* Now initialise the physical->machine mapping table. */
+    phys_to_machine_mapping = alloc_bootmem(max_pfn * sizeof(unsigned long));
+    for ( i = 0; i < max_pfn; i++ )
+    {
+        unsigned long pgde, *ppte;
+        unsigned long pfn = i + (PAGE_OFFSET >> PAGE_SHIFT);
+        pgde = *((unsigned long *)start_info.pt_base + (pfn >> 10));
+        ppte = (unsigned long *)machine_to_phys(pgde & PAGE_MASK) + (pfn&1023);
+        phys_to_machine_mapping[i] = 
+            (*(unsigned long *)__va(ppte)) >> PAGE_SHIFT;
+    }
 
 #ifdef CONFIG_BLK_DEV_INITRD
     if (start_info.mod_start) {

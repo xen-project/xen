@@ -31,7 +31,7 @@ static void DEBUG_allow_pt_reads(void)
         pte = update_debug_queue[i].ptep;
         if ( pte == NULL ) continue;
         update_debug_queue[i].ptep = NULL;
-        update.ptr = __pa(pte) + start_info.phys_base;
+        update.ptr = phys_to_machine(__pa(pte));
         update.val = update_debug_queue[i].pteval;
         HYPERVISOR_pt_update(&update, 1);
     }
@@ -51,7 +51,7 @@ static void DEBUG_disallow_pt_read(unsigned long pa)
     pgd = pgd_offset_k(va);
     pmd = pmd_offset(pgd, va);
     pte = pte_offset(pmd, va);
-    update.ptr = __pa(pte) + start_info.phys_base;
+    update.ptr = phys_to_machine(__pa(pte));
     pteval = *(unsigned long *)pte;
     update.val = pteval & ~_PAGE_PRESENT;
     HYPERVISOR_pt_update(&update, 1);
@@ -100,21 +100,21 @@ void queue_l1_entry_update(unsigned long ptr, unsigned long val)
 #if PT_UPDATE_DEBUG > 0
     DEBUG_disallow_pt_read(ptr);
 #endif
-    update_queue[idx].ptr = ptr + start_info.phys_base;
+    update_queue[idx].ptr = phys_to_machine(ptr);
     update_queue[idx].val = val;
     increment_index();
 }
 
 void queue_l2_entry_update(unsigned long ptr, unsigned long val)
 {
-    update_queue[idx].ptr = ptr + start_info.phys_base;
+    update_queue[idx].ptr = phys_to_machine(ptr);
     update_queue[idx].val = val;
     increment_index();
 }
 
 void queue_pt_switch(unsigned long ptr)
 {
-    update_queue[idx].ptr  = ptr + start_info.phys_base;
+    update_queue[idx].ptr  = phys_to_machine(ptr);
     update_queue[idx].ptr |= PGREQ_EXTENDED_COMMAND;
     update_queue[idx].val  = PGEXT_NEW_BASEPTR;
     increment_index();
@@ -137,7 +137,7 @@ void queue_invlpg(unsigned long ptr)
 
 void queue_pgd_pin(unsigned long ptr)
 {
-    update_queue[idx].ptr  = ptr + start_info.phys_base;
+    update_queue[idx].ptr  = phys_to_machine(ptr);
     update_queue[idx].ptr |= PGREQ_EXTENDED_COMMAND;
     update_queue[idx].val  = PGEXT_PIN_L2_TABLE;
     increment_index();
@@ -145,7 +145,7 @@ void queue_pgd_pin(unsigned long ptr)
 
 void queue_pgd_unpin(unsigned long ptr)
 {
-    update_queue[idx].ptr  = ptr + start_info.phys_base;
+    update_queue[idx].ptr  = phys_to_machine(ptr);
     update_queue[idx].ptr |= PGREQ_EXTENDED_COMMAND;
     update_queue[idx].val  = PGEXT_UNPIN_TABLE;
     increment_index();
@@ -153,7 +153,7 @@ void queue_pgd_unpin(unsigned long ptr)
 
 void queue_pte_pin(unsigned long ptr)
 {
-    update_queue[idx].ptr  = ptr + start_info.phys_base;
+    update_queue[idx].ptr  = phys_to_machine(ptr);
     update_queue[idx].ptr |= PGREQ_EXTENDED_COMMAND;
     update_queue[idx].val  = PGEXT_PIN_L1_TABLE;
     increment_index();
@@ -161,7 +161,7 @@ void queue_pte_pin(unsigned long ptr)
 
 void queue_pte_unpin(unsigned long ptr)
 {
-    update_queue[idx].ptr  = ptr + start_info.phys_base;
+    update_queue[idx].ptr  = phys_to_machine(ptr);
     update_queue[idx].ptr |= PGREQ_EXTENDED_COMMAND;
     update_queue[idx].val  = PGEXT_UNPIN_TABLE;
     increment_index();

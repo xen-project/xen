@@ -16,6 +16,9 @@
  * to all domains except DOM0.
  */
 #define HYPERVISOR_VIRT_START (0xFC000000UL)
+#ifndef machine_to_phys_mapping
+#define machine_to_phys_mapping ((unsigned long *)HYPERVISOR_VIRT_START)
+#endif
 
 typedef struct trap_info_st
 {
@@ -198,8 +201,7 @@ typedef struct shared_info_st {
 typedef struct start_info_st {
     unsigned long nr_pages;       /* total pages allocated to this domain */
     shared_info_t *shared_info;   /* start address of shared info struct */
-    unsigned long  pt_base;       /* address of page directory */
-    unsigned long phys_base;
+    unsigned long  pt_base;       /* VIRTUAL address of page directory */
     unsigned long mod_start;      /* start address of pre-loaded module */
     unsigned long mod_len;        /* size (bytes) of pre-loaded module */
     net_ring_t *net_rings;

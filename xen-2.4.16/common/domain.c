@@ -484,11 +484,6 @@ int final_setup_guestos(struct task_struct * p, dom_meminfo_t * meminfo)
     virt_startinfo_addr->shared_info = (shared_info_t *)meminfo->virt_shinfo_addr;
     virt_startinfo_addr->pt_base = meminfo->virt_load_addr + 
                     ((p->tot_pages - 1) << PAGE_SHIFT);
-
-    /* now, this is just temprorary before we switch to pseudo phys
-     * addressing. this works only for contiguous chunks of memory!!!
-     */
-    virt_startinfo_addr->phys_base = p->pg_head << PAGE_SHIFT;
     
     /* Add virtual network interfaces and point to them in startinfo. */
     while (meminfo->num_vifs-- > 0) {
@@ -737,7 +732,6 @@ int setup_guestos(struct task_struct *p, dom0_newdomain_t *params)
         (shared_info_t *)virt_shinfo_address;
     virt_startinfo_address->pt_base = virt_load_address + 
         ((p->tot_pages - 1) << PAGE_SHIFT); 
-    virt_startinfo_address->phys_base = p->pg_head << PAGE_SHIFT;
 
     /* Add virtual network interfaces and point to them in startinfo. */
     while (params->num_vifs-- > 0) {

@@ -126,23 +126,23 @@ static inline void set_pte_phys (unsigned long vaddr,
 
 void __init paging_init(void)
 {
+    unsigned long zones_size[MAX_NR_ZONES] = {0, 0, 0};
+    unsigned int max_dma, high, low;
+    
+    max_dma = virt_to_phys((char *)MAX_DMA_ADDRESS) >> PAGE_SHIFT;
+    low = max_low_pfn;
+    high = highend_pfn;
+    
+    if (low < max_dma)
     {
-        unsigned long zones_size[MAX_NR_ZONES] = {0, 0, 0};
-        unsigned int max_dma, high, low;
-
-        max_dma = virt_to_phys((char *)MAX_DMA_ADDRESS) >> PAGE_SHIFT;
-        low = max_low_pfn;
-        high = highend_pfn;
-
-        if (low < max_dma)
-            zones_size[ZONE_DMA] = low;
-        else {
-            zones_size[ZONE_DMA] = max_dma;
-            zones_size[ZONE_NORMAL] = low - max_dma;
-        }
-        free_area_init(zones_size);
+        zones_size[ZONE_DMA] = low;
     }
-    return;
+    else 
+    {
+        zones_size[ZONE_DMA] = max_dma;
+        zones_size[ZONE_NORMAL] = low - max_dma;
+    }
+    free_area_init(zones_size);
 }
 
 

@@ -27,8 +27,8 @@ void do_hypervisor_callback(struct pt_regs *regs);
 
 /* arch/xeno/mm/hypervisor.c */
 /*
- * NB. ptr values should be fake-physical. 'vals' should be already
- * fully adjusted (ie. for start_info.phys_base).
+ * NB. ptr values should be PHYSICAL, not MACHINE. 'vals' should be already
+ * be MACHINE addresses.
  */
 
 extern unsigned int pt_update_queue_idx;
@@ -77,7 +77,7 @@ extern page_update_debug_t update_debug_queue[];
  update_debug_queue[pt_update_queue_idx].line = __LINE__;         \
  update_debug_queue[pt_update_queue_idx].file = __FILE__;         \
  printk("L1 %s %d: %08lx (%08lx -> %08lx)\n", __FILE__, __LINE__, \
-        (_p)+start_info.phys_base, *(unsigned long *)__va(_p),    \
+        phys_to_machine(_p), *(unsigned long *)__va(_p),          \
         (unsigned long)(_v));                                     \
  queue_l1_entry_update((_p),(_v));                                \
 })
@@ -87,7 +87,7 @@ extern page_update_debug_t update_debug_queue[];
  update_debug_queue[pt_update_queue_idx].line = __LINE__;         \
  update_debug_queue[pt_update_queue_idx].file = __FILE__;         \
  printk("L2 %s %d: %08lx (%08lx -> %08lx)\n", __FILE__, __LINE__, \
-        (_p)+start_info.phys_base, *(unsigned long *)__va(_p),    \
+        phys_to_machine(_p), *(unsigned long *)__va(_p),          \
         (unsigned long)(_v));                                     \
  queue_l2_entry_update((_p),(_v));                                \
 })
