@@ -419,3 +419,9 @@ xen/tools/figlet/figlet
 xenolinux-2.4.16-sparse/arch/xeno/drivers/block/Makefile.orig
 xenolinux-2.4.16-sparse/arch/xeno/drivers/block/block.c.orig
 xenolinux-2.4.16-sparse/scripts/kconfig.tk
+tools/internal/xi_phys_grant
+tools/internal/xi_phys_grant.o
+tools/internal/xi_phys_probe
+tools/internal/xi_phys_probe.o
+tools/internal/xi_phys_revoke.o
+tools/internal/xi_phys_revoke
