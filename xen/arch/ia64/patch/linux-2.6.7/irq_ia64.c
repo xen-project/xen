@@ -1,5 +1,5 @@
---- /home/djm/src/xen/xeno-ia64.bk/xen/linux-2.6.7/arch/ia64/kernel/irq_ia64.c	2004-06-15 23:19:13.000000000 -0600
-+++ /home/djm/src/xen/xeno-ia64.bk/xen/arch/ia64/irq_ia64.c	2004-11-22 17:41:59.000000000 -0700
+--- /home/djm/linux-2.6.7/arch/ia64/kernel/irq_ia64.c	2004-06-15 23:19:13.000000000 -0600
++++ arch/ia64/irq_ia64.c	2005-02-17 13:06:07.000000000 -0700
 @@ -17,18 +17,26 @@
  #include <linux/config.h>
  #include <linux/module.h>
@@ -72,7 +72,7 @@
 +		}
 +#endif
 +		//FIXME: TEMPORARY HACK!!!!
-+		vcpu_pend_interrupt(dom0,vector);
++		vcpu_pend_interrupt(dom0->exec_domain[0],vector);
 +		domain_wake(dom0);
 +	}
 +	else
