@@ -103,11 +103,8 @@ typedef struct xen_regs
     u32 edi;
     u32 ebp;
     u32 eax;
-    u16 error_code;        /* private */
-    union { 
-        u16 entry_vector;  /* private */
-        u16 flags;
-    } PACKED;
+    u16 error_code;    /* private */
+    u16 entry_vector;  /* private */
     u32 eip;
     u32 cs;
     u32 eflags;

@@ -256,11 +256,22 @@ int map_ldt_shadow_page(unsigned int off)
     struct domain *d = ed->domain;
     unsigned long l1e;
 
+#if defined(__x86_64__)
+    /* If in user mode, switch to kernel mode just to read LDT mapping. */
+    extern void toggle_guest_mode(struct exec_domain *);
+    int user_mode = !(ed->arch.flags & TF_kernel_mode);
+#define TOGGLE_MODE() if ( user_mode ) toggle_guest_mode(ed)
+#elif defined(__i386__)
+#define TOGGLE_MODE() ((void)0)
+#endif
+
     if ( unlikely(in_irq()) )
         BUG();
 
+    TOGGLE_MODE();
     __get_user(l1e, (unsigned long *)
                &linear_pg_table[l1_linear_offset(ed->arch.ldt_base) + off]);
+    TOGGLE_MODE();
 
     if ( unlikely(!(l1e & _PAGE_PRESENT)) ||
          unlikely(!get_page_and_type(

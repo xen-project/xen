@@ -110,7 +110,8 @@
 #define TRAP_deferred_nmi     31
 
 /* Set for entry via SYSCALL. Informs return code to use SYSRETQ not IRETQ. */
-#define TRAP_syscall         256 /* NB. Same as ECF_IN_SYSCALL */
+/* NB. Same as ECF_IN_SYSCALL. No bits in common with any other TRAP_* defn. */
+#define TRAP_syscall         256
 
 /*
  * Non-fatal fault/trap handlers return an error code to the caller. If the
@@ -128,10 +129,8 @@
 #define TBF_INTERRUPT          8
 #define TBF_FAILSAFE          16
 
-/* arch_exec_domain' flags values */
-#define _TF_failsafe_return    0
-#define _TF_kernel_mode        1
-#define TF_failsafe_return     (1<<_TF_failsafe_return)
+/* 'arch_exec_domain' flags values */
+#define _TF_kernel_mode        0
 #define TF_kernel_mode         (1<<_TF_kernel_mode)
 
 #ifndef __ASSEMBLY__

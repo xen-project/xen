@@ -655,6 +655,12 @@ static void switch_segments(
             (unsigned long *)regs->rsp : 
             (unsigned long *)n->arch.kernel_sp;
 
+        /* Set the kernel-mode indicator byte at the top of RFLAGS. */
+        ((char *)regs->rflags)[7] = !!(n->arch.flags & TF_kernel_mode);
+
+        if ( !(n->arch.flags & TF_kernel_mode) )
+            toggle_guest_mode(n);
+
         if ( put_user(regs->ss,     rsp- 1) |
              put_user(regs->rsp,    rsp- 2) |
              put_user(regs->rflags, rsp- 3) |
@@ -670,9 +676,6 @@ static void switch_segments(
             DPRINTK("Error while creating failsafe callback frame.\n");
             domain_crash();
         }
-
-        if ( !(n->arch.flags & TF_kernel_mode) )
-            toggle_guest_mode(n);
 
         regs->entry_vector  = TRAP_syscall;
         regs->rflags       &= 0xFFFCBEFFUL;
@@ -762,20 +765,14 @@ void context_switch(struct exec_domain *prev_p, struct exec_domain *next_p)
             loaddebug(&next_p->arch, 7);
         }
 
-#ifdef CONFIG_VMX
         if ( VMX_DOMAIN(next_p) )
         {
-            /* Switch page tables. */
             write_ptbase(next_p);
- 
             set_current(next_p);
-            /* Switch GDT and LDT. */
             __asm__ __volatile__ ("lgdt %0" : "=m" (*next_p->arch.gdt));
-
             __sti();
             goto done;
         }
-#endif
  
         SET_FAST_TRAP(&next_p->arch);
 

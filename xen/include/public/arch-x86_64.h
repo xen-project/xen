@@ -104,6 +104,8 @@
  *   Restore RAX, R11, RCX, CS:RIP, RFLAGS, SS:RSP.
  * All other registers are saved on hypercall entry and restored to user.
  */
+/* Guest exited in SYSCALL context? Return to guest with SYSRET? */
+#define ECF_IN_SYSCALL (1<<8)
 struct switch_to_user {
     /* Top of stack (%rsp at point of hypercall). */
     u64 rax, r11, rcx, flags, rip, cs, rflags, rsp, ss;
@@ -153,12 +155,8 @@ typedef struct xen_regs
     union { u64 rdx, edx; } PACKED;
     union { u64 rsi, esi; } PACKED;
     union { u64 rdi, edi; } PACKED;
-    u32 error_code;        /* private */
-    union { 
-        u32 entry_vector;  /* private */
-#define ECF_IN_SYSCALL (1<<8) /* Guest synchronously interrupted by SYSCALL? */
-        u32 flags;
-    } PACKED;
+    u32 error_code;    /* private */
+    u32 entry_vector;  /* private */
     union { u64 rip, eip; } PACKED;
     u64 cs;
     union { u64 rflags, eflags; } PACKED;
