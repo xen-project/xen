@@ -28,17 +28,17 @@
  *
  */
 
-#include <xeno/config.h>
-/*  #include <xeno/kernel.h> */
-#include <xeno/init.h>
-#include <xeno/types.h>
-#include <xeno/sched.h>
-#include <xeno/pci.h>
-/*  #include <xeno/spinlock.h> */
-/*  #include <xeno/slab.h> */
-/*  #include <xeno/completion.h> */
-#include <xeno/blk.h>
-/*  #include <asm/semaphore.h> */
+#include <linux/config.h>
+#include <linux/kernel.h>
+#include <linux/init.h>
+#include <linux/types.h>
+#include <linux/sched.h>
+#include <linux/pci.h>
+#include <linux/spinlock.h>
+#include <linux/slab.h>
+/*#include <linux/completion.h>*/
+#include <linux/blk.h>
+/*#include <asm/semaphore.h>*/
 #include <asm/uaccess.h>
 #include "scsi.h"
 #include "hosts.h"
@@ -63,7 +63,7 @@ static int ioctl_send_fib(struct aac_dev * dev, void *arg)
 	if(fibptr == NULL)
 		return -ENOMEM;
 		
-	kfib = fibptr->fib;
+	kfib = fibptr->hw_fib;
 	/*
 	 *	First copy in the header so that we can check the size field.
 	 */
@@ -152,7 +152,7 @@ static int open_getadapter_fib(struct aac_dev * dev, void *arg)
 		 *	the list to 0.
 		 */
 		fibctx->count = 0;
-		INIT_LIST_HEAD(&fibctx->fibs);
+		INIT_LIST_HEAD(&fibctx->fib_list);
 		fibctx->jiffies = jiffies/HZ;
 		/*
 		 *	Now add this context onto the adapter's 
@@ -183,7 +183,7 @@ static int next_getadapter_fib(struct aac_dev * dev, void *arg)
 {
 	struct fib_ioctl f;
 	struct aac_fib_context *fibctx, *aifcp;
-	struct hw_fib * fib;
+	struct fib * fib;
 	int status;
 	struct list_head * entry;
 	int found;
@@ -213,12 +213,16 @@ static int next_getadapter_fib(struct aac_dev * dev, void *arg)
 		}
 		entry = entry->next;
 	}
-	if (found == 0)
+	if (found == 0) {
+		dprintk ((KERN_INFO "Fib not found\n"));
 		return -EINVAL;
+	}
 
 	if((fibctx->type != FSAFS_NTC_GET_ADAPTER_FIB_CONTEXT) ||
-		 (fibctx->size != sizeof(struct aac_fib_context)))
+		 (fibctx->size != sizeof(struct aac_fib_context))) {
+		dprintk ((KERN_INFO "Fib Context corrupt?\n"));
 		return -EINVAL;
+	}
 	status = 0;
 	spin_lock_irqsave(&dev->fib_lock, flags);
 	/*
@@ -226,27 +230,28 @@ static int next_getadapter_fib(struct aac_dev * dev, void *arg)
 	 *	-EAGAIN
 	 */
 return_fib:
-	if (!list_empty(&fibctx->fibs)) {
+	if (!list_empty(&fibctx->fib_list)) {
 		struct list_head * entry;
 		/*
 		 *	Pull the next fib from the fibs
 		 */
-		entry = fibctx->fibs.next;
+		entry = fibctx->fib_list.next;
 		list_del(entry);
 		
-		fib = list_entry(entry, struct hw_fib, header.FibLinks);
+		fib = list_entry(entry, struct fib, fiblink);
 		fibctx->count--;
 		spin_unlock_irqrestore(&dev->fib_lock, flags);
-		if (copy_to_user(f.fib, fib, sizeof(struct hw_fib))) {
+		if (copy_to_user(f.fib, fib->hw_fib, sizeof(struct hw_fib))) {
+			kfree(fib->hw_fib);
 			kfree(fib);
 			return -EFAULT;
 		}	
 		/*
 		 *	Free the space occupied by this copy of the fib.
 		 */
+		kfree(fib->hw_fib);
 		kfree(fib);
 		status = 0;
-		fibctx->jiffies = jiffies/HZ;
 	} else {
 		spin_unlock_irqrestore(&dev->fib_lock, flags);
 		if (f.wait) {
@@ -255,7 +260,7 @@ return_fib:
 				status = -EINTR;
 			} else {
 #else
-			    {
+			{
 #endif
 				/* Lock again and retry */
 				spin_lock_irqsave(&dev->fib_lock, flags);
@@ -265,28 +270,30 @@ return_fib:
 			status = -EAGAIN;
 		}	
 	}
+	fibctx->jiffies = jiffies/HZ;
 	return status;
 }
 
 int aac_close_fib_context(struct aac_dev * dev, struct aac_fib_context * fibctx)
 {
-	struct hw_fib *fib;
+	struct fib *fib;
 
 	/*
 	 *	First free any FIBs that have not been consumed.
 	 */
-	while (!list_empty(&fibctx->fibs)) {
+	while (!list_empty(&fibctx->fib_list)) {
 		struct list_head * entry;
 		/*
 		 *	Pull the next fib from the fibs
 		 */
-		entry = fibctx->fibs.next;
+		entry = fibctx->fib_list.next;
 		list_del(entry);
-		fib = list_entry(entry, struct hw_fib, header.FibLinks);
+		fib = list_entry(entry, struct fib, fiblink);
 		fibctx->count--;
 		/*
 		 *	Free the space occupied by this copy of the fib.
 		 */
+		kfree(fib->hw_fib);
 		kfree(fib);
 	}
 	/*

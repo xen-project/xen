@@ -18,6 +18,12 @@ Supported Cards/Chipsets
 	ADAPTEC 2120S
 	ADAPTEC 2200S
 	ADAPTEC 5400S
+	Legend S220
+	Legend S230
+	Adaptec 3230S
+	Adaptec 3240S
+	ASR-2020S PCI-X
+	AAR-2410SA SATA
 
 People
 -------------------------
@@ -28,15 +34,22 @@ Deanna Bonds <deanna_bonds@adaptec.com> (non-DASD support, PAE fibs and 64 bit, 
 					 added new ioctls, changed scsi interface to use new error handler,
 					 increased the number of fibs and outstanding commands to a container)
 
+					(fixed 64bit and 64G memory model, changed confusing naming convention
+					 where fibs that go to the hardware are consistently called hw_fibs and
+					 not just fibs like the name of the driver tracking structure)
+Mark Salyzyn <Mark_Salyzyn@adaptec.com> Fixed panic issues and added some new product ids for upcoming hbas.
+
 Original Driver
 -------------------------
 Adaptec Unix OEM Product Group
 
 Mailing List
 -------------------------
-None currently. Also note this is very different to Brian's original driver
+linux-aacraid-devel@dell.com (Interested parties troll here)
+http://mbserver.adaptec.com/ (Currently more Community Support than Devel Support)
+Also note this is very different to Brian's original driver
 so don't expect him to support it.
-Adaptec does support this driver.  Contact either tech support or deanna bonds.
+Adaptec does support this driver.  Contact either tech support or Mark Salyzyn.
 
 Original by Brian Boerner February 2001
 Rewritten by Alan Cox, November 2001

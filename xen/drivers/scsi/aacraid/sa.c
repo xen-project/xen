@@ -28,18 +28,18 @@
  *
  */
 
-#include <xeno/config.h>
-#include <xeno/kernel.h>
-#include <xeno/init.h>
-#include <xeno/types.h>
-#include <xeno/sched.h>
-/*  #include <xeno/pci.h> */
-/*  #include <xeno/spinlock.h> */
-/*  #include <xeno/slab.h> */
-#include <xeno/blk.h>
-#include <xeno/delay.h>
-/*  #include <xeno/completion.h> */
-/*  #include <asm/semaphore.h> */
+#include <linux/config.h>
+#include <linux/kernel.h>
+#include <linux/init.h>
+#include <linux/types.h>
+#include <linux/sched.h>
+#include <linux/pci.h>
+#include <linux/spinlock.h>
+#include <linux/slab.h>
+#include <linux/blk.h>
+#include <linux/delay.h>
+/*#include <linux/completion.h>*/
+/*#include <asm/semaphore.h>*/
 #include "scsi.h"
 #include "hosts.h"
 
@@ -235,9 +235,9 @@ static int sa_sync_cmd(struct aac_dev *dev, u32 command, u32 p1, u32 *ret)
 #if 0
 		set_current_state(TASK_UNINTERRUPTIBLE);
 		schedule_timeout(1);
+#else
+		mdelay(100);
 #endif
-		mdelay(100); 
-
 	}
 
 	if (ok != 1)
@@ -353,7 +353,7 @@ int aac_sa_init(struct aac_dev *dev, unsigned long devnum)
 	 *	Wait for the adapter to be up and running. Wait up to 3 minutes.
 	 */
 	while (!(sa_readl(dev, Mailbox7) & KERNEL_UP_AND_RUNNING)) {
-		if (time_after(start+180*HZ, jiffies)) {
+		if (time_after(jiffies, start+180*HZ)) {
 			status = sa_readl(dev, Mailbox7) >> 16;
 			printk(KERN_WARNING "%s%d: adapter kernel failed to start, init status = %d.\n", name, instance, le32_to_cpu(status));
 			return -1;
@@ -361,8 +361,9 @@ int aac_sa_init(struct aac_dev *dev, unsigned long devnum)
 #if 0
 		set_current_state(TASK_UNINTERRUPTIBLE);
 		schedule_timeout(1);
+#else
+		mdelay(100);
 #endif
-		mdelay(100); 
 	}
 
 	dprintk(("ATIRQ\n"));
@@ -392,8 +393,11 @@ int aac_sa_init(struct aac_dev *dev, unsigned long devnum)
 	 *	Start any kernel threads needed
 	 */
 	dev->thread_pid = kernel_thread((int (*)(void *))aac_command_thread, dev, 0);
+	if (dev->thread_pid < 0) {
+	     printk(KERN_ERR "aacraid: Unable to create command thread.\n");
+	     return -1;
+	}
 #endif
-
 	/*
 	 *	Tell the adapter that all is configure, and it can start 
 	 *	accepting requests

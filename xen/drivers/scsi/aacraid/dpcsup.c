@@ -29,17 +29,17 @@
  *
  */
 
-#include <xeno/config.h>
-/* #include <xeno/kernel.h> */
-#include <xeno/init.h>
-#include <xeno/types.h>
-#include <xeno/sched.h>
-#include <xeno/pci.h>
-/*  #include <xeno/spinlock.h> */
-/*  #include <xeno/slab.h> */
-/*  #include <xeno/completion.h> */
-#include <xeno/blk.h>
-/*  #include <asm/semaphore.h> */
+#include <linux/config.h>
+#include <linux/kernel.h>
+#include <linux/init.h>
+#include <linux/types.h>
+#include <linux/sched.h>
+#include <linux/pci.h>
+#include <linux/spinlock.h>
+#include <linux/slab.h>
+/*#include <linux/completion.h>*/
+#include <linux/blk.h>
+/*#include <asm/semaphore.h>*/
 #include "scsi.h"
 #include "hosts.h"
 
@@ -74,12 +74,14 @@ unsigned int aac_response_normal(struct aac_queue * q)
 	 */
 	while(aac_consumer_get(dev, q, &entry))
 	{
-		int fast;
-
-		fast = (int) (entry->addr & 0x01);
-		hwfib = addr2fib(entry->addr & ~0x01);
-		aac_consumer_free(dev, q, HostNormRespQueue);
+		u32 fast ;
+		fast = (entry->addr & cpu_to_le32(0x01));
+//		fib = &dev->fibs[(entry->addr >> 1)];
+//		hwfib = fib->hw_fib;
+		hwfib = bus_to_virt(le32_to_cpu(entry->addr & cpu_to_le32(~0x01)));
 		fib = &dev->fibs[hwfib->header.SenderData];
+
+		aac_consumer_free(dev, q, HostNormRespQueue);
 		/*
 		 *	Remove this fib from the Outstanding I/O queue.
 		 *	But only if it has not already been timed out.
@@ -173,32 +175,53 @@ unsigned int aac_command_normal(struct aac_queue *q)
 	 *	up the waiters until there are no more QEs. We then return
 	 *	back to the system.
 	 */
+	dprintk((KERN_INFO
+	  "dev=%p, dev->comm_phys=%x, dev->comm_addr=%p, dev->comm_size=%u\n",
+	  dev, (u32)dev->comm_phys, dev->comm_addr, (unsigned)dev->comm_size));
+
 	while(aac_consumer_get(dev, q, &entry))
 	{
-		struct hw_fib * fib;
-		fib = addr2fib(entry->addr);
+		struct fib fibctx;
+		struct fib *fib = &fibctx;
+		u32 hw_fib_pa = le32_to_cpu(entry->addr & cpu_to_le32(~0x01));
+		struct hw_fib * hw_fib_va = ((dev->comm_phys <= hw_fib_pa)
+		 && (hw_fib_pa < (dev->comm_phys + dev->comm_size)))
+		  ? dev->comm_addr + (hw_fib_pa - dev->comm_phys)
+		  : /* inconceivable */ bus_to_virt(hw_fib_pa);
+		dprintk((KERN_INFO "hw_fib_pa=%x hw_fib_va=%p\n", hw_fib_pa, hw_fib_va));
 
-		if (dev->aif_thread) {
-		        list_add_tail(&fib->header.FibLinks, &q->cmdq);
+		/*
+		 *	Allocate a FIB at all costs. For non queued stuff
+		 *	we can just use the stack so we are happy. We need
+		 *	a fib object in order to manage the linked lists
+		 */
+		if (dev->aif_thread)
+			if((fib = kmalloc(sizeof(struct fib), GFP_ATOMIC))==NULL)
+				fib = &fibctx;
+			
+		memset(fib, 0, sizeof(struct fib));
+		INIT_LIST_HEAD(&fib->fiblink);
+		fib->type = FSAFS_NTC_FIB_CONTEXT;
+		fib->size = sizeof(struct fib);
+		fib->hw_fib = hw_fib_va;
+		fib->data = hw_fib_va->data;
+		fib->dev = dev;
+		
+		if (dev->aif_thread && fib != &fibctx)
+		{		
+			list_add_tail(&fib->fiblink, &q->cmdq);
 	 	        aac_consumer_free(dev, q, HostNormCmdQueue);
 #if 0
 		        wake_up_interruptible(&q->cmdready);
 #endif
 		} else {
-			struct fib fibctx;
 	 	        aac_consumer_free(dev, q, HostNormCmdQueue);
 			spin_unlock_irqrestore(q->lock, flags);
-			memset(&fibctx, 0, sizeof(struct fib));
-			fibctx.type = FSAFS_NTC_FIB_CONTEXT;
-			fibctx.size = sizeof(struct fib);
-			fibctx.fib = fib;
-			fibctx.data = fib->data;
-			fibctx.dev = dev;
 			/*
 			 *	Set the status of this FIB
 			 */
-			*(u32 *)fib->data = cpu_to_le32(ST_OK);
-			fib_adapter_complete(&fibctx, sizeof(u32));
+			*(u32 *)hw_fib_va->data = cpu_to_le32(ST_OK);
+			fib_adapter_complete(fib, sizeof(u32));
 			spin_lock_irqsave(q->lock, flags);
 		}		
 	}
