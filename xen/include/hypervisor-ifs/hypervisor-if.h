@@ -47,6 +47,7 @@
 #define __HYPERVISOR_set_fast_trap	  16
 #define __HYPERVISOR_dom_mem_op		  17
 #define __HYPERVISOR_multicall		  18
+#define __HYPERVISOR_kbd_op               19
 
 /* And the trap vector is... */
 #define TRAP_INSTR "int $0x82"
@@ -77,6 +78,7 @@
 #define EVENT_DEBUG    0x08 /* Request guest to dump debug info (gross!) */
 #define EVENT_NET_TX   0x10 /* There are packets for transmission. */
 #define EVENT_NET_RX   0x20 /* There are empty buffers for receive. */
+#define EVENT_KBD      0x40 /* PS/2 keyboard or mouse event(s) */
 
 /* Bit offsets, as opposed to the above masks. */
 #define _EVENT_BLK_RESP 0
@@ -85,7 +87,7 @@
 #define _EVENT_NET_TX	3
 #define _EVENT_NET_RX	4
 #define _EVENT_DEBUG	5
-
+#define _EVENT_KBD      6
 
 /*
  * Virtual addresses beyond this are not modifiable by guest OSes.
