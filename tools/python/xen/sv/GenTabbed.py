@@ -1,17 +1,16 @@
 import types
 
-from HTMLBase import HTMLBase
-from TabView import TabView
+from xen.sv.HTMLBase import HTMLBase
+from xen.sv.TabView import TabView
 
 class GenTabbed( HTMLBase ):
 
-    def __init__( self, urlWriter, tabStrings, tabObjects, callback ):
+    def __init__( self, urlWriter, tabStrings, tabObjects ):
         HTMLBase.__init__(self)
         self.tab = 0;
         self.tabStrings = tabStrings
         self.tabObjects = tabObjects
         self.urlWriter = urlWriter
-        self.callback = callback
 
     def write_BODY( self, request, urlWriter = None ):
         tab = request.args.get('tab')
@@ -34,29 +33,23 @@ class GenTabbed( HTMLBase ):
             request.write( "<p>Bad Tab</p>" )
             self.finish_BODY( request )
         else:
-            render_tab.write_BODY( request, self.finish_BODY )
+            render_tab.write_BODY( request )
 
-    def finish_BODY( self, request ):
-            
         request.write( "</td></tr></table>" )
         
-        self.callback( request )
-    
 class PreTab( HTMLBase ):
 
     def __init__( self, source ):
         HTMLBase.__init__( self )
         self.source = source
     
-    def write_BODY( self, request, callback ):
+    def write_BODY( self, request ):
         
         request.write( "<div style='display: block; overflow: auto; border: 0px solid black; height: 400px; width: 540px; padding: 5px; z-index:0; align: center'><pre>" )
         
         request.write( self.source )
         
         request.write( "</pre></div>" )
-        
-        callback( request )
 
 class GeneralTab( HTMLBase ):
                         
@@ -66,7 +59,7 @@ class GeneralTab( HTMLBase ):
         self.dict = dict
         self.titles = titles
                         
-    def write_BODY( self, request, callback ): 
+    def write_BODY( self, request ): 
         
         request.write( "<p><u>%s</u></p>" % self.title )
         
@@ -87,17 +80,14 @@ class GeneralTab( HTMLBase ):
             writeAttr( niceName, attr )
                             
         request.write( "</table>" )
-        
-        callback( request )
-    
+
 class NullTab( HTMLBase ):
     
     def __init__( self ):
         HTMLBase.__init__( self )
         self.title = "Null Tab"
         
-    def write_BODY( self, request, callback ):
+    def write_BODY( self, request ):
         request.write( "<p>%s</p>" % self.title )
-        callback( request )
-         
+
         

@@ -1,24 +1,27 @@
-from xen.xend import XendDmesg
-from xen.xend import XendNode
+from xen.xend.XendClient import server
 
-from xen.xend.sv.util import *
-from xen.xend.sv.GenTabbed import *
-from xen.xend.sv.HTMLBase  import HTMLBase
+from xen.sv.util import *
+from xen.sv.GenTabbed import *
 
 class NodeInfo( GenTabbed ):
 
-    def __init__( self, urlWriter, callback ):
+    def __init__( self, urlWriter ):
     
         def newUrlWriter( url ):
             return urlWriter( "mod=node%s" % url )
     
-        GenTabbed.__init__( self, newUrlWriter, [ 'General', 'Dmesg' ], [ NodeGeneralTab, NodeDmesgTab ], callback )
+        GenTabbed.__init__( self, newUrlWriter, [ 'General', 'Dmesg' ], [ NodeGenTab, NodeDmesgTab ] )
 
+class NodeGenTab( PreTab ):
+    def __init__( self ):
+       text = sxp2string( server.xend_node() )
+       PreTab.__init__( self, text )            
+    
 class NodeGeneralTab( GeneralTab ):
                         
     def __init__( self ):
          
-        nodeInfo = XendNode.instance().info()
+        nodeInfo = server.xend_node()
         
         dictNodeInfo = {}
         
@@ -42,6 +45,6 @@ class NodeGeneralTab( GeneralTab ):
 class NodeDmesgTab( PreTab ):
 
     def __init__( self ):
-        self.xd = XendDmesg.instance()
-        PreTab.__init__( self, self.xd.info()[0] )
+        dmesg = server.xend_node_dmesg()
+        PreTab.__init__( self, dmesg[ 1 ] )
     

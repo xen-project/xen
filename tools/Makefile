@@ -16,6 +16,7 @@ install: all
 	$(MAKE) -C xentrace install
 	$(MAKE) -C python install
 	$(MAKE) -C xfrd install
+	$(MAKE) -C sv install
 
 dist: $(TARGET)
 	$(MAKE) prefix=`pwd`/../../install dist=yes install
