@@ -35,7 +35,6 @@ extern int pdb_get_values(u_char *buffer, int length,
 /* External entry points. */
 extern int pdb_handle_exception(int exceptionVector,
 				struct pt_regs *xen_regs);
-extern int pdb_serial_input(u_char c, struct pt_regs *regs);
 extern void pdb_do_debug(dom0_op_t *op);
 
 /* PDB Context. */
