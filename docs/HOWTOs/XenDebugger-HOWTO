@@ -77,7 +77,7 @@ Serial Port Configuration
   one stream (without the high bit) is the console and 
   one stream (with the high bit stripped) is the pdb communication.
 
-  See:  xeno.bk/tools/nsplitd
+  See:  xeno.bk/tools/misc/nsplitd
 
   nsplitd configuration
   ---------------------
@@ -107,7 +107,7 @@ Serial Port Configuration
   characters received.
 
   You can connect to the nsplitd using
-  'tools/xenctl/lib/console_client.py <host> <port>'
+  'tools/misc/xencons <host> <port>'
 
 GDB 6.0
   pdb has been tested with gdb 6.0.  It should also work with

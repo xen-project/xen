@@ -89,7 +89,11 @@ void enable_irq(unsigned int irq)
 
 asmlinkage void do_IRQ(struct pt_regs regs)
 {       
+#if defined(__i386__)
     unsigned int      irq = regs.orig_eax;
+#else
+    unsigned int      irq = 0; /* XXX */
+#endif
     irq_desc_t       *desc = &irq_desc[irq];
     struct irqaction *action;
 

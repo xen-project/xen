@@ -8,7 +8,7 @@ CFLAGS  := -nostdinc -fno-builtin -fno-common -fno-strict-aliasing -O3
 CFLAGS  += -iwithprefix include -Wall -Werror -fomit-frame-pointer
 CFLAGS  += -I$(BASEDIR)/include -Wno-pointer-arith -Wredundant-decls
 
-LDFLAGS := -T xen.lds -N 
+LDFLAGS := -T $(TARGET_SUBARCH)/xen.lds -N 
 
 ifeq ($(TARGET_SUBARCH),x86_32)
 CFLAGS += -m32 -march=i686

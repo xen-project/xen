@@ -27,7 +27,11 @@ class SrvDomain(SrvDir):
         return val
 
     def op_shutdown(self, op, req):
-        val = self.xd.domain_shutdown(self.dom.id)
+        #val = self.xd.domain_shutdown(self.dom.id)
+        fn = FormFn(self.xd.domain_shutdown,
+                    [['dom', 'int'],
+                     ['reason', 'str']])
+        val = fn(req.args, {'dom': self.dom.id})
         req.setResponseCode(202)
         req.setHeader("Location", "%s/.." % req.prePathURL())
         return val

@@ -16,8 +16,8 @@
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
 
-#ifndef _XEN_LIB_ALLOCATE_H_
-#define _XEN_LIB_ALLOCATE_H_
+#ifndef _XUTIL_ALLOCATE_H_
+#define _XUTIL_ALLOCATE_H_
 
 /** Allocate memory for a given type, and cast. */
 #define ALLOCATE(ctype) (ctype *)allocate(sizeof(ctype))
@@ -33,7 +33,7 @@ extern void memzero(void *p, int size);
 typedef void AllocateFailedFn(int size, int type);
 extern AllocateFailedFn *allocate_failed_fn;
 
-#endif /* _XEN_LIB_ALLOCATE_H_ */
+#endif /* _XUTIL_ALLOCATE_H_ */
 
 
 

@@ -1,4 +1,3 @@
-/* $Id: string_stream.h,v 1.1 2003/08/22 14:25:48 mjw Exp $ */
 /*
  * Copyright (C) 2001, 2002 Hewlett-Packard Company.
  *
@@ -17,8 +16,8 @@
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
 
-#ifndef _SP_STRING_STREAM_H_
-#define _SP_STRING_STREAM_H_
+#ifndef _XUTIL_STRING_STREAM_H_
+#define _XUTIL_STRING_STREAM_H_
 
 #include "iostream.h"
 
@@ -43,4 +42,4 @@ extern IOMethods *string_stream_get_methods(void);
 extern IOStream *string_stream_new(char *s, int n);
 extern void string_stream_init(IOStream *stream, StringData *data, char *s, int n);
 
-#endif /* !_SP_STRING_STREAM_H_ */
+#endif /* !_XUTIL_STRING_STREAM_H_ */
