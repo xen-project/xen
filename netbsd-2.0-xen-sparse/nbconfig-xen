@@ -1,0 +1,20 @@
+#! /bin/sh
+#
+
+: ${HOS:=$(uname -s | tr /A-Z/ /a-z/)}
+: ${HARCH:=$(uname -i)}
+: ${NETBSD_RELEASE:=$(basename $(cd $(dirname $0) && pwd) | sed 's/netbsd-\([0-9]\+\.[0-9]\+\).*/\1/')}
+: ${NETBSD_VERSION:=$(basename $(cd $(dirname $0) && pwd) | sed 's/netbsd-\([0-9]\+\.[0-9]\+.*\)-xen.*/\1/')}
+
+TOOLDIR="$TOPDIR/../netbsd-${NETBSD_RELEASE}-tools/$HOS-$HARCH"; export TOOLDIR
+
+CONF="$1"
+case "$1" in
+  /*)
+    CONF="$1"
+    ;;
+  *)
+    CONF="$TOPDIR"/sys/arch/xen/conf/"$1"
+    ;;
+esac
+exec "${TOOLDIR}/bin/nbconfig" -b $(pwd) -s "$TOPDIR"/sys "$CONF"
