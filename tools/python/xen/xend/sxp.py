@@ -626,7 +626,8 @@ def all_from_string(str):
 
     str string
     returns sxpr list
-    """    io = StringIO(str)
+    """
+    io = StringIO(str)
     vals = parse(io)
     return vals
 
