@@ -212,13 +212,13 @@ void machine_halt(void)
 
 void arch_do_createdomain(struct domain *d)
 {
-    d->shared_info = (void *)get_free_page();
+    d->shared_info = (void *)alloc_xenheap_page();
     memset(d->shared_info, 0, PAGE_SIZE);
     SHARE_PFN_WITH_DOMAIN(virt_to_page(d->shared_info), d);
     machine_to_phys_mapping[virt_to_phys(d->shared_info) >> 
                            PAGE_SHIFT] = 0x80000000UL;  /* debug */
 
-    d->mm.perdomain_pt = (l1_pgentry_t *)get_free_page();
+    d->mm.perdomain_pt = (l1_pgentry_t *)alloc_xenheap_page();
     memset(d->mm.perdomain_pt, 0, PAGE_SIZE);
     machine_to_phys_mapping[virt_to_phys(d->mm.perdomain_pt) >> 
                            PAGE_SHIFT] = 0x0fffdeadUL;  /* debug */

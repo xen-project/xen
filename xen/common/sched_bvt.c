@@ -62,7 +62,7 @@ struct bvt_cpu_info
 static s32 ctx_allow = (s32)MILLISECS(5);     /* context switch allowance */
 
 /* SLAB cache for struct bvt_dom_info objects */
-static kmem_cache_t *dom_info_cache;
+static xmem_cache_t *dom_info_cache;
 
 /*
  * Calculate the effective virtual time for a domain. Take into account 
@@ -102,7 +102,7 @@ static void __calc_evt(struct bvt_dom_info *inf)
  */
 int bvt_alloc_task(struct domain *p)
 {
-    p->sched_priv = kmem_cache_alloc(dom_info_cache);
+    p->sched_priv = xmem_cache_alloc(dom_info_cache);
     if ( p->sched_priv == NULL )
         return -1;
     
@@ -164,7 +164,7 @@ int bvt_init_idle_task(struct domain *p)
 void bvt_free_task(struct domain *p)
 {
     ASSERT( p->sched_priv != NULL );
-    kmem_cache_free( dom_info_cache, p->sched_priv );
+    xmem_cache_free( dom_info_cache, p->sched_priv );
 }
 
 
@@ -437,7 +437,7 @@ static void bvt_dump_cpu_state(int i)
    this functions makes sure that the run_list
    is initialised properly. The new domain needs
    NOT to appear as to be on the runqueue */
-static void cache_constructor(void *arg1, kmem_cache_t *arg2, unsigned long arg3)
+static void cache_constructor(void *arg1, xmem_cache_t *arg2, unsigned long arg3)
 {
     struct bvt_dom_info *dom_inf = (struct bvt_dom_info*)arg1;
     dom_inf->run_list.next = NULL;
@@ -451,7 +451,7 @@ int bvt_init_scheduler()
 
     for ( i = 0; i < NR_CPUS; i++ )
     {
-        schedule_data[i].sched_priv = kmalloc(sizeof(struct bvt_cpu_info));
+        schedule_data[i].sched_priv = xmalloc(sizeof(struct bvt_cpu_info));
         INIT_LIST_HEAD(RUNQUEUE(i));
         
         if ( schedule_data[i].sched_priv == NULL )
@@ -463,7 +463,7 @@ int bvt_init_scheduler()
         CPU_SVT(i) = 0; /* XXX do I really need to do this? */
     }
 
-    dom_info_cache = kmem_cache_create("BVT dom info",
+    dom_info_cache = xmem_cache_create("BVT dom info",
                                        sizeof(struct bvt_dom_info),
                                        0, 0, cache_constructor, NULL);
 

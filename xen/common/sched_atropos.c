@@ -75,7 +75,7 @@ struct at_cpu_info
 
 
 /* SLAB cache for struct at_dom_info objects */
-static kmem_cache_t *dom_info_cache;
+static xmem_cache_t *dom_info_cache;
 
 
 /** calculate the length of a linked list */
@@ -528,14 +528,14 @@ static int at_init_scheduler()
     
     for ( i = 0; i < NR_CPUS; i++ )
     {
-        schedule_data[i].sched_priv = kmalloc(sizeof(struct at_cpu_info));
+        schedule_data[i].sched_priv = xmalloc(sizeof(struct at_cpu_info));
         if ( schedule_data[i].sched_priv == NULL )
             return -1;
         WAITQ(i)->next = WAITQ(i);
         WAITQ(i)->prev = WAITQ(i);
     }
 
-    dom_info_cache = kmem_cache_create("Atropos dom info",
+    dom_info_cache = xmem_cache_create("Atropos dom info",
                                        sizeof(struct at_dom_info),
                                        0, 0, NULL, NULL);
 
@@ -591,7 +591,7 @@ static int at_alloc_task(struct domain *p)
 {
     ASSERT(p != NULL);
 
-    p->sched_priv = kmem_cache_alloc(dom_info_cache);
+    p->sched_priv = xmem_cache_alloc(dom_info_cache);
     if( p->sched_priv == NULL )
         return -1;
 
@@ -604,7 +604,7 @@ static int at_alloc_task(struct domain *p)
 /* free memory associated with a task */
 static void at_free_task(struct domain *p)
 {
-    kmem_cache_free( dom_info_cache, DOM_INFO(p) );
+    xmem_cache_free( dom_info_cache, DOM_INFO(p) );
 }
 
 

@@ -406,7 +406,7 @@ void __init start_secondary(void)
      * At this point, boot CPU has fully initialised the IDT. It is
      * now safe to make ourselves a private copy.
      */
-    idt_tables[cpu] = kmalloc(IDT_ENTRIES*8);
+    idt_tables[cpu] = xmalloc(IDT_ENTRIES*8);
     memcpy(idt_tables[cpu], idt_table, IDT_ENTRIES*8);
     *(unsigned short *)(&idt_load[0]) = (IDT_ENTRIES*8)-1;
     *(unsigned long  *)(&idt_load[2]) = (unsigned long)idt_tables[cpu];
@@ -671,7 +671,7 @@ static void __init do_boot_cpu (int apicid)
     /* So we see what's up. */
     printk("Booting processor %d/%d eip %lx\n", cpu, apicid, start_eip);
 
-    stack = __pa(__get_free_pages(1));
+    stack = __pa(alloc_xenheap_pages(1));
     stack_start.esp = stack + STACK_SIZE - STACK_RESERVED;
 
     /* Debug build: detect stack overflow by setting up a guard page. */

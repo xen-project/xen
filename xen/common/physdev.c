@@ -98,7 +98,7 @@ static void add_dev_to_task(struct domain *p,
         return;
     }
 
-    if ( (pdev = kmalloc(sizeof(phys_dev_t))) == NULL )
+    if ( (pdev = xmalloc(sizeof(phys_dev_t))) == NULL )
     {
         INFO("Error allocating pdev structure.\n");
         return;
@@ -171,7 +171,7 @@ int physdev_pci_access_modify(
 
     if ( p->io_bitmap == NULL )
     {
-        if ( (p->io_bitmap = kmalloc(IO_BITMAP_BYTES)) == NULL )
+        if ( (p->io_bitmap = xmalloc(IO_BITMAP_BYTES)) == NULL )
         {
             rc = -ENOMEM;
             goto out;
@@ -737,7 +737,7 @@ void physdev_init_dom0(struct domain *p)
         /* Skip bridges and other peculiarities for now. */
         if ( dev->hdr_type != PCI_HEADER_TYPE_NORMAL )
             continue;
-        pdev = kmalloc(sizeof(phys_dev_t));
+        pdev = xmalloc(sizeof(phys_dev_t));
         pdev->dev = dev;
         pdev->flags = ACC_WRITE;
         pdev->state = 0;

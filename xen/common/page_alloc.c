@@ -263,7 +263,7 @@ void __init init_page_allocator(unsigned long min, unsigned long max)
 
 
 /* Allocate 2^@order contiguous pages. Returns a VIRTUAL address. */
-unsigned long __get_free_pages(int order)
+unsigned long alloc_xenheap_pages(int order)
 {
     int i, attempts = 0;
     chunk_head_t *alloc_ch, *spare_ch;
@@ -321,7 +321,7 @@ retry:
         
     if ( attempts++ < 8 )
     {
-        kmem_cache_reap();
+        xmem_cache_reap();
         goto retry;
     }
 
@@ -333,7 +333,7 @@ retry:
 
 
 /* Free 2^@order pages at VIRTUAL address @p. */
-void __free_pages(unsigned long p, int order)
+void free_xenheap_pages(unsigned long p, int order)
 {
     unsigned long size = 1 << (order + PAGE_SHIFT);
     chunk_head_t *ch;

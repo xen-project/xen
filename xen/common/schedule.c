@@ -96,26 +96,26 @@ static struct ac_timer t_timer[NR_CPUS];
  */
 static struct ac_timer fallback_timer[NR_CPUS];
 
-extern kmem_cache_t *domain_struct_cachep;
+extern xmem_cache_t *domain_struct_cachep;
 
 void free_domain_struct(struct domain *d)
 {
     SCHED_OP(free_task, d);
-    kmem_cache_free(domain_struct_cachep, d);
+    xmem_cache_free(domain_struct_cachep, d);
 }
 
 struct domain *alloc_domain_struct(void)
 {
     struct domain *d;
 
-    if ( (d = kmem_cache_alloc(domain_struct_cachep)) == NULL )
+    if ( (d = xmem_cache_alloc(domain_struct_cachep)) == NULL )
         return NULL;
     
     memset(d, 0, sizeof(*d));
 
     if ( SCHED_OP(alloc_task, d) < 0 )
     {
-        kmem_cache_free(domain_struct_cachep, d);
+        xmem_cache_free(domain_struct_cachep, d);
         return NULL;
     }
 

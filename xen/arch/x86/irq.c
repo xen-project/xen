@@ -258,7 +258,7 @@ int pirq_guest_bind(struct domain *p, int irq, int will_share)
             goto out;
         }
 
-        action = kmalloc(sizeof(irq_guest_action_t));
+        action = xmalloc(sizeof(irq_guest_action_t));
         if ( (desc->action = (struct irqaction *)action) == NULL )
         {
             DPRINTK("Cannot bind IRQ %d to guest. Out of memory.\n", irq);
@@ -320,7 +320,7 @@ int pirq_guest_unbind(struct domain *p, int irq)
     if ( action->nr_guests == 1 )
     {
         desc->action = NULL;
-        kfree(action);
+        xfree(action);
         desc->depth   = 1;
         desc->status |= IRQ_DISABLED;
         desc->status &= ~IRQ_GUEST;

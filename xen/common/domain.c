@@ -365,7 +365,7 @@ void domain_destruct(struct domain *d)
     destroy_event_channels(d);
 
     free_perdomain_pt(d);
-    free_page((unsigned long)d->shared_info);
+    free_xenheap_page((unsigned long)d->shared_info);
 
     free_domain_struct(d);
 }
@@ -381,7 +381,7 @@ int final_setup_guestos(struct domain *p, dom0_builddomain_t *builddomain)
     int rc = 0;
     full_execution_context_t *c;
 
-    if ( (c = kmalloc(sizeof(*c))) == NULL )
+    if ( (c = xmalloc(sizeof(*c))) == NULL )
         return -ENOMEM;
 
     if ( test_bit(DF_CONSTRUCTED, &p->flags) )
@@ -405,6 +405,6 @@ int final_setup_guestos(struct domain *p, dom0_builddomain_t *builddomain)
 
  out:    
     if ( c != NULL )
-        kfree(c);
+        xfree(c);
     return rc;
 }

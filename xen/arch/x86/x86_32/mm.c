@@ -70,7 +70,7 @@ static void __init fixrange_init(unsigned long start,
     {
         if ( l2_pgentry_val(*l2e) != 0 )
             continue;
-        page = (unsigned long)get_free_page();
+        page = (unsigned long)alloc_xenheap_page();
         clear_page(page);
         *l2e = mk_l2_pgentry(__pa(page) | __PAGE_HYPERVISOR);
         vaddr += 1 << L2_PAGETABLE_SHIFT;
@@ -97,7 +97,7 @@ void __init paging_init(void)
     fixrange_init(addr, 0, idle_pg_table);
 
     /* Create page table for ioremap(). */
-    ioremap_pt = (void *)get_free_page();
+    ioremap_pt = (void *)alloc_xenheap_page();
     clear_page(ioremap_pt);
     idle_pg_table[IOREMAP_VIRT_START >> L2_PAGETABLE_SHIFT] = 
         mk_l2_pgentry(__pa(ioremap_pt) | __PAGE_HYPERVISOR);
@@ -109,7 +109,7 @@ void __init paging_init(void)
                       ~_PAGE_RW);
 
     /* Set up mapping cache for domain pages. */
-    mapcache = (unsigned long *)get_free_page();
+    mapcache = (unsigned long *)alloc_xenheap_page();
     clear_page(mapcache);
     idle_pg_table[MAPCACHE_VIRT_START >> L2_PAGETABLE_SHIFT] =
         mk_l2_pgentry(__pa(mapcache) | __PAGE_HYPERVISOR);

@@ -28,7 +28,7 @@
 
 unsigned long xenheap_phys_end;
 
-kmem_cache_t *domain_struct_cachep;
+xmem_cache_t *domain_struct_cachep;
 
 struct e820entry {
     unsigned long addr_lo, addr_hi;        /* start of memory segment */
@@ -268,10 +268,10 @@ void cmain(multiboot_info_t *mbi)
     init_page_allocator(__pa(heap_start), xenheap_phys_end);
  
     /* Initialise the slab allocator. */
-    kmem_cache_init();
-    kmem_cache_sizes_init(max_page);
+    xmem_cache_init();
+    xmem_cache_sizes_init(max_page);
 
-    domain_struct_cachep = kmem_cache_create(
+    domain_struct_cachep = xmem_cache_create(
         "domain_cache", sizeof(struct domain),
         0, SLAB_HWCACHE_ALIGN, NULL, NULL);
     if ( domain_struct_cachep == NULL )

@@ -9,7 +9,7 @@ extern void arch_final_setup_guestos(
 
 static inline void free_perdomain_pt(struct domain *d)
 {
-    free_page((unsigned long)d->mm.perdomain_pt);
+    free_xenheap_page((unsigned long)d->mm.perdomain_pt);
 }
 
 extern void domain_relinquish_memory(struct domain *d);

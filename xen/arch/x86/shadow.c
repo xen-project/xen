@@ -244,7 +244,7 @@ int shadow_mode_enable( struct domain *p, unsigned int mode )
     m->shadow_mode = mode;
  
     // allocate hashtable
-    m->shadow_ht = kmalloc(shadow_ht_buckets * 
+    m->shadow_ht = xmalloc(shadow_ht_buckets * 
                            sizeof(struct shadow_status));
     if( m->shadow_ht == NULL )
         goto nomem;
@@ -252,7 +252,7 @@ int shadow_mode_enable( struct domain *p, unsigned int mode )
     memset(m->shadow_ht, 0, shadow_ht_buckets * sizeof(struct shadow_status));
 
     // allocate space for first lot of extra nodes
-    m->shadow_ht_extras = kmalloc(sizeof(void*) + 
+    m->shadow_ht_extras = xmalloc(sizeof(void*) + 
                                   (shadow_ht_extra_size * 
                                    sizeof(struct shadow_status)));
     if( m->shadow_ht_extras == NULL )
@@ -278,7 +278,7 @@ int shadow_mode_enable( struct domain *p, unsigned int mode )
     {
         m->shadow_dirty_bitmap_size = (p->max_pages+63)&(~63);
         m->shadow_dirty_bitmap = 
-            kmalloc( m->shadow_dirty_bitmap_size/8);
+            xmalloc( m->shadow_dirty_bitmap_size/8);
         if( m->shadow_dirty_bitmap == NULL )
         {
             m->shadow_dirty_bitmap_size = 0;
@@ -313,20 +313,20 @@ void __shadow_mode_disable(struct domain *d)
         struct shadow_status * this = next;
         m->shadow_extras_count--;
         next = *((struct shadow_status **)(&next[shadow_ht_extra_size]));
-        kfree(this);
+        xfree(this);
     }
 
     SH_LOG("freed extras, now %d", m->shadow_extras_count);
 
     if ( m->shadow_dirty_bitmap  )
     {
-        kfree( m->shadow_dirty_bitmap );
+        xfree( m->shadow_dirty_bitmap );
         m->shadow_dirty_bitmap = 0;
         m->shadow_dirty_bitmap_size = 0;
     }
 
     // free the hashtable itself
-    kfree( &m->shadow_ht[0] );
+    xfree( &m->shadow_ht[0] );
 }
 
 static int shadow_mode_table_op(struct domain *d, 

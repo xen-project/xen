@@ -1126,7 +1126,7 @@ static struct pci_bus * __devinit pci_alloc_bus(void)
 {
 	struct pci_bus *b;
 
-	b = kmalloc(sizeof(*b));
+	b = xmalloc(sizeof(*b));
 	if (b) {
 		memset(b, 0, sizeof(*b));
 		INIT_LIST_HEAD(&b->children);
@@ -1351,7 +1351,7 @@ struct pci_dev * __devinit pci_scan_device(struct pci_dev *temp)
 	if (l == 0xffffffff || l == 0x00000000 || l == 0x0000ffff || l == 0xffff0000)
 		return NULL;
 
-	dev = kmalloc(sizeof(*dev));
+	dev = xmalloc(sizeof(*dev));
 	if (!dev)
 		return NULL;
 
@@ -1363,7 +1363,7 @@ struct pci_dev * __devinit pci_scan_device(struct pci_dev *temp)
 	   set this higher, assuming the system even supports it.  */
 	dev->dma_mask = 0xffffffff;
 	if (pci_setup_device(dev) < 0) {
-		kfree(dev);
+		xfree(dev);
 		dev = NULL;
 	}
 	return dev;
@@ -1431,7 +1431,7 @@ unsigned int __devinit pci_do_scan_bus(struct pci_bus *bus)
 	max = bus->secondary;
 
 	/* Create a device template */
-	dev0 = kmalloc(sizeof(struct pci_dev));
+	dev0 = xmalloc(sizeof(struct pci_dev));
 	if(!dev0) {
 	  panic("Out of memory scanning PCI bus!\n");
 	}
@@ -1444,7 +1444,7 @@ unsigned int __devinit pci_do_scan_bus(struct pci_bus *bus)
 		dev0->devfn = devfn;
 		pci_scan_slot(dev0);
 	}
-	kfree(dev0);
+	xfree(dev0);
 
 	/*
 	 * After performing arch-dependent fixup of the bus, look behind

@@ -31,11 +31,11 @@ struct rrobin_dom_info
 static void rr_dump_cpu_state(int cpu);
 
 /* SLAB cache for struct rrobin_dom_info objects */
-static kmem_cache_t *dom_info_cache;
+static xmem_cache_t *dom_info_cache;
 
 
 /* Ensures proper initialisation of the dom_info */
-static void cache_constructor(void *arg1, kmem_cache_t *arg2, unsigned long arg3)
+static void cache_constructor(void *arg1, xmem_cache_t *arg2, unsigned long arg3)
 {
     struct rrobin_dom_info *dom_inf = (struct rrobin_dom_info*)arg1;
     dom_inf->run_list.next = NULL;
@@ -51,7 +51,7 @@ static int rr_init_scheduler()
     for ( i = 0; i < NR_CPUS; i++ )
         INIT_LIST_HEAD(RUNQUEUE(i));
    
-    dom_info_cache = kmem_cache_create("FBVT dom info", 
+    dom_info_cache = xmem_cache_create("FBVT dom info", 
                                         sizeof(struct rrobin_dom_info), 
                                         0, 0, cache_constructor, NULL);
 
@@ -66,7 +66,7 @@ static int rr_init_scheduler()
 /* Allocates memory for per domain private scheduling data*/
 static int rr_alloc_task(struct domain *d)
 {
-    d->sched_priv = kmem_cache_alloc(dom_info_cache);
+    d->sched_priv = xmem_cache_alloc(dom_info_cache);
     if ( d->sched_priv == NULL )
         return -1;
 
@@ -85,7 +85,7 @@ static void rr_add_task(struct domain *p)
 static void rr_free_task(struct domain *p)
 {
     ASSERT( p->sched_priv != NULL );
-    kmem_cache_free( dom_info_cache, p->sched_priv );
+    xmem_cache_free( dom_info_cache, p->sched_priv );
 }
 
 /* Initialises idle task */

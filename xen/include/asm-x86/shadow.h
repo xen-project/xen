@@ -524,7 +524,7 @@ static inline void set_shadow_status( struct mm_struct *m,
         SH_LOG("allocate more shadow hashtable blocks");
 
         // we need to allocate more space
-        extra = kmalloc(sizeof(void*) + (shadow_ht_extra_size * 
+        extra = xmalloc(sizeof(void*) + (shadow_ht_extra_size * 
                                          sizeof(struct shadow_status)));
 
         if( ! extra ) BUG(); // should be more graceful here....

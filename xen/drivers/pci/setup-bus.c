@@ -74,7 +74,7 @@ pbus_assign_resources_sorted(struct pci_bus *bus)
 		pci_assign_resource(list->dev, idx);
 		tmp = list;
 		list = list->next;
-		kfree(tmp);
+		xfree(tmp);
 	}
 
 	return found_vga;

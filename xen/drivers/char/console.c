@@ -303,7 +303,7 @@ long do_console_io(int cmd, int count, char *buffer)
     case CONSOLEIO_write:
         if ( count > (PAGE_SIZE-1) )
             count = PAGE_SIZE-1;
-        if ( (kbuf = (char *)get_free_page()) == NULL )
+        if ( (kbuf = (char *)alloc_xenheap_page()) == NULL )
             return -ENOMEM;
         kbuf[count] = '\0';
         rc = count;
@@ -311,7 +311,7 @@ long do_console_io(int cmd, int count, char *buffer)
             rc = -EFAULT;
         else
             serial_puts(sercon_handle, kbuf);
-        free_page((unsigned long)kbuf);
+        free_xenheap_page((unsigned long)kbuf);
         break;
     case CONSOLEIO_read:
         rc = 0;

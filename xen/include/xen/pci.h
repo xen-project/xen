@@ -667,7 +667,7 @@ unsigned int pci_do_scan_bus(struct pci_bus *bus);
 struct pci_bus * pci_add_new_bus(struct pci_bus *parent, struct pci_dev *dev, int busnr);
 
 #if 0
-/* kmem_cache style wrapper around pci_alloc_consistent() */
+/* xmem_cache style wrapper around pci_alloc_consistent() */
 struct pci_pool *pci_pool_create (const char *name, struct pci_dev *dev,
 		size_t size, size_t align, size_t allocation, int flags);
 void pci_pool_destroy (struct pci_pool *pool);

@@ -220,7 +220,7 @@ int allocate_resource(struct resource *root, struct resource *new,
  */
 struct resource * __request_region(struct resource *parent, unsigned long start, unsigned long n, const char *name)
 {
-	struct resource *res = kmalloc(sizeof(*res));
+	struct resource *res = xmalloc(sizeof(*res));
 
 	if (res) {
 		memset(res, 0, sizeof(*res));
@@ -244,7 +244,7 @@ struct resource * __request_region(struct resource *parent, unsigned long start,
 			}
 
 			/* Uhhuh, that didn't work out.. */
-			kfree(res);
+			xfree(res);
 			res = NULL;
 			break;
 		}
@@ -262,7 +262,7 @@ int __check_region(struct resource *parent, unsigned long start, unsigned long n
 		return -EBUSY;
 
 	release_resource(res);
-	kfree(res);
+	xfree(res);
 	return 0;
 }
 
@@ -287,7 +287,7 @@ void __release_region(struct resource *parent, unsigned long start, unsigned lon
 			if (res->start != start || res->end != end)
 				break;
 			*p = res->sibling;
-			kfree(res);
+			xfree(res);
 			return;
 		}
 		p = &res->sibling;
