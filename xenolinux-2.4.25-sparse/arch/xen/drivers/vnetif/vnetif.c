@@ -32,6 +32,9 @@ static void network_tx_buf_gc(struct net_device *dev);
 static void network_alloc_rx_buffers(struct net_device *dev);
 static void cleanup_module(void);
 
+/* Dynamically-mapped IRQs. */
+static int network_irq, debug_irq;
+
 static struct list_head dev_list;
 
 struct net_private
@@ -468,7 +471,10 @@ static int __init init_module(void)
 
     INIT_LIST_HEAD(&dev_list);
 
-    err = request_irq(HYPEREVENT_IRQ(_EVENT_NET), network_interrupt, 
+    network_irq = bind_virq_to_irq(VIRQ_NET);
+    debug_irq   = bind_virq_to_irq(VIRQ_DEBUG);
+
+    err = request_irq(network_irq, network_interrupt, 
                       SA_SAMPLE_RANDOM, "network", NULL);
     if ( err )
     {
@@ -476,7 +482,7 @@ static int __init init_module(void)
         goto fail;
     }
     
-    err = request_irq(HYPEREVENT_IRQ(_EVENT_DEBUG), dbg_network_int, 
+    err = request_irq(debug_irq, dbg_network_int, 
                       SA_SHIRQ, "net_dbg", &dbg_network_int);
     if ( err )
         printk(KERN_WARNING "Non-fatal error -- no debug interrupt\n");
@@ -546,6 +552,12 @@ static void cleanup_module(void)
         unregister_netdev(dev);
         kfree(dev);
     }
+
+    free_irq(network_irq, NULL);
+    free_irq(debug_irq, NULL);
+
+    unbind_virq_from_irq(VIRQ_NET);
+    unbind_virq_from_irq(VIRQ_DEBUG);
 }
 
 

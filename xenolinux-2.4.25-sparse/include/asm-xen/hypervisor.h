@@ -25,10 +25,6 @@ union start_info_union
 extern union start_info_union start_info_union;
 #define start_info (start_info_union.start_info)
 
-/* arch/xen/kernel/hypervisor.c */
-void do_hypervisor_callback(struct pt_regs *regs);
-
-
 /* arch/xen/mm/hypervisor.c */
 /*
  * NB. ptr values should be PHYSICAL, not MACHINE. 'vals' should be already

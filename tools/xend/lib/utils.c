@@ -632,7 +632,8 @@ static PyObject *xu_port_new(PyObject *self, PyObject *args)
         goto fail2;
     }
 
-    if ( xc_evtchn_open(xup->xc_handle, DOMID_SELF, dom, &port1, &port2) != 0 )
+    if ( xc_evtchn_bind_interdomain(xup->xc_handle, 
+                                    DOMID_SELF, dom, &port1, &port2) != 0 )
     {
         PyErr_SetString(port_error, "Could not open channel to domain");
         goto fail3;

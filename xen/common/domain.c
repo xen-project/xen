@@ -53,14 +53,19 @@ struct task_struct *do_createdomain(domid_t dom_id, unsigned int cpu)
 
     if ( p->domain != IDLE_DOMAIN_ID )
     {
+        if ( init_event_channels(p) != 0 )
+        {
+            free_task_struct(p);
+            return NULL;
+        }
+        
         /* We use a large intermediate to avoid overflow in sprintf. */
         sprintf(buf, "Domain-%llu", dom_id);
         strncpy(p->name, buf, MAX_DOMAIN_NAME);
         p->name[MAX_DOMAIN_NAME-1] = '\0';
 
         spin_lock_init(&p->blk_ring_lock);
-        spin_lock_init(&p->event_channel_lock);
-        
+
         p->addr_limit = USER_DS;
         
         spin_lock_init(&p->page_list_lock);
@@ -133,8 +138,6 @@ void kill_domain_with_errmsg(const char *err)
 
 void __kill_domain(struct task_struct *p)
 {
-    extern void destroy_event_channels(struct task_struct *);
-
     int i;
     struct task_struct **pp;
     unsigned long flags;
@@ -197,25 +200,16 @@ void kill_domain(void)
 long kill_other_domain(domid_t dom, int force)
 {
     struct task_struct *p;
-    unsigned long cpu_mask = 0;
 
-    p = find_domain_by_id(dom);
-    if ( p == NULL ) return -ESRCH;
+    if ( (p = find_domain_by_id(dom)) == NULL )
+        return -ESRCH;
 
     if ( p->state == TASK_STOPPED )
-    {
         __kill_domain(p);
-    }
     else if ( force )
-    {
-        cpu_mask = mark_hyp_event(p, _HYP_EVENT_DIE);
-        hyp_event_notify(cpu_mask);
-    }
+        send_hyp_event(p, _HYP_EVENT_DIE);
     else
-    {
-        cpu_mask = mark_guest_event(p, _EVENT_DIE);
-        guest_event_notify(cpu_mask);
-    }
+        send_guest_virq(p, VIRQ_DIE);
 
     put_task_struct(p);
     return 0;
@@ -234,7 +228,6 @@ void stop_domain(void)
 
 long stop_other_domain(domid_t dom)
 {
-    unsigned long cpu_mask;
     struct task_struct *p;
     
     if ( dom == 0 )
@@ -244,10 +237,7 @@ long stop_other_domain(domid_t dom)
     if ( p == NULL) return -ESRCH;
     
     if ( p->state != TASK_STOPPED )
-    {
-        cpu_mask = mark_guest_event(p, _EVENT_STOP);
-        guest_event_notify(cpu_mask);
-    }
+        send_guest_virq(p, VIRQ_STOP);
     
     put_task_struct(p);
     return 0;
@@ -757,6 +747,7 @@ int setup_guestos(struct task_struct *p, dom0_createdomain_t *params,
     /* Set up shared info area. */
     update_dom_time(p->shared_info);
     p->shared_info->domain_time = 0;
+    p->shared_info->evtchn_upcall_mask = ~0UL; /* mask all upcalls */
 
     virt_startinfo_address = (start_info_t *)
         (virt_load_address + ((alloc_index - 1) << PAGE_SHIFT));

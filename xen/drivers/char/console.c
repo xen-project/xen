@@ -243,7 +243,6 @@ static void switch_serial_input(void)
 static void __serial_rx(unsigned char c, struct pt_regs *regs)
 {
     key_handler *handler;
-    unsigned long cpu_mask;
     struct task_struct *p;
 
     if ( xen_rx )
@@ -257,8 +256,7 @@ static void __serial_rx(unsigned char c, struct pt_regs *regs)
         if ( serial_rx_prod++ == serial_rx_cons )
         {
             p = find_domain_by_id(0); /* only DOM0 reads the serial buffer */
-            cpu_mask = mark_guest_event(p, _EVENT_CONSOLE);
-            guest_event_notify(cpu_mask);
+            send_guest_virq(p, VIRQ_CONSOLE);
             put_task_struct(p);
         }
     }

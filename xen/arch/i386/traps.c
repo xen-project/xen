@@ -205,7 +205,7 @@ static inline void do_trap(int trapnr, char *str,
     gtb->cs         = ti->cs;
     gtb->eip        = ti->address;
     if ( TI_GET_IF(ti) )
-        clear_bit(EVENTS_MASTER_ENABLE_BIT, &p->shared_info->events_mask);
+        set_bit(0, &p->shared_info->evtchn_upcall_mask);
     return; 
 
  fault_in_hypervisor:
@@ -276,7 +276,7 @@ asmlinkage void do_int3(struct pt_regs *regs, long error_code)
     gtb->cs         = ti->cs;
     gtb->eip        = ti->address;
     if ( TI_GET_IF(ti) )
-        clear_bit(EVENTS_MASTER_ENABLE_BIT, &p->shared_info->events_mask);
+        set_bit(0, &p->shared_info->evtchn_upcall_mask);
     return;
 
 }
@@ -346,7 +346,7 @@ asmlinkage void do_page_fault(struct pt_regs *regs, long error_code)
     gtb->cs         = ti->cs;
     gtb->eip        = ti->address;
     if ( TI_GET_IF(ti) )
-        clear_bit(EVENTS_MASTER_ENABLE_BIT, &p->shared_info->events_mask);
+        set_bit(0, &p->shared_info->evtchn_upcall_mask);
     return; 
 
  fault_in_hypervisor:
@@ -434,7 +434,7 @@ asmlinkage void do_general_protection(struct pt_regs *regs, long error_code)
     gtb->cs         = ti->cs;
     gtb->eip        = ti->address;
     if ( TI_GET_IF(ti) )
-        clear_bit(EVENTS_MASTER_ENABLE_BIT, &p->shared_info->events_mask);
+        set_bit(0, &p->shared_info->evtchn_upcall_mask);
     return;
 
  gp_in_kernel:

@@ -224,16 +224,12 @@ void pdb_do_debug (dom0_op_t *op)
 
         case 's' :
 	{
-	    unsigned long cpu_mask;
 	    struct task_struct * p = find_domain_by_id(op->u.debug.domain);
 
 	    if (p != NULL)
 	    {
 	        if (p->state != TASK_STOPPED)
-		{
-		    cpu_mask = mark_guest_event(p, _EVENT_STOP);
-		    guest_event_notify(cpu_mask);
-		}
+                    send_guest_virq(p, VIRQ_STOP);
 		put_task_struct(p);
 	    }
 	    else

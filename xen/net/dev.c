@@ -2335,10 +2335,7 @@ static void make_tx_response(net_vif_t     *vif,
 
     smp_mb(); /* Update producer before checking event threshold. */
     if ( i == vif->shared_idxs->tx_event )
-    {
-        unsigned long cpu_mask = mark_guest_event(vif->domain, _EVENT_NET);
-        guest_event_notify(cpu_mask);    
-    }
+        send_guest_virq(vif->domain, VIRQ_NET);
 }
 
 
@@ -2361,10 +2358,7 @@ static void make_rx_response(net_vif_t     *vif,
 
     smp_mb(); /* Update producer before checking event threshold. */
     if ( i == vif->shared_idxs->rx_event )
-    {
-        unsigned long cpu_mask = mark_guest_event(vif->domain, _EVENT_NET);
-        guest_event_notify(cpu_mask);    
-    }
+        send_guest_virq(vif->domain, VIRQ_NET);
 }
 
 

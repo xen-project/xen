@@ -29,7 +29,6 @@ long __vbd_create(struct task_struct *p,
     vbd_t *vbd; 
     rb_node_t **rb_p, *rb_parent = NULL;
     long ret = 0;
-    unsigned long cpu_mask;
 
     spin_lock(&p->vbd_lock);
 
@@ -69,8 +68,7 @@ long __vbd_create(struct task_struct *p,
     rb_link_node(&vbd->rb, rb_parent, rb_p);
     rb_insert_color(&vbd->rb, &p->vbd_rb);
 
-    cpu_mask = mark_guest_event(p, _EVENT_VBD_UPD);
-    guest_event_notify(cpu_mask);
+    send_guest_virq(p, VIRQ_VBD_UPD);
 
  out:
     spin_unlock(&p->vbd_lock);
@@ -110,7 +108,6 @@ long __vbd_grow(struct task_struct *p,
     vbd_t *vbd = NULL;
     rb_node_t *rb;
     long ret = 0;
-    unsigned long cpu_mask;
 
     spin_lock(&p->vbd_lock);
 
@@ -150,8 +147,7 @@ long __vbd_grow(struct task_struct *p,
 
     *px = x;
 
-    cpu_mask = mark_guest_event(p, _EVENT_VBD_UPD);
-    guest_event_notify(cpu_mask);
+    send_guest_virq(p, VIRQ_VBD_UPD);
 
  out:
     spin_unlock(&p->vbd_lock);
@@ -190,7 +186,6 @@ long vbd_shrink(vbd_shrink_t *shrink)
     vbd_t *vbd = NULL;
     rb_node_t *rb;
     long ret = 0;
-    unsigned long cpu_mask;
 
     if ( !IS_PRIV(current) )
         return -EPERM; 
@@ -233,8 +228,7 @@ long vbd_shrink(vbd_shrink_t *shrink)
     *px = x->next;
     kfree(x);
 
-    cpu_mask = mark_guest_event(p, _EVENT_VBD_UPD);
-    guest_event_notify(cpu_mask);
+    send_guest_virq(p, VIRQ_VBD_UPD);
 
  out:
     spin_unlock(&p->vbd_lock);
@@ -252,7 +246,6 @@ long vbd_setextents(vbd_setextents_t *setextents)
     rb_node_t *rb;
     int i;
     long ret = 0;
-    unsigned long cpu_mask;
 
     if ( !IS_PRIV(current) )
         return -EPERM; 
@@ -323,8 +316,7 @@ long vbd_setextents(vbd_setextents_t *setextents)
     /* Make the new list visible. */
     vbd->extents = new_extents;
 
-    cpu_mask = mark_guest_event(p, _EVENT_VBD_UPD);
-    guest_event_notify(cpu_mask);
+    send_guest_virq(p, VIRQ_VBD_UPD);
 
  out:
     spin_unlock(&p->vbd_lock);
@@ -348,7 +340,6 @@ long vbd_delete(vbd_delete_t *delete)
     vbd_t *vbd;
     rb_node_t *rb;
     xen_extent_le_t *x, *t;
-    unsigned long cpu_mask;
 
     if( !IS_PRIV(current) )
         return -EPERM; 
@@ -392,8 +383,7 @@ long vbd_delete(vbd_delete_t *delete)
         x = t;
     }
     
-    cpu_mask = mark_guest_event(p, _EVENT_VBD_UPD);
-    guest_event_notify(cpu_mask);
+    send_guest_virq(p, VIRQ_VBD_UPD);
    
     spin_unlock(&p->vbd_lock);
     put_task_struct(p);
@@ -406,7 +396,6 @@ void destroy_all_vbds(struct task_struct *p)
     vbd_t *vbd;
     rb_node_t *rb;
     xen_extent_le_t *x, *t;
-    unsigned long cpu_mask;
 
     spin_lock(&p->vbd_lock);
 
@@ -426,8 +415,7 @@ void destroy_all_vbds(struct task_struct *p)
         }          
     }
 
-    cpu_mask = mark_guest_event(p, _EVENT_VBD_UPD);
-    guest_event_notify(cpu_mask);
+    send_guest_virq(p, VIRQ_VBD_UPD);
 
     spin_unlock(&p->vbd_lock);
 }

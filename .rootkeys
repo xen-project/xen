@@ -628,8 +628,8 @@
 405853f6nbeazrNyEWNHBuoSg2PiPA xenolinux-2.4.25-sparse/arch/xen/drivers/vnetif/vnetif.c
 3e5a4e65lWzkiPXsZdzPt2RNnJGG1g xenolinux-2.4.25-sparse/arch/xen/kernel/Makefile
 3e5a4e65_hqfuxtGG8IUy6wRM86Ecg xenolinux-2.4.25-sparse/arch/xen/kernel/entry.S
+3e5a4e65ibVQmwlOn0j3sVH_j_6hAg xenolinux-2.4.25-sparse/arch/xen/kernel/evtchn.c
 3e5a4e65Hy_1iUvMTPsNqGNXd9uFpg xenolinux-2.4.25-sparse/arch/xen/kernel/head.S
-3e5a4e65ibVQmwlOn0j3sVH_j_6hAg xenolinux-2.4.25-sparse/arch/xen/kernel/hypervisor.c
 3e5a4e65RMGcuA-HCn3-wNx3fFQwdg xenolinux-2.4.25-sparse/arch/xen/kernel/i386_ksyms.c
 3e5a4e65MEvZhlr070sK5JsfAQlv7Q xenolinux-2.4.25-sparse/arch/xen/kernel/ioport.c
 3e5a4e653U6cELGv528IxOLHvCq8iA xenolinux-2.4.25-sparse/arch/xen/kernel/irq.c

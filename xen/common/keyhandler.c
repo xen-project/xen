@@ -99,7 +99,7 @@ static char *task_states[] =
 
 void do_task_queues(u_char key, void *dev_id, struct pt_regs *regs) 
 {
-    unsigned long       flags, cpu_mask = 0; 
+    unsigned long       flags;
     struct task_struct *p; 
     shared_info_t      *s; 
     s_time_t            now = NOW();
@@ -116,15 +116,13 @@ void do_task_queues(u_char key, void *dev_id, struct pt_regs *regs)
                p->domain, p->processor, p->has_cpu ? 'T':'F', 
                task_states[p->state], p->hyp_events); 
         s = p->shared_info; 
-        printk("Guest: events = %08lx, events_mask = %08lx\n", 
-               s->events, s->events_mask); 
+        printk("Guest: upcall_pend = %08lx, upcall_mask = %08lx\n", 
+               s->evtchn_upcall_pending, s->evtchn_upcall_mask);
         printk("Notifying guest...\n"); 
-        cpu_mask |= mark_guest_event(p, _EVENT_DEBUG);
+        send_guest_virq(p, VIRQ_DEBUG);
     }
 
     read_unlock_irqrestore(&tasklist_lock, flags); 
-
-    guest_event_notify(cpu_mask);
 }
 
 extern void perfc_printall (u_char key, void *dev_id, struct pt_regs *regs);

@@ -58,8 +58,11 @@ static inline int xen_kbd_controller_present ()
 /* resource allocation */
 #define kbd_request_region()     \
     do { } while (0)
-#define kbd_request_irq(handler) \
-    request_irq(HYPEREVENT_IRQ(_EVENT_PS2), handler, 0, "ps/2", NULL)
+#define kbd_request_irq(handler)                    \
+    do {                                            \
+        int irq = bind_virq_to_irq(VIRQ_PS2);       \
+        request_irq(irq, handler, 0, "ps/2", NULL); \
+    } while ( 0 )
 
 /* could implement these with command to xen to filter mouse stuff... */
 #define aux_request_irq(hand, dev_id) 0

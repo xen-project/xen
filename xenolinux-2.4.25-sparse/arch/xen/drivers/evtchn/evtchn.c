@@ -40,148 +40,54 @@ static unsigned int ring_cons, ring_prod, ring_overflow;
 static DECLARE_WAIT_QUEUE_HEAD(evtchn_wait);
 static struct fasync_struct *evtchn_async_queue;
 
-static evtchn_receiver_t rx_fns[1024];
-
-static u32 pend_outstanding[32];
-static u32 disc_outstanding[32];
+/*
+ * Pending normal notifications and pending exceptional notifications.
+ * 'Pending' means that we received an upcall but this is not yet ack'ed
+ * from userspace by writing to /dev/xen/evtchn.
+ */
+static u32 pend_nrm[32], pend_exc[32];
 
 static spinlock_t lock;
 
-int evtchn_request_port(unsigned int port, evtchn_receiver_t rx_fn)
+void evtchn_device_upcall(int port, int exception)
 {
-    unsigned long flags;
-    int rc;
+    u16 port_subtype;
 
-    spin_lock_irqsave(&lock, flags);
+    spin_lock(&lock);
 
-    if ( rx_fns[port] != NULL )
+    mask_evtchn(port);
+
+    if ( likely(!exception) )
     {
-        printk(KERN_ALERT "Event channel port %d already in use.\n", port);
-        rc = -EINVAL;
+        clear_evtchn(port);
+        set_bit(port, &pend_nrm[0]);
+        port_subtype = PORT_NORMAL;
     }
     else
     {
-        rx_fns[port] = rx_fn;
-        rc = 0;
+        clear_evtchn_exception(port);
+        set_bit(port, &pend_exc[0]);
+        port_subtype = PORT_EXCEPTION;
     }
 
-    spin_unlock_irqrestore(&lock, flags);
-
-    return rc;
-}
-
-int evtchn_free_port(unsigned int port)
-{
-    unsigned long flags;
-    int rc;
-
-    spin_lock_irqsave(&lock, flags);
-
-    if ( rx_fns[port] == NULL )
+    if ( ring != NULL )
     {
-        printk(KERN_ALERT "Event channel port %d not in use.\n", port);
-        rc = -EINVAL;
-    }
-    else
-    {
-        rx_fns[port] = NULL;
-        rc = 0;
-    }
-
-    spin_unlock_irqrestore(&lock, flags);
-
-    return rc;
-}
-
-/*
- * NB. Clearing port can race a notification from remote end. Caller must
- * therefore recheck notification status on return to avoid missing events.
- */
-void evtchn_clear_port(unsigned int port)
-{
-    unsigned int p = port & PORTIDX_MASK;
-    unsigned long flags;
-
-    spin_lock_irqsave(&lock, flags);
-
-    if ( unlikely(port & PORT_DISCONNECT) )
-    {
-        clear_bit(p, &disc_outstanding[0]);
-        clear_bit(p, &HYPERVISOR_shared_info->event_channel_disc[0]);
-    }
-    else
-    {
-        clear_bit(p, &pend_outstanding[0]);
-        clear_bit(p, &HYPERVISOR_shared_info->event_channel_pend[0]);
-    }
-
-    spin_unlock_irqrestore(&lock, flags);
-}
-
-static inline void process_bitmask(u32 *sel, 
-                                   u32 *mask,
-                                   u32 *outstanding,
-                                   unsigned int port_subtype)
-{
-    unsigned long l1, l2;
-    unsigned int  l1_idx, l2_idx, port;
-
-    l1 = xchg(sel, 0);
-    while ( (l1_idx = ffs(l1)) != 0 )
-    {
-        l1_idx--;
-        l1 &= ~(1 << l1_idx);
-
-        l2 = mask[l1_idx] & ~outstanding[l1_idx];
-        outstanding[l1_idx] |= l2;
-        while ( (l2_idx = ffs(l2)) != 0 )
+        if ( (ring_prod - ring_cons) < RING_SIZE )
         {
-            l2_idx--;
-            l2 &= ~(1 << l2_idx);
-
-            port = (l1_idx * 32) + l2_idx;
-            if ( rx_fns[port] != NULL )
+            ring[RING_MASK(ring_prod)] = (u16)port | port_subtype;
+            if ( ring_cons == ring_prod++ )
             {
-                (*rx_fns[port])(port | port_subtype);
-            }
-            else if ( ring != NULL )
-            {
-                if ( (ring_prod - ring_cons) < RING_SIZE )
-                {
-                    ring[RING_MASK(ring_prod)] = (u16)(port | port_subtype);
-                    if ( ring_cons == ring_prod++ )
-                    {
-                        wake_up_interruptible(&evtchn_wait);
-                        kill_fasync(&evtchn_async_queue, SIGIO, POLL_IN);
-                    }
-                }
-                else
-                {
-                    ring_overflow = 1;
-                }
+                wake_up_interruptible(&evtchn_wait);
+                kill_fasync(&evtchn_async_queue, SIGIO, POLL_IN);
             }
         }
+        else
+        {
+            ring_overflow = 1;
+        }
     }
-}
 
-static void evtchn_interrupt(int irq, void *dev_id, struct pt_regs *regs)
-{
-    shared_info_t *si = HYPERVISOR_shared_info;
-    unsigned long flags;
-
-    spin_lock_irqsave(&lock, flags);
-
-    process_bitmask(&si->event_channel_pend_sel, 
-                    &si->event_channel_pend[0],
-                    &pend_outstanding[0],
-                    PORT_NORMAL);
-        
-    process_bitmask(&si->event_channel_disc_sel,
-                    &si->event_channel_disc[0],
-                    &disc_outstanding[0],
-                    PORT_DISCONNECT);
-        
-    spin_unlock_irqrestore(&lock, flags);
+    spin_unlock(&lock);
 }
 
 static void __evtchn_reset_buffer_ring(void)
@@ -194,20 +100,18 @@ static void __evtchn_reset_buffer_ring(void)
 
     for ( i = 0; i < 32; i++ )
     {
-        m = pend_outstanding[i];
+        m = pend_exc[i];
         while ( (j = ffs(m)) != 0 )
         {
             m &= ~(1 << --j);
-            if ( rx_fns[(i * 32) + j] == NULL )
-                ring[ring_prod++] = (u16)(((i * 32) + j) | PORT_NORMAL);
+            ring[ring_prod++] = (u16)(((i * 32) + j) | PORT_EXCEPTION);
         }
 
-        m = disc_outstanding[i];
+        m = pend_nrm[i];
         while ( (j = ffs(m)) != 0 )
         {
             m &= ~(1 << --j);
-            if ( rx_fns[(i * 32) + j] == NULL )
-                ring[ring_prod++] = (u16)(((i * 32) + j) | PORT_DISCONNECT);
+            ring[ring_prod++] = (u16)(((i * 32) + j) | PORT_NORMAL);
         }
     }
 }
@@ -326,8 +230,14 @@ static ssize_t evtchn_write(struct file *file, const char *buf,
         goto out;
     }
 
+    spin_lock_irq(&lock);
     for ( i = 0; i < (count/2); i++ )
-        evtchn_clear_port(kbuf[i]);
+    {
+        clear_bit(kbuf[i]&PORTIDX_MASK, 
+                  (kbuf[i]&PORT_EXCEPTION) ? &pend_exc[0] : &pend_nrm[0]);
+        unmask_evtchn(kbuf[i]&PORTIDX_MASK);
+    }
+    spin_unlock_irq(&lock);
 
     rc = count;
 
@@ -455,25 +365,13 @@ static int __init init_module(void)
     /* (DEVFS) automatically destroy the symlink with its destination. */
     devfs_auto_unregister(evtchn_miscdev.devfs_handle, symlink_handle);
 
-    err = request_irq(HYPEREVENT_IRQ(_EVENT_EVTCHN),
-                      evtchn_interrupt, 0, "evtchn", NULL);
-    if ( err != 0 )
-    {
-        printk(KERN_ALERT "Could not allocate evtchn receive interrupt\n");
-        return err;
-    }
-
-    /* Kickstart servicing of notifications. */
-    evtchn_interrupt(0, NULL, NULL);
-
-    printk("Event-channel driver installed.\n");
+    printk("Event-channel device installed.\n");
 
     return 0;
 }
 
 static void cleanup_module(void)
 {
-    free_irq(HYPEREVENT_IRQ(_EVENT_EVTCHN), NULL);
     misc_deregister(&evtchn_miscdev);
 }
 

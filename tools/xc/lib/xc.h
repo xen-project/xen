@@ -165,25 +165,38 @@ int xc_vbd_probe(int xc_handle,
                  xc_vbd_t *vbds);
 
 #define DOMID_SELF              (~1ULL)
-#define EVTCHNSTAT_closed       0  /* Chennel is not in use.              */
-#define EVTCHNSTAT_disconnected 1  /* Channel is not connected to remote. */
-#define EVTCHNSTAT_connected    2  /* Channel is connected to remote.     */
-int xc_evtchn_open(int xc_handle,
-                   u64 dom1,   /* may be DOMID_SELF */
-                   u64 dom2,   /* may be DOMID_SELF */
-                   int *port1,
-                   int *port2);
+
+typedef struct {
+#define EVTCHNSTAT_closed       0  /* Chennel is not in use.                 */
+#define EVTCHNSTAT_unbound      1  /* Channel is not bound to a source.      */
+#define EVTCHNSTAT_interdomain  2  /* Channel is connected to remote domain. */
+#define EVTCHNSTAT_pirq         3  /* Channel is bound to a phys IRQ line.   */
+#define EVTCHNSTAT_virq         4  /* Channel is bound to a virtual IRQ line */
+    int status;
+    union {
+        struct {
+            u64 dom;
+            int port;
+        } interdomain;
+        int pirq;
+        int virq;
+    } u;
+} xc_evtchn_status_t;
+
+int xc_evtchn_bind_interdomain(int xc_handle,
+                               u64 dom1,   /* may be DOMID_SELF */
+                               u64 dom2,   /* may be DOMID_SELF */
+                               int *port1,
+                               int *port2);
 int xc_evtchn_close(int xc_handle,
                     u64 dom,   /* may be DOMID_SELF */
                     int port);
 int xc_evtchn_send(int xc_handle,
                    int local_port);
 int xc_evtchn_status(int xc_handle,
-                     u64 dom1, /* may be DOMID_SELF */
-                     int port1,
-                     u64 *dom2,
-                     int *port2,
-                     int *chn_status);
+                     u64 dom, /* may be DOMID_SELF */
+                     int port,
+                     xc_evtchn_status_t *status);
 
 int xc_physdev_pci_access_modify(int xc_handle,
                                  u64 domid,

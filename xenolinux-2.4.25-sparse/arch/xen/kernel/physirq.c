@@ -13,6 +13,7 @@
  *              by the virq irq type.
  */
 
+#ifdef CONFIG_PCI
 
 #include <linux/config.h>
 #include <asm/atomic.h>
@@ -46,7 +47,7 @@ static unsigned int startup_physirq_event(unsigned int irq)
     {
         printk("startup_physirq_event %d: setup event handler\n", irq);
         /* set up a event handler to demux virtualised physical interrupts */
-        err = request_irq(HYPEREVENT_IRQ(_EVENT_PHYSIRQ), physirq_interrupt, 
+        err = request_irq(IRQ_FROM_XEN_VIRQ(VIRQ_PHYSIRQ), physirq_interrupt, 
                           SA_SAMPLE_RANDOM, "physirq", NULL);
         if ( err )
         {
@@ -106,13 +107,13 @@ static void shutdown_physirq_event(unsigned int irq)
 static void enable_physirq_event(unsigned int irq)
 {
     /* XXX just enable all phys interrupts for now */
-    enable_irq(HYPEREVENT_IRQ(_EVENT_PHYSIRQ));
+    enable_irq(IRQ_FROM_XEN_VIRQ(VIRQ_PHYSIRQ));
 }
 
 static void disable_physirq_event(unsigned int irq)
 {
     /* XXX just disable all phys interrupts for now */
-    disable_irq(HYPEREVENT_IRQ(_EVENT_PHYSIRQ));
+    disable_irq(IRQ_FROM_XEN_VIRQ(VIRQ_PHYSIRQ));
 }
 
 static void ack_physirq_event(unsigned int irq)
@@ -170,3 +171,5 @@ void __init physirq_init(void)
         irq_desc[i + PHYS_IRQ_BASE].handler = &physirq_irq_type;
     }
 }
+
+#endif

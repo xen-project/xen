@@ -112,8 +112,8 @@ FAILSAFE_SEL    = 32
 FAILSAFE_ADDR   = 36
 
 /* Offsets in shared_info_t */
-EVENTS          =  0
-EVENTS_MASK     =  4
+UPCALL_PENDING  = 0
+UPCALL_MASK     = 4
 
 /* Offsets in guest_trap_bounce */
 GTB_ERROR_CODE   =  0
@@ -368,15 +368,12 @@ test_all_events:
         jnz  process_hyp_events
 /*test_guest_events:*/
         movl SHARED_INFO(%ebx),%eax
-        shl  $31,%ecx                   # %ecx = EVENTS_MASTER_ENABLE_MASK
-        test %ecx,EVENTS_MASK(%eax)     
-        jz   restore_all_guest          # only notify if master switch enabled
-        movl EVENTS(%eax),%ecx
-        andl EVENTS_MASK(%eax),%ecx
-        jz   restore_all_guest          # skip if no events to deliver
+        movl UPCALL_MASK(%eax),%ecx
         notl %ecx
-        btrl $31,%ecx                   # NB. We clear all events that are
-        andl %ecx,EVENTS_MASK(%eax)     # being delivered + master enable.
+        andl UPCALL_PENDING(%eax),%ecx  # ECX = pending & ~mask
+        andl $1,%ecx                    # Is bit 0 pending and not masked?
+        jz   restore_all_guest
+        orl  %ecx,UPCALL_MASK(%eax)     # Upcalls are masked during delivery
 /*process_guest_events:*/
         movzwl PROCESSOR(%ebx),%edx
         shl  $4,%edx                    # sizeof(guest_trap_bounce) == 16
