@@ -5,6 +5,7 @@
 import random
 import string
 import sys
+import socket
 
 from xen.xend import sxp
 from xen.xend import PrettyPrint
@@ -80,6 +81,13 @@ gopts.opt('paused', short='p',
 gopts.opt('console_autoconnect', short='c',
           fn=set_true, default=0,
           use="Connect to the console after the domain is created.")
+
+gopts.opt('vnc', val='DISPLAY',
+          fn=set_int, default=None,
+          use="""Spawn a vncviewer listening for a vnc server in the domain.
+          The address of the vncviewer is passed to the domain on the kernel command
+          line using 'VNC_SERVER=<host>:<port>'. The port used by vnc is 5500 + DISPLAY.
+          """)
 
 gopts.var('name', val='NAME',
           fn=set_value, default=None,
@@ -415,6 +423,27 @@ def preprocess_nfs(opts, vals):
         opts.err('Must set nfs root and nfs server')
     nfs = 'nfsroot=' + vals.nfs_server + ':' + vals.nfs_root
     vals.extra = nfs + ' ' + vals.extra
+
+
+def get_host_addr():
+    host = socket.gethostname()
+    addr = socket.gethostbyname(host)
+    return addr
+
+def spawn_vnc(display):
+    os.system("vncviewer -listen %d &" % display)
+    return 5500 + display
+    
+def preprocess_vnc(opts, vals):
+    """If vnc was specified, spawn a vncviewer in listen mode
+    and pass its address to the domain on the kernel command line.
+    """
+    if vals.vnc is None: return
+    vnc_host = get_host_addr()
+    vnc_port = spawn_vnc(vals.vnc)
+    if vnc_port > 0:
+        vnc = 'VNC_VIEWER=%s:%d' % (vnc_host, vnc_port)
+        vals.extra = vnc + ' ' + vals.extra
     
 def preprocess(opts, vals):
     if not vals.kernel:
@@ -424,6 +453,7 @@ def preprocess(opts, vals):
     preprocess_vifs(opts, vals)
     preprocess_ip(opts, vals)
     preprocess_nfs(opts, vals)
+    preprocess_vnc(opts, vals)
          
 def make_domain(opts, config):
     """Create, build and start a domain.
