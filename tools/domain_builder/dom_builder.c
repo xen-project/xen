@@ -11,6 +11,7 @@
 #include <sys/mman.h>
 #include <sys/types.h>
 #include <sys/stat.h>
+#include <stdlib.h>
 
 #include "hypervisor_defs.h"
 #include "dom0_ops.h"
@@ -24,9 +25,6 @@
 
 #define L1_PROT (_PAGE_PRESENT|_PAGE_RW|_PAGE_USER|_PAGE_ACCESSED)
 #define L2_PROT (_PAGE_PRESENT|_PAGE_RW|_PAGE_USER|_PAGE_ACCESSED|_PAGE_DIRTY)
-
-/* Round _n up to nearest multiple of _m. */
-#define ROUND_UP(_n,_m) (((_n) + (_m) - 1) / (_m))
 
 /* standardized error reporting function */
 static void dberr(char *msg)
@@ -203,7 +201,6 @@ static int do_kernel_chcks(char *image, long dom_size,
 		close(fd);
         goto out;
     }
-    *ksize = stat.st_size - SIG_LEN;
     
     read(fd, signature, SIG_LEN);
     if(strncmp(signature, GUEST_SIG, SIG_LEN)){
@@ -215,6 +212,8 @@ static int do_kernel_chcks(char *image, long dom_size,
     }
 
     read(fd, load_addr, sizeof(unsigned long));
+
+    *ksize = stat.st_size - SIG_LEN - sizeof(unsigned long);
 
     sprintf(status, "Kernel image %s valid, kernel virtual load address %lx", 
         image, *load_addr);
@@ -252,13 +251,16 @@ static dom_meminfo_t *setup_guestos(int dom, int kernel_fd,
     int cmd_fd;
 
     meminfo     = (dom_meminfo_t *)malloc(sizeof(dom_meminfo_t));
-    page_array  = (unsigned long *)dom_mem->vaddr;
+    page_array  = malloc(dom_mem->tot_pages * 4);
     pgt_updates = (page_update_request_t *)dom_mem->vaddr;
     alloc_index = dom_mem->tot_pages - 1;
 
+    memcpy(page_array, (void *)dom_mem->vaddr, dom_mem->tot_pages * 4);
+
     /* Count bottom-level PTs, rounding up. Include one PTE for shared info. */
-    num_pt_pages = ROUND_UP(l1_table_offset(virt_load_addr) +
-                            dom_mem->tot_pages + 1, 1024);
+    num_pt_pages = 
+        (l1_table_offset(virt_load_addr) + dom_mem->tot_pages + 1024) / 1024;
+
     /* We must also count the page directory. */
     num_pt_pages++;
 
@@ -282,9 +284,13 @@ static dom_meminfo_t *setup_guestos(int dom, int kernel_fd,
     pgt_updates++;
     num_pgt_updates++;
 
-    /* Initialise the page tables. */
+    /*
+     * Initialise the page tables. The final iteration is for the shared_info
+     * PTE -- we break out before filling in the entry, as that is done by
+     * Xen during final setup.
+     */
     l2tab += l2_table_offset(virt_load_addr) * sizeof(l2_pgentry_t);
-    for ( count = 0; count < dom_mem->tot_pages; count++ )
+    for ( count = 0; count < (dom_mem->tot_pages + 1); count++ )
     {    
         if ( !((unsigned long)l1tab & (PAGE_SIZE-1)) ) 
         {
@@ -302,6 +308,9 @@ static dom_meminfo_t *setup_guestos(int dom, int kernel_fd,
             num_pgt_updates++;
             l2tab += sizeof(l2_pgentry_t);
         }
+
+        /* The last PTE we consider is filled in later by Xen. */
+        if ( count == dom_mem->tot_pages ) break;
 		
         if ( count < pt_start )
         {
@@ -344,7 +353,8 @@ static dom_meminfo_t *setup_guestos(int dom, int kernel_fd,
     close(cmd_fd);
 
     /* Load the guest OS image. */
-    if(!(read(kernel_fd, (char *)dom_mem->vaddr, ksize) > 0)){
+    if( read(kernel_fd, (char *)dom_mem->vaddr, ksize) != ksize )
+    {
         dberr("Error reading kernel image, could not"
               " read the whole image. Terminating.\n");
         goto out;

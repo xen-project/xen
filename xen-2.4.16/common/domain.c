@@ -262,8 +262,8 @@ int final_setup_guestos(struct task_struct * p, dom_meminfo_t * meminfo)
     unmap_domain_mem((void *)((unsigned long)l1tab & PAGE_MASK));
 
     /* set up the shared info structure */
-	update_dom_time(p->shared_info);
-	p->shared_info->cpu_freq	 = cpu_freq;
+    update_dom_time(p->shared_info);
+    p->shared_info->cpu_freq	 = cpu_freq;
     p->shared_info->domain_time  = 0;
 
     /* we pass start info struct to guest os as function parameter on stack */

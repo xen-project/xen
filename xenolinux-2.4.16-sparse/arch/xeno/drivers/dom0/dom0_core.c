@@ -194,7 +194,8 @@ static int cmd_write_proc(struct file *file, const char *buffer,
     int ret = 0;
     struct proc_dir_entry * new_dom_id;
     dom0_newdomain_t * params;
-
+    int i;
+    unsigned long p;
     
     copy_from_user(&op, buffer, sizeof(dom0_op_t));
 
@@ -211,8 +212,11 @@ static int cmd_write_proc(struct file *file, const char *buffer,
     }
     else if ( op.cmd == DO_PGUPDATES )
     {
-        ret = HYPERVISOR_pt_update((void *)op.u.pgupdate.pgt_update_arr,
-                                   op.u.pgupdate.num_pgt_updates);
+        p = op.u.pgupdate.pgt_update_arr;
+        for ( i = 0; i < op.u.pgupdate.num_pgt_updates; i++ )
+        {
+            ret = HYPERVISOR_pt_update(p + i*8, 1);
+        }
     }
     else
     {

@@ -72,8 +72,8 @@ long do_dom0_op(dom0_op_t *u_dom0_op)
     case DOM0_STARTDOM:
     {
         struct task_struct * p = find_domain_by_id(op.u.meminfo.domain);
-        ret = final_setup_guestos(p, &op.u.meminfo);
-        if( ret != 0 ){
+        if ( (ret = final_setup_guestos(p, &op.u.meminfo)) != 0 )
+        {
             p->state = TASK_DYING;
             release_task(p);
             break;
