@@ -19,7 +19,7 @@
 
 {\Large Xen is Copyright (c) 2004, The Xen Team} \\[3mm]
 {\Large University of Cambridge, UK} \\[20mm]
-{\large Last updated on 12th October, 2004}
+{\large Last updated on 26th October, 2004}
 \end{tabular}
 \vfill
 \end{center}
@@ -247,12 +247,14 @@ operating system distribution.
 \section{Prerequisites}
 \label{sec:prerequisites}
 \begin{itemize}
+\item i686-class CPU or newer
 \item A working installation of your favourite Linux distribution.
 \item A working installation of the GRUB bootloader.
 \item An installation of Twisted v1.3 or above (see {\tt
 http://www.twistedmatrix.com}).  There may be a package available for
 your distribution; alternatively it can be installed by running {\tt \#
 make install-twisted} in the root of the Xen source tree.
+\item Python logging package (see {\tt http://www.red-dove.com/})
 \item The Linux bridge control tools (see {\tt
 http://bridge.sourceforge.net}).  There may be packages of these tools
 available for your distribution.
@@ -264,12 +266,6 @@ available for your distribution.
 \item python-dev
 \item python2.3-pycurl
 \item python2.3-twisted
-\end{itemize}
-
-\section{Optional}
-\begin{itemize}
-\item The Python logging package (see {\tt http://www.red-dove.com/})
-for additional Xend logging functionality.
 \end{itemize}
 
 \section{Install Bitkeeper (Optional)}
@@ -325,8 +321,9 @@ The Xen source code repository is structured as follows:
 \item[\path{tools/}] Xen node controller daemon (Xend), command line tools, 
   control libraries
 \item[\path{xen/}] The Xen hypervisor itself.
-\item[\path{linux-2.4.27-xen/}] Xen support for Linux 2.4
-\item[\path{linux-2.6.8.1-xen/}] Xen support for Linux 2.6
+\item[\path{linux-2.4.27-xen-sparse/}] Xen support for Linux 2.4
+\item[\path{linux-2.6.9-xen-sparse/}] Xen support for Linux 2.6
+\item[\path{linux-2.6.9-patches/}] Experimental patches for Linux 2.6
 \item[\path{netbsd-2.0-xen-sparse/}] Xen support for NetBSD 2.0
 \item[\path{docs/}] various documentation files for users and developers
 \item[\path{extras/}] currently this contains the Mini OS, aimed at developers
@@ -379,13 +376,10 @@ necessary to build the NetBSD kernel under Linux.
 If you have an SMP machine you may wish to give the {\tt '-j4'}
 argument to make to get a parallel build.
 
-XXX Insert details on customising the kernel to be built.
-i.e. merging config files
-
 If you have an existing Linux kernel configuration that you would like
 to use for domain 0, you should copy it to
 install/boot/config-2.6.8.1-xen0.  During the first build, you may be
-asked about some Xen-specific options.  We advised accepting the
+asked about some Xen-specific options.  We advise accepting the
 defaults for these options.
 
 \framebox{\parbox{5in}{
@@ -451,6 +445,12 @@ be passed to it (these are standard Linux parameters, identifying the
 root device and specifying it be initially mounted read only and
 instructing that console output be sent both to the screen and to the
 serial port).
+
+If you want to use an initrd, just add another {\tt module} line to
+the configuration, as usual:
+\begin{verbatim}
+  module /boot/my_initrd.gz
+\end{verbatim}
 
 As always when installing a new kernel, it is recommended that you do
 not remove the original contents of \path{menu.lst} --- you may want
@@ -726,10 +726,10 @@ or:
 
 \chapter{Other kinds of storage}
 
-It is possible to use any Linux block device to store virtual machine
-disk images.  This chapter covers some of the possibilities; note that
-it is also possible to use network-based block devices and other
-unconventional block devices.
+It is possible to directly export any Linux block device to a virtual,
+or to export filesystems / devices to virtual machines using standard
+network protocals (e.g. NBD, iSCSI, NFS, etc).  This chapter covers
+some of the possibilities.
 
 \section{File-backed virtual block devices}
 
@@ -769,6 +769,40 @@ In the configuration file set:\\
 
 As the virtual machine writes to its `disk', the sparse file will be
 filled in and consume more space up to the original 2GB.
+
+\section{NFS Root}
+
+The procedure for using NFS root in a virtual machine is basically the
+same as you would follow for a real machine.  NB. the Linux NFS root
+implementation is known to have stability problems under high load
+(this is not a Xen-specific problem), so this configuration may not be
+appropriate for critical servers.
+
+First, populate a root filesystem in a directory on the server machine
+--- this can be on another physical machine, or perhaps just another
+virtual machine on the same node.
+
+Now, configure the NFS server to export this filesystem over the
+network by adding a line to /etc/exports, for instance:
+
+\begin{verbatim}
+/export/vm1root      w.x.y.z/m (rw,sync,no_root_squash)
+\end{verbatim}
+
+Finally, configure the domain to use NFS root.  In addition to the
+normal variables, you should make sure to set the following values in
+the domain's configuration file:
+
+\begin{verbatim}
+root       = '/dev/nfs'
+nfs_server = 'a.b.c.d'       # Substitute the IP for the server here
+nfs_root   = '/path/to/root' # Path to root FS on the server machine
+\end{verbatim}
+
+The domain will need network access at boot-time, so either statically
+configure an IP address (Using the config variables {\tt ip}, {\tt
+netmask}, {\tt gateway}, {\tt hostname}) or enable DHCP ({\tt
+dhcp='dhcp'}).
 
 \section{LVM-backed virtual block devices}
 
@@ -840,29 +874,11 @@ To enable it, you have to make symbolic links in the appropriate
 runlevel directories or use the {\tt chkconfig} tool, where available.
 
 Once Xend is running, more sophisticated administration can be done
-using the Xensv web interface (see Chapter~\ref{cha:xensv}).
-
-\chapter{Xensv (Web interface server)}
-\label{cha:xensv}
-
-Xensv is the server for the web control interface.  It can be started
-using:\\
-\verb_# xensv start_ \\
-and stopped using:
-\verb_# xensv stop_ \\
-It will automatically start Xend if it is not already running.
-
-By default, Xensv will serve out the web interface on port 8080.  This
-can be changed by editing {\tt
-/usr/lib/python2.3/site-packages/xen/sv/params.py}.
-
-Once Xensv is running, the web interface can be used to manage running
-domains and provides a user friendly domain creation wizard.
+using the xm tool (see Chapter~\ref{cha:xm}) and the experimental
+Xensv web interface (see Chapter~\ref{cha:xensv}).
 
 \chapter{The xm tool}
 \label{cha:xm}
-
-XXX Add description of arguments and switches for all the options
 
 The xm tool is the primary tool for managing Xen from the console.
 The general format of an xm command line is:
@@ -910,13 +926,33 @@ try
 # xm help command
 \end{verbatim}
 
+\chapter{Xensv (Web control interface)}
+\label{cha:xensv}
+
+Xensv is the experimental web control interface for managing a Xen
+machine.  It can be used to perform some (but not yet all) of the
+management tasks that can be done using the xm tool.
+
+It can be started using:\\ \verb_# xensv start_ \\ and
+stopped using: \verb_# xensv stop_ \\ It will automatically start Xend
+if it is not already running.
+
+By default, Xensv will serve out the web interface on port 8080.  This
+can be changed by editing {\tt
+/usr/lib/python2.3/site-packages/xen/sv/params.py}.
+
+Once Xensv is running, the web interface can be used to manage running
+domains and provides a user friendly domain creation wizard.
+
+
+
 \chapter{Glossary}
 
 \begin{description}
 \item[Atropos]             One of the CPU schedulers provided by Xen.
                            Atropos provides domains with absolute shares
                            of the CPU, with timeliness guarantees and a
-                           mechanism for sharing out ``slack time''.
+                           mechanism for sharing out `slack time'.
 
 \item[BVT]                 The BVT scheduler is used to give proportional
                            fair shares of the CPU to domains.
@@ -1610,3 +1646,5 @@ image-specific settings (hostname, network settings, etc).
 
 %% You can use these modules to write your own custom scripts or you can
 %% customise the scripts supplied in the Xen distribution.
+
+% Explain about AGP GART
