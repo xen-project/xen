@@ -13,10 +13,11 @@ def sxp2hash( s ):
     sxphash = {}
         
     for child in sxp.children( s ):
-    	if child is types.ListType:
-            sxphash[ child[0] ] = sxp2hash( child[1] )
-        else:
-            sxphash[ child[0] ] = child[1]
+    	if isinstance( child, types.ListType ) and len( child ) > 1:
+            if isinstance( child[1], types.ListType ) and len( child ) > 1:
+                sxphash[ child[0] ] = sxp2hash( child[1] )
+            else:
+                sxphash[ child[0] ] = child[1]
         
     return sxphash  
     
