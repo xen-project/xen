@@ -82,6 +82,30 @@ static SxprType types[1024] = {
 /** Number of entries in the types array. */
 static int type_sup = sizeof(types)/sizeof(types[0]);
 
+/** Define a type.
+ * The tydef must have a non-zero type code.
+ * It is an error if the type code is out of range or already defined.
+ *
+ * @param tydef type definition
+ * @return 0 on success, error code otherwise
+ */
+int def_sxpr_type(SxprType *tydef){
+    int err = 0;
+    int ty = tydef->type;
+    if(ty < 0 || ty >= type_sup){
+        err = -EINVAL;
+        goto exit;
+    }
+    if(types[ty].type){
+        err = -EEXIST;
+        goto exit;
+    }
+    types[ty] = *tydef;
+  exit:
+    return err;
+    
+}
+
 /** Get the type definition for a given type code.
  *
  * @param ty type code

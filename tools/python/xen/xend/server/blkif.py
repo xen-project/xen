@@ -181,6 +181,8 @@ class BlkifBackendInterface(controller.BackendInterface):
             self.close()
         d = defer.Deferred()
         d.addCallback(cb_destroy)
+        if self.evtchn:
+            channel.eventChannelClose(self.evtchn)
         self.send_be_disconnect(response=d)
         
     def send_be_disconnect(self, response=None):

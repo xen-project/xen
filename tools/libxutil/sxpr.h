@@ -307,6 +307,7 @@ typedef struct SxprType {
 } SxprType;
 
 
+extern int def_sxpr_type(SxprType *tydef);
 extern SxprType *get_sxpr_type(int ty);
 
 /** Free the pointer in an sxpr.
