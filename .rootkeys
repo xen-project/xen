@@ -616,6 +616,7 @@
 3e5a4e673p7PEOyHFm3nHkYX6HQYBg xenolinux-2.4.22-sparse/include/asm-xeno/irq.h
 3ead095db_LRUXnxaqs0dA1DWhPoQQ xenolinux-2.4.22-sparse/include/asm-xeno/keyboard.h
 3e5a4e678ddsQOpbSiRdy1GRcDc9WA xenolinux-2.4.22-sparse/include/asm-xeno/mmu_context.h
+3f8707e7ZmZ6TxyX0ZUEfvhA2Pb_xQ xenolinux-2.4.22-sparse/include/asm-xeno/msr.h
 3e7270deQqtGPSnFxcW4AvJZuTUWfg xenolinux-2.4.22-sparse/include/asm-xeno/multicall.h
 3e5a4e67mnQfh-R8KcQCaVo2Oho6yg xenolinux-2.4.22-sparse/include/asm-xeno/page.h
 3e5a4e67uTYU5oEnIDjxuaez8njjqg xenolinux-2.4.22-sparse/include/asm-xeno/pgalloc.h
