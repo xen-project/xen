@@ -437,6 +437,9 @@ do_grant_table_op(
 {
     long rc;
 
+    /* XXX stubbed out XXX */
+    return -ENOSYS;
+
     if ( count > 512 )
         return -EINVAL;
 
