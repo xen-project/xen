@@ -798,14 +798,6 @@ unsigned long mk_hl2_table(struct exec_domain *ed)
     memset(hl2, 0, PAGE_SIZE);
     unmap_domain_mem(hl2);
 
-    // install this hl2 as the linear_pg_table
-    if ( shadow_mode_external(d) )
-        ed->arch.monitor_vtable[l2_table_offset(LINEAR_PT_VIRT_START)] =
-            mk_l2_pgentry((hl2mfn << PAGE_SHIFT) | __PAGE_HYPERVISOR);
-    else
-        ed->arch.shadow_vtable[l2_table_offset(LINEAR_PT_VIRT_START)] =
-            mk_l2_pgentry((hl2mfn << PAGE_SHIFT) | __PAGE_HYPERVISOR);
-
     return status;
 }
 
