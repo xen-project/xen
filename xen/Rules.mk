@@ -21,7 +21,8 @@ HDRS    := $(wildcard $(BASEDIR)/include/xen/*.h)
 HDRS    += $(wildcard $(BASEDIR)/include/public/*.h)
 HDRS    += $(wildcard $(BASEDIR)/include/asm-$(TARGET_ARCH)/*.h)
 HDRS    += $(wildcard $(BASEDIR)/include/asm-$(TARGET_ARCH)/$(TARGET_SUBARCH)/*.h)
-# compile.h is always regenerated, but other files shouldn't be rebuilt
+# Do not depend on auto-generated header files.
+HDRS    := $(subst $(BASEDIR)/include/asm-$(TARGET_ARCH)/asm-offsets.h,,$(HDRS))
 HDRS    := $(subst $(BASEDIR)/include/xen/banner.h,,$(HDRS))
 HDRS    := $(subst $(BASEDIR)/include/xen/compile.h,,$(HDRS))
 
