@@ -62,6 +62,9 @@ restart_modes = [
     RESTART_NEVER,
     ]
 
+STATE_RESTART_PENDING = 'pending'
+STATE_RESTART_BOOTING = 'booting'
+
 def shutdown_reason(code):
     """Get a shutdown reason from a code.
 
@@ -277,6 +280,7 @@ def vm_recreate(savedinfo, info):
     else:
         d = defer.Deferred()
         d.callback(vm)
+    vm.recreate = 0
     return d
 
 def vm_restore(src, progress=0):
@@ -360,8 +364,8 @@ class XendDomainInfo:
         self.state = self.STATE_OK
         #todo: set to migrate info if migrating
         self.migrate = None
-        #Whether to auto-restart
         self.restart_mode = RESTART_ONREBOOT
+        self.restart_state = None
         self.console_port = None
 
     def setdom(self, dom):
@@ -380,7 +384,7 @@ class XendDomainInfo:
         s += " name=" + self.name
         s += " memory=" + str(self.memory)
         if self.console:
-            s += " console=" + self.console.id
+            s += " console=" + str(self.console.console_port)
         if self.image:
             s += " image=" + self.image
         s += ""
@@ -536,6 +540,8 @@ class XendDomainInfo:
         devices have been released.
         """
         if self.dom is None: return 0
+        if self.restart_state == STATE_RESTART_PENDING and self.console:
+            self.console.deregisterChannel()
         chan = xend.getDomChannel(self.dom)
         if chan:
             log.debug("Closing channel to domain %d", self.dom)
@@ -603,7 +609,8 @@ class XendDomainInfo:
         memory = self.memory
         name = self.name
         cpu = int(sxp.child_value(self.config, 'cpu', '-1'))
-        dom = xc.domain_create(mem_kb= memory * 1024, name= name, cpu= cpu)
+        dom = self.dom or 0
+        dom = xc.domain_create(dom= dom, mem_kb= memory * 1024, name= name, cpu= cpu)
         if dom <= 0:
             raise VmError('Creating domain failed: name=%s memory=%d'
                           % (name, memory))
@@ -627,7 +634,7 @@ class XendDomainInfo:
         if self.blkif_backend: flags |= SIF_BLK_BE_DOMAIN
         err = buildfn(dom            = dom,
                       image          = kernel,
-                      control_evtchn = self.console.port2,
+                      control_evtchn = self.console.getRemotePort(),
                       cmdline        = cmdline,
                       ramdisk        = ramdisk,
                       flags          = flags)
@@ -650,7 +657,10 @@ class XendDomainInfo:
             if ramdisk and not os.path.isfile(ramdisk):
                 raise VmError('Kernel ramdisk does not exist: %s' % ramdisk)
         self.init_domain()
-        self.console = xendConsole.console_create(self.dom, console_port=self.console_port)
+        if self.console:
+            self.console.registerChannel()
+        else:
+            self.console = xendConsole.console_create(self.dom, console_port=self.console_port)
         self.build_domain(ostype, kernel, ramdisk, cmdline, vifs_n)
         self.image = kernel
         self.ramdisk = ramdisk
@@ -736,6 +746,20 @@ class XendDomainInfo:
         if self.restart_mode == RESTART_ONREBOOT:
             return reason == 'reboot'
         return 0
+
+    def restart_cancel(self):
+        self.restart_state = None
+
+    def restarting(self):
+        self.restart_state = STATE_RESTART_PENDING
+
+    def restart(self):
+        try:
+            self.restart_state = STATE_RESTART_BOOTING
+            d = self.construct(self.config)
+        finally:
+            self.restart_state = None
+        return d
 
     def configure_backends(self):
         """Set configuration flags if the vm is a backend for netif of blkif.

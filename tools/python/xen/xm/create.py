@@ -405,7 +405,7 @@ def make_domain(opts, config):
     dom = int(sxp.child_value(dominfo, 'id'))
     console_info = sxp.child(dominfo, 'console')
     if console_info:
-        console_port = int(sxp.child_value(console_info, 'port'))
+        console_port = int(sxp.child_value(console_info, 'console_port'))
     else:
         console_port = None
     

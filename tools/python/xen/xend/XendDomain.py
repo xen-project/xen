@@ -18,7 +18,6 @@ import XendRoot
 xroot = XendRoot.instance()
 import XendDB
 import XendDomainInfo
-import XendConsole
 import XendMigrate
 import EventServer
 from XendError import XendError
@@ -42,14 +41,13 @@ class XendDomain:
     """Table of domain info indexed by domain id."""
     domain = {}
     
-    """Table of configs for domain restart, indexed by domain id."""
+    """Table of domains to restart, indexed by domain id."""
     restarts = {}
 
     """Table of delayed calls."""
     schedule = {}
     
     def __init__(self):
-        self.xconsole = XendConsole.instance()
         # Table of domain info indexed by domain id.
         self.db = XendDB.XendDB(self.dbpath)
         self.domain_db = self.db.fetchall("")
@@ -322,6 +320,19 @@ class XendDomain:
         deferred.addCallback(fn)
         return deferred
 
+    def domain_restart(self, dominfo):
+        """Restart a domain.
+
+        @param dominfo: domain object
+        @return: deferred
+        """
+        deferred = dominfo.restart()
+        def fn(dominfo):
+            self._add_domain(dominfo.id, dominfo)
+            return dominfo
+        deferred.addCallback(fn)
+        return deferred        
+
     def domain_configure(self, id, config):
         """Configure an existing domain. This is intended for internal
         use by domain restore and migrate.
@@ -405,7 +416,7 @@ class XendDomain:
         if reason == 'halt':
             self.domain_restart_cancel(id)
         else:
-            self.domain_restart_schedule(id, reason, set=1)
+            self.domain_restart_schedule(id, reason, force=1)
         eserver.inject('xend.domain.shutdown', [id, reason])
         if reason == 'halt':
             reason = 'poweroff'
@@ -413,25 +424,22 @@ class XendDomain:
         self.refresh_schedule()
         return val
 
-    def domain_restart_schedule(self, id, reason, set=0):
+    def domain_restart_schedule(self, id, reason, force=0):
         """Schedule a restart for a domain if it needs one.
 
         @param id:     domain id
         @param reason: shutdown reason
         """
-        log.debug('domain_restart_schedule> %s %s %d', id, reason, set)
+        log.debug('domain_restart_schedule> %s %s %d', id, reason, force)
         dominfo = self.domain.get(id)
         if not dominfo:
             return
         if id in self.restarts:
             return
-        if set and reason == 'reboot':
-            dominfo.restart_mode = XendDomainInfo.RESTART_ALWAYS
-        restart = dominfo.restart_needed(reason)
+        restart = (force and reason == 'reboot') or dominfo.restart_needed(reason)
         if restart:
-            # Avoid multiple restarts.
-            dominfo.restart_mode = XendDomainInfo.RESTART_NEVER
-            self.restarts[id] = dominfo.config
+            dominfo.restarting()
+            self.restarts[id] = dominfo
             log.info('Scheduling restart for domain: id=%s name=%s', id, dominfo.name)
             self.domain_restarts_schedule()
             
@@ -440,10 +448,9 @@ class XendDomain:
 
         @param id: domain id
         """
-        dominfo = self.domain.get(id)
+        dominfo = self.restarts.get(id)
         if dominfo:
-            dominfo.restart_mode = XendDomainInfo.RESTART_NEVER
-        if id in self.restarts:
+            dominfo.restart_cancel()
             del self.restarts[id]
 
     def domain_restarts(self):
@@ -454,17 +461,17 @@ class XendDomain:
             if id in self.domain:
                 # Don't execute restart for domains still running.
                 continue
-            config = self.restarts[id]
+            dominfo = self.restarts[id]
             # Remove it from the restarts.
             del self.restarts[id]
             try:
-                log.info('domain_restarts> restart: id=%s config=%s', id, str(config))
+                log.info('domain_restarts> restart: id=%s config=%s', id, str(dominfo.config))
                 def cbok(dominfo):
                     log.info('Restarted domain %s as %s', id, dominfo.id)
                     self.domain_unpause(dominfo.id)
                 def cberr(err):
                     log.exception("Delayed exception restarting domain")
-                deferred = self.domain_create(config)
+                deferred = self.domain_restart(dominfo)
                 deferred.addCallback(cbok)
                 deferred.addErrback(cberr)
             except:
@@ -500,7 +507,7 @@ class XendDomain:
         if reason == 'halt':
             self.domain_restart_cancel(id)
         elif reason == 'reboot':
-            self.domain_restart_schedule(id, reason, set=1)
+            self.domain_restart_schedule(id, reason, force=1)
         val = self.final_domain_destroy(id)
         self.refresh_schedule()
         return val

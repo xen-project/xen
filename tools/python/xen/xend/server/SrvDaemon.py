@@ -121,7 +121,7 @@ class MgmtProtocol(protocol.DatagramProtocol):
         console_port = sxp.child_value(req, 'console_port')
         if console_port:
             console_port = int(console_port)
-        resp = self.daemon.console_create(dom, console_port)
+        resp = self.daemon.console_create(dom, console_port).sxpr()
         print name, resp
         return resp
 
@@ -730,10 +730,13 @@ class Daemon:
         console = self.consoleCF.getInstanceByDom(dom)
         if console is None:
             console = self.consoleCF.createInstance(dom, console_port)
-        return console.sxpr()
+        return console
 
     def consoles(self):
         return [ c.sxpr() for c in self.consoleCF.getInstances() ]
+
+    def get_consoles(self):
+        return self.consoleCF.getInstances()
 
     def get_console(self, id):
         return self.consoleCF.getInstance(id)

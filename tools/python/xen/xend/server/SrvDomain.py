@@ -204,7 +204,7 @@ class SrvDomain(SrvDir):
             req.write('<p>%s</p>' % self.dom)
             if self.dom.console:
                 cinfo = self.dom.console
-                cid = cinfo.id
+                cid = str(cinfo.console_port)
                 #todo: Local xref: need to know server prefix.
                 req.write('<p><a href="/xend/console/%s">Console %s</a></p>'
                           % (cid, cid))

@@ -199,7 +199,7 @@ class CtrlMsgRcvr:
         """
         if self.channel:
             self.channel.deregisterDevice(self)
-            del self.channel
+            self.channel = None
 
     def produceRequests(self):
         """Produce any queued requests.

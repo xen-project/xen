@@ -1,5 +1,7 @@
 # Copyright (C) 2004 Mike Wray <mike.wray@hp.com>
 
+import socket
+
 from twisted.internet import reactor
 from twisted.internet import protocol
 
@@ -124,16 +126,37 @@ class ConsoleController(controller.Controller):
         self.listen()
 
     def sxpr(self):
-        val =['console',
-              ['status',       self.status ],
-              ['id',           self.idx ],
-              ['domain',       self.dom ],
-              ['local_port',   self.channel.getLocalPort() ],
-              ['remote_port',  self.channel.getRemotePort() ],
-              ['console_port', self.console_port ] ]
+        val = ['console',
+               ['status', self.status ],
+               ['id',     self.idx    ],
+               ['domain', self.dom    ] ]
+        val.append(['local_port',   self.getLocalPort()  ])
+        val.append(['remote_port',  self.getRemotePort() ])
+        val.append(['console_port', self.console_port    ])
         if self.addr:
             val.append(['connected', self.addr[0], self.addr[1]])
         return val
+
+    def getLocalPort(self):
+        if self.channel:
+            return self.channel.getLocalPort()
+        else:
+            return 0
+
+    def getRemotePort(self):
+        if self.channel:
+            return self.channel.getRemotePort()
+        else:
+            return 0
+
+    def uri(self):
+        """Get the uri to use to connect to the console.
+        This will be a telnet: uri.
+
+        return uri
+        """
+        host = socket.gethostname()
+        return "telnet://%s:%d" % (host, self.console_port)
 
     def ready(self):
         return not (self.closed() or self.rbuf.empty())
@@ -222,7 +245,7 @@ class ConsoleController(controller.Controller):
         Writes as much to the channel as it can.
         """
         work = 0
-        while not self.wbuf.empty() and self.channel.writeReady():
+        while self.channel and not self.wbuf.empty() and self.channel.writeReady():
             msg = xu.message(CMSG_CONSOLE, 0, 0)
             msg.append_payload(self.wbuf.read(msg.MAX_PAYLOAD))
             work += self.channel.writeRequest(msg, notify=0)
@@ -240,7 +263,7 @@ class ConsoleController(controller.Controller):
         if self.closed(): return -1
         if conn != self.conn: return 0
         self.wbuf.write(data)
-        if self.produceRequests():
+        if self.channel and self.produceRequests():
             self.channel.notify()
         return 0
 

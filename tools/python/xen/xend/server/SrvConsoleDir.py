@@ -55,8 +55,9 @@ class SrvConsoleDir(SrvDir):
             sxp.show(consoles, out=req)
         else:
             consoles = self.xconsole.consoles()
-            consoles.sort(lambda x, y: cmp(x.id, y.id))
+            consoles.sort(lambda x, y: cmp(x.console_port, y.console_port))
             req.write('<ul>')
             for c in consoles:
-                req.write('<li><a href="%s%s"> %s</a></li>' % (url, c.id, c))
+                cid = str(c.console_port)
+                req.write('<li><a href="%s%s"> %s</a></li>' % (url, cid, cid))
             req.write('</ul>')
