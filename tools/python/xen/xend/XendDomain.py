@@ -659,6 +659,24 @@ class XendDomain:
             return xc.atropos_domain_get(dominfo.dom)
         except Exception, ex:
             raise XendError(str(ex))
+    
+    def domain_cpu_sedf_set(self, id, period, slice):
+        """Set Atropos scheduler parameters for a domain.
+        """
+        dominfo = self.domain_lookup(id)
+        try:
+            return xc.sedf_domain_set(dominfo.dom, period, slice)
+        except Exception, ex:
+            raise XendError(str(ex))
+
+    def domain_cpu_sedf_get(self, id):
+        """Get Atropos scheduler parameters for a domain.
+        """
+        dominfo = self.domain_lookup(id)
+        try:
+            return xc.sedf_domain_get(dominfo.dom)
+        except Exception, ex:
+            raise XendError(str(ex))
 
     def domain_device_create(self, id, devconfig):
         """Create a new device for a domain.

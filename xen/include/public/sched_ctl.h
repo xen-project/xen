@@ -11,6 +11,7 @@
 #define SCHED_BVT      0
 #define SCHED_ATROPOS  2
 #define SCHED_RROBIN   3
+#define SCHED_SEDF     4
 
 /* these describe the intended direction used for a scheduler control or domain
  * command */
@@ -64,6 +65,15 @@ struct sched_adjdom_cmd
             u64 latency;    /* 32 */
             u32 xtratime;   /* 36 */
         } PACKED atropos;
+        
+	struct sedf_adjdom
+        {
+            u64 period;     /* 16 */
+            u64 slice;      /* 24 */
+            u64 dummy1;     /* 32 */
+            u32 dummy2;     /* 36 */
+        } PACKED sedf;
+
     } PACKED u;
 } PACKED; /* 40 bytes */
 

@@ -12,6 +12,7 @@ vpath %c       $(XEN_LIBXUTIL)
 INCLUDES += -I $(XEN_LIBXUTIL)
 
 SRCS     :=
+SRCS     += xc_sedf.c
 SRCS     += xc_atropos.c
 SRCS     += xc_bvtsched.c
 SRCS     += xc_domain.c

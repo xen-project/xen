@@ -600,6 +600,23 @@ class ProgRrobin(Prog):
 
 xm.prog(ProgRrobin)
 
+class ProgSedf(Prog):
+    group = 'scheduler'
+    name= "sedf"
+    info = """Set simple EDF parameters."""
+
+    def help(self, args):
+        print args[0], "DOM PERIOD SLICE"
+        print "\nSet simple EDF parameters."
+
+    def main(self, args):
+        if len(args) != 4: self.err("%s: Invalid argument(s)" % args[0])
+        dom = args[1]
+        v = map(int, args[2:4])
+        server.xend_domain_cpu_sedf_set(dom, *v)
+
+xm.prog(ProgSedf)
+
 class ProgInfo(Prog):
     group = 'host'
     name = "info"
