@@ -330,9 +330,9 @@ def packMsg(ty, params):
     (major, minor) = msg_formats[ty]
     args = {}
     for (k, v) in params.items():
-        if k == 'mac':
+        if k in ['mac', 'be_mac']:
             for i in range(0, 6):
-                args['mac[%d]' % i] = v[i]
+                args['%s[%d]' % (k, i)] = v[i]
         else:
             args[k] = v
     msg = xu.message(major, minor, msgid, args)

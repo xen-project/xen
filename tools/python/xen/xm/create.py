@@ -160,11 +160,13 @@ gopts.var('ipaddr', val="IPADDR",
           fn=append_value, default=[],
           use="Add an IP address to the domain.")
 
-gopts.var('vif', val="mac=MAC,bridge=BRIDGE,script=SCRIPT,backend=DOM",
+gopts.var('vif', val="mac=MAC,be_mac=MAC,bridge=BRIDGE,script=SCRIPT,backend=DOM",
           fn=append_value, default=[],
           use="""Add a network interface with the given MAC address and bridge.
           The vif is configured by calling the given configuration script.
           If mac is not specified a random MAC address is used.
+          The MAC address of the backend interface can be selected with be_mac.
+          If not specified then the network backend chooses it's own MAC address.
           If bridge is not specified the default bridge is used.
           If script is not specified the default script is used.
           If backend is not specified the default backend driver domain is used.
@@ -314,18 +316,22 @@ def configure_vifs(config_devs, vals):
             mac = d.get('mac')
             if not mac:
                 mac = randomMAC()
+            be_mac = d.get('be_mac')
             bridge = d.get('bridge')
             script = d.get('script')
             backend = d.get('backend')
             ip = d.get('ip')
         else:
             mac = randomMAC()
+            be_mac = None
             bridge = None
             script = None
             backend = None
             ip = None
         config_vif = ['vif']
         config_vif.append(['mac', mac])
+        if be_mac:
+            config_vif.append(['be_mac', be_mac])
         if bridge:
             config_vif.append(['bridge', bridge])
         if script:
@@ -423,7 +429,7 @@ def preprocess_vifs(opts, vals):
             (k, v) = b.strip().split('=', 1)
             k = k.strip()
             v = v.strip()
-            if k not in ['mac', 'bridge', 'script', 'backend', 'ip']:
+            if k not in ['mac', 'be_mac', 'bridge', 'script', 'backend', 'ip']:
                 opts.err('Invalid vif specifier: ' + vif)
             d[k] = v
         vifs.append(d)

@@ -35,6 +35,8 @@ typedef struct netif_st {
     domid_t          domid;
     unsigned int     handle;
 
+    u8               fe_dev_addr[6];
+
     /* Physical parameters of the comms window. */
     unsigned long    tx_shmem_frame;
     unsigned long    rx_shmem_frame;

@@ -109,7 +109,14 @@ class NetDev(controller.SplitDev):
         vmac = sxp.child_value(config, 'mac')
         if not vmac: return None
         mac = [ int(x, 16) for x in vmac.split(':') ]
-        if len(mac) != 6: raise XendError("invalid mac")
+        if len(mac) != 6: raise XendError("invalid mac: %s" % vmac)
+        return mac
+
+    def _get_config_be_mac(self, config):
+        vmac = sxp.child_value(config, 'be_mac')
+        if not vmac: return None
+        mac = [ int(x, 16) for x in vmac.split(':') ]
+        if len(mac) != 6: raise XendError("invalid backend mac: %s" % vmac)
         return mac
 
     def _get_config_ipaddr(self, config):
@@ -127,6 +134,7 @@ class NetDev(controller.SplitDev):
             return self.reconfigure(config)
         self.config = config
         self.mac = None
+        self.be_mac = None
         self.bridge = None
         self.script = None
         self.ipaddr = []
@@ -135,6 +143,7 @@ class NetDev(controller.SplitDev):
         if mac is None:
             raise XendError("invalid mac")
         self.mac = mac
+        self.be_mac = self._get_config_be_mac(config)
         self.bridge = sxp.child_value(config, 'bridge')
         self.script = sxp.child_value(config, 'script')
         self.ipaddr = self._get_config_ipaddr(config) or []
@@ -159,6 +168,7 @@ class NetDev(controller.SplitDev):
         """
         changes = {}
         mac = self._get_config_mac(config)
+        be_mac = self._get_config_be_mac(config)
         bridge = sxp.child_value(config, 'bridge')
         script = sxp.child_value(config, 'script')
         ipaddr = self._get_config_ipaddr(config)
@@ -166,6 +176,8 @@ class NetDev(controller.SplitDev):
         backendDomain = str(xd.domain_lookup(sxp.child_value(config, 'backend', '0')).id)
         if (mac is not None) and (mac != self.mac):
             raise XendError("cannot change mac")
+        if (be_mac is not None) and (be_mac != self.be_mac):
+            raise XendError("cannot change backend mac")
         if (backendDomain is not None) and (backendDomain != str(self.backendDomain)):
             raise XendError("cannot change backend")
         if (bridge is not None) and (bridge != self.bridge):
@@ -190,6 +202,8 @@ class NetDev(controller.SplitDev):
                ['idx', self.idx],
                ['vif', vif],
                ['mac', mac]]
+        if self.be_mac:
+            val.append(['be_mac', self.get_be_mac()])
         if self.bridge:
             val.append(['bridge', self.bridge])
         if self.script:
@@ -213,6 +227,11 @@ class NetDev(controller.SplitDev):
         """Get the MAC address as a string.
         """
         return ':'.join(map(lambda x: "%02x" % x, self.mac))
+
+    def get_be_mac(self):
+        """Get the backend MAC address as a string.
+        """
+        return ':'.join(map(lambda x: "%02x" % x, self.be_mac))
 
     def vifctl_params(self, vmname=None):
         """Get the parameters to pass to vifctl.
@@ -267,6 +286,7 @@ class NetDev(controller.SplitDev):
         msg = packMsg('netif_be_create_t',
                       { 'domid'        : self.controller.dom,
                         'netif_handle' : self.vif,
+                        'be_mac'       : self.be_mac or [0, 0, 0, 0, 0, 0],
                         'mac'          : self.mac })
         self.getBackendInterface().writeRequest(msg, response=d)
         return d
