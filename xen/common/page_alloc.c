@@ -203,10 +203,8 @@ unsigned long alloc_boot_pages(unsigned long size, unsigned long align)
 #define NR_ZONES    2
 
 /* Up to 2^10 pages can be allocated at once. */
-#define MIN_ORDER  0
 #define MAX_ORDER 10
-#define NR_ORDERS (MAX_ORDER - MIN_ORDER + 1)
-static struct list_head heap[NR_ZONES][NR_ORDERS];
+static struct list_head heap[NR_ZONES][MAX_ORDER+1];
 
 static unsigned long avail[NR_ZONES];
 
@@ -220,7 +218,7 @@ void end_boot_allocator(void)
     memset(avail, 0, sizeof(avail));
 
     for ( i = 0; i < NR_ZONES; i++ )
-        for ( j = 0; j < NR_ORDERS; j++ )
+        for ( j = 0; j <= MAX_ORDER; j++ )
             INIT_LIST_HEAD(&heap[i][j]);
 
     /* Pages that are free now go to the domain sub-allocator. */
@@ -236,9 +234,12 @@ void end_boot_allocator(void)
 }
 
 /* Hand the specified arbitrary page range to the specified heap zone. */
-void init_heap_pages(int zone, struct pfn_info *pg, unsigned long nr_pages)
+void init_heap_pages(
+    unsigned int zone, struct pfn_info *pg, unsigned long nr_pages)
 {
     unsigned long i;
+
+    ASSERT(zone < NR_ZONES);
 
     for ( i = 0; i < nr_pages; i++ )
         free_heap_pages(zone, pg+i, 0);
@@ -246,24 +247,28 @@ void init_heap_pages(int zone, struct pfn_info *pg, unsigned long nr_pages)
 
 
 /* Allocate 2^@order contiguous pages. */
-struct pfn_info *alloc_heap_pages(int zone, int order)
+struct pfn_info *alloc_heap_pages(unsigned int zone, unsigned int order)
 {
     int i;
     struct pfn_info *pg;
 
-    if ( unlikely(order < MIN_ORDER) || unlikely(order > MAX_ORDER) )
+    ASSERT(zone < NR_ZONES);
+
+    if ( unlikely(order > MAX_ORDER) )
         return NULL;
 
     spin_lock(&heap_lock);
 
     /* Find smallest order which can satisfy the request. */
-    for ( i = order; i < NR_ORDERS; i++ )
+    for ( i = order; i <= MAX_ORDER; i++ )
 	if ( !list_empty(&heap[zone][i]) )
-	    break;
+	    goto found;
 
-    if ( i == NR_ORDERS ) 
-        goto no_memory;
- 
+    /* No suitable memory blocks. Fail the request. */
+    spin_unlock(&heap_lock);
+    return NULL;
+
+ found: 
     pg = list_entry(heap[zone][i].next, struct pfn_info, list);
     list_del(&pg->list);
 
@@ -281,17 +286,17 @@ struct pfn_info *alloc_heap_pages(int zone, int order)
     spin_unlock(&heap_lock);
 
     return pg;
-
- no_memory:
-    spin_unlock(&heap_lock);
-    return NULL;
 }
 
 
 /* Free 2^@order set of pages. */
-void free_heap_pages(int zone, struct pfn_info *pg, int order)
+void free_heap_pages(
+    unsigned int zone, struct pfn_info *pg, unsigned int order)
 {
     unsigned long mask;
+
+    ASSERT(zone < NR_ZONES);
+    ASSERT(order <= MAX_ORDER);
 
     spin_lock(&heap_lock);
 
@@ -393,7 +398,7 @@ void init_xenheap_pages(unsigned long ps, unsigned long pe)
 }
 
 
-unsigned long alloc_xenheap_pages(int order)
+unsigned long alloc_xenheap_pages(unsigned int order)
 {
     unsigned long flags;
     struct pfn_info *pg;
@@ -431,7 +436,7 @@ unsigned long alloc_xenheap_pages(int order)
 }
 
 
-void free_xenheap_pages(unsigned long p, int order)
+void free_xenheap_pages(unsigned long p, unsigned int order)
 {
     unsigned long flags;
 
@@ -459,7 +464,7 @@ void init_domheap_pages(unsigned long ps, unsigned long pe)
 }
 
 
-struct pfn_info *alloc_domheap_pages(struct domain *d, int order)
+struct pfn_info *alloc_domheap_pages(struct domain *d, unsigned int order)
 {
     struct pfn_info *pg;
     unsigned long mask, flushed_mask, pfn_stamp, cpu_stamp;
@@ -535,7 +540,7 @@ struct pfn_info *alloc_domheap_pages(struct domain *d, int order)
 }
 
 
-void free_domheap_pages(struct pfn_info *pg, int order)
+void free_domheap_pages(struct pfn_info *pg, unsigned int order)
 {
     int            i, drop_dom_ref;
     struct domain *d = pg->u.inuse.domain;
