@@ -202,20 +202,53 @@ int physdev_pci_access_modify(
                           &p->io_bitmap_sel);
             }
         }
-        else if ( r->flags & IORESOURCE_MEM )
-        {
-            /* allow domain to map IO memory for this device */
-            INFO("Giving domain %llu memory resources (%lx - %lx) "
-                 "for device %s\n", dom, r->start, r->end, pdev->slot_name);
-            for ( j = r->start; j < r->end + 1; j += PAGE_SIZE )
-                SHARE_PFN_WITH_DOMAIN(frame_table + (j >> PAGE_SHIFT), p);
-        }
-    }
 
-
+        /* rights to IO memory regions are checked when the domain maps them */
+	}
  out:
     put_task_struct(p);
     return rc;
+}
+
+/* Check if a domain controls a device with IO memory within frame @pfn.
+ * Returns: 1 if the domain should be allowed to map @pfn, 0 otherwise.  */
+int domain_iomem_in_pfn(struct task_struct *p, unsigned long pfn)
+{
+    int ret = 0;
+    struct list_head *l;
+
+    VERBOSE_INFO("Checking if physdev-capable domain %llu needs access to "
+                 "pfn %08lx\n", p->domain, pfn);
+    
+    spin_lock(&p->pcidev_lock);
+
+    list_for_each(l, &p->pcidev_list)
+    {
+        int i;
+        phys_dev_t *phys_dev = list_entry(l, phys_dev_t, node);
+        struct pci_dev *pci_dev = phys_dev->dev;
+
+        for ( i = 0; (i < DEVICE_COUNT_RESOURCE) && (ret == 0); i++ )
+        {
+            struct resource *r = &pci_dev->resource[i];
+            
+            if ( r->flags & IORESOURCE_MEM )
+                if ( (r->start >> PAGE_SHIFT) == pfn
+                     || (r->end >> PAGE_SHIFT) == pfn
+                     || ((r->start >> PAGE_SHIFT < pfn)
+                         && (r->end >> PAGE_SHIFT > pfn)) )
+                    ret = 1;
+        }
+
+        if ( ret != 0 ) break;
+    }
+    
+    spin_unlock(&p->pcidev_lock);
+
+    VERBOSE_INFO("Domain %llu %s mapping of pfn %08lx\n",
+                 p->domain, ret ? "allowed" : "disallowed", pfn);
+
+    return ret;
 }
 
 /* check if a domain has general access to a device */
@@ -235,8 +268,7 @@ inline static int check_dev_acc (struct task_struct *p,
     if ( bus > PCI_BUSMAX || dev > PCI_DEVMAX || func > PCI_FUNCMAX )
         return -EINVAL;
 
-    VERBOSE_INFO("a=%c b=%x d=%x f=%x ", (acc == ACC_READ) ? 'R' : 'W',
-                 mask, bus, dev, func);
+    VERBOSE_INFO("b=%x d=%x f=%x ", bus, dev, func);
 
     /* check target device */
     target_devfn = PCI_DEVFN(dev, func);
@@ -296,8 +328,8 @@ static int do_base_address_access(phys_dev_t *pdev, int acc, int idx,
         /* We could set *val to some value but the guest may well be in trouble
          * anyway if this write fails.  Hopefully the printk will give us a
          * clue what went wrong. */
-        printk("Guest attempting sub-dword %s to BASE_ADDRESS %d\n", 
-             (acc == ACC_READ) ? "read" : "write", idx);
+        printk("Guest %llu attempting sub-dword %s to BASE_ADDRESS %d\n",
+               pdev->owner->domain, (acc == ACC_READ) ? "read" : "write", idx);
         
         return -EPERM;
     }
@@ -328,7 +360,7 @@ static int do_base_address_access(phys_dev_t *pdev, int acc, int idx,
             }
         }
         VERBOSE_INFO("fixed pci write: %02x:%02x:%02x reg=0x%02x len=0x%02x"
-                     " val=0x%08x %lx\n", 
+                     " val=0x%08x %x\n", 
                      dev->bus->number, PCI_SLOT(dev->devfn), 
                      PCI_FUNC(dev->devfn), reg, len, *val, pdev->state);
     }
@@ -365,7 +397,7 @@ static int do_base_address_access(phys_dev_t *pdev, int acc, int idx,
             }
         }
         VERBOSE_INFO("fixed pci read: %02x:%02x:%02x reg=0x%02x len=0x%02x"
-                     " val=0x%08x %lx\n", 
+                     " val=0x%08x %x\n", 
                      dev->bus->number, PCI_SLOT(dev->devfn), 
                      PCI_FUNC(dev->devfn), reg, len, *val, pdev->state);
     }
@@ -422,9 +454,9 @@ static int do_rom_address_access(phys_dev_t *pdev, int acc, int len, u32 *val)
             }
         }
         VERBOSE_INFO("fixed pci write: %02x:%02x:%02x reg=0x%02x len=0x%02x"
-                     " val=0x%08x %lx\n", 
+                     " val=0x%08x %x\n", 
                      dev->bus->number, PCI_SLOT(dev->devfn), 
-                     PCI_FUNC(dev->devfn), reg, len, *val, pdev->state);
+                     PCI_FUNC(dev->devfn), PCI_ROM_ADDRESS, len, *val, pdev->state);
     }
     else if ( acc == ACC_READ )
     {
@@ -442,9 +474,9 @@ static int do_rom_address_access(phys_dev_t *pdev, int acc, int len, u32 *val)
             *val = *val | (orig_val & 0x1);
         }
         VERBOSE_INFO("fixed pci read: %02x:%02x:%02x reg=0x%02x len=0x%02x"
-                     " val=0x%08x %lx\n", 
+                     " val=0x%08x %x\n", 
                      dev->bus->number, PCI_SLOT(dev->devfn), 
-                     PCI_FUNC(dev->devfn), reg, len, *val, pdev->state);
+                     PCI_FUNC(dev->devfn), PCI_ROM_ADDRESS, len, *val, pdev->state);
     }
 
     return ret;
