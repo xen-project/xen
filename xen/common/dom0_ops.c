@@ -93,11 +93,14 @@ long do_dom0_op(dom0_op_t *u_dom0_op)
     {
         struct task_struct * p = find_domain_by_id(op.u.meminfo.domain);
         ret = -EINVAL;
-        if ( (p != NULL) && (p->flags & PF_CONSTRUCTED) )
+        if ( p != NULL )
         {
-            wake_up(p);
-            reschedule(p);
-            ret = p->domain;
+            if ( (p->flags & PF_CONSTRUCTED) != 0 )
+            {
+                wake_up(p);
+                reschedule(p);
+                ret = p->domain;
+            }
             put_task_struct(p);
         }
     }
