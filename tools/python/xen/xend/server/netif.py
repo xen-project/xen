@@ -5,7 +5,6 @@
 import random
 
 from twisted.internet import defer
-#defer.Deferred.debug = 1
 
 from xen.xend import sxp
 from xen.xend import Vifctl
@@ -208,13 +207,17 @@ class NetDev(controller.SplitDev):
         val = unpackMsg('netif_be_create_t', msg)
         return self
 
-    def destroy(self):
+    def destroy(self, change=0):
         """Destroy the device's resources and disconnect from the back-end
-        device controller.
+        device controller. If 'change' is true notify the front-end interface.
+
+        @param change: change flag
         """
         def cb_destroy(val):
             self.send_be_destroy()
             self.getBackendInterface().close()
+            if change:
+                self.interfaceChanged()
         log.debug("Destroying vif domain=%d vif=%d", self.controller.dom, self.vif)
         self.vifctl('down')
         d = self.send_be_disconnect()
@@ -256,7 +259,7 @@ class NetDev(controller.SplitDev):
                       { 'handle' : self.vif,
                         'status' : NETIF_INTERFACE_STATUS_CONNECTED,
                         'evtchn' : self.evtchn['port2'],
-                        'domid'  : 0, ## FIXME: should be domid of backend
+                        'domid'  : self.backendDomain,
                         'mac'    : self.mac })
         self.controller.writeRequest(msg)
 
@@ -265,7 +268,19 @@ class NetDev(controller.SplitDev):
                       { 'handle' : self.vif,
                         'status' : NETIF_INTERFACE_STATUS_DISCONNECTED,
                         'evtchn' : 0,
-                        'domid'  : 0, ## FIXME: should be domid of backend
+                        'domid'  : self.backendDomain,
+                        'mac'    : self.mac })
+        self.controller.writeRequest(msg)
+
+    def interfaceChanged(self):
+        """Notify the font-end that a device has been added or removed.
+        The front-end should then probe the devices.
+        """
+        msg = packMsg('netif_fe_interface_status_changed_t',
+                      { 'handle' : self.vif,
+                        'status' : NETIF_INTERFACE_STATUS_CHANGED,
+                        'evtchn' : 0,
+                        'domid'  : self.backendDomain,
                         'mac'    : self.mac })
         self.controller.writeRequest(msg)
         

@@ -771,6 +771,12 @@ static void netif_status_change(netif_fe_interface_status_changed_t *status)
         vif_wake(dev);
         break;
 
+    case NETIF_INTERFACE_STATUS_CHANGED:
+        /* The domain controller is notifying us that a device has been
+        * added or removed.
+        */
+        break;
+
     default:
         printk(KERN_WARNING "Status change to unknown value %d\n", 
                status->status);

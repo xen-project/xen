@@ -1148,6 +1148,12 @@ static void blkif_status_change(blkif_fe_interface_status_changed_t *status)
 
         break;
 
+    case BLKIF_INTERFACE_STATUS_CHANGED:
+        /* The domain controller is notifying us that a device has been
+        * added or removed.
+        */
+        break;
+
     default:
         printk(KERN_WARNING "Status change to unknown value %d\n", 
                status->status);

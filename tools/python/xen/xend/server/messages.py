@@ -50,6 +50,7 @@ BLKIF_DRIVER_STATUS_UP    = 1
 BLKIF_INTERFACE_STATUS_DESTROYED    = 0 #/* Interface doesn't exist.    */
 BLKIF_INTERFACE_STATUS_DISCONNECTED = 1 #/* Exists but is disconnected. */
 BLKIF_INTERFACE_STATUS_CONNECTED    = 2 #/* Exists and is connected.    */
+BLKIF_INTERFACE_STATUS_CHANGED      = 3 #/* A device has been added or removed. */
 
 BLKIF_BE_STATUS_OKAY                = 0
 BLKIF_BE_STATUS_ERROR               = 1
@@ -117,6 +118,7 @@ CMSG_NETIF_BE_DRIVER_STATUS_CHANGED    = 32
 NETIF_INTERFACE_STATUS_DESTROYED    = 0 #/* Interface doesn't exist.    */
 NETIF_INTERFACE_STATUS_DISCONNECTED = 1 #/* Exists but is disconnected. */
 NETIF_INTERFACE_STATUS_CONNECTED    = 2 #/* Exists and is connected.    */
+NETIF_INTERFACE_STATUS_CHANGED      = 3 #/* A device has been added or removed. */
 
 NETIF_DRIVER_STATUS_DOWN   = 0
 NETIF_DRIVER_STATUS_UP     = 1
