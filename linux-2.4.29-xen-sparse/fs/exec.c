@@ -328,7 +328,7 @@ int setup_arg_pages(struct linux_binprm *bprm)
 {
 	unsigned long stack_base;
 	struct vm_area_struct *mpnt;
-	int i;
+	int i, ret;
 
 	stack_base = STACK_TOP - MAX_ARG_PAGES*PAGE_SIZE;
 
@@ -352,7 +352,11 @@ int setup_arg_pages(struct linux_binprm *bprm)
 		mpnt->vm_pgoff = 0;
 		mpnt->vm_file = NULL;
 		mpnt->vm_private_data = (void *) 0;
-		insert_vm_struct(current->mm, mpnt);
+		if ((ret = insert_vm_struct(current->mm, mpnt))) {
+			up_write(&current->mm->mmap_sem);
+			kmem_cache_free(vm_area_cachep, mpnt);
+			return ret;
+		}
 		current->mm->total_vm = (mpnt->vm_end - mpnt->vm_start) >> PAGE_SHIFT;
 	} 
 
@@ -564,12 +568,29 @@ static inline void de_thread(struct task_struct *tsk)
 	tsk->tgid = tsk->pid;
 }
 
+void get_task_comm(char *buf, struct task_struct *tsk)
+{
+	/* buf must be at least sizeof(tsk->comm) in size */
+	task_lock(tsk);
+	memcpy(buf, tsk->comm, sizeof(tsk->comm));
+	task_unlock(tsk);
+}
+
+void set_task_comm(struct task_struct *tsk, char *buf)
+{
+	task_lock(tsk);
+	strncpy(tsk->comm, buf, sizeof(tsk->comm));
+	tsk->comm[sizeof(tsk->comm)-1]='\0';
+	task_unlock(tsk);
+}
+
 int flush_old_exec(struct linux_binprm * bprm)
 {
 	char * name;
 	int i, ch, retval;
 	struct signal_struct * oldsig;
 	struct files_struct * files;
+	char tcomm[sizeof(current->comm)];
 
 	/*
 	 * Make sure we have a private signal table
@@ -611,10 +632,11 @@ int flush_old_exec(struct linux_binprm * bprm)
 		if (ch == '/')
 			i = 0;
 		else
-			if (i < 15)
-				current->comm[i++] = ch;
+			if (i < (sizeof(tcomm) - 1))
+				tcomm[i++] = ch;
 	}
-	current->comm[i] = '\0';
+	tcomm[i] = '\0';
+	set_task_comm(current, tcomm);
 
 	flush_thread();
 
