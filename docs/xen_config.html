@@ -95,26 +95,10 @@ Defines a netbsd kernel image and its command-line parameters.
 
 <h2>(backend (blkif)) element</h2>
 The vm is a block device backend.
-The vm can have pci devices configured, but no virtual
-block devices.
+The vm can have pci devices configured.
 
 <h2>(backend (netif)) element</h2>
 The vm is a net device backend.
-The vm may not have virtual network interfaces (vifs) configured.
-
-<h2>(backend (vbd) element</h2>
-Defines the domain to use as the backend for virtual block devices.
-The domain must exist.
-<ul>
-    <li>domain: string, required. Domain name or id.
-</ul>
-
-<h2>(backend (vif) element</h2>
-Defines the domain to use as the backend for virtual network interfaces.
-The domain must exist.
-<ul>
-    <li>dom: string, required. Domain name or id.
-</ul>
 
 <h2>(device (vif)) element</h2>
 Defines a virtual network interface.
@@ -125,6 +109,8 @@ Defines a virtual network interface.
         when bringing the interface up or down.
     <li>ip: IP address, optional, no default. May be repeated. An IP address
     or CIDR-format subnet the vif may use.
+    <li>backend: domain name or id, optional, default 0.
+    Defines the domain to use as  the backend for the interface.
 </ul>
 
 <h2>(device (vbd)) element</h2>
@@ -133,6 +119,8 @@ Defines a virtual block device.
     <li>uname: string, required. Virtual block device id, e.g phys:hda1.
     <li>dev: string, required. Device file name in domain, e.g. xda1.
     <li>mode: string, optional, default r. Read-write mode: r | rw | w.
+    <li>backend: domain name or id, optional, default 0.
+     Defines the domain to use as the backend for the device.
 </ul>
 The uname field defines the device being exported from the block device
 controller. The dev field defines the device name the vm will see.
