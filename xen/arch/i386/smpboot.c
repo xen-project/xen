@@ -666,17 +666,13 @@ static void __init do_boot_cpu (int apicid)
     unsigned long boot_error = 0;
     int timeout, cpu;
     unsigned long start_eip;
-    l2_pgentry_t *pagetable;
 
     cpu = ++cpucount;
 
     if ( (idle = do_newdomain(IDLE_DOMAIN_ID, cpu)) == NULL )
         panic("failed 'newdomain' for CPU %d", cpu);
  
-    pagetable = (void *)get_free_page(GFP_KERNEL);
-    memcpy(pagetable, idle0_pg_table, PAGE_SIZE);
-    idle_pg_table[cpu] = pagetable;
-    idle->mm.pagetable = mk_pagetable(__pa(pagetable));
+    idle->mm.pagetable = mk_pagetable(__pa(idle_pg_table));
 
     map_cpu_to_boot_apicid(cpu, apicid);
 
@@ -687,7 +683,7 @@ static void __init do_boot_cpu (int apicid)
     /* start_eip had better be page-aligned! */
     start_eip = setup_trampoline();
 
-    /* So we see what's up   */
+    /* So we see what's up. */
     printk("Booting processor %d/%d eip %lx\n", cpu, apicid, start_eip);
     stack_start.esp = __pa(get_free_page(GFP_KERNEL)) + 4000;
 

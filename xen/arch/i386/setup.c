@@ -18,12 +18,7 @@ struct cpuinfo_x86 boot_cpu_data = { 0 };
 unsigned long mmu_cr4_features = X86_CR4_PSE | X86_CR4_PGE;
 unsigned long wait_init_idle;
 
-/* Basic page table for each CPU in the system. */
-l2_pgentry_t *idle_pg_table[NR_CPUS] = { idle0_pg_table };
 struct task_struct *idle_task[NR_CPUS] = { &idle0_task };
-
-/* for asm/domain_page.h, map_domain_page() */
-unsigned long *mapcache[NR_CPUS];
 
 int phys_proc_id[NR_CPUS];
 int logical_proc_id[NR_CPUS];
@@ -234,7 +229,6 @@ void __init cpu_init(void)
 {
     int nr = smp_processor_id();
     struct tss_struct * t = &init_tss[nr];
-    l2_pgentry_t *pl2e;
 
     if ( test_and_set_bit(nr, &cpu_initialized) )
         panic("CPU#%d already initialized!!!\n", nr);
@@ -267,16 +261,6 @@ void __init cpu_init(void)
     /* Install correct page table. */
     __asm__ __volatile__ ("movl %%eax,%%cr3"
                           : : "a" (pagetable_val(current->mm.pagetable)));
-
-    /* Set up mapping cache for domain pages. */
-    pl2e = idle_pg_table[nr] + (MAPCACHE_VIRT_START >> L2_PAGETABLE_SHIFT);
-    mapcache[nr] = (unsigned long *)get_free_page(GFP_KERNEL);
-    clear_page(mapcache[nr]);
-    *pl2e = mk_l2_pgentry(__pa(mapcache[nr]) | __PAGE_HYPERVISOR);
-
-    /* Set up linear page table mapping. */
-    idle_pg_table[nr][LINEAR_PT_VIRT_START >> L2_PAGETABLE_SHIFT] =
-        mk_l2_pgentry(__pa(idle_pg_table[nr]) | __PAGE_HYPERVISOR);
 
     init_idle_task();
 }

@@ -7,7 +7,7 @@
 #include <xeno/config.h>
 #include <xeno/sched.h>
 
-extern unsigned long *mapcache[NR_CPUS];
+extern unsigned long *mapcache;
 #define MAPCACHE_ENTRIES        1024
 
 /*

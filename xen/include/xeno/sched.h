@@ -50,7 +50,7 @@ extern struct mm_struct init_mm;
 {                                                                   \
     cpu_vm_mask: 0,                                                 \
     perdomain_pt: 0,                                                \
-    pagetable:   mk_pagetable(__pa(idle0_pg_table))                 \
+    pagetable:   mk_pagetable(__pa(idle_pg_table))                  \
 }
 
 #define _HYP_EVENT_NEED_RESCHED 0

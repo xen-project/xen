@@ -362,7 +362,7 @@ static int get_l2_table(unsigned long page_nr)
     
     /* Now we simply slap in our high mapping. */
     memcpy(p_l2_entry, 
-           idle_pg_table[smp_processor_id()] + DOMAIN_ENTRIES_PER_L2_PAGETABLE,
+           &idle_pg_table[DOMAIN_ENTRIES_PER_L2_PAGETABLE],
            HYPERVISOR_ENTRIES_PER_L2_PAGETABLE * sizeof(l2_pgentry_t));
     p_l2_entry[(PERDOMAIN_VIRT_START >> L2_PAGETABLE_SHIFT) -
               DOMAIN_ENTRIES_PER_L2_PAGETABLE] =

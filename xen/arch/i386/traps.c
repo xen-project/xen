@@ -398,9 +398,7 @@ asmlinkage void do_page_fault(struct pt_regs *regs, long error_code)
     if ( addr >= PAGE_OFFSET )
     {
         unsigned long page;
-        unsigned long *pde;
-        pde = (unsigned long *)idle_pg_table[smp_processor_id()];
-        page = pde[addr >> L2_PAGETABLE_SHIFT];
+        page = l2_pgentry_val(idle_pg_table[addr >> L2_PAGETABLE_SHIFT]);
         printk("*pde = %08lx\n", page);
         if ( page & _PAGE_PRESENT )
         {
@@ -683,7 +681,7 @@ void __init trap_init(void)
     tss->ss     = __HYPERVISOR_DS;
     tss->esp    = (unsigned long)
         &doublefault_stack[DOUBLEFAULT_STACK_SIZE];
-    tss->__cr3  = __pa(idle0_pg_table);
+    tss->__cr3  = __pa(idle_pg_table);
     tss->cs     = __HYPERVISOR_CS;
     tss->eip    = (unsigned long)do_double_fault;
     tss->eflags = 2;

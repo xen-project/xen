@@ -33,7 +33,7 @@ static inline void set_pte_phys (unsigned long vaddr,
     l2_pgentry_t *l2ent;
     l1_pgentry_t *l1ent;
 
-    l2ent = idle0_pg_table + l2_table_offset(vaddr);
+    l2ent = &idle_pg_table[l2_table_offset(vaddr)];
     l1ent = l2_pgentry_to_l1(*l2ent) + l1_table_offset(vaddr);
     *l1ent = entry;
 
@@ -89,31 +89,37 @@ void __init paging_init(void)
      * created - mappings will be set by set_fixmap():
      */
     addr = FIXADDR_START & ~((1<<L2_PAGETABLE_SHIFT)-1);
-    fixrange_init(addr, 0, idle0_pg_table);
+    fixrange_init(addr, 0, idle_pg_table);
 
     /* Create page table for ioremap(). */
     ioremap_pt = (void *)get_free_page(GFP_KERNEL);
     clear_page(ioremap_pt);
-    idle0_pg_table[IOREMAP_VIRT_START >> L2_PAGETABLE_SHIFT] = 
+    idle_pg_table[IOREMAP_VIRT_START >> L2_PAGETABLE_SHIFT] = 
         mk_l2_pgentry(__pa(ioremap_pt) | __PAGE_HYPERVISOR);
 
     /* Create read-only mapping of MPT for guest-OS use. */
-    idle0_pg_table[READONLY_MPT_VIRT_START >> L2_PAGETABLE_SHIFT] =
-        idle0_pg_table[RDWR_MPT_VIRT_START >> L2_PAGETABLE_SHIFT];
-    mk_l2_readonly(idle0_pg_table + 
+    idle_pg_table[READONLY_MPT_VIRT_START >> L2_PAGETABLE_SHIFT] =
+        idle_pg_table[RDWR_MPT_VIRT_START >> L2_PAGETABLE_SHIFT];
+    mk_l2_readonly(idle_pg_table + 
                    (READONLY_MPT_VIRT_START >> L2_PAGETABLE_SHIFT));
+
+    /* Set up mapping cache for domain pages. */
+    mapcache = (unsigned long *)get_free_page(GFP_KERNEL);
+    clear_page(mapcache);
+    idle_pg_table[MAPCACHE_VIRT_START >> L2_PAGETABLE_SHIFT] =
+        mk_l2_pgentry(__pa(mapcache) | __PAGE_HYPERVISOR);
+
+    /* Set up linear page table mapping. */
+    idle_pg_table[LINEAR_PT_VIRT_START >> L2_PAGETABLE_SHIFT] =
+        mk_l2_pgentry(__pa(idle_pg_table) | __PAGE_HYPERVISOR);
+
 }
 
 void __init zap_low_mappings (void)
 {
-    int i, j;
-    for ( i = 0; i < smp_num_cpus; i++ )
-    {
-        for ( j = 0; j < DOMAIN_ENTRIES_PER_L2_PAGETABLE; j++ )
-        {
-            idle_pg_table[i][j] = mk_l2_pgentry(0);
-        }
-    }
+    int i;
+    for ( i = 0; i < DOMAIN_ENTRIES_PER_L2_PAGETABLE; i++ )
+        idle_pg_table[i] = mk_l2_pgentry(0);
     flush_tlb_all();
 }
 

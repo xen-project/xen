@@ -110,7 +110,7 @@ continue_boot_cpu:
 skip_dom0_copy:              
 
         /* Initialize low and high mappings of all memory with 4MB pages */
-        mov     $idle0_pg_table-__PAGE_OFFSET,%edi
+        mov     $idle_pg_table-__PAGE_OFFSET,%edi
         mov     $0x1e3,%eax                  /* PRESENT+RW+A+D+4MB+GLOBAL */
 1:      mov     %eax,__PAGE_OFFSET>>20(%edi) /* high mapping */
         stosl                                /* low mapping */
@@ -127,7 +127,7 @@ skip_dom0_copy:
         ud2     /* Force a panic (invalid opcode). */
 
 start_paging:
-        mov     $idle0_pg_table-__PAGE_OFFSET,%eax
+        mov     $idle_pg_table-__PAGE_OFFSET,%eax
         mov     %eax,%cr3
         mov     %cr0,%eax
         or      $0x80010000,%eax /* set PG and WP bits */
@@ -254,9 +254,9 @@ ENTRY(gdt_table)
         .quad 0x0000000000000000     /* unused                           */
         .fill 2*NR_CPUS,8,0          /* space for TSS and LDT per CPU    */
 
-# The following adds 12kB to the kernel file size.
+# The following adds 8-12kB to the kernel file size.
         .org 0x1000
-ENTRY(idle0_pg_table)
+ENTRY(idle_pg_table)
         .org 0x2000
 ENTRY(cpu0_stack)
         .org 0x3000

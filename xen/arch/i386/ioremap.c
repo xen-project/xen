@@ -82,7 +82,7 @@ void * __ioremap(unsigned long phys_addr, unsigned long size, unsigned long flag
      */
     vaddr = remap_base;
     remap_base += size;
-    pl2e = idle0_pg_table + l2_table_offset(vaddr);
+    pl2e = &idle_pg_table[l2_table_offset(vaddr)];
     if ( l2_pgentry_empty(*pl2e) ) new_l2e(pl2e);
     pl1e = l2_pgentry_to_l1(*pl2e++) + l1_table_offset(vaddr);
     for ( ; ; ) 

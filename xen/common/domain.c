@@ -360,9 +360,8 @@ int final_setup_guestos(struct task_struct * p, dom_meminfo_t * meminfo)
      */
     phys_l2tab = meminfo->l2_pgt_addr;
     l2tab = map_domain_mem(phys_l2tab); 
-    memcpy(l2tab + DOMAIN_ENTRIES_PER_L2_PAGETABLE, 
-        ((l2_pgentry_t *)idle_pg_table[p->processor]) + 
-        DOMAIN_ENTRIES_PER_L2_PAGETABLE, 
+    memcpy(&l2tab[DOMAIN_ENTRIES_PER_L2_PAGETABLE], 
+        &idle_pg_table[DOMAIN_ENTRIES_PER_L2_PAGETABLE],
         (ENTRIES_PER_L2_PAGETABLE - DOMAIN_ENTRIES_PER_L2_PAGETABLE) 
         * sizeof(l2_pgentry_t));
     l2tab[PERDOMAIN_VIRT_START >> L2_PAGETABLE_SHIFT] = 
@@ -541,7 +540,7 @@ int setup_guestos(struct task_struct *p, dom0_newdomain_t *params,
      */
     phys_l2tab = alloc_page_from_domain(&alloc_address, &alloc_index);
     l2start = l2tab = map_domain_mem(phys_l2tab);
-    memcpy(l2tab, idle_pg_table[p->processor], PAGE_SIZE);
+    memcpy(l2tab, &idle_pg_table[0], PAGE_SIZE);
     l2tab[PERDOMAIN_VIRT_START >> L2_PAGETABLE_SHIFT] =
         mk_l2_pgentry(__pa(p->mm.perdomain_pt) | __PAGE_HYPERVISOR);
     l2tab[LINEAR_PT_VIRT_START >> L2_PAGETABLE_SHIFT] =
