@@ -96,7 +96,7 @@ static void timer_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 
     /* Rough hack to allow accurate timers to sort-of-work with no APIC. */
     if ( do_timer_lists_from_pit )
-        do_ac_timer();
+        __cpu_raise_softirq(smp_processor_id(), AC_TIMER_SOFTIRQ);
 }
 
 static struct irqaction irq0  = { timer_interrupt, SA_INTERRUPT, 0,

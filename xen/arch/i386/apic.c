@@ -711,58 +711,18 @@ int reprogram_ac_timer(s_time_t timeout)
     return 1;
 }
 
-/*
- * Local timer interrupt handler.
- * Here the programmable, accurate timers are executed.
- */
-inline void smp_local_timer_interrupt(struct pt_regs *regs)
-{
-    do_ac_timer();
-}
-
-/*
- * Local APIC timer interrupt. This is the most natural way for doing
- * local interrupts, but local timer interrupts can be emulated by
- * broadcast interrupts too. [in case the hw doesnt support APIC timers]
- *
- * [ if a single-CPU system runs an SMP kernel then we call the local
- *   interrupt as well. Thus we cannot inline the local irq ... ]
- */
 unsigned int apic_timer_irqs [NR_CPUS];
 
 void smp_apic_timer_interrupt(struct pt_regs * regs)
 {
     int cpu = smp_processor_id();
-#ifndef NDEBUG
-    u32 cc_start, cc_end;
-    rdtscl(cc_start);
-#endif
 
-    /*
-     * the NMI deadlock-detector uses this.
-     */
-    apic_timer_irqs[cpu]++;
-
-    /*
-     * NOTE! We'd better ACK the irq immediately, because timer handling can 
-     * be slow. XXX is this save?
-     */
     ack_APIC_irq();
 
-    /* call the local handler */
-    irq_enter(cpu, 0);
+    apic_timer_irqs[cpu]++;
     perfc_incrc(apic_timer);
-    smp_local_timer_interrupt(regs);
-    irq_exit(cpu, 0);
 
-    if (softirq_pending(cpu))
-        do_softirq();
-
-#ifndef NDEBUG
-    rdtscl(cc_end);
-    if ( (cc_end - cc_start) > (cpu_khz * 100) )
-        printk("APIC Long ISR on CPU=%02d %08X -> %08X\n",cpu,cc_start,cc_end);
-#endif
+    __cpu_raise_softirq(cpu, AC_TIMER_SOFTIRQ);
 }
 
 /*

@@ -241,88 +241,35 @@ void mod_ac_timer(struct ac_timer *timer, s_time_t new_time)
 }
 
 
-void do_ac_timer(void)
-{
-    int              cpu = smp_processor_id();
-    unsigned long    flags;
-    struct ac_timer *t, **heap;
-    s_time_t         diff, now = NOW();
-    long             max;
-
-    spin_lock_irqsave(&ac_timers[cpu].lock, flags);
-
- do_timer_again:
-    TRC(printk("ACT  [%02d] do(): now=%lld\n", cpu, NOW()));
-
-    heap = ac_timers[cpu].heap;
-
-    while ( (GET_HEAP_SIZE(heap) != 0) &&
-            ((t = heap[1])->expires < (NOW() + TIMER_SLOP)) )
-    {
-        remove_entry(heap, t);
-
-        /* Do some stats collection. */
-        diff = (now - t->expires);
-        if ( diff > 0x7fffffff ) 
-            diff =  0x7fffffff; /* THIS IS BAD! */
-        max = perfc_valuea(ac_timer_max, cpu);
-        if ( diff > max ) 
-            perfc_seta(ac_timer_max, cpu, diff);
-
-        spin_unlock_irqrestore(&ac_timers[cpu].lock, flags);
-        if ( t->function != NULL ) 
-            t->function(t->data);
-        spin_lock_irqsave(&ac_timers[cpu].lock, flags);
-
-        /* Heap may have grown while the lock was released. */
-        heap = ac_timers[cpu].heap;
-    }
-
-    if ( GET_HEAP_SIZE(heap) != 0 )
-    {
-        if ( !reprogram_ac_timer(heap[1]->expires) )
-            goto do_timer_again;
-    } 
-    else 
-    {
-        reprogram_ac_timer(0);
-    }
-
-    spin_unlock_irqrestore(&ac_timers[cpu].lock, flags);
-    TRC(printk("ACT  [%02d] do(): end\n", cpu));
-}
-
-
 static void ac_timer_softirq_action(struct softirq_action *a)
 {
-    int               cpu = smp_processor_id();
-    unsigned long     flags;
-    struct ac_timer  *t;
-    int               process_timer_list = 0;
+    int              cpu = smp_processor_id();
+    struct ac_timer *t, **heap;
+    s_time_t         now;
 
-    spin_lock_irqsave(&ac_timers[cpu].lock, flags);
+    spin_lock_irq(&ac_timers[cpu].lock);
     
-    if ( GET_HEAP_SIZE(ac_timers[cpu].heap) != 0 )
-    {
-        /*
-         * Reprogram timer with earliest deadline. If that has already passed
-         * then we will process the timer list as soon as we release the lock.
-         */
-        t = ac_timers[cpu].heap[1];
-        if ( (t->expires < (NOW() + TIMER_SLOP)) ||
-             !reprogram_ac_timer(t->expires) )
-            process_timer_list = 1;
+    do {
+        heap = ac_timers[cpu].heap;
+        now  = NOW();
+        
+        while ( (GET_HEAP_SIZE(heap) != 0) &&
+                ((t = heap[1])->expires < (now + TIMER_SLOP)) )
+        {
+            remove_entry(heap, t);
+                        
+            spin_unlock_irq(&ac_timers[cpu].lock);
+            if ( t->function != NULL ) 
+                t->function(t->data);
+            spin_lock_irq(&ac_timers[cpu].lock);
+            
+            /* Heap may have grown while the lock was released. */
+            heap = ac_timers[cpu].heap;
+        }
     }
-    else
-    {
-        /* No deadline to program the timer with.*/
-        reprogram_ac_timer((s_time_t)0);
-    }
+    while ( !reprogram_ac_timer(GET_HEAP_SIZE(heap) ? heap[1]->expires : 0) );
 
-    spin_unlock_irqrestore(&ac_timers[cpu].lock, flags);
-
-    if ( process_timer_list )
-        do_ac_timer();
+    spin_unlock_irq(&ac_timers[cpu].lock);
 }
 
 

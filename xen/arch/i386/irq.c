@@ -535,9 +535,6 @@ asmlinkage unsigned int do_IRQ(struct pt_regs regs)
     desc->handler->end(irq);
     spin_unlock(&desc->lock);
 
-    if (softirq_pending(cpu))
-        do_softirq();
-
     rdtscl(cc_end);
 
     if ( !action || (!(action->flags & SA_NOPROFILE)) )

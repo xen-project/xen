@@ -466,19 +466,6 @@ extern int		dev_ioctl(unsigned int cmd, void *);
 extern int		dev_change_flags(struct net_device *, unsigned);
 extern void		dev_init(void);
 
-extern int		netdev_nit;
-
-/* Post buffer to the network code from _non interrupt_ context.
- * see net/core/dev.c for netif_rx description.
- */
-static inline int netif_rx_ni(struct sk_buff *skb)
-{
-       int err = netif_rx(skb);
-       if (softirq_pending(smp_processor_id()))
-               do_softirq();
-       return err;
-}
-
 extern int netdev_finish_unregister(struct net_device *dev);
 
 static inline void dev_put(struct net_device *dev)

@@ -3,11 +3,8 @@
 # define dprintk(x)
 #endif
 
-/* Start of Xen additions XXX */
 #include <asm/byteorder.h>
 #include <xeno/interrupt.h>
-#define TRY_TASKLET
-/* End of Xen additions XXX */
 
 /*------------------------------------------------------------------------------
  *              D E F I N E S
@@ -1416,12 +1413,7 @@ int aac_rx_init(struct aac_dev *dev, unsigned long devNumber);
 int aac_sa_init(struct aac_dev *dev, unsigned long devNumber);
 unsigned int aac_response_normal(struct aac_queue * q);
 unsigned int aac_command_normal(struct aac_queue * q);
-#ifdef TRY_TASKLET
-extern struct tasklet_struct aac_command_tasklet;
-void aac_command_thread(unsigned long data);
-#else
-int aac_command_thread(struct aac_dev * dev);
-#endif
+void aac_command_thread(struct aac_dev * dev);
 int aac_close_fib_context(struct aac_dev * dev, struct aac_fib_context *fibctx);
 int fib_adapter_complete(struct fib * fibptr, unsigned short size);
 struct aac_driver_ident* aac_get_driver_ident(int devtype);

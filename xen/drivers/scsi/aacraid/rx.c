@@ -406,20 +406,6 @@ int aac_rx_init(struct aac_dev *dev, unsigned long num)
 
 	if (aac_init_adapter(dev) == NULL)
 		return -1;
-#ifdef TRY_TASKLET
-	aac_command_tasklet.data = (unsigned long)dev;
-	tasklet_enable(&aac_command_tasklet);
-#else
-	/*
-	 *	Start any kernel threads needed
-	 */
-	dev->thread_pid = kernel_thread((int (*)(void *))aac_command_thread, dev, 0);
-	if(dev->thread_pid < 0)
-	{
-		printk(KERN_ERR "aacraid: Unable to create rx thread.\n");
-		return -1;
-	}	
-#endif
 	/*
 	 *	Tell the adapter that all is configured, and it can start
 	 *	accepting requests
