@@ -574,6 +574,10 @@ void deliver_packet(struct sk_buff *skb, net_vif_t *vif)
 
  out:
     make_rx_response(vif, rx->id, size, status, offset);
+
+    /* record this so they can be billed */
+    vif->total_packets_received++;
+    vif->total_bytes_received += size;
 }
 
 /**
@@ -764,6 +768,10 @@ static void net_tx_action(unsigned long unused)
 
         skb->data_len = tx->size - PKT_PROT_LEN;
         skb->len      = tx->size;
+
+        /* record the transmission so they can be billed */
+        vif->total_packets_sent++;
+        vif->total_bytes_sent += tx->size;
 
         /* Transmit should always work, or the queue would be stopped. */
         if ( dev->hard_start_xmit(skb, dev) != 0 )
@@ -1882,10 +1890,6 @@ long do_net_update(void)
                 make_tx_response(vif, tx.id, RING_STATUS_OK);
             }
 
-            /* record the transmission so they can be billed */
-            vif->total_packets_sent++;
-            vif->total_bytes_sent += tx.size;
-
         tx_unmap_and_continue:
             unmap_domain_mem(g_data);
             spin_unlock_irq(&current->page_lock);
@@ -2041,10 +2045,6 @@ static void make_rx_response(net_vif_t     *vif,
         guest_event_notify(cpu_mask);    
     }
     spin_unlock_irqrestore(&vif->rx_lock, flags);
-
-    /* record this so they can be billed */
-    vif->total_packets_received++;
-    vif->total_bytes_received += size;
 }
 
 
