@@ -28,26 +28,28 @@
 
 #define INIT_EVENT_CHANNELS   16
 #define MAX_EVENT_CHANNELS  1024
+#define EVENT_CHANNELS_SPREAD 32
 
 
-static int get_free_port(struct domain *d)
+static int get_free_port(struct exec_domain *ed)
 {
+    struct domain *d = ed->domain;
     int max, port;
     event_channel_t *chn;
 
     max = d->max_event_channel;
     chn = d->event_channel;
 
-    for ( port = 0; port < max; port++ )
+    for ( port = ed->eid * EVENT_CHANNELS_SPREAD; port < max; port++ )
         if ( chn[port].state == ECS_FREE )
             break;
 
-    if ( port == max )
+    if ( port >= max )
     {
         if ( max == MAX_EVENT_CHANNELS )
             return -ENOSPC;
         
-        max *= 2;
+        max = port + EVENT_CHANNELS_SPREAD;
         
         chn = xmalloc(max * sizeof(event_channel_t));
         if ( unlikely(chn == NULL) )
@@ -57,7 +59,8 @@ static int get_free_port(struct domain *d)
 
         if ( d->event_channel != NULL )
         {
-            memcpy(chn, d->event_channel, (max/2) * sizeof(event_channel_t));
+            memcpy(chn, d->event_channel, d->max_event_channel *
+                   sizeof(event_channel_t));
             xfree(d->event_channel);
         }
 
@@ -76,7 +79,7 @@ static long evtchn_alloc_unbound(evtchn_alloc_unbound_t *alloc)
 
     spin_lock(&d->event_channel_lock);
 
-    if ( (port = get_free_port(d)) >= 0 )
+    if ( (port = get_free_port(current)) >= 0 )
     {
         d->event_channel[port].state = ECS_UNBOUND;
         d->event_channel[port].u.unbound.remote_domid = alloc->dom;
@@ -139,7 +142,7 @@ static long evtchn_bind_interdomain(evtchn_bind_interdomain_t *bind)
     /* Obtain, or ensure that we already have, a valid <port1>. */
     if ( port1 == 0 )
     {
-        if ( (port1 = get_free_port(d1)) < 0 )
+        if ( (port1 = get_free_port(ed1)) < 0 )
             ERROR_EXIT(port1);
     }
     else if ( port1 >= d1->max_event_channel )
@@ -151,7 +154,7 @@ static long evtchn_bind_interdomain(evtchn_bind_interdomain_t *bind)
         /* Make port1 non-free while we allocate port2 (in case dom1==dom2). */
         u16 tmp = d1->event_channel[port1].state;
         d1->event_channel[port1].state = ECS_INTERDOMAIN;
-        port2 = get_free_port(d2);
+        port2 = get_free_port(ed2);
         d1->event_channel[port1].state = tmp;
         if ( port2 < 0 )
             ERROR_EXIT(port2);
@@ -255,7 +258,7 @@ static long evtchn_bind_virq(evtchn_bind_virq_t *bind)
      */
     if ( ((port = ed->virq_to_evtchn[virq]) != 0) ||
          (virq == VIRQ_MISDIRECT) ||
-         ((port = get_free_port(d)) < 0) )
+         ((port = get_free_port(ed)) < 0) )
         goto out;
 
     d->event_channel[port].state  = ECS_VIRQ;
@@ -283,7 +286,7 @@ static long evtchn_bind_ipi(evtchn_bind_ipi_t *bind)
 
     spin_lock(&d->event_channel_lock);
 
-    if ( (port = get_free_port(d)) >= 0 )
+    if ( (port = get_free_port(ed)) >= 0 )
     {
         d->event_channel[port].state      = ECS_IPI;
         d->event_channel[port].u.ipi_edom = ipi_edom;
@@ -312,7 +315,7 @@ static long evtchn_bind_pirq(evtchn_bind_pirq_t *bind)
     spin_lock(&d->event_channel_lock);
 
     if ( ((rc = port = d->pirq_to_evtchn[pirq]) != 0) ||
-         ((rc = port = get_free_port(d)) < 0) )
+         ((rc = port = get_free_port(current)) < 0) )
         goto out;
 
     d->pirq_to_evtchn[pirq] = port;
@@ -476,26 +479,39 @@ static long evtchn_send(int lport)
 {
     struct domain *ld = current->domain;
     struct exec_domain *rd;
-    int            rport;
+    int            rport, ret = 0;
 
     spin_lock(&ld->event_channel_lock);
 
     if ( unlikely(lport < 0) ||
-         unlikely(lport >= ld->max_event_channel) || 
-         unlikely(ld->event_channel[lport].state != ECS_INTERDOMAIN) )
+         unlikely(lport >= ld->max_event_channel))
     {
         spin_unlock(&ld->event_channel_lock);
         return -EINVAL;
     }
 
-    rd    = ld->event_channel[lport].u.interdomain.remote_dom;
-    rport = ld->event_channel[lport].u.interdomain.remote_port;
+    switch ( ld->event_channel[lport].state )
+    {
+    case ECS_INTERDOMAIN:
+        rd    = ld->event_channel[lport].u.interdomain.remote_dom;
+        rport = ld->event_channel[lport].u.interdomain.remote_port;
 
-    evtchn_set_pending(rd, rport);
+        evtchn_set_pending(rd, rport);
+        break;
+    case ECS_IPI:
+        rd = ld->exec_domain[ld->event_channel[lport].u.ipi_edom];
+        if ( rd  )
+            evtchn_set_pending(rd, lport);
+        else
+            ret = -EINVAL;
+        break;
+    default:
+        ret = -EINVAL;
+    }
 
     spin_unlock(&ld->event_channel_lock);
 
-    return 0;
+    return ret;
 }
 
 

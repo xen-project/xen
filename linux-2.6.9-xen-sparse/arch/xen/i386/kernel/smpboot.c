@@ -457,10 +457,7 @@ static struct irqaction local_irq_debug = {
 
 void local_setup_debug(void)
 {
-	int time_irq;
-
-	time_irq = bind_virq_to_irq(VIRQ_DEBUG);
-	(void)setup_irq(time_irq, &local_irq_debug);
+	(void)setup_irq(bind_virq_to_irq(VIRQ_DEBUG), &local_irq_debug);
 }
 
 
@@ -484,6 +481,7 @@ int __init start_secondary(void *unused)
 	setup_misdirect_virq();
 	local_setup_timer();
 	local_setup_debug();	/* XXX */
+	smp_intr_init();
 	local_irq_enable();
 	/*
 	 * low-memory mappings have been cleared, flush them from
@@ -492,7 +490,7 @@ int __init start_secondary(void *unused)
 	local_flush_tlb();
 	cpu_set(smp_processor_id(), cpu_online_map);
 	wmb();
-	if (01) {
+	if (0) {
 		char *msg2 = "delay2\n";
 		int timeout;
 		for (timeout = 0; timeout < 50000; timeout++) {
@@ -1171,6 +1169,8 @@ static void __init smp_boot_cpus(unsigned int max_cpus)
 		return;
 	}
 
+	smp_intr_init();
+
 #if 0
 	connect_bsp_APIC();
 	setup_local_APIC();
@@ -1342,27 +1342,37 @@ void __init smp_cpus_done(unsigned int max_cpus)
 #endif
 }
 
+extern irqreturn_t smp_reschedule_interrupt(int, void *, struct pt_regs *);
+
+static struct irqaction reschedule_irq = {
+	smp_reschedule_interrupt, SA_INTERRUPT, CPU_MASK_NONE, "reschedule",
+	NULL, NULL
+};
+
+extern irqreturn_t smp_invalidate_interrupt(int, void *, struct pt_regs *);
+
+static struct irqaction invalidate_irq = {
+	smp_invalidate_interrupt, SA_INTERRUPT, CPU_MASK_NONE, "invalidate",
+	NULL, NULL
+};
+
+extern irqreturn_t smp_call_function_interrupt(int, void *, struct pt_regs *);
+
+static struct irqaction call_function_irq = {
+	smp_call_function_interrupt, SA_INTERRUPT, CPU_MASK_NONE,
+	"call_function", NULL, NULL
+};
+
 void __init smp_intr_init(void)
 {
-#if 1
-	xxprint("smp_intr_init\n");
-#else
-	/*
-	 * IRQ0 must be given a fixed assignment and initialized,
-	 * because it's used before the IO-APIC is set up.
-	 */
-	set_intr_gate(FIRST_DEVICE_VECTOR, interrupt[0]);
 
-	/*
-	 * The reschedule interrupt is a CPU-to-CPU reschedule-helper
-	 * IPI, driven by wakeup.
-	 */
-	set_intr_gate(RESCHEDULE_VECTOR, reschedule_interrupt);
-
-	/* IPI for invalidation */
-	set_intr_gate(INVALIDATE_TLB_VECTOR, invalidate_interrupt);
-
-	/* IPI for generic function call */
-	set_intr_gate(CALL_FUNCTION_VECTOR, call_function_interrupt);
-#endif
+	(void)setup_irq(
+	    bind_ipi_on_cpu_to_irq(smp_processor_id(), RESCHEDULE_VECTOR),
+	    &reschedule_irq);
+	(void)setup_irq(
+	    bind_ipi_on_cpu_to_irq(smp_processor_id(), INVALIDATE_TLB_VECTOR),
+	    &invalidate_irq);
+	(void)setup_irq(
+	    bind_ipi_on_cpu_to_irq(smp_processor_id(), CALL_FUNCTION_VECTOR),
+	    &call_function_irq);
 }

@@ -63,8 +63,7 @@ static int irq_to_evtchn[NR_IRQS];
 /* IRQ <-> VIRQ mapping. */
 DEFINE_PER_CPU(int, virq_to_irq[NR_VIRQS]);
 
-#define NR_IPIS 8
-/* IRQ <-> IPI mapping. */
+/* evtchn <-> IPI mapping. */
 DEFINE_PER_CPU(int, ipi_to_evtchn[NR_IPIS]);
 
 /* Reference counts for bindings to IRQs. */
@@ -196,38 +195,56 @@ void unbind_virq_from_irq(int virq)
     spin_unlock(&irq_mapping_update_lock);
 }
 
-void bind_ipi_on_cpu(int cpu, int ipi)
+int bind_ipi_on_cpu_to_irq(int cpu, int ipi)
 {
     evtchn_op_t op;
+    int evtchn, irq;
 
     spin_lock(&irq_mapping_update_lock);
 
-    if (per_cpu(ipi_to_evtchn, cpu)[ipi] == 0) {
+    if ( (evtchn = per_cpu(ipi_to_evtchn, cpu)[ipi]) == 0 )
+    {
         op.cmd                 = EVTCHNOP_bind_ipi;
         op.u.bind_ipi.ipi_edom = cpu;
         if ( HYPERVISOR_event_channel_op(&op) != 0 )
             panic("Failed to bind virtual IPI %d on cpu %d\n", ipi, cpu);
+        evtchn = op.u.bind_ipi.port;
 
-        per_cpu(ipi_to_evtchn, cpu)[ipi] = op.u.bind_ipi.port;
-    }
+        irq = find_unbound_irq();
+        evtchn_to_irq[evtchn] = irq;
+        irq_to_evtchn[irq]    = evtchn;
+
+        per_cpu(ipi_to_evtchn, cpu)[ipi] = evtchn;
+    } else
+	irq = evtchn_to_irq[evtchn];
+
+    irq_bindcount[irq]++;
 
     spin_unlock(&irq_mapping_update_lock);
+
+    return irq;
 }
 
-void unbind_ipi_on_cpu(int cpu, int ipi)
+void unbind_ipi_on_cpu_from_irq(int cpu, int ipi)
 {
     evtchn_op_t op;
     int evtchn = per_cpu(ipi_to_evtchn, cpu)[ipi];
+    int irq    = irq_to_evtchn[evtchn];
 
     spin_lock(&irq_mapping_update_lock);
 
-    op.cmd          = EVTCHNOP_close;
-    op.u.close.dom  = DOMID_SELF;
-    op.u.close.port = evtchn;
-    if ( HYPERVISOR_event_channel_op(&op) != 0 )
-	panic("Failed to unbind virtual IPI %d on cpu %d\n", ipi, cpu);
+    if ( --irq_bindcount[irq] == 0 )
+    {
+	op.cmd          = EVTCHNOP_close;
+	op.u.close.dom  = DOMID_SELF;
+	op.u.close.port = evtchn;
+	if ( HYPERVISOR_event_channel_op(&op) != 0 )
+	    panic("Failed to unbind virtual IPI %d on cpu %d\n", ipi, cpu);
 
-    per_cpu(ipi_to_evtchn, cpu)[ipi] = 0;
+        evtchn_to_irq[evtchn] = -1;
+        irq_to_evtchn[irq]    = -1;
+	per_cpu(ipi_to_evtchn, cpu)[ipi] = 0;
+    }
 
     spin_unlock(&irq_mapping_update_lock);
 }
@@ -538,10 +555,11 @@ void __init init_IRQ(void)
 
     spin_lock_init(&irq_mapping_update_lock);
 
-    /* No VIRQ -> IRQ mappings. */
-    for ( cpu = 0; cpu < NR_CPUS; cpu++ )
+    for ( cpu = 0; cpu < NR_CPUS; cpu++ ) {
+	/* No VIRQ -> IRQ mappings. */
 	for ( i = 0; i < NR_VIRQS; i++ )
 	    per_cpu(virq_to_irq, cpu)[i] = -1;
+    }
 
     /* No event-channel -> IRQ mappings. */
     for ( i = 0; i < NR_EVENT_CHANNELS; i++ )

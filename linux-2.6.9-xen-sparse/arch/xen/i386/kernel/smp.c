@@ -25,6 +25,7 @@
 #if 0
 #include <mach_apic.h>
 #endif
+#include <asm-xen/evtchn.h>
 
 #define xxprint(msg) HYPERVISOR_console_io(CONSOLEIO_write, strlen(msg), msg)
 
@@ -125,35 +126,47 @@ static inline int __prepare_ICR2 (unsigned int mask)
 	return SET_APIC_DEST_FIELD(mask);
 }
 
+DECLARE_PER_CPU(int, ipi_to_evtchn[NR_IPIS]);
+
+static inline void __send_IPI_one(unsigned int cpu, int vector)
+{
+	unsigned int evtchn;
+
+	evtchn = per_cpu(ipi_to_evtchn, cpu)[vector];
+	// printk("send_IPI_mask_bitmask cpu %d vector %d evtchn %d\n", cpu, vector, evtchn);
+	if (evtchn) {
+		shared_info_t *s = HYPERVISOR_shared_info;
+		while (synch_test_bit(evtchn, &s->evtchn_pending[0]) ||
+		       synch_test_bit(evtchn, &s->evtchn_mask[0]))
+			;
+		notify_via_evtchn(evtchn);
+	} else
+		printk("send_IPI to unbound port %d/%d",
+		       cpu, vector);
+}
+
 void __send_IPI_shortcut(unsigned int shortcut, int vector)
 {
-#if 1
-	xxprint("__send_IPI_shortcut\n");
-#else
-	/*
-	 * Subtle. In the case of the 'never do double writes' workaround
-	 * we have to lock out interrupts to be safe.  As we don't care
-	 * of the value read we use an atomic rmw access to avoid costly
-	 * cli/sti.  Otherwise we use an even cheaper single atomic write
-	 * to the APIC.
-	 */
-	unsigned int cfg;
+	int cpu;
 
-	/*
-	 * Wait for idle.
-	 */
-	apic_wait_icr_idle();
-
-	/*
-	 * No need to touch the target chip field
-	 */
-	cfg = __prepare_ICR(shortcut, vector);
-
-	/*
-	 * Send the IPI. The write to APIC_ICR fires this off.
-	 */
-	apic_write_around(APIC_ICR, cfg);
-#endif
+	switch (shortcut) {
+	case APIC_DEST_SELF:
+		__send_IPI_one(smp_processor_id(), vector);
+		break;
+	case APIC_DEST_ALLBUT:
+		for (cpu = 0; cpu < NR_CPUS; ++cpu) {
+			if (cpu == smp_processor_id())
+				continue;
+			if (cpu_isset(cpu, cpu_online_map)) {
+				__send_IPI_one(cpu, vector);
+			}
+		}
+		break;
+	default:
+		printk("XXXXXX __send_IPI_shortcut %08x vector %d\n", shortcut,
+		       vector);
+		break;
+	}
 }
 
 void fastcall send_IPI_self(int vector)
@@ -164,86 +177,26 @@ void fastcall send_IPI_self(int vector)
 /*
  * This is only used on smaller machines.
  */
-void send_IPI_mask_bitmask(cpumask_t cpumask, int vector)
+void send_IPI_mask_bitmask(cpumask_t mask, int vector)
 {
-#if 1
-	xxprint("send_IPI_mask_bitmask\n");
-	dump_stack();
-#else
-	unsigned long mask = cpus_addr(cpumask)[0];
-	unsigned long cfg;
 	unsigned long flags;
+	unsigned int cpu;
 
 	local_irq_save(flags);
-		
-	/*
-	 * Wait for idle.
-	 */
-	apic_wait_icr_idle();
-		
-	/*
-	 * prepare target chip field
-	 */
-	cfg = __prepare_ICR2(mask);
-	apic_write_around(APIC_ICR2, cfg);
-		
-	/*
-	 * program the ICR 
-	 */
-	cfg = __prepare_ICR(0, vector);
-			
-	/*
-	 * Send the IPI. The write to APIC_ICR fires this off.
-	 */
-	apic_write_around(APIC_ICR, cfg);
+
+	for (cpu = 0; cpu < NR_CPUS; ++cpu) {
+		if (cpu_isset(cpu, mask)) {
+			__send_IPI_one(cpu, vector);
+		}
+	}
 
 	local_irq_restore(flags);
-#endif
 }
 
 inline void send_IPI_mask_sequence(cpumask_t mask, int vector)
 {
-#if 1
-	xxprint("send_IPI_mask_sequence\n");
-#else
-	unsigned long cfg, flags;
-	unsigned int query_cpu;
 
-	/*
-	 * Hack. The clustered APIC addressing mode doesn't allow us to send 
-	 * to an arbitrary mask, so I do a unicasts to each CPU instead. This 
-	 * should be modified to do 1 message per cluster ID - mbligh
-	 */ 
-
-	local_irq_save(flags);
-
-	for (query_cpu = 0; query_cpu < NR_CPUS; ++query_cpu) {
-		if (cpu_isset(query_cpu, mask)) {
-		
-			/*
-			 * Wait for idle.
-			 */
-			apic_wait_icr_idle();
-		
-			/*
-			 * prepare target chip field
-			 */
-			cfg = __prepare_ICR2(cpu_to_logical_apicid(query_cpu));
-			apic_write_around(APIC_ICR2, cfg);
-		
-			/*
-			 * program the ICR 
-			 */
-			cfg = __prepare_ICR(0, vector);
-			
-			/*
-			 * Send the IPI. The write to APIC_ICR fires this off.
-			 */
-			apic_write_around(APIC_ICR, cfg);
-		}
-	}
-	local_irq_restore(flags);
-#endif
+	send_IPI_mask_bitmask(mask, vector);
 }
 
 #include <mach_ipi.h> /* must come after the send_IPI functions above for inlining */
@@ -325,7 +278,8 @@ static inline void leave_mm (unsigned long cpu)
  * 2) Leave the mm if we are in the lazy tlb mode.
  */
 
-asmlinkage void smp_invalidate_interrupt (void)
+irqreturn_t smp_invalidate_interrupt(int irq, void *dev_id,
+				     struct pt_regs *regs)
 {
 	unsigned long cpu;
 
@@ -351,16 +305,14 @@ asmlinkage void smp_invalidate_interrupt (void)
 		} else
 			leave_mm(cpu);
 	}
-#if 1
-	xxprint("smp_invalidate_interrupt ack_APIC_irq\n");
-#else
-	ack_APIC_irq();
-#endif
+	xxprint("smp_invalidate_interrupt\n");
 	smp_mb__before_clear_bit();
 	cpu_clear(cpu, flush_cpumask);
 	smp_mb__after_clear_bit();
 out:
 	put_cpu_no_resched();
+
+	return IRQ_HANDLED;
 }
 
 static void flush_tlb_others(cpumask_t cpumask, struct mm_struct *mm,
@@ -561,10 +513,10 @@ int smp_call_function (void (*func) (void *info), void *info, int nonatomic,
 	/* Wait for response */
 	while (atomic_read(&data.started) != cpus)
 		barrier();
-
 	if (wait)
 		while (atomic_read(&data.finished) != cpus)
 			barrier();
+
 	spin_unlock(&call_lock);
 
 	return 0;
@@ -609,26 +561,21 @@ void smp_send_stop(void)
  * all the work is done automatically when
  * we return from the interrupt.
  */
-asmlinkage void smp_reschedule_interrupt(void)
+irqreturn_t smp_reschedule_interrupt(int irq, void *dev_id,
+				     struct pt_regs *regs)
 {
-#if 1
-	xxprint("smp_reschedule_interrupt: ack_APIC_irq\n");
-#else
-	ack_APIC_irq();
-#endif
+
+	return IRQ_HANDLED;
 }
 
-asmlinkage void smp_call_function_interrupt(void)
+#include <linux/kallsyms.h>
+irqreturn_t smp_call_function_interrupt(int irq, void *dev_id,
+					struct pt_regs *regs)
 {
 	void (*func) (void *info) = call_data->func;
 	void *info = call_data->info;
 	int wait = call_data->wait;
 
-#if 1
-	xxprint("smp_call_function_interrupt: ack_APIC_irq\n");
-#else
-	ack_APIC_irq();
-#endif
 	/*
 	 * Notify initiating CPU that I've grabbed the data and am
 	 * about to execute the function
@@ -646,5 +593,7 @@ asmlinkage void smp_call_function_interrupt(void)
 		mb();
 		atomic_inc(&call_data->finished);
 	}
+
+	return IRQ_HANDLED;
 }
 

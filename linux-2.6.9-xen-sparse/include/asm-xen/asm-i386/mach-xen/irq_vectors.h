@@ -34,6 +34,7 @@
  * Vectors 0x20-0x2f are used for ISA interrupts.
  */
 
+#if 0
 /*
  * Special IRQ vectors used by the SMP architecture, 0xf0-0xff
  *
@@ -56,6 +57,7 @@
  * sources per level' errata.
  */
 #define LOCAL_TIMER_VECTOR	0xef
+#endif
 
 /*
  * First APIC vector available to drivers: (vectors 0x30-0xee)
@@ -64,8 +66,6 @@
  */
 #define FIRST_DEVICE_VECTOR	0x31
 #define FIRST_SYSTEM_VECTOR	0xef
-
-/*  #define TIMER_IRQ _EVENT_TIMER */
 
 /*
  * 16 8259A IRQ's, 208 potential APIC interrupt sources.
@@ -76,6 +76,12 @@
  * Since vectors 0x00-0x1f are used/reserved for the CPU,
  * the usable vector space is 0x20-0xff (224 vectors)
  */
+
+#define NR_IPIS 8
+
+#define RESCHEDULE_VECTOR	1
+#define INVALIDATE_TLB_VECTOR	2
+#define CALL_FUNCTION_VECTOR	3
 
 /*
  * The maximum number of vectors supported by i386 processors
@@ -138,8 +144,8 @@
 /* Dynamic binding of event channels and VIRQ sources to Linux IRQ space. */
 extern int  bind_virq_to_irq(int virq);
 extern void unbind_virq_from_irq(int virq);
-extern void bind_ipi_on_cpu(int cpu, int ipi);
-extern void unbind_ipi_on_cpu(int cpu, int ipi);
+extern int  bind_ipi_on_cpu_to_irq(int cpu, int ipi);
+extern void unbind_ipi_on_cpu_from_irq(int cpu, int ipi);
 extern int  bind_evtchn_to_irq(int evtchn);
 extern void unbind_evtchn_from_irq(int evtchn);
 
