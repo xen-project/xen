@@ -62,6 +62,7 @@ static void vbd_update(void){};
 #define BLKIF_STATE_DISCONNECTED 1
 #define BLKIF_STATE_CONNECTED    2
 
+#ifdef VERBOSE
 static char *blkif_state_name[] = {
     [BLKIF_STATE_CLOSED]       = "closed",
     [BLKIF_STATE_DISCONNECTED] = "disconnected",
@@ -74,6 +75,7 @@ static char * blkif_status_name[] = {
     [BLKIF_INTERFACE_STATUS_CONNECTED]    = "connected",
     [BLKIF_INTERFACE_STATUS_CHANGED]      = "changed",
 };
+#endif
 
 #define WPRINTK(fmt, args...) printk(KERN_WARNING "xen_blk: " fmt, ##args)
 

@@ -62,8 +62,8 @@ shared_info_t *HYPERVISOR_shared_info = (shared_info_t *)empty_zero_page;
 
 unsigned long *phys_to_machine_mapping, *pfn_to_mfn_frame_list;
 
-multicall_entry_t multicall_list[8];
-int nr_multicall_ents = 0;
+DEFINE_PER_CPU(multicall_entry_t, multicall_list[8]);
+DEFINE_PER_CPU(int, nr_multicall_ents);
 
 /*
  * Machine setup..
