@@ -860,6 +860,7 @@
 40dc4076pVeE1kEEWzcUaNZin65kCA xen/include/public/io/domain_controller.h
 41c0c412FLc0gunlJl91qMYscFtXVA xen/include/public/io/ioreq.h
 40f5623cTZ80EwjWUBlh44A9F9i_Lg xen/include/public/io/netif.h
+41d40e9b8zCk5VDqhVbuQyhc7G3lqA xen/include/public/io/ring.h
 4051db79512nOCGweabrFWO2M2h5ng xen/include/public/physdev.h
 40589968wmhPmV5-ENbBYmMjnedgKw xen/include/public/sched_ctl.h
 404f3d2eR2Owk-ZcGOx9ULGHg3nrww xen/include/public/trace.h
