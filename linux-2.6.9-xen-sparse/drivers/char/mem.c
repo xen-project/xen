@@ -26,7 +26,6 @@
 
 #include <asm/uaccess.h>
 #include <asm/io.h>
-#include <asm/pgalloc.h>
 
 #ifdef CONFIG_IA64
 # include <linux/efi.h>
@@ -43,12 +42,7 @@ extern void tapechar_init(void);
  */
 static inline int uncached_access(struct file *file, unsigned long addr)
 {
-#ifdef CONFIG_XEN
-        if (file->f_flags & O_SYNC)
-                return 1;
-        /* Xen sets correct MTRR type on non-RAM for us. */
-        return 0;
-#elif defined(__i386__)
+#if defined(__i386__)
 	/*
 	 * On the PPro and successors, the MTRRs are used to set
 	 * memory types for physical addresses outside main memory,
@@ -149,7 +143,7 @@ static ssize_t do_write_mem(void *p, unsigned long realp,
 	return written;
 }
 
-
+#ifndef ARCH_HAS_DEV_MEM
 /*
  * This funcion reads the *physical* memory. The f_pos points directly to the 
  * memory location. 
@@ -195,8 +189,9 @@ static ssize_t write_mem(struct file * file, const char __user * buf,
 		return -EFAULT;
 	return do_write_mem(__va(p), p, buf, count, ppos);
 }
+#endif
 
-static int mmap_mem(struct file * file, struct vm_area_struct * vma)
+static int mmap_kmem(struct file * file, struct vm_area_struct * vma)
 {
 	unsigned long offset = vma->vm_pgoff << PAGE_SHIFT;
 	int uncached;
@@ -216,15 +211,9 @@ static int mmap_mem(struct file * file, struct vm_area_struct * vma)
 	if (uncached)
 		vma->vm_flags |= VM_IO;
 
-#if defined(CONFIG_XEN)
-	if (io_remap_page_range(vma, vma->vm_start, offset, 
-				vma->vm_end-vma->vm_start, vma->vm_page_prot))
-		return -EAGAIN;
-#else
 	if (remap_page_range(vma, vma->vm_start, offset, vma->vm_end-vma->vm_start,
 			     vma->vm_page_prot))
 		return -EAGAIN;
-#endif
 	return 0;
 }
 
@@ -584,7 +573,7 @@ static int open_port(struct inode * inode, struct file * filp)
 	return capable(CAP_SYS_RAWIO) ? 0 : -EPERM;
 }
 
-#define mmap_kmem	mmap_mem
+#define mmap_mem	mmap_kmem
 #define zero_lseek	null_lseek
 #define full_lseek      null_lseek
 #define write_zero	write_null
@@ -592,6 +581,7 @@ static int open_port(struct inode * inode, struct file * filp)
 #define open_mem	open_port
 #define open_kmem	open_mem
 
+#ifndef ARCH_HAS_DEV_MEM
 static struct file_operations mem_fops = {
 	.llseek		= memory_lseek,
 	.read		= read_mem,
@@ -599,6 +589,9 @@ static struct file_operations mem_fops = {
 	.mmap		= mmap_mem,
 	.open		= open_mem,
 };
+#else
+extern struct file_operations mem_fops;
+#endif
 
 static struct file_operations kmem_fops = {
 	.llseek		= memory_lseek,
