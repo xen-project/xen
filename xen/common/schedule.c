@@ -613,18 +613,21 @@ void __init scheduler_init(void)
         spin_lock_init(&schedule_data[i].lock);
         schedule_data[i].curr = &idle0_task;
         
-        init_ac_timer(&schedule_data[i].s_timer, i);
+        init_ac_timer(&schedule_data[i].s_timer);
+        schedule_data[i].s_timer.cpu      = i;
         schedule_data[i].s_timer.data     = 2;
         schedule_data[i].s_timer.function = &sched_timer;
 
-        init_ac_timer(&fallback_timer[i], i);
+        init_ac_timer(&fallback_timer[i]);
+        fallback_timer[i].cpu      = i;
         fallback_timer[i].data     = 0;
         fallback_timer[i].function = &fallback_timer_fn;
     }
 
     schedule_data[0].idle = &idle0_task;
 
-    init_ac_timer(&v_timer, 0);
+    init_ac_timer(&v_timer);
+    v_timer.cpu      = 0;
     v_timer.data     = 0;
     v_timer.function = &virt_timer;
 }

@@ -107,7 +107,7 @@ net_vif_t *create_net_vif(int domain)
 
     new_vif->credit_bytes = new_vif->remaining_credit = ~0UL;
     new_vif->credit_usec  = 0UL;
-    init_ac_timer(&new_vif->credit_timeout, 0);
+    init_ac_timer(&new_vif->credit_timeout);
 
     if ( (p->domain == 0) && (dom_vif_idx == 0) )
     {

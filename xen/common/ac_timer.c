@@ -246,6 +246,7 @@ static void ac_timer_softirq_action(struct softirq_action *a)
     int              cpu = smp_processor_id();
     struct ac_timer *t, **heap;
     s_time_t         now;
+    void             (*fn)(unsigned long);
 
     spin_lock_irq(&ac_timers[cpu].lock);
     
@@ -257,12 +258,15 @@ static void ac_timer_softirq_action(struct softirq_action *a)
                 ((t = heap[1])->expires < (now + TIMER_SLOP)) )
         {
             remove_entry(heap, t);
-                        
-            spin_unlock_irq(&ac_timers[cpu].lock);
-            if ( t->function != NULL ) 
-                t->function(t->data);
-            spin_lock_irq(&ac_timers[cpu].lock);
-            
+
+            if ( (fn = t->function) != NULL )
+            {
+                unsigned long data = t->data;
+                spin_unlock_irq(&ac_timers[cpu].lock);
+                (*fn)(data);
+                spin_lock_irq(&ac_timers[cpu].lock);
+            }
+
             /* Heap may have grown while the lock was released. */
             heap = ac_timers[cpu].heap;
         }
