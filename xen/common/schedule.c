@@ -260,7 +260,7 @@ long do_sched_op(unsigned long op)
 
     case SCHEDOP_exit:
     {
-        DPRINTK("DOM%d killed itself!\n", current->domain);
+        DPRINTK("DOM%llu killed itself!\n", current->domain);
         DPRINTK(" EIP == %08lx\n", get_execution_context()->eip);
         kill_domain();
         break;
@@ -268,7 +268,7 @@ long do_sched_op(unsigned long op)
 
     case SCHEDOP_stop:
     {
-        DPRINTK("DOM%d stopped itself!\n", current->domain);
+        DPRINTK("DOM%llu stopped itself!\n", current->domain);
         DPRINTK(" EIP == %08lx\n", get_execution_context()->eip);
         stop_domain();
         break;

@@ -9,13 +9,13 @@
 #include "xc_private.h"
 
 int xc_vif_scheduler_set(int xc_handle,
-                         domid_t domid, 
+                         u64 domid, 
                          unsigned int vifid, 
                          xc_vif_sched_params_t *params)
 {
     network_op_t  netop;
     netop.cmd = NETWORK_OP_VIFSETPARAMS;
-    netop.u.vif_setparams.domain       = domid;
+    netop.u.vif_setparams.domain       = (domid_t)domid;
     netop.u.vif_setparams.vif          = vifid;
     netop.u.vif_setparams.credit_bytes = params->credit_bytes;
     netop.u.vif_setparams.credit_usec  = params->credit_usec;
@@ -24,7 +24,7 @@ int xc_vif_scheduler_set(int xc_handle,
 
 
 int xc_vif_scheduler_get(int xc_handle,
-                         domid_t domid, 
+                         u64 domid, 
                          unsigned int vifid, 
                          xc_vif_sched_params_t *params)
 {
@@ -32,7 +32,7 @@ int xc_vif_scheduler_get(int xc_handle,
     int rc;
 
     netop.cmd = NETWORK_OP_VIFGETINFO;
-    netop.u.vif_getinfo.domain = domid;
+    netop.u.vif_getinfo.domain = (domid_t)domid;
     netop.u.vif_getinfo.vif    = vifid;
 
     if ( (rc = do_network_op(xc_handle, &netop)) >= 0 )
@@ -46,7 +46,7 @@ int xc_vif_scheduler_get(int xc_handle,
 
 
 int xc_vif_stats_get(int xc_handle,
-                     domid_t domid, 
+                     u64 domid, 
                      unsigned int vifid, 
                      xc_vif_stats_t *stats)
 {
@@ -54,7 +54,7 @@ int xc_vif_stats_get(int xc_handle,
     int rc;
 
     netop.cmd = NETWORK_OP_VIFGETINFO;
-    netop.u.vif_getinfo.domain = domid;
+    netop.u.vif_getinfo.domain = (domid_t)domid;
     netop.u.vif_getinfo.vif    = vifid;
 
     if ( (rc = do_network_op(xc_handle, &netop)) >= 0 )

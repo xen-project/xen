@@ -18,10 +18,10 @@
 #define BLOCK_IO_OP_VBD_INFO     9    /* query info about a particular VBD */
 
 typedef struct _xen_extent { 
-    u16       device; 
-    u16       unused;
-    ulong     start_sector; 
-    ulong     nr_sectors;
+    u16          device; 
+    u16          unused;
+    xen_sector_t start_sector; 
+    xen_sector_t nr_sectors;
 } xen_extent_t; 
 
 #define VBD_MODE_R         0x1

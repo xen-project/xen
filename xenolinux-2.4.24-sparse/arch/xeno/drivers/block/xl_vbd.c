@@ -102,6 +102,7 @@ static int xlvbd_init_device(xen_disk_t *xd)
     struct block_device *bd;
     xl_disk_t *disk;
     int i, rc = 0, max_part, partno;
+    unsigned long capacity;
 
     unsigned char buf[64];
 
@@ -237,6 +238,9 @@ static int xlvbd_init_device(xen_disk_t *xd)
 
     gd->flags[minor >> gd->minor_shift] |= GENHD_FL_XENO;
         
+    /* NB. Linux 2.4 only handles 32-bit sector offsets and capacities. */
+    capacity = (unsigned long)xd->capacity;
+
     if ( partno != 0 )
     {
         /*
@@ -268,15 +272,15 @@ static int xlvbd_init_device(xen_disk_t *xd)
 
         /* Need to skankily setup 'partition' information */
         gd->part[minor].start_sect = 0; 
-        gd->part[minor].nr_sects   = xd->capacity; 
-        gd->sizes[minor]           = xd->capacity; 
+        gd->part[minor].nr_sects   = capacity; 
+        gd->sizes[minor]           = capacity; 
 
         gd->flags[minor >> gd->minor_shift] |= GENHD_FL_VIRT_PARTNS;
     }
     else
     {
-        gd->part[minor].nr_sects = xd->capacity;
-        gd->sizes[minor] = xd->capacity>>(BLOCK_SIZE_BITS-9);
+        gd->part[minor].nr_sects = capacity;
+        gd->sizes[minor] = capacity>>(BLOCK_SIZE_BITS-9);
         
         /* Some final fix-ups depending on the device type */
         switch ( XD_TYPE(xd->info) )
@@ -301,8 +305,7 @@ static int xlvbd_init_device(xen_disk_t *xd)
                        disk_name(gd, MINOR(device), buf));
                 break;
             }
-            register_disk(gd, device, gd->max_p, &xlvbd_block_fops, 
-                          xd->capacity);            
+            register_disk(gd, device, gd->max_p, &xlvbd_block_fops, capacity);
             break; 
 
         default:

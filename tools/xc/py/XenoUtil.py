@@ -133,8 +133,8 @@ def lookup_raw_partn(partition):
     nr_sectors, type }
         device:       Device number of the given partition
         start_sector: Index of first sector of the partition
-        nr_sectsors:  Number of sectors comprising this partition
-        type:       'Disk' or identifying name for partition type
+        nr_sectors:   Number of sectors comprising this partition
+        type:         'Disk' or identifying name for partition type
     """
 
     if not re.match( '/dev/', partition ):
@@ -147,8 +147,8 @@ def lookup_raw_partn(partition):
         line = fd.readline()
         if line:
             return [ { 'device' : blkdev_name_to_number(drive),
-                       'start_sector' : 0,
-                       'nr_sectors' : int(line) * 2,
+                       'start_sector' : long(0),
+                       'nr_sectors' : long(line) * 2,
                        'type' : 'Disk' } ]
         return None
 
@@ -162,8 +162,8 @@ def lookup_raw_partn(partition):
                        'size=\s*([0-9]+), Id=\s*(\S+).*$', line)
         if m:
             return [ { 'device' : blkdev_name_to_number(drive),
-                       'start_sector' : int(m.group(1)),
-                       'nr_sectors' : int(m.group(2)),
+                       'start_sector' : long(m.group(1)),
+                       'nr_sectors' : long(m.group(2)),
                        'type' : m.group(3) } ]
     
     return None
@@ -421,7 +421,7 @@ def vd_lookup(id):
                  # the disk device this extent is on - for passing to Xen
                  'device' : lookup_raw_partn(partition)[0]['device'],
                  # the offset of this extent within the disk - for passing to Xen
-                 'start_sector' : int(part_offset + lookup_raw_partn(partition)[0]['start_sector']),
+                 'start_sector' : long(part_offset + lookup_raw_partn(partition)[0]['start_sector']),
                  # extent size, in sectors
                  'nr_sectors' : nr_sectors,
                  # partition device this extent is on (useful to know for XenoUtil fns)

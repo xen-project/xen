@@ -28,7 +28,7 @@ typedef struct {
     int           has_cpu;
     int           stopped;
     unsigned long nr_pages;
-    unsigned long long cpu_time;
+    u64           cpu_time;
 #define XC_DOMINFO_MAXNAME 16
     char          name[XC_DOMINFO_MAXNAME];
 } xc_dominfo_t;
@@ -86,8 +86,8 @@ typedef struct {
 } xc_vif_sched_params_t;
 
 typedef struct {
-    unsigned long long tx_bytes, tx_pkts;
-    unsigned long long rx_bytes, rx_pkts;
+    u64 tx_bytes, tx_pkts;
+    u64 rx_bytes, rx_pkts;
 } xc_vif_stats_t;
 
 int xc_vif_scheduler_set(int xc_handle,
@@ -109,13 +109,13 @@ typedef struct {
     unsigned short vbdid;
 #define XC_VBDF_WRITEABLE (1<<0)
     unsigned long  flags;
-    unsigned long  nr_sectors;
+    u64            nr_sectors;
 } xc_vbd_t;
 
 typedef struct {
     unsigned short real_device;
-    unsigned long  start_sector;
-    unsigned long  nr_sectors;
+    u64            start_sector;
+    u64            nr_sectors;
 } xc_vbdextent_t;
 
 int xc_vbd_create(int xc_handle,

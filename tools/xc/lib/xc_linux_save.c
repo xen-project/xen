@@ -40,24 +40,24 @@
 
 static int check_pfn_ownership(int xc_handle, 
                                unsigned long mfn, 
-                               domid_t dom)
+                               u64 dom)
 {
     dom0_op_t op;
     op.cmd = DOM0_GETPAGEFRAMEINFO;
     op.u.getpageframeinfo.pfn    = mfn;
-    op.u.getpageframeinfo.domain = dom;
+    op.u.getpageframeinfo.domain = (domid_t)dom;
     return (do_dom0_op(xc_handle, &op) >= 0);
 }
 
 #define GETPFN_ERR (~0U)
 static unsigned int get_pfn_type(int xc_handle, 
                                  unsigned long mfn, 
-                                 domid_t dom)
+                                 u64 dom)
 {
     dom0_op_t op;
     op.cmd = DOM0_GETPAGEFRAMEINFO;
     op.u.getpageframeinfo.pfn    = mfn;
-    op.u.getpageframeinfo.domain = dom;
+    op.u.getpageframeinfo.domain = (domid_t)dom;
     if ( do_dom0_op(xc_handle, &op) < 0 )
     {
         PERROR("Unexpected failure when getting page frame info!");
@@ -75,7 +75,7 @@ static int checked_write(gzFile fd, void *buf, size_t count)
 }
 
 int xc_linux_save(int xc_handle,
-                  domid_t domid, 
+                  u64 domid, 
                   const char *state_file, 
                   int verbose)
 {
@@ -142,9 +142,9 @@ int xc_linux_save(int xc_handle,
     for ( ; ; )
     {
         op.cmd = DOM0_GETDOMAININFO;
-        op.u.getdomaininfo.domain = domid;
+        op.u.getdomaininfo.domain = (domid_t)domid;
         if ( (do_dom0_op(xc_handle, &op) < 0) || 
-             (op.u.getdomaininfo.domain != domid) )
+             ((u64)op.u.getdomaininfo.domain != domid) )
         {
             PERROR("Could not get info on domain");
             goto out;
@@ -160,7 +160,7 @@ int xc_linux_save(int xc_handle,
         we_stopped_it = 1;
 
         op.cmd = DOM0_STOPDOMAIN;
-        op.u.stopdomain.domain = domid;
+        op.u.stopdomain.domain = (domid_t)domid;
         if ( do_dom0_op(xc_handle, &op) != 0 )
         {
             we_stopped_it = 0;
@@ -375,7 +375,7 @@ int xc_linux_save(int xc_handle,
     if ( we_stopped_it )
     {
         op.cmd = DOM0_STARTDOMAIN;
-        op.u.startdomain.domain = domid;
+        op.u.startdomain.domain = (domid_t)domid;
         (void)do_dom0_op(xc_handle, &op);
     }
 

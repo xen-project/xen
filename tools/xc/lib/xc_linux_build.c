@@ -12,24 +12,24 @@
 #define L1_PROT (_PAGE_PRESENT|_PAGE_RW|_PAGE_ACCESSED)
 #define L2_PROT (_PAGE_PRESENT|_PAGE_RW|_PAGE_ACCESSED|_PAGE_DIRTY|_PAGE_USER)
 
-static long get_tot_pages(int xc_handle, domid_t domid)
+static long get_tot_pages(int xc_handle, u64 domid)
 {
     dom0_op_t op;
     op.cmd = DOM0_GETDOMAININFO;
-    op.u.getdomaininfo.domain = domid;
+    op.u.getdomaininfo.domain = (domid_t)domid;
     return (do_dom0_op(xc_handle, &op) < 0) ? 
         -1 : op.u.getdomaininfo.tot_pages;
 }
 
 static int get_pfn_list(int xc_handle,
-                        domid_t domid, 
+                        u64 domid, 
                         unsigned long *pfn_buf, 
                         unsigned long max_pfns)
 {
     dom0_op_t op;
     int ret;
     op.cmd = DOM0_GETMEMLIST;
-    op.u.getmemlist.domain   = domid;
+    op.u.getmemlist.domain   = (domid_t)domid;
     op.u.getmemlist.max_pfns = max_pfns;
     op.u.getmemlist.buffer   = pfn_buf;
 
@@ -96,7 +96,7 @@ static int copy_to_domain_page(int pm_handle,
 }
 
 static int setup_guestos(int xc_handle,
-                         domid_t dom, 
+                         u64 dom, 
                          gzFile kernel_gfd, 
                          gzFile initrd_gfd, 
                          unsigned long tot_pages,
@@ -312,7 +312,7 @@ static int setup_guestos(int xc_handle,
 }
 
 int xc_linux_build(int xc_handle,
-                   domid_t domid,
+                   u64 domid,
                    const char *image_name,
                    const char *ramdisk_name,
                    const char *cmdline)
@@ -382,9 +382,9 @@ int xc_linux_build(int xc_handle,
     }
 
     op.cmd = DOM0_GETDOMAININFO;
-    op.u.getdomaininfo.domain = domid;
+    op.u.getdomaininfo.domain = (domid_t)domid;
     if ( (do_dom0_op(xc_handle, &op) < 0) || 
-         (op.u.getdomaininfo.domain != domid) )
+         ((u64)op.u.getdomaininfo.domain != domid) )
     {
         PERROR("Could not get info on domain");
         goto error_out;
@@ -468,7 +468,7 @@ int xc_linux_build(int xc_handle,
     ctxt->failsafe_callback_cs  = FLAT_RING1_CS;
     ctxt->failsafe_callback_eip = 0;
 
-    launch_op.u.builddomain.domain   = domid;
+    launch_op.u.builddomain.domain   = (domid_t)domid;
     launch_op.u.builddomain.num_vifs = 1;
 
     launch_op.cmd = DOM0_BUILDDOMAIN;

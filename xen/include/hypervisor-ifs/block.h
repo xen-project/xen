@@ -8,6 +8,8 @@
 #ifndef __BLOCK_H__
 #define __BLOCK_H__
 
+typedef u64 xen_sector_t;
+
 /*
  *
  * These are the ring data structures for buffering messages between 
@@ -28,16 +30,17 @@
 /*
  * Maximum scatter/gather segments per request.
  * This is carefully chosen so that sizeof(blk_ring_t) <= PAGE_SIZE.
+ * NB. This could be 12 if the ring indexes weren't stored in the same page.
  */
-#define MAX_BLK_SEGS 12
+#define MAX_BLK_SEGS 11
 
 typedef struct blk_ring_req_entry 
 {
     unsigned long  id;                     /* private guest os value       */
-    unsigned long  sector_number;          /* start sector idx on disk     */
     unsigned short device;                 /* XENDEV_??? + idx             */
     unsigned char  operation;              /* XEN_BLOCK_???                */
     unsigned char  nr_segments;            /* number of segments           */
+    xen_sector_t   sector_number;          /* start sector idx on disk     */
     /* Least 9 bits is 'nr_sects'. High 23 bits are the address.           */
     unsigned long  buffer_and_sects[MAX_BLK_SEGS];
 } blk_ring_req_entry_t;
@@ -97,7 +100,7 @@ typedef struct xen_disk
 {
     unsigned short device;       /* device number (opaque 16 bit val)  */
     unsigned short info;         /* device type and flags              */
-    unsigned long  capacity;     /* size in terms of #512 byte sectors */
+    xen_sector_t   capacity;     /* size in terms of #512 byte sectors */
     domid_t        domain;       /* if a VBD, domain this 'belongs to' */
 } xen_disk_t;
 

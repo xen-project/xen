@@ -366,7 +366,7 @@ static int hypervisor_request(unsigned long   id,
     req = &blk_ring->ring[MASK_BLK_IDX(req_prod)].req;
     req->id            = id;
     req->operation     = operation;
-    req->sector_number = sector_number;
+    req->sector_number = (xen_sector_t)sector_number;
     req->device        = device; 
     req->nr_segments   = 1;
     req->buffer_and_sects[0] = buffer_ma | nr_sectors;

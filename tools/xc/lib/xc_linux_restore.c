@@ -19,14 +19,14 @@
     } while ( 0 )
 
 static int get_pfn_list(int xc_handle,
-                        domid_t domain_id, 
+                        u64 domain_id, 
                         unsigned long *pfn_buf, 
                         unsigned long max_pfns)
 {
     dom0_op_t op;
     int ret;
     op.cmd = DOM0_GETMEMLIST;
-    op.u.getmemlist.domain   = domain_id;
+    op.u.getmemlist.domain   = (domid_t)domain_id;
     op.u.getmemlist.max_pfns = max_pfns;
     op.u.getmemlist.buffer   = pfn_buf;
 
@@ -104,12 +104,12 @@ static int checked_read(gzFile fd, void *buf, size_t count)
 int xc_linux_restore(int xc_handle,
                      const char *state_file,
                      int verbose,
-                     domid_t *pdomid)
+                     u64 *pdomid)
 {
     dom0_op_t op;
     int rc = 1, i, j;
     unsigned long mfn, pfn;
-    domid_t dom = 0;
+    u64 dom = 0ULL;
     unsigned int prev_pc, this_pc;
     
     /* Number of page frames in use by this XenoLinux session. */
@@ -225,11 +225,11 @@ int xc_linux_restore(int xc_handle,
         ERROR("Could not create new domain");
         goto out;
     }
-    dom = op.u.createdomain.domain;
+    dom = (u64)op.u.createdomain.domain;
 
     /* Get the domain's shared-info frame. */
     op.cmd = DOM0_GETDOMAININFO;
-    op.u.getdomaininfo.domain = dom;
+    op.u.getdomaininfo.domain = (domid_t)dom;
     if ( do_dom0_op(xc_handle, &op) < 0 )
     {
         ERROR("Could not get information on new domain");
@@ -452,7 +452,7 @@ int xc_linux_restore(int xc_handle,
     }
 
     op.cmd = DOM0_BUILDDOMAIN;
-    op.u.builddomain.domain   = dom;
+    op.u.builddomain.domain   = (domid_t)dom;
     op.u.builddomain.num_vifs = 1;
     memcpy(&op.u.builddomain.ctxt, &ctxt, sizeof(ctxt));
     rc = do_dom0_op(xc_handle, &op);
@@ -463,7 +463,7 @@ int xc_linux_restore(int xc_handle,
         if ( dom != 0 )
         {
             op.cmd = DOM0_DESTROYDOMAIN;
-            op.u.destroydomain.domain = dom;
+            op.u.destroydomain.domain = (domid_t)dom;
             op.u.destroydomain.force  = 1;
             (void)do_dom0_op(xc_handle, &op);
         }

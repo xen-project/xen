@@ -2064,7 +2064,7 @@ static void get_rx_bufs(net_vif_t *vif)
         if ( unlikely(pte_pfn >= max_page) ||
              unlikely(!get_page_and_type(pte_page, p, PGT_l1_page_table)) )
         {
-            DPRINTK("Bad page frame for ppte %d,%08lx,%08lx,%08lx\n",
+            DPRINTK("Bad page frame for ppte %llu,%08lx,%08lx,%08lx\n",
                     p->domain, pte_pfn, max_page, pte_page->type_and_flags);
             make_rx_response(vif, rx.id, 0, RING_STATUS_BAD_PAGE, 0);
             continue;

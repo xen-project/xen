@@ -141,7 +141,7 @@
 
 #ifndef NDEBUG
 #define MEM_LOG(_f, _a...)                           \
-  printk("DOM%d: (file=memory.c, line=%d) " _f "\n", \
+  printk("DOM%llu: (file=memory.c, line=%d) " _f "\n", \
          current->domain, __LINE__, ## _a )
 #else
 #define MEM_LOG(_f, _a...) ((void)0)

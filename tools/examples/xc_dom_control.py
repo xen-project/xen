@@ -47,7 +47,7 @@ dom = None
 
 
 if len( sys.argv ) > 2 and re.match('\d+$', sys.argv[2]):
-    dom = string.atoi(sys.argv[2])
+    dom = long(sys.argv[2])
 
 if cmd == 'stop':
     rc = xc.domain_stop( dom=dom )

@@ -88,7 +88,7 @@ long vbd_create(vbd_create_t *create)
 
     if ( unlikely((p = find_domain_by_id(create->domain)) == NULL) )
     {
-        DPRINTK("vbd_create attempted for non-existent domain %d\n", 
+        DPRINTK("vbd_create attempted for non-existent domain %llu\n", 
                 create->domain); 
         return -EINVAL; 
     }
@@ -170,7 +170,7 @@ long vbd_grow(vbd_grow_t *grow)
 
     if ( unlikely((p = find_domain_by_id(grow->domain)) == NULL) )
     {
-        DPRINTK("vbd_grow: attempted for non-existent domain %d\n", 
+        DPRINTK("vbd_grow: attempted for non-existent domain %llu\n", 
                 grow->domain); 
         return -EINVAL; 
     }
@@ -197,7 +197,7 @@ long vbd_shrink(vbd_shrink_t *shrink)
 
     if ( (p = find_domain_by_id(shrink->domain)) == NULL )
     {
-        DPRINTK("vbd_shrink attempted for non-existent domain %d\n", 
+        DPRINTK("vbd_shrink attempted for non-existent domain %llu\n", 
                 shrink->domain); 
         return -EINVAL; 
     }
@@ -259,7 +259,7 @@ long vbd_setextents(vbd_setextents_t *setextents)
 
     if ( (p = find_domain_by_id(setextents->domain)) == NULL )
     {
-        DPRINTK("vbd_setextents attempted for non-existent domain %d\n", 
+        DPRINTK("vbd_setextents attempted for non-existent domain %llu\n", 
                 setextents->domain); 
         return -EINVAL; 
     }
@@ -355,7 +355,7 @@ long vbd_delete(vbd_delete_t *delete)
 
     if ( (p = find_domain_by_id(delete->domain)) == NULL )
     {
-        DPRINTK("vbd_delete attempted for non-existent domain %d\n", 
+        DPRINTK("vbd_delete attempted for non-existent domain %llu\n", 
                 delete->domain); 
         return -EINVAL; 
     }
@@ -450,7 +450,7 @@ static int vbd_probe_single(xen_disk_info_t *xdi,
     cur_disk.info   = vbd->type;
     if ( !VBD_CAN_WRITE(vbd) )
         cur_disk.info |= XD_FLAG_RO; 
-    cur_disk.capacity = 0 ; 
+    cur_disk.capacity = 0ULL;
     for ( x = vbd->extents; x != NULL; x = x->next )
         cur_disk.capacity += x->extent.nr_sectors; 
     cur_disk.domain = p->domain; 
@@ -542,7 +542,7 @@ long vbd_probe(vbd_probe_t *probe)
         if ( (probe->domain != VBD_PROBE_ALL) &&
              ((p = find_domain_by_id(probe->domain)) == NULL) )
         {
-            DPRINTK("vbd_probe attempted for non-existent domain %d\n", 
+            DPRINTK("vbd_probe attempted for non-existent domain %llu\n", 
                     probe->domain); 
             return -EINVAL; 
         }
@@ -597,7 +597,7 @@ long vbd_info(vbd_info_t *info)
 
     if ( (p = find_domain_by_id(info->domain)) == NULL )
     {
-        DPRINTK("vbd_info attempted for non-existent domain %d\n", 
+        DPRINTK("vbd_info attempted for non-existent domain %llu\n", 
                 info->domain); 
         return -EINVAL; 
     }
@@ -653,7 +653,8 @@ int vbd_translate(phys_seg_t *pseg, struct task_struct *p, int operation)
     xen_extent_le_t *x; 
     vbd_t *vbd;
     rb_node_t *rb;
-    unsigned long sec_off, nr_secs;
+    xen_sector_t sec_off;
+    unsigned long nr_secs;
 
     spin_lock(&p->vbd_lock);
 
@@ -669,7 +670,7 @@ int vbd_translate(phys_seg_t *pseg, struct task_struct *p, int operation)
             goto found;
     }
 
-    DPRINTK("vbd_translate; domain %d attempted to access "
+    DPRINTK("vbd_translate; domain %llu attempted to access "
             "non-existent VBD.\n", p->domain); 
 
     spin_unlock(&p->vbd_lock);

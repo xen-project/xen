@@ -452,7 +452,7 @@ static void dispatch_rw_block_io(struct task_struct *p,
 	new_segs = vbd_translate(&phys_seg[nr_psegs], p, operation);
 	if ( new_segs < 0 )
         { 
-            DPRINTK("access denied: %s of [%ld,%ld] on dev=%04x\n", 
+            DPRINTK("access denied: %s of [%llu,%llu] on dev=%04x\n", 
                     operation == READ ? "read" : "write", 
                     req->sector_number + tot_sects, 
                     req->sector_number + tot_sects + nr_sects, 
@@ -498,7 +498,7 @@ static void dispatch_rw_block_io(struct task_struct *p,
     
         bh->b_size          = phys_seg[i].nr_sects << 9;
         bh->b_dev           = phys_seg[i].dev;
-        bh->b_rsector       = phys_seg[i].sector_number;
+        bh->b_rsector       = (unsigned long)phys_seg[i].sector_number;
         bh->b_data          = phys_to_virt(phys_seg[i].buffer);
         bh->b_end_io        = end_block_io_op;
         bh->pending_req     = pending_req;

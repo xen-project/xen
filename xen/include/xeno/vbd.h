@@ -57,8 +57,8 @@ void destroy_all_vbds(struct task_struct *p);
 typedef struct {
     unsigned short dev;
     unsigned short nr_sects;
-    unsigned long  sector_number;
     unsigned long  buffer;
+    xen_sector_t   sector_number;
 } phys_seg_t;
 
 

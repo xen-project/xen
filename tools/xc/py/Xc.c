@@ -432,7 +432,7 @@ static PyObject *pyxc_vbd_grow(PyObject *self,
     static char *kwd_list[] = { "dom", "vbd", "device", 
                                 "start_sector", "nr_sectors", NULL };
 
-    if ( !PyArg_ParseTupleAndKeywords(args, kwds, "Liill", kwd_list, 
+    if ( !PyArg_ParseTupleAndKeywords(args, kwds, "LiiLL", kwd_list, 
                                       &dom, &vbd, 
                                       &extent.real_device, 
                                       &extent.start_sector, 
@@ -502,13 +502,13 @@ static PyObject *pyxc_vbd_setextents(PyObject *self,
                 goto fail;
             extents[i].real_device = (unsigned short)PyInt_AsLong(obj);
             if ( ((obj = PyDict_GetItemString(dict,"start_sector")) == NULL) ||
-                 !PyInt_Check(obj) )
+                 !PyLong_Check(obj) )
                 goto fail;
-            extents[i].start_sector = PyInt_AsLong(obj);
+            extents[i].start_sector = PyLong_AsUnsignedLongLong(obj);
             if ( ((obj = PyDict_GetItemString(dict, "nr_sectors")) == NULL) ||
-                 !PyInt_Check(obj) )
+                 !PyLong_Check(obj) )
                 goto fail;
-            extents[i].nr_sectors = PyInt_AsLong(obj);        
+            extents[i].nr_sectors = PyLong_AsUnsignedLongLong(obj);        
         }
     }
 
@@ -564,7 +564,7 @@ static PyObject *pyxc_vbd_getextents(PyObject *self,
         {
             PyList_SetItem(
                 list, i, 
-                Py_BuildValue("{s:i,s:l,s:l}",
+                Py_BuildValue("{s:i,s:L,s:L}",
                               "device",       extents[i].real_device,
                               "start_sector", extents[i].start_sector,
                               "nr_sectors",   extents[i].nr_sectors));
@@ -606,7 +606,7 @@ static PyObject *pyxc_vbd_probe(PyObject *self,
     {
         PyList_SetItem(
             list, i, 
-            Py_BuildValue("{s:L,s:i,s:i,s:l}",
+            Py_BuildValue("{s:L,s:i,s:i,s:L}",
                           "dom",        info[i].domid,
                           "vbd",        info[i].vbdid,
                           "writeable",  !!(info[i].flags & XC_VBDF_WRITEABLE),
@@ -806,8 +806,8 @@ static PyMethodDef pyxc_methods[] = {
       " dom          [long]: Identifier of domain containing the VBD.\n"
       " vbd          [int]:  Identifier of the VBD.\n"
       " device       [int]:  Identifier of the real underlying block device.\n"
-      " start_sector [int]:  Real start sector of this extent.\n"
-      " nr_sectors   [int]:  Length, in sectors, of this extent.\n\n"
+      " start_sector [long]: Real start sector of this extent.\n"
+      " nr_sectors   [long]: Length, in sectors, of this extent.\n\n"
       "Returns: [int] 0 on success; -1 on error.\n" },
 
     { "vbd_shrink", 
@@ -825,9 +825,9 @@ static PyMethodDef pyxc_methods[] = {
       " dom          [long]: Identifier of domain containing the VBD.\n"
       " vbd          [int]:  Identifier of the VBD.\n"
       " extents      [list of dicts]: Per-extent information.\n"
-      "  device       [int]: Identifier of the real underlying block device.\n"
-      "  start_sector [int]: Real start sector of this extent.\n"
-      "  nr_sectors   [int]: Length, in sectors, of this extent.\n\n"
+      "  device       [int]:  Id of the real underlying block device.\n"
+      "  start_sector [long]: Real start sector of this extent.\n"
+      "  nr_sectors   [long]: Length, in sectors, of this extent.\n\n"
       "Returns: [int] 0 on success; -1 on error.\n" },
 
     { "vbd_getextents", 
@@ -837,9 +837,9 @@ static PyMethodDef pyxc_methods[] = {
       " dom          [long]: Identifier of domain containing the VBD.\n"
       " vbd          [int]:  Identifier of the VBD.\n\n"
       "Returns: [list of dicts] per-extent information; empty on error.\n"
-      " device       [int]: Identifier of the real underlying block device.\n"
-      " start_sector [int]: Real start sector of this extent.\n"
-      " nr_sectors   [int]: Length, in sectors, of this extent.\n" },
+      " device       [int]:  Identifier of the real underlying block device.\n"
+      " start_sector [long]: Real start sector of this extent.\n"
+      " nr_sectors   [long]: Length, in sectors, of this extent.\n" },
 
     { "vbd_probe", 
       (PyCFunction)pyxc_vbd_probe, 
@@ -852,7 +852,7 @@ static PyMethodDef pyxc_methods[] = {
       " dom        [long]: Domain containing this VBD.\n"
       " vbd        [int]:  Domain-specific identifier of this VBD.\n"
       " writeable  [int]:  Bool - is this VBD writeable?\n"
-      " nr_sectors [int]:  Size of this VBD, in 512-byte sectors.\n" },
+      " nr_sectors [long]: Size of this VBD, in 512-byte sectors.\n" },
 
     { "readconsolering", 
       (PyCFunction)pyxc_readconsolering, 
