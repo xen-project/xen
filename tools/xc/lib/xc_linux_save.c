@@ -95,7 +95,7 @@ int xc_linux_save(int xc_handle,
     int verbose = flags & XCFLAGS_VERBOSE;
     int live = flags & XCFLAGS_LIVE;
     int debug = flags & XCFLAGS_DEBUG;
-    int sent_last_iter, sent_this_iter, max_iters;
+    int sent_last_iter, sent_this_iter, skip_this_iter, max_iters;
 
     /* Remember if we stopped the guest, so we can restart it on exit. */
     int we_stopped_it = 0;
@@ -137,8 +137,11 @@ int xc_linux_save(int xc_handle,
     /* number of pages we're dealing with */
     unsigned long nr_pfns;
 
-    /* bitmap of pages left to send */
-    unsigned long *to_send, *to_fix;
+    /* bitmap of pages:
+       - that should be sent this iteration (unless later marked as skip); 
+       - to skip this iteration because already dirty;
+       - to fixup by sending at the end if not already resent; */
+    unsigned long *to_send, *to_skip, *to_fix;
 
     int needed_to_fix = 0;
     int total_sent    = 0;
@@ -289,7 +292,7 @@ int xc_linux_save(int xc_handle,
 
 	last_iter = 0;
 	sent_last_iter = 1<<20; // 4GB's worth of pages
-	max_iters = 9; // limit us to 10 time round loop
+	max_iters = 19; // limit us to 20 times round loop
     }
     else
 	last_iter = 1;
@@ -301,12 +304,14 @@ int xc_linux_save(int xc_handle,
 	
 	to_send = malloc( sz );
 	to_fix  = calloc( 1, sz );
+	to_skip = malloc( sz );
 
-	if (!to_send || !to_fix)
+	if (!to_send || !to_fix || !to_skip)
 	{
 	    ERROR("Couldn't allocate to_send array");
 	    goto out;
 	}
+
 	memset( to_send, 0xff, sz );
 
 	if ( mlock( to_send, sz ) )
@@ -314,6 +319,15 @@ int xc_linux_save(int xc_handle,
 	    PERROR("Unable to mlock to_send");
 	    return 1;
 	}
+
+	/* (to fix is local only) */
+
+	if ( mlock( to_skip, sz ) )
+	{
+	    PERROR("Unable to mlock to_skip");
+	    return 1;
+	}
+
     }
 
 
@@ -379,6 +393,7 @@ int xc_linux_save(int xc_handle,
 	iter++;
 
 	sent_this_iter = 0;
+	skip_this_iter = 0;
 	prev_pc = 0;
 	verbose_printf("Saving memory pages: iter %d   0%%", iter);
 
@@ -392,6 +407,18 @@ int xc_linux_save(int xc_handle,
 		prev_pc = this_pc;
 	    }
 
+	    /* slightly wasteful to peek the whole array evey time, 
+	       but this is fast enough for the moment. */
+
+	    if ( !last_iter && 
+		 xc_shadow_control( xc_handle, domid, 
+				    DOM0_SHADOW_CONTROL_OP_PEEK,
+				    to_skip, nr_pfns ) != nr_pfns ) 
+	    {
+		ERROR("Error peeking shadow bitmap");
+		goto out;
+	    }
+	    
 
 	    /* load pfn_type[] with the mfn of all the pages we're doing in
 	       this batch. */
@@ -405,15 +432,29 @@ int xc_linux_save(int xc_handle,
 			    test_bit(n,to_send),
 			    live_mfn_to_pfn_table[live_pfn_to_mfn_table[n]&0xFFFFF]);
 
+		if (!last_iter && test_bit(n, to_send) && test_bit(n, to_skip))
+		    skip_this_iter++; // stats keeping
 
-		if ( !test_bit(n, to_send ) &&
-		    !( last_iter && test_bit(n, to_fix ) ) ) continue;
+		if (! ( (test_bit(n, to_send) && !test_bit(n, to_skip)) ||
+			(test_bit(n, to_send) && last_iter) ||
+			(test_bit(n, to_fix)  && last_iter) )   )
+		    continue;
+
+		/* we get here if:
+		   1. page is marked to_send & hasn't already been re-dirtied
+		   2. (ignore to_skip in last iteration)
+		   3. add in pages that still need fixup (net bufs)
+		 */
 		
 		pfn_batch[batch] = n;
 		pfn_type[batch] = live_pfn_to_mfn_table[n];
 
 		if( pfn_type[batch] == 0x80000004 )
 		{
+		    /* not currently in pusedo-physical map -- set bit
+		       in to_fix that we must send this page in last_iter
+		       unless its sent sooner anyhow */
+
 		    set_bit( n, to_fix );
 		    if( iter>1 )
 			DDPRINTF("Urk! netbuf race: iter %d, pfn %lx. mfn %lx\n",
@@ -572,7 +613,8 @@ int xc_linux_save(int xc_handle,
 
 	total_sent += sent_this_iter;
 
-	verbose_printf("\b\b\b\b100%% (%d pages)\n", sent_this_iter );
+	verbose_printf("\b\b\b\b100%% (pages sent= %d, skipped= %d )\n", 
+		       sent_this_iter, skip_this_iter );
 	
 	if ( last_iter )
 	{
@@ -604,7 +646,8 @@ int xc_linux_save(int xc_handle,
 	if ( live )
 	{
 	    if ( ( sent_this_iter > (sent_last_iter * 0.95) ) ||
-		 (iter >= max_iters) || (sent_this_iter < 10) )
+		 (iter >= max_iters) || (sent_this_iter < 10) || 
+		 (total_sent > nr_pfns*2) )
 	    {
 		DPRINTF("Start last iteration\n");
 		last_iter = 1;
@@ -685,14 +728,6 @@ int xc_linux_save(int xc_handle,
     munmap(live_shinfo, PAGE_SIZE);
 
 out:
-    /* Restart the domain if we had to stop it to save its state. */
-    if ( we_stopped_it )
-    {
-	printf("Restart domain\n");
-        op.cmd = DOM0_STARTDOMAIN;
-        op.u.startdomain.domain = (domid_t)domid;
-        (void)do_dom0_op(xc_handle, &op);
-    }
 
     if ( pfn_type != NULL )
         free(pfn_type);

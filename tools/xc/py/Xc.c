@@ -214,6 +214,7 @@ static PyObject *pyxc_linux_save(PyObject *self,
 	struct hostent *h;
 	struct sockaddr_in s;
 	int sockbufsize;
+	int rc = -1;
 
 	int writerfn(void *fd, const void *buf, size_t count)
 	{
@@ -257,12 +258,24 @@ static PyObject *pyxc_linux_save(PyObject *self,
 	if ( xc_linux_save(xc->xc_handle, dom, flags, 
                            writerfn, (void*)sd) == 0 )
 	{
-	    close(sd);
-	    Py_INCREF(zero);
-	    return zero;
+	    if ( read( sd, &rc, sizeof(int) ) != sizeof(int) )
+		goto serr;
+		
+	    if ( rc == 0 )
+	    {
+		printf("Migration succesful -- destroy local copy\n");
+		xc_domain_destroy( xc->xc_handle, dom, 1 );
+		close(sd);
+		Py_INCREF(zero);
+		return zero;
+	    }
+	    else
+		errno = rc;
 	}
 
     serr:
+	printf("Migration failed -- restart local copy\n");
+	xc_domain_start( xc->xc_handle, dom );
 	PyErr_SetFromErrno(xc_error);
 	if ( sd >= 0 ) close(sd);
 	return NULL;
@@ -355,7 +368,7 @@ static PyObject *pyxc_linux_restore(PyObject *self,
 	struct sockaddr_in s, d, p;
 	socklen_t dlen, plen;
 	int sockbufsize;
-	int on = 1;
+	int on = 1, rc = -1;
 
 	int readerfn(void *fd, void *buf, size_t count)
 	{
@@ -413,13 +426,18 @@ static PyObject *pyxc_linux_restore(PyObject *self,
                         sizeof sockbufsize) < 0 ) 
 	    goto serr;
 
-	if ( xc_linux_restore(xc->xc_handle, dom, flags, 
-                              readerfn, (void*)sd, &dom) == 0 )
+	rc = xc_linux_restore(xc->xc_handle, dom, flags, 
+                              readerfn, (void*)sd, &dom);
+
+	write( sd, &rc, sizeof(int) ); 
+
+	if (rc == 0)
 	{
 	    close(sd);
 	    Py_INCREF(zero);
 	    return zero;
 	}
+	errno = rc;
 
     serr:
 	PyErr_SetFromErrno(xc_error);
