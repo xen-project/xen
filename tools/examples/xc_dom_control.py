@@ -229,6 +229,10 @@ elif cmd == 'vbd_add':
 
     segments = XenoUtil.lookup_disk_uname(uname)
 
+    if not segments:
+        print "Lookup Failed"
+        sys.exit(1)
+
     if XenoUtil.vd_extents_validate(segments,writeable) < 0:
 	print "That mapping is too unsafe for the current VBD expertise level"
 	sys.exit(1)

@@ -314,7 +314,7 @@ def vd_create(size_mb, expiry):
                   FROM vdisks NATURAL JOIN vdisk_extents
                                                   NATURAL JOIN vdisk_part
                   WHERE expires AND expiry_time <= datetime('now')
-                  ORDER BY expiry_time asc, vdisk_extent_no desc
+                  ORDER BY expiry_time ASC, vdisk_extent_no DESC
                """)  # aims to reuse the last extents
                      # from the longest-expired disks first
 
@@ -389,7 +389,7 @@ def vd_lookup(id):
 
     if not count:
         cx.close()
-        return -1
+        return None
 
     cu.execute("SELECT size from vdisks WHERE vdisk_id = " + id)
     real_size, = cu.fetchone()
@@ -410,6 +410,7 @@ def vd_lookup(id):
                                              NATURAL JOIN vdisk_part
                                                 
                   WHERE vdisk_extents.vdisk_id = """ + id
+               + " ORDER BY vdisk_extents.vdisk_extent_no ASC"
                )
 
     extent_tuples = cu.fetchall()
@@ -509,7 +510,7 @@ def vd_enlarge(vdisk_id, extra_size_mb):
                   FROM vdisks NATURAL JOIN vdisk_extents
                                                   NATURAL JOIN vdisk_part
                   WHERE expires AND expiry_time <= datetime('now')
-                  ORDER BY expiry_time asc, vdisk_extent_no desc
+                  ORDER BY expiry_time ASC, vdisk_extent_no DESC
                """)  # aims to reuse the last extents
                      # from the longest-expired disks first
 
@@ -779,7 +780,7 @@ def vd_cp_to_file(vdisk_id,filename):
 
     extents = vd_lookup(vdisk_id)
 
-    if extents < 0:
+    if not extents:
         return -1
     
     file_idx = 0 # index into source file, in sectors
@@ -827,9 +828,12 @@ def vd_read_from_file(filename,expiry):
     returns [string] : vdisk ID for the destination vdisk
     """
 
-    size_sectors = os.stat(filename).st_size / 512
+    size_bytes = os.stat(filename).st_size
 
-    vdisk_id = vd_create(size_sectors / ( 2 * 1024 ),expiry)
+    (size_mb,leftover) =  divmod(size_bytes,1048580) # size in megabytes
+    if leftover > 0: size_mb += 1 # round up if not an exact number of MB
+
+    vdisk_id = vd_create(size_mb, expiry)
 
     if vdisk_id < 0:
         return -1
@@ -840,9 +844,11 @@ def vd_read_from_file(filename,expiry):
     cu.execute("""SELECT partition, extent_size, part_extent_no
                   FROM vdisk_part NATURAL JOIN vdisk_extents
                   WHERE vdisk_id =  """ + vdisk_id + """
-                  ORDER BY vdisk_extent_no""")
+                  ORDER BY vdisk_extent_no ASC""")
 
     extents = cu.fetchall()
+
+    size_sectors = size_mb * 2048 # for feeding to dd
 
     file_idx = 0 # index into source file, in sectors
 
@@ -856,7 +862,7 @@ def vd_read_from_file(filename,expiry):
                   + " count=" + str(min(extent_size, size_sectors - file_idx))
                   + " > /dev/null")
 
-        return file_idx + extent_size
+        return extent_size
 
     for i in extents:
         file_idx += write_extent_to_vd(i, file_idx, filename)

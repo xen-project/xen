@@ -204,6 +204,26 @@ just before deallocation (automated support for this may be added at a later
 date).
 
 
+Side note: The xvd* devices
+---------------------------
+
+The examples in this document make frequent use of the xvd* device nodes for
+representing virtual block devices.  It is not a requirement to use these with
+Xen, since VBDs can be mapped to any IDE or SCSI device node in the system.
+Changing the the references to xvd* nodes in the examples below to refer to
+some unused hd* or sd* node would also be valid.
+
+They can be useful when accessing VBDs from dom0, since binding VBDs to xvd*
+devices under will avoid clashes with real IDE or SCSI drives.
+
+There is a shell script provided in tools/misc/xen-mkdevnodes to create these
+nodes.  Specify on the command line the directory that the nodes should be
+placed under (e.g. /dev):
+
+> cd {root of Xen source tree}/tools/misc/
+> ./xen-mkdevnodes /dev
+
+
 Dynamically Registering VBDs
 ----------------------------
 
@@ -306,7 +326,7 @@ vbd_list variable, for instance using the line:
 (Note that you need to use quotes here, since config files are really small
 Python scripts.)
 
-To specify the mapping on the commandline, you'd use the -d switch and supply
+To specify the mapping on the command line, you'd use the -d switch and supply
 the triple as the argument, e.g.:
 
 > xc_dom_create.py [other arguments] -d phy:hdc,/dev/whatever,r
