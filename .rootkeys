@@ -850,11 +850,6 @@
 41a2188ar6_vOO3_tEJQjmFVU3409A tools/vnet/vnetd/vcache.h
 41a2188aETrGU60X9WtGhYVfU7z0Pw tools/vnet/vnetd/vnetd.c
 41a2188ahYjemudGyB7078AWMFR-0w tools/vnet/vnetd/vnetd.h
-4194e861IgTabTt8HOuh143QIJFD1Q tools/x2d2/Makefile
-4194e861M2gcBz4i94cQYpqzi8n6UA tools/x2d2/cntrl_con.c
-4194e8612TrrMvC8ZlA4h2ZYCPWz4g tools/x2d2/minixend.c
-4194e861x2eqNCD61RYPCUEBVdMYuw tools/x2d2/minixend.h
-4194e861A4V9VbD_FYmgXpYEj5YwVg tools/x2d2/util.c
 41d58ba63w1WfBmd6Cr_18nhLNv7PA tools/xcs/Makefile
 41d58ba6NxgkfzD_rmsGjgd_zJ3H_w tools/xcs/bindings.c
 41d58ba6I2umi60mShq4Pl0RDg7lzQ tools/xcs/connection.c
