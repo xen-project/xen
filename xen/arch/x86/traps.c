@@ -50,8 +50,7 @@
 #include <asm/flushtlb.h>
 #include <asm/uaccess.h>
 #include <asm/i387.h>
-#include <asm/pdb.h>
-#include <xen/debugger_hooks.h>
+#include <asm/debugger.h>
 
 extern char opt_nmi[];
 
@@ -223,7 +222,9 @@ static inline void do_trap(int trapnr, char *str,
     trap_info_t *ti;
     unsigned long fixup;
 
-    if (!(regs->cs & 3))
+    DEBUGGER_trap_entry(trapnr, regs, error_code);
+
+    if ( !(regs->cs & 3) )
         goto xen_fault;
 
     ti = current->thread.traps + trapnr;
@@ -244,8 +245,7 @@ static inline void do_trap(int trapnr, char *str,
         return;
     }
 
-    if (debugger_trap(trapnr, regs))
-	return;
+    DEBUGGER_trap_fatal(trapnr, regs, error_code);
 
     show_registers(regs);
     panic("CPU%d FATAL TRAP: vector = %d (%s)\n"
@@ -284,18 +284,15 @@ asmlinkage void do_int3(struct xen_regs *regs, long error_code)
     struct guest_trap_bounce *gtb = guest_trap_bounce+smp_processor_id();
     trap_info_t *ti;
 
-    if (debugger_trap(3, regs))
-        return;
+    DEBUGGER_trap_entry(TRAP_int3, regs, error_code);
 
-    if ( (regs->cs & 3) != 3 )
+    if ( unlikely((regs->cs & 3) == 0) )
     {
-        if ( unlikely((regs->cs & 3) == 0) )
-        {
-            show_registers(regs);
-            panic("CPU%d FATAL TRAP: vector = 3 (Int3)\n"
-                  "[error_code=%08x]\n",
-                  smp_processor_id(), error_code);
-        }
+        DEBUGGER_trap_fatal(TRAP_int3, regs, error_code);
+        show_registers(regs);
+        panic("CPU%d FATAL TRAP: vector = 3 (Int3)\n"
+              "[error_code=%08x]\n",
+              smp_processor_id(), error_code);
     }
 
     ti = current->thread.traps + 3;
@@ -331,7 +328,7 @@ asmlinkage void do_double_fault(void)
     printk("System needs manual reset.\n");
     printk("************************************\n");
 
-    debugger_trap(8, NULL);
+    DEBUGGER_trap_fatal(TRAP_double_fault, NULL, 0);
 
     /* Lock up the console to prevent spurious output from other CPUs. */
     console_force_lock();
@@ -351,6 +348,8 @@ asmlinkage void do_page_fault(struct xen_regs *regs, long error_code)
     int cpu = ed->processor;
 
     __asm__ __volatile__ ("movl %%cr2,%0" : "=r" (addr) : );
+
+    DEBUGGER_trap_entry(TRAP_page_fault, regs, error_code);
 
     perfc_incrc(page_faults);
 
@@ -411,8 +410,7 @@ asmlinkage void do_page_fault(struct xen_regs *regs, long error_code)
         return;
     }
 
-    if (debugger_trap(14, regs))
-	return;
+    DEBUGGER_trap_fatal(TRAP_page_fault, regs, error_code);
 
     if ( addr >= PAGE_OFFSET )
     {
@@ -446,6 +444,8 @@ asmlinkage void do_general_protection(struct xen_regs *regs, long error_code)
     trap_info_t *ti;
     unsigned long fixup;
 
+    DEBUGGER_trap_entry(TRAP_gp_fault, regs, error_code);
+    
     /* Badness if error in ring 0, or result of an interrupt. */
     if ( !(regs->cs & 3) || (error_code & 1) )
         goto gp_in_kernel;
@@ -476,15 +476,6 @@ asmlinkage void do_general_protection(struct xen_regs *regs, long error_code)
         ti = current->thread.traps + (error_code>>3);
         if ( TI_GET_DPL(ti) >= (regs->cs & 3) )
         {
-#ifdef XEN_DEBUGGER
-            if ( pdb_initialized && (pdb_ctx.system_call != 0) )
-            {
-                unsigned long cr3 = read_cr3();
-                if ( cr3 == pdb_ctx.ptbr )
-                    pdb_linux_syscall_enter_bkpt(regs, error_code, ti);
-            }
-#endif
-
             gtb->flags = GTBF_TRAP_NOCODE;
             regs->eip += 2;
             goto finish_propagation;
@@ -497,7 +488,7 @@ asmlinkage void do_general_protection(struct xen_regs *regs, long error_code)
          gpf_emulate_4gb(regs) )
         return;
 #endif
-    
+
     /* Pass on GPF as is. */
     ti = current->thread.traps + 13;
     gtb->flags      = GTBF_TRAP;
@@ -518,8 +509,7 @@ asmlinkage void do_general_protection(struct xen_regs *regs, long error_code)
         return;
     }
 
-    if (debugger_trap(13, regs))
-	return;
+    DEBUGGER_trap_fatal(TRAP_gp_fault, regs, error_code);
 
     die("general protection fault", regs, error_code);
 }
@@ -566,8 +556,7 @@ asmlinkage void io_check_error(struct xen_regs *regs)
 
 static void unknown_nmi_error(unsigned char reason, struct xen_regs * regs)
 {
-    if (debugger_trap(2, regs))
-	return;
+    DEBUGGER_trap_entry(TRAP_nmi, regs, 0);
 
     printk("Uhhuh. NMI received for unknown reason %02x.\n", reason);
     printk("Dazed and confused, but trying to continue\n");
@@ -622,39 +611,13 @@ asmlinkage void math_state_restore(struct xen_regs *regs, long error_code)
     }
 }
 
-#ifdef XEN_DEBUGGER
-asmlinkage void do_pdb_debug(struct xen_regs *regs, long error_code)
-{
-    unsigned int condition;
-    struct domain *tsk = current;
-    struct guest_trap_bounce *gtb = guest_trap_bounce+smp_processor_id();
-
-    __asm__ __volatile__("movl %%db6,%0" : "=r" (condition));
-    if ( (condition & (1 << 14)) != (1 << 14) )
-        printk("\nwarning: debug trap w/o BS bit [0x%x]\n\n", condition);
-    __asm__("movl %0,%%db6" : : "r" (0));
-
-    if ( pdb_handle_exception(1, regs) != 0 )
-    {
-        tsk->thread.debugreg[6] = condition;
-
-        gtb->flags = GTBF_TRAP_NOCODE;
-        gtb->cs    = tsk->thread.traps[1].cs;
-        gtb->eip   = tsk->thread.traps[1].address;
-    }
-}
-#endif
-
 asmlinkage void do_debug(struct xen_regs *regs, long error_code)
 {
     unsigned int condition;
     struct exec_domain *tsk = current;
     struct guest_trap_bounce *gtb = guest_trap_bounce+smp_processor_id();
 
-#ifdef XEN_DEBUGGER
-    if ( pdb_initialized )
-        return do_pdb_debug(regs, error_code);
-#endif
+    DEBUGGER_trap_entry(TRAP_debug, regs, error_code);
 
     __asm__ __volatile__("movl %%db6,%0" : "=r" (condition));
 

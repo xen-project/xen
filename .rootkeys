@@ -708,6 +708,7 @@
 404f1b920OQVnrbnXnySS-WxrH9Wzw xen/include/asm-x86/config.h
 3ddb79c2LLt11EQHjrd6sB7FUqvFfA xen/include/asm-x86/cpufeature.h
 40cf1596ajIU1KJfF22XD-tSLfH6XA xen/include/asm-x86/current.h
+4194efbdvxUXjCLobbopgLOojisO4Q xen/include/asm-x86/debugger.h
 3ddb79c2jFkPAZTDmU35L6IUssYMgQ xen/include/asm-x86/debugreg.h
 3ddb79c3r9-31dIsewPV3P3i8HALsQ xen/include/asm-x86/delay.h
 3ddb79c34BFiXjBJ_cCKB0aCsV1IDw xen/include/asm-x86/desc.h
@@ -772,7 +773,6 @@
 3ddb79c259jh8hE7vre_8NuE7nwNSA xen/include/xen/config.h
 3eb165e0eawr3R-p2ZQtSdLWtLRN_A xen/include/xen/console.h
 3ddb79c1V44RD26YqCUm-kqIupM37A xen/include/xen/ctype.h
-4194efbdvxUXjCLobbopgLOojisO4Q xen/include/xen/debugger_hooks.h
 3ddb79c05DdHQ0UxX_jKsXdR4QlMCA xen/include/xen/delay.h
 3ddb79c2O729EttZTYu1c8LcsUO_GQ xen/include/xen/elf.h
 3ddb79c0HIghfBF8zFUdmXhOU8i6hA xen/include/xen/errno.h

@@ -1214,6 +1214,27 @@ void pdb_key_pressed(unsigned char key)
     pdb_handle_exception(KEYPRESS_EXCEPTION, regs);
 }
 
+void pdb_handle_debug_trap(struct xen_regs *regs, long error_code)
+{
+    unsigned int condition;
+    struct domain *tsk = current;
+    struct guest_trap_bounce *gtb = guest_trap_bounce+smp_processor_id();
+
+    __asm__ __volatile__("movl %%db6,%0" : "=r" (condition));
+    if ( (condition & (1 << 14)) != (1 << 14) )
+        printk("\nwarning: debug trap w/o BS bit [0x%x]\n\n", condition);
+    __asm__("movl %0,%%db6" : : "r" (0));
+
+    if ( pdb_handle_exception(1, regs) != 0 )
+    {
+        tsk->thread.debugreg[6] = condition;
+
+        gtb->flags = GTBF_TRAP_NOCODE;
+        gtb->cs    = tsk->thread.traps[1].cs;
+        gtb->eip   = tsk->thread.traps[1].address;
+    }
+}
+
 void initialize_pdb()
 {
     extern char opt_pdb[];
@@ -1244,7 +1265,7 @@ void initialize_pdb()
     /* Acknowledge any spurious GDB packets. */
     pdb_put_char('+');
 
-    add_key_handler('D', pdb_key_pressed, "enter pervasive debugger");
+    register_keyhandler('D', pdb_key_pressed, "enter pervasive debugger");
 
     pdb_initialized = 1;
 }

@@ -84,4 +84,6 @@ void pdb_linux_syscall_enter_bkpt (struct xen_regs *regs, long error_code,
 void pdb_linux_syscall_exit_bkpt (struct xen_regs *regs, 
 				  struct pdb_context *pdb_ctx);
 
+void pdb_handle_debug_trap(struct xen_regs *regs, long error_code);
+
 #endif  /* __PDB_H__ */

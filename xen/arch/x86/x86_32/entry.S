@@ -63,7 +63,7 @@
 #include <public/xen.h>
 
 #define GET_CURRENT(reg)   \
-        movl $4096-4, reg; \
+        movl $8192-4, reg; \
         orl  %esp, reg;    \
         andl $~3,reg;      \
         movl (reg),reg;

@@ -1,3 +1,6 @@
+/******************************************************************************
+ * keyhandler.c
+ */
 
 #include <xen/keyhandler.h> 
 #include <xen/reboot.h>
@@ -10,49 +13,61 @@
 #define KEY_MAX 256
 #define STR_MAX  64
 
-static struct { 
-    key_handler *handler;
-    int          flags;
+static struct {
+    union {
+        keyhandler_t     *handler;
+        irq_keyhandler_t *irq_handler;
+    } u;
+    unsigned int flags;
     char         desc[STR_MAX]; 
 } key_table[KEY_MAX]; 
 
-#define KEYHANDLER_NO_DEFER 0x1
+#define KEYHANDLER_IRQ_CALLBACK 0x1
 
 static unsigned char keypress_key;
 
 void keypress_softirq(void)
 {
-    key_handler  *h;
+    keyhandler_t *h;
     unsigned char key = keypress_key;
-    if ( (h = key_table[key].handler) != NULL )
+    if ( (h = key_table[key].u.handler) != NULL )
         (*h)(key);
 }
 
 void handle_keypress(unsigned char key, struct xen_regs *regs)
 {
-    key_handler  *h;
+    irq_keyhandler_t *h;
 
-    keypress_key = key;
-    if ( (key_table[key].flags & KEYHANDLER_NO_DEFER) &&
-         ((h = key_table[key].handler) != NULL) )
-        ((void (*)(unsigned char, struct xen_regs *))*h)(key, regs);
+    if ( key_table[key].flags & KEYHANDLER_IRQ_CALLBACK )
+    {
+        if ( (h = key_table[key].u.irq_handler) != NULL )
+            (*h)(key, regs);
+    }
     else
+    {
+        keypress_key = key;
         raise_softirq(KEYPRESS_SOFTIRQ);
+    }
 }
 
-void add_key_handler(unsigned char key, key_handler *handler, char *desc)
+void register_keyhandler(
+    unsigned char key, keyhandler_t *handler, char *desc)
 {
-    key_table[key].handler = handler;
-    key_table[key].flags = 0;
+    ASSERT(key_table[key].u.handler == NULL);
+    key_table[key].u.handler = handler;
+    key_table[key].flags     = 0;
     strncpy(key_table[key].desc, desc, STR_MAX);
     key_table[key].desc[STR_MAX-1] = '\0'; 
 }
 
-void add_key_handler_no_defer(unsigned char key, key_handler *handler,
-                              char *desc)
+void register_irq_keyhandler(
+    unsigned char key, irq_keyhandler_t *handler, char *desc)
 {
-    add_key_handler(key, handler, desc);
-    key_table[key].flags |= KEYHANDLER_NO_DEFER;
+    ASSERT(key_table[key].u.irq_handler == NULL);
+    key_table[key].u.irq_handler = handler;
+    key_table[key].flags         = KEYHANDLER_IRQ_CALLBACK;
+    strncpy(key_table[key].desc, desc, STR_MAX);
+    key_table[key].desc[STR_MAX-1] = '\0'; 
 }
 
 static void show_handlers(unsigned char key)
@@ -60,16 +75,15 @@ static void show_handlers(unsigned char key)
     int i; 
     printk("'%c' pressed -> showing installed handlers\n", key);
     for ( i = 0; i < KEY_MAX; i++ ) 
-        if ( key_table[i].handler != NULL ) 
+        if ( key_table[i].u.handler != NULL ) 
             printk(" key '%c' (ascii '%02x') => %s\n", 
                    (i<33 || i>126)?(' '):(i),i,
                    key_table[i].desc);
 }
 
 
-static void dump_registers(unsigned char key)
+static void dump_registers(unsigned char key, struct xen_regs *regs)
 {
-    struct xen_regs *regs = (struct xen_regs *)get_execution_context();
     extern void show_registers(struct xen_regs *regs); 
     printk("'%c' pressed -> dumping registers\n", key); 
     show_registers(regs); 
@@ -153,20 +167,30 @@ void initialize_keytable(void)
 {
     open_softirq(KEYPRESS_SOFTIRQ, keypress_softirq);
 
-    add_key_handler('d', dump_registers, "dump registers"); 
-    add_key_handler('h', show_handlers, "show this message");
-    add_key_handler('l', print_sched_histo, "print sched latency histogram");
-    add_key_handler('L', reset_sched_histo, "reset sched latency histogram");
-    add_key_handler('q', do_task_queues, "dump task queues + guest state");
-    add_key_handler('r', dump_runq,      "dump run queues");
-    add_key_handler('R', halt_machine,   "reboot machine"); 
+    register_irq_keyhandler(
+        'd', dump_registers, "dump registers"); 
+    register_keyhandler(
+        'h', show_handlers, "show this message");
+    register_keyhandler(
+        'l', print_sched_histo, "print sched latency histogram");
+    register_keyhandler(
+        'L', reset_sched_histo, "reset sched latency histogram");
+    register_keyhandler(
+        'q', do_task_queues, "dump task queues + guest state");
+    register_keyhandler(
+        'r', dump_runq,      "dump run queues");
+    register_keyhandler(
+        'R', halt_machine,   "reboot machine"); 
 
 #ifndef NDEBUG
-    add_key_handler('o', audit_domains_key,  "audit domains >0 EXPERIMENTAL"); 
+    register_keyhandler(
+        'o', audit_domains_key,  "audit domains >0 EXPERIMENTAL"); 
 #endif
 
 #ifdef PERF_COUNTERS
-    add_key_handler('p', perfc_printall, "print performance counters"); 
-    add_key_handler('P', perfc_reset,    "reset performance counters"); 
+    register_keyhandler(
+        'p', perfc_printall, "print performance counters"); 
+    register_keyhandler(
+        'P', perfc_reset,    "reset performance counters"); 
 #endif
 }
