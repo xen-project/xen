@@ -853,12 +853,12 @@ void put_page_type(struct pfn_info *page)
                 nx &= ~PGT_validated;
             }
         }
-	else if ( unlikely((nx & (PGT_pinned | PGT_count_mask)) == 
+        else if ( unlikely((nx & (PGT_pinned | PGT_count_mask)) == 
                            (PGT_pinned | 1)) )
-	{
+        {
             /* Page is now only pinned. Make the back pointer mutable again. */
-	    nx |= PGT_va_mutable;
-	}
+            nx |= PGT_va_mutable;
+        }
     }
     while ( unlikely((y = cmpxchg(&page->u.inuse.type_info, x, nx)) != x) );
 }
@@ -927,7 +927,7 @@ int get_page_type(struct pfn_info *page, u32 type)
                 nx |= PGT_va_unknown;
             }
         }
-	else if ( unlikely(!(x & PGT_validated)) )
+        else if ( unlikely(!(x & PGT_validated)) )
         {
             /* Someone else is updating validation of this page. Wait... */
             while ( (y = page->u.inuse.type_info) == x )
@@ -948,8 +948,8 @@ int get_page_type(struct pfn_info *page, u32 type)
             MEM_LOG("Error while validating pfn %08lx for type %08x."
                     " caf=%08x taf=%08x\n",
                     page_to_pfn(page), type,
-		    page->count_info,
-		    page->u.inuse.type_info);
+                    page->count_info,
+                    page->u.inuse.type_info);
             /* Noone else can get a reference. We hold the only ref. */
             page->u.inuse.type_info = 0;
             return 0;
@@ -1463,8 +1463,8 @@ int do_mmu_update(mmu_update_t *ureqs, int count, int *success_count)
              * page as dirty.
              */
             if ( unlikely(d->mm.shadow_mode == SHM_logdirty) && 
-		 mark_dirty(&d->mm, pfn) )
-		d->mm.shadow_dirty_block_count++;
+                 mark_dirty(&d->mm, pfn) )
+                d->mm.shadow_dirty_block_count++;
 
             put_page(&frame_table[pfn]);
             break;
@@ -1647,8 +1647,7 @@ void ptwr_flush(const int which)
     int i;
 
     l1va = ptwr_info[cpu].ptinfo[which].l1va;
-    ptep = (unsigned long *)&linear_pg_table
-        [l1va>>PAGE_SHIFT];
+    ptep = (unsigned long *)&linear_pg_table[l1va>>PAGE_SHIFT];
 
     /* make pt page write protected */
     if ( unlikely(__get_user(pte, ptep)) ) {
@@ -1660,10 +1659,10 @@ void ptwr_flush(const int which)
     pte &= ~_PAGE_RW;
 
     if ( unlikely(current->mm.shadow_mode) ) {
-	unsigned long spte;
-	l1pte_no_fault(&current->mm, &pte, &spte);
-	__put_user( spte, (unsigned long *)&shadow_linear_pg_table
-		    [l1va>>PAGE_SHIFT] );
+        unsigned long spte;
+        l1pte_no_fault(&current->mm, &pte, &spte);
+        __put_user( spte, (unsigned long *)&shadow_linear_pg_table
+                    [l1va>>PAGE_SHIFT] );
     }
 
     if ( unlikely(__put_user(pte, ptep)) ) {
@@ -1682,8 +1681,8 @@ void ptwr_flush(const int which)
         if (likely(l1_pgentry_val(ol1e) == l1_pgentry_val(nl1e)))
             continue;
         if (likely(l1_pgentry_val(ol1e) == (l1_pgentry_val(nl1e) | _PAGE_RW))
-	    && readonly_page_from_l1e(nl1e))
-	    continue;
+            && readonly_page_from_l1e(nl1e))
+            continue;
         if (unlikely(l1_pgentry_val(ol1e) & _PAGE_PRESENT))
             put_page_from_l1e(ol1e, current);
         if (unlikely(!get_page_from_l1e(nl1e, current))) {
@@ -1694,10 +1693,10 @@ void ptwr_flush(const int which)
     unmap_domain_mem(pl1e);
 
     if (which == PTWR_PT_ACTIVE && likely(!current->mm.shadow_mode)) {
-	/* reconnect l1 page (no need if shadow mode)*/
-	pl2e = &linear_l2_table[ptwr_info[cpu].active_pteidx];
-	nl2e = mk_l2_pgentry(l2_pgentry_val(*pl2e) | _PAGE_PRESENT);
-	update_l2e(pl2e, *pl2e, nl2e);
+        /* reconnect l1 page (no need if shadow mode) */
+        pl2e = &linear_l2_table[ptwr_info[cpu].active_pteidx];
+        nl2e = mk_l2_pgentry(l2_pgentry_val(*pl2e) | _PAGE_PRESENT);
+        update_l2e(pl2e, *pl2e, nl2e);
     }
 
     if ( unlikely(current->mm.shadow_mode) )
@@ -1711,7 +1710,7 @@ void ptwr_flush(const int which)
             unsigned long spfn = sstat & PSH_pfn_mask;
             l1_pgentry_t *sl1e = map_domain_mem( spfn << PAGE_SHIFT );
             
-            for( i = 0; i < ENTRIES_PER_L1_PAGETABLE; i++ )
+            for ( i = 0; i < ENTRIES_PER_L1_PAGETABLE; i++ )
             {
                 l1pte_no_fault(&current->mm, 
                                &l1_pgentry_val(
@@ -1747,7 +1746,7 @@ int ptwr_do_page_fault(unsigned long addr)
          (__get_user(pte, (unsigned long *)
                      &linear_pg_table[addr >> PAGE_SHIFT]) == 0) )
     {
-        if( (pte & _PAGE_RW) && (pte & _PAGE_PRESENT) )
+        if ( (pte & _PAGE_RW) && (pte & _PAGE_PRESENT) )
             return 0; /* we can't help. Maybe shadow mode can? */
 
         pfn = pte >> PAGE_SHIFT;
@@ -1778,14 +1777,14 @@ int ptwr_do_page_fault(unsigned long addr)
 
             if (which == PTWR_PT_ACTIVE) {
                 ptwr_info[cpu].active_pteidx = va_mask;
-		if ( likely(!current->mm.shadow_mode) ) {
-		    /* disconnect l1 page (unnecessary in shadow mode) */
-		    nl2e = mk_l2_pgentry((l2_pgentry_val(*pl2e) &
-					  ~_PAGE_PRESENT));
-		    update_l2e(pl2e, *pl2e, nl2e);
-		    flush_tlb();
-		}
-	    }
+                if ( likely(!current->mm.shadow_mode) ) {
+                    /* disconnect l1 page (unnecessary in shadow mode) */
+                    nl2e = mk_l2_pgentry((l2_pgentry_val(*pl2e) &
+                                          ~_PAGE_PRESENT));
+                    update_l2e(pl2e, *pl2e, nl2e);
+                    flush_tlb();
+                }
+            }
 
             ptwr_info[cpu].ptinfo[which].pl1e =
                 map_domain_mem(pfn << PAGE_SHIFT);
@@ -1822,11 +1821,11 @@ static __init int ptwr_init(void)
         ptwr_info[i].ptinfo[PTWR_PT_INACTIVE].page =
             (void *)alloc_xenheap_page();
         machine_to_phys_mapping[virt_to_phys(
-	    ptwr_info[i].ptinfo[PTWR_PT_ACTIVE].page)>>PAGE_SHIFT] =
-	    INVALID_P2M_ENTRY;
+            ptwr_info[i].ptinfo[PTWR_PT_ACTIVE].page)>>PAGE_SHIFT] =
+            INVALID_P2M_ENTRY;
         machine_to_phys_mapping[virt_to_phys(
-	    ptwr_info[i].ptinfo[PTWR_PT_INACTIVE].page)>>PAGE_SHIFT] =
-	    INVALID_P2M_ENTRY; 
+            ptwr_info[i].ptinfo[PTWR_PT_INACTIVE].page)>>PAGE_SHIFT] =
+            INVALID_P2M_ENTRY; 
     }
 
     return 0;
@@ -1890,7 +1889,7 @@ void audit_domain(struct domain *d)
 
             if ( tcount < 0 )
             {
-		/* This will only come out once. */
+                /* This will only come out once. */
                 printk("Audit %d: type count whent below zero pfn=%x "
                        "taf=%x otaf=%x\n",
                        d->domain, page-frame_table,
@@ -1900,14 +1899,14 @@ void audit_domain(struct domain *d)
             
             page->u.inuse.type_info =
                 (page->u.inuse.type_info & ~PGT_count_mask) | 
-		(tcount & PGT_count_mask);
+                (tcount & PGT_count_mask);
         }
 
         ctot++;
         count += dir;
         if ( count < 0 )
         {
-	    /* This will only come out once. */
+            /* This will only come out once. */
             printk("Audit %d: general count whent below zero pfn=%x "
                    "taf=%x otaf=%x\n",
                    d->domain, page-frame_table,
@@ -1917,7 +1916,7 @@ void audit_domain(struct domain *d)
             
         page->count_info =
             (page->count_info & ~PGC_count_mask) | 
-	    (count & PGC_count_mask);            
+            (count & PGC_count_mask);            
 
     }
 
@@ -2107,17 +2106,17 @@ void audit_domain(struct domain *d)
                     unsigned long l1pfn = pt[i]>>PAGE_SHIFT;
                     struct pfn_info *l1page = &frame_table[l1pfn];
 
-		    if ( l1pfn < 0x100 )
-		    {
-			lowmem_mappings++;
-			continue;
-		    }
+                    if ( l1pfn < 0x100 )
+                    {
+                        lowmem_mappings++;
+                        continue;
+                    }
 
-		    if ( l1pfn > max_page )
-		    {
-			io_mappings++;
-			continue;
-		    }
+                    if ( l1pfn > max_page )
+                    {
+                        io_mappings++;
+                        continue;
+                    }
 
                     if ( pt[i] & _PAGE_RW )
                     {
@@ -2137,12 +2136,12 @@ void audit_domain(struct domain *d)
                     {
                         printk("Audit %d: [%lx,%x] Skip foreign page dom=%lx "
                                "pfn=%lx c=%08x t=%08x m2p=%lx\n",
-			       d->domain, pfn, i,
+                               d->domain, pfn, i,
                                (unsigned long)l1page->u.inuse.domain,
-			       l1pfn,
-			       l1page->count_info,
-			       l1page->u.inuse.type_info,
-			       machine_to_phys_mapping[l1pfn]);    
+                               l1pfn,
+                               l1page->count_info,
+                               l1page->u.inuse.type_info,
+                               machine_to_phys_mapping[l1pfn]);    
                         continue;
                     }
 
@@ -2159,8 +2158,8 @@ void audit_domain(struct domain *d)
     }
 
     if ( (io_mappings > 0) || (lowmem_mappings > 0) )
-	printk("Audit %d: Found %d lowmem mappings and %d io mappings\n",
-	       d->domain, lowmem_mappings, io_mappings);
+        printk("Audit %d: Found %d lowmem mappings and %d io mappings\n",
+               d->domain, lowmem_mappings, io_mappings);
 
     /* PHASE 2 */
 
@@ -2248,7 +2247,7 @@ void audit_domain(struct domain *d)
                          (l1pfn < 0x100) || (l1pfn > max_page) )
                         continue;
 
-		    adjust(l1page, 1, 0);
+                    adjust(l1page, 1, 0);
                 }
             }
 
@@ -2276,7 +2275,7 @@ void audit_domains(void)
 {
     struct domain *d;
     for_each_domain ( d )
-	audit_domain(d);
+        audit_domain(d);
 }
 
 void audit_domains_key(unsigned char key, void *dev_id,
