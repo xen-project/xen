@@ -7,6 +7,7 @@ from twisted.web import error
 
 from xen.xend import sxp
 from xen.xend import XendDomain
+from xen.xend.Args import FormFn
 
 from SrvDir import SrvDir
 from SrvDomain import SrvDomain
@@ -88,6 +89,12 @@ class SrvDomainDir(SrvDir):
             out.close()
             return val
 
+    def op_restore(self, op, req):
+        fn = FormFn(self.xd.domain_restore,
+                    [['file', 'str']])
+        val = fn(req.args)
+        return val
+        
     def render_POST(self, req):
         return self.perform(req)
 
@@ -129,3 +136,9 @@ class SrvDomainDir(SrvDir):
         req.write('<button type="submit" name="op" value="create">Create Domain</button>')
         req.write('Config <input type="file" name="config"><br>')
         req.write('</form>')
+        req.write('<form method="post" action="%s" enctype="multipart/form-data">'
+                  % req.prePathURL())
+        req.write('<button type="submit" name="op" value="create">Restore Domain</button>')
+        req.write('State <input type="string" name="state"><br>')
+        req.write('</form>')
+        

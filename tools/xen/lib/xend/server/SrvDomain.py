@@ -44,13 +44,6 @@ class SrvDomain(SrvDir):
         val = fn(req.args, {'dom': self.dom.id})
         return val
 
-    def op_restore(self, op, req):
-        fn = FormFn(self.xd.domain_restore,
-                    [['dom', 'int'],
-                     ['file', 'str']])
-        val = fn(req.args, {'dom': self.dom.id})
-        return val
-        
     def op_migrate(self, op, req):
         fn = FormFn(self.xd.domain_migrate,
                     [['dom', 'int'],

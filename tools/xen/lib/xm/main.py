@@ -9,7 +9,7 @@ from getopt import getopt
 from xen.xend import PrettyPrint
 from xen.xend import sxp
 from xen.xend.XendClient import server
-from xen.xend.xm import create, shutdown
+from xen.xm import create, shutdown
 
 class Prog:
     """Base class for sub-programs.

@@ -4,6 +4,7 @@ CFLAGS   = -Wall -O3 -Werror
 CFLAGS  += -I../../xen/include/hypervisor-ifs
 CFLAGS  += -I../../linux-xen-sparse/include
 CFLAGS  += -I../xu/lib
+CFLAGS  += -I../lib
 
 HDRS     = $(wildcard *.h)
 OBJS     = $(patsubst %.c,%.o,$(wildcard *.c))

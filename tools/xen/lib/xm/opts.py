@@ -290,6 +290,7 @@ class Opts:
         cmd = '\n'.join(["import sys",
                          "import os",
                          "import os.path",
+                         "import xen.util.ip",
                          "xm_file = '%s'" % defaults,
                          "xm_help = %d" % help ])
         exec cmd in globals, locals
