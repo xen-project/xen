@@ -166,7 +166,7 @@ static PyObject *pyxc_domain_getinfo(PyObject *self,
     {
         PyList_SetItem(
             list, i, 
-            Py_BuildValue("{s:i,s:i,s:i,s:i,s:l,s:L,s:s,s:l}",
+            Py_BuildValue("{s:i,s:i,s:i,s:i,s:i,s:i,s:i,s:i,s:l,s:L,s:s,s:l}",
                           "dom",       info[i].domid,
                           "cpu",       info[i].cpu,
                           "dying",     info[i].dying,
