@@ -145,16 +145,13 @@ NT_MASK		= 0x00004000
         pushl %ecx; \
         pushl %ebx; \
 
-#define SAVE_ALL_NOSTI     \
+#define SAVE_ALL \
         SAVE_ALL_NOSEGREGS \
         movl $(__HYPERVISOR_DS),%edx; \
         movl %edx,%ds; \
         movl %edx,%es; \
         movl %edx,%fs; \
         movl %edx,%gs;
-
-#define SAVE_ALL \
-        SAVE_ALL_NOSTI \
         sti;
 
 #define GET_CURRENT(reg)   \
@@ -533,12 +530,18 @@ error_code:
 	movl  GS(%esp), %edi		# get the function address
 	movl  %eax, ORIG_EAX(%esp)
 	movl  %ecx, GS(%esp)
-	movl  %esp,%edx
-	pushl %esi			# push the error code
-	pushl %edx			# push the pt_regs pointer
 	movl  $(__HYPERVISOR_DS),%edx
 	movl  %edx,%ds
 	movl  %edx,%es
+	movl  %edx,%fs
+	movl  %edx,%gs
+	movl  EFLAGS(%esp),%edx
+	testl $0x200,%edx               # Is IF asserted in saved EFLAGS?
+	jz    1f                        # Don't STI if it isn't.
+	sti
+1:	movl  %esp,%edx
+	pushl %esi			# push the error code
+	pushl %edx			# push the pt_regs pointer
 	GET_CURRENT(%ebx)
 	call  *%edi
         addl  $8,%esp
