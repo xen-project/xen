@@ -98,7 +98,7 @@ class BlkifControllerFactory(controller.ControllerFactory):
             blkif.reattached()
 
     def recv_be_driver_status_changed(self, msg, req):
-        val = unpackMsg('blkif_be_driver_status_changed_t'. msg)
+        val = unpackMsg('blkif_be_driver_status_changed_t', msg)
         status = val['status']
         if status == BLKIF_DRIVER_STATUS_UP and not self.attached:
             for blkif in self.getInstances():
