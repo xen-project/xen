@@ -311,6 +311,8 @@
 413cb3b5rIKB3TbyhK3pbNyVkYysqA netbsd-2.0-xen-sparse/sys/arch/xen/xen/xen_debug.c
 413cb3b5eKxnzoodEqaWn2wrPnHWnA netbsd-2.0-xen-sparse/sys/arch/xen/xen/xencons.c
 413cb3b5F56TvQWAmO5TsuzhtzLFPQ netbsd-2.0-xen-sparse/sys/arch/xen/xen/xenkbc.c
+422e4430vKaHLOOGS7X-SUUe3EBCgw netbsd-2.0-xen-sparse/sys/miscfs/kernfs/kernfs.h
+422e4430-gOD358H8nGGnNWes08Nng netbsd-2.0-xen-sparse/sys/miscfs/kernfs/kernfs_vnops.c
 413cb3b53nyOv1OIeDSsCXhBFDXvJA netbsd-2.0-xen-sparse/sys/nfs/files.nfs
 413aa1d0oNP8HXLvfPuMe6cSroUfSA patches/linux-2.6.10/agpgart.patch
 3f776bd1Hy9rn69ntXBhPReUFw9IEA tools/Makefile

@@ -85,6 +85,9 @@ popd >/dev/null
 # Get absolute path to the source directory
 AS=`pwd`
 
+# Get name of sparse directory
+SDN=$(basename $AS)
+
 # Get path to source, relative to destination
 abs_to_rel ${AD} ${AS}
 RS=$DESTPATH
@@ -96,12 +99,23 @@ for i in `find . -type f -o -type l` ; do rm -f ${AD}/${i#./} ; done
 cd ${AD}
 
 # Remove old symlinks
-for i in `find . -type l`; do rm -f $i; done
+find sys -type l | while read f
+do
+  case $(readlink $f) in
+  */$SDN/*)
+    rm -f $f
+    ;;
+  esac
+done
 
-# Create symlinks of files and directories which exist in the sparse source
-relative_lndir ${RS}
-rm -f mkbuildtree
-
+if [ -f ${AD}/BUILDING ]; then
+  # Create symlinks of files and directories which exist in the sparse source
+  (cd sys && relative_lndir ../${RS}/sys)
+else
+  # Create symlinks of files and directories which exist in the sparse source
+  relative_lndir ${RS}
+  rm -f mkbuildtree
+fi
 
 # Create links to the shared definitions of the Xen interface
 rm -rf ${AD}/sys/arch/xen/include/xen-public
