@@ -70,6 +70,10 @@ unsigned long arch_get_unmapped_area(struct file *filp, unsigned long addr, unsi
 */
 struct list_head *find_direct(struct list_head *list, unsigned long addr)
 {
+	struct list_head * curr;
+	struct list_head * direct_list = &current->mm->context.direct_list;
+	direct_mmap_node_t * node;
+
     for ( curr = direct_list->next; curr != direct_list; curr = curr->next )
     {
         node = list_entry(curr, direct_mmap_node_t, list);
