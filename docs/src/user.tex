@@ -218,6 +218,7 @@ running on a P6-class (or newer) CPU.
 \item [$*$] Development installation of zlib (e.g., zlib-dev).
 \item [$*$] Development installation of Python v2.2 or later (e.g., python-dev).
 \item [$*$] \LaTeX, transfig and tgif are required to build the documentation.
+\item [$\dag$] The \path{iproute2} package. 
 \item [$\dag$] The Linux bridge-utils\footnote{Available from 
 {\tt http://bridge.sourceforge.net}} (e.g., \path{/sbin/brctl})
 \item [$\dag$] An installation of Twisted v1.3 or
@@ -965,18 +966,36 @@ chapter covers some of the possibilities.
 
 \section{Exporting Physical Devices as VBDs} 
 
-\framebox{\centerline{\bf Warning: Block device sharing} \\
+One of the simplest configurations is to directly export 
+individual partitions from domain 0 to other domains. To 
+achieve this use the \path{phy:} specifier in your domain 
+configuration file. For example a line like
+\begin{quote}
+\verb_disk = ['phy:hda3,sda1,w']_
+\end{quote}
+specifies that the partition \path{/dev/hda3} in domain 0 
+should be exported to the new domain as \path{/dev/sda1}; 
+one could equally well export it as \path{/dev/hda3} or 
+\path{/dev/sdb5} should one wish. 
+
+In addition to local disks and partitions, it is possible to export
+any device that Linux considers to be ``a disk'' in the same manner.
+For example, if you have iSCSI disks or GNBD volumes imported into
+domain 0 you can export these to other domains using the \path{phy:}
+disk syntax.
+
+
+\begin{center}
+\framebox{\bf Warning: Block device sharing}
+\end{center}
+\begin{quote}
 Block devices should only be shared between domains in a read-only
 fashion otherwise the Linux kernels will obviously get very confused
 as the file system structure may change underneath them (having the
 same partition mounted rw twice is a sure fire way to cause
 irreparable damage)!  If you want read-write sharing, export the
-directory to other domains via NFS from domain0.}
-
-In addition to local disks, its possible to export any device
-that Linux knows about as a disk in another domain. For example,
-if you have iSCSI disks or GNBD volumes imported into domain 0
-you can export these to other domains using the "phy:" disk syntax.
+directory to other domains via NFS from domain0. 
+\end{quote}
 
 
 \section{Using File-backed VBDs}
@@ -990,31 +1009,41 @@ takes up half of the size allocated.
 
 For example, to create a 2GB sparse file-backed virtual block device
 (actually only consumes 1KB of disk):
-
+\begin{quote}
 \verb_# dd if=/dev/zero of=vm1disk bs=1k seek=2048k count=1_
+\end{quote}
 
-Make a file system in the disk file: \\
+Make a file system in the disk file: 
+\begin{quote}
 \verb_# mkfs -t ext3 vm1disk_
+\end{quote}
 
 (when the tool asks for confirmation, answer `y')
 
 Populate the file system e.g. by copying from the current root:
+\begin{quote}
 \begin{verbatim}
 # mount -o loop vm1disk /mnt
 # cp -ax /{root,dev,var,etc,usr,bin,sbin,lib} /mnt
 # mkdir /mnt/{proc,sys,home,tmp}
 \end{verbatim}
+\end{quote}
+
 Tailor the file system by editing \path{/etc/fstab},
 \path{/etc/hostname}, etc (don't forget to edit the files in the
 mounted file system, instead of your domain 0 filesystem, e.g. you
 would edit \path{/mnt/etc/fstab} instead of \path{/etc/fstab} ).  For
 this example put \path{/dev/sda1} to root in fstab.
 
-Now unmount (this is important!):\\
+Now unmount (this is important!):
+\begin{quote}
 \verb_# umount /mnt_
+\end{quote}
 
-In the configuration file set:\\
+In the configuration file set:
+\begin{quote}
 \verb_disk = ['file:/full/path/to/vm1disk,sda1,w']_
+\end{quote}
 
 As the virtual machine writes to its `disk', the sparse file will be
 filled in and consume more space up to the original 2GB.
@@ -1022,29 +1051,54 @@ filled in and consume more space up to the original 2GB.
 
 \section{Using LVM-backed VBDs}
 
-initialise a partition to LVM volumes:
- pvcreate /dev/sda10		
+A particularly appealing solution is to use LVM volumes 
+as backing for domain file-systems since this allows dynamic
+growing/shrinking of volumes as well as snapshot and other 
+features. 
 
-Create a volume group named 'vg' on the physical partition:
- vgcreate vg /dev/sda10
+To initialise a partition to support LVM volumes:
+\begin{quote}
+\begin{verbatim} 
+# pvcreate /dev/sda10		
+\end{verbatim} 
+\end{quote}
 
-Create a logical volume of size 4GB named 'myvmdisk1':
- lvcreate -L4096M -n myvmdisk1 vg
+Create a volume group named `vg' on the physical partition:
+\begin{quote}
+\begin{verbatim} 
+# vgcreate vg /dev/sda10
+\end{verbatim} 
+\end{quote}
 
-You should now see that you have a /dev/vg/myvmdisk1
-Make a filesystem, mount it and populate it. e.g.:
- mkfs -t ext3 /dev/vg/myvmdisk1
- mount /dev/vg/myvmdisk1 /mnt
- cp -ax / /mnt
- umount /mnt
+Create a logical volume of size 4GB named `myvmdisk1':
+\begin{quote}
+\begin{verbatim} 
+# lvcreate -L4096M -n myvmdisk1 vg
+\end{verbatim} 
+\end{quote}
 
-Now configure your VM with the following disk configuration
+You should now see that you have a \path{/dev/vg/myvmdisk1}
+Make a filesystem, mount it and populate it, e.g.:
+\begin{quote}
+\begin{verbatim} 
+# mkfs -t ext3 /dev/vg/myvmdisk1
+# mount /dev/vg/myvmdisk1 /mnt
+# cp -ax / /mnt
+# umount /mnt
+\end{verbatim} 
+\end{quote}
+
+Now configure your VM with the following disk configuration:
+\begin{quote}
+\begin{verbatim} 
  disk = [ 'phy:vg/myvmdisk1,sda1,w' ]
+\end{verbatim} 
+\end{quote}
 
-LVM enables you to grow the size logical volumes, but you'll need
+LVM enables you to grow the size of logical volumes, but you'll need
 to resize the corresponding file system to make use of the new
-space. Some file systems (e.g. ext3) now support on-line resize.
-See the LVM manuals for more details.
+space. Some file systems (e.g. ext3) now support on-line resize.  See
+the LVM manuals for more details.
 
 You can also use LVM for creating copy-on-write clones of LVM
 volumes (known as writable persistent snapshots in LVM
@@ -1057,59 +1111,71 @@ will improve in future.
 To create two copy-on-write clone of the above file system you
 would use the following commands:
 
- lvcreate -s -L1024M -n myclonedisk1 /dev/vg/myvmdisk1
- lvcreate -s -L1024M -n myclonedisk2 /dev/vg/myvmdisk1
+\begin{quote}
+\begin{verbatim} 
+# lvcreate -s -L1024M -n myclonedisk1 /dev/vg/myvmdisk1
+# lvcreate -s -L1024M -n myclonedisk2 /dev/vg/myvmdisk1
+\end{verbatim} 
+\end{quote}
 
 Each of these can grow to have 1GB of differences from the master
 volume. You can grow the amount of space for storing the
-differences using the lvextend command e.g.:
- lvextend +100M /dev/vg/myclonedisk1
+differences using the lvextend command, e.g.:
+\begin{quote}
+\begin{verbatim} 
+# lvextend +100M /dev/vg/myclonedisk1
+\end{verbatim} 
+\end{quote}
 
-Don't let the differences volume ever fill up otherwise LVM gets
+Don't let the `differences volume' ever fill up otherwise LVM gets
 rather confused. It may be possible to automate the growing
-process by using 'dmsetup wait' to spot the volume getting full
-and then issue an lvextend.
+process by using \path{dmsetup wait} to spot the volume getting full
+and then issue an \path{lvextend}.
 
-In principle, it is possible to continue writing to the volume
-that has been cloned (the changes will not be visible to the
-clones), but we wouldn't recommend this: have the cloned volume
-as a 'pristine' file system install that isn't mounted directly
-by any of the virtual machines.
+%% In principle, it is possible to continue writing to the volume
+%% that has been cloned (the changes will not be visible to the
+%% clones), but we wouldn't recommend this: have the cloned volume
+%% as a 'pristine' file system install that isn't mounted directly
+%% by any of the virtual machines.
 
 
 \section{Using NFS Root}
 
-The procedure for using NFS root in a virtual machine is basically the
-same as you would follow for a real machine.  NB. the Linux NFS root
-implementation is known to have stability problems under high load
-(this is not a Xen-specific problem), so this configuration may not be
-appropriate for critical servers.
+First, populate a root filesystem in a directory on the server
+machine. This can be on a distinct physical machine, or simply 
+run within a virtual machine on the same node.
 
-First, populate a root filesystem in a directory on the server machine
---- this can be on another physical machine, or perhaps just another
-virtual machine on the same node.
+Now configure the NFS server to export this filesystem over the
+network by adding a line to \path{/etc/exports}, for instance:
 
-Now, configure the NFS server to export this filesystem over the
-network by adding a line to /etc/exports, for instance:
-
+\begin{quote}
 \begin{verbatim}
 /export/vm1root      w.x.y.z/m (rw,sync,no_root_squash)
 \end{verbatim}
+\end{quote}
 
 Finally, configure the domain to use NFS root.  In addition to the
 normal variables, you should make sure to set the following values in
 the domain's configuration file:
 
+\begin{quote}
+\begin{small}
 \begin{verbatim}
 root       = '/dev/nfs'
-nfs_server = 'a.b.c.d'       # Substitute the IP for the server here
-nfs_root   = '/path/to/root' # Path to root FS on the server
+nfs_server = 'a.b.c.d'       # substitute IP address of server 
+nfs_root   = '/path/to/root' # path to root FS on the server
 \end{verbatim}
+\end{small}
+\end{quote}
 
-The domain will need network access at boot-time, so either statically
-configure an IP address (Using the config variables {\tt ip}, {\tt
-netmask}, {\tt gateway}, {\tt hostname}) or enable DHCP ({\tt
-dhcp='dhcp'}).
+The domain will need network access at boot time, so either statically
+configure an IP address (Using the config variables \path{ip}, 
+\path{netmask}, \path{gateway}, \path{hostname}) or enable DHCP (
+\path{dhcp='dhcp'}).
+
+Note that the Linux NFS root implementation is known to have stability
+problems under high load (this is not a Xen-specific problem), so this
+configuration may not be appropriate for critical servers.
 
 
 \part{User Reference Documentation}
@@ -1254,7 +1320,9 @@ vif = [ 'mac=aa:00:00:00:00:11, bridge=xen-br0',
 \item[disk] List of block devices to export to the domain,  e.g. \\
   \verb_disk = [ 'phy:hda1,sda1,r' ]_ \\
   exports physical device \path{/dev/hda1} to the domain 
-  as \path{/dev/sda1} with read-only access. 
+  as \path{/dev/sda1} with read-only access. Exporting a disk read-write 
+  which is currently mounted is dangerous -- if you are \emph{certain}
+  you wish to do this, you can specify \path{w!} as the mode. 
 \item[dhcp] Set to {\tt 'dhcp'} if you want to use DHCP to configure
   networking. 
 \item[netmask] Manually configured IP netmask.
@@ -1341,12 +1409,12 @@ according to the type of virtual device this domain will service.
 %% existing {\em virtual} devices (of the appropriate type) to that
 %% backend.
 
-Note that a block backend cannot import virtual block devices from
-other domains, and a network backend cannot import virtual network
-devices from other domains.  Thus (particularly in the case of block
-backends, which cannot import a virtual block device as their root
-filesystem), you may need to boot a backend domain from a ramdisk or a
-network device.
+Note that a block backend cannot currently import virtual block
+devices from other domains, and a network backend cannot import
+virtual network devices from other domains.  Thus (particularly in the
+case of block backends, which cannot import a virtual block device as
+their root filesystem), you may need to boot a backend domain from a
+ramdisk or a network device.
 
 Access to PCI devices may be configured on a per-device basis.  Xen
 will assign the minimal set of hardware privileges to a domain that
