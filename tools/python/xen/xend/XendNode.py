@@ -24,12 +24,22 @@ class XendNode:
     def notify(self, uri):
         return 0
     
-    def cpu_bvt_slice_set(self, slice):
+    def cpu_bvt_slice_set(self, ctx_allow):
         ret = 0
         #ret = self.xc.bvtsched_global_set(ctx_allow=slice)
         return ret
 
-    def cpu_bvt_slice_get(self, slice):
+    def cpu_bvt_slice_get(self, ctx_allow):
+        ret = 0
+        #ret = self.xc.bvtsched_global_get()
+        return ret
+    
+    def cpu_fbvt_slice_set(self, ctx_allow):
+        ret = 0
+        #ret = self.xc.bvtsched_global_set(ctx_allow=slice)
+        return ret
+
+    def cpu_fbvt_slice_get(self, ctx_allow):
         ret = 0
         #ret = self.xc.bvtsched_global_get()
         return ret

@@ -363,6 +363,19 @@ class XendDomain:
         dom = int(dom)
         return xc.bvtsched_domain_get(dom)
     
+    def domain_cpu_fbvt_set(self, dom, mcuadv, warp, warpl, warpu):
+        """Set FBVT (Fair Borrowed Virtual Time) scheduler parameters for a domain.
+        """
+        dom = int(dom)
+        return xc.fbvtsched_domain_set(dom=dom, mcuadv=mcuadv,
+                                      warp=warp, warpl=warpl, warpu=warpu)
+
+    def domain_cpu_fbvt_get(self, dom):
+        """Get FBVT (Fair Borrowed Virtual Time) scheduler parameters for a domain.
+        """
+        dom = int(dom)
+        return xc.fbvtsched_domain_get(dom)
+        
     def domain_cpu_atropos_set(self, dom, period, slice, latency, xtratime):
         """Set Atropos scheduler parameters for a domain.
         """

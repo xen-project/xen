@@ -171,10 +171,15 @@ class Xend:
                          {'op'      : 'cpu_rrobin_slice_set',
                           'slice'   : slice })
     
-    def xend_node_cpu_bvt_slice_set(self, slice):
+    def xend_node_cpu_bvt_slice_set(self, ctx_allow):
         return xend_call(self.nodeurl(),
                          {'op'      : 'cpu_bvt_slice_set',
-                          'slice'   : slice })
+                          'ctx_allow'   : ctx_allow })
+    
+    def xend_node_cpu_fbvt_slice_set(self, ctx_allow):
+        return xend_call(self.nodeurl(),
+                         {'op'      : 'cpu_fbvt_slice_set',
+                          'ctx_allow'   : ctx_allow })
 
     def xend_domains(self):
         return xend_get(self.domainurl())
@@ -226,10 +231,19 @@ class Xend:
     def xend_domain_cpu_bvt_set(self, id, mcuadv, warp, warpl, warpu):
         return xend_call(self.domainurl(id),
                          {'op'      : 'cpu_bvt_set',
-                          'mcuadv'  : mvuadv,
+                          'mcuadv'  : mcuadv,
                           'warp'    : warp,
                           'warpl'   : warpl,
                           'warpu'   : warpu })
+    
+    def xend_domain_cpu_fbvt_set(self, id, mcuadv, warp, warpl, warpu):
+        return xend_call(self.domainurl(id),
+                         {'op'      : 'cpu_fbvt_set',
+                          'mcuadv'  : mcuadv,
+                          'warp'    : warp,
+                          'warpl'   : warpl,
+                          'warpu'   : warpu })
+
 
     def xend_domain_cpu_atropos_set(self, id, period, slice, latency, xtratime):
         return xend_call(self.domainurl(id),

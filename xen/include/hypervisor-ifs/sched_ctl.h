@@ -9,8 +9,9 @@
 
 /* Scheduler types */
 #define SCHED_BVT      0
-#define SCHED_ATROPOS  1
-#define SCHED_RROBIN   2
+#define SCHED_FBVT     1
+#define SCHED_ATROPOS  2
+#define SCHED_RROBIN   3
 
 /* these describe the intended direction used for a scheduler control or domain
  * command */
@@ -31,6 +32,12 @@ struct sched_ctl_cmd
             /* IN variables. */
             u32 ctx_allow;            /*  8: context switch allowance */
         } PACKED bvt;
+
+        struct fbvt_ctl
+        {
+            /* IN variables. */
+            u32 ctx_allow;            /*  8: context switch allowance */
+        } PACKED fbvt;
 
         struct rrobin_ctl
         {
@@ -54,6 +61,14 @@ struct sched_adjdom_cmd
             u32 warpl;      /* 24: warp limit */
             u32 warpu;      /* 28: unwarp time requirement */
         } PACKED bvt;
+
+        struct fbvt_adjdom
+        {
+            u32 mcu_adv;    /* 16: mcu advance: inverse of weight */
+            u32 warp;       /* 20: time warp */
+            u32 warpl;      /* 24: warp limit */
+            u32 warpu;      /* 28: unwarp time requirement */
+        } PACKED fbvt;
 
         struct atropos_adjdom
         {

@@ -4,6 +4,7 @@ import os
 from SrvDir import SrvDir
 from xen.xend import sxp
 from xen.xend import XendNode
+from xen.xend.Args import FormFn
 
 class SrvNode(SrvDir):
     """Information about the node.
@@ -29,7 +30,13 @@ class SrvNode(SrvDir):
 
     def op_cpu_bvt_slice_set(self, op, req):
         fn = FormFn(self.xn.cpu_bvt_slice_set,
-                    [['slice', 'int']])
+                    [['ctx_allow', 'int']])
+        val = fn(req.args, {})
+        return val
+    
+    def op_cpu_fbvt_slice_set(self, op, req):
+        fn = FormFn(self.xn.cpu_fbvt_slice_set,
+                    [['ctx_allow', 'int']])
         val = fn(req.args, {})
         return val
 

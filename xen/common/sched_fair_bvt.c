@@ -26,12 +26,15 @@
 #include <xen/sched-if.h>
 #include <xen/slab.h>
 
+
 /* all per-domain BVT-specific scheduling info is stored here */
-struct bvt_dom_info
+struct fbvt_dom_info
 {
     unsigned long mcu_advance;      /* inverse of weight */
     u32           avt;              /* actual virtual time */
     u32           evt;              /* effective virtual time */
+    u32		      time_slept;	    /* records amount of time slept, used for scheduling */
+    u32		      vtb;	    	    /* virtual time bonus */
     int           warpback;         /* warp?  */
     long          warp;             /* virtual time warp */
     long          warpl;            /* warp limit */
@@ -40,14 +43,14 @@ struct bvt_dom_info
     s_time_t      uwarped;          /* time it ran unwarped last time */
 };
 
-struct bvt_cpu_info
+struct fbvt_cpu_info
 {
     unsigned long svt; /* XXX check this is unsigned long! */
 };
 
 
-#define BVT_INFO(p)   ((struct bvt_dom_info *)(p)->sched_priv)
-#define CPU_INFO(cpu) ((struct bvt_cpu_info *)(schedule_data[cpu]).sched_priv)
+#define FBVT_INFO(p)   ((struct fbvt_dom_info *)(p)->sched_priv)
+#define CPU_INFO(cpu) ((struct fbvt_cpu_info *)(schedule_data[cpu]).sched_priv)
 #define CPU_SVT(cpu)  (CPU_INFO(cpu)->svt)
 
 #define MCU            (s32)MICROSECS(100)    /* Minimum unit */
@@ -55,14 +58,14 @@ struct bvt_cpu_info
 #define TIME_SLOP      (s32)MICROSECS(50)     /* allow time to slip a bit */
 static s32 ctx_allow = (s32)MILLISECS(5);     /* context switch allowance */
 
-/* SLAB cache for struct bvt_dom_info objects */
+/* SLAB cache for struct fbvt_dom_info objects */
 static kmem_cache_t *dom_info_cache;
 
 /*
  * Calculate the effective virtual time for a domain. Take into account 
  * warping limits
  */
-static void __calc_evt(struct bvt_dom_info *inf)
+static void __calc_evt(struct fbvt_dom_info *inf)
 {
     s_time_t now = NOW();
 
@@ -89,12 +92,12 @@ static void __calc_evt(struct bvt_dom_info *inf)
 }
 
 /**
- * bvt_alloc_task - allocate BVT private structures for a task
+ * fbvt_alloc_task - allocate FBVT private structures for a task
  * @p:              task to allocate private structures for
  *
  * Returns non-zero on failure.
  */
-int bvt_alloc_task(struct domain *p)
+int fbvt_alloc_task(struct domain *p)
 {
     p->sched_priv = kmem_cache_alloc(dom_info_cache);
     if ( p->sched_priv == NULL )
@@ -106,15 +109,14 @@ int bvt_alloc_task(struct domain *p)
 /*
  * Add and remove a domain
  */
-void bvt_add_task(struct domain *p) 
+void fbvt_add_task(struct domain *p) 
 {
-    struct bvt_dom_info *inf = BVT_INFO(p);
+    struct fbvt_dom_info *inf = FBVT_INFO(p);
 
     ASSERT(inf != NULL);
     ASSERT(p   != NULL);
 
     inf->mcu_advance = MCU_ADVANCE;
-
     if ( p->domain == IDLE_DOMAIN_ID )
     {
         inf->avt = inf->evt = ~0U;
@@ -125,6 +127,8 @@ void bvt_add_task(struct domain *p)
         inf->avt         = CPU_SVT(p->processor);
         inf->evt         = CPU_SVT(p->processor);
         /* Set some default values here. */
+		inf->vtb	     = 0;
+		inf->time_slept  = 0;
         inf->warpback    = 0;
         inf->warp        = 0;
         inf->warpl       = 0;
@@ -135,26 +139,44 @@ void bvt_add_task(struct domain *p)
 }
 
 /**
- * bvt_free_task - free BVT private structures for a task
+ * fbvt_free_task - free FBVT private structures for a task
  * @p:             task
  */
-void bvt_free_task(struct domain *p)
+void fbvt_free_task(struct domain *p)
 {
     ASSERT( p->sched_priv != NULL );
     kmem_cache_free( dom_info_cache, p->sched_priv );
 }
 
 
-void bvt_wake_up(struct domain *p)
+void fbvt_wake_up(struct domain *p)
 {
-    struct bvt_dom_info *inf = BVT_INFO(p);
+    struct fbvt_dom_info *inf = FBVT_INFO(p);
+    s32 io_warp;
 
     ASSERT(inf != NULL);
     
 
     /* set the BVT parameters */
     if (inf->avt < CPU_SVT(p->processor))
-        inf->avt = CPU_SVT(p->processor);
+    {
+		/*
+	  	 *We want IO bound processes to gain
+		 *dispatch precedence. It is especially for
+		 *device driver domains. Therefore AVT should not be updated
+		 *to SVT but to a value marginally smaller.
+		 *Since frequently sleeping domains have high time_slept
+		 *values, the virtual time can be determined as:
+		 *SVT - const * TIME_SLEPT
+	 	 */
+	
+		io_warp = (int)(0.5 * inf->time_slept);
+		if(io_warp > 10000) io_warp = 10000;
+
+		ASSERT(inf->time_slept + CPU_SVT(p->processor) > inf->avt + io_warp);
+		inf->time_slept += CPU_SVT(p->processor) - inf->avt - io_warp;
+        inf->avt = CPU_SVT(p->processor) - io_warp;
+    }
 
     /* deal with warping here */
     inf->warpback  = 1;
@@ -166,15 +188,15 @@ void bvt_wake_up(struct domain *p)
 /* 
  * Block the currently-executing domain until a pertinent event occurs.
  */
-static void bvt_do_block(struct domain *p)
+static void fbvt_do_block(struct domain *p)
 {
-    BVT_INFO(p)->warpback = 0; 
+    FBVT_INFO(p)->warpback = 0; 
 }
 
 /* Control the scheduler. */
-int bvt_ctl(struct sched_ctl_cmd *cmd)
+int fbvt_ctl(struct sched_ctl_cmd *cmd)
 {
-    struct bvt_ctl *params = &cmd->u.bvt;
+    struct fbvt_ctl *params = &cmd->u.fbvt;
 
     if ( cmd->direction == SCHED_INFO_PUT )
     { 
@@ -189,10 +211,10 @@ int bvt_ctl(struct sched_ctl_cmd *cmd)
 }
 
 /* Adjust scheduling parameter for a given domain. */
-int bvt_adjdom(struct domain *p,
+int fbvt_adjdom(struct domain *p,
                struct sched_adjdom_cmd *cmd)
 {
-    struct bvt_adjdom *params = &cmd->u.bvt;
+    struct fbvt_adjdom *params = &cmd->u.fbvt;
     unsigned long flags;
 
     if ( cmd->direction == SCHED_INFO_PUT )
@@ -202,9 +224,9 @@ int bvt_adjdom(struct domain *p,
             warpl = params->warpl,
             warpu = params->warpu;
         
-        struct bvt_dom_info *inf = BVT_INFO(p);
+        struct fbvt_dom_info *inf = FBVT_INFO(p);
         
-        DPRINTK("Get domain %u bvt mcu_adv=%ld, warp=%ld, "
+        DPRINTK("Get domain %u fbvt mcu_adv=%ld, warp=%ld, "
                 "warpl=%ld, warpu=%ld\n",
                 p->domain, inf->mcu_advance, inf->warp,
                 inf->warpl, inf->warpu );
@@ -219,7 +241,7 @@ int bvt_adjdom(struct domain *p,
         inf->warpl = warpl;
         inf->warpu = warpu;
 
-        DPRINTK("Set domain %u bvt mcu_adv=%ld, warp=%ld, "
+        DPRINTK("Set domain %u fbvt mcu_adv=%ld, warp=%ld, "
                 "warpl=%ld, warpu=%ld\n",
                 p->domain, inf->mcu_advance, inf->warp,
                 inf->warpl, inf->warpu );
@@ -228,7 +250,7 @@ int bvt_adjdom(struct domain *p,
     }
     else if ( cmd->direction == SCHED_INFO_GET )
     {
-        struct bvt_dom_info *inf = BVT_INFO(p);
+        struct fbvt_dom_info *inf = FBVT_INFO(p);
 
         spin_lock_irqsave(&schedule_lock[p->processor], flags);   
         params->mcu_adv = inf->mcu_advance;
@@ -249,7 +271,7 @@ int bvt_adjdom(struct domain *p,
  *   i.e., the domain with lowest EVT.
  *   The runqueue should be ordered by EVT so that is easy.
  */
-static task_slice_t bvt_do_schedule(s_time_t now)
+static task_slice_t fbvt_do_schedule(s_time_t now)
 {
     struct domain *prev = current, *next = NULL, *next_prime, *p;
     struct list_head   *tmp;
@@ -258,7 +280,7 @@ static task_slice_t bvt_do_schedule(s_time_t now)
     s32                 ranfor;     /* assume we never run longer than 2.1s! */
     s32                 mcus;
     u32                 next_evt, next_prime_evt, min_avt;
-    struct bvt_dom_info *prev_inf       = BVT_INFO(prev),
+    struct fbvt_dom_info *prev_inf       = FBVT_INFO(prev),
                         *p_inf          = NULL,
                         *next_inf       = NULL,
                         *next_prime_inf = NULL;
@@ -272,7 +294,18 @@ static task_slice_t bvt_do_schedule(s_time_t now)
         ranfor = (s32)(now - prev->lastschd);
         /* Calculate mcu and update avt. */
         mcus = (ranfor + MCU - 1) / MCU;
-        prev_inf->avt += mcus * prev_inf->mcu_advance;
+    if(mcus * prev_inf->mcu_advance < prev_inf->vtb)
+	{
+	    ASSERT(prev_inf->time_slept >= mcus * prev_inf->mcu_advance);
+    	prev_inf->time_slept -= mcus * prev_inf->mcu_advance;
+	}
+	else
+	{
+	    prev_inf->avt += mcus * prev_inf->mcu_advance - prev_inf->vtb;
+		
+	    ASSERT(prev_inf->time_slept >= prev_inf->vtb);
+	    prev_inf->time_slept -= prev_inf->vtb;
+ 	}
         
         __calc_evt(prev_inf);
         
@@ -300,7 +333,7 @@ static task_slice_t bvt_do_schedule(s_time_t now)
     list_for_each ( tmp, &schedule_data[cpu].runqueue )
     {
         p     = list_entry(tmp, struct domain, run_list);
-        p_inf = BVT_INFO(p);
+        p_inf = FBVT_INFO(p);
 
         if ( p_inf->evt < next_evt )
         {
@@ -338,7 +371,7 @@ static task_slice_t bvt_do_schedule(s_time_t now)
         {
             if ( p->processor == cpu )
             {
-                p_inf = BVT_INFO(p);
+                p_inf = FBVT_INFO(p);
                 p_inf->evt -= 0xe0000000;
                 p_inf->avt -= 0xe0000000;
             }
@@ -346,6 +379,32 @@ static task_slice_t bvt_do_schedule(s_time_t now)
         write_unlock_irqrestore(&tasklist_lock, t_flags); 
         CPU_SVT(cpu) -= 0xe0000000;
     }
+
+    next_prime_inf = FBVT_INFO(next_prime);
+    next_inf       = FBVT_INFO(next);
+    
+    /* check for time_slept overrun for the domain we schedule to run*/
+    if(next_inf->time_slept >= 0xf0000000)
+    {
+        printk("Domain %d is assigned more CPU then it is able to use.\n"
+               "FBVT slept_time=%d, halving. Mcu_advance=%ld\n",next->domain, 
+               next_inf->time_slept, next_inf->mcu_advance);
+
+        next_inf->time_slept /= 2;
+    }
+
+
+   /*
+     * In here we decide on Virtual Time Bonus. The idea is, for the
+     * domains that have large time_slept values to be allowed to run
+     * for longer. Thus regaining the share of CPU originally allocated.
+     * This is acompanied by the warp mechanism (which moves IO-bound
+     * domains earlier in virtual time). Together this should give quite
+     * good control both for CPU and IO-bound domains.
+     */
+    next_inf->vtb = (int)(0.2 * next_inf->time_slept);
+    if(next_inf->vtb > 1000) next_inf->vtb = 1000;
+
 
     /* work out time for next run through scheduler */
     if ( is_idle_task(next) ) 
@@ -361,17 +420,14 @@ static task_slice_t bvt_do_schedule(s_time_t now)
         goto sched_done;
     }
 
-    next_prime_inf = BVT_INFO(next_prime);
-    next_inf       = BVT_INFO(next);
-
     /*
      * If we are here then we have two runnable tasks.
      * Work out how long 'next' can run till its evt is greater than
      * 'next_prime's evt. Take context switch allowance into account.
      */
     ASSERT(next_prime_inf->evt >= next_inf->evt);
-    
-    r_time = ((next_prime_inf->evt - next_inf->evt)/next_inf->mcu_advance)
+   
+    r_time = ((next_prime_inf->evt + next_inf->vtb - next_inf->evt)/next_inf->mcu_advance)
         + ctx_allow;
 
     ASSERT(r_time >= ctx_allow);
@@ -384,78 +440,99 @@ static task_slice_t bvt_do_schedule(s_time_t now)
 }
 
 
-static void bvt_dump_runq_el(struct domain *p)
+static void fbvt_dump_runq_el(struct domain *p)
 {
-    struct bvt_dom_info *inf = BVT_INFO(p);
+    struct fbvt_dom_info *inf = FBVT_INFO(p);
     
-    printk("mcua=0x%04lX ev=0x%08X av=0x%08X ",
-           inf->mcu_advance, inf->evt, inf->avt);
+    printk("mcua=0x%04lX ev=0x%08X av=0x%08X sl=0x%08X vtb=0x%08X ",
+           inf->mcu_advance, inf->evt, inf->avt, inf->time_slept, inf->vtb);
 }
 
-static void bvt_dump_settings(void)
+static void fbvt_dump_settings(void)
 {
-    printk("BVT: mcu=0x%08Xns ctx_allow=0x%08Xns ", (u32)MCU, (s32)ctx_allow );
+    printk("FBVT: mcu=0x%08Xns ctx_allow=0x%08Xns ", (u32)MCU, (s32)ctx_allow );
 }
 
-static void bvt_dump_cpu_state(int i)
+static void fbvt_dump_cpu_state(int i)
 {
     printk("svt=0x%08lX ", CPU_SVT(i));
 }
 
 
 /* Initialise the data structures. */
-int bvt_init_scheduler()
+int fbvt_init_scheduler()
 {
     int i;
 
     for ( i = 0; i < NR_CPUS; i++ )
     {
-        schedule_data[i].sched_priv = kmalloc(sizeof(struct bvt_cpu_info));
+        schedule_data[i].sched_priv = kmalloc(sizeof(struct fbvt_cpu_info));
         if ( schedule_data[i].sched_priv == NULL )
         {
-            printk("Failed to allocate BVT scheduler per-CPU memory!\n");
+            printk("Failed to allocate FBVT scheduler per-CPU memory!\n");
             return -1;
         }
 
         CPU_SVT(i) = 0; /* XXX do I really need to do this? */
     }
 
-    dom_info_cache = kmem_cache_create("BVT dom info",
-                                       sizeof(struct bvt_dom_info),
+    dom_info_cache = kmem_cache_create("FBVT dom info",
+                                       sizeof(struct fbvt_dom_info),
                                        0, 0, NULL, NULL);
 
     if ( dom_info_cache == NULL )
     {
-        printk("BVT: Failed to allocate domain info SLAB cache");
+        printk("FBVT: Failed to allocate domain info SLAB cache");
         return -1;
     }
 
     return 0;
 }
 
-static void bvt_pause(struct domain *p)
+static void fbvt_pause(struct domain *p)
 {
     if( __task_on_runqueue(p) )
+    {
         __del_from_runqueue(p);
+    }
 }
 
-struct scheduler sched_bvt_def = {
-    .name     = "Borrowed Virtual Time",
-    .opt_name = "bvt",
-    .sched_id = SCHED_BVT,
+static void fbvt_unpause(struct domain *p)
+{
+	struct fbvt_dom_info *inf = FBVT_INFO(p);
+
+	if ( p->domain == IDLE_DOMAIN_ID )
+    {
+        inf->avt = inf->evt = ~0U;
+    } 
+    else 
+    {
+        /* Set avt to system virtual time. */
+        inf->avt         = CPU_SVT(p->processor);
+        /* Set some default values here. */
+		inf->vtb	 = 0;
+		__calc_evt(inf);
+    }
+}
+
+struct scheduler sched_fbvt_def = {
+    .name     = "Fair Borrowed Virtual Time",
+    .opt_name = "fbvt",
+    .sched_id = SCHED_FBVT,
     
-    .init_scheduler = bvt_init_scheduler,
-    .alloc_task     = bvt_alloc_task,
-    .add_task       = bvt_add_task,
-    .free_task      = bvt_free_task,
-    .wake_up        = bvt_wake_up,
-    .do_block       = bvt_do_block,
-    .do_schedule    = bvt_do_schedule,
-    .control        = bvt_ctl,
-    .adjdom         = bvt_adjdom,
-    .dump_settings  = bvt_dump_settings,
-    .dump_cpu_state = bvt_dump_cpu_state,
-    .dump_runq_el   = bvt_dump_runq_el,
-    .pause          = bvt_pause,
+    .init_scheduler = fbvt_init_scheduler,
+    .alloc_task     = fbvt_alloc_task,
+    .add_task       = fbvt_add_task,
+    .free_task      = fbvt_free_task,
+    .wake_up        = fbvt_wake_up,
+    .do_block       = fbvt_do_block,
+    .do_schedule    = fbvt_do_schedule,
+    .control        = fbvt_ctl,
+    .adjdom         = fbvt_adjdom,
+    .dump_settings  = fbvt_dump_settings,
+    .dump_cpu_state = fbvt_dump_cpu_state,
+    .dump_runq_el   = fbvt_dump_runq_el,
+    .pause          = fbvt_pause,
+    .unpause	    = fbvt_unpause,
 };
 

@@ -50,6 +50,7 @@ struct scheduler
     void         (*dump_runq_el)   (struct domain *);
     int          (*prn_state)      (int);
     void         (*pause)          (struct domain *);
+	void		 (*unpause)		   (struct domain *);
 };
 
 /* per CPU scheduler information */

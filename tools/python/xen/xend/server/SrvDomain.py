@@ -70,6 +70,16 @@ class SrvDomain(SrvDir):
                      ['warpu', 'int']])
         val = fn(req.args, {'dom': self.dom.id})
         return val
+    
+    def op_cpu_fbvt_set(self, op, req):
+        fn = FormFn(self.xd.domain_cpu_fbvt_set,
+                    [['dom', 'int'],
+                     ['mcuadv', 'int'],
+                     ['warp', 'int'],
+                     ['warpl', 'int'],
+                     ['warpu', 'int']])
+        val = fn(req.args, {'dom': self.dom.id})
+        return val
 
     def op_cpu_atropos_set(self, op, req):
         fn = FormFn(self.xd.domain_cpu_atropos_set,
