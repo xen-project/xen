@@ -32,7 +32,11 @@
 
 #define NR_IRQS   (NR_PIRQS + NR_DYNIRQS)
 
-extern void physirq_init(void);
+#define pirq_to_irq(_x)   ((_x) + PIRQ_BASE)
+#define irq_to_pirq(_x)   ((_x) - PIRQ_BASE)
+
+#define dynirq_to_irq(_x) ((_x) + DYNIRQ_BASE)
+#define irq_to_dynirq(_x) ((_x) - DYNIRQ_BASE)
 
 /* Dynamic binding of event channels and VIRQ sources to Linux IRQ space. */
 extern int  bind_virq_to_irq(int virq);
@@ -40,14 +44,13 @@ extern void unbind_virq_from_irq(int virq);
 extern int  bind_evtchn_to_irq(int evtchn);
 extern void unbind_evtchn_from_irq(int evtchn);
 
-#define irq_cannonicalize(_irq) (_irq)
+static __inline__ int irq_cannonicalize(int irq)
+{
+    return (irq == 2) ? 9 : irq;
+}
 
 extern void disable_irq(unsigned int);
 extern void disable_irq_nosync(unsigned int);
 extern void enable_irq(unsigned int);
-
-#ifdef CONFIG_X86_LOCAL_APIC
-#define ARCH_HAS_NMI_WATCHDOG		/* See include/linux/nmi.h */
-#endif
 
 #endif /* _ASM_IRQ_H */

@@ -601,7 +601,7 @@ static void end_virt_irq (unsigned int i)
  * - shared interrupts are not allowed for now
  * - we change the hw_irq handler to something else
  */
-static long pci_request_irq(int irq)
+static long pirq_request(int irq)
 {
     int err;
     phys_dev_t *pdev = NULL, *t;
@@ -685,7 +685,7 @@ static long pci_request_irq(int irq)
     return 0;
 }
 
-static long pci_free_irq(int irq)
+long pirq_free(int irq)
 {
     phys_dev_t *pdev;
 
@@ -719,55 +719,12 @@ static long pci_free_irq(int irq)
     return 0;
 }
 
-static long pci_enable_irq(int irq)
+static long pci_unmask_irq(void)
 {
-    /* XXX not sure we need this */
-    /* guest can enable phys_irq event for now */
-    return 0;
-}
-
-static long pci_disable_irq(int irq)
-{
-    /* XXX not sure we need this */
-    /* guest can disable phys_irq event for now */
-    return 0;
-}
-
-static long pci_finished_irq(int irq)
-{
-    phys_dev_t *pdev;
-    
-    if ( !(pdev = irqs[irq]) )
-    {
-        printk("finished_irq called for unregistered irq %d\n", irq);
-        return -EINVAL;
-    }
-   
-    if ( pdev->owner != current )
-    {
-        printk("finished_irq called dom not owning irq %d\n", irq);
-        return -EPERM;
-    }
-
-    if ( !test_bit(ST_IRQ_DELIVERED, &pdev->state) )
-    {
-        printk("finished_irq called for undelivered irq %d\n", irq);
-        return -EINVAL;
-    }
-
-#if 0 /* XXX KAF: do we need this? */
-    if ( test_bit(irq, &current->shared_info->physirq_pend) )
-    {
-        printk("finished_irq called for un-acknowleged irq %d\n", irq);        
-        return -EINVAL;
-    }
-#endif
-
+#if 0
     clear_bit(ST_IRQ_DELIVERED, &pdev->state);
-
-    /* call original end handler */
     pdev->orig_handler->end(irq);
-
+#endif
     return 0;
 }
 
@@ -786,43 +743,27 @@ long do_physdev_op(physdev_op_t *uop)
     switch ( op.cmd )
     {
     case PHYSDEVOP_CFGREG_READ:
-        ret = pci_cfgreg_read (op.u.cfg_read.seg, op.u.cfg_read.bus,
-                               op.u.cfg_read.dev, op.u.cfg_read.func,
-                               op.u.cfg_read.reg, op.u.cfg_read.len,
-                               &op.u.cfg_read.value);
+        ret = pci_cfgreg_read(op.u.cfg_read.seg, op.u.cfg_read.bus,
+                              op.u.cfg_read.dev, op.u.cfg_read.func,
+                              op.u.cfg_read.reg, op.u.cfg_read.len,
+                              &op.u.cfg_read.value);
         break;
 
     case PHYSDEVOP_CFGREG_WRITE:
-        ret = pci_cfgreg_write (op.u.cfg_write.seg, op.u.cfg_write.bus,
-                                op.u.cfg_write.dev, op.u.cfg_write.func,
-                                op.u.cfg_write.reg, op.u.cfg_write.len,
-                                op.u.cfg_write.value);
+        ret = pci_cfgreg_write(op.u.cfg_write.seg, op.u.cfg_write.bus,
+                               op.u.cfg_write.dev, op.u.cfg_write.func,
+                               op.u.cfg_write.reg, op.u.cfg_write.len,
+                               op.u.cfg_write.value);
         break;
 
     case PHYSDEVOP_FIND_IRQ:
-        ret = pci_find_irq (op.u.find_irq.seg, op.u.find_irq.bus,
-                            op.u.find_irq.dev, op.u.find_irq.func,
-                            &op.u.find_irq.irq);
+        ret = pci_find_irq(op.u.find_irq.seg, op.u.find_irq.bus,
+                           op.u.find_irq.dev, op.u.find_irq.func,
+                           &op.u.find_irq.irq);
         break;
 
-    case PHYSDEVOP_REQUEST_IRQ:
-        ret = pci_request_irq (op.u.request_irq.irq);
-        break;
-
-    case PHYSDEVOP_FREE_IRQ:
-        ret = pci_free_irq (op.u.free_irq.irq);
-        break;
-
-    case PHYSDEVOP_ENABLE_IRQ:
-        ret = pci_enable_irq (op.u.enable_irq.irq);
-        break;
-
-    case PHYSDEVOP_DISABLE_IRQ:
-        ret = pci_disable_irq (op.u.disable_irq.irq);
-        break;
-
-    case PHYSDEVOP_FINISHED_IRQ:
-        ret = pci_finished_irq (op.u.finished_irq.irq);
+    case PHYSDEVOP_UNMASK_IRQ:
+        ret = pci_unmask_irq();
         break;
 
     default:

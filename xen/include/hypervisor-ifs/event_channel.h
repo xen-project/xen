@@ -30,7 +30,7 @@ typedef struct evtchn_bind_interdomain
  * NOTES:
  *  1. A virtual IRQ may be bound to at most one event channel per domain.
  */
-#define EVTCHNOP_bind_virq    1
+#define EVTCHNOP_bind_virq        1
 typedef struct evtchn_bind_virq
 {
     /* IN parameters. */
@@ -40,6 +40,21 @@ typedef struct evtchn_bind_virq
 } evtchn_bind_virq_t;
 
 /*
+ * EVTCHNOP_bind_pirq: Bind a local event channel to IRQ <irq>.
+ * NOTES:
+ *  1. A physical IRQ may be bound to at most one event channel per domain.
+ *  2. Only a sufficiently-privileged domain may bind to a physical IRQ.
+ */
+#define EVTCHNOP_bind_pirq        2
+typedef struct evtchn_bind_pirq
+{
+    /* IN parameters. */
+    int pirq;
+    /* OUT parameters. */
+    int port;
+} evtchn_bind_pirq_t;
+
+/*
  * EVTCHNOP_close: Close the communication channel which has an endpoint at
  * <dom, port>.
  * NOTES:
@@ -47,7 +62,7 @@ typedef struct evtchn_bind_virq
  *  2. Only a sufficiently-privileged domain may close an event channel
  *     for which <dom> is not DOMID_SELF.
  */
-#define EVTCHNOP_close            2
+#define EVTCHNOP_close            3
 typedef struct evtchn_close
 {
     /* IN parameters. */
@@ -60,7 +75,7 @@ typedef struct evtchn_close
  * EVTCHNOP_send: Send an event to the remote end of the channel whose local
  * endpoint is <DOMID_SELF, local_port>.
  */
-#define EVTCHNOP_send             3
+#define EVTCHNOP_send             4
 typedef struct evtchn_send
 {
     /* IN parameters. */
@@ -76,7 +91,7 @@ typedef struct evtchn_send
  *  2. Only a sufficiently-privileged domain may obtain the status of an event
  *     channel for which <dom> is not DOMID_SELF.
  */
-#define EVTCHNOP_status           4
+#define EVTCHNOP_status           5
 typedef struct evtchn_status
 {
     /* IN parameters */
@@ -86,8 +101,8 @@ typedef struct evtchn_status
 #define EVTCHNSTAT_closed       0  /* Chennel is not in use.                 */
 #define EVTCHNSTAT_unbound      1  /* Channel is not bound to a source.      */
 #define EVTCHNSTAT_interdomain  2  /* Channel is connected to remote domain. */
-#define EVTCHNSTAT_pirq     3      /* Channel is bound to a phys IRQ line.   */
-#define EVTCHNSTAT_virq     4      /* Channel is bound to a virtual IRQ line */
+#define EVTCHNSTAT_pirq         3  /* Channel is bound to a phys IRQ line.   */
+#define EVTCHNSTAT_virq         4  /* Channel is bound to a virtual IRQ line */
     int     status;
     union {
         int __none;    /* EVTCHNSTAT_closed, EVTCHNSTAT_unbound */
@@ -106,6 +121,7 @@ typedef struct evtchn_op
     union {
         evtchn_bind_interdomain_t bind_interdomain;
         evtchn_bind_virq_t        bind_virq;
+        evtchn_bind_pirq_t        bind_pirq;
         evtchn_close_t            close;
         evtchn_send_t             send;
         evtchn_status_t           status;
