@@ -1,4 +1,4 @@
-import string, re, os, sqlite, Xc, sys
+import string, re, os, sys
 
 ##### Module variables
 
@@ -15,6 +15,16 @@ VD_DB_FILE = "/var/spool/xen_vdisks.sqlite"
    2 - allow sharing with both doms r/w
 """
 VBD_EXPERT_MODE = 0
+
+##### Module initialisation
+
+try:
+    # try to import sqlite (not everyone will have it installed)
+    import sqlite
+except ImportError:
+    # on failure, just catch the error, don't do anything
+    pass
+
 
 ##### Networking-related functions
 
@@ -807,6 +817,8 @@ def vd_extents_validate(new_extents,new_writeable):
     returns [int]: either the expertise level of the mapping if it doesn't
                    exceed VBD_EXPERT_MODE or -1 if it does (error)
     """
+
+    import Xc # this is only needed in this function
 
     xc = Xc.new()
 
