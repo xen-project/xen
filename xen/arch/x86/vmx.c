@@ -109,11 +109,9 @@ static void inline __update_guest_eip(unsigned long inst_len)
 
 static int vmx_do_page_fault(unsigned long va, unsigned long error_code) 
 {
-    unsigned long eip, pfn;
-    unsigned int index;
-    unsigned long gpde = 0, gpte, gpa;
+    unsigned long eip;
+    unsigned long gpa;
     int result;
-    struct exec_domain *ed = current;
 
 #if VMX_DEBUG
     {
@@ -123,32 +121,13 @@ static int vmx_do_page_fault(unsigned long va, unsigned long error_code)
                 va, eip, error_code);
     }
 #endif
-    /*
-     * Set up guest page directory cache to make linear_pt_table[] work.
-     */
-    __guest_get_l2e(ed, va, &gpde);
-    if (!(gpde & _PAGE_PRESENT))
+
+    gpa = gva_to_gpa(va);
+    if (!gpa)
         return 0;
-
-    index = (va >> L2_PAGETABLE_SHIFT);
-    if (!l2_pgentry_val(ed->arch.guest_pl2e_cache[index])) {
-        pfn = phys_to_machine_mapping(gpde >> PAGE_SHIFT);
-
-        VMX_DBG_LOG(DBG_LEVEL_VMMU, "vmx_do_page_fault: pagetable = %lx\n",
-                pagetable_val(ed->arch.pagetable));
-
-        ed->arch.guest_pl2e_cache[index] = 
-            mk_l2_pgentry((pfn << PAGE_SHIFT) | __PAGE_HYPERVISOR);
-    }
-    
-    if (unlikely(__get_user(gpte, (unsigned long *)
-                            &linear_pg_table[va >> PAGE_SHIFT])))
-        return 0;
-    
-    gpa = (gpte & PAGE_MASK) | (va & (PAGE_SIZE - 1));
 
     if (mmio_space(gpa))
-        handle_mmio(va, gpte, gpa);
+        handle_mmio(va, gpa);
 
     if ((result = shadow_fault(va, error_code)))
         return result;
@@ -297,35 +276,6 @@ static inline void guest_pl2e_cache_invalidate(struct exec_domain *ed)
      * Need to optimize this
      */
     memset(ed->arch.guest_pl2e_cache, 0, PAGE_SIZE);
-}
-
-inline unsigned long gva_to_gpa(unsigned long gva)
-{
-    unsigned long gpde, gpte, pfn, index;
-    struct exec_domain *ed = current;
-
-    __guest_get_l2e(ed, gva, &gpde);
-    index = (gva >> L2_PAGETABLE_SHIFT);
-
-    pfn = phys_to_machine_mapping(gpde >> PAGE_SHIFT);
-
-    ed->arch.guest_pl2e_cache[index] = 
-            mk_l2_pgentry((pfn << PAGE_SHIFT) | __PAGE_HYPERVISOR);
-
-    if ( unlikely(__get_user(gpte, (unsigned long *)
-                             &linear_pg_table[gva >> PAGE_SHIFT])) )
-    {
-        printk("gva_to_gpa EXIT: read gpte faulted" );
-        return 0;
-    }
-
-    if ( !(gpte & _PAGE_PRESENT) )
-    {
-        printk("gva_to_gpa - EXIT: gpte not present (%lx)",gpte );
-        return 0;
-    }
-
-    return (gpte & PAGE_MASK) + (gva & ~PAGE_MASK); 
 }
 
 static void vmx_io_instruction(struct xen_regs *regs, 

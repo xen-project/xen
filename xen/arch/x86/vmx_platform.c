@@ -378,12 +378,7 @@ static int inst_copy_from_guest(char *buf, unsigned long guest_eip, int inst_len
     }
 
     if ((guest_eip & PAGE_MASK) == ((guest_eip + inst_len) & PAGE_MASK)) {
-        if ( unlikely(__get_user(gpte, (unsigned long *)
-                                 &linear_pg_table[guest_eip >> PAGE_SHIFT])) )
-            {
-                printk("inst_copy_from_guest- EXIT: read gpte faulted" );
-                return 0;
-            }
+        gpte = gva_to_gpte(guest_eip);
         mfn = phys_to_machine_mapping(gpte >> PAGE_SHIFT);
         ma = (mfn << PAGE_SHIFT) | (guest_eip & (PAGE_SIZE - 1));
         inst_start = (unsigned char *)map_domain_mem(ma);
@@ -392,6 +387,7 @@ static int inst_copy_from_guest(char *buf, unsigned long guest_eip, int inst_len
         unmap_domain_mem(inst_start);
     } else {
         // Todo: In two page frames
+        BUG();
     }
         
     return inst_len;
@@ -432,7 +428,6 @@ static void send_mmio_req(unsigned long gpa,
     ioreq_t *p;
     struct mi_per_cpu_info *mpci_p;
     struct xen_regs *inst_decoder_regs;
-    extern inline unsigned long gva_to_gpa(unsigned long gva);
     extern long evtchn_send(int lport);
     extern long do_block(void);
 
@@ -476,7 +471,7 @@ static void send_mmio_req(unsigned long gpa,
 
 }
 
-void handle_mmio(unsigned long va, unsigned long gpte, unsigned long gpa)
+void handle_mmio(unsigned long va, unsigned long gpa)
 {
     unsigned long eip;
     unsigned long inst_len;

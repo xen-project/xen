@@ -684,6 +684,41 @@ static inline void vmx_update_shadow_state(
     unmap_domain_mem(mpl2e);
 }
 
+static inline unsigned long gva_to_gpte(unsigned long gva)
+{
+    unsigned long gpde, gpte, pfn, index;
+    struct exec_domain *ed = current;
+
+    __guest_get_l2e(ed, gva, &gpde);
+    if (!(gpde & _PAGE_PRESENT))
+        return 0;
+
+    index = (gva >> L2_PAGETABLE_SHIFT);
+
+    if (!l2_pgentry_val(ed->arch.guest_pl2e_cache[index])) {
+        pfn = phys_to_machine_mapping(gpde >> PAGE_SHIFT);
+        ed->arch.guest_pl2e_cache[index] = 
+            mk_l2_pgentry((pfn << PAGE_SHIFT) | __PAGE_HYPERVISOR);
+    }
+
+    if ( unlikely(__get_user(gpte, (unsigned long *)
+                             &linear_pg_table[gva >> PAGE_SHIFT])) )
+        return 0;
+
+    return gpte;
+}
+
+static inline unsigned long gva_to_gpa(unsigned long gva)
+{
+    unsigned long gpte;
+
+    gpte = gva_to_gpte(gva);
+    if ( !(gpte & _PAGE_PRESENT) )
+        return 0;
+
+    return (gpte & PAGE_MASK) + (gva & ~PAGE_MASK); 
+}
+
 #endif /* CONFIG_VMX */
 
 static inline void __shadow_mk_pagetable(struct exec_domain *ed)
