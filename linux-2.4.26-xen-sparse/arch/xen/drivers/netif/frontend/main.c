@@ -99,6 +99,72 @@ static struct net_device *find_dev_by_handle(unsigned int handle)
     return NULL;
 }
 
+#define MULTIVIF
+//#ifdef MULTIVIF
+
+/** Network interface info. */
+struct netif_ctrl {
+    /** Number of interfaces. */
+    int interface_n;
+    /** Number of connected interfaces. */
+    int connected_n;
+    /** Error code. */
+    int err;
+};
+
+static struct netif_ctrl netctrl = {};
+
+static void netctrl_init(void){
+    netctrl = (struct netif_ctrl){};
+    netctrl.interface_n = -1;
+}
+
+/** Get or set a network interface error.
+ */
+static int netctrl_err(int err)
+{
+    if(err < 0 && !netctrl.err){
+        netctrl.err = err;
+        printk(KERN_WARNING "%s> err=%d\n", __FUNCTION__, err);
+    }
+    return netctrl.err;
+}
+
+/** Test if all network interfaces are connected.
+ *
+ * @return 1 if all connected, 0 if not, negative error code otherwise
+ */
+static int netctrl_connected(void)
+{
+    int ok = 0;
+    ok = (netctrl.err ? netctrl.err : (netctrl.connected_n == netctrl.interface_n));
+    return ok;
+}
+
+/** Count the connected network interfaces.
+ *
+ * @return connected count
+ */
+static int netctrl_connected_count(void)
+{
+    
+    struct list_head *ent;
+    struct net_private *np;
+    unsigned int connected;
+
+    connected = 0;
+    
+    list_for_each(ent, &dev_list) {
+        np = list_entry(ent, struct net_private, list);
+        if ( np->state == NETIF_STATE_CONNECTED){
+            connected++;
+        }
+    }
+    netctrl.connected_n = connected;
+    return connected;
+}
+
+//#endif
 
 static int network_open(struct net_device *dev)
 {
@@ -488,21 +554,100 @@ static struct net_device_stats *network_get_stats(struct net_device *dev)
 }
 
 
+static void network_reconnect(struct net_device *dev, netif_fe_interface_status_changed_t *status)
+{
+    struct net_private *np;
+    int i, requeue_idx;
+    netif_tx_request_t *tx;
+
+    np = dev->priv;
+    spin_lock_irq(&np->rx_lock);
+    spin_lock(&np->tx_lock);
+
+    /* Recovery procedure: */
+
+    /* Step 1: Reinitialise variables. */
+    np->rx_resp_cons = np->tx_resp_cons = np->tx_full = 0;
+    np->rx->event = 1;
+
+    /* Step 2: Rebuild the RX and TX ring contents.
+     * NB. We could just free the queued TX packets now but we hope
+     * that sending them out might do some good.  We have to rebuild
+     * the RX ring because some of our pages are currently flipped out
+     * so we can't just free the RX skbs.
+     * NB2. Freelist index entries are always going to be less than
+     *  __PAGE_OFFSET, whereas pointers to skbs will always be equal or
+     * greater than __PAGE_OFFSET: we use this property to distinguish
+     * them.
+     */
+
+    /* Rebuild the TX buffer freelist and the TX ring itself.
+     * NB. This reorders packets.  We could keep more private state
+     * to avoid this but maybe it doesn't matter so much given the
+     * interface has been down.
+     */
+    for( requeue_idx = 0, i = 1; i <= NETIF_TX_RING_SIZE; i++ ){
+            if( (unsigned long)np->tx_skbs[i] >= __PAGE_OFFSET ) {
+                struct sk_buff *skb = np->tx_skbs[i];
+                
+                tx = &np->tx->ring[requeue_idx++].req;
+                
+                tx->id   = i;
+                tx->addr = virt_to_machine(skb->data);
+                tx->size = skb->len;
+                
+                np->stats.tx_bytes += skb->len;
+                np->stats.tx_packets++;
+            }
+    }
+    wmb();
+    np->tx->req_prod = requeue_idx;
+
+    /* Rebuild the RX buffer freelist and the RX ring itself. */
+    for ( requeue_idx = 0, i = 1; i <= NETIF_RX_RING_SIZE; i++ )
+        if ( (unsigned long)np->rx_skbs[i] >= __PAGE_OFFSET )
+            np->rx->ring[requeue_idx++].req.id = i;
+    wmb();                
+    np->rx->req_prod = requeue_idx;
+
+    /* Step 3: All public and private state should now be sane.  Get
+     * ready to start sending and receiving packets and give the driver
+     * domain a kick because we've probably just requeued some
+     * packets.
+     */
+    netif_carrier_on(dev);
+    netif_start_queue(dev);
+    np->state = NETIF_STATE_ACTIVE;
+
+    notify_via_evtchn(status->evtchn);  
+
+    network_tx_buf_gc(dev);
+
+    printk(KERN_INFO "Recovery completed\n");
+
+    spin_unlock(&np->tx_lock);
+    spin_unlock_irq(&np->rx_lock);
+}
+
 static void netif_status_change(netif_fe_interface_status_changed_t *status)
 {
     ctrl_msg_t                   cmsg;
     netif_fe_interface_connect_t up;
     struct net_device *dev;
     struct net_private *np;
-
-    if ( status->handle != 0 )
-    {
-        printk(KERN_WARNING "Status change on unsupported netif %d\n",
-               status->handle);
+    
+//#ifdef MULTIVIF
+    if(netctrl.interface_n <= 0){
+        printk(KERN_WARNING "Status change: no interfaces\n");
         return;
     }
-
-    dev = find_dev_by_handle(0);
+//#endif
+    dev = find_dev_by_handle(status->handle);
+    if(!dev){
+        printk(KERN_WARNING "Status change: invalid netif handle %u\n",
+               status->handle);
+         return;
+    }
     np  = dev->priv;
     
     switch ( status->status )
@@ -560,7 +705,7 @@ static void netif_status_change(netif_fe_interface_status_changed_t *status)
         cmsg.type      = CMSG_NETIF_FE;
         cmsg.subtype   = CMSG_NETIF_FE_INTERFACE_CONNECT;
         cmsg.length    = sizeof(netif_fe_interface_connect_t);
-        up.handle      = 0;
+        up.handle      = status->handle;
         up.tx_shmem_frame = virt_to_machine(np->tx) >> PAGE_SHIFT;
         up.rx_shmem_frame = virt_to_machine(np->rx) >> PAGE_SHIFT;
         memcpy(cmsg.msg, &up, sizeof(up));
@@ -570,8 +715,7 @@ static void netif_status_change(netif_fe_interface_status_changed_t *status)
         break;
 
     case NETIF_INTERFACE_STATUS_CONNECTED:
-        if ( np->state == NETIF_STATE_CLOSED )
-        {
+        if ( np->state == NETIF_STATE_CLOSED ){
             printk(KERN_WARNING "Unexpected netif-CONNECTED message"
                    " in state %d\n", np->state);
             break;
@@ -579,87 +723,20 @@ static void netif_status_change(netif_fe_interface_status_changed_t *status)
 
         memcpy(dev->dev_addr, status->mac, ETH_ALEN);
 
-        if(netif_carrier_ok(dev))
+        if(netif_carrier_ok(dev)){
             np->state = NETIF_STATE_CONNECTED;
-        else
-        {
-            int i, requeue_idx;
-            netif_tx_request_t *tx;
-
-            spin_lock_irq(&np->rx_lock);
-            spin_lock(&np->tx_lock);
-
-            /* Recovery procedure: */
-
-            /* Step 1: Reinitialise variables. */
-            np->rx_resp_cons = np->tx_resp_cons = np->tx_full = 0;
-            np->rx->event = 1;
-
-            /* Step 2: Rebuild the RX and TX ring contents.
-             * NB. We could just free the queued TX packets now but we hope
-             * that sending them out might do some good.  We have to rebuild
-             * the RX ring because some of our pages are currently flipped out
-             * so we can't just free the RX skbs.
-	     * NB2. Freelist index entries are always going to be less than
-	     *  __PAGE_OFFSET, whereas pointers to skbs will always be equal or
-	     * greater than __PAGE_OFFSET: we use this property to distinguish
-             * them.
-             */
-
-            /* Rebuild the TX buffer freelist and the TX ring itself.
-             * NB. This reorders packets.  We could keep more private state
-             * to avoid this but maybe it doesn't matter so much given the
-             * interface has been down.
-             */
-            for ( requeue_idx = 0, i = 1; i <= NETIF_TX_RING_SIZE; i++ )
-            {
-                if ( (unsigned long)np->tx_skbs[i] >= __PAGE_OFFSET )
-                {
-                    struct sk_buff *skb = np->tx_skbs[i];
-                    
-                    tx = &np->tx->ring[requeue_idx++].req;
-                    
-                    tx->id   = i;
-                    tx->addr = virt_to_machine(skb->data);
-                    tx->size = skb->len;
-                    
-                    np->stats.tx_bytes += skb->len;
-                    np->stats.tx_packets++;
-                }
-            }
-            wmb();
-            np->tx->req_prod = requeue_idx;
-
-            /* Rebuild the RX buffer freelist and the RX ring itself. */
-            for ( requeue_idx = 0, i = 1; i <= NETIF_RX_RING_SIZE; i++ )
-                if ( (unsigned long)np->rx_skbs[i] >= __PAGE_OFFSET )
-                    np->rx->ring[requeue_idx++].req.id = i;
-            wmb();                
-            np->rx->req_prod = requeue_idx;
-
-            /* Step 3: All public and private state should now be sane.  Get
-             * ready to start sending and receiving packets and give the driver
-             * domain a kick because we've probably just requeued some
-             * packets.
-             */
-            netif_carrier_on(dev);
-            netif_start_queue(dev);
-            np->state = NETIF_STATE_ACTIVE;
-
-            notify_via_evtchn(status->evtchn);  
-
-	    network_tx_buf_gc(dev);
-
-            printk(KERN_INFO "Recovery completed\n");
-
-            spin_unlock(&np->tx_lock);
-            spin_unlock_irq(&np->rx_lock);
+        } else {
+            network_reconnect(dev, status);
         }
 
         np->evtchn = status->evtchn;
         np->irq = bind_evtchn_to_irq(np->evtchn);
         (void)request_irq(np->irq, netif_int, SA_SAMPLE_RANDOM, 
                           dev->name, dev);
+        
+#ifdef MULTIVIF
+        netctrl_connected_count();
+#endif
         break;
 
     default:
@@ -669,27 +746,102 @@ static void netif_status_change(netif_fe_interface_status_changed_t *status)
     }
 }
 
+/** Create a network devices.
+ *
+ * @param handle device handle
+ * @param val return parameter for created device
+ * @return 0 on success, error code otherwise
+ */
+static int create_netdev(int handle, struct net_device **val){
+    int err = 0;
+    struct net_device *dev = NULL;
+    struct net_private *np = NULL;
+
+    dev = alloc_etherdev(sizeof(struct net_private));
+    if (!dev){
+        printk(KERN_WARNING "%s> alloc_etherdev failed.\n", __FUNCTION__);
+        err = -ENOMEM;
+        goto exit;
+    }
+    np         = dev->priv;
+    np->state  = NETIF_STATE_CLOSED;
+    np->handle = handle;
+    
+    dev->open            = network_open;
+    dev->hard_start_xmit = network_start_xmit;
+    dev->stop            = network_close;
+    dev->get_stats       = network_get_stats;
+    dev->poll            = netif_poll;
+    dev->weight          = 64;
+    
+    err = register_netdev(dev);
+    if (err){
+        printk(KERN_WARNING "%s> register_netdev err=%d\n", __FUNCTION__, err);
+        goto exit;
+    }
+    np->dev = dev;
+    list_add(&np->list, &dev_list);
+  exit:
+    if(err){
+        if(dev) kfree(dev);
+        dev = NULL;
+    }
+    if(val) *val = dev;
+    return err;
+}
+
+//#ifdef MULTIVIF
+/** Initialize the network control interface. Set the number of network devices
+ * and create them.
+ */
+static void netif_driver_status_change(netif_fe_driver_status_changed_t *status)
+{
+    int err = 0;
+    int i;
+    
+    netctrl.interface_n = status->nr_interfaces;
+    netctrl.connected_n = 0;
+
+    for(i = 0; i < netctrl.interface_n; i++){
+        err = create_netdev(i, NULL);
+        if(err){
+            netctrl_err(err);
+            break;
+        }
+    }
+}
+//#endif
+
 
 static void netif_ctrlif_rx(ctrl_msg_t *msg, unsigned long id)
 {
+    int respond = 1;
     switch ( msg->subtype )
     {
     case CMSG_NETIF_FE_INTERFACE_STATUS_CHANGED:
         if ( msg->length != sizeof(netif_fe_interface_status_changed_t) )
-            goto parse_error;
+            goto error;
         netif_status_change((netif_fe_interface_status_changed_t *)
                             &msg->msg[0]);
         break;
+//#ifdef MULTIVIF
+    case CMSG_NETIF_FE_DRIVER_STATUS_CHANGED:
+        if ( msg->length != sizeof(netif_fe_driver_status_changed_t) )
+            goto error;
+        netif_driver_status_change((netif_fe_driver_status_changed_t *)
+                                   &msg->msg[0]);
+        // Message is a response, so do not respond.
+        respond = 0;
+        break;
+//#endif
+      error:
     default:
-        goto parse_error;
+        msg->length = 0;
+        break;
     }
-
-    ctrl_if_send_response(msg);
-    return;
-
- parse_error:
-    msg->length = 0;
-    ctrl_if_send_response(msg);
+    if(respond){
+        ctrl_if_send_response(msg);
+    }
 }
 
 
@@ -697,9 +849,11 @@ static int __init init_module(void)
 {
     ctrl_msg_t                       cmsg;
     netif_fe_driver_status_changed_t st;
-    int err;
-    struct net_device *dev;
-    struct net_private *np;
+    int err = 0;
+#ifdef MULTIVIF
+    int wait_n = 20;
+    int wait_i;
+#endif
 
     if ( (start_info.flags & SIF_INITDOMAIN) ||
          (start_info.flags & SIF_NET_BE_DOMAIN) )
@@ -708,32 +862,9 @@ static int __init init_module(void)
     printk("Initialising Xen virtual ethernet frontend driver");
 
     INIT_LIST_HEAD(&dev_list);
-
-    if ( (dev = alloc_etherdev(sizeof(struct net_private))) == NULL )
-    {
-        err = -ENOMEM;
-        goto fail;
-    }
-
-    np = dev->priv;
-    np->state  = NETIF_STATE_CLOSED;
-    np->handle = 0;
-
-    dev->open            = network_open;
-    dev->hard_start_xmit = network_start_xmit;
-    dev->stop            = network_close;
-    dev->get_stats       = network_get_stats;
-    dev->poll            = netif_poll;
-    dev->weight          = 64;
-    
-    if ( (err = register_netdev(dev)) != 0 )
-    {
-        kfree(dev);
-        goto fail;
-    }
-    
-    np->dev = dev;
-    list_add(&np->list, &dev_list);
+#ifdef MULTIVIF
+    netctrl_init();
+#endif
 
     (void)ctrl_if_register_receiver(CMSG_NETIF_FE, netif_ctrlif_rx,
                                     CALLBACK_IN_BLOCKING_CONTEXT);
@@ -743,25 +874,30 @@ static int __init init_module(void)
     cmsg.subtype   = CMSG_NETIF_FE_DRIVER_STATUS_CHANGED;
     cmsg.length    = sizeof(netif_fe_driver_status_changed_t);
     st.status      = NETIF_DRIVER_STATUS_UP;
+    st.nr_interfaces = 0;
     memcpy(cmsg.msg, &st, sizeof(st));
-
     ctrl_if_send_message_block(&cmsg, NULL, 0, TASK_UNINTERRUPTIBLE);
-    
-    /*
-     * We should read 'nr_interfaces' from response message and wait
-     * for notifications before proceeding. For now we assume that we
-     * will be notified of exactly one interface.
-     */
-    while ( np->state != NETIF_STATE_CONNECTED )
-    {
+
+#ifdef MULTIVIF
+    /* Wait for all interfaces to be connected. */
+    for(wait_i = 0; 1; wait_i++) {
+        if(wait_i < wait_n){
+            err = netctrl_connected();
+        } else {
+            err = -ENETDOWN;
+        }
+        if(err < 0) goto exit;
+        if(err > 0){
+            err = 0;
+            break;
+        }
         set_current_state(TASK_INTERRUPTIBLE);
         schedule_timeout(1);
-    }
+     }
+#endif
 
-    return 0;
-
- fail:
-    cleanup_module();
+ exit:
+    if(err) cleanup_module();
     return err;
 }
 

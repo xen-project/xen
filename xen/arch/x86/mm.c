@@ -103,10 +103,10 @@ void __init paging_init(void)
         mk_l2_pgentry(__pa(ioremap_pt) | __PAGE_HYPERVISOR);
 
     /* Create read-only mapping of MPT for guest-OS use. */
-    idle_pg_table[READONLY_MPT_VIRT_START >> L2_PAGETABLE_SHIFT] =
+    idle_pg_table[RO_MPT_VIRT_START >> L2_PAGETABLE_SHIFT] =
         idle_pg_table[RDWR_MPT_VIRT_START >> L2_PAGETABLE_SHIFT];
     mk_l2_readonly(idle_pg_table + 
-                   (READONLY_MPT_VIRT_START >> L2_PAGETABLE_SHIFT));
+                   (RO_MPT_VIRT_START >> L2_PAGETABLE_SHIFT));
 
     /* Set up mapping cache for domain pages. */
     mapcache = (unsigned long *)get_free_page(GFP_KERNEL);

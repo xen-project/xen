@@ -71,13 +71,14 @@ void __netif_disconnect_complete(netif_t *netif)
 
 void netif_create(netif_be_create_t *create)
 {
+    int                err = 0;
     domid_t            domid  = create->domid;
     unsigned int       handle = create->netif_handle;
     struct net_device *dev;
     netif_t          **pnetif, *netif;
-    char               name[IFNAMSIZ];
+    char               name[IFNAMSIZ] = {};
 
-    snprintf(name, IFNAMSIZ, "vif%u.%u", domid, handle);
+    snprintf(name, IFNAMSIZ - 1, "vif%u.%u", domid, handle);
     dev = alloc_netdev(sizeof(netif_t), name, ether_setup);
     if ( dev == NULL )
     {
@@ -123,9 +124,9 @@ void netif_create(netif_be_create_t *create)
     /* XXX In bridge mode we should force a different MAC from remote end. */
     dev->dev_addr[2] ^= 1;
 
-    if ( register_netdev(dev) != 0 )
-    {
-        DPRINTK("Could not register new net device\n");
+    err = register_netdev(dev);
+    if (err) {
+        DPRINTK("Could not register new net device %s: err=%d\n", dev->name, err);
         create->status = NETIF_BE_STATUS_OUT_OF_MEMORY;
         kfree(dev);
         return;
@@ -302,3 +303,13 @@ void netif_interface_init(void)
     bridge_br->bridge_forward_delay = bridge_br->forward_delay = 0;
     bridge_br->stp_enabled = 0;
 }
+
+#ifndef CONFIG_BRIDGE
+#error Must configure Ethernet bridging in Network Options
+#endif
+EXPORT_SYMBOL(br_add_bridge);
+EXPORT_SYMBOL(br_del_bridge);
+EXPORT_SYMBOL(br_add_if);
+EXPORT_SYMBOL(br_del_if);
+EXPORT_SYMBOL(br_get_bridge_ifindices);
+EXPORT_SYMBOL(br_get_port_ifindices);

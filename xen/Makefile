@@ -41,10 +41,9 @@ $(TARGET): delete-unfresh-files make-links $(GENERATED_FILES)
 
 make-links: delete-links
 	ln -sf asm-$(TARGET_ARCH) include/asm
-	ln -sf arch-$(TARGET_ARCH) include/hypervisor-ifs/arch
 
 delete-links:
-	rm -f include/asm include/hypervisor-ifs/arch
+	rm -f include/asm
 
 # Blow away kernel.o because build info is stored statically within it.
 delete-unfresh-files:

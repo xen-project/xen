@@ -30,10 +30,10 @@
 #define rdtscl(low) \
      __asm__ __volatile__("rdtsc" : "=a" (low) : : "edx")
 
-#ifdef x86_32
+#if defined(__i386__)
 #define rdtscll(val) \
      __asm__ __volatile__("rdtsc" : "=A" (val))
-#else
+#elif defined(__x86_64__)
 #define rdtscll(val) do { \
      unsigned int a,d; \
      asm volatile("rdtsc" : "=a" (a), "=d" (d)); \

@@ -20,10 +20,10 @@ typedef __signed__ int __s32;
 typedef unsigned int __u32;
 
 #if defined(__GNUC__) && !defined(__STRICT_ANSI__)
-#ifdef x86_32
+#if defined(__i386__)
 typedef __signed__ long long __s64;
 typedef unsigned long long __u64;
-#else
+#elif defined(__x86_64__)
 typedef __signed__ long __s64;
 typedef unsigned long __u64;
 #endif
@@ -40,11 +40,11 @@ typedef unsigned short u16;
 typedef signed int s32;
 typedef unsigned int u32;
 
-#ifdef x86_32
+#if defined(__i386__)
 typedef signed long long s64;
 typedef unsigned long long u64;
 #define BITS_PER_LONG 32
-#else
+#elif defined(__x86_64__)
 typedef signed long s64;
 typedef unsigned long u64;
 #define BITS_PER_LONG 64

@@ -73,11 +73,9 @@ def daemon_loop():
     # back-ends should use the DOM0 control interface).
     dom0_port = xend.utils.port(0)
     xend.netif.be_port = dom0_port
-    xend.blkif_be_port = dom0_port
+    xend.blkif.be_port = dom0_port
     notifier.bind(dom0_port.local_port)
     port_list[dom0_port.local_port] = dom0_port
-
-    xend.netif.be_port = dom0_port
 
     ##
     ## MAIN LOOP

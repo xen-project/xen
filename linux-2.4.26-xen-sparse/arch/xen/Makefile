@@ -124,10 +124,6 @@ archclean:
 
 archmrproper:
 	rm -f include/asm-xen/hypervisor-ifs/arch
-	rm -f $(prefix)/boot/vmlinux-syms-$(KERNELRELEASE)
-	rm -f $(prefix)/boot/vmlinuz-$(KERNELRELEASE)
 
 archdep:
-	rm -f include/asm-xen/hypervisor-ifs/arch
-	( cd include/asm-xen/hypervisor-ifs ; rm -rf arch ; ln -sf arch-x86 arch)
 	@$(MAKEBOOT) dep

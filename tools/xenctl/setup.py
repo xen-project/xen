@@ -2,7 +2,7 @@
 from distutils.core import setup, Extension
 import sys
 
-modules = [ 'xenctl.console_client', 'xenctl.utils' ]
+modules = [ 'xenctl.console_client', 'xenctl.utils', 'xenctl.ip' , 'xenctl.vdisk' ]
 
 # We need the 'tempfile' module from Python 2.3. We install this ourselves
 # if the installed Python is older than 2.3.

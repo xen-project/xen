@@ -19,7 +19,7 @@
 #include <asm/i387.h>
 #include <xen/shadow.h>
 
-#ifdef CONFIG_X86_64BITMODE
+#if defined(__x86_64__)
 #define ELFSIZE 64
 #else
 #define ELFSIZE 32
