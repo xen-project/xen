@@ -1,6 +1,6 @@
 #!/bin/bash 
 
-if [ -z "$DEFAULTS_FILE" ] ; then DEFAULTS_FILE=domctl.xml ; fi
+if [ -z "$DEFAULTS_FILE" ] ; then DEFAULTS_FILE=xenctl.xml ; fi
 if [ -z "$DEFAULTS_PATH" ] ; then DEFAULTS_PATH=.:/etc:/var/lib/xen ; fi
 if [ -z "$QUERY_DEV" ] ; then QUERY_DEV=eth0 ; fi
 if [ -z "$IFCONFIG" ] ; then IFCONFIG=/sbin/ifconfig ; fi

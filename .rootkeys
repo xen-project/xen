@@ -13,7 +13,6 @@
 3f0d61da3O5gkcntbIOdUmN2-RcZbQ tools/control/doc/INSTALL-cmdline
 3eca6a96a31IwaKtkEa4jmzwTWlm8Q tools/control/doc/INSTALL-web
 3f0d61daCTHGCpQK0Brz3PAp80d_2Q tools/control/doc/USAGE-cmdline
-3eb781fcabCKRogwxJA3-jJKstw9Vg tools/control/domctl.xml
 3f042c35FzVap5QW0UBPnZ2ZM0l3QA tools/control/src/org/xenoserver/cmdline/CommandParser.java
 3eb781fdNQvEJW3tNvovjqoN7GlePA tools/control/src/org/xenoserver/cmdline/Main.java
 3f042c35-TPgpCQViIaJzLts2-CnBw tools/control/src/org/xenoserver/cmdline/ParseDomainDestroy.java
@@ -120,6 +119,7 @@
 3ec41f7ek1RffqN2yRUzSTkD5m1J6w tools/control/web/tmpl/xenohead.def
 3ec41f7e1ZpfCsgQ2qRJBooBn_iRtA tools/control/web/tmpl/xenostyle.css
 3eb781fc6vgq5yhkJRGDLY9gWWRY2A tools/control/xenctl
+3eb781fcabCKRogwxJA3-jJKstw9Vg tools/control/xenctl.xml
 3eb781fdl4lXWYZzmqDDUAYhAThRqQ tools/internal/Makefile
 3eb781fdc539MQQm47rYRCCR3N5i-Q tools/internal/dom0_defs.h
 3ee609b3Yr4aggmLSKmhiIzT8-nURA tools/internal/dom0_ops.h

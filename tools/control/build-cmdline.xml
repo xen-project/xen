@@ -25,7 +25,7 @@
       <fileset dir=".">
         <include name="build-cmdline.xml"/>
         <include name="xenctl"/>
-        <include name="domctl.xml"/>
+	<include name="xenctl.xml"/>
         <include name="Makefile"/>
       </fileset>
       <manifest>

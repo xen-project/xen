@@ -10,7 +10,7 @@ import java.util.StringTokenizer;
 public final class Settings {
     /** Filename for the defaults file. */
     public static final String DEFAULTS_FILE =
-        System.getProperty("DEFAULTS_FILE", "domctl.xml");
+        System.getProperty("DEFAULTS_FILE", "xenctl.xml");
     /** Path to search for the defaults file. */
     public static final String DEFAULTS_PATH =
         System.getProperty("DEFAULTS_PATH", ".:/etc:/var/lib/xen");

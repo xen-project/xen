@@ -9,7 +9,7 @@ clean: clean-cmdline clean-web
 cmdline: FORCE
 	ant -buildfile build-cmdline.xml dist
 
-install-cmdline: domctl
+install-cmdline: cmdline
 	cp xenctl-cmdline.jar xenctl ../../../install/bin
 	chmod 755 ../../../install/bin/xenctl
 

@@ -29,11 +29,11 @@ to setup:
  ## install the xenctl web archive
  cp xeno.bk/tools/control/dist/xenctl-0.1-dev.war $CATALINA_HOME/webapps/xenctl.war
  # Only if you have not already copied this file for the command line tool
- cp xeno.bk/tools/control/domctl.xml /etc
+ cp xeno.bk/tools/control/xenctl.xml /etc
  # If it doesn't exist:
  mkdir /var/lib/xen
 
- ## either edit xi_tools_dir in domctl.xml or copy the binaries
+ ## either edit xi_tools_dir in xenctl.xml or copy the binaries
  ## unless already installed for the command line tool
  # find xeno.bk/tools/internal -perm +111 -type f -exec cp {} /usr/local/bin \;
 

@@ -27,10 +27,11 @@ Domain control
 --------------
 
 xenctl's command line interface is based on domctl. Defaults for domain
-creation are found in /etc/domctl.xml.
+creation are found in /etc/xenctl.xml which has the same format as the
+old domctl.xml
 
 Creating a domain: xenctl domain new <parameters>
-All parameters may be omitted to get defaults from domctl.xml, see help
+All parameters may be omitted to get defaults from xenctl.xml, see help
 for ful details of available parameters.
 
 Starting a domain: xenctl domain start -n<domain_no>

@@ -59,7 +59,7 @@ public class ParseDomainNew extends CommandParser {
     public String getHelpText() {
         return "Create a new domain.  Note that most of the parameters will assume\n"
             + "default values: it should not be necessary to specify them all. See\n"
-            + "domctl.xml for the current default settings.\n"
+            + "xenctl.xml for the current default settings.\n"
             + "\n"
             + "General command line options:\n"
             + "  -n  Domain name                              domain_name\n"
