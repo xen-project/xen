@@ -6,6 +6,7 @@
 package org.xenoserver.control;
 
 import java.util.Date;
+
 import org.w3c.dom.Document;
 import org.w3c.dom.Element;
 import org.w3c.dom.Node;
@@ -98,14 +99,14 @@ XMLHelper
   }
 
   static void
-  parse (PartitionManager pm, /*VirtualDiskManager vdm,*/ Document document)
+  parse (PartitionManager pm, VirtualDiskManager vdm, Document document)
   {
     if (document == null) return;
 
     /* parse partitions */
     parse_partitions(pm, document.getElementsByTagName("partition"));
-/*
-    / parse virtual disks /
+
+    /* parse virtual disks */
     NodeList list = document.getElementsByTagName("virtual_disk");
     for (int i = 0; i < list.getLength(); i++)
     {
@@ -128,20 +129,24 @@ XMLHelper
       }
     }
 
-    / parse virtual block devices /
+    /* parse virtual block devices */
     parse_virtual_block_devices(vdm, document.getElementsByTagName("virtual_block_device"));
-*/
+
     return;
   }
 
- /* static VirtualDisk
+  static VirtualDisk
   parse_virtual_disk(Node node)
   {
     VirtualDisk vd;
     Date date = new Date();
     NodeList list;
 
-    date.setTime(Long.parseLong(XMLHelper.get_text(XMLHelper.get_subnode("expiry", node))));
+    long timestamp = Long.parseLong(XMLHelper.get_text(XMLHelper.get_subnode("expiry", node)));
+    if ( timestamp == 0 )
+      date = null;
+    else
+      date.setTime( timestamp );
     vd = new VirtualDisk(XMLHelper.get_text(XMLHelper.get_subnode("name", node)),
 			 date,
 			 XMLHelper.get_text(XMLHelper.get_subnode("key", node)));
@@ -164,7 +169,7 @@ XMLHelper
     }
 
     return vd;
-  }*/
+  }
 
   static void
   parse_partitions (PartitionManager pm, NodeList nl)
@@ -186,12 +191,10 @@ XMLHelper
       pm.add_xeno_partition(partition);
     }
   }
-/*
+
   static void
   parse_virtual_block_devices (VirtualDiskManager vdm, NodeList nl)
   {
-    VirtualBlockDevice vbd;
-
     for (int loop = 0; loop < nl.getLength(); loop++)
     {
       Node node = nl.item(loop);
@@ -201,5 +204,5 @@ XMLHelper
 				      Integer.parseInt(XMLHelper.get_text(XMLHelper.get_subnode("vbdnum", node))),
 				      XMLHelper.get_text(XMLHelper.get_subnode("mode", node)));
     }
-  }*/
+  }
 }

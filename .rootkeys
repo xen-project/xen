@@ -25,10 +25,14 @@
 3f042c35UhRkvblwKSx0KW2QHUn3Fw tools/control/src/org/xenoserver/cmdline/ParseFailedException.java
 3f0445524oTSyogDGmCAyKMM665Rxg tools/control/src/org/xenoserver/cmdline/ParseGroup.java
 3f042c35Inw0LzkOzXo9ncbEHZzUHA tools/control/src/org/xenoserver/cmdline/ParseHelp.java
+3f098761jTSCT4f7lCWFePC3TJN_nw tools/control/src/org/xenoserver/cmdline/ParsePartitionsAdd.java
 3f05631djnPcaqmzMFSa8RLmGCZ-0Q tools/control/src/org/xenoserver/cmdline/ParsePartitionsList.java
 3f05631dswxJX_TpcuG6tBstyHSetg tools/control/src/org/xenoserver/cmdline/ParsePhysicalGrant.java
 3f05631dMY7PMkwSY7zBFelGJ8goVg tools/control/src/org/xenoserver/cmdline/ParsePhysicalList.java
 3f05631dYDFXv6mwNFAgz3ta9kShJA tools/control/src/org/xenoserver/cmdline/ParsePhysicalRevoke.java
+3f098761TRsbDk9woUM846Q6_F7EmA tools/control/src/org/xenoserver/cmdline/ParseVdCreate.java
+3f098761zh9WTV6LpRqcet3gqlXdtg tools/control/src/org/xenoserver/cmdline/ParseVdFree.java
+3f098761vY4hzt_QKskmvMcibN0zYQ tools/control/src/org/xenoserver/cmdline/ParseVdShow.java
 3f042c35V-Bf3dlIe1r5mZs8ZTPSvA tools/control/src/org/xenoserver/control/Command.java
 3f042c35U_4O2eovLKUgo2avPPHKUw tools/control/src/org/xenoserver/control/CommandDomainDestroy.java
 3f042c3570VRwuzl94tEozOIVBycNg tools/control/src/org/xenoserver/control/CommandDomainList.java
@@ -36,9 +40,11 @@
 3f042c36GqoXJJj_BvWGwBeKwEzgvg tools/control/src/org/xenoserver/control/CommandDomainStart.java
 3f042c36bmZJD0xrxURD075avUlIUg tools/control/src/org/xenoserver/control/CommandDomainStop.java
 3f042c35hdwL__Airzyz4HutOgGRqQ tools/control/src/org/xenoserver/control/CommandFailedException.java
+3f0987611uZwg-o64yi0p_2aXCYEug tools/control/src/org/xenoserver/control/CommandPartitionAdd.java
 3f05631ev3UK5FRi5vgR08zDp3OZYw tools/control/src/org/xenoserver/control/CommandPhysicalGrant.java
 3f05631e_G6wzHhEnpihX0pIkEsbMw tools/control/src/org/xenoserver/control/CommandPhysicalList.java
 3f05631eGWxq7bojQbMa-tGxsENIhw tools/control/src/org/xenoserver/control/CommandPhysicalRevoke.java
+3f098761c5-idlmf9vWEMOlDw0VCHg tools/control/src/org/xenoserver/control/CommandVdCreate.java
 3eb781fdBRXfSlWzK6GXlIQIlHFoaQ tools/control/src/org/xenoserver/control/Defaults.java
 3ec41f7cQ7Ug739JBDrsVH-7KJ5MvQ tools/control/src/org/xenoserver/control/Domain.java
 3ec41f7cAzdBu0lkuTTQx92rqSM9Qw tools/control/src/org/xenoserver/control/Extent.java
@@ -49,6 +55,9 @@
 3ec41f7djIGkw6M9meq8-YZ1WDATcw tools/control/src/org/xenoserver/control/PartitionManager.java
 3eb781fdmMkFbyb2SAGR0vsuFtl9Lw tools/control/src/org/xenoserver/control/Settings.java
 3eb781fdpgi83RpUvQWVccWjsDJK7w tools/control/src/org/xenoserver/control/StringPattern.java
+3ec41f7dNJZ1YkLD8X5CsqqYmP601g tools/control/src/org/xenoserver/control/VirtualBlockDevice.java
+3ec41f7dVFBlviwXPQ06BlU3UybziA tools/control/src/org/xenoserver/control/VirtualDisk.java
+3ec41f7dKX9YpwrfH7BZ7BogyWqqLA tools/control/src/org/xenoserver/control/VirtualDiskManager.java
 3ec41f7dUPpYTwYL5QVpRBv6PLKPrg tools/control/src/org/xenoserver/control/XML.java
 3ec41f7d7Try-2zmfnpaALwJjY0GCA tools/control/src/org/xenoserver/control/XMLHelper.java
 3ec41f7civcv4mQiYK0DeX9Zvsxhrw tools/control/src/uk/ac/cam/cl/xeno/xenctl/Main.java.orig

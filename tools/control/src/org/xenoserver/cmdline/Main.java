@@ -1,9 +1,6 @@
 package org.xenoserver.cmdline;
 
-import java.util.Arrays;
-import java.util.Collections;
 import java.util.LinkedList;
-import java.util.List;
 
 import org.xenoserver.control.CommandFailedException;
 import org.xenoserver.control.Defaults;
@@ -18,18 +15,25 @@ public class Main {
       new ParseDomainList()
     };
   static final CommandParser partitioncommands[] =
-    { new ParsePartitionsList()
+    { new ParsePartitionsAdd(),
+      new ParsePartitionsList()
     };
   static final CommandParser physicalcommands[] =
     { new ParsePhysicalGrant(),
       new ParsePhysicalRevoke(),
       new ParsePhysicalList()
     };
+  static final CommandParser vdcommands[] =
+    { new ParseVdCreate(),
+      new ParseVdShow(),
+      new ParseVdFree()
+    };
   static final CommandParser commands[] =
     { help,
       new ParseGroup( "domain", domaincommands ),
       new ParseGroup( "partitions", partitioncommands ),
-      new ParseGroup( "physical", physicalcommands )
+      new ParseGroup( "physical", physicalcommands ),
+      new ParseGroup( "vd", vdcommands )
     };
   static final CommandParser parser = new ParseGroup( null, commands );
 

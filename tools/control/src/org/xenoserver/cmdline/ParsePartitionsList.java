@@ -8,13 +8,10 @@ import org.xenoserver.control.Defaults;
 import org.xenoserver.control.Library;
 import org.xenoserver.control.Partition;
 import org.xenoserver.control.PartitionManager;
-import org.xenoserver.control.Settings;
-import org.xenoserver.control.XML;
 
 public class ParsePartitionsList extends CommandParser {
-
   public void parse(Defaults d, LinkedList args) throws ParseFailedException, CommandFailedException {
-    XML.load_state( PartitionManager.it, Settings.STATE_INPUT_FILE );
+    loadState();
     Iterator i = PartitionManager.it.iterator();
     int idx = 1;
     System.out.println( "     maj:min " + "    blocks " + "start sect " +

@@ -30,7 +30,7 @@ XML
    */
 
   public static void
-  dump_state (PartitionManager pm,/* VirtualDiskManager vdm,*/ String filename)
+  dump_state (PartitionManager pm, VirtualDiskManager vdm, String filename)
   {
     PrintWriter out;
 
@@ -48,7 +48,7 @@ XML
     out.println("<?xml version=\"1.0\"?>");
     out.println("<vdmanager>");
     pm.dump_xml(out);
-    //vdm.dump_xml(out);
+    vdm.dump_xml(out);
     out.println("</vdmanager>");
 
     out.close();
@@ -59,14 +59,14 @@ XML
    * load partition manager and virtual disk manager state from filename
    */
   public static void
-  load_state (PartitionManager pm, /*VirtualDiskManager vdm,*/ String filename)
+  load_state (PartitionManager pm, VirtualDiskManager vdm, String filename)
   {
     if (document == null)
     {
       load_file (filename);
     }
 
-    XMLHelper.parse(pm, /*vdm,*/ document);
+    XMLHelper.parse(pm, vdm, document);
   }
 
   /*
