@@ -76,6 +76,7 @@ fi
 
 # Add/remove vif to/from bridge.
 brctl ${brcmd} ${bridge} ${vif}
+ifconfig ${vif} $OP
 
 if [ ${ip} ] ; then
 

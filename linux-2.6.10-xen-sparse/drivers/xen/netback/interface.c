@@ -27,6 +27,44 @@ netif_t *netif_find_by_handle(domid_t domid, unsigned int handle)
     return netif;
 }
 
+static void __netif_up(netif_t *netif)
+{
+    struct net_device *dev = netif->dev;
+    spin_lock_bh(&dev->xmit_lock);
+    netif->active = 1;
+    spin_unlock_bh(&dev->xmit_lock);
+    (void)request_irq(netif->irq, netif_be_int, 0, dev->name, netif);
+    netif_schedule_work(netif);
+}
+
+static void __netif_down(netif_t *netif)
+{
+    struct net_device *dev = netif->dev;
+    spin_lock_bh(&dev->xmit_lock);
+    netif->active = 0;
+    spin_unlock_bh(&dev->xmit_lock);
+    free_irq(netif->irq, netif);
+    netif_deschedule_work(netif);
+}
+
+static int net_open(struct net_device *dev)
+{
+    netif_t *netif = netdev_priv(dev);
+    if ( netif->status == CONNECTED )
+        __netif_up(netif);
+    netif_start_queue(dev);
+    return 0;
+}
+
+static int net_close(struct net_device *dev)
+{
+    netif_t *netif = netdev_priv(dev);
+    netif_stop_queue(dev);
+    if ( netif->status == CONNECTED )
+        __netif_down(netif);
+    return 0;
+}
+
 static void __netif_disconnect_complete(void *arg)
 {
     netif_t              *netif = (netif_t *)arg;
@@ -40,9 +78,6 @@ static void __netif_disconnect_complete(void *arg)
      */
     unbind_evtchn_from_irq(netif->evtchn);
     vfree(netif->tx); /* Frees netif->rx as well. */
-    rtnl_lock();
-    (void)dev_close(netif->dev);
-    rtnl_unlock();
 
     /* Construct the deferred response message. */
     cmsg.type         = CMSG_NETIF_BE;
@@ -95,13 +130,11 @@ void netif_create(netif_be_create_t *create)
         return;
     }
 
-    netif = dev->priv;
+    netif = netdev_priv(dev);
     memset(netif, 0, sizeof(*netif));
     netif->domid  = domid;
     netif->handle = handle;
     netif->status = DISCONNECTED;
-    spin_lock_init(&netif->rx_lock);
-    spin_lock_init(&netif->tx_lock);
     atomic_set(&netif->refcnt, 0);
     netif->dev = dev;
 
@@ -124,6 +157,8 @@ void netif_create(netif_be_create_t *create)
 
     dev->hard_start_xmit = netif_be_start_xmit;
     dev->get_stats       = netif_be_get_stats;
+    dev->open            = net_open;
+    dev->stop            = net_close;
 
     /* Disable queuing. */
     dev->tx_queue_len = 0;
@@ -136,7 +171,11 @@ void netif_create(netif_be_create_t *create)
     memset(dev->dev_addr, 0xFF, ETH_ALEN);
     dev->dev_addr[0] &= ~0x01;
 
-    if ( (err = register_netdev(dev)) != 0 )
+    rtnl_lock();
+    err = register_netdevice(dev);
+    rtnl_unlock();
+
+    if ( err != 0 )
     {
         DPRINTK("Could not register new net device %s: err=%d\n",
                 dev->name, err);
@@ -249,17 +288,16 @@ void netif_connect(netif_be_connect_t *connect)
         (netif_tx_interface_t *)vma->addr;
     netif->rx             = 
         (netif_rx_interface_t *)((char *)vma->addr + PAGE_SIZE);
-    netif->status         = CONNECTED;
-    netif_get(netif);
-
     netif->tx->resp_prod = netif->rx->resp_prod = 0;
+    netif_get(netif);
+    wmb(); /* Other CPUs see new state before interface is started. */
 
     rtnl_lock();
-    (void)dev_open(netif->dev);
+    netif->status = CONNECTED;
+    wmb();
+    if ( netif_running(netif->dev) )
+        __netif_up(netif);
     rtnl_unlock();
-
-    (void)request_irq(netif->irq, netif_be_int, 0, netif->dev->name, netif);
-    netif_start_queue(netif->dev);
 
     connect->status = NETIF_BE_STATUS_OKAY;
 }
@@ -281,12 +319,13 @@ int netif_disconnect(netif_be_disconnect_t *disconnect, u8 rsp_id)
 
     if ( netif->status == CONNECTED )
     {
+        rtnl_lock();
         netif->status = DISCONNECTING;
         netif->disconnect_rspid = rsp_id;
-        wmb(); /* Let other CPUs see the status change. */
-        netif_stop_queue(netif->dev);
-        free_irq(netif->irq, netif);
-        netif_deschedule(netif);
+        wmb();
+        if ( netif_running(netif->dev) )
+            __netif_down(netif);
+        rtnl_unlock();
         netif_put(netif);
         return 0; /* Caller should not send response message. */
     }

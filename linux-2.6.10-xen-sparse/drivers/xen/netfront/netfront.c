@@ -277,7 +277,7 @@ static int vif_wake(struct net_device *dev)
 
 static int network_open(struct net_device *dev)
 {
-    struct net_private *np = dev->priv;
+    struct net_private *np = netdev_priv(dev);
 
     memset(&np->stats, 0, sizeof(np->stats));
 
@@ -295,7 +295,7 @@ static void network_tx_buf_gc(struct net_device *dev)
 {
     NETIF_RING_IDX i, prod;
     unsigned short id;
-    struct net_private *np = dev->priv;
+    struct net_private *np = netdev_priv(dev);
     struct sk_buff *skb;
 
     if ( np->backend_state != BEST_CONNECTED )
@@ -342,7 +342,7 @@ static void network_tx_buf_gc(struct net_device *dev)
 static void network_alloc_rx_buffers(struct net_device *dev)
 {
     unsigned short id;
-    struct net_private *np = dev->priv;
+    struct net_private *np = netdev_priv(dev);
     struct sk_buff *skb;
     int i, batch_target;
     NETIF_RING_IDX req_prod = np->rx->req_prod;
@@ -433,7 +433,7 @@ static void network_alloc_rx_buffers(struct net_device *dev)
 static int network_start_xmit(struct sk_buff *skb, struct net_device *dev)
 {
     unsigned short id;
-    struct net_private *np = (struct net_private *)dev->priv;
+    struct net_private *np = netdev_priv(dev);
     netif_tx_request_t *tx;
     NETIF_RING_IDX i;
 
@@ -509,7 +509,7 @@ static int network_start_xmit(struct sk_buff *skb, struct net_device *dev)
 static irqreturn_t netif_int(int irq, void *dev_id, struct pt_regs *ptregs)
 {
     struct net_device *dev = dev_id;
-    struct net_private *np = dev->priv;
+    struct net_private *np = netdev_priv(dev);
     unsigned long flags;
 
     spin_lock_irqsave(&np->tx_lock, flags);
@@ -526,7 +526,7 @@ static irqreturn_t netif_int(int irq, void *dev_id, struct pt_regs *ptregs)
 
 static int netif_poll(struct net_device *dev, int *pbudget)
 {
-    struct net_private *np = dev->priv;
+    struct net_private *np = netdev_priv(dev);
     struct sk_buff *skb, *nskb;
     netif_rx_response_t *rx;
     NETIF_RING_IDX i, rp;
@@ -704,7 +704,7 @@ static int netif_poll(struct net_device *dev, int *pbudget)
 
 static int network_close(struct net_device *dev)
 {
-    struct net_private *np = dev->priv;
+    struct net_private *np = netdev_priv(dev);
     np->user_state = UST_CLOSED;
     netif_stop_queue(np->dev);
     return 0;
@@ -713,7 +713,7 @@ static int network_close(struct net_device *dev)
 
 static struct net_device_stats *network_get_stats(struct net_device *dev)
 {
-    struct net_private *np = (struct net_private *)dev->priv;
+    struct net_private *np = netdev_priv(dev);
     return &np->stats;
 }
 
@@ -725,7 +725,7 @@ static void network_connect(struct net_device *dev,
     int i, requeue_idx;
     netif_tx_request_t *tx;
 
-    np = dev->priv;
+    np = netdev_priv(dev);
     spin_lock_irq(&np->tx_lock);
     spin_lock(&np->rx_lock);
 
@@ -889,7 +889,8 @@ static void vif_close(struct net_private *np)
  * Allocates tx/rx pages.
  * Sends connect message to xend.
  */
-static void vif_disconnect(struct net_private *np){
+static void vif_disconnect(struct net_private *np)
+{
     DPRINTK(">\n");
     if(np->tx) free_page((unsigned long)np->tx);
     if(np->rx) free_page((unsigned long)np->rx);
@@ -967,7 +968,7 @@ static int create_netdev(int handle, struct net_device **val)
         goto exit;
     }
 
-    np                = dev->priv;
+    np                = netdev_priv(dev);
     np->backend_state = BEST_CLOSED;
     np->user_state    = UST_CLOSED;
     np->handle        = handle;
@@ -1046,7 +1047,7 @@ target_vif(
 
   exit:
     if ( np != NULL )
-        *np = ((dev && !err) ? dev->priv : NULL);
+        *np = ((dev && !err) ? netdev_priv(dev) : NULL);
     DPRINTK("< err=%d\n", err);
     return err;
 }

@@ -58,7 +58,6 @@ static PEND_RING_IDX pending_prod, pending_cons;
 
 /* Freed TX SKBs get batched on this ring before return to pending_ring. */
 static u16 dealloc_ring[MAX_PENDING_REQS];
-static spinlock_t dealloc_lock = SPIN_LOCK_UNLOCKED;
 static PEND_RING_IDX dealloc_prod, dealloc_cons;
 
 static struct sk_buff_head tx_queue;
@@ -122,12 +121,13 @@ static inline int is_xen_skb(struct sk_buff *skb)
 
 int netif_be_start_xmit(struct sk_buff *skb, struct net_device *dev)
 {
-    netif_t *netif = (netif_t *)dev->priv;
+    netif_t *netif = netdev_priv(dev);
 
     ASSERT(skb->dev == dev);
 
     /* Drop the packet if the target domain has no receive buffers. */
-    if ( (netif->rx_req_cons == netif->rx->req_prod) ||
+    if ( !netif->active || 
+         (netif->rx_req_cons == netif->rx->req_prod) ||
          ((netif->rx_req_cons-netif->rx_resp_prod) == NETIF_RX_RING_SIZE) )
         goto drop;
 
@@ -153,6 +153,7 @@ int netif_be_start_xmit(struct sk_buff *skb, struct net_device *dev)
     }
 
     netif->rx_req_cons++;
+    netif_get(netif);
 
     skb_queue_tail(&rx_queue, skb);
     tasklet_schedule(&net_rx_tasklet);
@@ -203,7 +204,7 @@ static void net_rx_action(unsigned long unused)
     mmu = rx_mmu;
     while ( (skb = skb_dequeue(&rx_queue)) != NULL )
     {
-        netif   = (netif_t *)skb->dev->priv;
+        netif   = netdev_priv(skb->dev);
         vdata   = (unsigned long)skb->data;
         mdata   = virt_to_machine(vdata);
 
@@ -213,6 +214,7 @@ static void net_rx_action(unsigned long unused)
             if ( net_ratelimit() )
                 printk(KERN_WARNING "Memory squeeze in netback driver.\n");
             mod_timer(&net_timer, jiffies + HZ);
+            skb_queue_head(&rx_queue, skb);
             break;
         }
 
@@ -260,7 +262,7 @@ static void net_rx_action(unsigned long unused)
     mmu = rx_mmu;
     while ( (skb = __skb_dequeue(&rxq)) != NULL )
     {
-        netif   = (netif_t *)skb->dev->priv;
+        netif   = netdev_priv(skb->dev);
         size    = skb->tail - skb->data;
 
         /* Rederive the machine addresses. */
@@ -297,6 +299,7 @@ static void net_rx_action(unsigned long unused)
             notify_list[notify_nr++] = evtchn;
         }
 
+        netif_put(netif);
         dev_kfree_skb(skb);
 
         mcl += 2;
@@ -326,7 +329,7 @@ static void net_alarm(unsigned long unused)
 
 struct net_device_stats *netif_be_get_stats(struct net_device *dev)
 {
-    netif_t *netif = dev->priv;
+    netif_t *netif = netdev_priv(dev);
     return &netif->stats;
 }
 
@@ -353,7 +356,7 @@ static void add_to_net_schedule_list_tail(netif_t *netif)
         return;
 
     spin_lock_irq(&net_schedule_list_lock);
-    if ( !__on_net_schedule_list(netif) && (netif->status == CONNECTED) )
+    if ( !__on_net_schedule_list(netif) && netif->active )
     {
         list_add_tail(&netif->list, &net_schedule_list);
         netif_get(netif);
@@ -361,7 +364,7 @@ static void add_to_net_schedule_list_tail(netif_t *netif)
     spin_unlock_irq(&net_schedule_list_lock);
 }
 
-static inline void netif_schedule_work(netif_t *netif)
+void netif_schedule_work(netif_t *netif)
 {
     if ( (netif->tx_req_cons != netif->tx->req_prod) &&
          ((netif->tx_req_cons-netif->tx_resp_prod) != NETIF_TX_RING_SIZE) )
@@ -371,7 +374,7 @@ static inline void netif_schedule_work(netif_t *netif)
     }
 }
 
-void netif_deschedule(netif_t *netif)
+void netif_deschedule_work(netif_t *netif)
 {
     remove_from_net_schedule_list(netif);
 }
@@ -426,10 +429,8 @@ static void net_tx_action(unsigned long unused)
 
         netif = pending_tx_info[pending_idx].netif;
 
-        spin_lock(&netif->tx_lock);
         make_tx_response(netif, pending_tx_info[pending_idx].req.id, 
                          NETIF_RSP_OKAY);
-        spin_unlock(&netif->tx_lock);
         
         pending_ring[MASK_PEND_IDX(pending_prod++)] = pending_idx;
 
@@ -630,11 +631,12 @@ static void net_tx_action(unsigned long unused)
 
 static void netif_idx_release(u16 pending_idx)
 {
+    static spinlock_t _lock = SPIN_LOCK_UNLOCKED;
     unsigned long flags;
 
-    spin_lock_irqsave(&dealloc_lock, flags);
+    spin_lock_irqsave(&_lock, flags);
     dealloc_ring[MASK_PEND_IDX(dealloc_prod++)] = pending_idx;
-    spin_unlock_irqrestore(&dealloc_lock, flags);
+    spin_unlock_irqrestore(&_lock, flags);
 
     tasklet_schedule(&net_tx_tasklet);
 }
@@ -656,46 +658,6 @@ static void netif_skb_release(struct sk_buff *skb)
 
     netif_idx_release(pending_idx);
 }
-
-#if 0
-long flush_bufs_for_netif(netif_t *netif)
-{
-    NETIF_RING_IDX i;
-
-    /* Return any outstanding receive buffers to the guest OS. */
-    spin_lock(&netif->rx_lock);
-    for ( i = netif->rx_req_cons; 
-          (i != netif->rx->req_prod) &&
-              ((i-netif->rx_resp_prod) != NETIF_RX_RING_SIZE);
-          i++ )
-    {
-        make_rx_response(netif,
-                         netif->rx->ring[MASK_NETIF_RX_IDX(i)].req.id,
-                         NETIF_RSP_DROPPED, 0, 0);
-    }
-    netif->rx_req_cons = i;
-    spin_unlock(&netif->rx_lock);
-
-    /*
-     * Flush pending transmit buffers. The guest may still have to wait for
-     * buffers that are queued at a physical NIC.
-     */
-    spin_lock(&netif->tx_lock);
-    for ( i = netif->tx_req_cons; 
-          (i != netif->tx->req_prod) &&
-              ((i-netif->tx_resp_prod) != NETIF_TX_RING_SIZE);
-          i++ )
-    {
-        make_tx_response(netif,
-                         netif->tx->ring[MASK_NETIF_TX_IDX(i)].req.id,
-                         NETIF_RSP_DROPPED);
-    }
-    netif->tx_req_cons = i;
-    spin_unlock(&netif->tx_lock);
-
-    return 0;
-}
-#endif
 
 irqreturn_t netif_be_int(int irq, void *dev_id, struct pt_regs *regs)
 {
