@@ -102,6 +102,10 @@ dropping Xen and the XenoLinux kernel down onto a pre-existing Linux
 distribution, or using the file systems from the CD (which are based
 on RH9). See the installation instructions later in this document.
 
+If your video card requires 'agpgart' then it unfortunately won't yet
+work with Xen, and you'll only be able to configure a VGA X
+server. We're working on a fix for this for the next release.
+
 If you want to browse the Xen / XenoLinux source, it's all located
 under /usr/local/src, complete with BitKeeper repository. We've also
 included source code and configuration information for the various
