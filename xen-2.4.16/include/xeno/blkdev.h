@@ -272,6 +272,8 @@ struct request_queue
 #endif
 };
 
+#define bh_phys(bh)            (page_to_phys((bh)->b_page) + bh_offset((bh)))
+
 struct blk_dev_struct {
 	/*
 	 * queue_proc has to be atomic
