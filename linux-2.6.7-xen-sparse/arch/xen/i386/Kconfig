@@ -703,12 +703,6 @@ config PCI_DIRECT
  	depends on PCI && ((PCI_GODIRECT || PCI_GOANY) || X86_VISWS)
 	default y
 
-config PCI_MMCONFIG
-	bool
-	depends on PCI && (PCI_GOMMCONFIG || PCI_GOANY)
-	select ACPI_BOOT
-	default y
-
 source "drivers/pci/Kconfig"
 
 config ISA

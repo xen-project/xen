@@ -65,6 +65,7 @@ config UNIX98_PTYS
 
 
 if XEN_PHYSDEV_ACCESS
+source "drivers/i2c/Kconfig"
 source "drivers/video/Kconfig"
 endif
 
