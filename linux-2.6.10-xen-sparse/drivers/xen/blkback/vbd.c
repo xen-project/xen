@@ -129,7 +129,8 @@ void vbd_grow(blkif_be_vbd_grow_t *grow)
         return;
     }
 
-    x->extent.device        = grow->extent.device;
+    /* Mask to 16-bit for compatibility with old tools */
+    x->extent.device        = grow->extent.device & 0xffff;
     x->extent.sector_start  = grow->extent.sector_start;
     x->extent.sector_length = grow->extent.sector_length;
     x->next                 = (blkif_extent_le_t *)NULL;
