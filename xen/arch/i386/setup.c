@@ -384,7 +384,11 @@ void __init start_of_day(void)
 #endif
     initialize_keytable(); /* call back handling for key codes      */
 
-    disable_pit();		/* not needed anymore */
+    if ( cpu_has_apic )
+        disable_pit();
+    else if ( smp_num_cpus != 1 )
+        panic("We really need local APICs on SMP machines!");
+
     ac_timer_init();    /* init accurate timers */
     init_xeno_time();	/* initialise the time */
     schedulers_start(); /* start scheduler for each CPU */

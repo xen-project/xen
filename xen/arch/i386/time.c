@@ -54,7 +54,8 @@ int timer_ack = 0;
 
 static unsigned int    rdtsc_bitshift;  /* Which 32 bits of TSC do we use?   */
 static unsigned long   init_cmos_time;  /* RTC time when system time == 0    */
-static u64             cpu_freqs[3];    /* Slow/correct/fast CPU freqs       */
+static u64             cpu_freqs[3];    /* Slow/correct/fast CPU frequencies */
+static u64             cpu_freq;        /* Currently-selected CPU frequency  */
 static u32             st_scale_f;      /* Cycles -> ns, fractional part     */
 static u32             st_scale_i;      /* Cycles -> ns, integer part        */
 static struct ac_timer update_timer;    /* Periodic 'time update' function   */
@@ -92,6 +93,7 @@ static inline void do_timer_interrupt(
     }
 #endif
     do_timer(regs);
+    do_ac_timer();
 }
 
 /*
@@ -500,6 +502,8 @@ void __init time_init(void)
 
     ticks_per_usec = ticks_per_frac / (1000000/CALIBRATE_FRAC);
     cpu_khz = ticks_per_frac / (1000/CALIBRATE_FRAC);
+
+    cpu_freq = (u64)ticks_per_frac * (u64)CALIBRATE_FRAC;
 
     printk("Detected %lu.%03lu MHz processor.\n", 
            cpu_khz / 1000, cpu_khz % 1000);

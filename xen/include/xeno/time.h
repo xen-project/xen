@@ -37,12 +37,6 @@
  */
 extern int init_xeno_time();
 
-/*
- * Cycle Counter Time (defined in asm/time.h)
- */
-
-
-extern u64	cpu_freq;
 
 /*
  * System Time

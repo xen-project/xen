@@ -486,7 +486,6 @@ void __init init_apic_mappings(void)
 static unsigned int bus_freq;
 static u32          bus_cycle;   /* length of one bus cycle in pico-seconds */
 static u32          bus_scale;   /* scaling factor convert ns to bus cycles */
-u64 cpu_freq;
 
 /*
  * The timer chip is already set up at HZ interrupts per second here,
@@ -616,7 +615,11 @@ int __init calibrate_APIC_clock(void)
            result / (1000000/HZ), 
            result % (1000000/HZ));
 
-    cpu_freq = (u64)(((t2-t1)/LOOPS)*HZ);
+    /*
+     * KAF: Moved this to time.c where it's calculated relative to the TSC. 
+     * Therefore works on machines with no local APIC.
+     */
+    /*cpu_freq = (u64)(((t2-t1)/LOOPS)*HZ);*/
 
     /* set up multipliers for accurate timer code */
     bus_freq   = result*HZ;
