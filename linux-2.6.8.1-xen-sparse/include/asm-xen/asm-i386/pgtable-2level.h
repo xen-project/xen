@@ -27,14 +27,14 @@ static inline int pgd_present(pgd_t pgd)	{ return 1; }
 #define set_pte(pteptr, pteval) (*(pteptr) = pteval)
 #define set_pte_atomic(pteptr, pteval) (*(pteptr) = pteval)
 #else
-#define set_pte(pteptr, pteval) queue_l1_entry_update(pteptr, (pteval).pte_low)
-#define set_pte_atomic(pteptr, pteval) queue_l1_entry_update(pteptr, (pteval).pte_low)
+#define set_pte(pteptr, pteval) xen_l1_entry_update(pteptr, (pteval).pte_low)
+#define set_pte_atomic(pteptr, pteval) xen_l1_entry_update(pteptr, (pteval).pte_low)
 #endif
 /*
  * (pmds are folded into pgds so this doesn't get actually called,
  * but the define is needed for a generic inline function.)
  */
-#define set_pmd(pmdptr, pmdval) queue_l2_entry_update((pmdptr), (pmdval).pmd)
+#define set_pmd(pmdptr, pmdval) xen_l2_entry_update((pmdptr), (pmdval).pmd)
 #define set_pgd(pgdptr, pgdval) ((void)0)
 
 #define pgd_page(pgd) \

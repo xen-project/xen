@@ -125,6 +125,7 @@ static void __init page_table_range_init (unsigned long start, unsigned long end
 	}
 }
 
+/* NOTE: caller must call flush_page_update_queue() */
 void __init wrprotect_bootpt(pgd_t *pgd, void *page, int set)
 {
 	pmd_t *pmd;
@@ -141,6 +142,7 @@ void __init wrprotect_bootpt(pgd_t *pgd, void *page, int set)
 	    pte_val_ma(*pte) | _PAGE_RW);
 }
 
+/* NOTE: caller must call flush_page_update_queue() */
 static void __init protect_bootpt_entries(pgd_t *spgd, pgd_t *dpgd, int set,
     int pmdupdate, int pmdset)
 {
@@ -163,7 +165,6 @@ static void __init protect_bootpt_entries(pgd_t *spgd, pgd_t *dpgd, int set,
 			}
 		}
 	}
-	flush_page_update_queue();
 }
 
 static inline int is_kernel_text(unsigned long addr)
@@ -575,14 +576,13 @@ void __init paging_init(void)
 	protect_bootpt_entries((pgd_t *)start_info.pt_base, swapper_pg_dir,
 	    1, 1, 1);
 	queue_pgd_pin(__pa(swapper_pg_dir));
-	flush_page_update_queue();
 	load_cr3(swapper_pg_dir);
-	__flush_tlb_all();
+	__flush_tlb_all(); /* implicit flush */
 	queue_pgd_unpin(__pa(start_info.pt_base));
-	flush_page_update_queue();
 	protect_bootpt_entries((pgd_t *)start_info.pt_base, swapper_pg_dir,
 	    0, 1, 0);
 	wrprotect_bootpt((pgd_t *)start_info.pt_base, swapper_pg_dir, 0);
+	flush_page_update_queue();
 
 #ifdef CONFIG_X86_PAE
 	/*

@@ -22,8 +22,10 @@
 #ifdef CONFIG_SMP /* avoids "defined but not used" warnig */
 static void flush_ldt(void *null)
 {
-	if (current->active_mm)
+	if (current->active_mm) {
 		load_LDT(&current->active_mm->context);
+		flush_page_update_queue();
+	}
 }
 #endif
 
@@ -90,6 +92,7 @@ static inline int copy_ldt(mm_context_t *new, mm_context_t *old)
 	memcpy(new->ldt, old->ldt, old->size*LDT_ENTRY_SIZE);
 	make_pages_readonly(new->ldt, (new->size * LDT_ENTRY_SIZE) /
 			    PAGE_SIZE);
+	flush_page_update_queue();
 	return 0;
 }
 

@@ -33,6 +33,7 @@ static inline void pte_free_kernel(pte_t *pte)
 {
 	free_page((unsigned long)pte);
 	__make_page_writable(pte);
+	flush_page_update_queue();
 }
 
 static inline void pte_free(struct page *pte)
@@ -43,6 +44,7 @@ static inline void pte_free(struct page *pte)
 	{
 		__make_page_writable(phys_to_virt(page_to_pseudophys(pte)));
 		__free_page(pte);
+		flush_page_update_queue();
 	}
 }
 

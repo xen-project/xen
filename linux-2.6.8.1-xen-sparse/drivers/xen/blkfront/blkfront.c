@@ -1263,7 +1263,7 @@ void blkif_completion(blkif_request_t *req)
 	{
 	    unsigned long pfn = req->frame_and_sects[i] >> PAGE_SHIFT;
 	    unsigned long mfn = phys_to_machine_mapping[pfn];
-	    queue_machphys_update(mfn, pfn);
+	    xen_machphys_update(mfn, pfn);
 	}
 	break;
     }
