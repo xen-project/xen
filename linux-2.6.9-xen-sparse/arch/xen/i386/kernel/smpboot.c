@@ -404,6 +404,7 @@ void __init smp_callin(void)
 	smp_callin_clear_local_apic();
 	setup_local_APIC();
 	map_cpu_to_logical_apicid();
+#endif
 
 	local_irq_enable();
 
@@ -411,7 +412,6 @@ void __init smp_callin(void)
 	 * Get our bogomips.
 	 */
 	calibrate_delay();
-#endif
 	Dprintk("Stack at about %p\n",&cpuid);
 
 	/*
@@ -421,8 +421,8 @@ void __init smp_callin(void)
 
 #if 0
 	disable_APIC_timer();
-	local_irq_disable();
 #endif
+	local_irq_disable();
 	/*
 	 * Allow the master to continue.
 	 */
