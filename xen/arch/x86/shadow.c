@@ -473,7 +473,7 @@ unsigned long shadow_l2_table(
     spl2e[SH_LINEAR_PT_VIRT_START >> L2_PAGETABLE_SHIFT] =
         mk_l2_pgentry((spfn << PAGE_SHIFT) | __PAGE_HYPERVISOR);
     spl2e[PERDOMAIN_VIRT_START >> L2_PAGETABLE_SHIFT] =
-        mk_l2_pgentry(__pa(frame_table[gpfn].u.inuse.domain->exec_domain[0]->mm.perdomain_pt) |
+        mk_l2_pgentry(__pa(frame_table[gpfn].u.inuse.domain->mm_perdomain_pt) |
                       __PAGE_HYPERVISOR);
 #endif
 

@@ -17,9 +17,9 @@ static inline void load_LDT(struct exec_domain *p)
     {
         cpu = smp_processor_id();
         desc = (struct desc_struct *)GET_GDT_ADDRESS(p) + __LDT(cpu);
-        desc->a = ((LDT_VIRT_START&0xffff)<<16) | (ents*8-1);
-        desc->b = (LDT_VIRT_START&(0xff<<24)) | 0x8200 |
-            ((LDT_VIRT_START&0xff0000)>>16);
+        desc->a = ((LDT_VIRT_START(p)&0xffff)<<16) | (ents*8-1);
+        desc->b = (LDT_VIRT_START(p)&(0xff<<24)) | 0x8200 |
+            ((LDT_VIRT_START(p)&0xff0000)>>16);
         __asm__ __volatile__ ( "lldt %%ax" : : "a" (__LDT(cpu)<<3) );
     }
 }

@@ -346,6 +346,7 @@ asmlinkage void do_page_fault(struct xen_regs *regs, long error_code)
     struct domain *d = ed->domain;
     extern int map_ldt_shadow_page(unsigned int);
     int cpu = ed->processor;
+    int ret;
 
     __asm__ __volatile__ ("movl %%cr2,%0" : "=r" (addr) : );
 
@@ -359,7 +360,9 @@ asmlinkage void do_page_fault(struct xen_regs *regs, long error_code)
              unlikely((addr >> L2_PAGETABLE_SHIFT) ==
                       ptwr_info[cpu].ptinfo[PTWR_PT_ACTIVE].l2_idx) )
         {
+            LOCK_BIGLOCK(d);
             ptwr_flush(PTWR_PT_ACTIVE);
+            UNLOCK_BIGLOCK(d);
             return;
         }
 
@@ -373,16 +376,19 @@ asmlinkage void do_page_fault(struct xen_regs *regs, long error_code)
          (addr < PAGE_OFFSET) && shadow_fault(addr, error_code) )
         return; /* Returns TRUE if fault was handled. */
 
-    if ( unlikely(addr >= LDT_VIRT_START) && 
-         (addr < (LDT_VIRT_START + (ed->mm.ldt_ents*LDT_ENTRY_SIZE))) )
+    if ( unlikely(addr >= LDT_VIRT_START(ed)) && 
+         (addr < (LDT_VIRT_START(ed) + (ed->mm.ldt_ents*LDT_ENTRY_SIZE))) )
     {
         /*
          * Copy a mapping from the guest's LDT, if it is valid. Otherwise we
          * send the fault up to the guest OS to be handled.
          */
-        off  = addr - LDT_VIRT_START;
+        LOCK_BIGLOCK(d);
+        off  = addr - LDT_VIRT_START(ed);
         addr = ed->mm.ldt_base + off;
-        if ( likely(map_ldt_shadow_page(off >> PAGE_SHIFT)) )
+        ret = map_ldt_shadow_page(off >> PAGE_SHIFT);
+        UNLOCK_BIGLOCK(d);
+        if ( likely(ret) )
             return; /* successfully copied the mapping */
     }
 
@@ -784,6 +790,8 @@ long do_set_trap_table(trap_info_t *traps)
     trap_info_t cur;
     trap_info_t *dst = current->thread.traps;
 
+    LOCK_BIGLOCK(current->domain);
+
     for ( ; ; )
     {
         if ( copy_from_user(&cur, traps, sizeof(cur)) ) return -EFAULT;
@@ -795,6 +803,8 @@ long do_set_trap_table(trap_info_t *traps)
         memcpy(dst+cur.vector, &cur, sizeof(cur));
         traps++;
     }
+
+    UNLOCK_BIGLOCK(current->domain);
 
     return 0;
 }

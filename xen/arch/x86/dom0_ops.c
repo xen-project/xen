@@ -128,11 +128,11 @@ void arch_getdomaininfo_ctxt(struct exec_domain *d, full_execution_context_t *c)
     c->ldt_base = d->mm.ldt_base;
     c->ldt_ents = d->mm.ldt_ents;
     c->gdt_ents = 0;
-    if ( GET_GDT_ADDRESS(d) == GDT_VIRT_START )
+    if ( GET_GDT_ADDRESS(d) == GDT_VIRT_START(d) )
     {
         for ( i = 0; i < 16; i++ )
             c->gdt_frames[i] = 
-                l1_pgentry_to_pagenr(d->mm.perdomain_pt[i]);
+                l1_pgentry_to_pagenr(d->mm.perdomain_ptes[i]);
         c->gdt_ents = GET_GDT_ENTRIES(d);
     }
     c->guestos_ss  = d->thread.guestos_ss;

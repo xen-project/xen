@@ -46,6 +46,8 @@ struct domain *do_createdomain(domid_t dom_id, unsigned int cpu)
 
     spin_lock_init(&d->time_lock);
 
+    spin_lock_init(&d->big_lock);
+
     spin_lock_init(&d->page_alloc_lock);
     INIT_LIST_HEAD(&d->page_list);
     INIT_LIST_HEAD(&d->xenpage_list);
@@ -216,7 +218,6 @@ unsigned int alloc_new_dom_mem(struct domain *d, unsigned int kbytes)
 void domain_destruct(struct domain *d)
 {
     struct domain **pd;
-    struct exec_domain *ed;
     atomic_t      old, new;
 
     if ( !test_bit(DF_DYING, &d->d_flags) )
@@ -244,8 +245,7 @@ void domain_destruct(struct domain *d)
     destroy_event_channels(d);
     grant_table_destroy(d);
 
-    for_each_exec_domain(d, ed)
-        free_perdomain_pt(ed);
+    free_perdomain_pt(d);
     free_xenheap_page((unsigned long)d->shared_info);
 
     free_domain_struct(d);
@@ -333,10 +333,7 @@ long do_boot_vcpu(unsigned long vcpu, full_execution_context_t *ctxt)
     memcpy(&ed->thread, &idle0_exec_domain.thread, sizeof(ed->thread));
 
     /* arch_do_createdomain */
-    ed->mm.perdomain_pt = (l1_pgentry_t *)alloc_xenheap_page();
-    memset(ed->mm.perdomain_pt, 0, PAGE_SIZE);
-    machine_to_phys_mapping[virt_to_phys(ed->mm.perdomain_pt) >> 
-                           PAGE_SHIFT] = INVALID_P2M_ENTRY;
+    ed->mm.perdomain_ptes = d->mm_perdomain_pt + (ed->eid << PDPT_VCPU_SHIFT);
 
     sched_add_domain(ed);
 

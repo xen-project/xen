@@ -440,6 +440,8 @@ do_grant_table_op(
     if ( count > 512 )
         return -EINVAL;
 
+    LOCK_BIGLOCK(current->domain);
+
     switch ( cmd )
     {
     case GNTTABOP_map_grant_ref:
@@ -461,6 +463,8 @@ do_grant_table_op(
         rc = -ENOSYS;
         break;
     }
+
+    UNLOCK_BIGLOCK(current->domain);
 
     return rc;
 }

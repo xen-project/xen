@@ -113,7 +113,7 @@ int get_baselimit(u16 seg, unsigned long *base, unsigned long *limit)
     /* Get base and check limit. */
     if ( ldt )
     {
-        table = (unsigned long *)LDT_VIRT_START;
+        table = (unsigned long *)LDT_VIRT_START(d);
         if ( idx >= d->mm.ldt_ents )
             goto fail;
     }
@@ -179,7 +179,7 @@ int fixup_seg(u16 seg, int positive_access)
     /* Get base and check limit. */
     if ( ldt )
     {
-        table = (unsigned long *)LDT_VIRT_START;
+        table = (unsigned long *)LDT_VIRT_START(d);
         if ( idx >= d->mm.ldt_ents )
         {
             DPRINTK("Segment %04x out of LDT range (%d)\n",

@@ -108,12 +108,24 @@ struct exec_domain
 
 };
 
+#if 01
+#define LOCK_BIGLOCK(_d) spin_lock(&(_d)->big_lock)
+#define UNLOCK_BIGLOCK(_d) spin_unlock(&(_d)->big_lock)
+#else
+#define LOCK_BIGLOCK(_d) (void)(_d)
+#define UNLOCK_BIGLOCK(_d)
+#endif
+
 struct domain {
     domid_t          id;
     s_time_t         create_time;
 
     shared_info_t   *shared_info;     /* shared data area */
     spinlock_t       time_lock;
+
+    spinlock_t       big_lock;
+
+    l1_pgentry_t    *mm_perdomain_pt;
 
     spinlock_t       page_alloc_lock; /* protects all the following fields  */
     struct list_head page_list;       /* linked list, of size tot_pages     */

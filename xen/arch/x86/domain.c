@@ -90,7 +90,7 @@ void continue_cpu_idle_loop(void)
 void startup_cpu_idle_loop(void)
 {
     /* Just some sanity to ensure that the scheduler is set up okay. */
-    ASSERT(current->id == IDLE_DOMAIN_ID);
+    ASSERT(current->domain->id == IDLE_DOMAIN_ID);
     domain_unpause_by_systemcontroller(current->domain);
     __enter_scheduler();
 
@@ -210,9 +210,9 @@ void machine_halt(void)
     __machine_halt(NULL);
 }
 
-void free_perdomain_pt(struct exec_domain *d)
+void free_perdomain_pt(struct domain *d)
 {
-    free_xenheap_page((unsigned long)d->mm.perdomain_pt);
+    free_xenheap_page((unsigned long)d->mm_perdomain_pt);
 }
 
 void arch_do_createdomain(struct exec_domain *ed)
@@ -227,10 +227,11 @@ void arch_do_createdomain(struct exec_domain *ed)
     machine_to_phys_mapping[virt_to_phys(d->shared_info) >> 
                            PAGE_SHIFT] = INVALID_P2M_ENTRY;
 
-    ed->mm.perdomain_pt = (l1_pgentry_t *)alloc_xenheap_page();
-    memset(ed->mm.perdomain_pt, 0, PAGE_SIZE);
-    machine_to_phys_mapping[virt_to_phys(ed->mm.perdomain_pt) >> 
+    d->mm_perdomain_pt = (l1_pgentry_t *)alloc_xenheap_page();
+    memset(d->mm_perdomain_pt, 0, PAGE_SIZE);
+    machine_to_phys_mapping[virt_to_phys(d->mm_perdomain_pt) >> 
                            PAGE_SHIFT] = INVALID_P2M_ENTRY;
+    ed->mm.perdomain_ptes = d->mm_perdomain_pt;
 }
 
 int arch_final_setup_guestos(struct exec_domain *d, full_execution_context_t *c)
@@ -761,7 +762,7 @@ int construct_dom0(struct domain *p,
     l2tab[LINEAR_PT_VIRT_START >> L2_PAGETABLE_SHIFT] =
         mk_l2_pgentry((unsigned long)l2start | __PAGE_HYPERVISOR);
     l2tab[PERDOMAIN_VIRT_START >> L2_PAGETABLE_SHIFT] =
-        mk_l2_pgentry(__pa(ed->mm.perdomain_pt) | __PAGE_HYPERVISOR);
+        mk_l2_pgentry(__pa(p->mm_perdomain_pt) | __PAGE_HYPERVISOR);
     ed->mm.pagetable = mk_pagetable((unsigned long)l2start);
 
     l2tab += l2_table_offset(dsi.v_start);

@@ -249,7 +249,7 @@ void domain_wake(struct exec_domain *d)
 /* Block the currently-executing domain until a pertinent event occurs. */
 long do_block(void)
 {
-    ASSERT(current->id != IDLE_DOMAIN_ID);
+    ASSERT(current->domain->id != IDLE_DOMAIN_ID);
     current->vcpu_info->evtchn_upcall_mask = 0;
     set_bit(EDF_BLOCKED, &current->ed_flags);
     TRACE_2D(TRC_SCHED_BLOCK, current->id, current);
@@ -374,8 +374,13 @@ void __enter_scheduler(void)
     task_slice_t        next_slice;
     s32                 r_time;     /* time for new dom to run */
 
-    cleanup_writable_pagetable(
-        prev->domain, PTWR_CLEANUP_ACTIVE | PTWR_CLEANUP_INACTIVE);
+    if ( !is_idle_task(current->domain) )
+    {
+        LOCK_BIGLOCK(current->domain);
+        cleanup_writable_pagetable(
+            prev->domain, PTWR_CLEANUP_ACTIVE | PTWR_CLEANUP_INACTIVE);
+        UNLOCK_BIGLOCK(current->domain);
+    }
 
     perfc_incrc(sched_run);
     

@@ -364,7 +364,7 @@ struct mm_struct {
      * Every domain has a L1 pagetable of its own. Per-domain mappings
      * are put in this table (eg. the current GDT is mapped here).
      */
-    l1_pgentry_t *perdomain_pt;
+    l1_pgentry_t *perdomain_ptes;
     pagetable_t  pagetable;
 
     /* shadow mode status and controls */
@@ -410,8 +410,8 @@ static inline void write_ptbase(struct mm_struct *mm)
 
 #define IDLE0_MM                                                    \
 {                                                                   \
-    perdomain_pt: 0,                                                \
-    pagetable:   mk_pagetable(__pa(idle_pg_table))                  \
+    perdomain_ptes: 0,                                              \
+    pagetable:      mk_pagetable(__pa(idle_pg_table))               \
 }
 
 /* Convenient accessor for mm.gdt. */
