@@ -362,10 +362,11 @@ static unsigned long alloc_page_from_domain(unsigned long * cur_addr,
  * userspace dom0 and final setup is being done by final_setup_guestos.
  */
 int setup_guestos(struct task_struct *p, dom0_newdomain_t *params, 
-                  char *data_start, unsigned long data_len, char *cmdline)
+                  char *phy_data_start, unsigned long data_len, 
+		  char *cmdline, unsigned long initrd_len)
 {
     struct list_head *list_ent;
-    char *src, *dst;
+    char *src, *vsrc, *dst, *data_start;
     int i, dom = p->domain;
     unsigned long phys_l1tab, phys_l2tab;
     unsigned long cur_address, alloc_address;
@@ -381,6 +382,21 @@ int setup_guestos(struct task_struct *p, dom0_newdomain_t *params,
 
     /* Sanity! */
     if ( p->domain != 0 ) BUG();
+
+    /* This is all a bit grim. We've moved the modules to the "safe"
+     physical memory region above MAP_DIRECTMAP_ADDRESS (48MB). Later
+     in this routeine, we're going to copy it down into the region
+     that's actually been allocated to domain 0. This is highly likely
+     to be overlapping, so we use a forward copy.
+
+     MAP_DIRECTMAP_ADDRESS should be safe. The worst case is a machine
+     with 4GB and lots of network/disk cards that allocate loads of
+     buffers. We'll have to revist this if we ever support PAE (64GB).
+
+ */
+
+
+    data_start = map_domain_mem( (unsigned long) phy_data_start );
 
     if ( strncmp(data_start, "XenoGues", 8) )
     {
@@ -532,10 +548,24 @@ int setup_guestos(struct task_struct *p, dom0_newdomain_t *params,
     __cli();
     __write_cr3_counted(pagetable_val(p->mm.pagetable));
 
-    /* Copy the guest OS image. */
-    src = (char *)(data_start + 12);
+    /* Copy the guest OS image. */    
+    src = (char *)(phy_data_start + 12);
+    vsrc= (char *)(data_start + 12); /* data_start invalid after first page*/
     dst = (char *)virt_load_address;
-    while ( src < (data_start+data_len) ) *dst++ = *src++;
+    while ( src < (phy_data_start+data_len) )
+      {
+	*dst++ = *vsrc++;
+	src++;
+
+	if ( (((unsigned long)src) & (PAGE_SIZE-1)) == 0 )
+	  {
+	    unmap_domain_mem( vsrc-1 );
+	    vsrc = map_domain_mem( (unsigned long)src );
+	  }
+      }
+    unmap_domain_mem( vsrc );
+
+    printk("copy done\n");
 
     /* Set up start info area. */
     memset(virt_startinfo_address, 0, sizeof(*virt_startinfo_address));
@@ -544,6 +574,15 @@ int setup_guestos(struct task_struct *p, dom0_newdomain_t *params,
         (shared_info_t *)virt_shinfo_address;
     virt_startinfo_address->pt_base = virt_load_address + 
         ((p->tot_pages - 1) << PAGE_SHIFT); 
+
+    if ( initrd_len )
+      {
+	virt_startinfo_address->mod_start = (unsigned long)dst-initrd_len;
+	virt_startinfo_address->mod_len   = initrd_len;
+
+	printk("Initrd len 0x%x, start at 0x%08x\n",
+	       virt_startinfo_address->mod_len, virt_startinfo_address->mod_start);
+      }
 
     /* Add virtual network interfaces and point to them in startinfo. */
     while (params->num_vifs-- > 0) {

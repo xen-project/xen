@@ -170,7 +170,7 @@ void cmain (unsigned long magic, multiboot_info_t *mbi)
     printk("Initialised all memory on a %luMB machine\n",
            max_page >> (20-PAGE_SHIFT));
 
-    init_page_allocator(mod[0].mod_end, MAX_MONITOR_ADDRESS);
+    init_page_allocator(__pa(&_end), MAX_MONITOR_ADDRESS);
  
     /* These things will get done by do_newdomain() for all other tasks. */
     current->shared_info = (void *)get_free_page(GFP_KERNEL);
@@ -191,14 +191,20 @@ void cmain (unsigned long magic, multiboot_info_t *mbi)
 
     new_dom = do_newdomain(0, 0);
     if ( new_dom == NULL ) panic("Error creating domain 0\n");
+
+    /* We're going to setup domain0 using the module(s) that we
+       stashed safely above our MAX_DIRECTMAP_ADDRESS in boot/Boot.S
+
+       The second module, if present, is an initrd ramdisk
+     */
+
     if ( setup_guestos(new_dom, 
                        &dom0_params, 
-                       __va(mod[0].mod_start), 
-                       mod[0].mod_end - mod[0].mod_start, 
-                       __va(mod[0].string))
+                       MAX_DIRECTMAP_ADDRESS, 
+                       mod[mbi->mods_count-1].mod_end - mod[0].mod_start, 		              __va(mod[0].string),
+		       (mbi->mods_count==2)?
+		           (mod[1].mod_end - mod[1].mod_start):0)
          != 0 ) panic("Could not set up DOM0 guest OS\n");
-
-    release_bytes_to_allocator(__pa(&_end), mod[0].mod_end);
 
     update_dom_time(new_dom->shared_info);
     wake_up(new_dom);
