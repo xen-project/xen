@@ -474,7 +474,10 @@ int main(int argc, char **argv)
     if(launch_domain(meminfo) != 0)
 	ret = -1;
 
-    free(meminfo);
+    
 out:
-    return ret;
+    if( ret >= 0 )
+       return meminfo->domain;
+    else 
+       return ret;
 }
