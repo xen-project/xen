@@ -125,6 +125,7 @@ ln -sf ../asm-i386/math_emu.h
 ln -sf ../asm-i386/mc146818rtc.h
 ln -sf ../asm-i386/mca_dma.h 
 ln -sf ../asm-i386/mman.h 
+ln -sf ../asm-i386/mmu.h 
 ln -sf ../asm-i386/mmx.h 
 ln -sf ../asm-i386/module.h 
 ln -sf ../asm-i386/mpspec.h 

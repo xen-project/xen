@@ -16,7 +16,7 @@ public class CommandVbdList extends Command {
         String line;
 
         try {
-            in = new BufferedReader(new FileReader("/proc/xeno/dom0/vhd"));
+            in = new BufferedReader(new FileReader("/proc/xeno/vhd"));
             line = in.readLine();
             while (line != null) {
                 int domain = -1;

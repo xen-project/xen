@@ -1,6 +1,9 @@
 #ifndef _ASM_SEGMENT_H
 #define _ASM_SEGMENT_H
 
+#ifndef __ASSEMBLY__
+#include <linux/types.h>
+#endif
 #include <asm/hypervisor-ifs/hypervisor-if.h>
 
 #define __KERNEL_CS	FLAT_RING1_CS

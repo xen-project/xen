@@ -104,4 +104,7 @@ extern struct gendisk *xlscsi_gendisk;
 extern int  xlsegment_hwsect(int minor); 
 extern struct gendisk *xlsegment_gendisk;
 
+extern unsigned short xldev_to_physdev(kdev_t xldev);
+extern kdev_t physdev_to_xldev(unsigned short physdev);
+
 #endif /* __XL_BLOCK_H__ */

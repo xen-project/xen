@@ -8,7 +8,6 @@
  * Copyright (c) 2002-2003, A K Warfield and K A Fraser
  */
 
-#include <hypervisor-ifs/network.h>
 #include <xeno/sched.h>
 #include <xeno/errno.h>
 #include <xeno/init.h>
@@ -20,6 +19,7 @@
 #include <xeno/in.h>
 #include <asm/domain_page.h>
 #include <asm/io.h>
+#include <hypervisor-ifs/network.h>
 
 net_rule_ent_t *net_rule_list;                      /* global list of rules */
 kmem_cache_t *net_vif_cache;                        
@@ -222,7 +222,7 @@ int vif_query(vif_query_t *vq)
     if ( !(p = find_domain_by_id(vq->domain)) ) {
         buf[0] = -1;
         copy_to_user(vq->buf, buf, sizeof(int));
-        return -ENOSYS;
+        return -ESRCH;
     }
 
     for ( i = 0; i < MAX_DOMAIN_VIFS; i++ )
@@ -524,12 +524,13 @@ long do_network_op(network_op_t *u_network_op)
 {
     long ret=0;
     network_op_t op;
-    
+
     if ( current->domain != 0 )
         return -EPERM;
 
     if ( copy_from_user(&op, u_network_op, sizeof(op)) )
         return -EFAULT;
+
     switch ( op.cmd )
     {
 
@@ -566,6 +567,7 @@ long do_network_op(network_op_t *u_network_op)
     {
         ret = vif_query(&op.u.vif_query);
     }
+    break;
     
     default:
         ret = -ENOSYS;

@@ -8,6 +8,11 @@ CONFIG_ISA=y
 CONFIG_UID16=y
 
 #
+# Privileged guest OS
+#
+CONFIG_XENO_PRIV=y
+
+#
 # Code maturity level options
 #
 # CONFIG_EXPERIMENTAL is not set

@@ -197,9 +197,7 @@ void cmain (unsigned long magic, multiboot_info_t *mbi)
     start_of_day();
 
     /* Create initial domain 0. */
-    dom0_params.num_vifs  = 1;
     dom0_params.memory_kb = opt_dom0_mem;
-
     new_dom = do_newdomain(0, 0);
     if ( new_dom == NULL ) panic("Error creating domain 0\n");
 
@@ -209,7 +207,7 @@ void cmain (unsigned long magic, multiboot_info_t *mbi)
      * present, is an initrd ramdisk
      */
     if ( setup_guestos(new_dom, 
-                       &dom0_params, 
+                       &dom0_params, 1,
                        (char *)MAX_DIRECTMAP_ADDRESS, 
                        mod[mbi->mods_count-1].mod_end - mod[0].mod_start,
                        __va(mod[0].string),

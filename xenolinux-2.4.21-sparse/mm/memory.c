@@ -318,6 +318,13 @@ static inline int zap_pte_range(mmu_gather_t *tlb, pmd_t * pmd, unsigned long ad
 			continue;
 		if (pte_present(pte)) {
 			struct page *page = pte_page(pte);
+#if defined(CONFIG_XENO_PRIV)
+			if (pte_io(pte)) {
+				queue_l1_entry_update(
+					__pa(ptep)|PGREQ_UNCHECKED_UPDATE, 0);
+				continue;
+			}
+#endif
 			if (VALID_PAGE(page) && !PageReserved(page))
 				freed ++;
 			/* This will eventually call __free_pte on the pte. */
@@ -1373,6 +1380,15 @@ int handle_mm_fault(struct mm_struct *mm, struct vm_area_struct * vma,
 {
 	pgd_t *pgd;
 	pmd_t *pmd;
+
+#if defined(CONFIG_XENO_PRIV)
+	/* Take care of I/O mappings right here. */
+	if (vma->vm_flags & VM_IO) {
+		if (write_access && !(vma->vm_flags & VM_WRITE))
+			return -1;
+		return 1;
+	}
+#endif
 
 	current->state = TASK_RUNNING;
 	pgd = pgd_offset(mm, address);

@@ -146,9 +146,6 @@ long do_dom0_op(dom0_op_t *u_dom0_op)
         ret = p->domain;
         
         op.u.newdomain.domain = ret;
-        op.u.newdomain.pg_head = 
-            list_entry(p->pg_head.next, struct pfn_info, list) -
-            frame_table;
         copy_to_user(u_dom0_op, &op, sizeof(op));
 
     exit_create:
@@ -189,16 +186,38 @@ long do_dom0_op(dom0_op_t *u_dom0_op)
     case DOM0_GETMEMLIST:
     {
         int i;
-        unsigned long pfn = op.u.getmemlist.start_pfn;
+        struct task_struct * p = find_domain_by_id(op.u.getmemlist.domain);
+        unsigned long max_pfns = op.u.getmemlist.max_pfns;
+        unsigned long pfn;
         unsigned long *buffer = op.u.getmemlist.buffer;
         struct list_head *list_ent;
 
-        for ( i = 0; i < op.u.getmemlist.num_pfns; i++ )
+        ret = -EINVAL;
+        if ( p != NULL )
         {
-            /* XXX We trust DOM0 to give us a safe buffer. XXX */
-            *buffer++ = pfn;
-            list_ent = frame_table[pfn].list.next;
+            list_ent = p->pg_head.next;
             pfn = list_entry(list_ent, struct pfn_info, list) - frame_table;
+            
+            for ( i = 0; (i < max_pfns) && (list_ent != &p->pg_head); i++ )
+            {
+                if ( put_user(pfn, buffer) )
+                {
+                    ret = -EFAULT;
+                    goto out_getmemlist;
+                }
+                buffer++;
+                list_ent = frame_table[pfn].list.next;
+                pfn = list_entry(list_ent, struct pfn_info, list) - 
+                    frame_table;
+            }
+
+            op.u.getmemlist.num_pfns = i;
+            copy_to_user(u_dom0_op, &op, sizeof(op));
+
+            ret = 0;
+
+        out_getmemlist:
+            put_task_struct(p);
         }
     }
     break;
@@ -227,9 +246,6 @@ long do_dom0_op(dom0_op_t *u_dom0_op)
             op.u.getdominfo.state       = p->state;
             op.u.getdominfo.hyp_events  = p->hyp_events;
             op.u.getdominfo.mcu_advance = p->mcu_advance;
-            op.u.getdominfo.pg_head     = 
-                list_entry(p->pg_head.next, struct pfn_info, list) -
-                frame_table;
             op.u.getdominfo.tot_pages   = p->tot_pages;
             op.u.getdominfo.cpu_time    = p->cpu_time;
         }

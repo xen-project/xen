@@ -1,50 +1,43 @@
-#define _GNU_SOURCE
-#include <unistd.h>
-#include <stdio.h>
-#include <errno.h>
-#include <sys/fcntl.h>
-#include <string.h>
-#include <stdlib.h>
 
-#include "hypervisor-ifs/block.h"
+#define _GNU_SOURCE
+#include "dom0_defs.h"
 
 int main(int argc, char *argv[])
 {
-    xp_disk_t buf;
-    int fd;
-    char *strbuf;
+    privcmd_blkmsg_t blkmsg;
+    xp_disk_t        xpd;
 
-    if (argc != 7) {
-	fprintf(stderr,
-		"Usage: xi_physdev_grant <r/rw> <domain> <device> <start sector> <n_sectors> <partition>\n");
+    if ( argc != 7 )
+    {
+	fprintf(stderr, "Usage: xi_physdev_grant <r/rw> <domain> "
+                "<device> <start sector> <n_sectors> <partition>\n");
 	return 1;
     }
 
-    buf.mode = 0;
-    if (argv[1][0] == 'r')
-	buf.mode |= 1;
-    else if (argv[1][0] == 'w')
-	buf.mode |= 2;
-    if (argv[1][1] == 'r')
-	buf.mode |= 1;
-    else if (argv[1][1] == 'w')
-	buf.mode |= 2;
+    xpd.mode = 0;
+    if ( strchr(argv[1], 'r') )
+	xpd.mode |= PHYSDISK_MODE_R;
+    if ( strchr(argv[1], 'w') )
+        xpd.mode |= PHYSDISK_MODE_W;
 
-    buf.device = atol(argv[3]);
-    buf.start_sect = atol(argv[4]);
-    buf.n_sectors = atol(argv[5]);
-    buf.partition = atol(argv[6]);
+    xpd.domain     = atol(argv[2]);
+    xpd.device     = xldev_to_physdev(atol(argv[3]));
+    xpd.start_sect = atol(argv[4]);
+    xpd.n_sectors  = atol(argv[5]);
+    xpd.partition  = atol(argv[6]);
 
-    asprintf(&strbuf, "/proc/xeno/dom%s/phd", argv[2]);
-    fd = open(strbuf, O_WRONLY);
-    if (fd < 0) {
-	fprintf(stderr, "Can\'t open %s: %s.\n", strbuf, strerror(errno));
-	return 1;
+    if ( xpd.device == 0 )
+    {
+        ERROR("Unrecognised device");
+        return 1;
     }
-    free(strbuf);
 
-    write(fd, &buf, sizeof(buf));
-    close(fd);
+    blkmsg.op       = XEN_BLOCK_PHYSDEV_GRANT;
+    blkmsg.buf      = &xpd;
+    blkmsg.buf_size = sizeof(xpd);
+
+    if ( do_xen_blkmsg(&blkmsg) < 0 )
+        return 1;
 
     return 0;
 }

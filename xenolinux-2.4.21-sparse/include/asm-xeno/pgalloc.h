@@ -265,4 +265,10 @@ static inline void flush_tlb_pgtables(struct mm_struct *mm,
     XENO_flush_page_update_queue();
 }
 
+extern int direct_remap_area_pages(struct mm_struct *mm,
+                                   unsigned long address, 
+                                   unsigned long machine_addr,
+                                   unsigned long size, 
+                                   pgprot_t prot);
+
 #endif /* _I386_PGALLOC_H */

@@ -293,6 +293,13 @@ unsigned long do_mremap(unsigned long addr,
 	    !vm_enough_memory((new_len - old_len) >> PAGE_SHIFT))
 		goto out;
 
+#if defined(CONFIG_XENO_PRIV)
+	/* mremap() unsupported for I/O mappings in Xenolinux. */
+	ret = -EINVAL;
+	if (vma->vm_flags & VM_IO)
+		goto out;
+#endif
+
 	/* old_len exactly to the end of the area..
 	 * And we're not relocating the area.
 	 */

@@ -53,12 +53,12 @@ public class CommandVbdCreate extends Command {
         String command = vd.dumpForXen(vbd);
 
         try {
-            FileWriter fw = new FileWriter("/proc/xeno/dom0/vhd");
+            FileWriter fw = new FileWriter("/proc/xeno/vhd");
             fw.write(command);
             fw.flush();
             fw.close();
         } catch (IOException e) {
-            throw new CommandFailedException("Could not write VBD details to /proc/xeno/dom0/vhd", e);
+            throw new CommandFailedException("Could not write VBD details to /proc/xeno/vhd", e);
         }
 
         return "Created virtual block device "
