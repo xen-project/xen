@@ -43,6 +43,7 @@ PERFCOUNTER_CPU(shadow_status_miss,     "missed shadow cache" )
 PERFCOUNTER_CPU(shadow_status_hit_head, "hits on head of bucket" )
 PERFCOUNTER_CPU(check_pagetable,        "calls to check_pagetable" )
 PERFCOUNTER_CPU(check_all_pagetables,   "calls to check_all_pagetables" )
+PERFCOUNTER_CPU(shadow_get_page_fail,   "shadow_get_page_from_l1e fails" )
 
 PERFCOUNTER_CPU(shadow_sync_all,                   "calls to shadow_sync_all")
 PERFCOUNTER_CPU(shadow_make_snapshot,              "snapshots created")

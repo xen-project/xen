@@ -1858,8 +1858,6 @@ int do_mmu_update(
                 break;
 #endif /* __x86_64__ */
             default:
-                printk("do_mmu_update writable update: ma=%p val=%p\n",
-                       req.ptr, req.val);
                 if ( likely(get_page_type(page, PGT_writable_page)) )
                 {
                     if ( shadow_mode_enabled(d) )

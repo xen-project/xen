@@ -215,6 +215,30 @@ extern int shadow_status_noswap;
 
 /************************************************************************/
 
+static inline int
+shadow_get_page_from_l1e(l1_pgentry_t l1e, struct domain *d)
+{
+    int res = get_page_from_l1e(l1e, d);
+    struct domain *owner;
+
+    if ( unlikely(!res) && IS_PRIV(d) && !shadow_mode_translate(d) &&
+         (owner = page_get_owner(pfn_to_page(l1_pgentry_to_pfn(l1e)))) &&
+         (d != owner) )
+    {
+        res = get_page_from_l1e(l1e, owner);
+        printk("tried to map page from domain %d into shadow page tables "
+               "of domain %d; %s\n",
+               owner->id, d->id, res ? "success" : "failed");
+    }
+
+    if ( unlikely(!res) )
+        perfc_incrc(shadow_get_page_fail);
+
+    return res;
+}
+
+/************************************************************************/
+
 static inline void
 __shadow_get_l2e(
     struct exec_domain *ed, unsigned long va, unsigned long *psl2e)
@@ -257,7 +281,7 @@ __guest_set_l2e(
         if ( (old_hl2e ^ new_hl2e) & (PAGE_MASK | _PAGE_PRESENT) )
         {
             if ( new_hl2e & _PAGE_PRESENT )
-                get_page_from_l1e(mk_l1_pgentry(new_hl2e), ed->domain);
+                shadow_get_page_from_l1e(mk_l1_pgentry(new_hl2e), ed->domain);
             if ( old_hl2e & _PAGE_PRESENT )
                 put_page_from_l1e(mk_l1_pgentry(old_hl2e), ed->domain);
         }
@@ -574,7 +598,7 @@ validate_pte_change(
     if ( (old_spte ^ new_spte) & (PAGE_MASK | _PAGE_RW | _PAGE_PRESENT) )
     {
         if ( new_spte & _PAGE_PRESENT )
-            get_page_from_l1e(mk_l1_pgentry(new_spte), d);
+            shadow_get_page_from_l1e(mk_l1_pgentry(new_spte), d);
         if ( old_spte & _PAGE_PRESENT )
             put_page_from_l1e(mk_l1_pgentry(old_spte), d);
     }
@@ -1081,7 +1105,7 @@ shadow_set_l1e(unsigned long va, unsigned long new_spte, int create_l1_shadow)
     if ( (old_spte ^ new_spte) & (PAGE_MASK | _PAGE_RW | _PAGE_PRESENT) )
     {
         if ( new_spte & _PAGE_PRESENT )
-            get_page_from_l1e(mk_l1_pgentry(new_spte), d);
+            shadow_get_page_from_l1e(mk_l1_pgentry(new_spte), d);
         if ( old_spte & _PAGE_PRESENT )
             put_page_from_l1e(mk_l1_pgentry(old_spte), d);
     }
