@@ -27,7 +27,7 @@
 
 #include <asm-xen/proc_cmd.h>
 
-#define XENPKG "xen.ext.xu"
+#define XENPKG "xen.lowlevel.xu"
 
 /* Needed for Python versions earlier than 2.3. */
 #ifndef PyMODINIT_FUNC

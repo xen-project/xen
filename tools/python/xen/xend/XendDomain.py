@@ -8,7 +8,7 @@ import sys
 
 from twisted.internet import defer
 
-import xen.ext.xc; xc = xen.ext.xc.new()
+import xen.lowlevel.xc; xc = xen.lowlevel.xc.new()
 
 import sxp
 import XendRoot
@@ -36,7 +36,6 @@ class XendDomain:
         self.xconsole = XendConsole.instance()
         # Table of domain info indexed by domain id.
         self.db = XendDB.XendDB(self.dbpath)
-        #self.domain = {}
         self.domain_db = self.db.fetchall("")
         if xroot.get_rebooted():
             print 'XendDomain> rebooted: removing all domain info'
@@ -45,6 +44,8 @@ class XendDomain:
         self.initial_refresh()
 
     def onVirq(self, event, val):
+        """Event handler for virq.
+        """
         print 'XendDomain> virq', val
         self.reap()
 
@@ -102,28 +103,12 @@ class XendDomain:
 
     def _new_domain(self, savedinfo, info):
         """Create a domain entry from saved info.
+
+        savedinfo saved info from the db
+        info      domain info from xen
+
+        returns deferred
         """
-##         console = None
-##         kernel = None
-##         id = sxp.child_value(info, 'id')
-##         dom = int(id)
-##         name = sxp.child_value(info, 'name')
-##         memory = int(sxp.child_value(info, 'memory'))
-##         consoleinfo = sxp.child(info, 'console')
-##         if consoleinfo:
-##             consoleid = sxp.child_value(consoleinfo, 'id')
-##             console = self.xconsole.console_get(consoleid)
-##         if dom and console is None:
-##             # Try to connect a console.
-##             console = self.xconsole.console_create(dom)
-##         config = sxp.child(info, 'config')
-##         if config:
-##             image = sxp.child(info, 'image')
-##             if image:
-##                 image = sxp.child0(image)
-##                 kernel = sxp.child_value(image, 'kernel')
-##         dominfo = XendDomainInfo.XendDomainInfo(
-##             config, dom, name, memory, kernel, console)
         config = sxp.child_value(savedinfo, 'config')
         deferred = XendDomainInfo.vm_recreate(config, info)
         def fn(dominfo):
@@ -132,12 +117,23 @@ class XendDomain:
         return deferred
 
     def _add_domain(self, id, info, notify=1):
+        """Add a domain entry to the tables.
+
+        id     domain id
+        info   domain info object
+        notify send a domain created event if true
+        """
         self.domain[id] = info
         self.domain_db[id] = info.sxpr()
         self.sync_domain(id)
         if notify: eserver.inject('xend.domain.created', id)
 
     def _delete_domain(self, id, notify=1):
+        """Remove a domain from the tables.
+
+        id     domain id
+        notify send a domain died event if true
+        """
         if id in self.domain:
             if notify: eserver.inject('xend.domain.died', id)
             del self.domain[id]
@@ -146,14 +142,13 @@ class XendDomain:
             self.db.delete(id)
 
     def reap(self):
-        """Go through the domains looking for ones that have crashed or stopped.
+        """Look for domains that have crashed or stopped.
         Tidy them up.
         """
         print 'XendDomain>reap>'
         domlist = xc.domain_getinfo()
         casualties = []
         for d in domlist:
-            #print 'dom', d
             dead = 0
             dead = dead or (d['crashed'] or d['shutdown'])
             dead = dead or (d['dying'] and
@@ -163,9 +158,6 @@ class XendDomain:
         for d in casualties:
             id = str(d['dom'])
             print 'XendDomain>reap> died id=', id, d
-            dominfo = self.domain.get(id)
-            if not dominfo: continue
-            dominfo.died()
             self.domain_destroy(id, refresh=0)
         print 'XendDomain>reap<'
 
@@ -181,9 +173,6 @@ class XendDomain:
             doms[id] = d
             if id not in self.domain:
                 config = None
-                #image = None
-                #newinfo = XendDomainInfo.XendDomainInfo(
-                #    config, d['dom'], d['name'], d['mem_kb']/1024, image=image, info=d)
                 deferred = XendDomainInfo.vm_recreate(config, d)
                 def fn(dominfo):
                     self._add_domain(dominfo.id, dominfo)
@@ -198,6 +187,10 @@ class XendDomain:
         self.reap()
 
     def refresh_domain(self, id):
+        """Refresh information for a single domain.
+
+        id domain id
+        """
         dom = int(id)
         dominfo = xc.domain_getinfo(dom, 1)
         if dominfo == [] or dominfo[0]['dom'] != dom:
@@ -213,17 +206,28 @@ class XendDomain:
                 d.update(dominfo[0])
 
     def domain_ls(self):
-        # List domains.
-        # Update info from kernel first.
+        """Get list of domain ids.
+
+        return domain ids
+        """
         self.refresh()
         return self.domain.keys()
 
     def domains(self):
+        """Get list of domain objects.
+
+        return domain objects
+        """
         self.refresh()
         return self.domain.values()
     
     def domain_create(self, config):
-        # Create domain, log it.
+        """Create a domain from a configuration.
+
+        config configuration
+
+        returns deferred
+        """
         deferred = XendDomainInfo.vm_create(config)
         def fn(dominfo):
             self._add_domain(dominfo.id, dominfo)
@@ -232,12 +236,19 @@ class XendDomain:
         return deferred
     
     def domain_get(self, id):
+        """Get up-to-date info about a domain.
+
+        id domain id
+        returns domain object (or None)
+        """
         id = str(id)
         self.refresh_domain(id)
         return self.domain.get(id)
     
     def domain_unpause(self, id):
-        """(Re)start domain running.
+        """Unpause domain execution.
+
+        id domain id
         """
         dom = int(id)
         eserver.inject('xend.domain.unpause', id)
@@ -245,6 +256,8 @@ class XendDomain:
     
     def domain_pause(self, id):
         """Pause domain execution.
+
+        id domain id
         """
         dom = int(id)
         eserver.inject('xend.domain.pause', id)
@@ -252,6 +265,9 @@ class XendDomain:
     
     def domain_shutdown(self, id, reason='poweroff'):
         """Shutdown domain (nicely).
+
+        id     domain id
+        reason shutdown type: poweroff, reboot, halt
         """
         dom = int(id)
         if dom <= 0:
@@ -263,23 +279,37 @@ class XendDomain:
     
     def domain_destroy(self, id, refresh=1):
         """Terminate domain immediately.
+
+        id domain id
+        refresh send a domain destroy event if true
         """
         dom = int(id)
         if dom <= 0:
             return 0
         eserver.inject('xend.domain.destroy', id)
-        val = xc.domain_destroy(dom=dom)
+        dominfo = self.domain.get(id)
+        if dominfo:
+            val = dominfo.destroy()
+        else:
+            val = xc.domain_destroy(dom=dom)
         if refresh: self.refresh()
         return val       
 
     def domain_migrate(self, id, dst):
         """Start domain migration.
+
+        id domain id
         """
         # Need a cancel too?
         pass
 
     def domain_save(self, id, dst, progress=0):
-        """Save domain state to file, destroy domain.
+        """Save domain state to file, destroy domain on success.
+        Leave domain running on error.
+
+        id       domain id
+        dst      destination file
+        progress output progress if true
         """
         dom = int(id)
         dominfo = self.domain_get(id)
@@ -288,79 +318,140 @@ class XendDomain:
         vmconfig = sxp.to_string(dominfo.sxpr())
         self.domain_pause(id)
         eserver.inject('xend.domain.save', id)
-        rc = xc.linux_save(dom=dom, state_file=dst, vmconfig=vmconfig, progress=progress)
+        try:
+            rc = xc.linux_save(dom=dom, state_file=dst,
+                               vmconfig=vmconfig, progress=progress)
+        except:
+            rc = -1
         if rc == 0:
             self.domain_destroy(id)
+        else:
+            self.domain_unpause(id)
         return rc
     
     def domain_restore(self, src, progress=0):
         """Restore domain from file.
+
+        src      source file
+        progress output progress if true
+
+        returns domain object
         """
         dominfo = XendDomainInfo.vm_restore(src, progress=progress)
         self._add_domain(dominfo.id, dominfo)
         return dominfo
     
-    #============================================================================
-    # Backward compatibility stuff from here on.
-
     def domain_pincpu(self, dom, cpu):
+        """Pin a domain to a cpu.
+
+        dom domain
+        cpu cpu number
+        """
         dom = int(dom)
         return xc.domain_pincpu(dom, cpu)
 
     def domain_cpu_bvt_set(self, dom, mcuadv, warp, warpl, warpu):
+        """Set BVT (Borrowed Virtual Time) scheduler parameters for a domain.
+        """
         dom = int(dom)
         return xc.bvtsched_domain_set(dom=dom, mcuadv=mcuadv,
                                       warp=warp, warpl=warpl, warpu=warpu)
 
     def domain_cpu_bvt_get(self, dom):
+        """Get BVT (Borrowed Virtual Time) scheduler parameters for a domain.
+        """
         dom = int(dom)
         return xc.bvtsched_domain_get(dom)
     
     def domain_cpu_atropos_set(self, dom, period, slice, latency, xtratime):
+        """Set Atropos scheduler parameters for a domain.
+        """
         dom = int(dom)
         return xc.atropos_domain_set(dom, period, slice, latency, xtratime)
 
     def domain_cpu_atropos_get(self, dom):
+        """Get Atropos scheduler parameters for a domain.
+        """
         dom = int(dom)
         return xc.atropos_domain_get(dom)
 
-    def domain_vif_ls(self, dom):
+    def domain_devtype_ls(self, dom, type):
+        """Get list of device indexes for a domain.
+
+        dom  domain
+        type device type
+
+        returns device indexes
+        """
         dominfo = self.domain_get(dom)
         if not dominfo: return None
-        devs = dominfo.get_devices('vif')
+        devs = dominfo.get_devices(type)
         return range(0, len(devs))
 
-    def domain_vif_get(self, dom, vif):
+    def domain_devtype_get(self, dom, type, idx):
+        """Get a device from a domain.
+
+        dom  domain
+        type device type
+        idx  device index
+
+        returns device object (or None)
+        """
         dominfo = self.domain_get(dom)
         if not dominfo: return None
-        return dominfo.get_device_by_index(vif)
+        return dominfo.get_device_by_index(type, idx)
 
-##     def domain_vif_ip_add(self, dom, vif, ip):
-##         dom = int(dom)
-##         return xenctl.ip.setup_vfr_rules_for_vif(dom, vif, ip)
+    def domain_vif_ls(self, dom):
+        """Get list of virtual network interface (vif) indexes for a domain.
+
+        dom domain
+
+        returns vif indexes
+        """
+        return self.domain_devtype_ls(dom, 'vif')
+
+    def domain_vif_get(self, dom, vif):
+        """Get a virtual network interface (vif) from a domain.
+
+        dom domain
+        vif vif index
+
+        returns vif device object (or None)
+        """
+        return self.domain_devtype_get(dom, 'vif', vif)
 
     def domain_vbd_ls(self, dom):
-        dominfo = self.domain_get(dom)
-        if not dominfo: return []
-        devs = dominfo.get_devices('vbd')
-        return [ sxp.child_value(v, 'dev') for v in devs ]
+        """Get list of virtual block device (vbd) indexes for a domain.
+
+        dom domain
+
+        returns vbd indexes
+        """
+        return self.domain_devtype_ls(dom, 'vbd')
 
     def domain_vbd_get(self, dom, vbd):
-        dominfo = self.domain_get(dom)
-        if not dominfo: return None
-        devs = dominfo.get_devices('vbd')
-        for v in devs:
-            if sxp.child_value(v, 'dev') == vbd:
-                return v
-        return None
+        """Get a virtual block device (vbd) from a domain.
+
+        dom domain
+        vbd vbd index
+
+        returns vbd device (or None)
+        """
+        return self.domain_devtype_get(dom, 'vbd', vbd)
 
     def domain_shadow_control(self, dom, op):
+        """Shadow page control.
+
+        dom domain
+        op  operation
+        """
         dom = int(dom)
         return xc.shadow_control(dom, op)
 
-    #============================================================================
 
 def instance():
+    """Singleton constructor. Use this instead of the class constructor.
+    """
     global inst
     try:
         inst

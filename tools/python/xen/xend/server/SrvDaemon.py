@@ -23,7 +23,7 @@ from twisted.internet import protocol
 from twisted.internet import abstract
 from twisted.internet import defer
 
-from xen.ext import xu
+from xen.lowlevel import xu
 
 from xen.xend import sxp
 from xen.xend import PrettyPrint

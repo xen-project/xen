@@ -8,7 +8,7 @@ extra_compile_args  = [ "-fno-strict-aliasing", "-Wall", "-Werror" ]
 
 include_dirs = [ XEN_ROOT + "/xen/include/hypervisor-ifs",
                  XEN_ROOT + "/linux-xen-sparse/include",
-                 XEN_ROOT + "/tools/python/xen/ext/xu",
+                 XEN_ROOT + "/tools/python/xen/lowlevel/xu",
                  XEN_ROOT + "/tools/libxc",
                  XEN_ROOT + "/tools/libxutil",
                  ]
@@ -21,28 +21,28 @@ libraries = [ "xc", "xutil" ]
 
 xc = Extension("xc",
                extra_compile_args = extra_compile_args,
-               include_dirs       = include_dirs + [ "xen/ext/xc" ],
+               include_dirs       = include_dirs + [ "xen/lowlevel/xc" ],
                library_dirs       = library_dirs,
                libraries          = libraries,
-               sources            = [ "xen/ext/xc/xc.c" ])
+               sources            = [ "xen/lowlevel/xc/xc.c" ])
 
 xu = Extension("xu",
                extra_compile_args = extra_compile_args,
-               include_dirs       = include_dirs + [ "xen/ext/xu" ],
+               include_dirs       = include_dirs + [ "xen/lowlevel/xu" ],
                library_dirs       = library_dirs,
                libraries          = libraries,
-               sources            = [ "xen/ext/xu/xu.c" ])
+               sources            = [ "xen/lowlevel/xu/xu.c" ])
                
 setup(name            = 'xen',
       version         = '2.0',
       description     = 'Xen',
       packages        = ['xen',
-                         'xen.ext',
+                         'xen.lowlevel',
                          'xen.util',
                          'xen.xend',
                          'xen.xend.server',
                          'xen.xm',
                          ],
-      ext_package = "xen.ext",
+      ext_package = "xen.lowlevel",
       ext_modules = [ xc, xu ]
       )

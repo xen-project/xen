@@ -1,8 +1,8 @@
 # Copyright (C) 2004 Mike Wray <mike.wray@hp.com>
 
 import socket
-import xen.ext.xc
-xc = xen.ext.xc.new()
+import xen.lowlevel.xc
+xc = xen.lowlevel.xc.new()
 
 import sxp
 import XendRoot

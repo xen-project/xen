@@ -22,7 +22,7 @@
 #define PyMODINIT_FUNC DL_EXPORT(void)
 #endif
 
-#define XENPKG "xen.ext.xc"
+#define XENPKG "xen.lowlevel.xc"
 
 static PyObject *xc_error, *zero;
 

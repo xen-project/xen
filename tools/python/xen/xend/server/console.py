@@ -3,7 +3,7 @@ from twisted.internet import reactor
 from twisted.internet import protocol
 from twisted.protocols import telnet
 
-from xen.ext import xu
+from xen.lowlevel import xu
 
 from xen.xend import EventServer
 eserver = EventServer.instance()

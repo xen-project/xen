@@ -1,5 +1,5 @@
-import xen.ext.xc; xc = xen.ext.xc.new()
-from xen.ext import xu
+import xen.lowlevel.xc; xc = xen.lowlevel.xc.new()
+from xen.lowlevel import xu
 from messages import msgTypeName
 
 VIRQ_MISDIRECT  = 0  # Catch-all interrupt for unbound VIRQs.

@@ -1,4 +1,3 @@
-#!/usr/bin/python
 # Copyright (C) 2004 Mike Wray <mike.wray@hp.com>
 
 """Representation of a single domain.
@@ -16,7 +15,7 @@ import os
 
 from twisted.internet import defer
 
-import xen.ext.xc; xc = xen.ext.xc.new()
+import xen.lowlevel.xc; xc = xen.lowlevel.xc.new()
 import xen.util.ip
 
 import sxp
@@ -333,6 +332,9 @@ def _vm_configure2(val, vm):
 class XendDomainInfo:
     """Virtual machine object."""
 
+    STATE_OK = "ok"
+    STATE_TERMINATED = "terminated"
+
     def __init__(self):
         self.recreate = 0
         self.config = None
@@ -351,7 +353,7 @@ class XendDomainInfo:
         self.blkif_backend = 0
         self.netif_backend = 0
         #todo: state: running, suspended
-        self.state = 'running'
+        self.state = self.STATE_OK
         #todo: set to migrate info if migrating
         self.migrate = None
 
@@ -490,21 +492,42 @@ class XendDomainInfo:
         self.configs.append(val)
 
     def destroy(self):
-        if self.dom <= 0:
-            return 0
+        """Completely destroy the vm.
+        """
+        self.cleanup()
+        return self.destroy_domain()
+
+    def destroy_domain(self):
+        """Destroy the vm's domain.
+        The domain will not finally go away unless all vm
+        devices have been released.
+        """
+        if self.dom is None: return 0
         return xc.domain_destroy(dom=self.dom)
 
-    def died(self):
-        print 'died>', self.dom
+    def cleanup(self):
+        """Cleanup vm resources: release devices.
+        """
+        print 'cleanup>', self.dom
+        self.state = self.STATE_TERMINATED
         self.release_devices()
 
+    def is_terminated(self):
+        """Check if a domain has been terminated.
+        """
+        return self.state == self.STATE_TERMINATED
+
     def release_devices(self):
+        """Release all vm devices.
+        """
         print 'release_devices>', self.dom
         self.release_vifs()
         self.release_vbds()
         self.devices = {}
 
     def release_vifs(self):
+        """Release vm virtual network devices (vifs).
+        """
         print 'release_vifs>', self.dom
         if self.dom is None: return
         ctrl = xend.netif_get(self.dom)
@@ -512,6 +535,8 @@ class XendDomainInfo:
             ctrl.destroy()
 
     def release_vbds(self):
+        """Release vm virtual block devices (vbds).
+        """
         print 'release_vbds>', self.dom
         if self.dom is None: return
         ctrl = xend.blkif_get(self.dom)

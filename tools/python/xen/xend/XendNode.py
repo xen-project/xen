@@ -8,12 +8,12 @@
 """
 
 import os
-import xen.ext.xc
+import xen.lowlevel.xc
 
 class XendNode:
 
     def __init__(self):
-        self.xc = xen.ext.xc.new()
+        self.xc = xen.lowlevel.xc.new()
 
     def shutdown(self):
         return 0

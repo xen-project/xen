@@ -1,6 +1,6 @@
 import struct
 
-from xen.ext import xu
+from xen.lowlevel import xu
 
 DEBUG = 0
 
