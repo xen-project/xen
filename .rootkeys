@@ -168,6 +168,7 @@
 40faa751_zbZlAmLyQgCXdYekVFdWA linux-2.6.7-xen-sparse/arch/xen/i386/kernel/ioport.c
 40f562382aC3_Gt4RG-4ZsfvDRUg3Q linux-2.6.7-xen-sparse/arch/xen/i386/kernel/irq.c
 40f56238ue3YRsK52HG7iccNzP1AwQ linux-2.6.7-xen-sparse/arch/xen/i386/kernel/ldt.c
+4107adf1cNtsuOxOB4T6paAoY2R2PA linux-2.6.7-xen-sparse/arch/xen/i386/kernel/pci-dma.c
 40f56238a8iOVDEoostsbun_sy2i4g linux-2.6.7-xen-sparse/arch/xen/i386/kernel/process.c
 40f56238YQIJoYG2ehDGEcdTgLmGbg linux-2.6.7-xen-sparse/arch/xen/i386/kernel/setup.c
 40f56238nWMQg7CKbyTy0KJNvCzbtg linux-2.6.7-xen-sparse/arch/xen/i386/kernel/signal.c
@@ -185,6 +186,9 @@
 40f56239xcNylAxuGsQHwi1AyMLV8w linux-2.6.7-xen-sparse/arch/xen/i386/mm/init.c
 41062ab7CjxC1UBaFhOMWWdhHkIUyg linux-2.6.7-xen-sparse/arch/xen/i386/mm/ioremap.c
 40f5623906UYHv1rsVUeRc0tFT0dWw linux-2.6.7-xen-sparse/arch/xen/i386/mm/pgtable.c
+4107adf12ndy94MidCaivDibJ3pPAg linux-2.6.7-xen-sparse/arch/xen/i386/pci/Makefile
+4107adf1WcCgkhsdLTRGX52cOG1vJg linux-2.6.7-xen-sparse/arch/xen/i386/pci/direct.c
+4107adf1s5u6249DNPUViX1YNagbUQ linux-2.6.7-xen-sparse/arch/xen/i386/pci/irq.c
 40f56239zOksGg_H4XD4ye6iZNtoZA linux-2.6.7-xen-sparse/arch/xen/kernel/Makefile
 40f56239bvOjuuuViZ0XMlNiREFC0A linux-2.6.7-xen-sparse/arch/xen/kernel/ctrl_if.c
 40f56239pYRq5yshPTkv3ujXKc8K6g linux-2.6.7-xen-sparse/arch/xen/kernel/empty.c
@@ -204,6 +208,7 @@
 40f56239Wd4k_ycG_mFsSO1r5xKdtQ linux-2.6.7-xen-sparse/drivers/xen/net/Makefile
 405853f6nbeazrNyEWNHBuoSg2PiPA linux-2.6.7-xen-sparse/drivers/xen/net/network.c
 40f56239YAjS52QG2FIAQpHDZAdGHg linux-2.6.7-xen-sparse/include/asm-xen/asm-i386/desc.h
+4107adf1E5O4ztGHNGMzCCNhcvqNow linux-2.6.7-xen-sparse/include/asm-xen/asm-i386/dma-mapping.h
 40f5623anSzpuEHgiNmQ56fIRfCoaQ linux-2.6.7-xen-sparse/include/asm-xen/asm-i386/e820.h
 40f5623akIoBsQ3KxSB2kufkbgONXQ linux-2.6.7-xen-sparse/include/asm-xen/asm-i386/fixmap.h
 40f5623aGPlsm0u1LTO-NVZ6AGzNRQ linux-2.6.7-xen-sparse/include/asm-xen/asm-i386/hypervisor.h

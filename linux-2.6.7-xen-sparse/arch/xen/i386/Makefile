@@ -72,13 +72,13 @@ core-y					+= arch/xen/i386/kernel/ \
 # \
 #					   arch/xen/$(mcore-y)/
 drivers-$(CONFIG_MATH_EMULATION)	+= arch/i386/math-emu/
-drivers-$(CONFIG_PCI)			+= arch/i386/pci/
+drivers-$(CONFIG_PCI)			+= arch/xen/i386/pci/
 # must be linked after kernel/
 drivers-$(CONFIG_OPROFILE)		+= arch/i386/oprofile/
 drivers-$(CONFIG_PM)			+= arch/i386/power/
 
 # for clean
-obj-	+= kernel/
+obj-	+= kernel/ mm/ pci/
 #obj-	+= ../../i386/lib/ ../../i386/mm/ 
 #../../i386/$(mcore-y)/
 #obj-	+= ../../i386/pci/ ../../i386/oprofile/ ../../i386/power/
