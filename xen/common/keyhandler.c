@@ -42,13 +42,6 @@ key_handler *get_key_handler(u_char key)
     return key_table[key].handler; 
 }
 
-static void serial_rx(unsigned char c, struct pt_regs *regs)
-{
-    key_handler *handler;
-    if ( (handler = get_key_handler(c)) != NULL )
-        (*handler)(c, NULL, regs);
-}
-
 static void show_handlers(u_char key, void *dev_id, struct pt_regs *regs) 
 {
     int i; 
@@ -160,6 +153,4 @@ void initialize_keytable(void)
     add_key_handler('m', reaudit_pages, "re-audit pages");
     add_key_handler('M', audit_all_pages, "audit all pages");
 #endif
-
-    serial_set_rx_handler(sercon_handle, serial_rx);
 }

@@ -80,22 +80,14 @@ static void nonpriv_conwrite(const char *s, unsigned int count)
 
 static void priv_conwrite(const char *s, unsigned int count)
 {
-    static char str[256];
-    static int pos = 0;
-    int len;
+    int rc;
 
-    /* We buffer output until we see a newline, or until the buffer is full. */
-    while ( count != 0 )
+    while ( count > 0 )
     {
-        len = ((sizeof(str) - pos) > count) ? count : sizeof(str) - pos;
-        memcpy(str + pos, s, len);
-        pos   += len;
-        s     += len;
-        count -= len;
-        if ( (pos == sizeof(str)) || (str[pos-1] == '\n') )
+        if ( (rc = HYPERVISOR_serial_io(SERIALIO_write, count, s)) > 0 )
         {
-            (void)HYPERVISOR_console_write(str, pos);
-            pos = 0;
+            count -= rc;
+            s += rc;
         }
     }
 }

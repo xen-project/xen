@@ -188,12 +188,12 @@ extern unsigned long mmu_cr4_features;
 
 static inline void set_in_cr4 (unsigned long mask)
 {
-    HYPERVISOR_console_write("No set_in_cr4", 13);
+    BUG();
 }
 
 static inline void clear_in_cr4 (unsigned long mask)
 {
-    HYPERVISOR_console_write("No clear_in_cr4", 15);
+    BUG();
 }
 
 /*

@@ -1,3 +1,11 @@
+/******************************************************************************
+ * keyboard.c
+ * 
+ * Driver for IBM PC AT- and PS/2-compatible keyboards.
+ * 
+ * This file contains portions of code from Linux.
+ */
+
 #include <asm-i386/io.h>
 #include <asm-i386/irq.h>
 #include <xeno/sched.h>

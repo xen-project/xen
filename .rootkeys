@@ -134,7 +134,6 @@
 3ddb79bdff-gj-jFGKjOejeHLqL8Lg xen/common/Makefile
 3e397e66AyyD5fYraAySWuwi9uqSXg xen/common/ac_timer.c
 3ddb79bdrqnW93GR9gZk1OJe1qK-iQ xen/common/brlock.c
-3fb10d07GscSWPKxBqpvNfU-dYfa0g xen/common/console.c
 4022a73c_BbDFd2YJ_NQYVvKX5Oz7w xen/common/debug-linux.c
 3fa152581E5KhrAtqZef2Sr5NKTz4w xen/common/debug.c
 3ddb79bdLX_P6iB7ILiblRLWvebapg xen/common/dom0_ops.c
@@ -175,8 +174,9 @@
 3e9c248afxxsnAzIt2na7Ej24yNFzg xen/drivers/cdrom/Makefile
 3e9c248ajUkn2W3n4vgm72Hp2ftZ8A xen/drivers/cdrom/cdrom.c
 3e4a8cb7alzQCDKS7MlioPoHBKYkdQ xen/drivers/char/Makefile
+4049e6bfNSIq7s7OV-Bd69QD0RpR2Q xen/drivers/char/console.c
+3e4a8cb7WmiYdC-ASGiCSG_CL8vsqg xen/drivers/char/keyboard.c
 3e4a8cb7nMChlro4wvOBo76n__iCFA xen/drivers/char/serial.c
-3e4a8cb7WmiYdC-ASGiCSG_CL8vsqg xen/drivers/char/xen_kbd.c
 3ddb79bdhcqD9ebrslr0O0oHqTiiXg xen/drivers/ide/Makefile
 3e9c248aCM6Lex1Am8_NJIeesN4kKg xen/drivers/ide/ide-cd.c
 3e9c248aFfSNR_hl-WQBbv-R9CTgzg xen/drivers/ide/ide-cd.h
@@ -599,7 +599,6 @@
 401c0592pLrp_aCbQRo9GXiYQQaVVA xenolinux-2.4.25-sparse/include/linux/timer.h
 3e5a4e68W_hpMlM3u_-QOKMp3gzcwQ xenolinux-2.4.25-sparse/init/do_mounts.c
 3e5a4e68TJJavrunYwTAnLRSBxSYqQ xenolinux-2.4.25-sparse/kernel/panic.c
-3f1056a9LXNTgSzITNh1mb-MIKV1Ng xenolinux-2.4.25-sparse/kernel/printk.c
 3f9d4b44247udoqWEgFkaHiWv6Uvyg xenolinux-2.4.25-sparse/kernel/time.c
 401c059bjLBFYHRD4Py2uM3eA1D4zQ xenolinux-2.4.25-sparse/kernel/timer.c
 3eba8f878XjouY21EkQBXwYBsPsipQ xenolinux-2.4.25-sparse/lndir-rel

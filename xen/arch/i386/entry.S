@@ -727,6 +727,7 @@ ENTRY(hypervisor_call_table)
         .long SYMBOL_NAME(do_set_timer_op)       /* 20 */
         .long SYMBOL_NAME(do_event_channel_op)
         .long SYMBOL_NAME(do_xen_version)
+        .long SYMBOL_NAME(do_serial_io)
         .rept NR_syscalls-((.-hypervisor_call_table)/4)
         .long SYMBOL_NAME(do_ni_syscall)
         .endr

@@ -156,7 +156,6 @@ static inline int HYPERVISOR_set_trap_table(trap_info_t *table)
     return ret;
 }
 
-
 static inline int HYPERVISOR_mmu_update(mmu_update_t *req, int count)
 {
     int ret;
@@ -171,19 +170,6 @@ static inline int HYPERVISOR_mmu_update(mmu_update_t *req, int count)
         show_trace(NULL);
         panic("Failed mmu update: %p, %d", req, count);
     }
-
-    return ret;
-}
-
-
-static inline int HYPERVISOR_console_write(const char *str, int count)
-{
-    int ret;
-    __asm__ __volatile__ (
-        TRAP_INSTR
-        : "=a" (ret) : "0" (__HYPERVISOR_console_write), 
-        "b" (str), "c" (count) : "memory" );
-
 
     return ret;
 }
@@ -450,6 +436,17 @@ static inline int HYPERVISOR_xen_version(int cmd)
         TRAP_INSTR
         : "=a" (ret) : "0" (__HYPERVISOR_xen_version), 
         "b" (cmd) : "memory" );
+
+    return ret;
+}
+
+static inline int HYPERVISOR_serial_io(int cmd, int count, char *str)
+{
+    int ret;
+    __asm__ __volatile__ (
+        TRAP_INSTR
+        : "=a" (ret) : "0" (__HYPERVISOR_serial_io),
+        "b" (cmd), "c" (count), "d" (str) : "memory" );
 
     return ret;
 }

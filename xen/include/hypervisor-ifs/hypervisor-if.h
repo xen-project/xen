@@ -42,7 +42,7 @@
 /* EAX = vector; EBX, ECX, EDX, ESI, EDI = args 1, 2, 3, 4, 5. */
 #define __HYPERVISOR_set_trap_table        0
 #define __HYPERVISOR_mmu_update            1
-#define __HYPERVISOR_console_write         2
+#define __HYPERVISOR_console_write         2 /* DEPRECATED */
 #define __HYPERVISOR_set_gdt               3
 #define __HYPERVISOR_stack_switch          4
 #define __HYPERVISOR_set_callbacks         5
@@ -63,6 +63,7 @@
 #define __HYPERVISOR_set_timer_op         20
 #define __HYPERVISOR_event_channel_op     21
 #define __HYPERVISOR_xen_version          22
+#define __HYPERVISOR_serial_io            23
 
 /* And the trap vector is... */
 #define TRAP_INSTR "int $0x82"
@@ -107,6 +108,7 @@
 #define _EVENT_STOP     6
 #define _EVENT_EVTCHN   7
 #define _EVENT_VBD_UPD  8
+#define _EVENT_CONSOLE  9 /* This is only for domain-0 initial console. */
 
 /*
  * Virtual addresses beyond this are not modifiable by guest OSes. The 
@@ -169,6 +171,11 @@
 #define SCHEDOP_exit            3   /* Exit and kill this domain.        */
 #define SCHEDOP_stop            4   /* Stop executing this domain.       */
 
+/*
+ * Commands to HYPERVISOR_serial_io().
+ */
+#define SERIALIO_write          0
+#define SERIALIO_read           1
 
 #ifndef __ASSEMBLY__
 

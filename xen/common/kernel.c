@@ -8,6 +8,7 @@
  */
 
 #include <stdarg.h>
+#include <xeno/config.h>
 #include <xeno/lib.h>
 #include <xeno/errno.h>
 #include <xeno/spinlock.h>
@@ -33,21 +34,12 @@
 
 kmem_cache_t *task_struct_cachep;
 
-static int xpos, ypos;
-static unsigned char *video = __va(0xB8000);
-
-int sercon_handle = -1;
-int vgacon_enabled = 0;
-
-spinlock_t console_lock = SPIN_LOCK_UNLOCKED;
-
 struct e820entry {
     unsigned long addr_lo, addr_hi;        /* start of memory segment */
     unsigned long size_lo, size_hi;        /* size of memory segment */
     unsigned long type;                    /* type of memory segment */
 };
 
-static void init_vga(void);
 void start_of_day(void);
 
 /* opt_console: comma-separated list of console outputs. */
@@ -108,7 +100,7 @@ void cmain(unsigned long magic, multiboot_info_t *mbi)
     struct task_struct *new_dom;
     dom0_createdomain_t dom0_params;
     unsigned long max_page;
-    unsigned char *cmdline, *p;
+    unsigned char *cmdline;
     module_t *mod;
     void *heap_start;
     int i;
@@ -162,19 +154,7 @@ void cmain(unsigned long magic, multiboot_info_t *mbi)
     /* We initialise the serial devices very early so we can get debugging. */
     serial_init_stage1();
 
-    /* Where should console output go? */
-    for ( p = opt_console; p != NULL; p = strchr(p, ',') )
-    {
-        if ( *p == ',' )
-            p++;
-        if ( strncmp(p, "com", 3) == 0 )
-            sercon_handle = parse_serial_handle(p);
-        else if ( strncmp(p, "vga", 3) == 0 )
-            vgacon_enabled = 1;
-    }
-
-    /* Set up VGA console output, if it was enabled. */
-    init_vga();
+    init_console();
 
     /* HELLO WORLD --- start-of-day banner text. */
     printk(XEN_BANNER);
@@ -184,6 +164,7 @@ void cmain(unsigned long magic, multiboot_info_t *mbi)
            XEN_VERSION, XEN_SUBVERSION, XEN_EXTRAVERSION,
            XEN_COMPILE_BY, XEN_COMPILE_DOMAIN,
            XEN_COMPILER, XEN_COMPILE_DATE);
+    set_printk_prefix("(XEN) ");
 
     if ( opt_ser_baud != 0 )
         printk("**WARNING**: Xen option 'ser_baud=' is deprecated! "
@@ -266,294 +247,7 @@ void cmain(unsigned long magic, multiboot_info_t *mbi)
     startup_cpu_idle_loop();
 }
 
-
-/*********************************
- * Various console code follows...
- */
-
-/* VGA text (mode 3) definitions. */
-#define COLUMNS	    80
-#define LINES	    25
-#define ATTRIBUTE    7
-
-/* Clear the screen and initialize VIDEO, XPOS and YPOS.  */
-static void cls(void)
-{
-    memset(video, 0, COLUMNS * LINES * 2);
-    xpos = ypos = 0;
-    outw(10+(1<<(5+8)), 0x3d4); /* cursor off */
-}
-
-static int detect_video(void *video_base)
-{
-    volatile u16 *p = (volatile u16 *)video_base;
-    u16 saved1 = p[0], saved2 = p[1];
-    int video_found = 1;
-
-    p[0] = 0xAA55;
-    p[1] = 0x55AA;
-    if ( (p[0] != 0xAA55) || (p[1] != 0x55AA) )
-        video_found = 0;
-
-    p[0] = 0x55AA;
-    p[1] = 0xAA55;
-    if ( (p[0] != 0x55AA) || (p[1] != 0xAA55) )
-        video_found = 0;
-
-    p[0] = saved1;
-    p[1] = saved2;
-
-    return video_found;
-}
-
-static int detect_vga(void)
-{
-    /*
-     * Look at a number of well-known locations. Even if video is not at
-     * 0xB8000 right now, it will appear there when we set up text mode 3.
-     * 
-     * We assume if there is any sign of a video adaptor then it is at least
-     * VGA-compatible (surely noone runs CGA, EGA, .... these days?).
-     * 
-     * These checks are basically to detect headless server boxes.
-     */
-    return (detect_video(__va(0xA0000)) || 
-            detect_video(__va(0xB0000)) || 
-            detect_video(__va(0xB8000)));
-}
-
-/* This is actually code from vgaHWRestore in an old version of XFree86 :-) */
-static void init_vga(void)
-{
-    /* The following VGA state was saved from a chip in text mode 3. */
-    static unsigned char regs[] = {
-        /* Sequencer registers */
-        0x03, 0x00, 0x03, 0x00, 0x02,
-        /* CRTC registers */
-        0x5f, 0x4f, 0x50, 0x82, 0x55, 0x81, 0xbf, 0x1f, 0x00, 0x4f, 0x20,
-        0x0e, 0x00, 0x00, 0x01, 0xe0, 0x9c, 0x8e, 0x8f, 0x28, 0x1f, 0x96,
-        0xb9, 0xa3, 0xff,
-        /* Graphic registers */
-        0x00, 0x00, 0x00, 0x00, 0x00, 0x10, 0x0e, 0x00, 0xff,
-        /* Attribute registers */
-        0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x14, 0x07, 0x38, 0x39, 0x3a,
-        0x3b, 0x3c, 0x3d, 0x3e, 0x3f, 0x0c, 0x00, 0x0f, 0x08, 0x00
-    };
-
-    int i, j = 0;
-    volatile unsigned char tmp;
-
-    if ( !vgacon_enabled )
-        return;
-
-    if ( !detect_vga() )
-    {
-        printk("No VGA adaptor detected!\n");
-        vgacon_enabled = 0;
-        return;
-    }
-
-    tmp = inb(0x3da);
-    outb(0x00, 0x3c0);
-    
-    for ( i = 0; i < 5;  i++ )
-        outw((regs[j++] << 8) | i, 0x3c4);
-    
-    /* Ensure CRTC registers 0-7 are unlocked by clearing bit 7 of CRTC[17]. */
-    outw(((regs[5+17] & 0x7F) << 8) | 17, 0x3d4);
-    
-    for ( i = 0; i < 25; i++ ) 
-        outw((regs[j++] << 8) | i, 0x3d4);
-    
-    for ( i = 0; i < 9;  i++ )
-        outw((regs[j++] << 8) | i, 0x3ce);
-    
-    for ( i = 0; i < 21; i++ )
-    {
-        tmp = inb(0x3da);
-        outb(i, 0x3c0); 
-        outb(regs[j++], 0x3c0);
-    }
-    
-    tmp = inb(0x3da);
-    outb(0x20, 0x3c0);
-
-    cls();
-}
-
-
-static void put_newline(void)
-{
-    xpos = 0;
-    ypos++;
-
-    if (ypos >= LINES)
-    {
-        static char zeroarr[2*COLUMNS] = { 0 };
-        ypos = LINES-1;
-        memcpy((char*)video, 
-               (char*)video + 2*COLUMNS, (LINES-1)*2*COLUMNS);
-        memcpy((char*)video + (LINES-1)*2*COLUMNS, 
-               zeroarr, 2*COLUMNS);
-    }
-}
-
-
-static void putchar_console(int c)
-{
-    if ( !vgacon_enabled )
-        return;
-
-    if ( c == '\n' )
-    {
-        put_newline();
-    }
-    else
-    {
-        video[(xpos + ypos * COLUMNS) * 2]     = c & 0xFF;
-        video[(xpos + ypos * COLUMNS) * 2 + 1] = ATTRIBUTE;
-        if ( ++xpos >= COLUMNS )
-            put_newline();
-    }
-}
-
-
-void putchar_console_ring(int c)
-{
-    if ( console_ring.len < CONSOLE_RING_SIZE )
-        console_ring.buf[console_ring.len++] = (char)c;
-}
-
-
-static inline void __putstr(const char *str)
-{
-    int c;
-    serial_puts(sercon_handle, str);
-    while ( (c = *str++) != '\0' )
-    {
-        putchar_console(c);
-        putchar_console_ring(c);
-    }
-}
-
-
-void printf(const char *fmt, ...)
-{
-    va_list args;
-    char buf[128];
-    const char *p = fmt;
-    unsigned long flags;
-
-    /*
-     * If the format string contains '%' descriptors then we have to parse it 
-     * before printing it. We parse it into a fixed-length buffer. Long 
-     * strings should therefore _not_ contain '%' characters!
-     */
-    if ( strchr(fmt, '%') != NULL )
-    {
-        va_start(args, fmt);
-        (void)vsnprintf(buf, sizeof(buf), fmt, args);
-        va_end(args);        
-        p = buf; 
-    }
-
-    spin_lock_irqsave(&console_lock, flags);
-    __putstr(p);
-    spin_unlock_irqrestore(&console_lock, flags);
-}
-
-
-long do_console_write(char *str, unsigned int count)
-{
-#define SIZEOF_BUF 256
-    unsigned char safe_str[SIZEOF_BUF+1];
-    unsigned char single_line[SIZEOF_BUF+2];
-    unsigned char line_header[30];
-    unsigned char *p;
-    unsigned char  c;
-    unsigned long flags;
-    int            j;
-    
-    if ( count == 0 )
-        return 0;
-
-    if ( count > SIZEOF_BUF ) 
-        count = SIZEOF_BUF;
-    
-    if ( copy_from_user(safe_str, str, count) )
-        return -EFAULT;
-    safe_str[count] = '\0';
-    
-    sprintf(line_header, "DOM%llu: ", current->domain);
-    
-    p = safe_str;
-    while ( *p != '\0' )
-    {
-        j = 0;
-
-        while ( (c = *p++) != '\0' )
-        {
-            if ( c == '\n' )
-                break;
-            if ( (c < 32) || (c > 126) )
-                continue;
-            single_line[j++] = c;
-        }
-
-        single_line[j++] = '\n';
-        single_line[j++] = '\0';
-
-        spin_lock_irqsave(&console_lock, flags);
-        __putstr(line_header);
-        __putstr(single_line);
-        spin_unlock_irqrestore(&console_lock, flags);
-    }
-
-    return 0;
-}
-
-
-/*********************************
- * Debugging/tracing/error-report.
- */
-
-void panic(const char *fmt, ...)
-{
-    va_list args;
-    char buf[128];
-    unsigned long flags;
-    extern void machine_restart(char *);
-    
-    va_start(args, fmt);
-    (void)vsnprintf(buf, sizeof(buf), fmt, args);
-    va_end(args);
-    
-    /* Spit out multiline message in one go. */
-    spin_lock_irqsave(&console_lock, flags);
-    __putstr("\n****************************************\n");
-    __putstr(buf);
-    __putstr("Aieee! CPU");
-    sprintf(buf, "%d", smp_processor_id());
-    __putstr(buf);
-    __putstr(" is toast...\n");
-    __putstr("****************************************\n\n");
-    __putstr("Reboot in five seconds...\n");
-    spin_unlock_irqrestore(&console_lock, flags);
-
-    mdelay(5000);
-    machine_restart(0);
-}
-
-
-void __out_of_line_bug(int line)
-{
-    printk("kernel BUG in header file at line %d\n", line);
-    BUG();
-    for ( ; ; ) continue;
-}
-
-
-/*********************************
+/*
  * Simple syscalls.
  */
 

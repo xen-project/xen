@@ -9,28 +9,23 @@
 #ifndef __CONSOLE_H__
 #define __CONSOLE_H__
 
+#include <xeno/spinlock.h>
+
+extern spinlock_t console_lock;
+
 /*
  * Ownership of console --- currently hardwired to dom0. This is used to see 
  * who gets the PS/2 keyboard/mouse events
  */
-
-extern int sercon_handle;
-extern int vgacon_enabled;
-
 #define CONSOLE_ISOWNER(p) (p->domain == 0) 
 #define CONSOLE_OWNER      (find_domain_by_id(0))
 
-#define CONSOLE_RING_SIZE	16392
-#define CONSOLE_RING_CLEAR	1
+void set_printk_prefix(const char *prefix);
 
-typedef struct console_ring_st
-{
-    char buf[CONSOLE_RING_SIZE];
-    unsigned int len;
-} console_ring_t;
-
-extern console_ring_t console_ring;
-
+#define CONSOLE_RING_CLEAR 1
 long read_console_ring(unsigned long, unsigned int, unsigned int);
+
+void init_console(void);
+void console_endboot(int disable_vga);
 
 #endif

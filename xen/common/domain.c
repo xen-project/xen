@@ -806,9 +806,8 @@ int setup_guestos(struct task_struct *p, dom0_createdomain_t *params,
     }
     *dst = '\0';
 
-    /* HACK: Give up the VGA console iff the Xenolinux DOM0 wants it. */
-    if ( strstr(cmdline, "tty0") != NULL )
-        vgacon_enabled = 0;
+    /* NB: Give up the VGA console iff the Xenolinux DOM0 wants it. */
+    console_endboot(strstr(cmdline, "tty0") != NULL);
 
     /* Reinstate the caller's page tables. */
     write_cr3_counted(pagetable_val(current->mm.pagetable));

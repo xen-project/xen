@@ -110,7 +110,6 @@ NORET_TYPE void panic(const char * fmt, ...)
 #endif
 		CHECK_EMERGENCY_SYNC
 #if defined(CONFIG_XENO)
-		HYPERVISOR_console_write(buf, strlen(buf));
 		HYPERVISOR_exit();
 #endif
 	}
