@@ -362,6 +362,7 @@ do {                                                                          \
 } while (0)
 
 #define local_irq_save(x)       __save_and_cli(x)
+#define local_irq_set(x)        __save_and_sti(x)
 #define local_irq_restore(x)    __restore_flags(x)
 #define local_irq_disable()     __cli()
 #define local_irq_enable()      __sti()
