@@ -206,7 +206,7 @@ return (to);
  * This looks horribly ugly, but the compiler can optimize it totally,
  * as the count is constant.
  */
-static inline void * __constant_memcpy(void * to, const void * from, size_t n)
+static always_inline void * __constant_memcpy(void * to, const void * from, size_t n)
 {
 	switch (n) {
 		case 0:
@@ -272,12 +272,13 @@ __asm__ __volatile__( \
 }
 
 #define __HAVE_ARCH_MEMCPY
-
-#define memcpy(t, f, n) \
-(__builtin_constant_p(n) ? \
- __constant_memcpy((t),(f),(n)) : \
- __memcpy((t),(f),(n)))
-
+static always_inline __attribute_used__
+void memcpy(void *t, const void *f, size_t n)
+{
+	(__builtin_constant_p(n) ?
+	 __constant_memcpy((t),(f),(n)) :
+	 __memcpy((t),(f),(n)));
+}
 
 /*
  * struct_cpy(x,y), copy structure *x into (matching structure) *y.
@@ -410,7 +411,7 @@ return __res;
  * This looks horribly ugly, but the compiler can optimize it totally,
  * as we by now know that both pattern and count is constant..
  */
-static inline void * __constant_c_and_count_memset(void * s, unsigned long pattern, size_t count)
+static always_inline void * __constant_c_and_count_memset(void * s, unsigned long pattern, size_t count)
 {
 	switch (count) {
 		case 0:
