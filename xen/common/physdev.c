@@ -38,7 +38,7 @@ extern void pcibios_enable_irq(struct pci_dev *dev);
 #define VERBOSE_INFO(_f, _a...) ((void)0)
 #endif
 
-#if 1 || !defined(NDEBUG)
+#ifndef NDEBUG
 #define INFO(_f, _a...) printk( _f, ## _a )
 #else
 #define INFO(_f, _a...) ((void)0)
@@ -331,8 +331,8 @@ static int do_base_address_access(phys_dev_t *pdev, int acc, int idx,
         /* We could set *val to some value but the guest may well be in trouble
          * anyway if this write fails.  Hopefully the printk will give us a
          * clue what went wrong. */
-        printk("Guest %u attempting sub-dword %s to BASE_ADDRESS %d\n",
-               pdev->owner->domain, (acc == ACC_READ) ? "read" : "write", idx);
+        INFO("Guest %u attempting sub-dword %s to BASE_ADDRESS %d\n",
+             pdev->owner->domain, (acc == ACC_READ) ? "read" : "write", idx);
         
         return -EPERM;
     }
@@ -729,22 +729,21 @@ void physdev_init_dom0(struct domain *p)
 
     pci_for_each_dev(dev)
     {
-        if ( !pcidev_dom0_hidden(dev) )
+        if ( pcidev_dom0_hidden(dev) )
         {            
-            /* Skip bridges and other peculiarities for now. */
-            if ( dev->hdr_type != PCI_HEADER_TYPE_NORMAL )
-                continue;
-            pdev = kmalloc(sizeof(phys_dev_t), GFP_KERNEL);
-            pdev->dev = dev;
-            pdev->flags = ACC_WRITE;
-            pdev->state = 0;
-            pdev->owner = p;
-            list_add(&pdev->node, &p->pcidev_list);
-        }
-        else
-        {
             printk("Hiding PCI device %s from DOM0\n", dev->slot_name);
+            continue;
         }
+
+        /* Skip bridges and other peculiarities for now. */
+        if ( dev->hdr_type != PCI_HEADER_TYPE_NORMAL )
+            continue;
+        pdev = kmalloc(sizeof(phys_dev_t), GFP_KERNEL);
+        pdev->dev = dev;
+        pdev->flags = ACC_WRITE;
+        pdev->state = 0;
+        pdev->owner = p;
+        list_add(&pdev->node, &p->pcidev_list);
     }
 
     set_bit(DF_PHYSDEV, &p->flags);

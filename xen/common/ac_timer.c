@@ -275,8 +275,6 @@ void __init ac_timer_init(void)
 {
     int i;
 
-    printk ("ACT: Initialising Accurate timers\n");
-
     open_softirq(AC_TIMER_SOFTIRQ, ac_timer_softirq_action);
 
     for ( i = 0; i < smp_num_cpus; i++ )

@@ -9,45 +9,28 @@
 #define KEY_MAX 256
 #define STR_MAX  64
 
-typedef struct _key_te { 
+static struct { 
     key_handler *handler; 
     char         desc[STR_MAX]; 
-} key_te_t; 
+} key_table[KEY_MAX]; 
 
-static key_te_t key_table[KEY_MAX]; 
-    
-void add_key_handler(u_char key, key_handler *handler, char *desc) 
+void add_key_handler(unsigned char key, key_handler *handler, char *desc)
 {
-    int i; 
-    char *str; 
-
-    if ( key_table[key].handler != NULL ) 
-        printk("Warning: overwriting handler for key 0x%x\n", key); 
-
     key_table[key].handler = handler; 
-
-    str = key_table[key].desc; 
-    for ( i = 0; i < STR_MAX; i++ )
-    {
-        if ( *desc != '\0' ) 
-            *str++ = *desc++; 
-        else
-            break; 
-    }
-    if ( i == STR_MAX ) 
-        key_table[key].desc[STR_MAX-1] = '\0'; 
+    strncpy(key_table[key].desc, desc, STR_MAX);
+    key_table[key].desc[STR_MAX-1] = '\0'; 
 }
 
-key_handler *get_key_handler(u_char key)
+key_handler *get_key_handler(unsigned char key)
 {
     return key_table[key].handler; 
 }
 
-static void show_handlers(u_char key, void *dev_id, struct pt_regs *regs) 
+static void show_handlers(unsigned char key, void *dev_id,
+                          struct pt_regs *regs)
 {
     int i; 
-
-    printk("'%c' pressed -> showing installed handlers\n", key); 
+    printk("'%c' pressed -> showing installed handlers\n", key);
     for ( i = 0; i < KEY_MAX; i++ ) 
         if ( key_table[i].handler != NULL ) 
             printk(" key '%c' (ascii '%02x') => %s\n", 
@@ -56,24 +39,26 @@ static void show_handlers(u_char key, void *dev_id, struct pt_regs *regs)
 }
 
 
-static void dump_registers(u_char key, void *dev_id, struct pt_regs *regs) 
+static void dump_registers(unsigned char key, void *dev_id,
+                           struct pt_regs *regs)
 {
     extern void show_registers(struct pt_regs *regs); 
     printk("'%c' pressed -> dumping registers\n", key); 
     show_registers(regs); 
 }
 
-static void halt_machine(u_char key, void *dev_id, struct pt_regs *regs) 
+static void halt_machine(unsigned char key, void *dev_id,
+                         struct pt_regs *regs) 
 {
     printk("'%c' pressed -> rebooting machine\n", key); 
     machine_restart(NULL); 
 }
 
-void do_task_queues(u_char key, void *dev_id, struct pt_regs *regs) 
+void do_task_queues(unsigned char key, void *dev_id,
+                    struct pt_regs *regs) 
 {
     unsigned long  flags;
-    struct domain *d; 
-    shared_info_t *s; 
+    struct domain *d;
     s_time_t       now = NOW();
 
     printk("'%c' pressed -> dumping task queues (now=0x%X:%08X)\n", key,
@@ -87,10 +72,9 @@ void do_task_queues(u_char key, void *dev_id, struct pt_regs *regs)
                d->domain, d->processor, 
                test_bit(DF_RUNNING, &d->flags) ? 'T':'F',
                atomic_read(&d->refcnt), d->tot_pages);
-        s = d->shared_info; 
         printk("Guest: upcall_pend = %02x, upcall_mask = %02x\n", 
-               s->vcpu_data[0].evtchn_upcall_pending, 
-               s->vcpu_data[0].evtchn_upcall_mask);
+               d->shared_info->vcpu_data[0].evtchn_upcall_pending, 
+               d->shared_info->vcpu_data[0].evtchn_upcall_mask);
         printk("Notifying guest...\n"); 
         send_guest_virq(d, VIRQ_DEBUG);
     }
@@ -98,28 +82,21 @@ void do_task_queues(u_char key, void *dev_id, struct pt_regs *regs)
     read_unlock_irqrestore(&tasklist_lock, flags); 
 }
 
-extern void dump_runq(u_char key, void *dev_id, struct pt_regs *regs);
-extern void print_sched_histo(u_char key, void *dev_id, struct pt_regs *regs);
-extern void reset_sched_histo(u_char key, void *dev_id, struct pt_regs *regs);
+extern void dump_runq(unsigned char key, void *dev_id, 
+                      struct pt_regs *regs);
+extern void print_sched_histo(unsigned char key, void *dev_id, 
+                              struct pt_regs *regs);
+extern void reset_sched_histo(unsigned char key, void *dev_id, 
+                              struct pt_regs *regs);
 #ifdef PERF_COUNTERS
-extern void perfc_printall (u_char key, void *dev_id, struct pt_regs *regs);
-extern void perfc_reset (u_char key, void *dev_id, struct pt_regs *regs);
+extern void perfc_printall(unsigned char key, void *dev_id,
+                           struct pt_regs *regs);
+extern void perfc_reset(unsigned char key, void *dev_id,
+                        struct pt_regs *regs);
 #endif
-#ifndef NDEBUG
-void reaudit_pages(u_char key, void *dev_id, struct pt_regs *regs);
-void audit_all_pages(u_char key, void *dev_id, struct pt_regs *regs);
-#endif
-
 
 void initialize_keytable(void)
 {
-    int i; 
-
-    /* first initialize key handler table */
-    for ( i = 0; i < KEY_MAX; i++ ) 
-        key_table[i].handler = (key_handler *)NULL; 
-
-    /* setup own handlers */
     add_key_handler('d', dump_registers, "dump registers"); 
     add_key_handler('h', show_handlers, "show this message");
     add_key_handler('l', print_sched_histo, "print sched latency histogram");
@@ -130,9 +107,5 @@ void initialize_keytable(void)
 #ifdef PERF_COUNTERS
     add_key_handler('p', perfc_printall, "print performance counters"); 
     add_key_handler('P', perfc_reset,    "reset performance counters"); 
-#endif
-#ifndef NDEBUG
-    add_key_handler('m', reaudit_pages, "re-audit pages");
-    add_key_handler('M', audit_all_pages, "audit all pages");
 #endif
 }
