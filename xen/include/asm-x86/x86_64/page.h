@@ -98,6 +98,15 @@ typedef l4_pgentry_t root_pgentry_t;
 #define L3_DISALLOW_MASK ((cpu_has_nx?0:(1UL<<63)) | (7UL << 7))
 #define L4_DISALLOW_MASK ((cpu_has_nx?0:(1UL<<63)) | (7UL << 7))
 
+#ifndef __ASSEMBLY__
+static inline unsigned long canonicalise_virt_address(unsigned long v)
+{
+    v &= VADDR_MASK;
+    if ( v & (1UL << (VADDR_BITS - 1)) )
+        v |= ~VADDR_MASK;
+}
+#endif /* !__ASSEMBLY__ */
+
 #endif /* __X86_64_PAGE_H__ */
 
 /*
