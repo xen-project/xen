@@ -575,7 +575,7 @@ basics.
 \item Download the ttylinux disk image from XXX where from?
 \item Create a configuration file like the following:
 \begin{verbatim}
-kernel = "/boot/vmlinuz-2.6.9-xenU" # or a 2.4 kernel or a xen0 kernel
+kernel = "/boot/vmlinuz-2.6.9-xenU"
 memory = 64
 name = "ttylinux"
 cpu = -1 # leave to Xen to pick
@@ -905,8 +905,6 @@ docs to do advanced stuff.
 \chapter{Domain Configuration Files}
 \label{cha:config}
 
-XX Could use a little explanation about possible values
-
 Xen configuration files contain the following standard variables.
 Unless otherwise stated, configuration items should be enclosed in
 quotes (i.e. {\tt '...'} or {\tt ``....''})):
@@ -918,12 +916,16 @@ quotes (i.e. {\tt '...'} or {\tt ``....''})):
 \item[memory] Memory size in megabytes.
 \item[cpu] CPU to assign this domain to.
 \item[nics] Number of virtual network interfaces.
-\item[vif] List of MAC addresses (random addresses are assigned if not given) and /
-  or bridges to use for the domains network interfaces. e.g. \\
-  \verb_vif = [ 'mac=aa:00:00:00:00:11, bridge=xen-br0', 'bridge=xen-br1' ]_
-  to assign a MAC address and bridge to the first interface and assign a
-  different bridge to the second interface, leaving Xend to choose the MAC
-  address.
+\item[vif] List of MAC addresses (random addresses are assigned if not
+  given) and / or bridges to use for the domains network
+  interfaces. e.g.
+\begin{verbatim}
+vif = [ 'mac=aa:00:00:00:00:11, bridge=xen-br0',
+        'bridge=xen-br1' ]
+\end{verbatim}
+  to assign a MAC address and bridge to the first interface and assign
+  a different bridge to the second interface, leaving Xend to choose
+  the MAC address.
 \item[disk] List of block devices to export to the domain.  e.g. \\
   \verb_disk = [ 'phy:hda1,sda1,r' ]_ \\
   exports device \path{/dev/hda1} to the domain, as \path{/dev/sda1} with
@@ -931,8 +933,9 @@ quotes (i.e. {\tt '...'} or {\tt ``....''})):
   \verb_disk = [ 'phy:hda7,sda2,w', 'phy:hdb2,sda,w!' ]_ \\
   exports device \path{/dev/hda7} to the domain as \path{/dev/sda2} with
   write access enabled and \path{/dev/hdb2} as \path{/dev/sda} with write access
-  force enabled (bypassing safety checks).
-\item[dhcp] Set to {\tt 'dhcp'} if you want to DHCP allocate the IP address.
+  force enabled (bypassing safety checks, as indicated by the {\tt !}).
+\item[dhcp] Set to {\tt 'dhcp'} if you want to DHCP allocate the IP
+address.
 \item[netmask] IP netmask.
 \item[gateway] IP address for the gateway (if any).
 \item[hostname] Set the hostname for the virtual machine.
@@ -949,10 +952,9 @@ quotes (i.e. {\tt '...'} or {\tt ``....''})):
   \end{description}
 \end{description}
 
-It is also possible to include Python scripting commands in
-configuration files.  This is done in the \path{xmdefconfig} file in
-order to handle the {\tt vmid} variable.
-
+For additional flexibility, it is also possible to include Python
+scripting commands in configuration files.  An example of this is the
+\path{xmexample} file in order to handle the {\tt vmid} variable.
 
 \chapter{Xend (Node control daemon)}
 \label{cha:xend}
@@ -970,6 +972,8 @@ Xend command line:
 \verb_# xend start_ & start Xend, if not already running \\
 \verb_# xend stop_  & stop Xend if already running       \\
 \verb_# xend restart_ & restart Xend if running, otherwise start it \\
+\verb_# xend trace_start_ & start Xend, with very detailed debug logging \\
+\verb_# xend status_ & indicates Xend status by its return code
 \end{tabular}
 
 A SysV init script called {\tt xend} is provided to start Xend at boot
@@ -1045,8 +1049,8 @@ By default, Xensv will serve out the web interface on port 8080.  This
 can be changed by editing {\tt
 /usr/lib/python2.3/site-packages/xen/sv/params.py}.
 
-Once Xensv is running, the web interface can be used to manage running
-domains and provides a user friendly domain creation wizard.
+Once Xensv is running, the web interface can be used to create and
+manage running domains.
 
 
 
@@ -1305,8 +1309,8 @@ higher throughput.
 
 \chapter{Privileged domains}
 
-There are two possible types of privileges:  IO privileges and
-administration privileges.
+%% There are two possible types of privileges:  IO privileges and
+%% administration privileges.
 
 \section{Driver domains (IO Privileges)}
 
@@ -1314,8 +1318,7 @@ IO privileges can be assigned to allow a domain to drive PCI devices
 itself.  This is used to support driver domains.
 
 Setting backend privileges is currently only supported in SXP format
-config files (??? is this true - there's nothing in xmdefconfig,
-anyhow).  To allow a domain to function as a backend for others,
+config files.  To allow a domain to function as a backend for others,
 somewhere within the {\tt vm} element of its configuration file must
 be a {\tt backend} element of the form {\tt (backend ({\em type}))}
 where {\tt \em type} may be either {\tt netif} or {\tt blkif},
@@ -1357,14 +1360,15 @@ can be configured in either format of configuration file:
   or hexadecimal.
 \end{itemize}
 
-\section{Administration Domains}
+%% \section{Administration Domains}
 
-Administration privileges allow a domain to use the `dom0
-operations' (so called because they are usually available only to
-domain 0).  A privileged domain can build other domains, set scheduling
-parameters, etc.
+%% Administration privileges allow a domain to use the `dom0
+%% operations' (so called because they are usually available only to
+%% domain 0).  A privileged domain can build other domains, set scheduling
+%% parameters, etc.
 
-% Support for other administrative domains is not yet available...
+% Support for other administrative domains is not yet available...  perhaps
+% we should plumb it in some time
 
 \chapter{Debugging}
 
@@ -1379,7 +1383,7 @@ figuring out what's happened.  Debug a Xenlinux image just as you
 would any other Linux kernel.
 
 We supply a handy debug terminal program which you can find in
-/usr/local/src/xen-2.0.bk/tools/misc/miniterm/
+\path{/usr/local/src/xen-2.0.bk/tools/misc/miniterm/}
 This should be built and executed on another machine that is connected
 via a null modem cable. Documentation is included.
 Alternatively, if the Xen machine is connected to a serial-port server
