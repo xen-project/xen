@@ -238,4 +238,4 @@ cd ${AD}/arch/xen/drivers/dom0
 ln -sf ../../../../${LINUX_26}/drivers/xen/privcmd/privcmd.c core.c
 
 cd ${AD}/arch/xen/drivers/netif/frontend
-ln -sf ../../../../../${LINUX_26}/drivers/xen/net/network.c main.c
+ln -sf ../../../../../${LINUX_26}/drivers/xen/netfront/netfront.c main.c
