@@ -47,7 +47,7 @@ void perfc_printall(u_char key, void *dev_id, struct pt_regs *regs)
                 printk("%10d  0x%08x  %s[CPU %02d]\n",
                        atomic_read(&counters[j]), atomic_read(&counters[j]), 
                        perfc_info[i].name, j);
-            counters += j;
+            counters += NR_CPUS;
             break;
         case TYPE_ARRAY:
             for ( j = 0; j < perfc_info[i].nr_elements; j++ )
