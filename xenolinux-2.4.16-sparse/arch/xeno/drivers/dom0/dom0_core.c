@@ -128,7 +128,7 @@ static void create_proc_dom_entries(int dom)
 
     snprintf(dir_name, MAX_LEN, "%s%d", DOM_DIR, dom);
 
-    dom_data = (dom_procdata_t *)kmalloc(sizeof(proc_domdata_t), GFP_KERNEL);
+    dom_data = (dom_procdata_t *)kmalloc(sizeof(dom_procdata_t), GFP_KERNEL);
     dom_data->domain = dom;
 
     dir = proc_mkdir(dir_name, xeno_base);
