@@ -101,11 +101,16 @@ def check_user():
 def xcs_running():
     """ See if the control switch is running.
     """	
+    s = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
     try:
-	xcs_pidfile = open(XCS_PIDFILE)
-    except IOError:
-	return(0)
-    xcs_pidfile.close()
+        s.connect( (XCS_PATH) )
+        s.close()
+    except:
+        try:
+            os.remove(XCS_PIDFILE)
+        except:
+            pass
+	return 0
     return 1
     
 def start_xcs():
@@ -113,6 +118,8 @@ def start_xcs():
         if os.fork():
             time.sleep(0.1) # let xcs start
         else:
+            if not os.path.isdir(os.path.dirname(XCS_PATH)):
+                os.makedirs(os.path.dirname(XCS_PATH))
             try:
                 os.execvp(XCS_EXEC, XCS_ARGS)
             except:
@@ -129,12 +136,11 @@ def start_xcs():
 def stop_xcs():
     try:
 	xcs_pidfile = open(XCS_PIDFILE)
-    except IOError:
-	return
-    xcs_pid = int(xcs_pidfile.read().strip())
-    os.kill(xcs_pid, signal.SIGTERM)
-    xcs_pidfile.close()
-    
+        xcs_pid = int(xcs_pidfile.read().strip())
+        os.kill(xcs_pid, signal.SIGTERM)
+        xcs_pidfile.close()
+    except:
+	return    
             
 def main():
     try:
