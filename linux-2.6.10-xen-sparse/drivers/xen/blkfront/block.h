@@ -5,7 +5,7 @@
  * 
  * Copyright (c) 2003-2004, Keir Fraser & Steve Hand
  * Modifications by Mark A. Williamson are (c) Intel Research Cambridge
- * Copyright (c) 2004, Christian Limpach
+ * Copyright (c) 2004-2005, Christian Limpach
  * 
  * This file may be distributed separately from the Linux kernel, or
  * incorporated into other software packages, subject to the following license:
@@ -68,7 +68,8 @@ struct xlbd_type_info {
     int devs_per_major;
     int hardsect_size;
     int max_sectors;
-    char *name;
+    char *devname;
+    char *diskname;
 };
 
 /*
