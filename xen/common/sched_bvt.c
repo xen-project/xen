@@ -167,7 +167,7 @@ static inline u32 calc_evt(struct exec_domain *d, u32 avt)
  *
  * Returns non-zero on failure.
  */
-int bvt_alloc_task(struct exec_domain *ed)
+static int bvt_alloc_task(struct exec_domain *ed)
 {
     struct domain *d = ed->domain;
     if ( (d->sched_priv == NULL) ) {
@@ -184,7 +184,7 @@ int bvt_alloc_task(struct exec_domain *ed)
 /*
  * Add and remove a domain
  */
-void bvt_add_task(struct exec_domain *d) 
+static void bvt_add_task(struct exec_domain *d) 
 {
     struct bvt_dom_info *inf = BVT_INFO(d->domain);
     struct bvt_edom_info *einf = EBVT_INFO(d);
@@ -225,7 +225,7 @@ void bvt_add_task(struct exec_domain *d)
     }
 }
 
-int bvt_init_idle_task(struct exec_domain *p)
+static int bvt_init_idle_task(struct exec_domain *p)
 {
     if ( bvt_alloc_task(p) < 0 )
         return -1;
@@ -239,7 +239,7 @@ int bvt_init_idle_task(struct exec_domain *p)
     return 0;
 }
 
-void bvt_wake(struct exec_domain *d)
+static void bvt_wake(struct exec_domain *d)
 {
     struct bvt_edom_info *einf = EBVT_INFO(d);
     struct exec_domain  *curr;
@@ -290,14 +290,14 @@ static void bvt_sleep(struct exec_domain *d)
  * bvt_free_task - free BVT private structures for a task
  * @d:             task
  */
-void bvt_free_task(struct domain *d)
+static void bvt_free_task(struct domain *d)
 {
     ASSERT(d->sched_priv != NULL);
     xfree(d->sched_priv);
 }
 
 /* Control the scheduler. */
-int bvt_ctl(struct sched_ctl_cmd *cmd)
+static int bvt_ctl(struct sched_ctl_cmd *cmd)
 {
     struct bvt_ctl *params = &cmd->u.bvt;
 
@@ -310,7 +310,7 @@ int bvt_ctl(struct sched_ctl_cmd *cmd)
 }
 
 /* Adjust scheduling parameter for a given domain. */
-int bvt_adjdom(
+static int bvt_adjdom(
     struct domain *d, struct sched_adjdom_cmd *cmd)
 {
     struct bvt_adjdom *params = &cmd->u.bvt;
@@ -549,7 +549,7 @@ static void bvt_dump_cpu_state(int i)
 }
 
 /* Initialise the data structures. */
-int bvt_init_scheduler()
+static int bvt_init_scheduler(void)
 {
     int i;
 
