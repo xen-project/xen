@@ -59,11 +59,13 @@ void __init paging_init(void)
     void *ioremap_pt;
     int i;
 
-    /* Idle page table 1:1 maps the first part of physical memory. */
-    for ( i = 0; i < DOMAIN_ENTRIES_PER_L2_PAGETABLE; i++ )
-        idle_pg_table[i] = 
-            mk_l2_pgentry((i << L2_PAGETABLE_SHIFT) | 
-                          __PAGE_HYPERVISOR | _PAGE_PSE);
+    /* Xen heap mappings can be GLOBAL. */
+    if ( cpu_has_pge )
+    {
+        for ( i = 0; i < DIRECTMAP_PHYS_END; i++ )
+            ((unsigned long *)idle_pg_table)
+                [(i + PAGE_OFFSET) >> L2_PAGETABLE_SHIFT] |= _PAGE_GLOBAL;
+    }
 
     /* Create page table for ioremap(). */
     ioremap_pt = (void *)alloc_xenheap_page();
@@ -86,7 +88,6 @@ void __init paging_init(void)
     /* Set up linear page table mapping. */
     idle_pg_table[LINEAR_PT_VIRT_START >> L2_PAGETABLE_SHIFT] =
         mk_l2_pgentry(__pa(idle_pg_table) | __PAGE_HYPERVISOR);
-
 }
 
 void __init zap_low_mappings(void)
