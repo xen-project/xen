@@ -259,6 +259,8 @@ void arch_do_createdomain(struct exec_domain *ed)
         d->arch.mm_perdomain_l3[l3_table_offset(PERDOMAIN_VIRT_START)] = 
             mk_l3_pgentry(__pa(d->arch.mm_perdomain_l2) | __PAGE_HYPERVISOR);
 #endif
+
+        shadow_lock_init(d);        
     }
 }
 
@@ -290,12 +292,14 @@ void arch_vmx_do_launch(struct exec_domain *ed)
     reset_stack_and_jump(vmx_asm_do_launch);
 }
 
-static void monitor_mk_pagetable(struct exec_domain *ed)
+static void alloc_monitor_pagetable(struct exec_domain *ed)
 {
     unsigned long mpfn;
     l2_pgentry_t *mpl2e, *phys_table;
     struct pfn_info *mpfn_info;
     struct domain *d = ed->domain;
+
+    ASSERT(!ed->arch.monitor_table); /* we should only get called once */
 
     mpfn_info = alloc_domheap_page(NULL);
     ASSERT( mpfn_info ); 
@@ -309,7 +313,6 @@ static void monitor_mk_pagetable(struct exec_domain *ed)
            HYPERVISOR_ENTRIES_PER_L2_PAGETABLE * sizeof(l2_pgentry_t));
 
     ed->arch.monitor_table = mk_pagetable(mpfn << PAGE_SHIFT);
-    d->arch.shadow_mode = SHM_full_32;
 
     mpl2e[l2_table_offset(PERDOMAIN_VIRT_START)] =
         mk_l2_pgentry((__pa(d->arch.mm_perdomain_pt) & PAGE_MASK) 
@@ -327,7 +330,7 @@ static void monitor_mk_pagetable(struct exec_domain *ed)
 /*
  * Free the pages for monitor_table and guest_pl2e_cache
  */
-static void monitor_rm_pagetable(struct exec_domain *ed)
+static void free_monitor_pagetable(struct exec_domain *ed)
 {
     l2_pgentry_t *mpl2e;
     unsigned long mpfn;
@@ -382,7 +385,6 @@ static int vmx_final_setup_guest(struct exec_domain *ed,
         goto out;
     }
 
-    monitor_mk_pagetable(ed);
     ed->arch.schedule_tail = arch_vmx_do_launch;
     clear_bit(VMX_CPU_STATE_PG_ENABLED, &ed->arch.arch_vmx.cpu_state);
 
@@ -394,11 +396,19 @@ static int vmx_final_setup_guest(struct exec_domain *ed,
     if (ed == ed->domain->exec_domain[0]) {
         /* 
          * Required to do this once per domain
+         * XXX todo: add a seperate function to do these.
          */
         memset(&ed->domain->shared_info->evtchn_mask[0], 0xff, 
                sizeof(ed->domain->shared_info->evtchn_mask));
         clear_bit(IOPACKET_PORT, &ed->domain->shared_info->evtchn_mask[0]);
+
+        /* Put the domain in shadow mode even though we're going to be using
+         * the shared 1:1 page table initially. It shouldn't hurt */
+        shadow_mode_enable(ed->domain, SHM_full_32);
     }
+
+    update_pagetables(ed);     /* this assigns shadow_pagetable */
+    alloc_monitor_pagetable(ed); /* this assigns monitor_pagetable */
 
     return 0;
 
@@ -409,6 +419,8 @@ out:
 }
 #endif
 
+
+/* This is called by arch_final_setup_guest and do_boot_vcpu */
 int arch_final_setup_guest(
     struct exec_domain *d, full_execution_context_t *c)
 {
@@ -467,8 +479,8 @@ int arch_final_setup_guest(
     d->arch.failsafe_address  = c->failsafe_callback_eip;
     
     phys_basetab = c->pt_base;
-    d->arch.guest_table = mk_pagetable(phys_basetab);
-    d->arch.phys_table = d->arch.guest_table;
+    d->arch.guest_table = d->arch.phys_table = mk_pagetable(phys_basetab);
+
     if ( !get_page_and_type(&frame_table[phys_basetab>>PAGE_SHIFT], d->domain, 
                             PGT_base_page_table) )
         return -EINVAL;
@@ -489,6 +501,9 @@ int arch_final_setup_guest(
     if (c->flags & ECF_VMX_GUEST)
         return vmx_final_setup_guest(d, c);
 #endif
+
+    update_pagetables(d);  /* this assigns shadow_pagetable 
+                                and monitor_table */
 
     return 0;
 }
@@ -639,6 +654,7 @@ static void switch_segments(
         {
             n->arch.flags |= TF_kernel_mode;
             __asm__ __volatile__ ( "swapgs" );
+            update_pagetables(ed);
             write_ptbase(n);
         }
 
@@ -663,6 +679,7 @@ long do_switch_to_user(void)
 
     ed->arch.flags &= ~TF_kernel_mode;
     __asm__ __volatile__ ( "swapgs" );
+    update_pagetables(ed);
     write_ptbase(ed);
 
     regs->rip    = stu.rip;
@@ -929,7 +946,7 @@ static void vmx_domain_relinquish_memory(struct exec_domain *ed)
     free_vmcs(ed->arch.arch_vmx.vmcs);
     ed->arch.arch_vmx.vmcs = 0;
     
-    monitor_rm_pagetable(ed);
+    free_monitor_pagetable(ed);
     rem_ac_timer(&(vpit->pit_timer));
 }
 #endif

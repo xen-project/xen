@@ -36,6 +36,7 @@
 #include <asm/vmx.h>
 #include <asm/vmx_vmcs.h>
 #include <asm/vmx_intercept.h>
+#include <asm/shadow.h>
 #include <public/io/ioreq.h>
 
 #ifdef CONFIG_VMX
@@ -420,24 +421,31 @@ static void mov_to_cr(int gp, int cr, struct xen_regs *regs)
                 domain_crash(); /* need to take a clean path */
             }
             old_base_pfn = pagetable_val(d->arch.guest_table) >> PAGE_SHIFT;
+
+            /* We know that none of the previous 1:1 shadow pages are
+             * going to be used again, so might as well flush them.
+             * XXXX wait until the last VCPU boots before doing the flush !!
+             */
+            shadow_lock(d->domain);
+            free_shadow_state(d->domain); // XXX SMP
+            shadow_unlock(d->domain);
+
             /*
              * Now arch.guest_table points to machine physical.
              */
             d->arch.guest_table = mk_pagetable(pfn << PAGE_SHIFT);
+            update_pagetables(d);
 
             VMX_DBG_LOG(DBG_LEVEL_VMMU, "New arch.guest_table = %lx\n", 
                     (unsigned long) (pfn << PAGE_SHIFT));
 
-            shadow_lock(d->domain);
-            shadow_mode_enable(d->domain, SHM_full_32); 
-            shadow_unlock(d->domain);
-
             __vmwrite(GUEST_CR3, pagetable_val(d->arch.shadow_table));
             /* 
-             * mm->shadow_table should hold the next CR3 for shadow
+             * arch->shadow_table should hold the next CR3 for shadow
              */
             VMX_DBG_LOG(DBG_LEVEL_VMMU, "Update CR3 value = %lx, pfn = %lx\n", 
                     d->arch.arch_vmx.cpu_cr3, pfn);
+            /* undo the get_page done in the para virt case */
             put_page_and_type(&frame_table[old_base_pfn]);
 
         }
@@ -448,11 +456,11 @@ static void mov_to_cr(int gp, int cr, struct xen_regs *regs)
         unsigned long pfn;
 
         /*
-         * If paging is not enabled yet, simply copy the valut to CR3.
+         * If paging is not enabled yet, simply copy the value to CR3.
          */
         if (!test_bit(VMX_CPU_STATE_PG_ENABLED, &d->arch.arch_vmx.cpu_state)) {
             d->arch.arch_vmx.cpu_cr3 = value;
-            return;
+            break;
         }
         
         guest_pl2e_cache_invalidate(d);
@@ -484,10 +492,10 @@ static void mov_to_cr(int gp, int cr, struct xen_regs *regs)
             }
             pfn = phys_to_machine_mapping(value >> PAGE_SHIFT);
             vmx_shadow_clear_state(d->domain);
-            d->arch.guest_table = mk_pagetable(pfn << PAGE_SHIFT);
-            shadow_mk_pagetable(d);
+            d->arch.guest_table  = mk_pagetable(pfn << PAGE_SHIFT);
+            update_pagetables(d); 
             /* 
-             * mm->shadow_table should hold the next CR3 for shadow
+             * arch.shadow_table should now hold the next CR3 for shadow
              */
             d->arch.arch_vmx.cpu_cr3 = value;
             VMX_DBG_LOG(DBG_LEVEL_VMMU, "Update CR3 value = %lx\n", 

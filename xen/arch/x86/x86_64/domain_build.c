@@ -1,4 +1,4 @@
-/* -*-  Mode:C; c-basic-offset:4; tab-width:4; indent-tabs-mode:nil -*- */
+/* -*-  Modes:C; c-basic-offset:4; tab-width:4; indent-tabs-mode:nil -*- */
 /******************************************************************************
  * domain_build.c
  * 
@@ -327,6 +327,9 @@ int construct_dom0(struct domain *d,
     for ( i = 0; i < MAX_VIRT_CPUS; i++ )
         d->shared_info->vcpu_data[i].evtchn_upcall_mask = 1;
     d->shared_info->n_vcpu = smp_num_cpus;
+
+    /* setup shadow and monitor tables */
+    update_pagetable(ed);
 
     /* Install the new page tables. */
     __cli();

@@ -196,28 +196,7 @@ void arch_init_memory(void)
 
 void write_ptbase(struct exec_domain *ed)
 {
-    struct domain *d = ed->domain;
-    unsigned long pa;
-
-#ifdef CONFIG_VMX
-    if ( unlikely(shadow_mode(d)) )
-        pa = ((shadow_mode(d) == SHM_full_32) ?
-              pagetable_val(ed->arch.monitor_table) :
-              pagetable_val(ed->arch.shadow_table));
-    else
-        pa = pagetable_val(ed->arch.guest_table);
-#else
-    if ( unlikely(shadow_mode(d)) )
-        pa = pagetable_val(ed->arch.shadow_table);    
-#ifdef __x86_64__
-    else if ( !(ed->arch.flags & TF_kernel_mode) )
-        pa = pagetable_val(ed->arch.guest_table_user);
-#endif
-    else
-        pa = pagetable_val(ed->arch.guest_table);
-#endif
-
-    write_cr3(pa);
+    write_cr3(pagetable_val(ed->arch.monitor_table));
 }
 
 static void __invalidate_shadow_ldt(struct exec_domain *d)
@@ -1251,8 +1230,7 @@ int new_guest_cr3(unsigned long pfn)
         percpu_info[cpu].deferred_ops &= ~DOP_FLUSH_TLB;
         old_base_pfn = pagetable_val(ed->arch.guest_table) >> PAGE_SHIFT;
         ed->arch.guest_table = mk_pagetable(pfn << PAGE_SHIFT);
-
-        shadow_mk_pagetable(ed);
+        update_pagetables(ed); /* update shadow_table and monitor_table */
 
         write_ptbase(ed);
 

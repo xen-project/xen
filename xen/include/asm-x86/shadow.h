@@ -41,6 +41,7 @@ extern void shadow_l1_normal_pt_update(
 extern void shadow_l2_normal_pt_update(unsigned long pa, unsigned long gpde);
 extern void unshadow_table(unsigned long gpfn, unsigned int type);
 extern int shadow_mode_enable(struct domain *p, unsigned int mode);
+extern void free_shadow_state(struct domain *d);
 
 #ifdef CONFIG_VMX
 extern void vmx_shadow_clear_state(struct domain *);
@@ -723,43 +724,56 @@ static inline unsigned long gva_to_gpa(unsigned long gva)
 
 #endif /* CONFIG_VMX */
 
-static inline void __shadow_mk_pagetable(struct exec_domain *ed)
+static inline void __update_pagetables(struct exec_domain *ed)
 {
     struct domain *d = ed->domain;
     unsigned long gpfn = pagetable_val(ed->arch.guest_table) >> PAGE_SHIFT;
     unsigned long smfn = __shadow_status(d, gpfn) & PSH_pfn_mask;
 
-    SH_VVLOG("0: __shadow_mk_pagetable(gpfn=%p, smfn=%p)", gpfn, smfn);
+    SH_VVLOG("0: __update_pagetables(gpfn=%p, smfn=%p)", gpfn, smfn);
 
     if ( unlikely(smfn == 0) )
         smfn = shadow_l2_table(d, gpfn);
 #ifdef CONFIG_VMX
     else
         if (d->arch.shadow_mode == SHM_full_32)
+        {
             vmx_update_shadow_state(ed, gpfn, smfn);
+        }
 #endif
 
     ed->arch.shadow_table = mk_pagetable(smfn<<PAGE_SHIFT);
+
+    if (d->arch.shadow_mode != SHM_full_32)
+        ed->arch.monitor_table = ed->arch.shadow_table;
 }
 
-static inline void shadow_mk_pagetable(struct exec_domain *ed)
+static inline void update_pagetables(struct exec_domain *ed)
 {
      if ( unlikely(shadow_mode(ed->domain)) )
      {
-         SH_VVLOG("shadow_mk_pagetable( gptbase=%p, mode=%d )",
+         SH_VVLOG("update_pagetables( gptbase=%p, mode=%d )",
              pagetable_val(ed->arch.guest_table),
                   shadow_mode(ed->domain)); 
 
          shadow_lock(ed->domain);
-         __shadow_mk_pagetable(ed);
+         __update_pagetables(ed);
          shadow_unlock(ed->domain);
 
-     SH_VVLOG("leaving shadow_mk_pagetable:\n"
-              "( gptbase=%p, mode=%d ) sh=%p",
-              pagetable_val(ed->arch.guest_table),
-              shadow_mode(ed->domain), 
-              pagetable_val(ed->arch.shadow_table) );
+         SH_VVLOG("leaving update_pagetables:\n"
+                  "( gptbase=%p, mode=%d ) sh=%p",
+                  pagetable_val(ed->arch.guest_table),
+                  shadow_mode(ed->domain), 
+                  pagetable_val(ed->arch.shadow_table) );
      }
+     else
+#ifdef __x86_64__
+         if ( !(ed->arch.flags & TF_kernel_mode) )
+             ed->arch.monitor_table = ed->arch.guest_table_user;
+         else
+#endif
+             ed->arch.monitor_table = ed->arch.guest_table;
+
 }
 
 #if SHADOW_DEBUG

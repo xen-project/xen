@@ -40,8 +40,6 @@ struct domain *do_createdomain(domid_t dom_id, unsigned int cpu)
     atomic_set(&d->refcnt, 1);
     atomic_set(&ed->pausecnt, 0);
 
-    shadow_lock_init(d);
-
     d->id          = dom_id;
     ed->processor  = cpu;
     d->create_time = NOW();
@@ -330,7 +328,6 @@ long do_boot_vcpu(unsigned long vcpu, full_execution_context_t *ctxt)
     ed = d->exec_domain[vcpu];
 
     atomic_set(&ed->pausecnt, 0);
-    shadow_lock_init(d);
 
     memcpy(&ed->arch, &idle0_exec_domain.arch, sizeof(ed->arch));
 

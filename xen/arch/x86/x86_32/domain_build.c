@@ -307,6 +307,9 @@ int construct_dom0(struct domain *d,
         d->shared_info->vcpu_data[i].evtchn_upcall_mask = 1;
     d->shared_info->n_vcpu = smp_num_cpus;
 
+    /* setup shadow and monitor tables */
+    update_pagetables(ed);
+
     /* Install the new page tables. */
     __cli();
     write_ptbase(ed);
@@ -381,9 +384,8 @@ int construct_dom0(struct domain *d,
 #ifndef NDEBUG
     if (0) /* XXXXX DO NOT CHECK IN ENABLED !!! (but useful for testing so leave) */
     {
-        shadow_lock(d);
         shadow_mode_enable(d, SHM_test); 
-        shadow_unlock(d);
+        update_pagetable(ed); /* XXX SMP */
     }
 #endif
 
