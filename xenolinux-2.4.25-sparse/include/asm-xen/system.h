@@ -321,6 +321,7 @@ do {                                                                          \
     shared_info_t *_shared = HYPERVISOR_shared_info;                          \
     barrier();                                                                \
     _shared->vcpu_data[0].evtchn_upcall_mask = 0;                             \
+    barrier(); /* unmask then check (avoid races) */                          \
     if ( unlikely(_shared->vcpu_data[0].evtchn_upcall_pending) )              \
         evtchn_do_upcall(NULL);                                               \
 } while (0)
@@ -334,9 +335,11 @@ do {                                                                          \
 do {                                                                          \
     shared_info_t *_shared = HYPERVISOR_shared_info;                          \
     barrier();                                                                \
-    if ( (_shared->vcpu_data[0].evtchn_upcall_mask = x) == 0 )                \
+    if ( (_shared->vcpu_data[0].evtchn_upcall_mask = x) == 0 ) {              \
+        barrier(); /* unmask then check (avoid races) */                      \
         if ( unlikely(_shared->vcpu_data[0].evtchn_upcall_pending) )          \
             evtchn_do_upcall(NULL);                                           \
+    }                                                                         \
 } while (0)
 
 #define __save_and_cli(x)                                                     \
