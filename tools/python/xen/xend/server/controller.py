@@ -68,7 +68,7 @@ class CtrlMsgRcvr:
     @type responders: {int:Responder}
     """
 
-    def __init__(self):
+    def __init__(self, remote_port = 0):
         self.channelFactory = channel.channelFactory()
         self.majorTypes = {}
         self.dom = None
@@ -76,6 +76,7 @@ class CtrlMsgRcvr:
         self.idx = None
         self.responders = {}
         self.timeout = 10
+        self.remote_port = remote_port
 
     def setTimeout(self, timeout):
         self.timeout = timeout
@@ -217,7 +218,8 @@ class CtrlMsgRcvr:
         channel to our domain. Once we have registered, the channel
         will call requestReceived or responseReceived for our messages.
         """
-        self.channel = self.channelFactory.domChannel(self.dom)
+        self.channel = self.channelFactory.domChannel(self.dom,
+                                                      self.remote_port)
         self.idx = self.channel.getIndex()
         if self.majorTypes:
             self.channel.registerDevice(self.getMajorTypes(), self)
@@ -362,8 +364,8 @@ class Controller(CtrlMsgRcvr):
     @type idx:     String
     """
 
-    def __init__(self, factory, dom):
-        CtrlMsgRcvr.__init__(self)
+    def __init__(self, factory, dom, remote_port=0):
+        CtrlMsgRcvr.__init__(self, remote_port=remote_port)
         self.factory = factory
         self.dom = int(dom)
         self.channel = None

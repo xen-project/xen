@@ -669,12 +669,13 @@ class Daemon:
     def netif_get(self, dom):
         return self.netifCF.getControllerByDom(dom)
 
-    def console_create(self, dom, console_port=None):
+    def console_create(self, dom, console_port=None, remote_port=0):
         """Create a console for a domain.
         """
         console = self.consoleCF.getControllerByDom(dom)
         if console is None:
-            console = self.consoleCF.createController(dom, console_port)
+            console = self.consoleCF.createController(dom, console_port,
+                                                      remote_port=remote_port)
         return console
 
     def consoles(self):

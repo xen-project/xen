@@ -32,8 +32,9 @@ class XendConsole:
     def consoles(self):
         return daemon.get_consoles()
     
-    def console_create(self, dom, console_port=None):
-        consinfo = daemon.console_create(dom, console_port=console_port)
+    def console_create(self, dom, console_port=None, remote_port=0):
+        consinfo = daemon.console_create(dom, console_port=console_port,
+                                         remote_port=remote_port)
         return consinfo
     
     def console_get(self, id):

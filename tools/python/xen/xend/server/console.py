@@ -81,13 +81,14 @@ class ConsoleControllerFactory(controller.ControllerFactory):
     """Factory for creating console controllers.
     """
 
-    def createController(self, dom, console_port=None):
+    def createController(self, dom, console_port=None, remote_port=0):
         if console_port is None:
             console_port = CONSOLE_PORT_BASE + dom
         for c in self.getControllers():
             if c.console_port == console_port:
                 raise XendError('console port in use: ' + str(console_port))
-        console = ConsoleController(self, dom, console_port)
+        console = ConsoleController(self, dom, console_port,
+                                    remote_port=remote_port)
         self.addController(console)
         log.info("Created console id=%s domain=%d port=%d",
                  console.idx, console.dom, console.console_port)
@@ -111,8 +112,9 @@ class ConsoleController(controller.Controller):
     STATUS_CONNECTED = 'connected'
     STATUS_LISTENING = 'listening'
 
-    def __init__(self, factory, dom, console_port):
-        controller.Controller.__init__(self, factory, dom)
+    def __init__(self, factory, dom, console_port, remote_port=0):
+        controller.Controller.__init__(self, factory, dom,
+                                       remote_port=remote_port)
         self.addMethod(CMSG_CONSOLE, 0, None)
         self.status = self.STATUS_NEW
         self.addr = None
