@@ -44,6 +44,7 @@ get_maptrack_handle(
     if ( unlikely((h = t->maptrack_head) == NR_MAPTRACK_ENTRIES) )
         return -1;
     t->maptrack_head = t->maptrack[h].ref_and_flags >> MAPTRACK_REF_SHIFT;
+    t->map_count++;
     return h;
 }
 
@@ -53,6 +54,7 @@ put_maptrack_handle(
 {
     t->maptrack[handle].ref_and_flags = t->maptrack_head << MAPTRACK_REF_SHIFT;
     t->maptrack_head = handle;
+    t->map_count--;
 }
 
 static int
@@ -529,7 +531,7 @@ gnttab_unmap_grant_ref(
     if ( flush == 1 )
         __flush_tlb_one(va);
 
-    else if ( flush )
+    else if ( flush != 0 )
         local_flush_tlb();
 
     return 0;
@@ -734,12 +736,19 @@ gnttab_check_unmap(
     int found = 0;
 
     lgt = ld->grant_table;
+
+    /* Fast exit if we're not mapping anything using grant tables */
+    if ( lgt->map_count == 0 )
+        return 0;
+
     rgt = rd->grant_table;
 
+#ifdef GRANT_DEBUG
     if ( ld->id != 0 ) {
         DPRINTK("Foreign unref rd(%d) ld(%d) frm(%x) flgs(%x).\n",
                 rd->id, ld->id, frame, readonly);
     }
+#endif
 
     for ( handle = 0; handle < NR_MAPTRACK_ENTRIES; handle++ )
     {

@@ -74,6 +74,7 @@ typedef struct {
     /* Mapping tracking table. */
     grant_mapping_t      *maptrack;
     unsigned int          maptrack_head;
+    unsigned int          map_count;
     /* Lock protecting updates to active and shared grant tables. */
     spinlock_t            lock;
 } grant_table_t;
