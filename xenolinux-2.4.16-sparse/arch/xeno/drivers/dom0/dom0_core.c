@@ -40,6 +40,8 @@
 #define DOM_DIR         "dom"
 #define DOM_MEM         "mem"
 
+frame_table_t * frame_table;
+
 static struct proc_dir_entry *xeno_base;
 static struct proc_dir_entry *dom0_cmd_intf;
 static struct proc_dir_entry *proc_ft;
@@ -102,7 +104,11 @@ static ssize_t dom_mem_read(struct file * file, char * buff, size_t size, loff_t
 
     /* remap the range using xen specific routines */
 
+    printk(KERN_ALERT "bd240 debug: dmw entered %lx, %lx\n", mem_data->pfn, mem_data->tot_pages);
+
     addr = direct_mmap(mem_data->pfn << PAGE_SHIFT, mem_data->tot_pages << PAGE_SHIFT, prot, 0, 0);
+    
+    printk(KERN_ALERT "bd240 debug: dmw exit %lx, %lx\n", mem_data->pfn, mem_data->tot_pages);
 
     copy_to_user((unsigned long *)buff, &addr, sizeof(addr));
 
@@ -236,6 +242,8 @@ out:
 
 static int __init init_module(void)
 {
+    frame_table = (frame_table_t *)start_info.frame_table;
+    
     /* xeno proc root setup */
     xeno_base = proc_mkdir(XENO_BASE, &proc_root); 
 

@@ -826,7 +826,11 @@ int do_process_page_updates_bh(page_update_request_t * cur, int count)
 int do_process_page_updates(page_update_request_t *updates, int count)
 {
     page_update_request_t * pg_updates;
+    int ret;
 
     pg_updates = do_process_page_updates_uh(updates, count);
-    return do_process_page_updates_bh(pg_updates, count);
+    ret = do_process_page_updates_bh(pg_updates, count);
+    kfree(pg_updates);
+
+    return ret;
 }
