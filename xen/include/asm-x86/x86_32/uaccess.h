@@ -85,6 +85,7 @@ struct exception_table_entry
 };
 
 extern unsigned long search_exception_table(unsigned long);
+extern void sort_exception_tables(void);
 
 /**
  * get_user: - Get a simple variable from user space.

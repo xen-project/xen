@@ -44,6 +44,7 @@
 
 static struct xlbd_type_info xlbd_ide_type = {
 	.partn_shift = 6,
+	.partn_per_major = 2,
 	// XXXcl todo blksize_size[major]  = 1024;
 	.hardsect_size = 512,
 	.max_sectors = 128,  /* 'hwif->rqsize' if we knew it */
@@ -53,6 +54,7 @@ static struct xlbd_type_info xlbd_ide_type = {
 
 static struct xlbd_type_info xlbd_scsi_type = {
 	.partn_shift = 4,
+	.partn_per_major = 16,
 	// XXXcl todo blksize_size[major]  = 1024; /* XXX 512; */
 	.hardsect_size = 512,
 	.max_sectors = 128*8, /* XXX 128; */
@@ -62,6 +64,7 @@ static struct xlbd_type_info xlbd_scsi_type = {
 
 static struct xlbd_type_info xlbd_vbd_type = {
 	.partn_shift = 4,
+	.partn_per_major = 16,
 	// XXXcl todo blksize_size[major]  = 512;
 	.hardsect_size = 512,
 	.max_sectors = 128,
@@ -167,13 +170,17 @@ static struct xlbd_major_info *xlbd_get_major_info(int xd_device, int *minor)
 	switch (mi_idx) {
 	case 0 ... (NUM_IDE_MAJORS - 1):
 		major_info[mi_idx]->type = &xlbd_ide_type;
+		major_info[mi_idx]->index = mi_idx;
 		break;
 	case NUM_IDE_MAJORS ... (NUM_IDE_MAJORS + NUM_SCSI_MAJORS - 1):
 		major_info[mi_idx]->type = &xlbd_scsi_type;
+		major_info[mi_idx]->index = mi_idx - NUM_IDE_MAJORS;
 		break;
 	case (NUM_IDE_MAJORS + NUM_SCSI_MAJORS) ...
 		(NUM_IDE_MAJORS + NUM_SCSI_MAJORS + NUM_VBD_MAJORS - 1):
 		major_info[mi_idx]->type = &xlbd_vbd_type;
+		major_info[mi_idx]->index = mi_idx -
+			(NUM_IDE_MAJORS + NUM_SCSI_MAJORS);
 		break;
 	}
 	major_info[mi_idx]->major = new_major;
@@ -222,7 +229,8 @@ static struct gendisk *xlvbd_get_gendisk(struct xlbd_major_info *mi,
 	gd->fops = &xlvbd_block_fops;
 	gd->private_data = di;
 	sprintf(gd->disk_name, "%s%c%d", mi->type->name,
-	    'a' + (xd_minor >> mi->type->partn_shift),
+	    'a' + mi->index * mi->type->partn_per_major +
+		(xd_minor >> mi->type->partn_shift),
 	    xd_minor & ((1 << mi->type->partn_shift) - 1));
 	/*  sprintf(gd->devfs_name, "%s%s/disc%d", mi->type->name, , ); XXXdevfs */
 
