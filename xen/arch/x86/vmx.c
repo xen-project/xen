@@ -135,6 +135,7 @@ static int vmx_do_page_fault(unsigned long va, struct xen_regs *regs)
             return 0;
     gpa = (gpte & PAGE_MASK) + (va & ~PAGE_MASK);
 
+    /* Use 1:1 page table to identify MMIO address space */
     if (mmio_space(gpa))
         handle_mmio(va, gpa);
 

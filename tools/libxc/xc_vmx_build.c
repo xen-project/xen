@@ -108,6 +108,44 @@ static void build_e820map(struct mem_map *mem_mapp, unsigned long mem_size)
     mem_mapp->nr_map = nr_map;
 }
 
+static void zap_mmio_range(int xc_handle, u32 dom,
+                            l2_pgentry_t *vl2tab,
+                            unsigned long mmio_range_start,
+                            unsigned long mmio_range_size)
+{
+    unsigned long mmio_addr;
+    unsigned long mmio_range_end = mmio_range_start + mmio_range_size;
+    unsigned long vl2e;
+    l1_pgentry_t *vl1tab;
+
+    mmio_addr = mmio_range_start & PAGE_MASK;
+    for (; mmio_addr < mmio_range_end; mmio_addr += PAGE_SIZE) {
+        vl2e = vl2tab[l2_table_offset(mmio_addr)];
+        vl1tab = xc_map_foreign_range(xc_handle, dom, PAGE_SIZE,
+                                PROT_READ|PROT_WRITE, vl2e >> PAGE_SHIFT);
+        vl1tab[l1_table_offset(mmio_addr)] = 0;
+        munmap(vl1tab, PAGE_SIZE);
+    }
+}
+
+static void zap_mmio_ranges(int xc_handle, u32 dom,
+                            unsigned long l2tab,
+                            struct mem_map *mem_mapp)
+{
+    int i;
+    l2_pgentry_t *vl2tab = xc_map_foreign_range(xc_handle, dom, PAGE_SIZE,
+                                                PROT_READ|PROT_WRITE,
+                                                l2tab >> PAGE_SHIFT);
+    for (i = 0; i < mem_mapp->nr_map; i++) {
+        if ((mem_mapp->map[i].type == E820_IO)
+          && (mem_mapp->map[i].caching_attr == MEMMAP_UC))
+            zap_mmio_range(xc_handle, dom,
+                            vl2tab, mem_mapp->map[i].addr,
+                            mem_mapp->map[i].size);
+    }
+    munmap(vl2tab, PAGE_SIZE);
+}
+
 static int setup_guest(int xc_handle,
                          u32 dom, int memsize,
                          char *image, unsigned long image_size,
@@ -355,6 +393,7 @@ static int setup_guest(int xc_handle,
 
     /* memsize is in megabytes */
     build_e820map(mem_mapp, memsize << 20);
+    zap_mmio_ranges(xc_handle, dom, l2tab, mem_mapp);
     boot_paramsp->e820_map_nr = mem_mapp->nr_map;
     for (i=0; i<mem_mapp->nr_map; i++) {
         boot_paramsp->e820_map[i].addr = mem_mapp->map[i].addr; 

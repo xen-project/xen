@@ -68,8 +68,6 @@ struct instruction {
     __u32   flags; //
 };
 
-#define VGA_SPACE_START   0xA0000
-#define VGA_SPACE_END     0xC0000
 #define MAX_INST_LEN      32
 
 struct mi_per_cpu_info
@@ -89,12 +87,6 @@ struct virutal_platform_def {
 extern void handle_mmio(unsigned long, unsigned long);
 extern int vmx_setup_platform(struct exec_domain *, execution_context_t *);
 
-static inline int mmio_space(unsigned long gpa)
-{
-    if (gpa >= VGA_SPACE_START && gpa < VGA_SPACE_END) {
-        return 1;
-    }
-    return 0;
-}
+#define mmio_space(gpa) (!phys_to_machine_mapping((gpa) >> PAGE_SHIFT))
 
 #endif

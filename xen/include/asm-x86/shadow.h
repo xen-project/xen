@@ -279,7 +279,8 @@ static inline void l1pte_propagate_from_guest(
     unsigned long old_spte = spte;
 #endif
 
-    if ( shadow_mode_external(d) && mmio_space(gpte & 0xFFFFF000) ) {
+    /* Use 1:1 page table to identify MMIO address space */
+    if ( shadow_mode_external(d) && mmio_space(gpte) ) {
         *spte_p = 0;
         return;
     }
