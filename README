@@ -136,7 +136,10 @@ Take a look at the tools/misc/xen-clone script in the BK repository,
 which will 'bk clone' the live master tree, and then set about 
 building everything. The build procedure for xenolinux is slightly 
 complicated as its done by running the 'mkbuildtree' script over
-a pristine Linux tree to patch it for xenolinux.
+a pristine Linux tree to turn it into a xenolinux tree by adding the
+'xeno' architecture.
+
+The public master BK repository lives at:   bk://xen.bkbits.net/xeno.bk
 
 
 

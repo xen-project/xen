@@ -319,7 +319,7 @@ arguments to pass to Xen. In this case, we set the maximum amount of
 memory to allocate to domain0, and the serial baud rate (the default
 is 9600 baud). We could also disable smp support (nosmp) or disable
 hyper-threading support (noht). If you have multiple network interface
-you can use ifname=XXX to select which ones to use. If your network
+you can use ifname=ethXX to select which one to use. If your network
 card is unsupported, use ifname=dummy
 
 The second line specifies which xenolinux image to use, and the
