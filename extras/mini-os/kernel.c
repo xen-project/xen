@@ -36,10 +36,10 @@ char stack[8192];
 void hypervisor_callback(void);
 void failsafe_callback(void);
 
-/* default exit event handler */
+/* default event handlers */
 static void exit_handler(int ev, struct pt_regs *regs);
+static void debug_handler(int ev, struct pt_regs *regs);
 
-extern void trap_init(void);
 
 /*
  * INITIAL C ENTRY POINT.
@@ -100,6 +100,10 @@ void start_kernel(start_info_t *si)
     enable_ev_action(EV_DIE);
     enable_hypervisor_event(EV_DIE);
 
+    add_ev_action(EV_DEBUG, &debug_handler);
+    enable_ev_action(EV_DEBUG);
+    enable_hypervisor_event(EV_DEBUG);
+
     /* init time and timers */
     init_time();
 
@@ -124,3 +128,9 @@ static void exit_handler(int ev, struct pt_regs *regs) {
     do_exit();
 }
 
+/*
+ * a debug handler to print out some state from the guest
+ */
+static void debug_handler(int ev, struct pt_regs *regs) {
+    dump_regs(regs);
+}
