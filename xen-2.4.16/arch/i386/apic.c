@@ -218,9 +218,7 @@ int __init verify_local_APIC(void)
 
 void __init sync_Arb_IDs(void)
 {
-    /*
-     * Wait for idle.
-	 */
+    /* Wait for idle. */
     apic_wait_icr_idle();
 
     Dprintk("Synchronizing Arb IDs.\n");
@@ -508,11 +506,11 @@ void __init wait_8254_wraparound(void)
         prev_count = curr_count;
         curr_count = get_8254_timer_count();
         delta = curr_count-prev_count;
-	/*
-	 * This limit for delta seems arbitrary, but it isn't, it's
-	 * slightly above the level of error a buggy Mercury/Neptune
-	 * chipset timer can cause.
-	 */
+        /*
+         * This limit for delta seems arbitrary, but it isn't, it's slightly 
+         * above the level of error a buggy Mercury/Neptune chipset timer can 
+         * cause.
+         */
     } while (delta < 300);
 }
 
@@ -581,7 +579,7 @@ int __init calibrate_APIC_clock(void)
      * counter running for calibration. */
     __setup_APIC_LVTT(1000000000);
 
-	/* The timer chip counts down to zero. Let's wait
+    /* The timer chip counts down to zero. Let's wait
      * for a wraparound to start exact measurement:
      * (the current tick might have been already half done) */
     wait_8254_wraparound();
@@ -611,18 +609,18 @@ int __init calibrate_APIC_clock(void)
            result/(1000000/HZ),
            result%(1000000/HZ));
 
-	cpu_freq = (u64)(((t2-t1)/LOOPS)*HZ);
+    cpu_freq = (u64)(((t2-t1)/LOOPS)*HZ);
 
-	/* set up multipliers for accurate timer code */
-	bus_freq   = result*HZ;
-	bus_cycle  = (u32) (1000000000000LL/bus_freq); /* in pico seconds */
-	bus_scale  = (1000*262144)/bus_cycle;
+    /* set up multipliers for accurate timer code */
+    bus_freq   = result*HZ;
+    bus_cycle  = (u32) (1000000000000LL/bus_freq); /* in pico seconds */
+    bus_scale  = (1000*262144)/bus_cycle;
 
-	/* print results */
-	printk("..... bus_freq  = %u Hz\n",  bus_freq);
-	printk("..... bus_cycle = %u ps\n",  bus_cycle);
-	printk("..... bus_scale = %u \n",    bus_scale);
-	/* reset APIC to zero timeout value */
+    /* print results */
+    printk("..... bus_freq  = %u Hz\n",  bus_freq);
+    printk("..... bus_cycle = %u ps\n",  bus_cycle);
+    printk("..... bus_scale = %u \n",    bus_scale);
+    /* reset APIC to zero timeout value */
     __setup_APIC_LVTT(0);
     return result;
 }
@@ -636,7 +634,7 @@ void __init setup_APIC_clocks (void)
     printk("Using local APIC timer interrupts.\n");
     using_apic_timer = 1;
     __cli();
-	/* calibrate CPU0 for CPU speed and BUS speed */
+    /* calibrate CPU0 for CPU speed and BUS speed */
     bus_freq = calibrate_APIC_clock();
     /* Now set up the timer for real. */
     setup_APIC_timer((void *)bus_freq);
@@ -654,41 +652,38 @@ void __init setup_APIC_clocks (void)
  */
 int reprogram_ac_timer(s_time_t timeout)
 {
-	int 		cpu = smp_processor_id();
-	s_time_t	now;
-	s_time_t	expire;
-	u64			apic_tmict;
+    int 		cpu = smp_processor_id();
+    s_time_t	now;
+    s_time_t	expire;
+    u64			apic_tmict;
 
-	now = NOW();
-	expire = timeout - now;	/* value from now */
+    now = NOW();
+    expire = timeout - now;	/* value from now */
 
+    if (expire <= 0) {
+        printk("APICT[%02d] Timeout in the past 0x%08X%08X > 0x%08X%08X\n", 
+               cpu, (u32)(now>>32), (u32)now, (u32)(timeout>>32),(u32)timeout);
+        return 0;		/* timeout value in the past */
+    }
 
-	if (expire <= 0) {
-		TRC(printk("APICT[%02d] Timeout in the past 0x%08X%08X > 0x%08X%08X\n", 
-                   cpu, (u32)(now>>32), (u32)now, 
-                   (u32)(timeout>>32),(u32)timeout));
-		return 0;		/* timeout value in the past */
-	}
+    /* conversion to bus units */
+    apic_tmict = (((u64)bus_scale) * expire)>>18;
 
-	/* conversion to bus units */
-	apic_tmict = (((u64)bus_scale) * expire)>>18;
+    if (apic_tmict >= 0xffffffff) {
+        printk("APICT[%02d] Timeout value too large\n", cpu);
+        apic_tmict = 0xffffffff;
+    }
+    if (apic_tmict == 0) {
+        printk("APICT[%02d] timeout value too small\n", cpu);
+        return 0;
+    }
 
-	if (apic_tmict >= 0xffffffff) {
-        /* This is bad! */
-		printk("APICT[%02d] Timeout value too large\n", cpu);
-		apic_tmict = 0xffffffff;
-	}
-	if (apic_tmict == 0) {
-		TRC(printk("APICT[%02d] timeout value too small\n", cpu));
-		return 0;
-	}
+    /* programm timer */
+    apic_write(APIC_TMICT, (unsigned long)apic_tmict);
 
-	/* programm timer */
-	apic_write(APIC_TMICT, (unsigned long)apic_tmict);
-
-	TRC(printk("APICT[%02d] reprog(): expire=%lld %u\n",
-			   cpu, expire, apic_tmict));
-	return 1;
+    TRC(printk("APICT[%02d] reprog(): expire=%lld %u\n",
+               cpu, expire, apic_tmict));
+    return 1;
 }
 
 /*
@@ -702,29 +697,28 @@ int reprogram_ac_timer(s_time_t timeout)
 static s_time_t last_cpu0_tirq = 0;
 inline void smp_local_timer_interrupt(struct pt_regs * regs)
 {
-	int cpu = smp_processor_id();
-	s_time_t diff, now;
-
+    int cpu = smp_processor_id();
+    s_time_t diff, now;
 
     /* if CPU 0 do old timer stuff  */
-	if (cpu == 0) {
+    if (cpu == 0)
+    {
+        now = NOW();
+        diff = now - last_cpu0_tirq;
 
-		now = NOW();
-		diff = now - last_cpu0_tirq;
+        if (diff <= 0) {
+            printk ("System Time went backwards: %lld\n", diff);
+            return;
+        }
 
-		if (diff <= 0) {
-			printk ("System Time went backwards: %lld\n", diff);
-			return;
-		}
-
-		while (diff >= MILLISECS(10)) {
-			do_timer(regs);
-			diff           -= MILLISECS(10);
-			last_cpu0_tirq += MILLISECS(10);
-		}
-	}
-	/* call accurate timer function */
-	do_ac_timer();
+        while (diff >= MILLISECS(10)) {
+            do_timer(regs);
+            diff           -= MILLISECS(10);
+            last_cpu0_tirq += MILLISECS(10);
+        }
+    }
+    /* call accurate timer function */
+    do_ac_timer();
 }
 
 /*
@@ -747,9 +741,8 @@ void smp_apic_timer_interrupt(struct pt_regs * regs)
     apic_timer_irqs[cpu]++;
 
     /*
-     * NOTE! We'd better ACK the irq immediately,
-     * because timer handling can be slow.
-	 * XXX is this save?
+     * NOTE! We'd better ACK the irq immediately, because timer handling can 
+     * be slow. XXX is this save?
      */
     ack_APIC_irq();
 
@@ -825,7 +818,7 @@ int __init APIC_init_uniprocessor (void)
      * Complain if the BIOS pretends there is one.
      */
     if (!cpu_has_apic&&APIC_INTEGRATED(apic_version[boot_cpu_physical_apicid]))
-	{
+    {
         printk("BIOS bug, local APIC #%d not detected!...\n",
                boot_cpu_physical_apicid);
         return -1;
