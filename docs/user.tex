@@ -354,8 +354,8 @@ more complicated. The makefile needs a `pristine' linux kernel tree
 which it will then add the Xen architecture files to. You can tell the
 makefile the location of the appropriate linux compressed tar file by
 setting the LINUX\_SRC environment variable, e.g. \\
-\verb!# LINUX\_SRC=/tmp/linux-2.4.26.tar.gz make world! \\ or by
-placing the tar file somewhere in the search path of LINUX\_SRC\_PATH
+\verb!# LINUX_SRC=/tmp/linux-2.4.26.tar.gz make world! \\ or by
+placing the tar file somewhere in the search path of {\tt LINUX\_SRC\_PATH}
 which defaults to ``{\tt .:..}". If the makefile can't find a suitable
 kernel tar file it attempts to download it from kernel.org (this won't
 work if you're behind a firewall).
@@ -368,7 +368,7 @@ first virtual machine (``domain 0''), and one with a ``-xenU''
 extension that just contains virtual-device drivers.
 
 The procedure is similar to build the Linux 2.6 port: \\
-\verb!# LINUX\_SRC=/path/to/linux2.6/source make linux26!
+\verb!# LINUX_SRC=/path/to/linux2.6/source make linux26!
 
 In both cases, if you have an SMP machine you may wish to give the
 {\tt '-j4'} argument to make to get a parallel build.
@@ -476,11 +476,14 @@ are installed before you proceed.
 
 \section{From the web interface}
 
-\begin{itemize}
-\item Boot the Xen machine and start Xend
-\item Point your web browser at {\tt http://your\_machine:8080/}
-\item XXX More explanation needed here...
-\end{itemize}
+Boot the Xen machine and start Xensv (see Chapter~\ref{cha:xensv} for
+more details) using the command: \\
+\verb_# xensv start_ \\
+This will also start Xend (see Chapter~\ref{cha:xend} for more information).
+
+The domain management interface will then be available at {\tt
+http://your\_machine:8080/}.  This provides a user friendly wizard for
+starting domains and functions for managing running domains.
 
 \section{From the command line}
 
@@ -579,9 +582,7 @@ The output of {\tt xm list} is in rows of the following format:\\
 
 The {\tt xm list} command also supports a long output format when the
 {\tt -l} switch is used.  This outputs the fulls details of the
-running domains in SXP format.
-
- XXX More explanation needed here...
+running domains in Xend's SXP configuration format.
 
 \chapter{Other kinds of storage}
 
@@ -680,6 +681,51 @@ It is also possible to include Python scripting commands in
 configuration files.  This is done in the \path{xmdefaults} file in
 order to handle the {\tt vmid} variable.
 
+
+\chapter{Xend (Node control daemon)}
+\label{cha:xensv}
+
+The Xen Daemon (Xend) performs system management functions related to
+virtual machines.  It forms a central point of control for a machine
+and can be controlled using an HTTP-based protocol.  Xend must be
+running in order to start and manage virtual machines.
+
+Xend must be run as root because it needs access to privileged system
+management functions.  A small set of commands may be issued on the
+Xend command line:
+
+\begin{tabular}{ll}
+\verb_# xend start_ & start Xend, if not already running \\
+\verb_# xend stop_  & stop Xend if already running       \\
+\verb_# xend restart_ & restart Xend if running, otherwise start it \\
+\end{tabular}
+
+An SysV init script called {\tt xend} is provided to start Xend at
+boot time.  The {\tt make install} will install this script in
+{\path{/etc/init.d} automatically.  To enable it, you can make
+symbolic links in the appropriate runlevel directories or use the {\tt
+chkconfig} tool, where available.
+
+Once Xend is running, more sophisticated administration can be done
+using the Xensv web interface (see Chapter~\ref{cha:xensv}).
+
+\chapter{Xensv (Web interface server)}
+\label{cha:xensv}
+
+Xensv is the server for the web control interface.  It can be started
+using:\\
+\verb_# xensv start_ \\
+and stopped using:
+\verb_# xensv stop_ \\
+It will automatically start Xend if it is not already running.
+
+By default, Xensv will serve out the web interface on port 8080.  This
+can be changed by editing {\tt
+/usr/lib/python2.2/site-packages/xen/sv/params.py}.
+
+Once Xensv is running, the web interface can be used to manage running
+domains and provides a user friendly domain creation wizard.
+
 \chapter{The xm tool}
 \label{cha:xm}
 
@@ -728,8 +774,6 @@ The available commands are as follows:
 
 \chapter{Glossary}
 
-XXX More to add here
-
 \begin{description}
 \item[Atropos]             One of the CPU schedulers provided by Xen.
                            Atropos provides domains with absolute shares
@@ -738,6 +782,14 @@ XXX More to add here
 
 \item[BVT]                 The BVT scheduler is used to give propotional
                            fair shares of the CPU to domains.
+
+\item[Exokernel]           A minimal piece of privileged code, similar to
+                           a {\bf microkernel} but providing a more
+			   `hardware-like' interface to the tasks it
+			   manages.  This is similar to a paravirtualising
+			   VMM like {\bf Xen} but was designed as a new
+			   operating system structure, rather than
+			   specifically to run multiple conventional OSs.
 
 \item[FBVT]                A derivative of the { \bf BVT } scheduler that
                            aims to give better fairness performance to IO
@@ -772,6 +824,16 @@ XXX More to add here
                            because it means ``beyond supervisor'',
 			   since it is responsible for managing multiple
 			   ``supervisor'' kernels.
+
+\item[Microkernel]         A small base of code running at the highest
+                           hardware privilege level.  A microkernel is
+			   responsible for sharing CPU and memory (and
+			   sometimes other devices) between less
+			   privileged tasks running on the system.
+			   This is similar to a VMM, particularly a
+			   {\bf paravirtualising} VMM but typically
+			   addressing a different problem space and
+			   providing different kind of interface.
 
 \item[NetBSD/Xen]          A port of NetBSD to the Xen architecture.
 
