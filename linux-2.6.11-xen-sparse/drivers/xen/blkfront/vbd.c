@@ -365,7 +365,7 @@ static int xlvbd_init_device(vdisk_t *xd)
  */
 static int xlvbd_remove_device(int dev16)
 {
-    int i, rc = 0, minor = MINOR(dev16);
+    int i, rc = 0;
     struct gendisk *gd;
     struct block_device *bd;
     struct xlbd_disk_info *di;
@@ -393,7 +393,6 @@ static int xlvbd_remove_device(int dev16)
         goto out;
     }
 
-    BUG_ON(minor != gd->first_minor);
     /* The VBD is mapped to an entire unit. */
     
     invalidate_partition(gd, 0);
