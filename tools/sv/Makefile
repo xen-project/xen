@@ -17,15 +17,17 @@ IMAGES	+= next.png previous.png finish.png
 
 install:
 	# copy XenSV Main.rpy file
-	@$(INSTALL_DIR) $(DESTDIR)$(sv_insdir)
+	@[ -d $(DESTDIR)$(sv_insdir) ] || $(INSTALL_DIR) $(DESTDIR)$(sv_insdir)
 	@$(INSTALL_DATA) Main.rpy $(DESTDIR)$(sv_insdir)
 
 	# copy XenSV images
-	@$(INSTALL_DIR) $(DESTDIR)$(sv_insdir)/images
+	@[ -d $(DESTDIR)$(sv_insdir)/images ] || \
+		$(INSTALL_DIR) $(DESTDIR)$(sv_insdir)/images
 	@(cd images && $(INSTALL_DATA) $(IMAGES) $(DESTDIR)$(sv_insdir)/images)
 
 	# copy XenSV stylesheet
-	@$(INSTALL_DIR) $(DESTDIR)$(sv_insdir)/inc
+	@[ -d $(DESTDIR)$(sv_insdir)/inc ] || \
+		$(INSTALL_DIR) $(DESTDIR)$(sv_insdir)/inc
 	@$(INSTALL_DATA) inc/style.css inc/script.js $(DESTDIR)$(sv_insdir)/inc
 
 clean:

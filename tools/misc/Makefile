@@ -23,8 +23,8 @@ all: $(TARGETS)
 	$(MAKE) -C miniterm
 
 install: all
-	$(INSTALL_DIR) $(DESTDIR)/usr/bin
-	$(INSTALL_DIR) $(DESTDIR)/usr/sbin
+	[ -d $(DESTDIR)/usr/bin ] || $(INSTALL_DIR) $(DESTDIR)/usr/bin
+	[ -d $(DESTDIR)/usr/sbin ] || $(INSTALL_DIR) $(DESTDIR)/usr/sbin
 	$(INSTALL_PROG) $(INSTALL_BIN) $(DESTDIR)/usr/bin
 	$(INSTALL_PROG) $(INSTALL_SBIN) $(DESTDIR)/usr/sbin
 #       No sense in installing miniterm on the Xen box.

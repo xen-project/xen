@@ -29,8 +29,143 @@
 #include <asm/vmx_vmcs.h>
 #include <xen/event.h>
 #include <public/io/ioreq.h>
+#include <asm/vmx_platform.h>
 
 extern long do_block();
+  
+#if defined (__i386__)
+static void load_xen_regs(struct xen_regs *regs)
+{ 
+    /*
+     * Write the guest register value into VMCS
+     */
+    __vmwrite(GUEST_SS_SELECTOR, regs->ss);
+    __vmwrite(GUEST_ESP, regs->esp);
+    __vmwrite(GUEST_EFLAGS, regs->eflags);
+    __vmwrite(GUEST_CS_SELECTOR, regs->cs);
+    __vmwrite(GUEST_EIP, regs->eip);
+}
+
+static void set_reg_value (int size, int index, int seg, struct xen_regs *regs, long value)
+{
+    switch (size) {
+    case BYTE:
+        switch (index) {
+        case 0:
+            regs->eax &= 0xFFFFFF00;
+            regs->eax |= (value & 0xFF);
+            break;
+        case 1:
+            regs->ecx &= 0xFFFFFF00;
+            regs->ecx |= (value & 0xFF);
+            break;
+        case 2:
+            regs->edx &= 0xFFFFFF00;
+            regs->edx |= (value & 0xFF);
+            break;
+        case 3:
+            regs->ebx &= 0xFFFFFF00;
+            regs->ebx |= (value & 0xFF);
+            break;
+        case 4:
+            regs->eax &= 0xFFFF00FF;
+            regs->eax |= ((value & 0xFF) << 8);
+            break;
+        case 5:
+            regs->ecx &= 0xFFFF00FF;
+            regs->ecx |= ((value & 0xFF) << 8);
+            break;
+        case 6:
+            regs->edx &= 0xFFFF00FF;
+            regs->edx |= ((value & 0xFF) << 8);
+            break;
+        case 7:
+            regs->ebx &= 0xFFFF00FF;
+            regs->ebx |= ((value & 0xFF) << 8);
+            break;
+        default:
+            printk("size:%x, index:%x are invalid!\n", size, index);
+            break;
+
+        }
+        break;
+    case WORD:
+        switch (index) {
+        case 0:
+            regs->eax &= 0xFFFF0000;
+            regs->eax |= (value & 0xFFFF);
+            break;
+        case 1:
+            regs->ecx &= 0xFFFF0000;
+            regs->ecx |= (value & 0xFFFF);
+            break;
+        case 2:
+            regs->edx &= 0xFFFF0000;
+            regs->edx |= (value & 0xFFFF);
+            break;
+        case 3:
+            regs->ebx &= 0xFFFF0000;
+            regs->ebx |= (value & 0xFFFF);
+            break;
+        case 4:
+            regs->esp &= 0xFFFF0000;
+            regs->esp |= (value & 0xFFFF);
+            break;
+
+        case 5:
+            regs->ebp &= 0xFFFF0000;
+            regs->ebp |= (value & 0xFFFF);
+            break;
+        case 6:
+            regs->esi &= 0xFFFF0000;
+            regs->esi |= (value & 0xFFFF);
+            break;
+        case 7:
+            regs->edi &= 0xFFFF0000;
+            regs->edi |= (value & 0xFFFF);
+            break;
+        default:
+            printk("size:%x, index:%x are invalid!\n", size, index);
+            break;
+        }
+        break;
+    case LONG:
+        switch (index) {
+        case 0:
+            regs->eax = value;
+            break;
+        case 1:
+            regs->ecx = value;
+            break;
+        case 2:
+            regs->edx = value;
+            break;
+        case 3:
+            regs->ebx = value;
+            break;
+        case 4:
+            regs->esp = value;
+            break;
+        case 5:
+            regs->ebp = value;
+            break;
+        case 6:
+            regs->esi = value;
+            break;
+        case 7:
+            regs->edi = value;
+            break;
+        default:
+            printk("size:%x, index:%x are invalid!\n", size, index);
+            break;
+        }
+        break;
+    default:
+        printk("size:%x, index:%x are invalid!\n", size, index);
+        break;
+    }
+}
+#endif
 
 void vmx_io_assist(struct exec_domain *ed) 
 {
@@ -39,8 +174,12 @@ void vmx_io_assist(struct exec_domain *ed)
     struct domain *d = ed->domain;
     execution_context_t *ec = get_execution_context();
     unsigned long old_eax;
-    unsigned long eflags;
-    int dir;
+    int sign;
+    struct mi_per_cpu_info *mpci_p;
+    struct xen_regs *inst_decoder_regs;
+
+    mpci_p = &ed->thread.arch_vmx.vmx_platform.mpci;
+    inst_decoder_regs = mpci_p->inst_decoder_regs;
 
     /* clear the pending event */
     ed->vcpu_info->evtchn_upcall_pending = 0;
@@ -68,24 +207,39 @@ void vmx_io_assist(struct exec_domain *ed)
         return;
     }
 
-    __vmread(GUEST_EFLAGS, &eflags);
-    dir = (eflags & X86_EFLAGS_DF);
+    sign = (p->df) ? -1 : 1;
+    if (p->port_mm) {
+        if (p->pdata_valid) {
+            ec->esi += sign * p->count * p->size;
+            ec->edi += sign * p->count * p->size;
+        } else {
+            if (p->dir == IOREQ_WRITE) {
+                return;
+            }
+            int size = -1, index = -1;
+
+            size = operand_size(ed->thread.arch_vmx.vmx_platform.mpci.mmio_target);
+            index = operand_index(ed->thread.arch_vmx.vmx_platform.mpci.mmio_target);
+
+            if (ed->thread.arch_vmx.vmx_platform.mpci.mmio_target & WZEROEXTEND) {
+                p->u.data = p->u.data & 0xffff;
+            }        
+            set_reg_value(size, index, 0, (struct xen_regs *)ec, p->u.data);
+
+        }
+        load_xen_regs((struct xen_regs *)ec);
+        return;
+    }
 
     if (p->dir == IOREQ_WRITE) {
         if (p->pdata_valid) {
-            if (!dir)
-                ec->esi += p->count * p->size;
-            else
-                ec->esi -= p->count * p->size;
+            ec->esi += sign * p->count * p->size;
             ec->ecx -= p->count;
         }
         return;
     } else {
         if (p->pdata_valid) {
-            if (!dir)
-                ec->edi += p->count * p->size;
-            else
-                ec->edi -= p->count * p->size;
+            ec->edi += sign * p->count * p->size;
             ec->ecx -= p->count;
             return;
         }
