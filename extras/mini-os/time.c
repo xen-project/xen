@@ -47,102 +47,91 @@
  *************************************************************************/
 
 static unsigned int rdtsc_bitshift;
-static u32      st_scale_f;
-static u32      st_scale_i;
-static u32      shadow_st_pcc;
-static s_time_t shadow_st;
-static u32      shadow_wc_version=0;
-static long     shadow_tv_sec;
-static long     shadow_tv_usec;
-static s_time_t shadow_wc_timestamp;
+static u32 st_scale_f; /* convert ticks -> usecs */
+static u32 st_scale_i; /* convert ticks -> usecs */
 
-/*
- * System time.
- * We need to read the values from the shared info page "atomically" 
- * and use the cycle counter value as the "version" number. Clashes
- * should be very rare.
- */
-inline s_time_t get_s_time(void)
+/* These are peridically updated in shared_info, and then copied here. */
+static u32 shadow_tsc_stamp;
+static s64 shadow_system_time;
+static u32 shadow_time_version;
+static struct timeval shadow_tv;
+
+#ifndef rmb
+#define rmb()  __asm__ __volatile__ ("lock; addl $0,0(%%esp)": : :"memory")
+#endif
+
+#define HANDLE_USEC_OVERFLOW(_tv)          \
+    do {                                   \
+        while ( (_tv).tv_usec >= 1000000 ) \
+        {                                  \
+            (_tv).tv_usec -= 1000000;      \
+            (_tv).tv_sec++;                \
+        }                                  \
+    } while ( 0 )
+
+static void get_time_values_from_xen(void)
 {
-    s32 delta_tsc;
-    u32 low;
-    u64 delta, tsc;
-    u32	version;
-    u64 cpu_freq, scale;
+    do {
+        shadow_time_version = HYPERVISOR_shared_info->time_version2;
+        rmb();
+        shadow_tv.tv_sec    = HYPERVISOR_shared_info->wc_sec;
+        shadow_tv.tv_usec   = HYPERVISOR_shared_info->wc_usec;
+        shadow_tsc_stamp    = HYPERVISOR_shared_info->tsc_timestamp;
+        shadow_system_time  = HYPERVISOR_shared_info->system_time;
+        rmb();
+    }
+    while ( shadow_time_version != HYPERVISOR_shared_info->time_version1 );
+}
 
-    /* check if our values are still up-to-date */
-    while ( (version = HYPERVISOR_shared_info->wc_version) != 
-            shadow_wc_version )
-    {
-        barrier();
 
-        shadow_wc_version   = version;
-        shadow_tv_sec       = HYPERVISOR_shared_info->tv_sec;
-        shadow_tv_usec      = HYPERVISOR_shared_info->tv_usec;
-        shadow_wc_timestamp = HYPERVISOR_shared_info->wc_timestamp;
-        shadow_st_pcc       = HYPERVISOR_shared_info->st_timestamp;
-        shadow_st           = HYPERVISOR_shared_info->system_time;
+#define TIME_VALUES_UP_TO_DATE \
+    (shadow_time_version == HYPERVISOR_shared_info->time_version2)
 
-        rdtsc_bitshift      = HYPERVISOR_shared_info->rdtsc_bitshift;
-        cpu_freq            = HYPERVISOR_shared_info->cpu_freq;
 
-        /* XXX cpu_freq as u32 limits it to 4.29 GHz. Get a better do_div! */
-        scale = 1000000000LL << (32 + rdtsc_bitshift);
-        scale /= cpu_freq;
-        st_scale_f = scale & 0xffffffff;
-        st_scale_i = scale >> 32;
-
-        barrier();
-	}
+static inline unsigned long get_time_delta_usecs(void)
+{
+    s32      delta_tsc;
+    u32      low;
+    u64      delta, tsc;
 
     rdtscll(tsc);
     low = (u32)(tsc >> rdtsc_bitshift);
-    delta_tsc = (s32)(low - shadow_st_pcc);
+    delta_tsc = (s32)(low - shadow_tsc_stamp);
     if ( unlikely(delta_tsc < 0) ) delta_tsc = 0;
     delta = ((u64)delta_tsc * st_scale_f);
     delta >>= 32;
     delta += ((u64)delta_tsc * st_scale_i);
 
-    return shadow_st + delta;
+    return (unsigned long)delta;
 }
 
 
-/*
- * Wallclock time.
- * Based on what the hypervisor tells us, extrapolated using system time.
- * Again need to read a number of values from the shared page "atomically".
- * this time using a version number.
- */
 void gettimeofday(struct timeval *tv)
 {
-    long          usec, sec;
-    u64           now;
+    struct timeval _tv;
 
-    now   = get_s_time();
-    usec  = ((unsigned long)(now-shadow_wc_timestamp))/1000;
-    sec   = shadow_tv_sec;
-    usec += shadow_tv_usec;
-
-    while ( usec >= 1000000 ) 
-    {
-        usec -= 1000000;
-        sec++;
+    do {
+        get_time_values_from_xen();
+        _tv.tv_usec = get_time_delta_usecs();
+        _tv.tv_sec   = shadow_tv.tv_sec;
+        _tv.tv_usec += shadow_tv.tv_usec;
     }
+    while ( unlikely(!TIME_VALUES_UP_TO_DATE) );
 
-    tv->tv_sec = sec;
-    tv->tv_usec = usec;
+    HANDLE_USEC_OVERFLOW(_tv);
+    *tv = _tv;
 }
 
 
 static void timer_handler(int ev, struct pt_regs *regs)
 {
     static int i;
-    s_time_t now;
+    struct timeval tv;
 
     i++;
     if (i >= 1000) {
-        now = get_s_time();
-        printf("T(%lld)\n", now);
+        gettimeofday(&tv);
+        printf("T(s=%ld us=%ld)\n", tv.tv_sec, tv.tv_usec);
         i = 0;
     }
 }
@@ -150,11 +139,20 @@ static void timer_handler(int ev, struct pt_regs *regs)
 
 void init_time(void)
 {
-    u64         __cpu_khz;
+    u64         __cpu_khz, cpu_freq, scale;
     unsigned long cpu_khz;
 
     __cpu_khz = HYPERVISOR_shared_info->cpu_freq;
     cpu_khz = (u32) (__cpu_khz/1000);
+
+    rdtsc_bitshift = HYPERVISOR_shared_info->rdtsc_bitshift;
+    cpu_freq       = HYPERVISOR_shared_info->cpu_freq;
+
+    scale = 1000000LL << (32 + rdtsc_bitshift);
+    scale /= cpu_freq;
+
+    st_scale_f = scale & 0xffffffff;
+    st_scale_i = scale >> 32;
 
     printk("Xen reported: %lu.%03lu MHz processor.\n", 
            cpu_khz / 1000, cpu_khz % 1000);
