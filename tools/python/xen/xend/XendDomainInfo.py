@@ -465,6 +465,7 @@ class XendDomainInfo:
         @param name: name
         @raise: VMerror if invalid
         """
+        if self.recreate: return
         if name is None or name == '':
             raise VmError('missing vm name')
         if name[0] in string.digits:
