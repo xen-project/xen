@@ -30,16 +30,17 @@ Connecting to the virtual console
 Logging in via virtual console
 ------------------------------
  It is possible to log in to a guest OS via its virtual console if a
- 'getty' is running. To achieve this, a suitable device node must be
- created, and a new line added to inittab:
+ 'getty' is running. In most domains the virtual console is named tty1
+ so standard startup scripts and /etc/inittab should work
+ fine. Furthermore, tty2-63 are created as dummy console devices to
+ suppress warnings from standard startup scripts.
+
+ In domain 0 we avoid conflict with the 'real' console by registering
+ the virtual console with a special device number. A suitable device
+ node must therefore be created, and a new line added to inittab:
   # mkdir -p /dev/xen
   # mknod /dev/xen/cons c 4 123
   # echo "c:2345:respawn:/sbin/mingetty --noclear xen/cons" >>/etc/inittab
-
- [NOTE to users in the lab -- existing Xen installations may be running
- mingetty on /dev/console. This is incorrect behaviour! Please modify
- such setups to run mingetty on /dev/xen/cons.]
-
  Additionally, if you wish to allow root logins via the virtual
  console, then 'xen/cons' must be added to the trusted tty list in
  /etc/securetty. On some systems you *may* also need to modify the
@@ -48,12 +49,12 @@ Logging in via virtual console
 Virtual console for other domains
 ---------------------------------
  Every guest OS has a virtual console that is accessible via
- 'console=xencons0' at boot time, or mingetty running on
- /dev/xen/cons. However, domains other than domain 0 do not have access
- to the physical serial line. Instead, their console data is sent to
- and from a control daemon running in domain 0. When properly
- installed, this daemon can be started from the init scripts (e.g.,
- rc.local):
+ 'console=tty0' at boot time (or 'console=xencons0' for domain 0), and
+ mingetty running on /dev/tty1 (or /dev/xen/cons for domain 0).
+ However, domains other than domain 0 do not have access to the
+ physical serial line. Instead, their console data is sent to and from
+ a control daemon running in domain 0. When properly installed, this
+ daemon can be started from the init scripts (e.g., rc.local):
   # /usr/sbin/xend start
 
  Alternatively, Redhat- and LSB-compatible Linux installations can use

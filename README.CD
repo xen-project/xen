@@ -545,15 +545,19 @@ remove ttyN from /etc/inittab for domains>0.  Due to a bug in the RH9
 as it ignores the '#' and tries to access them anyway.
 
 Every Xenolinux instance owns a bidirectional 'virtual
-console'. Boot-time output can be directed to this console by
-specifying 'console=xencons0' as a boot parameter. It is also possible
-to log in via the virtual console. To do this, you must run a mingetty
-on the virtual console, which you can achieve as follows:
+console'. Boot-time output will be directed to this console by default
+for all domain other than 0 (because the console name is tty0); domain
+0 requires you to specify 'console=xencons0' as a boot parameter. It
+is also possible to log in via the virtual console --- once again, for
+most domains your normal startup scripts will work as normal (e.g., by
+running mingetty on tty1-7). For domain 0, you must connect to the
+special 'xencons' device node:
  # mkdir -p /dev/xen
  # mknod /dev/xen/cons c 4 123
  # echo "c:2345:respawn:/sbin/mingetty --noclear xen/cons" >>/etc/inittab
-If you wish to permit root logins via the virtual console then you must
-also add 'xen/cons' to the list of trusted ttys in /etc/securetty.
+If you wish to permit root logins via the special DOM0 node then you
+must also add 'xen/cons' to the list of trusted ttys in
+/etc/securetty.
 
 Note that, because domains>0 don't have any privileged access at all,
 certain commands in the default boot sequence will fail e.g. attempts

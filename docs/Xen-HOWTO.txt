@@ -276,18 +276,13 @@ terminal session. This module is also installed as /usr/bin/xencons,
 from a copy in tools/misc/xencons.  An alternative to manually running
 a terminal client is to specify '-c' to xc_dom_create.py, or add
 'auto_console=True' to the defaults file. This will cause
-xc_dom_create.py to automatically become teh console terminal after
+xc_dom_create.py to automatically become the console terminal after
 starting the domain.
 
-Boot-time output can be directed to this 'virtual console' by
-specifying 'console=xencons0' as a boot parameter. It is also possible
-to log in via the virtual console. To do this, you must run a mingetty
-on the virtual console, which you can achieve as follows:
- # mkdir -p /dev/xen
- # mknod /dev/xen/cons c 4 123
- # echo "c:2345:respawn:/sbin/mingetty --noclear xen/cons" >>/etc/inittab
-If you wish to permit root logins via the virtual console then you must
-also add 'xen/cons' to the list of trusted ttys in /etc/securetty.
+Boot-time output will be directed to this console by default, because
+the console name is tty0. It is also possible to log in via the
+virtual console --- once again, your normal startup scripts will work
+as normal (e.g., by running mingetty on tty1-7).
 
 
 Manage Running Domains

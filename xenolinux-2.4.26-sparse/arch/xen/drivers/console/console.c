@@ -30,7 +30,13 @@
 #include <asm/hypervisor-ifs/event_channel.h>
 #include <asm/ctrl_if.h>
 
-#define XEN_TTY_MINOR 123
+/*
+ * NB. /dev/xencons[0-9]+ are only exported by domain 0.
+ * All other domains use the normal /dev/tty[0-9]+ device nodes.
+ * Only /dev/tty1 is currently hooked up to real I/O -- all others are
+ * dummies to suppress warnings from standard distro startip scripts.
+ */
+#define XENCONS_TTY_MINOR   123
 
 /* The kernel and user-land drivers share a common transmit buffer. */
 #define WBUF_SIZE     4096
@@ -93,22 +99,34 @@ static void kcons_write_dom0(
 
 static kdev_t kcons_device(struct console *c)
 {
-    /*
-     * This is the magic that binds our "struct console" to our
-     * "tty_struct", defined below.
-     */
-    return MKDEV(TTY_MAJOR, XEN_TTY_MINOR);
+    return MKDEV(TTY_MAJOR, 1);
+}
+
+static kdev_t kcons_device_dom0(struct console *c)
+{
+    return MKDEV(TTY_MAJOR, XENCONS_TTY_MINOR);
 }
 
 static struct console kcons_info = {
-    name:    "xencons",
-    device:  kcons_device,
     flags:   CON_PRINTBUFFER,
     index:   -1,
 };
 
 void xen_console_init(void)
 {
+    if ( start_info.flags & SIF_INITDOMAIN )
+    {
+        strcpy(kcons_info.name, "xencons");
+        kcons_info.device = kcons_device_dom0;
+        kcons_info.write  = kcons_write_dom0;
+    }
+    else
+    {
+        strcpy(kcons_info.name, "tty");
+        kcons_info.device = kcons_device;
+        kcons_info.write  = kcons_write;
+    }
+
     kcons_info.write = 
         (start_info.flags & SIF_INITDOMAIN) ? kcons_write_dom0 : kcons_write;
     register_console(&kcons_info);
@@ -177,9 +195,9 @@ void xencons_force_flush(void)
 
 static struct tty_driver xencons_driver;
 static int xencons_refcount;
-static struct tty_struct *xencons_table[1];
-static struct termios *xencons_termios[1];
-static struct termios *xencons_termios_locked[1];
+static struct tty_struct *xencons_table[MAX_NR_CONSOLES];
+static struct termios *xencons_termios[MAX_NR_CONSOLES];
+static struct termios *xencons_termios_locked[MAX_NR_CONSOLES];
 static struct tty_struct *xencons_tty;
 static int xencons_priv_irq;
 static char x_char;
@@ -323,6 +341,10 @@ static int xencons_chars_in_buffer(struct tty_struct *tty)
 static void xencons_send_xchar(struct tty_struct *tty, char ch)
 {
     unsigned long flags;
+
+    if ( MINOR(tty->device) != xencons_driver.minor_start )
+        return;
+
     spin_lock_irqsave(&xencons_lock, flags);
     x_char = ch;
     __xencons_tx_flush();
@@ -331,12 +353,18 @@ static void xencons_send_xchar(struct tty_struct *tty, char ch)
 
 static void xencons_throttle(struct tty_struct *tty)
 {
+    if ( MINOR(tty->device) != xencons_driver.minor_start )
+        return;
+
     if ( I_IXOFF(tty) )
         xencons_send_xchar(tty, STOP_CHAR(tty));
 }
 
 static void xencons_unthrottle(struct tty_struct *tty)
 {
+    if ( MINOR(tty->device) != xencons_driver.minor_start )
+        return;
+
     if ( I_IXOFF(tty) )
     {
         if ( x_char != 0 )
@@ -349,6 +377,10 @@ static void xencons_unthrottle(struct tty_struct *tty)
 static void xencons_flush_buffer(struct tty_struct *tty)
 {
     unsigned long flags;
+
+    if ( MINOR(tty->device) != xencons_driver.minor_start )
+        return;
+
     spin_lock_irqsave(&xencons_lock, flags);
     wc = wp = 0;
     spin_unlock_irqrestore(&xencons_lock, flags);
@@ -371,6 +403,9 @@ static int xencons_write(struct tty_struct *tty, int from_user,
 
     if ( from_user && verify_area(VERIFY_READ, buf, count) )
         return -EINVAL;
+
+    if ( MINOR(tty->device) != xencons_driver.minor_start )
+        return count;
 
     spin_lock_irqsave(&xencons_lock, flags);
 
@@ -396,6 +431,10 @@ static int xencons_write(struct tty_struct *tty, int from_user,
 static void xencons_put_char(struct tty_struct *tty, u_char ch)
 {
     unsigned long flags;
+
+    if ( MINOR(tty->device) != xencons_driver.minor_start )
+        return;
+
     spin_lock_irqsave(&xencons_lock, flags);
     (void)__xencons_put_char(ch);
     spin_unlock_irqrestore(&xencons_lock, flags);
@@ -404,6 +443,10 @@ static void xencons_put_char(struct tty_struct *tty, u_char ch)
 static void xencons_flush_chars(struct tty_struct *tty)
 {
     unsigned long flags;
+
+    if ( MINOR(tty->device) != xencons_driver.minor_start )
+        return;
+
     spin_lock_irqsave(&xencons_lock, flags);
     __xencons_tx_flush();
     spin_unlock_irqrestore(&xencons_lock, flags);    
@@ -412,6 +455,9 @@ static void xencons_flush_chars(struct tty_struct *tty)
 static void xencons_wait_until_sent(struct tty_struct *tty, int timeout)
 {
     unsigned long orig_jiffies = jiffies;
+
+    if ( MINOR(tty->device) != xencons_driver.minor_start )
+        return;
 
     while ( tty->driver.chars_in_buffer(tty) )
     {
@@ -430,6 +476,9 @@ static int xencons_open(struct tty_struct *tty, struct file *filp)
 {
     int line;
     unsigned long flags;
+
+    if ( MINOR(tty->device) != xencons_driver.minor_start )
+        return 0;
 
     MOD_INC_USE_COUNT;
     line = MINOR(tty->device) - tty->driver.minor_start;
@@ -453,6 +502,9 @@ static void xencons_close(struct tty_struct *tty, struct file *filp)
 {
     unsigned long flags;
 
+    if ( MINOR(tty->device) != xencons_driver.minor_start )
+        return;
+
     if ( tty->count == 1 )
     {
         tty->closing = 1;
@@ -474,10 +526,8 @@ static int __init xencons_init(void)
 {
     memset(&xencons_driver, 0, sizeof(struct tty_driver));
     xencons_driver.magic           = TTY_DRIVER_MAGIC;
-    xencons_driver.name            = "xencons";
     xencons_driver.major           = TTY_MAJOR;
-    xencons_driver.minor_start     = XEN_TTY_MINOR;
-    xencons_driver.num             = 1;
+    xencons_driver.num             = MAX_NR_CONSOLES;
     xencons_driver.type            = TTY_DRIVER_TYPE_SERIAL;
     xencons_driver.subtype         = SERIAL_TYPE_NORMAL;
     xencons_driver.init_termios    = tty_std_termios;
@@ -487,6 +537,17 @@ static int __init xencons_init(void)
     xencons_driver.table           = xencons_table;
     xencons_driver.termios         = xencons_termios;
     xencons_driver.termios_locked  = xencons_termios_locked;
+
+    if ( start_info.flags & SIF_INITDOMAIN )
+    {
+        xencons_driver.name        = "xencons";
+        xencons_driver.minor_start = XENCONS_TTY_MINOR;
+    }
+    else
+    {
+        xencons_driver.name        = "tty";
+        xencons_driver.minor_start = 1;
+    }
 
     xencons_driver.open            = xencons_open;
     xencons_driver.close           = xencons_close;
