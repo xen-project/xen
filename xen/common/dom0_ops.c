@@ -321,8 +321,6 @@ long do_dom0_op(dom0_op_t *u_dom0_op)
                     p->failsafe_selector;
                 op.u.getdomaininfo.ctxt.failsafe_callback_eip = 
                     p->failsafe_address;
-                op.u.getdomaininfo.ctxt.start_info_frame = 
-                    p->thread.start_info_frame;
             }
         }
         read_unlock_irqrestore(&tasklist_lock, flags);

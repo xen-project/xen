@@ -599,7 +599,10 @@ static void reset_xlblk_interface(void)
     if ( HYPERVISOR_block_io_op(&op) != 0 )
         printk(KERN_ALERT "Possible blkdev trouble: couldn't reset ring\n");
 
-    set_fixmap(FIX_BLKRING_BASE, start_info.blk_ring);
+    op.cmd = BLOCK_IO_OP_RING_ADDRESS;
+    (void)HYPERVISOR_block_io_op(&op);
+
+    set_fixmap(FIX_BLKRING_BASE, op.u.ring_mfn << PAGE_SHIFT);
     blk_ring = (blk_ring_t *)fix_to_virt(FIX_BLKRING_BASE);
     blk_ring->req_prod = blk_ring->resp_prod = resp_cons = req_prod = 0;
 

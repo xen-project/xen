@@ -118,13 +118,29 @@ static void dbg_network_int(int irq, void *unused, struct pt_regs *ptregs)
 static int network_open(struct net_device *dev)
 {
     struct net_private *np = dev->priv;
-    int i;
+    netop_t netop;
+    int i, ret;
 
-    if ( HYPERVISOR_net_io_op(NETOP_RESET_RINGS, np->idx) != 0 )
+    netop.cmd = NETOP_RESET_RINGS;
+    netop.vif = np->idx;
+    if ( (ret = HYPERVISOR_net_io_op(&netop)) != 0 )
+    {
         printk(KERN_ALERT "Possible net trouble: couldn't reset ring idxs\n");
+        return ret;
+    }
+
+    netop.cmd = NETOP_GET_VIF_INFO;
+    netop.vif = np->idx;
+    if ( (ret = HYPERVISOR_net_io_op(&netop)) != 0 )
+    {
+        printk(KERN_ALERT "Couldn't get info for vif %d\n", np->idx);
+        return ret;
+    }
+
+    memcpy(dev->dev_addr, netop.u.get_vif_info.vmac, ETH_ALEN);
 
     set_fixmap(FIX_NETRING0_BASE + np->net_ring_fixmap_idx, 
-               start_info.net_rings[np->idx]);
+               netop.u.get_vif_info.ring_mfn << PAGE_SHIFT);
     np->net_ring = (net_ring_t *)fix_to_virt(
         FIX_NETRING0_BASE + np->net_ring_fixmap_idx);
     np->net_idx  = &HYPERVISOR_shared_info->net_idx[np->idx];
@@ -209,6 +225,7 @@ static void network_alloc_rx_buffers(struct net_device *dev)
     struct net_private *np = dev->priv;
     struct sk_buff *skb;
     unsigned int end = RX_RING_ADD(np->rx_resp_cons, RX_MAX_ENTRIES);    
+    netop_t netop;
 
     if ( ((i = np->net_idx->rx_req_prod) == end) ||
          (np->state != STATE_ACTIVE) )
@@ -245,7 +262,9 @@ static void network_alloc_rx_buffers(struct net_device *dev)
     /* Batch Xen notifications. */
     if ( np->rx_bufs_to_notify > (RX_MAX_ENTRIES/4) )
     {
-        HYPERVISOR_net_io_op(NETOP_PUSH_BUFFERS, np->idx);
+        netop.cmd = NETOP_PUSH_BUFFERS;
+        netop.vif = np->idx;
+        (void)HYPERVISOR_net_io_op(&netop);
         np->rx_bufs_to_notify = 0;
     }
 }
@@ -255,6 +274,7 @@ static int network_start_xmit(struct sk_buff *skb, struct net_device *dev)
 {
     unsigned int i, id;
     struct net_private *np = (struct net_private *)dev->priv;
+    netop_t netop;
 
     if ( np->tx_full )
     {
@@ -303,7 +323,11 @@ static int network_start_xmit(struct sk_buff *skb, struct net_device *dev)
     /* Only notify Xen if there are no outstanding responses. */
     mb();
     if ( np->net_idx->tx_resp_prod == i )
-        HYPERVISOR_net_io_op(NETOP_PUSH_BUFFERS, np->idx);
+    {
+        netop.cmd = NETOP_PUSH_BUFFERS;
+        netop.vif = np->idx;
+        (void)HYPERVISOR_net_io_op(&netop);
+    }
 
     return 0;
 }
@@ -391,13 +415,16 @@ static void network_interrupt(int irq, void *unused, struct pt_regs *ptregs)
 int network_close(struct net_device *dev)
 {
     struct net_private *np = dev->priv;
+    netop_t netop;
 
     np->state = STATE_SUSPENDED;
     wmb();
 
     netif_stop_queue(np->dev);
 
-    HYPERVISOR_net_io_op(NETOP_FLUSH_BUFFERS, np->idx);
+    netop.cmd = NETOP_FLUSH_BUFFERS;
+    netop.vif = np->idx;
+    (void)HYPERVISOR_net_io_op(&netop);
 
     while ( (np->rx_resp_cons != np->net_idx->rx_req_prod) ||
             (np->tx_resp_cons != np->net_idx->tx_req_prod) )
@@ -498,6 +525,7 @@ int __init init_module(void)
     int i, fixmap_idx=-1, err;
     struct net_device *dev;
     struct net_private *np;
+    netop_t netop;
 
     INIT_LIST_HEAD(&dev_list);
 
@@ -523,7 +551,10 @@ int __init init_module(void)
 
     for ( i = 0; i < MAX_DOMAIN_VIFS; i++ )
     {
-        if ( start_info.net_rings[i] == 0 )
+        /* If the VIF is invalid then the query hypercall will fail. */
+        netop.cmd = NETOP_GET_VIF_INFO;
+        netop.vif = i;
+        if ( HYPERVISOR_net_io_op(&netop) != 0 )
             continue;
 
         /* We actually only support up to 4 vifs right now. */
@@ -548,7 +579,7 @@ int __init init_module(void)
         dev->stop            = network_close;
         dev->get_stats       = network_get_stats;
 
-        memcpy(dev->dev_addr, start_info.net_vmac[i], ETH_ALEN);
+        memcpy(dev->dev_addr, netop.u.get_vif_info.vmac, ETH_ALEN);
 
         if ( (err = register_netdev(dev)) != 0 )
         {

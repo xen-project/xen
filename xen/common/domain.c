@@ -325,11 +325,7 @@ void release_task(struct task_struct *p)
  */
 int final_setup_guestos(struct task_struct *p, dom0_builddomain_t *builddomain)
 {
-    start_info_t *startinfo;
     unsigned long phys_l2tab;
-    net_ring_t *shared_rings;
-    net_vif_t *net_vif;
-    int i;
 
     if ( (p->flags & PF_CONSTRUCTED) )
         return -EINVAL;
@@ -365,7 +361,6 @@ int final_setup_guestos(struct task_struct *p, dom0_builddomain_t *builddomain)
     p->event_address     = builddomain->ctxt.event_callback_eip;
     p->failsafe_selector = builddomain->ctxt.failsafe_callback_cs;
     p->failsafe_address  = builddomain->ctxt.failsafe_callback_eip;
-    p->thread.start_info_frame = builddomain->ctxt.start_info_frame;
     
     /* NB. Page base must already be pinned! */
     phys_l2tab = builddomain->ctxt.pt_base;
@@ -376,30 +371,9 @@ int final_setup_guestos(struct task_struct *p, dom0_builddomain_t *builddomain)
     /* Set up the shared info structure. */
     update_dom_time(p->shared_info);
 
-    startinfo = (start_info_t *)
-        map_domain_mem(p->thread.start_info_frame << PAGE_SHIFT);
-
     /* Add virtual network interfaces and point to them in startinfo. */
     while ( builddomain->num_vifs-- > 0 )
-    {
-        net_vif = create_net_vif(p->domain);
-        shared_rings = net_vif->shared_rings;
-        if (!shared_rings) panic("no network ring!\n");
-    }
-
-    for ( i = 0; i < MAX_DOMAIN_VIFS; i++ )
-    {
-        if ( p->net_vif_list[i] == NULL ) continue;
-        startinfo->net_rings[i] = 
-            virt_to_phys(p->net_vif_list[i]->shared_rings);
-        memcpy(startinfo->net_vmac[i],
-               p->net_vif_list[i]->vmac, ETH_ALEN);
-    }
-
-    /* Add block io interface */
-    startinfo->blk_ring = virt_to_phys(p->blk_ring_base);
-
-    unmap_domain_mem(startinfo);
+        (void)create_net_vif(p->domain);
 
     p->flags |= PF_CONSTRUCTED;
     
@@ -438,8 +412,6 @@ int setup_guestos(struct task_struct *p, dom0_createdomain_t *params,
     l2_pgentry_t *l2tab, *l2start;
     l1_pgentry_t *l1tab = NULL, *l1start = NULL;
     struct pfn_info *page = NULL;
-    net_ring_t *shared_rings;
-    net_vif_t *net_vif;
 
     /* Sanity! */
     if ( p->domain != 0 ) BUG();
@@ -581,9 +553,6 @@ int setup_guestos(struct task_struct *p, dom0_createdomain_t *params,
     update_dom_time(p->shared_info);
     p->shared_info->domain_time = 0;
 
-    /* DOM0 can't be stopped/started, so no need for an ongoing s.i. frame. */
-    p->thread.start_info_frame = 0;
-
     virt_startinfo_address = (start_info_t *)
         (virt_load_address + ((alloc_index - 1) << PAGE_SHIFT));
     virt_stack_address  = (unsigned long)virt_startinfo_address;
@@ -636,23 +605,8 @@ int setup_guestos(struct task_struct *p, dom0_createdomain_t *params,
     }
 
     /* Add virtual network interfaces and point to them in startinfo. */
-    while (num_vifs-- > 0) {
-        net_vif = create_net_vif(dom);
-        shared_rings = net_vif->shared_rings;
-        if (!shared_rings) panic("no network ring!\n");
-    }
-
-    for ( i = 0; i < MAX_DOMAIN_VIFS; i++ )
-    {
-        if ( p->net_vif_list[i] == NULL ) continue;
-        virt_startinfo_address->net_rings[i] = 
-            virt_to_phys(p->net_vif_list[i]->shared_rings);
-        memcpy(virt_startinfo_address->net_vmac[i],
-               p->net_vif_list[i]->vmac, ETH_ALEN);
-    }
-
-    /* Add block io interface */
-    virt_startinfo_address->blk_ring = virt_to_phys(p->blk_ring_base); 
+    while ( num_vifs-- > 0 )
+        (void)create_net_vif(dom);
 
     dst = virt_startinfo_address->cmd_line;
     if ( cmdline != NULL )

@@ -78,9 +78,10 @@ typedef struct xen_vbd_info
 /* Block I/O trap operations and associated structures.
  */
 
-#define BLOCK_IO_OP_SIGNAL      0    /* let xen know we have work to do */ 
-#define BLOCK_IO_OP_ATTACH_VBD  1    /* attach a VBD to a given domain */
-#define BLOCK_IO_OP_RESET       2    /* reset ring indexes on quiescent i/f */
+#define BLOCK_IO_OP_SIGNAL       0 /* let xen know we have work to do     */ 
+#define BLOCK_IO_OP_ATTACH_VBD   1 /* attach a VBD to a given domain      */
+#define BLOCK_IO_OP_RESET        2 /* reset ring indexes on quiescent i/f */
+#define BLOCK_IO_OP_RING_ADDRESS 3 /* returns machine address of I/O ring */
 
 typedef struct _extent { 
     u16       raw_device; 
@@ -103,9 +104,10 @@ typedef struct block_io_op_st
     unsigned long cmd;
     union
     {
-        /* no entry for BLOCK_IO_OP_SIGNAL */
+        /* no entry for BLOCK_IO_OP_SIGNAL       */
 	vbd_attach_t attach_info; 
-        /* no entry for BLOCK_IO_OP_RESET  */
+        /* no entry for BLOCK_IO_OP_RESET        */
+        unsigned long ring_mfn;
     }
     u;
 } block_io_op_t;

@@ -79,8 +79,6 @@ static shared_info_t *map_shared_info(unsigned long pa)
  */
 void start_kernel(start_info_t *si)
 {
-    int i;
-
     /* Copy the start_info struct to a globally-accessible area. */
     memcpy(&start_info, si, sizeof(*si));
 
@@ -105,11 +103,13 @@ void start_kernel(start_info_t *si)
     printk("  pt_base:    %p",    (void *)si->pt_base); 
     printk("  mod_start:  0x%lx\n", si->mod_start);
     printk("  mod_len:    %lu\n", si->mod_len); 
+#if 0 /* XXX Change to use NETOP_GET_VIF_INFO and BLOCK_IO_OP_RING_ADDRESS */
     printk("  net_rings: ");
     for (i = 0; i < MAX_DOMAIN_VIFS; i++) {
         printk(" %lx", si->net_rings[i]);
     }; printk("\n");
     printk("  blk_ring:   0x%lx\n", si->blk_ring);
+#endif
     printk("  dom_id:     %d\n",  si->dom_id);
     printk("  flags:      0x%lx\n", si->flags);
     printk("  cmd_line:   %s\n",  si->cmd_line ? (const char *)si->cmd_line : "NULL");

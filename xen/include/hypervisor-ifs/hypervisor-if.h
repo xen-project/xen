@@ -286,18 +286,15 @@ typedef struct shared_info_st {
  * NB. We expect that this struct is smaller than a page.
  */
 typedef struct start_info_st {
+    /* THE FOLLOWING ARE FILLED IN BOTH ON INITIAL BOOT AND ON RESUME.     */
+    unsigned long nr_pages;	  /* total pages allocated to this domain. */
+    unsigned long shared_info;	  /* MACHINE address of shared info struct.*/
+    unsigned long dom_id;         /* Domain identifier.                    */
+    unsigned long flags;          /* SIF_xxx flags.                        */
     /* THE FOLLOWING ARE ONLY FILLED IN ON INITIAL BOOT (NOT RESUME).      */
     unsigned long pt_base;	  /* VIRTUAL address of page directory.    */
     unsigned long mod_start;	  /* VIRTUAL address of pre-loaded module. */
     unsigned long mod_len;	  /* Size (bytes) of pre-loaded module.    */
-    /* THE FOLLOWING ARE FILLED IN BOTH ON INITIAL BOOT AND ON RESUME.     */
-    unsigned long nr_pages;	  /* total pages allocated to this domain. */
-    unsigned long shared_info;	  /* MACHINE address of shared info struct.*/
-    unsigned int  dom_id;         /* Domain identifier.                    */
-    unsigned long flags;          /* SIF_xxx flags.                        */
-    unsigned long net_rings[MAX_DOMAIN_VIFS];   /* MACHINE address of ring.*/
-    unsigned char net_vmac[MAX_DOMAIN_VIFS][6]; /* MAC address of VIF.     */
-    unsigned long blk_ring;       /* MACHINE address of blkdev ring.       */
     unsigned char cmd_line[1];	  /* Variable-length options.              */
 } start_info_t;
 

@@ -41,7 +41,6 @@ typedef struct full_execution_context_st
     unsigned long event_callback_eip;
     unsigned long failsafe_callback_cs;     /* CS:EIP of failsafe callback  */
     unsigned long failsafe_callback_eip;
-    unsigned long start_info_frame;         /* Page frame containing s.i.   */
 } full_execution_context_t;
 
 #define MAX_CMD_LEN       256

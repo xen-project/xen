@@ -103,13 +103,13 @@ static inline int HYPERVISOR_set_callbacks(
     return ret;
 }
 
-static inline int HYPERVISOR_net_io_op(unsigned int op, unsigned int idx)
+static inline int HYPERVISOR_net_io_op(netop_t *op)
 {
     int ret;
     __asm__ __volatile__ (
         TRAP_INSTR
         : "=a" (ret) : "0" (__HYPERVISOR_net_io_op),
-        "b" (op), "c" (idx) );
+        "b" (op) );
 
     return ret;
 }

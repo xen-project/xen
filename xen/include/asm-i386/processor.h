@@ -354,7 +354,6 @@ struct tss_struct {
 };
 
 struct thread_struct {
-    unsigned long start_info_frame; /* Filled in on DOM0_START */
     unsigned long esp1, ss1;
 /* Hardware debugging registers */
     unsigned long	debugreg[8];  /* %%db0-7 debug registers */
@@ -386,7 +385,7 @@ extern struct desc_struct *idt_tables[];
 long set_fast_trap(struct task_struct *p, int idx);
 
 #define INIT_THREAD  {						\
-	0, 0, 0,		      		       		\
+	0, 0,		      		       			\
 	{ [0 ... 7] = 0 },	/* debugging registers */	\
 	{ { 0, }, },		/* 387 state */			\
 	0x20, { 0, 0 },		/* DEFAULT_FAST_TRAP */		\

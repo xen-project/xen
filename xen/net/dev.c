@@ -27,11 +27,10 @@
 #include <linux/brlock.h>
 #include <linux/init.h>
 #include <linux/module.h>
-
 #include <linux/event.h>
 #include <asm/domain_page.h>
 #include <asm/pgalloc.h>
-
+#include <asm/io.h>
 #include <xeno/perfc.h>
 
 #define BUG_TRAP ASSERT
@@ -2209,17 +2208,22 @@ long flush_bufs_for_vif(net_vif_t *vif)
  * Called from guest OS to notify updates to its transmit and/or receive
  * descriptor rings.
  */
-long do_net_io_op(unsigned int op, unsigned int idx)
+long do_net_io_op(netop_t *uop)
 {
+    netop_t op;
     net_vif_t *vif;
     long ret;
 
     perfc_incr(net_hypercalls);
 
-    if ( (vif = current->net_vif_list[idx]) == NULL )
+    if ( copy_from_user(&op, uop, sizeof(op)) )
+        return -EFAULT;
+
+    if ( (op.vif >= MAX_DOMAIN_VIFS) || 
+         ((vif = current->net_vif_list[op.vif]) == NULL) )
         return -EINVAL;
 
-    switch ( op )
+    switch ( op.cmd )
     {
     case NETOP_PUSH_BUFFERS:
         ret = get_bufs_from_vif(vif);
@@ -2245,6 +2249,13 @@ long do_net_io_op(unsigned int op, unsigned int idx)
             ret = 0;
         }
         spin_unlock_irq(&vif->tx_lock);
+        break;
+
+    case NETOP_GET_VIF_INFO:
+        op.u.get_vif_info.ring_mfn = 
+            virt_to_phys(vif->shared_rings) >> PAGE_SHIFT;
+        memcpy(op.u.get_vif_info.vmac, vif->vmac, ETH_ALEN);
+        ret = copy_to_user(uop, &op, sizeof(op)) ? -EFAULT: 0;
         break;
 
     default:

@@ -19,6 +19,18 @@
 #define NETOP_PUSH_BUFFERS    0  /* Notify Xen of new buffers on the rings. */
 #define NETOP_FLUSH_BUFFERS   1  /* Flush all pending request buffers.      */
 #define NETOP_RESET_RINGS     2  /* Reset ring indexes on a quiescent vif.  */
+#define NETOP_GET_VIF_INFO    3  /* Query information for this vif.         */
+typedef struct netop_st {
+    unsigned int cmd; /* NETOP_xxx */
+    unsigned int vif; /* VIF index */
+    union {
+        struct {
+            unsigned long ring_mfn; /* Page frame containing net_ring_t. */
+            unsigned char vmac[6];  /* Virtual Ethernet MAC address.     */
+        } get_vif_info;
+    } u;
+} netop_t;
+
 
 typedef struct tx_req_entry_st
 {
