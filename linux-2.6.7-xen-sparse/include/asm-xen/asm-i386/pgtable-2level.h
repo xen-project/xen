@@ -75,10 +75,38 @@ static inline pte_t ptep_get_and_clear(pte_t *xp)
 }
 
 #define pte_same(a, b)		((a).pte_low == (b).pte_low)
-#define pte_page(x)		pfn_to_page(pte_pfn(x))
+/*                                 
+ * We detect special mappings in one of two ways:
+ *  1. If the MFN is an I/O page then Xen will set the m2p entry
+ *     to be outside our maximum possible pseudophys range.
+ *  2. If the MFN belongs to a different domain then we will certainly
+ *     not have MFN in our p2m table. Conversely, if the page is ours,
+ *     then we'll have p2m(m2p(MFN))==MFN.
+ * If we detect a special mapping then it doesn't have a 'struct page'.
+ * We force !VALID_PAGE() by returning an out-of-range pointer.
+ */
+#define pte_page(_pte)                                        \
+({                                                            \
+    unsigned long mfn = (_pte).pte_low >> PAGE_SHIFT;         \
+    unsigned long pfn = mfn_to_pfn(mfn);                      \
+    if ( (pfn >= max_mapnr) || (pfn_to_mfn(pfn) != mfn) )     \
+        pfn = max_mapnr; /* special: force !VALID_PAGE() */   \
+    pfn_to_page(pfn);                                         \
+})
+
 #define pte_none(x)		(!(x).pte_low)
-/* XXXcl check valid because msync.c:filemap_sync_pte calls without pte_present check */
-#define pte_pfn(x)		((unsigned long)((((x).pte_low & 1 ? machine_to_phys((x).pte_low) : (x).pte_low) >> PAGE_SHIFT)))
+/* See comments above pte_page */
+/* XXXcl check pte_present because msync.c:filemap_sync_pte calls
+ * without pte_present check */
+#define pte_pfn(_pte)                                                   \
+({                                                                      \
+    unsigned long mfn = (_pte).pte_low >> PAGE_SHIFT;                   \
+    unsigned long pfn = pte_present(_pte) ? mfn_to_pfn(mfn) : mfn;      \
+    if ( (pfn >= max_mapnr) || (pfn_to_mfn(pfn) != mfn) )               \
+        pfn = max_mapnr; /* special: force !pfn_valid() */              \
+    pfn;                                                                \
+})
+
 #define pfn_pte(pfn, prot)	__pte(((pfn) << PAGE_SHIFT) | pgprot_val(prot))
 #define pfn_pte_ma(pfn, prot)	__pte_ma(((pfn) << PAGE_SHIFT) | pgprot_val(prot))
 #define pfn_pmd(pfn, prot)	__pmd(((pfn) << PAGE_SHIFT) | pgprot_val(prot))
