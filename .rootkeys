@@ -171,6 +171,7 @@
 40f56239sFcjHiIRmnObRIDF-zaeKQ linux-2.6.7-xen-sparse/arch/xen/kernel/process.c
 40f562392LBhwmOxVPsYdkYXMxI_ZQ linux-2.6.7-xen-sparse/arch/xen/kernel/reboot.c
 3f68905c5eiA-lBMQSvXLMWS1ikDEA linux-2.6.7-xen-sparse/arch/xen/kernel/xen_proc.c
+4124d8c4aocX7A-jIbuGraWN84pxGQ linux-2.6.7-xen-sparse/bio.h
 4108f5c1WfTIrs0HZFeV39sttekCTw linux-2.6.7-xen-sparse/drivers/char/mem.c
 4111308bZAIzwf_Kzu6x1TZYZ3E0_Q linux-2.6.7-xen-sparse/drivers/char/tty_io.c
 40f56239Dp_vMTgz8TEbvo1hjHGc3w linux-2.6.7-xen-sparse/drivers/xen/Makefile
