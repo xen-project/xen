@@ -1,21 +1,17 @@
 
 INSTALL  = $(wildcard *.py)
 
-ETC	 = defaults democd netbsd xmdefaults
+ETC	 = xmdefaults
 ETCDIR   = /etc/xen
 
-INITD    = init.d/xendomains init.d/xend
+INITD    = init.d/xend
 
 XEND     = vifctl
 XEND_DIR = $(ETCDIR)/xend
 
 all: 
 
-install: all install-bin install-initd install-etc install-xend
-
-install-bin:
-	mkdir -p $(prefix)/usr/bin
-	install -m0755 $(INSTALL) $(prefix)/usr/bin
+install: all install-initd install-etc install-xend
 
 install-initd:
 	mkdir -p $(prefix)/etc/init.d
@@ -35,6 +31,5 @@ install-xend:
 	    do [ -a $(prefix)/$(XEND_DIR)/$$i ] || \
 	    install -m0755 $$i $(prefix)$(XEND_DIR); \
 	done
-
 
 clean:
