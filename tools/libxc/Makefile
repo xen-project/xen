@@ -27,7 +27,6 @@ SRCS     += xc_linux_build.c
 SRCS     += xc_linux_restore.c
 SRCS     += xc_linux_save.c
 SRCS     += xc_misc.c
-SRCS     += xc_netbsd_build.c
 SRCS     += xc_physdev.c
 SRCS     += xc_private.c
 SRCS     += xc_rrobin.c

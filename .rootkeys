@@ -339,7 +339,6 @@
 3fbba6dbl267zZOAVHYLOdLCdhcZMw tools/libxc/xc_linux_restore.c
 3fbba6db7li3FJiABYtCmuGxOJxEGw tools/libxc/xc_linux_save.c
 3fbba6db7WnnJr0KFrIFrqNlSKvFYg tools/libxc/xc_misc.c
-40278d9ctaHVDaEuwhXI3Om2JOjx9w tools/libxc/xc_netbsd_build.c
 4051bce6CHAsYh8P5t2OHDtRWOP9og tools/libxc/xc_physdev.c
 3fbba6dctWRWlFJkYb6hdix2X4WMuw tools/libxc/xc_private.c
 3fbba6dcbVrG2hPzEzwdeV_UC8kydQ tools/libxc/xc_private.h
