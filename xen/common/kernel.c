@@ -39,10 +39,6 @@ void start_of_day(void);
 
 /* opt_console: comma-separated list of console outputs. */
 unsigned char opt_console[30] = "com1,vga";
-/* opt_ser_baud: Baud rate at which logging is sent to COM1. */
-/* NB. Default (0) means that serial I/O is disabled. */
-/* NB2. THIS OPTION IS DEPRECATED!! */
-unsigned int opt_ser_baud = 0;
 /* opt_com[12]: Config serial port with a string <baud>,DPS,<io-base>,<irq>. */
 unsigned char opt_com1[30] = "", opt_com2[30] = "";
 /* opt_dom0_mem: Kilobytes of memory allocated to domain 0. */
@@ -80,7 +76,6 @@ static struct {
     void *var;
 } opts[] = {
     { "console",           OPT_STR,  &opt_console },
-    { "ser_baud",          OPT_UINT, &opt_ser_baud },
     { "com1",              OPT_STR,  &opt_com1 },
     { "com2",              OPT_STR,  &opt_com2 },
     { "dom0_mem",          OPT_UINT, &opt_dom0_mem }, 
@@ -150,10 +145,6 @@ void cmain(unsigned long magic, multiboot_info_t *mbi)
         }
     }
 
-    /* Backward compatibility with deprecated 'ser_baud=' cmdline option. */
-    if ( opt_ser_baud != 0 )
-        sprintf(opt_com1, "%u,8n1", opt_ser_baud);
-
     /* We initialise the serial devices very early so we can get debugging. */
     serial_init_stage1();
 
@@ -168,10 +159,6 @@ void cmain(unsigned long magic, multiboot_info_t *mbi)
            XEN_COMPILE_BY, XEN_COMPILE_DOMAIN,
            XEN_COMPILER, XEN_COMPILE_DATE);
     set_printk_prefix("(XEN) ");
-
-    if ( opt_ser_baud != 0 )
-        printk("**WARNING**: Xen option 'ser_baud=' is deprecated! "
-               "Use 'com1=' instead.\n");
 
     if ( magic != MULTIBOOT_BOOTLOADER_MAGIC )
     {

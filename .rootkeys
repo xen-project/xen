@@ -350,7 +350,6 @@
 3ddb79bfoQcFKLf5P6wZlDl36alWdQ xen/drivers/pci/names.c
 3ddb79bfyX7-pD6XdxY_mdNrJR20iw xen/drivers/pci/pci.c
 3ddb79bf2AS7YBGwooE_Kbv7XgUqNQ xen/drivers/pci/pci.ids
-3ddb79bfGf5-CZSdzn0DGBYWjQiDjw xen/drivers/pci/proc.c
 3ddb79bf7sTn85WtP_8Nc2YEmmVExQ xen/drivers/pci/quirks.c
 3ddb79bfkVLMq5CWjZLACPDivqxq_w xen/drivers/pci/setup-bus.c
 3ddb79bfl1H1arbB0pzAEC2uPmY_3g xen/drivers/pci/setup-irq.c
