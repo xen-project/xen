@@ -85,13 +85,12 @@ cd xenolinux-${LINUX_VER}-sparse
 cd ../..
 mv linux-${LINUX_VER} xenolinux-${LINUX_VER}
 cd xenolinux-${LINUX_VER}
-export ARCH=xeno
-export INSTALL_MOD_PATH=${TOP}/install
-make oldconfig
-make dep
-make bzImage
-make dist || make install
-make modules
-make modules_install
+
+make ARCH=xeno oldconfig
+make ARCH=xeno dep
+make ARCH=xeno bzImage
+make ARCH=xeno dist || make ARCH=xeno install
+make ARCH=xeno modules
+make ARCH=xeno INSTALL_MOD_PATH=${TOP}/install modules_install
 cd ..
 

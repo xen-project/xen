@@ -114,7 +114,7 @@ static inline void kb_wait(void)
 void machine_restart(char * __unused)
 {
     extern int opt_noreboot;
-#if CONFIG_SMP
+#ifdef CONFIG_SMP
     int cpuid;
 #endif
 	
