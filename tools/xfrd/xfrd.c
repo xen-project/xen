@@ -171,6 +171,25 @@ void usage(int err){
     exit(err ? 1 : 0);
 }
 
+typedef struct Args {
+    int bufsize;
+    unsigned long port;
+    int verbose;
+    int compress;
+} Args;
+
+/** Transfer states. */
+enum {
+    XFR_INIT,
+    XFR_HELLO,
+    XFR_STATE,
+    XFR_RUN,
+    XFR_FAIL,
+    XFR_DONE,
+    XFR_MAX
+};
+
+#ifndef SXPR_PARSER_MAIN
 /** Short options. Options followed by ':' take an argument. */
 static char *short_opts = (char[]){
     OPT_PORT,     ':',
@@ -190,23 +209,12 @@ static struct option const long_opts[] = {
     { NULL,         0,                 NULL, 0            }
 };
 
-typedef struct Args {
-    int bufsize;
-    unsigned long port;
-    int verbose;
-    int compress;
-} Args;
+/** Xfrd arguments. */
+static Args _args = {};
 
-/** Transfer states. */
-enum {
-    XFR_INIT,
-    XFR_HELLO,
-    XFR_STATE,
-    XFR_RUN,
-    XFR_FAIL,
-    XFR_DONE,
-    XFR_MAX
-};
+/** Xfrd arguments. */
+static Args *args = &_args;
+#endif
 
 /** Initialize an array element for a constant to its string name. */
 #define VALDEF(val) { val, #val }
@@ -317,12 +325,6 @@ int XfrState_first_err(XfrState *s){
 int XfrState_first_err_state(XfrState *s){
     return s->err_state;
 }
-
-/** Xfrd arguments. */
-static Args _args = {};
-
-/** Xfrd arguments. */
-static Args *args = &_args;
 
 /** Set xfrd default arguments.
  *
@@ -1212,6 +1214,7 @@ int xfrd_main(Args *args){
     return err;
 }
 
+#ifndef SXPR_PARSER_MAIN
 /** Parse command-line arguments and call the xfrd main program.
  *
  * @param arg argument count
@@ -1265,4 +1268,4 @@ int main(int argc, char *argv[]){
     }
     return (err ? 1 : 0);
 }
-
+#endif
