@@ -253,7 +253,7 @@ void release_task(struct task_struct *p)
 
 asmlinkage void schedule(void)
 {
-    struct task_struct *prev, *next, *p;
+    struct task_struct *prev, *next;
     struct list_head *tmp;
     int this_cpu;
 
@@ -286,11 +286,11 @@ asmlinkage void schedule(void)
     }
     clear_bit(_HYP_EVENT_NEED_RESCHED, &prev->hyp_events);
 
+    /* Round-robin, skipping idle where possible. */
     next = NULL;
     list_for_each(tmp, &schedule_data[smp_processor_id()].runqueue) {
-        p = list_entry(tmp, struct task_struct, run_list);
-        next = p;
-        break;
+        next = list_entry(tmp, struct task_struct, run_list);
+        if ( next->domain != IDLE_DOMAIN_ID ) break;
     }
 
     prev->has_cpu = 0;
