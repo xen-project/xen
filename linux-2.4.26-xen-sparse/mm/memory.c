@@ -318,12 +318,6 @@ static inline int zap_pte_range(mmu_gather_t *tlb, pmd_t * pmd, unsigned long ad
 			continue;
 		if (pte_present(pte)) {
 			struct page *page = pte_page(pte);
-#if defined(CONFIG_XEN_PRIVILEGED_GUEST)
-			if (pte_io(pte)) {
-				queue_l1_entry_update(ptep, 0);
-				continue;
-			}
-#endif
 			if (VALID_PAGE(page) && !PageReserved(page))
 				freed ++;
 			/* This will eventually call __free_pte on the pte. */

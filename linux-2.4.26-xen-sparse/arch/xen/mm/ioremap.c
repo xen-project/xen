@@ -150,7 +150,7 @@ int direct_remap_area_pages(struct mm_struct *mm,
          * Fill in the machine address: PTE ptr is done later by
          * __direct_remap_area_pages(). 
          */
-        v->val = (machine_addr & PAGE_MASK) | pgprot_val(prot) | _PAGE_IO;
+        v->val = (machine_addr & PAGE_MASK) | pgprot_val(prot);
 
         machine_addr += PAGE_SIZE;
         address += PAGE_SIZE; 
@@ -262,8 +262,7 @@ void __init *bt_ioremap(unsigned long machine_addr, unsigned long size)
          */
         idx = FIX_BTMAP_BEGIN;
         while (nrpages > 0) {
-                __set_fixmap(idx, machine_addr, 
-                             __pgprot(__PAGE_KERNEL|_PAGE_IO));
+                __set_fixmap(idx, machine_addr, PAGE_KERNEL);
                 machine_addr += PAGE_SIZE;
                 --idx;
                 --nrpages;

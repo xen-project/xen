@@ -157,10 +157,10 @@ static int privcmd_ioctl(struct inode *inode, struct file *file,
         addr = m.addr;
         for ( i = 0; i < m.num; i++, addr += PAGE_SIZE, p++ )
         {
-            if ( get_user(mfn, p) ) return -EFAULT;
+            if ( get_user(mfn, p) )
+                return -EFAULT;
 
-            v->val = (mfn << PAGE_SHIFT) | pgprot_val(vma->vm_page_prot) |
-                _PAGE_IO;
+            v->val = (mfn << PAGE_SHIFT) | pgprot_val(vma->vm_page_prot);
 
             __direct_remap_area_pages(vma->vm_mm,
                                       addr, 
