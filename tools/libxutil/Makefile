@@ -1,12 +1,4 @@
 
-ifndef BUILD_PIC_LIBS
-ifeq ($(wildcard /etc/debian_version),)
-BUILD_PIC_LIBS=n
-else
-BUILD_PIC_LIBS=y
-endif
-endif
-
 XEN_ROOT = ../..
 INSTALL		= install
 INSTALL_DATA	= $(INSTALL) -m0644
@@ -51,22 +43,14 @@ LIB      += libxutil.a
 all: check-for-zlib
 	$(MAKE) $(LIB)
 
-$(PIC_OBJS): %.opic: %.c
-	$(CC) $(CPPFLAGS) -DPIC $(CFLAGS) -fPIC -c -o $@ $<
-
 libxutil.so: libxutil.so.$(MAJOR)
 	ln -sf $^ $@
 
 libxutil.so.$(MAJOR): libxutil.so.$(MAJOR).$(MINOR)
 	ln -sf $^ $@
 
-ifeq ($(BUILD_PIC_LIBS),y)
 libxutil.so.$(MAJOR).$(MINOR): $(PIC_OBJS)
 	$(CC) -Wl,-soname -Wl,libxutil.so.$(MAJOR) -shared -o $@ $^
-else
-libxutil.so.$(MAJOR).$(MINOR): $(LIB_OBJS)
-	$(CC) -Wl,-soname -Wl,libxutil.so.$(MAJOR) -shared -o $@ $^
-endif
 
 libxutil.a: $(LIB_OBJS)
 	$(AR) rc $@ $^
