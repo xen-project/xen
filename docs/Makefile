@@ -1,5 +1,7 @@
 #!/usr/bin/make -f
 
+INSTALL		= install
+INSTALL_DIR	= $(INSTALL) -d -m0755
 
 PS2PDF		:= ps2pdf
 DVIPS		:= dvips
@@ -36,18 +38,18 @@ clean:
 
 install: all
 	rm -rf $(prefix)$(pkgdocdir)
-	mkdir -p $(prefix)$(pkgdocdir)
+	$(INSTALL_DIR) $(prefix)$(pkgdocdir)
 	cp -dR ps $(prefix)$(pkgdocdir)
 	cp -dR pdf $(prefix)$(pkgdocdir)
 	cp -dR html $(prefix)$(pkgdocdir)
 
 pdf/%.pdf: ps/%.ps
-	mkdir -p $(@D)
+	$(INSTALL_DIR) $(@D)
 	$(PS2PDF) $< $@.new
 	mv $@.new $@
 
 ps/%.ps: %.dvi
-	mkdir -p $(@D)
+	$(INSTALL_DIR) $(@D)
 	$(DVIPS) -Ppdf -G0 -o $@.new $<
 	mv $@.new $@
 
@@ -62,7 +64,7 @@ ps/%.ps: %.dvi
 	$(TGIF) -print -color -eps $<
 
 html/%/index.html: src/%.tex
-	mkdir -p $(@D)
+	$(INSTALL_DIR) $(@D)
 	$(LATEX2HTML) -split 0 -show_section_numbers -toc_depth 3 -nonavigation \
 	-numbered_footnotes -local_icons -noinfo -math -dir $(@D) \
 	$< 1>/dev/null 2>/dev/null
