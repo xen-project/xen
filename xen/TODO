@@ -16,7 +16,7 @@ spreading them across processor packages.
 
 What we need to do is port code from Linux which stores information on
 relationships between processors in the system (eg. which ones are
-siblings in teh same package). We then use this to balance domains
+siblings in the same package). We then use this to balance domains
 across packages, and across virtual processors within a package.
 
 2. PROPER DESTRUCTION OF DOMAINS
@@ -78,7 +78,19 @@ Xen's timebase. Once this is done, we can have a timebase per CPU and
 not worry about relative drift (since they'll all get sync'ed
 periodically by ntp).
 
-8. NEW DESIGN FEATURES
+8. MODULE SUPPORT FOR XEN
+-------------------------
+Network and blkdev drivers are bloating Xen. At some point we want to
+build drivers as modules, stick them in a cheesy ramfs, then relocate
+them one by one at boot time. If a driver duccessfully probes hardware
+we keep it, otherwise we blow it away. Alternative is to have a
+central PCI ID to driver name repository. We then use that to decide
+which drivers to load.
+
+Most of the hard stuff (relocating and the like) is done for us by
+Linux's module system.
+
+9. NEW DESIGN FEATURES
 ----------------------
 This includes the last-chance page cache, and the unified buffer cache.
 
