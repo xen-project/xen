@@ -11,21 +11,24 @@
    debugger. so avoid it. */
 #define dbg_printk(...)
 
-static int
-xendbg_serhnd = -1;
+struct xendbg_context {
+	int serhnd;
+	u8 reply_csum;
+};
 
 static void
-xendbg_put_char(u8 data)
+xendbg_put_char(u8 data, struct xendbg_context *ctx)
 {
-	serial_putc(xendbg_serhnd, data);
+	ctx->reply_csum += data;
+	serial_putc(ctx->serhnd, data);
 }
 
 static u8
-xendbg_get_char(void)
+xendbg_get_char(struct xendbg_context *ctx)
 {
 	u8 ch;
 	extern unsigned char __serial_getc(int handle);
-	ch = __serial_getc(xendbg_serhnd);
+	ch = __serial_getc(ctx->serhnd);
 	return ch;
 }
 
@@ -46,7 +49,7 @@ hex_char_val(unsigned char c)
 /* Receive a command.  Returns -1 on csum error, 0 otherwise. */
 /* Does not acknowledge. */
 static int
-attempt_receive_packet(char *recv_buf)
+attempt_receive_packet(char *recv_buf, struct xendbg_context *ctx)
 {
 	int count;
 	u8 csum;
@@ -54,11 +57,11 @@ attempt_receive_packet(char *recv_buf)
 	u8 ch;
 
 	/* Skip over everything up to the first '$' */
-	while ((ch = xendbg_get_char()) != '$')
+	while ((ch = xendbg_get_char(ctx)) != '$')
 		;
 	csum = 0;
 	for (count = 0; count < 4096; count++) {
-		ch = xendbg_get_char();
+		ch = xendbg_get_char(ctx);
 		if (ch == '#')
 			break;
 		recv_buf[count] = ch;
@@ -69,8 +72,8 @@ attempt_receive_packet(char *recv_buf)
 		return -1;
 	}
 	recv_buf[count] = 0;
-	received_csum = hex_char_val(xendbg_get_char()) * 16 +
-		hex_char_val(xendbg_get_char());
+	received_csum = hex_char_val(xendbg_get_char(ctx)) * 16 +
+		hex_char_val(xendbg_get_char(ctx));
 	if (received_csum == csum) {
 		return 0;
 	} else {
@@ -80,183 +83,138 @@ attempt_receive_packet(char *recv_buf)
 
 /* Send a string of bytes to the debugger. */
 static void
-xendbg_send(const char *buf, int count)
+xendbg_send(const char *buf, int count, struct xendbg_context *ctx)
 {
 	int x;
 	for (x = 0; x < count; x++)
-		xendbg_put_char(buf[x]);
+		xendbg_put_char(buf[x], ctx);
 }
 
 /* Receive a command, discarding up to ten packets with csum
  * errors.  Acknowledges all received packets. */
 static int
-receive_command(char *recv_buf)
+receive_command(char *recv_buf, struct xendbg_context *ctx)
 {
 	int r;
 	int count;
 
 	count = 0;
 	do {
-		r = attempt_receive_packet(recv_buf);
+		r = attempt_receive_packet(recv_buf, ctx);
 		if (r < 0)
-			xendbg_send("-", 1);
+			xendbg_put_char('-', ctx);
 		else
-			xendbg_send("+", 1);
+			xendbg_put_char('+', ctx);
 		count++;
 	} while (r < 0 && count < 10);
 	return r;
 }
 
 static void
-u32_to_hex_u8(unsigned char val, char *buf)
+xendbg_start_reply(struct xendbg_context *ctx)
 {
-	sprintf(buf, "%.02x\n", val);
-}
-
-static void
-u32_to_hex_u32(unsigned val, char *buf)
-{
-	sprintf(buf, "%.08x\n", val);
-}
-
-static void
-xendbg_send_hex_u8(unsigned char val)
-{
-	char buf[3];
-	u32_to_hex_u8(val, buf);
-	xendbg_send(buf, 2);
-}
-
-static u8
-xendbg_reply_csum;
-
-static void
-xendbg_start_reply(void)
-{
-	xendbg_reply_csum = 0;
-	xendbg_send("$", 1);
-}
-
-static void
-xendbg_sendrep_data(const unsigned char *data, unsigned long len)
-{
-	int x;
-
-	for (x = 0; x < len; x++) {
-		xendbg_put_char(data[x]);
-		xendbg_reply_csum += data[x];
-	}
+	xendbg_put_char('$', ctx);
+	ctx->reply_csum = 0;
 }
 
 /* Return 0 if the reply was successfully received, !0 otherwise. */
 static int
-xendbg_finish_reply(void)
+xendbg_finish_reply(struct xendbg_context *ctx)
 {
 	char ch;
+	char buf[3];
 
-	xendbg_send("#", 1);
-	xendbg_send_hex_u8(xendbg_reply_csum);
-	ch = xendbg_get_char();
+	sprintf(buf, "%.02x\n", ctx->reply_csum);
+
+	xendbg_put_char('#', ctx);
+	xendbg_send(buf, 2, ctx);
+
+	ch = xendbg_get_char(ctx);
 	if (ch == '+')
 		return 0;
 	else
 		return 1;
 }
 
-static void
-xendbg_sendrep_hex_u8(unsigned val)
+/* Swap the order of the bytes in a work. */
+static inline unsigned
+bswab32(unsigned val)
 {
-	char buf[3];
-	u32_to_hex_u8(val, buf);
-	xendbg_sendrep_data(buf, 2);
-}
-
-static void
-xendbg_sendrep_hex_u32(unsigned val)
-{
-	char buf[9];
-	u32_to_hex_u32(val, buf);
-	xendbg_sendrep_data(buf, 8);
-}
-
-static void
-xendbg_sendrep_hex_u32_le(unsigned val)
-{
-	val = (((val >> 0) & 0xff) << 24) |
+	return (((val >> 0) & 0xff) << 24) |
 		(((val >> 8) & 0xff) << 16) |
 		(((val >> 16) & 0xff) << 8) |
 		(((val >> 24) & 0xff) << 0);
-	xendbg_sendrep_hex_u32(val);
 }
 
 static int
-handle_memory_read_command(unsigned long addr, unsigned long length)
+handle_memory_read_command(unsigned long addr, unsigned long length,
+			   struct xendbg_context *ctx)
 {
 	int x;
 	unsigned char val;
 	int r;
 	unsigned old_s_limit;
+	char buf[2];
 
 	dbg_printk("Memory read starting at %lx, length %lx.\n", addr,
 		   length);
 	old_s_limit = current->addr_limit.seg;
 	current->addr_limit.seg = ~0;
-	xendbg_start_reply();
+	xendbg_start_reply(ctx);
 	for (x = 0; x < length; x++) {
 		r = copy_from_user(&val, (void *)(addr + x), 1);
 		if (r != 0) {
 			dbg_printk("Error reading from %lx.\n", addr + x);
 			break;
 		}
-		xendbg_sendrep_hex_u8(val);
+		sprintf(buf, "%.02x", val);
+		xendbg_send(buf, 2, ctx);
 	}
 	if (x == 0)
-		xendbg_sendrep_data("E05", 3);
+		xendbg_send("E05", 3, ctx);
 	dbg_printk("Read done.\n");
 	current->addr_limit.seg = old_s_limit;
-	return xendbg_finish_reply();
+	return xendbg_finish_reply(ctx);
 }
 
 static int
-xendbg_send_reply(const char *buf)
+xendbg_send_reply(const char *buf, struct xendbg_context *ctx)
 {
-	xendbg_start_reply();
-	xendbg_sendrep_data(buf, strlen(buf));
-	return xendbg_finish_reply();
+	xendbg_start_reply(ctx);
+	xendbg_send(buf, strlen(buf), ctx);
+	return xendbg_finish_reply(ctx);
 }
 
 static int
-handle_register_read_command(struct pt_regs *regs)
+handle_register_read_command(struct pt_regs *regs, struct xendbg_context *ctx)
 {
-	xendbg_start_reply();
-	xendbg_sendrep_hex_u32_le(regs->eax);
-	xendbg_sendrep_hex_u32_le(regs->ecx);
-	xendbg_sendrep_hex_u32_le(regs->edx);
-	xendbg_sendrep_hex_u32_le(regs->ebx);
-	xendbg_sendrep_hex_u32_le(regs->esp);
-	xendbg_sendrep_hex_u32_le(regs->ebp);
-	xendbg_sendrep_hex_u32_le(regs->esi);
-	xendbg_sendrep_hex_u32_le(regs->edi);
-	xendbg_sendrep_hex_u32_le(regs->eip);
-	xendbg_sendrep_hex_u32_le(regs->eflags);
-	xendbg_sendrep_hex_u32_le(regs->xcs);
-	xendbg_sendrep_hex_u32_le(regs->xss);
-	xendbg_sendrep_hex_u32_le(regs->xes);
-	xendbg_sendrep_hex_u32_le(regs->xfs);
-	xendbg_sendrep_hex_u32_le(regs->xgs);
-	return xendbg_finish_reply();
-}
+	char buf[121];
 
-static unsigned long
-hex_to_int(const char *start, const char **end)
-{
-	return simple_strtol(start, (char **)end, 16);
+	sprintf(buf,
+		"%.08x%.08x%.08x%.08x%.08x%.08x%.08x%.08x%.08x%.08x%.08x%.08x%.08x%.08x%.08x",
+		bswab32(regs->eax),
+		bswab32(regs->ecx),
+		bswab32(regs->edx),
+		bswab32(regs->ebx),
+		bswab32(regs->esp),
+		bswab32(regs->ebp),
+		bswab32(regs->esi),
+		bswab32(regs->edi),
+		bswab32(regs->eip),
+		bswab32(regs->eflags),
+		bswab32(regs->xcs),
+		bswab32(regs->xss),
+		bswab32(regs->xes),
+		bswab32(regs->xfs),
+		bswab32(regs->xgs));
+	return xendbg_send_reply(buf, ctx);
 }
 
 static int
-process_command(const char *received_packet, struct pt_regs *regs)
+process_command(char *received_packet, struct pt_regs *regs,
+		struct xendbg_context *ctx)
 {
-	const char *ptr;
+	char *ptr;
 	unsigned long addr, length;
 	int retry;
 	int counter;
@@ -267,39 +225,40 @@ process_command(const char *received_packet, struct pt_regs *regs)
 	do {
 		switch (received_packet[0]) {
 		case 'g': /* Read registers */
-			retry = handle_register_read_command(regs);
+			retry = handle_register_read_command(regs, ctx);
 			break;
 		case 'm': /* Read memory */
-			addr = hex_to_int(received_packet + 1, &ptr);
+			addr = simple_strtoul(received_packet + 1, &ptr, 16);
 			if (ptr == received_packet + 1 ||
 			    ptr[0] != ',') {
-				xendbg_send_reply("E03");
+				xendbg_send_reply("E03", ctx);
 				return 0;
 			}
-			length = hex_to_int(ptr + 1, &ptr);
+			length = simple_strtoul(ptr + 1, &ptr, 16);
 			if (ptr[0] != 0) {
-				xendbg_send_reply("E04");
+				xendbg_send_reply("E04", ctx);
 				return 0;
 			}
 			retry =
 				handle_memory_read_command(addr,
-							   length);
+							   length,
+							   ctx);
 			break;
 		case 'G': /* Write registers */
 		case 'M': /* Write memory */
-			retry = xendbg_send_reply("E02");
+			retry = xendbg_send_reply("E02", ctx);
 			break;
 		case 'D':
 			resume = 1;
-			retry = xendbg_send_reply("");
+			retry = xendbg_send_reply("", ctx);
 			break;
 		case 'c': /* Resume at current address */
 		case 's': /* Single step */
 		case '?':
-			retry = xendbg_send_reply("S01");
+			retry = xendbg_send_reply("S01", ctx);
 			break;
 		default:
-			retry = xendbg_send_reply("");
+			retry = xendbg_send_reply("", ctx);
 			break;
 		}
 		counter++;
@@ -311,6 +270,11 @@ process_command(const char *received_packet, struct pt_regs *regs)
 	return resume;
 }
 
+static struct xendbg_context
+xdb_ctx = {
+	serhnd : -1
+};
+
 void
 __trap_to_xendbg(struct pt_regs *regs)
 {
@@ -320,7 +284,7 @@ __trap_to_xendbg(struct pt_regs *regs)
 	static char recv_buf[4096];
 	unsigned flags;
 
-	if (xendbg_serhnd < 0) {
+	if (xdb_ctx.serhnd < 0) {
 		dbg_printk("Debugger not ready yet.\n");
 		return;
 	}
@@ -343,12 +307,12 @@ __trap_to_xendbg(struct pt_regs *regs)
 	local_irq_save(flags);
 
 	while (resume == 0) {
-		r = receive_command(recv_buf);
+		r = receive_command(recv_buf, &xdb_ctx);
 		if (r < 0) {
 			dbg_printk("GDB disappeared, trying to resume Xen...\n");
 			resume = 1;
 		} else
-			resume = process_command(recv_buf, regs);
+			resume = process_command(recv_buf, regs, &xdb_ctx);
 	}
 	xendbg_running = 0;
 	local_irq_restore(flags);
@@ -361,12 +325,12 @@ initialize_xendbg(void)
 
 	if (!strcmp(opt_xendbg, "none"))
 		return;
-	xendbg_serhnd = parse_serial_handle(opt_xendbg);
-	if (xendbg_serhnd == -1)
+	xdb_ctx.serhnd = parse_serial_handle(opt_xendbg);
+	if (xdb_ctx.serhnd == -1)
 		panic("Can't parse %s as XDB serial info.\n", opt_xendbg);
 
 	/* Acknowledge any spurious GDB packets. */
-	xendbg_put_char('+');
+	xendbg_put_char('+', &xdb_ctx);
 
 	printk("Xendbg initialised.\n");
 }
