@@ -93,6 +93,7 @@
 #define EVENT_PS2      0x20 /* PS/2 keyboard or mouse event(s) */
 #define EVENT_STOP     0x40 /* Prepare for stopping and possible pickling */
 #define EVENT_EVTCHN   0x80 /* Event pending on an event channel */
+#define EVENT_VBD_UPD  0x100 /* Event to signal VBDs should be reprobed */
 
 /* Bit offsets, as opposed to the above masks. */
 #define _EVENT_BLKDEV   0
@@ -103,6 +104,7 @@
 #define _EVENT_PS2      5
 #define _EVENT_STOP     6
 #define _EVENT_EVTCHN   7
+#define _EVENT_VBD_UPD  8
 
 /*
  * Virtual addresses beyond this are not modifiable by guest OSes. The 

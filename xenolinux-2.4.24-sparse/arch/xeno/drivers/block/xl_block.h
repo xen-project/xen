@@ -62,6 +62,19 @@ extern int xenolinux_block_check(kdev_t dev);
 extern int xenolinux_block_revalidate(kdev_t dev);
 extern void do_xlblk_request (request_queue_t *rq); 
 
+extern xen_disk_info_t xlblk_disk_info; /* this is really in xl_block.c */
+extern void xlvbd_update_vbds(void);    /* this is really in xl_vbd.c */
+
+static inline xl_disk_t *xldev_to_xldisk(kdev_t xldev)
+{
+    struct gendisk *gd = get_gendisk(xldev);
+
+    if(!gd) return NULL;
+
+    return (xl_disk_t *)gd->real_devices + 
+        (MINOR(xldev) >> gd->minor_shift);
+}
+
 
 /* Virtual block-device subsystem. */
 extern int  xlvbd_init(xen_disk_info_t *xdi);

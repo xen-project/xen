@@ -5,13 +5,21 @@
  * 
  */
 
+/* Some modifications to the original by Mark A. Williamson and (C) Intel
+ * Research Cambridge */
+
 #include "xl_block.h"
 #include <linux/blk.h>
 #include <linux/cdrom.h>
+#include <linux/tqueue.h>
+#include <linux/sched.h>
+
+#include <linux/interrupt.h>
 
 typedef unsigned char byte; /* from linux/ide.h */
 
 #define XLBLK_RESPONSE_IRQ _EVENT_BLKDEV
+#define XLBLK_UPDATE_IRQ   _EVENT_VBD_UPD
 #define DEBUG_IRQ          _EVENT_DEBUG 
 
 #define STATE_ACTIVE    0
@@ -24,11 +32,12 @@ static BLK_RING_IDX resp_cons; /* Response consumer for comms ring. */
 static BLK_RING_IDX req_prod;  /* Private request producer.         */
 
 #define XDI_MAX 64 
-static xen_disk_info_t xlblk_disk_info; /* information about our disks/VBDs */
+xen_disk_info_t xlblk_disk_info; /* information about our disks/VBDs */
 
 /* We plug the I/O ring if the driver is suspended or if the ring is full. */
 #define RING_PLUGGED (((req_prod - resp_cons) == BLK_RING_SIZE) || \
                       (state != STATE_ACTIVE))
+
 
 /*
  * Request queues with outstanding work, but ring is currently full.
@@ -54,13 +63,6 @@ static inline void signal_requests_to_xen(void)
     op.cmd = BLOCK_IO_OP_SIGNAL; 
     HYPERVISOR_block_io_op(&op);
     return;
-}
-
-static inline xl_disk_t *xldev_to_xldisk(kdev_t xldev)
-{
-    struct gendisk *gd = get_gendisk(xldev);
-    return (xl_disk_t *)gd->real_devices + 
-        (MINOR(xldev) >> gd->minor_shift);
 }
 
 
@@ -97,7 +99,8 @@ int xenolinux_block_open(struct inode *inode, struct file *filep)
             return -ENODEV;    /* no such device */
         }
     }
-
+    
+    /* RACE: need locking SMP / pre-emptive kernels */
     disk->usage++;
     DPRINTK("xenolinux_block_open\n");
     return 0;
@@ -107,8 +110,18 @@ int xenolinux_block_open(struct inode *inode, struct file *filep)
 int xenolinux_block_release(struct inode *inode, struct file *filep)
 {
     xl_disk_t *disk = xldev_to_xldisk(inode->i_rdev);
-    disk->usage--;
+    disk->usage--; /* RACE: need locking for SMP / pre-emptive kernels */
     DPRINTK("xenolinux_block_release\n");
+
+ /* A reference to a disk has been dropped: may enable more changes to VBDs to
+  * go through (currently don't do any updates while references are held), so
+  * we run the update magic again.  Could equally well schedule this update for
+  * keventd to run, or use a flag so we only update at this point if we think
+  * something (relevant) may have changed.
+  * Keventd has the advantage that it'll serialise executions of this function
+  * - there's a race here for SMP / pre-emptive kernels */
+    xlvbd_update_vbds();
+
     return 0;
 }
 
@@ -136,7 +149,7 @@ int xenolinux_block_ioctl(struct inode *inode, struct file *filep,
         return put_user(part->nr_sects, (unsigned long *) argument);
 
     case BLKRRPART:                               /* re-read partition table */
-        DPRINTK_IOCTL("   BLKRRPART: %x\n", BLKRRPART); 
+        DPRINTK_IOCTL("   BLKRRPART: %x\n", BLKRRPART);
         return xenolinux_block_revalidate(dev);
 
     case BLKSSZGET:
@@ -185,7 +198,7 @@ int xenolinux_block_ioctl(struct inode *inode, struct file *filep,
         return 0;
 
     default:
-        printk("ioctl %08x not supported by xl_block\n", command);
+        printk(KERN_ALERT "ioctl %08x not supported by xl_block\n", command);
         return -ENOSYS;
     }
     
@@ -199,12 +212,15 @@ int xenolinux_block_check(kdev_t dev)
     return 0;
 }
 
+/* MAW - leaving this as it is for now.  As long as we're responding to the VBD
+ * update events from the hypervisor, I figure this will still do what it's
+ * meant to do :-) */
 int xenolinux_block_revalidate(kdev_t dev)
 {
     struct gendisk *gd = get_gendisk(dev);
     xl_disk_t *disk = xldev_to_xldisk(dev);
     unsigned long flags, capacity = gd->part[MINOR(dev)].nr_sects;
-    int i, disk_nr = MINOR(dev) >> gd->minor_shift; 
+    int i, disk_nr = MINOR(dev) >> gd->minor_shift;
     
     DPRINTK("xenolinux_block_revalidate: %d\n", dev);
 
@@ -223,6 +239,8 @@ int xenolinux_block_revalidate(kdev_t dev)
     }
     spin_unlock_irqrestore(&io_request_lock, flags);
 
+    /* RACE? is it OK that we give up the lock */
+
     for ( i = gd->max_p - 1; i >= 0; i-- )
     {
         invalidate_device(dev+i, 1);
@@ -231,7 +249,8 @@ int xenolinux_block_revalidate(kdev_t dev)
         gd->sizes[MINOR(dev+i)]           = 0;
     }
 
-    /* XXX Should perhaps revalidate VBDs here */
+    /* shouldn't need to revalidate VBDs here as it's done automatically when
+     * we get the VBD update event from Xen */
 
     grok_partitions(gd, disk_nr, gd->max_p, capacity);
 
@@ -345,8 +364,8 @@ void do_xlblk_request(request_queue_t *rq)
     struct request *req;
     struct buffer_head *bh, *next_bh;
     int rw, nsect, full, queued = 0;
-    
-    DPRINTK("xlblk.c::do_xlblk_request for '%s'\n", DEVICE_NAME); 
+
+    DPRINTK("xlblk.c::do_xlblk_request\n"); 
 
     while ( !rq->plugged && !list_empty(&rq->queue_head))
     {
@@ -430,12 +449,49 @@ static void kick_pending_request_queues(void)
 }
 
 
+/**
+ * do_update_vbds - called in process context by keventd to update VBDs
+ * @arg:            dummy argument to fit schedule_task API
+ *
+ * When this function is run, it simply calls through to xlvbd_update_vbds in
+ * update the VBD state information.  The argument is ignored - it's only there
+ * because the API for scheduling with keventd requires it.
+ */
+void do_update_vbds(void * arg)
+{
+    DPRINTK("xl_block.c::do_update_vbds() - called\n");
+    xlvbd_update_vbds();
+}
+
+/* this data is needed to register do_update_vbds() as a task for keventd */
+static struct tq_struct update = {
+    .sync = 0,
+    .routine = do_update_vbds,
+    .data = 0
+};
+
+/**
+ * xlblk_update_int - handle VBD update events from Xen
+ *
+ * This function schedules a task for keventd to run, which will update the
+ * VBDs and perform the corresponding updates to our view of VBD state, so the
+ * XenoLinux will respond to changes / additions / deletions to the set of VBDs
+ * automatically.
+ */
+static void xlblk_update_int(int irq, void *dev_id, struct pt_regs *ptregs)
+{
+    DPRINTK("xl_block.c::xlblk_update_int() - called\n");
+    
+    schedule_task(&update);
+}
+
+
 static void xlblk_response_int(int irq, void *dev_id, struct pt_regs *ptregs)
 {
     BLK_RING_IDX i; 
     unsigned long flags; 
     struct buffer_head *bh, *next_bh;
-
+    
     if ( unlikely(state == STATE_CLOSED) )
         return;
     
@@ -512,6 +568,15 @@ int __init xlblk_init(void)
         goto fail;
     }
 
+    error = request_irq(XLBLK_UPDATE_IRQ, xlblk_update_int,
+                        SA_INTERRUPT, "blkdev", NULL);
+
+    if ( error )
+    {
+        printk(KERN_ALERT "Could not allocate block update interrupt\n");
+        goto fail;
+    }
+
     /* Setup our [empty] disk information structure */
     xlblk_disk_info.max   = XDI_MAX; 
     xlblk_disk_info.disks = kmalloc(XDI_MAX * sizeof(xen_disk_t), GFP_KERNEL);
@@ -548,6 +613,7 @@ static void __exit xlblk_cleanup(void)
 {
     xlvbd_cleanup();
     free_irq(XLBLK_RESPONSE_IRQ, NULL);
+    free_irq(XLBLK_UPDATE_IRQ, NULL);
 }
 
 

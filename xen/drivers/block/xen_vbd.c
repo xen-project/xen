@@ -14,6 +14,9 @@
 #include <asm/current.h>
 #include <asm/domain_page.h>
 
+#include <hypervisor-ifs/hypervisor-if.h>
+#include <xeno/event.h>
+
 /* 
 ** XXX SMH: the below probe functions /append/ their info to the 
 ** xdi array; i.e.  they assume that all earlier slots are correctly 
@@ -36,9 +39,10 @@ long vbd_create(vbd_create_t *create)
     struct task_struct *p; 
     vbd_t *new_vbd, **pv; 
     long ret = 0;
+    unsigned long cpu_mask;
 
     if ( unlikely(!IS_PRIV(current)) )
-        return -EPERM; 
+        return -EPERM;
 
     if ( unlikely((p = find_domain_by_id(create->domain)) == NULL) )
     {
@@ -77,6 +81,9 @@ long vbd_create(vbd_create_t *create)
 
     *pv = new_vbd;
 
+    cpu_mask = mark_guest_event(p, _EVENT_VBD_UPD);
+    guest_event_notify(cpu_mask);
+
  out:
     spin_unlock(&p->vbd_lock);
     put_task_struct(p);
@@ -91,6 +98,7 @@ long vbd_grow(vbd_grow_t *grow)
     xen_extent_le_t **px, *x; 
     vbd_t *v; 
     long ret = 0;
+    unsigned long cpu_mask;
 
     if ( unlikely(!IS_PRIV(current)) )
         return -EPERM; 
@@ -132,6 +140,9 @@ long vbd_grow(vbd_grow_t *grow)
 
     *px = x;
 
+    cpu_mask = mark_guest_event(p, _EVENT_VBD_UPD);
+    guest_event_notify(cpu_mask);
+
  out:
     spin_unlock(&p->vbd_lock);
     put_task_struct(p);
@@ -145,6 +156,7 @@ long vbd_shrink(vbd_shrink_t *shrink)
     xen_extent_le_t **px, *x; 
     vbd_t *v; 
     long ret = 0;
+    unsigned long cpu_mask;
 
     if ( !IS_PRIV(current) )
         return -EPERM; 
@@ -177,6 +189,9 @@ long vbd_shrink(vbd_shrink_t *shrink)
     *px = x->next;
     kfree(x);
 
+    cpu_mask = mark_guest_event(p, _EVENT_VBD_UPD);
+    guest_event_notify(cpu_mask);
+
  out:
     spin_unlock(&p->vbd_lock);
     put_task_struct(p);
@@ -192,6 +207,7 @@ long vbd_setextents(vbd_setextents_t *setextents)
     vbd_t *v; 
     int i;
     long ret = 0;
+    unsigned long cpu_mask;
 
     if ( !IS_PRIV(current) )
         return -EPERM; 
@@ -253,6 +269,9 @@ long vbd_setextents(vbd_setextents_t *setextents)
     /* Make the new list visible. */
     v->extents = new_extents;
 
+    cpu_mask = mark_guest_event(p, _EVENT_VBD_UPD);
+    guest_event_notify(cpu_mask);
+
  out:
     spin_unlock(&p->vbd_lock);
     put_task_struct(p);
@@ -274,6 +293,7 @@ long vbd_delete(vbd_delete_t *delete)
     struct task_struct *p; 
     vbd_t *v, **pv; 
     xen_extent_le_t *x, *t;
+    unsigned long cpu_mask;
 
     if( !IS_PRIV(current) )
         return -EPERM; 
@@ -314,6 +334,9 @@ long vbd_delete(vbd_delete_t *delete)
         x = t;
     }
     
+    cpu_mask = mark_guest_event(p, _EVENT_VBD_UPD);
+    guest_event_notify(cpu_mask);
+   
     spin_unlock(&p->vbd_lock);
     put_task_struct(p);
     return 0;
@@ -325,6 +348,7 @@ void destroy_all_vbds(struct task_struct *p)
     int i;
     vbd_t *v; 
     xen_extent_le_t *x, *t;
+    unsigned long cpu_mask;
 
     spin_lock(&p->vbd_lock);
     for ( i = 0; i < VBD_HTAB_SZ; i++ )
@@ -344,6 +368,10 @@ void destroy_all_vbds(struct task_struct *p)
             }          
         }
     }
+
+    cpu_mask = mark_guest_event(p, _EVENT_VBD_UPD);
+    guest_event_notify(cpu_mask);
+
     spin_unlock(&p->vbd_lock);
 }
 
