@@ -21,7 +21,7 @@ public final class Settings {
         System.getProperty("XI_HELPER", "xi_helper");
     /** File to parse to get partition info. */
     public static final String PARTITIONS_FILE =
-        System.getProperty("PARTITIONS_FILE", "/proc/partitions");
+        System.getProperty("PARTITIONS_FILE", "/proc/xeno/blkdev_info");
     /** File to load virtual disk state from. */
     public static final String STATE_INPUT_FILE =
         System.getProperty("STATE_INPUT_FILE", "/var/lib/xen/vdstate.xml");

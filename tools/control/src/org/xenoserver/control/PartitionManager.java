@@ -20,7 +20,7 @@ import java.util.Vector;
 public class PartitionManager {
     /** The proc header string, used to check that this is a suitable proc file. */
     private static final String PROC_TEMPLATE =
-        "major minor  #blocks  start_sect   nr_sects name";
+        "major minor start_sector  num_sectors name";
 
     /** The single PartitionManager reference. */
     public static final PartitionManager IT =
@@ -59,12 +59,12 @@ public class PartitionManager {
             while (str != null) {
                 Partition partition =
                     new Partition(
-                        Integer.parseInt(str.substring(0, 5).trim()),
-                        Integer.parseInt(str.substring(5, 10).trim()),
-                        Integer.parseInt(str.substring(10, 21).trim()),
-                        Integer.parseInt(str.substring(21, 32).trim()),
-                        Integer.parseInt(str.substring(32, 43).trim()),
-                        str.substring(43).trim(),
+                        Integer.parseInt(str.substring( 0,  5).trim()),
+                        Integer.parseInt(str.substring( 6, 11).trim()),
+                        Integer.parseInt(str.substring(25, 37).trim())/2,
+                        Integer.parseInt(str.substring(12, 24).trim()),
+                        Integer.parseInt(str.substring(25, 37).trim()),
+                        str.substring(38).trim(),
                         false);
 
                 partition_map.add(partition);

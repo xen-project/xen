@@ -11,7 +11,7 @@
 #include <linux/kernel.h>
 #include <linux/sched.h>
 #include <linux/errno.h>
-#include <linux/proc_fs.h>
+#include <asm/xeno_proc.h>
 
 #include <linux/mm.h>
 #include <linux/mman.h>
@@ -37,9 +37,6 @@ typedef struct user_balloon_op {
 
 /* Dead entry written into ballon-owned entries in the PMT. */
 #define DEAD 0xdeadbeef
-
-#define BALLOON_ENTRY    "balloon"
-extern struct proc_dir_entry *xeno_base;
 
 static struct proc_dir_entry *balloon_pde;
 unsigned long credit;
@@ -260,7 +257,7 @@ static int __init init_module(void)
 
     credit = 0;
 
-    balloon_pde = create_proc_entry(BALLOON_ENTRY, 0600, xeno_base);
+    balloon_pde = create_xeno_proc_entry("balloon", 0600);
     if ( balloon_pde == NULL )
     {
         printk(KERN_ALERT "Unable to create balloon driver proc entry!");
@@ -274,6 +271,11 @@ static int __init init_module(void)
 
 static void __exit cleanup_module(void)
 {
+    if ( balloon_pde != NULL )
+    {
+        remove_xeno_proc_entry("balloon");
+        balloon_pde = NULL;
+    }
 }
 
 module_init(init_module);
