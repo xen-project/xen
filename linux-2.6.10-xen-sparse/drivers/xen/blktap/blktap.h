@@ -23,23 +23,32 @@
 #include <asm/pgalloc.h>
 #include <asm-xen/hypervisor.h>
 #include <asm-xen/xen-public/io/blkif.h>
+#include <asm-xen/xen-public/io/ring.h>
+
+/* Used to signal to the backend that this is a tap domain. */
+#define BLKTAP_COOKIE 0xbeadfeed
 
 /* -------[ debug / pretty printing ]--------------------------------- */
 
 #if 0
-#define ASSERT(_p) \
-    if ( !(_p) ) { printk("Assertion '%s' failed, line %d, file %s", #_p , \
-    __LINE__, __FILE__); *(int*)0=0; }
 #define DPRINTK(_f, _a...) printk(KERN_ALERT "(file=%s, line=%d) " _f, \
                            __FILE__ , __LINE__ , ## _a )
 #else
-#define ASSERT(_p) ((void)0)
 #define DPRINTK(_f, _a...) ((void)0)
+#endif
+
+#if 1
+#define ASSERT(_p) \
+    if ( !(_p) ) { printk("Assertion '%s' failed, line %d, file %s", #_p , \
+    __LINE__, __FILE__); *(int*)0=0; }
+#else
+#define ASSERT(_p) ((void)0)
 #endif
 
 #define WPRINTK(fmt, args...) printk(KERN_WARNING "blk_tap: " fmt, ##args)
 
-/* -------[ connection / request tracking ]--------------------------- */
+
+/* -------[ connection tracking ]------------------------------------- */
 
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,0)
 #define VMALLOC_VMADDR(x) ((unsigned long)(x))
@@ -49,29 +58,39 @@ extern spinlock_t blkif_io_lock;
 
 typedef struct blkif_st {
     /* Unique identifier for this interface. */
-    domid_t          domid;
-    unsigned int     handle;
+    domid_t             domid;
+    unsigned int        handle;
     /* Physical parameters of the comms window. */
-    unsigned long    shmem_frame;
-    unsigned int     evtchn;
-    int              irq;
+    unsigned long       shmem_frame;
+    unsigned int        evtchn;
+    int                 irq;
     /* Comms information. */
-    blkif_ring_t    *blk_ring_base; /* ioremap()'ed ptr to shmem_frame. */
-    BLKIF_RING_IDX     blk_req_cons;  /* Request consumer. */
-    BLKIF_RING_IDX     blk_resp_prod; /* Private version of resp. producer. */
+    blkif_back_ring_t   blk_ring;
     
     enum { DISCONNECTED, DISCONNECTING, CONNECTED } status;
     /*
      * DISCONNECT response is deferred until pending requests are ack'ed.
      * We therefore need to store the id from the original request.
-     */    u8               disconnect_rspid;
-    struct blkif_st *hash_next;
-    struct list_head blkdev_list;
-    spinlock_t       blk_ring_lock;
-    atomic_t         refcnt;
-    
+     */    
+    u8                  disconnect_rspid;
+    struct blkif_st    *hash_next;
+    struct list_head    blkdev_list;
+    spinlock_t          blk_ring_lock;
+    atomic_t            refcnt;
     struct work_struct work;
 } blkif_t;
+
+blkif_t *blkif_find_by_handle(domid_t domid, unsigned int handle);
+void blkif_disconnect_complete(blkif_t *blkif);
+#define blkif_get(_b) (atomic_inc(&(_b)->refcnt))
+#define blkif_put(_b)                             \
+    do {                                          \
+        if ( atomic_dec_and_test(&(_b)->refcnt) ) \
+            blkif_disconnect_complete(_b);        \
+    } while (0)
+
+
+/* -------[ active request tracking ]--------------------------------- */
 
 typedef struct {
     blkif_t       *blkif;
@@ -80,48 +99,16 @@ typedef struct {
     unsigned long  mach_fas[BLKIF_MAX_SEGMENTS_PER_REQUEST];
     unsigned long  virt_fas[BLKIF_MAX_SEGMENTS_PER_REQUEST];
     int            next_free;
+    int inuse; /* debugging */
 } active_req_t;
 
+typedef unsigned int ACTIVE_RING_IDX;
 
-/* -------[ block ring structs ]-------------------------------------- */
+active_req_t *lookup_active_req(ACTIVE_RING_IDX idx);
+inline unsigned int ID_TO_IDX(unsigned long id);
+inline domid_t ID_TO_DOM(unsigned long id);
 
-/* Types of ring. */
-#define BLKIF_REQ_RING_TYPE 1
-#define BLKIF_RSP_RING_TYPE 2
-
-/* generic ring struct. */
-typedef struct blkif_generic_ring_struct {
-    int type;
-} blkif_generic_ring_t;
-
-/* A requestor's view of a ring. */
-typedef struct blkif_req_ring_struct {
-
-    int type;                    /* Will be BLKIF_REQ_RING_TYPE        */
-    BLKIF_RING_IDX req_prod;     /* PRIVATE req_prod index             */
-    BLKIF_RING_IDX rsp_cons;     /* Response consumer index            */
-    blkif_ring_t *ring;          /* Pointer to shared ring struct      */
-
-} blkif_req_ring_t;
-
-#define BLKIF_REQ_RING_INIT { BLKIF_REQ_RING_TYPE, 0, 0, 0 }
-
-/* A responder's view of a ring. */
-typedef struct blkif_rsp_ring_struct {
-
-    int type;       
-    BLKIF_RING_IDX rsp_prod;     /* PRIVATE rsp_prod index             */
-    BLKIF_RING_IDX req_cons;     /* Request consumer index             */
-    blkif_ring_t *ring;          /* Pointer to shared ring struct      */
-
-} blkif_rsp_ring_t;
-
-#define BLKIF_RSP_RING_INIT = { BLKIF_RSP_RING_TYPE, 0, 0, 0 }
-
-#define RING(a) (blkif_generic_ring_t *)(a)
-
-inline int BLKTAP_RING_FULL(blkif_generic_ring_t *ring);
-
+inline void active_reqs_init(void);
 
 /* -------[ interposition -> character device interface ]------------- */
 
@@ -135,6 +122,7 @@ inline int BLKTAP_RING_FULL(blkif_generic_ring_t *ring);
 #define BLKTAP_IOCTL_KICK_FE         1
 #define BLKTAP_IOCTL_KICK_BE         2
 #define BLKTAP_IOCTL_SETMODE         3
+#define BLKTAP_IOCTL_PRINT_IDXS      100  
 
 /* blktap switching modes: (Set with BLKTAP_IOCTL_SETMODE)             */
 #define BLKTAP_MODE_PASSTHROUGH      0x00000000  /* default            */
@@ -196,22 +184,12 @@ extern unsigned long mmap_vstart;
 #define RING_PAGES 128 
 extern unsigned long rings_vstart;
 
-/* -------[ Here be globals ]----------------------------------------- */
 
+/* -------[ Here be globals ]----------------------------------------- */
 extern unsigned long blktap_mode;
 
-
-/* blkif struct, containing ring to FE domain */
-extern blkif_t ptfe_blkif; 
-
 /* Connection to a single backend domain. */
-extern blkif_ring_t *blk_ptbe_ring;   /* Ring from the PT to the BE dom    */ 
-extern BLKIF_RING_IDX ptbe_resp_cons; /* Response consumer for comms ring. */
-extern BLKIF_RING_IDX ptbe_req_prod;  /* Private request producer.         */
-
-/* Rings up to user space. */ 
-extern blkif_req_ring_t fe_ring;// = BLKIF_REQ_RING_INIT;
-extern blkif_rsp_ring_t be_ring;// = BLKIF_RSP_RING_INIT;
+extern blkif_front_ring_t blktap_be_ring;
 
 /* Event channel to backend domain. */
 extern unsigned int blkif_ptbe_evtchn;
@@ -224,10 +202,13 @@ extern unsigned long blktap_ring_ok;
 /* init function for character device interface.                       */
 int blktap_init(void);
 
+/* init function for the blkif cache. */
+void __init blkif_interface_init(void);
+void __init blkdev_schedule_init(void);
+void blkif_deschedule(blkif_t *blkif);
+
 /* interfaces to the char driver, passing messages to and from apps.   */
 void blktap_kick_user(void);
-int blktap_write_to_ring(blkif_request_t *req);
-
 
 /* user ring access functions: */
 int blktap_write_fe_ring(blkif_request_t *req);
@@ -235,11 +216,12 @@ int blktap_write_be_ring(blkif_response_t *rsp);
 int blktap_read_fe_ring(void);
 int blktap_read_be_ring(void);
 
-/* and the helpers they call: */
-inline int write_resp_to_fe_ring(blkif_response_t *rsp);
-inline void kick_fe_domain(void);
+/* fe/be ring access functions: */
+int write_resp_to_fe_ring(blkif_t *blkif, blkif_response_t *rsp);
+int write_req_to_be_ring(blkif_request_t *req);
 
-inline int write_req_to_be_ring(blkif_request_t *req);
+/* event notification functions */
+inline void kick_fe_domain(blkif_t *blkif);
 inline void kick_be_domain(void);
 
 /* Interrupt handlers. */
@@ -250,5 +232,8 @@ irqreturn_t blkif_ptfe_int(int irq, void *dev_id, struct pt_regs *regs);
 /* Control message receiver. */
 extern void blkif_ctrlif_rx(ctrl_msg_t *msg, unsigned long id);
 
+/* debug */
+void print_vm_ring_idxs(void);
+        
 #define __BLKINT_H__
 #endif

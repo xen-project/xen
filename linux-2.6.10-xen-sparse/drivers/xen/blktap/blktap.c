@@ -41,9 +41,9 @@ int __init xlblk_init(void)
     DPRINTK("   tap - Frontend connection init:\n");
     
     active_reqs_init();
+    blkif_interface_init();
+    blkdev_schedule_init();
     
-    ptfe_blkif.status = DISCONNECTED;
-
     (void)ctrl_if_register_receiver(CMSG_BLKIF_BE, blkif_ctrlif_rx, 
                                     CALLBACK_IN_BLOCKING_CONTEXT);
 

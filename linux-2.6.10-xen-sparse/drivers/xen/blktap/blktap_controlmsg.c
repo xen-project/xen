@@ -32,10 +32,71 @@ unsigned int blkif_ptbe_evtchn;
 
 /*-----[ Control Messages to/from Frontend VMs ]--------------------------*/
 
+#define BLKIF_HASHSZ 1024
+#define BLKIF_HASH(_d,_h) (((int)(_d)^(int)(_h))&(BLKIF_HASHSZ-1))
+
+static kmem_cache_t *blkif_cachep;
+static blkif_t      *blkif_hash[BLKIF_HASHSZ];
+
+blkif_t *blkif_find_by_handle(domid_t domid, unsigned int handle)
+{
+    blkif_t *blkif = blkif_hash[BLKIF_HASH(domid, handle)];
+    while ( (blkif != NULL) && 
+            ((blkif->domid != domid) || (blkif->handle != handle)) )
+        blkif = blkif->hash_next;
+    return blkif;
+}
+
+static void __blkif_disconnect_complete(void *arg)
+{
+    blkif_t              *blkif = (blkif_t *)arg;
+    ctrl_msg_t            cmsg;
+    blkif_be_disconnect_t disc;
+
+    /*
+     * These can't be done in blkif_disconnect() because at that point there
+     * may be outstanding requests at the disc whose asynchronous responses
+     * must still be notified to the remote driver.
+     */
+    unbind_evtchn_from_irq(blkif->evtchn);
+    vfree(blkif->blk_ring.sring);
+
+    /* Construct the deferred response message. */
+    cmsg.type         = CMSG_BLKIF_BE;
+    cmsg.subtype      = CMSG_BLKIF_BE_DISCONNECT;
+    cmsg.id           = blkif->disconnect_rspid;
+    cmsg.length       = sizeof(blkif_be_disconnect_t);
+    disc.domid        = blkif->domid;
+    disc.blkif_handle = blkif->handle;
+    disc.status       = BLKIF_BE_STATUS_OKAY;
+    memcpy(cmsg.msg, &disc, sizeof(disc));
+
+    /*
+     * Make sure message is constructed /before/ status change, because
+     * after the status change the 'blkif' structure could be deallocated at
+     * any time. Also make sure we send the response /after/ status change,
+     * as otherwise a subsequent CONNECT request could spuriously fail if
+     * another CPU doesn't see the status change yet.
+     */
+    mb();
+    if ( blkif->status != DISCONNECTING )
+        BUG();
+    blkif->status = DISCONNECTED;
+    mb();
+
+    /* Send the successful response. */
+    ctrl_if_send_response(&cmsg);
+}
+
+void blkif_disconnect_complete(blkif_t *blkif)
+{
+    INIT_WORK(&blkif->work, __blkif_disconnect_complete, (void *)blkif);
+    schedule_work(&blkif->work);
+}
 
 void blkif_ptfe_create(blkif_be_create_t *create)
 {
-    blkif_t      *blkif;
+    blkif_t      *blkif, **pblkif;
     domid_t       domid  = create->domid;
     unsigned int  handle = create->blkif_handle;
 
@@ -43,15 +104,37 @@ void blkif_ptfe_create(blkif_be_create_t *create)
     /* May want to store info on the connecting domain here. */
 
     DPRINTK("PT got BE_CREATE\n");
-    blkif = &ptfe_blkif; /* for convenience if the hash is readded later. */
+
+    if ( (blkif = kmem_cache_alloc(blkif_cachep, GFP_KERNEL)) == NULL )
+    {
+        DPRINTK("Could not create blkif: out of memory\n");
+        create->status = BLKIF_BE_STATUS_OUT_OF_MEMORY;
+        return;
+    }
 
     /* blkif struct init code from blkback.c */
     memset(blkif, 0, sizeof(*blkif));
     blkif->domid  = domid;
     blkif->handle = handle;
-    blkif->status = DISCONNECTED;    
+    blkif->status = DISCONNECTED;  
     spin_lock_init(&blkif->blk_ring_lock);
     atomic_set(&blkif->refcnt, 0);
+
+    pblkif = &blkif_hash[BLKIF_HASH(domid, handle)];
+    while ( *pblkif != NULL )
+    {
+        if ( ((*pblkif)->domid == domid) && ((*pblkif)->handle == handle) )
+        {
+            DPRINTK("Could not create blkif: already exists\n");
+            create->status = BLKIF_BE_STATUS_INTERFACE_EXISTS;
+            kmem_cache_free(blkif_cachep, blkif);
+            return;
+        }
+        pblkif = &(*pblkif)->hash_next;
+    }
+
+    blkif->hash_next = *pblkif;
+    *pblkif = blkif;
 
     create->status = BLKIF_BE_STATUS_OKAY;
 }
@@ -61,24 +144,59 @@ void blkif_ptfe_destroy(blkif_be_destroy_t *destroy)
 {
     /* Clear anything that we initialized above. */
 
+    domid_t       domid  = destroy->domid;
+    unsigned int  handle = destroy->blkif_handle;
+    blkif_t     **pblkif, *blkif;
+
     DPRINTK("PT got BE_DESTROY\n");
+    
+    pblkif = &blkif_hash[BLKIF_HASH(domid, handle)];
+    while ( (blkif = *pblkif) != NULL )
+    {
+        if ( (blkif->domid == domid) && (blkif->handle == handle) )
+        {
+            if ( blkif->status != DISCONNECTED )
+                goto still_connected;
+            goto destroy;
+        }
+        pblkif = &blkif->hash_next;
+    }
+
+    destroy->status = BLKIF_BE_STATUS_INTERFACE_NOT_FOUND;
+    return;
+
+ still_connected:
+    destroy->status = BLKIF_BE_STATUS_INTERFACE_CONNECTED;
+    return;
+
+ destroy:
+    *pblkif = blkif->hash_next;
+    kmem_cache_free(blkif_cachep, blkif);
     destroy->status = BLKIF_BE_STATUS_OKAY;
 }
 
 void blkif_ptfe_connect(blkif_be_connect_t *connect)
 {
-    domid_t       domid  = connect->domid;
-    /*unsigned int  handle = connect->blkif_handle;*/
-    unsigned int  evtchn = connect->evtchn;
-    unsigned long shmem_frame = connect->shmem_frame;
+    domid_t        domid  = connect->domid;
+    unsigned int   handle = connect->blkif_handle;
+    unsigned int   evtchn = connect->evtchn;
+    unsigned long  shmem_frame = connect->shmem_frame;
     struct vm_struct *vma;
-    pgprot_t      prot;
-    int           error;
-    blkif_t      *blkif;
+    pgprot_t       prot;
+    int            error;
+    blkif_t       *blkif;
+    blkif_sring_t *sring;
 
     DPRINTK("PT got BE_CONNECT\n");
 
-    blkif = &ptfe_blkif; /* for convenience if the hash is readded later. */
+    blkif = blkif_find_by_handle(domid, handle);
+    if ( unlikely(blkif == NULL) )
+    {
+        DPRINTK("blkif_connect attempted for non-existent blkif (%u,%u)\n", 
+                connect->domid, connect->blkif_handle); 
+        connect->status = BLKIF_BE_STATUS_INTERFACE_NOT_FOUND;
+        return;
+    }
 
     if ( (vma = get_vm_area(PAGE_SIZE, VM_IOREMAP)) == NULL )
     {
@@ -112,30 +230,51 @@ void blkif_ptfe_connect(blkif_be_connect_t *connect)
         return;
     }
 
+    sring = (blkif_sring_t *)vma->addr;
+    SHARED_RING_INIT(BLKIF_RING, sring);
+    BACK_RING_INIT(BLKIF_RING, &blkif->blk_ring, sring);
+    
     blkif->evtchn        = evtchn;
     blkif->irq           = bind_evtchn_to_irq(evtchn);
     blkif->shmem_frame   = shmem_frame;
-    blkif->blk_ring_base = (blkif_ring_t *)vma->addr;
     blkif->status        = CONNECTED;
-    /*blkif_get(blkif);*/
+    blkif_get(blkif);
 
     request_irq(blkif->irq, blkif_ptfe_int, 0, "blkif-pt-backend", blkif);
 
     connect->status = BLKIF_BE_STATUS_OKAY;
 }
 
-void blkif_ptfe_disconnect(blkif_be_disconnect_t *disconnect)
+int blkif_ptfe_disconnect(blkif_be_disconnect_t *disconnect, u8 rsp_id)
 {
-    /*
-     * don't actually set the passthrough to disconnected.
-     * We just act as a pipe, and defer to the real ends to handle things like
-     * recovery.
-     */
+    domid_t       domid  = disconnect->domid;
+    unsigned int  handle = disconnect->blkif_handle;
+    blkif_t      *blkif;
 
     DPRINTK("PT got BE_DISCONNECT\n");
+    
+    blkif = blkif_find_by_handle(domid, handle);
+    if ( unlikely(blkif == NULL) )
+    {
+        DPRINTK("blkif_disconnect attempted for non-existent blkif"
+                " (%u,%u)\n", disconnect->domid, disconnect->blkif_handle); 
+        disconnect->status = BLKIF_BE_STATUS_INTERFACE_NOT_FOUND;
+        return 1; /* Caller will send response error message. */
+    }
+
+    if ( blkif->status == CONNECTED )
+    {
+        blkif->status = DISCONNECTING;
+        blkif->disconnect_rspid = rsp_id;
+        wmb(); /* Let other CPUs see the status change. */
+        free_irq(blkif->irq, blkif);
+        blkif_deschedule(blkif);
+        blkif_put(blkif);
+        return 0; /* Caller should not send response message. */
+    }
 
     disconnect->status = BLKIF_BE_STATUS_OKAY;
-    return;
+    return 1;
 }
 
 /*-----[ Control Messages to/from Backend VM ]----------------------------*/
@@ -150,7 +289,7 @@ static void blkif_ptbe_send_interface_connect(void)
     };
     blkif_fe_interface_connect_t *msg = (void*)cmsg.msg;
     msg->handle      = 0;
-    msg->shmem_frame = virt_to_machine(blk_ptbe_ring) >> PAGE_SHIFT;
+    msg->shmem_frame = virt_to_machine(blktap_be_ring.sring) >> PAGE_SHIFT;
     
     ctrl_if_send_message_block(&cmsg, NULL, 0, TASK_UNINTERRUPTIBLE);
 }
@@ -162,9 +301,11 @@ static void blkif_ptbe_close(void)
 /* Move from CLOSED to DISCONNECTED state. */
 static void blkif_ptbe_disconnect(void)
 {
-    blk_ptbe_ring = (blkif_ring_t *)__get_free_page(GFP_KERNEL);
-    blk_ptbe_ring->req_prod = blk_ptbe_ring->resp_prod 
-                            = ptbe_resp_cons = ptbe_req_prod = 0;
+    blkif_sring_t *sring;
+    
+    sring = (blkif_sring_t *)__get_free_page(GFP_KERNEL);
+    SHARED_RING_INIT(BLKIF_RING, sring);
+    FRONT_RING_INIT(BLKIF_RING, &blktap_be_ring, sring);
     blkif_pt_state  = BLKIF_STATE_DISCONNECTED;
     DPRINTK("Blkif-Passthrough-BE is now DISCONNECTED.\n");
     blkif_ptbe_send_interface_connect();
@@ -319,7 +460,9 @@ void blkif_ctrlif_rx(ctrl_msg_t *msg, unsigned long id)
         case CMSG_BLKIF_BE_DISCONNECT:
             if ( msg->length != sizeof(blkif_be_disconnect_t) )
                 goto parse_error;
-            blkif_ptfe_disconnect((blkif_be_disconnect_t *)&msg->msg[0]);
+            if ( !blkif_ptfe_disconnect((blkif_be_disconnect_t *)&msg->msg[0],
+                    msg->id) )
+                return;
             break;        
 
         /* We just ignore anything to do with vbds for now. */
@@ -355,4 +498,13 @@ void blkif_ctrlif_rx(ctrl_msg_t *msg, unsigned long id)
  parse_error:
     msg->length = 0;
     ctrl_if_send_response(msg);
+}
+
+/*-----[ All control messages enter here: ]-------------------------------*/
+
+void __init blkif_interface_init(void)
+{
+    blkif_cachep = kmem_cache_create("blkif_cache", sizeof(blkif_t), 
+                                     0, 0, NULL, NULL);
+    memset(blkif_hash, 0, sizeof(blkif_hash));
 }
