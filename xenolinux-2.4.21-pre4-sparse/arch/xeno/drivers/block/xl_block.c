@@ -7,6 +7,7 @@
 
 #include "xl_block.h"
 #include <linux/blk.h>
+#include <linux/cdrom.h>
 
 typedef unsigned char byte; /* from linux/ide.h */
 
@@ -223,9 +224,15 @@ int xenolinux_block_ioctl(struct inode *inode, struct file *filep,
 	if (put_user(0x106, (unsigned int *) &geo->cylinders)) return -EFAULT;
 	return 0;
 
+    case CDROMMULTISESSION:
+        printk("FIXME: support multisession CDs later\n");
+        memset((struct cdrom_multisession *)argument, 0, 
+               sizeof(struct cdrom_multisession));
+        return 0;
+
     default:
-        DPRINTK_IOCTL("   eh? unknown ioctl\n");
-	break;
+        printk("ioctl %08x not supported by xl_block\n", command);
+	return -ENOSYS;
     }
     
     return 0;
