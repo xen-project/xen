@@ -7,18 +7,24 @@
 #ifndef __SCHED_CTL_H__
 #define __SCHED_CTL_H__
 
-/* Scheduler types. */
+/* Scheduler types */
 #define SCHED_BVT      0
 #define SCHED_ATROPOS  1
 #define SCHED_RROBIN   2
 
+/* these describe the intended direction used for a scheduler control or domain
+ * command */
+#define SCHED_INFO_PUT 0
+#define SCHED_INFO_GET 1
+
 /*
- * Generic scheduler control command: union of all scheduler control command
- * structures.
+ * Generic scheduler control command - used to adjust system-wide scheduler
+ * parameters
  */
 struct sched_ctl_cmd
 {
     unsigned int sched_id;
+    int direction;          /* are we getting or putting settings? */
     
     union
     {
@@ -40,6 +46,7 @@ struct sched_adjdom_cmd
 {
     unsigned int sched_id;
     domid_t domain;
+    int direction;          /* are we getting or putting settings? */
     
     union
     {
@@ -53,6 +60,9 @@ struct sched_adjdom_cmd
 
         struct atropos_adjdom
         {
+            u64 period;
+            u64 slice;
+            u64 latency;
             int xtratime;
         } atropos;
     } u;

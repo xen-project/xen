@@ -74,6 +74,7 @@ int xc_netbsd_build(int xc_handle,
 
 int xc_bvtsched_global_set(int xc_handle,
                            unsigned long ctx_allow);
+
 int xc_bvtsched_domain_set(int xc_handle,
                            u64 domid,
                            unsigned long mcuadv,
@@ -81,12 +82,31 @@ int xc_bvtsched_domain_set(int xc_handle,
                            unsigned long warpl,
                            unsigned long warpu);
 
+int xc_bvtsched_global_get(int xc_handle,
+			   unsigned long *ctx_allow);
+
+int xc_bvtsched_domain_get(int xc_handle,
+                           u64 domid,
+                           unsigned long *mcuadv,
+                           unsigned long *warp,
+                           unsigned long *warpl,
+                           unsigned long *warpu);
+
 int xc_atropos_domain_set(int xc_handle,
 			  u64 domid,
+			  u64 period, u64 slice, u64 latency,
 			  int xtratime);
+
+int xc_atropos_domain_get(int xc_handle,
+                          u64 domid,
+                          u64* period, u64 *slice, u64 *latency,
+                          int *xtratime);
 
 int xc_rrobin_global_set(int xc_handle,
 			 u64 slice);
+
+int xc_rrobin_global_get(int xc_handle,
+                         u64 *slice);
 
 typedef struct {
     unsigned long credit_bytes;

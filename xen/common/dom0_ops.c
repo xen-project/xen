@@ -200,12 +200,14 @@ long do_dom0_op(dom0_op_t *u_dom0_op)
     case DOM0_SCHEDCTL:
     {
         ret = sched_ctl(&op->u.schedctl);
+        copy_to_user(u_dom0_op, op, sizeof(*op));
     }
     break;
 
     case DOM0_ADJUSTDOM:
     {
         ret = sched_adjdom(&op->u.adjustdom);
+        copy_to_user(u_dom0_op, op, sizeof(*op));
     }
     break;
 
@@ -275,7 +277,6 @@ long do_dom0_op(dom0_op_t *u_dom0_op)
             if ( (p->state == TASK_STOPPED) || (p->state == TASK_DYING) )
                 op->u.getdomaininfo.state = DOMSTATE_STOPPED;
             op->u.getdomaininfo.hyp_events  = p->hyp_events;
-//            op->u.getdomaininfo.mcu_advance = p->mcu_advance;
             op->u.getdomaininfo.tot_pages   = p->tot_pages;
             op->u.getdomaininfo.cpu_time    = p->cpu_time;
             op->u.getdomaininfo.shared_info_frame = 
@@ -485,6 +486,14 @@ long do_dom0_op(dom0_op_t *u_dom0_op)
                                         op->u.pcidev_access.enable);
     }
     break;
+
+    case DOM0_SCHED_ID:
+    {
+        op->u.sched_id.sched_id = sched_id();
+
+        copy_to_user(u_dom0_op, op, sizeof(*op));
+        ret = 0;        
+    }
      
     default:
         ret = -ENOSYS;

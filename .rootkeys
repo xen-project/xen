@@ -175,6 +175,7 @@
 4051bcecFeq4DE70p4zGO5setf47CA xen/common/physdev.c
 4006e659i9j-doVxY7DKOGU4XVin1Q xen/common/rbtree.c
 3ddb79bdHqdQpATqC0rmUZNbsb6L6A xen/common/resource.c
+4064773cJ31vZt-zhbSoxqft1Jaw0w xen/common/sched_atropos.c
 40589968dD2D1aejwSOvrROg7fOvGQ xen/common/sched_bvt.c
 40589968be_t_n0-w6ggceW7h-sx0w xen/common/sched_rrobin.c
 3e397e6619PgAfBbw2XFbXkewvUWgw xen/common/schedule.c

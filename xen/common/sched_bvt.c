@@ -151,6 +151,7 @@ void bvt_wake_up(struct task_struct *p)
     struct bvt_dom_info *inf = BVT_INFO(p);
 
     ASSERT(inf != NULL);
+    
 
     /* set the BVT parameters */
     if (inf->avt < CPU_SVT(p->processor))
@@ -166,19 +167,25 @@ void bvt_wake_up(struct task_struct *p)
 /* 
  * Block the currently-executing domain until a pertinent event occurs.
  */
-static long bvt_do_block(struct task_struct *p)
+static void bvt_do_block(struct task_struct *p)
 {
     BVT_INFO(p)->warpback = 0; 
-    return 0;
 }
 
 /* Control the scheduler. */
 int bvt_ctl(struct sched_ctl_cmd *cmd)
 {
     struct bvt_ctl *params = &cmd->u.bvt;
-    
-    ctx_allow = params->ctx_allow;
 
+    if ( cmd->direction == SCHED_INFO_PUT )
+    { 
+        ctx_allow = params->ctx_allow;
+    }
+    else
+    {
+        params->ctx_allow = ctx_allow;
+    }
+    
     return 0;
 }
 
@@ -187,24 +194,40 @@ int bvt_adjdom(struct task_struct *p,
                struct sched_adjdom_cmd *cmd)
 {
     struct bvt_adjdom *params = &cmd->u.bvt;
-    unsigned long mcu_adv = params->mcu_adv,
-                    warp  = params->warp,
-                    warpl = params->warpl,
-                    warpu = params->warpu;
+    unsigned long flags;
+
+    if ( cmd->direction == SCHED_INFO_PUT )
+    {
+        unsigned long mcu_adv = params->mcu_adv,
+            warp  = params->warp,
+            warpl = params->warpl,
+            warpu = params->warpu;
+        
+        struct bvt_dom_info *inf = BVT_INFO(p);
+        
+        /* Sanity -- this can avoid divide-by-zero. */
+        if ( mcu_adv == 0 )
+            return -EINVAL;
+        
+        spin_lock_irqsave(&schedule_lock[p->processor], flags);   
+        inf->mcu_advance = mcu_adv;
+        inf->warp = warp;
+        inf->warpl = warpl;
+        inf->warpu = warpu;
+        spin_unlock_irqrestore(&schedule_lock[p->processor], flags);
+    }
+    else if ( cmd->direction == SCHED_INFO_GET )
+    {
+        struct bvt_dom_info *inf = BVT_INFO(p);
+
+        spin_lock_irqsave(&schedule_lock[p->processor], flags);   
+        params->mcu_adv = inf->mcu_advance;
+        params->warp    = inf->warp;
+        params->warpl   = inf->warpl;
+        params->warpu   = inf->warpu;
+        spin_unlock_irqrestore(&schedule_lock[p->processor], flags);
+    }
     
-    struct bvt_dom_info *inf = BVT_INFO(p);
-
-    /* Sanity -- this can avoid divide-by-zero. */
-    if ( mcu_adv == 0 )
-        return -EINVAL;
-
-    spin_lock_irq(&schedule_lock[p->processor]);   
-    inf->mcu_advance = mcu_adv;
-    inf->warp = warp;
-    inf->warpl = warpl;
-    inf->warpu = warpu;
-    spin_unlock_irq(&schedule_lock[p->processor]); 
-
     return 0;
 }
 

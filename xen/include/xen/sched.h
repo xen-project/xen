@@ -4,6 +4,9 @@
 #include <xen/config.h>
 #include <xen/types.h>
 #include <xen/spinlock.h>
+#include <xen/config.h>
+#include <xen/types.h>
+#include <xen/spinlock.h>
 #include <asm/ptrace.h>
 #include <xen/smp.h>
 #include <asm/page.h>
@@ -266,6 +269,7 @@ void sched_add_domain(struct task_struct *p);
 int  sched_rem_domain(struct task_struct *p);
 long sched_ctl(struct sched_ctl_cmd *);
 long sched_adjdom(struct sched_adjdom_cmd *);
+int  sched_id();
 void init_idle_task(void);
 void __wake_up(struct task_struct *p);
 void wake_up(struct task_struct *p);
@@ -302,6 +306,7 @@ void startup_cpu_idle_loop(void);
 void continue_cpu_idle_loop(void);
 
 void continue_nonidle_task(void);
+void sched_prn_state(int state);
 
 /* This task_hash and task_list are protected by the tasklist_lock. */
 #define TASK_HASH_SIZE 256

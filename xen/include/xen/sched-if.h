@@ -40,8 +40,7 @@ struct scheduler
     void         (*free_task)      (struct task_struct *);
     void         (*rem_task)       (struct task_struct *);
     void         (*wake_up)        (struct task_struct *);
-    /* XXX why does do_block need to return anything at all? */
-    long         (*do_block)       (struct task_struct *);
+    void         (*do_block)       (struct task_struct *);
     task_slice_t (*do_schedule)    (s_time_t);
     int          (*control)        (struct sched_ctl_cmd *);
     int          (*adjdom)         (struct task_struct *,
@@ -50,6 +49,7 @@ struct scheduler
     void         (*dump_settings)  (void);
     void         (*dump_cpu_state) (int);
     void         (*dump_runq_el)   (struct task_struct *);
+    int          (*prn_state)      (int);
 };
 
 /* per CPU scheduler information */
