@@ -288,6 +288,8 @@ CONFIG_JBD=y
 # CONFIG_TMPFS is not set
 # CONFIG_RAMFS is not set
 CONFIG_ISO9660_FS=y
+CONFIG_JOLIET=y
+CONFIG_ZISOFS=y
 # CONFIG_MINIX_FS is not set
 # CONFIG_VXFS_FS is not set
 # CONFIG_NTFS_FS is not set
@@ -400,6 +402,9 @@ CONFIG_KALLSYMS=y
 # CONFIG_JFS_FS is not set
 # CONFIG_QNX4FS_FS is not set
 
-
+# 
+# Library routines
+#
+CONFIG_ZLIB_INFLATE=y
 
 

@@ -520,7 +520,6 @@ void atapi_input_bytes (ide_drive_t *drive, void *buffer, unsigned int bytecount
 				     drive, buffer, bytecount);
 		return;
 	}
-printk("XXXXX atapi_input_bytes called -- mapping is likely broken\n");
 	++bytecount;
 #if defined(CONFIG_ATARI) || defined(CONFIG_Q40)
 	if (MACH_IS_ATARI || MACH_IS_Q40) {
@@ -541,8 +540,6 @@ void atapi_output_bytes (ide_drive_t *drive, void *buffer, unsigned int bytecoun
 				     drive, buffer, bytecount);
 		return;
 	}
-
-printk("XXXXX atapi_output_bytes called -- mapping is likely broken\n");
 
 	++bytecount;
 #if defined(CONFIG_ATARI) || defined(CONFIG_Q40)
@@ -2021,38 +2018,60 @@ void ide_init_drive_cmd (struct request *rq)
  */
 int ide_do_drive_cmd (ide_drive_t *drive, struct request *rq, ide_action_t action)
 {
-	unsigned long flags;
-	ide_hwgroup_t *hwgroup = HWGROUP(drive);
-	unsigned int major = HWIF(drive)->major;
-	struct list_head *queue_head = &drive->queue.queue_head;
-	/*DECLARE_COMPLETION(wait);*/
-
-#ifdef CONFIG_BLK_DEV_PDC4030
-	if (HWIF(drive)->chipset == ide_pdc4030 && rq->buffer != NULL)
-		return -ENOSYS;  /* special drive cmds not supported */
+    unsigned long flags;
+    ide_hwgroup_t *hwgroup = HWGROUP(drive);
+    unsigned int major = HWIF(drive)->major;
+    struct list_head *queue_head = &drive->queue.queue_head;
+#if 0 
+    DECLARE_COMPLETION(wait);
+#else 
+    int wait  = 1; 
+    int usecs = 0; 
 #endif
-	rq->errors = 0;
-	rq->rq_status = RQ_ACTIVE;
-	rq->rq_dev = MKDEV(major,(drive->select.b.unit)<<PARTN_BITS);
-	if (action == ide_wait) { 
-		printk("SMH says: wait on IDE device but no queue :-(\n"); 
-		return 0; 
-	} 
-	spin_lock_irqsave(&io_request_lock, flags);
-	if (list_empty(queue_head) || action == ide_preempt) {
-		if (action == ide_preempt)
-			hwgroup->rq = NULL;
-	} else {
-		if (action == ide_wait || action == ide_end) {
-			queue_head = queue_head->prev;
-		} else
-			queue_head = queue_head->next;
-	}
-	list_add(&rq->queue, queue_head);
-	ide_do_request(hwgroup, 0);
-	spin_unlock_irqrestore(&io_request_lock, flags);
-	return 0;
 
+    
+#ifdef CONFIG_BLK_DEV_PDC4030
+    if (HWIF(drive)->chipset == ide_pdc4030 && rq->buffer != NULL)
+	return -ENOSYS;  /* special drive cmds not supported */
+#endif
+    rq->errors = 0;
+    rq->rq_status = RQ_ACTIVE;
+    rq->rq_dev = MKDEV(major,(drive->select.b.unit)<<PARTN_BITS);
+
+
+    if (action == ide_wait) { 
+	/* XXX SMH: we cannot 'block' in xen => we'll spin instead */ 
+	rq->waiting = (void *)&wait; 
+    } 
+
+    spin_lock_irqsave(&io_request_lock, flags);
+    if (list_empty(queue_head) || action == ide_preempt) {
+	if (action == ide_preempt)
+	    hwgroup->rq = NULL;
+    } else {
+	if (action == ide_wait || action == ide_end) {
+	    queue_head = queue_head->prev;
+	} else
+	    queue_head = queue_head->next;
+    }
+    list_add(&rq->queue, queue_head);
+    ide_do_request(hwgroup, 0);
+    spin_unlock_irqrestore(&io_request_lock, flags);
+
+    /* XXX SMH: spin waiting for response */
+    if (action == ide_wait) { 
+	while(*(int *)rq->waiting) {
+	    udelay(500); 
+	    usecs += 500; 
+	    if(usecs > 1000000) { 
+		printk("ide_do_drive_cmd [ide_wait]: giving up after 1s\n"); 
+		*(int *)rq->waiting = 0; 
+	    }
+	}
+    }
+
+    return 0;
+    
 }
 
 /*
