@@ -149,6 +149,7 @@ struct task_struct {
     next_task:   &(_t)           \
 }
 
+extern struct task_struct *idle_task[NR_CPUS];
 #define IDLE_DOMAIN_ID   (~0)
 #define is_idle_task(_p) ((_p)->domain == IDLE_DOMAIN_ID)
 
@@ -214,7 +215,8 @@ asmlinkage void schedule(void);
 
 void domain_init(void);
 
-void cpu_idle(void);
+int idle_cpu(int cpu); /* Is CPU 'cpu' idle right now? */
+void cpu_idle(void);   /* Idle loop. */
 
 #define REMOVE_LINKS(p) do { \
         (p)->next_task->prev_task = (p)->prev_task; \

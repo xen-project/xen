@@ -30,6 +30,15 @@ static inline void detect_clustered_apic(char* oem, char* prod)
 		/*Start cyclone clock*/
 		cyclone_setup(0);
 	}
+	else if (!strncmp(oem, "IBM ENSW", 8) && !strncmp(prod, "RUTHLESS SMP", 9)){
+		clustered_apic_mode = CLUSTERED_APIC_XAPIC;
+		apic_broadcast_id = APIC_BROADCAST_ID_XAPIC;
+		int_dest_addr_mode = APIC_DEST_PHYSICAL;
+		int_delivery_mode = dest_Fixed;
+		esr_disable = 1;
+		/*Start cyclone clock*/
+		cyclone_setup(0);
+	}
 	else if (!strncmp(oem, "IBM NUMA", 8)){
 		clustered_apic_mode = CLUSTERED_APIC_NUMAQ;
 		apic_broadcast_id = APIC_BROADCAST_ID_APIC;
@@ -116,15 +125,6 @@ static inline int target_cpus(void)
 	return cpu_online_map;
 }
 #else
-/* KAF Xen: Round-robin allocate IRQs to CPUs. */
-static inline int target_cpus(void)
-{
-    static unsigned int cpu_field = 1;
-    do { 
-        cpu_field <<= 1; 
-        if ( cpu_field == 0x100 ) cpu_field = 1; /* logical field == 8 bits */ 
-    } while ( (cpu_field & cpu_online_map) == 0 );
-    return cpu_field;
-}
+#define target_cpus() (0xFF)
 #endif
 #endif

@@ -60,6 +60,11 @@
 irq_desc_t irq_desc[NR_IRQS] __cacheline_aligned =
 { [0 ... NR_IRQS-1] = { 0, &no_irq_type, NULL, 0, SPIN_LOCK_UNLOCKED}};
 
+#ifdef CONFIG_SMP
+/* NB. XXX We'll want some way of fiddling with this from DOM0. */
+unsigned long irq_affinity [NR_IRQS] = { [0 ... NR_IRQS-1] = ~0UL };
+#endif
+
 /*
  * Special irq handlers.
  */

@@ -174,6 +174,7 @@ long schedule_timeout(long timeout)
 }
 
 /* RN: XXX turn this into do_halt() */
+/* KAF: No, turn it back into do_yield()! */
 /*
  * yield the current process
  */
@@ -280,6 +281,15 @@ asmlinkage void schedule(void)
         goto need_resched_back;
     return;
 }
+
+
+/* No locking needed -- pointer comparison is safe :-) */
+int idle_cpu(int cpu)
+{
+    struct task_struct *p = schedule_data[cpu].curr;
+    return p == idle_task[cpu];
+}
+
 
 /*
  * The scheduling timer.
