@@ -149,18 +149,20 @@ typedef struct xp_disk
   int mode; /* 0 -> revoke existing access, otherwise bitmask of
 	       PHYSDISK_MODE_? constants */
   int domain;
-  unsigned short device;
+  unsigned short device; /* XENDEV_??? + idx */
+  unsigned short partition; /* partition number */
   unsigned long start_sect;
   unsigned long n_sectors;
 } xp_disk_t;
 
-#define PHYSDISK_MAX_ACES_PER_REQUEST 254
+#define PHYSDISK_MAX_ACES_PER_REQUEST 254 /* Make it fit in one page */
 typedef struct {
   int n_aces;
   int domain;
   int start_ind;
   struct {
-    unsigned short device;
+    unsigned short device; /* XENDEV_??? + idx */
+    unsigned short partition; /* partition number */
     unsigned long start_sect;
     unsigned long n_sectors;
     unsigned mode;

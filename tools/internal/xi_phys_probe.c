@@ -39,7 +39,8 @@ int main(int argc, char *argv[])
     for (x = 0; x < buf.n_aces; x++) {
       char read = ( buf.entries[x].mode & 1 ? 'r' : ' ' );
       char write = ( buf.entries[x].mode & 2 ? 'w' : ' ' );
-      printf("%x %lx %lx %c%c\n", buf.entries[x].device,
+      printf("%x %x %lx %lx %c%c\n", buf.entries[x].device,
+	     buf.entries[x].partition,
 	     buf.entries[x].start_sect,
 	     buf.entries[x].n_sectors,
 	     read,
