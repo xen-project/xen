@@ -6,6 +6,7 @@
 #include <asm/domain_page.h>
 #include <asm/page.h>
 #include <xen/event.h>
+#include <xen/sched.h>
 #include <xen/trace.h>
 
 /********

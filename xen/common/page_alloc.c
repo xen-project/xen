@@ -25,6 +25,7 @@
 #include <xen/types.h>
 #include <xen/lib.h>
 #include <xen/perfc.h>
+#include <xen/sched.h>
 #include <xen/spinlock.h>
 #include <xen/slab.h>
 #include <xen/irq.h>
