@@ -36,7 +36,7 @@ typedef struct VnetMsgHdr {
 } __attribute__((packed)) VnetMsgHdr;
 
 typedef struct VarpHdr {
-    VnetMsgHdr;
+    VnetMsgHdr vnetmsghdr;
     uint32_t vnet;
     Vmac vmac;
     uint32_t addr;
@@ -50,4 +50,4 @@ typedef struct VarpHdr {
 
 
 
-#endif /* ! _VNET_IF_VARP_H */
+#endif  /* ! _VNET_IF_VARP_H */
