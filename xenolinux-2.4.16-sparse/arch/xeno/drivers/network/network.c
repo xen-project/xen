@@ -241,7 +241,7 @@ static void network_alloc_rx_buffers(struct net_device *dev)
         skb = dev_alloc_skb(RX_BUF_SIZE);
         if ( skb == NULL ) break;
         skb->dev = dev;
-        //skb_reserve(skb, 2); /* word align the IP header */
+        skb_reserve(skb, 2); /* word align the IP header */
         np->rx_skb_ring[i] = skb;
         np->net_ring->rx_ring[i].addr = get_ppte(skb->head); 
         np->net_ring->rx_ring[i].size = RX_BUF_SIZE - 16; /* arbitrary */
@@ -269,6 +269,14 @@ static void network_free_rx_buffers(struct net_device *dev)
     }
 }
 
+void print_range(u8 *start, unsigned int len)
+{
+    int i = 0;
+
+    while (i++ < len)
+        printk("%x:", start[i]);
+    printk("\n");
+}
 
 static int network_start_xmit(struct sk_buff *skb, struct net_device *dev)
 {
@@ -281,10 +289,13 @@ static int network_start_xmit(struct sk_buff *skb, struct net_device *dev)
         netif_stop_queue(dev);
         return -ENOBUFS;
     }
-
+//print_range(skb->data, ETH_HLEN + 8);
+//print_range(skb->data + ETH_HLEN + 8, 20);
+//printk("skb->len is %u in guestOS (expected fraglen: %u).\n", skb->len, skb->len - (ETH_HLEN + 8));
     i = np->net_ring->tx_prod;
     np->tx_skb_ring[i] = skb;
-    np->net_ring->tx_ring[i].addr = (unsigned long)skb->data;
+    np->net_ring->tx_ring[i].addr 
+        = (unsigned long)phys_to_machine(virt_to_phys(skb->data));
     np->net_ring->tx_ring[i].size = skb->len;
     np->net_ring->tx_prod = TX_RING_INC(i);
     atomic_inc(&np->tx_entries);

@@ -501,7 +501,7 @@ int dev_queue_xmit(struct sk_buff *skb)
 {
 	struct net_device *dev = skb->dev;
 	struct Qdisc  *q;
-
+if (!(dev->features&NETIF_F_SG)) printk("NIC doesn't do SG!!!\n");
 	if (skb_shinfo(skb)->frag_list &&
 	    !(dev->features&NETIF_F_FRAGLIST) &&
 	    skb_linearize(skb, GFP_ATOMIC) != 0) {
@@ -673,12 +673,11 @@ void deliver_packet(struct sk_buff *skb, net_vif_t *vif)
 {
         net_shadow_ring_t *shadow_ring;
         rx_shadow_entry_t *rx;
-        unsigned long *g_pte, tmp;
+        unsigned long *g_pte; //tmp
         struct pfn_info *g_pfn, *h_pfn;
         unsigned int i; //, nvif;
 
-        if (skb->skb_type != SKB_ZERO_COPY) 
-            return;
+        
         
         /*
          * Write the virtual MAC address into the destination field
@@ -724,10 +723,11 @@ void deliver_packet(struct sk_buff *skb, net_vif_t *vif)
             //flip and/or set relevant pf_info fields.
             //tmp = g_pfn->next; g_pfn->next = h_pfn->next; h_pfn->next = tmp;
             //tmp = g_pfn->prev; g_pfn->prev = h_pfn->prev; h_pfn->prev = tmp;
-            tmp = g_pfn->flags; g_pfn->flags = h_pfn->flags; h_pfn->flags = tmp;
+            //tmp = g_pfn->flags; g_pfn->flags = h_pfn->flags; h_pfn->flags = tmp;
             h_pfn->tot_count = h_pfn->type_count = 1;
             g_pfn->tot_count = g_pfn->type_count = 0;
-            h_pfn->flags = g_pfn->flags & ~ PG_type_mask;
+            h_pfn->flags = g_pfn->flags & (~PG_type_mask);
+//if (h_pfn->flags & PG_domain_mask) printk("deliver packet to dom %lu\n", (h_pfn->flags & PG_domain_mask));
             if (*g_pte & _PAGE_RW) h_pfn->flags |= PGT_writeable_page;
             g_pfn->flags = 0;
             //point guest pte at the new page:
@@ -783,25 +783,28 @@ int netif_rx(struct sk_buff *skb)
         net_vif_t *vif;
 
 	local_irq_save(flags);
-        
-	if (skb->stamp.tv_sec == 0)
-		get_fast_time(&skb->stamp);
 
-        /* Attempt to handle zero-copy packets here: */
-        if (skb->skb_type == SKB_ZERO_COPY)
-        {
-                skb->head = (u8 *)map_domain_mem(((skb->pf - frame_table) << PAGE_SHIFT));
-
-                /* remapping this address really screws up all the skb pointers.  We need 
-                 * to map them all here sufficiently to get the packet demultiplexed.
-                 */
+        if (skb->skb_type != SKB_ZERO_COPY) 
+            BUG();
                 
-                skb->data = skb->head;
-                skb_reserve(skb,16); // need to ensure that all the drivers and not just tulip do this.
-                skb->mac.raw = skb->data;
-                skb->data += ETH_HLEN;
-                skb->nh.raw = skb->data;
-        }
+	if (skb->stamp.tv_sec == 0)
+	    get_fast_time(&skb->stamp);
+
+        if ( (skb->data - skb->head) != (18 + ETH_HLEN) )
+            BUG();
+        
+        skb->head = (u8 *)map_domain_mem(((skb->pf - frame_table) << PAGE_SHIFT));
+
+        /* remapping this address really screws up all the skb pointers.  We need 
+        * to map them all here sufficiently to get the packet demultiplexed.
+        */
+                
+        skb->data = skb->head;
+        skb_reserve(skb,18); // 18 is the 16 from dev_alloc_skb plus 2 for #
+                             // IP header alignment. 
+        skb->mac.raw = skb->data;
+        skb->data += ETH_HLEN;
+        skb->nh.raw = skb->data;
         
 	/* The code is rearranged so that the path is the most
 	   short when CPU is congested, but is still operating.
@@ -812,9 +815,11 @@ int netif_rx(struct sk_buff *skb)
 
         if ( skb->src_vif == VIF_UNKNOWN_INTERFACE )
             skb->src_vif = VIF_PHYSICAL_INTERFACE;
-
+                
         if ( skb->dst_vif == VIF_UNKNOWN_INTERFACE )
-            net_get_target_vif(skb);
+            skb->dst_vif = __net_get_target_vif(skb->mac.raw, skb->len, skb->src_vif);
+if (skb->dst_vif == VIF_DROP)
+printk("netif_rx target: %d (sec: %u)\n", skb->dst_vif, skb->security);
         
         if ( (vif = sys_vif_list[skb->dst_vif]) == NULL )
         {
@@ -851,17 +856,14 @@ int netif_rx(struct sk_buff *skb)
 
 drop:
 	netdev_rx_stat[this_cpu].dropped++;
-        if (skb->skb_type == SKB_ZERO_COPY)
-                unmap_domain_mem(skb->head);
+        unmap_domain_mem(skb->head);
 	kfree_skb(skb);
         local_irq_restore(flags);
 	return NET_RX_DROP;
 
 found:
-        if (skb->skb_type == SKB_ZERO_COPY) {
-                unmap_domain_mem(skb->head);
-                skb->head = skb->data = skb->tail = (void *)0xdeadbeef;
-        }
+        unmap_domain_mem(skb->head);
+        skb->head = skb->data = skb->tail = (void *)0xdeadbeef;
         kfree_skb(skb);
         hyp_event_notify(cpu_mask);
         local_irq_restore(flags);
@@ -990,7 +992,7 @@ void update_shared_ring(void)
     net_ring_t *net_ring;
     net_shadow_ring_t *shadow_ring;
     unsigned int nvif;
-
+    
     clear_bit(_HYP_EVENT_NET_RX, &current->hyp_events);
     for (nvif = 0; nvif < current->num_net_vifs; nvif++)
     {
@@ -1004,7 +1006,7 @@ void update_shared_ring(void)
 
             shadow_ring->rx_idx = RX_RING_INC(shadow_ring->rx_idx);
             net_ring->rx_cons   = RX_RING_INC(net_ring->rx_cons);
-
+            
             if (rx->flush_count == tlb_flush_count[smp_processor_id()])
                 __flush_tlb();
 
@@ -2134,13 +2136,59 @@ int __init net_dev_init(void)
 	return 0;
 }
 
+inline int init_tx_header(u8 *data, unsigned int len, struct net_device *dev)
+{
+        memcpy(data + ETH_ALEN, dev->dev_addr, ETH_ALEN);
+        
+        switch ( ntohs(*(unsigned short *)(data + 12)) )
+        {
+        case ETH_P_ARP:
+            if ( len < 42 ) break;
+            memcpy(data + 22, dev->dev_addr, 6);
+            return ETH_P_ARP;
+        case ETH_P_IP:
+            return ETH_P_IP;
+        }
+        return 0;
+}
 
+/* 
+ * tx_skb_release
+ *
+ * skb destructor function that is attached to zero-copy tx skbs before 
+ * they are passed to the device driver for transmission.  The destructor 
+ * is responsible for unlinking the fragment pointer to the skb data that 
+ * is in guest memory, and decrementing the tot_count on the packet pages 
+ * pfn_info.
+ */
+
+void tx_skb_release(struct sk_buff *skb)
+{
+    int i;
+    
+    for (i= 0; i < skb_shinfo(skb)->nr_frags; i++)
+        skb_shinfo(skb)->frags[i].page->tot_count--;
+    
+    skb_shinfo(skb)->nr_frags = 0; 
+}
+    
 /*
  * do_net_update:
  * 
  * Called from guest OS to notify updates to its transmit and/or receive
  * descriptor rings.
  */
+#define PKT_PROT_LEN (ETH_HLEN + 8)
+
+void print_range2(u8 *start, unsigned int len)
+{
+    int i=0;
+    while (i++ < len)
+    {
+        printk("%x:",start[i]);
+    }
+    printk("\n");
+}
 
 long do_net_update(void)
 {
@@ -2161,6 +2209,9 @@ long do_net_update(void)
     {
         current_vif = current->net_vif_list[j];
         net_ring = current_vif->net_ring;
+        int target;
+        u8 *g_data;
+        unsigned short protocol;
 
         /* First, we send out pending TX descriptors if they exist on this ring.
          */
@@ -2170,63 +2221,123 @@ long do_net_update(void)
             if ( copy_from_user(&tx, net_ring->tx_ring+i, sizeof(tx)) )
                 continue;
 
+            if ( tx.size < PKT_PROT_LEN ) continue; // This should be reasonable.
+            
+            // Packets must not cross page boundaries.  For now, this is a 
+            // kernel panic, later it may become a continue -- silent fail.
+            
+            if ( ((tx.addr & ~PAGE_MASK) + tx.size) >= PAGE_SIZE ) 
+            {
+                printk("tx.addr: %lx, size: %lu, end: %lu\n", tx.addr, tx.size,
+                    (tx.addr &~PAGE_MASK) + tx.size);
+                continue;
+                //BUG();
+            }
+            
             if ( TX_RING_INC(i) == net_ring->tx_event )
                 set_bit(_EVENT_NET_TX_FOR_VIF(j), &shared->events);
 
-            skb = alloc_skb(tx.size, GFP_KERNEL);
-            if ( skb == NULL ) continue;
-            skb_put(skb, tx.size);
-            if ( copy_from_user(skb->data, (void *)tx.addr, tx.size) )
+            /* Map the skb in from the guest, and get it's delivery target.
+             * We need this to know whether the packet is to be sent locally
+             * or remotely.
+             */
+            
+            g_data = map_domain_mem(tx.addr);
+
+//print_range2(g_data, PKT_PROT_LEN);                
+            protocol = __constant_htons(init_tx_header(g_data, tx.size, the_dev));
+            if ( protocol == 0 )
             {
-                kfree_skb(skb);
+                unmap_domain_mem(g_data);
                 continue;
             }
-            skb->dev = the_dev;
 
-            if ( skb->len < 16 )
+            target = __net_get_target_vif(g_data, tx.size, current_vif->id);
+//printk("Send to target: %d\n", target); 
+            if (target > VIF_PHYSICAL_INTERFACE )
             {
-                kfree_skb(skb);
-                continue;
-            }
+                // Local delivery: Allocate an skb off the domain free list
+                // fil it, and pass it to netif_rx as if it came off the NIC.
 
-            memcpy(skb->data + ETH_ALEN, skb->dev->dev_addr, ETH_ALEN);
-        
-            switch ( ntohs(*(unsigned short *)(skb->data + 12)) )
-            {
-            case ETH_P_ARP:
-                skb->protocol = __constant_htons(ETH_P_ARP);
-                if ( skb->len < 42 ) break;
-                memcpy(skb->data + 22, skb->dev->dev_addr, 6);
-                break;
-            case ETH_P_IP:
-                skb->protocol = __constant_htons(ETH_P_IP);
-                break;
-            default:
-                kfree_skb(skb);
-                skb = NULL;
-                break;
-            }
-
-            if ( skb != NULL )
-            {
-                skb->protocol = eth_type_trans(skb, skb->dev);
-                skb->src_vif = current_vif->id; 
-                net_get_target_vif(skb);
-                if ( skb->dst_vif > VIF_PHYSICAL_INTERFACE )
+                skb = dev_alloc_skb(tx.size);
+                if (skb == NULL) 
                 {
-printk("LOCAL DELIVERY!\n");
-                    (void)netif_rx(skb);
+                    unmap_domain_mem(g_data);
+                    continue;
                 }
-                else if ( skb->dst_vif == VIF_PHYSICAL_INTERFACE )
+                
+                skb->src_vif = current_vif->id;
+                skb->dst_vif = target;
+                skb->protocol = protocol;
+                if (copy_to_user(skb->data, g_data, tx.size))
                 {
-                    skb_push(skb, skb->dev->hard_header_len);
-                    dev_queue_xmit(skb);
-                } 
-                else
+                    unmap_domain_mem(g_data);
+                    continue;
+                }
+                
+                (void)netif_rx(skb); // why is there a void here?  It's from the old code.
+
+                unmap_domain_mem(g_data);
+            }
+            else if ( target == VIF_PHYSICAL_INTERFACE )
+            {
+                // External delivery: Allocate a small skb to hold protected header info
+                // and copy the eth header and IP address fields into that.
+                // Set a frag link to the remaining data, and we will scatter-gather
+                // in the device driver to send the two bits later.
+                
+                /*unmap_domain_mem(g_data);*/
+                    
+                skb = alloc_skb(PKT_PROT_LEN, GFP_KERNEL); // Eth header + two IP addrs.
+                if (skb == NULL) 
                 {
+printk("Alloc skb failed!\n");
+                    continue;
+                }
+            
+                skb_put(skb, PKT_PROT_LEN);
+                /*if ( copy_from_user(skb->data, (void *)tx.addr, PKT_PROT_LEN) )
+                {
+printk("Copy from user failed!\n");
                     kfree_skb(skb);
+                    continue;
                 }
+                */
+                memcpy(skb->data, g_data, PKT_PROT_LEN);
+                unmap_domain_mem(g_data);
+//print_range2(g_data, PKT_PROT_LEN);                
+                skb->dev = the_dev;
+                skb->src_vif = current_vif->id;
+                skb->dst_vif = target;
+                skb->protocol = protocol; // These next two lines abbreviate the call 
+                                          // to eth_type_trans as we already have our
+                                          // protocol.
+                //skb_pull(skb, skb->dev->hard_header_len);
+                skb->mac.raw=skb->data; 
 
+                // set tot_count++ in the guest data pfn.
+                page = (tx.addr >> PAGE_SHIFT) + frame_table;
+                page->tot_count++;
+
+                // place the remainder of the packet (which is in guest memory) into an
+                // skb frag.
+                skb_shinfo(skb)->frags[0].page = page;
+                skb_shinfo(skb)->frags[0].size = tx.size - PKT_PROT_LEN;
+                skb_shinfo(skb)->frags[0].page_offset 
+                    = (tx.addr & ~PAGE_MASK) + PKT_PROT_LEN;
+                skb_shinfo(skb)->nr_frags = 1;
+                skb->data_len = tx.size - skb->len;
+                skb->len = tx.size;
+                
+                // assign a destructor to the skb that will unlink and dec the tot_count
+                skb->destructor = &tx_skb_release;
+                //skb_push(skb, skb->dev->hard_header_len);
+//printk("calling dev_queue_xmit!\n");
+                dev_queue_xmit(skb);
+            }
+            else
+            {
+                unmap_domain_mem(g_data);
             }
         }
         net_ring->tx_cons = i;

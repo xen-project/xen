@@ -66,9 +66,10 @@ extern net_vif_t *sys_vif_list[];
 net_vif_t *create_net_vif(int domain);
 void destroy_net_vif(struct task_struct *p);
 void add_default_net_rule(int vif_id, u32 ipaddr);
-int net_get_target_vif(struct sk_buff *skb);
+int __net_get_target_vif(u8 *data, unsigned int len, int src_vif);
 void add_default_net_rule(int vif_id, u32 ipaddr);
 
+#define net_get_target_vif(skb) __net_get_target_vif(skb->data, skb->len, skb->src_vif)
 /* status fields per-descriptor:
  */
 

@@ -14,6 +14,7 @@
 #include <xeno/dom0_ops.h>
 #include <asm/byteorder.h>
 #include <linux/if_ether.h>
+#include <asm/domain_page.h>
 
 /* VGA text definitions. */
 #define COLUMNS	    80
@@ -297,11 +298,11 @@ void panic(const char *fmt, ...)
     char buf[1024], *p;
     unsigned long flags;
     extern void machine_restart(char *);
-
+    
     va_start(args, fmt);
     (void)vsnprintf(buf, sizeof(buf), fmt, args);
     va_end(args);
-  
+    
     /* Spit out multiline message in one go. */
     spin_lock_irqsave(&console_lock, flags);
     __putstr("\n****************************************\n");
@@ -353,6 +354,7 @@ unsigned short compute_cksum(unsigned short *buf, int count)
 /* XXX SMH: below is rather vile; pulled in to allow network console */
 
 extern int netif_rx(struct sk_buff *); 
+extern struct net_device *the_dev;
 
 typedef struct my_udphdr {
     __u16 source;
@@ -403,17 +405,24 @@ int console_export(char *str, int len)
     struct my_udphdr *udph = NULL; 
     struct my_ethhdr *ethh = NULL; 
     int hdr_size = sizeof(struct my_iphdr) + sizeof(struct my_udphdr); 
-    
-    // Prepare console packet
-    console_packet = alloc_skb(sizeof(struct my_ethhdr) + hdr_size + len, 
-			       GFP_KERNEL);
+    u8 *skb_data;
+
+    // Prepare console packet - the grim + 20 in the alloc is for headroom.
+    console_packet = dev_alloc_skb(sizeof(struct my_ethhdr) + hdr_size + len + 20);
+    if (!console_packet) return 0;
+//console_packet->security = 9; // hack to trace these packets.
+    console_packet->dev = the_dev;
+    skb_data = map_domain_mem((unsigned long)console_packet->head);
+    skb_reserve(console_packet, 2); // ip header alignment.
+//printk("Eth is: %d\n", console_packet->data - console_packet->head);
+    ethh   = (struct my_ethhdr *) skb_data + (console_packet->data - console_packet->head);
     skb_reserve(console_packet, sizeof(struct my_ethhdr)); 
-    ethh   = (struct my_ethhdr *)console_packet->head;
 
     skb_put(console_packet, hdr_size + len); 
-    iph  = (struct my_iphdr *)console_packet->data; 
-	udph = (struct my_udphdr *)(iph + 1); 
-	memcpy((char *)(udph + 1), str, len); 
+//printk("IP is: %d\n", console_packet->data - console_packet->head);
+    iph  = (struct my_iphdr *)skb_data + (console_packet->data - console_packet->head); 
+    udph = (struct my_udphdr *)(iph + 1); 
+    memcpy((char *)(udph + 1), str, len); 
 
     // Build IP header
     iph->version = 4;
@@ -442,6 +451,13 @@ int console_export(char *str, int len)
     memcpy(ethh->h_dest, "000000", 6);
     ethh->h_proto = htons(ETH_P_IP);
     console_packet->mac.ethernet= (struct ethhdr *)ethh;
+
+    // Make the packet appear to come off the external NIC so that the 
+    // tables code doesn't get too confused.
+    console_packet->src_vif = VIF_PHYSICAL_INTERFACE;
+    console_packet->dst_vif = 0;
+    
+    unmap_domain_mem(skb_data);
     
     // Pass the packet to netif_rx
     (void)netif_rx(console_packet);
@@ -477,23 +493,14 @@ long do_console_write(char *str, int count)
 	
         if ( !safe_str[i] ) break;
         putchar(prev = safe_str[i]);
-	
-        if ( prev == '\n' )
-        {
-	    exported_str[j]='\0';
-	    console_export(exported_str, j-1);
-	    j=0;
-        }
-	
-    }
-    if ( prev != '\n' ) 
-    {
-	putchar('\n');
-        exported_str[j]='\0';
-        console_export(exported_str, j-1);
     }
     
+    if ( prev != '\n' ) putchar('\n');
+    
     spin_unlock_irqrestore(&console_lock, flags);
+    
+    exported_str[j]='\0';
+    console_export(exported_str, j-1);
     
     return(0);
 }
