@@ -68,13 +68,14 @@ include/xen/compile.h:
 	@LANG=C echo >> $@
 
 .PHONY: $(GENERATED_FILES) make-links delete-links default 
-.PHONY: debug install clean delete-unfresh-files
+.PHONY: debug install clean delete-unfresh-files TAGS
 
 SUBDIRS = arch common drivers 
 TAGS: 
-	etags `find include/asm-$(TARGET_ARCH) -name '*.h'`
-	find include -type d \( -name "asm-*" -o -name config \) -prune -o -name '*.h' -print | xargs etags -a
-	find $(SUBDIRS) -name '*.[ch]' | xargs etags -a
+	( find include/asm-$(TARGET_ARCH) -name '*.h'; \
+	  find include -type d \( -name "asm-*" -o -name config \) -prune -o \
+		-name '*.h' -print; \
+	  find $(SUBDIRS) -name '*.[ch]' ) | grep -v /SCCS/ | etags -
 MAP:
 	nm $(TARGET) | grep -v '\(compiled\)\|\(\.o$$\)\|\( [aUw] \)\|\(\.\.ng$$\)\|\(LASH[RL]DI\)' | sort > System.map
 
