@@ -9,13 +9,12 @@
 #include <asm/io.h>		/* for phys_to_virt and page_to_pseudophys */
 
 #define pmd_populate_kernel(mm, pmd, pte) \
-	set_pmd(pmd, __pmd(_PAGE_TABLE + __pa(pte)))
+		set_pmd(pmd, __pmd(_PAGE_TABLE + __pa(pte)))
 
-#define pmd_populate(mm, pmd, pte) do {				\
+#define pmd_populate(mm, pmd, pte) 				\
 	set_pmd(pmd, __pmd(_PAGE_TABLE +			\
 		((unsigned long long)page_to_pfn(pte) <<	\
-			(unsigned long long) PAGE_SHIFT)));	\
-} while (0)
+			(unsigned long long) PAGE_SHIFT)))
 /*
  * Allocate and free page tables.
  */

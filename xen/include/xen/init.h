@@ -59,7 +59,7 @@ extern initcall_t __initcall_start, __initcall_end;
  */
 struct kernel_param {
     const char *name;
-    enum { OPT_STR, OPT_UINT, OPT_BOOL } type;
+    enum { OPT_STR, OPT_UINT, OPT_UINT_UNIT, OPT_BOOL } type;
     void *var;
     unsigned int len;
 };
@@ -74,6 +74,10 @@ extern struct kernel_param __setup_start, __setup_end;
     static char __setup_str_##_var[] __initdata = _name; \
     static struct kernel_param __setup_##_var __attribute_used__ \
         __initsetup = { __setup_str_##_var, OPT_UINT, &_var, sizeof(_var) }
+#define integer_unit_param(_name, _var) \
+    static char __setup_str_##_var[] __initdata = _name; \
+    static struct kernel_param __setup_##_var __attribute_used__ \
+        __initsetup = { __setup_str_##_var, OPT_UINT_UNIT, &_var, sizeof(_var) }
 #define string_param(_name, _var) \
     static char __setup_str_##_var[] __initdata = _name; \
     static struct kernel_param __setup_##_var __attribute_used__ \
