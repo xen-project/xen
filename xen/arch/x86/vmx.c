@@ -1,4 +1,3 @@
-/* -*-  Mode:C; c-basic-offset:4; tab-width:4; indent-tabs-mode:nil -*- */
 /*
  * vmx.c: handling VMX architecture-related VM exits
  * Copyright (c) 2004, Intel Corporation.
@@ -942,3 +941,12 @@ asmlinkage void load_cr2(void)
 }
 
 #endif /* CONFIG_VMX */
+
+/*
+ * Local variables:
+ * mode: C
+ * c-set-style: "BSD"
+ * c-basic-offset: 4
+ * tab-width: 4
+ * indent-tabs-mode: nil
+ */

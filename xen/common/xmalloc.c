@@ -1,4 +1,3 @@
-/* -*-  Mode:C; c-basic-offset:4; tab-width:4; indent-tabs-mode:nil -*- */
 /******************************************************************************
  * Simple allocator for Xen.  If larger than a page, simply use the
  * page-order allocator.
@@ -200,3 +199,12 @@ void xfree(const void *p)
 
     spin_unlock_irqrestore(&freelist_lock, flags);
 }
+
+/*
+ * Local variables:
+ * mode: C
+ * c-set-style: "BSD"
+ * c-basic-offset: 4
+ * tab-width: 4
+ * indent-tabs-mode: nil
+ */

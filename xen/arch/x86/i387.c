@@ -1,4 +1,3 @@
-/* -*-  Mode:C; c-basic-offset:4; tab-width:4; indent-tabs-mode:nil -*- */
 /*
  *  linux/arch/i386/kernel/i387.c
  *
@@ -56,3 +55,12 @@ void restore_fpu(struct exec_domain *tsk)
             "frstor %0"
             : : "m" (tsk->arch.i387) );
 }
+
+/*
+ * Local variables:
+ * mode: C
+ * c-set-style: "BSD"
+ * c-basic-offset: 4
+ * tab-width: 4
+ * indent-tabs-mode: nil
+ */

@@ -1,4 +1,3 @@
-/* -*-  Mode:C; c-basic-offset:4; tab-width:4; indent-tabs-mode:nil -*- */
 /******************************************************************************
  * kernel.c
  * 
@@ -87,3 +86,12 @@ long do_ni_hypercall(void)
     /* No-op hypercall. */
     return -ENOSYS;
 }
+
+/*
+ * Local variables:
+ * mode: C
+ * c-set-style: "BSD"
+ * c-basic-offset: 4
+ * tab-width: 4
+ * indent-tabs-mode: nil
+ */

@@ -1,4 +1,3 @@
-/* -*-  Mode:C; c-basic-offset:4; tab-width:4; indent-tabs-mode:nil -*- */
 /******************************************************************************
  * arch/x86/x86_64/mm.c
  * 
@@ -407,3 +406,12 @@ void memguard_unguard_range(void *p, unsigned long l)
 }
 
 #endif
+
+/*
+ * Local variables:
+ * mode: C
+ * c-set-style: "BSD"
+ * c-basic-offset: 4
+ * tab-width: 4
+ * indent-tabs-mode: nil
+ */

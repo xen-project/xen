@@ -1,4 +1,3 @@
-/* -*-  Mode:C; c-basic-offset:4; tab-width:4; indent-tabs-mode:nil -*- */
 /******************************************************************************
  * arch/x86/x86_32/seg_fixup.c
  * 
@@ -492,3 +491,12 @@ int gpf_emulate_4gb(struct xen_regs *regs)
     propagate_page_fault((unsigned long)pb, 4);
     return EXCRET_fault_fixed;
 }
+
+/*
+ * Local variables:
+ * mode: C
+ * c-set-style: "BSD"
+ * c-basic-offset: 4
+ * tab-width: 4
+ * indent-tabs-mode: nil
+ */

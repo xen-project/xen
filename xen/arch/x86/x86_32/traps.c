@@ -1,4 +1,3 @@
-/* -*-  Mode:C; c-basic-offset:4; tab-width:4; indent-tabs-mode:nil -*- */
 
 #include <xen/config.h>
 #include <xen/init.h>
@@ -292,3 +291,12 @@ long do_set_callbacks(unsigned long event_selector,
 
     return 0;
 }
+
+/*
+ * Local variables:
+ * mode: C
+ * c-set-style: "BSD"
+ * c-basic-offset: 4
+ * tab-width: 4
+ * indent-tabs-mode: nil
+ */

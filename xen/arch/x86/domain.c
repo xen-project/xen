@@ -1,4 +1,3 @@
-/* -*-  Mode:C; c-basic-offset:4; tab-width:4; indent-tabs-mode:nil -*- */
 /******************************************************************************
  * arch/x86/domain.c
  * 
@@ -1005,3 +1004,12 @@ void domain_relinquish_memory(struct domain *d)
     relinquish_list(d, &d->page_list);
 }
 
+
+/*
+ * Local variables:
+ * mode: C
+ * c-set-style: "BSD"
+ * c-basic-offset: 4
+ * tab-width: 4
+ * indent-tabs-mode: nil
+ */

@@ -1,5 +1,4 @@
-/* -*-  Mode:C; c-basic-offset:4; tab-width:4; indent-tabs-mode:nil -*-
- ****************************************************************************
+/****************************************************************************
  * (c) 2004 - Rolf Neugebauer - Intel Research Cambridge
  * (c) 2004 - Keir Fraser - University of Cambridge
  ****************************************************************************
@@ -776,3 +775,12 @@ void physdev_init_dom0(struct domain *p)
     set_bit(DF_PHYSDEV, &p->d_flags);
 }
 
+
+/*
+ * Local variables:
+ * mode: C
+ * c-set-style: "BSD"
+ * c-basic-offset: 4
+ * tab-width: 4
+ * indent-tabs-mode: nil
+ */

@@ -1,4 +1,3 @@
-/* -*-  Mode:C; c-basic-offset:4; tab-width:4; indent-tabs-mode:nil -*- */
 
 #include <xen/config.h>
 #include <xen/sched.h>
@@ -17,3 +16,12 @@ struct exec_domain idle0_exec_domain = {
 };
 
 struct tss_struct init_tss[NR_CPUS];
+
+/*
+ * Local variables:
+ * mode: C
+ * c-set-style: "BSD"
+ * c-basic-offset: 4
+ * tab-width: 4
+ * indent-tabs-mode: nil
+ */

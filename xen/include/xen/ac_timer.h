@@ -1,5 +1,4 @@
-/* -*-  Mode:C; c-basic-offset:4; tab-width:4 -*-
- ****************************************************************************
+/****************************************************************************
  * (C) 2002 - Rolf Neugebauer - Intel Research Cambridge
  ****************************************************************************
  *
@@ -89,3 +88,12 @@ extern void mod_ac_timer(struct ac_timer *timer, s_time_t new_time);
 extern int reprogram_ac_timer(s_time_t timeout);
 
 #endif /* _AC_TIMER_H_ */
+
+/*
+ * Local variables:
+ * mode: C
+ * c-set-style: "BSD"
+ * c-basic-offset: 4
+ * tab-width: 4
+ * indent-tabs-mode: nil
+ */

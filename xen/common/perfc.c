@@ -1,4 +1,3 @@
-/* -*-  Mode:C; c-basic-offset:4; tab-width:4; indent-tabs-mode:nil -*- */
 
 #include <xen/lib.h>
 #include <xen/smp.h>
@@ -217,3 +216,12 @@ int perfc_control(dom0_perfccontrol_t *pc)
 
     return rc;
 }
+
+/*
+ * Local variables:
+ * mode: C
+ * c-set-style: "BSD"
+ * c-basic-offset: 4
+ * tab-width: 4
+ * indent-tabs-mode: nil
+ */

@@ -1,4 +1,3 @@
-/* -*-  Mode:C; c-basic-offset:4; tab-width:4; indent-tabs-mode:nil -*- */
 /****************************************************************************
  * Round Robin Scheduler for Xen
  *
@@ -216,3 +215,12 @@ struct scheduler sched_rrobin_def = {
 };
 
 
+
+/*
+ * Local variables:
+ * mode: C
+ * c-set-style: "BSD"
+ * c-basic-offset: 4
+ * tab-width: 4
+ * indent-tabs-mode: nil
+ */

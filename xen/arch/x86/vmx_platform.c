@@ -1,4 +1,3 @@
-/* -*-  Mode:C; c-basic-offset:4; tab-width:4; indent-tabs-mode:nil -*- */
 /*
  * vmx_platform.c: handling x86 platform related MMIO instructions
  * Copyright (c) 2004, Intel Corporation.
@@ -551,3 +550,12 @@ void handle_mmio(unsigned long va, unsigned long gpa)
 }
 
 #endif /* CONFIG_VMX */
+
+/*
+ * Local variables:
+ * mode: C
+ * c-set-style: "BSD"
+ * c-basic-offset: 4
+ * tab-width: 4
+ * indent-tabs-mode: nil
+ */

@@ -1,5 +1,4 @@
-/* -*-  Mode:C; c-basic-offset:4; tab-width:4; indent-tabs-mode:nil -*-
- ****************************************************************************
+/****************************************************************************
  * (C) 2002-2003 - Rolf Neugebauer - Intel Research Cambridge
  * (C) 2002-2003 University of Cambridge
  * (C) 2004      - Mark Williamson - Intel Research Cambridge
@@ -633,3 +632,12 @@ void reset_sched_histo(unsigned char key)
 void print_sched_histo(unsigned char key) { }
 void reset_sched_histo(unsigned char key) { }
 #endif
+
+/*
+ * Local variables:
+ * mode: C
+ * c-set-style: "BSD"
+ * c-basic-offset: 4
+ * tab-width: 4
+ * indent-tabs-mode: nil
+ */

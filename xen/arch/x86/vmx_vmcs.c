@@ -1,4 +1,3 @@
-/* -*-  Mode:C; c-basic-offset:4; tab-width:4; indent-tabs-mode:nil -*- */
 /*
  * vmx_vmcs.c: VMCS management
  * Copyright (c) 2004, Intel Corporation.
@@ -479,3 +478,12 @@ void vm_resume_fail(unsigned long eflags)
 }
 
 #endif /* CONFIG_VMX */
+
+/*
+ * Local variables:
+ * mode: C
+ * c-set-style: "BSD"
+ * c-basic-offset: 4
+ * tab-width: 4
+ * indent-tabs-mode: nil
+ */

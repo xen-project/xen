@@ -1,4 +1,3 @@
-/* -*-  Mode:C; c-basic-offset:4; tab-width:4; indent-tabs-mode:nil -*- */
 /******************************************************************************
  * keyhandler.c
  */
@@ -201,3 +200,12 @@ void initialize_keytable(void)
 
     register_irq_keyhandler('%', do_debug_key,   "Trap to xendbg");
 }
+
+/*
+ * Local variables:
+ * mode: C
+ * c-set-style: "BSD"
+ * c-basic-offset: 4
+ * tab-width: 4
+ * indent-tabs-mode: nil
+ */

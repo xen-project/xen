@@ -1,4 +1,3 @@
-/* -*-  Mode:C; c-basic-offset:4; tab-width:4; indent-tabs-mode:nil -*- */
 /******************************************************************************
  * arch/x86/traps.c
  * 
@@ -918,3 +917,12 @@ unsigned long do_get_debugreg(int reg)
     if ( (reg < 0) || (reg > 7) ) return -EINVAL;
     return current->arch.debugreg[reg];
 }
+
+/*
+ * Local variables:
+ * mode: C
+ * c-set-style: "BSD"
+ * c-basic-offset: 4
+ * tab-width: 4
+ * indent-tabs-mode: nil
+ */

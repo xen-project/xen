@@ -1,5 +1,4 @@
-/* -*-  Mode:C; c-basic-offset:4; tab-width:4; indent-tabs-mode:nil -*-
- ****************************************************************************
+/****************************************************************************
  * (C) 2002-2003 - Rolf Neugebauer - Intel Research Cambridge
  * (C) 2002-2003 University of Cambridge
  ****************************************************************************
@@ -378,3 +377,12 @@ void __init time_init(void)
 
     setup_irq(0, &irq0);
 }
+
+/*
+ * Local variables:
+ * mode: C
+ * c-set-style: "BSD"
+ * c-basic-offset: 4
+ * tab-width: 4
+ * indent-tabs-mode: nil
+ */

@@ -1,4 +1,3 @@
-/* -*-  Mode:C; c-basic-offset:4; tab-width:4; indent-tabs-mode:nil -*- */
 
 #include <xen/config.h>
 #include <xen/types.h>
@@ -1129,3 +1128,12 @@ int _check_all_pagetables(struct domain *d, char *s)
 }
 
 #endif // SHADOW_DEBUG
+
+/*
+ * Local variables:
+ * mode: C
+ * c-set-style: "BSD"
+ * c-basic-offset: 4
+ * tab-width: 4
+ * indent-tabs-mode: nil
+ */

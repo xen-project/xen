@@ -1,4 +1,3 @@
-/* -*-  Mode:C; c-basic-offset:4; tab-width:4; indent-tabs-mode:nil -*- */
 
 #include <xen/config.h>
 #include <xen/init.h>
@@ -639,3 +638,12 @@ void __init __start_xen(multiboot_info_t *mbi)
     domain_unpause_by_systemcontroller(dom0);
     startup_cpu_idle_loop();
 }
+
+/*
+ * Local variables:
+ * mode: C
+ * c-set-style: "BSD"
+ * c-basic-offset: 4
+ * tab-width: 4
+ * indent-tabs-mode: nil
+ */

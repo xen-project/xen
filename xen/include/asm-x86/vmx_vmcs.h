@@ -1,4 +1,3 @@
-/* -*-  Mode:C; c-basic-offset:4; tab-width:4; indent-tabs-mode:nil -*- */
 /*
  * vmx_vmcs.h: VMCS related definitions
  * Copyright (c) 2004, Intel Corporation.
@@ -212,3 +211,12 @@ extern unsigned int opt_vmx_debug_level;
     } while (0)
 
 #endif /* ASM_X86_VMX_VMCS_H__ */
+
+/*
+ * Local variables:
+ * mode: C
+ * c-set-style: "BSD"
+ * c-basic-offset: 4
+ * tab-width: 4
+ * indent-tabs-mode: nil
+ */

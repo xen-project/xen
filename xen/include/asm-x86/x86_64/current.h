@@ -1,4 +1,3 @@
-/* -*-  Mode:C; c-basic-offset:4; tab-width:4; indent-tabs-mode:nil -*- */
 
 #ifndef _X86_64_CURRENT_H
 #define _X86_64_CURRENT_H
@@ -55,3 +54,12 @@ static inline unsigned long get_stack_bottom(void)
 #define schedule_tail(_ed) ((_ed)->arch.schedule_tail)(_ed)
 
 #endif /* !(_X86_64_CURRENT_H) */
+
+/*
+ * Local variables:
+ * mode: C
+ * c-set-style: "BSD"
+ * c-basic-offset: 4
+ * tab-width: 4
+ * indent-tabs-mode: nil
+ */

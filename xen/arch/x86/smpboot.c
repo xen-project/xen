@@ -1,4 +1,3 @@
-/* -*-  Mode:C; c-basic-offset:4; tab-width:4; indent-tabs-mode:nil -*- */
 /*
  *	x86 SMP booting functions
  *
@@ -945,3 +944,12 @@ void __init smp_boot_cpus(void)
 }
 
 #endif /* CONFIG_SMP */
+
+/*
+ * Local variables:
+ * mode: C
+ * c-set-style: "BSD"
+ * c-basic-offset: 4
+ * tab-width: 4
+ * indent-tabs-mode: nil
+ */

@@ -1,4 +1,3 @@
-/* -*-  Mode:C; c-basic-offset:4; tab-width:4; indent-tabs-mode:nil -*- */
 /*
  * vmx_io.c: handling I/O, interrupts related VMX entry/exit 
  * Copyright (c) 2004, Intel Corporation.
@@ -411,3 +410,12 @@ void vmx_do_resume(struct exec_domain *d)
 }
 
 #endif /* CONFIG_VMX */
+
+/*
+ * Local variables:
+ * mode: C
+ * c-set-style: "BSD"
+ * c-basic-offset: 4
+ * tab-width: 4
+ * indent-tabs-mode: nil
+ */
