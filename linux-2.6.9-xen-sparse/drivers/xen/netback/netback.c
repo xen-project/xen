@@ -41,7 +41,6 @@ static unsigned char rx_notify[NR_EVENT_CHANNELS];
 static unsigned long mmap_vstart;
 #define MMAP_VADDR(_req) (mmap_vstart + ((_req) * PAGE_SIZE))
 
-#define PKT_MIN_LEN (ETH_HLEN + 20)
 #define PKT_PROT_LEN 64
 
 static struct {
@@ -500,7 +499,7 @@ static void net_tx_action(unsigned long unused)
 
         netif_schedule_work(netif);
 
-        if ( unlikely(txreq.size <= PKT_MIN_LEN) || 
+        if ( unlikely(txreq.size < ETH_HLEN) || 
              unlikely(txreq.size > ETH_FRAME_LEN) )
         {
             DPRINTK("Bad packet size: %d\n", txreq.size);
