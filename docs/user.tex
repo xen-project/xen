@@ -420,10 +420,16 @@ title Xen 2.0 / XenLinux 2.4.27
 \end{verbatim}
 
 The first line of the configuration (kernel...) tells GRUB where to
-find Xen itself and what boot parameters should be passed to it.  The
-second line of the configuration describes the location of the
+find Xen itself and what boot parameters should be passed to it (in
+this case, setting domain 0's memory allocation and the settings for
+the serial port).
+
+The second line of the configuration describes the location of the
 XenLinux kernel that Xen should start and the parameters that should
-be passed to it.
+be passed to it (these are standard Linux parameters, identifying the
+root device and specifying it be initially mounted read only and
+instructing that console output be sent both to the screen and to the
+serial port).
 
 As always when installing a new kernel, it is recommended that you do
 not remove the original contents of \path{grub.conf} --- you may want
@@ -523,7 +529,7 @@ receive its IP address from a DHCP server. [i.e. {\tt dhcp=''dhcp''}]
 
 You may also want to edit the {\bf vif} variable in order to choose
 the MAC address of the virtual ethernet interface yourself.  For
-example: \\ \verb_vif = [`mac=00:06:AA:F6:BB:B3']_\\ If you do not set
+example: \\ \verb_vif = ['mac=00:06:AA:F6:BB:B3']_\\ If you do not set
 this variable, Xend will automatically generate a random MAC address
 from an unused range.
 
@@ -542,6 +548,37 @@ after creation.  The {\tt vmid=1} sets the {\tt vmid} variable used in
 the {\tt xmdefconfig} file.  The tool uses the
 \path{/etc/xen/xmdefconfig} file, since no custom configuration file
 was specified on the command line.
+
+\section{Starting / Stopping domains automatically}
+
+It is possible to have certain domains start automatically at boot
+time and to have dom0 wait for all running domains to shutdown before
+it shuts down the system.
+
+To specify a domain is to start at boot-time, place its
+configuration file (or a link to it) under /etc/xen/auto/.
+
+A Sys-V style init script for RedHat and LSB-compliant systems is
+provided and will be automatically copied to /etc/init.d/ during
+install.  You can then enable it in the appriate way for your
+distribution.
+
+For instance, on RedHat:
+
+\verb_# chkconfig --add xendomains_
+
+By default, this will start the boot-time domains in runlevels 3, 4
+and 5.
+
+You can also use the "service" command to run this script manually, e.g:
+
+\verb_# service xendomains start_
+
+Starts all the domains with config files under /etc/xc/auto/.
+
+\verb_# service xendomains stop_
+
+Shuts down ALL running Xen domains.
 
 \chapter{Domain management tasks}
 
@@ -609,14 +646,14 @@ For example, to create a 2GB sparse file-backed virtual block device
 
 \verb_# dd if=/dev/zero of=vm1disk bs=1k seek=2048k count=1_
 
-Choose a free loop back device, and attach file: \\
-\verb_# losetup /dev/loop0 vm1disk_ \\
-Make a file system on the loop back device: \\
-\verb_# mkfs -t ext3 /dev/loop0_
+Make a file system in the disk file: \\
+\verb_# mkfs -t ext3 vm1disk_
+
+(when the tool asks for confirmation, answer `y')
 
 Populate the file system e.g. by copying from the current root:
 \begin{verbatim}
-# mount /dev/loop0 /mnt
+# mount vm1disk /mnt -o loop
 # cp -ax / /mnt
 \end{verbatim}
 Tailor the file system by editing \path{/etc/fstab},
@@ -626,19 +663,15 @@ would edit \path{/mnt/etc/fstab} instead of \path{/etc/fstab} ).  For
 this example put \path{/dev/sda1} to root in fstab.
 
 Now unmount (this is important!):\\
-\verb_# umount /dev/loop0_
+\verb_# umount /mnt_
+
+And detach the file from its loop device:
 
 In the configuration file set:\\
-\verb_disk = [`phy:loop0,sda1,w']_
+\verb_disk = ['file:/full/path/to/vm1disk,sda1,w']_
 
 As the virtual machine writes to its `disk', the sparse file will be
 filled in and consume more space up to the original 2GB.
-
-{\em NB.} You will need to use {\tt losetup} to bind the file to
-\path{/dev/loop0} (or whatever loopback device you chose) each time
-you reboot domain 0.  In the near future, Xend will track which loop
-devices are currently free and do binding itself, making this manual
-effort unnecessary.
 
 \section{LVM-backed virtual block devices}
 
@@ -1111,13 +1144,13 @@ events within Xen for collection by control
 software.  For more information see the chapter on debugging,
 in the Xen Interface Manual.
 
-\chapter{Xen boot options}
+\chapter{Boot options}
+
+\section{Xen boot options}
 
 These options are used to configure Xen's behaviour at runtime.  They
 should be appended to Xen's command line, either manually or by
 editing \path{grub.conf}.
-
-\section{List of options}
 
 {\bf ignorebiostables }\\
  Disable parsing of BIOS-supplied tables. This may help with some
@@ -1218,6 +1251,16 @@ domain).  Device IDs should be given in hex format.  Bridge devices do
 not need to be hidden --- they are hidden implicitly, since guest OSes
 do not need to configure them.
 
+\section{XenLinux Options}
+
+{\bf xencons=xxx}
+Specify the device node to
+which the Xen virtual console driver is attached: \\
+ 'xencons=off': disable virtual console \\
+ 'xencons=tty': attach console to /dev/tty1 (tty0 at boot-time) \\
+ 'xencons=ttyS': attach console to /dev/ttyS0\\
+The default is ttyS for dom0 and tty for all other domains.
+
 \chapter{Further Support}
 
 If you have questions that are not answered by this manual, the
@@ -1255,6 +1298,9 @@ discussions and requests for help.  Subscribe at: \\
 \item[xen-announce@lists.sourceforge.net] Used for announcements only.
 Subscribe at: \\
 {\tt http://lists.sourceforge.net/mailman/listinfo/xen-announce}
+\item[xen-changelog@lists.sourceforge.net]  Changelog feed
+from the unstable and 2.0 trees - developer oriented.  Subscribe at: \\
+{\tt http://lists.sourceforge.net/mailman/listinfo/xen-changelog}
 \end{description}
 
 Although there is no specific user support list, the developers try to
