@@ -171,9 +171,9 @@ static ssize_t dom_mem_read(struct file * file, char * buff, size_t size, loff_t
 
     /* remap the range using xen specific routines */
 
-	printk(KERN_ALERT "bd240 debug: dom_mem_read: %lx, %lx\n", mem_data->pfn << PAGE_SHIFT, mem_data->tot_pages << PAGE_SHIFT);
-
     addr = direct_mmap(mem_data->pfn << PAGE_SHIFT, mem_data->tot_pages << PAGE_SHIFT, prot, 0, 0);
+	printk(KERN_ALERT "bd240 debug: dom_mem_read: %lx, %lx @ %lx\n", mem_data->pfn << PAGE_SHIFT, mem_data->tot_pages << PAGE_SHIFT, addr);
+
     //addr = direct_mmap(mem_data->pfn, mem_data->tot_pages << PAGE_SHIFT, prot, 1, 
     //                mem_data->tot_pages);
     copy_to_user((unsigned long *)buff, &addr, sizeof(addr));
