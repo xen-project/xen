@@ -69,7 +69,11 @@ static unsigned long pirq_needs_unmask_notify[NR_PIRQS/sizeof(unsigned long)];
 
 /* Upcall to generic IRQ layer. */
 #ifdef CONFIG_X86
+#if LINUX_VERSION_CODE > KERNEL_VERSION(2,6,9)
 extern fastcall unsigned int do_IRQ(struct pt_regs *regs);
+#else
+extern asmlinkage unsigned int do_IRQ(struct pt_regs *regs);
+#endif
 #define do_IRQ(irq, regs) do {		\
     (regs)->orig_eax = (irq);		\
     do_IRQ((regs));			\
