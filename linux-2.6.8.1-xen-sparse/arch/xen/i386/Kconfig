@@ -666,47 +666,52 @@ config PCI
 	  information about which PCI hardware does work under Linux and which
 	  doesn't.
 
-choice
-	prompt "PCI access mode"
-	depends on PCI && !X86_VISWS
-	default PCI_GOANY
-	---help---
-	  On PCI systems, the BIOS can be used to detect the PCI devices and
-	  determine their configuration. However, some old PCI motherboards
-	  have BIOS bugs and may crash if this is done. Also, some embedded
-	  PCI-based systems don't have any BIOS at all. Linux can also try to
-	  detect the PCI hardware directly without using the BIOS.
-
-	  With this option, you can specify how Linux should detect the
-	  PCI devices. If you choose "BIOS", the BIOS will be used,
-	  if you choose "Direct", the BIOS won't be used, and if you
-	  choose "MMConfig", then PCI Express MMCONFIG will be used.
-	  If you choose "Any", the kernel will try MMCONFIG, then the
-	  direct access method and falls back to the BIOS if that doesn't
-	  work. If unsure, go with the default, which is "Any".
-
-config PCI_GOBIOS
-	bool "BIOS"
-
-config PCI_GOMMCONFIG
-	bool "MMConfig"
-
-config PCI_GODIRECT
-	bool "Direct"
-
-config PCI_GOANY
-	bool "Any"
-
-endchoice
-
-config PCI_BIOS
-	bool
-	depends on !X86_VISWS && PCI && (PCI_GOBIOS || PCI_GOANY)
-	default y
+#choice
+#	prompt "PCI access mode"
+#	depends on PCI && !X86_VISWS
+#	default PCI_GOANY
+#	---help---
+#	  On PCI systems, the BIOS can be used to detect the PCI devices and
+#	  determine their configuration. However, some old PCI motherboards
+#	  have BIOS bugs and may crash if this is done. Also, some embedded
+#	  PCI-based systems don't have any BIOS at all. Linux can also try to
+#	  detect the PCI hardware directly without using the BIOS.
+#
+#	  With this option, you can specify how Linux should detect the
+#	  PCI devices. If you choose "BIOS", the BIOS will be used,
+#	  if you choose "Direct", the BIOS won't be used, and if you
+#	  choose "MMConfig", then PCI Express MMCONFIG will be used.
+#	  If you choose "Any", the kernel will try MMCONFIG, then the
+#	  direct access method and falls back to the BIOS if that doesn't
+#	  work. If unsure, go with the default, which is "Any".
+#
+#config PCI_GOBIOS
+#	bool "BIOS"
+#
+#config PCI_GOMMCONFIG
+#	bool "MMConfig"
+#
+#config PCI_GODIRECT
+#	bool "Direct"
+#
+#config PCI_GOANY
+#	bool "Any"
+#
+#endchoice
+#
+#config PCI_BIOS
+#	bool
+#	depends on !X86_VISWS && PCI && (PCI_GOBIOS || PCI_GOANY)
+#	default y
+#
+#config PCI_DIRECT
+#	bool
+# 	depends on PCI && ((PCI_GODIRECT || PCI_GOANY) || X86_VISWS)
+#	default y
 
 config PCI_DIRECT
 	bool
- 	depends on PCI && ((PCI_GODIRECT || PCI_GOANY) || X86_VISWS)
+ 	depends on PCI
 	default y
 
 source "drivers/pci/Kconfig"
