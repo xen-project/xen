@@ -28,7 +28,7 @@ Usage: %s [command] <params>
   vif_setsched [dom] [vif] [bytes] [usecs] -- rate limit vif bandwidth
   vif_getsched [dom] [vif] -- print vif's scheduling parameters
   vbd_add [dom] [uname] [dev] [mode] -- make disk/partition uname available to 
-                            domain as dev e.g. 'vbd_add phy:sda3 hda1 rw'
+                            domain as dev e.g. 'vbd_add 2 phy:sda3 hda1 w'
   vbd_remove [dom] [dev] -- remove disk or partition attached as 'dev' 
 """ % sys.argv[0]
 
@@ -119,14 +119,12 @@ elif cmd == 'unwatch':
         os.kill(pid, signal.SIGTERM)
 
 elif cmd == 'listvbds':
-    vbdInfo = xc.vbd_probe()
-    for vbd in vbdInfo:
-        print 'dom:' + str(vbd['dom'])
-	del vbd['dom']
-        print '-----'
-        for field in vbd:
-                print field + ': ' + str(vbd[field])
-        print '\n'
+    print 'Dom   Dev   Perm   Size(MB)'
+    
+    for vbd in xc.vbd_probe():
+        vbd['size_mb'] = vbd['nr_sectors'] / 2048
+        vbd['perm'] = (vbd['writeable'] and 'w') or 'r'
+        print '%(dom)-4d  %(vbd)04x  %(perm)-1s      %(size_mb)d' % vbd
 
 elif cmd == 'suspend':
     if len(sys.argv) < 4:

@@ -225,7 +225,7 @@ vbd_remove dom dev	   - Removes the VBD associated with a specified device
 These scripts are most useful when populating VDs.  VDs can't be populated
 directly, since they don't correspond to real devices.  Using:
 
-  xc_dom_control.py vbd_add vd:your_vd_id /dev/whatever 0 w
+  xc_dom_control.py vbd_add 0 vd:your_vd_id /dev/whatever w
 
 You can make a virtual disk available to DOM0.  Sensible devices to map VDs to
 in DOM0 are the /dev/xvd* nodes, since that makes it obvious that they are Xen
@@ -234,7 +234,7 @@ virtual devices that don't correspond to real physical devices.
 You can then format, mount and populate the VD through the nominated device
 node.  When you've finished, use:
 
-  xc_dom_control.py vbd_remove /dev/whatever 0
+  xc_dom_control.py vbd_remove 0 /dev/whatever
 
 To revoke DOM0's access to it.  It's then ready for use in a guest domain.
 
@@ -269,7 +269,7 @@ access virtual disks to a running domain (described above).  Specify the device
 as "phy:device", where device is the name of the device as seen from domain 0,
 or from normal Linux without Xen.  For instance:
 
-> xc_dom_control.py vbd_add phy:hdc /dev/whatever 2 r
+> xc_dom_control.py vbd_add 2 phy:hdc /dev/whatever r
 
 Will grant domain 2 read-only access to the device /dev/hdc (as seen from Dom0
 / normal Linux running on the same machine - i.e. the master drive on the
@@ -355,7 +355,7 @@ standard Linux root filesystem.  You'll need to temporarily add the VD to DOM0
 in order to do this.  To give DOM0 r/w access to the VD, use the following
 command line, substituting the ID you got earlier.
 
-> xc_dom_control.py vbd_add vd:<id> /dev/xvda 0 w
+> xc_dom_control.py vbd_add 0 vd:<id> /dev/xvda w
 
 This attaches the VD to the device /dev/xvda in domain zero, with read / write
 privileges - you can use other devices nodes if you choose too.
@@ -368,7 +368,7 @@ You should now remove the VD from DOM0.  This will prevent you accidentally
 changing it in DOM0, whilst the guest domain is using it (which could cause
 filesystem corruption, and confuse Linux).
 
-> xc_dom_control.py vbd_remove /dev/xvda 0
+> xc_dom_control.py vbd_remove 0 /dev/xvda
 
 It should now be possible to boot a guest domain from the VD.  To do this, you
 should specify the the VD's details in some way so that xc_dom_create.py will

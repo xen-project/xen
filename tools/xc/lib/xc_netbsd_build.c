@@ -389,16 +389,19 @@ myseek(gzFile gfd, off_t offset, int whence)
     unsigned char tmp[MYSEEK_BUFSIZE];
     int c;
 
-    if (offset < 0) {
+    if ( offset < 0 )
+    {
         ERROR("seek back not supported");
         return -1;
     }
 
-    while (offset) {
+    while ( offset != 0 )
+    {
         c = offset;
-        if (c > MYSEEK_BUFSIZE)
+        if ( c > MYSEEK_BUFSIZE )
             c = MYSEEK_BUFSIZE;
-        if (gzread(gfd, tmp, c) != c) {
+        if ( gzread(gfd, tmp, c) != c )
+        {
             PERROR("Error seeking in image.");
             return -1;
         }
@@ -459,77 +462,91 @@ loadelfimage(gzFile kernel_gfd, int pm_handle, unsigned long *page_array,
     p = NULL;
     maxva = 0;
 
-    if (gzread(kernel_gfd, &ehdr, sizeof(Elf_Ehdr)) != sizeof(Elf_Ehdr)) {
+    if ( gzread(kernel_gfd, &ehdr, sizeof(Elf_Ehdr)) != sizeof(Elf_Ehdr) )
+    {
         PERROR("Error reading kernel image ELF header.");
         goto out;
     }
     curpos = sizeof(Elf_Ehdr);
 
-    if (!IS_ELF(ehdr)) {
+    if ( !IS_ELF(ehdr) )
+    {
         PERROR("Image does not have an ELF header.");
         goto out;
     }
 
     *virt_load_addr = ehdr.e_entry;
 
-    if ((*virt_load_addr & (PAGE_SIZE-1)) != 0) {
+    if ( (*virt_load_addr & (PAGE_SIZE-1)) != 0 )
+    {
         ERROR("We can only deal with page-aligned load addresses");
         goto out;
     }
 
-    if ((*virt_load_addr + (tot_pages << PAGE_SHIFT)) >
-        HYPERVISOR_VIRT_START) {
+    if ( (*virt_load_addr + (tot_pages << PAGE_SHIFT)) > 
+         HYPERVISOR_VIRT_START )
+    {
         ERROR("Cannot map all domain memory without hitting Xen space");
         goto out;
     }
 
 
     phdr = malloc(ehdr.e_phnum * sizeof(Elf_Phdr));
-    if (phdr == NULL) {
+    if ( phdr == NULL )
+    {
         ERROR("Cannot allocate memory for Elf_Phdrs");
         goto out;
     }
 
-    if (myseek(kernel_gfd, ehdr.e_phoff - curpos, SEEK_SET) == -1) {
+    if ( myseek(kernel_gfd, ehdr.e_phoff - curpos, SEEK_SET) == -1 )
+    {
         ERROR("Seek to program header failed");
         goto out;
     }
     curpos = ehdr.e_phoff;
 
-    if (gzread(kernel_gfd, phdr, ehdr.e_phnum * sizeof(Elf_Phdr)) !=
-        ehdr.e_phnum * sizeof(Elf_Phdr)) {
+    if ( gzread(kernel_gfd, phdr, ehdr.e_phnum * sizeof(Elf_Phdr)) !=
+         ehdr.e_phnum * sizeof(Elf_Phdr) )
+    {
         PERROR("Error reading kernel image ELF program header.");
         goto out;
     }
     curpos += ehdr.e_phnum * sizeof(Elf_Phdr);
 
-    /* Copy kernel .text .data .bss segments into physical memory */
-    for (h = 0; h < ehdr.e_phnum; h++) {
-        if (phdr[h].p_type != PT_LOAD ||
-            (phdr[h].p_flags & (PF_W|PF_X)) == 0)
+    /* Copy run-time 'load' segments that are writeable and/or executable. */
+    for ( h = 0; h < ehdr.e_phnum; h++ ) 
+    {
+        if ( (phdr[h].p_type != PT_LOAD) ||
+             ((phdr[h].p_flags & (PF_W|PF_X)) == 0) )
             continue;
 
-        if (IS_TEXT(phdr[h]) || IS_DATA(phdr[h])) {
-            if (myseek(kernel_gfd, phdr[h].p_offset - curpos, SEEK_SET) ==
-                -1) {
+        if ( IS_TEXT(phdr[h]) || IS_DATA(phdr[h]) )
+        {
+            if ( myseek(kernel_gfd, phdr[h].p_offset - curpos, 
+                        SEEK_SET) == -1 )
+            {
                 ERROR("Seek to section failed");
                 goto out;
             }
             curpos = phdr[h].p_offset;
 
-            for (iva = phdr[h].p_vaddr;
-                 iva < phdr[h].p_vaddr + phdr[h].p_filesz; iva += c) {
+            for ( iva = phdr[h].p_vaddr;
+                  iva < phdr[h].p_vaddr + phdr[h].p_filesz; 
+                  iva += c)
+            {
                 c = PAGE_SIZE - (iva & (PAGE_SIZE - 1));
                 if (iva + c > phdr[h].p_vaddr + phdr[h].p_filesz)
                     c = phdr[h].p_vaddr + phdr[h].p_filesz - iva;
-                if (gzread(kernel_gfd, page, c) != c) {
+                if ( gzread(kernel_gfd, page, c) != c )
+                {
                     PERROR("Error reading kernel image page.");
                     goto out;
                 }
                 curpos += c;
                 vaddr = map_pfn(pm_handle, page_array[(iva - *virt_load_addr)
                                                      >> PAGE_SHIFT]);
-                if (vaddr == NULL) {
+                if ( vaddr == NULL )
+                {
                     ERROR("Couldn't map guest memory");
                     goto out;
                 }
@@ -539,11 +556,12 @@ loadelfimage(gzFile kernel_gfd, int pm_handle, unsigned long *page_array,
                 unmap_pfn(pm_handle, vaddr);
             }
 
-            if (phdr[h].p_vaddr + phdr[h].p_filesz > maxva)
+            if ( phdr[h].p_vaddr + phdr[h].p_filesz > maxva )
                 maxva = phdr[h].p_vaddr + phdr[h].p_filesz;
         }
 
-        if (IS_BSS(phdr[h])) {
+        if ( IS_BSS(phdr[h]) )
+        {
             /* XXX maybe clear phdr[h].p_memsz bytes from
                phdr[h].p_vaddr + phdr[h].p_filesz ??? */
             if (phdr[h].p_vaddr + phdr[h].p_memsz > maxva)
@@ -557,21 +575,24 @@ loadelfimage(gzFile kernel_gfd, int pm_handle, unsigned long *page_array,
 
     p = malloc(sizeof(int) + sizeof(Elf_Ehdr) +
                ehdr.e_shnum * sizeof(Elf_Shdr));
-    if (p == NULL) {
+    if ( p == NULL )
+    {
         ERROR("Cannot allocate memory for Elf_Shdrs");
         goto out;
     }
 
     shdr = (Elf_Shdr *)(p + sizeof(int) + sizeof(Elf_Ehdr));
 
-    if (myseek(kernel_gfd, ehdr.e_shoff - curpos, SEEK_SET) == -1) {
+    if ( myseek(kernel_gfd, ehdr.e_shoff - curpos, SEEK_SET) == -1 )
+    {
         ERROR("Seek to symbol header failed");
         goto out;
     }
     curpos = ehdr.e_shoff;
 
-    if (gzread(kernel_gfd, shdr, ehdr.e_shnum * sizeof(Elf_Shdr)) !=
-        ehdr.e_shnum * sizeof(Elf_Shdr)) {
+    if ( gzread(kernel_gfd, shdr, ehdr.e_shnum * sizeof(Elf_Shdr)) !=
+         ehdr.e_shnum * sizeof(Elf_Shdr) ) 
+    {
         PERROR("Error reading kernel image ELF symbol header.");
         goto out;
     }
@@ -586,35 +607,45 @@ loadelfimage(gzFile kernel_gfd, int pm_handle, unsigned long *page_array,
     maxva = (maxva + ELFROUND - 1) & ~(ELFROUND - 1);
 
     /* Copy kernel string / symbol tables into physical memory */
-    for (h = 0; h < ehdr.e_shnum; h++) {
-        if (shdr[h].sh_type == SHT_STRTAB) {
-            for (i = 0; i < ehdr.e_shnum; i++)
-                if (shdr[i].sh_type == SHT_SYMTAB &&
-                    shdr[i].sh_link == h)
+    for ( h = 0; h < ehdr.e_shnum; h++ )
+    {
+        if ( shdr[h].sh_type == SHT_STRTAB )
+        {
+            /* Look for a strtab @i linked to symtab @h. */
+            for ( i = 0; i < ehdr.e_shnum; i++ )
+                if ( (shdr[i].sh_type == SHT_SYMTAB) &&
+                     (shdr[i].sh_link == h) )
                     break;
-            if (i == ehdr.e_shnum) {
+            /* Skip symtab @h if we found no corresponding strtab @i. */
+            if ( i == ehdr.e_shnum )
+            {
                 shdr[h].sh_offset = 0;
-                continue;  /* Skip string tables which are not for symbol tables */
+                continue;
             }
         }
 
-        if (shdr[h].sh_type == SHT_STRTAB ||
-            shdr[h].sh_type == SHT_SYMTAB) {
-            if (myseek(kernel_gfd, shdr[h].sh_offset - curpos, SEEK_SET) ==
-                -1) {
+        if ( (shdr[h].sh_type == SHT_STRTAB) ||
+             (shdr[h].sh_type == SHT_SYMTAB) )
+        {
+            if ( myseek(kernel_gfd, shdr[h].sh_offset - curpos, 
+                        SEEK_SET) == -1 )
+            {
                 ERROR("Seek to symbol section failed");
                 goto out;
             }
             curpos = shdr[h].sh_offset;
 
-            shdr[h].sh_offset = maxva - *symtab_addr;  /* Mangled to be based on ELF header location */
+            /* Mangled to be based on ELF header location. */
+            shdr[h].sh_offset = maxva - *symtab_addr;
 
             DPRINTF(("copy section %d, size 0x%x\n", h, shdr[h].sh_size));
-            for (i = 0; i < shdr[h].sh_size; i += c, maxva += c) {
+            for ( i = 0; i < shdr[h].sh_size; i += c, maxva += c )
+            {
                 c = PAGE_SIZE - (maxva & (PAGE_SIZE - 1));
-                if (c > (shdr[h].sh_size - i))
+                if ( c > (shdr[h].sh_size - i) )
                     c = shdr[h].sh_size - i;
-                if (gzread(kernel_gfd, page, c) != c) {
+                if ( gzread(kernel_gfd, page, c) != c )
+                {
                     PERROR("Error reading kernel image page.");
                     goto out;
                 }
@@ -622,7 +653,8 @@ loadelfimage(gzFile kernel_gfd, int pm_handle, unsigned long *page_array,
 
                 vaddr = map_pfn(pm_handle, page_array[(maxva - *virt_load_addr)
                                                      >> PAGE_SHIFT]);
-                if (vaddr == NULL) {
+                if ( vaddr == NULL )
+                {
                     ERROR("Couldn't map guest memory");
                     goto out;
                 }
@@ -636,10 +668,11 @@ loadelfimage(gzFile kernel_gfd, int pm_handle, unsigned long *page_array,
             maxva = (maxva + ELFROUND - 1) & ~(ELFROUND - 1);
 
         }
-        shdr[h].sh_name = 0;  /* Name is NULL */
+        shdr[h].sh_name = 0;  /* Name is NULL. */
     }
 
-    if (*symtab_len == 0) {
+    if ( *symtab_len == 0 ) 
+    {
         DPRINTF(("no symbol table\n"));
         *symtab_addr = 0;
         ret = 0;
@@ -659,13 +692,15 @@ loadelfimage(gzFile kernel_gfd, int pm_handle, unsigned long *page_array,
 
     /* Copy total length, crafted ELF header and section header table */
     s = sizeof(int) + sizeof(Elf_Ehdr) + ehdr.e_shnum * sizeof(Elf_Shdr);
-    for (i = 0; i < s; i += c, symva += c) {
+    for ( i = 0; i < s; i += c, symva += c ) 
+    {
         c = PAGE_SIZE - (symva & (PAGE_SIZE - 1));
-        if (c > s - i)
+        if ( c > s - i )
             c = s - i;
         vaddr = map_pfn(pm_handle, page_array[(symva - *virt_load_addr)
                                              >> PAGE_SHIFT]);
-        if (vaddr == NULL) {
+        if ( vaddr == NULL )
+        {
             ERROR("Couldn't map guest memory");
             goto out;
         }
@@ -681,7 +716,8 @@ loadelfimage(gzFile kernel_gfd, int pm_handle, unsigned long *page_array,
     ret = 0;
 
  out:
-    if (ret == 0) {
+    if ( ret == 0 )
+    {
         maxva = (maxva + PAGE_SIZE - 1) & ~(PAGE_SIZE - 1);
         *ksize = (maxva - *virt_load_addr) >> PAGE_SHIFT;
 
@@ -690,9 +726,9 @@ loadelfimage(gzFile kernel_gfd, int pm_handle, unsigned long *page_array,
                  (void *)*symtab_len));
     }
 
-    if (phdr)
+    if ( phdr != NULL )
         free(phdr);
-    if (p)
+    if ( p != NULL )
         free(p);
     return ret;
 }

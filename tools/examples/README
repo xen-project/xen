@@ -35,7 +35,7 @@ xc_dom_control.py
   vif_setsched [dom] [vif] [bytes] [usecs] -- rate limit vif bandwidth
   vif_getsched [dom] [vif] -- print vif's scheduling parameters
   vbd_add [dom] [uname] [dev] [mode] -- make disk/partition uname available to 
-                            domain as dev e.g. 'vbd_add phy:sda3 hda1 rw'
+                            domain as dev e.g. 'vbd_add 2 phy:sda3 hda1 w'
   vbd_remove [dom] [dev] -- remove disk or partition attached as 'dev'
 
 

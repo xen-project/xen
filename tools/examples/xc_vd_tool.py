@@ -110,19 +110,17 @@ elif cmd == 'setexpiry':
 
     print "Refreshing a virtual disk"
     print "Id: " + id
-    print "Expiry time (seconds from now [or 0]): " + expiry_time
+    print "Expiry time (seconds from now [or 0]): " + str(expiry_time)
 
     rc = XenoUtil.vd_refresh(id, expiry_time)
 
 elif cmd == 'list':
+    print 'ID    Size(MB)      Expiry'
 
     for vbd in XenoUtil.vd_list():
-        print """ID: %s
-Expires: %s
-Expiry time: %s
-Size (MB): %d
-""" % (vbd['vdisk_id'], vbd['expires'],
-       str(vbd['expiry_time']), vbd['size'] / 2048)
+        vbd['size_mb'] = vbd['size'] / 2048
+        vbd['expiry'] = (vbd['expires'] and vbd['expiry_time']) or 'never'
+        print '%(vdisk_id)-4s  %(size_mb)-12d  %(expiry)s' % vbd
 
 elif cmd == 'freespace':
 
