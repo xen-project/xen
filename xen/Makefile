@@ -9,14 +9,15 @@ export BASEDIR          := $(shell pwd)
 
 include Rules.mk
 
-default: $(TARGET)
-	gzip -f -9 < $(TARGET) > $(TARGET).gz
+default: $(TARGET).gz
+$(TARGET).gz: $(TARGET)
+	gzip -f -9 < $< > $@.new
+	mv $@.new $@
 
 debug:	
 	objdump -D -S $(TARGET)-syms > $(TARGET).s
 
-install: $(TARGET)
-	gzip -f -9 < $(TARGET) > $(TARGET).gz
+install: $(TARGET).gz
 	mkdir -p $(prefix)/boot
 	install -m0644 $(TARGET).gz $(prefix)/boot
 	install -m0644 $(TARGET)-syms $(prefix)/boot

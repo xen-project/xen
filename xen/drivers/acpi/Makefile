@@ -6,7 +6,8 @@ include $(BASEDIR)/Rules.mk
 
 OBJS := acpi_ksyms.o tables.o
 
-default: $(OBJS)
+default: driver.o
+driver.o: $(OBJS)
 	$(LD) $(LDFLAGS) -r -o driver.o $(OBJS)
 
 clean:

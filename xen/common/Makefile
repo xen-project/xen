@@ -21,7 +21,8 @@ ifneq ($(trace),y)
 OBJS := $(subst trace.o,,$(OBJS))
 endif
 
-default: $(OBJS)
+default: common.o
+common.o: $(OBJS)
 	$(LD) $(LDFLAGS) -r -o common.o $(OBJS)
 
 clean:

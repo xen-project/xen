@@ -12,11 +12,17 @@ OBJS += $(patsubst %.c,%.o,$(wildcard mtrr/*.c))
 
 OBJS := $(subst $(TARGET_SUBARCH)/asm-offsets.o,,$(OBJS))
 
-default: boot/$(TARGET_SUBARCH).o $(OBJS) boot/mkelf32
-	$(LD) $(LDFLAGS) -r -o arch.o $(OBJS)
-	$(LD) $(LDFLAGS) -T $(TARGET_SUBARCH)/xen.lds -N \
-	    boot/$(TARGET_SUBARCH).o $(ALL_OBJS) -o $(TARGET)-syms
+default: $(TARGET)
+
+$(TARGET): $(TARGET)-syms boot/mkelf32
 	./boot/mkelf32 $(TARGET)-syms $(TARGET) 0x100000
+
+$(CURDIR)/arch.o: $(OBJS)
+	$(LD) $(LDFLAGS) -r -o $@ $(OBJS)
+
+$(TARGET)-syms: boot/$(TARGET_SUBARCH).o $(ALL_OBJS) $(TARGET_SUBARCH)/xen.lds
+	$(LD) $(LDFLAGS) -T $(TARGET_SUBARCH)/xen.lds -N \
+	    boot/$(TARGET_SUBARCH).o $(ALL_OBJS) -o $@
 
 asm-offsets.s: $(TARGET_SUBARCH)/asm-offsets.c
 	$(CC) $(CFLAGS) -S -o $@ $<
