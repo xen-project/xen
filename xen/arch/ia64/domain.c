@@ -670,6 +670,7 @@ void dummy(void)
 }
 
 
+#if 0
 void switch_to(struct exec_domain *prev, struct exec_domain *next)
 {
  	struct exec_domain *last;
@@ -677,6 +678,7 @@ void switch_to(struct exec_domain *prev, struct exec_domain *next)
 	__switch_to(prev,next,last);
 	//set_current(next);
 }
+#endif
 
 void domain_pend_keyboard_interrupt(int irq)
 {

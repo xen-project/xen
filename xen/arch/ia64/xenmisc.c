@@ -203,7 +203,7 @@ char * __devinit  pcibios_setup(char *str)
 
 void show_registers(struct pt_regs *regs)
 {
-	dummy();
+	printf("*** ADD REGISTER DUMP HERE FOR DEBUGGING\n");
 }	
 
 ///////////////////////////////
@@ -240,12 +240,36 @@ void *module_text_address(unsigned long addr)
 	return NULL;
 }
 
+void cs10foo(void) {}
+void cs01foo(void) {}
+
 // context_switch
 void context_switch(struct exec_domain *prev, struct exec_domain *next)
 {
-	switch_to(prev,next);
+printk("@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@\n");
+printk("@@@@@@ context switch from domain %d (%x) to domain %d (%x)\n",
+prev->domain->id,(long)prev&0xffffff,next->domain->id,(long)next&0xffffff);
+printk("@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@\n");
+if (prev->domain->id == 1 && next->domain->id == 0) cs10foo();
+if (prev->domain->id == 0 && next->domain->id == 1) cs01foo();
+	switch_to(prev,next,prev);
 	clear_bit(EDF_RUNNING, &prev->ed_flags);
 	//if (!is_idle_task(next->domain) )
 		//send_guest_virq(next, VIRQ_TIMER);
-	schedule_tail(next);
+	load_region_regs(current);
+}
+
+void panic_domain(struct pt_regs *regs, const char *fmt, ...)
+{
+	va_list args;
+	char buf[128];
+	struct exec_domain *ed = current;
+	static volatile int test = 1;	// so can continue easily in debug
+    
+	printf("$$$$$ PANIC in domain %d:",ed->domain->id);
+	va_start(args, fmt);
+	(void)vsnprintf(buf, sizeof(buf), fmt, args);
+	va_end(args);
+	if (regs) show_registers(regs);
+	while(test);
 }

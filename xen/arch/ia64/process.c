@@ -143,15 +143,13 @@ void reflect_interruption(unsigned long ifa, unsigned long isr, unsigned long it
 	}
 	if (!PSCB(ed,interrupt_collection_enabled)) {
 		if (!(PSCB(ed,ipsr) & IA64_PSR_DT)) {
-			printf("psr.dt off, trying to deliver nested dtlb!\n");
-			while(1);
+			panic_domain(regs,"psr.dt off, trying to deliver nested dtlb!\n");
 		}
 		vector &= ~0xf;
 		if (vector != IA64_DATA_TLB_VECTOR &&
 		    vector != IA64_DATA_TLB_VECTOR) {
-printf("psr.ic off, delivering fault=%lx,iip=%p,isr=%p,PSCB.iip=%p\n",
+panic_domain(regs,"psr.ic off, delivering fault=%lx,iip=%p,isr=%p,PSCB.iip=%p\n",
 	vector,regs->cr_iip,isr,PSCB(ed,iip));
-			while(1);
 			
 		}
 //printf("Delivering NESTED DATA TLB fault\n");
@@ -243,9 +241,6 @@ void xen_handle_domain_access(unsigned long address, unsigned long isr, struct p
 	unsigned long lookup_domain_mpa(struct domain *,unsigned long);
 	unsigned long match_dtlb(struct exec_domain *,unsigned long, unsigned long *, unsigned long *);
 	IA64FAULT fault;
-#ifndef USER_ACCESS
-	extern void __get_domain_bundle(void);
-#endif
 
 // NEED TO HANDLE THREE CASES:
 // 1) domain is in metaphysical mode
@@ -268,13 +263,6 @@ void xen_handle_domain_access(unsigned long address, unsigned long isr, struct p
 		vcpu_itc_no_srlz(ed,2,address,pteval,-1UL,PAGE_SHIFT);
 		return;
 	}
-#ifndef USER_ACCESS
-	if (*(unsigned long *)__get_domain_bundle != iip) {
-		printf("Bad user space access @%p ",address);
-		printf("iip=%p, ipsr=%p, b0=%p\n",iip,psr,regs->b0);
-		while(1);
-	}
-#endif
 if (address < 0x4000) printf("WARNING: page_fault @%p, iip=%p\n",address,iip);
 		
 	// if we are fortunate enough to have it in the 1-entry TLB...
@@ -285,13 +273,6 @@ if (address < 0x4000) printf("WARNING: page_fault @%p, iip=%p\n",address,iip);
 	// look in the TRs
 	fault = vcpu_tpa(ed,address,&mpaddr);
 	if (fault != IA64_NO_FAULT) {
-#ifndef USER_ACCESS
-		// this is hardcoded to handle __get_domain_bundle only
-		regs->r8 = 0; regs->r9 = 0;
-		regs->cr_iip += 0x20;
-		//regs->cr_iip |= (2UL << IA64_PSR_RI_BIT);
-		return;
-#else /* USER_ACCESS */
 		static int uacnt = 0;
 		// can't translate it, just fail (poor man's exception)
 		// which results in retrying execution
@@ -303,12 +284,10 @@ if (address < 0x4000) printf("WARNING: page_fault @%p, iip=%p\n",address,iip);
 		else {
 			// should never happen.  If it does, region 0 addr may
 			// indicate a bad xen pointer
-			printk("*** xen_handle_domain_access: exception table"
+			panic_domain(regs,"*** xen_handle_domain_access: exception table"
                                " lookup failed, iip=%p, addr=%p, spinning...\n",
 				iip,address);
-			while(1);
 		}
-#endif /* USER_ACCESS */
 	}
 	if (d == dom0) {
 		if (mpaddr < dom0_start || mpaddr >= dom0_start + dom0_size) {
@@ -375,7 +354,9 @@ void ia64_do_page_fault (unsigned long address, unsigned long isr, struct pt_reg
 	}
 	vector = is_data ? IA64_DATA_TLB_VECTOR : IA64_INST_TLB_VECTOR;
 	if (handle_lazy_cover(current, isr, regs)) return;
-if (!(address>>61)) { printf("ia64_do_page_fault: @%p???, iip=%p, itc=%p (spinning...)\n",address,iip,ia64_get_itc()); while(1); }
+if (!(address>>61)) {
+panic_domain(0,"ia64_do_page_fault: @%p???, iip=%p, itc=%p (spinning...)\n",address,iip,ia64_get_itc());
+}
 	if ((isr & IA64_ISR_SP)
 	    || ((isr & IA64_ISR_NA) && (isr & IA64_ISR_CODE_MASK) == IA64_ISR_CODE_LFETCH))
 	{
@@ -835,8 +816,7 @@ ia64_handle_reflection (unsigned long ifa, struct pt_regs *regs, unsigned long i
 	unsigned long itir = vcpu_get_itir_on_fault(ed,ifa);
 
 	if (!(psr & IA64_PSR_CPL)) {
-		printf("ia64_handle_reflection: reflecting with priv=0!!\n");
-		while(1);
+		panic_domain(regs,"ia64_handle_reflection: reflecting with priv=0!!\n");
 	}
 	// FIXME: no need to pass itir in to this routine as we need to
 	// compute the virtual itir anyway (based on domain's RR.ps)
