@@ -27,6 +27,7 @@
 #include <xeno/hdreg.h>
 #include <xeno/ide.h>
 
+#include <asm/domain_page.h>
 #include <asm/byteorder.h>
 #include <asm/irq.h>
 #include <asm/uaccess.h>
@@ -82,9 +83,11 @@ static inline void task_vlb_sync (ide_ioreg_t port) {
 /*
  * This is used for most PIO data transfers *from* the IDE interface
  */
-void ata_input_data (ide_drive_t *drive, void *buffer, unsigned int wcount)
+void ata_input_data (ide_drive_t *drive, void *vbuffer, unsigned int wcount)
 {
 	byte io_32bit = drive->io_32bit;
+
+        void *buffer = map_domain_mem(virt_to_phys(vbuffer));
 
 	if (io_32bit) {
 #if SUPPORT_VLB_SYNC
@@ -110,14 +113,18 @@ void ata_input_data (ide_drive_t *drive, void *buffer, unsigned int wcount)
 #endif /* SUPPORT_SLOW_DATA_PORTS */
 			insw(IDE_DATA_REG, buffer, wcount<<1);
 	}
+
+	unmap_domain_mem(buffer);
 }
 
 /*
  * This is used for most PIO data transfers *to* the IDE interface
  */
-void ata_output_data (ide_drive_t *drive, void *buffer, unsigned int wcount)
+void ata_output_data (ide_drive_t *drive, void *vbuffer, unsigned int wcount)
 {
 	byte io_32bit = drive->io_32bit;
+
+        void *buffer = map_domain_mem(virt_to_phys(vbuffer));
 
 	if (io_32bit) {
 #if SUPPORT_VLB_SYNC
@@ -143,6 +150,8 @@ void ata_output_data (ide_drive_t *drive, void *buffer, unsigned int wcount)
 #endif /* SUPPORT_SLOW_DATA_PORTS */
 			outsw(IDE_DATA_REG, buffer, wcount<<1);
 	}
+
+	unmap_domain_mem(buffer);
 }
 
 

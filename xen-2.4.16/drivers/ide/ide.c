@@ -149,6 +149,7 @@
 /*#include <xeno/completion.h>*/
 /*#include <xeno/reboot.h>*/
 
+#include <asm/domain_page.h>
 #include <asm/byteorder.h>
 #include <asm/irq.h>
 #include <asm/uaccess.h>
@@ -413,8 +414,9 @@ static inline void do_vlb_sync (ide_ioreg_t port) {
 /*
  * This is used for most PIO data transfers *from* the IDE interface
  */
-void ide_input_data (ide_drive_t *drive, void *buffer, unsigned int wcount)
+void ide_input_data (ide_drive_t *drive, void *vbuffer, unsigned int wcount)
 {
+        void *buffer;
 	byte io_32bit;
 
 	/* first check if this controller has defined a special function
@@ -423,9 +425,16 @@ void ide_input_data (ide_drive_t *drive, void *buffer, unsigned int wcount)
 
 	if(HWIF(drive)->ideproc) {
 		HWIF(drive)->ideproc(ideproc_ide_input_data,
-				     drive, buffer, wcount);
+				     drive, vbuffer, wcount);
 		return;
 	}
+
+	/* We assume controllers own functions will make their own
+         * arrangemnets for mapping/unmaping the destination mem if 
+	 * required (or not if DMA) 
+	 */
+
+	buffer = map_domain_mem(virt_to_phys(vbuffer));
 
 	io_32bit = drive->io_32bit;
 
@@ -453,20 +462,25 @@ void ide_input_data (ide_drive_t *drive, void *buffer, unsigned int wcount)
 #endif /* SUPPORT_SLOW_DATA_PORTS */
 			insw(IDE_DATA_REG, buffer, wcount<<1);
 	}
+
+	 unmap_domain_mem(buffer);
 }
 
 /*
  * This is used for most PIO data transfers *to* the IDE interface
  */
-void ide_output_data (ide_drive_t *drive, void *buffer, unsigned int wcount)
+void ide_output_data (ide_drive_t *drive, void *vbuffer, unsigned int wcount)
 {
+        void *buffer;
 	byte io_32bit;
 
 	if(HWIF(drive)->ideproc) {
 		HWIF(drive)->ideproc(ideproc_ide_output_data,
-				     drive, buffer, wcount);
+				     drive, vbuffer, wcount);
 		return;
 	}
+
+	buffer = map_domain_mem(virt_to_phys(vbuffer));
 
 	io_32bit = drive->io_32bit;
 
@@ -494,6 +508,8 @@ void ide_output_data (ide_drive_t *drive, void *buffer, unsigned int wcount)
 #endif /* SUPPORT_SLOW_DATA_PORTS */
 			outsw(IDE_DATA_REG, buffer, wcount<<1);
 	}
+
+	unmap_domain_mem(buffer);
 }
 
 /*
@@ -510,7 +526,7 @@ void atapi_input_bytes (ide_drive_t *drive, void *buffer, unsigned int bytecount
 				     drive, buffer, bytecount);
 		return;
 	}
-
+printk("XXXXX atapi_input_bytes called -- mapping is likely broken\n");
 	++bytecount;
 #if defined(CONFIG_ATARI) || defined(CONFIG_Q40)
 	if (MACH_IS_ATARI || MACH_IS_Q40) {
@@ -531,6 +547,8 @@ void atapi_output_bytes (ide_drive_t *drive, void *buffer, unsigned int bytecoun
 				     drive, buffer, bytecount);
 		return;
 	}
+
+printk("XXXXX atapi_output_bytes called -- mapping is likely broken\n");
 
 	++bytecount;
 #if defined(CONFIG_ATARI) || defined(CONFIG_Q40)
