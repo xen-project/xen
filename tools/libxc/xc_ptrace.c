@@ -281,9 +281,9 @@ xc_ptrace(enum __ptrace_request request, pid_t pid, void *addr, void *data)
 		SET_PT_REGS(pt, ctxt.cpu_ctxt); 
 		memcpy(data, &pt, sizeof(elf_gregset_t));
 	} else if (request == PTRACE_GETFPREGS)
-	    memcpy(data, &ctxt.fpu_ctxt, sizeof(elf_fpregset_t));
+	    memcpy(data, &ctxt.fpu_ctxt, sizeof(ctxt.fpu_ctxt));
 	else /*if (request == PTRACE_GETFPXREGS)*/
-	    memcpy(data, &ctxt.fpu_ctxt, sizeof(elf_fpxregset_t));
+	    memcpy(data, &ctxt.fpu_ctxt, sizeof(ctxt.fpu_ctxt));
 	cr3 = ctxt.pt_base;
 	regs_valid = 1;
 	break;

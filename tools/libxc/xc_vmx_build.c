@@ -478,10 +478,18 @@ int vmx_identify(void)
 {
     int eax, ecx;
 
+#ifdef __i386__
     __asm__ __volatile__ ("pushl %%ebx; cpuid; popl %%ebx" 
 			  : "=a" (eax), "=c" (ecx) 
 			  : "0" (1) 
 			  : "dx");
+#elif defined __x86_64__
+    __asm__ __volatile__ ("pushq %%rbx; cpuid; popq %%rbx"
+                          : "=a" (eax), "=c" (ecx)
+                          : "0" (1)
+                          : "dx");
+#endif
+
     if (!(ecx & VMX_FEATURE_FLAG)) {
         return -1;
     }
