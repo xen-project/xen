@@ -231,8 +231,8 @@ int xenolinux_block_revalidate(kdev_t dev)
     struct block_device *bd;
     struct gendisk *gd;
     xl_disk_t *disk;
-    unsigned long flags, capacity;
-    int i, rc = 0, disk_nr = MINOR(dev) >> gd->minor_shift;
+    unsigned long capacity;
+    int i, rc = 0;
     
     if ( (bd = bdget(dev)) == NULL )
         return -EINVAL;
@@ -257,15 +257,19 @@ int xenolinux_block_revalidate(kdev_t dev)
         goto out;
     }
 
-    for ( i = gd->max_p - 1; i >= 0; i-- )
+    /* Only reread partition table if VBDs aren't mapped to partitions. */
+    if ( !(gd->flags[MINOR(dev) >> gd->minor_shift] & GENHD_FL_VIRT_PARTNS) )
     {
-        invalidate_device(dev+i, 1);
-        gd->part[MINOR(dev+i)].start_sect = 0;
-        gd->part[MINOR(dev+i)].nr_sects   = 0;
-        gd->sizes[MINOR(dev+i)]           = 0;
-    }
+        for ( i = gd->max_p - 1; i >= 0; i-- )
+        {
+            invalidate_device(dev+i, 1);
+            gd->part[MINOR(dev+i)].start_sect = 0;
+            gd->part[MINOR(dev+i)].nr_sects   = 0;
+            gd->sizes[MINOR(dev+i)]           = 0;
+        }
 
-    grok_partitions(gd, disk_nr, gd->max_p, capacity);
+        grok_partitions(gd, MINOR(dev)>>gd->minor_shift, gd->max_p, capacity);
+    }
 
  out:
     up(&bd->bd_sem);

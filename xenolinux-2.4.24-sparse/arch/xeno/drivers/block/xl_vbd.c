@@ -244,10 +244,16 @@ static int xlvbd_init_device(xen_disk_t *xd)
          * up partition-table information. Virtual partitions override 
          * 'real' partitions, and the two cannot coexist on a device.
          */
-        if ( gd->sizes[minor & ~(max_part-1)] != 0 )
+        if ( !(gd->flags[minor >> gd->minor_shift] & GENHD_FL_VIRT_PARTNS) &&
+             (gd->sizes[minor & ~(max_part-1)] != 0) )
         {
+            /*
+             * Any non-zero sub-partition entries must be cleaned out before
+             * installing 'virtual' partition entries. The two types cannot
+             * coexist, and virtual partitions are favoured.
+             */
             kdev_t dev = device & ~(max_part-1);
-            for ( i = max_part - 1; i >= 0; i-- )
+            for ( i = max_part - 1; i > 0; i-- )
             {
                 invalidate_device(dev+i, 1);
                 gd->part[MINOR(dev+i)].start_sect = 0;
@@ -269,14 +275,15 @@ static int xlvbd_init_device(xen_disk_t *xd)
     }
     else
     {
+        gd->part[minor].nr_sects = xd->capacity;
+        gd->sizes[minor] = xd->capacity>>(BLOCK_SIZE_BITS-9);
+        
         /* Some final fix-ups depending on the device type */
         switch ( XD_TYPE(xd->info) )
         { 
         case XD_TYPE_CDROM:
         case XD_TYPE_FLOPPY: 
         case XD_TYPE_TAPE:
-            gd->part[minor].nr_sects = xd->capacity;
-            gd->sizes[minor] = xd->capacity>>(BLOCK_SIZE_BITS-9);
             gd->flags[minor >> gd->minor_shift] |= GENHD_FL_REMOVABLE; 
             printk(KERN_ALERT 
                    "Skipping partition check on %s /dev/%s\n", 
@@ -323,10 +330,10 @@ static int xlvbd_init_device(xen_disk_t *xd)
  */
 static int xlvbd_remove_device(int device)
 {
-    int i, rc = 0, max_part, minor = MINOR(device);
+    int i, rc = 0, minor = MINOR(device);
     struct gendisk *gd;
     struct block_device *bd;
-    xl_disk_t *disk;
+    xl_disk_t *disk = NULL;
 
     if ( (bd = bdget(device)) == NULL )
         return -1;
@@ -347,15 +354,8 @@ static int xlvbd_remove_device(int device)
         rc = -1;
         goto out;
     }
-
-    if ( IDE_DISK_MAJOR(MAJOR(device)) )
-        max_part = XLIDE_MAX_PART;
-    else if ( SCSI_BLK_MAJOR(MAJOR(device)) )
-        max_part = XLSCSI_MAX_PART;
-    else
-        max_part = XLVBD_MAX_PART;
  
-    if ( (minor & (max_part-1)) != 0 )
+    if ( (minor & (gd->max_p-1)) != 0 )
     {
         /* 1: The VBD is mapped to a partition rather than a whole unit. */
         invalidate_device(device, 1);
@@ -365,19 +365,42 @@ static int xlvbd_remove_device(int device)
 
         /* Clear the consists-of-virtual-partitions flag if possible. */
         gd->flags[minor >> gd->minor_shift] &= ~GENHD_FL_VIRT_PARTNS;
-        for ( i = 0; i < max_part; i++ )
-            if ( gd->sizes[(minor & ~(max_part-1)) + i] != 0 )
+        for ( i = 0; i < gd->max_p; i++ )
+            if ( gd->sizes[(minor & ~(gd->max_p-1)) + i] != 0 )
                 gd->flags[minor >> gd->minor_shift] |= GENHD_FL_VIRT_PARTNS;
+
+        /*
+         * If all virtual partitions are now gone, and a 'whole unit' VBD is
+         * present, then we can try to grok the unit's real partition table.
+         */
+        if ( !(gd->flags[minor >> gd->minor_shift] & GENHD_FL_VIRT_PARTNS) &&
+             (gd->sizes[minor & ~(gd->max_p-1)] != 0) &&
+             !(gd->flags[minor >> gd->minor_shift] & GENHD_FL_REMOVABLE) )
+        {
+            register_disk(gd,
+                          device&~(gd->max_p-1), 
+                          gd->max_p, 
+                          &xlvbd_block_fops,
+                          gd->part[minor&~(gd->max_p-1)].nr_sects);
+        }
     }
     else
     {
-        /* 2: The VBD is mapped to an entire 'unit'. Clear all partitions. */
-        for ( i = max_part - 1; i >= 0; i-- )
+        /*
+         * 2: The VBD is mapped to an entire 'unit'. Clear all partitions.
+         * NB. The partition entries are only cleared if there are no VBDs
+         * mapped to individual partitions on this unit.
+         */
+        i = gd->max_p - 1; /* Default: clear subpartitions as well. */
+        if ( gd->flags[minor >> gd->minor_shift] & GENHD_FL_VIRT_PARTNS )
+            i = 0; /* 'Virtual' mode: only clear the 'whole unit' entry. */
+        while ( i >= 0 )
         {
             invalidate_device(device+i, 1);
             gd->part[minor+i].start_sect = 0;
             gd->part[minor+i].nr_sects   = 0;
             gd->sizes[minor+i]           = 0;
+            i--;
         }
     }
 
