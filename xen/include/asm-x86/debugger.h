@@ -123,7 +123,7 @@ static inline int debugger_trap_fatal(
 
 #define debugger_trap_entry(_v, _r) (0)
 #define debugger_trap_fatal(_v, _r) (0)
-#define debugger_trap_immediate() ()
+#define debugger_trap_immediate()
 
 #endif
 

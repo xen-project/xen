@@ -149,7 +149,7 @@ extern void perfc_reset(unsigned char key);
 
 void do_debug_key(unsigned char key, struct xen_regs *regs)
 {
-    debugger_trap_fatal(0xf001, regs);
+    (void)debugger_trap_fatal(0xf001, regs);
     asm volatile ("nop"); /* Prevent the compiler doing tail call
                              optimisation, as that confuses xendbg a
                              bit. */
