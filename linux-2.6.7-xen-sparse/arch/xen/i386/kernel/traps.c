@@ -89,7 +89,7 @@ asmlinkage void page_fault(void);
 asmlinkage void coprocessor_error(void);
 asmlinkage void simd_coprocessor_error(void);
 asmlinkage void alignment_check(void);
-asmlinkage void spurious_interrupt_bug(void);
+asmlinkage void fixup_4gb_segment(void);
 asmlinkage void machine_check(void);
 
 static int kstack_depth_to_print = 24;
@@ -822,15 +822,6 @@ asmlinkage void do_simd_coprocessor_error(struct pt_regs * regs,
 	}
 }
 
-asmlinkage void do_spurious_interrupt_bug(struct pt_regs * regs,
-					  long error_code)
-{
-#if 0
-	/* No need to warn about this any longer. */
-	printk("Ignoring P6 Local APIC Spurious Interrupt Bug...\n");
-#endif
-}
-
 /*
  *  'math_state_restore()' saves the current math information in the
  * old math state array, and gets the new ones from the current task
@@ -953,7 +944,7 @@ static trap_info_t trap_table[] = {
 	{ 12, 0, __KERNEL_CS, (unsigned long)stack_segment		},
 	{ 13, 0, __KERNEL_CS, (unsigned long)general_protection		},
 	{ 14, 0, __KERNEL_CS, (unsigned long)page_fault			},
-	{ 15, 0, __KERNEL_CS, (unsigned long)spurious_interrupt_bug	},
+	{ 15, 0, __KERNEL_CS, (unsigned long)fixup_4gb_segment		},
 	{ 16, 0, __KERNEL_CS, (unsigned long)coprocessor_error		},
 	{ 17, 0, __KERNEL_CS, (unsigned long)alignment_check		},
 #ifdef CONFIG_X86_MCE

@@ -1,7 +1,7 @@
 /******************************************************************************
  * arch/i386/traps.c
  * 
- * Modifications to Linux original are copyright (c) 2002-2003, K A Fraser
+ * Modifications to Linux original are copyright (c) 2002-2004, K A Fraser
  * 
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -19,8 +19,6 @@
  */
 
 /*
- *  xen/arch/i386/traps.c
- *
  *  Copyright (C) 1991, 1992  Linus Torvalds
  *
  *  Pentium III FXSR, SSE support
@@ -220,30 +218,29 @@ static inline void do_trap(int trapnr, char *str,
 #define DO_ERROR_NOCODE(trapnr, str, name) \
 asmlinkage void do_##name(struct pt_regs * regs, long error_code) \
 { \
-do_trap(trapnr, str, regs, error_code, 0); \
+    do_trap(trapnr, str, regs, error_code, 0); \
 }
 
 #define DO_ERROR(trapnr, str, name) \
 asmlinkage void do_##name(struct pt_regs * regs, long error_code) \
 { \
-do_trap(trapnr, str, regs, error_code, 1); \
+    do_trap(trapnr, str, regs, error_code, 1); \
 }
 
 DO_ERROR_NOCODE( 0, "divide error", divide_error)
-    DO_ERROR_NOCODE( 4, "overflow", overflow)
-    DO_ERROR_NOCODE( 5, "bounds", bounds)
-    DO_ERROR_NOCODE( 6, "invalid operand", invalid_op)
-    DO_ERROR_NOCODE( 9, "coprocessor segment overrun", coprocessor_segment_overrun)
-    DO_ERROR(10, "invalid TSS", invalid_TSS)
-    DO_ERROR(11, "segment not present", segment_not_present)
-    DO_ERROR(12, "stack segment", stack_segment)
-/* Vector 15 reserved by Intel */
-    DO_ERROR_NOCODE(16, "fpu error", coprocessor_error)
-    DO_ERROR(17, "alignment check", alignment_check)
-    DO_ERROR_NOCODE(18, "machine check", machine_check)
-    DO_ERROR_NOCODE(19, "simd error", simd_coprocessor_error)
+DO_ERROR_NOCODE( 4, "overflow", overflow)
+DO_ERROR_NOCODE( 5, "bounds", bounds)
+DO_ERROR_NOCODE( 6, "invalid operand", invalid_op)
+DO_ERROR_NOCODE( 9, "coprocessor segment overrun", coprocessor_segment_overrun)
+DO_ERROR(10, "invalid TSS", invalid_TSS)
+DO_ERROR(11, "segment not present", segment_not_present)
+DO_ERROR(12, "stack segment", stack_segment)
+DO_ERROR_NOCODE(16, "fpu error", coprocessor_error)
+DO_ERROR(17, "alignment check", alignment_check)
+DO_ERROR_NOCODE(18, "machine check", machine_check)
+DO_ERROR_NOCODE(19, "simd error", simd_coprocessor_error)
 
-    asmlinkage void do_int3(struct pt_regs *regs, long error_code)
+asmlinkage void do_int3(struct pt_regs *regs, long error_code)
 {
     struct domain *p = current;
     struct guest_trap_bounce *gtb = guest_trap_bounce+smp_processor_id();

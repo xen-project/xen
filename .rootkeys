@@ -165,6 +165,7 @@
 40f56239bvOjuuuViZ0XMlNiREFC0A linux-2.6.7-xen-sparse/arch/xen/kernel/ctrl_if.c
 40f56239pYRq5yshPTkv3ujXKc8K6g linux-2.6.7-xen-sparse/arch/xen/kernel/empty.c
 40f56238xFQe9T7M_U_FItM-bZIpLw linux-2.6.7-xen-sparse/arch/xen/kernel/evtchn.c
+4110f478aeQWllIN7J4kouAHiAqrPw linux-2.6.7-xen-sparse/arch/xen/kernel/fixup.c
 40f56239sFcjHiIRmnObRIDF-zaeKQ linux-2.6.7-xen-sparse/arch/xen/kernel/process.c
 40f562392LBhwmOxVPsYdkYXMxI_ZQ linux-2.6.7-xen-sparse/arch/xen/kernel/reboot.c
 3f68905c5eiA-lBMQSvXLMWS1ikDEA linux-2.6.7-xen-sparse/arch/xen/kernel/xen_proc.c

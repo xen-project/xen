@@ -735,9 +735,8 @@ ENTRY(machine_check)
 	jmp error_code
 #endif
 
-ENTRY(spurious_interrupt_bug)
-	pushl $0
-	pushl $do_spurious_interrupt_bug
+ENTRY(fixup_4gb_segment)
+	pushl $do_fixup_4gb_segment
 	jmp error_code
 
 .data

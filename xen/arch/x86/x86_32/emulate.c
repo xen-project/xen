@@ -502,6 +502,20 @@ int gpf_emulate_4gb(struct pt_regs *regs)
     /* Success! */
     perfc_incrc(emulations);
     regs->eip += pb - eip;
+
+    /* If requested, give a callback on otherwise unused vector 15. */
+    if ( VM_ASSIST(d, VMASST_TYPE_4gb_segments_notify) )
+    {
+        ti  = &d->thread.traps[15];
+        gtb = &guest_trap_bounce[d->processor];
+        gtb->flags      = GTBF_TRAP;
+        gtb->error_code = pb - eip;
+        gtb->cs         = ti->cs;
+        gtb->eip        = ti->address;
+        if ( TI_GET_IF(ti) )
+            d->shared_info->vcpu_data[0].evtchn_upcall_mask = 1;
+    }
+
     return 1;
 
  undecodeable:
