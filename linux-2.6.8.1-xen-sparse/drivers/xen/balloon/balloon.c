@@ -11,7 +11,7 @@
 #include <linux/kernel.h>
 #include <linux/sched.h>
 #include <linux/errno.h>
-#include <asm/xen_proc.h>
+#include <asm-xen/xen_proc.h>
 
 #include <linux/mm.h>
 #include <linux/mman.h>
@@ -21,7 +21,8 @@
 #include <linux/highmem.h>
 #include <linux/vmalloc.h>
 
-#include <asm/hypervisor.h>
+#include <asm-xen/hypervisor.h>
+#include <asm-xen/ctrl_if.h>
 #include <asm/pgalloc.h>
 #include <asm/pgtable.h>
 #include <asm/uaccess.h>
@@ -37,6 +38,7 @@ typedef struct user_balloon_op {
 /* END OF USER DEFINE */
 
 static struct proc_dir_entry *balloon_pde;
+
 unsigned long credit;
 static unsigned long current_pages, most_seen_pages;
 
@@ -56,7 +58,7 @@ static inline pte_t *get_ptep(unsigned long addr)
     pmd = pmd_offset(pgd, addr);
     if ( pmd_none(*pmd) || pmd_bad(*pmd) ) BUG();
 
-    ptep = pte_offset(pmd, addr);
+    ptep = pte_offset_kernel(pmd, addr);
 
     return ptep;
 }
@@ -256,7 +258,7 @@ static void pagetable_extend (int cur_low_pfn, int newpages)
     end = (unsigned long)__va(low_pfn*PAGE_SIZE);
 
     pgd_base = init_mm.pgd;
-    i = __pgd_offset(PAGE_OFFSET);
+    i = pgd_index(PAGE_OFFSET);
     pgd = pgd_base + i;
 
     for (; i < PTRS_PER_PGD; pgd++, i++) {
@@ -279,11 +281,11 @@ static void pagetable_extend (int cur_low_pfn, int newpages)
                 vaddr = i*PGDIR_SIZE + j*PMD_SIZE + k*PAGE_SIZE;
                 if (end && (vaddr >= end))
                     break;
-                *pte = mk_pte_phys(__pa(vaddr), PAGE_KERNEL);
+                *pte = mk_pte(virt_to_page(vaddr), PAGE_KERNEL);
             }
             kpgd = pgd_offset_k((unsigned long)pte_base);
             kpmd = pmd_offset(kpgd, (unsigned long)pte_base);
-            kpte = pte_offset(kpmd, (unsigned long)pte_base);
+            kpte = pte_offset_kernel(kpmd, (unsigned long)pte_base);
             queue_l1_entry_update(kpte,
                                   (*(unsigned long *)kpte)&~_PAGE_RW);
             set_pmd(pmd, __pmd(_KERNPG_TABLE + __pa(pte_base)));
@@ -313,7 +315,7 @@ claim_new_pages(unsigned long num_pages)
 
     if (most_seen_pages+num_pages> max_pfn)
         num_pages = max_pfn-most_seen_pages;
-    if (num_pages==0) return 0;
+    if (num_pages==0) return -EINVAL;
 
     parray = (unsigned long *)vmalloc(num_pages * sizeof(unsigned long));
     if ( parray == NULL )
@@ -383,8 +385,76 @@ claim_new_pages(unsigned long num_pages)
     return new_page_cnt;
 }
 
+
+static int balloon_try_target(int target)
+{
+    if ( target < current_pages )
+    {
+        int change = inflate_balloon(current_pages-target);
+        if ( change <= 0 )
+            return change;
+
+        current_pages -= change;
+        printk(KERN_INFO "Relinquish %dMB to xen. Domain now has %luMB\n",
+            change>>PAGE_TO_MB_SHIFT, current_pages>>PAGE_TO_MB_SHIFT);
+    }
+    else if ( target > current_pages )
+    {
+        int change, reclaim = min(target,most_seen_pages) - current_pages;
+
+        if ( reclaim )
+        {
+            change = deflate_balloon( reclaim );
+            if ( change <= 0 )
+                return change;
+            current_pages += change;
+            printk(KERN_INFO "Reclaim %dMB from xen. Domain now has %luMB\n",
+                change>>PAGE_TO_MB_SHIFT, current_pages>>PAGE_TO_MB_SHIFT);
+        }
+
+        if ( most_seen_pages < target )
+        {
+            int growth = claim_new_pages(target-most_seen_pages);
+            if ( growth <= 0 )
+                return growth;
+            most_seen_pages += growth;
+            current_pages += growth;
+            printk(KERN_INFO "Granted %dMB new mem. Dom now has %luMB\n",
+                growth>>PAGE_TO_MB_SHIFT, current_pages>>PAGE_TO_MB_SHIFT);
+        }
+    }
+
+    return 1;
+}
+
+
+static void balloon_ctrlif_rx(ctrl_msg_t *msg, unsigned long id)
+{
+    switch ( msg->subtype )
+    {
+    case CMSG_MEM_REQUEST_SET:
+        if ( msg->length != sizeof(mem_request_t) )
+            goto parse_error;
+        {
+            mem_request_t *req = (mem_request_t *)&msg->msg[0];
+            req->status = balloon_try_target(req->target);
+        }
+        break;        
+    default:
+        goto parse_error;
+    }
+
+    ctrl_if_send_response(msg);
+    return;
+
+ parse_error:
+    msg->length = 0;
+    ctrl_if_send_response(msg);
+}
+
+
 static int balloon_write(struct file *file, const char *buffer,
-                         u_long count, void *data)
+                         size_t count, loff_t *offp)
 {
     char memstring[64], *endchar;
     int len, i;
@@ -414,100 +484,82 @@ static int balloon_write(struct file *file, const char *buffer,
     targetbytes = memparse(memstring,&endchar);
     target = targetbytes >> PAGE_SHIFT;
 
-    if ( target < current_pages )
-    {
-        int change = inflate_balloon(current_pages-target);
-        if ( change <= 0 )
-            return change;
+    i = balloon_try_target(target);
 
-        current_pages -= change;
-        printk(KERN_INFO "Relinquish %dMB to xen. Domain now has %luMB\n",
-            change>>PAGE_TO_MB_SHIFT, current_pages>>PAGE_TO_MB_SHIFT);
-    }
-    else if ( target > current_pages )
-    {
-        int change, reclaim = min(target,most_seen_pages) - current_pages;
+    if ( i <= 0 ) return i;
 
-        if ( reclaim )
-        {
-            change = deflate_balloon( reclaim);
-            if ( change <= 0 )
-                return change;
-            current_pages += change;
-            printk(KERN_INFO "Reclaim %dMB from xen. Domain now has %luMB\n",
-                change>>PAGE_TO_MB_SHIFT, current_pages>>PAGE_TO_MB_SHIFT);
-        }
-
-        if ( most_seen_pages < target )
-        {
-            int growth = claim_new_pages(target-most_seen_pages);
-            if ( growth <= 0 )
-                return growth;
-            most_seen_pages += growth;
-            current_pages += growth;
-            printk(KERN_INFO "Granted %dMB new mem. Dom now has %luMB\n",
-                growth>>PAGE_TO_MB_SHIFT, current_pages>>PAGE_TO_MB_SHIFT);
-        }
-    }
-
-
+    *offp += len;
     return len;
 }
 
 
-static int balloon_read(char *page, char **start, off_t off,
-      int count, int *eof, void *data)
+static int balloon_read(struct file *filp, char *buffer,
+                        size_t count, loff_t *offp)
 {
+    static char priv_buf[32];
+    char *priv_bufp = priv_buf;
     int len;
-    len = sprintf(page,"%lu\n",current_pages<<PAGE_SHIFT);
+    len = sprintf(priv_buf,"%lu\n",current_pages<<PAGE_SHIFT);
 
-    if (len <= off+count) *eof = 1;
-    *start = page + off;
-    len -= off;
+    len -= *offp;
+    priv_bufp += *offp;
     if (len>count) len = count;
     if (len<0) len = 0;
+
+    copy_to_user(buffer, priv_bufp, len);
+
+    *offp += len;
     return len;
 }
 
-static int __init init_module(void)
+static struct file_operations balloon_fops = {
+    .read  = balloon_read,
+    .write = balloon_write
+};
+
+static int __init balloon_init(void)
 {
     printk(KERN_ALERT "Starting Xen Balloon driver\n");
 
-    most_seen_pages = current_pages = min(xen_start_info.nr_pages,max_pfn);
+    most_seen_pages = current_pages = min(start_info.nr_pages,max_pfn);
     if ( (balloon_pde = create_xen_proc_entry("memory_target", 0644)) == NULL )
     {
         printk(KERN_ALERT "Unable to create balloon driver proc entry!");
         return -1;
     }
 
-    balloon_pde->write_proc = balloon_write;
-    balloon_pde->read_proc = balloon_read;
+    balloon_pde->owner     = THIS_MODULE;
+    balloon_pde->nlink     = 1;
+    balloon_pde->proc_fops = &balloon_fops;
+
+    (void)ctrl_if_register_receiver(CMSG_MEM_REQUEST, balloon_ctrlif_rx,
+                                    CALLBACK_IN_BLOCKING_CONTEXT);
 
     /* 
-     * make a new phys map if mem= says xen can give us memory  to grow
+     * make_module a new phys map if mem= says xen can give us memory  to grow
      */
-    if ( max_pfn > xen_start_info.nr_pages )
+    if ( max_pfn > start_info.nr_pages )
     {
         extern unsigned long *phys_to_machine_mapping;
         unsigned long *newmap;
         newmap = (unsigned long *)vmalloc(max_pfn * sizeof(unsigned long));
         memset(newmap, ~0, max_pfn * sizeof(unsigned long));
         memcpy(newmap, phys_to_machine_mapping,
-               xen_start_info.nr_pages * sizeof(unsigned long));
+               start_info.nr_pages * sizeof(unsigned long));
         phys_to_machine_mapping = newmap;
     }
 
     return 0;
 }
 
-static void __exit cleanup_module(void)
+static void __exit balloon_cleanup(void)
 {
     if ( balloon_pde != NULL )
     {
-        remove_xen_proc_entry("balloon");
+        remove_xen_proc_entry("memory_target");
         balloon_pde = NULL;
     }
 }
 
-module_init(init_module);
-module_exit(cleanup_module);
+module_init(balloon_init);
+module_exit(balloon_cleanup);
