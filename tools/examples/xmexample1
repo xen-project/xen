@@ -8,7 +8,7 @@
 
 #----------------------------------------------------------------------------
 # Kernel image file.
-kernel = "/boot/vmlinuz-2.6.8.1-xenU"
+kernel = "/boot/vmlinuz-2.6.9-xenU"
 
 # Optional ramdisk.
 #ramdisk = "/boot/initrd.gz"

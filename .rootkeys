@@ -423,7 +423,10 @@
 40fcefb23FfQn-ZBCbcHqA0cPGqQxw tools/python/xen/sv/GenTabbed.py
 40fcefb2QZAn3u3sX-M7NXBjOv5HGg tools/python/xen/sv/HTMLBase.py
 40fcefb2vnfDbl4w_yCTedROPuqs0g tools/python/xen/sv/Main.py
+4186e24fZMp7_bX4f50MvUscdrST9Q tools/python/xen/sv/MigrateDomain.py
 40fcefb24h-04WaHag-Tg4nxWPhTig tools/python/xen/sv/NodeInfo.py
+4186e24fb4YtJw155tNtSXXN6nEWqA tools/python/xen/sv/RestoreDomain.py
+4186e24fVXt0lfeQSAy1eiFKnPCHTg tools/python/xen/sv/SaveDomain.py
 40fcefb2Sif__6AqrANeBQZZfvP-6w tools/python/xen/sv/TabView.py
 41052eb8UrgtUkuJPg7oY1tutVQHsg tools/python/xen/sv/Wizard.py
 40fcefb2DqteqCCZYDCvvh4Q5jBd0w tools/python/xen/sv/__init__.py

@@ -3,6 +3,9 @@ from xen.sv.DomList  import DomList
 from xen.sv.NodeInfo import NodeInfo
 from xen.sv.DomInfo  import DomInfo
 from xen.sv.CreateDomain import CreateDomain
+from xen.sv.MigrateDomain import MigrateDomain
+from xen.sv.SaveDomain import SaveDomain
+from xen.sv.RestoreDomain import RestoreDomain
 
 from xen.xend.XendClient import server
 
@@ -16,7 +19,14 @@ class Main( HTMLBase ):
         self.modules = { "node": NodeInfo, 
                          "list": DomList, 
                          "info": DomInfo,
-                         "create": CreateDomain }
+                         "create": CreateDomain,
+                         "migrate" : MigrateDomain,
+                         "save" : SaveDomain,
+                         "restore" : RestoreDomain }
+
+        # ordered list of module menus to display
+        self.module_menus = [ "node", "create", "migrate", "save",
+                              "restore", "list" ]
         HTMLBase.__init__(self)
         
     def render_POST( self, request ):
@@ -53,10 +63,10 @@ class Main( HTMLBase ):
         request.write( "   <img src='images/xen.png' width='150' height='75' border='0'/></a><br/></td></tr>" )
         request.write( "   <tr><td height='60px' align='center'><p class='small'>SV Web Interface<br/>(C) <a href='mailto:tw275@cam.ac.uk'>Tom Wilkie</a> 2004</p></td></tr>")
         request.write( "   <tr><td align='center' valign='top'>" )
-        
-        for (modName, module) in self.modules.items():
-            module( self.mainUrlWriter( modName ) ).write_MENU( request )
 
+        for modName in self.module_menus:
+            self.modules[modName]( self.mainUrlWriter( modName ) ).write_MENU( request )
+        
         request.write( "   </td></tr>" )
         request.write( "  </table>" )
         request.write( " &nbsp;" )

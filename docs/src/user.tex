@@ -314,7 +314,7 @@ complicated.  The makefile needs a `pristine' Linux kernel tree to which
 it will then add the Xen architecture files.  You can tell the
 makefile the location of the appropriate Linux compressed tar file by
 setting the LINUX\_SRC environment variable, e.g. \\
-\verb!# LINUX_SRC=/tmp/linux-2.6.8.1.tar.bz2 make world! \\ or by
+\verb!# LINUX_SRC=/tmp/linux-2.6.9.tar.bz2 make world! \\ or by
 placing the tar file somewhere in the search path of {\tt
 LINUX\_SRC\_PATH} which defaults to `{\tt .:..}'.  If the makefile
 can't find a suitable kernel tar file it attempts to download it from
@@ -342,7 +342,7 @@ argument to make to get a parallel build.
 
 If you have an existing Linux kernel configuration that you would like
 to use for domain 0, you should copy it to
-install/boot/config-2.6.8.1-xen0.  During the first build, you may be
+install/boot/config-2.6.9-xen0.  During the first build, you may be
 asked about some Xen-specific options.  We advise accepting the
 defaults for these options.
 
@@ -364,8 +364,8 @@ destinations.
 Files in \path{install/boot/} include:
 \begin{itemize}
 \item \path{install/boot/xen.gz} The Xen 'kernel'
-\item \path{install/boot/vmlinuz-2.6.8.1-xen0}  Domain 0 XenLinux kernel
-\item \path{install/boot/vmlinuz-2.6.8.1-xenU}  Unprivileged XenLinux kernel
+\item \path{install/boot/vmlinuz-2.6.9-xen0}  Domain 0 XenLinux kernel
+\item \path{install/boot/vmlinuz-2.6.9-xenU}  Unprivileged XenLinux kernel
 \end{itemize}
 
 The difference between the two Linux kernels that are built is due to
@@ -379,7 +379,7 @@ domains.
 The \path{install/boot} directory will also contain the config files
 used for building the XenLinux kernels, and also versions of Xen and
 XenLinux kernels that contain debug symbols (\path{xen-syms} and
-\path{vmlinux-syms-2.6.8.1-xen0}) which are essential for interpreting crash
+\path{vmlinux-syms-2.6.9-xen0}) which are essential for interpreting crash
 dumps.  Retain these files as the developers may wish to see them if
 you post on the mailing list.
 
@@ -393,9 +393,9 @@ This file is sometimes called \path{menu.lst}, depending on your
 distribution.  The entry should look something like the following:
 
 \begin{verbatim}
-title Xen 2.0 / XenLinux 2.6.8.1
+title Xen 2.0 / XenLinux 2.6.9
   kernel /boot/xen.gz dom0_mem=131072 com1=115200,8n1
-  module /boot/vmlinuz-2.6.8.1-xen0 root=/dev/sda4 ro console=tty0 console=ttyS0
+  module /boot/vmlinuz-2.6.9-xen0 root=/dev/sda4 ro console=tty0 console=ttyS0
 \end{verbatim}
 
 The first line of the configuration (kernel...) tells GRUB where to
@@ -575,7 +575,7 @@ basics.
 \item Download the ttylinux disk image from XXX where from?
 \item Create a configuration file like the following:
 \begin{verbatim}
-kernel = "/boot/vmlinuz-2.6.8.1-xenU" # or a 2.4 kernel or a xen0 kernel
+kernel = "/boot/vmlinuz-2.6.9-xenU" # or a 2.4 kernel or a xen0 kernel
 memory = 64
 name = "ttylinux"
 cpu = -1 # leave to Xen to pick
@@ -905,9 +905,11 @@ docs to do advanced stuff.
 \chapter{Domain Configuration Files}
 \label{cha:config}
 
-XXX Could use a little explanation about possible values
+XX Could use a little explanation about possible values
 
-Xen configuration files contain the following standard variables:
+Xen configuration files contain the following standard variables.
+Unless otherwise stated, configuration items should be enclosed in
+quotes (i.e. {\tt '...'} or {\tt ``....''})):
 
 \begin{description}
 \item[kernel] Path to the kernel image (on the server).
@@ -916,8 +918,20 @@ Xen configuration files contain the following standard variables:
 \item[memory] Memory size in megabytes.
 \item[cpu] CPU to assign this domain to.
 \item[nics] Number of virtual network interfaces.
-\item[vif] List of MAC addresses (random addresses are assigned if not given).
-\item[disk] Regions of disk to export to the domain.
+\item[vif] List of MAC addresses (random addresses are assigned if not given) and /
+  or bridges to use for the domains network interfaces. e.g. \\
+  \verb_vif = [ 'mac=aa:00:00:00:00:11, bridge=xen-br0', 'bridge=xen-br1' ]_
+  to assign a MAC address and bridge to the first interface and assign a
+  different bridge to the second interface, leaving Xend to choose the MAC
+  address.
+\item[disk] List of block devices to export to the domain.  e.g. \\
+  \verb_disk = [ 'phy:hda1,sda1,r' ]_ \\
+  exports device \path{/dev/hda1} to the domain, as \path{/dev/sda1} with
+  readonly access being allowed. \\
+  \verb_disk = [ 'phy:hda7,sda2,w', 'phy:hdb2,sda,w!' ]_ \\
+  exports device \path{/dev/hda7} to the domain as \path{/dev/sda2} with
+  write access enabled and \path{/dev/hdb2} as \path{/dev/sda} with write access
+  force enabled (bypassing safety checks).
 \item[dhcp] Set to {\tt 'dhcp'} if you want to DHCP allocate the IP address.
 \item[netmask] IP netmask.
 \item[gateway] IP address for the gateway (if any).

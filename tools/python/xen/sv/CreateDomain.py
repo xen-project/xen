@@ -16,7 +16,7 @@ class CreateDomain( Wizard ):
                    CreatePage4,
                    CreateFinish ]
     
-    	Wizard.__init__( self, urlWriter, "Create Domain Wizard", sheets )
+    	Wizard.__init__( self, urlWriter, "Create Domain", sheets )
        
 class CreatePage0( Sheet ):
 
@@ -31,7 +31,8 @@ class CreatePage1( Sheet ):
 
     def __init__( self, urlWriter ):
         Sheet.__init__( self, urlWriter, "Setup Kernel Image", 1 )
-        self.addControl( ListControl( 'builder', [('linux', 'Linux'), ('netbsd', 'NetBSD')], 'Kernel Type:' ) )
+# For now we don't need to select a builder...
+#        self.addControl( ListControl( 'builder', [('linux', 'Linux'), ('netbsd', 'NetBSD')], 'Kernel Type:' ) )
         self.addControl( FileControl( 'kernel', '/boot/vmlinuz-2.6.9-xenU', 'Kernel Image:' ) )
         self.addControl( InputControl( 'extra', '', 'Kernel Command Line Parameters:' ) )
 
