@@ -120,7 +120,10 @@ static inline void __flush_page_update_queue(void)
     idx = 0;
     wmb(); /* Make sure index is cleared first to avoid double updates. */
     if ( unlikely(HYPERVISOR_mmu_update(update_queue, _idx, NULL) < 0) )
-        panic("Failed to execute MMU updates");
+    {
+        printk(KERN_ALERT "Failed to execute MMU updates.\n");
+        BUG();
+    }
 }
 
 void _flush_page_update_queue(void)
