@@ -772,11 +772,14 @@ int construct_dom0(struct domain *p,
     si->mfn_list     = vphysmap_start;
 
     /* Write the phys->machine and machine->phys table entries. */
-    for ( mfn = (alloc_start>>PAGE_SHIFT); 
-          mfn < (alloc_end>>PAGE_SHIFT); 
-          mfn++ )
+    for ( pfn = 0; pfn < p->tot_pages; pfn++ )
     {
-        pfn = mfn - (alloc_start>>PAGE_SHIFT);
+        mfn = pfn + (alloc_start>>PAGE_SHIFT);
+#ifndef NDEBUG
+#define REVERSE_START ((v_end - v_start) >> PAGE_SHIFT)
+        if ( pfn > REVERSE_START )
+            mfn = (alloc_end>>PAGE_SHIFT) - (pfn - REVERSE_START);
+#endif
         ((unsigned long *)vphysmap_start)[pfn] = mfn;
         machine_to_phys_mapping[mfn] = pfn;
     }
