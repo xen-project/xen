@@ -158,11 +158,10 @@ void do_debug_key(unsigned char key, struct xen_regs *regs)
 #ifndef NDEBUG
 void debugtrace_key(unsigned char key)
 {
-    static int send_to_console = 0;
-
-    send_to_console = !send_to_console;
-    printk("Toggling the state of debugtrace_printk\n");
-    debugtrace_dump(send_to_console);
+    debugtrace_send_to_console = !debugtrace_send_to_console;
+    debugtrace_dump();
+    printk("debugtrace_printk now writing to %s.\n",
+           debugtrace_send_to_console ? "console" : "buffer");
 }
 #endif
 
