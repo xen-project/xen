@@ -43,11 +43,11 @@
  */
 
 struct ac_timer {
-    struct list_head timer_list;
     s_time_t         expires;   /* system time time out value */
     unsigned long    data;
     void             (*function)(unsigned long);
-    int              cpu;
+    unsigned int     cpu;
+    unsigned int     heap_offset;
 };
 
 /* interface for "clients" */
@@ -57,12 +57,12 @@ extern void mod_ac_timer(struct ac_timer *timer, s_time_t new_time);
 static __inline__ void init_ac_timer(struct ac_timer *timer, int cpu)
 {
     timer->cpu = cpu;
-    timer->timer_list.next = NULL;
+    timer->heap_offset = 0;
 }
 /* check if ac_timer is active, i.e., on the list */
 static __inline__ int active_ac_timer(struct ac_timer *timer)
 {
-    return (timer->timer_list.next != NULL);
+    return (timer->heap_offset != 0);
 }
 
 /* interface used by programmable timer, implemented hardware dependent */
