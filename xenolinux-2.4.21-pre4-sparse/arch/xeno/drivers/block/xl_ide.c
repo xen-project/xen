@@ -18,7 +18,7 @@ static int xlide_blksize_size[XLIDE_MAX];
 static int xlide_hardsect_size[XLIDE_MAX];
 static int xlide_max_sectors[XLIDE_MAX];
 
-struct gendisk *xlide_gendisk;
+struct gendisk *xlide_gendisk = NULL;
 
 static struct block_device_operations xlide_block_fops = 
 {
@@ -40,6 +40,13 @@ int xlide_init(xen_disk_info_t *xdi)
 {
     int i, result, units, minors, disk;
     struct gendisk *gd;
+
+    /* If we don't have any usable IDE devices we may as well bail now. */
+    units = 0;
+    for ( i = 0; i < xdi->count; i++ )
+        if ( IS_IDE_XENDEV(xdi->disks[i].device) &&
+             ((xdi->disks[i].device & XENDEV_IDX_MASK) < 16) ) units++;
+    if ( units == 0 ) return 0;
 
     SET_MODULE_OWNER(&xlide_block_fops);
 
@@ -72,13 +79,6 @@ int xlide_init(xen_disk_info_t *xdi)
      * soon as we pass them down to Xen.
      */
     blk_queue_headactive(BLK_DEFAULT_QUEUE(XLIDE_MAJOR), 0);
-
-    /* If we don't have any usable IDE devices we may as well bail now. */
-    units = 0;
-    for ( i = 0; i < xdi->count; i++ )
-        if ( IS_IDE_XENDEV(xdi->disks[i].device) &&
-             ((xdi->disks[i].device & XENDEV_IDX_MASK) < 16) ) units++;
-    if ( units == 0 ) return 0;
 
     /* We may register up to 16 devices in a sparse identifier space. */
     units = 16;
@@ -133,6 +133,8 @@ int xlide_init(xen_disk_info_t *xdi)
 
 void xlide_cleanup(void)
 {
+    if ( xlide_gendisk == NULL ) return;
+
     blk_cleanup_queue(BLK_DEFAULT_QUEUE(XLIDE_MAJOR));
 
     xlide_gendisk = NULL;
