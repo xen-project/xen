@@ -289,9 +289,11 @@ long do_console_io(int cmd, int count, char *buffer)
     char *kbuf;
     long  rc;
 
+#ifdef NDEBUG
     /* Only domain-0 may access the emrgency console. */
     if ( current->domain != 0 )
         return -EPERM;
+#endif
 
     switch ( cmd )
     {

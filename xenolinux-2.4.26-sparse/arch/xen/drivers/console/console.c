@@ -86,6 +86,8 @@ static void kcons_write_dom0(
             count -= rc;
             s += rc;
         }
+	else
+	    break;
     }
 }
 
@@ -124,12 +126,9 @@ asmlinkage int xprintk(const char *fmt, ...)
     va_start(args, fmt);
     printk_len = vsnprintf(printk_buf, sizeof(printk_buf), fmt, args);
     va_end(args);
-    
+
     /* Send the processed output directly to Xen. */
-    if ( start_info.flags & SIF_INITDOMAIN )
-        kcons_write_dom0(NULL, printk_buf, printk_len);
-    else
-        kcons_write(NULL, printk_buf, printk_len);
+    kcons_write_dom0(NULL, printk_buf, printk_len);
 
     return 0;
 }
