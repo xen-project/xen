@@ -5,6 +5,8 @@
 #include <xeno/perfc.h>
 #include <xeno/keyhandler.h> 
 
+#undef  PERFCOUNTER
+#undef  PERFCOUNTER_ARRAY
 #define PERFCOUNTER( var, name ) "[0]"name"\0",
 #define PERFCOUNTER_ARRAY( var, name, size )  "["#size"]"name"\0",
 
