@@ -13,7 +13,7 @@
 
 /* include the hypervisor interface */
 #include <hypervisor-ifs/hypervisor-if.h>
-#include "../../../tools/xend/lib/domain_controller.h"
+#include "../../../tools/xu/lib/domain_controller.h"
 
 /*
  * a placeholder for the start of day information passed up from the hypervisor

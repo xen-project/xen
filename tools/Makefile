@@ -1,21 +1,22 @@
 
 all:	
 	$(MAKE) -C xc
+	$(MAKE) -C xu
 	$(MAKE) -C misc
 	$(MAKE) -C examples
 	$(MAKE) -C xentrace
 	$(MAKE) -C xenctl
-	$(MAKE) -C xend
-	$(MAKE) -C xenmgr
+	$(MAKE) -C xen
 
 install: all
 	$(MAKE) -C xc install
+	$(MAKE) -C xu install
 	$(MAKE) -C misc install
+	$(MAKE) -C xenctl install
 	$(MAKE) -C examples install
 	$(MAKE) -C xentrace install
 	$(MAKE) -C xenctl install
-	$(MAKE) -C xend install
-	$(MAKE) -C xenmgr install
+	$(MAKE) -C xen install
 
 dist: $(TARGET)
 	$(MAKE) prefix=`pwd`/../../install dist=yes install
@@ -23,10 +24,10 @@ dist: $(TARGET)
 
 clean:
 	$(MAKE) -C xc clean
+	$(MAKE) -C xu clean
 	$(MAKE) -C misc clean
 	$(MAKE) -C examples clean
 	$(MAKE) -C xentrace clean
 	$(MAKE) -C xenctl clean
-	$(MAKE) -C xend clean
-	$(MAKE) -C xenmgr clean
+	$(MAKE) -C xen clean
 

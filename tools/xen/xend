@@ -1,0 +1,41 @@
+#!/usr/bin/python
+#  -*- mode: python; -*-
+# Copyright (C) 2004 Mike Wray <mike.wray@hp.com>
+
+"""Xen management daemon. Lives in /usr/sbin.
+   Provides console server and HTTP management api.
+
+   Run:
+
+   xend start
+
+   The daemon is stopped with:
+
+   xend stop
+
+   Unfortunately restarting it upsets the channel to dom0 and
+   domain management stops working - needs a reboot to fix.
+"""
+import os
+import sys
+from xen.xend.server import SrvDaemon
+
+def main():
+    daemon = SrvDaemon.instance()
+    if not sys.argv[1:]:
+        print 'usage: %s {start|stop|restart}' % sys.argv[0]
+    elif os.fork():
+        pid, status = os.wait()
+        return status >> 8
+    elif sys.argv[1] == 'start':
+        return daemon.start()
+    elif sys.argv[1] == 'stop':
+        return daemon.stop()
+    elif sys.argv[1] == 'restart':
+        return daemon.stop() or daemon.start()
+    else:
+        print 'not an option:', sys.argv[1]
+    return 1
+
+if __name__ == '__main__':
+    sys.exit(main())

@@ -20,6 +20,8 @@
 #define PyMODINIT_FUNC DL_EXPORT(void)
 #endif
 
+#define XENPKG "xen.ext.xc"
+
 static PyObject *xc_error, *zero;
 
 typedef struct {
@@ -187,112 +189,73 @@ static PyObject *pyxc_domain_getinfo(PyObject *self,
     return list;
 }
 
-static PyObject *pyxc_linux_save(PyObject *self,
-                                 PyObject *args,
-                                 PyObject *kwds)
-{
-    XcObject *xc = (XcObject *)self;
-
-    u32   dom;
-    char *state_file;
-    int   progress = 1, live = -1, debug = 0;
-    unsigned int flags = 0;
-
-    static char *kwd_list[] = { "dom", "state_file", "progress", 
-                                "live", "debug", NULL };
-
-    if ( !PyArg_ParseTupleAndKeywords(args, kwds, "is|iii", kwd_list, 
-                                      &dom, &state_file, &progress, 
-                                      &live, &debug) )
-        return NULL;
-
-    if (progress)  flags |= XCFLAGS_VERBOSE;
-    if (live == 1) flags |= XCFLAGS_LIVE;
-    if (debug)     flags |= XCFLAGS_DEBUG;
-
-    if ( strncmp(state_file,"tcp:", strlen("tcp:")) == 0 )
-    {
+static PyObject *tcp_save(XcObject *xc, u32 dom, char *url, unsigned flags){
 #define max_namelen 64
-        char server[max_namelen];
-        char *port_s;
-        int port=777;
-        int sd = -1;
-        struct hostent *h;
-        struct sockaddr_in s;
-        int sockbufsize;
-        int rc = -1;
-
-        int writerfn(void *fd, const void *buf, size_t count)
-        {
-            int tot = 0, rc;
-            do {
-                rc = write( (int) fd, ((char*)buf)+tot, count-tot );
-                if ( rc < 0 ) { perror("WRITE"); return rc; };
-                tot += rc;
-            }
-            while ( tot < count );
-            return 0;
+    char server[max_namelen];
+    char *port_s;
+    int port=777;
+    int sd = -1;
+    struct hostent *h;
+    struct sockaddr_in s;
+    int sockbufsize;
+    int rc = -1;
+    
+    int writerfn(void *fd, const void *buf, size_t count) {
+        int tot = 0, rc;
+        do {
+            rc = write( (int) fd, ((char*)buf)+tot, count-tot );
+            if ( rc < 0 ) { perror("WRITE"); return rc; };
+            tot += rc;
         }
+        while ( tot < count );
+        return 0;
+    }
+    
+    strncpy( server, url+strlen("tcp://"), max_namelen);
+    server[max_namelen-1]='\0';
+    if ( (port_s = strchr(server,':')) != NULL ) {
+        *port_s = '\0';
+        port = atoi(port_s+1);
+    }
+    printf("X server=%s port=%d\n",server,port);
+    h = gethostbyname(server);
+    sd = socket(AF_INET, SOCK_STREAM,0);
+    if (sd < 0) goto serr;
+    s.sin_family = AF_INET;
+    bcopy ( h->h_addr, &(s.sin_addr.s_addr), h->h_length);
+    s.sin_port = htons(port);
+    if ( connect(sd, (struct sockaddr *) &s, sizeof(s)) ) goto serr;
+    sockbufsize=128*1024;
+    if ( setsockopt(sd, SOL_SOCKET, SO_SNDBUF, &sockbufsize, sizeof sockbufsize) < 0 ) goto serr;
 
-        if (live == -1) flags |= XCFLAGS_LIVE; /* default to live for tcp */
-
-        strncpy( server, state_file+strlen("tcp://"), max_namelen);
-        server[max_namelen-1]='\0';
-        if ( (port_s = strchr(server,':')) != NULL )
-        {
-            *port_s = '\0';
-            port = atoi(port_s+1);
-        }
-
-        printf("X server=%s port=%d\n",server,port);
- 
-        h = gethostbyname(server);
-        sd = socket (AF_INET,SOCK_STREAM,0);
-        if ( sd < 0 )
-            goto serr;
-        s.sin_family = AF_INET;
-        bcopy ( h->h_addr, &(s.sin_addr.s_addr), h->h_length);
-        s.sin_port = htons(port);
-        if ( connect(sd, (struct sockaddr *) &s, sizeof(s)) ) 
-            goto serr;
-
-        sockbufsize=128*1024;
-        if ( setsockopt(sd, SOL_SOCKET, SO_SNDBUF, 
-                        &sockbufsize, sizeof sockbufsize) < 0 ) 
-            goto serr;
-
-        if ( xc_linux_save(xc->xc_handle, dom, flags, 
-                           writerfn, (void*)sd) == 0 )
-        {
-            if ( read( sd, &rc, sizeof(int) ) != sizeof(int) )
-                goto serr;
+    if ( xc_linux_save(xc->xc_handle, dom, flags, writerfn, (void*)sd) == 0 ) {
+        if ( read( sd, &rc, sizeof(int) ) != sizeof(int) ) goto serr;
   
-            if ( rc == 0 )
-            {
+        if ( rc == 0 ) {
                 printf("Migration succesful -- destroy local copy\n");
                 xc_domain_destroy(xc->xc_handle, dom);
                 close(sd);
                 Py_INCREF(zero);
                 return zero;
-            }
-            else
-                errno = rc;
+        } else {
+            errno = rc;
         }
+    }
 
-    serr:
-        printf("Migration failed -- restart local copy\n");
-        xc_domain_unpause(xc->xc_handle, dom);
-        PyErr_SetFromErrno(xc_error);
-        if ( sd >= 0 ) close(sd);
-        return NULL;
-    }    
-    else
-    {
+  serr:
+    printf("Migration failed -- restart local copy\n");
+    xc_domain_unpause(xc->xc_handle, dom);
+    PyErr_SetFromErrno(xc_error);
+    if ( sd >= 0 ) close(sd);
+    return NULL;
+
+}
+
+static PyObject *file_save(XcObject *xc, u32 dom, char *state_file, unsigned flags){
         int fd = -1;
         gzFile gfd = NULL;
 
-        int writerfn(void *fd, const void *buf, size_t count)
-        {
+        int writerfn(void *fd, const void *buf, size_t count) {
             int rc;
             while ( ((rc = gzwrite( (gzFile*)fd, (void*)buf, count)) == -1) && 
                     (errno = EINTR) )
@@ -300,30 +263,24 @@ static PyObject *pyxc_linux_save(PyObject *self,
             return ! (rc == count);
         }
 
-        if (strncmp(state_file,"file:",strlen("file:")) == 0)
+        if (strncmp(state_file,"file:",strlen("file:")) == 0){
             state_file += strlen("file:");
+        }
 
-        if ( (fd = open(state_file, O_CREAT|O_EXCL|O_WRONLY, 0644)) == -1 )
-        {
+        if ( (fd = open(state_file, O_CREAT|O_EXCL|O_WRONLY, 0644)) == -1 ) {
             perror("Could not open file for writing");
             goto err;
         }
-
         /*
          * Compression rate 1: we want speed over compression. 
          * We're mainly going for those zero pages, after all.
          */
-
-        if ( (gfd = gzdopen(fd, "wb1")) == NULL )
-        {
+        if ( (gfd = gzdopen(fd, "wb1")) == NULL ) {
             perror("Could not allocate compression state for state file");
             close(fd);
             goto err;
         }
-
-
-        if ( xc_linux_save(xc->xc_handle, dom, flags, writerfn, gfd) == 0 )
-        {
+        if ( xc_linux_save(xc->xc_handle, dom, flags, writerfn, gfd) == 0 ) {
             /* kill domain. We don't want to do this for checkpointing, but
                if we don't do it here I think people will hurt themselves
                by accident... */
@@ -337,14 +294,45 @@ static PyObject *pyxc_linux_save(PyObject *self,
 
     err:
         PyErr_SetFromErrno(xc_error);
-        if ( gfd != NULL )
-            gzclose(gfd);
-        if ( fd >= 0 )
-            close(fd);
+        if ( gfd != NULL ) gzclose(gfd);
+        if ( fd >= 0 ) close(fd);
         unlink(state_file);
         return NULL;
-    }
+}
 
+static PyObject *pyxc_linux_save(PyObject *self,
+                                 PyObject *args,
+                                 PyObject *kwds)
+{
+    XcObject *xc = (XcObject *)self;
+
+    u32   dom;
+    char *state_file;
+    int   progress = 1, live = -1, debug = 0;
+    unsigned int flags = 0;
+    PyObject *val = NULL;
+
+    static char *kwd_list[] = { "dom", "state_file", "progress", 
+                                "live", "debug", NULL };
+
+    if ( !PyArg_ParseTupleAndKeywords(args, kwds, "is|iii", kwd_list, 
+                                      &dom, &state_file, &progress, 
+                                      &live, &debug) )
+        goto exit;
+
+    if (progress)  flags |= XCFLAGS_VERBOSE;
+    if (live == 1) flags |= XCFLAGS_LIVE;
+    if (debug)     flags |= XCFLAGS_DEBUG;
+
+    if ( strncmp(state_file,"tcp:", strlen("tcp:")) == 0 ) {
+        /* default to live for tcp */
+        if (live == -1) flags |= XCFLAGS_LIVE;
+        val = tcp_save(xc, dom, state_file, flags);
+    } else {
+        val = file_save(xc, dom, state_file, flags);
+    }
+  exit:
+    return val;
 }
 
 static PyObject *pyxc_linux_restore(PyObject *self,
@@ -1335,18 +1323,18 @@ static PyTypeObject PyXcType = {
 };
 
 static PyMethodDef PyXc_methods[] = {
-    { "new", PyXc_new, METH_VARARGS, "Create a new Xc object." },
+    { "new", PyXc_new, METH_VARARGS, "Create a new " XENPKG " object." },
     { NULL, NULL, 0, NULL }
 };
 
-PyMODINIT_FUNC initXc(void)
+PyMODINIT_FUNC initxc(void)
 {
     PyObject *m, *d;
 
-    m = Py_InitModule("Xc", PyXc_methods);
+    m = Py_InitModule(XENPKG, PyXc_methods);
 
     d = PyModule_GetDict(m);
-    xc_error = PyErr_NewException("Xc.error", NULL, NULL);
+    xc_error = PyErr_NewException(XENPKG ".error", NULL, NULL);
     PyDict_SetItemString(d, "error", xc_error);
 
     zero = PyInt_FromLong(0);

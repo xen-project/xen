@@ -1,0 +1,6 @@
+#!/usr/bin/python
+#  -*- mode: python; -*-
+import sys
+from xen.xm import main
+
+main.main(sys.argv)
