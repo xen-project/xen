@@ -13,6 +13,7 @@ import types
 import re
 import sys
 import os
+import time
 
 from twisted.internet import defer
 #defer.Deferred.debug = 1
@@ -331,6 +332,7 @@ class XendDomainInfo:
         self.config = None
         self.id = None
         self.dom = None
+        self.startTime = None
         self.name = None
         self.memory = None
         self.image = None
@@ -354,7 +356,7 @@ class XendDomainInfo:
     def setdom(self, dom):
         self.dom = int(dom)
         self.id = str(dom)
-        
+    
     def update(self, info):
         """Update with  info from xc.domain_getinfo().
         """
@@ -392,7 +394,13 @@ class XendDomainInfo:
                 reason = shutdown_reason(self.info['shutdown_reason'])
                 sxpr.append(['shutdown_reason', reason])
             sxpr.append(['cpu', self.info['cpu']])
-            sxpr.append(['cpu_time', self.info['cpu_time']/1e9])
+            sxpr.append(['cpu_time', self.info['cpu_time']/1e9])    
+            
+            if self.startTime:
+                upTime =  time.time() - self.startTime  
+                sxpr.append(['up_time', str( upTime ) ] )
+                sxpr.append(['start_time', str( self.startTime ) ] )
+
         if self.console:
             sxpr.append(self.console.sxpr())
         if self.config:
@@ -409,6 +417,10 @@ class XendDomainInfo:
             self.memory = int(sxp.child_value(config, 'memory'))
             if self.memory is None:
                 raise VmError('missing memory size')
+
+            if sxp.child_value( config, 'start_time' ) != None:
+                self.startTime = float( sxp.child_value( config, 'start_time' ) )
+
             self.configure_console()
             self.configure_restart()
             self.configure_backends()
@@ -585,6 +597,9 @@ class XendDomainInfo:
             raise VmError('Creating domain failed: name=%s memory=%d'
                           % (name, memory))
         self.setdom(dom)
+
+        if self.startTime == None:
+            self.startTime = time.time()
 
     def build_domain(self, ostype, kernel, ramdisk, cmdline, vifs_n):
         """Build the domain boot image.
