@@ -298,9 +298,8 @@ int delete_net_rule(net_rule_t *rule)
 
     write_lock(&net_rule_lock);
 
-    for ( pent = &net_rule_list; pent != NULL; pent = &ent->next )
+    for ( pent = &net_rule_list; (ent = *pent) != NULL; pent = &ent->next )
     {
-        ent = *pent;
         if ( memcmp(rule, &ent->r, sizeof(net_rule_t)) == 0 )
         {
             *pent = ent->next;
@@ -311,6 +310,27 @@ int delete_net_rule(net_rule_t *rule)
 
     write_unlock(&net_rule_lock);
     return 0;
+}
+
+void delete_all_domain_vfr_rules(struct task_struct *p)
+{
+    net_rule_ent_t **pent, *ent;
+
+    write_lock(&net_rule_lock);
+
+    for ( pent = &net_rule_list; (ent = *pent) != NULL; )
+    {
+        if ( (ent->r.src_dom == p->domain) || (ent->r.dst_dom == p->domain) )
+        {
+            *pent = ent->next;
+            kmem_cache_free(net_rule_cache, ent);
+            continue;
+        }
+
+        pent = &ent->next;
+    }
+
+    write_unlock(&net_rule_lock);
 }
  
 static char *idx_to_name(unsigned int idx)

@@ -99,6 +99,7 @@ void destroy_net_vif(net_vif_t *vif);
 void unlink_net_vif(net_vif_t *vif);
 net_vif_t *net_get_target_vif(u8 *data, unsigned int len, net_vif_t *src_vif);
 net_vif_t *find_net_vif(domid_t dom, unsigned int idx);
+void delete_all_domain_vfr_rules(struct task_struct *p);
 
 /*
  * Return values from net_get_target_vif:

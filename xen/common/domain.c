@@ -153,6 +153,8 @@ void __kill_domain(struct task_struct *p)
 
     destroy_event_channels(p);
 
+    delete_all_domain_vfr_rules(p);
+
     /*
      * Note this means that find_domain_by_id may fail, even when the caller
      * holds a reference to the domain being queried. Take care!
