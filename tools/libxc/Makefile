@@ -25,6 +25,7 @@ SRCS     += xc_misc.c
 SRCS     += xc_physdev.c
 SRCS     += xc_private.c
 SRCS     += xc_rrobin.c
+SRCS     += xc_vmx_build.c
 
 CFLAGS   += -Wall
 CFLAGS   += -Werror
