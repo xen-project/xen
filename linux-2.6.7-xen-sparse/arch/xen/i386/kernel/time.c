@@ -45,6 +45,7 @@
 #include <linux/sysdev.h>
 #include <linux/bcd.h>
 #include <linux/efi.h>
+#include <linux/sysctl.h>
 
 #include <asm/io.h>
 #include <asm/smp.h>
@@ -94,63 +95,75 @@ static u32 shadow_time_version;
 static struct timeval shadow_tv;
 extern u64 processed_system_time;
 
-#define NS_PER_TICK (1000000000ULL/HZ)
-
-/*
- * Reads a consistent set of time-base values from Xen, into a shadow data
- * area. Must be called with the xtime_lock held for writing.
- */
-int __get_time_values_from_xen(void)
-{
-	s64 delta;
-	unsigned int ticks = 0;
-
-	do {
-		shadow_time_version = HYPERVISOR_shared_info->time_version2;
-		rmb();
-		shadow_tv.tv_sec    = HYPERVISOR_shared_info->wc_sec;
-		shadow_tv.tv_usec   = HYPERVISOR_shared_info->wc_usec;
-		shadow_tsc_stamp    = HYPERVISOR_shared_info->tsc_timestamp.tsc_bits;
-		shadow_system_time  = HYPERVISOR_shared_info->system_time;
-		rmb();
-	}
-	while (shadow_time_version != HYPERVISOR_shared_info->time_version1);
-
-	delta = (s64)(shadow_system_time +
-		      cur_timer->get_offset() * NSEC_PER_USEC -
-		      processed_system_time);
-	if (delta < 0) {
-		printk("Timer ISR: Time went backwards: %lld\n", delta);
-		return 1;
-	}
-
-	if (delta < NS_PER_TICK)
-		return 1;
-
-	/* Process elapsed jiffies since last call. */
-	while (delta >= NS_PER_TICK) {
-		ticks++;
-		delta -= NS_PER_TICK;
-		processed_system_time += NS_PER_TICK;
-	}
-	jiffies_64 += ticks - 1;
-	/* We leave one tick for the caller to add to jiffies since
-	 * the timer interrupt will call do_timer(). */
-
-	return 0;
-}
-
-#define TIME_VALUES_UP_TO_DATE \
-	(shadow_time_version == HYPERVISOR_shared_info->time_version2)
-
 /*
  * We use this to ensure that gettimeofday() is monotonically increasing. We
  * only break this guarantee if the wall clock jumps backwards "a long way".
  */
 static struct timeval last_seen_tv = {0,0};
 
+#ifdef CONFIG_XEN_PRIVILEGED_GUEST
+/* Periodically propagate synchronised time base to the RTC and to Xen. */
+static long last_rtc_update, last_update_to_xen;
+#endif
+
+/* Periodically take synchronised time base from Xen, if we need it. */
+static long last_update_from_xen;   /* UTC seconds when last read Xen clock. */
+
 /* Keep track of last time we did processing/updating of jiffies and xtime. */
 u64 processed_system_time;   /* System time (ns) at last processing. */
+
+#define NS_PER_TICK (1000000000ULL/HZ)
+
+#define HANDLE_USEC_UNDERFLOW(_tv)         \
+    do {                                   \
+        while ( (_tv).tv_usec < 0 )        \
+        {                                  \
+            (_tv).tv_usec += 1000000;      \
+            (_tv).tv_sec--;                \
+        }                                  \
+    } while ( 0 )
+#define HANDLE_USEC_OVERFLOW(_tv)          \
+    do {                                   \
+        while ( (_tv).tv_usec >= 1000000 ) \
+        {                                  \
+            (_tv).tv_usec -= 1000000;      \
+            (_tv).tv_sec++;                \
+        }                                  \
+    } while ( 0 )
+
+/* Does this guest OS track Xen time, or set its wall clock independently? */
+static int independent_wallclock = 0;
+static int __init __independent_wallclock(char *str)
+{
+    independent_wallclock = 1;
+    return 1;
+}
+__setup("independent_wallclock", __independent_wallclock);
+
+/*
+ * Reads a consistent set of time-base values from Xen, into a shadow data
+ * area. Must be called with the xtime_lock held for writing.
+ */
+static void __get_time_values_from_xen(void)
+{
+	shared_info_t *s = HYPERVISOR_shared_info;
+
+	do {
+		shadow_time_version = s->time_version2;
+		rmb();
+		shadow_tv.tv_sec    = s->wc_sec;
+		shadow_tv.tv_usec   = s->wc_usec;
+		shadow_tsc_stamp    = s->tsc_timestamp.tsc_bits;
+		shadow_system_time  = s->system_time;
+		rmb();
+	}
+	while (shadow_time_version != s->time_version1);
+
+	cur_timer->mark_offset();
+}
+
+#define TIME_VALUES_UP_TO_DATE \
+	(shadow_time_version == HYPERVISOR_shared_info->time_version2)
 
 /*
  * This version of gettimeofday has microsecond resolution
@@ -196,10 +209,9 @@ void do_gettimeofday(struct timeval *tv)
 			 * overflowed). Detect that and recalculate
 			 * with fresh values.
 			 */
-			write_seqlock(&xtime_lock);
-			if (__get_time_values_from_xen() == 0)
-				jiffies_64++;
-			write_sequnlock(&xtime_lock);
+			write_seqlock_irq(&xtime_lock);
+			__get_time_values_from_xen();
+			write_sequnlock_irq(&xtime_lock);
 			continue;
 		}
 	} while (read_seqretry(&xtime_lock, seq));
@@ -229,18 +241,36 @@ int do_settimeofday(struct timespec *tv)
 {
 	time_t wtm_sec, sec = tv->tv_sec;
 	long wtm_nsec, nsec = tv->tv_nsec;
+	struct timespec xentime;
 
 	if ((unsigned long)tv->tv_nsec >= NSEC_PER_SEC)
 		return -EINVAL;
 
+	if (!independent_wallclock && !(start_info.flags & SIF_INITDOMAIN))
+		return 0; /* Silent failure? */
+
 	write_seqlock_irq(&xtime_lock);
+
+	/*
+	 * Ensure we don't get blocked for a long time so that our time delta
+	 * overflows. If that were to happen then our shadow time values would
+	 * be stale, so we can retry with fresh ones.
+	 */
+ again:
+	nsec -= cur_timer->get_offset() * NSEC_PER_USEC;
+	if (unlikely(!TIME_VALUES_UP_TO_DATE)) {
+		__get_time_values_from_xen();
+		goto again;
+	}
+
+	set_normalized_timespec(&xentime, sec, nsec);
+
 	/*
 	 * This is revolting. We need to set "xtime" correctly. However, the
 	 * value in this location is the value at the most recent update of
 	 * wall time.  Discover what correction gettimeofday() would have
 	 * made, and then undo it!
 	 */
-	nsec -= cur_timer->get_offset() * NSEC_PER_USEC;
 	nsec -= (jiffies - wall_jiffies) * TICK_NSEC;
 
 	wtm_sec  = wall_to_monotonic.tv_sec + (xtime.tv_sec - sec);
@@ -254,16 +284,31 @@ int do_settimeofday(struct timespec *tv)
 	time_maxerror = NTP_PHASE_LIMIT;
 	time_esterror = NTP_PHASE_LIMIT;
 
+	/* Reset all our running time counts. They make no sense now. */
 	last_seen_tv.tv_sec = 0;
+	last_update_from_xen = 0;
 
-	write_sequnlock_irq(&xtime_lock);
+#ifdef CONFIG_XEN_PRIVILEGED_GUEST
+	if (start_info.flags & SIF_INITDOMAIN) {
+		dom0_op_t op;
+		last_rtc_update = last_update_to_xen = 0;
+		op.cmd = DOM0_SETTIME;
+		op.u.settime.secs        = xentime.tv_sec;
+		op.u.settime.usecs       = xentime.tv_nsec / 1000;
+		op.u.settime.system_time = shadow_system_time;
+		write_sequnlock_irq(&xtime_lock);
+		HYPERVISOR_dom0_op(&op);
+	} else
+#endif
+		write_sequnlock_irq(&xtime_lock);
+
 	clock_was_set();
 	return 0;
 }
 
 EXPORT_SYMBOL(do_settimeofday);
 
-#if 0
+#ifdef CONFIG_XEN_PRIVILEGED_GUEST
 static int set_rtc_mmss(unsigned long nowtime)
 {
 	int retval;
@@ -278,12 +323,7 @@ static int set_rtc_mmss(unsigned long nowtime)
 
 	return retval;
 }
-
-/* last time the cmos clock got updated */
-static long last_rtc_update;
 #endif
-
-int timer_ack;
 
 /* monotonic_clock(): returns # of nanoseconds passed since time_init()
  *		Note: This function is required to return accurate
@@ -303,26 +343,91 @@ EXPORT_SYMBOL(monotonic_clock);
 static inline void do_timer_interrupt(int irq, void *dev_id,
 					struct pt_regs *regs)
 {
+	s64 delta;
+	unsigned int ticks = 0;
+	long sec_diff;
 
-#ifdef CONFIG_X86_IO_APIC
-	if (timer_ack) {
-		/*
-		 * Subtle, when I/O APICs are used we have to ack timer IRQ
-		 * manually to reset the IRR bit for do_slow_gettimeoffset().
-		 * This will also deassert NMI lines for the watchdog if run
-		 * on an 82489DX-based system.
-		 */
-		spin_lock(&i8259A_lock);
-		outb(0x0c, PIC_MASTER_OCW3);
-		/* Ack the IRQ; AEOI will end it automatically. */
-		inb(PIC_MASTER_POLL);
-		spin_unlock(&i8259A_lock);
+	__get_time_values_from_xen();
+
+	delta = (s64)(shadow_system_time +
+		      (cur_timer->get_offset() * NSEC_PER_USEC) -
+		      processed_system_time);
+	if (delta < 0) {
+		printk("Timer ISR: Time went backwards: %lld\n", delta);
+		return;
 	}
+
+	/* Process elapsed jiffies since last call. */
+	while (delta >= NS_PER_TICK) {
+		ticks++;
+		delta -= NS_PER_TICK;
+		processed_system_time += NS_PER_TICK;
+	}
+
+	if (ticks != 0) {
+		jiffies_64 += ticks - 1;
+		do_timer_interrupt_hook(regs); /* implicit 'jiffies_64++' */
+	}
+
+	/*
+	 * Take synchronised time from Xen once a minute if we're not
+	 * synchronised ourselves, and we haven't chosen to keep an independent
+	 * time base.
+	 */
+	if (!independent_wallclock && 
+	    ((time_status & STA_UNSYNC) != 0) &&
+	    (xtime.tv_sec > (last_update_from_xen + 60))) {
+		/* Adjust shadow for jiffies that haven't updated xtime yet. */
+		shadow_tv.tv_usec -= 
+			(jiffies - wall_jiffies) * (1000000/HZ);
+		HANDLE_USEC_UNDERFLOW(shadow_tv);
+
+		/*
+		 * Reset our running time counts if they are invalidated by
+		 * a warp backwards of more than 500ms.
+		 */
+		sec_diff = xtime.tv_sec - shadow_tv.tv_sec;
+		if (unlikely(abs(sec_diff) > 1) ||
+		    unlikely(((sec_diff * 1000000) + 
+		              (xtime.tv_nsec/1000) - shadow_tv.tv_usec) >
+		             500000)) {
+#ifdef CONFIG_XEN_PRIVILEGED_GUEST
+			last_rtc_update = last_update_to_xen = 0;
 #endif
+			last_seen_tv.tv_sec = 0;
+		}
 
-	do_timer_interrupt_hook(regs);
+		/* Update our unsynchronised xtime appropriately. */
+		xtime.tv_sec  = shadow_tv.tv_sec;
+		xtime.tv_nsec = shadow_tv.tv_usec * 1000;
 
-#if 0				/* XEN PRIV */
+		last_update_from_xen = xtime.tv_sec;
+	}
+
+#ifdef CONFIG_XEN_PRIVILEGED_GUEST
+	if (!(start_info.flags & SIF_INITDOMAIN))
+		return;
+
+	/* Send synchronised time to Xen approximately every minute. */
+	if (((time_status & STA_UNSYNC) == 0) &&
+	    (xtime.tv_sec > (last_update_to_xen + 60))) {
+		dom0_op_t op;
+		struct timeval tv;
+
+		tv.tv_sec   = xtime.tv_sec;
+		tv.tv_usec  = xtime.tv_nsec / 1000;
+		tv.tv_usec += (jiffies - wall_jiffies) * (1000000/HZ);
+		HANDLE_USEC_OVERFLOW(tv);
+
+		op.cmd = DOM0_SETTIME;
+		op.u.settime.secs        = tv.tv_sec;
+		op.u.settime.usecs       = tv.tv_usec;
+		op.u.settime.system_time = shadow_system_time;
+		HYPERVISOR_dom0_op(&op);
+
+		last_update_to_xen = xtime.tv_sec;
+	}
+
 	/*
 	 * If we have an externally synchronized Linux clock, then update
 	 * CMOS clock accordingly every ~11 minutes. Set_rtc_mmss() has to be
@@ -346,22 +451,6 @@ static inline void do_timer_interrupt(int irq, void *dev_id,
 			last_rtc_update = xtime.tv_sec - 600; /* do it again in 60 s */
 	}
 #endif
-
-#ifdef CONFIG_MCA
-	if( MCA_bus ) {
-		/* The PS/2 uses level-triggered interrupts.  You can't
-		turn them off, nor would you want to (any attempt to
-		enable edge-triggered interrupts usually gets intercepted by a
-		special hardware circuit).  Hence we have to acknowledge
-		the timer interrupt.  Through some incredibly stupid
-		design idea, the reset for IRQ 0 is done by setting the
-		high bit of the PPI port B (0x61).  Note that some PS/2s,
-		notably the 55SX, work fine if this is removed.  */
-
-		irq = inb_p( 0x61 );	/* read the current state */
-		outb_p( irq|0x80, 0x61 );	/* reset the IRQ */
-	}
-#endif
 }
 
 /*
@@ -379,15 +468,7 @@ irqreturn_t timer_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 	 * locally disabled. -arca
 	 */
 	write_seqlock(&xtime_lock);
-
-	if (__get_time_values_from_xen())
-		goto out;
-
-	cur_timer->mark_offset();
- 
 	do_timer_interrupt(irq, NULL, regs);
-
- out:
 	write_sequnlock(&xtime_lock);
 	return IRQ_HANDLED;
 }
@@ -506,7 +587,7 @@ void __init time_init(void)
 	__get_time_values_from_xen();
 	processed_system_time = shadow_system_time;
 
-	time_irq  = bind_virq_to_irq(VIRQ_TIMER);
+	time_irq = bind_virq_to_irq(VIRQ_TIMER);
 
 	(void)setup_irq(time_irq, &irq_timer);
 }
@@ -547,3 +628,23 @@ int set_timeout_timer(void)
 
 	return ret;
 }
+
+/*
+ * /proc/sys/xen: This really belongs in another file. It can stay here for
+ * now however.
+ */
+static ctl_table xen_subtable[] = {
+    {1, "independent_wallclock", &independent_wallclock,
+     sizeof(independent_wallclock), 0644, NULL, proc_dointvec},
+    {0}
+};
+static ctl_table xen_table[] = {
+    {123, "xen", NULL, 0, 0555, xen_subtable},
+    {0}
+};
+static int __init xen_sysctl_init(void)
+{
+    (void)register_sysctl_table(xen_table, 0);
+    return 0;
+}
+__initcall(xen_sysctl_init);

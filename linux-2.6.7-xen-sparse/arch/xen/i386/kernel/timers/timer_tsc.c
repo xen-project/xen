@@ -358,22 +358,11 @@ static int __init init_tsc(char* override)
 	return 0;
 }
 
-#ifndef CONFIG_X86_TSC
-/* disable flag for tsc.  Takes effect by clearing the TSC cpu flag
- * in cpu/common.c */
 static int __init tsc_setup(char *str)
 {
-	tsc_disable = 1;
+	printk(KERN_WARNING "notsc: cannot disable TSC in Xen/Linux.\n");
 	return 1;
 }
-#else
-static int __init tsc_setup(char *str)
-{
-	printk(KERN_WARNING "notsc: Kernel compiled with CONFIG_X86_TSC, "
-				"cannot disable TSC.\n");
-	return 1;
-}
-#endif
 __setup("notsc", tsc_setup);
 
 
