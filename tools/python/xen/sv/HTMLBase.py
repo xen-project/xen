@@ -25,9 +25,9 @@ class HTMLBase( Resource ):
         request.write( '<html><head><title>Xen</title><link rel="stylesheet" type="text/css" href="inc/style.css" />' )
         request.write( '<script src="inc/script.js"></script>' )
         request.write( '</head><body>' )
+        request.write('<form method="post" action="%s">' % request.uri)
 
     def write_BOTTOM( self, request ):
-        request.write('<form method="post" action="%s">' % request.uri)
         request.write('<input type="hidden" name="op" value="">')
         request.write('</form>')
         request.write( "</body></html>" )
