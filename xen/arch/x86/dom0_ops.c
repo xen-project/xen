@@ -435,8 +435,15 @@ void arch_getdomaininfo_ctxt(
     memcpy(c->debugreg, 
            ed->arch.debugreg, 
            sizeof(ed->arch.debugreg));
+#if defined(__i386__)
     c->event_callback_cs     = ed->arch.event_selector;
     c->event_callback_eip    = ed->arch.event_address;
     c->failsafe_callback_cs  = ed->arch.failsafe_selector;
     c->failsafe_callback_eip = ed->arch.failsafe_address;
+#elif defined(__x86_64__)
+    c->event_callback_eip    = ed->arch.event_address;
+    c->failsafe_callback_eip = ed->arch.failsafe_address;
+    c->syscall_callback_eip  = ed->arch.syscall_address;
+#endif
+    c->vm_assist = ed->domain->vm_assist;
 }

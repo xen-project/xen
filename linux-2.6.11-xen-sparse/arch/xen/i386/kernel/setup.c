@@ -1409,8 +1409,10 @@ void __init setup_arch(char **cmdline_p)
 	/* Register a call for panic conditions. */
 	notifier_chain_register(&panic_notifier_list, &xen_panic_block);
 
-	HYPERVISOR_vm_assist(VMASST_CMD_enable,
-			     VMASST_TYPE_4gb_segments);
+	HYPERVISOR_vm_assist(
+		VMASST_CMD_enable, VMASST_TYPE_4gb_segments);
+	HYPERVISOR_vm_assist(
+		VMASST_CMD_enable, VMASST_TYPE_writable_pagetables);
 
 	memcpy(&boot_cpu_data, &new_cpu_data, sizeof(new_cpu_data));
 	early_cpu_init();

@@ -110,18 +110,15 @@ static void __do_suspend(void)
     HYPERVISOR_shared_info = (shared_info_t *)empty_zero_page;
     clear_fixmap(FIX_SHARED_INFO);
 
-    memcpy(&suspend_record->resume_info, &xen_start_info, sizeof(xen_start_info));
+    memcpy(&suspend_record->resume_info, &xen_start_info,
+           sizeof(xen_start_info));
 
     HYPERVISOR_suspend(virt_to_machine(suspend_record) >> PAGE_SHIFT);
 
-    HYPERVISOR_vm_assist(VMASST_CMD_enable,
-			 VMASST_TYPE_4gb_segments);
-    HYPERVISOR_vm_assist(VMASST_CMD_enable,
-			 VMASST_TYPE_writable_pagetables);
-
     shutting_down = -1; 
 
-    memcpy(&xen_start_info, &suspend_record->resume_info, sizeof(xen_start_info));
+    memcpy(&xen_start_info, &suspend_record->resume_info,
+           sizeof(xen_start_info));
 
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,0)
     set_fixmap_ma(FIX_SHARED_INFO, xen_start_info.shared_info);

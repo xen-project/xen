@@ -22,7 +22,6 @@ struct domain_setup_info
     unsigned long v_kernend;
     unsigned long v_kernentry;
 
-    unsigned int use_writable_pagetables;
     unsigned int load_bsd_symtab;
 
     unsigned long symtab_addr;
@@ -87,10 +86,6 @@ static int setup_guest(int xc_handle,
     rc = parseelfimage(image, image_size, &dsi);
     if ( rc != 0 )
         goto error_out;
-
-    if (dsi.use_writable_pagetables)
-        xc_domain_setvmassist(xc_handle, dom, VMASST_CMD_enable,
-                              VMASST_TYPE_writable_pagetables);
 
     if (dsi.load_bsd_symtab)
         loadelfsymtab(image, xc_handle, dom, NULL, &dsi);
@@ -579,9 +574,6 @@ static int parseelfimage(char *elfbase,
     dsi->v_start = kernstart;
     if ( (p = strstr(guestinfo, "VIRT_BASE=")) != NULL )
         dsi->v_start = strtoul(p+10, &p, 0);
-
-    if ( (p = strstr(guestinfo, "PT_MODE_WRITABLE")) != NULL )
-        dsi->use_writable_pagetables = 1;
 
     if ( (p = strstr(guestinfo, "BSD_SYMTAB")) != NULL )
         dsi->load_bsd_symtab = 1;

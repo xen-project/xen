@@ -51,13 +51,6 @@ extern unsigned long xenheap_size;
 // from linux/include/linux/mm.h
 extern struct page *mem_map;
 
-// defined in include/asm-x86/mm.h, not really used for ia64
-typedef struct {
-    void	(*enable)(struct domain *p);
-    void	(*disable)(struct domain *p);
-} vm_assist_info_t;
-extern vm_assist_info_t vm_assist_info[];
-
 // xen/include/asm/config.h
 extern char _end[]; /* standard ELF symbol */
 

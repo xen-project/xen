@@ -228,8 +228,10 @@ void __init setup_arch(char **cmdline_p)
     blk_nohighio = 1;
 #endif
 
-    HYPERVISOR_vm_assist(VMASST_CMD_enable,
-                         VMASST_TYPE_4gb_segments);
+    HYPERVISOR_vm_assist(
+        VMASST_CMD_enable, VMASST_TYPE_4gb_segments);
+    HYPERVISOR_vm_assist(
+        VMASST_CMD_enable, VMASST_TYPE_writable_pagetables);
         
     HYPERVISOR_set_callbacks(
         __KERNEL_CS, (unsigned long)hypervisor_callback,

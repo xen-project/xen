@@ -129,10 +129,6 @@ int construct_dom0(struct domain *d,
     if ( rc != 0 )
         return rc;
 
-    /* Set up domain options */
-    if ( dsi.use_writable_pagetables )
-        vm_assist(d, VMASST_CMD_enable, VMASST_TYPE_writable_pagetables);
-
     /* Align load address to 4MB boundary. */
     dsi.v_start &= ~((1UL<<22)-1);
 

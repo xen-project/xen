@@ -27,7 +27,6 @@ struct domain_setup_info
     unsigned long v_kernend;
     unsigned long v_kernentry;
 
-    unsigned int use_writable_pagetables;
     unsigned int load_bsd_symtab;
 
     unsigned long symtab_addr;
@@ -197,10 +196,6 @@ static int setup_guest(int xc_handle,
     rc = parseelfimage(image, image_size, &dsi);
     if ( rc != 0 )
         goto error_out;
-
-    if (dsi.use_writable_pagetables)
-        xc_domain_setvmassist(xc_handle, dom, VMASST_CMD_enable,
-                              VMASST_TYPE_writable_pagetables);
 
     if (dsi.load_bsd_symtab)
         loadelfsymtab(image, xc_handle, dom, NULL, &dsi);
@@ -708,7 +703,6 @@ static int parseelfimage(char *elfbase,
     }
 
     dsi->v_start = 0x00000000;
-    dsi->use_writable_pagetables = 0;
     dsi->load_bsd_symtab = 0;
 
     dsi->v_kernstart = kernstart - LINUX_PAGE_OFFSET;

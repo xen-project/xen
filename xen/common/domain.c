@@ -358,13 +358,9 @@ long vm_assist(struct domain *p, unsigned int cmd, unsigned int type)
     {
     case VMASST_CMD_enable:
         set_bit(type, &p->vm_assist);
-        if (vm_assist_info[type].enable)
-            (*vm_assist_info[type].enable)(p);
         return 0;
     case VMASST_CMD_disable:
         clear_bit(type, &p->vm_assist);
-        if (vm_assist_info[type].disable)
-            (*vm_assist_info[type].disable)(p);
         return 0;
     }
 

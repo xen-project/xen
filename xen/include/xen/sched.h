@@ -155,8 +155,6 @@ struct domain_setup_info
     unsigned long v_kernstart;
     unsigned long v_kernend;
     unsigned long v_kernentry;
-
-    unsigned int use_writable_pagetables;
 };
 
 #include <asm/uaccess.h> /* for KERNEL_DS */

@@ -118,9 +118,6 @@ int parseelfimage(char *elfbase,
     {
         if ( (p = strstr(guestinfo, "VIRT_BASE=")) != NULL )
             dsi->v_start = simple_strtoul(p+10, &p, 0);
-        
-        if ( (p = strstr(guestinfo, "PT_MODE_WRITABLE")) != NULL )
-            dsi->use_writable_pagetables = 1;
     }
 
     dsi->v_kernstart = kernstart;

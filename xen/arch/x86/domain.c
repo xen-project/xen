@@ -494,10 +494,19 @@ int arch_set_info_guest(
     for ( i = 0; i < 8; i++ )
         (void)set_debugreg(ed, i, c->debugreg[i]);
 
+#if defined(__i386__)
     ed->arch.event_selector    = c->event_callback_cs;
     ed->arch.event_address     = c->event_callback_eip;
     ed->arch.failsafe_selector = c->failsafe_callback_cs;
     ed->arch.failsafe_address  = c->failsafe_callback_eip;
+#elif defined(__x86_64__)
+    ed->arch.event_address     = c->event_callback_eip;
+    ed->arch.failsafe_address  = c->failsafe_callback_eip;
+    ed->arch.syscall_address   = c->syscall_callback_eip;
+#endif
+
+    if ( ed->eid == 0 )
+        d->vm_assist = c->vm_assist;
 
     phys_basetab = c->pt_base;
     ed->arch.guest_table = ed->arch.phys_table = mk_pagetable(phys_basetab);
