@@ -36,7 +36,9 @@
 #include <asm-xen/hypervisor.h>
 #include <asm-xen/multicall.h>
 #include <asm-xen/balloon.h>
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,0)
 #include <linux/percpu.h>
+#endif
 
 /*
  * This suffices to protect us if we ever move to SMP domains.

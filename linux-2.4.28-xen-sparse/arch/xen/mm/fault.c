@@ -84,8 +84,8 @@ asmlinkage void do_page_fault(struct pt_regs *regs,
         error_code &= 3;
         error_code |= (regs->xcs & 2) << 1;
 
-	if ( flush_page_update_queue() != 0 )
-		return;
+	/* ensure all updates have completed */
+	flush_page_update_queue();
 
 	/*
 	 * We fault-in kernel-space virtual memory on-demand. The

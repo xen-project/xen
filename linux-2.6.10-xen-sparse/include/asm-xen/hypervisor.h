@@ -91,6 +91,23 @@ void xen_set_ldt(unsigned long ptr, unsigned long bytes);
 void xen_machphys_update(unsigned long mfn, unsigned long pfn);
 
 void _flush_page_update_queue(void);
+
+#if LINUX_VERSION_CODE < KERNEL_VERSION(2,6,0)
+/* 
+** XXX SMH: 2.4 doesn't have percpu.h (or support SMP guests) so just 
+** include sufficient #defines to allow the below to build. 
+*/
+#define DEFINE_PER_CPU(type, name) \
+    __typeof__(type) per_cpu__##name
+
+#define per_cpu(var, cpu)           (*((void)cpu, &per_cpu__##var))
+#define __get_cpu_var(var)          per_cpu__##var
+#define DECLARE_PER_CPU(type, name) extern __typeof__(type) per_cpu__##name
+
+#define EXPORT_PER_CPU_SYMBOL(var) EXPORT_SYMBOL(per_cpu__##var)
+#define EXPORT_PER_CPU_SYMBOL_GPL(var) EXPORT_SYMBOL_GPL(per_cpu__##var)
+#endif /* linux < 2.6.0 */
+
 #define flush_page_update_queue() do {				\
     DECLARE_PER_CPU(unsigned int, mmu_update_queue_idx);	\
     if (per_cpu(mmu_update_queue_idx, smp_processor_id()))	\

@@ -42,7 +42,6 @@
 #include <asm-xen/xen-public/physdev.h>
 #include <asm-xen/ctrl_if.h>
 #include <asm-xen/hypervisor.h>
-#define XEN_EVTCHN_MASK_OPS
 #include <asm-xen/evtchn.h>
 
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,0)
@@ -64,6 +63,9 @@ static int irq_to_evtchn[NR_IRQS];
 DEFINE_PER_CPU(int, virq_to_irq[NR_VIRQS]);
 
 /* evtchn <-> IPI mapping. */
+#ifndef NR_IPIS    // XXX SMH: temp fix for 2.4 
+#define NR_IPIS 1 
+#endif
 DEFINE_PER_CPU(int, ipi_to_evtchn[NR_IPIS]);
 
 /* Reference counts for bindings to IRQs. */

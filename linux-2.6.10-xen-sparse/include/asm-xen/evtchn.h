@@ -48,8 +48,6 @@ asmlinkage void evtchn_do_upcall(struct pt_regs *regs);
 /* Entry point for notifications into the userland character device. */
 void evtchn_device_upcall(int port);
 
-#ifdef XEN_EVTCHN_MASK_OPS
-
 static inline void mask_evtchn(int port)
 {
     shared_info_t *s = HYPERVISOR_shared_info;
@@ -75,8 +73,6 @@ static inline void unmask_evtchn(int port)
             force_evtchn_callback();
     }
 }
-
-#endif /* XEN_EVTCHN_MASK_OPS */
 
 static inline void clear_evtchn(int port)
 {
