@@ -142,7 +142,7 @@ static inline void set_pte_phys (unsigned long vaddr,
     }
     pte = pte_offset(pmd, vaddr);
 
-    queue_l1_entry_update(pte, phys | pgprot_val(prot));
+    set_pte(pte, (pte_t) { phys | pgprot_val(prot) });
 
     /*
      * It's enough to flush this one mapping.
@@ -201,17 +201,13 @@ static void __init fixrange_init (unsigned long start,
                 kpgd = pgd_offset_k((unsigned long)pte);
                 kpmd = pmd_offset(kpgd, (unsigned long)pte);
                 kpte = pte_offset(kpmd, (unsigned long)pte);
-                queue_l1_entry_update(kpte,
-                                      (*(unsigned long *)kpte)&~_PAGE_RW);
-
+                set_pte(kpte, pte_wrprotect(*kpte));
                 set_pmd(pmd, __pmd(_KERNPG_TABLE + __pa(pte)));
             }
             vaddr += PMD_SIZE;
         }
         j = 0;
     }
-	
-    XEN_flush_page_update_queue();
 }
 
 
@@ -257,10 +253,8 @@ static void __init pagetable_init (void)
             kpgd = pgd_offset_k((unsigned long)pte_base);
             kpmd = pmd_offset(kpgd, (unsigned long)pte_base);
             kpte = pte_offset(kpmd, (unsigned long)pte_base);
-            queue_l1_entry_update(kpte,
-                                  (*(unsigned long *)kpte)&~_PAGE_RW);
+            set_pte(kpte, pte_wrprotect(*kpte));
             set_pmd(pmd, __pmd(_KERNPG_TABLE + __pa(pte_base)));
-            XEN_flush_page_update_queue();
         }
     }
 
@@ -311,6 +305,7 @@ void __init paging_init(void)
     pagetable_init();
 
     zone_sizes_init();
+
     /* Switch to the real shared_info page, and clear the dummy page. */
     set_fixmap(FIX_SHARED_INFO, xen_start_info.shared_info);
     HYPERVISOR_shared_info = (shared_info_t *)fix_to_virt(FIX_SHARED_INFO);

@@ -84,6 +84,7 @@ static inline int copy_ldt(mm_context_t *new, mm_context_t *old)
 	}
 	memcpy(new->ldt, old->ldt, old->size*LDT_ENTRY_SIZE);
 	make_pages_readonly(new->ldt, (new->size*LDT_ENTRY_SIZE)/PAGE_SIZE);
+	flush_page_update_queue();
 	return 0;
 }
 

@@ -195,7 +195,7 @@ pte_t *pte_alloc_one_kernel(struct mm_struct *mm, unsigned long address)
 	pte_t *pte = (pte_t *)__get_free_page(GFP_KERNEL|__GFP_REPEAT|__GFP_ZERO);
 	if (pte) {
 		make_page_readonly(pte);
-		xen_flush_page_update_queue();
+		flush_page_update_queue();
 	}
 	return pte;
 }
