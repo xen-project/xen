@@ -91,7 +91,13 @@ int pdb_change_values(domid_t domain, u_char *buffer, unsigned long addr,
 
     if ((addr >> PAGE_SHIFT) == ((addr + length - 1) >> PAGE_SHIFT))
     {
-        l2_table = map_domain_mem(pagetable_val(p->mm.pagetable));
+#ifdef CONFIG_SHADOW
+        if (p->mm.shadowmode )
+          l2_table = map_domain_mem(pagetable_val(p->mm.shadowtable));
+	else
+#endif
+          l2_table = map_domain_mem(pagetable_val(p->mm.pagetable));
+
 	l2_table += l2_table_offset(addr);
 	if (!(l2_pgentry_val(*l2_table) & _PAGE_PRESENT)) 
 	{

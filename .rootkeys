@@ -158,6 +158,7 @@
 4006e659i9j-doVxY7DKOGU4XVin1Q xen/common/rbtree.c
 3ddb79bdHqdQpATqC0rmUZNbsb6L6A xen/common/resource.c
 3e397e6619PgAfBbw2XFbXkewvUWgw xen/common/schedule.c
+405b8599xI_PoEr3zZoJ2on-jdn7iw xen/common/shadow.c
 3ddb79bdB9RNMnkQnUyZ5C9hhMSQQw xen/common/slab.c
 3ddb79bd0gVQYmL2zvuJnldvD0AGxQ xen/common/softirq.c
 3e7f358awXBC3Vw-wFRwPw18qL1khg xen/common/string.c
@@ -552,6 +553,7 @@
 3e4540ccU1sgCx8seIMGlahmMfv7yQ xen/include/xeno/reboot.h
 3ddb79c0LzqqS0LhAQ50ekgj4oGl7Q xen/include/xeno/sched.h
 403a06a7H0hpHcKpAiDe5BPnaXWTlA xen/include/xeno/serial.h
+405b8599BsDsDwKEJLS0XipaiQW3TA xen/include/xeno/shadow.h
 3ddb79c0VDeD-Oft5eNfMneTU3D1dQ xen/include/xeno/skbuff.h
 3ddb79c14dXIhP7C2ahnoD08K90G_w xen/include/xeno/slab.h
 3ddb79c09xbS-xxfKxuV3JETIhBzmg xen/include/xeno/smp.h

@@ -45,6 +45,8 @@ void *map_domain_mem(unsigned long pa)
     unsigned long *cache = mapcache;
     unsigned long flags;
 
+    perfc_incrc(map_domain_mem_count);
+
     spin_lock_irqsave(&map_lock, flags);
 
     /* Has some other CPU caused a wrap? We must flush if so. */

@@ -39,6 +39,7 @@
 #include <xeno/spinlock.h>
 #include <xeno/irq.h>
 #include <xeno/perfc.h>
+#include <xeno/shadow.h>
 #include <asm/domain_page.h>
 #include <asm/system.h>
 #include <asm/io.h>
@@ -323,6 +324,8 @@ asmlinkage void do_page_fault(struct pt_regs *regs, long error_code)
 
     __asm__ __volatile__ ("movl %%cr2,%0" : "=r" (addr) : );
 
+    perfc_incrc(page_faults);
+
     if ( unlikely(addr >= LDT_VIRT_START) && 
          (addr < (LDT_VIRT_START + (p->mm.ldt_ents*LDT_ENTRY_SIZE))) )
     {
@@ -335,6 +338,18 @@ asmlinkage void do_page_fault(struct pt_regs *regs, long error_code)
         if ( likely(map_ldt_shadow_page(off >> PAGE_SHIFT)) )
             return; /* successfully copied the mapping */
     }
+
+#ifdef CONFIG_SHADOW
+//printk("1");
+check_pagetable( current->mm.pagetable, "pre-sf" );
+    if ( p->mm.shadowmode && addr < PAGE_OFFSET &&
+	 shadow_fault( addr, error_code ) )
+      {
+	check_pagetable( current->mm.pagetable, "post-sfa" );
+	return; // return true if fault was handled 
+      }
+    check_pagetable( current->mm.pagetable, "post-sfb" );
+#endif
 
     if ( unlikely(!(regs->xcs & 3)) )
         goto fault_in_hypervisor;
@@ -353,7 +368,8 @@ asmlinkage void do_page_fault(struct pt_regs *regs, long error_code)
 
     if ( likely((fixup = search_exception_table(regs->eip)) != 0) )
     {
-        DPRINTK("Page fault: %08lx -> %08lx\n", regs->eip, fixup);
+        perfc_incrc(copy_user_faults);
+        //DPRINTK("copy_user fault: %08lx -> %08lx\n", regs->eip, fixup);
         regs->eip = fixup;
         regs->xds = regs->xes = regs->xfs = regs->xgs = __HYPERVISOR_DS;
         return;

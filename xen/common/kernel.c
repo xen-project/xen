@@ -104,6 +104,7 @@ void cmain(unsigned long magic, multiboot_info_t *mbi)
     module_t *mod;
     void *heap_start;
     int i;
+    unsigned long frametable_pages, max_mem;
 
     /* Parse the command-line options. */
     cmdline = (unsigned char *)(mbi->cmdline ? __va(mbi->cmdline) : NULL);
@@ -190,21 +191,35 @@ void cmain(unsigned long magic, multiboot_info_t *mbi)
         for ( ; ; ) ;
     }
 
-    /* The array of pfn_info structures must fit into the reserved area. */
-    if ( sizeof(struct pfn_info) > 24 )
+    frametable_pages = ((FRAMETABLE_VIRT_END - RDWR_MPT_VIRT_START)/sizeof(struct pfn_info));
+
+    if ( frametable_pages < (1<<(32-PAGE_SHIFT)) ) 
     {
-        printk("'struct pfn_info' too large to fit in Xen address space!\n");
-        for ( ; ; ) ;
+      printk("Not enough space to initialise frame table for a 4GB machine (%luMB only)\n", frametable_pages >> (20-PAGE_SHIFT));
     }
 
     set_current(&idle0_task);
 
-    max_page = (mbi->mem_upper+1024) >> (PAGE_SHIFT - 10);
+    max_mem = max_page = (mbi->mem_upper+1024) >> (PAGE_SHIFT - 10);
+
+    if ( max_page > frametable_pages )
+      max_page = frametable_pages;
+
     init_frametable(max_page);
-    printk("Initialised all memory on a %luMB machine\n",
-           max_page >> (20-PAGE_SHIFT));
+    printk("Initialised %luMB memory on a %luMB machine\n",
+           max_page >> (20-PAGE_SHIFT),
+	   max_mem  >> (20-PAGE_SHIFT) );
 
     heap_start = memguard_init(&_end);
+
+    printk("Xen heap size is %luKB\n", 
+	   (MAX_MONITOR_ADDRESS-__pa(heap_start))/1024 );
+
+    if ( ((MAX_MONITOR_ADDRESS-__pa(heap_start))/1024) <= 4096 )
+    {
+        printk("Xen heap size is too small to safely continue!\n");
+        for ( ; ; ) ;
+    }
 
     init_page_allocator(__pa(heap_start), MAX_MONITOR_ADDRESS);
  

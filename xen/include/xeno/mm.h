@@ -67,6 +67,10 @@ struct pfn_info
     unsigned long       type_and_flags;
     /* Timestamp from 'TLB clock', used to reduce need for safety flushes. */
     unsigned long       tlbflush_timestamp;
+#ifdef CONFIG_SHADOW
+    /* Shadow page status: top bits flags, bottom bits are a pfn */
+    unsigned long       shadow_and_flags;  
+#endif
 };
 
  /* The following page types are MUTUALLY EXCLUSIVE. */
@@ -99,6 +103,7 @@ struct pfn_info
 #define PGC_allocated                 (1<<_PGC_allocated)
  /* 28-bit count of references to this frame. */
 #define PGC_count_mask                ((1<<28)-1)
+
 
 /* We trust the slab allocator in slab.c, and our use of it. */
 #define PageSlab(page)		(1)

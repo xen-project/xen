@@ -548,3 +548,13 @@ tools/xentrace/xentrace
 tools/xc/lib/xc_evtchn.o
 tools/xc/py/XenoUtil.pyc
 tools/xend/xend
+tools/xc/lib/libxc.so.1.3
+tools/xc/lib/libxc.so.1.3.0
+tools/xc/lib/xc_physdev.o
+tools/xend/xend_utils.o
+xen/common/physdev.o
+xen/common/shadow.o
+xen/common/trace.o
+xen/drivers/char/console.o
+xen/drivers/char/keyboard.o
+xen/include/hypervisor-ifs/arch

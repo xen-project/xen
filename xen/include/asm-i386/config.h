@@ -40,6 +40,9 @@
 
 #define CONFIG_XEN_ATTENTION_KEY 1
 
+#define CONFIG_SHADOW 1
+
+
 #define HZ 100
 
 /*
@@ -68,7 +71,7 @@
  */
 #define MAX_MONITOR_ADDRESS   (16*1024*1024)
 #define MAX_DMA_ADDRESS       (16*1024*1024)
-#define MAX_DIRECTMAP_ADDRESS (44*1024*1024)
+#define MAX_DIRECTMAP_ADDRESS (40*1024*1024) // XXX was 44
 /* And the virtual addresses for the direct-map region... */
 #define DIRECTMAP_VIRT_START  (READONLY_MPT_VIRT_END)
 #define DIRECTMAP_VIRT_END    (DIRECTMAP_VIRT_START + MAX_DIRECTMAP_ADDRESS)
@@ -81,8 +84,11 @@
 /* Next 4MB of virtual address space is used as a linear p.t. mapping. */
 #define LINEAR_PT_VIRT_START  (DIRECTMAP_VIRT_END)
 #define LINEAR_PT_VIRT_END    (LINEAR_PT_VIRT_START + (4*1024*1024))
+/* Next 4MB of virtual address space is used as a shadow linear p.t. map. */
+#define SH_LINEAR_PT_VIRT_START  (LINEAR_PT_VIRT_END)
+#define SH_LINEAR_PT_VIRT_END    (SH_LINEAR_PT_VIRT_START + (4*1024*1024))
 /* Next 4MB of virtual address space used for per-domain mappings (eg. GDT). */
-#define PERDOMAIN_VIRT_START  (LINEAR_PT_VIRT_END)
+#define PERDOMAIN_VIRT_START  (SH_LINEAR_PT_VIRT_END)
 #define PERDOMAIN_VIRT_END    (PERDOMAIN_VIRT_START + (4*1024*1024))
 #define GDT_VIRT_START        (PERDOMAIN_VIRT_START)
 #define GDT_VIRT_END          (GDT_VIRT_START + (64*1024))

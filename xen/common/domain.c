@@ -9,6 +9,7 @@
 #include <xeno/delay.h>
 #include <xeno/event.h>
 #include <xeno/time.h>
+#include <xeno/shadow.h>
 #include <hypervisor-ifs/dom0_ops.h>
 #include <asm/io.h>
 #include <asm/domain_page.h>
@@ -546,6 +547,10 @@ int final_setup_guestos(struct task_struct *p, dom0_builddomain_t *builddomain)
     get_page_and_type(&frame_table[phys_l2tab>>PAGE_SHIFT], p, 
                       PGT_l2_page_table);
 
+#ifdef CONFIG_SHADOW
+    p->mm.shadowtable = shadow_mk_pagetable(phys_l2tab, p->mm.shadowmode);
+#endif
+
     /* Set up the shared info structure. */
     update_dom_time(p->shared_info);
 
@@ -846,6 +851,15 @@ int setup_guestos(struct task_struct *p, dom0_createdomain_t *params,
     physdev_init_dom0(p);
 
     set_bit(PF_CONSTRUCTED, &p->flags);
+
+#ifdef CONFIG_SHADOW
+
+printk("Engage shadow mode for dom 0\n");
+    p->mm.shadowmode = SHM_test; // XXXXX IAP
+    p->mm.shadowtable = shadow_mk_pagetable(phys_l2tab, p->mm.shadowmode );
+#endif
+
+
 
     new_thread(p, 
                (unsigned long)virt_load_address, 
