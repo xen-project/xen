@@ -34,6 +34,7 @@ from xen.xend.XendError import XendError
 from xen.xend.server import SrvServer
 from xen.xend import XendRoot
 from xen.xend.XendLogging import log
+from xen.xend import util
 
 import channel
 import blkif
@@ -336,7 +337,7 @@ class Daemon:
         cmdex = '(?P<cmd>.*)'
         procre = re.compile('^\s*' + pidex + '\s*' + pythonex + '\s*' + cmdex + '$')
         xendre = re.compile('^/usr/sbin/xend\s*(start|restart)\s*.*$')
-        procs = os.popen('ps -e -o pid,args 2>/dev/null')
+        procs = util.popen('ps -e -o pid,args 2>/dev/null')
         for proc in procs:
             pm = procre.match(proc)
             if not pm: continue
@@ -382,7 +383,7 @@ class Daemon:
         """
         running = 0
         if pid:
-            lines = os.popen('ps %d 2>/dev/null' % pid).readlines()
+            lines = util.popen('ps %d 2>/dev/null' % pid).readlines()
             exp = '^ *%d.+%s' % (pid, name)
             for line in lines:
                 if re.search(exp, line):
