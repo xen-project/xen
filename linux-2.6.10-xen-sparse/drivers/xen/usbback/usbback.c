@@ -725,7 +725,7 @@ static void dispatch_usb_io(usbif_priv_t *up, usbif_request_t *req)
     purb->dev = port->dev;
     purb->context = pending_req;
     purb->transfer_buffer =
-        (void *)MMAP_VADDR(pending_idx, 0) + (buffer_mach & ~PAGE_MASK);
+        (void *)(MMAP_VADDR(pending_idx, 0) + offset_in_page(buffer_mach));
     if(buffer_mach == 0)
       purb->transfer_buffer = NULL;
     purb->complete = __end_usb_io_op;
