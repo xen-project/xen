@@ -256,3 +256,16 @@ void *decode_reg(struct xen_regs *regs, u8 b)
 
     return NULL;
 }
+
+long do_set_callbacks(unsigned long event_address,
+                      unsigned long failsafe_address,
+                      unsigned long syscall_address)
+{
+    struct exec_domain *d = current;
+
+    d->arch.event_address    = event_address;
+    d->arch.failsafe_address = failsafe_address;
+    d->arch.syscall_address  = syscall_address;
+
+    return 0;
+}

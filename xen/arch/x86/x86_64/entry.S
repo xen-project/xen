@@ -104,12 +104,15 @@ ENTRY(syscall_enter)
         movl  $TRAP_syscall,4(%rsp)
         SAVE_ALL
         GET_CURRENT(%rbx)
-        bts   $_TF_kernel_mode,EDOMAIN_thread_flags(%rbx)
-        jc    hypercall
-        swapgs
-        movq  %rbx,%rdi
-        call  SYMBOL_NAME(write_ptbase)
-        jmp   restore_all_guest
+        testb $TF_kernel_mode,EDOMAIN_thread_flags(%rbx)
+        jnz   hypercall
+
+        leaq  EDOMAIN_trap_bounce(%rbx),%rdx
+        movq  EDOMAIN_syscall_addr(%rbx),%rax
+        movq  %rax,TRAPBOUNCE_eip(%rdx)
+        movw  $0,TRAPBOUNCE_flags(%rdx)
+        pushq restore_all_guest(%rip)
+        jmp   create_bounce_frame
 
 hypercall:
         sti
