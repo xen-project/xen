@@ -48,7 +48,7 @@ class DomainController(controller.Controller):
 
     def __init__(self, factory, dom):
         controller.Controller.__init__(self, factory, dom)
-        self.majorTypes = [ CMSG_SHUTDOWN ]
+        self.addMethod(CMSG_SHUTDOWN, 0, None)
         self.registerChannel()
 
     def shutdown(self, reason):
