@@ -159,12 +159,12 @@ class ProgSave(Prog):
     info = """Save domain state (and config) to file."""
 
     def help(self, args):
-        print args[0], "DOM FILE [CONFIG]"
+        print self.name, "DOM FILE [CONFIG]"
         print """\nSave domain with id DOM to FILE.
         Optionally save config to CONFIG."""
         
     def main(self, args):
-        if len(args) < 3: self.err("%s: Missing arguments" % args[0])
+        if len(args) < 3: self.err("%s: Missing arguments" % self.name)
         dom = args[1]
         savefile = os.path.abspath(args[2])
         configfile = None
@@ -185,11 +185,11 @@ class ProgRestore(Prog):
     info = """Create a domain from a saved state."""
 
     def help(self, args):
-        print args[0], "FILE CONFIG"
+        print self.name, "FILE CONFIG"
         print "\nRestore a domain from FILE using configuration CONFIG."
     
     def main(self, help, args):
-        if len(args) < 3: self.err("%s: Missing arguments" % args[0])
+        if len(args) < 3: self.err("%s: Missing arguments" % self.name)
         savefile =  os.path.abspath(args[1])
         configfile = os.path.abspath(args[2])
         info = server.xend_domain_restore(savefile, configfile)
@@ -204,7 +204,7 @@ class ProgList(Prog):
 
     def help(self, args):
         if help:
-            print args[0], '[DOM...]'
+            print self.name, '[DOM...]'
             print """\nGet information about domains.
             Either all domains or the domains given."""
             return
@@ -236,11 +236,11 @@ class ProgDestroy(Prog):
     info = """Terminate a domain immediately."""
 
     def help(self, args):
-        print args[0], 'DOM'
+        print self.name, 'DOM'
         print '\nTerminate domain DOM immediately.'
 
     def main(self, args):
-        if len(args) < 2: self.err("%s: Missing domain" % args[0])
+        if len(args) < 2: self.err("%s: Missing domain" % self.name)
         dom = args[1]
         server.xend_domain_destroy(dom)
 
@@ -252,7 +252,7 @@ class ProgShutdown(Prog):
     info = """Shutdown a domain."""
 
     def help(self, args):
-        print args[0], 'DOM'
+        print self.name, 'DOM'
         print '\nSignal domain DOM to shutdown.'
     
     def main(self, args):
@@ -266,11 +266,11 @@ class ProgPause(Prog):
     info = """Pause execution of a domain."""
 
     def help(self, args):
-        print args[0], 'DOM'
+        print self.name, 'DOM'
         print '\nPause execution of domain DOM.'
 
     def main(self, args):
-        if len(args) < 2: self.err("%s: Missing domain" % args[0])
+        if len(args) < 2: self.err("%s: Missing domain" % self.name)
         dom = args[1]
         server.xend_domain_pause(dom)
 
@@ -282,11 +282,11 @@ class ProgUnpause(Prog):
     info = """Unpause a paused domain."""
 
     def help(self, args):
-        print args[0], 'DOM'
+        print self.name, 'DOM'
         print '\nUnpause execution of domain DOM.'
 
     def main(self, args):
-        if len(args) < 2: self.err("%s: Missing domain" % args[0])
+        if len(args) < 2: self.err("%s: Missing domain" % self.name)
         dom = args[1]
         server.xend_domain_unpause(dom)
 
@@ -298,11 +298,11 @@ class ProgPincpu(Prog):
     info = """Pin a domain to a cpu. """
 
     def help(self, args):
-        print args[0],'DOM CPU'
+        print self.name,'DOM CPU'
         print '\nPin domain DOM to cpu CPU.'
 
     def main(self, args):
-        if len(args) != 3: self.err("%s: Invalid argument(s)" % args[0])
+        if len(args) != 3: self.err("%s: Invalid argument(s)" % self.name)
         v = map(int, args[1:3])
         server.xend_domain_pincpu(*v)
 
@@ -314,11 +314,11 @@ class ProgBvt(Prog):
     info = """Set BVT scheduler parameters."""
     
     def help(self, args):
-        print args[0], "DOM MCUADV WARP WARPL WARPU"
+        print self.name, "DOM MCUADV WARP WARPL WARPU"
         print '\nSet Borrowed Virtual Time scheduler parameters.'
 
     def main(self, args):
-        if len(args) != 6: self.err("%s: Invalid argument(s)" % args[0])
+        if len(args) != 6: self.err("%s: Invalid argument(s)" % self.name)
         v = map(int, args[1:6])
         server.xend_domain_cpu_bvt_set(*v)
 
@@ -330,11 +330,11 @@ class ProgBvtslice(Prog):
     info = """Set the BVT scheduler slice."""
 
     def help(self, args):
-        print args[0], 'SLICE'
+        print self.name, 'SLICE'
         print '\nSet Borrowed Virtual Time scheduler slice.'
 
     def main(self, args):
-        if len(args) < 2: self.err('%s: Missing slice' % args[0])
+        if len(args) < 2: self.err('%s: Missing slice' % self.name)
         server.xend_node_cpu_bvt_slice_set(slice)
 
 xm.prog(ProgBvtslice)
@@ -345,11 +345,11 @@ class ProgAtropos(Prog):
     info = """Set atropos parameters."""
 
     def help(self, args):
-        print args[0], "DOM PERIOD SLICE LATENCY XTRATIME"
+        print self.name, "DOM PERIOD SLICE LATENCY XTRATIME"
         print "\nSet atropos parameters."
 
     def main(self, args):
-        if len(args) != 5: self.err("%s: Invalid argument(s)" % args[0])
+        if len(args) != 5: self.err("%s: Invalid argument(s)" % self.name)
         v = map(int, args[1:5])
         server.xend_domain_cpu_atropos_set(*v)
 
@@ -361,11 +361,11 @@ class ProgRrobin(Prog):
     info = """Set round robin slice."""
 
     def help(self, args):
-        print args[0], "SLICE"
+        print self.name, "SLICE"
         print "\nSet round robin scheduler slice."
 
     def main(self, args):
-        if len(args) != 2: self.err("%s: Invalid argument(s)" % args[0])
+        if len(args) != 2: self.err("%s: Invalid argument(s)" % self.name)
         rrslice = int(args[1])
         server.xend_node_rrobin_set(rrslice)
 
@@ -407,11 +407,11 @@ class ProgConsole(Prog):
     info = """Open a console to a domain."""
     
     def help(self, args):
-        print "console DOM"
+        print self.name, "DOM"
         print "\nOpen a console to domain DOM."
 
     def main(self, args):
-        if len(args) < 2: self.err("%s: Missing domain" % args[0])
+        if len(args) < 2: self.err("%s: Missing domain" % self.name)
         dom = args[1]
         info = server.xend_domain(dom)
         console = sxp.child(info, "console")
