@@ -27,10 +27,7 @@
 #include <asm/msr.h>
 #include <asm/mpspec.h>
 
-#undef Dprintk
-#define Dprintk(x...) printk(x)
-
-unsigned int nmi_watchdog = NMI_LOCAL_APIC;
+unsigned int nmi_watchdog = NMI_NONE;
 static unsigned int nmi_hz = HZ;
 unsigned int nmi_perfctr_msr;	/* the MSR to reset in NMI handler */
 extern void show_registers(struct pt_regs *regs);
@@ -80,6 +77,9 @@ int __init check_nmi_watchdog (void)
     unsigned int prev_nmi_count[NR_CPUS];
     int j, cpu;
     
+    if (!nmi_watchdog)
+        return 0;
+
     printk("testing NMI watchdog ---\n");
 
     for (j = 0; j < smp_num_cpus; j++) {
@@ -197,6 +197,9 @@ static int __pminit setup_p4_watchdog(void)
 
 void __pminit setup_apic_nmi_watchdog (void)
 {
+    if (!nmi_watchdog)
+        return;
+
     switch (boot_cpu_data.x86_vendor) {
     case X86_VENDOR_AMD:
         if (boot_cpu_data.x86 != 6 && boot_cpu_data.x86 != 15)

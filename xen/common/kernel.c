@@ -41,7 +41,7 @@ unsigned int opt_ser_baud = 9600;  /* default baud for COM1 */
 unsigned int opt_dom0_mem = 16000; /* default kbytes for DOM0 */
 unsigned int opt_ne_base = 0; /* NE2k NICs cannot be probed */
 unsigned char opt_ifname[10] = "eth0";
-int opt_noht=0, opt_noacpi=0, opt_nosmp=0;
+int opt_noht=0, opt_noacpi=0, opt_nosmp=0, opt_watchdog=0;
 enum { OPT_IP, OPT_STR, OPT_UINT, OPT_BOOL };
 static struct {
     unsigned char *name;
@@ -56,6 +56,7 @@ static struct {
     { "noht",        OPT_BOOL, &opt_noht },
     { "noacpi",      OPT_BOOL, &opt_noacpi },
     { "nosmp",       OPT_BOOL, &opt_nosmp },
+    { "watchdog",    OPT_BOOL, &opt_watchdog },
     { NULL,       0,        NULL     }
 };
 

@@ -704,14 +704,14 @@ static void dispatch_rw_block_io(struct task_struct *p, int index)
             phys_seg[nr_psegs].nr_sects      = nr_sects;
 	    if (p->domain != 0 &&
 		!xen_physdisk_access_okay(&phys_seg[nr_psegs], p, operation)) {
-	      DPRINTK("access denied\n");
-	      /* XXX not quite right, but close enough. */
-	      goto bad_descriptor;
+                DPRINTK("access denied: dev=%04x off=%ld nr=%ld\n",
+                        req->device, req->sector_number + tot_sects, nr_sects);
+                goto bad_descriptor;
 	    }
 	    phys_seg[nr_psegs].dev           = xendev_to_physdev(req->device);
             if ( phys_seg[nr_psegs].dev == 0 ) 
 	    {
-	        DPRINTK("bad device\n");
+	        DPRINTK("bad device: %04x\n", req_device);
 	        goto bad_descriptor;
 	    }
             new_segs = 1;

@@ -1768,7 +1768,7 @@ long do_net_update(void)
     net_vif_t *vif;
     net_idx_t *shared_idxs;
     unsigned int i, j, idx;
-    struct sk_buff *skb;
+    struct sk_buff *skb, *interdom_skb = NULL;
     tx_req_entry_t tx;
     rx_req_entry_t rx;
     unsigned long pte_pfn, buf_pfn;
@@ -1889,7 +1889,11 @@ long do_net_update(void)
                 skb->len = tx.size - ETH_HLEN;
                 unmap_domain_mem(skb->head);
 
-                (void)netif_rx(skb);
+                /*
+                 * We must defer netif_rx until we have released the current
+                 * domain's page_lock, or we may deadlock on SMP.
+                 */
+                interdom_skb = skb;
 
                 make_tx_response(vif, tx.id, RING_STATUS_OK);
             }
@@ -1897,6 +1901,11 @@ long do_net_update(void)
         tx_unmap_and_continue:
             unmap_domain_mem(g_data);
             spin_unlock_irq(&current->page_lock);
+            if ( interdom_skb != NULL )
+            {
+                (void)netif_rx(interdom_skb);
+                interdom_skb = NULL;
+            }
         }
 
         vif->tx_req_cons = i;

@@ -286,17 +286,20 @@ void __init start_of_day(void)
     extern void tqueue_bh(void);
     extern void immediate_bh(void);
     extern void init_timervecs(void);
-	extern void disable_pit(void);
-	extern void ac_timer_init(void);
+    extern void disable_pit(void);
+    extern void ac_timer_init(void);
     extern int  setup_network_devices(void);
     extern void net_init(void);
     extern void initialize_block_io(void);
     extern void initialize_keytable(); 
     extern void initialize_serial(void);
     extern void initialize_keyboard(void);
-    extern int opt_nosmp;
+    extern int opt_nosmp, opt_watchdog;
     unsigned long low_mem_size;
     
+    if ( opt_watchdog ) 
+        nmi_watchdog = NMI_LOCAL_APIC;
+
     /*
      * We do this early, but tables are in the lowest 1MB (usually
      * 0xfe000-0xfffff). Therefore they're unlikely to ever get clobbered.
