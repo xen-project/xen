@@ -197,7 +197,11 @@ class XendDomain:
         """
         self.domain_by_id[info.id] = info
         self.domain_db[info.id] = info.sxpr()
-        self.domain_by_name[info.name] = info
+        for k, d in self.domain_by_name.items():
+            if k != d.name:
+                del self.domain_by_name[k]
+        if info.name:
+            self.domain_by_name[info.name] = info
         self.sync_domain(info.id)
         if notify: eserver.inject('xend.domain.created', [info.name, info.id])
 
@@ -207,12 +211,13 @@ class XendDomain:
         @param id:     domain id
         @param notify: send a domain died event if true
         """
+        for info in self.domain_by_name.values():
+            if info.id == id:
+                del self.domain_by_name[info.name]
         if id in self.domain_by_id:
             info = self.domain_by_id[id]
-            if notify: eserver.inject('xend.domain.died', [info.name, info.id])
-            if info.name in self.domain_by_name:
-                del self.domain_by_name[info.name]
             del self.domain_by_id[id]
+            if notify: eserver.inject('xend.domain.died', [info.name, info.id])
         if id in self.domain_db:
             del self.domain_db[id]
             self.db.delete(id)
@@ -223,6 +228,10 @@ class XendDomain:
         """
         self.reap_cancel()
         domlist = xc.domain_getinfo()
+        #for d in domlist:
+        #    print 'reap> xen:  ', d['dom'], d
+        #for d in self.domain_by_id.values():
+        #    print 'reap> xend: ', d.id, d.info
         casualties = []
         for d in domlist:
             dead = 0
@@ -240,9 +249,12 @@ class XendDomain:
                 log.debug('XendDomain>reap> shutdown id=%s reason=%s', id, reason)
                 if reason in ['suspend']:
                     dominfo = self.domain_by_id.get(id)
-                    name = (dominfo and dominfo.name) or '??'
-                    eserver.inject('xend.domain.suspended', [name, id])
-                    continue
+                    if dominfo.is_terminated():
+                        log.debug('XendDomain>reap> Suspended domain died id=%s', id)
+                    else:
+                        name = (dominfo and dominfo.name) or '??'
+                        eserver.inject('xend.domain.suspended', [name, id])
+                        continue
                 if reason in ['poweroff', 'reboot']:
                     self.domain_restart_schedule(id, reason)
             destroyed += 1
@@ -257,6 +269,10 @@ class XendDomain:
         """
         self.refresh_cancel()
         domlist = xc.domain_getinfo()
+        #for d in domlist:
+        #    print 'refresh> xen:  ', d['dom'], d
+        #for d in self.domain_by_id.values():
+        #    print 'refresh> xend: ', d.id, d.info
         # Index the domlist by id.
         # Add entries for any domains we don't know about.
         doms = {}
@@ -344,6 +360,15 @@ class XendDomain:
         deferred.addCallback(cbok)
         return deferred
 
+    def domain_setname(self, dom, name):
+        """Set the name of a domain.
+        For internal use only.
+
+        @param dom: domain id
+        @param name: domain name
+        """
+        return xc.domain_setname(dom=dom, name=name)
+
     def domain_restart(self, dominfo):
         """Restart a domain.
 
@@ -358,22 +383,23 @@ class XendDomain:
         deferred.addCallback(cbok)
         return deferred        
 
-    def domain_configure(self, id, config):
+    def domain_configure(self, id, vmconfig):
         """Configure an existing domain. This is intended for internal
         use by domain restore and migrate.
 
-        @param id:     domain id
-        @param config: configuration
+        @param id:       domain id
+        @param vmconfig: vm configuration
         @return: deferred
         """
-        print 'domain_configure>', id, config
+        print 'domain_configure>', id, vmconfig
+        config = sxp.child_value(vmconfig, 'config')
         dominfo = self.domain_lookup(id)
         print 'domain_configure>', 'dominfo=', dominfo
         for dinfo in self.domain_by_id.values():
-            print 'domain', dinfo.id, dinfo.name
-        log.debug('domain_configure> id=%s config=%s', id, str(config))
+            print 'domain', 'id=', dinfo.id, 'name=', dinfo.name
+        log.debug('domain_configure> id=%s config=%s', str(id), str(config))
         if dominfo.config:
-            raise XendError("Domain already configured: " + dominfo.name)
+            raise XendError("Domain already configured: " + dominfo.id)
         def cbok(dominfo):
             self._add_domain(dominfo)
             return dominfo

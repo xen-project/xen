@@ -304,7 +304,44 @@ int xen_domain_configure(uint32_t dom, char *vmconfig, int vmconfig_n){
                             CURLFORM_COPYNAME,     "op",
                             CURLFORM_COPYCONTENTS, "configure",
                             CURLFORM_END);
+    if(formcode){
+        eprintf("> Error adding op field.\n");
+        err = -EINVAL;
+        goto exit;
+    }
+    // POST the form.
+    curl_easy_setopt(curl, CURLOPT_HTTPPOST, form);
+    err = curlresult(curl);
+  exit:
+    if(curl) curl_easy_cleanup(curl);
+    if(form) curl_formfree(form);
+    dprintf("< err=%d\n", err);
+    return err;
+}
 
+/** Get xend to unpause a domain.
+ *
+ * @param dom domain id
+ * @return 0 on success, error code otherwise
+ */
+int xen_domain_unpause(uint32_t dom){
+    int err = 0;
+    CURL *curl = NULL;
+    char url[128] = {};
+    int url_n = sizeof(url);
+    struct curl_httppost *form = NULL, *last = NULL;
+    CURLFORMcode formcode = 0;
+
+    dprintf("> dom=%u\n", dom);
+
+    err = curlsetup(&curl, url, url_n, "http://localhost:%d/xend/domain/%u", XEND_PORT, dom);
+    if(err) goto exit;
+
+    // Op field.
+    formcode = curl_formadd(&form, &last,
+                            CURLFORM_COPYNAME,     "op",
+                            CURLFORM_COPYCONTENTS, "unpause",
+                            CURLFORM_END);
     if(formcode){
         eprintf("> Error adding op field.\n");
         err = -EINVAL;

@@ -475,6 +475,8 @@ class XendDomainInfo:
         if not dominfo:
             return
         print 'check_name>', 'dom=', dominfo.name, dominfo.dom, 'self=', name, self.dom
+        if dominfo.is_terminated():
+            return
         if not self.dom or (dominfo.dom != self.dom):
             raise VmError('vm name clash: ' + name)
         
@@ -490,6 +492,8 @@ class XendDomainInfo:
         try:
             self.name = sxp.child_value(config, 'name')
             self.check_name(self.name)
+            if self.restore and self.dom:
+                xc.domain_setname(self.dom, self.name)
             self.memory = int(sxp.child_value(config, 'memory'))
             if self.memory is None:
                 raise VmError('missing memory size')
@@ -629,6 +633,7 @@ class XendDomainInfo:
             if self.restart_pending():
                 self.console.deregisterChannel()
             else:
+                log.debug('Closing console, domain %s', self.id)
                 self.console.close()
         chan = xend.getDomChannel(self.dom)
         if chan:

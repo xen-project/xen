@@ -21,10 +21,14 @@ class SrvDomain(SrvDir):
         self.xconsole = XendConsole.instance()
 
     def op_configure(self, op, req):
+        """Configure an existing domain.
+        Configure is unusual in that it requires a domain id,
+        not a domain name.
+        """
         fn = FormFn(self.xd.domain_configure,
-                    [['dom', 'str'],
+                    [['dom', 'int'],
                      ['config', 'sxpr']])
-        deferred = fn(req.args, {'dom': self.dom.name})
+        deferred = fn(req.args, {'dom': self.dom.dom})
         deferred.addErrback(self._op_configure_err, req)
         return deferred
 

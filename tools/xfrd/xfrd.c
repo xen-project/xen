@@ -605,12 +605,17 @@ int xfr_send_state(XfrState *state, Conn *xend, Conn *peer){
     // Send xfr message and the domain state.
     err = xfr_send_xfr(peer, state->vmid);
     if(err) goto exit;
+    dprintf(">*** Sending domain %u\n", state->vmid);
     err = xen_domain_snd(xend, peer->out,
                          state->vmid, state->vmconfig, state->vmconfig_n);
+    dprintf(">*** Sent domain %u\n", state->vmid);
     if(err) goto exit;
     // Sending the domain suspends it, and there's no way back.
     // So destroy it now. If anything goes wrong now it's too late.
+    dprintf(">*** Destroying domain %u\n", state->vmid);
     err = xfr_vm_destroy(xend, state->vmid);
+    if(err) goto exit;
+    err = xfr_error(peer, err);
     if(err) goto exit;
     IOStream_flush(peer->out);
     // Read the response from the peer.
@@ -778,14 +783,21 @@ int xfr_save(Args *args, XfrState *state, Conn *xend, char *file){
 int xfr_recv(Args *args, XfrState *state, Conn *peer){
     int err = 0;
     time_t t0 = time(NULL), t1;
+    Sxpr sxpr;
 
     dprintf(">\n");
     err = xen_domain_rcv(peer->in, &state->vmid_new, &state->vmconfig, &state->vmconfig_n);
     if(err) goto exit;
-
+    // Read from the peer. This is just so we wait before configuring.
+    // When migrating to the same host the peer must destroy the domain
+    // before we configure the new one.
+    err = Conn_sxpr(peer, &sxpr);
+    if(err) goto exit;
+    sleep(2);
     err = xen_domain_configure(state->vmid_new, state->vmconfig, state->vmconfig_n);
     if(err) goto exit;
-
+    err = xen_domain_unpause(state->vmid_new);
+    if(err) goto exit;
     // Report new domain id to peer.
     err = xfr_send_xfr_ok(peer, state->vmid_new);
     if(err) goto exit;

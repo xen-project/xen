@@ -12,4 +12,5 @@ extern int xen_domain_rcv(IOStream *io, uint32_t *dom, char **vmconfig, int *vmc
 
 
 extern int xen_domain_configure(uint32_t dom, char *vmconfig, int vmconfig_n);
+extern int xen_domain_unpause(uint32_t dom);
 #endif
