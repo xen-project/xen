@@ -3,6 +3,9 @@
 #define __XEN_MM_H__
 
 #include <xen/config.h>
+#ifdef LINUX_2_6
+#include <xen/gfp.h>
+#endif
 #include <xen/list.h>
 #include <xen/spinlock.h>
 #include <xen/perfc.h>

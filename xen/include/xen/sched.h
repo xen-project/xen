@@ -4,6 +4,9 @@
 #include <xen/config.h>
 #include <xen/types.h>
 #include <xen/spinlock.h>
+#ifdef LINUX_2_6
+#include <linux/thread_info.h>
+#endif
 #include <asm/ptrace.h>
 #include <xen/smp.h>
 #include <asm/page.h>
