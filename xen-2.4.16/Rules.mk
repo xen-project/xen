@@ -21,6 +21,9 @@ ALL_OBJS += $(BASEDIR)/drivers/block/driver.o
 ALL_OBJS += $(BASEDIR)/drivers/ide/driver.o
 ALL_OBJS += $(BASEDIR)/arch/$(ARCH)/arch.o
 
+HOSTCC     = gcc
+HOSTCFLAGS = -Wall -Wstrict-prototypes -O2 -fomit-frame-pointer 
+
 include $(BASEDIR)/arch/$(ARCH)/Rules.mk
 
 %.o: %.c $(HDRS) Makefile

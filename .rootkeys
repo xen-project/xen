@@ -147,6 +147,7 @@
 3ddb79c3n_UbPuxlkNxvvLycClIkxA xen-2.4.16/include/asm-i386/mpspec.h
 3ddb79c2wa0dA_LGigxOelSGbJ284Q xen-2.4.16/include/asm-i386/msr.h
 3ddb79c3xjYnrv5t3VqYlR4tNEOl4Q xen-2.4.16/include/asm-i386/page.h
+3e450943kzme29HPCtq5HNOVQkddfw xen-2.4.16/include/asm-i386/param.h
 3ddb79c3ysKUbxZuwKBRK3WXU2TlEg xen-2.4.16/include/asm-i386/pci.h
 3ddb79c3nm2zdzeO6Mj8g7ex3txgGw xen-2.4.16/include/asm-i386/pgalloc.h
 3ddb79c2QF5-pZGzuX4QukPCDAl59A xen-2.4.16/include/asm-i386/processor.h
@@ -158,6 +159,7 @@
 3ddb79c3e9DCEoR-WzNxcOQDzLu7BQ xen-2.4.16/include/asm-i386/softirq.h
 3ddb79c3NiyQE2vQnyGiaBnNjBO1rA xen-2.4.16/include/asm-i386/spinlock.h
 3ddb79c3ezddh34MdelJpa5tNR00Dw xen-2.4.16/include/asm-i386/system.h
+3e450943TfE-iovQIY_tMO_VdGsPhA xen-2.4.16/include/asm-i386/timex.h
 3ddb79c4HugMq7IYGxcQKFBpKwKhzA xen-2.4.16/include/asm-i386/types.h
 3ddb79c3M2n1ROZH6xk3HbyN4CPDqg xen-2.4.16/include/asm-i386/uaccess.h
 3ddb79c3uPGcP_l_2xyGgBSWd5aC-Q xen-2.4.16/include/asm-i386/unaligned.h
@@ -168,6 +170,7 @@
 3ddb79c4R4iVwqIIeychVQYmIH4FUg xen-2.4.16/include/scsi/scsi_ioctl.h
 3ddb79c4yw_mfd4Uikn3v_IOPRpa1Q xen-2.4.16/include/scsi/scsicam.h
 3ddb79c4HKPMLvDBP9LxzPi_szVxGA xen-2.4.16/include/scsi/sg.h
+3e450943xQztorJxTGW3BPZ4LhRHbw xen-2.4.16/include/stdarg.h
 3ddb79c0nTsjSpVK4ZVTI9WwN24xtQ xen-2.4.16/include/xeno/blk.h
 3ddb79c0dVhTHLsv6CPTf4baKix4mA xen-2.4.16/include/xeno/blkdev.h
 3ddb79c18ePBgitnOs7GiOCFilODVw xen-2.4.16/include/xeno/blkpg.h
