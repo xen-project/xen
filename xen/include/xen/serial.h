@@ -43,4 +43,6 @@ void serial_puts(int handle, const unsigned char *s);
  */
 unsigned char serial_getc(int handle);
 
+void serial_force_unlock(int handle);
+
 #endif /* __XEN_SERIAL_H__ */

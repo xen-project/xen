@@ -19,4 +19,7 @@ long read_console_ring(unsigned long, unsigned int, unsigned int);
 void init_console(void);
 void console_endboot(int disable_vga);
 
+void console_force_unlock(void);
+void console_force_lock(void);
+
 #endif

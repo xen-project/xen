@@ -33,6 +33,7 @@
 #include <xen/lib.h>
 #include <xen/errno.h>
 #include <xen/mm.h>
+#include <xen/console.h>
 #include <asm/ptrace.h>
 #include <xen/delay.h>
 #include <xen/spinlock.h>
@@ -140,7 +141,7 @@ void show_registers(struct pt_regs *regs)
     unsigned long esp;
     unsigned short ss;
 
-    esp = (unsigned long) (&regs->esp);
+    esp = (unsigned long)(&regs->esp);
     ss  = __HYPERVISOR_DS;
     if ( regs->xcs & 3 )
     {
@@ -271,7 +272,6 @@ DO_ERROR_NOCODE( 0, "divide error", divide_error)
 
 asmlinkage void do_double_fault(void)
 {
-    extern spinlock_t console_lock;
     struct tss_struct *tss = &doublefault_tss;
     unsigned int cpu = ((tss->back_link>>3)-__FIRST_TSS_ENTRY)>>1;
 
@@ -295,7 +295,7 @@ asmlinkage void do_double_fault(void)
     printk("************************************\n");
 
     /* Lock up the console to prevent spurious output from other CPUs. */
-    spin_lock(&console_lock); 
+    console_force_lock();
 
     /* Wait for manual reset. */
     for ( ; ; ) ;
@@ -472,9 +472,11 @@ asmlinkage void do_general_protection(struct pt_regs *regs, long error_code)
     die("general protection fault", regs, error_code);
 }
 
-asmlinkage void mem_parity_error(unsigned char reason, struct pt_regs * regs)
+asmlinkage void mem_parity_error(unsigned char reason, struct pt_regs *regs)
 {
-    printk("NMI received. Dazed and confused, but trying to continue\n");
+    console_force_unlock();
+
+    printk("\n\nNMI received. Dazed and confused, but trying to continue\n");
     printk("You probably have a hardware problem with your RAM chips\n");
 
     /* Clear and disable the memory parity error line. */
@@ -482,18 +484,40 @@ asmlinkage void mem_parity_error(unsigned char reason, struct pt_regs * regs)
     outb(reason, 0x61);
 
     show_registers(regs);
-    panic("PARITY ERROR");
+
+    printk("************************************\n");
+    printk("CPU%d MEMORY ERROR -- system shutdown\n", smp_processor_id());
+    printk("System needs manual reset.\n");
+    printk("************************************\n");
+
+    /* Lock up the console to prevent spurious output from other CPUs. */
+    console_force_lock();
+
+    /* Wait for manual reset. */
+    for ( ; ; ) ;
 }
 
-asmlinkage void io_check_error(unsigned char reason, struct pt_regs * regs)
+asmlinkage void io_check_error(unsigned char reason, struct pt_regs *regs)
 {
-    printk("NMI: IOCK error (debug interrupt?)\n");
+    console_force_unlock();
+
+    printk("\n\nNMI: IOCK error (debug interrupt?)\n");
 
     reason = (reason & 0xf) | 8;
     outb(reason, 0x61);
 
     show_registers(regs);
-    panic("IOCK ERROR");
+
+    printk("************************************\n");
+    printk("CPU%d I/O ERROR -- system shutdown\n", smp_processor_id());
+    printk("System needs manual reset.\n");
+    printk("************************************\n");
+
+    /* Lock up the console to prevent spurious output from other CPUs. */
+    console_force_lock();
+
+    /* Wait for manual reset. */
+    for ( ; ; ) ;
 }
 
 static void unknown_nmi_error(unsigned char reason, struct pt_regs * regs)

@@ -433,6 +433,17 @@ void console_endboot(int disable_vga)
     switch_serial_input();
 }
 
+void console_force_unlock(void)
+{
+    console_lock = SPIN_LOCK_UNLOCKED;
+    serial_force_unlock(sercon_handle);
+}
+
+void console_force_lock(void)
+{
+    spin_lock(&console_lock);
+}
+
 
 /*
  * **************************************************************
