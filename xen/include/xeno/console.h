@@ -37,7 +37,21 @@
  * yet, so this will do for now.
  */
 
-#define CONFIG_OUTPUT_CONSOLE 1
 #define CONFIG_OUTPUT_SERIAL  1
+#define CONFIG_OUTPUT_CONSOLE 1
+#define CONFIG_OUTPUT_CONSOLE_RING 1
 
 extern int opt_console;
+
+#define CONSOLE_RING_SIZE     16392
+
+typedef struct console_ring_st
+{
+    char buf[CONSOLE_RING_SIZE];
+    unsigned int len;
+} console_ring_t;
+
+console_ring_t console_ring;
+
+void init_console_ring();
+long read_console_ring(char *str, unsigned int count);

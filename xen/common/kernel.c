@@ -156,6 +156,7 @@ void cmain (unsigned long magic, multiboot_info_t *mbi)
     }
 
     init_serial();
+    init_console_ring();
     init_vga();
     cls();
 
@@ -447,12 +448,27 @@ void putchar_console(int c) {}
 
 #endif
 
+#ifdef CONFIG_OUTPUT_CONSOLE_RING
+
+void putchar_console_ring(int c)
+{
+    if (console_ring.len < CONSOLE_RING_SIZE)
+        console_ring.buf[console_ring.len++] = (char)c;
+}
+
+#else
+
+void putchar_console_ring(int c) {}
+
+#endif
+
 
 static void putchar(int c)
 {
     if ( (c != '\n') && ((c < 32) || (c > 126)) ) return;
     putchar_serial(c);
     putchar_console(c);
+    putchar_console_ring(c);
 }
 
 
