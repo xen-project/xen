@@ -533,6 +533,7 @@ void deliver_packet(struct sk_buff *skb, net_vif_t *vif)
     skb->pf = g_pfn;
 
  inc_and_out:        
+    smp_wmb(); /* updates must happen before releasing the descriptor. */
     shadow_ring->rx_idx = RX_RING_INC(i);
 }
 
@@ -681,6 +682,8 @@ static void tx_skb_release(struct sk_buff *skb)
      * mutual exclusion from do_IRQ().
      */
 
+    smp_wmb(); /* make sure any status updates occur before inc'ing tx_cons. */
+
     /* Skip over a sequence of bad descriptors, plus the first good one. */
     do {
         idx = vif->shadow_ring->tx_cons;
@@ -826,6 +829,7 @@ void update_shared_ring(void)
             if ( rx->flush_count == tlb_flush_count[smp_processor_id()] )
                 __flush_tlb();
 
+            smp_wmb(); /* copy descriptor before inc'ing rx_cons */
             shadow_ring->rx_cons = RX_RING_INC(shadow_ring->rx_cons);
 
             if ( shadow_ring->rx_cons == net_ring->rx_event )

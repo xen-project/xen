@@ -293,7 +293,7 @@ static void network_rx_int(int irq, void *dev_id, struct pt_regs *ptregs)
     {
         if (np->net_ring->rx_ring[i].status != RING_STATUS_OK)
         {
-            printk("bad buffer on RX ring!(%d)\n", 
+            printk(KERN_ALERT "bad buffer on RX ring!(%d)\n", 
                    np->net_ring->rx_ring[i].status);
             continue;
         }
