@@ -25,9 +25,25 @@ typedef int64_t            s64;
 #include <xen/event_channel.h>
 #include <xen/sched_ctl.h>
 
-/*\
+
+/*
+ *  DEFINITIONS FOR CPU BARRIERS
+ */ 
+
+#if defined(__i386__)
+#define rmb() __asm__ __volatile__ ("lock; addl $0,0(%%esp)" : : : "memory")
+#define wmb() __asm__ __volatile__ ("" : : : "memory")
+#elif defined(__x86_64__)
+#define mb()     asm volatile("mfence":::"memory")
+#define rmb()    asm volatile("lfence":::"memory")
+#define wmb()    asm volatile( "" :::"memory")
+#else
+#error "Define barriers"
+#endif
+
+/*
  *  INITIALIZATION FUNCTIONS
-\*/ 
+ */ 
 
 /**
  * This function opens a handle to the hypervisor interface.  This function can
@@ -55,9 +71,9 @@ int xc_interface_open(void);
  */
 int xc_interface_close(int xc_handle);
 
-/*\
+/*
  * DOMAIN MANAGEMENT FUNCTIONS
-\*/
+ */
 
 typedef struct {
     u32           domid;
@@ -257,9 +273,9 @@ int xc_rrobin_global_get(int xc_handle, u64 *slice);
 
 typedef evtchn_status_t xc_evtchn_status_t;
 
-/*\
+/*
  * EVENT CHANNEL FUNCTIONS
-\*/
+ */
 
 /**
  * This function allocates an unbound port.  Ports are named endpoints used for

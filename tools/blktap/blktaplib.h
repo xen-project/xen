@@ -10,22 +10,6 @@
 
 #include <stdint.h>
 
-typedef uint8_t            u8;
-typedef uint16_t           u16;
-typedef uint32_t           u32;
-typedef uint64_t           u64;
-typedef int8_t             s8;
-typedef int16_t            s16;
-typedef int32_t            s32;
-typedef int64_t            s64;
-                                                                                
-#if defined(__i386__)
-#define rmb() __asm__ __volatile__ ( "lock; addl $0,0(%%esp)" : : : "memory" )
-#define wmb() __asm__ __volatile__ ( "" : : : "memory" )
-#else
-#error "Define barriers"
-#endif
-    
 #include <sys/user.h>
 #include <xen/xen.h>
 #include <xen/io/blkif.h>

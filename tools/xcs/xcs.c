@@ -674,7 +674,7 @@ int main (int argc, char *argv[])
  
     for (;;)
     {
-        int n, ret;
+        int n = 0, ret;
         fd_set rd, wr, er;
         FD_ZERO ( &rd );
         FD_ZERO ( &wr );

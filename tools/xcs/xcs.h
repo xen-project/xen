@@ -39,13 +39,6 @@
 /* Size of a machine page frame. */
 #define PAGE_SIZE 4096
 
-#if defined(__i386__)
-#define rmb() __asm__ __volatile__ ( "lock; addl $0,0(%%esp)" : : : "memory" )
-#define wmb() __asm__ __volatile__ ( "" : : : "memory" )
-#else
-#error "Define barriers"
-#endif
-
 #ifndef timersub /* XOPEN and __BSD don't cooperate well... */
 #define timersub(a, b, result)                                                \
   do {                                                                        \

@@ -68,9 +68,9 @@ void perfc_printall(unsigned char key)
             printk("TOTAL[%10d]  ", sum);
             for ( j = 0; j < perfc_info[i].nr_elements; j++ )
             {
-                printk("A%02d[%10d]  ", j, atomic_read(&counters[j]));
-                if ( !(j % 4) )
-                    printk("\n ");
+                if ( (j != 0) && ((j % 4) == 0) )
+                    printk("\n                   ");
+                printk("ARR%02d[%10d]  ", j, atomic_read(&counters[j]));
             }
             counters += j;
             break;

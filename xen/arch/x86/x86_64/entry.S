@@ -141,6 +141,7 @@ hypercall:
         movq  %r10,%rcx
         andq  $(NR_hypercalls-1),%rax
         leaq  SYMBOL_NAME(hypercall_table)(%rip),%r10
+        PERFC_INCR(PERFC_hypercalls, %rax)
         callq *(%r10,%rax,8)
         movq %rax,XREGS_rax(%rsp)       # save the return value
 
@@ -297,6 +298,7 @@ error_code:
         movl  XREGS_entry_vector(%rsp),%eax
         leaq  SYMBOL_NAME(exception_table)(%rip),%rdx
         GET_CURRENT(%rbx)
+        PERFC_INCR(PERFC_exceptions, %rax)
         callq *(%rdx,%rax,8)
         testb $3,XREGS_cs(%rsp)
         jz    restore_all_xen

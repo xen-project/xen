@@ -1685,28 +1685,9 @@ int do_mmu_update(
         }
     }
 
-#ifdef PERF_COUNTERS
     perfc_incrc(calls_to_mmu_update); 
     perfc_addc(num_page_updates, count);
-    /*
-     * histogram: special treatment for 0 and 1 count. After that equally
-     * spaced with last bucket taking the rest.
-     */
-    if ( count == 0 )
-    {
-        perfc_incra(bpt_updates, 0);
-    } else if ( count == 1 )
-    {
-        perfc_incra(bpt_updates, 1);
-    } else if ( ((count-2) / PERFC_PT_UPDATES_BUCKET_SIZE)
-                < (PERFC_MAX_PT_UPDATES - 3) )
-    {
-        perfc_incra(bpt_updates, ((count-2)/PERFC_PT_UPDATES_BUCKET_SIZE) + 2);
-    } else
-    {
-        perfc_incra(bpt_updates, PERFC_MAX_PT_UPDATES - 1);
-    }
-#endif
+    perfc_incr_histo(bpt_updates, count, PT_UPDATES);
 
     if ( unlikely(!array_access_ok(VERIFY_READ, ureqs, count, sizeof(req))) )
     {
@@ -2254,7 +2235,9 @@ void ptwr_flush(const int which)
     int            i, cpu = smp_processor_id();
     struct exec_domain *ed = current;
     struct domain *d = ed->domain;
-    unsigned int   count;
+#ifdef PERF_COUNTERS
+    unsigned int   modified = 0;
+#endif
 
     l1va = ptwr_info[cpu].ptinfo[which].l1va;
     ptep = (unsigned long *)&linear_pg_table[l1_linear_offset(l1va)];
@@ -2313,7 +2296,7 @@ void ptwr_flush(const int which)
     /*
      * STEP 2. Validate any modified PTEs.
      */
-    count = 0;
+
     pl1e = ptwr_info[cpu].ptinfo[which].pl1e;
     for ( i = 0; i < L1_PAGETABLE_ENTRIES; i++ )
     {
@@ -2323,8 +2306,10 @@ void ptwr_flush(const int which)
         if ( likely(l1_pgentry_val(ol1e) == l1_pgentry_val(nl1e)) )
             continue;
 
-        /* update number of entries modified */
-        count++;
+#ifdef PERF_COUNTERS
+        /* Update number of entries modified. */
+        modified++;
+#endif
 
         /*
          * Fast path for PTEs that have merely been write-protected
@@ -2367,27 +2352,7 @@ void ptwr_flush(const int which)
     }
     unmap_domain_mem(pl1e);
 
-#ifdef PERF_COUNTERS
-    /*
-     * histogram: special treatment for 0 and 1 count. After that equally
-     * spaced with last bucket taking the rest.
-     */
-    if ( count == 0 )
-    {
-        perfc_incra(wpt_updates, 0);
-    } else if ( count == 1 ) 
-    {
-        perfc_incra(wpt_updates, 1);
-    } else if ( ((count-2) / PERFC_PT_UPDATES_BUCKET_SIZE)
-                < (PERFC_MAX_PT_UPDATES - 3) )
-    {
-        perfc_incra(wpt_updates, ((count-2)/PERFC_PT_UPDATES_BUCKET_SIZE) + 2);
-    } else
-    {
-        perfc_incra(wpt_updates, PERFC_MAX_PT_UPDATES - 1);
-    }
-#endif
-    
+    perfc_incr_histo(wpt_updates, modified, PT_UPDATES);
 
     /*
      * STEP 3. Reattach the L1 p.t. page into the current address space.

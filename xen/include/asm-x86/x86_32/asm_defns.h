@@ -76,6 +76,13 @@
         SET_XEN_SEGMENTS(_reg) \
         1:
 
+#ifdef PERF_COUNTERS
+#define PERFC_INCR(_name,_idx) \
+    lock incl SYMBOL_NAME(perfcounters)+_name(,_idx,4)
+#else
+#define PERFC_INCR(_name,_idx)
+#endif
+
 #endif
 
 #define BUILD_SMP_INTERRUPT(x,v) XBUILD_SMP_INTERRUPT(x,v)
