@@ -538,3 +538,4 @@ xen/arch/i386/flushtlb.o
 xen/common/rbtree.o
 xen/drivers/block/cciss.o
 xen/drivers/block/cciss_scsi.o
+TAGS
