@@ -328,10 +328,12 @@ static int __on_net_schedule_list(netif_t *netif)
 static void remove_from_net_schedule_list(netif_t *netif)
 {
     spin_lock(&net_schedule_list_lock);
-    ASSERT(__on_net_schedule_list(netif));
-    list_del(&netif->list);
-    netif->list.next = NULL;
-    netif_put(netif);
+    if ( likely(__on_net_schedule_list(netif)) )
+    {
+        list_del(&netif->list);
+        netif->list.next = NULL;
+        netif_put(netif);
+    }
     spin_unlock(&net_schedule_list_lock);
 }
 
