@@ -340,6 +340,8 @@
 42090340C-WkRPT7N3t-8Lzehzogdw tools/blktap/blktaplib.h
 42277b02WrfP1meTDPv1M5swFq8oHQ tools/blktap/blockstore.c
 42277b02P1C0FYj3gqwTZUD8sxKCug tools/blktap/blockstore.h
+42371b8aL1JsxAXOd4bBhmZKDyjiJg tools/blktap/blockstored.c
+42371b8aD_x3L9MKsXciMNqkuk58eQ tools/blktap/bstest.c
 42090340B3mDvcxvd9ehDHUkg46hvw tools/blktap/libgnbd/Makefile
 42090340ZWkc5Xhf9lpQmDON8HJXww tools/blktap/libgnbd/gnbdtest.c
 42090340ocMiUScJE3OpY7QNunvSbg tools/blktap/libgnbd/libgnbd.c
