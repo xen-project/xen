@@ -68,7 +68,7 @@ static inline void free_shadow_page( struct mm_struct *m,
                                      struct pfn_info *pfn_info )
 {
     unsigned long flags;
-    unsigned long type = pfn_info->type_and_flags & PGT_type_mask;
+    unsigned long type = pfn_info->u.inuse.type_info & PGT_type_mask;
 
     m->shadow_page_count--;
 
@@ -77,9 +77,9 @@ static inline void free_shadow_page( struct mm_struct *m,
     else if (type == PGT_l2_page_table)
         perfc_decr(shadow_l2_pages);
     else printk("Free shadow weird page type pfn=%08x type=%08x\n",
-                frame_table-pfn_info, pfn_info->type_and_flags);
+                frame_table-pfn_info, pfn_info->u.inuse.type_info);
     
-    pfn_info->type_and_flags = 0;
+    pfn_info->u.inuse.type_info = 0;
 
     spin_lock_irqsave(&free_list_lock, flags);
     list_add(&pfn_info->list, &free_list);
@@ -147,7 +147,7 @@ static inline int shadow_page_op( struct mm_struct *m, unsigned int op,
     {
 	case TABLE_OP_ZERO_L2:
 	{
-		if ( (spfn_info->type_and_flags & PGT_type_mask) == 
+		if ( (spfn_info->u.inuse.type_info & PGT_type_mask) == 
              PGT_l2_page_table )
 		{
 			unsigned long * spl1e = map_domain_mem( spfn<<PAGE_SHIFT );
@@ -161,7 +161,7 @@ static inline int shadow_page_op( struct mm_struct *m, unsigned int op,
 	
 	case TABLE_OP_ZERO_L1:
 	{
-		if ( (spfn_info->type_and_flags & PGT_type_mask) == 
+		if ( (spfn_info->u.inuse.type_info & PGT_type_mask) == 
              PGT_l1_page_table )
 		{
 			unsigned long * spl1e = map_domain_mem( spfn<<PAGE_SHIFT );
@@ -173,7 +173,7 @@ static inline int shadow_page_op( struct mm_struct *m, unsigned int op,
 
 	case TABLE_OP_FREE_L1:
 	{
-		if ( (spfn_info->type_and_flags & PGT_type_mask) == 
+		if ( (spfn_info->u.inuse.type_info & PGT_type_mask) == 
              PGT_l1_page_table )
 		{
 			// lock is already held
@@ -564,7 +564,7 @@ unsigned long shadow_l2_table(
 
     ASSERT( spfn_info ); // XXX deal with failure later e.g. blow cache
 
-    spfn_info->type_and_flags = PGT_l2_page_table;
+    spfn_info->u.inuse.type_info = PGT_l2_page_table;
     perfc_incr(shadow_l2_pages);
 
     spfn = (unsigned long) (spfn_info - frame_table);
@@ -585,7 +585,7 @@ unsigned long shadow_l2_table(
     spl2e[SH_LINEAR_PT_VIRT_START >> L2_PAGETABLE_SHIFT] =
         mk_l2_pgentry((spfn << PAGE_SHIFT) | __PAGE_HYPERVISOR);
     spl2e[PERDOMAIN_VIRT_START >> L2_PAGETABLE_SHIFT] =
-        mk_l2_pgentry(__pa(frame_table[gpfn].u.domain->mm.perdomain_pt) | 
+        mk_l2_pgentry(__pa(frame_table[gpfn].u.inuse.domain->mm.perdomain_pt) | 
                       __PAGE_HYPERVISOR);
 #endif
 
@@ -728,7 +728,7 @@ int shadow_fault( unsigned long va, long error_code )
             unsigned long *gpl1e, *spl1e;
             int i;
             sl1pfn_info = alloc_shadow_page( &current->mm ); 
-            sl1pfn_info->type_and_flags = PGT_l1_page_table;
+            sl1pfn_info->u.inuse.type_info = PGT_l1_page_table;
 			
             sl1pfn = sl1pfn_info - frame_table;
 
@@ -1017,7 +1017,7 @@ int check_pagetable( struct mm_struct *m, pagetable_t pt, char *s )
             );
 
     if ( (l2_pgentry_val(spl2e[PERDOMAIN_VIRT_START >> L2_PAGETABLE_SHIFT]) !=
-          ((__pa(frame_table[gpfn].u.domain->mm.perdomain_pt) | __PAGE_HYPERVISOR))) )
+          ((__pa(frame_table[gpfn].u.inuse.domain->mm.perdomain_pt) | __PAGE_HYPERVISOR))) )
         FAILPT("hypervisor per-domain map inconsistent");
 
 

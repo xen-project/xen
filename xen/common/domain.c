@@ -214,7 +214,7 @@ struct pfn_info *alloc_domain_page(struct domain *d)
     if ( unlikely(page == NULL) )
         return NULL;
 
-    if ( (mask = page->u.cpu_mask) != 0 )
+    if ( (mask = page->u.free.cpu_mask) != 0 )
     {
         pfn_stamp = page->tlbflush_timestamp;
         for ( i = 0; (mask != 0) && (i < smp_num_cpus); i++ )
@@ -234,8 +234,8 @@ struct pfn_info *alloc_domain_page(struct domain *d)
         }
     }
 
-    page->u.domain = d;
-    page->type_and_flags = 0;
+    page->u.inuse.domain = d;
+    page->u.inuse.type_info = 0;
     if ( d != NULL )
     {
         wmb(); /* Domain pointer must be visible before updating refcnt. */
@@ -248,7 +248,7 @@ struct pfn_info *alloc_domain_page(struct domain *d)
             goto free_and_exit;
         }
         list_add_tail(&page->list, &d->page_list);
-        page->count_and_flags = PGC_allocated | 1;
+        page->u.inuse.count_info = PGC_allocated | 1;
         if ( unlikely(d->tot_pages++ == 0) )
             get_domain(d);
         spin_unlock(&d->page_alloc_lock);
@@ -268,7 +268,7 @@ void free_domain_page(struct pfn_info *page)
 {
     unsigned long  flags;
     int            drop_dom_ref;
-    struct domain *d = page->u.domain;
+    struct domain *d = page->u.inuse.domain;
 
     if ( unlikely(IS_XEN_HEAP_FRAME(page)) )
     {
@@ -279,7 +279,7 @@ void free_domain_page(struct pfn_info *page)
     else
     {
         page->tlbflush_timestamp = tlbflush_clock;
-        page->u.cpu_mask = 1 << d->processor;
+        page->u.free.cpu_mask = 1 << d->processor;
         
         /* NB. May recursively lock from domain_relinquish_memory(). */
         spin_lock_recursive(&d->page_alloc_lock);
@@ -287,7 +287,7 @@ void free_domain_page(struct pfn_info *page)
         drop_dom_ref = (--d->tot_pages == 0);
         spin_unlock_recursive(&d->page_alloc_lock);
 
-        page->count_and_flags = 0;
+        page->u.inuse.count_info = 0;
         
         spin_lock_irqsave(&free_list_lock, flags);
         list_add(&page->list, &free_list);

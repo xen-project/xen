@@ -442,9 +442,9 @@ long do_dom0_op(dom0_op_t *u_dom0_op)
 
             op->u.getpageframeinfo.type = NOTAB;
 
-            if ( (page->type_and_flags & PGT_count_mask) != 0 )
+            if ( (page->u.inuse.type_info & PGT_count_mask) != 0 )
             {
-                switch ( page->type_and_flags & PGT_type_mask )
+                switch ( page->u.inuse.type_info & PGT_type_mask )
                 {
                 case PGT_l1_page_table:
                     op->u.getpageframeinfo.type = L1TAB;
@@ -645,7 +645,7 @@ long do_dom0_op(dom0_op_t *u_dom0_op)
                 if ( likely(get_page(page, d)) )
                 {
                     unsigned long type = 0;
-                    switch( page->type_and_flags & PGT_type_mask )
+                    switch( page->u.inuse.type_info & PGT_type_mask )
                     {
                     case PGT_l1_page_table:
                         type = L1TAB;

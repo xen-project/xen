@@ -71,9 +71,9 @@ void __init init_frametable(void *frametable_vstart, unsigned long nr_pages)
           mfn < virt_to_phys(&machine_to_phys_mapping[1<<20])>>PAGE_SHIFT;
           mfn++ )
     {
-        frame_table[mfn].count_and_flags = 1 | PGC_allocated;
-        frame_table[mfn].type_and_flags = 1 | PGT_gdt_page; /* non-RW type */
-        frame_table[mfn].u.domain = &idle0_task;
+        frame_table[mfn].u.inuse.count_info = 1 | PGC_allocated;
+        frame_table[mfn].u.inuse.type_info = 1 | PGT_gdt_page; /* non-RW type */
+        frame_table[mfn].u.inuse.domain = &idle0_task;
     }
 }
 
