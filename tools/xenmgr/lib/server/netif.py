@@ -31,6 +31,14 @@ class NetifControllerFactory(controller.ControllerFactory):
             netif = NetifController(self, dom)
             self.addInstance(netif)
         return netif
+
+    def getDomainDevices(self, dom):
+        netif = self.getInstanceByDom(dom)
+        return (netif and netif.getDevices()) or []
+
+    def getDomainDevice(self, dom, vif):
+        netif = self.getInstanceByDom(dom)
+        return (netif and netif.getDevice(vif)) or None
         
     def setControlDomain(self, dom):
         """Set the 'back-end' device driver domain.
@@ -98,6 +106,11 @@ class NetDev:
         self.vif = vif
         self.mac = mac
         self.evtchn = None
+
+    def sxpr(self):
+        vif = str(self.vif)
+        mac = ':'.join(map(lambda x: "%x" % x, self.mac))
+        return ['netif', ['vif', vif], ['mac', mac]]
     
 class NetifController(controller.Controller):
     """Network interface controller. Handles all network devices for a domain.
@@ -135,6 +148,29 @@ class NetifController(controller.Controller):
                 random.randint(0x00, 0xff) ]
         return mac
 
+    def lostChannel(self):
+        print 'NetifController>lostChannel>', 'dom=', self.dom
+        #for vif in self.devices:
+        #    self.send_be_destroy(vif)
+        controller.Controller.lostChannel(self)
+
+    def getDevices(self):
+        return self.devices.values()
+
+    def getDevice(self, vif):
+        return self.devices.get(vif)
+
+    def addDevice(self, vif, vmac):
+        if vmac is None:
+            mac = self.randomMAC()
+        else:
+            mac = [ int(x, 16) for x in vmac.split(':') ]
+        if len(mac) != 6: raise ValueError("invalid mac")
+        #print "attach_device>", "vif=", vif, "mac=", mac
+        dev = NetDev(vif, mac)
+        self.devices[vif] = dev
+        return dev
+
     def attach_device(self, vif, vmac):
         """Attach a network device.
         If vmac is None a random mac address is assigned.
@@ -142,13 +178,7 @@ class NetifController(controller.Controller):
         @param vif interface index
         @param vmac mac address (string)
         """
-        if vmac is None:
-            mac = self.randomMAC()
-        else:
-            mac = [ int(x, 16) for x in vmac.split(':') ]
-        if len(mac) != 6: raise ValueError("invalid mac")
-        #print "attach_device>", "vif=", vif, "mac=", mac
-        self.devices[vif] = NetDev(vif, mac)
+        self.addDevice(vif, vmac)
         d = self.factory.addDeferred()
         self.send_be_create(vif)
         return d

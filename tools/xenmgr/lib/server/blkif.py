@@ -33,6 +33,14 @@ class BlkifControllerFactory(controller.ControllerFactory):
             blkif.send_be_create()
         return d
 
+    def getDomainDevices(self, dom):
+        blkif = self.getInstanceByDom(dom)
+        return (blkif and blkif.getDevices()) or []
+
+    def getDomainDevice(self, dom, vdev):
+        blkif = self.getInstanceByDom(dom)
+        return (blkif and blkif.getDevice(vdev)) or None
+
     def setControlDomain(self, dom):
         if self.dom == dom: return
         self.deregisterChannel()
@@ -145,6 +153,12 @@ class BlkifController(controller.Controller):
         self.attached = 1
         self.registerChannel()
         #print 'BlkifController<', 'dom=', self.dom, 'idx=', self.idx
+
+    def getDevices(self):
+        return self.devices.values()
+
+    def getDevice(self, vdev):
+        return self.devices.get(vdev)
 
     def attach_device(self, vdev, mode, segment):
         """Attach a device to the specified interface.
