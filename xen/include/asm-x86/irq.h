@@ -5,6 +5,7 @@
 
 #include <xen/config.h>
 #include <asm/atomic.h>
+#include <asm/x86_32/asm_defns.h>
 
 extern void disable_irq(unsigned int);
 extern void disable_irq_nosync(unsigned int);
@@ -82,36 +83,6 @@ extern atomic_t irq_mis_count;
 extern char _stext, _etext;
 
 #define IO_APIC_IRQ(x) (((x) >= 16) || ((1<<(x)) & io_apic_irqs))
-
-#define __STR(x) #x
-#define STR(x) __STR(x)
-
-#if defined(__i386__)
-
-#define SAVE_ALL \
-	"cld\n\t" \
-	"pushl %gs\n\t" \
-	"pushl %fs\n\t" \
-	"pushl %es\n\t" \
-	"pushl %ds\n\t" \
-	"pushl %eax\n\t" \
-	"pushl %ebp\n\t" \
-	"pushl %edi\n\t" \
-	"pushl %esi\n\t" \
-	"pushl %edx\n\t" \
-	"pushl %ecx\n\t" \
-	"pushl %ebx\n\t" \
-	"movl $" STR(__HYPERVISOR_DS) ",%edx\n\t" \
-	"movl %edx,%ds\n\t" \
-	"movl %edx,%es\n\t" \
-	"movl %edx,%fs\n\t" \
-	"movl %edx,%gs\n\t"
-
-#else
-
-#define SAVE_ALL
-
-#endif
 
 #define BUILD_SMP_INTERRUPT(x,v) XBUILD_SMP_INTERRUPT(x,v)
 #define XBUILD_SMP_INTERRUPT(x,v)\

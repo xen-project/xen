@@ -166,14 +166,25 @@ void show_stack(unsigned long *esp)
 void show_registers(struct xen_regs *regs)
 {
     unsigned long esp;
-    unsigned short ss;
+    unsigned short ss, ds, es, fs, gs;
 
-    esp = (unsigned long)(&regs->esp);
-    ss  = __HYPERVISOR_DS;
     if ( regs->xcs & 3 )
     {
         esp = regs->esp;
         ss  = regs->xss & 0xffff;
+        ds  = regs->xds & 0xffff;
+        es  = regs->xes & 0xffff;
+        fs  = regs->xfs & 0xffff;
+        gs  = regs->xgs & 0xffff;
+    }
+    else
+    {
+        esp = (unsigned long)(&regs->esp);
+        ss  = __HYPERVISOR_DS;
+        ds  = __HYPERVISOR_DS;
+        es  = __HYPERVISOR_DS;
+        fs  = __HYPERVISOR_DS;
+        gs  = __HYPERVISOR_DS;
     }
 
     printk("CPU:    %d\nEIP:    %04x:[<%08lx>]      \nEFLAGS: %08lx\n",
@@ -183,8 +194,7 @@ void show_registers(struct xen_regs *regs)
     printk("esi: %08lx   edi: %08lx   ebp: %08lx   esp: %08lx\n",
            regs->esi, regs->edi, regs->ebp, esp);
     printk("ds: %04x   es: %04x   fs: %04x   gs: %04x   ss: %04x\n",
-           regs->xds & 0xffff, regs->xes & 0xffff, 
-           regs->xfs & 0xffff, regs->xgs & 0xffff, ss);
+           ds, es, fs, gs, ss);
 
     show_stack(&regs->esp);
 } 
@@ -230,7 +240,6 @@ static inline void do_trap(int trapnr, char *str,
     {
         DPRINTK("Trap %d: %08lx -> %08lx\n", trapnr, regs->eip, fixup);
         regs->eip = fixup;
-        regs->xds = regs->xes = regs->xfs = regs->xgs = __HYPERVISOR_DS;
         return;
     }
 
@@ -394,7 +403,6 @@ asmlinkage void do_page_fault(struct xen_regs *regs, long error_code)
         if ( !d->mm.shadow_mode )
             DPRINTK("Page fault: %08lx -> %08lx\n", regs->eip, fixup);
         regs->eip = fixup;
-        regs->xds = regs->xes = regs->xfs = regs->xgs = __HYPERVISOR_DS;
         return;
     }
 
@@ -509,7 +517,6 @@ asmlinkage void do_general_protection(struct xen_regs *regs, long error_code)
     {
         DPRINTK("GPF (%04lx): %08lx -> %08lx\n", error_code, regs->eip, fixup);
         regs->eip = fixup;
-        regs->xds = regs->xes = regs->xfs = regs->xgs = __HYPERVISOR_DS;
         return;
     }
 
