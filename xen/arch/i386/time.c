@@ -322,7 +322,6 @@ s_time_t get_s_time(void)
 
 
 /* Wall Clock time */
-static spinlock_t wctime_lock;
 struct timeval    wall_clock_time; /* wall clock time at last update */
 s_time_t          wctime_st;       /* system time at last update */
 
@@ -331,11 +330,11 @@ void do_gettimeofday(struct timeval *tv)
     unsigned long flags;
     unsigned long usec, sec;
 
-    spin_lock_irqsave(&wctime_lock, flags);
-    usec = ((unsigned long)(NOW() - wctime_st))/1000;
+    spin_lock_irqsave(&stime_lock, flags);
+    usec = ((unsigned long)(__get_s_time() - wctime_st))/1000;
     sec = wall_clock_time.tv_sec;
     usec += wall_clock_time.tv_usec;
-    spin_unlock_irqrestore(&wctime_lock, flags);
+    spin_unlock_irqrestore(&stime_lock, flags);
 
     while (usec >= 1000000) {
         usec -= 1000000;
@@ -362,57 +361,14 @@ void update_dom_time(shared_info_t *si)
     spin_lock_irqsave(&stime_lock, flags);
     si->system_time  = stime_now;
     si->st_timestamp = stime_pcc;
-    spin_unlock_irqrestore(&stime_lock, flags);
-
-    spin_lock_irqsave(&wctime_lock, flags);
     si->tv_sec       = wall_clock_time.tv_sec;
     si->tv_usec      = wall_clock_time.tv_usec;
     si->wc_timestamp = wctime_st;
     si->wc_version++;
-    spin_unlock_irqrestore(&wctime_lock, flags);    
+    spin_unlock_irqrestore(&stime_lock, flags);
 
     TRC(printk(" 0x%08X%08X\n", (u32)(wctime_st>>32), (u32)wctime_st));
 }
-
-/*
- * Update hypervisors notion of time
- * This is done periodically of it's own timer
- */
-static struct ac_timer update_timer;
-static void update_time(unsigned long foo)
-{
-    unsigned long  flags;
-    s_time_t       new_st;
-    unsigned long  usec;
-
-    /* Update system time. */
-    spin_lock_irqsave(&stime_lock, flags);
-    stime_now = new_st = __get_s_time();
-    rdtscl(stime_pcc);
-    /* Don't reeenable IRQs until we release wctime_lock. */
-    spin_unlock(&stime_lock);
-
-    /* Update wall clock time. */
-    spin_lock(&wctime_lock);
-    usec = ((unsigned long)(new_st - wctime_st))/1000;
-    usec += wall_clock_time.tv_usec;
-    while (usec >= 1000000) {
-        usec -= 1000000;
-        wall_clock_time.tv_sec++;
-    }
-    wall_clock_time.tv_usec = usec;
-    wctime_st = new_st;
-    spin_unlock_irqrestore(&wctime_lock, flags);
-
-    TRC(printk("TIME[%02d] update time: stime_now=%lld now=%lld,wct=%ld:%ld\n",
-               smp_processor_id(), stime_now, new_st, wall_clock_time.tv_sec,
-               wall_clock_time.tv_usec));
-
-    /* Reload the timer. */
-    update_timer.expires = new_st + MILLISECS(200);
-    add_ac_timer(&update_timer);
-}
-
 
 /*
  * VERY crude way to keep system time from drfiting.
@@ -428,15 +384,18 @@ static void update_time(unsigned long foo)
  * being in sync with the CMOS update-in-progress flag, which causes this
  * routine to bail.
  */
-#define UPDATE_PERIOD   MILLISECS(50200)
-static struct ac_timer scale_timer;
+/*
+ * NB2. Note that update_scale is called from update_time with the stime_lock
+ * still held. This is because we must only slow down cpu_freq at a timebase
+ * change. If we did it in the middle of an update period then time would
+ * seem to jump backwards since BASE+OLD_FREQ*DIFF > BASE+NEW_FREQ*DIFF.
+ */
+#define SCALE_UPDATE_PERIOD   MILLISECS(50200)
 static unsigned long   init_cmos_time;
 static u64             cpu_freqs[3];
-static void update_scale(unsigned long foo)
+static void update_scale(void)
 {
-    unsigned long  flags;
     unsigned long  cmos_time;
-    s_time_t       now;
     u32            st, ct;
     s32            dt;
     u64            scale;
@@ -445,11 +404,8 @@ static void update_scale(unsigned long foo)
     if ( (cmos_time = maybe_get_cmos_time()) == 0 )
         return;
 
-    spin_lock_irqsave(&stime_lock, flags);
-    now  = __get_s_time();
-
     ct = (u32)(cmos_time - init_cmos_time);
-    st = (u32)(now/SECONDS(1));
+    st = (u32)(stime_now/SECONDS(1));
     dt = (s32)(ct - st);
 
     /* work out adjustment to scaling factor. allow +/- 1s drift */
@@ -468,12 +424,57 @@ static void update_scale(unsigned long foo)
     scale /= cpu_freq;
     st_scale_f = scale & 0xffffffff;
     st_scale_i = scale >> 32;
+}
+
+
+/*
+ * Update hypervisors notion of time
+ * This is done periodically of it's own timer
+ */
+#define TIME_UPDATE_PERIOD    MILLISECS(200)
+static struct ac_timer update_timer;
+static void update_time(unsigned long foo)
+{
+    unsigned long  flags;
+    s_time_t       new_st;
+    unsigned long  usec;
+    static int calls_since_scale_update = 0;
+
+    spin_lock_irqsave(&stime_lock, flags);
+
+    /* Update system time. */
+    stime_now = new_st = __get_s_time();
+    rdtscl(stime_pcc);
+
+    /* Maybe update our rate to be in sync with the RTC. */
+    if ( ++calls_since_scale_update >= 
+         (SCALE_UPDATE_PERIOD/TIME_UPDATE_PERIOD) )
+    {
+        update_scale();
+        calls_since_scale_update = 0;
+    }
+
+    /* Update wall clock time. */
+    usec = ((unsigned long)(new_st - wctime_st))/1000;
+    usec += wall_clock_time.tv_usec;
+    while (usec >= 1000000) {
+        usec -= 1000000;
+        wall_clock_time.tv_sec++;
+    }
+    wall_clock_time.tv_usec = usec;
+    wctime_st = new_st;
 
     spin_unlock_irqrestore(&stime_lock, flags);
-    scale_timer.expires  = now + UPDATE_PERIOD;
-    add_ac_timer(&scale_timer);
-    TRC(printk(" %ds[%d] ", dt, freq_index));
+
+    TRC(printk("TIME[%02d] update time: stime_now=%lld now=%lld,wct=%ld:%ld\n",
+               smp_processor_id(), stime_now, new_st, wall_clock_time.tv_sec,
+               wall_clock_time.tv_usec));
+
+    /* Reload the timer. */
+    update_timer.expires = new_st + TIME_UPDATE_PERIOD;
+    add_ac_timer(&update_timer);
 }
+
 
 /***************************************************************************
  * Init Xeno Time
@@ -487,7 +488,6 @@ int __init init_xeno_time()
     s64      freq_off;
 
     spin_lock_init(&stime_lock);
-    spin_lock_init(&wctime_lock);
 
     printk("Init Time[%02d]:\n", cpu);
 
@@ -523,11 +523,6 @@ int __init init_xeno_time()
     update_timer.function = &update_time;
     update_time(0);
  
-    init_ac_timer(&scale_timer, 0);
-    scale_timer.data = 4;
-    scale_timer.function = &update_scale;
-    update_scale(0);
-
     printk(".... System Time: %lldns\n",   NOW());
     printk(".....cpu_freq:    %08X%08X\n", (u32)(cpu_freq>>32), (u32)cpu_freq);
     printk(".....cpu_cycle:   %u ps\n",    cpu_cycle);
