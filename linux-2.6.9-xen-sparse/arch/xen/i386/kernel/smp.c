@@ -135,10 +135,12 @@ static inline void __send_IPI_one(unsigned int cpu, int vector)
 	evtchn = per_cpu(ipi_to_evtchn, cpu)[vector];
 	// printk("send_IPI_mask_bitmask cpu %d vector %d evtchn %d\n", cpu, vector, evtchn);
 	if (evtchn) {
+#if 0
 		shared_info_t *s = HYPERVISOR_shared_info;
 		while (synch_test_bit(evtchn, &s->evtchn_pending[0]) ||
 		       synch_test_bit(evtchn, &s->evtchn_mask[0]))
 			;
+#endif
 		notify_via_evtchn(evtchn);
 	} else
 		printk("send_IPI to unbound port %d/%d",
@@ -417,7 +419,7 @@ void flush_tlb_page(struct vm_area_struct * vma, unsigned long va)
 	if (current->active_mm == mm) {
 		if(current->mm)
 			__flush_tlb_one(va);
-		 else
+		else
 		 	leave_mm(smp_processor_id());
 	}
 
@@ -513,10 +515,10 @@ int smp_call_function (void (*func) (void *info), void *info, int nonatomic,
 	/* Wait for response */
 	while (atomic_read(&data.started) != cpus)
 		barrier();
+
 	if (wait)
 		while (atomic_read(&data.finished) != cpus)
 			barrier();
-
 	spin_unlock(&call_lock);
 
 	return 0;
