@@ -457,10 +457,10 @@ static int __init init_amd(struct cpuinfo_x86 *c)
 
     switch(c->x86)
     {
-    case 6:	/* An Athlon/Duron. We can trust the BIOS probably */
-        break;		
-    default:
+    case 5: /* We don't like AMD K6 */
         panic("Unsupported AMD processor\n");
+    case 6:	/* An Athlon/Duron. We can trust the BIOS probably */
+        break;
     }
 
     display_cacheinfo(c);
