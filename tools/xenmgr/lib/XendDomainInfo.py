@@ -693,6 +693,12 @@ def vm_dev_pci(vm, val, index):
     func = sxp.child_value(val, 'func')
     if not func:
         raise VMError('pci: Missing func')
+    try:
+        bus = int(bus, 16)
+        dev = int(dev, 16)
+        func = int(func, 16)
+    except:
+        raise VMError('pci: invalid parameter')
     rc = xc.physdev_pci_access_modify(dom=vm.dom, bus=bus, dev=dev, func=func, enable=1)
     if rc < 0:
         #todo non-fatal
