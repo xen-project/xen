@@ -405,6 +405,8 @@ void __init start_of_day(void)
      */
 #endif
 
+    __sti();
+
     initialize_keytable(); /* call back handling for key codes      */
 
     serial_init_stage2();
@@ -421,8 +423,6 @@ void __init start_of_day(void)
     ac_timer_init();    /* init accurate timers */
     init_xen_time();	/* initialise the time */
     schedulers_start(); /* start scheduler for each CPU */
-
-    sti();
 
     check_nmi_watchdog();
 

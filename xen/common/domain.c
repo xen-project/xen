@@ -295,7 +295,7 @@ struct pfn_info *alloc_domain_page(struct task_struct *p)
 #ifdef NO_DEVICES_IN_XEN
     ASSERT(!in_irq());
 #else
-    ASSERT((p != NULL) || !in_irq());
+    ASSERT((p == NULL) || !in_irq());
 #endif
 
     spin_lock_irqsave(&free_list_lock, flags);

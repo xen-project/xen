@@ -128,6 +128,9 @@ void machine_restart(char * __unused)
 #ifdef CONFIG_SMP
     cpuid = GET_APIC_ID(apic_read(APIC_ID));
 
+    /* KAF: Need interrupts enabled for safe IPI. */
+    __sti();
+
     if (reboot_smp) {
 
         /* check to see if reboot_cpu is valid 

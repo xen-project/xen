@@ -437,17 +437,16 @@ static int network_close(struct net_device *dev)
 
     netif_stop_queue(np->dev);
 
-    while ( (np->rx_resp_cons != np->rx->req_prod) ||
+    np->state = NETIF_STATE_CONNECTED;
+
+    /* XXX We need to properly disconnect via the domain controller. */
+    while ( /*(np->rx_resp_cons != np->rx->req_prod) ||*/
             (np->tx_resp_cons != np->tx->req_prod) )
     {
         barrier();
         current->state = TASK_INTERRUPTIBLE;
         schedule_timeout(1);
     }
-
-    wmb();
-    np->state = NETIF_STATE_CONNECTED;
-    wmb();
 
     MOD_DEC_USE_COUNT;
 
