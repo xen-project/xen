@@ -49,6 +49,9 @@ struct task_struct *do_newdomain(void)
     p->active_mm  = &p->mm;
     p->num_net_vifs = 0;
 
+    INIT_LIST_HEAD(&p->io_done_queue);
+    spin_lock_init(&p->io_done_queue_lock);
+
     /*
      * KAF: Passing in newdomain struct to this function is gross!
      * Therefore, for now we just allocate the single blk_ring

@@ -70,13 +70,15 @@ struct task_struct {
     struct list_head pg_head;
     unsigned int tot_pages;
 
-    /* Pointer to this guest's virtual interfaces. */
-    /* network */
+    /* Network I/O */
     net_ring_t *net_ring_base;
     net_vif_t *net_vif_list[MAX_GUEST_VIFS];
     int num_net_vifs;
-    /* block io */
+
+    /* Block I/O */
     blk_ring_t *blk_ring_base;
+    struct list_head io_done_queue;
+    spinlock_t io_done_queue_lock;
 
     int has_cpu, policy, counter;
 

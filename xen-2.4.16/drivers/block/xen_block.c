@@ -36,10 +36,8 @@ blk_request_t blk_request_list[XEN_BLK_REQUEST_LIST_SIZE];
 
 struct list_head free_queue;          /* unused requests */
 struct list_head pending_queue;       /* waiting for hardware */
-struct list_head io_done_queue;       /* request completed. send to guest os */
 spinlock_t free_queue_lock;
 spinlock_t pending_queue_lock;
-spinlock_t io_done_queue_lock;
 
 /* some definitions */
 void dumpx (char *buffer, int count);
@@ -63,35 +61,36 @@ void end_block_io_op(struct buffer_head * bh)
     /* struct list_head *list;*/
     blk_request_t *blk_request = NULL;
     unsigned long flags; /* irq save */
-    
+    struct task_struct *p;
+
     if (XEN_BLK_DEBUG)  
 	printk(XEN_BLK_DEBUG_LEVEL "XEN end_block_io_op,  bh: %lx\n",
 	       (unsigned long)bh);
     
     spin_lock_irqsave(&pending_queue_lock, flags);
-    blk_request = (blk_request_t *)bh->b_xen_request;
-    
-    if (blk_request == NULL) {
-	printk (KERN_ALERT
-		"   block io interrupt received for unknown buffer [0x%lx]\n",
-		(unsigned long) bh);
-	spin_unlock_irqrestore(&pending_queue_lock, flags);
-	BUG();
-	return;
-    }
-    
+    if ( (blk_request = (blk_request_t *)bh->b_xen_request) == NULL) 
+        goto bad_interrupt;
     list_del(&blk_request->queue);
-    spin_unlock_irqrestore(&pending_queue_lock, flags);
+    spin_unlock(&pending_queue_lock);
     
-    spin_lock_irqsave(&io_done_queue_lock, flags);
-    list_add_tail(&blk_request->queue, &io_done_queue);
-    
+    p = blk_request->domain;
+
+    spin_lock(&p->io_done_queue_lock);
+    list_add_tail(&blk_request->queue, &p->io_done_queue);
     /* enqueue work for 'flush_blk_queue' handler */
-    cpu_mask = mark_hyp_event(blk_request->domain, _HYP_EVENT_BLK_RX);
-    spin_unlock_irqrestore(&io_done_queue_lock, flags);
+    cpu_mask = mark_hyp_event(p, _HYP_EVENT_BLK_RX);
+    spin_unlock_irqrestore(&p->io_done_queue_lock, flags);
     
     /* now kick the hypervisor */
     hyp_event_notify(cpu_mask); 
+    return;
+
+ bad_interrupt:
+    printk (KERN_ALERT
+            "   block io interrupt received for unknown buffer [0x%lx]\n",
+            (unsigned long) bh);
+    spin_unlock_irqrestore(&pending_queue_lock, flags);
+    BUG();
     return;
 }
 
@@ -104,23 +103,24 @@ void end_block_io_op(struct buffer_head * bh)
 
 void flush_blk_queue(void)
 {
+    struct task_struct *p = current;
     blk_request_t *blk_request;
     int position = 0;
     blk_ring_t *blk_ring;
     unsigned long flags;
     int loop;
     
-    spin_lock_irqsave(&io_done_queue_lock, flags);
-    clear_bit(_HYP_EVENT_BLK_RX, &current->hyp_events);
+    spin_lock_irqsave(&p->io_done_queue_lock, flags);
+    clear_bit(_HYP_EVENT_BLK_RX, &p->hyp_events);
     
-    while (!list_empty(&io_done_queue)) {
-
-	blk_request = list_entry(io_done_queue.next, blk_request_t, queue);
-	list_del (&blk_request->queue);
-	spin_unlock_irqrestore(&io_done_queue_lock, flags);
+    while ( !list_empty(&p->io_done_queue) )
+    {
+	blk_request = list_entry(p->io_done_queue.next, blk_request_t, queue);
+	list_del(&blk_request->queue);
+	spin_unlock_irqrestore(&p->io_done_queue_lock, flags);
 	
 	/* place on ring for guest os */ 
-	blk_ring = blk_request->domain->blk_ring_base;
+	blk_ring = p->blk_ring_base;
 	position = blk_ring->brx_prod;
 
 	if (XEN_BLK_DEBUG)  
@@ -131,19 +131,19 @@ void flush_blk_queue(void)
 	blk_ring->brx_prod = BLK_RX_RING_INC(blk_ring->brx_prod);
 
 	/* notify appropriate guest os */
-	set_bit(_EVENT_BLK_RX, &blk_request->domain->shared_info->events);
+	set_bit(_EVENT_BLK_RX, &p->shared_info->events);
 	
 	/* free the buffer header allocated in do_block_io_op */
-	if (blk_request->bh)
+	if ( blk_request->bh )
 	    kfree(blk_request->bh); 
 
 	spin_lock_irqsave(&free_queue_lock, flags);
 	list_add_tail(&blk_request->queue, &free_queue);
 	spin_unlock_irqrestore(&free_queue_lock, flags);
 
-	spin_lock_irqsave(&io_done_queue_lock, flags);
+	spin_lock_irqsave(&p->io_done_queue_lock, flags);
     }
-    spin_unlock_irqrestore(&io_done_queue_lock, flags);
+    spin_unlock_irqrestore(&p->io_done_queue_lock, flags);
 
 
     /* XXX SMH: below is ugly and dangerous -- fix */
@@ -160,15 +160,15 @@ void flush_blk_queue(void)
      * at domain 0 every time (although we might want to special
      * case domain 0);
      */
-    for (loop = 0; loop < XEN_BLOCK_MAX_DOMAINS; loop++) {
-
+    for ( loop = 0; loop < XEN_BLOCK_MAX_DOMAINS; loop++ )
+    {
 	int domain = pending_work & (1 << loop);
 
-	if (domain) {
-
+	if ( domain ) 
+        {
 	    struct task_struct *mytask = current;
 
-	    while (mytask->domain != loop)
+	    while ( mytask->domain != loop )
 		mytask = mytask->next_task;
 
 	    pending_work = pending_work & !(1 << loop);
@@ -421,9 +421,13 @@ static void dump_blockq(u_char key, void *dev_id, struct pt_regs *regs)
     dump_queue(&pending_queue, "PENDING QUEUE"); 
     spin_unlock_irqrestore(&pending_queue_lock, flags);
 
+#if 0
     spin_lock_irqsave(&io_done_queue_lock, flags);
     dump_queue(&io_done_queue, "IO DONE QUEUE"); 
     spin_unlock_irqrestore(&io_done_queue_lock, flags);
+#else
+    printk("FIXME: IO_DONE_QUEUE IS NOW PER DOMAIN!!\n");
+#endif
 
     return; 
 }
@@ -443,11 +447,9 @@ void initialize_block_io (){
     
     INIT_LIST_HEAD(&free_queue);
     INIT_LIST_HEAD(&pending_queue);
-    INIT_LIST_HEAD(&io_done_queue);
     
     spin_lock_init(&free_queue_lock);
     spin_lock_init(&pending_queue_lock);
-    spin_lock_init(&io_done_queue_lock);
     
     for (loop = 0; loop < XEN_BLK_REQUEST_LIST_SIZE; loop++)
     {
