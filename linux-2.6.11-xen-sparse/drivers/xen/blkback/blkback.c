@@ -8,10 +8,14 @@
  *  arch/xen/drivers/blkif/frontend
  * 
  * Copyright (c) 2003-2004, Keir Fraser & Steve Hand
+ * Copyright (c) 2005, Christopher Clark
  */
 
 #include "common.h"
 #include <asm-xen/evtchn.h>
+#ifdef CONFIG_XEN_BLKDEV_GRANT
+#include <asm-xen/xen-public/grant_table.h>
+#endif
 
 /*
  * These are rather arbitrary. They are fairly large because adjacent requests
@@ -80,6 +84,17 @@ static inline void flush_plugged_queue(void)
 }
 #endif
 
+#ifdef CONFIG_XEN_BLKDEV_GRANT
+/* When using grant tables to map a frame for device access then the
+ * handle returned must be used to unmap the frame. This is needed to
+ * drop the ref count on the frame.
+ */
+static u16 pending_grant_handles[MMAP_PAGES];
+#define pending_handle(_idx, _i) \
+    (pending_grant_handles[((_idx) * BLKIF_MAX_SEGMENTS_PER_REQUEST) + (_i)])
+#define BLKBACK_INVALID_HANDLE (0xFFFF)
+#endif
+
 #ifdef CONFIG_XEN_BLKDEV_TAP_BE
 /*
  * If the tap driver is used, we may get pages belonging to either the tap
@@ -100,6 +115,27 @@ static void make_response(blkif_t *blkif, unsigned long id,
 
 static void fast_flush_area(int idx, int nr_pages)
 {
+#ifdef CONFIG_XEN_BLKDEV_GRANT
+    gnttab_op_t       aop[BLKIF_MAX_SEGMENTS_PER_REQUEST];
+    unsigned int      i, invcount = 0;
+    u16               handle;
+
+    for ( i = 0; i < nr_pages; i++ )
+    {
+        if ( BLKBACK_INVALID_HANDLE != ( handle = pending_handle(idx, i) ) )
+        {
+            aop[i].u.unmap_grant_ref.host_virt_addr = MMAP_VADDR(idx, i);
+            aop[i].u.unmap_grant_ref.dev_bus_addr   = 0;
+            aop[i].u.unmap_grant_ref.handle         = handle;
+            pending_handle(idx, i) = BLKBACK_INVALID_HANDLE;
+            invcount++;
+        }
+    }
+    if ( unlikely(HYPERVISOR_grant_table_op(
+                    GNTTABOP_unmap_grant_ref, aop, invcount)))
+        BUG();
+#else
+
     multicall_entry_t mcl[BLKIF_MAX_SEGMENTS_PER_REQUEST];
     int               i;
 
@@ -114,6 +150,7 @@ static void fast_flush_area(int idx, int nr_pages)
     mcl[nr_pages-1].args[2] = UVMF_TLB_FLUSH|UVMF_ALL;
     if ( unlikely(HYPERVISOR_multicall(mcl, nr_pages) != 0) )
         BUG();
+#endif
 }
 
 
@@ -347,6 +384,26 @@ static void dispatch_probe(blkif_t *blkif, blkif_request_t *req)
          (blkif_last_sect(req->frame_and_sects[0]) != 7) )
         goto out;
 
+#ifdef CONFIG_XEN_BLKDEV_GRANT
+    {
+        gnttab_op_t     op;
+
+        op.u.map_grant_ref.host_virt_addr = MMAP_VADDR(pending_idx, 0);
+        op.u.map_grant_ref.flags = GNTMAP_host_map;
+        op.u.map_grant_ref.ref = blkif_gref_from_fas(req->frame_and_sects[0]);
+        op.u.map_grant_ref.dom = blkif->domid;
+
+        if ( unlikely(HYPERVISOR_grant_table_op(
+                        GNTTABOP_map_grant_ref, &op, 1)))
+            BUG();
+
+        if ( op.u.map_grant_ref.dev_bus_addr == 0 )
+            goto out;
+
+        pending_handle(pending_idx, 0) = op.u.map_grant_ref.handle;
+    }
+#else /* else CONFIG_XEN_BLKDEV_GRANT */
+
 #ifdef CONFIG_XEN_BLKDEV_TAP_BE
     /* Grab the real frontend out of the probe message. */
     if (req->frame_and_sects[1] == BLKTAP_COOKIE) 
@@ -369,7 +426,8 @@ static void dispatch_probe(blkif_t *blkif, blkif_request_t *req)
         
         goto out;
 #endif
-    
+#endif /* endif CONFIG_XEN_BLKDEV_GRANT */
+   
     rsp = vbd_probe(blkif, (vdisk_t *)MMAP_VADDR(pending_idx, 0), 
                     PAGE_SIZE / sizeof(vdisk_t));
 
@@ -382,10 +440,15 @@ static void dispatch_rw_block_io(blkif_t *blkif, blkif_request_t *req)
 {
     extern void ll_rw_block(int rw, int nr, struct buffer_head * bhs[]); 
     int operation = (req->operation == BLKIF_OP_WRITE) ? WRITE : READ;
-    unsigned long fas, remap_prot;
+    unsigned long fas = 0;
     int i, pending_idx = pending_ring[MASK_PEND_IDX(pending_cons)];
     pending_req_t *pending_req;
+#ifdef CONFIG_XEN_BLKDEV_GRANT
+    gnttab_op_t       aop[BLKIF_MAX_SEGMENTS_PER_REQUEST];
+#else
+    unsigned long remap_prot;
     multicall_entry_t mcl[BLKIF_MAX_SEGMENTS_PER_REQUEST];
+#endif
     struct phys_req preq;
     struct { 
         unsigned long buf; unsigned int nsec;
@@ -412,14 +475,58 @@ static void dispatch_rw_block_io(blkif_t *blkif, blkif_request_t *req)
     preq.sector_number = req->sector_number;
     preq.nr_sects      = 0;
 
+#ifdef CONFIG_XEN_BLKDEV_GRANT
     for ( i = 0; i < nseg; i++ )
     {
+        fas         = req->frame_and_sects[i];
+        seg[i].nsec = blkif_last_sect(fas) - blkif_first_sect(fas) + 1;
+
+        if ( seg[i].nsec <= 0 )
+            goto bad_descriptor;
+        preq.nr_sects += seg[i].nsec;
+
+        aop[i].u.map_grant_ref.host_virt_addr = MMAP_VADDR(pending_idx, i);
+
+        aop[i].u.map_grant_ref.dom = blkif->domid;
+        aop[i].u.map_grant_ref.ref = blkif_gref_from_fas(fas);
+        aop[i].u.map_grant_ref.flags = ( GNTMAP_host_map   |
+                                       ( ( operation == READ ) ?
+                                             0 : GNTMAP_readonly ) );
+    }
+
+    if ( unlikely(HYPERVISOR_grant_table_op(
+                    GNTTABOP_map_grant_ref, aop, nseg)))
+        BUG();
+
+    for ( i = 0; i < nseg; i++ )
+    {
+        if ( unlikely(aop[i].u.map_grant_ref.dev_bus_addr == 0) )
+        {
+            DPRINTK("invalid buffer -- could not remap it\n");
+            fast_flush_area(pending_idx, nseg);
+            goto bad_descriptor;
+        }
+
+        phys_to_machine_mapping[__pa(MMAP_VADDR(pending_idx, i))>>PAGE_SHIFT] =
+            FOREIGN_FRAME(aop[i].u.map_grant_ref.dev_bus_addr);
+
+        pending_handle(pending_idx, i) = aop[i].u.map_grant_ref.handle;
+    }
+#endif
+
+    for ( i = 0; i < nseg; i++ )
+    {
+#ifdef CONFIG_XEN_BLKDEV_GRANT
+        seg[i].buf  = (aop[i].u.map_grant_ref.dev_bus_addr << PAGE_SHIFT) |
+                      (blkif_first_sect(fas) << 9);
+#else
         fas          = req->frame_and_sects[i];
         seg[i].buf  = (fas & PAGE_MASK) | (blkif_first_sect(fas) << 9);
         seg[i].nsec = blkif_last_sect(fas) - blkif_first_sect(fas) + 1;
         if ( seg[i].nsec <= 0 )
             goto bad_descriptor;
         preq.nr_sects += seg[i].nsec;
+#endif
     }
 
     if ( vbd_translate(&preq, blkif, operation) != 0 )
@@ -430,6 +537,7 @@ static void dispatch_rw_block_io(blkif_t *blkif, blkif_request_t *req)
         goto bad_descriptor;
     }
 
+#ifndef CONFIG_XEN_BLKDEV_GRANT
     if ( operation == READ )
         remap_prot = _PAGE_PRESENT|_PAGE_DIRTY|_PAGE_ACCESSED|_PAGE_RW;
     else
@@ -461,6 +569,7 @@ static void dispatch_rw_block_io(blkif_t *blkif, blkif_request_t *req)
             goto bad_descriptor;
         }
     }
+#endif /* end ifndef CONFIG_XEN_BLKDEV_GRANT */
 
     pending_req = &pending_reqs[pending_idx];
     pending_req->blkif     = blkif;
@@ -628,9 +737,15 @@ static int __init blkif_init(void)
 
     blkif_ctrlif_init();
     
+#ifdef CONFIG_XEN_BLKDEV_GRANT
+    memset( pending_grant_handles,  BLKBACK_INVALID_HANDLE, MMAP_PAGES );
+    printk(KERN_ALERT "Blkif backend is using grant tables.\n");
+#endif
+
 #ifdef CONFIG_XEN_BLKDEV_TAP_BE
     printk(KERN_ALERT "NOTE: Blkif backend is running with tap support on!\n");
 #endif
+
     return 0;
 }
 

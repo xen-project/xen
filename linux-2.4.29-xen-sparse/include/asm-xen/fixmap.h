@@ -17,6 +17,7 @@
 #include <linux/kernel.h>
 #include <asm/apicdef.h>
 #include <asm/page.h>
+#include <asm-xen/gnttab.h>
 #ifdef CONFIG_HIGHMEM
 #include <linux/threads.h>
 #include <asm/kmap_types.h>
@@ -52,7 +53,8 @@ enum fixed_addresses {
 	FIX_NETRING2_BASE,
 	FIX_NETRING3_BASE,
         FIX_SHARED_INFO,
-	FIX_GNTTAB,
+	FIX_GNTTAB_BEGIN,
+    FIX_GNTTAB_END = FIX_GNTTAB_BEGIN + NR_GRANT_FRAMES - 1,
 #ifdef CONFIG_VGA_CONSOLE
 #define NR_FIX_BTMAPS   32  /* 128KB For the Dom0 VGA Console A0000-C0000 */
 #else

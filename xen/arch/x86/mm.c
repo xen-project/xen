@@ -1997,7 +1997,13 @@ int update_grant_va_mapping(unsigned long va,
         l1_pgentry_t ol1e = mk_l1_pgentry(_ol1e);
 
         if ( update_l1e(pl1e, ol1e, mk_l1_pgentry(_nl1e)) )
+        {
             put_page_from_l1e(ol1e, d);
+            if ( _ol1e & _PAGE_PRESENT )
+                rc = 0; /* Caller needs to invalidate TLB entry */
+            else
+                rc = 1; /* Caller need not invalidate TLB entry */
+        }
         else
             rc = -EINVAL;
     }
@@ -3277,7 +3283,7 @@ void audit_domains_key(unsigned char key)
         spin_unlock(&e->page_alloc_lock);
 
         /* Transfer is all done: tell the guest about its new page frame. */
-        gnttab_notify_transfer(e, gntref, pfn);
+        gnttab_notify_transfer(e, d, gntref, pfn);
         
         put_domain(e);
         break;
