@@ -500,8 +500,8 @@ class XendDomainInfo:
                 raise VmError('missing memory size')
 
             self.init_domain()
-            self.construct_image()
             self.configure_console()
+            self.construct_image()
             self.configure_restart()
             self.configure_backends()
             deferred = self.configure()
