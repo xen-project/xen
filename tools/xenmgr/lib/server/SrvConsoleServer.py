@@ -415,6 +415,7 @@ class VirqClient:
 
     def virqReceived(self, virq):
         print 'VirqClient.virqReceived>', virq
+        eserver.inject('xend.virq', virq)
 
     def lostChannel(self, channel):
         print 'VirqClient.lostChannel>', channel

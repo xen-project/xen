@@ -132,7 +132,7 @@ class Controller(CtrlMsgRcvr):
 
     def close(self):
         self.deregisterChannel()
-        self.lostChannel(self)
+        self.lostChannel()
 
     def lostChannel(self):
         self.factory.instanceClosed(self)

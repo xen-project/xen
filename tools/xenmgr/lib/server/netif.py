@@ -2,6 +2,8 @@ import random
 
 from twisted.internet import defer
 
+from xenmgr import sxp
+from xenmgr import PrettyPrint
 from xenmgr import XendBridge
 
 import channel
@@ -117,9 +119,13 @@ class NetDev(controller.Dev):
     def sxpr(self):
         vif = str(self.vif)
         mac = ':'.join(map(lambda x: "%x" % x, self.mac))
-        val = ['netif', ['vif', vif], ['mac', mac]]
+        val = ['netdev', ['vif', vif], ['mac', mac]]
         if self.bridge:
-            val += ['bridge', self.bridge]
+            val.append(['bridge', self.bridge])
+        if self.evtchn:
+            val.append(['evtchn',
+                        self.evtchn['port1'],
+                        self.evtchn['port2']])
         return val
 
     def bridge_add(self, bridge):
@@ -131,6 +137,8 @@ class NetDev(controller.Dev):
         self.bridge = None
 
     def destroy(self):
+        print 'NetDev>destroy>', 'vif=', self.vif
+        PrettyPrint.prettyprint(self.sxpr())
         self.bridge_rem()
         self.controller.send_be_destroy(self.vif)
         
@@ -155,7 +163,10 @@ class NetifController(controller.Controller):
         self.registerChannel()
         #print 'NetifController<', 'dom=', self.dom, 'idx=', self.idx
 
-
+    def sxpr(self):
+        val = ['netif', ['dom', self.dom]]
+        return val
+    
     def randomMAC(self):
         # VIFs get a random MAC address with a "special" vendor id.
         # 
@@ -194,6 +205,7 @@ class NetifController(controller.Controller):
         return dev
 
     def destroy(self):
+        print 'NetifController>destroy>', 'dom=', self.dom
         self.destroyDevices()
         
     def destroyDevices(self):
@@ -270,7 +282,8 @@ class NetifController(controller.Controller):
         self.factory.writeRequest(msg)
 
     def send_be_destroy(self, vif):
-        print 'send_be_destroy>', 'dom=', self.dom, 'vif=', vif
+        print 'NetifController>send_be_destroy>', 'dom=', self.dom, 'vif=', vif
+        PrettyPrint.prettyprint(self.sxpr())
         dev = self.devices[vif]
         del self.devices[vif]
         msg = packMsg('netif_be_destroy_t',
