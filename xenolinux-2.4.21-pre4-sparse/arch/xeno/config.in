@@ -125,3 +125,5 @@ if [ "$CONFIG_DEBUG_KERNEL" != "n" ]; then
 fi
 
 endmenu
+
+source lib/Config.in

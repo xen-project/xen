@@ -27,8 +27,8 @@ void do_hypervisor_callback(struct pt_regs *regs)
 
     do {
         /* Specialised local_irq_save(). */
-        flags = shared->events_enable;
-        shared->events_enable = 0;
+        flags = test_and_clear_bit(EVENTS_MASTER_ENABLE_BIT, 
+                                   &shared->events_mask);
         barrier();
 
         events  = xchg(&shared->events, 0);
@@ -50,7 +50,7 @@ void do_hypervisor_callback(struct pt_regs *regs)
             : "eax", "ecx", "edx", "memory" ); 
 
         /* Specialised local_irq_restore(). */
-        shared->events_enable = flags;
+        if ( flags ) set_bit(EVENTS_MASTER_ENABLE_BIT, &shared->events_mask);
         barrier();
     }
     while ( shared->events );
@@ -62,25 +62,25 @@ void do_hypervisor_callback(struct pt_regs *regs)
  * Define interface to generic handling in irq.c
  */
 
-static unsigned int startup_hypervisor_event(unsigned int irq)
-{
-    set_bit(irq, &event_mask);
-    return 0;
-}
-
 static void shutdown_hypervisor_event(unsigned int irq)
 {
     clear_bit(irq, &event_mask);
+    clear_bit(irq, &HYPERVISOR_shared_info->events_mask);
 }
 
 static void enable_hypervisor_event(unsigned int irq)
 {
     set_bit(irq, &event_mask);
+    set_bit(irq, &HYPERVISOR_shared_info->events_mask);
+    if ( test_bit(EVENTS_MASTER_ENABLE_BIT, 
+                  &HYPERVISOR_shared_info->events_mask) )
+        do_hypervisor_callback(NULL);
 }
 
 static void disable_hypervisor_event(unsigned int irq)
 {
     clear_bit(irq, &event_mask);
+    clear_bit(irq, &HYPERVISOR_shared_info->events_mask);
 }
 
 static void ack_hypervisor_event(unsigned int irq)
@@ -90,6 +90,13 @@ static void ack_hypervisor_event(unsigned int irq)
         printk("Unexpected hypervisor event %d\n", irq);
         atomic_inc(&irq_err_count);
     }
+    set_bit(irq, &HYPERVISOR_shared_info->events_mask);
+}
+
+static unsigned int startup_hypervisor_event(unsigned int irq)
+{
+    enable_hypervisor_event(irq);
+    return 0;
 }
 
 static void end_hypervisor_event(unsigned int irq)

@@ -210,15 +210,14 @@ ENTRY(system_call)
 	movl %eax,EAX(%esp)		# save the return value
 ENTRY(ret_from_sys_call)
         movl SYMBOL_NAME(HYPERVISOR_shared_info),%esi
-        xorl %eax,%eax
-        movl %eax,4(%esi)               # need_resched and signals atomic test
+        btrl $EVENTS_MASTER_ENABLE_BIT,4(%esi) # make tests atomic
 ret_syscall_tests:      
 	cmpl $0,need_resched(%ebx)
 	jne reschedule
 	cmpl $0,sigpending(%ebx)
 	je   safesti                    # ensure need_resched updates are seen
 signal_return:
-	btsl %eax,4(%esi)               # reenable event callbacks
+	btsl $EVENTS_MASTER_ENABLE_BIT,4(%esi) # reenable event callbacks
 	movl %esp,%eax
 	xorl %edx,%edx
 	call SYMBOL_NAME(do_signal)
@@ -255,8 +254,8 @@ ret_from_exception:
 
 	ALIGN
 reschedule:
-        btsl %eax,4(%esi)             # reenable event callbacks
-	call SYMBOL_NAME(schedule)    # test
+        btsl $EVENTS_MASTER_ENABLE_BIT,4(%esi) # reenable event callbacks
+	call SYMBOL_NAME(schedule)             # test
 	jmp ret_from_sys_call
 
 ENTRY(divide_error)
@@ -319,12 +318,12 @@ ENTRY(hypervisor_callback)
         movb CS(%esp),%cl
 	test $2,%cl          # slow return to ring 2 or 3
 	jne  ret_syscall_tests
-safesti:btsl %eax,4(%esi)     # reenable event callbacks
+safesti:btsl $EVENTS_MASTER_ENABLE_BIT,4(%esi) # reenable event callbacks
 scrit:  /**** START OF CRITICAL REGION ****/
         cmpl %eax,(%esi)
         jne  14f              # process more events if necessary...
         RESTORE_ALL
-14:     btrl %eax,4(%esi)
+14:     btrl $EVENTS_MASTER_ENABLE_BIT,4(%esi)
         jmp  11b
 ecrit:  /**** END OF CRITICAL REGION ****/
 # [How we do the fixup]. We want to merge the current stack frame with the
@@ -366,7 +365,7 @@ critical_fixup_table:
         .byte 0x20                            # pop  %es
         .byte 0x24,0x24,0x24                  # add  $4,%esp
         .byte 0x28                            # iret
-        .byte 0x00,0x00,0x00,0x00             # btrl %eax,4(%esi)
+        .byte 0x00,0x00,0x00,0x00,0x00        # btrl $31,4(%esi)
         .byte 0x00,0x00                       # jmp  11b
 
 # Hypervisor uses this for application faults while it executes.

@@ -115,7 +115,7 @@ FAILSAFE_ADDR   = 32
 
 /* Offsets in shared_info_t */
 EVENTS          =  0
-EVENTS_ENABLE   =  4
+EVENTS_MASK     =  4
 
 /* Offsets in guest_trap_bounce */
 GTB_ERROR_CODE   =  0
@@ -297,13 +297,15 @@ test_all_events:
         jnz  process_hyp_events
 /*test_guest_events:*/
         movl SHARED_INFO(%ebx),%eax
-        test %ecx,EVENTS(%eax)
-        jz   restore_all
-        test %ecx,EVENTS_ENABLE(%eax)
-        jz   restore_all
-        /* Prevent unnecessary reentry of event callback (stack overflow!) */
-        xorl %ecx,%ecx
-        movl %ecx,EVENTS_ENABLE(%eax)      
+        shl  $31,%ecx                   # %ecx = EVENTS_MASTER_ENABLE_MASK
+        test %ecx,EVENTS_MASK(%eax)     
+        jz   restore_all                # only notify if master switch enabled
+        movl EVENTS(%eax),%ecx
+        andl EVENTS_MASK(%eax),%ecx
+        jz   restore_all                # skip if no events to deliver
+        notl %ecx
+        btrl $31,%ecx                   # NB. We clear all events that are
+        andl %ecx,EVENTS_MASK(%eax)     # being delivered + master enable.
 /*process_guest_events:*/
         mov  PROCESSOR(%ebx),%edx
         shl  $4,%edx                    # sizeof(guest_trap_bounce) == 16

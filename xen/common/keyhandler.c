@@ -103,8 +103,8 @@ void do_task_queues(u_char key, void *dev_id, struct pt_regs *regs)
 	       task_states[p->state], p->hyp_events); 
 	s = p->shared_info; 
 	if(!is_idle_task(p)) {
-	    printk("Guest: events = %08lx, event_enable = %08lx\n", 
-		   s->events, s->events_enable); 
+	    printk("Guest: events = %08lx, events_mask = %08lx\n", 
+		   s->events, s->events_mask); 
 	    printk("Notifying guest...\n"); 
 	    set_bit(_EVENT_DEBUG, &s->events); 
 	}

@@ -131,6 +131,13 @@
 #define PGEXT_CMD_SHIFT		8
 
 
+/*
+ * Master "switch" for enabling/disabling event delivery.
+ */
+#define EVENTS_MASTER_ENABLE_MASK 0x80000000UL
+#define EVENTS_MASTER_ENABLE_BIT  31
+
+
 #ifndef __ASSEMBLY__
 
 #include "network.h"
@@ -173,12 +180,13 @@ typedef struct shared_info_st {
     /* Bitmask of outstanding event notifications hypervisor -> guest OS. */
     unsigned long events;
     /*
-     * Hypervisor will only signal event delivery via the "callback
-     * exception" when this value is non-zero. Hypervisor clears this when
-     * notiying the guest OS -- this prevents unbounded reentrancy and
-     * stack overflow (in this way, acts as an interrupt-enable flag).
+     * Hypervisor will only signal event delivery via the "callback exception"
+     * when a pending event is not masked. The mask also contains a "master
+     * enable" which prevents any event delivery. This mask can be used to
+     * prevent unbounded reentrancy and stack overflow (in this way, acts as a
+     * kind of interrupt-enable flag).
      */
-    unsigned long events_enable;
+    unsigned long events_mask;
 
     /*
      * Time: The following abstractions are exposed: System Time, Clock Time,
