@@ -10,7 +10,8 @@ include $(BASEDIR)/Rules.mk
 # wrapping that with a low-memory bootstrapper.)
 default: boot/boot.o $(OBJS)
 	$(LD) -r -o arch.o $(OBJS)
-	$(LD) $(LDFLAGS) boot/boot.o $(ALL_OBJS) -o $(TARGET)
+	$(LD) $(LDFLAGS) boot/boot.o $(ALL_OBJS) -o $(TARGET).dbg
+	objcopy -R .note -R .comment -S $(TARGET).dbg $(TARGET)
 	$(BASEDIR)/tools/elf-reloc $(MONITOR_BASE) $(LOAD_BASE) $(TARGET)
 
 clean:

@@ -21,6 +21,7 @@ install: $(TARGET)
 	gzip -f -9 < $(TARGET) > $(TARGET).gz
 	mkdir -p $(prefix)/boot
 	install -m0644 $(TARGET).gz $(prefix)/boot
+	install -m0644 $(TARGET).dbg $(prefix)/boot
 
 dist: $(TARGET)
 	$(MAKE) prefix=`pwd`/../../install dist=yes install
