@@ -12,25 +12,27 @@
 #include <public/xen.h>
 
 ENTRY(hypercall)
-        iret
-
+        movl  $0x0833,8(%rsp)
+        pushq %r11
+        pushq $0x082b
+        pushq %rcx
+        pushq $0
+        SAVE_ALL
+	andq  $(NR_hypercalls-1),%rax
+        leaq  SYMBOL_NAME(exception_table)(%rip),%rcx
+        callq *(%rcx,%rax,8)
+        RESTORE_ALL
+        addq  $8,%rsp
+        popq  %rcx
+        addq  $8,%rsp
+        popq  %r11
+        cli
+        popq  %rsp
+        sysretq
+        
 ENTRY(ret_from_intr)
 restore_all_xen:
-        popq  %r15
-        popq  %r14
-        popq  %r13
-        popq  %r12
-        popq  %rbp
-        popq  %rbx
-        popq  %r11
-        popq  %r10
-        popq  %r9
-        popq  %r8
-        popq  %rax
-        popq  %rcx
-        popq  %rdx
-        popq  %rsi
-        popq  %rdi
+        RESTORE_ALL
         addq  $8,%rsp
         iretq
 
@@ -156,3 +158,33 @@ ENTRY(exception_table)
         .quad SYMBOL_NAME(do_alignment_check)
         .quad SYMBOL_NAME(do_machine_check)
         .quad SYMBOL_NAME(do_simd_coprocessor_error)
+
+ENTRY(hypercall_table)
+        .quad SYMBOL_NAME(do_set_trap_table)     /*  0 */
+        .quad SYMBOL_NAME(do_mmu_update)
+        .quad SYMBOL_NAME(do_set_gdt)
+        .quad SYMBOL_NAME(do_stack_switch)
+        .quad SYMBOL_NAME(do_set_callbacks)
+        .quad SYMBOL_NAME(do_fpu_taskswitch)     /*  5 */
+        .quad SYMBOL_NAME(do_sched_op)
+        .quad SYMBOL_NAME(do_dom0_op)
+        .quad SYMBOL_NAME(do_set_debugreg)
+        .quad SYMBOL_NAME(do_get_debugreg)
+        .quad SYMBOL_NAME(do_update_descriptor)  /* 10 */
+        .quad SYMBOL_NAME(do_ni_hypercall) # do_set_fast_trap
+        .quad SYMBOL_NAME(do_dom_mem_op)
+        .quad SYMBOL_NAME(do_multicall)
+        .quad SYMBOL_NAME(do_update_va_mapping)
+        .quad SYMBOL_NAME(do_set_timer_op)       /* 15 */
+        .quad SYMBOL_NAME(do_event_channel_op)
+        .quad SYMBOL_NAME(do_xen_version)
+        .quad SYMBOL_NAME(do_console_io)
+        .quad SYMBOL_NAME(do_physdev_op)
+        .quad SYMBOL_NAME(do_grant_table_op)     /* 20 */
+        .quad SYMBOL_NAME(do_vm_assist)
+        .quad SYMBOL_NAME(do_update_va_mapping_otherdomain)
+        .quad SYMBOL_NAME(do_ni_hypercall) # do_switch_vm86
+        .quad SYMBOL_NAME(do_boot_vcpu)
+        .rept NR_hypercalls-((.-hypercall_table)/4)
+        .quad SYMBOL_NAME(do_ni_hypercall)
+        .endr
