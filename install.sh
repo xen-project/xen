@@ -32,9 +32,7 @@ do
   [ -e "$l" ] && ln -fs "$l" vmlinuz${v}-xenU
 done
 cd -
-cp -fdR $src/* $dst
-# hack to fixup the case that init.d is a symlink
-cp -fdR $src/etc/init.d/* $dst/etc/init.d/
+cp -fdRL $src/* $dst
 echo "All done."
 
 echo "Checking to see whether prerequisite tools are installed..."
