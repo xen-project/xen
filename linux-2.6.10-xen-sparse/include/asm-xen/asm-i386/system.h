@@ -106,8 +106,7 @@ static inline unsigned long _get_base(char * addr)
 /*
  * Clear and set 'TS' bit respectively
  */
-/* NB. 'clts' is done for us by Xen during virtual trap. */
-#define clts() ((void)0)
+#define clts() __asm__ __volatile__ ("clts")
 #define read_cr0() \
 	BUG();
 #define write_cr0(x) \

@@ -910,7 +910,7 @@ asmlinkage void math_state_restore(struct pt_regs regs)
 	if ((regs.xcs & 2) == 0)
 		return;
 
-	clts();		/* Allow maths ops (or we recurse) */
+	/* NB. 'clts' is done for us by Xen during virtual trap. */
 	if (!tsk->used_math)
 		init_fpu(tsk);
 	restore_fpu(tsk);

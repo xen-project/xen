@@ -351,7 +351,6 @@ asmlinkage int do_page_fault(struct xen_regs *regs)
 
 static int emulate_privileged_op(struct xen_regs *regs)
 {
-    extern long do_fpu_taskswitch(void);
     extern void *decode_reg(struct xen_regs *regs, u8 b);
 
     struct exec_domain *ed = current;
@@ -423,7 +422,16 @@ static int emulate_privileged_op(struct xen_regs *regs)
         {
         case 0: /* Write CR0 */
             if ( *reg & X86_CR0_TS )
-                (void)do_fpu_taskswitch();
+            {
+                set_bit(EDF_GUEST_STTS, &ed->ed_flags);
+                stts();
+            }
+            else
+            {
+                clear_bit(EDF_GUEST_STTS, &ed->ed_flags);
+                if ( test_bit(EDF_USEDFPU, &ed->ed_flags) )
+                    clts();
+            }
             break;
 
         case 2: /* Write CR2 */
