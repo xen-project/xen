@@ -340,8 +340,8 @@ class BlkDev(controller.SplitDev):
         val = unpackMsg('blkif_be_vbd_grow_t', msg)
 	status = val['status']
 	if status != BLKIF_BE_STATUS_OKAY:
-            raise XendError("Adding extent to vbd failed: device %d, error %d"
-                            % (self.vdev, status))
+            raise XendError("Adding extent to vbd failed: device %s, error %d"
+                            % (sxp.to_string(self.config), status))
         return self
 
     def send_be_vbd_destroy(self):
