@@ -1,0 +1,36 @@
+Xen crash debugger notes
+------------------------
+
+Xen has a simple gdb stub for doing post-mortem debugging i.e. once
+you've crashed it, you get to poke around and find out why.  There's
+also a special key handler for making it crash, which is handy.
+
+You need to have crash_debug=y set when compiling to enable the crash
+debugger (so go ``export crash_debug=y; make'', or ``crash_debug=y
+make'' or ``make crash_debug=y''), and you also need to enable it on
+the Xen command line, by going e.g. cdb=com1.  If you need to have a
+serial port shared between cdb and the console, try cdb=com1H.  CDB
+will then set the high bit on every byte it sends, and only respond to
+bytes with the high bit set.  Similarly for com2.
+
+The next step depends on your individual setup.  This is how to do
+it for a normal test box in the SRG:
+
+-- Make your test machine crash.  Either a normal panic or hitting
+   'C-A C-A C-A %' on the serial console will do.
+-- Start gdb as ``gdb ./xen-syms''
+-- Go ``target remote serial.srg:12331'', where 12331 is the second port
+   reported for that machine by xenuse. (In this case, the machine is
+   bombjack)
+-- Go ``add-symbol-file vmlinux''
+-- Debug as if you had a core file
+-- When you're finished, go and reboot your test box.  Hitting 'R' on the
+   serial console won't work.
+
+At one stage, it was sometimes possible to resume after entering the
+debugger from the serial console.  This seems to have rotted, however,
+and I'm not terribly interested in putting it back.
+
+As soon as you reach the debugger, we disable interrupts, the
+watchdog, and every other CPU, so the state of the world shouldn't
+change too much behind your back.
