@@ -28,7 +28,6 @@ static struct block_device_operations xlide_block_fops =
     revalidate:         xenolinux_block_revalidate,
 };
 
-
 int xlide_hwsect(int minor) 
 {
     return xlide_hardsect_size[minor]; 
@@ -38,7 +37,9 @@ int xlide_hwsect(int minor)
 int xlide_init(xen_disk_info_t *xdi) 
 {
     int i, result, units, minors, disk;
+    unsigned short minor; 
     struct gendisk *gd;
+    char buf[64]; 
 
     /* If we don't have any usable IDE devices we may as well bail now. */
     units = 0;
@@ -107,18 +108,43 @@ int xlide_init(xen_disk_info_t *xdi)
     /* Now register each disk in turn. */
     for ( i = 0; i < xdi->count; i++ )
     {
-        disk = xdi->disks[i].device & XENDEV_IDX_MASK;
+        disk  = xdi->disks[i].device & XENDEV_IDX_MASK;
+	minor = disk << XLIDE_PARTN_SHIFT; 
+
 
         /* We can use the first 16 IDE devices. */
         if ( !IS_IDE_XENDEV(xdi->disks[i].device) || (disk >= 16) ) continue;
 
         ((xl_disk_t *)gd->real_devices)[disk].capacity =
             xdi->disks[i].capacity;
-        register_disk(gd, 
-                      MKDEV(XLIDE_MAJOR, disk<<XLIDE_PARTN_SHIFT), 
-                      1<<XLIDE_PARTN_SHIFT, 
-                      &xlide_block_fops, 
-                      xdi->disks[i].capacity);
+
+
+	switch (xdi->disks[i].type) { 
+	case XD_TYPE_CDROM:
+	    set_device_ro(MKDEV(XLIDE_MAJOR, minor), 1); 
+	    // fall through
+
+	case XD_TYPE_FLOPPY: 
+	case XD_TYPE_TAPE:
+	    gd->flags[disk] = GENHD_FL_REMOVABLE; 
+	    printk(KERN_ALERT "Skipping partition check on %s /dev/%s\n", 
+		   xdi->disks[i].type == XD_TYPE_CDROM ? "cdrom" : 
+		   (xdi->disks[i].type == XD_TYPE_TAPE ? "tape" : "floppy"), 
+		   disk_name(gd, minor, buf)); 
+	    break; 
+
+	case XD_TYPE_DISK: 
+	    register_disk(gd, MKDEV(XLIDE_MAJOR, minor), 1<<XLIDE_PARTN_SHIFT, 
+			  &xlide_block_fops, xdi->disks[i].capacity);
+	    break; 
+
+	default: 
+	    printk(KERN_ALERT "XenoLinux: unknown ide device type %d\n", 
+		   xdi->disks[i].type); 
+	    break; 
+	}
+
+
     }
 
     printk(KERN_ALERT 

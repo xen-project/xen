@@ -94,10 +94,18 @@ typedef struct blk_ring_st
 
 #define XEN_MAX_DISK_COUNT 100
 
+/* XXX SMH: below types chosen to align with ide_xxx types in ide.h */
+#define XD_TYPE_FLOPPY  0x00
+#define XD_TYPE_TAPE    0x01
+#define XD_TYPE_CDROM   0x05
+#define XD_TYPE_OPTICAL 0x07
+#define XD_TYPE_DISK    0x20 
+
 typedef struct xen_disk
 {
-    unsigned short device;
-    unsigned long  capacity;
+    unsigned short device;       /* device number (see top of file)    */
+    unsigned short type;         /* device type, i.e. disk, cdrom, etc */
+    unsigned long  capacity;     /* size in terms of #512 byte sectors */
 } xen_disk_t;
 
 typedef struct xen_disk_info
