@@ -225,6 +225,7 @@ static inline int direct_zap_pte_range(mmu_gather_t *tlb, pmd_t * pmd, unsigned 
 		if (pte_none(pte))
 			continue;
 		freed ++;
+		printk("bd240 debug: clearing ptr %lx\n", __pa(ptep) + start_info.phys_base); 
 		direct_pte_clear(ptep);
 	}
 
