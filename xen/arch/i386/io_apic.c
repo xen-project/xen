@@ -826,7 +826,6 @@ void __init print_IO_APIC(void)
 			UNEXPECTED_IO_APIC();
 	}
 
-#if 0
 	printk(KERN_DEBUG ".... IRQ redirection table:\n");
 
 	printk(KERN_DEBUG " NR Log Phy Mask Trig IRR Pol"
@@ -871,7 +870,6 @@ void __init print_IO_APIC(void)
 			entry = irq_2_pin + entry->next;
 		}
 		printk("\n");
-#endif
 	}
 
 	printk(KERN_INFO ".................................... done.\n");
