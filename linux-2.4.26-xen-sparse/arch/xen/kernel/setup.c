@@ -120,10 +120,15 @@ union start_info_union start_info_union;
 static char command_line[COMMAND_LINE_SIZE];
 char saved_command_line[COMMAND_LINE_SIZE];
 
-static void __init parse_mem_cmdline (char ** cmdline_p)
+/* parse_mem_cmdline()
+ * returns the value of the mem= boot param converted to pages or 0
+ */ 
+static int __init parse_mem_cmdline (char ** cmdline_p)
 {
     char c = ' ', *to = command_line, *from = saved_command_line;
     int len = 0;
+    unsigned long long bytes;
+    int mem_param = 0;
 
     /* Save unparsed command line copy for /proc/cmdline */
     memcpy(saved_command_line, start_info.cmd_line, COMMAND_LINE_SIZE);
@@ -145,8 +150,9 @@ static void __init parse_mem_cmdline (char ** cmdline_p)
             } else if (!memcmp(from+4, "exactmap", 8)) {
                 from += 8+4;
             } else {
-                (void)memparse(from+4, &from);
-                if (*from == '@')
+                bytes = memparse(from+4, &from);
+                mem_param = bytes>>PAGE_SHIFT;
+		if (*from == '@')
                     (void)memparse(from+1, &from);
             }
         }
@@ -160,6 +166,8 @@ static void __init parse_mem_cmdline (char ** cmdline_p)
     }
     *to = '\0';
     *cmdline_p = command_line;
+
+    return mem_param;
 }
 
 /*
@@ -194,7 +202,9 @@ int xen_module_init(struct module *mod)
 
 void __init setup_arch(char **cmdline_p)
 {
-    unsigned long bootmap_size, start_pfn, max_low_pfn;
+    unsigned long bootmap_size, start_pfn, lmax_low_pfn;
+    int mem_param;  /* user specified memory size in pages */
+    int boot_pfn;   /* low pages available for bootmem */
 
     extern void hypervisor_callback(void);
     extern void failsafe_callback(void);
@@ -252,7 +262,16 @@ void __init setup_arch(char **cmdline_p)
     init_mm.end_data = (unsigned long) &_edata;
     init_mm.brk = (unsigned long) &_end;
 
-    parse_mem_cmdline(cmdline_p);
+    /* The mem= kernel command line param overrides the detected amount
+     * of memory.   For xenolinux, if this override is larger than detected
+     * memory, then boot using only detected memory and make provisions to
+     * use all of the override value.   The hypervisor can give this
+     * domain more memory later on and it will be added to the free
+     * lists at that time.   See claim_new_pages() in
+     * arch/xen/drivers/balloon/balloon.c
+     */
+    mem_param = parse_mem_cmdline(cmdline_p);
+    if (!mem_param) mem_param = start_info.nr_pages;
 
 #define PFN_UP(x)	(((x) + PAGE_SIZE-1) >> PAGE_SHIFT)
 #define PFN_DOWN(x)	((x) >> PAGE_SHIFT)
@@ -269,9 +288,9 @@ void __init setup_arch(char **cmdline_p)
     /*
      * Determine low and high memory ranges:
      */
-    max_low_pfn = max_pfn = start_info.nr_pages;
-    if (max_low_pfn > MAXMEM_PFN) {
-        max_low_pfn = MAXMEM_PFN;
+    lmax_low_pfn = max_pfn = mem_param;
+    if (lmax_low_pfn > MAXMEM_PFN) {
+        lmax_low_pfn = MAXMEM_PFN;
 #ifndef CONFIG_HIGHMEM
         /* Maximum memory usable is what is directly addressable */
         printk(KERN_WARNING "Warning only %ldMB will be used.\n",
@@ -314,11 +333,19 @@ void __init setup_arch(char **cmdline_p)
      * bootstrap page table. We are guaranteed to get >=512kB unused 'padding'
      * for our own use after all bootstrap elements (see hypervisor-if.h).
      */
-    bootmap_size = init_bootmem(start_pfn, max_low_pfn);
-    free_bootmem(0, PFN_PHYS(max_low_pfn));
+    boot_pfn = min((int)start_info.nr_pages,lmax_low_pfn);
+    bootmap_size = init_bootmem(start_pfn,boot_pfn);
+    free_bootmem(0, PFN_PHYS(boot_pfn));
     reserve_bootmem(__pa(&_stext), 
                     PFN_PHYS(start_pfn) + bootmap_size + PAGE_SIZE-1 - 
                     __pa(&_stext));
+
+    /* init_bootmem() set the global max_low_pfn to boot_pfn.  Now max_low_pfn 
+     * can be set to the override value.
+     */
+    max_low_pfn = lmax_low_pfn;
+
+
 
 #ifdef CONFIG_BLK_DEV_INITRD
     if ( start_info.mod_start != 0 )

@@ -219,11 +219,17 @@ static void __init pagetable_init (void)
     pmd_t *kpmd, *pmd;
     pte_t *kpte, *pte, *pte_base;
 
+    /* create tables only for boot_pfn frames.  max_low_pfn may be sized for
+     * pages yet to be allocated from the hypervisor, or it may be set
+     * to override the start_info amount of memory
+     */
+    int boot_pfn = min(start_info.nr_pages,max_low_pfn);
+
     /*
      * This can be zero as well - no problem, in that case we exit
      * the loops anyway due to the PTRS_PER_* conditions.
      */
-    end = (unsigned long)__va(max_low_pfn*PAGE_SIZE);
+    end = (unsigned long)__va(boot_pfn *PAGE_SIZE);
 
     pgd_base = init_mm.pgd;
     i = __pgd_offset(PAGE_OFFSET);
@@ -308,7 +314,6 @@ void __init paging_init(void)
     pagetable_init();
 
     zone_sizes_init();
-
     /* Switch to the real shared_info page, and clear the dummy page. */
     set_fixmap(FIX_SHARED_INFO, start_info.shared_info);
     HYPERVISOR_shared_info = (shared_info_t *)fix_to_virt(FIX_SHARED_INFO);
@@ -368,11 +373,18 @@ static int __init free_pages_init(void)
 #endif
     int reservedpages, pfn;
 
+    /* add only boot_pfn pages of low memory to free list.
+     * max_low_pfn may be sized for
+     * pages yet to be allocated from the hypervisor, or it may be set
+     * to override the start_info amount of memory
+     */
+    int boot_pfn = min(start_info.nr_pages,max_low_pfn);
+
     /* this will put all low memory onto the freelists */
     totalram_pages += free_all_bootmem();
 
     reservedpages = 0;
-    for (pfn = 0; pfn < max_low_pfn; pfn++) {
+    for (pfn = 0; pfn < boot_pfn ; pfn++) {
         /*
          * Only count reserved RAM pages
          */
@@ -380,7 +392,7 @@ static int __init free_pages_init(void)
             reservedpages++;
     }
 #ifdef CONFIG_HIGHMEM
-    for (pfn = highend_pfn-1; pfn >= highstart_pfn; pfn--)
+    for (pfn = start_info.nr_pages-1; pfn >= highstart_pfn; pfn--)
         one_highpage_init((struct page *) (mem_map + pfn), pfn, bad_ppro);
     totalram_pages += totalhigh_pages;
 #endif
@@ -460,11 +472,11 @@ void free_initrd_mem(unsigned long start, unsigned long end)
 
 void si_meminfo(struct sysinfo *val)
 {
-    val->totalram = totalram_pages;
+    val->totalram = max_pfn;
     val->sharedram = 0;
     val->freeram = nr_free_pages();
     val->bufferram = atomic_read(&buffermem_pages);
-    val->totalhigh = totalhigh_pages;
+    val->totalhigh = max_pfn-max_low_pfn;
     val->freehigh = nr_free_highpages();
     val->mem_unit = PAGE_SIZE;
     return;
