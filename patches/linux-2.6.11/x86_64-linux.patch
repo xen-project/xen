@@ -1,0 +1,66 @@
+diff -urN linux-2.6.10-orig/include/asm-x86_64/hw_irq.h linux-2.6.10/include/asm-x86_64/hw_irq.h
+--- linux-2.6.10-orig/include/asm-x86_64/hw_irq.h	2005-01-06 00:34:38.000000000 -0500
++++ linux-2.6.10/include/asm-x86_64/hw_irq.h	2005-02-25 17:45:37.181518088 -0500
+@@ -48,6 +48,7 @@
+  *
+  *  Vectors 0xf0-0xf9 are free (reserved for future Linux use).
+  */
++#if 0
+ #define SPURIOUS_APIC_VECTOR	0xff
+ #define ERROR_APIC_VECTOR	0xfe
+ #define INVALIDATE_TLB_VECTOR	0xfd
+@@ -57,7 +58,7 @@
+ #define KDB_VECTOR	0xf9
+ 
+ #define THERMAL_APIC_VECTOR	0xf0
+-
++#endif
+ 
+ /*
+  * Local APIC timer IRQ vector is on a different priority level,
+diff -urN linux-2.6.10-orig/include/asm-x86_64/irq.h linux-2.6.10/include/asm-x86_64/irq.h
+--- linux-2.6.10-orig/include/asm-x86_64/irq.h	2005-01-06 00:34:38.000000000 -0500
++++ linux-2.6.10/include/asm-x86_64/irq.h	2005-02-25 17:45:37.181518088 -0500
+@@ -10,6 +10,7 @@
+  *	<tomsoft@informatik.tu-chemnitz.de>
+  */
+ 
++#include "irq_vectors.h"
+ #define TIMER_IRQ 0
+ 
+ /*
+@@ -22,6 +23,7 @@
+  * the usable vector space is 0x20-0xff (224 vectors)
+  */
+ 
++#if 0
+ /*
+  * The maximum number of vectors supported by x86_64 processors
+  * is limited to 256. For processors other than x86_64, NR_VECTORS
+@@ -38,6 +40,7 @@
+ #define NR_IRQS 224
+ #define NR_IRQ_VECTORS 1024
+ #endif
++#endif
+ 
+ static __inline__ int irq_canonicalize(int irq)
+ {
+diff -urN linux-2.6.10-orig/include/asm-x86_64/posix_types.h linux-2.6.10/include/asm-x86_64/posix_types.h
+--- linux-2.6.10-orig/include/asm-x86_64/posix_types.h	2004-10-18 17:55:29.000000000 -0400
++++ linux-2.6.10/include/asm-x86_64/posix_types.h	2005-02-25 17:45:37.183517784 -0500
+@@ -6,7 +6,7 @@
+  * be a little careful about namespace pollution etc.  Also, we cannot
+  * assume GCC is being used.
+  */
+-
++#ifndef __ASSEMBLY__
+ typedef unsigned long	__kernel_ino_t;
+ typedef unsigned int	__kernel_mode_t;
+ typedef unsigned long	__kernel_nlink_t;
+@@ -115,5 +115,5 @@
+ }
+ 
+ #endif /* defined(__KERNEL__) */
+-
++#endif
+ #endif
