@@ -296,7 +296,6 @@ __gnttab_map_grant_ref(
                                                         _PAGE_DIRTY    |
                        ((flags & GNTMAP_readonly) ? 0 : _PAGE_RW),
                        ld, led );
-        DPRINTK("update_grant_va_mapping : rc %d\n", rc);
 
         spin_lock(&rd->grant_table->lock);
 
@@ -389,7 +388,7 @@ __gnttab_unmap_grant_ref(
     active_grant_entry_t *act;
     grant_entry_t *sha;
     grant_mapping_t *map;
-    s16            rc = -EFAULT;
+    s16            rc = 1;
     unsigned long  frame, virt;
 
     ld = current->domain;
@@ -431,8 +430,6 @@ __gnttab_unmap_grant_ref(
     act = &rd->grant_table->active[ref];
     sha = &rd->grant_table->shared[ref];
 
-    // cwc22: TODO: put_maptrack_handle
-
     spin_lock(&rd->grant_table->lock);
 
     if ( frame != 0 )
@@ -443,10 +440,14 @@ __gnttab_unmap_grant_ref(
         if ( map->ref_and_flags & GNTMAP_device_map )
             act->pin -= (map->ref_and_flags & GNTMAP_readonly) ? 
                 GNTPIN_devr_inc : GNTPIN_devw_inc;
+
+        map->ref_and_flags &= ~GNTMAP_device_map;
+        (void)__put_user(0, &uop->dev_bus_addr);
     }
     else
         frame = act->frame;
 
+    /* frame is now unmapped for device access */
 
     if ( (virt != 0) &&
          (map->ref_and_flags & GNTMAP_host_map) &&
@@ -485,12 +486,16 @@ __gnttab_unmap_grant_ref(
             goto fail;
         }
 
+        map->ref_and_flags &= ~GNTMAP_host_map;
+
         act->pin -= (map->ref_and_flags & GNTMAP_readonly) ?
                         GNTPIN_hstr_inc : GNTPIN_hstw_inc;
-
         rc = 0;
         *va = virt;
     }
+
+    if ( (map->ref_and_flags & (GNTMAP_device_map|GNTMAP_host_map)) == 0)
+        put_maptrack_handle(ld->grant_table, handle);
 
     /* If the last writable mapping has been removed, put_page_type */
     if ( ((act->pin & (GNTPIN_devw_mask|GNTPIN_hstw_mask)) == 0) &&
