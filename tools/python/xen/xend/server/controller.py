@@ -270,7 +270,7 @@ class CtrlMsgRcvr:
         else:
             print 'CtrlMsgRcvr>writeResponse>', 'no channel!', self
             
-class ControllerFactory(CtrlMsgRcvr):
+class ControllerFactory:
     """Abstract class for factories creating controllers for a domain.
     Maintains a table of instances.
 
@@ -281,8 +281,8 @@ class ControllerFactory(CtrlMsgRcvr):
     """
 
     def __init__(self):
-        CtrlMsgRcvr.__init__(self)
         self.instances = {}
+        self.backends = {}
         self.dom = 0
         
     def addInstance(self, instance):
@@ -369,6 +369,111 @@ class Controller(CtrlMsgRcvr):
         """
         self.deregisterChannel()
         self.factory.instanceClosed(self)
+
+class SplitControllerFactory(ControllerFactory):
+    """Factory for SplitControllers.
+    
+    @ivar backends:  mapping of domain id to backend
+    @type backends:  {int: BackendController}
+    """
+    
+    def __init__(self):
+        ControllerFactory.__init__(self)
+        self.backends = {}
+
+    def createInstance(self, dom, recreate=0, backend=0):
+        """Create an instance. Define in a subclass.
+
+        @param dom: domain
+        @type  dom: int
+        @param recreate: true if the instance is being recreated (after xend restart)
+        @type  recreate: int
+        @param backend: backend domain
+        @type  backend: int
+        @return: controller instance
+        @rtype:  SplitController (or subclass)
+        """
+        raise NotImplementedError()
+        
+    def getBackendController(self, dom):
+        """Get the backend controller for a domain.
+
+        @param dom: domain
+        @return: backend controller
+        """
+        ctrlr = self.backends.get(dom)
+        if ctrlr is None:
+            ctrlr = self.createBackendController(dom)
+            self.backends[dom] = ctrlr
+        return ctrlr
+
+    def createBackendController(self, dom):
+        """Create a backend controller. Define in a subclass.
+
+        @param dom: domain
+        """
+        raise NotImplementedError()
+
+    def delBackendController(self, ctrlr):
+        """Remove a backend controller.
+
+        @param ctrlr: backend controller
+        """
+        if ctrlr.dom in self.backends:
+            del self.backends[ctrlr.dom]
+
+    def backendControllerClosed(self, ctrlr):
+        """Callback called when a backend is closed.
+        """
+        self.delBackendController(ctrlr)
+
+class BackendController(CtrlMsgRcvr):
+    """Abstract class for a backend device controller attached to a domain.
+
+    @ivar factory: controller factory
+    @type factory: ControllerFactory
+    @ivar dom:     domain
+    @type dom:     int
+    @ivar channel: channel to the domain
+    @type channel: Channel
+    """
+
+    
+    def __init__(self, factory, dom):
+        CtrlMsgRcvr.__init__(self)
+        self.factory = factory
+        self.dom = int(dom)
+        self.channel = None
+        
+    def close(self):
+        self.lostChannel()
+
+    def lostChannel(self):
+        self.deregisterChannel()
+        self.factory.instanceClosed(self)
+
+
+class SplitController(Controller):
+    """Abstract class for a device controller attached to a domain.
+    A SplitController has a BackendContoller.
+    """
+
+    def __init__(self, factory, dom, backend):
+        Controller.__init__(self, factory, dom)
+        self.backendDomain = None
+        self.backendController = None
+        self.setBackendDomain(backend)
+        
+    def setBackendDomain(self, dom):
+        ctrlr = self.factory.getBackendController(dom)
+        self.backendDomain = ctrlr.dom
+        self.backendController = ctrlr
+
+    def getBackendDomain(self):
+        return self.backendDomain
+
+    def getBackendController(self):
+        return self.backendController
 
 class Dev:
     """Abstract class for a device attached to a device controller.

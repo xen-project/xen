@@ -18,20 +18,49 @@ import channel
 import controller
 from messages import *
 
-class NetifControllerFactory(controller.ControllerFactory):
-    """Factory for creating network interface controllers.
-    Also handles the 'back-end' channel to the device driver domain.
+class NetifBackendController(controller.BackendController):
+    """Handler for the 'back-end' channel to a device driver domain.
     """
-
-    def __init__(self):
-        controller.ControllerFactory.__init__(self)
+    
+    def __init__(self, factory, dom):
+        controller.BackendController.__init__(self, factory, dom)
         self.addMethod(CMSG_NETIF_BE,
                        CMSG_NETIF_BE_DRIVER_STATUS_CHANGED,
                        self.recv_be_driver_status_changed)
         self.attached = 1
         self.registerChannel()
 
-    def createInstance(self, dom, recreate=0):
+    def respond_be_connect(self, msg):
+        val = unpackMsg('netif_be_connect_t', msg)
+        dom = val['domid']
+        vif = val['netif_handle']
+        netif = self.factory.getInstanceByDom(dom)
+        if netif:
+            netif.send_interface_connected(vif)
+        else:
+            log.warning("respond_be_connect> unknown vif dom=%d vif=%d", dom, vif)
+            pass
+
+    def recv_be_driver_status_changed(self, msg, req):
+        val = unpackMsg('netif_be_driver_status_changed_t', msg)
+        status = val['status']
+        if status == NETIF_DRIVER_STATUS_UP and not self.attached:
+            # If we are not attached the driver domain was changed, and
+            # this signals the new driver domain is ready.
+            for netif in self.factory.getInstances():
+                if netif.backendController == self:
+                    netif.reattach_devices()
+            self.attached = 1
+
+class NetifControllerFactory(controller.SplitControllerFactory):
+    """Factory for creating network interface controllers.
+    """
+
+    def __init__(self):
+        controller.ControllerFactory.__init__(self)
+        self.attached = 1
+
+    def createInstance(self, dom, recreate=0, backend=0):
         """Create or find the network interface controller for a domain.
 
         @param dom:      domain
@@ -40,7 +69,7 @@ class NetifControllerFactory(controller.ControllerFactory):
         """
         netif = self.getInstanceByDom(dom)
         if netif is None:
-            netif = NetifController(self, dom)
+            netif = NetifController(self, dom, backend=backend)
             self.addInstance(netif)
         return netif
 
@@ -63,6 +92,9 @@ class NetifControllerFactory(controller.ControllerFactory):
         netif = self.getInstanceByDom(dom)
         return (netif and netif.getDevice(vif)) or None
         
+    def createBackendController(self, dom):
+        return NetifBackendController(self, dom)
+
     def setControlDomain(self, dom, recreate=0):
         """Set the 'back-end' device driver domain.
 
@@ -82,27 +114,6 @@ class NetifControllerFactory(controller.ControllerFactory):
         @return domain id
         """
         return self.dom
-
-    def respond_be_connect(self, msg):
-        val = unpackMsg('netif_be_connect_t', msg)
-        dom = val['domid']
-        vif = val['netif_handle']
-        netif = self.getInstanceByDom(dom)
-        if netif:
-            netif.send_interface_connected(vif)
-        else:
-            log.warning("respond_be_connect> unknown vif dom=%d vif=%d", dom, vif)
-            pass
-
-    def recv_be_driver_status_changed(self, msg, req):
-        val = unpackMsg('netif_be_driver_status_changed_t', msg)
-        status = val['status']
-        if status == NETIF_DRIVER_STATUS_UP and not self.attached:
-            # If we are not attached the driver domain was changed, and
-            # this signals the new driver domain is ready.
-            for netif in self.getInstances():
-                netif.reattach_devices()
-            self.attached = 1
 
 class NetDev(controller.Dev):
     """Info record for a network device.
@@ -207,14 +218,13 @@ class NetDev(controller.Dev):
         self.controller.send_be_disconnect(self.vif, response=d)
         
 
-class NetifController(controller.Controller):
+class NetifController(controller.SplitController):
     """Network interface controller. Handles all network devices for a domain.
     """
     
-    def __init__(self, factory, dom):
-        controller.Controller.__init__(self, factory, dom)
+    def __init__(self, factory, dom, backend):
+        controller.SplitController.__init__(self, factory, dom, backend)
         self.devices = {}
-        
         self.addMethod(CMSG_NETIF_FE,
                        CMSG_NETIF_FE_DRIVER_STATUS_CHANGED,
                        self.recv_fe_driver_status_changed)
@@ -317,8 +327,8 @@ class NetifController(controller.Controller):
                         'tx_shmem_frame' : val['tx_shmem_frame'],
                         'rx_shmem_frame' : val['rx_shmem_frame'] })
         d = defer.Deferred()
-        d.addCallback(self.factory.respond_be_connect)
-        self.factory.writeRequest(msg, response=d)
+        d.addCallback(self.backendController.respond_be_connect)
+        self.backendController.writeRequest(msg, response=d)
 
     def send_interface_connected(self, vif, response=None):
         dev = self.devices[vif]
@@ -335,14 +345,14 @@ class NetifController(controller.Controller):
                       { 'domid'        : self.dom,
                         'netif_handle' : dev.vif,
                         'mac'          : dev.mac })
-        self.factory.writeRequest(msg, response=response)
+        self.backendController.writeRequest(msg, response=response)
 
     def send_be_disconnect(self, vif, response=None):
         dev = self.devices[vif]
         msg = packMsg('netif_be_disconnect_t',
                       { 'domid'        : self.dom,
                         'netif_handle' : dev.vif })
-        self.factory.writeRequest(msg, response=response)
+        self.backendController.writeRequest(msg, response=response)
 
     def send_be_destroy(self, vif, response=None):
         dev = self.devices[vif]
@@ -350,4 +360,4 @@ class NetifController(controller.Controller):
         msg = packMsg('netif_be_destroy_t',
                       { 'domid'        : self.dom,
                         'netif_handle' : vif })
-        self.factory.writeRequest(msg, response=response)
+        self.backendController.writeRequest(msg, response=response)
