@@ -369,6 +369,7 @@
 40dc4076St6AmPTmQPrtQ6LGHPxGmw tools/python/xen/lowlevel/xu/__init__.py
 40dc4076pVeE1kEEWzcUaNZin65kCA tools/python/xen/lowlevel/xu/domain_controller.h
 40dc4076CwBYRTUQDdbdU1L6KcLgSw tools/python/xen/lowlevel/xu/xu.c
+41052eb84_irpx0E9N_kqBp9eoin5g tools/python/xen/sv/CreateDomain.py
 40fcefb2qm13BbRZBydAatOavaS0fQ tools/python/xen/sv/DomInfo.py
 40fcefb2-RIU8GB67mJMRzybME9bxw tools/python/xen/sv/DomList.py
 40fcefb23FfQn-ZBCbcHqA0cPGqQxw tools/python/xen/sv/GenTabbed.py
@@ -376,6 +377,7 @@
 40fcefb2vnfDbl4w_yCTedROPuqs0g tools/python/xen/sv/Main.py
 40fcefb24h-04WaHag-Tg4nxWPhTig tools/python/xen/sv/NodeInfo.py
 40fcefb2Sif__6AqrANeBQZZfvP-6w tools/python/xen/sv/TabView.py
+41052eb8UrgtUkuJPg7oY1tutVQHsg tools/python/xen/sv/Wizzard.py
 40fcefb2DqteqCCZYDCvvh4Q5jBd0w tools/python/xen/sv/__init__.py
 40fcefb4rnaZNjqsBu7A5V2rlLyqRw tools/python/xen/sv/util.py
 40d8915cyoVA0hJxiBFNymL7YvDaRg tools/python/xen/util/Brctl.py
@@ -440,9 +442,11 @@
 40fcefb3K6ESt5sQhD9aCQRscQIlXQ tools/sv/images/left-end-no-highlight.jpg
 40fcefb3BUT98zPzW8kAFKuxGdh4XA tools/sv/images/middle-highlight.jpg
 40fcefb38OTgsUKHBpwshLLIsiIaCA tools/sv/images/middle-no-highlight.jpg
+41052eb9SDUqSLGtG6rxk6Ep5fOhFA tools/sv/images/next.png
 40fcefb32SPtrw36c4S6YGFlLvkKuw tools/sv/images/orb_01.jpg
 40fcefb3Ok5qkX3iM7ZEPVkRInrUpg tools/sv/images/orb_02.jpg
 4104ffca9_GhWOxRE-83uZIad2Z1gg tools/sv/images/pause.png
+41052eb9NQqHe_f9-ev1CaA3y5YYZg tools/sv/images/previous.png
 41013a82ILk71xLqWFH5ZO5VmOIvBw tools/sv/images/reboot.png
 40fcefb3JnT5XeKTuVF4yUMGOtuNZg tools/sv/images/right-end-highlight.jpg
 40fcefb3-DuYOS7noo2W7b_0p7TOUg tools/sv/images/right-end-no-highlight.jpg

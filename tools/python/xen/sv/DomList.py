@@ -43,7 +43,7 @@ class DomList( HTMLBase ):
     def write_DOMAIN( self, request, domInfoHash, long=True ):   
         request.write( "<td class='domainInfo' align='center'>%(dom)-4d</td>\n" % domInfoHash )
 
-        url = self.urlWriter( "mod=info&dom=%(dom)-4d" % domInfoHash )
+        url = self.urlWriter( "&mod=info&dom=%(dom)-4d" % domInfoHash )
 
         request.write( "<td class='domainInfo' align='center'><a href='%s'>%s</a></td>\n" % ( url, domInfoHash['name'] ) )
         if long: 
