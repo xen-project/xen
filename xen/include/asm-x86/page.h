@@ -99,6 +99,13 @@ typedef struct { unsigned long l4_lo; } l4_pgentry_t;
   (((_a) >> L4_PAGETABLE_SHIFT) & (ENTRIES_PER_L4_PAGETABLE - 1))
 #endif
 
+/* Given a virtual address, get an entry offset into a linear page table. */
+#if defined(__i386__)
+#define l1_linear_offset(_a) ((_a) >> PAGE_SHIFT)
+#elif defined(__x86_64__)
+#define l1_linear_offset(_a) (((_a) & ((1UL << 48) - 1)) >> PAGE_SHIFT)
+#endif
+
 #if defined(__i386__)
 #define pagetable_t l2_pgentry_t
 #define pagetable_val(_x)  ((_x).l2_lo)

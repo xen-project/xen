@@ -95,7 +95,7 @@ static void fast_flush_area(int idx, int nr_pages)
     for ( i = 0; i < nr_pages; i++ )
     {
         mcl[i].op = __HYPERVISOR_update_va_mapping;
-        mcl[i].args[0] = MMAP_VADDR(idx, i) >> PAGE_SHIFT;
+        mcl[i].args[0] = MMAP_VADDR(idx, i);
         mcl[i].args[1] = 0;
         mcl[i].args[2] = 0;
     }
@@ -343,14 +343,14 @@ static void dispatch_probe(blkif_t *blkif, blkif_request_t *req)
 
 #ifdef CONFIG_XEN_BLKDEV_TAP_BE
     if ( HYPERVISOR_update_va_mapping_otherdomain(
-        MMAP_VADDR(pending_idx, 0) >> PAGE_SHIFT,
+        MMAP_VADDR(pending_idx, 0),
         (pte_t) { (req->frame_and_sects[0] & PAGE_MASK) | __PAGE_KERNEL },
         0, (blkif->is_blktap ? ID_TO_DOM(req->id) : blkif->domid) ) )
         
         goto out;
 #else
     if ( HYPERVISOR_update_va_mapping_otherdomain(
-        MMAP_VADDR(pending_idx, 0) >> PAGE_SHIFT,
+        MMAP_VADDR(pending_idx, 0),
         (pte_t) { (req->frame_and_sects[0] & PAGE_MASK) | __PAGE_KERNEL },
         0, blkif->domid) ) 
         
@@ -436,7 +436,7 @@ static void dispatch_rw_block_io(blkif_t *blkif, blkif_request_t *req)
     for ( i = 0; i < nr_psegs; i++ )
     {
         mcl[i].op = __HYPERVISOR_update_va_mapping_otherdomain;
-        mcl[i].args[0] = MMAP_VADDR(pending_idx, i) >> PAGE_SHIFT;
+        mcl[i].args[0] = MMAP_VADDR(pending_idx, i);
         mcl[i].args[1] = (phys_seg[i].buffer & PAGE_MASK) | remap_prot;
         mcl[i].args[2] = 0;
 #ifdef CONFIG_XEN_BLKDEV_TAP_BE

@@ -234,7 +234,7 @@ static void net_rx_action(unsigned long unused)
         mmu[2].val  = MMUEXT_REASSIGN_PAGE;
 
         mcl[0].op = __HYPERVISOR_update_va_mapping;
-        mcl[0].args[0] = vdata >> PAGE_SHIFT;
+        mcl[0].args[0] = vdata;
         mcl[0].args[1] = (new_mfn << PAGE_SHIFT) | __PAGE_KERNEL;
         mcl[0].args[2] = 0;
         mcl[1].op = __HYPERVISOR_mmu_update;
@@ -409,7 +409,7 @@ static void net_tx_action(unsigned long unused)
     {
         pending_idx = dealloc_ring[MASK_PEND_IDX(dc++)];
         mcl[0].op = __HYPERVISOR_update_va_mapping;
-        mcl[0].args[0] = MMAP_VADDR(pending_idx) >> PAGE_SHIFT;
+        mcl[0].args[0] = MMAP_VADDR(pending_idx);
         mcl[0].args[1] = 0;
         mcl[0].args[2] = 0;
         mcl++;     
@@ -546,7 +546,7 @@ static void net_tx_action(unsigned long unused)
         skb_reserve(skb, 16);
 
         mcl[0].op = __HYPERVISOR_update_va_mapping_otherdomain;
-        mcl[0].args[0] = MMAP_VADDR(pending_idx) >> PAGE_SHIFT;
+        mcl[0].args[0] = MMAP_VADDR(pending_idx);
         mcl[0].args[1] = (txreq.addr & PAGE_MASK) | __PAGE_KERNEL;
         mcl[0].args[2] = 0;
         mcl[0].args[3] = netif->domid;

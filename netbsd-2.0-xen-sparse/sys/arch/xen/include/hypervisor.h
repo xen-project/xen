@@ -398,7 +398,7 @@ HYPERVISOR_multicall(void *call_list, int nr_calls)
 }
 
 static inline int
-HYPERVISOR_update_va_mapping(unsigned long page_nr, unsigned long new_val,
+HYPERVISOR_update_va_mapping(unsigned long va, unsigned long new_val,
     unsigned long flags)
 {
     int ret;
@@ -408,12 +408,12 @@ HYPERVISOR_update_va_mapping(unsigned long page_nr, unsigned long new_val,
         TRAP_INSTR
         : "=a" (ret), "=b" (ign1), "=c" (ign2), "=d" (ign3)
 	: "0" (__HYPERVISOR_update_va_mapping), 
-          "1" (page_nr), "2" (new_val), "3" (flags)
+          "1" (va), "2" (new_val), "3" (flags)
 	: "memory" );
 
     if (__predict_false(ret < 0))
         panic("Failed update VA mapping: %08lx, %08lx, %08lx",
-              page_nr, new_val, flags);
+              va, new_val, flags);
 
     return ret;
 }
@@ -494,7 +494,7 @@ HYPERVISOR_grant_table_op(unsigned int cmd, void *uop, unsigned int count)
 }
 
 static inline int
-HYPERVISOR_update_va_mapping_otherdomain(unsigned long page_nr,
+HYPERVISOR_update_va_mapping_otherdomain(unsigned long va,
     unsigned long new_val, unsigned long flags, domid_t domid)
 {
     int ret;
@@ -504,7 +504,7 @@ HYPERVISOR_update_va_mapping_otherdomain(unsigned long page_nr,
         TRAP_INSTR
         : "=a" (ret), "=b" (ign1), "=c" (ign2), "=d" (ign3), "=S" (ign4)
 	: "0" (__HYPERVISOR_update_va_mapping_otherdomain),
-          "1" (page_nr), "2" (new_val), "3" (flags), "4" (domid) :
+          "1" (va), "2" (new_val), "3" (flags), "4" (domid) :
         "memory" );
     
     return ret;
