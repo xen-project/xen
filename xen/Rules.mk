@@ -23,6 +23,7 @@ ALL_OBJS += $(BASEDIR)/drivers/block/driver.o
 ALL_OBJS += $(BASEDIR)/drivers/cdrom/driver.o
 ALL_OBJS += $(BASEDIR)/drivers/ide/driver.o
 ALL_OBJS += $(BASEDIR)/drivers/scsi/driver.o
+ALL_OBJS += $(BASEDIR)/drivers/message/fusion/driver.o
 ALL_OBJS += $(BASEDIR)/arch/$(ARCH)/arch.o
 
 HOSTCC     = gcc

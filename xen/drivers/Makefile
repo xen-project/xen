@@ -7,6 +7,7 @@ default:
 	$(MAKE) -C cdrom
 	$(MAKE) -C ide
 	$(MAKE) -C scsi
+	$(MAKE) -C message/fusion
 
 clean:
 	$(MAKE) -C char clean
@@ -16,3 +17,4 @@ clean:
 	$(MAKE) -C cdrom clean
 	$(MAKE) -C ide clean
 	$(MAKE) -C scsi clean
+	$(MAKE) -C message/fusion clean

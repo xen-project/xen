@@ -3355,8 +3355,6 @@ int megaraid_detect (Scsi_Host_Template * pHostTmpl)
 		skip_id = (skip_id > 15) ? -1 : skip_id;
 	}
 
-	printk (KERN_NOTICE "megaraid: " MEGARAID_VERSION);
-
 	memset (mega_hbas, 0, sizeof (mega_hbas));
 
 	/* Detect ROMBs first */
@@ -3378,7 +3376,11 @@ int megaraid_detect (Scsi_Host_Template * pHostTmpl)
 	count += mega_findCard (pHostTmpl, PCI_VENDOR_ID_PERC4_QC_VERDE,
 				PCI_DEVICE_ID_PERC4_QC_VERDE, BOARD_QUARTZ);
 
-	mega_reorder_hosts ();
+	if (count)
+		printk (KERN_NOTICE "megaraid: " MEGARAID_VERSION);
+
+	if (count)
+		mega_reorder_hosts ();
 
 #ifdef CONFIG_PROC_FS
 	if (count) {
