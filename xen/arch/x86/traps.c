@@ -286,7 +286,7 @@ asmlinkage int do_page_fault(struct xen_regs *regs)
              ((regs->error_code & 3) == 3) && /* write-protection fault */
              ptwr_do_page_fault(addr) )
         {
-            if ( unlikely(shadow_mode(d)) )
+            if ( unlikely(shadow_mode_enabled(d)) )
                 (void)shadow_fault(addr, regs->error_code);
             UNLOCK_BIGLOCK(d);
             return EXCRET_fault_fixed;
@@ -294,7 +294,7 @@ asmlinkage int do_page_fault(struct xen_regs *regs)
         UNLOCK_BIGLOCK(d);
     }
 
-    if ( unlikely(shadow_mode(d)) && 
+    if ( unlikely(shadow_mode_enabled(d)) && 
          (addr < PAGE_OFFSET) && shadow_fault(addr, regs->error_code) )
         return EXCRET_fault_fixed;
 
@@ -330,7 +330,7 @@ asmlinkage int do_page_fault(struct xen_regs *regs)
     if ( likely((fixup = search_exception_table(regs->eip)) != 0) )
     {
         perfc_incrc(copy_user_faults);
-        if ( !shadow_mode(d) )
+        if ( !shadow_mode_enabled(d) )
             DPRINTK("Page fault: %p -> %p\n", regs->eip, fixup);
         regs->eip = fixup;
         return 0;
