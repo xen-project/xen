@@ -321,6 +321,30 @@ void __init start_of_day(void)
     extern int do_timer_lists_from_pit;
     unsigned long low_mem_size;
     
+#ifdef STACK_GUARD
+    extern unsigned long cpu0_stack[];
+    l1_pgentry_t *l1;
+    l2_pgentry_t *l2;
+    int i, j;
+
+    /* When stack-guarding, Xen's heap cannot be mapped by super pages. */
+    for ( i = 0; i < (MAX_MONITOR_ADDRESS >> L2_PAGETABLE_SHIFT); i++ )
+    {
+        l1 = (l1_pgentry_t *)get_free_page(GFP_KERNEL);
+        for ( j = 0; j < ENTRIES_PER_L1_PAGETABLE; j++ )
+            l1[j] = mk_l1_pgentry((i << L2_PAGETABLE_SHIFT) |
+                                   (j << L1_PAGETABLE_SHIFT) | 
+                                   PAGE_HYPERVISOR);
+        idle_pg_table[i] = idle_pg_table[i + l2_table_offset(PAGE_OFFSET)] =
+            mk_l2_pgentry(virt_to_phys(l1) | PAGE_HYPERVISOR);
+    }
+
+    /* Unmap the first page of CPU0's stack. */
+    l2  = &idle_pg_table[l2_table_offset(virt_to_phys(cpu0_stack))];
+    l1  = l2_pgentry_to_l1(*l2) + l1_table_offset(virt_to_phys(cpu0_stack));
+    *l1 = mk_l1_pgentry(0);
+#endif
+
     if ( opt_watchdog ) 
         nmi_watchdog = NMI_LOCAL_APIC;
 

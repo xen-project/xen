@@ -667,7 +667,7 @@ static void __init do_boot_cpu (int apicid)
     struct task_struct *idle;
     unsigned long boot_error = 0;
     int timeout, cpu;
-    unsigned long start_eip;
+    unsigned long start_eip, stack;
 
     cpu = ++cpucount;
 
@@ -687,7 +687,17 @@ static void __init do_boot_cpu (int apicid)
 
     /* So we see what's up. */
     printk("Booting processor %d/%d eip %lx\n", cpu, apicid, start_eip);
-    stack_start.esp = __pa(get_free_page(GFP_KERNEL)) + 4000;
+
+    stack = __pa(__get_free_pages(GFP_KERNEL, 1));
+#ifdef STACK_GUARD
+    {
+        /* Unmap the first page of the new CPU0's stack. */
+        l2_pgentry_t *l2  = &idle_pg_table[l2_table_offset(stack)];
+        l1_pgentry_t *l1  = l2_pgentry_to_l1(*l2) + l1_table_offset(stack);
+        *l1 = mk_l1_pgentry(0);
+    }
+#endif
+    stack_start.esp = stack + STACK_SIZE - STACK_RESERVED;
 
     /*
      * This grunge runs the startup process for

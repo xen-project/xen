@@ -7,7 +7,6 @@
 #include <asm/ptrace.h>
 #include <xeno/smp.h>
 #include <asm/processor.h>
-#include <asm/current.h>
 #include <hypervisor-ifs/hypervisor-if.h>
 #include <hypervisor-ifs/dom0_ops.h>
 
@@ -16,6 +15,9 @@
 #include <xeno/ac_timer.h>
 #include <xeno/delay.h>
 #include <xeno/rbtree.h>
+
+#define STACK_SIZE (2*PAGE_SIZE)
+#include <asm/current.h>
 
 #define MAX_DOMAIN_NAME 16
 
@@ -189,8 +191,6 @@ extern struct task_struct idle0_task;
 extern struct task_struct *idle_task[NR_CPUS];
 #define IDLE_DOMAIN_ID   (~0)
 #define is_idle_task(_p) ((_p)->domain == IDLE_DOMAIN_ID)
-
-#define STACK_SIZE PAGE_SIZE
 
 #include <xeno/slab.h>
 
