@@ -90,6 +90,7 @@
 3f108aeaLcGDgQdFAANLTUEid0a05w linux-2.4.29-xen-sparse/drivers/char/mem.c
 3e5a4e66rw65CxyolW9PKz4GG42RcA linux-2.4.29-xen-sparse/drivers/char/tty_io.c
 40c9c0c1pPwYE3-4i-oI3ubUu7UgvQ linux-2.4.29-xen-sparse/drivers/scsi/aic7xxx/Makefile
+41f97f64nW0wmgLxhwzPTzkF4E5ERA linux-2.4.29-xen-sparse/drivers/usb/hcd.c
 3e5a4e669uzIE54VwucPYtGwXLAbzA linux-2.4.29-xen-sparse/fs/exec.c
 3e5a4e66wbeCpsJgVf_U8Jde-CNcsA linux-2.4.29-xen-sparse/include/asm-xen/bugs.h
 3e5a4e66HdSkvIV6SJ1evG_xmTmXHA linux-2.4.29-xen-sparse/include/asm-xen/desc.h
