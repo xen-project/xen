@@ -794,7 +794,7 @@ static int check_l1_table(
         BUG();                                                 \
     } while ( 0 )
 
-int check_pagetable(struct mm_struct *m, pagetable_t pt, char *s)
+int _check_pagetable(struct mm_struct *m, pagetable_t pt, char *s)
 {
     unsigned long gptbase = pagetable_val(pt);
     unsigned long gpfn, spfn;
