@@ -75,14 +75,12 @@ void register_irq_keyhandler(
 static void show_handlers(unsigned char key)
 {
     int i; 
-    int buffer_enable = sercon_buffer_bypass();
     printk("'%c' pressed -> showing installed handlers\n", key);
     for ( i = 0; i < KEY_MAX; i++ ) 
         if ( key_table[i].u.handler != NULL ) 
             printk(" key '%c' (ascii '%02x') => %s\n", 
                    (i<33 || i>126)?(' '):(i),i,
                    key_table[i].desc);
-    sercon_buffer_set(buffer_enable);
 }
 
 static void dump_registers(unsigned char key, struct xen_regs *regs)
@@ -179,10 +177,6 @@ void initialize_keytable(void)
 #ifndef NDEBUG
     register_keyhandler(
         'o', audit_domains_key,  "audit domains >0 EXPERIMENTAL"); 
-
-    register_keyhandler(
-        'c', sercon_buffer_toggle,
-        "toggle serial console output vs ring buffer capture");
 #endif
 
 #ifdef PERF_COUNTERS
@@ -191,5 +185,6 @@ void initialize_keytable(void)
     register_keyhandler(
         'P', perfc_reset,    "reset performance counters"); 
 #endif
+
     register_irq_keyhandler('%', do_debug_key,   "Trap to xendbg");
 }

@@ -2,11 +2,18 @@
 #define __LIB_H__
 
 #include <stdarg.h>
+#include <xen/config.h>
 #include <xen/types.h>
 #include <xen/string.h>
 
+#define BUG() do {					\
+    printk("BUG at %s:%d\n", __FILE__, __LINE__);	\
+    debugtrace_dump();                                  \
+    FORCE_CRASH();                                      \
+} while ( 0 )
+
 #ifndef NDEBUG
-#define ASSERT(_p) if ( !(_p) ) { printk("Assertion '%s' failed, line %d, file %s\n", #_p , __LINE__, __FILE__); *(int*)0=0; }
+#define ASSERT(_p) if ( !(_p) ) { printk("Assertion '%s' failed, line %d, file %s\n", #_p , __LINE__, __FILE__); BUG(); }
 #else
 #define ASSERT(_p) ((void)0)
 #endif
@@ -19,6 +26,16 @@
 struct domain;
 
 void cmdline_parse(char *cmdline);
+
+#ifndef NDEBUG
+extern void debugtrace_reset(void);
+extern void debugtrace_dump(void);
+extern void debugtrace_printk(const char *fmt, ...);
+#else
+#define debugtrace_reset()         ((void)0)
+#define debugtrace_dump()          ((void)0)
+#define debugtrace_printk(_f, ...) ((void)0)
+#endif
 
 #define printk printf
 void printf(const char *format, ...);

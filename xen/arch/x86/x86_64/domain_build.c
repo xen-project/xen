@@ -15,6 +15,7 @@
 #include <asm/system.h>
 #include <asm/io.h>
 #include <asm/processor.h>
+#include <asm/shadow.h>
 #include <asm/desc.h>
 #include <asm/i387.h>
 #include <xen/event.h>
@@ -328,8 +329,8 @@ int construct_dom0(struct domain *d,
         d->shared_info->vcpu_data[i].evtchn_upcall_mask = 1;
     d->shared_info->n_vcpu = smp_num_cpus;
 
-    /* setup shadow and monitor tables */
-    update_pagetable(ed);
+    /* Set up shadow and monitor tables. */
+    update_pagetables(ed);
 
     /* Install the new page tables. */
     __cli();

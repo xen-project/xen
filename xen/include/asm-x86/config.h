@@ -99,19 +99,7 @@ extern void __out_of_line_bug(int line) __attribute__((noreturn));
 #define out_of_line_bug() __out_of_line_bug(__LINE__)
 #endif /* __ASSEMBLY__ */
 
-#ifndef __ASSEMBLY__
-#ifndef NDEBUG
-extern void _sercon_buffer_dump(void);
-#define sercon_buffer_dump() _sercon_buffer_dump()
-#else
-#define sercon_buffer_dump() ((void)0)
-#endif
-#define BUG() do {					\
-	printk("BUG at %s:%d\n", __FILE__, __LINE__);	\
-        watchdog_on = 0;                                \
-        sercon_buffer_dump();                           \
-} while (0)
-#endif /* __ASSEMBLY__ */
+#define FORCE_CRASH() __asm__ __volatile__ ( "ud2" )
 
 #if defined(__x86_64__)
 

@@ -469,7 +469,6 @@ unsigned long shadow_l2_table(
 {
     struct pfn_info *spfn_info;
     unsigned long    spfn;
-    l2_pgentry_t    *spl2e = 0;
     unsigned long guest_gpfn;
 
     guest_gpfn = __mfn_to_gpfn(d, gpfn);
@@ -500,6 +499,7 @@ unsigned long shadow_l2_table(
     }
     else
     {
+        l2_pgentry_t *spl2e;
         spl2e = (l2_pgentry_t *)map_domain_mem(spfn << PAGE_SHIFT);
         /*
          * We could proactively fill in PDEs for pages that are already

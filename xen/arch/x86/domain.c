@@ -658,7 +658,7 @@ static void switch_segments(
         {
             n->arch.flags |= TF_kernel_mode;
             __asm__ __volatile__ ( "swapgs" );
-            update_pagetables(ed);
+            update_pagetables(n);
             write_ptbase(n);
         }
 

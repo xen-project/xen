@@ -51,18 +51,6 @@ static int vgacon_enabled = 0;
 
 spinlock_t console_lock = SPIN_LOCK_UNLOCKED;
 
-#ifndef NDEBUG
-static unsigned char *sercon_buffer      = NULL;
-static unsigned char *sercon_buffer_end  = NULL;
-static unsigned char *sercon_buffer_head = NULL;
-static unsigned char *sercon_buffer_next = NULL;
-
-static unsigned int opt_sercon_buffer_size = 128; /* kbytes */
-integer_param("conbuf", opt_sercon_buffer_size);
-
-static void sercon_buffer_puts(const unsigned char *s);
-#endif
-
 /*
  * *******************************************************
  * *************** OUTPUT TO VGA CONSOLE *****************
@@ -266,11 +254,9 @@ static void switch_serial_input(void)
     xen_rx = !xen_rx;
     if ( SWITCH_CODE != 0 )
     {
-        int buffer_enable = sercon_buffer_bypass();
         printk("*** Serial input -> %s "
                "(type 'CTRL-%c' three times to switch input to %s).\n",
                input_str[xen_rx], opt_conswitch[0], input_str[!xen_rx]);
-        sercon_buffer_set(buffer_enable);
     }
 }
 
@@ -369,12 +355,7 @@ static inline void __putstr(const char *str)
 {
     int c;
 
-#ifndef NDEBUG
-    if ( sercon_handle & SERHND_BUFFERED )
-        sercon_buffer_puts(str);
-    else
-#endif
-        serial_puts(sercon_handle, str);
+    serial_puts(sercon_handle, str);
 
     while ( (c = *str++) != '\0' )
     {
@@ -485,133 +466,99 @@ void console_force_lock(void)
     spin_lock(&console_lock);
 }
 
-// 09Feb2005: this appears to be unused...
-void console_putc(char c)
-{
-    serial_putc(sercon_handle, c);
-}
-
-// 09Feb2005: this appears to be unused...
-int console_getc(void)
-{
-    return serial_getc(sercon_handle);
-}
-
-// 09Feb2005: this appears to be unused...
-int irq_console_getc(void)
-{
-    return irq_serial_getc(sercon_handle);
-}
 
 
 /*
  * **************************************************************
- * *************** serial console ring buffer *******************
+ * *************** Serial console ring buffer *******************
  * **************************************************************
  */
 
 #ifndef NDEBUG
-static void sercon_buffer_putc(const unsigned char c)
+
+static unsigned char *debugtrace_buf; /* Debug-trace buffer */
+static unsigned int   debugtrace_prd; /* Producer index     */
+static unsigned int   debugtrace_kilobytes = 128, debugtrace_bytes;
+integer_param("debugtrace", debugtrace_kilobytes);
+#define DEBUGTRACE_MASK(_p) ((_p) & (debugtrace_bytes-1))
+
+void debugtrace_reset(void)
 {
-    if ( !sercon_buffer )
+    if ( debugtrace_bytes != 0 )
+        memset(debugtrace_buf, '\0', debugtrace_bytes);
+}
+
+void debugtrace_dump(void)
+{
+    int _watchdog_on = watchdog_on;
+
+    if ( debugtrace_bytes == 0 )
         return;
-    if ( !c )
+
+    /* Watchdog can trigger if we print a really large buffer. */
+    watchdog_on = 0;
+
+    /* Print oldest portion of the ring. */
+    serial_puts(sercon_handle,
+                &debugtrace_buf[DEBUGTRACE_MASK(debugtrace_prd)]);
+
+    /* Print youngest portion of the ring. */
+    debugtrace_buf[DEBUGTRACE_MASK(debugtrace_prd)] = '\0';
+    serial_puts(sercon_handle,
+                &debugtrace_buf[0]);
+
+    debugtrace_reset();
+
+    watchdog_on = _watchdog_on;
+}
+
+void debugtrace_printk(const char *fmt, ...)
+{
+    static spinlock_t _lock = SPIN_LOCK_UNLOCKED;
+    static char       buf[1024];
+
+    va_list       args;
+    unsigned char *p;
+    unsigned long  flags;
+
+    if ( debugtrace_bytes == 0 )
         return;
 
-    if ( sercon_buffer_next == sercon_buffer_end )
-    {
-        // buffer wrap-around case...
-        sercon_buffer_head = sercon_buffer + 1;
-        sercon_buffer_next = sercon_buffer;
-    }
-    if ( sercon_buffer_head == sercon_buffer_next + 1 )
-    {
-        // the buffer is already full...
-        sercon_buffer_head++;
-    }
-    *sercon_buffer_next++ = c;
-    *sercon_buffer_next = 0;
+    spin_lock_irqsave(&_lock, flags);
+
+    va_start(args, fmt);
+    (void)vsnprintf(buf, sizeof(buf), fmt, args);
+    va_end(args);        
+
+    for ( p = buf; *p != '\0'; p++ )
+        debugtrace_buf[DEBUGTRACE_MASK(debugtrace_prd++)] = *p;
+
+    spin_unlock_irqrestore(&_lock, flags);
 }
 
-static void sercon_buffer_puts(const unsigned char *s)
-{
-    // inefficient but simple...
-    while ( *s )
-        sercon_buffer_putc(*s++);
-}
-
-static void sercon_buffer_reset(void)
-{
-    sercon_buffer_head = sercon_buffer;
-    sercon_buffer_next = sercon_buffer;
-    sercon_buffer_head[0] = 0;
-}
-
-static void sercon_buffer_flush(void)
-{
-    serial_puts(sercon_handle, sercon_buffer_head);
-    if ( sercon_buffer_head != sercon_buffer )
-        serial_puts(sercon_handle, sercon_buffer);
-    sercon_buffer_reset();
-}
-
-void _sercon_buffer_dump(void)
-{
-    sercon_buffer_flush();
-    sercon_handle &= ~SERHND_BUFFERED;
-}
-
-void sercon_buffer_toggle(unsigned char key)
-{
-    if ( !sercon_buffer )
-    {
-        printk("serial console buffer not allocated\n");
-        return;
-    }
-
-    if ( sercon_handle & SERHND_BUFFERED )
-        sercon_buffer_flush();
-    sercon_handle ^= SERHND_BUFFERED;
-}
-
-void _sercon_buffer_set(int enable)
-{
-    if (enable)
-        sercon_handle |= SERHND_BUFFERED;
-    else
-        sercon_handle &= ~SERHND_BUFFERED;
-}
-
-int _sercon_buffer_bypass(void)
-{
-    int buffering = !!(sercon_handle & SERHND_BUFFERED);
-    sercon_handle &= ~SERHND_BUFFERED;
-
-    return buffering;
-}
-
-static int __init sercon_buffer_init(void)
+static int __init debugtrace_init(void)
 {
     int order;
-    int kbytes = opt_sercon_buffer_size;
+    unsigned int kbytes;
 
-    if ( !kbytes )
+    /* Round size down to next power of two. */
+    while ( (kbytes = (debugtrace_kilobytes & (debugtrace_kilobytes-1))) != 0 )
+        debugtrace_kilobytes = kbytes;
+
+    debugtrace_bytes = debugtrace_kilobytes << 10;
+    if ( debugtrace_bytes == 0 )
         return 0;
 
-    order = get_order(kbytes * 1024);
-    sercon_buffer = (void *)alloc_xenheap_pages(order);
-    ASSERT( sercon_buffer );
-
-    sercon_buffer_end = sercon_buffer + kbytes*1024 - 1;
-    *sercon_buffer_end = 0;
-
-    sercon_buffer_reset();
+    order = get_order(debugtrace_bytes);
+    debugtrace_buf = (unsigned char *)alloc_xenheap_pages(order);
+    ASSERT(debugtrace_buf != NULL);
 
     return 0;
 }
-__initcall(sercon_buffer_init);
+__initcall(debugtrace_init);
 
-#endif /* not NDEBUG */
+#endif /* !NDEBUG */
+
 
 
 /*
@@ -647,8 +594,7 @@ void panic(const char *fmt, ...)
     __putstr("Reboot in five seconds...\n");
     spin_unlock_irqrestore(&console_lock, flags);
 
-    watchdog_on = 0;
-    sercon_buffer_dump();
+    debugtrace_dump();
 
     mdelay(5000);
     machine_restart(0);

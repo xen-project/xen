@@ -18,7 +18,6 @@
 #define SERHND_HI       (1<<1) /* Mux/demux each transferred char by MSB. */
 #define SERHND_LO       (1<<2) /* Ditto, except that the MSB is cleared.  */
 #define SERHND_COOKED   (1<<3) /* Newline/carriage-return translation?    */
-#define SERHND_BUFFERED (1<<4) /* Console serial port ring buffered?      */
 
 /* Two-stage initialisation (before/after IRQ-subsystem initialisation). */
 void serial_init_stage1(void);
