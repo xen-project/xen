@@ -166,6 +166,7 @@ uninstall:
 	rm -rf $(D)/usr/share/doc/xen  $(D)/usr/man/man*/xentrace*
 	rm -rf $(D)/usr/bin/xen* $(D)/usr/bin/miniterm
 	rm -rf $(D)/boot/*xen*
+	rm -rf $(D)/lib/modules/*xen*
 
 # Legacy targets for compatibility
 linux24:
