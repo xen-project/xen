@@ -25,6 +25,8 @@ hal_entry:
         mov     $(__HYPERVISOR_DS),%ecx
         mov     %ecx,%ds
         mov     %ecx,%es
+        mov     %ecx,%fs
+        mov     %ecx,%gs
         ljmp    $(__HYPERVISOR_CS),$(1f)-__PAGE_OFFSET
 1:      lss     stack_start-__PAGE_OFFSET,%esp
 

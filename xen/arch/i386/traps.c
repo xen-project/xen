@@ -185,44 +185,6 @@ void die(const char * str, struct pt_regs * regs, long err)
     panic("HYPERVISOR DEATH!!\n");
 }
 
-#define check_selector(_s)                    \
-  ({ int err;                                 \
-     __asm__ __volatile__ (                   \
-             "1: movl %2,%%gs       \n"       \
-             "2:                    \n"       \
-             ".section .fixup,\"ax\"\n"       \
-             "3: incl %0            \n"       \
-             "   jmp  2b            \n"       \
-             ".previous             \n"       \
-             ".section __ex_table,\"a\"\n"    \
-             ".align 4              \n"       \
-             ".long 1b,3b           \n"       \
-             ".previous               "       \
-             : "=&r" (err) : "0" (0),         \
-               "m" (*(unsigned int *)&(_s))); \
-     err; })
-
-static inline void check_saved_selectors(struct pt_regs *regs)
-{
-    /* Prevent recursion. */
-    __asm__ __volatile__ ( 
-        "movl %0,%%fs; movl %0,%%gs" 
-        : : "r" (0) );
-
-    /*
-     * NB. We need to check DS and ES as well, since we may have taken
-     * an exception after they were restored in 
-     */
-    if ( check_selector(regs->xds) )
-        regs->xds = 0;
-    if ( check_selector(regs->xes) )
-        regs->xes = 0;
-    if ( check_selector(regs->xfs) )
-        regs->xfs = 0;
-    if ( check_selector(regs->xgs) )
-        regs->xgs = 0;
-}
-
 
 static inline void do_trap(int trapnr, char *str,
 			   struct pt_regs *regs, 
@@ -247,10 +209,10 @@ static inline void do_trap(int trapnr, char *str,
 
  fault_in_hypervisor:
 
-    if ( (fixup = search_exception_table(regs->eip)) != 0 )
+    if ( likely((fixup = search_exception_table(regs->eip)) != 0) )
     {
         regs->eip = fixup;
-        check_saved_selectors(regs);
+        regs->xds = regs->xes = regs->xfs = regs->xgs = __HYPERVISOR_DS;
         return;
     }
 
@@ -331,13 +293,13 @@ asmlinkage void do_page_fault(struct pt_regs *regs, long error_code)
 
     __asm__ __volatile__ ("movl %%cr2,%0" : "=r" (addr) : );
 
+    if ( unlikely(!(regs->xcs & 3)) )
+        goto fault_in_hypervisor;
+
     if ( unlikely(addr > PAGE_OFFSET) )
         goto fault_in_xen_space;
 
- bounce_fault:
-
-    if ( unlikely(!(regs->xcs & 3)) )
-        goto fault_in_hypervisor;
+ propagate_fault:
 
     ti = p->thread.traps + 14;
     gtb->flags = GTBF_TRAP_CR2; /* page fault pushes %cr2 */
@@ -359,7 +321,7 @@ asmlinkage void do_page_fault(struct pt_regs *regs, long error_code)
 
     if ( (addr < LDT_VIRT_START) || 
          (addr >= (LDT_VIRT_START + (p->mm.ldt_ents*LDT_ENTRY_SIZE))) )
-        goto bounce_fault;
+        goto propagate_fault;
 
     off  = addr - LDT_VIRT_START;
     addr = p->mm.ldt_base + off;
@@ -368,19 +330,19 @@ asmlinkage void do_page_fault(struct pt_regs *regs, long error_code)
 
     __get_user(l1e, (unsigned long *)(linear_pg_table+(addr>>PAGE_SHIFT)));
     if ( !(l1e & _PAGE_PRESENT) )
-        goto unlock_and_bounce_fault;
+        goto unlock_and_propagate_fault;
 
     page = frame_table + (l1e >> PAGE_SHIFT);
     if ( (page->flags & PG_type_mask) != PGT_ldt_page )
     {
         if ( page->type_count != 0 )
-            goto unlock_and_bounce_fault;
+            goto unlock_and_propagate_fault;
 
         /* Check all potential LDT entries in the page. */
         ldt_page = (unsigned long *)(addr & PAGE_MASK);
         for ( i = 0; i < 512; i++ )
             if ( !check_descriptor(ldt_page[i*2], ldt_page[i*2+1]) )
-                goto unlock_and_bounce_fault;
+                goto unlock_and_propagate_fault;
 
         if ( page->flags & PG_need_flush )
         {
@@ -403,18 +365,18 @@ asmlinkage void do_page_fault(struct pt_regs *regs, long error_code)
     return;
 
 
- unlock_and_bounce_fault:
+ unlock_and_propagate_fault:
 
     spin_unlock(&p->page_lock);
-    goto bounce_fault;
+    goto propagate_fault;
 
 
  fault_in_hypervisor:
 
-    if ( (fixup = search_exception_table(regs->eip)) != 0 )
+    if ( likely((fixup = search_exception_table(regs->eip)) != 0) )
     {
         regs->eip = fixup;
-        check_saved_selectors(regs);
+        regs->xds = regs->xes = regs->xfs = regs->xgs = __HYPERVISOR_DS;
         return;
     }
 
@@ -445,8 +407,8 @@ asmlinkage void do_general_protection(struct pt_regs *regs, long error_code)
     trap_info_t *ti;
     unsigned long fixup;
 
-    /* Bad shit if error in ring 0, or result of an interrupt. */
-    if (!(regs->xcs & 3) || (error_code & 1))
+    /* Badness if error in ring 0, or result of an interrupt. */
+    if ( !(regs->xcs & 3) || (error_code & 1) )
         goto gp_in_kernel;
 
     /*
@@ -494,40 +456,38 @@ asmlinkage void do_general_protection(struct pt_regs *regs, long error_code)
 
  gp_in_kernel:
 
-    if ( (fixup = search_exception_table(regs->eip)) != 0 )
+    if ( likely((fixup = search_exception_table(regs->eip)) != 0) )
     {
         regs->eip = fixup;
-        check_saved_selectors(regs);
+        regs->xds = regs->xes = regs->xfs = regs->xgs = __HYPERVISOR_DS;
         return;
     }
 
     die("general protection fault", regs, error_code);
 }
 
-static void mem_parity_error(unsigned char reason, struct pt_regs * regs)
+asmlinkage void mem_parity_error(unsigned char reason, struct pt_regs * regs)
 {
-    printk("Uhhuh. NMI received. Dazed and confused, but trying to continue\n");
+    printk("NMI received. Dazed and confused, but trying to continue\n");
     printk("You probably have a hardware problem with your RAM chips\n");
 
     /* Clear and disable the memory parity error line. */
     reason = (reason & 0xf) | 4;
     outb(reason, 0x61);
+
+    show_registers(regs);
+    panic("PARITY ERROR");
 }
 
-static void io_check_error(unsigned char reason, struct pt_regs * regs)
+asmlinkage void io_check_error(unsigned char reason, struct pt_regs * regs)
 {
-    unsigned long i;
-
     printk("NMI: IOCK error (debug interrupt?)\n");
-    show_registers(regs);
 
-    /* Re-enable the IOCK line, wait for a few seconds */
     reason = (reason & 0xf) | 8;
     outb(reason, 0x61);
-    i = 2000;
-    while (--i) udelay(1000);
-    reason &= ~8;
-    outb(reason, 0x61);
+
+    show_registers(regs);
+    panic("IOCK ERROR");
 }
 
 static void unknown_nmi_error(unsigned char reason, struct pt_regs * regs)
@@ -537,34 +497,16 @@ static void unknown_nmi_error(unsigned char reason, struct pt_regs * regs)
     printk("Do you have a strange power saving mode enabled?\n");
 }
 
-asmlinkage void do_nmi(struct pt_regs * regs, long error_code)
+asmlinkage void do_nmi(struct pt_regs * regs, unsigned long reason)
 {
-    unsigned char reason = inb(0x61);
-
     ++nmi_count(smp_processor_id());
 
-    if (!(reason & 0xc0)) {
 #if CONFIG_X86_LOCAL_APIC
-        if (nmi_watchdog) {
-            nmi_watchdog_tick(regs);
-            return;
-        }
+    if ( nmi_watchdog )
+        nmi_watchdog_tick(regs);
+    else
 #endif
-        unknown_nmi_error(reason, regs);
-        return;
-    }
-    if (reason & 0x80)
-        mem_parity_error(reason, regs);
-    if (reason & 0x40)
-        io_check_error(reason, regs);
-    /*
-     * Reassert NMI in case it became active meanwhile
-     * as it's edge-triggered.
-     */
-    outb(0x8f, 0x70);
-    inb(0x71);		/* dummy */
-    outb(0x0f, 0x70);
-    inb(0x71);		/* dummy */
+        unknown_nmi_error((unsigned char)(reason&0xff), regs);
 }
 
 asmlinkage void math_state_restore(struct pt_regs *regs, long error_code)

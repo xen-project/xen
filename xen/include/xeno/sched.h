@@ -74,13 +74,11 @@ struct task_struct
      * Their offsets are hardcoded in entry.S
      */
 
-    int processor;               /* 00: current processor */
-    int state;                   /* 04: current run state */
-    int hyp_events;              /* 08: pending intra-Xen events */
-    unsigned int domain;         /* 12: domain id */
+    unsigned short processor;    /* 00: current processor */
+    unsigned short hyp_events;   /* 02: pending intra-Xen events */
 
     /* An unsafe pointer into a shared data area. */
-    shared_info_t *shared_info;  /* 16: shared data area */
+    shared_info_t *shared_info;  /* 04: shared data area */
 
     /*
      * Return vectors pushed to us by guest OS.
@@ -89,15 +87,25 @@ struct task_struct
      * for segment registers %ds, %es, %fs and %gs:
      * 	%ds, %es, %fs, %gs, %eip, %cs, %eflags [, %oldesp, %oldss]
      */
-    unsigned long event_selector;    /* 20: entry CS  */
-    unsigned long event_address;     /* 24: entry EIP */
-    unsigned long failsafe_selector; /* 28: entry CS  */
-    unsigned long failsafe_address;  /* 32: entry EIP */
+    unsigned long event_selector;    /* 08: entry CS  */
+    unsigned long event_address;     /* 12: entry EIP */
+
+    /* Saved DS,ES,FS,GS immediately before return to guest OS. */
+    unsigned long failsafe_selectors[4]; /* 16-32 */ 
+
+    /*
+     * END OF FIRST CACHELINE. Stuff above is touched a lot!
+     */
+
+    unsigned long failsafe_selector; /* 32: entry CS  */
+    unsigned long failsafe_address;  /* 36: entry EIP */
 
     /*
      * From here on things can be added and shuffled without special attention
      */
     
+    unsigned int domain;        /* domain id */
+
     struct list_head pg_head;
     unsigned int tot_pages;     /* number of pages currently possesed */
     unsigned int max_pages;     /* max number of pages that can be possesed */
@@ -105,6 +113,7 @@ struct task_struct
     /* scheduling */
     struct list_head run_list;
     int              has_cpu;
+    int state;                  /* current run state */
     
     s_time_t lastschd;              /* time this domain was last scheduled */
     s_time_t cpu_time;              /* total CPU time received till now */
@@ -134,17 +143,14 @@ struct task_struct
 				       the process can do raw access
 				       to. */
     spinlock_t physdev_lock;
-    segment_t *segment_list[XEN_MAX_SEGMENTS];                        /* xvd */
+    segment_t *segment_list[XEN_MAX_SEGMENTS];
 
     /* VM */
     struct mm_struct mm;
     /* We need this lock to check page types and frob reference counts. */
     spinlock_t page_lock;
 
-    mm_segment_t addr_limit;        /* thread address space:
-                                       0-0xBFFFFFFF for user-thead
-                                       0-0xFFFFFFFF for kernel-thread
-                                     */
+    mm_segment_t addr_limit;
 
     char name[MAX_DOMAIN_NAME];
 
