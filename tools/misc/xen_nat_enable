@@ -6,7 +6,9 @@ run_iptables() {
     fi
 }
 
+ifconfig eth0 up
 ifconfig eth0:0 169.254.1.0 up
+
 run_iptables -t filter -F
 run_iptables -t nat -F
 run_iptables -t filter -X
