@@ -246,11 +246,11 @@ class ProgList(Prog):
             info = server.xend_domain(dom)
             d = {}
             d['dom'] = int(dom)
-            d['name'] = sxp.child_value(info, 'name') or '??'
-            d['mem'] = int(sxp.child_value(info, 'memory') or '-1')
-            d['cpu'] = int(sxp.child_value(info, 'cpu') or '-1')
-            d['state'] = sxp.child_value(info, 'state') or '??'
-            d['cpu_time'] = float(sxp.child_value(info, 'cpu_time') or '-1')
+            d['name'] = sxp.child_value(info, 'name', '??')
+            d['mem'] = int(sxp.child_value(info, 'memory', '0'))
+            d['cpu'] = int(sxp.child_value(info, 'cpu', '0'))
+            d['state'] = sxp.child_value(info, 'state', '??')
+            d['cpu_time'] = float(sxp.child_value(info, 'cpu_time', '0'))
             print ("%(dom)-4d %(name)-16s %(mem)7d  %(cpu)3d  %(state)5s  %(cpu_time)7.1f" % d)
 
     def long_list(self, doms):
@@ -424,9 +424,9 @@ class ProgConsoles(Prog):
         for x in l:
             info = server.xend_console(x)
             d = {}
-            d['dom'] = (sxp.child(info, 'dst') or ['dst', '?', '?'])[1]
-            d['port'] = sxp.child_value(info, 'port') or '?'
-            d['id'] = sxp.child_value(info, 'id') or '?'
+            d['dom'] = sxp.child(info, 'dst', ['dst', '?', '?'])[1]
+            d['port'] = sxp.child_value(info, 'port', '?')
+            d['id'] = sxp.child_value(info, 'id', '?')
             print "%(dom)3s %(port)4s %(id)3s" % d
 
 xm.prog(ProgConsoles)
