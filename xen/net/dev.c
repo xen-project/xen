@@ -592,6 +592,7 @@ int netif_rx(struct sk_buff *skb)
 
     skb->next = skb_queue[cpu].rx;
     skb_queue[cpu].rx = skb;
+    skb_queue[cpu].rx_qlen++;
 
     local_irq_restore(flags);
 
@@ -680,26 +681,26 @@ static int __on_net_schedule_list(net_vif_t *vif)
 
 static void remove_from_net_schedule_list(net_vif_t *vif)
 {
-    unsigned long flags;
-    spin_lock_irqsave(&net_schedule_list_lock, flags);
+    spin_lock(&net_schedule_list_lock);
     ASSERT(__on_net_schedule_list(vif));
     list_del(&vif->list);
     vif->list.next = NULL;
     put_vif(vif);
-    spin_unlock_irqrestore(&net_schedule_list_lock, flags);
+    spin_unlock(&net_schedule_list_lock);
 }
 
 static void add_to_net_schedule_list_tail(net_vif_t *vif)
 {
-    unsigned long flags;
-    if ( __on_net_schedule_list(vif) ) return;
-    spin_lock_irqsave(&net_schedule_list_lock, flags);
-    if ( !__on_net_schedule_list(vif) )
+    if ( __on_net_schedule_list(vif) )
+        return;
+
+    spin_lock(&net_schedule_list_lock);
+    if ( likely(!__on_net_schedule_list(vif)) )
     {
         list_add_tail(&vif->list, &net_schedule_list);
         get_vif(vif);
     }
-    spin_unlock_irqrestore(&net_schedule_list_lock, flags);
+    spin_unlock(&net_schedule_list_lock);
 }
 
 
