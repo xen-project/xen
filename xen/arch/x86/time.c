@@ -135,7 +135,7 @@ static unsigned long __init calibrate_tsc(void)
 
     diff = end - start;
 
-#if defined(_i386__)
+#if defined(__i386__)
     /* If quotient doesn't fit in 32 bits then we return error (zero). */
     if ( diff & ~0xffffffffULL )
         return 0;
