@@ -94,6 +94,6 @@ TAGS:
 	( find include/asm-$(TARGET_ARCH) -name '*.h'; \
 	  find include -type d \( -name "asm-*" -o -name config \) -prune -o \
 		-name '*.h' -print; \
-	  find $(SUBDIRS) -name '*.[ch]' ) | grep -v /SCCS/ | etags -
+	  find $(SUBDIRS) -name '*.[chS]' ) | grep -v /SCCS/ | etags -
 MAP:
 	nm $(TARGET) | grep -v '\(compiled\)\|\(\.o$$\)\|\( [aUw] \)\|\(\.\.ng$$\)\|\(LASH[RL]DI\)' | sort > System.map
