@@ -96,6 +96,10 @@ bzImage: vmlinux
 	@$(MAKEBOOT) xenolinux.gz
 
 install: bzImage
+	mkdir -p /boot
+	cp -a arch/$(ARCH)/boot/xenolinux.gz /boot/xenolinux.gz
+
+dist: bzImage
 	mkdir -p ../install/boot
 	cp -a arch/$(ARCH)/boot/xenolinux.gz ../install/boot/xenolinux.gz
 

@@ -47,7 +47,7 @@ static inline unsigned long mark_guest_event(struct task_struct *p, int event)
 /* As above, but hyp_events are handled within the hypervisor. */
 static inline unsigned long mark_hyp_event(struct task_struct *p, int event)
 {
-    if ( test_and_set_bit(event, &p->shared_info->events) )
+    if ( test_and_set_bit(event, &p->hyp_events) )
         return 0;
     smp_mb();
     if ( p->state == TASK_INTERRUPTIBLE ) wake_up(p);

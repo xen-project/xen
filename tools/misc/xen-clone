@@ -76,7 +76,7 @@ fi
 
 # build and install Xen and tools
 cd ${DEST_BK_REP}
-make install
+make dist || make install
 
 # Turn linux into xenolinux then build it
 cd xenolinux-${LINUX_VER}-sparse
@@ -89,7 +89,7 @@ export INSTALL_MOD_PATH=${TOP}/install
 make oldconfig
 make dep
 make bzImage
-make install
+make dist || make install
 make modules
 make modules_install
 cd ..

@@ -17,16 +17,15 @@ To fetch a local copy, first download the BitKeeper tools at:
 http://www.bitmover.com/download with username 'bitkeeper' and
 password 'get bitkeeper'.
 
-Then install it and run:
-# cd /
+Then install the tools and then run:
 # bk clone bk://xen.bkbits.net/xeno-1.1.bk
 
 Under your current directory, a new directory named 'xeno-1.1.bk' has
 been created, which contains all the source codes for Xen and
-XenoLinux. Here we suppose you put it under '/'.
+XenoLinux. 
 
 To get newest changes to the repository, run
-# cd /xeno-1.1.bk
+# cd xeno-1.1.bk
 # bk pull
 
 
@@ -39,7 +38,7 @@ used to clone the repostitory and perform a full build.
 
 To build Xen manually:
 
-# cd /xeno-1.1.bk/xen
+# cd xeno-1.1.bk/xen
 # make clean
 # make
 
@@ -47,8 +46,13 @@ This will (should) produce a file called 'image' in the current
 directory.  This is the ELF 32-bit LSB executable file of Xen.  You
 can also find a gzip version, named 'image.gz'.
 
-Hint: There is a 'make install' rule which also and then copies it to
-../../install ; if this suits your setup, go for it.
+To install the built files on your Xenoserver under /usr, type 'make
+install' at the root of the BK repository. You will need to be root to
+do this!
+
+Hint: There is also a 'make dist' rule which copies built files to an
+install directory just outside the BK repo; if this suits your setup,
+go for it.
 
 
 Build XenoLinux
@@ -111,9 +115,11 @@ have zlib and devlopment headers installed. Also you will need at
 least Python v2.2. 
 
 'make install' in the tools directory will place executables and
-libraries in an install directory immediately outside you local
-repository. NOTE: the installation of the Python modules may need root
-privileges if you are not using a personal installation of Python.
+libraries in /usr/bin and /usr/lib. You will need to be root to do this!
+
+As noted earlier, 'make dist' installs files to a local 'install'
+directory just outside the BK repository. These files will then need
+to be installed manually onto the Xenoserver.
 
 
 Installation
@@ -204,7 +210,7 @@ UDP packets to  the local virtual network. Those  packets are received
 by xen_read_console running in Domain  0 and output are printed out to
 the standard output.
 
-Now edit the installed xi_createlinuxdom.py script to your taste. This
+Now edit the tools/examples/xi_createlinuxdom.py script to your taste. This
 should then be executed as root to create a new domain.
 
 You should be able to see XenoLinux boot message on standard output
@@ -215,14 +221,14 @@ List and Stop Domains
 ==============================
 
 You can see a list of existing domains with:
-# xi_listdoms.py
+# tools/examples/xi_listdoms.py
 
 In order to stop a domain, you use:
-# xi_stopdom.py <domain_id>
+# tools/examples/xi_stopdom.py <domain_id>
 
 To destroy a domain use ('force' causes an immediate destruction
 without waiting for the guest OS to shut down cleanly):
-# xi_destroydom.py <domain_id> [force]
+# tools/examples/xi_destroydom.py <domain_id> [force]
 
 
 Other Control Tasks using Python

@@ -27,6 +27,11 @@ install: all
 	$(MAKE) -C xc install
 	$(MAKE) -C misc install
 
+dist: all
+	$(MAKE) -C balloon dist
+	$(MAKE) -C xc dist
+	$(MAKE) -C misc dist
+
 clean:
 	$(MAKE) -C balloon clean
 	$(MAKE) -C xc clean

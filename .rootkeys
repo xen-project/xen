@@ -39,6 +39,10 @@
 3e6377b24eQqYMsDi9XrFkIgTzZ47A tools/balloon/Makefile
 3e6377d6eiFjF1hHIS6JEIOFk62xSA tools/balloon/README
 3e6377dbGcgnisKw16DPCaND7oGO3Q tools/balloon/balloon.c
+3fbe2f12OPAkzIUtumU3wRAihnhocQ tools/examples/xi_createlinuxdom.py
+3fbe2f12dZbmXLlgQdMgkmnSUj23AQ tools/examples/xi_destroydom.py
+3fbe2f12ltvweb13kBSsxqzZDAq4sg tools/examples/xi_listdoms.py
+3fbe2f12Bnt8mwmr1ZCP6HWGS6yvYw tools/examples/xi_stopdom.py
 3f776bd2Xd-dUcPKlPN2vG89VGtfvQ tools/misc/Makefile
 3f6dc136ZKOjd8PIqLbFBl_v-rnkGg tools/misc/miniterm/Makefile
 3f6dc140C8tAeBfroAF24VrmCS4v_w tools/misc/miniterm/README
@@ -53,10 +57,6 @@
 3f13d81e6Z6806ihYYUw8GVKNkYnuw tools/misc/xen_nat_enable.README
 3f1668d4F29Jsw0aC0bJEIkOBiagiQ tools/misc/xen_read_console.c
 3f87ba90EUVPQLVOlFG0sW89BCwouQ tools/misc/xen_refresh_dev.c
-3fbe2f12OPAkzIUtumU3wRAihnhocQ tools/misc/xi_createlinuxdom.py
-3fbe2f12dZbmXLlgQdMgkmnSUj23AQ tools/misc/xi_destroydom.py
-3fbe2f12ltvweb13kBSsxqzZDAq4sg tools/misc/xi_listdoms.py
-3fbe2f12Bnt8mwmr1ZCP6HWGS6yvYw tools/misc/xi_stopdom.py
 3fbca441SjQr8vJwTQIgH1laysaWog tools/xc/Makefile
 3fbba6dbDfYvJSsw9500b4SZyUhxjQ tools/xc/lib/Makefile
 3fbba6dbEVkVMX0JuDFzap9jeaucGA tools/xc/lib/libxc_bvtsched.c

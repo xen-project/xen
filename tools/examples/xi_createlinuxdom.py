@@ -1,4 +1,4 @@
-#!/usr/bin/python
+#!/usr/bin/env python
 
 #
 # Example script for creating and building a new Linux guest OS for Xen.
@@ -17,15 +17,15 @@ ipaddr  = "ADDRESS"
 netmask = XenoUtil.get_current_ipmask()
 gateway = XenoUtil.get_current_ipgw()
 
-# STEP 3. Specify NFS server and path to rootfs (only needed for network boot)
+# STEP 3a. Specify NFS server and path to rootfs (only needed for network boot)
 nfsserv = "ADDRESS"
 nfspath = "FULL_PATH_TO_ROOT_DIR"
 
-# STEP 4. Specify root (and possibly /usr) on local disc (if not NFS booting)
+# STEP 3b. Specify root (and possibly /usr) on local disc (if not NFS booting)
 #root_partn = "/dev/sda2"
 #usr_partn  = "/dev/sda6"
 
-# STEP 5. Check that the following cmdline setup is to your taste.
+# STEP 4. Check that the following cmdline setup is to your taste.
 cmdline = "ip="+ipaddr+":"+nfsserv+":"+gateway+":"+netmask+"::eth0:off"
 if root_partn:
     # Boot from local disc. May specify a separate /usr.

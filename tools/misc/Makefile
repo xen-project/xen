@@ -10,23 +10,25 @@ OBJS     = $(patsubst %.c,%.o,$(SRCS))
 TARGETS  = xen_read_console xen_refresh_dev xen_cpuperf
 
 INSTALL  = $(TARGETS) xen-mkdevnodes xen_nat_enable xen-clone 
-INSTALL += xi_createlinuxdom.py xi_destroydom.py xi_listdoms.py
-INSTALL += xi_stopdom.py
 
 all: $(TARGETS)
 	$(MAKE) -C miniterm	
 
 install: all
+	mkdir -p /usr/bin
+	cp -a $(INSTALL) /usr/bin
+	chmod 755 /usr/bin/xen-mkdevnodes
+	chmod 755 /usr/bin/xen_nat_enable
+	chmod 755 /usr/bin/xen-clone
+	$(MAKE) -C miniterm install
+
+dist: all
 	mkdir -p ../../../install/bin
 	cp -a $(INSTALL) ../../../install/bin
 	chmod 755 ../../../install/bin/xen-mkdevnodes
 	chmod 755 ../../../install/bin/xen_nat_enable
 	chmod 755 ../../../install/bin/xen-clone
-	chmod 755 ../../../install/bin/xi_createlinuxdom.py
-	chmod 755 ../../../install/bin/xi_destroydom.py
-	chmod 755 ../../../install/bin/xi_listdoms.py
-	chmod 755 ../../../install/bin/xi_stopdom.py
-	$(MAKE) -C miniterm install
+	$(MAKE) -C miniterm dist
 
 clean:
 	$(RM) *.o $(TARGETS)

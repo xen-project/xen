@@ -20,6 +20,14 @@ check-for-zlib:
 	fi
 
 install: all
+	mkdir -p /usr/lib
+	mkdir -p /usr/include
+	cp -a $(LIBS) /usr/lib
+	for i in $(LIBS); do chmod 755 /usr/bin/$i ; done
+	cp -a xc.h /usr/include
+	chmod 644 /usr/include/xc.h
+
+dist: all
 	mkdir -p ../../../../install/lib
 	mkdir -p ../../../../install/include
 	cp -a $(LIBS) ../../../../install/lib
