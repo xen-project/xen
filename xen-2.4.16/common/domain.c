@@ -55,7 +55,7 @@ struct task_struct *do_newdomain(void)
      */
     p->blk_ring_base = (blk_ring_t *)(p->shared_info + 1);
     p->net_ring_base = (net_ring_t *)(p->blk_ring_base + 1);
-    p->pg_head = p->pg_tail = p->tot_pages = 0;
+    p->pg_head = p->tot_pages = 0;
     write_lock_irq(&tasklist_lock);
     SET_LINKS(p);
     write_unlock_irq(&tasklist_lock);
@@ -325,7 +325,7 @@ static unsigned int alloc_new_dom_mem(struct task_struct *p, unsigned int kbytes
 {
 
     struct list_head *temp;
-    struct pfn_info *pf;
+    struct pfn_info *pf, *pf_head;
     unsigned int alloc_pfns;
     unsigned int req_pages;
 
@@ -339,22 +339,27 @@ static unsigned int alloc_new_dom_mem(struct task_struct *p, unsigned int kbytes
     /* allocate pages and build a thread through frame_table */
     temp = free_list.next;
     printk("bd240 debug: DOM%d requesting %d pages\n", p->domain, req_pages);
-    for(alloc_pfns = req_pages; alloc_pfns; alloc_pfns--){
+
+    /* allocate first page */
+    pf = list_entry(temp, struct pfn_info, list);
+    pf->flags |= p->domain;
+    temp = temp->next;
+    list_del(&pf->list);
+    pf->next = pf->prev = p->pg_head = (pf - frame_table);
+    free_pfns--;
+    pf_head = pf;
+
+    /* allocate the rest */
+    for(alloc_pfns = req_pages - 1; alloc_pfns; alloc_pfns--){
         pf = list_entry(temp, struct pfn_info, list);
         pf->flags |= p->domain;
         temp = temp->next;
         list_del(&pf->list);
 
-        if(p->pg_tail){
-            pf->next = p->pg_tail;
-            (frame_table + pf->next)->prev = p->pg_tail = (pf - frame_table); 
-        } else {
-            p->pg_head = (pf - frame_table);
-            p->pg_tail = p->pg_head;
-            pf->next = 0;
-            pf->prev = 0;
-        }
-        pf->prev = 0;
+        pf->next = p->pg_head;
+        pf->prev = pf_head->prev;
+        (frame_table + pf_head->prev)->next = (pf - frame_table);
+        pf_head->prev = (pf - frame_table);
 
         free_pfns--;
     }
@@ -396,6 +401,7 @@ int setup_guestos(struct task_struct *p, dom0_newdomain_t *params)
     unsigned long cur_address, end_address, alloc_address, vaddr;
     unsigned long virt_load_address, virt_stack_address, virt_shinfo_address;
     unsigned long virt_ftable_start_addr = 0, virt_ftable_end_addr;
+    unsigned long ft_mapping = frame_table;
     unsigned int ft_size = 0;
     start_info_t  *virt_startinfo_address;
     unsigned long long time;
@@ -527,7 +533,7 @@ int setup_guestos(struct task_struct *p, dom0_newdomain_t *params)
     /* for DOM0, setup mapping of frame table */
     if ( dom == 0 )
     {
-        virt_ftable_start_addr = virt_load_address + virt_shinfo_address + PAGE_SIZE;
+        virt_ftable_start_addr = virt_shinfo_address + PAGE_SIZE;
         virt_ftable_end_addr = virt_ftable_start_addr + frame_table_size;
         for(cur_address = virt_ftable_start_addr;
             cur_address < virt_ftable_end_addr;
@@ -535,7 +541,8 @@ int setup_guestos(struct task_struct *p, dom0_newdomain_t *params)
         {
             l2tab = pagetable_ptr(p->mm.pagetable) + l2_table_offset(cur_address);
             l1tab = l2_pgentry_to_l1(*l2tab) + l1_table_offset(cur_address); 
-            *l1tab = mk_l1_pgentry(__pa(cur_address)|L1_PROT);
+            *l1tab = mk_l1_pgentry(__pa(ft_mapping)|L1_PROT);
+            ft_mapping += PAGE_SIZE;
         }
     }
 

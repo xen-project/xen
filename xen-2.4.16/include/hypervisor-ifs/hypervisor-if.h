@@ -262,8 +262,8 @@ typedef struct start_info_st {
     net_ring_t *net_rings;
     int num_net_rings;
     blk_ring_t *blk_ring;         /* block io communication rings */
-    unsigned char cmd_line[1];    /* variable-length */
     unsigned long frame_table;    /* mapping of the frame_table for dom0 */
+    unsigned char cmd_line[1];    /* variable-length */
 } start_info_t;
 
 /* For use in guest OSes. */

@@ -80,7 +80,6 @@ struct task_struct {
      * domain together
      */
     unsigned long pg_head;
-    unsigned long pg_tail;
     unsigned int tot_pages;
 
     unsigned long flags;
