@@ -15,8 +15,8 @@ static long get_tot_pages(int domain_id)
 {
     dom0_op_t op;
     op.cmd = DOM0_GETDOMAININFO;
-    op.u.getdominfo.domain = domain_id;
-    return (do_dom0_op(&op) < 0) ? -1 : op.u.getdominfo.tot_pages;
+    op.u.getdomaininfo.domain = domain_id;
+    return (do_dom0_op(&op) < 0) ? -1 : op.u.getdomaininfo.tot_pages;
 }
 
 static int get_pfn_list(

@@ -144,17 +144,17 @@ long do_dom0_op(dom0_op_t *u_dom0_op)
             goto exit_create;
 
         pro = (pro+1) % smp_num_cpus;
-        p = do_newdomain(dom, pro);
+        p = do_createdomain(dom, pro);
         if ( p == NULL ) 
             goto exit_create;
 
-	if ( op.u.newdomain.name[0] )
+	if ( op.u.createdomain.name[0] )
         {
-            strncpy (p->name, op.u.newdomain.name, MAX_DOMAIN_NAME);
+            strncpy (p->name, op.u.createdomain.name, MAX_DOMAIN_NAME);
             p->name[MAX_DOMAIN_NAME - 1] = 0;
 	}
 
-        ret = alloc_new_dom_mem(p, op.u.newdomain.memory_kb);
+        ret = alloc_new_dom_mem(p, op.u.createdomain.memory_kb);
         if ( ret != 0 ) 
         {
             __kill_domain(p);
@@ -165,7 +165,7 @@ long do_dom0_op(dom0_op_t *u_dom0_op)
         
         ret = p->domain;
         
-        op.u.newdomain.domain = ret;
+        op.u.createdomain.domain = ret;
         copy_to_user(u_dom0_op, &op, sizeof(op));
  
     exit_create:
@@ -175,8 +175,8 @@ long do_dom0_op(dom0_op_t *u_dom0_op)
 
     case DOM0_DESTROYDOMAIN:
     {
-        unsigned int dom = op.u.killdomain.domain;
-        int force = op.u.killdomain.force;
+        unsigned int dom = op.u.destroydomain.domain;
+        int force = op.u.destroydomain.force;
         ret = (dom == IDLE_DOMAIN_ID) ? -EPERM : kill_other_domain(dom, force);
     }
     break;
@@ -250,7 +250,7 @@ long do_dom0_op(dom0_op_t *u_dom0_op)
         read_lock_irqsave (&tasklist_lock, flags);
 
         while ( (p = p->next_task) != &idle0_task )
-            if ( !is_idle_task(p) && (p->domain >= op.u.getdominfo.domain) )
+            if ( !is_idle_task(p) && (p->domain >= op.u.getdomaininfo.domain) )
                 break;
 
         if ( p == &idle0_task )
@@ -259,16 +259,16 @@ long do_dom0_op(dom0_op_t *u_dom0_op)
         }
         else
         {
-            op.u.getdominfo.domain      = p->domain;
-            strcpy (op.u.getdominfo.name, p->name);
-            op.u.getdominfo.processor   = p->processor;
-            op.u.getdominfo.has_cpu     = p->has_cpu;
-            op.u.getdominfo.state       = p->state;
-            op.u.getdominfo.hyp_events  = p->hyp_events;
-            op.u.getdominfo.mcu_advance = p->mcu_advance;
-            op.u.getdominfo.tot_pages   = p->tot_pages;
-            op.u.getdominfo.cpu_time    = p->cpu_time;
-            memcpy(&op.u.getdominfo.ctxt, 
+            op.u.getdomaininfo.domain      = p->domain;
+            strcpy (op.u.getdomaininfo.name, p->name);
+            op.u.getdomaininfo.processor   = p->processor;
+            op.u.getdomaininfo.has_cpu     = p->has_cpu;
+            op.u.getdomaininfo.state       = p->state;
+            op.u.getdomaininfo.hyp_events  = p->hyp_events;
+            op.u.getdomaininfo.mcu_advance = p->mcu_advance;
+            op.u.getdomaininfo.tot_pages   = p->tot_pages;
+            op.u.getdomaininfo.cpu_time    = p->cpu_time;
+            memcpy(&op.u.getdomaininfo.ctxt, 
                    &p->shared_info->execution_context,
                    sizeof(execution_context_t));
         }

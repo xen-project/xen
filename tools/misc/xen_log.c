@@ -85,14 +85,14 @@ void process(void)
         curport = ntohs(from.sin_port);
         if ( lastport != curport )
         {
-            op.u.getdominfo.domain = (int)curport;
+            op.u.getdomaininfo.domain = (int)curport;
             if ( do_dom0_op(&op) < 0 )
                 log("Error resolving domain name\n");
             else
                 lastport = curport;
         }
 
-        sprintf(obuf, "[%s] %s", op.u.getdominfo.name, buf);
+        sprintf(obuf, "[%s] %s", op.u.getdomaininfo.name, buf);
         log(obuf);
 
         fromlen = sizeof(from);

@@ -92,7 +92,7 @@ static struct {
 void cmain (unsigned long magic, multiboot_info_t *mbi)
 {
     struct task_struct *new_dom;
-    dom0_newdomain_t dom0_params;
+    dom0_createdomain_t dom0_params;
     unsigned long max_page;
     unsigned char *cmdline;
     module_t *mod;
@@ -190,7 +190,7 @@ void cmain (unsigned long magic, multiboot_info_t *mbi)
 
     init_page_allocator(__pa(&_end), MAX_MONITOR_ADDRESS);
  
-    /* These things will get done by do_newdomain() for all other tasks. */
+    /* These things will get done by do_createdomain() for all other tasks. */
     current->shared_info = (void *)get_free_page(GFP_KERNEL);
     memset(current->shared_info, 0, sizeof(shared_info_t));
     set_fs(USER_DS);
@@ -209,7 +209,7 @@ void cmain (unsigned long magic, multiboot_info_t *mbi)
 
     /* Create initial domain 0. */
     dom0_params.memory_kb = opt_dom0_mem;
-    new_dom = do_newdomain(0, 0);
+    new_dom = do_createdomain(0, 0);
     if ( new_dom == NULL ) panic("Error creating domain 0\n");
 
     /*

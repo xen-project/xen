@@ -294,7 +294,6 @@ struct i387_fsave_struct {
     long	foo;
     long	fos;
     long	st_space[20];	/* 8*10 bytes for each FP-reg = 80 bytes */
-    long	status;		/* software status information */
 };
 
 struct i387_fxsave_struct {
@@ -313,24 +312,9 @@ struct i387_fxsave_struct {
     long	padding[56];
 } __attribute__ ((aligned (16)));
 
-struct i387_soft_struct {
-    long	cwd;
-    long	swd;
-    long	twd;
-    long	fip;
-    long	fcs;
-    long	foo;
-    long	fos;
-    long	st_space[20];	/* 8*10 bytes for each FP-reg = 80 bytes */
-    unsigned char	ftop, changed, lookahead, no_update, rm, alimit;
-    struct info	*info;
-    unsigned long	entry_eip;
-};
-
 union i387_union {
     struct i387_fsave_struct	fsave;
     struct i387_fxsave_struct	fxsave;
-    struct i387_soft_struct soft;
 };
 
 typedef struct {
@@ -421,9 +405,32 @@ extern struct desc_struct *idt_tables[];
 	{~0, } /* ioperm */					\
 }
 
-/* Forward declaration, a strange C thing */
+struct mm_struct {
+    /*
+     * Every domain has a L1 pagetable of its own. Per-domain mappings
+     * are put in this table (eg. the current GDT is mapped here).
+     */
+    l1_pgentry_t *perdomain_pt;
+    pagetable_t  pagetable;
+    /* Current LDT details. */
+    unsigned long ldt_base, ldt_ents, shadow_ldt_mapcnt;
+    /* Next entry is passed to LGDT on domain switch. */
+    char gdt[6];
+};
+
+#define IDLE0_MM                                                    \
+{                                                                   \
+    perdomain_pt: 0,                                                \
+    pagetable:   mk_pagetable(__pa(idle_pg_table))                  \
+}
+
+/* Convenient accessor for mm.gdt. */
+#define SET_GDT_ENTRIES(_p, _e) ((*(u16 *)((_p)->mm.gdt + 0)) = (_e))
+#define SET_GDT_ADDRESS(_p, _a) ((*(u32 *)((_p)->mm.gdt + 2)) = (_a))
+#define GET_GDT_ENTRIES(_p)     ((*(u16 *)((_p)->mm.gdt + 0)))
+#define GET_GDT_ADDRESS(_p)     ((*(u32 *)((_p)->mm.gdt + 2)))
+
 struct task_struct;
-struct mm_struct;
 
 /* Free all resources held by a thread. */
 extern void release_thread(struct task_struct *);

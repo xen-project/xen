@@ -15,13 +15,13 @@ static int create_new_domain(long req_mem, char *name)
     dom0_op_t op;
 
     op.cmd = DOM0_CREATEDOMAIN;
-    op.u.newdomain.memory_kb = req_mem;
-    strncpy(op.u.newdomain.name, name, MAX_DOMAIN_NAME);
-    op.u.newdomain.name[MAX_DOMAIN_NAME-1] = '\0';
+    op.u.createdomain.memory_kb = req_mem;
+    strncpy(op.u.createdomain.name, name, MAX_DOMAIN_NAME);
+    op.u.createdomain.name[MAX_DOMAIN_NAME-1] = '\0';
 
     err = do_dom0_op(&op);
 
-    return (err < 0) ? err : op.u.newdomain.domain;
+    return (err < 0) ? err : op.u.createdomain.domain;
 }    
 
 int main(int argc, char **argv)

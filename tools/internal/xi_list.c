@@ -55,20 +55,20 @@ int main(int argc, char **argv)
     }
 
     op.cmd = DOM0_GETDOMAININFO;
-    op.u.getdominfo.domain = 0;
+    op.u.getdomaininfo.domain = 0;
     while ( do_dom0_op(&op) >= 0 )
     {
         printf("%8d %2d %1d %2d %s %08x %8ld %8d %s\n",
-               op.u.getdominfo.domain, 
-               op.u.getdominfo.processor,
-               op.u.getdominfo.has_cpu,
-               op.u.getdominfo.state,
-               statestr(op.u.getdominfo.state),
-               op.u.getdominfo.hyp_events,
-               op.u.getdominfo.mcu_advance,
-               op.u.getdominfo.tot_pages,
-               op.u.getdominfo.name);
-        op.u.getdominfo.domain++;
+               op.u.getdomaininfo.domain, 
+               op.u.getdomaininfo.processor,
+               op.u.getdomaininfo.has_cpu,
+               op.u.getdomaininfo.state,
+               statestr(op.u.getdomaininfo.state),
+               op.u.getdomaininfo.hyp_events,
+               op.u.getdomaininfo.mcu_advance,
+               op.u.getdomaininfo.tot_pages,
+               op.u.getdomaininfo.name);
+        op.u.getdomaininfo.domain++;
     }
 
     return 0;

@@ -10,8 +10,8 @@ static int kill_domain(int dom_id, int force)
     dom0_op_t op;
 
     op.cmd = DOM0_DESTROYDOMAIN;
-    op.u.killdomain.domain = dom_id;
-    op.u.killdomain.force  = force;
+    op.u.destroydomain.domain = dom_id;
+    op.u.destroydomain.force  = force;
 
     err = do_dom0_op(&op);
 

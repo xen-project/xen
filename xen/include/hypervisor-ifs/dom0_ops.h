@@ -13,18 +13,35 @@
 #include "hypervisor-if.h"
 
 
+/*
+ * The following is all CPU context. Note that the i387_ctxt block is filled 
+ * in by FXSAVE if the CPU has feature FXSR; otherwise FSAVE is used.
+ */
+typedef struct full_execution_context_st
+{
+    execution_context_t i386_ctxt;          /* User-level CPU registers     */
+    char          i387_ctxt[256];           /* User-level FPU registers     */
+    trap_info_t   trap_ctxt[256];           /* Virtual IDT                  */
+    unsigned int  fast_trap_idx;            /* "Fast trap" vector offset    */
+    unsigned long ldt_base, ldt_ents;       /* LDT (linear address, # ents) */
+    unsigned long gdt_frames[16], gdt_ents; /* GDT (machine frames, # ents) */
+    unsigned long ring1_ss, ring1_esp;      /* Virtual TSS (only SS1/ESP1)  */
+    unsigned long pt_base;                  /* CR3 (pagetable base)         */
+    unsigned long debugreg[8];              /* DB0-DB7 (debug registers)    */
+} full_execution_context_t;
+
 #define MAX_CMD_LEN       256
 #define MAX_DOMAIN_NAME    16
 
 #define DOM0_CREATEDOMAIN      8
-typedef struct dom0_newdomain_st 
+typedef struct dom0_createdomain_st 
 {
     /* IN parameters. */
     unsigned int memory_kb; 
     char name[MAX_DOMAIN_NAME];
     /* OUT parameters. */
     unsigned int domain; 
-} dom0_newdomain_t;
+} dom0_createdomain_t;
 
 #define DOM0_STARTDOMAIN      10
 typedef struct dom0_startdomain_st
@@ -41,12 +58,12 @@ typedef struct dom0_stopdomain_st
 } dom0_stopdomain_t;
 
 #define DOM0_DESTROYDOMAIN     9
-typedef struct dom0_killdomain_st
+typedef struct dom0_destroydomain_st
 {
     /* IN variables. */
     unsigned int domain;
     int          force;
-} dom0_killdomain_t;
+} dom0_destroydomain_t;
 
 #define DOM0_GETMEMLIST        2
 typedef struct dom0_getmemlist_st
@@ -71,7 +88,7 @@ typedef struct dom0_builddomain_st
     char cmd_line[MAX_CMD_LEN];
     unsigned long virt_mod_addr;
     unsigned long virt_mod_len;
-    execution_context_t ctxt;
+    full_execution_context_t ctxt;
 } dom0_builddomain_t;
 
 #define DOM0_BVTCTL            6
@@ -93,7 +110,7 @@ typedef struct dom0_adjustdom_st
 } dom0_adjustdom_t;
 
 #define DOM0_GETDOMAININFO    12
-typedef struct dom0_getdominfo_st
+typedef struct dom0_getdomaininfo_st
 {
     /* IN variables. */
     unsigned int domain;
@@ -106,8 +123,8 @@ typedef struct dom0_getdominfo_st
     unsigned long mcu_advance;
     unsigned int tot_pages;
     long long cpu_time;
-    execution_context_t ctxt;
-} dom0_getdominfo_t;
+    full_execution_context_t ctxt;
+} dom0_getdomaininfo_t;
 
 #define DOM0_GETPAGEFRAMEINFO 18
 typedef struct dom0_getpageframeinfo_st
@@ -163,22 +180,21 @@ typedef struct dom0_op_st
     unsigned long cmd;
     union
     {
-        dom0_newdomain_t newdomain;
-        dom0_startdomain_t startdomain;
-        dom0_stopdomain_t stopdomain;
-        dom0_killdomain_t killdomain;
-        dom0_getmemlist_t getmemlist;
-        dom0_bvtctl_t bvtctl;
-        dom0_adjustdom_t adjustdom;
-        dom0_builddomain_t builddomain;
-        dom0_getdominfo_t getdominfo;
+        dom0_createdomain_t     createdomain;
+        dom0_startdomain_t      startdomain;
+        dom0_stopdomain_t       stopdomain;
+        dom0_destroydomain_t    destroydomain;
+        dom0_getmemlist_t       getmemlist;
+        dom0_bvtctl_t           bvtctl;
+        dom0_adjustdom_t        adjustdom;
+        dom0_builddomain_t      builddomain;
+        dom0_getdomaininfo_t    getdomaininfo;
         dom0_getpageframeinfo_t getpageframeinfo;
-        dom0_iopl_t iopl;
-	dom0_msr_t msr;
-	dom0_debug_t debug;
-	dom0_settime_t settime;
-    }
-    u;
+        dom0_iopl_t             iopl;
+	dom0_msr_t              msr;
+	dom0_debug_t            debug;
+	dom0_settime_t          settime;
+    } u;
 } dom0_op_t;
 
 #endif

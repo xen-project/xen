@@ -27,31 +27,7 @@ extern struct timeval xtime;
 
 #include <xeno/spinlock.h>
 
-struct mm_struct {
-    /*
-     * Every domain has a L1 pagetable of its own. Per-domain mappings
-     * are put in this table (eg. the current GDT is mapped here).
-     */
-    l1_pgentry_t *perdomain_pt;
-    pagetable_t  pagetable;
-    /* Current LDT details. */
-    unsigned long ldt_base, ldt_ents, shadow_ldt_mapcnt;
-    /* Next entry is passed to LGDT on domain switch. */
-    char gdt[6];
-};
-
-/* Convenient accessor for mm.gdt. */
-#define SET_GDT_ENTRIES(_p, _e) ((*(u16 *)((_p)->mm.gdt + 0)) = (_e))
-#define SET_GDT_ADDRESS(_p, _a) ((*(u32 *)((_p)->mm.gdt + 2)) = (_a))
-#define GET_GDT_ENTRIES(_p)     ((*(u16 *)((_p)->mm.gdt + 0)))
-#define GET_GDT_ADDRESS(_p)     ((*(u32 *)((_p)->mm.gdt + 2)))
-
 extern struct mm_struct init_mm;
-#define IDLE0_MM                                                    \
-{                                                                   \
-    perdomain_pt: 0,                                                \
-    pagetable:   mk_pagetable(__pa(idle_pg_table))                  \
-}
 
 #define _HYP_EVENT_NEED_RESCHED 0
 #define _HYP_EVENT_DIE          1
@@ -218,9 +194,10 @@ extern kmem_cache_t *task_struct_cachep;
 #define get_task_struct(_p)  \
   atomic_inc(&(_p)->refcnt)
 
-extern struct task_struct *do_newdomain(unsigned int dom_id, unsigned int cpu);
+extern struct task_struct *do_createdomain(
+    unsigned int dom_id, unsigned int cpu);
 extern int setup_guestos(
-    struct task_struct *p, dom0_newdomain_t *params, unsigned int num_vifs,
+    struct task_struct *p, dom0_createdomain_t *params, unsigned int num_vifs,
     char *data_start, unsigned long data_len, 
     char *cmdline, unsigned long initrd_len);
 extern int final_setup_guestos(struct task_struct *p, dom0_builddomain_t *);

@@ -33,7 +33,7 @@ struct task_struct *task_hash[TASK_HASH_SIZE];
 /*
  * create a new domain
  */
-struct task_struct *do_newdomain(unsigned int dom_id, unsigned int cpu)
+struct task_struct *do_createdomain(unsigned int dom_id, unsigned int cpu)
 {
     int retval, i;
     struct task_struct *p = NULL;
@@ -441,7 +441,7 @@ static unsigned long alloc_page_from_domain(unsigned long * cur_addr,
 /* setup_guestos is used for building dom0 solely. other domains are built in
  * userspace dom0 and final setup is being done by final_setup_guestos.
  */
-int setup_guestos(struct task_struct *p, dom0_newdomain_t *params, 
+int setup_guestos(struct task_struct *p, dom0_createdomain_t *params, 
                   unsigned int num_vifs,
                   char *phy_data_start, unsigned long data_len, 
 		  char *cmdline, unsigned long initrd_len)

@@ -669,8 +669,8 @@ static void __init do_boot_cpu (int apicid)
 
     cpu = ++cpucount;
 
-    if ( (idle = do_newdomain(IDLE_DOMAIN_ID, cpu)) == NULL )
-        panic("failed 'newdomain' for CPU %d", cpu);
+    if ( (idle = do_createdomain(IDLE_DOMAIN_ID, cpu)) == NULL )
+        panic("failed 'createdomain' for CPU %d", cpu);
  
     idle->mm.pagetable = mk_pagetable(__pa(idle_pg_table));
 

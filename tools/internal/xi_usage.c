@@ -22,13 +22,13 @@ int main(int argc, char **argv)
     domain = atol(argv[1]);
 
     op.cmd                 = DOM0_GETDOMAININFO;
-    op.u.getdominfo.domain = domain;
+    op.u.getdomaininfo.domain = domain;
     if ( do_dom0_op(&op) < 0 )
         return 1;
 
     printf("cpu%d: %lld\n", 
-           op.u.getdominfo.processor,
-           op.u.getdominfo.cpu_time);
+           op.u.getdomaininfo.processor,
+           op.u.getdomaininfo.cpu_time);
 
     if ( mlock(vifs, sizeof(vifs)) != 0 )
     {
