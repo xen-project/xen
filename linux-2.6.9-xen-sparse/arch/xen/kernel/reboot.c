@@ -8,6 +8,7 @@ static int errno;
 #include <linux/unistd.h>
 #include <linux/module.h>
 #include <linux/reboot.h>
+#include <linux/sysrq.h>
 #include <asm/irq.h>
 #include <asm/mmu_context.h>
 #include <asm-xen/ctrl_if.h>
@@ -49,10 +50,9 @@ EXPORT_SYMBOL(machine_power_off);
  * Stop/pickle callback handling.
  */
 
-//#include <asm/suspend.h>
-
 /* Ignore multiple shutdown requests. */
 static int shutting_down = -1;
+static int pending_sysrq = -1;
 
 static void __do_suspend(void)
 {
@@ -214,9 +214,18 @@ static void __shutdown_handler(void *unused)
     }
 }
 
+static void __sysrq_handler(void *unused)
+{
+#ifdef CONFIG_MAGIC_SYSRQ
+    handle_sysrq(pending_sysrq, NULL, NULL);
+#endif
+    pending_sysrq = -1;
+}
+
 static void shutdown_handler(ctrl_msg_t *msg, unsigned long id)
 {
     static DECLARE_WORK(shutdown_work, __shutdown_handler, NULL);
+    static DECLARE_WORK(sysrq_work, __sysrq_handler, NULL);
 
     if ( (shutting_down == -1) &&
          ((msg->subtype == CMSG_SHUTDOWN_POWEROFF) ||
@@ -225,6 +234,12 @@ static void shutdown_handler(ctrl_msg_t *msg, unsigned long id)
     {
         shutting_down = msg->subtype;
         schedule_work(&shutdown_work);
+    }
+    else if ( (pending_sysrq == -1) && 
+              (msg->subtype == CMSG_SHUTDOWN_SYSRQ) )
+    {
+        pending_sysrq = msg->msg[0];
+        schedule_work(&sysrq_work);
     }
     else
     {

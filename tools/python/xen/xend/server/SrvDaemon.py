@@ -711,14 +711,14 @@ class Daemon:
             raise XendError('Invalid console id')
         console.disconnect()
 
-    def domain_shutdown(self, dom, reason):
+    def domain_shutdown(self, dom, reason, key=None):
         """Shutdown a domain.
         """
         dom = int(dom)
         ctrl = self.domainCF.getController(dom)
         if not ctrl:
             raise XendError('No domain controller: %s' % dom)
-        ctrl.shutdown(reason)
+        ctrl.shutdown(reason, key)
         return 0
 
     def domain_mem_target_set(self, dom, target):
