@@ -313,8 +313,7 @@
 3ddb79bcSC_LvnmFlX-T5iTgaR0SKg xen/arch/x86/boot/x86_32.S
 40e42bdbNu4MjI750THP_8J1S-Sa0g xen/arch/x86/boot/x86_64.S
 3ddb79bcUrk2EIaM5VsT6wUudH1kkg xen/arch/x86/delay.c
-3e32af9aRnYGl4GMOaDKp7JdfhOGhg xen/arch/x86/domain_page.c
-3ddb79bcecupHj56ZbTa3B0FxDowMg xen/arch/x86/entry.S
+3ddb79bc1_2bAt67x9MFCP4AZrQnvQ xen/arch/x86/domain.c
 3ddb79bcY5zW7KhvI9gvfuPi3ZumEg xen/arch/x86/extable.c
 3fe443fdDDb0Sw6NQBCk4GQapayfTA xen/arch/x86/flushtlb.c
 3ddb79bcesE5E-lS4QhRhlqXxqj9cA xen/arch/x86/i387.c
@@ -322,7 +321,6 @@
 3ddb79bcBit4xJXbwtX0kb1hh2uO1Q xen/arch/x86/idle0_task.c
 3ddb79bcKIkRR0kqWaJhe5VUDkMdxg xen/arch/x86/io_apic.c
 3ddb79bdqfIcjkz_h9Hvtp8Tk_19Zw xen/arch/x86/irq.c
-3ddb79bcHwuCQDjBICDTSis52hWguw xen/arch/x86/mm.c
 3ddb79bdS4UeWWXDH-FaBKqcpMFcnw xen/arch/x86/mpparse.c
 3f12cff65EV3qOG2j37Qm0ShgvXGRw xen/arch/x86/nmi.c
 3ddb79bdHe6_Uij4-glW91vInNtBYQ xen/arch/x86/pci-irq.c
@@ -331,7 +329,6 @@
 3ddb79bdIKgipvGoqExEQ7jawfVowA xen/arch/x86/pci-x86.h
 40a4dfced2dnSzbKgJFlD3chKHexjQ xen/arch/x86/pdb-linux.c
 4022a73czgX7d-2zfF_cb33oVemApQ xen/arch/x86/pdb-stub.c
-3ddb79bc1_2bAt67x9MFCP4AZrQnvQ xen/arch/x86/process.c
 3ddb79bc7KxGCEJsgBnkDX7XjD_ZEQ xen/arch/x86/rwlock.c
 3ddb79bcrD6Z_rUvSDgrvjyb4846Eg xen/arch/x86/setup.c
 3ddb79bcSx2e8JSR3pdSGa8x1ScYzA xen/arch/x86/smp.c
@@ -339,8 +336,14 @@
 3ddb79bc-Udq7ol-NX4q9XsYnN7A2Q xen/arch/x86/time.c
 3ddb79bccYVzXZJyVaxuv5T42Z1Fsw xen/arch/x86/trampoline.S
 3ddb79bcOftONV9h4QCxXOfiT0h91w xen/arch/x86/traps.c
-3ddb79bc4nTpGQOe6_-MbyZzkhlhFQ xen/arch/x86/usercopy.c
-3ddb79bcOMCu9-5mKpjIh5d0qqBDPg xen/arch/x86/xen.lds
+3e32af9aRnYGl4GMOaDKp7JdfhOGhg xen/arch/x86/x86_32/domain_page.c
+3ddb79bcecupHj56ZbTa3B0FxDowMg xen/arch/x86/x86_32/entry.S
+3ddb79bcHwuCQDjBICDTSis52hWguw xen/arch/x86/x86_32/mm.c
+3ddb79bc4nTpGQOe6_-MbyZzkhlhFQ xen/arch/x86/x86_32/usercopy.c
+3ddb79bcOMCu9-5mKpjIh5d0qqBDPg xen/arch/x86/x86_32/xen.lds
+40e96d3aLDI-nViMuYneD7VKYlZrVg xen/arch/x86/x86_64/entry.S
+40e96d3ahBTZqbTViInnq0lM03vs7A xen/arch/x86/x86_64/usercopy.c
+40e96d3akN3Hu_J5Bk-WXD8OGscrYQ xen/arch/x86/x86_64/xen.lds
 3ddb79bdff-gj-jFGKjOejeHLqL8Lg xen/common/Makefile
 3e397e66AyyD5fYraAySWuwi9uqSXg xen/common/ac_timer.c
 4022a73c_BbDFd2YJ_NQYVvKX5Oz7w xen/common/debug-linux.c
