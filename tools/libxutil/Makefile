@@ -1,3 +1,12 @@
+
+ifndef BUILD_PIC_LIBS
+ifeq ($(wildcard /etc/debian_version),)
+BUILD_PIC_LIBS=n
+else
+BUILD_PIC_LIBS=y
+endif
+endif
+
 XEN_ROOT = ../..
 INSTALL		= install
 INSTALL_DATA	= $(INSTALL) -m0644
@@ -24,7 +33,7 @@ LIB_SRCS += sys_string.c
 LIB_SRCS += util.c
 
 LIB_OBJS := $(LIB_SRCS:.c=.o)
-LIB_PIC_OBJS := $(LIB_SRCS:.c=.opic)
+PIC_OBJS := $(LIB_SRCS:.c=.opic)
 
 CFLAGS   += -Wall -Werror -O3 -fno-strict-aliasing
 
@@ -34,29 +43,32 @@ DEPS     = .*.d
 
 MAJOR    := 2.0
 MINOR    := 0
-LIB_NAME := libxutil
-SO_NAME  := $(LIB_NAME).so.$(MAJOR)
-LIB      := $(LIB_NAME).so 
-LIB      += $(LIB_NAME).so.$(MAJOR)
-LIB      += $(LIB_NAME).so.$(MAJOR).$(MINOR)
-LIB      += $(LIB_NAME).a
+LIB      := libxutil.so 
+LIB      += libxutil.so.$(MAJOR)
+LIB      += libxutil.so.$(MAJOR).$(MINOR)
+LIB      += libxutil.a
 
 all: check-for-zlib
 	$(MAKE) $(LIB)
 
-$(LIB_PIC_OBJS): %.opic: %.c
+$(PIC_OBJS): %.opic: %.c
 	$(CC) $(CPPFLAGS) -DPIC $(CFLAGS) -fPIC -c -o $@ $<
 
-$(LIB_NAME).so: $(LIB_NAME).so.$(MAJOR)
+libxutil.so: libxutil.so.$(MAJOR)
 	ln -sf $^ $@
 
-$(LIB_NAME).so.$(MAJOR): $(LIB_NAME).so.$(MAJOR).$(MINOR)
+libxutil.so.$(MAJOR): libxutil.so.$(MAJOR).$(MINOR)
 	ln -sf $^ $@
 
-$(LIB_NAME).so.$(MAJOR).$(MINOR): $(LIB_PIC_OBJS)
-	$(CC) -Wl,-soname -Wl,$(SO_NAME) -shared -o $@ $^
+ifeq ($(BUILD_PIC_LIBS),y)
+libxutil.so.$(MAJOR).$(MINOR): $(PIC_OBJS)
+	$(CC) -Wl,-soname -Wl,libxutil.so.$(MAJOR) -shared -o $@ $^
+else
+libxutil.so.$(MAJOR).$(MINOR): $(LIB_OBJS)
+	$(CC) -Wl,-soname -Wl,libxutil.so.$(MAJOR) -shared -o $@ $^
+endif
 
-$(LIB_NAME).a: $(LIB_OBJS)
+libxutil.a: $(LIB_OBJS)
 	$(AR) rc $@ $^
 
 check-for-zlib:
@@ -69,13 +81,13 @@ check-for-zlib:
 
 install: all
 	[ -d $(DESTDIR)/usr/lib ] || $(INSTALL_DIR) -p $(DESTDIR)/usr/lib
-	$(INSTALL_PROG) $(LIB_NAME).so.$(MAJOR).$(MINOR) $(DESTDIR)/usr/lib
-	$(INSTALL_DATA) $(LIB_NAME).a $(DESTDIR)/usr/lib
-	ln -sf $(LIB_NAME).so.$(MAJOR).$(MINOR) $(DESTDIR)/usr/lib/$(LIB_NAME).so.$(MAJOR)
-	ln -sf $(LIB_NAME).so.$(MAJOR) $(DESTDIR)/usr/lib/$(LIB_NAME).so
+	$(INSTALL_PROG) libxutil.so.$(MAJOR).$(MINOR) $(DESTDIR)/usr/lib
+	$(INSTALL_DATA) libxutil.a $(DESTDIR)/usr/lib
+	ln -sf libxutil.so.$(MAJOR).$(MINOR) $(DESTDIR)/usr/lib/libxutil.so.$(MAJOR)
+	ln -sf libxutil.so.$(MAJOR) $(DESTDIR)/usr/lib/libxutil.so
 
 clean:
-	$(RM) *.a *.so *.so.* *.o *.opic *.rpm 
+	$(RM) *.a *.so* *.o *.opic *.rpm 
 	$(RM) *~
 	$(RM) $(DEPS)
 

@@ -1,3 +1,12 @@
+
+ifndef BUILD_PIC_LIBS
+ifeq ($(wildcard /etc/debian_version),)
+BUILD_PIC_LIBS=n
+else
+BUILD_PIC_LIBS=y
+endif
+endif
+
 INSTALL		= install
 INSTALL_PROG	= $(INSTALL) -m0755
 INSTALL_DATA	= $(INSTALL) -m0644
@@ -5,8 +14,6 @@ INSTALL_DIR	= $(INSTALL) -d -m0755
 
 MAJOR    = 2.0
 MINOR    = 0
-LIB_NAME = libxc
-SONAME   = $(LIB_NAME).so.$(MAJOR)
 
 CC       = gcc
 
@@ -40,10 +47,10 @@ CFLAGS   += $(INCLUDES) -I.
 CFLAGS   += -Wp,-MD,.$(@F).d
 DEPS     = .*.d
 
-OBJS     := $(patsubst %.c,%.o,$(SRCS))
+LIB_OBJS := $(patsubst %.c,%.o,$(SRCS))
 PIC_OBJS := $(patsubst %.c,%.opic,$(SRCS))
 
-LIB		:= $(LIB_NAME).a $(LIB_NAME).so $(LIB_NAME).so.$(MAJOR) $(LIB_NAME).so.$(MAJOR).$(MINOR)
+LIB      := libxc.a libxc.so libxc.so.$(MAJOR) libxc.so.$(MAJOR).$(MINOR)
 
 all: check-for-zlib mk-symlinks
 	$(MAKE) $(LIB)
@@ -70,14 +77,14 @@ mk-symlinks:
 install: all
 	[ -d $(DESTDIR)/usr/lib ] || $(INSTALL_DIR) $(DESTDIR)/usr/lib
 	[ -d $(DESTDIR)/usr/include ] || $(INSTALL_DIR) $(DESTDIR)/usr/include
-	$(INSTALL_PROG) $(LIB_NAME).so.$(MAJOR).$(MINOR) $(DESTDIR)/usr/lib
-	$(INSTALL_DATA) $(LIB_NAME).a $(DESTDIR)/usr/lib
-	ln -sf $(LIB_NAME).so.$(MAJOR).$(MINOR) $(DESTDIR)/usr/lib/$(LIB_NAME).so.$(MAJOR)
-	ln -sf $(LIB_NAME).so.$(MAJOR) $(DESTDIR)/usr/lib/$(LIB_NAME).so
+	$(INSTALL_PROG) libxc.so.$(MAJOR).$(MINOR) $(DESTDIR)/usr/lib
+	$(INSTALL_DATA) libxc.a $(DESTDIR)/usr/lib
+	ln -sf libxc.so.$(MAJOR).$(MINOR) $(DESTDIR)/usr/lib/libxc.so.$(MAJOR)
+	ln -sf libxc.so.$(MAJOR) $(DESTDIR)/usr/lib/libxc.so
 	$(INSTALL_DATA) xc.h $(DESTDIR)/usr/include
 
 clean:
-	rm -rf *.a *.so *.o *.opic *.rpm $(LIB) *~ $(DEPS) xen
+	rm -rf *.a *.so* *.o *.opic *.rpm $(LIB) *~ $(DEPS) xen
 
 rpm: all
 	rm -rf staging
@@ -90,15 +97,21 @@ rpm: all
 
 $(PIC_OBJS): %.opic: %.c
 	$(CC) $(CPPFLAGS) -DPIC $(CFLAGS) -fPIC -c -o $@ $<
-	
-$(LIB_NAME).a: $(OBJS)
+
+libxc.a: $(OBJS)
 	$(AR) rc $@ $^
 
-$(LIB_NAME).so: $(LIB_NAME).so.$(MAJOR)
+libxc.so: libxc.so.$(MAJOR)
 	ln -sf $< $@
-$(LIB_NAME).so.$(MAJOR): $(LIB_NAME).so.$(MAJOR).$(MINOR)
+libxc.so.$(MAJOR): libxc.so.$(MAJOR).$(MINOR)
 	ln -sf $< $@
-$(LIB_NAME).so.$(MAJOR).$(MINOR): $(PIC_OBJS)
-	$(CC) -Wl,-soname -Wl,$(SONAME) -shared -o $@ $^ -L../libxutil -lxutil -lz
+
+ifeq ($(BUILD_PIC_LIBS),y)
+libxc.so.$(MAJOR).$(MINOR): $(PIC_OBJS)
+	$(CC) -Wl,-soname -Wl,libxc.so.$(MAJOR) -shared -o $@ $^ -L../libxutil -lxutil -lz
+else
+libxc.so.$(MAJOR).$(MINOR): $(LIB_OBJS)
+	$(CC) -Wl,-soname -Wl,libxc.so.$(MAJOR) -shared -o $@ $^ -L../libxutil -lxutil -lz
+endif
 
 -include $(DEPS)
