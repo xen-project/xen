@@ -84,7 +84,7 @@ spinlock_t rtc_lock = SPIN_LOCK_UNLOCKED;
 spinlock_t i8253_lock = SPIN_LOCK_UNLOCKED;
 EXPORT_SYMBOL(i8253_lock);
 
-extern struct init_timer_opts __initdata timer_tsc_init;
+extern struct init_timer_opts timer_tsc_init;
 extern struct timer_opts timer_tsc;
 struct timer_opts *cur_timer = &timer_tsc;
 
