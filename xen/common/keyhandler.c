@@ -3,6 +3,7 @@
  * keyhandler.c
  */
 
+#include <asm/regs.h>
 #include <xen/keyhandler.h> 
 #include <xen/reboot.h>
 #include <xen/event.h>
