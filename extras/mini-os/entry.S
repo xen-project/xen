@@ -1,41 +1,13 @@
-/*
- *  linux/arch/i386/entry.S
- *
- *  Copyright (C) 1991, 1992  Linus Torvalds
- *
- *  Adjusted for XenoLinux use by K A Frasier
- *  Adjusted for Xen minimal os by R Neugebauer
- */
-
         
 #include <os.h>
-        
-EBX		= 0x00
-ECX		= 0x04
-EDX		= 0x08
-ESI		= 0x0C
-EDI		= 0x10
-EBP		= 0x14
-EAX		= 0x18
-DS		= 0x1C
+
 ES		= 0x20
 ORIG_EAX	= 0x24
 EIP		= 0x28
 CS		= 0x2C
-EFLAGS		= 0x30
-OLDESP		= 0x34
-OLDSS		= 0x38
 
-CF_MASK		= 0x00000001
-IF_MASK		= 0x00000200
-NT_MASK		= 0x00004000
-
-/* Declare a globally-visible label */
 #define ENTRY(X) .globl X ; X :
 
-/* A Linux hangover. Just ignore it. */
-#define SYMBOL_NAME(X) X
-        
 #define SAVE_ALL \
 	cld; \
 	pushl %es; \
@@ -59,34 +31,15 @@ NT_MASK		= 0x00004000
 	popl %edi;	\
 	popl %ebp;	\
 	popl %eax;	\
-1:	popl %ds;	\
-2:	popl %es;	\
-	addl $4,%esp;	\
-3:	iret;		\
-.section .fixup,"ax";	\
-4:	movl $0,(%esp);	\
-	jmp 1b;		\
-5:	movl $0,(%esp);	\
-	jmp 2b;		\
-6:	pushl %ss;	\
 	popl %ds;	\
-	pushl %ss;	\
 	popl %es;	\
-	pushl $11;	\
-        call do_exit;	\
-.previous;		\
-.section __ex_table,"a";\
-	.align 4;	\
-	.long 1b,4b;	\
-	.long 2b,5b;	\
-	.long 3b,6b;	\
-.previous
+	addl $4,%esp;	\
+	iret;		\
 
 ENTRY(divide_error)
 	pushl $0		# no error code
-	pushl $ SYMBOL_NAME(do_divide_error)
-	.align 4
-error_code:
+	pushl $do_divide_error
+do_exception:
 	pushl %ds
 	pushl %eax
 	xorl %eax,%eax
@@ -112,20 +65,11 @@ error_code:
 	call *%edi
 	addl $8,%esp
 
-# These are the tests Linux makes before exiting the OS back to userland.
-# At these point preeemption may occur, or signals may get delivered.
-ret_to_user_tests:
-#        cmpl $0,need_resched(%ebx)
-#        jne reschedule
-#        cmpl $0,sigpending(%ebx)
-#        je   safesti
-        jmp safesti
-               
         
 ret_from_exception:
         movb CS(%esp),%cl
-	    test $2,%cl          # slow return to ring 2 or 3
-	    jne  ret_to_user_tests
+	test $2,%cl          # slow return to ring 2 or 3
+	jne  safesti
         RESTORE_ALL
 
 # A note on the "critical region" in our callback handler.
@@ -150,11 +94,11 @@ ENTRY(hypervisor_callback)
 11:     push %esp
         call do_hypervisor_callback
         add  $4,%esp
-        movl SYMBOL_NAME(HYPERVISOR_shared_info),%esi
+        movl HYPERVISOR_shared_info,%esi
         xorl %eax,%eax
         movb CS(%esp),%cl
     	test $2,%cl          # slow return to ring 2 or 3
-	    jne  ret_to_user_tests
+        jne  safesti
 safesti:btsl $31,4(%esi)     # reenable event callbacks
 scrit:  /**** START OF CRITICAL REGION ****/
         cmpl %eax,(%esi)
@@ -207,105 +151,78 @@ critical_fixup_table:
        
 # Hypervisor uses this for application faults while it executes.
 ENTRY(failsafe_callback)
-1:      pop  %ds
-2:      pop  %es
-3:      pop  %fs
-4:      pop  %gs
-5:      iret
-.section .fixup,"ax";	\
-6:	movl $0,(%esp);	\
-	jmp 1b;		\
-7:	movl $0,(%esp);	\
-	jmp 2b;		\
-8:	movl $0,(%esp);	\
-	jmp 3b;		\
-9:	movl $0,(%esp);	\
-	jmp 4b;		\
-10:	pushl %ss;	\
-	popl %ds;	\
-	pushl %ss;	\
-	popl %es;	\
-	pushl $11;	\
-	call do_exit;	\
-.previous;		\
-.section __ex_table,"a";\
-	.align 4;	\
-	.long 1b,6b;	\
-	.long 2b,7b;	\
-	.long 3b,8b;	\
-	.long 4b,9b;	\
-	.long 5b,10b;	\
-.previous
+      pop  %ds
+      pop  %es
+      pop  %fs
+      pop  %gs
+      iret
                 
 ENTRY(coprocessor_error)
 	pushl $0
-	pushl $ SYMBOL_NAME(do_coprocessor_error)
-	jmp error_code
+	pushl $do_coprocessor_error
+	jmp do_exception
 
 ENTRY(simd_coprocessor_error)
 	pushl $0
-	pushl $ SYMBOL_NAME(do_simd_coprocessor_error)
-	jmp error_code
+	pushl $do_simd_coprocessor_error
+	jmp do_exception
 
 ENTRY(device_not_available)
-	pushl $-1		# mark this as an int
-	SAVE_ALL
-	#call SYMBOL_NAME(math_state_restore)
-	jmp ret_from_exception
+        iret
 
 ENTRY(debug)
 	pushl $0
-	pushl $ SYMBOL_NAME(do_debug)
-	jmp error_code
+	pushl $do_debug
+	jmp do_exception
 
 ENTRY(int3)
 	pushl $0
-	pushl $ SYMBOL_NAME(do_int3)
-	jmp error_code
+	pushl $do_int3
+	jmp do_exception
 
 ENTRY(overflow)
 	pushl $0
-	pushl $ SYMBOL_NAME(do_overflow)
-	jmp error_code
+	pushl $do_overflow
+	jmp do_exception
 
 ENTRY(bounds)
 	pushl $0
-	pushl $ SYMBOL_NAME(do_bounds)
-	jmp error_code
+	pushl $do_bounds
+	jmp do_exception
 
 ENTRY(invalid_op)
 	pushl $0
-	pushl $ SYMBOL_NAME(do_invalid_op)
-	jmp error_code
+	pushl $do_invalid_op
+	jmp do_exception
 
 ENTRY(coprocessor_segment_overrun)
 	pushl $0
-	pushl $ SYMBOL_NAME(do_coprocessor_segment_overrun)
-	jmp error_code
+	pushl $do_coprocessor_segment_overrun
+	jmp do_exception
 
 ENTRY(double_fault)
-	pushl $ SYMBOL_NAME(do_double_fault)
-	jmp error_code
+	pushl $do_double_fault
+	jmp do_exception
 
 ENTRY(invalid_TSS)
-	pushl $ SYMBOL_NAME(do_invalid_TSS)
-	jmp error_code
+	pushl $do_invalid_TSS
+	jmp do_exception
 
 ENTRY(segment_not_present)
-	pushl $ SYMBOL_NAME(do_segment_not_present)
-	jmp error_code
+	pushl $do_segment_not_present
+	jmp do_exception
 
 ENTRY(stack_segment)
-	pushl $ SYMBOL_NAME(do_stack_segment)
-	jmp error_code
+	pushl $do_stack_segment
+	jmp do_exception
 
 ENTRY(general_protection)
-	pushl $ SYMBOL_NAME(do_general_protection)
-	jmp error_code
+	pushl $do_general_protection
+	jmp do_exception
 
 ENTRY(alignment_check)
-	pushl $ SYMBOL_NAME(do_alignment_check)
-	jmp error_code
+	pushl $do_alignment_check
+	jmp do_exception
 
 # This handler is special, because it gets an extra value on its stack,
 # which is the linear faulting address.
@@ -333,16 +250,16 @@ ENTRY(page_fault)
 	movl $(__KERNEL_DS),%edx
 	movl %edx,%ds
 	movl %edx,%es
-	call SYMBOL_NAME(do_page_fault)
+	call do_page_fault
 	addl $12,%esp
 	jmp ret_from_exception
 
 ENTRY(machine_check)
 	pushl $0
-	pushl $ SYMBOL_NAME(do_machine_check)
-	jmp error_code
+	pushl $do_machine_check
+	jmp do_exception
 
 ENTRY(spurious_interrupt_bug)
 	pushl $0
-	pushl $ SYMBOL_NAME(do_spurious_interrupt_bug)
-	jmp error_code
+	pushl $do_spurious_interrupt_bug
+	jmp do_exception

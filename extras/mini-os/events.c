@@ -29,7 +29,7 @@ void default_handler(int ev, struct pt_regs *regs);
 /*
  * demux events to different handlers
  */
-asmlinkage unsigned int do_event(int ev, struct pt_regs *regs)
+unsigned int do_event(int ev, struct pt_regs *regs)
 {
     ev_action_t  *action;
 

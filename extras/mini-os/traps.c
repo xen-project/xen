@@ -31,52 +31,6 @@ void machine_check(void);
 
 extern void do_exit(void);
 
-int kstack_depth_to_print = 24;
-#define THREAD_SIZE (2*PAGE_SIZE)
-
-static inline int kernel_text_address(unsigned long addr)
-{
-    return ( (addr >> 20) > 0x800 && (addr >> 20) < 0x804 );
-}
-
-void show_trace(unsigned long * stack)
-{
-    int i;
-    unsigned long addr;
-
-    if (!stack)
-        stack = (unsigned long*)&stack;
-
-    printk("Call Trace: ");
-    i = 1;
-    while (((long) stack & (4095)) != 0) {
-        addr = *stack++;
-        if (kernel_text_address(addr)) {
-            printf("0x%lx", addr);
-            i++;
-        }
-    }
-    printk("\n");
-}
-
-void show_stack(unsigned long * esp)
-{
-	unsigned long *stack;
-	int i;
-
-	if(esp==NULL)
-		esp=(unsigned long*)&esp;
-
-	stack = esp;
-	for(i=0; i < kstack_depth_to_print; i++) {
-		if (((long) stack & (THREAD_SIZE-1)) == 0)
-			break;
-		printk("%08lx ", *stack++);
-	}
-	printk("\n");
-	show_trace(esp);
-}
-
 void dump_regs(struct pt_regs *regs)
 {
 	int in_kernel = 1;
@@ -132,7 +86,6 @@ static void inline do_trap(int trapnr, char *str,
   printk("FATAL:  Unhandled Trap (see mini-os:traps.c)");
   printf("%d %s", trapnr, str);
   dump_regs(regs);
-  show_trace((void *)regs->esp);
   dump_code(regs->eip);
 
   do_exit();
@@ -164,7 +117,7 @@ DO_ERROR(12, "stack segment", stack_segment)
 DO_ERROR_INFO(17, "alignment check", alignment_check, BUS_ADRALN, 0)
 DO_ERROR(18, "machine check", machine_check)
 
-void do_page_fault(struct pt_regs * regs, long error_code,
+void do_page_fault(struct pt_regs *regs, long error_code,
                    unsigned long address)
 {
     printk("Page fault\n");
@@ -211,13 +164,13 @@ void simd_math_error(void *eip)
 }
 
 void do_simd_coprocessor_error(struct pt_regs * regs,
-					  long error_code)
+                               long error_code)
 {
     printk("SIMD copro error\n");
 }
 
 void do_spurious_interrupt_bug(struct pt_regs * regs,
-					  long error_code)
+                               long error_code)
 {
 }
 

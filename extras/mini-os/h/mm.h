@@ -15,25 +15,38 @@
  ****************************************************************************
  * $Id: h-insert.h,v 1.4 2002/11/08 16:03:55 rn Exp $
  ****************************************************************************
+ * Permission is hereby granted, free of charge, to any person obtaining a copy
+ * of this software and associated documentation files (the "Software"), to
+ * deal in the Software without restriction, including without limitation the
+ * rights to use, copy, modify, merge, publish, distribute, sublicense, and/or
+ * sell copies of the Software, and to permit persons to whom the Software is
+ * furnished to do so, subject to the following conditions:
+ * 
+ * The above copyright notice and this permission notice shall be included in
+ * all copies or substantial portions of the Software.
+ * 
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR 
+ * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, 
+ * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE 
+ * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER 
+ * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING 
+ * FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER 
+ * DEALINGS IN THE SOFTWARE.
  */
 
 #ifndef _MM_H_
 #define _MM_H_
 
-/* PAGE_SHIFT determines the page size */
 #define PAGE_SHIFT      12
 #define PAGE_SIZE       (1UL << PAGE_SHIFT)
 #define PAGE_MASK       (~(PAGE_SIZE-1))
-
 
 #define PFN_UP(x)	(((x) + PAGE_SIZE-1) >> PAGE_SHIFT)
 #define PFN_DOWN(x)	((x) >> PAGE_SHIFT)
 #define PFN_PHYS(x)	((x) << PAGE_SHIFT)
 
-
 /* to align the pointer to the (next) page boundary */
 #define PAGE_ALIGN(addr)        (((addr)+PAGE_SIZE-1)&PAGE_MASK)
-
 
 extern unsigned long *phys_to_machine_mapping;
 #define pfn_to_mfn(_pfn) (phys_to_machine_mapping[(_pfn)])
@@ -51,57 +64,12 @@ static inline unsigned long machine_to_phys(unsigned long machine)
     return phys;
 }
 
-/* VIRT <-> MACHINE conversion */
-#define virt_to_machine(_a) (phys_to_machine(__pa(_a)))
-#define machine_to_virt(_m) (__va(machine_to_phys(_m)))
+#define VIRT_START              0xC0000000UL
 
-/*
- * This handles the memory map.. We could make this a config
- * option, but too many people screw it up, and too few need
- * it.
- *
- * A __PAGE_OFFSET of 0xC0000000 means that the kernel has
- * a virtual address space of one gigabyte, which limits the
- * amount of physical memory you can use to about 950MB. 
- *
- * If you want more physical memory than this then see the CONFIG_HIGHMEM4G
- * and CONFIG_HIGHMEM64G options in the kernel configuration.
- */
+#define to_phys(x)                 ((unsigned long)(x)-VIRT_START)
+#define to_virt(x)                 ((void *)((unsigned long)(x)+VIRT_START))
 
-#define __PAGE_OFFSET           (0xC0000000)
-
-#define PAGE_OFFSET             ((unsigned long)__PAGE_OFFSET)
-#define __pa(x)                 ((unsigned long)(x)-PAGE_OFFSET)
-#define __va(x)                 ((void *)((unsigned long)(x)+PAGE_OFFSET))
-#define virt_to_page(kaddr)     (mem_map + (__pa(kaddr) >> PAGE_SHIFT))
-#define VALID_PAGE(page)        ((page - mem_map) < max_mapnr)
-
-#define VM_DATA_DEFAULT_FLAGS   (VM_READ | VM_WRITE | VM_EXEC | \
-                                 VM_MAYREAD | VM_MAYWRITE | VM_MAYEXEC)
-
-
-/* prototypes */
 void init_mm();
-void release_bytes_to_allocator(unsigned long min, unsigned long max);
-unsigned long __get_free_pages(int order);
-void __free_pages(unsigned long p, int order);
-#define get_free_pages(_o) (__get_free_pages(_o))
-#define get_free_page() (__get_free_pages(0))
-#define free_pages(_p,_o) (__free_pages(_p,_o))
-#define free_page(_p) (__free_pages(_p,0))
-
-static __inline__ int get_order(unsigned long size)
-{
-    int order;
-    
-    size = (size-1) >> (PAGE_SHIFT-1);
-    order = -1;
-    do {
-        size >>= 1;
-        order++;
-    } while (size);
-    return order;
-}
-
+unsigned long alloc_pages(int order);
 
 #endif /* _MM_H_ */

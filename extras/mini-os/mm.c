@@ -16,19 +16,23 @@
  ****************************************************************************
  * $Id: c-insert.c,v 1.7 2002/11/08 16:04:34 rn Exp $
  ****************************************************************************
- * This program is free software; you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation; either version 2 of the License, or
- * (at your option) any later version.
+ * Permission is hereby granted, free of charge, to any person obtaining a copy
+ * of this software and associated documentation files (the "Software"), to
+ * deal in the Software without restriction, including without limitation the
+ * rights to use, copy, modify, merge, publish, distribute, sublicense, and/or
+ * sell copies of the Software, and to permit persons to whom the Software is
+ * furnished to do so, subject to the following conditions:
  * 
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
+ * The above copyright notice and this permission notice shall be included in
+ * all copies or substantial portions of the Software.
  * 
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR 
+ * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, 
+ * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE 
+ * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER 
+ * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING 
+ * FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER 
+ * DEALINGS IN THE SOFTWARE.
  */
 
 #include <os.h>
@@ -59,7 +63,7 @@ void init_mm(void)
     printk("  _end:         %p\n", &_end);
 
     /* set up minimal memory infos */
-    start_pfn = PFN_UP(__pa(&_end));
+    start_pfn = PFN_UP(to_phys(&_end));
     max_pfn = start_info.nr_pages;
 
     printk("  start_pfn:    %lx\n", start_pfn);
@@ -79,19 +83,19 @@ void init_mm(void)
      * is always true.
      */
 
-    max_free_pfn = PFN_DOWN(__pa(pgd));
+    max_free_pfn = PFN_DOWN(to_phys(pgd));
     {
         unsigned long *pgd = (unsigned long *)start_info.pt_base;
         unsigned long  pte;
         int i;
-        printk("  pgd(pa(pgd)): %lx(%lx)", (u_long)pgd, __pa(pgd));
+        printk("  pgd(pa(pgd)): %lx(%lx)", (u_long)pgd, to_phys(pgd));
 
         for ( i = 0; i < (HYPERVISOR_VIRT_START>>22); i++ )
         {
             unsigned long pgde = *pgd++;
             if ( !(pgde & 1) ) continue;
             pte = machine_to_phys(pgde & PAGE_MASK);
-            printk("  PT(%x): %lx(%lx)", i, (u_long)__va(pte), pte);
+            printk("  PT(%x): %lx(%lx)", i, (u_long)to_virt(pte), pte);
             if (PFN_DOWN(pte) <= max_free_pfn) 
                 max_free_pfn = PFN_DOWN(pte);
         }
@@ -103,8 +107,8 @@ void init_mm(void)
      * now we can initialise the page allocator
      */
     printk("MM: Initialise page allocator for %lx(%lx)-%lx(%lx)\n",
-           (u_long)__va(PFN_PHYS(start_pfn)), PFN_PHYS(start_pfn), 
-           (u_long)__va(PFN_PHYS(max_free_pfn)), PFN_PHYS(max_free_pfn));
+           (u_long)to_virt(PFN_PHYS(start_pfn)), PFN_PHYS(start_pfn), 
+           (u_long)to_virt(PFN_PHYS(max_free_pfn)), PFN_PHYS(max_free_pfn));
     init_page_allocator(PFN_PHYS(start_pfn), PFN_PHYS(max_free_pfn));   
 
 
@@ -233,7 +237,7 @@ static void init_page_allocator(unsigned long min, unsigned long max)
     /* Allocate space for the allocation bitmap. */
     bitmap_size  = (max+1) >> (PAGE_SHIFT+3);
     bitmap_size  = round_pgup(bitmap_size);
-    alloc_bitmap = (unsigned long *)__va(min);
+    alloc_bitmap = (unsigned long *)to_virt(min);
     min         += bitmap_size;
     range        = max - min;
 
@@ -243,8 +247,8 @@ static void init_page_allocator(unsigned long min, unsigned long max)
     map_free(min>>PAGE_SHIFT, range>>PAGE_SHIFT);
 
     /* The buddy lists are addressed in high memory. */
-    min += PAGE_OFFSET;
-    max += PAGE_OFFSET;
+    min += VIRT_START;
+    max += VIRT_START;
 
     while ( range != 0 )
     {
@@ -271,22 +275,8 @@ static void init_page_allocator(unsigned long min, unsigned long max)
 }
 
 
-/* Release a PHYSICAL address range to the allocator. */
-void release_bytes_to_allocator(unsigned long min, unsigned long max)
-{
-    min = round_pgup  (min) + PAGE_OFFSET;
-    max = round_pgdown(max) + PAGE_OFFSET;
-
-    while ( min < max )
-    {
-        __free_pages(min, 0);
-        min += PAGE_SIZE;
-    }
-}
-
-
 /* Allocate 2^@order contiguous pages. Returns a VIRTUAL address. */
-unsigned long __get_free_pages(int order)
+unsigned long alloc_pages(int order)
 {
     int i;
     chunk_head_t *alloc_ch, *spare_ch;
@@ -325,7 +315,7 @@ unsigned long __get_free_pages(int order)
         free_head[i] = spare_ch;
     }
     
-    map_alloc(__pa(alloc_ch)>>PAGE_SHIFT, 1<<order);
+    map_alloc(to_phys(alloc_ch)>>PAGE_SHIFT, 1<<order);
 
     return((unsigned long)alloc_ch);
 
@@ -336,52 +326,3 @@ unsigned long __get_free_pages(int order)
     return 0;
 }
 
-
-/* Free 2^@order pages at VIRTUAL address @p. */
-void __free_pages(unsigned long p, int order)
-{
-    unsigned long size = 1 << (order + PAGE_SHIFT);
-    chunk_head_t *ch;
-    chunk_tail_t *ct;
-    unsigned long pagenr = __pa(p) >> PAGE_SHIFT;
-
-    map_free(pagenr, 1<<order);
-    
-    /* Merge chunks as far as possible. */
-    for ( ; ; )
-    {
-        if ( (p & size) )
-        {
-            /* Merge with predecessor block? */
-            if ( allocated_in_map(pagenr-1) ) break;
-            ct = (chunk_tail_t *)p - 1;
-            if ( ct->level != order ) break;
-            ch = (chunk_head_t *)(p - size);
-            p -= size;
-        }
-        else
-        {
-            /* Merge with successor block? */
-            if ( allocated_in_map(pagenr+(1<<order)) ) break;
-            ch = (chunk_head_t *)(p + size);
-            if ( ch->level != order ) break;
-        }
-        
-        /* Okay, unlink the neighbour. */
-        *ch->pprev = ch->next;
-        ch->next->pprev = ch->pprev;
-
-        order++;
-        size <<= 1;
-    }
-
-    /* Okay, add the final chunk to the appropriate free list. */
-    ch = (chunk_head_t *)p;
-    ct = (chunk_tail_t *)(p+size)-1;
-    ct->level = order;
-    ch->level = order;
-    ch->pprev = &free_head[order];
-    ch->next  = free_head[order];
-    ch->next->pprev = &ch->next;
-    free_head[order] = ch;
-}

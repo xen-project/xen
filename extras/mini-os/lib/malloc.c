@@ -51,17 +51,17 @@ static void *more_core(size_t n)
     if (n == 0)
         return last;
     
-    /* get pages */
-    order = get_order(n);
-    ret = (void *)get_free_pages(order);
+    n = PFN_UP(n);
+    for ( order = 0; n > 1; order++ )
+        n >>= 1;
+    ret = (void *)alloc_pages(order);
 
     /* work out pointer to end of chunk */
-    if (ret) {
+    if ( ret )
+    {
         num_pages = 1 << order;
         last = ret + (num_pages * PAGE_SIZE);
     }
-    
-    //printk("malloc(%lu) -> o=%lu r=%p, l=%p", n, order, ret, last);
 
     return ret;      
 }

@@ -7,7 +7,6 @@
 #ifndef _OS_H_
 #define _OS_H_
 
-
 #define NULL 0
 
 /*
@@ -126,9 +125,6 @@ do {                                                                          \
 typedef struct { volatile int counter; } atomic_t;
 
 
-/*
- * This XCHG macro is straight from Linux. It is gross.
- */
 #define xchg(ptr,v) \
         ((__typeof__(*(ptr)))__xchg((unsigned long)(v),(ptr),sizeof(*(ptr))))
 struct __xchg_dummy { unsigned long a[100]; };
@@ -251,19 +247,6 @@ static __inline__ void atomic_inc(atomic_t *v)
                 :"m" (v->counter));
 }
 
-
-/* useful hypervisor macros */
-
-struct desc_struct {
-        unsigned long a,b;
-};
-extern struct desc_struct default_ldt[];
-
-#define asmlinkage        __attribute__((regparm(0)))
-
-/*
- * some random linux macros
- */
 
 #define rdtscll(val) \
      __asm__ __volatile__("rdtsc" : "=A" (val))

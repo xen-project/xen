@@ -1,14 +1,4 @@
 
-/******************************************************************************
- * hypervisor.h
- * 
- * Linux-specific hypervisor handling.
- * 
- * Adjusted by R Neugebauer for Xen minimal OS
- *
- * Copyright (c) 2002, K A Fraser
- */
-
 #ifndef _HYPERVISOR_H_
 #define _HYPERVISOR_H_
 

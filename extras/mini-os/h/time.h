@@ -20,8 +20,6 @@
 #ifndef _TIME_H_
 #define _TIME_H_
 
-#include <list.h>
-
 /*
  * System Time
  * 64 bit value containing the nanoseconds elapsed since boot time.
