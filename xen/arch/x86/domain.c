@@ -699,7 +699,25 @@ int construct_dom0(struct domain *p,
     }
 
     /* Paranoia: scrub DOM0's memory allocation. */
-    memset((void *)alloc_start, 0, alloc_end - alloc_start);
+    printk("Scrubbing DOM0 RAM: ");
+    dst = (char *)alloc_start;
+    while ( dst < (char *)alloc_end )
+    {
+#define SCRUB_BYTES (100 * 1024 * 1024) /* 100MB */
+        printk(".");
+        touch_nmi_watchdog();
+        if ( ((char *)alloc_end - dst) > SCRUB_BYTES )
+        {
+            memset(dst, 0, SCRUB_BYTES);
+            dst += SCRUB_BYTES;
+        }
+        else
+        {
+            memset(dst, 0, (char *)alloc_end - dst);
+            break;
+        }
+    }
+    printk("done.\n");
 
     /* Construct a frame-allocation list for the initial domain. */
     for ( mfn = (alloc_start>>PAGE_SHIFT); 

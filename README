@@ -8,25 +8,74 @@ __  __            ____    ___
 ###############################
 
 University of Cambridge Computer Laboratory
-29 October 2004
+3 November 2004
 
 http://www.cl.cam.ac.uk/netos/xen/
 
-About the Xen Virtual Machine Monitor
-=====================================
+What is Xen?
+============
 
 Xen is a Virtual Machine Monitor (VMM) originally developed by the
 Systems Research Group of the University of Cambridge Computer
 Laboratory, as part of the UK-EPSRC funded XenoServers project.
+Xen is freely-distributable Open Source software, released under the
+GNU GPL.
 
 The 2.0 release offers excellent performance, hardware support and
 enterprise-grade features such as live migration. Linux 2.6, 2.4 and
 NetBSD 2.0 are already available for Xen, with more operating system
 ports on the way.
 
-Xen is freely-distributable Open Source software, released under the
-GNU GPL.
+This file contains some quick-start instructions to install Xen on
+your system. For full documentation, see the Xen User Manual. If this
+is a pre-built release then you can find the manual at:
+ dist/install/usr/share/doc/xen/pdf/user.pdf
+If you have a source release, then 'make -C docs' will build the
+manual at docs/pdf/user.pdf.
 
-For full documentation, see the Xen User Manual in docs/pdf/user.pdf
-(after running make -C docs) or the Documentation page on the Xen
-website.
+Quick-Start Guide - Pre-Built Binary Release
+============================================
+
+[NB. Unless noted otherwise, all the following steps should be
+performed with root privileges.]
+
+1. Install the binary distribution onto your filesystem:
+    # sh ./install.sh
+   Amongst other things, this will install Xen and XenLinux kernel
+   files in /boot, kernel modules and Python packages in /lib, and
+   various control tools in standard 'bin' directories.
+
+2. Configure your bootloader to boot Xen and an initial Linux virtual
+   machine. Note that Xen currently only works with GRUB: less common
+   alternatives such as LILO are *not* supported. You can most likely
+   find your GRUB menu file at /boot/grub/menu.lst: edit this file to
+   include an entry like the following:
+    # title Xen 2.0 / XenLinux 2.6.9
+    #   kernel /boot/xen.gz dom0_mem=<mem-kb> console=vga
+    #   module /boot/vmlinuz-2.6.9-xen0 root=<root-dev> ro console=tty0
+   For <mem-kb> you should specify the amount of memory, in kilobytes,
+   to allocate for use by your initial XenLinux virtual machine. Note
+   that Xen itself reserves about 32MB memory for internal use, which
+   is not available for allocation to virtual machines.
+   For <root-dev>, specify your usual root partition (e.g., /dev/hda1).
+
+3. Reboot your system and select the "Xen 2.0 / XenLinux 2.6.9" menu
+   option. After booting Xen, XenLinux will start and your
+   initialisation scripts should execute in the usual way.
+
+Quick-Start Guide - Source Release
+==================================
+
+First, there are a number of prerequisites for building a Xen source
+release. Make sure you have all the following installed, either by
+visiting the project webpage or installing a pre-built package
+provided by your Linux distributor:
+    * GCC (preferably v3.2.x or v3.3.x; older versions are unsupported) 
+    * GNU Make
+    * GNU Binutils
+    * Development install of libcurl (e.g., libcurl-dev)
+    * Development install of zlib (e.g., zlib-dev)
+    * Development install of Python v2.2 or later (e.g., python-dev)
+
+[NB. Unless noted otherwise, all the following steps should be
+performed with root privileges.]
