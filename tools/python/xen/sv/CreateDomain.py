@@ -113,6 +113,7 @@ class CreateFinish( Sheet ):
         
         vals.name = 	get( 'name' )
         vals.memory = 	get( 'memory' )
+        vals.maxmem =   get( 'maxmem' )
         vals.cpu =  	get( 'cpu' )
         vals.cpu_weight = get( 'cpu_weight' )
         
