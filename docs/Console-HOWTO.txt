@@ -42,7 +42,8 @@ Logging in via virtual console
 
  Additionally, if you wish to allow root logins via the virtual
  console, then 'xen/cons' must be added to the trusted tty list in
- /etc/securettys.
+ /etc/securetty. On some systems you *may* also need to modify the
+ file /etc/securettys (note the final 's').
 
 Virtual console for other domains
 ---------------------------------
