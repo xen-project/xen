@@ -918,8 +918,18 @@ int remap_page_range(unsigned long from, unsigned long phys_addr, unsigned long 
  */
 static inline void establish_pte(struct vm_area_struct * vma, unsigned long address, pte_t *page_table, pte_t entry)
 {
+#ifdef CONFIG_XENO
+	if ( likely(vma->vm_mm == current->mm) ) {
+		XENO_flush_page_update_queue();
+		HYPERVISOR_update_va_mapping(address>>PAGE_SHIFT, entry, UVMF_INVLPG);
+	} else {
+		set_pte(page_table, entry);
+		flush_tlb_page(vma, address);
+	}
+#else
 	set_pte(page_table, entry);
 	flush_tlb_page(vma, address);
+#endif
 	update_mmu_cache(vma, address, entry);
 }
 
@@ -1183,11 +1193,20 @@ static int do_swap_page(struct mm_struct * mm,
 
 	flush_page_to_ram(page);
 	flush_icache_page(vma, page);
+#ifdef CONFIG_XENO
+	if ( likely(vma->vm_mm == current->mm) ) {
+		XENO_flush_page_update_queue();
+		HYPERVISOR_update_va_mapping(address>>PAGE_SHIFT, pte, 0);
+	} else {
+		set_pte(page_table, pte);
+		XENO_flush_page_update_queue();
+	}
+#else
 	set_pte(page_table, pte);
+#endif
 
 	/* No need to invalidate - it was non-present before */
 	update_mmu_cache(vma, address, pte);
-	XENO_flush_page_update_queue();
 	spin_unlock(&mm->page_table_lock);
 	return ret;
 }
@@ -1229,11 +1248,20 @@ static int do_anonymous_page(struct mm_struct * mm, struct vm_area_struct * vma,
 		mark_page_accessed(page);
 	}
 
+#ifdef CONFIG_XENO
+	if ( likely(vma->vm_mm == current->mm) ) {
+		XENO_flush_page_update_queue();
+		HYPERVISOR_update_va_mapping(addr>>PAGE_SHIFT, entry, 0);
+	} else {
+		set_pte(page_table, entry);
+		XENO_flush_page_update_queue();
+	}
+#else
 	set_pte(page_table, entry);
+#endif
 
 	/* No need to invalidate - it was non-present before */
 	update_mmu_cache(vma, addr, entry);
-	XENO_flush_page_update_queue();
 	spin_unlock(&mm->page_table_lock);
 	return 1;	/* Minor fault */
 
@@ -1304,7 +1332,17 @@ static int do_no_page(struct mm_struct * mm, struct vm_area_struct * vma,
 		entry = mk_pte(new_page, vma->vm_page_prot);
 		if (write_access)
 			entry = pte_mkwrite(pte_mkdirty(entry));
+#ifdef CONFIG_XENO
+		if ( likely(vma->vm_mm == current->mm) ) {
+			XENO_flush_page_update_queue();
+			HYPERVISOR_update_va_mapping(address>>PAGE_SHIFT, entry, 0);
+		} else {
+			set_pte(page_table, entry);
+			XENO_flush_page_update_queue();
+		}
+#else
 		set_pte(page_table, entry);
+#endif
 	} else {
 		/* One of our sibling threads was faster, back out. */
 		page_cache_release(new_page);
@@ -1314,7 +1352,6 @@ static int do_no_page(struct mm_struct * mm, struct vm_area_struct * vma,
 
 	/* no need to invalidate: a not-present page shouldn't be cached */
 	update_mmu_cache(vma, address, entry);
-	XENO_flush_page_update_queue();
 	spin_unlock(&mm->page_table_lock);
 	return 2;	/* Major fault */
 }
@@ -1366,7 +1403,6 @@ static inline int handle_pte_fault(struct mm_struct *mm,
 	}
 	entry = pte_mkyoung(entry);
 	establish_pte(vma, address, pte, entry);
-	XENO_flush_page_update_queue();
 	spin_unlock(&mm->page_table_lock);
 	return 1;
 }

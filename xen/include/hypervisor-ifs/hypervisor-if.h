@@ -60,6 +60,7 @@
 #define __HYPERVISOR_dom_mem_op		  17
 #define __HYPERVISOR_multicall		  18
 #define __HYPERVISOR_kbd_op               19
+#define __HYPERVISOR_update_va_mapping    20
 
 /* And the trap vector is... */
 #define TRAP_INSTR "int $0x82"
@@ -141,6 +142,10 @@
 #define PGEXT_SET_LDT           8 /* ptr = VA of table; val = # entries    */
 #define PGEXT_CMD_MASK        255
 #define PGEXT_CMD_SHIFT         8
+
+/* These are passed as 'flags' to update_va_mapping. They can be ORed. */
+#define UVMF_FLUSH_TLB          1 /* Flush entire TLB. */
+#define UVMF_INVLPG             2 /* Flush the VA mapping being updated. */
 
 /*
  * Master "switch" for enabling/disabling event delivery.

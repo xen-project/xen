@@ -550,9 +550,7 @@ static int mod_l2_entry(l2_pgentry_t *p_l2_entry, l2_pgentry_t new_l2_entry)
                l2_pgentry_val(new_l2_entry)) & 0xfffff001) != 0 )
         {
             if ( (l2_pgentry_val(old_l2_entry) & _PAGE_PRESENT) ) 
-            {
                 put_l1_table(l2_pgentry_to_pagenr(old_l2_entry));
-            }
             
             /* Assume we're mapping an L1 table, falling back to twisted L2. */
             if ( unlikely(get_l1_table(l2_pgentry_to_pagenr(new_l2_entry))) )
@@ -601,15 +599,12 @@ static int mod_l1_entry(l1_pgentry_t *p_l1_entry, l1_pgentry_t new_l1_entry)
                l1_pgentry_val(new_l1_entry)) & 0xfffff003) != 0 )
         {
             if ( (l1_pgentry_val(old_l1_entry) & _PAGE_PRESENT) ) 
-            {
                 put_page(l1_pgentry_to_pagenr(old_l1_entry),
                          l1_pgentry_val(old_l1_entry) & _PAGE_RW);
-            }
-            
+
             if ( get_page(l1_pgentry_to_pagenr(new_l1_entry),
-                          l1_pgentry_val(new_l1_entry) & _PAGE_RW) ){
+                          l1_pgentry_val(new_l1_entry) & _PAGE_RW) )
                 goto fail;
-            }
         } 
     }
     else if ( (l1_pgentry_val(old_l1_entry) & _PAGE_PRESENT) )
@@ -753,17 +748,12 @@ int do_process_page_updates(page_update_request_t *ureqs, int count)
     struct pfn_info *page;
     int err = 0, i;
     unsigned int cmd;
-    unsigned long cr0 = read_cr0();
-
-    /* Clear the WP bit so that we can write even read-only page mappings. */
-    write_cr0(cr0 & ~X86_CR0_WP);
+    unsigned long cr0 = 0;
 
     for ( i = 0; i < count; i++ )
     {
         if ( copy_from_user(&req, ureqs, sizeof(req)) )
-        {
             kill_domain_with_errmsg("Cannot read page update request");
-        } 
 
         cmd = req.ptr & (sizeof(l1_pgentry_t)-1);
         pfn = req.ptr >> PAGE_SHIFT;
@@ -773,26 +763,23 @@ int do_process_page_updates(page_update_request_t *ureqs, int count)
         spin_lock_irq(&current->page_lock);
 
         /* Get the page-frame number that a non-extended command references. */
-        if ( likely(cmd != PGREQ_EXTENDED_COMMAND) )
+        if ( (cmd == PGREQ_NORMAL_UPDATE) || (cmd == PGREQ_UNCHECKED_UPDATE) )
         {
-            if ( likely(cmd != PGREQ_MPT_UPDATE) )
+            if ( cr0 == 0 )
             {
-                /* Need to use 'get_user' since the VA's PGD may be absent. */
-                __get_user(l1e, (unsigned long *)(linear_pg_table+pfn));
-                /* Now check that the VA's PTE isn't absent. */
-                if ( !(l1e & _PAGE_PRESENT) )
-                {
-                    MEM_LOG("L1E n.p. at VA %08lx (%08lx)", req.ptr&~3, l1e);
-                    goto unlock;
-                }
-                /* Finally, get the underlying machine address. */
-                pfn = l1e >> PAGE_SHIFT;
+                cr0 = read_cr0();
+                write_cr0(cr0 & ~X86_CR0_WP);
             }
-            else if ( pfn >= max_page )
+            /* Need to use 'get_user' since the VA's PGD may be absent. */
+            __get_user(l1e, (unsigned long *)(linear_pg_table+pfn));
+            /* Now check that the VA's PTE isn't absent. */
+            if ( !(l1e & _PAGE_PRESENT) )
             {
-                MEM_LOG("Page out of range (%08lx > %08lx)", pfn, max_page);
+                MEM_LOG("L1E n.p. at VA %08lx (%08lx)", req.ptr&~3, l1e);
                 goto unlock;
             }
+            /* Finally, get the underlying machine address. */
+            pfn = l1e >> PAGE_SHIFT;
         }
 
         /* Least significant bits of 'ptr' demux the operation type. */
@@ -850,7 +837,11 @@ int do_process_page_updates(page_update_request_t *ureqs, int count)
             
         case PGREQ_MPT_UPDATE:
             page = frame_table + pfn;
-            if ( DOMAIN_OKAY(page->flags) )
+            if ( pfn >= max_page )
+            {
+                MEM_LOG("Page out of range (%08lx > %08lx)", pfn, max_page);
+            }
+            else if ( DOMAIN_OKAY(page->flags) )
             {
                 machine_to_phys_mapping[pfn] = req.val;
                 err = 0;
@@ -892,9 +883,77 @@ int do_process_page_updates(page_update_request_t *ureqs, int count)
 
     }
 
-    /* Restore the WP bit before returning to guest. */
-    write_cr0(cr0);
+    if ( cr0 != 0 )
+        write_cr0(cr0);
 
     return 0;
 }
 
+
+/*
+ * Note: This function is structured this way so that the common path is very 
+ * fast. Tests that are unlikely to be TRUE branch to out-of-line code. 
+ * Unfortunately GCC's 'unlikely()' macro doesn't do the right thing :-(
+ */
+int do_update_va_mapping(unsigned long page_nr, 
+                         unsigned long val, 
+                         unsigned long flags)
+{
+    unsigned long _x, cr0 = 0;
+    struct task_struct *p = current;
+    int err = -EINVAL;
+
+    if ( page_nr >= (HYPERVISOR_VIRT_START >> PAGE_SHIFT) )
+        goto out;
+
+    spin_lock_irq(&p->page_lock);
+
+    /* Check that the VA's page-directory entry is present.. */
+    if ( (err = __get_user(_x, (unsigned long *)
+                           (&linear_pg_table[page_nr]))) != 0 )
+        goto unlock_and_out;
+
+    /* If the VA's page-directory entry is read-only, we frob the WP bit. */
+    if ( __put_user(_x, (unsigned long *)(&linear_pg_table[page_nr])) )
+        goto clear_wp; return_from_clear_wp:
+
+    if ( (err = mod_l1_entry(&linear_pg_table[page_nr], 
+                             mk_l1_pgentry(val))) != 0 )
+        goto bad;
+
+    if ( (flags & UVMF_INVLPG) )
+        goto invlpg; return_from_invlpg:
+
+    if ( (flags & UVMF_FLUSH_TLB) )
+        goto flush; return_from_flush:
+
+    if ( cr0 != 0 )
+        goto write_cr0; return_from_write_cr0:
+
+ unlock_and_out:
+    spin_unlock_irq(&p->page_lock);
+ out:
+    return err;
+
+ clear_wp:
+    cr0 = read_cr0();
+    write_cr0(cr0 & ~X86_CR0_WP);        
+    goto return_from_clear_wp;
+
+ bad:
+    spin_unlock_irq(&p->page_lock);
+    kill_domain_with_errmsg("Illegal VA-mapping update request");
+    return 0;
+
+ invlpg:
+    flush_tlb[p->processor] = 1;
+    goto return_from_invlpg;
+    
+ flush:
+    __write_cr3_counted(pagetable_val(p->mm.pagetable));
+    goto return_from_flush;
+
+ write_cr0:
+    write_cr0(cr0);
+    goto return_from_write_cr0;
+}

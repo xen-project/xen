@@ -369,4 +369,16 @@ static inline long HYPERVISOR_kbd_op(unsigned char op, unsigned char val)
     return ret;
 }
 
+static inline int HYPERVISOR_update_va_mapping(
+    unsigned long page_nr, pte_t new_val, unsigned long flags)
+{
+    int ret;
+    __asm__ __volatile__ (
+        TRAP_INSTR
+        : "=a" (ret) : "0" (__HYPERVISOR_update_va_mapping), 
+        "b" (page_nr), "c" ((new_val).pte_low), "d" (flags) );
+
+    return ret;
+}
+
 #endif /* __HYPERVISOR_H__ */
