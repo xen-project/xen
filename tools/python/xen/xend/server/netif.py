@@ -1,4 +1,6 @@
 # Copyright (C) 2004 Mike Wray <mike.wray@hp.com>
+"""Support for virtual network interfaces.
+"""
 
 import random
 
@@ -27,8 +29,6 @@ class NetifControllerFactory(controller.ControllerFactory):
         self.majorTypes = [ CMSG_NETIF_BE ]
 
         self.subTypes = {
-            #CMSG_NETIF_BE_CREATE : self.recv_be_create,
-            #CMSG_NETIF_BE_CONNECT: self.recv_be_connect,
             CMSG_NETIF_BE_DRIVER_STATUS_CHANGED: self.recv_be_driver_status_changed,
             }
         self.attached = 1
@@ -37,10 +37,9 @@ class NetifControllerFactory(controller.ControllerFactory):
     def createInstance(self, dom, recreate=0):
         """Create or find the network interface controller for a domain.
 
-        dom      domain
-        recreate if true this is a recreate (xend restarted)
-
-        returns netif controller
+        @param dom:      domain
+        @param recreate: if true this is a recreate (xend restarted)
+        @return: netif controller
         """
         netif = self.getInstanceByDom(dom)
         if netif is None:
@@ -51,9 +50,8 @@ class NetifControllerFactory(controller.ControllerFactory):
     def getDomainDevices(self, dom):
         """Get the network device controllers for a domain.
 
-        dom  domain
-        
-        returns netif controller
+        @param dom:  domain
+        @return: netif controller list
         """
         netif = self.getInstanceByDom(dom)
         return (netif and netif.getDevices()) or []
@@ -61,10 +59,9 @@ class NetifControllerFactory(controller.ControllerFactory):
     def getDomainDevice(self, dom, vif):
         """Get a virtual network interface device for a domain.
 
-        dom domain
-        vif virtual interface index
-
-        returns NetDev
+        @param dom: domain
+        @param vif: virtual interface index
+        @return: NetDev
         """
         netif = self.getInstanceByDom(dom)
         return (netif and netif.getDevice(vif)) or None
@@ -72,8 +69,8 @@ class NetifControllerFactory(controller.ControllerFactory):
     def setControlDomain(self, dom, recreate=0):
         """Set the 'back-end' device driver domain.
 
-        dom      domain
-        recreate if true this is a recreate (xend restarted)
+        @param dom:     domain
+        @param recreate: if true this is a recreate (xend restarted)
         """
         if self.dom == dom: return
         self.deregisterChannel()
@@ -84,6 +81,8 @@ class NetifControllerFactory(controller.ControllerFactory):
 
     def getControlDomain(self):
         """Get the domain id of the back-end control domain.
+
+        @return domain id
         """
         return self.dom
 
@@ -95,7 +94,7 @@ class NetifControllerFactory(controller.ControllerFactory):
         if netif:
             netif.send_interface_connected(vif)
         else:
-            log.warning("respond_be_connect> unknown dom=%d vif=%d", dom, vif)
+            log.warning("respond_be_connect> unknown vif dom=%d vif=%d", dom, vif)
             pass
 
     def recv_be_driver_status_changed(self, msg, req):
@@ -168,6 +167,8 @@ class NetDev(controller.Dev):
         return ':'.join(map(lambda x: "%02x" % x, self.mac))
 
     def vifctl_params(self, vmname=None):
+        """Get the parameters to pass to vifctl.
+        """
         dom = self.controller.dom
         if vmname is None:
             xd = get_component('xen.xend.XendDomain')
@@ -185,6 +186,11 @@ class NetDev(controller.Dev):
 
     def vifctl(self, op, vmname=None):
         """Bring the device up or down.
+        The vmname is needed when bringing a device up for a new domain because
+        the domain is not yet in the table so we can't look its name up.
+
+        @param op: operation name (up, down)
+        @param vmname: vmname
         """
         Vifctl.vifctl(op, **self.vifctl_params(vmname=vmname))
         vnet = XendVnet.instance().vnet_of_bridge(self.bridge)
@@ -239,19 +245,17 @@ class NetifController(controller.Controller):
     def getDevice(self, vif):
         """Get a device.
 
-        vif device index
-
-        returns device (or None)
+        @param vif: device index
+        @return: device (or None)
         """
         return self.devices.get(vif)
 
     def addDevice(self, vif, config):
         """Add a network interface.
 
-        vif device index
-        config device configuration 
-
-        returns device
+        @param vif: device index
+        @param config: device configuration 
+        @return: device
         """
         dev = NetDev(self, vif, config)
         self.devices[vif] = dev
@@ -263,15 +267,18 @@ class NetifController(controller.Controller):
         self.destroyDevices()
         
     def destroyDevices(self):
+        """Destroy all devices.
+        """
         for dev in self.getDevices():
             dev.destroy()
 
     def attachDevice(self, vif, config, recreate=0):
         """Attach a network device.
-        If vmac is None a random mac address is assigned.
 
-        @param vif interface index
-        @param vmac mac address (string)
+        @param vif: interface index
+        @param config: device configuration
+        @param recreate: recreate flag (true after xend restart)
+        @return: deferred
         """
         self.addDevice(vif, config)
         d = defer.Deferred()

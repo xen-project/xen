@@ -213,9 +213,6 @@ def packMsg(ty, params):
                 args['mac[%d]' % i] = v[i]
         else:
             args[k] = v
-    if DEBUG:
-        for (k, v) in args.items():
-            print 'packMsg>', k, v, type(v)
     msg = xu.message(major, minor, msgid, args)
     if DEBUG: print '<packMsg', msg.get_header()['id'], ty, params
     return msg

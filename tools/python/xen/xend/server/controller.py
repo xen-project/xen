@@ -247,7 +247,7 @@ class ControllerFactory(CtrlMsgRcvr):
     Maintains a table of instances.
 
     @ivar instances: mapping of index to controller instance
-    @type instances: {int: Controller}
+    @type instances: {String: Controller}
     @ivar dom: domain
     @type dom: int
     """
@@ -274,6 +274,10 @@ class ControllerFactory(CtrlMsgRcvr):
 
     def getInstanceByDom(self, dom):
         """Get the controller instance for the given domain.
+
+        @param dom: domain id
+        @type  dom: int
+        @return: controller or None
         """
         for inst in self.instances.values():
             if inst.dom == dom:
@@ -281,7 +285,9 @@ class ControllerFactory(CtrlMsgRcvr):
         return None
 
     def delInstance(self, instance):
-        """Delete an instance from the table.
+        """Delete a controller instance from the table.
+
+        @param instance: controller instance
         """
         if instance.idx in self.instances:
             del self.instances[instance.idx]
@@ -293,16 +299,29 @@ class ControllerFactory(CtrlMsgRcvr):
         @type  dom: int
         @param recreate: true if the instance is being recreated (after xend restart)
         @type  recreate: int
+        @return: controller instance
+        @rtype:  Controller (or subclass)
         """
         raise NotImplementedError()
 
     def instanceClosed(self, instance):
         """Callback called when an instance is closed (usually by the instance).
+        
+        @param instance: controller instance
         """
         self.delInstance(instance)
 
 class Controller(CtrlMsgRcvr):
     """Abstract class for a device controller attached to a domain.
+
+    @ivar factory: controller factory
+    @type factory: ControllerFactory
+    @ivar dom:     domain
+    @type dom:     int
+    @ivar channel: channel to the domain
+    @type channel: Channel
+    @ivar idx:     channel index
+    @type idx:     String
     """
 
     def __init__(self, factory, dom):
@@ -325,6 +344,13 @@ class Controller(CtrlMsgRcvr):
 
 class Dev:
     """Abstract class for a device attached to a device controller.
+
+    @ivar idx:        identifier
+    @type idx:        String
+    @ivar controller: device controller
+    @type controller: DeviceController
+    @ivar props:      property table
+    @type props:      { String: value }
     """
     
     def __init__(self, idx, controller):
@@ -349,6 +375,11 @@ class Dev:
             del self.props[k]
 
     def sxpr(self):
+        """Get the s-expression for the deivice.
+        Implement in a subclass.
+
+        @return: sxpr
+        """
         raise NotImplementedError()
 
     

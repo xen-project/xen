@@ -1,4 +1,6 @@
 # Copyright (C) 2004 Mike Wray <mike.wray@hp.com>
+"""Support for virtual block devices.
+"""
 
 from twisted.internet import defer
 #defer.Deferred.debug = 1
