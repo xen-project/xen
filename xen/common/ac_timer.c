@@ -286,5 +286,5 @@ void __init ac_timer_init(void)
         spin_lock_init(&ac_timers[i].lock);
     }
 
-    add_key_handler('a', dump_timerq, "dump ac_timer queues");
+    register_keyhandler('a', dump_timerq, "dump ac_timer queues");
 }

@@ -1244,7 +1244,7 @@ void initialize_pdb()
     /* Acknowledge any spurious GDB packets. */
     pdb_put_char('+');
 
-    add_key_handler('D', pdb_key_pressed, "enter pervasive debugger");
+    register_keyhandler('D', pdb_key_pressed, "enter pervasive debugger");
 
     pdb_initialized = 1;
 }
