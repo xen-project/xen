@@ -23,12 +23,23 @@ static inline int pgd_present(pgd_t pgd)	{ return 1; }
  * within a page table are directly modified.  Thus, the following
  * hook is made available.
  */
+#ifdef CONFIG_SMP
+#define set_pte(pteptr, pteval) xen_l1_entry_update(pteptr, (pteval).pte_low)
+#if 0
+do { \
+  (*(pteptr) = pteval); \
+  HYPERVISOR_xen_version(0); \
+} while (0)
+#endif
+#define set_pte_atomic(pteptr, pteval) set_pte(pteptr, pteval)
+#else
 #ifdef CONFIG_XEN_WRITABLE_PAGETABLES
 #define set_pte(pteptr, pteval) (*(pteptr) = pteval)
 #define set_pte_atomic(pteptr, pteval) (*(pteptr) = pteval)
 #else
 #define set_pte(pteptr, pteval) xen_l1_entry_update(pteptr, (pteval).pte_low)
 #define set_pte_atomic(pteptr, pteval) xen_l1_entry_update(pteptr, (pteval).pte_low)
+#endif
 #endif
 /*
  * (pmds are folded into pgds so this doesn't get actually called,
