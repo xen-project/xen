@@ -232,6 +232,12 @@ tools/internal/xi_create
 tools/internal/xi_create.o
 tools/internal/xi_destroy
 tools/internal/xi_destroy.o
+tools/internal/xi_phys_grant
+tools/internal/xi_phys_grant.o
+tools/internal/xi_phys_probe
+tools/internal/xi_phys_probe.o
+tools/internal/xi_phys_revoke
+tools/internal/xi_phys_revoke.o
 tools/internal/xi_start
 tools/internal/xi_start.o
 tools/internal/xi_stop
@@ -408,6 +414,7 @@ xen/include/asm
 xen/include/hypervisor-ifs/hypervisor-ifs
 xen/include/linux
 xen/include/xeno/compile.h
+xen/include/xeno/physdisk.h~
 xen/net/dev.o
 xen/net/dev_mcast.o
 xen/net/devinit.o
@@ -419,4 +426,3 @@ xen/tools/figlet/figlet
 xenolinux-2.4.16-sparse/arch/xeno/drivers/block/Makefile.orig
 xenolinux-2.4.16-sparse/arch/xeno/drivers/block/block.c.orig
 xenolinux-2.4.16-sparse/scripts/kconfig.tk
-xen/include/xeno/physdisk.h~
