@@ -428,3 +428,6 @@ xenolinux-2.4.16-sparse/arch/xeno/drivers/block/block.c.orig
 xenolinux-2.4.16-sparse/scripts/kconfig.tk
 xenolinux-2.4.21-sparse/include/linux/blk.h~
 tools/control/.checkstyle
+xenolinux-2.4.21-sparse/arch/xeno/drivers/block/xl_block.c~
+xenolinux-2.4.21-sparse/arch/xeno/drivers/block/xl_physdisk_proc.c.bak
+xenolinux-2.4.21-sparse/arch/xeno/drivers/block/xl_physdisk_proc.c~
