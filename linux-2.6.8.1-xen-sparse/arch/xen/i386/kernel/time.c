@@ -364,9 +364,8 @@ static inline void do_timer_interrupt(int irq, void *dev_id,
 					struct pt_regs *regs)
 {
 	time_t wtm_sec, sec;
-	s64 delta. nsec;
+	s64 delta, nsec;
 	long sec_diff, wtm_nsec;
-	long wtm_nsec;
 
 	__get_time_values_from_xen();
 
