@@ -1,6 +1,7 @@
 # Copyright (C) 2004 Mike Wray <mike.wray@hp.com>
 
 from twisted.internet import defer
+defer.Deferred.debug = 1
 
 from xen.xend import sxp
 from xen.xend import PrettyPrint
@@ -20,10 +21,6 @@ class BlkifControllerFactory(controller.ControllerFactory):
         self.majorTypes = [ CMSG_BLKIF_BE ]
 
         self.subTypes = {
-            CMSG_BLKIF_BE_CREATE     : self.recv_be_create,
-            CMSG_BLKIF_BE_CONNECT    : self.recv_be_connect,
-            CMSG_BLKIF_BE_VBD_CREATE : self.recv_be_vbd_create,
-            CMSG_BLKIF_BE_VBD_GROW   : self.recv_be_vbd_grow,
             CMSG_BLKIF_BE_DRIVER_STATUS_CHANGED: self.recv_be_driver_status_changed,
             }
         self.attached = 1
@@ -35,17 +32,20 @@ class BlkifControllerFactory(controller.ControllerFactory):
         dom      domain
         recreate if true it's a recreate (after xend restart)
         """
-        d = self.addDeferred()
+        d = defer.Deferred()
         blkif = self.getInstanceByDom(dom)
         if blkif:
-            self.callDeferred(blkif)
+            d.callback(blkif)
         else:
             blkif = BlkifController(self, dom)
             self.addInstance(blkif)
             if recreate:
-                self.callDeferred(blkif)
+                d.callback(blkif)
             else:
-                blkif.send_be_create()
+                d1 = defer.Deferred()
+                d1.addCallback(self.respond_be_create, d)
+                d1.addErrback(d.errback)
+                blkif.send_be_create(response=d1)
         return d
 
     def getDomainDevices(self, dom):
@@ -117,14 +117,14 @@ class BlkifControllerFactory(controller.ControllerFactory):
         for blkif in self.getInstances():
             blkif.reattached()
 
-    def recv_be_create(self, msg, req):
-        #print 'recv_be_create>'
+    def respond_be_create(self, msg, d):
+        print 'respond_be_create>'
         val = unpackMsg('blkif_be_create_t', msg)
         blkif = self.getInstanceByDom(val['domid'])
-        self.callDeferred(blkif)
+        d.callback(blkif)
     
-    def recv_be_connect(self, msg, req):
-        #print 'recv_be_create>'
+    def respond_be_connect(self, msg):
+        print 'respond_be_connect>', self
         val = unpackMsg('blkif_be_connect_t', msg)
         blkif = self.getInstanceByDom(val['domid'])
         if blkif:
@@ -132,25 +132,30 @@ class BlkifControllerFactory(controller.ControllerFactory):
         else:
             pass
     
-    def recv_be_vbd_create(self, msg, req):
-        #print 'recv_be_vbd_create>'
+    def respond_be_vbd_create(self, msg, d):
+        print 'recv_be_vbd_create>', self
         val = unpackMsg('blkif_be_vbd_create_t', msg)
         blkif = self.getInstanceByDom(val['domid'])
         if blkif:
-            blkif.send_be_vbd_grow(val['vdevice'])
+            d1 = defer.Deferred()
+            d1.addCallback(self.respond_be_vbd_grow, d)
+            if d: d1.addErrback(d.errback)
+            blkif.send_be_vbd_grow(val['vdevice'], response=d1)
         else:
             pass
     
-    def recv_be_vbd_grow(self, msg, req):
-        #print 'recv_be_vbd_grow>'
+    def respond_be_vbd_grow(self, msg, d):
+        print 'recv_be_vbd_grow>', self
         val = unpackMsg('blkif_be_vbd_grow_t', msg)
         # Check status?
         if self.attached:
-            self.callDeferred(0)
+            if d:
+                d.callback(0)
         else:
             self.reattachDevice(val['domid'], val['vdevice'])
 
     def recv_be_driver_status_changed(self, msg, req):
+        print 'recv_be_driver_status_changed>', self, req
         val = unpackMsg('blkif_be_driver_status_changed_t', msg)
         status = val['status']
         if status == BLKIF_DRIVER_STATUS_UP and not self.attached:
@@ -234,20 +239,22 @@ class BlkifController(controller.Controller):
         """
         dev = self.addDevice(vdev, mode, segment)
         if not dev: return -1
+        d = defer.Deferred()
         if recreate:
-            d = defer.Deferred()
             d.callback(self)
         else:
-            self.send_be_vbd_create(vdev)
-            d = self.factory.addDeferred()
+            d1 = defer.Deferred()
+            d1.addCallback(self.factory.respond_be_vbd_create, d)
+            d1.addErrback(d.errback)
+            self.send_be_vbd_create(vdev, response=d1)
         return d
 
     def destroy(self):
         def cb_destroy(val):
             self.send_be_destroy()
-        d = self.factory.addDeferred()
+        d = defer.Deferred()
         d.addCallback(cb_destroy)
-        self.send_be_disconnect()
+        self.send_be_disconnect(response=d)
 
     def destroyDevices(self):
         for dev in self.getDevices():
@@ -259,7 +266,9 @@ class BlkifController(controller.Controller):
         self.attached = 0
         for dev in self.devices.values():
             dev.attached = 0
-            self.send_be_vbd_create(vdev)
+            d1 = defer.Deferred()
+            d1.addCallback(self.factory.respond_be_vbd_create, None)
+            self.send_be_vbd_create(vdev, response=d1)
 
     def reattachDevice(self, vdev):
         """Reattach a device, when the back-end control domain has changed.
@@ -300,46 +309,47 @@ class BlkifController(controller.Controller):
                         'blkif_handle' : val['handle'],
                         'evtchn'       : self.evtchn['port1'],
                         'shmem_frame'  : val['shmem_frame'] })
-        self.factory.writeRequest(msg)
-        pass
+        d = defer.Deferred()
+        d.addCallback(self.factory.respond_be_connect)
+        self.factory.writeRequest(msg, response=d)
 
-    def send_fe_interface_status_changed(self):
+    def send_fe_interface_status_changed(self, response=None):
         msg = packMsg('blkif_fe_interface_status_changed_t',
                       { 'handle' : 0,
                         'status' : BLKIF_INTERFACE_STATUS_CONNECTED,
                         'evtchn' : self.evtchn['port2'] })
-        self.writeRequest(msg)
+        self.writeRequest(msg, response=response)
 
-    def send_be_create(self):
+    def send_be_create(self, response=None):
         msg = packMsg('blkif_be_create_t',
                       { 'domid'        : self.dom,
                         'blkif_handle' : 0 })
-        self.factory.writeRequest(msg)
+        self.factory.writeRequest(msg, response=response)
 
-    def send_be_disconnect(self):
+    def send_be_disconnect(self, response=None):
         print '>BlkifController>send_be_disconnect>', 'dom=', self.dom
         msg = packMsg('blkif_be_disconnect_t',
                       { 'domid'        : self.dom,
                         'blkif_handle' : 0 })
-        self.factory.writeRequest(msg)
+        self.factory.writeRequest(msg, response=response)
 
-    def send_be_destroy(self):
+    def send_be_destroy(self, response=None):
         print '>BlkifController>send_be_destroy>', 'dom=', self.dom
         msg = packMsg('blkif_be_destroy_t',
                       { 'domid'        : self.dom,
                         'blkif_handle' : 0 })
-        self.factory.writeRequest(msg)
+        self.factory.writeRequest(msg, response=response)
 
-    def send_be_vbd_create(self, vdev):
+    def send_be_vbd_create(self, vdev, response=None):
         dev = self.devices[vdev]
         msg = packMsg('blkif_be_vbd_create_t',
                       { 'domid'        : self.dom,
                         'blkif_handle' : 0,
                         'vdevice'      : dev.vdev,
                         'readonly'     : dev.readonly() })
-        self.factory.writeRequest(msg)
+        self.factory.writeRequest(msg, response=response)
         
-    def send_be_vbd_grow(self, vdev):
+    def send_be_vbd_grow(self, vdev, response=None):
         dev = self.devices[vdev]
         msg = packMsg('blkif_be_vbd_grow_t',
                       { 'domid'                : self.dom,
@@ -348,9 +358,9 @@ class BlkifController(controller.Controller):
                         'extent.device'        : dev.device,
                         'extent.sector_start'  : dev.start_sector,
                         'extent.sector_length' : dev.nr_sectors })
-        self.factory.writeRequest(msg)
+        self.factory.writeRequest(msg, response=response)
 
-    def send_be_vbd_destroy(self, vdev):
+    def send_be_vbd_destroy(self, vdev, response=None):
         print '>BlkifController>send_be_vbd_destroy>', 'dom=', self.dom, 'vdev=', vdev
         PrettyPrint.prettyprint(self.sxpr())
         dev = self.devices[vdev]
@@ -359,5 +369,5 @@ class BlkifController(controller.Controller):
                         'blkif_handle'         : 0,
                         'vdevice'              : dev.vdev })
         del self.devices[vdev]
-        self.factory.writeRequest(msg)
+        self.factory.writeRequest(msg, response=response)
     

@@ -8,6 +8,7 @@ import types
 import StringIO
 
 from twisted.internet import defer
+defer.Deferred.debug = 1
 from twisted.internet import reactor
 from twisted.web import error
 from twisted.web import resource
