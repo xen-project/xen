@@ -431,3 +431,5 @@ tools/control/.checkstyle
 xenolinux-2.4.21-sparse/arch/xeno/drivers/block/xl_block.c~
 xenolinux-2.4.21-sparse/arch/xeno/drivers/block/xl_physdisk_proc.c.bak
 xenolinux-2.4.21-sparse/arch/xeno/drivers/block/xl_physdisk_proc.c~
+xen/drivers/block/xen_block.c~
+xen/drivers/block/xen_physdisk.c~
