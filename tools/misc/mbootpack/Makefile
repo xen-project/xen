@@ -74,8 +74,6 @@ bzimage_header.c: bootsect setup bin2c
 	./bin2c -n 8 -b1 -a bzimage_bootsect bootsect > bzimage_header.c
 	./bin2c -n 8 -b1 -a bzimage_setup setup >> bzimage_header.c
 
-buildimage.c buildimage.d: bzimage_header.c
-
 %.o: %.S
 	$(CC) $(CFLAGS) $(INCS) $(DEFS) -c $< -o $@
 
