@@ -408,17 +408,17 @@ static int get_l2_table(unsigned long page_nr)
     {
         l2_entry = *p_l2_entry++;
         if ( !(l2_pgentry_val(l2_entry) & _PAGE_PRESENT) ) continue;
-        if ( (l2_pgentry_val(l2_entry) & (_PAGE_GLOBAL|_PAGE_PSE)) )
+        if ( unlikely((l2_pgentry_val(l2_entry) & (_PAGE_GLOBAL|_PAGE_PSE))) )
         {
             MEM_LOG("Bad L2 page type settings %04lx",
                     l2_pgentry_val(l2_entry) & (_PAGE_GLOBAL|_PAGE_PSE));
             ret = -1;
-            goto out;
+            goto fail;
         }
         /* Assume we're mapping an L1 table, falling back to twisted L2. */
         ret = get_l1_table(l2_pgentry_to_pagenr(l2_entry));
-        if ( ret ) ret = get_twisted_l2_table(page_nr, l2_entry);
-        if ( ret ) goto out;
+        if ( unlikely(ret) ) ret = get_twisted_l2_table(page_nr, l2_entry);
+        if ( unlikely(ret) ) goto fail;
     }
     
     /* Now we simply slap in our high mapping. */
@@ -435,6 +435,18 @@ static int get_l2_table(unsigned long page_nr)
  out:
     unmap_domain_mem(p_l2_entry);
     return ret;
+
+ fail:
+    p_l2_entry--;
+    while ( i-- > 0 )
+    {
+        l2_entry = *--p_l2_entry;
+        if ( (l2_pgentry_val(l2_entry) & _PAGE_PRESENT) )
+            put_l1_table(l2_pgentry_to_pagenr(l2_entry));
+    }
+    if ( dec_page_refcnt(page_nr, PGT_l2_page_table) != 0 )
+        BUG();
+    goto out;
 }
 
 
@@ -453,23 +465,37 @@ static int get_l1_table(unsigned long page_nr)
     {
         l1_entry = *p_l1_entry++;
         if ( !(l1_pgentry_val(l1_entry) & _PAGE_PRESENT) ) continue;
-        if ( (l1_pgentry_val(l1_entry) &
-              (_PAGE_GLOBAL|_PAGE_PAT)) )
+        if ( unlikely((l1_pgentry_val(l1_entry) &
+                       (_PAGE_GLOBAL|_PAGE_PAT))) )
         {
             MEM_LOG("Bad L1 page type settings %04lx",
                     l1_pgentry_val(l1_entry) &
                     (_PAGE_GLOBAL|_PAGE_PAT));
             ret = -1;
-            goto out;
+            goto fail;
         }
         ret = get_page(l1_pgentry_to_pagenr(l1_entry),
                        l1_pgentry_val(l1_entry) & _PAGE_RW);
-        if ( ret ) goto out;
+        if ( unlikely(ret) ) goto fail;
     }
 
  out:
     /* Make sure we unmap the right page! */
     unmap_domain_mem(p_l1_entry-1);
+    return ret;
+
+ fail:
+    p_l1_entry--;
+    while ( i-- > 0 )
+    {
+        l1_entry = *--p_l1_entry;
+        if ( (l1_pgentry_val(l1_entry) & _PAGE_PRESENT) ) 
+            put_page(l1_pgentry_to_pagenr(l1_entry), 
+                     l1_pgentry_val(l1_entry) & _PAGE_RW);
+    }
+    if ( dec_page_refcnt(page_nr, PGT_l1_page_table) != 0 )
+        BUG();
+    unmap_domain_mem(p_l1_entry);
     return ret;
 }
 
@@ -550,10 +576,8 @@ static void put_l1_table(unsigned long page_nr)
     {
         l1_entry = *p_l1_entry++;
         if ( (l1_pgentry_val(l1_entry) & _PAGE_PRESENT) ) 
-        {
             put_page(l1_pgentry_to_pagenr(l1_entry), 
                      l1_pgentry_val(l1_entry) & _PAGE_RW);
-        }
     }
 
     /* Make sure we unmap the right page! */
@@ -611,9 +635,6 @@ static int mod_l2_entry(l2_pgentry_t *p_l2_entry, l2_pgentry_t new_l2_entry)
         if ( ((l2_pgentry_val(old_l2_entry) ^ 
                l2_pgentry_val(new_l2_entry)) & 0xfffff001) != 0 )
         {
-            if ( (l2_pgentry_val(old_l2_entry) & _PAGE_PRESENT) ) 
-                put_l1_table(l2_pgentry_to_pagenr(old_l2_entry));
-            
             /* Assume we're mapping an L1 table, falling back to twisted L2. */
             if ( unlikely(get_l1_table(l2_pgentry_to_pagenr(new_l2_entry))) )
             {
@@ -623,6 +644,9 @@ static int mod_l2_entry(l2_pgentry_t *p_l2_entry, l2_pgentry_t new_l2_entry)
                 if ( get_twisted_l2_table(l1e >> PAGE_SHIFT, new_l2_entry) )
                     goto fail;
             }
+
+            if ( (l2_pgentry_val(old_l2_entry) & _PAGE_PRESENT) ) 
+                put_l1_table(l2_pgentry_to_pagenr(old_l2_entry));            
         } 
     }
     else if ( (l2_pgentry_val(old_l2_entry) & _PAGE_PRESENT) )
@@ -659,13 +683,13 @@ static int mod_l1_entry(l1_pgentry_t *p_l1_entry, l1_pgentry_t new_l1_entry)
         if ( ((l1_pgentry_val(old_l1_entry) ^
                l1_pgentry_val(new_l1_entry)) & 0xfffff003) != 0 )
         {
-            if ( (l1_pgentry_val(old_l1_entry) & _PAGE_PRESENT) ) 
-                put_page(l1_pgentry_to_pagenr(old_l1_entry),
-                         l1_pgentry_val(old_l1_entry) & _PAGE_RW);
-
             if ( get_page(l1_pgentry_to_pagenr(new_l1_entry),
                           l1_pgentry_val(new_l1_entry) & _PAGE_RW) )
                 goto fail;
+
+            if ( (l1_pgentry_val(old_l1_entry) & _PAGE_PRESENT) ) 
+                put_page(l1_pgentry_to_pagenr(old_l1_entry),
+                         l1_pgentry_val(old_l1_entry) & _PAGE_RW);
         } 
     }
     else if ( (l1_pgentry_val(old_l1_entry) & _PAGE_PRESENT) )
@@ -696,10 +720,24 @@ static int do_extended_command(unsigned long ptr, unsigned long val)
     switch ( cmd )
     {
     case MMUEXT_PIN_L1_TABLE:
+        if ( unlikely(page->type_count & REFCNT_PIN_BIT) )
+        {
+            MEM_LOG("Pfn %08lx already pinned", pfn);
+            err = 1;
+            break;
+        }
         err = get_l1_table(pfn);
         goto mark_as_pinned;
+
     case MMUEXT_PIN_L2_TABLE:
+        if ( unlikely(page->type_count & REFCNT_PIN_BIT) )
+        {
+            MEM_LOG("Pfn %08lx already pinned", pfn);
+            err = 1;
+            break;
+        }
         err = get_l2_table(pfn);
+
     mark_as_pinned:
         if ( unlikely(err) )
         {
@@ -708,16 +746,8 @@ static int do_extended_command(unsigned long ptr, unsigned long val)
         }
         put_page_type(page);
         put_page_tot(page);
-        if ( likely(!(page->type_count & REFCNT_PIN_BIT)) )
-        {
-            page->type_count |= REFCNT_PIN_BIT;
-            page->tot_count  |= REFCNT_PIN_BIT;
-        }
-        else
-        {
-            MEM_LOG("Pfn %08lx already pinned", pfn);
-            err = 1;
-        }
+        page->type_count |= REFCNT_PIN_BIT;
+        page->tot_count  |= REFCNT_PIN_BIT;
         break;
 
     case MMUEXT_UNPIN_TABLE:
@@ -805,7 +835,7 @@ int do_mmu_update(mmu_update_t *ureqs, int count)
     mmu_update_t req;
     unsigned long flags, pfn, l1e;
     struct pfn_info *page;
-    int err = 0, i, cpu = smp_processor_id();
+    int rc = 0, err = 0, i, cpu = smp_processor_id();
     unsigned int cmd;
     unsigned long cr0 = 0;
 
@@ -814,11 +844,10 @@ int do_mmu_update(mmu_update_t *ureqs, int count)
 
     for ( i = 0; i < count; i++ )
     {
-
         if ( unlikely(copy_from_user(&req, ureqs, sizeof(req)) != 0) )
         {
-            if ( cr0 != 0 ) write_cr0(cr0);
-            kill_domain_with_errmsg("Cannot read page update request");
+            rc = -EFAULT;
+            break;
         }
 
         cmd = req.ptr & (sizeof(l1_pgentry_t)-1);
@@ -939,8 +968,8 @@ int do_mmu_update(mmu_update_t *ureqs, int count)
 
         if ( unlikely(err) )
         {
-            if ( cr0 != 0 ) write_cr0(cr0);
-            kill_domain_with_errmsg("Illegal page update request");
+            rc = -EINVAL;
+            break;
         }
 
         ureqs++;
@@ -961,7 +990,7 @@ int do_mmu_update(mmu_update_t *ureqs, int count)
     if ( cr0 != 0 )
         write_cr0(cr0);
 
-    return 0;
+    return rc;
 }
 
 
@@ -991,11 +1020,11 @@ int do_update_va_mapping(unsigned long page_nr,
         write_cr0(cr0 & ~X86_CR0_WP);        
     }
 
-    if ( unlikely((err = mod_l1_entry(&linear_pg_table[page_nr], 
-                                      mk_l1_pgentry(val))) != 0) )
+    if ( unlikely(mod_l1_entry(&linear_pg_table[page_nr], 
+                               mk_l1_pgentry(val)) != 0) )
     {
-        spin_unlock_irq(&p->page_lock);
-        kill_domain_with_errmsg("Illegal VA-mapping update request");
+        err = -EINVAL;
+        goto check_cr0_unlock_and_out;
     }
 
     if ( unlikely(flags & UVMF_INVLPG) )
@@ -1004,9 +1033,9 @@ int do_update_va_mapping(unsigned long page_nr,
     if ( unlikely(flags & UVMF_FLUSH_TLB) )
         __write_cr3_counted(pagetable_val(p->mm.pagetable));
 
+ check_cr0_unlock_and_out:
     if ( unlikely(cr0 != 0) )
         write_cr0(cr0);
-
  unlock_and_out:
     spin_unlock_irq(&p->page_lock);
  out:

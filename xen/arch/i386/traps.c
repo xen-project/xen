@@ -292,13 +292,13 @@ asmlinkage void do_page_fault(struct pt_regs *regs, long error_code)
 
     __asm__ __volatile__ ("movl %%cr2,%0" : "=r" (addr) : );
 
-    if ( unlikely(!(regs->xcs & 3)) )
-        goto fault_in_hypervisor;
-
     if ( unlikely(addr > PAGE_OFFSET) )
         goto fault_in_xen_space;
 
  propagate_fault:
+
+    if ( unlikely(!(regs->xcs & 3)) )
+        goto fault_in_hypervisor;
 
     ti = p->thread.traps + 14;
     gtb->flags = GTBF_TRAP_CR2; /* page fault pushes %cr2 */

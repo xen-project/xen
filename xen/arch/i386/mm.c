@@ -129,7 +129,8 @@ long do_stack_switch(unsigned long ss, unsigned long esp)
     int nr = smp_processor_id();
     struct tss_struct *t = &init_tss[nr];
 
-    if ( ((ss & 3) == 0) || (esp > HYPERVISOR_VIRT_START) )
+    /* We need to do this check as we load and use SS on guest's behalf. */
+    if ( (ss & 3) == 0 )
         return -EPERM;
 
     current->thread.ss1  = ss;

@@ -10,6 +10,7 @@
 #define __HYPERVISOR_H__
 
 #include <linux/types.h>
+#include <linux/kernel.h>
 #include <asm/hypervisor-ifs/hypervisor-if.h>
 #include <asm/hypervisor-ifs/dom0_ops.h>
 #include <asm/ptrace.h>
@@ -166,6 +167,9 @@ static inline int HYPERVISOR_mmu_update(mmu_update_t *req, int count)
         TRAP_INSTR
         : "=a" (ret) : "0" (__HYPERVISOR_mmu_update), 
         "b" (req), "c" (count) );
+
+    if ( unlikely(ret < 0) )
+        panic("Failed mmu update: %p, %d", req, count);
 
     return ret;
 }
@@ -396,6 +400,10 @@ static inline int HYPERVISOR_update_va_mapping(
         : "=a" (ret) : "0" (__HYPERVISOR_update_va_mapping), 
         "b" (page_nr), "c" ((new_val).pte_low), "d" (flags) );
 
+    if ( unlikely(ret < 0) )
+        panic("Failed update VA mapping: %08lx, %08lx, %08lx",
+              page_nr, (new_val).pte_low, flags);
+    
     return ret;
 }
 

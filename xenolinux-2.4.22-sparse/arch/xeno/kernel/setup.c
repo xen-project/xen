@@ -155,8 +155,7 @@ static void __init parse_mem_cmdline (char ** cmdline_p)
 
 void __init setup_arch(char **cmdline_p)
 {
-    unsigned long start_pfn, max_pfn, max_low_pfn;
-    unsigned long bootmap_size;
+    unsigned long bootmap_size, start_pfn, max_low_pfn;
     unsigned long i;
 
     extern void hypervisor_callback(void);

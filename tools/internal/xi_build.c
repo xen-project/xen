@@ -461,7 +461,10 @@ int main(int argc, char **argv)
                        load_addr, ksize, &launch_op.u.builddomain,
                        argc, argv, args_start, 
                        op.u.getdomaininfo.shared_info_frame) < 0 )
+    {
+        ERROR("Error constructing guest OS");
         return 1;
+    }
 
     if ( initrd_fd >= 0 )
         close(initrd_fd);

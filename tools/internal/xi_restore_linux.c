@@ -42,12 +42,13 @@ static int get_pfn_list(
 static mmu_update_t mmu_updates[MAX_MMU_UPDATES];
 static int mmu_update_idx;
 
-static void flush_mmu_updates(void)
+static int flush_mmu_updates(void)
 {
+    int err = 0;
     privcmd_hypercall_t hypercall;
 
     if ( mmu_update_idx == 0 )
-        return;
+        return 0;
 
     hypercall.op     = __HYPERVISOR_mmu_update;
     hypercall.arg[0] = (unsigned long)mmu_updates;
@@ -56,26 +57,31 @@ static void flush_mmu_updates(void)
     if ( mlock(mmu_updates, sizeof(mmu_updates)) != 0 )
     {
         PERROR("Could not lock pagetable update array");
-        exit(1);
+        err = 1;
+        goto out;
     }
 
     if ( do_xen_hypercall(&hypercall) < 0 )
     {
         ERROR("Failure when submitting mmu updates");
-        exit(1);
+        err = 1;
     }
 
     mmu_update_idx = 0;
     
     (void)munlock(mmu_updates, sizeof(mmu_updates));
+
+ out:
+    return err;
 }
 
-static void add_mmu_update(unsigned long ptr, unsigned long val)
+static int add_mmu_update(unsigned long ptr, unsigned long val)
 {
     mmu_updates[mmu_update_idx].ptr = ptr;
     mmu_updates[mmu_update_idx].val = val;
     if ( ++mmu_update_idx == MAX_MMU_UPDATES )
-        flush_mmu_updates();
+        return flush_mmu_updates();
+    return 0;
 }
 
 static int devmem_fd;
@@ -163,9 +169,9 @@ int main(int argc, char **argv)
     }
 
     filename = argv[1];
-    if ( (fd = open(name, O_RDONLY)) == -1 )
+    if ( (fd = open(filename, O_RDONLY)) == -1 )
     {
-        PERROR("Could not open file for writing");
+        PERROR("Could not open state file for reading");
         return 1;
     }
 
@@ -269,8 +275,9 @@ int main(int argc, char **argv)
         {
         case L1TAB:
             memset(ppage, 0, PAGE_SIZE);
-            add_mmu_update((mfn<<PAGE_SHIFT) | MMU_EXTENDED_COMMAND,
-                           MMUEXT_PIN_L1_TABLE);
+            if ( add_mmu_update((mfn<<PAGE_SHIFT) | MMU_EXTENDED_COMMAND,
+                                MMUEXT_PIN_L1_TABLE) )
+                goto out;
             for ( j = 0; j < 1024; j++ )
             {
                 if ( page[j] & _PAGE_PRESENT )
@@ -285,17 +292,19 @@ int main(int argc, char **argv)
                         ERROR("Write access requested for a restricted frame");
                         goto out;
                     }
-                    page[j] &= PAGE_SIZE - 1;
+                    page[j] &= (PAGE_SIZE - 1) & ~(_PAGE_GLOBAL | _PAGE_PAT);
                     page[j] |= pfn_to_mfn_table[pfn] << PAGE_SHIFT;
                 }
-                add_mmu_update((unsigned long)&ppage[j], page[j]);
+                if ( add_mmu_update((unsigned long)&ppage[j], page[j]) )
+                    goto out;
             }
             break;
         case L2TAB:
             memset(ppage, 0, PAGE_SIZE);
-            add_mmu_update((mfn<<PAGE_SHIFT) | MMU_EXTENDED_COMMAND,
-                           MMUEXT_PIN_L2_TABLE);
-            for ( j = 0; j < 1024; j++ )
+            if ( add_mmu_update((mfn<<PAGE_SHIFT) | MMU_EXTENDED_COMMAND,
+                                MMUEXT_PIN_L2_TABLE) )
+                goto out;
+            for ( j = 0; j < (HYPERVISOR_VIRT_START>>L2_PAGETABLE_SHIFT); j++ )
             {
                 if ( page[j] & _PAGE_PRESENT )
                 {
@@ -309,22 +318,35 @@ int main(int argc, char **argv)
                         ERROR("Page table mistyping");
                         goto out;
                     }
-                    page[j] &= PAGE_SIZE - 1;
+                    /* Haven't reached the L1 table yet. Ensure it is safe! */
+                    if ( pfn > i )
+                    {
+                        unsigned long **l1 = map_pfn(pfn_to_mfn_table[pfn]);
+                        memset(l1, 0, PAGE_SIZE);
+                        unmap_pfn(l1);
+                    }
+                    page[j] &= (PAGE_SIZE - 1) & ~(_PAGE_GLOBAL | _PAGE_PSE);
                     page[j] |= pfn_to_mfn_table[pfn] << PAGE_SHIFT;
                 }
-                add_mmu_update((unsigned long)&ppage[j], page[j]);
+                if ( add_mmu_update((unsigned long)&ppage[j], page[j]) )
+                    goto out;
             }
             break;
         default:
             memcpy(ppage, page, PAGE_SIZE);
             break;
         }
+        /* NB. Must flush before unmapping page, as pass VAs to Xen. */
+        if ( flush_mmu_updates() )
+            goto out;
         unmap_pfn(ppage);
 
-        add_mmu_update((mfn<<PAGE_SHIFT) | MMU_MACHPHYS_UPDATE, i);
+        if ( add_mmu_update((mfn<<PAGE_SHIFT) | MMU_MACHPHYS_UPDATE, i) )
+            goto out;
     }
 
-    flush_mmu_updates();
+    if ( flush_mmu_updates() )
+        goto out;
 
     /* Uncanonicalise the suspend-record frame number and poke resume rec. */
     pfn = ctxt.i386_ctxt.esi;
@@ -391,7 +413,7 @@ int main(int argc, char **argv)
      *  4. fast_trap_idx is checked by Xen.
      *  5. ldt base must be page-aligned, no more than 8192 ents, ...
      *  6. gdt already done, and further checking is done by Xen.
-     *  7. check that ring1_ss/esp is safe.
+     *  7. check that ring1_ss is safe.
      *  8. pt_base is already done.
      *  9. debugregs are checked by Xen.
      *  10. callback code selectors need checking.
@@ -404,8 +426,6 @@ int main(int argc, char **argv)
     }
     if ( (ctxt.ring1_ss & 3) == 0 )
         ctxt.ring1_ss = FLAT_RING1_DS;
-    if ( ctxt.ring1_esp > HYPERVISOR_VIRT_START )
-        ctxt.ring1_esp = HYPERVISOR_VIRT_START;
     if ( (ctxt.event_callback_cs & 3) == 0 )
         ctxt.event_callback_cs = FLAT_RING1_CS;
     if ( (ctxt.failsafe_callback_cs & 3) == 0 )
@@ -419,9 +439,11 @@ int main(int argc, char **argv)
         goto out;
     }
 
-
-    /* Success! */
-    rc = 0;
+    op.cmd = DOM0_BUILDDOMAIN;
+    op.u.builddomain.domain   = dom;
+    op.u.builddomain.num_vifs = 1;
+    memcpy(&op.u.builddomain.ctxt, &ctxt, sizeof(ctxt));
+    rc = do_dom0_op(&op);
 
  out:
     /* If we experience an error then kill the half-constructed domain. */
