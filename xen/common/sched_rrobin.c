@@ -6,7 +6,7 @@
 
 #include <xeno/sched.h>
 #include <xeno/sched-if.h>
-#include <hypervisor-ifs/sched-ctl.h>
+#include <hypervisor-ifs/sched_ctl.h>
 #include <xeno/ac_timer.h>
 #include <xeno/time.h>
 
@@ -43,7 +43,7 @@ static void rr_dump_settings()
 }
 
 struct scheduler sched_rrobin_def = {
-    .name     = "Stupid Round Robin Scheduler",
+    .name     = "Round-Robin Scheduler",
     .opt_name = "rrobin",
     .sched_id = SCHED_RROBIN,
 

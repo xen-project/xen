@@ -11,7 +11,7 @@
 #define __DOM0_OPS_H__
 
 #include "hypervisor-if.h"
-#include "sched-ctl.h"
+#include "sched_ctl.h"
 
 /*
  * Make sure you increment the interface version whenever you modify this file!

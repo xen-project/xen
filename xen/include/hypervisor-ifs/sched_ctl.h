@@ -4,26 +4,20 @@
  * Mark Williamson, (C) 2004 Intel Research Cambridge
  */
 
-#ifndef _SCHED_CTL_H_
-#define _SCHED_CTL_H_
+#ifndef __SCHED_CTL_H__
+#define __SCHED_CTL_H__
 
-/**
- * When this file is changed, increment the version number.  This ensures that
- * tools will refuse to work (rather than causing a crash) when they're
- * out-of-sync with the Xen version number.
- */
-#define SCHED_CTL_IF_VER 0x0001
-
-/* scheduler types */
+/* Scheduler types. */
 #define SCHED_BVT      0
 #define SCHED_ATROPOS  1
 #define SCHED_RROBIN   2
 
-/* generic scheduler control command - union of all scheduler control
- * command structures */
+/*
+ * Generic scheduler control command: union of all scheduler control command
+ * structures.
+ */
 struct sched_ctl_cmd
 {
-    unsigned int if_ver;
     unsigned int sched_id;
     
     union
@@ -44,7 +38,6 @@ struct sched_ctl_cmd
 
 struct sched_adjdom_cmd
 {
-    unsigned int if_ver;
     unsigned int sched_id;
     domid_t domain;
     
@@ -65,4 +58,4 @@ struct sched_adjdom_cmd
     } u;
 };
 
-#endif /* _SCHED_CTL_H_ */
+#endif /* __SCHED_CTL_H__ */

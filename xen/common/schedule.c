@@ -26,7 +26,7 @@
 #include <xeno/timer.h>
 #include <xeno/perfc.h>
 #include <xeno/sched-if.h>
-#include <hypervisor-ifs/sched-ctl.h>
+#include <hypervisor-ifs/sched_ctl.h>
 #include <xeno/trace.h>
 
 /*#define WAKEUP_HISTO*/
@@ -40,8 +40,10 @@
 
 #define TIME_SLOP      (s32)MICROSECS(50)     /* allow time to slip a bit */
 
-/* XXX MAW pull trace-related #defines out of here and into an auto-generated
- * header file later on! */
+/*
+ * XXX Pull trace-related #defines out of here and into an auto-generated
+ * header file later on!
+ */
 #define TRC_SCHED_DOM_ADD             0x00010000
 #define TRC_SCHED_DOM_REM             0x00010001
 #define TRC_SCHED_WAKE                0x00010002
@@ -66,26 +68,23 @@ static void t_timer_fn(unsigned long unused);
 static void dom_timer_fn(unsigned long data);
 static void fallback_timer_fn(unsigned long unused);
 
-/* this is global for now so that private implementations can reach it */
+/* This is global for now so that private implementations can reach it. */
 schedule_data_t schedule_data[NR_CPUS];
 
-/* XXX would be nice if the schedulers array could get populated
- * automagically without having to hack the code in here         */
+/*
+ * XXX It would be nice if the schedulers array could get populated
+ * automagically without having to hack the code in here.
+ */
 extern struct scheduler sched_bvt_def, sched_rrobin_def;
 static struct scheduler *schedulers[] = { &sched_bvt_def,
                                           &sched_rrobin_def,
                                           NULL};
 
-/* scheduler ops for the current scheduler */
+/* Operations for the current scheduler. */
 static struct scheduler ops;
 
-/* for scheduler functions that return void             */
-#define SCHED_FN_VOID(fn, ...) do { if ( ops.fn ) ops.fn(__VA_ARGS__); } \
-                               while (0)
-
-/* for scheduler functions that return a numeric value  */
-#define SCHED_FN_RET(fn, ...)                             \
-         (( ops.fn != NULL ) ? ops.fn( __VA_ARGS__ ) : 0 )
+#define SCHED_FN(fn, ...) \
+    ((ops.fn != NULL) ? (ops.fn(__VA_ARGS__)) : (typeof(ops.fn(__VA_ARGS__)))0)
 
 spinlock_t schedule_lock[NR_CPUS] __cacheline_aligned;
 
@@ -102,7 +101,7 @@ extern kmem_cache_t *task_struct_cachep;
 
 void free_task_struct(struct task_struct *p)
 {
-    SCHED_FN_VOID(free_task, p);
+    SCHED_FN(free_task, p);
     kmem_cache_free(task_struct_cachep, p);
 }
 
@@ -120,7 +119,7 @@ struct task_struct *alloc_task_struct(void)
 
     memset(p, 0, sizeof(*p));    
 
-    if ( SCHED_FN_RET(alloc_task, p) < 0)
+    if ( SCHED_FN(alloc_task, p) < 0)
     {
         kmem_cache_free(task_struct_cachep, p);
         return NULL;
@@ -134,7 +133,7 @@ struct task_struct *alloc_task_struct(void)
  */
 void sched_add_domain(struct task_struct *p) 
 {
-    p->state       = TASK_STOPPED;
+    p->state = TASK_STOPPED;
 
     if( p->domain != IDLE_DOMAIN_ID )
     {
@@ -149,14 +148,11 @@ void sched_add_domain(struct task_struct *p)
         schedule_data[p->processor].idle = p;
     }
 
-    SCHED_FN_VOID(add_task, p);
+    SCHED_FN(add_task, p);
 
     TRACE_3D(TRC_SCHED_DOM_ADD, _HIGH32(p->domain), _LOW32(p->domain), p);
 }
 
-/* XXX race condition here?   we could both add and remove a domain at once, in
- * theory.  ick! */
-/* XXX is the task already removed from the runlist at this point? */
 int sched_rem_domain(struct task_struct *p) 
 {
     int x, y = p->state;
@@ -166,7 +162,7 @@ int sched_rem_domain(struct task_struct *p)
 
     rem_ac_timer(&p->timer);
 
-    SCHED_FN_VOID(rem_task, p);
+    SCHED_FN(rem_task, p);
 
     TRACE_3D(TRC_SCHED_DOM_REM, _HIGH32(p->domain), _LOW32(p->domain), p);
 
@@ -179,9 +175,9 @@ void init_idle_task(void)
     unsigned long flags;
     struct task_struct *p = current;
 
-    if ( SCHED_FN_RET (alloc_task, p) < 0)
+    if ( SCHED_FN (alloc_task, p) < 0)
 		panic("Failed to allocate scheduler private data for idle task");
-    SCHED_FN_VOID(add_task, p);
+    SCHED_FN(add_task, p);
 
     spin_lock_irqsave(&schedule_lock[p->processor], flags);
     p->has_cpu = 1;
@@ -202,7 +198,7 @@ void __wake_up(struct task_struct *p)
 
     p->state = TASK_RUNNING;
 
-    SCHED_FN_VOID(wake_up, p);
+    SCHED_FN(wake_up, p);
 
 #ifdef WAKEUP_HISTO
     p->wokenup = NOW();
@@ -319,13 +315,10 @@ long sched_ctl(struct sched_ctl_cmd *cmd)
 {
     TRACE_0D(TRC_SCHED_CTL);
 
-    if ( cmd->if_ver != SCHED_CTL_IF_VER )
-        return -EACCES;
-
     if ( cmd->sched_id != ops.sched_id )
         return -EINVAL;
 
-    return SCHED_FN_RET(control, cmd);
+    return SCHED_FN(control, cmd);
 }
 
 
@@ -334,9 +327,6 @@ long sched_adjdom(struct sched_adjdom_cmd *cmd)
 {
     struct task_struct *p;    
     
-    if ( cmd->if_ver != SCHED_CTL_IF_VER )
-        return -EACCES;
-
     if ( cmd->sched_id != ops.sched_id )
         return -EINVAL;
 
@@ -347,7 +337,7 @@ long sched_adjdom(struct sched_adjdom_cmd *cmd)
 
     TRACE_2D(TRC_SCHED_ADJDOM, _HIGH32(p->domain), _LOW32(p->domain));
 
-    SCHED_FN_VOID(adjdom, p, cmd);
+    SCHED_FN(adjdom, p, cmd);
 
     put_task_struct(p); 
     return 0;
@@ -388,7 +378,7 @@ unsigned long __reschedule(struct task_struct *p)
     if ( schedule_data[cpu].s_timer.expires > min_time + TIME_SLOP )
         mod_ac_timer(&schedule_data[cpu].s_timer, min_time);
 
-    return SCHED_FN_RET(reschedule, p);
+    return SCHED_FN(reschedule, p);
 }
 
 void reschedule(struct task_struct *p)
@@ -436,7 +426,7 @@ asmlinkage void __enter_scheduler(void)
         if ( signal_pending(prev) )
             prev->state = TASK_RUNNING;
         else
-            SCHED_FN_VOID(do_block, prev);
+            SCHED_FN(do_block, prev);
     }
 
     /* get policy-specific decision on scheduling... */
@@ -623,10 +613,10 @@ void __init scheduler_init(void)
     if ( ops.do_schedule == NULL)
         panic("Chosen scheduler has NULL do_schedule!");
 
-    if ( SCHED_FN_RET(init_scheduler) < 0 )
+    if ( SCHED_FN(init_scheduler) < 0 )
         panic("Initialising scheduler failed!");
 
-    SCHED_FN_VOID(add_task, &idle0_task);
+    SCHED_FN(add_task, &idle0_task);
 }
 
 /*
@@ -666,7 +656,7 @@ static void dump_rqueue(struct list_head *queue, char *name)
     list_for_each (list, queue) {
         p = list_entry(list, struct task_struct, run_list);
         printk("%3d: %llu has=%c ", loop++, p->domain, p->has_cpu ? 'T':'F');
-        SCHED_FN_VOID(dump_runq_el, p);
+        SCHED_FN(dump_runq_el, p);
         printk("c=0x%X%08X\n", (u32)(p->cpu_time>>32), (u32)p->cpu_time);
         printk("         l: %lx n: %lx  p: %lx\n",
                (unsigned long)list, (unsigned long)list->next,
@@ -682,12 +672,12 @@ void dump_runq(u_char key, void *dev_id, struct pt_regs *regs)
     int i;
 
 	printk("Scheduler: %s (%s)\n", ops.name, ops.opt_name);
-    SCHED_FN_VOID(dump_settings);
+    SCHED_FN(dump_settings);
     printk("NOW=0x%08X%08X\n",  (u32)(now>>32), (u32)now); 
     for (i = 0; i < smp_num_cpus; i++) {
         spin_lock_irqsave(&schedule_lock[i], flags);
         printk("CPU[%02d] ", i);
-        SCHED_FN_VOID(dump_cpu_state,i);
+        SCHED_FN(dump_cpu_state,i);
         dump_rqueue(&schedule_data[i].runqueue, "rq"); 
         spin_unlock_irqrestore(&schedule_lock[i], flags);
     }

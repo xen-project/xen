@@ -501,7 +501,7 @@
 3ead095dE_VF-QA88rl_5cWYRWtRVQ xen/include/hypervisor-ifs/kbd.h
 3ddb79c2oRPrzClk3zbTkRHlpumzKA xen/include/hypervisor-ifs/network.h
 4051db79512nOCGweabrFWO2M2h5ng xen/include/hypervisor-ifs/physdev.h
-40589968wmhPmV5-ENbBYmMjnedgKw xen/include/hypervisor-ifs/sched-ctl.h
+40589968wmhPmV5-ENbBYmMjnedgKw xen/include/hypervisor-ifs/sched_ctl.h
 404f3d2eR2Owk-ZcGOx9ULGHg3nrww xen/include/hypervisor-ifs/trace.h
 3f0d22cbroqp_BkoDPwkfRJhaw1LiQ xen/include/hypervisor-ifs/vbd.h
 3ddb79c4qbCoOFHrv9sCGshbWzBVlQ xen/include/scsi/scsi.h

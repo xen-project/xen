@@ -18,7 +18,7 @@
 #include <asm/pdb.h>
 #include <xeno/trace.h>
 #include <xeno/console.h>
-#include <hypervisor-ifs/sched-ctl.h>
+#include <hypervisor-ifs/sched_ctl.h>
 
 extern unsigned int alloc_new_dom_mem(struct task_struct *, unsigned int);
 

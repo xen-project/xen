@@ -4,7 +4,7 @@ all:
 
 install: all
 	if [ "$(prefix)" = "" ]; then python setup.py install; \
-	else python setup.py install --home="$(prefix)"; fi
+	else python setup.py install --root="$(prefix)"; fi
 	mkdir -p $(prefix)/usr/sbin
 	install -m0755 xend $(prefix)/usr/sbin
 

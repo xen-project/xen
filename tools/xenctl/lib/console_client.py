@@ -72,4 +72,7 @@ def connect(host,port):
         __send_to_sock(sock)
 
 if __name__ == '__main__':
+    if len(sys.argv) != 3:
+        print sys.argv[0] + " <host> <port>"
+        sys.exit(1)
     connect(str(sys.argv[1]),int(sys.argv[2]))
