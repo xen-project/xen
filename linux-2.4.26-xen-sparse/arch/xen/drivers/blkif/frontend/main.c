@@ -805,4 +805,16 @@ void blkdev_suspend(void)
 
 void blkdev_resume(void)
 {
+    ctrl_msg_t                       cmsg;
+    blkif_fe_driver_status_changed_t st;
+    
+
+    /* Send a driver-UP notification to the domain controller. */
+    cmsg.type      = CMSG_BLKIF_FE;
+    cmsg.subtype   = CMSG_BLKIF_FE_DRIVER_STATUS_CHANGED;
+    cmsg.length    = sizeof(blkif_fe_driver_status_changed_t);
+    st.status      = BLKIF_DRIVER_STATUS_UP;
+    memcpy(cmsg.msg, &st, sizeof(st));
+    ctrl_if_send_message_block(&cmsg, NULL, 0, TASK_UNINTERRUPTIBLE);
 }
+
