@@ -72,7 +72,6 @@
 4097ba837h2tuiweIWp-voNVzCRI6g linux-2.4.26-xen-sparse/arch/xen/drivers/netif/backend/interface.c
 4087cf0d5dudKw_DecIJgOhLlBF_0Q linux-2.4.26-xen-sparse/arch/xen/drivers/netif/backend/main.c
 405853f2wg7JXZJNltspMwOZJklxgw linux-2.4.26-xen-sparse/arch/xen/drivers/netif/frontend/Makefile
-405853f6nbeazrNyEWNHBuoSg2PiPA linux-2.4.26-xen-sparse/arch/xen/drivers/netif/frontend/main.c
 4097ba83Qy2eafeFUhGhm6_4iMIIDw linux-2.4.26-xen-sparse/arch/xen/drivers/netif/netif.h
 3e5a4e65lWzkiPXsZdzPt2RNnJGG1g linux-2.4.26-xen-sparse/arch/xen/kernel/Makefile
 4075806dE5mQwlVUf8-t3YXjiMMWDQ linux-2.4.26-xen-sparse/arch/xen/kernel/ctrl_if.c
@@ -199,7 +198,7 @@
 40f56239DoibTX6R-ZYd3QTXAB8_TA linux-2.6.7-xen-sparse/drivers/xen/evtchn/evtchn.c
 40f56239lrg_Ob0BJ8WBFS1zeg2CYw linux-2.6.7-xen-sparse/drivers/xen/net/Kconfig
 40f56239Wd4k_ycG_mFsSO1r5xKdtQ linux-2.6.7-xen-sparse/drivers/xen/net/Makefile
-40f56239vUsbJCS9tGFfRVi1YZlGEg linux-2.6.7-xen-sparse/drivers/xen/net/network.c
+405853f6nbeazrNyEWNHBuoSg2PiPA linux-2.6.7-xen-sparse/drivers/xen/net/network.c
 40f56239YAjS52QG2FIAQpHDZAdGHg linux-2.6.7-xen-sparse/include/asm-xen/asm-i386/desc.h
 40f5623anSzpuEHgiNmQ56fIRfCoaQ linux-2.6.7-xen-sparse/include/asm-xen/asm-i386/e820.h
 40f5623akIoBsQ3KxSB2kufkbgONXQ linux-2.6.7-xen-sparse/include/asm-xen/asm-i386/fixmap.h

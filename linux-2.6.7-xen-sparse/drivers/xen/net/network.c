@@ -1,6 +1,4 @@
 /******************************************************************************
- * network.c
- * 
  * Virtual network driver for conversing with remote driver backends.
  * 
  * Copyright (c) 2002-2004, K A Fraser
@@ -8,13 +6,12 @@
 
 #include <linux/config.h>
 #include <linux/module.h>
-
+#include <linux/version.h>
 #include <linux/kernel.h>
 #include <linux/sched.h>
 #include <linux/slab.h>
 #include <linux/string.h>
 #include <linux/errno.h>
-
 #include <linux/netdevice.h>
 #include <linux/inetdevice.h>
 #include <linux/etherdevice.h>
@@ -30,7 +27,13 @@
 
 #include <asm/page.h>
 
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,0)
 #include <asm-xen/netif.h>
+#else
+#include "../netif.h"
+#define irqreturn_t void
+#define IRQ_HANDLED
+#endif
 
 #define RX_BUF_SIZE ((PAGE_SIZE/2)+1) /* Fool the slab allocator :-) */
 
@@ -368,7 +371,7 @@ static int network_start_xmit(struct sk_buff *skb, struct net_device *dev)
 }
 
 
-static irqreturn_t netif_int(int irq, void *dev_id, struct pt_regs *ptregs)
+static void netif_int(int irq, void *dev_id, struct pt_regs *ptregs)
 {
     struct net_device *dev = dev_id;
     struct net_private *np = dev->priv;
@@ -381,8 +384,6 @@ static irqreturn_t netif_int(int irq, void *dev_id, struct pt_regs *ptregs)
     if ( (np->rx_resp_cons != np->rx->resp_prod) &&
          (np->user_state == UST_OPEN) )
         netif_rx_schedule(dev);
-
-    return IRQ_HANDLED;
 }
 
 
@@ -417,17 +418,24 @@ static int netif_poll(struct net_device *dev, int *pbudget)
     {
         rx = &np->rx->ring[MASK_NETIF_RX_IDX(i)].resp;
 
-        skb = np->rx_skbs[rx->id];
-        ADD_ID_TO_FREELIST(np->rx_skbs, rx->id);
-
+        /*
+         * An error here is very odd. Usually indicates a backend bug,
+         * low-memory condition, or that we didn't have reservation headroom.
+         * Whatever - print an error and queue the id again straight away.
+         */
         if ( unlikely(rx->status <= 0) )
         {
             /* Gate this error. We get a (valid) slew of them on suspend. */
-            if ( np->user_state != UST_OPEN )
+            if ( np->user_state == UST_OPEN )
                 printk(KERN_ALERT "bad buffer on RX ring!(%d)\n", rx->status);
-            dev_kfree_skb(skb);
+            np->rx->ring[MASK_NETIF_RX_IDX(np->rx->req_prod)].req.id = rx->id;
+            wmb();
+            np->rx->req_prod++;
             continue;
         }
+
+        skb = np->rx_skbs[rx->id];
+        ADD_ID_TO_FREELIST(np->rx_skbs, rx->id);
 
         skb->data = skb->tail = skb->head + (rx->addr & ~PAGE_MASK);
         skb_put(skb, rx->status);
