@@ -115,6 +115,8 @@ static u64 processed_system_time;   /* System time (ns) at last processing. */
         }                                  \
     } while ( 0 )
 
+/* Dynamically-mapped IRQs. */
+static int time_irq, debug_irq;
 
 /* Does this guest OS track Xen time, or set its wall clock independently? */
 static int independent_wallclock = 0;
@@ -623,13 +625,13 @@ void __init time_init(void)
     __get_time_values_from_xen();
     processed_system_time = shadow_system_time;
 
-    (void)setup_irq(HYPEREVENT_IRQ(_EVENT_TIMER), &irq_timer);
+    time_irq  = bind_virq_to_irq(VIRQ_TIMER);
+    debug_irq = bind_virq_to_irq(VIRQ_DEBUG);
 
-    (void)setup_irq(HYPEREVENT_IRQ(_EVENT_DEBUG), &dbg_time);
+    (void)setup_irq(time_irq, &irq_timer);
+    (void)setup_irq(debug_irq, &dbg_time);
 
     rdtscll(alarm);
-
-    clear_bit(_EVENT_TIMER, &HYPERVISOR_shared_info->events);
 }
 
 

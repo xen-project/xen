@@ -107,6 +107,7 @@ void cmain(unsigned long magic, multiboot_info_t *mbi)
     module_t *mod;
     void *heap_start;
     int i;
+    unsigned long max_mem;
 
     /* Parse the command-line options. */
     cmdline = (unsigned char *)(mbi->cmdline ? __va(mbi->cmdline) : NULL);
@@ -193,27 +194,37 @@ void cmain(unsigned long magic, multiboot_info_t *mbi)
         for ( ; ; ) ;
     }
 
-    max_page = (mbi->mem_upper+1024) >> (PAGE_SHIFT - 10);
+    max_mem = max_page = (mbi->mem_upper+1024) >> (PAGE_SHIFT - 10);
 
     /* The array of pfn_info structures must fit into the reserved area. */
-    if ( (sizeof(struct pfn_info) * max_page) > 
+    if ( (sizeof(struct pfn_info) * max_page) >
          (FRAMETABLE_VIRT_END - FRAMETABLE_VIRT_START) )
     {
-        unsigned long new_max = 
+        unsigned long new_max =
             (FRAMETABLE_VIRT_END - FRAMETABLE_VIRT_START) /
             sizeof(struct pfn_info);
-	printk("Truncating available memory to %lu/%luMB\n", 
+        printk("Truncating available memory to %lu/%luMB\n",
                new_max >> (20 - PAGE_SHIFT), max_page >> (20 - PAGE_SHIFT));
-	max_page = new_max;
+        max_page = new_max;
     }
 
     set_current(&idle0_task);
 
     init_frametable(max_page);
-    printk("Initialised all memory on a %luMB machine\n",
-           max_page >> (20-PAGE_SHIFT));
+    printk("Initialised %luMB memory on a %luMB machine\n",
+           max_page >> (20-PAGE_SHIFT),
+	   max_mem  >> (20-PAGE_SHIFT) );
 
     heap_start = memguard_init(&_end);
+
+    printk("Xen heap size is %luKB\n", 
+	   (MAX_MONITOR_ADDRESS-__pa(heap_start))/1024 );
+
+    if ( ((MAX_MONITOR_ADDRESS-__pa(heap_start))/1024) <= 4096 )
+    {
+        printk("Xen heap size is too small to safely continue!\n");
+        for ( ; ; ) ;
+    }
 
     init_page_allocator(__pa(heap_start), MAX_MONITOR_ADDRESS);
  

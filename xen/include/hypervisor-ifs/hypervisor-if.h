@@ -50,40 +50,25 @@
 #define ARGS_PER_MULTICALL_ENTRY 8
 
 
-/* EVENT MESSAGES
- *
- * Here, as in the interrupts to the guestos, additional network interfaces
- * are defined.	 These definitions server as placeholders for the event bits,
- * however, in the code these events will allways be referred to as shifted
- * offsets from the base NET events.
+/* 
+ * VIRTUAL INTERRUPTS
+ * 
+ * Virtual interrupts that a guest OS may receive from the hypervisor.
  */
 
-/* Events that a guest OS may receive from the hypervisor. */
-#define EVENT_BLKDEV   0x01  /* A block device response has been queued. */
-#define EVENT_TIMER    0x02  /* A timeout has been updated. */
-#define EVENT_DIE      0x04  /* OS is about to be killed. Clean up please! */
-#define EVENT_DEBUG    0x08  /* Request guest to dump debug info (gross!) */
-#define EVENT_NET      0x10  /* There are packets for transmission. */
-#define EVENT_PS2      0x20  /* PS/2 keyboard or mouse event(s) */
-#define EVENT_STOP     0x40  /* Prepare for stopping and possible pickling */
-#define EVENT_EVTCHN   0x80  /* Event pending on an event channel */
-#define EVENT_VBD_UPD  0x100 /* Event to signal VBDs should be reprobed */
-#define EVENT_CONSOLE  0x200 /* This is only for domain-0 initial console. */
-#define EVENT_PHYSIRQ  0x400 /* Event to signal pending physical IRQs. */
-
-/* Bit offsets, as opposed to the above masks. */
-#define _EVENT_BLKDEV    0
-#define _EVENT_TIMER     1
-#define _EVENT_DIE       2
-#define _EVENT_DEBUG     3
-#define _EVENT_NET       4
-#define _EVENT_PS2       5
-#define _EVENT_STOP      6
-#define _EVENT_EVTCHN    7
-#define _EVENT_VBD_UPD   8
-#define _EVENT_CONSOLE   9
-#define _EVENT_PHYSIRQ  10
-
+#define VIRQ_BLKDEV    0  /* A block device response has been queued. */
+#define VIRQ_TIMER     1  /* A timeout has been updated. */
+#define VIRQ_DIE       2  /* OS is about to be killed. Clean up please! */
+#define VIRQ_DEBUG     3  /* Request guest to dump debug info (gross!) */
+#define VIRQ_NET       4  /* There are packets for transmission. */
+#define VIRQ_PS2       5  /* PS/2 keyboard or mouse event(s) */
+#define VIRQ_STOP      6  /* Prepare for stopping and possible pickling */
+#define VIRQ_EVTCHN    7  /* Event pending on an event channel */
+#define VIRQ_VBD_UPD   8  /* Event to signal VBDs should be reprobed */
+#define VIRQ_CONSOLE   9  /* This is only for domain-0 initial console. */
+#define VIRQ_PHYSIRQ  10  /* Event to signal pending physical IRQs. */
+#define VIRQ_ERROR    11  /* Catch-all virtual interrupt. */
+#define NR_VIRQS      12
 
 /*
  * MMU_XXX: specified in least 2 bits of 'ptr' field. These bits are masked
@@ -120,12 +105,6 @@
 /* These are passed as 'flags' to update_va_mapping. They can be ORed. */
 #define UVMF_FLUSH_TLB          1 /* Flush entire TLB. */
 #define UVMF_INVLPG             2 /* Flush the VA mapping being updated. */
-
-/*
- * Master "switch" for enabling/disabling event delivery.
- */
-#define EVENTS_MASTER_ENABLE_MASK 0x80000000UL
-#define EVENTS_MASTER_ENABLE_BIT  31
 
 
 /*
@@ -168,49 +147,64 @@ typedef struct
     unsigned long args[7];
 } multicall_entry_t;
 
+/* Event channel endpoints per domain. */
+#define NR_EVENT_CHANNELS 1024
+
 /*
  * Xen/guestos shared data -- pointer provided in start_info.
  * NB. We expect that this struct is smaller than a page.
  */
-typedef struct shared_info_st {
-
-    /* Bitmask of outstanding event notifications hypervisor -> guest OS. */
-    unsigned long events;
+typedef struct shared_info_st
+{
     /*
-     * Hypervisor will only signal event delivery via the "callback exception"
-     * when a pending event is not masked. The mask also contains a "master
-     * enable" which prevents any event delivery. This mask can be used to
-     * prevent unbounded reentrancy and stack overflow (in this way, acts as a
-     * kind of interrupt-enable flag).
+     * If bit 0 in evtchn_upcall_pending is transitioned 0->1, and bit 0 in 
+     * evtchn_upcall_mask is clear, then an asynchronous upcall is scheduled. 
+     * The upcall mask can be used to prevent unbounded reentrancy and stack 
+     * overflow (in this way, acts as a kind of interrupt-enable flag).
      */
-    unsigned long events_mask;
+    unsigned long evtchn_upcall_pending;
+    unsigned long evtchn_upcall_mask;
 
     /*
-     * A domain can have up to 1024 bidirectional event channels to/from other
-     * domains. Domains must agree out-of-band to set up a connection, and then
-     * each must explicitly request a connection to the other. When both have
-     * made the request the channel is fully allocated and set up.
+     * A domain can have up to 1024 "event channels" on which it can send
+     * and receive asynchronous event notifications. There are three classes
+     * of event that are delivered by this mechanism:
+     *  1. Bi-directional inter- and intra-domain connections. Domains must
+     *     arrange out-of-band to set up a connection (usually the setup
+     *     is initiated and organised by a privileged third party such as
+     *     software running in domain 0).
+     *  2. Physical interrupts. A domain with suitable hardware-access
+     *     privileges can bind an event-channel port to a physical interrupt
+     *     source.
+     *  3. Virtual interrupts ('events'). A domain can bind an event-channel
+     *     port to a virtual interrupt source, such as the virtual-timer
+     *     device or the emergency console.
      * 
-     * An event channel is a single sticky 'bit' of information. Setting the
-     * sticky bit also causes an upcall into the target domain. In this way
-     * events can be seen as an IPI [Inter-Process(or) Interrupt].
+     * Event channels are addressed by a "port index" between 0 and 1023.
+     * Each channel is associated with three bits of information:
+     *  1. PENDING -- notifies the domain that there is a pending notification
+     *     to be processed. This bit is cleared by the guest.
+     *  2. EXCEPTION -- notifies the domain that there has been some
+     *     exceptional event associated with this channel (e.g. remote
+     *     disconnect, physical IRQ error). This bit is cleared by the guest.
+     *  3. MASK -- if this bit is clear then a 0->1 transition of PENDING
+     *     or EXCEPTION will cause an asynchronous upcall to be scheduled.
+     *     This bit is only updated by the guest. It is read-only within Xen.
+     *     If a channel becomes pending or an exceptional event occurs while
+     *     the channel is masked then the 'edge' is lost (i.e., when the
+     *     channel is unmasked, the guest must manually handle pending
+     *     notifications as no upcall will be scheduled by Xen).
      * 
-     * A guest can see which of its event channels are pending by reading the
-     * 'event_channel_pend' bitfield. To avoid a linear scan of the entire
-     * bitfield there is a 'selector' which indicates which words in the
-     * bitfield contain at least one set bit.
-     * 
-     * There is a similar bitfield to indicate which event channels have been
-     * disconnected by the remote end. There is also a 'selector' for this
-     * field.
+     * To expedite scanning of pending notifications and exceptions, any 
+     * 0->1 transition on an unmasked channel causes a corresponding bit in
+     * a 32-bit selector to be set. Each bit in the selector covers a 32-bit
+     * word in the PENDING or EXCEPTION bitfield array.
      */
-    u32 event_channel_pend[32];
-    u32 event_channel_pend_sel;
-    u32 event_channel_disc[32];
-    u32 event_channel_disc_sel;
-
-    /* Bitmask of physical IRQ lines that are pending for this domain. */
-    unsigned long physirq_pend;
+    u32 evtchn_pending[32];
+    u32 evtchn_pending_sel;
+    u32 evtchn_exception[32];
+    u32 evtchn_exception_sel;
+    u32 evtchn_mask[32];
 
     /*
      * Time: The following abstractions are exposed: System Time, Clock Time,

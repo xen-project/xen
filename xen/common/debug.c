@@ -91,7 +91,11 @@ int pdb_change_values(domid_t domain, u_char *buffer, unsigned long addr,
 
     if ((addr >> PAGE_SHIFT) == ((addr + length - 1) >> PAGE_SHIFT))
     {
-        l2_table = map_domain_mem(pagetable_val(p->mm.pagetable));
+        if (p->mm.shadow_mode )
+          l2_table = map_domain_mem(pagetable_val(p->mm.shadow_table));
+	else
+          l2_table = map_domain_mem(pagetable_val(p->mm.pagetable));
+
 	l2_table += l2_table_offset(addr);
 	if (!(l2_pgentry_val(*l2_table) & _PAGE_PRESENT)) 
 	{
@@ -224,16 +228,12 @@ void pdb_do_debug (dom0_op_t *op)
 
         case 's' :
 	{
-	    unsigned long cpu_mask;
 	    struct task_struct * p = find_domain_by_id(op->u.debug.domain);
 
 	    if (p != NULL)
 	    {
 	        if (p->state != TASK_STOPPED)
-		{
-		    cpu_mask = mark_guest_event(p, _EVENT_STOP);
-		    guest_event_notify(cpu_mask);
-		}
+                    send_guest_virq(p, VIRQ_STOP);
 		put_task_struct(p);
 	    }
 	    else

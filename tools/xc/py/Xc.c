@@ -687,9 +687,9 @@ static PyObject *pyxc_vbd_probe(PyObject *self,
     return list;
 }
 
-static PyObject *pyxc_evtchn_open(PyObject *self,
-                                  PyObject *args,
-                                  PyObject *kwds)
+static PyObject *pyxc_evtchn_bind_interdomain(PyObject *self,
+                                              PyObject *args,
+                                              PyObject *kwds)
 {
     XcObject *xc = (XcObject *)self;
 
@@ -702,7 +702,8 @@ static PyObject *pyxc_evtchn_open(PyObject *self,
                                       &dom1, &dom2) )
         return NULL;
 
-    if ( xc_evtchn_open(xc->xc_handle, dom1, dom2, &port1, &port2) != 0 )
+    if ( xc_evtchn_bind_interdomain(xc->xc_handle, dom1, 
+                                    dom2, &port1, &port2) != 0 )
         return PyErr_SetFromErrno(xc_error);
 
     return Py_BuildValue("{s:i,s:i}", 
@@ -759,34 +760,45 @@ static PyObject *pyxc_evtchn_status(PyObject *self,
     XcObject *xc = (XcObject *)self;
     PyObject *dict;
 
-    u64 dom1 = DOMID_SELF, dom2;
-    int port1, port2, status, ret;
+    u64 dom = DOMID_SELF;
+    int port, ret;
+    xc_evtchn_status_t status;
 
     static char *kwd_list[] = { "port", "dom", NULL };
 
     if ( !PyArg_ParseTupleAndKeywords(args, kwds, "i|L", kwd_list, 
-                                      &port1, &dom1) )
+                                      &port, &dom) )
         return NULL;
 
-    ret = xc_evtchn_status(xc->xc_handle, dom1, port1, &dom2, &port2, &status);
+    ret = xc_evtchn_status(xc->xc_handle, dom, port, &status);
     if ( ret != 0 )
         return PyErr_SetFromErrno(xc_error);
 
-    switch ( status )
+    switch ( status.status )
     {
     case EVTCHNSTAT_closed:
         dict = Py_BuildValue("{s:s}", 
                              "status", "closed");
         break;
-    case EVTCHNSTAT_disconnected:
+    case EVTCHNSTAT_unbound:
         dict = Py_BuildValue("{s:s}", 
-                             "status", "disconnected");
+                             "status", "unbound");
         break;
-    case EVTCHNSTAT_connected:
+    case EVTCHNSTAT_interdomain:
         dict = Py_BuildValue("{s:s,s:L,s:i}", 
-                             "status", "connected",
-                             "dom", dom2,
-                             "port", port2);
+                             "status", "interdomain",
+                             "dom", status.u.interdomain.dom,
+                             "port", status.u.interdomain.port);
+        break;
+    case EVTCHNSTAT_pirq:
+        dict = Py_BuildValue("{s:s,s:i}", 
+                             "status", "pirq",
+                             "irq", status.u.pirq);
+        break;
+    case EVTCHNSTAT_virq:
+        dict = Py_BuildValue("{s:s,s:i}", 
+                             "status", "virq",
+                             "irq", status.u.virq);
         break;
     default:
         dict = Py_BuildValue("{}");
@@ -1134,8 +1146,8 @@ static PyMethodDef pyxc_methods[] = {
       " writeable  [int]:  Bool - is this VBD writeable?\n"
       " nr_sectors [long]: Size of this VBD, in 512-byte sectors.\n" },
 
-    { "evtchn_open", 
-      (PyCFunction)pyxc_evtchn_open, 
+    { "evtchn_bind_interdomain", 
+      (PyCFunction)pyxc_evtchn_bind_interdomain, 
       METH_VARARGS | METH_KEYWORDS, "\n"
       "Open an event channel between two domains.\n"
       " dom1 [long, SELF]: First domain to be connected.\n"
@@ -1166,10 +1178,13 @@ static PyMethodDef pyxc_methods[] = {
       " dom  [long, SELF]: Dom-id of one endpoint of the channel.\n"
       " port [int]:        Port-id of one endpoint of the channel.\n\n"
       "Returns: [dict] dictionary is empty on failure.\n"
-      " status [str]:  'closed', 'disconnected', or 'connected'.\n"
-      "The following are also returned if 'status' is 'connected':\n"
-      " dom  [long]: Port-id for endpoint at dom1.\n"
-      " port [int]:  Port-id for endpoint at dom2.\n" },
+      " status [str]:  'closed', 'unbound', 'interdomain', 'pirq',"
+      " or 'virq'.\n"
+      "The following are returned if 'status' is 'interdomain':\n"
+      " dom  [long]: Dom-id of remote endpoint.\n"
+      " port [int]:  Port-id of remote endpoint.\n"
+      "The following are returned if 'status' is 'pirq' or 'virq':\n"
+      " irq  [int]:  IRQ number.\n" },
 
     { "physdev_pci_access_modify",
       (PyCFunction)pyxc_physdev_pci_access_modify,

@@ -25,7 +25,8 @@
 #include <hypervisor-ifs/hypervisor-if.h>
 #include <hypervisor-ifs/event_channel.h>
 
-#define MAX_EVENT_CHANNELS 1024
+#define INIT_EVENT_CHANNELS   16
+#define MAX_EVENT_CHANNELS  1024
 
 static int get_free_port(struct task_struct *p)
 {
@@ -65,28 +66,11 @@ static int get_free_port(struct task_struct *p)
     return port;
 }
 
-static inline unsigned long set_event_pending(struct task_struct *p, int port)
-{
-    if ( !test_and_set_bit(port,    &p->shared_info->event_channel_pend[0]) &&
-         !test_and_set_bit(port>>5, &p->shared_info->event_channel_pend_sel) )
-        return mark_guest_event(p, _EVENT_EVTCHN);
-    return 0;
-}
-
-static inline unsigned long set_event_disc(struct task_struct *p, int port)
-{
-    if ( !test_and_set_bit(port,    &p->shared_info->event_channel_disc[0]) &&
-         !test_and_set_bit(port>>5, &p->shared_info->event_channel_disc_sel) )
-        return mark_guest_event(p, _EVENT_EVTCHN);
-    return 0;
-}
-
-static long event_channel_open(evtchn_open_t *open)
+static long evtchn_bind_interdomain(evtchn_bind_interdomain_t *bind)
 {
     struct task_struct *p1, *p2;
     int                 port1 = 0, port2 = 0;
-    unsigned long       cpu_mask;
-    domid_t             dom1 = open->dom1, dom2 = open->dom2;
+    domid_t             dom1 = bind->dom1, dom2 = bind->dom2;
     long                rc = 0;
 
     if ( !IS_PRIV(current) )
@@ -130,21 +114,16 @@ static long event_channel_open(evtchn_open_t *open)
         goto out;
     }
 
-    p1->event_channel[port1].remote_dom  = p2;
-    p1->event_channel[port1].remote_port = (u16)port2;
-    p1->event_channel[port1].state       = ECS_CONNECTED;
+    p1->event_channel[port1].u.remote.dom  = p2;
+    p1->event_channel[port1].u.remote.port = (u16)port2;
+    p1->event_channel[port1].state         = ECS_INTERDOMAIN;
 
-    p2->event_channel[port2].remote_dom  = p1;
-    p2->event_channel[port2].remote_port = (u16)port1;
-    p2->event_channel[port2].state       = ECS_CONNECTED;
+    p2->event_channel[port2].u.remote.dom  = p1;
+    p2->event_channel[port2].u.remote.port = (u16)port1;
+    p2->event_channel[port2].state         = ECS_INTERDOMAIN;
 
-    /* Ensure that the disconnect signal is not asserted. */
-    clear_bit(port1, &p1->shared_info->event_channel_disc[0]);
-    clear_bit(port2, &p2->shared_info->event_channel_disc[0]);
-
-    cpu_mask  = set_event_pending(p1, port1);
-    cpu_mask |= set_event_pending(p2, port2);
-    guest_event_notify(cpu_mask);
+    evtchn_set_pending(p1, port1);
+    evtchn_set_pending(p2, port2);
     
  out:
     spin_unlock(&p1->event_channel_lock);
@@ -154,19 +133,55 @@ static long event_channel_open(evtchn_open_t *open)
     put_task_struct(p1);
     put_task_struct(p2);
 
-    open->port1 = port1;
-    open->port2 = port2;
+    bind->port1 = port1;
+    bind->port2 = port2;
 
     return rc;
 }
 
 
-static long __event_channel_close(struct task_struct *p1, int port1)
+static long evtchn_bind_virq(evtchn_bind_virq_t *bind)
+{
+    struct task_struct *p = current;
+    int virq = bind->virq;
+    int port;
+
+    if ( virq >= NR_VIRQS )
+        return -EINVAL;
+
+    spin_lock(&p->event_channel_lock);
+
+    /*
+     * Port 0 is the fallback port for VIRQs that haven't been explicitly
+     * bound yet. The exception is the 'error VIRQ', which is permanently 
+     * bound to port 0.
+     */
+    if ( ((port = p->virq_to_evtchn[virq]) != 0) ||
+         (virq == VIRQ_ERROR) ||
+         ((port = get_free_port(p)) < 0) )
+        goto out;
+
+    p->event_channel[port].state  = ECS_VIRQ;
+    p->event_channel[port].u.virq = virq;
+
+    p->virq_to_evtchn[virq] = port;
+
+ out:
+    spin_unlock(&p->event_channel_lock);
+
+    if ( port < 0 )
+        return port;
+
+    bind->port = port;
+    return 0;
+}
+
+
+static long __evtchn_close(struct task_struct *p1, int port1)
 {
     struct task_struct *p2 = NULL;
     event_channel_t    *chn1, *chn2;
     int                 port2;
-    unsigned long       cpu_mask = 0;
     long                rc = 0;
 
  again:
@@ -174,18 +189,34 @@ static long __event_channel_close(struct task_struct *p1, int port1)
 
     chn1 = p1->event_channel;
 
-    if ( (port1 < 0) || (port1 >= p1->max_event_channel) || 
-         (chn1[port1].state == ECS_FREE) )
+    /* NB. Port 0 is special (VIRQ_ERROR). Never let it be closed. */
+    if ( (port1 <= 0) || (port1 >= p1->max_event_channel) )
     {
         rc = -EINVAL;
         goto out;
     }
 
-    if ( chn1[port1].state == ECS_CONNECTED )
+    switch ( chn1[port1].state )
     {
+    case ECS_FREE:
+        rc = -EINVAL;
+        goto out;
+
+    case ECS_UNBOUND:
+        break;
+
+    case ECS_PIRQ:
+        p1->pirq_to_evtchn[chn1[port1].u.pirq] = 0;
+        break;
+
+    case ECS_VIRQ:
+        p1->virq_to_evtchn[chn1[port1].u.virq] = 0;
+        break;
+
+    case ECS_INTERDOMAIN:
         if ( p2 == NULL )
         {
-            p2 = chn1[port1].remote_dom;
+            p2 = chn1[port1].u.remote.dom;
             get_task_struct(p2);
 
             if ( p1->domain < p2->domain )
@@ -199,35 +230,39 @@ static long __event_channel_close(struct task_struct *p1, int port1)
                 goto again;
             }
         }
-        else if ( p2 != chn1[port1].remote_dom )
+        else if ( p2 != chn1[port1].u.remote.dom )
         {
             rc = -EINVAL;
             goto out;
         }
         
         chn2  = p2->event_channel;
-        port2 = chn1[port1].remote_port;
+        port2 = chn1[port1].u.remote.port;
 
         if ( port2 >= p2->max_event_channel )
             BUG();
-        if ( chn2[port2].state != ECS_CONNECTED )
+        if ( chn2[port2].state != ECS_INTERDOMAIN )
             BUG();
-        if ( chn2[port2].remote_dom != p1 )
+        if ( chn2[port2].u.remote.dom != p1 )
             BUG();
 
-        chn2[port2].state       = ECS_DISCONNECTED;
-        chn2[port2].remote_dom  = NULL;
-        chn2[port2].remote_port = 0xFFFF;
+        chn2[port2].state         = ECS_UNBOUND;
+        chn2[port2].u.remote.dom  = NULL;
+        chn2[port2].u.remote.port = 0xFFFF;
 
-        cpu_mask |= set_event_disc(p2, port2);
+        evtchn_set_exception(p2, port2);
+
+        break;
+
+    default:
+        BUG();
     }
 
-    chn1[port1].state       = ECS_FREE;
-    chn1[port1].remote_dom  = NULL;
-    chn1[port1].remote_port = 0xFFFF;
+    chn1[port1].state         = ECS_FREE;
+    chn1[port1].u.remote.dom  = NULL;
+    chn1[port1].u.remote.port = 0xFFFF;
     
-    cpu_mask |= set_event_disc(p1, port1);
-    guest_event_notify(cpu_mask);
+    evtchn_set_exception(p1, port1);
 
  out:
     if ( p2 != NULL )
@@ -243,7 +278,7 @@ static long __event_channel_close(struct task_struct *p1, int port1)
 }
 
 
-static long event_channel_close(evtchn_close_t *close)
+static long evtchn_close(evtchn_close_t *close)
 {
     struct task_struct *p;
     long                rc;
@@ -257,38 +292,36 @@ static long event_channel_close(evtchn_close_t *close)
     if ( (p = find_domain_by_id(dom)) == NULL )
         return -ESRCH;
 
-    rc = __event_channel_close(p, close->port);
+    rc = __evtchn_close(p, close->port);
 
     put_task_struct(p);
     return rc;
 }
 
 
-static long event_channel_send(int lport)
+static long evtchn_send(int lport)
 {
     struct task_struct *lp = current, *rp;
     int                 rport;
-    unsigned long       cpu_mask;
 
     spin_lock(&lp->event_channel_lock);
 
     if ( unlikely(lport < 0) ||
          unlikely(lport >= lp->max_event_channel) || 
-         unlikely(lp->event_channel[lport].state != ECS_CONNECTED) )
+         unlikely(lp->event_channel[lport].state != ECS_INTERDOMAIN) )
     {
         spin_unlock(&lp->event_channel_lock);
         return -EINVAL;
     }
 
-    rp    = lp->event_channel[lport].remote_dom;
-    rport = lp->event_channel[lport].remote_port;
+    rp    = lp->event_channel[lport].u.remote.dom;
+    rport = lp->event_channel[lport].u.remote.port;
 
     get_task_struct(rp);
 
     spin_unlock(&lp->event_channel_lock);
 
-    cpu_mask = set_event_pending(rp, rport);
-    guest_event_notify(cpu_mask);
+    evtchn_set_pending(rp, rport);
 
     put_task_struct(rp);
 
@@ -296,11 +329,11 @@ static long event_channel_send(int lport)
 }
 
 
-static long event_channel_status(evtchn_status_t *status)
+static long evtchn_status(evtchn_status_t *status)
 {
     struct task_struct *p;
-    domid_t             dom = status->dom1;
-    int                 port = status->port1;
+    domid_t             dom = status->dom;
+    int                 port = status->port;
     event_channel_t    *chn;
 
     if ( dom == DOMID_SELF )
@@ -326,13 +359,21 @@ static long event_channel_status(evtchn_status_t *status)
     case ECS_FREE:
         status->status = EVTCHNSTAT_closed;
         break;
-    case ECS_DISCONNECTED:
-        status->status = EVTCHNSTAT_disconnected;
+    case ECS_UNBOUND:
+        status->status = EVTCHNSTAT_unbound;
         break;
-    case ECS_CONNECTED:
-        status->status = EVTCHNSTAT_connected;
-        status->dom2   = chn[port].remote_dom->domain;
-        status->port2  = chn[port].remote_port;
+    case ECS_INTERDOMAIN:
+        status->status = EVTCHNSTAT_interdomain;
+        status->u.interdomain.dom  = chn[port].u.remote.dom->domain;
+        status->u.interdomain.port = chn[port].u.remote.port;
+        break;
+    case ECS_PIRQ:
+        status->status = EVTCHNSTAT_pirq;
+        status->u.pirq = chn[port].u.pirq;
+        break;
+    case ECS_VIRQ:
+        status->status = EVTCHNSTAT_virq;
+        status->u.virq = chn[port].u.virq;
         break;
     default:
         BUG();
@@ -353,22 +394,28 @@ long do_event_channel_op(evtchn_op_t *uop)
 
     switch ( op.cmd )
     {
-    case EVTCHNOP_open:
-        rc = event_channel_open(&op.u.open);
+    case EVTCHNOP_bind_interdomain:
+        rc = evtchn_bind_interdomain(&op.u.bind_interdomain);
+        if ( copy_to_user(uop, &op, sizeof(op)) != 0 )
+            rc = -EFAULT; /* Cleaning up here would be a mess! */
+        break;
+
+    case EVTCHNOP_bind_virq:
+        rc = evtchn_bind_virq(&op.u.bind_virq);
         if ( copy_to_user(uop, &op, sizeof(op)) != 0 )
             rc = -EFAULT; /* Cleaning up here would be a mess! */
         break;
 
     case EVTCHNOP_close:
-        rc = event_channel_close(&op.u.close);
+        rc = evtchn_close(&op.u.close);
         break;
 
     case EVTCHNOP_send:
-        rc = event_channel_send(op.u.send.local_port);
+        rc = evtchn_send(op.u.send.local_port);
         break;
 
     case EVTCHNOP_status:
-        rc = event_channel_status(&op.u.status);
+        rc = evtchn_status(&op.u.status);
         if ( copy_to_user(uop, &op, sizeof(op)) != 0 )
             rc = -EFAULT;
         break;
@@ -382,13 +429,28 @@ long do_event_channel_op(evtchn_op_t *uop)
 }
 
 
+int init_event_channels(struct task_struct *p)
+{
+    spin_lock_init(&p->event_channel_lock);
+    p->event_channel = kmalloc(INIT_EVENT_CHANNELS * sizeof(event_channel_t), 
+                               GFP_KERNEL);
+    if ( unlikely(p->event_channel == NULL) )
+        return -ENOMEM;
+    p->max_event_channel = INIT_EVENT_CHANNELS;
+    memset(p->event_channel, 0, INIT_EVENT_CHANNELS * sizeof(event_channel_t));
+    p->event_channel[0].state  = ECS_VIRQ;
+    p->event_channel[0].u.virq = VIRQ_ERROR;
+    return 0;
+}
+
+
 void destroy_event_channels(struct task_struct *p)
 {
     int i;
     if ( p->event_channel != NULL )
     {
         for ( i = 0; i < p->max_event_channel; i++ )
-            (void)__event_channel_close(p, i);
+            (void)__evtchn_close(p, i);
         kfree(p->event_channel);
     }
 }

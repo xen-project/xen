@@ -68,9 +68,7 @@ IF_MASK		= 0x00000200
 DF_MASK		= 0x00000400
 NT_MASK		= 0x00004000
 
-/*
- * these are offsets into the task-struct.
- */
+/* Offsets into task_struct. */
 state		=  0
 flags		=  4
 sigpending	=  8
@@ -79,6 +77,10 @@ exec_domain	= 16
 need_resched	= 20
 tsk_ptrace	= 24
 processor	= 52
+
+/* Offsets into shared_info_t. */
+#define evtchn_upcall_pending /* 0 */
+#define evtchn_upcall_mask       4
 
 ENOSYS = 38
 
@@ -208,14 +210,14 @@ ENTRY(system_call)
 	movl %eax,EAX(%esp)		# save the return value
 ENTRY(ret_from_sys_call)
         movl SYMBOL_NAME(HYPERVISOR_shared_info),%esi
-        btrl $EVENTS_MASTER_ENABLE_BIT,4(%esi) # make tests atomic
+        btsl $0,evtchn_upcall_mask(%esi) # make tests atomic
 ret_syscall_tests:
 	cmpl $0,need_resched(%ebx)
 	jne reschedule
 	cmpl $0,sigpending(%ebx)
 	je   safesti                    # ensure need_resched updates are seen
 signal_return:
-	btsl $EVENTS_MASTER_ENABLE_BIT,4(%esi) # reenable event callbacks
+	btrl $0,evtchn_upcall_mask(%esi) # reenable event callbacks
 	movl %esp,%eax
 	xorl %edx,%edx
 	call SYMBOL_NAME(do_signal)
@@ -252,7 +254,7 @@ ret_from_exception:
 
 	ALIGN
 reschedule:
-        btsl $EVENTS_MASTER_ENABLE_BIT,4(%esi) # reenable event callbacks
+        btrl $0,evtchn_upcall_mask(%esi)       # reenable event callbacks
 	call SYMBOL_NAME(schedule)             # test
 	jmp ret_from_sys_call
 
@@ -309,18 +311,18 @@ ENTRY(hypervisor_callback)
         cmpl $ecrit,%eax
         jb   critical_region_fixup
 11:     push %esp
-        call do_hypervisor_callback
+        call evtchn_do_upcall
         add  $4,%esp
         movl SYMBOL_NAME(HYPERVISOR_shared_info),%esi
         movb CS(%esp),%cl
 	test $2,%cl          # slow return to ring 2 or 3
 	jne  ret_syscall_tests
-safesti:btsl $EVENTS_MASTER_ENABLE_BIT,4(%esi) # reenable event callbacks
+safesti:btrl $0,evtchn_upcall_mask(%esi) # reenable event callbacks
 scrit:  /**** START OF CRITICAL REGION ****/
-        cmpl $0,(%esi)
-        jne  14f              # process more events if necessary...
+        testb $1,evtchn_upcall_pending(%esi)
+        jnz  14f              # process more events if necessary...
         RESTORE_ALL
-14:     btrl $EVENTS_MASTER_ENABLE_BIT,4(%esi)
+14:     btsl $0,evtchn_upcall_mask(%esi)
         jmp  11b
 ecrit:  /**** END OF CRITICAL REGION ****/
 # [How we do the fixup]. We want to merge the current stack frame with the
@@ -349,8 +351,8 @@ critical_region_fixup:
         jmp  11b
         
 critical_fixup_table:        
-        .byte 0x00,0x00,0x00                  # cmpl $0,(%esi)
-        .byte 0x00,0x00                       # jne  14f
+        .byte 0x00,0x00,0x00                  # testb $1,(%esi)
+        .byte 0x00,0x00                       # jnz  14f
         .byte 0x00                            # pop  %ebx
         .byte 0x04                            # pop  %ecx
         .byte 0x08                            # pop  %edx
@@ -362,7 +364,7 @@ critical_fixup_table:
         .byte 0x20                            # pop  %es
         .byte 0x24,0x24,0x24                  # add  $4,%esp
         .byte 0x28                            # iret
-        .byte 0x00,0x00,0x00,0x00,0x00        # btrl $31,4(%esi)
+        .byte 0x00,0x00,0x00,0x00,0x00        # btsl $0,4(%esi)
         .byte 0x00,0x00                       # jmp  11b
 
 # Hypervisor uses this for application faults while it executes.

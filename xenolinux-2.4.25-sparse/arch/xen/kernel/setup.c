@@ -58,6 +58,9 @@ shared_info_t *HYPERVISOR_shared_info = (shared_info_t *)empty_zero_page;
 
 unsigned long *phys_to_machine_mapping;
 
+multicall_entry_t multicall_list[8];
+int nr_multicall_ents = 0;
+
 /*
  * Machine setup..
  */
@@ -860,7 +863,8 @@ void __init identify_cpu(struct cpuinfo_x86 *c)
         break;
         
     default:
-        printk("Unsupported CPU vendor (%d) -- please report!\n");
+        printk("Unsupported CPU vendor (%d) -- please report!\n",
+               c->x86_vendor);
     }
 	
     printk(KERN_DEBUG "CPU: After vendor init, caps: %08x %08x %08x %08x\n",
@@ -1116,7 +1120,10 @@ void __init cpu_init (void)
  * Time-to-die callback handling.
  */
 
-static void die_irq(int irq, void *unused, struct pt_regs *regs)
+/* Dynamically-mapped IRQ. */
+static int die_irq;
+
+static void die_interrupt(int irq, void *unused, struct pt_regs *regs)
 {
     extern void ctrl_alt_del(void);
     ctrl_alt_del();
@@ -1124,7 +1131,8 @@ static void die_irq(int irq, void *unused, struct pt_regs *regs)
 
 static int __init setup_die_event(void)
 {
-    (void)request_irq(HYPEREVENT_IRQ(_EVENT_DIE), die_irq, 0, "die", NULL);
+    die_irq = bind_virq_to_irq(VIRQ_DIE);
+    (void)request_irq(die_irq, die_interrupt, 0, "die", NULL);
     return 0;
 }
 
@@ -1241,7 +1249,10 @@ static void stop_task(void *unused)
 
 static struct tq_struct stop_tq;
 
-static void stop_irq(int irq, void *unused, struct pt_regs *regs)
+/* Dynamically-mapped IRQ. */
+static int stop_irq;
+
+static void stop_interrupt(int irq, void *unused, struct pt_regs *regs)
 {
     stop_tq.routine = stop_task;
     schedule_task(&stop_tq);
@@ -1249,7 +1260,8 @@ static void stop_irq(int irq, void *unused, struct pt_regs *regs)
 
 static int __init setup_stop_event(void)
 {
-    (void)request_irq(HYPEREVENT_IRQ(_EVENT_STOP), stop_irq, 0, "stop", NULL);
+    stop_irq = bind_virq_to_irq(VIRQ_STOP);
+    (void)request_irq(stop_irq, stop_interrupt, 0, "stop", NULL);
     return 0;
 }
 

@@ -18,14 +18,13 @@
 
 typedef unsigned char byte; /* from linux/ide.h */
 
-#define XLBLK_RESPONSE_IRQ HYPEREVENT_IRQ(_EVENT_BLKDEV)
-#define XLBLK_UPDATE_IRQ   HYPEREVENT_IRQ(_EVENT_VBD_UPD)
-#define DEBUG_IRQ          HYPEREVENT_IRQ(_EVENT_DEBUG)
-
 #define STATE_ACTIVE    0
 #define STATE_SUSPENDED 1
 #define STATE_CLOSED    2
 static unsigned int state = STATE_SUSPENDED;
+
+/* Dynamically-mapped IRQs. */
+static int xlblk_response_irq, xlblk_update_irq;
 
 static blk_ring_t *blk_ring;
 static BLK_RING_IDX resp_cons; /* Response consumer for comms ring. */
@@ -552,7 +551,10 @@ int __init xlblk_init(void)
 
     reset_xlblk_interface();
 
-    error = request_irq(XLBLK_RESPONSE_IRQ, xlblk_response_int, 
+    xlblk_response_irq = bind_virq_to_irq(VIRQ_BLKDEV);
+    xlblk_update_irq   = bind_virq_to_irq(VIRQ_VBD_UPD);
+
+    error = request_irq(xlblk_response_irq, xlblk_response_int, 
                         SA_SAMPLE_RANDOM, "blkdev", NULL);
     if ( error )
     {
@@ -560,8 +562,8 @@ int __init xlblk_init(void)
         goto fail;
     }
 
-    error = request_irq(XLBLK_UPDATE_IRQ, xlblk_update_int,
-                        SA_INTERRUPT, "blkdev", NULL);
+    error = request_irq(xlblk_update_irq, xlblk_update_int,
+                        0, "blkdev", NULL);
 
     if ( error )
     {
@@ -581,8 +583,10 @@ int __init xlblk_init(void)
 static void __exit xlblk_cleanup(void)
 {
     xlvbd_cleanup();
-    free_irq(XLBLK_RESPONSE_IRQ, NULL);
-    free_irq(XLBLK_UPDATE_IRQ, NULL);
+    free_irq(xlblk_response_irq, NULL);
+    free_irq(xlblk_update_irq, NULL);
+    unbind_virq_from_irq(VIRQ_BLKDEV);
+    unbind_virq_from_irq(VIRQ_VBD_UPD);
 }
 
 

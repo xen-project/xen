@@ -14,18 +14,31 @@
 #include <asm/hypervisor.h>
 #include <asm/ptrace.h>
 
-#define NR_IRQS             256
+/*
+ * The flat IRQ space is divided into two regions:
+ *  1. A one-to-one mapping of real physical IRQs. This space is only used
+ *     if we have physical device-access privilege. This region is at the 
+ *     start of the IRQ space so that existing device drivers do not need
+ *     to be modified to translate physical IRQ numbers into our IRQ space.
+ *  3. A dynamic mapping of inter-domain and Xen-sourced virtual IRQs. These
+ *     are bound using the provided bind/unbind functions.
+ */
 
-#define PHYS_IRQ_BASE         0
-#define NR_PHYS_IRQS        128
+#define PIRQ_BASE   0
+#define NR_PIRQS  128
 
-#define HYPEREVENT_IRQ_BASE 128
-#define NR_HYPEREVENT_IRQS  128
+#define DYNIRQ_BASE (PIRQ_BASE + NR_PIRQS)
+#define NR_DYNIRQS  128
 
-#define HYPEREVENT_IRQ(_ev)       ((_ev)  + HYPEREVENT_IRQ_BASE)
-#define HYPEREVENT_FROM_IRQ(_irq) ((_irq) - HYPEREVENT_IRQ_BASE)
+#define NR_IRQS   (NR_PIRQS + NR_DYNIRQS)
 
 extern void physirq_init(void);
+
+/* Dynamic binding of event channels and VIRQ sources to Linux IRQ space. */
+extern int  bind_virq_to_irq(int virq);
+extern void unbind_virq_from_irq(int virq);
+extern int  bind_evtchn_to_irq(int evtchn);
+extern void unbind_evtchn_from_irq(int evtchn);
 
 #define irq_cannonicalize(_irq) (_irq)
 

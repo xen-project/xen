@@ -539,7 +539,6 @@ static void dispatch_rw_block_io(struct task_struct *p,
 static void make_response(struct task_struct *p, unsigned long id, 
 			  unsigned short op, unsigned long st)
 {
-    unsigned long cpu_mask;
     blk_ring_resp_entry_t *resp;
 
     /* Place on the response ring for the relevant domain. */ 
@@ -553,8 +552,7 @@ static void make_response(struct task_struct *p, unsigned long id,
     spin_unlock(&p->blk_ring_lock);
     
     /* Kick the relevant domain. */
-    cpu_mask = mark_guest_event(p, _EVENT_BLKDEV);
-    guest_event_notify(cpu_mask); 
+    send_guest_virq(p, VIRQ_BLKDEV);
 }
 
 static void dump_blockq(u_char key, void *dev_id, struct pt_regs *regs) 

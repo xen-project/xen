@@ -576,28 +576,16 @@ static long pci_find_irq(int seg, int bus, int dev, int func, u32 *val)
 static void phys_dev_interrupt(int irq, void *dev_id, struct pt_regs *ptregs)
 {
     phys_dev_t          *pdev;
-    struct task_struct  *p;
-    unsigned long cpu_mask = 0;
 
-    if ( !(pdev = (phys_dev_t *)dev_id) )
+    if ( (pdev = (phys_dev_t *)dev_id) == NULL )
     {
         printk("spurious interrupt, no proper device id, %d\n", irq);
         return;
     }
     
-    p = pdev->owner;
-
-    if ( test_bit(irq, &p->shared_info->physirq_pend) )
-    {
-        /* Some interrupt already delivered to guest */
-        return;
-    }
-
-    /* notify guest */
-    set_bit(irq, &p->shared_info->physirq_pend);
+    /* XXX KAF: introduced race here? */
     set_bit(ST_IRQ_DELIVERED, &pdev->state);
-    cpu_mask |= mark_guest_event(p, _EVENT_PHYSIRQ);
-    guest_event_notify(cpu_mask);
+    send_guest_pirq(pdev->owner, irq);
 }
 
 /* this is called instead of the PICs original end handler. 
@@ -767,11 +755,13 @@ static long pci_finished_irq(int irq)
         return -EINVAL;
     }
 
+#if 0 /* XXX KAF: do we need this? */
     if ( test_bit(irq, &current->shared_info->physirq_pend) )
     {
         printk("finished_irq called for un-acknowleged irq %d\n", irq);        
         return -EINVAL;
     }
+#endif
 
     clear_bit(ST_IRQ_DELIVERED, &pdev->state);
 

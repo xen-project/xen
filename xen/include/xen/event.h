@@ -6,110 +6,110 @@
  * Copyright (c) 2002, K A Fraser
  */
 
+#ifndef __XEN_EVENT_H__
+#define __XEN_EVENT_H__
+
 #include <xen/config.h>
 #include <xen/sched.h>
 #include <asm/bitops.h>
 
+/*
+ * GENERIC SCHEDULING CALLBACK MECHANISMS
+ */
+
+/* Schedule an asynchronous callback for the specified domain. */
+static inline void __guest_notify(struct task_struct *p)
+{
 #ifdef CONFIG_SMP
+    unsigned long flags, cpu_mask;
+
+    spin_lock_irqsave(&schedule_lock[p->processor], flags);
+    if ( p->state == TASK_INTERRUPTIBLE )
+        __wake_up(p);
+    cpu_mask = __reschedule(p);
+    if ( p->has_cpu )
+        cpu_mask |= 1 << p->processor;
+    spin_unlock_irqrestore(&schedule_lock[p->processor], flags);
+
+    cpu_mask &= ~(1 << smp_processor_id());
+    if ( cpu_mask != 0 )
+        smp_send_event_check_mask(cpu_mask);
+#else
+    if ( p->state == TASK_INTERRUPTIBLE )
+        wake_up(p);
+    reschedule(p);
+#endif
+}
+
+static inline void guest_notify(struct task_struct *p)
+{
+    /*
+     * Upcall already pending or upcalls masked?
+     * NB. Suitably synchronised on x86:
+     *  We must set the pending bit before checking the mask, but this is
+     *  guaranteed to occur because test_and_set_bit() is an ordering barrier.
+     */
+    if ( !test_and_set_bit(0, &p->shared_info->evtchn_upcall_pending) &&
+         !test_bit(0, &p->shared_info->evtchn_upcall_mask) )
+        __guest_notify(p);
+}
+
 
 /*
- * mark_guest_event:
- *  @p:        Domain to which event should be passed
- *  @event:    Event number
- *  RETURNS:   "Bitmask" of CPU on which process is currently running
- * 
- * Idea is that caller may loop on task_list, looking for domains
- * to pass events to (using this function). The caller accumulates the
- * bits returned by this function (ORing them together) then calls
- * event_notify().
- * 
- * Guest_events are per-domain events passed directly to the guest OS
- * in ring 1. 
+ * EVENT-CHANNEL NOTIFICATIONS
+ * NB. As in guest_notify, evtchn_set_* is suitably synchronised on x86.
  */
-static inline unsigned long mark_guest_event(struct task_struct *p, int event)
+
+static inline void evtchn_set_pending(struct task_struct *p, int port)
 {
-    unsigned long flags, cpu_mask;
-
-    if ( test_and_set_bit(event, &p->shared_info->events) )
-        return 0;
-
-    spin_lock_irqsave(&schedule_lock[p->processor], flags);
-    if ( p->state == TASK_INTERRUPTIBLE )
-        __wake_up(p);
-    cpu_mask = __reschedule(p);
-    if ( p->has_cpu )
-        cpu_mask |= 1 << p->processor;
-    spin_unlock_irqrestore(&schedule_lock[p->processor], flags);
-
-    return cpu_mask;
+    shared_info_t *s = p->shared_info;
+    if ( !test_and_set_bit(port,    &s->evtchn_pending[0]) &&
+         !test_bit        (port,    &s->evtchn_mask[0])    &&
+         !test_and_set_bit(port>>5, &s->evtchn_pending_sel) )
+        guest_notify(p);
 }
 
-/* As above, but hyp_events are handled within the hypervisor. */
-static inline unsigned long mark_hyp_event(struct task_struct *p, int event)
+static inline void evtchn_set_exception(struct task_struct *p, int port)
 {
-    unsigned long flags, cpu_mask;
-
-    if ( test_and_set_bit(event, &p->hyp_events) )
-        return 0;
-
-    spin_lock_irqsave(&schedule_lock[p->processor], flags);
-    if ( p->state == TASK_INTERRUPTIBLE )
-        __wake_up(p);
-    cpu_mask = __reschedule(p);
-    if ( p->has_cpu )
-        cpu_mask |= 1 << p->processor;
-    spin_unlock_irqrestore(&schedule_lock[p->processor], flags);
-
-    return cpu_mask;
+    shared_info_t *s = p->shared_info;
+    if ( !test_and_set_bit(port,    &s->evtchn_exception[0]) &&
+         !test_bit        (port,    &s->evtchn_mask[0])      &&
+         !test_and_set_bit(port>>5, &s->evtchn_exception_sel) )
+        guest_notify(p);
 }
 
-/* Notify the given set of CPUs that guest events may be outstanding. */
-static inline void guest_event_notify(unsigned long cpu_mask)
+/*
+ * send_guest_virq:
+ *  @p:        Domain to which virtual IRQ should be sent
+ *  @virq:     Virtual IRQ number (VIRQ_*)
+ */
+static inline void send_guest_virq(struct task_struct *p, int virq)
 {
-    cpu_mask &= ~(1 << smp_processor_id());
-    if ( cpu_mask != 0 ) smp_send_event_check_mask(cpu_mask);
+    evtchn_set_pending(p, p->virq_to_evtchn[virq]);
 }
 
-#else
-
-static inline unsigned long mark_guest_event(struct task_struct *p, int event)
+/*
+ * send_guest_pirq:
+ *  @p:        Domain to which physical IRQ should be sent
+ *  @pirq:     Physical IRQ number
+ */
+static inline void send_guest_pirq(struct task_struct *p, int pirq)
 {
-    if ( !test_and_set_bit(event, &p->shared_info->events) )
-    {
-        if ( p->state == TASK_INTERRUPTIBLE ) wake_up(p);
-        reschedule(p);
-    }
-    return 0;
+    evtchn_set_pending(p, p->pirq_to_evtchn[pirq]);
 }
 
-static inline unsigned long mark_hyp_event(struct task_struct *p, int event)
+
+/*
+ * HYPERVISOR-HANDLED EVENTS
+ */
+
+static inline void send_hyp_event(struct task_struct *p, int event)
 {
     if ( !test_and_set_bit(event, &p->hyp_events) )
-    {
-        if ( p->state == TASK_INTERRUPTIBLE ) wake_up(p);
-        reschedule(p);
-    }
-    return 0;
-}
-
-#define guest_event_notify(_mask) ((void)0)
-
-#endif
-
-/* Notify hypervisor events in thesame way as for guest OS events. */
-#define hyp_event_notify(_mask) guest_event_notify(_mask)
-
-/* Clear a guest-OS event from a per-domain mask. */
-static inline void clear_guest_event(struct task_struct *p, int event)
-{
-    clear_bit(event, &p->shared_info->events);
-}
-
-/* Clear a hypervisor event from a per-domain mask. */
-static inline void clear_hyp_event(struct task_struct *p, int event)
-{
-    clear_bit(event, &p->hyp_events);
+        __guest_notify(p);
 }
 
 /* Called on return from (architecture-dependent) entry.S. */
 void do_hyp_events(void);
+
+#endif /* __XEN_EVENT_H__ */

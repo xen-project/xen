@@ -86,11 +86,15 @@ cd ../..
 mv linux-${LINUX_VER} xenolinux-${LINUX_VER}
 cd xenolinux-${LINUX_VER}
 
-ARCH=xen make oldconfig
-ARCH=xen make dep
-ARCH=xen make bzImage
-ARCH=xen make dist || ARCH=xen make install
-ARCH=xen make modules
-ARCH=xen make INSTALL_MOD_PATH=${TOP}/install modules_install
+# cope with the change from ARCH=xeno to ARCH=xen
+cd arch; XEN=`/bin/ls -d xen*`; cd ..
+
+# built it all
+ARCH=$XEN make oldconfig
+ARCH=$XEN make dep
+ARCH=$XEN make bzImage
+ARCH=$XEN make dist || ARCH=xen make install
+ARCH=$XEN make modules
+ARCH=$XEN make INSTALL_MOD_PATH=${TOP}/install modules_install
 cd ..
 

@@ -217,7 +217,7 @@ void wake_up(struct task_struct *p)
 static long do_block(void)
 {
     ASSERT(current->domain != IDLE_DOMAIN_ID);
-    set_bit(EVENTS_MASTER_ENABLE_BIT, &current->shared_info->events_mask);
+    clear_bit(0, &current->shared_info->evtchn_upcall_mask);
     current->state = TASK_INTERRUPTIBLE;
     TRACE_2D(TRC_SCHED_BLOCK, current->domain, current);
     __enter_scheduler();
@@ -379,7 +379,7 @@ long sched_adjdom(struct sched_adjdom_cmd *cmd)
  */
 unsigned long __reschedule(struct task_struct *p)
 {
-       int cpu = p->processor;
+    int cpu = p->processor;
     struct task_struct *curr;
     s_time_t now, min_time;
 
@@ -413,9 +413,13 @@ void reschedule(struct task_struct *p)
 
     spin_lock_irqsave(&schedule_lock[p->processor], flags);
     cpu_mask = __reschedule(p);
-
     spin_unlock_irqrestore(&schedule_lock[p->processor], flags);
-    hyp_event_notify(cpu_mask);
+
+#ifdef CONFIG_SMP
+    cpu_mask &= ~(1 << smp_processor_id());
+    if ( cpu_mask != 0 )
+        smp_send_event_check_mask(cpu_mask);
+#endif
 }
 
 /* 
@@ -517,7 +521,7 @@ asmlinkage void __enter_scheduler(void)
 
     /* Mark a timer event for the newly-scheduled domain. */
     if ( !is_idle_task(next) )
-        set_bit(_EVENT_TIMER, &next->shared_info->events);
+        evtchn_set_pending(next, VIRQ_TIMER);
     
     schedule_tail(next);
 
@@ -556,8 +560,8 @@ static void t_timer_fn(unsigned long unused)
 
     TRACE_0D(TRC_SCHED_T_TIMER_FN);
 
-    if ( !is_idle_task(p) ) 
-        set_bit(_EVENT_TIMER, &p->shared_info->events);
+    if ( !is_idle_task(p) )
+        send_guest_virq(p, VIRQ_TIMER);
 
     t_timer[p->processor].expires = NOW() + MILLISECS(10);
     add_ac_timer(&t_timer[p->processor]);
@@ -566,13 +570,9 @@ static void t_timer_fn(unsigned long unused)
 /* Domain timer function, sends a virtual timer interrupt to domain */
 static void dom_timer_fn(unsigned long data)
 {
-    unsigned long cpu_mask = 0;
     struct task_struct *p = (struct task_struct *)data;
-
     TRACE_0D(TRC_SCHED_DOM_TIMER_FN);
-
-    cpu_mask |= mark_guest_event(p, _EVENT_TIMER);
-    guest_event_notify(cpu_mask);
+    send_guest_virq(p, VIRQ_TIMER);
 }
 
 

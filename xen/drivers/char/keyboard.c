@@ -193,7 +193,7 @@ static void keyboard_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 {
     unsigned char status=0, scancode;
     unsigned int work = 1000;
-    unsigned long cpu_mask = 0, flags;
+    unsigned long flags;
     struct task_struct *p = CONSOLE_OWNER;
 
     spin_lock_irqsave(&kbd_lock, flags);
@@ -227,7 +227,7 @@ static void keyboard_interrupt(int irq, void *dev_id, struct pt_regs *regs)
         if ( p != NULL )
         {
             kbd_ring_push(status, scancode);
-            cpu_mask |= mark_guest_event(p, _EVENT_PS2);
+            send_guest_virq(p, VIRQ_PS2);
         }
     }
     
@@ -237,10 +237,7 @@ static void keyboard_interrupt(int irq, void *dev_id, struct pt_regs *regs)
     spin_unlock_irqrestore(&kbd_lock, flags);
 
     if ( p != NULL )
-    {
         put_task_struct(p);
-        guest_event_notify(cpu_mask);
-    }
 }
     
     

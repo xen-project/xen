@@ -7,6 +7,7 @@
 #include <asm/segment.h>
 #include <asm/hypervisor.h>
 #include <linux/bitops.h> /* for LOCK_PREFIX */
+#include <asm/evtchn.h>
 
 #ifdef __KERNEL__
 
@@ -319,29 +320,38 @@ static inline unsigned long __cmpxchg(volatile void *ptr, unsigned long old,
 
 #define set_wmb(var, value) do { var = value; wmb(); } while (0)
 
+/*
+ * NB. ALl the following routines are SMP-safe on x86, even where they look
+ * possibly racy. For example, we must ensure that we clear the mask bit and
+ * /then/ check teh pending bit. But this will happen because the bit-update
+ * operations are ordering barriers.
+ * 
+ * For this reason also, many uses of 'barrier' here are rather anal. But
+ * they do no harm.
+ */
 
 #define __cli()                                                               \
 do {                                                                          \
-    clear_bit(EVENTS_MASTER_ENABLE_BIT, &HYPERVISOR_shared_info->events_mask);\
+    set_bit(0, &HYPERVISOR_shared_info->evtchn_upcall_mask);                  \
     barrier();                                                                \
 } while (0)
 
 #define __sti()                                                               \
 do {                                                                          \
     shared_info_t *_shared = HYPERVISOR_shared_info;                          \
-    set_bit(EVENTS_MASTER_ENABLE_BIT, &_shared->events_mask);                 \
+    clear_bit(0, &_shared->evtchn_upcall_mask);                               \
     barrier();                                                                \
-    if ( unlikely(_shared->events) ) do_hypervisor_callback(NULL);            \
+    if ( unlikely(test_bit(0, &_shared->evtchn_upcall_pending)) )             \
+        evtchn_do_upcall(NULL);                                               \
 } while (0)
 
 #define __save_flags(x)                                                       \
 do {                                                                          \
-    (x) = test_bit(EVENTS_MASTER_ENABLE_BIT,                                  \
-                   &HYPERVISOR_shared_info->events_mask);                     \
+    (x) = test_bit(0, &HYPERVISOR_shared_info->evtchn_upcall_mask);           \
     barrier();                                                                \
 } while (0)
 
-#define __restore_flags(x)      do { if (x) __sti(); } while (0)
+#define __restore_flags(x)      do { if (x) __cli(); else __sti(); } while (0)
 
 #define safe_halt()             ((void)0)
 
@@ -350,8 +360,7 @@ do {                                                                          \
 
 #define local_irq_save(x)                                                     \
 do {                                                                          \
-    (x) = test_and_clear_bit(EVENTS_MASTER_ENABLE_BIT,                        \
-                             &HYPERVISOR_shared_info->events_mask);           \
+    (x) = test_and_set_bit(0, &HYPERVISOR_shared_info->evtchn_upcall_mask);   \
     barrier();                                                                \
 } while (0)
 #define local_irq_restore(x)    __restore_flags(x)

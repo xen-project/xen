@@ -28,6 +28,7 @@
 #include <xen/init.h>
 #include <xen/module.h>
 #include <xen/event.h>
+#include <xen/shadow.h>
 #include <asm/domain_page.h>
 #include <asm/pgalloc.h>
 #include <asm/io.h>
@@ -488,11 +489,12 @@ struct netif_rx_stats netdev_rx_stat[NR_CPUS];
 void deliver_packet(struct sk_buff *skb, net_vif_t *vif)
 {
     rx_shadow_entry_t *rx;
-    unsigned long *ptep, pte; 
+    unsigned long *ptep, pte, new_pte; 
     struct pfn_info *old_page, *new_page, *pte_page;
     unsigned short size;
     unsigned char  offset, status = RING_STATUS_OK;
     struct task_struct *p = vif->domain;
+    unsigned long spte_pfn;
 
     memcpy(skb->mac.ethernet->h_dest, vif->vmac, ETH_ALEN);
     if ( ntohs(skb->mac.ethernet->h_proto) == ETH_P_ARP )
@@ -530,10 +532,12 @@ void deliver_packet(struct sk_buff *skb, net_vif_t *vif)
     wmb(); /* Get type count and set flush bit before updating PTE. */
 
     pte = *ptep;
+
+    new_pte = (pte & ~PAGE_MASK) | _PAGE_RW | _PAGE_PRESENT |
+                          ((new_page - frame_table) << PAGE_SHIFT);
+
     if ( unlikely(pte & _PAGE_PRESENT) || 
-         unlikely(cmpxchg(ptep, pte, 
-                          (pte & ~PAGE_MASK) | _PAGE_RW | _PAGE_PRESENT |
-                          ((new_page - frame_table) << PAGE_SHIFT))) != pte )
+         unlikely(cmpxchg(ptep, pte, new_pte)) != pte )
     {
         DPRINTK("PTE was modified or reused! %08lx %08lx\n", pte, *ptep);
         unmap_domain_mem(ptep);
@@ -541,6 +545,19 @@ void deliver_packet(struct sk_buff *skb, net_vif_t *vif)
         put_page_and_type(new_page);
         status = RING_STATUS_BAD_PAGE;
         goto out;
+    }
+
+    if ( p->mm.shadow_mode && 
+	 (spte_pfn=get_shadow_status(p, pte_page-frame_table)) )
+    {
+	unsigned long *sptr = map_domain_mem( (spte_pfn<<PAGE_SHIFT) |
+			(((unsigned long)ptep)&~PAGE_MASK) );
+
+        // avoid the fault later
+	*sptr = new_pte;
+
+	unmap_domain_mem(sptr);
+	put_shadow_status(p);
     }
 
     machine_to_phys_mapping[new_page - frame_table] 
@@ -2049,7 +2066,7 @@ static void get_rx_bufs(net_vif_t *vif)
     rx_shadow_entry_t *srx;
     unsigned long  pte_pfn, buf_pfn;
     struct pfn_info *pte_page, *buf_page;
-    unsigned long *ptep, pte;
+    unsigned long *ptep, pte, spfn;
 
     spin_lock(&vif->rx_lock);
 
@@ -2068,6 +2085,8 @@ static void get_rx_bufs(net_vif_t *vif)
 
         pte_pfn  = rx.addr >> PAGE_SHIFT;
         pte_page = &frame_table[pte_pfn];
+
+	//printk("MMM %08lx ", rx.addr);
             
         /* The address passed down must be to a valid PTE. */
         if ( unlikely(pte_pfn >= max_page) ||
@@ -2081,7 +2100,7 @@ static void get_rx_bufs(net_vif_t *vif)
         
         ptep = map_domain_mem(rx.addr);
         pte  = *ptep;
-        
+	//printk("%08lx\n",pte);        
         /* We must be passed a valid writeable mapping to swizzle. */
         if ( unlikely((pte & (_PAGE_PRESENT|_PAGE_RW)) != 
                       (_PAGE_PRESENT|_PAGE_RW)) ||
@@ -2092,6 +2111,17 @@ static void get_rx_bufs(net_vif_t *vif)
             make_rx_response(vif, rx.id, 0, RING_STATUS_BAD_PAGE, 0);
             goto rx_unmap_and_continue;
         }
+
+	if ( p->mm.shadow_mode && 
+	     (spfn=get_shadow_status(p, rx.addr>>PAGE_SHIFT)) )
+	  {
+	    unsigned long * sptr = 
+	      map_domain_mem( (spfn<<PAGE_SHIFT) | (rx.addr&~PAGE_MASK) );
+
+	    *sptr = 0;
+	    unmap_domain_mem( sptr );
+	    put_shadow_status(p);
+	  }
         
         buf_pfn  = pte >> PAGE_SHIFT;
         buf_page = &frame_table[buf_pfn];
@@ -2112,6 +2142,8 @@ static void get_rx_bufs(net_vif_t *vif)
             put_page_and_type(pte_page);
             make_rx_response(vif, rx.id, 0, RING_STATUS_BAD_PAGE, 0);
             goto rx_unmap_and_continue;
+
+	    // XXX IAP should SHADOW_CONFIG do something here?
         }
 
         /*
@@ -2335,10 +2367,7 @@ static void make_tx_response(net_vif_t     *vif,
 
     smp_mb(); /* Update producer before checking event threshold. */
     if ( i == vif->shared_idxs->tx_event )
-    {
-        unsigned long cpu_mask = mark_guest_event(vif->domain, _EVENT_NET);
-        guest_event_notify(cpu_mask);    
-    }
+        send_guest_virq(vif->domain, VIRQ_NET);
 }
 
 
@@ -2361,10 +2390,7 @@ static void make_rx_response(net_vif_t     *vif,
 
     smp_mb(); /* Update producer before checking event threshold. */
     if ( i == vif->shared_idxs->rx_event )
-    {
-        unsigned long cpu_mask = mark_guest_event(vif->domain, _EVENT_NET);
-        guest_event_notify(cpu_mask);    
-    }
+        send_guest_virq(vif->domain, VIRQ_NET);
 }
 
 

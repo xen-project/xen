@@ -18,6 +18,7 @@
 #include <asm/pdb.h>
 #include <xen/trace.h>
 #include <xen/console.h>
+#include <xen/shadow.h>
 #include <hypervisor-ifs/sched_ctl.h>
 
 extern unsigned int alloc_new_dom_mem(struct task_struct *, unsigned int);
@@ -491,6 +492,19 @@ long do_dom0_op(dom0_op_t *u_dom0_op)
                                         op->u.pcidev_access.dev,
                                         op->u.pcidev_access.func,
                                         op->u.pcidev_access.enable);
+    }
+    break;
+
+    case DOM0_SHADOW_CONTROL:
+    {
+        struct task_struct *p; 
+	
+	p = find_domain_by_id( op->u.shadow_control.domain );
+	if ( p )
+	{
+            ret = shadow_mode_control(p, op->u.shadow_control.op );
+	    put_task_struct(p);
+        }
     }
     break;
      

@@ -100,6 +100,7 @@ struct pfn_info
  /* 28-bit count of references to this frame. */
 #define PGC_count_mask                ((1<<28)-1)
 
+
 /* We trust the slab allocator in slab.c, and our use of it. */
 #define PageSlab(page)		(1)
 #define PageSetSlab(page)	((void)0)

@@ -51,13 +51,24 @@ struct task_struct;
 
 typedef struct event_channel_st
 {
-    struct task_struct *remote_dom;
-    u16                 remote_port;
-#define ECS_FREE         0 /* Available for use.                            */
-#define ECS_DISCONNECTED 1 /* Connection is closed. Remote is disconnected. */
-#define ECS_CONNECTED    2 /* Connected to remote end.                      */
-    u16                 state;
+#define ECS_FREE         0 /* Channel is available for use.                  */
+#define ECS_UNBOUND      1 /* Channel is not bound to a particular source.   */
+#define ECS_INTERDOMAIN  2 /* Channel is bound to another domain.            */
+#define ECS_PIRQ         3 /* Channel is bound to a physical IRQ line.       */
+#define ECS_VIRQ         4 /* Channel is bound to a virtual IRQ line.        */
+    u16 state;
+    union {
+        struct {
+            u16 port;
+            struct task_struct *dom;
+        } __attribute__ ((packed)) remote; /* state == ECS_CONNECTED */
+        u16 pirq; /* state == ECS_PIRQ */
+        u16 virq; /* state == ECS_VIRQ */
+    } u;
 } event_channel_t;
+
+int  init_event_channels(struct task_struct *p);
+void destroy_event_channels(struct task_struct *p);
 
 struct task_struct 
 {
@@ -144,6 +155,14 @@ struct task_struct
     event_channel_t *event_channel;
     unsigned int     max_event_channel;
     spinlock_t       event_channel_lock;
+
+    /*
+     * Interrupt to event-channel mappings. Updates should be protected by the 
+     * domain's event-channel spinlock. Read accesses can also synchronise on 
+     * the lock, but races don't usually matter.
+     */
+    u16 pirq_to_evtchn[64];
+    u16 virq_to_evtchn[NR_VIRQS];
 
     /* Physical I/O */
     spinlock_t       pcidev_lock;
@@ -272,8 +291,9 @@ static inline long schedule_timeout(long timeout)
 }
 
 #define signal_pending(_p) \
-    ((_p)->hyp_events ||   \
-     ((_p)->shared_info->events & (_p)->shared_info->events_mask))
+    (((_p)->hyp_events != 0) ||                                 \
+     (test_bit(0, &(_p)->shared_info->evtchn_upcall_pending) && \
+      !test_bit(0, &(_p)->shared_info->evtchn_upcall_mask)))
 
 void domain_init(void);
 

@@ -175,16 +175,16 @@ def daemon_loop():
             # getting clogged with stale connections.
             if type == notifier.DISCONNECT:
                 ret = xc.evtchn_status(idx)
-                if ret['status'] != 'connected':
+                if ret['status'] == 'interdomain':
                     notifier.clear(idx, notifier.NORMAL)
                     notifier.clear(idx, notifier.DISCONNECT)
                     if control_list.has_key(idx):
                         (port, rbuf, wbuf, con_if) =  control_list[idx]
                         con_if.close()
                         del control_list[idx], port, rbuf, wbuf, con_if
-                    elif ret['status'] == 'disconnected':
-                        # There's noone to do the closure for us...
-                        xc.evtchn_close(idx)
+                elif ret['status'] == 'unbound':
+                    # There's noone to do the closure for us...
+                    xc.evtchn_close(idx)
 
             # A standard notification: probably means there are messages to
             # read or that there is space to write messages.

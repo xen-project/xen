@@ -171,5 +171,5 @@ EXPORT_SYMBOL(xquad_portio);
 EXPORT_SYMBOL(create_xen_proc_entry);
 EXPORT_SYMBOL(remove_xen_proc_entry);
 
-EXPORT_SYMBOL(do_hypervisor_callback);
+EXPORT_SYMBOL(evtchn_do_upcall);
 EXPORT_SYMBOL(HYPERVISOR_shared_info);

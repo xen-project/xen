@@ -214,6 +214,22 @@ typedef struct dom0_pcidev_access_st
     int          enable;
 } dom0_pcidev_access_t;
 
+/* 
+ * Control shadow pagetables operation
+ */
+#define DOM0_SHADOW_CONTROL   24
+
+#define DOM0_SHADOW_CONTROL_OP_OFF         0
+#define DOM0_SHADOW_CONTROL_OP_ENABLE_TEST 1
+#define DOM0_SHADOW_CONTROL_OP_FLUSH       10
+typedef struct dom0_shadow_control_st
+{
+    /* IN variables. */
+    domid_t      domain;
+    int          op;
+} dom0_shadow_control_t;
+
+
 typedef struct dom0_op_st
 {
     unsigned long cmd;
@@ -239,6 +255,7 @@ typedef struct dom0_op_st
         dom0_gettbufs_t         gettbufs;
         dom0_physinfo_t         physinfo;
         dom0_pcidev_access_t    pcidev_access;
+	dom0_shadow_control_t   shadow_control;
     } u;
 } dom0_op_t;
 

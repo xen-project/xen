@@ -39,6 +39,7 @@
 #include <xen/spinlock.h>
 #include <xen/irq.h>
 #include <xen/perfc.h>
+#include <xen/shadow.h>
 #include <asm/domain_page.h>
 #include <asm/system.h>
 #include <asm/io.h>
@@ -205,7 +206,7 @@ static inline void do_trap(int trapnr, char *str,
     gtb->cs         = ti->cs;
     gtb->eip        = ti->address;
     if ( TI_GET_IF(ti) )
-        clear_bit(EVENTS_MASTER_ENABLE_BIT, &p->shared_info->events_mask);
+        set_bit(0, &p->shared_info->evtchn_upcall_mask);
     return; 
 
  fault_in_hypervisor:
@@ -276,7 +277,7 @@ asmlinkage void do_int3(struct pt_regs *regs, long error_code)
     gtb->cs         = ti->cs;
     gtb->eip        = ti->address;
     if ( TI_GET_IF(ti) )
-        clear_bit(EVENTS_MASTER_ENABLE_BIT, &p->shared_info->events_mask);
+        set_bit(0, &p->shared_info->evtchn_upcall_mask);
     return;
 
 }
@@ -323,6 +324,8 @@ asmlinkage void do_page_fault(struct pt_regs *regs, long error_code)
 
     __asm__ __volatile__ ("movl %%cr2,%0" : "=r" (addr) : );
 
+    perfc_incrc(page_faults);
+
     if ( unlikely(addr >= LDT_VIRT_START) && 
          (addr < (LDT_VIRT_START + (p->mm.ldt_ents*LDT_ENTRY_SIZE))) )
     {
@@ -336,6 +339,12 @@ asmlinkage void do_page_fault(struct pt_regs *regs, long error_code)
             return; /* successfully copied the mapping */
     }
 
+    if ( unlikely( p->mm.shadow_mode ) && addr < PAGE_OFFSET &&
+	 shadow_fault( addr, error_code ) )
+      {
+	return; // return true if fault was handled 
+      }
+
     if ( unlikely(!(regs->xcs & 3)) )
         goto fault_in_hypervisor;
 
@@ -346,14 +355,15 @@ asmlinkage void do_page_fault(struct pt_regs *regs, long error_code)
     gtb->cs         = ti->cs;
     gtb->eip        = ti->address;
     if ( TI_GET_IF(ti) )
-        clear_bit(EVENTS_MASTER_ENABLE_BIT, &p->shared_info->events_mask);
+        set_bit(0, &p->shared_info->evtchn_upcall_mask);
     return; 
 
  fault_in_hypervisor:
 
     if ( likely((fixup = search_exception_table(regs->eip)) != 0) )
     {
-        DPRINTK("Page fault: %08lx -> %08lx\n", regs->eip, fixup);
+        perfc_incrc(copy_user_faults);
+        //DPRINTK("copy_user fault: %08lx -> %08lx\n", regs->eip, fixup);
         regs->eip = fixup;
         regs->xds = regs->xes = regs->xfs = regs->xgs = __HYPERVISOR_DS;
         return;
@@ -434,7 +444,7 @@ asmlinkage void do_general_protection(struct pt_regs *regs, long error_code)
     gtb->cs         = ti->cs;
     gtb->eip        = ti->address;
     if ( TI_GET_IF(ti) )
-        clear_bit(EVENTS_MASTER_ENABLE_BIT, &p->shared_info->events_mask);
+        set_bit(0, &p->shared_info->evtchn_upcall_mask);
     return;
 
  gp_in_kernel:
