@@ -7,11 +7,6 @@
 #ifndef __PROC_CMD_H__
 #define __PROC_CMD_H__
 
-#define IOCTL_PRIVCMD_HYPERCALL        0
-#define IOCTL_PRIVCMD_BLKMSG           1
-#define IOCTL_PRIVCMD_LINDEV_TO_XENDEV 2
-#define IOCTL_PRIVCMD_XENDEV_TO_LINDEV 3
-
 typedef struct privcmd_hypercall
 {
     unsigned long op;
@@ -24,5 +19,14 @@ typedef struct privcmd_blkmsg
     void         *buf;
     int           buf_size;
 } privcmd_blkmsg_t;
+
+#define IOCTL_PRIVCMD_HYPERCALL        \
+    _IOC(_IOC_NONE, 'P', 0, sizeof(privcmd_hypercall_t))
+#define IOCTL_PRIVCMD_BLKMSG           \
+    _IOC(_IOC_NONE, 'P', 1, sizeof(privcmd_blkmsg_t))
+#define IOCTL_PRIVCMD_LINDEV_TO_XENDEV \
+    _IOC(_IOC_NONE, 'P', 2, sizeof(unsigned short))
+#define IOCTL_PRIVCMD_XENDEV_TO_LINDEV \
+    _IOC(_IOC_NONE, 'P', 3, sizeof(unsigned short))
 
 #endif /* __PROC_CMD_H__ */

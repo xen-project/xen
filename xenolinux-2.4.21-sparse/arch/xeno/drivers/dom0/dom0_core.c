@@ -47,8 +47,10 @@ static int privcmd_ioctl(struct inode *inode, struct file *file,
     case IOCTL_PRIVCMD_HYPERCALL:
     {
         privcmd_hypercall_t hypercall;
+  
         if ( copy_from_user(&hypercall, (void *)data, sizeof(hypercall)) )
             return -EFAULT;
+
         __asm__ __volatile__ (
             "pushl %%ebx; pushl %%ecx; pushl %%edx; pushl %%esi; pushl %%edi; "
             "movl  4(%%eax),%%ebx ;"
@@ -68,34 +70,47 @@ static int privcmd_ioctl(struct inode *inode, struct file *file,
         privcmd_blkmsg_t blkmsg;
         char            *kbuf;
         int              ret;
+  
         if ( copy_from_user(&blkmsg, (void *)data, sizeof(blkmsg)) )
             return -EFAULT;
+  
         if ( blkmsg.buf_size > PAGE_SIZE )
             return -EINVAL;
+  
         if ( (kbuf = kmalloc(blkmsg.buf_size, GFP_KERNEL)) == NULL )
             return -ENOMEM;
+  
         if ( copy_from_user(kbuf, blkmsg.buf, blkmsg.buf_size) ) {
             kfree(kbuf);
             return -EFAULT;
         }
+  
         ret = xenolinux_control_msg((int)blkmsg.op, kbuf, blkmsg.buf_size);
         if ( ret != 0 ) {
             kfree(kbuf);
             return ret;
         }
+  
         if ( copy_to_user(blkmsg.buf, kbuf, blkmsg.buf_size) ) {
             kfree(kbuf);
             return -EFAULT;
         }
+  
         kfree(kbuf);
     }
     break;
     
     case IOCTL_PRIVCMD_LINDEV_TO_XENDEV:
+    {
         ret = (int)xldev_to_physdev((kdev_t)data);
+    }
+    break;
 
     case IOCTL_PRIVCMD_XENDEV_TO_LINDEV:
+    {
         ret = (int)physdev_to_xldev((unsigned short)data);
+    }
+    break;
 
     default:
     {

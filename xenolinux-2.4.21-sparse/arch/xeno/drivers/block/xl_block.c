@@ -507,9 +507,7 @@ static void xlblk_response_int(int irq, void *dev_id, struct pt_regs *ptregs)
         case XEN_BLOCK_PROBE_BLK:
 	case XEN_BLOCK_PHYSDEV_GRANT:
 	case XEN_BLOCK_PHYSDEV_PROBE:
-            if ( bret->status )
-                printk(KERN_ALERT "Bad return from blkdev control request\n");
-            xlblk_control_msg_pending = 0;
+            xlblk_control_msg_pending = bret->status;
             break;
 	  
         default:
@@ -547,19 +545,19 @@ int xenolinux_control_msg(int operation, char *buffer, int size)
     if ( aligned_buf == NULL ) BUG();
     memcpy(aligned_buf, buffer, size);
 
-    xlblk_control_msg_pending = 1;
+    xlblk_control_msg_pending = 2;
     spin_lock_irqsave(&io_request_lock, flags);
     /* Note that size gets rounded up to a sector-sized boundary. */
     if ( hypervisor_request(0, operation, aligned_buf, 0, (size+511)/512, 0) )
         return -EAGAIN;
     signal_requests_to_xen();
     spin_unlock_irqrestore(&io_request_lock, flags);
-    while ( xlblk_control_msg_pending ) barrier();
+    while ( xlblk_control_msg_pending == 2 ) barrier();
 
     memcpy(buffer, aligned_buf, size);
     free_page((unsigned long)aligned_buf);
     
-    return 0;
+    return xlblk_control_msg_pending ? -EINVAL : 0;
 }
 
 
