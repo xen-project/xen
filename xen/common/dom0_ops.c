@@ -65,11 +65,7 @@ long do_dom0_op(dom0_op_t *u_dom0_op)
     {
         struct task_struct * p = find_domain_by_id(op.u.meminfo.domain);
         if ( (ret = final_setup_guestos(p, &op.u.meminfo)) != 0 )
-        {
-            p->state = TASK_DYING;
-            release_task(p);
             break;
-        }
         wake_up(p);
         reschedule(p);
         ret = p->domain;
@@ -83,13 +79,21 @@ long do_dom0_op(dom0_op_t *u_dom0_op)
         static unsigned int pro = 0;
         unsigned int dom = get_domnr();
         ret = -ENOMEM;
-        if ( dom == 0 ) break;
+
+        if ( dom == 0 ) 
+            break;
+
         pro = (pro+1) % smp_num_cpus;
         p = do_newdomain(dom, pro);
-        if ( p == NULL ) break;
+        if ( p == NULL ) 
+            break;
 
         ret = alloc_new_dom_mem(p, op.u.newdomain.memory_kb);
-        if ( ret != 0 ) break;
+        if ( ret != 0 ) 
+        {
+            __kill_domain(p);
+            break;
+        }
 
         build_page_list(p);
         

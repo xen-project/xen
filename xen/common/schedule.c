@@ -107,7 +107,7 @@ static inline int __task_on_runqueue(struct task_struct *p)
 ******************************************************************************/
 void sched_add_domain(struct task_struct *p) 
 {
-    p->state       = TASK_UNINTERRUPTIBLE;
+    p->state       = TASK_SUSPENDED;
     p->mcu_advance = 10;
 
     if (p->domain == IDLE_DOMAIN_ID) {

@@ -43,6 +43,30 @@ static void dbstatus(char * msg)
     printf("Domain Builder: %s\n", msg);
 }
 
+static int do_kill_domain(int dom_id, int force)
+{
+    char cmd_path[MAX_PATH];
+    dom0_op_t dop;
+    int cmd_fd;
+
+    dop.cmd = DOM0_KILLDOMAIN;
+    dop.u.killdomain.domain = dom_id;
+    dop.u.killdomain.force  = force;
+
+    /* open the /proc command interface */
+    sprintf(cmd_path, "%s%s%s%s", "/proc/", PROC_XENO_ROOT, "/", PROC_CMD);
+    cmd_fd = open(cmd_path, O_WRONLY);
+    if(cmd_fd < 0){
+        perror(PERR_STRING);
+        return -1;
+    }
+
+    write(cmd_fd, &dop, sizeof(dom0_op_t));
+    close(cmd_fd);
+
+    return 0;
+}
+
 /* clean up domain's memory allocations */
 static void dom_mem_cleanup(dom_mem_t * dom_mem)
 {
@@ -162,7 +186,7 @@ static dom0_newdomain_t * create_new_domain(long req_mem)
 
     sprintf(dom_id_path, "%s%s%s%s", "/proc/", PROC_XENO_ROOT, "/", 
         PROC_DOM_DATA);
-    while((id_fd = open(dom_id_path, O_RDONLY)) < 0){}
+    while((id_fd = open(dom_id_path, O_RDONLY)) < 0) continue;
     dom_data = (dom0_newdomain_t *)malloc(sizeof(dom0_newdomain_t));
     read(id_fd, dom_data, sizeof(dom0_newdomain_t));
     close(id_fd);
@@ -445,20 +469,18 @@ int main(int argc, char **argv)
     if(argc < 4) {
         dberr("Usage: dom_builder <kbytes_mem> <image> <num_vifs> "
 	      "[<initrd=initrd_name>] <boot_params>\n");
-        goto out;
+        return -1;
     }
 
     /* create new domain and set up all the neccessary mappings */
 
     kernel_fd = do_kernel_chcks(argv[2], atol(argv[1]), &load_addr, &ksize);
-    if(kernel_fd < 0) {
-	rc = errno; 
-        goto out;
-    }
+    if(kernel_fd < 0)
+	return -1;
     
     /* request the creation of new domain */
     if(!(dom_data = create_new_domain(atol(argv[1])))) 
-        goto out;
+        return -1;
 
     /* map domain's memory */
     if(map_dom_mem(dom_data->pg_head, dom_data->memory_kb >> (PAGE_SHIFT-10), 
@@ -520,7 +542,13 @@ int main(int argc, char **argv)
     
 out:
     if( rc >= 0 )
-       return meminfo->domain;
+    {
+        return meminfo->domain;
+    }
     else 
-       return rc;
+    {
+        if ( dom_data->domain != 0 )
+            do_kill_domain(dom_data->domain, 1);
+        return rc;
+    }
 }

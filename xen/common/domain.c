@@ -37,7 +37,7 @@ struct task_struct *do_newdomain(unsigned int dom_id, unsigned int cpu)
 
     retval = -ENOMEM;
     p = alloc_task_struct();
-    if (!p) goto newdomain_out;
+    if ( p == NULL ) return NULL;
     memset(p, 0, sizeof(*p));
 
     atomic_set(&p->refcnt, 1);
@@ -75,9 +75,9 @@ struct task_struct *do_newdomain(unsigned int dom_id, unsigned int cpu)
     SET_LINKS(p);
     write_unlock_irqrestore(&tasklist_lock, flags);
 
- newdomain_out:
     return(p);
 }
+
 
 /* Get a pointer to the specified domain.  Consider replacing this
  * with a hash lookup later.
@@ -110,33 +110,45 @@ void kill_domain_with_errmsg(const char *err)
 }
 
 
-/* Kill the currently executing domain. */
-void kill_domain(void)
+void __kill_domain(struct task_struct *p)
 {
     struct list_head *ent;
     net_vif_t *vif;
 
-    if ( current->domain == 0 )
+    if ( p->domain == 0 )
     {
         extern void machine_restart(char *);
         printk("Domain 0 killed: rebooting machine!\n");
         machine_restart(0);
     }
 
-    printk("Killing domain %d\n", current->domain);
+    printk("Killing domain %d\n", p->domain);
 
-    sched_rem_domain(current);
+    sched_rem_domain(p);
 
-    unlink_blkdev_info(current);
+    unlink_blkdev_info(p);
 
-    while ( (ent = current->net_vifs.next) != &current->net_vifs )
+    while ( (ent = p->net_vifs.next) != &p->net_vifs )
     {
         vif = list_entry(ent, net_vif_t, dom_list);
         unlink_net_vif(vif);
     }    
-    
-    schedule();
-    BUG(); /* never get here */
+
+    if ( p == current )
+    {
+        schedule();
+        BUG(); /* never get here */
+    }
+    else
+    {
+        free_task_struct(p);
+    }
+}
+
+
+void kill_domain(void)
+{
+    __kill_domain(current);
 }
 
 
@@ -148,7 +160,11 @@ long kill_other_domain(unsigned int dom, int force)
     p = find_domain_by_id(dom);
     if ( p == NULL ) return -ESRCH;
 
-    if ( force )
+    if ( p->state == TASK_SUSPENDED )
+    {
+        __kill_domain(p);
+    }
+    else if ( force )
     {
         cpu_mask = mark_hyp_event(p, _HYP_EVENT_DIE);
         hyp_event_notify(cpu_mask);
