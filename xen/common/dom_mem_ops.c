@@ -25,8 +25,8 @@
 
 #define PREEMPT_CHECK(_op)                          \
     if ( hypercall_preempt_check() )                \
-        return hypercall_create_continuation(       \
-            __HYPERVISOR_dom_mem_op, 5,             \
+        return hypercall5_create_continuation(      \
+            __HYPERVISOR_dom_mem_op,                \
             (_op) | (i << START_EXTENT_SHIFT),      \
             extent_list, nr_extents, extent_order,  \
             (d == current->domain) ? DOMID_SELF : d->id);

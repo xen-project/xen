@@ -791,8 +791,8 @@ long do_set_trap_table(trap_info_t *traps)
         if ( hypercall_preempt_check() )
         {
             UNLOCK_BIGLOCK(current->domain);
-            return hypercall_create_continuation(
-                __HYPERVISOR_set_trap_table, 1, traps);
+            return hypercall1_create_continuation(
+                __HYPERVISOR_set_trap_table, traps);
         }
 
         if ( copy_from_user(&cur, traps, sizeof(cur)) ) return -EFAULT;

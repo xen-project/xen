@@ -1378,8 +1378,8 @@ int do_mmu_update(
     {
         if ( hypercall_preempt_check() )
         {
-            rc = hypercall_create_continuation(
-                __HYPERVISOR_mmu_update, 3, ureqs, 
+            rc = hypercall3_create_continuation(
+                __HYPERVISOR_mmu_update, ureqs, 
                 (count - i) |
                 (FOREIGNDOM->id << MMU_UPDATE_PREEMPT_FDOM_SHIFT) | 
                 MMU_UPDATE_PREEMPTED, pdone);
