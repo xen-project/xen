@@ -292,7 +292,7 @@ long do_console_io(int cmd, int count, char *buffer)
     char *kbuf;
     long  rc;
 
-#ifdef NDEBUG
+#ifndef VERBOSE
     /* Only domain-0 may access the emergency console. */
     if ( current->domain != 0 )
         return -EPERM;
