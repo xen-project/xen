@@ -165,11 +165,11 @@ create_bounce_frame:
         testb $TF_kernel_mode,EDOMAIN_thread_flags(%rbx)
         jnz   1f
         /* Push new frame at registered guest-OS stack base. */
-        movq  EDOMAIN_kernel_sp(%rbx),%rsi
         pushq %rdx
         movq  %rbx,%rdi
         call  SYMBOL_NAME(toggle_guest_mode)
         popq  %rdx
+        movq  EDOMAIN_kernel_sp(%rbx),%rsi
         jmp   2f
 1:      /* In kernel context already: push new frame at existing %rsp. */
         movq  XREGS_rsp+8(%rsp),%rsi

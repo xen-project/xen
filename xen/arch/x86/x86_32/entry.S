@@ -299,23 +299,15 @@ process_softirqs:
                 
 /* CREATE A BASIC EXCEPTION FRAME ON GUEST OS (RING-1) STACK:            */
 /*   {EIP, CS, EFLAGS, [ESP, SS]}                                        */
-/* %edx == trap_bounce, %ebx == task_struct                              */
+/* %edx == trap_bounce, %ebx == struct exec_domain                       */
 /* %eax,%ecx are clobbered. %gs:%esi contain new XREGS_ss/XREGS_esp. */
 create_bounce_frame:
         movl XREGS_eflags+4(%esp),%ecx
         movb XREGS_cs+4(%esp),%cl
         testl $(2|X86_EFLAGS_VM),%ecx
         jz   ring1 /* jump if returning to an existing ring-1 activation */
-        /* obtain ss/esp from TSS -- no current ring-1 activations */
-        movl EDOMAIN_processor(%ebx),%eax
-        /* next 4 lines multiply %eax by 8320, which is sizeof(tss_struct) */
-        movl %eax, %ecx
-        shll $7, %ecx
-        shll $13, %eax
-        addl %ecx,%eax
-        addl $init_tss + 12,%eax
-        movl (%eax),%esi /* tss->esp1 */
-FLT6:   movl 4(%eax),%gs /* tss->ss1  */
+        movl EDOMAIN_kernel_sp(%ebx),%esi
+FLT6:   movl EDOMAIN_kernel_ss(%ebx),%gs
         testl $X86_EFLAGS_VM,XREGS_eflags+4(%esp)
         jz   nvm86_1
         subl $16,%esi       /* push ES/DS/FS/GS (VM86 stack frame) */
