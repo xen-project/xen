@@ -441,34 +441,41 @@ void cciss_probe_devices(xen_disk_info_t *xdi)
     drive_info_struct *drv; 
     xen_disk_t *xd = &xdi->disks[xdi->count];
 
-    ctlr = 0;  /* XXX SMH: only deal with 1 controller for now */
 
-    /* Loop through each real device */ 
-    for(i=0; i < NWD; i++) {
+    for(ctlr = 0; ctlr < MAX_CTLR; ctlr++) { 
+
+	if(hba[ctlr] != NULL) { 
+
+	    /* Loop through each real device */ 
+	    for(i=0; i < NWD; i++) {
+		
+		drv = &(hba[ctlr]->drv[i]);
+		
+		if (!(drv->nr_blocks))
+		    continue;
+		
+		if ( xdi->count == xdi->max )
+		    BUG();
 	
-        drv = &(hba[ctlr]->drv[i]);
 	
-	if (!(drv->nr_blocks))
-            continue;
+		hba[ctlr]->hd[i << NWD_SHIFT].nr_sects = 
+		    hba[ctlr]->sizes[i << NWD_SHIFT] = drv->nr_blocks;
 	
-	if ( xdi->count == xdi->max )
-	    BUG();
+		/* We export 'raw' linux device numbers to domain 0. */
+		xd->device   = MKDEV(hba[ctlr]->major, i << 4); 
+		xd->info     = XD_TYPE_DISK;   /* XXX should check properly  */
+		xd->capacity = drv->nr_blocks; /* number of 512 byte sectors */
+		xd->domain   = 0;
+		
+		xdi->count++;
+		xd++;
 	
-	
-	hba[ctlr]->hd[i << NWD_SHIFT].nr_sects = 
-	    hba[ctlr]->sizes[i << NWD_SHIFT] = drv->nr_blocks;
-	
-	/* We export 'raw' linux device numbers to domain 0. */
-	xd->device   = MKDEV(hba[ctlr]->major, i << 4); 
-	xd->info     = XD_TYPE_DISK;   /* XXX should check properly   */
-        xd->capacity = drv->nr_blocks; /* in terms of 512byte sectors */
-	xd->domain   = 0;
-	
-	xdi->count++;
-        xd++;
-	
+	    }
+
+	}
     }
 
+    return; 
 }
 
 /*
