@@ -9,6 +9,7 @@ from xen.xend import sxp
 from xen.xend import Vifctl
 from xen.xend.XendError import XendError
 from xen.xend.XendLogging import log
+from xen.xend import XendVnet
 
 import channel
 import controller
@@ -176,6 +177,9 @@ class NetDev(controller.Dev):
         """Bring the device up or down.
         """
         Vifctl.vifctl(op, **self.vifctl_params(vmname=vmname))
+        vnet = XendVnet.instance().vnet_of_bridge(self.bridge)
+        if vnet:
+            vnet.vifctl(op, self.get_vifname(), self.get_mac())
 
     def destroy(self):
         """Destroy the device's resources and disconnect from the back-end
