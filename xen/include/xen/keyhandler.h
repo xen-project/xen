@@ -4,12 +4,13 @@
 ** debug flag, dump registers, reboot, etc) to be hooked in in a slightly
 ** nicer fashion than just editing the serial/keyboard drivers. 
 */
-#include <xen/sched.h>
+struct xen_regs;
 
 typedef void key_handler(unsigned char key);
 
 extern void add_key_handler(unsigned char key, 
 			    key_handler *handler, char *desc); 
+extern void add_key_handler_no_defer(unsigned char key, 
+                                     key_handler *handler, char *desc); 
 
-extern void handle_keypress(unsigned char key);
-
+extern void handle_keypress(unsigned char key, struct xen_regs *regs);

@@ -247,7 +247,7 @@ static void __serial_rx(unsigned char c, struct xen_regs *regs)
 {
     if ( xen_rx )
     {
-        handle_keypress(c);
+        handle_keypress(c, regs);
     }
     else if ( (serial_rx_prod-serial_rx_cons) != SERIAL_RX_SIZE )
     {
