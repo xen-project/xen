@@ -24,6 +24,8 @@
 #ifndef __XEN_GRANT_H__
 #define __XEN_GRANT_H__
 
+#include <xen/config.h>
+#include <xen/mm.h>
 #include <hypervisor-ifs/grant_table.h>
 
 /* Active grant entry - used for shadowing GTF_permit_access grants. */
@@ -65,10 +67,19 @@ typedef struct {
 } grant_table_t;
 
 /* Start-of-day system initialisation. */
-void grant_table_init(void);
+void grant_table_init(
+    void);
 
 /* Create/destroy per-domain grant table context. */
-int  grant_table_create(struct domain *d);
-void grant_table_destroy(struct domain *d);
+int grant_table_create(
+    struct domain *d);
+void grant_table_destroy(
+    struct domain *d);
+
+/* Create/destroy host-CPU mappings via a grant-table entry. */
+int gnttab_try_map(
+    struct domain *rd, struct domain *ld, struct pfn_info *page, int readonly);
+int gnttab_try_unmap(
+    struct domain *rd, struct domain *ld, struct pfn_info *page, int readonly);
 
 #endif /* __XEN_GRANT_H__ */

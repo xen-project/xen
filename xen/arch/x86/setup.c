@@ -411,7 +411,7 @@ void __init start_of_day(void)
     clear_bit(smp_processor_id(), &wait_init_idle);
     smp_threads_ready = 1;
     smp_commence(); /* Tell other CPUs that state of the world is stable. */
-    while (wait_init_idle) 
+    while ( wait_init_idle != 0 )
     {
         cpu_relax();
         barrier();

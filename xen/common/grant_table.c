@@ -24,6 +24,13 @@
 #include <xen/config.h>
 #include <xen/sched.h>
 
+#define PIN_FAIL(_rc, _f, _a...)   \
+    do {                           \
+        DPRINTK( _f, ## _a );      \
+        rc = -(_rc);               \
+        goto out;                  \
+    } while ( 0 )
+
 static inline void
 check_tlb_flush(
     active_grant_entry_t *a)
@@ -70,6 +77,7 @@ gnttab_update_pin_status(
     active_grant_entry_t *act;
     grant_entry_t *sha;
     long           rc = 0;
+    unsigned long  frame;
 
     ld = current;
 
@@ -93,14 +101,19 @@ gnttab_update_pin_status(
         return -EINVAL;
     }
 
-    if ( unlikely((rd = find_domain_by_id(dom)) == NULL) )
+    if ( unlikely((rd = find_domain_by_id(dom)) == NULL) ||
+         unlikely(ld == rd) )
     {
+        if ( rd != NULL )
+            put_domain(rd);
         DPRINTK("Could not find domain %d\n", dom);
         return -ESRCH;
     }
 
     act = &rd->grant_table->active[ref];
     sha = &rd->grant_table->shared[ref];
+
+    spin_lock(&rd->grant_table->lock);
 
     if ( act->status == 0 )
     {
@@ -118,23 +131,17 @@ gnttab_update_pin_status(
 
             if ( unlikely((sflags & GTF_type_mask) != GTF_permit_access) ||
                  unlikely(sdom != ld->domain) )
-            {
-                DPRINTK("Bad flags (%x) or dom (%d). (NB. expected dom %d)\n",
+                PIN_FAIL(EINVAL,
+                         "Bad flags (%x) or dom (%d). (NB. expected dom %d)\n",
                         sflags, sdom, ld->domain);
-                rc = -EINVAL;
-                goto out;
-            }
 
             sflags |= GTF_reading;
             if ( !(pin_flags & GNTPIN_readonly) )
             {
                 sflags |= GTF_writing;
                 if ( unlikely(sflags & GTF_readonly) )
-                {
-                    DPRINTK("Attempt to write-pin a read-only grant entry.\n");
-                    rc = -EINVAL;
-                    goto out;
-                }
+                    PIN_FAIL(EINVAL,
+                             "Attempt to write-pin a r/o grant entry.\n");
             }
 
             /* Merge two 16-bit values into a 32-bit combined update. */
@@ -144,11 +151,8 @@ gnttab_update_pin_status(
             /* NB. prev_sflags is updated in place to seen value. */
             if ( unlikely(cmpxchg_user((u32 *)&sha->flags, prev_scombo, 
                                        prev_scombo | GTF_writing)) )
-            {
-                DPRINTK("Fault while modifying shared flags and domid.\n");
-                rc = -EINVAL;
-                goto out;
-            }
+                PIN_FAIL(EINVAL,
+                         "Fault while modifying shared flags and domid.\n");
 
             /* Did the combined update work (did we see what we expected?). */
             if ( prev_scombo == scombo )
@@ -161,10 +165,22 @@ gnttab_update_pin_status(
         }
 
         /* rmb(); */ /* not on x86 */
+        frame = sha->frame;
+        if ( unlikely(!pfn_is_ram(frame)) || 
+             unlikely(!((pin_flags & GNTPIN_readonly) ? 
+                        get_page(&frame_table[frame], rd) : 
+                        get_page_and_type(&frame_table[frame], rd, 
+                                          PGT_writable_page))) )
+        {
+            clear_bit(_GTF_writing, &sha->flags);
+            clear_bit(_GTF_reading, &sha->flags);
+            PIN_FAIL(EINVAL, 
+                     "Could not pin the granted frame!\n");
+        }
 
         act->status = pin_flags;
         act->domid  = sdom;
-        act->frame  = sha->frame;
+        act->frame  = frame;
 
         make_entry_mappable(rd->grant_table, act);
     }
@@ -174,11 +190,13 @@ gnttab_update_pin_status(
 
         if ( unlikely((act->status & 
                        (GNTPIN_wmap_mask|GNTPIN_rmap_mask)) != 0) )
-        {
-            DPRINTK("Attempt to deactivate a mapped g.e. (%x)\n", act->status);
-            rc = -EINVAL;
-            goto out;
-        }
+            PIN_FAIL(EINVAL,
+                     "Attempt to deactiv a mapped g.e. (%x)\n", act->status);
+
+        frame = act->frame;
+        if ( !(act->status & GNTPIN_readonly) )
+            put_page_type(&frame_table[frame]);
+        put_page(&frame_table[frame]);
 
         act->status = 0;
         make_entry_unmappable(rd->grant_table, act);
@@ -199,12 +217,9 @@ gnttab_update_pin_status(
              (unlikely((act->status & GNTPIN_wmap_mask) != 0) ||
               (((pin_flags & GNTPIN_host_accessible) == 0) &&
                unlikely((act->status & GNTPIN_rmap_mask) != 0))) )
-        {
-            DPRINTK("Attempt to reduce pinning of a mapped g.e. (%x,%x)\n",
+            PIN_FAIL(EINVAL,
+                     "Attempt to reduce pinning of a mapped g.e. (%x,%x)\n",
                     pin_flags, act->status);
-            rc = -EINVAL;
-            goto out;
-        }
 
         /* Check for changes to host accessibility. */
         if ( pin_flags & GNTPIN_host_accessible )
@@ -220,6 +235,7 @@ gnttab_update_pin_status(
         {
             if ( !(act->status & GNTPIN_readonly) )
             {
+                put_page_type(&frame_table[act->frame]);
                 check_tlb_flush(act);
                 clear_bit(_GTF_writing, &sha->flags);
             }
@@ -231,20 +247,19 @@ gnttab_update_pin_status(
                 prev_sflags = sflags;
 
                 if ( unlikely(prev_sflags & GTF_readonly) )
-                {
-                    DPRINTK("Attempt to write-pin a read-only grant entry.\n");
-                    rc = -EINVAL;
-                    goto out;
-                }
-                
+                    PIN_FAIL(EINVAL,
+                             "Attempt to write-pin a r/o grant entry.\n");
+
+                if ( unlikely(!get_page_type(&frame_table[act->frame],
+                                             PGT_writable_page)) )
+                    PIN_FAIL(EINVAL,
+                             "Attempt to write-pin a unwritable page.\n");
+
                 /* NB. prev_sflags is updated in place to seen value. */
                 if ( unlikely(cmpxchg_user(&sha->flags, prev_sflags, 
                                            prev_sflags | GTF_writing)) )
-                {
-                    DPRINTK("Fault while modifying shared flags.\n");
-                    rc = -EINVAL;
-                    goto out;
-                }
+                    PIN_FAIL(EINVAL,
+                             "Fault while modifying shared flags.\n");
             }
             while ( prev_sflags != sflags );
         }
@@ -261,6 +276,7 @@ gnttab_update_pin_status(
     (void)__put_user(act->frame, &uop->host_phys_addr);
 
  out:
+    spin_unlock(&rd->grant_table->lock);
     put_domain(rd);
     return rc;
 }
@@ -287,6 +303,20 @@ do_grant_table_op(
     }
 
     return rc;
+}
+
+int
+gnttab_try_map(
+    struct domain *rd, struct domain *ld, struct pfn_info *page, int readonly)
+{
+    return 0;
+}
+
+int
+gnttab_try_unmap(
+    struct domain *rd, struct domain *ld, struct pfn_info *page, int readonly)
+{
+    return 0;
 }
 
 int 
@@ -318,6 +348,7 @@ grant_table_create(
     SHARE_PFN_WITH_DOMAIN(virt_to_page(t->shared), d);
 
     /* Okay, install the structure. */
+    wmb(); /* avoid races with lock-free access to d->grant_table */
     d->grant_table = t;
     return 0;
 

@@ -87,9 +87,11 @@ struct pfn_info
  /* Cleared when the owning guest 'frees' this page. */
 #define _PGC_allocated                29
 #define PGC_allocated                 (1<<_PGC_allocated)
- /* 28-bit count of references to this frame. */
-#define PGC_count_mask                ((1<<29)-1)
-
+ /* This bit is always set, guaranteeing that the count word is never zero. */
+#define _PGC_always_set               28
+#define PGC_always_set                (1<<_PGC_always_set)
+ /* 27-bit count of references to this frame. */
+#define PGC_count_mask                ((1<<28)-1)
 
 /* We trust the slab allocator in slab.c, and our use of it. */
 #define PageSlab(page)		(1)
@@ -106,7 +108,8 @@ struct pfn_info
         wmb(); /* install valid domain ptr before updating refcnt. */       \
         spin_lock(&(_dom)->page_alloc_lock);                                \
         /* _dom holds an allocation reference */                            \
-        (_pfn)->u.inuse.count_info = PGC_allocated | 1;                     \
+        ASSERT((_pfn)->u.inuse.count_info == PGC_always_set);               \
+        (_pfn)->u.inuse.count_info |= PGC_allocated | 1;                    \
         if ( unlikely((_dom)->xenheap_pages++ == 0) )                       \
             get_knownalive_domain(_dom);                                    \
         list_add_tail(&(_pfn)->list, &(_dom)->xenpage_list);                \
@@ -150,10 +153,8 @@ static inline int get_page(struct pfn_info *page,
              unlikely((nx & PGC_count_mask) == 0) || /* Count overflow? */
              unlikely(p != domain) )                 /* Wrong owner? */
         {
-            DPRINTK("Error pfn %08lx: ed=%p(%u), sd=%p(%u),"
-                    " caf=%08x, taf=%08x\n",
-                    page_to_pfn(page), domain, domain->domain,
-                    p, (p && !((x & PGC_count_mask) == 0))?p->domain:999, 
+            DPRINTK("Error pfn %08lx: ed=%p, sd=%p, caf=%08x, taf=%08x\n",
+                    page_to_pfn(page), domain, p,
                     x, page->u.inuse.type_info);
             return 0;
         }
@@ -364,26 +365,21 @@ void ptwr_reconnect_disconnected(unsigned long addr);
 void ptwr_flush_inactive(void);
 int ptwr_do_page_fault(unsigned long);
 
-static always_inline void 
-__cleanup_writable_pagetable(
-    const int what)
-{
-    int cpu = smp_processor_id();
+#define __cleanup_writable_pagetable(_what)                               \
+do {                                                                      \
+    int cpu = smp_processor_id();                                         \
+    if ((_what) & PTWR_CLEANUP_ACTIVE)                                    \
+        if (ptwr_info[cpu].disconnected != ENTRIES_PER_L2_PAGETABLE)      \
+            ptwr_reconnect_disconnected(0L);                              \
+    if ((_what) & PTWR_CLEANUP_INACTIVE)                                  \
+        if (ptwr_info[cpu].writable_idx)                                  \
+            ptwr_flush_inactive();                                        \
+} while ( 0 )
 
-    if (what & PTWR_CLEANUP_ACTIVE)
-        if (ptwr_info[cpu].disconnected != ENTRIES_PER_L2_PAGETABLE)
-            ptwr_reconnect_disconnected(0L);
-    if (what & PTWR_CLEANUP_INACTIVE)
-        if (ptwr_info[cpu].writable_idx)
-            ptwr_flush_inactive();
-}
-
-static always_inline void
-cleanup_writable_pagetable(
-    struct domain *d, const int what)
-{
-    if ( unlikely(VM_ASSIST(d, VMASST_TYPE_writable_pagetables)) )
-        __cleanup_writable_pagetable(what);
-}
+#define cleanup_writable_pagetable(_d, _w)                                \
+    do {                                                                  \
+        if ( unlikely(VM_ASSIST((_d), VMASST_TYPE_writable_pagetables)) ) \
+        __cleanup_writable_pagetable(_w);                                 \
+    } while ( 0 )
 
 #endif /* __ASM_X86_MM_H__ */

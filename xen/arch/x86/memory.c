@@ -153,6 +153,9 @@ void arch_init_memory(void)
     vm_assist_info[VMASST_TYPE_writable_pagetables].disable =
         ptwr_disable;
 
+    for ( mfn = 0; mfn < max_page; mfn++ )
+        frame_table[mfn].u.inuse.count_info |= PGC_always_set;
+
     /* Initialise to a magic of 0x55555555 so easier to spot bugs later. */
     memset(machine_to_phys_mapping, 0x55, 4<<20);
 
@@ -179,9 +182,9 @@ void arch_init_memory(void)
           mfn < virt_to_phys(&machine_to_phys_mapping[1<<20])>>PAGE_SHIFT;
           mfn++ )
     {
-        frame_table[mfn].u.inuse.count_info = 1 | PGC_allocated;
-        frame_table[mfn].u.inuse.type_info  = 1 | PGT_gdt_page; /* non-RW */
-        frame_table[mfn].u.inuse.domain     = dom_xen;
+        frame_table[mfn].u.inuse.count_info |= PGC_allocated | 1;
+        frame_table[mfn].u.inuse.type_info   = PGT_gdt_page | 1; /* non-RW */
+        frame_table[mfn].u.inuse.domain      = dom_xen;
     }
 }
 
@@ -370,6 +373,7 @@ get_page_from_l1e(
 {
     unsigned long l1v = l1_pgentry_val(l1e);
     unsigned long pfn = l1_pgentry_to_pagenr(l1e);
+    struct pfn_info *page = &frame_table[pfn];
     extern int domain_iomem_in_pfn(struct domain *d, unsigned long pfn);
 
     if ( !(l1v & _PAGE_PRESENT) )
@@ -383,6 +387,8 @@ get_page_from_l1e(
 
     if ( unlikely(!pfn_is_ram(pfn)) )
     {
+        /* SPECIAL CASE 1. Mapping an I/O page. */
+
         /* Revert to caller privileges if FD == DOMID_IO. */
         if ( d == dom_io )
             d = current;
@@ -397,17 +403,41 @@ get_page_from_l1e(
         return 0;
     }
 
-    if ( l1v & _PAGE_RW )
+    if ( unlikely(!get_page_from_pagenr(pfn, d)) )
     {
-        if ( unlikely(!get_page_and_type_from_pagenr(
-            pfn, PGT_writable_page, d)) )
-            return 0;
-        set_bit(_PGC_tlb_flush_on_type_change, 
-                &frame_table[pfn].u.inuse.count_info);
-        return 1;
+        /* SPECIAL CASE 2. Mapping a foreign page via a grant table. */
+        
+        int rc;
+        struct domain *e;
+        u32 count_info;
+        /*
+         * Yuk! Amazingly this is the simplest way to get a guaranteed atomic
+         * snapshot of a 64-bit value on IA32. x86/64 solves this of course!
+         * Basically it's a no-op CMPXCHG, to get us the current contents.
+         * No need for LOCK prefix -- we know that count_info is never zero
+         * because it contains PGC_always_set.
+         */
+        __asm__ __volatile__(
+            "cmpxchg8b %2"
+            : "=a" (e), "=d" (count_info),
+              "=m" (*(volatile u64 *)(&page->u.inuse.domain))
+            : "0" (0), "1" (0), "b" (0), "c" (0) );
+        if ( unlikely((count_info & PGC_count_mask) == 0) ||
+             unlikely(e == NULL) || unlikely(!get_domain(e)) )
+             return 0;
+        rc = gnttab_try_map(e, d, page, l1v & _PAGE_RW);
+        put_domain(e);
+        return rc;
     }
 
-    return get_page_from_pagenr(pfn, d);
+    if ( l1v & _PAGE_RW )
+    {
+        if ( unlikely(!get_page_type(page, PGT_writable_page)) )
+            return 0;
+        set_bit(_PGC_tlb_flush_on_type_change, &page->u.inuse.count_info);
+    }
+
+    return 1;
 }
 
 
@@ -434,13 +464,32 @@ get_page_from_l2e(
 }
 
 
-static void put_page_from_l1e(l1_pgentry_t l1e)
+static void put_page_from_l1e(l1_pgentry_t l1e, struct domain *d)
 {
     struct pfn_info *page = &frame_table[l1_pgentry_to_pagenr(l1e)];
     unsigned long    l1v  = l1_pgentry_val(l1e);
+    struct domain   *e = page->u.inuse.domain;
 
     if ( !(l1v & _PAGE_PRESENT) || !pfn_is_ram(l1v >> PAGE_SHIFT) )
         return;
+
+    if ( unlikely(e != d) )
+    {
+        /*
+         * Unmap a foreign page that may have been mapped via a grant table.
+         * Note that this can fail for a privileged domain that can map foreign
+         * pages via MMUEXT_SET_FOREIGNDOM. Such domains can have some mappings
+         * counted via a grant entry and some counted directly in the page
+         * structure's reference count. Note that reference counts won't get
+         * dangerously confused as long as we always try to decrement the
+         * grant entry first. We may end up with a mismatch between which
+         * mappings and which unmappings are counted via the grant entry, but
+         * really it doesn't matter as privileged domains have carte blanche.
+         */
+        if ( likely(gnttab_try_unmap(e, d, page, l1v & _PAGE_RW)) )
+            return;
+        /* Assume this mapping was made via MMUEXT_SET_FOREIGNDOM... */
+    }
 
     if ( l1v & _PAGE_RW )
     {
@@ -452,7 +501,7 @@ static void put_page_from_l1e(l1_pgentry_t l1e)
         if ( unlikely(((page->u.inuse.type_info & PGT_type_mask) == 
                        PGT_ldt_page)) &&
              unlikely(((page->u.inuse.type_info & PGT_count_mask) != 0)) )
-            invalidate_shadow_ldt(page->u.inuse.domain);
+            invalidate_shadow_ldt(e);
         put_page(page);
     }
 }
@@ -527,7 +576,7 @@ static int alloc_l1_table(struct pfn_info *page)
 
  fail:
     while ( i-- > 0 )
-        put_page_from_l1e(pl1e[i]);
+        put_page_from_l1e(pl1e[i], d);
 
     unmap_domain_mem(pl1e);
     return 0;
@@ -551,6 +600,7 @@ static void free_l2_table(struct pfn_info *page)
 
 static void free_l1_table(struct pfn_info *page)
 {
+    struct domain *d = page->u.inuse.domain;
     unsigned long page_nr = page - frame_table;
     l1_pgentry_t *pl1e;
     int i;
@@ -558,7 +608,7 @@ static void free_l1_table(struct pfn_info *page)
     pl1e = map_domain_mem(page_nr << PAGE_SHIFT);
 
     for ( i = 0; i < ENTRIES_PER_L1_PAGETABLE; i++ )
-        put_page_from_l1e(pl1e[i]);
+        put_page_from_l1e(pl1e[i], d);
 
     unmap_domain_mem(pl1e);
 }
@@ -651,6 +701,7 @@ static int mod_l1_entry(l1_pgentry_t *pl1e, l1_pgentry_t nl1e)
 {
     l1_pgentry_t ol1e;
     unsigned long _ol1e;
+    struct domain *d = current;
 
     if ( unlikely(__get_user(_ol1e, (unsigned long *)pl1e) != 0) )
     {
@@ -671,18 +722,18 @@ static int mod_l1_entry(l1_pgentry_t *pl1e, l1_pgentry_t nl1e)
         
         if ( unlikely(!update_l1e(pl1e, ol1e, nl1e)) )
         {
-            put_page_from_l1e(nl1e);
+            put_page_from_l1e(nl1e, d);
             return 0;
         }
         
-        put_page_from_l1e(ol1e);
+        put_page_from_l1e(ol1e, d);
         return 1;
     }
 
     if ( unlikely(!update_l1e(pl1e, ol1e, nl1e)) )
         return 0;
     
-    put_page_from_l1e(ol1e);
+    put_page_from_l1e(ol1e, d);
     return 1;
 }
 
@@ -1289,20 +1340,10 @@ int do_update_va_mapping_otherdomain(unsigned long page_nr,
 }
 
 
-static inline int readonly_page_from_l1e(l1_pgentry_t l1e)
-{
-    struct pfn_info *page = &frame_table[l1_pgentry_to_pagenr(l1e)];
-    unsigned long    l1v  = l1_pgentry_val(l1e);
 
-    if ( (l1v & _PAGE_RW) || !(l1v & _PAGE_PRESENT) ||
-         !pfn_is_ram(l1v >> PAGE_SHIFT) )
-        return 0;
-    put_page_type(page);
-    return 1;
-}
-
-
-/* Writable Pagetables */
+/*************************
+ * Writable Pagetables
+ */
 
 ptwr_info_t ptwr_info[NR_CPUS] =
     { [ 0 ... NR_CPUS-1 ] =
@@ -1365,13 +1406,8 @@ void ptwr_reconnect_disconnected(unsigned long addr)
         nl1e = pl1e[i];
         if (likely(l1_pgentry_val(nl1e) == l1_pgentry_val(ol1e)))
             continue;
-        if (likely((l1_pgentry_val(nl1e) ^ l1_pgentry_val(ol1e)) ==
-                   _PAGE_RW)) {
-            if (likely(readonly_page_from_l1e(nl1e)))
-                continue;
-        }
         if (unlikely(l1_pgentry_val(ol1e) & _PAGE_PRESENT))
-            put_page_from_l1e(ol1e);
+            put_page_from_l1e(ol1e, current);
         if (unlikely(!get_page_from_l1e(nl1e, current)))
             BUG();
     }
@@ -1438,7 +1474,7 @@ void ptwr_flush_inactive(void)
             if (likely(l1_pgentry_val(ol1e) == l1_pgentry_val(nl1e)))
                 continue;
             if (unlikely(l1_pgentry_val(ol1e) & _PAGE_PRESENT))
-                put_page_from_l1e(ol1e);
+                put_page_from_l1e(ol1e, current);
             if (unlikely(!get_page_from_l1e(nl1e, current)))
                 BUG();
         }

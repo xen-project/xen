@@ -1,6 +1,9 @@
 #ifndef __SCHED_H__
 #define __SCHED_H__
 
+#define STACK_SIZE (2*PAGE_SIZE)
+#define MAX_DOMAIN_NAME 16
+
 #include <xen/config.h>
 #include <xen/types.h>
 #include <xen/spinlock.h>
@@ -10,22 +13,17 @@
 #include <asm/processor.h>
 #include <hypervisor-ifs/hypervisor-if.h>
 #include <hypervisor-ifs/dom0_ops.h>
-#include <xen/grant_table.h>
 #include <xen/list.h>
 #include <xen/time.h>
 #include <xen/ac_timer.h>
 #include <xen/delay.h>
 #include <asm/atomic.h>
-
-#define STACK_SIZE (2*PAGE_SIZE)
 #include <asm/current.h>
-
-#define MAX_DOMAIN_NAME 16
+#include <xen/spinlock.h>
+#include <xen/grant_table.h>
 
 extern unsigned long volatile jiffies;
 extern rwlock_t tasklist_lock;
-
-#include <xen/spinlock.h>
 
 struct domain;
 
@@ -167,10 +165,19 @@ struct domain *alloc_domain_struct();
  * Use this when you don't have an existing reference to @d. It returns
  * FALSE if @d is being destructed.
  */
-static inline int get_domain(struct domain *d)
+static always_inline int get_domain(struct domain *d)
 {
-    atomic_inc(&d->refcnt);
-    return !(atomic_read(&d->refcnt) & DOMAIN_DESTRUCTED);
+    atomic_t old, new, seen = d->refcnt;
+    do
+    {
+        old = seen;
+        if ( unlikely(_atomic_read(old) & DOMAIN_DESTRUCTED) )
+            return 0;
+        _atomic_set(new, _atomic_read(old) + 1);
+        seen = atomic_compareandswap(old, new, &d->refcnt);
+    }
+    while ( unlikely(_atomic_read(seen) != _atomic_read(old)) );
+    return 1;
 }
 
 /*

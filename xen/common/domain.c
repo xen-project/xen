@@ -232,12 +232,16 @@ void domain_destruct(struct domain *d)
 {
     struct domain **pd;
     unsigned long flags;
+    atomic_t      old, new;
 
     if ( !test_bit(DF_DYING, &d->flags) )
         BUG();
 
     /* May be already destructed, or get_domain() can race us. */
-    if ( cmpxchg(&d->refcnt.counter, 0, DOMAIN_DESTRUCTED) != 0 )
+    _atomic_set(old, 0);
+    _atomic_set(new, DOMAIN_DESTRUCTED);
+    old = atomic_compareandswap(old, new, &d->refcnt);
+    if ( _atomic_read(old) != 0 )
         return;
 
     DPRINTK("Releasing task %u\n", d->domain);
