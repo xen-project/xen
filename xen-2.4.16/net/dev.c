@@ -2043,11 +2043,12 @@ long do_net_update(void)
     
     for ( j = 0; j < current->num_net_vifs; j++)
     {
-        current_vif = current->net_vif_list[j];
-        net_ring = current_vif->net_ring;
         int target;
         u8 *g_data;
         unsigned short protocol;
+
+        current_vif = current->net_vif_list[j];
+        net_ring = current_vif->net_ring;
 
         /* First, we send out pending TX descriptors if they exist on this ring.
          */

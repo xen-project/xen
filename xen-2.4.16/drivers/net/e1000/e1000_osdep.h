@@ -69,7 +69,6 @@ typedef enum {
     TRUE = 1
 } boolean_t;
 
-#define ASSERT(x)	if(!(x)) BUG()
 #define MSGOUT(S, A, B)	printk(KERN_DEBUG S "\n", A, B)
 
 //#define DBG 1

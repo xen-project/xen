@@ -35,7 +35,7 @@
 #define TX_RING_ADD(_i,_j) (((_i)+(_j)) & (TX_RING_SIZE-1))
 #define RX_RING_ADD(_i,_j) (((_i)+(_j)) & (RX_RING_SIZE-1))
 
-#define RX_BUF_SIZE 2049 /* (was 1600) Ethernet MTU + plenty of slack! */
+#define RX_BUF_SIZE ((PAGE_SIZE/2)+1) /* Fool the slab allocator :-) */
 
 static void network_rx_int(int irq, void *dev_id, struct pt_regs *ptregs);
 static void network_tx_int(int irq, void *dev_id, struct pt_regs *ptregs);
@@ -92,9 +92,9 @@ static int network_open(struct net_device *dev)
     np->rx_skb_ring = kmalloc(RX_RING_SIZE * sizeof(struct sk_buff *),
                               GFP_KERNEL);
     np->net_ring->tx_ring = kmalloc(TX_RING_SIZE * sizeof(tx_entry_t), 
-                                  GFP_KERNEL);
+                                    GFP_KERNEL);
     np->net_ring->rx_ring = kmalloc(RX_RING_SIZE * sizeof(rx_entry_t), 
-                                  GFP_KERNEL);
+                                    GFP_KERNEL);
     if ( (np->tx_skb_ring == NULL) || (np->rx_skb_ring == NULL) ||
          (np->net_ring->tx_ring == NULL) || (np->net_ring->rx_ring == NULL) )
     {
@@ -106,7 +106,7 @@ static int network_open(struct net_device *dev)
     network_alloc_rx_buffers(dev);
 
     error = request_irq(NET_RX_IRQ, network_rx_int, 0, 
-                    "net-rx", dev);
+                        "net-rx", dev);
     if ( error )
     {
         printk(KERN_WARNING "%s: Could not allocate receive interrupt\n",
@@ -115,7 +115,7 @@ static int network_open(struct net_device *dev)
     }
 
     error = request_irq(NET_TX_IRQ, network_tx_int, 0, 
-                    "net-tx", dev);
+                        "net-tx", dev);
     if ( error )
     {
         printk(KERN_WARNING "%s: Could not allocate transmit interrupt\n",
@@ -171,20 +171,20 @@ static void network_tx_buf_gc(struct net_device *dev)
 
 inline unsigned long get_ppte(unsigned long addr)
 {
-        unsigned long ppte = 0xdeadbeef;
-        pgd_t *pgd; pmd_t *pmd; pte_t *ptep;
-        pgd = pgd_offset_k(addr);
+    unsigned long ppte = 0xdeadbeef;
+    pgd_t *pgd; pmd_t *pmd; pte_t *ptep;
+    pgd = pgd_offset_k(addr);
 
-        if (pgd_none(*pgd) || pgd_bad(*pgd)) BUG();
+    if (pgd_none(*pgd) || pgd_bad(*pgd)) BUG();
         
-        pmd = pmd_offset(pgd, addr);
-        if (pmd_none(*pmd)) BUG(); 
-        if (pmd_bad(*pmd)) BUG();
+    pmd = pmd_offset(pgd, addr);
+    if (pmd_none(*pmd)) BUG(); 
+    if (pmd_bad(*pmd)) BUG();
         
-        ptep = pte_offset(pmd, addr);
-        ppte = (unsigned long)phys_to_machine(virt_to_phys(ptep));
+    ptep = pte_offset(pmd, addr);
+    ppte = (unsigned long)phys_to_machine(virt_to_phys(ptep));
 
-        return ppte;
+    return ppte;
 }
 
 static void network_alloc_rx_buffers(struct net_device *dev)
@@ -250,8 +250,8 @@ static int network_start_xmit(struct sk_buff *skb, struct net_device *dev)
     }   
     
     np->tx_skb_ring[i] = skb;
-    np->net_ring->tx_ring[i].addr 
-        = (unsigned long)phys_to_machine(virt_to_phys(skb->data));
+    np->net_ring->tx_ring[i].addr =
+        (unsigned long)phys_to_machine(virt_to_phys(skb->data));
     np->net_ring->tx_ring[i].size = skb->len;
     np->net_ring->tx_prod = TX_RING_INC(i);
     atomic_inc(&np->tx_entries);
@@ -264,8 +264,8 @@ static int network_start_xmit(struct sk_buff *skb, struct net_device *dev)
     {
         np->tx_full = 1;
         netif_stop_queue(dev);
-        np->net_ring->tx_event = TX_RING_ADD(np->tx_idx,
-                                           atomic_read(&np->tx_entries) >> 1);
+        np->net_ring->tx_event = 
+            TX_RING_ADD(np->tx_idx, atomic_read(&np->tx_entries) >> 1);
     }
     else
     {
@@ -295,23 +295,24 @@ static void network_rx_int(int irq, void *dev_id, struct pt_regs *ptregs)
     {
         if (np->net_ring->rx_ring[i].status != RING_STATUS_OK)
         {
-                printk("bad buffer on RX ring!(%d)\n", 
-                                np->net_ring->rx_ring[i].status);
-                continue;
+            printk("bad buffer on RX ring!(%d)\n", 
+                   np->net_ring->rx_ring[i].status);
+            continue;
         }
         skb = np->rx_skb_ring[i];
 
         phys_to_machine_mapping[virt_to_phys(skb->head) >> PAGE_SHIFT] =
             (*(unsigned long *)phys_to_virt(
-                    machine_to_phys(np->net_ring->rx_ring[i].addr))
-             ) >> PAGE_SHIFT;
+                machine_to_phys(np->net_ring->rx_ring[i].addr))
+                ) >> PAGE_SHIFT;
 
         skb_put(skb, np->net_ring->rx_ring[i].size);
         skb->protocol = eth_type_trans(skb, dev);
 
-        /* Set up shinfo -- from alloc_skb 
-         * This was particularily nasty:  the shared info is hidden at the back of the data area
-         * (presumably so it can be shared), but on page flip it gets very spunked.
+        /*
+         * Set up shinfo -- from alloc_skb This was particularily nasty:  the 
+         * shared info is hidden at the back of the data area (presumably so 
+         * it can be shared), but on page flip it gets very spunked.
          */
 
         atomic_set(&(skb_shinfo(skb)->dataref), 1);
@@ -331,9 +332,7 @@ static void network_rx_int(int irq, void *dev_id, struct pt_regs *ptregs)
     
     /* Deal with hypervisor racing our resetting of rx_event. */
     smp_mb();
-    if ( np->net_ring->rx_cons != i ) { 
-                goto again;
-        }
+    if ( np->net_ring->rx_cons != i ) goto again;
 }
 
 

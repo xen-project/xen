@@ -13,9 +13,7 @@
 
 #ifdef CONFIG_SMP
 #define TARGET_CPUS cpu_online_map
-#define INT_DELIVERY_MODE 1     /* logical delivery broadcast to all procs */
 #else
-#define INT_DELIVERY_MODE 1     /* logical delivery */
 #define TARGET_CPUS 0x01
 #endif
 
