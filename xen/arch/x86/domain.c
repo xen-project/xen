@@ -770,7 +770,14 @@ int construct_dom0(struct domain *p,
         {
             page->u.inuse.type_info &= ~PGT_type_mask;
             page->u.inuse.type_info |= PGT_l2_page_table;
+
+            /*
+             * No longer writable: decrement the type_count.
+             * Installed as CR3: increment both the ref_count and type_count.
+             * Net: just increment the ref_count.
+             */
             get_page(page, p); /* an extra ref because of readable mapping */
+
             /* Get another ref to L2 page so that it can be pinned. */
             if ( !get_page_and_type(page, p, PGT_l2_page_table) )
                 BUG();
@@ -783,6 +790,12 @@ int construct_dom0(struct domain *p,
 	    page->u.inuse.type_info |= 
 		((dsi.v_start>>L2_PAGETABLE_SHIFT)+(count-1))<<PGT_va_shift;
 
+            /*
+             * No longer writable: decrement the type_count.
+             * This is an L1 page, installed in a validated L2 page:
+             * increment both the ref_count and type_count.
+             * Net: just increment the ref_count.
+             */
             get_page(page, p); /* an extra ref because of readable mapping */
         }
         l1tab++;
