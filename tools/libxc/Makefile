@@ -1,7 +1,8 @@
 
-MAJOR    = 2.0
-MINOR    = 0
-SONAME   = libxc.so.$(MAJOR)
+MAJOR		:= 2.0
+MINOR		:= 0
+LIB_NAME	:= libxc
+SONAME		:= $(LIB_NAME).so.$(MAJOR)
 
 CC       = gcc
 
@@ -35,9 +36,10 @@ CFLAGS   += $(INCLUDES) -I.
 CFLAGS   += -Wp,-MD,.$(@F).d
 DEPS     = .*.d
 
-OBJS     = $(patsubst %.c,%.o,$(SRCS))
+OBJS     := $(patsubst %.c,%.o,$(SRCS))
+PIC_OBJS := $(patsubst %.c,%.opic,$(SRCS))
 
-LIB      = libxc.so libxc.so.$(MAJOR) libxc.so.$(MAJOR).$(MINOR)
+LIB		:= $(LIB_NAME).a $(LIB_NAME).so $(LIB_NAME).so.$(MAJOR) $(LIB_NAME).so.$(MAJOR).$(MINOR)
 
 all: check-for-zlib mk-symlinks
 	$(MAKE) $(LIB)
@@ -65,12 +67,12 @@ install: all
 	mkdir -p $(prefix)/usr/lib
 	mkdir -p $(prefix)/usr/include
 	install -m0755 $(LIB) $(prefix)/usr/lib
-	ln -sf libxc.so.$(MAJOR).$(MINOR) $(prefix)/usr/lib/libxc.so.$(MAJOR)
-	ln -sf libxc.so.$(MAJOR) $(prefix)/usr/lib/libxc.so
+	ln -sf $(LIB_NAME).so.$(MAJOR).$(MINOR) $(prefix)/usr/lib/$(LIB_NAME).so.$(MAJOR)
+	ln -sf $(LIB_NAME).so.$(MAJOR) $(prefix)/usr/lib/$(LIB_NAME).so
 	install -m0644 xc.h $(prefix)/usr/include
 
 clean:
-	rm -rf *.a *.so *.o *.rpm $(LIB) *~ $(DEPS) xen
+	rm -rf *.a *.so *.o *.opic *.rpm $(LIB) *~ $(DEPS) xen
 
 rpm: all
 	rm -rf staging
@@ -81,11 +83,17 @@ rpm: all
 	mv staging/i386/*.rpm .
 	rm -rf staging
 
-libxc.so:
-	ln -sf libxc.so.$(MAJOR) $@
-libxc.so.$(MAJOR):
-	ln -sf libxc.so.$(MAJOR).$(MINOR) $@
-libxc.so.$(MAJOR).$(MINOR): $(OBJS)
+$(PIC_OBJS): %.opic: %.c
+	$(CC) $(CPPFLAGS) -DPIC $(CFLAGS) -fPIC -c -o $@ $<
+
+$(LIB_NAME).a: $(OBJS)
+	$(AR) rc $@ $^
+
+$(LIB_NAME).so: $(LIB_NAME).so.$(MAJOR)
+	ln -sf $< $@
+$(LIB_NAME).so.$(MAJOR): $(LIB_NAME).so.$(MAJOR).$(MINOR)
+	ln -sf $< $@
+$(LIB_NAME).so.$(MAJOR).$(MINOR): $(PIC_OBJS)
 	$(CC) -Wl,-soname -Wl,$(SONAME) -shared -o $@ $^ -L../libxutil -lxutil -lz
 
 -include $(DEPS)
