@@ -1689,10 +1689,8 @@ int do_mmu_update(
     perfc_incrc(calls_to_mmu_update); 
     perfc_addc(num_page_updates, count);
     /*
-     * do a histogram for count. 
-     * first bucket is for count=0,
-     * second bucket is for count=1
-     * last bucket is for count >= 63 *  PERFC_PT_UPDATES_BUCKET_SIZE
+     * histogram: special treatment for 0 and 1 count. After that equally
+     * spaced with last bucket taking the rest.
      */
     if ( count == 0 )
     {
@@ -1700,10 +1698,10 @@ int do_mmu_update(
     } else if ( count == 1 )
     {
         perfc_incra(bpt_updates, 1);
-    } else if ( (count / PERFC_PT_UPDATES_BUCKET_SIZE)
+    } else if ( ((count-2) / PERFC_PT_UPDATES_BUCKET_SIZE)
                 < (PERFC_MAX_PT_UPDATES - 3) )
     {
-        perfc_incra(bpt_updates, (count / PERFC_PT_UPDATES_BUCKET_SIZE) + 2);
+        perfc_incra(bpt_updates, ((count-2)/PERFC_PT_UPDATES_BUCKET_SIZE) + 2);
     } else
     {
         perfc_incra(bpt_updates, PERFC_MAX_PT_UPDATES - 1);
@@ -2371,10 +2369,8 @@ void ptwr_flush(const int which)
 
 #ifdef PERF_COUNTERS
     /*
-     * do a histogram for count. 
-     * first bucket is for count=0,
-     * second bucket is for count=1
-     * last bucket is for count >= 63 *  PERFC_PT_UPDATES_BUCKET_SIZE
+     * histogram: special treatment for 0 and 1 count. After that equally
+     * spaced with last bucket taking the rest.
      */
     if ( count == 0 )
     {
@@ -2382,10 +2378,10 @@ void ptwr_flush(const int which)
     } else if ( count == 1 ) 
     {
         perfc_incra(wpt_updates, 1);
-    } else if ( (count / PERFC_PT_UPDATES_BUCKET_SIZE)
+    } else if ( ((count-2) / PERFC_PT_UPDATES_BUCKET_SIZE)
                 < (PERFC_MAX_PT_UPDATES - 3) )
     {
-        perfc_incra(wpt_updates, (count / PERFC_PT_UPDATES_BUCKET_SIZE) + 2);
+        perfc_incra(wpt_updates, ((count-2)/PERFC_PT_UPDATES_BUCKET_SIZE) + 2);
     } else
     {
         perfc_incra(wpt_updates, PERFC_MAX_PT_UPDATES - 1);

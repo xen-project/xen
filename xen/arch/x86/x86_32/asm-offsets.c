@@ -5,6 +5,7 @@
  */
 
 #include <xen/sched.h>
+#include <xen/config.h>
 
 #define DEFINE(_sym, _val) \
     __asm__ __volatile__ ( "\n->" #_sym " %0 " #_val : : "i" (_val) )
@@ -69,6 +70,8 @@ void __dummy__(void)
 
     DEFINE(FIXMAP_apic_base, fix_to_virt(FIX_APIC_BASE));
 
-    OFFSET(PERFC_hypercalls, struct perfcounter_t, hypercalls);
-    OFFSET(PERFC_exceptions, struct perfcounter_t, exceptions);
+#if PERF_COUNTERS
+    OFFSET(PERFC_hypercalls, struct perfcounter, hypercalls);
+    OFFSET(PERFC_exceptions, struct perfcounter, exceptions);
+#endif
 }
