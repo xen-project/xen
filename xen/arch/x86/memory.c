@@ -1156,6 +1156,7 @@ static int do_extended_command(unsigned long ptr, unsigned long val)
                 : "0" (d), "1" (x), "c" (NULL), "b" (x) );
         } 
         while ( unlikely(nd != d) || unlikely(y != x) );
+	if (!okay) break;
 
         /*
          * Unlink from 'd'. At least one reference remains (now anonymous), so
