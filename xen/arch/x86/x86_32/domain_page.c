@@ -26,6 +26,11 @@ static spinlock_t map_lock = SPIN_LOCK_UNLOCKED;
 /* Use a spare PTE bit to mark entries ready for recycling. */
 #define READY_FOR_TLB_FLUSH (1<<10)
 
+#ifdef WATCH_MAP_DOMAIN_CALLERS
+int map_domain_mem_noisy = 1;
+#endif
+
+
 static void flush_all_ready_maps(void)
 {
     unsigned long *cache = mapcache;
@@ -38,8 +43,7 @@ static void flush_all_ready_maps(void)
     while ( ((unsigned long)(++cache) & ~PAGE_MASK) != 0 );
 }
 
-
-void *map_domain_mem(unsigned long pa)
+void *_map_domain_mem(unsigned long pa)
 {
     unsigned long va;
     unsigned int idx, cpu = smp_processor_id();

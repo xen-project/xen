@@ -416,8 +416,8 @@ static void mov_to_cr(int gp, int cr, struct xen_regs *regs)
             /*
              * The guest CR3 must be pointing to the guest physical.
              */
-            if (!(mfn = phys_to_machine_mapping(
-                      d->arch.arch_vmx.cpu_cr3 >> PAGE_SHIFT))) 
+            if (!VALID_MFN(mfn = phys_to_machine_mapping(
+                               d->arch.arch_vmx.cpu_cr3 >> PAGE_SHIFT)))
             {
                 VMX_DBG_LOG(DBG_LEVEL_VMMU, "Invalid CR3 value = %lx", 
                         d->arch.arch_vmx.cpu_cr3);

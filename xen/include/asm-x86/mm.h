@@ -76,6 +76,7 @@ struct pfn_info
 #define PGT_l4_shadow       PGT_l4_page_table
 #define PGT_hl2_shadow      (5<<29)
 #define PGT_snapshot        (6<<29)
+#define PGT_writable_pred   (7<<29) /* predicted gpfn with writable ref */
 
 #define PGT_type_mask       (7<<29) /* Bits 29-31. */
 
@@ -95,7 +96,10 @@ struct pfn_info
  /* 17-bit count of uses of this frame as its current type. */
 #define PGT_count_mask      ((1U<<17)-1)
 
-#define PGT_mfn_mask        ((1U<<21)-1) /* mfn mask for shadow types */
+#define PGT_mfn_mask        ((1U<<20)-1) /* mfn mask for shadow types */
+
+#define PGT_score_shift     20
+#define PGT_score_mask      (((1U<<4)-1)<<PGT_score_shift)
 
  /* Cleared when the owning guest 'frees' this page. */
 #define _PGC_allocated      31
@@ -144,6 +148,21 @@ static inline u32 pickle_domptr(struct domain *domain)
         list_add_tail(&(_pfn)->list, &(_dom)->xenpage_list);                \
         spin_unlock(&(_dom)->page_alloc_lock);                              \
     } while ( 0 )
+#define SHARE_PFN_WITH_DOMAIN2(_pfn, _dom)                                  \
+    do {                                                                    \
+        page_set_owner((_pfn), (_dom));                                     \
+        /* The incremented type count is intended to pin to 'writable'. */  \
+        (_pfn)->u.inuse.type_info = PGT_writable_page | PGT_validated | 1;  \
+        wmb(); /* install valid domain ptr before updating refcnt. */       \
+        spin_lock(&(_dom)->page_alloc_lock);                                \
+        /* _dom holds an allocation reference + writable ref */             \
+        ASSERT((_pfn)->count_info == 0);                                    \
+        (_pfn)->count_info |= PGC_allocated | 2;                            \
+        if ( unlikely((_dom)->xenheap_pages++ == 0) )                       \
+            get_knownalive_domain(_dom);                                    \
+        list_add_tail(&(_pfn)->list, &(_dom)->page_list);                   \
+        spin_unlock(&(_dom)->page_alloc_lock);                              \
+    } while ( 0 )
 
 extern struct pfn_info *frame_table;
 extern unsigned long frame_table_size;
@@ -153,9 +172,8 @@ void init_frametable(void);
 int alloc_page_type(struct pfn_info *page, unsigned int type);
 void free_page_type(struct pfn_info *page, unsigned int type);
 extern void invalidate_shadow_ldt(struct exec_domain *d);
-extern u32 shadow_remove_all_write_access(
-    struct domain *d, unsigned min_type, unsigned max_type,
-    unsigned long gpfn);
+extern int shadow_remove_all_write_access(
+    struct domain *d, unsigned long gpfn, unsigned long gmfn);
 extern u32 shadow_remove_all_access( struct domain *d, unsigned long gmfn);
 
 static inline void put_page(struct pfn_info *page)
@@ -188,6 +206,7 @@ static inline int get_page(struct pfn_info *page,
              unlikely((nx & PGC_count_mask) == 0) || /* Count overflow? */
              unlikely(d != _domain) )                /* Wrong owner? */
         {
+          if ( !domain->arch.shadow_mode )
             DPRINTK("Error pfn %p: rd=%p(%d), od=%p(%d), caf=%08x, taf=%08x\n",
                     page_to_pfn(page), domain, (domain ? domain->id : -1),
                     page_get_owner(page),
@@ -206,8 +225,36 @@ static inline int get_page(struct pfn_info *page,
     return 1;
 }
 
-void put_page_type(struct pfn_info *page);
-int  get_page_type(struct pfn_info *page, u32 type);
+//#define MFN1_TO_WATCH 0x1d8
+#ifdef MFN1_TO_WATCH
+#define get_page_type(__p, __t) (                                             \
+{                                                                             \
+    struct pfn_info *_p = (__p);                                              \
+    u32 _t = (__t);                                                           \
+    if ( page_to_pfn(_p) == MFN1_TO_WATCH )                                   \
+        printk("get_page_type(%x) c=%p ot=%p @ %s:%d in %s\n",                \
+               MFN1_TO_WATCH, frame_table[MFN1_TO_WATCH].count_info,          \
+               frame_table[MFN1_TO_WATCH].u.inuse.type_info,                  \
+               __FILE__, __LINE__, __func__);                                 \
+    _get_page_type(_p, _t);                                                   \
+})
+#define put_page_type(__p) (                                                  \
+{                                                                             \
+    struct pfn_info *_p = (__p);                                              \
+    if ( page_to_pfn(_p) == MFN1_TO_WATCH )                                   \
+        printk("put_page_type(%x) c=%p ot=%p @ %s:%d in %s\n",                \
+               MFN1_TO_WATCH, frame_table[MFN1_TO_WATCH].count_info,          \
+               frame_table[MFN1_TO_WATCH].u.inuse.type_info,                  \
+               __FILE__, __LINE__, __func__);                                 \
+    _put_page_type(_p);                                                       \
+})
+#else
+#define _get_page_type get_page_type
+#define _put_page_type put_page_type
+#endif
+
+void _put_page_type(struct pfn_info *page);
+int  _get_page_type(struct pfn_info *page, u32 type);
 int  get_page_from_l1e(l1_pgentry_t l1e, struct domain *d);
 void put_page_from_l1e(l1_pgentry_t l1e, struct domain *d);
 
@@ -266,6 +313,8 @@ void synchronise_pagetables(unsigned long cpu_mask);
  * been used by the read-only MPT map.
  */
 #define __phys_to_machine_mapping ((unsigned long *)RO_MPT_VIRT_START)
+#define INVALID_MFN               (~0UL)
+#define VALID_MFN(_mfn)           (!((_mfn) & (1U<<31)))
 
 /* Returns the machine physical */
 static inline unsigned long phys_to_machine_mapping(unsigned long pfn) 
@@ -273,10 +322,11 @@ static inline unsigned long phys_to_machine_mapping(unsigned long pfn)
     unsigned long mfn;
     l1_pgentry_t pte;
 
-   if (__get_user(l1_pgentry_val(pte), (__phys_to_machine_mapping + pfn)))
-       mfn = 0;
-   else
+   if ( !__get_user(l1_pgentry_val(pte), (__phys_to_machine_mapping + pfn)) &&
+        (l1_pgentry_val(pte) & _PAGE_PRESENT) )
        mfn = l1_pgentry_to_phys(pte) >> PAGE_SHIFT;
+   else
+       mfn = INVALID_MFN;
 
    return mfn; 
 }
@@ -361,15 +411,15 @@ int audit_adjust_pgtables(struct domain *d, int dir, int noisy);
 #define AUDIT_ERRORS_OK      ( 1u << 1 )
 #define AUDIT_QUIET          ( 1u << 2 )
 
-void _audit_domain(struct domain *d, int flags, const char *file, int line);
-#define audit_domain(_d) _audit_domain((_d), 0, __FILE__, __LINE__)
+void _audit_domain(struct domain *d, int flags);
+#define audit_domain(_d) _audit_domain((_d), 0)
 void audit_domains(void);
 
 #else
 
-#define _audit_domain(_d, _f, _file, _line) ((void)0)
-#define audit_domain(_d) ((void)0)
-#define audit_domains()  ((void)0)
+#define _audit_domain(_d, _f) ((void)0)
+#define audit_domain(_d)      ((void)0)
+#define audit_domains()       ((void)0)
 
 #endif
 

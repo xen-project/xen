@@ -56,7 +56,11 @@ static spinlock_t update_lock = SPIN_LOCK_UNLOCKED;
 #ifdef CONFIG_SMP
 #define QUEUE_SIZE 1
 #else
+#ifndef CONFIG_XEN_SHADOW_MODE
 #define QUEUE_SIZE 128
+#else /* CONFIG_XEN_SHADOW_MODE */
+#define QUEUE_SIZE 1
+#endif /* CONFIG_XEN_SHADOW_MODE */
 #endif
 #endif
 
@@ -139,9 +143,8 @@ void queue_l1_entry_update(pte_t *ptr, unsigned long val)
 #endif
     spin_unlock_irqrestore(&update_lock, flags);
 #else
-    _flush_page_update_queue();
-    *(unsigned long *)ptr = val;
-#endif
+    set_pte(ptr, __pte(val));
+#endif /* CONFIG_XEN_SHADOW_MODE */
 }
 
 void queue_l2_entry_update(pmd_t *ptr, unsigned long val)
@@ -157,9 +160,8 @@ void queue_l2_entry_update(pmd_t *ptr, unsigned long val)
     increment_index();
     spin_unlock_irqrestore(&update_lock, flags);
 #else
-    _flush_page_update_queue();
-    *(unsigned long *)ptr = val;
-#endif
+    set_pmd(ptr, __pmd(val));
+#endif /* CONFIG_XEN_SHADOW_MODE */
 }
 
 void queue_pt_switch(unsigned long ptr)
@@ -169,7 +171,11 @@ void queue_pt_switch(unsigned long ptr)
     unsigned long flags;
     spin_lock_irqsave(&update_lock, flags);
     idx = per_cpu(mmu_update_queue_idx, cpu);
+#ifndef CONFIG_XEN_SHADOW_MODE
     per_cpu(update_queue[idx], cpu).ptr  = phys_to_machine(ptr);
+#else /* CONFIG_XEN_SHADOW_MODE */
+    per_cpu(update_queue[idx], cpu).ptr  = __vms_phys_to_machine(ptr);
+#endif /* CONFIG_XEN_SHADOW_MODE */
     per_cpu(update_queue[idx], cpu).ptr |= MMU_EXTENDED_COMMAND;
     per_cpu(update_queue[idx], cpu).val  = MMUEXT_NEW_BASEPTR;
     increment_index();
@@ -203,56 +209,88 @@ void queue_invlpg(unsigned long ptr)
     spin_unlock_irqrestore(&update_lock, flags);
 }
 
+#ifndef CONFIG_XEN_SHADOW_MODE
 void queue_pgd_pin(unsigned long ptr)
+#else /* CONFIG_XEN_SHADOW_MODE */
+void __vms_queue_pgd_pin(unsigned long ptr)
+#endif /* CONFIG_XEN_SHADOW_MODE */
 {
     int cpu = smp_processor_id();
     int idx;
     unsigned long flags;
     spin_lock_irqsave(&update_lock, flags);
     idx = per_cpu(mmu_update_queue_idx, cpu);
+#ifndef CONFIG_XEN_SHADOW_MODE
     per_cpu(update_queue[idx], cpu).ptr  = phys_to_machine(ptr);
+#else /* CONFIG_XEN_SHADOW_MODE */
+    per_cpu(update_queue[idx], cpu).ptr  = __vms_phys_to_machine(ptr);
+#endif /* CONFIG_XEN_SHADOW_MODE */
     per_cpu(update_queue[idx], cpu).ptr |= MMU_EXTENDED_COMMAND;
     per_cpu(update_queue[idx], cpu).val  = MMUEXT_PIN_L2_TABLE;
     increment_index();
     spin_unlock_irqrestore(&update_lock, flags);
 }
 
+#ifndef CONFIG_XEN_SHADOW_MODE
 void queue_pgd_unpin(unsigned long ptr)
+#else /* CONFIG_XEN_SHADOW_MODE */
+void __vms_queue_pgd_unpin(unsigned long ptr)
+#endif /* CONFIG_XEN_SHADOW_MODE */
 {
     int cpu = smp_processor_id();
     int idx;
     unsigned long flags;
     spin_lock_irqsave(&update_lock, flags);
     idx = per_cpu(mmu_update_queue_idx, cpu);
+#ifndef CONFIG_XEN_SHADOW_MODE
     per_cpu(update_queue[idx], cpu).ptr  = phys_to_machine(ptr);
+#else /* CONFIG_XEN_SHADOW_MODE */
+    per_cpu(update_queue[idx], cpu).ptr  = __vms_phys_to_machine(ptr);
+#endif /* CONFIG_XEN_SHADOW_MODE */
     per_cpu(update_queue[idx], cpu).ptr |= MMU_EXTENDED_COMMAND;
     per_cpu(update_queue[idx], cpu).val  = MMUEXT_UNPIN_TABLE;
     increment_index();
     spin_unlock_irqrestore(&update_lock, flags);
 }
 
+#ifndef CONFIG_XEN_SHADOW_MODE
 void queue_pte_pin(unsigned long ptr)
+#else /* CONFIG_XEN_SHADOW_MODE */
+void __vms_queue_pte_pin(unsigned long ptr)
+#endif /* CONFIG_XEN_SHADOW_MODE */
 {
     int cpu = smp_processor_id();
     int idx;
     unsigned long flags;
     spin_lock_irqsave(&update_lock, flags);
     idx = per_cpu(mmu_update_queue_idx, cpu);
+#ifndef CONFIG_XEN_SHADOW_MODE
     per_cpu(update_queue[idx], cpu).ptr  = phys_to_machine(ptr);
+#else /* CONFIG_XEN_SHADOW_MODE */
+    per_cpu(update_queue[idx], cpu).ptr  = __vms_phys_to_machine(ptr);
+#endif /* CONFIG_XEN_SHADOW_MODE */
     per_cpu(update_queue[idx], cpu).ptr |= MMU_EXTENDED_COMMAND;
     per_cpu(update_queue[idx], cpu).val  = MMUEXT_PIN_L1_TABLE;
     increment_index();
     spin_unlock_irqrestore(&update_lock, flags);
 }
 
+#ifndef CONFIG_XEN_SHADOW_MODE
 void queue_pte_unpin(unsigned long ptr)
+#else /* CONFIG_XEN_SHADOW_MODE */
+void __vms_queue_pte_unpin(unsigned long ptr)
+#endif /* CONFIG_XEN_SHADOW_MODE */
 {
     int cpu = smp_processor_id();
     int idx;
     unsigned long flags;
     spin_lock_irqsave(&update_lock, flags);
     idx = per_cpu(mmu_update_queue_idx, cpu);
+#ifndef CONFIG_XEN_SHADOW_MODE
     per_cpu(update_queue[idx], cpu).ptr  = phys_to_machine(ptr);
+#else /* CONFIG_XEN_SHADOW_MODE */
+    per_cpu(update_queue[idx], cpu).ptr  = __vms_phys_to_machine(ptr);
+#endif /* CONFIG_XEN_SHADOW_MODE */
     per_cpu(update_queue[idx], cpu).ptr |= MMU_EXTENDED_COMMAND;
     per_cpu(update_queue[idx], cpu).val  = MMUEXT_UNPIN_TABLE;
     increment_index();
@@ -299,8 +337,8 @@ void xen_l1_entry_update(pte_t *ptr, unsigned long val)
     increment_index_and_flush();
     spin_unlock_irqrestore(&update_lock, flags);
 #else
-    *(unsigned long *)ptr = val;
-#endif
+    set_pte(ptr, __pte(val));
+#endif /* CONFIG_XEN_SHADOW_MODE */
 }
 
 void xen_l2_entry_update(pmd_t *ptr, unsigned long val)
@@ -316,8 +354,8 @@ void xen_l2_entry_update(pmd_t *ptr, unsigned long val)
     increment_index_and_flush();
     spin_unlock_irqrestore(&update_lock, flags);
 #else
-    *(unsigned long *)ptr = val;
-#endif
+    set_pmd(ptr, __pmd(val));
+#endif /* CONFIG_XEN_SHADOW_MODE */
 }
 
 void xen_pt_switch(unsigned long ptr)
@@ -327,7 +365,11 @@ void xen_pt_switch(unsigned long ptr)
     unsigned long flags;
     spin_lock_irqsave(&update_lock, flags);
     idx = per_cpu(mmu_update_queue_idx, cpu);
+#ifndef CONFIG_XEN_SHADOW_MODE
     per_cpu(update_queue[idx], cpu).ptr  = phys_to_machine(ptr);
+#else /* CONFIG_XEN_SHADOW_MODE */
+    per_cpu(update_queue[idx], cpu).ptr  = __vms_phys_to_machine(ptr);
+#endif /* CONFIG_XEN_SHADOW_MODE */
     per_cpu(update_queue[idx], cpu).ptr |= MMU_EXTENDED_COMMAND;
     per_cpu(update_queue[idx], cpu).val  = MMUEXT_NEW_BASEPTR;
     increment_index_and_flush();
@@ -361,56 +403,88 @@ void xen_invlpg(unsigned long ptr)
     spin_unlock_irqrestore(&update_lock, flags);
 }
 
+#ifndef CONFIG_XEN_SHADOW_MODE
 void xen_pgd_pin(unsigned long ptr)
+#else /* CONFIG_XEN_SHADOW_MODE */
+void __vms_xen_pgd_pin(unsigned long ptr)
+#endif /* CONFIG_XEN_SHADOW_MODE */
 {
     int cpu = smp_processor_id();
     int idx;
     unsigned long flags;
     spin_lock_irqsave(&update_lock, flags);
     idx = per_cpu(mmu_update_queue_idx, cpu);
+#ifndef CONFIG_XEN_SHADOW_MODE
     per_cpu(update_queue[idx], cpu).ptr  = phys_to_machine(ptr);
+#else /* CONFIG_XEN_SHADOW_MODE */
+    per_cpu(update_queue[idx], cpu).ptr  = __vms_phys_to_machine(ptr);
+#endif /* CONFIG_XEN_SHADOW_MODE */
     per_cpu(update_queue[idx], cpu).ptr |= MMU_EXTENDED_COMMAND;
     per_cpu(update_queue[idx], cpu).val  = MMUEXT_PIN_L2_TABLE;
     increment_index_and_flush();
     spin_unlock_irqrestore(&update_lock, flags);
 }
 
+#ifndef CONFIG_XEN_SHADOW_MODE
 void xen_pgd_unpin(unsigned long ptr)
+#else /* CONFIG_XEN_SHADOW_MODE */
+void __vms_xen_pgd_unpin(unsigned long ptr)
+#endif /* CONFIG_XEN_SHADOW_MODE */
 {
     int cpu = smp_processor_id();
     int idx;
     unsigned long flags;
     spin_lock_irqsave(&update_lock, flags);
     idx = per_cpu(mmu_update_queue_idx, cpu);
+#ifndef CONFIG_XEN_SHADOW_MODE
     per_cpu(update_queue[idx], cpu).ptr  = phys_to_machine(ptr);
+#else /* CONFIG_XEN_SHADOW_MODE */
+    per_cpu(update_queue[idx], cpu).ptr  = __vms_phys_to_machine(ptr);
+#endif /* CONFIG_XEN_SHADOW_MODE */
     per_cpu(update_queue[idx], cpu).ptr |= MMU_EXTENDED_COMMAND;
     per_cpu(update_queue[idx], cpu).val  = MMUEXT_UNPIN_TABLE;
     increment_index_and_flush();
     spin_unlock_irqrestore(&update_lock, flags);
 }
 
+#ifndef CONFIG_XEN_SHADOW_MODE
 void xen_pte_pin(unsigned long ptr)
+#else /* CONFIG_XEN_SHADOW_MODE */
+void __vms_xen_pte_pin(unsigned long ptr)
+#endif /* CONFIG_XEN_SHADOW_MODE */
 {
     int cpu = smp_processor_id();
     int idx;
     unsigned long flags;
     spin_lock_irqsave(&update_lock, flags);
     idx = per_cpu(mmu_update_queue_idx, cpu);
+#ifndef CONFIG_XEN_SHADOW_MODE
     per_cpu(update_queue[idx], cpu).ptr  = phys_to_machine(ptr);
+#else /* CONFIG_XEN_SHADOW_MODE */
+    per_cpu(update_queue[idx], cpu).ptr  = __vms_phys_to_machine(ptr);
+#endif /* CONFIG_XEN_SHADOW_MODE */
     per_cpu(update_queue[idx], cpu).ptr |= MMU_EXTENDED_COMMAND;
     per_cpu(update_queue[idx], cpu).val  = MMUEXT_PIN_L1_TABLE;
     increment_index_and_flush();
     spin_unlock_irqrestore(&update_lock, flags);
 }
 
+#ifndef CONFIG_XEN_SHADOW_MODE
 void xen_pte_unpin(unsigned long ptr)
+#else /* CONFIG_XEN_SHADOW_MODE */
+void __vms_xen_pte_unpin(unsigned long ptr)
+#endif /* CONFIG_XEN_SHADOW_MODE */
 {
     int cpu = smp_processor_id();
     int idx;
     unsigned long flags;
     spin_lock_irqsave(&update_lock, flags);
     idx = per_cpu(mmu_update_queue_idx, cpu);
+#ifndef CONFIG_XEN_SHADOW_MODE
     per_cpu(update_queue[idx], cpu).ptr  = phys_to_machine(ptr);
+#else /* CONFIG_XEN_SHADOW_MODE */
+    per_cpu(update_queue[idx], cpu).ptr  = __vms_phys_to_machine(ptr);
+#endif /* CONFIG_XEN_SHADOW_MODE */
     per_cpu(update_queue[idx], cpu).ptr |= MMU_EXTENDED_COMMAND;
     per_cpu(update_queue[idx], cpu).val  = MMUEXT_UNPIN_TABLE;
     increment_index_and_flush();
@@ -472,7 +546,11 @@ unsigned long allocate_empty_lowmem_region(unsigned long pages)
         pte = pte_offset_kernel(pmd, (vstart + (i*PAGE_SIZE))); 
         pfn_array[i] = pte->pte_low >> PAGE_SHIFT;
         queue_l1_entry_update(pte, 0);
+#ifndef CONFIG_XEN_SHADOW_MODE
         phys_to_machine_mapping[__pa(vstart)>>PAGE_SHIFT] = INVALID_P2M_ENTRY;
+#else /* CONFIG_XEN_SHADOW_MODE */
+        __vms_phys_to_machine_mapping[__pa(vstart)>>PAGE_SHIFT] = INVALID_P2M_ENTRY;
+#endif /* CONFIG_XEN_SHADOW_MODE */
     }
 
     /* Flush updates through and flush the TLB. */

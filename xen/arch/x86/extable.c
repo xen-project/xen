@@ -3,6 +3,11 @@
 #include <xen/spinlock.h>
 #include <asm/uaccess.h>
 
+#ifdef PERF_COUNTERS
+#include <xen/sched.h>
+#include <xen/perfc.h>
+#endif
+
 extern struct exception_table_entry __start___ex_table[];
 extern struct exception_table_entry __stop___ex_table[];
 extern struct exception_table_entry __start___pre_ex_table[];
@@ -69,5 +74,9 @@ search_pre_exception_table(struct xen_regs *regs)
     unsigned long fixup = search_one_table(
         __start___pre_ex_table, __stop___pre_ex_table-1, addr);
     DPRINTK("Pre-exception: %p -> %p\n", addr, fixup);
+#ifdef PERF_COUNTERS
+    if ( fixup )
+        perfc_incrc(exception_fixed);
+#endif
     return fixup;
 }

@@ -1,4 +1,3 @@
-
 PERFCOUNTER_CPU (seg_fixups,   "segmentation fixups" )
 
 PERFCOUNTER_CPU( irqs,         "#interrupts" )

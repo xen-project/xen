@@ -150,6 +150,8 @@ void show_registers(struct xen_regs *regs)
            ds, es, fs, gs, ss, cs);
 
     show_stack((unsigned long *)&regs->esp);
+    if ( GUEST_MODE(regs) )
+        show_guest_stack();
 } 
 
 void show_page_walk(unsigned long addr)
