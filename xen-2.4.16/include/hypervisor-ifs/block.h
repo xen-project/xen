@@ -51,13 +51,13 @@ typedef struct blk_ring_entry
 
 typedef struct blk_ring_st 
 {
-  blk_ring_entry_t *tx_ring;
-  unsigned int      tx_prod, tx_cons;
-  unsigned int 	    tx_ring_size;
+  blk_ring_entry_t *btx_ring;
+  unsigned int      btx_prod, btx_cons;
+  unsigned int 	    btx_ring_size;
 
-  blk_ring_entry_t *rx_ring;
-  unsigned int      rx_prod, rx_cons;
-  unsigned int	    rx_ring_size;
+  blk_ring_entry_t *brx_ring;
+  unsigned int      brx_prod, brx_cons;
+  unsigned int	    brx_ring_size;
 } blk_ring_t;
 
 #define MAX_XEN_DISK_COUNT 100

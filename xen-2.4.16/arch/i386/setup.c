@@ -283,6 +283,7 @@ void __init start_of_day(void)
     extern int  setup_network_devices(void);
     extern void net_init(void);
     extern void initialize_block_io(void);
+    extern void initialize_keytable(); 
     extern void initialize_serial(void);
     extern void initialize_keyboard(void);
 
@@ -337,8 +338,9 @@ void __init start_of_day(void)
 #endif
     do_initcalls();
 
+    initialize_keytable(); /* call back handling for key codes      */
     initialize_serial();   /* setup serial 'driver' (for debugging) */
-    initialize_keyboard(); /* setup keyboard (also for debugging) */
+    initialize_keyboard(); /* setup keyboard (also for debugging)   */
 
     if ( !setup_network_devices() )
         panic("Must have a network device!\n");

@@ -19,3 +19,4 @@ xen-2.4.16/include/xeno/sched.h.orig
 xenolinux-2.4.16-sparse/arch/xeno/drivers/block/Makefile.orig
 xenolinux-2.4.16-sparse/arch/xeno/drivers/block/block.c.orig
 xenolinux-2.4.16-sparse/scripts/kconfig.tk
+xen-2.4.16/foo
