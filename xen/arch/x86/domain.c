@@ -330,6 +330,8 @@ static void monitor_rm_pagetable(struct exec_domain *ed)
     l2_pgentry_t *mpl2e;
     unsigned long mpfn;
 
+    ASSERT( pagetable_val(m->monitor_table) );
+    
     mpl2e = (l2_pgentry_t *) map_domain_mem(pagetable_val(m->monitor_table));
     /*
      * First get the pfn for guest_pl2e_cache by looking at monitor_table

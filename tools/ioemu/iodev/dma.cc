@@ -182,6 +182,14 @@ bx_dma_c::init(void)
     }
   BX_DMA_THIS s[1].chan[0].used = 1; // cascade channel in use
   BX_INFO(("channel 4 used by cascade"));
+  bios_init();
+}
+
+/* Remove it when guest fw ready*/
+  void
+bx_dma_c::bios_init(void){
+  BX_DMA_THIS s[1].mask[0] = 0; // unmask cascade channel  
+  BX_DMA_THIS s[1].chan[0].mode.mode_type = 3; // cascade mode for channel 4
 }
 
   void
@@ -189,6 +197,7 @@ bx_dma_c::reset(unsigned type)
 {
   reset_controller(0);
   reset_controller(1);
+  bios_init();
 }
 
   void

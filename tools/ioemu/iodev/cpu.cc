@@ -213,6 +213,10 @@ bx_cpu_c::cpu_loop(int max_instr_count)
 #endif
 			interrupt(vector);
 		}
+		/* we check DMA after interrupt check*/
+		while(BX_HRQ){
+			DEV_dma_raise_hlda();
+		}
 
 		if (send_event) {
 			int ret;
