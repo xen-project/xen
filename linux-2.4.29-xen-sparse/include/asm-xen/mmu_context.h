@@ -28,9 +28,6 @@ static inline void enter_lazy_tlb(struct mm_struct *mm, struct task_struct *tsk,
 #endif
 
 extern pgd_t *cur_pgd;
-extern int mm_state_sync;
-#define STATE_SYNC_PT  1
-#define STATE_SYNC_LDT 2
 
 static inline void switch_mm(struct mm_struct *prev, struct mm_struct *next, struct task_struct *tsk, unsigned cpu)
 {
@@ -39,23 +36,16 @@ static inline void switch_mm(struct mm_struct *prev, struct mm_struct *next, str
 		clear_bit(cpu, &prev->cpu_vm_mask);
 		/* Re-load page tables */
 		cur_pgd = next->pgd;
-		mm_state_sync |= STATE_SYNC_PT;
+		xen_pt_switch(__pa(cur_pgd));
 		/* load_LDT, if either the previous or next thread
 		 * has a non-default LDT.
 		 */
 		if (next->context.size+prev->context.size)
-			mm_state_sync |= STATE_SYNC_LDT;
+			load_LDT(&next->context);
 	}
 }
 
-#define activate_mm(prev, next)                                 \
-do {                                                            \
-	switch_mm((prev),(next),NULL,smp_processor_id());       \
-	if (mm_state_sync & STATE_SYNC_PT)                      \
-		xen_pt_switch(__pa(cur_pgd));                   \
-	if (mm_state_sync & STATE_SYNC_LDT)                     \
-		load_LDT(&(next)->context);                     \
-	mm_state_sync = 0;                                      \
-} while ( 0 )
+#define activate_mm(prev, next)	\
+	switch_mm((prev),(next),NULL,smp_processor_id())
 
 #endif

@@ -305,35 +305,6 @@ void fastcall __switch_to(struct task_struct *prev_p, struct task_struct *next_p
     struct thread_struct *next = &next_p->thread;
     physdev_op_t op;
     multicall_entry_t _mcl[8], *mcl = _mcl;
-    mmu_update_t _mmu[2], *mmu = _mmu;
-
-    if ( mm_state_sync & STATE_SYNC_PT )
-    {
-        mmu->ptr = virt_to_machine(cur_pgd) | MMU_EXTENDED_COMMAND;
-        mmu->val = MMUEXT_NEW_BASEPTR;
-        mmu++;
-    }
-
-    if ( mm_state_sync & STATE_SYNC_LDT )
-    {
-        __asm__ __volatile__ ( 
-            "xorl %%eax,%%eax; movl %%eax,%%fs; movl %%eax,%%gs" : : : "eax" );
-        mmu->ptr = (unsigned long)next_p->mm->context.ldt |
-            MMU_EXTENDED_COMMAND;
-        mmu->val = (next_p->mm->context.size << MMUEXT_CMD_SHIFT) |
-            MMUEXT_SET_LDT;
-        mmu++;
-    }
-
-    if ( mm_state_sync != 0 )
-    {
-        mcl->op      = __HYPERVISOR_mmu_update;
-        mcl->args[0] = (unsigned long)_mmu;
-        mcl->args[1] = mmu - _mmu;
-        mcl->args[2] = 0;
-        mcl++;
-        mm_state_sync = 0;
-    }
 
     /*
      * This is basically 'unlazy_fpu', except that we queue a multicall to 
