@@ -185,7 +185,8 @@ int shadow_mode_enable(struct domain *p, unsigned int mode)
     {
         m->shadow_dirty_bitmap_size = (p->max_pages + 63) & ~63;
         m->shadow_dirty_bitmap = 
-            _xmalloc(m->shadow_dirty_bitmap_size/8);
+            xmalloc_array(unsigned long, m->shadow_dirty_bitmap_size /
+                                         (8 * sizeof(unsigned long)));
         if ( m->shadow_dirty_bitmap == NULL )
         {
             m->shadow_dirty_bitmap_size = 0;
