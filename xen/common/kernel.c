@@ -59,6 +59,9 @@ int opt_noht=0;
 int opt_noacpi=0;
 /* opt_nosmp: If true, secondary processors are ignored. */
 int opt_nosmp=0;
+/* opt_ignorebiostables: If true, ACPI and MP tables are ignored. */
+/* NB. This flag implies 'nosmp' and 'noacpi'. */
+int opt_ignorebiostables=0;
 /* opt_watchdog: If true, run a watchdog NMI on each processor. */
 int opt_watchdog=0;
 
@@ -67,15 +70,16 @@ static struct {
     enum { OPT_IP, OPT_STR, OPT_UINT, OPT_BOOL } type;
     void *var;
 } opts[] = {
-    { "console",     OPT_UINT, &opt_console },
-    { "ser_baud",    OPT_UINT, &opt_ser_baud },
-    { "dom0_mem",    OPT_UINT, &opt_dom0_mem }, 
-    { "ifname",      OPT_STR,  &opt_ifname },
-    { "noht",        OPT_BOOL, &opt_noht },
-    { "noacpi",      OPT_BOOL, &opt_noacpi },
-    { "nosmp",       OPT_BOOL, &opt_nosmp },
-    { "watchdog",    OPT_BOOL, &opt_watchdog },
-    { NULL,          0,        NULL     }
+    { "console",          OPT_UINT, &opt_console },
+    { "ser_baud",         OPT_UINT, &opt_ser_baud },
+    { "dom0_mem",         OPT_UINT, &opt_dom0_mem }, 
+    { "ifname",           OPT_STR,  &opt_ifname },
+    { "noht",             OPT_BOOL, &opt_noht },
+    { "noacpi",           OPT_BOOL, &opt_noacpi },
+    { "nosmp",            OPT_BOOL, &opt_nosmp },
+    { "ignorebiostables", OPT_BOOL, &opt_ignorebiostables },
+    { "watchdog",         OPT_BOOL, &opt_watchdog },
+    { NULL,               0,        NULL     }
 };
 
 

@@ -256,15 +256,28 @@ Troubleshooting Problems
 If you have problems booting Xen, there are a number of boot parameters 
 that may be able to help diagnose problems:
 
- noacpi   	turn acpi probing off, which may confuse Xen on some chipsets
- watchdog	enable NMI watchdog which can report certain failures
- nosmp		disable SMP support
- noht		disable Hyperthreading
- ifname=ethXX	select which Ethernet interface to use if you have multiple
- ifname=dummy	don't use any network interface
- ser_baud=xxx	set serial line baud rate for console 
- dom0_mem=xxx 	set the initial amount of memory for domain0. Xen will also
-		  reserve some memory fr itself too. 
+ ignorebiostables Disable parsing of BIOS-supplied tables. This is needed
+                  for some very unsupported chipsets (eg. nforce2). If you
+                  specify this option then ACPI tables are also ignored, and
+                  SMP suppirt is disabled.
+
+ nosmp		  Disable SMP support.
+                  This option is implied by 'ignorebiostables'.
+
+ noacpi   	  Disable ACPI tables, which confuse Xen on some chipsets.
+                  This option is implied by 'ignorebiostables'.
+
+ watchdog	  Enable NMI watchdog which can report certain failures.
+
+ noht		  Disable Hyperthreading.
+
+ ifname=ethXX	  Select which Ethernet interface to use.
+
+ ifname=dummy	  Don't use any network interface.
+
+ ser_baud=xxx	  Set serial line baud rate for console.
+
+ dom0_mem=xxx 	  Set the initial amount of memory for domain0.
 		  
 
 It's probably a good idea to join the Xen developer's mailing list on

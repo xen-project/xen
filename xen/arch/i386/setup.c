@@ -331,7 +331,7 @@ void __init start_of_day(void)
     extern void initialize_keytable(); 
     extern void initialize_serial(void);
     extern void initialize_keyboard(void);
-    extern int opt_nosmp, opt_watchdog;
+    extern int opt_nosmp, opt_watchdog, opt_noacpi, opt_ignorebiostables;
     extern int do_timer_lists_from_pit;
     unsigned long low_mem_size;
     
@@ -352,12 +352,21 @@ void __init start_of_day(void)
     if ( cpu_has_fxsr ) set_in_cr4(X86_CR4_OSFXSR);
     if ( cpu_has_xmm )  set_in_cr4(X86_CR4_OSXMMEXCPT);
 #ifdef CONFIG_SMP
-    find_smp_config();            /* find ACPI tables */
-    smp_alloc_memory();           /* trampoline which other CPUs jump at */
+    if ( opt_ignorebiostables )
+    {
+        opt_nosmp  = 1;           /* No SMP without configuration          */
+        opt_noacpi = 1;           /* ACPI will just confuse matters also   */
+    }
+    else
+    {
+        find_smp_config();
+        smp_alloc_memory();       /* trampoline which other CPUs jump at   */
+    }
 #endif
     paging_init();                /* not much here now, but sets up fixmap */
 #ifdef CONFIG_SMP
-    if ( smp_found_config ) get_smp_config();
+    if ( smp_found_config ) 
+        get_smp_config();
 #endif
     domain_init();
     scheduler_init();	
@@ -374,7 +383,7 @@ void __init start_of_day(void)
 #ifndef CONFIG_SMP    
     APIC_init_uniprocessor();
 #else
-    if( opt_nosmp )
+    if ( opt_nosmp )
 	APIC_init_uniprocessor();
     else
     	smp_boot_cpus(); 
