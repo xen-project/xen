@@ -116,6 +116,9 @@ void netif_create(netif_be_create_t *create)
     dev->get_stats       = netif_be_get_stats;
     memcpy(dev->dev_addr, create->mac, ETH_ALEN);
 
+    /* Disable queuing. */
+    dev->tx_queue_len = 0;
+
     /* XXX In bridge mode we should force a different MAC from remote end. */
     dev->dev_addr[2] ^= 1;
 
