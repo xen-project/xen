@@ -32,13 +32,6 @@
 #include <linux/kernel.h>
 #include <linux/sched.h>
 #include <linux/errno.h>
-
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,0)
-#include <asm-xen/xen_proc.h>
-#else
-#include <asm/xen_proc.h>
-#endif
-
 #include <linux/mm.h>
 #include <linux/mman.h>
 #include <linux/smp_lock.h>
@@ -46,20 +39,13 @@
 #include <linux/bootmem.h>
 #include <linux/highmem.h>
 #include <linux/vmalloc.h>
-
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,0)
+#include <asm-xen/xen_proc.h>
 #include <asm-xen/hypervisor.h>
 #include <asm-xen/ctrl_if.h>
-#else
-#include <asm/hypervisor.h>
-#include <asm/ctrl_if.h>
-#endif
-
 #include <asm/pgalloc.h>
 #include <asm/pgtable.h>
 #include <asm/uaccess.h>
 #include <asm/tlb.h>
-
 #include <linux/list.h>
 
 /* USER DEFINES -- THESE SHOULD BE COPIED TO USER-SPACE TOOLS */
@@ -89,6 +75,7 @@ static unsigned long current_pages, most_seen_pages;
 #define PAGE_TO_LIST(p) ( &p->list )
 #define LIST_TO_PAGE(l) ( list_entry(l, struct page, list) )
 #define UNLIST_PAGE(p)  ( list_del(&p->list) )
+#define pte_offset_kernel pte_offset
 #endif
 
 /* List of ballooned pages, threaded through the mem_map array. */
@@ -128,11 +115,7 @@ static inline pte_t *get_ptep(unsigned long addr)
     pmd = pmd_offset(pgd, addr);
     if ( pmd_none(*pmd) || pmd_bad(*pmd) ) BUG();
 
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,0)
     ptep = pte_offset_kernel(pmd, addr);
-#else
-    ptep = pte_offset(pmd, addr);
-#endif
 
     return ptep;
 }
@@ -382,11 +365,7 @@ static void pagetable_extend (int cur_low_pfn, int newpages)
             }
             kpgd = pgd_offset_k((unsigned long)pte_base);
             kpmd = pmd_offset(kpgd, (unsigned long)pte_base);
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,0)
             kpte = pte_offset_kernel(kpmd, (unsigned long)pte_base);
-#else
-	    kpte = pte_offset(kpmd, (unsigned long)pte_base);
-#endif
             queue_l1_entry_update(kpte,
                                   (*(unsigned long *)kpte)&~_PAGE_RW);
             set_pmd(pmd, __pmd(_KERNPG_TABLE + __pa(pte_base)));
@@ -609,7 +588,8 @@ static int balloon_read(struct file *filp, char *buffer,
     if (len>count) len = count;
     if (len<0) len = 0;
 
-    copy_to_user(buffer, priv_bufp, len);
+    if ( copy_to_user(buffer, priv_bufp, len) != 0 )
+        return -EFAULT;
 
     *offp += len;
     return len;
@@ -619,8 +599,8 @@ static struct file_operations balloon_fops = {
     .read  = balloon_read,
     .write = balloon_write
 };
-#else
 
+#else
 
 static int balloon_write(struct file *file, const char *buffer,
                          u_long count, void *data)
@@ -689,7 +669,6 @@ static int balloon_write(struct file *file, const char *buffer,
         }
     }
 
-
     return len;
 }
 
@@ -707,10 +686,7 @@ static int balloon_read(char *page, char **start, off_t off,
   return len;
 }
 
-
-
 #endif
-
 
 static int __init balloon_init(void)
 {

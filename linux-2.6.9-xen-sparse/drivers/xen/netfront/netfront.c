@@ -157,14 +157,14 @@ static char *be_state_name[] = {
 
 #if DEBUG
 #define DPRINTK(fmt, args...) \
-    printk(KERN_ALERT "[XEN] (%s:%d) " fmt, __FUNCTION__, __LINE__, ##args)
+    printk(KERN_ALERT "xen_net (%s:%d) " fmt, __FUNCTION__, __LINE__, ##args)
 #else
 #define DPRINTK(fmt, args...) ((void)0)
 #endif
 #define IPRINTK(fmt, args...) \
-    printk(KERN_INFO "[XEN] " fmt, ##args)
+    printk(KERN_INFO "xen_net: " fmt, ##args)
 #define WPRINTK(fmt, args...) \
-    printk(KERN_WARNING "[XEN] " fmt, ##args)
+    printk(KERN_WARNING "xen_net: " fmt, ##args)
 
 static struct net_device *find_dev_by_handle(unsigned int handle)
 {
@@ -768,10 +768,6 @@ static void network_connect(struct net_device *dev,
             np->rx->ring[requeue_idx++].req.id = i;
     wmb();                
     np->rx->req_prod = requeue_idx;
-
-    printk(KERN_ALERT "[XEN] Netfront recovered tx=%d rxfree=%d\n",
-           np->tx->req_prod,np->rx->req_prod);
-
 
     /* Step 3: All public and private state should now be sane.  Get
      * ready to start sending and receiving packets and give the driver
