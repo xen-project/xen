@@ -158,6 +158,10 @@ void xen_console_init(void)
         if ( xc_mode == XC_DEFAULT )
             xc_mode = XC_SERIAL;
         kcons_info.write = kcons_write_dom0;
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,0)
+	if ( xc_mode == XC_SERIAL )
+	    kcons_info.flags |= CON_ENABLED;
+#endif
     }
     else
     {
