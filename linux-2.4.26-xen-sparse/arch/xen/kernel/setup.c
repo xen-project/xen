@@ -205,6 +205,8 @@ void __init setup_arch(char **cmdline_p)
     extern const struct exception_table_entry __start___ex_table[];
     extern const struct exception_table_entry __stop___ex_table[];
 
+    extern char _stext;
+
     /* Force a quick death if the kernel panics. */
     extern int panic_timeout;
     if ( panic_timeout == 0 )
@@ -314,7 +316,9 @@ void __init setup_arch(char **cmdline_p)
      */
     bootmap_size = init_bootmem(start_pfn, max_low_pfn);
     free_bootmem(0, PFN_PHYS(max_low_pfn));
-    reserve_bootmem(0, PFN_PHYS(start_pfn) + bootmap_size + PAGE_SIZE-1);
+    reserve_bootmem(__pa(&_stext), 
+                    PFN_PHYS(start_pfn) + bootmap_size + PAGE_SIZE-1 - 
+                    __pa(&_stext));
 
 #ifdef CONFIG_BLK_DEV_INITRD
     if ( start_info.mod_start != 0 )

@@ -5,6 +5,7 @@
 #include "xc_private.h"
 #define ELFSIZE 32
 #include "xc_elf.h"
+#include <stdlib.h>
 #include <zlib.h>
 
 #define L1_PROT (_PAGE_PRESENT|_PAGE_RW|_PAGE_ACCESSED)
@@ -13,11 +14,12 @@
 #define round_pgup(_p)    (((_p)+(PAGE_SIZE-1))&PAGE_MASK)
 #define round_pgdown(_p)  ((_p)&PAGE_MASK)
 
-static int readelfimage_base_and_size(char *elfbase, 
-                                      unsigned long elfsize,
-                                      unsigned long *pkernstart,
-                                      unsigned long *pkernend,
-                                      unsigned long *pkernentry);
+static int parseelfimage(char *elfbase, 
+                         unsigned long elfsize,
+                         unsigned long *pvirtstart,
+                         unsigned long *pkernstart,
+                         unsigned long *pkernend,
+                         unsigned long *pkernentry);
 static int loadelfimage(char *elfbase, void *pmh, unsigned long *parray,
                         unsigned long vstart);
 
@@ -109,11 +111,17 @@ static int setup_guestos(int xc_handle,
     unsigned long vpt_end;
     unsigned long v_end;
 
-    rc = readelfimage_base_and_size(image, image_size, 
-                                    &vkern_start, &vkern_end, &vkern_entry);
+    rc = parseelfimage(image, image_size, &v_start,
+                       &vkern_start, &vkern_end, &vkern_entry);
     if ( rc != 0 )
         goto error_out;
     
+    if ( (v_start & (PAGE_SIZE-1)) != 0 )
+    {
+        PERROR("Guest OS must load to a page boundary.\n");
+        goto error_out;
+    }
+
     /*
      * Why do we need this? The number of page-table frames depends on the 
      * size of the bootstrap address space. But the size of the address space 
@@ -123,7 +131,6 @@ static int setup_guestos(int xc_handle,
      */
     for ( nr_pt_pages = 2; ; nr_pt_pages++ )
     {
-        v_start          = vkern_start & ~((1<<22)-1);
         vinitrd_start    = round_pgup(vkern_end);
         vinitrd_end      = vinitrd_start + initrd_len;
         vphysmap_start   = round_pgup(vinitrd_end);
@@ -137,16 +144,9 @@ static int setup_guestos(int xc_handle,
         v_end            = (vstack_end + (1<<22)-1) & ~((1<<22)-1);
         if ( (v_end - vstack_end) < (512 << 10) )
             v_end += 1 << 22; /* Add extra 4MB to get >= 512kB padding. */
-        if ( (((v_end - v_start) >> L2_PAGETABLE_SHIFT) + 1) <= nr_pt_pages )
+        if ( (((v_end - v_start + ((1<<L2_PAGETABLE_SHIFT)-1)) >> 
+               L2_PAGETABLE_SHIFT) + 1) <= nr_pt_pages )
             break;
-    }
-
-    if ( (v_end - v_start) > (nr_pages * PAGE_SIZE) )
-    {
-        printf("Initial guest OS requires too much space\n"
-               "(%luMB is greater than %luMB limit)\n",
-               (v_end-v_start)>>20, (nr_pages<<PAGE_SHIFT)>>20);
-        goto error_out;
     }
 
     printf("VIRTUAL MEMORY ARRANGEMENT:\n"
@@ -165,6 +165,14 @@ static int setup_guestos(int xc_handle,
            vstack_start, vstack_end,
            v_start, v_end);
     printf(" ENTRY ADDRESS: %08lx\n", vkern_entry);
+
+    if ( (v_end - v_start) > (nr_pages * PAGE_SIZE) )
+    {
+        printf("Initial guest OS requires too much space\n"
+               "(%luMB is greater than %luMB limit)\n",
+               (v_end-v_start)>>20, (nr_pages<<PAGE_SHIFT)>>20);
+        goto error_out;
+    }
 
     if ( (pm_handle = init_pfn_mapper((domid_t)dom)) == NULL )
         goto error_out;
@@ -541,17 +549,18 @@ static inline int is_loadable_phdr(Elf_Phdr *phdr)
             ((phdr->p_flags & (PF_W|PF_X)) != 0));
 }
 
-static int readelfimage_base_and_size(char *elfbase, 
-                                      unsigned long elfsize,
-                                      unsigned long *pkernstart,
-                                      unsigned long *pkernend,
-                                      unsigned long *pkernentry)
+static int parseelfimage(char *elfbase, 
+                         unsigned long elfsize,
+                         unsigned long *pvirtstart,
+                         unsigned long *pkernstart,
+                         unsigned long *pkernend,
+                         unsigned long *pkernentry)
 {
     Elf_Ehdr *ehdr = (Elf_Ehdr *)elfbase;
     Elf_Phdr *phdr;
     Elf_Shdr *shdr;
     unsigned long kernstart = ~0UL, kernend=0UL;
-    char *shstrtab, *guestinfo;
+    char *shstrtab, *guestinfo, *p;
     int h;
 
     if ( !IS_ELF(*ehdr) )
@@ -588,7 +597,9 @@ static int readelfimage_base_and_size(char *elfbase,
         shdr = (Elf_Shdr *)(elfbase + ehdr->e_shoff + (h*ehdr->e_shentsize));
         if ( strcmp(&shstrtab[shdr->sh_name], "__xen_guest") != 0 )
             continue;
+
         guestinfo = elfbase + shdr->sh_offset;
+
         if ( (strstr(guestinfo, "GUEST_OS=linux") == NULL) ||
              (strstr(guestinfo, "XEN_VER=1.3") == NULL) )
         {
@@ -596,6 +607,11 @@ static int readelfimage_base_and_size(char *elfbase,
             ERROR("Actually saw: '%s'", guestinfo);
             return -EINVAL;
         }
+
+        *pvirtstart = kernstart;
+        if ( (p = strstr(guestinfo, "VIRT_BASE=")) != NULL )
+            *pvirtstart = strtoul(p+10, &p, 0);
+
         break;
     }
     if ( h == ehdr->e_shnum )

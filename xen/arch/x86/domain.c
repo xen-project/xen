@@ -565,10 +565,16 @@ int construct_dom0(struct domain *p,
      * We'll have to revisit this if we ever support PAE (64GB).
      */
 
-    rc = readelfimage_base_and_size(image_start, image_len,
-                                    &vkern_start, &vkern_end, &vkern_entry);
+    rc = parseelfimage(image_start, image_len, &v_start,
+                       &vkern_start, &vkern_end, &vkern_entry);
     if ( rc != 0 )
         return rc;
+
+    if ( (v_start & (PAGE_SIZE-1)) != 0 )
+    {
+        printk("Initial guest OS must load to a page boundary.\n");
+        return -EINVAL;
+    }
 
     /*
      * Why do we need this? The number of page-table frames depends on the 
@@ -579,7 +585,6 @@ int construct_dom0(struct domain *p,
      */
     for ( nr_pt_pages = 2; ; nr_pt_pages++ )
     {
-        v_start          = vkern_start & ~((1<<22)-1);
         vinitrd_start    = round_pgup(vkern_end);
         vinitrd_end      = vinitrd_start + initrd_len;
         vphysmap_start   = round_pgup(vinitrd_end);
@@ -593,16 +598,9 @@ int construct_dom0(struct domain *p,
         v_end            = (vstack_end + (1<<22)-1) & ~((1<<22)-1);
         if ( (v_end - vstack_end) < (512 << 10) )
             v_end += 1 << 22; /* Add extra 4MB to get >= 512kB padding. */
-        if ( (((v_end - v_start) >> L2_PAGETABLE_SHIFT) + 1) <= nr_pt_pages )
+        if ( (((v_end - v_start + ((1<<L2_PAGETABLE_SHIFT)-1)) >> 
+               L2_PAGETABLE_SHIFT) + 1) <= nr_pt_pages )
             break;
-    }
-
-    if ( (v_end - v_start) > (nr_pages * PAGE_SIZE) )
-    {
-        printk("Initial guest OS requires too much space\n"
-               "(%luMB is greater than %luMB limit)\n",
-               (v_end-v_start)>>20, (nr_pages<<PAGE_SHIFT)>>20);
-        return -ENOMEM;
     }
 
     printk("PHYSICAL MEMORY ARRANGEMENT:\n"
@@ -628,6 +626,14 @@ int construct_dom0(struct domain *p,
            vstack_start, vstack_end,
            v_start, v_end);
     printk(" ENTRY ADDRESS: %08lx\n", vkern_entry);
+
+    if ( (v_end - v_start) > (nr_pages * PAGE_SIZE) )
+    {
+        printk("Initial guest OS requires too much space\n"
+               "(%luMB is greater than %luMB limit)\n",
+               (v_end-v_start)>>20, (nr_pages<<PAGE_SHIFT)>>20);
+        return -ENOMEM;
+    }
 
     /*
      * Protect the lowest 1GB of memory. We use a temporary mapping there

@@ -16,17 +16,18 @@ static inline int is_loadable_phdr(Elf_Phdr *phdr)
             ((phdr->p_flags & (PF_W|PF_X)) != 0));
 }
 
-int readelfimage_base_and_size(char *elfbase, 
-                                      unsigned long elfsize,
-                                      unsigned long *pkernstart,
-                                      unsigned long *pkernend,
-                                      unsigned long *pkernentry)
+int parseelfimage(char *elfbase, 
+                  unsigned long elfsize,
+                  unsigned long *pvirtstart,
+                  unsigned long *pkernstart,
+                  unsigned long *pkernend,
+                  unsigned long *pkernentry)
 {
     Elf_Ehdr *ehdr = (Elf_Ehdr *)elfbase;
     Elf_Phdr *phdr;
     Elf_Shdr *shdr;
     unsigned long kernstart = ~0UL, kernend=0UL;
-    char *shstrtab, *guestinfo;
+    char *shstrtab, *guestinfo, *p;
     int h;
 
     if ( !IS_ELF(*ehdr) )
@@ -63,14 +64,21 @@ int readelfimage_base_and_size(char *elfbase,
         shdr = (Elf_Shdr *)(elfbase + ehdr->e_shoff + (h*ehdr->e_shentsize));
         if ( strcmp(&shstrtab[shdr->sh_name], "__xen_guest") != 0 )
             continue;
+
         guestinfo = elfbase + shdr->sh_offset;
         printk("Xen-ELF header found: '%s'\n", guestinfo);
+
         if ( (strstr(guestinfo, "GUEST_OS=linux") == NULL) ||
              (strstr(guestinfo, "XEN_VER=1.3") == NULL) )
         {
             printk("ERROR: Xen will only load Linux built for Xen v1.3\n");
             return -EINVAL;
         }
+
+        *pvirtstart = kernstart;
+        if ( (p = strstr(guestinfo, "VIRT_BASE=")) != NULL )
+            *pvirtstart = simple_strtoul(p+10, &p, 0);
+
         break;
     }
     if ( h == ehdr->e_shnum )
