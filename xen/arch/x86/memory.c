@@ -467,11 +467,12 @@ static void put_page_from_l1e(l1_pgentry_t l1e, struct domain *d)
     unsigned long    l1v  = l1_pgentry_val(l1e);
     unsigned long    pfn  = l1_pgentry_to_pagenr(l1e);
     struct pfn_info *page = &frame_table[pfn];
-    struct domain   *e = page->u.inuse.domain;
+    struct domain   *e;
 
     if ( !(l1v & _PAGE_PRESENT) || !pfn_is_ram(pfn) )
         return;
 
+    e = page->u.inuse.domain;
     if ( unlikely(e != d) )
     {
         /*
