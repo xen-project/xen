@@ -168,7 +168,11 @@ static int grant_ioctl(struct inode *inode, struct file *file,
 {
     int                     ret;
     privcmd_hypercall_t     hypercall;
-                                                                                        
+
+    /* XXX Need safety checks here if using for anything other
+     *     than debugging */
+    return -ENOSYS;
+
     if ( cmd != IOCTL_PRIVCMD_HYPERCALL )
         return -ENOSYS;
 
