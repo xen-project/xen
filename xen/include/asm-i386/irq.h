@@ -115,7 +115,9 @@ extern char _stext, _etext;
 	"pushl %ebx\n\t" \
 	"movl $" STR(__HYPERVISOR_DS) ",%edx\n\t" \
 	"movl %edx,%ds\n\t" \
-	"movl %edx,%es\n\t"
+	"movl %edx,%es\n\t" \
+	"movl %edx,%fs\n\t" \
+	"movl %edx,%gs\n\t"
 
 #define IRQ_NAME2(nr) nr##_interrupt(void)
 #define IRQ_NAME(nr) IRQ_NAME2(IRQ##nr)
