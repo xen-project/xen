@@ -42,21 +42,19 @@ static PyObject *pyxc_domain_create(PyObject *self,
     XcObject *xc = (XcObject *)self;
 
     unsigned int mem_kb = 0;
-    char        *name   = "(anon)";
     int          cpu = -1;
     float        cpu_weight = 1;
     u32          dom = 0;
     int          ret;
 
-    static char *kwd_list[] = { "dom", "mem_kb", "name", 
-                                "cpu", "cpu_weight", NULL };
+    static char *kwd_list[] = { "dom", "mem_kb", "cpu", "cpu_weight", NULL };
 
-    if ( !PyArg_ParseTupleAndKeywords(args, kwds, "|iisif", kwd_list, 
-                                      &dom, &mem_kb, &name, &cpu, &cpu_weight))
+    if ( !PyArg_ParseTupleAndKeywords(args, kwds, "|iiif", kwd_list, 
+                                      &dom, &mem_kb, &cpu, &cpu_weight))
         return NULL;
 
     if ( (ret = xc_domain_create(
-                    xc->xc_handle, mem_kb, name, cpu, cpu_weight, &dom)) < 0 )
+                    xc->xc_handle, mem_kb, cpu, cpu_weight, &dom)) < 0 )
         return PyErr_SetFromErrno(xc_error);
 
     return PyInt_FromLong(dom);
@@ -172,7 +170,7 @@ static PyObject *pyxc_domain_getinfo(PyObject *self,
         PyList_SetItem(
             list, i, 
             Py_BuildValue("{s:i,s:i,s:i,s:i,s:i,s:i,s:i,s:i"
-                          ",s:l,s:L,s:s,s:l,s:i}",
+                          ",s:l,s:L,s:l,s:i}",
                           "dom",       info[i].domid,
                           "cpu",       info[i].cpu,
                           "dying",     info[i].dying,
@@ -183,7 +181,6 @@ static PyObject *pyxc_domain_getinfo(PyObject *self,
                           "running",   info[i].running,
                           "mem_kb",    info[i].nr_pages*4,
                           "cpu_time",  info[i].cpu_time,
-                          "name",      info[i].name,
                           "maxmem_kb", info[i].max_memkb,
                           "shutdown_reason", info[i].shutdown_reason
                 ));
@@ -779,27 +776,6 @@ static PyObject *pyxc_rrobin_global_get(PyObject *self,
     return Py_BuildValue("{s:L}", "slice", slice);
 }
 
-static PyObject *pyxc_domain_setname(PyObject *self,
-                                     PyObject *args,
-                                     PyObject *kwds)
-{
-    XcObject *xc = (XcObject *)self;
-    u32 dom;
-    char *name;
-
-    static char *kwd_list[] = { "dom", "name", NULL };
-
-    if ( !PyArg_ParseTupleAndKeywords(args, kwds, "is", kwd_list, 
-                                      &dom, &name) )
-        return NULL;
-
-    if ( xc_domain_setname(xc->xc_handle, dom, name) != 0 )
-        return PyErr_SetFromErrno(xc_error);
-    
-    Py_INCREF(zero);
-    return zero;
-}
-
 static PyObject *pyxc_domain_setmaxmem(PyObject *self,
                                        PyObject *args,
                                        PyObject *kwds)
@@ -830,7 +806,6 @@ static PyMethodDef pyxc_methods[] = {
       "Create a new domain.\n"
       " dom    [int, 0]:        Domain identifier to use (allocated if zero).\n"
       " mem_kb [int, 0]:        Memory allocation, in kilobytes.\n"
-      " name   [str, '(anon)']: Informative textual name.\n\n"
       "Returns: [int] new domain identifier; -1 on error.\n" },
 
     { "domain_pause", 
@@ -883,7 +858,6 @@ static PyMethodDef pyxc_methods[] = {
       " mem_kb   [int]:  Memory reservation, in kilobytes\n"
       " maxmem_kb [int]: Maximum memory limit, in kilobytes\n"
       " cpu_time [long]: CPU time consumed, in nanoseconds\n"
-      " name     [str]:  Identifying name\n"
       " shutdown_reason [int]: Numeric code from guest OS, explaining "
       "reason why it shut itself down.\n" },
 
@@ -1069,14 +1043,6 @@ static PyMethodDef pyxc_methods[] = {
       "Set parameter for shadow pagetable interface\n"
       " dom [int]:   Identifier of domain.\n"
       " op [int, 0]: operation\n\n"
-      "Returns: [int] 0 on success; -1 on error.\n" },
-
-    { "domain_setname", 
-      (PyCFunction)pyxc_domain_setname, 
-      METH_VARARGS | METH_KEYWORDS, "\n"
-      "Set domain informative textual name\n"
-      " dom [int]:  Identifier of domain.\n"
-      " name [str]: Text string.\n\n"
       "Returns: [int] 0 on success; -1 on error.\n" },
 
     { "domain_setmaxmem", 

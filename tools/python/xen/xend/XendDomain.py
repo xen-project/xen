@@ -355,15 +355,6 @@ class XendDomain:
         deferred.addCallback(cbok)
         return deferred
 
-    def domain_setname(self, dom, name):
-        """Set the name of a domain.
-        For internal use only.
-
-        @param dom: domain id
-        @param name: domain name
-        """
-        return xc.domain_setname(dom=dom, name=name)
-
     def domain_restart(self, dominfo):
         """Restart a domain.
 

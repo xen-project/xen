@@ -236,7 +236,7 @@ def vm_recreate(savedinfo, info):
     if config:
         d = vm.construct(config)
     else:
-        vm.name = info['name']
+        vm.name = sxp.child_value(savedinfo, 'name')
         d = defer.succeed(vm)
     vm.recreate = 0
     return d
@@ -434,8 +434,6 @@ class XendDomainInfo:
                 self.cpu_weight = float(sxp.child_value(config, 'cpu_weight', '1'))
             except:
                 raise VmError('invalid cpu weight')
-            if self.restore and self.dom:
-                xc.domain_setname(self.dom, self.name)
             self.memory = int(sxp.child_value(config, 'memory'))
             if self.memory is None:
                 raise VmError('missing memory size')
@@ -690,7 +688,7 @@ class XendDomainInfo:
             raise VmError('invalid cpu')
         cpu_weight = self.cpu_weight
         dom = xc.domain_create(dom= dom, mem_kb= memory * 1024,
-                               name= name, cpu= cpu, cpu_weight= cpu_weight)
+                               cpu= cpu, cpu_weight= cpu_weight)
         if dom <= 0:
             raise VmError('Creating domain failed: name=%s memory=%d'
                           % (name, memory))

@@ -2,7 +2,6 @@
 #define __SCHED_H__
 
 #define STACK_SIZE (2*PAGE_SIZE)
-#define MAX_DOMAIN_NAME 16
 
 #include <xen/config.h>
 #include <xen/types.h>
@@ -85,7 +84,6 @@ struct domain
      */
 
     domid_t  domain;
-    char     name[MAX_DOMAIN_NAME];
     s_time_t create_time;
 
     spinlock_t       page_alloc_lock; /* protects all the following fields  */
@@ -135,7 +133,7 @@ struct domain
                         * "interesting" (i.e. have clear bits) */
 
     /* Handy macro - number of bytes of the IO bitmap, per selector bit. */
-#define IOBMP_SELBIT_LWORDS ( IO_BITMAP_SIZE / 64 )
+#define IOBMP_SELBIT_LWORDS (IO_BITMAP_SIZE / 64)
     unsigned long *io_bitmap; /* Pointer to task's IO bitmap or NULL */
 
     unsigned long flags;

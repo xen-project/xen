@@ -102,9 +102,6 @@ int xc_linux_restore(int xc_handle, XcIOContext *ioctxt)
     /* First 16 bytes of the state file must contain 'LinuxGuestRecord'. */
     char signature[16];
     
-    /* A copy of the domain's name. */
-    char name[MAX_DOMAIN_NAME];
-
     /* A table containg the type of each PFN (/not/ MFN!). */
     unsigned long *pfn_type = NULL;
 
@@ -149,8 +146,7 @@ int xc_linux_restore(int xc_handle, XcIOContext *ioctxt)
         goto out;
     }
 
-    if ( xcio_read(ioctxt, name,                  sizeof(name)) ||
-         xcio_read(ioctxt, &nr_pfns,              sizeof(unsigned long)) ||
+    if ( xcio_read(ioctxt, &nr_pfns,              sizeof(unsigned long)) ||
          xcio_read(ioctxt, pfn_to_mfn_frame_list, PAGE_SIZE) )
     {
         xcio_error(ioctxt, "Error reading header");
@@ -162,17 +158,6 @@ int xc_linux_restore(int xc_handle, XcIOContext *ioctxt)
         xcio_error(ioctxt, "Error writing vmconfig");
         goto out;
     }
-
-    for ( i = 0; i < MAX_DOMAIN_NAME; i++ ) 
-    {
-        if ( name[i] == '\0' ) break;
-        if ( name[i] & 0x80 )
-        {
-            xcio_error(ioctxt, "Random characters in domain name");
-            goto out;
-        }
-    }
-    name[MAX_DOMAIN_NAME-1] = '\0';
 
     if ( nr_pfns > 1024*1024 )
     {
@@ -199,30 +184,9 @@ int xc_linux_restore(int xc_handle, XcIOContext *ioctxt)
         goto out;
     }
 
-#if 0
-    /* Set the domain's name to that from the restore file */
-    if ( xc_domain_setname( xc_handle, dom, name ) )
-    {
-        xcio_error(ioctxt, "Could not set domain name");
-        goto out;
-    }
-
-    /* Set the domain's initial memory allocation 
-       to that from the restore file */
-
-    if ( xc_domain_setinitialmem(xc_handle, dom, 
-                                 nr_pfns * (PAGE_SIZE / 1024)) )
-    {
-        xcio_error(ioctxt, "Could not set domain %d initial memory. pfns=%d, %dKB",
-		   dom, nr_pfns,nr_pfns * (PAGE_SIZE / 1024));
-        goto out;
-    }
-#endif
-
-
-    /* XXX create domain on CPU=-1 so that in future it auto load ballances by default */
-    if ( xc_domain_create( xc_handle,  nr_pfns * (PAGE_SIZE / 1024),
-			   "", -1, 1, &dom ) )
+    /* Create domain on CPU -1 so that it may auto load-balance in future. */
+    if ( xc_domain_create(xc_handle, nr_pfns * (PAGE_SIZE / 1024),
+                          -1, 1, &dom) )
     {
 	xcio_error(ioctxt, "Could not create domain. pfns=%d, %dKB",
 		   nr_pfns,nr_pfns * (PAGE_SIZE / 1024));

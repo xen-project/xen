@@ -24,7 +24,6 @@ struct domain *task_list;
 
 struct domain *do_createdomain(domid_t dom_id, unsigned int cpu)
 {
-    char buf[100];
     struct domain *d, **pd;
     unsigned long flags;
 
@@ -59,11 +58,6 @@ struct domain *do_createdomain(domid_t dom_id, unsigned int cpu)
             return NULL;
         }
 
-        /* We use a large intermediate to avoid overflow in sprintf. */
-        sprintf(buf, "Domain-%u", dom_id);
-        strncpy(d->name, buf, MAX_DOMAIN_NAME);
-        d->name[MAX_DOMAIN_NAME-1] = '\0';
-
         arch_do_createdomain(d);
 
         sched_add_domain(d);
@@ -81,7 +75,6 @@ struct domain *do_createdomain(domid_t dom_id, unsigned int cpu)
     }
     else
     {
-        sprintf(d->name, "Idle-%d", cpu);
         sched_add_domain(d);
     }
 

@@ -31,8 +31,6 @@ typedef struct {
     unsigned long nr_pages;
     unsigned long shared_info_frame;
     u64           cpu_time;
-#define XC_DOMINFO_MAXNAME 16
-    char          name[XC_DOMINFO_MAXNAME];
     unsigned long max_memkb;
 } xc_dominfo_t;
 
@@ -46,7 +44,6 @@ typedef struct xc_shadow_control_stats_st
 
 int xc_domain_create(int xc_handle, 
                      unsigned int mem_kb, 
-                     const char *name,
                      int cpu,
                      float cpu_weight,
                      u32 *pdomid);
@@ -192,10 +189,6 @@ int xc_physinfo(int xc_handle,
 
 int xc_sched_id(int xc_handle,
                 int *sched_id);
-
-int xc_domain_setname(int xc_handle,
-                      u32 domid, 
-                      char *name);
 
 int xc_domain_setinitialmem(int xc_handle,
                             u32 domid, 
