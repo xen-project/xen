@@ -146,6 +146,12 @@ config XEN_BATCH_MODE2
       we only use this for benchmarking
       enable only if you know what you are doing
 
+config XEN_SHADOW_MODE
+	bool "Fake shadow mode"
+	default n
+    help
+      fakes out a shadow mode kernel
+
 
 config XEN_SCRUB_PAGES
 	bool "Scrub memory before freeing it to Xen"

@@ -77,7 +77,9 @@ static pte_t * __init one_page_table_init(pmd_t *pmd)
 {
 	if (pmd_none(*pmd)) {
 		pte_t *page_table = (pte_t *) alloc_bootmem_low_pages(PAGE_SIZE);
+#ifndef CONFIG_XEN_SHADOW_MODE
 		make_page_readonly(page_table);
+#endif
 		set_pmd(pmd, __pmd(__pa(page_table) | _PAGE_TABLE));
 		if (page_table != pte_offset_kernel(pmd, 0))
 			BUG();	
@@ -349,7 +351,9 @@ static void __init pagetable_init (void)
 	 * it. We clean up by write-enabling and then freeing the old page dir.
 	 */
 	memcpy(new_pgd, old_pgd, PTRS_PER_PGD_NO_HV*sizeof(pgd_t));
+#ifndef CONFIG_XEN_SHADOW_MODE
 	make_page_readonly(new_pgd);
+#endif
 	queue_pgd_pin(__pa(new_pgd));
 	load_cr3(new_pgd);
 	queue_pgd_unpin(__pa(old_pgd));
