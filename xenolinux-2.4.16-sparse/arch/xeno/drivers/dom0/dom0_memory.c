@@ -20,6 +20,12 @@
 #define MAP_CONT    0
 #define MAP_DISCONT 1
 
+/* now, this is grimm, kmalloc seems to have problems allocating small mem
+ * blocks, so i have decided to use fixed (a bit) larger blocks... this needs
+ * to be traced down but no time now.
+ */
+#define KMALLOC_SIZE	128
+
 /*
  * maps a range of physical memory into the requested pages. the old
  * mappings are removed. any references to nonexistent pages results
@@ -178,13 +184,9 @@ unsigned long direct_mmap(unsigned long phys_addr, unsigned long size,
         goto out;
     }
 
-	printk(KERN_ALERT "bd240 debug: before kmalloc\n");
-
     /* add node on the list of directly mapped areas */ 
     //dmmap = (direct_mmap_node_t *)kmalloc(GFP_KERNEL, sizeof(direct_mmap_node_t));
-    dmmap = (direct_mmap_node_t *)kmalloc(GFP_KERNEL, 128);
-
-	printk(KERN_ALERT "bd240 debug: after kmalloc\n");
+    dmmap = (direct_mmap_node_t *)kmalloc(GFP_KERNEL, KMALLOC_SIZE);
 
     dmmap->addr = addr;
     list_add(&dmmap->list, &current->mm->context.direct_list);
