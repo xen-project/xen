@@ -36,7 +36,8 @@ install:
         
 	install -m0644 images/next.png $(sv_insdir)/images
 	install -m0644 images/previous.png $(sv_insdir)/images        
-
+	install -m0644 images/finish.png $(sv_insdir)/images 
+        
 	# make include folder
 	mkdir -p $(sv_insdir)/inc
 	
