@@ -37,7 +37,7 @@ clean: delete-symlinks
 	$(MAKE) -C xen clean
 	$(MAKE) -C tools clean
 
-make-symlinks:
+make-symlinks: delete-symlinks
 	ln -sf linux-2.4.26-xen-sparse linux-xen-sparse
 
 delete-symlinks:
