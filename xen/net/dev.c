@@ -615,7 +615,7 @@ int netif_rx(struct sk_buff *skb)
     /* This oughtn't to happen, really! */
     if ( unlikely(skb_queue_len(q) > 100) )
     {
-        printk("Congestion -- packet dropped!!\n");
+        perfc_incr(net_rx_congestion_drop);
         return NET_RX_DROP;
     }
 
