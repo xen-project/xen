@@ -338,8 +338,6 @@ static int xlvbd_device_add(struct list_head *list, vdisk_t *disk)
     if ( !bd )
         goto out;
     
-    down(&bd->bd_sem);
-
     gd = xlvbd_alloc_gendisk(mi, minor, disk);
     if ( !gd )
         goto out_bd;
@@ -365,7 +363,6 @@ static int xlvbd_device_add(struct list_head *list, vdisk_t *disk)
 
     list_add(&new->list, list);
 out_bd:
-    up(&bd->bd_sem);
     bdput(bd);
 out:
     return 0;
@@ -385,8 +382,6 @@ static int xlvbd_device_del(struct lvdisk *disk)
     if ( !bd )
         return -1;
 
-    down(&bd->bd_sem);
-
     gd = get_gendisk(device, &unused);
     di = gd->private_data;
 
@@ -400,7 +395,6 @@ static int xlvbd_device_del(struct lvdisk *disk)
 
     xlvbd_device_free(disk);
 out:
-    up(&bd->bd_sem);
     bdput(bd);
     return ret;
 }
@@ -421,13 +415,10 @@ static int xlvbd_device_update(struct lvdisk *ldisk, vdisk_t *disk)
     if ( !bd )
         return -1;
 
-    down(&bd->bd_sem);
-
     gd = get_gendisk(device, &unused);
     set_capacity(gd, disk->capacity);    
     ldisk->capacity = disk->capacity;
 
-    up(&bd->bd_sem);
     bdput(bd);
 
     return 0;
