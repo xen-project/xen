@@ -67,7 +67,7 @@ static volatile unsigned long cpu_callin_map;
 static volatile unsigned long cpu_callout_map;
 
 /* Per CPU bogomips and other parameters */
-struct cpuinfo_x86 cpu_data[NR_CPUS] __cacheline_aligned;
+struct cpuinfo_x86 cpu_data[NR_CPUS];
 
 /* Set when the idlers are all forked */
 int smp_threads_ready;

@@ -130,7 +130,7 @@ static struct {
     unsigned long       cr0;
     /* If non-NULL, specifies a foreign subject domain for some operations. */
     struct domain      *foreign;
-} percpu_info[NR_CPUS] __cacheline_aligned;
+} __cacheline_aligned percpu_info[NR_CPUS];
 
 /*
  * Returns the current foreign domain; defaults to the currently-executing

@@ -13,7 +13,7 @@
 #include <xen/sched.h>
 #include <asm/smpboot.h>
 
-irq_desc_t irq_desc[NR_IRQS] __cacheline_aligned;
+irq_desc_t irq_desc[NR_IRQS];
 
 static void __do_IRQ_guest(int irq);
 

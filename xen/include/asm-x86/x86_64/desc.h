@@ -82,7 +82,7 @@ union desc_union {
 struct per_cpu_gdt {
 	struct ldttss_desc tss;
 	struct ldttss_desc ldt; 
-} ____cacheline_aligned; 
+} __cacheline_aligned; 
 
 
 struct Xgt_desc_struct {
