@@ -253,7 +253,7 @@ def make_domain():
     else:                     io_priv = False
 
     if restore:
-        ret = eval('xc.%s_restore ( dom=id, state_file=state_file, progress=1, io_priv=%d )' % (builder_fn, io_priv))
+        ret = eval('xc.%s_restore ( dom=id, state_file=state_file, progress=1)' % (builder_fn) )
         if ret < 0:
             print "Error restoring domain"
             print "Return code = " + str(ret)

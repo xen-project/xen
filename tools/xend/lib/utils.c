@@ -22,10 +22,10 @@
 #include <signal.h>
 #include <xc.h>
 
-#include <asm-xen/proc_cmd.h>
-
 #include <hypervisor-if.h>
 #include "domain_controller.h"
+
+#include <asm-xen/proc_cmd.h>
 
 /* Needed for Python versions earlier than 2.3. */
 #ifndef PyMODINIT_FUNC

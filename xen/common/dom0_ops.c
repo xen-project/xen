@@ -274,7 +274,6 @@ long do_dom0_op(dom0_op_t *u_dom0_op)
         }
         else
         {
-printk("AAAA %p\n",op->u.getdomaininfo.ctxt);
             op->u.getdomaininfo.domain      = p->domain;
             strcpy (op->u.getdomaininfo.name, p->name);
             op->u.getdomaininfo.processor   = p->processor;
@@ -349,7 +348,6 @@ printk("AAAA %p\n",op->u.getdomaininfo.ctxt);
 
 		if( copy_to_user(op->u.getdomaininfo.ctxt, c, sizeof(*c)) )
 		{
-printk("URGHT %p\n",op->u.getdomaininfo.ctxt);
 		    ret = -EINVAL;
 		}
 
@@ -546,6 +544,7 @@ printk("URGHT %p\n",op->u.getdomaininfo.ctxt);
 	if ( p )
 	{
 	    strncpy(p->name, op->u.setdomainname.name, MAX_DOMAIN_NAME);
+	    put_task_struct(p);
 	}
 	else 
 	    ret = -ESRCH;
@@ -565,6 +564,7 @@ printk("URGHT %p\n",op->u.getdomaininfo.ctxt);
 		    p, op->u.setdomaininitialmem.initial_memkb );
 	    else
 		ret = -EINVAL;
+	    put_task_struct(p);
 	}
     }
     break;
@@ -577,6 +577,7 @@ printk("URGHT %p\n",op->u.getdomaininfo.ctxt);
 	{
 	    p->max_pages = 
 		(op->u.setdomainmaxmem.max_memkb+PAGE_SIZE-1)>> PAGE_SHIFT;
+	    put_task_struct(p);
 	}
 	else 
 	    ret = -ESRCH;

@@ -164,8 +164,8 @@ static inline int get_page(struct pfn_info *page,
              unlikely(x & PGC_zombie) ||             /* Zombie? */
              unlikely(p != domain) )                 /* Wrong owner? */
         {
-            DPRINTK("Error pfn %08lx: ed=%p,sd=%p,caf=%08x\n",
-                    page_to_pfn(page), domain, p, x);
+            DPRINTK("Error pfn %08lx: ed=%p(%lld), sd=%p(%lld), caf=%08x\n",
+                    page_to_pfn(page), domain, (domain)?domain->domain:1234, p, (p)?p->domain:1234, x);
             return 0;
         }
         __asm__ __volatile__(

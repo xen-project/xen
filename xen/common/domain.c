@@ -214,6 +214,10 @@ void __kill_domain(struct task_struct *p)
     *pp = p->next_hash;
     write_unlock_irqrestore(&tasklist_lock, flags);
 
+    if ( atomic_read(&p->refcnt) >2 )
+	DPRINTK("Domain refcnt>1 so kil deferred. Missing put_task? p=%p cur=%p cnt=%d\n",p,current,atomic_read(&p->refcnt));
+
+
     if ( p == current )
     {
         __enter_scheduler();

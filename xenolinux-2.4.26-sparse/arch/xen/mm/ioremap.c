@@ -35,7 +35,7 @@ static inline int direct_remap_area_pte(pte_t *pte,
                                         domid_t  domid)
 {
     unsigned long end;
-#define MAX_DIRECTMAP_MMU_QUEUE 64
+#define MAX_DIRECTMAP_MMU_QUEUE 130
     mmu_update_t u[MAX_DIRECTMAP_MMU_QUEUE], *v;
 
     address &= ~PMD_MASK;
@@ -70,7 +70,7 @@ static inline int direct_remap_area_pte(pte_t *pte,
 #endif
         v->ptr = virt_to_machine(pte);
         v->val = (machine_addr & PAGE_MASK) | pgprot_val(prot) | _PAGE_IO;
-        if ( ++v == MAX_DIRECTMAP_MMU_QUEUE )
+        if ( ( ++v - u )== MAX_DIRECTMAP_MMU_QUEUE ) 
         {
             if ( HYPERVISOR_mmu_update(u, MAX_DIRECTMAP_MMU_QUEUE) < 0 )
                 return -EFAULT;

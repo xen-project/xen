@@ -62,6 +62,14 @@ static int privcmd_ioctl(struct inode *inode, struct file *file,
     }
     break;
 
+    case IOCTL_PRIVCMD_INITDOMAIN_EVTCHN:
+    {
+        extern int initdom_ctrlif_domcontroller_port;
+        ret = initdom_ctrlif_domcontroller_port;
+    }
+    break;
+    
+
     case IOCTL_PRIVCMD_MMAP:
     {
 #define PRIVCMD_MMAP_SZ 32
@@ -108,13 +116,6 @@ static int privcmd_ioctl(struct inode *inode, struct file *file,
     }
     break;
 
-    case IOCTL_PRIVCMD_INITDOMAIN_EVTCHN:
-    {
-        extern int initdom_ctrlif_domcontroller_port;
-        ret = initdom_ctrlif_domcontroller_port;
-    }
-    break;
-    
     default:
         ret = -EINVAL;
     	break;
@@ -124,7 +125,6 @@ static int privcmd_ioctl(struct inode *inode, struct file *file,
 
 static int privcmd_mmap(struct file * file, struct vm_area_struct * vma)
 {
-printk(KERN_ALERT"privcmd_mmap\n");
 	/* DONTCOPY is essential for Xen as copy_page_range is broken. */
 	vma->vm_flags |= VM_RESERVED | VM_IO | VM_DONTCOPY;
 
