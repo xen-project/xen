@@ -387,12 +387,6 @@ static void network_alloc_rx_buffers(struct net_device *dev)
         rx_mcl[i].args[2] = 0;
     }
 
-    /*
-     * We may have allocated buffers which have entries outstanding in the page
-     * update queue -- make sure we flush those first!
-     */
-    flush_page_update_queue();
-
     /* After all PTEs have been zapped we blow away stale TLB entries. */
     rx_mcl[i-1].args[2] = UVMF_FLUSH_TLB;
 
