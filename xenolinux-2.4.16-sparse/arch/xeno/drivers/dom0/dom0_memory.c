@@ -327,6 +327,7 @@ int direct_unmap(unsigned long addr, unsigned long size)
         return -1;
 
     list_del(&node->list);
+	printk(KERN_ALERT "bd240 debug: delisted %lx from dlist\n", node->vm_start);
     kfree(node);
 
     direct_zap_page_range(current->mm, addr, size);
