@@ -52,6 +52,7 @@ struct fbvt_dom_info
 
 struct fbvt_cpu_info
 {
+    spinlock_t          run_lock;  /* protects runqueue */
     struct list_head    runqueue;  /* runqueue for this CPU */
     unsigned long       svt;       /* XXX check this is unsigned long! */
     u32                 vtb;       /* virtual time bonus */
@@ -160,15 +161,122 @@ int fbvt_init_idle_task(struct domain *p)
     if(fbvt_alloc_task(p) < 0) return -1;
 
     fbvt_add_task(p);
-    spin_lock_irqsave(&schedule_data[p->processor].schedule_lock, flags);
+    spin_lock_irqsave(&CPU_INFO(p->processor)->run_lock, flags);
     set_bit(DF_RUNNING, &p->flags);
     if ( !__task_on_runqueue(RUNLIST(p)) )
     __add_to_runqueue_head(RUNLIST(p), RUNQUEUE(p->processor));
-    spin_unlock_irqrestore(&schedule_data[p->processor].schedule_lock, flags);
+    spin_unlock_irqrestore(&CPU_INFO(p->processor)->run_lock, flags);
 
     return 0;
 }
                                         
+static void fbvt_wake(struct domain *d)
+{
+    unsigned long        flags;
+    struct fbvt_dom_info *inf = FBVT_INFO(d);
+    struct domain        *curr;
+    s_time_t             now, min_time;
+    int                  cpu = d->processor;
+    s32                  io_warp;
+
+    /* The runqueue accesses must be protected */
+    spin_lock_irqsave(&CPU_INFO(cpu)->run_lock, flags);
+    
+    /* If on the runqueue already then someone has done the wakeup work. */
+    if ( unlikely(__task_on_runqueue(RUNLIST(d))) )
+    {
+        spin_unlock_irqrestore(&CPU_INFO(cpu)->run_lock, flags); 
+        return;
+    }    
+    
+    __add_to_runqueue_head(RUNLIST(d), RUNQUEUE(cpu));
+ 
+    now = NOW();
+
+#if 0
+    /*
+     * XXX KAF: This was fbvt_unpause(). Not sure if it's the right thing
+     * to do, in light of the stuff that fbvt_wake_up() does.
+     * e.g., setting 'inf->avt = CPU_SVT(cpu);' would make the later test
+     * 'inf->avt < CPU_SVT(cpu)' redundant!
+     */
+    if ( d->domain == IDLE_DOMAIN_ID )
+    {
+        inf->avt = inf->evt = ~0U;
+    } 
+    else 
+    {
+        /* Set avt to system virtual time. */
+        inf->avt = CPU_SVT(cpu);
+        /* Set some default values here. */
+        LAST_VTB(cpu) = 0;
+        __calc_evt(inf);
+    }
+#endif
+
+    /* Set the BVT parameters. */
+    if ( inf->avt < CPU_SVT(cpu) )
+    {
+        /*
+         * We want IO bound processes to gain dispatch precedence. It is 
+         * especially for device driver domains. Therefore AVT 
+         * not be updated to SVT but to a value marginally smaller.
+         * Since frequently sleeping domains have high time_slept
+         * values, the virtual time can be determined as:
+         * SVT - const * TIME_SLEPT
+         */
+        io_warp = (int)(0.5 * inf->time_slept);
+        if ( io_warp > 1000 )
+            io_warp = 1000;
+
+        ASSERT(inf->time_slept + CPU_SVT(cpu) > inf->avt + io_warp);
+        inf->time_slept += CPU_SVT(cpu) - inf->avt - io_warp;
+        inf->avt = CPU_SVT(cpu) - io_warp;
+    }
+
+    /* Deal with warping here. */
+    inf->warpback  = 1;
+    inf->warped    = now;
+    __calc_evt(inf);
+    spin_unlock_irqrestore(&CPU_INFO(cpu)->run_lock, flags);
+    
+    /* Access to schedule_data protected by schedule_lock */
+    spin_lock_irqsave(&schedule_data[cpu].schedule_lock, flags);
+    
+ 
+    curr = schedule_data[cpu].curr;
+ 
+    /* Currently-running domain should run at least for ctx_allow. */
+    min_time = curr->lastschd + curr->min_slice;
+    
+    spin_unlock_irqrestore(&schedule_data[cpu].schedule_lock, flags);   
+    
+    if ( is_idle_task(curr) || (min_time <= now) )
+        cpu_raise_softirq(cpu, SCHEDULE_SOFTIRQ);
+    else if ( schedule_data[cpu].s_timer.expires > (min_time + TIME_SLOP) )
+        mod_ac_timer(&schedule_data[cpu].s_timer, min_time);
+}
+
+
+static void fbvt_sleep(struct domain *d)
+{
+    unsigned long flags;
+
+    
+    if ( test_bit(DF_RUNNING, &d->flags) )
+        cpu_raise_softirq(d->processor, SCHEDULE_SOFTIRQ);
+    else
+    {
+         /* The runqueue accesses must be protected */
+        spin_lock_irqsave(&CPU_INFO(d->processor)->run_lock, flags);       
+    
+        if ( __task_on_runqueue(RUNLIST(d)) )
+            __del_from_runqueue(RUNLIST(d));
+
+        spin_unlock_irqrestore(&CPU_INFO(d->processor)->run_lock, flags);
+    }
+}
+
 
 /**
  * fbvt_free_task - free FBVT private structures for a task
@@ -232,7 +340,7 @@ int fbvt_adjdom(struct domain *p,
         if ( mcu_adv == 0 )
             return -EINVAL;
         
-        spin_lock_irqsave(&schedule_data[p->processor].schedule_lock, flags);   
+        spin_lock_irqsave(&CPU_INFO(p->processor)->run_lock, flags);   
         inf->mcu_advance = mcu_adv;
         inf->warp = warp;
         inf->warpl = warpl;
@@ -243,20 +351,18 @@ int fbvt_adjdom(struct domain *p,
                 p->domain, inf->mcu_advance, inf->warp,
                 inf->warpl, inf->warpu );
 
-        spin_unlock_irqrestore(&schedule_data[p->processor].schedule_lock, 
-                                                                        flags);
+        spin_unlock_irqrestore(&CPU_INFO(p->processor)->run_lock, flags);
     }
     else if ( cmd->direction == SCHED_INFO_GET )
     {
         struct fbvt_dom_info *inf = FBVT_INFO(p);
 
-        spin_lock_irqsave(&schedule_data[p->processor].schedule_lock, flags);   
+        spin_lock_irqsave(&CPU_INFO(p->processor)->run_lock, flags);   
         params->mcu_adv = inf->mcu_advance;
         params->warp    = inf->warp;
         params->warpl   = inf->warpl;
         params->warpu   = inf->warpu;
-        spin_unlock_irqrestore(&schedule_data[p->processor].schedule_lock, 
-                                                                        flags);
+        spin_unlock_irqrestore(&CPU_INFO(p->processor)->run_lock, flags);
     }
     
     return 0;
@@ -272,6 +378,7 @@ int fbvt_adjdom(struct domain *p,
  */
 static task_slice_t fbvt_do_schedule(s_time_t now)
 {
+    unsigned long flags;
     struct domain *prev = current, *next = NULL, *next_prime, *p;
     struct list_head   *tmp;
     int                 cpu = prev->processor;
@@ -288,6 +395,10 @@ static task_slice_t fbvt_do_schedule(s_time_t now)
 
     ASSERT(prev->sched_priv != NULL);
     ASSERT(prev_inf != NULL);
+    
+    spin_lock_irqsave(&CPU_INFO(cpu)->run_lock, flags);
+
+    ASSERT(__task_on_runqueue(RUNLIST(prev)));
 
     if ( likely(!is_idle_task(prev)) ) 
     {
@@ -364,6 +475,8 @@ static task_slice_t fbvt_do_schedule(s_time_t now)
         if ( p_inf->avt < min_avt )
             min_avt = p_inf->avt;
     }
+
+    spin_unlock_irqrestore(&CPU_INFO(cpu)->run_lock, flags);
 
     /* Extract the domain pointers from the dom infos */
     next        = next_inf->domain;
@@ -475,7 +588,7 @@ static void fbvt_dump_cpu_state(int i)
     struct fbvt_dom_info *d_inf;
     struct domain *d;
 
-    spin_lock_irqsave(&schedule_data[i].schedule_lock, flags);
+    spin_lock_irqsave(&CPU_INFO(i)->run_lock, flags);
     printk("svt=0x%08lX ", CPU_SVT(i));
 
     queue = RUNQUEUE(i);
@@ -494,7 +607,7 @@ static void fbvt_dump_cpu_state(int i)
             (unsigned long)list, (unsigned long)list->next,
             (unsigned long)list->prev);
     }
-    spin_unlock_irqrestore(&schedule_data[i].schedule_lock, flags);
+    spin_unlock_irqrestore(&CPU_INFO(i)->run_lock, flags);        
 }
 
 
@@ -519,13 +632,16 @@ int fbvt_init_scheduler()
     for ( i = 0; i < NR_CPUS; i++ )
     {
         schedule_data[i].sched_priv = xmalloc(sizeof(struct fbvt_cpu_info));
-        INIT_LIST_HEAD(RUNQUEUE(i));
+        
         if ( schedule_data[i].sched_priv == NULL )
         {
             printk("Failed to allocate FBVT scheduler per-CPU memory!\n");
             return -1;
         }
 
+        INIT_LIST_HEAD(RUNQUEUE(i));
+        spin_lock_init(&CPU_INFO(i)->run_lock);
+ 
         CPU_SVT(i) = 0; /* XXX do I really need to do this? */
     }
 
@@ -541,86 +657,7 @@ int fbvt_init_scheduler()
 
     return 0;
 }
-
-static void fbvt_sleep(struct domain *d)
-{
-    if ( test_bit(DF_RUNNING, &d->flags) )
-        cpu_raise_softirq(d->processor, SCHEDULE_SOFTIRQ);
-    else if ( __task_on_runqueue(RUNLIST(d)) )
-        __del_from_runqueue(RUNLIST(d));
-}
-
-static void fbvt_wake(struct domain *d)
-{
-    struct fbvt_dom_info *inf = FBVT_INFO(d);
-    struct domain        *curr;
-    s_time_t              now, min_time;
-    int                   cpu = d->processor;
-    s32                   io_warp;
-
-    /* If on the runqueue already then someone has done the wakeup work. */
-    if ( unlikely(__task_on_runqueue(RUNLIST(d))) )
-        return;
-    __add_to_runqueue_head(RUNLIST(d), RUNQUEUE(cpu));
  
-    now = NOW();
-
-#if 0
-    /*
-     * XXX KAF: This was fbvt_unpause(). Not sure if it's the right thing
-     * to do, in light of the stuff that fbvt_wake_up() does.
-     * e.g., setting 'inf->avt = CPU_SVT(cpu);' would make the later test
-     * 'inf->avt < CPU_SVT(cpu)' redundant!
-     */
-    if ( d->domain == IDLE_DOMAIN_ID )
-    {
-        inf->avt = inf->evt = ~0U;
-    } 
-    else 
-    {
-        /* Set avt to system virtual time. */
-        inf->avt = CPU_SVT(cpu);
-        /* Set some default values here. */
-        LAST_VTB(cpu) = 0;
-        __calc_evt(inf);
-    }
-#endif
-
-    /* Set the BVT parameters. */
-    if ( inf->avt < CPU_SVT(cpu) )
-    {
-        /*
-         * We want IO bound processes to gain dispatch precedence. It is 
-         * especially for device driver domains. Therefore AVT 
-         * not be updated to SVT but to a value marginally smaller.
-         * Since frequently sleeping domains have high time_slept
-         * values, the virtual time can be determined as:
-         * SVT - const * TIME_SLEPT
-         */
-        io_warp = (int)(0.5 * inf->time_slept);
-        if ( io_warp > 1000 )
-            io_warp = 1000;
-
-        ASSERT(inf->time_slept + CPU_SVT(cpu) > inf->avt + io_warp);
-        inf->time_slept += CPU_SVT(cpu) - inf->avt - io_warp;
-        inf->avt = CPU_SVT(cpu) - io_warp;
-    }
-
-    /* Deal with warping here. */
-    inf->warpback  = 1;
-    inf->warped    = now;
-    __calc_evt(inf);
-
-    curr = schedule_data[cpu].curr;
- 
-    /* Currently-running domain should run at least for ctx_allow. */
-    min_time = curr->lastschd + curr->min_slice;
-    
-    if ( is_idle_task(curr) || (min_time <= now) )
-        cpu_raise_softirq(cpu, SCHEDULE_SOFTIRQ);
-    else if ( schedule_data[cpu].s_timer.expires > (min_time + TIME_SLOP) )
-        mod_ac_timer(&schedule_data[cpu].s_timer, min_time);
-} 
 
 struct scheduler sched_fbvt_def = {
     .name     = "Fair Borrowed Virtual Time",

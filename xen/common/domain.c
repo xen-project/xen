@@ -40,7 +40,9 @@ struct domain *do_createdomain(domid_t dom_id, unsigned int cpu)
     d->domain    = dom_id;
     d->processor = cpu;
     d->create_time = NOW();
-
+    /* Initialise the state_lock */
+    spin_lock_init(&d->state_lock);
+ 
     memcpy(&d->thread, &idle0_task.thread, sizeof(d->thread));
 
     if ( d->domain != IDLE_DOMAIN_ID )
