@@ -109,15 +109,18 @@ static long evtchn_bind_interdomain(evtchn_bind_interdomain_t *bind)
         goto out;
     }
 
+    /* 'Allocate' port1 before searching for a free port2. */
+    p1->event_channel[port1].state = ECS_INTERDOMAIN;
+
     if ( (port2 = get_free_port(p2)) < 0 )
     {
+        p1->event_channel[port1].state = ECS_FREE;
         rc = port2;
         goto out;
     }
 
     p1->event_channel[port1].u.remote.dom  = p2;
     p1->event_channel[port1].u.remote.port = (u16)port2;
-    p1->event_channel[port1].state         = ECS_INTERDOMAIN;
 
     p2->event_channel[port2].u.remote.dom  = p1;
     p2->event_channel[port2].u.remote.port = (u16)port1;

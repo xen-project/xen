@@ -102,6 +102,7 @@
 4055ee44Bu6oP7U0WxxXypbUt4dNPQ tools/xenctl/setup.py
 40431ac64Hj4ixUnKmlugZKhXPFE_Q tools/xend/Makefile
 4055ad95Se-FqttgxollqOAAHB94zA tools/xend/lib/__init__.py
+4092738fMRGC9fFBcPRCWaJaj9U3ag tools/xend/lib/blkif.py
 4055ad97wMLUj0BZT0e_T0EwQN0Bvw tools/xend/lib/console.py
 4048c0ddsF0WrU7HUzTvg1MJoCIfWg tools/xend/lib/domain_controller.h
 4054a301VEag2GwrBrFBna5U1BGlLA tools/xend/lib/main.py

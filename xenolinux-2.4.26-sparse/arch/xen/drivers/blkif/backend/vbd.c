@@ -47,7 +47,7 @@ void vbd_create(blkif_be_vbd_create_t *create)
         }
     }
 
-    if ( unlikely((vbd = kmalloc(sizeof(vbd_t), GFP_KERNEL)) == NULL) )
+    if ( unlikely((vbd = kmalloc(sizeof(vbd_t), GFP_ATOMIC)) == NULL) )
     {
         DPRINTK("vbd_create: out of memory\n");
         create->status = BLKIF_BE_STATUS_OUT_OF_MEMORY;
@@ -62,11 +62,12 @@ void vbd_create(blkif_be_vbd_create_t *create)
     rb_link_node(&vbd->rb, rb_parent, rb_p);
     rb_insert_color(&vbd->rb, &blkif->vbd_rb);
 
+    DPRINTK("Successful creation of vdev=%04x (dom=%llu)\n",
+            vdevice, create->domid);
     create->status = BLKIF_BE_STATUS_OKAY;
 
  out:
     spin_unlock(&blkif->vbd_lock);
-    blkif_put(blkif);
 }
 
 
@@ -110,7 +111,7 @@ void vbd_grow(blkif_be_vbd_grow_t *grow)
     } 
 
     if ( unlikely((x = kmalloc(sizeof(blkif_extent_le_t), 
-                               GFP_KERNEL)) == NULL) )
+                               GFP_ATOMIC)) == NULL) )
     {
         DPRINTK("vbd_grow: out of memory\n");
         grow->status = BLKIF_BE_STATUS_OUT_OF_MEMORY;
@@ -127,11 +128,12 @@ void vbd_grow(blkif_be_vbd_grow_t *grow)
 
     *px = x;
 
+    DPRINTK("Successful grow of vdev=%04x (dom=%llu)\n",
+            vdevice, grow->domid);
     grow->status = BLKIF_BE_STATUS_OKAY;
 
  out:
     spin_unlock(&blkif->vbd_lock);
-    blkif_put(blkif);
 }
 
 
@@ -190,7 +192,6 @@ void vbd_shrink(blkif_be_vbd_shrink_t *shrink)
 
  out:
     spin_unlock(&blkif->vbd_lock);
-    blkif_put(blkif);
 }
 
 
@@ -242,7 +243,6 @@ void vbd_destroy(blkif_be_vbd_destroy_t *destroy)
     
  out:
     spin_unlock(&blkif->vbd_lock);
-    blkif_put(blkif);
 }
 
 

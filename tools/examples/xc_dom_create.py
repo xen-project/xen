@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 
 import string, sys, os, time, socket, getopt, signal, syslog
-import Xc, xenctl.utils, xenctl.console_client
+import Xc, xenctl.utils, xenctl.console_client, re
 
 config_dir  = '/etc/xc/'
 config_file = xc_config_file = config_dir + 'defaults'
@@ -195,6 +195,15 @@ output('VM cmdline         : "%s"' % cmdline)
 if dryrun:
     sys.exit(1)
 
+##### HACK HACK HACK
+##### Until everyone moves to the new I/O world, and a more robust domain
+##### controller (xend), we use this little trick to discover whether we
+##### are in a testing environment for new I/O stuff.
+new_io_world = True
+for line in os.popen('cat /proc/interrupts').readlines():
+    if re.search('blkdev', line):
+        new_io_world = False
+
 ##### Code beyond this point is actually used to manage the mechanics of
 ##### starting (and watching if necessary) guest virtual machines.
 
@@ -228,14 +237,14 @@ def make_domain():
 
     cmsg = 'new_control_interface(dom='+str(id)+', console_port='+str(console_port)+')'
 
-    xend_response = xenctl.utils.xend_control_message(cmsg)
+    cons_response = xenctl.utils.xend_control_message(cmsg)
 
-    if not xend_response['success']:
+    if not cons_response['success']:
 	print "Error creating initial event channel"
-	print "Error type: " + xend_response['error_type']
-	if xend_response['error_type'] == 'exception':
-	    print "Exception type: " + xend_response['exception_type']
-	    print "Exception value: " + xend_response['exception_value']
+	print "Error type: " + cons_response['error_type']
+	if cons_response['error_type'] == 'exception':
+	    print "Exception type: " + cons_response['exception_type']
+	    print "Exception value: " + cons_response['exception_value']
 	xc.domain_destroy ( dom=id )
 	sys.exit()
 
@@ -263,6 +272,18 @@ def make_domain():
 
     # set the expertise level appropriately
     xenctl.utils.VBD_EXPERT_MODE = vbd_expert
+
+    if new_io_world:
+        cmsg = 'new_block_interface(dom='+str(id)+')'
+        xend_response = xenctl.utils.xend_control_message(cmsg)
+        if not xend_response['success']:
+            print "Error creating block interface"
+            print "Error type: " + xend_response['error_type']
+            if xend_response['error_type'] == 'exception':
+                print "Exception type: " + xend_response['exception_type']
+                print "Exception val:  " + xend_response['exception_value']
+            xc.domain_destroy ( dom=id )
+            sys.exit()
     
     for ( uname, virt_name, rw ) in vbd_list:
 	virt_dev = xenctl.utils.blkdev_name_to_number( virt_name )
@@ -273,42 +294,70 @@ def make_domain():
 	    xc.domain_destroy ( dom=id )
 	    sys.exit()
 
-        # check that setting up this VBD won't violate the sharing
-        # allowed by the current VBD expertise level
-        if xenctl.utils.vd_extents_validate(segments, rw=='w' or rw=='rw') < 0:
-            xc.domain_destroy( dom = id )
-            sys.exit()
-            
-	if xc.vbd_create( dom=id, vbd=virt_dev, writeable= rw=='w' or rw=='rw' ):
-	    print "Error creating VBD vbd=%d writeable=%d\n" % (virt_dev,rw)
-	    xc.domain_destroy ( dom=id )
-	    sys.exit()
-	
-        if xc.vbd_setextents( dom=id,
-                              vbd=virt_dev,
-                              extents=segments):
-            print "Error populating VBD vbd=%d\n" % virt_dev
-            xc.domain_destroy ( dom=id )
-            sys.exit()
-
-    # setup virtual firewall rules for all aliases
-    for ip in vfr_ipaddr:
-	xenctl.utils.setup_vfr_rules_for_vif( id, 0, ip )
-
-    # check for physical device access
-    for (pci_bus, pci_dev, pci_func) in pci_device_list:
-        if xc.physdev_pci_access_modify(
-            dom=id, bus=pci_bus, dev=pci_dev, func=pci_func, enable=1 ) < 0:
-            print "Non-fatal error enabling PCI device access."
+        if new_io_world:
+            if len(segments) > 1:
+                print "New I/O world cannot deal with multi-extent vdisks"
+                xc.domain_destroy ( dom=id )
+                sys.exit()
+            seg = segments[0]
+            cmsg = 'new_block_device(dom=' + str(id) + \
+                   ',handle=0,vdev=' + str(virt_dev) + \
+                   ',pdev=' + str(seg['device']) + \
+                   ',start_sect=' + str(seg['start_sector']) + \
+                   ',nr_sect=' + str(seg['nr_sectors']) + \
+                   ',readonly=' + str(not re.match('w',rw)) + ')'
+            xend_response = xenctl.utils.xend_control_message(cmsg)
+            if not xend_response['success']:
+                print "Error creating virtual block device"
+                print "Error type: " + xend_response['error_type']
+                if xend_response['error_type'] == 'exception':
+                    print "Exception type: " + xend_response['exception_type']
+                    print "Exception val:  " + xend_response['exception_value']
+                xc.domain_destroy ( dom=id )
+                sys.exit()
         else:
-            print "Enabled PCI access (%d:%d:%d)." % (pci_bus,pci_dev,pci_func)
+            # check that setting up this VBD won't violate the sharing
+            # allowed by the current VBD expertise level
+            if xenctl.utils.vd_extents_validate(segments,
+                                                rw=='w' or rw=='rw') < 0:
+                xc.domain_destroy( dom = id )
+                sys.exit()
+            
+            if xc.vbd_create( dom=id, vbd=virt_dev,
+                              writeable= rw=='w' or rw=='rw' ):
+                print "Error creating VBD %d (writeable=%d)\n" % (virt_dev,rw)
+                xc.domain_destroy ( dom=id )
+                sys.exit()
+	
+            if xc.vbd_setextents( dom=id,
+                                  vbd=virt_dev,
+                                  extents=segments):
+                print "Error populating VBD vbd=%d\n" % virt_dev
+                xc.domain_destroy ( dom=id )
+                sys.exit()
+
+    if not new_io_world:
+        # setup virtual firewall rules for all aliases
+        for ip in vfr_ipaddr:
+            xenctl.utils.setup_vfr_rules_for_vif( id, 0, ip )
+
+    if new_io_world:
+        # check for physical device access
+        for (pci_bus, pci_dev, pci_func) in pci_device_list:
+            if xc.physdev_pci_access_modify(
+                dom=id, bus=pci_bus, dev=pci_dev,
+                func=pci_func, enable=1 ) < 0:
+                print "Non-fatal error enabling PCI device access."
+            else:
+                print "Enabled PCI access (%d:%d:%d)." % \
+                      (pci_bus,pci_dev,pci_func)
 
     if xc.domain_start( dom=id ) < 0:
         print "Error starting domain"
         xc.domain_destroy ( dom=id )
         sys.exit()
 
-    return (id, xend_response['console_port'])
+    return (id, cons_response['console_port'])
 # end of make_domain()
 
 def mkpidfile():

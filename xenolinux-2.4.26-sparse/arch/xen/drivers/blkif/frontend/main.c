@@ -18,9 +18,9 @@
 
 typedef unsigned char byte; /* from linux/ide.h */
 
-#define BLKIF_STATE_CLOSED    0
-#define BLKIF_STATE_DOWN      1
-#define BLKIF_STATE_UP        2
+#define BLKIF_STATE_CLOSED       0
+#define BLKIF_STATE_DISCONNECTED 1
+#define BLKIF_STATE_CONNECTED    2
 static unsigned int blkif_state = BLKIF_STATE_CLOSED;
 static unsigned int blkif_evtchn, blkif_irq;
 
@@ -35,7 +35,7 @@ static BLK_RING_IDX req_prod;  /* Private request producer.         */
 
 /* We plug the I/O ring if the driver is suspended or if the ring is full. */
 #define RING_PLUGGED (((req_prod - resp_cons) == BLK_RING_SIZE) || \
-                      (blkif_state != BLKIF_STATE_UP))
+                      (blkif_state != BLKIF_STATE_CONNECTED))
 
 
 /*
@@ -123,8 +123,10 @@ int blkif_release(struct inode *inode, struct file *filep)
      */
     if ( --disk->usage == 0 )
     {
+#if 0
         update_tq.routine = update_vbds_task;
         schedule_task(&update_tq);
+#endif
     }
 
     return 0;
@@ -306,7 +308,7 @@ static int blkif_queue_request(unsigned long   id,
     if ( unlikely((buffer_ma & ((1<<9)-1)) != 0) )
         BUG();
 
-    if ( unlikely(blkif_state != BLKIF_STATE_UP) )
+    if ( unlikely(blkif_state != BLKIF_STATE_CONNECTED) )
         return 1;
 
     switch ( operation )
@@ -498,7 +500,7 @@ static void blkif_int(int irq, void *dev_id, struct pt_regs *ptregs)
             {
                 next_bh = bh->b_reqnext;
                 bh->b_reqnext = NULL;
-                bh->b_end_io(bh, !bret->status);
+                bh->b_end_io(bh, bret->status == BLKIF_RSP_OKAY);
             }
             break;
         case BLKIF_OP_PROBE:
@@ -556,18 +558,18 @@ void blkif_control_send(blkif_request_t *req, blkif_response_t *rsp)
 
 static void blkif_bringup_phase1(void *unused)
 {
-    ctrl_msg_t              cmsg;
-    blkif_fe_interface_up_t up;
+    ctrl_msg_t                   cmsg;
+    blkif_fe_interface_connect_t up;
 
-    /* Move from CLOSED to DOWN state. */
+    /* Move from CLOSED to DISCONNECTED state. */
     blk_ring = (blkif_ring_t *)__get_free_page(GFP_KERNEL);
     blk_ring->req_prod = blk_ring->resp_prod = resp_cons = req_prod = 0;
-    blkif_state  = BLKIF_STATE_DOWN;
+    blkif_state  = BLKIF_STATE_DISCONNECTED;
 
-    /* Construct an interface-UP message for the domain controller. */
+    /* Construct an interface-CONNECT message for the domain controller. */
     cmsg.type      = CMSG_BLKIF_FE;
-    cmsg.subtype   = CMSG_BLKIF_FE_INTERFACE_UP;
-    cmsg.length    = sizeof(blkif_fe_interface_up_t);
+    cmsg.subtype   = CMSG_BLKIF_FE_INTERFACE_CONNECT;
+    cmsg.length    = sizeof(blkif_fe_interface_connect_t);
     up.handle      = 0;
     up.shmem_frame = virt_to_machine(blk_ring) >> PAGE_SHIFT;
     memcpy(cmsg.msg, &up, sizeof(up));
@@ -578,13 +580,13 @@ static void blkif_bringup_phase1(void *unused)
 
 static void blkif_bringup_phase2(void *unused)
 {
-    /* Move from DOWN to UP state. */
     blkif_irq = bind_evtchn_to_irq(blkif_evtchn);
     (void)request_irq(blkif_irq, blkif_int, 0, "blkif", NULL);
-    blkif_state = BLKIF_STATE_UP;
 
     /* Probe for discs that are attached to the interface. */
     xlvbd_init();
+
+    blkif_state = BLKIF_STATE_CONNECTED;
 
     /* Kick pending requests. */
     spin_lock_irq(&io_request_lock);
@@ -608,22 +610,22 @@ static void blkif_status_change(blkif_fe_interface_status_changed_t *status)
                blkif_state);
         break;
 
-    case BLKIF_INTERFACE_STATUS_DOWN:
+    case BLKIF_INTERFACE_STATUS_DISCONNECTED:
         if ( blkif_state != BLKIF_STATE_CLOSED )
         {
-            printk(KERN_WARNING "Unexpected blkif-DOWN message in state %d\n",
-                   blkif_state);
+            printk(KERN_WARNING "Unexpected blkif-DISCONNECTED message"
+                   " in state %d\n", blkif_state);
             break;
         }
         blkif_statechange_tq.routine = blkif_bringup_phase1;
         schedule_task(&blkif_statechange_tq);
         break;
 
-    case BLKIF_INTERFACE_STATUS_UP:
+    case BLKIF_INTERFACE_STATUS_CONNECTED:
         if ( blkif_state == BLKIF_STATE_CLOSED )
         {
-            printk(KERN_WARNING "Unexpected blkif-UP message in state %d\n",
-                   blkif_state);
+            printk(KERN_WARNING "Unexpected blkif-CONNECTED message"
+                   " in state %d\n", blkif_state);
             break;
         }
         blkif_evtchn = status->evtchn;
@@ -682,6 +684,17 @@ int __init xlblk_init(void)
     st.status      = BLKIF_DRIVER_STATUS_UP;
     memcpy(cmsg.msg, &st, sizeof(st));
     ctrl_if_send_message_block(&cmsg, NULL, 0, TASK_UNINTERRUPTIBLE);
+
+    /*
+     * We should read 'nr_interfaces' from response message and wait
+     * for notifications before proceeding. For now we assume that we
+     * will be notified of exactly one interface.
+     */
+    while ( blkif_state != BLKIF_STATE_CONNECTED )
+    {
+        set_current_state(TASK_INTERRUPTIBLE);
+        schedule_timeout(1);
+    }
 
     return 0;
 }
