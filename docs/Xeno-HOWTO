@@ -108,19 +108,14 @@ all the tools.
 
 Particularly, in order to compile tools under 'control', you
 must have Apache Ant installed. Latest binary can be found at
-'http://ant.apache.org/bindownload.cgi'. Besides, the Java
-codes under 'control' are quite broken. You may encounter
-compilation errors. For now, it's wise to skip 'control'.
+'http://ant.apache.org/bindownload.cgi'.
+
+Besides, you must have Java J2SDK 1.4 installed. There seemed
+to be compilation errors with J2SDK 1.3, but fine with J2SDK 1.4
 
 To summarize:
 
-# cd /xeno-1.1.bk/tools/balloon
-# make
-# make install
-# cd /xeno-1.1.bk/tools/internal
-# make
-# make install
-# cd /xeno-1.1.bk/tools/misc
+# cd /xeno-1.1.bk/tools
 # make
 # make install
 # cd /install/bin
@@ -186,20 +181,109 @@ The following is a list of command line arguments to pass to Xen:
  dom0_mem=xxx     Set the maximum amount of memory for domain0.
 
 
+Xenctl Configuration
+==============================
+
+# cd /xeno-1.1.bk/tools/control/examples
+# cp xenctl.xml xen-mynewdom /etc
+
+Then, you need to modify /etc/xen-mynewdom:
+
+# cat /etc/xen-mynewdom
+domain new
+physical grant -pcdrom_link
+domain start
+
+You should substitue 'cdrom_link' with the
+root partition, e.g. '/dev/hda3', '/dev/sda1'.
+Therefore, the second looks like:
+'physical grant -p/dev/hda3'
+
+Then, you need to modify /etc/xenctl.xml:
+
+# cat /etc/xenctl.xml
+<?xml version="1.0"?>
+<domctl_defaults>
+<domain_name>XenoLinux</domain_name>
+<domain_size_kb>98304</domain_size_kb>
+<domain_image>/boot/xenolinux.gz</domain_image>
+<domain_vifs>1</domain_vifs>
+<domain_init_rd>/boot/initrd.gz</domain_init_rd>
+<root_device>/dev/ram0</root_device>
+<root_args>rw</root_args>
+<args>init=/linuxrc 4 DOMID=+</args>
+<nw_ip>169.254.1.0+</nw_ip>
+<nw_gw>169.254.1.0</nw_gw>
+<nw_mask>255.255.0.0</nw_mask>
+<nw_nfs_server>169.254.1.0</nw_nfs_server>
+<max_domain_number>1000</max_domain_number>
+<xi_tools_dir>/usr/local/bin/</xi_tools_dir>
+</domctl_defaults>
+
+The meaning of every line is very straightforward
+and should be modified according to your configuration.
+
+Normally you don't need <domain_init_rd>. And you probably want
+root_args set to "ro", otherwise fsck will complain. Assuming you've
+installed a standard linux installation, you probably don't want to
+explicit set the init program, or the run level,
+e.g. <args>DOMID=+</args>
+
+
 Boot into Domain 0
 ==============================
 
-Reboot your computer; After selecting the kernel to boot, stand back and watch Xen boot, closely followed by "domain 0" running the XenoLinux kernel.  Depending on which root partition you have assigned to XenoLinux kernel in Grub configuration file, you can use the corresponding username / password
-to log in.
+Reboot your computer; After selecting the kernel to boot, stand back
+and watch Xen boot, closely followed by "domain 0" running the
+XenoLinux kernel.  Depending on which root partition you have assigned
+to XenoLinux kernel in Grub configuration file, you can use the
+corresponding username / password to log in.
 
 Once logged in, it should look just like any regular linux box. All
 the usual tools and commands should work as per usual.
 
 
-Using the domain control tools
+Start New Domains
 ==============================
 
-The README.CD file contains some examples of how to use 'xenctl' and
-the other domain control tools. Invoking the tool without any
-arguments prints some usage inforamtion. There's also some
-documentation in the the repository under tools/control/doc
+You must be 'root' to start new domains.
+
+Make sure you have successfully configured at least one
+physical network interface. Then:
+
+# xen_nat_enable
+# xen_read_console &
+
+When new  domains are created and  started, they will  send output via
+UDP packets to  the local virtual network. Those  packets are received
+by xen_read_console running in Domain  0 and output are printed out to
+the standard output.
+
+# xenctl script -f/etc/xen-mynewdom
+
+This will create and start a new domain based on /etc/xen-mynewdom and
+/etc/xenctl.xml
+
+You should be able to see XenoLinux boot message on standard output
+with each line prepended [domain_id].
+
+
+List and Stop Domains
+==============================
+
+You can see a list of existing domains with:
+
+# xi_list
+or
+# xenctl domain list
+
+In order to stop a domain, you use:
+
+# xi_stop domain_id
+or
+# xenctl domain stop -ndomain_id
+
+followed by
+# xi_destroy domain_id
+or
+# xenctl domain destroy -ndomain_id
