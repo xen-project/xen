@@ -41,7 +41,7 @@ dma_map_sg(struct device *dev, struct scatterlist *sg, int nents,
 	for (i = 0; i < nents; i++ ) {
 		BUG_ON(!sg[i].page);
 
-		sg[i].dma_address = page_to_machine(sg[i].page) + sg[i].offset;
+		sg[i].dma_address = page_to_phys(sg[i].page) + sg[i].offset;
 	}
 
 	flush_write_buffers();
@@ -53,7 +53,7 @@ dma_map_page(struct device *dev, struct page *page, unsigned long offset,
 	     size_t size, enum dma_data_direction direction)
 {
 	BUG_ON(direction == DMA_NONE);
-	return page_to_machine(page) + offset;
+	return page_to_phys(page) + offset;
 }
 
 static inline void
