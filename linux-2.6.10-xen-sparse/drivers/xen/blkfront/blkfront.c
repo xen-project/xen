@@ -434,7 +434,7 @@ static irqreturn_t blkif_int(int irq, void *dev_id, struct pt_regs *ptregs)
         return IRQ_HANDLED;
     }
     
-    rp = blk_ring.sring->req_prod;
+    rp = blk_ring.sring->rsp_prod;
     rmb(); /* Ensure we see queued responses up to 'rp'. */
 
     for ( i = blk_ring.rsp_cons; i != rp; i++ )
