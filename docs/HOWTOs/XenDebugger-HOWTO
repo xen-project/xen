@@ -55,16 +55,16 @@ Xen Configuration
      com2H   gdb stub should communicate on com2 (with high bit set)
 
   Symbolic debugging infomration is quite helpful too:
-  xeno.bk/xen/arch/i386/Rules.mk
+  xeno.bk/xen/arch/x86/Rules.mk
     add -g to CFLAGS to compile Xen with symbols
-  xeno.bk/xenolinux-2.4.24-sparse/arch/xen/Makefile
+  xeno.bk/linux-2.4.27-xen-sparse/arch/xen/Makefile
     add -g to CFLAGS to compile Linux with symbols
 
   You may also want to consider dedicating a register to the
   frame pointer (disable the -fomit-frame-pointer compile flag).
 
   When booting Xen and domain 0, look for the console text 
-  "Initializing pervasive debugger (PDB)" just before DOM0 starts up.
+  "pdb: pervasive debugger" just before DOM0 starts up.
 
 Serial Port Configuration
 
@@ -144,10 +144,10 @@ Usage
    (gdb) delete
    Delete all breakpoints? (y or n) y
 4. You can add additional symbols to gdb
-   (gdb) add-sym xenolinux-2.4.24/vmlinux
-   add symbol table from file "xenolinux-2.4.24/vmlinux" at
+   (gdb) add-sym xeno.bk/linux-2.4.27-xen0/vmlinux
+   add symbol table from file "xeno.bk/linux-2.4.27-xen0/vmlinux" at
    (y or n) y
-   Reading symbols from xenolinux-2.4.24/vmlinux...done.
+   Reading symbols from xeno.bk/linux-2.4.27-xen0/vmlinux...done.
    (gdb) x/s cpu_vendor_names[0]
    0xc01530d2 <cpdext+62898>:	 "Intel"
    (gdb) break free_uid
@@ -204,7 +204,7 @@ processes, pdb currently supports just Linux 2.4.
 
    define setup
       file xeno-clone/xeno.bk/xen/xen
-      add-sym xeno-clone/xenolinux-2.4.25/vmlinux
+      add-sym xeno-clone/xeno.bk/linux-2.4.27-xen0/vmlinux
       add-sym ~ach61/a.out
    end
 
@@ -269,7 +269,7 @@ Some Helpful .gdbinit Commands
 
 define setup
   file    .../install/boot/xen-syms
-  add-sym .../install/boot/vmlinux-syms-2.4.26-xen0
+  add-sym .../install/boot/vmlinux-syms-2.4.27-xen0
   add-sym /homes/aho/a.out
 end
 document setup
