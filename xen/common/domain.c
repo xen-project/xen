@@ -264,7 +264,7 @@ int final_setup_guestos(struct domain *p, dom0_builddomain_t *builddomain)
     int rc = 0;
     full_execution_context_t *c;
 
-    if ( (c = xmalloc(sizeof(*c))) == NULL )
+    if ( (c = xmalloc(full_execution_context_t)) == NULL )
         return -ENOMEM;
 
     if ( test_bit(DF_CONSTRUCTED, &p->d_flags) )
@@ -311,7 +311,7 @@ long do_boot_vcpu(unsigned long vcpu, full_execution_context_t *ctxt)
     if ( alloc_exec_domain_struct(d, vcpu) == NULL )
         return -ENOMEM;
 
-    if ( (c = xmalloc(sizeof(*c))) == NULL )
+    if ( (c = xmalloc(full_execution_context_t)) == NULL )
     {
         rc = -ENOMEM;
         goto out;

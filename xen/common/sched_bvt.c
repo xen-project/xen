@@ -557,7 +557,7 @@ int bvt_init_scheduler()
 
     for ( i = 0; i < NR_CPUS; i++ )
     {
-        schedule_data[i].sched_priv = xmalloc(sizeof(struct bvt_cpu_info));
+        schedule_data[i].sched_priv = xmalloc(struct bvt_cpu_info);
        
         if ( schedule_data[i].sched_priv == NULL )
         {

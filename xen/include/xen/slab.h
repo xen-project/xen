@@ -18,6 +18,7 @@ typedef struct xmem_cache_s xmem_cache_t;
 
 #include <xen/mm.h>
 #include <xen/cache.h>
+#include <xen/types.h>
 
 /* Flags to pass to xmem_cache_create(). */
 /* NB. The first 3 are only valid when built with SLAB_DEBUG_SUPPORT. */
@@ -52,6 +53,17 @@ extern int xmem_cache_reap(void);
 
 extern void dump_slabinfo();
 
+/* Nicely typesafe for you. */
+#define xmalloc(type) ((type *)xmalloc(sizeof(type)))
+#define xmalloc_array(type, num) ((type *)xmalloc_array(sizeof(type), (num)))
+
+static inline void *xmalloc_array(size_t size, size_t num)
+{
+	/* Check for overflow. */
+	if (size && num > UINT_MAX / size)
+		return NULL;
+	return xmalloc(size * num);
+}
 #endif /* __ARCH_HAS_SLAB_ALLOCATOR */
 
 #endif /* __SLAB_H__ */

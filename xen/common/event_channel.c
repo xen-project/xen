@@ -54,7 +54,7 @@ static int get_free_port(struct exec_domain *ed)
         else
             max = port + EVENT_CHANNELS_SPREAD;
         
-        chn = xmalloc(max * sizeof(event_channel_t));
+        chn = xmalloc_array(event_channel_t, max);
         if ( unlikely(chn == NULL) )
             return -ENOMEM;
 

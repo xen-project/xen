@@ -173,7 +173,7 @@ static int at_alloc_task(struct domain *p)
 {
     ASSERT(p != NULL);
     
-    p->sched_priv = xmem_cache_alloc(dom_info_cache);
+    p->sched_priv = xmalloc(struct at_dom_info);
     if ( p->sched_priv == NULL )
         return -1;
     
