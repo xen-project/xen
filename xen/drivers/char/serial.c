@@ -129,7 +129,7 @@ static inline void __serial_putc(uart_t *uart, int handle, unsigned char c)
     if ( handle & SERHND_HI )
         c |= 0x80;
     else if ( handle & SERHND_LO )
-        c &= ~0x7f;
+        c &= 0x7f;
 
     while ( !(inb(uart->io_base + LSR) & LSR_THRE) )
         barrier();

@@ -1,4 +1,5 @@
 ARCH    ?= i386
+ARCH    := $(ARCH:i%86=i386)
 
 TARGET  := $(BASEDIR)/xen
 HDRS    := $(wildcard $(BASEDIR)/include/xeno/*.h)
