@@ -1,16 +1,16 @@
 /******************************************************************************
- * libxi_vif.c
+ * libxc_vif.c
  * 
  * API for manipulating and accessing per-network-interface parameters.
  * 
  * Copyright (c) 2003, K A Fraser.
  */
 
-#include "libxi_private.h"
+#include "libxc_private.h"
 
-int xi_vif_scheduler_set(unsigned int domid, 
+int xc_vif_scheduler_set(unsigned int domid, 
                          unsigned int vifid, 
-                         xi_vif_sched_params_t *params)
+                         xc_vif_sched_params_t *params)
 {
     network_op_t  netop;
     netop.cmd = NETWORK_OP_VIFSETPARAMS;
@@ -22,9 +22,9 @@ int xi_vif_scheduler_set(unsigned int domid,
 }
 
 
-int xi_vif_scheduler_get(unsigned int domid, 
+int xc_vif_scheduler_get(unsigned int domid, 
                          unsigned int vifid, 
-                         xi_vif_sched_params_t *params)
+                         xc_vif_sched_params_t *params)
 {
     network_op_t  netop;
     int rc;
@@ -43,9 +43,9 @@ int xi_vif_scheduler_get(unsigned int domid,
 }
 
 
-int xi_vif_stats_get(unsigned int domid, 
+int xc_vif_stats_get(unsigned int domid, 
                      unsigned int vifid, 
-                     xi_vif_stats_t *stats)
+                     xc_vif_stats_t *stats)
 {
     network_op_t  netop;
     int rc;

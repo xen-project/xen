@@ -1,14 +1,14 @@
 /******************************************************************************
- * libxi_domain.c
+ * libxc_domain.c
  * 
  * API for manipulating and obtaining information on domains.
  * 
  * Copyright (c) 2003, K A Fraser.
  */
 
-#include "libxi_private.h"
+#include "libxc_private.h"
 
-int xi_domain_create(unsigned int mem_kb, const char *name)
+int xc_domain_create(unsigned int mem_kb, const char *name)
 {
     int err;
     dom0_op_t op;
@@ -24,7 +24,7 @@ int xi_domain_create(unsigned int mem_kb, const char *name)
 }    
 
 
-int xi_domain_start(unsigned int domid)
+int xc_domain_start(unsigned int domid)
 {
     dom0_op_t op;
     op.cmd = DOM0_STARTDOMAIN;
@@ -33,7 +33,7 @@ int xi_domain_start(unsigned int domid)
 }    
 
 
-int xi_domain_stop(unsigned int domid)
+int xc_domain_stop(unsigned int domid)
 {
     dom0_op_t op;
     op.cmd = DOM0_STOPDOMAIN;
@@ -42,7 +42,7 @@ int xi_domain_stop(unsigned int domid)
 }    
 
 
-int xi_domain_destroy(unsigned int domid, int force)
+int xc_domain_destroy(unsigned int domid, int force)
 {
     dom0_op_t op;
     op.cmd = DOM0_DESTROYDOMAIN;
@@ -51,9 +51,9 @@ int xi_domain_destroy(unsigned int domid, int force)
     return do_dom0_op(&op);
 }
 
-int xi_domain_getinfo(unsigned int first_domid,
+int xc_domain_getinfo(unsigned int first_domid,
                       unsigned int max_doms,
-                      xi_dominfo_t *info)
+                      xc_dominfo_t *info)
 {
     unsigned int nr_doms, next_domid = first_domid;
     dom0_op_t op;
@@ -70,8 +70,8 @@ int xi_domain_getinfo(unsigned int first_domid,
         info->stopped = (op.u.getdomaininfo.state == DOMSTATE_STOPPED);
         info->nr_pages = op.u.getdomaininfo.tot_pages;
         info->cpu_time = op.u.getdomaininfo.cpu_time;
-        strncpy(info->name, op.u.getdomaininfo.name, XI_DOMINFO_MAXNAME);
-        info->name[XI_DOMINFO_MAXNAME-1] = '\0';
+        strncpy(info->name, op.u.getdomaininfo.name, XC_DOMINFO_MAXNAME);
+        info->name[XC_DOMINFO_MAXNAME-1] = '\0';
 
         next_domid = op.u.getdomaininfo.domain + 1;
     }

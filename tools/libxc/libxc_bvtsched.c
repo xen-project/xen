@@ -1,14 +1,14 @@
 /******************************************************************************
- * libxi_bvtsched.c
+ * libxc_bvtsched.c
  * 
  * API for manipulating parameters of the Borrowed Virtual Time scheduler.
  * 
  * Copyright (c) 2003, K A Fraser.
  */
 
-#include "libxi_private.h"
+#include "libxc_private.h"
 
-int xi_bvtsched_global_set(unsigned long ctx_allow)
+int xc_bvtsched_global_set(unsigned long ctx_allow)
 {
     dom0_op_t op;
     op.cmd = DOM0_BVTCTL;
@@ -16,7 +16,7 @@ int xi_bvtsched_global_set(unsigned long ctx_allow)
     return do_dom0_op(&op);
 }
 
-int xi_bvtsched_domain_set(unsigned int domid,
+int xc_bvtsched_domain_set(unsigned int domid,
                            unsigned long mcuadv,
                            unsigned long warp,
                            unsigned long warpl,

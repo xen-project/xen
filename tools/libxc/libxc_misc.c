@@ -1,14 +1,14 @@
 /******************************************************************************
- * libxi_misc.c
+ * libxc_misc.c
  * 
  * Miscellaneous control interface functions.
  */
 
-#include "libxi_private.h"
+#include "libxc_private.h"
 
 int privcmd_fd = -1;
 
-int xi_interface_open(void)
+int xc_interface_open(void)
 {
     if ( (privcmd_fd == -1) &&
          ((privcmd_fd = open("/proc/xeno/privcmd", O_RDWR)) < 0) )
@@ -19,7 +19,7 @@ int xi_interface_open(void)
     return 0;
 }
 
-int xi_interface_close(void)
+int xc_interface_close(void)
 {
     if ( privcmd_fd != -1 )
     {
@@ -32,7 +32,7 @@ int xi_interface_close(void)
 
 #define CONSOLE_RING_CLEAR	1
 
-int xi_readconsolering(char *str, unsigned int max_chars, int clear)
+int xc_readconsolering(char *str, unsigned int max_chars, int clear)
 {
     int ret;
     dom0_op_t op;

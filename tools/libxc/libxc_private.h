@@ -1,6 +1,6 @@
 
-#ifndef __LIBXI_PRIVATE_H__
-#define __LIBXI_PRIVATE_H__
+#ifndef __LIBXC_PRIVATE_H__
+#define __LIBXC_PRIVATE_H__
 
 typedef unsigned char      u8;
 typedef unsigned short     u16;
@@ -23,7 +23,7 @@ typedef signed long long   s64;
 #include <errno.h>
 #include <string.h>
 
-#include "xi.h"
+#include "xc.h"
 
 #include <asm-xeno/proc_cmd.h>
 #include <hypervisor-ifs/hypervisor-if.h>
@@ -152,4 +152,4 @@ int init_pfn_mapper(void);
 void *map_pfn(unsigned long pfn);
 void unmap_pfn(void *vaddr);
 
-#endif /* __LIBXI_PRIVATE_H__ */
+#endif /* __LIBXC_PRIVATE_H__ */

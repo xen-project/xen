@@ -1,12 +1,12 @@
 /******************************************************************************
- * libxi_linux_restore.c
+ * libxc_linux_restore.c
  * 
  * Restore the state of a Xenolinux session.
  * 
  * Copyright (c) 2003, K A Fraser.
  */
 
-#include "libxi_private.h"
+#include "libxc_private.h"
 #include <asm-xeno/suspend.h>
 #include <zlib.h>
 
@@ -97,7 +97,7 @@ static int checked_read(gzFile fd, void *buf, size_t count)
     return rc == count;
 }
 
-int xi_linux_restore(const char *state_file, int verbose)
+int xc_linux_restore(const char *state_file, int verbose)
 {
     dom0_op_t op;
     int rc = 1, i, j;

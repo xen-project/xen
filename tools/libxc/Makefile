@@ -4,12 +4,12 @@ CFLAGS   = -c -Wall -O3
 CFLAGS  += -I../../xen/include -I../../xenolinux-sparse/include
 
 HDRS     = $(wildcard *.h)
-OBJS     = $(patsubst %.c,%.o,$(wildcard libxi_*.c))
+OBJS     = $(patsubst %.c,%.o,$(wildcard libxc_*.c))
 
-LIBS     = libxi.a libxi.so
+LIBS     = libxc.a libxc.so
 
 all: check-for-zlib $(LIBS)
-	ranlib libxi.a
+	ranlib libxc.a
 
 check-for-zlib:
 	@if [ ! -e /usr/include/zlib.h ]; then \
@@ -24,8 +24,8 @@ install: all
 	mkdir -p ../../../install/include
 	cp -a $(LIBS) ../../../install/lib
 	for i in $(LIBS) do ; chmod 755 ../../../install/bin/$i ; done
-	cp -a xi.h ../../../install/include
-	chmod 644 ../../../install/include/xi.h
+	cp -a xc.h ../../../install/include
+	chmod 644 ../../../install/include/xc.h
 
 clean:
 	$(RM) *.a *.so *.o *.rpm $(LIBS)
@@ -39,10 +39,10 @@ rpm: all
 	mv staging/i386/*.rpm .
 	rm -rf staging
 
-libxi.so: $(OBJS)
+libxc.so: $(OBJS)
 	$(LD) -shared -o $@ $^ -lz
 
-libxi.a: libxi.a($(OBJS))
+libxc.a: libxc.a($(OBJS))
 
 %.o: %.c $(HDRS) Makefile
 	$(CC) $(CFLAGS) -o $@ $<

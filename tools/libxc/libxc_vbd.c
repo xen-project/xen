@@ -1,5 +1,5 @@
 /******************************************************************************
- * libxi_vbd.c
+ * libxc_vbd.c
  * 
  * API for manipulating and accessing per-domain virtual block devices.
  * 
@@ -7,9 +7,9 @@
  */
 
 #define _GNU_SOURCE
-#include "libxi_private.h"
+#include "libxc_private.h"
 
-int xi_vbd_create(unsigned int domid, unsigned short vbdid, int writeable)
+int xc_vbd_create(unsigned int domid, unsigned short vbdid, int writeable)
 {
     block_io_op_t op; 
     op.cmd = BLOCK_IO_OP_VBD_CREATE; 
@@ -20,7 +20,7 @@ int xi_vbd_create(unsigned int domid, unsigned short vbdid, int writeable)
 }
 
 
-int xi_vbd_destroy(unsigned int domid, unsigned short vbdid)
+int xc_vbd_destroy(unsigned int domid, unsigned short vbdid)
 {
     block_io_op_t op; 
     op.cmd = BLOCK_IO_OP_VBD_DELETE; 
@@ -30,7 +30,7 @@ int xi_vbd_destroy(unsigned int domid, unsigned short vbdid)
 }
 
 
-int xi_vbd_add_extent(unsigned int domid, 
+int xc_vbd_add_extent(unsigned int domid, 
                       unsigned short vbdid,
                       unsigned short real_device,
                       unsigned long start_sector,
@@ -47,7 +47,7 @@ int xi_vbd_add_extent(unsigned int domid,
 }
 
 
-int xi_vbd_delete_extent(unsigned int domid, 
+int xc_vbd_delete_extent(unsigned int domid, 
                          unsigned short vbdid,
                          unsigned short real_device,
                          unsigned long start_sector,
@@ -64,10 +64,10 @@ int xi_vbd_delete_extent(unsigned int domid,
 }
 
 
-int xi_vbd_probe(unsigned int domid,
+int xc_vbd_probe(unsigned int domid,
                  unsigned short vbdid,
                  unsigned int max_vbds,
-                 xi_vbd_t *vbds)
+                 xc_vbd_t *vbds)
 {
     block_io_op_t op; 
     xen_disk_info_t *xdi = &op.u.probe_params.xdi; 
@@ -101,7 +101,7 @@ int xi_vbd_probe(unsigned int domid,
             vbds[j].domid = xdi->disks[i].domain;
             vbds[j].vbdid = xdi->disks[i].device;
             vbds[j].flags = (xdi->disks[i].info & XD_FLAG_RO) ? 
-                0 : XI_VBDF_WRITEABLE;
+                0 : XC_VBDF_WRITEABLE;
             vbds[j].nr_sectors = xdi->disks[i].capacity;
             
             j++;

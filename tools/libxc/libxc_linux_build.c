@@ -1,8 +1,8 @@
 /******************************************************************************
- * libxi_linux_build.c
+ * libxc_linux_build.c
  */
 
-#include "libxi_private.h"
+#include "libxc_private.h"
 #include <zlib.h>
 
 /* This string is written to the head of every guest kernel image. */
@@ -312,7 +312,7 @@ static int setup_guestos(
     return -1;
 }
 
-int xi_domain_build(unsigned int domid,
+int xc_domain_build(unsigned int domid,
                     const char *image_name,
                     const char *ramdisk_name,
                     const char *cmdline,

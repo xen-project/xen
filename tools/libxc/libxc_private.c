@@ -1,10 +1,10 @@
 /******************************************************************************
- * libxi_private.c
+ * libxc_private.c
  * 
  * Helper functions for the rest of the library.
  */
 
-#include "libxi_private.h"
+#include "libxc_private.h"
 
 static int devmem_fd = -1;
 

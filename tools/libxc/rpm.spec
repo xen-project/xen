@@ -12,17 +12,17 @@ Library to make it easier to access the Xen control interfaces.
 %preun
 %install
 install -m 0755 -d $RPM_BUILD_ROOT/lib
-install -m 0755 libxi.a $RPM_BUILD_ROOT/lib/libxi.a
-install -m 0755 libxi.so $RPM_BUILD_ROOT/lib/libxi.so
+install -m 0755 libxc.a $RPM_BUILD_ROOT/lib/libxc.a
+install -m 0755 libxc.so $RPM_BUILD_ROOT/lib/libxc.so
 install -m 0755 -d $RPM_BUILD_ROOT/include
-install -m 0644 xi.h $RPM_BUILD_ROOT/include/xi.h
+install -m 0644 xc.h $RPM_BUILD_ROOT/include/xc.h
 %clean
 %post
 %postun
 %files
 %defattr(-,root,root)
 %dir /lib
-/lib/libxi.a
-/lib/libxi.so
+/lib/libxc.a
+/lib/libxc.so
 %dir /include
-/include/xi.h
+/include/xc.h
