@@ -181,7 +181,7 @@ pte_t *pte_alloc_one_kernel(struct mm_struct *mm, unsigned long address)
 	pte_t *pte = (pte_t *)__get_free_page(GFP_KERNEL|__GFP_REPEAT);
 	if (pte) {
 		clear_page(pte);
-		make_page_readonly(pte);
+		//make_page_readonly(pte);
 		xen_flush_page_update_queue();
 	}
 	return pte;
@@ -194,7 +194,7 @@ void pte_ctor(void *pte, kmem_cache_t *cache, unsigned long unused)
 	set_page_count(page, 1);
 
 	clear_page(pte);
-	make_page_readonly(pte);
+	//make_page_readonly(pte);
 	queue_pte_pin(__pa(pte));
 	flush_page_update_queue();
 }
@@ -304,7 +304,7 @@ void pgd_ctor(void *pgd, kmem_cache_t *cache, unsigned long unused)
 	spin_unlock_irqrestore(&pgd_lock, flags);
 	memset(pgd, 0, USER_PTRS_PER_PGD*sizeof(pgd_t));
  out:
-	make_page_readonly(pgd);
+	//make_page_readonly(pgd);
 	queue_pgd_pin(__pa(pgd));
 	flush_page_update_queue();
 }

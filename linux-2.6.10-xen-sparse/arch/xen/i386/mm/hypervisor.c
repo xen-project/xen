@@ -125,28 +125,14 @@ static inline void increment_index_and_flush(void)
 
 void queue_l1_entry_update(pte_t *ptr, unsigned long val)
 {
-    int cpu = smp_processor_id();
-    int idx;
-    unsigned long flags;
-    spin_lock_irqsave(&update_lock, flags);
-    idx = per_cpu(mmu_update_queue_idx, cpu);
-    per_cpu(update_queue[idx], cpu).ptr = virt_to_machine(ptr);
-    per_cpu(update_queue[idx], cpu).val = val;
-    increment_index();
-    spin_unlock_irqrestore(&update_lock, flags);
+    _flush_page_update_queue();
+    *(unsigned long *)ptr = val;
 }
 
 void queue_l2_entry_update(pmd_t *ptr, unsigned long val)
 {
-    int cpu = smp_processor_id();
-    int idx;
-    unsigned long flags;
-    spin_lock_irqsave(&update_lock, flags);
-    idx = per_cpu(mmu_update_queue_idx, cpu);
-    per_cpu(update_queue[idx], cpu).ptr = virt_to_machine(ptr);
-    per_cpu(update_queue[idx], cpu).val = val;
-    increment_index();
-    spin_unlock_irqrestore(&update_lock, flags);
+    _flush_page_update_queue();
+    *(unsigned long *)ptr = val;
 }
 
 void queue_pt_switch(unsigned long ptr)
@@ -275,28 +261,12 @@ void queue_machphys_update(unsigned long mfn, unsigned long pfn)
 /* queue and flush versions of the above */
 void xen_l1_entry_update(pte_t *ptr, unsigned long val)
 {
-    int cpu = smp_processor_id();
-    int idx;
-    unsigned long flags;
-    spin_lock_irqsave(&update_lock, flags);
-    idx = per_cpu(mmu_update_queue_idx, cpu);
-    per_cpu(update_queue[idx], cpu).ptr = virt_to_machine(ptr);
-    per_cpu(update_queue[idx], cpu).val = val;
-    increment_index_and_flush();
-    spin_unlock_irqrestore(&update_lock, flags);
+    *(unsigned long *)ptr = val;
 }
 
 void xen_l2_entry_update(pmd_t *ptr, unsigned long val)
 {
-    int cpu = smp_processor_id();
-    int idx;
-    unsigned long flags;
-    spin_lock_irqsave(&update_lock, flags);
-    idx = per_cpu(mmu_update_queue_idx, cpu);
-    per_cpu(update_queue[idx], cpu).ptr = virt_to_machine(ptr);
-    per_cpu(update_queue[idx], cpu).val = val;
-    increment_index_and_flush();
-    spin_unlock_irqrestore(&update_lock, flags);
+    *(unsigned long *)ptr = val;
 }
 
 void xen_pt_switch(unsigned long ptr)
