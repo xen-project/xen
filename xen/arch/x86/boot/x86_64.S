@@ -1,10 +1,11 @@
 #include <xen/config.h>
 #include <hypervisor-ifs/hypervisor-if.h>
 #include <asm/page.h>
+#include <asm/msr.h>
 
 #define  SECONDARY_CPU_FLAG 0xA5A5A5A5
                 
-       	.text
+        .text
         .code32
         
 ENTRY(start)
@@ -13,11 +14,11 @@ ENTRY(start)
         .org    0x004
 /*** MULTIBOOT HEADER ****/
         /* Magic number indicating a Multiboot header. */
-	.long	0x1BADB002
-	/* Flags to bootloader (see Multiboot spec). */
-	.long	0x00000002
-	/* Checksum: must be the negated sum of the first two fields. */
-	.long	-0x1BADB004
+        .long   0x1BADB002
+        /* Flags to bootloader (see Multiboot spec). */
+        .long   0x00000002
+        /* Checksum: must be the negated sum of the first two fields. */
+        .long   -0x1BADB004
 
         .org    0x010
         .asciz "Bad CPU: does not support 64-bit (long) mode."
@@ -66,38 +67,30 @@ __start:
         mov     $0x20,%ecx # X86_CR4_PAE
         mov     %ecx,%cr4
 
-        cmp     $(SECONDARY_CPU_FLAG),%ebx
-        je      start_paging
-
         mov     %ebx,0x1001e0 /* Multiboot info struct */
         mov     %eax,0x1001e4 /* Multiboot magic value */
 
-        /* Initialize mappings of 1GB of memory. */
-        mov     $0x103000,%edi               /* idle_pg_table_l2 */
-        mov     $0x1e3,%eax                  /* PRESENT+RW+A+D+PSE+GLOBAL */
-        mov     $512,%ecx
-1:      stosl
-        add     $0x200000,%eax
-        loop    1b
-
-start_paging:
+        /* Load pagetable base register. */
         mov     $0x101000,%eax   /* idle_pg_table */
         mov     %eax,%cr3
+
+        /* Set up EFER (Extended Feature Enable Register). */
+        movl    $MSR_EFER, %ecx
+        rdmsr
+        /* Long Mode, SYSCALL/SYSRET, No-Execute */
+        movl    $(EFER_LME|EFER_SCE|EFER_NX),%eax
+        wrmsr
+
         mov     $0x80050033,%eax /* hi-to-lo: PG,AM,WP,NE,ET,MP,PE */
         mov     %eax,%cr0
         jmp     1f
+
 1:      /* Now in compatibility mode. Long-jump into 64-bit mode. */
-        ljmp    $(__HYPERVISOR_CS64),$0x1000e0
-
-        .code64
-        .org    0x00e0
-
-        /* Jump to high mappings. */
-        mov     high_start(%rip),%rax
-        push    %rax
-        ret
-__high_start:
+        ljmp    $(__HYPERVISOR_CS64),$0x100100
         
+        .code64
+        .org    0x0100
+
         /* Install relocated selectors (FS/GS unused). */
         lgdt    gdt_descr(%rip)
         mov     $(__HYPERVISOR_DS),%ecx
@@ -112,9 +105,15 @@ __high_start:
         mov     stack_start(%rip),%rsp
         
         /* Reset EFLAGS (subsumes CLI and CLD). */
-	pushq	$0
-	popf
+        pushq   $0
+        popf
 
+        /* Jump to high mappings. */
+        mov     high_start(%rip),%rax
+        push    %rax
+        ret
+__high_start:
+        
         lidt    idt_descr(%rip)
                 
         cmp     $(SECONDARY_CPU_FLAG),%ebx
@@ -139,19 +138,15 @@ __high_start:
         add     $8,%rdi
         loop    1b
 
-        xor     %rax,%rax
         mov     0x1001e0,%eax /* Multiboot info struct */
         lea     start(%rip),%rbx
         sub     $0x100000,%rbx
         add     %rbx,%rax
         push    %rax
-        xor     %rax,%rax
         mov     0x1001e4,%eax /* Multiboot magic value */
         push    %rax
         
-        /* Call into main C routine. This should never return.*/
-       	call	cmain
-        ud2     /* Force a panic (invalid opcode). */
+        call    cmain
 
 /* This is the default interrupt handler. */
 int_msg:
@@ -167,7 +162,9 @@ ignore_int:
 1:      jmp     1b
 
         .code32
-                
+
+        .org    0x1e0
+                        
 /*** DESCRIPTOR TABLES ***/
 
 .globl SYMBOL_NAME(idt)
@@ -192,35 +189,51 @@ ENTRY(gdt_table)
 
         .word   0
 gdt_descr:
-	.word	(LAST_RESERVED_GDT_ENTRY*8)+7
+        .word   (LAST_RESERVED_GDT_ENTRY*8)+7
 SYMBOL_NAME(gdt):       
         .quad   SYMBOL_NAME(gdt_table)
 
         .word   0    
 idt_descr:
-	.word	256*8-1
+        .word   256*8-1
 SYMBOL_NAME(idt):
-        .quad	SYMBOL_NAME(idt_table)
+        .quad   SYMBOL_NAME(idt_table)
 
 ENTRY(stack_start)
-        .quad   SYMBOL_NAME(cpu0_stack) + 8100 - __PAGE_OFFSET
+        .quad   SYMBOL_NAME(cpu0_stack) + 8100
 
 high_start:
         .quad   __high_start
                 
+/* Initial PML4 -- level-4 page table */
         .org 0x1000
 ENTRY(idle_pg_table)
 ENTRY(idle_pg_table_4)
         .quad 0x0000000000102007 # PML4[0]
         .fill 261,8,0
         .quad 0x0000000000102007 # PML4[262]
+
+/* Initial PDP -- level-3 page table */
         .org 0x2000
 ENTRY(idle_pg_table_l3)
         .quad 0x0000000000103007
+
+/* Initial PDE -- level-2 page table. */
         .org 0x3000
 ENTRY(idle_pg_table_l2)
+        .macro identmap from=0, count=512
+        .if \count-1
+        identmap "(\from+0)","(\count/2)"
+        identmap "(\from+(0x200000*(\count/2)))","(\count/2)"
+        .else
+        .quad 0x00000000000001e3 + \from
+        .endif
+        .endm
+        identmap /* Too orangey for crows :-) */
+
         .org 0x4000
 ENTRY(cpu0_stack)    # Initial stack is 8kB
+
         .org 0x6000
 ENTRY(stext)
 ENTRY(_stext)

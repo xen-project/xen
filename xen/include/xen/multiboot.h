@@ -18,69 +18,59 @@
 #ifndef __MULTIBOOT_H__
 #define __MULTIBOOT_H__
 
-#ifndef __ELF__
-#error "Build on a 32-bit ELF system"
-#endif
-
 /* The magic number passed by a Multiboot-compliant boot loader. */
-#define MULTIBOOT_BOOTLOADER_MAGIC	0x2BADB002
+#define MULTIBOOT_BOOTLOADER_MAGIC 0x2BADB002
 
 /* The symbol table for a.out.  */
-typedef struct
-{
-  unsigned long tabsize;
-  unsigned long strsize;
-  unsigned long addr;
-  unsigned long reserved;
+typedef struct {
+    u32 tabsize;
+    u32 strsize;
+    u32 addr;
+    u32 reserved;
 } aout_symbol_table_t;
 
 /* The section header table for ELF.  */
-typedef struct
-{
-  unsigned long num;
-  unsigned long size;
-  unsigned long addr;
-  unsigned long shndx;
+typedef struct {
+    u32 num;
+    u32 size;
+    u32 addr;
+    u32 shndx;
 } elf_section_header_table_t;
 
 /* The Multiboot information.  */
-typedef struct
-{
-  unsigned long flags;
-  unsigned long mem_lower;
-  unsigned long mem_upper;
-  unsigned long boot_device;
-  unsigned long cmdline;
-  unsigned long mods_count;
-  unsigned long mods_addr;
-  union
-  {
-    aout_symbol_table_t aout_sym;
-    elf_section_header_table_t elf_sec;
-  } u;
-  unsigned long mmap_length;
-  unsigned long mmap_addr;
+typedef struct {
+    u32 flags;
+    u32 mem_lower;
+    u32 mem_upper;
+    u32 boot_device;
+    u32 cmdline;
+    u32 mods_count;
+    u32 mods_addr;
+    union {
+        aout_symbol_table_t aout_sym;
+        elf_section_header_table_t elf_sec;
+    } u;
+    u32 mmap_length;
+    u32 mmap_addr;
 } multiboot_info_t;
 
 /* The module structure.  */
-typedef struct
-{
-  unsigned long mod_start;
-  unsigned long mod_end;
-  unsigned long string;
-  unsigned long reserved;
+typedef struct {
+    u32 mod_start;
+    u32 mod_end;
+    u32 string;
+    u32 reserved;
 } module_t;
 
 /* The memory map. Be careful that the offset 0 is base_addr_low
    but no size.  */
-typedef struct
-{
-  unsigned long size;
-  unsigned long base_addr_low;
-  unsigned long base_addr_high;
-  unsigned long length_low;
-  unsigned long length_high;
-  unsigned long type;
+typedef struct {
+    u32 size;
+    u32 base_addr_low;
+    u32 base_addr_high;
+    u32 length_low;
+    u32 length_high;
+    u32 type;
 } memory_map_t;
 
 #endif /* __MULTIBOOT_H__ */
