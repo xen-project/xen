@@ -100,7 +100,7 @@
 #include <asm/domain_page.h>
 #include <asm/ldt.h>
 
-#ifndef NDEBUG
+#ifdef VERBOSE
 #define MEM_LOG(_f, _a...)                           \
   printk("DOM%u: (file=memory.c, line=%d) " _f "\n", \
          current->domain , __LINE__ , ## _a )
@@ -1250,7 +1250,7 @@ ptwr_info_t ptwr_info[NR_CPUS] =
       }
     };
 
-#ifndef NDEBUG
+#ifdef VERBOSE
 int ptwr_debug = 0;
 #define PTWR_PRINTK(x) if (ptwr_debug) printk x
 #else

@@ -31,7 +31,7 @@
 
 #define capable(_c) 0
 
-#ifndef NDEBUG
+#ifdef VERBOSE
 #define DPRINTK(_f, _a...) printk("(file=%s, line=%d) " _f, \
                            __FILE__ , __LINE__ , ## _a )
 #else
