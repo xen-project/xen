@@ -108,7 +108,7 @@ static void inline __update_guest_eip(unsigned long inst_len)
 static int vmx_do_page_fault(unsigned long va, struct xen_regs *regs) 
 {
     unsigned long eip;
-    unsigned long gpa;
+    unsigned long gpte, gpa;
     int result;
 
 #if VMX_DEBUG
@@ -130,9 +130,10 @@ static int vmx_do_page_fault(unsigned long va, struct xen_regs *regs)
         return 0;
     }
 
-    gpa = gva_to_gpa(va);
-    if (!gpa)
-        return 0;
+    gpte = gva_to_gpte(va);
+    if (!(gpte & _PAGE_PRESENT) )
+            return 0;
+    gpa = (gpte & PAGE_MASK) + (va & ~PAGE_MASK);
 
     if (mmio_space(gpa))
         handle_mmio(va, gpa);
