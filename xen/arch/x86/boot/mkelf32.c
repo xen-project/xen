@@ -199,6 +199,13 @@ int main(int argc, char **argv)
             return 1;
         }
 
+        if ( in32_ehdr.e_phnum != 1 )
+        {
+            fprintf(stderr, "Expect precisly 1 program header; found %d.\n",
+                    (int)in32_ehdr.e_phnum);
+            return 1;
+        }
+
         (void)lseek(infd, in32_ehdr.e_phoff, SEEK_SET);
         do_read(infd, &in32_phdr, sizeof(in32_phdr));
 
@@ -215,6 +222,13 @@ int main(int argc, char **argv)
         {
             fprintf(stderr, "Bad program header size (%d != %d).\n",
                     (int)in64_ehdr.e_phentsize, (int)sizeof(in64_phdr));
+            return 1;
+        }
+
+        if ( in64_ehdr.e_phnum != 1 )
+        {
+            fprintf(stderr, "Expect precisly 1 program header; found %d.\n",
+                    (int)in64_ehdr.e_phnum);
             return 1;
         }
 
