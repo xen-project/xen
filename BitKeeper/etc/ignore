@@ -101,3 +101,6 @@ xen/tools/figlet/figlet
 xen/xen
 xen/xen-syms
 xen/xen.*
+tools/misc/cpuperf/cpuperf-perfcntr
+tools/misc/cpuperf/cpuperf-xen
+tools/misc/xc_shadow

@@ -609,14 +609,13 @@ static inline int l1pte_read_fault(
 static inline void l1pte_propagate_from_guest(
     struct domain *d, unsigned long gpte, unsigned long *spte_p)
 { 
-    unsigned long pfn = gpte >> PAGE_SHIFT;
     unsigned long mfn, spte;
 
     spte = 0;
 
     if ( ((gpte & (_PAGE_PRESENT|_PAGE_ACCESSED) ) ==
           (_PAGE_PRESENT|_PAGE_ACCESSED)) &&
-         VALID_MFN(mfn = __gpfn_to_mfn(d, pfn)) )
+         VALID_MFN(mfn = __gpfn_to_mfn(d, gpte >> PAGE_SHIFT)) )
     {
         spte = (mfn << PAGE_SHIFT) | (gpte & ~PAGE_MASK);
         

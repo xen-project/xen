@@ -1427,14 +1427,27 @@ void shadow_map_l1_into_current_l2(unsigned long va)
             &(shadow_linear_pg_table[l1_linear_offset(va) &
                                      ~(L1_PAGETABLE_ENTRIES-1)]);
 
+        memset(spl1e, 0, PAGE_SIZE);
+
+        unsigned long sl1e;
+        int index = l1_table_offset(va);
+
+        l1pte_propagate_from_guest(d, gpl1e[index], &sl1e);
+        if ( (sl1e & _PAGE_PRESENT) &&
+             !shadow_get_page_from_l1e(mk_l1_pgentry(sl1e), d) )
+            sl1e = 0;
+        spl1e[index] = sl1e;
+
         for ( i = 0; i < L1_PAGETABLE_ENTRIES; i++ )
         {
-            unsigned long sl1e;
-
+            if ( i == index )
+                continue;
             l1pte_propagate_from_guest(d, gpl1e[i], &sl1e);
             if ( (sl1e & _PAGE_PRESENT) &&
                  !shadow_get_page_from_l1e(mk_l1_pgentry(sl1e), d) )
                 sl1e = 0;
+            if ( sl1e == 0 )
+                break;
             spl1e[i] = sl1e;
         }
     }
