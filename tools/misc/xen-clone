@@ -22,7 +22,7 @@ UCCL)
 esac
 
 DEST_DIR=${2:-xeno-clone}
-DEST_BK_REP=`basename ${BK_REP}`
+DEST_BK_REP=`basename "${BK_REP}"`
 
 echo usage: xen-clone bk_repository dest_dir orig_linux_dir
 echo Source BK Repository : ${BK_REP}
