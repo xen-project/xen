@@ -9,7 +9,7 @@
 
 #include <xen/config.h>
 #include <xen/sched.h>
-#include <xen/interrupt.h>
+#include <xen/softirq.h>
 #include <asm/flushtlb.h>
 
 u32 tlbflush_clock;

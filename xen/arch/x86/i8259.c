@@ -10,9 +10,7 @@
 #include <asm/ptrace.h>
 #include <xen/errno.h>
 #include <xen/sched.h>
-#include <xen/interrupt.h>
 #include <xen/irq.h>
-
 #include <asm/atomic.h>
 #include <asm/system.h>
 #include <asm/io.h>

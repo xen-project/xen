@@ -22,7 +22,6 @@
 
 #include <xen/config.h>
 #include <xen/init.h>
-#include <xen/interrupt.h>
 #include <xen/irq.h>
 #include <xen/delay.h>
 #include <xen/sched.h>
