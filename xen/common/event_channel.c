@@ -167,9 +167,12 @@ static long evtchn_bind_interdomain(evtchn_bind_interdomain_t *bind)
         break;
 
     case ECS_INTERDOMAIN:
-        rc = ((d1->event_channel[port1].u.interdomain.remote_dom != d2) ||
-              (d1->event_channel[port1].u.interdomain.remote_port != port2)) ?
-            -EINVAL : 0;
+        if ( d1->event_channel[port1].u.interdomain.remote_dom != d2 )
+            ERROR_EXIT(-EINVAL);
+        if ( (d1->event_channel[port1].u.interdomain.remote_port != port2) &&
+             (bind->port2 != 0) )
+            ERROR_EXIT(-EINVAL);
+        port2 = d1->event_channel[port1].u.interdomain.remote_port;
         goto out;
 
     default:
@@ -188,6 +191,15 @@ static long evtchn_bind_interdomain(evtchn_bind_interdomain_t *bind)
         if ( d2->event_channel[port2].u.unbound.remote_domid != dom1 )
             ERROR_EXIT(-EINVAL);
         break;
+
+    case ECS_INTERDOMAIN:
+        if ( d2->event_channel[port2].u.interdomain.remote_dom != d1 )
+            ERROR_EXIT(-EINVAL);
+        if ( (d2->event_channel[port2].u.interdomain.remote_port != port1) &&
+             (bind->port1 != 0) )
+            ERROR_EXIT(-EINVAL);
+        port1 = d2->event_channel[port2].u.interdomain.remote_port;
+        goto out;
 
     default:
         ERROR_EXIT(-EINVAL);

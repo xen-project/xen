@@ -403,7 +403,7 @@ get_page_from_l1e(
 
     return ((l1v & _PAGE_RW) ?
             get_page_and_type(page, d, PGT_writable_page) :
-            get_page(d));
+            get_page(page, d));
 }
 
 
