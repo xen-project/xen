@@ -27,6 +27,4 @@ extern void domain_relinquish_memory(struct domain *d);
 
 extern void dump_pageframe_info(struct domain *d);
 
-extern unsigned long alloc_monitor_pagetable(struct exec_domain *ed);
-
 #endif /* __XEN_DOMAIN_H__ */

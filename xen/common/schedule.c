@@ -423,6 +423,9 @@ void __enter_scheduler(void)
     
     perfc_incrc(sched_ctx);
 
+    // Q: With full shadow mode, do we need to flush out-of-sync pages
+    //    before switching domains?  Current belief is NO.
+
     if ( !is_idle_task(prev->domain) )
     {
         LOCK_BIGLOCK(prev->domain);

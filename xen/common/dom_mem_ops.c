@@ -14,6 +14,7 @@
 #include <xen/sched.h>
 #include <xen/event.h>
 #include <asm/domain_page.h>
+#include <asm/shadow.h>
 
 /*
  * To allow safe resume of do_dom_mem_op() after preemption, we need to know 
@@ -110,6 +111,27 @@ free_dom_mem(struct domain *d,
             
             if ( test_and_clear_bit(_PGC_allocated, &page->count_info) )
                 put_page(page);
+
+            if ( unlikely(shadow_mode_enabled(d)) )
+            {
+                // XXX This needs more thought.  This isn't pretty,
+                // and it's not fast.  But it's a place holder.
+                //
+                shadow_lock(d);
+                if ( page_out_of_sync(page) )
+                    __shadow_sync_mfn(d, mpfn + j);
+                shadow_remove_all_access(d, mpfn + j);
+
+                if (page->count_info != 1)
+                {
+                    printk("free_dom_mem in shadow mode didn't release page "
+                           "mfn=%p c=%p\n", mpfn+j, page->count_info);
+                    shadow_unlock(d);
+                    audit_domain(d);
+                    BUG();
+                }
+                shadow_unlock(d);
+            }
 
             put_page(page);
         }

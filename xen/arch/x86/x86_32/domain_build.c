@@ -49,6 +49,8 @@ int construct_dom0(struct domain *d,
     char *image_start  = (char *)_image_start;  /* use lowmem mappings */
     char *initrd_start = (char *)_initrd_start; /* use lowmem mappings */
 
+    int shadow_dom0 = 1; // HACK ALERT !!  Force dom0 to run in shadow mode.
+
     /*
      * This fully describes the memory layout of the initial domain. All 
      * *_start address are page-aligned, except v_start (and v_end) which are 
@@ -260,8 +262,14 @@ int construct_dom0(struct domain *d,
     l1tab += l1_table_offset(vpt_start);
     for ( count = 0; count < nr_pt_pages; count++ ) 
     {
-        *l1tab = mk_l1_pgentry(l1_pgentry_val(*l1tab) & ~_PAGE_RW);
         page = &frame_table[l1_pgentry_to_pfn(*l1tab)];
+
+        if ( !shadow_dom0 )
+            *l1tab = mk_l1_pgentry(l1_pgentry_val(*l1tab) & ~_PAGE_RW);
+        else
+            if ( !get_page_type(page, PGT_writable_page) )
+                BUG();
+
         if ( count == 0 )
         {
             page->u.inuse.type_info &= ~PGT_type_mask;
@@ -380,13 +388,11 @@ int construct_dom0(struct domain *d,
 
     new_thread(ed, dsi.v_kernentry, vstack_end, vstartinfo_start);
 
-#ifndef NDEBUG
-    if (0) /* XXXXX DO NOT CHECK IN ENABLED !!! (but useful for testing so leave) */
+    if ( shadow_dom0 )
     {
         shadow_mode_enable(d, SHM_enable); 
         update_pagetables(ed); /* XXX SMP */
     }
-#endif
 
     return 0;
 }

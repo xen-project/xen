@@ -69,7 +69,16 @@ struct pfn_info
 #define PGT_gdt_page        (5<<29) /* using this page in a GDT? */
 #define PGT_ldt_page        (6<<29) /* using this page in an LDT? */
 #define PGT_writable_page   (7<<29) /* has writable mappings of this page? */
+
+#define PGT_l1_shadow       PGT_l1_page_table
+#define PGT_l2_shadow       PGT_l2_page_table
+#define PGT_l3_shadow       PGT_l3_page_table
+#define PGT_l4_shadow       PGT_l4_page_table
+#define PGT_hl2_shadow      (5<<29)
+#define PGT_snapshot        (6<<29)
+
 #define PGT_type_mask       (7<<29) /* Bits 29-31. */
+
  /* Has this page been validated for use as its current type? */
 #define _PGT_validated      28
 #define PGT_validated       (1U<<_PGT_validated)
@@ -86,11 +95,19 @@ struct pfn_info
  /* 17-bit count of uses of this frame as its current type. */
 #define PGT_count_mask      ((1U<<17)-1)
 
+#define PGT_mfn_mask        ((1U<<21)-1) /* mfn mask for shadow types */
+
  /* Cleared when the owning guest 'frees' this page. */
 #define _PGC_allocated      31
 #define PGC_allocated       (1U<<_PGC_allocated)
- /* 31-bit count of references to this frame. */
-#define PGC_count_mask      ((1U<<31)-1)
+ /* Set when fullshadow mode marks a page out-of-sync */
+#define _PGC_out_of_sync     30
+#define PGC_out_of_sync     (1U<<_PGC_out_of_sync)
+ /* Set when fullshadow mode is using a page as a page table */
+#define _PGC_page_table      29
+#define PGC_page_table      (1U<<_PGC_page_table)
+ /* 29-bit count of references to this frame. */
+#define PGC_count_mask      ((1U<<29)-1)
 
 /* We trust the slab allocator in slab.c, and our use of it. */
 #define PageSlab(page)	    (1)
@@ -111,6 +128,8 @@ static inline u32 pickle_domptr(struct domain *domain)
 
 #define page_get_owner(_p)    (unpickle_domptr((_p)->u.inuse._domain))
 #define page_set_owner(_p,_d) ((_p)->u.inuse._domain = pickle_domptr(_d))
+
+#define page_out_of_sync(_p)  ((_p)->count_info & PGC_out_of_sync)
 
 #define SHARE_PFN_WITH_DOMAIN(_pfn, _dom)                                   \
     do {                                                                    \
@@ -135,6 +154,11 @@ void init_frametable(void);
 
 int alloc_page_type(struct pfn_info *page, unsigned int type);
 void free_page_type(struct pfn_info *page, unsigned int type);
+extern void invalidate_shadow_ldt(struct exec_domain *d);
+extern u32 shadow_remove_all_write_access(
+    struct domain *d, unsigned min_type, unsigned max_type,
+    unsigned long gpfn);
+extern u32 shadow_remove_all_access( struct domain *d, unsigned long gmfn);
 
 static inline void put_page(struct pfn_info *page)
 {
@@ -166,8 +190,10 @@ static inline int get_page(struct pfn_info *page,
              unlikely((nx & PGC_count_mask) == 0) || /* Count overflow? */
              unlikely(d != _domain) )                /* Wrong owner? */
         {
-            DPRINTK("Error pfn %p: ed=%p, sd=%p, caf=%08x, taf=%08x\n",
-                    page_to_pfn(page), domain, unpickle_domptr(d),
+            DPRINTK("Error pfn %p: rd=%p(%d), od=%p(%d), caf=%08x, taf=%08x\n",
+                    page_to_pfn(page), domain, (domain ? domain->id : -1),
+                    page_get_owner(page),
+                    (page_get_owner(page) ? page_get_owner(page)->id : -1),
                     x, page->u.inuse.type_info);
             return 0;
         }
@@ -184,6 +210,8 @@ static inline int get_page(struct pfn_info *page,
 
 void put_page_type(struct pfn_info *page);
 int  get_page_type(struct pfn_info *page, u32 type);
+int  get_page_from_l1e(l1_pgentry_t l1e, struct domain *d);
+void put_page_from_l1e(l1_pgentry_t l1e, struct domain *d);
 
 static inline void put_page_and_type(struct pfn_info *page)
 {
@@ -205,6 +233,22 @@ static inline int get_page_and_type(struct pfn_info *page,
     }
 
     return rc;
+}
+
+static inline int mfn_is_page_table(unsigned long mfn)
+{
+    if ( !pfn_is_ram(mfn) )
+        return 0;
+
+    return frame_table[mfn].count_info & PGC_page_table;
+}
+
+static inline int page_is_page_table(struct pfn_info *page)
+{
+    if ( !pfn_is_ram(page_to_pfn(page)) )
+        return 0;
+
+    return page->count_info & PGC_page_table;
 }
 
 #define ASSERT_PAGE_IS_TYPE(_p, _t)                            \
@@ -307,6 +351,7 @@ void ptwr_flush(const int);
 int ptwr_do_page_fault(unsigned long);
 
 int new_guest_cr3(unsigned long pfn);
+void propagate_page_fault(unsigned long addr, u16 error_code);
 
 #define __cleanup_writable_pagetable(_what)                                 \
 do {                                                                        \
@@ -326,14 +371,24 @@ do {                                                                        \
                                      PTWR_CLEANUP_INACTIVE);              \
     } while ( 0 )
 
+int audit_adjust_pgtables(struct domain *d, int dir, int noisy);
+
 #ifndef NDEBUG
-void audit_domain(struct domain *d);
+
+#define AUDIT_ALREADY_LOCKED ( 1u << 0 )
+#define AUDIT_ERRORS_OK      ( 1u << 1 )
+#define AUDIT_QUIET          ( 1u << 2 )
+
+void _audit_domain(struct domain *d, int flags, const char *file, int line);
+#define audit_domain(_d) _audit_domain((_d), 0, __FILE__, __LINE__)
 void audit_domains(void);
+
 #else
+
+#define _audit_domain(_d, _f, _file, _line) ((void)0)
 #define audit_domain(_d) ((void)0)
 #define audit_domains()  ((void)0)
-#endif
 
-void propagate_page_fault(unsigned long addr, u16 error_code);
+#endif
 
 #endif /* __ASM_X86_MM_H__ */
