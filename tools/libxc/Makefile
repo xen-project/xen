@@ -105,6 +105,6 @@ libxc.so.$(MAJOR): libxc.so.$(MAJOR).$(MINOR)
 	ln -sf $< $@
 
 libxc.so.$(MAJOR).$(MINOR): $(PIC_OBJS)
-	$(CC) $(CFLAGS) -Wl,-soname -Wl,libxc.so.$(MAJOR) -shared -o $@ $^ -L../libxutil -lxutil -lz
+	$(CC) $(CFLAGS) $(LDFLAGS) -Wl,-soname -Wl,libxc.so.$(MAJOR) -shared -o $@ $^ -L../libxutil -lxutil -lz
 
 -include $(DEPS)

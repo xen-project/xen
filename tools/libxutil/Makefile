@@ -7,8 +7,6 @@ INSTALL_DIR	= $(INSTALL) -d -m0755
 
 include $(XEN_ROOT)/tools/Rules.mk
 
-CC = gcc
-
 LIB_SRCS :=
 LIB_SRCS += allocate.c
 LIB_SRCS += enum.c

@@ -1,8 +1,8 @@
 
-CC := gcc
+include ../../Config.mk
 
 figlet: figlet.c
-	$(CC) -o $@ $<
+	$(HOSTCC) -o $@ $<
 
 clean:
 	rm -f *.o figlet

@@ -6,7 +6,6 @@ INSTALL_DATA	= $(INSTALL) -m0644
 XEN_ROOT=../..
 include $(XEN_ROOT)/tools/Rules.mk
 
-CC       = gcc
 CFLAGS  += -Wall -Werror -O3
 
 CFLAGS  += -I $(XEN_XC)
