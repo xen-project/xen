@@ -381,6 +381,10 @@ xc_linux_save  */
 	        /* With live migrate, we even get these...  Disable for now. */
                 // printk(KERN_ALERT "bad buffer on RX ring!(%d)\n", rx->status);
             }
+	    else
+		phys_to_machine_mapping[virt_to_phys(skb->head) >> PAGE_SHIFT] =
+		    0x80000004; // disown this page -- it was a flush
+
             dev_kfree_skb_any(skb);
             continue;
         }

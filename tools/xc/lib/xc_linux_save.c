@@ -82,6 +82,67 @@ inline void set_bit ( int nr, volatile void * addr)
 	(1 << (nr % (sizeof(unsigned long)*8) ) );
 }
 
+long long tv_to_us( struct timeval *new )
+{
+    return (new->tv_sec * 1000000) + new->tv_usec;
+}
+
+long long tvdelta( struct timeval *new, struct timeval *old )
+{
+    return ((new->tv_sec - old->tv_sec)*1000000 ) + 
+	(new->tv_usec - old->tv_usec);
+}
+
+int track_cpu_usage_dom0( int xc_handle, int print )
+{
+    static struct timeval wall_last;
+    static long long      cpu_last;
+
+    struct timeval        wall_now;
+    long long             cpu_now, wall_delta, cpu_delta;
+
+    gettimeofday(&wall_now, NULL);
+
+    cpu_now = xc_domain_get_cpu_usage( xc_handle, 0 )/1000;
+
+    wall_delta = tvdelta(&wall_now,&wall_last)/1000;
+    cpu_delta  = (cpu_now - cpu_last)/1000;
+
+    if(print)
+	printf("Dom0  : wall delta %lldms, cpu delta %lldms    : %d%%\n",
+	   wall_delta, cpu_delta, (cpu_delta*100)/wall_delta);
+
+    cpu_last  = cpu_now;
+    wall_last = wall_now;	
+
+    return 0;
+}
+
+int track_cpu_usage_target( int xc_handle, u64 domid, int print )
+{
+    static struct timeval wall_last;
+    static long long      cpu_last;
+
+    struct timeval        wall_now;
+    long long             cpu_now, wall_delta, cpu_delta;
+
+    gettimeofday(&wall_now, NULL);
+
+    cpu_now = xc_domain_get_cpu_usage( xc_handle, domid )/1000;
+
+    wall_delta = tvdelta(&wall_now,&wall_last)/1000;
+    cpu_delta  = (cpu_now - cpu_last)/1000;
+
+    if(print)
+	printf("Target: wall delta %lldms, cpu delta %lldms    : %d%%\n",
+	   wall_delta, cpu_delta, (cpu_delta*100)/wall_delta);
+
+    cpu_last  = cpu_now;
+    wall_last = wall_now;	
+
+    return 0;
+}
+
 
 int xc_linux_save(int xc_handle,
                   u64 domid, 
@@ -95,10 +156,11 @@ int xc_linux_save(int xc_handle,
     int verbose = flags & XCFLAGS_VERBOSE;
     int live = flags & XCFLAGS_LIVE;
     int debug = flags & XCFLAGS_DEBUG;
-    int sent_last_iter, sent_this_iter, max_iters;
-
-    /* Remember if we stopped the guest, so we can restart it on exit. */
-    int we_stopped_it = 0;
+    int sent_last_iter, sent_this_iter, skip_this_iter;
+    
+    /* Important tuning parameters */
+    int max_iters  = 29; // limit us to 30 times round loop
+    int max_factor = 3;  // never send more than 3x nr_pfns 
 
     /* The new domain's shared-info frame number. */
     unsigned long shared_info_frame;
@@ -137,11 +199,15 @@ int xc_linux_save(int xc_handle,
     /* number of pages we're dealing with */
     unsigned long nr_pfns;
 
-    /* bitmap of pages left to send */
-    unsigned long *to_send, *to_fix;
+    /* bitmap of pages:
+       - that should be sent this iteration (unless later marked as skip); 
+       - to skip this iteration because already dirty;
+       - to fixup by sending at the end if not already resent; */
+    unsigned long *to_send, *to_skip, *to_fix;
 
-//live=0;
-
+    int needed_to_fix = 0;
+    int total_sent    = 0;
+    
     if ( mlock(&ctxt, sizeof(ctxt) ) )
     {
         PERROR("Unable to mlock ctxt");
@@ -149,38 +215,15 @@ int xc_linux_save(int xc_handle,
     }
 
     /* Ensure that the domain exists, and that it is stopped. */
-    for ( ; ; )
+
+    if ( xc_domain_stop_sync( xc_handle, domid, &op, &ctxt ) )
     {
-        op.cmd = DOM0_GETDOMAININFO;
-        op.u.getdomaininfo.domain = (domid_t)domid;
-        op.u.getdomaininfo.ctxt = &ctxt;
-        if ( (do_dom0_op(xc_handle, &op) < 0) || 
-             ((u64)op.u.getdomaininfo.domain != domid) )
-        {
-            PERROR("Could not get info on domain");
-            goto out;
-        }
-
-        memcpy(name, op.u.getdomaininfo.name, sizeof(name));
-        shared_info_frame = op.u.getdomaininfo.shared_info_frame;
-
-        if ( op.u.getdomaininfo.state == DOMSTATE_STOPPED )
-            break;
-
-        we_stopped_it = 1;
-
-        op.cmd = DOM0_STOPDOMAIN;
-        op.u.stopdomain.domain = (domid_t)domid;
-        if ( do_dom0_op(xc_handle, &op) != 0 )
-        {
-            we_stopped_it = 0;
-            PERROR("Stopping target domain failed");
-            goto out;
-        }
-
-        usleep(1000); // 1ms
-	printf("Sleep for 1ms\n");
+	PERROR("Could not sync stop domain");
+	goto out;
     }
+
+    memcpy(name, op.u.getdomaininfo.name, sizeof(name));
+    shared_info_frame = op.u.getdomaininfo.shared_info_frame;
 
     /* A cheesy test to see whether the domain contains valid state. */
     if ( ctxt.pt_base == 0 )
@@ -288,7 +331,6 @@ int xc_linux_save(int xc_handle,
 
 	last_iter = 0;
 	sent_last_iter = 1<<20; // 4GB's worth of pages
-	max_iters = 9; // limit us to 10 time round loop
     }
     else
 	last_iter = 1;
@@ -300,12 +342,14 @@ int xc_linux_save(int xc_handle,
 	
 	to_send = malloc( sz );
 	to_fix  = calloc( 1, sz );
+	to_skip = malloc( sz );
 
-	if (!to_send || !to_fix)
+	if (!to_send || !to_fix || !to_skip)
 	{
 	    ERROR("Couldn't allocate to_send array");
 	    goto out;
 	}
+
 	memset( to_send, 0xff, sz );
 
 	if ( mlock( to_send, sz ) )
@@ -313,6 +357,15 @@ int xc_linux_save(int xc_handle,
 	    PERROR("Unable to mlock to_send");
 	    return 1;
 	}
+
+	/* (to fix is local only) */
+
+	if ( mlock( to_skip, sz ) )
+	{
+	    PERROR("Unable to mlock to_skip");
+	    return 1;
+	}
+
     }
 
 
@@ -369,8 +422,11 @@ int xc_linux_save(int xc_handle,
         goto out;
     }
 
-    /* Now write out each data page, canonicalising page tables as we go... */
+    track_cpu_usage_dom0(xc_handle, 0);
+    track_cpu_usage_target( xc_handle, domid, 0);
 
+    /* Now write out each data page, canonicalising page tables as we go... */
+    
     while(1)
     {
 	unsigned int prev_pc, batch, sent_this_iter;
@@ -378,6 +434,7 @@ int xc_linux_save(int xc_handle,
 	iter++;
 
 	sent_this_iter = 0;
+	skip_this_iter = 0;
 	prev_pc = 0;
 	verbose_printf("Saving memory pages: iter %d   0%%", iter);
 
@@ -391,6 +448,18 @@ int xc_linux_save(int xc_handle,
 		prev_pc = this_pc;
 	    }
 
+	    /* slightly wasteful to peek the whole array evey time, 
+	       but this is fast enough for the moment. */
+
+	    if ( !last_iter && 
+		 xc_shadow_control( xc_handle, domid, 
+				    DOM0_SHADOW_CONTROL_OP_PEEK,
+				    to_skip, nr_pfns ) != nr_pfns ) 
+	    {
+		ERROR("Error peeking shadow bitmap");
+		goto out;
+	    }
+	    
 
 	    /* load pfn_type[] with the mfn of all the pages we're doing in
 	       this batch. */
@@ -404,15 +473,29 @@ int xc_linux_save(int xc_handle,
 			    test_bit(n,to_send),
 			    live_mfn_to_pfn_table[live_pfn_to_mfn_table[n]&0xFFFFF]);
 
+		if (!last_iter && test_bit(n, to_send) && test_bit(n, to_skip))
+		    skip_this_iter++; // stats keeping
 
-		if ( !test_bit(n, to_send ) &&
-		    !( last_iter && test_bit(n, to_fix ) ) ) continue;
+		if (! ( (test_bit(n, to_send) && !test_bit(n, to_skip)) ||
+			(test_bit(n, to_send) && last_iter) ||
+			(test_bit(n, to_fix)  && last_iter) )   )
+		    continue;
+
+		/* we get here if:
+		   1. page is marked to_send & hasn't already been re-dirtied
+		   2. (ignore to_skip in last iteration)
+		   3. add in pages that still need fixup (net bufs)
+		 */
 		
 		pfn_batch[batch] = n;
 		pfn_type[batch] = live_pfn_to_mfn_table[n];
 
 		if( pfn_type[batch] == 0x80000004 )
 		{
+		    /* not currently in pusedo-physical map -- set bit
+		       in to_fix that we must send this page in last_iter
+		       unless its sent sooner anyhow */
+
 		    set_bit( n, to_fix );
 		    if( iter>1 )
 			DDPRINTF("Urk! netbuf race: iter %d, pfn %lx. mfn %lx\n",
@@ -422,6 +505,7 @@ int xc_linux_save(int xc_handle,
 
 		if ( last_iter && test_bit(n, to_fix ) && !test_bit(n, to_send ))
 		{
+		    needed_to_fix++;
 		    DPRINTF("Fix! iter %d, pfn %lx. mfn %lx\n",
 			       iter,n,pfn_type[batch]);
 		}
@@ -567,9 +651,23 @@ int xc_linux_save(int xc_handle,
 	munmap(region_base, batch*PAGE_SIZE);
 
     skip: 
+
+	total_sent += sent_this_iter;
+
+	verbose_printf("\b\b\b\b100%% (pages sent= %d, skipped= %d )\n", 
+		       sent_this_iter, skip_this_iter );
+
+	track_cpu_usage_dom0(xc_handle, 1);
+	track_cpu_usage_target( xc_handle, domid, 1);
+
 	
-	verbose_printf("\b\b\b\b100%% (%d pages)\n", sent_this_iter );
-	
+	if ( last_iter )
+	{
+	    verbose_printf("Total pages sent= %d (%.2fx)\n", 
+			   total_sent, ((float)total_sent)/nr_pfns );
+	    verbose_printf("(of which %d were fixups)\n", needed_to_fix  );
+	}       
+
 	if ( debug && last_iter )
 	{
 	    int minusone = -1;
@@ -592,18 +690,21 @@ int xc_linux_save(int xc_handle,
 
 	if ( live )
 	{
-	    if ( ( sent_this_iter > (sent_last_iter * 0.95) ) ||
-		 (iter >= max_iters) || (sent_this_iter < 10) )
+	    if ( 
+		 // ( sent_this_iter > (sent_last_iter * 0.95) ) ||		 
+		 (iter >= max_iters) || 
+		 (sent_this_iter+skip_this_iter < 10) || 
+		 (total_sent > nr_pfns*max_factor) )
 	    {
 		DPRINTF("Start last iteration\n");
 		last_iter = 1;
 
-		xc_domain_stop_sync( xc_handle, domid );
+		xc_domain_stop_sync( xc_handle, domid, &op, NULL );
 
 	    } 
 
 	    if ( xc_shadow_control( xc_handle, domid, 
-				    DOM0_SHADOW_CONTROL_OP_CLEAN,
+				    DOM0_SHADOW_CONTROL_OP_CLEAN2,
 				    to_send, nr_pfns ) != nr_pfns ) 
 	    {
 		ERROR("Error flushing shadow PT");
@@ -674,14 +775,6 @@ int xc_linux_save(int xc_handle,
     munmap(live_shinfo, PAGE_SIZE);
 
 out:
-    /* Restart the domain if we had to stop it to save its state. */
-    if ( we_stopped_it )
-    {
-	printf("Restart domain\n");
-        op.cmd = DOM0_STARTDOMAIN;
-        op.u.startdomain.domain = (domid_t)domid;
-        (void)do_dom0_op(xc_handle, &op);
-    }
 
     if ( pfn_type != NULL )
         free(pfn_type);

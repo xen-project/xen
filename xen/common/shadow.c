@@ -109,43 +109,68 @@ static void __free_shadow_table( struct mm_struct *m )
     SH_LOG("Free shadow table. Freed= %d",free);
 }
 
-static inline int shadow_page_op( struct mm_struct *m, unsigned int op,
-                                  struct pfn_info *spfn_info )
+
+#define TABLE_OP_ZERO_L2 1
+#define TABLE_OP_ZERO_L1 2
+#define TABLE_OP_FREE_L1 3
+
+static inline int shadow_page_op( struct mm_struct *m, unsigned int op, 
+								  unsigned int gpfn,
+                                  struct pfn_info *spfn_info, int *work )
 {
-    int work = 0;
     unsigned int spfn = spfn_info-frame_table;
+	int restart = 0;
 
     switch( op )
     {
-    case DOM0_SHADOW_CONTROL_OP_CLEAN:
-    {
-        int i;
-        if ( (spfn_info->type_and_flags & PGT_type_mask) == 
+	case TABLE_OP_ZERO_L2:
+	{
+		if ( (spfn_info->type_and_flags & PGT_type_mask) == 
+             PGT_l2_page_table )
+		{
+			unsigned long * spl1e = map_domain_mem( spfn<<PAGE_SHIFT );
+			memset( spl1e, 0, DOMAIN_ENTRIES_PER_L2_PAGETABLE * sizeof(*spl1e) );
+			unmap_domain_mem( spl1e );
+		}
+    }
+	break;
+	
+	case TABLE_OP_ZERO_L1:
+	{
+		if ( (spfn_info->type_and_flags & PGT_type_mask) == 
              PGT_l1_page_table )
-        {
-            unsigned long * spl1e = map_domain_mem( spfn<<PAGE_SHIFT );
-
-            for (i=0;i<ENTRIES_PER_L1_PAGETABLE;i++)
-            {                    
-                if ( (spl1e[i] & _PAGE_PRESENT ) && (spl1e[i] & _PAGE_RW) )
-                {
-                    work++;
-                    spl1e[i] &= ~_PAGE_RW;
-                }
-            }
-            unmap_domain_mem( spl1e );
-        }
+		{
+			unsigned long * spl1e = map_domain_mem( spfn<<PAGE_SHIFT );
+			memset( spl1e, 0, ENTRIES_PER_L1_PAGETABLE * sizeof(*spl1e) );
+			unmap_domain_mem( spl1e );
+		}
     }
 	break;
 
+	case TABLE_OP_FREE_L1:
+	{
+		if ( (spfn_info->type_and_flags & PGT_type_mask) == 
+             PGT_l1_page_table )
+		{
+			// lock is already held
+			delete_shadow_status( m, gpfn );
+			restart = 1; // we need to go to start of list again
+		}
     }
-    return work;
+
+	break;
+	
+	default:
+		BUG();
+
+    }
+    return restart;
 }
 
 static void __scan_shadow_table( struct mm_struct *m, unsigned int op )
 {
     int j, work=0;
-    struct shadow_status *a;
+    struct shadow_status *a, *next;
  
     // the code assumes you're not using the page tables i.e.
     // the domain is stopped and cr3 is something else!!
@@ -156,16 +181,25 @@ static void __scan_shadow_table( struct mm_struct *m, unsigned int op )
 
     for(j=0;j<shadow_ht_buckets;j++)
     {
-        a = &m->shadow_ht[j];        
+	retry:
+        a = &m->shadow_ht[j];     
+		next = a->next;
         if (a->pfn)
         {
-            work += shadow_page_op( m, op, &frame_table[a->spfn_and_flags & PSH_pfn_mask] );
+            if ( shadow_page_op( m, op, a->pfn,								 
+								 &frame_table[a->spfn_and_flags & PSH_pfn_mask], 
+								 &work ) )
+				goto retry;
         }
-        a=a->next;
+        a=next;
         while(a)
         { 
-            work += shadow_page_op( m, op, &frame_table[a->spfn_and_flags & PSH_pfn_mask] );
-            a=a->next;
+			next = a->next;
+            if ( shadow_page_op( m, op, a->pfn,
+								 &frame_table[a->spfn_and_flags & PSH_pfn_mask],
+								 &work ) )
+				goto retry;
+            a=next;
         }
         shadow_audit(m,0);
     }
@@ -301,16 +335,29 @@ static int shadow_mode_table_op( struct task_struct *p,
     switch(op)
     {
     case DOM0_SHADOW_CONTROL_OP_FLUSH:
-        __free_shadow_table( m );
+        // XXX THIS IS VERY DANGEROUS : MUST ENSURE THE PTs ARE NOT IN USE ON
+		// OTHER CPU -- fix when we get sched sync pause.
+        __free_shadow_table( m );  
         break;
    
-    case DOM0_SHADOW_CONTROL_OP_CLEAN:
+    case DOM0_SHADOW_CONTROL_OP_CLEAN:   // zero all-non hypervisor
+	{
+		__scan_shadow_table( m, TABLE_OP_ZERO_L2 );
+		__scan_shadow_table( m, TABLE_OP_ZERO_L1 );
+
+		goto send_bitmap;
+	}
+		
+
+    case DOM0_SHADOW_CONTROL_OP_CLEAN2:  // zero all L2, free L1s
     {
 		int i,j,zero=1;
 		
-		__scan_shadow_table( m, op );
-		//    __free_shadow_table( m );
-	
+		__scan_shadow_table( m, TABLE_OP_ZERO_L2 );
+		__scan_shadow_table( m, TABLE_OP_FREE_L1 );
+		
+	send_bitmap:
+
 		if( p->tot_pages > sc->pages || 
 			!sc->dirty_bitmap || !p->mm.shadow_dirty_bitmap )
 		{
@@ -350,6 +397,38 @@ static int shadow_mode_table_op( struct task_struct *p,
 
 		break;
     }
+
+    case DOM0_SHADOW_CONTROL_OP_PEEK:
+    {
+		int i;
+	
+		if( p->tot_pages > sc->pages || 
+			!sc->dirty_bitmap || !p->mm.shadow_dirty_bitmap )
+		{
+			rc = -EINVAL;
+			goto out;
+		}
+	
+		sc->pages = p->tot_pages;
+	
+#define chunk (8*1024) // do this in 1KB chunks for L1 cache
+	
+		for(i=0;i<p->tot_pages;i+=chunk)
+		{
+			int bytes = ((  ((p->tot_pages-i) > (chunk))?
+							(chunk):(p->tot_pages-i) ) + 7) / 8;
+	    
+			copy_to_user( sc->dirty_bitmap + (i/(8*sizeof(unsigned long))),
+						  p->mm.shadow_dirty_bitmap +(i/(8*sizeof(unsigned long))),
+						  bytes );	    
+		}
+
+		break;
+    }
+
+	default:
+		BUG();
+
     }
 
 
@@ -386,7 +465,7 @@ int shadow_mode_control( struct task_struct *p, dom0_shadow_control_t *sc )
         if(p->mm.shadow_mode) shadow_mode_disable(p);
         shadow_mode_enable(p, SHM_logdirty);
     } 
-    else if ( p->mm.shadow_mode && cmd >= DOM0_SHADOW_CONTROL_OP_FLUSH && cmd<=DOM0_SHADOW_CONTROL_OP_CLEAN )
+    else if ( p->mm.shadow_mode && cmd >= DOM0_SHADOW_CONTROL_OP_FLUSH && cmd<=DOM0_SHADOW_CONTROL_OP_CLEAN2 )
     {
         rc = shadow_mode_table_op(p, sc);
     }

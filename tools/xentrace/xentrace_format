@@ -4,7 +4,7 @@
 
 # Program for reformatting trace buffer output according to user-supplied rules
 
-import re, sys, string, signal, struct
+import re, sys, string, signal, struct, os, getopt
 
 def usage():
     print >> sys.stderr, \
@@ -43,6 +43,9 @@ def read_defs(defs_file):
         line = fd.readline()
         if not line:
             break
+	
+	if line[0] == '#' or line[0] == '\n':
+	    continue
         
         m = reg.match(line)
 
@@ -58,8 +61,21 @@ def sighand(x,y):
 
 ##### Main code
 
+mhz = 0
+
 if len(sys.argv) < 2:
     usage()
+
+try:
+    opts, arg = getopt.getopt(sys.argv[1:], "c:" )
+
+    for opt in opts:
+	if opt[0] == '-c' : mhz = int(opt[1])
+
+except getopt.GetoptError:
+    usage()
+
+print mhz
 
 signal.signal(signal.SIGTERM, sighand)
 signal.signal(signal.SIGHUP,  sighand)
@@ -67,19 +83,38 @@ signal.signal(signal.SIGINT,  sighand)
 
 interrupted = 0
 
-defs = read_defs(sys.argv[1])
+defs = read_defs(arg[0])
+
+print defs
 
 # structure of trace record + prepended CPU id (as output by xentrace):
 # CPU(I) TSC(Q) EVENT(L) D1(L) D2(L) D3(L) D4(L) D5(L)
 TRCREC = "IQLLLLLL"
 
+last_tsc = [0,0,0,0,0,0,0,0]
+
+i=0
+
 while not interrupted:
     try:
+	i=i+1
         line = sys.stdin.read(struct.calcsize(TRCREC))
         if not line:
             break
 
         (cpu, tsc, event, d1, d2, d3, d4, d5) = struct.unpack(TRCREC, line)
+
+	#tsc = (tscH<<32) | tscL
+
+	#print i, tsc
+
+	if tsc < last_tsc[cpu]:
+	    print "TSC stepped backward cpu %d !  %d %d" % (cpu,tsc,last_tsc[cpu])
+
+	last_tsc[cpu] = tsc
+
+	if mhz:
+	    tsc = tsc / (mhz*1000000.0)
 
         args = {'cpu'   : cpu,
                 'tsc'   : tsc,
@@ -90,8 +125,15 @@ while not interrupted:
                 '4'     : d4,
                 '5'     : d5    }
 
-        if defs.has_key(str(event)): print defs[str(event)] % args
-        # silently skip lines we don't have a format for - a 'complain' option
-        # should be added if needed
+	try:
+
+	    if defs.has_key(str(event)): 
+		print defs[str(event)] % args
+	    else: 
+		if defs.has_key(str(0)): print defs[str(0)] % args
+	except TypeError:
+	    print defs[str(event)]
+	    print args
+	    
 
     except IOError, struct.error: sys.exit()

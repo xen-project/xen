@@ -592,14 +592,11 @@ int xc_linux_restore(int xc_handle,
 
 
  out:
-    if ( rc != 0 )  // destroy is something went wrong
+    if ( rc != 0 )  // destroy if something went wrong
     {
         if ( dom != 0 )
         {
-            op.cmd = DOM0_DESTROYDOMAIN;
-            op.u.destroydomain.domain = (domid_t)dom;
-            op.u.destroydomain.force  = 1;
-            (void)do_dom0_op(xc_handle, &op);
+	    xc_domain_destroy( xc_handle, dom, 1 );
         }
     }
 

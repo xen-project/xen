@@ -61,10 +61,12 @@ static inline int trace(u32 event, u32 d1, u32 d2, u32 d3, u32 d4, u32 d5)
     if ( !tb_init_done )
         return -1;
 
-    buf = t_bufs[smp_processor_id()];
-    rec = buf->head_ptr;
 
-    spin_lock_irqsave(&buf->lock, flags);
+    buf = t_bufs[smp_processor_id()];
+
+    local_irq_save(flags);
+
+    rec = buf->head_ptr;
 
     rdtscll(rec->cycles);
     rec->event = event;
@@ -76,18 +78,12 @@ static inline int trace(u32 event, u32 d1, u32 d2, u32 d3, u32 d4, u32 d5)
 
     wmb(); /* above must be visible before reader sees index updated */
 
-    if ( likely(buf->head_ptr < (buf->vdata + buf->size - 1)) )
-    {
-        buf->head_ptr++;
-        buf->head++;
-    }
-    else
-    {
-        buf->head = 0;
+    buf->head_ptr++;
+    buf->head++;
+    if ( buf->head_ptr == (buf->vdata + (buf->size-1)) )
         buf->head_ptr = buf->vdata;
-    }
 
-    spin_unlock_irqrestore(&buf->lock, flags);
+    local_irq_restore(flags);
     
     return 0;
 }

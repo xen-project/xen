@@ -74,6 +74,9 @@ typedef struct dom0_stopdomain_st
 {
     /* IN parameters. */
     domid_t domain;
+    /* hack to indicate that you want to wait for other domain -- replace
+       with proper sychronous stop soon! */
+    int     sync;  
 } dom0_stopdomain_t;
 
 #define DOM0_GETDOMAININFO    12
@@ -236,8 +239,10 @@ typedef struct dom0_sched_id_st
 #define DOM0_SHADOW_CONTROL_OP_OFF         0
 #define DOM0_SHADOW_CONTROL_OP_ENABLE_TEST 1
 #define DOM0_SHADOW_CONTROL_OP_ENABLE_LOGDIRTY 2
-#define DOM0_SHADOW_CONTROL_OP_FLUSH       10
+#define DOM0_SHADOW_CONTROL_OP_FLUSH       10     /* table ops */
 #define DOM0_SHADOW_CONTROL_OP_CLEAN       11
+#define DOM0_SHADOW_CONTROL_OP_PEEK        12
+#define DOM0_SHADOW_CONTROL_OP_CLEAN2      13
 typedef struct dom0_shadow_control_st
 {
     /* IN variables. */
