@@ -127,12 +127,29 @@ typedef struct vif_getinfo_st
 {
     unsigned int        domain;
     unsigned int        vif;
+
     /* domain & vif are supplied by dom0, the rest are response fields */
     long long           total_bytes_sent;
     long long           total_bytes_received;
     long long           total_packets_sent;
     long long           total_packets_received;
+
+    /* Current scheduling parameters */
+    unsigned long credit_bytes;
+    unsigned long credit_usec;
 } vif_getinfo_t;
+
+/*
+ * Set parameters associated with a VIF. Currently this is only scheduling
+ * parameters --- permit 'credit_bytes' to be transmitted every 'credit_usec'.
+ */
+typedef struct vif_setparams_st
+{
+    unsigned int        domain;
+    unsigned int        vif;
+    unsigned long       credit_bytes;
+    unsigned long       credit_usec;
+} vif_setparams_t;
 
 /* Network trap operations and associated structure. 
  * This presently just handles rule insertion and deletion, but will
@@ -144,6 +161,7 @@ typedef struct vif_getinfo_st
 #define NETWORK_OP_GETRULELIST  2
 #define NETWORK_OP_VIFQUERY     3
 #define NETWORK_OP_VIFGETINFO   4
+#define NETWORK_OP_VIFSETPARAMS 5
 
 typedef struct network_op_st 
 {
@@ -153,6 +171,7 @@ typedef struct network_op_st
         net_rule_t net_rule;
         vif_query_t vif_query;
         vif_getinfo_t vif_getinfo;
+        vif_setparams_t vif_setparams;
     }
     u;
 } network_op_t;

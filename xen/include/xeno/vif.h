@@ -72,6 +72,12 @@ typedef struct net_vif_st {
     long long total_packets_sent;
     long long total_packets_received;
 
+    /* Trasnmit shaping: allow 'credit_bytes' everu 'credit_usec'. */
+    unsigned long   credit_bytes;
+    unsigned long   credit_usec;
+    unsigned long   remaining_credit;
+    struct ac_timer credit_timeout;
+
     /* Miscellaneous private stuff. */
     struct task_struct *domain;
     unsigned int idx; /* index within domain */

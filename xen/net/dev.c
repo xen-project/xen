@@ -1824,6 +1824,18 @@ inline int init_tx_header(net_vif_t *vif, u8 *data,
     return proto;
 }
 
+static void tx_credit_callback(unsigned long data)
+{
+    net_vif_t *vif = (net_vif_t *)data;
+
+    vif->remaining_credit = vif->credit_bytes;
+
+    if ( get_tx_bufs(vif) )
+    {
+        add_to_net_schedule_list_tail(vif);
+        maybe_schedule_tx_action();
+    }    
+}
 
 static int get_tx_bufs(net_vif_t *vif)
 {
@@ -1837,13 +1849,17 @@ static int get_tx_bufs(net_vif_t *vif)
     unsigned short      protocol;
     struct sk_buff     *skb;
     tx_req_entry_t      tx;
-    int                 i, j, ret;
+    int                 i, j, ret = 0;
     unsigned long       flags;
 
     if ( vif->tx_req_cons == shared_idxs->tx_req_prod )
         return 0;
 
     spin_lock_irqsave(&vif->tx_lock, flags);
+
+    /* Currently waiting for more credit? */
+    if ( vif->remaining_credit == 0 )
+        goto out;
 
     j = vif->tx_prod;
 
@@ -1867,6 +1883,29 @@ static int get_tx_bufs(net_vif_t *vif)
             __make_tx_response(vif, tx.id, RING_STATUS_BAD_PAGE);
             continue; 
         }
+
+        /* Credit-based scheduling. */
+        if ( tx.size > vif->remaining_credit )
+        {
+            s_time_t now = NOW(), next_credit = 
+                vif->credit_timeout.expires + MICROSECS(vif->credit_usec);
+            if ( next_credit <= now )
+            {
+                vif->credit_timeout.expires = now;
+                vif->remaining_credit = vif->credit_bytes;
+            }
+            else
+            {
+                vif->remaining_credit = 0;
+                vif->credit_timeout.expires  = next_credit;
+                vif->credit_timeout.data     = (unsigned long)vif;
+                vif->credit_timeout.function = tx_credit_callback;
+                vif->credit_timeout.cpu      = smp_processor_id();
+                add_ac_timer(&vif->credit_timeout);
+                break;
+            }
+        }
+        vif->remaining_credit -= tx.size;
 
         /* No crossing a page boundary as the payload mustn't fragment. */
         if ( ((tx.addr & ~PAGE_MASK) + tx.size) >= PAGE_SIZE ) 
@@ -1966,12 +2005,14 @@ static int get_tx_bufs(net_vif_t *vif)
      */
     smp_mb();
 
-    if ( (vif->tx_req_cons = i) != shared_idxs->tx_req_prod )
+    if ( ((vif->tx_req_cons = i) != shared_idxs->tx_req_prod) &&
+         (vif->remaining_credit != 0) )
         goto again;
 
     if ( (ret = (vif->tx_prod != j)) )
         vif->tx_prod = j;
 
+ out:
     spin_unlock_irqrestore(&vif->tx_lock, flags);
 
     return ret;

@@ -105,6 +105,10 @@ net_vif_t *create_net_vif(int domain)
     spin_lock_init(&new_vif->rx_lock);
     spin_lock_init(&new_vif->tx_lock);
 
+    new_vif->credit_bytes = new_vif->remaining_credit = ~0UL;
+    new_vif->credit_usec  = 0UL;
+    init_ac_timer(&new_vif->credit_timeout, 0);
+
     if ( (p->domain == 0) && (dom_vif_idx == 0) )
     {
         /*
@@ -246,33 +250,44 @@ int vif_query(vif_query_t *vq)
  */
 int vif_getinfo(vif_getinfo_t *info)
 {
-    struct task_struct *p;
     net_vif_t *vif;
 
-    info->total_bytes_sent =
-    info->total_bytes_received =
-    info->total_packets_sent =
-    info->total_packets_received = -1;
-
-    if ( !(p = find_domain_by_id(info->domain)) )
-        return -ENOSYS;
-
-    vif = p->net_vif_list[info->vif];
-
+    vif = find_vif_by_id((info->domain << VIF_DOMAIN_SHIFT) | info->vif);
     if ( vif == NULL )
-    {
-        put_task_struct(p);
-        return -ENOSYS;
-    }
+        return -ESRCH;
 
     info->total_bytes_sent              = vif->total_bytes_sent;
     info->total_bytes_received          = vif->total_bytes_received;
     info->total_packets_sent            = vif->total_packets_sent;
     info->total_packets_received        = vif->total_packets_received;
 
-    put_task_struct(p);
+    info->credit_bytes = vif->credit_bytes;
+    info->credit_usec  = vif->credit_usec;
+
+    put_vif(vif);
 
     return 0;
+}
+
+
+int vif_setparams(vif_setparams_t *params)
+{
+    net_vif_t *vif;
+
+    vif = find_vif_by_id((params->domain << VIF_DOMAIN_SHIFT) | params->vif);
+    if ( vif == NULL )
+        return -ESRCH;
+
+    /* Turning off rate limiting? */
+    if ( params->credit_usec == 0 )
+        params->credit_bytes = ~0UL;
+
+    vif->credit_bytes = vif->remaining_credit = params->credit_bytes;
+    vif->credit_usec  = params->credit_usec;
+
+    put_vif(vif);
+
+    return 0;    
 }
 
         
@@ -569,6 +584,12 @@ long do_network_op(network_op_t *u_network_op)
     case NETWORK_OP_VIFQUERY:
     {
         ret = vif_query(&op.u.vif_query);
+    }
+    break;
+    
+    case NETWORK_OP_VIFSETPARAMS:
+    {
+        ret = vif_setparams(&op.u.vif_setparams);
     }
     break;
     

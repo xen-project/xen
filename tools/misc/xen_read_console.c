@@ -11,7 +11,7 @@
 
 int main(void)
 {
-    unsigned char buf[208], abuf[32];
+    unsigned char buf[208];
     struct sockaddr_in addr, from;
     int fromlen = sizeof(from);
     int len, fd = socket(PF_INET, SOCK_DGRAM, 0);
@@ -37,6 +37,7 @@ int main(void)
             >= 0 )
     {
 #if 0
+        unsigned char abuf[32];
         printf("%d-byte message from %s:%d --\n", len,
                inet_ntop(AF_INET, &from.sin_addr, abuf, sizeof(abuf)),
                ntohs(from.sin_port));
