@@ -95,7 +95,7 @@ class ControllerFactory(CtrlMsgRcvr):
         if instance.idx in self.instances:
             del self.instances[instance.idx]
 
-    def createInstance(self, dom):
+    def createInstance(self, dom, recreate=0):
         raise NotImplementedError()
 
     def instanceClosed(self, instance):
@@ -136,3 +136,30 @@ class Controller(CtrlMsgRcvr):
 
     def lostChannel(self):
         self.factory.instanceClosed(self)
+
+class Dev:
+
+    def __init__(self, controller):
+        self.controller = controller
+        self.props = {}
+
+    def setprop(self, k, v):
+        self.props[k] = v
+
+    def getprop(self, k, v=None):
+        return self.props.get(k, v)
+
+    def hasprop(self, k):
+        return k in self.props
+
+    def delprop(self, k):
+        if k in self.props:
+            del self.props[k]
+
+    #def __repr__(self):
+    #    return str(self.sxpr())
+
+    def sxpr(self):
+        raise NotImplementedError()
+
+    

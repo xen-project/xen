@@ -6,6 +6,8 @@
 """
 import sys
 
+from twisted.internet import defer
+
 import Xc; xc = Xc.new()
 import xenctl.ip
 
@@ -59,21 +61,26 @@ class XendDomain:
         for d in domlist:
             domid = str(d['dom'])
             doms[domid] = d
+        dlist = []
         for config in self.domain_db.values():
             domid = str(sxp.child_value(config, 'id'))
             print "dom=", domid, "config=", config
             if domid in doms:
                 print "dom=", domid, "new"
-                self._new_domain(config)
+                deferred = self._new_domain(config, doms[domid])
+                dlist.append(deferred)
             else:
                 print "dom=", domid, "del"
                 self._delete_domain(domid)
-        print "doms:"
-        for d in self.domain.values(): print 'dom', d
-        print "refresh..."
-        self.refresh()
-        print "doms:"
-        for d in self.domain.values(): print 'dom', d
+        deferred = defer.DeferredList(dlist, fireOnOneErrback=1)
+        def cbok(val):
+            print "doms:"
+            for d in self.domain.values(): print 'dom', d
+            print "refresh..."
+            self.refresh()
+            print "doms:"
+            for d in self.domain.values(): print 'dom', d
+        deferred.addCallback(cbok)
 
     def sync(self):
         """Sync domain db to disk.
@@ -90,31 +97,36 @@ class XendDomain:
     def close(self):
         pass
 
-    def _new_domain(self, info):
+    def _new_domain(self, savedinfo, info):
         """Create a domain entry from saved info.
         """
-        console = None
-        kernel = None
-        id = sxp.child_value(info, 'id')
-        dom = int(id)
-        name = sxp.child_value(info, 'name')
-        memory = int(sxp.child_value(info, 'memory'))
-        consoleinfo = sxp.child(info, 'console')
-        if consoleinfo:
-            consoleid = sxp.child_value(consoleinfo, 'id')
-            console = self.xconsole.console_get(consoleid)
-        if dom and console is None:
-            # Try to connect a console.
-            console = self.xconsole.console_create(dom)
-        config = sxp.child(info, 'config')
-        if config:
-            image = sxp.child(info, 'image')
-            if image:
-                image = sxp.child0(image)
-                kernel = sxp.child_value(image, 'kernel')
-        dominfo = XendDomainInfo.XendDomainInfo(
-            config, dom, name, memory, kernel, console)
-        self.domain[id] = dominfo
+##         console = None
+##         kernel = None
+##         id = sxp.child_value(info, 'id')
+##         dom = int(id)
+##         name = sxp.child_value(info, 'name')
+##         memory = int(sxp.child_value(info, 'memory'))
+##         consoleinfo = sxp.child(info, 'console')
+##         if consoleinfo:
+##             consoleid = sxp.child_value(consoleinfo, 'id')
+##             console = self.xconsole.console_get(consoleid)
+##         if dom and console is None:
+##             # Try to connect a console.
+##             console = self.xconsole.console_create(dom)
+##         config = sxp.child(info, 'config')
+##         if config:
+##             image = sxp.child(info, 'image')
+##             if image:
+##                 image = sxp.child0(image)
+##                 kernel = sxp.child_value(image, 'kernel')
+##         dominfo = XendDomainInfo.XendDomainInfo(
+##             config, dom, name, memory, kernel, console)
+        config = sxp.child_value(savedinfo, 'config')
+        deferred = XendDomainInfo.vm_recreate(config, info)
+        def fn(dominfo):
+            self.domain[dominfo.id] = dominfo
+        deferred.addCallback(fn)
+        return deferred
 
     def _add_domain(self, id, info, notify=1):
         self.domain[id] = info
@@ -143,10 +155,13 @@ class XendDomain:
             doms[id] = d
             if id not in self.domain:
                 config = None
-                image = None
-                newinfo = XendDomainInfo.XendDomainInfo(
-                    config, d['dom'], d['name'], d['mem_kb']/1024, image=image, info=d)
-                self._add_domain(newinfo.id, newinfo)
+                #image = None
+                #newinfo = XendDomainInfo.XendDomainInfo(
+                #    config, d['dom'], d['name'], d['mem_kb']/1024, image=image, info=d)
+                deferred = XendDomainInfo.vm_recreate(config, d)
+                def fn(dominfo):
+                    self._add_domain(dominfo.id, dominfo)
+                deferred.addCallback(fn)
         # Remove entries for domains that no longer exist.
         for d in self.domain.values():
             dominfo = doms.get(d.id)
@@ -217,13 +232,13 @@ class XendDomain:
         self.refresh()
         return val
     
-    def domain_halt(self, id):
+    def domain_destroy(self, id):
         """Terminate domain immediately.
         """
         dom = int(id)
         if dom <= 0:
             return 0
-        eserver.inject('xend.domain.halt', id)
+        eserver.inject('xend.domain.destroy', id)
         val = xc.domain_destroy(dom=dom)
         self.refresh()
         return val       
@@ -235,14 +250,14 @@ class XendDomain:
         pass
     
     def domain_save(self, id, dst, progress=0):
-        """Save domain state to file, halt domain.
+        """Save domain state to file, destroy domain.
         """
         dom = int(id)
         self.domain_pause(id)
         eserver.inject('xend.domain.save', id)
         rc = xc.linux_save(dom=dom, state_file=dst, progress=progress)
         if rc == 0:
-            self.domain_halt(id)
+            self.domain_destroy(id)
         return rc
     
     def domain_restore(self, src, config, progress=0):

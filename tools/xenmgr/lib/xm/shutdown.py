@@ -1,3 +1,6 @@
+# Copyright (C) 2004 Mike Wray <mike.wray@hp.com>
+"""Domain shutdown.
+"""
 import string
 import sys
 import time
