@@ -25,11 +25,6 @@
 #include <asm-xen/hypervisor-ifs/io/netif.h>
 #include <asm/page.h>
 
-#if LINUX_VERSION_CODE < KERNEL_VERSION(2,6,0)
-#define irqreturn_t void
-#define IRQ_HANDLED
-#endif
-
 #define RX_BUF_SIZE ((PAGE_SIZE/2)+1) /* Fool the slab allocator :-) */
 
 static void network_tx_buf_gc(struct net_device *dev);

@@ -30,7 +30,7 @@ dist: all
 LINUX_RELEASE    ?= 2.4
 LINUX_VER        ?= $(shell ( /bin/ls -ld linux-$(LINUX_RELEASE).*-xen-sparse ) 2>/dev/null | \
 		      sed -e 's!^.*linux-\(.\+\)-xen-sparse!\1!' )
-LINUX24_VER      ?= $(shell ( /bin/ls -ld linux-2.4.*-xen-sparse ) 2>/dev/null | \
+LINUX26_VER      ?= $(shell ( /bin/ls -ld linux-2.6.*-xen-sparse ) 2>/dev/null | \
 		      sed -e 's!^.*linux-\(.\+\)-xen-sparse!\1!' )
 LINUX_CONFIG_DIR ?= $(INSTALL_DIR)/boot
 LINUX_SRC_PATH   ?= .:..
@@ -133,7 +133,7 @@ mrproper: clean
 	rm -rf install/* patches $(LINUX_TREES) linux-$(LINUX_VER).tar.*
 
 make-symlinks: delete-symlinks
-	ln -sf linux-$(LINUX24_VER)-xen-sparse linux-xen-sparse
+	ln -sf linux-$(LINUX26_VER)-xen-sparse linux-xen-sparse
 
 delete-symlinks:
 	$(RM) linux-xen-sparse

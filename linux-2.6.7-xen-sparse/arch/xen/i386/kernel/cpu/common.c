@@ -8,7 +8,7 @@
 #include <asm/msr.h>
 #include <asm/io.h>
 #include <asm/mmu_context.h>
-#include <asm/hypervisor.h>
+#include <asm-xen/hypervisor.h>
 
 #include "cpu.h"
 

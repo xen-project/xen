@@ -17,9 +17,6 @@ c-obj-y	:= semaphore.o vm86.o \
 		doublefault.o
 s-obj-y	:=
 
-#obj-y				+= hypervisor.o
-obj-y				+= evtchn.o
-
 obj-y				+= cpu/
 obj-y				+= timers/
 c-obj-$(CONFIG_ACPI_BOOT)	+= acpi/

@@ -26,8 +26,8 @@
 #include <asm/io.h>
 #include <asm/irq.h>
 #include <asm/uaccess.h>
-#include <asm/hypervisor.h>
 #include <asm/hypervisor-ifs/event_channel.h>
+#include <asm-xen/hypervisor.h>
 #include <asm-xen/evtchn.h>
 #include <asm-xen/ctrl_if.h>
 
@@ -80,8 +80,6 @@ static struct tty_driver xencons_driver;
 static struct tq_struct xencons_tx_flush_task = {
     routine: xencons_tx_flush_task_routine
 };
-#define irqreturn_t void
-#define IRQ_HANDLED
 #endif
 
 

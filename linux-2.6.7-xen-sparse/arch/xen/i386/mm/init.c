@@ -40,7 +40,7 @@
 #include <asm/tlb.h>
 #include <asm/tlbflush.h>
 #include <asm/sections.h>
-#include <asm/hypervisor.h>
+#include <asm-xen/hypervisor.h>
 
 DEFINE_PER_CPU(struct mmu_gather, mmu_gathers);
 unsigned long highstart_pfn, highend_pfn;

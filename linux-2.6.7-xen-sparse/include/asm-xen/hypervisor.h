@@ -11,12 +11,12 @@
 
 #include <linux/types.h>
 #include <linux/kernel.h>
+#include <linux/version.h>
 #include <asm/hypervisor-ifs/hypervisor-if.h>
 #include <asm/hypervisor-ifs/dom0_ops.h>
 #include <asm/hypervisor-ifs/io/domain_controller.h>
 #include <asm/ptrace.h>
 #include <asm/page.h>
-#include <asm-xen/xen.h>
 
 /* arch/xen/i386/kernel/setup.c */
 union start_info_union
@@ -26,6 +26,9 @@ union start_info_union
 };
 extern union start_info_union start_info_union;
 #define start_info (start_info_union.start_info)
+
+/* arch/xen/kernel/process.c */
+void xen_cpu_idle (void);
 
 /* arch/xen/i386/kernel/hypervisor.c */
 void do_hypervisor_callback(struct pt_regs *regs);
@@ -149,6 +152,7 @@ static inline int flush_page_update_queue(void)
     return idx;
 }
 #define xen_flush_page_update_queue() (_flush_page_update_queue())
+#define XEN_flush_page_update_queue() (_flush_page_update_queue())
 void MULTICALL_flush_page_update_queue(void);
 
 #ifdef CONFIG_XEN_PHYSDEV_ACCESS

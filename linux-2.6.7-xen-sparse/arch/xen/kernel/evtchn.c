@@ -15,10 +15,10 @@
 #include <asm/system.h>
 #include <asm/ptrace.h>
 #include <asm/synch_bitops.h>
-#include <asm/hypervisor.h>
 #include <asm/hypervisor-ifs/event_channel.h>
 #include <asm/hypervisor-ifs/physdev.h>
 #include <asm-xen/ctrl_if.h>
+#include <asm-xen/hypervisor.h>
 
 /*
  * This lock protects updates to the following mapping and reference-count
@@ -359,10 +359,10 @@ static struct hw_interrupt_type pirq_type = {
 };
 
 static irqreturn_t misdirect_interrupt(int irq, void *dev_id,
-				       struct pt_regs *regs)
+                                       struct pt_regs *regs)
 {
-	/* nothing */
-	return IRQ_HANDLED;
+    /* nothing */
+    return IRQ_HANDLED;
 }
 
 static struct irqaction misdirect_action = {

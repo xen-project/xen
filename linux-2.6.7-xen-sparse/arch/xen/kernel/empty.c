@@ -1,6 +1,6 @@
 
 #include <linux/string.h>
-#include <asm/hypervisor.h>
+#include <asm-xen/hypervisor.h>
 
 #if 0
 static __inline__ int HYPERVISOR_console_write(const char *str, int count)
