@@ -43,7 +43,7 @@ static ssize_t read_mem(struct file * file, char __user * buf,
 			size_t count, loff_t *ppos)
 {
 	unsigned long i, p = *ppos;
-	ssize_t read = 0;
+	ssize_t read = -EFAULT;
 	void *v;
 
 	if ((v = ioremap(p, count)) == NULL) {
@@ -60,12 +60,12 @@ static ssize_t read_mem(struct file * file, char __user * buf,
 		return count;
 	}
 	if (copy_to_user(buf, v, count))
-		return -EFAULT;
-	iounmap(v);
+		goto out;
 
-	read += count;
+	read = count;
 	*ppos += read;
-
+out:
+	iounmap(v);
 	return read;
 }
 
@@ -73,18 +73,18 @@ static ssize_t write_mem(struct file * file, const char __user * buf,
 			 size_t count, loff_t *ppos)
 {
 	unsigned long p = *ppos;
-	ssize_t written = 0;
+	ssize_t written = -EFAULT;
 	void *v;
 
 	if ((v = ioremap(p, count)) == NULL)
 		return -EFAULT;
 	if (copy_to_user(v, buf, count))
-		return -EFAULT;
-	iounmap(v);
+		goto out;
 
-	written += count;
+	written = count;
 	*ppos += written;
-
+out:
+	iounmap(v);
 	return written;
 }
 

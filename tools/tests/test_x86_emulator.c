@@ -1,0 +1,168 @@
+
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <stdint.h>
+typedef uint8_t            u8;
+typedef uint16_t           u16;
+typedef uint32_t           u32;
+typedef uint64_t           u64;
+typedef int8_t             s8;
+typedef int16_t            s16;
+typedef int32_t            s32;
+typedef int64_t            s64;
+#include <public/xen.h>
+#include <asm-x86/x86_emulate.h>
+
+static int read_any(
+    unsigned long addr,
+    unsigned long *val,
+    unsigned int bytes)
+{
+    switch ( bytes )
+    {
+    case 1: *val = *(u8 *)addr; break;
+    case 2: *val = *(u16 *)addr; break;
+    case 4: *val = *(u32 *)addr; break;
+    case 8: *val = *(unsigned long *)addr; break;
+    }
+    return 0;
+}
+
+static int write_any(
+    unsigned long addr,
+    unsigned long val,
+    unsigned int bytes)
+{
+    switch ( bytes )
+    {
+    case 1: *(u8 *)addr = (u8)val; break;
+    case 2: *(u16 *)addr = (u16)val; break;
+    case 4: *(u32 *)addr = (u32)val; break;
+    case 8: *(unsigned long *)addr = val; break;
+    }
+    return 0;
+}
+
+static int cmpxchg_any(
+    unsigned long addr,
+    unsigned long old,
+    unsigned long new,
+    unsigned long *seen,
+    unsigned int bytes)
+{
+    *seen = old;
+    switch ( bytes )
+    {
+    case 1: *(u8 *)addr = (u8)new; break;
+    case 2: *(u16 *)addr = (u16)new; break;
+    case 4: *(u32 *)addr = (u32)new; break;
+    case 8: *(unsigned long *)addr = new; break;
+    }
+    return 0;
+}
+
+static struct x86_mem_emulator emulops = {
+    read_any, write_any, read_any, write_any, cmpxchg_any
+};
+
+int main(int argc, char **argv)
+{
+    struct xen_regs regs;
+    char instr[] = { 0x01, 0x08 }; /* add %ecx,(%eax) */
+    unsigned int res = 0x7FFFFFFF;
+    unsigned long cr2;
+    int rc;
+
+    printf("%-40s", "Testing addl %%ecx,(%%eax)...");
+    instr[0] = 0x01; instr[1] = 0x08;
+    regs.eflags = 0x200;
+    regs.eip    = (unsigned long)&instr[0];
+    regs.ecx    = 0x12345678;
+    cr2         = (unsigned long)&res;
+    res         = 0x7FFFFFFF;
+    rc = x86_emulate_memop(&regs, cr2, &emulops, 4);
+    if ( (rc != 0) || 
+         (res != 0x92345677) || 
+         (regs.eflags != 0xa94) ||
+         (regs.eip != (unsigned long)&instr[2]) )
+        goto fail;
+    printf("okay\n");
+
+    printf("%-40s", "Testing xorl (%%eax),%%ecx...");
+    instr[0] = 0x33; instr[1] = 0x08;
+    regs.eflags = 0x200;
+    regs.eip    = (unsigned long)&instr[0];
+#ifdef __x86_64__
+    regs.ecx    = 0xFFFFFFFF12345678UL;
+#else
+    regs.ecx    = 0x12345678UL;
+#endif
+    cr2         = (unsigned long)&res;
+    rc = x86_emulate_memop(&regs, cr2, &emulops, 4);
+    if ( (rc != 0) || 
+         (res != 0x92345677) || 
+         (regs.ecx != 0x8000000FUL) ||
+         (regs.eip != (unsigned long)&instr[2]) )
+        goto fail;
+    printf("okay\n");
+
+    printf("%-40s", "Testing lock cmpxchgb %%cl,(%%eax)...");
+    instr[0] = 0xf0; instr[1] = 0x0f; instr[2] = 0xb0; instr[3] = 0x08;
+    regs.eflags = 0x200;
+    regs.eip    = (unsigned long)&instr[0];
+    regs.eax    = 0x92345677UL;
+    regs.ecx    = 0xAA;
+    cr2         = (unsigned long)&res;
+    rc = x86_emulate_memop(&regs, cr2, &emulops, 4);    
+    if ( (rc != 0) || 
+         (res != 0x923456AA) || 
+         (regs.eflags != 0x244) ||
+         (regs.eax != 0x92345677UL) ||
+         (regs.eip != (unsigned long)&instr[4]) )
+        goto fail;
+    printf("okay\n");
+
+    printf("%-40s", "Testing lock cmpxchgl %%ecx,(%%eax)...");
+    instr[0] = 0xf0; instr[1] = 0x0f; instr[2] = 0xb1; instr[3] = 0x08;
+    regs.eflags = 0x200;
+    regs.eip    = (unsigned long)&instr[0];
+    regs.eax    = 0x923456AAUL;
+    regs.ecx    = 0xDDEEFF00L;
+    cr2         = (unsigned long)&res;
+    rc = x86_emulate_memop(&regs, cr2, &emulops, 4);    
+    if ( (rc != 0) || 
+         (res != 0xDDEEFF00) || 
+         (regs.eflags != 0x244) ||
+         (regs.eax != 0x923456AAUL) ||
+         (regs.eip != (unsigned long)&instr[4]) )
+        goto fail;
+    printf("okay\n");
+
+    printf("%-40s", "Testing rep movsw...");
+    instr[0] = 0xf3; instr[1] = 0x66; instr[2] = 0xa5;
+    res         = 0x22334455;
+    regs.eflags = 0x200;
+    regs.ecx    = 23;
+    regs.eip    = (unsigned long)&instr[0];
+    regs.esi    = (unsigned long)&res + 0;
+    regs.edi    = (unsigned long)&res + 2;
+    regs.error_code = 0; /* read fault */
+    cr2         = regs.esi;
+    rc = x86_emulate_memop(&regs, cr2, &emulops, 4);    
+    if ( (rc != 0) || 
+         (res != 0x44554455) ||
+         (regs.eflags != 0x200) ||
+         (regs.ecx != 22) || 
+         (regs.esi != ((unsigned long)&res + 2)) ||
+         (regs.edi != ((unsigned long)&res + 4)) ||
+         (regs.eip != (unsigned long)&instr[0]) )
+        goto fail;
+    printf("okay\n");
+
+    return 0;
+
+ fail:
+    printf("failed!\n");
+    return 1;
+}

@@ -854,6 +854,10 @@ haltsys:
 	if (howto & RB_HALT) {
 		printf("\n");
 		printf("The operating system has halted.\n");
+
+		/* XXX cngetc() below doesn't work, shutdown machine for now */
+		HYPERVISOR_shutdown();
+
 		printf("Please press any key to reboot.\n\n");
 
 #ifdef BEEP_ONHALT

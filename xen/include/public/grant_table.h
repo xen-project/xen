@@ -207,6 +207,19 @@ typedef struct {
 } PACKED gnttab_setup_table_t; /* 16 bytes */
 
 /*
+ * GNTTABOP_dump_table: Dump the contents of the grant table to the
+ * xen console. Debugging use only.
+ */
+#define GNTTABOP_dump_table           3
+typedef struct {
+    /* IN parameters. */
+    domid_t     dom;                  /*  0 */
+    /* OUT parameters. */
+    s16         status;               /* 2: GNTST_* */
+} PACKED gnttab_dump_table_t; /* 4 bytes */
+
+
+/*
  * Bitfield values for update_pin_status.flags.
  */
  /* Map the grant entry for access by I/O devices. */
@@ -233,9 +246,10 @@ typedef struct {
 #define GNTST_general_error    (-1) /* General undefined error.              */
 #define GNTST_bad_domain       (-2) /* Unrecognsed domain id.                */
 #define GNTST_bad_gntref       (-3) /* Unrecognised or inappropriate gntref. */
-#define GNTST_bad_handle       (-3) /* Unrecognised or inappropriate handle. */
-#define GNTST_no_device_space  (-4) /* Out of space in I/O MMU.              */
-#define GNTST_permission_denied (-5) /* Not enough privilege for operation.  */
+#define GNTST_bad_handle       (-4) /* Unrecognised or inappropriate handle. */
+#define GNTST_bad_virt_addr    (-5) /* Inappropriate virtual address to map. */
+#define GNTST_no_device_space  (-6) /* Out of space in I/O MMU.              */
+#define GNTST_permission_denied (-7) /* Not enough privilege for operation.  */
 
 #define GNTTABOP_error_msgs {                   \
     "okay",                                     \
@@ -243,9 +257,20 @@ typedef struct {
     "unrecognised domain id",                   \
     "invalid grant reference",                  \
     "invalid mapping handle",                   \
+    "invalid virtual address",                  \
     "no spare translation slot in the I/O MMU", \
     "permission denied"                         \
 }
         
+                                                                                       
+typedef struct {
+    union {                           /*  0 */
+        gnttab_map_grant_ref_t    map_grant_ref;
+        gnttab_unmap_grant_ref_t  unmap_grant_ref;
+        gnttab_setup_table_t      setup_table;
+        gnttab_dump_table_t       dump_table;
+        u8                        __dummy[24];
+    } PACKED u;
+} PACKED gnttab_op_t; /* 32 bytes */
 
 #endif /* __XEN_PUBLIC_GRANT_TABLE_H__ */

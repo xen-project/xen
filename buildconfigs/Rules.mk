@@ -27,7 +27,7 @@ linux-%.tar.bz2:
 # Expand NetBSD release to NetBSD version
 NETBSD_RELEASE  ?= 2.0
 NETBSD_VER      ?= $(patsubst netbsd-%-xen-sparse,%,$(wildcard netbsd-$(NETBSD_RELEASE)*-xen-sparse))
-NETBSD_CVSSNAP  ?= 20041103
+NETBSD_CVSSNAP  ?= 20050309
 
 # Setup NetBSD search path
 NETBSD_SRC_PATH	?= .:..

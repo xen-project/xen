@@ -86,8 +86,8 @@ static int blktap_open(struct inode *inode, struct file *filp)
 
     SetPageReserved(virt_to_page(csring));
     
-    SHARED_RING_INIT(CTRL_RING, csring);
-    FRONT_RING_INIT(CTRL_RING, &blktap_uctrl_ring, csring);
+    SHARED_RING_INIT(csring);
+    FRONT_RING_INIT(&blktap_uctrl_ring, csring);
 
 
     /* Allocate the fe ring. */
@@ -97,8 +97,8 @@ static int blktap_open(struct inode *inode, struct file *filp)
 
     SetPageReserved(virt_to_page(sring));
     
-    SHARED_RING_INIT(BLKIF_RING, sring);
-    FRONT_RING_INIT(BLKIF_RING, &blktap_ufe_ring, sring);
+    SHARED_RING_INIT(sring);
+    FRONT_RING_INIT(&blktap_ufe_ring, sring);
 
     /* Allocate the be ring. */
     sring = (blkif_sring_t *)get_zeroed_page(GFP_KERNEL);
@@ -107,8 +107,8 @@ static int blktap_open(struct inode *inode, struct file *filp)
 
     SetPageReserved(virt_to_page(sring));
     
-    SHARED_RING_INIT(BLKIF_RING, sring);
-    BACK_RING_INIT(BLKIF_RING, &blktap_ube_ring, sring);
+    SHARED_RING_INIT(sring);
+    BACK_RING_INIT(&blktap_ube_ring, sring);
 
     DPRINTK(KERN_ALERT "blktap open.\n");
 
@@ -252,13 +252,13 @@ static unsigned int blktap_poll(struct file *file, poll_table *wait)
 {
         poll_wait(file, &blktap_wait, wait);
 
-        if ( RING_HAS_UNPUSHED_REQUESTS(BLKIF_RING, &blktap_uctrl_ring) ||
-             RING_HAS_UNPUSHED_REQUESTS(BLKIF_RING, &blktap_ufe_ring)   ||
-             RING_HAS_UNPUSHED_RESPONSES(BLKIF_RING, &blktap_ube_ring) ) {
+        if ( RING_HAS_UNPUSHED_REQUESTS(&blktap_uctrl_ring) ||
+             RING_HAS_UNPUSHED_REQUESTS(&blktap_ufe_ring)   ||
+             RING_HAS_UNPUSHED_RESPONSES(&blktap_ube_ring) ) {
 
-            RING_PUSH_REQUESTS(BLKIF_RING, &blktap_uctrl_ring);
-            RING_PUSH_REQUESTS(BLKIF_RING, &blktap_ufe_ring);
-            RING_PUSH_RESPONSES(BLKIF_RING, &blktap_ube_ring);
+            RING_PUSH_REQUESTS(&blktap_uctrl_ring);
+            RING_PUSH_REQUESTS(&blktap_ufe_ring);
+            RING_PUSH_RESPONSES(&blktap_ube_ring);
             return POLLIN | POLLRDNORM;
         }
 
@@ -298,12 +298,12 @@ int blktap_write_fe_ring(blkif_request_t *req)
         return 0;
     }
 
-    if ( RING_FULL(BLKIF_RING, &blktap_ufe_ring) ) {
+    if ( RING_FULL(&blktap_ufe_ring) ) {
         DPRINTK("blktap: fe_ring is full, can't add.\n");
         return 0;
     }
 
-    target = RING_GET_REQUEST(BLKIF_RING, &blktap_ufe_ring,
+    target = RING_GET_REQUEST(&blktap_ufe_ring,
             blktap_ufe_ring.req_prod_pvt);
     memcpy(target, req, sizeof(*req));
 
@@ -344,7 +344,7 @@ int blktap_write_be_ring(blkif_response_t *rsp)
 
     /* No test for fullness in the response direction. */
 
-    target = RING_GET_RESPONSE(BLKIF_RING, &blktap_ube_ring,
+    target = RING_GET_RESPONSE(&blktap_ube_ring,
             blktap_ube_ring.rsp_prod_pvt);
     memcpy(target, rsp, sizeof(*rsp));
 
@@ -353,6 +353,24 @@ int blktap_write_be_ring(blkif_response_t *rsp)
     blktap_ube_ring.rsp_prod_pvt++;
     
     return 0;
+}
+
+static void blktap_fast_flush_area(int idx, int nr_pages)
+{
+    multicall_entry_t mcl[MMAP_PAGES_PER_REQUEST];
+    int               i;
+
+    for ( i = 0; i < nr_pages; i++ )
+    {
+        mcl[i].op = __HYPERVISOR_update_va_mapping;
+        mcl[i].args[0] = MMAP_VADDR(idx, i);
+        mcl[i].args[1] = 0;
+        mcl[i].args[2] = 0;
+    }
+
+    mcl[nr_pages-1].args[2] = UVMF_FLUSH_TLB;
+    if ( unlikely(HYPERVISOR_multicall(mcl, nr_pages) != 0) )
+        BUG();
 }
 
 static int blktap_read_fe_ring(void)
@@ -375,11 +393,12 @@ static int blktap_read_fe_ring(void)
         
         for ( i = blktap_ufe_ring.rsp_cons; i != rp; i++ )
         {
-            resp_s = RING_GET_RESPONSE(BLKIF_RING, &blktap_ufe_ring, i);
+            resp_s = RING_GET_RESPONSE(&blktap_ufe_ring, i);
             
             DPRINTK("resp->fe_ring\n");
             ar = lookup_active_req(ID_TO_IDX(resp_s->id));
             blkif = ar->blkif;
+            blktap_fast_flush_area(ID_TO_IDX(resp_s->id), ar->nr_pages);
             write_resp_to_fe_ring(blkif, resp_s);
             kick_fe_domain(blkif);
         }
@@ -406,7 +425,7 @@ static int blktap_read_be_ring(void)
         rmb();
         for ( i = blktap_ube_ring.req_cons; i != rp; i++ )
         {
-            req_s = RING_GET_REQUEST(BLKIF_RING, &blktap_ube_ring, i);
+            req_s = RING_GET_REQUEST(&blktap_ube_ring, i);
 
             DPRINTK("req->be_ring\n");
             write_req_to_be_ring(req_s);
@@ -430,7 +449,7 @@ int blktap_write_ctrl_ring(ctrl_msg_t *msg)
 
     /* No test for fullness in the response direction. */
 
-    target = RING_GET_REQUEST(CTRL_RING, &blktap_uctrl_ring,
+    target = RING_GET_REQUEST(&blktap_uctrl_ring,
             blktap_uctrl_ring.req_prod_pvt);
     memcpy(target, msg, sizeof(*msg));
 

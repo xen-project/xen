@@ -52,6 +52,7 @@
 #include <asm/i387.h>
 #include <asm/debugger.h>
 #include <asm/msr.h>
+#include <asm/x86_emulate.h>
 
 /*
  * opt_nmi: one of 'ignore', 'dom0', or 'fatal'.
@@ -369,8 +370,6 @@ long do_fpu_taskswitch(int set)
 
 static int emulate_privileged_op(struct xen_regs *regs)
 {
-    extern void *decode_reg(struct xen_regs *regs, u8 b);
-
     struct exec_domain *ed = current;
     unsigned long *reg, eip = regs->eip;
     u8 opcode;
@@ -405,7 +404,7 @@ static int emulate_privileged_op(struct xen_regs *regs)
         eip += 1;
         if ( (opcode & 0xc0) != 0xc0 )
             goto fail;
-        reg = decode_reg(regs, opcode & 7);
+        reg = decode_register(opcode & 7, regs, 0);
         switch ( (opcode >> 3) & 7 )
         {
         case 0: /* Read CR0 */
@@ -433,7 +432,7 @@ static int emulate_privileged_op(struct xen_regs *regs)
         eip += 1;
         if ( (opcode & 0xc0) != 0xc0 )
             goto fail;
-        reg = decode_reg(regs, opcode & 7);
+        reg = decode_register(opcode & 7, regs, 0);
         switch ( (opcode >> 3) & 7 )
         {
         case 0: /* Write CR0 */

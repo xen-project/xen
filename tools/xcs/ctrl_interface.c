@@ -57,14 +57,14 @@ int ctrl_chan_read_request(control_channel_t *cc, xcs_control_msg_t *dmsg)
     control_msg_t     *smsg;
     RING_IDX          c = cc->tx_ring.req_cons;
 
-    if ( !RING_HAS_UNCONSUMED_REQUESTS(CTRL_RING, &cc->tx_ring) )
+    if ( !RING_HAS_UNCONSUMED_REQUESTS(&cc->tx_ring) )
     {
         DPRINTF("no request to read\n");
         return -1;
     }
     
     rmb(); /* make sure we see the data associated with the request */
-    smsg = RING_GET_REQUEST(CTRL_RING, &cc->tx_ring, c);
+    smsg = RING_GET_REQUEST(&cc->tx_ring, c);
     memcpy(&dmsg->msg, smsg, sizeof(*smsg));
     if ( dmsg->msg.length > sizeof(dmsg->msg.msg) )
         dmsg->msg.length = sizeof(dmsg->msg.msg);
@@ -78,18 +78,18 @@ int ctrl_chan_write_request(control_channel_t *cc,
     control_msg_t *dmsg;
     RING_IDX       p = cc->rx_ring.req_prod_pvt;
     
-    if ( RING_FULL(CTRL_RING, &cc->rx_ring) )
+    if ( RING_FULL(&cc->rx_ring) )
     {
         DPRINTF("no space to write request");
         return -ENOSPC;
     }
 
-    dmsg = RING_GET_REQUEST(CTRL_RING, &cc->rx_ring, p);
+    dmsg = RING_GET_REQUEST(&cc->rx_ring, p);
     memcpy(dmsg, &smsg->msg, sizeof(*dmsg));
 
     wmb();
     cc->rx_ring.req_prod_pvt++;
-    RING_PUSH_REQUESTS(CTRL_RING, &cc->rx_ring);
+    RING_PUSH_REQUESTS(&cc->rx_ring);
     
     return 0;
 }
@@ -99,14 +99,14 @@ int ctrl_chan_read_response(control_channel_t *cc, xcs_control_msg_t *dmsg)
     control_msg_t     *smsg;
     RING_IDX          c = cc->rx_ring.rsp_cons;
     
-    if ( !RING_HAS_UNCONSUMED_RESPONSES(CTRL_RING, &cc->rx_ring) )
+    if ( !RING_HAS_UNCONSUMED_RESPONSES(&cc->rx_ring) )
     {
         DPRINTF("no response to read");
         return -1;
     }
 
     rmb(); /* make sure we see the data associated with the request */
-    smsg = RING_GET_RESPONSE(CTRL_RING, &cc->rx_ring, c);
+    smsg = RING_GET_RESPONSE(&cc->rx_ring, c);
     memcpy(&dmsg->msg, smsg, sizeof(*smsg));
     if ( dmsg->msg.length > sizeof(dmsg->msg.msg) )
         dmsg->msg.length = sizeof(dmsg->msg.msg);
@@ -128,29 +128,29 @@ int ctrl_chan_write_response(control_channel_t *cc,
         return -ENOSPC;
     }
 
-    dmsg = RING_GET_RESPONSE(CTRL_RING, &cc->tx_ring, p);
+    dmsg = RING_GET_RESPONSE(&cc->tx_ring, p);
     memcpy(dmsg, &smsg->msg, sizeof(*dmsg));
 
     wmb();
     cc->tx_ring.rsp_prod_pvt++;
-    RING_PUSH_RESPONSES(CTRL_RING, &cc->tx_ring);
+    RING_PUSH_RESPONSES(&cc->tx_ring);
     
     return 0;
 }
 
 int ctrl_chan_request_to_read(control_channel_t *cc)
 {
-    return (RING_HAS_UNCONSUMED_REQUESTS(CTRL_RING, &cc->tx_ring));
+    return (RING_HAS_UNCONSUMED_REQUESTS(&cc->tx_ring));
 }
 
 int ctrl_chan_space_to_write_request(control_channel_t *cc)
 {
-    return (!(RING_FULL(CTRL_RING, &cc->rx_ring)));
+    return (!(RING_FULL(&cc->rx_ring)));
 }
 
 int ctrl_chan_response_to_read(control_channel_t *cc)
 {
-    return (RING_HAS_UNCONSUMED_RESPONSES(CTRL_RING, &cc->rx_ring));
+    return (RING_HAS_UNCONSUMED_RESPONSES(&cc->rx_ring));
 }
 
 int ctrl_chan_space_to_write_response(control_channel_t *cc)
@@ -186,8 +186,8 @@ int ctrl_chan_connect(control_channel_t *cc)
     }
 
     /* Synchronise ring indexes. */
-    BACK_RING_ATTACH(CTRL_RING, &cc->tx_ring, &cc->interface->tx_ring);
-    FRONT_RING_ATTACH(CTRL_RING, &cc->rx_ring, &cc->interface->rx_ring);
+    BACK_RING_ATTACH(&cc->tx_ring, &cc->interface->tx_ring);
+    FRONT_RING_ATTACH(&cc->rx_ring, &cc->interface->rx_ring);
 
     cc->connected = 1;
 

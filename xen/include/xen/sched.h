@@ -251,8 +251,9 @@ void domain_sleep(struct exec_domain *d);
 
 void __enter_scheduler(void);
 
-extern void switch_to(struct exec_domain *prev, 
-                      struct exec_domain *next);
+extern void context_switch(
+    struct exec_domain *prev, 
+    struct exec_domain *next);
 
 void domain_init(void);
 

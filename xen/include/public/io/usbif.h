@@ -54,8 +54,7 @@ typedef struct {
 #define USBIF_RSP_ERROR  -1 /* non-specific 'error' */
 #define USBIF_RSP_OKAY    0 /* non-specific 'okay'  */
 
-#define USBIF_RING RING_PARAMS(usbif_request_t, usbif_response_t, PAGE_SIZE)
-DEFINE_RING_TYPES(usbif, USBIF_RING);
+DEFINE_RING_TYPES(usbif, usbif_request_t, usbif_response_t, PAGE_SIZE);
 
 typedef struct {
     unsigned long length; /* IN = expected, OUT = actual */

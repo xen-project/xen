@@ -32,4 +32,8 @@ unsigned long
 gnttab_end_foreign_transfer(
     grant_ref_t ref);
 
+int
+gnttab_query_foreign_access( 
+    grant_ref_t ref );
+
 #endif /* __ASM_GNTTAB_H__ */

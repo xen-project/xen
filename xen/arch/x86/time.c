@@ -13,7 +13,9 @@
  *  Copyright (C) 1991, 1992, 1995  Linus Torvalds
  */
 
+#include <xen/config.h>
 #include <xen/errno.h>
+#include <xen/event.h>
 #include <xen/sched.h>
 #include <xen/lib.h>
 #include <xen/config.h>
@@ -272,13 +274,10 @@ s_time_t get_s_time(void)
     return now; 
 }
 
-
-void update_dom_time(struct domain *d)
+static inline void __update_dom_time(struct exec_domain *ed)
 {
+    struct domain *d  = ed->domain;
     shared_info_t *si = d->shared_info;
-    unsigned long flags;
-
-    read_lock_irqsave(&time_lock, flags);
 
     spin_lock(&d->time_lock);
 
@@ -295,10 +294,21 @@ void update_dom_time(struct domain *d)
     si->time_version2++;
 
     spin_unlock(&d->time_lock);
-
-    read_unlock_irqrestore(&time_lock, flags);
 }
 
+int update_dom_time(struct exec_domain *ed)
+{
+    unsigned long flags;
+
+    if ( ed->domain->shared_info->tsc_timestamp == full_tsc_irq )
+        return 0;
+
+    read_lock_irqsave(&time_lock, flags);
+    __update_dom_time(ed);
+    read_unlock_irqrestore(&time_lock, flags);
+
+    return 1;
+}
 
 /* Set clock to <secs,usecs> after 00:00:00 UTC, 1 January, 1970. */
 void do_settime(unsigned long secs, unsigned long usecs, u64 system_time_base)
@@ -320,9 +330,11 @@ void do_settime(unsigned long secs, unsigned long usecs, u64 system_time_base)
     wc_sec  = secs;
     wc_usec = _usecs;
 
-    write_unlock_irq(&time_lock);
+    /* Others will pick up the change at the next tick. */
+    __update_dom_time(current);
+    send_guest_virq(current, VIRQ_TIMER);
 
-    update_dom_time(current->domain);
+    write_unlock_irq(&time_lock);
 }
 
 

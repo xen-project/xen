@@ -75,7 +75,7 @@ static blkif_response_t blkif_control_rsp;
 static blkif_front_ring_t blk_ring;
 
 unsigned long rec_ring_free;
-blkif_request_t rec_ring[RING_SIZE(BLKIF_RING, &blk_ring)];
+blkif_request_t rec_ring[RING_SIZE(&blk_ring)];
 
 static int recovery = 0;           /* "Recovery in progress" flag.  Protected
                                     * by the blkif_io_lock */
@@ -90,7 +90,7 @@ static inline int GET_ID_FROM_FREELIST( void )
 {
     unsigned long free = rec_ring_free;
 
-    if ( free > RING_SIZE(BLKIF_RING, &blk_ring) )
+    if ( free > RING_SIZE(&blk_ring) )
         BUG();
 
     rec_ring_free = rec_ring[free].id;
@@ -151,7 +151,7 @@ static inline void translate_req_to_mfn(blkif_request_t *xreq,
 static inline void flush_requests(void)
 {
     DISABLE_SCATTERGATHER();
-    RING_PUSH_REQUESTS(BLKIF_RING, &blk_ring);
+    RING_PUSH_REQUESTS(&blk_ring);
     notify_via_evtchn(blkif_evtchn);
 }
 
@@ -331,7 +331,7 @@ static int blkif_queue_request(struct request *req)
         return 1;
 
     /* Fill out a communications ring structure. */
-    ring_req = RING_GET_REQUEST(BLKIF_RING, &blk_ring, blk_ring.req_prod_pvt);
+    ring_req = RING_GET_REQUEST(&blk_ring, blk_ring.req_prod_pvt);
     id = GET_ID_FROM_FREELIST();
     rec_ring[id].id = (unsigned long) req;
 
@@ -384,7 +384,7 @@ void do_blkif_request(request_queue_t *rq)
             continue;
         }
 
-        if ( RING_FULL(BLKIF_RING, &blk_ring) )
+        if ( RING_FULL(&blk_ring) )
         {
             blk_stop_queue(rq);
             break;
@@ -429,7 +429,7 @@ static irqreturn_t blkif_int(int irq, void *dev_id, struct pt_regs *ptregs)
     {
         unsigned long id;
 
-        bret = RING_GET_RESPONSE(BLKIF_RING, &blk_ring, i);
+        bret = RING_GET_RESPONSE(&blk_ring, i);
         id = bret->id;
         req = (struct request *)rec_ring[id].id;
         blkif_completion( &rec_ring[id] );
@@ -515,11 +515,11 @@ static void kick_pending_request_queues(void)
 {
     /* We kick pending request queues if the ring is reasonably empty. */
     if ( (nr_pending != 0) && 
-         (RING_PENDING_REQUESTS(BLKIF_RING, &blk_ring) < 
-          (RING_SIZE(BLKIF_RING, &blk_ring) >> 1)) )
+         (RING_PENDING_REQUESTS(&blk_ring) < 
+          (RING_SIZE(&blk_ring) >> 1)) )
     {
         /* Attempt to drain the queue, but bail if the ring becomes full. */
-        while ( (nr_pending != 0) && !RING_FULL(BLKIF_RING, &blk_ring) )
+        while ( (nr_pending != 0) && !RING_FULL(&blk_ring) )
             do_blkif_request(pending_queues[--nr_pending]);
     }
 }
@@ -813,7 +813,7 @@ static int blkif_queue_request(unsigned long   id,
              (sg_dev == device) &&
              (sg_next_sect == sector_number) )
         {
-            req = RING_GET_REQUEST(BLKIF_RING, &blk_ring, 
+            req = RING_GET_REQUEST(&blk_ring, 
                                    blk_ring.req_prod_pvt - 1);
             bh = (struct buffer_head *)id;
      
@@ -834,7 +834,7 @@ static int blkif_queue_request(unsigned long   id,
 
             return 0;
         }
-        else if ( RING_FULL(BLKIF_RING, &blk_ring) )
+        else if ( RING_FULL(&blk_ring) )
         {
             return 1;
         }
@@ -851,7 +851,7 @@ static int blkif_queue_request(unsigned long   id,
     }
 
     /* Fill out a communications ring structure. */
-    req = RING_GET_REQUEST(BLKIF_RING, &blk_ring, blk_ring.req_prod_pvt);
+    req = RING_GET_REQUEST(&blk_ring, blk_ring.req_prod_pvt);
 
     xid = GET_ID_FROM_FREELIST();
     rec_ring[xid].id = id;
@@ -976,7 +976,7 @@ static void blkif_int(int irq, void *dev_id, struct pt_regs *ptregs)
         unsigned long id;
         blkif_response_t *bret;
         
-        bret = RING_GET_RESPONSE(BLKIF_RING, &blk_ring, i);
+        bret = RING_GET_RESPONSE(&blk_ring, i);
         id = bret->id;
         bh = (struct buffer_head *)rec_ring[id].id; 
 
@@ -1026,21 +1026,21 @@ void blkif_control_send(blkif_request_t *req, blkif_response_t *rsp)
     blkif_request_t *req_d;
 
  retry:
-    while ( RING_FULL(BLKIF_RING, &blk_ring) )
+    while ( RING_FULL(&blk_ring) )
     {
         set_current_state(TASK_INTERRUPTIBLE);
         schedule_timeout(1);
     }
 
     spin_lock_irqsave(&blkif_io_lock, flags);
-    if ( RING_FULL(BLKIF_RING, &blk_ring) )
+    if ( RING_FULL(&blk_ring) )
     {
         spin_unlock_irqrestore(&blkif_io_lock, flags);
         goto retry;
     }
 
     DISABLE_SCATTERGATHER();
-    req_d = RING_GET_REQUEST(BLKIF_RING, &blk_ring, blk_ring.req_prod_pvt);
+    req_d = RING_GET_REQUEST(&blk_ring, blk_ring.req_prod_pvt);
     *req_d = *req;    
 
     id = GET_ID_FROM_FREELIST();
@@ -1130,8 +1130,8 @@ static void blkif_disconnect(void)
         free_page((unsigned long)blk_ring.sring);
     
     sring = (blkif_sring_t *)__get_free_page(GFP_KERNEL);
-    SHARED_RING_INIT(BLKIF_RING, sring);
-    FRONT_RING_INIT(BLKIF_RING, &blk_ring, sring);
+    SHARED_RING_INIT(sring);
+    FRONT_RING_INIT(&blk_ring, sring);
     blkif_state  = BLKIF_STATE_DISCONNECTED;
     blkif_send_interface_connect();
 }
@@ -1151,11 +1151,11 @@ static void blkif_recover(void)
      * This will need to be fixed once we have barriers */
 
     /* Stage 1 : Find active and move to safety. */
-    for ( i = 0; i < RING_SIZE(BLKIF_RING, &blk_ring); i++ )
+    for ( i = 0; i < RING_SIZE(&blk_ring); i++ )
     {
         if ( rec_ring[i].id >= PAGE_OFFSET )
         {
-            req = RING_GET_REQUEST(BLKIF_RING, &blk_ring, 
+            req = RING_GET_REQUEST(&blk_ring, 
                                    blk_ring.req_prod_pvt);
             translate_req_to_mfn(req, &rec_ring[i]);
             blk_ring.req_prod_pvt++;
@@ -1165,17 +1165,17 @@ static void blkif_recover(void)
     /* Stage 2 : Set up shadow list. */
     for ( i = 0; i < blk_ring.req_prod_pvt; i++ ) 
     {
-        req = RING_GET_REQUEST(BLKIF_RING, &blk_ring, i);
+        req = RING_GET_REQUEST(&blk_ring, i);
         rec_ring[i].id = req->id;  
         req->id = i;
         translate_req_to_pfn(&rec_ring[i], req);
     }
 
     /* Stage 3 : Set up free list. */
-    for ( ; i < RING_SIZE(BLKIF_RING, &blk_ring); i++ )
+    for ( ; i < RING_SIZE(&blk_ring); i++ )
         rec_ring[i].id = i+1;
     rec_ring_free = blk_ring.req_prod_pvt;
-    rec_ring[RING_SIZE(BLKIF_RING, &blk_ring)-1].id = 0x0fffffff;
+    rec_ring[RING_SIZE(&blk_ring)-1].id = 0x0fffffff;
 
     /* blk_ring->req_prod will be set when we flush_requests().*/
     wmb();
@@ -1368,9 +1368,9 @@ int __init xlblk_init(void)
     printk(KERN_INFO "xen_blk: Initialising virtual block device driver\n");
 
     rec_ring_free = 0;
-    for ( i = 0; i < RING_SIZE(BLKIF_RING, &blk_ring); i++ )
+    for ( i = 0; i < RING_SIZE(&blk_ring); i++ )
         rec_ring[i].id = i+1;
-    rec_ring[RING_SIZE(BLKIF_RING, &blk_ring)-1].id = 0x0fffffff;
+    rec_ring[RING_SIZE(&blk_ring)-1].id = 0x0fffffff;
 
     (void)ctrl_if_register_receiver(CMSG_BLKIF_FE, blkif_ctrlif_rx,
                                     CALLBACK_IN_BLOCKING_CONTEXT);

@@ -105,4 +105,9 @@ void
 gnttab_notify_transfer(
     struct domain *rd, grant_ref_t ref, unsigned long frame);
 
+/* Pre-domain destruction release of all mappings of other domains */
+void
+gnttab_release_all_mappings(grant_table_t *gt);
+
+
 #endif /* __XEN_GRANT_H__ */
