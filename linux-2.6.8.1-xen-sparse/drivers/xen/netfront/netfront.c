@@ -377,13 +377,14 @@ static int network_start_xmit(struct sk_buff *skb, struct net_device *dev)
     if ( unlikely((((unsigned long)skb->data & ~PAGE_MASK) + skb->len) >=
                   PAGE_SIZE) )
     {
-        struct sk_buff *new_skb;
-        if ( unlikely((new_skb = alloc_xen_skb(skb->len)) == NULL) )
+        struct sk_buff *nskb;
+        if ( unlikely((nskb = alloc_xen_skb(skb->len)) == NULL) )
             goto drop;
-        skb_put(new_skb, skb->len);
-        memcpy(new_skb->data, skb->data, skb->len);
+        skb_put(nskb, skb->len);
+        memcpy(nskb->data, skb->data, skb->len);
+        nskb->dev = skb->dev;
         dev_kfree_skb(skb);
-        skb = new_skb;
+        skb = nskb;
     }
     
     spin_lock_irq(&np->tx_lock);
@@ -553,13 +554,21 @@ static int netif_poll(struct net_device *dev, int *pbudget)
             /* Only copy the packet if it fits in the current MTU. */
             if ( skb->len <= (dev->mtu + ETH_HLEN) )
             {
+                if ( (skb->tail > skb->end) && net_ratelimit() )
+                    printk(KERN_INFO "Received packet needs %d bytes more "
+                           "headroom.\n", skb->tail - skb->end);
+
                 if ( (nskb = alloc_xen_skb(skb->len + 2)) != NULL )
                 {
                     skb_reserve(nskb, 2);
                     skb_put(nskb, skb->len);
                     memcpy(nskb->data, skb->data, skb->len);
+                    nskb->dev = skb->dev;
                 }
             }
+            else if ( net_ratelimit() )
+                printk(KERN_INFO "Received packet too big for MTU "
+                       "(%d > %d)\n", skb->len - ETH_HLEN, dev->mtu);
 
             /* Reinitialise and then destroy the old skbuff. */
             skb->len  = 0;

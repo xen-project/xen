@@ -138,7 +138,6 @@ int netif_be_start_xmit(struct sk_buff *skb, struct net_device *dev)
      * We do not copy the packet unless:
      *  1. The data is shared; or
      *  2. The data is not allocated from our special cache.
-     * The copying method is taken from skb_copy().
      * NB. We also couldn't cope with fragmented packets, but we won't get
      *     any because we not advertise the NETIF_F_SG feature.
      */
@@ -148,10 +147,9 @@ int netif_be_start_xmit(struct sk_buff *skb, struct net_device *dev)
         struct sk_buff *nskb = dev_alloc_skb(hlen + skb->len);
         if ( unlikely(nskb == NULL) )
             goto drop;
-        /* Account for any reservation already made by dev_alloc_skb(). */
-        skb_reserve(nskb, hlen - (nskb->data - nskb->head));
+        skb_reserve(nskb, hlen);
         __skb_put(nskb, skb->len);
-        (void)skb_copy_bits(skb, -hlen, nskb->head, hlen + skb->len);
+        (void)skb_copy_bits(skb, -hlen, nskb->data - hlen, skb->len + hlen);
         nskb->dev = skb->dev;
         dev_kfree_skb(skb);
         skb = nskb;
