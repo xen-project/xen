@@ -174,6 +174,7 @@ void do_gettimeofday(struct timeval *tv)
 	unsigned long seq;
 	unsigned long usec, sec;
 	unsigned long max_ntp_tick;
+	unsigned long flags;
 
 	do {
 		unsigned long lost;
@@ -198,6 +199,9 @@ void do_gettimeofday(struct timeval *tv)
 		else if (unlikely(lost))
 			usec += lost * (USEC_PER_SEC / HZ);
 
+		usec += (unsigned long)((shadow_system_time -
+			processed_system_time) / NSEC_PER_USEC);
+
 		sec = xtime.tv_sec;
 		usec += (xtime.tv_nsec / NSEC_PER_USEC);
 
@@ -209,9 +213,9 @@ void do_gettimeofday(struct timeval *tv)
 			 * overflowed). Detect that and recalculate
 			 * with fresh values.
 			 */
-			write_seqlock_irq(&xtime_lock);
+			write_seqlock_irqsave(&xtime_lock, flags);
 			__get_time_values_from_xen();
-			write_sequnlock_irq(&xtime_lock);
+			write_sequnlock_irqrestore(&xtime_lock, flags);
 			continue;
 		}
 	} while (read_seqretry(&xtime_lock, seq));
@@ -272,6 +276,8 @@ int do_settimeofday(struct timespec *tv)
 	 * made, and then undo it!
 	 */
 	nsec -= (jiffies - wall_jiffies) * TICK_NSEC;
+
+	nsec -= (unsigned long)(shadow_system_time - processed_system_time);
 
 	wtm_sec  = wall_to_monotonic.tv_sec + (xtime.tv_sec - sec);
 	wtm_nsec = wall_to_monotonic.tv_nsec + (xtime.tv_nsec - nsec);
