@@ -1206,6 +1206,17 @@ void __init setup_arch(char **cmdline_p)
 	conswitchp = &dummy_con;
 #endif
 #endif
+
+	/* If we are a privileged guest OS then we should request IO privs. */
+	if (start_info.flags & SIF_PRIVILEGED) {
+		dom0_op_t op;
+		op.cmd           = DOM0_IOPL;
+		op.u.iopl.domain = DOMID_SELF;
+		op.u.iopl.iopl   = 1;
+		if (HYPERVISOR_dom0_op(&op) != 0)
+			panic("Unable to obtain IOPL, despite SIF_PRIVILEGED");
+		current->thread.io_pl = 1;
+	}
 }
 
 #include "setup_arch_post.h"

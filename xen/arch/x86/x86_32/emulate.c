@@ -30,6 +30,15 @@
 #include <xen/perfc.h>
 #include <asm/processor.h>
 
+/*
+ * Obtain the base and limit associated with the given segment selector.
+ * The selector must identify a 32-bit code or data segment. Any segment that
+ * appears to be truncated to not overlap with Xen is assumed to be a truncated
+ * 4GB segment, and the returned limit reflects this.
+ *  @seg   (IN) : Segment selector to decode.
+ *  @base  (OUT): Decoded linear base address.
+ *  @limit (OUT): Decoded segment limit, in bytes. 0 == unlimited (4GB).
+ */
 int get_baselimit(u16 seg, unsigned long *base, unsigned long *limit)
 {
     struct domain *d = current;
@@ -80,6 +89,7 @@ int get_baselimit(u16 seg, unsigned long *base, unsigned long *limit)
     return 0;
 }
 
+/* Turn a segment+offset into a linear address. */
 int linearise_address(u16 seg, unsigned long off, unsigned long *linear)
 {
     unsigned long base, limit;
@@ -95,6 +105,7 @@ int linearise_address(u16 seg, unsigned long off, unsigned long *linear)
     return 1;
 }
 
+/* Decode Reg field of a ModRM byte: return a pointer into a register block. */
 void *decode_reg(struct pt_regs *regs, u8 b)
 {
     switch ( b & 7 )
@@ -120,6 +131,9 @@ void *decode_reg(struct pt_regs *regs, u8 b)
  *  @pseg (IN)   : address in pt_regs block of the override segment.
  *  @regs (IN)   : addrress of the the pt_regs block.
  */
+#define DECODE_EA_FAILED  0
+#define DECODE_EA_FIXME   1
+#define DECODE_EA_SUCCESS 2
 int decode_effective_address(u8 **ppb, void **preg, void **pmem,
                              unsigned int *pseg, struct pt_regs *regs)
 {
@@ -132,7 +146,7 @@ int decode_effective_address(u8 **ppb, void **preg, void **pmem,
     if ( get_user(modrm, pb) )
     {
         DPRINTK("Fault while extracting modrm byte\n");
-        return 0;
+        return DECODE_EA_FAILED;
     }
 
     pb++;
@@ -144,7 +158,7 @@ int decode_effective_address(u8 **ppb, void **preg, void **pmem,
     if ( rm == 4 )
     {
         DPRINTK("FIXME: Add decoding for the SIB byte.\n");
-        return 0;
+        return DECODE_EA_FIXME;
     }
 
     /* Decode Reg and R/M fields. */
@@ -164,7 +178,7 @@ int decode_effective_address(u8 **ppb, void **preg, void **pmem,
             if ( get_user(disp32, (u32 *)pb) )
             {
                 DPRINTK("Fault while extracting <disp8>.\n");
-                return 0;
+                return DECODE_EA_FAILED;
             }
             pb += 4;
         }
@@ -176,7 +190,7 @@ int decode_effective_address(u8 **ppb, void **preg, void **pmem,
         if ( get_user(disp8, pb) )
         {
             DPRINTK("Fault while extracting <disp8>.\n");
-            return 0;
+            return DECODE_EA_FAILED;
         }
         pb++;
         disp32 = (disp8 & 0x80) ? (disp8 | ~0xff) : disp8;;
@@ -188,22 +202,22 @@ int decode_effective_address(u8 **ppb, void **preg, void **pmem,
         if ( get_user(disp32, (u32 *)pb) )
         {
             DPRINTK("Fault while extracting <disp8>.\n");
-            return 0;
+            return DECODE_EA_FAILED;
         }
         pb += 4;
         break;
 
     case 3:
         DPRINTK("Not a memory operand!\n");
-        return 0;
+        return DECODE_EA_FAILED;
     }
 
     if ( !get_baselimit((u16)(*pseg), &ea, &limit) )
-        return 0;
+        return DECODE_EA_FAILED;
     if ( limit != 0 )
     {
         DPRINTK("Bailing: not a 4GB data segment.\n");
-        return 0;
+        return DECODE_EA_FAILED;
     }
 
     offset = disp32;
@@ -212,22 +226,41 @@ int decode_effective_address(u8 **ppb, void **preg, void **pmem,
     if ( (offset & 0xf0000000) != 0xf0000000 )
     {
         DPRINTK("Bailing: not a -ve offset into 4GB segment.\n");
-        return 0;
+        return DECODE_EA_FAILED;
     }
 
     ea += offset;
     if ( ea > (PAGE_OFFSET - PAGE_SIZE) )
     {
         DPRINTK("!!!! DISALLOWING UNSAFE ACCESS !!!!\n");
-        return 0;
+        return DECODE_EA_FAILED;
     }
 
     *ppb  = pb;
     *preg = regreg;
     *pmem = (void *)ea;
 
-    return 1;
+    return DECODE_EA_SUCCESS;
 }
+
+#define GET_IMM8                                   \
+    if ( get_user(ib, (u8 *)pb) ) {                \
+        DPRINTK("Fault while extracting imm8\n");  \
+        return 0;                                  \
+    }                                              \
+    pb += 1;
+#define GET_IMM16                                  \
+    if ( get_user(iw, (u8 *)pb) ) {                \
+        DPRINTK("Fault while extracting imm16\n"); \
+        return 0;                                  \
+    }                                              \
+    pb += 2;
+#define GET_IMM32                                  \
+    if ( get_user(il, (u32 *)pb) ) {               \
+        DPRINTK("Fault while extracting imm32\n"); \
+        return 0;                                  \
+    }                                              \
+    pb += 4;
 
 /*
  * Called from the general-protection fault handler to attempt to decode
@@ -239,14 +272,17 @@ int gpf_emulate_4gb(struct pt_regs *regs)
 {
     struct domain *d = current;
     trap_info_t   *ti;
-    u8            *eip, *nextbyte, b, mb, rb;
-    u16            mw, rw;
-    u32            ml, rl, eflags;
-    unsigned int  *pseg = NULL;
-    int            i;
-    int            opsz_override = 0;
-    void          *reg, *mem;
     struct guest_trap_bounce *gtb;
+
+    u8            *eip;         /* ptr to instruction start */
+    u8            *pb, b;       /* ptr into instr. / current instr. byte */
+    u8             ib, mb, rb;  /* byte operand from imm/register/memory */
+    u16            iw, mw, rw;  /* word operand from imm/register/memory */
+    u32            il, ml, rl;  /* long operand from imm/register/memory */
+    void          *reg, *mem;   /* ptr to register/memory operand */
+    unsigned int  *pseg = NULL; /* segment for memory operand (NULL=default) */
+    u32            eflags;
+    int            opsz_override = 0;
 
     if ( !linearise_address((u16)regs->xcs, regs->eip, (unsigned long *)&eip) )
     {
@@ -255,11 +291,11 @@ int gpf_emulate_4gb(struct pt_regs *regs)
     }
 
     /* Parse prefix bytes. We're basically looking for segment override. */
-    for ( i = 0; i < 4; i++ )
+    for ( pb = eip; (pb - eip) < 4; pb++ )
     {
-        if ( get_user(b, &eip[i]) )
+        if ( get_user(b, pb) )
         {
-            DPRINTK("Fault while accessing byte %d of instruction\n", i);
+            DPRINTK("Fault while accessing byte %d of instruction\n", pb-eip);
             return 0;
         }
         
@@ -298,141 +334,94 @@ int gpf_emulate_4gb(struct pt_regs *regs)
     }
  done_prefix:
 
-    nextbyte = &eip[i+1];
-    if ( !decode_effective_address(&nextbyte, &reg, &mem, pseg, regs) )
+    pb++; /* skip opcode byte */
+    switch ( decode_effective_address(&pb, &reg, &mem, pseg, regs) )
+    {
+    case DECODE_EA_FAILED:
+        return 0;
+    case DECODE_EA_FIXME:
         goto undecodeable;
+    }
 
     /* Only handle single-byte opcodes right now. Sufficient for MOV. */
-    /*
-     * XXX Now I see how this decode routine is panning out, it needs
-     * refactoring. Lots of duplicated cruft in here...
-     */
     switch ( b )
     {
     case 0x88: /* movb r,r/m */
         if ( __put_user(*(u8 *)reg, (u8 *)mem) )
             goto page_fault_w;
-        regs->eip += nextbyte - eip;
         break;
     case 0x89: /* movl r,r/m */
-        if ( opsz_override )
-        {
-            if ( __put_user(*(u16 *)reg, (u16 *)mem) )
-                goto page_fault_w;
-        }
-        else
-        {
-            if ( __put_user(*(u32 *)reg, (u32 *)mem) )
-                goto page_fault_w;
-        }
-        regs->eip += nextbyte - eip;
+        if ( opsz_override ? __put_user(*(u16 *)reg, (u16 *)mem)
+                           : __put_user(*(u32 *)reg, (u32 *)mem) )
+            goto page_fault_w;
         break;
     case 0x8a: /* movb r/m,r */
         if ( __get_user(*(u8 *)reg, (u8 *)mem) )
             goto page_fault_r;
-        regs->eip += nextbyte - eip;
         break;
     case 0x8b: /* movl r/m,r */
-        if ( opsz_override )
-        {
-            if ( __get_user(*(u16 *)reg, (u16 *)mem) )
-                goto page_fault_r;
-        }
-        else
-        {
-            if ( __get_user(*(u32 *)reg, (u32 *)mem) )
-                goto page_fault_r;
-        }
-        regs->eip += nextbyte - eip;
+        if ( opsz_override ? __get_user(*(u16 *)reg, (u16 *)mem)
+                           : __get_user(*(u32 *)reg, (u32 *)mem) )
+            goto page_fault_r;
         break;
     case 0xc6: /* movb imm,r/m */
         if ( reg != &regs->eax ) /* Reg == /0 */
             goto undecodeable;
-        if ( get_user(rb, nextbyte) )
-        {
-            DPRINTK("Fault while extracting immediate byte\n");
-            return 0;
-        }
-        if ( __put_user(rb, (u8 *)mem) )
+        GET_IMM8;
+        if ( __put_user(ib, (u8 *)mem) )
             goto page_fault_w;
-        regs->eip += nextbyte - eip + 1;
         break;
     case 0xc7: /* movl imm,r/m */
         if ( reg != &regs->eax ) /* Reg == /0 */
             goto undecodeable;
         if ( opsz_override )
         {
-            if ( get_user(rw, (u16 *)nextbyte) )
-            {
-                DPRINTK("Fault while extracting immediate word\n");
-                return 0;
-            }
-            if ( __put_user(rw, (u16 *)mem) )
+            GET_IMM16;
+            if ( __put_user(iw, (u16 *)mem) )
                 goto page_fault_w;
-            regs->eip += nextbyte - eip + 2;
         }
         else
         {
-            if ( get_user(rl, (u32 *)nextbyte) )
-            {
-                DPRINTK("Fault while extracting immediate longword\n");
-                return 0;
-            }
-            if ( __put_user(rl, (u32 *)mem) )
+            GET_IMM32;
+            if ( __put_user(il, (u32 *)mem) )
                 goto page_fault_w;
-            regs->eip += nextbyte - eip + 4;
         }
         break;
     case 0x80: /* cmpb imm8,r/m */
         if ( reg != &regs->edi ) /* Reg == /7 */
             goto undecodeable;
-        if ( get_user(rb, nextbyte) )
-        {
-            DPRINTK("Fault while extracting immediate byte\n");
-            return 0;
-        }
+        GET_IMM8;
         if ( __get_user(mb, (u8 *)mem) )
             goto page_fault_r;
         __asm__ __volatile__ (
             "cmpb %b1,%b2 ; pushf ; popl %0"
             : "=a" (eflags)
-            : "0" (rb), "b" (mb) );
+            : "0" (ib), "b" (mb) );
         regs->eflags &= ~0x8d5;     /* OF,SF,ZF,AF,PF,CF */
         regs->eflags |= eflags & 0x8d5;
-        regs->eip += nextbyte - eip + 1;
         break;
     case 0x81: /* cmpl imm32,r/m */
         if ( reg != &regs->edi ) /* Reg == /7 */
             goto undecodeable;
         if ( opsz_override )
         {
-            if ( get_user(rw, (u16 *)nextbyte) )
-            {
-                DPRINTK("Fault while extracting immediate word\n");
-                return 0;
-            }
+            GET_IMM16;
             if ( __get_user(mw, (u16 *)mem) )
                 goto page_fault_r;
             __asm__ __volatile__ (
                 "cmpw %w1,%w2 ; pushf ; popl %0"
                 : "=a" (eflags)
-                : "0" (rw), "b" (mw) );
-            regs->eip += nextbyte - eip + 2;
+                : "0" (iw), "b" (mw) );
         }
         else
         {
-            if ( get_user(rl, (u32 *)nextbyte) )
-            {
-                DPRINTK("Fault while extracting immediate longword\n");
-                return 0;
-            }
+            GET_IMM32;
             if ( __get_user(ml, (u32 *)mem) )
                 goto page_fault_r;
             __asm__ __volatile__ (
                 "cmpl %1,%2 ; pushf ; popl %0"
                 : "=a" (eflags)
-                : "0" (rl), "b" (ml) );
-            regs->eip += nextbyte - eip + 4;
+                : "0" (il), "b" (ml) );
         }
         regs->eflags &= ~0x8d5;     /* OF,SF,ZF,AF,PF,CF */
         regs->eflags |= eflags & 0x8d5;
@@ -440,35 +429,29 @@ int gpf_emulate_4gb(struct pt_regs *regs)
     case 0x83: /* cmpl imm8,r/m */
         if ( reg != &regs->edi ) /* Reg == /7 */
             goto undecodeable;
-        if ( get_user(rb, nextbyte) )
-        {
-            DPRINTK("Fault while extracting immediate byte\n");
-            return 0;
-        }
+        GET_IMM8;
         if ( opsz_override )
         {
-            rw = (rb & 0x80) ? (rb | ~0xff) : rb;
+            iw = (u16)(s16)(s8)ib;
             if ( __get_user(mw, (u16 *)mem) )
                 goto page_fault_r;
             __asm__ __volatile__ (
                 "cmpw %w1,%w2 ; pushf ; popl %0"
                 : "=a" (eflags)
-                : "0" (rw), "b" (mw) );
-            regs->eip += nextbyte - eip + 2;
+                : "0" (iw), "b" (mw) );
         }
         else
         {
-            rl = (rb & 0x80) ? (rb | ~0xff) : rb;
+            il = (u32)(s32)(s8)ib;
             if ( __get_user(ml, (u32 *)mem) )
                 goto page_fault_r;
             __asm__ __volatile__ (
                 "cmpl %1,%2 ; pushf ; popl %0"
                 : "=a" (eflags)
-                : "0" (rl), "b" (ml) );
+                : "0" (il), "b" (ml) );
         }
         regs->eflags &= ~0x8d5;     /* OF,SF,ZF,AF,PF,CF */
         regs->eflags |= eflags & 0x8d5;
-        regs->eip += nextbyte - eip + 1;
         break;
     case 0x38: /* cmpb r,r/m */
     case 0x3a: /* cmpb r/m,r */
@@ -481,7 +464,6 @@ int gpf_emulate_4gb(struct pt_regs *regs)
             : "0" ((b==0x38)?rb:mb), "b" ((b==0x38)?mb:rb) );
         regs->eflags &= ~0x8d5;     /* OF,SF,ZF,AF,PF,CF */
         regs->eflags |= eflags & 0x8d5;
-        regs->eip += nextbyte - eip;
         break;
     case 0x39: /* cmpl r,r/m */
     case 0x3b: /* cmpl r/m,r */
@@ -507,24 +489,23 @@ int gpf_emulate_4gb(struct pt_regs *regs)
         }
         regs->eflags &= ~0x8d5;     /* OF,SF,ZF,AF,PF,CF */
         regs->eflags |= eflags & 0x8d5;
-        regs->eip += nextbyte - eip;
         break;
     default:
         DPRINTK("Unhandleable opcode byte %02x\n", b);
         goto undecodeable;
     }
 
-    perfc_incrc(emulations);
-
     /* Success! */
+    regs->eip += pb - eip;
+    perfc_incrc(emulations);
     return 1;
 
  undecodeable:
-    printk("Undecodable instruction %02x:%02x:%02x:%02x:%02x:%02x:%02x:%02x "
-           "caused GPF(0) at %04x:%08lx\n",
-           eip[0], eip[1], eip[2], eip[3],
-           eip[4], eip[5], eip[6], eip[7],
-           regs->xcs, regs->eip);
+    DPRINTK("Undecodable instruction %02x:%02x:%02x:%02x:%02x:%02x:%02x:%02x "
+            "caused GPF(0) at %04x:%08lx\n",
+            eip[0], eip[1], eip[2], eip[3],
+            eip[4], eip[5], eip[6], eip[7],
+            regs->xcs, regs->eip);
     return 0;
 
  page_fault_w:
