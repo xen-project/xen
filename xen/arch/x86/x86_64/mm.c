@@ -28,12 +28,26 @@
 #include <asm/fixmap.h>
 #include <asm/msr.h>
 
-void *safe_page_alloc(void)
+static void *safe_page_alloc(void)
 {
     extern int early_boot;
     if ( early_boot )
-        return __va(alloc_boot_pages(PAGE_SIZE, PAGE_SIZE));
-    return (void *)alloc_xenheap_page();
+    {
+        unsigned long p = alloc_boot_pages(PAGE_SIZE, PAGE_SIZE);
+        if ( p == 0 )
+            goto oom;
+        return phys_to_virt(p);
+    }
+    else
+    {
+        struct pfn_info *pg = alloc_domheap_page(NULL);
+        if ( pg == NULL )
+            goto oom;
+        return page_to_virt(pg);
+    }
+ oom:
+    panic("Out of memory");
+    return NULL;
 }
 
 /* Map physical byte range (@p, @p+@s) at virt address @v in pagetable @pt. */
@@ -118,6 +132,7 @@ void __init paging_init(void)
 {
     unsigned long i, p, max;
     l3_pgentry_t *l3rw, *l3ro;
+    struct pfn_info *pg;
 
     /* Map all of physical memory. */
     max = ((max_page + L1_PAGETABLE_ENTRIES - 1) & 
@@ -130,10 +145,11 @@ void __init paging_init(void)
      */
     for ( i = 0; i < max_page; i += ((1UL << L2_PAGETABLE_SHIFT) / 8) )
     {
-        p = alloc_boot_pages(1UL << L2_PAGETABLE_SHIFT,
-                             1UL << L2_PAGETABLE_SHIFT);
-        if ( p == 0 )
+        pg = alloc_domheap_pages(
+            NULL, L2_PAGETABLE_SHIFT - L1_PAGETABLE_SHIFT);
+        if ( pg == NULL )
             panic("Not enough memory for m2p table\n");
+        p = page_to_phys(pg);
         map_pages(idle_pg_table, RDWR_MPT_VIRT_START + i*8, p, 
                   1UL << L2_PAGETABLE_SHIFT, PAGE_HYPERVISOR | _PAGE_USER);
         memset((void *)(RDWR_MPT_VIRT_START + i*8), 0x55,
