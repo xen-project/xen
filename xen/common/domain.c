@@ -328,9 +328,6 @@ long do_boot_vcpu(unsigned long vcpu, full_execution_context_t *ctxt)
     atomic_set(&ed->pausecnt, 0);
     shadow_lock_init(ed);
 
-    if ( (rc = init_exec_domain_event_channels(ed)) != 0 )
-        goto out;
-
     memcpy(&ed->thread, &idle0_exec_domain.thread, sizeof(ed->thread));
 
     /* arch_do_createdomain */

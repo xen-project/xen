@@ -458,7 +458,6 @@ void local_setup_debug(void)
 }
 
 
-extern void setup_misdirect_virq(void);
 extern void local_setup_timer(void);
 
 /*
@@ -475,7 +474,6 @@ int __init start_secondary(void *unused)
 	smp_callin();
 	while (!cpu_isset(smp_processor_id(), smp_commenced_mask))
 		rep_nop();
-	setup_misdirect_virq();
 	local_setup_timer();
 	local_setup_debug();	/* XXX */
 	smp_intr_init();

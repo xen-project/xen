@@ -57,7 +57,12 @@ static inline void evtchn_set_pending(struct exec_domain *ed, int port)
  */
 static inline void send_guest_virq(struct exec_domain *ed, int virq)
 {
-    evtchn_set_pending(ed, ed->virq_to_evtchn[virq]);
+    int port = ed->virq_to_evtchn[virq];
+
+    /* Always deliver misdirect virq's to exec domain 0. */
+    if ( unlikely(port == 0) )
+        ed = ed->domain->exec_domain[0];
+    evtchn_set_pending(ed, port);
 }
 
 /*
