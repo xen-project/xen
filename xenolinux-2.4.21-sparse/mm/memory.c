@@ -1381,15 +1381,6 @@ int handle_mm_fault(struct mm_struct *mm, struct vm_area_struct * vma,
 	pgd_t *pgd;
 	pmd_t *pmd;
 
-#if defined(CONFIG_XENO_PRIV)
-	/* Take care of I/O mappings right here. */
-	if (vma->vm_flags & VM_IO) {
-		if (write_access && !(vma->vm_flags & VM_WRITE))
-			return -1;
-		return 1;
-	}
-#endif
-
 	current->state = TASK_RUNNING;
 	pgd = pgd_offset(mm, address);
 
