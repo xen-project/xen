@@ -972,7 +972,7 @@ main(int argc, char *argv[])
 {
 	int r;
 
-	r = our_system(NETWORK SCRIPT " start antispoof=no");
+	r = our_system(NETWORK_SCRIPT " start antispoof=no");
 	if (r < 0)
 		err(1, "running " NETWORK_SCRIPT);
 	if (!WIFEXITED(r)) {
