@@ -89,7 +89,7 @@ static void dump_registers(unsigned char key, struct xen_regs *regs)
     show_registers(regs); 
 }
 
-static void halt_machine(unsigned char key)
+static void halt_machine(unsigned char key, struct xen_regs *regs)
 {
     printk("'%c' pressed -> rebooting machine\n", key); 
     machine_restart(NULL); 
@@ -169,7 +169,7 @@ void initialize_keytable(void)
         'q', do_task_queues, "dump task queues + guest state");
     register_keyhandler(
         'r', dump_runq,      "dump run queues");
-    register_keyhandler(
+    register_irq_keyhandler(
         'R', halt_machine,   "reboot machine"); 
 
 #ifndef NDEBUG
