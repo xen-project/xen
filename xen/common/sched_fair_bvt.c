@@ -252,7 +252,7 @@ static void fbvt_wake(struct domain *d)
          * values, the virtual time can be determined as:
          * SVT - const * TIME_SLEPT
          */
-        io_warp = (int)(0.5 * inf->time_slept);
+        io_warp = inf->time_slept/2;
         if ( io_warp > 1000 )
             io_warp = 1000;
 
@@ -551,7 +551,7 @@ static task_slice_t fbvt_do_schedule(s_time_t now)
      * domains earlier in virtual time). Together this should give quite
      * good control both for CPU and IO-bound domains.
      */
-    LAST_VTB(cpu) = (int)(0.2 * next_inf->time_slept);
+    LAST_VTB(cpu) = next_inf->time_slept/5;
     if(LAST_VTB(cpu) / next_inf->mcu_advance > max_vtb / MCU) 
         LAST_VTB(cpu) = max_vtb * next_inf->mcu_advance / MCU;
 
