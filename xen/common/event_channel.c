@@ -83,156 +83,158 @@ static inline unsigned long set_event_disc(struct task_struct *p, int port)
 
 static long event_channel_open(evtchn_open_t *open)
 {
-    struct task_struct *lp, *rp;
-    int                 lport = 0, rport = 0;
+    struct task_struct *p1, *p2;
+    int                 port1 = 0, port2 = 0;
     unsigned long       cpu_mask;
-    domid_t             ldom = open->local_dom, rdom = open->remote_dom;
+    domid_t             dom1 = open->dom1, dom2 = open->dom2;
     long                rc = 0;
 
     if ( !IS_PRIV(current) )
         return -EPERM;
 
-    /* 'local_dom' may be DOMID_SELF. 'remote_dom' cannot be.*/
-    if ( ldom == DOMID_SELF )
-        ldom = current->domain;
-
-    /* Event channel must connect distinct domains. */
-    if ( ldom == rdom )
+    /* 'dom1' may be DOMID_SELF. 'dom2' cannot be.*/
+    if ( dom1 == DOMID_SELF )
+        dom1 = current->domain;
+    if ( dom2 == DOMID_SELF )
         return -EINVAL;
 
-    if ( ((lp = find_domain_by_id(ldom)) == NULL) ||
-         ((rp = find_domain_by_id(rdom)) == NULL) )
+    /* Event channel must connect distinct domains. */
+    if ( dom1 == dom2 )
+        return -EINVAL;
+
+    if ( ((p1 = find_domain_by_id(dom1)) == NULL) ||
+         ((p2 = find_domain_by_id(dom2)) == NULL) )
     {
-        if ( lp != NULL )
-            put_task_struct(lp);
+        if ( p1 != NULL )
+            put_task_struct(p1);
         return -ESRCH;
     }
 
     /* Avoid deadlock by first acquiring lock of domain with smaller id. */
-    if ( ldom < rdom )
+    if ( dom1 < dom2 )
     {
-        spin_lock(&lp->event_channel_lock);
-        spin_lock(&rp->event_channel_lock);
+        spin_lock(&p1->event_channel_lock);
+        spin_lock(&p2->event_channel_lock);
     }
     else
     {
-        spin_lock(&rp->event_channel_lock);
-        spin_lock(&lp->event_channel_lock);
+        spin_lock(&p2->event_channel_lock);
+        spin_lock(&p1->event_channel_lock);
     }
 
-    if ( (lport = get_free_port(lp)) < 0 )
+    if ( (port1 = get_free_port(p1)) < 0 )
     {
-        rc = lport;
+        rc = port1;
         goto out;
     }
 
-    if ( (rport = get_free_port(rp)) < 0 )
+    if ( (port2 = get_free_port(p2)) < 0 )
     {
-        rc = rport;
+        rc = port2;
         goto out;
     }
 
-    lp->event_channel[lport].remote_dom  = rp;
-    lp->event_channel[lport].remote_port = (u16)rport;
-    lp->event_channel[lport].state       = ECS_CONNECTED;
+    p1->event_channel[port1].remote_dom  = p2;
+    p1->event_channel[port1].remote_port = (u16)port2;
+    p1->event_channel[port1].state       = ECS_CONNECTED;
 
-    rp->event_channel[rport].remote_dom  = lp;
-    rp->event_channel[rport].remote_port = (u16)lport;
-    rp->event_channel[rport].state       = ECS_CONNECTED;
+    p2->event_channel[port2].remote_dom  = p1;
+    p2->event_channel[port2].remote_port = (u16)port1;
+    p2->event_channel[port2].state       = ECS_CONNECTED;
 
-    cpu_mask  = set_event_pending(lp, lport);
-    cpu_mask |= set_event_pending(rp, rport);
+    cpu_mask  = set_event_pending(p1, port1);
+    cpu_mask |= set_event_pending(p2, port2);
     guest_event_notify(cpu_mask);
     
  out:
-    spin_unlock(&lp->event_channel_lock);
-    spin_unlock(&rp->event_channel_lock);
+    spin_unlock(&p1->event_channel_lock);
+    spin_unlock(&p2->event_channel_lock);
     
-    put_task_struct(lp);
-    put_task_struct(rp);
+    put_task_struct(p1);
+    put_task_struct(p2);
 
-    open->local_port  = lport;
-    open->remote_port = rport;
+    open->port1 = port1;
+    open->port2 = port2;
 
     return rc;
 }
 
 
-static long __event_channel_close(struct task_struct *lp, int lport)
+static long __event_channel_close(struct task_struct *p1, int port1)
 {
-    struct task_struct *rp = NULL;
-    event_channel_t    *lchn, *rchn;
-    int                 rport;
+    struct task_struct *p2 = NULL;
+    event_channel_t    *chn1, *chn2;
+    int                 port2;
     unsigned long       cpu_mask;
     long                rc = 0;
 
  again:
-    spin_lock(&lp->event_channel_lock);
+    spin_lock(&p1->event_channel_lock);
 
-    lchn = lp->event_channel;
+    chn1 = p1->event_channel;
 
-    if ( (lport < 0) || (lport >= lp->max_event_channel) || 
-         (lchn[lport].state == ECS_FREE) )
+    if ( (port1 < 0) || (port1 >= p1->max_event_channel) || 
+         (chn1[port1].state == ECS_FREE) )
     {
         rc = -EINVAL;
         goto out;
     }
 
-    if ( lchn[lport].state == ECS_CONNECTED )
+    if ( chn1[port1].state == ECS_CONNECTED )
     {
-        if ( rp == NULL )
+        if ( p2 == NULL )
         {
-            rp = lchn[lport].remote_dom;
-            get_task_struct(rp);
+            p2 = chn1[port1].remote_dom;
+            get_task_struct(p2);
 
-            if ( lp->domain < rp->domain )
+            if ( p1->domain < p2->domain )
             {
-                spin_lock(&rp->event_channel_lock);
+                spin_lock(&p2->event_channel_lock);
             }
             else
             {
-                spin_unlock(&lp->event_channel_lock);
-                spin_lock(&rp->event_channel_lock);
+                spin_unlock(&p1->event_channel_lock);
+                spin_lock(&p2->event_channel_lock);
                 goto again;
             }
         }
-        else if ( rp != lchn[lport].remote_dom )
+        else if ( p2 != chn1[port1].remote_dom )
         {
             rc = -EINVAL;
             goto out;
         }
         
-        rchn  = rp->event_channel;
-        rport = lchn[lport].remote_port;
+        chn2  = p2->event_channel;
+        port2 = chn1[port1].remote_port;
 
-        if ( rport >= rp->max_event_channel )
+        if ( port2 >= p2->max_event_channel )
             BUG();
-        if ( rchn[rport].state != ECS_CONNECTED )
+        if ( chn2[port2].state != ECS_CONNECTED )
             BUG();
-        if ( rchn[rport].remote_dom != lp )
+        if ( chn2[port2].remote_dom != p1 )
             BUG();
 
-        rchn[rport].state       = ECS_ZOMBIE;
-        rchn[rport].remote_dom  = NULL;
-        rchn[rport].remote_port = 0xFFFF;
+        chn2[port2].state       = ECS_ZOMBIE;
+        chn2[port2].remote_dom  = NULL;
+        chn2[port2].remote_port = 0xFFFF;
 
-        cpu_mask  = set_event_disc(lp, lport);
-        cpu_mask |= set_event_disc(rp, rport);
+        cpu_mask  = set_event_disc(p1, port1);
+        cpu_mask |= set_event_disc(p2, port2);
         guest_event_notify(cpu_mask);
     }
 
-    lchn[lport].state       = ECS_FREE;
-    lchn[lport].remote_dom  = NULL;
-    lchn[lport].remote_port = 0xFFFF;
+    chn1[port1].state       = ECS_FREE;
+    chn1[port1].remote_dom  = NULL;
+    chn1[port1].remote_port = 0xFFFF;
     
  out:
-    spin_unlock(&lp->event_channel_lock);
-    put_task_struct(lp);
+    spin_unlock(&p1->event_channel_lock);
+    put_task_struct(p1);
 
-    if ( rp != NULL )
+    if ( p2 != NULL )
     {
-        spin_unlock(&rp->event_channel_lock);
-        put_task_struct(rp);
+        spin_unlock(&p2->event_channel_lock);
+        put_task_struct(p2);
     }
     
     return rc;
@@ -241,22 +243,21 @@ static long __event_channel_close(struct task_struct *lp, int lport)
 
 static long event_channel_close(evtchn_close_t *close)
 {
-    struct task_struct *lp;
-    int                 lport = close->local_port;
+    struct task_struct *p;
     long                rc;
-    domid_t             ldom = close->local_dom;
+    domid_t             dom = close->dom;
 
-    if ( ldom == DOMID_SELF )
-        ldom = current->domain;
+    if ( dom == DOMID_SELF )
+        dom = current->domain;
     else if ( !IS_PRIV(current) )
         return -EPERM;
 
-    if ( (lp = find_domain_by_id(ldom)) == NULL )
+    if ( (p = find_domain_by_id(dom)) == NULL )
         return -ESRCH;
 
-    rc = __event_channel_close(lp, lport);
+    rc = __event_channel_close(p, close->port);
 
-    put_task_struct(lp);
+    put_task_struct(p);
     return rc;
 }
 
@@ -295,30 +296,30 @@ static long event_channel_send(int lport)
 
 static long event_channel_status(evtchn_status_t *status)
 {
-    struct task_struct *lp;
-    domid_t             ldom = status->local_dom;
-    int                 lport = status->local_port;
-    event_channel_t    *lchn;
+    struct task_struct *p;
+    domid_t             dom = status->dom1;
+    int                 port = status->port1;
+    event_channel_t    *chn;
 
-    if ( ldom == DOMID_SELF )
-        ldom = current->domain;
+    if ( dom == DOMID_SELF )
+        dom = current->domain;
     else if ( !IS_PRIV(current) )
         return -EPERM;
 
-    if ( (lp = find_domain_by_id(ldom)) == NULL )
+    if ( (p = find_domain_by_id(dom)) == NULL )
         return -ESRCH;
 
-    spin_lock(&lp->event_channel_lock);
+    spin_lock(&p->event_channel_lock);
 
-    lchn = lp->event_channel;
+    chn = p->event_channel;
 
-    if ( (lport < 0) || (lport >= lp->max_event_channel) )
+    if ( (port < 0) || (port >= p->max_event_channel) )
     {
-        spin_unlock(&lp->event_channel_lock);
+        spin_unlock(&p->event_channel_lock);
         return -EINVAL;
     }
 
-    switch ( lchn[lport].state )
+    switch ( chn[port].state )
     {
     case ECS_FREE:
         status->status = EVTCHNSTAT_closed;
@@ -328,14 +329,14 @@ static long event_channel_status(evtchn_status_t *status)
         break;
     case ECS_CONNECTED:
         status->status = EVTCHNSTAT_connected;
-        status->remote_dom  = lchn[lport].remote_dom->domain;
-        status->remote_port = lchn[lport].remote_port;
+        status->dom2   = chn[port].remote_dom->domain;
+        status->port2  = chn[port].remote_port;
         break;
     default:
         BUG();
     }
 
-    spin_unlock(&lp->event_channel_lock);
+    spin_unlock(&p->event_channel_lock);
     return 0;
 }
 

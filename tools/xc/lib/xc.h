@@ -156,6 +156,27 @@ int xc_vbd_probe(int xc_handle,
                  unsigned int max_vbds,
                  xc_vbd_t *vbds);
 
+#define DOMID_SELF              (~1ULL)
+#define EVTCHNSTAT_closed       0  /* Chennel is not in use.              */
+#define EVTCHNSTAT_disconnected 1  /* Channel is not connected to remote. */
+#define EVTCHNSTAT_connected    2  /* Channel is connected to remote.     */
+int xc_evtchn_open(int xc_handle,
+                   u64 dom1,   /* may be DOMID_SELF */
+                   u64 dom2,
+                   int *port1,
+                   int *port2);
+int xc_evtchn_close(int xc_handle,
+                    u64 dom,   /* may be DOMID_SELF */
+                    int port);
+int xc_evtchn_send(int xc_handle,
+                   int local_port);
+int xc_evtchn_status(int xc_handle,
+                     u64 dom1, /* may be DOMID_SELF */
+                     int port1,
+                     u64 *dom2,
+                     int *port2,
+                     int *chn_status);
+
 int xc_readconsolering(int xc_handle,
                        char *str, 
                        unsigned int max_chars, 

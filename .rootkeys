@@ -74,6 +74,7 @@
 3fbba6dbEVkVMX0JuDFzap9jeaucGA tools/xc/lib/xc_bvtsched.c
 3fbba6dbasJQV-MVElDC0DGSHMiL5w tools/xc/lib/xc_domain.c
 40278d99BLsfUv3qxv0I8C1sClZ0ow tools/xc/lib/xc_elf.h
+403e0977Bjsm_e82pwvl9VvaJxh8Gg tools/xc/lib/xc_evtchn.c
 3fbba6dbNCU7U6nsMYiXzKkp3ztaJg tools/xc/lib/xc_linux_build.c
 3fbba6dbl267zZOAVHYLOdLCdhcZMw tools/xc/lib/xc_linux_restore.c
 3fbba6db7li3FJiABYtCmuGxOJxEGw tools/xc/lib/xc_linux_save.c

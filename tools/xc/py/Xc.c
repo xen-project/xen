@@ -765,6 +765,133 @@ static PyObject *pyxc_vbd_probe(PyObject *self,
     return list;
 }
 
+static PyObject *pyxc_evtchn_open(PyObject *self,
+                                  PyObject *args,
+                                  PyObject *kwds)
+{
+    XcObject *xc = (XcObject *)self;
+    PyObject *dict;
+
+    u64 dom1 = DOMID_SELF, dom2;
+    int port1, port2, ret;
+
+    static char *kwd_list[] = { "dom2", "dom1", NULL };
+
+    if ( !PyArg_ParseTupleAndKeywords(args, kwds, "L|L", kwd_list, 
+                                      &dom2, &dom1) )
+    {
+        DPRINTF("could not parse parameter list.");
+        return NULL;
+    }
+
+    ret = xc_evtchn_open(xc->xc_handle, dom1, dom2, &port1, &port2);
+
+    if ( ret < 0 )
+        dict = Py_BuildValue("{}");
+    else
+        dict = Py_BuildValue("{s:i,s:i}", 
+                             "port1", port1,
+                             "port2", port2);
+    
+    return dict;
+}
+
+static PyObject *pyxc_evtchn_close(PyObject *self,
+                                   PyObject *args,
+                                   PyObject *kwds)
+{
+    XcObject *xc = (XcObject *)self;
+
+    u64 dom = DOMID_SELF;
+    int port, ret;
+
+    static char *kwd_list[] = { "port", "dom", NULL };
+
+    if ( !PyArg_ParseTupleAndKeywords(args, kwds, "i|L", kwd_list, 
+                                      &port, &dom) )
+    {
+        DPRINTF("could not parse parameter list.");
+        return NULL;
+    }
+
+    ret = xc_evtchn_close(xc->xc_handle, dom, port);
+
+    return PyInt_FromLong(ret);
+}
+
+static PyObject *pyxc_evtchn_send(PyObject *self,
+                                  PyObject *args,
+                                  PyObject *kwds)
+{
+    XcObject *xc = (XcObject *)self;
+
+    int port, ret;
+
+    static char *kwd_list[] = { "port", NULL };
+
+    if ( !PyArg_ParseTupleAndKeywords(args, kwds, "i", kwd_list, &port) )
+    {
+        DPRINTF("could not parse parameter list.");
+        return NULL;
+    }
+
+    ret = xc_evtchn_send(xc->xc_handle, port);
+
+    return PyInt_FromLong(ret);
+}
+
+static PyObject *pyxc_evtchn_status(PyObject *self,
+                                    PyObject *args,
+                                    PyObject *kwds)
+{
+    XcObject *xc = (XcObject *)self;
+    PyObject *dict;
+
+    u64 dom1 = DOMID_SELF, dom2;
+    int port1, port2, status, ret;
+
+    static char *kwd_list[] = { "port", "dom", NULL };
+
+    if ( !PyArg_ParseTupleAndKeywords(args, kwds, "i|L", kwd_list, 
+                                      &port1, &dom1) )
+    {
+        DPRINTF("could not parse parameter list.");
+        return NULL;
+    }
+
+    ret = xc_evtchn_status(xc->xc_handle, dom1, port1, &dom2, &port2, &status);
+
+    if ( ret < 0 )
+    {
+        dict = Py_BuildValue("{}");
+    }
+    else
+    {
+        switch ( status )
+        {
+        case EVTCHNSTAT_closed:
+            dict = Py_BuildValue("{s:s}", 
+                                 "status", "closed");
+            break;
+        case EVTCHNSTAT_disconnected:
+            dict = Py_BuildValue("{s:s}", 
+                                 "status", "disconnected");
+            break;
+        case EVTCHNSTAT_connected:
+            dict = Py_BuildValue("{s:s,s:L,s:i}", 
+                                 "status", "connected",
+                                 "dom", dom2,
+                                 "port", port2);
+            break;
+        default:
+            dict = Py_BuildValue("{}");
+            break;
+        }
+    }
+    
+    return dict;
+}
+
 static PyObject *pyxc_readconsolering(PyObject *self,
                                       PyObject *args,
                                       PyObject *kwds)
@@ -1030,6 +1157,43 @@ static PyMethodDef pyxc_methods[] = {
       " vbd        [int]:  Domain-specific identifier of this VBD.\n"
       " writeable  [int]:  Bool - is this VBD writeable?\n"
       " nr_sectors [long]: Size of this VBD, in 512-byte sectors.\n" },
+
+    { "evtchn_open", 
+      (PyCFunction)pyxc_evtchn_open, 
+      METH_VARARGS | METH_KEYWORDS, "\n"
+      "Open an event channel between two domains.\n"
+      " dom1 [long, SELF]: First domain to be connected.\n"
+      " dom2 [long]:       Second domain to be connected.\n\n"
+      "Returns: [dict] dictionary is empty on failure.\n"
+      " port1 [int]: Port-id for endpoint at dom1.\n"
+      " port2 [int]: Port-id for endpoint at dom2.\n" },
+
+    { "evtchn_close", 
+      (PyCFunction)pyxc_evtchn_close, 
+      METH_VARARGS | METH_KEYWORDS, "\n"
+      "Close an event channel.\n"
+      " dom  [long, SELF]: Dom-id of one endpoint of the channel.\n"
+      " port [int]:        Port-id of one endpoint of the channel.\n\n"
+      "Returns: [int] 0 on success; -1 on error.\n" },
+
+    { "evtchn_send", 
+      (PyCFunction)pyxc_evtchn_send, 
+      METH_VARARGS | METH_KEYWORDS, "\n"
+      "Send an event along a locally-connected event channel.\n"
+      " port [int]: Port-id of a local channel endpoint.\n\n"
+      "Returns: [int] 0 on success; -1 on error.\n" },
+
+    { "evtchn_status", 
+      (PyCFunction)pyxc_evtchn_status, 
+      METH_VARARGS | METH_KEYWORDS, "\n"
+      "Query the status of an event channel.\n"
+      " dom  [long, SELF]: Dom-id of one endpoint of the channel.\n"
+      " port [int]:        Port-id of one endpoint of the channel.\n\n"
+      "Returns: [dict] dictionary is empty on failure.\n"
+      " status [str]:  'closed', 'disconnected', or 'connected'.\n"
+      "The following are also returned if 'status' is 'connected':\n"
+      " dom  [long]: Port-id for endpoint at dom1.\n"
+      " port [int]:  Port-id for endpoint at dom2.\n" },
 
     { "readconsolering", 
       (PyCFunction)pyxc_readconsolering, 
