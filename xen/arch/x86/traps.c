@@ -51,6 +51,7 @@
 #include <asm/uaccess.h>
 #include <asm/i387.h>
 #include <asm/debugger.h>
+#include <asm/msr.h>
 
 /*
  * opt_nmi: one of 'ignore', 'dom0', or 'fatal'.

@@ -41,6 +41,7 @@ integer_param("xenheap_megabytes", opt_xenheap_megabytes);
 unsigned long xenheap_phys_end;
 
 xmem_cache_t *domain_struct_cachep;
+xmem_cache_t *exec_domain_struct_cachep;
 struct domain *dom0;
 
 vm_assist_info_t vm_assist_info[MAX_VMASST_TYPE + 1];
