@@ -17,6 +17,7 @@ struct task_struct;
 void xen_segment_initialize(void);
 void xen_refresh_segment_list (struct task_struct *p);
 int xen_segment_create(xv_disk_t *xvd);
+int xen_segment_delete(struct task_struct *p, int segnr);
 int xen_segment_map_request(
     phys_seg_t *pseg, struct task_struct *p, int operation,
     unsigned short segment_number,

@@ -15,13 +15,16 @@
 #include <asm/domain_page.h>
 #include <hypervisor-ifs/block.h>
 
-segment_t xsegments[XEN_MAX_SEGMENTS];
+static segment_t xsegments[XEN_MAX_SEGMENTS];
 
 #if 0
 #define DPRINTK(_f, _a...) printk( _f , ## _a )
 #else
 #define DPRINTK(_f, _a...) ((void)0)
 #endif
+
+/* XXX XXX XXX Why are there absolutely no calls to any locking
+   primitives anywhere in this? */
 
 /*
  * xen_segment_map_request
@@ -186,7 +189,6 @@ void xen_segment_probe_all(xen_segment_info_t *raw_xsi)
 {
     int loop;
     xen_segment_info_t *xsi = map_domain_mem(virt_to_phys(raw_xsi));
-    unsigned long device;
 
     xsi->count = 0;
     for ( loop = 0; loop < XEN_MAX_SEGMENTS; loop++ )
@@ -234,7 +236,6 @@ void xen_refresh_segment_list (struct task_struct *p)
  * if we see the same DOM#/SEG# combination, we reuse the slot in
  * the segment table (overwriting what was there before).
  * an alternative would be to raise an error if the slot is reused.
- * bug: we don't free the xtents array when we re-use a slot.
  */
 int xen_segment_create(xv_disk_t *xvd_in)
 {
@@ -261,6 +262,8 @@ int xen_segment_create(xv_disk_t *xvd_in)
     xsegments[idx].segment_number = xvd->segment;
     memcpy(xsegments[idx].key, xvd->key, XEN_SEGMENT_KEYSIZE);
     xsegments[idx].num_extents = xvd->ext_count;
+    if (xsegments[idx].extents)
+	kfree(xsegments[idx].extents);
     xsegments[idx].extents = (extent_t *)kmalloc(
         sizeof(extent_t)*xvd->ext_count,
         GFP_KERNEL);
@@ -296,10 +299,43 @@ int xen_segment_create(xv_disk_t *xvd_in)
  *
  * return 0 on success, 1 on failure
  *
- * TODO: caller must ensure that only domain 0 calls this function
  */
-int xen_segment_delete(struct task_struct *p, xv_disk_t *xvd)
+int xen_segment_delete(struct task_struct *p, int segnr)
 {
+    segment_t *seg;
+
+    if (!p) {
+	printk("xen_segment delete called with NULL domain?\n");
+	BUG();
+	return 1;
+    }
+
+    if (segnr < 0 || segnr > XEN_MAX_SEGMENTS) {
+	printk("xen_segment_delete called with bad segnr?\n");
+	BUG();
+	return 1;
+    }
+
+    if (!p->segment_list[segnr])
+	return 1;
+
+    seg = p->segment_list[segnr];
+
+    /* sanity checking */
+    if (seg->domain != p->domain || seg->segment_number != segnr ||
+	(seg->mode != XEN_SEGMENT_RO && seg->mode != XEN_SEGMENT_RW) ||
+	seg->num_extents <= 0 || seg->extents == NULL) {
+	printk("segment is insane!\n");
+	BUG();
+	return 1;
+    }
+
+    p->segment_list[segnr] = NULL;
+    seg->domain = -1;
+    seg->segment_number = -1;
+    kfree(seg->extents);
+    seg->mode = XEN_SEGMENT_UNUSED;
+
     return 0;
 }
 
