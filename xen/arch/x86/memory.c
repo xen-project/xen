@@ -1989,9 +1989,12 @@ void ptwr_status(void)
     page = &frame_table[pfn];
 
     PTWR_PRINTK(PP_ALL, ("    pl2e %p l2e %08lx pfn %08lx taf %08x/%08x\n",
-                         pl2e, l2_pgentry_val(*pl2e), pfn,
-                         frame_table[pfn].u.inuse.type_info,
-                         frame_table[pfn].u.inuse.domain->domain));
+                         pl2e, l2_pgentry_val(*pl2e), l1_pgentry_val(
+                             linear_pg_table[(unsigned long)pl2e >>
+                                             PAGE_SHIFT]) >> PAGE_SHIFT,
+                         frame_table[
+                             l2_pgentry_to_pagenr(*pl2e)].u.inuse.type_info,
+                         frame_table[pfn].u.inuse.type_info));
 }
 
 
