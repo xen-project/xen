@@ -355,6 +355,8 @@ static int __init init_tsc(char* override)
 
 	rdtscll(alarm);
 
+	use_tsc=1;
+
 	return 0;
 }
 

@@ -230,6 +230,7 @@
 40f5623aEToIXouJgO-ao5d5pcEt1w linux-2.6.8.1-xen-sparse/include/asm-xen/asm-i386/pgtable-2level.h
 40f5623aCCXRPlGpNthVXstGz9ZV3A linux-2.6.8.1-xen-sparse/include/asm-xen/asm-i386/pgtable.h
 40f5623aPCkQQfPtJSooGdhcatrvnQ linux-2.6.8.1-xen-sparse/include/asm-xen/asm-i386/processor.h
+412ea0afQL2CAI-f522TbLjLPMibPQ linux-2.6.8.1-xen-sparse/include/asm-xen/asm-i386/ptrace.h
 40f5623bzLvxr7WoJIxVf2OH4rCBJg linux-2.6.8.1-xen-sparse/include/asm-xen/asm-i386/segment.h
 40f5623bG_LzgG6-qwk292nTc5Wabw linux-2.6.8.1-xen-sparse/include/asm-xen/asm-i386/setup.h
 40f5623bgzm_9vwxpzJswlAxg298Gg linux-2.6.8.1-xen-sparse/include/asm-xen/asm-i386/synch_bitops.h
