@@ -53,9 +53,10 @@
 #define SERIAL_COM1 0x3f8
 #define SERIAL_COM2 0x2f8
 
+void initialize_serial_port(int base);
+
 int serial_com_base = SERIAL_COM1;
 int debug_com_base  = SERIAL_COM1;
-
 
 static int serial_echo = 0;       /* default is not to echo; change with '~' */
 
@@ -67,6 +68,7 @@ void toggle_echo(u_char key, void *dev_id, struct pt_regs *regs)
 void debug_set_com_port(int port)
 {
     debug_com_base = port == 1 ? SERIAL_COM1 : SERIAL_COM2;
+    if (port == 2) initialize_serial_port(SERIAL_COM2);
 }
 
 int debug_testchar()                                /* character available? */
@@ -153,8 +155,6 @@ static void serial_rx_int(int irq, void *dev_id, struct pt_regs *regs)
 
 void initialize_serial() 
 {
-    int rc; 
-
     if ( !SERIAL_ENABLED )
         return;
 
@@ -162,19 +162,44 @@ void initialize_serial()
     
     /* setup key handler */
     add_key_handler('~', toggle_echo, "toggle serial echo");
-    
+
+    initialize_serial_port(SERIAL_COM1);
+}
+
+/* warning: no protection against duplicate initialization */
+void initialize_serial_port(int base)
+{    
+    int rc; 
+
     /* This assumes we have a 16550. It's pretty darned likely really! */
     /* Clear FIFOs, enable, trigger at 1 byte */
     outb(NS16550_FCR_TRG1 | NS16550_FCR_ENABLE |
          NS16550_FCR_CLRX  | NS16550_FCR_CLTX, 
-         serial_com_base + NS16550_FCR);
+         base + NS16550_FCR);
 
     /* Enable receive interrupts. Also remember to keep DTR/RTS asserted. */
     outb(NS16550_MCR_OUT2|NS16550_MCR_DTR|NS16550_MCR_RTS, 
-         serial_com_base + NS16550_MCR);
+         base + NS16550_MCR);
     outb(NS16550_IER_ERDAI, 
-         serial_com_base + NS16550_IER );
+         base + NS16550_IER );
 
-    if( (rc = request_irq(4, serial_rx_int, SA_NOPROFILE, "serial", 0)) )
-	printk("initialize_serial: failed to get IRQ4, rc=%d\n", rc); 
+    switch(base)
+    {
+    case SERIAL_COM1 :
+    {
+        if( (rc = request_irq(4, serial_rx_int, SA_NOPROFILE, "serial 1", 0)) )
+	  printk("initialize_serial: failed to get IRQ4, rc=%d\n", rc); 
+	break;
+    }
+    case SERIAL_COM2 :
+    {
+        if( (rc = request_irq(3, serial_rx_int, SA_NOPROFILE, "serial 2", 0)) )
+	  printk("initialize_serial: failed to get IRQ3, rc=%d\n", rc); 
+	break;
+    }
+    default :
+    {
+	  printk("initialize_serial: unknown serial base: 0x%d\n", base); 
+    }
+    }
 }
