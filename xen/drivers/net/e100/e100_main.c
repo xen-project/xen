@@ -322,10 +322,12 @@ e100_add_skb_to_end(struct e100_private *bdp, struct rx_list_elem *rx_struct)
 
 	(rx_struct->skb)->dev = bdp->device;
 	rfdn = RFD_POINTER(rx_struct->skb, bdp);
+        rfdn = map_domain_mem(__pa(rfdn));
 	rfdn->rfd_header.cb_status = 0;
 	rfdn->rfd_header.cb_cmd = __constant_cpu_to_le16(RFD_EL_BIT);
 	rfdn->rfd_act_cnt = 0;
 	rfdn->rfd_sz = __constant_cpu_to_le16(RFD_DATA_SIZE);
+        unmap_domain_mem(rfdn);
 
 	pci_dma_sync_single(bdp->pdev, rx_struct->dma_addr, bdp->rfd_size,
 			    PCI_DMA_TODEVICE);
@@ -334,6 +336,7 @@ e100_add_skb_to_end(struct e100_private *bdp, struct rx_list_elem *rx_struct)
 		rx_struct_last = list_entry(bdp->active_rx_list.prev,
 					    struct rx_list_elem, list_elem);
 		rfd = RFD_POINTER(rx_struct_last->skb, bdp);
+                rfd = map_domain_mem(__pa(rfd));
 		pci_dma_sync_single(bdp->pdev, rx_struct_last->dma_addr,
 				    4, PCI_DMA_FROMDEVICE);
 		put_unaligned(cpu_to_le32(rx_struct->dma_addr),
@@ -343,6 +346,7 @@ e100_add_skb_to_end(struct e100_private *bdp, struct rx_list_elem *rx_struct)
 				    8, PCI_DMA_TODEVICE);
 		rfd->rfd_header.cb_cmd &=
 			__constant_cpu_to_le16((u16) ~RFD_EL_BIT);
+                unmap_domain_mem(rfd);
 
 		pci_dma_sync_single(bdp->pdev, rx_struct_last->dma_addr,
 				    4, PCI_DMA_TODEVICE);
@@ -2017,13 +2021,17 @@ e100_rx_srv(struct e100_private *bdp)
 		skb = rx_struct->skb;
 
 		rfd = RFD_POINTER(skb, bdp);	/* locate RFD within skb */
+                rfd = map_domain_mem(__pa(rfd));
 
 		// sync only the RFD header
 		pci_dma_sync_single(bdp->pdev, rx_struct->dma_addr,
 				    bdp->rfd_size, PCI_DMA_FROMDEVICE);
 		rfd_status = le16_to_cpu(rfd->rfd_header.cb_status);	/* get RFD's status */
 		if (!(rfd_status & RFD_STATUS_COMPLETE))	/* does not contains data yet - exit */
+                {
+			unmap_domain_mem(rfd);
 			break;
+                }
 
 		/* to allow manipulation with current skb we need to unlink it */
 		list_del(&(rx_struct->list_elem));
@@ -2032,11 +2040,14 @@ e100_rx_srv(struct e100_private *bdp)
 		 * move it to the end of skb list for reuse */
 		if (!(rfd_status & RFD_STATUS_OK)) {
 			e100_add_skb_to_end(bdp, rx_struct);
+                        unmap_domain_mem(rfd);
 			continue;
 		}
 
 		data_sz = min_t(u16, (le16_to_cpu(rfd->rfd_act_cnt) & 0x3fff),
 				(sizeof (rfd_t) - bdp->rfd_size));
+
+                unmap_domain_mem(rfd);
 
 		/* now sync all the data */
 		pci_dma_sync_single(bdp->pdev, rx_struct->dma_addr,
@@ -2063,6 +2074,7 @@ e100_rx_srv(struct e100_private *bdp)
 		skb->protocol = eth_type_trans(skb, dev);
 
 		/* set the checksum info */
+#if 0
 		if (bdp->flags & DF_CSUM_OFFLOAD) {
 			if (bdp->rev_id >= D102_REV_ID) {
 				skb->ip_summed = e100_D102_check_checksum(rfd);
@@ -2070,14 +2082,21 @@ e100_rx_srv(struct e100_private *bdp)
 				skb->ip_summed = e100_D101M_checksum(bdp, skb);
 			}
 		} else {
+#endif
 			skb->ip_summed = CHECKSUM_NONE;
+#if 0
 		}
+#endif
 
+#if 0
 		if(bdp->vlgrp && (rfd_status & CB_STATUS_VLAN)) {
 			vlan_hwaccel_rx(skb, bdp->vlgrp, be16_to_cpu(rfd->vlanid));
 		} else {
+#endif
 			netif_rx(skb);
+#if 0
 		}
+#endif
 		dev->last_rx = jiffies;
 		bdp->drv_stats.net_stats.rx_bytes += skb->len;
 		
