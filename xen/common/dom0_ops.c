@@ -610,6 +610,7 @@ long do_dom0_op(dom0_op_t *u_dom0_op)
                 if ( likely(get_page(page, d)) )
                 {
                     unsigned long type = 0;
+
                     switch( page->u.inuse.type_info & PGT_type_mask )
                     {
                     case PGT_l1_page_table:
@@ -625,7 +626,10 @@ long do_dom0_op(dom0_op_t *u_dom0_op)
                         type = L4TAB;
                         break;
                     }
-                    l_arr[j] |= type;
+
+		    if ( page->u.inuse.count_info & PGC_guest_pinned )
+			type |= LPINTAB;
+		    l_arr[j] |= type;
                     put_page(page);
                 }
                 else

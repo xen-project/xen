@@ -178,8 +178,11 @@ typedef struct {
 #define L2TAB (2<<28)
 #define L3TAB (3<<28)
 #define L4TAB (4<<28)
+#define LPINTAB  (1<<31)
 #define XTAB  (0xf<<28) /* invalid page */
 #define LTAB_MASK XTAB
+#define LTABTYPE_MASK (0x7<<28)
+
 typedef struct {
     /* IN variables. */
     memory_t pfn;          /*  0: Machine page frame number to query.       */

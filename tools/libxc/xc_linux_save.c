@@ -13,7 +13,7 @@
 #define BATCH_SIZE 1024   /* 1024 pages (4MB) at a time */
 
 #define DEBUG 1
-#define DDEBUG 0
+#define DDEBUG 1
 
 #if DEBUG
 #define DPRINTF(_f, _a...) printf ( _f , ## _a )
@@ -639,7 +639,7 @@ int xc_linux_save(int xc_handle, XcIOContext *ioctxt)
 
                     set_bit( n, to_fix );
                     if( iter>1 )
-                        DDPRINTF("netbuf race: iter %d, pfn %lx. mfn %lx\n",
+                        DDPRINTF("netbuf race: iter %d, pfn %x. mfn %lx\n",
                                  iter,n,pfn_type[batch]);
                     continue;
                 }
@@ -658,7 +658,7 @@ int xc_linux_save(int xc_handle, XcIOContext *ioctxt)
                 batch++;
             }
      
-            DDPRINTF("batch %d:%d (n=%d)\n", iter, batch, n);
+//            DDPRINTF("batch %d:%d (n=%d)\n", iter, batch, n);
 
             if ( batch == 0 )
                 goto skip; /* vanishingly unlikely... */
@@ -714,12 +714,12 @@ printf("type fail: page %i mfn %08lx\n",j,pfn_type[j]);
                     continue;
                 }
   
-                if ( ((pfn_type[j] & LTAB_MASK) == L1TAB) || 
-                     ((pfn_type[j] & LTAB_MASK) == L2TAB) ){
+                if ( ((pfn_type[j] & LTABTYPE_MASK) == L1TAB) || 
+                     ((pfn_type[j] & LTABTYPE_MASK) == L2TAB) ){
                     memcpy(page, region_base + (PAGE_SIZE*j), PAGE_SIZE);
       
                     for ( k = 0; 
-                          k < (((pfn_type[j] & LTAB_MASK) == L2TAB) ? 
+                          k < (((pfn_type[j] & LTABTYPE_MASK) == L2TAB) ? 
                                (HYPERVISOR_VIRT_START >> L2_PAGETABLE_SHIFT) :
                                1024); 
                           k++ ){
@@ -898,7 +898,6 @@ printf("nrpfns according to suspend record is %ld\n", p_srec->nr_pfns );
 
     /* Canonicalise each GDT frame number. */
     for ( i = 0; i < ctxt.gdt_ents; i += 512 ) {
-       ctxt.gdt_frames[i], live_mfn_to_pfn_table[ctxt.gdt_frames[i]]);
         if ( !translate_mfn_to_pfn(&ctxt.gdt_frames[i]) ) {
             xcio_error(ioctxt, "GDT frame is not in range of pseudophys map");
             goto out;
