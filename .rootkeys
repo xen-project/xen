@@ -183,6 +183,8 @@
 4108f5c1WfTIrs0HZFeV39sttekCTw linux-2.6.8.1-xen-sparse/drivers/char/mem.c
 4111308bZAIzwf_Kzu6x1TZYZ3E0_Q linux-2.6.8.1-xen-sparse/drivers/char/tty_io.c
 40f56239Dp_vMTgz8TEbvo1hjHGc3w linux-2.6.8.1-xen-sparse/drivers/xen/Makefile
+41768fbcncpBQf8s2l2-CwoSNIZ9uA linux-2.6.8.1-xen-sparse/drivers/xen/balloon/Makefile
+3e6377f8i5e9eGz7Pw6fQuhuTQ7DQg linux-2.6.8.1-xen-sparse/drivers/xen/balloon/balloon.c
 410d0893otFGghmv4dUXDUBBdY5aIA linux-2.6.8.1-xen-sparse/drivers/xen/blkback/Makefile
 4087cf0d1XgMkooTZAiJS6NrcpLQNQ linux-2.6.8.1-xen-sparse/drivers/xen/blkback/blkback.c
 4087cf0dZadZ8r6CEt4fNN350Yle3A linux-2.6.8.1-xen-sparse/drivers/xen/blkback/common.h
