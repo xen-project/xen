@@ -70,7 +70,6 @@ static struct console xen_console_info = {
 
 void xen_console_init(void)
 {
-  printk("xeno_console_init\n");
   register_console(&xen_console_info);
 }
 
@@ -156,9 +155,6 @@ static void xeno_console_close(struct tty_struct *tty, struct file *filp)
 
 int __init xeno_con_init(void)
 {
-
-    printk("xeno_con_init\n");
-
     memset(&xeno_console_driver, 0, sizeof(struct tty_driver));
     xeno_console_driver.magic           = TTY_DRIVER_MAGIC;
     xeno_console_driver.driver_name     = "xeno_console";

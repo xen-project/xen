@@ -342,13 +342,9 @@ void cls(void)
 /* Put the character C on the screen.  */
 static void putchar (int c)
 {
-#ifdef CONFIG_OUTPUT_CONSOLE
-    static char zeroarr[2*COLUMNS] = { 0 };
     if ( (c != '\n') && ((c < 32) || (c > 126)) ) return;
-#endif
-
     putchar_serial(c);
-
+  
 #ifdef CONFIG_OUTPUT_CONSOLE
     if(opt_console) {
       if (c == '\n')
@@ -358,6 +354,7 @@ static void putchar (int c)
 	  ypos++;
 	  if (ypos >= LINES)
 	    {
+	      static char zeroarr[2*COLUMNS] = { 0 };
 	      ypos = LINES-1;
 	      memcpy((char*)video, 
 		     (char*)video + 2*COLUMNS, (LINES-1)*2*COLUMNS);
