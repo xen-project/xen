@@ -1205,7 +1205,7 @@ static void stop_task(void *unused)
 
     memcpy(&suspend_record->resume_info, &start_info, sizeof(start_info));
 
-    HYPERVISOR_stop(virt_to_machine(suspend_record) >> PAGE_SHIFT);
+    HYPERVISOR_suspend(virt_to_machine(suspend_record) >> PAGE_SHIFT);
 
     suspending = 0; 
 

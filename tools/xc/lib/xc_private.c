@@ -229,7 +229,8 @@ int xc_domain_stop_sync( int xc_handle, domid_t domid,
             goto out;
         }
 
-        if ( op->u.getdomaininfo.state == DOMSTATE_STOPPED )
+        if ( (op->u.getdomaininfo.flags & DOMFLAGS_STATEMASK) == 
+             DOMSTATE_STOPPED )
         {
             printf("Domain %u stopped\n",domid);
             return 0;

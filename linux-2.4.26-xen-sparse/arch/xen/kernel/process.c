@@ -120,17 +120,23 @@ void machine_restart(char * __unused)
     /* We really want to get pending console data out before we die. */
     extern void xencons_force_flush(void);
     xencons_force_flush();
-    HYPERVISOR_exit();
+    HYPERVISOR_reboot();
 }
 
 void machine_halt(void)
 {
-    machine_restart(NULL);
+    /* We really want to get pending console data out before we die. */
+    extern void xencons_force_flush(void);
+    xencons_force_flush();
+    HYPERVISOR_shutdown();
 }
 
 void machine_power_off(void)
 {
-    machine_restart(NULL);
+    /* We really want to get pending console data out before we die. */
+    extern void xencons_force_flush(void);
+    xencons_force_flush();
+    HYPERVISOR_shutdown();
 }
 
 extern void show_trace(unsigned long* esp);

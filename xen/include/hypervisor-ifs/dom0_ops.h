@@ -19,7 +19,7 @@
  * This makes sure that old versions of dom0 tools will stop working in a
  * well-defined way (rather than crashing the machine, for instance).
  */
-#define DOM0_INTERFACE_VERSION   0xAAAA000E
+#define DOM0_INTERFACE_VERSION   0xAAAA000F
 
 #define MAX_DOMAIN_NAME    16
 
@@ -84,24 +84,33 @@ typedef struct {
 #define DOM0_GETDOMAININFO    12
 typedef struct {
     /* IN variables. */
-    domid_t domain;                   /*  0 */
-    u32     __pad;
-    full_execution_context_t *ctxt;   /*  8 */
-    MEMORY_PADDING;
+    domid_t  domain;                  /*  0 */ /* NB. IN/OUT variable. */
     /* OUT variables. */
-    u8      name[MAX_DOMAIN_NAME];    /* 16 */
-    u32     processor;                /* 32 */
-    u32     has_cpu;                  /* 36 */
-#define DOMSTATE_ACTIVE              0
-#define DOMSTATE_STOPPED             1
-    u32     state;                    /* 40 */
-    u32     hyp_events;               /* 44 */
-    u32     tot_pages;                /* 48 */
-    u32     max_pages;                /* 52 */
-    u64     cpu_time;                 /* 56 */
-    memory_t shared_info_frame;       /* 64: MFN of shared_info struct */
+#define DOMSTATE_CRASHED     0 /* Crashed domain; frozen for postmortem.     */
+#define DOMSTATE_STOPPED     1 /* Domain voluntarily halted it execution.    */
+#define DOMSTATE_PAUSED      2 /* Currently paused (forced non-schedulable). */
+#define DOMSTATE_BLOCKED     3 /* Currently blocked pending a wake-up event. */
+#define DOMSTATE_RUNNABLE    4 /* Currently runnable.                        */
+#define DOMSTATE_RUNNING     5 /* Currently running.                         */
+#define DOMFLAGS_STATEMASK   7 /* One of the DOMSTATE_??? values.            */
+#define DOMFLAGS_STATESHIFT  0
+#define DOMFLAGS_CPUMASK   255 /* CPU to which this domain is bound.         */
+#define DOMFLAGS_CPUSHIFT    3
+#define DOMFLAGS_GUESTMASK 255 /* DOMSTATE_STOPPED -> Guest-supplied code.   */
+#define DOMFLAGS_GUESTSHIFT 11
+    u32      flags;                   /*  4 */
+    u8       name[MAX_DOMAIN_NAME];   /*  8 */
+    full_execution_context_t *ctxt;   /* 24 */ /* NB. IN/OUT variable. */
     MEMORY_PADDING;
-} PACKED dom0_getdomaininfo_t; /* 72 bytes */
+    memory_t tot_pages;               /* 32 */
+    MEMORY_PADDING;
+    memory_t max_pages;               /* 40 */
+    MEMORY_PADDING;
+    memory_t shared_info_frame;       /* 48: MFN of shared_info struct */
+    MEMORY_PADDING;
+    u64      cpu_time;                /* 56 */
+    u32      hyp_events;              /* 64 */
+} PACKED dom0_getdomaininfo_t; /* 68 bytes */
 
 #define DOM0_BUILDDOMAIN      13
 typedef struct {
@@ -314,7 +323,7 @@ typedef struct {
     u32 cmd;                          /* 0 */
     u32 interface_version;            /* 4 */ /* DOM0_INTERFACE_VERSION */
     union {                           /* 8 */
-	u32                      dummy[14]; /* 56 bytes */
+	u32                      dummy[18]; /* 72 bytes */
         dom0_createdomain_t      createdomain;
         dom0_startdomain_t       startdomain;
         dom0_stopdomain_t        stopdomain;
@@ -341,6 +350,6 @@ typedef struct {
 	dom0_setdomainmaxmem_t   setdomainmaxmem;
 	dom0_getpageframeinfo2_t getpageframeinfo2;
     } PACKED u;
-} PACKED dom0_op_t; /* 64 bytes */
+} PACKED dom0_op_t; /* 80 bytes */
 
 #endif /* __DOM0_OPS_H__ */

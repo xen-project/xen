@@ -29,6 +29,16 @@ typedef struct {
 
 
 /*
+ * Stop codes for SCHEDOP_stop. These are opaque to Xen but interpreted by
+ * control software to determine appropriate action.
+ */
+
+#define STOPCODE_shutdown   0  /* Domain exited normally. Clean up and kill. */
+#define STOPCODE_reboot     1  /* Clean up, kill, and then restart. */
+#define STOPCODE_suspend    2  /* Clean up, save suspend info, kill. */
+
+
+/*
  * CONTROLLER MESSAGING INTERFACE.
  */
 

@@ -253,25 +253,39 @@ static inline int HYPERVISOR_block(void)
     return ret;
 }
 
-static inline int HYPERVISOR_exit(void)
+static inline int HYPERVISOR_shutdown(void)
 {
     int ret;
     __asm__ __volatile__ (
         TRAP_INSTR
         : "=a" (ret) : "0" (__HYPERVISOR_sched_op),
-        "b" (SCHEDOP_exit) : "memory" );
+        "b" (SCHEDOP_stop | (STOPCODE_shutdown << SCHEDOP_reasonshift))
+        : "memory" );
 
     return ret;
 }
 
-static inline int HYPERVISOR_stop(unsigned long srec)
+static inline int HYPERVISOR_reboot(void)
+{
+    int ret;
+    __asm__ __volatile__ (
+        TRAP_INSTR
+        : "=a" (ret) : "0" (__HYPERVISOR_sched_op),
+        "b" (SCHEDOP_stop | (STOPCODE_reboot << SCHEDOP_reasonshift))
+        : "memory" );
+
+    return ret;
+}
+
+static inline int HYPERVISOR_suspend(unsigned long srec)
 {
     int ret;
     /* NB. On suspend, control software expects a suspend record in %esi. */
     __asm__ __volatile__ (
         TRAP_INSTR
         : "=a" (ret) : "0" (__HYPERVISOR_sched_op),
-        "b" (SCHEDOP_stop), "S" (srec) : "memory" );
+        "b" (SCHEDOP_stop | (STOPCODE_suspend << SCHEDOP_reasonshift)), 
+        "S" (srec) : "memory" );
 
     return ret;
 }

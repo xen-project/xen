@@ -153,7 +153,7 @@ void start_kernel(start_info_t *si)
 void do_exit(void)
 {
     printk("do_exit called!\n");
-    for ( ;; ) HYPERVISOR_exit();
+    for ( ;; ) HYPERVISOR_shutdown();
 }
 static void exit_handler(int ev, struct pt_regs *regs) {
     do_exit();

@@ -446,34 +446,34 @@ FAULT12:movl %eax,8(%esi)
                               
 .section __ex_table,"a"
         .align 4
-        .long FAULT1, kill_domain_fixup3 # Fault writing to ring-1 stack
-        .long FAULT2, kill_domain_fixup3 # Fault writing to ring-1 stack
-        .long FAULT3, kill_domain_fixup3 # Fault writing to ring-1 stack
-        .long FAULT4, kill_domain_fixup3 # Fault writing to ring-1 stack
-        .long FAULT5, kill_domain_fixup1 # Fault executing failsafe iret
-        .long FAULT6, kill_domain_fixup2 # Fault loading ring-1 stack selector
-        .long FAULT7, kill_domain_fixup2 # Fault writing to ring-1 stack
-        .long FAULT8, kill_domain_fixup2 # Fault writing to ring-1 stack
-        .long FAULT9, kill_domain_fixup2 # Fault loading ring-1 stack selector
-        .long FAULT10,kill_domain_fixup2 # Fault writing to ring-1 stack
-        .long FAULT11,kill_domain_fixup2 # Fault writing to ring-1 stack
-        .long FAULT12,kill_domain_fixup2 # Fault writing to ring-1 stack
-        .long FAULT13,kill_domain_fixup3 # Fault writing to ring-1 stack
-        .long FAULT14,kill_domain_fixup3 # Fault writing to ring-1 stack
+        .long FAULT1, crash_domain_fixup3 # Fault writing to ring-1 stack
+        .long FAULT2, crash_domain_fixup3 # Fault writing to ring-1 stack
+        .long FAULT3, crash_domain_fixup3 # Fault writing to ring-1 stack
+        .long FAULT4, crash_domain_fixup3 # Fault writing to ring-1 stack
+        .long FAULT5, crash_domain_fixup1 # Fault executing failsafe iret
+        .long FAULT6, crash_domain_fixup2 # Fault loading ring-1 stack selector
+        .long FAULT7, crash_domain_fixup2 # Fault writing to ring-1 stack
+        .long FAULT8, crash_domain_fixup2 # Fault writing to ring-1 stack
+        .long FAULT9, crash_domain_fixup2 # Fault loading ring-1 stack selector
+        .long FAULT10,crash_domain_fixup2 # Fault writing to ring-1 stack
+        .long FAULT11,crash_domain_fixup2 # Fault writing to ring-1 stack
+        .long FAULT12,crash_domain_fixup2 # Fault writing to ring-1 stack
+        .long FAULT13,crash_domain_fixup3 # Fault writing to ring-1 stack
+        .long FAULT14,crash_domain_fixup3 # Fault writing to ring-1 stack
 .previous
                
 # This handler kills domains which experience unrecoverable faults.
 .section .fixup,"ax"
-kill_domain_fixup1:
+crash_domain_fixup1:
         subl  $4,%esp
         SAVE_ALL
-        jmp   kill_domain
-kill_domain_fixup2:
+        jmp   crash_domain
+crash_domain_fixup2:
         addl  $4,%esp                     
-kill_domain_fixup3:
+crash_domain_fixup3:
         pushl %ss
         popl  %ds
-        jmp   kill_domain
+        jmp   crash_domain
 .previous
 
         ALIGN

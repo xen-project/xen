@@ -282,11 +282,12 @@ long do_dom0_op(dom0_op_t *u_dom0_op)
 
     case DOM0_GETDOMAININFO:
     { 
-        struct task_struct *p;
-        u_long flags;
-        int i;
+        full_execution_context_t *c;
+        struct task_struct       *p;
+        unsigned long             flags;
+        int                       i;
 
-        read_lock_irqsave (&tasklist_lock, flags);
+        read_lock_irqsave(&tasklist_lock, flags);
 
         for_each_domain ( p )
         {
@@ -294,7 +295,7 @@ long do_dom0_op(dom0_op_t *u_dom0_op)
                 break;
         }
 
-        if ( p == NULL )
+        if ( (p == NULL) || (p->state == TASK_DYING) )
         {
             ret = -ESRCH;
             goto gdi_out;
@@ -302,12 +303,23 @@ long do_dom0_op(dom0_op_t *u_dom0_op)
         else
         {
             op->u.getdomaininfo.domain      = p->domain;
-            strcpy (op->u.getdomaininfo.name, p->name);
-            op->u.getdomaininfo.processor   = p->processor;
-            op->u.getdomaininfo.has_cpu     = p->has_cpu;
-            op->u.getdomaininfo.state       = DOMSTATE_ACTIVE;
-            if ( (p->state == TASK_STOPPED) || (p->state == TASK_DYING) )
-                op->u.getdomaininfo.state = DOMSTATE_STOPPED;
+            strcpy(op->u.getdomaininfo.name, p->name);
+
+            if ( p->state == TASK_RUNNING )
+                op->u.getdomaininfo.flags = 
+                    p->has_cpu ? DOMSTATE_RUNNING : DOMSTATE_RUNNABLE;
+            else if ( (p->state == TASK_INTERRUPTIBLE) || 
+                      (p->state == TASK_UNINTERRUPTIBLE) )
+                op->u.getdomaininfo.flags = DOMSTATE_BLOCKED;
+            else if ( p->state == TASK_PAUSED )
+                op->u.getdomaininfo.flags = DOMSTATE_PAUSED;
+            else if ( p->state == TASK_CRASHED )
+                op->u.getdomaininfo.flags = DOMSTATE_CRASHED;
+            else
+                op->u.getdomaininfo.flags = DOMSTATE_STOPPED;
+            op->u.getdomaininfo.flags |= p->processor << DOMFLAGS_CPUSHIFT;
+            op->u.getdomaininfo.flags |= p->stop_code << DOMFLAGS_GUESTSHIFT;
+
             op->u.getdomaininfo.hyp_events  = p->hyp_events;
             op->u.getdomaininfo.tot_pages   = p->tot_pages;
             op->u.getdomaininfo.max_pages   = p->max_pages;
@@ -315,13 +327,12 @@ long do_dom0_op(dom0_op_t *u_dom0_op)
             op->u.getdomaininfo.shared_info_frame = 
                 __pa(p->shared_info) >> PAGE_SHIFT;
 
-            if ( p->state == TASK_STOPPED && op->u.getdomaininfo.ctxt )
+            if ( (p->state == TASK_STOPPED) &&
+                 (op->u.getdomaininfo.ctxt != NULL) )
             {
-                full_execution_context_t *c=NULL;
-
                 if ( (c = kmalloc(sizeof(*c), GFP_KERNEL)) == NULL )
                 {
-                    ret= -ENOMEM;
+                    ret = -ENOMEM;
                     goto gdi_out;
                 }
 
@@ -373,12 +384,11 @@ long do_dom0_op(dom0_op_t *u_dom0_op)
                 c->failsafe_callback_eip = 
                     p->failsafe_address;
 
-                if( copy_to_user(op->u.getdomaininfo.ctxt, c, sizeof(*c)) )
-                {
+                if ( copy_to_user(op->u.getdomaininfo.ctxt, c, sizeof(*c)) )
                     ret = -EINVAL;
-                }
 
-                if (c) kfree(c);
+                if ( c != NULL )
+                    kfree(c);
             }
         }
 
@@ -387,7 +397,6 @@ long do_dom0_op(dom0_op_t *u_dom0_op)
 
     gdi_out:
         read_unlock_irqrestore(&tasklist_lock, flags);
-
     }
     break;
 

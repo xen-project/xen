@@ -123,6 +123,7 @@ struct task_struct
     struct list_head run_list;
     int              has_cpu;
     int              state;         /* current run state */
+    int              stop_code;     /* stop code from OS (if TASK_STOPPED). */
     int              cpupinned;     /* true if pinned to curent CPU */
     s_time_t         lastschd;      /* time this domain was last scheduled */
     s_time_t         lastdeschd;    /* time this domain was last descheduled */
@@ -207,6 +208,7 @@ struct task_struct
 #define TASK_STOPPED             4
 #define TASK_DYING               8
 #define TASK_PAUSED             16
+#define TASK_CRASHED            32
 
 #include <asm/uaccess.h> /* for KERNEL_DS */
 
@@ -255,9 +257,8 @@ struct task_struct *find_last_domain(void);
 extern void release_task(struct task_struct *);
 extern void __kill_domain(struct task_struct *p);
 extern void kill_domain(void);
-extern void kill_domain_with_errmsg(const char *err);
 extern long kill_other_domain(domid_t dom, int force);
-extern void stop_domain(void);
+extern void stop_domain(u8 reason);
 extern long stop_other_domain(domid_t dom);
 
 /* arch/process.c */

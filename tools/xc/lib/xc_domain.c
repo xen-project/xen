@@ -91,9 +91,14 @@ int xc_domain_getinfo(int xc_handle,
         if ( do_dom0_op(xc_handle, &op) < 0 )
             break;
         info->domid   = (u32)op.u.getdomaininfo.domain;
-        info->cpu     = op.u.getdomaininfo.processor;
-        info->has_cpu = op.u.getdomaininfo.has_cpu;
-        info->stopped = (op.u.getdomaininfo.state == DOMSTATE_STOPPED);
+
+        info->cpu     =
+            (op.u.getdomaininfo.flags>>DOMFLAGS_CPUSHIFT) & DOMFLAGS_CPUMASK;
+        info->has_cpu =
+            (op.u.getdomaininfo.flags&DOMFLAGS_STATEMASK) == DOMSTATE_RUNNING;
+        info->stopped = 
+            (op.u.getdomaininfo.flags&DOMFLAGS_STATEMASK) == DOMSTATE_STOPPED;
+
         info->nr_pages = op.u.getdomaininfo.tot_pages;
         info->max_memkb = op.u.getdomaininfo.max_pages<<(PAGE_SHIFT-10);
         info->shared_info_frame = op.u.getdomaininfo.shared_info_frame;

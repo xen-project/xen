@@ -170,13 +170,6 @@ struct task_struct *find_last_domain(void)
 }
 
 
-void kill_domain_with_errmsg(const char *err)
-{
-    printk("DOM%u FATAL ERROR: %s\n", current->domain, err);
-    kill_domain();
-}
-
-
 void __kill_domain(struct task_struct *p)
 {
     int i;
@@ -245,7 +238,7 @@ long kill_other_domain(domid_t dom, int force)
     if ( (p = find_domain_by_id(dom)) == NULL )
         return -ESRCH;
 
-    if ( p->state == TASK_STOPPED )
+    if ( (p->state == TASK_STOPPED) || (p->state == TASK_CRASHED) )
         __kill_domain(p);
     else if ( force )
         send_hyp_event(p, _HYP_EVENT_DIE);
@@ -256,8 +249,27 @@ long kill_other_domain(domid_t dom, int force)
     return 0;
 }
 
-void stop_domain(void)
+
+void crash_domain(void)
 {
+    struct task_struct *p;
+
+    set_current_state(TASK_CRASHED);
+    
+    p = find_domain_by_id(0);
+    send_guest_virq(p, VIRQ_DOM_EXC);
+    put_task_struct(p);
+    
+    __enter_scheduler();
+    BUG();
+}
+
+
+void stop_domain(u8 reason)
+{
+    struct task_struct *p;
+
+    current->stop_code = reason;
     memcpy(&current->shared_info->execution_context, 
            get_execution_context(), 
            sizeof(execution_context_t));
@@ -265,13 +277,9 @@ void stop_domain(void)
     wmb(); /* All CPUs must see saved info in state TASK_STOPPED. */
     set_current_state(TASK_STOPPED);
 
-    /* OK, this is grim, but helps speed up live migrate. When a domain stops,
-       kick Dom0 */
-    {
-        struct task_struct *p;
-        guest_schedule_to_run( p = find_domain_by_id(0ULL) );
-        put_task_struct(p);
-    }
+    p = find_domain_by_id(0);
+    send_guest_virq(p, VIRQ_DOM_EXC);
+    put_task_struct(p);
 
     __enter_scheduler();
 }

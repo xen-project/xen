@@ -436,7 +436,7 @@ int xc_linux_build(int xc_handle,
         PERROR("Could not get info on domain");
         goto error_out;
     }
-    if ( (op.u.getdomaininfo.state != DOMSTATE_STOPPED) ||
+    if ( ((op.u.getdomaininfo.flags&DOMFLAGS_STATEMASK) != DOMSTATE_STOPPED) ||
          (ctxt->pt_base != 0) )
     {
         ERROR("Domain is already constructed");
