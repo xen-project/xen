@@ -762,7 +762,7 @@ void time_resume(void)
 }
 
 #ifdef CONFIG_SMP
-static char timer_name[NR_IRQS][15];
+static char timer_name[NR_CPUS][15];
 void local_setup_timer(void)
 {
 	int seq, cpu = smp_processor_id();

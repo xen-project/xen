@@ -444,7 +444,7 @@ static irqreturn_t ldebug_interrupt(
 }
 
 static DEFINE_PER_CPU(int, ldebug_irq);
-static char ldebug_name[NR_IRQS][15];
+static char ldebug_name[NR_CPUS][15];
 
 void ldebug_setup(void)
 {
@@ -1335,8 +1335,8 @@ extern irqreturn_t smp_call_function_interrupt(int, void *, struct pt_regs *);
 
 static DEFINE_PER_CPU(int, resched_irq);
 static DEFINE_PER_CPU(int, callfunc_irq);
-static char resched_name[NR_IRQS][15];
-static char callfunc_name[NR_IRQS][15];
+static char resched_name[NR_CPUS][15];
+static char callfunc_name[NR_CPUS][15];
 
 void __init smp_intr_init(void)
 {
