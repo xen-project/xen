@@ -245,7 +245,7 @@ void __init percpu_traps_init(void)
      */
 
     wrmsr(MSR_STAR, 0, (FLAT_RING3_CS32<<16) | __HYPERVISOR_CS);
-    wrmsr(MSR_SYSCALL_MASK, ~EF_IE, 0U); /* disable interrupts */
+    wrmsr(MSR_SYSCALL_MASK, EF_VM|EF_RF|EF_NT|EF_DF|EF_IE|EF_TF, 0U);
 }
 
 void *decode_reg(struct xen_regs *regs, u8 b)
