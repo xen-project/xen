@@ -221,30 +221,32 @@ def make_domain():
         print "Ramdisk file '" + ramdisk + "' does not exist"
         sys.exit()
 
+    id = xc.domain_create( mem_kb=mem_size*1024, name=domain_name )
+    if id <= 0:
+	print "Error creating domain"
+	sys.exit()
+
+    cmsg = 'new_control_interface(dom='+str(id)+', console_port='+str(console_port)+')'
+
+    xend_response = xenctl.utils.xend_control_message(cmsg)
+
+    if not xend_response['success']:
+	print "Error creating initial event channel"
+	print "Error type: " + xend_response['error_type']
+	if xend_response['error_type'] == 'exception':
+	    print "Exception type: " + xend_response['exception_type']
+	    print "Exception value: " + xend_response['exception_value']
+	xc.domain_destroy ( dom=id )
+	sys.exit()
+
     if restore:
-        ret = eval('xc.%s_restore ( state_file=state_file, progress=1 )' % builder_fn)
+        ret = eval('xc.%s_restore ( dom=id, state_file=state_file, progress=1 )' % builder_fn)
         if ret < 0:
             print "Error restoring domain"
-            sys.exit()
-        else:
-            id = ret
-    else:
-        id = xc.domain_create( mem_kb=mem_size*1024, name=domain_name )
-        if id <= 0:
-            print "Error creating domain"
-            sys.exit()
-            
-        cmsg = 'new_control_interface(dom='+str(id)+', console_port='+str(console_port)+')'
-
-        xend_response = xenctl.utils.xend_control_message(cmsg)
-        if not xend_response['success']:
-            print "Error creating initial event channel"
-            print "Error type: " + xend_response['error_type']
-            if xend_response['error_type'] == 'exception':
-                print "Exception type: " + xend_response['exception_type']
-                print "Exception value: " + xend_response['exception_value']
+            print "Return code = " + str(ret)
             xc.domain_destroy ( dom=id )
             sys.exit()
+    else:
 
         ret = eval('xc.%s_build ( dom=id, image=image, ramdisk=ramdisk, cmdline=cmdline, control_evtchn=xend_response["remote_port"] )' % builder_fn)
         if ret < 0:

@@ -117,7 +117,7 @@ long do_dom0_op(dom0_op_t *u_dom0_op)
         static unsigned int pro = 0;
         domid_t dom;
         ret = -ENOMEM;
-        
+
         spin_lock_irq(&create_dom_lock);
         
         if ( (dom = get_domnr()) == 0 ) 
@@ -287,6 +287,7 @@ long do_dom0_op(dom0_op_t *u_dom0_op)
                 op->u.getdomaininfo.state = DOMSTATE_STOPPED;
             op->u.getdomaininfo.hyp_events  = p->hyp_events;
             op->u.getdomaininfo.tot_pages   = p->tot_pages;
+            op->u.getdomaininfo.max_pages   = p->max_pages;
             op->u.getdomaininfo.cpu_time    = p->cpu_time;
             op->u.getdomaininfo.shared_info_frame = 
                 __pa(p->shared_info) >> PAGE_SHIFT;
@@ -498,14 +499,15 @@ long do_dom0_op(dom0_op_t *u_dom0_op)
 
     case DOM0_SHADOW_CONTROL:
     {
-        struct task_struct *p; 
-	
+	struct task_struct *p; 
+	ret = -ESRCH;
 	p = find_domain_by_id( op->u.shadow_control.domain );
 	if ( p )
 	{
             ret = shadow_mode_control(p, op->u.shadow_control.op );
 	    put_task_struct(p);
         }
+	
     }
     break;
 
@@ -516,7 +518,52 @@ long do_dom0_op(dom0_op_t *u_dom0_op)
         copy_to_user(u_dom0_op, op, sizeof(*op));
         ret = 0;        
     }
-     
+    break;
+
+    case DOM0_SETDOMAINNAME:
+    {
+	struct task_struct *p; 
+	p = find_domain_by_id( op->u.setdomainname.domain );
+	if ( p )
+	{
+	    strncpy(p->name, op->u.setdomainname.name, MAX_DOMAIN_NAME);
+	}
+	else 
+	    ret = -ESRCH;
+    }
+    break;
+
+    case DOM0_SETDOMAININITIALMEM:
+    {
+	struct task_struct *p; 
+	ret = -ESRCH;
+	p = find_domain_by_id( op->u.setdomaininitialmem.domain );
+	if ( p )
+	{	
+	    /* should only be used *before* domain is built. */
+            if ( ! test_bit(PF_CONSTRUCTED, &p->flags) )
+		ret = alloc_new_dom_mem( 
+		    p, op->u.setdomaininitialmem.initial_memkb );
+	    else
+		ret = -EINVAL;
+	}
+    }
+    break;
+
+    case DOM0_SETDOMAINMAXMEM:
+    {
+	struct task_struct *p; 
+	p = find_domain_by_id( op->u.setdomainmaxmem.domain );
+	if ( p )
+	{
+	    p->max_pages = 
+		(op->u.setdomainmaxmem.max_memkb+PAGE_SIZE-1)>> PAGE_SHIFT;
+	}
+	else 
+	    ret = -ESRCH;
+    }
+    break;
+
     default:
         ret = -ENOSYS;
 

@@ -52,6 +52,7 @@ static int checked_read(gzFile fd, void *buf, size_t count)
 }
 
 int xc_linux_restore(int xc_handle,
+		     u64 dom,
                      const char *state_file,
                      int verbose,
                      u64 *pdomid)
@@ -59,7 +60,6 @@ int xc_linux_restore(int xc_handle,
     dom0_op_t op;
     int rc = 1, i, j;
     unsigned long mfn, pfn;
-    u64 dom = 0ULL;
     unsigned int prev_pc, this_pc;
     
     /* Number of page frames in use by this Linux session. */
@@ -165,16 +165,21 @@ int xc_linux_restore(int xc_handle,
         goto out;
     }
 
-    /* Create a new domain of the appropriate size, and find it's dom_id. */
-    op.cmd = DOM0_CREATEDOMAIN;
-    op.u.createdomain.memory_kb = nr_pfns * (PAGE_SIZE / 1024);
-    memcpy(op.u.createdomain.name, name, MAX_DOMAIN_NAME);
-    if ( do_dom0_op(xc_handle, &op) < 0 )
+    /* Set the domain's name to that from the restore file */
+    if ( xc_domain_setname( xc_handle, dom, name ) )
     {
-        ERROR("Could not create new domain");
+        ERROR("Could not set domain name");
         goto out;
     }
-    dom = (u64)op.u.createdomain.domain;
+
+    /* Set the domain's initial memory allocation 
+       to that from the restore file */
+
+    if ( xc_domain_setinitialmem( xc_handle, dom, nr_pfns * (PAGE_SIZE / 1024)) )
+    {
+        ERROR("Could not set domain initial memory");
+        goto out;
+    }
 
     /* Get the domain's shared-info frame. */
     op.cmd = DOM0_GETDOMAININFO;

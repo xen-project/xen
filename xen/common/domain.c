@@ -483,12 +483,11 @@ unsigned int alloc_new_dom_mem(struct task_struct *p, unsigned int kbytes)
 {
     unsigned int alloc_pfns, nr_pages;
 
-    nr_pages = kbytes >> (PAGE_SHIFT - 10);
+    nr_pages = (kbytes + ((PAGE_SIZE-1)>>10)) >> (PAGE_SHIFT - 10);
+    p->max_pages = nr_pages; /* this can now be controlled independently */
 
-    /* TEMPORARY: max_pages should be explicitly specified. */
-    p->max_pages = nr_pages;
-
-    for ( alloc_pfns = 0; alloc_pfns < nr_pages; alloc_pfns++ )
+    /* grow the allocation if necessary */
+    for ( alloc_pfns = p->tot_pages; alloc_pfns < nr_pages; alloc_pfns++ )
     {
         if ( unlikely(alloc_domain_page(p) == NULL) ||
              unlikely(free_pfns < (SLACK_DOMAIN_MEM_KILOBYTES >> 
