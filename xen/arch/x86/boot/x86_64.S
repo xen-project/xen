@@ -270,9 +270,8 @@ copy_user_generic:
 memcmp:
 idt_tables:
 new_thread:
-.globl switch_to, continue_nonidle_task, __get_user_1, paging_init, trap_init
+.globl switch_to, __get_user_1, paging_init, trap_init
 switch_to:
-continue_nonidle_task:
 __get_user_1:
 paging_init:
 trap_init: 

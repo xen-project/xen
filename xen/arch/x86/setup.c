@@ -328,6 +328,8 @@ void __init start_of_day(void)
 
     sort_exception_tables();
 
+    arch_do_createdomain(current);
+
     /* Tell the PCI layer not to allocate too close to the RAM area.. */
     low_mem_size = ((max_page << PAGE_SHIFT) + 0xfffff) & ~0xfffff;
     if ( low_mem_size > pci_mem_start ) pci_mem_start = low_mem_size;

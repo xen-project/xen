@@ -48,35 +48,16 @@
 #define round_pgup(_p)    (((_p)+(PAGE_SIZE-1))&PAGE_MASK)
 #define round_pgdown(_p)  ((_p)&PAGE_MASK)
 
-int hlt_counter;
-
-void disable_hlt(void)
-{
-    hlt_counter++;
-}
-
-void enable_hlt(void)
-{
-    hlt_counter--;
-}
-
-/*
- * We use this if we don't have any better
- * idle routine..
- */
 static void default_idle(void)
 {
-    if ( hlt_counter == 0 )
-    {
-        __cli();
-        if ( !softirq_pending(smp_processor_id()) )
-            safe_halt();
-        else
-            __sti();
-    }
+    __cli();
+    if ( !softirq_pending(smp_processor_id()) )
+        safe_halt();
+    else
+        __sti();
 }
 
-void continue_cpu_idle_loop(void)
+static void idle_loop(void)
 {
     int cpu = smp_processor_id();
     for ( ; ; )
@@ -102,7 +83,7 @@ void startup_cpu_idle_loop(void)
     smp_mb();
     init_idle();
 
-    continue_cpu_idle_loop();
+    idle_loop();
 }
 
 static long no_idt[2];
@@ -216,20 +197,43 @@ void free_perdomain_pt(struct domain *d)
     free_xenheap_page((unsigned long)d->mm.perdomain_pt);
 }
 
+static void continue_idle_task(struct domain *d)
+{
+    reset_stack_and_jump(idle_loop);
+}
+
+static void continue_nonidle_task(struct domain *d)
+{
+    reset_stack_and_jump(ret_from_intr);
+}
+
 void arch_do_createdomain(struct domain *d)
 {
-    d->shared_info = (void *)alloc_xenheap_page();
-    memset(d->shared_info, 0, PAGE_SIZE);
-    d->shared_info->arch.mfn_to_pfn_start = 
-	virt_to_phys(&machine_to_phys_mapping[0])>>PAGE_SHIFT;
-    SHARE_PFN_WITH_DOMAIN(virt_to_page(d->shared_info), d);
-    machine_to_phys_mapping[virt_to_phys(d->shared_info) >> 
-                           PAGE_SHIFT] = INVALID_P2M_ENTRY;
+#ifdef ARCH_HAS_FAST_TRAP
+    SET_DEFAULT_FAST_TRAP(&d->thread);
+#endif
 
-    d->mm.perdomain_pt = (l1_pgentry_t *)alloc_xenheap_page();
-    memset(d->mm.perdomain_pt, 0, PAGE_SIZE);
-    machine_to_phys_mapping[virt_to_phys(d->mm.perdomain_pt) >> 
-                           PAGE_SHIFT] = INVALID_P2M_ENTRY;
+    if ( d->id == IDLE_DOMAIN_ID )
+    {
+        d->thread.schedule_tail = continue_idle_task;
+    }
+    else
+    {
+        d->thread.schedule_tail = continue_nonidle_task;
+
+        d->shared_info = (void *)alloc_xenheap_page();
+        memset(d->shared_info, 0, PAGE_SIZE);
+        d->shared_info->arch.mfn_to_pfn_start = 
+            virt_to_phys(&machine_to_phys_mapping[0])>>PAGE_SHIFT;
+        SHARE_PFN_WITH_DOMAIN(virt_to_page(d->shared_info), d);
+        machine_to_phys_mapping[virt_to_phys(d->shared_info) >> 
+                               PAGE_SHIFT] = INVALID_P2M_ENTRY;
+
+        d->mm.perdomain_pt = (l1_pgentry_t *)alloc_xenheap_page();
+        memset(d->mm.perdomain_pt, 0, PAGE_SIZE);
+        machine_to_phys_mapping[virt_to_phys(d->mm.perdomain_pt) >> 
+                               PAGE_SHIFT] = INVALID_P2M_ENTRY;
+    }
 }
 
 int arch_final_setup_guestos(struct domain *d, full_execution_context_t *c)
@@ -263,7 +267,6 @@ int arch_final_setup_guestos(struct domain *d, full_execution_context_t *c)
            sizeof(d->thread.traps));
 
 #ifdef ARCH_HAS_FAST_TRAP
-    SET_DEFAULT_FAST_TRAP(&d->thread);
     if ( (rc = (int)set_fast_trap(d, c->fast_trap_idx)) != 0 )
         return rc;
 #endif
@@ -328,9 +331,6 @@ void new_thread(struct domain *d,
 
     __save_flags(ec->eflags);
     ec->eflags |= X86_EFLAGS_IF;
-
-    /* No fast trap at start of day. */
-    SET_DEFAULT_FAST_TRAP(&d->thread);
 }
 
 

@@ -271,13 +271,6 @@ static inline int local_irq_is_enabled(void)
     return !!(flags & (1<<9)); /* EFLAGS_IF */
 }
 
-/*
- * disable hlt during certain critical i/o operations
- */
-#define HAVE_DISABLE_HLT
-void disable_hlt(void);
-void enable_hlt(void);
-
 #define BROKEN_ACPI_Sx		0x0001
 #define BROKEN_INIT_AFTER_S1	0x0002
 
