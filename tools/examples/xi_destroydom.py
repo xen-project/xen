@@ -13,6 +13,6 @@ if len(sys.argv) < 2:
     sys.exit()
 
 if (len(sys.argv) > 2) and re.match( 'force', sys.argv[2] ):
-    xc.domain_destroy( dom=int(sys.argv[1]), force=0 )
-else:
     xc.domain_destroy( dom=int(sys.argv[1]), force=1 )
+else:
+    xc.domain_destroy( dom=int(sys.argv[1]), force=0 )
