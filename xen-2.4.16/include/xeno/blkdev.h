@@ -45,7 +45,6 @@ struct block_device_operations {
 };
 
 
-/*** BUFFER_HEAD stuff: maybe this will die, or live on in reduced form */
 enum bh_state_bits {
         BH_Uptodate,    /* 1 if the buffer contains valid data */
         BH_Dirty,       /* 1 if the buffer is dirty */
@@ -57,10 +56,8 @@ enum bh_state_bits {
         BH_Wait_IO,     /* 1 if we should write out this buffer */
         BH_Launder,     /* 1 if we can throttle on this buffer */
         BH_JBD,         /* 1 if it has an attached journal_head */
-
-        BH_PrivateStart,/* not a state bit, but the first bit available
-                         * for private allocation by other entities
-                         */
+        BH_Read,        /* 1 if request is a read from disc */
+        BH_Write        /* 1 if request is a write to disc */
 };
 
 struct buffer_head {

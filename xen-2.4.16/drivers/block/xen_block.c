@@ -17,7 +17,7 @@
 #include <xeno/keyhandler.h>
 #include <xeno/interrupt.h>
 
-#if 0
+#if 1
 #define DPRINTK(_f, _a...) printk( _f , ## _a )
 #else
 #define DPRINTK(_f, _a...) ((void)0)
@@ -133,6 +133,21 @@ static void maybe_trigger_io_schedule(void)
 
 static void end_block_io_op(struct buffer_head *bh, int uptodate)
 {
+    struct pfn_info *page;
+    unsigned long pfn;
+
+    for ( pfn = virt_to_phys(bh->b_data) >> PAGE_SHIFT; 
+          pfn < ((virt_to_phys(bh->b_data) + bh->b_size + PAGE_SIZE - 1) >> 
+                 PAGE_SHIFT);
+          pfn++ )
+    {
+        page = frame_table + pfn;
+        if ( ((bh->b_state & (1 << BH_Read)) != 0) &&
+             (put_page_type(page) == 0) )
+            page->flags &= ~PG_type_mask;
+        put_page_tot(page);
+    }
+
     atomic_dec(&nr_pending);
     make_response(bh->b_xen_domain, bh->b_xen_id, uptodate ? 0 : 1);
 
@@ -223,22 +238,66 @@ static void dispatch_rw_block_io(struct task_struct *p, int index)
     blk_ring_t *blk_ring = p->blk_ring_base;
     struct buffer_head *bh;
     int operation;
-    
-    /*
-     * check to make sure that the block request seems at least
-     * a bit legitimate
-     */
-    if ( (blk_ring->ring[index].req.block_size & (0x200 - 1)) != 0 )
-	panic("error: dodgy block size: %d\n", 
-              blk_ring->ring[index].req.block_size);
-    
-    if ( blk_ring->ring[index].req.buffer == NULL )
-	panic("xen_block: bogus buffer from guestOS\n"); 
+    unsigned short size;
+    unsigned long buffer, pfn;
+    struct pfn_info *page;
 
-    DPRINTK("req_cons: %d  req_prod %d  index: %d, op: %s\n",
-            p->blk_req_cons, blk_ring->req_prod, index, 
-            (blk_ring->ring[index].req.operation == XEN_BLOCK_READ ? 
-             "read" : "write"));
+    operation = (blk_ring->ring[index].req.operation == XEN_BLOCK_WRITE) ? 
+        WRITE : READ;
+
+    /* Sectors are 512 bytes. Make sure request size is a multiple. */
+    size = blk_ring->ring[index].req.block_size; 
+    if ( (size == 0) || (size & (0x200 - 1)) != 0 )
+    {
+	DPRINTK("dodgy block size: %d\n", 
+                blk_ring->ring[index].req.block_size);
+        goto bad_descriptor;
+    }
+
+    /* Buffer address should be sector aligned. */
+    buffer = (unsigned long)blk_ring->ring[index].req.buffer;
+    if ( (buffer & (0x200 - 1)) != 0 )
+    {
+        DPRINTK("unaligned buffer %08lx\n", buffer);
+        goto bad_descriptor;
+    }
+
+    /* A request may span multiple page frames. Each must be checked. */
+    for ( pfn = buffer >> PAGE_SHIFT; 
+          pfn < ((buffer + size + PAGE_SIZE - 1) >> PAGE_SHIFT);
+          pfn++ )
+    {
+        /* Each frame must be within bounds of machine memory. */
+        if ( pfn >= max_page )
+        {
+            DPRINTK("pfn out of range: %08lx\n", pfn);
+            goto bad_descriptor;
+        }
+
+        page = frame_table + pfn;
+
+        /* Each frame must belong to the requesting domain. */
+        if ( (page->flags & PG_domain_mask) != p->domain )
+        {
+            DPRINTK("bad domain: expected %d, got %ld\n", 
+                    p->domain, page->flags & PG_domain_mask);
+            goto bad_descriptor;
+        }
+
+        /* If reading into the frame, the frame must be writeable. */
+        if ( operation == READ )
+        {
+            if ( (page->flags & PG_type_mask) != PGT_writeable_page )
+            {
+                DPRINTK("non-writeable page passed for block read\n");
+                goto bad_descriptor;
+            }
+            get_page_type(page);
+        }
+
+        /* Xen holds a frame reference until the operation is complete. */
+        get_page_tot(page);
+    }
 
     atomic_inc(&nr_pending);
     bh = kmem_cache_alloc(buffer_head_cachep, GFP_KERNEL);
@@ -248,11 +307,10 @@ static void dispatch_rw_block_io(struct task_struct *p, int index)
     memset (bh, 0, sizeof (struct buffer_head));
     
     bh->b_blocknr       = blk_ring->ring[index].req.block_number;
-    bh->b_size          = blk_ring->ring[index].req.block_size; 
+    bh->b_size          = size;
     bh->b_dev           = blk_ring->ring[index].req.device; 
     bh->b_rsector       = blk_ring->ring[index].req.sector_number;
-    bh->b_data          = phys_to_virt((unsigned long)
-				       blk_ring->ring[index].req.buffer);
+    bh->b_data          = phys_to_virt(buffer);
     bh->b_count.counter = 1;
     bh->b_end_io        = end_block_io_op;
 
@@ -260,20 +318,23 @@ static void dispatch_rw_block_io(struct task_struct *p, int index)
     bh->b_xen_domain    = p;
     bh->b_xen_id        = blk_ring->ring[index].req.id;
 
-    if ( blk_ring->ring[index].req.operation == XEN_BLOCK_WRITE )
+    if ( operation == WRITE )
     {
-	bh->b_state = ((1 << BH_JBD) | (1 << BH_Mapped) | (1 << BH_Req) |
-		       (1 << BH_Dirty) | (1 << BH_Uptodate));
-	operation = WRITE;
+	bh->b_state = (1 << BH_JBD) | (1 << BH_Mapped) | (1 << BH_Req) |
+            (1 << BH_Dirty) | (1 << BH_Uptodate) | (1 << BH_Write);
     } 
     else
     {
-	bh->b_state = (1 << BH_Mapped);
-	operation = READ;
+	bh->b_state = (1 << BH_Mapped) | (1 << BH_Read);
     }
 
     /* Dispatch a single request. We'll flush it to disc later. */
     ll_rw_block(operation, 1, &bh);
+    return;
+
+ bad_descriptor:
+    make_response(p, blk_ring->ring[index].req.id, 1);
+    return;
 }
 
 
