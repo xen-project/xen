@@ -1036,7 +1036,7 @@ struct irq_routing_table * __devinit pcibios_get_irq_routing_table(void)
 	if (ret & 0xff00)
 		printk(KERN_ERR "PCI: Error %02x when fetching IRQ routing table.\n", (ret >> 8) & 0xff);
 	else if (opt.size) {
-		rt = (struct irq_routing_table *)xmalloc(u8[sizeof(struct irq_routing_table) + opt.size]);
+		rt = xmalloc_bytes(sizeof(struct irq_routing_table) + opt.size);
 		if (rt) {
 			memset(rt, 0, sizeof(struct irq_routing_table));
 			rt->size = opt.size + sizeof(struct irq_routing_table);

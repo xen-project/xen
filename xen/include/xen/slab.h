@@ -53,11 +53,17 @@ extern int xmem_cache_reap(void);
 
 extern void dump_slabinfo();
 
-/* Nicely typesafe for you. */
-#define xmalloc(_type) ((typeof(_type) *)_xmalloc(sizeof(_type)))
+/* Allocate space for typed object. */
+#define xmalloc(_type) ((_type *)_xmalloc(sizeof(_type)))
+
+/* Allocate space for array of typed objects. */
 #define xmalloc_array(_type, _num)                 \
 ((_type *)(((_num) > (UINT_MAX / sizeof(_type))) ? \
            NULL : _xmalloc((_num) * sizeof(_type))))
+
+/* Allocate untyped storage. */
+#define xmalloc_bytes(_bytes) (_xmalloc(_bytes))
+
 #endif /* __ARCH_HAS_SLAB_ALLOCATOR */
 
 #endif /* __SLAB_H__ */
