@@ -96,7 +96,7 @@ static void init_interfaces(void)
 static control_channel_t *add_interface(u32 dom, int local_port, 
                                         int remote_port)
 {
-    control_channel_t *cc, *oldcc;
+    control_channel_t *cc=NULL, *oldcc;
     int ret;
     
     if (cc_list[dom_to_port[dom]] != NULL)
