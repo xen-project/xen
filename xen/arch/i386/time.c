@@ -20,19 +20,6 @@
  */
 
 /*
- * Note from KAF: We should probably be more careful about overflow
- * of our timestamp cycle counter value, as we only use 31 bits of
- * precision. This will overflow on a 3GHz processor in less than a second,
- * and the situation is only going to get worse. 
- * 
- * Probably we should use bits N-N+31 of the TSC rather than 0-31, and
- * adjust scale_f and scale_i accordingly. If we're really smart we'd
- * calculate N dynamically, according to the measured CPU speed!
- * 
- * I think the current code limps along okay for now though.
- */
-
-/*
  *  linux/arch/i386/kernel/time.c
  *
  *  Copyright (C) 1991, 1992, 1995  Linus Torvalds
@@ -64,6 +51,9 @@
 
 unsigned long cpu_khz;  /* Detected as we calibrate the TSC */
 unsigned long ticks_per_usec; /* TSC ticks per microsecond. */
+
+/* We use this to prevent overflow of 31-bit RDTSC "diffs". */
+static unsigned int rdtsc_bitshift;
 
 spinlock_t rtc_lock = SPIN_LOCK_UNLOCKED;
 
@@ -288,26 +278,18 @@ s_time_t    stime_now;   /* time in ns at last timer IRQ */
 static inline s_time_t __get_s_time(void)
 {
     s32      delta_tsc;
-    u32      low, pcc;
-    u64      delta;
-    s_time_t now;
-
-    pcc = stime_pcc;        
-    now = stime_now;
-
-    /*
-     * We only use the bottom 32 bits of the TSC. This should be sufficient,
-     * although we take care that TSC on this CPU may be lagging the master TSC
-     * slightly. In this case we clamp the TSC difference to a minimum of zero.
-     */
-    rdtscl(low);
-    delta_tsc = low - pcc;
+    u32      low;
+    u64      delta, tsc;
+    
+    rdtscll(tsc);
+    low = (u32)(tsc >> rdtsc_bitshift);
+    delta_tsc = (s32)(low - stime_pcc);
     if ( unlikely(delta_tsc < 0) ) delta_tsc = 0;
     delta = ((u64)delta_tsc * st_scale_f);
     delta >>= 32;
     delta += ((u64)delta_tsc * st_scale_i);
 
-    return now + delta;
+    return stime_now + delta;
 }
 
 s_time_t get_s_time(void)
@@ -359,11 +341,13 @@ void update_dom_time(shared_info_t *si)
     unsigned long flags;
 
     spin_lock_irqsave(&stime_lock, flags);
-    si->system_time  = stime_now;
-    si->st_timestamp = stime_pcc;
-    si->tv_sec       = wall_clock_time.tv_sec;
-    si->tv_usec      = wall_clock_time.tv_usec;
-    si->wc_timestamp = wctime_st;
+    si->cpu_freq       = cpu_freq;
+    si->rdtsc_bitshift = rdtsc_bitshift;
+    si->system_time    = stime_now;
+    si->st_timestamp   = stime_pcc;
+    si->tv_sec         = wall_clock_time.tv_sec;
+    si->tv_usec        = wall_clock_time.tv_usec;
+    si->wc_timestamp   = wctime_st;
     si->wc_version++;
     spin_unlock_irqrestore(&stime_lock, flags);
 
@@ -420,7 +404,7 @@ static void update_scale(void)
     cpu_freq = cpu_freqs[freq_index];
 
     /* adjust scaling factor */
-    scale = 1000000000LL << 32;
+    scale = 1000000000LL << (32 + rdtsc_bitshift);
     scale /= cpu_freq;
     st_scale_f = scale & 0xffffffff;
     st_scale_i = scale >> 32;
@@ -438,21 +422,15 @@ static void update_time(unsigned long foo)
     unsigned long  flags;
     s_time_t       new_st;
     unsigned long  usec;
-    static int calls_since_scale_update = 0;
+    u64            full_pcc;
+    static int     calls_since_scale_update = 0;
 
     spin_lock_irqsave(&stime_lock, flags);
 
     /* Update system time. */
     stime_now = new_st = __get_s_time();
-    rdtscl(stime_pcc);
-
-    /* Maybe update our rate to be in sync with the RTC. */
-    if ( ++calls_since_scale_update >= 
-         (SCALE_UPDATE_PERIOD/TIME_UPDATE_PERIOD) )
-    {
-        update_scale();
-        calls_since_scale_update = 0;
-    }
+    rdtscll(full_pcc);
+    stime_pcc = (u32)(full_pcc >> rdtsc_bitshift);
 
     /* Update wall clock time. */
     usec = ((unsigned long)(new_st - wctime_st))/1000;
@@ -463,6 +441,14 @@ static void update_time(unsigned long foo)
     }
     wall_clock_time.tv_usec = usec;
     wctime_st = new_st;
+
+    /* Maybe update our rate to be in sync with the RTC. */
+    if ( ++calls_since_scale_update >= 
+         (SCALE_UPDATE_PERIOD/TIME_UPDATE_PERIOD) )
+    {
+        update_scale();
+        calls_since_scale_update = 0;
+    }
 
     spin_unlock_irqrestore(&stime_lock, flags);
 
@@ -486,24 +472,30 @@ int __init init_xeno_time()
     u32      cpu_cycle;  /* time of one cpu cyle in pico-seconds */
     u64      scale;      /* scale factor */
     s64      freq_off;
+    u64      full_pcc;
+    unsigned int cpu_ghz;
 
     spin_lock_init(&stime_lock);
 
-    printk("Init Time[%02d]:\n", cpu);
+    cpu_ghz = (unsigned int)(cpu_freq / 1000000000ULL);
+    for ( rdtsc_bitshift = 0; cpu_ghz != 0; rdtsc_bitshift++, cpu_ghz >>= 1 )
+        continue;
+
+    printk("Init Time[%02d]: %u\n", cpu, rdtsc_bitshift);
 
     /* System Time */
     cpu_cycle   = (u32) (1000000000LL/cpu_khz); /* in pico seconds */
-
-    scale = 1000000000LL << 32;
-    scale /= cpu_freq;
-    st_scale_f = scale & 0xffffffff;
-    st_scale_i = scale >> 32;
 
     /* calculate adjusted frequencies */
     freq_off  = cpu_freq/1000; /* .1%  */
     cpu_freqs[0] = cpu_freq + freq_off;
     cpu_freqs[1] = cpu_freq;
     cpu_freqs[2] = cpu_freq - freq_off;
+
+    scale = 1000000000LL << (32 + rdtsc_bitshift);
+    scale /= cpu_freq;
+    st_scale_f = scale & 0xffffffff;
+    st_scale_i = scale >> 32;
 
     /* Wall Clock time */
     wall_clock_time.tv_sec  = get_cmos_time();
@@ -514,7 +506,8 @@ int __init init_xeno_time()
 
     /* set starting times */
     stime_now = (s_time_t)0;
-    rdtscl(stime_pcc);
+    rdtscll(full_pcc);
+    stime_pcc = (u32)(full_pcc >> rdtsc_bitshift);
     wctime_st = NOW();
 
     /* start timer to update time periodically */

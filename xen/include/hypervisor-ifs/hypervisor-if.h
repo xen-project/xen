@@ -193,20 +193,21 @@ typedef struct shared_info_st {
     /*
      * Time: The following abstractions are exposed: System Time, Clock Time,
      * Domain Virtual Time. Domains can access Cycle counter time directly.
-     * XXX RN: Need something to pass NTP scaling to GuestOS.
+     * 
+     * The following values are updated periodically (and atomically, from the
+     * p.o.v. of the guest OS). Th eguest OS detects this because the wc_version
+     * is incremented.
      */
-
-    u64		  cpu_freq;	    /* to calculate ticks -> real time */
-
+    u32		       wc_version;      /* a version number for info below */
+    unsigned int       rdtsc_bitshift;  /* use bits N:N+31 of TSC          */
+    u64		       cpu_freq;        /* to calculate ticks -> real time */
     /* System Time */
-    long long	       system_time;	/* in ns */
-    unsigned long      st_timestamp;	/* cyclecounter at last update */
-
+    long long	       system_time;     /* in ns */
+    unsigned long      st_timestamp;    /* cyclecounter at last update */
     /* Wall Clock Time */
-    u32		       wc_version;	/* a version number for info below */
-    long	       tv_sec;		/* essentially a struct timeval */
+    long	       tv_sec;          /* essentially a struct timeval */
     long	       tv_usec;
-    long long	       wc_timestamp;	/* system time at last update */
+    long long	       wc_timestamp;    /* system time at last update */
     
     /* Domain Virtual Time */
     unsigned long long domain_time;

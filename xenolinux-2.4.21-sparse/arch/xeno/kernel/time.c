@@ -76,9 +76,9 @@ spinlock_t rtc_lock = SPIN_LOCK_UNLOCKED;
 extern rwlock_t xtime_lock;
 
 unsigned long cpu_khz;	/* get this from Xen, used elsewhere */
-static spinlock_t hyp_stime_lock = SPIN_LOCK_UNLOCKED;
-static spinlock_t hyp_wctime_lock = SPIN_LOCK_UNLOCKED;
+static spinlock_t hyp_time_lock = SPIN_LOCK_UNLOCKED;
 
+static unsigned int rdtsc_bitshift;
 static u32 st_scale_f;
 static u32 st_scale_i;
 static u32 shadow_st_pcc;
@@ -92,37 +92,22 @@ static s64 shadow_st;
  * and use the cycle counter value as the "version" number. Clashes
  * should be very rare.
  */
-static inline long long get_s_time(void)
+static inline s64 __get_s_time(void)
 {
-	unsigned long flags;
-    u32           delta_tsc, low, pcc;
-	u64           delta;
-	s64           now;
+    s32 delta_tsc;
+    u32 low;
+	u64 delta, tsc;
 
-	spin_lock_irqsave(&hyp_stime_lock, flags);
-
-	while ((pcc = HYPERVISOR_shared_info->st_timestamp) != shadow_st_pcc)
-	{
-		barrier();
-		shadow_st_pcc = pcc;
-		shadow_st     = HYPERVISOR_shared_info->system_time;
-		barrier();
-	}
-
-    now = shadow_st;
-    /* only use bottom 32bits of TSC. This should be sufficient */
-	rdtscl(low);
-    delta_tsc = low - pcc;
+    rdtscll(tsc);
+    low = (u32)(tsc >> rdtsc_bitshift);
+    delta_tsc = (s32)(low - shadow_st_pcc);
+    if ( unlikely(delta_tsc < 0) ) delta_tsc = 0;
 	delta = ((u64)delta_tsc * st_scale_f);
 	delta >>= 32;
 	delta += ((u64)delta_tsc * st_scale_i);
 
-	spin_unlock_irqrestore(&hyp_time_lock, flags);
-
-    return now + delta; 
-
+    return shadow_st + delta;
 }
-#define NOW()				((long long)get_s_time())
 
 /*
  * Wallclock time.
@@ -139,21 +124,35 @@ void do_gettimeofday(struct timeval *tv)
 	unsigned long flags;
     long          usec, sec;
 	u32	          version;
-	u64           now;
+	u64           now, cpu_freq, scale;
 
-	spin_lock_irqsave(&hyp_wctime_lock, flags);
+	spin_lock_irqsave(&hyp_time_lock, flags);
 
-	while ((version = HYPERVISOR_shared_info->wc_version)!= shadow_wc_version)
+	while ( (version = HYPERVISOR_shared_info->wc_version) != 
+            shadow_wc_version )
 	{
 		barrier();
+
 		shadow_wc_version   = version;
 		shadow_tv_sec       = HYPERVISOR_shared_info->tv_sec;
 		shadow_tv_usec      = HYPERVISOR_shared_info->tv_usec;
 		shadow_wc_timestamp = HYPERVISOR_shared_info->wc_timestamp;
+		shadow_st_pcc       = HYPERVISOR_shared_info->st_timestamp;
+		shadow_st           = HYPERVISOR_shared_info->system_time;
+
+        rdtsc_bitshift      = HYPERVISOR_shared_info->rdtsc_bitshift;
+        cpu_freq            = HYPERVISOR_shared_info->cpu_freq;
+
+        /* XXX cpu_freq as u32 limits it to 4.29 GHz. Get a better do_div! */
+        scale = 1000000000LL << (32 + rdtsc_bitshift);
+        do_div(scale,(u32)cpu_freq);
+        st_scale_f = scale & 0xffffffff;
+        st_scale_i = scale >> 32;
+
 		barrier();
 	}
 
-	now   = NOW();
+	now   = __get_s_time();
 	usec  = ((unsigned long)(now-shadow_wc_timestamp))/1000;
 	sec   = shadow_tv_sec;
 	usec += shadow_tv_usec;
@@ -242,18 +241,6 @@ static inline void do_timer_interrupt(int irq, void *dev_id,
 	struct timeval tv;
 	long long time, delta;
 	
-#ifdef XENO_TIME_DEBUG
-	static u32 foo_count = 0;
-	foo_count++;		
-	if (foo_count>= 1000) {
-		s64 n = NOW();
-		struct timeval tv;
-		do_gettimeofday(&tv);
-		printk("0x%08X%08X %ld:%ld\n",
-			   (u32)(n>>32), (u32)n, tv.tv_sec, tv.tv_usec);
-		foo_count = 0;
-	}
-#endif
     /*
      * The next bit really sucks:
      * Linux not only uses do_gettimeofday() to keep a notion of
@@ -268,7 +255,7 @@ static inline void do_timer_interrupt(int irq, void *dev_id,
      * updates xtime accordingly. Yuck!
      */
 
-	/* work out the number of jiffies past and update them */
+	/* Work out the number of jiffy intervals passed and update them. */
 	do_gettimeofday(&tv);
 	time = (((long long)tv.tv_sec) * 1000000) + tv.tv_usec;
 	delta = time - last_irq;
@@ -307,23 +294,13 @@ static struct irqaction irq_timer = {
 void __init time_init(void)
 {
     unsigned long long alarm;
-	u64	cpu_freq = HYPERVISOR_shared_info->cpu_freq;
-	u64 scale;
+    u64 __cpu_khz;
 
-	cpu_khz = (u32)cpu_freq/1000;
+    __cpu_khz = HYPERVISOR_shared_info->cpu_freq;
+    do_div(__cpu_khz, 1000);
+    cpu_khz = (u32)__cpu_khz;
 	printk("Xen reported: %lu.%03lu MHz processor.\n", 
 		   cpu_khz / 1000, cpu_khz % 1000);
-
-	/*
-     * calculate systemtime scaling factor
-	 * XXX RN: have to cast cpu_freq to u32 limits it to 4.29 GHz. 
-	 *     Get a better do_div!
-	 */
-	scale = 1000000000LL << 32;
-	do_div(scale,(u32)cpu_freq);
-	st_scale_f = scale & 0xffffffff;
-	st_scale_i = scale >> 32;
-	printk("System Time scale: %X %X\n",st_scale_i, st_scale_f);
 
 	do_gettimeofday(&xtime);
 	last_irq = (((long long)xtime.tv_sec) * 1000000) + xtime.tv_usec;

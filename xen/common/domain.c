@@ -382,7 +382,6 @@ int final_setup_guestos(struct task_struct * p, dom_meminfo_t * meminfo)
 
     /* set up the shared info structure */
     update_dom_time(p->shared_info);
-    p->shared_info->cpu_freq     = cpu_freq;
     p->shared_info->domain_time  = 0;
 
     /* we pass start info struct to guest os as function parameter on stack */
@@ -635,7 +634,6 @@ int setup_guestos(struct task_struct *p, dom0_newdomain_t *params,
 
     /* Set up shared info area. */
     update_dom_time(p->shared_info);
-    p->shared_info->cpu_freq     = cpu_freq;
     p->shared_info->domain_time  = 0;
 
     virt_startinfo_address = (start_info_t *)
