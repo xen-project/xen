@@ -177,6 +177,10 @@
 3eb781fd8oRfPgH7qTh7xvgmwD6NgA tools/internal/xi_start.c
 3eb781fd0Eo9K1jEFCSAVzO51i_ngg tools/internal/xi_stop.c
 3f108ae2to5nHRRXfvUK7oxgjcW_yA tools/internal/xi_usage.c
+3fb01fd5CGkDlZddcIlPxLwrquLqKA tools/internal/xi_vbd_add.c
+3fb01fd5MoGCWdylPicf4UinUjYfDg tools/internal/xi_vbd_create.c
+3fb01fd54I4P44vZDb1CtDt1BytDtA tools/internal/xi_vbd_info.c
+3fb01fd5B-UeibZkmSCOUZckNyNFYA tools/internal/xi_vbd_list.c
 3f86be322bd0h9jG3krZFOUgCDoxZg tools/internal/xi_vif_params.c
 3eb781fd7211MZsLxJSiuy7W4KnJXg tools/internal/xi_vifinit
 3f776bd2Xd-dUcPKlPN2vG89VGtfvQ tools/misc/Makefile
