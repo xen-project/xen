@@ -261,7 +261,7 @@ def make_domain():
             sys.exit()
     else:
 
-        ret = eval('xc.%s_build ( dom=id, image=image, ramdisk=ramdisk, cmdline=cmdline, control_evtchn=xend_response["remote_port"], io_priv=%d )' % (builder_fn, io_priv) )
+        ret = eval('xc.%s_build ( dom=id, image=image, ramdisk=ramdisk, cmdline=cmdline, control_evtchn=cons_response["remote_port"], io_priv=%d )' % (builder_fn, io_priv) )
         if ret < 0:
             print "Error building Linux guest OS: "
             print "Return code = " + str(ret)
