@@ -192,7 +192,7 @@ typedef struct dom0_settime_st
 #define DOM0_READCONSOLE      19
 typedef struct dom0_readconsole_st
 {
-    char *str;
+    unsigned long str;
     unsigned int count;
 } dom0_readconsole_t;
 

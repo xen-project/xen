@@ -7,7 +7,7 @@
 #define CONSOLE_RING_SIZE 16392
 static char *argv0 = "read_console_ring";
 
-static long read_console_ring(char *str, unsigned count)
+static long read_console_ring(unsigned long str, unsigned count)
 {
     int ret;
     dom0_op_t op;
@@ -18,7 +18,7 @@ static long read_console_ring(char *str, unsigned count)
 
     ret = do_dom0_op(&op);
     if (ret > 0) {
-        *(str + ret) = '\0';
+        *((char *)str + ret) = '\0';
     }
 
     return ret;
@@ -36,7 +36,7 @@ int main(int argc, char **argv)
         return 1;
     }
     
-    if ( read_console_ring(str, CONSOLE_RING_SIZE) < 0 ) {
+    if ( read_console_ring((unsigned long)str, CONSOLE_RING_SIZE) < 0 ) {
 	printf("Read console ring error.\n");
 	printf("%s", str);
         return 1;

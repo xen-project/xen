@@ -51,7 +51,7 @@ typedef struct console_ring_st
     unsigned int len;
 } console_ring_t;
 
-console_ring_t console_ring;
+extern console_ring_t console_ring;
 
 void init_console_ring();
-long read_console_ring(char *str, unsigned int count);
+long read_console_ring(unsigned long, unsigned int);

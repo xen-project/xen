@@ -156,7 +156,6 @@ void cmain (unsigned long magic, multiboot_info_t *mbi)
     }
 
     init_serial();
-    init_console_ring();
     init_vga();
     cls();
 

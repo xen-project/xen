@@ -415,7 +415,7 @@ long do_dom0_op(dom0_op_t *u_dom0_op)
     
     case DOM0_READCONSOLE:
     {
-    	extern long read_console_ring(char *, unsigned int);
+    	extern long read_console_ring(unsigned long, unsigned int);
         ret = read_console_ring(op.u.readconsole.str, 
                          	op.u.readconsole.count); 
     }
