@@ -39,7 +39,8 @@ def network(op, script=None, bridge=None, antispoof=None):
 
 def set_vif_name(vif_old, vif_new):
     if vif_old == vif_new:
-        vif = view_new
+        vif = vif_new
+        return vif
     if os.system("ip link show %s" % vif_old) == 0:
         os.system("ip link set %s down" % vif_old)
         os.system("ip link set %s name %s" % (vif_old, vif_new))
