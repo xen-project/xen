@@ -420,13 +420,13 @@ static ide_startstop_t chs_rw_disk (ide_drive_t *drive, struct request *rq, unsi
 	taskfile.device_head	|= drive->select.all;
 	taskfile.command	= command;
 
-	/* #ifdef DEBUG */
+#ifdef DEBUG
 	printk("%s: %sing: ", drive->name, (rq->cmd==READ) ? "read" : "writ");
 	if (lba)	printk("LBAsect=%lld, ", block);
 	else		printk("CHS=%d/%d/%d, ", cyl, head, sect);
 	printk("sectors=%ld, ", rq->nr_sectors);
 	printk("buffer=0x%08lx\n", (unsigned long) rq->buffer);
-	/* #endif*/
+#endif
 
 	memcpy(args.tfRegister, &taskfile, sizeof(struct hd_drive_task_hdr));
 	memcpy(args.hobRegister, &hobfile, sizeof(struct hd_drive_hob_hdr));
@@ -578,8 +578,7 @@ static ide_startstop_t do_rw_disk (ide_drive_t *drive, struct request *rq, unsig
 			tasklets[9] = (task_ioreg_t) 0;
 //			tasklets[8] = (task_ioreg_t) (block>>32);
 //			tasklets[9] = (task_ioreg_t) (block>>40);
-			/*#ifdef DEBUG */
-			printk("[A]\n");
+#ifdef DEBUG
 			printk("%s: %sing: LBAsect=%lu, sectors=%ld, buffer=0x%08lx, LBAsect=0x%012lx\n",
 				drive->name,
 				(rq->cmd==READ)?"read":"writ",
@@ -591,7 +590,7 @@ static ide_startstop_t do_rw_disk (ide_drive_t *drive, struct request *rq, unsig
 				drive->name, tasklets[3], tasklets[2],
 				tasklets[9], tasklets[8], tasklets[7],
 				tasklets[6], tasklets[5], tasklets[4]);
-			/* #endif */
+#endif
 			OUT_BYTE(tasklets[1], IDE_FEATURE_REG);
 			OUT_BYTE(tasklets[3], IDE_NSECTOR_REG);
 			OUT_BYTE(tasklets[7], IDE_SECTOR_REG);
@@ -1321,10 +1320,6 @@ static void idedisk_setup (ide_drive_t *drive)
 	
 	struct hd_driveid *id = drive->id;
 	unsigned long capacity;
-
-	printk (KERN_ALERT
-		"ide-disk.c::idedisk_setup: chs %d %d %d\n",
-		drive->cyl, drive->head, drive->sect);
 	
 	idedisk_add_settings(drive);
 
@@ -1388,7 +1383,7 @@ static void idedisk_setup (ide_drive_t *drive)
 	if ((capacity >= (drive->bios_cyl * drive->bios_sect * drive->bios_head)) &&
 	    (!drive->forced_geom) && drive->bios_sect && drive->bios_head)
 		drive->bios_cyl = (capacity / drive->bios_sect) / drive->bios_head;
-	printk (KERN_INFO "[XEN] %s: %ld sectors", drive->name, capacity);
+	printk (KERN_INFO "XEN %s: %ld sectors", drive->name, capacity);
 
 	/* Give size in megabytes (MB), not mebibytes (MiB). */
 	/* We compute the exact rounded value, avoiding overflow. */

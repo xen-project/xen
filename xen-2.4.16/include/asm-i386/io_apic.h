@@ -15,7 +15,8 @@
 #define APIC_MISMATCH_DEBUG
 
 #define IO_APIC_BASE(idx) \
-		((volatile int *)__fix_to_virt(FIX_IO_APIC_BASE_0 + idx))
+		((volatile int *)(__fix_to_virt(FIX_IO_APIC_BASE_0 + idx) \
+		+ (mp_ioapics[idx].mpc_apicaddr & ~PAGE_MASK)))
 
 /*
  * The structure of the IO-APIC:
@@ -96,7 +97,7 @@ extern struct mpc_config_ioapic mp_ioapics[MAX_IO_APICS];
 extern int mp_irq_entries;
 
 /* MP IRQ source entries */
-extern struct mpc_config_intsrc mp_irqs[MAX_IRQ_SOURCES];
+extern struct mpc_config_intsrc *mp_irqs;
 
 /* non-0 if default (table-less) MP configuration */
 extern int mpc_default_type;
@@ -132,8 +133,7 @@ static inline void io_apic_sync(unsigned int apic)
 }
 
 /* 1 if "noapic" boot option passed */
-//extern int skip_ioapic_setup;
-#define skip_ioapic_setup 0
+extern int skip_ioapic_setup;
 
 /*
  * If we use the IO-APIC for IRQ routing, disable automatic

@@ -171,6 +171,8 @@ ide_startstop_t do_rw_taskfile (ide_drive_t *drive, ide_task_t *task)
 	struct hd_driveid *id = drive->id;
 	byte HIHI = (drive->addressing) ? 0xE0 : 0xEF;
 
+	printk(KERN_ALERT "do_rw_taskfile\n");
+
 	/* (ks/hs): Moved to start, do not use for multiple out commands */
 	if (task->handler != task_mulout_intr) {
 		if (IDE_CONTROL_REG)

@@ -358,16 +358,22 @@ struct thread_struct {
     trap_info_t         traps[256];
 };
 
+#define IDT_ENTRIES 256
+extern struct desc_struct idt_table[];
+extern struct desc_struct *idt_tables[];
+
 #define SET_DEFAULT_FAST_TRAP(_p) \
     (_p)->fast_trap_idx = 0x20;   \
     (_p)->fast_trap_desc.a = 0;   \
     (_p)->fast_trap_desc.b = 0;
 
 #define CLEAR_FAST_TRAP(_p) \
-    (memset(idt_table + (_p)->fast_trap_idx, 0, 8))
+    (memset(idt_tables[smp_processor_id()] + (_p)->fast_trap_idx, \
+     0, 8))
 
 #define SET_FAST_TRAP(_p)   \
-    (memcpy(idt_table + (_p)->fast_trap_idx, &((_p)->fast_trap_desc), 8))
+    (memcpy(idt_tables[smp_processor_id()] + (_p)->fast_trap_idx, \
+     &((_p)->fast_trap_desc), 8))
 
 #define INIT_THREAD  {						\
 	sizeof(idle0_stack) + (long) &idle0_stack, /* esp0 */   \

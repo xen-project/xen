@@ -395,6 +395,10 @@ int cpucount;
  */
 int __init start_secondary(void *unused)
 {
+    unsigned int cpu = smp_processor_id();
+    /* 6 bytes suitable for passing to LIDT instruction. */
+    unsigned char idt_load[6];
+
     extern void cpu_init(void);
 
     /*
@@ -407,6 +411,16 @@ int __init start_secondary(void *unused)
 
     while (!atomic_read(&smp_commenced))
         rep_nop();
+
+    /*
+     * At this point, boot CPU has fully initialised the IDT. It is
+     * now safe to make ourselves a private copy.
+     */
+    idt_tables[cpu] = kmalloc(IDT_ENTRIES*8, GFP_KERNEL);
+    memcpy(idt_tables[cpu], idt_table, IDT_ENTRIES*8);
+    *(unsigned short *)(&idt_load[0]) = (IDT_ENTRIES*8)-1;
+    *(unsigned long  *)(&idt_load[2]) = (unsigned long)idt_tables[cpu];
+    __asm__ __volatile__ ( "lidt %0" : "=m" (idt_load) );
 
     /*
      * low-memory mappings have been cleared, flush them from the local TLBs 

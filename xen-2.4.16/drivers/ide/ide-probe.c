@@ -51,10 +51,17 @@
 #include <asm/uaccess.h>
 #include <asm/io.h>
 
+#define IDE_PROBE_TRACE 0
+
 static inline void do_identify (ide_drive_t *drive, byte cmd)
 {
 	int bswap = 1;
 	struct hd_driveid *id;
+
+	if (IDE_PROBE_TRACE)
+	{
+	  printk (KERN_ALERT "ide-probe::do_identify\n");
+	}
 
 	id = drive->id = kmalloc (SECTOR_WORDS*4, GFP_ATOMIC);	/* called with interrupts disabled! */
 	if (!id) {
@@ -201,6 +208,11 @@ static int actual_try_to_identify (ide_drive_t *drive, byte cmd)
 	unsigned long timeout;
 	byte s, a;
 
+	if (IDE_PROBE_TRACE)
+	{
+	  printk (KERN_ALERT "ide-probe::actual_try_to_identify\n");
+	}
+
 	if (IDE_CONTROL_REG) {
 		/* take a deep breath */
 		ide_delay_50ms();
@@ -260,6 +272,11 @@ static int try_to_identify (ide_drive_t *drive, byte cmd)
 	int autoprobe = 0;
 	unsigned long cookie = 0;
 
+	if (IDE_PROBE_TRACE)
+	{
+	  printk (KERN_ALERT "ide-probe::try_to_identify\n");
+	}
+
 	if (IDE_CONTROL_REG && !HWIF(drive)->irq) {
 		autoprobe = 1;
 		cookie = probe_irq_on();
@@ -314,6 +331,12 @@ static int do_probe (ide_drive_t *drive, byte cmd)
 {
 	int rc;
 	ide_hwif_t *hwif = HWIF(drive);
+
+	if (IDE_PROBE_TRACE)
+	{
+	  printk (KERN_ALERT "ide-probe::do_probe\n");
+	}
+
 	if (drive->present) {	/* avoid waiting for inappropriate probes */
 		if ((drive->media != ide_disk) && (cmd == WIN_IDENTIFY))
 			return 4;
@@ -372,6 +395,11 @@ static void enable_nest (ide_drive_t *drive)
 {
 	unsigned long timeout;
 
+	if (IDE_PROBE_TRACE)
+	{
+	  printk (KERN_ALERT "ide-probe::enable_nest\n");
+	}
+
 	printk("%s: enabling %s -- ", HWIF(drive)->name, drive->id->model);
 	SELECT_DRIVE(HWIF(drive), drive);
 	ide_delay_50ms();
@@ -402,6 +430,11 @@ static void enable_nest (ide_drive_t *drive)
  */
 static inline byte probe_for_drive (ide_drive_t *drive)
 {
+  if (IDE_PROBE_TRACE)
+  {
+    printk (KERN_ALERT "ide-probe::probe_for_drive\n");
+  }
+
 	if (drive->noprobe)			/* skip probing? */
 		return drive->present;
 	if (do_probe(drive, WIN_IDENTIFY) >= 2) { /* if !(success||timed-out) */
@@ -499,6 +532,11 @@ static void probe_hwif (ide_hwif_t *hwif)
 {
 	unsigned int unit;
 	unsigned long flags;
+
+  if (IDE_PROBE_TRACE)
+  {
+    printk (KERN_ALERT "ide-probe::probe_hwif\n");
+  }
 
 	if (hwif->noprobe)
 		return;
@@ -978,6 +1016,11 @@ int ideprobe_init (void)
 {
 	unsigned int index;
 	int probe[MAX_HWIFS];
+
+  if (IDE_PROBE_TRACE)
+  {
+    printk (KERN_ALERT "ide-probe::ideprobe_init\n");
+  }
 	
 	MOD_INC_USE_COUNT;
 	memset(probe, 0, MAX_HWIFS * sizeof(int));

@@ -85,10 +85,11 @@ typedef struct
 #define __HYPERVISOR_exit                  8
 #define __HYPERVISOR_dom0_op               9
 #define __HYPERVISOR_network_op           10
-#define __HYPERVISOR_set_debugreg         11
-#define __HYPERVISOR_get_debugreg         12
-#define __HYPERVISOR_update_descriptor    13
-#define __HYPERVISOR_set_fast_trap        14
+#define __HYPERVISOR_block_io_op          11
+#define __HYPERVISOR_set_debugreg         12
+#define __HYPERVISOR_get_debugreg         13
+#define __HYPERVISOR_update_descriptor    14
+#define __HYPERVISOR_set_fast_trap        15
 
 #define TRAP_INSTR "int $0x82"
 

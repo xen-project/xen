@@ -28,10 +28,22 @@
 #include <xeno/config.h>
 #include <asm/mc146818rtc.h>
 #include <asm/io.h>
-#include <asm/desc.h>
 #include <asm/smp.h>
+#include <asm/desc.h>
+#include <asm/smpboot.h>
+
+
+static unsigned int nmi_watchdog;  /* XXXX XEN */
+
+#undef APIC_LOCKUP_DEBUG
+
+#define APIC_LOCKUP_DEBUG
 
 static spinlock_t ioapic_lock = SPIN_LOCK_UNLOCKED;
+
+unsigned int int_dest_addr_mode = APIC_DEST_LOGICAL;
+unsigned char int_delivery_mode = dest_LowestPrio;
+
 
 /*
  * # of IRQ routing registers
@@ -47,6 +59,7 @@ int nr_ioapic_registers[MAX_IO_APICS];
 
 /*
  * This is performance-critical, we want to do it O(1)
+ *
  * the indexing order of this array favors 1:1 mappings
  * between pins and IRQs.
  */
@@ -60,7 +73,7 @@ static struct irq_pin_list {
  * shared ISA-space IRQs, so we have to support them. We are super
  * fast in the common case, and fast for shared ISA-space IRQs.
  */
-static void add_pin_to_irq(unsigned int irq, int apic, int pin)
+static void __init add_pin_to_irq(unsigned int irq, int apic, int pin)
 {
 	static int first_free_entry = NR_IRQS;
 	struct irq_pin_list *entry = irq_2_pin + irq;
@@ -76,6 +89,26 @@ static void add_pin_to_irq(unsigned int irq, int apic, int pin)
 	}
 	entry->apic = apic;
 	entry->pin = pin;
+}
+
+/*
+ * Reroute an IRQ to a different pin.
+ */
+static void __init replace_pin_at_irq(unsigned int irq,
+				      int oldapic, int oldpin,
+				      int newapic, int newpin)
+{
+	struct irq_pin_list *entry = irq_2_pin + irq;
+
+	while (1) {
+		if (entry->apic == oldapic && entry->pin == oldpin) {
+			entry->apic = newapic;
+			entry->pin = newpin;
+		}
+		if (!entry->next)
+			break;
+		entry = irq_2_pin + entry->next;
+	}
 }
 
 #define __DO_ACTION(R, ACTION, FINAL)					\
@@ -157,6 +190,66 @@ static void clear_IO_APIC (void)
 }
 
 /*
+ * support for broken MP BIOSs, enables hand-redirection of PIRQ0-7 to
+ * specific CPU-side IRQs.
+ */
+
+#define MAX_PIRQS 8
+int pirq_entries [MAX_PIRQS];
+int pirqs_enabled;
+
+int skip_ioapic_setup;
+#if 0
+
+static int __init noioapic_setup(char *str)
+{
+	skip_ioapic_setup = 1;
+	return 1;
+}
+
+__setup("noapic", noioapic_setup);
+
+static int __init ioapic_setup(char *str)
+{
+	skip_ioapic_setup = 0;
+	return 1;
+}
+
+__setup("apic", ioapic_setup);
+
+
+
+static int __init ioapic_pirq_setup(char *str)
+{
+	int i, max;
+	int ints[MAX_PIRQS+1];
+
+	get_options(str, ARRAY_SIZE(ints), ints);
+
+	for (i = 0; i < MAX_PIRQS; i++)
+		pirq_entries[i] = -1;
+
+	pirqs_enabled = 1;
+	printk(KERN_INFO "PIRQ redirection, working around broken MP-BIOS.\n");
+	max = MAX_PIRQS;
+	if (ints[0] < MAX_PIRQS)
+		max = ints[0];
+
+	for (i = 0; i < max; i++) {
+		printk(KERN_DEBUG "... PIRQ%d -> IRQ %d\n", i, ints[i+1]);
+		/*
+		 * PIRQs are mapped upside down, usually.
+		 */
+		pirq_entries[MAX_PIRQS-i-1] = ints[i+1];
+	}
+	return 1;
+}
+
+__setup("pirq=", ioapic_pirq_setup);
+
+#endif
+
+/*
  * Find the IRQ entry number of a certain pin.
  */
 static int __init find_irq_entry(int apic, int pin, int type)
@@ -206,7 +299,7 @@ int IO_APIC_get_PCI_irq_vector(int bus, int slot, int pin)
 
 	Dprintk("querying PCI -> IRQ mapping bus:%d, slot:%d, pin:%d.\n",
 		bus, slot, pin);
-	if (mp_bus_id_to_pci_bus[bus] == -1) {
+	if ((mp_bus_id_to_pci_bus==NULL) || (mp_bus_id_to_pci_bus[bus] == -1)) {
 		printk(KERN_WARNING "PCI BIOS passed nonexistent PCI bus %d!\n", bus);
 		return -1;
 	}
@@ -466,6 +559,20 @@ static int pin_2_irq(int idx, int apic, int pin)
 		}
 	}
 
+	/*
+	 * PCI IRQ command line redirection. Yes, limits are hardcoded.
+	 */
+	if ((pin >= 16) && (pin <= 23)) {
+		if (pirq_entries[pin-16] != -1) {
+			if (!pirq_entries[pin-16]) {
+				printk(KERN_DEBUG "disabling PIRQ%d\n", pin-16);
+			} else {
+				irq = pirq_entries[pin-16];
+				printk(KERN_DEBUG "using PIRQ%d -> IRQ %d\n",
+						pin-16, irq);
+			}
+		}
+	}
 	return irq;
 }
 
@@ -495,10 +602,16 @@ static int __init assign_irq_vector(int irq)
 		return IO_APIC_VECTOR(irq);
 next:
 	current_vector += 8;
+
         /* XXX Skip the guestOS -> Xen syscall vector! XXX */
 	if (current_vector == HYPERVISOR_CALL_VECTOR) goto next;
         /* XXX Skip the Linux/BSD fast-trap vector! XXX */
         if (current_vector == 0x80) goto next;
+
+#if 0
+	if (current_vector == SYSCALL_VECTOR)
+		goto next;
+#endif
 
 	if (current_vector > FIRST_SYSTEM_VECTOR) {
 		offset++;
@@ -532,10 +645,10 @@ void __init setup_IO_APIC_irqs(void)
 		 */
 		memset(&entry,0,sizeof(entry));
 
-		entry.delivery_mode = dest_LowestPrio;
-		entry.dest_mode = INT_DELIVERY_MODE;
+		entry.delivery_mode = INT_DELIVERY_MODE;
+		entry.dest_mode = (INT_DEST_ADDR_MODE != 0);
 		entry.mask = 0;				/* enable IRQ */
-		entry.dest.logical.logical_dest = TARGET_CPUS;
+		entry.dest.logical.logical_dest = target_cpus();
 
 		idx = find_irq_entry(apic,pin,mp_INT);
 		if (idx == -1) {
@@ -553,11 +666,18 @@ void __init setup_IO_APIC_irqs(void)
 		if (irq_trigger(idx)) {
 			entry.trigger = 1;
 			entry.mask = 1;
-			entry.dest.logical.logical_dest = TARGET_CPUS;
 		}
 
 		irq = pin_2_irq(idx, apic, pin);
-		add_pin_to_irq(irq, apic, pin);
+		/*
+		 * skip adding the timer int on secondary nodes, which causes
+		 * a small but painful rift in the time-space continuum
+		 */
+		if ((clustered_apic_mode == CLUSTERED_APIC_NUMAQ) 
+			&& (apic != 0) && (irq == 0))
+			continue;
+		else
+			add_pin_to_irq(irq, apic, pin);
 
 		if (!apic && !IO_APIC_IRQ(irq))
 			continue;
@@ -607,16 +727,16 @@ void __init setup_ExtINT_IRQ0_pin(unsigned int pin, int vector)
 	 * We use logical delivery to get the timer IRQ
 	 * to the first CPU.
 	 */
-	entry.dest_mode = INT_DELIVERY_MODE;
+	entry.dest_mode = (INT_DEST_ADDR_MODE != 0);
 	entry.mask = 0;					/* unmask IRQ now */
-	entry.dest.logical.logical_dest = TARGET_CPUS;
-	entry.delivery_mode = dest_LowestPrio;
+	entry.dest.logical.logical_dest = target_cpus();
+	entry.delivery_mode = INT_DELIVERY_MODE;
 	entry.polarity = 0;
 	entry.trigger = 0;
 	entry.vector = vector;
 
 	/*
-	 * The timer IRQ doesnt have to know that behind the
+	 * The timer IRQ doesn't have to know that behind the
 	 * scene we have a 8259A-master in AEOI mode ...
 	 */
 	irq_desc[0].handler = &ioapic_edge_irq_type;
@@ -634,8 +754,9 @@ void __init setup_ExtINT_IRQ0_pin(unsigned int pin, int vector)
 
 void __init UNEXPECTED_IO_APIC(void)
 {
-	printk(KERN_WARNING " WARNING: unexpected IO-APIC, please mail\n");
-	printk(KERN_WARNING "          to linux-smp@vger.kernel.org\n");
+	printk(KERN_WARNING 
+		"An unexpected IO-APIC was found. If this kernel release is less than\n"
+		"three months old please report this to linux-smp@vger.kernel.org\n");
 }
 
 void __init print_IO_APIC(void)
@@ -667,7 +788,7 @@ void __init print_IO_APIC(void)
 	spin_unlock_irqrestore(&ioapic_lock, flags);
 
 	printk("\n");
-	printk(KERN_DEBUG "IO APIC #%d......\n", mp_ioapics[apic].mpc_apicid);
+	printk(KERN_DEBUG "IO APIC #%d..XXXX....\n", mp_ioapics[apic].mpc_apicid);
 	printk(KERN_DEBUG ".... register #00: %08X\n", *(int *)&reg_00);
 	printk(KERN_DEBUG ".......    : physical APIC id: %02X\n", reg_00.ID);
 	if (reg_00.__reserved_1 || reg_00.__reserved_2)
@@ -688,6 +809,7 @@ void __init print_IO_APIC(void)
 	printk(KERN_DEBUG ".......     : PRQ implemented: %X\n", reg_01.PRQ);
 	printk(KERN_DEBUG ".......     : IO APIC version: %04X\n", reg_01.version);
 	if (	(reg_01.version != 0x01) && /* 82489DX IO-APICs */
+		(reg_01.version != 0x02) && /* VIA */
 		(reg_01.version != 0x10) && /* oldest IO-APICs */
 		(reg_01.version != 0x11) && /* Pentium/Pro IO-APICs */
 		(reg_01.version != 0x13) && /* Xeon IO-APICs */
@@ -898,6 +1020,9 @@ static void __init enable_IO_APIC(void)
 		irq_2_pin[i].pin = -1;
 		irq_2_pin[i].next = 0;
 	}
+	if (!pirqs_enabled)
+		for (i = 0; i < MAX_PIRQS; i++)
+			pirq_entries[i] = -1;
 
 	/*
 	 * The number of IO-APIC IRQ registers (== #pins):
@@ -944,6 +1069,9 @@ static void __init setup_ioapic_ids_from_mpc (void)
 	unsigned char old_id;
 	unsigned long flags;
 
+	if (clustered_apic_mode)
+		/* We don't have a good way to do this yet - hack */
+		phys_id_present_map = (u_long) 0xf;
 	/*
 	 * Set the IOAPIC ID to the value stored in the MPC table.
 	 */
@@ -956,7 +1084,7 @@ static void __init setup_ioapic_ids_from_mpc (void)
 		
 		old_id = mp_ioapics[apic].mpc_apicid;
 
-		if (mp_ioapics[apic].mpc_apicid >= 0xf) {
+		if (mp_ioapics[apic].mpc_apicid >= apic_broadcast_id) {
 			printk(KERN_ERR "BIOS bug, IO-APIC#%d ID is %d in the MPC table!...\n",
 				apic, mp_ioapics[apic].mpc_apicid);
 			printk(KERN_ERR "... fixing up to %d. (tell your hw vendor)\n",
@@ -968,14 +1096,16 @@ static void __init setup_ioapic_ids_from_mpc (void)
 		 * Sanity check, is the ID really free? Every APIC in a
 		 * system must have a unique ID or we get lots of nice
 		 * 'stuck on smp_invalidate_needed IPI wait' messages.
+		 * I/O APIC IDs no longer have any meaning for xAPICs and SAPICs.
 		 */
-		if (phys_id_present_map & (1 << mp_ioapics[apic].mpc_apicid)) {
+		if ((clustered_apic_mode != CLUSTERED_APIC_XAPIC) &&
+		    (phys_id_present_map & (1 << mp_ioapics[apic].mpc_apicid))) {
 			printk(KERN_ERR "BIOS bug, IO-APIC#%d ID %d is already used!...\n",
 				apic, mp_ioapics[apic].mpc_apicid);
 			for (i = 0; i < 0xf; i++)
 				if (!(phys_id_present_map & (1 << i)))
 					break;
-			if (i >= 0xf)
+			if (i >= apic_broadcast_id)
 				panic("Max APIC ID exceeded!\n");
 			printk(KERN_ERR "... fixing up to %d. (tell your hw vendor)\n",
 				i);
@@ -1170,6 +1300,10 @@ static void end_level_ioapic_irq (unsigned int irq)
 #ifdef APIC_LOCKUP_DEBUG
 		struct irq_pin_list *entry;
 #endif
+
+#ifdef APIC_MISMATCH_DEBUG
+		atomic_inc(&irq_mis_count);
+#endif
 		spin_lock(&ioapic_lock);
 		__mask_and_edge_IO_APIC_irq(irq);
 #ifdef APIC_LOCKUP_DEBUG
@@ -1302,6 +1436,36 @@ static struct hw_interrupt_type lapic_irq_type = {
 	end_lapic_irq
 };
 
+static void enable_NMI_through_LVT0 (void * dummy)
+{
+	unsigned int v, ver;
+
+	ver = apic_read(APIC_LVR);
+	ver = GET_APIC_VERSION(ver);
+	v = APIC_DM_NMI;			/* unmask and set to NMI */
+	if (!APIC_INTEGRATED(ver))		/* 82489DX */
+		v |= APIC_LVT_LEVEL_TRIGGER;
+	apic_write_around(APIC_LVT0, v);
+}
+
+static void setup_nmi (void)
+{
+	/*
+ 	 * Dirty trick to enable the NMI watchdog ...
+	 * We put the 8259A master into AEOI mode and
+	 * unmask on all local APICs LVT0 as NMI.
+	 *
+	 * The idea to use the 8259A in AEOI mode ('8259A Virtual Wire')
+	 * is from Maciej W. Rozycki - so we do not have to EOI from
+	 * the NMI handler or the timer interrupt.
+	 */ 
+	printk(KERN_INFO "activating NMI Watchdog ...");
+
+	smp_call_function(enable_NMI_through_LVT0, NULL, 1, 1);
+	enable_NMI_through_LVT0(NULL);
+
+	printk(" done.\n");
+}
 
 /*
  * This looks a bit hackish but it's about the only one way of sending
@@ -1407,6 +1571,12 @@ static inline void check_timer(void)
 		 */
 		unmask_IO_APIC_irq(0);
 		if (timer_irq_works()) {
+			if (nmi_watchdog == NMI_IO_APIC) {
+				disable_8259A_irq(0);
+				setup_nmi();
+				enable_8259A_irq(0);
+				// XXX Xen check_nmi_watchdog();
+			}
 			return;
 		}
 		clear_IO_APIC_pin(0, pin1);
@@ -1422,6 +1592,14 @@ static inline void check_timer(void)
 		setup_ExtINT_IRQ0_pin(pin2, vector);
 		if (timer_irq_works()) {
 			printk("works.\n");
+			if (pin1 != -1)
+				replace_pin_at_irq(0, 0, pin1, 0, pin2);
+			else
+				add_pin_to_irq(0, 0, pin2);
+			if (nmi_watchdog == NMI_IO_APIC) {
+				setup_nmi();
+				// XXX Xen check_nmi_watchdog();
+			}
 			return;
 		}
 		/*
@@ -1430,6 +1608,11 @@ static inline void check_timer(void)
 		clear_IO_APIC_pin(0, pin2);
 	}
 	printk(" failed.\n");
+
+	if (nmi_watchdog) {
+		printk(KERN_WARNING "timer doesn't work through the IO-APIC - disabling NMI Watchdog!\n");
+		nmi_watchdog = 0;
+	}
 
 	printk(KERN_INFO "...trying to set up timer as Virtual Wire IRQ...");
 
@@ -1462,10 +1645,19 @@ static inline void check_timer(void)
 }
 
 /*
+ *
  * IRQ's that are handled by the old PIC in all cases:
  * - IRQ2 is the cascade IRQ, and cannot be a io-apic IRQ.
  *   Linux doesn't really care, as it's not actually used
  *   for any interrupt handling anyway.
+ * - There used to be IRQ13 here as well, but all
+ *   MPS-compliant must not use it for FPU coupling and we
+ *   want to use exception 16 anyway.  And there are
+ *   systems who connect it to an I/O APIC for other uses.
+ *   Thus we don't mark it special any longer.
+ *
+ * Additionally, something is definitely wrong with irq9
+ * on PIIX4 boards.
  */
 #define PIC_IRQS	(1<<2)
 

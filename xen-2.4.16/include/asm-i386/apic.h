@@ -1,9 +1,12 @@
 #ifndef __ASM_APIC_H
 #define __ASM_APIC_H
 
-#include <asm/system.h>
-#include <asm/ptrace.h>
+//#include <linux/config.h>
+//#include <linux/pm.h>
 #include <asm/apicdef.h>
+#include <asm/system.h>
+
+#ifdef CONFIG_X86_LOCAL_APIC
 
 #define APIC_DEBUG 0
 
@@ -37,9 +40,15 @@ static __inline__ void apic_wait_icr_idle(void)
 	do { } while ( apic_read( APIC_ICR ) & APIC_ICR_BUSY );
 }
 
-#define FORCE_READ_AROUND_WRITE 0
-#define apic_read_around(x)
-#define apic_write_around(x,y) apic_write((x),(y))
+#ifdef CONFIG_X86_GOOD_APIC
+# define FORCE_READ_AROUND_WRITE 0
+# define apic_read_around(x)
+# define apic_write_around(x,y) apic_write((x),(y))
+#else
+# define FORCE_READ_AROUND_WRITE 1
+# define apic_read_around(x) apic_read(x)
+# define apic_write_around(x,y) apic_write_atomic((x),(y))
+#endif
 
 static inline void ack_APIC_irq(void)
 {
@@ -64,8 +73,24 @@ extern void init_bsp_APIC (void);
 extern void setup_local_APIC (void);
 extern void init_apic_mappings (void);
 extern void setup_APIC_clocks (void);
+extern void setup_apic_nmi_watchdog (void);
+extern inline void nmi_watchdog_tick (struct pt_regs * regs);
 extern int APIC_init_uniprocessor (void);
+extern void disable_APIC_timer(void);
+extern void enable_APIC_timer(void);
+
+//extern struct pm_dev *apic_pm_register(pm_dev_t, unsigned long, pm_callback);
+//extern void apic_pm_unregister(struct pm_dev*);
 
 extern unsigned int apic_timer_irqs [NR_CPUS];
+extern int check_nmi_watchdog (void);
+
+extern unsigned int nmi_watchdog;
+#define NMI_NONE	0
+#define NMI_IO_APIC	1
+#define NMI_LOCAL_APIC	2
+#define NMI_INVALID	3
+
+#endif /* CONFIG_X86_LOCAL_APIC */
 
 #endif /* __ASM_APIC_H */
