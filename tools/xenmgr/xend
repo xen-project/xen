@@ -29,6 +29,8 @@ def main():
         return status >> 8
     elif sys.argv[1] == 'start':
         return daemon.start()
+    elif sys.argv[1] == 'trace_start':
+        return daemon.start(trace=1)
     elif sys.argv[1] == 'stop':
         return daemon.stop()
     elif sys.argv[1] == 'restart':

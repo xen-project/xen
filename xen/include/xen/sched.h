@@ -279,7 +279,6 @@ static inline void domain_unpause(struct domain *d)
 
 static inline void domain_unblock(struct domain *d)
 {
-    ASSERT(d != current);
     if ( test_and_clear_bit(DF_BLOCKED, &d->flags) )
         domain_wake(d);
 }
@@ -293,7 +292,6 @@ static inline void domain_pause_by_systemcontroller(struct domain *d)
 
 static inline void domain_unpause_by_systemcontroller(struct domain *d)
 {
-    ASSERT(d != current);
     if ( test_and_clear_bit(DF_CTRLPAUSE, &d->flags) )
         domain_wake(d);
 }

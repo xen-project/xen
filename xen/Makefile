@@ -24,7 +24,7 @@ install: $(TARGET)
 	install -m0644 $(TARGET)-syms $(prefix)/boot
 
 dist: $(TARGET)
-	$(MAKE) prefix=`pwd`/../../install dist=yes install
+	$(MAKE) prefix=`pwd`/../install dist=yes install
 
 clean: delete-links
 	$(MAKE) -C tools clean

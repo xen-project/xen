@@ -364,6 +364,7 @@ class XendDomainInfo:
         """Update with  info from xc.domain_getinfo().
         """
         self.info = info
+        self.memory = self.info['mem_kb'] / 1024
 
     def __str__(self):
         s = "domain"

@@ -1,5 +1,8 @@
 from twisted.internet import defer
 
+from xenmgr import sxp
+from xenmgr import PrettyPrint
+
 import channel
 import controller
 from messages import *
@@ -140,11 +143,12 @@ class BlkDev(controller.Dev):
         return 'w' not in self.mode
 
     def sxpr(self):
-        print 'BlkDev>sxpr>', vars(self)
-        val = ['blkif', ['vdev', self.vdev], ['mode', self.mode] ]
+        val = ['blkdev', ['vdev', self.vdev], ['mode', self.mode] ]
         return val
 
     def destroy(self):
+        print 'BlkDev>destroy>', self.vdev
+        PrettyPrint.prettyprint(self.sxpr())
         self.controller.send_be_vbd_destroy(self.vdev)
         
 class BlkifController(controller.Controller):
@@ -166,8 +170,17 @@ class BlkifController(controller.Controller):
                 self.recv_fe_interface_connect,
             }
         self.attached = 1
+        self.evtchn = None
         self.registerChannel()
         #print 'BlkifController<', 'dom=', self.dom, 'idx=', self.idx
+
+    def sxpr(self):
+        val = ['blkif', ['dom', self.dom]]
+        if self.evtchn:
+            val.append(['evtchn',
+                        self.evtchn['port1'],
+                        self.evtchn['port2']])
+        return val
 
     def lostChannel(self):
         print 'BlkifController>lostChannel>', 'dom=', self.dom
@@ -201,7 +214,9 @@ class BlkifController(controller.Controller):
         return d
 
     def destroy(self):
+        print 'BlkifController>destroy> dom=', self.dom
         self.destroyDevices()
+        self.send_be_destroy()
 
     def destroyDevices(self):
         for dev in self.getDevices():
@@ -229,7 +244,8 @@ class BlkifController(controller.Controller):
         return self.attached
 
     def reattached(self):
-        """All devices have been reattached after the back-end control domain has changed.
+        """All devices have been reattached after the back-end control
+        domain has changed.
         """
         msg = packMsg('blkif_fe_interface_status_changed_t',
                       { 'handle' : 0,
@@ -246,6 +262,8 @@ class BlkifController(controller.Controller):
     def recv_fe_interface_connect(self, msg, req):
         val = unpackMsg('blkif_fe_interface_connect_t', msg)
         self.evtchn = channel.eventChannel(0, self.dom)
+        print 'recv_fe_interface_connect>'
+        PrettyPrint.prettyprint(self.sxpr())
         msg = packMsg('blkif_be_connect_t',
                       { 'domid'        : self.dom,
                         'blkif_handle' : val['handle'],
@@ -272,6 +290,13 @@ class BlkifController(controller.Controller):
                         'blkif_handle' : 0 })
         self.factory.writeRequest(msg)
 
+    def send_be_destroy(self):
+        print '>BlkifController>send_be_destroy>', 'dom=', self.dom
+        msg = packMsg('blkif_be_destroy_t',
+                      { 'domid'        : self.dom,
+                        'blkif_handle' : 0 })
+        self.factory.writeRequest(msg)
+
     def send_be_vbd_create(self, vdev):
         dev = self.devices[vdev]
         msg = packMsg('blkif_be_vbd_create_t',
@@ -293,6 +318,8 @@ class BlkifController(controller.Controller):
         self.factory.writeRequest(msg)
 
     def send_be_vbd_destroy(self, vdev):
+        print '>BlkifController>send_be_vbd_destroy>', 'dom=', self.dom, 'vdev=', vdev
+        PrettyPrint.prettyprint(self.sxpr())
         dev = self.devices[vdev]
         msg = packMsg('blkif_be_vbd_destroy_t',
                       { 'domid'                : self.dom,
