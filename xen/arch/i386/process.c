@@ -253,6 +253,15 @@ void switch_to(struct task_struct *prev_p, struct task_struct *next_p)
            &next_p->shared_info->execution_context,
            sizeof(*stack_ec));
 
+    /*
+     * This is sufficient! If the descriptor DPL differs from CS RPL
+     * then we'll #GP. If DS, ES, FS, GS are DPL 0 then they'll be
+     * cleared automatically. If SS RPL or DPL differs from CS RPL
+     * then we'll #GP.
+     */
+    if ( (stack_ec->cs & 3) == 0 )
+        stack_ec->cs = 0;
+
     unlazy_fpu(prev_p);
 
     /* Switch the fast-trap handler. */

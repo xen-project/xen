@@ -14,20 +14,18 @@
 #define load_TR(n)  __asm__ __volatile__ ("ltr  %%ax" : : "a" (__TSS(n)<<3) )
 
 /*
- * Guest OS must provide its own code selectors, or use the one we provide.
- * The RPL must be 1, as we only create bounce frames to ring 1.
- * Any LDT selector value is okay.
+ * Guest OS must provide its own code selectors, or use the one we provide. The
+ * RPL must be 1, as we only create bounce frames to ring 1. Any LDT selector
+ * value is okay. Note that checking only the RPL is insufficient: if the
+ * selector is poked into an interrupt, trap or call gate then the RPL is
+ * ignored when the gate is accessed.
  */
-
 #define VALID_SEL(_s)                                                      \
     (((((_s)>>3) < FIRST_RESERVED_GDT_ENTRY) ||                            \
       (((_s)>>3) >  LAST_RESERVED_GDT_ENTRY) ||                            \
       ((_s)&4)) &&                                                         \
      (((_s)&3) == 1))
-
 #define VALID_CODESEL(_s) ((_s) == FLAT_RING1_CS || VALID_SEL(_s))
-
-#define VALID_DATASEL(_s) ((_s) == FLAT_RING1_DS || VALID_SEL(_s))
 
 /* These are bitmasks for the first 32 bits of a descriptor table entry. */
 #define _SEGMENT_TYPE    (15<< 8)

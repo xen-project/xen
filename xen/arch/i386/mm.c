@@ -129,9 +129,10 @@ long do_stack_switch(unsigned long ss, unsigned long esp)
     int nr = smp_processor_id();
     struct tss_struct *t = &init_tss[nr];
 
-    if ( !VALID_DATASEL(ss) )
-        return -EINVAL;
-
+    /*
+     * No need to check validity: CPU will fault if SS or ESP is bad. This is
+     * true even for a fast trap: a bad SS:ESP will get us either a #SS or #TS.
+     */
     current->thread.ss1  = ss;
     current->thread.esp1 = esp;
     t->ss1  = ss;
