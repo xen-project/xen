@@ -21,6 +21,7 @@
 #include <xen/list.h>
 #include <xen/serial.h>
 #include <xen/softirq.h>
+#include <xen/init.h>
 
 /* opt_pdb: Name of serial port for Xen pervasive debugger (and enable pdb) */
 static unsigned char opt_pdb[10] = "none";
