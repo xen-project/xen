@@ -445,6 +445,13 @@ class XendDomainInfo:
                 devices.append(dev)
         return devices
 
+    def config_device(self, type, idx):
+        devs = self.config_devices(type)
+        if 0 <= idx < len(devs):
+            return devs[idx]
+        else:
+            return None
+
     def add_device(self, type, dev):
         """Add a device to a virtual machine.
 
@@ -649,6 +656,39 @@ class XendDomainInfo:
         deferred = defer.DeferredList(dlist, fireOnOneErrback=1)
         print '<create_devices'
         return deferred
+
+    def device_create(self, dev_config):
+        """Create a new device.
+
+        @param dev_config: device configuration
+        @return: deferred
+        """
+        dev_name = sxp.name(dev_config)
+        dev_handler = get_device_handler(dev_name)
+        if dev_handler is None:
+            raise VmError('unknown device type: ' + dev_name)
+        devs = self.get_devices(dev_name)
+        dev_index = len(devs)
+        self.config.append(['device', dev_config])
+        d = dev_handler(self, dev_config, dev_index)
+        return d
+
+    def device_destroy(self, type, idx):
+        """Destroy a device.
+
+        @param type: device type
+        @param idx:  device index
+        """
+        dev = self.get_device_by_index(type, idx)
+        if not dev:
+            raise VmError('invalid device: %s %d' % (type, idx))
+        devs = self.devices.get(type)
+        if 0 <= idx < len(devs):
+            del devs[idx]
+        dev_config = self.config_device(type, idx)
+        if dev_config:
+            self.config.remove(['device', dev_config])
+        dev.destroy()
 
     def configure_backends(self):
         """Set configuration flags if the vm is a backend for netif of blkif.

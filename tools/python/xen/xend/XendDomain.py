@@ -566,18 +566,31 @@ class XendDomain:
         return xc.atropos_domain_get(dom)
 
     def domain_device_create(self, dom, devconfig):
+        """Create a new device for a domain.
+
+        @param dom:       domain id
+        @param devconfig: device configuration
+        @return: deferred
+        """
         dom = int(dom)
         dominfo = self.domain_get(dom)
         if not dominfo:
             raise ValueError("invalid domain:" + str(dom))
+        self.refresh_schedule()
         return dominfo.device_create(devconfig)
-    
 
     def domain_device_destroy(self, dom, type, idx):
+        """Destroy a device.
+
+        @param dom:  domain id
+        @param type: device type
+        @param idx:  device index
+        """
         dom = int(dom)
         dominfo = self.domain_get(dom)
         if not dominfo:
             raise ValueError("invalid domain:" + str(dom))
+        self.refresh_schedule()
         return dominfo.device_destroy(type, idx)
 
     def domain_devtype_ls(self, dom, type):
