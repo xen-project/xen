@@ -5,7 +5,7 @@
  *
  * (C) Copyright 1995 1996 Linus Torvalds
  *
- * Modifications for Xenolinux (c) 2003 Keir Fraser
+ * Modifications for Xenolinux (c) 2003-2004 Keir Fraser
  */
 
 #include <linux/slab.h>
@@ -28,21 +28,26 @@
   __direct_mk_pte((physpage) >> PAGE_SHIFT, pgprot)
 
 static inline int direct_remap_area_pte(pte_t *pte, 
-                                         unsigned long address, 
-                                         unsigned long size,
-                                         unsigned long machine_addr, 
-                                         pgprot_t prot,
-                                         domid_t  domid)
+                                        unsigned long address, 
+                                        unsigned long size,
+                                        unsigned long machine_addr, 
+                                        pgprot_t prot,
+                                        domid_t  domid)
 {
     unsigned long end;
+#define MAX_DIRECTMAP_MMU_QUEUE 64
+    mmu_update_t u[MAX_DIRECTMAP_MMU_QUEUE], *v;
 
-    mmu_update_t *u, *v;
-    u = v = vmalloc(3*PAGE_SIZE); /* plenty */
+    address &= ~PMD_MASK;
+    end = address + size;
+    if (end > PMD_SIZE)
+        end = PMD_SIZE;
+    if (address >= end)
+        BUG();
 
-    if (!u) 
-	return -ENOMEM;
-
+ reset_buffer:
     /* If not I/O mapping then specify General-Purpose Subject Domain (GPS). */
+    v = &u[0];
     if ( domid != 0 )
     {
         v[0].val  = (unsigned long)(domid<<16) & ~0xFFFFUL;
@@ -56,12 +61,6 @@ static inline int direct_remap_area_pte(pte_t *pte,
         v += 2;
     }
 
-    address &= ~PMD_MASK;
-    end = address + size;
-    if (end > PMD_SIZE)
-        end = PMD_SIZE;
-    if (address >= end)
-        BUG();
     do {
 #if 0  /* thanks to new ioctl mmaping interface this is no longer a bug */
         if (!pte_none(*pte)) {
@@ -71,7 +70,12 @@ static inline int direct_remap_area_pte(pte_t *pte,
 #endif
         v->ptr = virt_to_machine(pte);
         v->val = (machine_addr & PAGE_MASK) | pgprot_val(prot) | _PAGE_IO;
-        v++;
+        if ( ++v == MAX_DIRECTMAP_MMU_QUEUE )
+        {
+            if ( HYPERVISOR_mmu_update(u, MAX_DIRECTMAP_MMU_QUEUE) < 0 )
+                return -EFAULT;
+            goto reset_buffer;
+        }
         address += PAGE_SIZE;
         machine_addr += PAGE_SIZE;
         pte++;
@@ -84,7 +88,6 @@ static inline int direct_remap_area_pte(pte_t *pte,
 	return -EINVAL;
     }
 
-    vfree(u);
     return 0;
 }
 
@@ -96,8 +99,8 @@ static inline int direct_remap_area_pmd(struct mm_struct *mm,
                                         pgprot_t prot,
                                         domid_t  domid)
 {
+    int error = 0;
     unsigned long end;
-    int rc;
 
     address &= ~PGDIR_MASK;
     end = address + size;
@@ -111,14 +114,14 @@ static inline int direct_remap_area_pmd(struct mm_struct *mm,
         if (!pte)
             return -ENOMEM;
 
-        if ( rc = direct_remap_area_pte(pte, address, end - address, 
-                              address + machine_addr, prot, domid) )
-	    return rc;
-
+        error = direct_remap_area_pte(pte, address, end - address, 
+                                      address + machine_addr, prot, domid);
+        if ( error )
+            break;
         address = (address + PMD_SIZE) & PMD_MASK;
         pmd++;
     } while (address && (address < end));
-    return 0;
+    return error;
 }
  
 int direct_remap_area_pages(struct mm_struct *mm,

@@ -5,7 +5,7 @@
 ###########################################################
 
 import errno, re, os, pwd, select, signal, socket, struct, sys, time
-import xend.console, xend.manager, xend.utils, Xc
+import xend.blkif, xend.console, xend.manager, xend.utils, Xc
 
 
 # The following parameters could be placed in a configuration file.
@@ -16,13 +16,35 @@ CONTROL_DIR  = '/var/run/xend'
 UNIX_SOCK    = 'management_sock' # relative to CONTROL_DIR
 
 
+CMSG_CONSOLE  = 0
+CMSG_BLKIF_BE = 1
+CMSG_BLKIF_FE = 2
+
+
+def port_from_dom(dom):
+    global port_list
+    for idx, port in port_list.items():
+        if port.remote_dom == dom:
+            return port
+    return None
+
+
+def send_management_response(response, addr):
+    try:
+        response = str(response)
+        print "Mgmt_rsp[%s]: %s" % (addr, response)
+        management_interface.sendto(response, addr)
+    except socket.error, error:
+        pass
+
+
 def daemon_loop():
     # Could we do this more nicely? The xend.manager functions need access
     # to this global state to do their work.
-    global control_list, notifier
+    global port_list, notifier, management_interface, mgmt_req_addr, dom0_port
 
-    # List of all control interfaces, indexed by local event-channel port.
-    control_list = {}
+    # Lists of all interfaces, indexed by local event-channel port.
+    port_list = {}
 
     xc = Xc.new()
 
@@ -44,6 +66,13 @@ def daemon_loop():
     # notifications.
     notifier = xend.utils.notifier()
 
+    # The DOM0 control interface is not set up via the management interface.
+    # Note that console messages don't come our way (actually, only driver
+    # back-ends should use the DOM0 control interface).
+    dom0_port = xend.utils.port(0)
+    notifier.bind(dom0_port.local_port)
+    port_list[dom0_port.local_port] = dom0_port
+
     ##
     ## MAIN LOOP
     ## 
@@ -58,10 +87,10 @@ def daemon_loop():
         waitset = select.poll()
         waitset.register(management_interface, select.POLLIN)
         waitset.register(notifier, select.POLLIN)
-        for idx, (port, rbuf, wbuf, con_if) in control_list.items():
+        for idx, con_if in xend.console.interface.list_by_fd.items():
             if not con_if.closed():
                 pflags = select.POLLIN
-                if not rbuf.empty() and con_if.connected():
+                if not con_if.rbuf.empty() and con_if.connected():
                     pflags = select.POLLIN | select.POLLOUT
                 waitset.register(con_if.sock.fileno(), pflags)
 
@@ -72,16 +101,16 @@ def daemon_loop():
         # These should consist of executable Python statements that call
         # well-known management functions (e.g., new_control_interface(dom=9)).
         try:
-            data, addr = management_interface.recvfrom(2048)
+            data, mgmt_req_addr = management_interface.recvfrom(2048)
         except socket.error, error:
             if error[0] != errno.EAGAIN:
                 raise
         else:
-            if addr:
+            if mgmt_req_addr:
                 # Evaluate the request in an exception-trapping sandbox.
                 try:
-                    print "Mgmt_req[%s]: %s" % (addr, data)
-                    response = str(eval('xend.manager.'+data))
+                    print "Mgmt_req[%s]: %s" % (mgmt_req_addr, data)
+                    response = eval('xend.manager.'+data)
 
                 except:
                     # Catch all exceptions and turn into an error response:
@@ -97,69 +126,20 @@ def daemon_loop():
                     response = str(response)
 
                 # Try to send a response to the requester.
-                try:
-                    print "Mgmt_rsp[%s]: %s" % (addr, response)
-                    management_interface.sendto(response, addr)
-                except socket.error, error:
-                    pass
+                if response:
+                    send_management_response(response, mgmt_req_addr)
                 
         # Do work for every console interface that hit in the poll set.
         for (fd, events) in fdset:
-            if not xend.console.interface.interface_list.has_key(fd):
-                continue
-            con_if = xend.console.interface.interface_list[fd]
-
-            # If the interface is listening, check for pending connections.
-            if con_if.listening():
-                con_if.connect()
-
-            # All done if the interface is not connected.
-            if not con_if.connected():
-                continue
-            (port, rbuf, wbuf, con_if) = control_list[con_if.key]
-
-            # Send as much pending data as possible via the socket.
-            while not rbuf.empty():
-                try:
-                    bytes = con_if.sock.send(rbuf.peek())
-                    if bytes > 0:
-                        rbuf.discard(bytes)
-                except socket.error, error:
-                    pass
-
-            # Read as much data as is available. Don't worry about
-            # overflowing our buffer: it's more important to read the
-            # incoming data stream and detect errors or closure of the
-            # remote end in a timely manner.
-            try:
-                while 1:
-                    data = con_if.sock.recv(2048)
-                    # Return of zero means the remote end has disconnected.
-                    # We therefore return the console interface to listening.
-                    if not data:
-                        con_if.listen()
-                        break
-                    wbuf.write(data)
-            except socket.error, error:
-                # Assume that most errors mean that the connection is dead.
-                # In such cases we return the interface to 'listening' state.
-                if error[0] != errno.EAGAIN:
-                    print "Better return to listening"
-                    con_if.listen()
-                    print "New status: " + str(con_if.status)
-
-            # We may now have pending data to send via the relevant
-            # inter-domain control interface. If so then we send all we can
-            # and notify the remote end.
-            work_done = False
-            while not wbuf.empty() and port.space_to_write_request():
-                msg = xend.utils.message(0, 0, 0)
-                msg.append_payload(wbuf.read(msg.MAX_PAYLOAD))
-                port.write_request(msg)
-                work_done = True
-            if work_done:
-                port.notify()
-
+            if xend.console.interface.list_by_fd.has_key(fd):
+                con_if = xend.console.interface.list_by_fd[fd]
+                con_if.socket_work()
+                # We may now have pending data to send via the control
+                # interface. If so then send all we can and notify the remote.
+                port = port_list[con_if.key]
+                if con_if.ctrlif_transmit_work(port):
+                    port.notify()
+                    
         # Process control-interface notifications from other guest OSes.
         while 1:            
             # Grab a notification, if there is one.
@@ -168,11 +148,19 @@ def daemon_loop():
                 break
             (idx, type) = notification
 
-            if not control_list.has_key(idx):
+            if not port_list.has_key(idx):
                 continue
 
-            (port, rbuf, wbuf, con_if) = control_list[idx]
+            port = port_list[idx]
             work_done = False
+
+            con_if = False
+            if xend.console.interface.list.has_key(idx):
+                con_if = xend.console.interface.list[idx]
+
+            blk_if = False
+            if xend.blkif.interface.list.has_key(idx):
+                blk_if = xend.blkif.interface.list[idx]
 
             # If we pick up a disconnect notification then we do any necessary
             # cleanup.
@@ -180,30 +168,49 @@ def daemon_loop():
                 ret = xc.evtchn_status(idx)
                 if ret['status'] == 'unbound':
                     notifier.unbind(idx)
-                    con_if.close()
-                    del control_list[idx], port, rbuf, wbuf, con_if
+                    del port_list[idx], port
+                    if con_if:
+                        con_if.destroy()
+                        del con_if
+                    if blk_if:
+                        blk_if.destroy()
+                        del blk_if
                     continue
 
-            # Read incoming requests. Currently assume that request
-            # message always containb console data.
+            # Process incoming requests.
             while port.request_to_read():
                 msg = port.read_request()
-                rbuf.write(msg.get_payload())
-                port.write_response(msg)
                 work_done = True
+                type = (msg.get_header())['type']
+                if type == CMSG_CONSOLE and con_if:
+                    con_if.ctrlif_rx_req(port, msg)
+                elif type == CMSG_BLKIF_FE and blk_if:
+                    blk_if.ctrlif_rx_req(port, msg)
+                elif type == CMSG_BLKIF_BE and port == dom0_port:
+                    xend.blkif.backend_rx_req(port, msg)
+                else:
+                    port.write_response(msg)
 
-            # Incoming responses are currently thrown on the floor.
+            # Process incoming responses.
             while port.response_to_read():
                 msg = port.read_response()
                 work_done = True
+                type = (msg.get_header())['type']
+                if type == CMSG_BLKIF_BE and port == dom0_port:
+                    xend.blkif.backend_rx_rsp(port, msg)
 
-            # Send as much pending console data as there is room for.
-            while not wbuf.empty() and port.space_to_write_request():
-                msg = xend.utils.message(0, 0, 0)
-                msg.append_payload(wbuf.read(msg.MAX_PAYLOAD))
-                port.write_request(msg)
+            # Send console data.
+            if con_if and con_if.ctrlif_transmit_work(port):
                 work_done = True
 
+            # Send blkif messages.
+            if blk_if and blk_if.ctrlif_transmit_work(port):
+                work_done = True
+
+            # Back-end block-device work.
+            if port == dom0_port and xend.blkif.backend_do_work(port):
+                work_done = True
+                
             # Finally, notify the remote end of any work that we did.
             if work_done:
                 port.notify()

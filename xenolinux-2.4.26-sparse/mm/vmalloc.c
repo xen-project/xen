@@ -45,6 +45,10 @@ static inline void free_area_pte(pmd_t * pmd, unsigned long address, unsigned lo
 			continue;
 		if (pte_present(page)) {
 			struct page *ptpage = pte_page(page);
+#if defined(CONFIG_XEN_PRIVILEGED_GUEST)
+			if (pte_io(page))
+				continue;
+#endif
 			if (VALID_PAGE(ptpage) && (!PageReserved(ptpage)))
 				__free_page(ptpage);
 			continue;
@@ -250,11 +254,6 @@ void __vfree(void * addr, int free_area_pages)
 	for (p = &vmlist ; (tmp = *p) ; p = &tmp->next) {
 		if (tmp->addr == addr) {
 			*p = tmp->next;
-#ifdef CONFIG_XEN_PRIVILEGED_GUEST
-			if (tmp->flags & VM_IOREMAP)
-				zap_page_range(&init_mm, VMALLOC_VMADDR(tmp->addr), tmp->size);
-			else
-#endif
 			if (free_area_pages)
 			    vmfree_area_pages(VMALLOC_VMADDR(tmp->addr), tmp->size);
 			write_unlock(&vmlist_lock);

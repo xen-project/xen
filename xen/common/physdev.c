@@ -115,16 +115,17 @@ static void add_dev_to_task(struct task_struct *p,
 
 /*
  * physdev_pci_access_modify:
- * Allow/disallow access to a specific PCI device. Also allow read access to 
- * PCI devices from the device to the root of the device tree. If the given 
- * device is a bridge, then the domain should get access to all the devices 
- * attached to that bridge (XXX this is unimplemented!).
+ * Allow/disallow access to a specific PCI device.  Guests should not be
+ * allowed to see bridge devices as it needlessly complicates things (one
+ * possible exception to this is the AGP bridge).  If the given device is a
+ * bridge, then the domain should get access to all the leaf devices below
+ * that bridge (XXX this is unimplemented!).
  */
 int physdev_pci_access_modify(
     domid_t dom, int bus, int dev, int func, int enable)
 {
     struct task_struct *p;
-    struct pci_dev *pdev, *rdev, *tdev;
+    struct pci_dev *pdev;
     int rc = 0;
  
     if ( !IS_PRIV(current) )
@@ -145,7 +146,7 @@ int physdev_pci_access_modify(
         return -ESRCH;
 
     /* Make the domain privileged. */
-    set_bit(PF_PRIVILEGED, &p->flags); 
+    set_bit(PF_PRIVILEGED, &p->flags);
 
     /* Grant write access to the specified device. */
     if ( (pdev = pci_find_slot(bus, PCI_DEVFN(dev, func))) == NULL )
@@ -155,26 +156,9 @@ int physdev_pci_access_modify(
         goto out;
     }
     add_dev_to_task(p, pdev, ACC_WRITE);
+
     INFO("  add RW %02x:%02x:%02x\n", pdev->bus->number,
          PCI_SLOT(pdev->devfn), PCI_FUNC(pdev->devfn));
-
-    /* Grant read access to the root device. */
-    if ( (rdev = pci_find_slot(0, PCI_DEVFN(0, 0))) == NULL )
-    {
-        INFO("  bizarre -- no PCI root dev\n");
-        rc = -ENODEV;
-        goto out;
-    }
-    add_dev_to_task(p, rdev, ACC_READ);
-    INFO("  add R0 %02x:%02x:%02x\n", 0, 0, 0);
-
-    /* Grant read access to all devices on the path to the root. */
-    for ( tdev = pdev->bus->self; tdev != NULL; tdev = tdev->bus->self )
-    {
-        add_dev_to_task(p, tdev, ACC_READ);
-        INFO("  add RO %02x:%02x:%02x\n", tdev->bus->number,
-             PCI_SLOT(tdev->devfn), PCI_FUNC(tdev->devfn));
-    }
 
     /* Is the device a bridge or cardbus? */
     if ( pdev->hdr_type != PCI_HEADER_TYPE_NORMAL )
@@ -256,8 +240,16 @@ static int do_base_address_access(phys_dev_t *pdev, int acc, int idx,
 
     if ( len != sizeof(u32) )
     {
-        INFO("Guest attempting sub-dword %s to BASE_ADDRESS %d\n", 
+        /* This isn't illegal, but there doesn't seem to be a very good reason
+         * to do it for normal devices (bridges are another matter).  Since it
+         * would complicate the code below, we don't support this for now. */
+
+        /* We could set *val to some value but the guest may well be in trouble
+         * anyway if this write fails.  Hopefully the printk will give us a
+         * clue what went wrong. */
+        printk("Guest attempting sub-dword %s to BASE_ADDRESS %d\n", 
              (acc == ACC_READ) ? "read" : "write", idx);
+        
         return -EPERM;
     }
 
@@ -420,7 +412,13 @@ static long pci_cfgreg_read(int bus, int dev, int func, int reg,
     phys_dev_t *pdev;
 
     if ( (ret = check_dev_acc(current, bus, dev, func, &pdev)) != 0 )
-        return ret;
+    {
+        /* PCI spec states that reads from non-existent devices should return
+         * all 1s.  In this case the domain has no read access, which should
+         * also look like the device is non-existent. */
+        *val = 0xFFFFFFFF;
+        return ret; /* KAF: error return seems to matter on my test machine. */
+    }
 
     /* Fake out read requests for some registers. */
     switch ( reg )
@@ -608,6 +606,21 @@ long do_physdev_op(physdev_op_t *uop)
     return ret;
 }
 
+/* Test if boot params specify this device should NOT be visible to DOM0
+ * (e.g. so that another domain can control it instead) */
+int pcidev_dom0_hidden(struct pci_dev *dev)
+{
+    extern char opt_physdev_dom0_hide[];
+    char cmp[10] = "(.......)";
+    
+    strncpy(&cmp[1], dev->slot_name, 7);
+
+    if ( strstr(opt_physdev_dom0_hide, dev->slot_name) == NULL )
+        return 0;
+    
+    return 1;
+}
+
 
 /* Domain 0 has read access to all devices. */
 void physdev_init_dom0(struct task_struct *p)
@@ -619,14 +632,22 @@ void physdev_init_dom0(struct task_struct *p)
 
     pci_for_each_dev(dev)
     {
-        /* Skip bridges and other peculiarities for now. */
-        if ( dev->hdr_type != PCI_HEADER_TYPE_NORMAL )
-            continue;
-        pdev = kmalloc(sizeof(phys_dev_t), GFP_KERNEL);
-        pdev->dev = dev;
-        pdev->flags = ACC_WRITE;
-        pdev->state = 0;
-        pdev->owner = p;
-        list_add(&pdev->node, &p->pcidev_list);
-	}    
+        if ( !pcidev_dom0_hidden(dev) )
+        {            
+            /* Skip bridges and other peculiarities for now. */
+            if ( dev->hdr_type != PCI_HEADER_TYPE_NORMAL )
+                continue;
+            pdev = kmalloc(sizeof(phys_dev_t), GFP_KERNEL);
+            pdev->dev = dev;
+            pdev->flags = ACC_WRITE;
+            pdev->state = 0;
+            pdev->owner = p;
+            list_add(&pdev->node, &p->pcidev_list);
+        }
+        else
+        {
+            printk("Hiding PCI device %s from DOM0\n", dev->slot_name);
+        }
+    }
 }
+

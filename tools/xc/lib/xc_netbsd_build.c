@@ -63,7 +63,8 @@ static int setup_guestos(int xc_handle,
 			 full_execution_context_t *ctxt,
                          const char *cmdline,
                          unsigned long shared_info_frame,
-                         unsigned int control_evtchn)
+                         unsigned int control_evtchn,
+                         int io_priv)
 {
     l1_pgentry_t *vl1tab=NULL, *vl1e=NULL;
     l2_pgentry_t *vl2tab=NULL, *vl2e=NULL;
@@ -175,7 +176,7 @@ static int setup_guestos(int xc_handle,
     start_info->mod_len     = symtab_len;
     start_info->nr_pages    = tot_pages;
     start_info->shared_info = shared_info_frame << PAGE_SHIFT;
-    start_info->flags       = 0;
+    start_info->flags       = io_priv ? SIF_PRIVILEGED : 0;
     start_info->domain_controller_evtchn = control_evtchn;
     strncpy(start_info->cmd_line, cmdline, MAX_CMDLINE);
     start_info->cmd_line[MAX_CMDLINE-1] = '\0';
@@ -212,7 +213,8 @@ int xc_netbsd_build(int xc_handle,
                     u64 domid,
                     const char *image_name,
                     const char *cmdline,
-                    unsigned int control_evtchn)
+                    unsigned int control_evtchn,
+                    int io_priv)
 {
     dom0_op_t launch_op, op;
     unsigned long load_addr;
@@ -269,7 +271,7 @@ int xc_netbsd_build(int xc_handle,
                        &virt_startinfo_addr,
                        &load_addr, &st_ctxt, cmdline,
                        op.u.getdomaininfo.shared_info_frame,
-                       control_evtchn) < 0 )
+                       control_evtchn, io_priv) < 0 )
     {
         ERROR("Error constructing guest OS");
         goto error_out;

@@ -1,5 +1,5 @@
 /******************************************************************************
- * block.c
+ * arch/xen/drivers/blkif/frontend/main.c
  * 
  * Xenolinux virtual block-device driver.
  * 
@@ -7,32 +7,35 @@
  * Modifications by Mark A. Williamson are (c) Intel Research Cambridge
  */
 
-#include "block.h"
+#include "common.h"
 #include <linux/blk.h>
 #include <linux/cdrom.h>
 #include <linux/tqueue.h>
 #include <linux/sched.h>
-#include <scsi/scsi.h>
-
 #include <linux/interrupt.h>
+#include <scsi/scsi.h>
+#include <asm/ctrl_if.h>
 
 typedef unsigned char byte; /* from linux/ide.h */
 
-#define STATE_ACTIVE    0
-#define STATE_SUSPENDED 1
-#define STATE_CLOSED    2
-static unsigned int state = STATE_SUSPENDED;
+#define BLKIF_STATE_CLOSED       0
+#define BLKIF_STATE_DISCONNECTED 1
+#define BLKIF_STATE_CONNECTED    2
+static unsigned int blkif_state = BLKIF_STATE_CLOSED;
+static unsigned int blkif_evtchn, blkif_irq;
 
-/* Dynamically-mapped IRQs. */
-static int xlblk_response_irq, xlblk_update_irq;
+static struct tq_struct blkif_statechange_tq;
 
-static blk_ring_t *blk_ring;
+static int blkif_control_rsp_valid;
+static blkif_response_t blkif_control_rsp;
+
+static blkif_ring_t *blk_ring;
 static BLK_RING_IDX resp_cons; /* Response consumer for comms ring. */
 static BLK_RING_IDX req_prod;  /* Private request producer.         */
 
 /* We plug the I/O ring if the driver is suspended or if the ring is full. */
 #define RING_PLUGGED (((req_prod - resp_cons) == BLK_RING_SIZE) || \
-                      (state != STATE_ACTIVE))
+                      (blkif_state != BLKIF_STATE_CONNECTED))
 
 
 /*
@@ -49,39 +52,27 @@ static int           sg_operation = -1;
 static unsigned long sg_next_sect;
 #define DISABLE_SCATTERGATHER() (sg_operation = -1)
 
-static inline void signal_requests_to_xen(void)
+static inline void flush_requests(void)
 {
-    block_io_op_t op; 
-
     DISABLE_SCATTERGATHER();
     blk_ring->req_prod = req_prod;
-
-    op.cmd = BLOCK_IO_OP_SIGNAL; 
-    HYPERVISOR_block_io_op(&op);
-    return;
+    notify_via_evtchn(blkif_evtchn);
 }
 
 
 /*
- * xlblk_update_int/update-vbds_task - handle VBD update events from Xen
- * 
- * Schedule a task for keventd to run, which will update the VBDs and perform 
- * the corresponding updates to our view of VBD state, so the XenoLinux will 
- * respond to changes / additions / deletions to the set of VBDs automatically.
+ * blkif_update_int/update-vbds_task - handle VBD update events.
+ *  Schedule a task for keventd to run, which will update the VBDs and perform 
+ *  the corresponding updates to our view of VBD state.
  */
 static struct tq_struct update_tq;
 static void update_vbds_task(void *unused)
 { 
     xlvbd_update_vbds();
 }
-static void xlblk_update_int(int irq, void *dev_id, struct pt_regs *ptregs)
-{
-    update_tq.routine = update_vbds_task;
-    schedule_task(&update_tq);
-}
 
 
-int xen_block_open(struct inode *inode, struct file *filep)
+int blkif_open(struct inode *inode, struct file *filep)
 {
     short xldev = inode->i_rdev; 
     struct gendisk *gd = get_gendisk(xldev);
@@ -122,7 +113,7 @@ int xen_block_open(struct inode *inode, struct file *filep)
 }
 
 
-int xen_block_release(struct inode *inode, struct file *filep)
+int blkif_release(struct inode *inode, struct file *filep)
 {
     xl_disk_t *disk = xldev_to_xldisk(inode->i_rdev);
 
@@ -132,15 +123,17 @@ int xen_block_release(struct inode *inode, struct file *filep)
      */
     if ( --disk->usage == 0 )
     {
+#if 0
         update_tq.routine = update_vbds_task;
         schedule_task(&update_tq);
+#endif
     }
 
     return 0;
 }
 
 
-int xen_block_ioctl(struct inode *inode, struct file *filep,
+int blkif_ioctl(struct inode *inode, struct file *filep,
                           unsigned command, unsigned long argument)
 {
     kdev_t dev = inode->i_rdev;
@@ -170,7 +163,7 @@ int xen_block_ioctl(struct inode *inode, struct file *filep,
 
     case BLKRRPART:                               /* re-read partition table */
         DPRINTK_IOCTL("   BLKRRPART: %x\n", BLKRRPART);
-        return xen_block_revalidate(dev);
+        return blkif_revalidate(dev);
 
     case BLKSSZGET:
         return hardsect_size[MAJOR(dev)][MINOR(dev)]; 
@@ -218,11 +211,11 @@ int xen_block_ioctl(struct inode *inode, struct file *filep,
         return 0;
 
     case SCSI_IOCTL_GET_BUS_NUMBER:
-        DPRINTK("FIXME: SCSI_IOCTL_GET_BUS_NUMBER ioctl in Xen blkdev");
+        DPRINTK("FIXME: SCSI_IOCTL_GET_BUS_NUMBER ioctl in XL blkif");
         return -ENOSYS;
 
     default:
-        printk(KERN_ALERT "ioctl %08x not supported by Xen blkdev\n", command);
+        printk(KERN_ALERT "ioctl %08x not supported by XL blkif\n", command);
         return -ENOSYS;
     }
     
@@ -230,13 +223,13 @@ int xen_block_ioctl(struct inode *inode, struct file *filep,
 }
 
 /* check media change: should probably do something here in some cases :-) */
-int xen_block_check(kdev_t dev)
+int blkif_check(kdev_t dev)
 {
-    DPRINTK("xen_block_check\n");
+    DPRINTK("blkif_check\n");
     return 0;
 }
 
-int xen_block_revalidate(kdev_t dev)
+int blkif_revalidate(kdev_t dev)
 {
     struct block_device *bd;
     struct gendisk *gd;
@@ -289,25 +282,25 @@ int xen_block_revalidate(kdev_t dev)
 
 
 /*
- * hypervisor_request
+ * blkif_queue_request
  *
  * request block io 
  * 
  * id: for guest use only.
- * operation: XEN_BLOCK_{READ,WRITE,PROBE,VBD*}
+ * operation: BLKIF_OP_{READ,WRITE,PROBE}
  * buffer: buffer to read/write into. this should be a
  *   virtual address in the guest os.
  */
-static int hypervisor_request(unsigned long   id,
-                              int             operation,
-                              char *          buffer,
-                              unsigned long   sector_number,
-                              unsigned short  nr_sectors,
-                              kdev_t          device)
+static int blkif_queue_request(unsigned long   id,
+                               int             operation,
+                               char *          buffer,
+                               unsigned long   sector_number,
+                               unsigned short  nr_sectors,
+                               kdev_t          device)
 {
-    unsigned long buffer_ma = phys_to_machine(virt_to_phys(buffer)); 
-    struct gendisk *gd;
-    blk_ring_req_entry_t *req;
+    unsigned long       buffer_ma = phys_to_machine(virt_to_phys(buffer)); 
+    struct gendisk     *gd;
+    blkif_request_t    *req;
     struct buffer_head *bh;
 
     if ( unlikely(nr_sectors >= (1<<9)) )
@@ -315,26 +308,26 @@ static int hypervisor_request(unsigned long   id,
     if ( unlikely((buffer_ma & ((1<<9)-1)) != 0) )
         BUG();
 
-    if ( unlikely(state == STATE_CLOSED) )
+    if ( unlikely(blkif_state != BLKIF_STATE_CONNECTED) )
         return 1;
 
     switch ( operation )
     {
 
-    case XEN_BLOCK_READ:
-    case XEN_BLOCK_WRITE:
+    case BLKIF_OP_READ:
+    case BLKIF_OP_WRITE:
         gd = get_gendisk(device); 
 
         /*
          * Update the sector_number we'll pass down as appropriate; note that
          * we could sanity check that resulting sector will be in this
-         * partition, but this will happen in xen anyhow.
+         * partition, but this will happen in driver backend anyhow.
          */
         sector_number += gd->part[MINOR(device)].start_sect;
 
         /*
-         * If this unit doesn't consist of virtual (i.e., Xen-specified)
-         * partitions then we clear the partn bits from the device number.
+         * If this unit doesn't consist of virtual partitions then we clear 
+         * the partn bits from the device number.
          */
         if ( !(gd->flags[MINOR(device)>>gd->minor_shift] & 
                GENHD_FL_VIRT_PARTNS) )
@@ -375,7 +368,7 @@ static int hypervisor_request(unsigned long   id,
     req = &blk_ring->ring[MASK_BLK_IDX(req_prod)].req;
     req->id            = id;
     req->operation     = operation;
-    req->sector_number = (xen_sector_t)sector_number;
+    req->sector_number = (blkif_sector_t)sector_number;
     req->device        = device; 
     req->nr_segments   = 1;
     req->buffer_and_sects[0] = buffer_ma | nr_sectors;
@@ -386,23 +379,23 @@ static int hypervisor_request(unsigned long   id,
 
 
 /*
- * do_xlblk_request
+ * do_blkif_request
  *  read a block; request is in a request queue
  */
-void do_xlblk_request(request_queue_t *rq)
+void do_blkif_request(request_queue_t *rq)
 {
     struct request *req;
     struct buffer_head *bh, *next_bh;
     int rw, nsect, full, queued = 0;
 
-    DPRINTK("xlblk.c::do_xlblk_request\n"); 
+    DPRINTK("Entered do_blkif_request\n"); 
 
     while ( !rq->plugged && !list_empty(&rq->queue_head))
     {
         if ( (req = blkdev_entry_next_request(&rq->queue_head)) == NULL ) 
             goto out;
   
-        DPRINTK("do_xlblk_request %p: cmd %i, sec %lx, (%li/%li) bh:%p\n",
+        DPRINTK("do_blkif_request %p: cmd %i, sec %lx, (%li/%li) bh:%p\n",
                 req, req->cmd, req->sector,
                 req->current_nr_sectors, req->nr_sectors, req->bh);
 
@@ -420,9 +413,9 @@ void do_xlblk_request(request_queue_t *rq)
             next_bh = bh->b_reqnext;
             bh->b_reqnext = NULL;
 
-            full = hypervisor_request(
+            full = blkif_queue_request(
                 (unsigned long)bh,
-                (rw == READ) ? XEN_BLOCK_READ : XEN_BLOCK_WRITE, 
+                (rw == READ) ? BLKIF_OP_READ : BLKIF_OP_WRITE, 
                 bh->b_data, bh->b_rsector, bh->b_size>>9, bh->b_rdev);
 
             if ( full )
@@ -462,7 +455,8 @@ void do_xlblk_request(request_queue_t *rq)
     }
 
  out:
-    if ( queued != 0 ) signal_requests_to_xen();
+    if ( queued != 0 )
+        flush_requests();
 }
 
 
@@ -474,30 +468,30 @@ static void kick_pending_request_queues(void)
     {
         /* Attempt to drain the queue, but bail if the ring becomes full. */
         while ( (nr_pending != 0) && !RING_PLUGGED )
-            do_xlblk_request(pending_queues[--nr_pending]);
+            do_blkif_request(pending_queues[--nr_pending]);
     }
 }
 
 
-static void xlblk_response_int(int irq, void *dev_id, struct pt_regs *ptregs)
+static void blkif_int(int irq, void *dev_id, struct pt_regs *ptregs)
 {
     BLK_RING_IDX i; 
     unsigned long flags; 
     struct buffer_head *bh, *next_bh;
     
-    if ( unlikely(state == STATE_CLOSED) )
+    if ( unlikely(blkif_state == BLKIF_STATE_CLOSED) )
         return;
     
     spin_lock_irqsave(&io_request_lock, flags);     
 
     for ( i = resp_cons; i != blk_ring->resp_prod; i++ )
     {
-        blk_ring_resp_entry_t *bret = &blk_ring->ring[MASK_BLK_IDX(i)].resp;
+        blkif_response_t *bret = &blk_ring->ring[MASK_BLK_IDX(i)].resp;
         switch ( bret->operation )
         {
-        case XEN_BLOCK_READ:
-        case XEN_BLOCK_WRITE:
-            if ( unlikely(bret->status != 0) )
+        case BLKIF_OP_READ:
+        case BLKIF_OP_WRITE:
+            if ( unlikely(bret->status != BLKIF_RSP_OKAY) )
                 DPRINTK("Bad return from blkdev data request: %lx\n",
                         bret->status);
             for ( bh = (struct buffer_head *)bret->id; 
@@ -506,10 +500,13 @@ static void xlblk_response_int(int irq, void *dev_id, struct pt_regs *ptregs)
             {
                 next_bh = bh->b_reqnext;
                 bh->b_reqnext = NULL;
-                bh->b_end_io(bh, !bret->status);
+                bh->b_end_io(bh, bret->status == BLKIF_RSP_OKAY);
             }
             break;
-     
+        case BLKIF_OP_PROBE:
+            memcpy(&blkif_control_rsp, bret, sizeof(*bret));
+            blkif_control_rsp_valid = 1;
+            break;
         default:
             BUG();
         }
@@ -523,70 +520,190 @@ static void xlblk_response_int(int irq, void *dev_id, struct pt_regs *ptregs)
 }
 
 
-static void reset_xlblk_interface(void)
+void blkif_control_send(blkif_request_t *req, blkif_response_t *rsp)
 {
-    block_io_op_t op; 
+    unsigned long flags;
 
-    nr_pending = 0;
+ retry:
+    while ( (req_prod - resp_cons) == BLK_RING_SIZE )
+    {
+        set_current_state(TASK_INTERRUPTIBLE);
+        schedule_timeout(1);
+    }
 
-    op.cmd = BLOCK_IO_OP_RESET;
-    if ( HYPERVISOR_block_io_op(&op) != 0 )
-        printk(KERN_ALERT "Possible blkdev trouble: couldn't reset ring\n");
+    spin_lock_irqsave(&io_request_lock, flags);
+    if ( (req_prod - resp_cons) == BLK_RING_SIZE )
+    {
+        spin_unlock_irqrestore(&io_request_lock, flags);
+        goto retry;
+    }
 
-    op.cmd = BLOCK_IO_OP_RING_ADDRESS;
-    (void)HYPERVISOR_block_io_op(&op);
+    DISABLE_SCATTERGATHER();
+    memcpy(&blk_ring->ring[MASK_BLK_IDX(req_prod)].req, req, sizeof(*req));
+    req_prod++;
+    flush_requests();
 
-    set_fixmap(FIX_BLKRING_BASE, op.u.ring_mfn << PAGE_SHIFT);
-    blk_ring = (blk_ring_t *)fix_to_virt(FIX_BLKRING_BASE);
+    spin_unlock_irqrestore(&io_request_lock, flags);
+
+    while ( !blkif_control_rsp_valid )
+    {
+        set_current_state(TASK_INTERRUPTIBLE);
+        schedule_timeout(1);
+    }
+
+    memcpy(rsp, &blkif_control_rsp, sizeof(*rsp));
+    blkif_control_rsp_valid = 0;
+}
+
+
+static void blkif_bringup_phase1(void *unused)
+{
+    ctrl_msg_t                   cmsg;
+    blkif_fe_interface_connect_t up;
+
+    /* Move from CLOSED to DISCONNECTED state. */
+    blk_ring = (blkif_ring_t *)__get_free_page(GFP_KERNEL);
     blk_ring->req_prod = blk_ring->resp_prod = resp_cons = req_prod = 0;
+    blkif_state  = BLKIF_STATE_DISCONNECTED;
 
-    wmb();
-    state = STATE_ACTIVE;
+    /* Construct an interface-CONNECT message for the domain controller. */
+    cmsg.type      = CMSG_BLKIF_FE;
+    cmsg.subtype   = CMSG_BLKIF_FE_INTERFACE_CONNECT;
+    cmsg.length    = sizeof(blkif_fe_interface_connect_t);
+    up.handle      = 0;
+    up.shmem_frame = virt_to_machine(blk_ring) >> PAGE_SHIFT;
+    memcpy(cmsg.msg, &up, sizeof(up));
+
+    /* Tell the controller to bring up the interface. */
+    ctrl_if_send_message_block(&cmsg, NULL, 0, TASK_UNINTERRUPTIBLE);
+}
+
+static void blkif_bringup_phase2(void *unused)
+{
+    blkif_irq = bind_evtchn_to_irq(blkif_evtchn);
+    (void)request_irq(blkif_irq, blkif_int, 0, "blkif", NULL);
+
+    /* Probe for discs that are attached to the interface. */
+    xlvbd_init();
+
+    blkif_state = BLKIF_STATE_CONNECTED;
+
+    /* Kick pending requests. */
+    spin_lock_irq(&io_request_lock);
+    kick_pending_request_queues();
+    spin_unlock_irq(&io_request_lock);
+}
+
+static void blkif_status_change(blkif_fe_interface_status_changed_t *status)
+{
+    if ( status->handle != 0 )
+    {
+        printk(KERN_WARNING "Status change on unsupported blkif %d\n",
+               status->handle);
+        return;
+    }
+
+    switch ( status->status )
+    {
+    case BLKIF_INTERFACE_STATUS_DESTROYED:
+        printk(KERN_WARNING "Unexpected blkif-DESTROYED message in state %d\n",
+               blkif_state);
+        break;
+
+    case BLKIF_INTERFACE_STATUS_DISCONNECTED:
+        if ( blkif_state != BLKIF_STATE_CLOSED )
+        {
+            printk(KERN_WARNING "Unexpected blkif-DISCONNECTED message"
+                   " in state %d\n", blkif_state);
+            break;
+        }
+        blkif_statechange_tq.routine = blkif_bringup_phase1;
+        schedule_task(&blkif_statechange_tq);
+        break;
+
+    case BLKIF_INTERFACE_STATUS_CONNECTED:
+        if ( blkif_state == BLKIF_STATE_CLOSED )
+        {
+            printk(KERN_WARNING "Unexpected blkif-CONNECTED message"
+                   " in state %d\n", blkif_state);
+            break;
+        }
+        blkif_evtchn = status->evtchn;
+        blkif_statechange_tq.routine = blkif_bringup_phase2;
+        schedule_task(&blkif_statechange_tq);
+        break;
+
+    default:
+        printk(KERN_WARNING "Status change to unknown value %d\n", 
+               status->status);
+        break;
+    }
+}
+
+
+static void blkif_ctrlif_rx(ctrl_msg_t *msg, unsigned long id)
+{
+    switch ( msg->subtype )
+    {
+    case CMSG_BLKIF_FE_INTERFACE_STATUS_CHANGED:
+        if ( msg->length != sizeof(blkif_fe_interface_status_changed_t) )
+            goto parse_error;
+        blkif_status_change((blkif_fe_interface_status_changed_t *)
+                            &msg->msg[0]);
+        break;        
+#if 0
+    case CMSG_BLKIF_FE_VBD_STATUS_CHANGED:
+        update_tq.routine = update_vbds_task;
+        schedule_task(&update_tq);
+        break;
+#endif
+    default:
+        goto parse_error;
+    }
+
+    ctrl_if_send_response(msg);
+    return;
+
+ parse_error:
+    msg->length = 0;
+    ctrl_if_send_response(msg);
 }
 
 
 int __init xlblk_init(void)
 {
-    int error; 
+    ctrl_msg_t                       cmsg;
+    blkif_fe_driver_status_changed_t st;
 
-    reset_xlblk_interface();
+    (void)ctrl_if_register_receiver(CMSG_BLKIF_FE, blkif_ctrlif_rx);
 
-    xlblk_response_irq = bind_virq_to_irq(VIRQ_BLKDEV);
-    xlblk_update_irq   = bind_virq_to_irq(VIRQ_VBD_UPD);
+    /* Send a driver-UP notification to the domain controller. */
+    cmsg.type      = CMSG_BLKIF_FE;
+    cmsg.subtype   = CMSG_BLKIF_FE_DRIVER_STATUS_CHANGED;
+    cmsg.length    = sizeof(blkif_fe_driver_status_changed_t);
+    st.status      = BLKIF_DRIVER_STATUS_UP;
+    memcpy(cmsg.msg, &st, sizeof(st));
+    ctrl_if_send_message_block(&cmsg, NULL, 0, TASK_UNINTERRUPTIBLE);
 
-    error = request_irq(xlblk_response_irq, xlblk_response_int, 
-                        SA_SAMPLE_RANDOM, "blkdev", NULL);
-    if ( error )
+    /*
+     * We should read 'nr_interfaces' from response message and wait
+     * for notifications before proceeding. For now we assume that we
+     * will be notified of exactly one interface.
+     */
+    while ( blkif_state != BLKIF_STATE_CONNECTED )
     {
-        printk(KERN_ALERT "Could not allocate receive interrupt\n");
-        goto fail;
+        set_current_state(TASK_INTERRUPTIBLE);
+        schedule_timeout(1);
     }
-
-    error = request_irq(xlblk_update_irq, xlblk_update_int,
-                        0, "blkdev", NULL);
-
-    if ( error )
-    {
-        printk(KERN_ALERT "Could not allocate block update interrupt\n");
-        goto fail;
-    }
-
-    (void)xlvbd_init();
 
     return 0;
-
- fail:
-    return error;
 }
 
 
 static void __exit xlblk_cleanup(void)
 {
-    xlvbd_cleanup();
-    free_irq(xlblk_response_irq, NULL);
-    free_irq(xlblk_update_irq, NULL);
-    unbind_virq_from_irq(VIRQ_BLKDEV);
-    unbind_virq_from_irq(VIRQ_VBD_UPD);
+    /* XXX FIXME */
+    BUG();
 }
 
 
@@ -598,28 +715,13 @@ module_exit(xlblk_cleanup);
 
 void blkdev_suspend(void)
 {
-    state = STATE_SUSPENDED;
-    wmb();
-
-    while ( resp_cons != blk_ring->req_prod )
-    {
-        barrier();
-        current->state = TASK_INTERRUPTIBLE;
-        schedule_timeout(1);
-    }
-
-    wmb();
-    state = STATE_CLOSED;
-    wmb();
-
-    clear_fixmap(FIX_BLKRING_BASE);
+    /* XXX FIXME */
+    BUG();
 }
 
 
 void blkdev_resume(void)
 {
-    reset_xlblk_interface();
-    spin_lock_irq(&io_request_lock);
-    kick_pending_request_queues();
-    spin_unlock_irq(&io_request_lock);
+    /* XXX FIXME */
+    BUG();
 }

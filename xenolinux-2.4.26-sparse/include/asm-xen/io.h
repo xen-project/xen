@@ -159,12 +159,46 @@ extern void iounmap(void *addr);
 extern void *bt_ioremap(unsigned long offset, unsigned long size);
 extern void bt_iounmap(void *addr, unsigned long size);
 
+#ifdef CONFIG_XEN_PHYSDEV_ACCESS
+
+#ifdef CONFIG_HIGHMEM
+#error "Highmem is not yet compatible with physical device access"
+#endif
+
 /*
- * IO bus memory addresses are also 1:1 with the physical address
+ * The bus translation macros need special care if we are executing device
+ * accesses to/from other domains' memory. In these cases the virtual address
+ * is actually a temporary mapping in the 'vmalloc' space. The physical
+ * address will therefore be >max_low_pfn, and will not have a valid entry
+ * in the phys_to_mach mapping table.
  */
+static inline unsigned long phys_to_bus(unsigned long phys)
+{
+    extern unsigned long max_pfn;
+    pgd_t *pgd; pmd_t *pmd; pte_t *pte;
+    void *addr;
+    unsigned long bus;
+    if ( (phys >> PAGE_SHIFT) < max_pfn )
+        return phys_to_machine(phys);
+    addr = phys_to_virt(phys);
+    pgd = pgd_offset_k(   (unsigned long)addr);
+    pmd = pmd_offset(pgd, (unsigned long)addr);
+    pte = pte_offset(pmd, (unsigned long)addr);
+    bus = (pte->pte_low & PAGE_MASK) | (phys & ~PAGE_MASK);
+    return bus;
+}
+
+#define virt_to_bus(_x) phys_to_bus(virt_to_phys(_x))
+#define bus_to_virt(_x) phys_to_virt(machine_to_phys(_x))
+#define page_to_bus(_x) phys_to_bus(page_to_phys(_x))
+
+#else
+
 #define virt_to_bus(_x) phys_to_machine(virt_to_phys(_x))
 #define bus_to_virt(_x) phys_to_virt(machine_to_phys(_x))
 #define page_to_bus(_x) phys_to_machine(page_to_phys(_x))
+
+#endif /* CONFIG_XEN_PHYSDEV_ACCESS */
 
 /*
  * readX/writeX() are used to access memory mapped devices. On some

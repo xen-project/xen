@@ -51,6 +51,8 @@ static unsigned char  pdb_xmit_checksum;
 unsigned long pdb_linux_pid_ptbr (unsigned long cr3, int pid);
 void pdb_linux_get_values(char *buffer, int length, unsigned long address,
 			  int pid, unsigned long cr3);
+void pdb_linux_set_values(char *buffer, int length, unsigned long address,
+			  int pid, unsigned long cr3);
 
 struct pdb_context
 {
@@ -570,6 +572,12 @@ pdb_process_command (char *ptr, struct pt_regs *regs, unsigned long cr3,
 			if (addr >= PAGE_OFFSET)
 			{
 			    hex2mem (ptr, (char *)addr, length);
+			}
+			else if (pdb_ctx.process != -1)
+			{
+			    pdb_linux_set_values(ptr, length, addr,
+						 pdb_ctx.process, 
+						 pdb_ctx.ptbr);
 			}
 			else
 			{

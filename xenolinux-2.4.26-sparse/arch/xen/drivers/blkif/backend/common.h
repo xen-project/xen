@@ -34,23 +34,37 @@ typedef struct blkif_st {
     unsigned int     evtchn;
     int              irq;
     /* Comms information. */
-    blk_ring_t      *blk_ring_base; /* ioremap()'ed ptr to shmem_frame. */
+    blkif_ring_t    *blk_ring_base; /* ioremap()'ed ptr to shmem_frame. */
     BLK_RING_IDX     blk_req_cons;  /* Request consumer. */
     BLK_RING_IDX     blk_resp_prod; /* Private version of response producer. */
     /* VBDs attached to this interface. */
     rb_root_t        vbd_rb;        /* Mapping from 16-bit vdevices to VBDs. */
     spinlock_t       vbd_lock;      /* Protects VBD mapping. */
     /* Private fields. */
+    enum { DISCONNECTED, DISCONNECTING, CONNECTED } status;
+    /*
+     * DISCONNECT response is deferred until pending requests are ack'ed.
+     * We therefore need to store the id from the original request.
+     */
+    u8               disconnect_rspid;
     struct blkif_st *hash_next;
     struct list_head blkdev_list;
     spinlock_t       blk_ring_lock;
+    atomic_t         refcnt;
 } blkif_t;
 
-void blkif_create(blkif_create_t *create);
-void blkif_destroy(blkif_destroy_t *destroy);
+void blkif_create(blkif_be_create_t *create);
+void blkif_destroy(blkif_be_destroy_t *destroy);
+void blkif_connect(blkif_be_connect_t *connect);
+int  blkif_disconnect(blkif_be_disconnect_t *disconnect, u8 rsp_id);
+void __blkif_disconnect_complete(blkif_t *blkif);
 blkif_t *blkif_find_by_handle(domid_t domid, unsigned int handle);
-void blkif_get(blkif_t *blkif);
-void blkif_put(blkif_t *blkif);
+#define blkif_get(_b) (atomic_inc(&(_b)->refcnt))
+#define blkif_put(_b)                             \
+    do {                                          \
+        if ( atomic_dec_and_test(&(_b)->refcnt) ) \
+            __blkif_disconnect_complete(_b);      \
+    } while (0)
 
 /* An entry in a list of xen_extents. */
 typedef struct _blkif_extent_le { 
@@ -60,25 +74,25 @@ typedef struct _blkif_extent_le {
 
 typedef struct _vbd { 
     blkif_vdev_t       vdevice;   /* what the domain refers to this vbd as */
-    unsigned char      mode;      /* VBD_MODE_{R,W} */
+    unsigned char      readonly;  /* Non-zero -> read-only */
     unsigned char      type;      /* XD_TYPE_xxx */
     blkif_extent_le_t *extents;   /* list of xen_extents making up this vbd */
     rb_node_t          rb;        /* for linking into R-B tree lookup struct */
 } vbd_t; 
 
-long vbd_create(blkif_vbd_create_t *create_params); 
-long vbd_grow(blkif_vbd_grow_t *grow_params); 
-long vbd_shrink(blkif_vbd_shrink_t *shrink_params);
-long vbd_destroy(blkif_vbd_destroy_t *delete_params); 
-
-void destroy_all_vbds(struct task_struct *p);
+void vbd_create(blkif_be_vbd_create_t *create); 
+void vbd_grow(blkif_be_vbd_grow_t *grow); 
+void vbd_shrink(blkif_be_vbd_shrink_t *shrink);
+void vbd_destroy(blkif_be_vbd_destroy_t *delete); 
+int vbd_probe(blkif_t *blkif, vdisk_t *vbd_info, int max_vbds);
+void destroy_all_vbds(blkif_t *blkif);
 
 typedef struct {
     blkif_t       *blkif;
     unsigned long  id;
     atomic_t       pendcnt;
     unsigned short operation;
-    unsigned short status;
+    int            status;
 } pending_req_t;
 
 /* Describes a [partial] disk extent (part of a block io request) */
@@ -91,7 +105,10 @@ typedef struct {
 
 int vbd_translate(phys_seg_t *pseg, blkif_t *blkif, int operation); 
 
-int blkif_be_controller_init(void);
+void blkif_interface_init(void);
+void blkif_ctrlif_init(void);
+
+void blkif_deschedule(blkif_t *blkif);
 
 void blkif_be_int(int irq, void *dev_id, struct pt_regs *regs);
 

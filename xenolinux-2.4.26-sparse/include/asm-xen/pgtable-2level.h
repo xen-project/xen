@@ -47,6 +47,11 @@ static inline pmd_t * pmd_offset(pgd_t * dir, unsigned long address)
 	return (pmd_t *) dir;
 }
 
+#define pte_same(a, b)		((a).pte_low == (b).pte_low)
+#define pte_page(x)		(mem_map+((unsigned long)((pte_val(x) >> PAGE_SHIFT))))
+#define pte_none(x)		(!(x).pte_low)
+#define __mk_pte(page_nr,pgprot) __pte(((page_nr) << PAGE_SHIFT) | pgprot_val(pgprot))
+
 /*
  * A note on implementation of this atomic 'get-and-clear' operation.
  * This is actually very simple because XenoLinux can only run on a single
@@ -59,13 +64,9 @@ static inline pmd_t * pmd_offset(pgd_t * dir, unsigned long address)
 static inline pte_t ptep_get_and_clear(pte_t *xp)
 {
     pte_t pte = *xp;
-    queue_l1_entry_update(xp, 0);
+    if ( !pte_none(pte) )
+        queue_l1_entry_update(xp, 0);
     return pte;
 }
-
-#define pte_same(a, b)		((a).pte_low == (b).pte_low)
-#define pte_page(x)		(mem_map+((unsigned long)((pte_val(x) >> PAGE_SHIFT))))
-#define pte_none(x)		(!(x).pte_low)
-#define __mk_pte(page_nr,pgprot) __pte(((page_nr) << PAGE_SHIFT) | pgprot_val(pgprot))
 
 #endif /* _I386_PGTABLE_2LEVEL_H */
