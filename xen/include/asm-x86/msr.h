@@ -95,12 +95,6 @@
 #define MSR_IA32_EVNTSEL0      0x186
 #define MSR_IA32_EVNTSEL1      0x187
 
-#define MSR_IA32_DEBUGCTLMSR       0x1d9
-#define MSR_IA32_LASTBRANCHFROMIP  0x1db
-#define MSR_IA32_LASTBRANCHTOIP        0x1dc
-#define MSR_IA32_LASTINTFROMIP     0x1dd
-#define MSR_IA32_LASTINTTOIP       0x1de
-
 #define MSR_MTRRfix64K_00000	0x250
 #define MSR_MTRRfix16K_80000	0x258
 #define MSR_MTRRfix16K_A0000	0x259
@@ -118,6 +112,8 @@
 #define MSR_IA32_MC0_STATUS        0x401
 #define MSR_IA32_MC0_ADDR      0x402
 #define MSR_IA32_MC0_MISC      0x403
+
+#define MSR_IA32_DS_AREA	0x600
 
 #define MSR_IA32_APICBASE		0x1b
 #define MSR_IA32_APICBASE_BSP		(1<<8)
@@ -138,11 +134,22 @@
 #define MSR_IA32_THERM_STATUS		0x19c
 #define MSR_IA32_MISC_ENABLE		0x1a0
 
+#define MSR_IA32_MISC_ENABLE_PERF_AVAIL   (1<<7)
+#define MSR_IA32_MISC_ENABLE_BTS_UNAVAIL  (1<<11)
+#define MSR_IA32_MISC_ENABLE_PEBS_UNAVAIL (1<<12)
+
 #define MSR_IA32_DEBUGCTLMSR		0x1d9
-#define MSR_IA32_LASTBRANCHFROMIP	0x1db
-#define MSR_IA32_LASTBRANCHTOIP		0x1dc
-#define MSR_IA32_LASTINTFROMIP		0x1dd
-#define MSR_IA32_LASTINTTOIP		0x1de
+#define MSR_IA32_DEBUGCTLMSR_LBR        (1<<0)
+#define MSR_IA32_DEBUGCTLMSR_BTF        (1<<1)
+#define MSR_IA32_DEBUGCTLMSR_TR		(1<<2)
+#define MSR_IA32_DEBUGCTLMSR_BTS        (1<<3)
+#define MSR_IA32_DEBUGCTLMSR_BTINT      (1<<4)
+
+#define MSR_IA32_LASTBRANCH_TOS         0x1da
+#define MSR_IA32_LASTBRANCH_0		0x1db
+#define MSR_IA32_LASTBRANCH_1		0x1dc
+#define MSR_IA32_LASTBRANCH_2		0x1dd
+#define MSR_IA32_LASTBRANCH_3		0x1de
 
 #define MSR_IA32_MC0_CTL		0x400
 #define MSR_IA32_MC0_STATUS		0x401
@@ -153,6 +160,7 @@
 #define MSR_P6_PERFCTR1			0xc2
 #define MSR_P6_EVNTSEL0			0x186
 #define MSR_P6_EVNTSEL1			0x187
+
 
 /* K7/K8 MSRs. Not complete. See the architecture manual for a more complete list. */
 #define MSR_K7_EVNTSEL0            0xC0010000
