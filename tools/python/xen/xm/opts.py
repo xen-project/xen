@@ -126,6 +126,42 @@ class Opt:
         """
         return self.specified_opt
 
+class OptVar(Opt):
+    """An individual option variable.
+    """
+    def __init__(self, opts, name,
+                 val=None, fn=None, use=None, default=None):
+        """Create an option.
+
+        opts    parent options object
+        name    name of the field it controls
+        val     string used to print option args in help.
+                If val is not specified the option has no arg.
+        fn      function to call when the option is specified.
+        use     usage (help) string
+        default default value if not specified on command-line
+        """
+        if val is None:
+            val = name.upper()
+        Opt.__init__(self, opts, name, val=val, fn=fn, use=use, default=default)
+        self.optkeys = []
+        self.optkeys.append(self.long)
+
+    def short_opt(self):
+        return None
+
+    def long_opt(self):
+        return None
+
+    def show(self):
+        print '%s=%s' %(self.optkeys[0], self.val) 
+        print
+        if self.use:
+            print '\t',
+            print self.use
+        if self.val:
+            print '\tDefault', self.default or 'None'
+
 class OptVals:
     """Class to hold option values.
     """
@@ -134,6 +170,13 @@ class OptVals:
 class Opts:
     """Container for options.
     """
+
+    imports = ["import sys",
+               "import os",
+               "import os.path",
+               "from xen.util.ip import *",
+               ]
+
     def __init__(self, use=None):
         """Options constructor.
 
@@ -167,6 +210,12 @@ class Opts:
         self.options.append(x)
         self.options_map[name] = x
         return x
+
+    def var(self, name, **args):
+        x = OptVar(self, name, **args)
+        self.options.append(x)
+        self.options_map[name] = x
+        return x     
 
     def setvar(self, var, val):
         """Set a default script variable.
@@ -232,7 +281,14 @@ class Opts:
             else:
                 print >>sys.stderr, "Error: Unknown option:", k
                 self.usage()
-        return args
+        xargs = []
+        for arg in args:
+            (k, v) = arg.split('=', 1)
+            for opt in self.options:
+                if opt.specify(k, v): break
+            else:
+                xargs.append(arg)
+        return xargs
 
     def short_opts(self):
         """Get short options specifier for getopt.
@@ -257,6 +313,7 @@ class Opts:
     def usage(self):
         print 'Usage: ', self.argv[0], self.use or 'OPTIONS'
         for opt in self.options:
+            print
             opt.show()
 
     def load_defaults(self, help=0):
@@ -287,21 +344,22 @@ class Opts:
         globals = {}
         locals = {}
         locals.update(self.vars)
-        cmd = '\n'.join(["import sys",
-                         "import os",
-                         "import os.path",
-                         "from xen.xm.help import Vars",
-                         "from xen.util import ip",
-                         "xm_file = '%s'" % defaults,
-                         "xm_help = %d" % help,
-                         "xm_vars = Vars(xm_file, xm_help, locals())",
-                         ])
+        cmd = '\n'.join(self.imports + 
+                        [ "from xen.xm.help import Vars",
+                          "xm_file = '%s'" % defaults,
+                          "xm_help = %d" % help,
+                          "xm_vars = Vars(xm_file, xm_help, locals())"
+                          ])
         exec cmd in globals, locals
         try:
             execfile(defaults, globals, locals)
         except:
             if not help: raise
-        if help: return
+        if help:
+            print 'The following imports are done automatically:'
+            for x in self.imports:
+                print x
+            return
         # Extract the values set by the script and set the corresponding
         # options, if not set on the command line.
         vtypes = [ types.StringType,
@@ -322,6 +380,17 @@ def set_false(opt, k, v):
     """Set an option false."""
     opt.set(0)
 
+def set_bool(opt, k, v):
+    """Set a boolean option.
+    """
+    if v in ['yes']:
+        opt.set(1)
+    elif v in ['no']:
+        opt.set(0)
+    else:
+        opt.opts.err('Invalid value:' +v)
+        
+
 def set_value(opt, k, v):
     """Set an option to a valoue."""
     opt.set(v)
@@ -341,6 +410,6 @@ def append_value(opt, k, v):
 def set_var(opt, k, v):
     """Set a default script variable.
     """
-    (var, val) = v.strip().split('=')
+    (var, val) = v.strip().split('=', 1)
     opt.opts.setvar(var.strip(), val.strip())
 
