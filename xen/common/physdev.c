@@ -125,10 +125,10 @@ int physdev_pci_access_modify(
     domid_t dom, int bus, int dev, int func, int enable)
 {
     struct domain *p;
-    struct exec_domain *ed;
+    struct exec_domain *ed, *edc;
     struct pci_dev *pdev;
     int i, j, rc = 0;
- 
+
     if ( !IS_PRIV(current->domain) )
         BUG();
 
@@ -182,6 +182,12 @@ int physdev_pci_access_modify(
         memset(ed->thread.io_bitmap, 0xFF, IOBMP_BYTES);
 
         ed->thread.io_bitmap_sel = ~0ULL;
+
+        for_each_exec_domain(p, edc) {
+            if (edc == ed)
+                continue;
+            edc->thread.io_bitmap = ed->thread.io_bitmap;
+        }
     }
 
     for ( i = 0; i < DEVICE_COUNT_RESOURCE; i++ )
@@ -205,6 +211,13 @@ int physdev_pci_access_modify(
 
         /* rights to IO memory regions are checked when the domain maps them */
     }
+
+    for_each_exec_domain(p, edc) {
+        if (edc == ed)
+            continue;
+        edc->thread.io_bitmap_sel = ed->thread.io_bitmap_sel;
+    }
+
  out:
     put_domain(p);
     return rc;
