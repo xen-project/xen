@@ -757,7 +757,8 @@ class XendDomainInfo:
         if self.console:
             self.console.registerChannel()
         else:
-            self.console = xendConsole.console_create(self.dom, console_port=self.console_port)
+            self.console = xendConsole.console_create(
+                self.dom, console_port=self.console_port, remote_port=1)
         self.build_domain(ostype, kernel, ramdisk, cmdline)
         self.image = kernel
         self.ramdisk = ramdisk

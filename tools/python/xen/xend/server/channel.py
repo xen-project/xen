@@ -45,7 +45,7 @@ class ChannelFactory:
             del self.channels[idx]
             self.notifier.unbind(idx)
 
-    def domChannel(self, dom):
+    def domChannel(self, dom, remote_port=0):
         """Get the channel for the given domain.
         Construct if necessary.
 
@@ -55,7 +55,7 @@ class ChannelFactory:
         """
         chan = self.getDomChannel(dom)
         if not chan:
-            chan = Channel(self, dom)
+            chan = Channel(self, dom, remote_port=remote_port)
             self.addChannel(chan)
         return chan
 
@@ -91,10 +91,10 @@ class ChannelFactory:
         """
         self.delChannel(channel.idx)
 
-    def createPort(self, dom):
+    def createPort(self, dom, remote_port=0):
         """Create a port for a channel to the given domain.
         """
-        return xu.port(dom)
+        return xu.port(dom, remote_port)
 
 def channelFactory():
     """Singleton constructor for the channel factory.
@@ -200,7 +200,7 @@ class Channel(BaseChannel):
     are multiplexed over the channel (console, block devs, net devs).
     """
 
-    def __init__(self, factory, dom):
+    def __init__(self, factory, dom, remote_port=0):
         """Create a channel to the given domain using the given factory.
 
         Do not call directly, use domChannel on the factory.
@@ -209,7 +209,7 @@ class Channel(BaseChannel):
         # Domain.
         self.dom = int(dom)
         # Domain port (object).
-        self.port = self.factory.createPort(dom)
+        self.port = self.factory.createPort(dom, remote_port=remote_port)
         # Channel port (int).
         self.idx = self.port.local_port
         # Registered devices.
