@@ -28,6 +28,10 @@
 #include <xen/trace.h>
 #include <public/sched_ctl.h>
 
+/* opt_sched: scheduler - default to Borrowed Virtual Time */
+static char opt_sched[10] = "bvt";
+string_param("sched", opt_sched);
+
 /*#define WAKE_HISTO*/
 /*#define BLOCKTIME_HISTO*/
 
@@ -480,8 +484,6 @@ void __init scheduler_init(void)
     }
 
     schedule_data[0].idle = &idle0_task;
-
-    extern char opt_sched[];
 
     for ( i = 0; schedulers[i] != NULL; i++ )
     {

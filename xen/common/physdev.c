@@ -19,6 +19,7 @@
  */
 
 #include <xen/config.h>
+#include <xen/init.h>
 #include <xen/lib.h>
 #include <xen/types.h>
 #include <xen/sched.h>
@@ -697,11 +698,15 @@ long do_physdev_op(physdev_op_t *uop)
     return ret;
 }
 
+/* opt_physdev_dom0_hide: list of PCI slots to hide from domain 0. */
+/* Format is '(%02x:%02x.%1x)(%02x:%02x.%1x)' and so on. */
+static char opt_physdev_dom0_hide[200] = "";
+string_param("physdev_dom0_hide", opt_physdev_dom0_hide);
+
 /* Test if boot params specify this device should NOT be visible to DOM0
  * (e.g. so that another domain can control it instead) */
 int pcidev_dom0_hidden(struct pci_dev *dev)
 {
-    extern char opt_physdev_dom0_hide[];
     char cmp[10] = "(.......)";
     
     strncpy(&cmp[1], dev->slot_name, 7);

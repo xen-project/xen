@@ -52,6 +52,19 @@
 #include <asm/i387.h>
 #include <asm/debugger.h>
 
+/*
+ * opt_nmi: one of 'ignore', 'dom0', or 'fatal'.
+ *  fatal:  Xen prints diagnostic message and then hangs.
+ *  dom0:   The NMI is virtualised to DOM0.
+ *  ignore: The NMI error is cleared and ignored.
+ */
+#ifdef NDEBUG
+char opt_nmi[10] = "dom0";
+#else
+char opt_nmi[10] = "fatal";
+#endif
+string_param("nmi", opt_nmi);
+
 #if defined(__i386__)
 
 #define GUEST_FAULT(_r) (likely(VM86_MODE(_r) || !RING_0(_r)))

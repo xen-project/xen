@@ -8,6 +8,7 @@
 
 #include <stdarg.h>
 #include <xen/config.h>
+#include <xen/init.h>
 #include <xen/lib.h>
 #include <xen/errno.h>
 #include <xen/event.h>
@@ -17,7 +18,16 @@
 #include <xen/keyhandler.h>
 #include <asm/uaccess.h>
 
-extern unsigned char opt_console[], opt_conswitch[];
+/* opt_console: comma-separated list of console outputs. */
+static unsigned char opt_console[30] = "com1,vga";
+string_param("console", opt_console);
+
+/* opt_conswitch: a character pair controlling console switching. */
+/* Char 1: CTRL+<char1> is used to switch console input between Xen and DOM0 */
+/* Char 2: If this character is 'x', then do not auto-switch to DOM0 when it */
+/*         boots. Any other value, or omitting the char, enables auto-switch */
+static unsigned char opt_conswitch[5] = "a";
+string_param("conswitch", opt_conswitch);
 
 static int xpos, ypos;
 static unsigned char *video = __va(0xB8000);

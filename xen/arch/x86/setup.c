@@ -16,14 +16,33 @@
 #include <asm/domain_page.h>
 #include <asm/pdb.h>
 
+/* opt_noht: If true, Hyperthreading is ignored. */
+int opt_noht = 0;
+boolean_param("noht", opt_noht);
+
+/* opt_noacpi: If true, ACPI tables are not parsed. */
+static int opt_noacpi = 0;
+boolean_param("noacpi", opt_noacpi);
+
+/* opt_nosmp: If true, secondary processors are ignored. */
+static int opt_nosmp = 0;
+boolean_param("nosmp", opt_nosmp);
+
+/* opt_ignorebiostables: If true, ACPI and MP tables are ignored. */
+/* NB. This flag implies 'nosmp' and 'noacpi'. */
+static int opt_ignorebiostables = 0;
+boolean_param("ignorebiostables", opt_ignorebiostables);
+
+/* opt_watchdog: If true, run a watchdog NMI on each processor. */
+static int opt_watchdog = 0;
+boolean_param("watchdog", opt_watchdog);
+
 extern void arch_init_memory(void);
 extern void init_IRQ(void);
 extern void trap_init(void);
 extern void time_init(void);
 extern void ac_timer_init(void);
 extern void initialize_keytable();
-extern int opt_nosmp, opt_watchdog, opt_noacpi;
-extern int opt_ignorebiostables;
 extern int do_timer_lists_from_pit;
 
 char ignore_irq13;		/* set if exception 16 works */

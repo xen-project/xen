@@ -1830,7 +1830,12 @@ int io_apic_set_pci_routing (int ioapic, int pin, int irq, int edge_level, int a
 
 #endif /*CONFIG_ACPI_BOOT*/
 
-extern char opt_leveltrigger[], opt_edgetrigger[];
+/* opt_leveltrigger, opt_edgetrigger: Force an IO-APIC-routed IRQ to be */
+/*                                    level- or edge-triggered.         */
+/* Example: 'leveltrigger=4,5,6,20 edgetrigger=21'. */
+static char opt_leveltrigger[30] = "", opt_edgetrigger[30] = "";
+string_param("leveltrigger", opt_leveltrigger);
+string_param("edgetrigger", opt_edgetrigger);
 
 static int __init ioapic_trigger_setup(void)
 {

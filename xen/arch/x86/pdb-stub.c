@@ -22,6 +22,10 @@
 #include <xen/serial.h>
 #include <xen/softirq.h>
 
+/* opt_pdb: Name of serial port for Xen pervasive debugger (and enable pdb) */
+static unsigned char opt_pdb[10] = "none";
+string_param("pdb", opt_pdb);
+
 #define PDB_DEBUG_TRACE
 #ifdef PDB_DEBUG_TRACE
 #define TRC(_x) _x
@@ -1241,8 +1245,6 @@ void pdb_handle_debug_trap(struct xen_regs *regs, long error_code)
 
 void initialize_pdb()
 {
-    extern char opt_pdb[];
-
     /* Certain state must be initialised even when PDB will not be used. */
     memset((void *) &breakpoints, 0, sizeof(breakpoints));
     INIT_LIST_HEAD(&breakpoints.list);

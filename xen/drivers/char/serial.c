@@ -9,6 +9,7 @@
  */
 
 #include <xen/config.h>
+#include <xen/init.h>
 #include <xen/irq.h>
 #include <xen/keyhandler.h> 
 #include <asm/pdb.h>
@@ -16,6 +17,11 @@
 #include <xen/sched.h>
 #include <xen/serial.h>
 #include <asm/io.h>
+
+/* opt_com[12]: Config serial port with a string <baud>,DPS,<io-base>,<irq>. */
+static unsigned char opt_com1[30] = "", opt_com2[30] = "";
+string_param("com1", opt_com1);
+string_param("com2", opt_com2);
 
 /* Register offsets */
 #define RBR             0x00    /* receive buffer       */
@@ -280,8 +286,6 @@ static void uart_config_stage2(uart_t *uart)
 
 void serial_init_stage1(void)
 {
-    extern unsigned char opt_com1[], opt_com2[];
-
     parse_port_config(opt_com1, &com[0]);
     parse_port_config(opt_com2, &com[1]);
 

@@ -12,6 +12,7 @@
  */
 
 #include <xen/config.h>
+#include <xen/init.h>
 #include <xen/lib.h>
 #include <xen/errno.h>
 #include <xen/sched.h>
@@ -33,6 +34,10 @@
 #include <xen/console.h>
 #include <xen/elf.h>
 #include <xen/multicall.h>
+
+/* opt_noreboot: If true, machine will need manual reset on error. */
+static int opt_noreboot = 0;
+boolean_param("noreboot", opt_noreboot);
 
 #if !defined(CONFIG_X86_64BITMODE)
 /* No ring-3 access in initial page tables. */
@@ -110,7 +115,6 @@ static inline void kb_wait(void)
 
 void machine_restart(char * __unused)
 {
-    extern int opt_noreboot;
 #ifdef CONFIG_SMP
     int cpuid;
 #endif

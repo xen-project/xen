@@ -28,6 +28,10 @@
 #include <asm/atomic.h>
 #include <public/dom0_ops.h>
 
+/* opt_tbuf_size: trace buffer size (in pages) */
+static unsigned int opt_tbuf_size = 10;
+integer_param("tbuf_size", opt_tbuf_size);
+
 /* Pointers to the meta-data objects for all system trace buffers */
 struct t_buf *t_bufs[NR_CPUS];
 
@@ -43,7 +47,6 @@ int tb_init_done = 0;
  */
 void init_trace_bufs(void)
 {
-    extern int opt_tbuf_size;
     int           i, order;
     unsigned long nr_pages;
     char         *rawbuf;
@@ -102,10 +105,8 @@ void init_trace_bufs(void)
  */
 int get_tb_info(dom0_gettbufs_t *st)
 {
-    if(tb_init_done)
+    if ( tb_init_done )
     {
-        extern unsigned int opt_tbuf_size;
-        
         st->mach_addr = __pa(t_bufs[0]);
         st->size      = opt_tbuf_size * PAGE_SIZE;
         
