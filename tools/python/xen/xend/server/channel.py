@@ -216,11 +216,13 @@ class Channel(BaseChannel):
     def getLocalPort(self):
         """Get the local port.
         """
+        if self.closed: return -1
         return self.port.local_port
 
     def getRemotePort(self):
         """Get the remote port.
         """
+        if self.closed: return -1
         return self.port.remote_port
 
     def close(self):
@@ -233,6 +235,7 @@ class Channel(BaseChannel):
         self.factory.channelClosed(self)
         self.devs = []
         self.devs_by_type = {}
+        del self.port
 
     def registerDevice(self, types, dev):
         """Register a device controller.
@@ -273,8 +276,8 @@ class Channel(BaseChannel):
     def __repr__(self):
         return ('<Channel dom=%d ports=%d:%d>'
                 % (self.dom,
-                   self.port.local_port,
-                   self.port.remote_port))
+                   self.getLocalPort(),
+                   self.getRemotePort()))
 
     def handleNotification(self, type):
         work = 0
@@ -285,6 +288,7 @@ class Channel(BaseChannel):
             self.notify()
 
     def notify(self):
+        if self.closed: return
         self.port.notify()
 
     def handleRequests(self):

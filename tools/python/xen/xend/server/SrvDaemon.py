@@ -14,6 +14,7 @@ import socket
 import pwd
 import re
 import StringIO
+import traceback
 
 from twisted.internet import pollreactor
 pollreactor.install()
@@ -396,6 +397,12 @@ class EventProtocol(protocol.Protocol):
         eserver.inject(sxp.name(event), event)
         return ['ok']
 
+    def op_traceon(self, name, v):
+        self.daemon.tracing(1)
+
+    def op_traceoff(self, name, v):
+        self.daemon.tracing(0)
+
 
 class EventFactory(protocol.Factory):
     """Asynchronous handler for the event server socket.
@@ -428,6 +435,7 @@ class Daemon:
     """
     def __init__(self):
         self.shutdown = 0
+        self.traceon = 0
 
     def daemon_pids(self):
         pids = []
@@ -486,7 +494,7 @@ class Daemon:
         while code > 0:
             code = os.waitpid(-1, os.WNOHANG)
 
-    def start(self,trace=0):
+    def start(self, trace=0):
         if self.cleanup(kill=False):
             return 1
 
@@ -510,7 +518,21 @@ class Daemon:
         # Child
         logfile = self.open_logfile()
         self.redirect_output(logfile)
-        if trace:
+        
+        self.tracing(trace)
+
+        self.run()
+        return 0
+
+    def tracing(self, traceon):
+        """Turn tracing on or off.
+
+        traceon tracing flag
+        """
+        if traceon == self.traceon:
+            return
+        self.traceon = traceon
+        if traceon:
             self.tracefile = open('/var/log/xend.trace', 'w+', 1)
             self.traceindent = 0
             sys.settrace(self.trace)
@@ -518,26 +540,35 @@ class Daemon:
                 threading.settrace(self.trace) # Only in Python >= 2.3
             except:
                 pass
-        self.run()
-        return 0
 
-    def print_trace(self,str):
+    def print_trace(self, str):
         for i in range(self.traceindent):
-            self.tracefile.write("    ")
+            ch = " "
+            if (i % 5):
+                ch = ' '
+            else:
+                ch = '|'
+            self.tracefile.write(ch)
         self.tracefile.write(str)
             
     def trace(self, frame, event, arg):
+        if not self.traceon:
+            print >>self.tracefile
+            print >>self.tracefile, '-' * 20, 'TRACE OFF', '-' * 20
+            self.tracefile.close()
+            self.tracefile = None
+            return None
         if event == 'call':
             code = frame.f_code
             filename = code.co_filename
-            m = re.search('.*xenmgr/(.*)', code.co_filename)
+            m = re.search('.*xend/(.*)', filename)
             if not m:
                 return None
             modulename = m.group(1)
             if re.search('sxp.py', modulename):
                 return None
             self.traceindent += 1
-            self.print_trace("++++ %s:%s\n"
+            self.print_trace("> %s:%s\n"
                              % (modulename, code.co_name))
         elif event == 'line':
             filename = frame.f_code.co_filename
@@ -547,15 +578,18 @@ class Daemon:
         elif event == 'return':
             code = frame.f_code
             filename = code.co_filename
-            m = re.search('.*xenmgr/(.*)', code.co_filename)
+            m = re.search('.*xend/(.*)', filename)
             if not m:
                 return None
             modulename = m.group(1)
-            self.print_trace("---- %s:%s\n"
+            self.print_trace("< %s:%s\n"
                              % (modulename, code.co_name))
             self.traceindent -= 1
         elif event == 'exception':
-            pass
+            self.print_trace("! Exception:\n")
+            (ex, val, tb) = arg
+            traceback.print_exception(ex, val, tb, 10, self.tracefile)
+            #del tb
         return self.trace
 
     def open_logfile(self):
