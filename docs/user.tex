@@ -696,6 +696,31 @@ The {\tt xm list} command also supports a long output format when the
 {\tt -l} switch is used.  This outputs the fulls details of the
 running domains in Xend's SXP configuration format.
 
+For example, suppose the system is running the ttylinux domain as
+described earlier.  The list command should produce output somewhat
+like the following:
+\begin{verbatim}
+# xm list
+Name              Id  Mem(MB)  CPU  State  Time(s)  Console
+Domain-0           0      251    0  r----    172.2        
+ttylinux           5       63    0  -b---      3.0    9605
+\end{verbatim}
+
+Here we can see the details for the ttylinux domain, as well as for
+domain 0 (which of course is always running).  Note that the console
+port for the ttylinux domain is 9605.  This can be connected to by TCP
+using a terminal program (e.g. {\tt telnet} or, better, {\tt
+xencons}).  The simplest way to connect is to use the {\tt xm console}
+command, specifying the domain name or ID.  To connect to the console
+of the ttylinux domain, we could use:
+\begin{verbatim}
+# xm console ttylinux
+\end{verbatim}
+or:
+\begin{verbatim}
+# xm console 5
+\end{verbatim}
+
 \chapter{Other kinds of storage}
 
 It is possible to use any Linux block device to store virtual machine
@@ -854,6 +879,7 @@ custom variables (for instance, the \path{xmdefconfig} file uses a
 The available commands are as follows:
 
 \begin{description}
+\item[balloon] Request a domain to adjust its memory footprint.
 \item[create] Create a new domain.
 \item[destroy] Kill a domain immediately.
 \item[list] List running domains.
@@ -975,8 +1001,6 @@ The available commands are as follows:
 \end{description}
 
 \part{Advanced Topics}
-
-XXX More to add here, including config file format
 
 \chapter{Advanced Network Configuration}
 
