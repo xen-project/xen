@@ -69,7 +69,10 @@ static __attribute_used__ void idle_loop(void)
     {
         irq_stat[cpu].idle_timestamp = jiffies;
         while ( !softirq_pending(cpu) )
+        {
+            page_scrub_schedule_work();
             default_idle();
+        }
         do_softirq();
     }
 }

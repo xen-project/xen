@@ -7,7 +7,8 @@
 #define NEW_TLBFLUSH_CLOCK_PERIOD_SOFTIRQ 2
 #define KEYPRESS_SOFTIRQ                  3
 #define NMI_SOFTIRQ                       4
-#define NR_SOFTIRQS                       5
+#define PAGE_SCRUB_SOFTIRQ                5
+#define NR_SOFTIRQS                       6
 
 #ifndef __ASSEMBLY__
 

@@ -673,6 +673,7 @@ int set_timeout_timer(void)
 {
 	u64 alarm = 0;
 	int ret = 0;
+	unsigned long j;
 
 	/*
 	 * This is safe against long blocking (since calculations are
@@ -681,7 +682,10 @@ int set_timeout_timer(void)
 	 * would first get locked out. It is safe against normal
 	 * updates of jiffies since interrupts are off.
 	 */
-	alarm = __jiffies_to_st(next_timer_interrupt());
+	j = next_timer_interrupt();
+	if (j < (jiffies + 1))
+		j = jiffies + 1;
+	alarm = __jiffies_to_st(j);
 
 	/* Failure is pretty bad, but we'd best soldier on. */
 	if ( HYPERVISOR_set_timer_op(alarm) != 0 )
