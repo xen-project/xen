@@ -259,13 +259,16 @@ shadow_get_page_from_l1e(l1_pgentry_t l1e, struct domain *d)
          (d != owner) )
     {
         res = get_page_from_l1e(l1e, owner);
-        printk("tried to map page from domain %d into shadow page tables "
+        printk("tried to map mfn %p from domain %d into shadow page tables "
                "of domain %d; %s\n",
-               owner->id, d->id, res ? "success" : "failed");
+               mfn, owner->id, d->id, res ? "success" : "failed");
     }
 
     if ( unlikely(!res) )
+    {
         perfc_incrc(shadow_get_page_fail);
+        FSH_LOG("%s failed to get ref l1e=%p\n", l1_pgentry_val(l1e));
+    }
 
     return res;
 }
@@ -313,8 +316,9 @@ __guest_set_l2e(
         //
         if ( (old_hl2e ^ new_hl2e) & (PAGE_MASK | _PAGE_PRESENT) )
         {
-            if ( new_hl2e & _PAGE_PRESENT )
-                shadow_get_page_from_l1e(mk_l1_pgentry(new_hl2e), ed->domain);
+            if ( (new_hl2e & _PAGE_PRESENT) &&
+                 !shadow_get_page_from_l1e(mk_l1_pgentry(new_hl2e), ed->domain) )
+                new_hl2e = 0;
             if ( old_hl2e & _PAGE_PRESENT )
                 put_page_from_l1e(mk_l1_pgentry(old_hl2e), ed->domain);
         }
@@ -531,26 +535,20 @@ static inline void l1pte_read_fault(
 static inline void l1pte_propagate_from_guest(
     struct domain *d, unsigned long gpte, unsigned long *spte_p)
 { 
-    unsigned long spte = *spte_p;
     unsigned long pfn = gpte >> PAGE_SHIFT;
     unsigned long mfn = __gpfn_to_mfn(d, pfn);
+    unsigned long spte;
 
 #if SHADOW_VERBOSE_DEBUG
-    unsigned long old_spte = spte;
+    unsigned long old_spte = *spte_p;
 #endif
 
-    if ( unlikely(!mfn) )
-    {
-        // likely an MMIO address space mapping...
-        //
-        *spte_p = 0;
-        return;
-    }
-
     spte = 0;
-    if ( (gpte & (_PAGE_PRESENT|_PAGE_ACCESSED) ) == 
-         (_PAGE_PRESENT|_PAGE_ACCESSED) ) {
-        
+
+    if ( mfn &&
+         ((gpte & (_PAGE_PRESENT|_PAGE_ACCESSED) ) ==
+          (_PAGE_PRESENT|_PAGE_ACCESSED)) ) {
+
         spte = (mfn << PAGE_SHIFT) | (gpte & ~PAGE_MASK);
         
         if ( shadow_mode_log_dirty(d) ||
@@ -563,7 +561,7 @@ static inline void l1pte_propagate_from_guest(
 
 #if SHADOW_VERBOSE_DEBUG
     if ( old_spte || spte || gpte )
-        debugtrace_printk("l1pte_propagate_from_guest: gpte=0x%p, old spte=0x%p, new spte=0x%p\n", gpte, old_spte, spte);
+        SH_VLOG("l1pte_propagate_from_guest: gpte=0x%p, old spte=0x%p, new spte=0x%p", gpte, old_spte, spte);
 #endif
 
     *spte_p = spte;
@@ -624,8 +622,7 @@ validate_pte_change(
 #endif
 
     old_spte = *shadow_pte_p;
-    l1pte_propagate_from_guest(d, new_pte, shadow_pte_p);
-    new_spte = *shadow_pte_p;
+    l1pte_propagate_from_guest(d, new_pte, &new_spte);
 
     // only do the ref counting if something important changed.
     //
@@ -634,11 +631,14 @@ validate_pte_change(
     {
         perfc_incrc(validate_pte_changes);
 
-        if ( new_spte & _PAGE_PRESENT )
-            shadow_get_page_from_l1e(mk_l1_pgentry(new_spte), d);
+        if ( (new_spte & _PAGE_PRESENT) &&
+             !shadow_get_page_from_l1e(mk_l1_pgentry(new_spte), d) )
+            new_spte = 0;
         if ( old_spte & _PAGE_PRESENT )
             put_page_from_l1e(mk_l1_pgentry(old_spte), d);
     }
+
+    *shadow_pte_p = new_spte;
 
     // paranoia rules!
     return 1;
@@ -652,13 +652,14 @@ validate_pde_change(
     unsigned long new_pde,
     unsigned long *shadow_pde_p)
 {
-    unsigned long old_spde = *shadow_pde_p;
-    unsigned long new_spde;
+    unsigned long old_spde, new_spde;
 
     perfc_incrc(validate_pde_calls);
 
-    l2pde_propagate_from_guest(d, &new_pde, shadow_pde_p);
-    new_spde = *shadow_pde_p;
+    old_spde = *shadow_pde_p;
+    l2pde_propagate_from_guest(d, &new_pde, &new_spde);
+
+    // XXX Shouldn't we supposed to propagate the new_pde to the guest?
 
     // only do the ref counting if something important changed.
     //
@@ -667,11 +668,14 @@ validate_pde_change(
     {
         perfc_incrc(validate_pde_changes);
 
-        if ( new_spde & _PAGE_PRESENT )
-            get_shadow_ref(new_spde >> PAGE_SHIFT);
+        if ( (new_spde & _PAGE_PRESENT) &&
+             !get_shadow_ref(new_spde >> PAGE_SHIFT) )
+            BUG();
         if ( old_spde & _PAGE_PRESENT )
             put_shadow_ref(old_spde >> PAGE_SHIFT);
     }
+
+    *shadow_pde_p = new_spde;
 
     // paranoia rules!
     return 1;
@@ -1140,7 +1144,8 @@ shadow_set_l1e(unsigned long va, unsigned long new_spte, int create_l1_shadow)
             if ( sl1mfn )
             {
                 perfc_incrc(shadow_set_l1e_unlinked);
-                get_shadow_ref(sl1mfn);
+                if (!get_shadow_ref(sl1mfn))
+                    BUG();
                 l2pde_general(d, &gpde, &sl2e, sl1mfn);
                 __guest_set_l2e(ed, va, gpde);
                 __shadow_set_l2e(ed, va, sl2e);
@@ -1155,17 +1160,19 @@ shadow_set_l1e(unsigned long va, unsigned long new_spte, int create_l1_shadow)
     }
 
     old_spte = l1_pgentry_val(shadow_linear_pg_table[l1_linear_offset(va)]);
-    shadow_linear_pg_table[l1_linear_offset(va)] = mk_l1_pgentry(new_spte);
 
     // only do the ref counting if something important changed.
     //
     if ( (old_spte ^ new_spte) & (PAGE_MASK | _PAGE_RW | _PAGE_PRESENT) )
     {
-        if ( new_spte & _PAGE_PRESENT )
-            shadow_get_page_from_l1e(mk_l1_pgentry(new_spte), d);
+        if ( (new_spte & _PAGE_PRESENT) &&
+             !shadow_get_page_from_l1e(mk_l1_pgentry(new_spte), d) )
+            new_spte = 0;
         if ( old_spte & _PAGE_PRESENT )
             put_page_from_l1e(mk_l1_pgentry(old_spte), d);
     }
+
+    shadow_linear_pg_table[l1_linear_offset(va)] = mk_l1_pgentry(new_spte);
 }
 
 /************************************************************************/

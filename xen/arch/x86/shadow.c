@@ -1178,7 +1178,8 @@ void shadow_map_l1_into_current_l2(unsigned long va)
     ASSERT( !(old_sl2e & _PAGE_PRESENT) );
 #endif
 
-    get_shadow_ref(sl1mfn);
+    if (!get_shadow_ref(sl1mfn))
+        BUG();
     l2pde_general(d, &gl2e, &sl2e, sl1mfn);
     __guest_set_l2e(ed, va, gl2e);
     __shadow_set_l2e(ed, va, sl2e);
@@ -1195,9 +1196,13 @@ void shadow_map_l1_into_current_l2(unsigned long va)
 
         for ( i = 0; i < L1_PAGETABLE_ENTRIES; i++ )
         {
-            l1pte_propagate_from_guest(d, gpl1e[i], &spl1e[i]);
-            if ( spl1e[i] & _PAGE_PRESENT )
-                shadow_get_page_from_l1e(mk_l1_pgentry(spl1e[i]), d);
+            unsigned long sl1e;
+
+            l1pte_propagate_from_guest(d, gpl1e[i], &sl1e);
+            if ( (sl1e & _PAGE_PRESENT) &&
+                 !shadow_get_page_from_l1e(mk_l1_pgentry(sl1e), d) )
+                sl1e = 0;
+            spl1e[i] = sl1e;
         }
     }
 }
@@ -1502,8 +1507,9 @@ static u32 remove_all_write_access_in_ptpage(
             unsigned long old = pt[i];
             unsigned long new = old & ~_PAGE_RW;
 
-            if ( is_l1_shadow )
-                shadow_get_page_from_l1e(mk_l1_pgentry(new), d);
+            if ( is_l1_shadow &&
+                 !shadow_get_page_from_l1e(mk_l1_pgentry(new), d) )
+                BUG();
 
             count++;
             pt[i] = new;
@@ -1724,8 +1730,9 @@ void __shadow_sync_all(struct domain *d)
         unsigned long opte = *ppte;
         unsigned long npte = opte & ~_PAGE_RW;
 
-        if ( npte & _PAGE_PRESENT)
-            shadow_get_page_from_l1e(mk_l1_pgentry(npte), d);
+        if ( (npte & _PAGE_PRESENT) &&
+             !shadow_get_page_from_l1e(mk_l1_pgentry(npte), d) )
+            BUG();
         *ppte = npte;
         put_page_from_l1e(mk_l1_pgentry(opte), d);
 
