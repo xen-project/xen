@@ -312,7 +312,7 @@ pdb_process_z (int onoff, char *ptr)
 	{
 	    if (onoff == 1)
 	    {
-	        pdb_bwcpoint_p bwc = (pdb_bwcpoint_p) kmalloc(sizeof(pdb_bwcpoint_t));
+	        pdb_bwcpoint_p bwc = (pdb_bwcpoint_p) xmalloc(sizeof(pdb_bwcpoint_t));
 
 		bwc->address = addr;
 		bwc->length = pdb_x86_bkpt_length;
@@ -350,7 +350,7 @@ pdb_process_z (int onoff, char *ptr)
 	{
 	    if (onoff == 1)
 	    {
-	        pdb_bwcpoint_p bwc = (pdb_bwcpoint_p) kmalloc(sizeof(pdb_bwcpoint_t));
+	        pdb_bwcpoint_p bwc = (pdb_bwcpoint_p) xmalloc(sizeof(pdb_bwcpoint_t));
 
 		bwc->address = addr;
 		bwc->length = length;
@@ -734,15 +734,15 @@ pdb_process_command (char *ptr, struct pt_regs *regs, unsigned long cr3,
 		    pdb_page_fault = 0;
 
 	    {
-	        u_char *buffer = (u_char *) kmalloc (length);
+	        u_char *buffer = (u_char *) xmalloc (length);
 		if (!buffer)
 		{
-		    printk ("pdb error: kmalloc failure\n");
+		    printk ("pdb error: xmalloc failure\n");
 		    break;
 		}
 		pdb_read_memory (addr, length, buffer, &pdb_ctx);
 		mem2hex (buffer, pdb_out_buffer, length); 
-		kfree(buffer);
+		xfree(buffer);
 	    }
 
 		    pdb_page_fault_possible = 0;
@@ -772,15 +772,15 @@ pdb_process_command (char *ptr, struct pt_regs *regs, unsigned long cr3,
 	    pdb_page_fault = 0;
 
 	    {
-	        u_char *buffer = (u_char *) kmalloc (length);
+	        u_char *buffer = (u_char *) xmalloc (length);
 		if (!buffer)
 		{
-		    printk ("pdb error: kmalloc failure\n");
+		    printk ("pdb error: xmalloc failure\n");
 		    break;
 		}
 	        hex2mem (ptr, buffer, length);
 		pdb_write_memory (addr, length, buffer, &pdb_ctx);
-		kfree(buffer);
+		xfree(buffer);
 	    }
 
 	    pdb_page_fault_possible = 0;
