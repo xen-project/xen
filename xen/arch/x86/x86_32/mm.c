@@ -151,13 +151,13 @@ void subarch_init_memory(struct domain *dom_xen)
      * 64-bit operations on them. Also, just for sanity, we assert the size
      * of the structure here.
      */
-    if ( (offsetof(struct pfn_info, u.inuse.domain) != 
+    if ( (offsetof(struct pfn_info, u.inuse._domain) != 
           (offsetof(struct pfn_info, count_info) + sizeof(u32))) ||
          (sizeof(struct pfn_info) != 24) )
     {
         printk("Weird pfn_info layout (%ld,%ld,%d)\n",
                offsetof(struct pfn_info, count_info),
-               offsetof(struct pfn_info, u.inuse.domain),
+               offsetof(struct pfn_info, u.inuse._domain),
                sizeof(struct pfn_info));
         for ( ; ; ) ;
     }
@@ -167,11 +167,11 @@ void subarch_init_memory(struct domain *dom_xen)
         idle_pg_table[l2_table_offset(RDWR_MPT_VIRT_START)]);
     for ( i = 0; i < 1024; i++ )
     {
-        frame_table[m2p_start_mfn+i].count_info        = PGC_allocated | 1;
+        frame_table[m2p_start_mfn+i].count_info = PGC_allocated | 1;
 	/* gdt to make sure it's only mapped read-only by non-privileged
 	   domains. */
         frame_table[m2p_start_mfn+i].u.inuse.type_info = PGT_gdt_page | 1;
-        frame_table[m2p_start_mfn+i].u.inuse.domain    = dom_xen;
+        page_set_owner(&frame_table[m2p_start_mfn+i], dom_xen);
     }
 }
 

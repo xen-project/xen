@@ -171,6 +171,21 @@ void subarch_init_memory(struct domain *dom_xen)
     l3_pgentry_t l3e;
     l2_pgentry_t l2e;
 
+    /*
+     * We are rather picky about the layout of 'struct pfn_info'. The
+     * count_info and domain fields must be adjacent, as we perform atomic
+     * 64-bit operations on them.
+     */
+    if ( (offsetof(struct pfn_info, u.inuse._domain) != 
+          (offsetof(struct pfn_info, count_info) + sizeof(u32))) )
+    {
+        printk("Weird pfn_info layout (%ld,%ld,%d)\n",
+               offsetof(struct pfn_info, count_info),
+               offsetof(struct pfn_info, u.inuse._domain),
+               sizeof(struct pfn_info));
+        for ( ; ; ) ;
+    }
+
     /* M2P table is mappable read-only by privileged domains. */
     for ( v  = RDWR_MPT_VIRT_START; 
           v != RDWR_MPT_VIRT_END;
@@ -187,11 +202,11 @@ void subarch_init_memory(struct domain *dom_xen)
 
         for ( i = 0; i < ENTRIES_PER_L1_PAGETABLE; i++ )
         {
-            frame_table[m2p_start_mfn+i].count_info        = PGC_allocated | 1;
+            frame_table[m2p_start_mfn+i].count_info = PGC_allocated | 1;
             /* gdt to make sure it's only mapped read-only by non-privileged
                domains. */
             frame_table[m2p_start_mfn+i].u.inuse.type_info = PGT_gdt_page | 1;
-            frame_table[m2p_start_mfn+i].u.inuse.domain    = dom_xen;
+            page_set_owner(&frame_table[m2p_start_mfn+i], dom_xen);
         }
     }
 }

@@ -897,6 +897,7 @@
 41f97ef5139vN42cOYHfX_Ac8WOOjA xen/arch/x86/vmx_platform.c
 41c0c4128URE0dxcO15JME_MuKBPfg xen/arch/x86/vmx_vmcs.c
 419cbedeQDg8IrO3izo3o5rQNlo0kQ xen/arch/x86/x86_32/asm-offsets.c
+4202391dkvdTZ8GhWXe3Gqf9EOgWXg xen/arch/x86/x86_32/domain_build.c
 3e32af9aRnYGl4GMOaDKp7JdfhOGhg xen/arch/x86/x86_32/domain_page.c
 3ddb79bcecupHj56ZbTa3B0FxDowMg xen/arch/x86/x86_32/entry.S
 3ddb79bcHwuCQDjBICDTSis52hWguw xen/arch/x86/x86_32/mm.c
@@ -905,6 +906,7 @@
 3ddb79bc4nTpGQOe6_-MbyZzkhlhFQ xen/arch/x86/x86_32/usercopy.c
 3ddb79bcOMCu9-5mKpjIh5d0qqBDPg xen/arch/x86/x86_32/xen.lds
 41bf1717Ty3hwN3E9swdu8QfnvGqww xen/arch/x86/x86_64/asm-offsets.c
+4202391dA91ZovYX9d_5zJi9yGvLoQ xen/arch/x86/x86_64/domain_build.c
 40e96d3aLDI-nViMuYneD7VKYlZrVg xen/arch/x86/x86_64/entry.S
 41bf1717XhPz_dNT5OKSjgmbFuWBuA xen/arch/x86/x86_64/mm.c
 42000d3cMb8o1WuFBXC07c8i3lPZBw xen/arch/x86/x86_64/traps.c

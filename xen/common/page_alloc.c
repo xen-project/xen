@@ -418,7 +418,7 @@ unsigned long alloc_xenheap_pages(unsigned int order)
     for ( i = 0; i < (1 << order); i++ )
     {
         pg[i].count_info        = 0;
-        pg[i].u.inuse.domain    = NULL;
+        pg[i].u.inuse._domain   = 0;
         pg[i].u.inuse.type_info = 0;
     }
 
@@ -501,7 +501,7 @@ struct pfn_info *alloc_domheap_pages(struct domain *d, unsigned int order)
         }
 
         pg[i].count_info        = 0;
-        pg[i].u.inuse.domain    = NULL;
+        pg[i].u.inuse._domain   = 0;
         pg[i].u.inuse.type_info = 0;
     }
 
@@ -529,7 +529,7 @@ struct pfn_info *alloc_domheap_pages(struct domain *d, unsigned int order)
 
     for ( i = 0; i < (1 << order); i++ )
     {
-        pg[i].u.inuse.domain = d;
+        page_set_owner(&pg[i], d);
         wmb(); /* Domain pointer must be visible before updating refcnt. */
         pg[i].count_info |= PGC_allocated | 1;
         list_add_tail(&pg[i].list, &d->page_list);
@@ -544,7 +544,7 @@ struct pfn_info *alloc_domheap_pages(struct domain *d, unsigned int order)
 void free_domheap_pages(struct pfn_info *pg, unsigned int order)
 {
     int            i, drop_dom_ref;
-    struct domain *d = pg->u.inuse.domain;
+    struct domain *d = page_get_owner(pg);
     struct exec_domain *ed;
     void          *p;
     int cpu_mask = 0;

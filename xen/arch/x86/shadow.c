@@ -420,7 +420,7 @@ static inline struct pfn_info *alloc_shadow_page(struct mm_struct *m)
 void unshadow_table(unsigned long gpfn, unsigned int type)
 {
     unsigned long  spfn;
-    struct domain *d = frame_table[gpfn].u.inuse.domain;
+    struct domain *d = page_get_owner(&frame_table[gpfn]);
 
     SH_VLOG("unshadow_table type=%08x gpfn=%08lx", type, gpfn);
 
@@ -494,7 +494,7 @@ unsigned long shadow_l2_table(
         spl2e[SH_LINEAR_PT_VIRT_START >> L2_PAGETABLE_SHIFT] =
             mk_l2_pgentry((spfn << PAGE_SHIFT) | __PAGE_HYPERVISOR);
         spl2e[PERDOMAIN_VIRT_START >> L2_PAGETABLE_SHIFT] =
-            mk_l2_pgentry(__pa(frame_table[gpfn].u.inuse.domain->mm_perdomain_pt) |
+            mk_l2_pgentry(__pa(page_get_owner(&frame_table[gpfn])->mm_perdomain_pt) |
 			  __PAGE_HYPERVISOR);
     }
 #endif
@@ -924,7 +924,7 @@ int check_pagetable(struct mm_struct *m, pagetable_t pt, char *s)
 
     if (m->shadow_mode != SHM_full_32) {
         if ( (l2_pgentry_val(spl2e[PERDOMAIN_VIRT_START >> L2_PAGETABLE_SHIFT]) !=
-              ((__pa(frame_table[gpfn].u.inuse.domain->mm.perdomain_pt) | 
+              ((__pa(page_get_owner(&frame_table[gpfn])->mm.perdomain_pt) | 
             __PAGE_HYPERVISOR))) )
             FAILPT("hypervisor per-domain map inconsistent");
     }

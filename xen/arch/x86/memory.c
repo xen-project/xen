@@ -444,7 +444,7 @@ static void put_page_from_l1e(l1_pgentry_t l1e, struct domain *d)
     if ( !(l1v & _PAGE_PRESENT) || !pfn_is_ram(pfn) )
         return;
 
-    e = page->u.inuse.domain;
+    e = page_get_owner(page);
     if ( unlikely(e != d) )
     {
         /*
@@ -493,7 +493,7 @@ static void put_page_from_l2e(l2_pgentry_t l2e, unsigned long pfn)
 
 static int alloc_l2_table(struct pfn_info *page)
 {
-    struct domain *d = page->u.inuse.domain;
+    struct domain *d = page_get_owner(page);
     unsigned long  page_nr = page_to_pfn(page);
     l2_pgentry_t  *pl2e;
     int            i;
@@ -512,7 +512,7 @@ static int alloc_l2_table(struct pfn_info *page)
     pl2e[LINEAR_PT_VIRT_START >> L2_PAGETABLE_SHIFT] =
         mk_l2_pgentry((page_nr << PAGE_SHIFT) | __PAGE_HYPERVISOR);
     pl2e[PERDOMAIN_VIRT_START >> L2_PAGETABLE_SHIFT] =
-        mk_l2_pgentry(__pa(page->u.inuse.domain->mm_perdomain_pt) | 
+        mk_l2_pgentry(__pa(page_get_owner(page)->mm_perdomain_pt) | 
                       __PAGE_HYPERVISOR);
 #endif
 
@@ -530,7 +530,7 @@ static int alloc_l2_table(struct pfn_info *page)
 
 static int alloc_l1_table(struct pfn_info *page)
 {
-    struct domain *d = page->u.inuse.domain;
+    struct domain *d = page_get_owner(page);
     unsigned long  page_nr = page_to_pfn(page);
     l1_pgentry_t  *pl1e;
     int            i;
@@ -570,7 +570,7 @@ static void free_l2_table(struct pfn_info *page)
 
 static void free_l1_table(struct pfn_info *page)
 {
-    struct domain *d = page->u.inuse.domain;
+    struct domain *d = page_get_owner(page);
     unsigned long page_nr = page - frame_table;
     l1_pgentry_t *pl1e;
     int i;
@@ -731,7 +731,7 @@ int alloc_page_type(struct pfn_info *page, unsigned int type)
 
 void free_page_type(struct pfn_info *page, unsigned int type)
 {
-    struct domain *d = page->u.inuse.domain;
+    struct domain *d = page_get_owner(page);
 
     switch ( type )
     {
@@ -774,7 +774,7 @@ void put_page_type(struct pfn_info *page)
          * See domain.c:relinquish_list().
          */
         ASSERT((x & PGT_validated) || 
-               test_bit(DF_DYING, &page->u.inuse.domain->d_flags));
+               test_bit(DF_DYING, &page_get_owner(page)->d_flags));
 
         if ( unlikely((nx & PGT_count_mask) == 0) )
         {
@@ -832,7 +832,7 @@ int get_page_type(struct pfn_info *page, u32 type)
                  * may be unnecessary (e.g., page was GDT/LDT) but those
                  * circumstances should be very rare.
                  */
-                struct domain *d = page->u.inuse.domain;
+                struct domain *d = page_get_owner(page);
                 if ( unlikely(NEED_FLUSH(tlbflush_time[d->exec_domain[0]->processor],
                                          page->tlbflush_timestamp)) )
                 {
@@ -987,7 +987,7 @@ static int do_extended_command(unsigned long ptr, unsigned long val)
         if ( unlikely(!(okay = get_page_from_pagenr(pfn, FOREIGNDOM))) )
         {
             MEM_LOG("Page %08lx bad domain (dom=%p)",
-                    ptr, page->u.inuse.domain);
+                    ptr, page_get_owner(page));
         }
         else if ( likely(test_and_clear_bit(_PGT_pinned, 
                                             &page->u.inuse.type_info)) )
@@ -1117,7 +1117,7 @@ static int do_extended_command(unsigned long ptr, unsigned long val)
          * benign reference to the page (PGC_allocated). If that reference
          * disappears then the deallocation routine will safely spin.
          */
-        nd = page->u.inuse.domain;
+        nd = page_get_owner(page);
         y  = page->count_info;
         do {
             x = y;
@@ -1173,7 +1173,7 @@ static int do_extended_command(unsigned long ptr, unsigned long val)
         if ( unlikely(e->tot_pages++ == 0) )
             get_knownalive_domain(e);
         list_add_tail(&page->list, &e->page_list);
-        page->u.inuse.domain = e;
+        page_set_owner(page, e);
 
         spin_unlock(&e->page_alloc_lock);
 
@@ -1229,7 +1229,7 @@ static int do_extended_command(unsigned long ptr, unsigned long val)
          * benign reference to the page (PGC_allocated). If that reference
          * disappears then the deallocation routine will safely spin.
          */
-        nd = page->u.inuse.domain;
+        nd = page_get_owner(page);
         y  = page->count_info;
         do {
             x = y;
@@ -2072,7 +2072,7 @@ void audit_domain(struct domain *d)
         pfn = list_entry(list_ent, struct pfn_info, list) - frame_table;       
         page = &frame_table[pfn];
 
-        if ( page->u.inuse.domain != d )
+        if ( page_get_owner(page) != d )
             BUG();
 
         if ( (page->u.inuse.type_info & PGT_count_mask) >
@@ -2118,7 +2118,7 @@ void audit_domain(struct domain *d)
         pfn = list_entry(list_ent, struct pfn_info, list) - frame_table;       
         page = &frame_table[pfn];
 
-        if ( page->u.inuse.domain != d )
+        if ( page_get_owner(page) != d )
             BUG();
 
         switch ( page->u.inuse.type_info & PGT_type_mask )
@@ -2144,10 +2144,10 @@ void audit_domain(struct domain *d)
                     unsigned long l1pfn = pt[i]>>PAGE_SHIFT;
                     struct pfn_info *l1page = &frame_table[l1pfn];
 
-                    if ( l1page->u.inuse.domain != d )
+                    if ( page_get_owner(l1page) != d )
                     {
                         printk("L2: Skip bizarre page belonging to other "
-                               "dom %p\n", l1page->u.inuse.domain);    
+                               "dom %p\n", page_get_owner(l1page));
                         continue;
                     }
                     
@@ -2222,12 +2222,12 @@ void audit_domain(struct domain *d)
 
                     }
 
-                    if ( l1page->u.inuse.domain != d )
+                    if ( page_get_owner(l1page) != d )
                     {
-                        printk("Audit %d: [%lx,%x] Skip foreign page dom=%lx "
+                        printk("Audit %d: [%lx,%x] Skip foreign page dom=%p "
                                "pfn=%lx c=%08x t=%08x m2p=%lx\n",
                                d->id, pfn, i,
-                               (unsigned long)l1page->u.inuse.domain,
+                               page_get_owner(l1page),
                                l1pfn,
                                l1page->count_info,
                                l1page->u.inuse.type_info,
@@ -2312,7 +2312,7 @@ void audit_domain(struct domain *d)
                     unsigned long l1pfn = pt[i]>>PAGE_SHIFT;
                     struct pfn_info *l1page = &frame_table[l1pfn];
 
-                    if ( l1page->u.inuse.domain == d)
+                    if ( page_get_owner(l1page) == d )
                         adjust(l1page, 1, 1);
                 }
             }
@@ -2333,7 +2333,7 @@ void audit_domain(struct domain *d)
                     unsigned long l1pfn = pt[i]>>PAGE_SHIFT;
                     struct pfn_info *l1page = &frame_table[l1pfn];
 
-                    if ( (l1page->u.inuse.domain != d) ||
+                    if ( (page_get_owner(l1page) != d) ||
                          (l1pfn < 0x100) || (l1pfn > max_page) )
                         continue;
 
