@@ -73,9 +73,8 @@ void cpu_idle (void)
 {
     int cpu = smp_processor_id();
 
+    /* Just some sanity to ensure that the scheduler is set up okay. */
     ASSERT(current->domain == IDLE_DOMAIN_ID);
-
-    current->has_cpu = 1;
     (void)wake_up(current);
     schedule();
 
