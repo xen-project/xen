@@ -30,11 +30,12 @@ def __recv_from_sock(sock):
         except socket.error, error:
             if error[0] != errno.EINTR:
                 raise
-        try:
-            os.write(1, data)
-        except os.error, error:
-            if error[0] != errno.EINTR:
-                raise
+        else:
+            try:
+                os.write(1, data)
+            except os.error, error:
+                if error[0] != errno.EINTR:
+                    raise
     os.wait()
 
 def __send_to_sock(sock):
