@@ -218,7 +218,8 @@ void continue_cpu_idle_loop(void);
 
 void continue_nonidle_task(void);
 
-void hypercall_create_continuation(unsigned int op, unsigned int nr_args, ...);
+unsigned long hypercall_create_continuation(
+    unsigned int op, unsigned int nr_args, ...);
 #define hypercall_preempt_check() \
     (unlikely(softirq_pending(smp_processor_id())))
 

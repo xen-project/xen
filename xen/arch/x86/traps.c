@@ -805,11 +805,8 @@ long do_set_trap_table(trap_info_t *traps)
     for ( ; ; )
     {
         if ( hypercall_preempt_check() )
-        {
-            hypercall_create_continuation(
+            return hypercall_create_continuation(
                 __HYPERVISOR_set_trap_table, 1, traps);
-            return __HYPERVISOR_set_trap_table;
-        }
 
         if ( copy_from_user(&cur, traps, sizeof(cur)) ) return -EFAULT;
 

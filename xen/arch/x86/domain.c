@@ -427,7 +427,8 @@ long do_iopl(domid_t domain, unsigned int new_io_pl)
     return 0;
 }
 
-void hypercall_create_continuation(unsigned int op, unsigned int nr_args, ...)
+unsigned long hypercall_create_continuation(
+    unsigned int op, unsigned int nr_args, ...)
 {
     struct mc_state *mcs = &mc_state[smp_processor_id()];
     execution_context_t *ec;
@@ -455,6 +456,8 @@ void hypercall_create_continuation(unsigned int op, unsigned int nr_args, ...)
     }
 
     va_end(args);
+
+    return op;
 }
 
 #endif
