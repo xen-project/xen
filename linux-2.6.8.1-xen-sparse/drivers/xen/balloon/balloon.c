@@ -11,7 +11,12 @@
 #include <linux/kernel.h>
 #include <linux/sched.h>
 #include <linux/errno.h>
+
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,0)
 #include <asm-xen/xen_proc.h>
+#else
+#include <asm/xen_proc.h>
+#endif
 
 #include <linux/mm.h>
 #include <linux/mman.h>
@@ -21,8 +26,14 @@
 #include <linux/highmem.h>
 #include <linux/vmalloc.h>
 
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,0)
 #include <asm-xen/hypervisor.h>
 #include <asm-xen/ctrl_if.h>
+#else
+#include <asm/hypervisor.h>
+#include <asm/ctrl_if.h>
+#endif
+
 #include <asm/pgalloc.h>
 #include <asm/pgtable.h>
 #include <asm/uaccess.h>
@@ -58,7 +69,11 @@ static inline pte_t *get_ptep(unsigned long addr)
     pmd = pmd_offset(pgd, addr);
     if ( pmd_none(*pmd) || pmd_bad(*pmd) ) BUG();
 
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,0)
     ptep = pte_offset_kernel(pmd, addr);
+#else
+    ptep = pte_offset(pmd, addr);
+#endif
 
     return ptep;
 }
@@ -258,7 +273,11 @@ static void pagetable_extend (int cur_low_pfn, int newpages)
     end = (unsigned long)__va(low_pfn*PAGE_SIZE);
 
     pgd_base = init_mm.pgd;
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,0)
     i = pgd_index(PAGE_OFFSET);
+#else
+    i = __pgd_offset(PAGE_OFFSET);
+#endif
     pgd = pgd_base + i;
 
     for (; i < PTRS_PER_PGD; pgd++, i++) {
@@ -281,11 +300,19 @@ static void pagetable_extend (int cur_low_pfn, int newpages)
                 vaddr = i*PGDIR_SIZE + j*PMD_SIZE + k*PAGE_SIZE;
                 if (end && (vaddr >= end))
                     break;
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,0)
                 *pte = mk_pte(virt_to_page(vaddr), PAGE_KERNEL);
+#else
+		*pte = mk_pte_phys(__pa(vaddr), PAGE_KERNEL);
+#endif
             }
             kpgd = pgd_offset_k((unsigned long)pte_base);
             kpmd = pmd_offset(kpgd, (unsigned long)pte_base);
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,0)
             kpte = pte_offset_kernel(kpmd, (unsigned long)pte_base);
+#else
+	    kpte = pte_offset(kpmd, (unsigned long)pte_base);
+#endif
             queue_l1_entry_update(kpte,
                                   (*(unsigned long *)kpte)&~_PAGE_RW);
             set_pmd(pmd, __pmd(_KERNPG_TABLE + __pa(pte_base)));
@@ -453,6 +480,7 @@ static void balloon_ctrlif_rx(ctrl_msg_t *msg, unsigned long id)
 }
 
 
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,0)
 static int balloon_write(struct file *file, const char *buffer,
                          size_t count, loff_t *offp)
 {
@@ -492,7 +520,6 @@ static int balloon_write(struct file *file, const char *buffer,
     return len;
 }
 
-
 static int balloon_read(struct file *filp, char *buffer,
                         size_t count, loff_t *offp)
 {
@@ -516,6 +543,98 @@ static struct file_operations balloon_fops = {
     .read  = balloon_read,
     .write = balloon_write
 };
+#else
+
+
+static int balloon_write(struct file *file, const char *buffer,
+                         u_long count, void *data)
+{
+    char memstring[64], *endchar;
+    int len, i;
+    unsigned long target;
+    unsigned long long targetbytes;
+
+    /* Only admin can play with the balloon :) */
+    if ( !capable(CAP_SYS_ADMIN) )
+        return -EPERM;
+
+    if ( count > sizeof(memstring) )
+        return -EFBIG;
+
+    len = strnlen_user(buffer, count);
+    if ( len == 0 ) return -EBADMSG;
+    if ( len == 1 ) return 1; /* input starts with a NUL char */
+    if ( strncpy_from_user(memstring, buffer, len) < 0 )
+        return -EFAULT;
+
+    endchar = memstring;
+    for ( i = 0; i < len; ++i, ++endchar )
+        if ( (memstring[i] < '0') || (memstring[i] > '9') )
+            break;
+    if ( i == 0 )
+        return -EBADMSG;
+
+    targetbytes = memparse(memstring,&endchar);
+    target = targetbytes >> PAGE_SHIFT;
+
+    if ( target < current_pages )
+    {
+        int change = inflate_balloon(current_pages-target);
+        if ( change <= 0 )
+            return change;
+
+        current_pages -= change;
+        printk(KERN_INFO "Relinquish %dMB to xen. Domain now has %luMB\n",
+            change>>PAGE_TO_MB_SHIFT, current_pages>>PAGE_TO_MB_SHIFT);
+    }
+    else if ( target > current_pages )
+    {
+        int change, reclaim = min(target,most_seen_pages) - current_pages;
+
+        if ( reclaim )
+        {
+            change = deflate_balloon( reclaim);
+            if ( change <= 0 )
+                return change;
+            current_pages += change;
+            printk(KERN_INFO "Reclaim %dMB from xen. Domain now has %luMB\n",
+                change>>PAGE_TO_MB_SHIFT, current_pages>>PAGE_TO_MB_SHIFT);
+        }
+
+        if ( most_seen_pages < target )
+        {
+            int growth = claim_new_pages(target-most_seen_pages);
+            if ( growth <= 0 )
+                return growth;
+            most_seen_pages += growth;
+            current_pages += growth;
+            printk(KERN_INFO "Granted %dMB new mem. Dom now has %luMB\n",
+                growth>>PAGE_TO_MB_SHIFT, current_pages>>PAGE_TO_MB_SHIFT);
+        }
+    }
+
+
+    return len;
+}
+
+static int balloon_read(char *page, char **start, off_t off,
+			int count, int *eof, void *data)
+{
+  int len;
+  len = sprintf(page,"%lu\n",current_pages<<PAGE_SHIFT);
+  
+  if (len <= off+count) *eof = 1;
+  *start = page + off;
+  len -= off;
+  if (len>count) len = count;
+  if (len<0) len = 0;
+  return len;
+}
+
+
+
+#endif
+
 
 static int __init balloon_init(void)
 {
@@ -528,9 +647,14 @@ static int __init balloon_init(void)
         return -1;
     }
 
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,0)
     balloon_pde->owner     = THIS_MODULE;
     balloon_pde->nlink     = 1;
     balloon_pde->proc_fops = &balloon_fops;
+#else
+    balloon_pde->write_proc = balloon_write;
+    balloon_pde->read_proc  = balloon_read;
+#endif
 
     (void)ctrl_if_register_receiver(CMSG_MEM_REQUEST, balloon_ctrlif_rx,
                                     CALLBACK_IN_BLOCKING_CONTEXT);
