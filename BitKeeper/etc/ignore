@@ -47,6 +47,7 @@ linux-*-xen0/*
 linux-*-xenU/*
 linux-xen-sparse
 linux-*.patch
+mkddbxen
 netbsd-*-tools/*
 netbsd-*-xen0/*
 netbsd-*-xenU/*
@@ -63,6 +64,7 @@ tools/web-shutdown.tap
 tools/xentrace/xentrace
 tools/xfrd/xfrd
 xen/arch/x86/boot/mkelf32
+xen/ddb/*
 xen/drivers/pci/classlist.h
 xen/drivers/pci/devlist.h
 xen/drivers/pci/gen-devlist
