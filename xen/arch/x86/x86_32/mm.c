@@ -68,7 +68,7 @@ static void __init fixrange_init(unsigned long start,
 
     for ( ; (i < ENTRIES_PER_L2_PAGETABLE) && (vaddr != end); l2e++, i++ ) 
     {
-        if ( !l2_pgentry_empty(*l2e) )
+        if ( l2_pgentry_val(*l2e) != 0 )
             continue;
         page = (unsigned long)get_free_page();
         clear_page(page);
@@ -104,9 +104,9 @@ void __init paging_init(void)
 
     /* Create read-only mapping of MPT for guest-OS use. */
     idle_pg_table[RO_MPT_VIRT_START >> L2_PAGETABLE_SHIFT] =
-        idle_pg_table[RDWR_MPT_VIRT_START >> L2_PAGETABLE_SHIFT];
-    mk_l2_readonly(idle_pg_table + 
-                   (RO_MPT_VIRT_START >> L2_PAGETABLE_SHIFT));
+        mk_l2_pgentry(l2_pgentry_val(
+            idle_pg_table[RDWR_MPT_VIRT_START >> L2_PAGETABLE_SHIFT]) & 
+                      ~_PAGE_RW);
 
     /* Set up mapping cache for domain pages. */
     mapcache = (unsigned long *)get_free_page();

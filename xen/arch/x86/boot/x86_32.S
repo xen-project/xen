@@ -20,9 +20,15 @@ ENTRY(start)
 	.long	-0x1BADB004
         
 bad_cpu_msg:
-        .asciz "Bad CPU: we need at least a P6-compatible core."
+        .asciz "ERR: Not a P6-compatible CPU!"
+not_multiboot_msg:
+        .asciz "ERR: Not a Multiboot bootloader!"
 bad_cpu:
         mov     $SYMBOL_NAME(bad_cpu_msg)-__PAGE_OFFSET,%esi
+        jmp     print_err
+not_multiboot:
+        mov     $SYMBOL_NAME(not_multiboot_msg)-__PAGE_OFFSET,%esi
+print_err:
         mov     $0xB8000,%edi  # VGA framebuffer
 1:      mov     (%esi),%bl
         test    %bl,%bl        # Terminate on '\0' sentinel
@@ -79,9 +85,13 @@ __start:
         cmp     $(SECONDARY_CPU_FLAG),%ebx
         je      start_paging
                 
+        /* Check for Multiboot bootloader */
+        cmp     $0x2BADB002,%eax
+        jne     not_multiboot
+
+        /* Save the Multiboot info structure for later use. */
 	add     $__PAGE_OFFSET,%ebx
-        push    %ebx /* Multiboot info struct */
-        push    %eax /* Multiboot magic value */
+        push    %ebx
 
         /* Initialize BSS (no nasty surprises!) */
         mov     $__bss_start-__PAGE_OFFSET,%edi

@@ -94,6 +94,11 @@ extern void __out_of_line_bug(int line) __attribute__((noreturn));
 #define out_of_line_bug() __out_of_line_bug(__LINE__)
 #endif /* __ASSEMBLY__ */
 
+#define BUG() do {					\
+	printk("BUG at %s:%d\n", __FILE__, __LINE__);	\
+	__asm__ __volatile__("ud2");			\
+} while (0)
+
 #if defined(__x86_64__)
 
 #define XENHEAP_DEFAULT_MB (16)

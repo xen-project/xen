@@ -1,16 +1,37 @@
-#ifndef _I386_PAGE_H
-#define _I386_PAGE_H
+/******************************************************************************
+ * asm-x86/page.h
+ * 
+ * Definitions relating to page tables.
+ */
 
-#define BUG() do {					\
-	printk("BUG at %s:%d\n", __FILE__, __LINE__);	\
-	__asm__ __volatile__("ud2");			\
-} while (0)
+#ifndef __X86_PAGE_H__
+#define __X86_PAGE_H__
+
+#if defined(__x86_64__)
+
+#define L1_PAGETABLE_SHIFT       12
+#define L2_PAGETABLE_SHIFT       21
+#define L3_PAGETABLE_SHIFT       30
+#define L4_PAGETABLE_SHIFT       39
+
+#define ENTRIES_PER_L1_PAGETABLE 512
+#define ENTRIES_PER_L2_PAGETABLE 512
+#define ENTRIES_PER_L3_PAGETABLE 512
+#define ENTRIES_PER_L4_PAGETABLE 512
+
+#define __PAGE_OFFSET		(0xFFFF830000000000)
+
+#elif defined(__i386__)
 
 #define L1_PAGETABLE_SHIFT       12
 #define L2_PAGETABLE_SHIFT       22
 
 #define ENTRIES_PER_L1_PAGETABLE 1024
 #define ENTRIES_PER_L2_PAGETABLE 1024
+
+#define __PAGE_OFFSET		(0xFC400000)
+
+#endif
 
 #define PAGE_SHIFT               L1_PAGETABLE_SHIFT
 #define PAGE_SIZE	         (1UL << PAGE_SHIFT)
@@ -23,44 +44,60 @@
 #include <xen/config.h>
 typedef struct { unsigned long l1_lo; } l1_pgentry_t;
 typedef struct { unsigned long l2_lo; } l2_pgentry_t;
-typedef l1_pgentry_t *l1_pagetable_t;
-typedef l2_pgentry_t *l2_pagetable_t;
+typedef struct { unsigned long l3_lo; } l3_pgentry_t;
+typedef struct { unsigned long l4_lo; } l4_pgentry_t;
 typedef struct { unsigned long pt_lo; } pagetable_t;
 #endif /* !__ASSEMBLY__ */
 
 /* Strip type from a table entry. */
 #define l1_pgentry_val(_x) ((_x).l1_lo)
 #define l2_pgentry_val(_x) ((_x).l2_lo)
+#define l3_pgentry_val(_x) ((_x).l3_lo)
+#define l4_pgentry_val(_x) ((_x).l4_lo)
 #define pagetable_val(_x)  ((_x).pt_lo)
 
 /* Add type to a table entry. */
 #define mk_l1_pgentry(_x)  ( (l1_pgentry_t) { (_x) } )
 #define mk_l2_pgentry(_x)  ( (l2_pgentry_t) { (_x) } )
+#define mk_l3_pgentry(_x)  ( (l3_pgentry_t) { (_x) } )
+#define mk_l4_pgentry(_x)  ( (l4_pgentry_t) { (_x) } )
 #define mk_pagetable(_x)   ( (pagetable_t) { (_x) } )
 
 /* Turn a typed table entry into a page index. */
 #define l1_pgentry_to_pagenr(_x) (l1_pgentry_val(_x) >> PAGE_SHIFT) 
 #define l2_pgentry_to_pagenr(_x) (l2_pgentry_val(_x) >> PAGE_SHIFT)
+#define l3_pgentry_to_pagenr(_x) (l3_pgentry_val(_x) >> PAGE_SHIFT)
+#define l4_pgentry_to_pagenr(_x) (l4_pgentry_val(_x) >> PAGE_SHIFT)
 
 /* Turn a typed table entry into a physical address. */
 #define l1_pgentry_to_phys(_x) (l1_pgentry_val(_x) & PAGE_MASK)
 #define l2_pgentry_to_phys(_x) (l2_pgentry_val(_x) & PAGE_MASK)
+#define l3_pgentry_to_phys(_x) (l3_pgentry_val(_x) & PAGE_MASK)
+#define l4_pgentry_to_phys(_x) (l4_pgentry_val(_x) & PAGE_MASK)
 
-/* Dereference a typed level-2 entry to yield a typed level-1 table. */
-#define l2_pgentry_to_l1(_x)     \
+/* Pagetable walking. */
+#define l2_pgentry_to_l1(_x) \
   ((l1_pgentry_t *)__va(l2_pgentry_val(_x) & PAGE_MASK))
+#define l3_pgentry_to_l2(_x) \
+  ((l2_pgentry_t *)__va(l3_pgentry_val(_x) & PAGE_MASK))
+#define l4_pgentry_to_l3(_x) \
+  ((l3_pgentry_t *)__va(l4_pgentry_val(_x) & PAGE_MASK))
 
 /* Given a virtual address, get an entry offset into a page table. */
 #define l1_table_offset(_a) \
   (((_a) >> L1_PAGETABLE_SHIFT) & (ENTRIES_PER_L1_PAGETABLE - 1))
+#if defined(__i386__)
 #define l2_table_offset(_a) \
   ((_a) >> L2_PAGETABLE_SHIFT)
+#elif defined(__x86_64__)
+#define l2_table_offset(_a) \
+  (((_a) >> L2_PAGETABLE_SHIFT) & (ENTRIES_PER_L2_PAGETABLE -1))
+#define l3_table_offset(_a) \
+  (((_a) >> L3_PAGETABLE_SHIFT) & (ENTRIES_PER_L3_PAGETABLE -1))
+#define l4_table_offset(_a) \
+  ((_a) >> L4_PAGETABLE_SHIFT)
+#endif
 
-/* Hypervisor table entries use zero to sugnify 'empty'. */
-#define l1_pgentry_empty(_x) (!l1_pgentry_val(_x))
-#define l2_pgentry_empty(_x) (!l2_pgentry_val(_x))
-
-#define __PAGE_OFFSET		(0xFC400000)
 #define PAGE_OFFSET		((unsigned long)__PAGE_OFFSET)
 #define __pa(x)			((unsigned long)(x)-PAGE_OFFSET)
 #define __va(x)			((void *)((unsigned long)(x)+PAGE_OFFSET))
@@ -148,24 +185,11 @@ __asm__ __volatile__("invlpg %0": :"m" (*(char *) (__addr)))
 	(_PAGE_PRESENT | _PAGE_RW | _PAGE_DIRTY | _PAGE_ACCESSED)
 #define __PAGE_HYPERVISOR_NOCACHE \
 	(_PAGE_PRESENT | _PAGE_RW | _PAGE_DIRTY | _PAGE_PCD | _PAGE_ACCESSED)
-#define __PAGE_HYPERVISOR_RO \
-	(_PAGE_PRESENT | _PAGE_DIRTY | _PAGE_ACCESSED)
 
 #define MAKE_GLOBAL(_x) ((_x) | _PAGE_GLOBAL)
 
 #define PAGE_HYPERVISOR MAKE_GLOBAL(__PAGE_HYPERVISOR)
-#define PAGE_HYPERVISOR_RO MAKE_GLOBAL(__PAGE_HYPERVISOR_RO)
 #define PAGE_HYPERVISOR_NOCACHE MAKE_GLOBAL(__PAGE_HYPERVISOR_NOCACHE)
-
-#define mk_l2_writeable(_p) \
-    (*(_p) = mk_l2_pgentry(l2_pgentry_val(*(_p)) |  _PAGE_RW))
-#define mk_l2_readonly(_p) \
-    (*(_p) = mk_l2_pgentry(l2_pgentry_val(*(_p)) & ~_PAGE_RW))
-#define mk_l1_writeable(_p) \
-    (*(_p) = mk_l1_pgentry(l1_pgentry_val(*(_p)) |  _PAGE_RW))
-#define mk_l1_readonly(_p) \
-    (*(_p) = mk_l1_pgentry(l1_pgentry_val(*(_p)) & ~_PAGE_RW))
-
 
 #ifndef __ASSEMBLY__
 static __inline__ int get_order(unsigned long size)
@@ -184,4 +208,4 @@ static __inline__ int get_order(unsigned long size)
 extern void zap_low_mappings(void);
 #endif
 
-#endif /* _I386_PAGE_H */
+#endif /* __I386_PAGE_H__ */

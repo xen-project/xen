@@ -305,7 +305,7 @@ that may be able to help diagnose problems:
                   shared by two subsystems (eg. console and
                   debugger). Sharing is controlled by MSB of each
                   transmitted/received character.
- [NB. Default for this option is 'com1,tty']
+ [NB. Default for this option is 'com1,vga']
 
  conswitch=<switch-char><auto-switch-char>
                   Specify how to switch serial-console input between
