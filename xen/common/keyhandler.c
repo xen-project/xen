@@ -119,6 +119,9 @@ void do_debug_key(unsigned char key, void *dev_id, struct pt_regs *regs)
 {
     extern void trap_to_xendbg(void);
     trap_to_xendbg();
+    asm volatile ("nop"); /* Prevent the compiler doing tail call
+			     optimisation, as that confuses xendbg a
+			     bit. */
 }
 
 void initialize_keytable(void)
