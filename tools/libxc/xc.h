@@ -375,11 +375,6 @@ int xc_domain_setmaxmem(int xc_handle,
                         u32 domid, 
                         unsigned int max_memkb);
 
-int xc_domain_setvmassist(int xc_handle,
-                          u32 domid, 
-                          unsigned int cmd,
-                          unsigned int type);
-
 typedef dom0_perfc_desc_t xc_perfc_desc_t;
 /* IMPORTANT: The caller is responsible for mlock()'ing the @desc array. */
 int xc_perfc_control(int xc_handle,

@@ -320,15 +320,6 @@ typedef struct {
     MEMORY_PADDING;
 } PACKED dom0_getpageframeinfo2_t; /* 24 bytes */
 
-#define DOM0_SETDOMAINVMASSIST   30
-typedef struct {
-    /* IN variables. */
-    domid_t      domain;              /*  0 */
-    u16          __pad0;
-    u32          cmd;                 /*  4: vm_assist cmd */
-    u32          type;                /*  8: vm_assist cmd */
-} PACKED dom0_setdomainvmassist_t; /* 12 bytes */
-
 /*
  * Request memory range (@pfn, @pfn+@nr_pfns-1) to have type @type.
  * On x86, @type is an architecture-defined MTRR memory type.
@@ -443,7 +434,6 @@ typedef struct {
 	dom0_setdomaininitialmem_t setdomaininitialmem;
 	dom0_setdomainmaxmem_t   setdomainmaxmem;
 	dom0_getpageframeinfo2_t getpageframeinfo2;
-	dom0_setdomainvmassist_t setdomainvmassist;
         dom0_add_memtype_t       add_memtype;
         dom0_del_memtype_t       del_memtype;
         dom0_read_memtype_t      read_memtype;
