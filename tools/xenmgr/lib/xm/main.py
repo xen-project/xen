@@ -1,7 +1,7 @@
 #!/usr/bin/python
-import string
 import sys
 
+from xenmgr import PrettyPrint
 from xenmgr import sxp
 from xenmgr.XendClient import server
 from xenmgr.xm import create, shutdown
@@ -39,7 +39,7 @@ class Xm:
     def help(self, meth, args):
         name = meth[3:]
         f = getattr(self, meth)
-        print "%s\t%s" % (name, f.__doc__ or '')
+        print "%-14s %s" % (name, f.__doc__ or '')
 
     def xm_help(self, help, args):
         """Print help."""
@@ -69,11 +69,12 @@ class Xm:
             print args[0], "FILE"
             print "\nRestore a domain from FILE."
         if len(args) < 2: self.err("%s: Missing file" % args[0])
-        server.xend_domain_restore(dom, None, filename)
+        filename = args[1]
+        server.xend_domain_restore(None, filename)
 
-    def xm_ls(self, help, args):
+    def xm_domains(self, help, args):
         """List domains."""
-        if help: self.help('xm_' + args[0]); return
+        if help: self.help('xm_' + args[0], args); return
         doms = server.xend_domains()
         print 'Dom  Name             Mem(MB)  CPU  State  Time(s)'
         for dom in doms:
@@ -86,6 +87,18 @@ class Xm:
             d['state'] = sxp.child_value(info, 'state', '??')
             d['cpu_time'] = float(sxp.child_value(info, 'cpu_time', '0'))
             print ("%(dom)-4d %(name)-16s %(mem)4d     %(cpu)3d %(state)5s %(cpu_time)10.2f" % d)
+
+    def xm_domain(self, help, args):
+        """Get information about a domain."""
+        if help:
+            print args[0], 'DOM'
+            print '\nGet information about domain DOM.'
+            return
+        if len(args) < 2: self.err("%s: Missing domain" % args[0])
+        dom = args[1]
+        info = server.xend_domain(dom)
+        PrettyPrint.prettyprint(info)
+        print
 
     def xm_halt(self, help, args):
         """Terminate a domain immediately."""
@@ -101,8 +114,8 @@ class Xm:
         """Shutdown a domain."""
         shutdown.main(args)
 
-    def xm_stop(self, help, args):
-        """Stop execution of a domain."""
+    def xm_pause(self, help, args):
+        """Pause execution of a domain."""
         if help:
             print args[0], 'DOM'
             print '\nStop execution of domain DOM.'
@@ -111,11 +124,11 @@ class Xm:
         dom = args[1]
         server.xend_domain_stop(dom)
 
-    def xm_start(self, help, args):
-        """Start execution of a domain."""
+    def xm_unpause(self, help, args):
+        """Unpause a paused domain."""
         if help:
             print args[0], 'DOM'
-            print '\nStart execution of domain DOM.'
+            print '\nUnpause execution of domain DOM.'
             return
         if len(args) < 2: self.err("%s: Missing domain" % args[0])
         dom = args[1]
@@ -131,31 +144,31 @@ class Xm:
         v = map(int, args[1:3])
         server.xend_domain_pincpu(*v)
 
-    def xm_vif_stats(self, help, args):
-        """Get stats for a virtual interface."""
-        if help:
-            print args[0], 'DOM VIF'
-            print '\nGet stats for interface VIF on domain DOM.'
-            return
-        if len(args) != 3: self.err("%s: Invalid argument(s)" % args[0])
-        v = map(int, args[1:3])
-        print server.xend_domain_vif_stats(*v)
+##     def xm_vif_stats(self, help, args):
+##         """Get stats for a virtual interface."""
+##         if help:
+##             print args[0], 'DOM VIF'
+##             print '\nGet stats for interface VIF on domain DOM.'
+##             return
+##         if len(args) != 3: self.err("%s: Invalid argument(s)" % args[0])
+##         v = map(int, args[1:3])
+##         print server.xend_domain_vif_stats(*v)
 
-    def xm_vif_rate(self, help, args):
-        """Set or get vif rate params."""
-        if help:
-            print args[0], "DOM VIF [BYTES USECS]"
-            print '\nSet or get rate controls for interface VIF on domain DOM.'
-            return
-        n = len(args)
-        if n == 3:
-            v = map(int, args[1:n])
-            print server.xend_domain_vif_scheduler_get(*v)
-        elif n == 5:
-            v = map(int, args[1:n])
-            server.xend_domain_vif_scheduler_set(*v)
-        else:
-            self.err("%s: Invalid argument(s)" % args[0])
+##     def xm_vif_rate(self, help, args):
+##         """Set or get vif rate params."""
+##         if help:
+##             print args[0], "DOM VIF [BYTES USECS]"
+##             print '\nSet or get rate controls for interface VIF on domain DOM.'
+##             return
+##         n = len(args)
+##         if n == 3:
+##             v = map(int, args[1:n])
+##             print server.xend_domain_vif_scheduler_get(*v)
+##         elif n == 5:
+##             v = map(int, args[1:n])
+##             server.xend_domain_vif_scheduler_set(*v)
+##         else:
+##             self.err("%s: Invalid argument(s)" % args[0])
 
     def xm_bvt(self, help, args):
         """Set BVT scheduler parameters."""
@@ -193,15 +206,28 @@ class Xm:
             print "\nSet round robin scheduler slice."
             return
         if len(args) != 2: self.err("%s: Invalid argument(s)" % args[0])
-        slice = int(args[1])
-        server.xend_node_rrobin_set(slice)
+        rrslice = int(args[1])
+        server.xend_node_rrobin_set(rrslice)
 
     def xm_info(self, help, args):
         """Get information about the xen host."""
-        if help: self.help('xm_info'); return
+        if help: self.help('xm_' + args[0], args); return
         info = server.xend_node()
         for x in info[1:]:
             print "%-23s:" % x[0], x[1]
+
+    def xm_consoles(self, help, args):
+        """Get information about domain consoles."""
+        if help: self.help('xm_' + args[0], args); return
+        l = server.xend_consoles()
+        print "Dom Port  Id"
+        for x in l:
+            info = server.xend_console(x)
+            d = {}
+            d['dom'] = sxp.child(info, 'dst', ['dst', '?', '?'])[1]
+            d['port'] = sxp.child_value(info, 'port', '?')
+            d['id'] = sxp.child_value(info, 'id', '?')
+            print "%(dom)3s %(port)4s %(id)3s" % d
 
     def xm_console(self, help, args):
         """Open a console to a domain."""
