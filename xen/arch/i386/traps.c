@@ -185,13 +185,47 @@ void die(const char * str, struct pt_regs * regs, long err)
     panic("HYPERVISOR DEATH!!\n");
 }
 
-static inline void die_if_kernel(const char * str, struct pt_regs * regs, long err)
+#define check_selector(_s)                    \
+  ({ int err;                                 \
+     __asm__ __volatile__ (                   \
+             "1: movl %2,%%gs       \n"       \
+             "2:                    \n"       \
+             ".section .fixup,\"ax\"\n"       \
+             "3: incl %0            \n"       \
+             "   jmp  2b            \n"       \
+             ".previous             \n"       \
+             ".section __ex_table,\"a\"\n"    \
+             ".align 4              \n"       \
+             ".long 1b,3b           \n"       \
+             ".previous               "       \
+             : "=&r" (err) : "0" (0),         \
+               "m" (*(unsigned int *)&(_s))); \
+     err; })
+
+static inline void check_saved_selectors(struct pt_regs *regs)
 {
-    if (!(3 & regs->xcs)) die(str, regs, err);
+    /* Prevent recursion. */
+    __asm__ __volatile__ ( 
+        "movl %0,%%fs; movl %0,%%gs" 
+        : : "r" (0) );
+
+    /*
+     * NB. We need to check DS and ES as well, since we may have taken
+     * an exception after they were restored in 
+     */
+    if ( check_selector(regs->xds) )
+        regs->xds = 0;
+    if ( check_selector(regs->xes) )
+        regs->xes = 0;
+    if ( check_selector(regs->xfs) )
+        regs->xfs = 0;
+    if ( check_selector(regs->xgs) )
+        regs->xgs = 0;
 }
 
-static void inline do_trap(int trapnr, char *str,
-			   struct pt_regs * regs, 
+
+static inline void do_trap(int trapnr, char *str,
+			   struct pt_regs *regs, 
                            long error_code, int use_error_code)
 {
     struct task_struct *p = current;
@@ -216,7 +250,7 @@ static void inline do_trap(int trapnr, char *str,
     if ( (fixup = search_exception_table(regs->eip)) != 0 )
     {
         regs->eip = fixup;
-        regs->xfs = regs->xgs = 0;
+        check_saved_selectors(regs);
         return;
     }
 
@@ -380,7 +414,7 @@ asmlinkage void do_page_fault(struct pt_regs *regs, long error_code)
     if ( (fixup = search_exception_table(regs->eip)) != 0 )
     {
         regs->eip = fixup;
-        regs->xfs = regs->xgs = 0;
+        check_saved_selectors(regs);
         return;
     }
 
@@ -463,7 +497,7 @@ asmlinkage void do_general_protection(struct pt_regs *regs, long error_code)
     if ( (fixup = search_exception_table(regs->eip)) != 0 )
     {
         regs->eip = fixup;
-        regs->xfs = regs->xgs = 0;
+        check_saved_selectors(regs);
         return;
     }
 

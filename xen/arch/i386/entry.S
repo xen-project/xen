@@ -490,15 +490,6 @@ ENTRY(ret_from_intr)
 	jne test_all_events
 	jmp restore_all
 
-        ALIGN
-ret_from_exception:
-        movb CS(%esp),%al
-	testb $3,%al	# return to non-supervisor?
-	jne process_guest_exception_and_events
-        jmp restore_all
-
-	ALIGN
-
 ENTRY(divide_error)
 	pushl $0		# no error code
 	pushl $ SYMBOL_NAME(do_divide_error)
@@ -530,11 +521,11 @@ error_code:
 	movl  %edx,%es
 	GET_CURRENT(%ebx)
 	call  *%edi
-        # NB. We reenable interrupts AFTER exception processing, as that is
-        #     required by the page fault handler (needs to save %cr2)
-        sti
         addl  $8,%esp
-	jmp ret_from_exception
+        movb  CS(%esp),%al
+	testb $3,%al
+	je    restore_all
+        jmp   process_guest_exception_and_events
 
 ENTRY(coprocessor_error)
 	pushl $0
@@ -564,7 +555,7 @@ ENTRY(nmi)
 	pushl %edx
 	call SYMBOL_NAME(do_nmi)
 	addl $8,%esp
-	RESTORE_ALL
+        jmp  restore_all
 
 ENTRY(int3)
 	pushl $0

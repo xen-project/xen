@@ -159,3 +159,5 @@ EXPORT_SYMBOL(xquad_portio);
 EXPORT_SYMBOL(create_xeno_proc_entry);
 EXPORT_SYMBOL(remove_xeno_proc_entry);
 
+EXPORT_SYMBOL(do_hypervisor_callback)
+EXPORT_SYMBOL(HYPERVISOR_shared_info)

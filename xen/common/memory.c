@@ -231,7 +231,12 @@ static void __invalidate_shadow_ldt(void)
         put_page_type(page);
         put_page_tot(page);                
     }
+
+    /* Dispose of the (now possibly invalid) mappings from the TLB.  */
+    flush_tlb[smp_processor_id()] = 1;
 }
+
+
 static inline void invalidate_shadow_ldt(void)
 {
     if ( current->mm.shadow_ldt_mapcnt != 0 )
@@ -720,13 +725,10 @@ static int do_extended_command(unsigned long ptr, unsigned long val)
                   (current->mm.ldt_base != ptr) )
         {
             if ( current->mm.ldt_ents != 0 )
-            {
                 invalidate_shadow_ldt();
-                flush_tlb[smp_processor_id()] = 1;
-            }
             current->mm.ldt_base = ptr;
             current->mm.ldt_ents = ents;
-            load_LDT();
+            load_LDT(current);
         }
         break;
     }

@@ -288,7 +288,7 @@ void switch_to(struct task_struct *prev_p, struct task_struct *next_p)
 
     /* Switch GDT and LDT. */
     __asm__ __volatile__ ("lgdt %0" : "=m" (*next_p->mm.gdt));
-    load_LDT();
+    load_LDT(next_p);
 
     /* Maybe switch the debug registers. */
     if ( next->debugreg[7] )
