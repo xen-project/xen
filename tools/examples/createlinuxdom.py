@@ -77,11 +77,11 @@ if root_partn:
         print "Error creating root VBD"
         xc.domain_destroy ( dom=id )
         sys.exit()
-    if xc.vbd_add_extent( dom=id,
-                          vbd=root_info[0],
-                          device=root_info[1],
-                          start_sector=root_info[2],
-                          nr_sectors=root_info[3] ):
+    if xc.vbd_grow( dom=id,
+                    vbd=root_info[0],
+                    device=root_info[1],
+                    start_sector=root_info[2],
+                    nr_sectors=root_info[3] ):
         print "Error populating root VBD"
         xc.domain_destroy ( dom=id )
         sys.exit()
@@ -91,11 +91,11 @@ if usr_partn:
         print "Error creating usr VBD"
         xc.domain_destroy ( dom=id )
         sys.exit()
-    if xc.vbd_add_extent( dom=id,
-                          vbd=usr_info[0],
-                          device=usr_info[1],
-                          start_sector=usr_info[2],
-                          nr_sectors=usr_info[3] ):
+    if xc.vbd_grow( dom=id,
+                    vbd=usr_info[0],
+                    device=usr_info[1],
+                    start_sector=usr_info[2],
+                    nr_sectors=usr_info[3] ):
         print "Error populating usr VBD"
         xc.domain_destroy ( dom=id )
         sys.exit()

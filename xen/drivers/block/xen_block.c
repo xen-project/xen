@@ -274,14 +274,19 @@ long do_block_io_op(block_io_op_t *u_block_io_op)
 	ret = vbd_create(&op.u.create_params); 
 	break; 
 
-    case BLOCK_IO_OP_VBD_ADD:  
-	/* add an extent to a VBD */
-	ret = vbd_add(&op.u.add_params); 
+    case BLOCK_IO_OP_VBD_GROW:  
+	/* append an extent to a VBD */
+	ret = vbd_grow(&op.u.grow_params); 
 	break; 
 
-    case BLOCK_IO_OP_VBD_REMOVE:  
-	/* remove an extent from a VBD */
-	ret = vbd_remove(&op.u.remove_params); 
+    case BLOCK_IO_OP_VBD_SHRINK:  
+	/* remove teh final extent from a VBD */
+	ret = vbd_shrink(&op.u.shrink_params); 
+	break; 
+
+    case BLOCK_IO_OP_VBD_SET_EXTENTS:  
+	/* a fresh extent list for the given VBD */
+	ret = vbd_setextents(&op.u.setextents_params); 
 	break; 
 
     case BLOCK_IO_OP_VBD_DELETE:  

@@ -33,6 +33,7 @@ extern int scsi_probe_devices(xen_disk_info_t *xdi);
 /* XXX SMH: crappy 'hash function' .. fix when care. */
 #define HSH(_x) ((_x) & (VBD_HTAB_SZ - 1))
 
+
 /* 
 ** Create a new VBD; all this involves is adding an entry to the domain's
 ** vbd hash table; caller must be privileged. 
@@ -43,10 +44,10 @@ long vbd_create(vbd_create_t *create)
     vbd_t *new_vbd, **pv; 
     long ret = 0;
 
-    if( !IS_PRIV(current) )
+    if ( unlikely(!IS_PRIV(current)) )
         return -EPERM; 
 
-    if ( (p = find_domain_by_id(create->domain)) == NULL )
+    if ( unlikely((p = find_domain_by_id(create->domain)) == NULL) )
     {
         DPRINTK("vbd_create attempted for non-existent domain %d\n", 
                 create->domain); 
@@ -59,7 +60,7 @@ long vbd_create(vbd_create_t *create)
           *pv != NULL; 
           pv = &(*pv)->next ) 
     {
-        if ( (*pv)->vdevice == create->vdevice )
+        if ( unlikely((*pv)->vdevice == create->vdevice) )
         {
             DPRINTK("vbd_create attempted for already existing vbd\n");
             ret = -EINVAL;
@@ -69,10 +70,16 @@ long vbd_create(vbd_create_t *create)
             break;
     }
 
-    new_vbd = kmalloc(sizeof(vbd_t), GFP_KERNEL); 
+    if ( unlikely((new_vbd = kmalloc(sizeof(vbd_t), GFP_KERNEL)) == NULL) )
+    {
+        DPRINTK("vbd_create: out of memory\n");
+        ret = -ENOMEM;
+        goto out;
+    }
+
     new_vbd->vdevice = create->vdevice; 
     new_vbd->mode    = create->mode; 
-    new_vbd->extents = (xen_extent_le_t *)NULL; 
+    new_vbd->extents = NULL; 
     new_vbd->next    = *pv; 
 
     *pv = new_vbd;
@@ -83,44 +90,48 @@ long vbd_create(vbd_create_t *create)
     return ret; 
 }
 
-/*
-** Add an extent to an existing VBD; fails if the VBD doesn't exist. 
-** Doesn't worry about overlapping extents (e.g. merging etc) for now. 
-*/
-long vbd_add(vbd_add_t *add) 
+
+/* Grow a VBD by appending a new extent. Fails if the VBD doesn't exist. */
+long vbd_grow(vbd_grow_t *grow) 
 {
     struct task_struct *p; 
     xen_extent_le_t **px, *x; 
     vbd_t *v; 
     long ret = 0;
 
-    if ( !IS_PRIV(current) )
+    if ( unlikely(!IS_PRIV(current)) )
         return -EPERM; 
 
-    if ( (p = find_domain_by_id(add->domain)) == NULL )
+    if ( unlikely((p = find_domain_by_id(grow->domain)) == NULL) )
     {
-        DPRINTK("vbd_add attempted for non-existent domain %d\n", 
-                add->domain); 
+        DPRINTK("vbd_grow: attempted for non-existent domain %d\n", 
+                grow->domain); 
         return -EINVAL; 
     }
 
     spin_lock(&p->vbd_lock);
 
-    for ( v = p->vbdtab[HSH(add->vdevice)]; v != NULL; v = v->next ) 
-        if ( v->vdevice == add->vdevice )
+    for ( v = p->vbdtab[HSH(grow->vdevice)]; v != NULL; v = v->next ) 
+        if ( v->vdevice == grow->vdevice )
             break; 
 
-    if ( v == NULL )
+    if ( unlikely(v == NULL) )
     {
-        DPRINTK("vbd_add; attempted to add extent to non-existent VBD.\n"); 
+        DPRINTK("vbd_grow: attempted to append extent to non-existent VBD.\n");
         ret = -EINVAL;
         goto out; 
     }
 
-    x = kmalloc(sizeof(xen_extent_le_t), GFP_KERNEL); 
-    x->extent.device       = add->extent.device; 
-    x->extent.start_sector = add->extent.start_sector; 
-    x->extent.nr_sectors   = add->extent.nr_sectors; 
+    if ( unlikely((x = kmalloc(sizeof(xen_extent_le_t), GFP_KERNEL)) == NULL) )
+    {
+        DPRINTK("vbd_grow: out of memory\n");
+        ret = -ENOMEM;
+        goto out;
+    }
+ 
+    x->extent.device       = grow->extent.device; 
+    x->extent.start_sector = grow->extent.start_sector; 
+    x->extent.nr_sectors   = grow->extent.nr_sectors; 
     x->next                = (xen_extent_le_t *)NULL; 
 
     for ( px = &v->extents; *px != NULL; px = &(*px)->next ) 
@@ -134,7 +145,8 @@ long vbd_add(vbd_add_t *add)
     return ret;
 }
 
-long vbd_remove(vbd_remove_t *remove) 
+
+long vbd_shrink(vbd_shrink_t *shrink)
 {
     struct task_struct *p; 
     xen_extent_le_t **px, *x; 
@@ -144,39 +156,31 @@ long vbd_remove(vbd_remove_t *remove)
     if ( !IS_PRIV(current) )
         return -EPERM; 
 
-    if ( (p = find_domain_by_id(remove->domain)) == NULL )
+    if ( (p = find_domain_by_id(shrink->domain)) == NULL )
     {
-        DPRINTK("vbd_remove attempted for non-existent domain %d\n", 
-                remove->domain); 
+        DPRINTK("vbd_shrink attempted for non-existent domain %d\n", 
+                shrink->domain); 
         return -EINVAL; 
     }
 
     spin_lock(&p->vbd_lock);
 
-    for ( v = p->vbdtab[HSH(remove->vdevice)]; v != NULL; v = v->next ) 
-        if ( v->vdevice == remove->vdevice )
+    for ( v = p->vbdtab[HSH(shrink->vdevice)]; v != NULL; v = v->next ) 
+        if ( v->vdevice == shrink->vdevice )
             break; 
 
-    if ( v == NULL )
+    if ( unlikely(v == NULL) || unlikely(v->extents == NULL) )
     {
-        DPRINTK("vbd_remove; attempt to remove ext from non-existent VBD.\n"); 
+        DPRINTK("vbd_shrink: attempt to remove non-existent extent.\n"); 
         ret = -EINVAL;
         goto out;
     }
 
-    for ( px = &v->extents; *px != NULL; px = &(*px)->next ) 
-        if ( (*px)->extent.start_sector == remove->extent.start_sector )
-            break;
-    
-    if ( ((x = *px) == NULL) || 
-         (x->extent.nr_sectors != remove->extent.nr_sectors) || 
-         (x->extent.device != remove->extent.device) )
-    {
-        DPRINTK("vbd_remove: attempt to remove non-matching extent.\n");
-        ret = -EINVAL;
-        goto out;
-    }
+    /* Find the last extent. We now know that there is at least one. */
+    for ( px = &v->extents; (*px)->next != NULL; px = &(*px)->next )
+        continue;
 
+    x   = *px;
     *px = x->next;
     kfree(x);
 
@@ -185,6 +189,92 @@ long vbd_remove(vbd_remove_t *remove)
     put_task_struct(p);
     return ret; 
 }
+
+
+long vbd_setextents(vbd_setextents_t *setextents)
+{
+    struct task_struct *p; 
+    xen_extent_t e;
+    xen_extent_le_t *new_extents, *x, *t; 
+    vbd_t *v; 
+    int i;
+    long ret = 0;
+
+    if ( !IS_PRIV(current) )
+        return -EPERM; 
+
+    if ( (p = find_domain_by_id(setextents->domain)) == NULL )
+    {
+        DPRINTK("vbd_setextents attempted for non-existent domain %d\n", 
+                setextents->domain); 
+        return -EINVAL; 
+    }
+
+    spin_lock(&p->vbd_lock);
+
+    for ( v = p->vbdtab[HSH(setextents->vdevice)]; v != NULL; v = v->next ) 
+        if ( v->vdevice == setextents->vdevice )
+            break; 
+
+    if ( unlikely(v == NULL) )
+    {
+        DPRINTK("vbd_setextents: attempt to modify non-existent VBD.\n"); 
+        ret = -EINVAL;
+        goto out;
+    }
+
+    /* Construct the new extent list. */
+    new_extents = NULL;
+    for ( i = setextents->nr_extents; i >= 0; i++ )
+    {
+        if ( unlikely(copy_from_user(&e, 
+                                     &setextents->extents[i], 
+                                     sizeof(e)) != 0) )
+        {
+            DPRINTK("vbd_setextents: copy_from_user failed\n");
+            ret = -EFAULT;
+            goto free_and_out;
+        }
+        
+        if ( unlikely((x = kmalloc(sizeof(xen_extent_le_t), GFP_KERNEL))
+                      == NULL) )
+        {
+            DPRINTK("vbd_setextents: out of memory\n");
+            ret = -ENOMEM;
+            goto free_and_out;
+        }
+        
+        x->extent = e;
+        x->next   = new_extents;
+
+        new_extents = x;
+    }
+
+    /* Delete the old extent list _after_ successfully creating the new. */
+    for ( x = v->extents; x != NULL; x = t )
+    {
+        t = x->next;
+        kfree(x);
+    }
+
+    /* Make the new list visible. */
+    v->extents = new_extents;
+
+ out:
+    spin_unlock(&p->vbd_lock);
+    put_task_struct(p);
+    return ret;
+
+ free_and_out:
+    /* Failed part-way through the new list. Delete all that we managed. */
+    for ( x = new_extents; x != NULL; x = t )
+    {
+        t = x->next;
+        kfree(x);
+    }
+    goto out;
+}
+
 
 long vbd_delete(vbd_delete_t *delete) 
 {
@@ -442,6 +532,8 @@ long vbd_info(vbd_info_t *info)
     extents = info->extents;
     for ( x = v->extents; x != NULL; x = x->next )
     {
+        if ( info->nextents == info->maxextents )
+            break;
         if ( copy_to_user(extents, &x->extent, sizeof(xen_extent_t)) )
         {
             DPRINTK("vbd_info: copy_to_user failed\n");
@@ -449,7 +541,7 @@ long vbd_info(vbd_info_t *info)
             goto out; 
         } 
         extents++;
-        info->nextents++; 
+        info->nextents++;
     }
 
  out: 
