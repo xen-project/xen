@@ -888,6 +888,10 @@ docs to do advanced stuff.
 
 \chapter{Control Software} 
 
+The Xen control software includes the \xend node control daemon (which 
+must be running), the xm command line tools, and the prototype 
+xensv web interface. 
+
 \section{\Xend (Node control daemon)}
 \label{s:xend}
 
@@ -904,7 +908,7 @@ management functions.  A small set of commands may be issued on the
 \verb!# xend start! & start \xend, if not already running \\
 \verb!# xend stop!  & stop \xend if already running       \\
 \verb!# xend restart! & restart \xend if running, otherwise start it \\
-\verb!# xend trace_start! & start \xend, with very detailed debug logging \\
+% \verb!# xend trace_start! & start \xend, with very detailed debug logging \\
 \verb!# xend status! & indicates \xend status by its return code
 \end{tabular}
 
@@ -991,24 +995,27 @@ manage running domains.
 \chapter{Domain Configuration}
 \label{cha:config}
 
+The following contains the syntax of the domain configuration 
+files and description of how to further specify networking, 
+driver domain and general scheduling behaviour. 
 
 \section{Configuration Files}
 \label{s:cfiles}
 
 Xen configuration files contain the following standard variables.
 Unless otherwise stated, configuration items should be enclosed in
-quotes (i.e. {\tt '...'} or {\tt ``....''})):
+quotes: see \path{/etc/xen/xmexample1} for an example. 
 
 \begin{description}
-\item[kernel] Path to the kernel image (on the server).
+\item[kernel] Path to the kernel image 
 \item[ramdisk] Path to a ramdisk image (optional).
 % \item[builder] The name of the domain build function (e.g. {\tt'linux'} or {\tt'netbsd'}.
 \item[memory] Memory size in megabytes.
-\item[cpu] CPU to assign this domain to.
+\item[cpu] CPU to run this domain on, or {\tt -1} for
+  auto-allocation. 
 \item[nics] Number of virtual network interfaces.
 \item[vif] List of MAC addresses (random addresses are assigned if not
-  given) and / or bridges to use for the domains network
-  interfaces. e.g.
+  given) and bridges to use for the domain's network interfaces, e.g.
 \begin{verbatim}
 vif = [ 'mac=aa:00:00:00:00:11, bridge=xen-br0',
         'bridge=xen-br1' ]
@@ -1016,23 +1023,21 @@ vif = [ 'mac=aa:00:00:00:00:11, bridge=xen-br0',
   to assign a MAC address and bridge to the first interface and assign
   a different bridge to the second interface, leaving \xend to choose
   the MAC address.
-\item[disk] List of block devices to export to the domain.  e.g. \\
+\item[disk] List of block devices to export to the domain,  e.g. \\
   \verb_disk = [ 'phy:hda1,sda1,r' ]_ \\
-  exports device \path{/dev/hda1} to the domain, as \path{/dev/sda1} with
-  readonly access being allowed. \\
-  \verb_disk = [ 'phy:hda7,sda2,w', 'phy:hdb2,sda,w!' ]_ \\
-  exports device \path{/dev/hda7} to the domain as \path{/dev/sda2} with
-  write access enabled and \path{/dev/hdb2} as \path{/dev/sda} with write access
-  force enabled (bypassing safety checks, as indicated by the {\tt !}).
-\item[dhcp] Set to {\tt 'dhcp'} if you want to DHCP allocate the IP
-address.
-\item[netmask] IP netmask.
-\item[gateway] IP address for the gateway (if any).
+  exports physical device \path{/dev/hda1} to the domain 
+  as \path{/dev/sda1} with read-only access. 
+\item[dhcp] Set to {\tt 'dhcp'} if you want to use DHCP to configure
+  networking. 
+\item[netmask] Manually configured IP netmask.
+\item[gateway] Manually configured IP gateway. 
 \item[hostname] Set the hostname for the virtual machine.
-\item[root] Set the root device.
-\item[nfs\_server] IP address for the NFS server.
-\item[nfs\_root] Path of the root filesystem on the NFS server.
-\item[extra] Extra string to append to the kernel command line.
+\item[root] Specify the root device parameter on the kernel command
+  line. 
+\item[nfs\_server] IP address for the NFS server (if any). 
+\item[nfs\_root] Path of the root filesystem on the NFS server (if any).
+\item[extra] Extra string to append to the kernel command line (if
+  any) 
 \item[restart] Three possible options:
   \begin{description}
   \item[always] Always restart the domain, no matter what
@@ -1051,162 +1056,48 @@ scripting commands in configuration files.  An example of this is the
 
 \section{Network Configuration}
 
-For simple systems with a single ethernet interface with a simple
-configuration, the default installation should work `out of the
-box'.  More complicated network setups, for instance with multiple
-ethernet interfaces and / or existing bridging setups will require
-some special configuration.
+For many users, the default installation should work `out of the box'.
+More complicated network setups, for instance with multiple ethernet
+interfaces and/or existing bridging setups will require some
+special configuration.
 
-The purpose of this chapter is to describe the mechanisms provided by
+The purpose of this section is to describe the mechanisms provided by
 \xend to allow a flexible configuration for Xen's virtual networking.
 
 \subsection{Xen networking scripts}
 
-Xen's virtual networking is configured by 3 shell scripts.  These are
-called automatically by \xend when certain events occur, with arguments
-to the scripts providing further contextual information.  These
-scripts are found by default in \path{/etc/xen}.  The names and
-locations of the scripts can be configured in \path{xend-config.sxp}.
+Xen's virtual networking is configured by two shell scripts (by
+default \path{network} and \path{vif-bridge}).  These are
+called automatically by \xend when certain events occur, with
+arguments to the scripts providing further contextual information.
+These scripts are found by default in \path{/etc/xen/scripts}.  The
+names and locations of the scripts can be configured in
+\path{/etc/xen/xend-config.sxp}.
 
-\subsubsection{\path{network}}
+\begin{description} 
 
-This script is called once when \xend is started and once when \xend is
-stopped.  Its job is to do any advance preparation required for the
-Xen virtual network when \xend starts and to do any corresponding
-cleanup when \xend exits.
+\item[network:] This script is called whenever \xend is started or
+stopped to respectively initialize or tear down the Xen virtual
+network. In the default configuration initialization creates the
+bridge `xen-br0' and moves eth0 onto that bridge, modifying the
+routing accordingly. When \xend exits, it deletes the Xen bridge and
+removes eth0, restoring the normal IP and routing configuration.
 
-In the default configuration, this script creates the bridge
-`xen-br0' and moves eth0 onto that bridge, modifying the routing
-accordingly.
+%% In configurations where the bridge already exists, this script could
+%% be replaced with a link to \path{/bin/true} (for instance).
 
-In configurations where the bridge already exists, this script could
-be replaced with a link to \path{/bin/true} (for instance).
+\item[vif-bridge:] This script is called for every domain virtual
+interface and can configure firewalling rules and add the vif 
+to the appropriate bridge. By default, this adds and removes 
+VIFs on the default Xen bridge.
 
-When \xend exits, this script is called with the {\tt stop} argument,
-which causes it to delete the Xen bridge and remove {\tt eth0} from
-it, restoring the normal IP and routing configuration.
+\end{description} 
 
-\subsubsection{\path{vif-bridge}}
-
-This script is called for every domain virtual interface.  This should
-do things like configuring firewalling rules for that interface and
-adding it to the appropriate bridge.
-
-By default, this adds and removes VIFs on the default Xen bridge.
-This script can be customized to properly deal with more complicated
-bridging setups.
-
-\section{Scheduler Configuration}
-
-\subsection{Scheduler selection}
-
-Xen offers a boot time choice between multiple schedulers.  To select
-a scheduler, pass the boot parameter { \tt sched=sched\_name } to Xen,
-substituting the appropriate scheduler name.  Details of the schedulers
-and their parameters are included below; future versions of the tools
-will provide a higher-level interface to these tools.
-
-It is expected that system administrators configure their system to
-use the scheduler most appropriate to their needs.  Currently, the BVT
-scheduler is the recommended choice, since the Atropos scheduler is
-not finished.
-
-\subsection{Borrowed Virtual Time}
-
-{\tt sched=bvt } (the default) \\ 
-
-BVT provides proportional fair shares of the CPU time.  It has been
-observed to penalise domains that block frequently (e.g. IO intensive
-domains), but this can be compensated by using warping. 
-
-\subsubsection{Global Parameters}
-
-\begin{description}
-\item[ctx\_allow]
-  the context switch allowance is similar to the "quantum"
-  in traditional schedulers.  It is the minimum time that
-  a scheduled domain will be allowed to run before being
-  pre-empted.  This prevents thrashing of the CPU.
-\end{description}
-
-\subsubsection{Per-domain parameters}
-
-\begin{description}
-\item[mcuadv]
-  the MCU (Minimum Charging Unit) advance determines the
-  proportional share of the CPU that a domain receives.  It
-  is set inversely proportionally to a domain's sharing weight.
-\item[warp]
-  the amount of "virtual time" the domain is allowed to warp
-  backwards
-\item[warpl]
-  the warp limit is the maximum time a domain can run warped for
-\item[warpu]
-  the unwarp requirement is the minimum time a domain must
-  run unwarped for before it can warp again
-\end{description}
-
-\subsection{Atropos}
-
-{\tt sched=atropos } \\
-
-Atropos is a Soft Real Time scheduler.  It provides guarantees about
-absolute shares of the CPU (with a method for optionally sharing out
-slack CPU time on a best-effort basis) and can provide timeliness
-guarantees for latency-sensitive domains.
-
-Every domain has an associated period and slice.  The domain should
-receive 'slice' nanoseconds every 'period' nanoseconds.  This allows
-the administrator to configure both the absolute share of the CPU a
-domain receives and the frequency with which it is scheduled.  When
-domains unblock, their period is reduced to the value of the latency
-hint (the slice is scaled accordingly so that they still get the same
-proportion of the CPU).  For each subsequent period, the slice and
-period times are doubled until they reach their original values.
-
-Note: don't overcommit the CPU when using Atropos (i.e. don't reserve
-more CPU than is available - the utilisation should be kept to
-slightly less than 100% in order to ensure predictable behaviour).
-
-\subsubsection{Per-domain parameters}
-
-\begin{description}
-\item[slice]
-  The length of time per period that a domain is guaranteed.
-\item[period]
-  The period over which a domain is guaranteed to receive
-  its slice of CPU time.
-\item[latency]
-  The latency hint is used to control how soon after
-  waking up a domain should be scheduled.
-\item[xtratime]
-  This is a true (1) / false (0) flag that specifies whether
-  a domain should be allowed a share of the system slack time.
-\end{description}
-
-\section{Round Robin}
-
-{\tt sched=rrobin } \\
-
-The Round Robin scheduler is included as a simple demonstration of
-Xen's internal scheduler API.  It is not intended for production use
---- the other schedulers included are all more general and should give
-higher throughput.
-
-\subsection{Global parameters}
-
-\begin{description}
-\item[rr\_slice]
-  The maximum time each domain runs before the next
-  scheduling decision is made.
-\end{description}
-
-\chapter{Privileged domains}
 
 %% There are two possible types of privileges:  IO privileges and
 %% administration privileges.
 
-\section{Driver domains (I/O Privileges)}
+\section{Driver Domain Configuration} 
 
 I/O privileges can be assigned to allow a domain to directly access
 PCI devices itself.  This is used to support driver domains.
@@ -1217,37 +1108,33 @@ somewhere within the {\tt vm} element of its configuration file must
 be a {\tt backend} element of the form {\tt (backend ({\em type}))}
 where {\tt \em type} may be either {\tt netif} or {\tt blkif},
 according to the type of virtual device this domain will service.
-After this domain has been built, \xend will connect all new and
-existing {\em virtual} devices (of the appropriate type) to that
-backend.
+%% After this domain has been built, \xend will connect all new and
+%% existing {\em virtual} devices (of the appropriate type) to that
+%% backend.
 
-Note that:
-\begin{itemize}
-\item a block backend cannot import virtual block devices from other
-domains
-\item a network backend cannot import virtual network devices from
-other domains
-\end{itemize}
+Note that a block backend cannot import virtual block devices from
+other domains, and a network backend cannot import virtual network
+devices from other domains.  Thus (particularly in the case of block
+backends, which cannot import a virtual block device as their root
+filesystem), you may need to boot a backend domain from a ramdisk or a
+network device.
 
-Thus (particularly in the case of block backends, which cannot import
-a virtual block device as their root filesystem), you may need to boot
-a backend domain from a ramdisk or a network device.
-
-The privilege to drive PCI devices may also be specified on a
-per-device basis.  Xen will assign the minimal set of hardware
-privileges to a domain that are required to control its devices.  This
-can be configured in either format of configuration file:
+Access to PCI devices may be configured on a per-device basis.  Xen
+will assign the minimal set of hardware privileges to a domain that
+are required to control its devices.  This can be configured in either
+format of configuration file:
 
 \begin{itemize}
-\item SXP Format:
-  Include {\tt device} elements
-  {\tt (device (pci (bus {\em x}) (dev {\em y}) (func {\em z}))) } \\
+\item SXP Format: Include device elements of the form: \\
+\centerline{  {\tt (device (pci (bus {\em x}) (dev {\em y}) (func {\em z}))) }} \\
   inside the top-level {\tt vm} element.  Each one specifies the address
-  of a device this domain is allowed to drive ---
+  of a device this domain is allowed to access ---
   the numbers {\em x},{\em y} and {\em z} may be in either decimal or
   hexadecimal format.
 \item Flat Format: Include a list of PCI device addresses of the
-  format: \\ {\tt pci = ['x,y,z', ...] } \\ where each element in the
+  format: \\ 
+\centerline{{\tt pci = ['x,y,z', ...] }} \\ 
+where each element in the
   list is a string specifying the components of the PCI device
   address, separated by commas.  The components ({\tt \em x}, {\tt \em
   y} and {\tt \em z}) of the list may be formatted as either decimal
@@ -1264,63 +1151,152 @@ can be configured in either format of configuration file:
 % Support for other administrative domains is not yet available...  perhaps
 % we should plumb it in some time
 
-\chapter{Debugging}
 
-Xen has a set of debugging features that can be useful to try and
-figure out what's going on. Hit 'h' on the serial line (if you
-specified a baud rate on the Xen command line) or ScrollLock-h on the
-keyboard to get a list of supported commands.
 
-If you have a crash you'll likely get a crash dump containing an EIP
-(PC) which, along with an 'objdump -d image', can be useful in
-figuring out what's happened.  Debug a Xenlinux image just as you
-would any other Linux kernel.
 
-We supply a handy debug terminal program which you can find in
-\path{/usr/local/src/xen-2.0.bk/tools/misc/miniterm/}
-This should be built and executed on another machine that is connected
-via a null modem cable. Documentation is included.
-Alternatively, if the Xen machine is connected to a serial-port server
-then we supply a dumb TCP terminal client, {\tt xencons}.
 
-\chapter{Xen build options}
+\section{Scheduler Configuration}
+\label{s:sched} 
 
-For most users, the default build of Xen will be adequate.  For some
-advanced uses, Xen provides a number of build-time options:
 
-At build time, these options should be set as environment variables or
-passed on make's command-line.  For example:
+Xen offers a boot time choice between multiple schedulers.  To select
+a scheduler, pass the boot parameter {\em sched=sched\_name} to Xen,
+substituting the appropriate scheduler name.  Details of the schedulers
+and their parameters are included below; future versions of the tools
+will provide a higher-level interface to these tools.
 
-\begin{verbatim}
-export option=y; make
-option=y make
-make option1=y option2=y
-\end{verbatim}
+It is expected that system administrators configure their system to
+use the scheduler most appropriate to their needs.  Currently, the BVT
+scheduler is the recommended choice. 
 
-\section{List of options}
+\subsection{Borrowed Virtual Time}
 
-{\bf verbose=y }\\
-Enable debugging messages when Xen detects an unexpected condition.
-Also enables console output from all domains. \\
-{\bf debug=y }\\
-Enable debug assertions.  Implies {\bf verbose=y }.
-(Primarily useful for tracing bugs in Xen).        \\
-{\bf debugger=y }\\
-Enable the in-Xen pervasive debugger (PDB).
-This can be used to debug Xen, guest OSes, and
-applications. For more information see the 
-XenDebugger-HOWTO.                                 \\
-{\bf perfc=y }\\
-Enable performance-counters for significant events
+{\tt sched=bvt } (the default) \\ 
+
+BVT provides proportional fair shares of the CPU time.  It has been
+observed to penalise domains that block frequently (e.g. I/O intensive
+domains), but this can be compensated for by using warping. 
+
+\subsubsection{Global Parameters}
+
+\begin{description}
+\item[ctx\_allow]
+  the context switch allowance is similar to the "quantum"
+  in traditional schedulers.  It is the minimum time that
+  a scheduled domain will be allowed to run before being
+  pre-empted. 
+\end{description}
+
+\subsubsection{Per-domain parameters}
+
+\begin{description}
+\item[mcuadv]
+  the MCU (Minimum Charging Unit) advance determines the
+  proportional share of the CPU that a domain receives.  It
+  is set inversely proportionally to a domain's sharing weight.
+\item[warp]
+  the amount of ``virtual time'' the domain is allowed to warp
+  backwards
+\item[warpl]
+  the warp limit is the maximum time a domain can run warped for
+\item[warpu]
+  the unwarp requirement is the minimum time a domain must
+  run unwarped for before it can warp again
+\end{description}
+
+\subsection{Atropos}
+
+{\tt sched=atropos } \\
+
+Atropos is a soft real time scheduler.  It provides guarantees about
+absolute shares of the CPU, with a facility for sharing
+slack CPU time on a best-effort basis. It can provide timeliness
+guarantees for latency-sensitive domains.
+
+Every domain has an associated period and slice.  The domain should
+receive `slice' nanoseconds every `period' nanoseconds.  This allows
+the administrator to configure both the absolute share of the CPU a
+domain receives and the frequency with which it is scheduled. 
+
+%%  When
+%% domains unblock, their period is reduced to the value of the latency
+%% hint (the slice is scaled accordingly so that they still get the same
+%% proportion of the CPU).  For each subsequent period, the slice and
+%% period times are doubled until they reach their original values.
+
+Note: don't overcommit the CPU when using Atropos (i.e. don't reserve
+more CPU than is available --- the utilisation should be kept to
+slightly less than 100\% in order to ensure predictable behaviour).
+
+\subsubsection{Per-domain parameters}
+
+\begin{description}
+\item[period] The regular time interval during which a domain is
+  guaranteed to receive its allocation of CPU time.
+\item[slice]
+  The length of time per period that a domain is guaranteed to run
+  for (in the absence of voluntary yielding of the CPU). 
+\item[latency]
+  The latency hint is used to control how soon after
+  waking up a domain it should be scheduled.
+\item[xtratime] This is a boolean flag that specifies whether a domain
+  should be allowed a share of the system slack time.
+\end{description}
+
+\section{Round Robin}
+
+{\tt sched=rrobin } \\
+
+The round robin scheduler is included as a simple demonstration of
+Xen's internal scheduler API.  It is not intended for production use. 
+
+\subsection{Global parameters}
+
+\begin{description}
+\item[rr\_slice]
+  The maximum time each domain runs before the next
+  scheduling decision is made.
+\end{description}
+
+
+
+
+
+
+
+
+
+
+
+
+\chapter{Build, Boot and Debug options} 
+
+This chapter describes the build- and boot-time options 
+which may be used to tailor your Xen system. 
+
+\section{Xen build options}
+
+Xen provides a number of build-time options which should be 
+set as environment variables or passed on make's command-line.  
+
+\begin{description} 
+\item[verbose=y] Enable debugging messages when Xen detects an unexpected condition.
+Also enables console output from all domains.
+\item[debug=y] 
+Enable debug assertions.  Implies {\bf verbose=y}.
+(Primarily useful for tracing bugs in Xen).       
+\item[debugger=y] 
+Enable the in-Xen debugger. This can be used to debug 
+Xen, guest OSes, and applications.
+\item[perfc=y] 
+Enable performance counters for significant events
 within Xen. The counts can be reset or displayed
-on Xen's console via console control keys.          \\
-{\bf trace=y }\\
+on Xen's console via console control keys.
+\item[trace=y] 
 Enable per-cpu trace buffers which log a range of
 events within Xen for collection by control
-software.  For more information see the chapter on debugging,
-in the Xen Interface Manual.
-
-\chapter{Boot options}
+software. 
+\end{description} 
 
 \section{Xen boot options}
 
@@ -1328,49 +1304,48 @@ These options are used to configure Xen's behaviour at runtime.  They
 should be appended to Xen's command line, either manually or by
 editing \path{grub.conf}.
 
-{\bf ignorebiostables }\\
+\begin{description}
+\item [ignorebiostables ] 
  Disable parsing of BIOS-supplied tables. This may help with some
  chipsets that aren't fully supported by Xen. If you specify this
  option then ACPI tables are also ignored, and SMP support is
- disabled. \\
+ disabled. 
 
-{\bf noreboot } \\
+\item [noreboot ] 
  Don't reboot the machine automatically on errors.  This is
  useful to catch debug output if you aren't catching console messages
- via the serial line. \\
+ via the serial line. 
 
-{\bf nosmp } \\
+\item [nosmp ] 
  Disable SMP support.
- This option is implied by 'ignorebiostables'. \\
+ This option is implied by `ignorebiostables'. 
 
-{\bf noacpi } \\
+\item [noacpi ] 
  Disable ACPI tables, which confuse Xen on some chipsets.
- This option is implied by 'ignorebiostables'. \\
+ This option is implied by `ignorebiostables'. 
 
-{\bf watchdog } \\
- Enable NMI watchdog which can report certain failures. \\
+\item [watchdog ] 
+ Enable NMI watchdog which can report certain failures. 
 
-{\bf noht } \\
- Disable Hyperthreading. \\
+\item [noht ] 
+ Disable Hyperthreading. 
 
-{\bf badpage=$<$page number$>$[,$<$page number$>$] } \\
+\item [badpage=$<$page number$>$,$<$page number$>$, \ldots ] 
  Specify a list of pages not to be allocated for use 
  because they contain bad bytes. For example, if your
  memory tester says that byte 0x12345678 is bad, you would
- place 'badpage=0x12345' on Xen's command line (i.e., the
- last three digits of the byte address are not
- included!). \\
+ place `badpage=0x12345' on Xen's command line. 
 
-{\bf com1=$<$baud$>$,DPS[,$<$io\_base$>$,$<$irq$>$] \\
- com2=$<$baud$>$,DPS[,$<$io\_base$>$,$<$irq$>$] } \\
+\item [com1=$<$baud$>$,DPS,$<$io\_base$>$,$<$irq$>$
+ com2=$<$baud$>$,DPS,$<$io\_base$>$,$<$irq$>$ ] \mbox{}\\ 
  Xen supports up to two 16550-compatible serial ports.
  For example: 'com1=9600,8n1,0x408,5' maps COM1 to a
  9600-baud port, 8 data bits, no parity, 1 stop bit,
  I/O port base 0x408, IRQ 5.
  If the I/O base and IRQ are standard (com1:0x3f8,4;
- com2:0x2f8,3) then they need not be specified. \\
+ com2:0x2f8,3) then they need not be specified. 
 
-{\bf console=$<$specifier list$>$ } \\
+\item [console=$<$specifier list$>$ ] 
  Specify the destination for Xen console I/O.
  This is a comma-separated list of, for example:
 \begin{description}
@@ -1387,55 +1362,89 @@ editing \path{grub.conf}.
  shared by two subsystems (e.g. console and
  debugger). Sharing is controlled by MSB of each
  transmitted/received character.
- [NB. Default for this option is 'com1,tty'] \\
+ [NB. Default for this option is `com1,vga'] 
 
-{\bf conswitch=$<$switch-char$><$auto-switch-char$>$ } \\
+\item [conswitch=$<$switch-char$><$auto-switch-char$>$ ] 
  Specify how to switch serial-console input between
- Xen and DOM0. The required sequence is CTRL-<switch-char>
- pressed three times. Specifying '`' disables switching.
- The <auto-switch-char> specifies whether Xen should
- auto-switch input to DOM0 when it boots -- if it is 'x'
+ Xen and DOM0. The required sequence is CTRL-$<$switch-char$>$
+ pressed three times. Specifying the backtick character 
+ disables switching.
+ The $<$auto-switch-char$>$ specifies whether Xen should
+ auto-switch input to DOM0 when it boots --- if it is `x'
  then auto-switching is disabled.  Any other value, or
  omitting the character, enables auto-switching.
- [NB. Default for this option is 'a'] \\
+ [NB. default switch-char is `a'] 
 
-{\bf nmi=xxx } \\
+\item [nmi=xxx ] 
  Specify what to do with an NMI parity or I/O error. \\
- 'nmi=fatal':  Xen prints a diagnostic and then hangs. \\
- 'nmi=dom0':   Inform DOM0 of the NMI. \\
- 'nmi=ignore': Ignore the NMI. \\
+ `nmi=fatal':  Xen prints a diagnostic and then hangs. \\
+ `nmi=dom0':   Inform DOM0 of the NMI. \\
+ `nmi=ignore': Ignore the NMI. 
 
-{\bf dom0\_mem=xxx } \\
- Set the maximum amount of memory for domain0. \\
+\item [dom0\_mem=xxx ] 
+ Set the amount of memory (in kB) to be allocated to domain0.  
 
-{\bf tbuf\_size=xxx } \\
+\item [tbuf\_size=xxx ] 
  Set the size of the per-cpu trace buffers, in pages
  (default 1).  Note that the trace buffers are only
  enabled in debug builds.  Most users can ignore
- this feature completely. \\
+ this feature completely. 
 
-{\bf sched=xxx } \\
+\item [sched=xxx ] 
  Select the CPU scheduler Xen should use.  The current
- possibilities are 'bvt', 'atropos' and 'rrobin'.  The
- default is 'bvt'.  For more information see
- Sched-HOWTO.txt. \\
+ possibilities are `bvt' (default), `atropos' and `rrobin'. 
+ For more information see Section~\ref{s:sched}. 
 
-{\bf pci\_dom0\_hide=(xx.xx.x)(yy.yy.y)... } \\
+\item [pci\_dom0\_hide=(xx.xx.x)(yy.yy.y)\ldots ] 
 Hide selected PCI devices from domain 0 (for instance, to stop it
 taking ownership of them so that they can be driven by another
 domain).  Device IDs should be given in hex format.  Bridge devices do
 not need to be hidden --- they are hidden implicitly, since guest OSes
 do not need to configure them.
+\end{description} 
+
+
 
 \section{XenLinux Boot Options}
 
-{\bf xencons=xxx}
-Specify the device node to
-which the Xen virtual console driver is attached: \\
- 'xencons=off': disable virtual console \\
- 'xencons=tty': attach console to /dev/tty1 (tty0 at boot-time) \\
- 'xencons=ttyS': attach console to /dev/ttyS0\\
+In addition to the standard linux kernel boot options, we support: 
+\begin{description} 
+\item[xencons=xxx ] Specify the device node to which the Xen virtual
+console driver is attached. The following options are supported:
+\begin{center}
+\begin{tabular}{l}
+`xencons=off': disable virtual console \\ 
+`xencons=tty': attach console to /dev/tty1 (tty0 at boot-time) \\
+`xencons=ttyS': attach console to /dev/ttyS0
+\end{tabular}
+\end{center}
 The default is ttyS for dom0 and tty for all other domains.
+\end{description} 
+
+
+
+\section{Debugging}
+\label{s:keys} 
+
+Xen has a set of debugging features that can be useful to try and
+figure out what's going on. Hit 'h' on the serial line (if you
+specified a baud rate on the Xen command line) or ScrollLock-h on the
+keyboard to get a list of supported commands.
+
+If you have a crash you'll likely get a crash dump containing an EIP
+(PC) which, along with an 'objdump -d image', can be useful in
+figuring out what's happened.  Debug a Xenlinux image just as you
+would any other Linux kernel.
+
+%% We supply a handy debug terminal program which you can find in
+%% \path{/usr/local/src/xen-2.0.bk/tools/misc/miniterm/}
+%% This should be built and executed on another machine that is connected
+%% via a null modem cable. Documentation is included.
+%% Alternatively, if the Xen machine is connected to a serial-port server
+%% then we supply a dumb TCP terminal client, {\tt xencons}.
+
+
+
 
 \chapter{Further Support}
 
@@ -1455,13 +1464,13 @@ into this manual.
 
 \section{Online references}
 
-The official Xen web site is found at: \\
-{\tt
-http://www.cl.cam.ac.uk/Research/SRG/netos/xen/] }.
+The official Xen web site is found at:
+\begin{quote}
+{\tt http://www.cl.cam.ac.uk/Research/SRG/netos/xen/}
+\end{quote}
 
-Links to other
-documentation sources are listed at: \\ {\tt
-http://www.cl.cam.ac.uk/Research/SRG/netos/xen/documentation.html}.
+This contains links to the latest versions of all on-line 
+documentation. 
 
 \section{Mailing lists}
 
@@ -1470,13 +1479,13 @@ There are currently three official Xen mailing lists:
 \begin{description}
 \item[xen-devel@lists.sourceforge.net] Used for development
 discussions and requests for help.  Subscribe at: \\
-{\tt http://lists.sourceforge.net/mailman/listinfo/xen-devel}
+{\small {\tt http://lists.sourceforge.net/mailman/listinfo/xen-devel}}
 \item[xen-announce@lists.sourceforge.net] Used for announcements only.
 Subscribe at: \\
-{\tt http://lists.sourceforge.net/mailman/listinfo/xen-announce}
+{\small {\tt http://lists.sourceforge.net/mailman/listinfo/xen-announce}}
 \item[xen-changelog@lists.sourceforge.net]  Changelog feed
 from the unstable and 2.0 trees - developer oriented.  Subscribe at: \\
-{\tt http://lists.sourceforge.net/mailman/listinfo/xen-changelog}
+{\small {\tt http://lists.sourceforge.net/mailman/listinfo/xen-changelog}}
 \end{description}
 
 Although there is no specific user support list, the developers try to
@@ -1485,12 +1494,13 @@ list increases, a dedicated user support list may be introduced.
 
 \appendix
 
+
 \chapter{Installing Debian}
 
-The Debian project provides a tool called {\tt debootstrap} which
+The Debian project provides a tool called {\small {\tt debootstrap}} which
 allows a base Debian system to be installed into a filesystem without
 requiring the host system to have any Debian-specific software (such
-as {\tt apt}).
+as {\small {\tt apt}}).
 
 Here's some info how to install Debian 3.1 (Sarge) for an unprivileged
 Xen domain:
@@ -1502,116 +1512,116 @@ Xen domain:
 \item Create disk images for root-fs and swap (alternatively, you
       might create dedicated partitions, LVM logical volumes, etc. if
       that suits your setup).
-\begin{verbatim}  
+\begin{small}\begin{verbatim}  
 dd if=/dev/zero of=/path/diskimage bs=1024k count=size_in_mbytes
 dd if=/dev/zero of=/path/swapimage bs=1024k count=size_in_mbytes
-\end{verbatim}
+\end{verbatim}\end{small}
       If you're going to use this filesystem / diskimage only as a
       `template' for other vm diskimages, something like 300 MB should
       be enough.. (of course it depends what kind of packages you are
       planning to install to the template)
 
 \item Create the filesystem and initialise the swap image
-\begin{verbatim}
+\begin{small}\begin{verbatim}
 mkfs.ext3 /path/diskimage
 mkswap /path/swapimage
-\end{verbatim}
+\end{verbatim}\end{small}
 
 \item Mount the diskimage for installation
-\begin{verbatim}
+\begin{small}\begin{verbatim}
 mount -o loop /path/diskimage /mnt/disk
-\end{verbatim}
+\end{verbatim}\end{small}
 
-\item Install {\tt debootstrap}
+\item Install {\small {\tt debootstrap}}
 
 Make sure you have debootstrap installed on the host.  If you are
 running Debian sarge (3.1 / testing) or unstable you can install it by
-running {\tt apt-get install debootstrap}.  Otherwise, it can be
+running {\small {\tt apt-get install debootstrap}}.  Otherwise, it can be
 downloaded from the Debian project website.
 
 \item Install debian base to the diskimage:
-\begin{verbatim}
+\begin{small}\begin{verbatim}
 debootstrap --arch i386 sarge /mnt/disk  \
             http://ftp.<countrycode>.debian.org/debian
-\end{verbatim}
+\end{verbatim}\end{small}
 
 You can use any other Debian http/ftp mirror you want.
 
 \item When debootstrap completes successfully, modify settings:
-\begin{verbatim}
+\begin{small}\begin{verbatim}
 chroot /mnt/disk /bin/bash
-\end{verbatim}
+\end{verbatim}\end{small}
 
 Edit the following files using vi or nano and make needed changes:
-\begin{verbatim}
+\begin{small}\begin{verbatim}
 /etc/hostname
 /etc/hosts
 /etc/resolv.conf
 /etc/network/interfaces
 /etc/networks
-\end{verbatim}
+\end{verbatim}\end{small}
 
 Set up access to the services, edit:
-\begin{verbatim}
+\begin{small}\begin{verbatim}
 /etc/hosts.deny
 /etc/hosts.allow
 /etc/inetd.conf
-\end{verbatim}
+\end{verbatim}\end{small}
 
 Add Debian mirror to:   
-\begin{verbatim}
+\begin{small}\begin{verbatim}
 /etc/apt/sources.list
-\end{verbatim}
+\end{verbatim}\end{small}
 
 Create fstab like this:
-\begin{verbatim}
+\begin{small}\begin{verbatim}
 /dev/sda1       /       ext3    errors=remount-ro       0       1
 /dev/sda2       none    swap    sw                      0       0
 proc            /proc   proc    defaults                0       0
-\end{verbatim}
+\end{verbatim}\end{small}
 
 Logout
 
 \item      Umount the diskimage
-\begin{verbatim}
+\begin{small}\begin{verbatim}
 umount /mnt/disk
-\end{verbatim}
+\end{verbatim}\end{small}
 
 \item Create Xen 2.0 configuration file for the new domain. You can
         use the example-configurations coming with xen as a template.
 
         Make sure you have the following set up:
-\begin{verbatim}
+\begin{small}\begin{verbatim}
 disk = [ 'file:/path/diskimage,sda1,w', 'file:/path/swapimage,sda2,w' ]
 root = "/dev/sda1 ro"
-\end{verbatim}
+\end{verbatim}\end{small}
 
 \item Start the new domain
-\begin{verbatim}
+\begin{small}\begin{verbatim}
 xm create -f domain_config_file
-\end{verbatim}
+\end{verbatim}\end{small}
 
 Check that the new domain is running:
-\begin{verbatim}
+\begin{small}\begin{verbatim}
 xm list
-\end{verbatim}
+\end{verbatim}\end{small}
 
 \item   Attach to the console of the new domain.
         You should see something like this when starting the new domain:
 
-\begin{verbatim}
+\begin{small}\begin{verbatim}
 Started domain testdomain2, console on port 9626
-\end{verbatim}
+\end{verbatim}\end{small}
         
         There you can see the ID of the console: 26. You can also list
-        the consoles with {\tt xm consoles"}. (ID is the last two
+        the consoles with {\small {\tt xm consoles}} (ID is the last two
         digits of the portnumber.)
 
         Attach to the console:
 
-\begin{verbatim}
+\begin{small}\begin{verbatim}
 xm console 26
-\end{verbatim}
+\end{verbatim}\end{small}
 
         or by telnetting to the port 9626 of localhost (the xm console
         progam works better).
@@ -1624,21 +1634,22 @@ xm console 26
         errors.  Check that the swap is active, and the network settings are
         correct.
 
-        Run {\tt /usr/sbin/base-config} to set up the Debian settings.
+        Run {\small {\tt/usr/sbin/base-config}} to set up the Debian settings.
 
         Set up the password for root using passwd.
 
-\item     Done. You can exit the console by pressing {\tt Ctrl + ]}
+\item     Done. You can exit the console by pressing {\small {\tt Ctrl + ]}}
 
 \end{enumerate}
 
 If you need to create new domains, you can just copy the contents of
 the `template'-image to the new disk images, either by mounting the
-template and the new image, and using {\tt cp -a} or {\tt tar} or by
+template and the new image, and using {\small {\tt cp -a}} or {\small
+    {\tt tar}} or by
 simply copying the image file.  Once this is done, modify the
 image-specific settings (hostname, network settings, etc).
 
-\chapter{Installing Xen / XenLinux on Redhat / Fedora}
+\chapter{Installing Xen / XenLinux on Redhat or Fedora Core}
 
 When using Xen / Xenlinux on a standard Linux distribution there are
 a couple of things to watch out for:
@@ -1670,13 +1681,13 @@ systems way to late in the boot process. The easiest way I found to do
 this was to have a \path{/linuxrc} script run ahead of
 \path{/sbin/init} that mounts \path{/usr}:
 
-\begin{verbatim}
+\begin{small}\begin{verbatim}
  #!/bin/bash
  /sbin/ipconfig lo 127.0.0.1
  /sbin/portmap
  /bin/mount /usr
  exec /sbin/init "$@" <>/dev/console 2>&1
-\end{verbatim}
+\end{verbatim}\end{small}
 
 %$ XXX SMH: font lock fix :-)  
 
