@@ -25,7 +25,8 @@
 #include <xeno/lib.h>
 #include <xeno/config.h>
 #include <xeno/smp.h>
-#include <xeno/init.h>
+
+#include <xeno/perfc.h>
 
 #include <xeno/time.h>
 #include <xeno/ac_timer.h>
@@ -33,10 +34,6 @@
 
 #include <asm/system.h>
 #include <asm/desc.h>
-
-
-#undef AC_TIMER_TRACE
-#undef AC_TIMER_STATS
 
 #ifdef AC_TIMER_TRACE
 #define TRC(_x) _x
@@ -55,21 +52,9 @@ typedef struct ac_timers_st
 {
     spinlock_t lock;
     struct list_head timers;
-    struct ac_timer *prev, *curr;
+    s_time_t    max_diff;
 } __cacheline_aligned ac_timers_t;
 static ac_timers_t ac_timers[NR_CPUS];
-
-#ifdef AC_TIMER_STATS
-#define BUCKETS		1000
-#define MAX_STATS
-typedef struct act_stats_st
-{
-    u32 count;
-    u32 times[2*(BUCKETS)];
-} __cacheline_aligned act_stats_t;
-static act_stats_t act_stats[NR_CPUS];
-
-#endif
 
 /* local prototypes */
 static int  detach_ac_timer(struct ac_timer *timer);
@@ -172,14 +157,14 @@ static int detach_ac_timer(struct ac_timer *timer)
  */
 int rem_ac_timer(struct ac_timer *timer)
 {
-    int 		  cpu = smp_processor_id();
-    int           res;
+    int           cpu = smp_processor_id();
+    int           res = 0;
     unsigned long flags;
 
     TRC(printk("ACT  [%02d] remove(): timo=%lld \n", cpu, timer->expires));
-
     spin_lock_irqsave(&ac_timers[cpu].lock, flags);
-    res = detach_ac_timer(timer);	
+    if (timer->timer_list.next)
+        res = detach_ac_timer(timer);   
     spin_unlock_irqrestore(&ac_timers[cpu].lock, flags);
 
     return res;
@@ -207,45 +192,23 @@ int mod_ac_timer(struct ac_timer *timer, s_time_t new_time)
  */
 void do_ac_timer(void)
 {
-    int 			 cpu = smp_processor_id();
-    unsigned long 	 flags;
-    struct ac_timer	 *t;
+    int              cpu = smp_processor_id();
+    unsigned long    flags;
+    struct ac_timer  *t;
+    s_time_t diff, now = NOW();
+    long max;
 
     spin_lock_irqsave(&ac_timers[cpu].lock, flags);
 
  do_timer_again:
 
     TRC(printk("ACT  [%02d] do(): now=%lld\n", cpu, NOW()));
-		
-	/* Sanity: is the timer list empty? */
-    if ( list_empty(&ac_timers[cpu].timers) )
+        
+    /* Sanity: is the timer list empty? */
+    if ( list_empty(&ac_timers[cpu].timers) ) {
         printk("ACT[%02d] do_ac_timer(): timer irq without timer\n", cpu);
-
-#ifdef AC_TIMER_STATS
-    {
-        s32	diff;
-        u32 i;
-        diff = ((s32)(NOW() - t->expires)) / 1000; /* delta in us */
-        if (diff < -BUCKETS)
-            diff = -BUCKETS;
-        else if (diff > BUCKETS)
-            diff = BUCKETS;
-        act_stats[cpu].times[diff+BUCKETS]++;
-        act_stats[cpu].count++;
-
-        if (act_stats[cpu].count >= 5000) {
-            printk("ACT Stats\n");
-			for (i=0; i < 2*BUCKETS; i++) {
-				if (act_stats[cpu].times[i] != 0)
-                    printk("ACT [%02d]: %3dus: %5d\n",
-                           cpu,i-BUCKETS, act_stats[cpu].times[i]);
-                act_stats[cpu].times[i]=0;
-            }
-            act_stats[cpu].count = 0;
-            printk("\n");
-        }
+        return;
     }
-#endif
 
     /* Handle all timeouts in the near future. */
     while ( !list_empty(&ac_timers[cpu].timers) )
@@ -253,12 +216,19 @@ void do_ac_timer(void)
         t = list_entry(ac_timers[cpu].timers.next, 
                        struct ac_timer, timer_list);
         if ( t->expires > (NOW() + TIMER_SLOP) ) break;
+
+        /* do some stats */
+        diff = (now - t->expires);
+        if (diff > 0x7fffffff) diff =  0x7fffffff; /* THIS IS BAD! */
+        max = perfc_valuea(ac_timer_max, cpu);
+        if (diff > max) perfc_seta(ac_timer_max, cpu, diff);
+
         detach_ac_timer(t);
         spin_unlock_irqrestore(&ac_timers[cpu].lock, flags);
         if ( t->function != NULL ) t->function(t->data);
         spin_lock_irqsave(&ac_timers[cpu].lock, flags);
     }
-		
+        
     /* If list not empty then reprogram timer to new head of list */
     if ( !list_empty(&ac_timers[cpu].timers) )
     {
@@ -287,7 +257,7 @@ static void dump_tqueue(struct list_head *queue, char *name)
 {
     struct list_head *list;
     int loop = 0;
-    struct ac_timer	 *t;
+    struct ac_timer  *t;
 
     printk ("QUEUE %s %lx   n: %lx, p: %lx\n", name,  (unsigned long)queue,
             (unsigned long) queue->next, (unsigned long) queue->prev);
@@ -303,18 +273,21 @@ static void dump_tqueue(struct list_head *queue, char *name)
 }
 
 
-static void dump_timerq(u_char key, void *dev_id, struct pt_regs *regs)
+void dump_timerq(u_char key, void *dev_id, struct pt_regs *regs)
 {
     u_long   flags; 
     s_time_t now = NOW();
+    int i;
 
-    printk("Dumping ac_timer queues for cpu 0: NOW=0x%08X%08X\n",
+    printk("Dumping ac_timer queues: NOW=0x%08X%08X\n",
            (u32)(now>>32), (u32)now); 
-	
-    spin_lock_irqsave(&ac_timers[0].lock, flags);
-    dump_tqueue(&ac_timers[0].timers, "ac_time"); 
-    spin_unlock_irqrestore(&ac_timers[0].lock, flags);
-    printk("\n");
+    for (i = 0; i < smp_num_cpus; i++) {
+        printk("CPU[%02d] ", i);
+        spin_lock_irqsave(&ac_timers[i].lock, flags);
+        dump_tqueue(&ac_timers[i].timers, "ac_time"); 
+        spin_unlock_irqrestore(&ac_timers[i].lock, flags);
+        printk("\n");
+    }
     return; 
 }
 
@@ -330,6 +303,4 @@ void __init ac_timer_init(void)
         INIT_LIST_HEAD(&ac_timers[i].timers);
         spin_lock_init(&ac_timers[i].lock);
     }
-
-    add_key_handler('a', dump_timerq, "dump ac_timer queues");
 }

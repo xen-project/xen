@@ -36,6 +36,7 @@
 #include <asm/pgalloc.h>
 #include <xeno/delay.h>
 
+#include <xeno/perfc.h>
 
 /*
  * Linux has a controller-independent x86 interrupt architecture.
@@ -469,6 +470,11 @@ asmlinkage unsigned int do_IRQ(struct pt_regs regs)
     struct irqaction * action;
     unsigned int status;
 
+    u32     cc_start, cc_end;
+
+    perfc_incra(irqs, cpu);
+    rdtscl(cc_start);
+
     spin_lock(&desc->lock);
     desc->handler->ack(irq);
     /*
@@ -529,6 +535,9 @@ asmlinkage unsigned int do_IRQ(struct pt_regs regs)
 
     if (softirq_pending(cpu))
         do_softirq();
+
+    rdtscl(cc_end);
+    perfc_adda(irq_time, cpu, cc_end - cc_start);
 
     return 1;
 }
