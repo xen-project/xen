@@ -123,7 +123,7 @@ static int skip_atoi(const char **s)
 #define SPECIAL	32		/* 0x */
 #define LARGE	64		/* use 'ABCDEF' instead of 'abcdef' */
 
-static char * number(char * buf, char * end, long num, int base, int size, int precision, int type)
+static char * number(char * buf, char * end, long long num, int base, int size, int precision, int type)
 {
     char c,sign,tmp[66];
     const char *digits;
@@ -163,7 +163,7 @@ static char * number(char * buf, char * end, long num, int base, int size, int p
     else 
     {
         /* XXX KAF: force unsigned mod and div. */
-        unsigned long num2=(unsigned long)num;
+        unsigned long long num2=(unsigned long long)num;
         unsigned int base2=(unsigned int)base;
         while (num2 != 0) { tmp[i++] = digits[num2%base2]; num2 /= base2; }
     }
