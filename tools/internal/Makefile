@@ -28,9 +28,10 @@ $(XI_DESTROY).o: $(XI_DESTROY).c dom0_ops.h dom0_defs.h
 	$(CC) -c $(XI_DESTROY).c 
 
 install: all
-	cp -a xi_list xi_vifinit $(XI_CREATE) $(XI_BUILD) $(XI_START) $(XI_STOP) $(XI_DESTROY) ../../../install/bin
+	cp -a xi_list xi_vifinit xi_helper $(XI_CREATE) $(XI_BUILD) $(XI_START) $(XI_STOP) $(XI_DESTROY) ../../../install/bin
 	chmod 755 ../../../install/bin/xi_list
 	chmod 755 ../../../install/bin/xi_vifinit
+	chmod 755 ../../../install/bin/xi_helper
 
 rpm: all
 	rm -rf staging
