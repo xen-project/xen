@@ -369,7 +369,7 @@ static struct seq_operations proc_bus_pci_devices_op = {
 	show:	show_device
 };
 
-static struct proc_dir_entry *proc_bus_pci_dir;
+struct proc_dir_entry *proc_bus_pci_dir;
 
 int pci_proc_attach_device(struct pci_dev *dev)
 {

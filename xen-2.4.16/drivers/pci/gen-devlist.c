@@ -1,7 +1,7 @@
 /*
  *	Generate devlist.h and classlist.h from the PCI ID file.
  *
- *	(c) 1999--2000 Martin Mares <mj@ucw.cz>
+ *	(c) 1999--2002 Martin Mares <mj@ucw.cz>
  */
 
 #include <stdio.h>
@@ -15,8 +15,13 @@ pq(FILE *f, const char *c)
 	while (*c) {
 		if (*c == '"')
 			fprintf(f, "\\\"");
-		else
+		else {
 			fputc(*c, f);
+			if (*c == '?' && c[1] == '?') {
+				/* Avoid trigraphs */
+				fprintf(f, "\" \"");
+			}
+		}
 		c++;
 	}
 }

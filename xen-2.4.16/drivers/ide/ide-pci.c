@@ -12,15 +12,15 @@
  *  configuration of all PCI IDE interfaces present in a system.  
  */
 
-#include <xeno/config.h>
-#include <xeno/types.h>
-#include <xeno/lib.h>
-#include <xeno/timer.h>
-#include <xeno/mm.h>
-#include <xeno/interrupt.h>
-#include <xeno/pci.h>
-#include <xeno/init.h>
-#include <xeno/ide.h>
+#include <linux/config.h>
+#include <linux/types.h>
+#include <linux/kernel.h>
+#include <linux/timer.h>
+#include <linux/mm.h>
+#include <linux/interrupt.h>
+#include <linux/pci.h>
+#include <linux/init.h>
+#include <linux/ide.h>
 
 #include <asm/io.h>
 #include <asm/irq.h>
@@ -405,7 +405,7 @@ static ide_pci_device_t ide_pci_chipsets[] __initdata = {
 #ifndef CONFIG_PDC202XX_FORCE
         {DEVID_PDC20246,"PDC20246",	PCI_PDC202XX,	NULL,		INIT_PDC202XX,	NULL,		{{0x00,0x00,0x00}, {0x00,0x00,0x00}},	OFF_BOARD,	16 },
         {DEVID_PDC20262,"PDC20262",	PCI_PDC202XX,	ATA66_PDC202XX,	INIT_PDC202XX,	NULL,		{{0x00,0x00,0x00}, {0x00,0x00,0x00}},	OFF_BOARD,	48 },
-        {DEVID_PDC20265,"PDC20265",	PCI_PDC202XX,	ATA66_PDC202XX,	INIT_PDC202XX,	NULL,		{{0x00,0x00,0x00}, {0x00,0x00,0x00}},	ON_BOARD,	48 },
+        {DEVID_PDC20265,"PDC20265",	PCI_PDC202XX,	ATA66_PDC202XX,	INIT_PDC202XX,	NULL,		{{0x00,0x00,0x00}, {0x00,0x00,0x00}},	OFF_BOARD,	48 },
         {DEVID_PDC20267,"PDC20267",	PCI_PDC202XX,	ATA66_PDC202XX,	INIT_PDC202XX,	NULL,		{{0x00,0x00,0x00}, {0x00,0x00,0x00}},	OFF_BOARD,	48 },
 #else /* !CONFIG_PDC202XX_FORCE */
 	{DEVID_PDC20246,"PDC20246",	PCI_PDC202XX,	NULL,		INIT_PDC202XX,	NULL,		{{0x50,0x02,0x02}, {0x50,0x04,0x04}}, 	OFF_BOARD,	16 },
@@ -623,8 +623,12 @@ static void __init ide_setup_pci_device (struct pci_dev *dev, ide_pci_device_t *
 	}
 
 	if (pci_enable_device(dev)) {
-		printk(KERN_WARNING "%s: (ide_setup_pci_device:) Could not enable device.\n", d->name);
-		return;
+		if(pci_enable_device_bars(dev, 1<<4))
+		{
+			printk(KERN_WARNING "%s: (ide_setup_pci_device:) Could not enable device.\n", d->name);
+			return;
+		}
+		printk(KERN_INFO "%s: BIOS setup was incomplete.\n", d->name);
 	}
 
 check_if_enabled:
@@ -669,18 +673,27 @@ check_if_enabled:
 	 */
 	pciirq = dev->irq;
 	
-#ifdef CONFIG_PDC202XX_FORCE
-	if (dev->class >> 8 == PCI_CLASS_STORAGE_RAID) {
-		/*
-		 * By rights we want to ignore Promise FastTrak and SuperTrak
-		 * series here, those use own driver.
+	if (dev->class >> 8 == PCI_CLASS_STORAGE_RAID)
+	{
+	    /*  By rights we want to ignore these, but the Promise Fastrak
+		 *	people have some strange ideas about proprietary so we have
+		 *	to act otherwise on those. The supertrak however we need
+		 *	to skip 
 		 */
-		if (dev->vendor == PCI_VENDOR_ID_PROMISE) {
-			printk(KERN_INFO "ide: Skipping Promise RAID controller.\n");
-			return;
+		if (IDE_PCI_DEVID_EQ(d->devid, DEVID_PDC20265))
+		{
+			printk(KERN_INFO "ide: Found promise 20265 in RAID mode.\n");
+			if(dev->bus->self && dev->bus->self->vendor == PCI_VENDOR_ID_INTEL &&
+			   dev->bus->self->device == PCI_DEVICE_ID_INTEL_I960)
+			{
+				printk(KERN_INFO "ide: Skipping Promise PDC20265 attached to I2O RAID controller.\n");
+				return;
+			}
 		}
+		/* Its attached to something else, just a random bridge.
+		   Suspect a fastrak and fall through */
 	}
-#endif /* CONFIG_PDC202XX_FORCE */
+
 	if ((dev->class & ~(0xfa)) != ((PCI_CLASS_STORAGE_IDE << 8) | 5)) {
 		printk("%s: not 100%% native mode: will probe irqs later\n", d->name);
 		/*

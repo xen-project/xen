@@ -92,7 +92,8 @@ extern int allocate_resource(struct resource *root, struct resource *new,
 			     unsigned long size,
 			     unsigned long min, unsigned long max,
 			     unsigned long align,
-			     void (*alignf)(void *, struct resource *, unsigned long),
+			     void (*alignf)(void *, struct resource *,
+					    unsigned long, unsigned long),
 			     void *alignf_data);
 
 /* Convenience shorthand with allocation */

@@ -376,11 +376,14 @@ struct pci_dev {
 	struct resource dma_resource[DEVICE_COUNT_DMA];
 	struct resource irq_resource[DEVICE_COUNT_IRQ];
 
-	char		name[80];	/* device name */
+	char		name[90];	/* device name */
 	char		slot_name[8];	/* slot name */
 	int		active;		/* ISAPnP: device is active */
 	int		ro;		/* ISAPnP: read only */
 	unsigned short	regs;		/* ISAPnP: supported registers */
+
+	/* These fields are used by common fixups */
+	unsigned short	transparent:1;	/* Transparent PCI bridge */
 
 	int (*prepare)(struct pci_dev *dev);	/* ISAPnP hooks */
 	int (*activate)(struct pci_dev *dev);
@@ -436,6 +439,7 @@ struct pci_bus {
 extern struct list_head pci_root_buses;	/* list of all known PCI buses */
 extern struct list_head pci_devices;	/* list of all devices */
 
+extern struct proc_dir_entry *proc_bus_pci_dir;
 /*
  * Error values that may be returned by PCI functions.
  */
@@ -460,9 +464,9 @@ struct pci_ops {
 
 struct pbus_set_ranges_data
 {
-	int found_vga;
 	unsigned long io_start, io_end;
 	unsigned long mem_start, mem_end;
+	unsigned long prefetch_start, prefetch_end;
 };
 
 struct pci_device_id {
@@ -479,7 +483,7 @@ struct pci_driver {
 	int  (*probe)  (struct pci_dev *dev, const struct pci_device_id *id);	/* New device inserted */
 	void (*remove) (struct pci_dev *dev);	/* Device removed (NULL if not a hot-plug capable driver) */
 	int  (*save_state) (struct pci_dev *dev, u32 state);    /* Save Device Context */
-	int  (*suspend)(struct pci_dev *dev, u32 state);	/* Device suspended */
+	int  (*suspend) (struct pci_dev *dev, u32 state);	/* Device suspended */
 	int  (*resume) (struct pci_dev *dev);	                /* Device woken up */
 	int  (*enable_wake) (struct pci_dev *dev, u32 state, int enable);   /* Enable wake event */
 };
@@ -493,11 +497,12 @@ struct pci_driver {
 
 void pcibios_init(void);
 void pcibios_fixup_bus(struct pci_bus *);
-int pcibios_enable_device(struct pci_dev *);
+int pcibios_enable_device(struct pci_dev *, int mask);
 char *pcibios_setup (char *str);
 
 /* Used only when drivers/pci/setup.c is used */
-void pcibios_align_resource(void *, struct resource *, unsigned long);
+void pcibios_align_resource(void *, struct resource *,
+			    unsigned long, unsigned long);
 void pcibios_update_resource(struct pci_dev *, struct resource *,
 			     struct resource *, int);
 void pcibios_update_irq(struct pci_dev *, int irq);
@@ -559,6 +564,7 @@ int pci_write_config_word(struct pci_dev *dev, int where, u16 val);
 int pci_write_config_dword(struct pci_dev *dev, int where, u32 val);
 
 int pci_enable_device(struct pci_dev *dev);
+int pci_enable_device_bars(struct pci_dev *dev, int mask);
 void pci_disable_device(struct pci_dev *dev);
 void pci_set_master(struct pci_dev *dev);
 #define HAVE_PCI_SET_MWI
@@ -580,13 +586,15 @@ int pci_enable_wake(struct pci_dev *dev, u32 state, int enable);
 int pci_claim_resource(struct pci_dev *, int);
 void pci_assign_unassigned_resources(void);
 void pdev_enable_device(struct pci_dev *);
-void pdev_sort_resources(struct pci_dev *, struct resource_list *, u32);
+void pdev_sort_resources(struct pci_dev *, struct resource_list *);
 unsigned long pci_bridge_check_io(struct pci_dev *);
 void pci_fixup_irqs(u8 (*)(struct pci_dev *, u8 *),
 		    int (*)(struct pci_dev *, u8, u8));
-#define HAVE_PCI_REQ_REGIONS
+#define HAVE_PCI_REQ_REGIONS	2
 int pci_request_regions(struct pci_dev *, char *);
 void pci_release_regions(struct pci_dev *);
+int pci_request_region(struct pci_dev *, int, char *);
+void pci_release_region(struct pci_dev *, int);
 
 /* New-style probing supporting hot-pluggable devices */
 int pci_register_driver(struct pci_driver *);
@@ -650,6 +658,7 @@ unsigned int ss_vendor, unsigned int ss_device, const struct pci_dev *from)
 { return NULL; }
 
 static inline void pci_set_master(struct pci_dev *dev) { }
+static inline int pci_enable_device_bars(struct pci_dev *dev, int mask) { return -EBUSY; }
 static inline int pci_enable_device(struct pci_dev *dev) { return -EIO; }
 static inline void pci_disable_device(struct pci_dev *dev) { }
 static inline int pci_module_init(struct pci_driver *drv) { return -ENODEV; }

@@ -76,7 +76,6 @@
 3e4a8cb7nMChlro4wvOBo76n__iCFA xen-2.4.16/drivers/char/xen_serial.c
 3ddb79bdhcqD9ebrslr0O0oHqTiiXg xen-2.4.16/drivers/ide/Makefile
 3ddb79bdErDn_WC3G-fWxKNR3viLnA xen-2.4.16/drivers/ide/ide-disk.c
-3e4a8cb7DcFFHW_fG_OHbY_6f3lPWw xen-2.4.16/drivers/ide/ide-disk.c.orig
 3ddb79bdIPNW36FrlId94jTXaW8HoA xen-2.4.16/drivers/ide/ide-dma.c
 3ddb79be5Ysvhn4se_Z-LQY_hI6UPw xen-2.4.16/drivers/ide/ide-features.c
 3ddb79bdh1ohsWYRH_KdaXr7cqs12w xen-2.4.16/drivers/ide/ide-geometry.c

@@ -92,6 +92,9 @@ static int piix_get_info (char *buffer, char **addr, off_t offset, int count)
 		case PCI_DEVICE_ID_INTEL_82801BA_8:
 		case PCI_DEVICE_ID_INTEL_82801BA_9:
 	        case PCI_DEVICE_ID_INTEL_82801CA_10:
+	        case PCI_DEVICE_ID_INTEL_82801CA_11:
+	        case PCI_DEVICE_ID_INTEL_82801DB_11:
+	        case PCI_DEVICE_ID_INTEL_82801E_11:
 			p += sprintf(p, "\n                                Intel PIIX4 Ultra 100 Chipset.\n");
 			break;
 		case PCI_DEVICE_ID_INTEL_82372FB_1:
@@ -258,8 +261,8 @@ static void piix_tune_drive (ide_drive_t *drive, byte pio)
 			master_data = master_data | 0x0070;
 		pci_read_config_byte(HWIF(drive)->pci_dev, slave_port, &slave_data);
 		slave_data = slave_data & (HWIF(drive)->index ? 0x0f : 0xf0);
-		slave_data = slave_data | ((timings[pio][0] << 2) | (timings[pio][1]
-					   << (HWIF(drive)->index ? 4 : 0)));
+		slave_data = slave_data | (((timings[pio][0] << 2) | timings[pio][1])
+					   << (HWIF(drive)->index ? 4 : 0));
 	} else {
 		master_data = master_data & 0xccf8;
 		if (pio > 1)
@@ -366,7 +369,10 @@ static int piix_config_drive_for_dma (ide_drive_t *drive)
 	byte udma_66		= eighty_ninty_three(drive);
 	int ultra100		= ((dev->device == PCI_DEVICE_ID_INTEL_82801BA_8) ||
 				   (dev->device == PCI_DEVICE_ID_INTEL_82801BA_9) ||
-				   (dev->device == PCI_DEVICE_ID_INTEL_82801CA_10)) ? 1 : 0;
+				   (dev->device == PCI_DEVICE_ID_INTEL_82801CA_10) ||
+				   (dev->device == PCI_DEVICE_ID_INTEL_82801CA_11) ||
+				   (dev->device == PCI_DEVICE_ID_INTEL_82801DB_11) ||
+				   (dev->device == PCI_DEVICE_ID_INTEL_82801E_11)) ? 1 : 0;
 	int ultra66		= ((ultra100) ||
 				   (dev->device == PCI_DEVICE_ID_INTEL_82801AA_1) ||
 				   (dev->device == PCI_DEVICE_ID_INTEL_82372FB_1)) ? 1 : 0;
@@ -425,7 +431,7 @@ static int config_drive_xfer_rate (ide_drive_t *drive)
 		}
 		dma_func = ide_dma_off_quietly;
 		if (id->field_valid & 4) {
-			if (id->dma_ultra & 0x002F) {
+			if (id->dma_ultra & 0x003F) {
 				/* Force if Capable UltraDMA */
 				dma_func = piix_config_drive_for_dma(drive);
 				if ((id->field_valid & 2) &&

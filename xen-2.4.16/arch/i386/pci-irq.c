@@ -6,7 +6,7 @@
 
 #include <linux/config.h>
 #include <linux/types.h>
-//#include <linux/kernel.h>
+/*#include <linux/kernel.h>*/
 #include <linux/pci.h>
 #include <linux/init.h>
 #include <linux/slab.h>
@@ -22,6 +22,8 @@
 
 #define PIRQ_SIGNATURE	(('$' << 0) + ('P' << 8) + ('I' << 16) + ('R' << 24))
 #define PIRQ_VERSION 0x0100
+
+int broken_hp_bios_irq9;
 
 static struct irq_routing_table *pirq_table;
 
@@ -207,6 +209,24 @@ static int pirq_via_set(struct pci_dev *router, struct pci_dev *dev, int pirq, i
 }
 
 /*
+ * ITE 8330G pirq rules are nibble-based
+ * FIXME: pirqmap may be { 1, 0, 3, 2 },
+ * 	  2+3 are both mapped to irq 9 on my system
+ */
+static int pirq_ite_get(struct pci_dev *router, struct pci_dev *dev, int pirq)
+{
+	static unsigned char pirqmap[4] = { 1, 0, 2, 3 };
+	return read_config_nybble(router,0x43, pirqmap[pirq-1]);
+}
+
+static int pirq_ite_set(struct pci_dev *router, struct pci_dev *dev, int pirq, int irq)
+{
+	static unsigned char pirqmap[4] = { 1, 0, 2, 3 };
+	write_config_nybble(router, 0x43, pirqmap[pirq-1], irq);
+	return 1;
+}
+
+/*
  * OPTI: high four bits are nibble pointer..
  * I wonder what the low bits do?
  */
@@ -226,12 +246,12 @@ static int pirq_opti_set(struct pci_dev *router, struct pci_dev *dev, int pirq, 
  */
 static int pirq_cyrix_get(struct pci_dev *router, struct pci_dev *dev, int pirq)
 {
-	return read_config_nybble(router, 0x5C, pirq-1);
+	return read_config_nybble(router, 0x5C, (pirq-1)^1);
 }
 
 static int pirq_cyrix_set(struct pci_dev *router, struct pci_dev *dev, int pirq, int irq)
 {
-	write_config_nybble(router, 0x5C, pirq-1, irq);
+	write_config_nybble(router, 0x5C, (pirq-1)^1, irq);
 	return 1;
 }
 
@@ -444,9 +464,18 @@ static struct irq_router pirq_routers[] = {
 	{ "PIIX", PCI_VENDOR_ID_INTEL, PCI_DEVICE_ID_INTEL_82371AB_0, pirq_piix_get, pirq_piix_set },
 	{ "PIIX", PCI_VENDOR_ID_INTEL, PCI_DEVICE_ID_INTEL_82371MX,   pirq_piix_get, pirq_piix_set },
 	{ "PIIX", PCI_VENDOR_ID_INTEL, PCI_DEVICE_ID_INTEL_82443MX_0, pirq_piix_get, pirq_piix_set },
+	{ "PIIX", PCI_VENDOR_ID_INTEL, PCI_DEVICE_ID_INTEL_82801AA_0, pirq_piix_get, pirq_piix_set },
+	{ "PIIX", PCI_VENDOR_ID_INTEL, PCI_DEVICE_ID_INTEL_82801AB_0, pirq_piix_get, pirq_piix_set },
 	{ "PIIX", PCI_VENDOR_ID_INTEL, PCI_DEVICE_ID_INTEL_82801BA_0, pirq_piix_get, pirq_piix_set },
+	{ "PIIX", PCI_VENDOR_ID_INTEL, PCI_DEVICE_ID_INTEL_82801BA_10, pirq_piix_get, pirq_piix_set },
+	{ "PIIX", PCI_VENDOR_ID_INTEL, PCI_DEVICE_ID_INTEL_82801CA_0, pirq_piix_get, pirq_piix_set },
+	{ "PIIX", PCI_VENDOR_ID_INTEL, PCI_DEVICE_ID_INTEL_82801CA_12, pirq_piix_get, pirq_piix_set },
+	{ "PIIX", PCI_VENDOR_ID_INTEL, PCI_DEVICE_ID_INTEL_82801DB_0, pirq_piix_get, pirq_piix_set },
+	{ "PIIX", PCI_VENDOR_ID_INTEL, PCI_DEVICE_ID_INTEL_82801E_0, pirq_piix_get, pirq_piix_set },
 
 	{ "ALI", PCI_VENDOR_ID_AL, PCI_DEVICE_ID_AL_M1533, pirq_ali_get, pirq_ali_set },
+
+	{ "ITE", PCI_VENDOR_ID_ITE, PCI_DEVICE_ID_ITE_IT8330G_0, pirq_ite_get, pirq_ite_set },
 
 	{ "VIA", PCI_VENDOR_ID_VIA, PCI_DEVICE_ID_VIA_82C586_0, pirq_via_get, pirq_via_set },
 	{ "VIA", PCI_VENDOR_ID_VIA, PCI_DEVICE_ID_VIA_82C596, pirq_via_get, pirq_via_set },
@@ -462,6 +491,10 @@ static struct irq_router pirq_routers[] = {
 	{ "ServerWorks", PCI_VENDOR_ID_SERVERWORKS, PCI_DEVICE_ID_SERVERWORKS_CSB5,
 	  pirq_serverworks_get, pirq_serverworks_set },
 	{ "AMD756 VIPER", PCI_VENDOR_ID_AMD, PCI_DEVICE_ID_AMD_VIPER_740B,
+		pirq_amd756_get, pirq_amd756_set },
+	{ "AMD766", PCI_VENDOR_ID_AMD, PCI_DEVICE_ID_AMD_VIPER_7413,
+		pirq_amd756_get, pirq_amd756_set },
+	{ "AMD768", PCI_VENDOR_ID_AMD, PCI_DEVICE_ID_AMD_VIPER_7443,
 		pirq_amd756_get, pirq_amd756_set },
 
 	{ "default", 0, 0, NULL, NULL }
@@ -565,6 +598,15 @@ static int pcibios_lookup_irq(struct pci_dev *dev, int assign)
 	}
 	DBG(" -> PIRQ %02x, mask %04x, excl %04x", pirq, mask, pirq_table->exclusive_irqs);
 	mask &= pcibios_irq_mask;
+
+	/* Work around broken HP Pavilion Notebooks which assign USB to
+	   IRQ 9 even though it is actually wired to IRQ 11 */
+
+	if (broken_hp_bios_irq9 && pirq == 0x59 && dev->irq == 9) {
+		dev->irq = 11;
+		pci_write_config_byte(dev, PCI_INTERRUPT_LINE, 11);
+		r->set(pirq_router_dev, dev, pirq, 11);
+	}
 
 	/*
 	 * Find the best IRQ to assign: use the one

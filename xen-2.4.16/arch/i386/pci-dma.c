@@ -19,7 +19,7 @@ void *pci_alloc_consistent(struct pci_dev *hwdev, size_t size,
 	void *ret;
 	int gfp = GFP_ATOMIC;
 
-	if (hwdev == NULL || hwdev->dma_mask != 0xffffffff)
+	if (hwdev == NULL || ((u32)hwdev->dma_mask < 0xffffffff))
 		gfp |= GFP_DMA;
 	ret = (void *)__get_free_pages(gfp, get_order(size));
 

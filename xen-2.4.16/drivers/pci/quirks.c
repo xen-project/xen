@@ -14,7 +14,7 @@
 
 #include <linux/config.h>
 #include <linux/types.h>
-//#include <linux/kernel.h>
+/*#include <linux/kernel.h>*/
 #include <linux/pci.h>
 #include <linux/init.h>
 #include <linux/delay.h>
@@ -90,8 +90,8 @@ static void __init quirk_triton(struct pci_dev *dev)
  *	VIA Apollo KT133 needs PCI latency patch
  *	Made according to a windows driver based patch by George E. Breese
  *	see PCI Latency Adjust on http://www.viahardware.com/download/viatweak.shtm
- *      Also see http://home.tiscalinet.de/au-ja/review-kt133a-1-en.html for
- *      the info on which Mr Breese based his work.
+ *      Also see http://www.au-ja.org/review-kt133a-1-en.phtml for the info on which 
+ *	Mr Breese based his work.
  *
  *	Updated based on further information from the site and also on
  *	information provided by VIA 
@@ -444,13 +444,53 @@ static void __init quirk_amd_ioapic(struct pci_dev *dev)
 static void __init quirk_amd_ordering(struct pci_dev *dev)
 {
 	u32 pcic;
-	
-	pci_read_config_dword(dev, 0x42, &pcic);
-	if((pcic&2)==0)
+	pci_read_config_dword(dev, 0x4C, &pcic);
+	if((pcic&6)!=6)
 	{
-		pcic |= 2;
-		printk(KERN_WARNING "BIOS disabled PCI ordering compliance, so we enabled it again.\n");
-		pci_write_config_dword(dev, 0x42, pcic);		
+		pcic |= 6;
+		printk(KERN_WARNING "BIOS failed to enable PCI standards compliance, fixing this error.\n");
+		pci_write_config_dword(dev, 0x4C, pcic);
+		pci_read_config_dword(dev, 0x84, &pcic);
+		pcic |= (1<<23);	/* Required in this mode */
+		pci_write_config_dword(dev, 0x84, pcic);
+	}
+}
+
+/*
+ *	DreamWorks provided workaround for Dunord I-3000 problem
+ *
+ *	This card decodes and responds to addresses not apparently
+ *	assigned to it. We force a larger allocation to ensure that
+ *	nothing gets put too close to it.
+ */
+
+static void __init quirk_dunord ( struct pci_dev * dev )
+{
+	struct resource * r = & dev -> resource [ 1 ];
+	r -> start = 0;
+	r -> end = 0xffffff;
+}
+
+static void __init quirk_transparent_bridge(struct pci_dev *dev)
+{
+	dev->transparent = 1;
+}
+
+/*
+ * Common misconfiguration of the MediaGX/Geode PCI master that will
+ * reduce PCI bandwidth from 70MB/s to 25MB/s.  See the GXM/GXLV/GX1
+ * datasheets found at http://www.national.com/ds/GX for info on what
+ * these bits do.  <christer@weinigel.se>
+ */
+ 
+static void __init quirk_mediagx_master(struct pci_dev *dev)
+{
+	u8 reg;
+	pci_read_config_byte(dev, 0x41, &reg);
+	if (reg & 2) {
+		reg &= ~2;
+		printk(KERN_INFO "PCI: Fixup for MediaGX/Geode Slave Disconnect Boundary (0x41=0x%02x)\n", reg);
+                pci_write_config_byte(dev, 0x41, reg);
 	}
 }
 
@@ -459,6 +499,7 @@ static void __init quirk_amd_ordering(struct pci_dev *dev)
  */
 
 static struct pci_fixup pci_fixups[] __initdata = {
+	{ PCI_FIXUP_HEADER,	PCI_VENDOR_ID_DUNORD,	PCI_DEVICE_ID_DUNORD_I3000,	quirk_dunord },
 	{ PCI_FIXUP_FINAL,	PCI_VENDOR_ID_INTEL,	PCI_DEVICE_ID_INTEL_82441,	quirk_passive_release },
 	{ PCI_FIXUP_FINAL,	PCI_VENDOR_ID_INTEL,	PCI_DEVICE_ID_INTEL_82441,	quirk_passive_release },
 	/*
@@ -484,7 +525,7 @@ static struct pci_fixup pci_fixups[] __initdata = {
 	{ PCI_FIXUP_FINAL,	PCI_VENDOR_ID_SI,	PCI_DEVICE_ID_SI_496,		quirk_nopcipci },
 	{ PCI_FIXUP_FINAL,	PCI_VENDOR_ID_VIA,	PCI_DEVICE_ID_VIA_8363_0,	quirk_vialatency },
 	{ PCI_FIXUP_FINAL,	PCI_VENDOR_ID_VIA,	PCI_DEVICE_ID_VIA_8371_1,	quirk_vialatency },
-	{ PCI_FIXUP_FINAL,	PCI_VENDOR_ID_VIA,	0x3112	/* Not out yet ? */,	quirk_vialatency },
+	{ PCI_FIXUP_FINAL,	PCI_VENDOR_ID_VIA,	PCI_DEVICE_ID_VIA_8361,	quirk_vialatency },
 	{ PCI_FIXUP_FINAL,	PCI_VENDOR_ID_VIA,	PCI_DEVICE_ID_VIA_82C576,	quirk_vsfx },
 	{ PCI_FIXUP_FINAL,	PCI_VENDOR_ID_VIA,	PCI_DEVICE_ID_VIA_82C597_0,	quirk_viaetbf },
 	{ PCI_FIXUP_HEADER,	PCI_VENDOR_ID_VIA,	PCI_DEVICE_ID_VIA_82C597_0,	quirk_vt82c598_id },
@@ -507,6 +548,15 @@ static struct pci_fixup pci_fixups[] __initdata = {
 
 	{ PCI_FIXUP_FINAL, 	PCI_VENDOR_ID_AMD,	PCI_DEVICE_ID_AMD_VIPER_7410,	quirk_amd_ioapic },
 	{ PCI_FIXUP_FINAL,	PCI_VENDOR_ID_AMD,	PCI_DEVICE_ID_AMD_FE_GATE_700C, quirk_amd_ordering },
+	/*
+	 * i82380FB mobile docking controller: its PCI-to-PCI bridge
+	 * is subtractive decoding (transparent), and does indicate this
+	 * in the ProgIf. Unfortunately, the ProgIf value is wrong - 0x80
+	 * instead of 0x01.
+	 */
+	{ PCI_FIXUP_HEADER,	PCI_VENDOR_ID_INTEL,	PCI_DEVICE_ID_INTEL_82380FB,	quirk_transparent_bridge },
+
+	{ PCI_FIXUP_FINAL,	PCI_VENDOR_ID_CYRIX,	PCI_DEVICE_ID_CYRIX_PCI_MASTER, quirk_mediagx_master },
 
 	{ 0 }
 };

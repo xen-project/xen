@@ -17,7 +17,7 @@
  */
 
 #include <linux/init.h>
-//#include <linux/kernel.h>
+/*#include <linux/kernel.h>*/
 #include <linux/pci.h>
 #include <linux/errno.h>
 #include <linux/ioport.h>
@@ -69,6 +69,7 @@ static int pci_assign_bus_resource(const struct pci_bus *bus,
 	unsigned int type_mask,
 	int resno)
 {
+	unsigned long align;
 	int i;
 
 	type_mask |= IORESOURCE_IO | IORESOURCE_MEM;
@@ -81,12 +82,20 @@ static int pci_assign_bus_resource(const struct pci_bus *bus,
 		if ((res->flags ^ r->flags) & type_mask)
 			continue;
 
-		/* We cannot allocate a non-prefetching resource from a pre-fetching area */
-		if ((r->flags & IORESOURCE_PREFETCH) && !(res->flags & IORESOURCE_PREFETCH))
+		/* We cannot allocate a non-prefetching resource
+		   from a pre-fetching area */
+		if ((r->flags & IORESOURCE_PREFETCH) &&
+		    !(res->flags & IORESOURCE_PREFETCH))
 			continue;
 
+		/* The bridge resources are special, as their
+		   size != alignment. Sizing routines return
+		   required alignment in the "start" field. */
+		align = (resno < PCI_BRIDGE_RESOURCES) ? size : res->start;
+
 		/* Ok, try it out.. */
-		if (allocate_resource(r, res, size, min, -1, size, pcibios_align_resource, dev) < 0)
+		if (allocate_resource(r, res, size, min, -1, align,
+				      pcibios_align_resource, dev) < 0)
 			continue;
 
 		/* Update PCI config space.  */
@@ -127,47 +136,45 @@ pci_assign_resource(struct pci_dev *dev, int i)
 	return 0;
 }
 
-/* Sort resources of a given type by alignment */
+/* Sort resources by alignment */
 void __init
-pdev_sort_resources(struct pci_dev *dev,
-		    struct resource_list *head, u32 type_mask)
+pdev_sort_resources(struct pci_dev *dev, struct resource_list *head)
 {
 	int i;
 
 	for (i = 0; i < PCI_NUM_RESOURCES; i++) {
 		struct resource *r;
 		struct resource_list *list, *tmp;
-		unsigned long r_size;
-
-		/* PCI-PCI bridges may have I/O ports or
-		   memory on the primary bus */
-		if (dev->class >> 8 == PCI_CLASS_BRIDGE_PCI &&
-						i >= PCI_BRIDGE_RESOURCES)
-			continue;
+		unsigned long r_align;
 
 		r = &dev->resource[i];
-		r_size = r->end - r->start;
+		r_align = r->end - r->start;
 		
-		if (!(r->flags & type_mask) || r->parent)
+		if (!(r->flags) || r->parent)
 			continue;
-		if (!r_size) {
+		if (!r_align) {
 			printk(KERN_WARNING "PCI: Ignore bogus resource %d "
-					 "[%lx:%lx] of %s\n",
-					  i, r->start, r->end, dev->name);
+					    "[%lx:%lx] of %s\n",
+					    i, r->start, r->end, dev->name);
 			continue;
 		}
+		r_align = (i < PCI_BRIDGE_RESOURCES) ? r_align + 1 : r->start;
 		for (list = head; ; list = list->next) {
-			unsigned long size = 0;
+			unsigned long align = 0;
 			struct resource_list *ln = list->next;
+			int idx;
 
-			if (ln)
-				size = ln->res->end - ln->res->start;
-			if (r_size > size) {
+			if (ln) {
+				idx = ln->res - &ln->dev->resource[0];
+				align = (idx < PCI_BRIDGE_RESOURCES) ?
+					ln->res->end - ln->res->start + 1 :
+					ln->res->start;
+			}
+			if (r_align > align) {
 				tmp = kmalloc(sizeof(*tmp), GFP_KERNEL);
-				if (!tmp) {
-					printk(KERN_ERR "pdev_sort_resources(): kmalloc() failed!\n");
-					continue;
-				}
+				if (!tmp)
+					panic("pdev_sort_resources(): "
+					      "kmalloc() failed!\n");
 				tmp->next = ln;
 				tmp->res = r;
 				tmp->dev = dev;

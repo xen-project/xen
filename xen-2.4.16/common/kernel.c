@@ -506,3 +506,10 @@ long do_console_write(char *str, int count)
     
     return(0);
 }
+
+void __out_of_line_bug(int line)
+{
+    printk("kernel BUG in header file at line %d\n", line);
+    BUG();
+    for ( ; ; ) continue;
+}
