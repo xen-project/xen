@@ -380,6 +380,19 @@ get_linear_pagetable(
 }
 
 
+static inline int
+readonly_page_from_l1e(
+    l1_pgentry_t l1e)
+{
+    struct pfn_info *page = &frame_table[l1_pgentry_to_pagenr(l1e)];
+    unsigned long    l1v  = l1_pgentry_val(l1e);
+
+    if ( !(l1v & _PAGE_PRESENT) || !pfn_is_ram(l1v >> PAGE_SHIFT) )
+        return 0;
+    put_page_type(page);
+    return 1;
+}
+
 static int
 get_page_from_l1e(
     l1_pgentry_t l1e, struct domain *d)
@@ -1540,6 +1553,11 @@ void ptwr_reconnect_disconnected(unsigned long addr)
         nl1e = pl1e[i];
         if (likely(l1_pgentry_val(nl1e) == l1_pgentry_val(ol1e)))
             continue;
+        if (likely(l1_pgentry_val(nl1e) == (l1_pgentry_val(ol1e) | _PAGE_RW)))
+        {
+            if (likely(readonly_page_from_l1e(nl1e)))
+                continue;
+        }
         if (unlikely(l1_pgentry_val(ol1e) & _PAGE_PRESENT))
             put_page_from_l1e(ol1e, current);
         if (unlikely(!get_page_from_l1e(nl1e, current))) {
