@@ -1892,7 +1892,6 @@ int do_mmu_update(
                 okay = 1;
                 break;
             }
-            BUG();
             
             if ( unlikely(!get_page_from_pagenr(mfn, FOREIGNDOM)) )
             {
