@@ -38,8 +38,6 @@ TOP=`/bin/pwd`
 case "$SITE" in
 UCCL)
 	PATH=$PATH:/usr/groups/xeno/build_tools/bin
-	mkdir ${DEST_VER}-install
-	ln -s ${DEST_VER}-install install
 	mkdir -p install/boot
 	cd install/boot
 	ln -sf ../../../xeno-roots/roots .
@@ -83,7 +81,6 @@ then
 
  make -j4 world
  make -j4 linux24
- make -j4 dist
  cd ../install/boot
  [ -r vmlinuz-2.6.*-xen0 ] && ln -s vmlinuz-2.6.*-xen0 xenolinux.gz
   

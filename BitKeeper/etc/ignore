@@ -46,9 +46,11 @@ dist/*
 linux-*-xen0/*
 linux-*-xenU/*
 linux-xen-sparse
+linux-*.patch
 netbsd-*-tools/*
 netbsd-*-xen0/*
 netbsd-*-xenU/*
+netbsd-*.patch
 patches/*
 pristine-*
 tools/*/build/lib*/*.py
