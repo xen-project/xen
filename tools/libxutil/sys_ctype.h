@@ -1,5 +1,5 @@
-#ifndef _XENO_SYS_CTYPE_H_
-#define _XENO_SYS_CTYPE_H_
+#ifndef _XUTIL_SYS_CTYPE_H_
+#define _XUTIL_SYS_CTYPE_H_
 /** @file
  ** Replacement for ctype include that can be used
  * from user or kernel code.
@@ -9,4 +9,4 @@
 #else
 #  include <ctype.h>
 #endif
-#endif /* ! _XENO_SYS_CTYPE_H_ */
+#endif /* ! _XUTIL_SYS_CTYPE_H_ */
