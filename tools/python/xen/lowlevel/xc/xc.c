@@ -369,32 +369,6 @@ static PyObject *pyxc_linux_build(PyObject *self,
     return zero;
 }
 
-static PyObject *pyxc_netbsd_build(PyObject *self,
-                                   PyObject *args,
-                                   PyObject *kwds)
-{
-    XcObject *xc = (XcObject *)self;
-
-    u32   dom;
-    char *image, *ramdisk = NULL, *cmdline = "";
-    int   control_evtchn;
-
-    static char *kwd_list[] = { "dom", "control_evtchn",
-                                "image", "ramdisk", "cmdline", NULL };
-
-    if ( !PyArg_ParseTupleAndKeywords(args, kwds, "iis|ssi", kwd_list, 
-                                      &dom, &control_evtchn,
-                                      &image, &ramdisk, &cmdline) )
-        return NULL;
-
-    if ( xc_netbsd_build(xc->xc_handle, dom, image, 
-                         cmdline, control_evtchn) != 0 )
-        return PyErr_SetFromErrno(xc_error);
-    
-    Py_INCREF(zero);
-    return zero;
-}
-
 static PyObject *pyxc_bvtsched_global_set(PyObject *self,
                                           PyObject *args,
                                           PyObject *kwds)
@@ -937,15 +911,6 @@ static PyMethodDef pyxc_methods[] = {
       " dom     [int]:      Identifier of domain to build into.\n"
       " image   [str]:      Name of kernel image file. May be gzipped.\n"
       " ramdisk [str, n/a]: Name of ramdisk file, if any.\n"
-      " cmdline [str, n/a]: Kernel parameters, if any.\n\n"
-      "Returns: [int] 0 on success; -1 on error.\n" },
-
-    { "netbsd_build", 
-      (PyCFunction)pyxc_netbsd_build, 
-      METH_VARARGS | METH_KEYWORDS, "\n"
-      "Build a new NetBSD guest OS.\n"
-      " dom     [int]:     Identifier of domain to build into.\n"
-      " image   [str]:      Name of kernel image file. May be gzipped.\n"
       " cmdline [str, n/a]: Kernel parameters, if any.\n\n"
       "Returns: [int] 0 on success; -1 on error.\n" },
 
