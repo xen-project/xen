@@ -1,7 +1,3 @@
-/*
- * Written by Mark Hemment, 1996.
- * (markhe@nextd.demon.co.uk)
- */
 
 #ifndef __SLAB_H__
 #define __SLAB_H__
