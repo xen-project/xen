@@ -17,6 +17,7 @@ import types
 import errno
 import string
 from StringIO import StringIO
+from xen.util.ip import _readline, _readlines
 
 __all__ = [
     "mime_type", 
@@ -713,7 +714,7 @@ def parse(io):
     """
     pin = Parser()
     while 1:
-        buf = io.readline()
+        buf = _readline(io)
         pin.input(buf)
         if len(buf) == 0:
             break
