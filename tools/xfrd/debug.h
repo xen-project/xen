@@ -15,8 +15,8 @@
  * along with this library; if not, write to the Free Software
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
-#ifndef _XEN_LIB_DEBUG_H_
-#define _XEN_LIB_DEBUG_H_
+#ifndef _XUTIL_DEBUG_H_
+#define _XUTIL_DEBUG_H_
 
 #ifndef MODULE_NAME
 #define MODULE_NAME ""
@@ -69,4 +69,4 @@
  */
 #define IPFMT "%u.%u.%u.%u"
 
-#endif /* ! _XEN_LIB_DEBUG_H_ */
+#endif /* ! _XUTIL_DEBUG_H_ */

@@ -15,8 +15,8 @@
  * Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307 USA
  */
 
-#ifndef _XEN_LIB_ENUM_H_
-#define _XEN_LIB_ENUM_H_
+#ifndef _XUTIL_ENUM_H_
+#define _XUTIL_ENUM_H_
 
 /** Mapping of an enum value to a name. */
 typedef struct EnumDef {
@@ -27,4 +27,4 @@ typedef struct EnumDef {
 extern int enum_name_to_val(char *name, EnumDef *defs);
 extern char *enum_val_to_name(int val, EnumDef *defs);
 
-#endif /* _XEN_LIB_ENUM_H_ */
+#endif /* _XUTIL_ENUM_H_ */

@@ -1,7 +1,3 @@
-/* $Id: lzi_stream.c,v 1.4 2003/09/30 15:22:53 mjw Exp $ */
-#define __FILE_ID_INFO "$Id: lzi_stream.c,v 1.4 2003/09/30 15:22:53 mjw Exp $"
-#include <what.h>
-static char __rcsid[] __attribute__((unused)) = WHAT_ID __FILE_ID_INFO;
 /*
  * Copyright (C) 2003 Hewlett-Packard Company.
  *
@@ -55,10 +51,8 @@ static char __rcsid[] __attribute__((unused)) = WHAT_ID __FILE_ID_INFO;
 #define iprintf(fmt, args...) fprintf(stdout, "[INFO]  LZI>%s" fmt, __FUNCTION__, ##args)
 #define eprintf(fmt, args...) fprintf(stderr, "[ERROR] LZI>%s" fmt, __FUNCTION__, ##args)
 
-static int lzi_read(IOStream *s, void *buf, size_t size, size_t count);
-static int lzi_write(IOStream *s, const void *buf, size_t size, size_t count);
-static int lzi_print(IOStream *s, const char *msg, va_list args);
-static int lzi_getc(IOStream *s);
+static int lzi_read(IOStream *s, void *buf, size_t n);
+static int lzi_write(IOStream *s, const void *buf, size_t n);
 static int lzi_error(IOStream *s);
 static int lzi_close(IOStream *s);
 static void lzi_free(IOStream *s);
@@ -71,10 +65,8 @@ enum {
 
 /** Methods used by a gzFile* IOStream. */
 static const IOMethods lzi_methods = {
-    read: lzi_read,
+    read:  lzi_read,
     write: lzi_write,
-    print: lzi_print,
-    getc:  lzi_getc,
     error: lzi_error,
     close: lzi_close,
     free:  lzi_free,
@@ -151,7 +143,7 @@ static int mode_flags(const char *mode, int *flags){
  * @return stream state.
  */
 static inline LZIState * lzi_state(IOStream *io){
-    return io->data;
+    return (LZIState*)io->data;
 }
 
 IOStream *lzi_stream_io(IOStream *io){
@@ -274,7 +266,7 @@ int read_block(LZIState *s){
 int write_block(LZIState *s){
     int err = 0;
     int k = ((char*)s->zstream.next_out) - ((char*)s->outbuf);
-    int k2 = s->outbuf_size - s->zstream.avail_out;
+    //int k2 = s->outbuf_size - s->zstream.avail_out;
     //dprintf("> k=%d k2=%d\n", k, k2);
     if(!k) goto exit;
     err = marshal_uint32(s->io, k);
@@ -308,16 +300,14 @@ int write_terminator(LZIState *s){
  *
  * @param io destination
  * @param buf data
- * @param size size of data elements
- * @param count number of data elements to write
- * @return number of data elements written
+ * @param n number of bytes to write
+ * @return number of bytes written
  */
-static int lzi_write(IOStream *io, const void *buf, size_t size, size_t count){
+static int lzi_write(IOStream *io, const void *buf, size_t n){
     int err = 0;
-    int n = size * count;
     LZIState *s = lzi_state(io);
 
-    //dprintf("> buf=%p size=%d count=%d n=%d\n", buf, size, count, n);
+    //dprintf("> buf=%p n=%d\n", buf, n);
     if(!LZIState_writeable(s)){
         err = -EINVAL;
         goto exit;
@@ -339,7 +329,6 @@ static int lzi_write(IOStream *io, const void *buf, size_t size, size_t count){
     }
     err = n;
     s->plain_bytes += n;
-    if(size != 1) err /= size;
   exit:
     //dprintf("< err=%d\n", err);
     return err;
@@ -350,16 +339,14 @@ static int lzi_write(IOStream *io, const void *buf, size_t size, size_t count){
  *
  * @param io input
  * @param buf where to put input
- * @param size size of data elements
- * @param count number of data elements to read
- * @return number of data elements read
+ * @param n number of bytes to read
+ * @return number of bytes read
  */
-static int lzi_read(IOStream *io, void *buf, size_t size, size_t count){
+static int lzi_read(IOStream *io, void *buf, size_t n){
     int err, zerr;
-    int n = size * count;
     LZIState *s = lzi_state(io);
 
-    //dprintf("> size=%d count=%d n=%d\n", size, count, n);
+    //dprintf("> n=%d\n", n);
     if(!LZIState_readable(s)){
         err = -EINVAL;
         goto exit;
@@ -380,52 +367,9 @@ static int lzi_read(IOStream *io, void *buf, size_t size, size_t count){
     }
     err = n - s->zstream.avail_out;
     s->plain_bytes += err;
-    if(size != 1) err /= size;
   exit:
     set_error(s, err);
     //dprintf("< err=%d\n", err);
-    return err;
-}
-
-/** Print to the underlying stream.
- * Returns 0 if the formatted output is too big for the internal buffer.
- *
- * @param io lzi stream
- * @param msg format to use
- * @param args arguments
- * @return result of the print
- */
-static int lzi_print(IOStream *io, const char *msg, va_list args){
-    char buf[1024];
-    int buf_n = sizeof(buf);
-    int n;
-    LZIState *s = lzi_state(io);
-    if(!LZIState_writeable(s)){
-        n = -EINVAL;
-        goto exit;
-    }
-    n = vsnprintf(buf, buf_n, (char*)msg, args);
-    if(n < 0) goto exit;
-    if(n > buf_n){
-        n = 0;
-    } else {
-        n = lzi_write(io, buf, 1, n);
-    }
-  exit:
-    return n;
-}
-
-/** Read a character from the underlying stream
- *
- * @param io lzi stream
- * @return character read, IOSTREAM_EOF on end of file (or error)
- */
-static int lzi_getc(IOStream *io){
-    int err;
-    char c;
-    err = lzi_read(io, &c, 1, 1);
-    if(err < 1) c = EOF;
-    err = (c==EOF ? IOSTREAM_EOF : c);
     return err;
 }
 
@@ -433,7 +377,6 @@ static int flush_output(LZIState *s, int mode){
     int err = 0, zerr;
     int done = 0;
     int avail_out_old;
-    int count = 10;
 
     //dprintf("> avail_in=%d avail_out=%d\n", s->zstream.avail_in, s->zstream.avail_out);
     if(s->flushed == 1 + mode) goto exit;

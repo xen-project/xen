@@ -393,6 +393,10 @@ struct pci_dev {
 					   this is D0-D3, D0 being fully functional,
 					   and D3 being off. */
 
+#ifdef LINUX_2_6
+	struct device dev;		/* Generic device interface */
+#endif
+
 	/* device is compatible with these IDs */
 	unsigned short vendor_compatible[DEVICE_COUNT_COMPATIBLE];
 	unsigned short device_compatible[DEVICE_COUNT_COMPATIBLE];

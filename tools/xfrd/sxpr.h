@@ -13,8 +13,8 @@
  * along with this library; if not, write to the Free Software Foundation,
  * Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307 USA
  */
-#ifndef _XEN_LIB_SXPR_H_
-#define _XEN_LIB_SXPR_H_
+#ifndef _XUTIL_SXPR_H_
+#define _XUTIL_SXPR_H_
 
 #include <stdint.h>
 
@@ -350,6 +350,7 @@ Sxpr sxpr_attributes(Sxpr obj);
 Sxpr sxpr_attribute(Sxpr obj, Sxpr key, Sxpr def);
 Sxpr sxpr_children(Sxpr obj);
 Sxpr sxpr_child(Sxpr obj, Sxpr name, Sxpr def);
+Sxpr sxpr_childN(Sxpr obj, int n, Sxpr def);
 Sxpr sxpr_child0(Sxpr obj, Sxpr def);
 Sxpr sxpr_child_value(Sxpr obj, Sxpr name, Sxpr def);
 
@@ -410,4 +411,4 @@ static inline Sxpr mkbool(int b){
 #define c_concat_open  '{'
 #define c_concat_close '}'
 
-#endif /* ! _XEN_LIB_SXPR_H_ */
+#endif /* ! _XUTIL_SXPR_H_ */

@@ -1,6 +1,5 @@
-/* $Id: marshal.h,v 1.1 2003/10/17 15:48:43 mjw Exp $ */
-#ifndef _SP_MARSHAL_H_
-#define _SP_MARSHAL_H_
+#ifndef _XUTIL_MARSHAL_H_
+#define _XUTIL_MARSHAL_H_
 
 #include "iostream.h"
 
@@ -40,4 +39,4 @@ extern int marshal_string(IOStream *io, char *s, uint32_t s_n);
 extern int unmarshal_string(IOStream *io, char *s, uint32_t s_n);
 extern int unmarshal_new_string(IOStream *io, char **s, uint32_t *s_n);
 
-#endif /* ! _SP_MARSHAL_H_ */
+#endif /* ! _XUTIL_MARSHAL_H_ */

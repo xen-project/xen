@@ -890,7 +890,7 @@ pci_set_mwi(struct pci_dev *dev)
 	u16 cmd;
 
 #ifdef HAVE_ARCH_PCI_MWI
-	rc = pcibios_set_mwi(dev);
+	rc = pcibios_prep_mwi(dev);
 #else
 	rc = pci_generic_prep_mwi(dev);
 #endif
@@ -1384,7 +1384,7 @@ struct pci_dev * __devinit pci_scan_slot(struct pci_dev *temp)
 		temp->hdr_type = hdr_type & 0x7f;
 
 		dev = pci_scan_device(temp);
-		if (!pcibios_scan_all_fns() && func == 0) {
+		if (!pcibios_scan_all_fns(0,0) && func == 0) {
 			if (!dev)
 				break;
 		} else {

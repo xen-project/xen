@@ -1,4 +1,3 @@
-/* $Id: hash_table.h,v 1.1 2004/03/30 16:21:26 mjw Exp $ */
 /*
  * Copyright (C) 2001 - 2004 Mike Wray <mike.wray@hp.com>
  *
@@ -17,8 +16,8 @@
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
 
-#ifndef _XEN_LIB_HASH_TABLE_H_
-#define _XEN_LIB_HASH_TABLE_H_
+#ifndef _XUTIL_HASH_TABLE_H_
+#define _XUTIL_HASH_TABLE_H_
 
 #include "iostream.h"
 
@@ -292,4 +291,4 @@ static inline Hashcode hash_hul(Hashcode a, unsigned long b){
  */
 #define HVAL(x) ((unsigned long)(x))
 
-#endif /* !_XEN_LIB_HASH_TABLE_H_ */
+#endif /* !_XUTIL_HASH_TABLE_H_ */

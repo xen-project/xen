@@ -18,8 +18,10 @@
 #define CONFIG_ACPI_BOOT 1
 
 #define CONFIG_PCI 1
-#define CONFIG_PCI_BIOS 1
 #define CONFIG_PCI_DIRECT 1
+#if defined(__i386__)
+#define CONFIG_PCI_BIOS 1
+#endif
 
 #define CONFIG_IDE 1
 #define CONFIG_BLK_DEV_IDE 1
@@ -164,7 +166,8 @@ extern void __out_of_line_bug(int line) __attribute__((noreturn));
 #define DIRECTMAP_PHYS_END (40*1024*1024)
 
 /* Hypervisor owns top 64MB of virtual address space. */
-#define HYPERVISOR_VIRT_START (0xFC000000UL)
+#define __HYPERVISOR_VIRT_START  0xFC000000
+#define HYPERVISOR_VIRT_START   (0xFC000000UL)
 
 /*
  * First 4MB are mapped read-only for all. It's for the machine->physical

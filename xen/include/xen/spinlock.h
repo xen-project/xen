@@ -54,6 +54,8 @@ typedef struct { int gcc_is_buggy; } spinlock_t;
 #define spin_trylock(lock)      ({1; })
 #define spin_unlock_wait(lock)  do { } while(0)
 #define spin_unlock(lock)       do { } while(0)
+#define spin_lock_recursive(lock)   do { } while(0)
+#define spin_unlock_recursive(lock) do { } while(0)
 
 #if (__GNUC__ > 2)
 typedef struct { } rwlock_t;

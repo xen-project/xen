@@ -15,6 +15,7 @@
 #include <xen/time.h>
 #include <xen/ac_timer.h>
 #include <xen/delay.h>
+#include <asm/atomic.h>
 
 #define STACK_SIZE (2*PAGE_SIZE)
 #include <asm/current.h>

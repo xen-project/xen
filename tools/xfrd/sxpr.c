@@ -757,7 +757,9 @@ int sxpr_is(Sxpr obj, char *s){
 }
 
 int sxpr_elementp(Sxpr obj, Sxpr name){
-    return CONSP(obj) && objequal(CAR(obj), name);
+    int ok = 0;
+    ok = CONSP(obj) && objequal(CAR(obj), name);
+    return ok;
 }
 
 /** Get the attributes of an sxpr.
@@ -830,6 +832,19 @@ Sxpr sxpr_child0(Sxpr obj, Sxpr def){
     return val;
 }
 
+Sxpr sxpr_childN(Sxpr obj, int n, Sxpr def){
+    Sxpr val = def;
+    Sxpr l;
+    int i;
+    for (i = 0, l = sxpr_children(obj); CONSP(l); i++, l = CDR(l)){
+        if(i == n){
+            val = CAR(l);
+            break;
+        }
+    }
+    return val;
+}
+    
 Sxpr sxpr_child_value(Sxpr obj, Sxpr name, Sxpr def){
     Sxpr val = ONONE;
     val = sxpr_child(obj, name, ONONE);

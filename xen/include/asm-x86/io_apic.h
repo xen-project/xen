@@ -3,6 +3,7 @@
 
 #include <xen/config.h>
 #include <xen/types.h>
+#include <asm/mpspec.h>
 
 /*
  * Intel IO-APIC support for SMP and UP systems.

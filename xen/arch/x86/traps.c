@@ -62,6 +62,8 @@ struct guest_trap_bounce {
     unsigned long  eip;               /*  12 */
 } guest_trap_bounce[NR_CPUS] = { { 0 } };
 
+#if defined(__i386__)
+
 #define DOUBLEFAULT_STACK_SIZE 1024
 static struct tss_struct doublefault_tss;
 static unsigned char doublefault_stack[DOUBLEFAULT_STACK_SIZE];
@@ -906,3 +908,5 @@ unsigned long do_get_debugreg(int reg)
     if ( (reg < 0) || (reg > 7) ) return -EINVAL;
     return current->thread.debugreg[reg];
 }
+
+#endif /* __i386__ */

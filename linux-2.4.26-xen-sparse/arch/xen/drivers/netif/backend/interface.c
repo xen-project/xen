@@ -266,12 +266,14 @@ int netif_disconnect(netif_be_disconnect_t *disconnect, u8 rsp_id)
         netif->disconnect_rspid = rsp_id;
         wmb(); /* Let other CPUs see the status change. */
         netif_stop_queue(netif->dev);
-        free_irq(netif->irq, NULL);
+        free_irq(netif->irq, netif);
         netif_deschedule(netif);
         netif_put(netif);
+        return 0; /* Caller should not send response message. */
     }
 
-    return 0; /* Caller should not send response message. */
+    disconnect->status = NETIF_BE_STATUS_OKAY;
+    return 1;
 }
 
 void netif_interface_init(void)

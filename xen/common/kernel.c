@@ -22,7 +22,6 @@
 #include <xen/shadow.h>
 #include <xen/trace.h>
 #include <asm/io.h>
-#include <asm/msr.h>
 #include <asm/uaccess.h>
 #include <asm/domain_page.h>
 #include <hypervisor-ifs/dom0_ops.h>
@@ -202,6 +201,18 @@ void cmain(unsigned long magic, multiboot_info_t *mbi)
 
 #if defined(__i386__)
 
+    initial_images_start = DIRECTMAP_PHYS_END;
+    initial_images_end   = initial_images_start + 
+        (mod[mbi->mods_count-1].mod_end - mod[0].mod_start);
+    if ( initial_images_end > (max_page << PAGE_SHIFT) )
+    {
+        printk("Not enough memory to stash the DOM0 kernel image.\n");
+        for ( ; ; ) ;
+    }
+    memmove((void *)initial_images_start,  /* use low mapping */
+            (void *)mod[0].mod_start,      /* use low mapping */
+            mod[mbi->mods_count-1].mod_end - mod[0].mod_start);
+
     if ( opt_xenheap_megabytes > XENHEAP_DEFAULT_MB )
     {
         printk("Xen heap size is limited to %dMB - you specified %dMB.\n",
@@ -214,10 +225,6 @@ void cmain(unsigned long magic, multiboot_info_t *mbi)
 
     init_frametable((void *)FRAMETABLE_VIRT_START, max_page);
 
-    /* Initial images stashed away above DIRECTMAP area in boot.S. */
-    initial_images_start = DIRECTMAP_PHYS_END;
-    initial_images_end   = initial_images_start + 
-        (mod[mbi->mods_count-1].mod_end - mod[0].mod_start);
 
 #elif defined(__x86_64__)
 

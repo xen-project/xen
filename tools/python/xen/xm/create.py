@@ -1,4 +1,5 @@
 # Copyright (C) 2004 Mike Wray <mike.wray@hp.com>
+
 """Domain creation.
 """
 import string
@@ -12,14 +13,24 @@ from xen.util import console_client
 
 from xen.xm.opts import *
 
-gopts = Opts(use="""[options]
+gopts = Opts(use="""[options] [vars]
 
 Create a domain.
+
+Domain creation parameters can be set by command-line switches, from
+a python configuration script or an SXP config file. See documentation
+for --defaults, --config. Configuration variables can be set using
+VAR=VAL on the command line. For example vmid=3 sets vmid to 3.
+
 """)
 
 gopts.opt('help', short='h',
          fn=set_true, default=0,
          use="Print this help.")
+
+gopts.opt('help_config',
+          fn=set_true, default=0,
+          use="Print help for configuration file.")
 
 gopts.opt('quiet', short='q',
          fn=set_true, default=0,
@@ -31,58 +42,73 @@ gopts.opt('path', val='PATH',
 
 gopts.opt('defaults', short='f', val='FILE',
          fn=set_value, default='xmdefaults',
-         use="Use the given default script.")
+         use="""Use the given Python defaults script.
+The defaults script is loaded after arguments have been processed.
+Each command-line option sets a configuration variable named after
+its long option name, and these variables are placed in the
+environment of the script before it is loaded.
+Variables for options that may be repeated have list values.
+Other variables can be set using VAR=VAL on the command line.
+
+After the script is loaded, option values that were not set on the
+command line are replaced by the values set in the script.
+""")
 
 gopts.opt('config', short='F', val='FILE',
          fn=set_value, default=None,
-         use='Domain configuration to use (SXP).')
+         use="""Domain configuration to use (SXP).
+SXP is the underlying configuration format used by Xen.
+SXP configs can be hand-written or generated from Python defaults
+scripts, using the -n (dryrun) option to print the config.
+""")
 
 gopts.opt('load', short='L', val='FILE',
           fn=set_value, default=None,
           use='Domain saved state to load.')
 
-gopts.opt('define', short='D', val='VAR=VAL',
-         fn=set_var, default=None,
-         use="""Set a variable before loading defaults, e.g. '-D vmid=3'
-         to set vmid. May be repeated to set more thanone variable.""")
-
 gopts.opt('dryrun', short='n',
          fn=set_true, default=0,
-         use="Dry run - print the config but don't create the domain.")
-
-gopts.opt('name', short='N', val='NAME',
-          fn=set_value, default=None,
-          use="Domain name.")
+         use="""Dry run - print the config but don't create the domain.
+The defaults file is loaded and the SXP configuration is created and printed.         
+""")
 
 gopts.opt('console_autoconnect', short='c',
          fn=set_true, default=0,
          use="Connect to console after domain is created.")
 
-gopts.opt('kernel', short='k', val='FILE',
+gopts.var('name', val='NAME',
+          fn=set_value, default=None,
+          use="Domain name.")
+
+gopts.var('kernel', val='FILE',
          fn=set_value, default=None,
          use="Path to kernel image.")
 
-gopts.opt('ramdisk', short='r', val='FILE',
+gopts.var('ramdisk', val='FILE',
          fn=set_value, default='',
          use="Path to ramdisk.")
 
-gopts.opt('builder', short='b', val='FUNCTION',
+gopts.var('builder', val='FUNCTION',
          fn=set_value, default='linux',
          use="Function to use to build the domain.")
 
-gopts.opt('memory', short='m', val='MEMORY',
+gopts.var('memory', val='MEMORY',
          fn=set_value, default=128,
          use="Domain memory in MB.")
 
-gopts.opt('blkif',
-          fn=set_true, default=0,
+gopts.var('autorestart', val='no|yes',
+         fn=set_bool, default=0,
+         use="Whether to restart the domain on exit.")
+
+gopts.var('blkif', val='no|yes',
+          fn=set_bool, default=0,
           use="Make the domain a block device backend.")
 
-gopts.opt('netif',
-          fn=set_true, default=0,
+gopts.var('netif', val='no|yes',
+          fn=set_bool, default=0,
           use="Make the domain a network interface backend.")
 
-gopts.opt('disk', short='d', val='phy:DEV,VDEV,MODE',
+gopts.var('disk', val='phy:DEV,VDEV,MODE',
          fn=append_value, default=[],
          use="""Add a disk device to a domain. The physical device is DEV,
          which is exported to the domain as VDEV. The disk is read-only if MODE
@@ -90,18 +116,18 @@ gopts.opt('disk', short='d', val='phy:DEV,VDEV,MODE',
          The option may be repeated to add more than one disk.
          """)
 
-gopts.opt('pci', val='BUS,DEV,FUNC',
+gopts.var('pci', val='BUS,DEV,FUNC',
          fn=append_value, default=[],
          use="""Add a PCI device to a domain, using given params (in hex).
          For example '-pci c0,02,1a'.
          The option may be repeated to add more than one pci device.
          """)
 
-gopts.opt('ipaddr', short='i', val="IPADDR",
+gopts.var('ipaddr', val="IPADDR",
          fn=append_value, default=[],
          use="Add an IP address to the domain.")
 
-gopts.opt('vif', val="mac=MAC,bridge=BRIDGE",
+gopts.var('vif', val="mac=MAC,bridge=BRIDGE",
          fn=append_value, default=[],
          use="""Add a network interface with the given MAC address and bridge.
          If mac is not specified a random MAC address is used.
@@ -110,7 +136,7 @@ gopts.opt('vif', val="mac=MAC,bridge=BRIDGE",
          Specifying vifs will increase the number of interfaces as needed.
          """)
 
-gopts.opt('nics', val="NUM",
+gopts.var('nics', val="NUM",
          fn=set_int, default=1,
          use="""Set the number of network interfaces.
          Use the vif option to define interface parameters, otherwise
@@ -118,44 +144,44 @@ gopts.opt('nics', val="NUM",
          number of interfaces as needed.
          """)
 
-gopts.opt('root', short='R', val='DEVICE',
+gopts.var('root', val='DEVICE',
          fn=set_value, default='',
          use="""Set the root= parameter on the kernel command line.
          Use a device, e.g. /dev/sda1, or /dev/nfs for NFS root.""")
 
-gopts.opt('extra', short='E', val="ARGS",
+gopts.var('extra', val="ARGS",
          fn=set_value, default='',
          use="Set extra arguments to append to the kernel command line.")
 
-gopts.opt('ip', short='I', val='IPADDR',
+gopts.var('ip', val='IPADDR',
          fn=set_value, default='',
          use="Set the kernel IP interface address.")
 
-gopts.opt('gateway', val="IPADDR",
+gopts.var('gateway', val="IPADDR",
          fn=set_value, default='',
          use="Set the kernel IP gateway.")
 
-gopts.opt('netmask', val="MASK",
+gopts.var('netmask', val="MASK",
          fn=set_value, default = '',
          use="Set the kernel IP netmask.")
 
-gopts.opt('hostname', val="NAME",
+gopts.var('hostname', val="NAME",
          fn=set_value, default='',
          use="Set the kernel IP hostname.")
 
-gopts.opt('interface', val="INTF",
+gopts.var('interface', val="INTF",
          fn=set_value, default="eth0",
          use="Set the kernel IP interface name.")
 
-gopts.opt('dhcp', val="off|dhcp",
+gopts.var('dhcp', val="off|dhcp",
          fn=set_value, default='off',
          use="Set the kernel dhcp option.")
 
-gopts.opt('nfs_server', val="IPADDR",
+gopts.var('nfs_server', val="IPADDR",
          fn=set_value, default=None,
          use="Set the address of the NFS server for NFS root.")
 
-gopts.opt('nfs_root', val="PATH",
+gopts.var('nfs_root', val="PATH",
          fn=set_value, default=None,
          use="Set the path of the root NFS directory.")
 
@@ -244,6 +270,8 @@ def make_config(opts):
         config.append(['backend', ['blkif']])
     if opts.netif:
         config.append(['backend', ['netif']])
+    if opts.autorestart:
+        config.append(['autorestart'])
     
     configure_image(config, opts)
     config_devs = []
@@ -282,7 +310,7 @@ def preprocess_vifs(opts):
         d = {}
         a = vif.split(',')
         for b in a:
-            (k, v) = b.strip().split('=')
+            (k, v) = b.strip().split('=', 1)
             k = k.strip()
             v = v.strip()
             if k not in ['mac', 'bridge']:
@@ -352,7 +380,15 @@ def main(argv):
     args = opts.parse(argv)
     if opts.vals.help:
         opts.usage()
+    if opts.vals.help or opts.vals.help_config:
+        opts.load_defaults(help=1)
+    if opts.vals.help or opts.vals.help_config:
         return
+    # Process remaining args as config variables.
+    for arg in args:
+        if '=' in arg:
+            (var, val) = arg.strip().split('=', 1)
+            gopts.setvar(var.strip(), val.strip())
     if opts.vals.config:
         pass
     else:

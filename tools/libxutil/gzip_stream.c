@@ -1,4 +1,3 @@
-/* $Id: gzip_stream.c,v 1.4 2003/09/30 15:22:53 mjw Exp $ */
 /*
  * Copyright (C) 2003 Hewlett-Packard Company.
  *

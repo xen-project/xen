@@ -14,11 +14,16 @@
  * Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307 USA
  */
 
-#ifndef _SP_LEXIS_H_
-#define _SP_LEXIS_H_
+#ifndef _XUTIL_LEXIS_H_
+#define _XUTIL_LEXIS_H_
 
 #include "sys_string.h"
-#include "sys_ctype.h"
+
+#ifdef __KERNEL__
+#  include <linux/ctype.h>
+#else
+#  include <ctype.h>
+#endif
 
 /** @file
  * Lexical analysis.
@@ -119,4 +124,4 @@ extern int is_hex_number(const char *s, int n);
 extern int is_keyword(const char *s, const char *k);
 extern int is_keychar(const char *s, char c);
 
-#endif /* !_SP_LEXIS_H_ */
+#endif /* !_XUTIL_LEXIS_H_ */

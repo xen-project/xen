@@ -1,4 +1,3 @@
-#/* $Id: lzi_stream.h,v 1.3 2003/09/30 15:22:53 mjw Exp $ */
 /*
  * Copyright (C) 2003 Hewlett-Packard Company.
  *
@@ -17,8 +16,8 @@
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
 
-#ifndef _SP_LZI_STREAM_H_
-#define _SP_LZI_STREAM_H_
+#ifndef _XUTIL_LZI_STREAM_H_
+#define _XUTIL_LZI_STREAM_H_
 
 #ifndef __KERNEL__
 #include "iostream.h"
@@ -33,4 +32,4 @@ extern int lzi_stream_comp_bytes(IOStream *io);
 extern float lzi_stream_ratio(IOStream *io);
 
 #endif
-#endif /* !_SP_FILE_STREAM_H_ */
+#endif /* !_XUTIL_LZI_STREAM_H_ */

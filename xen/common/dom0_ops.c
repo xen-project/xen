@@ -14,7 +14,6 @@
 #include <xen/sched.h>
 #include <xen/event.h>
 #include <asm/domain_page.h>
-#include <asm/msr.h>
 #include <asm/pdb.h>
 #include <xen/trace.h>
 #include <xen/console.h>
@@ -25,23 +24,8 @@
 #define TRC_DOM0OP_LEAVE_BASE  0x00030000
 
 extern unsigned int alloc_new_dom_mem(struct domain *, unsigned int);
-
-static int msr_cpu_mask;
-static unsigned long msr_addr;
-static unsigned long msr_lo;
-static unsigned long msr_hi;
-
-static void write_msr_for(void *unused)
-{
-    if (((1 << current->processor) & msr_cpu_mask))
-        wrmsr(msr_addr, msr_lo, msr_hi);
-}
-
-static void read_msr_for(void *unused)
-{
-    if (((1 << current->processor) & msr_cpu_mask))
-        rdmsr(msr_addr, msr_lo, msr_hi);
-}
+extern long arch_do_dom0_op(dom0_op_t *op, dom0_op_t *u_dom0_op);
+extern void arch_getdomaininfo_ctxt(struct domain *, full_execution_context_t *);
 
 long do_dom0_op(dom0_op_t *u_dom0_op)
 {
@@ -276,7 +260,6 @@ long do_dom0_op(dom0_op_t *u_dom0_op)
         full_execution_context_t *c;
         struct domain            *d;
         unsigned long             flags;
-        int                       i;
 
         read_lock_irqsave(&tasklist_lock, flags);
 
@@ -328,52 +311,7 @@ long do_dom0_op(dom0_op_t *u_dom0_op)
             if ( d != current )
                 domain_pause(d);
 
-            c->flags = 0;
-            memcpy(&c->cpu_ctxt, 
-                   &d->shared_info->execution_context,
-                   sizeof(d->shared_info->execution_context));
-            if ( test_bit(DF_DONEFPUINIT, &d->flags) )
-                c->flags |= ECF_I387_VALID;
-            memcpy(&c->fpu_ctxt,
-                   &d->thread.i387,
-                   sizeof(d->thread.i387));
-            memcpy(&c->trap_ctxt,
-                   d->thread.traps,
-                   sizeof(d->thread.traps));
-#ifdef ARCH_HAS_FAST_TRAP
-            if ( (d->thread.fast_trap_desc.a == 0) &&
-                 (d->thread.fast_trap_desc.b == 0) )
-                c->fast_trap_idx = 0;
-            else
-                c->fast_trap_idx = 
-                    d->thread.fast_trap_idx;
-#endif
-            c->ldt_base = d->mm.ldt_base;
-            c->ldt_ents = d->mm.ldt_ents;
-            c->gdt_ents = 0;
-            if ( GET_GDT_ADDRESS(d) == GDT_VIRT_START )
-            {
-                for ( i = 0; i < 16; i++ )
-                    c->gdt_frames[i] = 
-                        l1_pgentry_to_pagenr(d->mm.perdomain_pt[i]);
-                c->gdt_ents = 
-                    (GET_GDT_ENTRIES(d) + 1) >> 3;
-            }
-            c->guestos_ss  = d->thread.guestos_ss;
-            c->guestos_esp = d->thread.guestos_sp;
-            c->pt_base   = 
-                pagetable_val(d->mm.pagetable);
-            memcpy(c->debugreg, 
-                   d->thread.debugreg, 
-                   sizeof(d->thread.debugreg));
-            c->event_callback_cs  =
-                d->event_selector;
-            c->event_callback_eip =
-                d->event_address;
-            c->failsafe_callback_cs  = 
-                d->failsafe_selector;
-            c->failsafe_callback_eip = 
-                d->failsafe_address;
+            arch_getdomaininfo_ctxt(d,c);
 
             if ( d != current )
                 domain_unpause(d);
@@ -448,32 +386,6 @@ long do_dom0_op(dom0_op_t *u_dom0_op)
     }
     break;
 
-    case DOM0_MSR:
-    {
-        if ( op->u.msr.write )
-        {
-            msr_cpu_mask = op->u.msr.cpu_mask;
-            msr_addr = op->u.msr.msr;
-            msr_lo = op->u.msr.in1;
-            msr_hi = op->u.msr.in2;
-            smp_call_function(write_msr_for, NULL, 1, 1);
-            write_msr_for(NULL);
-        }
-        else
-        {
-            msr_cpu_mask = op->u.msr.cpu_mask;
-            msr_addr = op->u.msr.msr;
-            smp_call_function(read_msr_for, NULL, 1, 1);
-            read_msr_for(NULL);
-
-            op->u.msr.out1 = msr_lo;
-            op->u.msr.out2 = msr_hi;
-            copy_to_user(u_dom0_op, op, sizeof(*op));
-        }
-        ret = 0;
-    }
-    break;
-
 #ifdef XEN_DEBUGGER
     case DOM0_DEBUG:
     {
@@ -540,20 +452,6 @@ long do_dom0_op(dom0_op_t *u_dom0_op)
                                         op->u.pcidev_access.dev,
                                         op->u.pcidev_access.func,
                                         op->u.pcidev_access.enable);
-    }
-    break;
-
-    case DOM0_SHADOW_CONTROL:
-    {
-        struct domain *d; 
-        ret = -ESRCH;
-        d = find_domain_by_id(op->u.shadow_control.domain);
-        if ( d != NULL )
-        {
-            ret = shadow_mode_control(d, &op->u.shadow_control);
-            put_domain(d);
-            copy_to_user(u_dom0_op, op, sizeof(*op));
-        } 
     }
     break;
 
@@ -696,7 +594,7 @@ long do_dom0_op(dom0_op_t *u_dom0_op)
     break;
 
     default:
-        ret = -ENOSYS;
+        ret = arch_do_dom0_op(op,u_dom0_op);
 
     }
 

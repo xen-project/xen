@@ -8,6 +8,8 @@
  * This file handles the architecture-dependent parts of initialization
  */
 
+#define __KERNEL_SYSCALLS__
+static int errno;
 #include <linux/errno.h>
 #include <linux/sched.h>
 #include <linux/kernel.h>
@@ -30,6 +32,7 @@
 #include <linux/highmem.h>
 #include <linux/bootmem.h>
 #include <linux/seq_file.h>
+#include <linux/reboot.h>
 #include <asm/processor.h>
 #include <linux/console.h>
 #include <linux/module.h>
@@ -1148,10 +1151,10 @@ void __init cpu_init (void)
 
 #include <asm/suspend.h>
 
-/* Treat multiple suspend requests as a single one. */
-static int suspending;
+/* Ignore multiple shutdown requests. */
+static int shutting_down = -1;
 
-static void suspend_task(void *unused)
+static void __do_suspend(void)
 {
     /* Hmmm... a cleaner interface to suspend/resume blkdevs would be nice. */
     extern void blkdev_suspend(void);
@@ -1220,7 +1223,7 @@ static void suspend_task(void *unused)
 
     HYPERVISOR_suspend(virt_to_machine(suspend_record) >> PAGE_SHIFT);
 
-    suspending = 0; 
+    shutting_down = -1; 
 
     memcpy(&start_info, &suspend_record->resume_info, sizeof(start_info));
 
@@ -1272,25 +1275,78 @@ static void suspend_task(void *unused)
         free_page((unsigned long)suspend_record);
 }
 
-static struct tq_struct suspend_tq;
-
-static void shutdown_handler(ctrl_msg_t *msg, unsigned long id)
+static int shutdown_process(void *__unused)
 {
-    if ( msg->subtype != CMSG_SHUTDOWN_SUSPEND )
+    static char *envp[] = { "HOME=/", "TERM=linux", 
+                            "PATH=/sbin:/usr/sbin:/bin:/usr/bin", NULL };
+    static char *restart_argv[]  = { "/sbin/shutdown", "-r", "now", NULL };
+    static char *poweroff_argv[] = { "/sbin/halt",     "-p",        NULL };
+
+    extern asmlinkage long sys_reboot(int magic1, int magic2,
+                                      unsigned int cmd, void *arg);
+
+    daemonize();
+
+    switch ( shutting_down )
     {
-        extern void ctrl_alt_del(void);
-        ctrl_if_send_response(msg);
-        ctrl_alt_del();
+    case CMSG_SHUTDOWN_POWEROFF:
+        if ( execve("/sbin/halt", poweroff_argv, envp) < 0 )
+        {
+            sys_reboot(LINUX_REBOOT_MAGIC1,
+                       LINUX_REBOOT_MAGIC2,
+                       LINUX_REBOOT_CMD_POWER_OFF,
+                       NULL);
+        }
+        break;
+
+    case CMSG_SHUTDOWN_REBOOT:
+        if ( execve("/sbin/shutdown", restart_argv, envp) < 0 )
+        {
+            sys_reboot(LINUX_REBOOT_MAGIC1,
+                       LINUX_REBOOT_MAGIC2,
+                       LINUX_REBOOT_CMD_RESTART,
+                       NULL);
+        }
+        break;
     }
-    else if ( !suspending )
+
+    return 0;
+}
+
+static void __shutdown_handler(void *unused)
+{
+    int err;
+
+    if ( shutting_down != CMSG_SHUTDOWN_SUSPEND )
     {
-	suspending = 1;
-	suspend_tq.routine = suspend_task;
-	schedule_task(&suspend_tq);	
+        err = kernel_thread(shutdown_process, NULL, CLONE_FS | CLONE_FILES);
+        if ( err < 0 )
+            printk(KERN_ALERT "Error creating shutdown process!\n");
+        else
+            shutting_down = -1; /* could try again */
     }
     else
     {
-	printk(KERN_ALERT"Ignore queued suspend request\n");
+        __do_suspend();
+    }
+}
+
+static void shutdown_handler(ctrl_msg_t *msg, unsigned long id)
+{
+    static struct tq_struct shutdown_tq;
+
+    if ( (shutting_down == -1) &&
+         ((msg->subtype == CMSG_SHUTDOWN_POWEROFF) ||
+          (msg->subtype == CMSG_SHUTDOWN_REBOOT) ||
+          (msg->subtype == CMSG_SHUTDOWN_SUSPEND)) )
+    {
+        shutting_down = msg->subtype;
+        shutdown_tq.routine = __shutdown_handler;
+        schedule_task(&shutdown_tq);
+    }
+    else
+    {
+	printk("Ignore spurious shutdown request\n");
     }
 
     ctrl_if_send_response(msg);
