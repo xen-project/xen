@@ -142,6 +142,34 @@ netif_formats = {
 msg_formats.update(netif_formats)
 
 #============================================================================
+CMSG_SUSPEND  = 5
+CMSG_SHUTDOWN = 6
+
+CMSG_SHUTDOWN_HALT      = 0
+CMSG_SHUTDOWN_POWEROFF  = 1
+CMSG_SHUTDOWN_REBOOT    = 2
+
+STOPCODE_shutdown       = 0
+STOPCODE_reboot         = 1
+STOPCODE_suspend        = 2
+
+ctrlif_formats = {
+    'ctrlif_suspend_t':
+    (CMSG_SUSPEND, 0, "??"),
+
+    'ctrlif_shutdown_halt_t':
+    (CMSG_SHUTDOWN, CMSG_SHUTDOWN_HALT, "??"),
+    
+    'ctrlif_shutdown_poweroff_t':
+    (CMSG_SHUTDOWN, CMSG_SHUTDOWN_POWEROFF, "??"),
+    
+    'ctrlif_shutdown_reboot_t':
+    (CMSG_SHUTDOWN, CMSG_SHUTDOWN_REBOOT, "??"),
+    }
+
+msg_formats.update(ctrlif_formats)
+
+#============================================================================
 
 class Msg:
     pass
