@@ -230,7 +230,6 @@ static void network_alloc_rx_buffers(struct net_device *dev)
         skb = dev_alloc_skb(RX_BUF_SIZE);
         if ( skb == NULL ) break;
         skb->dev = dev;
-        skb_reserve(skb, 2); /* word align the IP header */
         np->rx_skb_ring[i] = skb;
         np->net_ring->rx_ring[i].addr = get_ppte((unsigned long)skb->head); 
         np->net_ring->rx_ring[i].size = RX_BUF_SIZE - 16; /* arbitrary */
@@ -317,25 +316,20 @@ static void network_rx_int(int irq, void *dev_id, struct pt_regs *ptregs)
     struct net_device *dev = (struct net_device *)dev_id;
     struct net_private *np = dev->priv;
     struct sk_buff *skb;
+    rx_entry_t *rx;
     
  again:
     for ( i = np->rx_idx; i != np->net_ring->rx_cons; i = RX_RING_INC(i) )
     {
-        if (np->net_ring->rx_ring[i].status != RING_STATUS_OK)
-        {
-            printk(KERN_ALERT "bad buffer on RX ring!(%d)\n", 
-                   np->net_ring->rx_ring[i].status);
-            continue;
-        }
+        rx  = &np->net_ring->rx_ring[i];
         skb = np->rx_skb_ring[i];
 
-        phys_to_machine_mapping[virt_to_phys(skb->head) >> PAGE_SHIFT] =
-            (*(unsigned long *)phys_to_virt(
-                machine_to_phys(np->net_ring->rx_ring[i].addr))
-                ) >> PAGE_SHIFT;
-
-        skb_put(skb, np->net_ring->rx_ring[i].size);
-        skb->protocol = eth_type_trans(skb, dev);
+        if ( rx->status != RING_STATUS_OK )
+        {
+            printk(KERN_ALERT "bad buffer on RX ring!(%d)\n", rx->status);
+            dev_kfree_skb_any(skb);
+            continue;
+        }
 
         /*
          * Set up shinfo -- from alloc_skb This was particularily nasty:  the
@@ -346,6 +340,22 @@ static void network_rx_int(int irq, void *dev_id, struct pt_regs *ptregs)
         skb_shinfo(skb)->nr_frags = 0;
         skb_shinfo(skb)->frag_list = NULL;
                                 
+        phys_to_machine_mapping[virt_to_phys(skb->head) >> PAGE_SHIFT] =
+            (*(unsigned long *)phys_to_virt(machine_to_phys(rx->addr))
+                ) >> PAGE_SHIFT;
+
+        if ( rx->offset < 16 )
+        {
+            printk(KERN_ALERT "need pkt offset >= 16 (got %d)\n", rx->offset);
+            dev_kfree_skb_any(skb);
+            continue;
+        }
+        
+        skb_reserve(skb, rx->offset - 16);
+
+        skb_put(skb, np->net_ring->rx_ring[i].size);
+        skb->protocol = eth_type_trans(skb, dev);
+
         np->stats.rx_packets++;
 
         np->stats.rx_bytes += np->net_ring->rx_ring[i].size;

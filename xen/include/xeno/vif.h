@@ -28,7 +28,8 @@
 typedef struct rx_shadow_entry_st {
     unsigned long  addr;
     unsigned short size;
-    unsigned short status;
+    unsigned char  status;
+    unsigned char  offset;
     unsigned long  flush_count;
 } rx_shadow_entry_t;
 
@@ -36,7 +37,8 @@ typedef struct tx_shadow_entry_st {
     void          *header;
     unsigned long  payload;
     unsigned short size;
-    unsigned short status;
+    unsigned char  status;
+    unsigned char  _unused;
 } tx_shadow_entry_t;
 
 typedef struct net_shadow_ring_st {

@@ -6338,12 +6338,9 @@ static int __devinit tg3_get_invariants(struct tg3 *tp)
 		tp->dev->hard_start_xmit = tg3_start_xmit;
 
 	tp->rx_offset = 2;
-/* XXX Xen: we trust our ASICs, for better or worse ;-) */
-#if 0
 	if (GET_ASIC_REV(tp->pci_chip_rev_id) == ASIC_REV_5701 &&
 	    (tp->tg3_flags & TG3_FLAG_PCIX_MODE) != 0)
 		tp->rx_offset = 0;
-#endif
 
 	/* By default, disable wake-on-lan.  User can change this
 	 * using ETHTOOL_SWOL.

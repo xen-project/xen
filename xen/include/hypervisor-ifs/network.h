@@ -15,15 +15,17 @@
 #include <linux/types.h>
 
 typedef struct tx_entry_st {
-	unsigned long  addr;   /* machine address of packet */
-	unsigned short size;   /* in bytes */
-        unsigned short status; /* per descriptor status. */
+    unsigned long  addr;   /* machine address of packet (IN VAR) */
+    unsigned short size;   /* in bytes (IN VAR) */
+    unsigned char  status; /* per descriptor status (OUT VAR) */
+    unsigned char  _unused;
 } tx_entry_t;
 
 typedef struct rx_entry_st {
-	unsigned long  addr;   /* machine address of PTE to swizzle */
-	unsigned short size;   /* in bytes */
-        unsigned short status; /* per descriptor status. */
+    unsigned long  addr;   /* machine address of PTE to swizzle (IN VAR) */
+    unsigned short size;   /* in bytes (OUT VAR) */
+    unsigned char  status; /* per descriptor status (OUT VAR) */
+    unsigned char  offset; /* offset in page of received pkt (OUT VAR) */
 } rx_entry_t;
 
 #define TX_RING_SIZE 256
@@ -120,12 +122,9 @@ typedef struct net_rule_ent_st
 /* Drop a new rule down to the network tables. */
 int add_net_rule(net_rule_t *rule);
 
-
-/* Descriptor status values:
- */
-
-#define RING_STATUS_OK               0  // Everything is gravy.
-#define RING_STATUS_ERR_CFU         -1  // Copy from user problems.
-#define RING_STATUS_BAD_PAGE        -2  // What they gave us was pure evil.
+/* Descriptor status values */
+#define RING_STATUS_OK               0  /* Everything is gravy. */
+#define RING_STATUS_ERR_CFU          1  /* Copy from user problems. */
+#define RING_STATUS_BAD_PAGE         2  /* What they gave us was pure evil */
 
 #endif

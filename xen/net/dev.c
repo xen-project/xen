@@ -506,9 +506,10 @@ void deliver_packet(struct sk_buff *skb, net_vif_t *vif)
     }
 
     rx = shadow_ring->rx_ring + i;
-    if ( (skb->len + ETH_HLEN) < rx->size )
-        rx->size = skb->len + ETH_HLEN;
-            
+    ASSERT(skb->len <= PAGE_SIZE);
+    rx->size   = skb->len;
+    rx->offset = (unsigned char)((unsigned long)skb->data & ~PAGE_MASK);
+
     spin_lock_irqsave(&vif->domain->page_lock, flags);
 
     g_pte = map_domain_mem(rx->addr);
@@ -559,7 +560,7 @@ void deliver_packet(struct sk_buff *skb, net_vif_t *vif)
 int netif_rx(struct sk_buff *skb)
 {
     unsigned long cpu_mask;
-    int this_cpu = smp_processor_id();
+    int offset, this_cpu = smp_processor_id();
     unsigned long flags;
     net_vif_t *vif;
 
@@ -567,23 +568,25 @@ int netif_rx(struct sk_buff *skb)
 
     ASSERT(skb->skb_type == SKB_ZERO_COPY);
     ASSERT((skb->data - skb->head) == (18 + ETH_HLEN));
-        
+
+    /*
+     * Offset will include 16 bytes padding from dev_alloc_skb, 14 bytes for 
+     * ethernet header, plus any other alignment padding added by the driver.
+     */
+    offset = (int)skb->data & ~PAGE_MASK; 
     skb->head = (u8 *)map_domain_mem(((skb->pf - frame_table) << PAGE_SHIFT));
-    skb->data = skb->head;
-    skb_reserve(skb,18); /* 18 is the 16 from dev_alloc_skb plus 2 for
-                            IP header alignment. */
+    skb->data = skb->nh.raw = skb->head + offset;
+    skb->tail = skb->data + skb->len;
+    skb_push(skb, ETH_HLEN);
     skb->mac.raw = skb->data;
-    skb->data += ETH_HLEN;
-    skb->nh.raw = skb->data;
-        
+
     netdev_rx_stat[this_cpu].total++;
 
     if ( skb->src_vif == VIF_UNKNOWN_INTERFACE )
         skb->src_vif = VIF_PHYSICAL_INTERFACE;
                 
     if ( skb->dst_vif == VIF_UNKNOWN_INTERFACE )
-        skb->dst_vif = __net_get_target_vif(skb->mac.raw, 
-                                            skb->len, skb->src_vif);
+        skb->dst_vif = __net_get_target_vif(skb->data, skb->len, skb->src_vif);
         
     if ( ((vif = sys_vif_list[skb->dst_vif]) == NULL) ||
          (skb->dst_vif <= VIF_PHYSICAL_INTERFACE) )
@@ -1959,8 +1962,8 @@ long do_net_update(void)
              * This copy assumes that rx_shadow_entry_t is an extension of 
              * rx_net_entry_t extra fields must be tacked on to the end.
              */
-            if ( copy_from_user( shadow_ring->rx_ring+i, net_ring->rx_ring+i, 
-                                 sizeof (rx_entry_t) ) )
+            if ( copy_from_user(shadow_ring->rx_ring+i, net_ring->rx_ring+i, 
+                                sizeof (rx_entry_t) ) )
             {
                 DPRINTK("Bad copy_from_user for rx ring\n");
                 shadow_ring->rx_ring[i].status = RING_STATUS_ERR_CFU;
