@@ -4,16 +4,13 @@
 #include <xen/config.h>
 #include <xen/types.h>
 #include <xen/spinlock.h>
-#ifdef LINUX_2_6
-#include <linux/thread_info.h>
-#endif
 #include <asm/ptrace.h>
 #include <xen/smp.h>
 #include <asm/page.h>
 #include <asm/processor.h>
 #include <hypervisor-ifs/hypervisor-if.h>
 #include <hypervisor-ifs/dom0_ops.h>
-
+#include <xen/grant_table.h>
 #include <xen/list.h>
 #include <xen/time.h>
 #include <xen/ac_timer.h>
@@ -95,6 +92,7 @@ struct domain
 
     spinlock_t       page_alloc_lock; /* protects all the following fields  */
     struct list_head page_list;       /* linked list, of size tot_pages     */
+    struct list_head xenpage_list;    /* linked list, of size xenheap_pages */
     unsigned int     tot_pages;       /* number of pages currently possesed */
     unsigned int     max_pages;       /* maximum value for tot_pages        */
     unsigned int     xenheap_pages;   /* # pages allocated from Xen heap    */
@@ -120,6 +118,8 @@ struct domain
     event_channel_t *event_channel;
     unsigned int     max_event_channel;
     spinlock_t       event_channel_lock;
+
+    grant_table_t *grant_table;
 
     /*
      * Interrupt to event-channel mappings. Updates should be protected by the 

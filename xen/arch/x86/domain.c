@@ -472,13 +472,19 @@ void domain_relinquish_memory(struct domain *d)
      */
     destroy_gdt(d);
 
-    /* Relinquish Xen-heap pages. Currently this can only be 'shared_info'. */
-    page = virt_to_page(d->shared_info);
-    if ( test_and_clear_bit(_PGC_allocated, &page->u.inuse.count_info) )
-        put_page(page);
+    /* Use a recursive lock, as we may enter 'free_domheap_page'. */
+    spin_lock_recursive(&d->page_alloc_lock);
+
+    /* Relinquish Xen-heap pages. */
+    list_for_each_safe ( ent, tmp, &d->xenpage_list )
+    {
+        page = list_entry(ent, struct pfn_info, list);
+
+        if ( test_and_clear_bit(_PGC_allocated, &page->u.inuse.count_info) )
+            put_page(page);
+    }
 
     /* Relinquish all pages on the domain's allocation list. */
-    spin_lock_recursive(&d->page_alloc_lock); /* may enter free_domheap_page */
     list_for_each_safe ( ent, tmp, &d->page_list )
     {
         page = list_entry(ent, struct pfn_info, list);
@@ -507,6 +513,7 @@ void domain_relinquish_memory(struct domain *d)
         }
         while ( unlikely(y != x) );
     }
+
     spin_unlock_recursive(&d->page_alloc_lock);
 }
 

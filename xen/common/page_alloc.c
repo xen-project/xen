@@ -418,6 +418,8 @@ void free_domheap_pages(struct pfn_info *pg, int order)
     if ( unlikely(IS_XEN_HEAP_FRAME(pg)) )
     {
         spin_lock_recursive(&d->page_alloc_lock);
+        for ( i = 0; i < (1 << order); i++ )
+            list_del(&pg[i].list);
         d->xenheap_pages -= 1 << order;
         drop_dom_ref = (d->xenheap_pages == 0);
         spin_unlock_recursive(&d->page_alloc_lock);
