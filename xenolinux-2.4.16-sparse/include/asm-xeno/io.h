@@ -2,7 +2,7 @@
 #define _ASM_IO_H
 
 #include <linux/config.h>
-
+#include <asm/hypervisor.h>
 /*
  * This file contains the definitions for the x86 IO instructions
  * inb/inw/inl/outb/outw/outl and the "string versions" of the same
@@ -72,6 +72,22 @@ static inline void * phys_to_virt(unsigned long address)
 {
 	return __va(address);
 }
+
+/*
+ * Change virtual addresses to machine addresses and vv.
+ * These are equally trivial.
+ */
+
+static inline unsigned long virt_to_mach(volatile void * address)
+{
+       return __pa(address) + (unsigned long) start_info.phys_base;
+}
+
+static inline void *mach_to_virt(unsigned long address)
+{
+        return __va(address) - (unsigned long) start_info.phys_base;
+}
+
 
 /*
  * Change "struct page" to physical address.

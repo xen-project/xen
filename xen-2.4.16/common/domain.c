@@ -402,8 +402,8 @@ extern module_t *mod;
 extern unsigned char *cmdline;
 int setup_guestos(struct task_struct *p, dom0_newdomain_t *params)
 {
-#define L2_PROT (_PAGE_PRESENT|_PAGE_RW|_PAGE_USER|_PAGE_ACCESSED)
-#define L1_PROT (_PAGE_PRESENT|_PAGE_RW|_PAGE_USER|_PAGE_ACCESSED|_PAGE_DIRTY)
+#define L1_PROT (_PAGE_PRESENT|_PAGE_RW|_PAGE_USER|_PAGE_ACCESSED)
+#define L2_PROT (_PAGE_PRESENT|_PAGE_RW|_PAGE_USER|_PAGE_ACCESSED|_PAGE_DIRTY)
 #define ALLOC_FRAME_FROM_DOMAIN() (alloc_address -= PAGE_SIZE)
     char *src, *dst;
     int i, dom = p->domain;

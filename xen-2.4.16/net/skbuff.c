@@ -180,8 +180,8 @@ static inline void dealloc_skb_data_page(struct sk_buff *skb)
         pf = skb->pf;
 
         spin_lock_irqsave(&free_list_lock, flags);
-
-        list_add_tail(&pf->list, &free_list);
+        
+        list_add(&pf->list, &free_list);
         free_pfns++;
 
         spin_unlock_irqrestore(&free_list_lock, flags);
@@ -213,6 +213,7 @@ struct sk_buff *alloc_zc_skb(unsigned int size,int gfp_mask)
         /* Get the DATA. Size must match skb_add_mtu(). */
         size = SKB_DATA_ALIGN(size);
         data = alloc_skb_data_page(skb);
+
         if (data == NULL)
                 goto nodata;
 
@@ -237,6 +238,7 @@ struct sk_buff *alloc_zc_skb(unsigned int size,int gfp_mask)
         atomic_set(&(skb_shinfo(skb)->dataref), 1);
         skb_shinfo(skb)->nr_frags = 0;
         skb_shinfo(skb)->frag_list = NULL;
+
         return skb;
 
 nodata:
@@ -381,6 +383,7 @@ static void skb_clone_fraglist(struct sk_buff *skb)
 
 static void skb_release_data(struct sk_buff *skb)
 {
+
 	if (!skb->cloned ||
 	    atomic_dec_and_test(&(skb_shinfo(skb)->dataref))) {
 		if (skb_shinfo(skb)->nr_frags) {
@@ -394,10 +397,9 @@ static void skb_release_data(struct sk_buff *skb)
 
                 if (skb->skb_type == SKB_NORMAL) {
 		    kfree(skb->head);
-                } else if (skb->skb_type == SKB_ZERO_COPY) {
-                    dealloc_skb_data_page(skb);
+                } else if (skb->skb_type == SKB_ZERO_COPY) {                    dealloc_skb_data_page(skb);
                 } else {
-                    printk("skb_release_data called with unknown skb type!\n");
+                    BUG(); //skb_release_data called with unknown skb type!
                 }
 	}
 }
@@ -436,6 +438,7 @@ void __kfree_skb(struct sk_buff *skb)
 		}
 		skb->destructor(skb);
 	}
+
 #ifdef CONFIG_NETFILTER
 	nf_conntrack_put(skb->nfct);
 #endif

@@ -119,5 +119,6 @@ int add_net_rule(net_rule_t *rule);
 
 #define RING_STATUS_OK               0  // Everything is gravy.
 #define RING_STATUS_ERR_CFU         -1  // Copy from user problems.
+#define RING_STATUS_BAD_PAGE        -2  // What they gave us was pure evil.
 
 #endif

@@ -42,7 +42,7 @@ typedef struct rx_shadow_entry_st {
 typedef struct net_shadow_ring_st {
     tx_shadow_entry_t *tx_ring;
     rx_shadow_entry_t *rx_ring;
-    unsigned int rx_prod;  // trying to add shadow pointers only as I need to.
+    unsigned int rx_prod, rx_cons, rx_idx;
 } net_shadow_ring_t;
 
 typedef struct net_vif_st {

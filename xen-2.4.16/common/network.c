@@ -78,7 +78,7 @@ net_vif_t *create_net_vif(int domain)
     if ((shadow_ring->tx_ring == NULL) || (shadow_ring->rx_ring == NULL))
             goto fail;
 
-    shadow_ring->rx_prod = 0;
+    shadow_ring->rx_prod = shadow_ring->rx_cons = shadow_ring->rx_idx = 0;
     
     // fill in the new vif struct.
     

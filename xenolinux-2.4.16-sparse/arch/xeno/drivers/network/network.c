@@ -192,9 +192,9 @@ static void network_alloc_rx_buffers(struct net_device *dev)
         skb = dev_alloc_skb(RX_BUF_SIZE);
         if ( skb == NULL ) break;
         skb->dev = dev;
-        skb_reserve(skb, 2); /* word align the IP header */
+        //skb_reserve(skb, 2); /* word align the IP header */
         np->rx_skb_ring[i] = skb;
-        np->net_ring->rx_ring[i].addr = (unsigned long)skb->data;
+        np->net_ring->rx_ring[i].addr = (unsigned long)skb->net_page->ppte; //data;
         np->net_ring->rx_ring[i].size = RX_BUF_SIZE - 16; /* arbitrary */
     }
 
@@ -276,10 +276,18 @@ static void network_rx_int(int irq, void *dev_id, struct pt_regs *ptregs)
  again:
     for ( i = np->rx_idx; i != np->net_ring->rx_cons; i = RX_RING_INC(i) )
     {
+        if (np->net_ring->rx_ring[i].status != RING_STATUS_OK)
+        {
+                printk("bad buffer on RX ring!(%d)\n", 
+                                np->net_ring->rx_ring[i].status);
+                continue;
+        }
         skb = np->rx_skb_ring[i];
+        
         skb_put(skb, np->net_ring->rx_ring[i].size);
         skb->protocol = eth_type_trans(skb, dev);
         np->stats.rx_packets++;
+
         np->stats.rx_bytes += np->net_ring->rx_ring[i].size;
         netif_rx(skb);
         dev->last_rx = jiffies;

@@ -59,7 +59,7 @@
 #include <net/tcp.h>
 #include <net/udp.h>
 #include <net/sock.h>
-
+#include <asm/io.h>
 #include <asm/uaccess.h>
 #include <asm/system.h>
 
@@ -246,19 +246,17 @@ void init_net_pages(unsigned long order_pages)
         {
                 np = net_page_table + i;
                 np->virt_addr = (unsigned long)net_page_chunk + (i * PAGE_SIZE);
-                
+
                 // now fill the pte pointer:
                 np->ppte = 0xdeadbeef;
                 pgd = pgd_offset_k(np->virt_addr);
-                if (!pgd_none(*pgd))
-                {
-                    pmd = pmd_offset(pgd, np->virt_addr);
-                    if (!pmd_none(*pmd))
-                    {
-                            ptep = pte_offset(pmd, np->virt_addr);
-                            np->ppte = (unsigned long)ptep; // neet to virt_to_phys this?
-                    }
-                }
+                if (pgd_none(*pgd) || pgd_bad(*pgd)) BUG();
+
+                if (pmd_none(*pmd)) BUG(); 
+                if (pmd_bad(*pmd)) BUG();
+
+                ptep = pte_offset(pmd, np->virt_addr);
+                np->ppte = (unsigned long)virt_to_mach(ptep);
 
                 list_add_tail(&np->list, &net_page_list);
         }
@@ -297,10 +295,11 @@ void free_net_page(struct net_page_info *np)
     
     spin_lock_irqsave(&net_page_list_lock, flags);
     
-    list_add_tail(&np->list, &net_page_list);
+    list_add(&np->list, &net_page_list);
     net_pages++;
 
     spin_unlock_irqrestore(&net_page_list_lock, flags);
+
 }
 
 struct sk_buff *alloc_zc_skb(unsigned int size,int gfp_mask)
@@ -427,12 +426,14 @@ static void skb_clone_fraglist(struct sk_buff *skb)
 
 static void skb_release_data(struct sk_buff *skb)
 {
-	if (!skb->cloned ||
+        if (!skb->cloned ||
 	    atomic_dec_and_test(&(skb_shinfo(skb)->dataref))) {
 		if (skb_shinfo(skb)->nr_frags) {
 			int i;
-			for (i = 0; i < skb_shinfo(skb)->nr_frags; i++)
+			for (i = 0; i < skb_shinfo(skb)->nr_frags; i++) 
+{
 				put_page(skb_shinfo(skb)->frags[i].page);
+}
 		}
 
 		if (skb_shinfo(skb)->frag_list)
@@ -445,6 +446,7 @@ static void skb_release_data(struct sk_buff *skb)
                     free_net_page(skb->net_page);
                 }
 	}
+
 }
 
 /*
