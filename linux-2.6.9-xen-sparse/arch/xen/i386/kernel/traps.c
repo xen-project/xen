@@ -1064,7 +1064,7 @@ void __init trap_init(void)
 	clear_page(&default_ldt[0]);
 	set_call_gate(&default_ldt[0],lcall7);
 	set_call_gate(&default_ldt[4],lcall27);
-	__make_page_readonly(&default_ldt[0]);
+	make_lowmem_page_readonly(&default_ldt[0]);
 	xen_flush_page_update_queue();
 
 	/*

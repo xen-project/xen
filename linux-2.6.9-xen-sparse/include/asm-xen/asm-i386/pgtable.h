@@ -465,61 +465,12 @@ do {				  					\
 } while (0)
 
 /* NOTE: make_page* callers must call flush_page_update_queue() */
-static inline void __make_page_readonly(void *va)
-{
-	pgd_t *pgd = pgd_offset_k((unsigned long)va);
-	pmd_t *pmd = pmd_offset(pgd, (unsigned long)va);
-	pte_t *pte = pte_offset_kernel(pmd, (unsigned long)va);
-	queue_l1_entry_update(pte, (*(unsigned long *)pte)&~_PAGE_RW);
-}
-
-static inline void __make_page_writable(void *va)
-{
-	pgd_t *pgd = pgd_offset_k((unsigned long)va);
-	pmd_t *pmd = pmd_offset(pgd, (unsigned long)va);
-	pte_t *pte = pte_offset_kernel(pmd, (unsigned long)va);
-	queue_l1_entry_update(pte, (*(unsigned long *)pte)|_PAGE_RW);
-}
-
-static inline void make_page_readonly(void *va)
-{
-	pgd_t *pgd = pgd_offset_k((unsigned long)va);
-	pmd_t *pmd = pmd_offset(pgd, (unsigned long)va);
-	pte_t *pte = pte_offset_kernel(pmd, (unsigned long)va);
-	queue_l1_entry_update(pte, (*(unsigned long *)pte)&~_PAGE_RW);
-	if ( (unsigned long)va >= VMALLOC_START )
-		__make_page_readonly(machine_to_virt(
-			*(unsigned long *)pte&PAGE_MASK));
-}
-
-static inline void make_page_writable(void *va)
-{
-	pgd_t *pgd = pgd_offset_k((unsigned long)va);
-	pmd_t *pmd = pmd_offset(pgd, (unsigned long)va);
-	pte_t *pte = pte_offset_kernel(pmd, (unsigned long)va);
-	queue_l1_entry_update(pte, (*(unsigned long *)pte)|_PAGE_RW);
-	if ( (unsigned long)va >= VMALLOC_START )
-		__make_page_writable(machine_to_virt(
-			*(unsigned long *)pte&PAGE_MASK));
-}
-
-static inline void make_pages_readonly(void *va, unsigned int nr)
-{
-	while ( nr-- != 0 )
-	{
-		make_page_readonly(va);
-		va = (void *)((unsigned long)va + PAGE_SIZE);
-	}
-}
-
-static inline void make_pages_writable(void *va, unsigned int nr)
-{
-	while ( nr-- != 0 )
-	{
-		make_page_writable(va);
-		va = (void *)((unsigned long)va + PAGE_SIZE);
-	}
-}
+void make_lowmem_page_readonly(void *va);
+void make_lowmem_page_writable(void *va);
+void make_page_readonly(void *va);
+void make_page_writable(void *va);
+void make_pages_readonly(void *va, unsigned int nr);
+void make_pages_writable(void *va, unsigned int nr);
 
 static inline unsigned long arbitrary_virt_to_phys(void *va)
 {

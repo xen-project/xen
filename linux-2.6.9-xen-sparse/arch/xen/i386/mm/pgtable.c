@@ -179,7 +179,7 @@ pte_t *pte_alloc_one_kernel(struct mm_struct *mm, unsigned long address)
 	pte_t *pte = (pte_t *)__get_free_page(GFP_KERNEL|__GFP_REPEAT);
 	if (pte) {
 		clear_page(pte);
-		__make_page_readonly(pte);
+		make_page_readonly(pte);
 		xen_flush_page_update_queue();
 	}
 	return pte;
@@ -192,7 +192,7 @@ void pte_ctor(void *pte, kmem_cache_t *cache, unsigned long unused)
 	set_page_count(page, 1);
 
 	clear_page(pte);
-	__make_page_readonly(pte);
+	make_page_readonly(pte);
 	queue_pte_pin(virt_to_phys(pte));
 	flush_page_update_queue();
 }
@@ -203,7 +203,7 @@ void pte_dtor(void *pte, kmem_cache_t *cache, unsigned long unused)
 	ClearPageForeign(page);
 
 	queue_pte_unpin(virt_to_phys(pte));
-	__make_page_writable(pte);
+	make_page_writable(pte);
 	flush_page_update_queue();
 }
 
@@ -304,7 +304,7 @@ void pgd_ctor(void *pgd, kmem_cache_t *cache, unsigned long unused)
 	spin_unlock_irqrestore(&pgd_lock, flags);
 	memset(pgd, 0, USER_PTRS_PER_PGD*sizeof(pgd_t));
  out:
-	__make_page_readonly(pgd);
+	make_page_readonly(pgd);
 	queue_pgd_pin(__pa(pgd));
 	flush_page_update_queue();
 }
@@ -315,7 +315,7 @@ void pgd_dtor(void *pgd, kmem_cache_t *cache, unsigned long unused)
 	unsigned long flags; /* can be called from interrupt context */
 
 	queue_pgd_unpin(__pa(pgd));
-	__make_page_writable(pgd);
+	make_page_writable(pgd);
 	flush_page_update_queue();
 
 	if (PTRS_PER_PMD > 1)
@@ -359,4 +359,72 @@ void pgd_free(pgd_t *pgd)
 			kmem_cache_free(pmd_cache, (void *)__va(pgd_val(pgd[i])-1));
 	/* in the non-PAE case, clear_page_tables() clears user pgd entries */
 	kmem_cache_free(pgd_cache, pgd);
+}
+
+void make_lowmem_page_readonly(void *va)
+{
+	pgd_t *pgd = pgd_offset_k((unsigned long)va);
+	pmd_t *pmd = pmd_offset(pgd, (unsigned long)va);
+	pte_t *pte = pte_offset_kernel(pmd, (unsigned long)va);
+	queue_l1_entry_update(pte, (*(unsigned long *)pte)&~_PAGE_RW);
+}
+
+void make_lowmem_page_writable(void *va)
+{
+	pgd_t *pgd = pgd_offset_k((unsigned long)va);
+	pmd_t *pmd = pmd_offset(pgd, (unsigned long)va);
+	pte_t *pte = pte_offset_kernel(pmd, (unsigned long)va);
+	queue_l1_entry_update(pte, (*(unsigned long *)pte)|_PAGE_RW);
+}
+
+void make_page_readonly(void *va)
+{
+	pgd_t *pgd = pgd_offset_k((unsigned long)va);
+	pmd_t *pmd = pmd_offset(pgd, (unsigned long)va);
+	pte_t *pte = pte_offset_kernel(pmd, (unsigned long)va);
+	queue_l1_entry_update(pte, (*(unsigned long *)pte)&~_PAGE_RW);
+	if ( (unsigned long)va >= (unsigned long)high_memory )
+	{
+		unsigned long phys;
+		phys = machine_to_phys(*(unsigned long *)pte & PAGE_MASK);
+#ifdef CONFIG_HIGHMEM
+		if ( (phys >> PAGE_SHIFT) < highstart_pfn )
+#endif
+			make_lowmem_page_readonly(phys_to_virt(phys));
+	}
+}
+
+void make_page_writable(void *va)
+{
+	pgd_t *pgd = pgd_offset_k((unsigned long)va);
+	pmd_t *pmd = pmd_offset(pgd, (unsigned long)va);
+	pte_t *pte = pte_offset_kernel(pmd, (unsigned long)va);
+	queue_l1_entry_update(pte, (*(unsigned long *)pte)|_PAGE_RW);
+	if ( (unsigned long)va >= (unsigned long)high_memory )
+	{
+		unsigned long phys;
+		phys = machine_to_phys(*(unsigned long *)pte & PAGE_MASK);
+#ifdef CONFIG_HIGHMEM
+		if ( (phys >> PAGE_SHIFT) < highstart_pfn )
+#endif
+			make_lowmem_page_writable(phys_to_virt(phys));
+	}
+}
+
+void make_pages_readonly(void *va, unsigned int nr)
+{
+	while ( nr-- != 0 )
+	{
+		make_page_readonly(va);
+		va = (void *)((unsigned long)va + PAGE_SIZE);
+	}
+}
+
+void make_pages_writable(void *va, unsigned int nr)
+{
+	while ( nr-- != 0 )
+	{
+		make_page_writable(va);
+		va = (void *)((unsigned long)va + PAGE_SIZE);
+	}
 }
