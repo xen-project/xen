@@ -170,6 +170,9 @@ static ssize_t dom_mem_read(struct file * file, char * buff, size_t size, loff_t
     prot = PAGE_SHARED; 
 
     /* remap the range using xen specific routines */
+
+	printk(KERN_ALERT "bd240 debug: dom_mem_read: %lx, %lx\n", mem_data->pfn << PAGE_SHIFT, mem_data->tot_pages << PAGE_SHIFT);
+
     addr = direct_mmap(mem_data->pfn << PAGE_SHIFT, mem_data->tot_pages << PAGE_SHIFT, prot, 0, 0);
     //addr = direct_mmap(mem_data->pfn, mem_data->tot_pages << PAGE_SHIFT, prot, 1, 
     //                mem_data->tot_pages);
@@ -216,6 +219,8 @@ static int dom_map_mem(unsigned int dom, unsigned long pfn, int tot_pages)
                 memdata->pfn = pfn;
                 memdata->tot_pages = tot_pages;
                 file->data = memdata;
+
+				printk(KERN_ALERT "bd240 debug: cmd setup dom mem: %lx, %d\n", memdata->pfn, memdata->tot_pages);
 
                 ret = 0;
                 break;
