@@ -940,6 +940,7 @@
 3e7f358awXBC3Vw-wFRwPw18qL1khg xen/common/string.c
 403a3edbejm33XLTGMuinKEwQBrOIg xen/common/trace.c
 3ddb79bd3zgV33PHdt-cgh3sxcb1hw xen/common/vsprintf.c
+4203fb92Qcy7mGpauBdq09J-WAqfoA xen/common/xmalloc.c
 3ddb79c0ppNeJtjC4va8j41ADCnchA xen/drivers/Makefile
 40715b2bi9gU43-cYzlmPDgreYQchw xen/drivers/acpi/Makefile
 40715b2bDxNCz5LFV8FAXihmYJZFUQ xen/drivers/acpi/acpi_ksyms.c

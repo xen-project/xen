@@ -6,8 +6,6 @@
  * Arch-specifics.
  */
 
-extern void domain_startofday(void);
-
 extern struct domain *arch_alloc_domain_struct(void);
 
 extern void arch_free_domain_struct(struct domain *d);
