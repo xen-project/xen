@@ -280,7 +280,7 @@ void pgd_dtor(void *pgd, kmem_cache_t *cache, unsigned long unused)
 	unsigned long flags; /* can be called from interrupt context */
 
 	queue_pgd_unpin(__pa(pgd));
-	__make_page_writeable(pgd);
+	__make_page_writable(pgd);
 	flush_page_update_queue();
 
 	if (PTRS_PER_PMD > 1)

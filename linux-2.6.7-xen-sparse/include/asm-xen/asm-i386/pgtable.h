@@ -281,7 +281,7 @@ static inline pte_t pte_modify(pte_t pte, pgprot_t newprot)
 #define pmd_clear(xp)	do {					\
 	pmd_t p = *(xp);					\
 	set_pmd(xp, __pmd(0));					\
-	__make_page_writeable((void *)pmd_page_kernel(p));	\
+	__make_page_writable((void *)pmd_page_kernel(p));	\
 	/* XXXcl queue */ \
 } while (0)
 
@@ -401,7 +401,7 @@ static inline void __make_page_readonly(void *va)
 	queue_l1_entry_update(pte, (*(unsigned long *)pte)&~_PAGE_RW);
 }
 
-static inline void __make_page_writeable(void *va)
+static inline void __make_page_writable(void *va)
 {
 	pgd_t *pgd = pgd_offset_k((unsigned long)va);
 	pmd_t *pmd = pmd_offset(pgd, (unsigned long)va);
@@ -421,14 +421,14 @@ static inline void make_page_readonly(void *va)
 	/* XXXcl queue */
 }
 
-static inline void make_page_writeable(void *va)
+static inline void make_page_writable(void *va)
 {
 	pgd_t *pgd = pgd_offset_k((unsigned long)va);
 	pmd_t *pmd = pmd_offset(pgd, (unsigned long)va);
 	pte_t *pte = pte_offset_kernel(pmd, (unsigned long)va);
 	queue_l1_entry_update(pte, (*(unsigned long *)pte)|_PAGE_RW);
 	if ( (unsigned long)va >= VMALLOC_START )
-		__make_page_writeable(machine_to_virt(
+		__make_page_writable(machine_to_virt(
 			*(unsigned long *)pte&PAGE_MASK));
 	/* XXXcl queue */
 }
@@ -443,11 +443,11 @@ static inline void make_pages_readonly(void *va, unsigned int nr)
 	/* XXXcl queue */
 }
 
-static inline void make_pages_writeable(void *va, unsigned int nr)
+static inline void make_pages_writable(void *va, unsigned int nr)
 {
 	while ( nr-- != 0 )
 	{
-		make_page_writeable(va);
+		make_page_writable(va);
 		va = (void *)((unsigned long)va + PAGE_SIZE);
 	}
 	/* XXXcl queue */

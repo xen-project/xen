@@ -718,8 +718,9 @@ ENTRY(hypercall_table)
         .long SYMBOL_NAME(do_xen_version)
         .long SYMBOL_NAME(do_console_io)
         .long SYMBOL_NAME(do_physdev_op)
-        .long SYMBOL_NAME(do_update_va_mapping_otherdomain) /* 20 */
+        .long SYMBOL_NAME(do_grant_table_op)     /* 20 */
         .long SYMBOL_NAME(do_vm_assist)
+        .long SYMBOL_NAME(do_update_va_mapping_otherdomain)
         .rept NR_hypercalls-((.-hypercall_table)/4)
         .long SYMBOL_NAME(do_ni_hypercall)
         .endr

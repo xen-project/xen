@@ -716,7 +716,7 @@ int construct_dom0(struct domain *p,
         
         page = &frame_table[mfn];
         set_bit(_PGC_tlb_flush_on_type_change, &page->u.inuse.count_info);
-        if ( !get_page_and_type(page, p, PGT_writeable_page) )
+        if ( !get_page_and_type(page, p, PGT_writable_page) )
             BUG();
 
         mfn++;

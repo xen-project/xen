@@ -65,8 +65,6 @@ struct domain *do_createdomain(domid_t dom_id, unsigned int cpu)
         strncpy(d->name, buf, MAX_DOMAIN_NAME);
         d->name[MAX_DOMAIN_NAME-1] = '\0';
 
-        d->addr_limit = USER_DS;
-        
 	arch_do_createdomain(d);
 
         sched_add_domain(d);

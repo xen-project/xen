@@ -357,7 +357,7 @@ long do_update_descriptor(
             goto out;
         break;
     default:
-        if ( unlikely(!get_page_type(page, PGT_writeable_page)) )
+        if ( unlikely(!get_page_type(page, PGT_writable_page)) )
             goto out;
         break;
     }

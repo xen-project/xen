@@ -109,8 +109,6 @@ struct domain
 
     struct mm_struct mm;
 
-    mm_segment_t addr_limit;
-
     struct thread_struct thread;
     struct domain *next_list, *next_hash;
 

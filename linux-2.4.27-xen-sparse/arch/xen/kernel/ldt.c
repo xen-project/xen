@@ -115,7 +115,7 @@ int init_new_context(struct task_struct *tsk, struct mm_struct *mm)
 void destroy_context(struct mm_struct *mm)
 {
 	if (mm->context.size) {
-		make_pages_writeable(
+		make_pages_writable(
 			mm->context.ldt, 
 			(mm->context.size*LDT_ENTRY_SIZE)/PAGE_SIZE);
 		flush_page_update_queue();

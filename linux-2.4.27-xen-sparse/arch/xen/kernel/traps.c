@@ -648,7 +648,7 @@ void __init trap_init(void)
  * ensures this end result (blow away the selector value) without the dangers
  * of the normal page-fault handler.
  * 
- * NB. Perhaps this can all go away after we have implemented writeable
+ * NB. Perhaps this can all go away after we have implemented writable
  * page tables. :-)
  */
 

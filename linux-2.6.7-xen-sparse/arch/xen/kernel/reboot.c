@@ -98,7 +98,7 @@ static void __do_suspend(void)
 			 VMASST_TYPE_4gb_segments);
 #ifdef CONFIG_XEN_WRITABLE_PAGETABLES
     HYPERVISOR_vm_assist(VMASST_CMD_enable,
-			 VMASST_TYPE_writeable_pagetables);
+			 VMASST_TYPE_writable_pagetables);
 #endif
 
     shutting_down = -1; 

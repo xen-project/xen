@@ -23,6 +23,10 @@ static long alloc_dom_mem(struct domain *d,
     struct pfn_info *page;
     unsigned long    i;
 
+    if ( unlikely(!access_ok(VERIFY_WRITE, extent_list, 
+                             nr_extents*sizeof(*extent_list))) )
+        return 0;
+
     if ( (extent_order != 0) && !IS_CAPABLE_PHYSDEV(current) )
     {
         DPRINTK("Only I/O-capable domains may allocate > order-0 memory.\n");
@@ -38,7 +42,7 @@ static long alloc_dom_mem(struct domain *d,
         }
 
         /* Inform the domain of the new page's machine address. */ 
-        if ( unlikely(put_user(page_to_pfn(page), &extent_list[i]) != 0) )
+        if ( unlikely(__put_user(page_to_pfn(page), &extent_list[i]) != 0) )
             return i;
     }
 
@@ -53,9 +57,13 @@ static long free_dom_mem(struct domain *d,
     struct pfn_info *page;
     unsigned long    i, j, mpfn;
 
+    if ( unlikely(!access_ok(VERIFY_READ, extent_list, 
+                             nr_extents*sizeof(*extent_list))) )
+        return 0;
+
     for ( i = 0; i < nr_extents; i++ )
     {
-        if ( unlikely(get_user(mpfn, &extent_list[i]) != 0) )
+        if ( unlikely(__get_user(mpfn, &extent_list[i]) != 0) )
             return i;
 
         for ( j = 0; j < (1 << extent_order); j++ )
