@@ -134,6 +134,7 @@
 3e20b82fl1jmQiKdLy7fxMcutfpjWA xen-2.4.16/include/asm-i386/domain_page.h
 3ddb79c2O729EttZTYu1c8LcsUO_GQ xen-2.4.16/include/asm-i386/elf.h
 3ddb79c3NU8Zy40OTrq3D-i30Y3t4A xen-2.4.16/include/asm-i386/fixmap.h
+3e2d29944GI24gf7vOP_7x8EyuqxeA xen-2.4.16/include/asm-i386/flushtlb.h
 3ddb79c39o75zPP0T1aQQ4mNrCAN2w xen-2.4.16/include/asm-i386/hardirq.h
 3ddb79c3BFEIwXR4IsWbwp4BoL4DkA xen-2.4.16/include/asm-i386/hdreg.h
 3ddb79c3TMDjkxVndKFKnGiwY0HzDg xen-2.4.16/include/asm-i386/i387.h

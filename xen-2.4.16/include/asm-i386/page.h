@@ -91,36 +91,36 @@ typedef struct { unsigned long pt_lo; } pagetable_t;
 #include <asm/processor.h>
 #include <asm/fixmap.h>
 #include <asm/bitops.h>
+#include <asm/flushtlb.h>
 
 extern l2_pgentry_t idle0_pg_table[ENTRIES_PER_L2_PAGETABLE];
 extern l2_pgentry_t *idle_pg_table[NR_CPUS];
 extern void paging_init(void);
 
-#define __flush_tlb()							\
-	do {								\
-		unsigned int tmpreg;					\
-									\
-		__asm__ __volatile__(					\
-			"movl %%cr3, %0;  # flush TLB \n"		\
-			"movl %0, %%cr3;              \n"		\
-			: "=r" (tmpreg)					\
-			:: "memory");					\
-	} while (0)
+#define __flush_tlb() __flush_tlb_counted()
 
 /* Flush global pages as well. */
+
+#define __pge_off()                                                     \
+        do {                                                            \
+                __asm__ __volatile__(                                   \
+                        "movl %0, %%cr4;  # turn off PGE     "          \
+                        :: "r" (mmu_cr4_features & ~X86_CR4_PGE));      \
+        } while (0)
+
+#define __pge_on()                                                      \
+        do {                                                            \
+                __asm__ __volatile__(                                   \
+                        "movl %0, %%cr4;  # turn off PGE     "          \
+                        :: "r" (mmu_cr4_features));                     \
+        } while (0)
+
+
 #define __flush_tlb_all()						\
 	do {								\
-		unsigned int tmpreg;					\
-									\
-		__asm__ __volatile__(					\
-			"movl %1, %%cr4;  # turn off PGE     \n"	\
-			"movl %%cr3, %0;  # flush TLB        \n"	\
-			"movl %0, %%cr3;                     \n"	\
-			"movl %2, %%cr4;  # turn PGE back on \n"	\
-			: "=&r" (tmpreg)				\
-			: "r" (mmu_cr4_features & ~X86_CR4_PGE),	\
-			  "r" (mmu_cr4_features)			\
-			: "memory");					\
+                __pge_off();                                            \
+		__flush_tlb_counted();					\
+                __pge_on();                                             \
 	} while (0)
 
 #define __flush_tlb_one(__addr) \

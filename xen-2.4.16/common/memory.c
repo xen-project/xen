@@ -171,6 +171,7 @@
 #include <xeno/sched.h>
 #include <xeno/errno.h>
 #include <asm/page.h>
+#include <asm/flushtlb.h>
 #include <asm/io.h>
 #include <asm/uaccess.h>
 #include <asm/domain_page.h>
@@ -766,9 +767,7 @@ int do_process_page_updates(page_update_request_t *updates, int count)
     if ( tlb_flush[smp_processor_id()] )
     {
         tlb_flush[smp_processor_id()] = 0;
-        __asm__ __volatile__ (
-            "movl %%eax,%%cr3" : : 
-            "a" (pagetable_val(current->mm.pagetable)));
+        __write_cr3_counted(pagetable_val(current->mm.pagetable));
     }
 
     return(0);

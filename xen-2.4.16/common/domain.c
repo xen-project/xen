@@ -11,6 +11,7 @@
 #include <xeno/dom0_ops.h>
 #include <asm/io.h>
 #include <asm/domain_page.h>
+#include <asm/flushtlb.h>
 
 rwlock_t tasklist_lock __cacheline_aligned = RW_LOCK_UNLOCKED;
 
@@ -581,8 +582,7 @@ int setup_guestos(struct task_struct *p, dom0_newdomain_t *params)
 
     /* Install the new page tables. */
     __cli();
-    __asm__ __volatile__ (
-        "mov %%eax,%%cr3" : : "a" (pagetable_val(p->mm.pagetable)));
+    __write_cr3_counted(pagetable_val(p->mm.pagetable));
 
     /* Copy the guest OS image. */
     src = (char *)__va(mod[0].mod_start + 12);
@@ -657,8 +657,7 @@ int setup_guestos(struct task_struct *p, dom0_newdomain_t *params)
     }
 
     /* Reinstate the caller's page tables. */
-    __asm__ __volatile__ (
-        "mov %%eax,%%cr3" : : "a" (pagetable_val(current->mm.pagetable)));    
+    __write_cr3_counted(pagetable_val(current->mm.pagetable));
     __sti();
 
     new_thread(p, 
