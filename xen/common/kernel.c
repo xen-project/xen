@@ -396,12 +396,20 @@ long do_ni_hypercall(void)
 
 #ifndef NDEBUG
 
-static int crit_count[NR_CPUS];
-static int crit_checking = 1;
+static int crit_count[NR_CPUS], crit_checking_disabled[NR_CPUS];
 
 void disable_criticalregion_checking(void)
 {
-    crit_checking = 0;
+    int cpu = smp_processor_id();
+    ASSERT(crit_checking_disabled[cpu] >= 0);
+    crit_checking_disabled[cpu]++;
+}
+
+void enable_criticalregion_checking(void)
+{
+    int cpu = smp_processor_id();
+    crit_checking_disabled[cpu]--;
+    ASSERT(crit_checking_disabled[cpu] >= 0);
 }
 
 void criticalregion_enter(void)
@@ -421,7 +429,7 @@ void criticalregion_exit(void)
 void ASSERT_no_criticalregion(void)
 {
     int cpu = smp_processor_id();
-    if ( (crit_count[cpu] == 0) || !crit_checking )
+    if ( (crit_count[cpu] == 0) || crit_checking_disabled[cpu] )
         return;
     disable_criticalregion_checking();
     ASSERT(crit_count[cpu] >= 0); /* -ve count is a special kind of bogus! */
