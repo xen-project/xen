@@ -148,6 +148,8 @@ static void create_proc_dom_entries(int dom)
 static ssize_t dom_mem_write(struct file * file, const char * buff, 
 	size_t size , loff_t * off)
 {
+	printk(KERN_ALERT "bd240 debug: dom_mem_write invoked!\n");
+
     unsigned long addr;
     proc_memdata_t * mem_data = (proc_memdata_t *)((struct proc_dir_entry *)file->f_dentry->d_inode->u.generic_ip)->data;
     
