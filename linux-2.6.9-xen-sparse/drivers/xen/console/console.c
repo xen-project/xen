@@ -658,6 +658,8 @@ const struct consw xennull_con = {
 
 static int __init xencons_init(void)
 {
+    int rc;
+
     if ( xc_mode == XC_OFF )
         return 0;
 
@@ -713,9 +715,12 @@ static int __init xencons_init(void)
     xencons_driver.wait_until_sent = xencons_wait_until_sent;
 #endif
 
-    if ( tty_register_driver(DRV(xencons_driver)) )
-        panic("Couldn't register Xen virtual console driver as %s\n",
-              DRV(xencons_driver)->name);
+    if ( (rc = tty_register_driver(DRV(xencons_driver))) != 0 )
+    {
+        printk("Couldn't register Xen virtual console driver as %s\n",
+               DRV(xencons_driver)->name);
+        return rc;
+    }
 
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,0)
     tty_register_device(xencons_driver, 0, NULL);
