@@ -90,7 +90,7 @@ void continue_cpu_idle_loop(void)
 void startup_cpu_idle_loop(void)
 {
     /* Just some sanity to ensure that the scheduler is set up okay. */
-    ASSERT(current->domain == IDLE_DOMAIN_ID);
+    ASSERT(current->id == IDLE_DOMAIN_ID);
     domain_unpause_by_systemcontroller(current);
     __enter_scheduler();
 
@@ -595,7 +595,7 @@ int construct_dom0(struct domain *p,
     extern void physdev_init_dom0(struct domain *);
 
     /* Sanity! */
-    if ( p->domain != 0 ) 
+    if ( p->id != 0 ) 
         BUG();
     if ( test_bit(DF_CONSTRUCTED, &p->flags) ) 
         BUG();

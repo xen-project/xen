@@ -398,7 +398,7 @@ struct pfn_info *alloc_domheap_pages(struct domain *d, int order)
          unlikely((d->tot_pages + (1 << order)) > d->max_pages) )
     {
         DPRINTK("Over-allocation for domain %u: %u > %u\n",
-                d->domain, d->tot_pages + (1 << order), d->max_pages);
+                d->id, d->tot_pages + (1 << order), d->max_pages);
         DPRINTK("...or the domain is dying (%d)\n", 
                 !!test_bit(DF_DYING, &d->flags));
         spin_unlock(&d->page_alloc_lock);

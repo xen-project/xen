@@ -220,7 +220,7 @@ int domain_iomem_in_pfn(struct domain *p, unsigned long pfn)
     struct list_head *l;
 
     VERBOSE_INFO("Checking if physdev-capable domain %u needs access to "
-                 "pfn %08lx\n", p->domain, pfn);
+                 "pfn %08lx\n", p->id, pfn);
     
     spin_lock(&p->pcidev_lock);
 
@@ -248,7 +248,7 @@ int domain_iomem_in_pfn(struct domain *p, unsigned long pfn)
     spin_unlock(&p->pcidev_lock);
 
     VERBOSE_INFO("Domain %u %s mapping of pfn %08lx\n",
-                 p->domain, ret ? "allowed" : "disallowed", pfn);
+                 p->id, ret ? "allowed" : "disallowed", pfn);
 
     return ret;
 }
@@ -331,7 +331,7 @@ static int do_base_address_access(phys_dev_t *pdev, int acc, int idx,
          * anyway if this write fails.  Hopefully the printk will give us a
          * clue what went wrong. */
         INFO("Guest %u attempting sub-dword %s to BASE_ADDRESS %d\n",
-             pdev->owner->domain, (acc == ACC_READ) ? "read" : "write", idx);
+             pdev->owner->id, (acc == ACC_READ) ? "read" : "write", idx);
         
         return -EPERM;
     }

@@ -35,8 +35,8 @@ struct domain *do_createdomain(domid_t dom_id, unsigned int cpu)
 
     shadow_lock_init(d);
 
-    d->domain    = dom_id;
-    d->processor = cpu;
+    d->id          = dom_id;
+    d->processor   = cpu;
     d->create_time = NOW();
  
     memcpy(&d->thread, &idle0_task.thread, sizeof(d->thread));
@@ -49,7 +49,7 @@ struct domain *do_createdomain(domid_t dom_id, unsigned int cpu)
     spin_lock_init(&d->pcidev_lock);
     INIT_LIST_HEAD(&d->pcidev_list);
 
-    if ( d->domain != IDLE_DOMAIN_ID )
+    if ( d->id != IDLE_DOMAIN_ID )
     {
         if ( (init_event_channels(d) != 0) || (grant_table_create(d) != 0) )
         {
@@ -65,7 +65,7 @@ struct domain *do_createdomain(domid_t dom_id, unsigned int cpu)
         write_lock_irqsave(&tasklist_lock, flags);
         pd = &task_list; /* NB. task_list is maintained in order of dom_id. */
         for ( pd = &task_list; *pd != NULL; pd = &(*pd)->next_list )
-            if ( (*pd)->domain > d->domain )
+            if ( (*pd)->id > d->id )
                 break;
         d->next_list = *pd;
         *pd = d;
@@ -91,7 +91,7 @@ struct domain *find_domain_by_id(domid_t dom)
     d = task_hash[TASK_HASH(dom)];
     while ( d != NULL )
     {
-        if ( d->domain == dom )
+        if ( d->id == dom )
         {
             if ( unlikely(!get_domain(d)) )
                 d = NULL;
@@ -144,7 +144,7 @@ void domain_crash(void)
 {
     struct domain *d;
 
-    if ( current->domain == 0 )
+    if ( current->id == 0 )
         BUG();
 
     set_bit(DF_CRASHED, &current->flags);
@@ -161,7 +161,7 @@ void domain_shutdown(u8 reason)
 {
     struct domain *d;
 
-    if ( current->domain == 0 )
+    if ( current->id == 0 )
     {
         extern void machine_restart(char *);
         extern void machine_halt(void);
@@ -212,7 +212,7 @@ unsigned int alloc_new_dom_mem(struct domain *d, unsigned int kbytes)
         {
             /* Initialise with magic marker if in DEBUG mode. */
             void *a = map_domain_mem((page-frame_table)<<PAGE_SHIFT);
-            memset(a, 0x80 | (char)d->domain, PAGE_SIZE);
+            memset(a, 0x80 | (char)d->id, PAGE_SIZE);
             unmap_domain_mem(a);
         }
 #endif
@@ -239,7 +239,7 @@ void domain_destruct(struct domain *d)
     if ( _atomic_read(old) != 0 )
         return;
 
-    DPRINTK("Releasing task %u\n", d->domain);
+    DPRINTK("Releasing task %u\n", d->id);
 
     /* Delete from task list and task hashtable. */
     write_lock_irqsave(&tasklist_lock, flags);
@@ -247,7 +247,7 @@ void domain_destruct(struct domain *d)
     while ( *pd != d ) 
         pd = &(*pd)->next_list;
     *pd = d->next_list;
-    pd = &task_hash[TASK_HASH(d->domain)];
+    pd = &task_hash[TASK_HASH(d->id)];
     while ( *pd != d ) 
         pd = &(*pd)->next_hash;
     *pd = d->next_hash;

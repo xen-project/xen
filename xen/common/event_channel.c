@@ -78,9 +78,9 @@ static long evtchn_bind_interdomain(evtchn_bind_interdomain_t *bind)
         return -EPERM;
 
     if ( dom1 == DOMID_SELF )
-        dom1 = current->domain;
+        dom1 = current->id;
     if ( dom2 == DOMID_SELF )
-        dom2 = current->domain;
+        dom2 = current->id;
 
     if ( ((d1 = find_domain_by_id(dom1)) == NULL) ||
          ((d2 = find_domain_by_id(dom2)) == NULL) )
@@ -119,12 +119,12 @@ static long evtchn_bind_interdomain(evtchn_bind_interdomain_t *bind)
         goto out;
     }
 
-    d1->event_channel[port1].u.remote.dom  = d2;
-    d1->event_channel[port1].u.remote.port = (u16)port2;
+    d1->event_channel[port1].u.interdomain.remote_dom  = d2;
+    d1->event_channel[port1].u.interdomain.remote_port = (u16)port2;
 
-    d2->event_channel[port2].u.remote.dom  = d1;
-    d2->event_channel[port2].u.remote.port = (u16)port1;
-    d2->event_channel[port2].state         = ECS_INTERDOMAIN;
+    d2->event_channel[port2].u.interdomain.remote_dom  = d1;
+    d2->event_channel[port2].u.interdomain.remote_port = (u16)port1;
+    d2->event_channel[port2].state                     = ECS_INTERDOMAIN;
 
  out:
     spin_unlock(&d1->event_channel_lock);
@@ -254,7 +254,7 @@ static long __evtchn_close(struct domain *d1, int port1)
     case ECS_INTERDOMAIN:
         if ( d2 == NULL )
         {
-            d2 = chn1[port1].u.remote.dom;
+            d2 = chn1[port1].u.interdomain.remote_dom;
 
             /* If we unlock d1 then we could lose d2. Must get a reference. */
             if ( unlikely(!get_domain(d2)) )
@@ -278,20 +278,20 @@ static long __evtchn_close(struct domain *d1, int port1)
                 goto again;
             }
         }
-        else if ( d2 != chn1[port1].u.remote.dom )
+        else if ( d2 != chn1[port1].u.interdomain.remote_dom )
         {
             rc = -EINVAL;
             goto out;
         }
     
         chn2  = d2->event_channel;
-        port2 = chn1[port1].u.remote.port;
+        port2 = chn1[port1].u.interdomain.remote_port;
 
         if ( port2 >= d2->max_event_channel )
             BUG();
         if ( chn2[port2].state != ECS_INTERDOMAIN )
             BUG();
-        if ( chn2[port2].u.remote.dom != d1 )
+        if ( chn2[port2].u.interdomain.remote_dom != d1 )
             BUG();
 
         chn2[port2].state = ECS_UNBOUND;
@@ -324,7 +324,7 @@ static long evtchn_close(evtchn_close_t *close)
     domid_t        dom = close->dom;
 
     if ( dom == DOMID_SELF )
-        dom = current->domain;
+        dom = current->id;
     else if ( !IS_PRIV(current) )
         return -EPERM;
 
@@ -353,8 +353,8 @@ static long evtchn_send(int lport)
         return -EINVAL;
     }
 
-    rd    = ld->event_channel[lport].u.remote.dom;
-    rport = ld->event_channel[lport].u.remote.port;
+    rd    = ld->event_channel[lport].u.interdomain.remote_dom;
+    rport = ld->event_channel[lport].u.interdomain.remote_port;
 
     evtchn_set_pending(rd, rport);
 
@@ -373,7 +373,7 @@ static long evtchn_status(evtchn_status_t *status)
     long             rc = 0;
 
     if ( dom == DOMID_SELF )
-        dom = current->domain;
+        dom = current->id;
     else if ( !IS_PRIV(current) )
         return -EPERM;
 
@@ -400,8 +400,8 @@ static long evtchn_status(evtchn_status_t *status)
         break;
     case ECS_INTERDOMAIN:
         status->status = EVTCHNSTAT_interdomain;
-        status->u.interdomain.dom  = chn[port].u.remote.dom->domain;
-        status->u.interdomain.port = chn[port].u.remote.port;
+        status->u.interdomain.dom  = chn[port].u.interdomain.remote_dom->id;
+        status->u.interdomain.port = chn[port].u.interdomain.remote_port;
         break;
     case ECS_PIRQ:
         status->status = EVTCHNSTAT_pirq;

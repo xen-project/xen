@@ -104,7 +104,7 @@
 #ifdef VERBOSE
 #define MEM_LOG(_f, _a...)                           \
   printk("DOM%u: (file=memory.c, line=%d) " _f "\n", \
-         current->domain , __LINE__ , ## _a )
+         current->id , __LINE__ , ## _a )
 #else
 #define MEM_LOG(_f, _a...) ((void)0)
 #endif
@@ -174,7 +174,7 @@ void arch_init_memory(void)
      */
     dom_xen = alloc_domain_struct();
     atomic_set(&dom_xen->refcnt, 1);
-    dom_xen->domain = DOMID_XEN;
+    dom_xen->id = DOMID_XEN;
 
     /*
      * Initialise our DOMID_IO domain.
@@ -183,7 +183,7 @@ void arch_init_memory(void)
      */
     dom_io = alloc_domain_struct();
     atomic_set(&dom_io->refcnt, 1);
-    dom_io->domain = DOMID_IO;
+    dom_io->id = DOMID_IO;
 
     /* M2P table is mappable read-only by privileged domains. */
     for ( mfn = virt_to_phys(&machine_to_phys_mapping[0<<20])>>PAGE_SHIFT;
@@ -1071,7 +1071,7 @@ static int do_extended_command(unsigned long ptr, unsigned long val)
                 percpu_info[cpu].foreign = dom_io;
                 break;
             default:
-                MEM_LOG("Dom %u cannot set foreign dom\n", d->domain);
+                MEM_LOG("Dom %u cannot set foreign dom\n", d->id);
                 okay = 0;
                 break;
             }
@@ -1130,7 +1130,7 @@ static int do_extended_command(unsigned long ptr, unsigned long val)
             {
                 MEM_LOG("Bad page values %08lx: ed=%p(%u), sd=%p,"
                         " caf=%08x, taf=%08x\n", page_to_pfn(page),
-                        d, d->domain, nd, x, page->u.inuse.type_info);
+                        d, d->id, nd, x, page->u.inuse.type_info);
                 spin_unlock(&d->page_alloc_lock);
                 put_domain(e);
                 return 0;
@@ -1189,7 +1189,7 @@ static int do_extended_command(unsigned long ptr, unsigned long val)
     case MMUEXT_REASSIGN_PAGE:
         if ( unlikely(!IS_PRIV(d)) )
         {
-            MEM_LOG("Dom %u has no reassignment priv", d->domain);
+            MEM_LOG("Dom %u has no reassignment priv", d->id);
             okay = 0;
             break;
         }
@@ -1242,7 +1242,7 @@ static int do_extended_command(unsigned long ptr, unsigned long val)
             {
                 MEM_LOG("Bad page values %08lx: ed=%p(%u), sd=%p,"
                         " caf=%08x, taf=%08x\n", page_to_pfn(page),
-                        d, d->domain, nd, x, page->u.inuse.type_info);
+                        d, d->id, nd, x, page->u.inuse.type_info);
                 okay = 0;
                 goto reassign_fail;
             }
@@ -1887,7 +1887,7 @@ void audit_domain(struct domain *d)
                 /* This will only come out once. */
                 printk("Audit %d: type count whent below zero pfn=%x "
                        "taf=%x otaf=%x\n",
-                       d->domain, page-frame_table,
+                       d->id, page-frame_table,
                        page->u.inuse.type_info,
                        page->tlbflush_timestamp);
             }
@@ -1904,7 +1904,7 @@ void audit_domain(struct domain *d)
             /* This will only come out once. */
             printk("Audit %d: general count whent below zero pfn=%x "
                    "taf=%x otaf=%x\n",
-                   d->domain, page-frame_table,
+                   d->id, page-frame_table,
                    page->u.inuse.type_info,
                    page->tlbflush_timestamp);
         }
@@ -1937,7 +1937,7 @@ void audit_domain(struct domain *d)
                     if ( (pt[i] & _PAGE_PRESENT) &&
                          ((pt[i] >> PAGE_SHIFT) == xpfn) )
                         printk("     found dom=%d i=%x pfn=%lx t=%x c=%x\n",
-                               d->domain, i, pfn, page->u.inuse.type_info,
+                               d->id, i, pfn, page->u.inuse.type_info,
                                page->count_info);
                 unmap_domain_mem(pt);           
             }
@@ -2032,11 +2032,11 @@ void audit_domain(struct domain *d)
 
             if ( (page->u.inuse.type_info & PGT_validated) != PGT_validated )
                 printk("Audit %d: L2 not validated %x\n",
-                       d->domain, page->u.inuse.type_info);
+                       d->id, page->u.inuse.type_info);
 
             if ( (page->u.inuse.type_info & PGT_pinned) != PGT_pinned )
                 printk("Audit %d: L2 not pinned %x\n",
-                       d->domain, page->u.inuse.type_info);
+                       d->id, page->u.inuse.type_info);
             else
                 adjust( page, -1, 1 );
            
@@ -2059,14 +2059,14 @@ void audit_domain(struct domain *d)
                     if ( (l1page->u.inuse.type_info & PGT_type_mask) ==
                          PGT_l2_page_table )
                         printk("Audit %d: [%x] Found %s Linear PT "
-                               "t=%x pfn=%lx\n", d->domain, i, 
+                               "t=%x pfn=%lx\n", d->id, i, 
                                (l1pfn==pfn) ? "Self" : "Other",
                                l1page->u.inuse.type_info,
                                l1pfn);
                     else if ( (l1page->u.inuse.type_info & PGT_type_mask) !=
                               PGT_l1_page_table )
                         printk("Audit %d: [%x] Expected L1 t=%x pfn=%lx\n",
-                               d->domain, i,
+                               d->id, i,
                                l1page->u.inuse.type_info,
                                l1pfn);
 
@@ -2086,11 +2086,11 @@ void audit_domain(struct domain *d)
 
             if ( (page->u.inuse.type_info & PGT_validated) != PGT_validated )
                 printk("Audit %d: L1 not validated %x\n",
-                       d->domain, page->u.inuse.type_info);
+                       d->id, page->u.inuse.type_info);
 #if 0
             if ( (page->u.inuse.type_info & PGT_pinned) != PGT_pinned )
                 printk("Audit %d: L1 not pinned %x\n",
-                       d->domain, page->u.inuse.type_info);
+                       d->id, page->u.inuse.type_info);
 #endif
             pt = map_domain_mem( pfn<<PAGE_SHIFT );
 
@@ -2121,7 +2121,7 @@ void audit_domain(struct domain *d)
                              (l1page->u.inuse.type_info & PGT_type_mask) ==
                              PGT_l2_page_table )
                             printk("Audit %d: [%x] Ilegal RW t=%x pfn=%lx\n",
-                                   d->domain, i,
+                                   d->id, i,
                                    l1page->u.inuse.type_info,
                                    l1pfn);
 
@@ -2131,7 +2131,7 @@ void audit_domain(struct domain *d)
                     {
                         printk("Audit %d: [%lx,%x] Skip foreign page dom=%lx "
                                "pfn=%lx c=%08x t=%08x m2p=%lx\n",
-                               d->domain, pfn, i,
+                               d->id, pfn, i,
                                (unsigned long)l1page->u.inuse.domain,
                                l1pfn,
                                l1page->count_info,
@@ -2154,7 +2154,7 @@ void audit_domain(struct domain *d)
 
     if ( (io_mappings > 0) || (lowmem_mappings > 0) )
         printk("Audit %d: Found %d lowmem mappings and %d io mappings\n",
-               d->domain, lowmem_mappings, io_mappings);
+               d->id, lowmem_mappings, io_mappings);
 
     /* PHASE 2 */
 
@@ -2172,7 +2172,7 @@ void audit_domain(struct domain *d)
             if ( (page->u.inuse.type_info & PGT_count_mask) != 0 )
             {
                 printk("Audit %d: type count!=0 t=%x ot=%x c=%x pfn=%lx\n",
-                       d->domain, page->u.inuse.type_info, 
+                       d->id, page->u.inuse.type_info, 
                        page->tlbflush_timestamp,
                        page->count_info, pfn );
                 scan_for_pfn_remote(pfn);
@@ -2181,7 +2181,7 @@ void audit_domain(struct domain *d)
             if ( (page->count_info & PGC_count_mask) != 1 )
             {
                 printk("Audit %d: gen count!=1 (c=%x) t=%x ot=%x pfn=%lx\n",
-                       d->domain, 
+                       d->id, 
                        page->count_info,
                        page->u.inuse.type_info, 
                        page->tlbflush_timestamp, pfn );
@@ -2260,7 +2260,7 @@ void audit_domain(struct domain *d)
 
     adjust(&frame_table[pagetable_val(d->mm.pagetable)>>PAGE_SHIFT], 1, 1);
 
-    printk("Audit %d: Done. ctot=%d ttot=%d\n",d->domain, ctot, ttot );
+    printk("Audit %d: Done. ctot=%d ttot=%d\n", d->id, ctot, ttot );
 
     if ( d != current )
         domain_unpause(d);

@@ -62,7 +62,7 @@ struct shadow_status {
 #ifdef VERBOSE
 #define SH_LOG(_f, _a...)                             \
 printk("DOM%u: (file=shadow.c, line=%d) " _f "\n",    \
-       current->domain , __LINE__ , ## _a )
+       current->id , __LINE__ , ## _a )
 #else
 #define SH_LOG(_f, _a...) 
 #endif
@@ -70,7 +70,7 @@ printk("DOM%u: (file=shadow.c, line=%d) " _f "\n",    \
 #if SHADOW_DEBUG
 #define SH_VLOG(_f, _a...)                             \
     printk("DOM%u: (file=shadow.c, line=%d) " _f "\n", \
-           current->domain , __LINE__ , ## _a )
+           current->id , __LINE__ , ## _a )
 #else
 #define SH_VLOG(_f, _a...) 
 #endif
@@ -78,7 +78,7 @@ printk("DOM%u: (file=shadow.c, line=%d) " _f "\n",    \
 #if 0
 #define SH_VVLOG(_f, _a...)                             \
     printk("DOM%u: (file=shadow.c, line=%d) " _f "\n",  \
-           current->domain , __LINE__ , ## _a )
+           current->id , __LINE__ , ## _a )
 #else
 #define SH_VVLOG(_f, _a...) 
 #endif

@@ -127,7 +127,7 @@ void sched_add_domain(struct domain *d)
     /* Must be unpaused by control software to start execution. */
     set_bit(DF_CTRLPAUSE, &d->flags);
 
-    if ( d->domain != IDLE_DOMAIN_ID )
+    if ( d->id != IDLE_DOMAIN_ID )
     {
         /* Initialise the per-domain timer. */
         init_ac_timer(&d->timer);
@@ -142,14 +142,14 @@ void sched_add_domain(struct domain *d)
 
     SCHED_OP(add_task, d);
 
-    TRACE_2D(TRC_SCHED_DOM_ADD, d->domain, d);
+    TRACE_2D(TRC_SCHED_DOM_ADD, d->id, d);
 }
 
 void sched_rem_domain(struct domain *d) 
 {
     rem_ac_timer(&d->timer);
     SCHED_OP(rem_task, d);
-    TRACE_2D(TRC_SCHED_DOM_REM, d->domain, d);
+    TRACE_2D(TRC_SCHED_DOM_REM, d->id, d);
 }
 
 void init_idle_task(void)
@@ -185,7 +185,7 @@ void domain_wake(struct domain *d)
 
     if ( likely(domain_runnable(d)) )
     {
-        TRACE_2D(TRC_SCHED_WAKE, d->domain, d);
+        TRACE_2D(TRC_SCHED_WAKE, d->id, d);
         SCHED_OP(wake, d);
 #ifdef WAKE_HISTO
         d->wokenup = NOW();
@@ -200,10 +200,10 @@ void domain_wake(struct domain *d)
 /* Block the currently-executing domain until a pertinent event occurs. */
 long do_block(void)
 {
-    ASSERT(current->domain != IDLE_DOMAIN_ID);
+    ASSERT(current->id != IDLE_DOMAIN_ID);
     current->shared_info->vcpu_data[0].evtchn_upcall_mask = 0;
     set_bit(DF_BLOCKED, &current->flags);
-    TRACE_2D(TRC_SCHED_BLOCK, current->domain, current);
+    TRACE_2D(TRC_SCHED_BLOCK, current->id, current);
     __enter_scheduler();
     return 0;
 }
@@ -211,7 +211,7 @@ long do_block(void)
 /* Voluntarily yield the processor for this allocation. */
 static long do_yield(void)
 {
-    TRACE_2D(TRC_SCHED_YIELD, current->domain, current);
+    TRACE_2D(TRC_SCHED_YIELD, current->id, current);
     __enter_scheduler();
     return 0;
 }
@@ -264,7 +264,7 @@ long do_set_timer_op(unsigned long timeout_hi, unsigned long timeout_lo)
         add_ac_timer(&p->timer);
     }
 
-    TRACE_4D(TRC_SCHED_SET_TIMER, p->domain, p, timeout_hi, timeout_lo);
+    TRACE_4D(TRC_SCHED_SET_TIMER, p->id, p, timeout_hi, timeout_lo);
 
     return 0;
 }
@@ -301,7 +301,7 @@ long sched_adjdom(struct sched_adjdom_cmd *cmd)
     if ( d == NULL )
         return -ESRCH;
 
-    TRACE_1D(TRC_SCHED_ADJDOM, d->domain);
+    TRACE_1D(TRC_SCHED_ADJDOM, d->id);
 
     spin_lock_irq(&schedule_data[d->processor].schedule_lock);
     SCHED_OP(adjdom, d, cmd);
@@ -394,7 +394,7 @@ void __enter_scheduler(void)
     }
 #endif
 
-    TRACE_2D(TRC_SCHED_SWITCH, next->domain, next);
+    TRACE_2D(TRC_SCHED_SWITCH, next->id, next);
 
     switch_to(prev, next);
 

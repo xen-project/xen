@@ -29,16 +29,19 @@ struct domain;
 typedef struct event_channel_st
 {
 #define ECS_FREE         0 /* Channel is available for use.                  */
-#define ECS_UNBOUND      1 /* Channel is not bound to a particular source.   */
+#define ECS_UNBOUND      1 /* Channel is waiting to bind to a remote domain. */
 #define ECS_INTERDOMAIN  2 /* Channel is bound to another domain.            */
 #define ECS_PIRQ         3 /* Channel is bound to a physical IRQ line.       */
 #define ECS_VIRQ         4 /* Channel is bound to a virtual IRQ line.        */
     u16 state;
     union {
         struct {
-            u16 port;
-            struct domain *dom;
-        } __attribute__ ((packed)) remote; /* state == ECS_CONNECTED */
+            domid_t remote_domid;
+        } __attribute__ ((packed)) unbound; /* state == ECS_UNBOUND */
+        struct {
+            u16            remote_port;
+            struct domain *remote_dom;
+        } __attribute__ ((packed)) interdomain; /* state == ECS_INTERDOMAIN */
         u16 pirq; /* state == ECS_PIRQ */
         u16 virq; /* state == ECS_VIRQ */
     } u;
@@ -83,7 +86,7 @@ struct domain
      * From here on things can be added and shuffled without special attention
      */
 
-    domid_t  domain;
+    domid_t  id;
     s_time_t create_time;
 
     spinlock_t       page_alloc_lock; /* protects all the following fields  */

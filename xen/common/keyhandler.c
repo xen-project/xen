@@ -72,7 +72,7 @@ void do_task_queues(unsigned char key, void *dev_id,
     {
         printk("Xen: DOM %u, CPU %d [has=%c] flags=%lx refcnt=%d nr_pages=%d "
                "xenheap_pages=%d\n",
-               d->domain, d->processor, 
+               d->id, d->processor, 
                test_bit(DF_RUNNING, &d->flags) ? 'T':'F', d->flags,
                atomic_read(&d->refcnt), d->tot_pages, d->xenheap_pages);
 

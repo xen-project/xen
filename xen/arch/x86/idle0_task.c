@@ -5,7 +5,7 @@
 #define IDLE0_TASK(_t)           \
 {                                \
     processor:   0,              \
-    domain:      IDLE_DOMAIN_ID, \
+    id:          IDLE_DOMAIN_ID, \
     mm:          IDLE0_MM,       \
     thread:      INIT_THREAD,    \
     flags:       1<<DF_IDLETASK, \

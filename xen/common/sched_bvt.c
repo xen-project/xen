@@ -194,7 +194,7 @@ void bvt_add_task(struct domain *d)
     inf->unwarp_timer.data = (unsigned long)inf;
     inf->unwarp_timer.function = &unwarp_timer_fn;
     
-    if ( d->domain == IDLE_DOMAIN_ID )
+    if ( d->id == IDLE_DOMAIN_ID )
     {
         inf->avt = inf->evt = ~0U;
     } 
@@ -308,7 +308,7 @@ int bvt_adjdom(
         
         DPRINTK("Get domain %u bvt mcu_adv=%u, warpback=%d, warpvalue=%d, "
                 "warpl=%lld, warpu=%lld\n",
-                d->domain, inf->mcu_advance, inf->warpback, inf->warp_value,
+                d->id, inf->mcu_advance, inf->warpback, inf->warp_value,
                 inf->warpl, inf->warpu);
 
         /* Sanity -- this can avoid divide-by-zero. */
@@ -331,7 +331,7 @@ int bvt_adjdom(
         
         DPRINTK("Get domain %u bvt mcu_adv=%u, warpback=%d, warpvalue=%d, "
                 "warpl=%lld, warpu=%lld\n",
-                d->domain, inf->mcu_advance, inf->warpback, inf->warp_value,
+                d->id, inf->mcu_advance, inf->warpback, inf->warp_value,
                 inf->warpl, inf->warpu);
                 
     }
@@ -531,7 +531,7 @@ static void bvt_dump_cpu_state(int i)
     {
         d_inf = list_entry(list, struct bvt_dom_info, run_list);
         d = d_inf->domain;
-        printk("%3d: %u has=%c ", loop++, d->domain,
+        printk("%3d: %u has=%c ", loop++, d->id,
                test_bit(DF_RUNNING, &d->flags) ? 'T':'F');
         bvt_dump_runq_el(d);
         printk("c=0x%X%08X\n", (u32)(d->cpu_time>>32), (u32)d->cpu_time);

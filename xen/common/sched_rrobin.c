@@ -180,7 +180,7 @@ void rr_wake(struct domain *d)
 
 static void rr_dump_domain(struct domain *d)
 {
-    printk("%u has=%c ", d->domain,
+    printk("%u has=%c ", d->id,
            test_bit(DF_RUNNING, &d->flags) ? 'T':'F');
     printk("c=0x%X%08X\n", (u32)(d->cpu_time>>32), (u32)d->cpu_time);
 }

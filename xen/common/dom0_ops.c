@@ -218,7 +218,7 @@ long do_dom0_op(dom0_op_t *u_dom0_op)
 
         ret = 0;
         
-        op->u.createdomain.domain = d->domain;
+        op->u.createdomain.domain = d->id;
         copy_to_user(u_dom0_op, op, sizeof(*op));
     }
     break;
@@ -340,7 +340,7 @@ long do_dom0_op(dom0_op_t *u_dom0_op)
 
         for_each_domain ( d )
         {
-            if ( d->domain >= op->u.getdomaininfo.domain )
+            if ( d->id >= op->u.getdomaininfo.domain )
                 break;
         }
 
@@ -353,7 +353,7 @@ long do_dom0_op(dom0_op_t *u_dom0_op)
 
         read_unlock_irqrestore(&tasklist_lock, flags);
 
-        op->u.getdomaininfo.domain = d->domain;
+        op->u.getdomaininfo.domain = d->id;
         
         op->u.getdomaininfo.flags =
             (test_bit(DF_DYING,     &d->flags) ? DOMFLAGS_DYING    : 0) |

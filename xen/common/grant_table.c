@@ -128,10 +128,10 @@ __gnttab_map_grant_ref(
             u32 scombo, prev_scombo, new_scombo;
 
             if ( unlikely((sflags & GTF_type_mask) != GTF_permit_access) ||
-                 unlikely(sdom != ld->domain) )
+                 unlikely(sdom != ld->id) )
                 PIN_FAIL(GNTST_general_error,
                          "Bad flags (%x) or dom (%d). (NB. expected dom %d)\n",
-                        sflags, sdom, ld->domain);
+                        sflags, sdom, ld->id);
 
             /* Merge two 16-bit values into a 32-bit combined update. */
             /* NB. Endianness! */
@@ -404,7 +404,7 @@ gnttab_setup_table(
 
     if ( op.dom == DOMID_SELF )
     {
-        op.dom = current->domain;
+        op.dom = current->id;
     }
     else if ( unlikely(!IS_PRIV(current)) )
     {
@@ -486,7 +486,7 @@ gnttab_prepare_for_transfer(
     if ( unlikely((t = rd->grant_table) == NULL) ||
          unlikely(ref >= NR_GRANT_ENTRIES) )
     {
-        DPRINTK("Dom %d has no g.t., or ref is bad (%d).\n", rd->domain, ref);
+        DPRINTK("Dom %d has no g.t., or ref is bad (%d).\n", rd->id, ref);
         return 0;
     }
 
@@ -500,10 +500,10 @@ gnttab_prepare_for_transfer(
     for ( ; ; )
     {
         if ( unlikely(sflags != GTF_accept_transfer) ||
-             unlikely(sdom != ld->domain) )
+             unlikely(sdom != ld->id) )
         {
             DPRINTK("Bad flags (%x) or dom (%d). (NB. expected dom %d)\n",
-                    sflags, sdom, ld->domain);
+                    sflags, sdom, ld->id);
             goto fail;
         }
 
@@ -565,10 +565,11 @@ grant_table_create(
     memset(t, 0, sizeof(*t));
     spin_lock_init(&t->lock);
 
-    /* Active grant-table page. */
+    /* Active grant table. */
     if ( (t->active = xmalloc(sizeof(active_grant_entry_t) * 
                               NR_GRANT_ENTRIES)) == NULL )
         goto no_mem;
+    memset(t->active, 0, sizeof(active_grant_entry_t) * NR_GRANT_ENTRIES);
 
     if ( (t->maptrack = (void *)alloc_xenheap_page()) == NULL )
         goto no_mem;
@@ -576,7 +577,7 @@ grant_table_create(
     for ( i = 0; i < NR_MAPTRACK_ENTRIES; i++ )
         t->maptrack[i].ref_and_flags = (i+1) << MAPTRACK_REF_SHIFT;
 
-    /* Set up shared grant-table page. */
+    /* Shared grant table. */
     if ( (t->shared = (void *)alloc_xenheap_page()) == NULL )
         goto no_mem;
     memset(t->shared, 0, PAGE_SIZE);

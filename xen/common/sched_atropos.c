@@ -212,7 +212,7 @@ static void at_add_task(struct domain *p)
     p->lastschd = now;
  
     /* DOM 0's parameters must be set here for it to boot the system! */
-    if(p->domain == 0)
+    if(p->id == 0)
     {
         DOM_INFO(p)->remain = MILLISECS(15);
         DOM_INFO(p)->nat_period =
@@ -250,7 +250,7 @@ static void dequeue(struct domain *sdom)
 {
     struct at_dom_info *inf = DOM_INFO(sdom);
     
-    ASSERT(sdom->domain != IDLE_DOMAIN_ID);
+    ASSERT(sdom->id != IDLE_DOMAIN_ID);
     
     /* just delete it from all the queues! */
     list_del(&inf->waitq);
@@ -482,7 +482,7 @@ deschedule_done:
     /* MAW - the idle domain is always on the run queue.  We run from the
      * runqueue if it's NOT the idle domain or if there's nothing on the wait
      * queue */
-    if (cur_sdom->domain == IDLE_DOMAIN_ID && !list_empty(WAITQ(cpu)))
+    if (cur_sdom->id == IDLE_DOMAIN_ID && !list_empty(WAITQ(cpu)))
     {
         struct list_head *item;
 
@@ -564,7 +564,7 @@ deschedule_done:
     ret.task = cur_sdom;
     ret.time = newtime - time;
 
-    TRACE_1D(0, cur_sdom->domain);
+    TRACE_1D(0, cur_sdom->id);
  
     return ret;
 }
@@ -616,7 +616,7 @@ static void at_dump_cpu_state(int cpu)
     {
         d_inf = list_entry(list, struct at_dom_info, run_list);
         d = d_inf->owner;
-        printk("%3d: %d has=%c ", loop++, d->domain, 
+        printk("%3d: %d has=%c ", loop++, d->id, 
                                     test_bit(DF_RUNNING, &d->flags) ? 'T':'F');
         at_dump_runq_el(d);
         printk("c=0x%X%08X\n", (u32)(d->cpu_time>>32), (u32)d->cpu_time);
@@ -634,7 +634,7 @@ static void at_dump_cpu_state(int cpu)
     {
         d_inf = list_entry(list, struct at_dom_info, waitq);
         d = d_inf->owner;
-        printk("%3d: %d has=%c ", loop++, d->domain, 
+        printk("%3d: %d has=%c ", loop++, d->id, 
                                     test_bit(DF_RUNNING, &d->flags) ? 'T':'F');
         at_dump_runq_el(d);
         printk("c=0x%X%08X\n", (u32)(d->cpu_time>>32), (u32)d->cpu_time);
