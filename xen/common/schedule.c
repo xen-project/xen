@@ -157,18 +157,10 @@ void sched_rem_domain(struct domain *d)
 
 void init_idle_task(void)
 {
-    unsigned long flags;
     struct domain *d = current;
 
-    if ( SCHED_OP(alloc_task, d) < 0)
-        panic("Failed to allocate scheduler private data for idle task");
-    SCHED_OP(add_task, d);
-
-    spin_lock_irqsave(&schedule_lock[d->processor], flags);
-    set_bit(DF_RUNNING, &d->flags);
-    if ( !__task_on_runqueue(d) )
-        __add_to_runqueue_head(d);
-    spin_unlock_irqrestore(&schedule_lock[d->processor], flags);
+    if ( SCHED_OP(init_idle_task, d) < 0)
+        panic("Failed to initialise idle task for processor %d",d->processor);
 }
 
 void domain_sleep(struct domain *d)
@@ -193,7 +185,6 @@ void domain_wake(struct domain *d)
 {
     unsigned long       flags;
     int                 cpu = d->processor;
-
     spin_lock_irqsave(&schedule_lock[cpu], flags);
     if ( likely(domain_runnable(d)) )
     {
@@ -342,7 +333,7 @@ void __enter_scheduler(void)
     rem_ac_timer(&schedule_data[cpu].s_timer);
     
     ASSERT(!in_irq());
-    ASSERT(__task_on_runqueue(prev));
+    // TODO - move to specific scheduler ASSERT(__task_on_runqueue(prev));
 
     if ( test_bit(DF_BLOCKED, &prev->flags) )
     {
@@ -490,7 +481,6 @@ void __init scheduler_init(void)
 
     for ( i = 0; i < NR_CPUS; i++ )
     {
-        INIT_LIST_HEAD(&schedule_data[i].runqueue);
         spin_lock_init(&schedule_lock[i]);
         schedule_data[i].curr = &idle0_task;
         
@@ -547,31 +537,8 @@ void schedulers_start(void)
 }
 
 
-static void dump_rqueue(struct list_head *queue, char *name)
-{
-    struct list_head *list;
-    int loop = 0;
-    struct domain *d;
-
-    printk("QUEUE %s %lx   n: %lx, p: %lx\n", name,  (unsigned long)queue,
-           (unsigned long) queue->next, (unsigned long) queue->prev);
-
-    list_for_each ( list, queue )
-    {
-        d = list_entry(list, struct domain, run_list);
-        printk("%3d: %u has=%c ", loop++, d->domain, 
-               test_bit(DF_RUNNING, &d->flags) ? 'T':'F');
-        SCHED_OP(dump_runq_el, d);
-        printk("c=0x%X%08X\n", (u32)(d->cpu_time>>32), (u32)d->cpu_time);
-        printk("         l: %lx n: %lx  p: %lx\n",
-               (unsigned long)list, (unsigned long)list->next,
-               (unsigned long)list->prev);
-    }
-}
-
 void dump_runq(u_char key, void *dev_id, struct pt_regs *regs)
 {
-    unsigned long flags; 
     s_time_t      now = NOW();
     int           i;
 
@@ -580,11 +547,8 @@ void dump_runq(u_char key, void *dev_id, struct pt_regs *regs)
     printk("NOW=0x%08X%08X\n",  (u32)(now>>32), (u32)now); 
     for ( i = 0; i < smp_num_cpus; i++ )
     {
-        spin_lock_irqsave(&schedule_lock[i], flags);
         printk("CPU[%02d] ", i);
         SCHED_OP(dump_cpu_state,i);
-        dump_rqueue(&schedule_data[i].runqueue, "rq"); 
-        spin_unlock_irqrestore(&schedule_lock[i], flags);
     }
 }
 
