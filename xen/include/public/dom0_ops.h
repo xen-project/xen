@@ -336,6 +336,56 @@ typedef struct {
     u32          type;                /*  8: vm_assist cmd */
 } PACKED dom0_setdomainvmassist_t; /* 12 bytes */
 
+/*
+ * Request memory range (@pfn, @pfn+@nr_pfns-1) to have type @type.
+ * On x86, @type is an architecture-defined MTRR memory type.
+ * On success, returns the MTRR that was used (@reg) and a handle that can
+ * be passed to DOM0_DEL_MEMTYPE to accurately tear down the new setting.
+ * (x86-specific).
+ */
+#define DOM0_ADD_MEMTYPE         31
+typedef struct {
+    /* IN variables. */
+    memory_t pfn;                     /*  0 */
+    MEMORY_PADDING;
+    memory_t nr_pfns;                 /*  8 */
+    MEMORY_PADDING;
+    u32      type;                    /* 16 */
+    u32      __pad0;
+    /* OUT variables. */
+    u32      handle;                  /* 24 */
+    u32      reg;                     /* 28 */
+} PACKED dom0_add_memtype_t; /* 32 bytes */
+
+/*
+ * Tear down an existing memory-range type. If @handle is remembered then it
+ * should be passed in to accurately tear down the correct setting (in case
+ * of overlapping memory regions with differing types). If it is not known
+ * then @handle should be set to zero. In all cases @reg must be set.
+ * (x86-specific).
+ */
+#define DOM0_DEL_MEMTYPE         32
+typedef struct {
+    /* IN variables. */
+    u32      handle;                  /*  0 */
+    u32      reg;                     /*  4 */
+} PACKED dom0_del_memtype_t; /* 8 bytes */
+
+/* Read current type of an MTRR (x86-specific). */
+#define DOM0_READ_MEMTYPE        33
+typedef struct {
+    /* IN variables. */
+    u32      reg;                     /*  0 */
+    u32      __pad0;
+    /* OUT variables. */
+    memory_t pfn;                     /*  8 */
+    MEMORY_PADDING;
+    memory_t nr_pfns;                 /* 16 */
+    MEMORY_PADDING;
+    u32      type;                    /* 24 */
+    u32      __pad1;
+} PACKED dom0_read_memtype_t; /* 32 bytes */
+
 typedef struct {
     u32 cmd;                          /* 0 */
     u32 interface_version;            /* 4 */ /* DOM0_INTERFACE_VERSION */
@@ -366,6 +416,9 @@ typedef struct {
 	dom0_setdomainmaxmem_t   setdomainmaxmem;
 	dom0_getpageframeinfo2_t getpageframeinfo2;
 	dom0_setdomainvmassist_t setdomainvmassist;
+        dom0_add_memtype_t       add_memtype;
+        dom0_del_memtype_t       del_memtype;
+        dom0_read_memtype_t      read_memtype;
     } PACKED u;
 } PACKED dom0_op_t; /* 80 bytes */
 
