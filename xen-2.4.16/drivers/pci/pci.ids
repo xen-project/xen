@@ -582,6 +582,7 @@
 	6003  CS 4614/22/24 [CrystalClear SoundFusion Audio Accelerator]
 		1013 4280  Crystal SoundFusion PCI Audio Accelerator
 		1681 0050  Hercules Game Theater XP
+		1681 a011  Hercules Fortissimo III 7.1
 	6004  CS 4614/22/24 [CrystalClear SoundFusion Audio Accelerator]
 	6005  Crystal CS4281 PCI Audio
 		1013 4281  Crystal CS4281 PCI Audio
@@ -2617,6 +2618,7 @@
 10fc  I-O Data Device, Inc.
 # What's in the cardbus end of a Sony ACR-A01 card, comes with newer Vaio CD-RW drives
 	0003  Cardbus IDE Controller
+	0005  Cardbus SCSI CBSC II
 10fd  Soyo Computer, Inc
 10fe  Fast Multimedia AG
 10ff  NCube
@@ -2678,6 +2680,7 @@
 	0505  VT82C505
 	0561  VT82C561
 	0571  VT82C586B PIPC Bus Master IDE
+		1458 5002 GA-7VAX Mainboard
 	0576  VT82C576 3V [Apollo Master]
 	0585  VT82C585VP [Apollo VP1/VPX]
 	0586  VT82C586/A/B PCI-to-ISA [Apollo VP]
@@ -2726,6 +2729,7 @@
 		1462 3091  MS-6309 Onboard Audio
 		15dd 7609  Onboard Audio
 	3059  VT8233 AC97 Audio Controller
+		1458 a002  GA-7VAX Onboard Audio (Realtek ALC650) 
 	3065  VT6102 [Rhine-II]
 		1186 1400  DFE-530TX rev A
 		1186 1401  DFE-530TX rev B
@@ -2739,6 +2743,7 @@
 	3102  VT8662 Host Bridge
 	3103  VT8615 Host Bridge
 	3104  USB 2.0
+		1458 5004  GA-7VAX Mainboard
 	3109  VT8233C PCI to ISA Bridge
 	3112  VT8361 [KLE133] Host Bridge
 	3128  VT8753 [P4X266 AGP]
@@ -2747,6 +2752,9 @@
 	3148  P4M266 Host Bridge
 	3156  P/KN266 Host Bridge
 	3177  VT8233A ISA Bridge
+		1458 5001 GA-7VAX Mainboard
+	3189  VT8377 [KT400 AGP] Host Bridge
+		1458 5000 GA-7VAX Mainboard
 	5030  VT82C596 ACPI [Apollo PRO]
 	6100  VT85C100A [Rhine II]
 	8231  VT8231 [PCI-to-ISA Bridge]
@@ -2767,6 +2775,7 @@
 	b102  VT8362 AGP Bridge
 	b103  VT8615 AGP Bridge
 	b112  VT8361 [KLE133] AGP Bridge
+	b168  VT8235 PCI Bridge
 1107  Stratus Computers
 	0576  VIA VT82C570MV [Apollo] (Wrong vendor ID!)
 1108  Proteon, Inc.
@@ -3027,6 +3036,12 @@
 1144  Cincinnati Milacron
 	0001  Noservo controller
 1145  Workbit Corporation
+	f007  NinjaSCSI-32 KME
+	8007  NinjaSCSI-32 Workbit
+	f010  NinjaSCSI-32 Workbit
+	f012  NinjaSCSI-32 Logitec
+	f013  NinjaSCSI-32 Logitec
+	f015  NinjaSCSI-32 Melco
 1146  Force Computers
 1147  Interface Corp
 1148  Syskonnect (Schneider & Koch)
