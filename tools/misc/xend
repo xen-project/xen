@@ -20,27 +20,79 @@
 """
 import os
 import sys
-from xen.xend.server import SrvDaemon
+
+class CheckError(ValueError):
+    pass
+
+def hline():
+    print >>sys.stderr, "*" * 70
+
+def msg(message):
+    print >>sys.stderr, "*" * 3, message
+
+def check_logging():
+    """Check python logging is installed and raise an error if not.
+    Logging is standard from Python 2.3 on.
+    """
+    try:
+        import logging
+    except ImportError:
+        hline()
+        msg("Python logging is not installed.")
+        msg("Use 'make install-logging' at the xen root to install.")
+        msg("")
+        msg("Alternatively download and install from")
+        msg("http://www.red-dove.com/python_logging.html")
+        hline()
+        raise CheckError("logging is not installed")
 
 def check_twisted_version():
-    """Check twisted version and print a warning if not high enough.
+    """Check twisted is installed with a supported version and print a warning if not.
+    Raises an error if twisted is not installed.
     """
-    from twisted.copyright import version
     # Supported twisted release and major version.
     RELEASE = 1
     MAJOR   = 3
+    try:
+        from twisted.copyright import version
+    except ImportError:
+        hline()
+        msg("The Twisted framework is not installed.")
+        msg("Use 'make install-twisted' at the xen root to install.")
+        msg("")
+        msg("Alternatively download and install version %d.%d or higher" % (RELEASE, MAJOR))
+        msg("from http://www.twistedmatrix.com/products")
+        hline()
+        raise CheckError("twisted is not installed")
+        
+    
     (release, major, minor) = version.split('.')
     release = int(release)
     major = int(major)
     if release > RELEASE: return
     if release == RELEASE and major >= MAJOR: return
-    print >>sys.stderr, "*" * 60
-    print >>sys.stderr, "*" * 3, "Warning: Twisted version not supported: %s" % version
-    print >>sys.stderr, "*" * 3, "Use Twisted version %d.%d.0 or higher" % (RELEASE, MAJOR)
-    print >>sys.stderr, "*" * 60
+    hline()
+    msg("Warning: Twisted version not supported: %s" % version)
+    msg("Use Twisted version %d.%d.0 or higher" % (RELEASE, MAJOR))
+    hline()
 
+def check_user():
+    """Check that the effective user id is 0 (root).
+    """
+    if os.geteuid() != 0:
+        hline()
+        msg("Xend must be run as root.")
+        hline()
+        raise CheckError("invalid user")
+    
 def main():
-    check_twisted_version()
+    try:
+        check_logging()
+        check_twisted_version()
+        check_user()
+    except CheckError:
+        sys.exit(1)
+    from xen.xend.server import SrvDaemon
     daemon = SrvDaemon.instance()
     if not sys.argv[1:]:
         print 'usage: %s {start|stop|restart}' % sys.argv[0]

@@ -135,6 +135,12 @@ install-twisted:
 	tar -zxf Twisted-*.tar.gz
 	( cd Twisted-* ; python setup.py install )
 
+install-logging: LOGGING=logging-0.4.9.2
+install-logging:
+	[ -f $(LOGGING).tar.gz ] || wget http://www.red-dove.com/$(LOGGING).tar.gz
+	tar -xfz $(LOGGING).tar.gz
+	( cd $(LOGGING) && python setup.py install )
+
 # handy target to upgrade iptables (use rpm or apt-get in preference)
 install-iptables:
 	wget http://www.netfilter.org/files/iptables-1.2.11.tar.bz2
