@@ -1637,8 +1637,8 @@ void ptwr_reconnect_disconnected(void)
     unsigned long pte;
 #ifdef VERBOSE
     unsigned long pfn;
+    l2_pgentry_t *pl2e;
 #endif
-    l2_pgentry_t *pl2e, nl2e;
     l1_pgentry_t *pl1e;
     int cpu = smp_processor_id();
     int i;
@@ -1648,9 +1648,9 @@ void ptwr_reconnect_disconnected(void)
     PTWR_PRINTK(PP_A, ("[A] page fault in disconn space %08lx\n",
                        ptwr_info[cpu].disconnected_pteidx <<
                        L2_PAGETABLE_SHIFT));
-    pl2e = &linear_l2_table[ptwr_info[cpu].disconnected_pteidx];
 
 #ifdef VERBOSE
+    pl2e = &linear_l2_table[ptwr_info[cpu].disconnected_pteidx];
     pfn = ptwr_info[cpu].disconnected_pte >> PAGE_SHIFT;
 #endif
     PTWR_PRINTK(PP_A, ("[A]     pl2e %p l2e %08lx pfn %08lx taf %08x/%08x\n",
@@ -1660,7 +1660,6 @@ void ptwr_reconnect_disconnected(void)
                        frame_table[pfn].u.inuse.type_info,
                        frame_table[pfn].count_info));
 
-    nl2e = mk_l2_pgentry(l2_pgentry_val(*pl2e) | _PAGE_PRESENT);
     pl1e = ptwr_info[cpu].disconnected_pl1e;
     for ( i = 0; i < ENTRIES_PER_L1_PAGETABLE; i++ ) {
         l1_pgentry_t ol1e, nl1e;
@@ -1684,8 +1683,6 @@ void ptwr_reconnect_disconnected(void)
         pl1e[i] = ptwr_info[cpu].disconnected_page[i];
     }
     unmap_domain_mem(pl1e);
-    /* reconnect l1 page */
-    update_l2e(pl2e, *pl2e, nl2e);
 
     PTWR_PRINTK(PP_A,
                 ("[A] now pl2e %p l2e %08lx              taf %08x/%08x\n",
