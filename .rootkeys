@@ -83,6 +83,10 @@
 3e4540cc3t7_y-YLeyMG2pX9xtdXPA xen-2.4.16/drivers/net/e1000/e1000_osdep.h
 3e4540cct_8Ig-Y1W_vM2gS_u7mC0A xen-2.4.16/drivers/net/e1000/e1000_param.c
 3ddb79c0GejJrp1U6W4G6dYi-RiH4A xen-2.4.16/drivers/net/eepro100.c
+3e465c00t2nochqR27eEY_FBjxsUCw xen-2.4.16/drivers/net/ne/8390.c
+3e465c00AIRmk20x1vYETtnL71eGvA xen-2.4.16/drivers/net/ne/8390.h
+3e465c00UIvPTAtAcgcQWCVFa2bwww xen-2.4.16/drivers/net/ne/Makefile
+3e465c00rWSHiXmHuOWLRf7r2n8S3g xen-2.4.16/drivers/net/ne/ne.c
 3ddb79bfKvn9mt0kofpkw0QaWjxO6A xen-2.4.16/drivers/net/net_init.c
 3ddb79c0fQgORkFlqWZdP-6cDHyFIQ xen-2.4.16/drivers/net/pcnet32.c
 3ddb79bf_CBcu3QWYwq4bNAOnM2RqQ xen-2.4.16/drivers/net/setup.c

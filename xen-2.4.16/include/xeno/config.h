@@ -7,6 +7,8 @@
 #ifndef __XENO_CONFIG_H__
 #define __XENO_CONFIG_H__
 
+#define CONFIG_X86 1
+
 #define CONFIG_SMP 1
 #define CONFIG_X86_LOCAL_APIC 1
 #define CONFIG_X86_IO_APIC 1

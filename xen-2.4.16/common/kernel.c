@@ -43,6 +43,7 @@ void start_of_day(void);
 unsigned long opt_ipbase=0, opt_nfsserv=0, opt_gateway=0, opt_netmask=0;
 unsigned char opt_nfsroot[50]="";
 unsigned int opt_dom0_mem = 16000; /* default kbytes for DOM0 */
+unsigned int opt_ne_base = 0; /* NE2k NICs cannot be probed */
 enum { OPT_IP, OPT_STR, OPT_UINT };
 static struct {
     unsigned char *name;
@@ -55,6 +56,7 @@ static struct {
     { "netmask",  OPT_IP,   &opt_netmask },
     { "nfsroot",  OPT_STR,  &opt_nfsroot },
     { "dom0_mem", OPT_UINT, &opt_dom0_mem }, 
+    { "ne_base",  OPT_UINT, &opt_ne_base },
     { NULL,       0,        NULL     }
 };
 
@@ -143,7 +145,8 @@ void cmain (unsigned long magic, multiboot_info_t *mbi)
                     }
                     else /* opts[i].type == OPT_UINT */
                     {
-                        *(unsigned int *)opts[i].var = simple_strtol(opt, (char **)&opt, 10);
+                        *(unsigned int *)opts[i].var =
+                            simple_strtol(opt, (char **)&opt, 0);
                     }
                     break;
                 }
