@@ -76,7 +76,7 @@ void startup_cpu_idle_loop(void)
 {
     /* Just some sanity to ensure that the scheduler is set up okay. */
     ASSERT(current->domain == IDLE_DOMAIN_ID);
-    domain_start(current);
+    domain_unpause_by_systemcontroller(current);
     __enter_scheduler();
 
     /*

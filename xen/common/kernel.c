@@ -286,8 +286,8 @@ void cmain(unsigned long magic, multiboot_info_t *mbi)
 
     init_trace_bufs();
 
-    domain_start(current);
-    domain_start(new_dom);
+    domain_unpause_by_systemcontroller(current);
+    domain_unpause_by_systemcontroller(new_dom);
     startup_cpu_idle_loop();
 }
 

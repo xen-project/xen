@@ -25,8 +25,8 @@ def usage (rc=0):
 Usage: %s [command] <params>
 
   help                   -- print usage
-  stop      [dom]        -- pause a domain
-  start     [dom]        -- un-pause a domain
+  pause     [dom]        -- pause a domain
+  unpause   [dom]        -- un-pause a domain
   shutdown  [dom] [[-w]] -- request a domain to shutdown (can specify 'all')
                             (optionally wait for complete shutdown)
   destroy   [dom]        -- immediately terminate a domain
@@ -89,11 +89,11 @@ if len( sys.argv ) > 2 and re.match('\d+$', sys.argv[2]):
 if cmd == "help":
     usage()
     
-elif cmd == 'stop':
-    rc = server.xend_domain_stop(dom)
+elif cmd == 'pause':
+    rc = server.xend_domain_pause(dom)
 
-elif cmd == 'start':
-    rc = server.xend_domain_start(dom)    
+elif cmd == 'unpause':
+    rc = server.xend_domain_unpause(dom)    
 
 elif cmd == 'shutdown':
     doms = []

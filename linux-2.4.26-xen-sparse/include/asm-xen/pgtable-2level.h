@@ -48,7 +48,26 @@ static inline pmd_t * pmd_offset(pgd_t * dir, unsigned long address)
 }
 
 #define pte_same(a, b)		((a).pte_low == (b).pte_low)
-#define pte_page(x)		(mem_map+((unsigned long)((pte_val(x) >> PAGE_SHIFT))))
+
+/*                                 
+ * We detect special mappings in one of two ways:
+ *  1. If the MFN is an I/O page then Xen will set the m2p entry
+ *     to be outside our maximum possible pseudophys range.
+ *  2. If the MFN belongs to a different domain then we will certainly
+ *     not have MFN in our p2m table. Conversely, if the page is ours,
+ *     then we'll have p2m(m2p(MFN))==MFN.
+ * If we detect a special mapping then it doesn't have a 'struct page'.
+ * We force !VALID_PAGE() by returning an out-of-range pointer.
+ */
+#define pte_page(_pte)                                        \
+({                                                            \
+    unsigned long mfn = (_pte).pte_low >> PAGE_SHIFT;         \
+    unsigned long pfn = mfn_to_pfn(mfn);                      \
+    if ( (pfn >= max_mapnr) || (pfn_to_mfn(pfn) != mfn) )     \
+        pfn = max_mapnr; /* specia: force !VALID_PAGE() */    \
+    &mem_map[pfn];                                            \
+})
+
 #define pte_none(x)		(!(x).pte_low)
 #define __mk_pte(page_nr,pgprot) __pte(((page_nr) << PAGE_SHIFT) | pgprot_val(pgprot))
 

@@ -305,7 +305,7 @@ def make_domain(config):
     else:
         console_port = None
     
-    if server.xend_domain_start(dom) < 0:
+    if server.xend_domain_unpause(dom) < 0:
         print "Error starting domain"
         server.xend_domain_halt(dom)
         sys.exit()

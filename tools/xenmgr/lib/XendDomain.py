@@ -192,18 +192,18 @@ class XendDomain:
         self.refresh_domain(id)
         return self.domain[id]
     
-    def domain_start(self, id):
-        """Start domain running.
+    def domain_unpause(self, id):
+        """(Re)start domain running.
         """
         dom = int(id)
-        eserver.inject('xend.domain.start', id)
-        return xend.domain_start(dom)
+        eserver.inject('xend.domain.unpause', id)
+        return xc.domain_unpause(dom=dom)
     
-    def domain_stop(self, id):
-        """Stop domain running.
+    def domain_pause(self, id):
+        """Pause domain execution.
         """
         dom = int(id)
-        return xend.domain_stop(dom)
+        return xc.domain_pause(dom=dom)
     
     def domain_shutdown(self, id):
         """Shutdown domain (nicely).
@@ -212,7 +212,7 @@ class XendDomain:
         if dom <= 0:
             return 0
         eserver.inject('xend.domain.shutdown', id)
-        val = xend.domain_destroy(dom, force=0)
+        val = xc.domain_destroy(dom=dom) # FIXME -- send CMSG_SHUTDOWN
         self.refresh()
         return val
     
@@ -223,7 +223,7 @@ class XendDomain:
         if dom <= 0:
             return 0
         eserver.inject('xend.domain.halt', id)
-        val = xend.domain_destroy(dom, force=1)
+        val = xc.domain_destroy(dom=dom)
         self.refresh()
         return val       
 
@@ -237,7 +237,7 @@ class XendDomain:
         """Save domain state to file, halt domain.
         """
         dom = int(id)
-        self.domain_stop(id)
+        self.domain_pause(id)
         eserver.inject('xend.domain.save', id)
         rc = xc.linux_save(dom=dom, state_file=dst, progress=progress)
         if rc == 0:

@@ -18,12 +18,12 @@ class SrvDomain(SrvDir):
         self.xd = XendDomain.instance()
         self.xconsole = XendConsole.instance()
 
-    def op_start(self, op, req):
-        val = self.xd.domain_start(self.dom.id)
+    def op_unpause(self, op, req):
+        val = self.xd.domain_unpause(self.dom.id)
         return val
         
-    def op_stop(self, op, req):
-        val = self.xd.domain_stop(self.dom.id)
+    def op_pause(self, op, req):
+        val = self.xd.domain_pause(self.dom.id)
         return val
 
     def op_shutdown(self, op, req):

@@ -273,10 +273,9 @@ int xc_linux_save(int xc_handle,
     }
 
     /* Ensure that the domain exists, and that it is stopped. */
-
-    if ( xc_domain_stop_sync( xc_handle, domid, &op, &ctxt ) )
+    if ( xc_domain_pause(xc_handle, domid) )
     {
-        PERROR("Could not sync stop domain");
+        PERROR("Could not pause domain");
         goto out;
     }
 
@@ -381,9 +380,9 @@ int xc_linux_save(int xc_handle,
             goto out;
         }
 
-        if ( xc_domain_start( xc_handle, domid ) < 0 )
+        if ( xc_domain_unpause(xc_handle, domid) < 0 )
         {
-            ERROR("Couldn't restart domain");
+            ERROR("Couldn't unpause domain");
             goto out;
         }
 
@@ -754,8 +753,7 @@ int xc_linux_save(int xc_handle,
                 DPRINTF("Start last iteration\n");
                 last_iter = 1;
 
-                xc_domain_stop_sync( xc_handle, domid, &op, NULL );
-
+                xc_domain_pause(xc_handle, domid);
             } 
 
             if ( xc_shadow_control( xc_handle, domid, 

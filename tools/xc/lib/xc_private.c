@@ -199,19 +199,6 @@ int finish_mmu_updates(int xc_handle, mmu_t *mmu)
 }
 
 
-/***********************************************************/
-
-/* this function is a hack until we get proper synchronous domain stop */
-
-int xc_domain_stop_sync( int xc_handle, domid_t domid,
-                         dom0_op_t *op, full_execution_context_t *ctxt)
-{
-    op->cmd = DOM0_STOPDOMAIN;
-    op->u.stopdomain.domain = (domid_t)domid;
-    do_dom0_op(xc_handle, op);
-    return 0;
-}
-
 long long  xc_domain_get_cpu_usage( int xc_handle, domid_t domid )
 {
     dom0_op_t op;
@@ -228,8 +215,6 @@ long long  xc_domain_get_cpu_usage( int xc_handle, domid_t domid )
     return op.u.getdomaininfo.cpu_time;
 }
 
-
-/**********************************************************************/
 
 /* This is shared between save and restore, and may generally be useful. */
 unsigned long csum_page (void * page)

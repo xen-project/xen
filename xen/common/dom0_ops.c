@@ -80,16 +80,16 @@ long do_dom0_op(dom0_op_t *u_dom0_op)
     }
     break;
 
-    case DOM0_STARTDOMAIN:
+    case DOM0_PAUSEDOMAIN:
     {
-        struct domain *d = find_domain_by_id(op->u.startdomain.domain);
+        struct domain *d = find_domain_by_id(op->u.pausedomain.domain);
         ret = -ESRCH;
         if ( d != NULL )
         {
             ret = -EINVAL;
-            if ( test_bit(DF_CONSTRUCTED, &d->flags) )
+            if ( d != current )
             {
-                domain_start(d);
+                domain_pause_by_systemcontroller(d);
                 ret = 0;
             }
             put_domain(d);
@@ -97,16 +97,16 @@ long do_dom0_op(dom0_op_t *u_dom0_op)
     }
     break;
 
-    case DOM0_STOPDOMAIN:
+    case DOM0_UNPAUSEDOMAIN:
     {
-        struct domain *d = find_domain_by_id(op->u.stopdomain.domain);
+        struct domain *d = find_domain_by_id(op->u.unpausedomain.domain);
         ret = -ESRCH;
         if ( d != NULL )
         {
             ret = -EINVAL;
-            if ( d != current )
+            if ( test_bit(DF_CONSTRUCTED, &d->flags) )
             {
-                domain_stop(d);
+                domain_unpause_by_systemcontroller(d);
                 ret = 0;
             }
             put_domain(d);
@@ -299,16 +299,16 @@ long do_dom0_op(dom0_op_t *u_dom0_op)
         strcpy(op->u.getdomaininfo.name, d->name);
         
         op->u.getdomaininfo.flags =
-            (test_bit(DF_DYING,     &d->flags) ? DOMFLAGS_DYING     : 0) |
-            (test_bit(DF_CRASHED,   &d->flags) ? DOMFLAGS_CRASHED   : 0) |
-            (test_bit(DF_SUSPENDED, &d->flags) ? DOMFLAGS_SUSPENDED : 0) |
-            (test_bit(DF_STOPPED,   &d->flags) ? DOMFLAGS_STOPPED   : 0) |
-            (test_bit(DF_BLOCKED,   &d->flags) ? DOMFLAGS_BLOCKED   : 0) |
-            (test_bit(DF_RUNNING,   &d->flags) ? DOMFLAGS_RUNNING   : 0);
+            (test_bit(DF_DYING,     &d->flags) ? DOMFLAGS_DYING    : 0) |
+            (test_bit(DF_CRASHED,   &d->flags) ? DOMFLAGS_CRASHED  : 0) |
+            (test_bit(DF_SHUTDOWN,  &d->flags) ? DOMFLAGS_SHUTDOWN : 0) |
+            (test_bit(DF_CTRLPAUSE, &d->flags) ? DOMFLAGS_PAUSED   : 0) |
+            (test_bit(DF_BLOCKED,   &d->flags) ? DOMFLAGS_BLOCKED  : 0) |
+            (test_bit(DF_RUNNING,   &d->flags) ? DOMFLAGS_RUNNING  : 0);
 
         op->u.getdomaininfo.flags |= d->processor << DOMFLAGS_CPUSHIFT;
         op->u.getdomaininfo.flags |= 
-            d->suspend_code << DOMFLAGS_SUSPCODESHIFT;
+            d->shutdown_code << DOMFLAGS_SHUTDOWNSHIFT;
 
         op->u.getdomaininfo.tot_pages   = d->tot_pages;
         op->u.getdomaininfo.max_pages   = d->max_pages;
