@@ -103,16 +103,16 @@ relative_lndir ${RS}
 rm -f mkbuildtree
 
 ## There are a whole bunch of special symlinks, mostly for files
-## which are identical in the i386 and xeno-i386 architecture-dependent
+## which are identical in the i386 and xen-i386 architecture-dependent
 ## subdirectories.
 
 # This first symlink is special: it links to shared files in Xen's source tree
-rm -rf ${AD}/include/asm-xeno/hypervisor-ifs
-mkdir  ${AD}/include/asm-xeno/hypervisor-ifs
-cd     ${AD}/include/asm-xeno/hypervisor-ifs
+rm -rf ${AD}/include/asm-xen/hypervisor-ifs
+mkdir  ${AD}/include/asm-xen/hypervisor-ifs
+cd     ${AD}/include/asm-xen/hypervisor-ifs
 relative_lndir ../../../${RS}/../xen/include/hypervisor-ifs
 
-# The remainder are the i386 -> xeno-i386 links
+# The remainder are the i386 -> xen-i386 links
 cd ..
 ln -sf ../asm-i386/a.out.h 
 ln -sf ../asm-i386/apicdef.h 
@@ -198,7 +198,7 @@ ln -sf ../asm-i386/unistd.h
 ln -sf ../asm-i386/user.h 
 ln -sf ../asm-i386/xor.h 
 
-cd ../../arch/xeno/kernel
+cd ../../arch/xen/kernel
 ln -sf ../../i386/kernel/i387.c
 ln -sf ../../i386/kernel/init_task.c
 ln -sf ../../i386/kernel/ptrace.c

@@ -464,7 +464,7 @@ static void unuse_process(struct mm_struct * mm,
 		pgd_t * pgd = pgd_offset(mm, vma->vm_start);
 		unuse_vma(vma, pgd, entry, page);
 	}
-	XENO_flush_page_update_queue();
+	XEN_flush_page_update_queue();
 	spin_unlock(&mm->page_table_lock);
 	return;
 }

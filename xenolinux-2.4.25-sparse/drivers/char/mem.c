@@ -7,8 +7,8 @@
  *    Jan-11-1998, C. Scott Ananian <cananian@alumni.princeton.edu>
  *  Shared /dev/zero mmaping support, Feb 2000, Kanoj Sarcar <kanoj@sgi.com>
  *
- *  MODIFIED FOR XENOLINUX by Keir Fraser, 10th July 2003.
- *  Xenolinux has strange semantics for /dev/mem and /dev/kmem!!
+ *  MODIFIED FOR XEN by Keir Fraser, 10th July 2003.
+ *  Linux running on Xen has strange semantics for /dev/mem and /dev/kmem!!
  *   1. mmap will not work on /dev/kmem
  *   2. mmap on /dev/mem interprets the 'file offset' as a machine address
  *      rather than a physical address.
@@ -201,18 +201,18 @@ static int mmap_mem(struct file * file, struct vm_area_struct * vma)
 {
 	unsigned long offset = vma->vm_pgoff << PAGE_SHIFT;
 
-#if defined(CONFIG_XENO) && defined(CONFIG_XENO_PRIV)
+#if defined(CONFIG_XEN) && defined(CONFIG_XEN_PRIVILEGED_GUEST)
 	if (!(start_info.flags & SIF_PRIVILEGED))
 		return -ENXIO;
 
-	/* DONTCOPY is essential for Xenolinux as copy_page_range is broken. */
+	/* DONTCOPY is essential for Xen as copy_page_range is broken. */
 	vma->vm_flags |= VM_RESERVED | VM_IO | VM_DONTCOPY;
 	vma->vm_page_prot = pgprot_noncached(vma->vm_page_prot);
 	if (direct_remap_area_pages(vma->vm_mm, vma->vm_start, offset, 
 			     vma->vm_end-vma->vm_start, vma->vm_page_prot))
 		return -EAGAIN;
 	return 0;
-#elif defined(CONFIG_XENO)
+#elif defined(CONFIG_XEN)
 	return -ENXIO;
 #else
 	/*
@@ -426,7 +426,7 @@ static inline size_t read_zero_pagealigned(char * buf, size_t size)
 			goto out_up;
 		if (vma->vm_flags & VM_SHARED)
 			break;
-#if defined(CONFIG_XENO_PRIV)
+#if defined(CONFIG_XEN_PRIVILEGED_GUEST)
 		if (vma->vm_flags & VM_IO)
 			break;
 #endif
@@ -615,7 +615,7 @@ static int mmap_kmem(struct file * file, struct vm_area_struct * vma)
 	unsigned long offset = vma->vm_pgoff << PAGE_SHIFT;
 	unsigned long size = vma->vm_end - vma->vm_start;
 
-#if defined(CONFIG_XENO)
+#if defined(CONFIG_XEN)
 	return -ENXIO;
 #endif
 
@@ -715,8 +715,8 @@ static int memory_open(struct inode * inode, struct file * filp)
 			break;
 #if defined(CONFIG_ISA) || !defined(__mc68000__)
 		case 4:
-#if defined(CONFIG_XENO)
-#if defined(CONFIG_XENO_PRIV)
+#if defined(CONFIG_XEN)
+#if defined(CONFIG_XEN_PRIVILEGED_GUEST)
 			if (!(start_info.flags & SIF_PRIVILEGED))
 #endif
 				return -ENXIO;

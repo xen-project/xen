@@ -10,6 +10,7 @@ KERNELRELEASE=$(VERSION).$(PATCHLEVEL).$(SUBLEVEL)$(EXTRAVERSION)
 # This will be overriden for Xen and UML builds.
 SUBARCH := $(shell uname -m | sed -e s/i.86/i386/ -e s/sun4u/sparc64/ -e s/arm.*/arm/ -e s/sa110/arm/)
 ARCH ?= $(SUBARCH)
+ARCH := $(ARCH:xeno=xen) ## Temporary hack while users adjust to new archname
 
 KERNELPATH=kernel-$(shell echo $(KERNELRELEASE) | sed -e "s/-//g")
 

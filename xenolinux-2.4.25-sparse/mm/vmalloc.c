@@ -248,7 +248,7 @@ void vfree(void * addr)
 	for (p = &vmlist ; (tmp = *p) ; p = &tmp->next) {
 		if (tmp->addr == addr) {
 			*p = tmp->next;
-#ifdef CONFIG_XENO_PRIV
+#ifdef CONFIG_XEN_PRIVILEGED_GUEST
 			if (tmp->flags & VM_IOREMAP)
 				zap_page_range(&init_mm, VMALLOC_VMADDR(tmp->addr), tmp->size);
 			else

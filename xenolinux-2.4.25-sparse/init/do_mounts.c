@@ -255,7 +255,7 @@ static struct dev_name_struct {
 	{ "ftld", 0x2c18 },
 	{ "mtdblock", 0x1f00 },
 	{ "nb", 0x2b00 },
-#if defined(CONFIG_XENOLINUX_BLOCK)
+#if defined(CONFIG_XEN_VBD)
         { "xvda", 0x7D00 }, { "xvdb", 0x7D10 },
         { "xvdc", 0x7D20 }, { "xvdd", 0x7D30 },
         { "xvde", 0x7D40 }, { "xvdf", 0x7D50 },

@@ -64,7 +64,7 @@ asmlinkage long sys_time(int * tloc)
 	return i;
 }
 
-#if !defined(CONFIG_XENO)
+#if !defined(CONFIG_XEN)
 
 /*
  * sys_stime() can be implemented in user-level using

@@ -597,10 +597,10 @@ CONFIG_BLK_DEV_NBD
   If unsure, say N.
 
 XenoLinux virtual block device support
-CONFIG_XENOLINUX_BLOCK
+CONFIG_XEN_VBD
   Xen can export virtual block devices which map back to extents of
   blocks on the physical partitions.  This option is needed for
-  xenolinux to make use of such devices when running as a Xen guest.
+  Linux to make use of such devices when running as a Xen guest.
 
   If unsure, say Y.
 
@@ -17383,11 +17383,11 @@ Acorn partition support
 CONFIG_ACORN_PARTITION
   Support hard disks partitioned under Acorn operating systems.
 
-Xeno partition support
-CONFIG_XENO_PARTITION
-  Support Xeno-style partitions on physical disks.  The Xen
+Xen virtual-partition support
+CONFIG_XEN_VBD_PARTITION
+  Support partition-level virtual block devices.  The Xen
   hypervisor can export partitions on a physical disk to clients,
-  but access to the partition table requires special hackery.
+  but access to the partition table requires special trickery.
   This will be used if this option is enabled; otherwise, 
   it will be possible to access exported partitions by sector
   number but not with useful names e.g. /dev/hda4.

@@ -311,7 +311,7 @@ void put_dirty_page(struct task_struct * tsk, struct page *page, unsigned long a
 	if (vma)
 		prot = vma->vm_page_prot;
 	set_pte(pte, pte_mkdirty(pte_mkwrite(mk_pte(page, prot))));
-	XENO_flush_page_update_queue();
+	XEN_flush_page_update_queue();
 	tsk->mm->rss++;
 	spin_unlock(&tsk->mm->page_table_lock);
 

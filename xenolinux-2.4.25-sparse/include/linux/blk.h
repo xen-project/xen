@@ -55,9 +55,9 @@ extern int xpram_init(void);
 extern int tapeblock_init(void);
 #endif /* CONFIG_ARCH_S390 */
 
-#if defined(CONFIG_XENOLINUX_BLOCK)
+#if defined(CONFIG_XEN_VBD)
 extern int xlblk_init(void);
-#endif /* CONFIG_ARCH_XENO */
+#endif /* CONFIG_XEN_VBD */
 
 extern void set_device_ro(kdev_t dev,int flag);
 void add_blkdev_randomness(int major);

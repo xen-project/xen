@@ -288,7 +288,7 @@ asmlinkage long sys_mprotect(unsigned long start, size_t len, unsigned long prot
 	if (!vma || vma->vm_start > start)
 		goto out;
 
-#if defined(CONFIG_XENO_PRIV)
+#if defined(CONFIG_XEN_PRIVILEGED_GUEST)
 	/* mprotect() unsupported for I/O mappings in Xenolinux. */
 	error = -EINVAL;
 	if (vma->vm_flags & VM_IO)

@@ -115,11 +115,11 @@ static int move_page_tables(struct mm_struct * mm,
 	 * the old page tables)
 	 */
 oops_we_failed:
-	XENO_flush_page_update_queue();
+	XEN_flush_page_update_queue();
 	flush_cache_range(mm, new_addr, new_addr + len);
 	while ((offset += PAGE_SIZE) < len)
 		move_one_page(mm, new_addr + offset, old_addr + offset);
-	XENO_flush_page_update_queue();
+	XEN_flush_page_update_queue();
 	zap_page_range(mm, new_addr, len);
 	return -1;
 }
@@ -309,7 +309,7 @@ unsigned long do_mremap(unsigned long addr,
 	    !vm_enough_memory((new_len - old_len) >> PAGE_SHIFT))
 		goto out;
 
-#if defined(CONFIG_XENO_PRIV)
+#if defined(CONFIG_XEN_PRIVILEGED_GUEST)
 	/* mremap() unsupported for I/O mappings in Xenolinux. */
 	ret = -EINVAL;
 	if (vma->vm_flags & VM_IO)

@@ -1557,7 +1557,7 @@ int __init blk_dev_init(void)
 #ifdef CONFIG_BLK_DEV_FD
 	floppy_init();
 #else
-#if defined(__i386__) && !defined(CONFIG_XENO) /* Do we even need this? */
+#if defined(__i386__) && !defined(CONFIG_XEN) /* Do we even need this? */
 	outb_p(0xc, 0x3f2);
 #endif
 #endif
@@ -1617,7 +1617,7 @@ int __init blk_dev_init(void)
 	jsfd_init();
 #endif
 
-#ifdef CONFIG_XENOLINUX_BLOCK
+#ifdef CONFIG_XEN_VBD
     xlblk_init();
 #endif
 

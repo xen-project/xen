@@ -109,7 +109,7 @@ NORET_TYPE void panic(const char * fmt, ...)
 		panic_blink(); 
 #endif
 		CHECK_EMERGENCY_SYNC
-#if defined(CONFIG_XENO)
+#if defined(CONFIG_XEN)
 		HYPERVISOR_exit();
 #endif
 	}
