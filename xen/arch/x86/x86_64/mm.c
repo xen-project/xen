@@ -26,7 +26,7 @@
 #include <asm/page.h>
 #include <asm/flushtlb.h>
 #include <asm/fixmap.h>
-#include <asm/domain_page.h>
+#include <asm/msr.h>
 
 void *safe_page_alloc(void)
 {
@@ -235,6 +235,34 @@ long do_stack_switch(unsigned long ss, unsigned long esp)
         return -EPERM;
     current->arch.kernel_ss = ss;
     current->arch.kernel_sp = esp;
+    return 0;
+}
+
+long do_set_segment_base(unsigned int which, unsigned long base)
+{
+    struct exec_domain *ed = current;
+
+    switch ( which )
+    {
+    case SEGBASE_FS:
+        ed->arch.user_ctxt.fs_base = base;
+        wrmsr(MSR_FS_BASE, base, base>>32);
+        break;
+
+    case SEGBASE_GS_USER:
+        ed->arch.user_ctxt.gs_base_user = base;
+        wrmsr(MSR_SHADOW_GS_BASE, base, base>>32);
+        break;
+
+    case SEGBASE_GS_KERNEL:
+        ed->arch.user_ctxt.gs_base_kernel = base;
+        wrmsr(MSR_GS_BASE, base, base>>32);
+        break;
+
+    default:
+        return -EINVAL;
+    }
+
     return 0;
 }
 

@@ -34,11 +34,11 @@ static inline execution_context_t *get_execution_context(void)
 }
 
 /*
- * Get the top-of-stack, as stored in the per-CPU TSS. This is actually
- * 20 bytes below the real top of the stack to allow space for:
+ * Get the bottom-of-stack, as stored in the per-CPU TSS. This is actually
+ * 20 bytes before the real bottom of the stack to allow space for:
  *  domain pointer, DS, ES, FS, GS.
  */
-static inline unsigned long get_stack_top(void)
+static inline unsigned long get_stack_bottom(void)
 {
     unsigned long p;
     __asm__ ( "andl %%esp,%0; addl %2,%0" 

@@ -256,6 +256,8 @@ void arch_do_createdomain(struct exec_domain *ed)
 
     SET_DEFAULT_FAST_TRAP(&ed->arch);
 
+    ed->arch.flags = TF_kernel_mode;
+
     if ( d->id == IDLE_DOMAIN_ID )
     {
         ed->arch.schedule_tail = continue_idle_task;
@@ -287,8 +289,6 @@ void arch_do_createdomain(struct exec_domain *ed)
         d->arch.mm_perdomain_l3[l3_table_offset(PERDOMAIN_VIRT_START)] = 
             mk_l3_pgentry(__pa(d->arch.mm_perdomain_l2) | __PAGE_HYPERVISOR);
 #endif
-
-        ed->arch.flags = TF_kernel_mode;
     }
 }
 
@@ -550,6 +550,172 @@ void new_thread(struct exec_domain *d,
 }
 
 
+#ifdef __x86_64__
+
+#define loadsegment(seg,value) ({               \
+    int __r = 1;                                \
+    __asm__ __volatile__ (                      \
+        "1: movl %k1,%%" #seg "\n2:\n"          \
+        ".section .fixup,\"ax\"\n"              \
+        "3: xorl %k0,%k0\n"                     \
+        "   movl %k0,%%" #seg "\n"              \
+        "   jmp 2b\n"                           \
+        ".previous\n"                           \
+        ".section __ex_table,\"a\"\n"           \
+        "   .align 8\n"                         \
+        "   .quad 1b,3b\n"                      \
+        ".previous"                             \
+        : "=r" (__r) : "r" (value), "0" (__r) );\
+    __r; })
+
+static void switch_segments(
+    struct xen_regs *regs, struct exec_domain *p, struct exec_domain *n)
+{
+    int all_segs_okay = 1;
+
+    if ( !is_idle_task(p->domain) )
+    {
+        __asm__ __volatile__ ( "movl %%ds,%0" : "=m" (p->arch.user_ctxt.ds) );
+        __asm__ __volatile__ ( "movl %%es,%0" : "=m" (p->arch.user_ctxt.es) );
+        __asm__ __volatile__ ( "movl %%fs,%0" : "=m" (p->arch.user_ctxt.fs) );
+        __asm__ __volatile__ ( "movl %%gs,%0" : "=m" (p->arch.user_ctxt.gs) );
+    }
+
+    /* Either selector != 0 ==> reload. */
+    if ( unlikely(p->arch.user_ctxt.ds |
+                  n->arch.user_ctxt.ds) )
+        all_segs_okay &= loadsegment(ds, n->arch.user_ctxt.ds);
+
+    /* Either selector != 0 ==> reload. */
+    if ( unlikely(p->arch.user_ctxt.es |
+                  n->arch.user_ctxt.es) )
+        all_segs_okay &= loadsegment(es, n->arch.user_ctxt.es);
+
+    /*
+     * Either selector != 0 ==> reload.
+     * Also reload to reset FS_BASE if it was non-zero.
+     */
+    if ( unlikely(p->arch.user_ctxt.fs |
+                  p->arch.user_ctxt.fs_base |
+                  n->arch.user_ctxt.fs) )
+    {
+        all_segs_okay &= loadsegment(fs, n->arch.user_ctxt.fs);
+        if ( p->arch.user_ctxt.fs ) /* != 0 selector kills fs_base */
+            p->arch.user_ctxt.fs_base = 0;
+    }
+
+    /*
+     * Either selector != 0 ==> reload.
+     * Also reload to reset GS_BASE if it was non-zero.
+     */
+    if ( unlikely(p->arch.user_ctxt.gs |
+                  p->arch.user_ctxt.gs_base_user |
+                  n->arch.user_ctxt.gs) )
+    {
+        /* Reset GS_BASE with user %gs? */
+        if ( p->arch.user_ctxt.gs || !n->arch.user_ctxt.gs_base_user )
+            all_segs_okay &= loadsegment(gs, n->arch.user_ctxt.gs);
+        if ( p->arch.user_ctxt.gs ) /* != 0 selector kills gs_base_user */
+            p->arch.user_ctxt.gs_base_user = 0;
+    }
+
+    /* This can only be non-zero if selector is NULL. */
+    if ( n->arch.user_ctxt.fs_base )
+        wrmsr(MSR_FS_BASE,
+              n->arch.user_ctxt.fs_base,
+              n->arch.user_ctxt.fs_base>>32);
+
+    /* This can only be non-zero if selector is NULL. */
+    if ( n->arch.user_ctxt.gs_base_user )
+        wrmsr(MSR_GS_BASE,
+              n->arch.user_ctxt.gs_base_user,
+              n->arch.user_ctxt.gs_base_user>>32);
+
+    /* This can only be non-zero if selector is NULL. */
+    if ( p->arch.user_ctxt.gs_base_kernel |
+         n->arch.user_ctxt.gs_base_kernel )
+        wrmsr(MSR_SHADOW_GS_BASE,
+              n->arch.user_ctxt.gs_base_kernel,
+              n->arch.user_ctxt.gs_base_kernel>>32);
+
+    /* If in kernel mode then switch the GS bases around. */
+    if ( n->arch.flags & TF_kernel_mode )
+        __asm__ __volatile__ ( "swapgs" );
+
+    if ( unlikely(!all_segs_okay) )
+    {
+        unsigned long *rsp =
+            (n->arch.flags & TF_kernel_mode) ?
+            (unsigned long *)regs->rsp : 
+            (unsigned long *)n->arch.kernel_sp;
+
+        if ( put_user(regs->ss,     rsp- 1) |
+             put_user(regs->rsp,    rsp- 2) |
+             put_user(regs->rflags, rsp- 3) |
+             put_user(regs->cs,     rsp- 4) |
+             put_user(regs->rip,    rsp- 5) |
+             put_user(regs->gs,     rsp- 6) |
+             put_user(regs->fs,     rsp- 7) |
+             put_user(regs->es,     rsp- 8) |
+             put_user(regs->ds,     rsp- 9) |
+             put_user(regs->r11,    rsp-10) |
+             put_user(regs->rcx,    rsp-11) )
+        {
+            DPRINTK("Error while creating failsafe callback frame.\n");
+            domain_crash();
+        }
+
+        if ( !(n->arch.flags & TF_kernel_mode) )
+        {
+            n->arch.flags |= TF_kernel_mode;
+            __asm__ __volatile__ ( "swapgs" );
+            write_ptbase(n);
+        }
+
+        regs->entry_vector  = TRAP_syscall;
+        regs->rflags       &= 0xFFFCBEFFUL;
+        regs->ss            = __GUEST_SS;
+        regs->rsp           = (unsigned long)(rsp-11);
+        regs->cs            = __GUEST_CS;
+        regs->rip           = n->arch.failsafe_address;
+    }
+}
+
+long do_switch_to_user(void)
+{
+    struct xen_regs       *regs = get_execution_context();
+    struct switch_to_user  stu;
+    struct exec_domain    *ed = current;
+
+    if ( unlikely(copy_from_user(&stu, (void *)regs->rsp, sizeof(stu))) )
+        return -EFAULT;
+
+    ed->arch.flags &= ~TF_kernel_mode;
+    __asm__ __volatile__ ( "swapgs" );
+    write_ptbase(ed);
+
+    regs->rip    = stu.rip;
+    regs->cs     = stu.cs;
+    regs->rflags = stu.rflags;
+    regs->rsp    = stu.rsp;
+    regs->ss     = stu.ss;
+
+    if ( !(stu.flags & ECF_IN_SYSCALL) )
+    {
+        regs->entry_vector = 0;
+        regs->r11 = stu.r11;
+        regs->rcx = stu.rcx;
+    }
+    
+    return regs->rax;
+}
+
+#elif defined(__i386__)
+
+#define switch_segments(_r, _p, _n) ((void)0)
+
+#endif
+
 /*
  * This special macro can be used to load a debugging register
  */
@@ -566,21 +732,12 @@ void switch_to(struct exec_domain *prev_p, struct exec_domain *next_p)
 #ifdef CONFIG_VMX
     unsigned long vmx_domain = next_p->arch.arch_vmx.flags; 
 #endif
-#ifdef __x86_64__
-    int all_segs_okay = 1;
-#endif
 
     __cli();
 
     /* Switch guest general-register state. */
     if ( !is_idle_task(prev_p->domain) )
     {
-#ifdef __x86_64__
-        __asm__ __volatile__ ( "movl %%ds,%0" : "=m" (stack_ec->ds) );
-        __asm__ __volatile__ ( "movl %%es,%0" : "=m" (stack_ec->es) );
-        __asm__ __volatile__ ( "movl %%fs,%0" : "=m" (stack_ec->fs) );
-        __asm__ __volatile__ ( "movl %%gs,%0" : "=m" (stack_ec->gs) );
-#endif
         memcpy(&prev_p->arch.user_ctxt,
                stack_ec, 
                sizeof(*stack_ec));
@@ -624,7 +781,7 @@ void switch_to(struct exec_domain *prev_p, struct exec_domain *next_p)
         SET_FAST_TRAP(&next_p->arch);
 
 #ifdef __i386__
-        /* Switch the guest OS ring-1 stack. */
+        /* Switch the kernel ring-1 stack. */
         tss->esp1 = next_p->arch.kernel_sp;
         tss->ss1  = next_p->arch.kernel_ss;
 #endif
@@ -660,126 +817,7 @@ void switch_to(struct exec_domain *prev_p, struct exec_domain *next_p)
 
     __sti();
 
-#ifdef __x86_64__
-
-#define loadsegment(seg,value) ({               \
-    int __r = 1;                                \
-    __asm__ __volatile__ (                      \
-        "1: movl %k1,%%" #seg "\n2:\n"          \
-        ".section .fixup,\"ax\"\n"              \
-        "3: xorl %k0,%k0\n"                     \
-        "   movl %k0,%%" #seg "\n"              \
-        "   jmp 2b\n"                           \
-        ".previous\n"                           \
-        ".section __ex_table,\"a\"\n"           \
-        "   .align 8\n"                         \
-        "   .quad 1b,3b\n"                      \
-        ".previous"                             \
-        : "=r" (__r) : "r" (value), "0" (__r) );\
-    __r; })
-
-    /* Either selector != 0 ==> reload. */
-    if ( unlikely(prev_p->arch.user_ctxt.ds) ||
-         unlikely(next_p->arch.user_ctxt.ds) )
-        all_segs_okay &= loadsegment(ds, next_p->arch.user_ctxt.ds);
-
-    /* Either selector != 0 ==> reload. */
-    if ( unlikely(prev_p->arch.user_ctxt.es) ||
-         unlikely(next_p->arch.user_ctxt.es) )
-        all_segs_okay &= loadsegment(es, next_p->arch.user_ctxt.es);
-
-    /*
-     * Either selector != 0 ==> reload.
-     * Also reload to reset FS_BASE if it was non-zero.
-     */
-    if ( unlikely(prev_p->arch.user_ctxt.fs) ||
-         unlikely(prev_p->arch.user_ctxt.fs_base) ||
-         unlikely(next_p->arch.user_ctxt.fs) )
-    {
-        all_segs_okay &= loadsegment(fs, next_p->arch.user_ctxt.fs);
-        if ( prev_p->arch.user_ctxt.fs ) /* != 0 selector kills fs_base */
-            prev_p->arch.user_ctxt.fs_base = 0;
-    }
-
-    /*
-     * Either selector != 0 ==> reload.
-     * Also reload to reset GS_BASE if it was non-zero.
-     */
-    if ( unlikely(prev_p->arch.user_ctxt.gs) ||
-         unlikely(prev_p->arch.user_ctxt.gs_base_os) ||
-         unlikely(prev_p->arch.user_ctxt.gs_base_app) ||
-         unlikely(next_p->arch.user_ctxt.gs) )
-    {
-        /* Reset GS_BASE with user %gs. */
-        all_segs_okay &= loadsegment(gs, next_p->arch.user_ctxt.gs);
-        /* Reset KERNEL_GS_BASE if we won't be doing it later. */
-        if ( !next_p->arch.user_ctxt.gs_base_os )
-            wrmsr(MSR_KERNEL_GS_BASE, 0, 0);
-        if ( prev_p->arch.user_ctxt.gs ) /* != 0 selector kills app gs_base */
-            prev_p->arch.user_ctxt.gs_base_app = 0;
-    }
-
-    /* This can only be non-zero if selector is NULL. */
-    if ( next_p->arch.user_ctxt.fs_base )
-        wrmsr(MSR_FS_BASE,
-              next_p->arch.user_ctxt.fs_base,
-              next_p->arch.user_ctxt.fs_base>>32);
-
-    /* This can only be non-zero if selector is NULL. */
-    if ( next_p->arch.user_ctxt.gs_base_os )
-        wrmsr(MSR_KERNEL_GS_BASE,
-              next_p->arch.user_ctxt.gs_base_os,
-              next_p->arch.user_ctxt.gs_base_os>>32);
-
-    /* This can only be non-zero if selector is NULL. */
-    if ( next_p->arch.user_ctxt.gs_base_app )
-        wrmsr(MSR_GS_BASE,
-              next_p->arch.user_ctxt.gs_base_app,
-              next_p->arch.user_ctxt.gs_base_app>>32);
-
-    /* If in guest-OS mode, switch the GS bases around. */
-    if ( next_p->arch.flags & TF_kernel_mode )
-        __asm__ __volatile__ ( "swapgs" );
-
-    if ( unlikely(!all_segs_okay) )
-    {
-        unsigned long *rsp =
-            (next_p->arch.flags & TF_kernel_mode) ?
-            (unsigned long *)stack_ec->rsp : 
-            (unsigned long *)next_p->arch.kernel_sp;
-
-        if ( put_user(stack_ec->ss,     rsp- 1) |
-             put_user(stack_ec->rsp,    rsp- 2) |
-             put_user(stack_ec->rflags, rsp- 3) |
-             put_user(stack_ec->cs,     rsp- 4) |
-             put_user(stack_ec->rip,    rsp- 5) |
-             put_user(stack_ec->gs,     rsp- 6) |
-             put_user(stack_ec->fs,     rsp- 7) |
-             put_user(stack_ec->es,     rsp- 8) |
-             put_user(stack_ec->ds,     rsp- 9) |
-             put_user(stack_ec->r11,    rsp-10) |
-             put_user(stack_ec->rcx,    rsp-11) )
-        {
-            DPRINTK("Error while creating failsafe callback frame.\n");
-            domain_crash();
-        }
-
-        if ( !(next_p->arch.flags & TF_kernel_mode) )
-        {
-            next_p->arch.flags |= TF_kernel_mode;
-            __asm__ __volatile__ ( "swapgs" );
-            /* XXX switch page tables XXX */
-        }
-
-        stack_ec->entry_vector  = TRAP_syscall;
-        stack_ec->rflags       &= 0xFFFCBEFFUL;
-        stack_ec->ss            = __GUEST_SS;
-        stack_ec->rsp           = (unsigned long)(rsp-11);
-        stack_ec->cs            = __GUEST_CS;
-        stack_ec->rip           = next_p->arch.failsafe_address;
-    }
-
-#endif /* __x86_64__ */
+    switch_segments(stack_ec, prev_p, next_p);
 }
 
 
@@ -935,13 +973,23 @@ void domain_relinquish_memory(struct domain *d)
     /* Exit shadow mode before deconstructing final guest page table. */
     shadow_mode_disable(d);
 
-    /* Drop the in-use reference to the page-table base. */
+    /* Drop the in-use references to page-table bases. */
     for_each_exec_domain ( d, ed )
     {
         if ( pagetable_val(ed->arch.pagetable) != 0 )
-            put_page_and_type(&frame_table[pagetable_val(ed->arch.pagetable) >>
-                                           PAGE_SHIFT]);
-        ed->arch.pagetable = mk_pagetable(0);
+        {
+            put_page_and_type(
+                &frame_table[pagetable_val(ed->arch.pagetable) >> PAGE_SHIFT]);
+            ed->arch.pagetable = mk_pagetable(0);
+        }
+
+        if ( pagetable_val(ed->arch.pagetable_user) != 0 )
+        {
+            put_page_and_type(
+                &frame_table[pagetable_val(ed->arch.pagetable_user) >>
+                            PAGE_SHIFT]);
+            ed->arch.pagetable_user = mk_pagetable(0);
+        }
     }
 
 #ifdef CONFIG_VMX

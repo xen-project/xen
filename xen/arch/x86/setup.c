@@ -325,9 +325,9 @@ void __init cpu_init(void)
     memset(t->io_bitmap, ~0, sizeof(t->io_bitmap));
 #if defined(__i386__)
     t->ss0  = __HYPERVISOR_DS;
-    t->esp0 = get_stack_top();
+    t->esp0 = get_stack_bottom();
 #elif defined(__x86_64__)
-    t->rsp0 = get_stack_top();
+    t->rsp0 = get_stack_bottom();
 #endif
     set_tss_desc(nr,t);
     load_TR(nr);

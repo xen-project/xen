@@ -153,12 +153,14 @@ asmlinkage void do_double_fault(struct xen_regs *regs)
         __asm__ __volatile__ ( "hlt" );
 }
 
-asmlinkage void hypercall(void);
+asmlinkage void syscall_enter(void);
 void __init percpu_traps_init(void)
 {
-    char *stack_top = (char *)get_stack_top();
-    char *stack     = (char *)((unsigned long)stack_top & ~(STACK_SIZE - 1));
-    int   cpu       = smp_processor_id();
+    char *stack_bottom, *stack;
+    int   cpu = smp_processor_id();
+
+    stack_bottom = (char *)get_stack_bottom();
+    stack        = (char *)((unsigned long)stack_bottom & ~(STACK_SIZE - 1));
 
     /* Double-fault handler has its own per-CPU 1kB stack. */
     init_tss[cpu].ist[0] = (unsigned long)&stack[1024];
@@ -181,17 +183,17 @@ void __init percpu_traps_init(void)
     stack[0] = 0x48;
     stack[1] = 0x89;
     stack[2] = 0x25;
-    *(u32 *)&stack[3] = (stack_top - &stack[7]) - 16;
+    *(u32 *)&stack[3] = (stack_bottom - &stack[7]) - 16;
 
     /* leaq saversp(%rip), %rsp */
     stack[7] = 0x48;
     stack[8] = 0x8d;
     stack[9] = 0x25;
-    *(u32 *)&stack[10] = (stack_top - &stack[14]) - 16;
+    *(u32 *)&stack[10] = (stack_bottom - &stack[14]) - 16;
 
-    /* jmp hypercall */
+    /* jmp syscall_enter */
     stack[14] = 0xe9;
-    *(u32 *)&stack[15] = (char *)hypercall - &stack[19];
+    *(u32 *)&stack[15] = (char *)syscall_enter - &stack[19];
 
     /*
      * Trampoline for SYSCALL entry from compatibility mode.
@@ -205,17 +207,17 @@ void __init percpu_traps_init(void)
     stack[0] = 0x48;
     stack[1] = 0x89;
     stack[2] = 0x25;
-    *(u32 *)&stack[3] = (stack_top - &stack[7]) - 16;
+    *(u32 *)&stack[3] = (stack_bottom - &stack[7]) - 16;
 
     /* leaq saversp(%rip), %rsp */
     stack[7] = 0x48;
     stack[8] = 0x8d;
     stack[9] = 0x25;
-    *(u32 *)&stack[10] = (stack_top - &stack[14]) - 16;
+    *(u32 *)&stack[10] = (stack_bottom - &stack[14]) - 16;
 
-    /* jmp hypercall */
+    /* jmp syscall_enter */
     stack[14] = 0xe9;
-    *(u32 *)&stack[15] = (char *)hypercall - &stack[19];
+    *(u32 *)&stack[15] = (char *)syscall_enter - &stack[19];
 
     /*
      * Common SYSCALL parameters.

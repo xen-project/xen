@@ -209,6 +209,10 @@ void write_ptbase(struct exec_domain *ed)
 #else
     if ( unlikely(shadow_mode(d)) )
         pa = pagetable_val(ed->arch.shadow_table);    
+#ifdef __x86_64__
+    else if ( !(ed->arch.flags & TF_kernel_mode) )
+        pa = pagetable_val(ed->arch.pagetable_user);
+#endif
     else
         pa = pagetable_val(ed->arch.pagetable);
 #endif
@@ -1340,6 +1344,24 @@ static int do_extended_command(unsigned long ptr, unsigned long val)
     case MMUEXT_NEW_BASEPTR:
         okay = new_guest_cr3(pfn);
         break;
+        
+#ifdef __x86_64__
+    case MMUEXT_NEW_USER_BASEPTR:
+        okay = get_page_and_type_from_pagenr(pfn, PGT_root_page_table, d);
+        if ( unlikely(!okay) )
+        {
+            MEM_LOG("Error while installing new baseptr %p", pfn);
+        }
+        else
+        {
+            unsigned long old_pfn =
+                pagetable_val(ed->arch.pagetable_user) >> PAGE_SHIFT;
+            ed->arch.pagetable_user = mk_pagetable(pfn << PAGE_SHIFT);
+            if ( old_pfn != 0 )
+                put_page_and_type(&frame_table[old_pfn]);
+        }
+        break;
+#endif
         
     case MMUEXT_TLB_FLUSH:
         percpu_info[cpu].deferred_ops |= DOP_FLUSH_TLB;

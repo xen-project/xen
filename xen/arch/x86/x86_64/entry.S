@@ -20,8 +20,8 @@
 
         ALIGN
 restore_all_guest:
-        testb $TF_failsafe_return,EDOMAIN_thread_flags(%rbx)
-        jnz   failsafe_callback
+        btr   $_TF_failsafe_return,EDOMAIN_thread_flags(%rbx)
+        jc    failsafe_callback
         RESTORE_ALL
         testw $TRAP_syscall,4(%rsp)
         jz    1f
@@ -50,9 +50,8 @@ FIX1:   popq  -15*8-8(%rsp)            # error_code/entry_vector
 DBLFLT1:GET_CURRENT(%rbx)
         jmp   test_all_events
 DBLFIX1:GET_CURRENT(%rbx)
-        testb $TF_failsafe_return,EDOMAIN_thread_flags(%rbx)
-        jnz   domain_crash             # cannot reenter failsafe code
-        orb   $TF_failsafe_return,EDOMAIN_thread_flags(%rbx)
+        bts   $_TF_failsafe_return,EDOMAIN_thread_flags(%rbx)
+        jc    domain_crash             # cannot reenter failsafe code
         jmp   test_all_events          # will return via failsafe code
 .previous
 .section __pre_ex_table,"a"
@@ -65,7 +64,6 @@ DBLFIX1:GET_CURRENT(%rbx)
 /* No special register assumptions */
 failsafe_callback:
         GET_CURRENT(%rbx)
-        andb $~TF_failsafe_return,EDOMAIN_thread_flags(%rbx)
         leaq EDOMAIN_trap_bounce(%rbx),%rdx
         movq EDOMAIN_failsafe_addr(%rbx),%rax
         movq %rax,TRAPBOUNCE_eip(%rdx)
@@ -97,8 +95,7 @@ restore_all_xen:
  * NB. We must move %r10 to %rcx for C function-calling ABI.
  */
         ALIGN
-ENTRY(hypercall)
-        sti
+ENTRY(syscall_enter)
         movl  $__GUEST_SS,8(%rsp)
         pushq %r11
         pushq $__GUEST_CS
@@ -106,13 +103,20 @@ ENTRY(hypercall)
         pushq $0
         movl  $TRAP_syscall,4(%rsp)
         SAVE_ALL
+        GET_CURRENT(%rbx)
+        bts   $_TF_kernel_mode,EDOMAIN_thread_flags(%rbx)
+        jc    hypercall
+        swapgs
+        movq  %rbx,%rdi
+        call  SYMBOL_NAME(write_ptbase)
+        jmp   restore_all_guest
+
+hypercall:
+        sti
         movq  %r10,%rcx
         andq  $(NR_hypercalls-1),%rax
-        leaq  SYMBOL_NAME(hypercall_table)(%rip),%rbx
-        callq *(%rbx,%rax,8)
-        GET_CURRENT(%rbx)
-
-ret_from_hypercall:
+        leaq  SYMBOL_NAME(hypercall_table)(%rip),%r10
+        callq *(%r10,%rax,8)
         movq %rax,XREGS_rax(%rsp)       # save the return value
 
 test_all_events:
@@ -154,7 +158,7 @@ create_bounce_frame:
         movq  XREGS_rsp+8(%rsp),%rsi
         testb $TF_kernel_mode,EDOMAIN_thread_flags(%rbx)
         jnz   1f
-        /* Push new frame at registered guest-OS stack top. */
+        /* Push new frame at registered guest-OS stack base. */
         movq  EDOMAIN_kernel_sp(%rbx),%rsi
 1:      movq  $HYPERVISOR_VIRT_START,%rax
         cmpq  %rax,%rsi
@@ -203,11 +207,11 @@ FLT15:  movq  %rax,(%rsi)               # RCX
         /* Rewrite our stack frame and return to guest-OS mode. */
         /* IA32 Ref. Vol. 3: TF, VM, RF and NT flags are cleared on trap. */
         movb  $0,TRAPBOUNCE_flags(%rdx)
-        testb $TF_kernel_mode,EDOMAIN_thread_flags(%rbx)
-        jnz   1f
-        orb   $TF_kernel_mode,EDOMAIN_thread_flags(%rbx)
+        bts   $_TF_kernel_mode,EDOMAIN_thread_flags(%rbx)
+        jc    1f
         swapgs
-        /* XXX switch page tables XXX */
+        movq  %rbx,%rdi
+        call  SYMBOL_NAME(write_ptbase)
 1:      movl  $TRAP_syscall,XREGS_entry_vector+8(%rsp)
         andl  $0xfffcbeff,XREGS_eflags+8(%rsp)
         movl  $__GUEST_SS,XREGS_ss+8(%rsp)
@@ -425,7 +429,7 @@ ENTRY(hypercall_table)
         .quad SYMBOL_NAME(do_set_debugreg)
         .quad SYMBOL_NAME(do_get_debugreg)
         .quad SYMBOL_NAME(do_update_descriptor)  /* 10 */
-        .quad SYMBOL_NAME(do_ni_hypercall) # do_set_fast_trap
+        .quad SYMBOL_NAME(do_ni_hypercall)
         .quad SYMBOL_NAME(do_dom_mem_op)
         .quad SYMBOL_NAME(do_multicall)
         .quad SYMBOL_NAME(do_update_va_mapping)
@@ -437,8 +441,9 @@ ENTRY(hypercall_table)
         .quad SYMBOL_NAME(do_grant_table_op)     /* 20 */
         .quad SYMBOL_NAME(do_vm_assist)
         .quad SYMBOL_NAME(do_update_va_mapping_otherdomain)
-        .quad SYMBOL_NAME(do_ni_hypercall) # do_switch_vm86
+        .quad SYMBOL_NAME(do_switch_to_user)
         .quad SYMBOL_NAME(do_boot_vcpu)
+        .quad SYMBOL_NAME(do_set_segment_base)   /* 25 */
         .rept NR_hypercalls-((.-hypercall_table)/4)
         .quad SYMBOL_NAME(do_ni_hypercall)
         .endr

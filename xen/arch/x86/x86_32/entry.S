@@ -81,7 +81,7 @@
  *   (9)  u32 fs;
  *   (8)  u32 ds;
  *   (7)  u32 es;
- *               <- get_stack_top() (= HOST_ESP)
+ *               <- get_stack_bottom() (= HOST_ESP)
  *   (6)  u32 ss;
  *   (5)  u32 esp;
  *   (4)  u32 eflags;
@@ -89,8 +89,8 @@
  *   (2)  u32 eip;
  * (2/1)  u16 entry_vector;
  * (1/1)  u16 error_code;
- * However, get_stack_top() acturally returns 20 bytes below the real
- * top of the stack to allow space for:
+ * However, get_stack_bottom() actually returns 20 bytes before the real
+ * bottom of the stack to allow space for:
  * domain pointer, DS, ES, FS, GS. Therefore, we effectively skip 6 registers.
  */
 #define VMX_MONITOR_EFLAGS	0x202 /* IF on */
@@ -173,8 +173,8 @@ vmx_process_softirqs:
 
         ALIGN
 restore_all_guest:
-        testb $TF_failsafe_return,EDOMAIN_thread_flags(%ebx)
-        jnz  failsafe_callback
+        btr  $_TF_failsafe_return,EDOMAIN_thread_flags(%ebx)
+        jc   failsafe_callback
         testl $X86_EFLAGS_VM,XREGS_eflags(%esp)
         jnz  restore_all_vm86
 FLT1:   movl XREGS_ds(%esp),%ds
@@ -216,9 +216,8 @@ FIX1:   SET_XEN_SEGMENTS(a)
 DBLFLT1:GET_CURRENT(%ebx)
         jmp   test_all_events
 DBLFIX1:GET_CURRENT(%ebx)
-        testb $TF_failsafe_return,EDOMAIN_thread_flags(%ebx)
-        jnz   domain_crash             # cannot reenter failsafe code
-        orb   $TF_failsafe_return,EDOMAIN_thread_flags(%ebx)
+        bts   $_TF_failsafe_return,EDOMAIN_thread_flags(%ebx)
+        jc    domain_crash             # cannot reenter failsafe code
         jmp   test_all_events          # will return via failsafe code
 .previous
 .section __pre_ex_table,"a"
@@ -235,7 +234,6 @@ DBLFIX1:GET_CURRENT(%ebx)
 /* No special register assumptions */
 failsafe_callback:
         GET_CURRENT(%ebx)
-        andb $~TF_failsafe_return,EDOMAIN_thread_flags(%ebx)
         leal EDOMAIN_trap_bounce(%ebx),%edx
         movl EDOMAIN_failsafe_addr(%ebx),%eax
         movl %eax,TRAPBOUNCE_eip(%edx)
@@ -282,8 +280,6 @@ ENTRY(hypercall)
         GET_CURRENT(%ebx)
 	andl $(NR_hypercalls-1),%eax
 	call *SYMBOL_NAME(hypercall_table)(,%eax,4)
-
-ret_from_hypercall:
         movl %eax,XREGS_eax(%esp)       # save the return value
 
 test_all_events:

@@ -63,7 +63,7 @@
 #define MSR_SYSCALL_MASK 0xc0000084	/* EFLAGS mask for syscall */
 #define MSR_FS_BASE 0xc0000100		/* 64bit GS base */
 #define MSR_GS_BASE 0xc0000101		/* 64bit FS base */
-#define MSR_KERNEL_GS_BASE  0xc0000102	/* SwapGS GS shadow (or USER_GS from kernel) */ 
+#define MSR_SHADOW_GS_BASE  0xc0000102	/* SwapGS GS shadow */ 
 /* EFER bits: */ 
 #define _EFER_SCE 0  /* SYSCALL/SYSRET */
 #define _EFER_LME 8  /* Long mode enable */

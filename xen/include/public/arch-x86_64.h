@@ -77,12 +77,38 @@
 #define HYPERVISOR_VIRT_END   (0xFFFF880000000000UL)
 #endif
 
+#ifndef __ASSEMBLY__
+
 /* The machine->physical mapping table starts at this address, read-only. */
 #ifndef machine_to_phys_mapping
 #define machine_to_phys_mapping ((unsigned long *)HYPERVISOR_VIRT_START)
 #endif
 
-#ifndef __ASSEMBLY__
+/*
+ * int HYPERVISOR_set_segment_base(unsigned int which, unsigned long base)
+ *  @which == SEGBASE_*  ;  @base == 64-bit base address
+ * Returns 0 on success.
+ */
+#define SEGBASE_FS          0
+#define SEGBASE_GS_USER     1
+#define SEGBASE_GS_KERNEL   2
+
+/*
+ * int HYPERVISOR_switch_to_user(void)
+ *  All arguments are on the kernel stack, in the following format.
+ * Never returns if successful. Current kernel context is lost.
+ * If flags contains ECF_IN_SYSCALL:
+ *   Restore RIP, RFLAGS, RSP. 
+ *   Discard R11, RCX, CS, SS.
+ * Otherwise:
+ *   Restore R11, RCX, CS:RIP, RFLAGS, SS:RSP.
+ * All other registers are saved on hypercall entry and restored to user.
+ */
+struct switch_to_user {
+    /* Top of stack (%rsp at point of hypercall). */
+    u64 r11, rcx, flags, rip, cs, rflags, rsp, ss;
+    /* Bottom of switch_to_user stack frame. */
+} PACKED;
 
 /* NB. Both the following are 64 bits each. */
 typedef unsigned long memory_t;   /* Full-sized pointer/address/memory-size. */
@@ -136,8 +162,8 @@ typedef struct xen_regs
     u64 fs;      /* Non-zero => takes precedence over fs_base.     */
     u64 gs;      /* Non-zero => takes precedence over gs_base_app. */
     u64 fs_base;
-    u64 gs_base_os;
-    u64 gs_base_app;
+    u64 gs_base_kernel;
+    u64 gs_base_user;
 } PACKED execution_context_t;
 
 typedef u64 tsc_timestamp_t; /* RDTSC timestamp */

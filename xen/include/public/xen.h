@@ -42,7 +42,7 @@
 #define __HYPERVISOR_set_debugreg          8
 #define __HYPERVISOR_get_debugreg          9
 #define __HYPERVISOR_update_descriptor    10
-#define __HYPERVISOR_set_fast_trap        11
+#define __HYPERVISOR_set_fast_trap        11 /* x86/32 only */
 #define __HYPERVISOR_dom_mem_op           12
 #define __HYPERVISOR_multicall            13
 #define __HYPERVISOR_update_va_mapping    14
@@ -54,8 +54,10 @@
 #define __HYPERVISOR_grant_table_op       20
 #define __HYPERVISOR_vm_assist            21
 #define __HYPERVISOR_update_va_mapping_otherdomain 22
-#define __HYPERVISOR_switch_vm86          23
+#define __HYPERVISOR_switch_vm86          23 /* x86/32 only */
+#define __HYPERVISOR_switch_to_user       23 /* x86/64 only */
 #define __HYPERVISOR_boot_vcpu            24
+#define __HYPERVISOR_set_segment_base     25 /* x86/64 only */
 
 /*
  * MULTICALLS
@@ -118,6 +120,10 @@
  *   val[7:0] == MMUEXT_NEW_BASEPTR:
  *   ptr[:2]  -- Machine address of new page-table base to install in MMU.
  * 
+ *   val[7:0] == MMUEXT_NEW_USER_BASEPTR: [x86/64 only]
+ *   ptr[:2]  -- Machine address of new page-table base to install in MMU
+ *               when in user space.
+ * 
  *   val[7:0] == MMUEXT_TLB_FLUSH:
  *   No additional arguments.
  * 
@@ -166,6 +172,7 @@
 #define MMUEXT_CLEAR_FOREIGNDOM 11
 #define MMUEXT_TRANSFER_PAGE    12 /* ptr = MA of frame; val[31:16] = dom    */
 #define MMUEXT_REASSIGN_PAGE    13
+#define MMUEXT_NEW_USER_BASEPTR 14
 #define MMUEXT_CMD_MASK        255
 #define MMUEXT_CMD_SHIFT         8
 

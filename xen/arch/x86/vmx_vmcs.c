@@ -222,7 +222,7 @@ void vmx_do_launch(struct exec_domain *ed)
     ed->arch.shadow_table = ed->arch.pagetable;
     __vmwrite(GUEST_CR3, pagetable_val(ed->arch.pagetable));
     __vmwrite(HOST_CR3, pagetable_val(ed->arch.monitor_table));
-    __vmwrite(HOST_ESP, (unsigned long) get_stack_top());
+    __vmwrite(HOST_ESP, (unsigned long)get_stack_bottom());
 
     ed->arch.schedule_tail = arch_vmx_do_resume;
 }

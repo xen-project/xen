@@ -382,7 +382,7 @@ void vmx_do_resume(struct exec_domain *d)
 {
     __vmwrite(HOST_CR3, pagetable_val(d->arch.monitor_table));
     __vmwrite(GUEST_CR3, pagetable_val(d->arch.shadow_table));
-    __vmwrite(HOST_ESP, (unsigned long) get_stack_top());
+    __vmwrite(HOST_ESP, (unsigned long)get_stack_bottom());
 
     if (event_pending(d)) {
         if (test_bit(IOPACKET_PORT, &d->domain->shared_info->evtchn_pending[0])) 

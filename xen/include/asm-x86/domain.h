@@ -98,6 +98,7 @@ struct arch_exec_domain
      */
     l1_pgentry_t *perdomain_ptes;
     pagetable_t  pagetable;
+    pagetable_t  pagetable_user;  /* x86/64: user-space pagetable. */
 
     pagetable_t  monitor_table;
     pagetable_t  phys_table;            /* 1:1 pagetable */

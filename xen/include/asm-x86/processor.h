@@ -130,8 +130,10 @@
 #define TBF_FAILSAFE          16
 
 /* arch_exec_domain' flags values */
-#define TF_failsafe_return     1
-#define TF_kernel_mode        2
+#define _TF_failsafe_return    0
+#define _TF_kernel_mode        1
+#define TF_failsafe_return     (1<<_TF_failsafe_return)
+#define TF_kernel_mode         (1<<_TF_kernel_mode)
 
 #ifndef __ASSEMBLY__
 
