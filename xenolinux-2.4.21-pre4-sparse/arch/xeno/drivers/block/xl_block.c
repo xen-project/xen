@@ -45,7 +45,7 @@ static inline void signal_requests_to_xen(void)
 }
 
 /* Convert from a XenoLinux major device to the Xen-level 'physical' device */
-static inline unsigned short xldev_to_physdev(kdev_t xldev) 
+inline unsigned short xldev_to_physdev(kdev_t xldev) 
 {
     unsigned short physdev = 0;
 
@@ -149,7 +149,6 @@ int xenolinux_block_ioctl(struct inode *inode, struct file *filep,
 
     case BLKRRPART:                               /* re-read partition table */
         DPRINTK_IOCTL("   BLKRRPART: %x\n", BLKRRPART); 
-        if ( !capable(CAP_SYS_ADMIN) ) return -EACCES;
         return xenolinux_block_revalidate(dev);
 
     case BLKSSZGET:
@@ -231,7 +230,11 @@ int xenolinux_block_revalidate(kdev_t dev)
     xl_disk_t *disk = xldev_to_xldisk(dev);
     unsigned long flags;
     int i, partn_shift = PARTN_SHIFT(dev);
+    int xdev = dev & XENDEV_IDX_MASK;
     
+    DPRINTK("xenolinux_block_revalidate: %d %d %d\n", 
+	    dev, xdev, XENDEV_IDX_MASK);
+
     spin_lock_irqsave(&io_request_lock, flags);
     if ( disk->usage > 1 )
     {
@@ -242,9 +245,9 @@ int xenolinux_block_revalidate(kdev_t dev)
 
     for ( i = 0; i < (1 << partn_shift); i++ )
     {
-        invalidate_device(dev + i, 1);
-        gd->part[dev + i].start_sect = 0;
-        gd->part[dev + i].nr_sects = 0;
+        invalidate_device(xdev + i, 1);
+        gd->part[xdev + i].start_sect = 0;
+        gd->part[xdev + i].nr_sects = 0;
     }
 
     grok_partitions(gd, MINOR(dev) >> partn_shift,
@@ -438,7 +441,8 @@ static void xlblk_response_int(int irq, void *dev_id, struct pt_regs *ptregs)
         case XEN_BLOCK_READ:
         case XEN_BLOCK_WRITE:
             if ( bret->status )
-                printk(KERN_ALERT "Bad return from blkdev data request\n");
+                printk(KERN_ALERT "Bad return from blkdev data request: %lx\n",
+		       bret->status);
             for ( bh = (struct buffer_head *)bret->id; 
                   bh != NULL; 
                   bh = next_bh )
@@ -491,6 +495,7 @@ int xenolinux_control_msg(int operation, char *buffer, int size)
     /* We copy from an aligned buffer, as interface needs sector alignment. */
     aligned_buf = (char *)get_free_page(GFP_KERNEL);
     if ( aligned_buf == NULL ) BUG();
+    memcpy(aligned_buf, buffer, size);
 
     xlblk_control_msg_pending = 1;
     spin_lock_irqsave(&io_request_lock, flags);

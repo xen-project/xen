@@ -1388,7 +1388,7 @@ static void idedisk_setup (ide_drive_t *drive)
 	if ((capacity >= (drive->bios_cyl * drive->bios_sect * drive->bios_head)) &&
 	    (!drive->forced_geom) && drive->bios_sect && drive->bios_head)
 		drive->bios_cyl = (capacity / drive->bios_sect) / drive->bios_head;
-	printk (KERN_INFO "[XEN] %s: %ld sectors", drive->name, capacity);
+	printk (KERN_INFO "%s: %ld sectors", drive->name, capacity);
 
 	/* Give size in megabytes (MB), not mebibytes (MiB). */
 	/* We compute the exact rounded value, avoiding overflow. */

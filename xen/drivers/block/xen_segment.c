@@ -36,6 +36,7 @@ int xen_segment_map_request(
     extent_t  *ext;
     int sum, i;
 
+    segment_number &= XENDEV_IDX_MASK;
     if ( segment_number >= XEN_MAX_SEGMENTS ) goto fail;
 
     seg = p->segment_list[segment_number];
@@ -138,7 +139,6 @@ void xen_refresh_segment_list (struct task_struct *p)
             continue;
 
         p->segment_list[xsegments[loop].segment_number] = &xsegments[loop];
-        p->segment_count++;
     }
 }
 
@@ -147,18 +147,23 @@ void xen_refresh_segment_list (struct task_struct *p)
  *
  * return 0 on success, 1 on failure
  *
- * TODO: need to check to see if the DOM#/SEG# combination
- *       already exists. if so, reuse the slot in the segment table.
+ * if we see the same DOM#/SEG# combination, we reuse the slot in
+ * the segment table (overwriting what was there before).
+ * an alternative would be to raise an error if the slot is reused.
+ * bug: we don't free the xtents array when we re-use a slot.
  */
 int xen_segment_create(xv_disk_t *xvd_in)
 {
     int idx;
     int loop;
     xv_disk_t *xvd = map_domain_mem(virt_to_phys(xvd_in));
+    struct task_struct *p;
 
     for (idx = 0; idx < XEN_MAX_SEGMENTS; idx++)
     {
-        if (xsegments[idx].mode == XEN_SEGMENT_UNUSED) break;
+        if (xsegments[idx].mode == XEN_SEGMENT_UNUSED ||
+	    (xsegments[idx].domain == xvd->domain &&
+	     xsegments[idx].segment_number == xvd->segment)) break;
     }
     if (idx == XEN_MAX_SEGMENTS)
     {
@@ -187,6 +192,18 @@ int xen_segment_create(xv_disk_t *xvd_in)
             unmap_domain_mem(xvd);
             return 1;
         }
+    }
+
+    /* if the domain exists, assign the segment to the domain */
+    p = current;
+    do
+    {
+      p = p->next_task;
+    } while (p != current && p->domain != xvd->domain);
+
+    if (p->domain == xvd->domain)
+    {
+      p->segment_list[xvd->segment] = &xsegments[idx];
     }
 
     unmap_domain_mem(xvd);
@@ -222,7 +239,7 @@ static void dump_segments(u_char key, void *dev_id, struct pt_regs *regs)
                    xsegments[loop].num_extents);
             for (i = 0; i < xsegments[loop].num_extents; i++)
             {
-                printk("     ext %d: disk %d, offset 0x%lx, size 0x%lx\n",
+                printk("     extent %d: disk 0x%x, offset 0x%lx, size 0x%lx\n",
                        i, xsegments[loop].extents[i].disk,
                        xsegments[loop].extents[i].offset,
                        xsegments[loop].extents[i].size);
@@ -230,19 +247,19 @@ static void dump_segments(u_char key, void *dev_id, struct pt_regs *regs)
         }
     }
 
-    printk("segments by domain\n");
-    p = current->next_task;
+    printk("segments by domain (index into segments list)\n");
+    p = current;
     do
     {
-        printk("  domain: %d\n", p->domain);
-        for (loop = 0; loop < p->segment_count; loop++)
+        printk("  domain %d: ", p->domain);
+        for (loop = 0; loop < XEN_MAX_SEGMENTS; loop++)
         {
-            printk("    mode:%d domain:%d seg:%d exts:%d\n",
-                   p->segment_list[loop]->mode,
-                   p->segment_list[loop]->domain,
-                   p->segment_list[loop]->segment_number,
-                   p->segment_list[loop]->num_extents);
+	  if (p->segment_list[loop])
+	  {
+	    printk (" %d", p->segment_list[loop] - xsegments);
+	  }
         }
+	printk("\n");
         p = p->next_task;
     } while (p != current);
 }

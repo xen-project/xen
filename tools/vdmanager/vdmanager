@@ -1,0 +1,16 @@
+#!/bin/sh
+
+# development only
+export ANT_HOME=/anfs/scratch/boulderdash/ach61/jakarta-ant-1.5.1
+export JAVA_HOME=/anfs/scratch/labyrinth/ach61/java-1.4.1
+export PATH=${ANT_HOME}/bin:${JAVA_HOME}/bin:${PATH}
+
+# runtime
+export JAVA_HOME=../jre-1.4.1
+export PATH=${JAVA_HOME}/bin:${PATH}
+if [ -f /var/run/vdmanager.xml ]
+then
+  cp /var/run/vdmanager.xml /var/run/vdmanager.old.xml
+fi
+
+java -jar vdmanager.jar $*

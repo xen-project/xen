@@ -202,7 +202,12 @@ static void end_block_io_op(struct buffer_head *bh, int uptodate)
     if ( !uptodate )
     {
         DPRINTK("Buffer not up-to-date at end of operation\n");
-        pending_req->status = 1;
+        pending_req->status = 2;
+    }
+
+    if (pending_req->status)
+    {
+      printk ("Hey! status is %d\n", pending_req->status);
     }
 
     unlock_buffer(pending_req->domain, 
@@ -646,6 +651,7 @@ kdev_t xendev_to_physdev(unsigned short xendev)
         }
         return scsi_devs[xendev];
         
+    case XENDEV_VIRTUAL:
     default:
         DPRINTK("xendev_to_physdev: unknown device %d\n", xendev);
     }
@@ -660,6 +666,11 @@ static void make_response(struct task_struct *p, unsigned long id,
     unsigned long cpu_mask, flags;
     int position;
     blk_ring_t *blk_ring;
+
+    if (st != 0)
+    {
+      printk("status is %ld\n", st);
+    }
 
     /* Place on the response ring for the relevant domain. */ 
     spin_lock_irqsave(&p->blk_ring_lock, flags);
@@ -711,7 +722,6 @@ void init_blkdev_info(struct task_struct *p)
     p->blkdev_list.next = NULL;
 
     memset(p->segment_list, 0, sizeof(p->segment_list));
-    p->segment_count = 0;
 
     /* Get any previously created segments. */
     xen_refresh_segment_list(p);
@@ -743,5 +753,5 @@ void initialize_block_io ()
 
     xen_segment_initialize();
     
-    add_key_handler('b', dump_blockq, "dump xen ide blkdev stats");     
+    add_key_handler('b', dump_blockq, "dump xen ide blkdev statistics");
 }

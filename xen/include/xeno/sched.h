@@ -117,8 +117,7 @@ struct task_struct {
     unsigned int blk_resp_prod; /* (private version of) response producer */
     struct list_head blkdev_list;
     spinlock_t blk_ring_lock;
-    segment_t *segment_list[XEN_MAX_SEGMENTS];                        /* vhd */
-    int segment_count;
+    segment_t *segment_list[XEN_MAX_SEGMENTS];                        /* xvd */
 
     /* VM */
     struct mm_struct mm;
