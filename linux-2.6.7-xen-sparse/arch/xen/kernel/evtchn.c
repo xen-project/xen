@@ -380,7 +380,7 @@ static struct irqaction misdirect_action = {
 
 void irq_suspend(void)
 {
-    int virq, irq, evtchn;
+    int pirq, virq, irq, evtchn;
 
     /* Unbind VIRQs from event channels. */
     for ( virq = 0; virq < NR_VIRQS; virq++ )
@@ -394,15 +394,12 @@ void irq_suspend(void)
         irq_to_evtchn[irq]    = -1;
     }
 
-    /*
-     * We should now be unbound from all event channels. Stale bindings to 
-     * PIRQs and/or inter-domain event channels will cause us to barf here.
-     */
-    for ( evtchn = 0; evtchn < NR_EVENT_CHANNELS; evtchn++ )
-        if ( evtchn_to_irq[evtchn] != -1 )
-            panic("Suspend attempted while bound to evtchn %d.\n", evtchn);
+    /* Check that no PIRQs are still bound. */
+    for ( pirq = 0; pirq < NR_PIRQS; pirq++ )
+        if ( (evtchn = irq_to_evtchn[pirq_to_irq(pirq)]) != -1 )
+            panic("Suspend attempted while PIRQ %d bound to evtchn %d.\n",
+                  pirq, evtchn);
 }
-
 
 void irq_resume(void)
 {
