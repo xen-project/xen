@@ -514,8 +514,8 @@ static inline void set_l1_page_va(unsigned long pfn,
     struct pfn_info *page;
     
     page = &frame_table[pfn];
-    page->type_and_flags &= ~PGT_va_mask;
-    page->type_and_flags |= va_idx << PGT_va_shift;
+    page->u.inuse.type_info &= ~PGT_va_mask;
+    page->u.inuse.type_info |= va_idx << PGT_va_shift;
 }
 
 
@@ -1280,9 +1280,9 @@ void ptwr_reconnect_disconnected(unsigned long addr)
                 l2_pgentry_val(*pl2e),
                 l1_pgentry_val(linear_pg_table[(unsigned long)pl2e >>
                                                PAGE_SHIFT]) >> PAGE_SHIFT,
-                frame_table[pfn].type_and_flags,
-                frame_table[pfn].count_and_flags,
-                frame_table[pfn].u.domain->domain);
+                frame_table[pfn].u.inuse.type_info,
+                frame_table[pfn].u.inuse.count_info,
+                frame_table[pfn].u.inuse.domain->domain);
 
     nl2e = mk_l2_pgentry((l2_pgentry_val(*pl2e) & ~0x800) |
                          _PAGE_PRESENT);
@@ -1299,7 +1299,7 @@ void ptwr_reconnect_disconnected(unsigned long addr)
             struct pfn_info *page = &frame_table[l1_pgentry_to_pagenr(nl1e)];
             printk("%03x: %08lx != %08lx %08x/%08x\n", i,
                    l1_pgentry_val(ol1e), l1_pgentry_val(nl1e),
-                   page->type_and_flags, page->count_and_flags);
+                   page->u.inuse.type_info, page->u.inuse.count_info);
 #endif
             if (likely(readonly_page_from_l1e(nl1e)))
                 continue;
@@ -1318,17 +1318,17 @@ void ptwr_reconnect_disconnected(unsigned long addr)
     update_l2e(pl2e, *pl2e, nl2e);
 
 #if 0
-    if (page->count_and_flags & PGC_guest_pinned) {
-        if ((page->type_and_flags & PGT_count_mask) != 1)
+    if (page->u.inuse.count_info & PGC_guest_pinned) {
+        if ((page->u.inuse.type_info & PGT_count_mask) != 1)
             BUG();
-        page->type_and_flags++;
+        page->u.inuse.type_info++;
     }
 #endif
     PTWR_PRINTK("now pl2e %p l2e %08lx              taf %08x/%08x/%u\n", pl2e,
                 l2_pgentry_val(*pl2e),
-                frame_table[pfn].type_and_flags,
-                frame_table[pfn].count_and_flags,
-                frame_table[pfn].u.domain->domain);
+                frame_table[pfn].u.inuse.type_info,
+                frame_table[pfn].u.inuse.count_info,
+                frame_table[pfn].u.inuse.domain->domain);
     ptwr_disconnected[cpu] = ENTRIES_PER_L2_PAGETABLE;
     /* make pt page write protected */
     if (__get_user(pte, ptwr_writable_l1[cpu]))
@@ -1380,7 +1380,7 @@ void ptwr_flush_inactive(void)
                 struct pfn_info *page = &frame_table[l1_pgentry_to_pagenr(nl1e)];
                 printk("%03x: %08lx != %08lx %08x/%08x\n", i,
                        l1_pgentry_val(ol1e), l1_pgentry_val(nl1e),
-                       page->type_and_flags, page->count_and_flags);
+                       page->u.inuse.type_info, page->u.inuse.count_info);
 #endif
                 if (readonly_page_from_l1e(nl1e))
                     continue;
@@ -1398,10 +1398,10 @@ void ptwr_flush_inactive(void)
         unmap_domain_mem(pl1e);
 
 #if 0
-        if (page->count_and_flags & PGC_guest_pinned) {
-            if ((page->type_and_flags & PGT_count_mask) != 1)
+        if (page->u.inuse.count_info & PGC_guest_pinned) {
+            if ((page->u.inuse.type_info & PGT_count_mask) != 1)
                 BUG();
-            page->type_and_flags++;
+            page->u.inuse.type_info++;
         }
 #endif
         /* make pt page writable */
@@ -1439,36 +1439,36 @@ int ptwr_do_page_fault(unsigned long addr)
                     addr);
 #endif
         page = &frame_table[pfn];
-        if ((page->type_and_flags & PGT_type_mask) == PGT_l1_page_table) {
+        if ((page->u.inuse.type_info & PGT_type_mask) == PGT_l1_page_table) {
 #ifdef TRACK_PTWR_DOMAIN
             if (ptwr_domain[cpu] != get_current()->domain)
                 printk("ptwr_do_page_fault domain mismatch %d != %d\n",
                        ptwr_domain[cpu], get_current()->domain);
 #endif
-            pl2e = &linear_l2_table[(page->type_and_flags &
+            pl2e = &linear_l2_table[(page->u.inuse.type_info &
                                      PGT_va_mask) >> PGT_va_shift];
             PTWR_PRINTK("page_fault on l1 pt at va %08lx, pt for %08x, pfn %08lx\n",
-                        addr, ((page->type_and_flags & PGT_va_mask) >>
+                        addr, ((page->u.inuse.type_info & PGT_va_mask) >>
                                PGT_va_shift) << L2_PAGETABLE_SHIFT, pfn);
 #if 0
-            if (page->count_and_flags & PGC_guest_pinned) {
+            if (page->u.inuse.count_info & PGC_guest_pinned) {
                 PTWR_PRINTK(" pinned l1 page %p taf %08x/%08x\n", page,
-                            page->type_and_flags, page->count_and_flags);
-                if ((page->type_and_flags & PGT_count_mask) != 2)
+                            page->u.inuse.type_info, page->u.inuse.count_info);
+                if ((page->u.inuse.type_info & PGT_count_mask) != 2)
                     BUG();
-                page->type_and_flags--;
+                page->u.inuse.type_info--;
             }
 #endif
             if (l2_pgentry_val(*pl2e) >> PAGE_SHIFT != pfn) {
                 l1_pgentry_t *pl1e;
                 PTWR_PRINTK("freeing l1 page %p taf %08x/%08x\n", page,
-                            page->type_and_flags, page->count_and_flags);
+                            page->u.inuse.type_info, page->u.inuse.count_info);
                 if (ptwr_writable_idx[cpu] == PTWR_NR_WRITABLES)
                     ptwr_flush_inactive();
                 ptwr_writables[cpu][ptwr_writable_idx[cpu]] = (unsigned long *)
                     &linear_pg_table[addr>>PAGE_SHIFT];
 #if 0
-                if ((page->type_and_flags & PGT_count_mask) != 1)
+                if ((page->u.inuse.type_info & PGT_count_mask) != 1)
                     BUG();
 #endif
 
@@ -1488,21 +1488,21 @@ int ptwr_do_page_fault(unsigned long addr)
                             l1_pgentry_val(linear_pg_table[(unsigned long)pl2e
                                                            >> PAGE_SHIFT]) >>
                             PAGE_SHIFT,
-                            frame_table[pfn].type_and_flags,
-                            frame_table[pfn].count_and_flags,
-                            frame_table[pfn].u.domain->domain);
+                            frame_table[pfn].u.inuse.type_info,
+                            frame_table[pfn].u.inuse.count_info,
+                            frame_table[pfn].u.inuse.domain->domain);
                 /* disconnect l1 page */
                 nl2e = mk_l2_pgentry((l2_pgentry_val(*pl2e) &
                                       ~_PAGE_PRESENT) | 0x800);
                 update_l2e(pl2e, *pl2e, nl2e);
 
-                ptwr_disconnected[cpu] = (page->type_and_flags & PGT_va_mask)
+                ptwr_disconnected[cpu] = (page->u.inuse.type_info & PGT_va_mask)
                     >> PGT_va_shift;
                 PTWR_PRINTK("now pl2e %p l2e %08lx              taf %08x/%08x/%u\n",
                             pl2e, l2_pgentry_val(*pl2e),
-                            frame_table[pfn].type_and_flags,
-                            frame_table[pfn].count_and_flags,
-                            frame_table[pfn].u.domain->domain);
+                            frame_table[pfn].u.inuse.type_info,
+                            frame_table[pfn].u.inuse.count_info,
+                            frame_table[pfn].u.inuse.domain->domain);
                 ptwr_writable_l1[cpu] = (unsigned long *)
                     &linear_pg_table[addr>>PAGE_SHIFT];
                 pl1e = map_domain_mem(l2_pgentry_to_pagenr(nl2e) <<
@@ -1559,6 +1559,6 @@ void ptwr_status(void)
                 l2_pgentry_val(*pl2e),
                 l1_pgentry_val(linear_pg_table[(unsigned long)pl2e >>
                                                PAGE_SHIFT]) >> PAGE_SHIFT,
-                frame_table[l2_pgentry_to_pagenr(*pl2e)].type_and_flags,
-                frame_table[pfn].type_and_flags, frame_table[pfn].u.domain->domain);
+                frame_table[l2_pgentry_to_pagenr(*pl2e)].u.inuse.type_info,
+                frame_table[pfn].u.inuse.type_info, frame_table[pfn].u.inuse.domain->domain);
 }
