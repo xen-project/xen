@@ -11,6 +11,8 @@ from xen.xend.XendError import XendError
 from xen.xend import EventServer
 eserver = EventServer.instance()
 from xen.xend.XendLogging import log
+from xen.xend import XendRoot
+xroot = XendRoot.instance()
 
 import controller
 from messages import *
@@ -191,7 +193,8 @@ class ConsoleController(controller.Controller):
             pass
         else:
             f = ConsoleFactory(self, self.idx)
-            self.listener = reactor.listenTCP(self.console_port, f)
+            interface = xroot.get_console_address()
+            self.listener = reactor.listenTCP(self.console_port, f, interface=interface)
 
     def connect(self, addr, conn):
         """Connect a TCP connection to the console.

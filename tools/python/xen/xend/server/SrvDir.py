@@ -88,7 +88,7 @@ class SrvDir(SrvBase):
                 req.write('</body></html>')
             return ''
         except Exception, ex:
-            self._perform_err(ex, req)
+            self._perform_err(ex, "GET", req)
             
     def ls(self, req, use_sxp=0):
         url = req.prePathURL()
