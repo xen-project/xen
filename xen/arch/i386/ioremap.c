@@ -15,9 +15,6 @@
 
 static unsigned long remap_base = 0;
 
-#define L1_PROT (_PAGE_PRESENT|_PAGE_RW|_PAGE_ACCESSED)
-#define L2_PROT (_PAGE_PRESENT|_PAGE_RW|_PAGE_ACCESSED|_PAGE_DIRTY)
-
 #define PAGE_ALIGN(addr)    (((addr)+PAGE_SIZE-1)&PAGE_MASK)
 
 static void new_l2e(l2_pgentry_t *pl2e)
@@ -25,7 +22,7 @@ static void new_l2e(l2_pgentry_t *pl2e)
     l1_pgentry_t *pl1e = (l1_pgentry_t *)get_free_page(GFP_KERNEL);
     if ( !pl1e ) BUG();
     clear_page(pl1e);
-    *pl2e = mk_l2_pgentry(__pa(pl1e)|L2_PROT);
+    *pl2e = mk_l2_pgentry(__pa(pl1e)|__PAGE_HYPERVISOR);
 }
 
 
@@ -89,7 +86,7 @@ void * __ioremap(unsigned long phys_addr, unsigned long size, unsigned long flag
     for ( ; ; ) 
     {
         if ( !l1_pgentry_empty(*pl1e) ) BUG();
-        *pl1e++ = mk_l1_pgentry((phys_addr+cur)|L1_PROT|flags);
+        *pl1e++ = mk_l1_pgentry((phys_addr+cur)|PAGE_HYPERVISOR|flags);
         cur += PAGE_SIZE;
         if ( cur == size ) break;
         if ( !((unsigned long)pl1e & (PAGE_SIZE-1)) )

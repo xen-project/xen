@@ -36,10 +36,8 @@
  * in that it means we don't have to do messy GDT/LDT lookups to find
  * out which the privilege-level of the return code-selector. That code
  * would just be a hassle to write, and would need to account for running
- * off the end of the GDT/LDT, for example. The event callback has quite
- * a constrained callback method: the guest OS provides a linear address
- * which we call back to using the hard-coded __GUEST_CS descriptor (which
- * is a ring 1 descriptor). For IDT callbacks, we check that the provided
+ * off the end of the GDT/LDT, for example. For all callbacks we check
+ * that the provided
  * return CS is not == __HYPERVISOR_{CS,DS}. Apart from that we're safe as
  * don't allow a guest OS to install ring-0 privileges into the GDT/LDT.
  * It's up to the guest OS to ensure all returns via the IDT are to ring 1.
@@ -105,12 +103,14 @@ STATE           =  4
 HYP_EVENTS      =  8
 DOMAIN          = 12        
 SHARED_INFO     = 16
+EVENT_SEL       = 20
+EVENT_ADDR      = 24
+FAILSAFE_SEL    = 28
+FAILSAFE_ADDR   = 32
 
 /* Offsets in shared_info_t */
 EVENTS          =  0
 EVENTS_ENABLE   =  4
-EVENT_ADDR      =  8
-FAILSAFE_ADDR   = 12
 
 /* Offsets in guest_trap_bounce */
 GTB_ERROR_CODE  =  0
@@ -290,14 +290,14 @@ test_all_events:
         /* Prevent unnecessary reentry of event callback (stack overflow!) */
         xorl %ecx,%ecx
         movl %ecx,EVENTS_ENABLE(%eax)      
-/* %eax == shared_info, %ebx == task_struct */
-process_guest_events:   
+/*process_guest_events:*/
         mov  PROCESSOR(%ebx),%edx
         shl  $4,%edx                    # sizeof(guest_trap_bounce) == 16
         lea  guest_trap_bounce(%edx),%edx
-        movl EVENT_ADDR(%eax),%eax
+        movl EVENT_ADDR(%ebx),%eax
         movl %eax,GTB_EIP(%edx)
-        movw $__GUEST_CS,GTB_CS(%edx)
+        movl EVENT_SEL(%ebx),%eax
+        movw %ax,GTB_CS(%edx)
         call create_bounce_frame
         jmp  restore_all
 
@@ -319,10 +319,10 @@ failsafe_callback:
         mov  PROCESSOR(%ebx),%eax
         shl  $4,%eax
         lea  guest_trap_bounce(%eax),%edx
-        movl SHARED_INFO(%ebx),%eax
-        movl FAILSAFE_ADDR(%eax),%eax
+        movl FAILSAFE_ADDR(%ebx),%eax
         movl %eax,GTB_EIP(%edx)
-        movw $__GUEST_CS,GTB_CS(%edx)
+        movl FAILSAFE_SEL(%ebx),%eax
+        movw %ax,GTB_CS(%edx)
         call create_bounce_frame
         subl $8,%esi                 # add DS/ES to failsafe stack frame
         movl DS(%esp),%eax
@@ -590,7 +590,7 @@ ENTRY(hypervisor_call_table)
         .long SYMBOL_NAME(do_console_write)
         .long SYMBOL_NAME(do_set_gdt)
         .long SYMBOL_NAME(do_stack_switch)
-        .long SYMBOL_NAME(do_ldt_switch)
+        .long SYMBOL_NAME(do_set_callbacks)
         .long SYMBOL_NAME(do_net_update)
         .long SYMBOL_NAME(do_fpu_taskswitch)
         .long SYMBOL_NAME(do_yield)

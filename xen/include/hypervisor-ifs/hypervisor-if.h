@@ -10,13 +10,17 @@
 /*
  * SEGMENT DESCRIPTOR TABLES
  */
-/* 8 entries, plus a TSS entry for each CPU (up to 32 CPUs). */
+/* The first few GDT entries are reserved by Xen. */
 #define FIRST_DOMAIN_GDT_ENTRY	40
-/* These are flat segments for domain bootstrap and fallback. */
-#define FLAT_RING1_CS		0x11
-#define FLAT_RING1_DS		0x19
-#define FLAT_RING3_CS		0x23
-#define FLAT_RING3_DS		0x2b
+/*
+ * These flat segments are in the Xen-private section of every GDT. Since 
+ * these are also present in the initial GDT, many OSes will be able to avoid 
+ * installing their own GDT.
+ */
+#define FLAT_RING1_CS		0x0019
+#define FLAT_RING1_DS		0x0021
+#define FLAT_RING3_CS		0x002b
+#define FLAT_RING3_DS		0x0033
 
 
 /*
@@ -29,7 +33,7 @@
 #define __HYPERVISOR_console_write	   2
 #define __HYPERVISOR_set_gdt		   3
 #define __HYPERVISOR_stack_switch          4
-#define __HYPERVISOR_ldt_switch            5
+#define __HYPERVISOR_set_callbacks         5
 #define __HYPERVISOR_net_update		   6
 #define __HYPERVISOR_fpu_taskswitch	   7
 #define __HYPERVISOR_yield		   8
@@ -97,28 +101,32 @@
 /*
  * PAGE UPDATE COMMANDS AND FLAGS
  * 
- * PGREQ_XXX: specified in least-significant bits of 'ptr' field.
- * All requests specify relevent PTE or PT address in 'ptr'.
+ * PGREQ_XXX: specified in least 2 bits of 'ptr' field. These bits are masked
+ *  off to get the real 'ptr' value.
+ * All requests specify relevent machine address in 'ptr'.
  * Normal requests specify update value in 'value'.
- * Extended requests specify command in least 8 bits of 'value'.
+ * Extended requests specify command in least 8 bits of 'value'. These bits
+ *  are masked off to get the real 'val' value. Except for PGEXT_SET_LDT 
+ *  which shifts the least bits out.
  */
 /* A normal page-table update request. */
-#define PGREQ_NORMAL		0
+#define PGREQ_NORMAL		0 /* does a checked form of '*ptr = val'   */
 /* Update an entry in the machine->physical mapping table. */
-#define PGREQ_MPT_UPDATE	1
+#define PGREQ_MPT_UPDATE	1 /* ptr = frame to modify table entry for */
 /* An extended command. */
-#define PGREQ_EXTENDED_COMMAND	2
+#define PGREQ_EXTENDED_COMMAND	2 /* least 8 bits of val demux further     */
 /* DOM0 can make entirely unchecked updates which do not affect refcnts. */
-#define PGREQ_UNCHECKED_UPDATE	3
-/* Announce a new top-level page table. */
-#define PGEXT_PIN_L1_TABLE	0
-#define PGEXT_PIN_L2_TABLE	1
-#define PGEXT_PIN_L3_TABLE	2
-#define PGEXT_PIN_L4_TABLE	3
-#define PGEXT_UNPIN_TABLE	4
-#define PGEXT_NEW_BASEPTR	5
-#define PGEXT_TLB_FLUSH		6
-#define PGEXT_INVLPG		7
+#define PGREQ_UNCHECKED_UPDATE	3 /* does an unchecked '*ptr = val'        */
+/* Extended commands: */
+#define PGEXT_PIN_L1_TABLE	0 /* ptr = frame to pin                    */
+#define PGEXT_PIN_L2_TABLE	1 /* ptr = frame to pin                    */
+#define PGEXT_PIN_L3_TABLE	2 /* ptr = frame to pin                    */
+#define PGEXT_PIN_L4_TABLE	3 /* ptr = frame to pin                    */
+#define PGEXT_UNPIN_TABLE	4 /* ptr = frame to unpin                  */
+#define PGEXT_NEW_BASEPTR	5 /* ptr = new pagetable base to install   */
+#define PGEXT_TLB_FLUSH		6 /* ptr = NULL                            */
+#define PGEXT_INVLPG		7 /* ptr = NULL ; val = page to invalidate */
+#define PGEXT_SET_LDT           8 /* ptr = linear address; val = # entries */
 #define PGEXT_CMD_MASK	      255
 #define PGEXT_CMD_SHIFT		8
 
@@ -171,27 +179,6 @@ typedef struct shared_info_st {
      * stack overflow (in this way, acts as an interrupt-enable flag).
      */
     unsigned long events_enable;
-
-    /*
-     * Address for callbacks hypervisor -> guest OS.
-     * Stack frame looks like that of an interrupt.
-     * Code segment is the default flat selector.
-     * This handler will only be called when events_enable is non-zero.
-     */
-    unsigned long event_address;
-
-    /*
-     * Hypervisor uses this callback when it takes a fault on behalf of
-     * an application. This can happen when returning from interrupts for
-     * example: various faults can occur when reloading the segment
-     * registers, and executing 'iret'.
-     * This callback is provided with an extended stack frame, augmented
-     * with saved values for segment registers %ds and %es:
-     *	%ds, %es, %eip, %cs, %eflags [, %oldesp, %oldss]
-     * Code segment is the default flat selector.
-     * FAULTS WHEN CALLING THIS HANDLER WILL TERMINATE THE DOMAIN!!!
-     */
-    unsigned long failsafe_address;
 
     /*
      * Time: The following abstractions are exposed: System Time, Clock Time,

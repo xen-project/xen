@@ -195,13 +195,16 @@ static inline int HYPERVISOR_stack_switch(unsigned long ss, unsigned long esp)
     return ret;
 }
 
-static inline int HYPERVISOR_ldt_switch(unsigned long ldts)
+static inline int HYPERVISOR_set_callbacks(
+    unsigned long event_selector, unsigned long event_address,
+    unsigned long failsafe_selector, unsigned long failsafe_address)
 {
     int ret;
     __asm__ __volatile__ (
         TRAP_INSTR
-        : "=a" (ret) : "0" (__HYPERVISOR_ldt_switch),
-        "b" (ldts) : "memory" );
+        : "=a" (ret) : "0" (__HYPERVISOR_set_callbacks),
+        "b" (event_selector), "c" (event_address), 
+        "d" (failsafe_selector), "S" (failsafe_address) : "memory" );
 
     return ret;
 }

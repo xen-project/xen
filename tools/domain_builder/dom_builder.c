@@ -23,8 +23,13 @@
 #define GUEST_SIG   "XenoGues"
 #define SIG_LEN    8
 
-#define L1_PROT (_PAGE_PRESENT|_PAGE_RW|_PAGE_USER|_PAGE_ACCESSED)
-#define L2_PROT (_PAGE_PRESENT|_PAGE_RW|_PAGE_USER|_PAGE_ACCESSED|_PAGE_DIRTY)
+/*
+ * NB. No ring-3 access in initial guestOS pagetables. Note that we allow
+ * ring-3 privileges in the page directories, so that the guestOS may later
+ * decide to share a 4MB region with applications.
+ */
+#define L1_PROT (_PAGE_PRESENT|_PAGE_RW|_PAGE_ACCESSED)
+#define L2_PROT (_PAGE_PRESENT|_PAGE_RW|_PAGE_ACCESSED|_PAGE_DIRTY|_PAGE_USER)
 
 /* standardized error reporting function */
 static void dberr(char *msg)

@@ -16,8 +16,13 @@
 #include <asm/msr.h>
 #include <xeno/blkdev.h>
 
-#define L1_PROT (_PAGE_PRESENT|_PAGE_RW|_PAGE_USER|_PAGE_ACCESSED)
-#define L2_PROT (_PAGE_PRESENT|_PAGE_RW|_PAGE_USER|_PAGE_ACCESSED|_PAGE_DIRTY)
+/*
+ * NB. No ring-3 access in initial guestOS pagetables. Note that we allow
+ * ring-3 privileges in the page directories, so that the guestOS may later
+ * decide to share a 4MB region with applications.
+ */
+#define L1_PROT (_PAGE_PRESENT|_PAGE_RW|_PAGE_ACCESSED)
+#define L2_PROT (_PAGE_PRESENT|_PAGE_RW|_PAGE_ACCESSED|_PAGE_DIRTY|_PAGE_USER)
 
 rwlock_t tasklist_lock __cacheline_aligned = RW_LOCK_UNLOCKED;
 
@@ -46,6 +51,9 @@ struct task_struct *do_newdomain(unsigned int dom_id, unsigned int cpu)
     p->shared_info = (void *)get_free_page(GFP_KERNEL);
     memset(p->shared_info, 0, PAGE_SIZE);
     SHARE_PFN_WITH_DOMAIN(virt_to_page(p->shared_info), dom_id);
+
+    p->mm.perdomain_pt = (l1_pgentry_t *)get_free_page(GFP_KERNEL);
+    memset(p->mm.perdomain_pt, 0, PAGE_SIZE);
 
     init_blkdev_info(p);
 
@@ -224,7 +232,8 @@ void release_task(struct task_struct *p)
     {
         destroy_net_vif(p);
     }
-    if ( p->mm.perdomain_pt ) free_page((unsigned long)p->mm.perdomain_pt);
+    
+    free_page((unsigned long)p->mm.perdomain_pt);
 
     destroy_blkdev_info(p);
 
@@ -268,7 +277,7 @@ int final_setup_guestos(struct task_struct * p, dom_meminfo_t * meminfo)
     net_ring_t *net_ring;
     net_vif_t *net_vif;
 
-    /* entries 0xe0000000 onwards in page table must contain hypervisor
+    /* High entries in page table must contain hypervisor
      * mem mappings - set them up.
      */
     phys_l2tab = meminfo->l2_pgt_addr;
@@ -279,7 +288,7 @@ int final_setup_guestos(struct task_struct * p, dom_meminfo_t * meminfo)
         (ENTRIES_PER_L2_PAGETABLE - DOMAIN_ENTRIES_PER_L2_PAGETABLE) 
         * sizeof(l2_pgentry_t));
     l2tab[PERDOMAIN_VIRT_START >> L2_PAGETABLE_SHIFT] = 
-        mk_l2_pgentry(__pa(p->mm.perdomain_pt) | PAGE_HYPERVISOR);
+        mk_l2_pgentry(__pa(p->mm.perdomain_pt) | __PAGE_HYPERVISOR);
     p->mm.pagetable = mk_pagetable(phys_l2tab);
     unmap_domain_mem(l2tab);
 

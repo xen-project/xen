@@ -325,6 +325,7 @@ asmlinkage void do_general_protection(struct pt_regs * regs, long error_code)
     return;
 
  gp_in_kernel:
+
     if ( (fixup = search_exception_table(regs->eip)) != 0 )
     {
         regs->eip = fixup;
@@ -568,23 +569,38 @@ long do_set_trap_table(trap_info_t *traps)
     trap_info_t cur;
     trap_info_t *dst = current->thread.traps;
 
-    /*
-     * I'm removing the next line, since it seems more intuitive to use this 
-     * as an interface to incrementally update a domain's trap table. Clearing 
-     * out old entries automatically is rather antisocial!
-     */
-    /*memset(dst, 0, sizeof(*dst) * 256);*/
-
     for ( ; ; )
     {
         if ( copy_from_user(&cur, traps, sizeof(cur)) ) return -EFAULT;
-        if ( (cur.cs & 3) == 0 ) return -EPERM;
+
         if ( cur.address == 0 ) break;
+
+        if ( !VALID_CODESEL(cur.cs) ) return -EPERM;
+
         memcpy(dst+cur.vector, &cur, sizeof(cur));
         traps++;
     }
 
-    return(0);
+    return 0;
+}
+
+
+long do_set_callbacks(unsigned long event_selector,
+                      unsigned long event_address,
+                      unsigned long failsafe_selector,
+                      unsigned long failsafe_address)
+{
+    struct task_struct *p = current;
+
+    if ( !VALID_CODESEL(event_selector) || !VALID_CODESEL(failsafe_selector) )
+        return -EPERM;
+
+    p->event_selector    = event_selector;
+    p->event_address     = event_address;
+    p->failsafe_selector = failsafe_selector;
+    p->failsafe_address  = failsafe_address;
+
+    return 0;
 }
 
 

@@ -312,15 +312,15 @@ void new_thread(struct task_struct *p,
 
     /*
      * Initial register values:
-     *  DS,ES,FS,GS = __GUEST_DS
-     *       CS:EIP = __GUEST_CS:start_pc
-     *       SS:ESP = __GUEST_DS:start_stack
+     *  DS,ES,FS,GS = FLAT_RING1_DS
+     *       CS:EIP = FLAT_RING1_CS:start_pc
+     *       SS:ESP = FLAT_RING1_DS:start_stack
      *          ESI = start_info
      *  [EAX,EBX,ECX,EDX,EDI,EBP are zero]
      */
-    p->thread.fs = p->thread.gs = __GUEST_DS;
-    regs->xds = regs->xes = regs->xss = __GUEST_DS;
-    regs->xcs = __GUEST_CS;
+    p->thread.fs = p->thread.gs = FLAT_RING1_DS;
+    regs->xds = regs->xes = regs->xss = FLAT_RING1_DS;
+    regs->xcs = FLAT_RING1_CS;
     regs->eip = start_pc;
     regs->esp = start_stack;
     regs->esi = start_info;
@@ -395,7 +395,7 @@ void __switch_to(struct task_struct *prev_p, struct task_struct *next_p)
 
     /* Switch GDT and LDT. */
     __asm__ __volatile__ ("lgdt %0" : "=m" (*next_p->mm.gdt));
-    __load_LDT(next_p->mm.ldt_sel);
+//    __load_LDT(0);
 
     /*
      * Restore %fs and %gs.

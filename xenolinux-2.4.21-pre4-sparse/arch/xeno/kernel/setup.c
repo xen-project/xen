@@ -153,10 +153,9 @@ void __init setup_arch(char **cmdline_p)
     extern unsigned long cpu0_pte_quicklist[];
     extern unsigned long cpu0_pgd_quicklist[];
 
-    HYPERVISOR_shared_info->event_address    = 
-        (unsigned long)hypervisor_callback;
-    HYPERVISOR_shared_info->failsafe_address =
-        (unsigned long)failsafe_callback;
+    HYPERVISOR_set_callbacks(
+        __KERNEL_CS, (unsigned long)hypervisor_callback,
+        __KERNEL_CS, (unsigned long)failsafe_callback);
 
     boot_cpu_data.pgd_quick = cpu0_pgd_quicklist;
     boot_cpu_data.pte_quick = cpu0_pte_quicklist;

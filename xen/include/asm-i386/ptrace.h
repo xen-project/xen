@@ -79,7 +79,6 @@ enum EFLAGS {
 
 #ifdef __KERNEL__
 #define user_mode(regs) ((3 & (regs)->xcs))
-#define instruction_pointer(regs) ((regs)->eip)
 extern void show_regs(struct pt_regs *);
 #endif
 

@@ -27,10 +27,10 @@ struct mm_struct {
      * Every domain has a L1 pagetable of its own. Per-domain mappings
      * are put in this table (eg. the current GDT is mapped here).
      */
-    l2_pgentry_t *perdomain_pt;
+    l1_pgentry_t *perdomain_pt;
     pagetable_t  pagetable;
-    /* Current LDT selector. */
-    unsigned int ldt_sel;
+    /* Current LDT descriptor. */
+    unsigned long ldt[2];
     /* Next entry is passed to LGDT on domain switch. */
     char gdt[6];
 };
@@ -65,16 +65,28 @@ struct task_struct {
 
     /*
      * DO NOT CHANGE THE ORDER OF THE FOLLOWING.
-     * There offsets are hardcoded in entry.S
+     * Their offsets are hardcoded in entry.S
      */
 
     int processor;               /* 00: current processor */
     int state;                   /* 04: current run state */
-    int hyp_events;              /* 08: pending events */
+    int hyp_events;              /* 08: pending intra-Xen events */
     unsigned int domain;         /* 12: domain id */
 
     /* An unsafe pointer into a shared data area. */
     shared_info_t *shared_info;  /* 16: shared data area */
+
+    /*
+     * Return vectors pushed to us by guest OS.
+     * The stack frame for events is exactly that of an x86 hardware interrupt.
+     * The stack frame for a failsafe callback is augmented with saved values
+     * for segment registers %ds and %es:
+     * 	%ds, %es, %eip, %cs, %eflags [, %oldesp, %oldss]
+     */
+    unsigned long event_selector;    /* 20: entry CS  */
+    unsigned long event_address;     /* 24: entry EIP */
+    unsigned long failsafe_selector; /* 28: entry CS  */
+    unsigned long failsafe_address;  /* 32: entry EIP */
 
     /*
      * From here on things can be added and shuffled without special attention
