@@ -45,6 +45,7 @@ UCCL)
 	ln -sf ../bin .
 	ln -sf /usr/groups/srgboot/${USER}/xenoboot.sh .
 	ln -sf `pwd` /usr/groups/srgboot/${USER}/${DEST_DIR}
+	ln -sf xen.gz image.gz
 	cd ../..
 	;;
 esac
