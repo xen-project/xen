@@ -257,7 +257,7 @@ static int netctrl_connected_count(void)
  * @param dev device
  * @return 0 on success, error code otherwise
  */
-static int vif_wake(struct net_device *dev)
+static int send_fake_arp(struct net_device *dev)
 {
     struct sk_buff *skb;
     u32             src_ip, dst_ip;
@@ -265,10 +265,15 @@ static int vif_wake(struct net_device *dev)
     dst_ip = INADDR_BROADCAST;
     src_ip = inet_select_addr(dev, dst_ip, RT_SCOPE_LINK);
 
+    /* No IP? Then nothing to do. */
+    if ( src_ip == 0 )
+        return 0;
+
     skb = arp_create(ARPOP_REPLY, ETH_P_ARP,
                      dst_ip, dev, src_ip,
                      /*dst_hw*/ NULL, /*src_hw*/ NULL, 
                      /*target_hw*/ dev->dev_addr);
+    printk(KERN_ALERT "ARP sent on %08x %08x %p\n", dst_ip, src_ip, skb);
     if ( skb == NULL )
         return -ENOMEM;
 
@@ -822,13 +827,11 @@ static void send_interface_connect(struct net_private *np)
     };
     netif_fe_interface_connect_t *msg = (void*)cmsg.msg;
 
-    DPRINTK(">\n"); vif_show(np); 
     msg->handle = np->handle;
     msg->tx_shmem_frame = (virt_to_machine(np->tx) >> PAGE_SHIFT);
     msg->rx_shmem_frame = (virt_to_machine(np->rx) >> PAGE_SHIFT);
         
     ctrl_if_send_message_block(&cmsg, NULL, 0, TASK_UNINTERRUPTIBLE);
-    DPRINTK("<\n");
 }
 
 /* Send a driver status notification to the domain controller. */
@@ -876,13 +879,12 @@ static void vif_release(struct net_private *np)
  */
 static void vif_close(struct net_private *np)
 {
-    DPRINTK(">\n"); vif_show(np);
     WPRINTK("Unexpected netif-CLOSED message in state %s\n",
             be_state_name[np->backend_state]);
     vif_release(np);
     np->backend_state = BEST_CLOSED;
     /* todo: take dev down and free. */
-    vif_show(np); DPRINTK("<\n");
+    vif_show(np);
 }
 
 /* Move the vif into disconnected state.
@@ -891,7 +893,6 @@ static void vif_close(struct net_private *np)
  */
 static void vif_disconnect(struct net_private *np)
 {
-    DPRINTK(">\n");
     if(np->tx) free_page((unsigned long)np->tx);
     if(np->rx) free_page((unsigned long)np->rx);
     // Before this np->tx and np->rx had better be null.
@@ -901,7 +902,7 @@ static void vif_disconnect(struct net_private *np)
     memset(np->rx, 0, PAGE_SIZE);
     np->backend_state = BEST_DISCONNECTED;
     send_interface_connect(np);
-    vif_show(np); DPRINTK("<\n");
+    vif_show(np);
 }
 
 /* Begin interface recovery.
@@ -921,12 +922,11 @@ static void
 vif_reset(
     struct net_private *np)
 {
-    DPRINTK(">\n");
     IPRINTK("Attempting to reconnect network interface: handle=%u\n",
             np->handle);    
     vif_release(np);
     vif_disconnect(np);
-    vif_show(np); DPRINTK("<\n");
+    vif_show(np);
 }
 
 /* Move the vif into connected state.
@@ -938,15 +938,14 @@ vif_connect(
     struct net_private *np, netif_fe_interface_status_t *status)
 {
     struct net_device *dev = np->dev;
-    DPRINTK(">\n");
     memcpy(dev->dev_addr, status->mac, ETH_ALEN);
     network_connect(dev, status);
     np->evtchn = status->evtchn;
     np->irq = bind_evtchn_to_irq(np->evtchn);
     (void)request_irq(np->irq, netif_int, SA_SAMPLE_RANDOM, dev->name, dev);
     netctrl_connected_count();
-    vif_wake(dev);
-    vif_show(np); DPRINTK("<\n");
+    (void)send_fake_arp(dev);
+    vif_show(np);
 }
 
 
@@ -1058,7 +1057,6 @@ static void netif_interface_status(netif_fe_interface_status_t *status)
     int err = 0;
     struct net_private *np = NULL;
     
-    DPRINTK(">\n");
     DPRINTK("> status=%s handle=%d\n",
             status_name[status->status], status->handle);
 
@@ -1073,8 +1071,6 @@ static void netif_interface_status(netif_fe_interface_status_t *status)
         DPRINTK("> no vif\n");
         return;
     }
-
-    DPRINTK(">\n"); vif_show(np);
 
     switch ( status->status )
     {
@@ -1129,8 +1125,8 @@ static void netif_interface_status(netif_fe_interface_status_t *status)
         WPRINTK("Invalid netif status code %d\n", status->status);
         break;
     }
+
     vif_show(np);
-    DPRINTK("<\n");
 }
 
 /*
@@ -1138,10 +1134,7 @@ static void netif_interface_status(netif_fe_interface_status_t *status)
  */
 static void netif_driver_status(netif_fe_driver_status_t *status)
 {
-    DPRINTK("> status=%d\n", status->status);
     netctrl.up = status->status;
-    //netctrl.interface_n = status->max_handle;
-    //netctrl.connected_n = 0;
     netctrl_connected_count();
 }
 
@@ -1266,6 +1259,39 @@ static int probe_interfaces(void)
 
 #endif
 
+/*
+ * We use this notifier to send out a fake ARP reply to reset switches and
+ * router ARP caches when an IP interface is brought up on a VIF.
+ */
+static int inetdev_notify(struct notifier_block *this, 
+                          unsigned long event, 
+                          void *ptr)
+{
+    struct in_ifaddr  *ifa = (struct in_ifaddr *)ptr; 
+    struct net_device *dev = ifa->ifa_dev->dev;
+    struct list_head  *ent;
+    struct net_private *np;
+
+    if ( event != NETDEV_UP )
+        goto out;
+
+    list_for_each ( ent, &dev_list )
+    {
+        np = list_entry(ent, struct net_private, list);
+        if ( np->dev == dev )
+            (void)send_fake_arp(dev);
+    }
+        
+ out:
+    return NOTIFY_DONE;
+}
+
+static struct notifier_block notifier_inetdev = {
+    .notifier_call  = inetdev_notify,
+    .next           = NULL,
+    .priority       = 0
+};
+
 static int __init netif_init(void)
 {
     int err = 0;
@@ -1276,6 +1302,7 @@ static int __init netif_init(void)
 
     IPRINTK("Initialising virtual ethernet driver.\n");
     INIT_LIST_HEAD(&dev_list);
+    (void)register_inetaddr_notifier(&notifier_inetdev);
     netctrl_init();
     (void)ctrl_if_register_receiver(CMSG_NETIF_FE, netif_ctrlif_rx,
                                     CALLBACK_IN_BLOCKING_CONTEXT);
@@ -1290,57 +1317,48 @@ static int __init netif_init(void)
 
 static void vif_suspend(struct net_private *np)
 {
-    // Avoid having tx/rx stuff happen until we're ready.
-    DPRINTK(">\n");
+    /* Avoid having tx/rx stuff happen until we're ready. */
     free_irq(np->irq, np->dev);
     unbind_evtchn_from_irq(np->evtchn);
-    DPRINTK("<\n");
 }
 
 static void vif_resume(struct net_private *np)
 {
-    // Connect regardless of whether IFF_UP flag set.
-    // Stop bad things from happening until we're back up.
-    DPRINTK(">\n");
+    /*
+     * Connect regardless of whether IFF_UP flag set.
+     * Stop bad things from happening until we're back up.
+     */
     np->backend_state = BEST_DISCONNECTED;
     memset(np->tx, 0, PAGE_SIZE);
     memset(np->rx, 0, PAGE_SIZE);
     
     send_interface_connect(np);
-    DPRINTK("<\n");
 }
 
 void netif_suspend(void)
 {
-#if 1 /* XXX THIS IS TEMPORARY */
     struct list_head *ent;
     struct net_private *np;
     
-    DPRINTK(">\n");
-    list_for_each(ent, &dev_list){
+    list_for_each ( ent, &dev_list )
+    {
         np = list_entry(ent, struct net_private, list);
         vif_suspend(np);
     }
-    DPRINTK("<\n");
-#endif
 }
 
 void netif_resume(void)
 {
-#if 1
-    /* XXX THIS IS TEMPORARY */
     struct list_head *ent;
     struct net_private *np;
 
-    DPRINTK(">\n");
     list_for_each ( ent, &dev_list )
     {
         np = list_entry(ent, struct net_private, list);
         vif_resume(np);
     }
-    DPRINTK("<\n");
-#endif	    
 }
 
 
-__initcall(netif_init);
+module_init(netif_init);
+
