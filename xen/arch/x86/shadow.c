@@ -1724,7 +1724,8 @@ void __shadow_sync_all(struct domain *d)
         unsigned long opte = *ppte;
         unsigned long npte = opte & ~_PAGE_RW;
 
-        shadow_get_page_from_l1e(mk_l1_pgentry(npte), d);
+        if ( npte & _PAGE_PRESENT)
+            shadow_get_page_from_l1e(mk_l1_pgentry(npte), d);
         *ppte = npte;
         put_page_from_l1e(mk_l1_pgentry(opte), d);
 

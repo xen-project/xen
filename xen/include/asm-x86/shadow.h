@@ -246,9 +246,15 @@ static inline int
 shadow_get_page_from_l1e(l1_pgentry_t l1e, struct domain *d)
 {
     int res = get_page_from_l1e(l1e, d);
+    unsigned long mfn;
     struct domain *owner;
 
+    ASSERT( l1_pgentry_val(l1e) & _PAGE_PRESENT );
+
     if ( unlikely(!res) && IS_PRIV(d) && !shadow_mode_translate(d) &&
+         !(l1_pgentry_val(l1e) & L1_DISALLOW_MASK) &&
+         (mfn = l1_pgentry_to_pfn(l1e)) &&
+         pfn_is_ram(mfn) &&
          (owner = page_get_owner(pfn_to_page(l1_pgentry_to_pfn(l1e)))) &&
          (d != owner) )
     {
