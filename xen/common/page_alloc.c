@@ -393,10 +393,13 @@ struct pfn_info *alloc_domheap_pages(struct domain *d, int order)
 
     spin_lock(&d->page_alloc_lock);
 
-    if ( unlikely((d->tot_pages + (1 << order)) > d->max_pages) )
+    if ( unlikely(test_bit(DF_DYING, &d->flags)) ||
+         unlikely((d->tot_pages + (1 << order)) > d->max_pages) )
     {
         DPRINTK("Over-allocation for domain %u: %u > %u\n",
                 d->domain, d->tot_pages + (1 << order), d->max_pages);
+        DPRINTK("...or the domain is dying (%d)\n", 
+                !!test_bit(DF_DYING, &d->flags));
         spin_unlock(&d->page_alloc_lock);
         free_heap_pages(MEMZONE_DOM, pg, order);
         return NULL;
@@ -427,6 +430,7 @@ void free_domheap_pages(struct pfn_info *pg, int order)
 
     if ( unlikely(IS_XEN_HEAP_FRAME(pg)) )
     {
+        /* NB. May recursively lock from domain_relinquish_memory(). */
         spin_lock_recursive(&d->page_alloc_lock);
 
         for ( i = 0; i < (1 << order); i++ )

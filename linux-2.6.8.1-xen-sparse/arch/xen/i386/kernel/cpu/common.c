@@ -20,6 +20,8 @@ struct cpu_dev * cpu_devs[X86_VENDOR_NUM] = {};
 
 extern void mcheck_init(struct cpuinfo_x86 *c);
 
+extern void machine_specific_modify_cpu_capabilities(struct cpuinfo_x86 *c);
+
 extern int disable_pse;
 
 static void default_init(struct cpuinfo_x86 * c)
@@ -392,6 +394,8 @@ void __init identify_cpu(struct cpuinfo_x86 *c)
 				c->x86_vendor, c->x86_model);
 	}
 
+	machine_specific_modify_cpu_capabilities(c);
+
 	/* Now the feature flags better reflect actual CPU features! */
 
 	printk(KERN_DEBUG "CPU: After all inits, caps:        %08lx %08lx %08lx %08lx\n",
@@ -504,7 +508,7 @@ void __init cpu_gdt_init(struct Xgt_desc_struct *gdt_descr)
 	     va < gdt_descr->address + gdt_descr->size;
 	     va += PAGE_SIZE, f++) {
 		frames[f] = virt_to_machine(va) >> PAGE_SHIFT;
-		wrprotect_bootpt(swapper_pg_dir, (void *)va, 1);
+		protect_page(swapper_pg_dir, (void *)va, PROT_ON);
 	}
 	flush_page_update_queue();
 	if (HYPERVISOR_set_gdt(frames, gdt_descr->size / 8))

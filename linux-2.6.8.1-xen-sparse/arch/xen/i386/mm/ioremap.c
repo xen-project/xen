@@ -17,6 +17,25 @@
 #include <asm/tlbflush.h>
 #include <asm/pgtable.h>
 
+#ifndef CONFIG_XEN_PHYSDEV_ACCESS
+
+void * __ioremap(unsigned long phys_addr, unsigned long size, unsigned long flags)
+{ return NULL; }
+
+void *ioremap_nocache (unsigned long phys_addr, unsigned long size)
+{ return NULL; }
+
+void iounmap(void *addr)
+{ }
+
+void __init *bt_ioremap(unsigned long phys_addr, unsigned long size)
+{ return NULL; }
+
+void __init bt_iounmap(void *addr, unsigned long size)
+{ }
+
+#else
+
 static inline void remap_area_pte(pte_t * pte, unsigned long address, unsigned long size,
 	unsigned long phys_addr, unsigned long flags)
 {
@@ -133,11 +152,11 @@ void * __ioremap(unsigned long phys_addr, unsigned long size, unsigned long flag
 	/*
 	 * Don't allow anybody to remap normal RAM that we're using..
 	 */
-	if (phys_addr < virt_to_phys(high_memory)) {
+	if (machine_to_phys(phys_addr) < virt_to_phys(high_memory)) {
 		char *t_addr, *t_end;
 		struct page *page;
 
-		t_addr = __va(phys_addr);
+		t_addr = bus_to_virt(phys_addr);
 		t_end = t_addr + (size - 1);
 	   
 		for(page = virt_to_page(t_addr); page <= virt_to_page(t_end); page++)
@@ -200,8 +219,8 @@ void *ioremap_nocache (unsigned long phys_addr, unsigned long size)
 	/* Guaranteed to be > phys_addr, as per __ioremap() */
 	last_addr = phys_addr + size - 1;
 
-	if (last_addr < virt_to_phys(high_memory)) { 
-		struct page *ppage = virt_to_page(__va(phys_addr));		
+	if (machine_to_phys(last_addr) < virt_to_phys(high_memory)) { 
+		struct page *ppage = virt_to_page(bus_to_virt(phys_addr));
 		unsigned long npages;
 
 		phys_addr &= PAGE_MASK;
@@ -237,8 +256,8 @@ void iounmap(void *addr)
 		return;
 	} 
 
-	if (p->flags && p->phys_addr < virt_to_phys(high_memory)) { 
-		change_page_attr(virt_to_page(__va(p->phys_addr)),
+	if (p->flags && machine_to_phys(p->phys_addr) < virt_to_phys(high_memory)) { 
+		change_page_attr(virt_to_page(bus_to_virt(p->phys_addr)),
 				 p->size >> PAGE_SHIFT,
 				 PAGE_KERNEL); 				 
 		global_flush_tlb();
@@ -316,6 +335,7 @@ void __init bt_iounmap(void *addr, unsigned long size)
 	}
 }
 
+#endif /* CONFIG_XEN_PHYSDEV_ACCESS */
 
 #if defined(CONFIG_XEN_PRIVILEGED_GUEST)
 

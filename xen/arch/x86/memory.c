@@ -142,8 +142,6 @@ static struct domain *dom_xen, *dom_io;
 
 void arch_init_memory(void)
 {
-    static void ptwr_init_backpointers(void);
-    static void ptwr_disable(void);
     unsigned long mfn;
 
     /*
@@ -165,10 +163,15 @@ void arch_init_memory(void)
 
     memset(percpu_info, 0, sizeof(percpu_info));
 
+/* XXXX WRITEABLE PAGETABLES SHOULD BE A DOMAIN CREATION-TIME
+   DECISION, NOT SOMETHING THAT IS CHANGED ON A RUNNING DOMAIN 
+   !!! FIX ME !!!! 
+ */
+
     vm_assist_info[VMASST_TYPE_writable_pagetables].enable =
-        ptwr_init_backpointers;
+        NULL;
     vm_assist_info[VMASST_TYPE_writable_pagetables].disable =
-        ptwr_disable;
+        NULL;
 
     for ( mfn = 0; mfn < max_page; mfn++ )
         frame_table[mfn].count_info |= PGC_always_set;
@@ -322,17 +325,6 @@ static int get_page_and_type_from_pagenr(unsigned long page_nr,
 }
 
 
-static inline void set_l1_page_va(unsigned long pfn,
-                                  unsigned long va_idx)
-{
-    struct pfn_info *page;
-    
-    page = &frame_table[pfn];
-    page->u.inuse.type_info &= ~PGT_va_mask;
-    page->u.inuse.type_info |= va_idx << PGT_va_shift;
-}
-
-
 /*
  * We allow an L2 tables to map each other (a.k.a. linear page tables). It
  * needs some special care with reference counst and access permissions:
@@ -466,8 +458,11 @@ get_page_from_l1e(
 /* NB. Virtual address 'l2e' maps to a machine address within frame 'pfn'. */
 static int 
 get_page_from_l2e(
-    l2_pgentry_t l2e, unsigned long pfn, struct domain *d)
+    l2_pgentry_t l2e, unsigned long pfn,
+    struct domain *d, unsigned long va_idx)
 {
+    int rc;
+
     if ( !(l2_pgentry_val(l2e) & _PAGE_PRESENT) )
         return 1;
 
@@ -478,8 +473,11 @@ get_page_from_l2e(
         return 0;
     }
 
-    if ( unlikely(!get_page_and_type_from_pagenr(
-        l2_pgentry_to_pagenr(l2e), PGT_l1_page_table, d)) )
+    rc = get_page_and_type_from_pagenr(
+        l2_pgentry_to_pagenr(l2e), 
+        PGT_l1_page_table | (va_idx<<PGT_va_shift), d);
+
+    if ( unlikely(!rc) )
         return get_linear_pagetable(l2e, pfn, d);
 
     return 1;
@@ -553,9 +551,8 @@ static int alloc_l2_table(struct pfn_info *page)
     pl2e = map_domain_mem(page_nr << PAGE_SHIFT);
 
     for ( i = 0; i < DOMAIN_ENTRIES_PER_L2_PAGETABLE; i++ ) {
-        if ( unlikely(!get_page_from_l2e(pl2e[i], page_nr, d)) )
+        if ( unlikely(!get_page_from_l2e(pl2e[i], page_nr, d, i)) )
             goto fail;
-        set_l1_page_va(l2_pgentry_val(pl2e[i]) >> PAGE_SHIFT, i);
     }
     
 #if defined(__i386__)
@@ -677,11 +674,10 @@ static int mod_l2_entry(l2_pgentry_t *pl2e,
         if ( ((l2_pgentry_val(ol2e) ^ l2_pgentry_val(nl2e)) & ~0xffe) == 0 )
             return update_l2e(pl2e, ol2e, nl2e);
 
-        if ( unlikely(!get_page_from_l2e(nl2e, pfn, current)) )
+        if ( unlikely(!get_page_from_l2e(nl2e, pfn, current, 
+					((unsigned long)pl2e & 
+                                         ~PAGE_MASK) >> 2)) )
             return 0;
-        
-        set_l1_page_va(l2_pgentry_val(nl2e) >> PAGE_SHIFT,
-                       ((unsigned long)pl2e & (PAGE_SIZE-1)) >> 2);
 
         if ( unlikely(!update_l2e(pl2e, ol2e, nl2e)) )
         {
@@ -836,10 +832,17 @@ static int do_extended_command(unsigned long ptr, unsigned long val)
     {
     case MMUEXT_PIN_L1_TABLE:
     case MMUEXT_PIN_L2_TABLE:
+        /*
+         * We insist that, if you pin an L1 page, it's the first thing that
+         * you do to it. This is because we require the backptr to still be
+         * mutable. This assumption seems safe.
+         */
         okay = get_page_and_type_from_pagenr(
             pfn, 
-            (cmd==MMUEXT_PIN_L2_TABLE) ? PGT_l2_page_table : PGT_l1_page_table,
+            ((cmd==MMUEXT_PIN_L2_TABLE) ? 
+	     PGT_l2_page_table : (PGT_l1_page_table|PGT_va_mutable)),
             FOREIGNDOM);
+
         if ( unlikely(!okay) )
         {
             MEM_LOG("Error while pinning pfn %08lx", pfn);
@@ -847,8 +850,8 @@ static int do_extended_command(unsigned long ptr, unsigned long val)
             break;
         }
 
-        if ( unlikely(test_and_set_bit(_PGC_guest_pinned,
-                                       &page->count_info)) )
+        if ( unlikely(test_and_set_bit(_PGT_pinned,
+                                       &page->u.inuse.type_info)) )
         {
             MEM_LOG("Pfn %08lx already pinned", pfn);
             put_page_and_type(page);
@@ -864,8 +867,8 @@ static int do_extended_command(unsigned long ptr, unsigned long val)
             MEM_LOG("Page %08lx bad domain (dom=%p)",
                     ptr, page->u.inuse.domain);
         }
-        else if ( likely(test_and_clear_bit(_PGC_guest_pinned, 
-                                            &page->count_info)) )
+        else if ( likely(test_and_clear_bit(_PGT_pinned, 
+                                            &page->u.inuse.type_info)) )
         {
             put_page_and_type(page);
             put_page(page);
@@ -897,8 +900,7 @@ static int do_extended_command(unsigned long ptr, unsigned long val)
             /*
              * Note that we tick the clock /after/ dropping the old base's
              * reference count. If the page tables got freed then this will
-             * avoid unnecessary TLB flushes when the pages are reused.
-             */
+             * avoid unnecessary TLB flushes when the pages are reused.  */
             tlb_clocktick();
         }
         else
@@ -913,6 +915,18 @@ static int do_extended_command(unsigned long ptr, unsigned long val)
     
     case MMUEXT_INVLPG:
         __flush_tlb_one(ptr);
+        break;
+
+    case MMUEXT_FLUSH_CACHE:
+        if ( unlikely(!IS_CAPABLE_PHYSDEV(d)) )
+        {
+            MEM_LOG("Non-physdev domain tried to FLUSH_CACHE.\n");
+            okay = 0;
+        }
+        else
+        {
+            wbinvd();
+        }
         break;
 
     case MMUEXT_SET_LDT:
@@ -1040,13 +1054,18 @@ static int do_extended_command(unsigned long ptr, unsigned long val)
 
         spin_lock(&e->page_alloc_lock);
 
-        /* Check that 'e' will accept the page and has reservation headroom. */
+        /*
+         * Check that 'e' will accept the page and has reservation headroom.
+         * Also, a domain mustn't have PGC_allocated pages when it is dying.
+         */
         ASSERT(e->tot_pages <= e->max_pages);
-        if ( unlikely(e->tot_pages == e->max_pages) ||
+        if ( unlikely(test_bit(DF_DYING, &e->flags)) ||
+             unlikely(e->tot_pages == e->max_pages) ||
              unlikely(!gnttab_prepare_for_transfer(e, d, gntref)) )
         {
             MEM_LOG("Transferee has no reservation headroom (%d,%d), or "
-                    "provided a bad grant ref.\n", e->tot_pages, e->max_pages);
+                    "provided a bad grant ref, or is dying (%08lx).\n",
+                    e->tot_pages, e->max_pages, e->flags);
             spin_unlock(&e->page_alloc_lock);
             put_domain(e);
             okay = 0;
@@ -1182,6 +1201,7 @@ int do_mmu_update(mmu_update_t *ureqs, int count, int *success_count)
     unsigned long prev_spfn = 0;
     l1_pgentry_t *prev_spl1e = 0;
     struct domain *d = current;
+    u32 type_info;
 
     perfc_incrc(calls_to_mmu_update); 
     perfc_addc(num_page_updates, count);
@@ -1230,10 +1250,11 @@ int do_mmu_update(mmu_update_t *ureqs, int count, int *success_count)
             }
 
             page = &frame_table[pfn];
-            switch ( (page->u.inuse.type_info & PGT_type_mask) )
+            switch ( (type_info = page->u.inuse.type_info) & PGT_type_mask )
             {
             case PGT_l1_page_table: 
-                if ( likely(get_page_type(page, PGT_l1_page_table)) )
+                if ( likely(get_page_type(
+                    page, type_info & (PGT_type_mask|PGT_va_mask))) )
                 {
                     okay = mod_l1_entry((l1_pgentry_t *)va, 
                                         mk_l1_pgentry(req.val)); 
@@ -1483,11 +1504,11 @@ void ptwr_reconnect_disconnected(unsigned long addr)
         [ptwr_info[cpu].writable_l1>>PAGE_SHIFT];
 
 #ifdef PTWR_TRACK_DOMAIN
-    if (ptwr_domain[cpu] != get_current()->domain)
+    if (ptwr_domain[cpu] != current->domain)
         printk("ptwr_reconnect_disconnected domain mismatch %d != %d\n",
-               ptwr_domain[cpu], get_current()->domain);
+               ptwr_domain[cpu], current->domain);
 #endif
-    PTWR_PRINTK(("[A] page fault in disconnected space: addr %08lx space %08lx\n",
+    PTWR_PRINTK(("[A] page fault in disconn space: addr %08lx space %08lx\n",
                  addr, ptwr_info[cpu].disconnected << L2_PAGETABLE_SHIFT));
     pl2e = &linear_l2_table[ptwr_info[cpu].disconnected];
 
@@ -1559,9 +1580,9 @@ void ptwr_flush_inactive(void)
     int i, idx;
 
 #ifdef PTWR_TRACK_DOMAIN
-    if (ptwr_info[cpu].domain != get_current()->domain)
+    if (ptwr_info[cpu].domain != current->domain)
         printk("ptwr_flush_inactive domain mismatch %d != %d\n",
-               ptwr_info[cpu].domain, get_current()->domain);
+               ptwr_info[cpu].domain, current->domain);
 #endif
 #if 0
     {
@@ -1626,9 +1647,11 @@ int ptwr_do_page_fault(unsigned long addr)
     PTWR_PRINTK(("get user %p for va %08lx\n",
                  &linear_pg_table[addr>>PAGE_SHIFT], addr));
 #endif
+
+    /* Testing for page_present in the L2 avoids lots of unncessary fixups */
     if ( (l2_pgentry_val(linear_l2_table[addr >> L2_PAGETABLE_SHIFT]) &
-          _PAGE_PRESENT) &&
-         (__get_user(pte, (unsigned long *)
+      _PAGE_PRESENT) &&
+	 (__get_user(pte, (unsigned long *)
                      &linear_pg_table[addr >> PAGE_SHIFT]) == 0) )
     {
         pfn = pte >> PAGE_SHIFT;
@@ -1640,9 +1663,9 @@ int ptwr_do_page_fault(unsigned long addr)
         if ( (page->u.inuse.type_info & PGT_type_mask) == PGT_l1_page_table )
         {
 #ifdef PTWR_TRACK_DOMAIN
-            if ( ptwr_info[cpu].domain != get_current()->domain )
+            if ( ptwr_info[cpu].domain != current->domain )
                 printk("ptwr_do_page_fault domain mismatch %d != %d\n",
-                       ptwr_info[cpu].domain, get_current()->domain);
+                       ptwr_info[cpu].domain, current->domain);
 #endif
             pl2e = &linear_l2_table[(page->u.inuse.type_info &
                                      PGT_va_mask) >> PGT_va_shift];
@@ -1653,6 +1676,7 @@ int ptwr_do_page_fault(unsigned long addr)
 
             if ( l2_pgentry_val(*pl2e) >> PAGE_SHIFT != pfn )
             {
+		/* this L1 is not in the current address space */
                 l1_pgentry_t *pl1e;
                 PTWR_PRINTK(("[I] freeing l1 page %p taf %08x/%08x\n", page,
                              page->u.inuse.type_info,
@@ -1716,36 +1740,6 @@ int ptwr_do_page_fault(unsigned long addr)
         }
     }
     return 0;
-}
-
-static void ptwr_init_backpointers(void)
-{
-    struct pfn_info *page;
-    unsigned long pde;
-    int va_idx;
-
-    for ( va_idx = 0; va_idx < DOMAIN_ENTRIES_PER_L2_PAGETABLE; va_idx++ )
-    {
-        /* check if entry valid */
-        pde = l2_pgentry_val(linear_l2_table[va_idx]);
-        if ( (pde & _PAGE_PRESENT) == 0 )
-            continue;
-
-        page = &frame_table[pde >> PAGE_SHIFT];
-        /* assert that page is an l1_page_table   XXXcl maybe l2? */
-        if ( (page->u.inuse.type_info & PGT_type_mask) != PGT_l1_page_table ) {
-	    MEM_LOG("ptwr: Inconsistent pagetable: pde %lx not an l1 page\n",
-		    pde >> PAGE_SHIFT);
-	    domain_crash();
-	}
-        page->u.inuse.type_info &= ~PGT_va_mask;
-        page->u.inuse.type_info |= va_idx << PGT_va_shift;
-    }
-}
-
-static void ptwr_disable(void)
-{
-    __cleanup_writable_pagetable(PTWR_CLEANUP_ACTIVE | PTWR_CLEANUP_INACTIVE);
 }
 
 #ifndef NDEBUG

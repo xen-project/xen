@@ -185,32 +185,44 @@ pte_t *pte_alloc_one_kernel(struct mm_struct *mm, unsigned long address)
 	return pte;
 }
 
+void pte_ctor(void *pte, kmem_cache_t *cache, unsigned long unused)
+{
+
+	clear_page(pte);
+	__make_page_readonly(pte);
+	queue_pte_pin(virt_to_phys(pte));
+	flush_page_update_queue();
+}
+
+void pte_dtor(void *pte, kmem_cache_t *cache, unsigned long unused)
+{
+
+	queue_pte_unpin(virt_to_phys(pte));
+	__make_page_writable(pte);
+	flush_page_update_queue();
+}
+
 struct page *pte_alloc_one(struct mm_struct *mm, unsigned long address)
 {
-	struct page *pte;
+	pte_t *ptep;
 
 #ifdef CONFIG_HIGHPTE
+	struct page *pte;
+
 	pte = alloc_pages(GFP_KERNEL|__GFP_HIGHMEM|__GFP_REPEAT, 0);
-#else
-	pte = alloc_pages(GFP_KERNEL|__GFP_REPEAT, 0);
-#endif
-	if (pte) {
-#ifdef CONFIG_HIGHPTE
-		void *kaddr = kmap_atomic(pte, KM_USER0);
-		clear_page(kaddr);
-		kunmap_atomic_force(kaddr, KM_USER0);
-#else
+	if (pte == NULL)
+		return pte;
+	if (pte >= highmem_start_page) {
 		clear_highpage(pte);
-#endif
-#ifdef CONFIG_HIGHPTE
-		if (pte < highmem_start_page)
-#endif
-		{
-			__make_page_readonly(phys_to_virt(page_to_pseudophys(pte)));
-			flush_page_update_queue();
-		}
+		return pte;
 	}
-	return pte;
+	/* not a highmem page -- free page and grab one from the cache */
+	__free_page(pte);
+#endif
+	ptep = kmem_cache_alloc(pte_cache, GFP_KERNEL);
+	if (ptep)
+		return virt_to_page(ptep);
+	return NULL;
 }
 
 void pmd_ctor(void *pmd, kmem_cache_t *cache, unsigned long flags)

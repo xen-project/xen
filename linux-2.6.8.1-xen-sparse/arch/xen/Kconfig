@@ -26,13 +26,12 @@ menu "XEN"
 config XEN_PRIVILEGED_GUEST
 	bool "Privileged Guest (domain 0)"
 	default n
+        select XEN_PHYSDEV_ACCESS
 	help
 	  Support for privileged operation (domain 0)
 
 config XEN_PHYSDEV_ACCESS
 	bool "Device-driver domain (physical device access)"
-	default y if XEN_PRIVILEGED_GUEST
-	default n
 	help
 	  Device-driver domain (physical device access)
 

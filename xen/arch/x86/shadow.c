@@ -262,7 +262,7 @@ void __shadow_mode_disable(struct domain *d)
     __free_shadow_table(m);
     m->shadow_mode = 0;
 
-    SH_LOG("freed tables count=%d l1=%d l2=%d",
+    SH_VLOG("freed tables count=%d l1=%d l2=%d",
            m->shadow_page_count, perfc_value(shadow_l1_pages), 
            perfc_value(shadow_l2_pages));
 

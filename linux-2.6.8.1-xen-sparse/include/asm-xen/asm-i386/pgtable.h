@@ -35,9 +35,12 @@ extern unsigned long empty_zero_page[1024];
 extern pgd_t swapper_pg_dir[1024];
 extern kmem_cache_t *pgd_cache;
 extern kmem_cache_t *pmd_cache;
+extern kmem_cache_t *pte_cache;
 extern spinlock_t pgd_lock;
 extern struct page *pgd_list;
 
+void pte_ctor(void *, kmem_cache_t *, unsigned long);
+void pte_dtor(void *, kmem_cache_t *, unsigned long);
 void pmd_ctor(void *, kmem_cache_t *, unsigned long);
 void pgd_ctor(void *, kmem_cache_t *, unsigned long);
 void pgd_dtor(void *, kmem_cache_t *, unsigned long);
@@ -315,9 +318,7 @@ static inline pte_t pte_modify(pte_t pte, pgprot_t newprot)
 ((unsigned long) __va(pmd_val(pmd) & PAGE_MASK))
 
 #define pmd_clear(xp)	do {					\
-	pmd_t p = *(xp);					\
 	set_pmd(xp, __pmd(0));					\
-	__make_page_writable((void *)pmd_page_kernel(p));	\
 	xen_flush_page_update_queue();				\
 } while (0)
 
