@@ -2,7 +2,9 @@
 #include <stdlib.h>
 #include <stdio.h>
 
-#ifndef _XEN_XFR_STUB_
+#ifdef _XEN_XFR_STUB_
+typedef unsigned long u32;
+#else
 #include "xc.h"
 #include "xc_io.h"
 #endif
@@ -16,8 +18,8 @@
 #define DEBUG 1
 #include "debug.h"
 
-#ifndef _XEN_XFR_STUB_
-static int domain_suspend(u32 dom, void *data){
+
+int domain_suspend(u32 dom, void *data){
     int err = 0;
     Conn *xend = data;
 
@@ -27,6 +29,7 @@ static int domain_suspend(u32 dom, void *data){
     return err;
 }
 
+#ifndef _XEN_XFR_STUB_
 static int xc_handle = 0;
 
 int xcinit(void){
@@ -61,6 +64,7 @@ int xen_domain_snd(Conn *xend, IOStream *io, uint32_t dom, char *vmconfig, int v
     err = marshal_string(io, vmconfig, vmconfig_n);
     if(err) goto exit;
     n = 32 * 1024 * 1024;
+    n = 32 * 1024;
     buf_n = sizeof(buf);
     err = marshal_uint32(io, n);
     for(k = 0; k < n; k += d){
@@ -72,7 +76,8 @@ int xen_domain_snd(Conn *xend, IOStream *io, uint32_t dom, char *vmconfig, int v
     }
     
     dom = 99;
-    err = xfr_vm_suspend(xend, dom);
+    err = domain_suspend(dom, xend);
+    IOStream_close(io);
   exit:
 #else 
     XcIOContext _ioctxt = {}, *ioctxt = &_ioctxt;
@@ -195,7 +200,7 @@ int xen_domain_configure(uint32_t dom, char *vmconfig, int vmconfig_n){
     // POST the form.
     curl_easy_setopt(curl, CURLOPT_HTTPPOST, form);
     dprintf("> curl perform...\n");
-#ifdef _XEN_XFR_STUB_
+#if 0 && defined(_XEN_XFR_STUB_)
     dprintf("> _XEN_XFR_STUB_ defined - not calling xend\n");
     curlcode = 0;
 #else
