@@ -164,7 +164,7 @@ void subarch_init_memory(struct domain *dom_xen)
     }
 
     /* M2P table is mappable read-only by privileged domains. */
-    m2p_start_mfn = l2_pgentry_to_pagenr(
+    m2p_start_mfn = l2_pgentry_to_pfn(
         idle_pg_table[l2_table_offset(RDWR_MPT_VIRT_START)]);
     for ( i = 0; i < 1024; i++ )
     {

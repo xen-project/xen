@@ -1,39 +1,14 @@
-/******************************************************************************
- * asm-x86/page.h
- * 
- * Definitions relating to page tables.
- */
+/* -*-  Mode:C; c-basic-offset:4; tab-width:4; indent-tabs-mode:nil -*- */
 
 #ifndef __X86_PAGE_H__
 #define __X86_PAGE_H__
 
-#if defined(__x86_64__)
-
-#define L1_PAGETABLE_SHIFT       12
-#define L2_PAGETABLE_SHIFT       21
-#define L3_PAGETABLE_SHIFT       30
-#define L4_PAGETABLE_SHIFT       39
-
-#define ENTRIES_PER_L1_PAGETABLE 512
-#define ENTRIES_PER_L2_PAGETABLE 512
-#define ENTRIES_PER_L3_PAGETABLE 512
-#define ENTRIES_PER_L4_PAGETABLE 512
-
-#define __PAGE_OFFSET		(0xFFFF830000000000)
-
-#elif defined(__i386__)
-
-#define L1_PAGETABLE_SHIFT       12
-#define L2_PAGETABLE_SHIFT       22
-
-#define ENTRIES_PER_L1_PAGETABLE 1024
-#define ENTRIES_PER_L2_PAGETABLE 1024
-
-#define __PAGE_OFFSET		(0xFC400000)
-
+#if defined(__i386__)
+#include <asm/x86_32/page.h>
+#elif defined(__x86_64__)
+#include <asm/x86_64/page.h>
 #endif
 
-#define PAGE_SHIFT               L1_PAGETABLE_SHIFT
 #ifndef __ASSEMBLY__
 #define PAGE_SIZE	         (1UL << PAGE_SHIFT)
 #else
@@ -44,84 +19,9 @@
 #define clear_page(_p)           memset((void *)(_p), 0, PAGE_SIZE)
 #define copy_page(_t,_f)         memcpy((void *)(_t), (void *)(_f), PAGE_SIZE)
 
-#ifndef __ASSEMBLY__
-#include <xen/config.h>
-typedef struct { unsigned long l1_lo; } l1_pgentry_t;
-typedef struct { unsigned long l2_lo; } l2_pgentry_t;
-typedef struct { unsigned long l3_lo; } l3_pgentry_t;
-typedef struct { unsigned long l4_lo; } l4_pgentry_t;
-#endif /* !__ASSEMBLY__ */
-
-/* Strip type from a table entry. */
-#define l1_pgentry_val(_x) ((_x).l1_lo)
-#define l2_pgentry_val(_x) ((_x).l2_lo)
-#define l3_pgentry_val(_x) ((_x).l3_lo)
-#define l4_pgentry_val(_x) ((_x).l4_lo)
-
-/* Add type to a table entry. */
-#define mk_l1_pgentry(_x)  ( (l1_pgentry_t) { (_x) } )
-#define mk_l2_pgentry(_x)  ( (l2_pgentry_t) { (_x) } )
-#define mk_l3_pgentry(_x)  ( (l3_pgentry_t) { (_x) } )
-#define mk_l4_pgentry(_x)  ( (l4_pgentry_t) { (_x) } )
-
-/* Turn a typed table entry into a page index. */
-#define l1_pgentry_to_pagenr(_x) (l1_pgentry_val(_x) >> PAGE_SHIFT) 
-#define l2_pgentry_to_pagenr(_x) (l2_pgentry_val(_x) >> PAGE_SHIFT)
-#define l3_pgentry_to_pagenr(_x) (l3_pgentry_val(_x) >> PAGE_SHIFT)
-#define l4_pgentry_to_pagenr(_x) (l4_pgentry_val(_x) >> PAGE_SHIFT)
-
-/* Turn a typed table entry into a physical address. */
-#define l1_pgentry_to_phys(_x) (l1_pgentry_val(_x) & PAGE_MASK)
-#define l2_pgentry_to_phys(_x) (l2_pgentry_val(_x) & PAGE_MASK)
-#define l3_pgentry_to_phys(_x) (l3_pgentry_val(_x) & PAGE_MASK)
-#define l4_pgentry_to_phys(_x) (l4_pgentry_val(_x) & PAGE_MASK)
-
-/* Pagetable walking. */
-#define l2_pgentry_to_l1(_x) \
-  ((l1_pgentry_t *)__va(l2_pgentry_val(_x) & PAGE_MASK))
-#define l3_pgentry_to_l2(_x) \
-  ((l2_pgentry_t *)__va(l3_pgentry_val(_x) & PAGE_MASK))
-#define l4_pgentry_to_l3(_x) \
-  ((l3_pgentry_t *)__va(l4_pgentry_val(_x) & PAGE_MASK))
-
-/* Given a virtual address, get an entry offset into a page table. */
-#define l1_table_offset(_a) \
-  (((_a) >> L1_PAGETABLE_SHIFT) & (ENTRIES_PER_L1_PAGETABLE - 1))
-#if defined(__i386__)
-#define l2_table_offset(_a) \
-  ((_a) >> L2_PAGETABLE_SHIFT)
-#elif defined(__x86_64__)
-#define l2_table_offset(_a) \
-  (((_a) >> L2_PAGETABLE_SHIFT) & (ENTRIES_PER_L2_PAGETABLE - 1))
-#define l3_table_offset(_a) \
-  (((_a) >> L3_PAGETABLE_SHIFT) & (ENTRIES_PER_L3_PAGETABLE - 1))
-#define l4_table_offset(_a) \
-  (((_a) >> L4_PAGETABLE_SHIFT) & (ENTRIES_PER_L4_PAGETABLE - 1))
-#endif
-
-/* Given a virtual address, get an entry offset into a linear page table. */
-#if defined(__i386__)
-#define l1_linear_offset(_a) ((_a) >> PAGE_SHIFT)
-#elif defined(__x86_64__)
-#define l1_linear_offset(_a) (((_a) & ((1UL << 48) - 1)) >> PAGE_SHIFT)
-#endif
-
-#if defined(__i386__)
-#define pagetable_t l2_pgentry_t
-#define pagetable_val(_x)  ((_x).l2_lo)
-#define mk_pagetable(_x)   ( (l2_pgentry_t) { (_x) } )
-#define ENTRIES_PER_PAGETABLE ENTRIES_PER_L2_PAGETABLE
-#elif defined(__x86_64__)
-#define pagetable_t l4_pgentry_t
-#define pagetable_val(_x)  ((_x).l4_lo)
-#define mk_pagetable(_x)   ( (l4_pgentry_t) { (_x) } )
-#define ENTRIES_PER_PAGETABLE ENTRIES_PER_L4_PAGETABLE
-#endif
-
 #define PAGE_OFFSET		((unsigned long)__PAGE_OFFSET)
 #define __pa(x)			((unsigned long)(x)-PAGE_OFFSET)
 #define __va(x)			((void *)((unsigned long)(x)+PAGE_OFFSET))
-#define page_address(_p)        (__va(((_p) - frame_table) << PAGE_SHIFT))
 #define pfn_to_page(_pfn)       (frame_table + (_pfn))
 #define phys_to_page(kaddr)     (frame_table + ((kaddr) >> PAGE_SHIFT))
 #define virt_to_page(kaddr)	(frame_table + (__pa(kaddr) >> PAGE_SHIFT))

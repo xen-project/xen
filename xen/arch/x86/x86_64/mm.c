@@ -199,7 +199,7 @@ void subarch_init_memory(struct domain *dom_xen)
         l2e = l3_pgentry_to_l2(l3e)[l2_table_offset(v)];
         if ( !(l2_pgentry_val(l2e) & _PAGE_PRESENT) )
             continue;
-        m2p_start_mfn = l2_pgentry_to_pagenr(l2e);
+        m2p_start_mfn = l2_pgentry_to_pfn(l2e);
 
         for ( i = 0; i < ENTRIES_PER_L1_PAGETABLE; i++ )
         {
