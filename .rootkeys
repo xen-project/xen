@@ -64,6 +64,7 @@
 3f8bcf29ulZIC9rC4wM70H_q4s6VPg tools/misc/xen_log.c
 3f13d81eQ9Vz-h-6RDGFkNR9CRP95g tools/misc/xen_nat_enable
 3f13d81e6Z6806ihYYUw8GVKNkYnuw tools/misc/xen_nat_enable.README
+405eedf6_nnNhFQ1I85lhCkLK6jFGA tools/misc/xencons
 4056f5155QYZdsk-1fLdjsZPFTnlhg tools/misc/xensymoops.py
 4022a73cEKvrYe_DVZW2JlAxobg9wg tools/nsplitd/Makefile
 4022a73cKms4Oq030x2JBzUB426lAQ tools/nsplitd/nsplitd.c

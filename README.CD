@@ -203,11 +203,13 @@ have e.g.:
 
 xc_dom_create.py will print the local TCP port to which you should
 connect to perform console I/O. A suitable console client is provided
-by the Python module xend.console_client: running this module from the
-command line with <host> and <port> parameters will start a terminal
-session. An alternative is to specify '-c' to xc_dom_create.py, or add
+by the Python module xenctl.console_client: running this module from
+the command line with <host> and <port> parameters will start a
+terminal session. This module is also installed as /usr/bin/xencons,
+from a copy in tools/misc/xencons.  An alternative to manually running
+a terminal client is to specify '-c' to xc_dom_create.py, or add
 'auto_console=True' to the defaults file. This will cause
-xc_dom_create.py to automatically become teh console terminal after
+xc_dom_create.py to automatically become the console terminal after
 starting the domain.
 
 The 169.254.x.x network is special in that it is the 'link local'
