@@ -8,6 +8,6 @@ ln -s ../../../xen-2.4.16/include/hypervisor-ifs old/xenolinux-2.4.16-sparse/inc
 mkdir -p xenolinux-2.4.21-pre4-sparse
 mkdir -p xenolinux-2.4.21-pre4-sparse/include
 mkdir -p xenolinux-2.4.21-pre4-sparse/include/asm-xeno
-ln -s ../../../xen-2.4.16/include/hypervisor-ifs xenolinux-2.4.21-pre4-sparse/include/asm-xeno/hypervisor-ifs
+ln -s ../../../xen/include/hypervisor-ifs xenolinux-2.4.21-pre4-sparse/include/asm-xeno/hypervisor-ifs
 (find -depth -type d -print | xargs -r rmdir 2>/dev/null) || true
 exit 0
