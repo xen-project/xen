@@ -324,7 +324,7 @@ struct tss_struct {
     u16 bitmap;
     u8  io_bitmap[IOBMP_BYTES];
     /* Pads the TSS to be cacheline-aligned (total size is 0x2080). */
-    u32 __cacheline_filler[5];
+    u32 __cacheline_filler[6];
 };
 
 struct trap_bounce {
