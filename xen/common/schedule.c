@@ -73,11 +73,9 @@ extern struct scheduler sched_rrobin_def;
 extern struct scheduler sched_atropos_def;
 static struct scheduler *schedulers[] = { 
     &sched_bvt_def,
-#ifdef BROKEN_SCHEDULERS
     &sched_fbvt_def,
     &sched_rrobin_def,
     &sched_atropos_def,
-#endif
     NULL
 };
 

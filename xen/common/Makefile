@@ -19,14 +19,6 @@ ifneq ($(trace),y)
 OBJS := $(subst trace.o,,$(OBJS))
 endif
 
-ifneq ($(broken_schedulers),y)
-OBJS := $(subst sched_atropos.o,,$(OBJS))
-OBJS := $(subst sched_fair_bvt.o,,$(OBJS))
-OBJS := $(subst sched_rrobin.o,,$(OBJS))
-else
-CFLAGS += -DBROKEN_SCHEDULERS
-endif
-
 default: $(OBJS)
 	$(LD) $(LDFLAGS) -r -o common.o $(OBJS)
 

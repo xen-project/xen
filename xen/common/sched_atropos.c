@@ -54,10 +54,8 @@ struct at_dom_info
 /* Atropos-specific per-CPU data */
 struct at_cpu_info
 {
-    spinlock_t runq_lock;
-    struct list_head runq;  /* run queue */
-    spinlock_t waitq_lock;
-    struct list_head waitq; /* wait queue*/
+    struct list_head runq;
+    struct list_head waitq;
 };
 
 
@@ -71,14 +69,8 @@ struct at_cpu_info
 
 static void at_dump_cpu_state(int cpu);
 
-
-/* SLAB cache for struct at_dom_info objects */
 static xmem_cache_t *dom_info_cache;
 
-/*
- * Wrappers for run-queue management. Must be called with the run_lock
- * held.
- */
 static inline void __add_to_runqueue_head(struct domain *d)
 {
     list_add(RUNLIST(d), RUNQ(d->processor));
@@ -590,8 +582,6 @@ static int at_init_scheduler()
             return -1;
         INIT_LIST_HEAD(WAITQ(i));
         INIT_LIST_HEAD(RUNQ(i));
-        spin_lock_init(&CPU_INFO(i)->runq_lock);       
-        spin_lock_init(&CPU_INFO(i)->waitq_lock);        
     }
 
     dom_info_cache = xmem_cache_create("Atropos dom info",
