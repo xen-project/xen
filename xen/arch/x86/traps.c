@@ -946,6 +946,7 @@ void __init trap_init(void)
     set_intr_gate(TRAP_alignment_check,&alignment_check);
     set_intr_gate(TRAP_machine_check,&machine_check);
     set_intr_gate(TRAP_simd_error,&simd_coprocessor_error);
+    set_intr_gate(TRAP_deferred_nmi,&nmi);
 
     /* Only ring 1 can access Xen services. */
     _set_gate(idt_table+HYPERCALL_VECTOR,14,1,&hypercall);
