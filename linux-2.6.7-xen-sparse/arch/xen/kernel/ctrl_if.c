@@ -93,8 +93,12 @@ static void __ctrl_if_tx_tasklet(unsigned long data)
     control_if_t *ctrl_if = get_ctrl_if();
     ctrl_msg_t   *msg;
     int           was_full = TX_FULL(ctrl_if);
+    CONTROL_RING_IDX rp;
 
-    while ( ctrl_if_tx_resp_cons != ctrl_if->tx_resp_prod )
+    rp = ctrl_if->tx_resp_prod;
+    rmb(); /* Ensure we see all requests up to 'rp'. */
+
+    while ( ctrl_if_tx_resp_cons != rp )
     {
         msg = &ctrl_if->tx_ring[MASK_CONTROL_IDX(ctrl_if_tx_resp_cons)];
 
@@ -132,8 +136,12 @@ static void __ctrl_if_tx_tasklet(unsigned long data)
 static void __ctrl_if_rxmsg_deferred(void *unused)
 {
     ctrl_msg_t *msg;
+    CONTROL_RING_IDX dp;
 
-    while ( ctrl_if_rxmsg_deferred_cons != ctrl_if_rxmsg_deferred_prod )
+    dp = ctrl_if_rxmsg_deferred_prod;
+    rmb(); /* Ensure we see all deferred requests up to 'dp'. */
+
+    while ( ctrl_if_rxmsg_deferred_cons != dp )
     {
         msg = &ctrl_if_rxmsg_deferred[MASK_CONTROL_IDX(
             ctrl_if_rxmsg_deferred_cons++)];
@@ -145,8 +153,13 @@ static void __ctrl_if_rx_tasklet(unsigned long data)
 {
     control_if_t *ctrl_if = get_ctrl_if();
     ctrl_msg_t    msg, *pmsg;
+    CONTROL_RING_IDX rp, dp;
 
-    while ( ctrl_if_rx_req_cons != ctrl_if->rx_req_prod )
+    dp = ctrl_if_rxmsg_deferred_prod;
+    rp = ctrl_if->rx_req_prod;
+    rmb(); /* Ensure we see all requests up to 'rp'. */
+
+    while ( ctrl_if_rx_req_cons != rp )
     {
         pmsg = &ctrl_if->rx_ring[MASK_CONTROL_IDX(ctrl_if_rx_req_cons++)];
         memcpy(&msg, pmsg, offsetof(ctrl_msg_t, msg));
@@ -161,20 +174,21 @@ static void __ctrl_if_rx_tasklet(unsigned long data)
 
         if ( test_bit(msg.type, 
                       (unsigned long *)&ctrl_if_rxmsg_blocking_context) )
-        {
-            pmsg = &ctrl_if_rxmsg_deferred[MASK_CONTROL_IDX(
-                ctrl_if_rxmsg_deferred_prod++)];
-            memcpy(pmsg, &msg, offsetof(ctrl_msg_t, msg) + msg.length);
-#if LINUX_VERSION_CODE < KERNEL_VERSION(2,6,0)
-            schedule_task(&ctrl_if_rxmsg_deferred_tq);
-#else
-            schedule_work(&ctrl_if_rxmsg_deferred_work);
-#endif
-        }
+            memcpy(&ctrl_if_rxmsg_deferred[MASK_CONTROL_IDX(dp++)],
+                   &msg, offsetof(ctrl_msg_t, msg) + msg.length);
         else
-        {
             (*ctrl_if_rxmsg_handler[msg.type])(&msg, 0);
-        }
+    }
+
+    if ( dp != ctrl_if_rxmsg_deferred_prod )
+    {
+        wmb();
+        ctrl_if_rxmsg_deferred_prod = dp;
+#if LINUX_VERSION_CODE < KERNEL_VERSION(2,6,0)
+        schedule_task(&ctrl_if_rxmsg_deferred_tq);
+#else
+        schedule_work(&ctrl_if_rxmsg_deferred_work);
+#endif
     }
 }
 

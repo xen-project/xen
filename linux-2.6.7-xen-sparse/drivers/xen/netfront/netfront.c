@@ -118,10 +118,8 @@ static void netctrl_init(void)
  */
 static int netctrl_err(int err)
 {
-    if(err < 0 && !netctrl.err){
+    if ( (err < 0) && !netctrl.err )
         netctrl.err = err;
-        printk(KERN_WARNING "%s> err=%d\n", __FUNCTION__, err);
-    }
     return netctrl.err;
 }
 
@@ -177,7 +175,6 @@ static int network_open(struct net_device *dev)
     return 0;
 }
 
-
 static void network_tx_buf_gc(struct net_device *dev)
 {
     NETIF_RING_IDX i, prod;
@@ -190,6 +187,7 @@ static void network_tx_buf_gc(struct net_device *dev)
 
     do {
         prod = np->tx->resp_prod;
+        rmb(); /* Ensure we see responses up to 'rp'. */
 
         for ( i = np->tx_resp_cons; i != prod; i++ )
         {
@@ -295,6 +293,7 @@ static void network_alloc_rx_buffers(struct net_device *dev)
     if ( rx_mcl[nr_pfns].args[5] != nr_pfns )
         panic("Unable to reduce memory reservation\n");
 
+    /* Above is a suitable barrier to ensure backend will see requests. */
     np->rx->req_prod = i;
 }
 
@@ -344,7 +343,7 @@ static int network_start_xmit(struct sk_buff *skb, struct net_device *dev)
     tx->addr = virt_to_machine(skb->data);
     tx->size = skb->len;
 
-    wmb();
+    wmb(); /* Ensure that backend will see the request. */
     np->tx->req_prod = i + 1;
 
     network_tx_buf_gc(dev);
@@ -392,7 +391,7 @@ static int netif_poll(struct net_device *dev, int *pbudget)
     struct net_private *np = dev->priv;
     struct sk_buff *skb;
     netif_rx_response_t *rx;
-    NETIF_RING_IDX i;
+    NETIF_RING_IDX i, rp;
     mmu_update_t *mmu = rx_mmu;
     multicall_entry_t *mcl = rx_mcl;
     int work_done, budget, more_to_do = 1;
@@ -412,8 +411,11 @@ static int netif_poll(struct net_device *dev, int *pbudget)
     if ( (budget = *pbudget) > dev->quota )
         budget = dev->quota;
 
+    rp = np->rx->resp_prod;
+    rmb(); /* Ensure we see queued responses up to 'rp'. */
+
     for ( i = np->rx_resp_cons, work_done = 0; 
-          (i != np->rx->resp_prod) && (work_done < budget); 
+          (i != rp) && (work_done < budget); 
           i++, work_done++ )
     {
         rx = &np->rx->ring[MASK_NETIF_RX_IDX(i)].resp;
@@ -904,9 +906,8 @@ void netif_suspend(void)
 
 void netif_resume(void)
 {
-    ctrl_msg_t                       cmsg;
-    netif_fe_interface_connect_t     up;
-//    netif_fe_driver_status_changed_t   st;
+    ctrl_msg_t                   cmsg;
+    netif_fe_interface_connect_t up;
     struct net_device *dev = NULL;
     struct net_private *np = NULL;
     int i;

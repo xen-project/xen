@@ -446,6 +446,7 @@ static void net_tx_action(unsigned long unused)
             netif_put(netif);
             continue;
         }
+        rmb(); /* Ensure that we see the request. */
         memcpy(&txreq, &netif->tx->ring[MASK_NETIF_TX_IDX(i)].req, 
                sizeof(txreq));
         netif->tx_req_cons++;
