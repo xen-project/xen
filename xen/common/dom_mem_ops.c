@@ -23,14 +23,12 @@
 #define START_EXTENT_SHIFT 4 /* op[:4] == start_extent */
 
 #define PREEMPT_CHECK(_op)                          \
-    if ( hypercall_preempt_check() ) {              \
-        hypercall_create_continuation(              \
+    if ( hypercall_preempt_check() )                \
+        return hypercall_create_continuation(       \
             __HYPERVISOR_dom_mem_op, 5,             \
             (_op) | (i << START_EXTENT_SHIFT),      \
             extent_list, nr_extents, extent_order,  \
-            (d == current) ? DOMID_SELF : d->id);   \
-        return __HYPERVISOR_dom_mem_op;             \
-    }
+            (d == current) ? DOMID_SELF : d->id)
 
 static long
 alloc_dom_mem(struct domain *d, 
