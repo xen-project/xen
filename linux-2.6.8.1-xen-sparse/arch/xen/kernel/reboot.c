@@ -65,7 +65,7 @@ static void __do_suspend(void)
     extern void blkdev_suspend(void);
     extern void blkdev_resume(void);
 #endif
-#ifdef CONFIG_XEN_NETIF_FRONTEND
+#ifdef CONFIG_XEN_NETDEV_FRONTEND
     extern void netif_suspend(void);
     extern void netif_resume(void);    
 #endif
@@ -82,7 +82,7 @@ static void __do_suspend(void)
 
     __cli();
 
-#ifdef CONFIG_XEN_NETIF_FRONTEND
+#ifdef CONFIG_XEN_NETDEV_FRONTEND
     netif_suspend();
 #endif
 
@@ -143,7 +143,7 @@ static void __do_suspend(void)
     blkdev_resume();
 #endif
 
-#ifdef CONFIG_XEN_NETIF_FRONTEND
+#ifdef CONFIG_XEN_NETDEV_FRONTEND
     netif_resume();
 #endif
 
