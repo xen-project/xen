@@ -152,17 +152,6 @@ struct domain
 
 #include <asm/uaccess.h> /* for KERNEL_DS */
 
-#define IDLE0_TASK(_t)           \
-{                                \
-    processor:   0,              \
-    domain:      IDLE_DOMAIN_ID, \
-    mm:          IDLE0_MM,       \
-    addr_limit:  KERNEL_DS,      \
-    thread:      INIT_THREAD,    \
-    flags:       1<<DF_IDLETASK, \
-    refcnt:      ATOMIC_INIT(1)  \
-}
-
 extern struct domain idle0_task;
 
 extern struct domain *idle_task[NR_CPUS];
