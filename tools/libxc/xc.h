@@ -10,7 +10,6 @@
 #define __XC_H__
 
 #include <stdint.h>
-#include "linux_boot_params.h"
 
 typedef uint8_t            u8;
 typedef uint16_t           u16;
@@ -25,7 +24,6 @@ typedef int64_t            s64;
 #include <xen/dom0_ops.h>
 #include <xen/event_channel.h>
 #include <xen/sched_ctl.h>
-#include <xen/io/domain_controller.h>
 
 /* Obtain or relinquish a handle on the 'xc' library. */
 int xc_interface_open(void);
@@ -107,6 +105,7 @@ xc_plan9_build (int xc_handle,
 		unsigned int control_evtchn, 
 		unsigned long flags);
 
+struct mem_map;
 int xc_vmx_build(int xc_handle,
                  u32 domid,
                  const char *image_name,

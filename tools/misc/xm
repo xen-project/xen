@@ -3,7 +3,7 @@
 import sys
 
 # Default install path for Xen binary packages.
-sys.path.append('/lib/python')
+sys.path = [ '/usr/lib/python' ] + sys.path
 from xen.xm import main
 
 main.main(sys.argv)

@@ -278,6 +278,8 @@ extern ptwr_info_t ptwr_info[];
 void ptwr_flush(const int);
 int ptwr_do_page_fault(unsigned long);
 
+int new_guest_cr3(unsigned long pfn);
+
 #define __cleanup_writable_pagetable(_what)                                 \
 do {                                                                        \
     int cpu = smp_processor_id();                                           \
@@ -302,5 +304,7 @@ void audit_domains(void);
 #define audit_domain(_d) ((void)0)
 #define audit_domains()  ((void)0)
 #endif
+
+void propagate_page_fault(unsigned long addr, u16 error_code);
 
 #endif /* __ASM_X86_MM_H__ */

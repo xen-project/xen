@@ -8,3 +8,5 @@ libgui.a: $(OBJS)
 	$(AR) $(ARFLAGS) $@ $(OBJS)
 
 include $(TOPDIR)/mk/helix.mk
+
+install:: all

@@ -937,12 +937,41 @@ int get_page_type(struct pfn_info *page, u32 type)
 }
 
 
+int new_guest_cr3(unsigned long pfn)
+{
+    struct exec_domain *ed = current;
+    struct domain *d = ed->domain;
+    int okay, cpu = smp_processor_id();
+    unsigned long old_base_pfn;
+    
+    okay = get_page_and_type_from_pagenr(pfn, PGT_l2_page_table, d);
+    if ( likely(okay) )
+    {
+        invalidate_shadow_ldt(ed);
+
+        percpu_info[cpu].deferred_ops &= ~DOP_FLUSH_TLB;
+        old_base_pfn = pagetable_val(ed->mm.pagetable) >> PAGE_SHIFT;
+        ed->mm.pagetable = mk_pagetable(pfn << PAGE_SHIFT);
+
+        shadow_mk_pagetable(&ed->mm);
+
+        write_ptbase(&ed->mm);
+
+        put_page_and_type(&frame_table[old_base_pfn]);
+    }
+    else
+    {
+        MEM_LOG("Error while installing new baseptr %08lx", ptr);
+    }
+
+    return okay;
+}
+
 static int do_extended_command(unsigned long ptr, unsigned long val)
 {
     int okay = 1, cpu = smp_processor_id();
     unsigned int cmd = val & MMUEXT_CMD_MASK;
     unsigned long pfn = ptr >> PAGE_SHIFT;
-    unsigned long old_base_pfn;
     struct pfn_info *page = &frame_table[pfn];
     struct exec_domain *ed = current;
     struct domain *d = ed->domain, *nd, *e;
@@ -1003,25 +1032,7 @@ static int do_extended_command(unsigned long ptr, unsigned long val)
         break;
 
     case MMUEXT_NEW_BASEPTR:
-        okay = get_page_and_type_from_pagenr(pfn, PGT_l2_page_table, d);
-        if ( likely(okay) )
-        {
-            invalidate_shadow_ldt(ed);
-
-            percpu_info[cpu].deferred_ops &= ~DOP_FLUSH_TLB;
-            old_base_pfn = pagetable_val(ed->mm.pagetable) >> PAGE_SHIFT;
-            ed->mm.pagetable = mk_pagetable(pfn << PAGE_SHIFT);
-
-            shadow_mk_pagetable(&ed->mm);
-
-            write_ptbase(&ed->mm);
-
-            put_page_and_type(&frame_table[old_base_pfn]);
-        }
-        else
-        {
-            MEM_LOG("Error while installing new baseptr %08lx", ptr);
-        }
+        okay = new_guest_cr3(pfn);
         break;
         
     case MMUEXT_TLB_FLUSH:

@@ -11,5 +11,5 @@ device-model: $(OBJS) $(BXLIBS)
 
 include $(TOPDIR)/mk/helix.mk
 
-install::
+install:: all
 	install device-model $(prefix)/usr/sbin

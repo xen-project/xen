@@ -29,7 +29,7 @@ XCS_EXEC = "/usr/sbin/xcs"
 XCS_LOGFILE = "/var/log/xcs.log"
 
 # Default install path for Xen binary packages.
-sys.path.append('/lib/python')
+sys.path = [ '/usr/lib/python' ] + sys.path
 from xen.xend.server import SrvDaemon
 
 class CheckError(ValueError):

@@ -485,6 +485,9 @@ struct mm_struct {
     unsigned long min_pfn;		/* min host physical */
     unsigned long max_pfn;		/* max host physical */
 
+    /* Virtual CR2 value. Can be read/written by guest. */
+    unsigned long guest_cr2;
+
     /* shadow mode status and controls */
     unsigned int shadow_mode;  /* flags to control shadow table operation */
     pagetable_t  shadow_table;

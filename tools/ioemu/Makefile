@@ -1,12 +1,12 @@
 # Order is important!
 SUBDIRS=gui memory iodev
 
-all: $(SUBDIRS)
+.PHONY: all clean install
 
-$(SUBDIRS):
-	$(MAKE) -C $@
-
-.PHONY: all $(SUBDIRS)
+all:
+	@for subdir in $(SUBDIRS); do 				\
+		$(MAKE) -C $$subdir $(MAKEDEFS) $@ || exit -1; 	\
+	done
 
 clean:
 	@for subdir in $(SUBDIRS); do 				\

@@ -10,6 +10,7 @@
 #include <sys/time.h>
 #include "xc_private.h"
 #include <xen/linux/suspend.h>
+#include <xen/io/domain_controller.h>
 #include <time.h>
 
 #define BATCH_SIZE 1024   /* 1024 pages (4MB) at a time */
