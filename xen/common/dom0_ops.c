@@ -17,12 +17,24 @@
 
 extern unsigned int alloc_new_dom_mem(struct task_struct *, unsigned int);
 
+/* Basically used to protect the domain-id space. */
+static spinlock_t create_dom_lock = SPIN_LOCK_UNLOCKED;
+
 static unsigned int get_domnr(void)
 {
     static unsigned int domnr = 0;
-    do { domnr = (domnr+1) & ((1<<20)-1); }
-    while ( find_domain_by_id(domnr) != NULL );
-    return domnr;
+    struct task_struct *p;
+    int tries = 0;
+
+    for ( tries = 0; tries < 1024; tries++ )
+    {
+        domnr = (domnr+1) & ((1<<20)-1);
+        if ( (p = find_domain_by_id(domnr)) == NULL )
+            return domnr;
+        free_task_struct(p);
+    }
+
+    return 0;
 }
 
 static void build_page_list(struct task_struct *p)
@@ -97,16 +109,18 @@ long do_dom0_op(dom0_op_t *u_dom0_op)
     {
         struct task_struct *p;
         static unsigned int pro = 0;
-        unsigned int dom = get_domnr();
+        unsigned int dom;
         ret = -ENOMEM;
-
-        if ( dom == 0 ) 
-            break;
+        
+        spin_lock_irq(&create_dom_lock);
+        
+        if ( (dom = get_domnr()) == 0 ) 
+            goto exit_create;
 
         pro = (pro+1) % smp_num_cpus;
         p = do_newdomain(dom, pro);
         if ( p == NULL ) 
-            break;
+            goto exit_create;
 
 	if (op.u.newdomain.name[0]) {
 	  strncpy (p -> name, op.u.newdomain.name, MAX_DOMAIN_NAME);
@@ -117,7 +131,7 @@ long do_dom0_op(dom0_op_t *u_dom0_op)
         if ( ret != 0 ) 
         {
             __kill_domain(p);
-            break;
+            goto exit_create;
         }
 
         build_page_list(p);
@@ -129,6 +143,9 @@ long do_dom0_op(dom0_op_t *u_dom0_op)
             list_entry(p->pg_head.next, struct pfn_info, list) -
             frame_table;
         copy_to_user(u_dom0_op, &op, sizeof(op));
+
+    exit_create:
+        spin_unlock_irq(&create_dom_lock);
     }
     break;
 
