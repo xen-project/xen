@@ -1,3 +1,4 @@
+/* -*-  Mode:C; c-basic-offset:4; tab-width:4; indent-tabs-mode:nil -*- */
 /******************************************************************************
  * arch/x86/x86_32/seg_fixup.c
  * 
@@ -114,7 +115,7 @@ int get_baselimit(u16 seg, unsigned long *base, unsigned long *limit)
     if ( ldt )
     {
         table = (unsigned long *)LDT_VIRT_START(d);
-        if ( idx >= d->mm.ldt_ents )
+        if ( idx >= d->arch.ldt_ents )
             goto fail;
     }
     else /* gdt */
@@ -180,10 +181,10 @@ int fixup_seg(u16 seg, unsigned long offset)
     if ( ldt )
     {
         table = (unsigned long *)LDT_VIRT_START(d);
-        if ( idx >= d->mm.ldt_ents )
+        if ( idx >= d->arch.ldt_ents )
         {
             DPRINTK("Segment %04x out of LDT range (%ld)\n",
-                    seg, d->mm.ldt_ents);
+                    seg, d->arch.ldt_ents);
             goto fail;
         }
     }
@@ -466,8 +467,8 @@ int gpf_emulate_4gb(struct xen_regs *regs)
     /* If requested, give a callback on otherwise unused vector 15. */
     if ( VM_ASSIST(d->domain, VMASST_TYPE_4gb_segments_notify) )
     {
-        ti  = &d->thread.traps[15];
-        tb = &d->thread.trap_bounce;
+        ti  = &d->arch.traps[15];
+        tb  = &d->arch.trap_bounce;
         tb->flags      = TBF_EXCEPTION | TBF_EXCEPTION_ERRCODE;
         tb->error_code = pb - eip;
         tb->cs         = ti->cs;

@@ -1,3 +1,4 @@
+/* -*-  Mode:C; c-basic-offset:4; tab-width:4; indent-tabs-mode:nil -*- */
 /******************************************************************************
  * domain_build.c
  * 
@@ -224,11 +225,11 @@ int construct_dom0(struct domain *d,
      * We're basically forcing default RPLs to 1, so that our "what privilege
      * level are we returning to?" logic works.
      */
-    ed->thread.failsafe_selector = FLAT_GUESTOS_CS;
-    ed->thread.event_selector    = FLAT_GUESTOS_CS;
-    ed->thread.guestos_ss = FLAT_GUESTOS_SS;
+    ed->arch.failsafe_selector = FLAT_GUESTOS_CS;
+    ed->arch.event_selector    = FLAT_GUESTOS_CS;
+    ed->arch.guestos_ss = FLAT_GUESTOS_SS;
     for ( i = 0; i < 256; i++ ) 
-        ed->thread.traps[i].cs = FLAT_GUESTOS_CS;
+        ed->arch.traps[i].cs = FLAT_GUESTOS_CS;
 
     /* WARNING: The new domain must have its 'processor' field filled in! */
     phys_to_page(mpt_alloc)->u.inuse.type_info = PGT_l4_page_table;
@@ -237,8 +238,8 @@ int construct_dom0(struct domain *d,
     l4tab[l4_table_offset(LINEAR_PT_VIRT_START)] =
         mk_l4_pgentry(__pa(l4start) | __PAGE_HYPERVISOR);
     l4tab[l4_table_offset(PERDOMAIN_VIRT_START)] =
-        mk_l4_pgentry(__pa(d->mm_perdomain_pt) | __PAGE_HYPERVISOR);
-    ed->mm.pagetable = mk_pagetable(__pa(l4start));
+        mk_l4_pgentry(__pa(d->arch.mm_perdomain_pt) | __PAGE_HYPERVISOR);
+    ed->arch.pagetable = mk_pagetable(__pa(l4start));
 
     l4tab += l4_table_offset(dsi.v_start);
     mfn = alloc_start >> PAGE_SHIFT;
@@ -329,7 +330,7 @@ int construct_dom0(struct domain *d,
 
     /* Install the new page tables. */
     __cli();
-    write_ptbase(&ed->mm);
+    write_ptbase(ed);
 
     /* Copy the OS image. */
     (void)loadelfimage(image_start);
@@ -382,7 +383,7 @@ int construct_dom0(struct domain *d,
     *dst = '\0';
 
     /* Reinstate the caller's page tables. */
-    write_ptbase(&current->mm);
+    write_ptbase(current);
     __sti();
 
     /* DOM0 gets access to everything. */

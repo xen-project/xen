@@ -1,3 +1,4 @@
+/* -*-  Mode:C; c-basic-offset:4; tab-width:4; indent-tabs-mode:nil -*- */
 /*
  * vmx_platform.c: handling x86 platform related MMIO instructions
  * Copyright (c) 2004, Intel Corporation.
@@ -420,9 +421,9 @@ static void send_mmio_req(unsigned long gpa,
     extern long evtchn_send(int lport);
     extern long do_block(void);
 
-    mpci_p = &current->thread.arch_vmx.vmx_platform.mpci;
+    mpci_p = &current->arch.arch_vmx.vmx_platform.mpci;
     inst_decoder_regs = mpci_p->inst_decoder_regs;
-    vio = (vcpu_iodata_t *) d->thread.arch_vmx.vmx_platform.shared_page_va;
+    vio = (vcpu_iodata_t *) d->arch.arch_vmx.vmx_platform.shared_page_va;
         
     if (vio == NULL) {
         printk("bad shared page\n");
@@ -430,7 +431,7 @@ static void send_mmio_req(unsigned long gpa,
     }
     p = &vio->vp_ioreq;
         
-    set_bit(ARCH_VMX_IO_WAIT, &d->thread.arch_vmx.flags);
+    set_bit(ARCH_VMX_IO_WAIT, &d->arch.arch_vmx.flags);
     p->dir = dir;
     p->pdata_valid = pvalid;
     p->count = 1;
@@ -470,7 +471,7 @@ void handle_mmio(unsigned long va, unsigned long gpte, unsigned long gpa)
     unsigned char inst[MAX_INST_LEN];
     int ret;
      
-    mpci_p = &current->thread.arch_vmx.vmx_platform.mpci;
+    mpci_p = &current->arch.arch_vmx.vmx_platform.mpci;
     inst_decoder_regs = mpci_p->inst_decoder_regs;
 
     __vmread(GUEST_EIP, &eip);

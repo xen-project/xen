@@ -1,3 +1,4 @@
+/* -*-  Mode:C; c-basic-offset:4; tab-width:4; indent-tabs-mode:nil -*- */
 /*
  * vmx_vmcs.c: VMCS management
  * Copyright (c) 2004, Intel Corporation.
@@ -137,7 +138,7 @@ int vmx_setup_platform(struct exec_domain *d, execution_context_t *context)
 
     mpfn = phys_to_machine_mapping[gpfn];
     p = map_domain_mem(mpfn << PAGE_SHIFT);
-    d->thread.arch_vmx.vmx_platform.shared_page_va = (unsigned long) p;
+    d->arch.arch_vmx.vmx_platform.shared_page_va = (unsigned long) p;
 
     return 0;
 }
@@ -159,7 +160,7 @@ static int add_mapping_perdomain(struct exec_domain *d, unsigned long gpfn,
     if (gpfn > ENTRIES_PER_L2_PAGETABLE * ENTRIES_PER_L1_PAGETABLE)
         return -1;
 
-    if (!(l1_pgentry_val(d->domain->mm_perdomain_pt[
+    if (!(l1_pgentry_val(d->domain->arch.mm_perdomain_pt[
             gpfn >> (L2_PAGETABLE_SHIFT - L1_PAGETABLE_SHIFT)]) & _PAGE_PRESENT))
     {
         page = (struct pfn_info *) alloc_domheap_page(NULL);
@@ -168,7 +169,7 @@ static int add_mapping_perdomain(struct exec_domain *d, unsigned long gpfn,
         }
 
         pfn = (unsigned long) (page - frame_table);
-        d->domain->mm_perdomain_pt[gpfn >> (L2_PAGETABLE_SHIFT - L1_PAGETABLE_SHIFT)] = 
+        d->domain->arch.mm_perdomain_pt[gpfn >> (L2_PAGETABLE_SHIFT - L1_PAGETABLE_SHIFT)] = 
             mk_l1_pgentry((pfn << PAGE_SHIFT) | __PAGE_HYPERVISOR);
     }
     phys_to_machine_mapping[gpfn] = mpfn;
@@ -190,18 +191,18 @@ void vmx_do_launch(struct exec_domain *ed)
     struct domain *d = ed->domain;
 
     cpu =  smp_processor_id();
-    ed->mm.min_pfn = ed->mm.max_pfn = 0;
+    d->arch.min_pfn = d->arch.max_pfn = 0;
 
     spin_lock(&d->page_alloc_lock);
     list_ent = d->page_list.next;
 
-    mpl2e = (l2_pgentry_t *)map_domain_mem(pagetable_val(ed->mm.monitor_table));
+    mpl2e = (l2_pgentry_t *)map_domain_mem(pagetable_val(ed->arch.monitor_table));
 
     for ( i = 0; list_ent != &d->page_list; i++ )
     {
         pfn = list_entry(list_ent, struct pfn_info, list) - frame_table;
-        ed->mm.min_pfn = min(ed->mm.min_pfn, pfn);
-        ed->mm.max_pfn = max(ed->mm.max_pfn, pfn);
+        d->arch.min_pfn = min(d->arch.min_pfn, pfn);
+        d->arch.max_pfn = max(d->arch.max_pfn, pfn);
         list_ent = frame_table[pfn].list.next;
         add_mapping_perdomain(ed, i, pfn);
     }
@@ -219,7 +220,7 @@ void vmx_do_launch(struct exec_domain *ed)
 
     guest_pl2e_cache = map_domain_mem(pfn << PAGE_SHIFT);
     memset(guest_pl2e_cache, 0, PAGE_SIZE); /* clean it up */
-    ed->mm.guest_pl2e_cache = guest_pl2e_cache; 
+    ed->arch.guest_pl2e_cache = guest_pl2e_cache; 
         
     unmap_domain_mem(mpl2e);
 
@@ -245,12 +246,12 @@ void vmx_do_launch(struct exec_domain *ed)
     error |= __vmwrite(GUEST_TR_BASE, 0);
     error |= __vmwrite(GUEST_TR_LIMIT, 0xff);
 
-    ed->mm.shadow_table = ed->mm.pagetable;
-    __vmwrite(GUEST_CR3, pagetable_val(ed->mm.pagetable));
-    __vmwrite(HOST_CR3, pagetable_val(ed->mm.monitor_table));
+    ed->arch.shadow_table = ed->arch.pagetable;
+    __vmwrite(GUEST_CR3, pagetable_val(ed->arch.pagetable));
+    __vmwrite(HOST_CR3, pagetable_val(ed->arch.monitor_table));
     __vmwrite(HOST_ESP, (unsigned long) get_stack_top());
 
-    ed->thread.schedule_tail = arch_vmx_do_resume;
+    ed->arch.schedule_tail = arch_vmx_do_resume;
 }
 
 /*

@@ -133,7 +133,7 @@ ENTRY(double_fault)
         jmp   error_code
 
 ENTRY(nmi)
-        iret
+        iretq
 
 .data
 

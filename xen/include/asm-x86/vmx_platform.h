@@ -19,7 +19,8 @@
 #ifndef __ASM_X86_VMX_PLATFORM_H__
 #define __ASM_X86_VMX_PLATFORM_H__
 
-#include <asm/e820.h>       /* from Linux */
+#include <public/xen.h>
+#include <asm/e820.h>
 
 #define MAX_OPERAND_NUM 3
 #define I_NAME_LEN  16

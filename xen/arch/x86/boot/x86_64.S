@@ -211,7 +211,7 @@ SYMBOL_NAME(idt):
         .quad   SYMBOL_NAME(idt_table)
 
 ENTRY(stack_start)
-        .quad   SYMBOL_NAME(cpu0_stack) + 8000
+        .quad   SYMBOL_NAME(cpu0_stack) + STACK_SIZE - 200
 
 high_start:
         .quad   __high_start
@@ -248,12 +248,3 @@ ENTRY(cpu0_stack)    # Initial stack is 8kB
         .org 0x6000
 ENTRY(stext)
 ENTRY(_stext)
-
-.globl copy_from_user, copy_to_user, copy_user_generic
-copy_from_user: 
-copy_to_user:
-copy_user_generic:
-.globl __get_user_1, __get_user_4, __get_user_8
-__get_user_1:
-__get_user_4:
-__get_user_8:

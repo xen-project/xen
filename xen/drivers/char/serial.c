@@ -1,3 +1,4 @@
+/* -*-  Mode:C; c-basic-offset:4; tab-width:4; indent-tabs-mode:nil -*- */
 /******************************************************************************
  * serial.c
  * 
@@ -12,7 +13,6 @@
 #include <xen/init.h>
 #include <xen/irq.h>
 #include <xen/keyhandler.h> 
-#include <asm/pdb.h>
 #include <xen/reboot.h>
 #include <xen/sched.h>
 #include <xen/serial.h>
@@ -33,14 +33,14 @@ string_param("com2", opt_com2);
 #define MCR             0x04    /* Modem control        */
 #define LSR             0x05    /* line status          */
 #define MSR             0x06    /* Modem status         */
-#define DLL             0x00    /* divisor latch (ls) ( DLAB=1)	*/
-#define DLM             0x01    /* divisor latch (ms) ( DLAB=1)	*/
+#define DLL             0x00    /* divisor latch (ls) (DLAB=1) */
+#define DLM             0x01    /* divisor latch (ms) (DLAB=1) */
 
 /* Interrupt Enable Register */
 #define IER_ERDAI       0x01    /* rx data recv'd       */
 #define IER_ETHREI      0x02    /* tx reg. empty        */
 #define IER_ELSI        0x04    /* rx line status       */
-#define IER_EMSI        0x08    /* MODEM status	        */
+#define IER_EMSI        0x08    /* MODEM status         */
 
 /* FIFO control register */
 #define FCR_ENABLE      0x01    /* enable FIFO          */

@@ -8,55 +8,6 @@
 #include <asm/uaccess.h>
 
 /*
- * Copy a null terminated string from userspace.
- */
-
-#define __do_strncpy_from_user(dst,src,count,res)			   \
-do {									   \
-	long __d0, __d1, __d2;						   \
-	__asm__ __volatile__(						   \
-		"	testq %1,%1\n"					   \
-		"	jz 2f\n"					   \
-		"0:	lodsb\n"					   \
-		"	stosb\n"					   \
-		"	testb %%al,%%al\n"				   \
-		"	jz 1f\n"					   \
-		"	decq %1\n"					   \
-		"	jnz 0b\n"					   \
-		"1:	subq %1,%0\n"					   \
-		"2:\n"							   \
-		".section .fixup,\"ax\"\n"				   \
-		"3:	movq %5,%0\n"					   \
-		"	jmp 2b\n"					   \
-		".previous\n"						   \
-		".section __ex_table,\"a\"\n"				   \
-		"	.align 8\n"					   \
-		"	.quad 0b,3b\n"					   \
-		".previous"						   \
-		: "=r"(res), "=c"(count), "=&a" (__d0), "=&S" (__d1),	   \
-		  "=&D" (__d2)						   \
-		: "i"(-EFAULT), "0"(count), "1"(count), "3"(src), "4"(dst) \
-		: "memory");						   \
-} while (0)
-
-long
-__strncpy_from_user(char *dst, const char *src, long count)
-{
-	long res;
-	__do_strncpy_from_user(dst, src, count, res);
-	return res;
-}
-
-long
-strncpy_from_user(char *dst, const char *src, long count)
-{
-	long res = -EFAULT;
-	if (access_ok(VERIFY_READ, src, 1))
-		__do_strncpy_from_user(dst, src, count, res);
-	return res;
-}
-
-/*
  * Zero Userspace
  */
 
@@ -93,6 +44,86 @@ unsigned long __clear_user(void *addr, unsigned long size)
 	return size;
 }
 
+unsigned long __copy_to_user_ll(void __user *to, const void *from, unsigned n)
+{
+	unsigned long __d0, __d1, __d2, __n = n;
+	__asm__ __volatile__(
+		"	cmpq  $15,%0\n"
+		"	jbe  1f\n"
+		"	mov  %1,%0\n"
+		"	neg  %0\n"
+		"	and  $7,%0\n"
+		"	sub  %0,%3\n"
+		"4:	rep; movsb\n" /* make 'to' address aligned */
+		"	mov  %3,%0\n"
+		"	shr  $3,%0\n"
+		"	and  $7,%3\n"
+		"	.align 2,0x90\n"
+		"0:	rep; movsq\n" /* as many quadwords as possible... */
+		"	mov  %3,%0\n"
+		"1:	rep; movsb\n" /* ...remainder copied as bytes */
+		"2:\n"
+		".section .fixup,\"ax\"\n"
+		"5:	add %3,%0\n"
+		"	jmp 2b\n"
+		"3:	lea 0(%3,%0,8),%0\n"
+		"	jmp 2b\n"
+		".previous\n"
+		".section __ex_table,\"a\"\n"
+		"	.align 8\n"
+		"	.quad 4b,5b\n"
+		"	.quad 0b,3b\n"
+		"	.quad 1b,2b\n"
+		".previous"
+		: "=&c"(__n), "=&D" (__d0), "=&S" (__d1), "=r"(__d2)
+		: "3"(__n), "0"(__n), "1"(to), "2"(from)
+		: "memory");
+	return (unsigned)__n;
+}
+
+unsigned long
+__copy_from_user_ll(void *to, const void __user *from, unsigned n)
+{
+	unsigned long __d0, __d1, __d2, __n = n;
+	__asm__ __volatile__(
+		"	cmp  $15,%0\n"
+		"	jbe  1f\n"
+		"	mov  %1,%0\n"
+		"	neg  %0\n"
+		"	and  $7,%0\n"
+		"	sub  %0,%3\n"
+		"4:	rep; movsb\n" /* make 'to' address aligned */
+		"	mov  %3,%0\n"
+		"	shr  $3,%0\n"
+		"	and  $7,%3\n"
+		"	.align 2,0x90\n"
+		"0:	rep; movsq\n" /* as many quadwords as possible... */
+		"	mov  %3,%0\n"
+		"1:	rep; movsb\n" /* ...remainder copied as bytes */
+		"2:\n"
+		".section .fixup,\"ax\"\n"
+		"5:	add %3,%0\n"
+		"	jmp 6f\n"
+		"3:	lea 0(%3,%0,8),%0\n"
+		"6:	push %0\n"
+		"	push %%rax\n"
+		"	xor  %%rax,%%rax\n"
+		"	rep; stosb\n"
+		"	pop  %%rax\n"
+		"	pop  %0\n"
+		"	jmp 2b\n"
+		".previous\n"
+		".section __ex_table,\"a\"\n"
+		"	.align 8\n"
+		"	.quad 4b,5b\n"
+		"	.quad 0b,3b\n"
+		"	.quad 1b,6b\n"
+		".previous"
+		: "=&c"(__n), "=&D" (__d0), "=&S" (__d1), "=r"(__d2)
+		: "3"(__n), "0"(__n), "1"(to), "2"(from)
+		: "memory");
+	return (unsigned)__n;
+}
 
 unsigned long clear_user(void *to, unsigned long n)
 {
@@ -101,36 +132,49 @@ unsigned long clear_user(void *to, unsigned long n)
 	return n;
 }
 
-/*
- * Return the size of a string (including the ending 0)
+/**
+ * copy_to_user: - Copy a block of data into user space.
+ * @to:   Destination address, in user space.
+ * @from: Source address, in kernel space.
+ * @n:    Number of bytes to copy.
  *
- * Return 0 on exception, a value greater than N if too long
+ * Context: User context only.  This function may sleep.
+ *
+ * Copy data from kernel space to user space.
+ *
+ * Returns number of bytes that could not be copied.
+ * On success, this will be zero.
  */
-
-long strnlen_user(const char *s, long n)
+unsigned long
+copy_to_user(void __user *to, const void *from, unsigned n)
 {
-	unsigned long res = 0;
-	char c;
-
-	if (!access_ok(VERIFY_READ, s, n))
-		return 0;
-
-	while (1) {
-		if (get_user(c, s))
-			return 0;
-		if (!c)
-			return res+1;
-		if (res>n)
-			return n+1;
-		res++;
-		s++;
-	}
+	if (access_ok(VERIFY_WRITE, to, n))
+		n = __copy_to_user(to, from, n);
+	return n;
 }
 
-unsigned long copy_in_user(void *to, const void *from, unsigned len)
+/**
+ * copy_from_user: - Copy a block of data from user space.
+ * @to:   Destination address, in kernel space.
+ * @from: Source address, in user space.
+ * @n:    Number of bytes to copy.
+ *
+ * Context: User context only.  This function may sleep.
+ *
+ * Copy data from user space to kernel space.
+ *
+ * Returns number of bytes that could not be copied.
+ * On success, this will be zero.
+ *
+ * If some data could not be copied, this function will pad the copied
+ * data to the requested size using zero bytes.
+ */
+unsigned long
+copy_from_user(void *to, const void __user *from, unsigned n)
 {
-	if (access_ok(VERIFY_WRITE, to, len) && access_ok(VERIFY_READ, from, len)) { 
-		return copy_user_generic(to, from, len);
-	} 
-	return len;		
+	if (access_ok(VERIFY_READ, from, n))
+		n = __copy_from_user(to, from, n);
+	else
+		memset(to, 0, n);
+	return n;
 }

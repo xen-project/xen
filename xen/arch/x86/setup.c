@@ -1,3 +1,4 @@
+/* -*-  Mode:C; c-basic-offset:4; tab-width:4; indent-tabs-mode:nil -*- */
 
 #include <xen/config.h>
 #include <xen/init.h>
@@ -17,7 +18,6 @@
 #include <asm/apic.h>
 #include <asm/desc.h>
 #include <asm/domain_page.h>
-#include <asm/pdb.h>
 #include <asm/shadow.h>
 #include <asm/e820.h>
 
@@ -309,7 +309,7 @@ void __init cpu_init(void)
     /* Set up GDT and IDT. */
     SET_GDT_ENTRIES(current, DEFAULT_GDT_ENTRIES);
     SET_GDT_ADDRESS(current, DEFAULT_GDT_ADDRESS);
-    __asm__ __volatile__ ( "lgdt %0" : "=m" (*current->mm.gdt) );
+    __asm__ __volatile__ ( "lgdt %0" : "=m" (*current->arch.gdt) );
     __asm__ __volatile__ ( "lidt %0" : "=m" (idt_descr) );
 
     /* No nested task. */
@@ -339,7 +339,7 @@ void __init cpu_init(void)
     percpu_traps_init();
 
     /* Install correct page table. */
-    write_ptbase(&current->mm);
+    write_ptbase(current);
 
     init_idle_task();
 }
@@ -360,7 +360,7 @@ static void __init start_of_day(void)
 #ifdef MEMORY_GUARD
     /* Unmap the first page of CPU0's stack. */
     extern unsigned long cpu0_stack[];
-    memguard_guard_range(cpu0_stack, PAGE_SIZE);
+    memguard_guard_stack(cpu0_stack);
 #endif
 
     open_softirq(NEW_TLBFLUSH_CLOCK_PERIOD_SOFTIRQ, new_tlbflush_clock_period);
@@ -426,10 +426,6 @@ static void __init start_of_day(void)
     initialize_keytable(); /* call back handling for key codes */
 
     serial_init_stage2();
-
-#ifdef XEN_DEBUGGER
-    initialize_pdb();      /* pervasive debugger */
-#endif
 
     if ( !cpu_has_apic )
     {
@@ -596,10 +592,6 @@ void __init __start_xen(multiboot_info_t *mbi)
 	   (xenheap_phys_end-__pa(heap_start)) >> 10);
 
     early_boot = 0;
-
-    /* Initialise the slab allocator. */
-    xmem_cache_init();
-    xmem_cache_sizes_init(max_page);
 
     start_of_day();
 

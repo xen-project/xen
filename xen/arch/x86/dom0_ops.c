@@ -15,7 +15,6 @@
 #include <xen/event.h>
 #include <asm/domain_page.h>
 #include <asm/msr.h>
-#include <asm/pdb.h>
 #include <xen/trace.h>
 #include <xen/console.h>
 #include <asm/shadow.h>
@@ -216,7 +215,7 @@ long arch_do_dom0_op(dom0_op_t *op, dom0_op_t *u_dom0_op)
         domid_t dom = op->u.getpageframeinfo2.domain;
         unsigned long *s_ptr = (unsigned long*) op->u.getpageframeinfo2.array;
         struct domain *d;
-        unsigned long l_arr[GPF2_BATCH];
+        unsigned long *l_arr;
         ret = -ESRCH;
 
         if ( unlikely((d = find_domain_by_id(dom)) == NULL) )
@@ -227,6 +226,8 @@ long arch_do_dom0_op(dom0_op_t *op, dom0_op_t *u_dom0_op)
             ret = -E2BIG;
             break;
         }
+
+        l_arr = (unsigned long *)alloc_xenheap_page();
  
         ret = 0;
         for( n = 0; n < num; )
@@ -291,6 +292,8 @@ long arch_do_dom0_op(dom0_op_t *op, dom0_op_t *u_dom0_op)
             n += j;
         }
 
+        free_xenheap_page((unsigned long)l_arr);
+
         put_domain(d);
     }
     break;
@@ -341,49 +344,50 @@ long arch_do_dom0_op(dom0_op_t *op, dom0_op_t *u_dom0_op)
     return ret;
 }
 
-void arch_getdomaininfo_ctxt(struct exec_domain *d, full_execution_context_t *c)
+void arch_getdomaininfo_ctxt(
+    struct exec_domain *ed, full_execution_context_t *c)
 { 
     int i;
 
     c->flags = 0;
     memcpy(&c->cpu_ctxt, 
-           &d->thread.user_ctxt,
-           sizeof(d->thread.user_ctxt));
-    if ( test_bit(EDF_DONEFPUINIT, &d->ed_flags) )
+           &ed->arch.user_ctxt,
+           sizeof(ed->arch.user_ctxt));
+    if ( test_bit(EDF_DONEFPUINIT, &ed->ed_flags) )
         c->flags |= ECF_I387_VALID;
     memcpy(&c->fpu_ctxt,
-           &d->thread.i387,
-           sizeof(d->thread.i387));
+           &ed->arch.i387,
+           sizeof(ed->arch.i387));
     memcpy(&c->trap_ctxt,
-           d->thread.traps,
-           sizeof(d->thread.traps));
+           ed->arch.traps,
+           sizeof(ed->arch.traps));
 #ifdef ARCH_HAS_FAST_TRAP
-    if ( (d->thread.fast_trap_desc.a == 0) &&
-         (d->thread.fast_trap_desc.b == 0) )
+    if ( (ed->arch.fast_trap_desc.a == 0) &&
+         (ed->arch.fast_trap_desc.b == 0) )
         c->fast_trap_idx = 0;
     else
         c->fast_trap_idx = 
-            d->thread.fast_trap_idx;
+            ed->arch.fast_trap_idx;
 #endif
-    c->ldt_base = d->mm.ldt_base;
-    c->ldt_ents = d->mm.ldt_ents;
+    c->ldt_base = ed->arch.ldt_base;
+    c->ldt_ents = ed->arch.ldt_ents;
     c->gdt_ents = 0;
-    if ( GET_GDT_ADDRESS(d) == GDT_VIRT_START(d) )
+    if ( GET_GDT_ADDRESS(ed) == GDT_VIRT_START(ed) )
     {
         for ( i = 0; i < 16; i++ )
             c->gdt_frames[i] = 
-                l1_pgentry_to_pagenr(d->mm.perdomain_ptes[i]);
-        c->gdt_ents = GET_GDT_ENTRIES(d);
+                l1_pgentry_to_pagenr(ed->arch.perdomain_ptes[i]);
+        c->gdt_ents = GET_GDT_ENTRIES(ed);
     }
-    c->guestos_ss  = d->thread.guestos_ss;
-    c->guestos_esp = d->thread.guestos_sp;
+    c->guestos_ss  = ed->arch.guestos_ss;
+    c->guestos_esp = ed->arch.guestos_sp;
     c->pt_base   = 
-        pagetable_val(d->mm.pagetable);
+        pagetable_val(ed->arch.pagetable);
     memcpy(c->debugreg, 
-           d->thread.debugreg, 
-           sizeof(d->thread.debugreg));
-    c->event_callback_cs     = d->thread.event_selector;
-    c->event_callback_eip    = d->thread.event_address;
-    c->failsafe_callback_cs  = d->thread.failsafe_selector;
-    c->failsafe_callback_eip = d->thread.failsafe_address;
+           ed->arch.debugreg, 
+           sizeof(ed->arch.debugreg));
+    c->event_callback_cs     = ed->arch.event_selector;
+    c->event_callback_eip    = ed->arch.event_address;
+    c->failsafe_callback_cs  = ed->arch.failsafe_selector;
+    c->failsafe_callback_eip = ed->arch.failsafe_address;
 }

@@ -1,3 +1,4 @@
+/* -*-  Mode:C; c-basic-offset:4; tab-width:4; indent-tabs-mode:nil -*- */
 /*
  * vmx_vmcs.h: VMCS related definitions
  * Copyright (c) 2004, Intel Corporation.
@@ -59,7 +60,7 @@ struct arch_vmx_struct {
 #define vmx_schedule_tail(next)         \
     (next)->thread.arch_vmx.arch_vmx_schedule_tail((next))
 
-#define VMX_DOMAIN(d)   d->thread.arch_vmx.flags
+#define VMX_DOMAIN(d)   d->arch.arch_vmx.flags
 
 #define ARCH_VMX_VMCS_LOADED    0       /* VMCS has been loaded and active */
 #define ARCH_VMX_VMCS_LAUNCH    1       /* Needs VMCS launch */

@@ -38,10 +38,8 @@ struct usbif_priv_st {
     unsigned long    shmem_frame;
     unsigned int     evtchn;
     int              irq;
-    /* Comms information. */
-    usbif_t      *usb_ring_base; /* ioremap()'ed ptr to shmem_frame. */
-    USBIF_RING_IDX     usb_req_cons;  /* Request consumer. */
-    USBIF_RING_IDX     usb_resp_prod; /* Private version of resp. producer. */
+    /* Comms Information */
+    usbif_back_ring_t usb_ring;
     /* Private fields. */
     enum { DISCONNECTED, DISCONNECTING, CONNECTED } status;
     /*
@@ -49,11 +47,10 @@ struct usbif_priv_st {
      * We therefore need to store the id from the original request.
      */
     u8                   disconnect_rspid;
-    usbif_priv_t *hash_next;
+    usbif_priv_t        *hash_next;
     struct list_head     usbif_list;
     spinlock_t           usb_ring_lock;
     atomic_t             refcnt;
-    atomic_t             work_scheduled;
 
     struct work_struct work;
 };
@@ -80,7 +77,8 @@ usbif_priv_t *usbif_find(domid_t domid);
 void usbif_interface_init(void);
 void usbif_ctrlif_init(void);
 
-void usbif_deschedule(usbif_priv_t *usbif);
+void usbif_deschedule(usbif_priv_t *up);
+void remove_from_usbif_list(usbif_priv_t *up);
 
 irqreturn_t usbif_be_int(int irq, void *dev_id, struct pt_regs *regs);
 

@@ -54,8 +54,9 @@ $(TARGET): delete-unfresh-files include/xen/compile.h
 	$(MAKE) -C drivers
 	$(MAKE) -C arch/$(TARGET_ARCH)
 
+# drivers/char/console.o may contain static banner/compile info. Blow it away.
 delete-unfresh-files:
-	rm -f include/xen/banner.h include/xen/compile.h
+	rm -f include/xen/banner.h include/xen/compile.h drivers/char/console.o
 	$(MAKE) -C arch/$(TARGET_ARCH) delete-unfresh-files
 
 # compile.h contains dynamic build info. Rebuilt on every 'make' invocation.

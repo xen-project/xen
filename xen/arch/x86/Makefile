@@ -1,11 +1,6 @@
 
 include $(BASEDIR)/Rules.mk
 
-ifneq ($(debugger),y)
-OBJS := $(subst pdb-linux.o,,$(OBJS))
-OBJS := $(subst pdb-stub.o,,$(OBJS))
-endif
-
 OBJS += $(patsubst %.S,%.o,$(wildcard $(TARGET_SUBARCH)/*.S))
 OBJS += $(patsubst %.c,%.o,$(wildcard $(TARGET_SUBARCH)/*.c))
 OBJS += $(patsubst %.c,%.o,$(wildcard mtrr/*.c))
@@ -41,9 +36,9 @@ clean:
 	rm -f *.o *.s *~ core boot/*.o boot/*~ boot/core boot/mkelf32
 	rm -f x86_32/*.o x86_32/*~ x86_32/core
 	rm -f x86_64/*.o x86_64/*~ x86_64/core
+	rm -f mtrr/*.o mtrr/*~ mtrr/core
 
-# setup.o contains bits of compile.h so it must be blown away
 delete-unfresh-files:
-	rm -f setup.o
+	# nothing
 
 .PHONY: default clean delete-unfresh-files

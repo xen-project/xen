@@ -1,3 +1,4 @@
+/* -*-  Mode:C; c-basic-offset:4; tab-width:4; indent-tabs-mode:nil -*- */
 /******************************************************************************
  * domain.c
  * 
@@ -38,13 +39,13 @@ struct domain *do_createdomain(domid_t dom_id, unsigned int cpu)
     atomic_set(&d->refcnt, 1);
     atomic_set(&ed->pausecnt, 0);
 
-    shadow_lock_init(ed);
+    shadow_lock_init(d);
 
     d->id          = dom_id;
-    ed->processor   = cpu;
+    ed->processor  = cpu;
     d->create_time = NOW();
  
-    memcpy(&ed->thread, &idle0_exec_domain.thread, sizeof(ed->thread));
+    memcpy(&ed->arch, &idle0_exec_domain.arch, sizeof(ed->arch));
 
     spin_lock_init(&d->time_lock);
 
@@ -326,13 +327,11 @@ long do_boot_vcpu(unsigned long vcpu, full_execution_context_t *ctxt)
     ed = d->exec_domain[vcpu];
 
     atomic_set(&ed->pausecnt, 0);
-    shadow_lock_init(ed);
+    shadow_lock_init(d);
 
-    memcpy(&ed->thread, &idle0_exec_domain.thread, sizeof(ed->thread));
+    memcpy(&ed->arch, &idle0_exec_domain.arch, sizeof(ed->arch));
 
-    /* arch_do_createdomain */
-    ed->thread.schedule_tail = d->exec_domain[0]->thread.schedule_tail;
-    ed->mm.perdomain_ptes = d->mm_perdomain_pt + (ed->eid << PDPT_VCPU_SHIFT);
+    arch_do_boot_vcpu(ed);
 
     sched_add_domain(ed);
 

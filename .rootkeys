@@ -882,8 +882,6 @@
 3ddb79bcZ_2FxINljqNSkqa17ISyJw xen/arch/x86/pci-pc.c
 3ddb79bdeJ7_86z03yTAPIeeywOg3Q xen/arch/x86/pci-x86.c
 3ddb79bdIKgipvGoqExEQ7jawfVowA xen/arch/x86/pci-x86.h
-40a4dfced2dnSzbKgJFlD3chKHexjQ xen/arch/x86/pdb-linux.c
-4022a73czgX7d-2zfF_cb33oVemApQ xen/arch/x86/pdb-stub.c
 3ddb79bc7KxGCEJsgBnkDX7XjD_ZEQ xen/arch/x86/rwlock.c
 3ddb79bcrD6Z_rUvSDgrvjyb4846Eg xen/arch/x86/setup.c
 405b8599xI_PoEr3zZoJ2on-jdn7iw xen/arch/x86/shadow.c
@@ -914,8 +912,6 @@
 40e96d3akN3Hu_J5Bk-WXD8OGscrYQ xen/arch/x86/x86_64/xen.lds
 3ddb79bdff-gj-jFGKjOejeHLqL8Lg xen/common/Makefile
 3e397e66AyyD5fYraAySWuwi9uqSXg xen/common/ac_timer.c
-4022a73c_BbDFd2YJ_NQYVvKX5Oz7w xen/common/debug-linux.c
-3fa152581E5KhrAtqZef2Sr5NKTz4w xen/common/debug.c
 3ddb79bdLX_P6iB7ILiblRLWvebapg xen/common/dom0_ops.c
 3e6377e4i0c9GtKN65e99OtRbw3AZw xen/common/dom_mem_ops.c
 3ddb79bdYO5D8Av12NHqPeSviav7cg xen/common/domain.c
@@ -925,7 +921,6 @@
 3ddb79bd9drcFPVxd4w2GPOIjLlXpA xen/common/kernel.c
 3e4cd9d8LAAghUY0hNIK72uc2ch_Nw xen/common/keyhandler.c
 3ddb79bduhSEZI8xa7IbGQCpap5y2A xen/common/lib.c
-4200cf14XGr26_PCC8NxREDhr7Hk5Q xen/common/malloc.c
 41a61536SZbR6cj1ukWTb0DYU-vz9w xen/common/multicall.c
 3ddb79bdD4SLmmdMD7yLW5HcUWucXw xen/common/page_alloc.c
 3e54c38dkHAev597bPr71-hGzTdocg xen/common/perfc.c
@@ -935,11 +930,11 @@
 40589968dD2D1aejwSOvrROg7fOvGQ xen/common/sched_bvt.c
 40589968be_t_n0-w6ggceW7h-sx0w xen/common/sched_rrobin.c
 3e397e6619PgAfBbw2XFbXkewvUWgw xen/common/schedule.c
-3ddb79bdB9RNMnkQnUyZ5C9hhMSQQw xen/common/slab.c
 3ddb79bd0gVQYmL2zvuJnldvD0AGxQ xen/common/softirq.c
 3e7f358awXBC3Vw-wFRwPw18qL1khg xen/common/string.c
 403a3edbejm33XLTGMuinKEwQBrOIg xen/common/trace.c
 3ddb79bd3zgV33PHdt-cgh3sxcb1hw xen/common/vsprintf.c
+4203fb92Qcy7mGpauBdq09J-WAqfoA xen/common/xmalloc.c
 3ddb79c0ppNeJtjC4va8j41ADCnchA xen/drivers/Makefile
 40715b2bi9gU43-cYzlmPDgreYQchw xen/drivers/acpi/Makefile
 40715b2bDxNCz5LFV8FAXihmYJZFUQ xen/drivers/acpi/acpi_ksyms.c
@@ -1004,12 +999,14 @@
 3ddb79c3r9-31dIsewPV3P3i8HALsQ xen/include/asm-x86/delay.h
 3ddb79c34BFiXjBJ_cCKB0aCsV1IDw xen/include/asm-x86/desc.h
 40715b2dTokMLYGSuD58BnxOqyWVew xen/include/asm-x86/div64.h
+4204e7acwzqgXyTAPKa1nM-L7Ec0Qw xen/include/asm-x86/domain.h
 41febc4bBKTKHhnAu_KPYwgNkHjFlg xen/include/asm-x86/domain_page.h
 41d3eaaeIBzW621S1oa0c2yk7X43qQ xen/include/asm-x86/e820.h
 3ddb79c3NU8Zy40OTrq3D-i30Y3t4A xen/include/asm-x86/fixmap.h
 3e2d29944GI24gf7vOP_7x8EyuqxeA xen/include/asm-x86/flushtlb.h
 3ddb79c39o75zPP0T1aQQ4mNrCAN2w xen/include/asm-x86/hardirq.h
 3ddb79c3TMDjkxVndKFKnGiwY0HzDg xen/include/asm-x86/i387.h
+4204e7acwXDo-5iAAiO2eQbtDeYZXA xen/include/asm-x86/init.h
 3ddb79c3fQ_O3o5NHK2N8AJdk0Ea4Q xen/include/asm-x86/io.h
 3ddb79c2TKeScYHQZreTdHqYNLbehQ xen/include/asm-x86/io_apic.h
 3ddb79c2L7rTlFzazOLW1XuSZefpFw xen/include/asm-x86/irq.h
@@ -1022,7 +1019,6 @@
 41a61536MFhNalgbVmYGXAhQsPTZNw xen/include/asm-x86/multicall.h
 3ddb79c3xjYnrv5t3VqYlR4tNEOl4Q xen/include/asm-x86/page.h
 3ddb79c3ysKUbxZuwKBRK3WXU2TlEg xen/include/asm-x86/pci.h
-4022a73diKn2Ax4-R4gzk59lm1YdDg xen/include/asm-x86/pdb.h
 3ddb79c2QF5-pZGzuX4QukPCDAl59A xen/include/asm-x86/processor.h
 40cf1596bim9F9DNdV75klgRSZ6Y2A xen/include/asm-x86/regs.h
 3ddb79c2plf7ciNgoNjU-RsbUzawsw xen/include/asm-x86/rwlock.h

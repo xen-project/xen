@@ -1,3 +1,4 @@
+/* -*-  Mode:C; c-basic-offset:4; tab-width:4; indent-tabs-mode:nil -*- */
 /*
  *	x86 SMP booting functions
  *
@@ -662,7 +663,7 @@ static void __init do_boot_cpu (int apicid)
 
     set_bit(DF_IDLETASK, &idle->d_flags);
 
-    ed->mm.pagetable = mk_pagetable(__pa(idle_pg_table));
+    ed->arch.pagetable = mk_pagetable(__pa(idle_pg_table));
 
     map_cpu_to_boot_apicid(cpu, apicid);
 
@@ -674,7 +675,7 @@ static void __init do_boot_cpu (int apicid)
     /* So we see what's up. */
     printk("Booting processor %d/%d eip %lx\n", cpu, apicid, start_eip);
 
-    stack = (void *)alloc_xenheap_pages(1);
+    stack = (void *)alloc_xenheap_pages(STACK_ORDER);
 #if defined(__i386__)
     stack_start.esp = __pa(stack) + STACK_SIZE - STACK_RESERVED;
 #elif defined(__x86_64__)
@@ -682,7 +683,7 @@ static void __init do_boot_cpu (int apicid)
 #endif
 
     /* Debug build: detect stack overflow by setting up a guard page. */
-    memguard_guard_range(stack, PAGE_SIZE);
+    memguard_guard_stack(stack);
 
     /*
      * This grunge runs the startup process for

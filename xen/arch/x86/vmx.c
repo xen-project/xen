@@ -1,3 +1,4 @@
+/* -*-  Mode:C; c-basic-offset:4; tab-width:4; indent-tabs-mode:nil -*- */
 /*
  * vmx.c: handling VMX architecture-related VM exits
  * Copyright (c) 2004, Intel Corporation.
@@ -110,7 +111,6 @@ static int vmx_do_page_fault(unsigned long va, unsigned long error_code)
     unsigned long gpde = 0, gpte, gpa;
     int result;
     struct exec_domain *ed = current;
-    struct mm_struct *m = &ed->mm;
 
 #if VMX_DEBUG
     {
@@ -123,18 +123,18 @@ static int vmx_do_page_fault(unsigned long va, unsigned long error_code)
     /*
      * Set up guest page directory cache to make linear_pt_table[] work.
      */
-    __guest_get_pl2e(m, va, &gpde);
+    __guest_get_pl2e(ed, va, &gpde);
     if (!(gpde & _PAGE_PRESENT))
         return 0;
 
     index = (va >> L2_PAGETABLE_SHIFT);
-    if (!l2_pgentry_val(m->guest_pl2e_cache[index])) {
+    if (!l2_pgentry_val(ed->arch.guest_pl2e_cache[index])) {
         pfn = phys_to_machine_mapping[gpde >> PAGE_SHIFT];
 
         VMX_DBG_LOG(DBG_LEVEL_VMMU, "vmx_do_page_fault: pagetable = %lx\n",
-                pagetable_val(m->pagetable));
+                pagetable_val(ed->arch.pagetable));
 
-        m->guest_pl2e_cache[index] = 
+        ed->arch.guest_pl2e_cache[index] = 
             mk_l2_pgentry((pfn << PAGE_SHIFT) | __PAGE_HYPERVISOR);
     }
     
@@ -246,18 +246,18 @@ static void vmx_dr_access (unsigned long exit_qualification, struct xen_regs *re
     case TYPE_MOV_TO_DR: 
         /* don't need to check the range */
         if (reg != REG_ESP)
-            ed->thread.debugreg[reg] = *reg_p; 
+            ed->arch.debugreg[reg] = *reg_p; 
         else {
             unsigned long value;
             __vmread(GUEST_ESP, &value);
-            ed->thread.debugreg[reg] = value;
+            ed->arch.debugreg[reg] = value;
         }
         break;
     case TYPE_MOV_FROM_DR:
         if (reg != REG_ESP)
-            *reg_p = ed->thread.debugreg[reg];
+            *reg_p = ed->arch.debugreg[reg];
         else {
-            __vmwrite(GUEST_ESP, ed->thread.debugreg[reg]);
+            __vmwrite(GUEST_ESP, ed->arch.debugreg[reg]);
         }
         break;
     }
@@ -270,7 +270,7 @@ static void vmx_dr_access (unsigned long exit_qualification, struct xen_regs *re
 static void vmx_vmexit_do_invlpg(unsigned long va) 
 {
     unsigned long eip;
-    struct exec_domain *d = current;
+    struct exec_domain *ed = current;
     unsigned int index;
 
     __vmread(GUEST_EIP, &eip);
@@ -282,31 +282,31 @@ static void vmx_vmexit_do_invlpg(unsigned long va)
      * We do the safest things first, then try to update the shadow
      * copying from guest
      */
-    vmx_shadow_invlpg(&d->mm, va);
+    vmx_shadow_invlpg(ed->domain, va);
     index = (va >> L2_PAGETABLE_SHIFT);
-    d->mm.guest_pl2e_cache[index] = mk_l2_pgentry(0); /* invalidate pgd cache */
+    ed->arch.guest_pl2e_cache[index] = 
+        mk_l2_pgentry(0); /* invalidate pgd cache */
 }
 
-static inline void guest_pl2e_cache_invalidate(struct mm_struct *m) 
+static inline void guest_pl2e_cache_invalidate(struct exec_domain *ed)
 {
     /*
      * Need to optimize this
      */
-    memset(m->guest_pl2e_cache, 0, PAGE_SIZE);
+    memset(ed->arch.guest_pl2e_cache, 0, PAGE_SIZE);
 }
 
 inline unsigned long gva_to_gpa(unsigned long gva)
 {
     unsigned long gpde, gpte, pfn, index;
-    struct exec_domain *d = current;
-    struct mm_struct *m = &d->mm;
+    struct exec_domain *ed = current;
 
-    __guest_get_pl2e(m, gva, &gpde);
+    __guest_get_pl2e(ed, gva, &gpde);
     index = (gva >> L2_PAGETABLE_SHIFT);
 
     pfn = phys_to_machine_mapping[gpde >> PAGE_SHIFT];
 
-    m->guest_pl2e_cache[index] = 
+    ed->arch.guest_pl2e_cache[index] = 
             mk_l2_pgentry((pfn << PAGE_SHIFT) | __PAGE_HYPERVISOR);
 
     if ( unlikely(__get_user(gpte, (unsigned long *)
@@ -350,14 +350,14 @@ static void vmx_io_instruction(struct xen_regs *regs,
         return;
     }
 
-    vio = (vcpu_iodata_t *) d->thread.arch_vmx.vmx_platform.shared_page_va;
+    vio = (vcpu_iodata_t *) d->arch.arch_vmx.vmx_platform.shared_page_va;
     if (vio == 0) {
         VMX_DBG_LOG(DBG_LEVEL_1, "bad shared page: %lx\n", (unsigned long) vio);
         domain_crash(); 
     }
     p = &vio->vp_ioreq;
     p->dir = test_bit(3, &exit_qualification);  
-    set_bit(ARCH_VMX_IO_WAIT, &d->thread.arch_vmx.flags);
+    set_bit(ARCH_VMX_IO_WAIT, &d->arch.arch_vmx.flags);
 
     p->pdata_valid = 0;
     p->count = 1;
@@ -443,40 +443,40 @@ static void mov_to_cr(int gp, int cr, struct xen_regs *regs)
         __vmwrite(CR0_READ_SHADOW, value);
 
         if (value & (X86_CR0_PE | X86_CR0_PG) &&
-            !test_bit(VMX_CPU_STATE_PG_ENABLED, &d->thread.arch_vmx.cpu_state)) {
+            !test_bit(VMX_CPU_STATE_PG_ENABLED, &d->arch.arch_vmx.cpu_state)) {
             /*
              * Enable paging
              */
-            set_bit(VMX_CPU_STATE_PG_ENABLED, &d->thread.arch_vmx.cpu_state);
+            set_bit(VMX_CPU_STATE_PG_ENABLED, &d->arch.arch_vmx.cpu_state);
             /*
              * The guest CR3 must be pointing to the guest physical.
              */
             if (!(pfn = phys_to_machine_mapping[
-                      d->thread.arch_vmx.cpu_cr3 >> PAGE_SHIFT])) 
+                      d->arch.arch_vmx.cpu_cr3 >> PAGE_SHIFT])) 
             {
                 VMX_DBG_LOG(DBG_LEVEL_VMMU, "Invalid CR3 value = %lx\n", 
-                        d->thread.arch_vmx.cpu_cr3);
+                        d->arch.arch_vmx.cpu_cr3);
                 domain_crash(); /* need to take a clean path */
             }
-            old_base_pfn = pagetable_val(d->mm.pagetable) >> PAGE_SHIFT;
+            old_base_pfn = pagetable_val(d->arch.pagetable) >> PAGE_SHIFT;
             /*
              * Now mm.pagetable points to machine physical.
              */
-            d->mm.pagetable = mk_pagetable(pfn << PAGE_SHIFT);
+            d->arch.pagetable = mk_pagetable(pfn << PAGE_SHIFT);
 
             VMX_DBG_LOG(DBG_LEVEL_VMMU, "New mm.pagetable = %lx\n", 
                     (unsigned long) (pfn << PAGE_SHIFT));
 
-            shadow_lock(&d->mm);
+            shadow_lock(d->domain);
             shadow_mode_enable(d->domain, SHM_full_32); 
-            shadow_unlock(&d->mm);
+            shadow_unlock(d->domain);
 
-            __vmwrite(GUEST_CR3, pagetable_val(d->mm.shadow_table));
+            __vmwrite(GUEST_CR3, pagetable_val(d->arch.shadow_table));
             /* 
              * mm->shadow_table should hold the next CR3 for shadow
              */
             VMX_DBG_LOG(DBG_LEVEL_VMMU, "Update CR3 value = %lx, pfn = %lx\n", 
-                    d->thread.arch_vmx.cpu_cr3, pfn);
+                    d->arch.arch_vmx.cpu_cr3, pfn);
             put_page_and_type(&frame_table[old_base_pfn]);
 
         }
@@ -489,26 +489,26 @@ static void mov_to_cr(int gp, int cr, struct xen_regs *regs)
         /*
          * If paging is not enabled yet, simply copy the valut to CR3.
          */
-        if (!test_bit(VMX_CPU_STATE_PG_ENABLED, &d->thread.arch_vmx.cpu_state)) {
-            d->thread.arch_vmx.cpu_cr3 = value;
+        if (!test_bit(VMX_CPU_STATE_PG_ENABLED, &d->arch.arch_vmx.cpu_state)) {
+            d->arch.arch_vmx.cpu_cr3 = value;
             return;
         }
         
-        guest_pl2e_cache_invalidate(&d->mm);
+        guest_pl2e_cache_invalidate(d);
         /*
          * We make a new one if the shadow does not exist.
          */
-        if (value == d->thread.arch_vmx.cpu_cr3) {
+        if (value == d->arch.arch_vmx.cpu_cr3) {
             /* 
              * This is simple TLB flush, implying the guest has 
              * removed some translation or changed page attributes.
              * We simply invalidate the shadow.
              */
             pfn = phys_to_machine_mapping[value >> PAGE_SHIFT];
-            if ((pfn << PAGE_SHIFT) != pagetable_val(d->mm.pagetable))
+            if ((pfn << PAGE_SHIFT) != pagetable_val(d->arch.pagetable))
                 __vmx_bug(regs);
-            vmx_shadow_clear_state(&d->mm);
-            shadow_invalidate(&d->mm);
+            vmx_shadow_clear_state(d->domain);
+            shadow_invalidate(d);
         } else {
             /*
              * If different, make a shadow. Check if the PDBR is valid
@@ -522,16 +522,16 @@ static void mov_to_cr(int gp, int cr, struct xen_regs *regs)
                 domain_crash(); /* need to take a clean path */
             }
             pfn = phys_to_machine_mapping[value >> PAGE_SHIFT];
-            vmx_shadow_clear_state(&d->mm);
-            d->mm.pagetable = mk_pagetable(pfn << PAGE_SHIFT);
-            shadow_mk_pagetable(&d->mm);
+            vmx_shadow_clear_state(d->domain);
+            d->arch.pagetable = mk_pagetable(pfn << PAGE_SHIFT);
+            shadow_mk_pagetable(d);
             /* 
              * mm->shadow_table should hold the next CR3 for shadow
              */
-            d->thread.arch_vmx.cpu_cr3 = value;
+            d->arch.arch_vmx.cpu_cr3 = value;
             VMX_DBG_LOG(DBG_LEVEL_VMMU, "Update CR3 value = %lx\n", 
                     value);
-            __vmwrite(GUEST_CR3, pagetable_val(d->mm.shadow_table));
+            __vmwrite(GUEST_CR3, pagetable_val(d->arch.shadow_table));
         }
         break;
     }
@@ -549,9 +549,9 @@ static void mov_to_cr(int gp, int cr, struct xen_regs *regs)
          * all TLB entries except global entries.
          */
         if ((old_cr ^ value) & (X86_CR4_PSE | X86_CR4_PGE | X86_CR4_PAE)) {
-            vmx_shadow_clear_state(&d->mm);
-            shadow_invalidate(&d->mm);
-            guest_pl2e_cache_invalidate(&d->mm);
+            vmx_shadow_clear_state(d->domain);
+            shadow_invalidate(d);
+            guest_pl2e_cache_invalidate(d);
         }
         break;
     default:
@@ -576,7 +576,7 @@ static void mov_from_cr(int cr, int gp, struct xen_regs *regs)
     if (cr != 3)
         __vmx_bug(regs);
 
-    value = (unsigned long) d->thread.arch_vmx.cpu_cr3;
+    value = (unsigned long) d->arch.arch_vmx.cpu_cr3;
     ASSERT(value);
 
     switch (gp) {
@@ -799,7 +799,7 @@ asmlinkage void vmx_vmexit_handler(struct xen_regs regs)
                     "eax=%lx, ebx=%lx, ecx=%lx, edx=%lx, esi=%lx, edi=%lx\n",
                         regs.eax, regs.ebx, regs.ecx, regs.edx, regs.esi,
                         regs.edi);
-            d->thread.arch_vmx.vmx_platform.mpci.inst_decoder_regs = &regs;
+            d->arch.arch_vmx.vmx_platform.mpci.inst_decoder_regs = &regs;
 
             if (!(error = vmx_do_page_fault(va, error_code))) {
                 /*
@@ -813,7 +813,7 @@ asmlinkage void vmx_vmexit_handler(struct xen_regs regs)
                            VECTOR_PG);
                 __vmwrite(VM_ENTRY_INTR_INFO_FIELD, intr_fields);
                 __vmwrite(VM_ENTRY_EXCEPTION_ERROR_CODE, error_code);
-                d->thread.arch_vmx.cpu_cr2 = va;
+                d->arch.arch_vmx.cpu_cr2 = va;
             }
             break;
         }
@@ -935,5 +935,5 @@ asmlinkage void load_cr2(void)
     struct exec_domain *d = current;
 
     local_irq_disable();        
-    asm volatile("movl %0,%%cr2": :"r" (d->thread.arch_vmx.cpu_cr2));
+    asm volatile("movl %0,%%cr2": :"r" (d->arch.arch_vmx.cpu_cr2));
 }

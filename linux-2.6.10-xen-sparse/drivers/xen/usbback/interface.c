@@ -43,7 +43,7 @@ static void __usbif_disconnect_complete(void *arg)
      * must still be notified to the remote driver.
      */
     unbind_evtchn_from_irq(usbif->evtchn);
-    vfree(usbif->usb_ring_base);
+    vfree(usbif->usb_ring.sring);
 
     /* Construct the deferred response message. */
     cmsg.type         = CMSG_USBIF_BE;
@@ -153,6 +153,7 @@ void usbif_connect(usbif_be_connect_t *connect)
     pgprot_t      prot;
     int           error;
     usbif_priv_t *up;
+    usbif_sring_t *sring;
 
     up = usbif_find(domid);
     if ( unlikely(up == NULL) )
@@ -192,10 +193,13 @@ void usbif_connect(usbif_be_connect_t *connect)
         return;
     }
 
+    sring = (usbif_sring_t *)vma->addr;
+    SHARED_RING_INIT(USBIF_RING, sring);
+    BACK_RING_INIT(USBIF_RING, &up->usb_ring, sring);
+
     up->evtchn        = evtchn;
     up->irq           = bind_evtchn_to_irq(evtchn);
     up->shmem_frame   = shmem_frame;
-    up->usb_ring_base = (usbif_t *)vma->addr;
     up->status        = CONNECTED;
     usbif_get(up);
 

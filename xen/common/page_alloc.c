@@ -1,3 +1,4 @@
+/* -*-  Mode:C; c-basic-offset:4; tab-width:4; indent-tabs-mode:nil -*- */
 /******************************************************************************
  * page_alloc.c
  * 
@@ -262,8 +263,8 @@ struct pfn_info *alloc_heap_pages(unsigned int zone, unsigned int order)
 
     /* Find smallest order which can satisfy the request. */
     for ( i = order; i <= MAX_ORDER; i++ )
-	if ( !list_empty(&heap[zone][i]) )
-	    goto found;
+        if ( !list_empty(&heap[zone][i]) )
+            goto found;
 
     /* No suitable memory blocks. Fail the request. */
     spin_unlock(&heap_lock);
@@ -403,9 +404,8 @@ unsigned long alloc_xenheap_pages(unsigned int order)
 {
     unsigned long flags;
     struct pfn_info *pg;
-    int i, attempts = 0;
+    int i;
 
- retry:
     local_irq_save(flags);
     pg = alloc_heap_pages(MEMZONE_XEN, order);
     local_irq_restore(flags);
@@ -425,14 +425,7 @@ unsigned long alloc_xenheap_pages(unsigned int order)
     return (unsigned long)page_to_virt(pg);
 
  no_memory:
-    if ( attempts++ < 8 )
-    {
-        xmem_cache_reap();
-        goto retry;
-    }
-
     printk("Cannot handle page request order %d!\n", order);
-    dump_slabinfo();
     return 0;
 }
 

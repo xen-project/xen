@@ -1,3 +1,4 @@
+/* -*-  Mode:C; c-basic-offset:4; tab-width:4; indent-tabs-mode:nil -*- */
 /******************************************************************************
  * arch/x86/x86_64/mm.c
  * 
@@ -220,7 +221,7 @@ static void __synchronise_pagetables(void *mask)
     struct exec_domain *ed = current;
     if ( ((unsigned long)mask & (1 << ed->processor)) &&
          is_idle_task(ed->domain) )
-        write_ptbase(&ed->mm);
+        write_ptbase(ed);
 }
 void synchronise_pagetables(unsigned long cpu_mask)
 {
@@ -232,8 +233,8 @@ long do_stack_switch(unsigned long ss, unsigned long esp)
 {
     if ( (ss & 3) != 3 )
         return -EPERM;
-    current->thread.guestos_ss = ss;
-    current->thread.guestos_sp = esp;
+    current->arch.guestos_ss = ss;
+    current->arch.guestos_sp = esp;
     return 0;
 }
 
@@ -346,9 +347,9 @@ void destroy_gdt(struct exec_domain *ed)
 
     for ( i = 0; i < 16; i++ )
     {
-        if ( (pfn = l1_pgentry_to_pagenr(ed->mm.perdomain_ptes[i])) != 0 )
+        if ( (pfn = l1_pgentry_to_pagenr(ed->arch.perdomain_ptes[i])) != 0 )
             put_page_and_type(&frame_table[pfn]);
-        ed->mm.perdomain_ptes[i] = mk_l1_pgentry(0);
+        ed->arch.perdomain_ptes[i] = mk_l1_pgentry(0);
     }
 }
 
@@ -402,7 +403,7 @@ long set_gdt(struct exec_domain *ed,
 
     /* Install the new GDT. */
     for ( i = 0; i < nr_pages; i++ )
-        ed->mm.perdomain_ptes[i] =
+        ed->arch.perdomain_ptes[i] =
             mk_l1_pgentry((frames[i] << PAGE_SHIFT) | __PAGE_HYPERVISOR);
 
     SET_GDT_ADDRESS(ed, GDT_VIRT_START(ed));
@@ -432,7 +433,7 @@ long do_set_gdt(unsigned long *frame_list, unsigned int entries)
     if ( (ret = set_gdt(current, frames, entries)) == 0 )
     {
         local_flush_tlb();
-        __asm__ __volatile__ ("lgdt %0" : "=m" (*current->mm.gdt));
+        __asm__ __volatile__ ("lgdt %0" : "=m" (*current->arch.gdt));
     }
 
     return ret;
@@ -461,7 +462,7 @@ long do_update_descriptor(
     {
     case PGT_gdt_page:
         /* Disallow updates of Xen-reserved descriptors in the current GDT. */
-        if ( (l1_pgentry_to_pagenr(current->mm.perdomain_ptes[0]) == pfn) &&
+        if ( (l1_pgentry_to_pagenr(current->arch.perdomain_ptes[0]) == pfn) &&
              (((pa&(PAGE_SIZE-1))>>3) >= FIRST_RESERVED_GDT_ENTRY) &&
              (((pa&(PAGE_SIZE-1))>>3) <= LAST_RESERVED_GDT_ENTRY) )
             goto out;
@@ -494,18 +495,19 @@ long do_update_descriptor(
 
 #ifdef MEMORY_GUARD
 
-#if 1
-
-void *memguard_init(void *heap_start) { return heap_start; }
-void memguard_guard_range(void *p, unsigned long l) {}
-void memguard_unguard_range(void *p, unsigned long l) {}
-
-#else
-
+#define ALLOC_PT(_level) \
+do { \
+    (_level) = (_level ## _pgentry_t *)heap_start; \
+    heap_start = (void *)((unsigned long)heap_start + PAGE_SIZE); \
+    clear_page(_level); \
+} while ( 0 )
 void *memguard_init(void *heap_start)
 {
-    l1_pgentry_t *l1;
-    int i, j;
+    l1_pgentry_t *l1 = NULL;
+    l2_pgentry_t *l2 = NULL;
+    l3_pgentry_t *l3 = NULL;
+    l4_pgentry_t *l4 = &idle_pg_table[l4_table_offset(PAGE_OFFSET)];
+    unsigned long i, j;
 
     /* Round the allocation pointer up to a page boundary. */
     heap_start = (void *)(((unsigned long)heap_start + (PAGE_SIZE-1)) & 
@@ -514,14 +516,22 @@ void *memguard_init(void *heap_start)
     /* Memory guarding is incompatible with super pages. */
     for ( i = 0; i < (xenheap_phys_end >> L2_PAGETABLE_SHIFT); i++ )
     {
-        l1 = (l1_pgentry_t *)heap_start;
-        heap_start = (void *)((unsigned long)heap_start + PAGE_SIZE);
+        ALLOC_PT(l1);
         for ( j = 0; j < ENTRIES_PER_L1_PAGETABLE; j++ )
             l1[j] = mk_l1_pgentry((i << L2_PAGETABLE_SHIFT) |
                                    (j << L1_PAGETABLE_SHIFT) | 
                                   __PAGE_HYPERVISOR);
-        idle_pg_table[i] = idle_pg_table[i + l2_table_offset(PAGE_OFFSET)] =
-            mk_l2_pgentry(virt_to_phys(l1) | __PAGE_HYPERVISOR);
+        if ( !((unsigned long)l2 & (PAGE_SIZE-1)) )
+        {
+            ALLOC_PT(l2);
+            if ( !((unsigned long)l3 & (PAGE_SIZE-1)) )
+            {
+                ALLOC_PT(l3);
+                *l4++ = mk_l4_pgentry(virt_to_phys(l3) | __PAGE_HYPERVISOR);
+            }
+            *l3++ = mk_l3_pgentry(virt_to_phys(l2) | __PAGE_HYPERVISOR);
+        }
+        *l2++ = mk_l2_pgentry(virt_to_phys(l1) | __PAGE_HYPERVISOR);
     }
 
     return heap_start;
@@ -531,6 +541,8 @@ static void __memguard_change_range(void *p, unsigned long l, int guard)
 {
     l1_pgentry_t *l1;
     l2_pgentry_t *l2;
+    l3_pgentry_t *l3;
+    l4_pgentry_t *l4;
     unsigned long _p = (unsigned long)p;
     unsigned long _l = (unsigned long)l;
 
@@ -542,8 +554,10 @@ static void __memguard_change_range(void *p, unsigned long l, int guard)
 
     while ( _l != 0 )
     {
-        l2  = &idle_pg_table[l2_table_offset(_p)];
-        l1  = l2_pgentry_to_l1(*l2) + l1_table_offset(_p);
+        l4 = &idle_pg_table[l4_table_offset(_p)];
+        l3 = l4_pgentry_to_l3(*l4) + l3_table_offset(_p);
+        l2 = l3_pgentry_to_l2(*l3) + l2_table_offset(_p);
+        l1 = l2_pgentry_to_l1(*l2) + l1_table_offset(_p);
         if ( guard )
             *l1 = mk_l1_pgentry(l1_pgentry_val(*l1) & ~_PAGE_PRESENT);
         else
@@ -551,6 +565,12 @@ static void __memguard_change_range(void *p, unsigned long l, int guard)
         _p += PAGE_SIZE;
         _l -= PAGE_SIZE;
     }
+}
+
+void memguard_guard_stack(void *p)
+{
+    p = (void *)((unsigned long)p + PAGE_SIZE);
+    memguard_guard_range(p, 2 * PAGE_SIZE);
 }
 
 void memguard_guard_range(void *p, unsigned long l)
@@ -563,7 +583,5 @@ void memguard_unguard_range(void *p, unsigned long l)
 {
     __memguard_change_range(p, l, 0);
 }
-
-#endif
 
 #endif

@@ -86,7 +86,7 @@ static pending_req_t pending_reqs[MAX_PENDING_REQS];
 static unsigned char pending_ring[MAX_PENDING_REQS];
 static spinlock_t pend_prod_lock;
 
-/* NB. We use a different index type to differentiate from shared blk rings. */
+/* NB. We use a different index type to differentiate from shared usb rings. */
 typedef unsigned int PEND_RING_IDX;
 #define MASK_PEND_IDX(_i) ((_i)&(MAX_PENDING_REQS-1))
 static PEND_RING_IDX pending_prod, pending_cons;
@@ -391,17 +391,17 @@ irqreturn_t usbif_be_int(int irq, void *dev_id, struct pt_regs *regs)
 
 static int do_usb_io_op(usbif_priv_t *up, int max_to_do)
 {
-    usbif_t *usb_ring = up->usb_ring_base;
+    usbif_back_ring_t *usb_ring = &up->usb_ring;
     usbif_request_t *req;
-    USBIF_RING_IDX i, rp;
+    RING_IDX i, rp;
     int more_to_do = 0;
 
-    rp = usb_ring->req_prod;
+    rp = usb_ring->sring->req_prod;
     rmb(); /* Ensure we see queued requests up to 'rp'. */
     
     /* Take items off the comms ring, taking care not to overflow. */
-    for ( i = up->usb_req_cons; 
-          (i != rp) && ((i-up->usb_resp_prod) != USBIF_RING_SIZE);
+    for ( i = usb_ring->req_cons; 
+          (i != rp) && !RING_REQUEST_CONS_OVERFLOW(USBIF_RING, usb_ring, i);
           i++ )
     {
         if ( (max_to_do-- == 0) || (NR_PENDING_REQS == MAX_PENDING_REQS) )
@@ -410,7 +410,7 @@ static int do_usb_io_op(usbif_priv_t *up, int max_to_do)
             break;
         }
 
-        req = &usb_ring->ring[MASK_USBIF_IDX(i)].req;
+        req = RING_GET_REQUEST(USBIF_RING, usb_ring, i);
         
         switch ( req->operation )
         {
@@ -435,7 +435,7 @@ static int do_usb_io_op(usbif_priv_t *up, int max_to_do)
         }
     }
 
-    up->usb_req_cons = i;
+    usb_ring->req_cons = i;
 
     return more_to_do;
 }
@@ -783,11 +783,11 @@ static void make_response(usbif_priv_t *up, unsigned long id,
 {
     usbif_response_t *resp;
     unsigned long     flags;
+    usbif_back_ring_t *usb_ring = &up->usb_ring;
 
     /* Place on the response ring for the relevant domain. */ 
     spin_lock_irqsave(&up->usb_ring_lock, flags);
-    resp = &up->usb_ring_base->
-        ring[MASK_USBIF_IDX(up->usb_resp_prod)].resp;
+    resp = RING_GET_RESPONSE(USBIF_RING, usb_ring, usb_ring->rsp_prod_pvt);
     resp->id        = id;
     resp->operation = op;
     resp->status    = st;
@@ -797,7 +797,8 @@ static void make_response(usbif_priv_t *up, unsigned long id,
 
     dump_response(resp);
 
-    up->usb_ring_base->resp_prod = ++up->usb_resp_prod;
+    usb_ring->rsp_prod_pvt++;
+    RING_PUSH_RESPONSES(USBIF_RING, usb_ring);
     spin_unlock_irqrestore(&up->usb_ring_lock, flags);
 
     /* Kick the relevant domain. */

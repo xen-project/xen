@@ -119,7 +119,7 @@ static void xhci_drain_ring(void);
 
 #define MAX_URB_LOOP	2048		/* Maximum number of linked URB's */
 
-struct xhci *xhci;
+static struct xhci *xhci;
 
 enum { USBIF_STATE_CONNECTED = 2,
        USBIF_STATE_DISCONNECTED = 1,
@@ -128,10 +128,60 @@ enum { USBIF_STATE_CONNECTED = 2,
 
 static int awaiting_reset = 0;
 
+#ifdef DEBUG
+
+static void dump_urb(struct urb *urb)
+{
+    printk(KERN_DEBUG "dumping urb @ %p\n"
+           "  hcpriv = %p\n"
+           "  next = %p\n"
+           "  dev = %p\n"
+           "  pipe = 0x%lx\n"
+           "  status = %d\n"
+           "  transfer_flags = 0x%lx\n"
+           "  transfer_buffer = %p\n"
+           "  transfer_buffer_length = %d\n"
+           "  actual_length = %d\n"
+           "  bandwidth = %d\n"
+           "  setup_packet = %p\n",
+           urb, urb->hcpriv, urb->next, urb->dev, urb->pipe, urb->status,
+           urb->transfer_flags, urb->transfer_buffer, urb->transfer_buffer_length,
+           urb->actual_length, urb->bandwidth, urb->setup_packet);
+    if ( urb->setup_packet != NULL )
+        printk(KERN_DEBUG
+               "setup = { 0x%x, 0x%x, 0x%x, 0x%x, 0x%x, 0x%x, 0x%x, 0x%x }\n",
+               urb->setup_packet[0], urb->setup_packet[1], urb->setup_packet[2], urb->setup_packet[3],
+               urb->setup_packet[4], urb->setup_packet[5], urb->setup_packet[6], urb->setup_packet[7]);
+    printk(KERN_DEBUG "complete = %p\n"
+           "interval = %d\n", urb->complete, urb->interval);
+        
+}
+
+static void xhci_show_resp(usbif_response_t *r)
+{
+        printk(KERN_DEBUG "dumping response @ %p\n"
+               "  id=0x%lx\n"
+               "  op=0x%x\n"
+               "  data=0x%x\n"
+               "  status=0x%x\n"
+               "  length=0x%lx\n",
+               r->id, r->operation, r->data, r->status, r->length);
+}
+
+#define DPRINK(...) printk(KERN_DEBUG __VA_ARGS__)
+
+#else /* DEBUG */
+
+#define dump_urb(blah) ((void)0)
+#define xhci_show_resp(blah) ((void)0)
+#define DPRINTK(blah,...) ((void)0)
+
+#endif /* DEBUG */
+
 /**
  * xhci_construct_isoc - add isochronous information to a request
  */
-int xhci_construct_isoc(usbif_request_t *req, struct urb *urb)
+static int xhci_construct_isoc(usbif_request_t *req, struct urb *urb)
 {
         usbif_iso_t *schedule;
         int i;
@@ -155,56 +205,28 @@ int xhci_construct_isoc(usbif_request_t *req, struct urb *urb)
         return 0;
 }
 
-#define USBIF_RING_FULL ((xhci->usbif->req_prod - xhci->usb_resp_cons) == USBIF_RING_SIZE)
-
-static void dump_urb(struct urb *urb)
-{
-        printk("dumping urb @ %p\n", urb);
-        
-        printk("hcpriv = %p\n", urb->hcpriv);
-        printk("next = %p\n", urb->next);
-        printk("dev = %p\n", urb->dev);
-        printk("pipe = 0x%lx\n", urb->pipe);
-        printk("status = %d\n", urb->status);
-        printk("transfer_flags = 0x%lx\n", urb->transfer_flags);
-        printk("transfer_buffer = %p\n", urb->transfer_buffer);
-        printk("transfer_buffer_length = %d\n", urb->transfer_buffer_length);
-        printk("actual_length = %d\n", urb->actual_length);
-        printk("bandwidth = %d\n", urb->bandwidth);
-        printk("setup_packet = %p\n", urb->setup_packet);
-	if ( urb->setup_packet != NULL )
-	          printk("setup = { 0x%x, 0x%x, 0x%x, 0x%x, 0x%x, 0x%x, 0x%x, 0x%x\n",
-               urb->setup_packet[0], urb->setup_packet[1], urb->setup_packet[2], urb->setup_packet[3],
-               urb->setup_packet[4], urb->setup_packet[5], urb->setup_packet[6], urb->setup_packet[7]);
-        printk("complete = %p\n", urb->complete);
-        printk("interval = %d\n", urb->interval);
-        
-}
-
-
-static int
-xhci_queue_req(struct urb *urb)
+static int xhci_queue_req(struct urb *urb)
 {
         usbif_request_t *req;
-        usbif_t *usbif = xhci->usbif;
+        usbif_front_ring_t *usb_ring = &xhci->usb_ring;
 
-#if 0
-        printk("usbif = %p, req_prod = %d (@ 0x%lx), resp_prod = %d, resp_cons = %d\n",
+#if DEBUG
+        printk(KERN_DEBUG
+               "usbif = %p, req_prod = %d (@ 0x%lx), resp_prod = %d, resp_cons = %d\n",
                usbif, usbif->req_prod, virt_to_machine(&usbif->req_prod),
                usbif->resp_prod, xhci->usb_resp_cons);
 #endif
         
 
-/* 	printk("Usbif_priv %p, want IO at 0x%lx\n", urb->hcpriv, virt_to_machine(urb->transfer_buffer)); */
-
-        if ( USBIF_RING_FULL )
+        if ( RING_FULL(USBIF_RING, usb_ring) )
         {
-                printk("xhci_queue_req(): USB ring full, not queuing request\n");
+                printk(KERN_WARNING
+                       "xhci_queue_req(): USB ring full, not queuing request\n");
                 return -ENOBUFS;
         }
 
         /* Stick something in the shared communications ring. */
-        req = &usbif->ring[MASK_USBIF_IDX(usbif->req_prod)].req;
+	req = RING_GET_REQUEST(USBIF_RING, usb_ring, usb_ring->req_prod_pvt);
 
         req->operation       = USBIF_OP_IO;
         req->port            = 0; /* We don't care what the port is. */
@@ -232,37 +254,38 @@ xhci_queue_req(struct urb *urb)
         else
                 memset(req->setup, 0, 8);
         
-        wmb();
-
-        usbif->req_prod++;
+        usb_ring->req_prod_pvt++;
+        RING_PUSH_REQUESTS(USBIF_RING, usb_ring);
 
 	notify_via_evtchn(xhci->evtchn);
 
-	//	dump_urb(urb);
+        DPRINTK("Queued request for an URB.\n");
+        dump_urb(urb);
 
         return -EINPROGRESS;
 }
 
-static inline usbif_request_t *
-xhci_queue_probe(usbif_vdev_t port)
+static inline usbif_request_t *xhci_queue_probe(usbif_vdev_t port)
 {
         usbif_request_t *req;
-        usbif_t *usbif = xhci->usbif;
+        usbif_front_ring_t *usb_ring = &xhci->usb_ring;
 
-#if 0
-	printk("queuing probe: req_prod = %d (@ 0x%lx), resp_prod = %d, resp_cons = %d\n",
+#if DEBUG
+	printk(KERN_DEBUG
+               "queuing probe: req_prod = %d (@ 0x%lx), resp_prod = %d, resp_cons = %d\n",
 	       usbif->req_prod, virt_to_machine(&usbif->req_prod),
 	       usbif->resp_prod, xhci->usb_resp_cons);
 #endif
         
-        if ( USBIF_RING_FULL )
+        if ( RING_FULL(USBIF_RING, usb_ring) )
         {
-                printk("xhci_queue_probe(): USB ring full, not queuing request\n");
+                printk(KERN_WARNING
+                       "xhci_queue_probe(): USB ring full, not queuing request\n");
                 return NULL;
         }
 
         /* Stick something in the shared communications ring. */
-        req = &usbif->ring[MASK_USBIF_IDX(usbif->req_prod)].req;
+        req = RING_GET_REQUEST(USBIF_RING, usb_ring, usb_ring->req_prod_pvt);
 
         req->operation       = USBIF_OP_PROBE;
         req->port            = port;
@@ -277,34 +300,31 @@ xhci_queue_probe(usbif_vdev_t port)
 	req->endpoint        = 0;
 	req->speed           = 0;
 
-        wmb();
-
-        usbif->req_prod++;
+        usb_ring->req_prod_pvt++;
+        RING_PUSH_REQUESTS(USBIF_RING, usb_ring);
 
 	notify_via_evtchn(xhci->evtchn);
 
         return req;
 }
 
-static int
-xhci_port_reset(usbif_vdev_t port)
+static int xhci_port_reset(usbif_vdev_t port)
 {
         usbif_request_t *req;
-        usbif_t *usbif = xhci->usbif;
+        usbif_front_ring_t *usb_ring = &xhci->usb_ring;
 
         /* We only reset one port at a time, so we only need one variable per
          * hub. */
         awaiting_reset = 1;
         
         /* Stick something in the shared communications ring. */
-        req = &usbif->ring[MASK_USBIF_IDX(usbif->req_prod)].req;
+	req = RING_GET_REQUEST(USBIF_RING, usb_ring, usb_ring->req_prod_pvt);
 
         req->operation       = USBIF_OP_RESET;
         req->port            = port;
         
-        wmb();
-
-        usbif->req_prod++;
+        usb_ring->req_prod_pvt++;
+	RING_PUSH_REQUESTS(USBIF_RING, usb_ring);
 
 	notify_via_evtchn(xhci->evtchn);
 
@@ -315,12 +335,6 @@ xhci_port_reset(usbif_vdev_t port)
         }
 
         return awaiting_reset;
-}
-
-static void xhci_show_resp(usbif_response_t *r)
-{
-        printk("id=0x%lx, op=0x%x, data=0x%x, status=0x%x, length=0x%lx\n",
-               r->id, r->operation, r->data, r->status, r->length);
 }
 
 
@@ -457,10 +471,8 @@ static int xhci_submit_urb(struct urb *urb)
 	struct urb *eurb;
 	int bustime;
 
-#if 0
-        printk("submitting urb @ %p for dev @ %p, devnum = %d path %s\n",
-               urb, urb->dev, urb->dev->devnum, urb->dev->devpath);
-#endif
+        DPRINTK("URB submitted to XHCI driver.\n");
+        dump_urb(urb);
 
 	if (!urb)
 		return -EINVAL;
@@ -471,12 +483,7 @@ static int xhci_submit_urb(struct urb *urb)
 	}
 
         if ( urb->dev->devpath == NULL )
-        {
-                printk("BARF!\n");
                 BUG();
-        }
-        
-        
 
 	usb_inc_dev_use(urb->dev);
 
@@ -516,10 +523,6 @@ static int xhci_submit_urb(struct urb *urb)
 
 		goto out;
 	}
-
-	if ( usb_pipedevice(urb->pipe) == 1 )
-	  printk("dev = %p, dev->path = %s, rh.dev = %p, rh.dev.devnum = %d rh.dev->path = %s!\n",
-		 urb->dev, urb->dev->devpath, xhci->rh.dev, xhci->rh.dev->devnum, xhci->rh.dev->devpath);
 
 	switch (usb_pipetype(urb->pipe)) {
 	case PIPE_CONTROL:
@@ -768,7 +771,7 @@ static int xhci_unlink_urb(struct urb *urb)
 }
 
 
-struct usb_operations xhci_device_operations = {
+static struct usb_operations xhci_device_operations = {
 	.allocate = xhci_alloc_dev,
 	.deallocate = xhci_free_dev,
         /* It doesn't look like any drivers actually care what the frame number
@@ -1094,7 +1097,6 @@ static int rh_submit_urb(struct urb *urb)
 		}
 		break;
 	case RH_SET_ADDRESS:
-	  printk("setting root hub device to %d\n", wValue);
 		xhci->rh.devnum = wValue;
 		OK(0);
 	case RH_GET_DESCRIPTOR:
@@ -1266,14 +1268,14 @@ static void xhci_finish_completion(void)
 	spin_unlock_irqrestore(&xhci->complete_list_lock, flags);
 }
 
-void receive_usb_reset(usbif_response_t *resp)
+static void receive_usb_reset(usbif_response_t *resp)
 {
     awaiting_reset = resp->status;
     rmb();
     
 }
 
-void receive_usb_probe(usbif_response_t *resp)
+static void receive_usb_probe(usbif_response_t *resp)
 {
     spin_lock(&xhci->rh.port_state_lock);
 
@@ -1281,8 +1283,6 @@ void receive_usb_probe(usbif_response_t *resp)
     {
         if ( resp->status == 1 )
         {
-/* 	  printk("hey hey, there's a device on port %d\n", resp->data); */
-
             /* If theres a device there and there wasn't one before there must
              * have been a connection status change. */
             if( xhci->rh.ports[resp->data].cs == 0 )
@@ -1290,20 +1290,19 @@ void receive_usb_probe(usbif_response_t *resp)
                 xhci->rh.ports[resp->data].cs = 1;
                 xhci->rh.ports[resp->data].ccs = 1;
                 xhci->rh.ports[resp->data].cs_chg = 1;
-/* 		printk("Look at device on port %d that wasn't there before\n", resp->data); */
 	    }
         }
         else
-            printk("receive_usb_probe(): unexpected status %d for port %d\n",
+            printk(KERN_WARNING "receive_usb_probe(): unexpected status %d for port %d\n",
                    resp->status, resp->data);
     }
     else if ( resp->status < 0)
-        printk("receive_usb_probe(): got error status %d\n", resp->status);
+        printk(KERN_WARNING "receive_usb_probe(): got error status %d\n", resp->status);
 
     spin_unlock(&xhci->rh.port_state_lock);
 }
 
-void receive_usb_io(usbif_response_t *resp)
+static void receive_usb_io(usbif_response_t *resp)
 {
         struct urb_priv *urbp = (struct urb_priv *)resp->id;
         struct urb *urb = urbp->urb;
@@ -1333,33 +1332,25 @@ void receive_usb_io(usbif_response_t *resp)
 static void xhci_drain_ring(void)
 {
 	struct list_head *tmp, *head;
-	usbif_t *usb_ring = xhci->usbif;
+	usbif_front_ring_t *usb_ring = &xhci->usb_ring;
 	usbif_response_t *resp;
-        USBIF_RING_IDX i, rp;
+        RING_IDX i, rp;
 
         /* Walk the ring here to get responses, updating URBs to show what
          * completed. */
         
-        rp = usb_ring->resp_prod;
+        rp = usb_ring->sring->rsp_prod;
         rmb(); /* Ensure we see queued requests up to 'rp'. */
 
         /* Take items off the comms ring, taking care not to overflow. */
-        for ( i = xhci->usb_resp_cons; 
-              (i != rp) && ((i-usb_ring->req_prod) != USBIF_RING_SIZE);
-              i++ )
+        for ( i = usb_ring->rsp_cons; i != rp; i++ )
         {
-            resp = &usb_ring->ring[MASK_USBIF_IDX(i)].resp;
+            resp = RING_GET_RESPONSE(USBIF_RING, usb_ring, i);
             
             /* May need to deal with batching and with putting a ceiling on
                the number dispatched for performance and anti-dos reasons */
 
-#if 0
-            printk("usbfront: Processing response:\n");
-            printk("          id = 0x%x\n", resp->id);
-            printk("          op = %d\n", resp->operation);
-            printk("          status = %d\n", resp->status);
-            printk("          length = %d\n", resp->length);
-#endif            
+            xhci_show_resp(resp);
 
             switch ( resp->operation )
             {
@@ -1376,13 +1367,14 @@ static void xhci_drain_ring(void)
                 break;
 
             default:
-                printk("error: unknown USB io operation response [%d]\n",
-                       usb_ring->ring[i].req.operation);
+                printk(KERN_WARNING
+                       "error: unknown USB io operation response [%d]\n",
+                       resp->operation);
                 break;
             }
         }
 
-        xhci->usb_resp_cons = i;
+        usb_ring->rsp_cons = i;
 
 	/* Walk the list of pending URB's to see which ones completed and do
          * callbacks, etc. */
@@ -1413,22 +1405,6 @@ static void free_xhci(struct xhci *xhci)
 {
 	kfree(xhci);
 }
-
-/* /\* */
-/*  * De-allocate all resources.. */
-/*  *\/ */
-/* static void release_xhci(struct xhci *xhci) */
-/* { */
-/* 	if (xhci->irq >= 0) { */
-/* 		free_irq(xhci->irq, xhci); */
-/* 		xhci->irq = -1; */
-/* 	} */
-
-/*         /\* Get the ring back from the backend domain.  Then free it.  Hmmmm. */
-/*          * Lets ignore this for now - not particularly useful. *\/ */
-
-/* 	free_xhci(xhci); */
-/* } */
 
 /**
  * Initialise a new virtual root hub for a new USB device channel.
@@ -1500,10 +1476,6 @@ static int alloc_xhci(void)
 /*
  * error exits:
  */
-err_start_root_hub:
-	free_irq(xhci->irq, xhci);
-	xhci->irq = -1;
-
 err_alloc_root_hub:
 	usb_free_bus(xhci->bus);
 	xhci->bus = NULL;
@@ -1520,7 +1492,7 @@ static void usbif_status_change(usbif_fe_interface_status_changed_t *status)
     ctrl_msg_t                   cmsg;
     usbif_fe_interface_connect_t up;
     long rc;
-    usbif_t *usbif;
+    usbif_sring_t *sring;
 
     switch ( status->status )
     {
@@ -1540,15 +1512,16 @@ static void usbif_status_change(usbif_fe_interface_status_changed_t *status)
         }
 
         /* Move from CLOSED to DISCONNECTED state. */
-        xhci->usbif = usbif = (usbif_t *)__get_free_page(GFP_KERNEL);
-        usbif->req_prod = usbif->resp_prod = 0;
+        sring = (usbif_sring_t *)__get_free_page(GFP_KERNEL);
+        SHARED_RING_INIT(USBIF_RING, sring);
+        FRONT_RING_INIT(USBIF_RING, &xhci->usb_ring, sring);
         xhci->state  = USBIF_STATE_DISCONNECTED;
 
         /* Construct an interface-CONNECT message for the domain controller. */
         cmsg.type      = CMSG_USBIF_FE;
         cmsg.subtype   = CMSG_USBIF_FE_INTERFACE_CONNECT;
         cmsg.length    = sizeof(usbif_fe_interface_connect_t);
-        up.shmem_frame = virt_to_machine(usbif) >> PAGE_SHIFT;
+        up.shmem_frame = virt_to_machine(sring) >> PAGE_SHIFT;
         memcpy(cmsg.msg, &up, sizeof(up));
         
         /* Tell the controller to bring up the interface. */
@@ -1571,8 +1544,6 @@ static void usbif_status_change(usbif_fe_interface_status_changed_t *status)
         xhci->rh.ports = kmalloc (sizeof(xhci_port_t) * xhci->rh.numports, GFP_KERNEL);
         memset(xhci->rh.ports, 0, sizeof(xhci_port_t) * xhci->rh.numports);
 
-        printk("rh.dev @ %p\n", xhci->rh.dev);
-
 	usb_connect(xhci->rh.dev);
 
 	if (usb_new_device(xhci->rh.dev) != 0) {
@@ -1589,8 +1560,8 @@ static void usbif_status_change(usbif_fe_interface_status_changed_t *status)
                                SA_SAMPLE_RANDOM, "usbif", xhci)) )
                 printk(KERN_ALERT"usbfront request_irq failed (%ld)\n",rc);
 
-	printk(KERN_INFO __FILE__ ": USB XHCI: SHM at %p (0x%lx), EVTCHN %d IRQ %d\n",
-               xhci->usbif, virt_to_machine(xhci->usbif), xhci->evtchn, xhci->irq);
+	DPRINTK(KERN_INFO __FILE__ ": USB XHCI: SHM at %p (0x%lx), EVTCHN %d IRQ %d\n",
+               xhci->usb_ring.sring, virt_to_machine(xhci->usbif), xhci->evtchn, xhci->irq);
 
         xhci->state = USBIF_STATE_CONNECTED;
         
@@ -1685,7 +1656,7 @@ static int __init xhci_hcd_init(void)
         }
         
         if (xhci->state != USBIF_STATE_CONNECTED)
-            printk(KERN_INFO "Timeout connecting USB frontend driver!\n");
+            printk(KERN_WARNING "Timeout connecting USB frontend driver!\n");
 	
 	return 0;
 
@@ -1702,7 +1673,7 @@ errbuf_failed:
 static void __exit xhci_hcd_cleanup(void) 
 {
 	if (kmem_cache_destroy(xhci_up_cachep))
-		printk(KERN_INFO "xhci: not all urb_priv's were freed\n");
+		printk(KERN_WARNING "xhci: not all urb_priv's were freed\n");
 
 //        release_xhci(); do some calls here
 
