@@ -194,7 +194,7 @@ static void __init kernel_physical_mapping_init(pgd_t *pgd_base)
 			}
 		}
 		pmd_idx = 0;
-	}	
+	}
 }
 
 static inline int page_kills_ppro(unsigned long pagenr)

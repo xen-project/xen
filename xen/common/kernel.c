@@ -55,6 +55,24 @@ void cmdline_parse(char *cmdline)
                     *(unsigned int *)param->var =
                         simple_strtol(opt, (char **)&opt, 0);
                 break;
+            case OPT_UINT_UNIT:
+                if ( opt != NULL )
+                {
+                    int base = 1;
+                    unsigned int value;
+
+                    value = simple_strtoul(opt, (char **)&opt, 0);
+                    if (*opt == 'G' || *opt == 'g') {
+                        base = 1024 * 1024;
+                        opt++;
+                    } if (*opt == 'M' || *opt == 'm') {
+                        base = 1024;
+                        opt++;
+                    } else if (*opt == 'K' || *opt == 'k')
+                        opt++;
+                    *(unsigned int *) param->var = value * base;
+                }
+                break;
             case OPT_BOOL:
                 *(int *)param->var = 1;
                 break;

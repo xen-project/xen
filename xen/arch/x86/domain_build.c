@@ -23,7 +23,7 @@
 
 /* opt_dom0_mem: Kilobytes of memory allocated to domain 0. */
 static unsigned int opt_dom0_mem = 0;
-integer_param("dom0_mem", opt_dom0_mem);
+integer_unit_param("dom0_mem", opt_dom0_mem);
 
 static unsigned int opt_dom0_shadow = 0;
 boolean_param("dom0_shadow", opt_dom0_shadow);
