@@ -315,3 +315,20 @@ void __init ctrl_if_init(void)
 
     ctrl_if_resume();
 }
+
+
+/*
+ * !! The following are DANGEROUS FUNCTIONS !!
+ * Use with care [for example, see xencons_force_flush()].
+ */
+
+int ctrl_if_transmitter_empty(void)
+{
+    return (get_ctrl_if()->tx_req_prod == ctrl_if_tx_resp_cons);
+}
+
+void ctrl_if_discard_responses(void)
+{
+    ctrl_if_tx_resp_cons = get_ctrl_if()->tx_resp_prod;
+}
+

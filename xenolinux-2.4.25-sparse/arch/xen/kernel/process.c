@@ -117,17 +117,20 @@ void cpu_idle (void)
 
 void machine_restart(char * __unused)
 {
+    /* We really want to get pending console data out before we die. */
+    extern void xencons_force_flush(void);
+    xencons_force_flush();
     HYPERVISOR_exit();
 }
 
 void machine_halt(void)
 {
-    HYPERVISOR_exit();
+    machine_restart(NULL);
 }
 
 void machine_power_off(void)
 {
-    HYPERVISOR_exit();
+    machine_restart(NULL);
 }
 
 extern void show_trace(unsigned long* esp);
@@ -207,7 +210,7 @@ void release_thread(struct task_struct *dead_task)
     if (dead_task->mm) {
         // temporary debugging check
         if (dead_task->mm->context.size) {
-            printk("WARNING: dead process %8s still has LDT? <%p/%p>\n",
+            printk("WARNING: dead process %8s still has LDT? <%p/%08x>\n",
                    dead_task->comm, 
 		   dead_task->mm->context.ldt,
 		   dead_task->mm->context.size);

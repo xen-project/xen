@@ -95,4 +95,20 @@ void ctrl_if_resume(void);
 /* Start-of-day setup. */
 void ctrl_if_init(void);
 
+/*
+ * Returns TRUE if there are no outstanding message requests at the domain
+ * controller. This can be used to ensure that messages have really flushed
+ * through when it is not possible to use the response-callback interface.
+ * WARNING: If other subsystems are using the control interface then this
+ * function might never return TRUE!
+ */
+int ctrl_if_transmitter_empty(void);  /* !! DANGEROUS FUNCTION !! */
+
+/*
+ * Manually discard response messages from the domain controller. 
+ * WARNING: This is usually done automatically -- this function should only
+ * be called when normal interrupt mechanisms are disabled!
+ */
+void ctrl_if_discard_responses(void); /* !! DANGEROUS FUNCTION !! */
+
 #endif /* __ASM_XEN__CONTROL_IF_H__ */

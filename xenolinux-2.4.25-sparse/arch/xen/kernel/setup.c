@@ -169,6 +169,11 @@ void __init setup_arch(char **cmdline_p)
     extern unsigned long cpu0_pte_quicklist[];
     extern unsigned long cpu0_pgd_quicklist[];
 
+    /* Force a quick death if the kernel panics. */
+    extern int panic_timeout;
+    if ( panic_timeout == 0 )
+        panic_timeout = 1;
+
 #ifndef CONFIG_HIGHIO
     blk_nohighio = 1;
 #endif

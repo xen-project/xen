@@ -50,6 +50,7 @@ static struct tq_struct xencons_tx_flush_task = {
     routine: xencons_tx_flush_task_routine
 };
 
+
 /******************** Kernel console driver ********************************/
 
 static void kcons_write(
@@ -112,7 +113,7 @@ void xen_console_init(void)
 }
 
 
-/*** Useful function for console debugging -- goes straight to Xen ****/
+/*** Useful function for console debugging -- goes straight to Xen. ***/
 asmlinkage int xprintk(const char *fmt, ...)
 {
     va_list args;
@@ -131,6 +132,45 @@ asmlinkage int xprintk(const char *fmt, ...)
         kcons_write(NULL, printk_buf, printk_len);
 
     return 0;
+}
+
+/*** Forcibly flush console data before dying. ***/
+void xencons_force_flush(void)
+{
+    ctrl_msg_t msg;
+    int        sz;
+
+    /* Emergency console is synchronous, so there's nothing to flush. */
+    if ( start_info.flags & SIF_INITDOMAIN )
+        return;
+
+    /*
+     * We use dangerous control-interface functions that require a quiescent
+     * system and no interrupts. Try to ensure this with a global cli().
+     */
+    cli();
+
+    /* Spin until console data is flushed through to the domain controller. */
+    while ( (wc != wp) && !ctrl_if_transmitter_empty() )
+    {
+        /* Interrupts are disabled -- we must manually reap responses. */
+        ctrl_if_discard_responses();
+
+        if ( (sz = wp - wc) == 0 )
+            continue;
+        if ( sz > sizeof(msg.msg) )
+            sz = sizeof(msg.msg);
+        if ( sz > (WBUF_SIZE - WBUF_MASK(wc)) )
+            sz = WBUF_SIZE - WBUF_MASK(wc);
+
+        msg.type    = CMSG_CONSOLE;
+        msg.subtype = CMSG_CONSOLE_DATA;
+        msg.length  = sz;
+        memcpy(msg.msg, &wbuf[WBUF_MASK(wc)], sz);
+            
+        if ( ctrl_if_send_message_noblock(&msg, NULL, 0) == 0 )
+            wc += sz;
+    }
 }
 
 
@@ -431,7 +471,7 @@ static void xencons_close(struct tty_struct *tty, struct file *filp)
     MOD_DEC_USE_COUNT;
 }
 
-int __init xencons_init(void)
+static int __init xencons_init(void)
 {
     memset(&xencons_driver, 0, sizeof(struct tty_driver));
     xencons_driver.magic           = TTY_DRIVER_MAGIC;
@@ -481,7 +521,7 @@ int __init xencons_init(void)
     return 0;
 }
 
-void __exit xencons_fini(void)
+static void __exit xencons_fini(void)
 {
     int ret;
 
@@ -501,4 +541,3 @@ void __exit xencons_fini(void)
 
 module_init(xencons_init);
 module_exit(xencons_fini);
-
