@@ -317,16 +317,24 @@ asmlinkage void do_page_fault(struct pt_regs *regs, long error_code)
 {
     struct guest_trap_bounce *gtb = guest_trap_bounce+smp_processor_id();
     trap_info_t *ti;
-    unsigned long addr, fixup;
+    unsigned long off, addr, fixup;
     struct task_struct *p = current;
     extern int map_ldt_shadow_page(unsigned int);
 
     __asm__ __volatile__ ("movl %%cr2,%0" : "=r" (addr) : );
 
-    if ( unlikely(addr > PAGE_OFFSET) )
-        goto fault_in_xen_space;
-
- propagate_fault:
+    if ( unlikely(addr >= LDT_VIRT_START) && 
+         (addr < (LDT_VIRT_START + (p->mm.ldt_ents*LDT_ENTRY_SIZE))) )
+    {
+        /*
+         * Copy a mapping from the guest's LDT, if it is valid. Otherwise we
+         * send the fault up to the guest OS to be handled.
+         */
+        off  = addr - LDT_VIRT_START;
+        addr = p->mm.ldt_base + off;
+        if ( likely(map_ldt_shadow_page(off >> PAGE_SHIFT) == 0) )
+            return; /* successfully copied the mapping */
+    }
 
     if ( unlikely(!(regs->xcs & 3)) )
         goto fault_in_hypervisor;
@@ -340,20 +348,6 @@ asmlinkage void do_page_fault(struct pt_regs *regs, long error_code)
     if ( TI_GET_IF(ti) )
         clear_bit(EVENTS_MASTER_ENABLE_BIT, &p->shared_info->events_mask);
     return; 
-
-    /*
-     * FAULT IN XEN ADDRESS SPACE:
-     *  We only deal with one kind -- a fault in the shadow LDT mapping.
-     *  If this occurs we pull a mapping from the guest's LDT, if it is
-     *  valid. Otherwise we send the fault up to the guest OS to be handled.
-     */
- fault_in_xen_space:
-
-    if ( (addr < LDT_VIRT_START) || 
-         (addr >= (LDT_VIRT_START + (p->mm.ldt_ents*LDT_ENTRY_SIZE))) ||
-         map_ldt_shadow_page((addr - LDT_VIRT_START) >> PAGE_SHIFT) )
-        goto propagate_fault;
-    return;
 
  fault_in_hypervisor:
 

@@ -367,10 +367,12 @@ critical_fixup_table:
 
 # Hypervisor uses this for application faults while it executes.
 ENTRY(failsafe_callback)
+        call SYMBOL_NAME(install_safe_pf_handler)
 1:      pop  %ds
 2:      pop  %es
 3:      pop  %fs
 4:      pop  %gs
+        call SYMBOL_NAME(install_normal_pf_handler)
 5:      iret
 .section .fixup,"ax";	\
 6:	movl $0,(%esp);	\
@@ -470,34 +472,37 @@ ENTRY(alignment_check)
 
 # This handler is special, because it gets an extra value on its stack,
 # which is the linear faulting address.
-ENTRY(page_fault)
-	pushl %ds
-	pushl %eax
-	xorl %eax,%eax
-	pushl %ebp
-	pushl %edi
-	pushl %esi
-	pushl %edx
-	decl %eax			# eax = -1
-	pushl %ecx
-	pushl %ebx
-	GET_CURRENT(%ebx)
-	cld
-	movl %es,%ecx
-	movl ORIG_EAX(%esp), %esi	# get the error code
-	movl ES(%esp), %edi		# get the faulting address
-	movl %eax, ORIG_EAX(%esp)
-	movl %ecx, ES(%esp)
-	movl %esp,%edx
-        pushl %edi                      # push the faulting address
-	pushl %esi			# push the error code
-	pushl %edx			# push the pt_regs pointer
-	movl $(__KERNEL_DS),%edx
-	movl %edx,%ds
-	movl %edx,%es
-	call SYMBOL_NAME(do_page_fault)
-	addl $12,%esp
-	jmp ret_from_exception
+#define PAGE_FAULT_STUB(_name1, _name2)                                  \
+ENTRY(_name1)                                                            \
+	pushl %ds                                                      ; \
+	pushl %eax                                                     ; \
+	xorl %eax,%eax                                                 ; \
+	pushl %ebp                                                     ; \
+	pushl %edi                                                     ; \
+	pushl %esi                                                     ; \
+	pushl %edx                                                     ; \
+	decl %eax                      /* eax = -1 */                  ; \
+	pushl %ecx                                                     ; \
+	pushl %ebx                                                     ; \
+	GET_CURRENT(%ebx)                                              ; \
+	cld                                                            ; \
+	movl %es,%ecx                                                  ; \
+	movl ORIG_EAX(%esp), %esi      /* get the error code */        ; \
+	movl ES(%esp), %edi            /* get the faulting address */  ; \
+	movl %eax, ORIG_EAX(%esp)                                      ; \
+	movl %ecx, ES(%esp)                                            ; \
+	movl %esp,%edx                                                 ; \
+        pushl %edi                     /* push the faulting address */ ; \
+	pushl %esi                     /* push the error code */       ; \
+	pushl %edx                     /* push the pt_regs pointer */  ; \
+	movl $(__KERNEL_DS),%edx                                       ; \
+	movl %edx,%ds                                                  ; \
+	movl %edx,%es                                                  ; \
+	call SYMBOL_NAME(_name2)                                       ; \
+	addl $12,%esp                                                  ; \
+	jmp ret_from_exception                                         ;
+PAGE_FAULT_STUB(page_fault, do_page_fault)
+PAGE_FAULT_STUB(safe_page_fault, do_safe_page_fault)
 
 ENTRY(machine_check)
 	pushl $0

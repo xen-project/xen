@@ -86,8 +86,9 @@ static void DEBUG_disallow_pt_read(unsigned long va)
 void MULTICALL_flush_page_update_queue(void)
 {
     unsigned long flags;
+    unsigned int _idx;
     spin_lock_irqsave(&update_lock, flags);
-    if ( idx != 0 ) 
+    if ( (_idx = idx) != 0 ) 
     {
 #if MMU_UPDATE_DEBUG > 1
         printk("Flushing %d entries from pt update queue\n", idx);
@@ -95,24 +96,27 @@ void MULTICALL_flush_page_update_queue(void)
 #if MMU_UPDATE_DEBUG > 0
         DEBUG_allow_pt_reads();
 #endif
+        idx = 0;
+        wmb(); /* Make sure index is cleared first to avoid double updates. */
         queue_multicall2(__HYPERVISOR_mmu_update, 
                          (unsigned long)update_queue, 
-                         idx);
-        idx = 0;
+                         _idx);
     }
     spin_unlock_irqrestore(&update_lock, flags);
 }
 
 static inline void __flush_page_update_queue(void)
 {
+    unsigned int _idx = idx;
 #if MMU_UPDATE_DEBUG > 1
     printk("Flushing %d entries from pt update queue\n", idx);
 #endif
 #if MMU_UPDATE_DEBUG > 0
     DEBUG_allow_pt_reads();
 #endif
-    HYPERVISOR_mmu_update(update_queue, idx);
     idx = 0;
+    wmb(); /* Make sure index is cleared first to avoid double updates. */
+    HYPERVISOR_mmu_update(update_queue, _idx);
 }
 
 void _flush_page_update_queue(void)
