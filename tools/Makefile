@@ -25,6 +25,7 @@ install:
 	$(MAKE) -C ioemu install
 
 clean:
+	$(MAKE) -C check clean
 	$(MAKE) -C libxutil clean
 	$(MAKE) -C libxc clean
 	$(MAKE) -C misc clean
