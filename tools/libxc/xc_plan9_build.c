@@ -98,7 +98,8 @@ static int
 	     unsigned long tot_pages, unsigned long *virt_load_addr,
 	     unsigned long *ksize, unsigned long *symtab_addr,
 	     unsigned long *symtab_len,
-	     unsigned long *first_data_page, unsigned long *pdb_page);
+	     unsigned long *first_data_page, unsigned long *pdb_page, 
+	     const char *cmdline);
 
 #define P9ROUND (P9SIZE / 8)
 
@@ -157,7 +158,7 @@ setup_guest(int xc_handle,
 
 	if (loadp9image(kernel_gfd, xc_handle, dom, cpage_array, tot_pages,
 			virt_load_addr, &ksize, &symtab_addr, &symtab_len,
-			&first_data_page, &first_page_after_kernel))
+			&first_data_page, &first_page_after_kernel, cmdline))
 		goto error_out;
 	DPRINTF(("First data page is 0x%lx\n", first_data_page));
 	DPRINTF(("First page after kernel is 0x%lx\n",
@@ -554,7 +555,7 @@ xc_plan9_build(int xc_handle,
  * Plan 9 memory layout (initial)
  * ----------------
  * | info from xen| @0
- * ----------------
+ * ---------------|<--- boot args (start at 0x1200 + 64)
  * | stack        |
  * ----------------<--- page 2
  * | empty        |
@@ -589,7 +590,8 @@ loadp9image(gzFile kernel_gfd, int xc_handle, u32 dom,
 	    unsigned long tot_pages, unsigned long *virt_load_addr,
 	    unsigned long *ksize, unsigned long *symtab_addr,
 	    unsigned long *symtab_len,
-	    unsigned long *first_data_page, unsigned long *pdb_page)
+	    unsigned long *first_data_page, unsigned long *pdb_page, 
+	    const char *cmdline)
 {
 	unsigned long datapage;
 	Exec ehdr;
@@ -600,6 +602,7 @@ loadp9image(gzFile kernel_gfd, int xc_handle, u32 dom,
 	PAGE *image = 0;
 	unsigned long image_tot_pages = 0;
 	unsigned long textround;
+	static PAGE args;
 
 	ret = -1;
 
@@ -667,6 +670,16 @@ loadp9image(gzFile kernel_gfd, int xc_handle, u32 dom,
 			     image, image_tot_pages * 4096, page_array, 0x100);
 	DPRINTF(("done copying kernel to guest memory\n"));
 
+	/* now do the bootargs */
+	/* in plan 9, the x=y bootargs start at 0x1200 + 64 in real memory */
+	/* we'll copy to page 1, so we offset into the page struct at 
+	 * 0x200 + 64 
+	 */
+	memset(&args, 0, sizeof(args));
+	memcpy(&args.data[0x200 + 64], cmdline, strlen(cmdline));
+	printf("Copied :%s: to page for args\n", cmdline);
+	ret = memcpy_toguest(xc_handle, dom, &args, sizeof(args), page_array,1);
+	dumpit(xc_handle, dom, 0 /*0x100000>>12*/, 4, page_array) ;
       out:
 	if (image)
 		free(image);
