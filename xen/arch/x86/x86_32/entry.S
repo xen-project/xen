@@ -148,6 +148,7 @@ ENTRY(continue_nonidle_task)
  *   2. We cannot recursively call HYPERVISOR_multicall, or a malicious
  *      caller could cause our stack to blow up.
  */
+#define MULTICALL_ENTRY_ORDER 5
 do_multicall:
         popl  %eax
         cmpl  $SYMBOL_NAME(multicall_return_from_call),%eax
@@ -155,6 +156,13 @@ do_multicall:
         pushl %ebx
         movl  4(%esp),%ebx   /* EBX == call_list */
         movl  8(%esp),%ecx   /* ECX == nr_calls  */
+        /* Ensure the entire multicall list is below HYPERVISOR_VIRT_START. */
+        movl  %ecx,%eax
+        shll  $MULTICALL_ENTRY_ORDER,%eax
+        addl  %ebx,%eax      /* EAX == end of multicall list */
+        jc    bad_multicall_address
+        cmpl  $__HYPERVISOR_VIRT_START,%eax
+        jnc   bad_multicall_address
 multicall_loop:
         pushl %ecx
 multicall_fault1: 
@@ -176,12 +184,17 @@ multicall_fault7:
         movl  %eax,24(%ebx) # args[5] == result
         addl  $20,%esp
         popl  %ecx
-        addl  $(ARGS_PER_MULTICALL_ENTRY*4),%ebx
+        addl  $(1<<MULTICALL_ENTRY_ORDER),%ebx
         loop  multicall_loop
         popl  %ebx
         xorl  %eax,%eax
         jmp   ret_from_hypercall
 
+bad_multicall_address:
+        popl  %ebx
+        movl  $-EFAULT,%eax
+        jmp   ret_from_hypercall        
+                
 .section __ex_table,"a"
         .align 4
         .long multicall_fault1, multicall_fixup1
