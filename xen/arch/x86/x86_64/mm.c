@@ -250,7 +250,7 @@ long do_set_segment_base(unsigned int which, unsigned long base)
     struct exec_domain *ed = current;
 
     /* Canonicalise the base address. */
-    base &= VADDR_MASK;
+    base |= ~VADDR_MASK;
 
     switch ( which )
     {
