@@ -48,22 +48,3 @@ page directory to a write-able page, we must ensure that no other CPU
 still has the page in its TLB to ensure memory system integrity.  One
 other issue for supporting MP guests is that we'll need some sort of
 CPU gang scheduler, which will require some research.
-
-Currently, the privileged domain0 can request access to the underlying
-hardware. This is how we enable the VGA console and Xserver to run in
-domain0. We are planning on extending this functionality to enable
-other device drivers for 'low performance' devices to be run in
-domain0, and then virtualized to other domains by domain0. This will
-enable random PCMCIA and USB devices to be used that we're unlikely to
-ever get around to writing a Xen driver for.
-
-We'd also like to experiment moving the network and block device
-drivers out of Xen, and each into their own special domains that are
-given access to the specific set of h/w resources they need to
-operate.  This will provide some isolation against faulty device
-drivers, potentially allowing them to be restarted on failure. There
-may be more context switches incurred, but due to Xen's pipelined
-asynchronous i/o interface we expect this overhead to be amortised.
-This architecture would also allow device drivers to be easily
-upgraded independent of Xen, which is necessary for our vision of Xen
-as a next-gen BIOS replacement.
