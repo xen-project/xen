@@ -255,7 +255,7 @@ long do_block_io_op(block_io_op_t *u_block_io_op)
 	break; 
 
     case BLOCK_IO_OP_VBD_REMOVE:  
-	/* remove an extnet from a VBD; caller must be privileged  */
+	/* remove an extent from a VBD; caller must be privileged  */
 	if(!IS_PRIV(p))
 	    return -EPERM; 
 	ret = vbd_remove(&op.u.remove_info); 
