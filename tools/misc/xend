@@ -118,7 +118,7 @@ def main():
     
     if (not xcs_running()):
         if os.fork():
-            time.usleep(500) # let xcs start
+            time.sleep(0.5) # let xcs start
         else:
             try:
                 logfile = os.open(XCS_LOGFILE, 
