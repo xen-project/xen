@@ -578,8 +578,11 @@ void domain_relinquish_memory(struct domain *d)
 
     /* Drop the in-use reference to the page-table base. */
     if ( pagetable_val(d->mm.pagetable) != 0 )
+    {
         put_page_and_type(&frame_table[pagetable_val(d->mm.pagetable) >>
                                       PAGE_SHIFT]);
+	d->mm.pagetable = mk_pagetable(0);
+    }
 
     /*
      * Relinquish GDT mappings. No need for explicit unmapping of the LDT as 

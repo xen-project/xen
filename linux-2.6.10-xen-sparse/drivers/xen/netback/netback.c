@@ -1,11 +1,11 @@
 /******************************************************************************
- * arch/xen/drivers/netif/backend/main.c
+ * drivers/xen/netback/netback.c
  * 
- * Back-end of the driver for virtual block devices. This portion of the
- * driver exports a 'unified' block-device interface that can be accessed
+ * Back-end of the driver for virtual network devices. This portion of the
+ * driver exports a 'unified' network-device interface that can be accessed
  * by any operating system that implements a compatible front end. A 
  * reference front-end implementation can be found in:
- *  arch/xen/drivers/netif/frontend
+ *  drivers/xen/netfront/netfront.c
  * 
  * Copyright (c) 2002-2004, K A Fraser
  */
