@@ -1,0 +1,67 @@
+#
+# For a description of the syntax of this configuration file,
+# see Documentation/kbuild/kconfig-language.txt.
+#
+
+mainmenu "Linux Kernel Configuration"
+
+config XEN
+	bool
+	default y
+	help
+	  This is the Linux Xen port.
+
+config ARCH_XEN
+	bool
+	default y
+
+
+source "init/Kconfig"
+
+#config VT
+#	bool
+#	default y
+
+#config VT_CONSOLE
+#	bool
+#	default y
+
+#config HW_CONSOLE
+#	bool
+#	default y
+
+choice
+	prompt "Processor Type"
+	default X86
+
+config X86
+	bool "X86"
+	help
+	  Choose this option if your computer is a X86 architecture.
+
+config X86_64
+	bool "X86_64"
+	help
+	  Choose this option if your computer is a X86 architecture.
+
+endchoice
+
+if X86
+source "arch/xen/i386/Kconfig"
+endif
+
+menu "Executable file formats"
+
+source "fs/Kconfig.binfmt"
+
+endmenu
+
+source "arch/xen/Kconfig.drivers"
+
+source "fs/Kconfig"
+
+source "security/Kconfig"
+
+source "crypto/Kconfig"
+
+source "lib/Kconfig"

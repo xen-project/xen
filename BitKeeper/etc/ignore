@@ -13,8 +13,8 @@ TAGS
 extras/mini-os/h/hypervisor-ifs
 install
 install/*
-linux-*-xen*/*
-linux-2.4.26-xen/*
+linux-*-xen0/*
+linux-*-xenU/*
 linux-xen-sparse
 patches/*
 tools/*/build/lib*/*.py
