@@ -6,21 +6,14 @@
  *
  * Based on Linux's uhci.c, original copyright notices are displayed
  * below.  Portions also (c) 2004 Intel Research Cambridge
- * and (c) 2004 Mark Williamson
+ * and (c) 2004, 2005 Mark Williamson
  *
  * Contact <mark.williamson@cl.cam.ac.uk> or
  * <xen-devel@lists.sourceforge.net> regarding this code.
  *
  * Still to be (maybe) implemented:
- * - multiple port
- * - multiple interfaces
  * - migration / backend restart support?
- * - unloading support
- *
- * Differences to a normal host controller:
- * - the backend does most of the mucky stuff so we don't have to do various
- *   things that are necessary for a normal host controller (e.g. FSBR).
- * - we don't have any hardware, so status registers are simulated in software.
+ * - support for building / using as a module
  */
 
 /*
@@ -55,13 +48,11 @@
 #include <linux/module.h>
 #include <linux/kernel.h>
 #include <linux/init.h>
-#include <linux/delay.h>
-#include <linux/ioport.h>
 #include <linux/sched.h>
+#include <linux/delay.h>
 #include <linux/slab.h>
 #include <linux/smp_lock.h>
 #include <linux/errno.h>
-#include <linux/unistd.h>
 #include <linux/interrupt.h>
 #include <linux/spinlock.h>
 #ifdef CONFIG_USB_DEBUG
@@ -71,13 +62,10 @@
 #endif
 #include <linux/usb.h>
 
-#include <asm/uaccess.h>
 #include <asm/irq.h>
 #include <asm/system.h>
 
 #include "xhci.h"
-
-#include <linux/pm.h>
 
 #include "../../../../../drivers/usb/hcd.h"
 
@@ -89,8 +77,10 @@
  * Version Information
  */
 #define DRIVER_VERSION "v1.0"
-#define DRIVER_AUTHOR "Linus 'Frodo Rabbit' Torvalds, Johannes Erdfelt, Randy Dunlap, Georg Acher, Deti Fliegl, Thomas Sailer, Roman Weissgaerber, Mark Williamson"
-#define DRIVER_DESC "Xen Virtual USB Host Controller Interface driver"
+#define DRIVER_AUTHOR "Linus 'Frodo Rabbit' Torvalds, Johannes Erdfelt, " \
+                      "Randy Dunlap, Georg Acher, Deti Fliegl, " \
+                      "Thomas Sailer, Roman Weissgaerber, Mark Williamson"
+#define DRIVER_DESC "Xen Virtual USB Host Controller Interface"
 
 /*
  * debug = 0, no debugging messages
@@ -107,26 +97,22 @@ MODULE_PARM_DESC(debug, "Debug level");
 static char *errbuf;
 #define ERRBUF_LEN    (PAGE_SIZE * 8)
 
-static kmem_cache_t *xhci_up_cachep;	/* urb_priv */
-
 static int rh_submit_urb(struct urb *urb);
 static int rh_unlink_urb(struct urb *urb);
-//static int xhci_get_current_frame_number(struct usb_device *dev);
 static int xhci_unlink_urb(struct urb *urb);
-static void xhci_unlink_generic(struct urb *urb);
 static void xhci_call_completion(struct urb *urb);
 static void xhci_drain_ring(void);
+static void xhci_transfer_result(struct xhci *xhci, struct urb *urb);
+static void xhci_finish_completion(void);
 
 #define MAX_URB_LOOP	2048		/* Maximum number of linked URB's */
 
-static struct xhci *xhci;
+static kmem_cache_t *xhci_up_cachep;	/* urb_priv cache */
+static struct xhci *xhci;               /* XHCI structure for the interface */
 
-enum { USBIF_STATE_CONNECTED = 2,
-       USBIF_STATE_DISCONNECTED = 1,
-       USBIF_STATE_CLOSED =0
-};
-
-static int awaiting_reset = 0;
+/******************************************************************************
+ * DEBUGGING
+ */
 
 #ifdef DEBUG
 
@@ -145,13 +131,16 @@ static void dump_urb(struct urb *urb)
            "  bandwidth = %d\n"
            "  setup_packet = %p\n",
            urb, urb->hcpriv, urb->next, urb->dev, urb->pipe, urb->status,
-           urb->transfer_flags, urb->transfer_buffer, urb->transfer_buffer_length,
-           urb->actual_length, urb->bandwidth, urb->setup_packet);
+           urb->transfer_flags, urb->transfer_buffer,
+           urb->transfer_buffer_length, urb->actual_length, urb->bandwidth,
+           urb->setup_packet);
     if ( urb->setup_packet != NULL )
         printk(KERN_DEBUG
                "setup = { 0x%x, 0x%x, 0x%x, 0x%x, 0x%x, 0x%x, 0x%x, 0x%x }\n",
-               urb->setup_packet[0], urb->setup_packet[1], urb->setup_packet[2], urb->setup_packet[3],
-               urb->setup_packet[4], urb->setup_packet[5], urb->setup_packet[6], urb->setup_packet[7]);
+               urb->setup_packet[0], urb->setup_packet[1],
+               urb->setup_packet[2], urb->setup_packet[3],
+               urb->setup_packet[4], urb->setup_packet[5],
+               urb->setup_packet[6], urb->setup_packet[7]);
     printk(KERN_DEBUG "complete = %p\n"
            "interval = %d\n", urb->complete, urb->interval);
         
@@ -177,6 +166,10 @@ static void xhci_show_resp(usbif_response_t *r)
 #define DPRINTK(blah,...) ((void)0)
 
 #endif /* DEBUG */
+
+/******************************************************************************
+ * RING REQUEST HANDLING
+ */
 
 /**
  * xhci_construct_isoc - add isochronous information to a request
@@ -205,6 +198,9 @@ static int xhci_construct_isoc(usbif_request_t *req, struct urb *urb)
         return 0;
 }
 
+/**
+ * xhci_queue_req - construct and queue request for an URB
+ */
 static int xhci_queue_req(struct urb *urb)
 {
         usbif_request_t *req;
@@ -265,6 +261,9 @@ static int xhci_queue_req(struct urb *urb)
         return -EINPROGRESS;
 }
 
+/**
+ * xhci_queue_probe - queue a probe request for a particular port
+ */
 static inline usbif_request_t *xhci_queue_probe(usbif_vdev_t port)
 {
         usbif_request_t *req;
@@ -272,33 +271,26 @@ static inline usbif_request_t *xhci_queue_probe(usbif_vdev_t port)
 
 #if DEBUG
 	printk(KERN_DEBUG
-               "queuing probe: req_prod = %d (@ 0x%lx), resp_prod = %d, resp_cons = %d\n",
-	       usbif->req_prod, virt_to_machine(&usbif->req_prod),
+               "queuing probe: req_prod = %d (@ 0x%lx), resp_prod = %d, "
+               "resp_cons = %d\n", usbif->req_prod,
+               virt_to_machine(&usbif->req_prod),
 	       usbif->resp_prod, xhci->usb_resp_cons);
 #endif
         
         if ( RING_FULL(USBIF_RING, usb_ring) )
         {
                 printk(KERN_WARNING
-                       "xhci_queue_probe(): USB ring full, not queuing request\n");
+                       "xhci_queue_probe(): ring full, not queuing request\n");
                 return NULL;
         }
 
         /* Stick something in the shared communications ring. */
         req = RING_GET_REQUEST(USBIF_RING, usb_ring, usb_ring->req_prod_pvt);
 
+        memset(req, sizeof(*req), 0);
+
         req->operation       = USBIF_OP_PROBE;
         req->port            = port;
-        req->id              = 0;
-        req->transfer_buffer = 0;
-	req->devnum          = 0;
-        req->direction       = 0;
-	req->speed           = 0;
-        req->pipe_type       = 0;
-        req->length          = 0;
-        req->transfer_flags  = 0;
-	req->endpoint        = 0;
-	req->speed           = 0;
 
         usb_ring->req_prod_pvt++;
         RING_PUSH_REQUESTS(USBIF_RING, usb_ring);
@@ -308,6 +300,9 @@ static inline usbif_request_t *xhci_queue_probe(usbif_vdev_t port)
         return req;
 }
 
+/**
+ * xhci_port_reset - queue a reset request for a particular port
+ */
 static int xhci_port_reset(usbif_vdev_t port)
 {
         usbif_request_t *req;
@@ -315,10 +310,12 @@ static int xhci_port_reset(usbif_vdev_t port)
 
         /* We only reset one port at a time, so we only need one variable per
          * hub. */
-        awaiting_reset = 1;
+        xhci->awaiting_reset = 1;
         
         /* Stick something in the shared communications ring. */
 	req = RING_GET_REQUEST(USBIF_RING, usb_ring, usb_ring->req_prod_pvt);
+
+        memset(req, sizeof(*req), 0);
 
         req->operation       = USBIF_OP_RESET;
         req->port            = port;
@@ -328,25 +325,167 @@ static int xhci_port_reset(usbif_vdev_t port)
 
 	notify_via_evtchn(xhci->evtchn);
 
-        while ( awaiting_reset > 0 )
+        while ( xhci->awaiting_reset > 0 )
         {
                 mdelay(1);
                 xhci_drain_ring();
         }
 
-        return awaiting_reset;
+        return xhci->awaiting_reset;
 }
 
 
-/*
- * Only the USB core should call xhci_alloc_dev and xhci_free_dev
+/******************************************************************************
+ * RING RESPONSE HANDLING
  */
-static int xhci_alloc_dev(struct usb_device *dev)
+
+static void receive_usb_reset(usbif_response_t *resp)
 {
-	return 0;
+    xhci->awaiting_reset = resp->status;
+    rmb();
+    
 }
 
-static int xhci_free_dev(struct usb_device *dev)
+static void receive_usb_probe(usbif_response_t *resp)
+{
+    spin_lock(&xhci->rh.port_state_lock);
+
+    if ( resp->status > 0 )
+    {
+        if ( resp->status == 1 )
+        {
+            /* If theres a device there and there wasn't one before there must
+             * have been a connection status change. */
+            if( xhci->rh.ports[resp->data].cs == 0 )
+	    {
+                xhci->rh.ports[resp->data].cs = 1;
+                xhci->rh.ports[resp->data].ccs = 1;
+                xhci->rh.ports[resp->data].cs_chg = 1;
+	    }
+        }
+        else
+            printk(KERN_WARNING "receive_usb_probe(): unexpected status %d "
+                   "for port %d\n", resp->status, resp->data);
+    }
+    else if ( resp->status < 0)
+        printk(KERN_WARNING "receive_usb_probe(): got error status %d\n",
+               resp->status);
+
+    spin_unlock(&xhci->rh.port_state_lock);
+}
+
+static void receive_usb_io(usbif_response_t *resp)
+{
+        struct urb_priv *urbp = (struct urb_priv *)resp->id;
+        struct urb *urb = urbp->urb;
+
+        urb->actual_length = resp->length;
+	urb->status = resp->status;
+	urbp->status = resp->status;
+        urbp->in_progress = 0;
+
+        if( usb_pipetype(urb->pipe) == 0 ) /* ISO */
+        {
+                int i;
+              
+                /* Copy ISO schedule results back in. */
+                for ( i = 0; i < urb->number_of_packets; i++ )
+                {
+                        urb->iso_frame_desc[i].status
+                                = urbp->schedule[i].status;
+                        urb->iso_frame_desc[i].actual_length
+                                = urbp->schedule[i].length;
+                }
+                free_page((unsigned long)urbp->schedule);
+        }
+}
+
+/**
+ * xhci_drain_ring - drain responses from the ring, calling handlers
+ *
+ * This may be called from interrupt context when an event is received from the
+ * backend domain, or sometimes in process context whilst waiting for a port
+ * reset or URB completion.
+ */
+static void xhci_drain_ring(void)
+{
+	struct list_head *tmp, *head;
+	usbif_front_ring_t *usb_ring = &xhci->usb_ring;
+	usbif_response_t *resp;
+        RING_IDX i, rp;
+
+        /* Walk the ring here to get responses, updating URBs to show what
+         * completed. */
+        
+        rp = usb_ring->sring->rsp_prod;
+        rmb(); /* Ensure we see queued requests up to 'rp'. */
+
+        /* Take items off the comms ring, taking care not to overflow. */
+        for ( i = usb_ring->rsp_cons; i != rp; i++ )
+        {
+            resp = RING_GET_RESPONSE(USBIF_RING, usb_ring, i);
+            
+            /* May need to deal with batching and with putting a ceiling on
+               the number dispatched for performance and anti-dos reasons */
+
+            xhci_show_resp(resp);
+
+            switch ( resp->operation )
+            {
+            case USBIF_OP_PROBE:
+                receive_usb_probe(resp);
+                break;
+                
+            case USBIF_OP_IO:
+                receive_usb_io(resp);
+                break;
+
+            case USBIF_OP_RESET:
+                receive_usb_reset(resp);
+                break;
+
+            default:
+                printk(KERN_WARNING
+                       "error: unknown USB io operation response [%d]\n",
+                       resp->operation);
+                break;
+            }
+        }
+
+        usb_ring->rsp_cons = i;
+
+	/* Walk the list of pending URB's to see which ones completed and do
+         * callbacks, etc. */
+	spin_lock(&xhci->urb_list_lock);
+	head = &xhci->urb_list;
+	tmp = head->next;
+	while (tmp != head) {
+		struct urb *urb = list_entry(tmp, struct urb, urb_list);
+
+		tmp = tmp->next;
+
+		/* Checks the status and does all of the magic necessary */
+		xhci_transfer_result(xhci, urb);
+	}
+	spin_unlock(&xhci->urb_list_lock);
+
+	xhci_finish_completion();
+}
+
+
+static void xhci_interrupt(int irq, void *__xhci, struct pt_regs *regs)
+{
+        xhci_drain_ring();
+}
+
+/******************************************************************************
+ * HOST CONTROLLER FUNCTIONALITY
+ */
+
+/**
+ * no-op implementation of private device alloc / free routines
+ */
+static int xhci_do_nothing_dev(struct usb_device *dev)
 {
 	return 0;
 }
@@ -365,6 +504,8 @@ static inline void xhci_add_complete(struct urb *urb)
  * storage.
  *
  * We spin and wait for the URB to complete before returning.
+ *
+ * Call with urb->lock acquired.
  */
 static void xhci_delete_urb(struct urb *urb)
 {
@@ -526,8 +667,10 @@ static int xhci_submit_urb(struct urb *urb)
 
 	switch (usb_pipetype(urb->pipe)) {
 	case PIPE_CONTROL:
+	case PIPE_BULK:
 		ret = xhci_queue_req(urb);
 		break;
+
 	case PIPE_INTERRUPT:
 		if (urb->bandwidth == 0) {	/* not yet checked/allocated */
 			bustime = usb_check_bandwidth(urb->dev, urb);
@@ -536,14 +679,13 @@ static int xhci_submit_urb(struct urb *urb)
 			else {
 				ret = xhci_queue_req(urb);
 				if (ret == -EINPROGRESS)
-					usb_claim_bandwidth(urb->dev, urb, bustime, 0);
+					usb_claim_bandwidth(urb->dev, urb,
+                                                            bustime, 0);
 			}
 		} else		/* bandwidth is already set */
 			ret = xhci_queue_req(urb);
 		break;
-	case PIPE_BULK:
-		ret = xhci_queue_req(urb);
-		break;
+
 	case PIPE_ISOCHRONOUS:
 		if (urb->bandwidth == 0) {	/* not yet checked/allocated */
 			if (urb->number_of_packets <= 0) {
@@ -563,7 +705,6 @@ static int xhci_submit_urb(struct urb *urb)
 			ret = xhci_queue_req(urb);
 		break;
 	}
-
 out:
 	urb->status = ret;
 
@@ -577,7 +718,7 @@ out:
 		return 0;
 	}
 
-	xhci_unlink_generic(urb);
+	xhci_delete_urb(urb);
 
 	spin_unlock(&urb->lock);
 	spin_unlock_irqrestore(&xhci->urb_list_lock, flags);
@@ -643,7 +784,7 @@ static void xhci_transfer_result(struct xhci *xhci, struct urb *urb)
 		/* Spinlock needed ? */
 		if (urb->bandwidth)
 			usb_release_bandwidth(urb->dev, urb, 1);
-		xhci_unlink_generic(urb);
+		xhci_delete_urb(urb);
 		break;
 	case PIPE_INTERRUPT:
 		/* Interrupts are an exception */
@@ -654,11 +795,11 @@ static void xhci_transfer_result(struct xhci *xhci, struct urb *urb)
 		/* Spinlock needed ? */
 		if (urb->bandwidth)
 			usb_release_bandwidth(urb->dev, urb, 0);
-		xhci_unlink_generic(urb);
+		xhci_delete_urb(urb);
 		break;
 	default:
 		info("xhci_transfer_result: unknown pipe type %d for urb %p\n",
-			usb_pipetype(urb->pipe), urb);
+                     usb_pipetype(urb->pipe), urb);
 	}
 
 	/* Remove it from xhci->urb_list */
@@ -669,23 +810,6 @@ out_complete:
 
 out:
 	spin_unlock_irqrestore(&urb->lock, flags);
-}
-
-/*
- * MUST be called with urb->lock acquired
- */
-static void xhci_unlink_generic(struct urb *urb)
-{
-	struct urb_priv *urbp = urb->hcpriv;
-
-	/* We can get called when urbp allocation fails, so check */
-	if (!urbp)
-		return;
-
-        /* ??? This function is now so minimal it doesn't do much.  Do we really
-         * need it? */
-
-	xhci_delete_urb(urb);
 }
 
 static int xhci_unlink_urb(struct urb *urb)
@@ -725,7 +849,7 @@ static int xhci_unlink_urb(struct urb *urb)
 
 	list_del_init(&urb->urb_list);
 
-	xhci_unlink_generic(urb);
+	xhci_delete_urb(urb);
 
 	/* Short circuit the virtual root hub */
 	if (urb->dev == xhci->rh.dev) {
@@ -770,10 +894,114 @@ static int xhci_unlink_urb(struct urb *urb)
 	return 0;
 }
 
+static void xhci_call_completion(struct urb *urb)
+{
+	struct urb_priv *urbp;
+	struct usb_device *dev = urb->dev;
+	int is_ring = 0, killed, resubmit_interrupt, status;
+	struct urb *nurb;
+	unsigned long flags;
+
+	spin_lock_irqsave(&urb->lock, flags);
+
+	urbp = (struct urb_priv *)urb->hcpriv;
+	if (!urbp || !urb->dev) {
+		spin_unlock_irqrestore(&urb->lock, flags);
+		return;
+	}
+
+	killed = (urb->status == -ENOENT || urb->status == -ECONNABORTED ||
+			urb->status == -ECONNRESET);
+	resubmit_interrupt = (usb_pipetype(urb->pipe) == PIPE_INTERRUPT &&
+			urb->interval);
+
+	nurb = urb->next;
+	if (nurb && !killed) {
+		int count = 0;
+
+		while (nurb && nurb != urb && count < MAX_URB_LOOP) {
+			if (nurb->status == -ENOENT ||
+			    nurb->status == -ECONNABORTED ||
+			    nurb->status == -ECONNRESET) {
+				killed = 1;
+				break;
+			}
+
+			nurb = nurb->next;
+			count++;
+		}
+
+		if (count == MAX_URB_LOOP)
+			err("xhci_call_completion: too many linked URB's, loop? (first loop)");
+
+		/* Check to see if chain is a ring */
+		is_ring = (nurb == urb);
+	}
+
+	status = urbp->status;
+	if (!resubmit_interrupt || killed)
+		/* We don't need urb_priv anymore */
+		xhci_destroy_urb_priv(urb);
+
+	if (!killed)
+		urb->status = status;
+
+	spin_unlock_irqrestore(&urb->lock, flags);
+
+	if (urb->complete)
+		urb->complete(urb);
+
+	if (resubmit_interrupt)
+		/* Recheck the status. The completion handler may have */
+		/*  unlinked the resubmitting interrupt URB */
+		killed = (urb->status == -ENOENT ||
+			  urb->status == -ECONNABORTED ||
+			  urb->status == -ECONNRESET);
+
+	if (resubmit_interrupt && !killed) {
+                if ( urb->dev != xhci->rh.dev )
+                        xhci_queue_req(urb); /* XXX What if this fails? */
+                /* Don't need to resubmit URBs for the virtual root dev. */
+	} else {
+		if (is_ring && !killed) {
+			urb->dev = dev;
+			xhci_submit_urb(urb);
+		} else {
+			/* We decrement the usage count after we're done */
+			/*  with everything */
+			usb_dec_dev_use(dev);
+		}
+	}
+}
+
+static void xhci_finish_completion(void)
+{
+	struct list_head *tmp, *head;
+	unsigned long flags;
+
+	spin_lock_irqsave(&xhci->complete_list_lock, flags);
+	head = &xhci->complete_list;
+	tmp = head->next;
+	while (tmp != head) {
+		struct urb_priv *urbp = list_entry(tmp, struct urb_priv,
+                                                   complete_list);
+		struct urb *urb = urbp->urb;
+
+		list_del_init(&urbp->complete_list);
+		spin_unlock_irqrestore(&xhci->complete_list_lock, flags);
+
+		xhci_call_completion(urb);
+
+		spin_lock_irqsave(&xhci->complete_list_lock, flags);
+		head = &xhci->complete_list;
+		tmp = head->next;
+	}
+	spin_unlock_irqrestore(&xhci->complete_list_lock, flags);
+}
 
 static struct usb_operations xhci_device_operations = {
-	.allocate = xhci_alloc_dev,
-	.deallocate = xhci_free_dev,
+	.allocate = xhci_do_nothing_dev,
+	.deallocate = xhci_do_nothing_dev,
         /* It doesn't look like any drivers actually care what the frame number
 	 * is at the moment!  If necessary, we could approximate the current
 	 * frame nubmer by passing it from the backend in response messages. */
@@ -782,7 +1010,9 @@ static struct usb_operations xhci_device_operations = {
 	.unlink_urb = xhci_unlink_urb
 };
 
-/* Virtual Root Hub */
+/******************************************************************************
+ * VIRTUAL ROOT HUB EMULATION
+ */
 
 static __u8 root_hub_dev_des[] =
 {
@@ -867,9 +1097,8 @@ static int rh_send_irq(struct urb *urb)
 
 	spin_lock_irqsave(&urb->lock, flags);
 	for (i = 0; i < xhci->rh.numports; i++) {
-                /* MAW: No idea what the old code was doing here or why it worked.
-		 * This implementation sets a bit if anything at all has changed on the 
-		 * port, as per USB spec 11.12 */
+                /* Set a bit if anything at all has changed on the port, as per
+		 * USB spec 11.12 */
 		data |= (ports[i].cs_chg || ports[i].pe_chg )
                         ? (1 << (i + 1))
                         : 0;
@@ -921,7 +1150,8 @@ static void rh_int_timer_do(unsigned long ptr)
 		spin_lock(&u->lock);
 
 		/* Check if the URB timed out */
-		if (u->timeout && time_after_eq(jiffies, up->inserttime + u->timeout)) {
+		if (u->timeout && time_after_eq(jiffies,
+                                                up->inserttime + u->timeout)) {
 			list_del(&u->urb_list);
 			list_add_tail(&u->urb_list, &list);
 		}
@@ -951,7 +1181,8 @@ static int rh_init_int_timer(struct urb *urb)
 	init_timer(&xhci->rh.rh_int_timer);
 	xhci->rh.rh_int_timer.function = rh_int_timer_do;
 	xhci->rh.rh_int_timer.data = (unsigned long)urb;
-	xhci->rh.rh_int_timer.expires = jiffies + (HZ * (urb->interval < 30 ? 30 : urb->interval)) / 1000;
+	xhci->rh.rh_int_timer.expires = jiffies
+                + (HZ * (urb->interval < 30 ? 30 : urb->interval)) / 1000;
 	add_timer(&xhci->rh.rh_int_timer);
 
 	return 0;
@@ -963,7 +1194,8 @@ static int rh_init_int_timer(struct urb *urb)
 static int rh_submit_urb(struct urb *urb)
 {
 	unsigned int pipe = urb->pipe;
-	struct usb_ctrlrequest *cmd = (struct usb_ctrlrequest *)urb->setup_packet;
+	struct usb_ctrlrequest *cmd =
+                (struct usb_ctrlrequest *)urb->setup_packet;
 	void *data = urb->transfer_buffer;
 	int leni = urb->transfer_buffer_length;
 	int len = 0;
@@ -1164,250 +1396,12 @@ static int rh_unlink_urb(struct urb *urb)
 	return 0;
 }
 
-static void xhci_call_completion(struct urb *urb)
-{
-	struct urb_priv *urbp;
-	struct usb_device *dev = urb->dev;
-	int is_ring = 0, killed, resubmit_interrupt, status;
-	struct urb *nurb;
-	unsigned long flags;
-
-	spin_lock_irqsave(&urb->lock, flags);
-
-	urbp = (struct urb_priv *)urb->hcpriv;
-	if (!urbp || !urb->dev) {
-		spin_unlock_irqrestore(&urb->lock, flags);
-		return;
-	}
-
-	killed = (urb->status == -ENOENT || urb->status == -ECONNABORTED ||
-			urb->status == -ECONNRESET);
-	resubmit_interrupt = (usb_pipetype(urb->pipe) == PIPE_INTERRUPT &&
-			urb->interval);
-
-	nurb = urb->next;
-	if (nurb && !killed) {
-		int count = 0;
-
-		while (nurb && nurb != urb && count < MAX_URB_LOOP) {
-			if (nurb->status == -ENOENT ||
-			    nurb->status == -ECONNABORTED ||
-			    nurb->status == -ECONNRESET) {
-				killed = 1;
-				break;
-			}
-
-			nurb = nurb->next;
-			count++;
-		}
-
-		if (count == MAX_URB_LOOP)
-			err("xhci_call_completion: too many linked URB's, loop? (first loop)");
-
-		/* Check to see if chain is a ring */
-		is_ring = (nurb == urb);
-	}
-
-	status = urbp->status;
-	if (!resubmit_interrupt || killed)
-		/* We don't need urb_priv anymore */
-		xhci_destroy_urb_priv(urb);
-
-	if (!killed)
-		urb->status = status;
-
-	spin_unlock_irqrestore(&urb->lock, flags);
-
-	if (urb->complete)
-		urb->complete(urb);
-
-	if (resubmit_interrupt)
-		/* Recheck the status. The completion handler may have */
-		/*  unlinked the resubmitting interrupt URB */
-		killed = (urb->status == -ENOENT ||
-			  urb->status == -ECONNABORTED ||
-			  urb->status == -ECONNRESET);
-
-	if (resubmit_interrupt && !killed) {
-                if ( urb->dev != xhci->rh.dev )
-                        xhci_queue_req(urb); /* XXX What if this fails? */
-                /* Don't need to resubmit URBs for the virtual root dev. */
-	} else {
-		if (is_ring && !killed) {
-			urb->dev = dev;
-			xhci_submit_urb(urb);
-		} else {
-			/* We decrement the usage count after we're done */
-			/*  with everything */
-			usb_dec_dev_use(dev);
-		}
-	}
-}
-
-static void xhci_finish_completion(void)
-{
-	struct list_head *tmp, *head;
-	unsigned long flags;
-
-	spin_lock_irqsave(&xhci->complete_list_lock, flags);
-	head = &xhci->complete_list;
-	tmp = head->next;
-	while (tmp != head) {
-		struct urb_priv *urbp = list_entry(tmp, struct urb_priv, complete_list);
-		struct urb *urb = urbp->urb;
-
-		list_del_init(&urbp->complete_list);
-		spin_unlock_irqrestore(&xhci->complete_list_lock, flags);
-
-		xhci_call_completion(urb);
-
-		spin_lock_irqsave(&xhci->complete_list_lock, flags);
-		head = &xhci->complete_list;
-		tmp = head->next;
-	}
-	spin_unlock_irqrestore(&xhci->complete_list_lock, flags);
-}
-
-static void receive_usb_reset(usbif_response_t *resp)
-{
-    awaiting_reset = resp->status;
-    rmb();
-    
-}
-
-static void receive_usb_probe(usbif_response_t *resp)
-{
-    spin_lock(&xhci->rh.port_state_lock);
-
-    if ( resp->status > 0 )
-    {
-        if ( resp->status == 1 )
-        {
-            /* If theres a device there and there wasn't one before there must
-             * have been a connection status change. */
-            if( xhci->rh.ports[resp->data].cs == 0 )
-	    {
-                xhci->rh.ports[resp->data].cs = 1;
-                xhci->rh.ports[resp->data].ccs = 1;
-                xhci->rh.ports[resp->data].cs_chg = 1;
-	    }
-        }
-        else
-            printk(KERN_WARNING "receive_usb_probe(): unexpected status %d for port %d\n",
-                   resp->status, resp->data);
-    }
-    else if ( resp->status < 0)
-        printk(KERN_WARNING "receive_usb_probe(): got error status %d\n", resp->status);
-
-    spin_unlock(&xhci->rh.port_state_lock);
-}
-
-static void receive_usb_io(usbif_response_t *resp)
-{
-        struct urb_priv *urbp = (struct urb_priv *)resp->id;
-        struct urb *urb = urbp->urb;
-
-        urb->actual_length = resp->length;
-	urb->status = resp->status;
-	urbp->status = resp->status;
-        urbp->in_progress = 0;
-
-        if( usb_pipetype(urb->pipe) == 0 ) /* ISO */
-        {
-                int i;
-              
-                /* Copy ISO schedule results back in. */
-
-                for ( i = 0; i < urb->number_of_packets; i++ )
-                {
-                        urb->iso_frame_desc[i].status
-			  = urbp->schedule[i].status;
-                        urb->iso_frame_desc[i].actual_length
-                                = urbp->schedule[i].length;
-                }
-                free_page((unsigned long)urbp->schedule);
-        }
-}
-
-static void xhci_drain_ring(void)
-{
-	struct list_head *tmp, *head;
-	usbif_front_ring_t *usb_ring = &xhci->usb_ring;
-	usbif_response_t *resp;
-        RING_IDX i, rp;
-
-        /* Walk the ring here to get responses, updating URBs to show what
-         * completed. */
-        
-        rp = usb_ring->sring->rsp_prod;
-        rmb(); /* Ensure we see queued requests up to 'rp'. */
-
-        /* Take items off the comms ring, taking care not to overflow. */
-        for ( i = usb_ring->rsp_cons; i != rp; i++ )
-        {
-            resp = RING_GET_RESPONSE(USBIF_RING, usb_ring, i);
-            
-            /* May need to deal with batching and with putting a ceiling on
-               the number dispatched for performance and anti-dos reasons */
-
-            xhci_show_resp(resp);
-
-            switch ( resp->operation )
-            {
-            case USBIF_OP_PROBE:
-                receive_usb_probe(resp);
-                break;
-                
-            case USBIF_OP_IO:
-                receive_usb_io(resp);
-                break;
-
-            case USBIF_OP_RESET:
-                receive_usb_reset(resp);
-                break;
-
-            default:
-                printk(KERN_WARNING
-                       "error: unknown USB io operation response [%d]\n",
-                       resp->operation);
-                break;
-            }
-        }
-
-        usb_ring->rsp_cons = i;
-
-	/* Walk the list of pending URB's to see which ones completed and do
-         * callbacks, etc. */
-	spin_lock(&xhci->urb_list_lock);
-	head = &xhci->urb_list;
-	tmp = head->next;
-	while (tmp != head) {
-                
-		struct urb *urb = list_entry(tmp, struct urb, urb_list);
-
-		tmp = tmp->next;
-
-		/* Checks the status and does all of the magic necessary */
-		xhci_transfer_result(xhci, urb);
-	}
-	spin_unlock(&xhci->urb_list_lock);
-
-	xhci_finish_completion();
-}
-
-
-static void xhci_interrupt(int irq, void *__xhci, struct pt_regs *regs)
-{
-        xhci_drain_ring();
-}
-
-static void free_xhci(struct xhci *xhci)
-{
-	kfree(xhci);
-}
+/******************************************************************************
+ * CONTROL PLANE FUNCTIONALITY
+ */
 
 /**
- * Initialise a new virtual root hub for a new USB device channel.
+ * alloc_xhci - initialise a new virtual root hub for a new USB device channel
  */
 static int alloc_xhci(void)
 {
@@ -1442,12 +1436,8 @@ static int alloc_xhci(void)
 
 	spin_lock_init(&xhci->frame_list_lock);
 
-	/* We need exactly one page (per XHCI specs), how convenient */
-	/* We assume that one page is atleast 4k (1024 frames * 4 bytes) */
-#if PAGE_SIZE < (4 * 1024)
-#error PAGE_SIZE is not atleast 4k
-#endif
 	bus = usb_alloc_bus(&xhci_device_operations);
+
 	if (!bus) {
 		err("unable to allocate bus");
 		goto err_alloc_bus;
@@ -1477,16 +1467,20 @@ static int alloc_xhci(void)
  * error exits:
  */
 err_alloc_root_hub:
+        usb_deregister_bus(xhci->bus);
 	usb_free_bus(xhci->bus);
 	xhci->bus = NULL;
 
 err_alloc_bus:
-	free_xhci(xhci);
+	kfree(xhci);
 
 err_alloc_xhci:
 	return retval;
 }
 
+/**
+ * usbif_status_change - deal with an incoming USB_INTERFACE_STATUS_ message
+ */
 static void usbif_status_change(usbif_fe_interface_status_changed_t *status)
 {
     ctrl_msg_t                   cmsg;
@@ -1551,8 +1545,8 @@ static void usbif_status_change(usbif_fe_interface_status_changed_t *status)
 	}
 
 	/* Allocate the appropriate USB bandwidth here...  Need to
-	* somehow know what the total available is thought to be so we
-	* can calculate the reservation correctly. */
+         * somehow know what the total available is thought to be so we
+         * can calculate the reservation correctly. */
  	usb_claim_bandwidth(xhci->rh.dev, xhci->rh.urb,
  			    1000 - xhci->bandwidth, 0);
 
@@ -1560,8 +1554,10 @@ static void usbif_status_change(usbif_fe_interface_status_changed_t *status)
                                SA_SAMPLE_RANDOM, "usbif", xhci)) )
                 printk(KERN_ALERT"usbfront request_irq failed (%ld)\n",rc);
 
-	DPRINTK(KERN_INFO __FILE__ ": USB XHCI: SHM at %p (0x%lx), EVTCHN %d IRQ %d\n",
-               xhci->usb_ring.sring, virt_to_machine(xhci->usbif), xhci->evtchn, xhci->irq);
+	DPRINTK(KERN_INFO __FILE__
+                ": USB XHCI: SHM at %p (0x%lx), EVTCHN %d IRQ %d\n",
+                xhci->usb_ring.sring, virt_to_machine(xhci->usbif),
+                xhci->evtchn, xhci->irq);
 
         xhci->state = USBIF_STATE_CONNECTED;
         
@@ -1574,7 +1570,9 @@ static void usbif_status_change(usbif_fe_interface_status_changed_t *status)
     }
 }
 
-
+/**
+ * usbif_ctrlif_rx - demux control messages by subtype
+ */
 static void usbif_ctrlif_rx(ctrl_msg_t *msg, unsigned long id)
 {
     switch ( msg->subtype )
@@ -1623,9 +1621,6 @@ static int __init xhci_hcd_init(void)
 	if (!xhci_up_cachep)
 		goto up_failed;
 
-        /* Lazily avoid unloading issues for now. ;-)*/
-	MOD_INC_USE_COUNT;
-
         /* Let the domain controller know we're here.  For now we wait until
          * connection, as for the block and net drivers.  This is only strictly
          * necessary if we're going to boot off a USB device. */
@@ -1661,29 +1656,14 @@ static int __init xhci_hcd_init(void)
 	return 0;
 
 up_failed:
-
 	if (errbuf)
 		kfree(errbuf);
 
 errbuf_failed:
-
 	return retval;
 }
 
-static void __exit xhci_hcd_cleanup(void) 
-{
-	if (kmem_cache_destroy(xhci_up_cachep))
-		printk(KERN_WARNING "xhci: not all urb_priv's were freed\n");
-
-//        release_xhci(); do some calls here
-
-
-	if (errbuf)
-		kfree(errbuf);
-}
-
 module_init(xhci_hcd_init);
-module_exit(xhci_hcd_cleanup);
 
 MODULE_AUTHOR(DRIVER_AUTHOR);
 MODULE_DESCRIPTION(DRIVER_DESC);
