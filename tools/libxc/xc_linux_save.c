@@ -898,7 +898,6 @@ printf("nrpfns according to suspend record is %ld\n", p_srec->nr_pfns );
 
     /* Canonicalise each GDT frame number. */
     for ( i = 0; i < ctxt.gdt_ents; i += 512 ) {
-       ctxt.gdt_frames[i], live_mfn_to_pfn_table[ctxt.gdt_frames[i]]);
         if ( !translate_mfn_to_pfn(&ctxt.gdt_frames[i]) ) {
             xcio_error(ioctxt, "GDT frame is not in range of pseudophys map");
             goto out;
