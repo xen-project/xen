@@ -1,0 +1,363 @@
+# Copyright (C) 2004 Tom Wilkie <tw275@cam.ac.uk>
+# Copyright (C) 2004 Mike Wray
+"""Client API for the HTTP interface on xend.
+Callable as a script - see main().
+
+This API is the 'control-plane' for xend.
+The 'data-plane' is done separately. For example, consoles
+are accessed via sockets on xend, but the list of consoles
+is accessible via this API.
+
+This one is similar to mikes, but works in an async fashion
+"""
+import sys
+import httplib
+import types
+from StringIO import StringIO
+import urlparse
+
+from xen.xend.encode import *
+from xen.xend.sxp import *
+from xen.xend.PrettyPrint import prettyprint
+
+from twisted.protocols.http import HTTPClient
+from twisted.internet.protocol import ClientCreator
+from twisted.internet.defer import Deferred
+from twisted.internet import reactor
+
+DEBUG = 0
+
+class XendRequest( HTTPClient ):
+    def __init__(self, deferred, urls):
+        self.urls  = urls
+        self.deferred = deferred
+
+    def connectionMade(self):
+        self.sendCommand('GET', self.urls[2])
+        self.sendHeader('Host', '%s:%d' % (self.urls[0], self.urls[1]) )
+        self.endHeaders()
+
+    def handleResponse(self, data):
+        self.deferred.callback( data )
+    
+def process_SXP( sexp ):
+    pin = Parser()
+    pin.input(sexp)
+    pin.input_eof()
+    return pin.get_val()
+    
+def xend_request(url, method, data=None):
+    """Make a request to xend.
+
+    url    xend request url
+    method http method: POST or GET
+    data   request argument data (dict)
+    """
+    urlinfo = urlparse.urlparse(url)
+    (uproto, ulocation, upath, uparam, uquery, ufrag) = urlinfo
+    (hdr, args) = encode_data(data)
+    if data and method == 'GET':
+        upath += '?' + args
+        args = None
+    if method == "POST" and upath.endswith('/'):
+        upath = upath[:-1]
+
+    deferred = Deferred() 
+
+    clientCreator = ClientCreator( reactor, XendRequest, deferred, (ulocation, 8000, upath) )
+    clientCreator.connectTCP( ulocation, 8000 )
+    
+    deferred.addCallback( process_SXP )
+    
+    return deferred
+    
+class XendError(RuntimeError):
+    pass
+
+class Foo(httplib.HTTPResponse):
+
+    def begin(self):
+        fin = self.fp
+        while(1):
+            buf = fin.readline()
+            print "***", buf
+            if buf == '':
+                print
+                sys.exit()
+
+
+def sxprio(sxpr):
+    """Convert an sxpr to a string.
+    """
+    io = StringIO()
+    sxp.show(sxpr, out=io)
+    print >> io
+    io.seek(0)
+    return io
+
+def fileof(val):
+    """Converter for passing configs.
+    Handles lists, files directly.
+    Assumes a string is a file name and passes its contents.
+    """
+    if isinstance(val, types.ListType):
+        return sxprio(val)
+    if isinstance(val, types.StringType):
+        return file(val)
+    if hasattr(val, 'readlines'):
+        return val
+
+# todo: need to sort of what urls/paths are using for objects.
+# e.g. for domains at the moment return '0'.
+# should probably return abs path w.r.t. server, e.g. /xend/domain/0.
+# As an arg, assume abs path is obj uri, otherwise just id.
+
+# Function to convert to full url: Xend.uri(path), e.g.
+# maps /xend/domain/0 to http://wray-m-3.hpl.hp.com:8000/xend/domain/0
+# And should accept urls for ids?
+
+def urljoin(location, root, prefix='', rest=''):
+    prefix = str(prefix)
+    rest = str(rest)
+    base = 'http://' + location + root + prefix
+    url = urlparse.urljoin(base, rest)
+    return url
+
+def nodeurl(location, root, id=''):
+    return urljoin(location, root, 'node/', id)
+
+def domainurl(location, root, id=''):
+    return urljoin(location, root, 'domain/', id)
+
+def consoleurl(location, root, id=''):
+    return urljoin(location, root, 'console/', id)
+
+def deviceurl(location, root, id=''):
+    return urljoin(location, root, 'device/', id)
+
+def vneturl(location, root, id=''):
+    return urljoin(location, root, 'vnet/', id)
+
+def eventurl(location, root, id=''):
+    return urljoin(location, root, 'event/', id)
+
+def xend_get(url, args=None):
+    """Make a xend request using GET.
+    Requests using GET are 'safe' and may be repeated without
+    nasty side-effects.
+    """
+    return xend_request(url, "GET", args)
+
+def xend_call(url, data):
+    """Make xend request using POST.
+    Requests using POST potentially cause side-effects and should
+    not be repeated unless it really is wanted to do the side
+    effect again.
+    """
+    return xend_request(url, "POST", data)
+
+class Xend:
+
+    """Default location of the xend server."""
+    SRV_DEFAULT = "localhost"
+
+    """Default path to the xend root on the server."""
+    ROOT_DEFAULT = "/xend/"
+
+    def __init__(self, srv=None, root=None):
+        self.bind(srv, root)
+
+    def bind(self, srv=None, root=None):
+        """Bind to a given server.
+
+        srv  server location (host:port)
+        root server xend root path
+        """
+        if srv is None: srv = self.SRV_DEFAULT
+        if root is None: root = self.ROOT_DEFAULT
+        if not root.endswith('/'): root += '/'
+        self.location = srv
+        self.root = root
+
+    def nodeurl(self, id=''):
+        return nodeurl(self.location, self.root, id)
+
+    def domainurl(self, id=''):
+        return domainurl(self.location, self.root, id)
+
+    def consoleurl(self, id=''):
+        return consoleurl(self.location, self.root, id)
+
+    def deviceurl(self, id=''):
+        return deviceurl(self.location, self.root, id)
+
+    def vneturl(self, id=''):
+        return vneturl(self.location, self.root, id)
+
+    def eventurl(self, id=''):
+        return eventurl(self.location, self.root, id)
+
+    def xend(self):
+        return xend_get(urljoin(self.location, self.root))
+
+    def xend_node(self):
+        return xend_get(self.nodeurl())
+
+    def xend_node_cpu_rrobin_slice_set(self, slice):
+        return xend_call(self.nodeurl(),
+                         {'op'      : 'cpu_rrobin_slice_set',
+                          'slice'   : slice })
+    
+    def xend_node_cpu_bvt_slice_set(self, ctx_allow):
+        return xend_call(self.nodeurl(),
+                         {'op'      : 'cpu_bvt_slice_set',
+                          'ctx_allow'   : ctx_allow })
+    
+    def xend_node_cpu_fbvt_slice_set(self, ctx_allow):
+        return xend_call(self.nodeurl(),
+                         {'op'      : 'cpu_fbvt_slice_set',
+                          'ctx_allow'   : ctx_allow })
+
+    def xend_domains(self):
+        return xend_get(self.domainurl())
+
+    def xend_domain_create(self, conf):
+        return xend_call(self.domainurl(),
+                         {'op'      : 'create',
+                          'config'  : fileof(conf) })
+
+    def xend_domain(self, id):
+        return xend_get(self.domainurl(id))
+
+    def xend_domain_unpause(self, id):
+        return xend_call(self.domainurl(id),
+                         {'op'      : 'unpause'})
+
+    def xend_domain_pause(self, id):
+        return xend_call(self.domainurl(id),
+                         {'op'      : 'pause'})
+
+    def xend_domain_shutdown(self, id, reason):
+        return xend_call(self.domainurl(id),
+                         {'op'      : 'shutdown',
+                          'reason'  : reason })
+
+    def xend_domain_destroy(self, id):
+        return xend_call(self.domainurl(id),
+                         {'op'      : 'destroy'})
+
+    def xend_domain_save(self, id, filename):
+        return xend_call(self.domainurl(id),
+                         {'op'      : 'save',
+                          'file'    : filename})
+
+    def xend_domain_restore(self, id, filename):
+        return xend_call(self.domainurl(id),
+                         {'op'      : 'restore',
+                          'file'    : filename })
+
+    def xend_domain_migrate(self, id, dst):
+        return xend_call(self.domainurl(id),
+                         {'op'      : 'migrate',
+                          'destination': dst})
+
+    def xend_domain_pincpu(self, id, cpu):
+        return xend_call(self.domainurl(id),
+                         {'op'      : 'pincpu',
+                          'cpu'     : cpu})
+
+    def xend_domain_cpu_bvt_set(self, id, mcuadv, warp, warpl, warpu):
+        return xend_call(self.domainurl(id),
+                         {'op'      : 'cpu_bvt_set',
+                          'mcuadv'  : mcuadv,
+                          'warp'    : warp,
+                          'warpl'   : warpl,
+                          'warpu'   : warpu })
+    
+    def xend_domain_cpu_fbvt_set(self, id, mcuadv, warp, warpl, warpu):
+        return xend_call(self.domainurl(id),
+                         {'op'      : 'cpu_fbvt_set',
+                          'mcuadv'  : mcuadv,
+                          'warp'    : warp,
+                          'warpl'   : warpl,
+                          'warpu'   : warpu })
+
+
+    def xend_domain_cpu_atropos_set(self, id, period, slice, latency, xtratime):
+        return xend_call(self.domainurl(id),
+                         {'op'      : 'cpu_atropos_set',
+                          'period'  : period,
+                          'slice'   : slice,
+                          'latency' : latency,
+                          'xtratime': xtratime })
+
+    def xend_domain_vifs(self, id):
+        return xend_get(self.domainurl(id),
+                        { 'op'      : 'vifs' })
+    
+    def xend_domain_vif_ip_add(self, id, vif, ipaddr):
+        return xend_call(self.domainurl(id),
+                         {'op'      : 'vif_ip_add',
+                          'vif'     : vif,
+                          'ip'      : ipaddr })
+        
+    def xend_domain_vbds(self, id):
+        return xend_get(self.domainurl(id),
+                        {'op'       : 'vbds'})
+
+    def xend_domain_vbd(self, id, vbd):
+        return xend_get(self.domainurl(id),
+                        {'op'       : 'vbd',
+                         'vbd'      : vbd})
+
+    def xend_consoles(self):
+        return xend_get(self.consoleurl())
+
+    def xend_console(self, id):
+        return xend_get(self.consoleurl(id))
+
+    def xend_vnets(self):
+        return xend_get(self.vneturl())
+
+    def xend_vnet_create(self, conf):
+        return xend_call(self.vneturl(),
+                         {'op': 'create', 'config': fileof(conf) })
+
+    def xend_vnet(self, id):
+        return xend_get(self.vneturl(id))
+
+    def xend_vnet_delete(self, id):
+        return xend_call(self.vneturl(id),
+                         {'op': 'delete'})
+
+    def xend_event_inject(self, sxpr):
+        val = xend_call(self.eventurl(),
+                        {'op': 'inject', 'event': fileof(sxpr) })
+    
+def main(argv):
+    """Call an API function:
+    
+    python XendClient.py fn args...
+
+    The leading 'xend_' on the function can be omitted.
+    Example:
+
+    > python XendClient.py domains
+    (domain 0 8)
+    > python XendClient.py domain 0
+    (domain (id 0) (name Domain-0) (memory 128))
+    """
+    server = Xend()
+    fn = argv[1]
+    if not fn.startswith('xend'):
+        fn = 'xend_' + fn
+    args = argv[2:]
+    deferred = getattr(server, fn)(*args)
+    deferred.addCallback( prettyprint )
+    reactor.run()
+    print
+
+if __name__ == "__main__":
+    main(sys.argv)
+else:    
+    server = Xend()
