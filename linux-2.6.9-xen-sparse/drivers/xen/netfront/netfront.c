@@ -45,6 +45,7 @@
 #include <asm-xen/evtchn.h>
 #include <asm-xen/ctrl_if.h>
 #include <asm-xen/xen-public/io/netif.h>
+#include <asm-xen/balloon.h>
 #include <asm/page.h>
 
 #include <net/arp.h>
@@ -409,6 +410,9 @@ static void network_alloc_rx_buffers(struct net_device *dev)
     rx_mcl[i].args[3] = 0;
     rx_mcl[i].args[4] = DOMID_SELF;
 
+    /* Tell the ballon driver what is going on. */
+    balloon_update_driver_allowance(i);
+
     /* Zap PTEs and give away pages in one big multicall. */
     (void)HYPERVISOR_multicall(rx_mcl, i+1);
 
@@ -557,14 +561,15 @@ static int netif_poll(struct net_device *dev, int *pbudget)
         /*
          * An error here is very odd. Usually indicates a backend bug,
          * low-memory condition, or that we didn't have reservation headroom.
-         * Whatever - print an error and queue the id again straight away.
          */
         if ( unlikely(rx->status <= 0) )
         {
-	    printk(KERN_ALERT "bad buffer on RX ring!(%d)\n", rx->status);
+            if ( net_ratelimit() )
+                printk(KERN_WARNING "Bad rx buffer (memory squeeze?).\n");
             np->rx->ring[MASK_NETIF_RX_IDX(np->rx->req_prod)].req.id = rx->id;
             wmb();
             np->rx->req_prod++;
+            work_done--;
             continue;
         }
 
@@ -594,6 +599,9 @@ static int netif_poll(struct net_device *dev, int *pbudget)
 
         __skb_queue_tail(&rxq, skb);
     }
+
+    /* Some pages are no longer absent... */
+    balloon_update_driver_allowance(-work_done);
 
     /* Do all the remapping work, and M->P updates, in one big hypercall. */
     if ( likely((mcl - rx_mcl) != 0) )

@@ -7,7 +7,6 @@
  */
 
 #include <linux/config.h>
-#include <linux/module.h>
 #include <linux/kernel.h>
 #include <linux/sched.h>
 #include <linux/slab.h>
@@ -213,23 +212,9 @@ static int __init privcmd_init(void)
 
     privcmd_intf = create_xen_proc_entry("privcmd", 0400);
     if ( privcmd_intf != NULL )
-    {
-        privcmd_intf->owner      = THIS_MODULE;
-        privcmd_intf->nlink      = 1;
-        privcmd_intf->proc_fops  = &privcmd_file_ops;
-    }
+        privcmd_intf->proc_fops = &privcmd_file_ops;
 
     return 0;
 }
 
-
-static void __exit privcmd_cleanup(void)
-{
-    if ( privcmd_intf == NULL ) return;
-    remove_xen_proc_entry("privcmd");
-    privcmd_intf = NULL;
-}
-
-
-module_init(privcmd_init);
-module_exit(privcmd_cleanup);
+__initcall(privcmd_init);

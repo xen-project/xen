@@ -444,4 +444,7 @@ BUILDIO(b,b,char)
 BUILDIO(w,w,short)
 BUILDIO(l,,int)
 
+/* We will be supplying our own /dev/mem implementation */
+#define ARCH_HAS_DEV_MEM
+
 #endif

@@ -275,7 +275,8 @@ void __init setup_arch(char **cmdline_p)
      * arch/xen/drivers/balloon/balloon.c
      */
     mem_param = parse_mem_cmdline(cmdline_p);
-    if (!mem_param) mem_param = xen_start_info.nr_pages;
+    if (mem_param < xen_start_info.nr_pages)
+        mem_param = xen_start_info.nr_pages;
 
 #define PFN_UP(x)	(((x) + PAGE_SIZE-1) >> PAGE_SHIFT)
 #define PFN_DOWN(x)	((x) >> PAGE_SHIFT)
@@ -303,6 +304,7 @@ void __init setup_arch(char **cmdline_p)
             printk(KERN_WARNING "Use a PAE enabled kernel.\n");
         else
             printk(KERN_WARNING "Use a HIGHMEM enabled kernel.\n");
+        max_pfn = lmax_low_pfn;
 #else /* !CONFIG_HIGHMEM */
 #ifndef CONFIG_X86_PAE
         if (max_pfn > MAX_NONPAE_PFN) {
@@ -350,8 +352,6 @@ void __init setup_arch(char **cmdline_p)
      */
     max_low_pfn = lmax_low_pfn;
 
-
-
 #ifdef CONFIG_BLK_DEV_INITRD
     if ( xen_start_info.mod_start != 0 )
     {
@@ -374,6 +374,20 @@ void __init setup_arch(char **cmdline_p)
 #endif
 
     paging_init();
+
+    /* Make sure we have a large enough P->M table. */
+    if ( max_pfn > xen_start_info.nr_pages )
+    {
+        phys_to_machine_mapping = alloc_bootmem_low_pages(
+            max_pfn * sizeof(unsigned long));
+        memset(phys_to_machine_mapping, ~0, max_pfn * sizeof(unsigned long));
+        memcpy(phys_to_machine_mapping,
+               (unsigned long *)xen_start_info.mfn_list,
+               xen_start_info.nr_pages * sizeof(unsigned long));
+        free_bootmem(__pa(xen_start_info.mfn_list), 
+                     PFN_PHYS(PFN_UP(xen_start_info.nr_pages *
+                                     sizeof(unsigned long))));
+    }
 
     pfn_to_mfn_frame_list = alloc_bootmem_low_pages(PAGE_SIZE);
     for ( i=0, j=0; i < max_pfn; i+=(PAGE_SIZE/sizeof(unsigned long)), j++ )

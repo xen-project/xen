@@ -3,22 +3,18 @@ XEN_ROOT=../..
 include $(XEN_ROOT)/tools/Make.defs
 
 CC         = gcc
-CFLAGS     = -Wall -O3 
+CFLAGS     = -Wall -Werror -O3 
 
 INCLUDES += -I $(XEN_XC)
 INCLUDES += -I $(XEN_LIBXC)
-INCLUDES += -I $(XEN_LIBXUTIL)
-
-CFLAGS += $(INCLUDES)
+CFLAGS   += $(INCLUDES)
 
 HDRS     = $(wildcard *.h)
-SRCS     = $(wildcard *.c)
-OBJS     = $(patsubst %.c,%.o,$(SRCS))
 
-TARGETS  = 
+TARGETS  = xenperf
 
 INSTALL_BIN  = $(TARGETS) xencons
-INSTALL_SBIN = netfix xm xend xensv
+INSTALL_SBIN = netfix xm xend xensv xenperf
 
 all: $(TARGETS)
 	$(MAKE) -C miniterm
@@ -32,7 +28,7 @@ install: all
 
 clean:
 	$(RM) *.o $(TARGETS) *~
-	$(MAKE) -C miniterm clean	
+	$(MAKE) -C miniterm clean
 
 %: %.c $(HDRS) Makefile
-	$(CC) $(CFLAGS) -o $@ $<
+	$(CC) $(CFLAGS) -o $@ $< -L$(XEN_LIBXC) -lxc -L$(XEN_LIBXUTIL) -lxutil

@@ -19,9 +19,29 @@ export INSTALL_DIR
 include buildconfigs/Rules.mk
 
 .PHONY:	all dist install xen tools kernels docs world clean mkpatches mrproper
-.PHONY:	kbuild kdelete kclean
+.PHONY:	kbuild kdelete kclean install-tools install-xen install-docs
+.PHONY: install-kernels
 
 all: dist
+
+# install everything into the standard system directories
+# NB: install explicitly does not check that everything is up to date!
+install: install-tools install-xen install-kernels install-docs
+
+install-xen:
+	$(MAKE) -C xen install
+
+install-tools:
+	$(MAKE) -C tools install
+
+install-kernels:
+	$(shell cp -a $(INSTALL_DIR)/boot/* /boot/)
+	$(shell cp -a $(INSTALL_DIR)/lib/modules/* /lib/modules/)
+	$(shell cp -dR $(INSTALL_DIR)/boot/*$(LINUX_VER)* $(prefix)/boot/)
+	$(shell cp -dR $(INSTALL_DIR)/lib/modules/* $(prefix)/lib/modules/)
+
+install-docs:
+	sh ./docs/check_pkgs && $(MAKE) -C docs install || true
 
 # build and install everything into local dist directory
 dist: xen tools kernels docs
@@ -30,17 +50,6 @@ dist: xen tools kernels docs
 	install -m0755 ./install.sh $(DIST_DIR)
 	mkdir -p $(DIST_DIR)/check
 	install -m0755 tools/check/chk tools/check/check_* $(DIST_DIR)/check
-
-# install everything into the standard system directories
-# NB: install explicitly does not check that everything is up to date!
-install: 
-	$(MAKE) -C xen install
-	$(MAKE) -C tools install
-	$(shell cp -a $(INSTALL_DIR)/boot/* /boot/)
-	$(shell cp -a $(INSTALL_DIR)/lib/modules/* /lib/modules/)
-	sh ./docs/check_pkgs && $(MAKE) -C docs install || true
-	$(shell cp -dR $(INSTALL_DIR)/boot/*$(LINUX_VER)* $(prefix)/boot/)
-	$(shell cp -dR $(INSTALL_DIR)/lib/modules/* $(prefix)/lib/modules/)
 
 xen:
 	$(MAKE) prefix=$(INSTALL_DIR) dist=yes -C xen install

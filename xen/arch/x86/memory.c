@@ -1302,9 +1302,6 @@ int do_mmu_update(
     u32 type_info;
     domid_t domid;
 
-    perfc_incrc(calls_to_mmu_update); 
-    perfc_addc(num_page_updates, count);
-
     LOCK_BIGLOCK(d);
 
     cleanup_writable_pagetable(d, PTWR_CLEANUP_ACTIVE | PTWR_CLEANUP_INACTIVE);
@@ -1335,6 +1332,9 @@ int do_mmu_update(
             goto out;
         }
     }
+
+    perfc_incrc(calls_to_mmu_update); 
+    perfc_addc(num_page_updates, count);
 
     if ( unlikely(!array_access_ok(VERIFY_READ, ureqs, count, sizeof(req))) )
     {

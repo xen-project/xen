@@ -63,6 +63,7 @@ tools/check/.*
 tools/libxc/xen/*
 tools/misc/miniterm/miniterm
 tools/misc/xen_cpuperf
+tools/misc/xenperf
 tools/vnet/gc
 tools/vnet/gc*/*
 tools/vnet/vnet-module/*.ko

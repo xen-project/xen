@@ -11,7 +11,7 @@ from xen.xend import PrettyPrint
 from xen.xend import sxp
 from xen.xend.XendClient import XendError, server
 from xen.xend.XendClient import main as xend_client_main
-from xen.xm import create, destroy, migrate, shutdown
+from xen.xm import create, destroy, migrate, shutdown, sysrq
 from xen.xm.opts import *
 
 class Group:
@@ -400,6 +400,19 @@ class ProgShutdown(Prog):
         shutdown.main(args)
 
 xm.prog(ProgShutdown)
+
+class ProgSysrq(Prog):
+    group = 'domain'
+    name = "sysrq"
+    info = """Send a sysrq to a domain."""
+
+    def help(self, args):
+        sysrq.main([args[0], '-h'])
+    
+    def main(self, args):
+        sysrq.main(args)
+
+xm.prog(ProgSysrq)
 
 class ProgPause(Prog):
     group = 'domain'
