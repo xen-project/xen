@@ -302,7 +302,7 @@ class ProgMigrate(Prog):
     info = """Migrate a domain to another machine."""
 
     def help(self, args):
-        migrate.help(arg)
+        migrate.help(args)
     
     def main(self, args):
         migrate.main(args)
