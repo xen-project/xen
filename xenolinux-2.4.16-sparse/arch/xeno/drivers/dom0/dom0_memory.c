@@ -60,8 +60,6 @@ static inline void direct_remappte_range(pte_t * pte, unsigned long address, uns
 		pte_t oldpage;
 		oldpage = ptep_get_and_clear(pte);
         
-        printk(KERN_ALERT "bd240 debug: %lx - %lx\n", address, phys_addr);
-
  		direct_set_pte(pte, direct_mk_pte_phys(phys_addr, prot));
 
 		forget_pte(oldpage);
