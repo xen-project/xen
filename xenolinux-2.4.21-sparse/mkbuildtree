@@ -169,7 +169,6 @@ ln -sf ../asm-i386/ucontext.h
 ln -sf ../asm-i386/unaligned.h
 ln -sf ../asm-i386/unistd.h 
 ln -sf ../asm-i386/user.h 
-ln -sf ../asm-i386/vga.h 
 ln -sf ../asm-i386/xor.h 
 
 cd ../../arch/xeno/kernel

@@ -26,7 +26,8 @@
 // the notion of privileges for guest os's (e.g. console privilege) has not been explored yet
 // so this will do for now
 
-#define CONFIG_OUTPUT_CONSOLE 1 // but see also opt_console
+#define CONFIG_OUTPUT_CONSOLE 1 //  XXX You need to undef this
+				//  but see also opt_console
 #define CONFIG_OUTPUT_SERIAL  1
 
 extern unsigned int opt_console;

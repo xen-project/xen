@@ -47,8 +47,12 @@ enum fixed_addresses {
 	FIX_NETRING1_BASE,
 	FIX_NETRING2_BASE,
 	FIX_NETRING3_BASE,
+#define NR_FIX_BTMAPS   8  /* 32KB For the Dom0 VGA Console */
+        FIX_BTMAP_END,
+        FIX_BTMAP_BEGIN = FIX_BTMAP_END + NR_FIX_BTMAPS - 1,
+
 	__end_of_permanent_fixed_addresses,
-	__end_of_fixed_addresses
+	__end_of_fixed_addresses = __end_of_permanent_fixed_addresses
 };
 
 extern void __set_fixmap (enum fixed_addresses idx,

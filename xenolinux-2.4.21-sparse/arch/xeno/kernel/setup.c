@@ -58,6 +58,8 @@ struct cpuinfo_x86 boot_cpu_data = { 0, 0, 0, 0, -1, 1, 0, 0, -1 };
 
 unsigned long mmu_cr4_features;
 
+unsigned char * vgacon_mmap;
+
 /*
  * Bus types ..
  */

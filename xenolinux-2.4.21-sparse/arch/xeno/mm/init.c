@@ -113,10 +113,7 @@ static inline void set_pte_phys (unsigned long vaddr,
 		return;
 	}
 	pte = pte_offset(pmd, vaddr);
-#if 0 // XXX Xen ?????
-	/* <phys,flags> stored as-is, to permit clearing entries */
-	set_pte(pte, mk_pte_phys(phys, flags));
-#endif
+
 	if (pte_val(*pte))
 		pte_ERROR(*pte);
 

@@ -677,7 +677,7 @@ int setup_guestos(struct task_struct *p, dom0_newdomain_t *params,
     // 1) its privileged (need iopl right now)
     // 2) its the owner of the console (and therefore will get kbd/mouse events)
     // 3) xen hasnt tried to touch the console (see console.h)
-    virt_startinfo_address->flags |= (IS_PRIV(p) && CONSOLE_ISOWNER(p) && opt_console == 0) ? SIF_CONSOLE : 0;
+    virt_startinfo_address->flags |= (IS_PRIV(p) && CONSOLE_ISOWNER(p) ) ? SIF_CONSOLE : 0;
 
     if ( initrd_len )
     {
@@ -717,6 +717,14 @@ int setup_guestos(struct task_struct *p, dom0_newdomain_t *params,
         }
     }
     *dst = '\0';
+
+    /* If this guy's getting the console we'd better let go */
+    if ( virt_startinfo_address->flags & SIF_CONSOLE )
+    {
+        // should reset the console, but seems to work anyhow...
+        opt_console = 0;
+    }  
+
 
     /* Reinstate the caller's page tables. */
     __write_cr3_counted(pagetable_val(current->mm.pagetable));

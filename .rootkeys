@@ -583,11 +583,13 @@
 3e5a4e68uJz-xI0IBVMD7xRLQKJDFg xenolinux-2.4.21-sparse/include/asm-xeno/segment.h
 3e5a4e68Nfdh6QcOKUTGCaYkf2LmYA xenolinux-2.4.21-sparse/include/asm-xeno/smp.h
 3e5a4e68mTr0zcp9SXDbnd-XLrrfxw xenolinux-2.4.21-sparse/include/asm-xeno/system.h
+3f1056a9L_kqHcFheV00KbKBzv9j5w xenolinux-2.4.21-sparse/include/asm-xeno/vga.h
 3f056927gMHl7mWB89rb73JahbhQIA xenolinux-2.4.21-sparse/include/linux/blk.h
 3e5a4e68WLX3B8owTvktP3HHOtznPQ xenolinux-2.4.21-sparse/include/linux/major.h
 3e5a4e686V0nioX2ZpFf056sgvdiQw xenolinux-2.4.21-sparse/include/linux/sunrpc/debug.h
 3e5a4e68W_hpMlM3u_-QOKMp3gzcwQ xenolinux-2.4.21-sparse/init/do_mounts.c
 3e5a4e68TJJavrunYwTAnLRSBxSYqQ xenolinux-2.4.21-sparse/kernel/panic.c
+3f1056a9LXNTgSzITNh1mb-MIKV1Ng xenolinux-2.4.21-sparse/kernel/printk.c
 3eba8f878XjouY21EkQBXwYBsPsipQ xenolinux-2.4.21-sparse/lndir-rel
 3e6e7c1efbQe93xCvOpOVCnXTMmQ5w xenolinux-2.4.21-sparse/mkbuildtree
 3e5a4e68GxCIaFH4sy01v1wjapetaA xenolinux-2.4.21-sparse/mm/memory.c
