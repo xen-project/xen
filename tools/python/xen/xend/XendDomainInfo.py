@@ -9,6 +9,7 @@ Author: Mike Wray <mike.wray@hpl.hp.com>
 """
 
 import string
+import types
 import re
 import sys
 import os
@@ -821,7 +822,7 @@ def vm_dev_vbd(vm, val, index):
     return defer
 
 def parse_pci(val):
-    if isinstance(val, StringType):
+    if isinstance(val, types.StringType):
         radix = 10
         if val.startswith('0x') or val.startswith('0X'):
             radix = 16
