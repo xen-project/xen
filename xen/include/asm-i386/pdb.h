@@ -1,6 +1,7 @@
 
 /*
  * pervasive debugger
+ * www.cl.cam.ac.uk/netos/pdb
  *
  * alex ho
  * 2004
@@ -18,6 +19,9 @@
 extern int pdb_initialized;
 extern int pdb_com_port;
 extern int pdb_high_bit;
+extern int pdb_page_fault_possible;
+extern int pdb_page_fault_scratch;
+extern int pdb_page_fault;
 
 extern void initialize_pdb(void);
 

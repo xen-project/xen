@@ -386,6 +386,15 @@ asmlinkage void do_page_fault(struct pt_regs *regs, long error_code)
 #endif
     }
 
+    if (pdb_page_fault_possible)
+    {
+        pdb_page_fault = 1;
+	/* make eax & edx valid to complete the instruction */
+	regs->eax = (long)&pdb_page_fault_scratch;
+	regs->edx = (long)&pdb_page_fault_scratch;
+	return;
+    }
+
     show_registers(regs);
     panic("CPU%d FATAL PAGE FAULT\n"
           "[error_code=%08x]\n"
