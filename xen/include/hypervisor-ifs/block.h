@@ -21,6 +21,10 @@
 #define XENDEV_SCSI           (2 << XENDEV_TYPE_SHIFT)
 #define XENDEV_VIRTUAL        (3 << XENDEV_TYPE_SHIFT)
 
+#define IS_IDE_XENDEV(_d)     (((_d) & XENDEV_TYPE_MASK) == XENDEV_IDE)
+#define IS_SCSI_XENDEV(_d)    (((_d) & XENDEV_TYPE_MASK) == XENDEV_SCSI)
+#define IS_VIRTUAL_XENDEV(_d) (((_d) & XENDEV_TYPE_MASK) == XENDEV_VIRTUAL)
+
 #define MK_IDE_XENDEV(_i)     ((_i) | XENDEV_IDE)
 #define MK_SCSI_XENDEV(_i)    ((_i) | XENDEV_SCSI)
 #define MK_VIRTUAL_XENDEV(_i) ((_i) | XENDEV_VIRTUAL)
@@ -90,19 +94,15 @@ typedef struct blk_ring_st
 
 #define XEN_MAX_DISK_COUNT 100
 
-#define XEN_DISK_IDE  1
-#define XEN_DISK_SCSI 2
-#define XEN_DISK_VIRTUAL 3                                            /* vhd */
-
-typedef struct xen_disk                                     /* physical disk */
+typedef struct xen_disk
 {
-  int           type;                                           /* disk type */
-  unsigned long capacity;
+    unsigned short device;
+    unsigned long  capacity;
 } xen_disk_t;
 
 typedef struct xen_disk_info
 {
-  int         count;            /* number of xen_disk_t structures to follow */
+  int         count;
   xen_disk_t  disks[XEN_MAX_DISK_COUNT];
 } xen_disk_info_t;
 

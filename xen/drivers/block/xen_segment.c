@@ -97,27 +97,28 @@ int xen_segment_map_request(
  *
  * return a list of segments to the guestos
  */
-void xen_segment_probe (xen_disk_info_t *raw_xdi, int *count)
+void xen_segment_probe(struct task_struct *p, xen_disk_info_t *raw_xdi)
 {
     int loop, i;
     xen_disk_info_t *xdi = map_domain_mem(virt_to_phys(raw_xdi));
 
-    for (loop = 0; loop < XEN_MAX_SEGMENTS; loop++ )
+    for ( loop = 0; loop < XEN_MAX_SEGMENTS; loop++ )
     {
-        if (xsegments[loop].mode != XEN_SEGMENT_UNUSED)
+        if ( (xsegments[loop].mode == XEN_SEGMENT_UNUSED) ||
+             (xsegments[loop].domain != p->domain) )
+            continue;
+
+        xdi->disks[xdi->count].device = 
+            MK_VIRTUAL_XENDEV(xsegments[loop].segment_number);
+        for ( i = 0; i < xsegments[loop].num_extents; i++ )
         {
-            xdi->disks[xdi->count].type = XEN_DISK_VIRTUAL;
-            for (i = 0; i < xsegments[loop].num_extents; i++)
-            {
-                xdi->disks[xdi->count].capacity += 
-                    xsegments[loop].extents[i].size;
-            }
-            xdi->count++;
+            xdi->disks[xdi->count].capacity += 
+                xsegments[loop].extents[i].size;
         }
+        xdi->count++;
     }
 
     unmap_domain_mem(xdi);
-    return;
 }
 
 /*
@@ -132,14 +133,13 @@ void xen_refresh_segment_list (struct task_struct *p)
 
     for (loop = 0; loop < XEN_MAX_SEGMENTS; loop++)
     {
-        if (xsegments[loop].mode != XEN_SEGMENT_UNUSED &&
-            xsegments[loop].domain == p->domain)
-        {
-            p->segment_list[xsegments[loop].segment_number] = &xsegments[loop];
-            p->segment_count++;
-        }
+        if ( (xsegments[loop].mode == XEN_SEGMENT_UNUSED) ||
+             (xsegments[loop].domain != p->domain) )
+            continue;
+
+        p->segment_list[xsegments[loop].segment_number] = &xsegments[loop];
+        p->segment_count++;
     }
-    return;
 }
 
 /*

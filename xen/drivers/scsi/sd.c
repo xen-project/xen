@@ -1325,7 +1325,7 @@ void scsi_probe_devices(xen_disk_info_t *xdi)
     {
         if ( sd->device == NULL ) continue;
 
-        xen_xdi->disks[xen_xdi->count].type = XEN_DISK_SCSI; 
+        xen_xdi->disks[xen_xdi->count].device   = MK_SCSI_XENDEV(i);
         xen_xdi->disks[xen_xdi->count].capacity = sd->capacity; 
         xen_xdi->count++; 
                 

@@ -90,13 +90,12 @@ int __init xlseg_init(void)
      */
     blk_queue_headactive(BLK_DEFAULT_QUEUE(XLVIRT_MAJOR), 0);
 
-
-    /* Count number of virtual devices installed in the system. */
-    units = 0;
-    for ( i = 0; i < xdi->count; i++ )
-        if ( xdi->disks[i].type == XEN_DISK_VIRTUAL ) units++;
-
-    if ( units == 0 ) return 0;
+    /*
+     * We may register up to 16 devices in a sparse identifier space.
+     * Unlike with IDE and SCSI, we always register a gendisk, as new
+     * virtual devices may get allocate dto us later on.
+     */
+    units = 16;
 
     /* Construct an appropriate gendisk structure. */
     minors    = units * (1<<VIRT_PARTN_BITS);
@@ -122,10 +121,14 @@ int __init xlseg_init(void)
     add_gendisk(gd);
 
     /* Now register each disk in turn. */
-    disk = 0;
     for ( i = 0; i < xdi->count; i++ )
     {
-        if ( xdi->disks[i].type != XEN_DISK_VIRTUAL ) continue;
+        disk = xdi->disks[i].device & XENDEV_IDX_MASK;
+
+        /* We can use the first 16 IDE devices. */
+        if ( !IS_VIRTUAL_XENDEV(xdi->disks[i].device) || (disk >= 16) )
+            continue;
+
         ((xl_disk_t *)gd->real_devices)[disk].capacity =
             xdi->disks[i].capacity;
         register_disk(gd, 
@@ -133,7 +136,6 @@ int __init xlseg_init(void)
                       1<<VIRT_PARTN_BITS, 
                       &xlsegment_block_fops, 
                       xdi->disks[i].capacity);
-        disk++;
     }
 
     printk(KERN_ALERT 

@@ -26,7 +26,8 @@ void ide_probe_devices(xen_disk_info_t* xdi)
             if ( !drive->present ) continue;
             
             capacity = current_capacity(drive);
-            xen_xdi->disks[xen_xdi->count].type = XEN_DISK_IDE;
+            xen_xdi->disks[xen_xdi->count].device =
+                MK_IDE_XENDEV((loop * MAX_DRIVES) + unit);
             xen_xdi->disks[xen_xdi->count].capacity = capacity;
             xen_xdi->count++;
 

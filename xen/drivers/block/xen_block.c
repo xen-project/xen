@@ -482,7 +482,8 @@ static void dispatch_probe_blk(struct task_struct *p, int index)
 
 static void dispatch_probe_seg(struct task_struct *p, int index)
 {
-    extern void xen_segment_probe(xen_disk_info_t *xdi);
+    extern void xen_segment_probe(struct task_struct *, xen_disk_info_t *);
+
     blk_ring_t *blk_ring = p->blk_ring_base;
     xen_disk_info_t *xdi;
     unsigned long flags, buffer;
@@ -502,7 +503,7 @@ static void dispatch_probe_seg(struct task_struct *p, int index)
     spin_unlock_irqrestore(&p->page_lock, flags);
 
     xdi = phys_to_virt(buffer);
-    xen_segment_probe(xdi);
+    xen_segment_probe(p, xdi);
 
     unlock_buffer(p, buffer, sizeof(xen_disk_info_t), 1);
 

@@ -74,12 +74,15 @@ int xlscsi_init(xen_disk_info_t *xdi)
      */
     blk_queue_headactive(BLK_DEFAULT_QUEUE(XLSCSI_MAJOR), 0);
 
-    /* Count number of SCSI devices installed in the system. */
+    /* If we don't have any usable SCSI devices we may as well bail now. */
     units = 0;
     for ( i = 0; i < xdi->count; i++ )
-        if ( xdi->disks[i].type == XEN_DISK_SCSI ) units++;
-
+        if ( IS_SCSI_XENDEV(xdi->disks[i].device) &&
+             ((xdi->disks[i].device & XENDEV_IDX_MASK) < 16) ) units++;
     if ( units == 0 ) return 0;
+
+    /* We may register up to 16 devices in a sparse identifier space. */
+    units = 16;
 
     /* Construct an appropriate gendisk structure. */
     minors    = units * (1<<SCSI_PARTN_BITS);
@@ -105,10 +108,13 @@ int xlscsi_init(xen_disk_info_t *xdi)
     add_gendisk(gd);
 
     /* Now register each disk in turn. */
-    disk = 0;
     for ( i = 0; i < xdi->count; i++ )
     {
-        if ( xdi->disks[i].type != XEN_DISK_SCSI ) continue;
+        disk = xdi->disks[i].device & XENDEV_IDX_MASK;
+
+        /* We can use the first 16 IDE devices. */
+        if ( !IS_SCSI_XENDEV(xdi->disks[i].device) || (disk >= 16) ) continue;
+
         ((xl_disk_t *)gd->real_devices)[disk].capacity =
             xdi->disks[i].capacity;
         register_disk(gd,
@@ -116,7 +122,6 @@ int xlscsi_init(xen_disk_info_t *xdi)
                       1<<SCSI_PARTN_BITS, 
                       &xlscsi_block_fops, 
                       xdi->disks[i].capacity);
-        disk++;
     }
    
     printk(KERN_ALERT 
