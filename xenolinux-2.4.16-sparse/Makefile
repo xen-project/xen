@@ -9,6 +9,9 @@ HW_ARCH := $(shell uname -m | sed -e s/i.86/i386/ -e s/sun4u/sparc64/ -e s/arm.*
 ifndef ARCH
 ARCH := $(HW_ARCH)
 endif
+
+ARCH=xeno
+
 KERNELPATH=kernel-$(shell echo $(KERNELRELEASE) | sed -e "s/-//")
 
 CONFIG_SHELL := $(shell if [ -x "$$BASH" ]; then echo $$BASH; \
