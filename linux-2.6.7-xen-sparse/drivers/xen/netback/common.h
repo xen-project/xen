@@ -17,7 +17,14 @@
 #include <asm-xen/ctrl_if.h>
 #include <asm/io.h>
 #include <asm/pgalloc.h>
+
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,0)
 #include <asm-xen/netif.h>
+#else
+#include "../netif.h"
+#define irqreturn_t void
+#define IRQ_HANDLED
+#endif
 
 #if 0
 #define ASSERT(_p) \

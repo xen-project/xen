@@ -239,3 +239,9 @@ ln -sf ../../../../${LINUX_26}/drivers/xen/privcmd/privcmd.c core.c
 
 cd ${AD}/arch/xen/drivers/netif/frontend
 ln -sf ../../../../../${LINUX_26}/drivers/xen/netfront/netfront.c main.c
+
+cd ${AD}/arch/xen/drivers/netif/backend
+ln -sf ../../../../../${LINUX_26}/drivers/xen/netback/common.h
+ln -sf ../../../../../${LINUX_26}/drivers/xen/netback/control.c
+ln -sf ../../../../../${LINUX_26}/drivers/xen/netback/interface.c
+ln -sf ../../../../../${LINUX_26}/drivers/xen/netback/netback.c main.c
