@@ -74,8 +74,10 @@ static blkif_response_t blkif_control_rsp;
 
 static blkif_front_ring_t blk_ring;
 
+#define BLK_RING_SIZE __RING_SIZE((blkif_sring_t *)0, PAGE_SIZE)
+
 unsigned long rec_ring_free;
-blkif_request_t rec_ring[RING_SIZE(&blk_ring)];
+blkif_request_t rec_ring[BLK_RING_SIZE];
 
 static int recovery = 0;           /* "Recovery in progress" flag.  Protected
                                     * by the blkif_io_lock */
@@ -90,8 +92,7 @@ static inline int GET_ID_FROM_FREELIST( void )
 {
     unsigned long free = rec_ring_free;
 
-    if ( free > RING_SIZE(&blk_ring) )
-        BUG();
+    BUG_ON(free > BLK_RING_SIZE);
 
     rec_ring_free = rec_ring[free].id;
 
@@ -522,8 +523,7 @@ static void kick_pending_request_queues(void)
 {
     /* We kick pending request queues if the ring is reasonably empty. */
     if ( (nr_pending != 0) && 
-         (RING_PENDING_REQUESTS(&blk_ring) < 
-          (RING_SIZE(&blk_ring) >> 1)) )
+         (RING_PENDING_REQUESTS(&blk_ring) < (BLK_RING_SIZE >> 1)) )
     {
         /* Attempt to drain the queue, but bail if the ring becomes full. */
         while ( (nr_pending != 0) && !RING_FULL(&blk_ring) )
@@ -1138,7 +1138,7 @@ static void blkif_disconnect(void)
     
     sring = (blkif_sring_t *)__get_free_page(GFP_KERNEL);
     SHARED_RING_INIT(sring);
-    FRONT_RING_INIT(&blk_ring, sring);
+    FRONT_RING_INIT(&blk_ring, sring, PAGE_SIZE);
     blkif_state  = BLKIF_STATE_DISCONNECTED;
     blkif_send_interface_connect();
 }
@@ -1158,7 +1158,7 @@ static void blkif_recover(void)
      * This will need to be fixed once we have barriers */
 
     /* Stage 1 : Find active and move to safety. */
-    for ( i = 0; i < RING_SIZE(&blk_ring); i++ )
+    for ( i = 0; i < BLK_RING_SIZE; i++ )
     {
         if ( rec_ring[i].id >= PAGE_OFFSET )
         {
@@ -1179,10 +1179,10 @@ static void blkif_recover(void)
     }
 
     /* Stage 3 : Set up free list. */
-    for ( ; i < RING_SIZE(&blk_ring); i++ )
+    for ( ; i < BLK_RING_SIZE; i++ )
         rec_ring[i].id = i+1;
     rec_ring_free = blk_ring.req_prod_pvt;
-    rec_ring[RING_SIZE(&blk_ring)-1].id = 0x0fffffff;
+    rec_ring[BLK_RING_SIZE-1].id = 0x0fffffff;
 
     /* blk_ring->req_prod will be set when we flush_requests().*/
     wmb();
@@ -1369,9 +1369,9 @@ int __init xlblk_init(void)
     printk(KERN_INFO "xen_blk: Initialising virtual block device driver\n");
 
     rec_ring_free = 0;
-    for ( i = 0; i < RING_SIZE(&blk_ring); i++ )
+    for ( i = 0; i < BLK_RING_SIZE; i++ )
         rec_ring[i].id = i+1;
-    rec_ring[RING_SIZE(&blk_ring)-1].id = 0x0fffffff;
+    rec_ring[BLK_RING_SIZE-1].id = 0x0fffffff;
 
     (void)ctrl_if_register_receiver(CMSG_BLKIF_FE, blkif_ctrlif_rx,
                                     CALLBACK_IN_BLOCKING_CONTEXT);

@@ -229,7 +229,7 @@ void blkif_ptfe_connect(blkif_be_connect_t *connect)
 
     sring = (blkif_sring_t *)vma->addr;
     SHARED_RING_INIT(sring);
-    BACK_RING_INIT(&blkif->blk_ring, sring);
+    BACK_RING_INIT(&blkif->blk_ring, sring, PAGE_SIZE);
     
     blkif->evtchn        = evtchn;
     blkif->irq           = bind_evtchn_to_irq(evtchn);
@@ -302,7 +302,7 @@ static void blkif_ptbe_disconnect(void)
     
     sring = (blkif_sring_t *)__get_free_page(GFP_KERNEL);
     SHARED_RING_INIT(sring);
-    FRONT_RING_INIT(&blktap_be_ring, sring);
+    FRONT_RING_INIT(&blktap_be_ring, sring, PAGE_SIZE);
     blktap_be_state  = BLKIF_STATE_DISCONNECTED;
     DPRINTK("Blkif-Passthrough-BE is now DISCONNECTED.\n");
     blkif_ptbe_send_interface_connect();

@@ -1549,7 +1549,7 @@ static void usbif_status_change(usbif_fe_interface_status_changed_t *status)
         /* Move from CLOSED to DISCONNECTED state. */
         sring = (usbif_sring_t *)__get_free_page(GFP_KERNEL);
         SHARED_RING_INIT(sring);
-        FRONT_RING_INIT(&xhci->usb_ring, sring);
+        FRONT_RING_INIT(&xhci->usb_ring, sring, PAGE_SIZE);
         xhci->state  = USBIF_STATE_DISCONNECTED;
 
         /* Construct an interface-CONNECT message for the domain controller. */

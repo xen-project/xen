@@ -195,7 +195,7 @@ void usbif_connect(usbif_be_connect_t *connect)
 
     sring = (usbif_sring_t *)vma->addr;
     SHARED_RING_INIT(sring);
-    BACK_RING_INIT(&up->usb_ring, sring);
+    BACK_RING_INIT(&up->usb_ring, sring, PAGE_SIZE);
 
     up->evtchn        = evtchn;
     up->irq           = bind_evtchn_to_irq(evtchn);

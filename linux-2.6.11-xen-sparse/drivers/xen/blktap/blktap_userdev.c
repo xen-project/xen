@@ -87,8 +87,7 @@ static int blktap_open(struct inode *inode, struct file *filp)
     SetPageReserved(virt_to_page(csring));
     
     SHARED_RING_INIT(csring);
-    FRONT_RING_INIT(&blktap_uctrl_ring, csring);
-
+    FRONT_RING_INIT(&blktap_uctrl_ring, csring, PAGE_SIZE);
 
     /* Allocate the fe ring. */
     sring = (blkif_sring_t *)get_zeroed_page(GFP_KERNEL);
@@ -98,7 +97,7 @@ static int blktap_open(struct inode *inode, struct file *filp)
     SetPageReserved(virt_to_page(sring));
     
     SHARED_RING_INIT(sring);
-    FRONT_RING_INIT(&blktap_ufe_ring, sring);
+    FRONT_RING_INIT(&blktap_ufe_ring, sring, PAGE_SIZE);
 
     /* Allocate the be ring. */
     sring = (blkif_sring_t *)get_zeroed_page(GFP_KERNEL);
@@ -108,7 +107,7 @@ static int blktap_open(struct inode *inode, struct file *filp)
     SetPageReserved(virt_to_page(sring));
     
     SHARED_RING_INIT(sring);
-    BACK_RING_INIT(&blktap_ube_ring, sring);
+    BACK_RING_INIT(&blktap_ube_ring, sring, PAGE_SIZE);
 
     DPRINTK(KERN_ALERT "blktap open.\n");
 

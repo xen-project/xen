@@ -36,11 +36,17 @@ typedef u32 CONTROL_RING_IDX;
  * two 32-bit counters:  (64 * 8) + (2 * 4) = 520
  */
 #define CONTROL_RING_MEM 520
-DEFINE_RING_TYPES(ctrl, control_msg_t, control_msg_t, CONTROL_RING_MEM);
+DEFINE_RING_TYPES(ctrl, control_msg_t, control_msg_t);
 
 typedef struct {
-    ctrl_sring_t tx_ring; /*    0: guest -> controller  */
-    ctrl_sring_t rx_ring; /*  520: controller -> guest  */
+    union {
+        ctrl_sring_t tx_ring; /*    0: guest -> controller  */
+        char __x[CONTROL_RING_MEM];
+    } PACKED;
+    union {
+        ctrl_sring_t rx_ring; /*  520: controller -> guest  */
+        char __y[CONTROL_RING_MEM];
+    } PACKED;
 } PACKED control_if_t; /* 1040 bytes */
 
 /*

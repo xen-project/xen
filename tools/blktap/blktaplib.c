@@ -385,13 +385,13 @@ int blktap_listen(void)
 
     /* assign the rings to the mapped memory */
     csring = (ctrl_sring_t *)blktap_mem;
-    BACK_RING_INIT(&ctrl_ring, csring);
+    BACK_RING_INIT(&ctrl_ring, csring, CONTROL_RING_MEM);
     
     sring = (blkif_sring_t *)((unsigned long)blktap_mem + PAGE_SIZE);
-    FRONT_RING_INIT(&be_ring, sring);
+    FRONT_RING_INIT(&be_ring, sring, PAGE_SIZE);
     
     sring = (blkif_sring_t *)((unsigned long)blktap_mem + (2 *PAGE_SIZE));
-    BACK_RING_INIT(&fe_ring, sring);
+    BACK_RING_INIT(&fe_ring, sring, PAGE_SIZE);
 
     mmap_vstart = (unsigned long)blktap_mem + (BLKTAP_RING_PAGES << PAGE_SHIFT);
     
