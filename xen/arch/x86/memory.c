@@ -913,10 +913,9 @@ int get_page_type(struct pfn_info *page, u32 type)
             }
             else if ( unlikely((x & PGT_va_mask) != (type & PGT_va_mask)) )
             {
-                /* The va backpointer wasn't mutable, and is different. */
-                MEM_LOG("Unexpected va backpointer (saw %08x != exp %08x)"
-                        " for pfn %08lx\n", x, type, page_to_pfn(page));
-                return 0;
+                /* This table is potentially mapped at multiple locations. */
+                nx &= ~PGT_va_mask;
+                nx |= PGT_va_unknown;
             }
         }
 	else if ( unlikely(!(x & PGT_validated)) )
@@ -1786,12 +1785,21 @@ int ptwr_do_page_fault(unsigned long addr)
         page = &frame_table[pfn];
         if ( (page->u.inuse.type_info & PGT_type_mask) == PGT_l1_page_table )
         {
-            pl2e = &linear_l2_table[(page->u.inuse.type_info &
-                                     PGT_va_mask) >> PGT_va_shift];
+            u32 va_mask = page->u.inuse.type_info & PGT_va_mask;
+
+            /*
+             * XXX KAF: This version of writable pagetables doesn't need
+             * to know the back pointer at all, as it is unnecessary to be
+             * unlinking the page table --- FIXME!
+             */
+            if ( unlikely(va_mask >= PGT_va_unknown) )
+                domain_crash();
+            va_mask >>= PGT_va_shift;
+
+            pl2e = &linear_l2_table[va_mask];
             PTWR_PRINTK(PP_ALL, ("page_fault on l1 pt at va %08lx, pt for %08x"
                                  ", pfn %08lx\n", addr,
-                                 ((page->u.inuse.type_info & PGT_va_mask) >>
-                                  PGT_va_shift) << L2_PAGETABLE_SHIFT, pfn));
+                                 va_mask << L2_PAGETABLE_SHIFT, pfn));
 
             if ( l2_pgentry_val(*pl2e) >> PAGE_SHIFT != pfn )
             {
@@ -1832,8 +1840,7 @@ int ptwr_do_page_fault(unsigned long addr)
                 nl2e = mk_l2_pgentry((l2_pgentry_val(*pl2e) & ~_PAGE_PRESENT));
                 update_l2e(pl2e, *pl2e, nl2e);
 
-                ptwr_info[cpu].disconnected_pteidx =
-                    (page->u.inuse.type_info & PGT_va_mask) >> PGT_va_shift;
+                ptwr_info[cpu].disconnected_pteidx = va_mask;
                 PTWR_PRINTK(PP_A, ("[A] now pl2e %p l2e %08lx              "
                                    "taf %08x/%08x\n", pl2e,
                                    l2_pgentry_val(*pl2e),

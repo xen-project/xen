@@ -77,7 +77,10 @@ struct pfn_info
  /* The 10 most significant bits of virt address if this is a page table. */
 #define PGT_va_shift        17
 #define PGT_va_mask         (((1<<10)-1)<<PGT_va_shift)
-#define PGT_va_mutable      PGT_va_mask /* va backpointer is mutable? */
+ /* Is the back pointer still mutable (i.e. not fixed yet)? */
+#define PGT_va_mutable      (((1<<10)-1)<<PGT_va_shift)
+ /* Is the back pointer unknown (e.g., p.t. is mapped at multiple VAs)? */
+#define PGT_va_unknown      (((1<<10)-2)<<PGT_va_shift)
  /* 17-bit count of uses of this frame as its current type. */
 #define PGT_count_mask      ((1<<17)-1)
 
