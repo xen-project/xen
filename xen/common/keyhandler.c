@@ -161,6 +161,7 @@ void debugtrace_key(unsigned char key)
     static int send_to_console = 0;
 
     send_to_console = !send_to_console;
+    printk("Toggling the state of debugtrace_printk\n");
     debugtrace_dump(send_to_console);
 }
 #endif
