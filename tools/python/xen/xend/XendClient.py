@@ -207,12 +207,12 @@ class Xend:
     def xend_node_cpu_bvt_slice_set(self, ctx_allow):
         return xend_call(self.nodeurl(),
                          {'op'      : 'cpu_bvt_slice_set',
-                          'ctx_allow'   : ctx_allow })
+                          'ctx_allow' : ctx_allow })
     
     def xend_node_cpu_fbvt_slice_set(self, ctx_allow):
         return xend_call(self.nodeurl(),
                          {'op'      : 'cpu_fbvt_slice_set',
-                          'ctx_allow'   : ctx_allow })
+                          'ctx_allow' : ctx_allow })
 
     def xend_domains(self):
         return xend_get(self.domainurl())
@@ -237,11 +237,11 @@ class Xend:
 
     def xend_domain_unpause(self, id):
         return xend_call(self.domainurl(id),
-                         {'op'      : 'unpause'})
+                         {'op'      : 'unpause' })
 
     def xend_domain_pause(self, id):
         return xend_call(self.domainurl(id),
-                         {'op'      : 'pause'})
+                         {'op'      : 'pause' })
 
     def xend_domain_shutdown(self, id, reason):
         return xend_call(self.domainurl(id),
@@ -250,22 +250,22 @@ class Xend:
 
     def xend_domain_destroy(self, id):
         return xend_call(self.domainurl(id),
-                         {'op'      : 'destroy'})
+                         {'op'      : 'destroy' })
 
     def xend_domain_save(self, id, filename):
         return xend_call(self.domainurl(id),
                          {'op'      : 'save',
-                          'file'    : filename})
+                          'file'    : filename })
 
     def xend_domain_migrate(self, id, dst):
         return xend_call(self.domainurl(id),
                          {'op'      : 'migrate',
-                          'destination': dst})
+                          'destination': dst })
 
     def xend_domain_pincpu(self, id, cpu):
         return xend_call(self.domainurl(id),
                          {'op'      : 'pincpu',
-                          'cpu'     : cpu})
+                          'cpu'     : cpu })
 
     def xend_domain_cpu_bvt_set(self, id, mcuadv, warp, warpl, warpu):
         return xend_call(self.domainurl(id),
@@ -296,12 +296,11 @@ class Xend:
         return xend_get(self.domainurl(id),
                         { 'op'      : 'vifs' })
     
-    def xend_domain_vif_ip_add(self, id, vif, ipaddr):
-        return xend_call(self.domainurl(id),
-                         {'op'      : 'vif_ip_add',
-                          'vif'     : vif,
-                          'ip'      : ipaddr })
-        
+    def xend_domain_vif(self, id, vif):
+        return xend_get(self.domainurl(id),
+                        { 'op'      : 'vif',
+                          'vif'     : vif })
+    
     def xend_domain_vbds(self, id):
         return xend_get(self.domainurl(id),
                         {'op'       : 'vbds'})
@@ -309,7 +308,7 @@ class Xend:
     def xend_domain_vbd(self, id, vbd):
         return xend_get(self.domainurl(id),
                         {'op'       : 'vbd',
-                         'vbd'      : vbd})
+                         'vbd'      : vbd })
 
     def xend_consoles(self):
         return xend_get(self.consoleurl())
@@ -329,7 +328,7 @@ class Xend:
 
     def xend_vnet_delete(self, id):
         return xend_call(self.vneturl(id),
-                         {'op': 'delete'})
+                         {'op': 'delete' })
 
     def xend_event_inject(self, sxpr):
         val = xend_call(self.eventurl(),
