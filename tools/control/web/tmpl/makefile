@@ -5,7 +5,8 @@ src1 = index.jsp about.jsp help.jsp vd.jsp \
        vd-par.jsp vd-vdcr.jsp vd-vddr.jsp vd-vdrr.jsp \
        vd-vbdcr.jsp vd-vbdfr.jsp \
        dom.jsp dom-lis.jsp dom-new.jsp dom-newr.jsp dom-sta.jsp dom-star.jsp \
-       dom-stp.jsp dom-stpr.jsp dom-del.jsp dom-delr.jsp
+       dom-stp.jsp dom-stpr.jsp dom-del.jsp dom-delr.jsp \
+       pd.jsp pd-g.jsp pd-gr.jsp pd-l.jsp pd-r.jsp pd-rr.jsp
 target = ..
 target0 = $(target)/xenostyle.css
 target1 = $(target)/index.jsp $(target)/vd.jsp \
@@ -19,7 +20,9 @@ target1 = $(target)/index.jsp $(target)/vd.jsp \
           $(target)/dom.jsp $(target)/dom-lis.jsp $(target)/dom-new.jsp \
           $(target)/dom-newr.jsp $(target)/dom-sta.jsp $(target)/dom-star.jsp \
           $(target)/dom-stp.jsp $(target)/dom-stpr.jsp \
-          $(target)/dom-del.jsp $(target)/dom-delr.jsp
+          $(target)/dom-del.jsp $(target)/dom-delr.jsp \
+          $(target)/pd.jsp $(target)/pd-g.jsp $(target)/pd-gr.jsp \
+          $(target)/pd-l.jsp $(target)/pd-r.jsp $(target)/pd-rr.jsp
 
 .SUFFIXES: .tmpl .jsp
 
@@ -29,7 +32,7 @@ $(target)/index.jsp: index.tmpl
 	./install.pl -s -home index
 	mv index.jsp $(target)
 
-$(target)/%.jsp: %.tmpl
+$(target)/%.jsp: %.tmpl xenofoot.def xenohead.def
 	./install.pl $*
 	mv $*.jsp $(target)
 	

@@ -7,7 +7,7 @@
 3e6377d6eiFjF1hHIS6JEIOFk62xSA tools/balloon/README
 3e6377dbGcgnisKw16DPCaND7oGO3Q tools/balloon/balloon.c
 3eb781edFwm_pW9FwnQACIe68viLOw tools/control/Makefile
-3eca6a96a31IwaKtkEa4jmzwTWlm8Q tools/control/README-xenctl
+3eca6a96a31IwaKtkEa4jmzwTWlm8Q tools/control/README-web
 3eb781fceEYkUi1XHKf2V0KX7si2JA tools/control/build-cmdline.xml
 3ec41f7cWCxQ8pdH8ZWqhhv-38qQ1w tools/control/build-web.xml
 3ec41f7ca6IBXDSe0HVcMPp3PPloOQ tools/control/build.properties
@@ -95,6 +95,13 @@
 3ec41f7eTqbaFqMGU7lJG09vlEt0TQ tools/control/web/tmpl/index.tmpl
 3ec41f7ed6_QZ1mg0vuA9Xu1wu1plw tools/control/web/tmpl/install.pl
 3ec41f7emmAnjM4gsW6JWkqsjfi4Rg tools/control/web/tmpl/makefile
+3f0d3c5bP8omJUhjEmXpsRvOZH3igw tools/control/web/tmpl/pd-g.tmpl
+3f0d3c5bpmNu22iZ8mb-9hzOZUWEZw tools/control/web/tmpl/pd-gr.tmpl
+3f0d3c5b1oQA8A-Y4AK0akN9k2T1KQ tools/control/web/tmpl/pd-l.tmpl
+3f0d3c5bkJgUEumHh-qAL3ZB1xApSw tools/control/web/tmpl/pd-r.tmpl
+3f0d3c5bOEOuHzB1HdWY9GvlYj7H-w tools/control/web/tmpl/pd-rr.tmpl
+3f0d3c5cb9-AClRfExuRwJi45LcYuA tools/control/web/tmpl/pd.tmpl
+3f0d3c5cQqQ23OpQJx-sNE0-EclRlA tools/control/web/tmpl/pdmenu.tmpl
 3ec41f7eoDHD2raa4x6dBINr4QLO3A tools/control/web/tmpl/vd-fv.tmpl
 3ec41f7eawycxV05Ow3LfZtOlHZJPA tools/control/web/tmpl/vd-pa.tmpl
 3ec41f7ef4mVT4vwOEL40MKIzS4EeA tools/control/web/tmpl/vd-par.tmpl

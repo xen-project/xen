@@ -40,6 +40,6 @@ for development:
  ## edit xeno.bk/tools/control/build.properties
  # change manger.url to your xenoserver: mousetrap-0.xeno.cl.cam.ac.uk
  # change build.home to your xeno.bk full path 
- ## to "make install" in xeno.bk/tools/control  instead of copying the war file
+ ## to "make install-web" in xeno.bk/tools/control  instead of copying the war file
  cp $CATALINA_HOME/conf/tomcat-users.xml $CATALINA_HOME/conf/tomcat-users.orig
  sed -e 's/<tomcat-users>/<tomcat-users>\  <role rolename="standard"\/>\  <role rolename="manager"\/>\  <user username="hobbes" password="tiger" roles="standard,manager"\/>/' $CATALINA_HOME/conf/tomcat-users.orig > $CATALINA_HOME/conf/tomcat-users.xml
