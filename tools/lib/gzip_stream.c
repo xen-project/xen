@@ -28,8 +28,6 @@
 
 #include "zlib.h"
 
-extern FILE* gzfile(gzFile file);
-
 #include "allocate.h"
 #include "gzip_stream.h"
 
@@ -57,18 +55,6 @@ static const IOMethods gzip_methods = {
  */
 static inline gzFile get_gzfile(IOStream *s){
     return (gzFile)s->data;
-}
-
-/** Control buffering on the underlying stream, like setvbuf().
- *
- * @param io gzip stream
- * @param buf buffer
- * @param mode buffering mode (see man setvbuf())
- * @param size buffer size
- * @return 0 on success, non-zero otherwise
- */
-int gzip_stream_setvbuf(IOStream *io, char *buf, int mode, size_t size){
-    return setvbuf(gzfile(get_gzfile(io)), buf, mode, size);
 }
 
 /** Write to the underlying stream.
@@ -113,7 +99,7 @@ static int gzip_error(IOStream *s){
     int err;
     gzFile *gz = get_gzfile(s);
     gzerror(gz, &err);
-    return (err == Z_ERRNO ? ferror(gzfile(gz)) : err);
+    return (err == Z_ERRNO ? 1 /* ferror(gzfile(gz)) */ : err);
 }
 
 /** Close a gzip stream.

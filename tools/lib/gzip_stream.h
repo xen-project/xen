@@ -27,7 +27,5 @@
 extern IOStream *gzip_stream_new(gzFile *f);
 extern IOStream *gzip_stream_fopen(const char *file, const char *flags);
 extern IOStream *gzip_stream_fdopen(int fd, const char *flags);
-
-extern int gzip_stream_setvbuf(IOStream *io, char *buf, int mode, size_t size);
 #endif
 #endif /* !_SP_FILE_STREAM_H_ */

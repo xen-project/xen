@@ -2,7 +2,7 @@
 #define __XC_XC_IO_H__
 
 #include "xc_private.h"
-#include <iostream.h>
+#include "iostream.h"
 
 typedef struct XcIOContext {
     u32 domain;
