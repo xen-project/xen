@@ -15,7 +15,7 @@
 # 
 # Name of the project, such as "BitKeeper" or "The GNU C compiler".
 # 
-description: XenoServer Source 
+description: Xen Virtual Machine Monitor source code
 # 
 # What (RedHat package) category this project fits into, if any.
 # 
@@ -83,7 +83,7 @@ checkout:get
 # discovers a problem which requires local intervention.  Please make the
 # contact information accurate so we can support you.
 # 
-contact: Steven Hand
+contact: xen-admin@lists.sourceforge.net
 # 
 # It is very important that this email address is filled out and accurate.
 # If someone converts your repository to open logging (which you may not
@@ -92,16 +92,16 @@ contact: Steven Hand
 # response from anyone else at your location after 90 days, then open logging
 # will be implicitly approved.
 # 
-email: bk+steven.hand@cl.cam.ac.uk
+email: xen-admin@lists.sourceforge.net
 # 
 # Add your street address if you like, it is optional.
 # 
-street: 
-city: 
+street: University of Cambridge Computer Laboratory, JJ Thomson Avenue
+city: Cambridge
 state: 
-postal: 
-country: 
-phone: 
+postal: CB3 0FD
+country: UK
+phone: +44 1223 334639
 cell: 
 pager: 
 # 
