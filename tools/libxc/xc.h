@@ -48,6 +48,7 @@ int xc_domain_create(int xc_handle,
                      unsigned int mem_kb, 
                      const char *name,
                      int cpu,
+                     float cpu_weight,
                      u32 *pdomid);
 int xc_domain_pause(int xc_handle, 
                     u32 domid);
@@ -62,6 +63,9 @@ int xc_domain_getinfo(int xc_handle,
                       u32 first_domid, 
                       unsigned int max_doms,
                       xc_dominfo_t *info);
+int xc_domain_setcpuweight(int xc_handle,
+                           u32 domid,
+                           float weight);
 
 int xc_shadow_control(int xc_handle,
                       u32 domid, 
@@ -208,6 +212,9 @@ typedef struct {
 
 int xc_physinfo(int xc_handle,
                 xc_physinfo_t *info);
+
+int xc_sched_id(int xc_handle,
+                int *sched_id);
 
 int xc_domain_setname(int xc_handle,
                       u32 domid, 
