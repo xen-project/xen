@@ -96,7 +96,7 @@ class Daemon:
         reactor.run()
 
     def exit(self):
-        reactor.diconnectAll()
+        reactor.disconnectAll()
         sys.exit(0)
 
 def instance():
