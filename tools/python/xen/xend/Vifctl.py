@@ -1,36 +1,70 @@
-"""Xend interface to the vifctl script.
+"""Xend interface to networking control scripts.
 """
 import os
 import os.path
 import sys
 
-VIFCTL = '/etc/xen/xend/vifctl'
+from xen.xend import XendRoot
+xroot = XendRoot.instance()
 
-def init():
-    """Call 'vifctl init'. Called when xend starts.
-    """
-    os.system(VIFCTL + ' init ')
+"""Where network control scripts live."""
+SCRIPT_DIR = xroot.network_script_dir
 
-def vifctl_args(vif, mac=None, bridge=None, ipaddr=[]):
-    """Construct the argument list for vifctl.
+def network(op, script=None, bridge=None, antispoof=None):
+    """Call a network control script.
+    Xend calls this with op 'start' when it starts.
+
+    @param op:        operation (start, stop, status)
+    @param script:    network script name
+    @param bridge:    xen bridge
+    @param antispoof: whether to enable IP antispoofing rules
     """
-    args = ['vif=%s' % vif]
-    if mac:
-        args.append('mac=%s' % mac)
+    if op not in ['start', 'stop', 'status']:
+        raise ValueError('Invalid operation:' + op)
+    if script is None:
+        script = xroot.get_network_script()
+    if bridge is None:
+        bridge = xroot.get_vif_bridge()
+    if antispoof is None:
+        antispoof = xroot.get_vif_antispoof()
+    script = os.path.join(SCRIPT_DIR, script)
+    args = [op]
+    args.append("bridge='%s'" % bridge)
+    if antispoof:
+        args.append("antispoof=yes")
+    else:
+        args.append("antispoof=no")
+    args = ' '.join(args)
+    os.system(script + ' ' + args)
+
+def vifctl(op, vif=None, script=None, domain=None, mac=None, bridge=None, ipaddr=[]):
+    """Call a vif control script.
+    Xend calls this when bringing vifs up or down.
+
+    @param op:     vif operation (up, down)
+    @param vif:    vif name
+    @param script: name of control script
+    @param domain: name of domain the vif is on
+    @param mac:    vif MAC address
+    @param bridge: bridge to add the vif to
+    @param ipaddr: list of ipaddrs the vif may use
+    """
+    if op not in ['up', 'down']:
+        raise ValueError('Invalid operation:' + op)
+    if script is None:
+        script = xroot.get_vif_script()
+    if bridge is None:
+        bridge = xroot.get_vif_bridge()
+    script = os.path.join(SCRIPT_DIR, script)
+    args = [op]
+    args.append("vif='%s'" % vif)
+    args.append("domain='%s'" % domain)
+    args.append("mac='%s'" % mac)
     if bridge:
-        args.append('bridge=%s' % bridge)
-    for ip in ipaddr:
-        args.append('ipaddr=%s' % ip)
-    return ' '.join(args)
-    
-def up(vif, **kwds):
-    """Call 'vifctl up' for a vif. Called when a vif is created.
-    """
-    args = vifctl_args(vif, **kwds)
-    os.system(VIFCTL + ' up ' + args)
+        args.append("bridge='%s'" % bridge)
+    if ipaddr:
+        ips = ' '.join(ipaddr)
+        args.append("ip='%s'" % ips)
+    args = ' '.join(args)
+    os.system(script + ' ' + args)
 
-def down(vif, **kwds):
-    """Call 'vifctl down' for a vif. Called when a vif is destroyed.
-    """
-    args = vifctl_args(vif, **kwds)
-    os.system(VIFCTL + ' down ' + args)

@@ -41,6 +41,9 @@ class XendRoot:
     """Environment variable used to override config_default."""
     config_var     = "XEND_CONFIG"
 
+    """Where network control scripts live."""
+    network_script_dir = "/etc/xen"
+
     def __init__(self):
         self.rebooted = 0
         self.last_reboot = None
@@ -99,6 +102,7 @@ class XendRoot:
         return self.rebooted
 
     def configure(self):
+        print 'XendRoot>configure>'
         self.set_config()
         self.dbroot = self.get_config_value("dbroot", self.dbroot_default)
         self.lastboot = self.get_config_value("lastboot", self.lastboot_default)
@@ -114,23 +118,27 @@ class XendRoot:
         The config file is a sequence of sxp forms.
         """
         self.config_path = os.getenv(self.config_var, self.config_default)
+        print 'XendRoot>set_config> config_path=', self.config_path
         if os.path.exists(self.config_path):
+            print 'XendRoot>set_config> loading'
             fin = file(self.config_path, 'rb')
             try:
                 config = sxp.parse(fin)
-                config.insert(0, 'config')
+                config.insert(0, 'xend-config')
                 self.config = config
             finally:
                 fin.close()
         else:
-            self.config = ['config']
+            print 'XendRoot>set_config> not found'
+            self.config = ['xend-config']
+        print 'XendRoot> config=', self.config
 
     def get_config(self, name=None):
         """Get the configuration element with the given name, or
         the whole configuration if no name is given.
 
-        name	element name (optional)
-        returns config or none
+        @param name: element name (optional)
+        @return: config or none
         """
         if name is None:
             val = self.config
@@ -141,11 +149,30 @@ class XendRoot:
     def get_config_value(self, name, val=None):
         """Get the value of an atomic configuration element.
 
-        name	element name
-        val	default value (optional, defaults to None)
-        returns value
+        @param name: element name
+        @param val:  default value (optional, defaults to None)
+        @return: value
         """
         return sxp.child_value(self.config, name, val=val)
+
+    def get_xend_port(self):
+        return int(self.get_config_value('xend-port', '8000'))
+
+    def get_xend_address(self):
+        return self.get_config_value('xend-address', '')
+
+    def get_network_script(self):
+        return self.get_config_value('network-script', 'network')
+
+    def get_vif_bridge(self):
+        return self.get_config_value('vif-bridge', 'xen-br0')
+
+    def get_vif_script(self):
+        return self.get_config_value('vif-script', 'vif-bridge')
+
+    def get_vif_antispoof(self):
+        v = self.get_config_value('vif-antispoof', 'yes')
+        return v in ['yes', '1', 'on']
 
 def instance():
     global inst

@@ -37,18 +37,17 @@ from xen.xend import Vifctl
 from SrvRoot import SrvRoot
 
 def create(port=None, interface=None, bridge=0):
-    if port is None: port = 8000
-    if interface is None: interface = ''
+    if port is None:
+        port = xroot.get_xend_port()
+    if interface is None:
+        interface = xroot.get_xend_address()
     if bridge or xroot.rebooted:
-        init_bridge()
+        Vifctl.network('start')
     root = resource.Resource()
     xend = SrvRoot()
     root.putChild('xend', xend)
     site = server.Site(root)
     reactor.listenTCP(port, site, interface=interface)
-
-def init_bridge():
-    Vifctl.init()
 
 def main(port=None, interface=None):
     create(port, interface)

@@ -146,16 +146,6 @@ def make_disk(dom, uname, dev, mode, recreate=0):
     ctrl.addCallback(fn)
     return ctrl
         
-def make_vif(dom, vif, vmac, recreate=0):
-    """Create a virtual network device for a domain.
-
-    
-    @returns Deferred
-    """
-    xend.netif_create(dom, recreate=recreate)
-    d = xend.netif_dev_create(dom, vif, vmac, recreate=recreate)
-    return d
-
 def vif_up(iplist):
     """send an unsolicited ARP reply for all non link-local IP addresses.
 
@@ -312,28 +302,28 @@ def append_deferred(dlist, v):
 
 def _vm_configure1(val, vm):
     d = vm.create_devices()
-    print '_vm_configure1> made devices...'
+    #print '_vm_configure1> made devices...'
     def cbok(x):
-        print '_vm_configure1> cbok', x
+        #print '_vm_configure1> cbok', x
         return x
     d.addCallback(cbok)
     d.addCallback(_vm_configure2, vm)
-    print '_vm_configure1<'
+    #print '_vm_configure1<'
     return d
 
 def _vm_configure2(val, vm):
-    print '>callback _vm_configure2...'
+    #print '>callback _vm_configure2...'
     d = vm.configure_fields()
     def cbok(results):
-        print '_vm_configure2> cbok', results
+        #print '_vm_configure2> cbok', results
         return vm
     def cberr(err):
-        print '_vm_configure2> cberr', err
+        #print '_vm_configure2> cberr', err
         vm.destroy()
         return err
     d.addCallback(cbok)
     d.addErrback(cberr)
-    print '<_vm_configure2'
+    #print '<_vm_configure2'
     return d
 
 class XendDomainInfo:
@@ -803,14 +793,11 @@ def vm_dev_vif(vm, val, index):
         raise VmError('vif: vif in netif backend domain')
     vif = index #todo
     vmac = sxp.child_value(val, "mac")
-    defer = make_vif(vm.dom, vif, vmac, vm.recreate)
+    xend.netif_create(vm.dom, recreate=vm.recreate)
+    defer = xend.netif_dev_create(vm.dom, vif, val, recreate=vm.recreate)
     def fn(id):
         dev = xend.netif_dev(vm.dom, vif)
-        devid = sxp.attribute(val, 'id')
-        if devid:
-            dev.setprop('id', devid)
-        bridge = sxp.child_value(val, "bridge")
-        dev.up(bridge)
+        dev.vifctl('up')
         vm.add_device('vif', dev)
         print 'vm_dev_vif> created', dev
         return id

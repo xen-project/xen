@@ -2,6 +2,7 @@
 
 """Domain creation.
 """
+import random
 import string
 import sys
 
@@ -127,11 +128,13 @@ gopts.var('ipaddr', val="IPADDR",
          fn=append_value, default=[],
          use="Add an IP address to the domain.")
 
-gopts.var('vif', val="mac=MAC,bridge=BRIDGE",
+gopts.var('vif', val="mac=MAC,bridge=BRIDGE,script=SCRIPT",
          fn=append_value, default=[],
          use="""Add a network interface with the given MAC address and bridge.
+         The vif is configured by calling the given configuration script.
          If mac is not specified a random MAC address is used.
          If bridge is not specified the default bridge is used.
+         If script is not specified the default script is used.
          This option may be repeated to add more than one vif.
          Specifying vifs will increase the number of interfaces as needed.
          """)
@@ -227,6 +230,24 @@ def configure_pci(config_devs, vals):
         config_pci = ['pci', ['bus', bus], ['dev', dev], ['func', func]]
         config_devs.append(['device', config_pci])
 
+def randomMAC():
+    """Generate a random MAC address.
+
+    Uses OUI (Organizationally Unique Identifier) AA:00:00, an
+    unassigned one that used to belong to DEC. The OUI list is
+    available at 'standards.ieee.org'.
+
+    The remaining 3 fields are random, with the first bit of the first
+    random field set 0.
+
+    returns array of 6 ints
+    """
+    mac = [ 0xaa, 0x00, 0x00,
+            random.randint(0x00, 0x7f),
+            random.randint(0x00, 0xff),
+            random.randint(0x00, 0xff) ]
+    return ':'.join(map(lambda x: "%x" % x, mac))
+
 def configure_vifs(config_devs, vals):
     """Create the config for virtual network interfaces.
     """
@@ -238,14 +259,17 @@ def configure_vifs(config_devs, vals):
             d = vifs[idx]
             mac = d.get('mac')
             bridge = d.get('bridge')
+            script = d.get('script')
         else:
-            mac = None
+            mac = randomMAC()
             bridge = None
+            script = None
         config_vif = ['vif']
-        if mac:
-            config_vif.append(['mac', mac])
+        config_vif.append(['mac', mac])
         if bridge:
             config_vif.append(['bridge', bridge])
+        if script:
+            config_vif.append(['script', script])
         config_devs.append(['device', config_vif])
 
 def configure_vfr(config, vals):

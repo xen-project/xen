@@ -16,7 +16,7 @@
 #    added on up and removed on down. The bridge a vif is added to can
 #    be set in the vm config.
 #
-# The default bridge is nbe-br.
+# The default bridge is xen-br0.
 # The default interface is eth0.
 #
 #============================================================================
@@ -33,7 +33,7 @@ class VifControl:
 
     prefix = 'vifctl_'
 
-    DEFAULT_BRIDGE = 'nbe-br'
+    DEFAULT_BRIDGE = 'xen-br0'
     DEFAULT_INTERFACE = 'eth0'
 
     def __init__(self):

@@ -1,0 +1,23 @@
+# Xend configuration file.
+
+# Port xend should use for the HTTP interface.
+(xend-port         8000)
+
+# Address xend should listen on.
+# Specifying 'localhost' prevents remote connections.
+# Specifying the empty string '' allows all connections.
+(xend-address      '')
+
+# The script used to start/stop networking for xend.
+(network-script    network)
+
+# The default bridge that virtual interfaces should be connected to.
+(vif-bridge        xen-br0)
+
+# The default script used to control virtual interfaces.
+(vif-script        vif-bridge)
+
+# Whether iptables should be set up to prevent IP spoofing for
+# virtual interfaces. Specify 'yes' or 'no'.
+(vif-antispoof     no)
+

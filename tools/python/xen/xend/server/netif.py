@@ -109,20 +109,42 @@ class NetDev(controller.Dev):
     """Info record for a network device.
     """
 
-    def __init__(self, ctrl, vif, mac):
+    def __init__(self, ctrl, vif, config):
         controller.Dev.__init__(self, ctrl)
         self.vif = vif
-        self.mac = mac
         self.evtchn = None
-        self.bridge = None
-        self.ipaddr = []
+        self.configure(config)
 
+    def configure(self, config):
+        self.config = config
+        self.mac = None
+        self.bridge = None
+        self.script = None
+        self.ipaddr = None
+        
+        vmac = sxp.child_value(config, 'mac')
+        if not vmac: raise ValueError("invalid mac")
+        mac = [ int(x, 16) for x in vmac.split(':') ]
+        if len(mac) != 6: raise ValueError("invalid mac")
+        self.mac = mac
+
+        self.bridge = sxp.child_value(config, 'bridge')
+        self.script = sxp.child_value(config, 'script')
+
+        ipaddrs = sxp.children(config, elt='ip')
+        for ipaddr in ipaddrs:
+            self.ipaddr.append(sxp.child0(ipaddr))
+        
     def sxpr(self):
         vif = str(self.vif)
         mac = self.get_mac()
-        val = ['netdev', ['vif', vif], ['mac', mac]]
+        val = ['vif', ['idx', vif], ['mac', mac]]
         if self.bridge:
             val.append(['bridge', self.bridge])
+        if self.script:
+            val.append(['script', self.script])
+        for ip in self.ipaddr:
+            val.append(['ip', ip])
         if self.evtchn:
             val.append(['evtchn',
                         self.evtchn['port1'],
@@ -140,24 +162,22 @@ class NetDev(controller.Dev):
         return ':'.join(map(lambda x: "%x" % x, self.mac))
 
     def vifctl_params(self):
-        return { 'mac'   : self.get_mac(),
+        from xen.xend import XendDomain
+        xd = XendDomain.instance()
+        dom = self.controller.dom
+        dominfo = xd.domain_get(dom)
+        name = (dominfo and dominfo.name) or ('DOM%d' % dom)
+        return { 'domain': name,
+                 'vif'   : self.get_vifname(), 
+                 'mac'   : self.get_mac(),
                  'bridge': self.bridge,
-                 'ipaddr': self.ipaddr }
+                 'script': self.script,
+                 'ipaddr': self.ipaddr, }
 
-    def up(self, bridge=None, ipaddr=[]):
-        """Bring the device up.
-
-        bridge ethernet bridge to connect to
-        ipaddr list of ipaddrs to filter using iptables
+    def vifctl(self, op):
+        """Bring the device up or down.
         """
-        self.bridge = bridge
-        self.ipaddr = ipaddr
-        Vifctl.up(self.get_vifname(), **self.vifctl_params())
-
-    def down(self):
-        """Bring the device down.
-        """
-        Vifctl.down(self.get_vifname(), **self.vifctl_params())
+        Vifctl.vifctl(op, **self.vifctl_params())
 
     def destroy(self):
         """Destroy the device's resources and disconnect from the back-end
@@ -165,7 +185,7 @@ class NetDev(controller.Dev):
         """
         def cb_destroy(val):
             self.controller.send_be_destroy(self.vif)
-        self.down()
+        self.vifctl('down')
         #d = self.controller.factory.addDeferred()
         d = defer.Deferred()
         d.addCallback(cb_destroy)
@@ -194,24 +214,6 @@ class NetifController(controller.Controller):
         val = ['netif', ['dom', self.dom]]
         return val
     
-    def randomMAC(self):
-        """Generate a random MAC address.
-
-        Uses OUI (Organizationally Unique Identifier) AA:00:00, an
-        unassigned one that used to belong to DEC. The OUI list is
-        available at 'standards.ieee.org'.
-
-        The remaining 3 fields are random, with the first bit of the first
-        random field set 0.
-
-        returns array of 6 ints
-        """
-        mac = [ 0xaa, 0x00, 0x00,
-                random.randint(0x00, 0x7f),
-                random.randint(0x00, 0xff),
-                random.randint(0x00, 0xff) ]
-        return mac
-
     def lostChannel(self):
         """Method called when the channel has been lost.
         """
@@ -231,22 +233,15 @@ class NetifController(controller.Controller):
         """
         return self.devices.get(vif)
 
-    def addDevice(self, vif, vmac):
-        """Add a network interface. If vmac is None a random MAC is
-        assigned. If specified, vmac must be a string of the form
-        XX:XX:XX:XX:XX where X is hex digit.
+    def addDevice(self, vif, config):
+        """Add a network interface.
 
         vif device index
-        vmac device MAC 
+        config device configuration 
 
         returns device
         """
-        if vmac is None:
-            mac = self.randomMAC()
-        else:
-            mac = [ int(x, 16) for x in vmac.split(':') ]
-        if len(mac) != 6: raise ValueError("invalid mac")
-        dev = NetDev(self, vif, mac)
+        dev = NetDev(self, vif, config)
         self.devices[vif] = dev
         return dev
 
@@ -259,14 +254,14 @@ class NetifController(controller.Controller):
         for dev in self.getDevices():
             dev.destroy()
 
-    def attachDevice(self, vif, vmac, recreate=0):
+    def attachDevice(self, vif, config, recreate=0):
         """Attach a network device.
         If vmac is None a random mac address is assigned.
 
         @param vif interface index
         @param vmac mac address (string)
         """
-        self.addDevice(vif, vmac)
+        self.addDevice(vif, config)
         d = defer.Deferred()
         if recreate:
             d.callback(self)

@@ -734,15 +734,14 @@ class Daemon:
     def netif_get(self, dom):
         return self.netifCF.getInstanceByDom(dom)
 
-    def netif_dev_create(self, dom, vif, vmac, recreate=0):
+    def netif_dev_create(self, dom, vif, config, recreate=0):
         """Create a network device.
 
-        todo
         """
         ctrl = self.netifCF.getInstanceByDom(dom)
         if not ctrl:
             raise ValueError('No netif controller: %d' % dom)
-        d = ctrl.attachDevice(vif, vmac, recreate=recreate)
+        d = ctrl.attachDevice(vif, config, recreate=recreate)
         return d
 
     def netif_dev(self, dom, vif):

@@ -39,7 +39,7 @@ def _readline(fd):
 When bridging is used, eth0 may not have an IP address,
 as it may have been moved onto the bridge.
 """
-NBE_BRIDGE = 'nbe-br'
+NBE_BRIDGE = 'xen-br0'
 
 def get_current_ipaddr(dev='eth0'):
     """Get the primary IP address for the given network interface.

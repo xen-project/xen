@@ -41,7 +41,7 @@ name = "NetBSD VM %d" % vmid
 
 # Optionally define mac and/or bridge for the network interfaces.
 # Random MACs are assigned if not given.
-#vif = [ 'mac=aa:00:00:00:00:11, bridge=nbe-br' ]
+#vif = [ 'mac=aa:00:00:00:00:11, bridge=xen-br0' ]
 
 # Specify IP address(es), for the new domain.  You need to
 # configure IP addrs within the domain just as you do normally.  This
