@@ -14,7 +14,6 @@
 #include <xen/config.h>
 #include <xen/lib.h>
 #include <xen/smp.h>
-#include <xen/irq_cpustat.h>
 #include <asm/bitops.h>
 #include <asm/hardirq.h>
 
