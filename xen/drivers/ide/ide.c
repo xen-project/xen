@@ -2060,14 +2060,22 @@ int ide_do_drive_cmd (ide_drive_t *drive, struct request *rq, ide_action_t actio
 
     /* XXX SMH: spin waiting for response */
     if (action == ide_wait) { 
-	while(*(int *)rq->waiting) {
-	    udelay(500); 
-	    usecs += 500; 
-	    if(usecs > 1000000) { 
-		printk("ide_do_drive_cmd [ide_wait]: giving up after 1s\n"); 
-		*(int *)rq->waiting = 0; 
-	    }
+
+	/* if we get an error, ide-cd.c requeues (and kills our 'waitq') */
+	if((rq->waiting != NULL) && *(int *)(rq->waiting)) {
+	    do { 
+		udelay(500); 
+		usecs += 500; 
+		if(usecs > 1000000) { 
+		    printk("ide_do_drive_cmd [ide_wait]: giving "
+			   "up after 1s\n"); 
+		    *(int *)rq->waiting = 0; 
+		}
+	    } while((rq->waiting != NULL) && *(int *)(rq->waiting)); 
 	}
+
+	if(rq->waiting == NULL)
+	    return 1; 
     }
 
     return 0;

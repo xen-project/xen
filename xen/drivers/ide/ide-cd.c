@@ -623,6 +623,8 @@ static int cdrom_decode_status (ide_startstop_t *startstop, ide_drive_t *drive,
 		   command request to the request sense request. */
 
 		if ((stat & ERR_STAT) != 0) {
+			// XXX SMH: if we get here we should retry ... hmmm
+			printk("ide-cd: error (stat = 0x%x): will retry\n", stat); 
 			wait = rq->waiting;
 			rq->waiting = NULL;
 		}
