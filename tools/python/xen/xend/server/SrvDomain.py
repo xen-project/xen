@@ -131,6 +131,14 @@ class SrvDomain(SrvDir):
         d = fn(req.args, {'dom': self.dom.id})
         return d
 
+    def op_device_refresh(self, op, req):
+        fn = FormFn(self.xd.domain_device_refresh,
+                    [['dom', 'str'],
+                     ['type', 'str'],
+                     ['idx', 'str']])
+        val = fn(req.args, {'dom': self.dom.id})
+        return val
+
     def op_device_destroy(self, op, req):
         fn = FormFn(self.xd.domain_device_destroy,
                     [['dom', 'str'],

@@ -414,6 +414,10 @@ class BlkDev(controller.SplitDev):
             val.append(['index', self.index])
         return val
 
+    def refresh(self):
+        log.debug("Refreshing vbd domain=%d idx=%s", self.controller.dom, self.idx)
+        self.interfaceChanged()
+
     def destroy(self, change=0):
         """Destroy the device. If 'change' is true notify the front-end interface.
 

@@ -687,6 +687,18 @@ class XendDomain:
         self.update_domain(dominfo.id)
         return val
     
+    def domain_device_refresh(self, id, type, idx):
+        """Refresh a device.
+
+        @param id:  domain id
+        @param idx:  device index
+        @param type: device type
+        """
+        dominfo = self.domain_lookup(id)
+        self.refresh_schedule()
+        val = dominfo.device_refresh(type, idx)
+        self.update_domain(dominfo.id)
+        return val
 
     def domain_device_destroy(self, id, type, idx):
         """Destroy a device.
