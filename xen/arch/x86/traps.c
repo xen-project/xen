@@ -371,7 +371,9 @@ static int emulate_privileged_op(struct xen_regs *regs)
     switch ( opcode )
     {
     case 0x06: /* CLTS */
-        (void)do_fpu_taskswitch();
+        clear_bit(EDF_GUEST_STTS, &ed->ed_flags);
+        if ( test_bit(EDF_USEDFPU, &ed->ed_flags) )
+            clts();
         break;
 
     case 0x09: /* WBINVD */
@@ -420,8 +422,8 @@ static int emulate_privileged_op(struct xen_regs *regs)
         switch ( (opcode >> 3) & 7 )
         {
         case 0: /* Write CR0 */
-            if ( *reg & X86_CR0_TS ) /* XXX ignore all but TS bit */
-                (void)do_fpu_taskswitch;
+            if ( *reg & X86_CR0_TS )
+                (void)do_fpu_taskswitch();
             break;
 
         case 2: /* Write CR2 */
