@@ -925,7 +925,6 @@
 3ddb79bd9drcFPVxd4w2GPOIjLlXpA xen/common/kernel.c
 3e4cd9d8LAAghUY0hNIK72uc2ch_Nw xen/common/keyhandler.c
 3ddb79bduhSEZI8xa7IbGQCpap5y2A xen/common/lib.c
-4200cf14XGr26_PCC8NxREDhr7Hk5Q xen/common/malloc.c
 41a61536SZbR6cj1ukWTb0DYU-vz9w xen/common/multicall.c
 3ddb79bdD4SLmmdMD7yLW5HcUWucXw xen/common/page_alloc.c
 3e54c38dkHAev597bPr71-hGzTdocg xen/common/perfc.c
