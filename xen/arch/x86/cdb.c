@@ -4,6 +4,8 @@
 /* We try to avoid assuming much about what the rest of the system is
    doing.  In particular, dynamic memory allocation is out of the
    question. */
+/* Resuming after we've stopped used to work, but more through luck
+   than any actual intention.  It doesn't at the moment. */
 #include <xen/lib.h>
 #include <asm/uaccess.h>
 #include <xen/serial.h>
@@ -14,7 +16,7 @@
 
 /* Printk isn't particularly safe just after we've trapped to the
    debugger. so avoid it. */
-#define dbg_printk
+#define dbg_printk(...)
 
 static unsigned char opt_cdb[30] = "none";
 string_param("cdb", opt_cdb);
@@ -319,6 +321,7 @@ __trap_to_cdb(struct xen_regs *regs)
 	static atomic_t xendbg_running = ATOMIC_INIT(1);
 	static char recv_buf[4096];
 	unsigned flags;
+	unsigned old_watchdog;
 
 	if (xdb_ctx.serhnd < 0) {
 		dbg_printk("Debugger not ready yet.\n");
@@ -349,6 +352,8 @@ __trap_to_cdb(struct xen_regs *regs)
 	}
 
 	smp_send_stop();
+	old_watchdog = watchdog_on;
+	watchdog_on = 0;
 
 	/* Shouldn't really do this, but otherwise we stop for no
 	   obvious reason, which is Bad */
@@ -374,6 +379,7 @@ __trap_to_cdb(struct xen_regs *regs)
 			ASSERT(!local_irq_is_enabled());
 		}
 	}
+	watchdog_on = old_watchdog;
 	atomic_inc(&xendbg_running);
 	local_irq_restore(flags);
 }
