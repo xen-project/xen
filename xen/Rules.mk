@@ -5,6 +5,7 @@ debugger    ?= n
 perfc       ?= n
 trace       ?= n
 optimize    ?= y
+crash_debug ?= n
 
 # Currently supported architectures: x86_32, x86_64
 COMPILE_ARCH    ?= $(shell uname -m | sed -e s/i.86/x86_32/)
@@ -54,8 +55,11 @@ else
 CFLAGS += -DVERBOSE
 endif
 
-ifeq ($(gdb_stub),y)
-CFLAGS += -g
+ifeq ($(crash_debug),y)
+CFLAGS += -g -DCRASH_DEBUG
+ifeq ($(debugger),y)
+error Crash debugger conflicts with PDB
+endif
 endif
 
 ifeq ($(perfc),y)

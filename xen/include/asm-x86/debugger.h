@@ -93,6 +93,16 @@ static inline int debugger_trap_fatal(
     return ret;
 }
 
+#define debugger_trap_immediate() ()
+
+#elif defined(CRASH_DEBUG)
+
+extern void cdb_trap(void);
+extern void __trap_to_cdb(struct xen_regs *);
+#define debugger_trap_entry(_v, _r) (0)
+#define debugger_trap_fatal(_v, _r) (__trap_to_cdb(_r), 0)
+#define debugger_trap_immediate() (cdb_trap())
+
 #elif 0
 
 extern int kdb_trap(int, int, struct xen_regs *);
@@ -113,6 +123,7 @@ static inline int debugger_trap_fatal(
 
 #define debugger_trap_entry(_v, _r) (0)
 #define debugger_trap_fatal(_v, _r) (0)
+#define debugger_trap_immediate() ()
 
 #endif
 

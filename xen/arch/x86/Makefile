@@ -11,6 +11,10 @@ ifneq ($(TARGET_SUBARCH),x86_32)
 OBJS := $(patsubst vmx%.o,,$(OBJS))
 endif
 
+ifneq ($(crash_debug),y)
+OBJS := $(subst cdb%.o,,$(OBJS))
+endif
+
 default: $(TARGET)
 
 $(TARGET): $(TARGET)-syms boot/mkelf32

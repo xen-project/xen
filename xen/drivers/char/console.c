@@ -20,6 +20,7 @@
 #include <xen/keyhandler.h>
 #include <asm/uaccess.h>
 #include <asm/mm.h>
+#include <asm/debugger.h>
 
 /* opt_console: comma-separated list of console outputs. */
 static unsigned char opt_console[30] = OPT_CONSOLE_STR;
@@ -497,7 +498,7 @@ void panic(const char *fmt, ...)
     (void)vsnprintf(buf, sizeof(buf), fmt, args);
     va_end(args);
 
-    trap_to_xendbg();
+    debugger_trap_immediate();
 
     /* Spit out multiline message in one go. */
     spin_lock_irqsave(&console_lock, flags);

@@ -10,6 +10,7 @@
 #include <xen/serial.h>
 #include <xen/sched.h>
 #include <xen/softirq.h>
+#include <asm/debugger.h>
 
 #define KEY_MAX 256
 #define STR_MAX  64
@@ -146,13 +147,12 @@ extern void perfc_printall(unsigned char key);
 extern void perfc_reset(unsigned char key);
 #endif
 
-void do_debug_key(unsigned char key, void *dev_id, struct pt_regs *regs)
+void do_debug_key(unsigned char key, struct xen_regs *regs)
 {
-    extern void trap_to_xendbg(void);
-    trap_to_xendbg();
+    debugger_trap_fatal(0xf001, regs);
     asm volatile ("nop"); /* Prevent the compiler doing tail call
-			     optimisation, as that confuses xendbg a
-			     bit. */
+                             optimisation, as that confuses xendbg a
+                             bit. */
 }
 
 void initialize_keytable(void)
@@ -185,5 +185,5 @@ void initialize_keytable(void)
     register_keyhandler(
         'P', perfc_reset,    "reset performance counters"); 
 #endif
-    add_key_handler('%', do_debug_key,   "Trap to xendbg");
+    register_irq_keyhandler('%', do_debug_key,   "Trap to xendbg");
 }

@@ -1,15 +1,22 @@
-/* Simple hacked-up version of pdb for us in post-mortem debugging of
+/* Simple hacked-up version of pdb for use in post-mortem debugging of
    Xen and domain 0. This should be a little cleaner, hopefully.  Note
    that we can't share a serial line with PDB. */
+/* We try to avoid assuming much about what the rest of the system is
+   doing.  In particular, dynamic memory allocation is out of the
+   question. */
 #include <xen/lib.h>
 #include <asm/uaccess.h>
 #include <xen/serial.h>
 #include <asm/irq.h>
 #include <xen/spinlock.h>
+#include <asm/debugger.h>
 
 /* Printk isn't particularly safe just after we've trapped to the
    debugger. so avoid it. */
 #define dbg_printk(...)
+
+static unsigned char opt_cdb[30] = "none";
+string_param("cdb", opt_cdb);
 
 struct xendbg_context {
 	int serhnd;
@@ -22,15 +29,6 @@ xendbg_put_char(u8 data, struct xendbg_context *ctx)
 {
 	ctx->reply_csum += data;
 	serial_putc(ctx->serhnd, data);
-}
-
-static u8
-xendbg_get_char(struct xendbg_context *ctx)
-{
-	u8 ch;
-	extern unsigned char __serial_getc(int handle);
-	ch = __serial_getc(ctx->serhnd);
-	return ch;
 }
 
 static int
@@ -58,11 +56,11 @@ attempt_receive_packet(char *recv_buf, struct xendbg_context *ctx)
 	u8 ch;
 
 	/* Skip over everything up to the first '$' */
-	while ((ch = xendbg_get_char(ctx)) != '$')
+	while ((ch = irq_serial_getc(ctx->serhnd)) != '$')
 		;
 	csum = 0;
 	for (count = 0; count < 4096; count++) {
-		ch = xendbg_get_char(ctx);
+		ch = irq_serial_getc(ctx->serhnd);
 		if (ch == '#')
 			break;
 		recv_buf[count] = ch;
@@ -73,8 +71,8 @@ attempt_receive_packet(char *recv_buf, struct xendbg_context *ctx)
 		return -1;
 	}
 	recv_buf[count] = 0;
-	received_csum = hex_char_val(xendbg_get_char(ctx)) * 16 +
-		hex_char_val(xendbg_get_char(ctx));
+	received_csum = hex_char_val(irq_serial_getc(ctx->serhnd)) * 16 +
+		hex_char_val(irq_serial_getc(ctx->serhnd));
 	if (received_csum == csum) {
 		return 0;
 	} else {
@@ -130,7 +128,7 @@ xendbg_finish_reply(struct xendbg_context *ctx)
 	xendbg_put_char('#', ctx);
 	xendbg_send(buf, 2, ctx);
 
-	ch = xendbg_get_char(ctx);
+	ch = irq_serial_getc(ctx->serhnd);
 	if (ch == '+')
 		return 0;
 	else
@@ -154,16 +152,13 @@ handle_memory_read_command(unsigned long addr, unsigned long length,
 	int x;
 	unsigned char val;
 	int r;
-	unsigned old_s_limit;
 	char buf[2];
 
 	dbg_printk("Memory read starting at %lx, length %lx.\n", addr,
 		   length);
-	old_s_limit = current->addr_limit.seg;
-	current->addr_limit.seg = ~0;
 	xendbg_start_reply(ctx);
 	for (x = 0; x < length; x++) {
-		r = copy_from_user(&val, (void *)(addr + x), 1);
+		r = __copy_from_user(&val, (void *)(addr + x), 1);
 		if (r != 0) {
 			dbg_printk("Error reading from %lx.\n", addr + x);
 			break;
@@ -174,7 +169,6 @@ handle_memory_read_command(unsigned long addr, unsigned long length,
 	if (x == 0)
 		xendbg_send("E05", 3, ctx);
 	dbg_printk("Read done.\n");
-	current->addr_limit.seg = old_s_limit;
 	return xendbg_finish_reply(ctx);
 }
 
@@ -187,7 +181,7 @@ xendbg_send_reply(const char *buf, struct xendbg_context *ctx)
 }
 
 static int
-handle_register_read_command(struct pt_regs *regs, struct xendbg_context *ctx)
+handle_register_read_command(struct xen_regs *regs, struct xendbg_context *ctx)
 {
 	char buf[121];
 
@@ -203,16 +197,16 @@ handle_register_read_command(struct pt_regs *regs, struct xendbg_context *ctx)
 		bswab32(regs->edi),
 		bswab32(regs->eip),
 		bswab32(regs->eflags),
-		bswab32(regs->xcs),
-		bswab32(regs->xss),
-		bswab32(regs->xes),
-		bswab32(regs->xfs),
-		bswab32(regs->xgs));
+		bswab32(regs->cs),
+		bswab32(regs->ss),
+		bswab32(regs->es),
+		bswab32(regs->fs),
+		bswab32(regs->gs));
 	return xendbg_send_reply(buf, ctx);
 }
 
 static int
-process_command(char *received_packet, struct pt_regs *regs,
+process_command(char *received_packet, struct xen_regs *regs,
 		struct xendbg_context *ctx)
 {
 	char *ptr;
@@ -288,11 +282,11 @@ xdb_ctx = {
 };
 
 void
-__trap_to_xendbg(struct pt_regs *regs)
+__trap_to_cdb(struct xen_regs *regs)
 {
 	int resume = 0;
 	int r;
-	static int xendbg_running;
+	static atomic_t xendbg_running = ATOMIC_INIT(1);
 	static char recv_buf[4096];
 	unsigned flags;
 
@@ -300,23 +294,33 @@ __trap_to_xendbg(struct pt_regs *regs)
 		dbg_printk("Debugger not ready yet.\n");
 		return;
 	}
-	/* We rely on our caller to ensure we're only on one processor
-	 * at a time... We should probably panic here, but given that
-	 * we're a debugger we should probably be a little tolerant of
-	 * things going wrong. */
-	if (xendbg_running) {
-		dbg_printk("WARNING WARNING WARNING: Avoiding recursive xendbg.\n");
-		return;
-	}
-	xendbg_running = 1;
-
-	/* Shouldn't really do this, but otherwise we stop for no
-	   obvious reason, which is Bad */
-	printk("Waiting for GDB to attach to XenDBG\n");
 
 	/* Try to make things a little more stable by disabling
 	   interrupts while we're here. */
 	local_irq_save(flags);
+
+	/* We rely on our caller to ensure we're only on one processor
+	 * at a time... We should probably panic here, but given that
+	 * we're a debugger we should probably be a little tolerant of
+	 * things going wrong. */
+	/* We don't want to use a spin lock here, because we're doing
+	   two distinct things:
+
+	   1 -- we don't want to run on more than one processor at a time,
+	        and
+	   2 -- we want to do something sensible if we re-enter ourselves.
+
+	   Spin locks are good for 1, but useless for 2. */
+	if (!atomic_dec_and_test(&xendbg_running)) {
+		printk("WARNING WARNING WARNING: Avoiding recursive xendbg.\n");
+		atomic_inc(&xendbg_running);
+		local_irq_restore(flags);
+		return;
+	}
+
+	/* Shouldn't really do this, but otherwise we stop for no
+	   obvious reason, which is Bad */
+	printk("Waiting for GDB to attach to XenDBG\n");
 
 	/* If gdb is already attached, tell it we've stopped again. */
 	if (xdb_ctx.currently_attached) {
@@ -333,20 +337,18 @@ __trap_to_xendbg(struct pt_regs *regs)
 		} else
 			resume = process_command(recv_buf, regs, &xdb_ctx);
 	}
-	xendbg_running = 0;
+	atomic_inc(&xendbg_running);
 	local_irq_restore(flags);
 }
 
 void
 initialize_xendbg(void)
 {
-	extern char opt_xendbg[];
-
-	if (!strcmp(opt_xendbg, "none"))
+	if (!strcmp(opt_cdb, "none"))
 		return;
-	xdb_ctx.serhnd = parse_serial_handle(opt_xendbg);
+	xdb_ctx.serhnd = parse_serial_handle(opt_cdb);
 	if (xdb_ctx.serhnd == -1)
-		panic("Can't parse %s as XDB serial info.\n", opt_xendbg);
+		panic("Can't parse %s as CDB serial info.\n", opt_cdb);
 
 	/* Acknowledge any spurious GDB packets. */
 	xendbg_put_char('+', &xdb_ctx);
