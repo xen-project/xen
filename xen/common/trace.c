@@ -49,8 +49,8 @@ int tb_init_done = 0;
 void init_trace_bufs(void)
 {
     extern int opt_tbuf_size;
-    int           i, pages_order;
-    unsigned long total_size;
+    int           i, order;
+    unsigned long nr_pages;
     char         *rawbuf;
     struct t_buf *buf;
     
@@ -60,27 +60,18 @@ void init_trace_bufs(void)
         return;
     }
 
-    /* calculate page_order - we'll allocate 2^page_order pages */
-    pages_order = 0;
-    total_size = smp_num_cpus * opt_tbuf_size;
+    nr_pages = smp_num_cpus * opt_tbuf_size;
+    order    = get_order(nr_pages * PAGE_SIZE);
     
-    while( (total_size) >> ( pages_order + 1 ) )
-        pages_order++;
-
-    /* if total_size is not an exact power of two then over-allocate */
-    if( total_size & ~( 1 << pages_order ) )
-        pages_order++;
-
-    /* we allocate 2^page_order pages to hold the data */
-    if ( (rawbuf = (char *)__get_free_pages(GFP_KERNEL, pages_order)) == NULL )
+    if ( (rawbuf = (char *)__get_free_pages(GFP_KERNEL, order)) == NULL )
     {
         printk("Xen trace buffers: memory allocation failed\n");
         return;
     }
 
     /* share pages so that xentrace can map them */
-    for( i = 0; i < total_size; i++)
-        SHARE_PFN_WITH_DOMAIN( &frame_table[(__pa(rawbuf)>>PAGE_SHIFT)+i], 0);
+    for( i = 0; i < nr_pages; i++)
+        SHARE_PFN_WITH_DOMAIN(virt_to_page(rawbuf+(i*PAGE_SIZE)), 0);
     
     for ( i = 0; i < smp_num_cpus; i++ )
     {
@@ -97,7 +88,7 @@ void init_trace_bufs(void)
 
         /* For use in both. */
         buf->size = (opt_tbuf_size * PAGE_SIZE - sizeof(struct t_buf))
-                                                        / sizeof(struct t_rec);
+            / sizeof(struct t_rec);
     }
 
     printk("Xen trace buffers: initialised\n");
