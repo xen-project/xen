@@ -39,7 +39,7 @@ static inline void switch_mm(struct mm_struct *prev,
 		cpu_set(cpu, next->cpu_vm_mask);
 
 		/* Re-load page tables */
-		load_cr3_noflush(next->pgd);
+		load_cr3(next->pgd);
 
 		/*
 		 * load the LDT, if the LDT is different:
@@ -56,7 +56,7 @@ static inline void switch_mm(struct mm_struct *prev,
 			/* We were in lazy tlb mode and leave_mm disabled 
 			 * tlb flush IPI delivery. We must reload %cr3.
 			 */
-			load_cr3_noflush(next->pgd);
+			load_cr3(next->pgd);
 			load_LDT_nolock(&next->context, cpu);
 		}
 	}

@@ -180,6 +180,7 @@ pte_t *pte_alloc_one_kernel(struct mm_struct *mm, unsigned long address)
 	if (pte) {
 		clear_page(pte);
 		__make_page_readonly(pte);
+		xen_flush_page_update_queue();
 	}
 	return pte;
 }
@@ -204,7 +205,10 @@ struct page *pte_alloc_one(struct mm_struct *mm, unsigned long address)
 #ifdef CONFIG_HIGHPTE
 		if (pte < highmem_start_page)
 #endif
-		__make_page_readonly(phys_to_virt(page_to_pseudophys(pte)));
+		{
+			__make_page_readonly(phys_to_virt(page_to_pseudophys(pte)));
+			flush_page_update_queue();
+		}
 	}
 	return pte;
 }

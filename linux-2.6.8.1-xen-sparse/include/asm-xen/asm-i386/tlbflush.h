@@ -6,8 +6,7 @@
 #include <asm/processor.h>
 
 #define __flush_tlb() do {						\
-	queue_tlb_flush();						\
-	xen_flush_page_update_queue();					\
+	xen_tlb_flush();						\
 } while (/*CONSTCOND*/0)
 
 /*
@@ -16,8 +15,7 @@
  */
 #define __flush_tlb_global()						\
 	do {								\
-		queue_tlb_flush();					\
-		xen_flush_page_update_queue();				\
+		xen_tlb_flush();					\
 	} while (0)
 
 extern unsigned long pgkern_mask;
@@ -33,8 +31,7 @@ extern unsigned long pgkern_mask;
 #define cpu_has_invlpg	(boot_cpu_data.x86 > 3)
 
 #define __flush_tlb_single(addr) do {					\
-	queue_invlpg(addr);						\
-	xen_flush_page_update_queue();					\
+	xen_invlpg(addr);						\
 } while (/* CONSTCOND */0)
 
 # define __flush_tlb_one(addr) __flush_tlb_single(addr)

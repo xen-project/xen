@@ -252,7 +252,7 @@ static inline int ptep_test_and_clear_dirty(pte_t *ptep)
 	pte_t pte = *ptep;
 	int ret = pte_dirty(pte);
 	if (ret)
-		queue_l1_entry_update(ptep, pte_mkclean(pte).pte_low);
+		xen_l1_entry_update(ptep, pte_mkclean(pte).pte_low);
 	return ret;
 }
 
@@ -261,7 +261,7 @@ static inline int ptep_test_and_clear_young(pte_t *ptep)
 	pte_t pte = *ptep;
 	int ret = pte_young(pte);
 	if (ret)
-		queue_l1_entry_update(ptep, pte_mkold(pte).pte_low);
+		xen_l1_entry_update(ptep, pte_mkold(pte).pte_low);
 	return ret;
 }
 
@@ -275,7 +275,7 @@ static inline void ptep_mkdirty(pte_t *ptep)
 {
 	pte_t pte = *ptep;
 	if (!pte_dirty(pte))
-		queue_l1_entry_update(ptep, pte_mkdirty(pte).pte_low);
+		xen_l1_entry_update(ptep, pte_mkdirty(pte).pte_low);
 }
 
 /*
@@ -318,7 +318,7 @@ static inline pte_t pte_modify(pte_t pte, pgprot_t newprot)
 	pmd_t p = *(xp);					\
 	set_pmd(xp, __pmd(0));					\
 	__make_page_writable((void *)pmd_page_kernel(p));	\
-	/* XXXcl queue */ \
+	xen_flush_page_update_queue();				\
 } while (0)
 
 #ifndef CONFIG_DISCONTIGMEM
@@ -418,12 +418,13 @@ extern pte_t *lookup_address(unsigned long address);
 #define update_mmu_cache(vma,address,pte) do { } while (0)
 #define  __HAVE_ARCH_PTEP_SET_ACCESS_FLAGS
 
-#if 1
+#if 0
 #define ptep_set_access_flags(__vma, __address, __ptep, __entry, __dirty) \
 	do {								  \
 		if (__dirty) {						  \
 			queue_l1_entry_update((__ptep), (__entry).pte_low); \
-			flush_tlb_page(__vma, __address);		  \
+			flush_tlb_page(__vma, __address);                 \
+			xen_flush_page_update_queue();                    \
 		}							  \
 	} while (0)
 #else
@@ -434,8 +435,7 @@ extern pte_t *lookup_address(unsigned long address);
 			    xen_flush_page_update_queue();                \
 			    HYPERVISOR_update_va_mapping(address>>PAGE_SHIFT, entry, UVMF_INVLPG); \
 			} else {                                          \
-                            queue_l1_entry_update((__ptep), (__entry).pte_low); \
-			    xen_flush_page_update_queue();                \
+                            xen_l1_entry_update((__ptep), (__entry).pte_low); \
 			}                                                 \
 		}							  \
 	} while (0)
@@ -449,6 +449,7 @@ extern pte_t *lookup_address(unsigned long address);
 #define __pte_to_swp_entry(pte)		((swp_entry_t) { (pte).pte_low })
 #define __swp_entry_to_pte(x)		((pte_t) { (x).val })
 
+/* NOTE: make_page* callers must call flush_page_update_queue() */
 static inline void __make_page_readonly(void *va)
 {
 	pgd_t *pgd = pgd_offset_k((unsigned long)va);
@@ -474,7 +475,6 @@ static inline void make_page_readonly(void *va)
 	if ( (unsigned long)va >= VMALLOC_START )
 		__make_page_readonly(machine_to_virt(
 			*(unsigned long *)pte&PAGE_MASK));
-	/* XXXcl queue */
 }
 
 static inline void make_page_writable(void *va)
@@ -486,7 +486,6 @@ static inline void make_page_writable(void *va)
 	if ( (unsigned long)va >= VMALLOC_START )
 		__make_page_writable(machine_to_virt(
 			*(unsigned long *)pte&PAGE_MASK));
-	/* XXXcl queue */
 }
 
 static inline void make_pages_readonly(void *va, unsigned int nr)
@@ -496,7 +495,6 @@ static inline void make_pages_readonly(void *va, unsigned int nr)
 		make_page_readonly(va);
 		va = (void *)((unsigned long)va + PAGE_SIZE);
 	}
-	/* XXXcl queue */
 }
 
 static inline void make_pages_writable(void *va, unsigned int nr)
@@ -506,7 +504,6 @@ static inline void make_pages_writable(void *va, unsigned int nr)
 		make_page_writable(va);
 		va = (void *)((unsigned long)va + PAGE_SIZE);
 	}
-	/* XXXcl queue */
 }
 
 static inline unsigned long arbitrary_virt_to_phys(void *va)

@@ -182,12 +182,6 @@ static inline unsigned int cpuid_edx(unsigned int op)
 
 #define load_cr3(pgdir) do {				\
 	queue_pt_switch(__pa(pgdir));			\
-	flush_page_update_queue();			\
-	cur_pgd = pgdir;	/* XXXsmp */		\
-} while (/* CONSTCOND */0)
-
-#define load_cr3_noflush(pgdir) do {			\
-	queue_pt_switch(__pa(pgdir));			\
 	cur_pgd = pgdir;	/* XXXsmp */		\
 } while (/* CONSTCOND */0)
 
