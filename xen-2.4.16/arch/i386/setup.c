@@ -280,6 +280,7 @@ void __init start_of_day(void)
     extern void tqueue_bh(void);
     extern void immediate_bh(void);
     extern void init_timervecs(void);
+	extern void disable_pit(void);
 	extern void ac_timer_init(void);
     extern int  setup_network_devices(void);
     extern void net_init(void);
@@ -329,8 +330,11 @@ void __init start_of_day(void)
                       * fall thru to 8259A if we have to (but slower).
                       */
 #endif
-	init_xeno_time();	/* initialise the time */
+    initialize_keytable(); /* call back handling for key codes      */
+
+	disable_pit();		/* not needed anymore */
 	ac_timer_init();    /* init accurate timers */
+	init_xeno_time();	/* initialise the time */
 	schedulers_start(); /* start scheduler for each CPU */
 
     sti();
@@ -343,7 +347,7 @@ void __init start_of_day(void)
 #endif
     do_initcalls();
 
-    initialize_keytable(); /* call back handling for key codes      */
+
     initialize_serial();   /* setup serial 'driver' (for debugging) */
     initialize_keyboard(); /* setup keyboard (also for debugging)   */
 

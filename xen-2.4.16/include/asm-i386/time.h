@@ -41,9 +41,6 @@ typedef s64      s_time_t;	     /* System time */
 extern  u32      stime_pcc;      /* cycle counter value at last timer irq */
 extern  s_time_t stime_now;      /* time in ns at last timer IRQ */
 
-/* update time variables once in a while */
-extern void update_time(void);
-
 /*
  * Domain Virtual Time
  */

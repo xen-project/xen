@@ -282,6 +282,9 @@ asmlinkage void schedule(void)
     return;
 }
 
+/*
+ * The scheduling timer.
+ */
 static __cacheline_aligned int count[NR_CPUS];
 static void sched_timer(unsigned long foo)
 {
@@ -290,13 +293,34 @@ static void sched_timer(unsigned long foo)
 	s_time_t			now;
 	int 				res;
 
+	/* reschedule after each 5 ticks */
 	if (count[cpu] >= 5) {
 		set_bit(_HYP_EVENT_NEED_RESCHED, &curr->hyp_events);
 		count[cpu] = 0;
-		if (cpu == 0)
-			update_time(); /* XXX RN: Should be moved on its own timer */
 	}
 	count[cpu]++;
+
+	/*
+     * deliver virtual timer interrups to domains if we are CPU 0
+     * XXX RN: We don't have a per CPU list of domains yet. Otherwise 
+     * would use that. Plus, this should be removed anyway once
+     * Domains "know" about virtual time and timeouts. But, it's better
+     * here then where it was before.
+     */
+	if (cpu == 0) {
+		struct task_struct *p;
+		unsigned long cpu_mask = 0;
+
+		/* send virtual timer interrupt */
+		read_lock(&tasklist_lock);
+		p = &idle0_task;
+		do {
+			cpu_mask |= mark_guest_event(p, _EVENT_TIMER);
+		}
+		while ( (p = p->next_task) != &idle0_task );
+		read_unlock(&tasklist_lock);
+		guest_event_notify(cpu_mask);
+	}
 
  again:
 	now = NOW();
@@ -310,6 +334,8 @@ static void sched_timer(unsigned long foo)
 		goto again;
 
 }
+
+
 /*
  * Initialise the data structures
  */
