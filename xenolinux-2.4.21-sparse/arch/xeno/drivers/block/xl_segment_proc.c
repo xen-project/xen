@@ -51,7 +51,7 @@ static int proc_vhd_show(struct seq_file *s, void *v)
 		data->segments[data->count - 1].domain,
 		data->segments[data->count - 1].seg_nr,
 		data->segments[data->count - 1].key,
-		physdev_to_xldev(data->segments[data->count - 1].device));
+		data->segments[data->count - 1].mode);
 
     return 0;
 }

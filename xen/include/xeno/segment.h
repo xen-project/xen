@@ -35,10 +35,6 @@ typedef struct extent
     unsigned long size;               /* size of this extent */
 } extent_t;
 
-#define XEN_SEGMENT_UNUSED 0          /* bzero default */
-#define XEN_SEGMENT_RO XEN_DISK_READ_ONLY
-#define XEN_SEGMENT_RW XEN_DISK_READ_WRITE
-
 typedef struct segment
 {
     int mode;                         /* UNUSED, RO, or RW */
