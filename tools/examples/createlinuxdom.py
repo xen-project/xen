@@ -14,7 +14,7 @@ import Xc, XenoUtil, string, sys, os, time, socket
 # initialize a few variables that might come in handy
 thishostname = socket.gethostname()
 guestid = 0
-if sys.argv >= 2:
+if len(sys.argv) >= 2:
     guestid = string.atoi(sys.argv[1])
     print "Offset to add to guest's IP etc : %d\n" % guestid
  
