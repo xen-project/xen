@@ -366,8 +366,6 @@ mkbuildtree} script to add the Xen patches the kernel. It then builds
 two different XenLinux images, one with a ``-xen0'' extension which
 contains hardware device drivers and drivers for Xen's virtual devices,
 and one with a ``-xenU'' extension that just contains the virtual ones.
-The former is intended to be used in the first virtual machine (``domain 0''),
-the latter just has a smaller memory footprint.
 
 The procedure is similar to build the Linux 2.4 port: \\
 \verb!# LINUX_SRC=/path/to/linux2.4/source make linux24!
