@@ -23,6 +23,7 @@ esac
 
 DEST_DIR=${2:-xeno-clone}
 DEST_BK_REP=`basename "${BK_REP}"`
+DEST_VER=`basename ${DEST_BK_REP} .bk`
 
 echo usage: xen-clone bk_repository dest_dir orig_linux_dir
 echo Source BK Repository : ${BK_REP}
@@ -37,6 +38,8 @@ TOP=`/bin/pwd`
 case "$SITE" in
 UCCL)
 	PATH=$PATH:/usr/groups/xeno/build_tools/bin
+	mkdir ${DEST_VER}-install
+	ln -s ${DEST_VER}-install install
 	mkdir -p install/boot
 	cd install/boot
 	ln -sf ../../../xeno-roots/roots .
