@@ -97,6 +97,14 @@ int xc_linux_build(int xc_handle,
                    unsigned int control_evtchn,
                    unsigned long flags);
 
+int
+xc_plan9_build (int xc_handle,
+                u32 domid, 
+                const char *image_name,
+                const char *cmdline, 
+		unsigned int control_evtchn, 
+		unsigned long flags);
+
 int xc_bvtsched_global_set(int xc_handle,
                            unsigned long ctx_allow);
 

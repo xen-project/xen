@@ -366,6 +366,33 @@ static PyObject *pyxc_linux_build(PyObject *self,
     return zero;
 }
 
+static PyObject *pyxc_plan9_build(PyObject *self,
+                                  PyObject *args,
+                                  PyObject *kwds)
+{
+    XcObject *xc = (XcObject *)self;
+
+    u32   dom;
+    char *image, *ramdisk = NULL, *cmdline = "";
+    int   control_evtchn, flags = 0;
+
+    static char *kwd_list[] = { "dom", "control_evtchn",
+                                "image", "ramdisk", "cmdline", "flags",
+                                NULL };
+
+    if ( !PyArg_ParseTupleAndKeywords(args, kwds, "iis|ssi", kwd_list,
+                                      &dom, &control_evtchn,
+                                      &image, &ramdisk, &cmdline, &flags) )
+        return NULL;
+
+    if ( xc_plan9_build(xc->xc_handle, dom, image,
+                        cmdline, control_evtchn, flags) != 0 )
+        return PyErr_SetFromErrno(xc_error);
+
+    Py_INCREF(zero);
+    return zero;
+}
+
 static PyObject *pyxc_bvtsched_global_set(PyObject *self,
                                           PyObject *args,
                                           PyObject *kwds)
@@ -888,6 +915,14 @@ static PyMethodDef pyxc_methods[] = {
       " dom        [int]:    Identifier of domain to be saved.\n"
       " state_file [str]:    Name of state file. Must not currently exist.\n"
       " progress   [int, 1]: Bool - display a running progress indication?\n\n"
+      "Returns: [int] 0 on success; -1 on error.\n" },
+    { "plan9_build",
+      (PyCFunction)pyxc_plan9_build,
+      METH_VARARGS | METH_KEYWORDS, "\n"
+      "Build a new Plan 9 guest OS.\n"
+      " dom     [long]:     Identifier of domain to build into.\n"
+      " image   [str]:      Name of kernel image file. May be gzipped.\n"
+      " cmdline [str, n/a]: Kernel parameters, if any.\n\n"
       "Returns: [int] 0 on success; -1 on error.\n" },
 
     { "linux_restore", 
