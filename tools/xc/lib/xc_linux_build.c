@@ -26,6 +26,7 @@ static long get_tot_pages(int xc_handle, u64 domid)
     dom0_op_t op;
     op.cmd = DOM0_GETDOMAININFO;
     op.u.getdomaininfo.domain = (domid_t)domid;
+    op.u.getdomaininfo.ctxt = NULL;
     return (do_dom0_op(xc_handle, &op) < 0) ? 
         -1 : op.u.getdomaininfo.tot_pages;
 }
@@ -70,7 +71,7 @@ static int setup_guestos(int xc_handle,
                          gzFile initrd_gfd, unsigned long initrd_len,
                          unsigned long nr_pages,
                          unsigned long *pvsi, unsigned long *pvke,
-                         dom0_builddomain_t *builddomain, 
+			 full_execution_context_t *ctxt,
                          const char *cmdline,
                          unsigned long shared_info_frame,
                          unsigned int control_evtchn)
@@ -163,8 +164,6 @@ static int setup_guestos(int xc_handle,
            v_start, v_end);
     printf(" ENTRY ADDRESS: %08lx\n", vkern_entry);
 
-    memset(builddomain, 0, sizeof(*builddomain));
-
     if ( (pm_handle = init_pfn_mapper((domid_t)dom)) < 0 )
         goto error_out;
 
@@ -205,7 +204,7 @@ static int setup_guestos(int xc_handle,
     /* First allocate page for page dir. */
     ppt_alloc = (vpt_start - v_start) >> PAGE_SHIFT;
     l2tab = page_array[ppt_alloc++] << PAGE_SHIFT;
-    builddomain->ctxt.pt_base = l2tab;
+    ctxt->pt_base = l2tab;
 
     /* Initialise the page tables. */
     if ( (vl2tab = map_pfn_writeable(pm_handle, l2tab >> PAGE_SHIFT)) == NULL )
@@ -388,7 +387,7 @@ int xc_linux_build(int xc_handle,
     int initrd_fd = -1;
     gzFile initrd_gfd = NULL;
     int rc, i;
-    full_execution_context_t *ctxt;
+    full_execution_context_t st_ctxt, *ctxt = &st_ctxt;
     unsigned long nr_pages;
     char         *image = NULL;
     unsigned long image_size, initrd_size=0;
@@ -420,8 +419,15 @@ int xc_linux_build(int xc_handle,
         }
     }
 
+    if ( mlock(&st_ctxt, sizeof(st_ctxt) ) )
+    {   
+        PERROR("Unable to mlock ctxt");
+        return 1;
+    }
+
     op.cmd = DOM0_GETDOMAININFO;
     op.u.getdomaininfo.domain = (domid_t)domid;
+    op.u.getdomaininfo.ctxt = ctxt;
     if ( (do_dom0_op(xc_handle, &op) < 0) || 
          ((u64)op.u.getdomaininfo.domain != domid) )
     {
@@ -429,7 +435,7 @@ int xc_linux_build(int xc_handle,
         goto error_out;
     }
     if ( (op.u.getdomaininfo.state != DOMSTATE_STOPPED) ||
-         (op.u.getdomaininfo.ctxt.pt_base != 0) )
+         (ctxt->pt_base != 0) )
     {
         ERROR("Domain is already constructed");
         goto error_out;
@@ -438,7 +444,7 @@ int xc_linux_build(int xc_handle,
     if ( setup_guestos(xc_handle, domid, image, image_size, 
                        initrd_gfd, initrd_size, nr_pages, 
                        &vstartinfo_start, &vkern_entry,
-                       &launch_op.u.builddomain, cmdline,
+                       ctxt, cmdline,
                        op.u.getdomaininfo.shared_info_frame,
                        control_evtchn) < 0 )
     {
@@ -452,8 +458,6 @@ int xc_linux_build(int xc_handle,
         gzclose(initrd_gfd);
     if ( image != NULL )
         free(image);
-
-    ctxt = &launch_op.u.builddomain.ctxt;
 
     ctxt->flags = 0;
 
@@ -507,8 +511,11 @@ int xc_linux_build(int xc_handle,
     ctxt->failsafe_callback_cs  = FLAT_GUESTOS_CS;
     ctxt->failsafe_callback_eip = 0;
 
+    memset( &launch_op, 0, sizeof(launch_op) );
+
     launch_op.u.builddomain.domain   = (domid_t)domid;
     launch_op.u.builddomain.num_vifs = 1;
+    launch_op.u.builddomain.ctxt = ctxt;
 
     launch_op.cmd = DOM0_BUILDDOMAIN;
     rc = do_dom0_op(xc_handle, &launch_op);

@@ -27,6 +27,7 @@ static long get_tot_pages(int xc_handle, u64 domid)
     dom0_op_t op;
     op.cmd = DOM0_GETDOMAININFO;
     op.u.getdomaininfo.domain = (domid_t)domid;
+    op.u.getdomaininfo.ctxt = NULL;
     return (do_dom0_op(xc_handle, &op) < 0) ? 
         -1 : op.u.getdomaininfo.tot_pages;
 }
@@ -59,7 +60,7 @@ static int setup_guestos(int xc_handle,
                          unsigned long tot_pages,
                          unsigned long *virt_startinfo_addr, 
                          unsigned long *virt_load_addr, 
-                         dom0_builddomain_t *builddomain, 
+			 full_execution_context_t *ctxt,
                          const char *cmdline,
                          unsigned long shared_info_frame,
                          unsigned int control_evtchn)
@@ -77,8 +78,6 @@ static int setup_guestos(int xc_handle,
     unsigned long ksize;
     mmu_t *mmu = NULL;
     int pm_handle, i;
-
-    memset(builddomain, 0, sizeof(*builddomain));
 
     if ( (pm_handle = init_pfn_mapper((domid_t)dom)) < 0 )
         goto error_out;
@@ -119,7 +118,7 @@ static int setup_guestos(int xc_handle,
      */
     l2tab = page_array[alloc_index] << PAGE_SHIFT;
     alloc_index--;
-    builddomain->ctxt.pt_base = l2tab;
+    ctxt->pt_base = l2tab;
     
     if ( (mmu = init_mmu_updates(xc_handle, dom)) == NULL )
         goto error_out;
@@ -221,7 +220,7 @@ int xc_netbsd_build(int xc_handle,
     int kernel_fd = -1;
     gzFile kernel_gfd = NULL;
     int rc, i;
-    full_execution_context_t *ctxt;
+    full_execution_context_t st_ctxt, *ctxt = &st_ctxt;
     unsigned long virt_startinfo_addr;
 
     if ( (tot_pages = get_tot_pages(xc_handle, domid)) < 0 )
@@ -244,8 +243,15 @@ int xc_netbsd_build(int xc_handle,
         return 1;
     }
 
+    if ( mlock(&st_ctxt, sizeof(st_ctxt) ) )
+    {   
+        PERROR("Unable to mlock ctxt");
+        return 1;
+    }
+
     op.cmd = DOM0_GETDOMAININFO;
     op.u.getdomaininfo.domain = (domid_t)domid;
+    op.u.getdomaininfo.ctxt = ctxt;
     if ( (do_dom0_op(xc_handle, &op) < 0) || 
          ((u64)op.u.getdomaininfo.domain != domid) )
     {
@@ -253,7 +259,7 @@ int xc_netbsd_build(int xc_handle,
         goto error_out;
     }
     if ( (op.u.getdomaininfo.state != DOMSTATE_STOPPED) ||
-         (op.u.getdomaininfo.ctxt.pt_base != 0) )
+         (op.u.getdomaininfo.ctxt->pt_base != 0) )
     {
         ERROR("Domain is already constructed");
         goto error_out;
@@ -261,7 +267,7 @@ int xc_netbsd_build(int xc_handle,
 
     if ( setup_guestos(xc_handle, domid, kernel_gfd, tot_pages,
                        &virt_startinfo_addr,
-                       &load_addr, &launch_op.u.builddomain, cmdline,
+                       &load_addr, &st_ctxt, cmdline,
                        op.u.getdomaininfo.shared_info_frame,
                        control_evtchn) < 0 )
     {
@@ -273,8 +279,6 @@ int xc_netbsd_build(int xc_handle,
         close(kernel_fd);
     if( kernel_gfd )
         gzclose(kernel_gfd);
-
-    ctxt = &launch_op.u.builddomain.ctxt;
 
     ctxt->flags = 0;
 
@@ -328,9 +332,11 @@ int xc_netbsd_build(int xc_handle,
     ctxt->failsafe_callback_cs  = FLAT_GUESTOS_CS;
     ctxt->failsafe_callback_eip = 0;
 
+    memset( &launch_op, 0, sizeof(launch_op) );
+
     launch_op.u.builddomain.domain   = (domid_t)domid;
     launch_op.u.builddomain.num_vifs = 1;
-
+    launch_op.u.builddomain.ctxt = ctxt;
     launch_op.cmd = DOM0_BUILDDOMAIN;
     rc = do_dom0_op(xc_handle, &launch_op);
     

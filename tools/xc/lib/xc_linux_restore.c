@@ -58,8 +58,8 @@ int xc_linux_restore(int xc_handle,
                      u64 *pdomid)
 {
     dom0_op_t op;
-    int rc = 1, i, j;
-    unsigned long mfn, pfn;
+    int rc = 1, i, j, n, k;
+    unsigned long mfn, pfn, xpfn;
     unsigned int prev_pc, this_pc;
     
     /* Number of page frames in use by this Linux session. */
@@ -114,6 +114,14 @@ int xc_linux_restore(int xc_handle,
         return 1;
     }
 
+    if ( mlock(&ctxt, sizeof(ctxt) ) )
+    {   
+        /* needed for when we do the build dom0 op, 
+	   but might as well do early */
+        PERROR("Unable to mlock ctxt");
+        return 1;
+    }
+
     /* Start writing out the saved-domain record. */
     if ( !checked_read(gfd, signature, 16) ||
          (memcmp(signature, "LinuxGuestRecord", 16) != 0) )
@@ -159,12 +167,6 @@ int xc_linux_restore(int xc_handle,
         goto out;
     }
 
-    if ( !checked_read(gfd, pfn_type, 4 * nr_pfns) )
-    {
-        ERROR("Error when reading from state file");
-        goto out;
-    }
-
     /* Set the domain's name to that from the restore file */
     if ( xc_domain_setname( xc_handle, dom, name ) )
     {
@@ -184,6 +186,7 @@ int xc_linux_restore(int xc_handle,
     /* Get the domain's shared-info frame. */
     op.cmd = DOM0_GETDOMAININFO;
     op.u.getdomaininfo.domain = (domid_t)dom;
+    op.u.getdomaininfo.ctxt = NULL;
     if ( do_dom0_op(xc_handle, &op) < 0 )
     {
         ERROR("Could not get information on new domain");
@@ -219,73 +222,119 @@ int xc_linux_restore(int xc_handle,
      * We uncanonicalise page tables as we go.
      */
     prev_pc = 0;
-    for ( i = 0; i < nr_pfns; i++ )
+
+    n=0;
+    while(1)
     {
-        this_pc = (i * 100) / nr_pfns;
+	int j;
+	unsigned long region_pfn_type[1024];
+
+        this_pc = (n * 100) / nr_pfns;
         if ( (this_pc - prev_pc) >= 5 )
         {
             verbose_printf("\b\b\b\b%3d%%", this_pc);
             prev_pc = this_pc;
         }
 
-        mfn = pfn_to_mfn_table[i];
-
-        ppage = map_pfn_writeable(pm_handle, mfn);
-
-        if ( !checked_read(gfd, ppage, PAGE_SIZE) )
+        if ( !checked_read(gfd, &j, sizeof(int)) )
         {
             ERROR("Error when reading from state file");
             goto out;
         }
 
-        if ( pfn_type[i] == L1TAB )
+	printf("batch=%d\n",j);
+	
+	if(j==0) break;  // our work here is done
+	
+        if ( !checked_read(gfd, region_pfn_type, j*sizeof(unsigned long)) )
         {
-            for ( j = 0; j < 1024; j++ )
-            {
-                if ( ppage[j] & _PAGE_PRESENT )
-                {
-                    if ( (pfn = ppage[j] >> PAGE_SHIFT) >= nr_pfns )
-                    {
-                        ERROR("Frame number in type %d page table is out of range. i=%d j=%d pfn=%d nr_pfns=%d",pfn_type[i],i,j,pfn,nr_pfns);
-                        goto out;
-                    }
-                    if ( (pfn_type[pfn] != NONE) && (ppage[j] & _PAGE_RW) )
-                    {
-                        ERROR("Write access requested for a restricted frame");
-                        goto out;
-                    }
-                    ppage[j] &= (PAGE_SIZE - 1) & ~(_PAGE_GLOBAL | _PAGE_PAT);
-                    ppage[j] |= pfn_to_mfn_table[pfn] << PAGE_SHIFT;
-                }
-            }
-        }
-        else if ( pfn_type[i] == L2TAB )
-        {
-            for ( j = 0; j < (HYPERVISOR_VIRT_START>>L2_PAGETABLE_SHIFT); j++ )
-            {
-                if ( ppage[j] & _PAGE_PRESENT )
-                {
-                    if ( (pfn = ppage[j] >> PAGE_SHIFT) >= nr_pfns )
-                    {
-                        ERROR("Frame number in page table is out of range");
-                        goto out;
-                    }
-                    if ( pfn_type[pfn] != L1TAB )
-                    {
-                        ERROR("Page table mistyping");
-                        goto out;
-                    }
-                    ppage[j] &= (PAGE_SIZE - 1) & ~(_PAGE_GLOBAL | _PAGE_PSE);
-                    ppage[j] |= pfn_to_mfn_table[pfn] << PAGE_SHIFT;
-                }
-            }
-        }
-
-        unmap_pfn(pm_handle, ppage);
-
-        if ( add_mmu_update(xc_handle, mmu,
-                            (mfn<<PAGE_SHIFT) | MMU_MACHPHYS_UPDATE, i) )
+            ERROR("Error when reading from state file");
             goto out;
+        }
+
+	for(i=0;i<j;i++)
+	{
+	    pfn = region_pfn_type[i] & ~PGT_type_mask;
+	    	  	    
+//if(pfn_type[i])printf("^pfn=%d %08lx\n",pfn,pfn_type[i]);
+
+            if (pfn>nr_pfns)
+	    {
+		ERROR("pfn out of range");
+		goto out;
+	    }
+
+	    region_pfn_type[i] &= PGT_type_mask;
+
+	    pfn_type[pfn] = region_pfn_type[i];
+
+	    mfn = pfn_to_mfn_table[pfn];
+
+if(region_pfn_type[i])printf("i=%d pfn=%d mfn=%d type=%lx\n",i,pfn,mfn,region_pfn_type[i]);
+
+	    ppage = map_pfn_writeable(pm_handle, mfn);
+
+	    if ( !checked_read(gfd, ppage, PAGE_SIZE) )
+	    {
+		ERROR("Error when reading from state file");
+		goto out;
+	    }
+
+	    if ( region_pfn_type[i] == L1TAB )
+	    {
+		for ( k = 0; k < 1024; k++ )
+		{
+		    if ( ppage[k] & _PAGE_PRESENT )
+		    {
+			if ( (xpfn = ppage[k] >> PAGE_SHIFT) >= nr_pfns )
+			{
+			    ERROR("Frame number in type %d page table is out of range. i=%d k=%d pfn=%d nr_pfns=%d",region_pfn_type[i],i,k,xpfn,nr_pfns);
+			    goto out;
+			}
+#if 0
+			if ( (region_pfn_type[xpfn] != NONE) && (ppage[k] & _PAGE_RW) )
+			{
+			    ERROR("Write access requested for a restricted frame");
+			    goto out;
+			}
+#endif
+			ppage[k] &= (PAGE_SIZE - 1) & ~(_PAGE_GLOBAL | _PAGE_PAT);
+			ppage[k] |= pfn_to_mfn_table[xpfn] << PAGE_SHIFT;
+		    }
+		}
+	    }
+	    else if ( region_pfn_type[i] == L2TAB )
+	    {
+		for ( k = 0; k < (HYPERVISOR_VIRT_START>>L2_PAGETABLE_SHIFT); k++ )
+		{
+		    if ( ppage[k] & _PAGE_PRESENT )
+		    {
+			if ( (xpfn = ppage[k] >> PAGE_SHIFT) >= nr_pfns )
+			{
+			    ERROR("Frame number in page table is out of range");
+			    goto out;
+			}
+#if 0
+			if ( region_pfn_type[pfn] != L1TAB )
+			{
+			    ERROR("Page table mistyping");
+			    goto out;
+			}
+#endif
+			ppage[k] &= (PAGE_SIZE - 1) & ~(_PAGE_GLOBAL | _PAGE_PSE);
+			ppage[k] |= pfn_to_mfn_table[xpfn] << PAGE_SHIFT;
+		    }
+		}
+	    }
+
+	    unmap_pfn(pm_handle, ppage);
+
+	    if ( add_mmu_update(xc_handle, mmu,
+				(mfn<<PAGE_SHIFT) | MMU_MACHPHYS_UPDATE, pfn) )
+		goto out;
+
+	}
+
     }
 
     /*
@@ -352,7 +401,9 @@ int xc_linux_restore(int xc_handle,
     pfn = ctxt.pt_base >> PAGE_SHIFT;
     if ( (pfn >= nr_pfns) || (pfn_type[pfn] != L2TAB) )
     {
-        ERROR("PT base is bad");
+        printf("PT base is bad. pfn=%d nr=%d type=%08lx %08lx\n",
+	       pfn, nr_pfns, pfn_type[pfn], L2TAB);
+        ERROR("PT base is bad.");
         goto out;
     }
     ctxt.pt_base = pfn_to_mfn_table[pfn] << PAGE_SHIFT;
@@ -406,11 +457,11 @@ int xc_linux_restore(int xc_handle,
         ERROR("Bad LDT base or size");
         goto out;
     }
-
+   
     op.cmd = DOM0_BUILDDOMAIN;
     op.u.builddomain.domain   = (domid_t)dom;
     op.u.builddomain.num_vifs = 1;
-    memcpy(&op.u.builddomain.ctxt, &ctxt, sizeof(ctxt));
+    op.u.builddomain.ctxt = &ctxt;
     rc = do_dom0_op(xc_handle, &op);
 
  out:

@@ -84,6 +84,7 @@ int xc_domain_getinfo(int xc_handle,
     {
         op.cmd = DOM0_GETDOMAININFO;
         op.u.getdomaininfo.domain = (domid_t)next_domid;
+        op.u.getdomaininfo.ctxt = NULL; // no exec context info, thanks.
         if ( do_dom0_op(xc_handle, &op) < 0 )
             break;
         info->domid   = (u64)op.u.getdomaininfo.domain;

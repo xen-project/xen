@@ -10,7 +10,7 @@
 #include <asm-xen/suspend.h>
 #include <zlib.h>
 
-#define BATCH_SIZE 512   /* 1024 pages (4MB) at a time */
+#define BATCH_SIZE 1024   /* 1024 pages (4MB) at a time */
 
 /* This may allow us to create a 'quiet' command-line option, if necessary. */
 #define verbose_printf(_f, _a...) \
@@ -122,11 +122,18 @@ int xc_linux_save(int xc_handle,
         return 1;
     }
 
+    if ( mlock(&ctxt, sizeof(ctxt) ) )
+    {
+        PERROR("Unable to mlock ctxt");
+        return 1;
+    }
+
     /* Ensure that the domain exists, and that it is stopped. */
     for ( ; ; )
     {
         op.cmd = DOM0_GETDOMAININFO;
         op.u.getdomaininfo.domain = (domid_t)domid;
+        op.u.getdomaininfo.ctxt = &ctxt;
         if ( (do_dom0_op(xc_handle, &op) < 0) || 
              ((u64)op.u.getdomaininfo.domain != domid) )
         {
@@ -134,7 +141,6 @@ int xc_linux_save(int xc_handle,
             goto out;
         }
 
-        memcpy(&ctxt, &op.u.getdomaininfo.ctxt, sizeof(ctxt));
         memcpy(name, op.u.getdomaininfo.name, sizeof(name));
         shared_info_frame = op.u.getdomaininfo.shared_info_frame;
 
@@ -223,7 +229,7 @@ int xc_linux_save(int xc_handle,
 
 
     /* We want zeroed memory so use calloc rather than malloc. */
-    pfn_type         = calloc(1, 4 * srec.nr_pfns);
+    pfn_type = calloc(BATCH_SIZE, sizeof(unsigned long));
 
     if ( (pfn_type == NULL) )
     {
@@ -231,6 +237,11 @@ int xc_linux_save(int xc_handle,
         goto out;
     }
 
+    if ( mlock( pfn_type, BATCH_SIZE * sizeof(unsigned long) ) )
+    {
+	ERROR("Unable to mlock");
+	goto out;
+    }
 
 
     /* Track the mfn_to_pfn table down from the domains PT */
@@ -238,26 +249,22 @@ int xc_linux_save(int xc_handle,
 	unsigned long *pgd;
 	unsigned long mfn_to_pfn_table_start_mfn;
 
-    pgd = mfn_mapper_map_single(xc_handle, domid, 
+	pgd = mfn_mapper_map_single(xc_handle, domid, 
 				PAGE_SIZE, PROT_READ, 
 				ctxt.pt_base>>PAGE_SHIFT);
-/*
-    printf("pt mfn=%d pfn=%d type=%08x pte=%08x\n",ctxt.pt_base>>PAGE_SHIFT,
-	   mfn_to_pfn_table[ctxt.pt_base>>PAGE_SHIFT],
-	   pfn_type[mfn_to_pfn_table[ctxt.pt_base>>PAGE_SHIFT]],
-	   pgd[HYPERVISOR_VIRT_START>>L2_PAGETABLE_SHIFT] );
-*/
-    mfn_to_pfn_table_start_mfn = pgd[HYPERVISOR_VIRT_START>>L2_PAGETABLE_SHIFT]>>PAGE_SHIFT;
 
-    live_mfn_to_pfn_table = 
-	mfn_mapper_map_single(xc_handle, ~0ULL, 
-			      PAGE_SIZE*1024, PROT_READ, 
-			      mfn_to_pfn_table_start_mfn );
+	mfn_to_pfn_table_start_mfn = 
+	    pgd[HYPERVISOR_VIRT_START>>L2_PAGETABLE_SHIFT]>>PAGE_SHIFT;
+
+	live_mfn_to_pfn_table = 
+	    mfn_mapper_map_single(xc_handle, ~0ULL, 
+				  PAGE_SIZE*1024, PROT_READ, 
+				  mfn_to_pfn_table_start_mfn );
     }
 
 
     /*
-     * Quick sanity check.
+     * Quick belt and braces sanity check.
      */
 
     for ( i = 0; i < srec.nr_pfns; i++ )
@@ -268,50 +275,6 @@ int xc_linux_save(int xc_handle,
 	    printf("i=%d mfn=%d live_mfn_to_pfn_table=%d\n",
 		   i,mfn,live_mfn_to_pfn_table[mfn]);
     }
-
-
-/* test new pfn_type stuff */
-    {
-	int n, i, j;
-
-	if ( mlock( pfn_type, srec.nr_pfns * sizeof(unsigned long) ) )
-	{
-	    ERROR("Unable to mlock");
-	    goto out;
-	}
-	for ( n = 0; n < srec.nr_pfns; )
-	{
-
-	    for( j = 0, i = n; j < BATCH_SIZE && i < srec.nr_pfns ; j++, i++ )
-	    {		
-		pfn_type[i] = live_pfn_to_mfn_table[i];
-	    }
-
-	    if ( get_pfn_type_batch(xc_handle, domid, j, &pfn_type[n]) )
-	    {
-		ERROR("get_pfn_type_batch failed");
-		goto out;
-	    }
-
-	    for( j = 0, i = n; j < BATCH_SIZE && i < srec.nr_pfns ; j++, i++ )
-	    {
-		
-		pfn_type[i] >>= 29;
-
-		if(pfn_type[i] == 7)
-		{
-		    ERROR("bogus page");
-		    goto out;
-		}
-
-/*		if(pfn_type[i])
-		    printf("i=%d type=%d\n",i,pfn_type[i]);    */
-	    }
-
-	    n+=j;
-	}
-    }
-
 
 
     /* Canonicalise the suspend-record frame number. */
@@ -366,8 +329,7 @@ int xc_linux_save(int xc_handle,
          !checked_write(gfd, &srec.nr_pfns,         sizeof(unsigned long)) ||
          !checked_write(gfd, &ctxt,                 sizeof(ctxt)) ||
          !checked_write(gfd, live_shinfo,           PAGE_SIZE) ||
-         !checked_write(gfd, pfn_to_mfn_frame_list, PAGE_SIZE) ||
-         !checked_write(gfd, pfn_type,              4 * srec.nr_pfns) )
+         !checked_write(gfd, pfn_to_mfn_frame_list, PAGE_SIZE) )
     {
         ERROR("Error when writing to state file");
         goto out;
@@ -394,6 +356,11 @@ int xc_linux_save(int xc_handle,
             prev_pc = this_pc;
         }
 
+	for( j = 0, i = n; j < BATCH_SIZE && i < srec.nr_pfns ; j++, i++ )
+	{		
+	    pfn_type[j] = live_pfn_to_mfn_table[i];
+	}
+
 
 	for( j = 0, i = n; j < BATCH_SIZE && i < srec.nr_pfns ; j++, i++ )
 	{
@@ -411,32 +378,54 @@ int xc_linux_save(int xc_handle,
 	    goto out;
 	}
 
-#if 0	   
-	typer_handle = get_type_init( xc_handle, BATCH_SIZE )
-
+	if ( get_pfn_type_batch(xc_handle, domid, j, pfn_type) )
+	{
+	    ERROR("get_pfn_type_batch failed");
+	    goto out;
+	}
+	
 	for( j = 0, i = n; j < BATCH_SIZE && i < srec.nr_pfns ; j++, i++ )
 	{
-	    /* queue up ownership and type checks for all pages in batch */
+	    if((pfn_type[j]>>29) == 7)
+	    {
+		ERROR("bogus page");
+		goto out;
+	    }
 
-	    get_type_queue_entry( typer_handle, domain, 
-				  pfn_to_mfn_frame_list[i] );
+	    /* canonicalise mfn->pfn */
+	    pfn_type[j] = (pfn_type[j] & PGT_type_mask) |
+		live_mfn_to_pfn_table[pfn_type[j]&~PGT_type_mask];
+	    
+/*	    if(pfn_type[j]>>29)
+		    printf("i=%d type=%d\n",i,pfn_type[i]);    */
 	}
 
-	region_type = get_type;
 
-#endif
+	if ( !checked_write(gfd, &j, sizeof(int) ) )
+	{
+	    ERROR("Error when writing to state file");
+	    goto out;
+	}
+
+	if ( !checked_write(gfd, pfn_type, sizeof(unsigned long)*j ) )
+	{
+	    ERROR("Error when writing to state file");
+	    goto out;
+	}
+
 
 	for( j = 0, i = n; j < BATCH_SIZE && i < srec.nr_pfns ; j++, i++ )
 	{
 	    /* write out pages in batch */
 
-	    if ( (pfn_type[i] == L1TAB) || (pfn_type[i] == L2TAB) )
+	    if ( ((pfn_type[j] & PGT_type_mask) == L1TAB) || 
+		 ((pfn_type[j] & PGT_type_mask) == L2TAB) )
 	    {
 		
 		memcpy(page, region_base + (PAGE_SIZE*j), PAGE_SIZE);
 
 		for ( k = 0; 
-		      k < ((pfn_type[i] == L2TAB) ? 
+		      k < (((pfn_type[j] & PGT_type_mask) == L2TAB) ? 
 			   (HYPERVISOR_VIRT_START >> L2_PAGETABLE_SHIFT) : 1024); 
 		      k++ )
 		{
@@ -477,6 +466,14 @@ int xc_linux_save(int xc_handle,
 
     /* Success! */
     rc = 0;
+
+    /* Zero terminate */
+    if ( !checked_write(gfd, &rc, sizeof(int)) )
+    {
+	ERROR("Error when writing to state file");
+	goto out;
+    }
+    
 
 out:
     /* Restart the domain if we had to stop it to save its state. */

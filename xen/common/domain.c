@@ -535,45 +535,58 @@ void release_task(struct task_struct *p)
 int final_setup_guestos(struct task_struct *p, dom0_builddomain_t *builddomain)
 {
     unsigned long phys_basetab;
-    int i;
+    int i, rc = 0;
+    full_execution_context_t *c;
+
+    if ( (c = kmalloc(sizeof(*c), GFP_KERNEL)) == NULL )
+	return -ENOMEM;
 
     if ( test_bit(PF_CONSTRUCTED, &p->flags) )
-        return -EINVAL;
+    {
+        rc = -EINVAL;
+	goto out;
+    }
+
+    if ( copy_from_user(c, builddomain->ctxt, sizeof(*c)) )
+    {
+        rc = -EFAULT;
+        goto out;
+    }
     
     clear_bit(PF_DONEFPUINIT, &p->flags);
-    if ( builddomain->ctxt.flags & ECF_I387_VALID )
+    if ( c->flags & ECF_I387_VALID )
         set_bit(PF_DONEFPUINIT, &p->flags);
     memcpy(&p->shared_info->execution_context,
-           &builddomain->ctxt.cpu_ctxt,
+           &c->cpu_ctxt,
            sizeof(p->shared_info->execution_context));
     memcpy(&p->thread.i387,
-           &builddomain->ctxt.fpu_ctxt,
+           &c->fpu_ctxt,
            sizeof(p->thread.i387));
     memcpy(p->thread.traps,
-           &builddomain->ctxt.trap_ctxt,
+           &c->trap_ctxt,
            sizeof(p->thread.traps));
 #ifdef ARCH_HAS_FAST_TRAP
     SET_DEFAULT_FAST_TRAP(&p->thread);
-    (void)set_fast_trap(p, builddomain->ctxt.fast_trap_idx);
+    (void)set_fast_trap(p, c->fast_trap_idx);
 #endif
-    p->mm.ldt_base = builddomain->ctxt.ldt_base;
-    p->mm.ldt_ents = builddomain->ctxt.ldt_ents;
+    p->mm.ldt_base = c->ldt_base;
+    p->mm.ldt_ents = c->ldt_ents;
     SET_GDT_ENTRIES(p, DEFAULT_GDT_ENTRIES);
     SET_GDT_ADDRESS(p, DEFAULT_GDT_ADDRESS);
-    if ( builddomain->ctxt.gdt_ents != 0 )
+    if ( c->gdt_ents != 0 )
         (void)set_gdt(p,
-                      builddomain->ctxt.gdt_frames,
-                      builddomain->ctxt.gdt_ents);
-    p->thread.guestos_ss = builddomain->ctxt.guestos_ss;
-    p->thread.guestos_sp = builddomain->ctxt.guestos_esp;
+                      c->gdt_frames,
+                      c->gdt_ents);
+    p->thread.guestos_ss = c->guestos_ss;
+    p->thread.guestos_sp = c->guestos_esp;
     for ( i = 0; i < 8; i++ )
-        (void)set_debugreg(p, i, builddomain->ctxt.debugreg[i]);
-    p->event_selector    = builddomain->ctxt.event_callback_cs;
-    p->event_address     = builddomain->ctxt.event_callback_eip;
-    p->failsafe_selector = builddomain->ctxt.failsafe_callback_cs;
-    p->failsafe_address  = builddomain->ctxt.failsafe_callback_eip;
+        (void)set_debugreg(p, i, c->debugreg[i]);
+    p->event_selector    = c->event_callback_cs;
+    p->event_address     = c->event_callback_eip;
+    p->failsafe_selector = c->failsafe_callback_cs;
+    p->failsafe_address  = c->failsafe_callback_eip;
     
-    phys_basetab = builddomain->ctxt.pt_base;
+    phys_basetab = c->pt_base;
     p->mm.pagetable = mk_pagetable(phys_basetab);
     get_page_and_type(&frame_table[phys_basetab>>PAGE_SHIFT], p, 
                       PGT_base_page_table);
@@ -586,8 +599,11 @@ int final_setup_guestos(struct task_struct *p, dom0_builddomain_t *builddomain)
         (void)create_net_vif(p->domain);
 
     set_bit(PF_CONSTRUCTED, &p->flags);
+
+out:    
+    if (c) kfree(c);
     
-    return 0;
+    return rc;
 }
 
 static inline int is_loadable_phdr(Elf_Phdr *phdr)
