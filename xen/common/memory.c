@@ -766,32 +766,32 @@ void free_page_type(struct pfn_info *page, unsigned int type)
     {
     case PGT_l1_page_table:
         free_l1_table(page);
-	if ( unlikely(current->mm.shadow_mode) && 
-	     (get_shadow_status(&current->mm, 
-				page-frame_table) & PSH_shadowed) )
-	{
-	    /* using 'current-mm' is safe because page type changes only
-	       occur within the context of the currently running domain as 
-	       pagetable pages can not be shared across domains. The one
-	       exception is when destroying a domain. However, we get away 
-	       with this as there's no way the current domain can have this
-	       mfn shadowed, so we won't get here... Phew! */
+        if ( unlikely(current->mm.shadow_mode) && 
+             (get_shadow_status(&current->mm, 
+                                page-frame_table) & PSH_shadowed) )
+        {
+            /* using 'current-mm' is safe because page type changes only
+               occur within the context of the currently running domain as 
+               pagetable pages can not be shared across domains. The one
+               exception is when destroying a domain. However, we get away 
+               with this as there's no way the current domain can have this
+               mfn shadowed, so we won't get here... Phew! */
 
- 	    unshadow_table( page-frame_table, type );
-	    put_shadow_status(&current->mm);
+            unshadow_table( page-frame_table, type );
+            put_shadow_status(&current->mm);
         }
-	return;
+        return;
 
     case PGT_l2_page_table:
         free_l2_table(page);
-	if ( unlikely(current->mm.shadow_mode) && 
-	     (get_shadow_status(&current->mm, 
-				page-frame_table) & PSH_shadowed) )
-	{
-	    unshadow_table( page-frame_table, type );
-	    put_shadow_status(&current->mm);
+        if ( unlikely(current->mm.shadow_mode) && 
+             (get_shadow_status(&current->mm, 
+                                page-frame_table) & PSH_shadowed) )
+        {
+            unshadow_table( page-frame_table, type );
+            put_shadow_status(&current->mm);
         }
-	return;
+        return;
 
     default:
         BUG();
@@ -813,7 +813,7 @@ static int do_extended_command(unsigned long ptr, unsigned long val)
     case MMUEXT_PIN_L2_TABLE:
         okay = get_page_and_type_from_pagenr(
             pfn, (cmd == MMUEXT_PIN_L2_TABLE) ? PGT_l2_page_table : 
-                                                PGT_l1_page_table,
+            PGT_l1_page_table,
             CHECK_STRICT);
         if ( unlikely(!okay) )
         {
@@ -866,7 +866,7 @@ static int do_extended_command(unsigned long ptr, unsigned long val)
 
             shadow_mk_pagetable(&current->mm);
 
-	    write_ptbase(&current->mm);
+            write_ptbase(&current->mm);
 
             put_page_and_type(&frame_table[old_base_pfn]);    
         }
@@ -1005,14 +1005,14 @@ int do_mmu_update(mmu_update_t *ureqs, int count)
                     okay = mod_l1_entry((l1_pgentry_t *)va, 
                                         mk_l1_pgentry(req.val)); 
 
-		    if ( okay && unlikely(current->mm.shadow_mode) &&
-			 (get_shadow_status(&current->mm, page-frame_table) &
-			  PSH_shadowed) )
-		    {
-		        shadow_l1_normal_pt_update( req.ptr, req.val, 
-						    &prev_spfn, &prev_spl1e );
-			put_shadow_status(&current->mm);
-		    }
+                    if ( okay && unlikely(current->mm.shadow_mode) &&
+                         (get_shadow_status(&current->mm, page-frame_table) &
+                          PSH_shadowed) )
+                    {
+                        shadow_l1_normal_pt_update( req.ptr, req.val, 
+                                                    &prev_spfn, &prev_spl1e );
+                        put_shadow_status(&current->mm);
+                    }
 
                     put_page_type(page);
                 }
@@ -1024,13 +1024,13 @@ int do_mmu_update(mmu_update_t *ureqs, int count)
                                         mk_l2_pgentry(req.val),
                                         pfn); 
 
-		    if ( okay && unlikely(current->mm.shadow_mode) &&
-			 (get_shadow_status(&current->mm, page-frame_table) & 
-			  PSH_shadowed) )
-		    {
-		        shadow_l2_normal_pt_update( req.ptr, req.val );
-			put_shadow_status(&current->mm);
-		    }
+                    if ( okay && unlikely(current->mm.shadow_mode) &&
+                         (get_shadow_status(&current->mm, page-frame_table) & 
+                          PSH_shadowed) )
+                    {
+                        shadow_l2_normal_pt_update( req.ptr, req.val );
+                        put_shadow_status(&current->mm);
+                    }
 
                     put_page_type(page);
                 }
@@ -1041,8 +1041,6 @@ int do_mmu_update(mmu_update_t *ureqs, int count)
                     *(unsigned long *)va = req.val;
                     okay = 1;
                     put_page_type(page);
-
-                    // at present, we don't shadowing such pages
                 }
                 break;
             }
@@ -1127,8 +1125,10 @@ int do_update_va_mapping(unsigned long page_nr,
     if ( unlikely(page_nr >= (HYPERVISOR_VIRT_START >> PAGE_SHIFT)) )
         return -EINVAL;
 
-    // XXX when we make this support 4MB pages we should also
-    // deal with the case of updating L2s
+    /*
+     * XXX When we make this support 4MB superpages we should also deal with 
+     * the case of updating L2 entries.
+     */
 
     if ( unlikely(!mod_l1_entry(&linear_pg_table[page_nr], 
                                 mk_l1_pgentry(val))) )
@@ -1138,20 +1138,20 @@ int do_update_va_mapping(unsigned long page_nr,
     {
         unsigned long sval;
 
-	l1pte_no_fault( &current->mm, &val, &sval );
+        l1pte_no_fault( &current->mm, &val, &sval );
 
-	if ( unlikely(__put_user( sval, ((unsigned long *) (&shadow_linear_pg_table[page_nr])) ) ) )
-	{
-	    // Since L2's are guranteed RW, failure indicates the page
-	    // was not shadowed, so ignore.
+        if ( unlikely(__put_user(sval, ((unsigned long *)(
+            &shadow_linear_pg_table[page_nr])))) )
+        {
+            /*
+             * Since L2's are guranteed RW, failure indicates the page was not 
+             * shadowed, so ignore.
+             */
             perfc_incrc(shadow_update_va_fail);
-	    //MEM_LOG("update_va_map: couldn't write update\n");	
-	}
+        }
 
-	check_pagetable( p, p->mm.pagetable, "va" ); // debug
-    
+        check_pagetable( p, p->mm.pagetable, "va" ); /* debug */
     }
-
 
     deferred_ops = percpu_info[cpu].deferred_ops;
     percpu_info[cpu].deferred_ops = 0;
@@ -1309,7 +1309,7 @@ void audit_all_pages(u_char key, void *dev_id, struct pt_regs *regs)
 
         /* check ref count for leaf pages */
         if ( ((frame_table[i].type_and_flags & PGT_type_mask) ==
-               PGT_writeable_page) )
+              PGT_writeable_page) )
         {
             ref_count = 0;
 

@@ -425,9 +425,9 @@ struct mm_struct {
     spinlock_t shadow_lock;
     struct shadow_status *shadow_ht;
     struct shadow_status *shadow_ht_free;
-    struct shadow_status *shadow_ht_extras; // extra allocation units
+    struct shadow_status *shadow_ht_extras; /* extra allocation units */
     unsigned int *shadow_dirty_bitmap;
-    unsigned int shadow_dirty_bitmap_size;  // in pages, bit per page
+    unsigned int shadow_dirty_bitmap_size;  /* in pages, bit per page */
     unsigned int shadow_page_count;
     unsigned int shadow_max_page_count;
     unsigned int shadow_extras_count;
@@ -440,19 +440,11 @@ struct mm_struct {
 
 static inline void write_ptbase( struct mm_struct *m )
 {
-/*    printk("write_ptbase mode=%08x pt=%08lx st=%08lx\n",
-	   m->shadow_mode, pagetable_val(m->pagetable),
-	   pagetable_val(m->shadow_table) );
- */
-    if( m->shadow_mode )
-      {
-	//check_pagetable( m, m->pagetable, "write_ptbase" );
-	write_cr3_counted(pagetable_val(m->shadow_table));
-      }
+    if ( unlikely(m->shadow_mode) )
+        write_cr3_counted(pagetable_val(m->shadow_table));
     else
-      write_cr3_counted(pagetable_val(m->pagetable));
+        write_cr3_counted(pagetable_val(m->pagetable));
 }
-
 
 #define IDLE0_MM                                                    \
 {                                                                   \

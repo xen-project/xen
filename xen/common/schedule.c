@@ -175,7 +175,7 @@ void init_idle_task(void)
     struct task_struct *p = current;
 
     if ( SCHED_OP(alloc_task, p) < 0)
-		panic("Failed to allocate scheduler private data for idle task");
+        panic("Failed to allocate scheduler private data for idle task");
     SCHED_OP(add_task, p);
 
     spin_lock_irqsave(&schedule_lock[p->processor], flags);
@@ -283,13 +283,11 @@ long do_sched_op(unsigned long op)
 }
 
 
-/* sched_pause_sync - synchronously pause a domain's execution 
-
-XXXX This is horibly broken -- here just as a place holder at present,
-                               do not use.
-
-*/
-
+/*
+ * sched_pause_sync - synchronously pause a domain's execution 
+ * XXXX This is horibly broken -- here just as a place holder at present,
+ *                                do not use.
+ */
 void sched_pause_sync(struct task_struct *p)
 {
     unsigned long flags;
@@ -297,22 +295,21 @@ void sched_pause_sync(struct task_struct *p)
 
     spin_lock_irqsave(&schedule_lock[cpu], flags);
 
+    /* If not the current task, we can remove it from scheduling now. */
     if ( schedule_data[cpu].curr != p )
-        /* if not the current task, we can remove it from scheduling now */
         SCHED_OP(pause, p);
 
     p->state = TASK_PAUSED;
     
     spin_unlock_irqrestore(&schedule_lock[cpu], flags);
 
-    /* spin until domain is descheduled by its local scheduler */
+    /* Spin until domain is descheduled by its local scheduler. */
     while ( schedule_data[cpu].curr == p )
     {
-		send_hyp_event(p, _HYP_EVENT_NEED_RESCHED );
-		do_yield();
+        send_hyp_event(p, _HYP_EVENT_NEED_RESCHED );
+        do_yield();
     }
-    
-    
+        
     /* The domain will not be scheduled again until we do a wake_up(). */
 }
 
