@@ -6,36 +6,34 @@ The vnet module can be compiled for 2.4 or 2.6 series kernels.
 The makefiles  use the following variables, which
 can be set in your env or on the make command line:
 
-LINUX_RELEASE: linux release to compile for, 2.4 (default), or 2.6.
-XENO_ROOT: root of the xen tree containing kernel source. Default '..'.
-ROOT: root path to install in, default is XENO_ROOT/install.
-      Set to '/' to install relative to filesystem root.
-KERNEL_VERSION: kernel version, default got from XENO_ROOT.
+LINUX_SERIES: linux release to compile for, 2.4 (default), or 2.6.
+XEN_ROOT: root of the xen tree containing kernel source.
+KERNEL_VERSION: kernel version, default got from XEN_ROOT.
 KERNEL_MINOR: kernel minor version, default -xen0.
-KERNEL_SRC: path to kernel source, default linux-<VERSION> under XENO_ROOT.
+KERNEL_SRC: path to kernel source, default linux-<VERSION> under XEN_ROOT.
 
 *) For 2.4 kernel
 
 To compile from scratch:
 
 make clean
-make 
+make LINUX_SERIES=2.4
 
 This will build vnet_module.o in the current directory.
 To install the module use
 
-make install
+make LINUX_SERIES=2.4 install
 
 *) For 2.6 kernel
 
 To compile from scratch:
 
 make clean
-make LINUX_RELEASE=2.6
+make
 
 This will build vnet_module.ko in the current directory.
 To install the module use
 
-make LINUX_RELEASE=2.6 install
+make install
 
 
