@@ -29,8 +29,8 @@
  */
 
 #include <linux/config.h>
-#include <linux/module.h>
 #include <linux/kernel.h>
+#include <linux/module.h>
 #include <linux/sched.h>
 #include <linux/errno.h>
 #include <linux/mm.h>
@@ -43,16 +43,41 @@
 #include <asm-xen/xen_proc.h>
 #include <asm-xen/hypervisor.h>
 #include <asm-xen/ctrl_if.h>
+#include <asm-xen/balloon.h>
 #include <asm/pgalloc.h>
 #include <asm/pgtable.h>
 #include <asm/uaccess.h>
 #include <asm/tlb.h>
 #include <linux/list.h>
 
+#define MIN_TARGET ((16 << 20) >> PAGE_SHIFT) /* 16MB */
+
 static struct proc_dir_entry *balloon_pde;
 
-unsigned long credit;
+static DECLARE_MUTEX(balloon_mutex);
+spinlock_t balloon_lock = SPIN_LOCK_UNLOCKED;
+
+/* We aim for 'current allocation' == 'target allocation'. */
 static unsigned long current_pages;
+static unsigned long target_pages;
+
+/* We may hit the hard limit in Xen. If we do then we remember it. */
+static unsigned long hard_limit;
+
+/*
+ * Drivers may alter the memory reservation independently, but they must
+ * inform the balloon driver so that we can avoid hitting the hard limit.
+ */
+static unsigned long driver_pages;
+
+/* List of ballooned pages, threaded through the mem_map array. */
+static LIST_HEAD(ballooned_pages);
+static unsigned long balloon_low, balloon_high;
+
+/* Main work function, always executed in process context. */
+static void balloon_process(void *unused);
+static DECLARE_WORK(balloon_worker, balloon_process, NULL);
+static struct timer_list balloon_timer;
 
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,0)
 /* Use the private and mapping fields of struct page as a list. */
@@ -75,17 +100,24 @@ static unsigned long current_pages;
 #define WPRINTK(fmt, args...) \
     printk(KERN_WARNING "xen_mem: " fmt, ##args)
 
-/* List of ballooned pages, threaded through the mem_map array. */
-LIST_HEAD(ballooned_pages);
-
 /* balloon_append: add the given page to the balloon. */
-void balloon_append(struct page *page)
+static void balloon_append(struct page *page)
 {
-    list_add(PAGE_TO_LIST(page), &ballooned_pages);
+    /* Low memory is re-populated first, so highmem pages go at list tail. */
+    if ( PageHighMem(page) )
+    {
+        list_add_tail(PAGE_TO_LIST(page), &ballooned_pages);
+        balloon_high++;
+    }
+    else
+    {
+        list_add(PAGE_TO_LIST(page), &ballooned_pages);
+        balloon_low++;
+    }
 }
 
 /* balloon_retrieve: rescue a page from the balloon, if it is not empty. */
-struct page *balloon_retrieve(void)
+static struct page *balloon_retrieve(void)
 {
     struct page *page;
 
@@ -94,6 +126,12 @@ struct page *balloon_retrieve(void)
 
     page = LIST_TO_PAGE(ballooned_pages.next);
     UNLIST_PAGE(page);
+
+    if ( PageHighMem(page) )
+        balloon_high--;
+    else
+        balloon_low--;
+
     return page;
 }
 
@@ -111,193 +149,147 @@ static inline pte_t *get_ptep(unsigned long addr)
     return pte_offset_kernel(pmd, addr);
 }
 
-/* Main function for relinquishing memory. */
-static unsigned long inflate_balloon(unsigned long num_pages)
+static void balloon_alarm(unsigned long unused)
 {
-    unsigned long *parray, *currp, curraddr, ret = 0, i, j, mfn, pfn;
-    struct page *page;
-
-    parray = (unsigned long *)vmalloc(num_pages * sizeof(unsigned long));
-    if ( parray == NULL )
-    {
-        WPRINTK("inflate_balloon: Unable to vmalloc parray\n");
-        return -ENOMEM;
-    }
-
-    currp = parray;
-
-    for ( i = 0; i < num_pages; i++, currp++ )
-    {
-        page = alloc_page(GFP_HIGHUSER);
-        pfn  = page - mem_map;
-
-        /* If allocation fails then free all reserved pages. */
-        if ( page == NULL )
-        {
-            printk(KERN_ERR "Unable to inflate balloon by %ld, only"
-                   " %ld pages free.", num_pages, i);
-            currp = parray;
-            for ( j = 0; j < i; j++, currp++ )
-                __free_page((struct page *) (mem_map + *currp));
-
-            ret = -EFAULT;
-            goto cleanup;
-        }
-
-        *currp = pfn;
-    }
-
-    for ( i = 0, currp = parray; i < num_pages; i++, currp++ )
-    {
-        mfn      = phys_to_machine_mapping[*currp];
-        curraddr = (unsigned long)page_address(mem_map + *currp);
-        /* Blow away page contents for security, and also p.t. ref if any. */
-        if ( curraddr != 0 )
-        {
-            scrub_pages(curraddr, 1);
-            queue_l1_entry_update(get_ptep(curraddr), 0);
-        }
-#ifdef CONFIG_XEN_SCRUB_PAGES
-        else
-        {
-            void *p = kmap(&mem_map[*currp]);
-            scrub_pages(p, 1);
-            kunmap(&mem_map[*currp]);
-        }
-#endif
-
-        balloon_append(&mem_map[*currp]);
-
-        phys_to_machine_mapping[*currp] = INVALID_P2M_ENTRY;
-        *currp = mfn;
-    }
-
-    /* Flush updates through and flush the TLB. */
-    xen_tlb_flush();
-
-    ret = HYPERVISOR_dom_mem_op(MEMOP_decrease_reservation, 
-                                parray, num_pages, 0);
-    if ( unlikely(ret != num_pages) )
-    {
-        printk(KERN_ERR "Unable to inflate balloon, error %lx\n", ret);
-        goto cleanup;
-    }
-
-    credit += num_pages;
-    ret = num_pages;
-
- cleanup:
-    vfree(parray);
-
-    return ret;
+    schedule_work(&balloon_worker);
 }
 
-/* Install a set of new pages (@mfn_list, @nr_mfns) into the memory map. */
-static unsigned long process_returned_pages(
-    unsigned long *mfn_list, unsigned long nr_mfns)
+static unsigned long current_target(void)
 {
-    unsigned long pfn, i;
-    struct page *page;
+    unsigned long target = min(target_pages, hard_limit);
+    if ( target > (current_pages + balloon_low + balloon_high) )
+        target = current_pages + balloon_low + balloon_high;
+    if ( target < MIN_TARGET )
+        target = MIN_TARGET;
+    return target;
+}
 
-    for ( i = 0; i < nr_mfns; i++ )
+static void balloon_process(void *unused)
+{
+    unsigned long *mfn_list, pfn, i, flags;
+    struct page   *page;
+    long           credit, debt, rc;
+    void          *v;
+
+    down(&balloon_mutex);
+
+ retry:
+    mfn_list = NULL;
+
+    if ( (credit = current_target() - current_pages) > 0 )
     {
-        if ( (page = balloon_retrieve()) != NULL )
-            break;
+        mfn_list = (unsigned long *)vmalloc(credit * sizeof(*mfn_list));
+        if ( mfn_list == NULL )
+            goto out;
 
-        pfn = page - mem_map;
-        if ( phys_to_machine_mapping[pfn] != INVALID_P2M_ENTRY )
+        balloon_lock(flags);
+        rc = HYPERVISOR_dom_mem_op(
+            MEMOP_increase_reservation, mfn_list, credit, 0);
+        balloon_unlock(flags);
+        if ( rc < credit )
+        {
+            /* We hit the Xen hard limit: reprobe. */
+            if ( HYPERVISOR_dom_mem_op(
+                MEMOP_decrease_reservation, mfn_list, rc, 0) != rc )
+                BUG();
+            hard_limit = current_pages + rc - driver_pages;
+            vfree(mfn_list);
+            goto retry;
+        }
+
+        for ( i = 0; i < credit; i++ )
+        {
+            if ( (page = balloon_retrieve()) == NULL )
+                BUG();
+
+            pfn = page - mem_map;
+            if ( phys_to_machine_mapping[pfn] != INVALID_P2M_ENTRY )
+                BUG();
+
+            /* Update P->M and M->P tables. */
+            phys_to_machine_mapping[pfn] = mfn_list[i];
+            queue_machphys_update(mfn_list[i], pfn);
+            
+            /* Link back into the page tables if it's not a highmem page. */
+            if ( pfn < max_low_pfn )
+                queue_l1_entry_update(
+                    get_ptep((unsigned long)__va(pfn << PAGE_SHIFT)),
+                    (mfn_list[i] << PAGE_SHIFT) | pgprot_val(PAGE_KERNEL));
+            
+            /* Finally, relinquish the memory back to the system allocator. */
+            ClearPageReserved(page);
+            set_page_count(page, 1);
+            __free_page(page);
+        }
+
+        current_pages += credit;
+    }
+    else if ( credit < 0 )
+    {
+        debt = -credit;
+
+        mfn_list = (unsigned long *)vmalloc(debt * sizeof(*mfn_list));
+        if ( mfn_list == NULL )
+            goto out;
+
+        for ( i = 0; i < debt; i++ )
+        {
+            if ( (page = alloc_page(GFP_HIGHUSER)) == NULL )
+            {
+                debt = i;
+                break;
+            }
+
+            pfn = page - mem_map;
+            mfn_list[i] = phys_to_machine_mapping[pfn];
+            phys_to_machine_mapping[pfn] = INVALID_P2M_ENTRY;
+
+            if ( !PageHighMem(page) )
+            {
+                v = phys_to_virt((page - mem_map) << PAGE_SHIFT);
+                scrub_pages(v, 1);
+                queue_l1_entry_update(get_ptep((unsigned long)v), 0);
+            }
+#ifdef CONFIG_XEN_SCRUB_PAGES
+            else
+            {
+                v = kmap(page);
+                scrub_pages(v, 1);
+                kunmap(page);
+            }
+#endif            
+
+            balloon_append(page);
+        }
+
+        /* Flush updates through and flush the TLB. */
+        xen_tlb_flush();
+
+        if ( HYPERVISOR_dom_mem_op(
+            MEMOP_decrease_reservation, mfn_list, debt, 0) != debt )
             BUG();
 
-        /* Update P->M and M->P tables. */
-        phys_to_machine_mapping[pfn] = mfn_list[i];
-        queue_machphys_update(mfn_list[i], pfn);
-
-        /* Link back into the page tables if it's not a highmem page. */
-        if ( pfn < max_low_pfn )
-            queue_l1_entry_update(
-                get_ptep((unsigned long)__va(pfn << PAGE_SHIFT)),
-                (mfn_list[i] << PAGE_SHIFT) | pgprot_val(PAGE_KERNEL));
-
-        /* Finally, relinquish the memory back to the system allocator. */
-        ClearPageReserved(page);
-        set_page_count(page, 1);
-        __free_page(page);
+        current_pages -= debt;
     }
 
-    return i;
+ out:
+    if ( mfn_list != NULL )
+        vfree(mfn_list);
+
+    /* Schedule more work if there is some still to be done. */
+    if ( current_target() != current_pages )
+        mod_timer(&balloon_timer, jiffies + HZ);
+
+    up(&balloon_mutex);
 }
 
-unsigned long deflate_balloon(unsigned long num_pages)
+/* Resets the Xen limit, sets new target, and kicks off processing. */
+static void set_new_target(unsigned long target)
 {
-    unsigned long ret;
-    unsigned long *parray;
-
-    if ( num_pages > credit )
-    {
-        printk(KERN_ERR "deflate_balloon: %lu pages > %lu credit.\n",
-               num_pages, credit);
-        return -EAGAIN;
-    }
-
-    parray = (unsigned long *)vmalloc(num_pages * sizeof(unsigned long));
-    if ( parray == NULL )
-    {
-        printk(KERN_ERR "deflate_balloon: Unable to vmalloc parray\n");
-        return 0;
-    }
-
-    ret = HYPERVISOR_dom_mem_op(MEMOP_increase_reservation, 
-                                parray, num_pages, 0);
-    if ( unlikely(ret != num_pages) )
-    {
-        printk(KERN_ERR "deflate_balloon: xen increase_reservation err %lx\n",
-               ret);
-        goto cleanup;
-    }
-
-    if ( (ret = process_returned_pages(parray, num_pages)) < num_pages )
-    {
-        printk(KERN_WARNING
-               "deflate_balloon: restored only %lx of %lx pages.\n",
-           ret, num_pages);
-        goto cleanup;
-    }
-
-    ret = num_pages;
-    credit -= num_pages;
-
- cleanup:
-    vfree(parray);
-
-    return ret;
+    hard_limit   = ~0UL;
+    target_pages = target;
+    balloon_process(NULL);
 }
-
-#define PAGE_TO_MB_SHIFT 8
-
-static int balloon_try_target(int target)
-{
-    int change, reclaim;
-
-    if ( target < current_pages )
-    {
-        if ( (change = inflate_balloon(current_pages-target)) <= 0 )
-            return change;
-        current_pages -= change;
-        printk(KERN_INFO "Relinquish %dMB to xen. Domain now has %luMB\n",
-            change>>PAGE_TO_MB_SHIFT, current_pages>>PAGE_TO_MB_SHIFT);
-    }
-    else if ( (reclaim = target - current_pages) > 0 )
-    {
-        if ( (change = deflate_balloon(reclaim)) <= 0 )
-            return change;
-        current_pages += change;
-        printk(KERN_INFO "Reclaim %dMB from xen. Domain now has %luMB\n",
-               change>>PAGE_TO_MB_SHIFT, current_pages>>PAGE_TO_MB_SHIFT);
-    }
-
-    return 1;
-}
-
 
 static void balloon_ctrlif_rx(ctrl_msg_t *msg, unsigned long id)
 {
@@ -308,7 +300,8 @@ static void balloon_ctrlif_rx(ctrl_msg_t *msg, unsigned long id)
             goto parse_error;
         {
             mem_request_t *req = (mem_request_t *)&msg->msg[0];
-            req->status = balloon_try_target(req->target);
+            set_new_target(req->target);
+            req->status = 0;
         }
         break;        
     default:
@@ -323,20 +316,13 @@ static void balloon_ctrlif_rx(ctrl_msg_t *msg, unsigned long id)
     ctrl_if_send_response(msg);
 }
 
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,0)
-typedef size_t count_t;
-#else
-typedef u_long count_t;
-#endif
-
-static int do_balloon_write(const char *buffer, count_t count)
+static int balloon_write(struct file *file, const char *buffer,
+                         size_t count, loff_t *offp)
 {
     char memstring[64], *endchar;
     int len, i;
-    unsigned long target;
-    unsigned long long targetbytes;
+    unsigned long long target_bytes;
 
-    /* Only admin can play with the balloon :) */
     if ( !capable(CAP_SYS_ADMIN) )
         return -EPERM;
 
@@ -344,8 +330,10 @@ static int do_balloon_write(const char *buffer, count_t count)
         return -EFBIG;
 
     len = strnlen_user(buffer, count);
-    if ( len == 0 ) return -EBADMSG;
-    if ( len == 1 ) return 1; /* input starts with a NUL char */
+    if ( len == 0 )
+        return -EBADMSG;
+    if ( len == 1 )
+        goto out; /* input starts with a NUL char */
     if ( strncpy_from_user(memstring, buffer, len) < 0 )
         return -EFAULT;
 
@@ -356,24 +344,10 @@ static int do_balloon_write(const char *buffer, count_t count)
     if ( i == 0 )
         return -EBADMSG;
 
-    targetbytes = memparse(memstring,&endchar);
-    target = targetbytes >> PAGE_SHIFT;
+    target_bytes = memparse(memstring,&endchar);
+    set_new_target(target_bytes >> PAGE_SHIFT);
 
-    i = balloon_try_target(target);
-
-    if ( i <= 0 ) return i;
-
-    return len;
-}
-
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,0)
-static int balloon_write(struct file *file, const char *buffer,
-                         size_t count, loff_t *offp)
-{
-    int len = do_balloon_write(buffer, count);
-    
-    if ( len <= 0 ) return len;
-
+ out:
     *offp += len;
     return len;
 }
@@ -381,18 +355,44 @@ static int balloon_write(struct file *file, const char *buffer,
 static int balloon_read(struct file *filp, char *buffer,
                         size_t count, loff_t *offp)
 {
-    static char priv_buf[32];
-    char *priv_bufp = priv_buf;
+    char *priv_buf;
     int len;
-    len = sprintf(priv_buf,"%lu\n",current_pages<<PAGE_SHIFT);
+
+    priv_buf = (char *)__get_free_page(GFP_KERNEL);
+    if ( priv_buf == NULL )
+        return -ENOMEM;
+
+#define K(_p) ((_p)<<(PAGE_SHIFT-10))
+    len = sprintf(
+        priv_buf,
+        "Current allocation: %8lu kB\n"
+        "Target allocation:  %8lu kB / %8lu kB (actual / requested)\n"
+        "Unused heap space:  %8lu kB / %8lu kB (low-mem / high-mem)\n"
+        "Xen hard limit:     ",
+        K(current_pages),
+        K(current_target()), K(target_pages),
+        K(balloon_low), K(balloon_high));
+
+    if ( hard_limit != ~0UL )
+        len += sprintf(
+            priv_buf + len, 
+            "%8lu kB (inc. %8lu kB driver headroom)\n",
+            K(hard_limit), K(driver_pages));
+    else
+        len += sprintf(
+            priv_buf + len,
+            "     ??? kB\n");
 
     len -= *offp;
-    priv_bufp += *offp;
-    if (len>count) len = count;
-    if (len<0) len = 0;
+    if ( len > count)
+        len = count;
+    if ( len < 0 )
+        len = 0;
 
-    if ( copy_to_user(buffer, priv_bufp, len) != 0 )
-        return -EFAULT;
+    if ( len != 0 )
+        (void)copy_to_user(buffer, &priv_buf[*offp], len);
+
+    free_page((unsigned long)priv_buf);
 
     *offp += len;
     return len;
@@ -403,30 +403,6 @@ static struct file_operations balloon_fops = {
     .write = balloon_write
 };
 
-#else
-
-static int balloon_write(struct file *file, const char *buffer,
-                         u_long count, void *data)
-{
-    return do_balloon_write(buffer, count);
-}
-
-static int balloon_read(char *page, char **start, off_t off,
-			int count, int *eof, void *data)
-{
-  int len;
-  len = sprintf(page,"%lu\n",current_pages<<PAGE_SHIFT);
-  
-  if (len <= off+count) *eof = 1;
-  *start = page + off;
-  len -= off;
-  if (len>count) len = count;
-  if (len<0) len = 0;
-  return len;
-}
-
-#endif
-
 static int __init balloon_init(void)
 {
     unsigned long pfn;
@@ -435,20 +411,23 @@ static int __init balloon_init(void)
     IPRINTK("Initialising balloon driver.\n");
 
     current_pages = min(xen_start_info.nr_pages, max_pfn);
-    if ( (balloon_pde = create_xen_proc_entry("memory_target", 0644)) == NULL )
+    target_pages  = current_pages;
+    balloon_low   = 0;
+    balloon_high  = 0;
+    driver_pages  = 0UL;
+    hard_limit    = ~0UL;
+
+    init_timer(&balloon_timer);
+    balloon_timer.data = 0;
+    balloon_timer.function = balloon_alarm;
+    
+    if ( (balloon_pde = create_xen_proc_entry("balloon", 0644)) == NULL )
     {
-        WPRINTK("Unable to create balloon driver proc entry!");
+        WPRINTK("Unable to create /proc/xen/balloon.\n");
         return -1;
     }
 
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,0)
-    balloon_pde->owner     = THIS_MODULE;
-    balloon_pde->nlink     = 1;
     balloon_pde->proc_fops = &balloon_fops;
-#else
-    balloon_pde->write_proc = balloon_write;
-    balloon_pde->read_proc  = balloon_read;
-#endif
 
     (void)ctrl_if_register_receiver(CMSG_MEM_REQUEST, balloon_ctrlif_rx,
                                     CALLBACK_IN_BLOCKING_CONTEXT);
@@ -464,14 +443,29 @@ static int __init balloon_init(void)
     return 0;
 }
 
-static void __exit balloon_cleanup(void)
+__initcall(balloon_init);
+
+void balloon_update_driver_allowance(long delta)
 {
-    if ( balloon_pde != NULL )
-    {
-        remove_xen_proc_entry("memory_target");
-        balloon_pde = NULL;
-    }
+    unsigned long flags;
+    balloon_lock(flags);
+    driver_pages += delta;
+    balloon_unlock(flags);
 }
 
-module_init(balloon_init);
-module_exit(balloon_cleanup);
+void balloon_put_pages(unsigned long *mfn_list, unsigned long nr_mfns)
+{
+    unsigned long flags;
+
+    balloon_lock(flags);
+    if ( HYPERVISOR_dom_mem_op(MEMOP_decrease_reservation, 
+                               mfn_list, nr_mfns, 0) != nr_mfns )
+        BUG();
+    current_pages -= nr_mfns;
+    balloon_unlock(flags);
+
+    schedule_work(&balloon_worker);
+}
+
+EXPORT_SYMBOL(balloon_update_driver_allowance);
+EXPORT_SYMBOL(balloon_put_pages);

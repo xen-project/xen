@@ -13,6 +13,7 @@
 #include <linux/pci.h>
 #include <linux/version.h>
 #include <asm/io.h>
+#include <asm-xen/balloon.h>
 
 #if LINUX_VERSION_CODE < KERNEL_VERSION(2,6,0)
 #define pte_offset_kernel pte_offset
@@ -37,9 +38,12 @@ xen_contig_memory(unsigned long vstart, unsigned int order)
 	pgd_t         *pgd; 
 	pmd_t         *pmd;
 	pte_t         *pte;
-	unsigned long  pfn, i;
+	unsigned long  pfn, i, flags;
 
 	scrub_pages(vstart, 1 << order);
+
+        balloon_lock(flags);
+
 	/* 1. Zap current PTEs, giving away the underlying pages. */
 	for (i = 0; i < (1<<order); i++) {
 		pgd = pgd_offset_k(   (vstart + (i*PAGE_SIZE)));
@@ -70,6 +74,8 @@ xen_contig_memory(unsigned long vstart, unsigned int order)
 	}
 	/* Flush updates through and flush the TLB. */
 	xen_tlb_flush();
+
+        balloon_unlock(flags);
 }
 
 #if LINUX_VERSION_CODE < KERNEL_VERSION(2,6,0)
