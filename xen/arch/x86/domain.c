@@ -476,7 +476,7 @@ void domain_relinquish_memory(struct domain *d)
         put_page(page);
 
     /* Relinquish all pages on the domain's allocation list. */
-    spin_lock_recursive(&d->page_alloc_lock); /* may enter free_domain_page */
+    spin_lock_recursive(&d->page_alloc_lock); /* may enter free_domheap_page */
     list_for_each_safe ( ent, tmp, &d->page_list )
     {
         page = list_entry(ent, struct pfn_info, list);

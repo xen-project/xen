@@ -27,6 +27,7 @@
 #include <asm/page.h>
 #include <xen/spinlock.h>
 #include <xen/slab.h>
+#include <xen/irq.h>
 
 
 /*********************
@@ -198,6 +199,9 @@ struct pfn_info *alloc_heap_pages(int zone, int order)
     struct pfn_info *pg;
     unsigned long flags;
 
+    if ( unlikely(order < MIN_ORDER) || unlikely(order > MAX_ORDER) )
+        return NULL;
+
     spin_lock_irqsave(&heap_lock, flags);
 
     /* Find smallest order which can satisfy the request. */
@@ -331,18 +335,116 @@ void init_domheap_pages(unsigned long ps, unsigned long pe)
     init_heap_pages(MEMZONE_DOM, phys_to_page(ps), (pe - ps) >> PAGE_SHIFT);
 }
 
-struct pfn_info *alloc_domheap_pages(int order)
+struct pfn_info *alloc_domheap_pages(struct domain *d, int order)
 {
-    struct pfn_info *pg = alloc_heap_pages(MEMZONE_DOM, order);
+    struct pfn_info *pg;
+    unsigned long mask, flushed_mask, pfn_stamp, cpu_stamp;
+    int i;
+
+    ASSERT(!in_irq());
+
+    if ( unlikely((pg = alloc_heap_pages(MEMZONE_DOM, order)) == NULL) )
+        return NULL;
+
+    flushed_mask = 0;
+    for ( i = 0; i < (1 << order); i++ )
+    {
+        pg[i].u.inuse.domain    = NULL;
+        pg[i].u.inuse.type_info = 0;
+
+        if ( (mask = (pg[i].u.free.cpu_mask & ~flushed_mask)) != 0 )
+        {
+            pfn_stamp = pg[i].tlbflush_timestamp;
+            for ( i = 0; (mask != 0) && (i < smp_num_cpus); i++ )
+            {
+                if ( mask & (1<<i) )
+                {
+                    cpu_stamp = tlbflush_time[i];
+                    if ( !NEED_FLUSH(cpu_stamp, pfn_stamp) )
+                        mask &= ~(1<<i);
+                }
+            }
+            
+            if ( unlikely(mask != 0) )
+            {
+                flush_tlb_mask(mask);
+                perfc_incrc(need_flush_tlb_flush);
+                flushed_mask |= mask;
+            }
+        }
+    }
+
+    if ( d == NULL )
+        return pg;
+
+    spin_lock(&d->page_alloc_lock);
+
+    if ( unlikely((d->tot_pages + (1 << order)) > d->max_pages) )
+    {
+        DPRINTK("Over-allocation for domain %u: %u > %u\n",
+                d->domain, d->tot_pages + (1 << order), d->max_pages);
+        spin_unlock(&d->page_alloc_lock);
+        free_heap_pages(MEMZONE_DOM, pg, order);
+        return NULL;
+    }
+
+    if ( unlikely(d->tot_pages == 0) )
+        get_domain(d);
+
+    d->tot_pages += 1 << order;
+
+    for ( i = 0; i < (1 << order); i++ )
+    {
+        pg[i].u.inuse.domain = d;
+        wmb(); /* Domain pointer must be visible before updating refcnt. */
+        pg->u.inuse.count_info = PGC_allocated | 1;
+        list_add_tail(&pg->list, &d->page_list);
+    }
+
+    spin_unlock(&d->page_alloc_lock);
+    
     return pg;
 }
 
 void free_domheap_pages(struct pfn_info *pg, int order)
 {
-    free_heap_pages(MEMZONE_DOM, pg, order);
+    int            i, drop_dom_ref;
+    struct domain *d = pg->u.inuse.domain;
+
+    if ( unlikely(IS_XEN_HEAP_FRAME(pg)) )
+    {
+        spin_lock_recursive(&d->page_alloc_lock);
+        d->xenheap_pages -= 1 << order;
+        drop_dom_ref = (d->xenheap_pages == 0);
+        spin_unlock_recursive(&d->page_alloc_lock);
+    }
+    else
+    {
+        /* NB. May recursively lock from domain_relinquish_memory(). */
+        spin_lock_recursive(&d->page_alloc_lock);
+
+        for ( i = 0; i < (1 << order); i++ )
+        {
+            pg[i].tlbflush_timestamp = tlbflush_clock;
+            pg[i].u.inuse.count_info = 0;
+            pg[i].u.free.cpu_mask    = 1 << d->processor;
+            list_del(&pg[i].list);
+        }
+
+        d->tot_pages -= 1 << order;
+        drop_dom_ref = (d->tot_pages == 0);
+
+        spin_unlock_recursive(&d->page_alloc_lock);
+
+        free_heap_pages(MEMZONE_DOM, pg, order);
+    }
+
+    if ( drop_dom_ref )
+        put_domain(d);
 }
 
 unsigned long avail_domheap_pages(void)
 {
     return avail[MEMZONE_DOM];
 }
+

@@ -512,7 +512,7 @@ int shadow_mode_control(struct domain *d, dom0_shadow_control_t *sc)
 static inline struct pfn_info *alloc_shadow_page(struct mm_struct *m)
 {
     m->shadow_page_count++;
-    return alloc_domheap_page();
+    return alloc_domheap_page(NULL);
 }
 
 void unshadow_table( unsigned long gpfn, unsigned int type )
