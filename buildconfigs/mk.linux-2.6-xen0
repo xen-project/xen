@@ -36,6 +36,10 @@ $(LINUX_DIR)/include/linux/autoconf.h: pristine-linux-$(LINUX_VER)
 		$(LINUX_DIR)/.config
 	$(MAKE) -C $(LINUX_DIR) ARCH=xen oldconfig
 
+config: CONFIGMODE = menuconfig
+config: $(LINUX_DIR)/include/linux/autoconf.h
+	$(MAKE) -C $(LINUX_DIR) ARCH=xen $(CONFIGMODE)
+
 clean:
 	$(MAKE) -C $(LINUX_DIR) ARCH=xen clean
 
