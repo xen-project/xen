@@ -47,6 +47,12 @@ static void cleanup_module(void);
 
 static struct list_head dev_list;
 
+/*
+ * Needed because network_close() is not properly implemented yet. So
+ * an open after a close needs to do much less than the initial open.
+ */
+static int opened_once_already = 0;
+
 struct net_private
 {
     struct list_head list;
@@ -100,6 +106,13 @@ static int network_open(struct net_device *dev)
     struct net_private *np = dev->priv;
     int i, error = 0;
 
+    if ( opened_once_already )
+    {
+        memset(&np->stats, 0, sizeof(np->stats));
+        netif_start_queue(dev);
+        return 0;
+    }
+
     np->rx_resp_cons = np->tx_resp_cons = np->tx_full = 0;
     memset(&np->stats, 0, sizeof(np->stats));
     spin_lock_init(&np->tx_lock);
@@ -149,6 +162,8 @@ static int network_open(struct net_device *dev)
     netif_start_queue(dev);
 
     MOD_INC_USE_COUNT;
+
+    opened_once_already = 1;
 
     return 0;
 
@@ -228,15 +243,16 @@ static void network_alloc_rx_buffers(struct net_device *dev)
             virt_to_machine(get_ppte(skb->head));
     }
 
-    np->net_idx->rx_req_prod = i;
-
-    np->net_idx->rx_event = RX_RING_INC(np->rx_resp_cons);
-
     /*
      * We may have allocated buffers which have entries outstanding in
      * the page update queue -- make sure we flush those first!
      */
     flush_page_update_queue();
+
+    np->net_idx->rx_req_prod = i;
+
+    np->net_idx->rx_event = RX_RING_INC(np->rx_resp_cons);
+
     HYPERVISOR_net_update();
 }
 
@@ -385,9 +401,6 @@ int network_close(struct net_device *dev)
 {
     netif_stop_queue(dev);
 
-    free_irq(NET_RX_IRQ, dev);
-    free_irq(NET_TX_IRQ, dev);
-
     /*
      * XXXX This cannot be done safely until be have a proper interface
      * for setting up and tearing down virtual interfaces on the fly.
@@ -395,12 +408,15 @@ int network_close(struct net_device *dev)
      * no sensible way of retrieving them.
      */
 #if 0
+    free_irq(NET_RX_IRQ, dev);
+    free_irq(NET_TX_IRQ, dev);
+
     network_free_rx_buffers(dev);
     kfree(np->net_ring->rx_ring);
     kfree(np->net_ring->tx_ring);
-#endif
 
     MOD_DEC_USE_COUNT;
+#endif
 
     return 0;
 }

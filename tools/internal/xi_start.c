@@ -20,7 +20,7 @@ static int start_domain(int id)
 
 int main(int argc, char **argv)
 {
-    int rc;
+    int rc, dom;
 
     if ( argv[0] != NULL ) 
         argv0 = argv[0];
@@ -31,7 +31,14 @@ int main(int argc, char **argv)
         return 1;
     }
 
-    rc = start_domain(atol(argv[1]));
+    dom = atoi(argv[1]);
+    if ( dom == 0 )
+    {
+        ERROR("Did you really mean domain 0?");
+        return 1;
+    }
+
+    rc = start_domain(dom);;
 
     return (rc != 0) ? 1 : 0;
 }

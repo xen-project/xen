@@ -21,7 +21,7 @@ static int kill_domain(int dom_id, int force)
 
 int main(int argc, char **argv)
 {
-    int ret;
+    int ret, dom;
     
     if ( argv[0] != NULL ) 
         argv0 = argv[0];
@@ -37,7 +37,14 @@ int main(int argc, char **argv)
     if ( (argc == 3) && strcmp("-f", argv[1]) )
         goto usage;
     
-    ret = kill_domain(atoi(argv[argc-1]), argc == 3);
+    dom = atoi(argv[argc-1]);
+    if ( dom == 0 )
+    {
+        ERROR("Did you really mean domain 0?");
+        return 1;
+    }
+
+    ret = kill_domain(dom, argc == 3);
     
     return (ret != 0) ? 1 : 0;
 }
