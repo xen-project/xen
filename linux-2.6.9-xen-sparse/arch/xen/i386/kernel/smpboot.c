@@ -904,7 +904,7 @@ static int __init do_boot_cpu(int apicid)
 		     va < cpu_gdt_descr[cpu].address + cpu_gdt_descr[cpu].size;
 		     va += PAGE_SIZE, f++) {
 			ctxt.gdt_frames[f] = virt_to_machine(va) >> PAGE_SHIFT;
-			protect_page(swapper_pg_dir, (void *)va, PROT_ON);
+			make_page_readonly((void *)va);
 		}
 		ctxt.gdt_ents = cpu_gdt_descr[cpu].size / 8;
 		flush_page_update_queue();
