@@ -128,27 +128,6 @@ void do_task_queues(u_char key, void *dev_id, struct pt_regs *regs)
     read_unlock_irqrestore(&tasklist_lock, flags); 
 }
 
-void cpu_counters(u_char key, void *dev_id, struct pt_regs *regs)
-{
-    printk("CPU performance counters for CPU %d (current):\n",
-        smp_processor_id());
-    {
-        unsigned int one1,one2,zero1,zero2;
-        rdmsr(MSR_P6_PERFCTR0, zero1, zero2);
-        rdmsr(MSR_P6_PERFCTR1, one1, one2);
-        printk("CPU%02d counter0=0x%02x:%08x  counter1=0x%02x:%08x\n",
-           smp_processor_id(), zero2,zero1,one2,one1 );
-    }
-}
-
-void cpu_counters_reset(u_char key, void *dev_id, struct pt_regs *regs)
-{
-    printk("Reset CPU performance counters for CPU %d (current):\n",
-	smp_processor_id());
-    wrmsr(MSR_P6_PERFCTR0,0,0);
-    wrmsr(MSR_P6_PERFCTR1,0,0);
-}
-
 extern void perfc_printall (u_char key, void *dev_id, struct pt_regs *regs);
 extern void perfc_reset (u_char key, void *dev_id, struct pt_regs *regs);
 extern void dump_runq(u_char key, void *dev_id, struct pt_regs *regs);
@@ -175,7 +154,5 @@ void initialize_keytable()
     add_key_handler('r', dump_runq,      "dump run queues");
     add_key_handler('B', kill_dom0,      "reboot machine gracefully"); 
     add_key_handler('R', halt_machine,   "reboot machine ungracefully"); 
-    add_key_handler('c', cpu_counters,   "CPU performance counters");
-    add_key_handler('C', cpu_counters_reset,"reset CPU perfomance counters");    
     return; 
 }
