@@ -473,7 +473,7 @@ class XendDomainInfo:
         # When creating or rebooting, a domain with my name should not exist.
         # When restoring, a domain with my name will exist, but it should have
         # my domain id.
-        if dominfo and (not self.dom or dominfo.dom != self.dom)
+        if dominfo and (not self.dom or dominfo.dom != self.dom):
             raise VmError('vm name clash: ' + name)
         
     def construct(self, config):

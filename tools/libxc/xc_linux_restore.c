@@ -86,7 +86,7 @@ int xc_linux_restore(int xc_handle, XcIOContext *ioctxt)
     int rc = 1, i, n, k;
     unsigned long mfn, pfn, xpfn;
     unsigned int prev_pc, this_pc;
-    u32 dom = ioctxt->domain;
+    u32 dom = 0;
     int verify = 0; 
 
     /* Number of page frames in use by this Linux session. */
@@ -143,7 +143,7 @@ int xc_linux_restore(int xc_handle, XcIOContext *ioctxt)
         return 1;
     }
 
-    /* Start writing out the saved-domain record. */
+    /* Start reading the saved-domain record. */
     if ( xcio_read(ioctxt, signature, 16) ||
          (memcmp(signature, "LinuxGuestRecord", 16) != 0) )
     {
@@ -201,6 +201,7 @@ int xc_linux_restore(int xc_handle, XcIOContext *ioctxt)
         goto out;
     }
 
+#if 0
     /* Set the domain's name to that from the restore file */
     if ( xc_domain_setname( xc_handle, dom, name ) )
     {
@@ -218,6 +219,21 @@ int xc_linux_restore(int xc_handle, XcIOContext *ioctxt)
 		   dom, nr_pfns,nr_pfns * (PAGE_SIZE / 1024));
         goto out;
     }
+#endif
+
+
+    /* XXX create domain on CPU=-1 so that in future it auto load ballances by default */
+    if ( xc_domain_create( xc_handle,  nr_pfns * (PAGE_SIZE / 1024),
+			   name,
+			   -1, &dom ) )
+    {
+	xcio_error(ioctxt, "Could not create domain. pfns=%d, %dKB",
+		   nr_pfns,nr_pfns * (PAGE_SIZE / 1024));
+        goto out;
+    }
+    
+    ioctxt->domain = dom;
+    printf("Created domain %ld\n",dom);
 
     /* Get the domain's shared-info frame. */
     op.cmd = DOM0_GETDOMAININFO;
