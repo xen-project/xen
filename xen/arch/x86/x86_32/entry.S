@@ -585,8 +585,8 @@ do_switch_vm86:
         # Discard the return address
         addl $4,%esp
 
-        movl XREGS_eflags(%esp),%ecx
-                
+        movl XREGS_eflags(%esp),%edx
+
         # GS:ESI == Ring-1 stack activation
         movl XREGS_esp(%esp),%esi
 VFLT1:  movl XREGS_ss(%esp),%gs
@@ -608,11 +608,11 @@ VFLT3:  movl %gs:(%esi),%eax
 
         # Fix up EFLAGS
         andl $~X86_EFLAGS_IOPL,XREGS_eflags(%esp)
-        andl $X86_EFLAGS_IOPL,%ecx # Ignore attempts to change EFLAGS.IOPL
+        andl $X86_EFLAGS_IOPL,%edx # Ignore attempts to change EFLAGS.IOPL
         jnz  1f
-        orl  $X86_EFLAGS_IF,%ecx   # EFLAGS.IOPL=0 => no messing with EFLAGS.IF
-1:      orl  $X86_EFLAGS_VM,%ecx   # Force EFLAGS.VM
-        orl  %ecx,XREGS_eflags(%esp)
+        orl  $X86_EFLAGS_IF,%edx   # EFLAGS.IOPL=0 => no messing with EFLAGS.IF
+1:      orl  $X86_EFLAGS_VM,%edx   # Force EFLAGS.VM
+        orl  %edx,XREGS_eflags(%esp)
         
         jmp test_all_events
 

@@ -207,6 +207,7 @@ ENTRY(ret_from_fork)
 	call schedule_tail
 	GET_THREAD_INFO(%ebp)
 	popl %eax
+	movl HYPERVISOR_shared_info, %esi
 	jmp syscall_exit
 
 /*
@@ -227,6 +228,7 @@ ret_from_intr:
 	testl $(VM_MASK | 2), %eax
 	jz resume_kernel		# returning to kernel or vm86-space
 ENTRY(resume_userspace)
+	movl HYPERVISOR_shared_info, %esi
 	XEN_BLOCK_EVENTS(%esi)		# make sure we don't miss an interrupt
 					# setting need_resched or sigpending
 					# between sampling and the iret
@@ -238,14 +240,15 @@ ENTRY(resume_userspace)
 
 #ifdef CONFIG_PREEMPT
 ENTRY(resume_kernel)
+	movl HYPERVISOR_shared_info, %esi
 	cmpl $0,TI_preempt_count(%ebp)	# non-zero preempt_count ?
 	jnz restore_all
 need_resched:
 	movl TI_flags(%ebp), %ecx	# need_resched set ?
 	testb $_TIF_NEED_RESCHED, %cl
 	jz restore_all
-	testl $IF_MASK,EFLAGS(%esp)     # interrupts off (exception path) ?
-	jz restore_all
+	testb $0xFF,EVENT_MASK(%esp)	# interrupts off (exception path) ?
+	jnz restore_all
 	movl $PREEMPT_ACTIVE,TI_preempt_count(%ebp)
 	XEN_UNBLOCK_EVENTS(%esi)
 	call schedule
@@ -566,13 +569,13 @@ critical_fixup_table:
 
 # Hypervisor uses this for application faults while it executes.
 ENTRY(failsafe_callback)
-1:      popl %ds
-2:      popl %es
-3:      popl %fs
-4:      pop  %gs
-        subl $4,%esp
-        SAVE_ALL
-        jmp  ret_from_exception
+1:	popl %ds
+2:	popl %es
+3:	popl %fs
+4:	popl %gs
+	subl $4,%esp
+	SAVE_ALL
+	jmp  ret_from_exception
 .section .fixup,"ax";	\
 6:	movl $0,(%esp);	\
 	jmp 1b;		\
