@@ -310,7 +310,7 @@ static struct file_operations proc_vhd_operations = {
 
 int __init xlseg_proc_init(void)
 {
-    vhd = create_proc_entry("xeno/dom0/vhd", 0644, NULL);
+    vhd = create_proc_entry("xeno/dom0/vhd", 0600, NULL);
     if (vhd == NULL)
     {
         panic ("xlseg_init: unable to create vhd proc entry\n");
