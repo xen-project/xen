@@ -484,10 +484,12 @@ class Daemon:
             # XXX KAF: Why doesn't this capture output from C extensions that
             # fprintf(stdout) or fprintf(stderr) ??
             os.open('/var/log/xend-debug.log', os.O_WRONLY|os.O_CREAT)
+            os.dup(1)
         else:
             os.open('/dev/null', os.O_RDWR)
             os.dup(0)
-        os.dup(1)
+            os.open('/var/log/xend-debug.log', os.O_WRONLY|os.O_CREAT)
+
         
     def start(self, trace=0):
         """Attempts to start the daemons.
