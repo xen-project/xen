@@ -58,6 +58,8 @@ install: all
 	mkdir -p $(prefix)/usr/lib
 	mkdir -p $(prefix)/usr/include
 	install -m0755 $(LIB) $(prefix)/usr/lib
+	ln -sf libxc.so.$(MAJOR).$(MINOR) $(prefix)/usr/lib/libxc.so.$(MAJOR)
+	ln -sf libxc.so.$(MAJOR) $(prefix)/usr/lib/libxc.so
 	install -m0644 xc.h $(prefix)/usr/include
 
 clean:

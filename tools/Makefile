@@ -9,7 +9,10 @@ all:
 	$(MAKE) -C python
 	$(MAKE) -C xfrd
 
-install: all
+install: 
+ifneq ($(dist),yes)
+	$(MAKE) -C check install
+endif
 	$(MAKE) -C libxutil install
 	$(MAKE) -C libxc install
 	$(MAKE) -C misc install

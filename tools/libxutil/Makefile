@@ -52,6 +52,8 @@ check-for-zlib:
 install: all
 	mkdir -p $(prefix)/usr/lib
 	install -m0755 $(LIB) $(prefix)/usr/lib
+	ln -sf $(LIB_NAME).so.$(MAJOR).$(MINOR) $(prefix)/usr/lib/$(LIB_NAME).so.$(MAJOR)
+	ln -sf $(LIB_NAME).so.$(MAJOR) $(prefix)/usr/lib/$(LIB_NAME).so
 
 clean:
 	$(RM) *.a *.so *.so.* *.o *.rpm 
