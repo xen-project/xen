@@ -382,13 +382,27 @@ asmlinkage void do_machine_check(struct xen_regs *regs)
     fatal_trap(TRAP_machine_check, regs);
 }
 
-asmlinkage int do_page_fault(struct xen_regs *regs)
+void propagate_page_fault(unsigned long addr, u16 error_code)
 {
     trap_info_t *ti;
+    struct domain *d = current;
+    struct trap_bounce *tb = &d->thread.trap_bounce;
+
+    ti = d->thread.traps + 14;
+    tb->flags = TBF_EXCEPTION | TBF_EXCEPTION_ERRCODE | TBF_EXCEPTION_CR2;
+    tb->cr2        = addr;
+    tb->error_code = error_code;
+    tb->cs         = ti->cs;
+    tb->eip        = ti->address;
+    if ( TI_GET_IF(ti) )
+        d->shared_info->vcpu_data[0].evtchn_upcall_mask = 1;
+}
+
+asmlinkage int do_page_fault(struct xen_regs *regs)
+{
     unsigned long off, addr, fixup;
     struct domain *d = current;
     extern int map_ldt_shadow_page(unsigned int);
-    struct trap_bounce *tb = &d->thread.trap_bounce;
     int cpu = d->processor;
 
     __asm__ __volatile__ ("movl %%cr2,%0" : "=r" (addr) : );
@@ -437,14 +451,7 @@ asmlinkage int do_page_fault(struct xen_regs *regs)
     if ( !GUEST_FAULT(regs) )
         goto xen_fault;
 
-    ti = d->thread.traps + 14;
-    tb->flags = TBF_EXCEPTION | TBF_EXCEPTION_ERRCODE | TBF_EXCEPTION_CR2;
-    tb->cr2        = addr;
-    tb->error_code = regs->error_code;
-    tb->cs         = ti->cs;
-    tb->eip        = ti->address;
-    if ( TI_GET_IF(ti) )
-        d->shared_info->vcpu_data[0].evtchn_upcall_mask = 1;
+    propagate_page_fault(addr, regs->error_code);
     return 0; 
 
  xen_fault:

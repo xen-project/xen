@@ -296,4 +296,6 @@ void audit_domains(void);
 #define audit_domains()  ((void)0)
 #endif
 
+void propagate_page_fault(unsigned long addr, u16 error_code);
+
 #endif /* __ASM_X86_MM_H__ */

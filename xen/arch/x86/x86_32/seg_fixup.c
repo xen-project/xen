@@ -278,9 +278,7 @@ void *decode_reg(struct xen_regs *regs, u8 b)
 
 /*
  * Called from the general-protection fault handler to attempt to decode
- * and emulate an instruction that depends on 4GB segments. At this point
- * we assume that the instruction itself is paged into memory (the CPU
- * must have triggered this in order to decode the instruction itself).
+ * and emulate an instruction that depends on 4GB segments.
  */
 int gpf_emulate_4gb(struct xen_regs *regs)
 {
@@ -315,7 +313,7 @@ int gpf_emulate_4gb(struct xen_regs *regs)
         if ( get_user(b, pb) )
         {
             DPRINTK("Fault while accessing byte %d of instruction\n", pb-eip);
-            goto fail;
+            goto page_fault;
         }
 
         if ( (pb - eip) >= 15 )
@@ -371,10 +369,21 @@ int gpf_emulate_4gb(struct xen_regs *regs)
         switch ( decode & 7 )
         {
         case 1:
-            offset = (long)(*(char *)pb);
+            if ( get_user(b, pb) )
+            {
+                DPRINTK("Fault while extracting <moffs8>.\n");
+                goto page_fault;
+            }
+            pb++;
+            offset = (signed long)(signed char)b;
             goto skip_modrm;
         case 4:
-            offset = *(long *)pb;
+            if ( get_user(offset, (u32 *)pb) )
+            {
+                DPRINTK("Fault while extracting <disp8>.\n");
+                goto page_fault;
+            }
+            pb += 4;
             goto skip_modrm;
         default:
             goto fail;
@@ -388,7 +397,7 @@ int gpf_emulate_4gb(struct xen_regs *regs)
     if ( get_user(modrm, pb) )
     {
         DPRINTK("Fault while extracting modrm byte\n");
-        goto fail;
+        goto page_fault;
     }
 
     pb++;
@@ -420,7 +429,7 @@ int gpf_emulate_4gb(struct xen_regs *regs)
             if ( get_user(disp32, (u32 *)pb) )
             {
                 DPRINTK("Fault while extracting <disp8>.\n");
-                goto fail;
+                goto page_fault;
             }
             pb += 4;
         }
@@ -432,7 +441,7 @@ int gpf_emulate_4gb(struct xen_regs *regs)
         if ( get_user(disp8, pb) )
         {
             DPRINTK("Fault while extracting <disp8>.\n");
-            goto fail;
+            goto page_fault;
         }
         pb++;
         disp32 = (disp8 & 0x80) ? (disp8 | ~0xff) : disp8;;
@@ -444,7 +453,7 @@ int gpf_emulate_4gb(struct xen_regs *regs)
         if ( get_user(disp32, (u32 *)pb) )
         {
             DPRINTK("Fault while extracting <disp8>.\n");
-            goto fail;
+            goto page_fault;
         }
         pb += 4;
         break;
@@ -478,7 +487,7 @@ int gpf_emulate_4gb(struct xen_regs *regs)
             d->shared_info->vcpu_data[0].evtchn_upcall_mask = 1;
     }
 
-    return 1;
+    return EXCRET_fault_fixed;
 
  fixme:
     DPRINTK("Undecodable instruction %02x:%02x:%02x:%02x:%02x:%02x:%02x:%02x "
@@ -488,4 +497,8 @@ int gpf_emulate_4gb(struct xen_regs *regs)
             regs->cs, regs->eip);
  fail:
     return 0;
+
+ page_fault:
+    propagate_page_fault((unsigned long)pb, 4);
+    return EXCRET_fault_fixed;
 }
