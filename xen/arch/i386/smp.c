@@ -21,6 +21,15 @@
 #ifdef CONFIG_SMP
 
 /*
+ * This lock must be acquired before sending a synchronous IPI to another
+ * CPU (i.e., IPI + spin waiting for acknowledgement). The only safe ways of
+ * acquiring the lock are spin_lock() and spin_trylock(). The former is only
+ * safe if local interrupts are enabled (otherwise we will never see an IPI
+ * destined for us which we must acknowledge for the lock to be released).
+ */
+static spinlock_t synchronous_ipi_lock = SPIN_LOCK_UNLOCKED;
+
+/*
  *	Some notes on x86 processor bugs affecting SMP operation:
  *
  *	Pentium, Pentium Pro, II, III (and all CPUs) have bugs.
@@ -106,7 +115,7 @@ void send_IPI_self(int vector)
     __send_IPI_shortcut(APIC_DEST_SELF, vector);
 }
 
-static inline void send_IPI_mask_bitmask(int mask, int vector)
+static inline void send_IPI_mask(int mask, int vector)
 {
     unsigned long cfg;
     unsigned long flags;
@@ -139,48 +148,6 @@ static inline void send_IPI_mask_bitmask(int mask, int vector)
     __restore_flags(flags);
 }
 
-static inline void send_IPI_mask_sequence(int mask, int vector)
-{
-    unsigned long cfg, flags;
-    unsigned int query_cpu, query_mask;
-
-    __save_flags(flags);
-    __cli();
-
-    for (query_cpu = 0; query_cpu < NR_CPUS; ++query_cpu) {
-        query_mask = 1 << query_cpu;
-        if (query_mask & mask) {
-		
-            /*
-             * Wait for idle.
-             */
-            apic_wait_icr_idle();
-		
-            /*
-             * prepare target chip field
-             */
-            cfg = __prepare_ICR2(cpu_to_logical_apicid(query_cpu));
-            apic_write_around(APIC_ICR2, cfg);
-		
-            /*
-             * program the ICR 
-             */
-            cfg = __prepare_ICR(0, vector);
-			
-            /*
-             * Send the IPI. The write to APIC_ICR fires this off.
-             */
-            apic_write_around(APIC_ICR, cfg);
-        }
-    }
-    __restore_flags(flags);
-}
-
-static inline void send_IPI_mask(int mask, int vector)
-{
-    send_IPI_mask_bitmask(mask, vector);
-}
-
 static inline void send_IPI_allbutself(int vector)
 {
     /*
@@ -192,11 +159,6 @@ static inline void send_IPI_allbutself(int vector)
         return;
 
     __send_IPI_shortcut(APIC_DEST_ALLBUT, vector);
-}
-
-static inline void send_IPI_all(int vector)
-{
-    __send_IPI_shortcut(APIC_DEST_ALLINC, vector);
 }
 
 /*
@@ -259,14 +221,13 @@ static inline void send_IPI_all(int vector)
  */
 
 static volatile unsigned long flush_cpumask;
-static spinlock_t tlbstate_lock = SPIN_LOCK_UNLOCKED;
 #define FLUSH_ALL	0xffffffff
 
 asmlinkage void smp_invalidate_interrupt(void)
 {
     ack_APIC_irq();
-    clear_bit(smp_processor_id(), &flush_cpumask);
     local_flush_tlb();
+    clear_bit(smp_processor_id(), &flush_cpumask);
 }
 
 int try_flush_tlb_mask(unsigned long mask)
@@ -279,7 +240,7 @@ int try_flush_tlb_mask(unsigned long mask)
 
     if ( mask != 0 )
     {
-        if ( unlikely(!spin_trylock(&tlbstate_lock)) )
+        if ( unlikely(!spin_trylock(&synchronous_ipi_lock)) )
             return 0;
         flush_cpumask = mask;
         send_IPI_mask(mask, INVALIDATE_TLB_VECTOR);
@@ -288,7 +249,7 @@ int try_flush_tlb_mask(unsigned long mask)
             rep_nop();
             barrier();
         }
-        spin_unlock(&tlbstate_lock);
+        spin_unlock(&synchronous_ipi_lock);
     }
 
     return 1;
@@ -296,9 +257,7 @@ int try_flush_tlb_mask(unsigned long mask)
 
 void flush_tlb_mask(unsigned long mask)
 {
-    /* WARNING: Only try_flush_tlb_mask() is safe in IRQ context. */
-    if ( unlikely(in_irq()) )
-        BUG();
+    ASSERT(local_irq_is_enabled());
     
     if ( mask & (1 << smp_processor_id()) )
     {
@@ -308,7 +267,7 @@ void flush_tlb_mask(unsigned long mask)
 
     if ( mask != 0 )
     {
-        spin_lock(&tlbstate_lock);
+        spin_lock(&synchronous_ipi_lock);
         flush_cpumask = mask;
         send_IPI_mask(mask, INVALIDATE_TLB_VECTOR);
         while ( flush_cpumask != 0 )
@@ -316,16 +275,17 @@ void flush_tlb_mask(unsigned long mask)
             rep_nop();
             barrier();
         }
-        spin_unlock(&tlbstate_lock);
+        spin_unlock(&synchronous_ipi_lock);
     }
 }
 
 void new_tlbflush_clock_period(void)
 {
-    if ( unlikely(!spin_trylock(&tlbstate_lock)) )
+    if ( unlikely(!spin_trylock(&synchronous_ipi_lock)) )
         return;
 
-    if ( unlikely((flush_cpumask = tlbflush_mask) != 0) )
+    flush_cpumask = tlbflush_mask & ~(1 << smp_processor_id());
+    if ( unlikely(flush_cpumask != 0) )
     {
         send_IPI_mask(flush_cpumask, INVALIDATE_TLB_VECTOR);
         while ( flush_cpumask != 0 )
@@ -340,7 +300,7 @@ void new_tlbflush_clock_period(void)
     wmb(); /* Reset the mask before allowing the clock to continue ticking. */
     tlbflush_clock++;
 
-    spin_unlock(&tlbstate_lock);
+    spin_unlock(&synchronous_ipi_lock);
 }
 
 static void flush_tlb_all_pge_ipi(void* info)
@@ -358,12 +318,6 @@ void smp_send_event_check_mask(unsigned long cpu_mask)
 {
     send_IPI_mask(cpu_mask, EVENT_CHECK_VECTOR);
 }
-
-/*
- * Structure and data for smp_call_function(). This is designed to minimise
- * static memory requirements. It also looks cleaner.
- */
-static spinlock_t call_lock = SPIN_LOCK_UNLOCKED;
 
 struct call_data_struct {
     void (*func) (void *info);
@@ -408,7 +362,9 @@ int smp_call_function (void (*func) (void *info), void *info, int nonatomic,
     if (wait)
         atomic_set(&data.finished, 0);
 
-    spin_lock(&call_lock);
+    ASSERT(local_irq_is_enabled());
+
+    spin_lock(&synchronous_ipi_lock);
     call_data = &data;
     wmb();
     /* Send a message to all other CPUs and wait for them to respond */
@@ -422,7 +378,7 @@ int smp_call_function (void (*func) (void *info), void *info, int nonatomic,
         while (atomic_read(&data.finished) != cpus)
             barrier();
 
-    spin_unlock(&call_lock);
+    spin_unlock(&synchronous_ipi_lock);
 
     return 0;
 }

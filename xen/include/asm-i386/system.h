@@ -175,6 +175,13 @@ static inline unsigned long __cmpxchg(volatile void *ptr, unsigned long old,
 #define local_irq_disable()	__cli()
 #define local_irq_enable()	__sti()
 
+static inline int local_irq_is_enabled(void)
+{
+    unsigned long flags;
+    __save_flags(flags);
+    return !!(flags & (1<<9)); /* EFLAGS_IF */
+}
+
 #ifdef CONFIG_SMP
 
 extern void __global_cli(void);
