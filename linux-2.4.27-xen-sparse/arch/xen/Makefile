@@ -16,9 +16,6 @@
 #           Added '-march' and '-mpreferred-stack-boundary' support
 #
 
-XENVERSION   ?= $(shell cat .extraversion 2>/dev/null || echo "-xen")
-EXTRAVERSION := $(EXTRAVERSION)$(XENVERSION)
-
 # If no .config file exists then use the appropriate defconfig-* file
 ifneq (.config,$(wildcard .config))
 DUMMYX:=$(shell cp $(TOPDIR)/arch/xen/defconfig$(EXTRAVERSION) $(TOPDIR)/.config)

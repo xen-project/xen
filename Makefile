@@ -64,7 +64,12 @@ mk-linux-trees: patches/ebtables.diff pristine-linux-src
           ./mkbuildtree ../linux-$(LINUX_VER)-xen0 )
 	cp -al linux-$(LINUX_VER)-xen0 linux-$(LINUX_VER)-xenU
 	( cd linux-$(LINUX_VER)-xen0 ; \
-          patch -p1 -F3 < ../patches/ebtables.diff )
+          patch -p1 -F3 < ../patches/ebtables.diff ; \
+          sed -e 's/^EXTRAVERSION.*/&-xen0/' Makefile >Mk.tmp ; \
+          rm -f Makefile ; mv Mk.tmp Makefile )
+	( cd linux-$(LINUX_VER)-xenU ; \
+          sed -e 's/^EXTRAVERSION.*/&-xenU/' Makefile >Mk.tmp ; \
+          rm -f Makefile ; mv Mk.tmp Makefile )
 else
 mk-linux-trees: pristine-linux-src 
 	$(RM) -rf $(LINUX_TREES)
@@ -74,35 +79,40 @@ mk-linux-trees: pristine-linux-src
 	( cd linux-$(LINUX_VER)-xen-sparse ; \
           ./mkbuildtree ../linux-$(LINUX_VER)-xen0 )
 	cp -al linux-$(LINUX_VER)-xen0 linux-$(LINUX_VER)-xenU
+	( cd linux-$(LINUX_VER)-xen0 ; \
+          sed -e 's/^EXTRAVERSION.*/&-xen0/' Makefile >Mk.tmp ; \
+          rm -f Makefile ; mv Mk.tmp Makefile )
+	( cd linux-$(LINUX_VER)-xenU ; \
+          sed -e 's/^EXTRAVERSION.*/&-xenU/' Makefile >Mk.tmp ; \
+          rm -f Makefile ; mv Mk.tmp Makefile )
 endif
 
 # configure the specified linux tree
 CDIR = $(subst config-,linux-$(LINUX_VER)-,$@)
 ifeq ($(LINUX_RELEASE),2.4)
 config-xen%:
-	$(MAKE) -C $(CDIR) ARCH=xen XENVERSION=$(subst config,,$@) mrproper
+	$(MAKE) -C $(CDIR) ARCH=xen mrproper
 	cp $(LINUX_CONFIG_DIR)/config-$(LINUX_VER)$(subst config,,$@) \
 	    $(CDIR)/.config || \
-	    $(MAKE) -C $(CDIR) ARCH=xen XENVERSION=$(subst config,,$@) $(subst config-,,$@)_config
-	$(MAKE) -C $(CDIR) ARCH=xen XENVERSION=$(subst config,,$@) oldconfig
-	$(MAKE) -C $(CDIR) ARCH=xen XENVERSION=$(subst config,,$@) dep
+	    $(MAKE) -C $(CDIR) ARCH=xen $(subst config-,,$@)_config
+	$(MAKE) -C $(CDIR) ARCH=xen oldconfig
+	$(MAKE) -C $(CDIR) ARCH=xen dep
 else
 config-xen%:
-	$(MAKE) -C $(CDIR) ARCH=xen XENVERSION=$(subst config,,$@) mrproper
+	$(MAKE) -C $(CDIR) ARCH=xen mrproper
 	@[ -e $(LINUX_CONFIG_DIR)/config-$(LINUX_VER)-$(subst config-,,$@) ] \
 	  && cp $(LINUX_CONFIG_DIR)/config-$(LINUX_VER)-$(subst config-,,$@) \
 		$(CDIR)/.config || \
-	$(MAKE) -C $(CDIR) ARCH=xen XENVERSION=$(subst config,,$@) $(subst config-,,$@)_defconfig
+	$(MAKE) -C $(CDIR) ARCH=xen $(subst config-,,$@)_defconfig
 endif
 
 # build the specified linux tree
 BDIR = $(subst linux-,linux-$(LINUX_VER)-,$@)
 linux-xen%:	
-	$(MAKE) -C $(BDIR) ARCH=xen XENVERSION=$(subst linux,,$@) modules
-	$(MAKE) -C $(BDIR) ARCH=xen XENVERSION=$(subst linux,,$@) INSTALL_MOD_PATH=$(INSTALL_DIR) \
+	$(MAKE) -C $(BDIR) ARCH=xen modules
+	$(MAKE) -C $(BDIR) ARCH=xen INSTALL_MOD_PATH=$(INSTALL_DIR) \
 	    modules_install
-	$(MAKE) -C $(BDIR) ARCH=xen XENVERSION=$(subst linux,,$@) INSTALL_PATH=$(INSTALL_DIR) install
-
+	$(MAKE) -C $(BDIR) ARCH=xen INSTALL_PATH=$(INSTALL_DIR) install
 
 NETBSD_RELEASE   ?= 2.0
 NETBSD_VER       ?= $(shell ( /bin/ls -ld netbsd-$(NETBSD_RELEASE)*-xen-sparse ) 2>/dev/null | \

@@ -12,9 +12,6 @@
 # Copyright (C) 2004 by Christian Limpach
 #
 
-XENVERSION   ?= $(shell cat .extraversion 2>/dev/null || echo "-xen")
-EXTRAVERSION := $(EXTRAVERSION)$(XENVERSION)
-
 XENARCH	:= $(subst ",,$(CONFIG_XENARCH))
 
 # pick up headers from include/asm-xen/asm in preference over include/asm
