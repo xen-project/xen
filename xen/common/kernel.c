@@ -1,3 +1,12 @@
+/******************************************************************************
+ * kernel.c
+ * 
+ * This file should contain architecture-independent bootstrap and low-level
+ * help routines. It's a bit x86/PC specific right now!
+ * 
+ * Copyright (c) 2002-2003 K A Fraser
+ */
+
 #include <stdarg.h>
 #include <xeno/lib.h>
 #include <xeno/errno.h>
@@ -10,6 +19,7 @@
 #include <xeno/interrupt.h>
 #include <xeno/compile.h>
 #include <xeno/version.h>
+#include <xeno/netdevice.h>
 #include <asm/io.h>
 #include <asm/msr.h>
 #include <asm/uaccess.h>
@@ -35,29 +45,37 @@ void init_vga(void);
 void init_serial(void);
 void start_of_day(void);
 
-/* Command line options and variables. */
-unsigned int opt_console = 1;
-unsigned int opt_ser_baud = 9600;  /* default baud for COM1 */
-unsigned int opt_dom0_mem = 16000; /* default kbytes for DOM0 */
-unsigned int opt_ne_base = 0; /* NE2k NICs cannot be probed */
+/* opt_console: If true, Xen sends logging to the VGA console. */
+int opt_console = 1;
+/* opt_ser_baud: Baud rate at which logging is sent to COM1. */
+unsigned int opt_ser_baud = 9600;
+/* opt_dom0_mem: Kilobytes of memory allocated to domain 0. */
+unsigned int opt_dom0_mem = 16000;
+/* opt_ifname: Name of physical network interface to use. */
 unsigned char opt_ifname[10] = "eth0";
-int opt_noht=0, opt_noacpi=0, opt_nosmp=0, opt_watchdog=0;
-enum { OPT_IP, OPT_STR, OPT_UINT, OPT_BOOL };
+/* opt_noht: If true, Hyperthreading is ignored. */
+int opt_noht=0;
+/* opt_noacpi: If true, ACPI tables are not parsed. */
+int opt_noacpi=0;
+/* opt_nosmp: If true, secondary processors are ignored. */
+int opt_nosmp=0;
+/* opt_watchdog: If true, run a watchdog NMI on each processor. */
+int opt_watchdog=0;
+
 static struct {
     unsigned char *name;
-    int type;
+    enum { OPT_IP, OPT_STR, OPT_UINT, OPT_BOOL } type;
     void *var;
 } opts[] = {
     { "console",     OPT_UINT, &opt_console },
     { "ser_baud",    OPT_UINT, &opt_ser_baud },
     { "dom0_mem",    OPT_UINT, &opt_dom0_mem }, 
-    { "ne_base",     OPT_UINT, &opt_ne_base },
     { "ifname",      OPT_STR,  &opt_ifname },
     { "noht",        OPT_BOOL, &opt_noht },
     { "noacpi",      OPT_BOOL, &opt_noacpi },
     { "nosmp",       OPT_BOOL, &opt_nosmp },
     { "watchdog",    OPT_BOOL, &opt_watchdog },
-    { NULL,       0,        NULL     }
+    { NULL,          0,        NULL     }
 };
 
 
@@ -71,57 +89,19 @@ void cmain (unsigned long magic, multiboot_info_t *mbi)
     int i;
 
     /*
-     * Note that serial output cannot be done properly until 
-     * after command-line arguments have been parsed, and the required baud 
-     * rate is known. Any messages before that will be output using the
-     * settings of the bootloader, for example. Maybe okay for error msgs...
+     * Note that serial output cannot be done properly until after 
+     * command-line arguments have been parsed, and the required baud rate is 
+     * known. Any messages before that will be output using the settings of 
+     * the bootloader, for example.
      */
-#define early_error(args...) opt_console=1; init_vga(); cls(); printk(args)
 
     if ( magic != MULTIBOOT_BOOTLOADER_MAGIC )
     {
-        early_error("Invalid magic number: 0x%x\n", (unsigned)magic);
-        return;
+        init_vga();
+        cls();
+        printk("Invalid magic number: 0x%x\n", (unsigned)magic);
+        for ( ; ; ) ;
     }
-
-    /*
-     * We require some kind of memory and module information.
-     * The rest we can fake!
-     */
-    if ( (mbi->flags & 9) != 9 )
-    {
-        early_error("Bad flags passed by bootloader: 0x%x\n", (unsigned)mbi->flags);
-        return;
-    }
-
-    if ( mbi->mods_count == 0 )
-    {
-        early_error("Require at least one module!\n");
-        return;
-    }
-
-    /* Are mmap_* valid?  */
-#if 0
-    if ( (mbi->flags & (1<<6)) )
-    {
-        memory_map_t *mmap = (memory_map_t *)mbi->mmap_addr;
-        struct e820entry *e820 = E820_MAP;
-
-        while ( (unsigned long)mmap < (mbi->mmap_addr + mbi->mmap_length) )
-        {
-            e820->addr_lo = mmap->base_addr_low;
-            e820->addr_hi = mmap->base_addr_high;
-            e820->size_lo = mmap->length_low;
-            e820->size_hi = mmap->length_high;
-            e820->type    = mmap->type;
-            e820++;
-            mmap = (memory_map_t *) 
-                ((unsigned long)mmap + mmap->size + sizeof (mmap->size));
-        }
-    }
-#endif
-
-    mod = (module_t *)__va(mbi->mods_addr);
 
     /* Parse the command line. */
     cmdline = (unsigned char *)(mbi->cmdline ? __va(mbi->cmdline) : NULL);
@@ -165,13 +145,9 @@ void cmain (unsigned long magic, multiboot_info_t *mbi)
         }
     }
 
-#undef early_error
-
+    init_serial();
     init_vga();
     cls();
-
-    /* INITIALISE SERIAL LINE (printk will work okay from here on). */
-    init_serial();
 
     printk(XEN_BANNER);
     printk(" http://www.cl.cam.ac.uk/netos/xen\n");
@@ -180,6 +156,20 @@ void cmain (unsigned long magic, multiboot_info_t *mbi)
            XEN_VERSION, XEN_SUBVERSION, XEN_EXTRAVERSION,
            XEN_COMPILE_BY, XEN_COMPILE_DOMAIN,
            XEN_COMPILER, XEN_COMPILE_DATE);
+
+    /* We require memory and module information. */
+    if ( (mbi->flags & 9) != 9 )
+    {
+        printk("FATAL ERROR: Bad flags passed by bootloader: 0x%x\n", 
+               (unsigned)mbi->flags);
+        for ( ; ; ) ;
+    }
+
+    if ( mbi->mods_count == 0 )
+    {
+        printk("Require at least one Multiboot module!\n");
+        for ( ; ; ) ;
+    }
 
     memcpy(&idle0_task_union, &first_task_struct, sizeof(first_task_struct));
 
@@ -203,10 +193,11 @@ void cmain (unsigned long magic, multiboot_info_t *mbi)
     if ( new_dom == NULL ) panic("Error creating domain 0\n");
 
     /*
-     * We're going to setup domain0 using the module(s) that we stashed safely 
-     * above our MAX_DIRECTMAP_ADDRESS in boot/Boot.S The second module, if 
+     * We're going to setup domain0 using the module(s) that we stashed safely
+     * above our MAX_DIRECTMAP_ADDRESS in boot/Boot.S The second module, if
      * present, is an initrd ramdisk
      */
+    mod = (module_t *)__va(mbi->mods_addr);
     if ( setup_guestos(new_dom, 
                        &dom0_params, 1,
                        (char *)MAX_DIRECTMAP_ADDRESS, 
@@ -220,8 +211,10 @@ void cmain (unsigned long magic, multiboot_info_t *mbi)
     wake_up(new_dom);
 
     cpu_idle();
-}    
+}
 
+
+#ifdef CONFIG_OUTPUT_SERIAL
 
 #define SERIAL_BASE 0x3f8
 #define RX_BUF      0
@@ -237,7 +230,6 @@ void cmain (unsigned long magic, multiboot_info_t *mbi)
 
 void init_serial(void)
 {
-#ifdef CONFIG_OUTPUT_SERIAL
     /* 'opt_ser_baud' baud, no parity, 1 stop bit, 8 data bits. */
     outb(0x83, SERIAL_BASE+DATA_FORMAT);
     outb(115200/opt_ser_baud, SERIAL_BASE+DIVISOR_LO);
@@ -246,19 +238,25 @@ void init_serial(void)
 
     /* No interrupts. */
     outb(0x00, SERIAL_BASE+INT_ENABLE);
-#endif
 }
 
 
 void putchar_serial(unsigned char c)
 {
-#ifdef CONFIG_OUTPUT_SERIAL
     if ( c == '\n' ) putchar_serial('\r');
     while ( !(inb(SERIAL_BASE+LINE_STATUS)&(1<<5)) ) barrier();
     outb(c, SERIAL_BASE+TX_HOLD);
-#endif
 }
 
+#else
+
+void init_serial(void) {}
+void putchar_serial(unsigned char c) {}
+
+#endif
+
+
+#ifdef CONFIG_OUTPUT_CONSOLE
 
 /* VGA text (mode 3) definitions. */
 #define COLUMNS	    80
@@ -269,7 +267,6 @@ void putchar_serial(unsigned char c)
 /* This is actually code from vgaHWRestore in an old version of XFree86 :-) */
 void init_vga(void)
 {
-#ifdef CONFIG_OUTPUT_CONSOLE
     /* The following VGA state was saved from a chip in text mode 3. */
     static unsigned char regs[] = {
         /* Sequencer registers */
@@ -288,96 +285,115 @@ void init_vga(void)
     int i, j = 0;
     volatile unsigned char tmp;
 
-    if(opt_console) {
-      tmp = inb(0x3da);
-      outb(0x00, 0x3c0);
-      
-      for ( i = 0; i < 5;  i++ )
+    if ( !opt_console )
+        return;
+
+    tmp = inb(0x3da);
+    outb(0x00, 0x3c0);
+    
+    for ( i = 0; i < 5;  i++ )
         outw((regs[j++] << 8) | i, 0x3c4);
-      
-      /* Ensure CRTC registers 0-7 are unlocked by clearing bit 7 of CRTC[17]. */
-      outw(((regs[5+17] & 0x7F) << 8) | 17, 0x3d4);
-      
-      for ( i = 0; i < 25; i++ ) 
+    
+    /* Ensure CRTC registers 0-7 are unlocked by clearing bit 7 of CRTC[17]. */
+    outw(((regs[5+17] & 0x7F) << 8) | 17, 0x3d4);
+    
+    for ( i = 0; i < 25; i++ ) 
         outw((regs[j++] << 8) | i, 0x3d4);
-      
-      for ( i = 0; i < 9;  i++ )
+    
+    for ( i = 0; i < 9;  i++ )
         outw((regs[j++] << 8) | i, 0x3ce);
-      
-      for ( i = 0; i < 21; i++ )
-	{
-	  tmp = inb(0x3da);
-	  outb(i, 0x3c0); 
-	  outb(regs[j++], 0x3c0);
-	}
-      
-      tmp = inb(0x3da);
-      outb(0x20, 0x3c0);
+    
+    for ( i = 0; i < 21; i++ )
+    {
+        tmp = inb(0x3da);
+        outb(i, 0x3c0); 
+        outb(regs[j++], 0x3c0);
     }
-#endif
+    
+    tmp = inb(0x3da);
+    outb(0x20, 0x3c0);
 }
 
 
 /* Clear the screen and initialize VIDEO, XPOS and YPOS.  */
 void cls(void)
 {
-#ifdef CONFIG_OUTPUT_CONSOLE
     int i;
 
-    if(opt_console) {
-      video = (unsigned char *) VIDEO;
-      
-      for (i = 0; i < COLUMNS * LINES * 2; i++)
+    if ( !opt_console )
+        return;
+
+    video = (unsigned char *) VIDEO;
+    
+    for (i = 0; i < COLUMNS * LINES * 2; i++)
         *(video + i) = 0;
-      
-      xpos = 0;
-      ypos = 0;
-      
-      outw(10+(1<<(5+8)), 0x3d4); /* cursor off */
-    }
-#endif
+    
+    xpos = 0;
+    ypos = 0;
+    
+    outw(10+(1<<(5+8)), 0x3d4); /* cursor off */
 }
 
 
-/* Put the character C on the screen.  */
-static void putchar (int c)
+static void put_newline(void)
+{
+    xpos = 0;
+    ypos++;
+
+    if (ypos >= LINES)
+    {
+        static char zeroarr[2*COLUMNS] = { 0 };
+        ypos = LINES-1;
+        memcpy((char*)video, 
+               (char*)video + 2*COLUMNS, (LINES-1)*2*COLUMNS);
+        memcpy((char*)video + (LINES-1)*2*COLUMNS, 
+               zeroarr, 2*COLUMNS);
+    }
+}
+
+
+void putchar_console(int c)
+{
+    if ( !opt_console )
+        return;
+
+    if ( c == '\n' )
+    {
+        put_newline();
+    }
+    else
+    {
+        *(video + (xpos + ypos * COLUMNS) * 2) = c & 0xFF;
+        *(video + (xpos + ypos * COLUMNS) * 2 + 1) = ATTRIBUTE;
+        
+        xpos++;
+        if (xpos >= COLUMNS)
+            put_newline();
+    }
+}
+
+#else
+
+void init_vga(void) {}
+void cls(void) {}
+void putchar_console(int c) {}
+
+#endif
+
+
+static void putchar(int c)
 {
     if ( (c != '\n') && ((c < 32) || (c > 126)) ) return;
     putchar_serial(c);
-  
-#ifdef CONFIG_OUTPUT_CONSOLE
-    if(opt_console) {
-      if (c == '\n')
-	{
-	newline:
-	  xpos = 0;
-	  ypos++;
-	  if (ypos >= LINES)
-	    {
-	      static char zeroarr[2*COLUMNS] = { 0 };
-	      ypos = LINES-1;
-	      memcpy((char*)video, 
-		     (char*)video + 2*COLUMNS, (LINES-1)*2*COLUMNS);
-	      memcpy((char*)video + (LINES-1)*2*COLUMNS, 
-		     zeroarr, 2*COLUMNS);
-	    }
-	  return;
-	}
-      
-      *(video + (xpos + ypos * COLUMNS) * 2) = c & 0xFF;
-      *(video + (xpos + ypos * COLUMNS) * 2 + 1) = ATTRIBUTE;
-      
-      xpos++;
-      if (xpos >= COLUMNS)
-        goto newline;
-    }
-#endif
+    putchar_console(c);
 }
+
 
 static inline void __putstr(const char *str)
 {
     while ( *str ) putchar(*str++);
 }
+
 
 void printf (const char *fmt, ...)
 {
@@ -403,6 +419,7 @@ void printf (const char *fmt, ...)
     while ( *p ) putchar(*p++);
     spin_unlock_irqrestore(&console_lock, flags);
 }
+
 
 void panic(const char *fmt, ...)
 {
@@ -430,6 +447,7 @@ void panic(const char *fmt, ...)
     mdelay(5000);
     machine_restart(0);
 }
+
 
 /* No-op syscall. */
 asmlinkage long sys_ni_syscall(void)
@@ -461,11 +479,6 @@ unsigned short compute_cksum(unsigned short *buf, int count)
     return ~(sum & 0xFFFF);
 }
 
-
-
-/* XXX SMH: below is rather vile; pulled in to allow network console */
-
-extern int netif_rx(struct sk_buff *); 
 
 /*
  * Function written by ek247. Exports console output from all domains upwards 
@@ -575,9 +588,35 @@ long do_console_write(char *str, unsigned int count)
     return(0);
 }
 
+
 void __out_of_line_bug(int line)
 {
     printk("kernel BUG in header file at line %d\n", line);
     BUG();
     for ( ; ; ) continue;
 }
+
+
+/*
+ * GRAVEYARD
+ */
+#if 0
+    if ( (mbi->flags & (1<<6)) )
+    {
+        memory_map_t *mmap = (memory_map_t *)mbi->mmap_addr;
+        struct e820entry *e820 = E820_MAP;
+
+        while ( (unsigned long)mmap < (mbi->mmap_addr + mbi->mmap_length) )
+        {
+            e820->addr_lo = mmap->base_addr_low;
+            e820->addr_hi = mmap->base_addr_high;
+            e820->size_lo = mmap->length_low;
+            e820->size_hi = mmap->length_high;
+            e820->type    = mmap->type;
+            e820++;
+            mmap = (memory_map_t *) 
+                ((unsigned long)mmap + mmap->size + sizeof (mmap->size));
+        }
+    }
+#endif
+

@@ -88,7 +88,7 @@ continue_boot_cpu:
         cmp     $0x2BADB002,%eax
         jne     skip_dom0_copy
         sub     $__PAGE_OFFSET,%ebx          /* turn back into a phys addr */
-        mov     0x14(%ebx),%edi              /* mb->mods_count */
+        mov     0x14(%ebx),%edi              /* mbi->mods_count */
         dec     %edi                         /* mbi->mods_count-- */
         jb      skip_dom0_copy               /* skip if no modules */
         mov     0x18(%ebx),%eax              /* mbi->mods_addr */
