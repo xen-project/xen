@@ -163,8 +163,16 @@ void __init setup_arch(char **cmdline_p)
     ROOT_DEV = MKDEV(RAMDISK_MAJOR,0);
     memset(&drive_info, 0, sizeof(drive_info));
     memset(&screen_info, 0, sizeof(screen_info));
+    // this is drawn from a dump from vgacon:startup in standard linux
+    screen_info.orig_video_mode = 3; 
+    screen_info.orig_video_isVGA = 1;
+    screen_info.orig_video_lines = 25;
+    screen_info.orig_video_cols = 80;
+    screen_info.orig_video_ega_bx = 3;
+    screen_info.orig_video_points = 16;
+
     memset(&apm_info.bios, 0, sizeof(apm_info.bios));
-    aux_device_present = 0;
+    aux_device_present = 0; 
 #ifdef CONFIG_BLK_DEV_RAM
     rd_image_start = 0;
     rd_prompt = 0;
@@ -292,6 +300,27 @@ void __init setup_arch(char **cmdline_p)
 #endif
 
     paging_init();
+
+    if(start_info.flags & SIF_PRIVILEGED) {
+      // we are privileged guest os - should be able to set IOPL
+      if(HYPERVISOR_iopl(1)) {
+	panic("Unable to obtain IOPL, despite being SIF_PRIVILEGED");
+      }
+
+    }
+
+    if(start_info.flags & SIF_CONSOLE) {
+      if(!(start_info.flags & SIF_PRIVILEGED)) {
+	panic("Xen granted us console access but not privileged status");
+      }
+#ifdef CONFIG_VT
+#if defined(CONFIG_VGA_CONSOLE)
+      conswitchp = &vga_con;
+#elif defined(CONFIG_DUMMY_CONSOLE)
+      conswitchp = &dummy_con;
+#endif
+#endif
+    }
 }
 
 static int cachesize_override __initdata = -1;

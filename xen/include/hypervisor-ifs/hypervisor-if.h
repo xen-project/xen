@@ -250,7 +250,8 @@ typedef struct start_info_st {
 } start_info_t;
 
 /* These flags are passed in the 'flags' field of start_info_t. */
-#define SIF_PRIVILEGED 1          /* Is thie domain privileged? */
+#define SIF_PRIVILEGED 1          /* Is the domain privileged? */
+#define SIF_CONSOLE    2          /* Does the domain own the physical console? */
 
 /* For use in guest OSes. */
 extern shared_info_t *HYPERVISOR_shared_info;

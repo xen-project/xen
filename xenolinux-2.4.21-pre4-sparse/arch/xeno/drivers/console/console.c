@@ -24,9 +24,11 @@
 #include <asm/uaccess.h>
 #include <asm/hypervisor.h>
 
+#define XENO_TTY_MINOR 123
+
 /******************** Kernel console driver ********************************/
 
-static void kconsole_write(struct console *co, const char *s, unsigned count)
+static void xen_console_write(struct console *co, const char *s, unsigned count)
 {
 #define STRLEN 256
     static char str[STRLEN];
@@ -49,56 +51,57 @@ static void kconsole_write(struct console *co, const char *s, unsigned count)
     }
 }
 
-static kdev_t kconsole_device(struct console *c)
+static kdev_t xen_console_device(struct console *c)
 {
     /*
      * This is the magic that binds our "struct console" to our
      * "tty_struct", defined below.
      */
-    return MKDEV(TTY_MAJOR, 0);
+    return MKDEV(TTY_MAJOR, XENO_TTY_MINOR);
 }
 
-static struct console kconsole_info = {
-    name:		"xenocon",
-    write:		kconsole_write,
-    device:             kconsole_device,
+static struct console xen_console_info = {
+    name:		"xen_console",
+    write:		xen_console_write,
+    device:             xen_console_device,
     flags:		CON_PRINTBUFFER,
     index:		-1,
 };
 
-void xeno_console_init(void)
+void xen_console_init(void)
 {
-    register_console(&kconsole_info);
+  printk("xeno_console_init\n");
+  register_console(&xen_console_info);
 }
 
 
 /******************** Initial /dev/console *********************************/
 
 
-static struct tty_driver console_driver;
-static int console_refcount;
-static struct tty_struct *console_table[1];
-static struct termios *console_termios[1];
-static struct termios *console_termios_locked[1];
+static struct tty_driver xeno_console_driver;
+static int xeno_console_refcount;
+static struct tty_struct *xeno_console_table[1];
+static struct termios *xeno_console_termios[1];
+static struct termios *xeno_console_termios_locked[1];
 
-static int console_write_room(struct tty_struct *tty)
+static int xeno_console_write_room(struct tty_struct *tty)
 {
     return INT_MAX;
 }
 
-static int console_chars_in_buffer(struct tty_struct *tty)
+static int xeno_console_chars_in_buffer(struct tty_struct *tty)
 {
     return 0;
 }
 
-static inline int console_xmit(int ch)
+static inline int xeno_console_xmit(int ch)
 {
     char _ch = ch;
-    kconsole_write(NULL, &_ch, 1);
+    xen_console_write(NULL, &_ch, 1);
     return 1;
 }
 
-static int console_write(struct tty_struct *tty, int from_user,
+static int xeno_console_write(struct tty_struct *tty, int from_user,
                        const u_char * buf, int count)
 {
     int i;
@@ -119,17 +122,17 @@ static int console_write(struct tty_struct *tty, int from_user,
         {
             ch = buf[i];
         }
-        console_xmit(ch);
+        xeno_console_xmit(ch);
     }
     return i;
 }
 
-static void console_put_char(struct tty_struct *tty, u_char ch)
+static void xeno_console_put_char(struct tty_struct *tty, u_char ch)
 {
-    console_xmit(ch);
+    xeno_console_xmit(ch);
 }
 
-static int console_open(struct tty_struct *tty, struct file *filp)
+static int xeno_console_open(struct tty_struct *tty, struct file *filp)
 {
     int line;
 
@@ -146,37 +149,40 @@ static int console_open(struct tty_struct *tty, struct file *filp)
     return 0;
 }
 
-static void console_close(struct tty_struct *tty, struct file *filp)
+static void xeno_console_close(struct tty_struct *tty, struct file *filp)
 {
     MOD_DEC_USE_COUNT;
 }
 
-static int __init console_ini(void)
+int __init xeno_con_init(void)
 {
-    memset(&console_driver, 0, sizeof(struct tty_driver));
-    console_driver.magic           = TTY_DRIVER_MAGIC;
-    console_driver.driver_name     = "xeno_console";
-    console_driver.name            = "console";
-    console_driver.major           = TTY_MAJOR;
-    console_driver.minor_start     = 0;
-    console_driver.num             = 1;
-    console_driver.type            = TTY_DRIVER_TYPE_SERIAL;
-    console_driver.subtype         = SERIAL_TYPE_NORMAL;
-    console_driver.init_termios    = tty_std_termios;
-    console_driver.flags           = TTY_DRIVER_REAL_RAW;
-    console_driver.refcount        = &console_refcount;
-    console_driver.table           = console_table;
-    console_driver.termios         = console_termios;
-    console_driver.termios_locked  = console_termios_locked;
-    /* Functions */
-    console_driver.open            = console_open;
-    console_driver.close           = console_close;
-    console_driver.write           = console_write;
-    console_driver.write_room      = console_write_room;
-    console_driver.put_char        = console_put_char;
-    console_driver.chars_in_buffer = console_chars_in_buffer;
 
-    if ( tty_register_driver(&console_driver) )
+    printk("xeno_con_init\n");
+
+    memset(&xeno_console_driver, 0, sizeof(struct tty_driver));
+    xeno_console_driver.magic           = TTY_DRIVER_MAGIC;
+    xeno_console_driver.driver_name     = "xeno_console";
+    xeno_console_driver.name            = "xencon";
+    xeno_console_driver.major           = TTY_MAJOR;
+    xeno_console_driver.minor_start     = XENO_TTY_MINOR;
+    xeno_console_driver.num             = 1;
+    xeno_console_driver.type            = TTY_DRIVER_TYPE_SERIAL;
+    xeno_console_driver.subtype         = SERIAL_TYPE_NORMAL;
+    xeno_console_driver.init_termios    = tty_std_termios;
+    xeno_console_driver.flags           = TTY_DRIVER_REAL_RAW | TTY_DRIVER_NO_DEVFS;
+    xeno_console_driver.refcount        = &xeno_console_refcount;
+    xeno_console_driver.table           = xeno_console_table;
+    xeno_console_driver.termios         = xeno_console_termios;
+    xeno_console_driver.termios_locked  = xeno_console_termios_locked;
+    /* Functions */
+    xeno_console_driver.open            = xeno_console_open;
+    xeno_console_driver.close           = xeno_console_close;
+    xeno_console_driver.write           = xeno_console_write;
+    xeno_console_driver.write_room      = xeno_console_write_room;
+    xeno_console_driver.put_char        = xeno_console_put_char;
+    xeno_console_driver.chars_in_buffer = xeno_console_chars_in_buffer;
+
+    if ( tty_register_driver(&xeno_console_driver) )
     {
         printk(KERN_ERR "Couldn't register Xeno console driver\n");
     }
@@ -188,17 +194,17 @@ static int __init console_ini(void)
     return 0;
 }
 
-static void __exit console_fin(void)
+void __exit xeno_con_fini(void)
 {
     int ret;
 
-    ret = tty_unregister_driver(&console_driver);
+    ret = tty_unregister_driver(&xeno_console_driver);
     if ( ret != 0 )
     {
         printk(KERN_ERR "Unable to unregister Xeno console driver: %d\n", ret);
     }
 }
 
-module_init(console_ini);
-module_exit(console_fin);
+module_init(xeno_con_init);
+module_exit(xeno_con_fini);
 

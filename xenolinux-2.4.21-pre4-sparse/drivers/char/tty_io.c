@@ -102,8 +102,8 @@
 
 #include <linux/kmod.h>
 
-#ifdef CONFIG_XENO
-extern void xeno_console_init(void);
+#ifdef CONFIG_XEN_CONSOLE
+extern void xen_console_init(void);
 #endif
 
 #ifdef CONFIG_VT
@@ -817,8 +817,9 @@ static int init_dev(kdev_t device, struct tty_struct **ret_tty)
 	int idx;
 
 	driver = get_tty_driver(device);
-	if (!driver)
-		return -ENODEV;
+	if (!driver) {
+	  return -ENODEV;
+	}
 
 	idx = MINOR(device) - driver->minor_start;
 
@@ -2186,7 +2187,7 @@ int tty_unregister_driver(struct tty_driver *driver)
  */
 void __init console_init(void)
 {
-	/* Setup the default TTY line discipline. */
+        /* Setup the default TTY line discipline. */
 	memset(ldiscs, 0, sizeof(ldiscs));
 	(void) tty_register_ldisc(N_TTY, &tty_ldisc_N_TTY);
 
@@ -2209,8 +2210,13 @@ void __init console_init(void)
 #ifdef CONFIG_EARLY_PRINTK
 	disable_early_printk(); 
 #endif
+
 #ifdef CONFIG_VT
 	con_init();
+#endif
+
+#ifdef CONFIG_XEN_CONSOLE
+	xen_console_init();
 #endif
 #ifdef CONFIG_AU1000_SERIAL_CONSOLE
 	au1000_serial_console_init();
@@ -2326,9 +2332,6 @@ void __init tty_init(void)
 	/* console calls tty_register_driver() before kmalloc() works.
 	 * Thus, we can't devfs_register() then.  Do so now, instead. 
 	 */
-#ifdef CONFIG_XENO
-        xeno_console_init();
-#endif
 #ifdef CONFIG_VT
 	con_init_devfs();
 #endif
@@ -2358,11 +2361,6 @@ void __init tty_init(void)
 		panic("Couldn't register /dev/tty0 driver\n");
 
 	kbd_init();
-#else
-	// the below is a dodgy hack to allow keyboard/mouse support without the console support, along with the file "dummy_console.c"
-#ifdef CONFIG_DUMMY_CONSOLE
-	kbd_init();
-#endif
 #endif
 
 #ifdef CONFIG_ESPSERIAL  /* init ESP before rs, so rs doesn't see the port */

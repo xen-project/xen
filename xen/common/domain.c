@@ -15,6 +15,7 @@
 #include <asm/flushtlb.h>
 #include <asm/msr.h>
 #include <xeno/blkdev.h>
+#include <xeno/console.h>
 
 /*
  * NB. No ring-3 access in initial guestOS pagetables. Note that we allow
@@ -625,6 +626,11 @@ int setup_guestos(struct task_struct *p, dom0_newdomain_t *params,
 
     virt_startinfo_address->dom_id = p->domain;
     virt_startinfo_address->flags  = IS_PRIV(p) ? SIF_PRIVILEGED : 0;
+    // guest os can have console if:
+    // 1) its privileged (need iopl right now)
+    // 2) its the owner of the console (and therefore will get kbd/mouse events)
+    // 3) xen hasnt tried to touch the console (see console.h)
+    virt_startinfo_address->flags |= (IS_PRIV(p) && CONSOLE_ISOWNER(p) && opt_console == 0) ? SIF_CONSOLE : 0;
 
     if ( initrd_len )
     {

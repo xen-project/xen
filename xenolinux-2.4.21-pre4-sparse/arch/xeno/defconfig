@@ -125,9 +125,11 @@ CONFIG_XENOLINUX_BLOCK=y
 #
 # Character devices
 #
+CONFIG_XEN_CONSOLE=y
 # CONFIG_VT is not set
+# CONFIG_VGA_CONSOLE is not set
 # CONFIG_DUMMY_CONSOLE is not set
-CONFIG_PSMOUSE=y
+# CONFIG_PSMOUSE is not set
 # CONFIG_UNIX98_PTYS is not set
 
 #
