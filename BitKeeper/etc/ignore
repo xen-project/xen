@@ -30,3 +30,4 @@ xen/tools/figlet/figlet
 xen/xen
 xen/xen.*
 xen/xen-syms
+install
