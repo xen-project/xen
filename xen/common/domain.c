@@ -206,6 +206,9 @@ void release_task(struct task_struct *p)
     REMOVE_LINKS(p);
     write_unlock_irq(&tasklist_lock);
 
+    /* XXX SMH: so below is screwed currently; need ref counting on vifs,
+       vhds, etc and proper clean up. Until then just blow the memory :-( */
+#if 0
     /*
      * Safe! Only queue skbuffs with tasklist_lock held.
      * Only access shared_info with tasklist_lock held.
@@ -225,6 +228,9 @@ void release_task(struct task_struct *p)
     free_all_dom_mem(p);
 
     free_task_struct(p);
+#else 
+    printk("XEN::release_task: not freeing memory etc yet XXX FIXME.\n"); 
+#endif
 }
 
 
