@@ -401,16 +401,9 @@ get_page_from_l1e(
         return 0;
     }
 
-    if ( unlikely(!get_page_from_pagenr(pfn, d)) )
-        return 0;
-
-    if ( l1v & _PAGE_RW )
-    {
-        if ( unlikely(!get_page_type(page, PGT_writable_page)) )
-            return 0;
-    }
-
-    return 1;
+    return ((l1v & _PAGE_RW) ?
+            get_page_and_type(page, d, PGT_writable_page) :
+            get_page(d));
 }
 
 
