@@ -994,13 +994,13 @@ class XendDomainInfo:
 
         @return: deferred
         """
-        if (self.get_devices("vbd") == None):
+        if self.get_devices("vbd") == []:
             ctrl = xend.blkif_create(self.dom, recreate=self.recreate)
             back = ctrl.getBackendInterface(0)
             return back.connect(recreate=self.recreate)
         else:
             return None
-    
+
     def dom_construct(self, dom, config):
         """Construct a vm for an existing domain.
 
