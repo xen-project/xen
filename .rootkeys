@@ -575,6 +575,7 @@
 40589969nPq3DMzv24RDb5LXE9brHw xen/include/xen/sched-if.h
 3ddb79c0LzqqS0LhAQ50ekgj4oGl7Q xen/include/xen/sched.h
 403a06a7H0hpHcKpAiDe5BPnaXWTlA xen/include/xen/serial.h
+405b8599BsDsDwKEJLS0XipaiQW3TA xen/include/xen/shadow.h
 3ddb79c0VDeD-Oft5eNfMneTU3D1dQ xen/include/xen/skbuff.h
 3ddb79c14dXIhP7C2ahnoD08K90G_w xen/include/xen/slab.h
 3ddb79c09xbS-xxfKxuV3JETIhBzmg xen/include/xen/smp.h
@@ -591,7 +592,6 @@
 3f055a3dwldYR102YcSuBaxIf9t3Jw xen/include/xen/vbd.h
 3e8827bdaqPeZAWGVOwswgY9bWSx4g xen/include/xen/version.h
 3ddb79c2Ae5KpzhC9LCYG7mP_Vi4Aw xen/include/xen/vif.h
-405b8599BsDsDwKEJLS0XipaiQW3TA xen/include/xeno/shadow.h
 3ddb79c4YQCQ6r0xNLLu0jfbM7pVmA xen/net/Makefile
 3ddb79c4AkfDkTCw0comx4L8wsUOMg xen/net/dev.c
 3ddb79c4x1L_soh8b-r_1jQW_37Icw xen/net/dev_mcast.c

@@ -3,10 +3,10 @@
 #ifndef _XENO_SHADOW_H
 #define _XENO_SHADOW_H
 
-#include <xeno/config.h>
-#include <xeno/types.h>
-#include <xeno/mm.h>
-#include <xeno/perfc.h>
+#include <xen/config.h>
+#include <xen/types.h>
+#include <xen/mm.h>
+#include <xen/perfc.h>
 
 /* Shadow PT flag bits in pfn_info */
 #define PSH_shadowed	(1<<31) /* page has a shadow. PFN points to shadow */

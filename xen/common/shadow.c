@@ -1,9 +1,9 @@
 /* -*-  Mode:C; c-basic-offset:4; tab-width:4 -*- */
 
-#include <xeno/config.h>
-#include <xeno/types.h>
-#include <xeno/mm.h>
-#include <xeno/shadow.h>
+#include <xen/config.h>
+#include <xen/types.h>
+#include <xen/mm.h>
+#include <xen/shadow.h>
 #include <asm/domain_page.h>
 #include <asm/page.h>
 

@@ -107,7 +107,7 @@ void cmain(unsigned long magic, multiboot_info_t *mbi)
     module_t *mod;
     void *heap_start;
     int i;
-    unsigned long frametable_pages, max_mem;
+    unsigned long max_mem;
 
     /* Parse the command-line options. */
     cmdline = (unsigned char *)(mbi->cmdline ? __va(mbi->cmdline) : NULL);
