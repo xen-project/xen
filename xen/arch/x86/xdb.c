@@ -318,6 +318,7 @@ __trap_to_xendbg(struct pt_regs *regs)
 	int r;
 	static int xendbg_running;
 	static char recv_buf[4096];
+	unsigned flags;
 
 	if (xendbg_serhnd < 0) {
 		dbg_printk("Debugger not ready yet.\n");
@@ -337,6 +338,10 @@ __trap_to_xendbg(struct pt_regs *regs)
 	   obvious reason, which is Bad */
 	printk("Waiting for GDB to attach to XenDBG\n");
 
+	/* Try to make things a little more stable by disabling
+	   interrupts while we're here. */
+	local_irq_save(flags);
+
 	while (resume == 0) {
 		r = receive_command(recv_buf);
 		if (r < 0) {
@@ -346,6 +351,7 @@ __trap_to_xendbg(struct pt_regs *regs)
 			resume = process_command(recv_buf, regs);
 	}
 	xendbg_running = 0;
+	local_irq_restore(flags);
 }
 
 void
