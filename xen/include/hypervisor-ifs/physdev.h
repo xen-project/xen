@@ -14,43 +14,54 @@
 #define PHYSDEVOP_PCI_CFGREG_WRITE      1
 #define PHYSDEVOP_PCI_INITIALISE_DEVICE 2
 #define PHYSDEVOP_PCI_PROBE_ROOT_BUSES  3
-#define PHYSDEVOP_UNMASK_IRQ            4
+#define PHYSDEVOP_IRQ_UNMASK_NOTIFY     4
+#define PHYSDEVOP_IRQ_STATUS_QUERY      5
 
 /* Read from PCI configuration space. */
-typedef struct physdevop_pci_cfgreg_read_st
-{
-    int bus;        /* IN */
-    int dev;        /* IN */
-    int func;       /* IN */
-    int reg;        /* IN */
-    int len;        /* IN */
-    u32 value;      /* OUT */
+typedef struct {
+    /* IN */
+    int bus;
+    int dev;
+    int func;
+    int reg;
+    int len;
+    /* OUT */
+    u32 value;
 } physdevop_pci_cfgreg_read_t;
 
 /* Write to PCI configuration space. */
-typedef struct physdevop_pci_cfgreg_write_st
-{
-    int bus;        /* IN */
-    int dev;        /* IN */
-    int func;       /* IN */
-    int reg;        /* IN */
-    int len;        /* IN */
-    u32 value;      /* IN */
+typedef struct {
+    /* IN */
+    int bus;
+    int dev;
+    int func;
+    int reg;
+    int len;
+    u32 value;
 } physdevop_pci_cfgreg_write_t;
 
 /* Do final initialisation of a PCI device (e.g., last-moment IRQ routing). */
-typedef struct physdevop_pci_initialise_device_st
-{
-    int bus;      /* IN */
-    int dev;      /* IN */
-    int func;     /* IN */
+typedef struct {
+    /* IN */
+    int bus;
+    int dev;
+    int func;
 } physdevop_pci_initialise_device_t;
 
 /* Find the root buses for subsequent scanning. */
-typedef struct physdevop_pci_probe_root_buses_st
-{
-    u32 busmask[256/32]; /* OUT */
+typedef struct {
+    /* OUT */
+    u32 busmask[256/32];
 } physdevop_pci_probe_root_buses_t;
+
+typedef struct {
+    /* IN */
+    int irq;
+    /* OUT */
+/* Need to call PHYSDEVOP_IRQ_UNMASK_NOTIFY when the IRQ has been serviced? */
+#define PHYSDEVOP_IRQ_NEEDS_UNMASK_NOTIFY (1<<0)
+    unsigned long flags;
+} physdevop_irq_status_query_t;
 
 typedef struct _physdev_op_st 
 {
@@ -61,6 +72,7 @@ typedef struct _physdev_op_st
         physdevop_pci_cfgreg_write_t      pci_cfgreg_write;
         physdevop_pci_initialise_device_t pci_initialise_device;
         physdevop_pci_probe_root_buses_t  pci_probe_root_buses;
+        physdevop_irq_status_query_t      irq_status_query;
     } u;
 } physdev_op_t;
 

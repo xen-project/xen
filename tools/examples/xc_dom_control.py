@@ -92,14 +92,14 @@ elif cmd == 'pincpu':
     rc = xc.domain_pincpu( dom, cpu )
 
 elif cmd == 'list':
-    print 'Dom  Name             Mem(kb)  CPU  State  Time(s)'
+    print 'Dom  Name             Mem(kb)  CPU  State  Time(ms)'
     for domain in xc.domain_getinfo():
 
 	run = (domain['running'] and 'r') or '-'		# domain['running'] ? run='r' : run='-'
 	stop = (domain['stopped'] and 's') or '-'		# domain['stopped'] ? stop='s': stop='-'
 
         domain['state'] = run + stop
-        domain['cpu_time'] = domain['cpu_time']/1e8
+        domain['cpu_time'] = domain['cpu_time']/1e6
 
         print "%(dom)-4d %(name)-16s %(mem_kb)7d %(cpu)3d %(state)5s %(cpu_time)8d" % domain
 

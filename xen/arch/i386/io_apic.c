@@ -208,7 +208,11 @@ static void set_ioapic_affinity (unsigned int irq, unsigned long mask)
 	spin_unlock_irqrestore(&ioapic_lock, flags);
 }
 
-#if CONFIG_SMP
+/*
+ * In new I/O model, the interrupt is pinned to the CPU of the first
+ * device-driver domain that attaches. Dynamic balancing is pointless.
+ */
+#if defined(CONFIG_SMP) && !defined(NO_DEVICES_IN_XEN)
 
 typedef struct {
 	unsigned int cpu;
@@ -219,8 +223,6 @@ static irq_balance_t irq_balance[NR_IRQS] __cacheline_aligned
 			= { [ 0 ... NR_IRQS-1 ] = { 0, 0 } };
 
 extern unsigned long irq_affinity [NR_IRQS];
-
-#endif
 
 #define IDLE_ENOUGH(cpu,now) \
 		(idle_cpu(cpu) && ((now) - irq_stat[(cpu)].idle_timestamp > 1))
@@ -256,7 +258,6 @@ inside:
 
 static inline void balance_irq(int irq)
 {
-#if CONFIG_SMP
 	irq_balance_t *entry = irq_balance + irq;
 	unsigned long now = jiffies;
 
@@ -272,8 +273,13 @@ static inline void balance_irq(int irq)
 		entry->cpu = move(entry->cpu, allowed_mask, now, random_number);
 		set_ioapic_affinity(irq, apicid_to_phys_cpu_present(entry->cpu));
 	}
-#endif
 }
+
+#else
+
+#define balance_irq(_irq) ((void)0)
+
+#endif
 
 /*
  * support for broken MP BIOSs, enables hand-redirection of PIRQ0-7 to
@@ -883,6 +889,7 @@ void __init UNEXPECTED_IO_APIC(void)
 
 void __init print_IO_APIC(void)
 {
+#ifndef NDEBUG
 	int apic, i;
 	struct IO_APIC_reg_00 reg_00;
 	struct IO_APIC_reg_01 reg_01;
@@ -1019,9 +1026,11 @@ void __init print_IO_APIC(void)
 	}
 
 	printk(KERN_INFO ".................................... done.\n");
-
-	return;
+#endif
 }
+
+
+#if 0 /* Maybe useful for debugging, but not currently used anywhere. */
 
 static void print_APIC_bitfield (int base)
 {
@@ -1040,6 +1049,7 @@ static void print_APIC_bitfield (int base)
 		printk("\n");
 	}
 }
+
 
 void /*__init*/ print_local_APIC(void * dummy)
 {
@@ -1155,6 +1165,9 @@ void /*__init*/ print_PIC(void)
 	v = inb(0x4d1) << 8 | inb(0x4d0);
 	printk(KERN_DEBUG "... PIC ELCR: %04x\n", v);
 }
+
+#endif /* 0 */
+
 
 static void __init enable_IO_APIC(void)
 {
@@ -1874,7 +1887,7 @@ int io_apic_set_pci_routing (int ioapic, int pin, int irq, int edge_level, int a
 		mp_ioapics[ioapic].mpc_apicid, pin, entry.vector, irq, edge_level, active_high_low);
 
 	if (edge_level) {
-	irq_desc[irq].handler = &ioapic_level_irq_type;
+		irq_desc[irq].handler = &ioapic_level_irq_type;
 	} else {
 		irq_desc[irq].handler = &ioapic_edge_irq_type;
 	}
@@ -1893,3 +1906,110 @@ int io_apic_set_pci_routing (int ioapic, int pin, int irq, int edge_level, int a
 }
 
 #endif /*CONFIG_ACPI_BOOT*/
+
+extern char opt_leveltrigger[], opt_edgetrigger[];
+
+static int __init ioapic_trigger_setup(void)
+{
+    char       *p;
+    irq_desc_t *desc;
+    long        irq;
+
+    p = opt_leveltrigger;
+    while ( *p != '\0' )
+    {
+        irq = simple_strtol(p, &p, 10);
+        if ( (irq <= 0) || (irq >= NR_IRQS) )
+        {
+            printk("IRQ '%ld' out of range in level-trigger list '%s'\n",
+                   irq, opt_leveltrigger);
+            break;
+        }
+
+        printk("Forcing IRQ %ld to level-trigger: ", irq);
+
+        desc = &irq_desc[irq];
+        spin_lock_irq(&desc->lock);
+
+        if ( desc->handler == &ioapic_level_irq_type )
+        {
+            printk("already level-triggered (no force applied).\n");
+        }
+        else if ( desc->handler != &ioapic_edge_irq_type )
+        {
+            printk("cannot force (can only force IO-APIC-edge IRQs).\n");
+        }
+        else
+        {
+            desc->handler = &ioapic_level_irq_type;
+            __mask_IO_APIC_irq(irq);
+            __level_IO_APIC_irq(irq);        
+            printk("done.\n");
+        }
+
+        spin_unlock_irq(&desc->lock);
+
+        if ( *p == '\0' )
+            break;
+
+        if ( *p != ',' )
+        {
+            printk("Unexpected character '%c' in level-trigger list '%s'\n",
+                   *p, opt_leveltrigger);
+            break;
+        }
+
+        p++;
+    }
+
+    p = opt_edgetrigger;
+    while ( *p != '\0' )
+    {
+        irq = simple_strtol(p, &p, 10);
+        if ( (irq <= 0) || (irq >= NR_IRQS) )
+        {
+            printk("IRQ '%ld' out of range in edge-trigger list '%s'\n",
+                   irq, opt_edgetrigger);
+            break;
+        }
+
+        printk("Forcing IRQ %ld to edge-trigger: ", irq);
+
+        desc = &irq_desc[irq];
+        spin_lock_irq(&desc->lock);
+
+        if ( desc->handler == &ioapic_edge_irq_type )
+        {
+            printk("already edge-triggered (no force applied).\n");
+        }
+        else if ( desc->handler != &ioapic_level_irq_type )
+        {
+            printk("cannot force (can only force IO-APIC-level IRQs).\n");
+        }
+        else
+        {
+            desc->handler = &ioapic_edge_irq_type;
+            __edge_IO_APIC_irq(irq);        
+            desc->status |= IRQ_PENDING; /* may have lost a masked edge */
+            printk("done.\n");
+        }
+
+        spin_unlock_irq(&desc->lock);
+
+        if ( *p == '\0' )
+            break;
+
+        if ( *p != ',' )
+        {
+            printk("Unexpected character '%c' in edge-trigger list '%s'\n",
+                   *p, opt_edgetrigger);
+            break;
+        }
+
+        p++;
+    }
+
+    return 0;
+}
+
+__initcall(ioapic_trigger_setup);

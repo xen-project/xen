@@ -520,7 +520,7 @@ asmlinkage void __enter_scheduler(void)
 
     /* Mark a timer event for the newly-scheduled domain. */
     if ( !is_idle_task(next) )
-        evtchn_set_pending(next, VIRQ_TIMER);
+        send_guest_virq(next, VIRQ_TIMER);
     
     schedule_tail(next);
 

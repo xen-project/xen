@@ -116,12 +116,14 @@ int netif_be_start_xmit(struct sk_buff *skb, struct net_device *dev)
  
     /*
      * We do not copy the packet unless:
-     *  1. It is fragmented; or
+     *  1. The data is shared; or
      *  2. It spans a page boundary; or
      *  3. We cannot be sure the whole data page is allocated.
      * The copying method is taken from skb_copy().
+     * NB. We also couldn't cope with fragmented packets, but we won't get
+     *     any because we not advertise the NETIF_F_SG feature.
      */
-    if ( (skb_shinfo(skb)->nr_frags != 0) ||
+    if ( skb_shared(skb) || skb_cloned(skb) || 
          (((unsigned long)skb->end ^ (unsigned long)skb->head) & PAGE_MASK) ||
          ((skb->end - skb->head) < (PAGE_SIZE/2)) )
     {

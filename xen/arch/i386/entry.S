@@ -245,6 +245,10 @@ restore_all_guest:
         movsl
         movsl
         movsl
+        # Third, reenable interrupts. They will definitely be reenabled by IRET
+        # in any case. They could be disabled here if we are returning from an
+        # interrupt. We need interrupts enabled if we take a fault.
+        sti
         # Finally, restore guest registers -- faults will cause failsafe
         popl %ebx
 	popl %ecx

@@ -634,9 +634,10 @@ static long pci_probe_root_buses(u32 *busmask)
  */
 long do_physdev_op(physdev_op_t *uop)
 {
-    phys_dev_t *pdev;
+    phys_dev_t  *pdev;
     physdev_op_t op;
-    long ret;
+    long         ret;
+    int          irq;
 
     if ( unlikely(copy_from_user(&op, uop, sizeof(op)) != 0) )
         return -EFAULT;
@@ -674,8 +675,20 @@ long do_physdev_op(physdev_op_t *uop)
         ret = pci_probe_root_buses(op.u.pci_probe_root_buses.busmask);
         break;
 
-    case PHYSDEVOP_UNMASK_IRQ:
+    case PHYSDEVOP_IRQ_UNMASK_NOTIFY:
         ret = pirq_guest_unmask(current);
+        break;
+
+    case PHYSDEVOP_IRQ_STATUS_QUERY:
+        irq = op.u.irq_status_query.irq;
+        ret = -EINVAL;
+        if ( (irq < 0) || (irq >= NR_IRQS) )
+            break;
+        op.u.irq_status_query.flags = 0;
+        /* Edge-triggered interrupts don't need an explicit unmask downcall. */
+        if ( strstr(irq_desc[irq].handler->typename, "edge") == NULL )
+            op.u.irq_status_query.flags |= PHYSDEVOP_IRQ_NEEDS_UNMASK_NOTIFY;
+        ret = 0;
         break;
 
     default:

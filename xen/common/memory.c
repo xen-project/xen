@@ -194,7 +194,6 @@ static struct {
  */
 void __init init_frametable(unsigned long nr_pages)
 {
-    int i;
     unsigned long mfn;
 
     memset(percpu_info, 0, sizeof(percpu_info));
@@ -209,20 +208,19 @@ void __init init_frametable(unsigned long nr_pages)
     INIT_LIST_HEAD(&free_list);    
     free_pfns = 0;
 
-    /* so that we can map them latter, set the ownership of pages
-       belonging to the machine_to_phys_mapping to CPU0 idle task */
-    
-    mfn = virt_to_phys((void *)RDWR_MPT_VIRT_START)>>PAGE_SHIFT;
-
     /* initialise to a magic of 0x55555555 so easier to spot bugs later */
     memset( machine_to_phys_mapping, 0x55, 4*1024*1024 );
 
     /* The array is sized for a 4GB machine regardless of actuall mem size. 
        This costs 4MB -- may want to fix some day */
-    for(i=0;i<1024*1024;i+=1024,mfn++)
+
+    /* Pin the ownership of the MP table so that DOM0 can map it later. */
+    for ( mfn = virt_to_phys((void *)RDWR_MPT_VIRT_START)>>PAGE_SHIFT;
+          mfn < virt_to_phys((void *)RDWR_MPT_VIRT_END)>>PAGE_SHIFT;
+          mfn++ )
     {
 	frame_table[mfn].count_and_flags = 1 | PGC_allocated;
-	frame_table[mfn].type_and_flags = 1 | PGT_gdt_page; // anything non RW
+	frame_table[mfn].type_and_flags = 1 | PGT_gdt_page; /* non-RW type */
 	frame_table[mfn].u.domain = &idle0_task;
     }
 }

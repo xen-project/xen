@@ -270,7 +270,7 @@ void switch_to(struct task_struct *prev_p, struct task_struct *next_p)
         tss->ss1  = next->guestos_ss;
 
         /* Maybe switch the debug registers. */
-        if ( next->debugreg[7] )
+        if ( unlikely(next->debugreg[7]) )
         {
             loaddebug(next, 0);
             loaddebug(next, 1);
@@ -280,10 +280,17 @@ void switch_to(struct task_struct *prev_p, struct task_struct *next_p)
             loaddebug(next, 6);
             loaddebug(next, 7);
         }
+
+        /* Switch page tables. */
+        write_ptbase(&next_p->mm);
+        tlb_clocktick();
     }
 
-    if ( ( prev_p->io_bitmap != NULL ) || ( next_p->io_bitmap != NULL ) ) {
-        if ( next_p->io_bitmap != NULL ) {
+    if ( unlikely(prev_p->io_bitmap != NULL) || 
+         unlikely(next_p->io_bitmap != NULL) )
+    {
+        if ( next_p->io_bitmap != NULL )
+        {
             /* Copy in the appropriate parts of the IO bitmap.  We use the
              * selector to copy only the interesting parts of the bitmap. */
 
@@ -314,7 +321,9 @@ void switch_to(struct task_struct *prev_p, struct task_struct *next_p)
 
             tss->bitmap = IO_BITMAP_OFFSET;
 
-	} else {
+	}
+        else
+        {
             /* In this case, we're switching FROM a task with IO port access,
              * to a task that doesn't use the IO bitmap.  We set any TSS bits
              * that might have been cleared, ready for future use. */
@@ -332,11 +341,6 @@ void switch_to(struct task_struct *prev_p, struct task_struct *next_p)
             tss->bitmap = INVALID_IO_BITMAP_OFFSET;
 	}
     }
-    
-    
-    /* Switch page tables. */
-    write_ptbase(&next_p->mm);
-    tlb_clocktick();
 
     set_current(next_p);
 
