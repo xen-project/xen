@@ -23,8 +23,10 @@ LINKFLAGS =-T $(TOPDIR)/arch/xeno/vmlinux.lds $(LDFLAGS)
 
 CFLAGS += -pipe
 
+check_gcc = $(shell if $(CC) $(1) -S -o /dev/null -xc /dev/null > /dev/null 2>&1; then echo "$(1)"; else echo "$(2)"; fi)
+
 # prevent gcc from keeping the stack 16 byte aligned
-CFLAGS += $(shell if $(CC) -mpreferred-stack-boundary=2 -S -o /dev/null -xc /dev/null >/dev/null 2>&1; then echo "-mpreferred-stack-boundary=2"; fi)
+CFLAGS += $(call check_gcc,-mpreferred-stack-boundary=2,)
 
 ifdef CONFIG_M686
 CFLAGS += -march=i686
@@ -39,7 +41,7 @@ CFLAGS += -march=i686
 endif
 
 ifdef CONFIG_MK7
-CFLAGS += $(shell if $(CC) -march=athlon -S -o /dev/null -xc /dev/null >/dev/null 2>&1; then echo "-march=athlon"; else echo "-march=i686 -malign-functions=4"; fi) 
+CFLAGS += $(call check_gcc,-march=athlon,-march=i686 -malign-functions=4)
 endif
 
 HEAD := arch/xeno/kernel/head.o arch/xeno/kernel/init_task.o

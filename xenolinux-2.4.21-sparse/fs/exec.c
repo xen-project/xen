@@ -577,8 +577,10 @@ int flush_old_exec(struct linux_binprm * bprm)
 
 	current->sas_ss_sp = current->sas_ss_size = 0;
 
-	if (current->euid == current->uid && current->egid == current->gid)
+	if (current->euid == current->uid && current->egid == current->gid) {
 		current->mm->dumpable = 1;
+		current->task_dumpable = 1;
+	}
 	name = bprm->filename;
 	for (i=0; (ch = *(name++)) != '\0';) {
 		if (ch == '/')
@@ -1086,7 +1088,7 @@ int do_coredump(long signr, struct pt_regs * regs)
 	binfmt = current->binfmt;
 	if (!binfmt || !binfmt->core_dump)
 		goto fail;
-	if (!current->mm->dumpable)
+	if (!is_dumpable(current))
 		goto fail;
 	current->mm->dumpable = 0;
 	if (current->rlim[RLIMIT_CORE].rlim_cur < binfmt->min_coredump)

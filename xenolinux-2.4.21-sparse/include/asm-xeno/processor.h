@@ -63,6 +63,7 @@ struct cpuinfo_x86 {
 #define X86_VENDOR_RISE 6
 #define X86_VENDOR_TRANSMETA 7
 #define X86_VENDOR_NSC 8
+#define X86_VENDOR_SIS 9
 #define X86_VENDOR_UNKNOWN 0xff
 
 /*
@@ -264,6 +265,7 @@ extern unsigned int mca_pentium_flag;
  * Size of io_bitmap in longwords: 32 is ports 0-0x3ff.
  */
 #define IO_BITMAP_SIZE	32
+#define IO_BITMAP_BYTES (IO_BITMAP_SIZE * 4)
 #define IO_BITMAP_OFFSET offsetof(struct tss_struct,io_bitmap)
 #define INVALID_IO_BITMAP_OFFSET 0x8000
 
@@ -408,7 +410,7 @@ extern void release_thread(struct task_struct *);
 /*
  * create a kernel thread without removing it from tasklists
  */
-extern int kernel_thread(int (*fn)(void *), void * arg, unsigned long flags);
+extern int arch_kernel_thread(int (*fn)(void *), void * arg, unsigned long flags);
 
 /* Copy and release all segment info associated with a VM */
 extern void copy_segments(struct task_struct *p, struct mm_struct * mm);
@@ -458,7 +460,7 @@ static inline void rep_nop(void)
 #define cpu_relax()	rep_nop()
 
 /* Prefetch instructions for Pentium III and AMD Athlon */
-#ifdef 	CONFIG_MPENTIUMIII
+#if defined(CONFIG_MPENTIUMIII) || defined (CONFIG_MPENTIUM4)
 
 #define ARCH_HAS_PREFETCH
 extern inline void prefetch(const void *x)

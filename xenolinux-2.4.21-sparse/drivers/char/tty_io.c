@@ -131,12 +131,6 @@ extern struct tty_driver ptm_driver[];	/* Unix98 pty masters; for /dev/ptmx */
 extern struct tty_driver pts_driver[];	/* Unix98 pty slaves;  for /dev/ptmx */
 #endif
 
-/*
- * redirect is the pseudo-tty that console output
- * is redirected to if asked by TIOCCONS.
- */
-struct tty_struct * redirect;
-
 static void initialize_tty_struct(struct tty_struct *tty);
 
 static ssize_t tty_read(struct file *, char *, size_t, loff_t *);
@@ -431,6 +425,8 @@ static struct file_operations hung_up_tty_fops = {
 	release:	tty_release,
 };
 
+static spinlock_t redirect_lock = SPIN_LOCK_UNLOCKED;
+static struct file *redirect;
 /*
  * This can be called by the "eventd" kernel thread.  That is process synchronous,
  * but doesn't hold any locks, so we need to make sure we have the appropriate
@@ -440,6 +436,7 @@ void do_tty_hangup(void *data)
 {
 	struct tty_struct *tty = (struct tty_struct *) data;
 	struct file * cons_filp = NULL;
+	struct file *f = NULL;
 	struct task_struct *p;
 	struct list_head *l;
 	int    closecount = 0, n;
@@ -449,6 +446,15 @@ void do_tty_hangup(void *data)
 
 	/* inuse_filps is protected by the single kernel lock */
 	lock_kernel();
+
+	spin_lock(&redirect_lock);
+	if (redirect && redirect->private_data == tty) {
+		f = redirect;
+		redirect = NULL;
+	}
+	spin_unlock(&redirect_lock);
+	if (f)
+		fput(f);
 	
 	check_tty_count(tty, "do_tty_hangup");
 	file_list_lock();
@@ -747,7 +753,7 @@ static ssize_t tty_write(struct file * file, const char * buf, size_t count,
 {
 	int is_console;
 	struct tty_struct * tty;
-	struct inode *inode;
+	struct inode *inode = file->f_dentry->d_inode;
 
 	/* Can't seek (pwrite) on ttys.  */
 	if (ppos != &file->f_pos)
@@ -761,10 +767,24 @@ static ssize_t tty_write(struct file * file, const char * buf, size_t count,
 	is_console = (inode->i_rdev == SYSCONS_DEV ||
 		      inode->i_rdev == CONSOLE_DEV);
 
-	if (is_console && redirect)
-		tty = redirect;
-	else
-		tty = (struct tty_struct *)file->private_data;
+	if (is_console) {
+		struct file *p = NULL;
+
+		spin_lock(&redirect_lock);
+		if (redirect) {
+			get_file(redirect);
+			p = redirect;
+		}
+		spin_unlock(&redirect_lock);
+
+		if (p) {
+			ssize_t res = p->f_op->write(p, buf, count, &p->f_pos);
+			fput(p);
+			return res;
+		}
+	}
+
+	tty = (struct tty_struct *)file->private_data;
 	if (tty_paranoia_check(tty, inode->i_rdev, "tty_write"))
 		return -EIO;
 	if (!tty || !tty->driver.write || (test_bit(TTY_IO_ERROR, &tty->flags)))
@@ -1228,7 +1248,7 @@ static void release_dev(struct file * filp)
 	/*
 	 * If _either_ side is closing, make sure there aren't any
 	 * processes that still think tty or o_tty is their controlling
-	 * tty.  Also, clear redirect if it points to either tty.
+	 * tty.
 	 */
 	if (tty_closing || o_tty_closing) {
 		struct task_struct *p;
@@ -1239,9 +1259,6 @@ static void release_dev(struct file * filp)
 				p->tty = NULL;
 		}
 		read_unlock(&tasklist_lock);
-
-		if (redirect == tty || (o_tty && redirect == o_tty))
-			redirect = NULL;
 	}
 
 	/* check whether both sides are closing ... */
@@ -1520,19 +1537,29 @@ static int tiocswinsz(struct tty_struct *tty, struct tty_struct *real_tty,
 	return 0;
 }
 
-static int tioccons(struct inode *inode,
-	struct tty_struct *tty, struct tty_struct *real_tty)
+static int tioccons(struct inode *inode, struct file *file)
 {
 	if (inode->i_rdev == SYSCONS_DEV ||
 	    inode->i_rdev == CONSOLE_DEV) {
+		struct file *f;
 		if (!suser())
 			return -EPERM;
+		spin_lock(&redirect_lock);
+		f = redirect;
 		redirect = NULL;
+		spin_unlock(&redirect_lock);
+		if (f)
+			fput(f);
 		return 0;
 	}
-	if (redirect)
+	spin_lock(&redirect_lock);
+	if (redirect) {
+		spin_unlock(&redirect_lock);
 		return -EBUSY;
-	redirect = real_tty;
+	}
+	get_file(file);
+	redirect = file;
+	spin_unlock(&redirect_lock);
 	return 0;
 }
 
@@ -1752,7 +1779,7 @@ int tty_ioctl(struct inode * inode, struct file * file,
 		case TIOCSWINSZ:
 			return tiocswinsz(tty, real_tty, (struct winsize *) arg);
 		case TIOCCONS:
-			return tioccons(inode, tty, real_tty);
+			return real_tty!=tty ? -EINVAL : tioccons(inode, file);
 		case FIONBIO:
 			return fionbio(file, (int *) arg);
 		case TIOCEXCL:

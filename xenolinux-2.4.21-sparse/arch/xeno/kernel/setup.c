@@ -400,10 +400,19 @@ static void __init display_cacheinfo(struct cpuinfo_x86 *c)
         (c->x86_model == 11) && (l2size == 0))
         l2size = 256;
 
-    /* VIA C3 CPUs (670-68F) need further shifting. */
-    if (c->x86_vendor == X86_VENDOR_CENTAUR && (c->x86 == 6) &&
-        ((c->x86_model == 7) || (c->x86_model == 8))) {
-        l2size = l2size >> 8;
+    if (c->x86_vendor == X86_VENDOR_CENTAUR) {
+	/* VIA C3 CPUs (670-68F) need further shifting. */
+	if ((c->x86 == 6) &&
+	    ((c->x86_model == 7) || (c->x86_model == 8))) {
+		l2size >>= 8;
+	}
+
+	/* VIA also screwed up Nehemiah stepping 1, and made
+	   it return '65KB' instead of '64KB'
+	   - Note, it seems this may only be in engineering samples. */
+	if ((c->x86==6) && (c->x86_model==9) &&
+	    (c->x86_mask==1) && (l2size==65))
+		l2size -= 1;
     }
 
     /* Allow user to override all this if necessary. */

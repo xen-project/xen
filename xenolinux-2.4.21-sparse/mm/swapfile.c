@@ -916,6 +916,11 @@ asmlinkage long sys_swapon(const char * specialfile, int swap_flags)
 		struct block_device_operations *bdops;
 		devfs_handle_t de;
 
+		if (is_mounted(dev)) {
+			error = -EBUSY;
+			goto bad_swap_2;
+		}
+
 		p->swap_device = dev;
 		set_blocksize(dev, PAGE_SIZE);
 		

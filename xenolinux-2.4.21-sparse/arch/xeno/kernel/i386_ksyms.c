@@ -79,6 +79,7 @@ EXPORT_SYMBOL_NOVERS(__up_wakeup);
 /* Networking helper routines. */
 EXPORT_SYMBOL(csum_partial_copy_generic);
 /* Delay loops */
+EXPORT_SYMBOL(__ndelay);
 EXPORT_SYMBOL(__udelay);
 EXPORT_SYMBOL(__delay);
 EXPORT_SYMBOL(__const_udelay);

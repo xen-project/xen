@@ -753,7 +753,7 @@ ENTRY(sys_call_table)
 	.long SYMBOL_NAME(sys_lremovexattr)
 	.long SYMBOL_NAME(sys_fremovexattr)
  	.long SYMBOL_NAME(sys_tkill)
-	.long SYMBOL_NAME(sys_ni_syscall)	/* reserved for sendfile64 */
+	.long SYMBOL_NAME(sys_sendfile64)
 	.long SYMBOL_NAME(sys_ni_syscall)	/* 240 reserved for futex */
 	.long SYMBOL_NAME(sys_ni_syscall)	/* reserved for sched_setaffinity */
 	.long SYMBOL_NAME(sys_ni_syscall)	/* reserved for sched_getaffinity */
@@ -767,6 +767,12 @@ ENTRY(sys_call_table)
 	.long SYMBOL_NAME(sys_ni_syscall)	/* 250 sys_alloc_hugepages */
 	.long SYMBOL_NAME(sys_ni_syscall)	/* sys_free_hugepages */
 	.long SYMBOL_NAME(sys_ni_syscall)	/* sys_exit_group */
+	.long SYMBOL_NAME(sys_ni_syscall)	/* sys_lookup_dcookie */
+	.long SYMBOL_NAME(sys_ni_syscall)	/* sys_epoll_create */
+	.long SYMBOL_NAME(sys_ni_syscall)	/* sys_epoll_ctl 255 */
+	.long SYMBOL_NAME(sys_ni_syscall)	/* sys_epoll_wait */
+ 	.long SYMBOL_NAME(sys_ni_syscall)	/* sys_remap_file_pages */
+ 	.long SYMBOL_NAME(sys_ni_syscall)	/* sys_set_tid_address */
 
 	.rept NR_syscalls-(.-sys_call_table)/4
 		.long SYMBOL_NAME(sys_ni_syscall)
