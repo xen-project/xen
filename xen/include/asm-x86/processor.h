@@ -85,11 +85,11 @@
 #define X86_CR4_OSXMMEXCPT	0x0400	/* enable unmasked SSE exceptions */
 
 /*
- * 'guest_trap_bounce' flags values.
+ * 'trap_bounce' flags values.
  */
-#define GTBF_TRAP        1
-#define GTBF_TRAP_NOCODE 2
-#define GTBF_TRAP_CR2    4
+#define TBF_TRAP        1
+#define TBF_TRAP_NOCODE 2
+#define TBF_TRAP_CR2    4
 
 #ifndef __ASSEMBLY__
 
@@ -298,16 +298,44 @@ struct tss_struct {
     u32 __cacheline_filler[5];
 };
 
+struct trap_bounce {
+    unsigned long  error_code;
+    unsigned long  cr2;
+    unsigned short flags; /* TBF_ */
+    unsigned short cs;
+    unsigned long  eip;
+};
+
 struct thread_struct {
     unsigned long      guestos_sp;
     unsigned long      guestos_ss;
-/* Hardware debugging registers */
+
+    /* Hardware debugging registers */
     unsigned long      debugreg[8];  /* %%db0-7 debug registers */
-/* floating point info */
+
+    /* floating point info */
     struct i387_state  i387;
-/* general user-visible register state */
+
+    /* general user-visible register state */
     execution_context_t user_ctxt;
-/* Trap info. */
+
+    /*
+     * Return vectors pushed to us by guest OS.
+     * The stack frame for events is exactly that of an x86 hardware interrupt.
+     * The stack frame for a failsafe callback is augmented with saved values
+     * for segment registers %ds, %es, %fs and %gs:
+     * 	%ds, %es, %fs, %gs, %eip, %cs, %eflags [, %oldesp, %oldss]
+     */
+    unsigned long event_selector;    /* 08: entry CS  */
+    unsigned long event_address;     /* 12: entry EIP */
+
+    unsigned long failsafe_selector; /* 16: entry CS  */
+    unsigned long failsafe_address;  /* 20: entry EIP */
+
+    /* Bounce information for propagating an exception to guest OS. */
+    struct trap_bounce trap_bounce;
+
+    /* Trap info. */
 #ifdef __i386__
     int                fast_trap_idx;
     struct desc_struct fast_trap_desc;
@@ -343,29 +371,13 @@ extern struct desc_struct *idt_tables[];
 
 long set_fast_trap(struct domain *p, int idx);
 
-#define INIT_THREAD  {						\
-	0, 0,		      		       			\
-	{ [0 ... 7] = 0 },	/* debugging registers */	\
-	{ { 0, }, },		/* 387 state */			\
-	{ 0 },							\
-	0x20, { 0, 0 },		/* DEFAULT_FAST_TRAP */		\
-	{ {0} }			/* io permissions */		\
-}
+#define INIT_THREAD  { fast_trap_idx: 0x20 }
 
 #elif defined(__x86_64__)
 
 #define INIT_THREAD { 0 }
 
 #endif /* __x86_64__ */
-
-struct guest_trap_bounce {
-    unsigned long  error_code;        /*   0 */
-    unsigned long  cr2;               /*   4 */
-    unsigned short flags;             /*   8 */
-    unsigned short cs;                /*  10 */
-    unsigned long  eip;               /*  12 */
-};
-extern struct guest_trap_bounce guest_trap_bounce[];
 
 extern int gpf_emulate_4gb(struct xen_regs *regs);
 

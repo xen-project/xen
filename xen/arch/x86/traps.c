@@ -52,8 +52,6 @@
 #include <asm/i387.h>
 #include <asm/debugger.h>
 
-struct guest_trap_bounce guest_trap_bounce[NR_CPUS] = { { 0 } };
-
 #if defined(__i386__)
 
 #define DOUBLEFAULT_STACK_SIZE 1024
@@ -234,8 +232,8 @@ static inline void do_trap(int trapnr, char *str,
                            struct xen_regs *regs, 
                            long error_code, int use_error_code)
 {
-    struct domain *p = current;
-    struct guest_trap_bounce *gtb = guest_trap_bounce+smp_processor_id();
+    struct domain *d = current;
+    struct trap_bounce *tb = &d->thread.trap_bounce;
     trap_info_t *ti;
     unsigned long fixup;
 
@@ -245,12 +243,12 @@ static inline void do_trap(int trapnr, char *str,
         goto xen_fault;
 
     ti = current->thread.traps + trapnr;
-    gtb->flags = use_error_code ? GTBF_TRAP : GTBF_TRAP_NOCODE;
-    gtb->error_code = error_code;
-    gtb->cs         = ti->cs;
-    gtb->eip        = ti->address;
+    tb->flags = use_error_code ? TBF_TRAP : TBF_TRAP_NOCODE;
+    tb->error_code = error_code;
+    tb->cs         = ti->cs;
+    tb->eip        = ti->address;
     if ( TI_GET_IF(ti) )
-        p->shared_info->vcpu_data[0].evtchn_upcall_mask = 1;
+        d->shared_info->vcpu_data[0].evtchn_upcall_mask = 1;
     return; 
 
  xen_fault:
@@ -296,8 +294,8 @@ DO_ERROR_NOCODE(19, "simd error", simd_coprocessor_error)
 
 asmlinkage void do_int3(struct xen_regs *regs, long error_code)
 {
-    struct domain *p = current;
-    struct guest_trap_bounce *gtb = guest_trap_bounce+smp_processor_id();
+    struct domain *d = current;
+    struct trap_bounce *tb = &d->thread.trap_bounce;
     trap_info_t *ti;
 
     DEBUGGER_trap_entry(TRAP_int3, regs, error_code);
@@ -312,12 +310,12 @@ asmlinkage void do_int3(struct xen_regs *regs, long error_code)
     }
 
     ti = current->thread.traps + 3;
-    gtb->flags      = GTBF_TRAP_NOCODE;
-    gtb->error_code = error_code;
-    gtb->cs         = ti->cs;
-    gtb->eip        = ti->address;
+    tb->flags      = TBF_TRAP_NOCODE;
+    tb->error_code = error_code;
+    tb->cs         = ti->cs;
+    tb->eip        = ti->address;
     if ( TI_GET_IF(ti) )
-        p->shared_info->vcpu_data[0].evtchn_upcall_mask = 1;
+        d->shared_info->vcpu_data[0].evtchn_upcall_mask = 1;
 }
 
 asmlinkage void do_double_fault(void)
@@ -359,11 +357,11 @@ asmlinkage void do_machine_check(struct xen_regs *regs, long error_code)
 
 asmlinkage void do_page_fault(struct xen_regs *regs, long error_code)
 {
-    struct guest_trap_bounce *gtb = guest_trap_bounce+smp_processor_id();
     trap_info_t *ti;
     unsigned long off, addr, fixup;
     struct domain *d = current;
     extern int map_ldt_shadow_page(unsigned int);
+    struct trap_bounce *tb = &d->thread.trap_bounce;
     int cpu = d->processor;
 
     __asm__ __volatile__ ("movl %%cr2,%0" : "=r" (addr) : );
@@ -409,11 +407,11 @@ asmlinkage void do_page_fault(struct xen_regs *regs, long error_code)
         goto xen_fault;
 
     ti = d->thread.traps + 14;
-    gtb->flags = GTBF_TRAP_CR2; /* page fault pushes %cr2 */
-    gtb->cr2        = addr;
-    gtb->error_code = error_code;
-    gtb->cs         = ti->cs;
-    gtb->eip        = ti->address;
+    tb->flags = TBF_TRAP_CR2; /* page fault pushes %cr2 */
+    tb->cr2        = addr;
+    tb->error_code = error_code;
+    tb->cs         = ti->cs;
+    tb->eip        = ti->address;
     if ( TI_GET_IF(ti) )
         d->shared_info->vcpu_data[0].evtchn_upcall_mask = 1;
     return; 
@@ -458,7 +456,7 @@ asmlinkage void do_page_fault(struct xen_regs *regs, long error_code)
 asmlinkage void do_general_protection(struct xen_regs *regs, long error_code)
 {
     struct domain *d = current;
-    struct guest_trap_bounce *gtb = guest_trap_bounce+smp_processor_id();
+    struct trap_bounce *tb = &d->thread.trap_bounce;
     trap_info_t *ti;
     unsigned long fixup;
 
@@ -494,7 +492,7 @@ asmlinkage void do_general_protection(struct xen_regs *regs, long error_code)
         ti = current->thread.traps + (error_code>>3);
         if ( TI_GET_DPL(ti) >= (regs->cs & 3) )
         {
-            gtb->flags = GTBF_TRAP_NOCODE;
+            tb->flags = TBF_TRAP_NOCODE;
             regs->eip += 2;
             goto finish_propagation;
         }
@@ -509,11 +507,11 @@ asmlinkage void do_general_protection(struct xen_regs *regs, long error_code)
 
     /* Pass on GPF as is. */
     ti = current->thread.traps + 13;
-    gtb->flags      = GTBF_TRAP;
-    gtb->error_code = error_code;
+    tb->flags      = TBF_TRAP;
+    tb->error_code = error_code;
  finish_propagation:
-    gtb->cs         = ti->cs;
-    gtb->eip        = ti->address;
+    tb->cs         = ti->cs;
+    tb->eip        = ti->address;
     if ( TI_GET_IF(ti) )
         d->shared_info->vcpu_data[0].evtchn_upcall_mask = 1;
     return;
@@ -599,18 +597,18 @@ asmlinkage void math_state_restore(struct xen_regs *regs, long error_code)
 
     if ( test_and_clear_bit(DF_GUEST_STTS, &current->flags) )
     {
-        struct guest_trap_bounce *gtb = guest_trap_bounce+smp_processor_id();
-        gtb->flags      = GTBF_TRAP_NOCODE;
-        gtb->cs         = current->thread.traps[7].cs;
-        gtb->eip        = current->thread.traps[7].address;
+        struct trap_bounce *tb = &current->thread.trap_bounce;
+        tb->flags      = TBF_TRAP_NOCODE;
+        tb->cs         = current->thread.traps[7].cs;
+        tb->eip        = current->thread.traps[7].address;
     }
 }
 
 asmlinkage void do_debug(struct xen_regs *regs, long error_code)
 {
     unsigned int condition;
-    struct domain *tsk = current;
-    struct guest_trap_bounce *gtb = guest_trap_bounce+smp_processor_id();
+    struct domain *d = current;
+    struct trap_bounce *tb = &d->thread.trap_bounce;
 
     DEBUGGER_trap_entry(TRAP_debug, regs, error_code);
 
@@ -618,7 +616,7 @@ asmlinkage void do_debug(struct xen_regs *regs, long error_code)
 
     /* Mask out spurious debug traps due to lazy DR7 setting */
     if ( (condition & (DR_TRAP0|DR_TRAP1|DR_TRAP2|DR_TRAP3)) &&
-         (tsk->thread.debugreg[7] == 0) )
+         (d->thread.debugreg[7] == 0) )
     {
         __asm__("movl %0,%%db7" : : "r" (0));
         return;
@@ -638,11 +636,11 @@ asmlinkage void do_debug(struct xen_regs *regs, long error_code)
     }
 
     /* Save debug status register where guest OS can peek at it */
-    tsk->thread.debugreg[6] = condition;
+    d->thread.debugreg[6] = condition;
 
-    gtb->flags = GTBF_TRAP_NOCODE;
-    gtb->cs    = tsk->thread.traps[1].cs;
-    gtb->eip   = tsk->thread.traps[1].address;
+    tb->flags = TBF_TRAP_NOCODE;
+    tb->cs    = d->thread.traps[1].cs;
+    tb->eip   = d->thread.traps[1].address;
 }
 
 
@@ -800,15 +798,15 @@ long do_set_callbacks(unsigned long event_selector,
                       unsigned long failsafe_selector,
                       unsigned long failsafe_address)
 {
-    struct domain *p = current;
+    struct domain *d = current;
 
     if ( !VALID_CODESEL(event_selector) || !VALID_CODESEL(failsafe_selector) )
         return -EPERM;
 
-    p->event_selector    = event_selector;
-    p->event_address     = event_address;
-    p->failsafe_selector = failsafe_selector;
-    p->failsafe_address  = failsafe_address;
+    d->thread.event_selector    = event_selector;
+    d->thread.event_address     = event_address;
+    d->thread.failsafe_selector = failsafe_selector;
+    d->thread.failsafe_address  = failsafe_address;
 
     return 0;
 }

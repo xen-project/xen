@@ -142,12 +142,8 @@ void arch_getdomaininfo_ctxt(struct domain *d, full_execution_context_t *c)
     memcpy(c->debugreg, 
            d->thread.debugreg, 
            sizeof(d->thread.debugreg));
-    c->event_callback_cs  =
-        d->event_selector;
-    c->event_callback_eip =
-        d->event_address;
-    c->failsafe_callback_cs  = 
-        d->failsafe_selector;
-    c->failsafe_callback_eip = 
-        d->failsafe_address;
+    c->event_callback_cs     = d->thread.event_selector;
+    c->event_callback_eip    = d->thread.event_address;
+    c->failsafe_callback_cs  = d->thread.failsafe_selector;
+    c->failsafe_callback_eip = d->thread.failsafe_address;
 }
