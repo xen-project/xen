@@ -103,7 +103,7 @@ include/asm-$(TARGET_ARCH)/asm-offsets.h: arch/$(TARGET_ARCH)/asm-offsets.s
 	  echo ""; \
 	  echo "#endif") <$< >$@
 
-.PHONY: default debug install dist clean delete-unfresh-files TAGS
+.PHONY: default debug install dist clean delete-unfresh-files TAGS tags
 
 SUBDIRS = arch/$(TARGET_ARCH) common drivers 
 TAGS: 
@@ -111,5 +111,10 @@ TAGS:
 	  find include -type d \( -name "asm-*" -o -name config \) -prune -o \
 		-name '*.h' -print; \
 	  find $(SUBDIRS) -name '*.[ch]' ) | grep -v /SCCS/ | etags -
+tags: 
+	( find include/asm-$(TARGET_ARCH) -name '*.h'; \
+	  find include -type d \( -name "asm-*" -o -name config \) -prune -o \
+		-name '*.h' -print; \
+	  find $(SUBDIRS) -name '*.[chS]' ) | grep -v /SCCS/ | xargs ctags
 MAP:
 	nm $(TARGET) | grep -v '\(compiled\)\|\(\.o$$\)\|\( [aUw] \)\|\(\.\.ng$$\)\|\(LASH[RL]DI\)' | sort > System.map
