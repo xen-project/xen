@@ -354,18 +354,17 @@ def preprocess_vifs(opts, vals):
     vals.vif = vifs
 
 def preprocess_ip(opts, vals):
-    setip = (vals.hostname or vals.netmask
-             or vals.nfs_server
-             or vals.gateway or vals.dhcp or vals.interface)
-    if not setip: return
-    dummy_nfs_server = '1.2.3.4'
-    ip = (vals.ip
+    if vals.ip or vals.dhcp != 'off':
+        dummy_nfs_server = '1.2.3.4'
+        ip = (vals.ip
           + ':' + (vals.nfs_server or dummy_nfs_server)
           + ':' + vals.gateway
           + ':' + vals.netmask
           + ':' + vals.hostname
           + ':' + vals.interface
           + ':' + vals.dhcp)
+    else:
+        ip = ''
     vals.cmdline_ip = ip
 
 def preprocess_nfs(opts, vals):
