@@ -63,7 +63,6 @@
 4075806dibjCcfuXv6CINMhxWTw3jQ linux-2.4.26-xen-sparse/arch/xen/drivers/blkif/frontend/vbd.c
 3e5a4e65G3e2s0ghPMgiJ-gBTUJ0uQ linux-2.4.26-xen-sparse/arch/xen/drivers/console/Makefile
 3e5a4e656nfFISThfbyXQOA6HN6YHw linux-2.4.26-xen-sparse/arch/xen/drivers/dom0/Makefile
-3e5a4e65BXtftInNHUC2PjDfPhdZZA linux-2.4.26-xen-sparse/arch/xen/drivers/dom0/core.c
 40420a6ebRqDjufoN1WSJvolEW2Wjw linux-2.4.26-xen-sparse/arch/xen/drivers/evtchn/Makefile
 40420a73Wou6JlsZDiu6YwjYomsm7A linux-2.4.26-xen-sparse/arch/xen/drivers/evtchn/evtchn.c
 4083dc16-Kd5y9psK_yk161sme5j5Q linux-2.4.26-xen-sparse/arch/xen/drivers/netif/Makefile
@@ -91,7 +90,6 @@
 3e5a4e66aHCbQ_F5QZ8VeyikLmuRZQ linux-2.4.26-xen-sparse/arch/xen/kernel/traps.c
 3e5a4e66-9_NczrVMbuQkoSLyXckIw linux-2.4.26-xen-sparse/arch/xen/lib/Makefile
 3e5a4e6637ZDk0BvFEC-aFQs599-ng linux-2.4.26-xen-sparse/arch/xen/lib/delay.c
-3f68905cF5i8-NYpIhGjKmh0y8Gu5g linux-2.4.26-xen-sparse/arch/xen/lib/xen_proc.c
 3e5a4e66croVgpcJyJuF2ycQw0HuJw linux-2.4.26-xen-sparse/arch/xen/mm/Makefile
 3e5a4e66l8Q5Tv-6B3lQIRmaVbFPzg linux-2.4.26-xen-sparse/arch/xen/mm/fault.c
 3e5a4e668SE9rixq4ahho9rNhLUUFQ linux-2.4.26-xen-sparse/arch/xen/mm/hypervisor.c
@@ -133,7 +131,6 @@
 4062f7e2PzFOUGT0PaE7A0VprTU3JQ linux-2.4.26-xen-sparse/include/asm-xen/synch_bitops.h
 3e5a4e68mTr0zcp9SXDbnd-XLrrfxw linux-2.4.26-xen-sparse/include/asm-xen/system.h
 3f1056a9L_kqHcFheV00KbKBzv9j5w linux-2.4.26-xen-sparse/include/asm-xen/vga.h
-3f689063nhrIRsMMZjZxMFk7iEINqQ linux-2.4.26-xen-sparse/include/asm-xen/xen_proc.h
 40659defgWA92arexpMGn8X3QMDj3w linux-2.4.26-xen-sparse/include/asm-xen/xor.h
 3f056927gMHl7mWB89rb73JahbhQIA linux-2.4.26-xen-sparse/include/linux/blk.h
 41051ec1m6bJVjZocTG0C0V0O6RsVg linux-2.4.26-xen-sparse/include/linux/blkdev.h
