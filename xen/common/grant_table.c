@@ -707,7 +707,8 @@ gnttab_release_all_mappings(grant_table_t *gt)
     grant_mapping_t        *map;
     domid_t                 dom;
     grant_ref_t             ref;
-    u16                     handle, i;
+    u16                     handle;
+    u32                     pincount;
     struct domain          *ld, *rd;
     unsigned long           frame;
     active_grant_entry_t   *act;
@@ -733,10 +734,8 @@ gnttab_release_all_mappings(grant_table_t *gt)
             {
                 if ( rd != NULL )
                     put_domain(rd);
-                /* TODO: need to be able to handle domains destroyed
-                 *       with active mappings.
-                 */
-                DPRINTK("Grant release: Could not find domain %d\n", dom);
+
+                printk(KERN_WARNING "Grant release: Could not find domain %d\n", dom);
                 continue;
             }
 
@@ -747,15 +746,15 @@ gnttab_release_all_mappings(grant_table_t *gt)
 
             frame = act->frame;
 
-            for ( i = ((act->pin & GNTPIN_hstw_mask) >> GNTPIN_hstw_shift) +
-                      ((act->pin & GNTPIN_devw_mask) >> GNTPIN_devw_shift);
-                  i > 0; i-- )
-            {
-                put_page_type(&frame_table[frame]);
-            }
-            act->pin = 0;
+            pincount = ((act->pin & GNTPIN_hstw_mask) >> GNTPIN_hstw_shift) +
+                       ((act->pin & GNTPIN_devw_mask) >> GNTPIN_devw_shift);
+
+            if ( pincount > 0 )
+                put_page_types(&frame_table[frame], pincount);
 
             put_page(&frame_table[frame]);
+
+            act->pin = 0;
 
             clear_bit(_GTF_reading, &sha->flags);
             clear_bit(_GTF_writing, &sha->flags);
