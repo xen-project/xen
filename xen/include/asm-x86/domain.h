@@ -102,10 +102,9 @@ struct arch_exec_domain
     l1_pgentry_t *perdomain_ptes;
 
     pagetable_t  guest_table_user;      /* x86/64: user-space pagetable. */
-    pagetable_t  guest_table;           /* guest notion of cr3 */
-    pagetable_t  shadow_table;          /* shadow of guest */
-    pagetable_t  hl2_table;             /* shortcut to guest's L1 PTEs */
-    pagetable_t  monitor_table;         /* used in hypervisor */
+    pagetable_t  guest_table;           /* (MA) guest notion of cr3 */
+    pagetable_t  shadow_table;          /* (MA) shadow of guest */
+    pagetable_t  monitor_table;         /* (MA) used in hypervisor */
 
     pagetable_t  phys_table;            /* guest 1:1 pagetable */
 
