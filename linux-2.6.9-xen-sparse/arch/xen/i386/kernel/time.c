@@ -732,8 +732,8 @@ static irqreturn_t local_timer_interrupt(int irq, void *dev_id,
 	 */
 	// irq_enter();
 	/* XXX add processed_system_time loop thingy */
-	// if (regs)
-	//	update_process_times(user_mode(regs));
+	if (regs)
+		update_process_times(user_mode(regs));
 	// irq_exit();
 	if (smp_processor_id() == 0) {
 	    xxprint("bug bug\n");
