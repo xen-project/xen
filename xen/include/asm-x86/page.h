@@ -180,6 +180,8 @@ static __inline__ int get_order(unsigned long size)
     } while (size);
     return order;
 }
+
+extern void zap_low_mappings(void);
 #endif
 
 #endif /* _I386_PAGE_H */

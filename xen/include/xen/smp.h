@@ -72,7 +72,9 @@ extern volatile int smp_msg_id;
 /*
  *	These macros fold the SMP functionality into a single CPU system
  */
- 
+
+#define smp_send_event_check_mask(_m)           ((void)0)
+#define smp_send_event_check_cpu(_p)            ((void)0) 
 #define smp_num_cpus				1
 #define smp_processor_id()			0
 #define hard_smp_processor_id()			0
