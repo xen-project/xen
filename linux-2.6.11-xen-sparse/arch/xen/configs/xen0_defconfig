@@ -1,7 +1,7 @@
 #
 # Automatically generated make config: don't edit
 # Linux kernel version: 2.6.11-xen0
-# Sat Mar 12 21:28:56 2005
+# Sat Mar 19 19:42:39 2005
 #
 CONFIG_XEN=y
 CONFIG_ARCH_XEN=y
@@ -816,7 +816,7 @@ CONFIG_AGP_SIS=m
 CONFIG_AGP_SWORKS=m
 CONFIG_AGP_VIA=m
 # CONFIG_AGP_EFFICEON is not set
-CONFIG_DRM=y
+CONFIG_DRM=m
 CONFIG_DRM_TDFX=m
 # CONFIG_DRM_GAMMA is not set
 CONFIG_DRM_R128=m
@@ -888,6 +888,16 @@ CONFIG_USB_ARCH_HAS_OHCI=y
 # USB Gadget Support
 #
 # CONFIG_USB_GADGET is not set
+
+#
+# MMC/SD Card support
+#
+# CONFIG_MMC is not set
+
+#
+# InfiniBand support
+#
+# CONFIG_INFINIBAND is not set
 
 #
 # File systems
