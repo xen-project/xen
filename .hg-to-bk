@@ -1,13 +1,5 @@
 #!/bin/sh -x
 set -e
-mkdir -p extras
-mkdir -p extras/mini-os
-mkdir -p extras/mini-os/h
-mkdir -p extras/mini-os/h/hypervisor-ifs
-ln -s ../../../xen/include/hypervisor-ifs/block.h extras/mini-os/h/hypervisor-ifs/block.h
-ln -s ../../../xen/include/hypervisor-ifs/hypervisor-if.h extras/mini-os/h/hypervisor-ifs/hypervisor-if.h
-ln -s ../../../xen/include/hypervisor-ifs/kbd.h extras/mini-os/h/hypervisor-ifs/kbd.h
-ln -s ../../../xen/include/hypervisor-ifs/network.h extras/mini-os/h/hypervisor-ifs/network.h
 ln -s xenolinux-2.4.22-sparse xenolinux-sparse
 (find -depth -type d -print | xargs -r rmdir 2>/dev/null) || true
 exit 0

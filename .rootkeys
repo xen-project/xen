@@ -11,10 +11,6 @@
 3f815144wiiDekmfMl9LIPIvhR83Uw extras/mini-os/entry.S
 3f815144r7AHj8GPvc3Nl1L9OSsWIg extras/mini-os/events.c
 3f815144h-Chna6E38yo40jqU95G1Q extras/mini-os/h/events.h
-3f815144oqr2OlUDzE2GfkKX5Hcxqg extras/mini-os/h/hypervisor-ifs/block.h
-3f8151443nGXvfUTFG67VXOIH8P4lg extras/mini-os/h/hypervisor-ifs/hypervisor-if.h
-3f81514417ZlYqiRdM_AHPy7G11htA extras/mini-os/h/hypervisor-ifs/kbd.h
-3f815144J3ZfU5am03Td7Wjfrz30qQ extras/mini-os/h/hypervisor-ifs/network.h
 3f8151445bYdgThGHQPeOW49PsrJ_A extras/mini-os/h/hypervisor.h
 3f815144f2Vg3qb6tiwt2VZad-DWsg extras/mini-os/h/lib.h
 3f815144iqXtdYup_pyfPSmDZuvZcg extras/mini-os/h/list.h

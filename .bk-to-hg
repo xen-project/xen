@@ -1,13 +1,5 @@
 #!/bin/sh -x
 set -e
-test -L extras/mini-os/h/hypervisor-ifs/block.h
-rm      extras/mini-os/h/hypervisor-ifs/block.h
-test -L extras/mini-os/h/hypervisor-ifs/hypervisor-if.h
-rm      extras/mini-os/h/hypervisor-ifs/hypervisor-if.h
-test -L extras/mini-os/h/hypervisor-ifs/kbd.h
-rm      extras/mini-os/h/hypervisor-ifs/kbd.h
-test -L extras/mini-os/h/hypervisor-ifs/network.h
-rm      extras/mini-os/h/hypervisor-ifs/network.h
 test -L xenolinux-sparse
 rm      xenolinux-sparse
 (find -depth -type d -print | xargs -r rmdir 2>/dev/null) || true
