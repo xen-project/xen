@@ -45,7 +45,7 @@ int main(void)
         if ( buf[len-1] != '\n' ) { buf[len] = '\n'; len++; }
         buf[len] = '\0';
 
-        printf("%s", buf);
+        printf("[%d] %s", ntohs(from.sin_port),buf);
 
         fromlen = sizeof(from);
     }
