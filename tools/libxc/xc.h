@@ -62,13 +62,15 @@ int xc_domain_getinfo(int xc_handle,
                       xc_dominfo_t *info);
 int xc_domain_getfullinfo(int xc_handle,
                           u32 domid,
+                          u32 vcpu,
                           xc_domaininfo_t *info,
                           full_execution_context_t *ctxt);
 int xc_domain_setcpuweight(int xc_handle,
                            u32 domid,
                            float weight);
 long long xc_domain_get_cpu_usage(int xc_handle,
-                                  domid_t domid);
+                                  domid_t domid,
+                                  int vcpu);
 
 
 typedef dom0_shadow_control_stats_t xc_shadow_control_stats_t;

@@ -232,8 +232,8 @@ static int print_stats( int xc_handle, u32 domid,
 
     gettimeofday(&wall_now, NULL);
 
-    d0_cpu_now = xc_domain_get_cpu_usage( xc_handle, 0 )/1000;
-    d1_cpu_now = xc_domain_get_cpu_usage( xc_handle, domid )/1000;
+    d0_cpu_now = xc_domain_get_cpu_usage( xc_handle, 0, /* FIXME */ 0 )/1000;
+    d1_cpu_now = xc_domain_get_cpu_usage( xc_handle, domid, /* FIXME */ 0 )/1000;
 
     if ( (d0_cpu_now == -1) || (d1_cpu_now == -1) ) 
         printf("ARRHHH!!\n");
@@ -331,7 +331,7 @@ int suspend_and_state(int xc_handle, XcIOContext *ioctxt,
 
 retry:
 
-    if ( xc_domain_getfullinfo(xc_handle, ioctxt->domain, info, ctxt) )
+    if ( xc_domain_getfullinfo(xc_handle, ioctxt->domain, /* FIXME */ 0, info, ctxt) )
     {
 	xcio_error(ioctxt, "Could not get full domain info");
 	return -1;
@@ -444,7 +444,7 @@ int xc_linux_save(int xc_handle, XcIOContext *ioctxt)
         return 1;
     }
 
-    if ( xc_domain_getfullinfo( xc_handle, domid, &info, &ctxt) )
+    if ( xc_domain_getfullinfo( xc_handle, domid, /* FIXME */ 0, &info, &ctxt) )
     {
         xcio_error(ioctxt, "Could not get full domain info");
         goto out;

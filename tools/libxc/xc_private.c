@@ -160,12 +160,13 @@ int finish_mmu_updates(int xc_handle, mmu_t *mmu)
 }
 
 
-long long  xc_domain_get_cpu_usage( int xc_handle, domid_t domid )
+long long xc_domain_get_cpu_usage( int xc_handle, domid_t domid, int vcpu )
 {
     dom0_op_t op;
 
     op.cmd = DOM0_GETDOMAININFO;
     op.u.getdomaininfo.domain = (domid_t)domid;
+    op.u.getdomaininfo.exec_domain = (u16)vcpu;
     op.u.getdomaininfo.ctxt = NULL;
     if ( (do_dom0_op(xc_handle, &op) < 0) || 
          ((u16)op.u.getdomaininfo.domain != domid) )
@@ -248,6 +249,7 @@ long xc_get_tot_pages(int xc_handle, u32 domid)
     dom0_op_t op;
     op.cmd = DOM0_GETDOMAININFO;
     op.u.getdomaininfo.domain = (domid_t)domid;
+    op.u.getdomaininfo.exec_domain = 0;
     op.u.getdomaininfo.ctxt = NULL;
     return (do_dom0_op(xc_handle, &op) < 0) ? 
         -1 : op.u.getdomaininfo.tot_pages;

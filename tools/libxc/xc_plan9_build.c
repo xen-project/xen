@@ -467,6 +467,7 @@ xc_plan9_build(int xc_handle,
 
 	op.cmd = DOM0_GETDOMAININFO;
 	op.u.getdomaininfo.domain = (domid_t) domid;
+        op.u.getdomaininfo.exec_domain = 0;
 	op.u.getdomaininfo.ctxt = ctxt;
 	if ((do_dom0_op(xc_handle, &op) < 0) ||
 	    ((u32) op.u.getdomaininfo.domain != domid)) {
