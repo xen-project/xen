@@ -31,27 +31,25 @@ struct gendisk *xlvbd_gendisk[XLVBD_MAX_MAJORS] = { NULL };
 
 
 #define XLIDE_PARTN_SHIFT  6    /* amount to shift minor to get 'real' minor */
-#define XLIDE_MAX_MINORS  (1 << XLIDE_PARTN_SHIFT)     /* minors per ide vbd */
+#define XLIDE_MAX_PART    (1 << XLIDE_PARTN_SHIFT)     /* minors per ide vbd */
 
-#define XLSCSI_PARTN_SHIFT 6    /* amount to shift minor to get 'real' minor */
-#define XLSCSI_MAX_MINORS (1 << XLSCSI_PARTN_SHIFT)   /* minors per scsi vbd */
+#define XLSCSI_PARTN_SHIFT 4    /* amount to shift minor to get 'real' minor */
+#define XLSCSI_MAX_PART   (1 << XLSCSI_PARTN_SHIFT)   /* minors per scsi vbd */
 
 #define XLVBD_PARTN_SHIFT  6    /* amount to shift minor to get 'real' minor */
-#define XLVBD_MAX_MINORS  (1 << XLVBD_PARTN_SHIFT) /* minors per 'other' vbd */
+#define XLVBD_MAX_PART    (1 << XLVBD_PARTN_SHIFT) /* minors per 'other' vbd */
 
 
 /* the below are for the use of the generic drivers/block/ll_rw_block.c code */
-static int xlide_blksize_size[XLIDE_MAX_MINORS];
-static int xlide_hardsect_size[XLIDE_MAX_MINORS];
-static int xlide_max_sectors[XLIDE_MAX_MINORS];
-
-static int xlscsi_blksize_size[XLSCSI_MAX_MINORS];
-static int xlscsi_hardsect_size[XLSCSI_MAX_MINORS];
-static int xlscsi_max_sectors[XLSCSI_MAX_MINORS];
-
-static int xlvbd_blksize_size[XLVBD_MAX_MINORS];
-static int xlvbd_hardsect_size[XLVBD_MAX_MINORS];
-static int xlvbd_max_sectors[XLVBD_MAX_MINORS];
+static int xlide_blksize_size[256];
+static int xlide_hardsect_size[256];
+static int xlide_max_sectors[256];
+static int xlscsi_blksize_size[256];
+static int xlscsi_hardsect_size[256];
+static int xlscsi_max_sectors[256];
+static int xlvbd_blksize_size[256];
+static int xlvbd_hardsect_size[256];
+static int xlvbd_max_sectors[256];
 
 
 static struct block_device_operations xlvbd_block_fops = 
@@ -76,10 +74,10 @@ typedef unsigned char bool;
 */
 int __init xlvbd_init(xen_disk_info_t *xdi)
 {
-    int i, result, nminors; 
+    int i, result, max_part; 
     struct gendisk *gd = NULL;
     kdev_t device; 
-    unsigned short major, minor, real_minor; 
+    unsigned short major, minor, partno; 
     bool is_ide, is_scsi; 
     char *major_name; 
     unsigned char buf[64]; 
@@ -88,29 +86,24 @@ int __init xlvbd_init(xen_disk_info_t *xdi)
     SET_MODULE_OWNER(&xlvbd_block_fops);
 
     /* Initialize the global arrays. */
-    for (i = 0; i < XLIDE_MAX_MINORS; i++) 
+    for (i = 0; i < 256; i++) 
     {
 	/* from the generic ide code (drivers/ide/ide-probe.c, etc) */
 	xlide_blksize_size[i]  = 1024;
 	xlide_hardsect_size[i] = 512;
 	xlide_max_sectors[i]   = 128;  /* 'hwif->rqsize' if we knew it */
-    }
-    
-    for (i = 0; i < XLSCSI_MAX_MINORS; i++) 
-    {
+
 	/* from the generic scsi disk code (drivers/scsi/sd.c) */
 	xlscsi_blksize_size[i]  = 1024; //XXX 512;
 	xlscsi_hardsect_size[i] = 512;
 	xlscsi_max_sectors[i]   = 128*8; //XXX 128;
-    }
-    
-    for (i = 0; i < XLVBD_MAX_MINORS; i++) 
-    {
+
 	/* we don't really know what to set these too since it depends */
 	xlvbd_blksize_size[i]  = 512;
 	xlvbd_hardsect_size[i] = 512;
 	xlvbd_max_sectors[i]   = 128;
     }
+
 
     /* keep track of which majors we've seen so far */
     for (i = 0; i < 256; i++) 
@@ -135,13 +128,13 @@ int __init xlvbd_init(xen_disk_info_t *xdi)
 	
 	if(is_ide) { 
 	    major_name = XLIDE_MAJOR_NAME; 
-	    nminors    = XLIDE_MAX_MINORS; 
+	    max_part   = XLIDE_MAX_PART;
 	} else if(is_scsi) { 
 	    major_name = XLSCSI_MAJOR_NAME;
-	    nminors    = XLSCSI_MAX_MINORS; 
+	    max_part   = XLSCSI_MAX_PART;
 	} else { 
 	    major_name = XLVBD_MAJOR_NAME;
-	    nminors    = XLVBD_MAX_MINORS; 
+	    max_part   = XLVBD_MAX_PART;
 	}
 
 	/* 
@@ -150,7 +143,7 @@ int __init xlvbd_init(xen_disk_info_t *xdi)
 	** minor devices require slightly different handling than 
 	** 'full' devices (e.g. in terms of partition table handling). 
 	*/
-	real_minor = minor & (nminors - 1); 
+	partno = minor & (max_part - 1); 
 
 	if(!majors[major]) {
 
@@ -188,13 +181,10 @@ int __init xlvbd_init(xen_disk_info_t *xdi)
 
 	    /* Construct an appropriate gendisk structure. */
 	    gd             = kmalloc(sizeof(struct gendisk), GFP_KERNEL);
-	    gd->sizes      = kmalloc(nminors*sizeof(int), GFP_KERNEL);
-	    gd->part       = kmalloc(nminors*sizeof(struct hd_struct), 
-				     GFP_KERNEL);
 	    gd->major      = major;
 	    gd->major_name = major_name; 
 	    
-	    gd->max_p      = nminors; 
+	    gd->max_p      = max_part; 
 	    if(is_ide) { 
 		gd->minor_shift  = XLIDE_PARTN_SHIFT; 
 		gd->nr_real      = XLIDE_DEVS_PER_MAJOR; 
@@ -205,19 +195,33 @@ int __init xlvbd_init(xen_disk_info_t *xdi)
 		gd->minor_shift  = XLVBD_PARTN_SHIFT; 
 		gd->nr_real      = XLVBD_DEVS_PER_MAJOR; 
 	    }
+
+	    /* 
+	    ** The sizes[] and part[] arrays hold the sizes and other 
+	    ** information about every partition with this 'major' (i.e. 
+	    ** every disk sharing the 8 bit prefix * max partns per disk) 
+	    */
+	    gd->sizes = kmalloc(max_part*gd->nr_real*sizeof(int), GFP_KERNEL);
+	    gd->part  = kmalloc(max_part*gd->nr_real*sizeof(struct hd_struct), 
+				     GFP_KERNEL);
+	    memset(gd->sizes, 0, max_part * gd->nr_real * sizeof(int));
+	    memset(gd->part,  0, max_part * gd->nr_real 
+		   * sizeof(struct hd_struct));
+
+
 	    gd->real_devices = kmalloc(gd->nr_real * sizeof(xl_disk_t), 
 				       GFP_KERNEL);
+	    memset(gd->real_devices, 0, gd->nr_real * sizeof(xl_disk_t));
+
 	    gd->next   = NULL;            
 	    gd->fops   = &xlvbd_block_fops;
+
 	    gd->de_arr = kmalloc(gd->nr_real * sizeof(*gd->de_arr), 
 				 GFP_KERNEL);
 	    gd->flags  = kmalloc(gd->nr_real * sizeof(*gd->flags), GFP_KERNEL);
 	    
-	    memset(gd->sizes, 0, nminors * sizeof(int));
-	    memset(gd->part,  0, nminors * sizeof(struct hd_struct));
 	    memset(gd->de_arr, 0, gd->nr_real * sizeof(*gd->de_arr));
 	    memset(gd->flags, 0, gd->nr_real *  sizeof(*gd->flags));
-	    memset(gd->real_devices, 0, gd->nr_real * sizeof(xl_disk_t));
 
 	    /* 
 	    ** Keep track of gendisk both locally and in the global array. 
@@ -235,20 +239,22 @@ int __init xlvbd_init(xen_disk_info_t *xdi)
 	    
 	    /* remember that we've done this major */
 	    majors[major] = 1; 
-	}
+	} else 
+	    /* Continue the setup of this gendisk */
+	    gd = get_gendisk(device); 
 
 	if(XD_READONLY(xdi->disks[i].info)) 
 	    set_device_ro(device, 1); 
 
-	if(real_minor) { 
+	if(partno) { 
 
 	    /* Need to skankily setup 'partition' information */
-	    gd->part[real_minor].start_sect = 0; 
-	    gd->part[real_minor].nr_sects   = xdi->disks[i].capacity; 
-	    gd->sizes[real_minor]           = xdi->disks[i].capacity; 
+	    gd->part[partno].start_sect = 0; 
+	    gd->part[partno].nr_sects   = xdi->disks[i].capacity; 
+	    gd->sizes[partno]           = xdi->disks[i].capacity; 
 
 	} else { 
-	
+
 	    /* Some final fix-ups depending on the device type */
 	    switch (XD_TYPE(xdi->disks[i].info)) 
 	    { 
@@ -256,7 +262,7 @@ int __init xlvbd_init(xen_disk_info_t *xdi)
 	    case XD_TYPE_CDROM:
 	    case XD_TYPE_FLOPPY: 
 	    case XD_TYPE_TAPE:
-		gd->flags[0] = GENHD_FL_REMOVABLE; 
+		gd->flags[minor >> gd->minor_shift] = GENHD_FL_REMOVABLE; 
 		printk(KERN_ALERT 
 		       "Skipping partition check on %s /dev/%s\n", 
 		       XD_TYPE(xdi->disks[i].info)==XD_TYPE_CDROM ? "cdrom" : 
@@ -265,6 +271,9 @@ int __init xlvbd_init(xen_disk_info_t *xdi)
 		break; 
 		
 	    case XD_TYPE_DISK: 
+		printk(KERN_ALERT 
+		       "Calling register_disk for device %04x [gd=%p]\n", 
+		       device, gd); 
 		register_disk(gd, device, gd->nr_real, &xlvbd_block_fops, 
 			      xdi->disks[i].capacity);
 		break; 
