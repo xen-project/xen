@@ -38,8 +38,7 @@ CPU:  Pentium Pro/II/III/IV/Xeon, Athlon (i.e. P6 or newer) SMP supported
 IDE:  Intel PIIX chipset, others will be PIO only (slow)
 SCSI: Adaptec / Dell PERC Raid (aacraid), megaraid, Adaptec aic7xxx
 Net:  Recommended: Intel e1000, Broadcom BCM57xx (tg3), 3c905 (3c59x)
-      Tested but require extra copies : pcnet32
-      Untested and also requires extra copies : Intel e100, tulip
+      Working, but require extra copies : pcnet32, Intel e100, tulip
 
 Because of the demo CD's use of RAM disks, make sure you have plenty
 of RAM (256MB+).

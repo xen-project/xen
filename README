@@ -128,8 +128,8 @@ e1000, Broadcom BCM 57xx (tg3), 3COM 3c905 (3c59x). Adding support for
 other NICs that support hardware DMA scatter/gather from half-word
 aligned addresses is relatively straightforward, by porting the
 equivalent Linux driver. Drivers for a number of other older cards
-have recently been added [pcnet32, e100, tulip], but are untested and
-not recommended.
+have recently been added [pcnet32, e100, tulip], but these are not 
+recommended since they require extra packet copies.
 
 
 Building Xen and XenoLinux
