@@ -38,7 +38,7 @@
 #define TX_RING_ADD(_i,_j) (((_i)+(_j)) & (TX_RING_SIZE-1))
 #define RX_RING_ADD(_i,_j) (((_i)+(_j)) & (RX_RING_SIZE-1))
 
-#define RX_BUF_SIZE 1600 /* Ethernet MTU + plenty of slack! */
+#define RX_BUF_SIZE 2049 /* (was 1600) Ethernet MTU + plenty of slack! */
 
 static void network_rx_int(int irq, void *dev_id, struct pt_regs *ptregs);
 static void network_tx_int(int irq, void *dev_id, struct pt_regs *ptregs);

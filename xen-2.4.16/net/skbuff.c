@@ -63,6 +63,7 @@
 
 #include <asm/uaccess.h>
 #include <asm/system.h>
+#include <asm/io.h>
 
 #define BUG_TRAP ASSERT
 
@@ -149,6 +150,8 @@ static __inline__ void skb_head_to_pool(struct sk_buff *skb)
 	kmem_cache_free(skbuff_head_cache, skb);
 }
 
+//static unsigned long skbpagesout=0, skbpagesin=0;
+
 static inline u8 *alloc_skb_data_page(struct sk_buff *skb)
 {
         struct list_head *list_ptr;
@@ -169,6 +172,7 @@ static inline u8 *alloc_skb_data_page(struct sk_buff *skb)
         spin_unlock_irqrestore(&free_list_lock, flags);
 
         skb->pf = pf;
+//if (skbpagesout++ % 100 == 0) printk("XEN-: skb allocs: %lu\n", skbpagesout);
         return (u8 *)((pf - frame_table) << PAGE_SHIFT);
 }
 
@@ -185,6 +189,8 @@ static inline void dealloc_skb_data_page(struct sk_buff *skb)
         free_pfns++;
 
         spin_unlock_irqrestore(&free_list_lock, flags);
+
+//if (skbpagesin++ % 100 == 0) printk("XEN-: skb allocs: %lu\n", skbpagesin);
 }
 
 struct sk_buff *alloc_zc_skb(unsigned int size,int gfp_mask)
@@ -217,6 +223,11 @@ struct sk_buff *alloc_zc_skb(unsigned int size,int gfp_mask)
         if (data == NULL)
                 goto nodata;
 
+        // This is so that pci_map_single does the right thing in the driver.
+        // If you want to ever use this pointer otherwise, you need to regenerate it 
+        // based on skb->pf.
+        data = phys_to_virt((unsigned long)data); 
+        
         /* XXX: does not include slab overhead */
         skb->truesize = size + sizeof(struct sk_buff);
 

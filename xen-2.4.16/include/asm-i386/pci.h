@@ -76,18 +76,7 @@ static inline dma_addr_t pci_map_single(struct pci_dev *hwdev, void *ptr,
 		BUG();
 	flush_write_buffers();
 
-        if ((unsigned long) ptr > PAGE_OFFSET)
-	    return virt_to_bus(ptr);
-
-        /* If an address that is not in hypervisor VM is passed to this 
-         * function (ie > PAGE_OFFSET) we assume that the passer knows 
-         * what they are doing, and have passed a physical address that 
-         * should not be converted here.  This is a little hackish, but 
-         * is being added to allow references to domain memory in order 
-         * to support zero-copy network code.
-         */
-        
-        return (dma_addr_t) ptr;
+	return virt_to_bus(ptr);
 }
 
 /* Unmap a single streaming mode DMA translation.  The dma_addr and size

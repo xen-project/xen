@@ -4114,14 +4114,16 @@ static int tg3_reset_hw(struct tg3 *tp)
 		udelay(10);
 	}
 
-	tw32(HOSTCC_RXCOL_TICKS, 0);
-	tw32(HOSTCC_RXMAX_FRAMES, 1);
-	tw32(HOSTCC_RXCOAL_TICK_INT, 0);
-	tw32(HOSTCC_RXCOAL_MAXF_INT, 1);
-	tw32(HOSTCC_TXCOL_TICKS, LOW_TXCOL_TICKS);
-	tw32(HOSTCC_TXMAX_FRAMES, LOW_RXMAX_FRAMES);
-	tw32(HOSTCC_TXCOAL_TICK_INT, 0);
-	tw32(HOSTCC_TXCOAL_MAXF_INT, 0);
+        // akw: I have set these all back to default coalescing values.
+        
+	tw32(HOSTCC_RXCOL_TICKS, DEFAULT_RXCOL_TICKS); //0);
+	tw32(HOSTCC_RXMAX_FRAMES, DEFAULT_RXMAX_FRAMES); //1);
+	tw32(HOSTCC_RXCOAL_TICK_INT, DEFAULT_RXCOAL_TICK_INT); //, 0);
+	tw32(HOSTCC_RXCOAL_MAXF_INT, DEFAULT_RXCOAL_MAXF_INT); //, 1);
+	tw32(HOSTCC_TXCOL_TICKS, DEFAULT_TXCOL_TICKS); //, LOW_TXCOL_TICKS);
+	tw32(HOSTCC_TXMAX_FRAMES, DEFAULT_TXMAX_FRAMES); //, LOW_RXMAX_FRAMES);
+	tw32(HOSTCC_TXCOAL_TICK_INT, DEFAULT_TXCOAL_TICK_INT); //, 0);
+	tw32(HOSTCC_TXCOAL_MAXF_INT, DEFAULT_TXCOAL_MAXF_INT); //, 0);
 	tw32(HOSTCC_STAT_COAL_TICKS,
 	     DEFAULT_STAT_COAL_TICKS);
 
@@ -6185,9 +6187,11 @@ static int __devinit tg3_get_invariants(struct tg3 *tp)
 	}
 
 	tp->rx_offset = 2;
+
 	if (GET_ASIC_REV(tp->pci_chip_rev_id) == ASIC_REV_5701 &&
 	    (tp->tg3_flags & TG3_FLAG_PCIX_MODE) != 0)
-		tp->rx_offset = 0;
+                printk("WARNING: This card may not support unaligned receive pointers.\n");
+		//tp->rx_offset = 0;
 
 	/* By default, disable wake-on-lan.  User can change this
 	 * using ETHTOOL_SWOL.

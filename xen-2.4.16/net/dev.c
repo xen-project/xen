@@ -712,28 +712,20 @@ void deliver_packet(struct sk_buff *skb, net_vif_t *vif)
             rx = shadow_ring->rx_ring+i;
             if ( (skb->len + ETH_HLEN) < rx->size )
                 rx->size = skb->len + ETH_HLEN;
-                        
-            
             
             g_pte = map_domain_mem(rx->addr);
 
             g_pfn =  frame_table + (*g_pte >> PAGE_SHIFT);
             h_pfn = skb->pf;
 
-            //flip and/or set relevant pf_info fields.
-            //tmp = g_pfn->next; g_pfn->next = h_pfn->next; h_pfn->next = tmp;
-            //tmp = g_pfn->prev; g_pfn->prev = h_pfn->prev; h_pfn->prev = tmp;
-            //tmp = g_pfn->flags; g_pfn->flags = h_pfn->flags; h_pfn->flags = tmp;
             h_pfn->tot_count = h_pfn->type_count = 1;
             g_pfn->tot_count = g_pfn->type_count = 0;
             h_pfn->flags = g_pfn->flags & (~PG_type_mask);
-//if (h_pfn->flags & PG_domain_mask) printk("deliver packet to dom %lu\n", (h_pfn->flags & PG_domain_mask));
+
             if (*g_pte & _PAGE_RW) h_pfn->flags |= PGT_writeable_page;
             g_pfn->flags = 0;
+            
             //point guest pte at the new page:
-
-//printk("newmpfn: %lx, old mpfn: %lx,  old:(%lx) new:(%lx)\n", h_pfn - frame_table, *g_pte >> PAGE_SHIFT, machine_to_phys_mapping[h_pfn - frame_table], machine_to_phys_mapping[*g_pte >> PAGE_SHIFT]);
-
             machine_to_phys_mapping[h_pfn - frame_table] 
                     = machine_to_phys_mapping[g_pfn - frame_table];
 
@@ -791,7 +783,8 @@ int netif_rx(struct sk_buff *skb)
 	    get_fast_time(&skb->stamp);
 
         if ( (skb->data - skb->head) != (18 + ETH_HLEN) )
-            BUG();
+            printk("headroom was %lu!\n", (unsigned long)skb->data - (unsigned long)skb->head);
+        //    BUG();
         
         skb->head = (u8 *)map_domain_mem(((skb->pf - frame_table) << PAGE_SHIFT));
 
@@ -818,11 +811,12 @@ int netif_rx(struct sk_buff *skb)
                 
         if ( skb->dst_vif == VIF_UNKNOWN_INTERFACE )
             skb->dst_vif = __net_get_target_vif(skb->mac.raw, skb->len, skb->src_vif);
-if (skb->dst_vif == VIF_DROP)
-printk("netif_rx target: %d (sec: %u)\n", skb->dst_vif, skb->security);
+//if (skb->dst_vif == VIF_DROP)
+//printk("netif_rx target: %d (sec: %u)\n", skb->dst_vif, skb->security);
         
         if ( (vif = sys_vif_list[skb->dst_vif]) == NULL )
         {
+//printk("No such vif! (%d).\n", skb->dst_vif);
             // the target vif does not exist.
             goto drop;
         }
@@ -2258,7 +2252,7 @@ long do_net_update(void)
             {
                 // Local delivery: Allocate an skb off the domain free list
                 // fil it, and pass it to netif_rx as if it came off the NIC.
-
+//printk("LOCAL! (%d) \n", target);
                 skb = dev_alloc_skb(tx.size);
                 if (skb == NULL) 
                 {
@@ -2269,13 +2263,16 @@ long do_net_update(void)
                 skb->src_vif = current_vif->id;
                 skb->dst_vif = target;
                 skb->protocol = protocol;
-                if (copy_to_user(skb->data, g_data, tx.size))
-                {
-                    unmap_domain_mem(g_data);
-                    continue;
-                }
+
+                skb->head = (u8 *)map_domain_mem(((skb->pf - frame_table) << PAGE_SHIFT));
+                skb->data = skb->head + 16;
+                skb_reserve(skb,2);
+                memcpy(skb->data, g_data, tx.size);
+                skb->len = tx.size;
+                unmap_domain_mem(skb->head);
+                skb->data += ETH_HLEN; // so the assertion in netif_RX doesn't freak out.
                 
-                (void)netif_rx(skb); // why is there a void here?  It's from the old code.
+                (void)netif_rx(skb);
 
                 unmap_domain_mem(g_data);
             }

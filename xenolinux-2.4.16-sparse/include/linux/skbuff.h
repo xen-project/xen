@@ -1066,8 +1066,8 @@ static inline struct sk_buff *__dev_alloc_skb(unsigned int length,
 {
 	struct sk_buff *skb;
 
-	//skb = alloc_skb(length+16, gfp_mask);
-        skb = alloc_zc_skb(length+16, gfp_mask);
+	skb = alloc_skb(length+16, gfp_mask);
+        //skb = alloc_zc_skb(length+16, gfp_mask);
 	if (skb)
 		skb_reserve(skb,16);
 	return skb;
