@@ -319,7 +319,7 @@ do {                                                  \
     shared_info_t *_shared = HYPERVISOR_shared_info;  \
     _shared->events_enable = (x);                     \
     barrier();                                        \
-    if ( _shared->events && (x) ) do_hypervisor_callback(NULL);  \
+    if ( unlikely(_shared->events) && (x) ) do_hypervisor_callback(NULL);  \
 } while (0)
 #define __cli()                 (HYPERVISOR_shared_info->events_enable = 0); barrier()
 #define __sti()                                       \
@@ -327,7 +327,7 @@ do {                                                  \
     shared_info_t *_shared = HYPERVISOR_shared_info;  \
     _shared->events_enable = 1;                       \
     barrier();                                        \
-    if ( _shared->events ) do_hypervisor_callback(NULL);  \
+    if ( unlikely(_shared->events) ) do_hypervisor_callback(NULL);  \
 } while (0)
 #define safe_halt()             ((void)0)
 
