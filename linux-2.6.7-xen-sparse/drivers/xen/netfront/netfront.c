@@ -27,12 +27,15 @@
 #include <asm/page.h>
 
 #if 0
-#define dprintf(fmt, args...) printk(KERN_INFO "[XEN] %s" fmt, __FUNCTION__, ##args)
+#define DPRINTK(fmt, args...) \
+    printk(KERN_INFO "[XEN] %s" fmt, __FUNCTION__, ##args)
 #else
-#define dprintf(fmt, args...) do {} while(0)
+#define DPRINTK(fmt, args...) ((void)0)
 #endif
 
-#define RX_BUF_SIZE ((PAGE_SIZE/2)+1) /* Fool the slab allocator :-) */
+#ifndef __GFP_NOWARN
+#define __GFP_NOWARN 0
+#endif
 
 static void network_tx_buf_gc(struct net_device *dev);
 static void network_alloc_rx_buffers(struct net_device *dev);
@@ -163,9 +166,20 @@ static int netctrl_connected_count(void)
     }
 
     netctrl.connected_n = connected;
-    dprintf("> connected_n=%d interface_n=%d\n",
+    DPRINTK("> connected_n=%d interface_n=%d\n",
             netctrl.connected_n, netctrl.interface_n);
     return connected;
+}
+
+static inline struct sk_buff *alloc_skb_page(void)
+{
+    struct sk_buff *skb;
+    skb = __dev_alloc_skb((PAGE_SIZE/2)+1, GFP_ATOMIC|__GFP_NOWARN);
+#if 0
+    if ( skb && unlikely(((unsigned long)skb->head & (PAGE_SIZE-1)) != 0) )
+        panic("alloc_skb needs to provide us page-aligned buffers.");
+#endif
+    return skb;
 }
 
 static int network_open(struct net_device *dev)
@@ -246,14 +260,10 @@ static void network_alloc_rx_buffers(struct net_device *dev)
         return;
 
     do {
-        skb = dev_alloc_skb(RX_BUF_SIZE);
-        if ( unlikely(skb == NULL) )
+        if ( unlikely((skb = alloc_skb_page()) == NULL) )
             break;
 
         skb->dev = dev;
-
-        if ( unlikely(((unsigned long)skb->head & (PAGE_SIZE-1)) != 0) )
-            panic("alloc_skb needs to provide us page-aligned buffers.");
 
         id = GET_ID_FROM_FREELIST(np->rx_skbs);
 
@@ -325,8 +335,8 @@ static int network_start_xmit(struct sk_buff *skb, struct net_device *dev)
     if ( unlikely((((unsigned long)skb->data & ~PAGE_MASK) + skb->len) >=
                   PAGE_SIZE) )
     {
-        struct sk_buff *new_skb = dev_alloc_skb(RX_BUF_SIZE);
-        if ( unlikely(new_skb == NULL) )
+        struct sk_buff *new_skb;
+        if ( unlikely((new_skb = alloc_skb_page()) == NULL) )
             return 1;
         skb_put(new_skb, skb->len);
         memcpy(new_skb->data, skb->data, skb->len);
@@ -628,8 +638,8 @@ static void netif_status_change(netif_fe_interface_status_changed_t *status)
     struct net_device *dev;
     struct net_private *np;
     
-    dprintf(">\n");
-    dprintf("> status=%d handle=%d mac=%02x:%02x:%02x:%02x:%02x:%02x\n",
+    DPRINTK(">\n");
+    DPRINTK("> status=%d handle=%d mac=%02x:%02x:%02x:%02x:%02x:%02x\n",
            status->status,
            status->handle,
            status->mac[0], status->mac[1], status->mac[2],
@@ -804,7 +814,7 @@ static void netif_driver_status_change(
     int err = 0;
     int i;
 
-    dprintf("> nr_interfaces=%d\n", status->nr_interfaces);
+    DPRINTK("> nr_interfaces=%d\n", status->nr_interfaces);
 
     netctrl.interface_n = status->nr_interfaces;
     netctrl.connected_n = 0;
@@ -856,20 +866,26 @@ static int wait_for_interfaces(void)
     int err = 0, conn = 0;
     int wait_i, wait_n = 100;
 
-    dprintf(">\n");
+    DPRINTK(">\n");
+
     for ( wait_i = 0; wait_i < wait_n; wait_i++)
     { 
-        dprintf("> wait_i=%d\n", wait_i);
+        DPRINTK("> wait_i=%d\n", wait_i);
         conn = netctrl_connected();
         if(conn) break;
         set_current_state(TASK_INTERRUPTIBLE);
         schedule_timeout(10);
     }
-    if(conn <= 0){
+
+    if ( conn <= 0 )
+    {
         err = netctrl_err(-ENETDOWN);
-        printk(KERN_WARNING "[XEN] Failed to connect all virtual interfaces: err=%d\n", err);
+        printk(KERN_WARNING "[XEN] Failed to connect all virtual interfaces: "
+               "err=%d\n", err);
     }
-    dprintf("< err=%d\n", err);
+
+    DPRINTK("< err=%d\n", err);
+
     return err;
 }
 

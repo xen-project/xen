@@ -12,6 +12,8 @@ function usage {
     exit 1
 }
 
+export PATH=${PATH}:/sbin:/usr/sbin
+
 case $1 in
     build)
         check="CHECK-BUILD"

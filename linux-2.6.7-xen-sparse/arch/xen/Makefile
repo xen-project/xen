@@ -24,8 +24,6 @@ UTS_MACHINE := $(XENARCH)
 
 core-y	+= arch/xen/kernel/
 
-drivers-y	+= drivers/xen/
-
 include/.asm-ignore:
 	@rm -f include/.asm-ignore
 	@mv include/asm include/.asm-ignore

@@ -748,6 +748,7 @@ static int __init netback_init(void)
     for ( i = 0; i < MAX_PENDING_REQS; i++ )
     {
         page = virt_to_page(MMAP_VADDR(i));
+        set_page_count(page, 1);
         SetPageForeign(page);
         PageForeignDestructor(page) = netif_page_release;
     }

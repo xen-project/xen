@@ -1215,11 +1215,14 @@ int __init xlblk_init(void)
      * for notifications before proceeding. For now we assume that we
      * will be notified of exactly one interface.
      */
-    while ( blkif_state != BLKIF_STATE_CONNECTED )
+    for ( i=0; (blkif_state != BLKIF_STATE_CONNECTED) && (i < 10*HZ); i++ )
     {
         set_current_state(TASK_INTERRUPTIBLE);
         schedule_timeout(1);
     }
+
+    if (blkif_state != BLKIF_STATE_CONNECTED)
+        printk(KERN_INFO "Timeout connecting block device driver!\n");
 
     return 0;
 }

@@ -109,6 +109,7 @@ struct pfn_info
         (_pfn)->u.inuse.count_info = PGC_allocated | 1;                     \
         if ( unlikely((_dom)->xenheap_pages++ == 0) )                       \
             get_knownalive_domain(_dom);                                    \
+        list_add_tail(&(_pfn)->list, &(_dom)->xenpage_list);                \
         spin_unlock(&(_dom)->page_alloc_lock);                              \
     } while ( 0 )
 

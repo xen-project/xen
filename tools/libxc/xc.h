@@ -231,4 +231,11 @@ int xc_domain_setmaxmem(int xc_handle,
                             unsigned int max_memkb);
 
 
+void *xc_map_foreign_range(int xc_handle, u32 dom,
+                            int size, int prot,
+                            unsigned long mfn );
+
+void *xc_map_foreign_batch(int xc_handle, u32 dom, int prot,
+                           unsigned long *arr, int num );
+
 #endif /* __XC_H__ */
