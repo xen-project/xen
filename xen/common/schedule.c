@@ -79,7 +79,8 @@ static struct scheduler *schedulers[] = {
     NULL
 };
 
-/* Operations for the current scheduler. */
+static void __enter_scheduler(void);
+
 static struct scheduler ops;
 
 #define SCHED_OP(fn, ...)                                 \
@@ -310,7 +311,7 @@ long sched_adjdom(struct sched_adjdom_cmd *cmd)
  * - deschedule the current domain (scheduler independent).
  * - pick a new domain (scheduler dependent).
  */
-void __enter_scheduler(void)
+static void __enter_scheduler(void)
 {
     struct domain *prev = current, *next = NULL;
     int                 cpu = prev->processor;

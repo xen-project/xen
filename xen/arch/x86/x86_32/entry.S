@@ -112,7 +112,7 @@ DBLFLT1:GET_CURRENT(%ebx)
         jmp   test_all_events
 DBLFIX1:GET_CURRENT(%ebx)
         testb $TF_failsafe_return,DOMAIN_thread_flags(%ebx)
-        jnz   domain_crash             # cannot reenter failsafe code
+        jnz   domain_crash_synchronous # cannot reenter failsafe code
         orb   $TF_failsafe_return,DOMAIN_thread_flags(%ebx)
         jmp   test_all_events          # will return via failsafe code
 .previous
@@ -330,7 +330,7 @@ DBLFLT2:jmp   process_guest_exception_and_events
 	.long FLT23,FIX7 , FLT24,FIX7 , FLT25,FIX7 , FLT26,FIX7 , FLT27,FIX7
 .previous
 .section __ex_table,"a"
-        .long DBLFLT2,domain_crash
+        .long DBLFLT2,domain_crash_synchronous
 .previous
 
         ALIGN
@@ -620,9 +620,9 @@ VFLT3:  movl %gs:(%esi),%eax
         jmp test_all_events
 
 .section __ex_table,"a"
-        .long VFLT1,domain_crash
-        .long VFLT2,domain_crash
-        .long VFLT3,domain_crash
+        .long VFLT1,domain_crash_synchronous
+        .long VFLT2,domain_crash_synchronous
+        .long VFLT3,domain_crash_synchronous
 .previous
 
 .data

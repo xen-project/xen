@@ -184,8 +184,19 @@ struct domain *find_domain_by_id(domid_t dom);
 struct domain *find_last_domain(void);
 extern void domain_destruct(struct domain *d);
 extern void domain_kill(struct domain *d);
-extern void domain_crash(void);
 extern void domain_shutdown(u8 reason);
+
+/*
+ * Mark current domain as crashed. This function returns: the domain is not
+ * synchronously descheduled from any processor.
+ */
+extern void domain_crash(void);
+
+/*
+ * Mark current domain as crashed and synchronously deschedule from the local
+ * processor. This function never returns.
+ */
+extern void domain_crash_synchronous(void) __attribute__((noreturn));
 
 void new_thread(struct domain *d,
                 unsigned long start_pc,
@@ -206,8 +217,6 @@ int  sched_id();
 void init_idle_task(void);
 void domain_wake(struct domain *d);
 void domain_sleep(struct domain *d);
-
-void __enter_scheduler(void);
 
 extern void switch_to(struct domain *prev, 
                       struct domain *next);

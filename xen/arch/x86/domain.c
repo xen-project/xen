@@ -82,7 +82,8 @@ void startup_cpu_idle_loop(void)
     /* Just some sanity to ensure that the scheduler is set up okay. */
     ASSERT(current->id == IDLE_DOMAIN_ID);
     domain_unpause_by_systemcontroller(current);
-    __enter_scheduler();
+    raise_softirq(SCHEDULE_SOFTIRQ);
+    do_softirq();
 
     /*
      * Declares CPU setup done to the boot processor.
