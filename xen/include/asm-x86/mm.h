@@ -67,7 +67,7 @@ struct pfn_info
 #define PGT_l4_page_table   (4<<29) /* using this page as an L4 page table? */
 #define PGT_gdt_page        (5<<29) /* using this page in a GDT? */
 #define PGT_ldt_page        (6<<29) /* using this page in an LDT? */
-#define PGT_writeable_page  (7<<29) /* has writable mappings of this page? */
+#define PGT_writable_page   (7<<29) /* has writable mappings of this page? */
 #define PGT_type_mask       (7<<29) /* Bits 29-31. */
  /* Has this page been validated for use as its current type? */
 #define _PGT_validated      28
@@ -101,8 +101,8 @@ struct pfn_info
 #define SHARE_PFN_WITH_DOMAIN(_pfn, _dom)                                   \
     do {                                                                    \
         (_pfn)->u.inuse.domain = (_dom);                                    \
-        /* The incremented type count is intended to pin to 'writeable'. */ \
-        (_pfn)->u.inuse.type_info  = PGT_writeable_page | PGT_validated | 1;\
+        /* The incremented type count is intended to pin to 'writable'. */  \
+        (_pfn)->u.inuse.type_info  = PGT_writable_page | PGT_validated | 1; \
         wmb(); /* install valid domain ptr before updating refcnt. */       \
         spin_lock(&(_dom)->page_alloc_lock);                                \
         /* _dom holds an allocation reference */                            \
@@ -221,8 +221,8 @@ static inline int get_page_type(struct pfn_info *page, u32 type)
             {
                 nx &= ~(PGT_type_mask | PGT_validated);
                 nx |= type;
-                /* No extra validation needed for writeable pages. */
-                if ( type == PGT_writeable_page )
+                /* No extra validation needed for writable pages. */
+                if ( type == PGT_writable_page )
                     nx |= PGT_validated;
             }
         }
@@ -364,7 +364,7 @@ void ptwr_reconnect_disconnected(unsigned long addr);
 void ptwr_flush_inactive(void);
 int ptwr_do_page_fault(unsigned long);
 
-static inline void cleanup_writable_pagetable(const int what)
+static inline void __cleanup_writable_pagetable(const int what)
 {
     int cpu = smp_processor_id();
 
@@ -374,6 +374,12 @@ static inline void cleanup_writable_pagetable(const int what)
     if (what & PTWR_CLEANUP_INACTIVE)
         if (ptwr_info[cpu].writable_idx)
             ptwr_flush_inactive();
+}
+
+static inline void cleanup_writable_pagetable(struct domain *d, const int what)
+{
+    if ( unlikely(VM_ASSIST(d, VMASST_TYPE_writable_pagetables)) )
+        __cleanup_writable_pagetable(what);
 }
 
 #endif /* __ASM_X86_MM_H__ */

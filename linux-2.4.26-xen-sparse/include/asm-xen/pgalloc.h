@@ -111,7 +111,7 @@ static inline void free_pgd_slow(pgd_t *pgd)
 	kmem_cache_free(pae_pgd_cachep, pgd);
 #else
 	queue_pgd_unpin(__pa(pgd));
-        __make_page_writeable(pgd);
+        __make_page_writable(pgd);
 	free_page((unsigned long)pgd);
 #endif
 }
@@ -154,7 +154,7 @@ static inline pte_t *pte_alloc_one_fast(struct mm_struct *mm,
 static __inline__ void pte_free_slow(pte_t *pte)
 {
     queue_pte_unpin(__pa(pte));
-    __make_page_writeable(pte);
+    __make_page_writable(pte);
     free_page((unsigned long)pte);
 }
 

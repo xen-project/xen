@@ -24,9 +24,45 @@
 #ifndef __XEN_GRANT_H__
 #define __XEN_GRANT_H__
 
-#ifndef __GRANT_TABLE_IMPLEMENTATION__
-typedef void grant_table_t;
-#endif
+#include <hypervisor-ifs/grant_table.h>
+
+/* Active grant entry - used for shadowing GTF_permit_access grants. */
+typedef struct {
+    u32           status; /* Reference count information.  */
+    u32           tlbflush_timestamp; /* Flush avoidance.  */
+    u16           next;   /* Mapping hash chain.           */
+    domid_t       domid;  /* Domain being granted access.  */
+    unsigned long frame;  /* Frame being granted.          */
+} active_grant_entry_t;
+
+/*
+ * Bitfields in active_grant_entry_t:counts.
+ * NB. Some other GNTPIN_xxx definitions are in hypervisor-ifs/grant_table.h.
+ */
+ /* Count of writable host-CPU mappings. */
+#define GNTPIN_wmap_shift    (4)
+#define GNTPIN_wmap_mask     (0x3FFFU << GNTPIN_wmap_shift)
+ /* Count of read-only host-CPU mappings. */
+#define GNTPIN_rmap_shift    (18)
+#define GNTPIN_rmap_mask     (0x3FFFU << GNTPIN_rmap_shift)
+
+#define GNT_MAPHASH_SZ       (256)
+#define GNT_MAPHASH(_k)      ((_k) & (GNT_MAPHASH_SZ-1))
+#define GNT_MAPHASH_INVALID  (0xFFFFU)
+
+#define NR_GRANT_ENTRIES     (PAGE_SIZE / sizeof(grant_entry_t))
+
+/* Per-domain grant information. */
+typedef struct {
+    /* Shared grant table (see include/hypervisor-ifs/grant_table.h). */
+    grant_entry_t        *shared;
+    /* Active grant table. */
+    active_grant_entry_t *active;
+    /* Lock protecting updates to maphash and shared grant table. */
+    spinlock_t            lock;
+    /* Hash table: frame -> active grant entry. */
+    u16                   maphash[GNT_MAPHASH_SZ];
+} grant_table_t;
 
 /* Start-of-day system initialisation. */
 void grant_table_init(void);

@@ -371,7 +371,8 @@ void __enter_scheduler(void)
     if ( unlikely(prev == next) )
         return;
     
-    cleanup_writable_pagetable(PTWR_CLEANUP_ACTIVE | PTWR_CLEANUP_INACTIVE);
+    cleanup_writable_pagetable(
+        prev, PTWR_CLEANUP_ACTIVE | PTWR_CLEANUP_INACTIVE);
 
 #ifdef PTWR_TRACK_DOMAIN
     {

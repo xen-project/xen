@@ -5,8 +5,17 @@
  * page-ownership transfers.
  * 
  * Copyright (c) 2004, K A Fraser
- * 
- * Some rough guidelines on accessing and updating grant-table entries
+ */
+
+#ifndef __HYPERVISOR_IFS_GRANT_TABLE_H__
+#define __HYPERVISOR_IFS_GRANT_TABLE_H__
+
+
+/***********************************
+ * GRANT TABLE REPRESENTATION
+ */
+
+/* Some rough guidelines on accessing and updating grant-table entries
  * in a concurreny-safe manner. For more information, Linux contains a
  * reference implementation for guest OSes (arch/xen/kernel/grant_table.c).
  * 
@@ -35,9 +44,6 @@
  *  Use SMP-safe bit-setting instruction.
  */
 
-#ifndef __HYPERVISOR_IFS_GRANT_TABLE_H__
-#define __HYPERVISOR_IFS_GRANT_TABLE_H__
-
 /*
  * A grant table comprises a packed array of grant entries in one or more
  * page frames shared between Xen and a guest.
@@ -55,11 +61,6 @@ typedef struct {
      */
     u32     frame;      /* 4 */
 } PACKED grant_entry_t; /* 8 bytes */
-
-/*
- * Reference to a grant entry in a specified domain's grant table.
- */
-typedef u16 grant_ref_t;
 
 /*
  * Type of grant entry.
@@ -82,8 +83,64 @@ typedef u16 grant_ref_t;
 #define _GTF_readonly       (2)
 #define GTF_readonly        (1<<_GTF_readonly)
 #define _GTF_reading        (3)
-#define GTF_reading         (1<<_GTF_inuse)
+#define GTF_reading         (1<<_GTF_reading)
 #define _GTF_writing        (4)
-#define GTF_writing         (1<<_GTF_inuse)
+#define GTF_writing         (1<<_GTF_writing)
+
+
+/***********************************
+ * GRANT TABLE QUERIES AND USES
+ */
+
+/*
+ * Reference to a grant entry in a specified domain's grant table.
+ */
+typedef u16 grant_ref_t;
+
+/*
+ * GNTTABOP_update_pin_status: Change the pin status of of <dom>'s grant entry
+ * with reference <ref>.
+ * NOTES:
+ *  1. If GNTPIN_dev_accessible is specified then <dev_bus_addr> is the address
+ *     via which I/O devices may access the granted frame.
+ *  2. If GNTPIN_host_accessible is specified then <host_phys_addr> is the
+ *     physical address of the frame, which may be mapped into the caller's
+ *     page tables.
+ */
+#define GNTTABOP_update_pin_status    0
+typedef struct {
+    /* IN parameters. */
+    domid_t     dom;                  /*  0 */
+    grant_ref_t ref;                  /*  2 */
+    u16         pin_flags;            /*  4 */
+    u16         __pad;                /*  6 */
+    /* OUT parameters. */
+    memory_t    dev_bus_addr;         /*  8 */
+    MEMORY_PADDING;
+    memory_t    host_phys_addr;       /* 12 */
+    MEMORY_PADDING;
+} PACKED gnttab_update_pin_status_t; /* 16 bytes */
+
+typedef struct {
+    u32 cmd; /* GNTTABOP_* */         /*  0 */
+    u32 __reserved;                   /*  4 */
+    union {                           /*  8 */
+        gnttab_update_pin_status_t update_pin_status;
+        u8                         __dummy[16];
+    } PACKED u;
+} PACKED gnttab_op_t; /* 24 bytes */
+
+/*
+ * Bitfield values for <pin_flags>.
+ */
+ /* Pin the grant entry for access by I/O devices. */
+#define _GNTPIN_dev_accessible  (0)
+#define GNTPIN_dev_accessible   (1<<_GNTPIN_dev_accessible)
+ /* Pin the grant entry for access by host CPUs. */
+#define _GNTPIN_host_accessible (1)
+#define GNTPIN_host_accessible  (1<<_GNTPIN_host_accessible)
+ /* Accesses to the granted frame will be restricted to read-only access. */
+#define _GNTPIN_readonly        (2)
+#define GNTPIN_readonly         (1<<_GNTPIN_readonly)
 
 #endif /* __HYPERVISOR_IFS_GRANT_TABLE_H__ */

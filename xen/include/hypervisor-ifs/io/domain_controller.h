@@ -267,7 +267,7 @@ typedef struct {
     u16        __pad;
     u32        blkif_handle;  /*  4: ...ditto...                         */
     blkif_vdev_t vdevice;     /*  8: Interface-specific id for this VBD. */
-    u16        readonly;      /* 10: Non-zero -> VBD isn't writeable.    */
+    u16        readonly;      /* 10: Non-zero -> VBD isn't writable.     */
     /* OUT */
     u32        status;        /* 12 */
 } PACKED blkif_be_vbd_create_t; /* 16 bytes */

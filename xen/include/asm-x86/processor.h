@@ -244,10 +244,6 @@ struct i387_state {
     u8 state[512]; /* big enough for FXSAVE */
 } __attribute__ ((aligned (16)));
 
-typedef struct {
-    unsigned long seg;
-} mm_segment_t;
-
 struct tss_struct {
     unsigned short	back_link,__blh;
 #ifdef __x86_64__

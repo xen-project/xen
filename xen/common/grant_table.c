@@ -21,58 +21,141 @@
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
 
-#define __GRANT_TABLE_IMPLEMENTATION__
-typedef struct grant_table grant_table_t;
-
 #include <xen/config.h>
 #include <xen/sched.h>
-#include <hypervisor-ifs/grant_table.h>
 
-/* Active grant entry - used for shadowing GTF_permit_access grants. */
-typedef struct {
-    u32           counts; /* Reference count information.   */
-    u16           next;   /* Mapping hash chain.            */
-    domid_t       domid;  /* Domain being granted access.   */
-    unsigned long frame;  /* Frame being granted.           */
-} active_grant_entry_t;
+#define update_shared_flags(x,y,z) (0)
 
-/* Bitfields in active_grant_entry_t:counts. */
- /* Grant is pinned by 'domid' for read mappings and I/O. */
-#define _GNTCNT_read_pinned  (0)
-#define GNTCNT_read_pinned   (1<<_GNTCNT_read_pinned)
- /* Grant is pinned by 'domid' for write mappings and I/O. */
-#define _GNTCNT_write_pinned (1)
-#define GNTCNT_write_pinned  (1<<_GNTCNT_write_pinned)
- /* Grant is pinned in IOMMU (read-only unless GNTCNT_write_pinned). */
-#define _GNTCNT_io_pinned    (2)
-#define GNTCNT_io_pinned     (1<<_GNTCNT_io_pinned)
- /* Grant is mappable (read-only unless GNTCNT_write_pinned). */
-#define _GNTCNT_mappable     (3)
-#define GNTCNT_mappable      (1<<_GNTCNT_mappable)
- /* Count of writable page mappings. (!GNTCNT_write_pinned => count==0). */
-#define GNTCNT_wmap_shift    (4)
-#define GNTCNT_wmap_mask     (0x3FFFU << GNTCNT_wmap_shift)
- /* Count of read-only page mappings. */
-#define GNTCNT_rmap_shift    (18)
-#define GNTCNT_rmap_mask     (0x3FFFU << GNTCNT_rmap_shift)
+static long gnttab_update_pin_status(gnttab_update_pin_status_t *uop)
+{
+    domid_t        dom, sdom;
+    grant_ref_t    ref;
+    u16            pin_flags;
+    struct domain *ld, *rd;
+    u32            sflags;
+    active_grant_entry_t *act;
+    grant_entry_t *sha;
+    long           rc = 0;
 
-#define MAPHASH_SZ       (256)
-#define MAPHASH(_k)      ((_k) & (MAPHASH_SZ-1))
-#define MAPHASH_INVALID  (0xFFFFU)
+    ld = current;
 
-#define NR_GRANT_ENTRIES     (PAGE_SIZE / sizeof(grant_entry_t))
+    if ( unlikely(__get_user(dom, &uop->dom)) || 
+         unlikely(__get_user(ref, &uop->ref)) ||
+         unlikely(__get_user(pin_flags, &uop->pin_flags)) )
+        return -EFAULT;
 
-/* Per-domain grant information. */
-struct grant_table {
-    /* Shared grant table (see include/hypervisor-ifs/grant_table.h). */
-    grant_entry_t        *shared;
-    /* Active grant table. */
-    active_grant_entry_t *active;
-    /* Lock protecting updates to maphash and shared grant table. */
-    spinlock_t            lock;
-    /* Hash table: frame -> active grant entry. */
-    u16                   maphash[MAPHASH_SZ];
-};
+    pin_flags &= (GNTPIN_dev_accessible | 
+                  GNTPIN_host_accessible |
+                  GNTPIN_readonly);
+
+    if ( unlikely(ref >= NR_GRANT_ENTRIES) || 
+         unlikely(pin_flags == GNTPIN_readonly) )
+        return -EINVAL;
+
+    if ( unlikely((rd = find_domain_by_id(dom)) == NULL) )
+        return -ESRCH;
+
+    act = &rd->grant_table->active[ref];
+    sha = &rd->grant_table->shared[ref];
+
+    if ( act->status == 0 )
+    {
+        if ( unlikely(pin_flags == 0) )
+            goto out;
+
+        sflags = sha->flags;
+        sdom   = sha->domid;
+
+        do {
+            if ( unlikely((sflags & GTF_type_mask) != GTF_permit_access) ||
+                 unlikely(sdom != ld->domain) )
+            {
+            }
+        
+            sflags |= GTF_reading;
+            if ( !(pin_flags & GNTPIN_readonly) )
+            {
+                sflags |= GTF_writing;
+                if ( unlikely(sflags & GTF_readonly) )
+                {
+                }
+            }
+        }
+        while ( !update_shared_flags(sha, sflags, sdom) );
+
+        act->status = pin_flags;
+        act->domid  = sdom;
+
+        /* XXX MAP XXX */
+    }
+    else if ( pin_flags == 0 )
+    {
+        if ( unlikely((act->status & 
+                       (GNTPIN_wmap_mask|GNTPIN_rmap_mask)) != 0) )
+        {
+        }
+
+        clear_bit(_GTF_writing, &sha->flags);
+        clear_bit(_GTF_reading, &sha->flags);
+
+        act->status = 0;
+
+        /* XXX UNMAP XXX */
+    }
+    else 
+    {
+        if ( pin_flags & GNTPIN_readonly )
+        {
+            if ( !(act->status & GNTPIN_readonly) )
+            {
+            }
+        }
+        else if ( act->status & GNTPIN_readonly )
+        {
+        }
+
+        if ( pin_flags & GNTPIN_host_accessible )
+        {
+            if ( !(act->status & GNTPIN_host_accessible) )
+            {
+                /* XXX MAP XXX */
+            }
+        }
+        else if ( act->status & GNTPIN_host_accessible )
+        {
+            /* XXX UNMAP XXX */
+        }
+
+        act->status &= ~GNTPIN_dev_accessible;
+        act->status |= pin_flags & GNTPIN_dev_accessible; 
+    }
+
+ out:
+    put_domain(rd);
+    return rc;
+}
+
+long do_grant_table_op(gnttab_op_t *uop)
+{
+    long rc;
+    u32  cmd;
+
+    if ( unlikely(!access_ok(VERIFY_WRITE, uop, sizeof(*uop))) ||
+         unlikely(__get_user(cmd, &uop->cmd)) )
+        return -EFAULT;
+
+    switch ( cmd )
+    {
+    case GNTTABOP_update_pin_status:
+        rc = gnttab_update_pin_status(&uop->u.update_pin_status);
+        break;
+    default:
+        rc = -ENOSYS;
+        break;
+    }
+
+    return rc;
+}
 
 int grant_table_create(struct domain *d)
 {
@@ -86,8 +169,8 @@ int grant_table_create(struct domain *d)
     t->shared = NULL;
     t->active = NULL;
     spin_lock_init(&t->lock);
-    for ( i = 0; i < MAPHASH_SZ; i++ )
-        t->maphash[i] = MAPHASH_INVALID;
+    for ( i = 0; i < GNT_MAPHASH_SZ; i++ )
+        t->maphash[i] = GNT_MAPHASH_INVALID;
 
     /* Active grant-table page. */
     if ( (t->active = xmalloc(sizeof(active_grant_entry_t) * 

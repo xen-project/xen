@@ -38,7 +38,7 @@
  * 
  * TYPE_COUNT is more subtle. A frame can be put to one of three
  * mutually-exclusive uses: it might be used as a page directory, or a
- * page table, or it may be mapped writeable by the domain [of course, a
+ * page table, or it may be mapped writable by the domain [of course, a
  * frame may not be used in any of these three ways!].
  * So, type_count is a count of the number of times a frame is being 
  * referred to in its current incarnation. Therefore, a page can only
@@ -53,10 +53,10 @@
  * point safety checks would need to be carried out next time the count
  * is increased again.
  * 
- * A further note on writeable page mappings:
- * ------------------------------------------
- * For simplicity, the count of writeable mappings for a page may not
- * correspond to reality. The 'writeable count' is incremented for every
+ * A further note on writable page mappings:
+ * -----------------------------------------
+ * For simplicity, the count of writable mappings for a page may not
+ * correspond to reality. The 'writable count' is incremented for every
  * PTE which maps the page with the _PAGE_RW flag set. However, for
  * write access to be possible the page directory entry must also have
  * its _PAGE_RW bit set. We do not check this as it complicates the 
@@ -70,12 +70,12 @@
  * -----------------------------------------
  * We want domains to be able to map pages for read-only access. The
  * main reason is that page tables and directories should be readable
- * by a domain, but it would not be safe for them to be writeable.
+ * by a domain, but it would not be safe for them to be writable.
  * However, domains have free access to rings 1 & 2 of the Intel
  * privilege model. In terms of page protection, these are considered
  * to be part of 'supervisor mode'. The WP bit in CR0 controls whether
  * read-only restrictions are respected in supervisor mode -- if the 
- * bit is clear then any mapped page is writeable.
+ * bit is clear then any mapped page is writable.
  * 
  * We get round this by always setting the WP bit and disallowing 
  * updates to it. This is very unlikely to cause a problem for guest
@@ -143,12 +143,15 @@ static struct domain *dom_xen, *dom_io;
 void arch_init_memory(void)
 {
     static void ptwr_init_backpointers(void);
+    static void ptwr_disable(void);
     unsigned long mfn;
 
     memset(percpu_info, 0, sizeof(percpu_info));
 
-    vm_assist_info[VMASST_TYPE_writeable_pagetables].enable =
+    vm_assist_info[VMASST_TYPE_writable_pagetables].enable =
         ptwr_init_backpointers;
+    vm_assist_info[VMASST_TYPE_writable_pagetables].disable =
+        ptwr_disable;
 
     /* Initialise to a magic of 0x55555555 so easier to spot bugs later. */
     memset(machine_to_phys_mapping, 0x55, 4<<20);
@@ -397,7 +400,7 @@ get_page_from_l1e(
     if ( l1v & _PAGE_RW )
     {
         if ( unlikely(!get_page_and_type_from_pagenr(
-            pfn, PGT_writeable_page, d)) )
+            pfn, PGT_writable_page, d)) )
             return 0;
         set_bit(_PGC_tlb_flush_on_type_change, 
                 &frame_table[pfn].u.inuse.count_info);
@@ -1020,17 +1023,21 @@ int do_mmu_update(mmu_update_t *ureqs, int count, int *success_count)
     unsigned int cmd;
     unsigned long prev_spfn = 0;
     l1_pgentry_t *prev_spl1e = 0;
+    struct domain *d = current;
 
     perfc_incrc(calls_to_mmu_update); 
     perfc_addc(num_page_updates, count);
 
-    cleanup_writable_pagetable(PTWR_CLEANUP_ACTIVE | PTWR_CLEANUP_INACTIVE);
+    cleanup_writable_pagetable(d, PTWR_CLEANUP_ACTIVE | PTWR_CLEANUP_INACTIVE);
+
+    if ( unlikely(!access_ok(VERIFY_READ, ureqs, count * sizeof(req))) )
+        return -EFAULT;
 
     for ( i = 0; i < count; i++ )
     {
-        if ( unlikely(copy_from_user(&req, ureqs, sizeof(req)) != 0) )
+        if ( unlikely(__copy_from_user(&req, ureqs, sizeof(req)) != 0) )
         {
-            MEM_LOG("Bad copy_from_user");
+            MEM_LOG("Bad __copy_from_user");
             rc = -EFAULT;
             break;
         }
@@ -1073,13 +1080,13 @@ int do_mmu_update(mmu_update_t *ureqs, int count, int *success_count)
                     okay = mod_l1_entry((l1_pgentry_t *)va, 
                                         mk_l1_pgentry(req.val)); 
 
-                    if ( okay && unlikely(current->mm.shadow_mode) &&
-                         (get_shadow_status(&current->mm, page-frame_table) &
+                    if ( unlikely(d->mm.shadow_mode) && okay &&
+                         (get_shadow_status(&d->mm, page-frame_table) &
                           PSH_shadowed) )
                     {
-                        shadow_l1_normal_pt_update( req.ptr, req.val, 
-                                                    &prev_spfn, &prev_spl1e );
-                        put_shadow_status(&current->mm);
+                        shadow_l1_normal_pt_update(
+                            req.ptr, req.val, &prev_spfn, &prev_spl1e);
+                        put_shadow_status(&d->mm);
                     }
 
                     put_page_type(page);
@@ -1092,19 +1099,19 @@ int do_mmu_update(mmu_update_t *ureqs, int count, int *success_count)
                                         mk_l2_pgentry(req.val),
                                         pfn); 
 
-                    if ( okay && unlikely(current->mm.shadow_mode) &&
-                         (get_shadow_status(&current->mm, page-frame_table) & 
+                    if ( unlikely(d->mm.shadow_mode) && okay &&
+                         (get_shadow_status(&d->mm, page-frame_table) & 
                           PSH_shadowed) )
                     {
-                        shadow_l2_normal_pt_update( req.ptr, req.val );
-                        put_shadow_status(&current->mm);
+                        shadow_l2_normal_pt_update(req.ptr, req.val);
+                        put_shadow_status(&d->mm);
                     }
 
                     put_page_type(page);
                 }
                 break;
             default:
-                if ( likely(get_page_type(page, PGT_writeable_page)) )
+                if ( likely(get_page_type(page, PGT_writable_page)) )
                 {
                     *(unsigned long *)va = req.val;
                     okay = 1;
@@ -1114,7 +1121,6 @@ int do_mmu_update(mmu_update_t *ureqs, int count, int *success_count)
             }
 
             put_page(page);
-
             break;
 
         case MMU_MACHPHYS_UPDATE:
@@ -1131,8 +1137,8 @@ int do_mmu_update(mmu_update_t *ureqs, int count, int *success_count)
              * If in log-dirty mode, mark the corresponding pseudo-physical
              * page as dirty.
              */
-            if ( unlikely(current->mm.shadow_mode == SHM_logdirty) )
-                mark_dirty(&current->mm, pfn);
+            if ( unlikely(d->mm.shadow_mode == SHM_logdirty) )
+                mark_dirty(&d->mm, pfn);
 
             put_page(&frame_table[pfn]);
             break;
@@ -1163,7 +1169,7 @@ int do_mmu_update(mmu_update_t *ureqs, int count, int *success_count)
     if ( prev_pfn != 0 )
         unmap_domain_mem((void *)va);
 
-    if( prev_spl1e != 0 ) 
+    if ( unlikely(prev_spl1e != 0) ) 
         unmap_domain_mem((void *)prev_spl1e);
 
     deferred_ops = percpu_info[cpu].deferred_ops;
@@ -1171,7 +1177,7 @@ int do_mmu_update(mmu_update_t *ureqs, int count, int *success_count)
 
     if ( deferred_ops & DOP_FLUSH_TLB )
         local_flush_tlb();
-
+        
     if ( deferred_ops & DOP_RELOAD_LDT )
         (void)map_ldt_shadow_page(0);
 
@@ -1192,9 +1198,9 @@ int do_update_va_mapping(unsigned long page_nr,
                          unsigned long val, 
                          unsigned long flags)
 {
-    struct domain *p = current;
+    struct domain *d = current;
     int err = 0;
-    unsigned int cpu = p->processor;
+    unsigned int cpu = d->processor;
     unsigned long deferred_ops;
 
     perfc_incrc(calls_to_update_va);
@@ -1202,7 +1208,7 @@ int do_update_va_mapping(unsigned long page_nr,
     if ( unlikely(page_nr >= (HYPERVISOR_VIRT_START >> PAGE_SHIFT)) )
         return -EINVAL;
 
-    cleanup_writable_pagetable(PTWR_CLEANUP_ACTIVE | PTWR_CLEANUP_INACTIVE);
+    cleanup_writable_pagetable(d, PTWR_CLEANUP_ACTIVE | PTWR_CLEANUP_INACTIVE);
 
     /*
      * XXX When we make this support 4MB superpages we should also deal with 
@@ -1213,11 +1219,11 @@ int do_update_va_mapping(unsigned long page_nr,
                                 mk_l1_pgentry(val))) )
         err = -EINVAL;
 
-    if ( unlikely(p->mm.shadow_mode) )
+    if ( unlikely(d->mm.shadow_mode) )
     {
         unsigned long sval;
 
-        l1pte_no_fault( &current->mm, &val, &sval );
+        l1pte_no_fault(&d->mm, &val, &sval);
 
         if ( unlikely(__put_user(sval, ((unsigned long *)(
             &shadow_linear_pg_table[page_nr])))) )
@@ -1234,10 +1240,10 @@ int do_update_va_mapping(unsigned long page_nr,
          * the PTE in the PT-holding page. We need the machine frame number
          * for this.
          */
-        if ( p->mm.shadow_mode == SHM_logdirty )
+        if ( d->mm.shadow_mode == SHM_logdirty )
             mark_dirty( &current->mm, va_to_l1mfn(page_nr<<PAGE_SHIFT) );  
   
-        check_pagetable( p, p->mm.pagetable, "va" ); /* debug */
+        check_pagetable(d, d->mm.pagetable, "va"); /* debug */
     }
 
     deferred_ops = percpu_info[cpu].deferred_ops;
@@ -1266,8 +1272,6 @@ int do_update_va_mapping_otherdomain(unsigned long page_nr,
 
     if ( unlikely(!IS_PRIV(current)) )
         return -EPERM;
-
-    cleanup_writable_pagetable(PTWR_CLEANUP_ACTIVE | PTWR_CLEANUP_INACTIVE);
 
     percpu_info[cpu].foreign = d = find_domain_by_id(domid);
     if ( unlikely(d == NULL) )
@@ -1574,6 +1578,11 @@ static void ptwr_init_backpointers(void)
         page->u.inuse.type_info &= ~PGT_va_mask;
         page->u.inuse.type_info |= va_idx << PGT_va_shift;
     }
+}
+
+static void ptwr_disable(void)
+{
+    __cleanup_writable_pagetable(PTWR_CLEANUP_ACTIVE | PTWR_CLEANUP_INACTIVE);
 }
 
 #ifndef NDEBUG

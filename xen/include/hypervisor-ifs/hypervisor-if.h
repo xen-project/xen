@@ -45,8 +45,9 @@
 #define __HYPERVISOR_xen_version          17
 #define __HYPERVISOR_console_io           18
 #define __HYPERVISOR_physdev_op           19
-#define __HYPERVISOR_update_va_mapping_otherdomain 20
+#define __HYPERVISOR_grant_table_op       20
 #define __HYPERVISOR_vm_assist            21
+#define __HYPERVISOR_update_va_mapping_otherdomain 22
 
 /*
  * MULTICALLS
@@ -183,7 +184,7 @@
 #define VMASST_CMD_disable               1
 #define VMASST_TYPE_4gb_segments         0
 #define VMASST_TYPE_4gb_segments_notify  1
-#define VMASST_TYPE_writeable_pagetables 2
+#define VMASST_TYPE_writable_pagetables  2
 #define MAX_VMASST_TYPE 2
 
 #ifndef __ASSEMBLY__
@@ -370,7 +371,7 @@ typedef struct shared_info_st
  *  7. The list of page frames forms a contiguous 'pseudo-physical' memory
  *     layout for the domain. In particular, the bootstrap virtual-memory
  *     region is a 1:1 mapping to the first section of the pseudo-physical map.
- *  8. All bootstrap elements are mapped read-writeable for the guest OS. The
+ *  8. All bootstrap elements are mapped read-writable for the guest OS. The
  *     only exception is the bootstrap page table, which is mapped read-only.
  *  9. There is guaranteed to be at least 512kB padding after the final
  *     bootstrap element. If necessary, the bootstrap virtual region is

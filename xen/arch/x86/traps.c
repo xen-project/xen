@@ -328,17 +328,19 @@ asmlinkage void do_page_fault(struct pt_regs *regs, long error_code)
             return; /* successfully copied the mapping */
     }
 
-    if ( (addr >> L2_PAGETABLE_SHIFT) == ptwr_info[cpu].disconnected )
+    if ( unlikely(VM_ASSIST(d, VMASST_TYPE_writable_pagetables)) )
     {
-        ptwr_reconnect_disconnected(addr);
-        return;
-    }
+        if ( (addr >> L2_PAGETABLE_SHIFT) == ptwr_info[cpu].disconnected )
+        {
+            ptwr_reconnect_disconnected(addr);
+            return;
+        }
 
-    if ( VM_ASSIST(d, VMASST_TYPE_writeable_pagetables) && 
-         (addr < PAGE_OFFSET) &&
-         ((error_code & 3) == 3) && /* write-protection fault */
-         ptwr_do_page_fault(addr) )
-        return;
+        if ( (addr < PAGE_OFFSET) &&
+             ((error_code & 3) == 3) && /* write-protection fault */
+             ptwr_do_page_fault(addr) )
+            return;
+    }
 
     if ( unlikely(d->mm.shadow_mode) && 
          (addr < PAGE_OFFSET) && shadow_fault(addr, error_code) )

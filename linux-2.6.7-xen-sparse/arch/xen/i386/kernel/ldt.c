@@ -71,7 +71,7 @@ static int alloc_ldt(mm_context_t *pc, int mincount, int reload)
 #endif
 	}
 	if (oldsize) {
-		make_pages_writeable(oldldt, (oldsize * LDT_ENTRY_SIZE) /
+		make_pages_writable(oldldt, (oldsize * LDT_ENTRY_SIZE) /
 			PAGE_SIZE);
 		flush_page_update_queue();
 		if (oldsize*LDT_ENTRY_SIZE > PAGE_SIZE)
@@ -121,9 +121,9 @@ void destroy_context(struct mm_struct *mm)
 	if (mm->context.size) {
 		if (mm == current->active_mm)
 			clear_LDT();
-		make_pages_writeable(mm->context.ldt, 
-				     (mm->context.size * LDT_ENTRY_SIZE) /
-				     PAGE_SIZE);
+		make_pages_writable(mm->context.ldt, 
+                                    (mm->context.size * LDT_ENTRY_SIZE) /
+                                    PAGE_SIZE);
 		flush_page_update_queue();
 		if (mm->context.size*LDT_ENTRY_SIZE > PAGE_SIZE)
 			vfree(mm->context.ldt);
