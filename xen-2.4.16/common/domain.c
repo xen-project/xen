@@ -14,8 +14,8 @@
 #include <asm/msr.h>
 #include <xeno/multiboot.h>
 
-#define L2_PROT (_PAGE_PRESENT|_PAGE_RW|_PAGE_USER|_PAGE_ACCESSED)
-#define L1_PROT (_PAGE_PRESENT|_PAGE_RW|_PAGE_USER|_PAGE_ACCESSED|_PAGE_DIRTY)
+#define L1_PROT (_PAGE_PRESENT|_PAGE_RW|_PAGE_USER|_PAGE_ACCESSED)
+#define L2_PROT (_PAGE_PRESENT|_PAGE_RW|_PAGE_USER|_PAGE_ACCESSED|_PAGE_DIRTY)
 
 extern int nr_mods;
 extern module_t *mod;
@@ -69,7 +69,8 @@ struct task_struct *do_newdomain(void)
      */
     p->blk_ring_base = (blk_ring_t *)(p->shared_info + 1);
     p->net_ring_base = (net_ring_t *)(p->blk_ring_base + 1);
-    p->pg_head = p->tot_pages = 0;
+    INIT_LIST_HEAD(&p->pg_head);
+    p->tot_pages = 0;
     write_lock_irqsave(&tasklist_lock, flags);
     SET_LINKS(p);
     write_unlock_irqrestore(&tasklist_lock, flags);
@@ -243,6 +244,8 @@ long kill_other_domain(unsigned int dom)
 /* Release resources belonging to task @p. */
 void release_task(struct task_struct *p)
 {
+    struct list_head *list_ent, *tmp;
+
     ASSERT(!__task_on_runqueue(p));
     ASSERT(p->state == TASK_DYING);
     ASSERT(!p->has_cpu);
@@ -261,17 +264,15 @@ void release_task(struct task_struct *p)
     }
     if ( p->mm.perdomain_pt ) free_page((unsigned long)p->mm.perdomain_pt);
     free_page((unsigned long)p->shared_info);
-    if ( p->tot_pages != 0 )
+
+    list_for_each_safe(list_ent, tmp, &p->pg_head)
     {
-        /* Splice domain's pages into the free list. */
-        struct list_head *first = &frame_table[p->pg_head].list;
-        struct list_head *last  = first->prev;
-        free_list.next->prev = last;
-        last->next = free_list.next;
-        free_list.next = first;
-        first->prev = &free_list;            
-        free_pfns += p->tot_pages;
+        struct pfn_info *pf = list_entry(list_ent, struct pfn_info, list);
+        pf->type_count = pf->tot_count = pf->flags = 0;
+        list_del(list_ent);
+        list_add(list_ent, &free_list);
     }
+
     free_task_struct(p);
 }
 
@@ -350,7 +351,7 @@ asmlinkage void schedule(void)
 unsigned int alloc_new_dom_mem(struct task_struct *p, unsigned int kbytes)
 {
     struct list_head *temp;
-    struct pfn_info *pf, *pf_head;
+    struct pfn_info *pf;
     unsigned int alloc_pfns;
     unsigned int req_pages;
 
@@ -358,33 +359,18 @@ unsigned int alloc_new_dom_mem(struct task_struct *p, unsigned int kbytes)
     req_pages = kbytes >> (PAGE_SHIFT - 10);
 
     /* is there enough mem to serve the request? */   
-    if(req_pages > free_pfns)
-        return -1;
+    if ( req_pages > free_pfns ) return -1;
     
     /* allocate pages and build a thread through frame_table */
     temp = free_list.next;
-
-    /* allocate first page */
-    pf = pf_head = list_entry(temp, struct pfn_info, list);
-    pf->flags |= p->domain;
-    temp = temp->next;
-    list_del(&pf->list);
-    INIT_LIST_HEAD(&pf->list);
-    p->pg_head = pf - frame_table;
-    pf->type_count = pf->tot_count = 0;
-    free_pfns--;
-
-    /* allocate the rest */
-    for ( alloc_pfns = req_pages - 1; alloc_pfns; alloc_pfns-- )
+    for ( alloc_pfns = 0; alloc_pfns < req_pages; alloc_pfns++ )
     {
         pf = list_entry(temp, struct pfn_info, list);
         pf->flags |= p->domain;
+        pf->type_count = pf->tot_count = 0;
         temp = temp->next;
         list_del(&pf->list);
-
-        list_add_tail(&pf->list, &pf_head->list);
-        pf->type_count = pf->tot_count = 0;
-
+        list_add_tail(&pf->list, &p->pg_head);
         free_pfns--;
     }
     
@@ -532,11 +518,12 @@ int final_setup_guestos(struct task_struct * p, dom_meminfo_t * meminfo)
 static unsigned long alloc_page_from_domain(unsigned long * cur_addr, 
     unsigned long * index)
 {
-    struct list_head *ent = frame_table[*cur_addr >> PAGE_SHIFT].list.prev;
+    unsigned long ret = *cur_addr;
+    struct list_head *ent = frame_table[ret >> PAGE_SHIFT].list.prev;
     *cur_addr = list_entry(ent, struct pfn_info, list) - frame_table;
     *cur_addr <<= PAGE_SHIFT;
     (*index)--;    
-    return *cur_addr;
+    return ret;
 }
 
 /* setup_guestos is used for building dom0 solely. other domains are built in
@@ -578,7 +565,9 @@ int setup_guestos(struct task_struct *p, dom0_newdomain_t *params)
     }
 
     if ( alloc_new_dom_mem(p, params->memory_kb) ) return -ENOMEM;
-    alloc_address = p->pg_head << PAGE_SHIFT;
+    alloc_address = list_entry(p->pg_head.prev, struct pfn_info, list) -
+        frame_table;
+    alloc_address <<= PAGE_SHIFT;
     alloc_index = p->tot_pages;
 
     if ( (mod[nr_mods-1].mod_end-mod[0].mod_start) > 
@@ -615,7 +604,9 @@ int setup_guestos(struct task_struct *p, dom0_newdomain_t *params)
      */
 
     l2tab += l2_table_offset(virt_load_address);
-    cur_address = p->pg_head << PAGE_SHIFT;
+    cur_address = list_entry(p->pg_head.next, struct pfn_info, list) -
+        frame_table;
+    cur_address <<= PAGE_SHIFT;
     for ( count = 0; count < p->tot_pages + 1; count++ )
     {
         if ( !((unsigned long)l1tab & (PAGE_SIZE-1)) )
@@ -647,7 +638,9 @@ int setup_guestos(struct task_struct *p, dom0_newdomain_t *params)
     unmap_domain_mem(l1start);
 
     /* pages that are part of page tables must be read only */
-    cur_address = p->pg_head << PAGE_SHIFT;
+    cur_address = list_entry(p->pg_head.next, struct pfn_info, list) -
+        frame_table;
+    cur_address <<= PAGE_SHIFT;
     for ( count = 0; count < alloc_index; count++ ) 
     {
         list_ent = frame_table[cur_address >> PAGE_SHIFT].list.next;
