@@ -94,6 +94,13 @@ static void __do_suspend(void)
 
     HYPERVISOR_suspend(virt_to_machine(suspend_record) >> PAGE_SHIFT);
 
+    HYPERVISOR_vm_assist(VMASST_CMD_enable,
+			 VMASST_TYPE_4gb_segments);
+#ifdef CONFIG_XEN_WRITABLE_PAGETABLES
+    HYPERVISOR_vm_assist(VMASST_CMD_enable,
+			 VMASST_TYPE_writeable_pagetables);
+#endif
+
     shutting_down = -1; 
 
     memcpy(&start_info, &suspend_record->resume_info, sizeof(start_info));
