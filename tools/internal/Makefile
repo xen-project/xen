@@ -1,7 +1,7 @@
 
 CC       = gcc
 CFLAGS   = -Wall -O3 
-CFLAGS  += -I../../xen/include -I../../xenolinux-2.4.21-sparse/include
+CFLAGS  += -I../../xen/include -I../../xenolinux-sparse/include
 
 HDRS     = $(wildcard *.h)
 SRCS     = $(wildcard *.c)
@@ -15,6 +15,7 @@ INSTALL  = $(TARGETS) xi_vifinit xi_helper
 all: $(TARGETS)
 
 install: all
+	mkdir -p ../../../install/bin
 	cp -a $(INSTALL) ../../../install/bin
 	chmod 755 ../../../install/bin/xi_vifinit
 	chmod 755 ../../../install/bin/xi_helper
