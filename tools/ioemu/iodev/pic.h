@@ -67,7 +67,6 @@ typedef struct {
 
 
 class bx_pic_c : public bx_pic_stub_c {
-
 public:
   bx_pic_c(void);
   ~bx_pic_c(void);
@@ -77,6 +76,7 @@ public:
   virtual void   raise_irq(unsigned irq_no);
   virtual Bit8u  IAC(void);
   virtual void   show_pic_state(void);
+  Bit8u  irq_to_vec(Bit8u);
 
 private:
   struct {

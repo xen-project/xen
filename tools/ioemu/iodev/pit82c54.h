@@ -15,6 +15,11 @@
 
 #include "bochs.h"
 
+#ifdef BX_USE_VMX
+#define BX_VMX_PIT 1
+#define PIT_FREQ 1193181
+#endif
+
 
 class pit_82C54 : public logfunctions {
 
@@ -107,6 +112,10 @@ private:
   void clock(Bit8u cnum) BX_CPP_AttrRegparmN(1);
 
   void print_counter(counter_type & thisctr);
+
+#ifdef BX_USE_VMX
+  void write_initcount_vmx(Bit8u cnum);
+#endif
 
 public:
   void init (void);

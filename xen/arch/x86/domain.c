@@ -756,6 +756,7 @@ static void relinquish_list(struct domain *d, struct list_head *list)
 #ifdef CONFIG_VMX
 static void vmx_domain_relinquish_memory(struct exec_domain *ed)
 {
+    struct vmx_virpit_t *vpit = &(ed->arch.arch_vmx.vmx_platform.vmx_pit);
     /*
      * Free VMCS
      */
@@ -764,6 +765,7 @@ static void vmx_domain_relinquish_memory(struct exec_domain *ed)
     ed->arch.arch_vmx.vmcs = 0;
     
     monitor_rm_pagetable(ed);
+    rem_ac_timer(&(vpit->pit_timer));
 }
 #endif
 

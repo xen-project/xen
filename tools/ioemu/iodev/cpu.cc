@@ -144,7 +144,11 @@ void bx_cpu_c::dispatch_ioreq(ioreq_t *req)
 			}
 		}
 	}
-	req->state = STATE_IORESP_READY;
+
+        /* No state change if state = STATE_IORESP_HOOK */
+        if (req->state == STATE_IOREQ_INPROCESS)
+                req->state = STATE_IORESP_READY;
+
 	send_event = 1;
 }
 

@@ -326,11 +326,13 @@ bx_pit_c::write( Bit32u   address, Bit32u   dvalue,
         (unsigned) address, (unsigned) value));
   }
 
+#ifndef BX_VMX_PIT
   if ((BX_PIT_THIS s.timer.read_OUT(0))==1) {
     DEV_pic_raise_irq(0);
   } else {
     DEV_pic_lower_irq(0);
   }
+#endif
 
   if(time_passed ||
      (BX_PIT_THIS s.last_next_event_time
@@ -419,12 +421,16 @@ bx_pit_c::periodic( Bit32u   usec_delta )
     BX_PIT_THIS s.timer.clock_all(timedelta);
     if ( (prev_timer0_out==0) ) {
       if ((BX_PIT_THIS s.timer.read_OUT(0))==1) {
+#ifndef BX_VMX_PIT
 	DEV_pic_raise_irq(0);
+#endif
         prev_timer0_out=1;
       }
     } else {
       if ((BX_PIT_THIS s.timer.read_OUT(0))==0) {
+#ifndef BX_VMX_PIT
 	DEV_pic_lower_irq(0);
+#endif
         prev_timer0_out=0;
       }
     }

@@ -855,6 +855,21 @@ bx_pic_c::IAC(void)
   BX_DBG_IAC_REPORT(vector, irq);
   return(vector);
 }
+ 
+  Bit8u
+bx_pic_c::irq_to_vec(Bit8u irq)
+{
+  Bit8u vector = 0;
+
+  if (irq >= 8 && irq <= 15)
+    vector = irq + BX_PIC_THIS s.slave_pic.interrupt_offset;
+  else if (irq != 2 && irq <= 7)
+    vector = irq + BX_PIC_THIS s.master_pic.interrupt_offset;
+  else
+    BX_ERROR(("invalid irq!\n"));
+
+  return vector;
+}
 
   void
 bx_pic_c::show_pic_state(void)

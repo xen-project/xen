@@ -608,6 +608,37 @@ pit_82C54::clock(Bit8u cnum) {
     return 0;
   }
 
+#ifdef BX_VMX_PIT
+//extra operations when use vmx pit device model
+  void pit_82C54::write_initcount_vmx(Bit8u cnum) {
+    if(cnum>MAX_COUNTER) {
+      BX_ERROR(("Counter number incorrect\n"));
+    }
+
+    ioreq_t *req = &((vcpu_iodata_t *) shared_page)->vp_ioreq;
+    extern bx_pic_c *thePic;
+    counter_type & thisctr = counter[cnum];
+    if(req->pdata_valid) {
+      BX_ERROR(("VMX_PIT:err!pit is port io!\n"));
+    }
+
+    if (thisctr.mode == 2) {//periodic mode, need HV to help send interrupt
+      req->state = STATE_IORESP_HOOK;
+
+//      req->u.data = thisctr.inlatch * 1000 / PIT_FREQ;//init count:16 bit
+      req->u.data = thisctr.inlatch;			//init count:16 bit
+      //get the pit irq(0)'s vector from pic DM
+      req->u.data |= ((thePic->irq_to_vec(0)) << 16 );	//timer vec:8 bit
+      req->u.data |= (cnum << 24);			//PIT channel(0~2):2 bit
+      req->u.data |= ((thisctr.rw_mode) << 26);		//rw mode:2 bit
+
+      BX_INFO(("VMX_PIT:whole pit hook packet = 0x%llx \n", (req->u.data ) ));
+      BX_INFO(("VMX_PIT:init counter = %d ms\n", (req->u.data & 0xFFFF) ));
+    }
+
+  }
+#endif
+
   void pit_82C54::write(Bit8u address, Bit8u data) {
     if(address>MAX_ADDRESS) {
       BX_ERROR(("Counter address incorrect in data write."));
@@ -709,6 +740,9 @@ pit_82C54::clock(Bit8u cnum) {
 	thisctr.inlatch=(thisctr.inlatch & (0xFF<<8)) | data;
 	thisctr.null_count=1;
 	thisctr.count_written=1;
+#ifdef BX_VMX_PIT
+	write_initcount_vmx(address);
+#endif
 	break;
       case MSByte_multiple:
 	thisctr.write_state=LSByte_multiple;
@@ -716,6 +750,9 @@ pit_82C54::clock(Bit8u cnum) {
 	thisctr.inlatch=(thisctr.inlatch & 0xFF) | (data<<8);
 	thisctr.null_count=1;
 	thisctr.count_written=1;
+#ifdef BX_VMX_PIT
+	write_initcount_vmx(address);
+#endif
 	break;
       default:
 	BX_ERROR(("write counter in invalid write state."));

@@ -34,6 +34,7 @@
 #include <asm/spinlock.h>
 #include <asm/vmx.h>
 #include <asm/vmx_vmcs.h>
+#include <asm/vmx_intercept.h>
 #include <public/io/ioreq.h>
 
 #ifdef CONFIG_VMX
@@ -359,7 +360,6 @@ static void vmx_io_instruction(struct xen_regs *regs,
     }
     p = &vio->vp_ioreq;
     p->dir = test_bit(3, &exit_qualification);  
-    set_bit(ARCH_VMX_IO_WAIT, &d->arch.arch_vmx.flags);
 
     p->pdata_valid = 0;
     p->count = 1;
@@ -396,6 +396,14 @@ static void vmx_io_instruction(struct xen_regs *regs,
 
     p->addr = addr;
     p->port_mm = 0;
+
+    /* Check if the packet needs to be intercepted */
+    if (vmx_io_intercept(p)) {
+	/* no blocking & no evtchn notification */
+        return;
+    } 
+
+    set_bit(ARCH_VMX_IO_WAIT, &d->arch.arch_vmx.flags);
     p->state = STATE_IOREQ_READY;
     evtchn_send(IOPACKET_PORT);
     do_block();

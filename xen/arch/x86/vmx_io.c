@@ -31,6 +31,7 @@
 #include <xen/event.h>
 #include <public/io/ioreq.h>
 #include <asm/vmx_platform.h>
+#include <asm/vmx_virpit.h>
 
 #ifdef CONFIG_VMX
 
@@ -197,6 +198,11 @@ void vmx_io_assist(struct exec_domain *ed)
         domain_crash();
     }
     p = &vio->vp_ioreq;
+
+    if (p->state == STATE_IORESP_HOOK){
+        vmx_hooks_assist(ed);
+    }
+
     /* clear IO wait VMX flag */
     if (test_bit(ARCH_VMX_IO_WAIT, &ed->arch.arch_vmx.flags)) {
         if (p->state != STATE_IORESP_READY) {
@@ -337,6 +343,7 @@ void vmx_intr_assist(struct exec_domain *d)
 {
     int highest_vector = find_highest_pending_irq(d);
     unsigned long intr_fields, eflags;
+    struct vmx_virpit_t *vpit = &(d->arch.arch_vmx.vmx_platform.vmx_pit);
 
     if (highest_vector == -1)
         return;
@@ -355,11 +362,18 @@ void vmx_intr_assist(struct exec_domain *d)
         return;
     }
         
-    clear_highest_bit(d, highest_vector); 
+    if (vpit->pending_intr_nr && highest_vector == vpit->vector)
+        vpit->pending_intr_nr--;
+    else
+        clear_highest_bit(d, highest_vector); 
+
     intr_fields = (INTR_INFO_VALID_MASK | INTR_TYPE_EXT_INTR | highest_vector);
     __vmwrite(VM_ENTRY_INTR_INFO_FIELD, intr_fields);
 
     __vmwrite(GUEST_INTERRUPTIBILITY_INFO, 0);
+
+    if (highest_vector == vpit->vector)
+        vpit->inject_point = NOW();
 
     return;
 }
