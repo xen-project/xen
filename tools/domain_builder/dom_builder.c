@@ -238,7 +238,7 @@ out:
  * manner. this way, many potentially messy things are avoided...
  */ 
 #define PAGE_TO_VADDR(_pfn) ((void *)(dom_mem->vaddr + ((_pfn) * PAGE_SIZE)))
-static dom_meminfo_t *setup_guestos(int dom, int kernel_fd, 
+static dom_meminfo_t *setup_guestos(int dom, int kernel_fd, int initrd_fd,
     unsigned long virt_load_addr, size_t ksize, dom_mem_t *dom_mem)
 {
     dom_meminfo_t *meminfo;
@@ -259,6 +259,8 @@ static dom_meminfo_t *setup_guestos(int dom, int kernel_fd,
     page_array  = malloc(dom_mem->tot_pages * 4);
     pgt_updates = (page_update_request_t *)dom_mem->vaddr;
     alloc_index = dom_mem->tot_pages - 1;
+
+    memset(meminfo, 0, sizeof(meminfo));
 
     memcpy(page_array, (void *)dom_mem->vaddr, dom_mem->tot_pages * 4);
 
@@ -365,6 +367,31 @@ static dom_meminfo_t *setup_guestos(int dom, int kernel_fd,
         goto out;
     }
 
+    if( initrd_fd )
+      {
+	struct stat stat;
+	unsigned long isize;
+
+	if(fstat(initrd_fd, &stat) < 0){
+	  perror(PERR_STRING);
+	  close(initrd_fd);
+	  goto out;
+	}
+	isize = stat.st_size;
+
+	if( read(initrd_fd, ((char *)dom_mem->vaddr)+ksize, isize) != isize )
+	  {
+	    dberr("Error reading initrd image, could not"
+		  " read the whole image. Terminating.\n");
+	    goto out;
+	  }
+
+	meminfo->virt_mod_addr = virt_load_addr + ksize;
+	meminfo->virt_mod_len  = isize;
+
+      }
+
+
     ret = meminfo;
 out:
 
@@ -404,16 +431,20 @@ int main(int argc, char **argv)
     size_t ksize;
     unsigned long load_addr;
     char status[1024];
-    int kernel_fd;
+    int kernel_fd, initrd_fd = 0;
     int count;
     int cmd_len;
     int rc = -1;
+    int args_start = 4;
+    char initrd_name[1024];
 
     unsigned long addr;
 
+    /**** this argument parsing code is really _gross_. rewrite me! ****/
+
     if(argc < 4) {
         dberr("Usage: dom_builder <kbytes_mem> <image> <num_vifs> "
-	      "<boot_params>\n");
+	      "[<initrd=initrd_name>] <boot_params>\n");
         goto out;
     }
 
@@ -434,8 +465,22 @@ int main(int argc, char **argv)
 		   dom_data->domain, &dom_os_image))
         goto out;
 
+    if( strncmp("initrd=", argv[args_start], 7) == 0 )
+      {
+	strncpy( initrd_name, argv[args_start]+7, sizeof(initrd_name) );
+	initrd_name[sizeof(initrd_name)-1] = 0;
+	printf("initrd present, name = %s\n", initrd_name );
+	args_start++;
+
+	initrd_fd = open(initrd_name, O_RDONLY);
+	if(initrd_fd < 0){
+	  perror(PERR_STRING);
+	  goto out;
+	}
+      }
+
     /* the following code does the actual domain building */
-    meminfo = setup_guestos(dom_data->domain, kernel_fd, load_addr, 
+    meminfo = setup_guestos(dom_data->domain, kernel_fd, initrd_fd, load_addr, 
 			    ksize, &dom_os_image); 
     
     /* and unmap the new domain's memory image since we no longer need it */
@@ -450,7 +495,7 @@ int main(int argc, char **argv)
     meminfo->num_vifs = atoi(argv[3]);
     meminfo->cmd_line[0] = '\0';
     cmd_len = 0;
-    for(count = 4; count < argc; count++){
+    for(count = args_start; count < argc; count++){
         if(cmd_len + strlen(argv[count]) > MAX_CMD_LEN - 1){
             dberr("Size of image boot params too big!\n");
             break;

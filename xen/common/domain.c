@@ -333,7 +333,16 @@ int final_setup_guestos(struct task_struct * p, dom_meminfo_t * meminfo)
     virt_startinfo_addr->shared_info = (shared_info_t *)meminfo->virt_shinfo_addr;
     virt_startinfo_addr->pt_base = meminfo->virt_load_addr + 
                     ((p->tot_pages - 1) << PAGE_SHIFT);
-    
+   
+    /* module size and length */
+
+    virt_startinfo_addr->mod_start = meminfo->virt_mod_addr;
+    virt_startinfo_addr->mod_len   = meminfo->virt_mod_len;
+
+	
+    if( virt_startinfo_addr->mod_len )
+	printk("Initrd module present %08x (%08x)\n",virt_startinfo_addr->mod_start, virt_startinfo_addr->mod_len);	
+ 
     /* Add virtual network interfaces and point to them in startinfo. */
     while (meminfo->num_vifs-- > 0) {
         net_vif = create_net_vif(p->domain);
