@@ -30,7 +30,12 @@
 #include <xen/irq.h>
 #include <asm/domain_page.h>
 
-extern char opt_badpage[];
+/*
+ * Comma-separated list of hexadecimal page numbers containing bad bytes.
+ * e.g. 'badpage=0x3f45,0x8a321'.
+ */
+static char opt_badpage[100] = "";
+string_param("badpage", opt_badpage);
 
 /*********************
  * ALLOCATION BITMAP

@@ -28,8 +28,10 @@
 #include <asm/atomic.h>
 #include <public/dom0_ops.h>
 
-extern unsigned int opt_tbuf_size;
-        
+/* opt_tbuf_size: trace buffer size (in pages) */
+static unsigned int opt_tbuf_size = 10;
+integer_param("tbuf_size", opt_tbuf_size);
+
 /* Pointers to the meta-data objects for all system trace buffers */
 struct t_buf *t_bufs[NR_CPUS];
 
