@@ -1,0 +1,205 @@
+###########################################
+Xeno HOWTO
+
+University of Cambridge Computer Laboratory
+
+http://www.cl.cam.ac.uk/netos/xen
+#############################
+
+
+Get Xeno Source Codes
+==========================
+
+The public master BK repository for the 1.1 release lives at:
+'bk://xen.bkbits.net/xeno-1.1.bk'
+
+To fetch a local copy, first download the BitKeeper tools at:
+http://www.bitmover.com/download with username 'bitkeeper' and
+password 'get bitkeeper'.
+
+Then install it and run:
+# cd /
+# bk clone bk://xen.bkbits.net/xeno-1.1.bk
+
+Under your current directory, a new directory named 'xeno-1.1.bk' has
+been created, which contains all the source codes for Xen and
+XenoLinux. Here we suppose you put it under '/'.
+
+To get newest changes to the repository, run
+# cd /xeno-1.1.bk
+# bk pull
+
+
+Build Xen
+=============================
+
+Hint: To see how to build Xen and all the control tools, inspect the
+tools/misc/xen-clone script in the BK repository. This script can be
+used to clone the repostitory and perform a full build.
+
+To build Xen manually:
+
+# cd /xeno-1.1.bk/xen
+# make clean
+# make
+
+This will (should) produce a file called 'image' in the current
+directory.  This is the ELF 32-bit LSB executable file of Xen.  You
+can also find a gzip version, named 'image.gz'.
+
+Hint: There is a 'make install' rule which also and then copies it to
+../../install ; if this suits your setup, go for it.
+
+
+Build XenoLinux
+==============================
+
+This is a little more involved since the repository only contains a
+"sparse" tree -- this is essentially an 'overlay' on a standard linux
+kernel source tree. It contains only those files currently 'in play'
+which are either modified versions of files in the vanilla linux tree,
+or brand new files specific to XenoLinux.
+
+So, first you need a vanilla linux-2.4.22 tree, which is located at:
+http://www.kernel.org/pub/linux/kernel/v2.4
+
+Then:
+  # mv linux-2.4.22.tar.gz /xeno-1.1.bk
+  # cd /xeno-1.1.bk
+  # tar -zxvf linux-2.4.22.tar.gz
+
+You'll find a new directory 'linux-2.4.22' which contains all
+the vanilla Linux 2.4.22 kernel source codes.
+
+Hint: You should choose the vanilla linux kernel tree that has the
+same version as the "sparse" tree.
+
+Next, you need to 'overlay' this sparse tree on the full vanilla Linux
+kernel tree:
+
+  # cd /xeno-1.1.bk/xenolinux-2.4.22-sparse
+  # ./mkbuildtree ../linux-2.4.22
+
+Finally, rename the buildtree since it is now a xenolinux buildtree. 
+
+  # cd /xeno-1.1.bk
+  # mv linux-2.4.22 xenolinux-2.4.22
+
+Now that the buildtree is there, you can build the xenolinux kernel. 
+
+  # cd /xeno-1.1.bk/xenolinux-2.4.22
+  # ARCH=xeno make xconfig   { or menuconfig, or oldconfig, or config }  
+  # ARCH=xeno make dep bzImage
+
+Assuming the build works, you'll end up with
+/xeno-1.1.bk/xenolinux-2.4.22/arch/xeno/boot/image.gz
+This is the gzip version of XenoLinux kernel image.
+
+
+Build the Domain Control Tools
+==============================
+
+Under '/xeno-1.1.bk/tools', there are four sub-directories:
+'balloon', 'control', 'internal' and 'misc', each containing
+a group of tools. You can enter any of the four sub-directories
+and type 'make' to compile the corresponding group of tools.
+Or you can type 'make' under '/xeno-1.1.bk/tools' to compile
+all the tools.
+
+Particularly, in order to compile tools under 'control', you
+must have Apache Ant installed. Latest binary can be found at
+'http://ant.apache.org/bindownload.cgi'. Besides, the Java
+codes under 'control' are quite broken. You may encounter
+compilation errors. For now, it's wise to skip 'control'.
+
+To summarize:
+
+# cd /xeno-1.1.bk/tools/balloon
+# make
+# make install
+# cd /xeno-1.1.bk/tools/internal
+# make
+# make install
+# cd /xeno-1.1.bk/tools/misc
+# make
+# make install
+# cd /install/bin
+# cp * /usr/local/bin
+
+
+Installation
+==============================
+
+First:
+# cp /xen-1.1.bk/xen/image.gz /boot/xen.gz
+# cp /xen-1.1.bk/xenolinux-2.4.22/arch/xeno/boot/image.gz /boot/xenolinux.gz
+
+Second, you must have 'GNU Grub' installed. Then you need to edit
+the Grub configuration file '/boot/grub/menu.lst'.
+
+A typical Grub menu option might look like:
+
+title Xen / XenoLinux 2.4.22
+        kernel /boot/xen.gz dom0_mem=131072 ser_baud=115200 noht
+        module /boot/xenolinux.gz root=/dev/sda4 ro console=tty0
+
+The first line specifies which Xen image to use, and what command line
+arguments to pass to Xen. In this case we set the maximum amount of
+memory to allocate to domain0, and enable serial I/O at 115200 baud.
+We could also disable smp support (nosmp) or disable hyper-threading
+support (noht). If you have multiple network interface you can use
+ifname=ethXX to select which one to use. If your network card is
+unsupported, use ifname=dummy
+
+The second line specifies which XenoLinux image to use, and the
+standard linux command line arguments to pass to the kernel. In this
+case, we're configuring the root partition and stating that it should
+be mounted read-only (normal practice). 
+
+The following is a list of command line arguments to pass to Xen:
+
+ ignorebiostables Disable parsing of BIOS-supplied tables. This may
+                  help with some chipsets that aren't fully supported
+                  by Xen. If you specify this option then ACPI tables are
+                  also ignored, and SMP support is disabled.
+
+ noreboot         Don't reboot the machine automatically on errors.
+                  This is useful to catch debug output if you aren't
+                  catching console messages via the serial line.
+
+ nosmp            Disable SMP support.
+                  This option is implied by 'ignorebiostables'.
+
+ noacpi           Disable ACPI tables, which confuse Xen on some chipsets.
+                  This option is implied by 'ignorebiostables'.
+
+ watchdog         Enable NMI watchdog which can report certain failures.
+
+ noht             Disable Hyperthreading.
+
+ ifname=ethXX     Select which Ethernet interface to use.
+
+ ifname=dummy     Don't use any network interface.
+
+ ser_baud=xxx     Enable serial I/O and set the baud rate.
+
+ dom0_mem=xxx     Set the maximum amount of memory for domain0.
+
+
+Boot into Domain 0
+==============================
+
+Reboot your computer; After selecting the kernel to boot, stand back and watch Xen boot, closely followed by "domain 0" running the XenoLinux kernel.  Depending on which root partition you have assigned to XenoLinux kernel in Grub configuration file, you can use the corresponding username / password
+to log in.
+
+Once logged in, it should look just like any regular linux box. All
+the usual tools and commands should work as per usual.
+
+
+Using the domain control tools
+==============================
+
+The README.CD file contains some examples of how to use 'xenctl' and
+the other domain control tools. Invoking the tool without any
+arguments prints some usage inforamtion. There's also some
+documentation in the the repository under tools/control/doc
