@@ -266,6 +266,10 @@ void cmain(unsigned long magic, multiboot_info_t *mbi)
 }
 
 
+/*********************************
+ * Various console code follows...
+ */
+
 /* VGA text (mode 3) definitions. */
 #define COLUMNS	    80
 #define LINES	    25
@@ -458,41 +462,6 @@ void printf(const char *fmt, ...)
 }
 
 
-void panic(const char *fmt, ...)
-{
-    va_list args;
-    char buf[128];
-    unsigned long flags;
-    extern void machine_restart(char *);
-    
-    va_start(args, fmt);
-    (void)vsnprintf(buf, sizeof(buf), fmt, args);
-    va_end(args);
-    
-    /* Spit out multiline message in one go. */
-    spin_lock_irqsave(&console_lock, flags);
-    __putstr("\n****************************************\n");
-    __putstr(buf);
-    __putstr("Aieee! CPU");
-    sprintf(buf, "%d", smp_processor_id());
-    __putstr(buf);
-    __putstr(" is toast...\n");
-    __putstr("****************************************\n\n");
-    __putstr("Reboot in five seconds...\n");
-    spin_unlock_irqrestore(&console_lock, flags);
-
-    mdelay(5000);
-    machine_restart(0);
-}
-
-
-/* No-op syscall. */
-asmlinkage long sys_ni_syscall(void)
-{
-    return -ENOSYS;
-}
-
-
 unsigned short compute_cksum(unsigned short *buf, int count)
 {
     unsigned long sum = 0;
@@ -625,11 +594,61 @@ long do_console_write(char *str, unsigned int count)
 }
 
 
+/*********************************
+ * Debugging/tracing/error-report.
+ */
+
+void panic(const char *fmt, ...)
+{
+    va_list args;
+    char buf[128];
+    unsigned long flags;
+    extern void machine_restart(char *);
+    
+    va_start(args, fmt);
+    (void)vsnprintf(buf, sizeof(buf), fmt, args);
+    va_end(args);
+    
+    /* Spit out multiline message in one go. */
+    spin_lock_irqsave(&console_lock, flags);
+    __putstr("\n****************************************\n");
+    __putstr(buf);
+    __putstr("Aieee! CPU");
+    sprintf(buf, "%d", smp_processor_id());
+    __putstr(buf);
+    __putstr(" is toast...\n");
+    __putstr("****************************************\n\n");
+    __putstr("Reboot in five seconds...\n");
+    spin_unlock_irqrestore(&console_lock, flags);
+
+    mdelay(5000);
+    machine_restart(0);
+}
+
+
 void __out_of_line_bug(int line)
 {
     printk("kernel BUG in header file at line %d\n", line);
     BUG();
     for ( ; ; ) continue;
+}
+
+
+/*********************************
+ * Simple syscalls.
+ */
+
+long do_xen_version(int cmd)
+{
+    if ( cmd != 0 )
+        return -ENOSYS;
+    return (XEN_VERSION<<16) | (XEN_SUBVERSION);
+}
+
+long do_ni_syscall(void)
+{
+    /* No-op syscall. */
+    return -ENOSYS;
 }
 
 

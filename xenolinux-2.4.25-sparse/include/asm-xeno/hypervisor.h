@@ -294,14 +294,14 @@ static inline int HYPERVISOR_stop(unsigned long srec)
     return ret;
 }
 
-static inline long HYPERVISOR_set_dom_timer(u64 timeout)
+static inline long HYPERVISOR_set_timer_op(u64 timeout)
 {
     int ret;
     unsigned long timeout_hi = (unsigned long)(timeout>>32);
     unsigned long timeout_lo = (unsigned long)timeout;
     __asm__ __volatile__ (
         TRAP_INSTR
-        : "=a" (ret) : "0" (__HYPERVISOR_set_dom_timer),
+        : "=a" (ret) : "0" (__HYPERVISOR_set_timer_op),
         "b" (timeout_hi), "c" (timeout_lo) : "memory" );
 
     return ret;
@@ -432,6 +432,17 @@ static inline int HYPERVISOR_update_va_mapping(
         panic("Failed update VA mapping: %08lx, %08lx, %08lx",
               page_nr, (new_val).pte_low, flags);
     
+    return ret;
+}
+
+static inline int HYPERVISOR_xen_version(int cmd)
+{
+    int ret;
+    __asm__ __volatile__ (
+        TRAP_INSTR
+        : "=a" (ret) : "0" (__HYPERVISOR_xen_version), 
+        "b" (cmd) : "memory" );
+
     return ret;
 }
 

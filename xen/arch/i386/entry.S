@@ -704,28 +704,29 @@ nmi_io_err:
         
 .data
 ENTRY(hypervisor_call_table)
-        .long SYMBOL_NAME(do_set_trap_table)
+        .long SYMBOL_NAME(do_set_trap_table)     /*  0 */
         .long SYMBOL_NAME(do_mmu_update)
         .long SYMBOL_NAME(do_console_write)
         .long SYMBOL_NAME(do_set_gdt)
         .long SYMBOL_NAME(do_stack_switch)
-        .long SYMBOL_NAME(do_set_callbacks)
+        .long SYMBOL_NAME(do_set_callbacks)      /*  5 */
         .long SYMBOL_NAME(do_net_io_op)
         .long SYMBOL_NAME(do_fpu_taskswitch)
         .long SYMBOL_NAME(do_sched_op)
-        .long SYMBOL_NAME(do_set_timer_op)
         .long SYMBOL_NAME(do_dom0_op)
-        .long SYMBOL_NAME(do_network_op)
+        .long SYMBOL_NAME(do_network_op)         /* 10 */
         .long SYMBOL_NAME(do_block_io_op)
         .long SYMBOL_NAME(do_set_debugreg)
         .long SYMBOL_NAME(do_get_debugreg)
         .long SYMBOL_NAME(do_update_descriptor)
-        .long SYMBOL_NAME(do_set_fast_trap)
+        .long SYMBOL_NAME(do_set_fast_trap)      /* 15 */
         .long SYMBOL_NAME(do_dom_mem_op)
         .long SYMBOL_NAME(do_multicall)
         .long SYMBOL_NAME(do_kbd_op)
         .long SYMBOL_NAME(do_update_va_mapping)
+        .long SYMBOL_NAME(do_set_timer_op)       /* 20 */
         .long SYMBOL_NAME(do_event_channel_op)
+        .long SYMBOL_NAME(do_xen_version)
         .rept NR_syscalls-((.-hypervisor_call_table)/4)
-        .long SYMBOL_NAME(sys_ni_syscall)
+        .long SYMBOL_NAME(do_ni_syscall)
         .endr
