@@ -20,6 +20,7 @@ typedef struct net_vif_st {
     net_ring_t  *net_ring;
     int          id;
     struct sk_buff_head skb_list;
+    unsigned int domain;
     // rules table goes here in next revision.
 } net_vif_t;
 
@@ -32,6 +33,8 @@ extern int sys_vif_count;
 extern net_vif_t *sys_vif_list[];
 
 /* vif prototypes */
-net_ring_t *create_net_vif(int domain);
+net_vif_t *create_net_vif(int domain);
 void destroy_net_vif(struct task_struct *p);
-
+void add_default_net_rule(int vif_id, u32 ipaddr);
+int net_get_target_vif(struct sk_buff *skb);
+void add_default_net_rule(int vif_id, u32 ipaddr);

@@ -44,21 +44,162 @@ typedef struct
 #define TRAP_INSTR "int $0x82"
 
 
+static inline int HYPERVISOR_set_trap_table(trap_info_t *table)
+{
+    int ret;
+    __asm__ __volatile__ (
+        TRAP_INSTR
+        : "=a" (ret) : "0" (__HYPERVISOR_set_trap_table),
+        "b" (table) );
+
+    return ret;
+}
+
+
+static inline int HYPERVISOR_pt_update(page_update_request_t *req, int count)
+{
+    int ret;
+    __asm__ __volatile__ (
+        TRAP_INSTR
+        : "=a" (ret) : "0" (__HYPERVISOR_pt_update), 
+        "b" (req), "c" (count) );
+
+    return ret;
+}
+
+
+static inline int HYPERVISOR_console_write(const char *str, int count)
+{
+    int ret;
+    __asm__ __volatile__ (
+        TRAP_INSTR
+        : "=a" (ret) : "0" (__HYPERVISOR_console_write), 
+        "b" (str), "c" (count) );
+
+
+    return ret;
+}
+
+static inline int HYPERVISOR_set_pagetable(unsigned long ptr)
+{
+    int ret;
+    __asm__ __volatile__ (
+        TRAP_INSTR
+        : "=a" (ret) : "0" (__HYPERVISOR_set_pagetable),
+        "b" (ptr) );
+
+    return ret;
+}
+
+static inline int HYPERVISOR_set_guest_stack(
+    unsigned long ss, unsigned long esp)
+{
+    int ret;
+    __asm__ __volatile__ (
+        TRAP_INSTR
+        : "=a" (ret) : "0" (__HYPERVISOR_set_guest_stack),
+        "b" (ss), "c" (esp) );
+
+    return ret;
+}
+
+static inline int HYPERVISOR_net_update(void)
+{
+    int ret;
+    __asm__ __volatile__ (
+        TRAP_INSTR
+        : "=a" (ret) : "0" (__HYPERVISOR_net_update) );
+
+    return ret;
+}
+
+static inline int HYPERVISOR_fpu_taskswitch(void)
+{
+    int ret;
+    __asm__ __volatile__ (
+        TRAP_INSTR
+        : "=a" (ret) : "0" (__HYPERVISOR_fpu_taskswitch) );
+
+    return ret;
+}
+
+static inline int HYPERVISOR_yield(void)
+{
+    int ret;
+    __asm__ __volatile__ (
+        TRAP_INSTR
+        : "=a" (ret) : "0" (__HYPERVISOR_yield) );
+
+    return ret;
+}
+
+static inline int HYPERVISOR_exit(void)
+{
+    int ret;
+    __asm__ __volatile__ (
+        TRAP_INSTR
+        : "=a" (ret) : "0" (__HYPERVISOR_exit) );
+
+    return ret;
+}
+
+static inline int HYPERVISOR_dom0_op(void *dom0_op)
+{
+    int ret;
+    __asm__ __volatile__ (
+        TRAP_INSTR
+        : "=a" (ret) : "0" (__HYPERVISOR_dom0_op),
+        "b" (dom0_op) );
+
+    return ret;
+}
+
+static inline int HYPERVISOR_network_op(void *network_op)
+{
+    int ret;
+    __asm__ __volatile__ (
+        TRAP_INSTR
+        : "=a" (ret) : "0" (__HYPERVISOR_network_op),
+        "b" (network_op) );
+
+    return ret;
+}
+
+/* Event message note:
+ *
+ * Here, as in the interrupts to the guestos, additional network interfaces
+ * are defined.  These definitions server as placeholders for the event bits,
+ * however, in the code these events will allways be referred to as shifted
+ * offsets from the base NET events.
+ */
+
 /* Events that a guest OS may receive from the hypervisor. */
-#define EVENT_NET_TX  0x01 /* packets for transmission. */
-#define EVENT_NET_RX  0x02 /* empty buffers for receive. */
-#define EVENT_TIMER   0x04 /* a timeout has been updated. */
-#define EVENT_DIE     0x08 /* OS is about to be killed. Clean up please! */
-#define EVENT_BLK_TX  0x10 /* packets for transmission. */
-#define EVENT_BLK_RX  0x20 /* empty buffers for receive. */
+#define EVENT_BLK_TX   0x01 /* packets for transmission. */
+#define EVENT_BLK_RX   0x02 /* empty buffers for receive. */
+#define EVENT_TIMER    0x04 /* a timeout has been updated. */
+#define EVENT_DIE      0x08 /* OS is about to be killed. Clean up please! */
+#define EVENT_NET_TX   0x10 /* packets for transmission. */
+#define EVENT_NET_RX   0x20 /* empty buffers for receive. */
+#define EVENT_NET2_TX  0x40 /* packets for transmission. */
+#define EVENT_NET2_RX  0x80 /* empty buffers for receive. */
+
+/* should these macros and the ones below test for range violation? */
+#define EVENT_NET_TX_FOR_VIF(x)    (EVENT_NET_TX << (2 * x))
+#define EVENT_NET_RX_FOR_VIF(x)    (EVENT_NET_RX << (2 * x))
+
 
 /* Bit offsets, as opposed to the above masks. */
-#define _EVENT_NET_TX 0
-#define _EVENT_NET_RX 1
-#define _EVENT_TIMER  2
-#define _EVENT_DIE    3
-#define _EVENT_BLK_TX 4
-#define _EVENT_BLK_RX 5
+#define _EVENT_BLK_TX  0
+#define _EVENT_BLK_RX  1
+#define _EVENT_TIMER   2
+#define _EVENT_DIE     3
+#define _EVENT_NET_TX  4
+#define _EVENT_NET_RX  5
+#define _EVENT_NET2_TX 6
+#define _EVENT_NET2_RX 7
+
+#define _EVENT_NET_TX_FOR_VIF(x)    (_EVENT_NET_TX + (2 * x))
+#define _EVENT_NET_RX_FOR_VIF(x)    (_EVENT_NET_RX + (2 * x))
 
 /*
  * NB. We expect that this struct is smaller than a page.
@@ -70,7 +211,7 @@ typedef struct shared_info_st {
     /*
      * Hypervisor will only signal event delivery via the "callback
      * exception" when this value is non-zero. Hypervisor clears this when
-     * notiying the guest OS -- thsi prevents unbounded reentrancy and
+     * notiying the guest OS -- this prevents unbounded reentrancy and
      * stack overflow (in this way, acts as an interrupt-enable flag).
      */
     unsigned long events_enable;
