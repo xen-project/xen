@@ -462,6 +462,26 @@ static PyObject *pyxc_bvtsched_domain_get(PyObject *self,
                          "warpu", warpu);
 }
 
+static PyObject *pyxc_evtchn_alloc_unbound(PyObject *self,
+                                           PyObject *args,
+                                           PyObject *kwds)
+{
+    XcObject *xc = (XcObject *)self;
+
+    u32 dom;
+    int port;
+
+    static char *kwd_list[] = { "dom", NULL };
+
+    if ( !PyArg_ParseTupleAndKeywords(args, kwds, "i", kwd_list, &dom) )
+        return NULL;
+
+    if ( xc_evtchn_alloc_unbound(xc->xc_handle, dom, &port) != 0 )
+        return PyErr_SetFromErrno(xc_error);
+
+    return PyInt_FromLong(port);
+}
+
 static PyObject *pyxc_evtchn_bind_interdomain(PyObject *self,
                                               PyObject *args,
                                               PyObject *kwds)
@@ -469,12 +489,12 @@ static PyObject *pyxc_evtchn_bind_interdomain(PyObject *self,
     XcObject *xc = (XcObject *)self;
 
     u32 dom1 = DOMID_SELF, dom2 = DOMID_SELF;
-    int port1, port2;
+    int port1 = 0, port2 = 0;
 
-    static char *kwd_list[] = { "dom1", "dom2", NULL };
+    static char *kwd_list[] = { "dom1", "dom2", "port1", "port2", NULL };
 
-    if ( !PyArg_ParseTupleAndKeywords(args, kwds, "|ii", kwd_list, 
-                                      &dom1, &dom2) )
+    if ( !PyArg_ParseTupleAndKeywords(args, kwds, "|iiii", kwd_list, 
+                                      &dom1, &dom2, &port1, &port2) )
         return NULL;
 
     if ( xc_evtchn_bind_interdomain(xc->xc_handle, dom1, 
@@ -965,6 +985,13 @@ static PyMethodDef pyxc_methods[] = {
       "Returns [dict]:\n"
       " slice  [long]: Scheduler time slice.\n" },    
 
+    { "evtchn_alloc_unbound", 
+      (PyCFunction)pyxc_evtchn_alloc_unbound,
+      METH_VARARGS | METH_KEYWORDS, "\n"
+      "Allocate an unbound local port that will await a remote connection.\n"
+      " dom [int]: Remote domain to accept connections from.\n\n"
+      "Returns: [int] Unbound event-channel port.\n" },
+
     { "evtchn_bind_interdomain", 
       (PyCFunction)pyxc_evtchn_bind_interdomain, 
       METH_VARARGS | METH_KEYWORDS, "\n"
@@ -985,7 +1012,7 @@ static PyMethodDef pyxc_methods[] = {
     { "evtchn_close", 
       (PyCFunction)pyxc_evtchn_close, 
       METH_VARARGS | METH_KEYWORDS, "\n"
-      "Close an event channel.\n"
+      "Close an event channel. If interdomain, sets remote end to 'unbound'.\n"
       " dom  [int, SELF]: Dom-id of one endpoint of the channel.\n"
       " port [int]:       Port-id of one endpoint of the channel.\n\n"
       "Returns: [int] 0 on success; -1 on error.\n" },

@@ -29,6 +29,7 @@
 #define INIT_EVENT_CHANNELS   16
 #define MAX_EVENT_CHANNELS  1024
 
+
 static int get_free_port(struct domain *d)
 {
     int max, port;
@@ -67,15 +68,43 @@ static int get_free_port(struct domain *d)
     return port;
 }
 
+
+static long evtchn_alloc_unbound(evtchn_alloc_unbound_t *alloc)
+{
+    struct domain *d = current;
+    int            port;
+
+    spin_lock(&d->event_channel_lock);
+
+    if ( (port = get_free_port(d)) >= 0 )
+    {
+        d->event_channel[port].state = ECS_UNBOUND;
+        d->event_channel[port].u.unbound.remote_domid = alloc->dom;
+    }
+
+    spin_unlock(&d->event_channel_lock);
+
+    if ( port < 0 )
+        return port;
+
+    alloc->port = port;
+    return 0;
+}
+
+
 static long evtchn_bind_interdomain(evtchn_bind_interdomain_t *bind)
 {
+#define ERROR_EXIT(_errno) do { rc = (_errno); goto out; } while ( 0 )
     struct domain *d1, *d2;
-    int            port1 = 0, port2 = 0;
+    int            port1 = bind->port1, port2 = bind->port2;
     domid_t        dom1 = bind->dom1, dom2 = bind->dom2;
     long           rc = 0;
 
-    if ( !IS_PRIV(current) )
+    if ( !IS_PRIV(current) && (dom1 != DOMID_SELF) )
         return -EPERM;
+
+    if ( (port1 < 0) || (port2 < 0) )
+        return -EINVAL;
 
     if ( dom1 == DOMID_SELF )
         dom1 = current->id;
@@ -103,25 +132,73 @@ static long evtchn_bind_interdomain(evtchn_bind_interdomain_t *bind)
         spin_lock(&d1->event_channel_lock);
     }
 
-    if ( (port1 = get_free_port(d1)) < 0 )
+    /* Obtain, or ensure that we already have, a valid <port1>. */
+    if ( port1 == 0 )
     {
-        rc = port1;
+        if ( (port1 = get_free_port(d1)) < 0 )
+            ERROR_EXIT(port1);
+    }
+    else if ( port1 >= d1->max_event_channel )
+        ERROR_EXIT(-EINVAL);
+
+    /* Obtain, or ensure that we already have, a valid <port2>. */
+    if ( port2 == 0 )
+    {
+        /* Make port1 non-free while we allocate port2 (in case dom1==dom2). */
+        u16 tmp = d1->event_channel[port1].state;
+        d1->event_channel[port1].state = ECS_INTERDOMAIN;
+        port2 = get_free_port(d2);
+        d1->event_channel[port1].state = tmp;
+        if ( port2 < 0 )
+            ERROR_EXIT(port2);
+    }
+    else if ( port2 >= d2->max_event_channel )
+        ERROR_EXIT(-EINVAL);
+
+    /* Validate <dom1,port1>'s current state. */
+    switch ( d1->event_channel[port1].state )
+    {
+    case ECS_FREE:
+        break;
+
+    case ECS_UNBOUND:
+        if ( d1->event_channel[port1].u.unbound.remote_domid != dom2 )
+            ERROR_EXIT(-EINVAL);
+        break;
+
+    case ECS_INTERDOMAIN:
+        rc = ((d1->event_channel[port1].u.interdomain.remote_dom != d2) ||
+              (d1->event_channel[port1].u.interdomain.remote_port != port2)) ?
+            -EINVAL : 0;
         goto out;
+
+    default:
+        ERROR_EXIT(-EINVAL);
     }
 
-    /* 'Allocate' port1 before searching for a free port2. */
-    d1->event_channel[port1].state = ECS_INTERDOMAIN;
-
-    if ( (port2 = get_free_port(d2)) < 0 )
+    /* Validate <dom2,port2>'s current state. */
+    switch ( d2->event_channel[port2].state )
     {
-        d1->event_channel[port1].state = ECS_FREE;
-        rc = port2;
-        goto out;
+    case ECS_FREE:
+        break;
+
+    case ECS_UNBOUND:
+        if ( d2->event_channel[port2].u.unbound.remote_domid != dom1 )
+            ERROR_EXIT(-EINVAL);
+        break;
+
+    default:
+        ERROR_EXIT(-EINVAL);
     }
+
+    /*
+     * Everything checked out okay -- bind <dom1,port1> to <dom2,port2>.
+     */
 
     d1->event_channel[port1].u.interdomain.remote_dom  = d2;
     d1->event_channel[port1].u.interdomain.remote_port = (u16)port2;
-
+    d1->event_channel[port1].state                     = ECS_INTERDOMAIN;
+    
     d2->event_channel[port2].u.interdomain.remote_dom  = d1;
     d2->event_channel[port2].u.interdomain.remote_port = (u16)port1;
     d2->event_channel[port2].state                     = ECS_INTERDOMAIN;
@@ -138,6 +215,7 @@ static long evtchn_bind_interdomain(evtchn_bind_interdomain_t *bind)
     bind->port2 = port2;
 
     return rc;
+#undef ERROR_EXIT
 }
 
 
@@ -295,6 +373,7 @@ static long __evtchn_close(struct domain *d1, int port1)
             BUG();
 
         chn2[port2].state = ECS_UNBOUND;
+        chn2[port2].u.unbound.remote_domid = d1->id;
         break;
 
     default:
@@ -397,6 +476,7 @@ static long evtchn_status(evtchn_status_t *status)
         break;
     case ECS_UNBOUND:
         status->status = EVTCHNSTAT_unbound;
+        status->u.unbound.dom = chn[port].u.unbound.remote_domid;
         break;
     case ECS_INTERDOMAIN:
         status->status = EVTCHNSTAT_interdomain;
@@ -432,6 +512,12 @@ long do_event_channel_op(evtchn_op_t *uop)
 
     switch ( op.cmd )
     {
+    case EVTCHNOP_alloc_unbound:
+        rc = evtchn_alloc_unbound(&op.u.alloc_unbound);
+        if ( (rc == 0) && (copy_to_user(uop, &op, sizeof(op)) != 0) )
+            rc = -EFAULT; /* Cleaning up here would be a mess! */
+        break;
+
     case EVTCHNOP_bind_interdomain:
         rc = evtchn_bind_interdomain(&op.u.bind_interdomain);
         if ( (rc == 0) && (copy_to_user(uop, &op, sizeof(op)) != 0) )
