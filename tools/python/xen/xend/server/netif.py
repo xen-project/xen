@@ -3,6 +3,7 @@
 import random
 
 from twisted.internet import defer
+defer.Deferred.debug = 1
 
 from xen.xend import sxp
 from xen.xend import PrettyPrint
@@ -23,8 +24,8 @@ class NetifControllerFactory(controller.ControllerFactory):
         self.majorTypes = [ CMSG_NETIF_BE ]
 
         self.subTypes = {
-            CMSG_NETIF_BE_CREATE : self.recv_be_create,
-            CMSG_NETIF_BE_CONNECT: self.recv_be_connect,
+            #CMSG_NETIF_BE_CREATE : self.recv_be_create,
+            #CMSG_NETIF_BE_CONNECT: self.recv_be_connect,
             CMSG_NETIF_BE_DRIVER_STATUS_CHANGED: self.recv_be_driver_status_changed,
             }
         self.attached = 1
@@ -83,10 +84,7 @@ class NetifControllerFactory(controller.ControllerFactory):
         """
         return self.dom
 
-    def recv_be_create(self, msg, req):
-        self.callDeferred(0)
-    
-    def recv_be_connect(self, msg, req):
+    def respond_be_connect(self, msg):
         val = unpackMsg('netif_be_connect_t', msg)
         dom = val['domid']
         vif = val['netif_handle']
@@ -94,7 +92,7 @@ class NetifControllerFactory(controller.ControllerFactory):
         if netif:
             netif.send_interface_connected(vif)
         else:
-            print "recv_be_connect> unknown vif=", vif
+            print "respond_be_connect> unknown vif=", vif
             pass
 
     def recv_be_driver_status_changed(self, msg, req):
@@ -168,9 +166,10 @@ class NetDev(controller.Dev):
         def cb_destroy(val):
             self.controller.send_be_destroy(self.vif)
         self.down()
-        d = self.controller.factory.addDeferred()
+        #d = self.controller.factory.addDeferred()
+        d = defer.Deferred()
         d.addCallback(cb_destroy)
-        self.controller.send_be_disconnect(self.vif)
+        self.controller.send_be_disconnect(self.vif, response=d)
         
 
 class NetifController(controller.Controller):
@@ -268,20 +267,19 @@ class NetifController(controller.Controller):
         @param vmac mac address (string)
         """
         self.addDevice(vif, vmac)
+        d = defer.Deferred()
         if recreate:
-            d = defer.Deferred()
             d.callback(self)
         else:
-            d = self.factory.addDeferred()
-            self.send_be_create(vif)
+            self.send_be_create(vif, response=d)
         return d
 
     def reattach_devices(self):
         """Reattach all devices when the back-end control domain has changed.
         """
-        d = self.factory.addDeferred()
+        #d = self.factory.addDeferred()
         self.send_be_create(vif)
-        self.attach_fe_devices(0)
+        self.attach_fe_devices()
 
     def attach_fe_devices(self):
         for dev in self.devices.values():
@@ -310,37 +308,39 @@ class NetifController(controller.Controller):
                         'evtchn'         : dev.evtchn['port1'],
                         'tx_shmem_frame' : val['tx_shmem_frame'],
                         'rx_shmem_frame' : val['rx_shmem_frame'] })
-        self.factory.writeRequest(msg)
+        d = defer.Deferred()
+        d.addCallback(self.factory.respond_be_connect)
+        self.factory.writeRequest(msg, response=d)
 
-    def send_interface_connected(self, vif):
+    def send_interface_connected(self, vif, response=None):
         dev = self.devices[vif]
         msg = packMsg('netif_fe_interface_status_changed_t',
                       { 'handle' : dev.vif,
                         'status' : NETIF_INTERFACE_STATUS_CONNECTED,
                         'evtchn' : dev.evtchn['port2'],
                         'mac'    : dev.mac })
-        self.writeRequest(msg)
+        self.writeRequest(msg, response=response)
 
-    def send_be_create(self, vif):
+    def send_be_create(self, vif, response=None):
         dev = self.devices[vif]
         msg = packMsg('netif_be_create_t',
                       { 'domid'        : self.dom,
                         'netif_handle' : dev.vif,
                         'mac'          : dev.mac })
-        self.factory.writeRequest(msg)
+        self.factory.writeRequest(msg, response=response)
 
-    def send_be_disconnect(self, vif):
+    def send_be_disconnect(self, vif, response=None):
         dev = self.devices[vif]
         msg = packMsg('netif_be_disconnect_t',
                       { 'domid'        : self.dom,
                         'netif_handle' : dev.vif })
-        self.factory.writeRequest(msg)
+        self.factory.writeRequest(msg, response=response)
 
-    def send_be_destroy(self, vif):
+    def send_be_destroy(self, vif, response=None):
         PrettyPrint.prettyprint(self.sxpr())
         dev = self.devices[vif]
         del self.devices[vif]
         msg = packMsg('netif_be_destroy_t',
                       { 'domid'        : self.dom,
                         'netif_handle' : vif })
-        self.factory.writeRequest(msg)
+        self.factory.writeRequest(msg, response=response)

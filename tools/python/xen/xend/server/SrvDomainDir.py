@@ -63,7 +63,8 @@ class SrvDomainDir(SrvDir):
                                    "Invalid configuration")
         try:
             deferred = self.xd.domain_create(config)
-            deferred.addCallback(self._cb_op_create, configstring, req)
+            deferred.addCallback(self._op_create_cb, configstring, req)
+            deferred.addErrback(self._op_create_err, req)
             return deferred
         except Exception, ex:
             print 'op_create> Exception creating domain:'
@@ -75,7 +76,7 @@ class SrvDomainDir(SrvDir):
             #                       str(ex))
                                    
 
-    def _cb_op_create(self, dominfo, configstring, req):
+    def _op_create_cb(self, dominfo, configstring, req):
         """Callback to handle deferred domain creation.
         """
         dom = dominfo.id
@@ -94,6 +95,13 @@ class SrvDomainDir(SrvDir):
             val = out.getvalue()
             out.close()
             return val
+
+    def _op_create_err(self, err, req):
+        """Callback to handle errors in deferred domain creation.
+        """
+        print 'op_create> Deferred Exception creating domain:', err
+        req.setResponseCode(http.BAD_REQUEST, "Error creating domain")
+        return str(err)
 
     def op_restore(self, op, req):
         """Restore a domain from file.

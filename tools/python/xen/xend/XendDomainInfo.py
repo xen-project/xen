@@ -15,6 +15,7 @@ import sys
 import os
 
 from twisted.internet import defer
+defer.Deferred.debug = 1
 
 import xen.lowlevel.xc; xc = xen.lowlevel.xc.new()
 import xen.util.ip
@@ -430,14 +431,18 @@ class XendDomainInfo:
                 raise VmError('unknown image type: ' + image_name)
             image_handler(self, image)
             deferred = self.configure()
+            def cbok(x):
+                print 'vm_create> cbok', x
+                return x
+            def cberr(err):
+                self.destroy()
+                return err
+            deferred.addCallback(cbok)
+            deferred.addErrback(cberr)
         except StandardError, ex:
             # Catch errors, cleanup and re-raise.
             self.destroy()
             raise
-        def cbok(x):
-            print 'vm_create> cbok', x
-            return x
-        deferred.addCallback(cbok)
         print 'vm_create<'
         return deferred
 
@@ -710,6 +715,10 @@ class XendDomainInfo:
             self.name = d['name']
             self.memory = d['memory']/1024
             deferred = self.configure()
+            def cberr(err):
+                self.destroy()
+                return err
+            deferred.addErrback(cberr)
         except StandardError, ex:
             self.destroy()
             raise

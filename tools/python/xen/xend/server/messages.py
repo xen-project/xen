@@ -179,6 +179,12 @@ msg_formats.update(shutdown_formats)
 class Msg:
     pass
 
+_next_msgid = 0
+
+def nextid():
+    global _next_msgid
+    return ++_next_msgid
+
 def packMsg(ty, params):
     """Pack a message.
     Any 'mac' parameter is passed in as an int[6] array and converted.
@@ -188,7 +194,8 @@ def packMsg(ty, params):
 
     returns xu message
     """
-    if DEBUG: print '>packMsg', ty, params
+    msgid = nextid()
+    if DEBUG: print '>packMsg', msgid, ty, params
     (major, minor) = msg_formats[ty]
     args = {}
     for (k, v) in params.items():
@@ -200,7 +207,6 @@ def packMsg(ty, params):
     if DEBUG:
         for (k, v) in args.items():
             print 'packMsg>', k, v, type(v)
-    msgid = 0
     msg = xu.message(major, minor, msgid, args)
     return msg
 
@@ -228,7 +234,9 @@ def unpackMsg(ty, msg):
         args['mac'] = mac
         for k in macs:
             del args[k]
-    if DEBUG: print '<unpackMsg', ty, args
+    if DEBUG:
+        msgid = msg.get_header()['id']
+        print '<unpackMsg', msgid, ty, args
     return args
 
 def msgTypeName(ty, subty):
