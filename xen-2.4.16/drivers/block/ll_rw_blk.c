@@ -31,6 +31,9 @@
 #include <xeno/slab.h>
 #include <xeno/module.h>
 
+/* XXX SMH: temporarily we just dive at xen_block completion handler */
+extern void end_block_io_op(struct buffer_head *bh); 
+
 static void end_buffer_dummy(struct buffer_head *bh, int uptodate)
 {
   /* do nothing */
@@ -1030,6 +1033,8 @@ out:
 	return 0;
 end_io:
 	bh->b_end_io(bh, test_bit(BH_Uptodate, &bh->b_state));
+	/* XXX SMH: do we need this every time? */
+	end_block_io_op(bh);
 	return 0;
 }
 
@@ -1101,6 +1106,8 @@ void generic_make_request (int rw, struct buffer_head * bh)
 
 			/* Yecch again */
 			bh->b_end_io(bh, 0);
+			/* XXX SMH */ 
+			end_block_io_op(bh);
 			return;
 		}
 	}
@@ -1142,10 +1149,6 @@ void generic_make_request (int rw, struct buffer_head * bh)
  */
 void submit_bh(int rw, struct buffer_head * bh)
 {
-	int count = bh->b_size >> 9;
-
-	/* 	printk(KERN_ALERT "submit_bh\n"); */
-
 	if (!test_bit(BH_Lock, &bh->b_state))
 		BUG();
 
@@ -1160,17 +1163,6 @@ void submit_bh(int rw, struct buffer_head * bh)
 	/*	bh->b_rsector = bh->b_blocknr * count; */
 
 	generic_make_request(rw, bh);
-
-#if 0
-	switch (rw) {
-		case WRITE:
-			kstat.pgpgout += count;
-			break;
-		default:
-			kstat.pgpgin += count;
-			break;
-	}
-#endif
 }
 
 /**
@@ -1267,6 +1259,8 @@ void ll_rw_block(int rw, int nr, struct buffer_head * bhs[])
 			BUG();
 	end_io:
 			bh->b_end_io(bh, test_bit(BH_Uptodate, &bh->b_state));
+			/* XXX SMH */
+			end_block_io_op(bh);
 			continue;
 		}
 
@@ -1275,6 +1269,7 @@ void ll_rw_block(int rw, int nr, struct buffer_head * bhs[])
 	return;
 
 sorry:
+	printk("~~~");
 	/* Make sure we don't get infinite dirty retries.. */
 	for (i = 0; i < nr; i++)
 		mark_buffer_clean(bhs[i]);

@@ -326,7 +326,7 @@ static void floppy_off(unsigned int nr);
 
 #elif (MAJOR_NR == XLBLK_MAJOR)
 
-#define DEVICE_NAME "blk"
+#define DEVICE_NAME "xeno disk"
 #define DEVICE_REQUEST do_xlblk_request
 /* #define DEVICE_INTR */
 #define DEVICE_NR(device) (MINOR(device))
