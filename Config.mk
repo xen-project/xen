@@ -10,9 +10,7 @@ override TARGET_SUBARCH  := $(XEN_TARGET_ARCH)
 override COMPILE_ARCH    := $(patsubst x86%,x86,$(XEN_COMPILE_ARCH))
 override TARGET_ARCH     := $(patsubst x86%,x86,$(XEN_TARGET_ARCH))
 
-#
-# Tool configuration Makefile fragment
-#
+# Tools to run on system hosting the build
 HOSTCC     = gcc
 HOSTCFLAGS = -Wall -Wstrict-prototypes -O2 -fomit-frame-pointer 
 
@@ -26,7 +24,6 @@ STRIP      = $(CROSS_COMPILE)strip
 OBJCOPY    = $(CROSS_COMPILE)objcopy
 OBJDUMP    = $(CROSS_COMPILE)objdump
 
-
 ifneq ($(EXTRA_PREFIX),)
 EXTRA_INCLUDES += $(EXTRA_PREFIX)/include
 EXTRA_LIB += $(EXTRA_PREFIX)/lib
@@ -34,7 +31,3 @@ endif
 
 LDFLAGS += $(foreach i, $(EXTRA_LIB), -L$(i)) 
 CFLAGS += $(foreach i, $(EXTRA_INCLUDES), -I$(i))
-
-CFLAGS += -g
-
-

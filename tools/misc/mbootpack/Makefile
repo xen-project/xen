@@ -8,56 +8,36 @@ INSTALL_DIR	= $(INSTALL) -d -m0755
 XEN_ROOT=../../..
 include $(XEN_ROOT)/tools/Rules.mk
 
-CFLAGS   += -Wall -Werror -O3 
-
-INCLUDES += -I $(XEN_XC)
-INCLUDES += -I $(XEN_LIBXC)
-CFLAGS   += $(INCLUDES)
-
-HDRS     = $(wildcard *.h)
-
-TARGETS  = mbootpack
-
-INSTALL_BIN  = mbootpack
-INSTALL_SBIN =
-
 all: build
-build: $(TARGETS)
+build: mbootpack
 
 install: build
-	$(INSTALL_PROG) $(INSTALL_BIN) $(DESTDIR)/usr/bin
+	$(INSTALL_PROG) mbootpack $(DESTDIR)/usr/bin
 
-#
-#  What object files need building for the program
-#
-
-OBJS	:= mbootpack.o buildimage.o
-DEPS	:= mbootpack.d buildimage.d
-
-# 
 #  Tools etc.
-#
-
 RM 	:= rm -f
 GDB	:= gdb
 INCS	:= -I. -I-
 DEFS	:= 
 LDFLAGS	:= 
 CC	:= gcc
-CFLAGS 	:= -W -Wall -Wpointer-arith -Wcast-qual -Wno-unused -Wno-format
+CFLAGS 	:= -Wall -Wpointer-arith -Wcast-qual -Wno-unused -Wno-format
 CFLAGS	+= -Wmissing-prototypes
 #CFLAGS	+= -pipe -g -O0 -Wcast-align
 CFLAGS	+= -pipe -O3 
 
-#
-#  Rules
-#
+#  What object files need building for the program
+OBJS	:= mbootpack.o buildimage.o
+
+# Get gcc to generate the dependencies for us.
+DEPFLAGS = -Wp,-MD,.$(@F).d
+DEPS     = .*.d
 
 mbootpack: $(OBJS)
 	$(CC) -o $@ $(filter-out %.a, $^) $(LDFLAGS)
 
-clean: FRC
-	$(RM) mbootpack *.o *.d bootsect setup bzimage_header.c bin2c
+clean:
+	$(RM) mbootpack *.o $(DEPS) bootsect setup bzimage_header.c bin2c
 
 bootsect: bootsect.S
 	$(CC) $(CFLAGS) $(INCS) $(DEFS) -D__MB_ASM -c bootsect.S -o bootsect.o
@@ -78,16 +58,12 @@ buildimage.c: bzimage_header.c
 	@
 
 %.o: %.S
-	$(CC) $(CFLAGS) $(INCS) $(DEFS) -c $< -o $@
+	$(CC) $(DEPFLAGS) $(CFLAGS) $(INCS) $(DEFS) -c $< -o $@
 
 %.o: %.c
-	$(CC) $(CFLAGS) $(INCS) $(DEFS) -c $< -o $@
+	$(CC) $(DEPFLAGS) $(CFLAGS) $(INCS) $(DEFS) -c $< -o $@
 
-%.d: %.c
-	$(CC) $(CFLAGS) $(INCS) $(DEFS) -M $< > $@
-
-FRC: 
-.PHONY:: all FRC clean gdb
+.PHONY: all clean gdb
 .PRECIOUS: $(OBJS) $(OBJS:.o=.c) $(DEPS)
 .SUFFIXES: 
 
