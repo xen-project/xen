@@ -69,10 +69,23 @@ int xenolinux_block_open(struct inode *inode, struct file *filep)
     short xldev = inode->i_rdev; 
     struct gendisk *gd = xldev_to_gendisk(xldev);
     xl_disk_t *disk = xldev_to_xldisk(inode->i_rdev);
+    short minor = MINOR(xldev); 
 
-    /* Don't allow open if device doesn't exist :-) */
-    if(!gd->part[MINOR(xldev)].nr_sects) 
-	return -ENXIO; // no such device 
+    if(!gd->part[minor].nr_sects) { 
+	/* Device either doesn't exist, or has zero capacity; we use 
+	   a few cheesy heuristics to return the relevant error code */
+	if(disk->capacity || (minor & (gd->max_p - 1))) { 
+	    // we have a real device, but no such partition, or we just 
+	    // have a partition number so guess this is the problem 
+	    return -ENXIO;     // no such device or address 
+	} else if (gd->flags[minor >> gd->minor_shift] & GENHD_FL_REMOVABLE) {
+	    // this is a removable device => assume that media is missing 
+	    return -ENOMEDIUM; // media not present (this is a guess) 
+	} else 
+	    // just go for the general 'no such device' error
+	    return -ENODEV;    // no such device
+    }
+
 
     disk->usage++;
     DPRINTK("xenolinux_block_open\n");
