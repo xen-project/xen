@@ -1,4 +1,5 @@
 
+verbose     ?= n
 debug       ?= n
 debugger    ?= n
 perfc       ?= n
