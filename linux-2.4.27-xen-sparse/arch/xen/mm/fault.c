@@ -84,27 +84,6 @@ asmlinkage void do_page_fault(struct pt_regs *regs,
         error_code &= 3;
         error_code |= (regs->xcs & 2) << 1;
 
-#if MMU_UPDATE_DEBUG > 0
-        if ( (error_code == 0) && (address >= TASK_SIZE) )
-        {
-            unsigned long paddr = __pa(address);
-            int i;
-            for ( i = 0; i < mmu_update_queue_idx; i++ )
-            {
-                if ( update_debug_queue[i].ptr == paddr )
-                {
-                    printk("XXX now(EIP=%08lx:ptr=%08lx) "
-                           "then(%s/%d:p/v=%08lx/%08lx)\n",
-                           regs->eip, address,
-                           update_debug_queue[i].file,
-                           update_debug_queue[i].line,
-                           update_debug_queue[i].ptr,
-                           update_debug_queue[i].val);
-                }
-            }
-        }
-#endif
-
 	if ( flush_page_update_queue() != 0 )
 		return;
 
