@@ -246,9 +246,10 @@ typedef struct {
 #define GNTST_general_error    (-1) /* General undefined error.              */
 #define GNTST_bad_domain       (-2) /* Unrecognsed domain id.                */
 #define GNTST_bad_gntref       (-3) /* Unrecognised or inappropriate gntref. */
-#define GNTST_bad_handle       (-3) /* Unrecognised or inappropriate handle. */
-#define GNTST_no_device_space  (-4) /* Out of space in I/O MMU.              */
-#define GNTST_permission_denied (-5) /* Not enough privilege for operation.  */
+#define GNTST_bad_handle       (-4) /* Unrecognised or inappropriate handle. */
+#define GNTST_bad_virt_addr    (-5) /* Inappropriate virtual address to map. */
+#define GNTST_no_device_space  (-6) /* Out of space in I/O MMU.              */
+#define GNTST_permission_denied (-7) /* Not enough privilege for operation.  */
 
 #define GNTTABOP_error_msgs {                   \
     "okay",                                     \
@@ -256,6 +257,7 @@ typedef struct {
     "unrecognised domain id",                   \
     "invalid grant reference",                  \
     "invalid mapping handle",                   \
+    "invalid virtual address",                  \
     "no spare translation slot in the I/O MMU", \
     "permission denied"                         \
 }

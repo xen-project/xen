@@ -1910,16 +1910,124 @@ int do_mmu_update(
     return rc;
 }
 
+void update_shadow_va_mapping(unsigned long va,
+                              unsigned long val,
+                              struct exec_domain *ed,
+                              struct domain *d)
+{
+    /* This function assumes the caller is holding the domain's BIGLOCK
+     * and is running in a shadow mode
+     */
+
+    unsigned long   sval = 0;
+
+    l1pte_propagate_from_guest(d, &val, &sval);
+
+    if ( unlikely(__put_user(sval, ((unsigned long *)(
+        &shadow_linear_pg_table[l1_linear_offset(va)])))) )
+    {
+        /*
+         * Since L2's are guranteed RW, failure indicates either that the
+         * page was not shadowed, or that the L2 entry has not yet been
+         * updated to reflect the shadow.
+         */
+        l2_pgentry_t gpde = linear_l2_table[l2_table_offset(va)];
+        unsigned long gpfn = l2_pgentry_val(gpde) >> PAGE_SHIFT;
+
+        if (get_shadow_status(d, gpfn))
+        {
+            unsigned long gmfn = __gpfn_to_mfn(d, gpfn);
+            unsigned long *gl1e = map_domain_mem(gmfn << PAGE_SHIFT);
+            unsigned l1_idx = l1_table_offset(va);
+            gl1e[l1_idx] = sval;
+            unmap_domain_mem(gl1e);
+            put_shadow_status(d);
+
+            perfc_incrc(shadow_update_va_fail1);
+        }
+        else
+            perfc_incrc(shadow_update_va_fail2);
+    }
+
+    /*
+     * If we're in log-dirty mode then we need to note that we've updated
+     * the PTE in the PT-holding page. We need the machine frame number
+     * for this.
+     */
+    if ( shadow_mode_log_dirty(d) )
+        mark_dirty(d, va_to_l1mfn(va));
+
+    check_pagetable(d, ed->arch.guest_table, "va"); /* debug */
+}
+
+int update_grant_va_mapping(unsigned long va,
+                            unsigned long _nl1e, 
+                            struct domain *d,
+                            struct exec_domain *ed)
+{
+    /* Caller must:
+     * . own d's BIGLOCK 
+     * . already have 'get_page' correctly on the to-be-installed nl1e
+     * . be responsible for flushing the TLB
+     * . check PTE being installed isn't DISALLOWED
+     */
+
+    /* Return value:
+     * -ve : error
+     * 0   : done
+     * GNTUPDVA_prev_ro : done & prior mapping was ro to same frame
+     * GNTUPDVA_prev_rw : done & prior mapping was rw to same frame
+     */
+
+    int             rc = 0;
+    l1_pgentry_t   *pl1e;
+    unsigned long   _ol1e;
+
+    cleanup_writable_pagetable(d);
+
+    pl1e = &linear_pg_table[l1_linear_offset(va)];
+
+    if ( unlikely(__get_user(_ol1e, (unsigned long *)pl1e) != 0) )
+        rc = -EINVAL;
+    else
+    {
+        l1_pgentry_t ol1e = mk_l1_pgentry(_ol1e);
+
+        if ( update_l1e(pl1e, ol1e, mk_l1_pgentry(_nl1e)) )
+        {
+            /* overwrote different mfn?  */
+            if (((_ol1e ^ _nl1e) & (PADDR_MASK & PAGE_MASK)) != 0)
+            {
+                rc = 0;
+                put_page_from_l1e(ol1e, d);
+            }
+            else
+                rc = ((_ol1e & _PAGE_RW) ? GNTUPDVA_prev_rw
+                                         : GNTUPDVA_prev_ro );
+                /* use return code to avoid nasty grant table
+                 * slow path in put_page_from_l1e -- caller
+                 * must handle ref count instead. */
+        }
+        else
+            rc = -EINVAL;
+    }
+
+    if ( unlikely(shadow_mode_enabled(d)) )
+        update_shadow_va_mapping(va, _nl1e, ed, d);
+
+    return rc;
+}
+
 
 int do_update_va_mapping(unsigned long va,
                          unsigned long val, 
                          unsigned long flags)
 {
-    struct exec_domain *ed = current;
-    struct domain *d = ed->domain;
-    int err = 0;
-    unsigned int cpu = ed->processor;
-    unsigned long deferred_ops;
+    struct exec_domain      *ed  = current;
+    struct domain           *d   = ed->domain;
+    unsigned int             cpu = ed->processor;
+    unsigned long            deferred_ops;
+    int                      rc = 0;
 
     perfc_incrc(calls_to_update_va);
 
@@ -1940,50 +2048,10 @@ int do_update_va_mapping(unsigned long va,
 
     if ( unlikely(!mod_l1_entry(&linear_pg_table[l1_linear_offset(va)],
                                 mk_l1_pgentry(val))) )
-        err = -EINVAL;
+        rc = -EINVAL;
 
     if ( unlikely(shadow_mode_enabled(d)) )
-    {
-        unsigned long sval = 0;
-
-        l1pte_propagate_from_guest(d, &val, &sval);
-
-        if ( unlikely(__put_user(sval, ((unsigned long *)(
-            &shadow_linear_pg_table[l1_linear_offset(va)])))) )
-        {
-            /*
-             * Since L2's are guranteed RW, failure indicates either that the
-             * page was not shadowed, or that the L2 entry has not yet been
-             * updated to reflect the shadow.
-             */
-            l2_pgentry_t gpde = linear_l2_table[l2_table_offset(va)];
-            unsigned long gpfn = l2_pgentry_val(gpde) >> PAGE_SHIFT;
-
-            if (get_shadow_status(d, gpfn))
-            {
-                unsigned long gmfn = __gpfn_to_mfn(d, gpfn);
-                unsigned long *gl1e = map_domain_mem(gmfn << PAGE_SHIFT);
-                unsigned l1_idx = l1_table_offset(va);
-                gl1e[l1_idx] = sval;
-                unmap_domain_mem(gl1e);
-                put_shadow_status(d);
-
-                perfc_incrc(shadow_update_va_fail1);
-            }
-            else
-                perfc_incrc(shadow_update_va_fail2);
-        }
-
-        /*
-         * If we're in log-dirty mode then we need to note that we've updated
-         * the PTE in the PT-holding page. We need the machine frame number
-         * for this.
-         */
-        if ( shadow_mode_log_dirty(d) )
-            mark_dirty(d, va_to_l1mfn(va));
-  
-        check_pagetable(d, ed->arch.guest_table, "va"); /* debug */
-    }
+        update_shadow_va_mapping(va, val, ed, d);
 
     deferred_ops = percpu_info[cpu].deferred_ops;
     percpu_info[cpu].deferred_ops = 0;
@@ -1999,7 +2067,7 @@ int do_update_va_mapping(unsigned long va,
     
     UNLOCK_BIGLOCK(d);
 
-    return err;
+    return rc;
 }
 
 int do_update_va_mapping_otherdomain(unsigned long va,

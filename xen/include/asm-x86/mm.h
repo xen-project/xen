@@ -341,4 +341,14 @@ void audit_domains(void);
 
 void propagate_page_fault(unsigned long addr, u16 error_code);
 
+/* update_grant_va_mapping
+ * Caller must own d's BIGLOCK, is responsible for flushing the TLB,
+ * and have already get_page'd */
+int update_grant_va_mapping(unsigned long va,
+                            unsigned long val,
+                            struct domain *d,
+                            struct exec_domain *ed);
+#define GNTUPDVA_prev_ro 1
+#define GNTUPDVA_prev_rw 2
+
 #endif /* __ASM_X86_MM_H__ */
