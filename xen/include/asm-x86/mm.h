@@ -370,14 +370,12 @@ extern vm_assist_info_t vm_assist_info[];
 
 
 /* Writable Pagetables */
-#define	PTWR_NR_WRITABLES 1
 typedef struct {
-    unsigned long disconnected;
+    long disconnected_pteidx;
     l1_pgentry_t disconnected_page[ENTRIES_PER_L1_PAGETABLE];
-    unsigned long writable_l1;
-    unsigned long writables[PTWR_NR_WRITABLES];
-    int writable_idx;
-    l1_pgentry_t writable_page[PTWR_NR_WRITABLES][ENTRIES_PER_L1_PAGETABLE];
+    unsigned long disconnected_l1va;
+    unsigned long writable_l1va;
+    l1_pgentry_t writable_page[ENTRIES_PER_L1_PAGETABLE];
 } __cacheline_aligned ptwr_info_t;
 
 extern ptwr_info_t ptwr_info[];
@@ -385,19 +383,19 @@ extern ptwr_info_t ptwr_info[];
 #define PTWR_CLEANUP_ACTIVE	1
 #define PTWR_CLEANUP_INACTIVE	2
 
-void ptwr_reconnect_disconnected(unsigned long addr);
+void ptwr_reconnect_disconnected(void);
 void ptwr_flush_inactive(void);
 int ptwr_do_page_fault(unsigned long);
 
-#define __cleanup_writable_pagetable(_what)                               \
-do {                                                                      \
-    int cpu = smp_processor_id();                                         \
-    if ((_what) & PTWR_CLEANUP_ACTIVE)                                    \
-        if (ptwr_info[cpu].disconnected != ENTRIES_PER_L2_PAGETABLE)      \
-            ptwr_reconnect_disconnected(0L);                              \
-    if ((_what) & PTWR_CLEANUP_INACTIVE)                                  \
-        if (ptwr_info[cpu].writable_idx)                                  \
-            ptwr_flush_inactive();                                        \
+#define __cleanup_writable_pagetable(_what)                                 \
+do {                                                                        \
+    int cpu = smp_processor_id();                                           \
+    if ((_what) & PTWR_CLEANUP_ACTIVE)                                      \
+        if (ptwr_info[cpu].disconnected_pteidx >= 0)                        \
+            ptwr_reconnect_disconnected();                                  \
+    if ((_what) & PTWR_CLEANUP_INACTIVE)                                    \
+        if (ptwr_info[cpu].writable_l1va)                                   \
+            ptwr_flush_inactive();                                          \
 } while ( 0 )
 
 #define cleanup_writable_pagetable(_d, _w)                                \

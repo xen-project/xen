@@ -1486,8 +1486,8 @@ int do_update_va_mapping_otherdomain(unsigned long page_nr,
 ptwr_info_t ptwr_info[NR_CPUS] =
     { [ 0 ... NR_CPUS-1 ] =
       {
-          .disconnected = ENTRIES_PER_L2_PAGETABLE,
-          .writable_idx = 0,
+          .disconnected_pteidx = -1,
+          .writable_l1va = 0,
       }
     };
 
@@ -1498,7 +1498,7 @@ int ptwr_debug = 0;
 #define PTWR_PRINTK(x)
 #endif
 
-void ptwr_reconnect_disconnected(unsigned long addr)
+void ptwr_reconnect_disconnected(void)
 {
     unsigned long pte;
     unsigned long pfn;
@@ -1508,11 +1508,11 @@ void ptwr_reconnect_disconnected(unsigned long addr)
     int cpu = smp_processor_id();
     int i;
     unsigned long *writable_pte = (unsigned long *)&linear_pg_table
-        [ptwr_info[cpu].writable_l1>>PAGE_SHIFT];
+        [ptwr_info[cpu].disconnected_l1va>>PAGE_SHIFT];
 
-    PTWR_PRINTK(("[A] page fault in disconn space: addr %08lx space %08lx\n",
-                 addr, ptwr_info[cpu].disconnected << L2_PAGETABLE_SHIFT));
-    pl2e = &linear_l2_table[ptwr_info[cpu].disconnected];
+    PTWR_PRINTK(("[A] page fault in disconn space %08lx\n",
+                 ptwr_info[cpu].disconnected_pteidx << L2_PAGETABLE_SHIFT));
+    pl2e = &linear_l2_table[ptwr_info[cpu].disconnected_pteidx];
 
     if (__get_user(pte, writable_pte)) {
         MEM_LOG("ptwr: Could not read pte at %p\n", writable_pte);
@@ -1558,21 +1558,21 @@ void ptwr_reconnect_disconnected(unsigned long addr)
                  frame_table[pfn].u.inuse.type_info,
                  frame_table[pfn].count_info,
                  frame_table[pfn].u.inuse.domain->domain));
-    ptwr_info[cpu].disconnected = ENTRIES_PER_L2_PAGETABLE;
+    ptwr_info[cpu].disconnected_pteidx = -1;
     /* make pt page write protected */
     if (__get_user(pte, writable_pte)) {
         MEM_LOG("ptwr: Could not read pte at %p\n", writable_pte);
         domain_crash();
     }
-    PTWR_PRINTK(("[A] writable_l1 at %p is %08lx\n",
+    PTWR_PRINTK(("[A] disconnected_l1va at %p is %08lx\n",
                  writable_pte, pte));
     pte &= ~_PAGE_RW;
     if (__put_user(pte, writable_pte)) {
         MEM_LOG("ptwr: Could not update pte at %p\n", writable_pte);
         domain_crash();
     }
-    __flush_tlb_one(ptwr_info[cpu].writable_l1);
-    PTWR_PRINTK(("[A] writable_l1 at %p now %08lx\n",
+    __flush_tlb_one(ptwr_info[cpu].disconnected_l1va);
+    PTWR_PRINTK(("[A] disconnected_l1va at %p now %08lx\n",
                  writable_pte, pte));
     /* and try again */
     return;
@@ -1584,48 +1584,47 @@ void ptwr_flush_inactive(void)
     struct pfn_info *page;
     l1_pgentry_t *pl1e;
     int cpu = smp_processor_id();
-    int i, idx;
+    int i;
 
-    for (idx = 0; idx < ptwr_info[cpu].writable_idx; idx++) {
-        unsigned long *writable_pte = (unsigned long *)&linear_pg_table
-            [ptwr_info[cpu].writables[idx]>>PAGE_SHIFT];
-        if (__get_user(pte, writable_pte)) {
-            MEM_LOG("ptwr: Could not read pte at %p\n", writable_pte);
-            domain_crash();
-        }
-        pfn = pte >> PAGE_SHIFT;
-        page = &frame_table[pfn];
-        PTWR_PRINTK(("[I] alloc l1 page %p\n", page));
-
-        pl1e = map_domain_mem(pfn << PAGE_SHIFT);
-        for ( i = 0; i < ENTRIES_PER_L1_PAGETABLE; i++ ) {
-            l1_pgentry_t ol1e, nl1e;
-            ol1e = ptwr_info[cpu].writable_page[idx][i];
-            nl1e = pl1e[i];
-            if (likely(l1_pgentry_val(ol1e) == l1_pgentry_val(nl1e)))
-                continue;
-            if (unlikely(l1_pgentry_val(ol1e) & _PAGE_PRESENT))
-                put_page_from_l1e(ol1e, current);
-            if (unlikely(!get_page_from_l1e(nl1e, current))) {
-                MEM_LOG("ptwr: Could not re-validate l1 page\n");
-                domain_crash();
-            }
-        }
-        unmap_domain_mem(pl1e);
-
-        /* make pt page writable */
-        PTWR_PRINTK(("[I] writable_l1 at %p is %08lx\n",
-                     writable_pte, pte));
-        pte &= ~_PAGE_RW;
-        if (__put_user(pte, writable_pte)) {
-            MEM_LOG("ptwr: Could not update pte at %p\n", writable_pte);
-            domain_crash();
-        }
-        __flush_tlb_one(ptwr_info[cpu].writables[idx]);
-        PTWR_PRINTK(("[I] writable_l1 at %p now %08lx\n",
-                     writable_pte, pte));
+    unsigned long *writable_pte = (unsigned long *)&linear_pg_table
+        [ptwr_info[cpu].writable_l1va>>PAGE_SHIFT];
+    if (__get_user(pte, writable_pte)) {
+        MEM_LOG("ptwr: Could not read pte at %p\n", writable_pte);
+        domain_crash();
     }
-    ptwr_info[cpu].writable_idx = 0;
+    pfn = pte >> PAGE_SHIFT;
+    page = &frame_table[pfn];
+    PTWR_PRINTK(("[I] alloc l1 page %p\n", page));
+
+    pl1e = map_domain_mem(pfn << PAGE_SHIFT);
+    for ( i = 0; i < ENTRIES_PER_L1_PAGETABLE; i++ ) {
+        l1_pgentry_t ol1e, nl1e;
+        ol1e = ptwr_info[cpu].writable_page[i];
+        nl1e = pl1e[i];
+        if (likely(l1_pgentry_val(ol1e) == l1_pgentry_val(nl1e)))
+            continue;
+        if (unlikely(l1_pgentry_val(ol1e) & _PAGE_PRESENT))
+            put_page_from_l1e(ol1e, current);
+        if (unlikely(!get_page_from_l1e(nl1e, current))) {
+            MEM_LOG("ptwr: Could not re-validate l1 page\n");
+            domain_crash();
+        }
+    }
+    unmap_domain_mem(pl1e);
+
+    /* make pt page writable */
+    PTWR_PRINTK(("[I] disconnected_l1va at %p is %08lx\n",
+                 writable_pte, pte));
+    pte &= ~_PAGE_RW;
+    if (__put_user(pte, writable_pte)) {
+        MEM_LOG("ptwr: Could not update pte at %p\n", writable_pte);
+        domain_crash();
+    }
+    __flush_tlb_one(ptwr_info[cpu].writable_l1va);
+    PTWR_PRINTK(("[I] disconnected_l1va at %p now %08lx\n",
+                 writable_pte, pte));
+
+    ptwr_info[cpu].writable_l1va = 0;
 }
 
 int ptwr_do_page_fault(unsigned long addr)
@@ -1669,24 +1668,21 @@ int ptwr_do_page_fault(unsigned long addr)
                 PTWR_PRINTK(("[I] freeing l1 page %p taf %08x/%08x\n", page,
                              page->u.inuse.type_info,
                              page->count_info));
-                if (ptwr_info[cpu].writable_idx == PTWR_NR_WRITABLES)
+                if (ptwr_info[cpu].writable_l1va)
                     ptwr_flush_inactive();
-                ptwr_info[cpu].writables[ptwr_info[cpu].writable_idx] = addr;
+                ptwr_info[cpu].writable_l1va = addr | 1;
 
                 pl1e = map_domain_mem(pfn << PAGE_SHIFT);
-                memcpy(&ptwr_info[cpu].writable_page[
-                           ptwr_info[cpu].writable_idx][0],
+                memcpy(&ptwr_info[cpu].writable_page[0],
                        pl1e, ENTRIES_PER_L1_PAGETABLE * sizeof(l1_pgentry_t));
                 unmap_domain_mem(pl1e);
-
-                ptwr_info[cpu].writable_idx++;
             }
             else
             {
                 l2_pgentry_t nl2e;
                 l1_pgentry_t *pl1e;
-                if ( ptwr_info[cpu].disconnected != ENTRIES_PER_L2_PAGETABLE )
-                    ptwr_reconnect_disconnected(addr);
+                if ( ptwr_info[cpu].disconnected_pteidx >= 0 )
+                    ptwr_reconnect_disconnected();
                 PTWR_PRINTK(("[A]    pl2e %p l2e %08lx pfn %08lx "
                              "taf %08x/%08x/%u\n", pl2e, l2_pgentry_val(*pl2e),
                              l1_pgentry_val(linear_pg_table[(unsigned long)pl2e
@@ -1699,14 +1695,14 @@ int ptwr_do_page_fault(unsigned long addr)
                 nl2e = mk_l2_pgentry((l2_pgentry_val(*pl2e) & ~_PAGE_PRESENT));
                 update_l2e(pl2e, *pl2e, nl2e);
 
-                ptwr_info[cpu].disconnected =
+                ptwr_info[cpu].disconnected_pteidx =
                     (page->u.inuse.type_info & PGT_va_mask) >> PGT_va_shift;
                 PTWR_PRINTK(("[A] now pl2e %p l2e %08lx              "
                              "taf %08x/%08x/%u\n", pl2e, l2_pgentry_val(*pl2e),
                              frame_table[pfn].u.inuse.type_info,
                              frame_table[pfn].count_info,
                              frame_table[pfn].u.inuse.domain->domain));
-                ptwr_info[cpu].writable_l1 = addr;
+                ptwr_info[cpu].disconnected_l1va = addr;
                 pl1e = map_domain_mem(l2_pgentry_to_pagenr(nl2e) <<
                                       PAGE_SHIFT);
                 memcpy(&ptwr_info[cpu].disconnected_page[0], pl1e,
@@ -1739,34 +1735,31 @@ void ptwr_status(void)
     l2_pgentry_t *pl2e;
     int cpu = smp_processor_id();
 
-    for ( i = 0; i < ptwr_info[cpu].writable_idx; i++ )
-    {
-        unsigned long *writable_pte = (unsigned long *)&linear_pg_table
-            [ptwr_info[cpu].writables[i]>>PAGE_SHIFT];
+    unsigned long *writable_pte = (unsigned long *)&linear_pg_table
+        [ptwr_info[cpu].writable_l1va>>PAGE_SHIFT];
 
-        if ( __get_user(pte, writable_pte) ) {
-            MEM_LOG("ptwr: Could not read pte at %p\n", writable_pte);
-            domain_crash();
-        }
-
-        pfn = pte >> PAGE_SHIFT;
-        page = &frame_table[pfn];
-        printk("need to alloc l1 page %p\n", page);
-        /* make pt page writable */
-        printk("need to make read-only l1-page at %p is %08lx\n",
-               writable_pte, pte);
+    if ( __get_user(pte, writable_pte) ) {
+        MEM_LOG("ptwr: Could not read pte at %p\n", writable_pte);
+        domain_crash();
     }
 
-    if ( ptwr_info[cpu].disconnected == ENTRIES_PER_L2_PAGETABLE )
+    pfn = pte >> PAGE_SHIFT;
+    page = &frame_table[pfn];
+    printk("need to alloc l1 page %p\n", page);
+    /* make pt page writable */
+    printk("need to make read-only l1-page at %p is %08lx\n",
+           writable_pte, pte);
+
+    if ( ptwr_info[cpu].disconnected_pteidx < 0 )
         return;
 
     printk("disconnected space: space %08lx\n",
-           ptwr_info[cpu].disconnected << L2_PAGETABLE_SHIFT);
-    pl2e = &linear_l2_table[ptwr_info[cpu].disconnected];
+           ptwr_info[cpu].disconnected_pteidx << L2_PAGETABLE_SHIFT);
+    pl2e = &linear_l2_table[ptwr_info[cpu].disconnected_pteidx];
 
-    if ( __get_user(pte, (unsigned long *)ptwr_info[cpu].writable_l1) ) {
+    if ( __get_user(pte, (unsigned long *)ptwr_info[cpu].disconnected_l1va) ) {
         MEM_LOG("ptwr: Could not read pte at %p\n", (unsigned long *)
-                ptwr_info[cpu].writable_l1);
+                ptwr_info[cpu].disconnected_l1va);
         domain_crash();
     }
     pfn = pte >> PAGE_SHIFT;
