@@ -45,7 +45,7 @@ struct domain *do_createdomain(domid_t dom_id, unsigned int cpu)
 
     spin_lock_init(&d->page_alloc_lock);
     INIT_LIST_HEAD(&d->page_list);
-    d->max_pages = d->tot_pages = 0;
+    INIT_LIST_HEAD(&d->xenpage_list);
 
     /* Per-domain PCI-device list. */
     spin_lock_init(&d->pcidev_lock);
@@ -53,12 +53,13 @@ struct domain *do_createdomain(domid_t dom_id, unsigned int cpu)
 
     if ( d->domain != IDLE_DOMAIN_ID )
     {
-        if ( init_event_channels(d) != 0 )
+        if ( (init_event_channels(d) != 0) || (grant_table_create(d) != 0) )
         {
+            destroy_event_channels(d);
             free_domain_struct(d);
             return NULL;
         }
-        
+
         /* We use a large intermediate to avoid overflow in sprintf. */
         sprintf(buf, "Domain-%u", dom_id);
         strncpy(d->name, buf, MAX_DOMAIN_NAME);
@@ -256,6 +257,7 @@ void domain_destruct(struct domain *d)
     write_unlock_irqrestore(&tasklist_lock, flags);
 
     destroy_event_channels(d);
+    grant_table_destroy(d);
 
     free_perdomain_pt(d);
     free_xenheap_page((unsigned long)d->shared_info);

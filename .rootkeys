@@ -571,6 +571,7 @@
 3ddb79bdYO5D8Av12NHqPeSviav7cg xen/common/domain.c
 40f2b4a27xPOh3R6zD4M_aabz-TDyg xen/common/elf.c
 3fba5b96H0khoxNiKbjdi0inpXV-Pw xen/common/event_channel.c
+41262590gGIOn-1pvF5KpUu8Wb6_JA xen/common/grant_table.c
 3ddb79bd9drcFPVxd4w2GPOIjLlXpA xen/common/kernel.c
 3e4cd9d8LAAghUY0hNIK72uc2ch_Nw xen/common/keyhandler.c
 3ddb79bduhSEZI8xa7IbGQCpap5y2A xen/common/lib.c
@@ -719,6 +720,7 @@
 3ddb79c2O729EttZTYu1c8LcsUO_GQ xen/include/xen/elf.h
 3ddb79c0HIghfBF8zFUdmXhOU8i6hA xen/include/xen/errno.h
 3ddb79c1W0lQca8gRV7sN6j3iY4Luw xen/include/xen/event.h
+41262590CyJy4vd42dnqzsn8-eeGvw xen/include/xen/grant_table.h
 3ddb79c0GurNF9tDWqQbAwJFH8ugfA xen/include/xen/init.h
 3ddb79c1nzaWu8NoF4xCCMSFJR4MlA xen/include/xen/ioport.h
 3ddb79c2qAxCOABlkKtD8Txohe-qEw xen/include/xen/irq.h
