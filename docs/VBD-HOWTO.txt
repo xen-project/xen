@@ -86,7 +86,7 @@ Virtual Disk Management
 The VD management code runs entirely in userspace.  The code is written in
 Python and can therefore be accessed from custom scripts, as well as from the
 convenience scripts provided.  The underlying VD database is a SQLite database
-in /var/lib/xen_vdisks.sqlite.
+in /var/db/xen_vdisks.sqlite.
 
 The scripts provided are as follows:
 
@@ -131,7 +131,7 @@ More detail:
 
 When you use vd_format.py to add a device to the free space pool, the device is
 logically split up into extents.  These extents are recorded in the Virtual
-Disk Management database in /var/lib/xen_vdisks.sqlite.
+Disk Management database in /var/db/xen_vdisks.sqlite.
 
 When you use vd_create.py to add create a virtual disk, some of the extents in
 the free space pool are reallocated for that virtual disk and a record for that
