@@ -63,8 +63,13 @@ unsigned long arch_get_unmapped_area(struct file *filp, unsigned long addr, unsi
          * is not available. this is the only difference to generic
          * arch_get_unmapped_area. 
          */
-		if ((!vma || addr + len <= vma->vm_start) && !direct_mapped(addr))
+		printk(KERN_ALERT "bd240 debug: gua: vm addr found %lx\n", addr);
+		if ((!vma || addr + len <= vma->vm_start) && !direct_mapped(addr)){
+			printk(KERN_ALERT "bd240 debug: gua: first condition %d\n", !vma || addr + len =< vma->vm-start);
+			printk(KERN_ALERT "bd240 debug: gua: second condition %d\n", direct_mapped(addr));
+
 			return addr;
+		}
 		
         addr = vma->vm_end;
 	}
