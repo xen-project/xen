@@ -701,29 +701,42 @@ found in {\tt xen/include/public/xen.h}.
 \end{quote}
 
 Explicitly updating batches of page table entries is extremely
-efficient, but can require a number of alterations to the guest 
-OS. Using the writable page table mode is recommended 
-for new OS ports. 
+efficient, but can require a number of alterations to the guest
+OS. Using the writable page table mode (Chapter~\ref{c:memory}) is
+recommended for new OS ports.
 
-However in either mode, there are some occasions (in particular
-handling a demand page fault) where a guest OS will wish to 
-modify exactly one PTE rather than a batch. This is catered 
-for by the following hypercall: 
+Regardlesss of which page table update mode is being used, however,
+there are some occasions (notably handling a demand page fault) where
+a guest OS will wish to modify exactly one PTE rather than a
+batch. This is catered for by the following:
 
 \begin{quote} 
 \hypercall{update\_va\_mapping(unsigned long page\_nr, unsigned long
-val, unsigned long flags)}
+val, \\ unsigned long flags)}
+
+Update the currently installed PTE for the page {\tt page\_nr} to 
+{\tt val}. As with {\tt mmu\_update()}, Xen checks the modification 
+is safe before applying it. The {\tt flags} determine which kind
+of TLB flush, if any, should follow the update. 
 
 \end{quote} 
 
-Finally, privileged domains may be able to xxx. 
-
+Finally, sufficiently privileged domains may occasionally wish to manipulate 
+the page tables of others: 
 \begin{quote}
 
 \hypercall{update\_va\_mapping\_otherdomain(unsigned long page\_nr,
 unsigned long val, unsigned long flags, uint16\_t domid)}
 
+Identical to {\tt update\_va\_mapping()} save that it operates 
+on the page tables of the domain with id {\tt domid}. 
+
 \end{quote}
+
+This privileged operation is currently used by backend virtual device
+drivers to efficiently implement `page flipping'.
+
+
 
 \section{Segmentation Support}
 
