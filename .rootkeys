@@ -632,6 +632,7 @@
 3e5a4e67AJPjW-zL7p-xWuA6IVeH1g xenolinux-2.4.22-sparse/include/asm-xeno/ptrace.h
 3e5a4e68uJz-xI0IBVMD7xRLQKJDFg xenolinux-2.4.22-sparse/include/asm-xeno/segment.h
 3e5a4e68Nfdh6QcOKUTGCaYkf2LmYA xenolinux-2.4.22-sparse/include/asm-xeno/smp.h
+3fa8e3f0kBLeE4To2vpdi3cpJbIkbQ xenolinux-2.4.22-sparse/include/asm-xeno/suspend.h
 3e5a4e68mTr0zcp9SXDbnd-XLrrfxw xenolinux-2.4.22-sparse/include/asm-xeno/system.h
 3f1056a9L_kqHcFheV00KbKBzv9j5w xenolinux-2.4.22-sparse/include/asm-xeno/vga.h
 3f689063nhrIRsMMZjZxMFk7iEINqQ xenolinux-2.4.22-sparse/include/asm-xeno/xeno_proc.h
