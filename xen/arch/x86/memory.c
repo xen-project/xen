@@ -1317,7 +1317,7 @@ int do_mmu_update(
             (void)get_user(done, pdone);
     }
 
-    if ( unlikely(!array_access_ok(VERIFY_READ, ureqs, count, sizeof(req))) )
+    if ( unlikely(!array_access_ok(VERIFY_READ, ureqs, count, sizeof(req))) ) {
         UNLOCK_BIGLOCK(d);
         return -EFAULT;
     }
