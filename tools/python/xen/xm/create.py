@@ -8,6 +8,8 @@ from xen.xend import sxp
 from xen.xend import PrettyPrint
 from xen.xend.XendClient import server
 
+from xen.util import console_client
+
 from xen.xm.opts import *
 
 gopts = Opts(use="""[options]
@@ -52,7 +54,7 @@ gopts.opt('name', short='N', val='NAME',
           fn=set_value, default=None,
           use="Domain name.")
 
-gopts.opt('console', short='c',
+gopts.opt('console_autoconnect', short='c',
          fn=set_true, default=0,
          use="Connect to console after domain is created.")
 
@@ -82,8 +84,8 @@ gopts.opt('netif',
 
 gopts.opt('disk', short='d', val='phy:DEV,VDEV,MODE',
          fn=append_value, default=[],
-         use="""Add a disk device to a domain. The physical device is DEV, which
-         is exported to the domain as VDEV. The disk is read-only if MODE
+         use="""Add a disk device to a domain. The physical device is DEV,
+         which is exported to the domain as VDEV. The disk is read-only if MODE
          is 'r', read-write if MODE is 'w'.
          The option may be repeated to add more than one disk.
          """)
@@ -360,7 +362,9 @@ def main(argv):
     if opts.vals.dryrun:
         PrettyPrint.prettyprint(config)
     else:
-        make_domain(opts, config)
+        (d, c) = make_domain(opts, config)
+        if opts.vals.console_autoconnect:
+            console_client.connect('localhost', c)
         
 if __name__ == '__main__':
     main(sys.argv)
