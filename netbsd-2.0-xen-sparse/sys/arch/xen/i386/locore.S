@@ -180,7 +180,12 @@
  * Xen guest identifier and loader selection
  */
 .section __xen_guest
-	.asciz "GUEST_OS=netbsd,GUEST_VER=2.0,XEN_VER=2.0,LOADER=generic"
+	.ascii	"GUEST_OS=netbsd,GUEST_VER=2.0,XEN_VER=2.0"
+	.ascii	",LOADER=generic"
+#if (NKSYMS || defined(DDB) || defined(LKM)) && !defined(SYMTAB_SPACE)
+	.ascii	",BSD_SYMTAB"
+#endif
+	.byte	0
 
 
 /*
@@ -189,7 +194,7 @@
 	.data
 
 	.globl	_C_LABEL(cpu)
-	.globl	_C_LABEL(esym),_C_LABEL(boothowto)
+	.globl	_C_LABEL(boothowto)
 	.globl	_C_LABEL(bootinfo),_C_LABEL(atdevbase)
 #ifdef COMPAT_OLDBOOT
 	.globl	_C_LABEL(bootdev)
@@ -228,7 +233,6 @@ _C_LABEL(lapic_tpr):
 
 _C_LABEL(cpu):		.long	0	# are we 386, 386sx, or 486,
 					#   or Pentium, or..
-_C_LABEL(esym):		.long	0	# ptr to end of syms
 _C_LABEL(atdevbase):	.long	0	# location of start of iomem in virtual
 _C_LABEL(proc0paddr):	.long	0
 _C_LABEL(PTDpaddr):	.long	0	# paddr of PTD, for libkvm
@@ -254,11 +258,6 @@ tmpstk:
 #define	_RELOC(x)	((x))
 #define	RELOC(x)	_RELOC(_C_LABEL(x))
 
-/* XXX assym.h */
-#define MOD_START   48
-#define MOD_LEN     56
-/* XXX assym.h */
-
 	.text
 	.globl	_C_LABEL(kernel_text)
 	.set	_C_LABEL(kernel_text),KERNTEXTOFF
@@ -270,13 +269,6 @@ start:
 	lss	tmpstk,%esp		# bootstrap stack end location
 
 	movl	%esi,%ebx		# save start_info pointer
-
-#if (NKSYMS || defined(DDB) || defined(LKM)) && !defined(SYMTAB_SPACE)
-	/* Save the symbol locations. */
-	movl	MOD_START(%ebx),%esi
-	addl	MOD_LEN(%ebx),%esi
-	movl	%esi,RELOC(esym)
-#endif
 
         /* Clear BSS first so that there are no surprises... */
 	xorl	%eax,%eax

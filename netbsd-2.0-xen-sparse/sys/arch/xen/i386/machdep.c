@@ -2061,7 +2061,6 @@ init386(paddr_t first_avail)
 #if NKSYMS || defined(DDB) || defined(LKM)
 	{
 		extern int end;
-		extern int *esym;
 		struct btinfo_symtab *symtab;
 
 #ifdef DDB
@@ -2077,7 +2076,10 @@ init386(paddr_t first_avail)
 			    (int *)symtab->esym);
 		}
 		else
-			ksyms_init(*(int *)&end, ((int *)&end) + 1, esym);
+			ksyms_init(*(int *)&end, ((int *)&end) + 1,
+				   xen_start_info.mod_start ?
+				   (void *)xen_start_info.mod_start :
+				   (void *)xen_start_info.mfn_list);
 	}
 #endif
 #ifdef DDB
