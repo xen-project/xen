@@ -273,7 +273,26 @@ asmlinkage void do_general_protection(struct pt_regs * regs, long error_code)
     if (!(regs->xcs & 3) || (error_code & 1))
         goto gp_in_kernel;
 
-    if ( (error_code & 2) )
+    /*
+     * Cunning trick to allow arbitrary "INT n" handling.
+     * 
+     * We set DPL == 0 on all vectors in the IDT. This prevents any INT <n>
+     * instruction from trapping to the appropriate vector, when that might not 
+     * be expected by Xen or the guest OS. For example, that entry might be for
+     * a fault handler (unlike traps, faults don't increment EIP), or might
+     * expect an error code on the stack (which a software trap never
+     * provides), or might be a hardware interrupt handler that doesn't like
+     * being called spuriously.  
+     * 
+     * Instead, a GPF occurs with the faulting IDT vector in the error code.
+     * Bit 1 is set to indicate that an IDT entry caused the fault.
+     * Bit 0 is clear to indicate that it's a software fault, not hardware.
+     * 
+     * NOTE: Vectors 3 and 4 are dealt with from their own handler. This is okay
+     * because they can only be triggered by an explicit DPL-checked instruction.
+     * The DPL specified by the guest OS for these vectors is NOT CHECKED!!
+     */
+    if ( (error_code & 3) == 2 )
     {
         /* This fault must be due to <INT n> instruction. */
         ti = current->thread.traps + (error_code>>3);
@@ -505,9 +524,9 @@ void __init trap_init(void)
     set_trap_gate(0,&divide_error);
     set_trap_gate(1,&debug);
     set_intr_gate(2,&nmi);
-    set_system_gate(3,&int3);	/* int3-5 can be called from all */
-    set_system_gate(4,&overflow);
-    set_system_gate(5,&bounds);
+    set_system_gate(3,&int3);     /* usable from all privilege levels */
+    set_system_gate(4,&overflow); /* usable from all privilege levels */
+    set_trap_gate(5,&bounds);
     set_trap_gate(6,&invalid_op);
     set_trap_gate(7,&device_not_available);
     set_trap_gate(8,&double_fault);
@@ -522,15 +541,6 @@ void __init trap_init(void)
     set_trap_gate(17,&alignment_check);
     set_trap_gate(18,&machine_check);
     set_trap_gate(19,&simd_coprocessor_error);
-
-    /*
-     * Cunning trick to allow arbitrary "INT n" handling.
-     * 
-     * 1. 3 <= N <= 5 is trivial, as these are intended to be explicit.
-     * 
-     * 2. All others, we set gate DPL == 0. Any use of "INT n" will thus
-     *    cause a GPF with CS:EIP pointing at the faulting instruction.
-     */
 
     /* Only ring 1 can access monitor services. */
     _set_gate(idt_table+HYPERVISOR_CALL_VECTOR,15,1,&hypervisor_call);
