@@ -84,7 +84,7 @@ static int find_unbound_irq(void)
             break;
 
     if ( irq == NR_IRQS )
-        BUG();
+        panic("No available IRQ to bind to: increase NR_IRQS!\n");
 
     return irq;
 }
@@ -101,7 +101,7 @@ int bind_virq_to_irq(int virq)
         op.cmd              = EVTCHNOP_bind_virq;
         op.u.bind_virq.virq = virq;
         if ( HYPERVISOR_event_channel_op(&op) != 0 )
-            BUG();
+            panic("Failed to bind virtual IRQ %d\n", virq);
         evtchn = op.u.bind_virq.port;
 
         irq = find_unbound_irq();
@@ -132,7 +132,7 @@ void unbind_virq_from_irq(int virq)
         op.u.close.dom  = DOMID_SELF;
         op.u.close.port = evtchn;
         if ( HYPERVISOR_event_channel_op(&op) != 0 )
-            BUG();
+            panic("Failed to unbind virtual IRQ %d\n", virq);
 
         evtchn_to_irq[evtchn] = -1;
         irq_to_evtchn[irq]    = -1;
@@ -241,8 +241,8 @@ static unsigned int startup_pirq(unsigned int irq)
     op.cmd              = EVTCHNOP_bind_pirq;
     op.u.bind_pirq.pirq = irq;
     if ( HYPERVISOR_event_channel_op(&op) != 0 )
-        BUG();
-    evtchn = op.u.bind_virq.port;
+        panic("Failed to obtain physical IRQ %d\n", irq);
+    evtchn = op.u.bind_pirq.port;
 
     evtchn_to_irq[evtchn] = irq;
     irq_to_evtchn[irq]    = evtchn;
@@ -264,7 +264,7 @@ static void shutdown_pirq(unsigned int irq)
     op.u.close.dom  = DOMID_SELF;
     op.u.close.port = evtchn;
     if ( HYPERVISOR_event_channel_op(&op) != 0 )
-        BUG();
+        panic("Failed to unbind physical IRQ %d\n", irq);
 
     evtchn_to_irq[evtchn] = -1;
     irq_to_evtchn[irq]    = -1;

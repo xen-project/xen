@@ -689,6 +689,7 @@
 3e5a4e68mTr0zcp9SXDbnd-XLrrfxw xenolinux-2.4.25-sparse/include/asm-xen/system.h
 3f1056a9L_kqHcFheV00KbKBzv9j5w xenolinux-2.4.25-sparse/include/asm-xen/vga.h
 3f689063nhrIRsMMZjZxMFk7iEINqQ xenolinux-2.4.25-sparse/include/asm-xen/xen_proc.h
+40659defgWA92arexpMGn8X3QMDj3w xenolinux-2.4.25-sparse/include/asm-xen/xor.h
 3f056927gMHl7mWB89rb73JahbhQIA xenolinux-2.4.25-sparse/include/linux/blk.h
 3e5a4e68WLX3B8owTvktP3HHOtznPQ xenolinux-2.4.25-sparse/include/linux/major.h
 401c0590D_kwJDU59X8NyvqSv_Cl2A xenolinux-2.4.25-sparse/include/linux/sched.h

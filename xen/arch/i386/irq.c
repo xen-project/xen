@@ -1005,12 +1005,19 @@ int pirq_guest_bind(struct task_struct *p, int irq)
     {
         rc = -EBUSY;
         if ( desc->action != NULL )
+        {
+            DPRINTK("Cannot bind IRQ %d to guest. In use by '%s'.\n",
+                    irq, desc->action->name);
             goto out;
+        }
 
         rc = -ENOMEM;
         action = kmalloc(sizeof(irq_guest_action_t), GFP_KERNEL);
         if ( (desc->action = (struct irqaction *)action) == NULL )
+        {
+            DPRINTK("Cannot bind IRQ %d to guest. Out of memory.\n", irq);
             goto out;
+        }
 
         action->nr_guests = 0;
         action->in_flight = 0;
@@ -1025,9 +1032,14 @@ int pirq_guest_bind(struct task_struct *p, int irq)
 
     rc = -EBUSY;
     if ( action->nr_guests == IRQ_MAX_GUESTS )
+    {
+        DPRINTK("Cannot bind IRQ %d to guest. Already at max share.\n", irq);
         goto out;
+    }
 
     action->guest[action->nr_guests++] = p;
+
+    rc = 0;
 
  out:
     spin_unlock_irqrestore(&desc->lock, flags);

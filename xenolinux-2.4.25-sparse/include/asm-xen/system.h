@@ -107,32 +107,11 @@ static inline unsigned long _get_base(char * addr)
 		".previous"			\
 		: :"m" (*(unsigned int *)&(value)))
 
+/* NB. 'clts' is done for us by Xen during virtual trap. */
 #define clts() ((void)0)
-#define read_cr0() ({ \
-	unsigned int __dummy; \
-	__asm__( \
-		"movl %%cr0,%0\n\t" \
-		:"=r" (__dummy)); \
-	__dummy; \
-})
-#define write_cr0(x) \
-	__asm__("movl %0,%%cr0": :"r" (x));
-
-#define read_cr4() ({ \
-	unsigned int __dummy; \
-	__asm__( \
-		"movl %%cr4,%0\n\t" \
-		:"=r" (__dummy)); \
-	__dummy; \
-})
-#define write_cr4(x) \
-	__asm__("movl %0,%%cr4": :"r" (x));
 #define stts() (HYPERVISOR_fpu_taskswitch())
 
 #endif	/* __KERNEL__ */
-
-#define wbinvd() \
-	__asm__ __volatile__ ("wbinvd": : :"memory");
 
 static inline unsigned long get_limit(unsigned long segment)
 {
