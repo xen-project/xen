@@ -370,7 +370,6 @@ static task_slice_t bvt_do_schedule(s_time_t now)
 {
     struct domain *d;
     struct exec_domain      *prev = current, *next = NULL, *next_prime, *ed; 
-    struct list_head   *tmp;
     int                 cpu = prev->processor;
     s32                 r_time;     /* time for new dom to run */
     u32                 next_evt, next_prime_evt, min_avt;
@@ -415,10 +414,8 @@ static task_slice_t bvt_do_schedule(s_time_t now)
     next_prime_evt = ~0U;
     min_avt        = ~0U;
 
-    list_for_each ( tmp, RUNQUEUE(cpu) )
+    list_for_each_entry ( p_einf, RUNQUEUE(cpu), run_list )
     {
-        p_einf = list_entry(tmp, struct bvt_edom_info, run_list);
-
         if ( p_einf->evt < next_evt )
         {
             next_prime_einf  = next_einf;
@@ -530,7 +527,7 @@ static void bvt_dump_settings(void)
 
 static void bvt_dump_cpu_state(int i)
 {
-    struct list_head *list, *queue;
+    struct list_head *queue;
     int loop = 0;
     struct bvt_edom_info *d_inf;
     struct exec_domain *d;
@@ -541,17 +538,15 @@ static void bvt_dump_cpu_state(int i)
     printk("QUEUE rq %lx   n: %lx, p: %lx\n",  (unsigned long)queue,
            (unsigned long) queue->next, (unsigned long) queue->prev);
 
-    list_for_each ( list, queue )
+    list_for_each_entry ( d_inf, queue, run_list )
     {
-        d_inf = list_entry(list, struct bvt_edom_info, run_list);
         d = d_inf->exec_domain;
         printk("%3d: %u has=%c ", loop++, d->domain->id,
                test_bit(EDF_RUNNING, &d->ed_flags) ? 'T':'F');
         bvt_dump_runq_el(d);
         printk("c=0x%X%08X\n", (u32)(d->cpu_time>>32), (u32)d->cpu_time);
-        printk("         l: %lx n: %lx  p: %lx\n",
-               (unsigned long)list, (unsigned long)list->next,
-               (unsigned long)list->prev);
+        printk("         l: %p n: %p  p: %p\n",
+               &d_inf->run_list, d_inf->run_list.next, d_inf->run_list.prev);
     }
 }
 

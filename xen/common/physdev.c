@@ -635,7 +635,7 @@ static long pci_probe_root_buses(u32 *busmask)
 
     memset(busmask, 0, 256/8);
 
-    list_for_each_entry ( pdev, &current->pcidev_list, node )
+    list_for_each_entry ( pdev, &current->domain->pcidev_list, node )
         set_bit(pdev->dev->bus->number, busmask);
 
     return 0;
