@@ -5,7 +5,7 @@
 ###########################################################
 
 import errno, re, os, pwd, select, signal, socket, struct, sys, time
-import xend.blkif, xend.console, xend.manager, xend.utils, Xc
+import xend.blkif, xend.netif, xend.console, xend.manager, xend.utils, Xc
 
 
 # The following parameters could be placed in a configuration file.
@@ -19,6 +19,8 @@ UNIX_SOCK    = 'management_sock' # relative to CONTROL_DIR
 CMSG_CONSOLE  = 0
 CMSG_BLKIF_BE = 1
 CMSG_BLKIF_FE = 2
+CMSG_NETIF_BE = 3
+CMSG_NETIF_FE = 4
 
 
 def port_from_dom(dom):
@@ -162,6 +164,10 @@ def daemon_loop():
             if xend.blkif.interface.list.has_key(idx):
                 blk_if = xend.blkif.interface.list[idx]
 
+            net_if = False
+            if xend.netif.interface.list.has_key(idx):
+                net_if = xend.netif.interface.list[idx]
+
             # If we pick up a disconnect notification then we do any necessary
             # cleanup.
             if type == notifier.EXCEPTION:
@@ -175,6 +181,9 @@ def daemon_loop():
                     if blk_if:
                         blk_if.destroy()
                         del blk_if
+                    if net_if:
+                        net_if.destroy()
+                        del net_if
                     continue
 
             # Process incoming requests.
@@ -188,6 +197,10 @@ def daemon_loop():
                     blk_if.ctrlif_rx_req(port, msg)
                 elif type == CMSG_BLKIF_BE and port == dom0_port:
                     xend.blkif.backend_rx_req(port, msg)
+                elif type == CMSG_NETIF_FE and net_if:
+                    net_if.ctrlif_rx_req(port, msg)
+                elif type == CMSG_NETIF_BE and port == dom0_port:
+                    xend.netif.backend_rx_req(port, msg)
                 else:
                     port.write_response(msg)
 
@@ -198,6 +211,8 @@ def daemon_loop():
                 type = (msg.get_header())['type']
                 if type == CMSG_BLKIF_BE and port == dom0_port:
                     xend.blkif.backend_rx_rsp(port, msg)
+                elif type == CMSG_NETIF_BE and port == dom0_port:
+                    xend.netif.backend_rx_rsp(port, msg)
 
             # Send console data.
             if con_if and con_if.ctrlif_transmit_work(port):
@@ -207,8 +222,16 @@ def daemon_loop():
             if blk_if and blk_if.ctrlif_transmit_work(port):
                 work_done = True
 
+            # Send netif messages.
+            if net_if and net_if.ctrlif_transmit_work(port):
+                work_done = True
+
             # Back-end block-device work.
             if port == dom0_port and xend.blkif.backend_do_work(port):
+                work_done = True
+                
+            # Back-end network-device work.
+            if port == dom0_port and xend.netif.backend_do_work(port):
                 work_done = True
                 
             # Finally, notify the remote end of any work that we did.

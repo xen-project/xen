@@ -415,6 +415,7 @@ static int get_page_from_l1e(l1_pgentry_t l1e)
 {
     unsigned long l1v = l1_pgentry_val(l1e);
     unsigned long pfn = l1_pgentry_to_pagenr(l1e);
+    extern int domain_iomem_in_pfn(struct task_struct *p, unsigned long pfn);
 
     if ( !(l1v & _PAGE_PRESENT) )
         return 1;
@@ -428,7 +429,11 @@ static int get_page_from_l1e(l1_pgentry_t l1e)
     if ( unlikely(!pfn_is_ram(pfn)) )
     {
         if ( IS_PRIV(current) )
-            return 1;
+            return 1;	
+
+	if ( IS_CAPABLE_PHYSDEV(current) )
+            return domain_iomem_in_pfn(current, pfn);
+
         MEM_LOG("Non-privileged attempt to map I/O space %08lx", pfn);
         return 0;
     }
@@ -915,7 +920,8 @@ static int do_extended_command(unsigned long ptr, unsigned long val)
         break;
 
     case MMUEXT_SET_SUBJECTDOM_H:
-        percpu_info[cpu].subject_id |= ((domid_t)((ptr&~0xFFFF)|(val>>16)))<<32;
+        percpu_info[cpu].subject_id |= 
+            ((domid_t)((ptr&~0xFFFF)|(val>>16)))<<32;
 
         if ( !IS_PRIV(current) )
         {
@@ -937,6 +943,33 @@ static int do_extended_command(unsigned long ptr, unsigned long val)
                 okay = 0;
             }
         }
+        break;
+
+        /* XXX This function is racey! */
+    case MMUEXT_REASSIGN_PAGE:
+        if ( unlikely(!IS_PRIV(current)) )
+        {
+            MEM_LOG("Dom %llu has no privilege to reassign page ownership",
+                    current->domain);
+            okay = 0;
+        }
+        else if ( likely(percpu_info[cpu].gps != NULL) )
+        {
+            current->tot_pages--;
+            percpu_info[cpu].gps->tot_pages++;
+            page->u.domain = percpu_info[cpu].gps;
+        }
+        else
+        {
+            MEM_LOG("No GPS to reassign pfn %08lx to\n", pfn);
+            okay = 0;
+        }
+        break;
+
+    case MMUEXT_RESET_SUBJECTDOM:
+        if ( percpu_info[cpu].gps != NULL )
+            put_task_struct(percpu_info[cpu].gps);
+        percpu_info[cpu].gps = percpu_info[cpu].pts = NULL;
         break;
 
     default:

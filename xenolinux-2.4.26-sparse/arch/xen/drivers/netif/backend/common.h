@@ -16,6 +16,7 @@
 #include <asm/ctrl_if.h>
 #include <asm/io.h>
 #include "../netif.h"
+#include "../../../../../net/bridge/br_private.h"
 
 #ifndef NDEBUG
 #define ASSERT(_p) \
@@ -28,7 +29,7 @@
 #define DPRINTK(_f, _a...) ((void)0)
 #endif
 
-typedef struct {
+typedef struct netif_st {
     /* Unique identifier for this interface. */
     domid_t          domid;
     unsigned int     handle;
@@ -49,13 +50,7 @@ typedef struct {
     NETIF_RING_IDX tx_req_cons;
     NETIF_RING_IDX tx_resp_prod; /* private version of shared variable */
 
-    /* Usage accounting */
-    long long total_bytes_sent;
-    long long total_bytes_received;
-    long long total_packets_sent;
-    long long total_packets_received;
-
-    /* Trasnmit shaping: allow 'credit_bytes' every 'credit_usec'. */
+    /* Transmit shaping: allow 'credit_bytes' every 'credit_usec'. */
     unsigned long   credit_bytes;
     unsigned long   credit_usec;
     unsigned long   remaining_credit;
@@ -72,7 +67,8 @@ typedef struct {
     struct list_head list;  /* scheduling list */
     atomic_t         refcnt;
     spinlock_t       rx_lock, tx_lock;
-    unsigned char    vmac[ETH_ALEN];
+    struct net_device *dev;
+    struct net_device_stats stats;
 } netif_t;
 
 void netif_create(netif_be_create_t *create);
@@ -93,6 +89,8 @@ void netif_ctrlif_init(void);
 
 void netif_deschedule(netif_t *netif);
 
+int netif_be_start_xmit(struct sk_buff *skb, struct net_device *dev);
+struct net_device_stats *netif_be_get_stats(struct net_device *dev);
 void netif_be_int(int irq, void *dev_id, struct pt_regs *regs);
 
 #endif /* __NETIF__BACKEND__COMMON_H__ */

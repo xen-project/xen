@@ -24,17 +24,15 @@
 #define MAX_PENDING_REQS 64
 #define BATCH_PER_DOMAIN 16
 
-static struct vm_struct *mmap_vma;
-#define MMAP_PAGES_PER_SEGMENT \
-    ((BLKIF_MAX_SEGMENTS_PER_REQUEST >> (PAGE_SHIFT-9)) + 1)
+static unsigned long mmap_vstart;
 #define MMAP_PAGES_PER_REQUEST \
-    (2 * BLKIF_MAX_SEGMENTS_PER_REQUEST * MMAP_PAGES_PER_SEGMENT)
+    (BLKIF_MAX_SEGMENTS_PER_REQUEST + 1)
 #define MMAP_PAGES             \
     (MAX_PENDING_REQS * MMAP_PAGES_PER_REQUEST)
-#define MMAP_VADDR(_req,_seg)            \
-    ((unsigned long)mmap_vma->addr +     \
+#define MMAP_VADDR(_req,_seg)                        \
+    (mmap_vstart +                                   \
      ((_req) * MMAP_PAGES_PER_REQUEST * PAGE_SIZE) + \
-     ((_seg) * MMAP_PAGES_PER_SEGMENT * PAGE_SIZE))
+     ((_seg) * PAGE_SIZE))
 
 /*
  * Each outstanding request that we've passed to the lower device layers has a 
@@ -259,11 +257,13 @@ static void dispatch_probe(blkif_t *blkif, blkif_request_t *req)
     prot = __pgprot(_PAGE_PRESENT|_PAGE_DIRTY|_PAGE_ACCESSED|_PAGE_RW);
     for ( i = 0; i < req->nr_segments; i++ )
     {
-        if ( (req->buffer_and_sects[i] & ~PAGE_MASK) != (PAGE_SIZE / 512) )
+        /* Make sure the buffer is page-sized. */
+        if ( (blkif_first_sect(req->frame_and_sects[i]) != 0) ||
+             (blkif_last_sect(req->frame_and_sects[i]) != 7) )
             goto bad_descriptor;
         rc = direct_remap_area_pages(&init_mm, 
                                      MMAP_VADDR(pending_idx, i),
-                                     req->buffer_and_sects[i] & PAGE_MASK, 
+                                     req->frame_and_sects[i] & PAGE_MASK, 
                                      PAGE_SIZE, prot, blkif->domid);
         if ( rc != 0 )
             goto bad_descriptor;
@@ -288,15 +288,15 @@ static void dispatch_rw_block_io(blkif_t *blkif, blkif_request_t *req)
     extern void ll_rw_block(int rw, int nr, struct buffer_head * bhs[]); 
     struct buffer_head *bh;
     int operation = (req->operation == BLKIF_OP_WRITE) ? WRITE : READ;
-    unsigned short nr_sects;
-    unsigned long buffer;
+    short nr_sects;
+    unsigned long buffer, fas;
     int i, tot_sects, pending_idx = pending_ring[MASK_PEND_IDX(pending_cons)];
     pending_req_t *pending_req;
     pgprot_t       prot;
 
     /* We map virtual scatter/gather segments to physical segments. */
     int new_segs, nr_psegs = 0;
-    phys_seg_t phys_seg[BLKIF_MAX_SEGMENTS_PER_REQUEST * 2];
+    phys_seg_t phys_seg[BLKIF_MAX_SEGMENTS_PER_REQUEST + 1];
 
     /* Check that number of segments is sane. */
     if ( unlikely(req->nr_segments == 0) || 
@@ -314,17 +314,12 @@ static void dispatch_rw_block_io(blkif_t *blkif, blkif_request_t *req)
      */
     for ( i = tot_sects = 0; i < req->nr_segments; i++, tot_sects += nr_sects )
     {
-        buffer   = req->buffer_and_sects[i] & ~0x1FF;
-        nr_sects = req->buffer_and_sects[i] &  0x1FF;
+        fas      = req->frame_and_sects[i];
+        buffer   = (fas & PAGE_MASK) | (blkif_first_sect(fas) << 9);
+        nr_sects = blkif_last_sect(fas) - blkif_first_sect(fas) + 1;
 
-        if ( unlikely(nr_sects == 0) )
-            continue;
-
-        if ( unlikely(nr_sects > BLKIF_MAX_SECTORS_PER_SEGMENT) )
-        {
-            DPRINTK("Too many sectors in segment\n");
+        if ( nr_sects <= 0 )
             goto bad_descriptor;
-        }
 
         phys_seg[nr_psegs].dev           = req->device;
         phys_seg[nr_psegs].sector_number = req->sector_number + tot_sects;
@@ -344,7 +339,7 @@ static void dispatch_rw_block_io(blkif_t *blkif, blkif_request_t *req)
         }
   
         nr_psegs += new_segs;
-        ASSERT(nr_psegs <= BLKIF_MAX_SEGMENTS_PER_REQUEST*2);
+        ASSERT(nr_psegs <= (BLKIF_MAX_SEGMENTS_PER_REQUEST+1));
     }
 
     /* Nonsensical zero-sized request? */
@@ -358,13 +353,10 @@ static void dispatch_rw_block_io(blkif_t *blkif, blkif_request_t *req)
 
     for ( i = 0; i < nr_psegs; i++ )
     {
-        unsigned long sz = ((phys_seg[i].buffer & ~PAGE_MASK) + 
-                            (phys_seg[i].nr_sects << 9) + 
-                            (PAGE_SIZE - 1)) & PAGE_MASK;
         int rc = direct_remap_area_pages(&init_mm, 
                                          MMAP_VADDR(pending_idx, i),
                                          phys_seg[i].buffer & PAGE_MASK, 
-                                         sz, prot, blkif->domid);
+                                         PAGE_SIZE, prot, blkif->domid);
         if ( rc != 0 )
         {
             DPRINTK("invalid buffer\n");
@@ -372,6 +364,8 @@ static void dispatch_rw_block_io(blkif_t *blkif, blkif_request_t *req)
                               MMAP_PAGES_PER_REQUEST * PAGE_SIZE);
             goto bad_descriptor;
         }
+        phys_to_machine_mapping[__pa(MMAP_VADDR(pending_idx, i))>>PAGE_SHIFT] =
+            phys_seg[i].buffer >> PAGE_SHIFT;
     }
 
     pending_req = &pending_reqs[pending_idx];
@@ -399,6 +393,7 @@ static void dispatch_rw_block_io(blkif_t *blkif, blkif_request_t *req)
         bh->b_rsector       = (unsigned long)phys_seg[i].sector_number;
         bh->b_data          = (char *)MMAP_VADDR(pending_idx, i) +
             (phys_seg[i].buffer & ~PAGE_MASK);
+//        bh->b_page          = virt_to_page(MMAP_VADDR(pending_idx, i));
         bh->b_end_io        = end_block_io_op;
         bh->b_private       = pending_req;
 
@@ -456,13 +451,13 @@ static int __init init_module(void)
 {
     int i;
 
+    if ( !(start_info.flags & SIF_INITDOMAIN) )
+        return 0;
+
     blkif_interface_init();
 
-    if ( (mmap_vma = get_vm_area(MMAP_PAGES * PAGE_SIZE, VM_IOREMAP)) == NULL )
-    {
-        printk(KERN_WARNING "Could not allocate VMA for blkif backend.\n");
-        return -ENOMEM;
-    }
+    if ( (mmap_vstart = allocate_empty_lowmem_region(MMAP_PAGES)) == 0 )
+        BUG();
 
     pending_cons = 0;
     pending_prod = MAX_PENDING_REQS;
@@ -484,6 +479,7 @@ static int __init init_module(void)
 
 static void cleanup_module(void)
 {
+    BUG();
 }
 
 module_init(init_module);

@@ -10,8 +10,6 @@
 
 static void netif_ctrlif_rx(ctrl_msg_t *msg, unsigned long id)
 {
-    DPRINTK("Received netif backend message, subtype=%d\n", msg->subtype);
-    
     switch ( msg->subtype )
     {
     case CMSG_NETIF_BE_CREATE:
@@ -54,7 +52,8 @@ void netif_ctrlif_init(void)
     ctrl_msg_t                       cmsg;
     netif_be_driver_status_changed_t st;
 
-    (void)ctrl_if_register_receiver(CMSG_NETIF_BE, netif_ctrlif_rx);
+    (void)ctrl_if_register_receiver(CMSG_NETIF_BE, netif_ctrlif_rx,
+                                    CALLBACK_IN_BLOCKING_CONTEXT);
 
     /* Send a driver-UP notification to the domain controller. */
     cmsg.type      = CMSG_NETIF_BE;

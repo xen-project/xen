@@ -145,16 +145,13 @@ NT_MASK		= 0x00004000
         pushl %ecx; \
         pushl %ebx; \
 
-#define SAVE_ALL_NOSTI     \
+#define SAVE_ALL \
         SAVE_ALL_NOSEGREGS \
         movl $(__HYPERVISOR_DS),%edx; \
         movl %edx,%ds; \
         movl %edx,%es; \
         movl %edx,%fs; \
         movl %edx,%gs;
-
-#define SAVE_ALL \
-        SAVE_ALL_NOSTI \
         sti;
 
 #define GET_CURRENT(reg)   \
@@ -406,7 +403,11 @@ create_bounce_frame:
         jz   1f /* jump if returning to an existing ring-1 activation */
         /* obtain ss/esp from TSS -- no current ring-1 activations */
         movzwl PROCESSOR(%ebx),%eax
-        shll $8,%eax /* multiply by 256 */
+        /* next 4 lines multiply %eax by 8320, which is sizeof(tss_struct) */
+        movl %eax, %ecx
+        shll $7, %ecx
+        shll $13, %eax
+        addl %ecx,%eax
         addl $init_tss + 12,%eax
         movl (%eax),%esi /* tss->esp1 */
 FAULT6: movl 4(%eax),%ds /* tss->ss1  */
@@ -529,12 +530,18 @@ error_code:
 	movl  GS(%esp), %edi		# get the function address
 	movl  %eax, ORIG_EAX(%esp)
 	movl  %ecx, GS(%esp)
-	movl  %esp,%edx
-	pushl %esi			# push the error code
-	pushl %edx			# push the pt_regs pointer
 	movl  $(__HYPERVISOR_DS),%edx
 	movl  %edx,%ds
 	movl  %edx,%es
+	movl  %edx,%fs
+	movl  %edx,%gs
+	movl  EFLAGS(%esp),%edx
+	testl $0x200,%edx               # Is IF asserted in saved EFLAGS?
+	jz    1f                        # Don't STI if it isn't.
+	sti
+1:	movl  %esp,%edx
+	pushl %esi			# push the error code
+	pushl %edx			# push the pt_regs pointer
 	GET_CURRENT(%ebx)
 	call  *%edi
         addl  $8,%esp

@@ -375,7 +375,7 @@ struct tss_struct {
     unsigned short	trace, bitmap;
     unsigned long	io_bitmap[IO_BITMAP_SIZE+1];
     /*
-     * pads the TSS to be cacheline-aligned (size is 0x100)
+     * pads the TSS to be cacheline-aligned (total size is 0x2080)
      */
     unsigned long __cacheline_filler[5];
 };

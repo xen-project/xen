@@ -80,8 +80,14 @@ void ctrl_if_send_response(ctrl_msg_t *msg);
  * Register a receiver for typed messages from the domain controller. The 
  * handler (@hnd) is called for every received message of specified @type.
  * Returns TRUE (non-zero) if the handler was successfully registered.
+ * If CALLBACK_IN_BLOCKING CONTEXT is specified in @flags then callbacks will
+ * occur in a context in which it is safe to yield (i.e., process context).
  */
-int ctrl_if_register_receiver(u8 type, ctrl_msg_handler_t hnd);
+#define CALLBACK_IN_BLOCKING_CONTEXT 1
+int ctrl_if_register_receiver(
+    u8 type, 
+    ctrl_msg_handler_t hnd,
+    unsigned int flags);
 
 /*
  * Unregister a receiver for typed messages from the domain controller. The 

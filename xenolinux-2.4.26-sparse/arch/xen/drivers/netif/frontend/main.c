@@ -25,15 +25,17 @@
 #include <net/sock.h>
 #include <net/pkt_sched.h>
 
+#include <asm/evtchn.h>
+#include <asm/ctrl_if.h>
+#include <asm/hypervisor-ifs/dom_mem_ops.h>
+
+#include "../netif.h"
+
 #define RX_BUF_SIZE ((PAGE_SIZE/2)+1) /* Fool the slab allocator :-) */
 
-static void network_interrupt(int irq, void *dev_id, struct pt_regs *ptregs);
 static void network_tx_buf_gc(struct net_device *dev);
 static void network_alloc_rx_buffers(struct net_device *dev);
 static void cleanup_module(void);
-
-/* Dynamically-mapped IRQs. */
-static int network_irq, debug_irq;
 
 static struct list_head dev_list;
 
@@ -43,26 +45,30 @@ struct net_private
     struct net_device *dev;
 
     struct net_device_stats stats;
-    NET_RING_IDX rx_resp_cons, tx_resp_cons;
-    unsigned int net_ring_fixmap_idx, tx_full;
-    net_ring_t  *net_ring;
-    net_idx_t   *net_idx;
+    NETIF_RING_IDX rx_resp_cons, tx_resp_cons;
+    unsigned int tx_full;
+    
+    netif_tx_interface_t *tx;
+    netif_rx_interface_t *rx;
+
     spinlock_t   tx_lock;
-    unsigned int idx; /* Domain-specific index of this VIF. */
 
-    unsigned int rx_bufs_to_notify;
+    unsigned int handle;
+    unsigned int evtchn;
+    unsigned int irq;
 
-#define STATE_ACTIVE    0
-#define STATE_SUSPENDED 1
-#define STATE_CLOSED    2
+#define NETIF_STATE_CLOSED       0
+#define NETIF_STATE_DISCONNECTED 1
+#define NETIF_STATE_CONNECTED    2
+#define NETIF_STATE_ACTIVE       3
     unsigned int state;
 
     /*
      * {tx,rx}_skbs store outstanding skbuffs. The first entry in each
      * array is an index into a chain of free entries.
      */
-    struct sk_buff *tx_skbs[XENNET_TX_RING_SIZE+1];
-    struct sk_buff *rx_skbs[XENNET_RX_RING_SIZE+1];
+    struct sk_buff *tx_skbs[NETIF_TX_RING_SIZE+1];
+    struct sk_buff *rx_skbs[NETIF_RX_RING_SIZE+1];
 };
 
 /* Access macros for acquiring freeing slots in {tx,rx}_skbs[]. */
@@ -75,86 +81,43 @@ struct net_private
     (unsigned short)_id; })
 
 
-static void _dbg_network_int(struct net_device *dev)
-{
-    struct net_private *np = dev->priv;
-
-    if ( np->state == STATE_CLOSED )
-        return;
-    
-    printk(KERN_ALERT "net: tx_full=%d, tx_resp_cons=0x%08x,"
-           " tx_req_prod=0x%08x\nnet: tx_resp_prod=0x%08x,"
-           " tx_event=0x%08x, state=%d\n",
-           np->tx_full, np->tx_resp_cons, 
-           np->net_idx->tx_req_prod, np->net_idx->tx_resp_prod, 
-           np->net_idx->tx_event,
-           test_bit(__LINK_STATE_XOFF, &dev->state));
-    printk(KERN_ALERT "net: rx_resp_cons=0x%08x,"
-           " rx_req_prod=0x%08x\nnet: rx_resp_prod=0x%08x, rx_event=0x%08x\n",
-           np->rx_resp_cons, np->net_idx->rx_req_prod,
-           np->net_idx->rx_resp_prod, np->net_idx->rx_event);
-}
-
-
-static void dbg_network_int(int irq, void *unused, struct pt_regs *ptregs)
+static struct net_device *find_dev_by_handle(unsigned int handle)
 {
     struct list_head *ent;
     struct net_private *np;
     list_for_each ( ent, &dev_list )
     {
         np = list_entry(ent, struct net_private, list);
-        _dbg_network_int(np->dev);
+        if ( np->handle == handle )
+            return np->dev;
     }
+    return NULL;
 }
 
 
 static int network_open(struct net_device *dev)
 {
     struct net_private *np = dev->priv;
-    netop_t netop;
-    int i, ret;
+    int i;
 
-    netop.cmd = NETOP_RESET_RINGS;
-    netop.vif = np->idx;
-    if ( (ret = HYPERVISOR_net_io_op(&netop)) != 0 )
-    {
-        printk(KERN_ALERT "Possible net trouble: couldn't reset ring idxs\n");
-        return ret;
-    }
+    if ( np->state != NETIF_STATE_CONNECTED )
+        return -EINVAL;
 
-    netop.cmd = NETOP_GET_VIF_INFO;
-    netop.vif = np->idx;
-    if ( (ret = HYPERVISOR_net_io_op(&netop)) != 0 )
-    {
-        printk(KERN_ALERT "Couldn't get info for vif %d\n", np->idx);
-        return ret;
-    }
-
-    memcpy(dev->dev_addr, netop.u.get_vif_info.vmac, ETH_ALEN);
-
-    set_fixmap(FIX_NETRING0_BASE + np->net_ring_fixmap_idx, 
-               netop.u.get_vif_info.ring_mfn << PAGE_SHIFT);
-    np->net_ring = (net_ring_t *)fix_to_virt(
-        FIX_NETRING0_BASE + np->net_ring_fixmap_idx);
-    np->net_idx  = &HYPERVISOR_shared_info->net_idx[np->idx];
-
-    np->rx_bufs_to_notify = 0;
     np->rx_resp_cons = np->tx_resp_cons = np->tx_full = 0;
     memset(&np->stats, 0, sizeof(np->stats));
     spin_lock_init(&np->tx_lock);
-    memset(np->net_ring, 0, sizeof(*np->net_ring));
-    memset(np->net_idx, 0, sizeof(*np->net_idx));
 
     /* Initialise {tx,rx}_skbs to be a free chain containing every entry. */
-    for ( i = 0; i <= XENNET_TX_RING_SIZE; i++ )
+    for ( i = 0; i <= NETIF_TX_RING_SIZE; i++ )
         np->tx_skbs[i] = (void *)(i+1);
-    for ( i = 0; i <= XENNET_RX_RING_SIZE; i++ )
+    for ( i = 0; i <= NETIF_RX_RING_SIZE; i++ )
         np->rx_skbs[i] = (void *)(i+1);
 
     wmb();
-    np->state = STATE_ACTIVE;
+    np->state = NETIF_STATE_ACTIVE;
 
     network_alloc_rx_buffers(dev);
+    np->rx->event = np->rx_resp_cons + 1;
 
     netif_start_queue(dev);
 
@@ -166,18 +129,17 @@ static int network_open(struct net_device *dev)
 
 static void network_tx_buf_gc(struct net_device *dev)
 {
-    NET_RING_IDX i, prod;
+    NETIF_RING_IDX i, prod;
     unsigned short id;
     struct net_private *np = dev->priv;
     struct sk_buff *skb;
-    tx_entry_t *tx_ring = np->net_ring->tx_ring;
 
     do {
-        prod = np->net_idx->tx_resp_prod;
+        prod = np->tx->resp_prod;
 
         for ( i = np->tx_resp_cons; i != prod; i++ )
         {
-            id  = tx_ring[MASK_NET_TX_IDX(i)].resp.id;
+            id  = np->tx->ring[MASK_NET_TX_IDX(i)].resp.id;
             skb = np->tx_skbs[id];
             ADD_ID_TO_FREELIST(np->tx_skbs, id);
             dev_kfree_skb_any(skb);
@@ -193,17 +155,17 @@ static void network_tx_buf_gc(struct net_device *dev)
          * in such cases notification from Xen is likely to be the only kick
          * that we'll get.
          */
-        np->net_idx->tx_event = 
-            prod + ((np->net_idx->tx_req_prod - prod) >> 1) + 1;
+        np->tx->event = 
+            prod + ((np->tx->req_prod - prod) >> 1) + 1;
         mb();
     }
-    while ( prod != np->net_idx->tx_resp_prod );
+    while ( prod != np->tx->resp_prod );
 
     if ( np->tx_full && 
-         ((np->net_idx->tx_req_prod - prod) < XENNET_TX_RING_SIZE) )
+         ((np->tx->req_prod - prod) < NETIF_TX_RING_SIZE) )
     {
         np->tx_full = 0;
-        if ( np->state == STATE_ACTIVE )
+        if ( np->state == NETIF_STATE_ACTIVE )
             netif_wake_queue(dev);
     }
 }
@@ -224,11 +186,15 @@ static void network_alloc_rx_buffers(struct net_device *dev)
     unsigned short id;
     struct net_private *np = dev->priv;
     struct sk_buff *skb;
-    netop_t netop;
-    NET_RING_IDX i = np->net_idx->rx_req_prod;
+    NETIF_RING_IDX i = np->rx->req_prod;
+    dom_mem_op_t op;
+    unsigned long pfn_array[NETIF_RX_RING_SIZE];
+    int ret, nr_pfns = 0;
+    pte_t *pte;
 
-    if ( unlikely((i - np->rx_resp_cons) == XENNET_RX_RING_SIZE) || 
-         unlikely(np->state != STATE_ACTIVE) )
+    /* Make sure the batch is large enough to be worthwhile (1/2 ring). */
+    if ( unlikely((i - np->rx_resp_cons) > (NETIF_RX_RING_SIZE/2)) || 
+         unlikely(np->state != NETIF_STATE_ACTIVE) )
         return;
 
     do {
@@ -244,13 +210,13 @@ static void network_alloc_rx_buffers(struct net_device *dev)
         id = GET_ID_FROM_FREELIST(np->rx_skbs);
         np->rx_skbs[id] = skb;
 
-        np->net_ring->rx_ring[MASK_NET_RX_IDX(i)].req.id   = id;
-        np->net_ring->rx_ring[MASK_NET_RX_IDX(i)].req.addr = 
-            virt_to_machine(get_ppte(skb->head));
-
-        np->rx_bufs_to_notify++;
+        np->rx->ring[MASK_NET_RX_IDX(i)].req.id = id;
+        
+        pte = get_ppte(skb->head);
+        pfn_array[nr_pfns++] = pte->pte_low >> PAGE_SHIFT;
+        queue_l1_entry_update(pte, 0);
     }
-    while ( (++i - np->rx_resp_cons) != XENNET_RX_RING_SIZE );
+    while ( (++i - np->rx_resp_cons) != NETIF_RX_RING_SIZE );
 
     /*
      * We may have allocated buffers which have entries outstanding in the page
@@ -258,17 +224,16 @@ static void network_alloc_rx_buffers(struct net_device *dev)
      */
     flush_page_update_queue();
 
-    np->net_idx->rx_req_prod = i;
-    np->net_idx->rx_event    = np->rx_resp_cons + 1;
-        
-    /* Batch Xen notifications. */
-    if ( np->rx_bufs_to_notify > (XENNET_RX_RING_SIZE/4) )
+    op.op = MEMOP_RESERVATION_DECREASE;
+    op.u.decrease.size  = nr_pfns;
+    op.u.decrease.pages = pfn_array;
+    if ( (ret = HYPERVISOR_dom_mem_op(&op)) != nr_pfns )
     {
-        netop.cmd = NETOP_PUSH_BUFFERS;
-        netop.vif = np->idx;
-        (void)HYPERVISOR_net_io_op(&netop);
-        np->rx_bufs_to_notify = 0;
+        printk(KERN_WARNING "Unable to reduce memory reservation (%d)\n", ret);
+        BUG();
     }
+
+    np->rx->req_prod = i;
 }
 
 
@@ -276,9 +241,8 @@ static int network_start_xmit(struct sk_buff *skb, struct net_device *dev)
 {
     unsigned short id;
     struct net_private *np = (struct net_private *)dev->priv;
-    tx_req_entry_t *tx;
-    netop_t netop;
-    NET_RING_IDX i;
+    netif_tx_request_t *tx;
+    NETIF_RING_IDX i;
 
     if ( unlikely(np->tx_full) )
     {
@@ -297,27 +261,27 @@ static int network_start_xmit(struct sk_buff *skb, struct net_device *dev)
         memcpy(new_skb->data, skb->data, skb->len);
         dev_kfree_skb(skb);
         skb = new_skb;
-    }   
+    }
     
     spin_lock_irq(&np->tx_lock);
 
-    i = np->net_idx->tx_req_prod;
+    i = np->tx->req_prod;
 
     id = GET_ID_FROM_FREELIST(np->tx_skbs);
     np->tx_skbs[id] = skb;
 
-    tx = &np->net_ring->tx_ring[MASK_NET_TX_IDX(i)].req;
+    tx = &np->tx->ring[MASK_NET_TX_IDX(i)].req;
 
     tx->id   = id;
-    tx->addr = phys_to_machine(virt_to_phys(skb->data));
+    tx->addr = virt_to_machine(skb->data);
     tx->size = skb->len;
 
     wmb();
-    np->net_idx->tx_req_prod = i + 1;
+    np->tx->req_prod = i + 1;
 
     network_tx_buf_gc(dev);
 
-    if ( (i - np->tx_resp_cons) == (XENNET_TX_RING_SIZE - 1) )
+    if ( (i - np->tx_resp_cons) == (NETIF_TX_RING_SIZE - 1) )
     {
         np->tx_full = 1;
         netif_stop_queue(dev);
@@ -330,48 +294,55 @@ static int network_start_xmit(struct sk_buff *skb, struct net_device *dev)
 
     /* Only notify Xen if there are no outstanding responses. */
     mb();
-    if ( np->net_idx->tx_resp_prod == i )
-    {
-        netop.cmd = NETOP_PUSH_BUFFERS;
-        netop.vif = np->idx;
-        (void)HYPERVISOR_net_io_op(&netop);
-    }
+    if ( np->tx->resp_prod == i )
+        notify_via_evtchn(np->evtchn);
 
     return 0;
 }
 
 
-static inline void _network_interrupt(struct net_device *dev)
+static void netif_int(int irq, void *dev_id, struct pt_regs *ptregs)
 {
+    struct net_device *dev = dev_id;
     struct net_private *np = dev->priv;
     unsigned long flags;
     struct sk_buff *skb;
-    rx_resp_entry_t *rx;
-    NET_RING_IDX i;
+    netif_rx_response_t *rx;
+    NETIF_RING_IDX i;
+    mmu_update_t mmu[2];
+    pte_t *pte;
 
-    if ( unlikely(np->state == STATE_CLOSED) )
-        return;
-    
     spin_lock_irqsave(&np->tx_lock, flags);
     network_tx_buf_gc(dev);
     spin_unlock_irqrestore(&np->tx_lock, flags);
 
  again:
-    for ( i = np->rx_resp_cons; i != np->net_idx->rx_resp_prod; i++ )
+    for ( i = np->rx_resp_cons; i != np->rx->resp_prod; i++ )
     {
-        rx = &np->net_ring->rx_ring[MASK_NET_RX_IDX(i)].resp;
+        rx = &np->rx->ring[MASK_NET_RX_IDX(i)].resp;
 
         skb = np->rx_skbs[rx->id];
         ADD_ID_TO_FREELIST(np->rx_skbs, rx->id);
 
-        if ( unlikely(rx->status != RING_STATUS_OK) )
+        if ( unlikely(rx->status <= 0) )
         {
             /* Gate this error. We get a (valid) slew of them on suspend. */
-            if ( np->state == STATE_ACTIVE )
+            if ( np->state == NETIF_STATE_ACTIVE )
                 printk(KERN_ALERT "bad buffer on RX ring!(%d)\n", rx->status);
             dev_kfree_skb_any(skb);
             continue;
         }
+
+        /* Remap the page. */
+        pte = get_ppte(skb->head);
+        mmu[0].ptr  = virt_to_machine(pte);
+        mmu[0].val  = (rx->addr & PAGE_MASK) | __PAGE_KERNEL;
+        mmu[1].ptr  = (rx->addr & PAGE_MASK) | MMU_MACHPHYS_UPDATE;
+        mmu[1].val  = __pa(skb->head) >> PAGE_SHIFT;
+        if ( HYPERVISOR_mmu_update(mmu, 2) != 0 )
+            BUG();
+        phys_to_machine_mapping[__pa(skb->head) >> PAGE_SHIFT] = 
+            rx->addr >> PAGE_SHIFT;
 
         /*
          * Set up shinfo -- from alloc_skb This was particularily nasty:  the
@@ -385,13 +356,13 @@ static inline void _network_interrupt(struct net_device *dev)
         phys_to_machine_mapping[virt_to_phys(skb->head) >> PAGE_SHIFT] =
             (*(unsigned long *)get_ppte(skb->head)) >> PAGE_SHIFT;
 
-        skb->data = skb->tail = skb->head + rx->offset;
-        skb_put(skb, rx->size);
+        skb->data = skb->tail = skb->head + (rx->addr & ~PAGE_MASK);
+        skb_put(skb, rx->status);
         skb->protocol = eth_type_trans(skb, dev);
 
         np->stats.rx_packets++;
 
-        np->stats.rx_bytes += rx->size;
+        np->stats.rx_bytes += rx->status;
         netif_rx(skb);
         dev->last_rx = jiffies;
     }
@@ -399,42 +370,23 @@ static inline void _network_interrupt(struct net_device *dev)
     np->rx_resp_cons = i;
 
     network_alloc_rx_buffers(dev);
+    np->rx->event = np->rx_resp_cons + 1;
     
     /* Deal with hypervisor racing our resetting of rx_event. */
     mb();
-    if ( np->net_idx->rx_resp_prod != i )
+    if ( np->rx->resp_prod != i )
         goto again;
-}
-
-
-static void network_interrupt(int irq, void *unused, struct pt_regs *ptregs)
-{
-    struct list_head *ent;
-    struct net_private *np;
-    list_for_each ( ent, &dev_list )
-    {
-        np = list_entry(ent, struct net_private, list);
-        _network_interrupt(np->dev);
-    }
 }
 
 
 static int network_close(struct net_device *dev)
 {
     struct net_private *np = dev->priv;
-    netop_t netop;
-
-    np->state = STATE_SUSPENDED;
-    wmb();
 
     netif_stop_queue(np->dev);
 
-    netop.cmd = NETOP_FLUSH_BUFFERS;
-    netop.vif = np->idx;
-    (void)HYPERVISOR_net_io_op(&netop);
-
-    while ( (np->rx_resp_cons != np->net_idx->rx_req_prod) ||
-            (np->tx_resp_cons != np->net_idx->tx_req_prod) )
+    while ( (np->rx_resp_cons != np->rx->req_prod) ||
+            (np->tx_resp_cons != np->tx->req_prod) )
     {
         barrier();
         current->state = TASK_INTERRUPTIBLE;
@@ -442,11 +394,8 @@ static int network_close(struct net_device *dev)
     }
 
     wmb();
-    np->state = STATE_CLOSED;
+    np->state = NETIF_STATE_CONNECTED;
     wmb();
-
-    /* Now no longer safe to take interrupts for this device. */
-    clear_fixmap(FIX_NETRING0_BASE + np->net_ring_fixmap_idx);
 
     MOD_DEC_USE_COUNT;
 
@@ -461,72 +410,164 @@ static struct net_device_stats *network_get_stats(struct net_device *dev)
 }
 
 
-static int __init init_module(void)
+static void netif_status_change(netif_fe_interface_status_changed_t *status)
 {
-#if 0
-    int i, fixmap_idx=-1, err;
+    ctrl_msg_t                   cmsg;
+    netif_fe_interface_connect_t up;
     struct net_device *dev;
     struct net_private *np;
-    netop_t netop;
+    
+    if ( status->handle != 0 )
+    {
+        printk(KERN_WARNING "Status change on unsupported netif %d\n",
+               status->handle);
+        return;
+    }
+
+    dev = find_dev_by_handle(0);
+    np  = dev->priv;
+    
+    switch ( status->status )
+    {
+    case NETIF_INTERFACE_STATUS_DESTROYED:
+        printk(KERN_WARNING "Unexpected netif-DESTROYED message in state %d\n",
+               np->state);
+        break;
+
+    case NETIF_INTERFACE_STATUS_DISCONNECTED:
+        if ( np->state != NETIF_STATE_CLOSED )
+        {
+            printk(KERN_WARNING "Unexpected netif-DISCONNECTED message"
+                   " in state %d\n", np->state);
+            break;
+        }
+
+        /* Move from CLOSED to DISCONNECTED state. */
+        np->tx = (netif_tx_interface_t *)__get_free_page(GFP_KERNEL);
+        np->rx = (netif_rx_interface_t *)__get_free_page(GFP_KERNEL);
+        memset(np->tx, 0, PAGE_SIZE);
+        memset(np->rx, 0, PAGE_SIZE);
+        np->state  = NETIF_STATE_DISCONNECTED;
+
+        /* Construct an interface-CONNECT message for the domain controller. */
+        cmsg.type      = CMSG_NETIF_FE;
+        cmsg.subtype   = CMSG_NETIF_FE_INTERFACE_CONNECT;
+        cmsg.length    = sizeof(netif_fe_interface_connect_t);
+        up.handle      = 0;
+        up.tx_shmem_frame = virt_to_machine(np->tx) >> PAGE_SHIFT;
+        up.rx_shmem_frame = virt_to_machine(np->rx) >> PAGE_SHIFT;
+        memcpy(cmsg.msg, &up, sizeof(up));
+        
+        /* Tell the controller to bring up the interface. */
+        ctrl_if_send_message_block(&cmsg, NULL, 0, TASK_UNINTERRUPTIBLE);
+        break;
+
+    case NETIF_INTERFACE_STATUS_CONNECTED:
+        if ( np->state == NETIF_STATE_CLOSED )
+        {
+            printk(KERN_WARNING "Unexpected netif-CONNECTED message"
+                   " in state %d\n", np->state);
+            break;
+        }
+
+        memcpy(dev->dev_addr, status->mac, ETH_ALEN);
+
+        np->evtchn = status->evtchn;
+        np->irq = bind_evtchn_to_irq(np->evtchn);
+        (void)request_irq(np->irq, netif_int, SA_SAMPLE_RANDOM, 
+                      dev->name, dev);
+        
+        np->state = NETIF_STATE_CONNECTED;
+        break;
+
+    default:
+        printk(KERN_WARNING "Status change to unknown value %d\n", 
+               status->status);
+        break;
+    }
+}
+
+
+static void netif_ctrlif_rx(ctrl_msg_t *msg, unsigned long id)
+{
+    switch ( msg->subtype )
+    {
+    case CMSG_NETIF_FE_INTERFACE_STATUS_CHANGED:
+        if ( msg->length != sizeof(netif_fe_interface_status_changed_t) )
+            goto parse_error;
+        netif_status_change((netif_fe_interface_status_changed_t *)
+                            &msg->msg[0]);
+        break;
+    default:
+        goto parse_error;
+    }
+
+    ctrl_if_send_response(msg);
+    return;
+
+ parse_error:
+    msg->length = 0;
+    ctrl_if_send_response(msg);
+}
+
+
+static int __init init_module(void)
+{
+    ctrl_msg_t                       cmsg;
+    netif_fe_driver_status_changed_t st;
+    int err;
+    struct net_device *dev;
+    struct net_private *np;
+
+    if ( start_info.flags & SIF_INITDOMAIN )
+        return 0;
 
     INIT_LIST_HEAD(&dev_list);
 
-    network_irq = bind_virq_to_irq(VIRQ_NET);
-    debug_irq   = bind_virq_to_irq(VIRQ_DEBUG);
-
-    err = request_irq(network_irq, network_interrupt, 
-                      SA_SAMPLE_RANDOM, "network", NULL);
-    if ( err )
+    if ( (dev = alloc_etherdev(sizeof(struct net_private))) == NULL )
     {
-        printk(KERN_WARNING "Could not allocate network interrupt\n");
+        err = -ENOMEM;
+        goto fail;
+    }
+
+    np = dev->priv;
+    np->state  = NETIF_STATE_CLOSED;
+    np->handle = 0;
+
+    dev->open            = network_open;
+    dev->hard_start_xmit = network_start_xmit;
+    dev->stop            = network_close;
+    dev->get_stats       = network_get_stats;
+    
+    if ( (err = register_netdev(dev)) != 0 )
+    {
+        kfree(dev);
         goto fail;
     }
     
-    err = request_irq(debug_irq, dbg_network_int, 
-                      SA_SHIRQ, "net_dbg", &dbg_network_int);
-    if ( err )
-        printk(KERN_WARNING "Non-fatal error -- no debug interrupt\n");
+    np->dev = dev;
+    list_add(&np->list, &dev_list);
 
-    for ( i = 0; i < MAX_DOMAIN_VIFS; i++ )
+    (void)ctrl_if_register_receiver(CMSG_NETIF_FE, netif_ctrlif_rx,
+                                    CALLBACK_IN_BLOCKING_CONTEXT);
+
+    /* Send a driver-UP notification to the domain controller. */
+    cmsg.type      = CMSG_NETIF_FE;
+    cmsg.subtype   = CMSG_NETIF_FE_DRIVER_STATUS_CHANGED;
+    cmsg.length    = sizeof(netif_fe_driver_status_changed_t);
+    st.status      = NETIF_DRIVER_STATUS_UP;
+    memcpy(cmsg.msg, &st, sizeof(st));
+    ctrl_if_send_message_block(&cmsg, NULL, 0, TASK_UNINTERRUPTIBLE);
+
+    /*
+     * We should read 'nr_interfaces' from response message and wait
+     * for notifications before proceeding. For now we assume that we
+     * will be notified of exactly one interface.
+     */
+    while ( np->state != NETIF_STATE_CONNECTED )
     {
-        /* If the VIF is invalid then the query hypercall will fail. */
-        netop.cmd = NETOP_GET_VIF_INFO;
-        netop.vif = i;
-        if ( HYPERVISOR_net_io_op(&netop) != 0 )
-            continue;
-
-        /* We actually only support up to 4 vifs right now. */
-        if ( ++fixmap_idx == 4 )
-            break;
-
-        dev = alloc_etherdev(sizeof(struct net_private));
-        if ( dev == NULL )
-        {
-            err = -ENOMEM;
-            goto fail;
-        }
-
-        np = dev->priv;
-        np->state               = STATE_CLOSED;
-        np->net_ring_fixmap_idx = fixmap_idx;
-        np->idx                 = i;
-
-        SET_MODULE_OWNER(dev);
-        dev->open            = network_open;
-        dev->hard_start_xmit = network_start_xmit;
-        dev->stop            = network_close;
-        dev->get_stats       = network_get_stats;
-
-        memcpy(dev->dev_addr, netop.u.get_vif_info.vmac, ETH_ALEN);
-
-        if ( (err = register_netdev(dev)) != 0 )
-        {
-            kfree(dev);
-            goto fail;
-        }
-
-        np->dev = dev;
-        list_add(&np->list, &dev_list);
+        set_current_state(TASK_INTERRUPTIBLE);
+        schedule_timeout(1);
     }
 
     return 0;
@@ -534,30 +575,13 @@ static int __init init_module(void)
  fail:
     cleanup_module();
     return err;
-#endif
-    return 0;
 }
 
 
 static void cleanup_module(void)
 {
-    struct net_private *np;
-    struct net_device *dev;
-
-    while ( !list_empty(&dev_list) )
-    {
-        np = list_entry(dev_list.next, struct net_private, list);
-        list_del(&np->list);
-        dev = np->dev;
-        unregister_netdev(dev);
-        kfree(dev);
-    }
-
-    free_irq(network_irq, NULL);
-    free_irq(debug_irq, NULL);
-
-    unbind_virq_from_irq(VIRQ_NET);
-    unbind_virq_from_irq(VIRQ_DEBUG);
+    /* XXX FIXME */
+    BUG();
 }
 
 

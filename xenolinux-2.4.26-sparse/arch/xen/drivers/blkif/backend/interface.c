@@ -70,7 +70,7 @@ void blkif_create(blkif_be_create_t *create)
     unsigned int  handle = create->blkif_handle;
     blkif_t     **pblkif, *blkif;
 
-    if ( (blkif = kmem_cache_alloc(blkif_cachep, GFP_ATOMIC)) == NULL )
+    if ( (blkif = kmem_cache_alloc(blkif_cachep, GFP_KERNEL)) == NULL )
     {
         DPRINTK("Could not create blkif: out of memory\n");
         create->status = BLKIF_BE_STATUS_OUT_OF_MEMORY;

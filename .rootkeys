@@ -107,6 +107,7 @@
 4048c0ddsF0WrU7HUzTvg1MJoCIfWg tools/xend/lib/domain_controller.h
 4054a301VEag2GwrBrFBna5U1BGlLA tools/xend/lib/main.py
 4055ad9ah9IuC3sJT2c_gYIFY5Tw_g tools/xend/lib/manager.py
+409ba2e729HhE7fEra4B5EqX-F8Xzw tools/xend/lib/netif.py
 40431ac8wrUEj-XM7B8smFtx_HA7lQ tools/xend/lib/utils.c
 4054a2fdkdATEnRw-U7AUlgu-6JiUA tools/xend/setup.py
 4056cd26Qyp09iNoOjrvzg8KYzSqOw tools/xend/xend
@@ -735,6 +736,7 @@
 3f8707e7ZmZ6TxyX0ZUEfvhA2Pb_xQ xenolinux-2.4.26-sparse/include/asm-xen/msr.h
 3e7270deQqtGPSnFxcW4AvJZuTUWfg xenolinux-2.4.26-sparse/include/asm-xen/multicall.h
 3e5a4e67mnQfh-R8KcQCaVo2Oho6yg xenolinux-2.4.26-sparse/include/asm-xen/page.h
+409ba2e7ZfV5hqTvIzxLtpClnxtIzg xenolinux-2.4.26-sparse/include/asm-xen/pci.h
 3e5a4e67uTYU5oEnIDjxuaez8njjqg xenolinux-2.4.26-sparse/include/asm-xen/pgalloc.h
 3e5a4e67X7JyupgdYkgDX19Huj2sAw xenolinux-2.4.26-sparse/include/asm-xen/pgtable-2level.h
 3e5a4e67gr4NLGtQ5CvSLimMYZlkOA xenolinux-2.4.26-sparse/include/asm-xen/pgtable.h
@@ -762,6 +764,7 @@
 3e5a4e68GxCIaFH4sy01v1wjapetaA xenolinux-2.4.26-sparse/mm/memory.c
 3f108af5VxPkLv13tXpXgoRKALQtXQ xenolinux-2.4.26-sparse/mm/mprotect.c
 3e5a4e681xMPdF9xCMwpyfuYMySU5g xenolinux-2.4.26-sparse/mm/mremap.c
+409ba2e7akOFqQUg6Qyg2s28xcXiMg xenolinux-2.4.26-sparse/mm/page_alloc.c
 3e5a4e683HKVU-sxtagrDasRB8eBVw xenolinux-2.4.26-sparse/mm/swapfile.c
 3f108af81Thhb242EmKjGCYkjx-GJA xenolinux-2.4.26-sparse/mm/vmalloc.c
 407eb087XaNDLn8thVDLH-rI0hG-Xw xenolinux-sparse

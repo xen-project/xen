@@ -333,7 +333,18 @@ def make_domain():
                 xc.domain_destroy ( dom=id )
                 sys.exit()
 
-    if not new_io_world:
+    if new_io_world:
+        cmsg = 'new_network_interface(dom='+str(id)+')'
+        xend_response = xenctl.utils.xend_control_message(cmsg)
+        if not xend_response['success']:
+            print "Error creating network interface"
+            print "Error type: " + xend_response['error_type']
+            if xend_response['error_type'] == 'exception':
+                print "Exception type: " + xend_response['exception_type']
+                print "Exception val:  " + xend_response['exception_value']
+            xc.domain_destroy ( dom=id )
+            sys.exit()
+    else:
         # setup virtual firewall rules for all aliases
         for ip in vfr_ipaddr:
             xenctl.utils.setup_vfr_rules_for_vif( id, 0, ip )

@@ -26,18 +26,21 @@
  */
 #define BLKIF_MAX_SEGMENTS_PER_REQUEST 11
 
-#define BLKIF_MAX_SECTORS_PER_SEGMENT  16
-
 typedef struct {
     u8             operation;        /* BLKIF_OP_???                         */
     u8             nr_segments;      /* number of segments                   */
     blkif_vdev_t   device;           /* only for read/write requests         */
     unsigned long  id;               /* private guest value, echoed in resp  */
     blkif_sector_t sector_number;    /* start sector idx on disk (r/w only)  */
-    /* Least 9 bits is 'nr_sects'. High 23 bits is the address.       */
-    /* We must have '0 <= nr_sects <= BLKIF_MAX_SECTORS_PER_SEGMENT'. */
-    unsigned long  buffer_and_sects[BLKIF_MAX_SEGMENTS_PER_REQUEST];
+    /* @f_a_s[2:0]=last_sect ; @f_a_s[5:3]=first_sect ; @f_a_s[:12]=frame.   */
+    /* @first_sect: first sector in frame to transfer (inclusive).           */
+    /* @last_sect: last sector in frame to transfer (inclusive).             */
+    /* @frame: machine page frame number.                                    */
+    unsigned long  frame_and_sects[BLKIF_MAX_SEGMENTS_PER_REQUEST];
 } blkif_request_t;
+
+#define blkif_first_sect(_fas) (((_fas)>>3)&7)
+#define blkif_last_sect(_fas)  ((_fas)&7)
 
 typedef struct {
     unsigned long   id;              /* copied from request */
@@ -79,8 +82,8 @@ typedef struct {
  *  @device      == unused (zero)
  *  @id          == any value (echoed in response message)
  *  @sector_num  == unused (zero)
- *  @buffer_and_sects == list of page-aligned, page-sized buffers.
- *                       (i.e., nr_sects == 8).
+ *  @frame_and_sects == list of page-sized buffers.
+ *                       (i.e., @first_sect == 0, @last_sect == 7).
  * 
  * The response is a list of vdisk_t elements copied into the out-of-band
  * probe buffer. On success the response status field contains the number

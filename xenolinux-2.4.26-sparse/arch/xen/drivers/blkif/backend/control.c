@@ -74,7 +74,8 @@ void blkif_ctrlif_init(void)
     ctrl_msg_t                       cmsg;
     blkif_be_driver_status_changed_t st;
 
-    (void)ctrl_if_register_receiver(CMSG_BLKIF_BE, blkif_ctrlif_rx);
+    (void)ctrl_if_register_receiver(CMSG_BLKIF_BE, blkif_ctrlif_rx, 
+                                    CALLBACK_IN_BLOCKING_CONTEXT);
 
     /* Send a driver-UP notification to the domain controller. */
     cmsg.type      = CMSG_BLKIF_BE;

@@ -47,7 +47,7 @@ void vbd_create(blkif_be_vbd_create_t *create)
         }
     }
 
-    if ( unlikely((vbd = kmalloc(sizeof(vbd_t), GFP_ATOMIC)) == NULL) )
+    if ( unlikely((vbd = kmalloc(sizeof(vbd_t), GFP_KERNEL)) == NULL) )
     {
         DPRINTK("vbd_create: out of memory\n");
         create->status = BLKIF_BE_STATUS_OUT_OF_MEMORY;
@@ -111,7 +111,7 @@ void vbd_grow(blkif_be_vbd_grow_t *grow)
     } 
 
     if ( unlikely((x = kmalloc(sizeof(blkif_extent_le_t), 
-                               GFP_ATOMIC)) == NULL) )
+                               GFP_KERNEL)) == NULL) )
     {
         DPRINTK("vbd_grow: out of memory\n");
         grow->status = BLKIF_BE_STATUS_OUT_OF_MEMORY;
