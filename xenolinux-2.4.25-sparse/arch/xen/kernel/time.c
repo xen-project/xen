@@ -18,28 +18,28 @@
  * This file contains the PC-specific time handling details:
  * reading the RTC at bootup, etc..
  * 1994-07-02    Alan Modra
- *	fixed set_rtc_mmss, fixed time.year for >= 2000, new mktime
+ * fixed set_rtc_mmss, fixed time.year for >= 2000, new mktime
  * 1995-03-26    Markus Kuhn
  *      fixed 500 ms bug at call to set_rtc_mmss, fixed DS12887
  *      precision CMOS clock update
  * 1996-05-03    Ingo Molnar
  *      fixed time warps in do_[slow|fast]_gettimeoffset()
- * 1997-09-10	Updated NTP code according to technical memorandum Jan '96
- *		"A Kernel Model for Precision Timekeeping" by Dave Mills
+ * 1997-09-10 Updated NTP code according to technical memorandum Jan '96
+ *  "A Kernel Model for Precision Timekeeping" by Dave Mills
  * 1998-09-05    (Various)
- *	More robust do_fast_gettimeoffset() algorithm implemented
- *	(works with APM, Cyrix 6x86MX and Centaur C6),
- *	monotonic gettimeofday() with fast_get_timeoffset(),
- *	drift-proof precision TSC calibration on boot
- *	(C. Scott Ananian <cananian@alumni.princeton.edu>, Andrew D.
- *	Balsa <andrebalsa@altern.org>, Philip Gladstone <philip@raptor.com>;
- *	ported from 2.0.35 Jumbo-9 by Michael Krause <m.krause@tu-harburg.de>).
+ * More robust do_fast_gettimeoffset() algorithm implemented
+ * (works with APM, Cyrix 6x86MX and Centaur C6),
+ * monotonic gettimeofday() with fast_get_timeoffset(),
+ * drift-proof precision TSC calibration on boot
+ * (C. Scott Ananian <cananian@alumni.princeton.edu>, Andrew D.
+ * Balsa <andrebalsa@altern.org>, Philip Gladstone <philip@raptor.com>;
+ * ported from 2.0.35 Jumbo-9 by Michael Krause <m.krause@tu-harburg.de>).
  * 1998-12-16    Andrea Arcangeli
- *	Fixed Jumbo-9 code in 2.1.131: do_gettimeofday was missing 1 jiffy
- *	because was not accounting lost_ticks.
+ * Fixed Jumbo-9 code in 2.1.131: do_gettimeofday was missing 1 jiffy
+ * because was not accounting lost_ticks.
  * 1998-12-24 Copyright (C) 1998  Andrea Arcangeli
- *	Fixed a xtime SMP race (we need the xtime_lock rw spinlock to
- *	serialize accesses to xtime/lost_ticks).
+ * Fixed a xtime SMP race (we need the xtime_lock rw spinlock to
+ * serialize accesses to xtime/lost_ticks).
  */
 
 #include <asm/smp.h>
@@ -67,7 +67,7 @@ spinlock_t rtc_lock = SPIN_LOCK_UNLOCKED;
 extern rwlock_t xtime_lock;
 extern unsigned long wall_jiffies;
 
-unsigned long cpu_khz;	/* get this from Xen, used elsewhere */
+unsigned long cpu_khz; /* get this from Xen, used elsewhere */
 
 static unsigned int rdtsc_bitshift;
 static u32 st_scale_f; /* convert ticks -> usecs */
@@ -165,7 +165,7 @@ static int set_rtc_mmss(unsigned long nowtime)
     real_seconds = nowtime % 60;
     real_minutes = nowtime / 60;
     if ( ((abs(real_minutes - cmos_minutes) + 15)/30) & 1 )
-        real_minutes += 30;		/* correct for half hour time zone */
+        real_minutes += 30;  /* correct for half hour time zone */
     real_minutes %= 60;
 
     if ( abs(real_minutes - cmos_minutes) < 30 )
@@ -251,7 +251,7 @@ static inline unsigned long __get_time_delta_usecs(void)
  */
 void do_gettimeofday(struct timeval *tv)
 {
-	unsigned long flags, lost;
+    unsigned long flags, lost;
     struct timeval _tv;
 
  again:
@@ -325,7 +325,7 @@ void do_settimeofday(struct timeval *tv)
     HANDLE_USEC_UNDERFLOW(*tv);
 
     xtime = *tv;
-    time_adjust = 0;		/* stop active adjtime() */
+    time_adjust = 0;  /* stop active adjtime() */
     time_status |= STA_UNSYNC;
     time_maxerror = NTP_PHASE_LIMIT;
     time_esterror = NTP_PHASE_LIMIT;
@@ -356,21 +356,21 @@ void do_settimeofday(struct timeval *tv)
 
 asmlinkage long sys_stime(int *tptr)
 {
-	int value;
+    int value;
     struct timeval tv;
 
-	if ( !capable(CAP_SYS_TIME) )
-		return -EPERM;
+    if ( !capable(CAP_SYS_TIME) )
+        return -EPERM;
 
-	if ( get_user(value, tptr) )
-		return -EFAULT;
+    if ( get_user(value, tptr) )
+        return -EFAULT;
 
     tv.tv_sec  = value;
     tv.tv_usec = 0;
 
     do_settimeofday(&tv);
 
-	return 0;
+    return 0;
 }
 
 
@@ -436,7 +436,9 @@ static inline void do_timer_interrupt(int irq, void *dev_id,
              unlikely(((sec_diff * 1000000) + 
                        xtime.tv_usec - shadow_tv.tv_usec) > 500000) )
         {
+#ifdef CONFIG_XEN_PRIVILEGED_GUEST
             last_update_to_rtc = last_update_to_xen = 0;
+#endif
             last_seen_tv.tv_sec = 0;
         }
 
@@ -447,7 +449,7 @@ static inline void do_timer_interrupt(int irq, void *dev_id,
     }
 
 #ifdef CONFIG_XEN_PRIVILEGED_GUEST
-	if ( (start_info.flags & SIF_INITDOMAIN) &&
+    if ( (start_info.flags & SIF_INITDOMAIN) &&
          ((time_status & STA_UNSYNC) == 0) )
     {
         /* Send synchronised time to Xen approximately every minute. */
