@@ -148,7 +148,7 @@ void cmain(multiboot_info_t *mbi)
     {
         unsigned char *opt_end, *opt;
         while ( *cmdline == ' ' ) cmdline++;
-        cmdline = strchr(cmdline, ' ');
+        cmdline = strchr(cmdline, ' '); /* skip the image name */
         while ( cmdline != NULL )
         {
             while ( *cmdline == ' ' ) cmdline++;
@@ -326,6 +326,15 @@ void cmain(multiboot_info_t *mbi)
 
     shadow_mode_init();
 
+    /* Grab the DOM0 command line. Skip past the image name. */
+    cmdline = (unsigned char *)(mod[0].string ? __va(mod[0].string) : NULL);
+    if ( cmdline != NULL )
+    {
+        while ( *cmdline == ' ' ) cmdline++;
+        if ( (cmdline = strchr(cmdline, ' ')) != NULL )
+            while ( *cmdline == ' ' ) cmdline++;
+    }
+
     /*
      * We're going to setup domain0 using the module(s) that we stashed safely
      * above our heap. The second module, if present, is an initrd ramdisk.
@@ -338,7 +347,7 @@ void cmain(multiboot_info_t *mbi)
                         (mod[1].mod_start-mod[0].mod_start),
                         (mbi->mods_count == 1) ? 0 :
                         mod[mbi->mods_count-1].mod_end - mod[1].mod_start,
-                        __va(mod[0].string)) != 0)
+                        cmdline) != 0)
         panic("Could not set up DOM0 guest OS\n");
 
     /* The stash space for the initial kernel image can now be freed up. */

@@ -151,7 +151,7 @@ stipending()
 	return (ret);
 }
 
-void do_hypervisor_callback(struct trapframe *regs)
+void do_hypervisor_callback(struct intrframe *regs)
 {
 	uint32_t l1;
 	unsigned long l2;

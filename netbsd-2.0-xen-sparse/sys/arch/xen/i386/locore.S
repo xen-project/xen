@@ -1567,6 +1567,7 @@ idle_zero:
 	pushl	$IPL_NONE
 	call	_C_LABEL(Xspllower)
 	addl	$4,%esp
+	jmp	idle_start
 4:
 	call	_C_LABEL(uvm_pageidlezero)
 	CLI(%eax)
@@ -1577,6 +1578,9 @@ idle_loop:
 	movl	_C_LABEL(uvm)+UVM_PAGE_IDLE_ZERO,%ecx
 	testl	%ecx,%ecx
 	jnz	idle_zero
+	call	_C_LABEL(idle_block)
+	cmpl	$0,_C_LABEL(sched_whichqs)
+	jnz	idle_exit
 	STIC(%eax)
     	jz	4f
 	call	_C_LABEL(stipending)

@@ -84,7 +84,8 @@ void *dma_alloc_coherent(struct device *dev, size_t size,
 			phys_to_machine_mapping[(__pa(ret)>>PAGE_SHIFT)+i] =
 				pfn+i;
 		}
-		flush_page_update_queue();
+		/* Flush updates through and flush the TLB. */
+		xen_tlb_flush();
 	}
 
 	memset(ret, 0, size);

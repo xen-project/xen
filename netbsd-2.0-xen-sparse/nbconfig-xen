@@ -5,6 +5,7 @@
 : ${HARCH:=$(uname -i)}
 : ${NETBSD_RELEASE:=$(basename $(cd $(dirname $0) && pwd) | sed 's/netbsd-\([0-9]\+\.[0-9]\+\).*/\1/')}
 : ${NETBSD_VERSION:=$(basename $(cd $(dirname $0) && pwd) | sed 's/netbsd-\([0-9]\+\.[0-9]\+.*\)-xen.*/\1/')}
+: ${TOPDIR:=$(cd $(dirname $0) && pwd | sed 's/\(netbsd-[0-9]\+\.[0-9]\+.*-xen[^/]*\)/\1/')}
 
 TOOLDIR="$TOPDIR/../netbsd-${NETBSD_RELEASE}-tools/$HOS-$HARCH"; export TOOLDIR
 

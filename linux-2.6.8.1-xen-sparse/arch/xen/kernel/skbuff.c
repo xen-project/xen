@@ -20,38 +20,16 @@ EXPORT_SYMBOL(__dev_alloc_skb);
 /* Referenced in netback.c. */
 /*static*/ kmem_cache_t *skbuff_cachep;
 
+/* Size must be cacheline-aligned (alloc_skb uses SKB_DATA_ALIGN). */
+#define XEN_SKB_SIZE \
+    ((PAGE_SIZE - sizeof(struct skb_shared_info)) & ~(SMP_CACHE_BYTES - 1))
+
 struct sk_buff *__dev_alloc_skb(unsigned int length, int gfp_mask)
 {
     struct sk_buff *skb;
-    u8             *new_data, *new_shinfo; 
-
-    /*
-     * Yuk! There is no way to get a skbuff head without allocating the
-     * data area using kmalloc(). So we do that and then replace the default
-     * data area with our own.
-     */
-    skb = alloc_skb(0, gfp_mask);
-    if ( unlikely(skb == NULL) )
-        return NULL;
-
-    new_data = kmem_cache_alloc(skbuff_cachep, gfp_mask);
-    if ( new_data == NULL )
-    {
-        dev_kfree_skb(skb);
-        return NULL;
-    }
-
-    new_shinfo = 
-        new_data + PAGE_SIZE - sizeof(struct skb_shared_info);
-    memcpy(new_shinfo, skb_shinfo(skb), sizeof(struct skb_shared_info));
-
-    kfree(skb->head);
-
-    skb->head = new_data;
-    skb->data = skb->tail = new_data + 16; /* __dev_alloc_skb does this */
-    skb->end  = new_shinfo;
-    skb->truesize = 1500;                  /* is this important? */
-
+    skb = alloc_skb_from_cache(skbuff_cachep, length + 16, gfp_mask);
+    if ( likely(skb != NULL) )
+        skb_reserve(skb, 16);
     return skb;
 }
 

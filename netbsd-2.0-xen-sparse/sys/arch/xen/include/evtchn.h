@@ -43,7 +43,7 @@ typedef int (*ev_handler_t)(void *);
 
 void events_default_setup(void);
 void init_events(void);
-unsigned int do_event(int, struct trapframe *);
+unsigned int do_event(int, struct intrframe *);
 int event_set_handler(int, ev_handler_t, void *, int);
 
 int bind_virq_to_irq(int);
