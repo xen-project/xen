@@ -41,6 +41,10 @@ struct guest_trap_bounce {
     unsigned long  eip;               /*  12 */
 } guest_trap_bounce[NR_CPUS] = { { 0 } };
 
+#define DOUBLEFAULT_STACK_SIZE 1024
+static struct tss_struct doublefault_tss;
+static unsigned char doublefault_stack[DOUBLEFAULT_STACK_SIZE];
+
 asmlinkage int hypervisor_call(void);
 asmlinkage void lcall7(void);
 asmlinkage void lcall27(void);
@@ -58,7 +62,6 @@ asmlinkage void overflow(void);
 asmlinkage void bounds(void);
 asmlinkage void invalid_op(void);
 asmlinkage void device_not_available(void);
-asmlinkage void double_fault(void);
 asmlinkage void coprocessor_segment_overrun(void);
 asmlinkage void invalid_TSS(void);
 asmlinkage void segment_not_present(void);
@@ -119,19 +122,17 @@ void show_stack(unsigned long * esp)
     unsigned long *stack;
     int i;
 
-    // debugging aid: "show_stack(NULL);" prints the
-    // back trace for this cpu.
-
-    if(esp==NULL)
-        esp=(unsigned long*)&esp;
+    if ( esp == NULL )
+        esp = (unsigned long *)&esp;
 
     printk("Stack trace from ESP=%p:\n", esp);
 
     stack = esp;
-    for(i=0; i < kstack_depth_to_print; i++) {
-        if (((long) stack & (THREAD_SIZE-1)) == 0)
+    for ( i = 0; i < kstack_depth_to_print; i++ )
+    {
+        if ( ((long)stack & (THREAD_SIZE-1)) == 0 )
             break;
-        if (i && ((i % 8) == 0))
+        if ( i && ((i % 8) == 0) )
             printk("\n       ");
         if ( kernel_text_address(*stack) )
             printk("[%08lx] ", *stack++);
@@ -139,7 +140,6 @@ void show_stack(unsigned long * esp)
             printk("%08lx ", *stack++);            
     }
     printk("\n");
-    //show_trace(esp);
 }
 
 void show_registers(struct pt_regs *regs)
@@ -240,7 +240,6 @@ DO_ERROR_NOCODE( 4, "overflow", overflow)
 DO_ERROR_NOCODE( 5, "bounds", bounds)
 DO_ERROR_NOCODE( 6, "invalid operand", invalid_op)
 DO_ERROR_NOCODE( 7, "device not available", device_not_available)
-DO_ERROR( 8, "double fault", double_fault)
 DO_ERROR_NOCODE( 9, "coprocessor segment overrun", coprocessor_segment_overrun)
 DO_ERROR(10, "invalid TSS", invalid_TSS)
 DO_ERROR(11, "segment not present", segment_not_present)
@@ -250,6 +249,38 @@ DO_ERROR_NOCODE(16, "fpu error", coprocessor_error)
 DO_ERROR(17, "alignment check", alignment_check)
 DO_ERROR_NOCODE(18, "machine check", machine_check)
 DO_ERROR_NOCODE(19, "simd error", simd_coprocessor_error)
+
+asmlinkage void do_double_fault(void)
+{
+    extern spinlock_t console_lock;
+    struct tss_struct *tss = &doublefault_tss;
+    unsigned int cpu = ((tss->back_link>>3)-__FIRST_TSS_ENTRY)>>1;
+
+    /* Disable the NMI watchdog. It's useless now. */
+    watchdog_on = 0;
+
+    /* Find information saved during fault and dump it to the console. */
+    tss = &init_tss[cpu];
+    printk("CPU:    %d\nEIP:    %04x:[<%08lx>]      \nEFLAGS: %08lx\n",
+           cpu, tss->cs, tss->eip, tss->eflags);
+    printk("CR3:    %08lx\n", tss->__cr3);
+    printk("eax: %08lx   ebx: %08lx   ecx: %08lx   edx: %08lx\n",
+           tss->eax, tss->ebx, tss->ecx, tss->edx);
+    printk("esi: %08lx   edi: %08lx   ebp: %08lx   esp: %08lx\n",
+           tss->esi, tss->edi, tss->ebp, tss->esp);
+    printk("ds: %04x   es: %04x   fs: %04x   gs: %04x   ss: %04x\n",
+           tss->ds, tss->es, tss->fs, tss->gs, tss->ss);
+    printk("************************************\n");
+    printk("CPU%d DOUBLE FAULT -- system shutdown\n", cpu);
+    printk("System needs manual reset.\n");
+    printk("************************************\n");
+
+    /* Lock up the console to prevent spurious output from other CPUs. */
+    spin_lock(&console_lock); 
+
+    /* Wait for manual reset. */
+    for ( ; ; ) ;
+}
 
 asmlinkage void do_page_fault(struct pt_regs *regs, long error_code)
 {
@@ -603,6 +634,12 @@ static void __init set_system_gate(unsigned int n, void *addr)
     _set_gate(idt_table+n,14,3,addr);
 }
 
+static void set_task_gate(unsigned int n, unsigned int sel)
+{
+    idt_table[n].a = sel << 16;
+    idt_table[n].b = 0x8500;
+}
+
 #define _set_seg_desc(gate_addr,type,dpl,base,limit) {\
 	*((gate_addr)+1) = ((base) & 0xff000000) | \
 		(((base) & 0x00ff0000)>>16) | \
@@ -632,6 +669,25 @@ void set_tss_desc(unsigned int n, void *addr)
 void __init trap_init(void)
 {
     /*
+     * Make a separate task for double faults. This will get us debug output if
+     * we blow the kernel stack.
+     */
+    struct tss_struct *tss = &doublefault_tss;
+    memset(tss, 0, sizeof(*tss));
+    tss->ds     = __HYPERVISOR_DS;
+    tss->es     = __HYPERVISOR_DS;
+    tss->ss     = __HYPERVISOR_DS;
+    tss->esp    = (unsigned long)
+        &doublefault_stack[DOUBLEFAULT_STACK_SIZE];
+    tss->__cr3  = __pa(idle0_pg_table);
+    tss->cs     = __HYPERVISOR_CS;
+    tss->eip    = (unsigned long)do_double_fault;
+    tss->eflags = 2;
+    tss->bitmap = INVALID_IO_BITMAP_OFFSET;
+    _set_tssldt_desc(gdt_table+__DOUBLEFAULT_TSS_ENTRY,
+                     (int)tss, 235, 0x89);
+
+    /*
      * Note that interrupt gates are always used, rather than trap gates. We 
      * must have interrupts disabled until DS/ES/FS/GS are saved because the 
      * first activation must have the "bad" value(s) for these registers and 
@@ -647,7 +703,7 @@ void __init trap_init(void)
     set_intr_gate(5,&bounds);
     set_intr_gate(6,&invalid_op);
     set_intr_gate(7,&device_not_available);
-    set_intr_gate(8,&double_fault);
+    set_task_gate(8,__DOUBLEFAULT_TSS_ENTRY<<3);
     set_intr_gate(9,&coprocessor_segment_overrun);
     set_intr_gate(10,&invalid_TSS);
     set_intr_gate(11,&segment_not_present);
