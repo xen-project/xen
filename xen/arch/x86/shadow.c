@@ -1103,7 +1103,8 @@ static unsigned long shadow_l2_table(
             // shadow_mode_translate (but not external) sl2 tables hold a
             // ref to their hl2.
             //
-            get_shadow_ref(hl2mfn);
+            if ( !get_shadow_ref(hl2mfn) )
+                BUG();
             
             spl2e[l2_table_offset(LINEAR_PT_VIRT_START)] =
                 mk_l2_pgentry((hl2mfn << PAGE_SHIFT) | __PAGE_HYPERVISOR);
@@ -1178,7 +1179,7 @@ void shadow_map_l1_into_current_l2(unsigned long va)
     ASSERT( !(old_sl2e & _PAGE_PRESENT) );
 #endif
 
-    if (!get_shadow_ref(sl1mfn))
+    if ( !get_shadow_ref(sl1mfn) )
         BUG();
     l2pde_general(d, &gl2e, &sl2e, sl1mfn);
     __guest_set_l2e(ed, va, gl2e);
@@ -1298,7 +1299,8 @@ shadow_make_snapshot(
         BUG(); /* XXX FIXME: try a shadow flush to free up some memory. */
     }
 
-    get_shadow_ref(smfn);
+    if ( !get_shadow_ref(smfn) )
+        BUG();
 
     original = map_domain_mem(gmfn << PAGE_SHIFT);
     snapshot = map_domain_mem(smfn << PAGE_SHIFT);
@@ -1341,13 +1343,7 @@ shadow_mark_mfn_out_of_sync(struct exec_domain *ed, unsigned long gpfn,
 
     ASSERT(spin_is_locked(&d->arch.shadow_lock));
     ASSERT(pfn_is_ram(mfn));
-    //ASSERT((page->u.inuse.type_info & PGT_type_mask) == PGT_writable_page);
-    if (!((page->u.inuse.type_info & PGT_type_mask) == PGT_writable_page))
-    {
-        printk("assertion failed: gpfn=%p gmfn=%p t=%p\n",
-               gpfn, mfn, page->u.inuse.type_info);
-        BUG();
-    }
+    ASSERT((page->u.inuse.type_info & PGT_type_mask) == PGT_writable_page);
 
     FSH_LOG("mark_mfn_out_of_sync(gpfn=%p, mfn=%p) c=%p t=%p",
             gpfn, mfn, page->count_info, page->u.inuse.type_info);
@@ -1378,7 +1374,7 @@ shadow_mark_mfn_out_of_sync(struct exec_domain *ed, unsigned long gpfn,
     return entry;
 }
 
-void shadow_mark_out_of_sync(
+void shadow_mark_va_out_of_sync(
     struct exec_domain *ed, unsigned long gpfn, unsigned long mfn, unsigned long va)
 {
     struct out_of_sync_entry *entry =
@@ -1407,7 +1403,8 @@ void shadow_mark_out_of_sync(
     // Increment shadow's page count to represent the reference
     // inherent in entry->writable_pl1e
     //
-    get_shadow_ref(sl2e >> PAGE_SHIFT);
+    if ( !get_shadow_ref(sl2e >> PAGE_SHIFT) )
+        BUG();
 
     FSH_LOG("mark_out_of_sync(va=%p -> writable_pl1e=%p)",
             va, entry->writable_pl1e);
@@ -1917,7 +1914,8 @@ void __update_pagetables(struct exec_domain *ed)
      */
     if ( unlikely(!(smfn = __shadow_status(d, gpfn, PGT_base_page_table))) )
         smfn = shadow_l2_table(d, gpfn, gmfn);
-    get_shadow_ref(smfn);
+    if ( !get_shadow_ref(smfn) )
+        BUG();
     if ( pagetable_val(ed->arch.shadow_table) )
         put_shadow_ref(pagetable_val(ed->arch.shadow_table) >> PAGE_SHIFT);
     ed->arch.shadow_table = mk_pagetable(smfn << PAGE_SHIFT);
@@ -1945,7 +1943,8 @@ void __update_pagetables(struct exec_domain *ed)
     {
         if ( unlikely(!(hl2mfn = __shadow_status(d, gpfn, PGT_hl2_shadow))) )
             hl2mfn = shadow_hl2_table(d, gpfn, gmfn, smfn);
-        get_shadow_ref(hl2mfn);
+        if ( !get_shadow_ref(hl2mfn) )
+            BUG();
 
         if ( ed->arch.hl2_vtable )
             unmap_domain_mem(ed->arch.hl2_vtable);

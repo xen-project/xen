@@ -396,7 +396,8 @@ shadow_pin(unsigned long smfn)
     ASSERT( !(frame_table[smfn].u.inuse.type_info & PGT_pinned) );
 
     frame_table[smfn].u.inuse.type_info |= PGT_pinned;
-    get_shadow_ref(smfn);
+    if ( !get_shadow_ref(smfn) )
+        BUG();
 }
 
 static inline void
@@ -464,7 +465,7 @@ static inline int mark_dirty(struct domain *d, unsigned int mfn)
 
 /************************************************************************/
 
-extern void shadow_mark_out_of_sync(
+extern void shadow_mark_va_out_of_sync(
     struct exec_domain *ed, unsigned long gpfn, unsigned long mfn,
     unsigned long va);
 
@@ -497,7 +498,7 @@ static inline void l1pte_write_fault(
         __mark_dirty(d, mfn);
 
     if ( mfn_is_page_table(mfn) )
-        shadow_mark_out_of_sync(ed, gpfn, mfn, va);
+        shadow_mark_va_out_of_sync(ed, gpfn, mfn, va);
 
     *gpte_p = gpte;
     *spte_p = spte;
@@ -1144,7 +1145,7 @@ shadow_set_l1e(unsigned long va, unsigned long new_spte, int create_l1_shadow)
             if ( sl1mfn )
             {
                 perfc_incrc(shadow_set_l1e_unlinked);
-                if (!get_shadow_ref(sl1mfn))
+                if ( !get_shadow_ref(sl1mfn) )
                     BUG();
                 l2pde_general(d, &gpde, &sl2e, sl1mfn);
                 __guest_set_l2e(ed, va, gpde);
