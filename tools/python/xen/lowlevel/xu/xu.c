@@ -259,6 +259,7 @@ static PyTypeObject xu_notifier_type = {
  */
 
 #define TYPE(_x,_y) (((_x)<<8)|(_y))
+
 #define P2C(_struct, _field, _ctype)                                      \
     do {                                                                  \
         PyObject *obj;                                                    \
@@ -279,6 +280,29 @@ static PyTypeObject xu_notifier_type = {
         }                                                                 \
         xum->msg.length = sizeof(_struct);                                \
     } while ( 0 )
+
+/** Set a char[] field in a struct from a Python string.
+ * Can't do this in P2C because of the typing.
+ */
+#define P2CSTRING(_struct, _field)                                        \
+    do {                                                                  \
+        PyObject *obj;                                                    \
+        if ( (obj = PyDict_GetItemString(payload, #_field)) != NULL )     \
+        {                                                                 \
+            if ( PyString_Check(obj) )                                    \
+            {                                                             \
+                _struct * _cobj = (_struct *)&xum->msg.msg[0];            \
+                int _field_n = sizeof(_cobj->_field);                     \
+                memset(_cobj->_field, 0, _field_n);                       \
+                strncpy(_cobj->_field,                                    \
+                        PyString_AsString(obj),                           \
+                        _field_n - 1);                                    \
+                dict_items_parsed++;                                      \
+            }                                                             \
+        }                                                                 \
+        xum->msg.length = sizeof(_struct);                                \
+    } while ( 0 )
+
 #define C2P(_struct, _field, _pytype, _ctype)                             \
     do {                                                                  \
         PyObject *obj = Py ## _pytype ## _From ## _ctype                  \
@@ -456,6 +480,7 @@ static PyObject *xu_message_get_payload(PyObject *self, PyObject *args)
         C2P(netif_be_create_t, domid,        Int, Long);
         C2P(netif_be_create_t, netif_handle, Int, Long);
         C2P(netif_be_create_t, status,       Int, Long);
+        C2P(netif_be_create_t, vifname,      String, String);
         return dict;
     case TYPE(CMSG_NETIF_BE, CMSG_NETIF_BE_DESTROY):
         C2P(netif_be_destroy_t, domid,        Int, Long);
@@ -623,6 +648,7 @@ static PyObject *xu_message_new(PyObject *self, PyObject *args)
         P2C(netif_be_create_t, mac[3],       u8);
         P2C(netif_be_create_t, mac[4],       u8);
         P2C(netif_be_create_t, mac[5],       u8);
+        P2CSTRING(netif_be_create_t, vifname);
         break;
     case TYPE(CMSG_NETIF_BE, CMSG_NETIF_BE_DESTROY):
         P2C(netif_be_destroy_t, domid,        u32);
