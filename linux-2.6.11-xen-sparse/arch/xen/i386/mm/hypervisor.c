@@ -33,11 +33,11 @@
 #include <linux/vmalloc.h>
 #include <asm/page.h>
 #include <asm/pgtable.h>
-#include <asm/tlbflush.h>
 #include <asm-xen/hypervisor.h>
 #include <asm-xen/balloon.h>
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,0)
 #include <linux/percpu.h>
+#include <asm/tlbflush.h>
 #endif
 
 #if LINUX_VERSION_CODE < KERNEL_VERSION(2,6,0)
