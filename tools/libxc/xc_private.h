@@ -142,6 +142,38 @@ static inline int do_dom_mem_op(int            xc_handle,
  out1: return ret;
 }    
 
+static inline int do_mmuext_op(
+    int xc_handle,
+    struct mmuext_op *op,
+    unsigned int nr_ops,
+    domid_t dom)
+{
+    privcmd_hypercall_t hypercall;
+    long ret = -EINVAL;
+	
+    hypercall.op     = __HYPERVISOR_mmuext_op;
+    hypercall.arg[0] = (unsigned long)op;
+    hypercall.arg[1] = (unsigned long)nr_ops;
+    hypercall.arg[2] = (unsigned long)0;
+    hypercall.arg[3] = (unsigned long)dom;
+
+    if ( mlock(op, nr_ops*sizeof(*op)) != 0 )
+    {
+        PERROR("Could not lock memory for Xen hypercall");
+        goto out1;
+    }
+
+    if ( (ret = do_xen_hypercall(xc_handle, &hypercall)) < 0 )
+    {
+	fprintf(stderr, "Dom_mem operation failed (rc=%ld errno=%d)-- need to"
+                    " rebuild the user-space tool set?\n",ret,errno);
+        goto out2;
+    }
+
+ out2: (void)munlock(op, nr_ops*sizeof(*op));
+ out1: return ret;
+}    
+
 
 /*
  * PFN mapping.

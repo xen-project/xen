@@ -95,36 +95,15 @@ unsigned int get_pfn_type(int xc_handle,
 int pin_table(
     int xc_handle, unsigned int type, unsigned long mfn, domid_t dom)
 {
-    int err = 0;
     struct mmuext_op op;
-    privcmd_hypercall_t hypercall;
 
     op.cmd = type;
     op.mfn = mfn;
 
-    hypercall.op     = __HYPERVISOR_mmuext_op;
-    hypercall.arg[0] = (unsigned long)&op;
-    hypercall.arg[1] = 1;
-    hypercall.arg[2] = 0;
-    hypercall.arg[3] = dom;
+    if ( do_mmuext_op(xc_handle, &op, 1, dom) < 0 )
+        return 1;
 
-    if ( mlock(&op, sizeof(op)) != 0 )
-    {
-        PERROR("Could not lock mmuext_op");
-        err = 1;
-        goto out;
-    }
-
-    if ( do_xen_hypercall(xc_handle, &hypercall) < 0 )
-    {
-        ERROR("Failure when submitting mmu updates");
-        err = 1;
-    }
-
-    (void)munlock(&op, sizeof(op));
-
- out:
-    return err;
+    return 0;
 }
 
 static int flush_mmu_updates(int xc_handle, mmu_t *mmu)

@@ -1186,7 +1186,8 @@ int get_page_type(struct pfn_info *page, u32 type)
                 nx &= ~PGT_va_mask;
                 nx |= type; /* we know the actual type is correct */
             }
-            else if ( unlikely((x & PGT_va_mask) != (type & PGT_va_mask)) )
+            else if ( ((type & PGT_va_mask) != PGT_va_mutable) &&
+                      ((type & PGT_va_mask) != (x & PGT_va_mask)) )
             {
                 /* This table is potentially mapped at multiple locations. */
                 nx &= ~PGT_va_mask;
@@ -1388,11 +1389,6 @@ int do_mmuext_op(
         switch ( op.cmd )
         {
         case MMUEXT_PIN_L1_TABLE:
-            /*
-             * We insist that, if you pin an L1 page, it's the first thing that
-             * you do to it. This is because we require the backptr to still be
-             * mutable. This assumption seems safe.
-             */
             type = PGT_l1_page_table | PGT_va_mutable;
 
         pin_page:
