@@ -37,8 +37,8 @@ domain=${domain:?}
 vif=${vif:?}
 ip=${ip:?} 
 
-# better way to strip /netmask from the ip?
-vif_ip=`echo ${ip} | awk -F. '{print $1"."$2"."$3"."$4}'`
+# strip /netmask
+vif_ip=`echo ${ip} | awk -F/ '{print $1}'`
 
 main_ip=`ifconfig eth0 | grep "inet addr:" | sed -e 's/.*inet addr:\(\w\w*\.\w\w*\.\w\w*\.\w\w*\).*/\1/'`
 
