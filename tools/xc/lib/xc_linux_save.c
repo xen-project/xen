@@ -11,6 +11,14 @@
 
 #define BATCH_SIZE 1024   /* 1024 pages (4MB) at a time */
 
+#define DEBUG 0
+
+#if DEBUG
+#define DPRINTF(_f, _a...) printf ( _f , ## _a )
+#else
+#define DPRINTF(_f, _a...) ((void)0)
+#endif
+
 /* This may allow us to create a 'quiet' command-line option, if necessary. */
 #define verbose_printf(_f, _a...) \
     do {                          \
@@ -64,7 +72,7 @@ int xc_linux_save(int xc_handle,
     int rc = 1, i, j, k, n, last_iter, iter = 0;
     unsigned long mfn;
     int verbose = flags & XCFLAGS_VERBOSE;
-    int live = 1; //flags & XCFLAGS_LIVE;     // XXXXXXXXXXXXXXXXXXX
+    int live = flags & XCFLAGS_LIVE;
     int sent_last_iter, sent_this_iter, max_iters;
 
     /* Remember if we stopped the guest, so we can restart it on exit. */
@@ -149,15 +157,12 @@ int xc_linux_save(int xc_handle,
 	printf("Sleep for 1ms\n");
     }
 
-#if 1
     /* A cheesy test to see whether the domain contains valid state. */
     if ( ctxt.pt_base == 0 )
     {
         ERROR("Domain is not in a valid Linux guest OS state");
         goto out;
     }
-#endif
-
 
     /* Map the suspend-record MFN to pin it. The page must be owned by 
        domid for this to succeed. */
@@ -225,16 +230,23 @@ int xc_linux_save(int xc_handle,
         goto out;
     }
 
-    for(i=0;i<(nr_pfns+1023)/1024 ;i++)
-	printf("LF: %d %x\n",i,live_pfn_to_mfn_frame_list[i]);
 
+    /* Canonicalise the pfn-to-mfn table frame-number list. */
+    memcpy( pfn_to_mfn_frame_list, live_pfn_to_mfn_frame_list, PAGE_SIZE );
+    for ( i = 0; i < nr_pfns; i += 1024 )
+    {
+        if ( !translate_mfn_to_pfn(&pfn_to_mfn_frame_list[i/1024]) )
+        {
+            ERROR("Frame # in pfn-to-mfn frame list is not in pseudophys");
+            goto out;
+        }
+    }
 
-    /* At this point, we can start the domain again if we're doign a
+    /* At this point, we can start the domain again if we're doing a
        live suspend */
 
     if( live )
     { 
-#if 1
 	if ( xc_shadow_control( xc_handle, domid, 
 			   DOM0_SHADOW_CONTROL_OP_ENABLE_LOGDIRTY,
 			   NULL, 0 ) < 0 )
@@ -242,16 +254,16 @@ int xc_linux_save(int xc_handle,
 	    ERROR("Couldn't enable shadow mode");
 	    goto out;
 	}
-#endif 
+
 	if ( xc_domain_start( xc_handle, domid ) < 0 )
 	{
 	    ERROR("Couldn't restart domain");
 	    goto out;
 	}
-//exit(-1);
+
 	last_iter = 0;
 	sent_last_iter = 1<<20; // 4GB's worth of pages
-	max_iters = 8; // limit us to 9 time round loop
+	max_iters = 9; // limit us to 10 time round loop
     }
     else
 	last_iter = 1;
@@ -297,7 +309,7 @@ int xc_linux_save(int xc_handle,
     /*
      * Quick belt and braces sanity check.
      */
-
+#if DEBUG
     for ( i = 0; i < nr_pfns; i++ )
     {
         mfn = live_pfn_to_mfn_table[i];
@@ -306,17 +318,7 @@ int xc_linux_save(int xc_handle,
 	    printf("i=0x%x mfn=%x live_mfn_to_pfn_table=%x\n",
 		   i,mfn,live_mfn_to_pfn_table[mfn]);
     }
-
-    /* Canonicalise the pfn-to-mfn table frame-number list. */
-    memcpy( pfn_to_mfn_frame_list, live_pfn_to_mfn_frame_list, PAGE_SIZE );
-    for ( i = 0; i < nr_pfns; i += 1024 )
-    {
-        if ( !translate_mfn_to_pfn(&pfn_to_mfn_frame_list[i/1024]) )
-        {
-            ERROR("Frame # in pfn-to-mfn frame list is not in pseudophys");
-            goto out;
-        }
-    }
+#endif
 
     /* Map the shared info frame */
     live_shinfo = mfn_mapper_map_single(xc_handle, domid,
@@ -374,28 +376,16 @@ int xc_linux_save(int xc_handle,
 
 		if( pfn_type[batch] == 0x80000004 )
 		{
-		    //printf("Skip netbuf pfn %lx. mfn %lx\n",n,pfn_type[batch]);
+		    DPRINTF("Skip netbuf pfn %lx. mfn %lx\n",n,pfn_type[batch]);
 		    continue;
 		}
 
-//if(iter>1) printf("pfn=%x mfn=%x\n",n,pfn_type[batch]);
+		if(iter>1) { DPRINTF("pfn=%x mfn=%x\n",n,pfn_type[batch]); }
 		
 		batch++;
 	    }
-
-	    for( j = 0; j < batch; j++ )
-	    {
-
-		if( (pfn_type[j] &0xfffff) == 0x0000004 )
-		{
-		    printf("XXXXXXXXSkip netbuf entry %d mfn %lx\n",j,pfn_type[j]);
-		}
-
-		
-	    }
-
 	    
-	    printf("batch %d:%d (n=%d)\n",iter,batch,n);
+	    DPRINTF("batch %d:%d (n=%d)\n",iter,batch,n);
 
 	    if(batch == 0) goto skip; // vanishingly unlikely...
  	    
@@ -418,10 +408,9 @@ int xc_linux_save(int xc_handle,
 	    {
 		if((pfn_type[j]>>29) == 7)
 		{
-		    //printf("type fail: page %i mfn %08lx\n",j,pfn_type[j]);
+		    DPRINTF("type fail: page %i mfn %08lx\n",j,pfn_type[j]);
 		    continue;
 		}
-//if((pfn_type[j] & PGT_type_mask) == L2TAB) printf("L2 pfn=%08lx mfn=%lx\n",pfn_type[j],live_mfn_to_pfn_table[pfn_type[j]&~PGT_type_mask]);
 		
 		/* canonicalise mfn->pfn */
 		pfn_type[j] = (pfn_type[j] & PGT_type_mask) |
@@ -448,7 +437,7 @@ int xc_linux_save(int xc_handle,
 		
 		if((pfn_type[j]>>29) == 7)
 		{
-		    //printf("SKIP BOGUS page %i mfn %08lx\n",j,pfn_type[j]);
+		    DPRINTF("SKIP BOGUS page %i mfn %08lx\n",j,pfn_type[j]);
 		    continue;
 		}
 		
@@ -471,26 +460,28 @@ int xc_linux_save(int xc_handle,
 
 			if ( !MFN_IS_IN_PSEUDOPHYS_MAP(mfn) )
 			{
+			    // I don't think this should ever happen
+
 			    printf("FNI %d : [%08lx,%d] pte=%08lx, mfn=%08lx, pfn=%08lx [mfn]=%08lx\n",
 				   j, pfn_type[j], k,
 				   page[k], mfn, live_mfn_to_pfn_table[mfn],
 				   (live_mfn_to_pfn_table[mfn]<nr_pfns)? 
-				live_pfn_to_mfn_table[live_mfn_to_pfn_table[mfn]]: 0xdeadbeef);
-			    pfn = 0; // be suspicious
+				   live_pfn_to_mfn_table[live_mfn_to_pfn_table[mfn]]: 0xdeadbeef);
+
+			    pfn = 0; // be suspicious, very suspicious
 			    
-//			    ERROR("Frame number in pagetable page is invalid");
-//			    goto out;
+			    //goto out;  // let's try our luck
 
 
 			}
 			page[k] &= PAGE_SIZE - 1;
 			page[k] |= pfn << PAGE_SHIFT;
 			
-			/*
-			  printf("L%d i=%d pfn=%d mfn=%d k=%d pte=%08lx xpfn=%d\n",
-			  pfn_type[j]>>29,
-			  j,i,mfn,k,page[k],page[k]>>PAGE_SHIFT);
-			  */
+#if DEBUG
+			printf("L%d i=%d pfn=%d mfn=%d k=%d pte=%08lx xpfn=%d\n",
+			       pfn_type[j]>>29,
+			       j,i,mfn,k,page[k],page[k]>>PAGE_SHIFT);
+#endif			  
 			
 		    } /* end of page table rewrite for loop */
 		    
@@ -526,11 +517,8 @@ int xc_linux_save(int xc_handle,
 
 	if ( live )
 	{
-	    if ( sent_this_iter < (sent_last_iter * 0.95) && iter < max_iters )
-	    {
-		// we seem to be doing OK, keep going
-	    }
-	    else
+	    if ( ( sent_this_iter > (sent_last_iter * 0.95) ) ||
+		 (iter >= max_iters) || (sent_this_iter < 10) )
 	    {
 		printf("Start last iteration\n");
 		last_iter = 1;
@@ -547,17 +535,13 @@ int xc_linux_save(int xc_handle,
 		goto out;
 	    }
 
-#if 0
-	    if(last_iter) memset(to_send, 0xff, (nr_pfns+7)/8 );
-#endif
-
 	    sent_last_iter = sent_this_iter;
 	}
 
 
     } /* end of while 1 */
 
-printf("All memory is saved\n");
+    DPRINTF("All memory is saved\n");
 
     /* Success! */
     rc = 0;
@@ -579,14 +563,14 @@ printf("All memory is saved\n");
 	PERROR("Could not get info on domain");
 	goto out;
     }
-printf("A\n");    
+
     /* Canonicalise the suspend-record frame number. */
     if ( !translate_mfn_to_pfn(&ctxt.cpu_ctxt.esi) )
     {
         ERROR("State record is not in range of pseudophys map");
         goto out;
     }
-printf("B\n");    
+
     /* Canonicalise each GDT frame number. */
     for ( i = 0; i < ctxt.gdt_ents; i += 512 )
     {
@@ -596,7 +580,7 @@ printf("B\n");
             goto out;
         }
     }
-printf("C\n");    
+
     /* Canonicalise the page table base pointer. */
     if ( !MFN_IS_IN_PSEUDOPHYS_MAP(ctxt.pt_base >> PAGE_SHIFT) )
     {
@@ -604,7 +588,7 @@ printf("C\n");
         goto out;
     }
     ctxt.pt_base = live_mfn_to_pfn_table[ctxt.pt_base >> PAGE_SHIFT] << PAGE_SHIFT;
-printf("D\n");    
+
     if ( (*writerfn)(writerst, &ctxt,                 sizeof(ctxt)) ||
          (*writerfn)(writerst, live_shinfo,           PAGE_SIZE) )
     {
@@ -612,7 +596,7 @@ printf("D\n");
         goto out;
     }
     munmap(live_shinfo, PAGE_SIZE);
-printf("E\n");        
+
 out:
     /* Restart the domain if we had to stop it to save its state. */
     if ( we_stopped_it )

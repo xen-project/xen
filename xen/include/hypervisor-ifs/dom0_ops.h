@@ -289,6 +289,7 @@ typedef struct dom0_op_st
     unsigned long interface_version; /* DOM0_INTERFACE_VERSION */
     union
     {
+	unsigned long           dummy[4];
         dom0_createdomain_t     createdomain;
         dom0_startdomain_t      startdomain;
         dom0_stopdomain_t       stopdomain;

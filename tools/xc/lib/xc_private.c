@@ -379,19 +379,24 @@ int finish_mmu_updates(int xc_handle, mmu_t *mmu)
 int xc_domain_stop_sync( int xc_handle, domid_t domid )
 {
     dom0_op_t op;
+    int i;
+    
 
-    while (1)
+    op.cmd = DOM0_STOPDOMAIN;
+    op.u.stopdomain.domain = (domid_t)domid;
+    if ( do_dom0_op(xc_handle, &op) != 0 )
     {
-        op.cmd = DOM0_STOPDOMAIN;
-        op.u.stopdomain.domain = (domid_t)domid;
-        if ( do_dom0_op(xc_handle, &op) != 0 )
-        {
-            PERROR("Stopping target domain failed");
-            goto out;
-        }
+	PERROR("Stopping target domain failed");
+	goto out;
+    }
 
-        usleep(1000); // 1ms
-	printf("Sleep for 1ms\n");
+    usleep(100); // 100us
+
+    for(i=0;;i++)
+    {
+	if (i>0)
+	    if (i==1) printf("Sleep.");
+	    else printf(".");
 
         op.cmd = DOM0_GETDOMAININFO;
         op.u.getdomaininfo.domain = (domid_t)domid;
@@ -405,10 +410,11 @@ int xc_domain_stop_sync( int xc_handle, domid_t domid )
 
         if ( op.u.getdomaininfo.state == DOMSTATE_STOPPED )
 	{
-	    printf("Domain %lld stopped\n",domid);
+	    printf("\nDomain %lld stopped\n",domid);
             return 0;
 	}
-
+	
+	usleep(1000);
     }
 
 out:

@@ -6,6 +6,8 @@
 #include <xen/shadow.h>
 #include <asm/domain_page.h>
 #include <asm/page.h>
+#include <xen/event.h>
+#include <xen/trace.h>
 
 
 /********
@@ -25,6 +27,8 @@ hypercall context, in which case we'll probably at have a per-domain
 hypercall lock anyhow (at least initially).
 
 ********/
+
+static spinlock_t cpu_stall_lock; 
 
 static inline void free_shadow_page( struct mm_struct *m, 
                                      struct pfn_info *pfn_info )
@@ -155,6 +159,11 @@ static void __scan_shadow_table( struct mm_struct *m, unsigned int op )
 }
 
 
+void shadow_mode_init(void)
+{
+    spin_lock_init( &cpu_stall_lock ); 
+}
+
 int shadow_mode_enable( struct task_struct *p, unsigned int mode )
 {
     struct mm_struct *m = &p->mm;
@@ -260,11 +269,11 @@ void shadow_mode_disable( struct task_struct *p )
 }
 
 static int shadow_mode_table_op( struct task_struct *p, 
-								  dom0_shadow_control_t *sc )
+				 dom0_shadow_control_t *sc )
 {
-	unsigned int op = sc->op;
+    unsigned int op = sc->op;
     struct mm_struct *m = &p->mm;
-	int rc = 0;
+    int rc = 0;
 
     // since Dom0 did the hypercall, we should be running with it's page
     // tables right now. Calling flush on yourself would be really
@@ -290,37 +299,50 @@ static int shadow_mode_table_op( struct task_struct *p,
         break;
    
     case DOM0_SHADOW_CONTROL_OP_CLEAN:
+    {
+	int i,j,zero=1;
+		
+	__scan_shadow_table( m, op );
+	
+	if( p->tot_pages > sc->pages || 
+	    !sc->dirty_bitmap || !p->mm.shadow_dirty_bitmap )
 	{
-		int i;
-
-	    __scan_shadow_table( m, op );
-
-	    if( p->tot_pages > sc->pages || 
-			!sc->dirty_bitmap || !p->mm.shadow_dirty_bitmap )
-	    {
-			rc = -EINVAL;
-			goto out;
-	    }
-	    
-	    sc->pages = p->tot_pages;
-	   
-#define chunk (8*1024) // do this in 1KB chunks for L1 cache
-
-	    for(i=0;i<p->tot_pages;i+=chunk)
-	    {
-			int bytes = ((  ((p->tot_pages-i) > (chunk))?
-				(chunk):(p->tot_pages-i) ) + 7) / 8;
-
-			copy_to_user( sc->dirty_bitmap + (i/(8*sizeof(unsigned long))),
-						  p->mm.shadow_dirty_bitmap +(i/(8*sizeof(unsigned long))),
-						  bytes );
-
-			memset( p->mm.shadow_dirty_bitmap +(i/(8*sizeof(unsigned long))),
-				   0, bytes);
-		}
-
-        break;
+	    rc = -EINVAL;
+	    goto out;
 	}
+	
+	sc->pages = p->tot_pages;
+	
+#define chunk (8*1024) // do this in 1KB chunks for L1 cache
+	
+	for(i=0;i<p->tot_pages;i+=chunk)
+	{
+	    int bytes = ((  ((p->tot_pages-i) > (chunk))?
+			    (chunk):(p->tot_pages-i) ) + 7) / 8;
+	    
+	    copy_to_user( sc->dirty_bitmap + (i/(8*sizeof(unsigned long))),
+			  p->mm.shadow_dirty_bitmap +(i/(8*sizeof(unsigned long))),
+			  bytes );
+	    
+	    for(j=0; zero && j<bytes/sizeof(unsigned long);j++)
+	    {
+		if( p->mm.shadow_dirty_bitmap[j] != 0 )
+		    zero = 0;
+	    }
+
+	    memset( p->mm.shadow_dirty_bitmap +(i/(8*sizeof(unsigned long))),
+		    0, bytes);
+	}
+
+	if (zero)
+	{
+	    /* might as well stop the domain as an optimization. */
+	    if ( p->state != TASK_STOPPED )
+		send_guest_virq(p, VIRQ_STOP);
+	}
+	
+	break;
+    }
     }
 
 
@@ -338,22 +360,45 @@ out:
 	return rc;
 }
 
-
 int shadow_mode_control( struct task_struct *p, dom0_shadow_control_t *sc )
 {
-    int  we_paused = 0;
-	unsigned int cmd = sc->op;
-	int rc = 0;
- 
+    unsigned int cmd = sc->op;
+    int rc = 0, cpu;
+
     // don't call if already shadowed...
 
-    // sychronously stop domain
-    if( 0 && !(p->state & TASK_STOPPED) && !(p->state & TASK_PAUSED))
+    /* The following is pretty hideous because we don't have a way of
+       synchronously pausing a domain. If it's assigned to the curernt CPU,
+       we don't have to worry -- it can't possibly actually be running.
+       If its on another CPU, for the moment, we do something really gross:
+       we cause the other CPU to spin regardless of what domain it is running. 
+
+       I know this is really grim, but it only lasts a few 10's of
+       microseconds. It needs fixing as soon as the last of the Linux-isms
+       get removed from the task structure...
+
+       Oh, and let's hope someone doesn't repin the CPU while we're here.
+       Also, prey someone else doesn't do this in another domain.
+       At least there's only one dom0 at the moment...
+     */
+printk("SMC\n");
+    spin_lock( &cpu_stall_lock );		
+    cpu = p->processor;
+printk("got %d %d\n",cpu, current->processor );
+    if ( cpu != current->processor )
     {
-        printk("about to pause domain\n");
-        sched_pause_sync(p);
-        printk("paused domain\n");
-        we_paused = 1;
+printk("CPU %d %d\n",cpu, current->processor );
+	static void cpu_stall(void * data)
+	{
+	    if ( current->processor == (int) data )
+	    {
+		printk("Stall %d\n",(int)data);
+		spin_lock( &cpu_stall_lock );
+		spin_unlock( &cpu_stall_lock );
+	    }
+	}
+
+	smp_call_function(cpu_stall, (void*)cpu, 1, 0); // don't wait!
     }
 
     if ( p->mm.shadow_mode && cmd == DOM0_SHADOW_CONTROL_OP_OFF )
@@ -376,11 +421,11 @@ int shadow_mode_control( struct task_struct *p, dom0_shadow_control_t *sc )
     }
     else
     {
-        if ( we_paused ) wake_up(p);
-        return -EINVAL;
+        rc = -EINVAL;
     }
 
-    if ( we_paused ) wake_up(p);
+    spin_unlock( &cpu_stall_lock );
+printk("SMC-\n");
     return rc;
 }
 

@@ -31,6 +31,7 @@
 #include <xen/console.h>
 #include <xen/net_headers.h>
 #include <xen/serial.h>
+#include <xen/shadow.h>
 
 kmem_cache_t *task_struct_cachep;
 
@@ -267,6 +268,8 @@ void cmain(unsigned long magic, multiboot_info_t *mbi)
         panic("Error creating domain 0\n");
 
     set_bit(PF_PRIVILEGED, &new_dom->flags);
+
+    shadow_mode_init();
 
     /*
      * We're going to setup domain0 using the module(s) that we stashed safely

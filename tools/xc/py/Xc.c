@@ -191,7 +191,7 @@ static PyObject *pyxc_linux_save(PyObject *self,
 
     u64   dom;
     char *state_file;
-    int   progress = 1, live = 0;
+    int   progress = 1, live = -1;
     unsigned int flags = 0;
 
     static char *kwd_list[] = { "dom", "state_file", "progress", "live", NULL };
@@ -200,8 +200,8 @@ static PyObject *pyxc_linux_save(PyObject *self,
                                       &dom, &state_file, &progress, &live) )
         return NULL;
 
-    if (progress) flags |= XCFLAGS_VERBOSE;
-    if (live)     flags |= XCFLAGS_LIVE;
+    if (progress)  flags |= XCFLAGS_VERBOSE;
+    if (live == 1) flags |= XCFLAGS_LIVE;
 
     if ( strncmp(state_file,"tcp:", strlen("tcp:")) == 0 )
     {
@@ -225,6 +225,8 @@ static PyObject *pyxc_linux_save(PyObject *self,
 	    while ( tot < count );
 	    return 0;
 	}
+
+	if (live == -1) flags |= XCFLAGS_LIVE; // default to live for tcp
 
 	strncpy( server, state_file+strlen("tcp://"), max_namelen);
 	server[max_namelen-1]='\0';

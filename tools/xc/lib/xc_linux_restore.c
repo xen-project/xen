@@ -12,6 +12,15 @@
 
 #define MAX_BATCH_SIZE 1024
 
+#define DEBUG 0
+
+#if DEBUG
+#define DPRINTF(_f, _a...) printf ( _f , ## _a )
+#else
+#define DPRINTF(_f, _a...) ((void)0)
+#endif
+
+
 /* This may allow us to create a 'quiet' command-line option, if necessary. */
 #define verbose_printf(_f, _a...) \
     do {                          \
@@ -230,7 +239,7 @@ int xc_linux_restore(int xc_handle,
             goto out;
         }
 
-	printf("batch %d\n",j);
+	DPRINTF("batch %d\n",j);
 	
 	if (j == 0) 
 	    break;  // our work here is done
@@ -272,11 +281,6 @@ int xc_linux_restore(int xc_handle,
 
 	    pfn = region_pfn_type[i] & ~PGT_type_mask;
 
-//if(n>=nr_pfns || ((region_pfn_type[i] & PGT_type_mask) == L2TAB) ) printf("pfn=%08lx mfn=%x\n",region_pfn_type[i],pfn_to_mfn_table[pfn]);
-
-	    	  	    
-//if(pfn_type[i])printf("^pfn=%d %08lx\n",pfn,pfn_type[i]);
-
             if ((region_pfn_type[i]>>29) == 7)
 		continue;
 
@@ -291,8 +295,6 @@ int xc_linux_restore(int xc_handle,
 	    pfn_type[pfn] = region_pfn_type[i];
 
 	    mfn = pfn_to_mfn_table[pfn];
-
-//if(region_pfn_type[i])printf("i=%d pfn=%d mfn=%d type=%lx\n",i,pfn,mfn,region_pfn_type[i]);
 
             ppage = (unsigned long*) (region_base + i*PAGE_SIZE);
 
@@ -315,21 +317,12 @@ int xc_linux_restore(int xc_handle,
 		    {
 			xpfn = ppage[k] >> PAGE_SHIFT;
 
-/*printf("L1 i=%d pfn=%d mfn=%d k=%d pte=%08lx xpfn=%d\n",
-       i,pfn,mfn,k,ppage[k],xpfn);*/
-
 			if ( xpfn >= nr_pfns )
 			{
 			    ERROR("Frame number in type %d page table is out of range. i=%d k=%d pfn=0x%x nr_pfns=%d",region_pfn_type[i]>>29,i,k,xpfn,nr_pfns);
 			    goto out;
 			}
-#if 0
-			if ( (region_pfn_type[xpfn] != NONE) && (ppage[k] & _PAGE_RW) )
-			{
-			    ERROR("Write access requested for a restricted frame");
-			    goto out;
-			}
-#endif
+
 			ppage[k] &= (PAGE_SIZE - 1) & ~(_PAGE_GLOBAL | _PAGE_PAT);
 			ppage[k] |= pfn_to_mfn_table[xpfn] << PAGE_SHIFT;
 		    }
@@ -344,9 +337,6 @@ int xc_linux_restore(int xc_handle,
 		    if ( ppage[k] & _PAGE_PRESENT )
 		    {
 			xpfn = ppage[k] >> PAGE_SHIFT;
-
-/*printf("L2 i=%d pfn=%d mfn=%d k=%d pte=%08lx xpfn=%d\n",
-       i,pfn,mfn,k,ppage[k],xpfn);*/
 
 			if ( xpfn >= nr_pfns )
 			{
@@ -383,7 +373,8 @@ int xc_linux_restore(int xc_handle,
 	n+=j; // crude stats
 
     }
-printf("RECEIVED ALL PAGES\n");
+
+    DPRINTF("Received all pages\n");
 
     mfn_mapper_close( region_mapper );
 
@@ -444,8 +435,6 @@ printf("RECEIVED ALL PAGES\n");
     p_srec->resume_info.shared_info = shared_info_frame << PAGE_SHIFT;
     p_srec->resume_info.flags       = 0;
     unmap_pfn(pm_handle, p_srec);
-
-printf("new shared info is %lx\n", shared_info_frame);
 
     /* Uncanonicalise each GDT frame number. */
     if ( ctxt.gdt_ents > 8192 )
@@ -554,9 +543,9 @@ printf("new shared info is %lx\n", shared_info_frame);
     op.u.builddomain.ctxt = &ctxt;
     rc = do_dom0_op(xc_handle, &op);
 
-printf("NORMAL EXIT RESTORE\n");
+    DPRINTF("Everything OK!\n");
+
  out:
-printf("EXIT RESTORE\n");
     if ( mmu != NULL )
         free(mmu);
 

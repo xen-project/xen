@@ -23,6 +23,7 @@
 #define shadow_linear_pg_table ((l1_pgentry_t *)SH_LINEAR_PT_VIRT_START)
 #define shadow_linear_l2_table ((l2_pgentry_t *)(SH_LINEAR_PT_VIRT_START+(SH_LINEAR_PT_VIRT_START>>(L2_PAGETABLE_SHIFT-L1_PAGETABLE_SHIFT))))
 
+extern void shadow_mode_init(void);
 extern int shadow_mode_control( struct task_struct *p, dom0_shadow_control_t *sc );
 extern int shadow_fault( unsigned long va, long error_code );
 extern void shadow_l1_normal_pt_update( unsigned long pa, unsigned long gpte, 
