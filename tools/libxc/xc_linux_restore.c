@@ -99,7 +99,7 @@ int xc_linux_restore(int xc_handle, XcIOContext *ioctxt)
     /* A temporary mapping of the guest's suspend record. */
     suspend_record_t *p_srec;
 
-    char *region_base;
+    char *region_base, *p_gdt;
 
     mmu_t *mmu = NULL;
 
@@ -541,6 +541,13 @@ int xc_linux_restore(int xc_handle, XcIOContext *ioctxt)
         }
         ctxt.gdt_frames[i] = pfn_to_mfn_table[pfn];
     }
+
+    /* Zero hypervisor GDT entries (supresses ugly warning) */
+    p_gdt = xc_map_foreign_range(
+        xc_handle, dom, PAGE_SIZE, PROT_WRITE, ctxt.gdt_frames[0]);
+    memset( p_gdt + FIRST_RESERVED_GDT_ENTRY*8, 0,
+               NR_RESERVED_GDT_ENTRIES*8 );
+    munmap( p_gdt, PAGE_SIZE );
 
     /* Uncanonicalise the page table base pointer. */
     pfn = ctxt.pt_base >> PAGE_SHIFT;
