@@ -243,6 +243,15 @@ int xc_linux_restore(int xc_handle, XcIOContext *ioctxt)
     }
     shared_info_frame = op.u.getdomaininfo.shared_info_frame;
 
+    if(ioctxt->flags & XCFLAGS_CONFIGURE)
+    {
+        if(xcio_configure_domain(ioctxt))
+        {
+           xcio_error(ioctxt, "Configuring domain failed"); 
+           goto out;
+        }
+    }
+
     /* Build the pfn-to-mfn table. We choose MFN ordering returned by Xen. */
     if ( get_pfn_list(xc_handle, dom, pfn_to_mfn_table, nr_pfns) != nr_pfns )
     {

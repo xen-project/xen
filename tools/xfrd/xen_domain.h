@@ -11,7 +11,10 @@ extern int xen_domain_snd(Conn *xend, IOStream *io,
                           uint32_t dom,
                           char *vmconfig, int vmconfig_n,
                           int live);
-extern int xen_domain_rcv(IOStream *io, uint32_t *dom, char **vmconfig, int *vmconfig_n);
+extern int xen_domain_rcv(IOStream *io,
+                          uint32_t *dom,
+                          char **vmconfig, int *vmconfig_n,
+                          int *configured);
 
 
 extern int xen_domain_configure(uint32_t dom, char *vmconfig, int vmconfig_n);

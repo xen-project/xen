@@ -211,9 +211,9 @@ class XendDomain:
         @param id:     domain id
         @param notify: send a domain died event if true
         """
-        for info in self.domain_by_name.values():
+        for (k, info) in self.domain_by_name.items():
             if info.id == id:
-                del self.domain_by_name[info.name]
+                del self.domain_by_name[k]
         if id in self.domain_by_id:
             info = self.domain_by_id[id]
             del self.domain_by_id[id]
@@ -408,11 +408,15 @@ class XendDomain:
         @return: deferred
         """
         
-        def cbok(dominfo):
-            self._add_domain(dominfo)
-            return dominfo
-        deferred = XendDomainInfo.vm_restore(src, progress=progress)
-        deferred.addCallback(cbok)
+        if 0:
+            def cbok(dominfo):
+                self._add_domain(dominfo)
+                return dominfo
+            deferred = XendDomainInfo.vm_restore(src, progress=progress)
+            deferred.addCallback(cbok)
+        else:
+            xmigrate = XendMigrate.instance()
+            deferred = xmigrate.restore_begin(src)
         return deferred
     
     def domain_get(self, id):

@@ -99,6 +99,8 @@ Sxpr oxfr_hello;     // (xfr.hello <major> <minor>)
 Sxpr oxfr_migrate;   // (xfr.migrate <vmid> <vmconfig> <host> <port> <live>)
 Sxpr oxfr_migrate_ok;// (xfr.migrate.ok <value>)
 Sxpr oxfr_progress;  // (xfr.progress <percent> <rate: kb/s>)
+Sxpr oxfr_restore;   // (xfr.restore <file>)
+Sxpr oxfr_restore_ok;// (xfr.restore.ok <vmid>)
 Sxpr oxfr_save;      // (xfr.save <vmid> <vmconfig> <file>)
 Sxpr oxfr_save_ok;   // (xfr.save.ok)
 Sxpr oxfr_vm_destroy;// (xfr.vm.destroy <vmid>)
@@ -113,6 +115,8 @@ void xfr_init(void){
     oxfr_migrate        = intern("xfr.migrate");
     oxfr_migrate_ok     = intern("xfr.migrate.ok");
     oxfr_progress       = intern("xfr.progress");
+    oxfr_restore        = intern("xfr.restore");
+    oxfr_restore_ok     = intern("xfr.restore.ok");
     oxfr_save           = intern("xfr.save");
     oxfr_save_ok        = intern("xfr.save.ok");
     oxfr_vm_destroy     = intern("xfr.vm.destroy");
@@ -540,6 +544,14 @@ int xfr_send_migrate_ok(Conn *conn, uint32_t vmid){
     return (err < 0 ? err : 0);
 }
 
+int xfr_send_restore_ok(Conn *conn, uint32_t vmid){
+    int err = 0;
+
+    err = IOStream_print(conn->out, "(%s %d)",
+                         atom_name(oxfr_restore_ok), vmid);
+    return (err < 0 ? err : 0);
+}
+
 int xfr_send_save_ok(Conn *conn){
     int err = 0;
 
@@ -777,6 +789,46 @@ int xfr_save(Args *args, XfrState *state, Conn *xend, char *file){
     return err;
 }
 
+/** Restore a vm from file.
+ *
+ * @return 0 on success, error code otherwise
+ */
+int xfr_restore(Args *args, XfrState *state, Conn *xend, char *file){
+    int err = 0;
+    IOStream *io = NULL;
+    int configured=0;
+
+    dprintf("> file=%s\n", file);
+    io = gzip_stream_fopen(file, "rb");
+    if(!io){
+        eprintf("> Failed to open %s\n", file);
+        err = -EINVAL;
+        goto exit;
+    }
+    err = xen_domain_rcv(io,
+                         &state->vmid_new,
+                         &state->vmconfig, &state->vmconfig_n,
+                         &configured);
+    if(err) goto exit;
+    if(!configured){
+        err = xen_domain_configure(state->vmid_new, state->vmconfig, state->vmconfig_n);
+        if(err) goto exit;
+    }
+    err = xen_domain_unpause(state->vmid_new);
+  exit:
+    if(io){
+        IOStream_close(io);
+        IOStream_free(io);
+    }
+    if(err){
+        xfr_error(xend, err);
+    } else {
+        xfr_send_restore_ok(xend, state->vmid_new);
+    }
+    dprintf("< err=%d\n", err);
+    return err;
+}
+
 /** Accept the transfer of a vm from another node.
  *
  * @param peer connection
@@ -787,17 +839,31 @@ int xfr_recv(Args *args, XfrState *state, Conn *peer){
     int err = 0;
     time_t t0 = time(NULL), t1;
     Sxpr sxpr;
+    int configured=0;
 
-    dprintf(">\n");
-    err = xen_domain_rcv(peer->in, &state->vmid_new, &state->vmconfig, &state->vmconfig_n);
+    dprintf("> peer=%s\n", inet_ntoa(peer->addr.sin_addr));
+    // If receiving from localhost set configured so that that xen_domain_rcv()
+    // does not attempt to configure the new domain. This is because the old
+    // domain still exists and will make it fail.
+    if(peer->addr.sin_addr.s_addr == htonl(INADDR_LOOPBACK)){
+        dprintf("> Peer is localhost\n");
+        configured = 1;
+    }
+    err = xen_domain_rcv(peer->in,
+                         &state->vmid_new,
+                         &state->vmconfig, &state->vmconfig_n,
+                         &configured);
     if(err) goto exit;
     // Read from the peer. This is just so we wait before configuring.
     // When migrating to the same host the peer must destroy the domain
     // before we configure the new one.
     err = Conn_sxpr(peer, &sxpr);
     if(err) goto exit;
-    err = xen_domain_configure(state->vmid_new, state->vmconfig, state->vmconfig_n);
-    if(err) goto exit;
+    if(!configured){
+        dprintf("> Configuring...\n");
+        err = xen_domain_configure(state->vmid_new, state->vmconfig, state->vmconfig_n);
+        if(err) goto exit;
+    }
     err = xen_domain_unpause(state->vmid_new);
     if(err) goto exit;
     // Report new domain id to peer.
@@ -877,6 +943,17 @@ int xfrd_service(Args *args, int peersock, struct sockaddr_in peer_in){
         err = stringof(sxpr_childN(sxpr, n++, ONONE), &file);
         if(err) goto exit;
         err = xfr_save(args, state, conn, file);
+
+    } else if(sxpr_elementp(sxpr, oxfr_restore)){
+        // Restore message from xend.
+        char *file;
+        XfrState _state = {}, *state = &_state;
+        int n = 0;
+
+        dprintf("> xfr.restore\n");
+        err = stringof(sxpr_childN(sxpr, n++, ONONE), &file);
+        if(err) goto exit;
+        err = xfr_restore(args, state, conn, file);
 
     } else if(sxpr_elementp(sxpr, oxfr_xfr)){
         // Xfr message from peer xfrd.
@@ -1144,9 +1221,11 @@ int main(int argc, char *argv[]){
     int long_index = 0;
     static const char * LOGFILE = "/var/log/xfrd.log";
 
+#ifndef DEBUG
     freopen(LOGFILE, "w+", stdout);
     fclose(stderr);
     stderr = stdout;
+#endif
     dprintf(">\n");
     set_defaults(args);
     while(1){
