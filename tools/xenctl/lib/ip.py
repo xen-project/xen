@@ -3,7 +3,43 @@ import re
 import socket
 import struct
 
+def readlines(fd):
+    """Version of readlines safe against EINTR.
+    """
+    import errno
+    
+    lines = []
+    while 1:
+        try:
+            line = fd.readline()
+        except IOError, ex:
+            if ex.errno == errno.EINTR:
+                continue
+            else:
+                raise
+        if line == '': break
+        lines.append(line)
+    return lines
+
+def readline(fd):
+    """Version of readline safe against EINTR.
+    """
+    while 1:
+        try:
+            return fd.readline()
+        except IOError, ex:
+            if ex.errno == errno.EINTR:
+                continue
+            else:
+                raise
+
 ##### Networking-related functions
+
+"""Bridge for network backend.
+When bridging is used, eth0 may not have an IP address,
+as it may have been moved onto the bridge.
+"""
+NBE_BRIDGE = 'nbe-br'
 
 def get_current_ipaddr(dev='eth0'):
     """Return a string containing the primary IP address for the given
@@ -16,6 +52,8 @@ def get_current_ipaddr(dev='eth0'):
                        line )
         if m:
             return m.group(1)
+    if dev == 'eth0':
+        return get_current_ipaddr(NBE_BRIDGE)
     return None
 
 def get_current_ipmask(dev='eth0'):
@@ -29,6 +67,8 @@ def get_current_ipmask(dev='eth0'):
                        line )
         if m:
             return m.group(1)
+    if dev == 'eth0':
+        return get_current_ipmask(NBE_BRIDGE)
     return None
 
 def get_current_ipgw(dev='eth0'):
@@ -42,30 +82,8 @@ def get_current_ipgw(dev='eth0'):
                        '\s+\S+\s+\S*G.*' + dev + '.*', line )
         if m:
             return m.group(1)
-    return None
-
-def setup_vfr_rules_for_vif(dom,vif,addr):
-    """Takes a tuple ( domain-id, vif-id, ip-addr ), where the ip-addr
-    is expressed as a textual dotted quad, and set up appropriate routing
-    rules in Xen. No return value.
-    """
-    fd = os.open( '/proc/xen/vfr', os.O_WRONLY )
-    if ( re.search( '169\.254', addr) ):
-        os.write( fd, 'ADD ACCEPT srcaddr=' + addr +
-                  ' srcaddrmask=255.255.255.255' +
-                  ' srcdom=' + str(dom) + ' srcidx=' + str(vif) +
-                  ' dstdom=0 dstidx=0 proto=any\n' )
-    else:
-        os.write( fd, 'ADD ACCEPT srcaddr=' + addr +
-                  ' srcaddrmask=255.255.255.255' +
-                  ' srcdom=' + str(dom) + ' srcidx=' + str(vif) +
-                  ' dst=PHYS proto=any\n' )
-    os.write( fd, 'ADD ACCEPT dstaddr=' + addr +
-              ' dstaddrmask=255.255.255.255' +
-              ' src=ANY' +
-              ' dstdom=' + str(dom) + ' dstidx=' + str(vif) +
-              ' proto=any\n' )
-    os.close( fd )
+    if dev == 'eth0':
+        return get_current_ipgw(NBE_BRIDGE)
     return None
 
 def inet_aton(addr):

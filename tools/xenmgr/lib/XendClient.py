@@ -12,7 +12,7 @@ from encode import *
 import sxp
 import PrettyPrint
 
-DEBUG = 1
+DEBUG = 0
 
 class Foo(httplib.HTTPResponse):
 
@@ -55,6 +55,8 @@ def fileof(val):
 # And should accept urls for ids?
 
 def urljoin(location, root, prefix='', rest=''):
+    prefix = str(prefix)
+    rest = str(rest)
     base = 'http://' + location + root + prefix
     url = urlparse.urljoin(base, rest)
     return url
@@ -67,9 +69,6 @@ def domainurl(location, root, id=''):
 
 def consoleurl(location, root, id=''):
     return urljoin(location, root, 'console/', id)
-
-def vbdurl(location, root, id=''):
-    return urljoin(location, root, 'vbd/', id)
 
 def deviceurl(location, root, id=''):
     return urljoin(location, root, 'device/', id)
@@ -154,9 +153,6 @@ class Xend:
 
     def consoleurl(self, id=''):
         return consoleurl(self.location, self.root, id)
-
-    def vbdurl(self, id=''):
-        return vbdurl(self.location, self.root, id)
 
     def deviceurl(self, id=''):
         return deviceurl(self.location, self.root, id)
@@ -283,45 +279,23 @@ class Xend:
                         {'op'       : 'vbd',
                          'vbd'      : vbd})
 
-    def xend_domain_vbd_add(self, id, uname, dev, mode):
-        return xend_call(self.domainurl(id),
-                         {'op'      : 'vbd_add',
-                          'uname'   : uname,
-                          'dev'     : dev,
-                          'mode'    : mode})
+##     def xend_domain_vbd_add(self, id, uname, dev, mode):
+##         return xend_call(self.domainurl(id),
+##                          {'op'      : 'vbd_add',
+##                           'uname'   : uname,
+##                           'dev'     : dev,
+##                           'mode'    : mode})
 
-    def xend_domain_vbd_remove(self, id, dev):
-        return xend_call(self.domainurl(id),
-                         {'op'      : 'vbd_remove',
-                          'dev'     : dev})
+##     def xend_domain_vbd_remove(self, id, dev):
+##         return xend_call(self.domainurl(id),
+##                          {'op'      : 'vbd_remove',
+##                           'dev'     : dev})
 
     def xend_consoles(self):
         return xend_get(self.consoleurl())
 
     def xend_console(self, id):
         return xend_get(self.consoleurl(id))
-
-    def xend_vbds(self):
-        return xend_get(self.vbdurl())
-
-    def xend_vbd_create(self, conf):
-        return xend_call(self.vbdurl(),
-                         {'op': 'create', 'config': fileof(conf) })
-
-    def xend_vbd(self, id):
-        return xend_get(self.vbdurl(id))
-
-    def xend_vbd_delete(self, id):
-        return xend_call(self.vbdurl(id),
-                         {'op': 'delete'})
-
-    def xend_vbd_refresh(self, id, expiry):
-        return xend_call(self.vbdurl(id),
-                         {'op': 'refresh', 'expiry': expiry })
-
-    def xend_vbd_expand(self, id, size):
-        return xend_call(self.vbdurl(id),
-                         {'op': 'expand', 'size': size})
 
     def xend_vnets(self):
         return xend_get(self.vneturl())
