@@ -350,6 +350,38 @@ static int shadow_mode_table_op( struct task_struct *p,
 
 		break;
     }
+
+    case DOM0_SHADOW_CONTROL_OP_PEEK:
+    {
+		int i;
+	
+		if( p->tot_pages > sc->pages || 
+			!sc->dirty_bitmap || !p->mm.shadow_dirty_bitmap )
+		{
+			rc = -EINVAL;
+			goto out;
+		}
+	
+		sc->pages = p->tot_pages;
+	
+#define chunk (8*1024) // do this in 1KB chunks for L1 cache
+	
+		for(i=0;i<p->tot_pages;i+=chunk)
+		{
+			int bytes = ((  ((p->tot_pages-i) > (chunk))?
+							(chunk):(p->tot_pages-i) ) + 7) / 8;
+	    
+			copy_to_user( sc->dirty_bitmap + (i/(8*sizeof(unsigned long))),
+						  p->mm.shadow_dirty_bitmap +(i/(8*sizeof(unsigned long))),
+						  bytes );	    
+		}
+
+		break;
+    }
+
+	default:
+		BUG();
+
     }
 
 
@@ -386,7 +418,7 @@ int shadow_mode_control( struct task_struct *p, dom0_shadow_control_t *sc )
         if(p->mm.shadow_mode) shadow_mode_disable(p);
         shadow_mode_enable(p, SHM_logdirty);
     } 
-    else if ( p->mm.shadow_mode && cmd >= DOM0_SHADOW_CONTROL_OP_FLUSH && cmd<=DOM0_SHADOW_CONTROL_OP_CLEAN )
+    else if ( p->mm.shadow_mode && cmd >= DOM0_SHADOW_CONTROL_OP_FLUSH && cmd<=DOM0_SHADOW_CONTROL_OP_PEEK )
     {
         rc = shadow_mode_table_op(p, sc);
     }

@@ -140,8 +140,9 @@ int xc_linux_save(int xc_handle,
     /* bitmap of pages left to send */
     unsigned long *to_send, *to_fix;
 
-//live=0;
-
+    int needed_to_fix = 0;
+    int total_sent    = 0;
+    
     if ( mlock(&ctxt, sizeof(ctxt) ) )
     {
         PERROR("Unable to mlock ctxt");
@@ -422,6 +423,7 @@ int xc_linux_save(int xc_handle,
 
 		if ( last_iter && test_bit(n, to_fix ) && !test_bit(n, to_send ))
 		{
+		    needed_to_fix++;
 		    DPRINTF("Fix! iter %d, pfn %lx. mfn %lx\n",
 			       iter,n,pfn_type[batch]);
 		}
@@ -567,9 +569,18 @@ int xc_linux_save(int xc_handle,
 	munmap(region_base, batch*PAGE_SIZE);
 
     skip: 
-	
+
+	total_sent += sent_this_iter;
+
 	verbose_printf("\b\b\b\b100%% (%d pages)\n", sent_this_iter );
 	
+	if ( last_iter )
+	{
+	    verbose_printf("Total pages sent= %d (%.2fx)\n", 
+			   total_sent, ((float)total_sent)/nr_pfns );
+	    verbose_printf("(of which %d were fixups)\n", needed_to_fix  );
+	}       
+
 	if ( debug && last_iter )
 	{
 	    int minusone = -1;

@@ -238,6 +238,7 @@ typedef struct dom0_sched_id_st
 #define DOM0_SHADOW_CONTROL_OP_ENABLE_LOGDIRTY 2
 #define DOM0_SHADOW_CONTROL_OP_FLUSH       10
 #define DOM0_SHADOW_CONTROL_OP_CLEAN       11
+#define DOM0_SHADOW_CONTROL_OP_PEEK        12
 typedef struct dom0_shadow_control_st
 {
     /* IN variables. */
