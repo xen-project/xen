@@ -8,11 +8,13 @@ CFLAGS	+= -Iarch/$(XENARCH)/kernel
 extra-y 	:= head.o head64.o init_task.o
 
 obj-y	:= process.o signal.o entry.o traps.o  \
-		time.o ioport.o ldt.o setup.o \
+		ioport.o ldt.o setup.o \
 		x8664_ksyms.o vsyscall.o \
 		setup64.o e820.o irq.o early_printk.o
 c-obj-y	:= semaphore.o i387.o sys_x86_64.o \
 		ptrace.o quirks.o syscall.o
+
+obj-y				+= ../../i386/time.o
 obj-y				+= ../../i386/kernel/timers/
 
 s-obj-y	:=
