@@ -68,10 +68,16 @@ static PEND_RING_IDX pending_prod, pending_cons;
 static kmem_cache_t *buffer_head_cachep;
 #else
 static request_queue_t *plugged_queue;
-static inline void bdev_flush_queue(request_queue_t *q)
+static inline void flush_plugged_queue(void)
 {
-    if ( q->unplug_fn != NULL )
-        q->unplug_fn(q);
+    request_queue_t *q = plugged_queue;
+    if ( q != NULL )
+    {
+        if ( q->unplug_fn != NULL )
+            q->unplug_fn(q);
+        blk_put_queue(q);
+        plugged_queue = NULL;
+    }
 }
 #endif
 
@@ -187,11 +193,7 @@ static int blkio_schedule(void *arg)
 #if LINUX_VERSION_CODE < KERNEL_VERSION(2,6,0)
         run_task_queue(&tq_disk);
 #else
-        if ( plugged_queue != NULL )
-        {
-            bdev_flush_queue(plugged_queue);
-            plugged_queue = NULL;
-        }
+        flush_plugged_queue();
 #endif
     }
 }
@@ -516,8 +518,8 @@ static void dispatch_rw_block_io(blkif_t *blkif, blkif_request_t *req)
 
         if ( (q = bdev_get_queue(bio->bi_bdev)) != plugged_queue )
         {
-            if ( plugged_queue != NULL )
-                bdev_flush_queue(plugged_queue);
+            flush_plugged_queue();
+            blk_get_queue(q);
             plugged_queue = q;
         }
 
