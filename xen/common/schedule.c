@@ -164,13 +164,13 @@ void init_idle_task(void)
 void domain_sleep(struct domain *d)
 {
     unsigned long flags;
-    int           cpu = d->processor;
 
-    spin_lock_irqsave(&schedule_data[cpu].schedule_lock, flags);
+    /* sleep and wake protected by domain's state_lock */
+    spin_lock_irqsave(&d->state_lock, flags);
     if ( likely(!domain_runnable(d)) )
         SCHED_OP(sleep, d);
-    spin_unlock_irqrestore(&schedule_data[cpu].schedule_lock, flags);
-
+    spin_unlock_irqrestore(&d->state_lock, flags);
+ 
     /* Synchronous. */
     while ( test_bit(DF_RUNNING, &d->flags) && !domain_runnable(d) )
     {
@@ -182,8 +182,9 @@ void domain_sleep(struct domain *d)
 void domain_wake(struct domain *d)
 {
     unsigned long       flags;
-    int                 cpu = d->processor;
-    spin_lock_irqsave(&schedule_data[cpu].schedule_lock, flags);
+
+    spin_lock_irqsave(&d->state_lock, flags);
+    
     if ( likely(domain_runnable(d)) )
     {
         TRACE_2D(TRC_SCHED_WAKE, d->domain, d);
@@ -192,7 +193,8 @@ void domain_wake(struct domain *d)
         d->wokenup = NOW();
 #endif
     }
-    spin_unlock_irqrestore(&schedule_data[cpu].schedule_lock, flags);
+
+    spin_unlock_irqrestore(&d->state_lock, flags);
 }
 
 /* Block the currently-executing domain until a pertinent event occurs. */
@@ -323,9 +325,9 @@ void __enter_scheduler(void)
     s32                 r_time;     /* time for new dom to run */
 
     perfc_incrc(sched_run);
-
+    
     spin_lock_irq(&schedule_data[cpu].schedule_lock);
-
+ 
     now = NOW();
 
     rem_ac_timer(&schedule_data[cpu].s_timer);
@@ -349,9 +351,9 @@ void __enter_scheduler(void)
 
     r_time = next_slice.time;
     next = next_slice.task;
-
+    
     schedule_data[cpu].curr = next;
-
+    
     next->lastschd = now;
 
     /* reprogramm the timer */
