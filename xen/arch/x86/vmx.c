@@ -21,6 +21,7 @@
 #include <xen/config.h>
 #include <xen/init.h>
 #include <xen/lib.h>
+#include <xen/trace.h>
 #include <xen/sched.h>
 #include <asm/current.h>
 #include <asm/io.h>
@@ -675,11 +676,14 @@ void restore_xen_regs(struct xen_regs *regs)
 }
 #endif
 
+#define TRC_VMX_VMEXIT 0x00040001
+#define TRC_VMX_VECTOR 0x00040002
+
 asmlinkage void vmx_vmexit_handler(struct xen_regs regs)
 {
     unsigned int exit_reason, idtv_info_field;
     unsigned long exit_qualification, eip, inst_len = 0;
-    struct exec_domain *d = current;
+    struct exec_domain *ed = current;
     int error;
 
     if ((error = __vmread(VM_EXIT_REASON, &exit_reason)))
@@ -707,11 +711,12 @@ asmlinkage void vmx_vmexit_handler(struct xen_regs regs)
         VMX_DBG_LOG(DBG_LEVEL_0, "exit reason = %x\n", exit_reason);
 
     if (exit_reason & VMX_EXIT_REASONS_FAILED_VMENTRY) {
-        __vmread(EXIT_QUALIFICATION, &exit_qualification);
-        __vmread(GUEST_EIP, &eip);
         domain_crash();         
         return;
     }
+
+    __vmread(GUEST_EIP, &eip);
+    TRACE_3D(TRC_VMX_VMEXIT, ed->domain->id, eip, exit_reason);
 
     switch (exit_reason) {
     case EXIT_REASON_EXCEPTION_NMI:
@@ -733,6 +738,7 @@ asmlinkage void vmx_vmexit_handler(struct xen_regs regs)
 
         perfc_incra(cause_vector, vector);
 
+        TRACE_3D(TRC_VMX_VECTOR, ed->domain->id, eip, vector);
         switch (vector) {
 #ifdef XEN_DEBUGGER
         case VECTOR_DB:
@@ -763,7 +769,7 @@ asmlinkage void vmx_vmexit_handler(struct xen_regs regs)
                     "eax=%lx, ebx=%lx, ecx=%lx, edx=%lx, esi=%lx, edi=%lx\n",
                         regs.eax, regs.ebx, regs.ecx, regs.edx, regs.esi,
                         regs.edi);
-            d->arch.arch_vmx.vmx_platform.mpci.inst_decoder_regs = &regs;
+            ed->arch.arch_vmx.vmx_platform.mpci.inst_decoder_regs = &regs;
 
             if (!(error = vmx_do_page_fault(va, error_code))) {
                 /*
@@ -777,7 +783,7 @@ asmlinkage void vmx_vmexit_handler(struct xen_regs regs)
                            VECTOR_PG);
                 __vmwrite(VM_ENTRY_INTR_INFO_FIELD, intr_fields);
                 __vmwrite(VM_ENTRY_EXCEPTION_ERROR_CODE, error_code);
-                d->arch.arch_vmx.cpu_cr2 = va;
+                ed->arch.arch_vmx.cpu_cr2 = va;
             }
             break;
         }
@@ -814,7 +820,7 @@ asmlinkage void vmx_vmexit_handler(struct xen_regs regs)
     case EXIT_REASON_PENDING_INTERRUPT:
         __vmwrite(CPU_BASED_VM_EXEC_CONTROL, 
               MONITOR_CPU_BASED_EXEC_CONTROLS);
-        vmx_intr_assist(d);
+        vmx_intr_assist(ed);
         break;
     case EXIT_REASON_TASK_SWITCH:
         __vmx_bug(&regs);
@@ -844,7 +850,7 @@ asmlinkage void vmx_vmexit_handler(struct xen_regs regs)
         __vmread(GUEST_EIP, &eip);
         __vmread(EXIT_QUALIFICATION, &exit_qualification);
 
-        vmx_print_line(regs.eax, d); /* provides the current domain */
+        vmx_print_line(regs.eax, ed); /* provides the current domain */
         __update_guest_eip(inst_len);
         break;
     case EXIT_REASON_CR_ACCESS:
@@ -892,7 +898,7 @@ asmlinkage void vmx_vmexit_handler(struct xen_regs regs)
         __vmx_bug(&regs);       /* should not happen */
     }
 
-    vmx_intr_assist(d);
+    vmx_intr_assist(ed);
     return;
 }
 
