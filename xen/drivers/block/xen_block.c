@@ -536,15 +536,20 @@ static void dispatch_rw_block_io(struct task_struct *p, int index)
 	rc = vbd_translate(&phys_seg[nr_psegs], &new_segs, p, operation); 
 
 	/* If it fails we bail (unless the caller is priv => has raw access) */
-	if(rc && !IS_PRIV(p)) { 
-	    printk("access denied: attempted %s of [%ld,%ld] on dev=%04x\n", 
-		   operation == READ ? "read" : "write", 
-		   req->sector_number + tot_sects, 
-		   req->sector_number + tot_sects + nr_sects, 
-		   req->device); 
-	    goto bad_descriptor;
+	if(rc) { 
+	    if(!IS_PRIV(p)) {
+		printk("access denied: %s of [%ld,%ld] on dev=%04x\n", 
+		       operation == READ ? "read" : "write", 
+		       req->sector_number + tot_sects, 
+		       req->sector_number + tot_sects + nr_sects, 
+		       req->device); 
+		goto bad_descriptor;
+	    }
+
+	    /* SMH: skanky hack; clear any 'partition' info in device */
+	    phys_seg[nr_psegs].dev = req->device & 0xFFF0;
 	}
-	    
+	 
         nr_psegs += new_segs;
         if ( nr_psegs >= (MAX_BLK_SEGS*2) ) BUG();
     }
