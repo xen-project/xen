@@ -1,18 +1,18 @@
 /******************************************************************************
- * xen/i386/mm/hypervisor.c
+ * mm/hypervisor.c
  * 
  * Update page tables via the hypervisor.
  * 
- * Copyright (c) 2002, K A Fraser
+ * Copyright (c) 2002-2004, K A Fraser
  */
 
 #include <linux/config.h>
 #include <linux/sched.h>
 #include <linux/mm.h>
 #include <linux/vmalloc.h>
-#include <asm/hypervisor.h>
 #include <asm/page.h>
 #include <asm/pgtable.h>
+#include <asm-xen/hypervisor.h>
 #include <asm-xen/multicall.h>
 
 /*
@@ -23,11 +23,14 @@
  */
 static spinlock_t update_lock = SPIN_LOCK_UNLOCKED;
 
-#if 0
+/* Linux 2.6 isn't using the traditional batched interface. */
+#if LINUX_VERSION_CODE < KERNEL_VERSION(2,6,0)
 #define QUEUE_SIZE 2048
+#define pte_offset_kernel pte_offset
 #else
 #define QUEUE_SIZE 1
 #endif
+
 static mmu_update_t update_queue[QUEUE_SIZE];
 unsigned int mmu_update_queue_idx = 0;
 #define idx mmu_update_queue_idx

@@ -202,6 +202,12 @@ ln -sf ../asm-i386/ucontext.h
 ln -sf ../asm-i386/unaligned.h
 ln -sf ../asm-i386/unistd.h 
 ln -sf ../asm-i386/user.h 
+ln -sf ../../${LINUX_26}/include/asm-xen/ctrl_if.h
+ln -sf ../../${LINUX_26}/include/asm-xen/evtchn.h
+ln -sf ../../${LINUX_26}/include/asm-xen/hypervisor.h
+ln -sf ../../${LINUX_26}/include/asm-xen/multicall.h
+ln -sf ../../${LINUX_26}/include/asm-xen/proc_cmd.h
+ln -sf ../../${LINUX_26}/include/asm-xen/suspend.h
 ln -sf ../../${LINUX_26}/include/asm-xen/xen_proc.h
 
 cd ${AD}/arch/xen/kernel
@@ -213,6 +219,8 @@ ln -sf ../../i386/kernel/pci-i386.h
 ln -sf ../../i386/kernel/ptrace.c
 ln -sf ../../i386/kernel/semaphore.c 
 ln -sf ../../i386/kernel/sys_i386.c 
+ln -sf ../../../${LINUX_26}/arch/xen/kernel/ctrl_if.c
+ln -sf ../../../${LINUX_26}/arch/xen/kernel/evtchn.c
 ln -sf ../../../${LINUX_26}/arch/xen/i386/kernel/ioport.c
 
 cd ${AD}/arch/xen/lib
@@ -230,12 +238,16 @@ ln -sf ../../../${LINUX_26}/arch/xen/kernel/xen_proc.c
 cd ${AD}/arch/xen/mm
 ln -sf ../../i386/mm/extable.c 
 ln -sf ../../i386/mm/pageattr.c 
+ln -sf ../../../${LINUX_26}/arch/xen/i386/mm/hypervisor.c
 
 cd ${AD}/arch/xen/drivers/console
 ln -sf ../../../../${LINUX_26}/drivers/xen/console/console.c 
 
 cd ${AD}/arch/xen/drivers/dom0
 ln -sf ../../../../${LINUX_26}/drivers/xen/privcmd/privcmd.c core.c
+
+cd ${AD}/arch/xen/drivers/evtchn
+ln -sf ../../../../${LINUX_26}/drivers/xen/evtchn/evtchn.c
 
 cd ${AD}/arch/xen/drivers/netif/frontend
 ln -sf ../../../../../${LINUX_26}/drivers/xen/netfront/netfront.c main.c

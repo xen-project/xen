@@ -3,7 +3,7 @@
  *
  * Code to handle memory related requests from domains eg. balloon driver.
  *
- * Copyright (c) 2003, B Dragovic & K A Fraser.
+ * Copyright (c) 2003-2004, B Dragovic & K A Fraser.
  */
 
 #include <xen/config.h>

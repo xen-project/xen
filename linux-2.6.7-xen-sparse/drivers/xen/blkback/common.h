@@ -12,16 +12,12 @@
 #include <linux/interrupt.h>
 #include <linux/slab.h>
 #include <linux/blkdev.h>
-#include <asm-xen/ctrl_if.h>
 #include <asm/io.h>
 #include <asm/setup.h>
 #include <asm/pgalloc.h>
+#include <asm-xen/ctrl_if.h>
+#include <asm-xen/hypervisor.h>
 #include <asm-xen/hypervisor-ifs/io/blkif.h>
-
-#if LINUX_VERSION_CODE < KERNEL_VERSION(2,6,0)
-#define irqreturn_t void
-#define IRQ_HANDLED
-#endif
 
 #if 0
 #define ASSERT(_p) \

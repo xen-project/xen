@@ -22,10 +22,16 @@
 #include <linux/poll.h>
 #include <linux/irq.h>
 #include <linux/init.h>
-#include <linux/gfp.h>
 #include <asm-xen/evtchn.h>
 
-#if 0
+#if LINUX_VERSION_CODE < KERNEL_VERSION(2,6,0)
+#include <linux/devfs_fs_kernel.h>
+#define OLD_DEVFS
+#else
+#include <linux/gfp.h>
+#endif
+
+#ifdef OLD_DEVFS
 /* NB. This must be shared amongst drivers if more things go in /dev/xen */
 static devfs_handle_t xen_dev_dir;
 #endif
@@ -50,7 +56,6 @@ static spinlock_t lock;
 
 void evtchn_device_upcall(int port)
 {
-
     spin_lock(&lock);
 
     mask_evtchn(port);
@@ -314,17 +319,19 @@ static struct file_operations evtchn_fops = {
 };
 
 static struct miscdevice evtchn_miscdev = {
-	.minor		= EVTCHN_MINOR,
-	.name		= "evtchn",
-	.devfs_name 	= "misc/evtchn",
-	.fops		= &evtchn_fops
+    .minor        = EVTCHN_MINOR,
+    .name         = "evtchn",
+    .fops         = &evtchn_fops,
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,0)
+    .devfs_name   = "misc/evtchn",
+#endif
 };
 
 static int __init evtchn_init(void)
 {
-#if 0
+#ifdef OLD_DEVFS
     devfs_handle_t symlink_handle;
-    int            err, pos;
+    int            pos;
     char           link_dest[64];
 #endif
     int err;
@@ -337,7 +344,7 @@ static int __init evtchn_init(void)
         return err;
     }
 
-#if 0
+#ifdef OLD_DEVFS
     /* (DEVFS) create directory '/dev/xen'. */
     xen_dev_dir = devfs_mk_dir(NULL, "xen", NULL);
 

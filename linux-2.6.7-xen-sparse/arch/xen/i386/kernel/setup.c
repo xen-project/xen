@@ -48,7 +48,7 @@
 #include <asm/io_apic.h>
 #include <asm/ist.h>
 #include <asm/std_resources.h>
-#include <asm/hypervisor.h>
+#include <asm-xen/hypervisor.h>
 #include "setup_arch_pre.h"
 
 int disable_pse __initdata = 0;

@@ -19,11 +19,6 @@
 #include <asm/io.h>
 #include <asm/pgalloc.h>
 
-#if LINUX_VERSION_CODE < KERNEL_VERSION(2,6,0)
-#define irqreturn_t void
-#define IRQ_HANDLED
-#endif
-
 #if 0
 #define ASSERT(_p) \
     if ( !(_p) ) { printk("Assertion '%s' failed, line %d, file %s", #_p , \

@@ -2,7 +2,7 @@
 #define __ASM_MSR_H
 
 #include <linux/smp.h>
-#include <asm/hypervisor.h>
+#include <asm-xen/hypervisor.h>
 
 /*
  * Access to machine-specific registers (available on 586 and better only)
