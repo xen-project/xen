@@ -19,7 +19,7 @@ vpath linux-%.tar.bz2 $(LINUX_SRC_PATH)
 # download a pristine Linux kernel tarball if there isn't one in LINUX_SRC_PATH
 linux-%.tar.bz2: override _LINUX_VDIR = $(word 1,$(subst ., ,$*)).$(word 2,$(subst ., ,$*))
 linux-%.tar.bz2:
-	echo "Cannot find linux-$*.tar.bz2 in path $(LINUX_SRC_PATH)"
+	@echo "Cannot find linux-$*.tar.bz2 in path $(LINUX_SRC_PATH)"
 	wget http://www.kernel.org/pub/linux/kernel/v$(_LINUX_VDIR)/linux-$*.tar.bz2 -O./$@
 
 
@@ -35,7 +35,7 @@ vpath netbsd-%.tar.bz2 $(NETBSD_SRC_PATH)
 
 # download a pristine NetBSD tarball if there isn't one in NETBSD_SRC_PATH
 netbsd-%-xen-kernel-$(NETBSD_CVSSNAP).tar.bz2:
-	echo "Cannot find $@ in path $(NETBSD_SRC_PATH)"
+	@echo "Cannot find $@ in path $(NETBSD_SRC_PATH)"
 	wget http://www.cl.cam.ac.uk/Research/SRG/netos/xen/downloads/netbsd-$(NETBSD_VER)-xen-kernel-$(NETBSD_CVSSNAP).tar.bz2 -O./$@
 
 netbsd-%.tar.bz2: netbsd-%-xen-kernel-$(NETBSD_CVSSNAP).tar.bz2

@@ -12,32 +12,26 @@ NETBSD_DIR   = netbsd-$(FULLVERSION)
 
 include buildconfigs/Rules.mk
 
-build: $(NETBSD_DIR) netbsd-$(EXTRAVERSION)
+build: netbsd-$(EXTRAVERSION)
 
-NETBSD_TOOLS_SRC ?= $(firstword $(foreach dir,$(subst :, ,$(NETBSD_SRC_PATH)),\
-                    $(wildcard $(dir)/netbsd-$(NETBSD_VER)-tools.tar.*z*)))
-
-netbsd-tools-src: 
-ifeq ($(NETBSD_TOOLS_SRC),)
+netbsd-%-tools.tar.bz2:
 	@echo "Cannot find netbsd-$(NETBSD_VER)-tools.tar.gz in path $(NETBSD_SRC_PATH)"
-	@wget http://www.cl.cam.ac.uk/Research/SRG/netos/xen/downloads/netbsd-$(NETBSD_VER)-tools.tar.bz2 -O./netbsd-$(NETBSD_VER)-tools.tar.bz2
-NETBSD_TOOLS_SRC := ./netbsd-$(NETBSD_VER)-tools.tar.bz2 
-endif
+	wget http://www.cl.cam.ac.uk/Research/SRG/netos/xen/downloads/netbsd-$*-tools.tar.bz2 -O./$@
 
-netbsd-tools: netbsd-tools-src
-	@[ -d netbsd-$(NETBSD_RELEASE)-tools ] || { \
-		echo extract $(NETBSD_TOOLS_SRC); \
-		tar -jxf $(NETBSD_TOOLS_SRC); }
+netbsd-%-tools: netbsd-%-tools.tar.bz2
+	tar -jxf netbsd-$*-tools.tar.bz2
+	touch $@ # update timestamp to avoid rebuild
 
-$(NETBSD_DIR): netbsd-tools pristine-netbsd-$(NETBSD_VER)
+$(NETBSD_DIR)/.valid: pristine-netbsd-$(NETBSD_VER)
 	$(RM) -rf $(NETBSD_DIR)
 	cp -al pristine-netbsd-$(NETBSD_VER) $(NETBSD_DIR)
 	# Apply arch-xen patches
 	( cd netbsd-$(NETBSD_VER)-xen-sparse ; \
           ./mkbuildtree ../$(NETBSD_DIR) )
+	@touch $(NETBSD_DIR)/.valid
 
 # build the specified netbsd tree
-netbsd-xen%:	
+netbsd-xen%: $(NETBSD_DIR)/.valid netbsd-$(NETBSD_RELEASE)-tools
 	$(MAKE) -C netbsd-$(FULLVERSION) config
 	$(MAKE) -C netbsd-$(FULLVERSION) netbsd
 	$(MAKE) -C netbsd-$(FULLVERSION) INSTALL_PATH=$(INSTALL_DIR) INSTALL_NAME=boot/netbsd-$(NETBSD_VER)-xen$* install
