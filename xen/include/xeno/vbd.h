@@ -9,27 +9,40 @@
 #include <hypervisor-ifs/block.h>
 #include <hypervisor-ifs/vbd.h>
 
-/* an entry in a list of xen_extent's */
+#include <xeno/rbtree.h>
+
+/* An entry in a list of xen_extents. */
 typedef struct _xen_extent_le { 
-    xen_extent_t           extent;     /* an individual extent */
+    xen_extent_t extent;               /* an individual extent */
     struct _xen_extent_le *next;       /* and a pointer to the next */ 
 } xen_extent_le_t; 
 
-
 /*
-** This is what a vbd looks like from the pov of xen: essentially a list 
-** of xen_extents which a given domain refers to by a particular 16bit id. 
-** Each domain has a hash table to map from these to the relevant VBD. 
-*/
+ * This is what a vbd looks like from the p.o.v. of xen: essentially a list of
+ * xen_extents which a given domain refers to by a particular 16bit id. Each
+ * domain has a lookup structure to map from these to the relevant VBD.
+ */
 typedef struct _vbd { 
     unsigned short    vdevice;   /* what the domain refers to this vbd as */
-    unsigned short    mode;      /* VBD_MODE_{READONLY,READWRITE} */
+    unsigned char     mode;      /* VBD_MODE_{R,W} */
+    unsigned char     type;      /* XD_TYPE_xxx */
     xen_extent_le_t  *extents;   /* list of xen_extents making up this vbd */
-    struct _vbd      *next;      /* for chaining in the hash table */
+    rb_node_t         rb;        /* for linking into R-B tree lookup struct */
 } vbd_t; 
 
-#define VBD_HTAB_SZ  16       /* # entries in the vbd hash table. */
+/*
+ * Internal forms of 'vbd_create' and 'vbd_grow. Used when setting up real 
+ * physical device access for domain 0.
+ */
+long __vbd_create(struct task_struct *p,
+                  unsigned short vdevice,
+                  unsigned char mode,
+                  unsigned char type);
+long __vbd_grow(struct task_struct *p,
+                unsigned short vdevice,
+                xen_extent_t *extent);
 
+/* This is the main API, accessible from guest OSes. */
 long vbd_create(vbd_create_t *create_params); 
 long vbd_grow(vbd_grow_t *grow_params); 
 long vbd_shrink(vbd_shrink_t *shrink_params);

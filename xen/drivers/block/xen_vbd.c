@@ -1,5 +1,9 @@
-/*
- * xen_vbd.c : routines for managing virtual block devices 
+/******************************************************************************
+ * xen_vbd.c
+ * 
+ * Routines for managing virtual block devices.
+ * 
+ * Copyright (c) 2003-2004, Keir Fraser & Steve Hand
  */
 
 #include <xeno/config.h>
@@ -17,29 +21,67 @@
 #include <hypervisor-ifs/hypervisor-if.h>
 #include <xeno/event.h>
 
-/* 
-** XXX SMH: the below probe functions /append/ their info to the 
-** xdi array; i.e.  they assume that all earlier slots are correctly 
-** filled, and that xdi->count points to the first  free entry in 
-** the array. All kinda gross but it'll do for now.  
-*/
-extern int ide_probe_devices(xen_disk_info_t *xdi);
-extern int scsi_probe_devices(xen_disk_info_t *xdi);
-
-/* XXX SMH: crappy 'hash function' .. fix when care. */
-#define HSH(_x) ((_x) & (VBD_HTAB_SZ - 1))
-
-
-/* 
-** Create a new VBD; all this involves is adding an entry to the domain's
-** vbd hash table; caller must be privileged. 
-*/
-long vbd_create(vbd_create_t *create) 
+long __vbd_create(struct task_struct *p,
+                  unsigned short vdevice,
+                  unsigned char mode,
+                  unsigned char type)
 {
-    struct task_struct *p; 
-    vbd_t *new_vbd, **pv; 
+    vbd_t *vbd; 
+    rb_node_t **rb_p, *rb_parent = NULL;
     long ret = 0;
     unsigned long cpu_mask;
+
+    spin_lock(&p->vbd_lock);
+
+    rb_p = &p->vbd_rb.rb_node;
+    while ( *rb_p != NULL )
+    {
+        rb_parent = *rb_p;
+        vbd = rb_entry(rb_parent, vbd_t, rb);
+        if ( vdevice < vbd->vdevice )
+        {
+            rb_p = &rb_parent->rb_left;
+        }
+        else if ( vdevice > vbd->vdevice )
+        {
+            rb_p = &rb_parent->rb_right;
+        }
+        else
+        {
+            DPRINTK("vbd_create attempted for already existing vbd\n");
+            ret = -EINVAL;
+            goto out;
+        }
+    }
+
+    if ( unlikely((vbd = kmalloc(sizeof(vbd_t), GFP_KERNEL)) == NULL) )
+    {
+        DPRINTK("vbd_create: out of memory\n");
+        ret = -ENOMEM;
+        goto out;
+    }
+
+    vbd->vdevice = vdevice; 
+    vbd->mode    = mode; 
+    vbd->type    = type;
+    vbd->extents = NULL; 
+
+    rb_link_node(&vbd->rb, rb_parent, rb_p);
+    rb_insert_color(&vbd->rb, &p->vbd_rb);
+
+    cpu_mask = mark_guest_event(p, _EVENT_VBD_UPD);
+    guest_event_notify(cpu_mask);
+
+ out:
+    spin_unlock(&p->vbd_lock);
+    return ret; 
+}
+
+
+long vbd_create(vbd_create_t *create) 
+{
+    struct task_struct *p;
+    long rc;
 
     if ( unlikely(!IS_PRIV(current)) )
         return -EPERM;
@@ -47,58 +89,81 @@ long vbd_create(vbd_create_t *create)
     if ( unlikely((p = find_domain_by_id(create->domain)) == NULL) )
     {
         DPRINTK("vbd_create attempted for non-existent domain %d\n", 
-                create->domain); 
+                domain); 
         return -EINVAL; 
     }
 
+    rc = __vbd_create(p, create->vdevice, create->mode,
+                      XD_TYPE_DISK | XD_FLAG_VIRT);
+
+    put_task_struct(p);
+
+    return rc;
+}
+
+
+long __vbd_grow(struct task_struct *p,
+                unsigned short vdevice,
+                xen_extent_t *extent)
+{
+    xen_extent_le_t **px, *x; 
+    vbd_t *vbd = NULL;
+    rb_node_t *rb;
+    long ret = 0;
+    unsigned long cpu_mask;
+
     spin_lock(&p->vbd_lock);
 
-    for ( pv = &p->vbdtab[HSH(create->vdevice)]; 
-          *pv != NULL; 
-          pv = &(*pv)->next ) 
+    rb = p->vbd_rb.rb_node;
+    while ( rb != NULL )
     {
-        if ( unlikely((*pv)->vdevice == create->vdevice) )
-        {
-            DPRINTK("vbd_create attempted for already existing vbd\n");
-            ret = -EINVAL;
-            goto out;
-        }
-        if ( (*pv)->vdevice > create->vdevice )
+        vbd = rb_entry(rb, vbd_t, rb);
+        if ( vdevice < vbd->vdevice )
+            rb = rb->rb_left;
+        else if ( vdevice > vbd->vdevice )
+            rb = rb->rb_right;
+        else
             break;
     }
 
-    if ( unlikely((new_vbd = kmalloc(sizeof(vbd_t), GFP_KERNEL)) == NULL) )
+    if ( unlikely(vbd == NULL) || unlikely(vbd->vdevice != vdevice) )
     {
-        DPRINTK("vbd_create: out of memory\n");
+        DPRINTK("vbd_grow: attempted to append extent to non-existent VBD.\n");
+        ret = -EINVAL;
+        goto out;
+    } 
+
+    if ( unlikely((x = kmalloc(sizeof(xen_extent_le_t), GFP_KERNEL)) == NULL) )
+    {
+        DPRINTK("vbd_grow: out of memory\n");
         ret = -ENOMEM;
         goto out;
     }
+ 
+    x->extent.device       = extent->device; 
+    x->extent.start_sector = extent->start_sector; 
+    x->extent.nr_sectors   = extent->nr_sectors; 
+    x->next                = (xen_extent_le_t *)NULL; 
 
-    new_vbd->vdevice = create->vdevice; 
-    new_vbd->mode    = create->mode; 
-    new_vbd->extents = NULL; 
-    new_vbd->next    = *pv; 
+    for ( px = &vbd->extents; *px != NULL; px = &(*px)->next ) 
+        continue;
 
-    *pv = new_vbd;
+    *px = x;
 
     cpu_mask = mark_guest_event(p, _EVENT_VBD_UPD);
     guest_event_notify(cpu_mask);
 
  out:
     spin_unlock(&p->vbd_lock);
-    put_task_struct(p);
-    return ret; 
+    return ret;
 }
 
 
 /* Grow a VBD by appending a new extent. Fails if the VBD doesn't exist. */
 long vbd_grow(vbd_grow_t *grow) 
 {
-    struct task_struct *p; 
-    xen_extent_le_t **px, *x; 
-    vbd_t *v; 
-    long ret = 0;
-    unsigned long cpu_mask;
+    struct task_struct *p;
+    long rc;
 
     if ( unlikely(!IS_PRIV(current)) )
         return -EPERM; 
@@ -110,43 +175,11 @@ long vbd_grow(vbd_grow_t *grow)
         return -EINVAL; 
     }
 
-    spin_lock(&p->vbd_lock);
+    rc = __vbd_grow(p, grow->vdevice, &grow->extent);
 
-    for ( v = p->vbdtab[HSH(grow->vdevice)]; v != NULL; v = v->next ) 
-        if ( v->vdevice == grow->vdevice )
-            break; 
-
-    if ( unlikely(v == NULL) )
-    {
-        DPRINTK("vbd_grow: attempted to append extent to non-existent VBD.\n");
-        ret = -EINVAL;
-        goto out; 
-    }
-
-    if ( unlikely((x = kmalloc(sizeof(xen_extent_le_t), GFP_KERNEL)) == NULL) )
-    {
-        DPRINTK("vbd_grow: out of memory\n");
-        ret = -ENOMEM;
-        goto out;
-    }
- 
-    x->extent.device       = grow->extent.device; 
-    x->extent.start_sector = grow->extent.start_sector; 
-    x->extent.nr_sectors   = grow->extent.nr_sectors; 
-    x->next                = (xen_extent_le_t *)NULL; 
-
-    for ( px = &v->extents; *px != NULL; px = &(*px)->next ) 
-        continue;
-
-    *px = x;
-
-    cpu_mask = mark_guest_event(p, _EVENT_VBD_UPD);
-    guest_event_notify(cpu_mask);
-
- out:
-    spin_unlock(&p->vbd_lock);
     put_task_struct(p);
-    return ret;
+
+    return rc;
 }
 
 
@@ -154,7 +187,8 @@ long vbd_shrink(vbd_shrink_t *shrink)
 {
     struct task_struct *p; 
     xen_extent_le_t **px, *x; 
-    vbd_t *v; 
+    vbd_t *vbd = NULL;
+    rb_node_t *rb;
     long ret = 0;
     unsigned long cpu_mask;
 
@@ -170,11 +204,21 @@ long vbd_shrink(vbd_shrink_t *shrink)
 
     spin_lock(&p->vbd_lock);
 
-    for ( v = p->vbdtab[HSH(shrink->vdevice)]; v != NULL; v = v->next ) 
-        if ( v->vdevice == shrink->vdevice )
-            break; 
+    rb = p->vbd_rb.rb_node;
+    while ( rb != NULL )
+    {
+        vbd = rb_entry(rb, vbd_t, rb);
+        if ( shrink->vdevice < vbd->vdevice )
+            rb = rb->rb_left;
+        else if ( shrink->vdevice > vbd->vdevice )
+            rb = rb->rb_right;
+        else
+            break;
+    }
 
-    if ( unlikely(v == NULL) || unlikely(v->extents == NULL) )
+    if ( unlikely(vbd == NULL) || 
+         unlikely(vbd->vdevice != shrink->vdevice) ||
+         unlikely(vbd->extents == NULL) )
     {
         DPRINTK("vbd_shrink: attempt to remove non-existent extent.\n"); 
         ret = -EINVAL;
@@ -182,7 +226,7 @@ long vbd_shrink(vbd_shrink_t *shrink)
     }
 
     /* Find the last extent. We now know that there is at least one. */
-    for ( px = &v->extents; (*px)->next != NULL; px = &(*px)->next )
+    for ( px = &vbd->extents; (*px)->next != NULL; px = &(*px)->next )
         continue;
 
     x   = *px;
@@ -204,7 +248,8 @@ long vbd_setextents(vbd_setextents_t *setextents)
     struct task_struct *p; 
     xen_extent_t e;
     xen_extent_le_t *new_extents, *x, *t; 
-    vbd_t *v; 
+    vbd_t *vbd = NULL;
+    rb_node_t *rb;
     int i;
     long ret = 0;
     unsigned long cpu_mask;
@@ -221,11 +266,20 @@ long vbd_setextents(vbd_setextents_t *setextents)
 
     spin_lock(&p->vbd_lock);
 
-    for ( v = p->vbdtab[HSH(setextents->vdevice)]; v != NULL; v = v->next ) 
-        if ( v->vdevice == setextents->vdevice )
-            break; 
+    rb = p->vbd_rb.rb_node;
+    while ( rb != NULL )
+    {
+        vbd = rb_entry(rb, vbd_t, rb);
+        if ( setextents->vdevice < vbd->vdevice )
+            rb = rb->rb_left;
+        else if ( setextents->vdevice > vbd->vdevice )
+            rb = rb->rb_right;
+        else
+            break;
+    }
 
-    if ( unlikely(v == NULL) )
+    if ( unlikely(vbd == NULL) || 
+         unlikely(vbd->vdevice != setextents->vdevice) )
     {
         DPRINTK("vbd_setextents: attempt to modify non-existent VBD.\n"); 
         ret = -EINVAL;
@@ -260,14 +314,14 @@ long vbd_setextents(vbd_setextents_t *setextents)
     }
 
     /* Delete the old extent list _after_ successfully creating the new. */
-    for ( x = v->extents; x != NULL; x = t )
+    for ( x = vbd->extents; x != NULL; x = t )
     {
         t = x->next;
         kfree(x);
     }
 
     /* Make the new list visible. */
-    v->extents = new_extents;
+    vbd->extents = new_extents;
 
     cpu_mask = mark_guest_event(p, _EVENT_VBD_UPD);
     guest_event_notify(cpu_mask);
@@ -291,7 +345,8 @@ long vbd_setextents(vbd_setextents_t *setextents)
 long vbd_delete(vbd_delete_t *delete) 
 {
     struct task_struct *p; 
-    vbd_t *v, **pv; 
+    vbd_t *vbd;
+    rb_node_t *rb;
     xen_extent_le_t *x, *t;
     unsigned long cpu_mask;
 
@@ -307,14 +362,18 @@ long vbd_delete(vbd_delete_t *delete)
 
     spin_lock(&p->vbd_lock);
 
-    for ( pv = &p->vbdtab[HSH(delete->vdevice)]; 
-          *pv != NULL; 
-          pv = &(*pv)->next ) 
+    rb = p->vbd_rb.rb_node;
+    while ( rb != NULL )
     {
-        if ( (*pv)->vdevice == delete->vdevice )
+        vbd = rb_entry(rb, vbd_t, rb);
+        if ( delete->vdevice < vbd->vdevice )
+            rb = rb->rb_left;
+        else if ( delete->vdevice > vbd->vdevice )
+            rb = rb->rb_right;
+        else
             goto found;
     }
-    
+
     DPRINTK("vbd_delete attempted for non-existing VBD.\n");
 
     spin_unlock(&p->vbd_lock);
@@ -322,10 +381,9 @@ long vbd_delete(vbd_delete_t *delete)
     return -EINVAL;
 
  found:
-    v = *pv;
-    *pv = v->next;
-    x = v->extents;
-    kfree(v);
+    rb_erase(rb, &p->vbd_rb);
+    x = vbd->extents;
+    kfree(vbd);
 
     while ( x != NULL )
     {
@@ -345,28 +403,27 @@ long vbd_delete(vbd_delete_t *delete)
 
 void destroy_all_vbds(struct task_struct *p)
 {
-    int i;
-    vbd_t *v; 
+    vbd_t *vbd;
+    rb_node_t *rb;
     xen_extent_le_t *x, *t;
     unsigned long cpu_mask;
 
     spin_lock(&p->vbd_lock);
-    for ( i = 0; i < VBD_HTAB_SZ; i++ )
+
+    while ( (rb = p->vbd_rb.rb_node) != NULL )
     {
-        while ( (v = p->vbdtab[i]) != NULL )
+        vbd = rb_entry(rb, vbd_t, rb);
+
+        rb_erase(rb, &p->vbd_rb);
+        x = vbd->extents;
+        kfree(vbd);
+        
+        while ( x != NULL )
         {
-            p->vbdtab[i] = v->next;
-      
-            x = v->extents;
-            kfree(v);
-            
-            while ( x != NULL )
-            {
-                t = x->next;
-                kfree(x);
-                x = t;
-            }          
-        }
+            t = x->next;
+            kfree(x);
+            x = t;
+        }          
     }
 
     cpu_mask = mark_guest_event(p, _EVENT_VBD_UPD);
@@ -376,68 +433,100 @@ void destroy_all_vbds(struct task_struct *p)
 }
 
 
-/*
- * vbd_probe_devices: 
- *
- * add the virtual block devices for this domain to a xen_disk_info_t; 
- * we assume xdi->count points to the first unused place in the array. 
- */
-static int vbd_probe_devices(xen_disk_info_t *xdi, struct task_struct *p)
+static int vbd_probe_single(xen_disk_info_t *xdi, 
+                            vbd_t *vbd, 
+                            struct task_struct *p)
 {
     xen_extent_le_t *x; 
     xen_disk_t cur_disk; 
-    vbd_t *v; 
-    int i; 
+
+    if ( xdi->count == xdi->max )
+    {
+        DPRINTK("vbd_probe_devices: out of space for probe.\n"); 
+        return -ENOMEM; 
+    }
+
+    cur_disk.device = vbd->vdevice; 
+    cur_disk.info   = vbd->type;
+    if ( !VBD_CAN_WRITE(vbd) )
+        cur_disk.info |= XD_FLAG_RO; 
+    cur_disk.capacity = 0 ; 
+    for ( x = vbd->extents; x != NULL; x = x->next )
+        cur_disk.capacity += x->extent.nr_sectors; 
+    cur_disk.domain = p->domain; 
+        
+    /* Now copy into relevant part of user-space buffer */
+    if( copy_to_user(&xdi->disks[xdi->count], 
+                     &cur_disk, 
+                     sizeof(xen_disk_t)) )
+    { 
+        DPRINTK("vbd_probe_devices: copy_to_user failed\n");
+        return -EFAULT;
+    } 
+        
+    xdi->count++; 
+
+    return 0;
+}
+
+
+static int vbd_probe_devices(xen_disk_info_t *xdi, struct task_struct *p)
+{
+    int rc = 0;
+    rb_node_t *rb;
 
     spin_lock(&p->vbd_lock);
 
-    for ( i = 0; i < VBD_HTAB_SZ; i++ )
-    { 
-        for ( v = p->vbdtab[i]; v != NULL; v = v->next )
-        { 
-            if ( xdi->count == xdi->max )
-            {
-                DPRINTK("vbd_probe_devices: out of space for probe.\n"); 
-                spin_unlock(&p->vbd_lock);
-                return -ENOMEM; 
-            }
+    if ( (rb = p->vbd_rb.rb_node) == NULL )
+        goto out;
 
-            cur_disk.device = v->vdevice; 
-            cur_disk.info   = XD_FLAG_VIRT | XD_TYPE_DISK; 
-            if ( !VBD_CAN_WRITE(v) )
-                cur_disk.info |= XD_FLAG_RO; 
-            cur_disk.capacity = 0 ; 
-            for ( x = v->extents; x != NULL; x = x->next )
-                cur_disk.capacity += x->extent.nr_sectors; 
-            cur_disk.domain = p->domain; 
+ new_subtree:
+    /* STEP 1. Find least node (it'll be left-most). */
+    while ( rb->rb_left != NULL )
+        rb = rb->rb_left;
 
-            /* Now copy into relevant part of user-space buffer */
-            if( copy_to_user(&xdi->disks[xdi->count], 
-                             &cur_disk, 
-                             sizeof(xen_disk_t)) )
-            { 
-                DPRINTK("vbd_probe_devices: copy_to_user failed\n");
-                spin_unlock(&p->vbd_lock);
-                return -EFAULT;
-            } 
-        
-            xdi->count++; 
+    for ( ; ; )
+    {
+        /* STEP 2. Dealt with left subtree. Now process current node. */
+        if ( (rc = vbd_probe_single(xdi, rb_entry(rb, vbd_t, rb), p)) != 0 )
+            goto out;
+
+        /* STEP 3. Process right subtree, if any. */
+        if ( rb->rb_right != NULL )
+        {
+            rb = rb->rb_right;
+            goto new_subtree;
         }
-    } 
 
+        /* STEP 4. Done both subtrees. Head back through ancesstors. */
+        for ( ; ; ) 
+        {
+            /* We're done when we get back to the root node. */
+            if ( rb->rb_parent == NULL )
+                goto out;
+            /* If we are left of parent, then parent is next to process. */
+            if ( rb->rb_parent->rb_left == rb )
+                break;
+            /* If we are right of parent, then we climb to grandparent. */
+            rb = rb->rb_parent;
+        }
+
+        rb = rb->rb_parent;
+    }
+
+ out:
     spin_unlock(&p->vbd_lock);
-    return 0;  
+    return rc;  
 }
 
 
 /*
-** Return information about the VBDs available for a given domain, 
-** or for all domains; in the general case the 'domain' argument 
-** will be 0 which means "information about the caller"; otherwise
-** the 'domain' argument will specify either a given domain, or 
-** all domains ("VBD_PROBE_ALL") -- both of these cases require the
-** caller to be privileged. 
-*/
+ * Return information about the VBDs available for a given domain, or for all 
+ * domains; in the general case the 'domain' argument will be 0 which means 
+ * "information about the caller"; otherwise the 'domain' argument will 
+ * specify either a given domain, or all domains ("VBD_PROBE_ALL") -- both of 
+ * these cases require the caller to be privileged.
+ */
 long vbd_probe(vbd_probe_t *probe) 
 {
     struct task_struct *p = NULL; 
@@ -446,7 +535,7 @@ long vbd_probe(vbd_probe_t *probe)
 
     if ( probe->domain != 0 )
     { 
-        /* We can only probe for ourselves unless we're privileged. */
+        /* We can only probe for ourselves (unless we're privileged). */
         if( (probe->domain != current->domain) && !IS_PRIV(current) )
             return -EPERM; 
 
@@ -464,14 +553,6 @@ long vbd_probe(vbd_probe_t *probe)
         p = current; 
         get_task_struct(p); /* to mirror final put_task_struct */
     }
-
-    if ( (probe->domain == VBD_PROBE_ALL) || IS_PRIV(p) )
-    { 
-        /* Privileged domains always get access to the 'real' devices. */
-        if ( ((ret = ide_probe_devices(&probe->xdi)) != 0) ||
-             ((ret = scsi_probe_devices(&probe->xdi)) != 0) )
-            goto out; 
-    } 
 
     if ( probe->domain == VBD_PROBE_ALL )
     { 
@@ -507,7 +588,8 @@ long vbd_info(vbd_info_t *info)
     struct task_struct *p; 
     xen_extent_le_t *x; 
     xen_extent_t *extents; 
-    vbd_t *v; 
+    vbd_t *vbd = NULL;
+    rb_node_t *rb;
     long ret = 0;  
    
     if ( (info->domain != current->domain) && !IS_PRIV(current) )
@@ -522,22 +604,30 @@ long vbd_info(vbd_info_t *info)
 
     spin_lock(&p->vbd_lock);
 
-    for ( v = p->vbdtab[HSH(info->vdevice)]; v != NULL; v = v->next ) 
-        if ( v->vdevice == info->vdevice )
-            break; 
+    rb = p->vbd_rb.rb_node;
+    while ( rb != NULL )
+    {
+        vbd = rb_entry(rb, vbd_t, rb);
+        if ( info->vdevice < vbd->vdevice )
+            rb = rb->rb_left;
+        else if ( info->vdevice > vbd->vdevice )
+            rb = rb->rb_right;
+        else
+            break;
+    }
 
-    if ( v == NULL )
+    if ( unlikely(vbd == NULL) || unlikely(vbd->vdevice != info->vdevice) )
     {
         DPRINTK("vbd_info attempted on non-existent VBD.\n"); 
         ret = -EINVAL; 
         goto out; 
     }
 
-    info->mode     = v->mode; 
+    info->mode     = vbd->mode;
     info->nextents = 0; 
 
     extents = info->extents;
-    for ( x = v->extents; x != NULL; x = x->next )
+    for ( x = vbd->extents; x != NULL; x = x->next )
     {
         if ( info->nextents == info->maxextents )
             break;
@@ -561,26 +651,34 @@ long vbd_info(vbd_info_t *info)
 int vbd_translate(phys_seg_t *pseg, struct task_struct *p, int operation)
 {
     xen_extent_le_t *x; 
-    vbd_t *v; 
+    vbd_t *vbd;
+    rb_node_t *rb;
     unsigned long sec_off, nr_secs;
 
     spin_lock(&p->vbd_lock);
 
-    for ( v = p->vbdtab[HSH(pseg->dev)]; v != NULL; v = v->next ) 
-        if ( v->vdevice == pseg->dev )
-            goto found; 
+    rb = p->vbd_rb.rb_node;
+    while ( rb != NULL )
+    {
+        vbd = rb_entry(rb, vbd_t, rb);
+        if ( pseg->dev < vbd->vdevice )
+            rb = rb->rb_left;
+        else if ( pseg->dev > vbd->vdevice )
+            rb = rb->rb_right;
+        else
+            goto found;
+    }
 
-    if ( unlikely(!IS_PRIV(p)) ) 
-        DPRINTK("vbd_translate; domain %d attempted to access "
-                "non-existent VBD.\n", p->domain); 
+    DPRINTK("vbd_translate; domain %d attempted to access "
+            "non-existent VBD.\n", p->domain); 
 
     spin_unlock(&p->vbd_lock);
     return -ENODEV; 
 
  found:
 
-    if ( ((operation == READ) && !VBD_CAN_READ(v)) ||
-         ((operation == WRITE) && !VBD_CAN_WRITE(v)) )
+    if ( ((operation == READ) && !VBD_CAN_READ(vbd)) ||
+         ((operation == WRITE) && !VBD_CAN_WRITE(vbd)) )
     {
         spin_unlock(&p->vbd_lock);
         return -EACCES; 
@@ -592,7 +690,7 @@ int vbd_translate(phys_seg_t *pseg, struct task_struct *p, int operation)
      */
     sec_off = pseg->sector_number; 
     nr_secs = pseg->nr_sects;
-    for ( x = v->extents; x != NULL; x = x->next )
+    for ( x = vbd->extents; x != NULL; x = x->next )
     { 
         if ( sec_off < x->extent.nr_sectors )
         {

@@ -26,7 +26,7 @@
 #define MULTIBOOT_BOOTLOADER_MAGIC	0x2BADB002
 
 /* The symbol table for a.out.  */
-typedef struct aout_symbol_table
+typedef struct
 {
   unsigned long tabsize;
   unsigned long strsize;
@@ -35,7 +35,7 @@ typedef struct aout_symbol_table
 } aout_symbol_table_t;
 
 /* The section header table for ELF.  */
-typedef struct elf_section_header_table
+typedef struct
 {
   unsigned long num;
   unsigned long size;
@@ -44,7 +44,7 @@ typedef struct elf_section_header_table
 } elf_section_header_table_t;
 
 /* The Multiboot information.  */
-typedef struct multiboot_info
+typedef struct
 {
   unsigned long flags;
   unsigned long mem_lower;
@@ -63,7 +63,7 @@ typedef struct multiboot_info
 } multiboot_info_t;
 
 /* The module structure.  */
-typedef struct module
+typedef struct
 {
   unsigned long mod_start;
   unsigned long mod_end;
@@ -73,7 +73,7 @@ typedef struct module
 
 /* The memory map. Be careful that the offset 0 is base_addr_low
    but no size.  */
-typedef struct memory_map
+typedef struct
 {
   unsigned long size;
   unsigned long base_addr_low;

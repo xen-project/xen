@@ -52,7 +52,6 @@ typedef struct xl_disk {
     int usage;
 } xl_disk_t;
 
-/* Generic layer. */
 extern int xenolinux_control_msg(int operration, char *buffer, int size);
 extern int xenolinux_block_open(struct inode *inode, struct file *filep);
 extern int xenolinux_block_release(struct inode *inode, struct file *filep);
@@ -62,22 +61,22 @@ extern int xenolinux_block_check(kdev_t dev);
 extern int xenolinux_block_revalidate(kdev_t dev);
 extern void do_xlblk_request (request_queue_t *rq); 
 
-extern xen_disk_info_t xlblk_disk_info; /* this is really in xl_block.c */
-extern void xlvbd_update_vbds(void);    /* this is really in xl_vbd.c */
+extern void xlvbd_update_vbds(void);
 
 static inline xl_disk_t *xldev_to_xldisk(kdev_t xldev)
 {
     struct gendisk *gd = get_gendisk(xldev);
-
-    if(!gd) return NULL;
-
+    
+    if ( gd == NULL ) 
+        return NULL;
+    
     return (xl_disk_t *)gd->real_devices + 
         (MINOR(xldev) >> gd->minor_shift);
 }
 
 
 /* Virtual block-device subsystem. */
-extern int  xlvbd_init(xen_disk_info_t *xdi);
+extern int  xlvbd_init(void);
 extern void xlvbd_cleanup(void); 
 
 #endif /* __XL_BLOCK_H__ */

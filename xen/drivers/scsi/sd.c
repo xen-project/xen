@@ -32,18 +32,9 @@
 
 #include <xeno/config.h>
 #include <xeno/module.h>
-
-/*  #include <xeno/fs.h> */
-/*  #include <xeno/kernel.h> */
 #include <xeno/sched.h>
-/*  #include <xeno/mm.h> */
-/*  #include <xeno/string.h> */
 #include <xeno/hdreg.h>
-/*  #include <xeno/errno.h> */
-/*  #include <xeno/interrupt.h> */
 #include <xeno/init.h>
-
-/*  #include <xeno/smp.h> */
 
 #include <asm/uaccess.h>
 #include <asm/system.h>
@@ -1322,9 +1313,7 @@ static void sd_finish()
 **
 */
 
-#define NR_SCSI_DEVS 16
-
-static kdev_t scsi_devs[NR_SCSI_DEVS] = { 
+static kdev_t scsi_devs[] = { 
     MKDEV(SCSI_DISK0_MAJOR,   0), MKDEV(SCSI_DISK0_MAJOR,  16), /* sda, sdb */
     MKDEV(SCSI_DISK0_MAJOR,  32), MKDEV(SCSI_DISK0_MAJOR,  48), /* sdc, sdd */
     MKDEV(SCSI_DISK0_MAJOR,  64), MKDEV(SCSI_DISK0_MAJOR,  80), /* sde, sdf */
@@ -1336,39 +1325,29 @@ static kdev_t scsi_devs[NR_SCSI_DEVS] = {
 };
 
 
-int scsi_probe_devices(xen_disk_info_t *xdi)
+void scsi_probe_devices(xen_disk_info_t *xdi)
 {
+    int i;
     Scsi_Disk *sd; 
-    xen_disk_t cur_disk; 
-    int i, ret;
+    xen_disk_t *xd = &xdi->disks[xdi->count];
 
     for ( sd = rscsi_disks, i = 0; i < sd_template.dev_max; i++, sd++ )
     {
-        if ( sd->device == NULL ) continue;
+        if ( sd->device == NULL )
+            continue;
 
-	/* SMH: don't ever expect this to happen, hence verbose printk */
-	if ( xdi->count == xdi->max ) { 
-	    printk("scsi_probe_devices: out of space for probe.\n"); 
-	    return -ENOMEM; 
-	}
+	if ( xdi->count == xdi->max )
+            BUG();
 
-	/* SMH: we export 'raw' linux device numbers to domain 0 */
-	cur_disk.device   = scsi_devs[i]; 
-	cur_disk.info     = XD_TYPE_DISK; // XXX SMH: should determine properly
-        cur_disk.capacity = sd->capacity;
-	cur_disk.domain   = 0;            // 'physical' disks belong to dom0 
+	/* We export 'raw' linux device numbers to domain 0. */
+	xd->device   = scsi_devs[i]; 
+	xd->info     = XD_TYPE_DISK; /* XXX should determine properly */
+        xd->capacity = sd->capacity;
+	xd->domain   = 0;
 
-	/* Now copy into relevant part of user-space buffer */
-	if((ret = copy_to_user(xdi->disks + xdi->count, &cur_disk, 
-			       sizeof(xen_disk_t))) < 0) {  
-	    printk("scsi_probe_devices: copy_to_user failed [rc=%d]\n", ret); 
-	    return ret; 
-	} 
-	
 	xdi->count++;
+        xd++;
     }
-
-    return 0;
 }	
 
 

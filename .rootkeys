@@ -134,6 +134,7 @@
 3ddb79bdN51qpRC-6bOH-v5hl_AK6A xen/common/network.c
 3ddb79bdD4SLmmdMD7yLW5HcUWucXw xen/common/page_alloc.c
 3e54c38dkHAev597bPr71-hGzTdocg xen/common/perfc.c
+4006e659i9j-doVxY7DKOGU4XVin1Q xen/common/rbtree.c
 3ddb79bdHqdQpATqC0rmUZNbsb6L6A xen/common/resource.c
 3e397e6619PgAfBbw2XFbXkewvUWgw xen/common/schedule.c
 3ddb79bdB9RNMnkQnUyZ5C9hhMSQQw xen/common/slab.c
@@ -461,6 +462,7 @@
 3e54c38dlSCVdyVM4PKcrSfzLLxWUQ xen/include/xeno/perfc.h
 3e54c38de9SUSYSAwxDf_DwkpAnQFA xen/include/xeno/perfc_defn.h
 3ddb79c04nQVR3EYM5L4zxDV_MCo1g xen/include/xeno/prefetch.h
+4006e65fWMwLqcocgik6wbF0Eeh0Og xen/include/xeno/rbtree.h
 3e4540ccU1sgCx8seIMGlahmMfv7yQ xen/include/xeno/reboot.h
 3ddb79c0LzqqS0LhAQ50ekgj4oGl7Q xen/include/xeno/sched.h
 3ddb79c0VDeD-Oft5eNfMneTU3D1dQ xen/include/xeno/skbuff.h

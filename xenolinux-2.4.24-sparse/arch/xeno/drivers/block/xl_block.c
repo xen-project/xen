@@ -3,10 +3,9 @@
  * 
  * Xenolinux virtual block-device driver.
  * 
+ * Copyright (c) 2003-2004, Keir Fraser & Steve Hand
+ * Modifications by Mark A. Williamson are (c) Intel Research Cambridge
  */
-
-/* Some modifications to the original by Mark A. Williamson and (C) Intel
- * Research Cambridge */
 
 #include "xl_block.h"
 #include <linux/blk.h>
@@ -30,9 +29,6 @@ static unsigned int state = STATE_SUSPENDED;
 static blk_ring_t *blk_ring;
 static BLK_RING_IDX resp_cons; /* Response consumer for comms ring. */
 static BLK_RING_IDX req_prod;  /* Private request producer.         */
-
-#define XDI_MAX 64 
-xen_disk_info_t xlblk_disk_info; /* information about our disks/VBDs */
 
 /* We plug the I/O ring if the driver is suspended or if the ring is full. */
 #define RING_PLUGGED (((req_prod - resp_cons) == BLK_RING_SIZE) || \
@@ -63,6 +59,25 @@ static inline void signal_requests_to_xen(void)
     op.cmd = BLOCK_IO_OP_SIGNAL; 
     HYPERVISOR_block_io_op(&op);
     return;
+}
+
+
+/*
+ * xlblk_update_int/update-vbds_task - handle VBD update events from Xen
+ * 
+ * Schedule a task for keventd to run, which will update the VBDs and perform 
+ * the corresponding updates to our view of VBD state, so the XenoLinux will 
+ * respond to changes / additions / deletions to the set of VBDs automatically.
+ */
+static struct tq_struct update_tq;
+static void update_vbds_task(void *unused)
+{ 
+    xlvbd_update_vbds();
+}
+static void xlblk_update_int(int irq, void *dev_id, struct pt_regs *ptregs)
+{
+    update_tq.routine = update_vbds_task;
+    schedule_task(&update_tq);
 }
 
 
@@ -100,9 +115,9 @@ int xenolinux_block_open(struct inode *inode, struct file *filep)
         }
     }
     
-    /* RACE: need locking SMP / pre-emptive kernels */
+    /* Update of usage count is protected by per-device semaphore. */
     disk->usage++;
-    DPRINTK("xenolinux_block_open\n");
+
     return 0;
 }
 
@@ -110,17 +125,16 @@ int xenolinux_block_open(struct inode *inode, struct file *filep)
 int xenolinux_block_release(struct inode *inode, struct file *filep)
 {
     xl_disk_t *disk = xldev_to_xldisk(inode->i_rdev);
-    disk->usage--; /* RACE: need locking for SMP / pre-emptive kernels */
-    DPRINTK("xenolinux_block_release\n");
 
- /* A reference to a disk has been dropped: may enable more changes to VBDs to
-  * go through (currently don't do any updates while references are held), so
-  * we run the update magic again.  Could equally well schedule this update for
-  * keventd to run, or use a flag so we only update at this point if we think
-  * something (relevant) may have changed.
-  * Keventd has the advantage that it'll serialise executions of this function
-  * - there's a race here for SMP / pre-emptive kernels */
-    xlvbd_update_vbds();
+    /*
+     * When usage drops to zero it may allow more VBD updates to occur.
+     * Update of usage count is protected by a per-device semaphore.
+     */
+    if ( --disk->usage == 0 )
+    {
+        update_tq.routine = update_vbds_task;
+        schedule_task(&update_tq);
+    }
 
     return 0;
 }
@@ -212,34 +226,36 @@ int xenolinux_block_check(kdev_t dev)
     return 0;
 }
 
-/* MAW - leaving this as it is for now.  As long as we're responding to the VBD
- * update events from the hypervisor, I figure this will still do what it's
- * meant to do :-) */
 int xenolinux_block_revalidate(kdev_t dev)
 {
-    struct gendisk *gd = get_gendisk(dev);
-    xl_disk_t *disk = xldev_to_xldisk(dev);
-    unsigned long flags, capacity = gd->part[MINOR(dev)].nr_sects;
-    int i, disk_nr = MINOR(dev) >> gd->minor_shift;
+    struct block_device *bd;
+    struct gendisk *gd;
+    xl_disk_t *disk;
+    unsigned long flags, capacity;
+    int i, rc = 0, disk_nr = MINOR(dev) >> gd->minor_shift;
     
-    DPRINTK("xenolinux_block_revalidate: %d\n", dev);
-
-    /*
-     * We didn't construct this VBD by reading a partition table. This
-     * function can only do bad things to us.
-     */
-    if ( capacity == 0 )
+    if ( (bd = bdget(dev)) == NULL )
         return -EINVAL;
 
-    spin_lock_irqsave(&io_request_lock, flags);
+    /*
+     * Update of partition info, and check of usage count, is protected
+     * by the per-block-device semaphore.
+     */
+    down(&bd->bd_sem);
+
+    if ( ((gd = get_gendisk(dev)) == NULL) ||
+         ((disk = xldev_to_xldisk(dev)) == NULL) ||
+         ((capacity = gd->part[MINOR(dev)].nr_sects) == 0) )
+    {
+        rc = -EINVAL;
+        goto out;
+    }
+
     if ( disk->usage > 1 )
     {
-        spin_unlock_irqrestore(&io_request_lock, flags);
-        return -EBUSY;
+        rc = -EBUSY;
+        goto out;
     }
-    spin_unlock_irqrestore(&io_request_lock, flags);
-
-    /* RACE? is it OK that we give up the lock */
 
     for ( i = gd->max_p - 1; i >= 0; i-- )
     {
@@ -249,12 +265,12 @@ int xenolinux_block_revalidate(kdev_t dev)
         gd->sizes[MINOR(dev+i)]           = 0;
     }
 
-    /* shouldn't need to revalidate VBDs here as it's done automatically when
-     * we get the VBD update event from Xen */
-
     grok_partitions(gd, disk_nr, gd->max_p, capacity);
 
-    return 0;
+ out:
+    up(&bd->bd_sem);
+    bdput(bd);
+    return rc;
 }
 
 
@@ -449,43 +465,6 @@ static void kick_pending_request_queues(void)
 }
 
 
-/**
- * do_update_vbds - called in process context by keventd to update VBDs
- * @arg:            dummy argument to fit schedule_task API
- *
- * When this function is run, it simply calls through to xlvbd_update_vbds in
- * update the VBD state information.  The argument is ignored - it's only there
- * because the API for scheduling with keventd requires it.
- */
-void do_update_vbds(void * arg)
-{
-    DPRINTK("xl_block.c::do_update_vbds() - called\n");
-    xlvbd_update_vbds();
-}
-
-/* this data is needed to register do_update_vbds() as a task for keventd */
-static struct tq_struct update = {
-    .sync = 0,
-    .routine = do_update_vbds,
-    .data = 0
-};
-
-/**
- * xlblk_update_int - handle VBD update events from Xen
- *
- * This function schedules a task for keventd to run, which will update the
- * VBDs and perform the corresponding updates to our view of VBD state, so the
- * XenoLinux will respond to changes / additions / deletions to the set of VBDs
- * automatically.
- */
-static void xlblk_update_int(int irq, void *dev_id, struct pt_regs *ptregs)
-{
-    DPRINTK("xl_block.c::xlblk_update_int() - called\n");
-    
-    schedule_task(&update);
-}
-
-
 static void xlblk_response_int(int irq, void *dev_id, struct pt_regs *ptregs)
 {
     BLK_RING_IDX i; 
@@ -530,7 +509,6 @@ static void xlblk_response_int(int irq, void *dev_id, struct pt_regs *ptregs)
 }
 
 
-
 static void reset_xlblk_interface(void)
 {
     block_io_op_t op; 
@@ -556,7 +534,6 @@ static void reset_xlblk_interface(void)
 int __init xlblk_init(void)
 {
     int error; 
-    block_io_op_t op; 
 
     reset_xlblk_interface();
 
@@ -577,37 +554,14 @@ int __init xlblk_init(void)
         goto fail;
     }
 
-    /* Setup our [empty] disk information structure */
-    xlblk_disk_info.max   = XDI_MAX; 
-    xlblk_disk_info.disks = kmalloc(XDI_MAX * sizeof(xen_disk_t), GFP_KERNEL);
-    xlblk_disk_info.count = 0; 
-
-    /* Probe for disk information. */
-    memset(&op, 0, sizeof(op)); 
-    op.cmd = BLOCK_IO_OP_VBD_PROBE; 
-    op.u.probe_params.domain = 0; 
-    memcpy(&op.u.probe_params.xdi, &xlblk_disk_info, sizeof(xlblk_disk_info)); 
-
-    error = HYPERVISOR_block_io_op(&op); 
-
-    if ( error )
-    {
-        printk(KERN_ALERT "Could not probe disks (%d)\n", error);
-        free_irq(XLBLK_RESPONSE_IRQ, NULL);
-        goto fail;
-    }
-
-    /* copy back the [updated] count parameter */
-    xlblk_disk_info.count = op.u.probe_params.xdi.count; 
-
-    /* Pass the information to our virtual block device susbystem. */
-    xlvbd_init(&xlblk_disk_info);
+    (void)xlvbd_init();
 
     return 0;
 
  fail:
     return error;
 }
+
 
 static void __exit xlblk_cleanup(void)
 {

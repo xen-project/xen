@@ -287,7 +287,7 @@ long do_block_io_op(block_io_op_t *u_block_io_op)
 	/* query VBD information for self or others (or all) */
 	if ( (ret = vbd_probe(&op.u.probe_params)) == 0 )
 	    copy_to_user(u_block_io_op, &op, sizeof(op)); 
-	break; 
+	break;
 
     case BLOCK_IO_OP_VBD_INFO: 
 	/* query information about a particular VBD */
@@ -449,21 +449,15 @@ static void dispatch_rw_block_io(struct task_struct *p,
 	phys_seg[nr_psegs].nr_sects      = nr_sects;
 
         /* Translate the request into the relevant 'physical device' */
-	new_segs = vbd_translate(&phys_seg[nr_psegs], p, operation); 
-
-	/* If it fails we bail (unless the caller is privileged). */
+	new_segs = vbd_translate(&phys_seg[nr_psegs], p, operation);
 	if ( new_segs < 0 )
         { 
-            if ( unlikely(new_segs != -ENODEV) || unlikely(!IS_PRIV(p)) )
-            {
-                DPRINTK("access denied: %s of [%ld,%ld] on dev=%04x\n", 
-                        operation == READ ? "read" : "write", 
-                        req->sector_number + tot_sects, 
-                        req->sector_number + tot_sects + nr_sects, 
-                        req->device); 
-                goto bad_descriptor;
-            }
-            new_segs = 1;
+            DPRINTK("access denied: %s of [%ld,%ld] on dev=%04x\n", 
+                    operation == READ ? "read" : "write", 
+                    req->sector_number + tot_sects, 
+                    req->sector_number + tot_sects + nr_sects, 
+                    req->device); 
+            goto bad_descriptor;
         }
 	 
         nr_psegs += new_segs;

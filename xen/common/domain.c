@@ -542,6 +542,11 @@ int setup_guestos(struct task_struct *p, dom0_createdomain_t *params,
     l1_pgentry_t *l1tab = NULL, *l1start = NULL;
     struct pfn_info *page = NULL;
 
+    extern void ide_probe_devices(xen_disk_info_t *);
+    extern void scsi_probe_devices(xen_disk_info_t *);
+    xen_disk_info_t xdi;
+    xen_disk_t *xd;
+
     /* Sanity! */
     if ( p->domain != 0 ) BUG();
     if ( (p->flags & PF_CONSTRUCTED) ) BUG();
@@ -770,6 +775,27 @@ int setup_guestos(struct task_struct *p, dom0_createdomain_t *params,
     /* Reinstate the caller's page tables. */
     write_cr3_counted(pagetable_val(current->mm.pagetable));
     __sti();
+
+    /* DOM0 gets access to all real block devices. */
+#define MAX_REAL_DISKS 256
+    xd = kmalloc(MAX_REAL_DISKS * sizeof(xen_disk_t), GFP_KERNEL);
+    xdi.max   = MAX_REAL_DISKS;
+    xdi.count = 0;
+    xdi.disks = xd;
+    ide_probe_devices(&xdi);
+    scsi_probe_devices(&xdi);
+    for ( i = 0; i < xdi.count; i++ )
+    {
+        xen_extent_t e;
+        e.device       = xd[i].device;
+        e.start_sector = 0;
+        e.nr_sectors   = xd[i].capacity;
+        if ( (__vbd_create(p, xd[i].device, VBD_MODE_R|VBD_MODE_W, 
+                           xd[i].info) != 0) ||
+             (__vbd_grow(p, xd[i].device, &e) != 0) )
+            BUG();
+    }
+    kfree(xd);
 
     p->flags |= PF_CONSTRUCTED;
 

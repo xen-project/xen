@@ -230,7 +230,7 @@ static inline int HYPERVISOR_net_io_op(netop_t *op)
     __asm__ __volatile__ (
         TRAP_INSTR
         : "=a" (ret) : "0" (__HYPERVISOR_net_io_op),
-        "b" (op) );
+        "b" (op) : "memory" );
 
     return ret;
 }
@@ -297,18 +297,18 @@ static inline int HYPERVISOR_network_op(void *network_op)
     __asm__ __volatile__ (
         TRAP_INSTR
         : "=a" (ret) : "0" (__HYPERVISOR_network_op),
-        "b" (network_op) );
+        "b" (network_op) : "memory" );
 
     return ret;
 }
 
-static inline int HYPERVISOR_block_io_op(void * block_io_op)
+static inline int HYPERVISOR_block_io_op(void *block_io_op)
 {
     int ret;
     __asm__ __volatile__ (
         TRAP_INSTR
         : "=a" (ret) : "0" (__HYPERVISOR_block_io_op),
-        "b" (block_io_op) ); 
+        "b" (block_io_op) : "memory" ); 
 
     return ret;
 }

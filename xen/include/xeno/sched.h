@@ -15,6 +15,7 @@
 #include <xeno/time.h>
 #include <xeno/ac_timer.h>
 #include <xeno/delay.h>
+#include <xeno/rbtree.h>
 
 #define MAX_DOMAIN_NAME 16
 
@@ -126,8 +127,8 @@ struct task_struct
     BLK_RING_IDX blk_resp_prod; /* (private version of) response producer */
     struct list_head blkdev_list;
     spinlock_t blk_ring_lock;
-    vbd_t *vbdtab[VBD_HTAB_SZ];   /* mapping from 16-bit vdevices to vbds */
-    spinlock_t vbd_lock;
+    rb_root_t  vbd_rb;          /* mapping from 16-bit vdevices to vbds */
+    spinlock_t vbd_lock;        /* protects VBD mapping */
 
     /* VM */
     struct mm_struct mm;
