@@ -998,21 +998,27 @@ static void mega_Convert8ldTo40ld (mega_RAIDINQ * inquiry,
 				   mega_Enquiry3 * enquiry3,
 				   megaRaidProductInfo * productInfo);
 
+#if 0
 static int megaraid_reboot_notify (struct notifier_block *,
 				   unsigned long, void *);
+#endif
 #if LINUX_VERSION_CODE < KERNEL_VERSION(2,3,0)  
 static mega_scb *mega_ioctl (mega_host_config * megaCfg, Scsi_Cmnd * SCpnt);
 static void mega_build_kernel_sg (char *barea, ulong xfersize, mega_scb * pScb,
 			   mega_ioctl_mbox * mbox);
 #endif
 
+#if 0
 static int megadev_open (struct inode *, struct file *);
 static int megadev_ioctl_entry (struct inode *, struct file *,
 				unsigned int, unsigned long);
+#endif
 static int megadev_ioctl (struct inode *, struct file *,
 			  unsigned int, unsigned long);
 static mega_scb *megadev_doioctl (mega_host_config *, Scsi_Cmnd *);
+#if 0
 static int megadev_close (struct inode *, struct file *);
+#endif
 static void megadev_ioctl_done (Scsi_Cmnd *);
 static int mega_init_scb (mega_host_config *);
 static void enq_scb_freelist (mega_host_config *, mega_scb *,

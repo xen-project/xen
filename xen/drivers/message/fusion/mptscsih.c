@@ -204,10 +204,10 @@ static int	mptscsih_doDv(MPT_SCSI_HOST *hd, int channel, int target);
 static void	mptscsih_dv_parms(MPT_SCSI_HOST *hd, DVPARAMETERS *dv,void *pPage);
 static void	mptscsih_fillbuf(char *buffer, int size, int index, int width);
 #endif
-/*static int	mptscsih_setup(char *str);*/
+#if XEN_KILLED
+static int	mptscsih_setup(char *str);
 static int	mptscsih_halt(struct notifier_block *nb, ulong event, void *buf);
 
-#if XEN_KILLED
 /*
  *	Reboot Notification
  */
@@ -2168,6 +2168,7 @@ mptscsih_release(struct Scsi_Host *host)
 	return 0;
 }
 
+#if 0 /* XEN */
 /*=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=*/
 /**
  *	mptscsih_halt - Process the reboot notification
@@ -2209,6 +2210,7 @@ mptscsih_halt(struct notifier_block *nb, ulong event, void *buf)
 #endif
 	return NOTIFY_OK;
 }
+#endif /* 0 (XEN) */
 
 /*=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=*/
 /**
@@ -2286,6 +2288,7 @@ static int copy_info(struct info_str *info, char *fmt, ...)
 #define off_t int
 #endif
 
+#if 0 /* XEN */
 static int mptscsih_host_info(MPT_ADAPTER *ioc, char *pbuf, off_t offset, int len)
 {
 	struct info_str info;
@@ -2302,13 +2305,16 @@ static int mptscsih_host_info(MPT_ADAPTER *ioc, char *pbuf, off_t offset, int le
 
 	return ((info.pos > info.offset) ? info.pos - info.offset : 0);
 }
+#endif /* 0 (XEN) */
 
 #ifndef MPTSCSIH_DBG_TIMEOUT
+#if 0 /* XEN */
 static int mptscsih_user_command(MPT_ADAPTER *ioc, char *pbuf, int len)
 {
 	/* Not yet implemented */
 	return len;
 }
+#endif /* 0 (XEN) */
 #else
 #define is_digit(c)	((c) >= '0' && (c) <= '9')
 #define digit_to_bin(c)	((c) - '0')

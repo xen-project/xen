@@ -662,13 +662,6 @@ void schedulers_start(void)
 }
 
 
-static void process_timeout(unsigned long __data)
-{
-    struct task_struct * p = (struct task_struct *) __data;
-    wake_up(p);
-}
-
-
 static void dump_rqueue(struct list_head *queue, char *name)
 {
     struct list_head *list;

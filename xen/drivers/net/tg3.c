@@ -5943,6 +5943,7 @@ do {	p = orig_p + (reg);	\
 
 #endif /* ETHTOOL */
 
+#if 0
 static int tg3_get_settings(struct net_device *dev, struct ethtool_cmd *cmd)
 {
   	struct tg3 *tp = dev->priv;
@@ -6091,6 +6092,7 @@ static int tg3_nway_reset(struct net_device *dev)
   
 	return r;
 }
+#endif /* 0 */
   
 #ifdef ETHTOOL
 
@@ -6178,6 +6180,7 @@ static int tg3_set_pauseparam(struct net_device *dev, struct ethtool_pauseparam 
   
 #endif /* ETHTOOL */
 
+#if 0
 static u32 tg3_get_rx_csum(struct net_device *dev)
 {
 	struct tg3 *tp = dev->priv;
@@ -6221,7 +6224,8 @@ static int tg3_set_tx_csum(struct net_device *dev, u32 data)
 
 	return 0;
 }
-  
+#endif /* 0 */
+
 static int tg3_ioctl(struct net_device *dev, struct ifreq *ifr, int cmd)
 {
 	struct mii_ioctl_data *data = (struct mii_ioctl_data *)&ifr->ifr_data;

@@ -403,7 +403,7 @@ static int ahd_linux_next_unit(void);
 static void ahd_runq_tasklet(unsigned long data);
 /* SAE: .... */
 struct notifier_block;
-static int ahd_linux_halt(struct notifier_block *nb, u_long event, void *buf);
+/*static int ahd_linux_halt(struct notifier_block *nb, u_long event, void *buf);*/
 
 static __inline struct ahd_linux_device*
 		     ahd_linux_get_device(struct ahd_softc *ahd, u_int channel,
@@ -613,7 +613,7 @@ ahd_linux_map_seg(struct ahd_softc *ahd, struct scb *scb,
 			consumed++;
 			next_sg = sg + 1;
 			next_sg->addr = 0;
-			next_len = 0x100000000 - (addr & 0xFFFFFFFF);
+			next_len = (uint32_t)((-addr) & 0xFFFFFFFF);
 			len -= next_len;
 			next_len |= ((addr >> 8) + 0x1000000) & 0x7F000000;
 			next_sg->len = ahd_htole32(next_len);
@@ -655,7 +655,6 @@ ahd_runq_tasklet(unsigned long data)
 static struct notifier_block ahd_linux_notifier = {
 	ahd_linux_halt, NULL, 0
 };
-*/
 
 static int ahd_linux_halt(struct notifier_block *nb, u_long event, void *buf)
 {
@@ -668,6 +667,7 @@ static int ahd_linux_halt(struct notifier_block *nb, u_long event, void *buf)
 	}
 	return (NOTIFY_OK);
 }
+*/
 
 /******************************** Macros **************************************/
 #define BUILD_SCSIID(ahd, cmd)						\

@@ -4549,6 +4549,7 @@ mega_partsize(Disk * disk, kdev_t dev, int *geom)
 }
 
 
+#if 0 /* XEN */
 /*
  * This routine will be called when the use has done a forced shutdown on the
  * system. Flush the Adapter cache, that's the most we can do.
@@ -4587,6 +4588,7 @@ static int megaraid_reboot_notify (struct notifier_block *this, unsigned long co
 	}
 	return NOTIFY_DONE;
 }
+#endif /* 0 (XEN) */
 
 static int mega_init_scb (mega_host_config * megacfg)
 {
@@ -4714,6 +4716,7 @@ static void enq_scb_freelist (mega_host_config * megacfg, mega_scb * scb, int lo
 	}
 }
 
+#if 0 /* XEN */
 /*
  * Routines for the character/ioctl interface to the driver
  */
@@ -4742,6 +4745,7 @@ static int megadev_ioctl_entry (struct inode *inode, struct file *filep,
 	return ret;
 
 }
+#endif /* 0 (XEN) */
 
 static int megadev_ioctl (struct inode *inode, struct file *filep,
 	       unsigned int cmd, unsigned long arg)
@@ -5272,6 +5276,7 @@ megadev_doioctl (mega_host_config * megacfg, Scsi_Cmnd * sc)
 	return scb;
 }
 
+#if 0
 static int
 megadev_close (struct inode *inode, struct file *filep)
 {
@@ -5280,6 +5285,7 @@ megadev_close (struct inode *inode, struct file *filep)
 #endif
 	return 0;
 }
+#endif /* 0 */
 
 
 static int

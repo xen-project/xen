@@ -29,9 +29,9 @@ unsigned long wait_init_idle;
 struct task_struct *idle_task[NR_CPUS] = { &idle0_task };
 
 #ifdef	CONFIG_ACPI_INTERPRETER
-	int acpi_disabled = 0;
+int acpi_disabled = 0;
 #else
-	int acpi_disabled = 1;
+int acpi_disabled = 1;
 #endif
 EXPORT_SYMBOL(acpi_disabled);
 
@@ -72,27 +72,27 @@ static int __init have_cpuid_p(void)
 
 void __init get_cpu_vendor(struct cpuinfo_x86 *c)
 {
-        char *v = c->x86_vendor_id;
+    char *v = c->x86_vendor_id;
 
-        if (!strcmp(v, "GenuineIntel"))
-                c->x86_vendor = X86_VENDOR_INTEL;
-        else if (!strcmp(v, "AuthenticAMD"))
-                c->x86_vendor = X86_VENDOR_AMD;
-        else if (!strcmp(v, "CyrixInstead"))
-                c->x86_vendor = X86_VENDOR_CYRIX;
-        else if (!strcmp(v, "UMC UMC UMC "))
-                c->x86_vendor = X86_VENDOR_UMC;
-        else if (!strcmp(v, "CentaurHauls"))
-                c->x86_vendor = X86_VENDOR_CENTAUR;
-        else if (!strcmp(v, "NexGenDriven"))
-                c->x86_vendor = X86_VENDOR_NEXGEN;
-        else if (!strcmp(v, "RiseRiseRise"))
-                c->x86_vendor = X86_VENDOR_RISE;
-        else if (!strcmp(v, "GenuineTMx86") ||
-                 !strcmp(v, "TransmetaCPU"))
-                c->x86_vendor = X86_VENDOR_TRANSMETA;
-        else
-                c->x86_vendor = X86_VENDOR_UNKNOWN;
+    if (!strcmp(v, "GenuineIntel"))
+        c->x86_vendor = X86_VENDOR_INTEL;
+    else if (!strcmp(v, "AuthenticAMD"))
+        c->x86_vendor = X86_VENDOR_AMD;
+    else if (!strcmp(v, "CyrixInstead"))
+        c->x86_vendor = X86_VENDOR_CYRIX;
+    else if (!strcmp(v, "UMC UMC UMC "))
+        c->x86_vendor = X86_VENDOR_UMC;
+    else if (!strcmp(v, "CentaurHauls"))
+        c->x86_vendor = X86_VENDOR_CENTAUR;
+    else if (!strcmp(v, "NexGenDriven"))
+        c->x86_vendor = X86_VENDOR_NEXGEN;
+    else if (!strcmp(v, "RiseRiseRise"))
+        c->x86_vendor = X86_VENDOR_RISE;
+    else if (!strcmp(v, "GenuineTMx86") ||
+             !strcmp(v, "TransmetaCPU"))
+        c->x86_vendor = X86_VENDOR_TRANSMETA;
+    else
+        c->x86_vendor = X86_VENDOR_UNKNOWN;
 }
 
 static void __init init_intel(struct cpuinfo_x86 *c)
@@ -290,13 +290,9 @@ void __init cpu_init(void)
 
 static void __init do_initcalls(void)
 {
-        initcall_t *call;
-
-        call = &__initcall_start;
-        do {
-                (*call)();
-                call++;
-        } while (call < &__initcall_end);
+    initcall_t *call;
+    for ( call = &__initcall_start; call < &__initcall_end; call++ )
+        (*call)();
 }
 
 /*
@@ -403,12 +399,12 @@ void __init start_of_day(void)
 	APIC_init_uniprocessor();
     else
     	smp_boot_cpus(); 
-		     /*
-                      * Does loads of stuff, including kicking the local
-                      * APIC, and the IO APIC after other CPUs are booted.
-                      * Each IRQ is preferably handled by IO-APIC, but
-                      * fall thru to 8259A if we have to (but slower).
-                      */
+    /*
+     * Does loads of stuff, including kicking the local
+     * APIC, and the IO APIC after other CPUs are booted.
+     * Each IRQ is preferably handled by IO-APIC, but
+     * fall thru to 8259A if we have to (but slower).
+     */
 #endif
 
     initialize_keytable(); /* call back handling for key codes      */

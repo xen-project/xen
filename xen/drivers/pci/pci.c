@@ -619,6 +619,7 @@ pci_match_device(const struct pci_device_id *ids, const struct pci_dev *dev)
 	return NULL;
 }
 
+#ifndef NO_DEVICES_IN_XEN
 static int
 pci_announce_device(struct pci_driver *drv, struct pci_dev *dev)
 {
@@ -643,6 +644,7 @@ pci_announce_device(struct pci_driver *drv, struct pci_dev *dev)
 out:
 	return ret;
 }
+#endif /* !NO_DEVICES_IN_XEN */
 
 /**
  * pci_register_driver - register a new pci driver

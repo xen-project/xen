@@ -1519,25 +1519,6 @@ static void enable_NMI_through_LVT0 (void * dummy)
 	apic_write_around(APIC_LVT0, v);
 }
 
-static void setup_nmi (void)
-{
-	/*
- 	 * Dirty trick to enable the NMI watchdog ...
-	 * We put the 8259A master into AEOI mode and
-	 * unmask on all local APICs LVT0 as NMI.
-	 *
-	 * The idea to use the 8259A in AEOI mode ('8259A Virtual Wire')
-	 * is from Maciej W. Rozycki - so we do not have to EOI from
-	 * the NMI handler or the timer interrupt.
-	 */ 
-	printk(KERN_INFO "activating NMI Watchdog ...");
-
-	smp_call_function(enable_NMI_through_LVT0, NULL, 1, 1);
-	enable_NMI_through_LVT0(NULL);
-
-	printk(" done.\n");
-}
-
 /*
  * This looks a bit hackish but it's about the only one way of sending
  * a few INTA cycles to 8259As and any associated glue logic.  ICR does

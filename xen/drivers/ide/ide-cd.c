@@ -2974,11 +2974,13 @@ int ide_cdrom_cleanup(ide_drive_t *drive)
     return 0;
 }
 
+#if 0
 static
 int ide_cdrom_reinit (ide_drive_t *drive)
 {
     return 0;
 }
+#endif /* 0 */
 
 static ide_driver_t ide_cdrom_driver = {
     name:			"ide-cdrom",

@@ -645,6 +645,7 @@ static int aac_ioctl(Scsi_Device * scsi_dev_ptr, int cmd, void * arg)
 	return aac_do_ioctl(dev, cmd, arg);
 }
 
+#if 0 /* XEN */
 /**
  *	aac_cfg_open		-	open a configuration file
  *	@inode: inode being opened
@@ -698,6 +699,7 @@ static int aac_cfg_ioctl(struct inode * inode,  struct file * file, unsigned int
 	struct aac_dev *dev = aac_devices[MINOR(inode->i_rdev)];
 	return aac_do_ioctl(dev, cmd, (void *)arg);
 }
+#endif /* 0 (XEN) */
 
 /*
  *	To use the low level SCSI driver support using the linux kernel loadable 

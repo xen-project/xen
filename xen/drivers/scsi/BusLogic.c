@@ -4440,6 +4440,7 @@ static void BusLogic_Message(BusLogic_MessageLevel_T MessageLevel,
 }
 
 
+#if 0 /* XEN */
 /*
   BusLogic_ParseKeyword parses an individual option keyword.  It returns true
   and updates the pointer if the keyword is recognized and false otherwise.
@@ -4462,7 +4463,6 @@ static boolean BusLogic_ParseKeyword(char **StringPointer, char *Keyword)
   return true;
 }
 
-#if 0 /* XEN */
 /*
   BusLogic_ParseDriverOptions handles processing of BusLogic Driver Options
   specifications.

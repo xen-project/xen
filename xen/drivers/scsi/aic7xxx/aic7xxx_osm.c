@@ -447,9 +447,11 @@ static void ahc_linux_handle_scsi_status(struct ahc_softc *,
 					 struct scb *);
 static void ahc_linux_filter_command(struct ahc_softc*, Scsi_Cmnd*,
 				     struct scb*);
-//static void ahc_linux_sem_timeout(u_long arg);
+#if 0
+static void ahc_linux_sem_timeout(u_long arg);
 static void ahc_linux_freeze_sim_queue(struct ahc_softc *ahc);
 static void ahc_linux_release_sim_queue(u_long arg);
+#endif
 static void ahc_linux_dev_timed_unfreeze(u_long arg);
 static int  ahc_linux_queue_recovery_cmd(Scsi_Cmnd *cmd, scb_flag flag);
 static void ahc_linux_initialize_scsi_bus(struct ahc_softc *ahc);
@@ -473,7 +475,9 @@ static void ahc_linux_run_device_queue(struct ahc_softc*,
 static void ahc_linux_setup_tag_info(char *p, char *end);
 static int ahc_linux_next_unit(void);
 static void ahc_runq_tasklet(unsigned long data);
+#if 0
 static int ahc_linux_halt(struct notifier_block *nb, u_long event, void *buf);
+#endif
 
 static __inline struct ahc_linux_device*
 		     ahc_linux_get_device(struct ahc_softc *ahc, u_int channel,
@@ -683,7 +687,7 @@ ahc_linux_map_seg(struct ahc_softc *ahc, struct scb *scb,
 			consumed++;
 			next_sg = sg + 1;
 			next_sg->addr = 0;
-			next_len = 0x100000000 - (addr & 0xFFFFFFFF);
+			next_len = (uint32_t)((-addr) & 0xFFFFFFFF);
 			len -= next_len;
 			next_len |= ((addr >> 8) + 0x1000000) & 0x7F000000;
 			next_sg->len = ahc_htole32(next_len);
@@ -725,7 +729,6 @@ ahc_runq_tasklet(unsigned long data)
 static struct notifier_block ahc_linux_notifier = {
 	ahc_linux_halt, NULL, 0
 };
-#endif
 
 static int ahc_linux_halt(struct notifier_block *nb, u_long event, void *buf)
 {
@@ -738,6 +741,7 @@ static int ahc_linux_halt(struct notifier_block *nb, u_long event, void *buf)
 	}
 	return (NOTIFY_OK);
 }
+#endif
 
 /******************************** Macros **************************************/
 #define BUILD_SCSIID(ahc, cmd)						\
@@ -2498,7 +2502,6 @@ ahc_linux_sem_timeout(u_long arg)
 	sem = (struct semaphore *)arg;
 	up(sem);
 }
-#endif
 
 static void
 ahc_linux_freeze_sim_queue(struct ahc_softc *ahc)
@@ -2539,6 +2542,7 @@ ahc_linux_release_sim_queue(u_long arg)
 #endif
 	}
 }
+#endif /* 0 */
 
 static void
 ahc_linux_dev_timed_unfreeze(u_long arg)

@@ -119,7 +119,7 @@ static struct board_type products[] = {
 /* Originally cciss driver only supports 8 major number */
 #define MAX_CTLR_ORIG  COMPAQ_CISS_MAJOR7 - COMPAQ_CISS_MAJOR + 1
 
-#define CCISS_DMA_MASK 0xFFFFFFFFFFFFFFFF /* 64 bit DMA */
+#define CCISS_DMA_MASK (~0UL)
 
 #ifdef CONFIG_CISS_MONITOR_THREAD
 static int cciss_monitor(void *ctlr);

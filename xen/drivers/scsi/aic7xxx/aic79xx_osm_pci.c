@@ -159,12 +159,12 @@ ahd_linux_pci_dev_probe(struct pci_dev *pdev, const struct pci_device_id *ent)
 		uint64_t memsize;
 
 		memsize = ahd_linux_get_memsize();
-		if (memsize >= 0x8000000000
+		if (memsize >= 0x8000000000ULL
 	 	 && ahd_pci_set_dma_mask(pdev, 0xFFFFFFFFFFFFFFFFULL) == 0) {
 			ahd->flags |= AHD_64BIT_ADDRESSING;
 			ahd->platform_data->hw_dma_mask =
 			    (bus_addr_t)(0xFFFFFFFFFFFFFFFFULL&(bus_addr_t)~0);
-		} else if (memsize > 0x80000000
+		} else if (memsize > 0x80000000ULL
 			&& ahd_pci_set_dma_mask(pdev, 0x7FFFFFFFFFULL) == 0) {
 			ahd->flags |= AHD_39BIT_ADDRESSING;
 			ahd->platform_data->hw_dma_mask =

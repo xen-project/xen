@@ -1106,7 +1106,7 @@ static void sym_eh_done(Scsi_Cmnd *cmd) { __sym_eh_done(cmd, 0); }
 /*
  *  Some timeout handler to avoid waiting too long.
  */
-static void sym_eh_timeout(u_long p) { __sym_eh_done((Scsi_Cmnd *)p, 1); }
+/*static void sym_eh_timeout(u_long p) { __sym_eh_done((Scsi_Cmnd *)p, 1); }*/
 
 /*
  *  Generic method for our eh processing.
