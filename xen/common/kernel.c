@@ -233,7 +233,6 @@ void init_serial(void)
 void putchar_serial(unsigned char c)
 {
     if ( c == '\n' ) putchar_serial('\r');
-    if ( (c != '\n') && (c != '\r') && ((c < 32) || (c > 126)) ) return;
     while ( !(inb(SERIAL_BASE+LINE_STATUS)&(1<<5)) ) barrier();
     outb(c, SERIAL_BASE+TX_HOLD);
 }
@@ -315,9 +314,11 @@ static void putchar (int c)
 {
     static char zeroarr[2*COLUMNS] = { 0 };
 
+    if ( (c != '\n') && ((c < 32) || (c > 126)) ) return;
+
     putchar_serial(c);
 
-    if (c == '\n' || c == '\r')
+    if ( c == '\n' )
     {
     newline:
         xpos = 0;
