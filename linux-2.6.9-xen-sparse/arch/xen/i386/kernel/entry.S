@@ -319,8 +319,9 @@ restore_all:
 	RESTORE_ALL
 
 resume_vm86:
+	XEN_UNBLOCK_EVENTS(%esi)
 	RESTORE_REGS
-	pushl %eax,(%esp)
+	movl %eax,(%esp)
 	movl $__HYPERVISOR_switch_vm86,%eax
 	int $0x82			# Atomically enables events delivery
 	ud2
