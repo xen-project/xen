@@ -26,7 +26,6 @@ extern rwlock_t tasklist_lock;
 #include <xeno/spinlock.h>
 
 struct mm_struct {
-    unsigned long cpu_vm_mask;
     /*
      * Every domain has a L1 pagetable of its own. Per-domain mappings
      * are put in this table (eg. the current GDT is mapped here).
@@ -48,7 +47,6 @@ struct mm_struct {
 extern struct mm_struct init_mm;
 #define IDLE0_MM                                                    \
 {                                                                   \
-    cpu_vm_mask: 0,                                                 \
     perdomain_pt: 0,                                                \
     pagetable:   mk_pagetable(__pa(idle_pg_table))                  \
 }
@@ -105,13 +103,9 @@ struct task_struct
     unsigned int max_pages;     /* max number of pages that can be possesed */
 
     /* scheduling */
-    struct list_head run_list;      /* the run list  */
+    struct list_head run_list;
     int              has_cpu;
-    int              policy;
-    int              counter;
     
-    struct ac_timer blt;            /* blocked timeout */
-
     s_time_t lastschd;              /* time this domain was last scheduled */
     s_time_t cpu_time;              /* total CPU time received till now */
     s_time_t wokenup;               /* time domain got woken up */
@@ -154,12 +148,6 @@ struct task_struct
 
     char name[MAX_DOMAIN_NAME];
 
-    /*
-     * active_mm stays for now. It's entangled in the tricky TLB flushing
-     * stuff which I haven't addressed yet. It stays until I'm man enough
-     * to venture in.
-     */
-    struct mm_struct *active_mm;
     struct thread_struct thread;
     struct task_struct *prev_task, *next_task, *next_hash;
     
@@ -190,8 +178,6 @@ struct task_struct
 #define TASK_SUSPENDED          8
 #define TASK_DYING              16
 
-#define SCHED_YIELD             0x10
-
 #include <asm/uaccess.h> /* for KERNEL_DS */
 
 #define IDLE0_TASK(_t)           \
@@ -204,7 +190,6 @@ struct task_struct
     avt:         0xffffffff,     \
     mm:          IDLE0_MM,       \
     addr_limit:  KERNEL_DS,      \
-    active_mm:   &idle0_task.mm, \
     thread:      INIT_THREAD,    \
     prev_task:   &(_t),          \
     next_task:   &(_t)           \

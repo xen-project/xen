@@ -55,53 +55,7 @@
  *	7AP.	We do not assume writes to the LVT deassering IRQs
  *	8AP.	We do not enable low power mode (deep sleep) during MP bootup
  *	9AP.	We do not use mixed mode
- *
- *	Pentium
- *		There is a marginal case where REP MOVS on 100MHz SMP
- *	machines with B stepping processors can fail. XXX should provide
- *	an L1cache=Writethrough or L1cache=off option.
- *
- *		B stepping CPUs may hang. There are hardware work arounds
- *	for this. We warn about it in case your board doesnt have the work
- *	arounds. Basically thats so I can tell anyone with a B stepping
- *	CPU and SMP problems "tough".
- *
- *	Specific items [From Pentium Processor Specification Update]
- *
- *	1AP.	Linux doesn't use remote read
- *	2AP.	Linux doesn't trust APIC errors
- *	3AP.	We work around this
- *	4AP.	Linux never generated 3 interrupts of the same priority
- *		to cause a lost local interrupt.
- *	5AP.	Remote read is never used
- *	6AP.	not affected - worked around in hardware
- *	7AP.	not affected - worked around in hardware
- *	8AP.	worked around in hardware - we get explicit CS errors if not
- *	9AP.	only 'noapic' mode affected. Might generate spurious
- *		interrupts, we log only the first one and count the
- *		rest silently.
- *	10AP.	not affected - worked around in hardware
- *	11AP.	Linux reads the APIC between writes to avoid this, as per
- *		the documentation. Make sure you preserve this as it affects
- *		the C stepping chips too.
- *	12AP.	not affected - worked around in hardware
- *	13AP.	not affected - worked around in hardware
- *	14AP.	we always deassert INIT during bootup
- *	15AP.	not affected - worked around in hardware
- *	16AP.	not affected - worked around in hardware
- *	17AP.	not affected - worked around in hardware
- *	18AP.	not affected - worked around in hardware
- *	19AP.	not affected - worked around in BIOS
- *
- *	If this sounds worrying believe me these bugs are either ___RARE___,
- *	or are signal timing bugs worked around in hardware and there's
- *	about nothing of note with C stepping upwards.
  */
-
-/* The 'big kernel lock' */
-spinlock_t kernel_flag = SPIN_LOCK_UNLOCKED;
-
-struct tlb_state cpu_tlbstate[NR_CPUS] = {[0 ... NR_CPUS-1] = { 0 }};
 
 /*
  * the following functions deal with sending IPIs between CPUs.
@@ -245,6 +199,14 @@ static inline void send_IPI_all(int vector)
 }
 
 /*
+ * ********* XEN NOTICE **********
+ * I've left the following comments lying around as they look liek they might
+ * be useful to get multiprocessor guest OSes going. However, I suspect the
+ * issues we face will be quite different so I've ripped out all the
+ * TLBSTATE logic (I didn't understand it anyway :-). These comments do
+ * not apply to Xen, therefore! -- Keir (8th Oct 2003).
+ */
+/*
  *	Smarter SMP flushing macros. 
  *		c/o Linus Torvalds.
  *
@@ -252,28 +214,6 @@ static inline void send_IPI_all(int vector)
  *	writing to user space from interrupts. (Its not allowed anyway).
  *
  *	Optimizations Manfred Spraul <manfred@colorfullife.com>
- */
-
-static volatile unsigned long flush_cpumask;
-#if 0
-static struct mm_struct * flush_mm;
-static unsigned long flush_va;
-#endif
-static spinlock_t tlbstate_lock = SPIN_LOCK_UNLOCKED;
-#define FLUSH_ALL	0xffffffff
-
-/*
- * We cannot call mmdrop() because we are in interrupt context, 
- * instead update mm.cpu_vm_mask.
- */
-static void inline leave_mm (unsigned long cpu)
-{
-    if (cpu_tlbstate[cpu].state == TLBSTATE_OK)
-        BUG();
-    clear_bit(cpu, &cpu_tlbstate[cpu].active_mm->cpu_vm_mask);
-}
-
-/*
  *
  * The flush IPI assumes that a thread switch happens in this order:
  * [cpu0: the cpu that switches]
@@ -310,14 +250,16 @@ static void inline leave_mm (unsigned long cpu)
  *
  * The good news is that cpu_tlbstate is local to each cpu, no
  * write/read ordering problems.
- */
-
-/*
+ *
  * TLB flush IPI:
  *
  * 1) Flush the tlb entries if the cpu uses the mm that's being flushed.
  * 2) Leave the mm if we are in the lazy tlb mode.
  */
+
+static volatile unsigned long flush_cpumask;
+static spinlock_t tlbstate_lock = SPIN_LOCK_UNLOCKED;
+#define FLUSH_ALL	0xffffffff
 
 asmlinkage void smp_invalidate_interrupt (void)
 {
@@ -326,19 +268,8 @@ asmlinkage void smp_invalidate_interrupt (void)
     if (!test_bit(cpu, &flush_cpumask))
         return;
 
-#if 0		 
-    if (flush_mm == cpu_tlbstate[cpu].active_mm) {
-        if (cpu_tlbstate[cpu].state == TLBSTATE_OK) {
-            if (flush_va == FLUSH_ALL)
-#endif
-                local_flush_tlb();
-#if 0
-            else
-                __flush_tlb_one(flush_va);
-        } else
-            leave_mm(cpu);
-    }
-#endif
+    local_flush_tlb();
+
     ack_APIC_irq();
     clear_bit(cpu, &flush_cpumask);
 }
@@ -354,11 +285,7 @@ void flush_tlb_others(unsigned long cpumask)
 	
 static inline void do_flush_tlb_all_local(void)
 {
-    unsigned long cpu = smp_processor_id();
-
     __flush_tlb_all();
-    if (cpu_tlbstate[cpu].state == TLBSTATE_LAZY)
-        leave_mm(cpu);
 }
 
 static void flush_tlb_all_ipi(void* info)

@@ -506,37 +506,6 @@ static void update_wall_time(unsigned long ticks)
 	}
 }
 
-static inline void do_process_times(struct task_struct *p,
-	unsigned long user, unsigned long system)
-{
-}
-
-
-void update_one_process(struct task_struct *p, unsigned long user,
-			unsigned long system, int cpu)
-{
-	do_process_times(p, user, system);
-}	
-
-/*
- * Called from the timer interrupt handler to charge one tick to the current 
- * process.  user_tick is 1 if the tick is user time, 0 for system.
- */
-void update_process_times(int user_tick)
-{
-    struct task_struct *p = current;
-    int cpu = smp_processor_id(), system = user_tick ^ 1;
-    
-    update_one_process(p, user_tick, system, cpu);
-    
-    if ( --p->counter <= 0 )
-    {
-        p->counter = 0;
-        set_bit(_HYP_EVENT_NEED_RESCHED, &p->hyp_events);
-    }
-}
-
-
 /* jiffies at the most recent update of wall time */
 unsigned long wall_jiffies;
 
@@ -580,11 +549,7 @@ void timer_bh(void)
 
 void do_timer(struct pt_regs *regs)
 {
-
     (*(unsigned long *)&jiffies)++;
-
-    if ( !using_apic_timer )
-        update_process_times(user_mode(regs));
 
     mark_bh(TIMER_BH);
     if (TQ_ACTIVE(tq_timer))

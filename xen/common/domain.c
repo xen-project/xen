@@ -71,7 +71,6 @@ struct task_struct *do_newdomain(unsigned int dom_id, unsigned int cpu)
     SET_GDT_ADDRESS(p, DEFAULT_GDT_ADDRESS);
 
     p->addr_limit = USER_DS;
-    p->active_mm  = &p->mm;
 
     /*
      * We're basically forcing default RPLs to 1, so that our "what privilege

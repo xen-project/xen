@@ -470,7 +470,6 @@ asmlinkage void __enter_scheduler(void)
     if ( unlikely(prev == next) )
     {
         /* We won't go through the normal tail, so do this by hand */
-        prev->policy &= ~SCHED_YIELD;
         update_dom_time(prev->shared_info);
         return;
     }
@@ -491,8 +490,7 @@ asmlinkage void __enter_scheduler(void)
 
     switch_to(prev, next);
     
-    prev->policy &= ~SCHED_YIELD;
-    if ( prev->state == TASK_DYING ) 
+    if ( unlikely(prev->state == TASK_DYING) ) 
         put_task_struct(prev);
 
     update_dom_time(next->shared_info);
