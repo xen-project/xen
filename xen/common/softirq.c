@@ -13,7 +13,6 @@
 #include <xen/init.h>
 #include <xen/mm.h>
 #include <xen/sched.h>
-#include <asm/vmx_vmcs.h>
 #include <xen/softirq.h>
 
 irq_cpustat_t irq_stat[NR_CPUS];
