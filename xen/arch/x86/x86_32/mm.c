@@ -320,7 +320,7 @@ long do_update_descriptor(
 
     page = &frame_table[pfn];
     if ( unlikely(!get_page(page, current)) )
-        goto out;
+        return -EINVAL;
 
     /* Check if the given frame is in use in an unsafe context. */
     switch ( page->type_and_flags & PGT_type_mask )
