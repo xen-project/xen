@@ -227,17 +227,17 @@ void __init init_frametable(unsigned long nr_pages)
     frame_table = (frame_table_t *)FRAMETABLE_VIRT_START;
     memset(frame_table, 0, frame_table_size);
 
-    free_pfns = nr_pages - 
-        ((__pa(frame_table) + frame_table_size) >> PAGE_SHIFT);
+    free_pfns = 0;
 
     /* Put all domain-allocatable memory on a free list. */
     INIT_LIST_HEAD(&free_list);
-    for( page_index = (__pa(frame_table) + frame_table_size) >> PAGE_SHIFT; 
-         page_index < nr_pages; 
-         page_index++ )      
+    for( page_index = nr_pages - 1;
+         page_index >= (__pa(frame_table) + frame_table_size) >> PAGE_SHIFT; 
+         page_index -= 2 )      
     {
         pf = list_entry(&frame_table[page_index].list, struct pfn_info, list);
         list_add_tail(&pf->list, &free_list);
+        free_pfns++;
     }
 }
 

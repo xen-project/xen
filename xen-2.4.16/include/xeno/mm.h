@@ -118,6 +118,7 @@ void init_frametable(unsigned long nr_pages);
  * will use it to store a "physical" frame number to give the appearance of
  * contiguous (or near contiguous) physical memory.
  */
+#undef  machine_to_phys_mapping
 #define machine_to_phys_mapping ((unsigned long *)RDWR_MPT_VIRT_START)
 
 /* Part of the domain API. */
