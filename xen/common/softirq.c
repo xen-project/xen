@@ -48,44 +48,42 @@ static struct softirq_action softirq_vec[32] __cacheline_aligned;
 
 asmlinkage void do_softirq()
 {
-	int cpu = smp_processor_id();
-	__u32 pending;
-	long flags;
+    int cpu = smp_processor_id();
+    struct softirq_action *h;
+    __u32 pending;
+    long flags;
 
-	if (in_interrupt())
-		return;
+    if (in_interrupt())
+        return;
 
-	local_irq_save(flags);
+    local_irq_save(flags);
 
-	pending = softirq_pending(cpu);
+    pending = xchg(&softirq_pending(cpu), 0);
+    if ( !pending ) goto out;
 
-	while (pending) {
-		struct softirq_action *h;
+    local_bh_disable();
 
-		local_bh_disable();
-restart:
-		/* Reset the pending bitmask before enabling irqs */
-		softirq_pending(cpu) = 0;
+    do {
+        local_irq_enable();
+        
+        h = softirq_vec;
+        
+        do {
+            if (pending & 1)
+                h->action(h);
+            h++;
+            pending >>= 1;
+        } while (pending);
+        
+        local_irq_disable();
+        
+        pending = xchg(&softirq_pending(cpu), 0);
+    } while ( pending );
 
-		local_irq_enable();
+    __local_bh_enable();
 
-		h = softirq_vec;
-
-		do {
-			if (pending & 1)
-				h->action(h);
-			h++;
-			pending >>= 1;
-		} while (pending);
-
-		local_irq_disable();
-
-		pending = softirq_pending(cpu);
-		if (pending) goto restart;
-		__local_bh_enable();
-	}
-
-	local_irq_restore(flags);
+out:
+    local_irq_restore(flags);
 }
 
 /*
@@ -93,27 +91,27 @@ restart:
  */
 inline void cpu_raise_softirq(unsigned int cpu, unsigned int nr)
 {
-	__cpu_raise_softirq(cpu, nr);
+    __cpu_raise_softirq(cpu, nr);
 
 #ifdef CONFIG_SMP
-        if ( cpu != smp_processor_id() )
-            smp_send_event_check_cpu(cpu);
+    if ( cpu != smp_processor_id() )
+        smp_send_event_check_cpu(cpu);
 #endif
 }
 
 void raise_softirq(unsigned int nr)
 {
-	long flags;
+    long flags;
 
-	local_irq_save(flags);
-	cpu_raise_softirq(smp_processor_id(), nr);
-	local_irq_restore(flags);
+    local_irq_save(flags);
+    cpu_raise_softirq(smp_processor_id(), nr);
+    local_irq_restore(flags);
 }
 
 void open_softirq(int nr, void (*action)(struct softirq_action*), void *data)
 {
-	softirq_vec[nr].data = data;
-	softirq_vec[nr].action = action;
+    softirq_vec[nr].data = data;
+    softirq_vec[nr].action = action;
 }
 
 
@@ -124,119 +122,119 @@ struct tasklet_head tasklet_hi_vec[NR_CPUS] __cacheline_aligned;
 
 void __tasklet_schedule(struct tasklet_struct *t)
 {
-	int cpu = smp_processor_id();
-	unsigned long flags;
+    int cpu = smp_processor_id();
+    unsigned long flags;
 
-	local_irq_save(flags);
-	t->next = tasklet_vec[cpu].list;
-	tasklet_vec[cpu].list = t;
-	cpu_raise_softirq(cpu, TASKLET_SOFTIRQ);
-	local_irq_restore(flags);
+    local_irq_save(flags);
+    t->next = tasklet_vec[cpu].list;
+    tasklet_vec[cpu].list = t;
+    cpu_raise_softirq(cpu, TASKLET_SOFTIRQ);
+    local_irq_restore(flags);
 }
 
 void __tasklet_hi_schedule(struct tasklet_struct *t)
 {
-	int cpu = smp_processor_id();
-	unsigned long flags;
+    int cpu = smp_processor_id();
+    unsigned long flags;
 
-	local_irq_save(flags);
-	t->next = tasklet_hi_vec[cpu].list;
-	tasklet_hi_vec[cpu].list = t;
-	cpu_raise_softirq(cpu, HI_SOFTIRQ);
-	local_irq_restore(flags);
+    local_irq_save(flags);
+    t->next = tasklet_hi_vec[cpu].list;
+    tasklet_hi_vec[cpu].list = t;
+    cpu_raise_softirq(cpu, HI_SOFTIRQ);
+    local_irq_restore(flags);
 }
 
 static void tasklet_action(struct softirq_action *a)
 {
-	int cpu = smp_processor_id();
-	struct tasklet_struct *list;
+    int cpu = smp_processor_id();
+    struct tasklet_struct *list;
 
-	local_irq_disable();
-	list = tasklet_vec[cpu].list;
-	tasklet_vec[cpu].list = NULL;
-	local_irq_enable();
+    local_irq_disable();
+    list = tasklet_vec[cpu].list;
+    tasklet_vec[cpu].list = NULL;
+    local_irq_enable();
 
-	while (list) {
-		struct tasklet_struct *t = list;
+    while (list) {
+        struct tasklet_struct *t = list;
 
-		list = list->next;
+        list = list->next;
 
-		if (tasklet_trylock(t)) {
-			if (!atomic_read(&t->count)) {
-				if (!test_and_clear_bit(TASKLET_STATE_SCHED, &t->state))
-					BUG();
-				t->func(t->data);
-			}
-			tasklet_unlock(t);
-			continue;
-		}
+        if (tasklet_trylock(t)) {
+            if (!atomic_read(&t->count)) {
+                if (!test_and_clear_bit(TASKLET_STATE_SCHED, &t->state))
+                    BUG();
+                t->func(t->data);
+            }
+            tasklet_unlock(t);
+            continue;
+        }
 
-		local_irq_disable();
-		t->next = tasklet_vec[cpu].list;
-		tasklet_vec[cpu].list = t;
-		__cpu_raise_softirq(cpu, TASKLET_SOFTIRQ);
-		local_irq_enable();
-	}
+        local_irq_disable();
+        t->next = tasklet_vec[cpu].list;
+        tasklet_vec[cpu].list = t;
+        __cpu_raise_softirq(cpu, TASKLET_SOFTIRQ);
+        local_irq_enable();
+    }
 }
 
 static void tasklet_hi_action(struct softirq_action *a)
 {
-	int cpu = smp_processor_id();
-	struct tasklet_struct *list;
+    int cpu = smp_processor_id();
+    struct tasklet_struct *list;
 
-	local_irq_disable();
-	list = tasklet_hi_vec[cpu].list;
-	tasklet_hi_vec[cpu].list = NULL;
-	local_irq_enable();
+    local_irq_disable();
+    list = tasklet_hi_vec[cpu].list;
+    tasklet_hi_vec[cpu].list = NULL;
+    local_irq_enable();
 
-	while (list) {
-		struct tasklet_struct *t = list;
+    while (list) {
+        struct tasklet_struct *t = list;
 
-		list = list->next;
+        list = list->next;
 
-		if (tasklet_trylock(t)) {
-			if (!atomic_read(&t->count)) {
-				if (!test_and_clear_bit(TASKLET_STATE_SCHED, &t->state))
-					BUG();
-				t->func(t->data);
-			}
-			tasklet_unlock(t);
-			continue;
-		}
+        if (tasklet_trylock(t)) {
+            if (!atomic_read(&t->count)) {
+                if (!test_and_clear_bit(TASKLET_STATE_SCHED, &t->state))
+                    BUG();
+                t->func(t->data);
+            }
+            tasklet_unlock(t);
+            continue;
+        }
 
-		local_irq_disable();
-		t->next = tasklet_hi_vec[cpu].list;
-		tasklet_hi_vec[cpu].list = t;
-		__cpu_raise_softirq(cpu, HI_SOFTIRQ);
-		local_irq_enable();
-	}
+        local_irq_disable();
+        t->next = tasklet_hi_vec[cpu].list;
+        tasklet_hi_vec[cpu].list = t;
+        __cpu_raise_softirq(cpu, HI_SOFTIRQ);
+        local_irq_enable();
+    }
 }
 
 
 void tasklet_init(struct tasklet_struct *t,
 		  void (*func)(unsigned long), unsigned long data)
 {
-	t->next = NULL;
-	t->state = 0;
-	atomic_set(&t->count, 0);
-	t->func = func;
-	t->data = data;
+    t->next = NULL;
+    t->state = 0;
+    atomic_set(&t->count, 0);
+    t->func = func;
+    t->data = data;
 }
 
 void tasklet_kill(struct tasklet_struct *t)
 {
-	if (in_interrupt())
-		printk("Attempt to kill tasklet from interrupt\n");
+    if (in_interrupt())
+        printk("Attempt to kill tasklet from interrupt\n");
 
-	while (test_and_set_bit(TASKLET_STATE_SCHED, &t->state)) {
-		set_current_state(TASK_RUNNING);
-		do {
-			current->policy |= SCHED_YIELD;
-			schedule();
-		} while (test_bit(TASKLET_STATE_SCHED, &t->state));
-	}
-	tasklet_unlock_wait(t);
-	clear_bit(TASKLET_STATE_SCHED, &t->state);
+    while (test_and_set_bit(TASKLET_STATE_SCHED, &t->state)) {
+        set_current_state(TASK_RUNNING);
+        do {
+            current->policy |= SCHED_YIELD;
+            schedule();
+        } while (test_bit(TASKLET_STATE_SCHED, &t->state));
+    }
+    tasklet_unlock_wait(t);
+    clear_bit(TASKLET_STATE_SCHED, &t->state);
 }
 
 
@@ -259,74 +257,74 @@ spinlock_t global_bh_lock = SPIN_LOCK_UNLOCKED;
 
 static void bh_action(unsigned long nr)
 {
-	int cpu = smp_processor_id();
+    int cpu = smp_processor_id();
 
-	if (!spin_trylock(&global_bh_lock))
-		goto resched;
+    if (!spin_trylock(&global_bh_lock))
+        goto resched;
 
-	if (!hardirq_trylock(cpu))
-		goto resched_unlock;
+    if (!hardirq_trylock(cpu))
+        goto resched_unlock;
 
-	if (bh_base[nr])
-		bh_base[nr]();
+    if (bh_base[nr])
+        bh_base[nr]();
 
-	hardirq_endlock(cpu);
-	spin_unlock(&global_bh_lock);
-	return;
+    hardirq_endlock(cpu);
+    spin_unlock(&global_bh_lock);
+    return;
 
-resched_unlock:
-	spin_unlock(&global_bh_lock);
-resched:
-	mark_bh(nr);
+ resched_unlock:
+    spin_unlock(&global_bh_lock);
+ resched:
+    mark_bh(nr);
 }
 
 void init_bh(int nr, void (*routine)(void))
 {
-	bh_base[nr] = routine;
-	mb();
+    bh_base[nr] = routine;
+    mb();
 }
 
 void remove_bh(int nr)
 {
-	tasklet_kill(bh_task_vec+nr);
-	bh_base[nr] = NULL;
+    tasklet_kill(bh_task_vec+nr);
+    bh_base[nr] = NULL;
 }
 
 void __init softirq_init()
 {
-	int i;
+    int i;
 
-	for (i=0; i<32; i++)
-		tasklet_init(bh_task_vec+i, bh_action, i);
+    for (i=0; i<32; i++)
+        tasklet_init(bh_task_vec+i, bh_action, i);
 
-	open_softirq(TASKLET_SOFTIRQ, tasklet_action, NULL);
-	open_softirq(HI_SOFTIRQ, tasklet_hi_action, NULL);
+    open_softirq(TASKLET_SOFTIRQ, tasklet_action, NULL);
+    open_softirq(HI_SOFTIRQ, tasklet_hi_action, NULL);
 }
 
 void __run_task_queue(task_queue *list)
 {
-	struct list_head head, *next;
-	unsigned long flags;
+    struct list_head head, *next;
+    unsigned long flags;
 
-	spin_lock_irqsave(&tqueue_lock, flags);
-	list_add(&head, list);
-	list_del_init(list);
-	spin_unlock_irqrestore(&tqueue_lock, flags);
+    spin_lock_irqsave(&tqueue_lock, flags);
+    list_add(&head, list);
+    list_del_init(list);
+    spin_unlock_irqrestore(&tqueue_lock, flags);
 
-	next = head.next;
-	while (next != &head) {
-		void (*f) (void *);
-		struct tq_struct *p;
-		void *data;
+    next = head.next;
+    while (next != &head) {
+        void (*f) (void *);
+        struct tq_struct *p;
+        void *data;
 
-		p = list_entry(next, struct tq_struct, list);
-		next = next->next;
-		f = p->routine;
-		data = p->data;
-		wmb();
-		p->sync = 0;
-		if (f)
-			f(data);
-	}
+        p = list_entry(next, struct tq_struct, list);
+        next = next->next;
+        f = p->routine;
+        data = p->data;
+        wmb();
+        p->sync = 0;
+        if (f)
+            f(data);
+    }
 }
 

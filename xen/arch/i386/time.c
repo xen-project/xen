@@ -364,10 +364,8 @@ static void update_time(unsigned long foo)
                wall_clock_time.tv_usec));
 
     /* Reload the timer. */
- again:
     update_timer.expires  = new_st + MILLISECS(200);
-    if(add_ac_timer(&update_timer) == 1)
-        goto again;
+    add_ac_timer(&update_timer);
 }
 
 /***************************************************************************
@@ -402,7 +400,7 @@ int __init init_xeno_time()
     wctime_st = NOW();
 
     /* start timer to update time periodically */
-    init_ac_timer(&update_timer);
+    init_ac_timer(&update_timer, 0);
     update_timer.function = &update_time;
     update_time(0);
 

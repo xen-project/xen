@@ -369,13 +369,6 @@ asmlinkage void schedule(void)
  sched_done:
     ASSERT(r_time >= ctx_allow);
 
-#ifndef NDEBUG
-    if (r_time < ctx_allow) {
-        printk("[%02d]: %lx\n", this_cpu, r_time);
-        dump_rqueue(&schedule_data[this_cpu].runqueue, "foo");
-    }
-#endif
-
     prev->has_cpu = 0;
     next->has_cpu = 1;
 
@@ -385,14 +378,8 @@ asmlinkage void schedule(void)
     next->lastschd = now;
 
     /* reprogramm the timer */
- timer_redo:
     schedule_data[this_cpu].s_timer.expires  = now + r_time;
-    if (add_ac_timer(&schedule_data[this_cpu].s_timer) == 1) {
-        printk("SCHED[%02d]: timeout already happened! r_time=%u\n",
-               this_cpu, r_time);
-        now = NOW();
-        goto timer_redo;
-    }
+    add_ac_timer(&schedule_data[this_cpu].s_timer);
 
     spin_unlock_irq(&schedule_data[this_cpu].lock);
 
@@ -450,7 +437,6 @@ static void virt_timer(unsigned long foo)
     unsigned long cpu_mask = 0;
     struct task_struct *p;
     s_time_t now;
-    int res;
 
     /* send virtual timer interrupt */
     read_lock(&tasklist_lock);
@@ -463,12 +449,9 @@ static void virt_timer(unsigned long foo)
     read_unlock(&tasklist_lock);
     guest_event_notify(cpu_mask);
 
-    again:
     now = NOW();
     v_timer.expires  = now + MILLISECS(10);
-    res=add_ac_timer(&v_timer);
-    if (res==1)
-        goto again;
+    add_ac_timer(&v_timer);
 }
 
 /*
@@ -488,12 +471,12 @@ void __init scheduler_init(void)
         schedule_data[i].curr = &idle0_task;
         
         /* a timer for each CPU  */
-        init_ac_timer(&schedule_data[i].s_timer);
+        init_ac_timer(&schedule_data[i].s_timer, i);
         schedule_data[i].s_timer.function = &sched_timer;
 
     }
     schedule_data[0].idle = &idle0_task; /* idle on CPU 0 is special */
-    init_ac_timer(&v_timer);
+    init_ac_timer(&v_timer, 0);
     v_timer.function = &virt_timer;
 }
 

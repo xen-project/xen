@@ -24,13 +24,11 @@
 #include <xeno/sched.h>
 #include <xeno/lib.h>
 #include <xeno/smp.h>
-
 #include <xeno/perfc.h>
-
 #include <xeno/time.h>
+#include <xeno/interrupt.h>
 #include <xeno/ac_timer.h>
 #include <xeno/keyhandler.h>
-
 #include <asm/system.h>
 #include <asm/desc.h>
 
@@ -55,47 +53,24 @@ typedef struct ac_timers_st
 } __cacheline_aligned ac_timers_t;
 static ac_timers_t ac_timers[NR_CPUS];
 
-/* local prototypes */
-static int  detach_ac_timer(struct ac_timer *timer);
-
 
 /*****************************************************************************
  * add a timer.
- * return value:
- *  0: success
- *  1: failure, timer in the past or timeout value to small
- * -1: failure, timer uninitialised
- * fail
+ * return value: CPU mask of remote processors to send an event to
  *****************************************************************************/
-int add_ac_timer(struct ac_timer *timer)
+static inline unsigned long __add_ac_timer(struct ac_timer *timer)
 {
-    int              cpu = smp_processor_id();
-    unsigned long    flags;
-    s_time_t         now;
-
-    /* make sure timeout value is in the future */
-    
-    now = NOW();
-    if (timer->expires <= now) {    
-        TRC(printk("ACT[%02d] add_ac_timer:now=0x%08X%08X>expire=0x%08X%08X\n",
-                   cpu, (u32)(now>>32), (u32)now,
-                   (u32)(timer->expires>>32), (u32)timer->expires));
-        return 1;
-    }
-
-    spin_lock_irqsave(&ac_timers[cpu].lock, flags);
+    int cpu = timer->cpu;
 
     /*
-     * Add timer to the list. If it gets added to the front we have to
-     * reprogramm the timer
+     * Add timer to the list. If it gets added to the front we schedule
+     * a softirq. This will reprogram the timer, or handle the timer event
+     * imemdiately, depending on whether alarm is sufficiently ahead in the
+     * future.
      */
     if (list_empty(&ac_timers[cpu].timers)) {
-        if (!reprogram_ac_timer(timer->expires)) {
-            printk("ACT[%02d] add at head failed\n", cpu);
-            spin_unlock_irqrestore(&ac_timers[cpu].lock, flags);
-            return 1; /* failed */
-        }
         list_add(&timer->timer_list, &ac_timers[cpu].timers);
+        goto send_softirq;
     } else {
         struct list_head *pos;
         struct ac_timer  *t;
@@ -105,21 +80,33 @@ int add_ac_timer(struct ac_timer *timer)
             if (t->expires > timer->expires)
                 break;
         }
-        list_add (&(timer->timer_list), pos->prev);
+        list_add(&(timer->timer_list), pos->prev);
 
-        if (timer->timer_list.prev == &ac_timers[cpu].timers) {
-            /* added at head */
-            if (!reprogram_ac_timer(timer->expires)) {
-                printk("ACT[%02d] add at head failed\n", cpu);
-                detach_ac_timer(timer);
-                spin_unlock_irqrestore(&ac_timers[cpu].lock, flags);
-                return 1; /* failed */
-            }
-        }
+        if (timer->timer_list.prev == &ac_timers[cpu].timers)
+            goto send_softirq;
     }
-    spin_unlock_irqrestore(&ac_timers[cpu].lock, flags);
+
     return 0;
+
+ send_softirq:
+    __cpu_raise_softirq(cpu, AC_TIMER_SOFTIRQ);
+    return (cpu != smp_processor_id()) ? 1<<cpu : 0;
 }
+
+void add_ac_timer(struct ac_timer *timer) 
+{
+    int           cpu = timer->cpu;
+    unsigned long flags, cpu_mask;
+
+    spin_lock_irqsave(&ac_timers[cpu].lock, flags);
+    ASSERT(timer != NULL);
+    ASSERT(!active_ac_timer(timer));
+    cpu_mask = __add_ac_timer(timer);
+    spin_unlock_irqrestore(&ac_timers[cpu].lock, flags);
+
+    if ( cpu_mask ) smp_send_event_check_mask(cpu_mask);
+}
+
 
 /*****************************************************************************
  * detach a timer (no locking)
@@ -127,65 +114,87 @@ int add_ac_timer(struct ac_timer *timer)
  *  0: success
  * -1: bogus timer
  *****************************************************************************/
-static int detach_ac_timer(struct ac_timer *timer)
+static inline void detach_ac_timer(struct ac_timer *timer)
 {  
     TRC(printk("ACT  [%02d] detach(): \n", cpu));
     list_del(&timer->timer_list);
     timer->timer_list.next = NULL;
-    return 0;
 }
+
 
 /*****************************************************************************
  * remove a timer
- * return values:
- *  0: success
- * -1: bogus timer
+ * return values: CPU mask of remote processors to send an event to
  *****************************************************************************/
-int rem_ac_timer(struct ac_timer *timer)
+static inline unsigned long __rem_ac_timer(struct ac_timer *timer)
 {
-    int           cpu = smp_processor_id();
-    int           res = 0;
-    unsigned long flags;
+    int cpu = timer->cpu;
 
     TRC(printk("ACT  [%02d] remove(): timo=%lld \n", cpu, timer->expires));
-    spin_lock_irqsave(&ac_timers[cpu].lock, flags);
-    if (timer->timer_list.next) {
-        res = detach_ac_timer(timer);
+    ASSERT(timer->timer_list.next);
 
-        if (timer->timer_list.prev == &ac_timers[cpu].timers) {
-            /* just removed the head */
-            if (list_empty(&ac_timers[cpu].timers)) {
-                reprogram_ac_timer((s_time_t) 0);
-            } else {
-                timer = list_entry(ac_timers[cpu].timers.next,
-                                   struct ac_timer, timer_list);
-                if ( timer->expires > (NOW() + TIMER_SLOP) )
-                    reprogram_ac_timer(timer->expires);
-            }
+    detach_ac_timer(timer);
+    
+    if (timer->timer_list.prev == &ac_timers[cpu].timers) {
+        /* just removed the head */
+        if (list_empty(&ac_timers[cpu].timers)) {
+            goto send_softirq;
+        } else {
+            timer = list_entry(ac_timers[cpu].timers.next,
+                               struct ac_timer, timer_list);
+            if ( timer->expires > (NOW() + TIMER_SLOP) )
+                goto send_softirq;
         }
-    } else
-        res = -1;
+    }
 
+    return 0;
+
+ send_softirq:
+    __cpu_raise_softirq(cpu, AC_TIMER_SOFTIRQ);
+    return (cpu != smp_processor_id()) ? 1<<cpu : 0;
+}
+
+void rem_ac_timer(struct ac_timer *timer)
+{
+    int           cpu = timer->cpu;
+    unsigned long flags, cpu_mask = 0;
+
+    spin_lock_irqsave(&ac_timers[cpu].lock, flags);
+    ASSERT(timer != NULL);
+    if ( active_ac_timer(timer) )
+        cpu_mask = __rem_ac_timer(timer);
     spin_unlock_irqrestore(&ac_timers[cpu].lock, flags);
 
-    return res;
+    if ( cpu_mask ) smp_send_event_check_mask(cpu_mask);
 }
+
 
 /*****************************************************************************
  * modify a timer, i.e., set a new timeout value
  * return value:
  *  0: sucess
- * -1: error
+ *  1: timeout error
+ * -1: bogus timer
  *****************************************************************************/
-int mod_ac_timer(struct ac_timer *timer, s_time_t new_time)
+void mod_ac_timer(struct ac_timer *timer, s_time_t new_time)
 {
-    if (rem_ac_timer(timer) != 0)
-        return -1;
+    int           cpu = timer->cpu;
+    unsigned long flags, cpu_mask = 0;
+
+    spin_lock_irqsave(&ac_timers[cpu].lock, flags);
+
+    ASSERT(timer != NULL);
+
+    if ( active_ac_timer(timer) )
+        cpu_mask = __rem_ac_timer(timer);
     timer->expires = new_time;
-    if (add_ac_timer(timer) != 0)
-        return -1;
-    return 0;
+    cpu_mask |= __add_ac_timer(timer);
+
+    spin_unlock_irqrestore(&ac_timers[cpu].lock, flags);
+
+    if ( cpu_mask ) smp_send_event_check_mask(cpu_mask);
 }
+
 
 /*****************************************************************************
  * do_ac_timer
@@ -202,21 +211,18 @@ void do_ac_timer(void)
     spin_lock_irqsave(&ac_timers[cpu].lock, flags);
 
  do_timer_again:
-
     TRC(printk("ACT  [%02d] do(): now=%lld\n", cpu, NOW()));
         
     /* Sanity: is the timer list empty? */
-    if ( list_empty(&ac_timers[cpu].timers) ) {
-        /* This does sometimes happen: race condition in resetting timeout? */
-        spin_unlock_irqrestore(&ac_timers[cpu].lock, flags);
-        return;
-    }
+    if ( list_empty(&ac_timers[cpu].timers) ) goto out;
 
     /* Handle all timeouts in the near future. */
     while ( !list_empty(&ac_timers[cpu].timers) )
     {
         t = list_entry(ac_timers[cpu].timers.next,struct ac_timer, timer_list);
         if ( t->expires > (NOW() + TIMER_SLOP) ) break;
+
+        ASSERT(t->cpu == cpu);
 
         /* do some stats */
         diff = (now - t->expires);
@@ -234,22 +240,21 @@ void do_ac_timer(void)
     if ( !list_empty(&ac_timers[cpu].timers) )
     {
         t = list_entry(ac_timers[cpu].timers.next,struct ac_timer, timer_list);
-        if ( t->expires > 0 )
+        TRC(printk("ACT  [%02d] do(): reprog timo=%lld\n",cpu,t->expires));
+        if ( !reprogram_ac_timer(t->expires) )
         {
-            TRC(printk("ACT  [%02d] do(): reprog timo=%lld\n",cpu,t->expires));
-            if ( !reprogram_ac_timer(t->expires) )
-            {
-                TRC(printk("ACT  [%02d] do(): again\n", cpu));
-                goto do_timer_again;
-            }
+            TRC(printk("ACT  [%02d] do(): again\n", cpu));
+            goto do_timer_again;
         }
     } else {
         reprogram_ac_timer((s_time_t) 0);
     }
 
+ out:
     spin_unlock_irqrestore(&ac_timers[cpu].lock, flags);
     TRC(printk("ACT  [%02d] do(): end\n", cpu));
 }
+
 
 /*****************************************************************************
  * debug dump_queue
@@ -273,6 +278,40 @@ static void dump_tqueue(struct list_head *queue, char *name)
     }
     return; 
 }
+
+
+static void ac_timer_softirq_action(struct softirq_action *a)
+{
+    int           cpu = smp_processor_id();
+    unsigned long flags;
+    struct ac_timer *t;
+    struct list_head *tlist;
+
+    spin_lock_irqsave(&ac_timers[cpu].lock, flags);
+    
+    tlist = &ac_timers[cpu].timers;
+    if ( list_empty(tlist) ) 
+    {
+        reprogram_ac_timer((s_time_t)0);
+        spin_unlock_irqrestore(&ac_timers[cpu].lock, flags);
+        return;
+    }
+
+    t = list_entry(tlist, struct ac_timer, timer_list);
+
+    if ( (t->expires < (NOW() + TIMER_SLOP)) ||
+         !reprogram_ac_timer(t->expires) ) 
+    {
+        /*
+         * Timer handler needs protecting from local APIC interrupts, but takes
+         * the spinlock itself, so we release that before calling in.
+         */
+        spin_unlock(&ac_timers[cpu].lock);
+        do_ac_timer();
+        local_irq_restore(flags);
+    }
+}
+
 
 void dump_timerq(u_char key, void *dev_id, struct pt_regs *regs)
 {
@@ -299,12 +338,15 @@ void __init ac_timer_init(void)
 
     printk ("ACT: Initialising Accurate timers\n");
 
+    open_softirq(AC_TIMER_SOFTIRQ, ac_timer_softirq_action, NULL);
+
     for (i = 0; i < NR_CPUS; i++)
     {
         INIT_LIST_HEAD(&ac_timers[i].timers);
         spin_lock_init(&ac_timers[i].lock);
     }
 }
+
 
 /*****************************************************************************
  * GRAVEYARD

@@ -47,15 +47,22 @@ struct ac_timer {
     s_time_t         expires;   /* system time time out value */
     unsigned long    data;
     void             (*function)(unsigned long);
+    int              cpu;
 };
 
 /* interface for "clients" */
-extern int add_ac_timer(struct ac_timer *timer);
-extern int rem_ac_timer(struct ac_timer *timer);
-extern int mod_ac_timer(struct ac_timer *timer, s_time_t new_time);
-static inline void init_ac_timer(struct ac_timer *timer)
+extern void add_ac_timer(struct ac_timer *timer);
+extern void rem_ac_timer(struct ac_timer *timer);
+extern void mod_ac_timer(struct ac_timer *timer, s_time_t new_time);
+static __inline__ void init_ac_timer(struct ac_timer *timer, int cpu)
 {
+    timer->cpu = cpu;
     timer->timer_list.next = NULL;
+}
+/* check if ac_timer is active, i.e., on the list */
+static __inline__ int active_ac_timer(struct ac_timer *timer)
+{
+    return (timer->timer_list.next != NULL);
 }
 
 /* interface used by programmable timer, implemented hardware dependent */
