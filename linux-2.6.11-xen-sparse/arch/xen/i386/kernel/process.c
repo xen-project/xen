@@ -445,22 +445,7 @@ struct task_struct fastcall * __switch_to(struct task_struct *prev_p, struct tas
 	physdev_op_t iopl_op, iobmp_op;
 	multicall_entry_t _mcl[8], *mcl = _mcl;
 
-	/*
-	 * Save away %fs and %gs. No need to save %es and %ds, as
-	 * those are always kernel segments while inside the kernel.
-	 */
-	asm volatile("movl %%fs,%0":"=m" (*(int *)&prev->fs));
-	asm volatile("movl %%gs,%0":"=m" (*(int *)&prev->gs));
-
-	/*
-	 * We clobber FS and GS here so that we avoid a GPF when restoring
-	 * previous task's FS/GS values in Xen when the LDT is switched.
-	 */
-	__asm__ __volatile__ ( 
-		"xorl %%eax,%%eax; movl %%eax,%%fs; movl %%eax,%%gs" : : :
-		"eax" );
-
-	/* never put a printk in __switch_to... printk() calls wake_up*() indirectly */
+        /* XEN NOTE: FS/GS saved in switch_mm(), not here. */
 
 	/*
 	 * This is basically '__unlazy_fpu', except that we queue a
