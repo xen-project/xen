@@ -30,6 +30,7 @@ PERFCOUNTER_CPU( shadow_set_l1e_force_map, "shadow_set_l1e forced to map l1" )
 PERFCOUNTER_CPU( shadow_set_l1e_unlinked,  "shadow_set_l1e found unlinked l1" )
 PERFCOUNTER_CPU( shadow_set_l1e_fail,      "shadow_set_l1e failed (no sl1)" )
 PERFCOUNTER_CPU( shadow_invlpg_faults,     "shadow_invlpg's get_user faulted")
+PERFCOUNTER_CPU( unshadow_l2_count,        "unpinned L2 count")
 
 
 /* STATUS counters do not reset when 'P' is hit */

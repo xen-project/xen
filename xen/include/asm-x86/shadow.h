@@ -651,7 +651,7 @@ validate_pte_change(
 static int inline
 validate_pde_change(
     struct domain *d,
-    unsigned long new_pde,
+    unsigned long new_gpde,
     unsigned long *shadow_pde_p)
 {
     unsigned long old_spde, new_spde;
@@ -659,11 +659,12 @@ validate_pde_change(
     perfc_incrc(validate_pde_calls);
 
     old_spde = *shadow_pde_p;
-    l2pde_propagate_from_guest(d, &new_pde, &new_spde);
+    l2pde_propagate_from_guest(d, &new_gpde, &new_spde);
 
-    // XXX Shouldn't we supposed to propagate the new_pde to the guest?
+    // XXX Shouldn't we propagate the new_gpde to the guest?
+    // And then mark the guest's L2 page as dirty?
 
-    // only do the ref counting if something important changed.
+    // Only do the ref counting if something important changed.
     //
     if ( ((old_spde | new_spde) & _PAGE_PRESENT) &&
          ((old_spde ^ new_spde) & (PAGE_MASK | _PAGE_PRESENT)) )

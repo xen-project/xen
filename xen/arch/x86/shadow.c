@@ -299,8 +299,6 @@ free_shadow_hl2_table(struct domain *d, unsigned long smfn)
 static void inline
 free_shadow_l2_table(struct domain *d, unsigned long smfn)
 {
-    printk("free_shadow_l2_table(smfn=%p)\n", smfn);
-
     unsigned long *pl2e = map_domain_mem(smfn << PAGE_SHIFT);
     int i, external = shadow_mode_external(d);
 
@@ -1666,6 +1664,7 @@ static int resync_all(struct domain *d, u32 stype)
     unsigned long smfn;
     unsigned long *guest, *shadow, *snapshot;
     int need_flush = 0, external = shadow_mode_external(d);
+    int unshadow;
 
     ASSERT(spin_is_locked(&d->arch.shadow_lock));
 
@@ -1686,6 +1685,7 @@ static int resync_all(struct domain *d, u32 stype)
         guest    = map_domain_mem(entry->gmfn         << PAGE_SHIFT);
         snapshot = map_domain_mem(entry->snapshot_mfn << PAGE_SHIFT);
         shadow   = map_domain_mem(smfn                << PAGE_SHIFT);
+        unshadow = 0;
 
         switch ( stype ) {
         case PGT_l1_shadow:
@@ -1719,6 +1719,16 @@ static int resync_all(struct domain *d, u32 stype)
                     //
                     // snapshot[i] = new_pde;
                 }
+
+                // XXX - This hack works for linux guests.
+                //       Need a better solution long term.
+                if ( !(new_pde & _PAGE_PRESENT) && unlikely(new_pde != 0) &&
+                     (frame_table[smfn].u.inuse.type_info & PGT_pinned) &&
+                     !unshadow )
+                {
+                    perfc_incrc(unshadow_l2_count);
+                    unshadow = 1;
+                }
             }
             break;
         default:
@@ -1729,6 +1739,9 @@ static int resync_all(struct domain *d, u32 stype)
         unmap_domain_mem(shadow);
         unmap_domain_mem(snapshot);
         unmap_domain_mem(guest);
+
+        if ( unlikely(unshadow) )
+            shadow_unpin(smfn);
     }
 
     return need_flush;
@@ -1919,7 +1932,7 @@ void __update_pagetables(struct exec_domain *ed)
     struct domain *d = ed->domain;
     unsigned long gmfn = pagetable_val(ed->arch.guest_table) >> PAGE_SHIFT;
     unsigned long gpfn = __mfn_to_gpfn(d, gmfn);
-    unsigned long smfn, hl2mfn;
+    unsigned long smfn, hl2mfn, old_smfn;
 
     int max_mode = ( shadow_mode_external(d) ? SHM_external
                      : shadow_mode_translate(d) ? SHM_translate
@@ -1946,9 +1959,10 @@ void __update_pagetables(struct exec_domain *ed)
         smfn = shadow_l2_table(d, gpfn, gmfn);
     if ( !get_shadow_ref(smfn) )
         BUG();
-    if ( pagetable_val(ed->arch.shadow_table) )
-        put_shadow_ref(pagetable_val(ed->arch.shadow_table) >> PAGE_SHIFT);
+    old_smfn = pagetable_val(ed->arch.shadow_table) >> PAGE_SHIFT;
     ed->arch.shadow_table = mk_pagetable(smfn << PAGE_SHIFT);
+    if ( old_smfn )
+        put_shadow_ref(old_smfn);
 
     SH_VVLOG("0: __update_pagetables(gmfn=%p, smfn=%p)", gmfn, smfn);
 
