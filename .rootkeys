@@ -5,16 +5,15 @@
 4177dbbfqsi01p2zgZa0geUOgScONw COPYING
 3eb788d6Kleck_Cut0ouGneviGzliQ Makefile
 3f5ef5a24IaQasQE2tyMxrfxskMmvw README
-3f5ef5a2l4kfBYSQTUaOyyD76WROZQ README.CD
 3f69d8abYB1vMyD_QVDvzxy5Zscf1A TODO
 3f9e7d53iC47UnlfORp9iC1vai6kWw docs/Makefile
 3f9e7d60PWZJeVh5xdnk0nLUdxlqEA docs/figs/xenlogo.eps
 4022a73cgxX1ryj1HgS-IwwB6NUi2A docs/misc/XenDebugger-HOWTO
 412f4bd9sm5mCQ8BkrgKcAKZGadq7Q docs/misc/blkif-drivers-explained.txt
 40d6ccbfKKBq8jE0ula4eHEzBiQuDA docs/misc/xen_config.html
+410a4c2bAO_m_l4RsiiPHnZ4ixHWbQ docs/misc/xend.tex
 3f9e7d564bWFB-Czjv1qdmE6o0GqNg docs/src/interface.tex
 410144afnSd2Yw68AHGO5gXu2m3y6A docs/src/user.tex
-410a4c2bAO_m_l4RsiiPHnZ4ixHWbQ docs/src/xend.tex
 3f9e7d5bz8BwYkNuwyiPVu7JJG441A docs/xenstyle.cls
 3f815144d1vI2777JI-dO4wk49Iw7g extras/mini-os/Makefile
 3f815144zTnCV5591ulIJQrpe5b-5Q extras/mini-os/README

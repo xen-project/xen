@@ -1,5 +1,5 @@
 \documentclass[11pt,twoside,final,openright]{xenstyle}
-\usepackage{a4,graphicx,setspace}
+\usepackage{a4,graphicx,setspace,times}
 \setstretch{1.15}
 
 \begin{document}
@@ -37,6 +37,7 @@
 \widowpenalty=10000
 \clubpenalty=10000
 \parindent=0pt
+\parskip=5pt
 \renewcommand{\topfraction}{.8}
 \renewcommand{\bottomfraction}{.8}
 \renewcommand{\textfraction}{.2}
@@ -55,137 +56,110 @@ these and please report any you find to the developer's mailing list.
 Contributions of material, suggestions and corrections are welcome.
 }
 
-Xen is a { \em paravirtualising } virtual machine monitor (VMM) or
-``Hypervisor'' for the x86 processor architecture.  Xen can securely
-multiplex heterogeneous virtual machines on a single physical with
-near-native performance.  The virtual machine technology facilitates
-enterprise-grade functionality, including:
+\vspace{5mm}
+
+Xen is a { \em paravirtualising } virtual machine monitor (VMM), or
+`hypervisor', for the x86 processor architecture.  Xen can securely
+execute multiple virtual machines on a single physical system with
+close-to-native performance.  The virtual machine technology
+facilitates enterprise-grade functionality, including:
 
 \begin{itemize}
-\item Virtual machines with close to native performance.
+\item Virtual machines with performance nearly identical to native
+  hardware.
 \item Live migration of running virtual machines.
-\item Excellent hardware support (use unmodified Linux device drivers).
+\item Excellent hardware support (supports most Linux device drivers).
 \item Suspend to disk / resume from disk of running virtual machines.
-\item Transparent copy on write disks.
+\item Transparent copy-on-write disks for simple sharing across VMs.
 \item Sandboxed, restartable device drivers.
-\item Pervasive debugging - debug whole OSes, from kernel to applications.
 \end{itemize}
 
-Xen support is available for increasingly many operating systems.  The
-following OSs have either been ported already or a port is in
-progress:
-\begin{itemize}
-\item Linux 2.4
-\item Linux 2.6
-\item NetBSD 2.0
-\item Dragonfly BSD
-\item FreeBSD 5.3
-\item Plan 9
-% \item Windows XP
-\end{itemize}
+Paravirtualisation allows very high performance virtual machine
+technology, even on architectures like x86 that are traditionally
+hard to virtualise.
+The drawback of this approach is that it requires operating systems to
+be {\em ported} to run on Xen.  This process is similar to a port of
+an operating system to a new hardware platform, although the process
+is simplified because the paravirtual machine architecture is very
+similar to the underlying native hardware. Although operating system
+kernels must explicitly support Xen, a key feature is that user space
+applications and libraries {\em do not} require modification.
 
-Right now, Linux 2.4, Linux 2.6 and NetBSD are available for Xen 2.0.
-It is intended that Xen support be integrated into the official
-releases of Linux 2.6, NetBSD 2.0, FreeBSD and Dragonfly BSD.
+Xen support is available for increasingly many operating systems:
+right now, Linux 2.4, Linux 2.6 and NetBSD are available for Xen 2.0.
+We expect that Xen support will ultimately be integrated into the
+official releases of Linux, NetBSD, FreeBSD and Dragonfly BSD. 
+Other OS ports, including Plan 9, are in progress.
 
-Even running multiple copies of Linux can be very useful, providing a
-means of containing faults to one OS image, providing performance
-isolation between the various OS instances and trying out multiple
-distros.
-
-% The Windows XP port is only available to those who have signed the
-% Microsoft Academic Source License.  Publically available XP support
-% will not be available for the foreseeable future (this may change when
-% Intel's Vanderpool Technology becomes available).
+%Even running multiple copies of Linux can be very useful, providing a
+%means of containing faults to one OS image, providing performance
+%isolation between the various OS instances and trying out multiple
+%distros.
 
 Possible usage scenarios for Xen include:
 \begin{description}
-\item [Kernel development] test and debug kernel modifications in a
+\item [Kernel development.] Test and debug kernel modifications in a
       sandboxed virtual machine --- no need for a separate test
-      machine
-\item [Multiple OS Configurations] run multiple operating systems
-      simultaneously, for instance for compatibility or QA purposes
-\item [Server consolidation] move multiple servers onto one box,
+      machine.
+\item [Multiple OS configurations.] Run multiple operating systems
+      simultaneously, for instance for compatibility or QA purposes.
+\item [Server consolidation.] Move multiple servers onto one box,
       provided performance and fault isolation at virtual machine
-      boundaries
-\item [Cluster computing] improve manageability and efficiency by
+      boundaries.
+\item [Cluster computing.] Improve manageability and efficiency by
       running services in virtual machines, isolated from
-      machine-specifics and load balance using live migration
-\item [High availability computing] run device drivers in sandboxed
-      domains for increased robustness
-\item [Hardware support for custom OSes] export drivers from a
+      machine-specifics and load balance using live migration.
+\item [High availability computing.] Run device drivers in sandboxed
+      domains for increased robustness.
+\item [Hardware support for custom OSes.] Export drivers from a
       mainstream OS (e.g. Linux) with good hardware support
       to your custom OS, avoiding the need for you to port existing
-      drivers to achieve good hardware support
+      drivers to achieve good hardware support.
 \end{description}
 
-\section{Structure}
+\section{Structure of a Xen-Based System}
 
-\subsection{High level}
+A Xen system has multiple layers, the lowest and most privileged of
+which is Xen itself. Xen in turn may host multiple {\em guest}
+operating systems, each of which is executed within a secure virtual
+machine (in Xen terminology, a {\em domain}). Domains are scheduled by
+Xen to make effective use of the available physical CPUs.  Each guest
+OS manages its own applications, which includes responsibility for
+scheduling each application within the time allotted to the VM by Xen.
 
-A Xen system has multiple layers.  The lowest layer is Xen itself ---
-the most privileged piece of code in the system.  On top of Xen run
-guest operating system kernels.  These are scheduled pre-emptively by
-Xen.  On top of these run the applications of the guest OSs.  Guest
-OSs are responsible for scheduling their own applications within the
-time allotted to them by Xen.
+The first domain, {\em Domain 0}, is created automatically when the
+system boots and has special management privileges. Domain 0 builds
+other domains and manages their virtual devices. It also performs
+suspend, resume and migration of virtual machines. Where one is
+required, the X server is also run in domain 0.
 
-One of the domains --- { \em Domain 0 } --- is privileged.  It is
-started by Xen at system boot and is responsible for initialising and
-managing the whole machine.  Domain 0 builds other domains and manages
-their virtual devices.  It also performs suspend, resume and
-migration of other virtual machines.  Where it is used, the X server
-is also run in domain 0.
-
-Within Domain 0, a process called ``Xend'' runs to manage the system.
+Within Domain 0, a process called `Xend' runs to manage the system.
 Xend is responsible for managing virtual machines and providing access
 to their consoles.  Commands are issued to Xend over an HTTP
 interface, either from a command-line tool or from a web browser.
 
-XXX need diagram(s) here to make this make sense
-
-\subsection{Paravirtualisation}
-
-Paravirtualisation allows very high performance virtual machine
-technology, even on architectures (like x86) which are traditionally
-hard to virtualise.
-
-Paravirtualisation requires guest operating systems to be { \em ported
-} to run on the VMM.  This process is similar to a port of an
-operating system to a new hardware platform.  Although operating
-system kernels must explicitly support Xen in order to run in a
-virtual machine, { \em user space applications and libraries
-do not require modification }.
-
 \section{Hardware Support}
 
-Xen currently runs on the x86 architecture, but could in principle be
-ported to others. In fact, it would have been rather easier to write
-Xen for pretty much any other architecture as x86 is particularly
-tricky to handle. A good description of Xen's design, implementation
-and performance is contained in the October 2003 SOSP paper, available
-at:\\
-{\tt http://www.cl.cam.ac.uk/netos/papers/2003-xensosp.pdf}\\
-Work to port Xen to x86\_64 and IA64 is currently underway.
-
-Xen requires a ``P6'' or newer processor (e.g. Pentium Pro, Celeron,
+Xen currently runs only on the x86 architecture (however, ports to other
+architectures, including x86/64 and IA64, are in progress).
+Xen requires a `P6' or newer processor (e.g. Pentium Pro, Celeron,
 Pentium II, Pentium III, Pentium IV, Xeon, AMD Athlon, AMD Duron).
 Multiprocessor machines are supported, and we also have basic support
 for HyperThreading (SMT), although this remains a topic for ongoing
-research.  We're also working on an x86\_64 port (though Xen already
-runs on these systems just fine in 32-bit mode).
+research.  As mentioned above, a port specifically for x86/64 is in
+progress, although Xen already runs on such systems in 32-bit legacy
+mode.
 
 Xen can currently use up to 4GB of memory.  It is possible for x86
-machines to address up to 64GB of physical memory but (unless an
-external developer volunteers) there are no plans to support these
-systems.  The x86\_64 port is the planned route to supporting more
-than 4GB of memory.
+machines to address up to 64GB of physical memory but there are no
+plans to support these systems.  The x86\_64 port is the planned route
+to supporting more than 4GB of memory.
 
 Xen offloads most of the hardware support issues to the guest OS
 running in Domain 0.  Xen itself only contains code to detect and
-start additional processors, setup interrupt routing and perform PCI
+start additional processors, set up interrupt routing and perform PCI
 bus enumeration.  Device drivers run within a privileged guest OS
-rather than within Xen itself.  This means that we should be
+rather than within Xen itself, meaning that we should be
 compatible with the majority of device hardware supported by Linux.
 The default XenLinux build contains support for relatively modern
 server-class network and disk hardware, but you can add support for
@@ -195,12 +169,11 @@ other hardware by configuring your XenLinux kernel in the normal way
 \section{History}
 
 
-``Xen'' is a Virtual Machine Monitor (VMM) originally developed by the
-Systems Research Group of the University of Cambridge Computer
-Laboratory, as part of the UK-EPSRC funded XenoServers project.
-
-The XenoServers project aims to provide a ``public infrastructure for
-global distributed computing'', and Xen plays a key part in that,
+Xen was originally developed by the Systems Research Group at the
+University of Cambridge Computer Laboratory as part of the XenoServers
+project, funded by UK-EPSRC.
+XenoServers aim to provide a `public infrastructure for
+global distributed computing', and Xen plays a key part in that,
 allowing us to efficiently partition a single machine to enable
 multiple independent clients to run their operating systems and
 applications in an environment providing protection, resource
@@ -213,25 +186,18 @@ investigate interesting research issues regarding the best techniques
 for virtualizing resources such as the CPU, memory, disk and network.
 The project has been bolstered by support from Intel Research
 Cambridge, and HP Labs, who are now working closely with us.
-% We're also in receipt of support from Microsoft Research Cambridge to
-% port Windows XP to run on Xen.
 
-Xen was first described in the 2003 paper at SOSP \\
-({\tt http://www.cl.cam.ac.uk/netos/papers/2003-xensosp.pdf}).
-The first public release of Xen (1.0) was made in October 2003.  Xen
-was developed as a research project by the University of Cambridge
-Computer Laboratory (UK).  Xen was the first Virtual Machine Monitor
-to make use of {\em paravirtualisation} to achieve near-native
-performance virtualisation of commodity operating systems.  Since
+Xen was first described in the 2003 paper at SOSP\footnote{\tt
+http://www.cl.cam.ac.uk/netos/papers/2003-xensosp.pdf}, and the
+first public release (1.0) was made in October 2003.  Since
 then, Xen has been extensively developed and is now used in production
 scenarios on multiple sites.
 
-Xen 2.0 is the latest release, featuring greatly enhanced hardware
-support, configuration flexibility, usability and a larger complement
-of supported operating systems.  We think that Xen has the potential
-to become {\em the} definitive open source virtualisation solution and
-will work to conclusively achieve that position.
-
+Xen 2.0 feature greatly enhanced hardware support, configuration
+flexibility, usability and a larger complement of supported operating
+systems. We think that Xen has the potential to become {\em the}
+definitive open source virtualisation solution and will work to
+conclusively achieve that position.
 
 \chapter{Installation}
 
@@ -330,7 +296,7 @@ The Xen source code repository is structured as follows:
 
 \section{Build and install}
 
-The Xen makefile includes a target ``world'' that will do the
+The Xen makefile includes a target `world' that will do the
 following:
 
 \begin{itemize}
@@ -351,15 +317,15 @@ makefile the location of the appropriate linux compressed tar file by
 setting the LINUX\_SRC environment variable, e.g. \\
 \verb!# LINUX_SRC=/tmp/linux-2.6.8.1.tar.bz2 make world! \\ or by
 placing the tar file somewhere in the search path of {\tt
-LINUX\_SRC\_PATH} which defaults to ``{\tt .:..}".  If the makefile
+LINUX\_SRC\_PATH} which defaults to `{\tt .:..}'.  If the makefile
 can't find a suitable kernel tar file it attempts to download it from
 kernel.org (this won't work if you're behind a firewall).
 
 After untaring the pristine kernel tree, the makefile uses the {\tt
 mkbuildtree} script to add the Xen patches to the kernel.  It then
-builds two different XenLinux images, one with a ``-xen0'' extension
+builds two different XenLinux images, one with a `-xen0' extension
 which contains hardware device drivers and drivers for Xen's virtual
-devices, and one with a ``-xenU'' extension that just contains the
+devices, and one with a `-xenU' extension that just contains the
 virtual ones.
 
 The procedure is similar to build the Linux 2.4 port: \\
@@ -407,7 +373,7 @@ The difference between the two Linux kernels that are built is due to
 the configuration file used for each.  The "U" suffixed unprivileged
 version doesn't contain any of the physical hardware device drivers
 --- it is 30\% smaller and hence may be preferred for your
-non-privileged domains.  The ``0'' suffixed privileged version can be
+non-privileged domains.  The `0' suffixed privileged version can be
 used to boot the system, as well as in driver domains and unprivileged
 domains.
 
@@ -989,13 +955,13 @@ domains and provides a user friendly domain creation wizard.
                            a complete system of real hardware devices.
 
 \item[Hypervisor]          An alternative term for { \bf VMM }, used
-                           because it means ``beyond supervisor'',
+                           because it means `beyond supervisor',
                            since it is responsible for managing multiple
-                           ``supervisor'' kernels.
+                           `supervisor' kernels.
 
 \item[Live migration]      A technique for moving a running virtual
                            machine to another physical host, without
-			   stopping it or the services running on it.
+                           stopping it or the services running on it.
 
 \item[Microkernel]         A small base of code running at the highest
                            hardware privilege level.  A microkernel is
@@ -1018,10 +984,10 @@ domains and provides a user friendly domain creation wizard.
 
 \item[Shadow pagetables]   A technique for hiding the layout of machine
                            memory from a virtual machine's operating
-			   system.  Used in some {\bf VMM}s to provide
-			   the illusion of contiguous physical memory,
-			   in Xen this is used during
-			   {\bf live migration}.
+                           system.  Used in some {\bf VMM}s to provide
+                           the illusion of contiguous physical memory,
+                           in Xen this is used during
+                           {\bf live migration}.
 
 \item[Virtual Machine]     The environment in which a hosted operating
                            system runs, providing the abstraction of a
@@ -1049,8 +1015,8 @@ domains and provides a user friendly domain creation wizard.
 \chapter{Advanced Network Configuration}
 
 For simple systems with a single ethernet interface with a simple
-configuration, the default installation should work ``out of the
-box''.  More complicated network setups, for instance with multiple
+configuration, the default installation should work `out of the
+box'.  More complicated network setups, for instance with multiple
 ethernet interfaces and / or existing bridging setups will require
 some special configuration.
 
@@ -1073,7 +1039,7 @@ Xen virtual network when Xend starts and to do any corresponding
 cleanup when Xend exits.
 
 In the default configuration, this script creates the bridge
-``xen-br0'' and moves eth0 onto that bridge, modifying the routing
+`xen-br0' and moves eth0 onto that bridge, modifying the routing
 accordingly.
 
 In configurations where the bridge already exists, this script could
@@ -1254,8 +1220,8 @@ can be configured in either format of configuration file:
 
 \section{Administration Domains}
 
-Administration privileges allow a domain to use the ``dom0
-operations'' (so called because they are usually available only to
+Administration privileges allow a domain to use the `dom0
+operations' (so called because they are usually available only to
 domain 0).  A privileged domain can build other domains, set scheduling
 parameters, etc.
 
