@@ -340,7 +340,7 @@ def preprocess_disk(opts, vals):
         d = v.split(',')
         n = len(d)
         if n == 3:
-            d.append(none)
+            d.append(None)
         elif n == 4:
             pass
         else:
