@@ -15,17 +15,19 @@
 #include <linux/types.h>
 
 typedef struct tx_entry_st {
-	unsigned long addr; /* virtual address */
-	unsigned long size; /* in bytes */
+	unsigned long addr;   /* virtual address */
+	unsigned long size;   /* in bytes */
+        int           status; /* per descriptor status. */
 } tx_entry_t;
 
 typedef struct rx_entry_st {
-	unsigned long addr; /* virtual address */
-	unsigned long size; /* in bytes */
+	unsigned long addr;   /* virtual address */
+	unsigned long size;   /* in bytes */
+        int           status; /* per descriptor status. */
 } rx_entry_t;
 
-#define TX_RING_SIZE 1024
-#define RX_RING_SIZE 1024
+#define TX_RING_SIZE 256
+#define RX_RING_SIZE 256
 typedef struct net_ring_st {
     /*
      * Guest OS places packets into ring at tx_prod.
@@ -110,5 +112,13 @@ typedef struct net_rule_ent_st
 
 /* Drop a new rule down to the network tables. */
 int add_net_rule(net_rule_t *rule);
+
+
+/* Descriptor status values:
+ */
+
+#define RING_STATUS_OK               0  // Everything is gravy.
+#define RING_STATUS_ERR_CFU         -1  // Copy from user problems.
+#define RING_STATUS_BAD_PAGE        -2  // What they gave us was pure evil.
 
 #endif
