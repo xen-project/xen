@@ -9,6 +9,7 @@ The 'data-plane' is done separately. For example, consoles
 are accessed via sockets on xend, but the list of consoles
 is accessible via this API.
 """
+import os
 import sys
 import httplib
 import types
@@ -331,8 +332,14 @@ class Xend:
     """Default location of the xend server."""
     SRV_DEFAULT = "localhost:8000"
 
+    """Environment variable to set the location of xend."""
+    SRV_VAR = "XEND"
+
     """Default path to the xend root on the server."""
     ROOT_DEFAULT = "/xend/"
+
+    """Environment variable to set the xend root path."""
+    ROOT_VAR = "XEND_ROOT"
 
     def __init__(self, client=None, srv=None, root=None):
         """Create a xend client interface.
@@ -348,14 +355,24 @@ class Xend:
         self.client = client
         self.bind(srv, root)
 
+    def default_server(self):
+        """Get the default location of the xend server.
+        """
+        return os.getenv(self.SRV_VAR, self.SRV_DEFAULT)
+
+    def default_root(self):
+        """Get the default root path on the xend server.
+        """
+        return os.getenv(self.ROOT_VAR, self.ROOT_DEFAULT)
+
     def bind(self, srv=None, root=None):
         """Bind to a given server.
 
         @param srv:  server location (host:port)
         @param root: xend root path on the server
         """
-        if srv is None: srv = self.SRV_DEFAULT
-        if root is None: root = self.ROOT_DEFAULT
+        if srv is None: srv = self.default_server()
+        if root is None: root = self.default_root()
         if not root.endswith('/'): root += '/'
         (host, port) = srv.split(':', 1)
         self.url = URL(host=host, port=port, path=root)
