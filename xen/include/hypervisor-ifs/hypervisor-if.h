@@ -44,6 +44,7 @@
 #define __HYPERVISOR_console_io           18
 #define __HYPERVISOR_physdev_op           19
 #define __HYPERVISOR_update_va_mapping_otherdomain 20
+#define __HYPERVISOR_vm_assist            21
 
 /*
  * MULTICALLS
@@ -180,6 +181,14 @@
  */
 #define MEMOP_increase_reservation 0
 #define MEMOP_decrease_reservation 1
+
+/*
+ * Commands to HYPERVISOR_vm_assist().
+ */
+#define VMASST_CMD_enable                0
+#define VMASST_CMD_disable               1
+#define VMASST_TYPE_4gb_segments         0
+#define VMASST_TYPE_writeable_pagetables 1
 
 #ifndef __ASSEMBLY__
 

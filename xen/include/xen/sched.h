@@ -144,6 +144,7 @@ struct domain
     unsigned long *io_bitmap; /* Pointer to task's IO bitmap or NULL */
 
     unsigned long flags;
+    unsigned long vm_assist;
 
     atomic_t refcnt;
     atomic_t pausecnt;
@@ -288,6 +289,8 @@ static inline void domain_unpause_by_systemcontroller(struct domain *d)
 
 #define IS_PRIV(_d) (test_bit(DF_PRIVILEGED, &(_d)->flags))
 #define IS_CAPABLE_PHYSDEV(_d) (test_bit(DF_PHYSDEV, &(_d)->flags))
+
+#define VM_ASSIST(_d,_t) (test_bit((_t), &(_d)->vm_assist))
 
 #include <xen/slab.h>
 #include <asm/domain.h>

@@ -310,50 +310,54 @@ asmlinkage void do_page_fault(struct pt_regs *regs, long error_code)
     struct guest_trap_bounce *gtb = guest_trap_bounce+smp_processor_id();
     trap_info_t *ti;
     unsigned long off, addr, fixup;
-    struct domain *p = current;
+    struct domain *d = current;
     extern int map_ldt_shadow_page(unsigned int);
-    int cpu = smp_processor_id();
+    int cpu = d->processor;
 
     __asm__ __volatile__ ("movl %%cr2,%0" : "=r" (addr) : );
 
     perfc_incrc(page_faults);
 
     if ( unlikely(addr >= LDT_VIRT_START) && 
-         (addr < (LDT_VIRT_START + (p->mm.ldt_ents*LDT_ENTRY_SIZE))) )
+         (addr < (LDT_VIRT_START + (d->mm.ldt_ents*LDT_ENTRY_SIZE))) )
     {
         /*
          * Copy a mapping from the guest's LDT, if it is valid. Otherwise we
          * send the fault up to the guest OS to be handled.
          */
         off  = addr - LDT_VIRT_START;
-        addr = p->mm.ldt_base + off;
+        addr = d->mm.ldt_base + off;
         if ( likely(map_ldt_shadow_page(off >> PAGE_SHIFT)) )
             return; /* successfully copied the mapping */
     }
 
-    if ((addr >> L2_PAGETABLE_SHIFT) == ptwr_info[cpu].disconnected) {
+    if ( (addr >> L2_PAGETABLE_SHIFT) == ptwr_info[cpu].disconnected )
+    {
         ptwr_reconnect_disconnected(addr);
         return;
     }
 
-    if (addr < PAGE_OFFSET && error_code & 2 && ptwr_do_page_fault(addr))
+    if ( VM_ASSIST(d, VMASST_TYPE_writeable_pagetables) && 
+         (addr < PAGE_OFFSET) &&
+         ((error_code & 3) == 3) && /* write-protection fault */
+         ptwr_do_page_fault(addr) )
         return;
 
-    if ( unlikely(p->mm.shadow_mode) && 
+    if ( unlikely(d->mm.shadow_mode) && 
          (addr < PAGE_OFFSET) && shadow_fault(addr, error_code) )
         return; /* Returns TRUE if fault was handled. */
 
     if ( unlikely(!(regs->xcs & 3)) )
         goto xen_fault;
 
-    ti = p->thread.traps + 14;
+    ti = d->thread.traps + 14;
     gtb->flags = GTBF_TRAP_CR2; /* page fault pushes %cr2 */
     gtb->cr2        = addr;
     gtb->error_code = error_code;
     gtb->cs         = ti->cs;
     gtb->eip        = ti->address;
     if ( TI_GET_IF(ti) )
-        p->shared_info->vcpu_data[0].evtchn_upcall_mask = 1;
+        d->shared_info->vcpu_data[0].evtchn_upcall_mask = 1;
     return; 
 
  xen_fault:
@@ -361,7 +365,7 @@ asmlinkage void do_page_fault(struct pt_regs *regs, long error_code)
     if ( likely((fixup = search_exception_table(regs->eip)) != 0) )
     {
         perfc_incrc(copy_user_faults);
-        if ( !p->mm.shadow_mode )
+        if ( !d->mm.shadow_mode )
             DPRINTK("Page fault: %08lx -> %08lx\n", regs->eip, fixup);
         regs->eip = fixup;
         regs->xds = regs->xes = regs->xfs = regs->xgs = __HYPERVISOR_DS;
@@ -405,7 +409,7 @@ asmlinkage void do_page_fault(struct pt_regs *regs, long error_code)
 
 asmlinkage void do_general_protection(struct pt_regs *regs, long error_code)
 {
-    struct domain *p = current;
+    struct domain *d = current;
     struct guest_trap_bounce *gtb = guest_trap_bounce+smp_processor_id();
     trap_info_t *ti;
     unsigned long fixup;
@@ -457,7 +461,9 @@ asmlinkage void do_general_protection(struct pt_regs *regs, long error_code)
     }
 
 #if defined(__i386__)
-    if ( (error_code == 0) && gpf_emulate_4gb(regs) )
+    if ( VM_ASSIST(d, VMASST_TYPE_4gb_segments) && 
+         (error_code == 0) && 
+         gpf_emulate_4gb(regs) )
         return;
 #endif
     
@@ -469,7 +475,7 @@ asmlinkage void do_general_protection(struct pt_regs *regs, long error_code)
     gtb->cs         = ti->cs;
     gtb->eip        = ti->address;
     if ( TI_GET_IF(ti) )
-        p->shared_info->vcpu_data[0].evtchn_upcall_mask = 1;
+        d->shared_info->vcpu_data[0].evtchn_upcall_mask = 1;
     return;
 
  gp_in_kernel:

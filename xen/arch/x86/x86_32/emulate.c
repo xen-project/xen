@@ -499,31 +499,6 @@ int gpf_emulate_4gb(struct pt_regs *regs)
         goto undecodeable;
     }
 
-#if 0
-    {
-        char str1[] = { 0x65,0x8b,0x00,0x8b,0x30 };
-        char str2[] = { 0x65,0x8b,0x02,0x8b,0x40,0x0c };
-        char str3[] = { 0x65,0x8b,0x30,0x85,0xf6 };
-        char str4[] = { 0x65,0x8b,0x00,0x5d,0x8b,0x00 };
-        char str5[] = { 0x65,0x89,0x30,0x8b,0x45,0x08 };
-        char str6[] = { 0x65,0x8b,0x00,0x8b,0x50,0x0c };
-        char str7[] = { 0x65,0x89,0x51,0x00,0x83,0xc8,0xff };
-        if ( (memcmp(eip,str1,5) == 0) ||
-             (memcmp(eip,str2,6) == 0) ) goto out;
-        if ( (memcmp(eip,str3,5) == 0) ||
-             (memcmp(eip,str4,6) == 0) ) goto out;
-        if ( (memcmp(eip,str5,6) == 0) ||
-             (memcmp(eip,str6,6) == 0) ) goto out;
-        if ( (memcmp(eip,str7,7) == 0) ||
-             (memcmp(eip,str7,7) == 0) ) goto out;
-    }
-    printk(" .byte 0x%02x,0x%02x,0x%02x,0x%02x,0x%02x,0x%02x,0x%02x,0x%02x\n",
-           eip[-8],eip[-7],eip[-6],eip[-5],eip[-4],eip[-3],eip[-2],eip[-1]);
-    printk(" .byte 0x%02x,0x%02x,0x%02x,0x%02x,0x%02x,0x%02x,0x%02x,0x%02x\n",
-           eip[0],eip[1],eip[2],eip[3],eip[4],eip[5],eip[6],eip[7]);
-    printk(" @ %04x:%08lx\n", regs->xcs, regs->eip);
-#endif
-
     /* Success! */
     perfc_incrc(emulations);
     regs->eip += pb - eip;

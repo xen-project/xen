@@ -1096,6 +1096,13 @@ void __init setup_arch(char **cmdline_p)
 {
 	unsigned long max_low_pfn;
 
+	HYPERVISOR_vm_assist(VMASST_CMD_enable,
+			     VMASST_TYPE_4gb_segments);
+#if 0
+	HYPERVISOR_vm_assist(VMASST_CMD_enable,
+			     VMASST_TYPE_writeable_pagetables);
+#endif
+
 	memcpy(&boot_cpu_data, &new_cpu_data, sizeof(new_cpu_data));
 	early_cpu_init();
 

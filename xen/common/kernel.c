@@ -340,6 +340,24 @@ long do_xen_version(int cmd)
     return (XEN_VERSION<<16) | (XEN_SUBVERSION);
 }
 
+long do_vm_assist(unsigned int cmd, unsigned int type)
+{
+    if ( type > (sizeof(unsigned long) * 8) )
+        return -EINVAL;
+
+    switch ( cmd )
+    {
+    case VMASST_CMD_enable:
+        set_bit(type, &current->vm_assist);
+        return 0;
+    case VMASST_CMD_disable:
+        clear_bit(type, &current->vm_assist);
+        return 0;
+    }
+
+    return -ENOSYS;
+}
+
 long do_ni_hypercall(void)
 {
     /* No-op hypercall. */

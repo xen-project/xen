@@ -467,4 +467,15 @@ static inline int HYPERVISOR_update_va_mapping_otherdomain(
     return ret;
 }
 
+static inline int HYPERVISOR_vm_assist(unsigned int cmd, unsigned int type)
+{
+    int ret;
+    __asm__ __volatile__ (
+        TRAP_INSTR
+        : "=a" (ret) : "0" (__HYPERVISOR_vm_assist),
+        "b" (cmd), "c" (type) : "memory" );
+
+    return ret;
+}
+
 #endif /* __HYPERVISOR_H__ */
