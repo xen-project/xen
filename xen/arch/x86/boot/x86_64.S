@@ -52,16 +52,16 @@ __start:
 
         /* Set up a few descriptors: on entry only CS is guaranteed good. */
         lgdt    %cs:0x1001f0
-        mov     $(__HYPERVISOR_DS),%ecx
+        mov     $(__HYPERVISOR_DS32),%ecx
         mov     %ecx,%ds
         mov     %ecx,%es
 
-        /* Check for Multiboot bootloader */
         cmp     $(SECONDARY_CPU_FLAG),%ebx
-        je      skip_multiboot_check
+        je      skip_boot_checks
+
+        /* Check for Multiboot bootloader */
         cmp     $0x2BADB002,%eax
         jne     not_multiboot
-skip_multiboot_check:
         
         /* Save the Multiboot info structure for later use. */
         mov     %ebx,0x1001e0
@@ -75,7 +75,8 @@ skip_multiboot_check:
         cpuid
         bt      $29,%edx            # Long mode feature?
         jnc     bad_cpu
-        
+skip_boot_checks:
+
         /* Set up FPU. */
         fninit
         
@@ -106,10 +107,6 @@ skip_multiboot_check:
 
         /* Install relocated selectors (FS/GS unused). */
         lgdt    gdt_descr(%rip)
-        mov     $(__HYPERVISOR_DS),%ecx
-        mov     %ecx,%ds
-        mov     %ecx,%es
-        mov     %ecx,%ss
 
         /* Enable full CR4 features. */
         mov     mmu_cr4_features(%rip),%rcx
@@ -127,6 +124,13 @@ skip_multiboot_check:
         ret
 __high_start:
         
+        mov     $(__HYPERVISOR_DS64),%ecx
+        mov     %ecx,%ds
+        mov     %ecx,%es
+        mov     %ecx,%fs
+        mov     %ecx,%gs
+        mov     %ecx,%ss
+
         lidt    idt_descr(%rip)
                 
         cmp     $(SECONDARY_CPU_FLAG),%ebx
@@ -164,9 +168,6 @@ int_msg:
         .asciz "Unknown interrupt\n"
 ignore_int:
         cld
-        mov     $(__HYPERVISOR_DS),%eax
-        mov     %eax,%ds
-        mov     %eax,%es
         lea     int_msg(%rip),%rdi
         call    SYMBOL_NAME(printf)
 1:      jmp     1b
@@ -195,7 +196,7 @@ ENTRY(gdt_table)
         .quad 0x00affa000000ffff     /* 0x082b ring 3 code, 64-bit mode   */
         .quad 0x00cff2000000ffff     /* 0x0833 ring 3 data                */
         .quad 0x0000000000000000     /* unused                            */
-        .fill 2*NR_CPUS,8,0          /* space for TSS and LDT per CPU     */
+        .fill 4*NR_CPUS,8,0          /* space for TSS and LDT per CPU     */
 
         .word   0
 gdt_descr:
@@ -205,12 +206,12 @@ SYMBOL_NAME(gdt):
 
         .word   0    
 idt_descr:
-        .word   256*8-1
+        .word   256*16-1
 SYMBOL_NAME(idt):
         .quad   SYMBOL_NAME(idt_table)
 
 ENTRY(stack_start)
-        .quad   SYMBOL_NAME(cpu0_stack) + 8100
+        .quad   SYMBOL_NAME(cpu0_stack) + 8000
 
 high_start:
         .quad   __high_start
@@ -248,34 +249,11 @@ ENTRY(cpu0_stack)    # Initial stack is 8kB
 ENTRY(stext)
 ENTRY(_stext)
 
-.globl map_domain_mem, unmap_domain_mem, ret_from_intr
-map_domain_mem:
-unmap_domain_mem:
-ret_from_intr:
-#undef machine_to_phys_mapping
-#undef phys_to_machine_mapping
-.globl copy_to_user, set_intr_gate, die, machine_to_phys_mapping
-.globl phys_to_machine_mapping
-copy_to_user:
-set_intr_gate:
-die:
-machine_to_phys_mapping:
-phys_to_machine_mapping:
-.globl copy_from_user, show_registers, do_iopl
+.globl copy_from_user, copy_to_user, copy_user_generic
 copy_from_user: 
-show_registers: 
-do_iopl: 
-.globl idt_table, copy_user_generic, idt_tables, new_thread
-idt_table:
+copy_to_user:
 copy_user_generic:
-idt_tables:
-new_thread:
-.globl switch_to, __get_user_1, __get_user_4, __get_user_8, trap_init
-switch_to:
+.globl __get_user_1, __get_user_4, __get_user_8
 __get_user_1:
 __get_user_4:
 __get_user_8:
-trap_init: 
-.globl set_debugreg
-set_debugreg:
-        

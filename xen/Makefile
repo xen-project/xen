@@ -1,3 +1,7 @@
+# Default is to install to local 'dist' directory.
+DISTDIR ?= ../dist
+DESTDIR ?= $(DISTDIR)/install
+
 INSTALL			= install
 INSTALL_DATA		= $(INSTALL) -m0644
 INSTALL_DIR		= $(INSTALL) -d -m0755
@@ -19,6 +23,9 @@ $(TARGET).gz: $(TARGET)
 
 debug:	
 	objdump -D -S $(TARGET)-syms > $(TARGET).s
+
+dist:
+	$(MAKE) install
 
 install: $(TARGET).gz
 	[ -d $(DESTDIR)/boot ] || $(INSTALL_DIR) $(DESTDIR)/boot
@@ -77,7 +84,7 @@ include/xen/banner.h: tools/figlet/figlet tools/figlet/xen.flf
 	tools/figlet/figlet -d tools/figlet Xen $(XEN_VERSION).$(XEN_SUBVERSION)$(XEN_EXTRAVERSION) > $@.new
 	@mv -f $@.new $@
 
-include/asm-$(TARGET_ARCH)/asm-offsets.h: arch/$(TARGET_ARCH)/asm-offsets.s
+include/asm-$(TARGET_ARCH)/asm-offsets.h: arch/$(TARGET_ARCH)/asm-offsets.s $(HDRS)
 	@(set -e; \
 	  echo "/*"; \
 	  echo " * DO NOT MODIFY."; \

@@ -331,11 +331,13 @@ int parse_serial_handle(char *conf)
         goto fail;
     }
 
+#ifndef NO_UART_CONFIG_OK
     if ( !UART_ENABLED(&com[handle]) )
     {
         printk("ERROR: cannot use unconfigured serial port COM%d\n", handle+1);
         return -1;
     }
+#endif
 
     if ( conf[4] == 'H' )
         handle |= SERHND_HI;

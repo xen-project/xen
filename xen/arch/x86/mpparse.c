@@ -859,7 +859,7 @@ void __init get_smp_config (void)
 
 static int __init smp_scan_config (unsigned long base, unsigned long length)
 {
-	unsigned long *bp = phys_to_virt(base);
+	unsigned int *bp = phys_to_virt(base);
 	struct intel_mp_floating *mpf;
 
 	Dprintk("Scan SMP from %p for %ld bytes.\n", bp,length);

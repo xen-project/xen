@@ -130,7 +130,7 @@ static int add_entry(struct ac_timer **heap, struct ac_timer *t)
     if ( unlikely(sz == GET_HEAP_LIMIT(heap)) )
     {
         int i, limit = (GET_HEAP_LIMIT(heap)+1) << 1;
-        struct ac_timer **new_heap = xmalloc(limit*sizeof(struct ac_timer *));
+        struct ac_timer **new_heap = xmalloc_array(struct ac_timer *, limit);
         if ( new_heap == NULL ) BUG();
         memcpy(new_heap, heap, (limit>>1)*sizeof(struct ac_timer *));
         for ( i = 0; i < smp_num_cpus; i++ )
@@ -278,8 +278,7 @@ void __init ac_timer_init(void)
 
     for ( i = 0; i < smp_num_cpus; i++ )
     {
-        ac_timers[i].heap = xmalloc(
-            (DEFAULT_HEAP_LIMIT+1) * sizeof(struct ac_timer *));
+        ac_timers[i].heap = xmalloc_array(struct ac_timer *, DEFAULT_HEAP_LIMIT+1);
         if ( ac_timers[i].heap == NULL ) BUG();
         SET_HEAP_SIZE(ac_timers[i].heap, 0);
         SET_HEAP_LIMIT(ac_timers[i].heap, DEFAULT_HEAP_LIMIT);

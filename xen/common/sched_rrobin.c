@@ -27,8 +27,6 @@ struct rrobin_dom_info
 #define RUNLIST(d)      ((struct list_head *)&(RR_INFO(d)->run_list))
 #define RUNQUEUE(cpu)   RUNLIST(schedule_data[cpu].idle)
 
-static xmem_cache_t *dom_info_cache;
-
 static inline void __add_to_runqueue_head(struct domain *d)
 {
     list_add(RUNLIST(d), RUNQUEUE(d->processor));
@@ -59,21 +57,12 @@ static int rr_init_scheduler()
     for ( i = 0; i < NR_CPUS; i++ )
         INIT_LIST_HEAD(RUNQUEUE(i));
    
-    dom_info_cache = xmem_cache_create(
-        "RR dom info", sizeof(struct rrobin_dom_info), 0, 0, 0, NULL);
-    if ( dom_info_cache == NULL )
-    {
-        printk("Could not allocate SLAB cache.\n");
-        return -1;
-    }
-
     return 0;                                                                
 }
-
 /* Allocates memory for per domain private scheduling data*/
 static int rr_alloc_task(struct domain *d)
 {
-    if ( (d->sched_priv = xmem_cache_alloc(dom_info_cache)) == NULL )
+    if ( (d->sched_priv = new(struct rrobin_dom_info) == NULL )
         return -1;
     memset(d->sched_priv, 0, sizeof(struct rrobin_dom_info));
     return 0;
@@ -91,7 +80,7 @@ static void rr_add_task(struct domain *d)
 static void rr_free_task(struct domain *d)
 {
     ASSERT(d->sched_priv != NULL);
-    xmem_cache_free(dom_info_cache, d->sched_priv);
+    xfree(d->sched_priv);
 }
 
 /* Initialises idle task */

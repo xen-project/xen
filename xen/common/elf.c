@@ -35,11 +35,8 @@ int parseelfimage(char *elfbase,
     char *shstrtab, *guestinfo=NULL, *p;
     int h;
 
-    if ( !IS_ELF(*ehdr) )
-    {
-        printk("Kernel image does not have an ELF header.\n");
+    if ( !elf_sanity_check(ehdr) )
         return -EINVAL;
-    }
 
     if ( (ehdr->e_phoff + (ehdr->e_phnum * ehdr->e_phentsize)) > elfsize )
     {
@@ -92,7 +89,7 @@ int parseelfimage(char *elfbase,
     if ( guestinfo == NULL )
     {
         printk("Not a Xen-ELF image: '__xen_guest' section not found.\n");
-#ifndef FORCE_XENELF_IMAGE
+#if FORCE_XENELF_IMAGE
         return -EINVAL;
 #endif
     }

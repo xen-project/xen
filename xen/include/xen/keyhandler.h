@@ -10,7 +10,7 @@
 #ifndef __XEN_KEYHANDLER_H__
 #define __XEN_KEYHANDLER_H__
 
-struct xen_regs;
+#include <asm/regs.h>
 
 /*
  * Register a callback function for key @key. The callback occurs in

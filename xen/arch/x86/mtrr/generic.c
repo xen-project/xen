@@ -52,7 +52,8 @@ void __init get_mtrr_state(void)
 	unsigned lo, dummy;
 
 	if (!mtrr_state.var_ranges) {
-		mtrr_state.var_ranges = xmalloc(num_var_ranges * sizeof (struct mtrr_var_range));
+		mtrr_state.var_ranges = xmalloc_array(struct mtrr_var_range,
+						  num_var_ranges);
 		if (!mtrr_state.var_ranges)
 			return;
 	} 

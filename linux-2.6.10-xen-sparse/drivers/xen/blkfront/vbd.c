@@ -317,7 +317,7 @@ static int xlvbd_init_device(vdisk_t *xd)
     down(&bd->bd_sem);
 
     gd = xlvbd_get_gendisk(mi, minor, xd);
-    if (mi == NULL) {
+    if (gd == NULL) {
         err = -EPERM;
         goto out;
     }

@@ -917,6 +917,12 @@ static PyObject *xu_message_new(PyObject *self, PyObject *args)
         P2C(netif_be_create_t, mac[3],       u8);
         P2C(netif_be_create_t, mac[4],       u8);
         P2C(netif_be_create_t, mac[5],       u8);
+        P2C(netif_be_create_t, be_mac[0],    u8);
+        P2C(netif_be_create_t, be_mac[1],    u8);
+        P2C(netif_be_create_t, be_mac[2],    u8);
+        P2C(netif_be_create_t, be_mac[3],    u8);
+        P2C(netif_be_create_t, be_mac[4],    u8);
+        P2C(netif_be_create_t, be_mac[5],    u8);
         break;
     case TYPE(CMSG_NETIF_BE, CMSG_NETIF_BE_DESTROY):
         P2C(netif_be_destroy_t, domid,        u32);

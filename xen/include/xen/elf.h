@@ -528,4 +528,8 @@ struct domain_setup_info;
 extern int loadelfimage(char *);
 extern int parseelfimage(char *, unsigned long, struct domain_setup_info *);
 
+#ifdef Elf_Ehdr
+extern int elf_sanity_check(Elf_Ehdr *ehdr);
+#endif
+
 #endif /* __XEN_ELF_H__ */

@@ -489,9 +489,11 @@ typedef struct {
     u32        netif_handle;  /*  4: Domain-specific interface handle.   */
     u8         mac[6];        /*  8 */
     u16        __pad1;        /* 14 */
+    u8         be_mac[6];     /* 16 */
+    u16        __pad2;        /* 22 */
     /* OUT */
-    u32        status;        /* 16 */
-} PACKED netif_be_create_t; /* 20 bytes */
+    u32        status;        /* 24 */
+} PACKED netif_be_create_t; /* 28 bytes */
 
 /*
  * CMSG_NETIF_BE_DESTROY:

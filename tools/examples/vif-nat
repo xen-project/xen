@@ -1,0 +1,66 @@
+#!/bin/sh
+#============================================================================
+# /etc/xen/vif-nat
+#
+# Script for configuring a vif in routed-nat mode.
+# Xend calls a vif script when bringing a vif up or down.
+# This script is the default - but it can be configured for each vif.
+#
+# Example invocation:
+#
+# vif-nat up domain=VM1 vif=vif1.0 ip="192.168.0.10/31"
+#
+# Usage:
+# vif-nat (up|down) {VAR=VAL}*
+#
+# Vars:
+#
+# domain  name of the domain the interface is on (required).
+# vif     vif interface name (required).
+# ip      list of IP networks for the vif, space-separated (required).
+#============================================================================
+
+# Exit if anything goes wrong
+set -e 
+
+echo "vif-nat $*"
+
+# Operation name.
+OP=$1
+shift
+
+# Pull variables in args into environment
+for arg ; do export "${arg}" ; done
+
+# Required parameters. Fail if not set.
+domain=${domain:?}
+vif=${vif:?}
+ip=${ip:?} 
+
+# better way to strip /netmask from the ip?
+vif_ip=`echo ${ip} | awk -F. '{print $1"."$2"."$3"."$4}'`
+
+main_ip=`ifconfig eth0 | grep "inet addr:" | sed -e 's/.*inet addr:\(\w\w*\.\w\w*\.\w\w*\.\w\w*\).*/\1/'`
+
+# Are we going up or down?
+case $OP in
+    up)
+        ifconfig ${vif} ${vif_ip} netmask 255.255.255.0 up
+        echo 1 >/proc/sys/net/ipv4/conf/${vif}/proxy_arp
+        iptcmd='-A'
+        ipcmd='a'
+        ;;
+    down)
+        ifconfig ${vif} down
+        iptcmd='-D'
+        ipcmd='d'
+        ;;
+    *)
+        echo 'Invalid command: ' $OP
+        echo 'Valid commands are: up, down'
+        exit 1
+        ;;
+esac
+
+ip r ${ipcmd} ${ip} dev ${vif} src ${main_ip}
+#    iptables ${iptcmd} FORWARD -m physdev --physdev-in ${vif} -p udp --sport 68 --dport 67 -j ACCEPT

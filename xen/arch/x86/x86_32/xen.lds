@@ -64,11 +64,7 @@ SECTIONS
   __initcall_start = .;
   .initcall.init : { *(.initcall.init) } :text
   __initcall_end = .;
-  . = ALIGN(4096);
   __init_end = .;
-
-  . = ALIGN(4096);
-  .data.page_aligned : { *(.data.idt) } :text
 
   __bss_start = .;		/* BSS */
   .bss : {

@@ -211,6 +211,7 @@ xc_plan9_build (int xc_handle,
 struct mem_map;
 int xc_vmx_build(int xc_handle,
                  u32 domid,
+                 int memsize,
                  const char *image_name,
                  struct mem_map *memmap,
                  const char *ramdisk_name,

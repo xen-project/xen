@@ -176,8 +176,7 @@ int shadow_mode_enable(struct domain *p, unsigned int mode)
 {
     struct mm_struct *m = &p->exec_domain[0]->mm;
 
-    m->shadow_ht = xmalloc(
-        shadow_ht_buckets * sizeof(struct shadow_status));
+    m->shadow_ht = xmalloc_array(struct shadow_status, shadow_ht_buckets);
     if ( m->shadow_ht == NULL )
         goto nomem;
     memset(m->shadow_ht, 0, shadow_ht_buckets * sizeof(struct shadow_status));
@@ -186,7 +185,8 @@ int shadow_mode_enable(struct domain *p, unsigned int mode)
     {
         m->shadow_dirty_bitmap_size = (p->max_pages + 63) & ~63;
         m->shadow_dirty_bitmap = 
-            xmalloc(m->shadow_dirty_bitmap_size/8);
+            xmalloc_array(unsigned long, m->shadow_dirty_bitmap_size /
+                                         (8 * sizeof(unsigned long)));
         if ( m->shadow_dirty_bitmap == NULL )
         {
             m->shadow_dirty_bitmap_size = 0;
@@ -420,7 +420,7 @@ static inline struct pfn_info *alloc_shadow_page(struct mm_struct *m)
 void unshadow_table(unsigned long gpfn, unsigned int type)
 {
     unsigned long  spfn;
-    struct domain *d = frame_table[gpfn].u.inuse.domain;
+    struct domain *d = page_get_owner(&frame_table[gpfn]);
 
     SH_VLOG("unshadow_table type=%08x gpfn=%08lx", type, gpfn);
 
@@ -494,7 +494,7 @@ unsigned long shadow_l2_table(
         spl2e[SH_LINEAR_PT_VIRT_START >> L2_PAGETABLE_SHIFT] =
             mk_l2_pgentry((spfn << PAGE_SHIFT) | __PAGE_HYPERVISOR);
         spl2e[PERDOMAIN_VIRT_START >> L2_PAGETABLE_SHIFT] =
-            mk_l2_pgentry(__pa(frame_table[gpfn].u.inuse.domain->mm_perdomain_pt) |
+            mk_l2_pgentry(__pa(page_get_owner(&frame_table[gpfn])->mm_perdomain_pt) |
 			  __PAGE_HYPERVISOR);
     }
 #endif
@@ -924,7 +924,7 @@ int check_pagetable(struct mm_struct *m, pagetable_t pt, char *s)
 
     if (m->shadow_mode != SHM_full_32) {
         if ( (l2_pgentry_val(spl2e[PERDOMAIN_VIRT_START >> L2_PAGETABLE_SHIFT]) !=
-              ((__pa(frame_table[gpfn].u.inuse.domain->mm.perdomain_pt) | 
+              ((__pa(page_get_owner(&frame_table[gpfn])->mm.perdomain_pt) | 
             __PAGE_HYPERVISOR))) )
             FAILPT("hypervisor per-domain map inconsistent");
     }

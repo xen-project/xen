@@ -292,7 +292,7 @@ int gpf_emulate_4gb(struct xen_regs *regs)
     u32           disp32 = 0;
     u8            *eip;         /* ptr to instruction start */
     u8            *pb, b;       /* ptr into instr. / current instr. byte */
-    unsigned int  *pseg = NULL; /* segment for memory operand (NULL=default) */
+    unsigned long *pseg = NULL; /* segment for memory operand (NULL=default) */
 
     /* WARNING: We only work for ring-3 segments. */
     if ( unlikely(VM86_MODE(regs)) || unlikely(!RING_3(regs)) )

@@ -49,8 +49,9 @@ static unsigned long  bitmap_size; /* in bytes */
 static unsigned long *alloc_bitmap;
 #define PAGES_PER_MAPWORD (sizeof(unsigned long) * 8)
 
-#define allocated_in_map(_pn) \
-(alloc_bitmap[(_pn)/PAGES_PER_MAPWORD] & (1<<((_pn)&(PAGES_PER_MAPWORD-1))))
+#define allocated_in_map(_pn)                 \
+( !! (alloc_bitmap[(_pn)/PAGES_PER_MAPWORD] & \
+     (1UL<<((_pn)&(PAGES_PER_MAPWORD-1)))) )
 
 /*
  * Hint regarding bitwise arithmetic in map_{alloc,free}:
@@ -79,13 +80,13 @@ static void map_alloc(unsigned long first_page, unsigned long nr_pages)
 
     if ( curr_idx == end_idx )
     {
-        alloc_bitmap[curr_idx] |= ((1<<end_off)-1) & -(1<<start_off);
+        alloc_bitmap[curr_idx] |= ((1UL<<end_off)-1) & -(1UL<<start_off);
     }
     else 
     {
-        alloc_bitmap[curr_idx] |= -(1<<start_off);
-        while ( ++curr_idx < end_idx ) alloc_bitmap[curr_idx] = ~0L;
-        alloc_bitmap[curr_idx] |= (1<<end_off)-1;
+        alloc_bitmap[curr_idx] |= -(1UL<<start_off);
+        while ( ++curr_idx < end_idx ) alloc_bitmap[curr_idx] = ~0UL;
+        alloc_bitmap[curr_idx] |= (1UL<<end_off)-1;
     }
 }
 
@@ -108,13 +109,13 @@ static void map_free(unsigned long first_page, unsigned long nr_pages)
 
     if ( curr_idx == end_idx )
     {
-        alloc_bitmap[curr_idx] &= -(1<<end_off) | ((1<<start_off)-1);
+        alloc_bitmap[curr_idx] &= -(1UL<<end_off) | ((1UL<<start_off)-1);
     }
     else 
     {
-        alloc_bitmap[curr_idx] &= (1<<start_off)-1;
+        alloc_bitmap[curr_idx] &= (1UL<<start_off)-1;
         while ( ++curr_idx != end_idx ) alloc_bitmap[curr_idx] = 0;
-        alloc_bitmap[curr_idx] &= -(1<<end_off);
+        alloc_bitmap[curr_idx] &= -(1UL<<end_off);
     }
 }
 
@@ -176,7 +177,7 @@ unsigned long alloc_boot_pages(unsigned long size, unsigned long align)
     size  = round_pgup(size) >> PAGE_SHIFT;
     align = round_pgup(align) >> PAGE_SHIFT;
 
-    for ( pg = 0; (pg + size) < (bitmap_size*PAGES_PER_MAPWORD); pg += align )
+    for ( pg = 0; (pg + size) < (bitmap_size*8); pg += align )
     {
         for ( i = 0; i < size; i++ )
             if ( allocated_in_map(pg + i) )
@@ -417,7 +418,7 @@ unsigned long alloc_xenheap_pages(unsigned int order)
     for ( i = 0; i < (1 << order); i++ )
     {
         pg[i].count_info        = 0;
-        pg[i].u.inuse.domain    = NULL;
+        pg[i].u.inuse._domain   = 0;
         pg[i].u.inuse.type_info = 0;
     }
 
@@ -483,11 +484,11 @@ struct pfn_info *alloc_domheap_pages(struct domain *d, unsigned int order)
             pfn_stamp = pg[i].tlbflush_timestamp;
             for ( j = 0; (mask != 0) && (j < smp_num_cpus); j++ )
             {
-                if ( mask & (1<<j) )
+                if ( mask & (1UL<<j) )
                 {
                     cpu_stamp = tlbflush_time[j];
                     if ( !NEED_FLUSH(cpu_stamp, pfn_stamp) )
-                        mask &= ~(1<<j);
+                        mask &= ~(1UL<<j);
                 }
             }
             
@@ -500,7 +501,7 @@ struct pfn_info *alloc_domheap_pages(struct domain *d, unsigned int order)
         }
 
         pg[i].count_info        = 0;
-        pg[i].u.inuse.domain    = NULL;
+        pg[i].u.inuse._domain   = 0;
         pg[i].u.inuse.type_info = 0;
     }
 
@@ -528,7 +529,7 @@ struct pfn_info *alloc_domheap_pages(struct domain *d, unsigned int order)
 
     for ( i = 0; i < (1 << order); i++ )
     {
-        pg[i].u.inuse.domain = d;
+        page_set_owner(&pg[i], d);
         wmb(); /* Domain pointer must be visible before updating refcnt. */
         pg[i].count_info |= PGC_allocated | 1;
         list_add_tail(&pg[i].list, &d->page_list);
@@ -543,7 +544,7 @@ struct pfn_info *alloc_domheap_pages(struct domain *d, unsigned int order)
 void free_domheap_pages(struct pfn_info *pg, unsigned int order)
 {
     int            i, drop_dom_ref;
-    struct domain *d = pg->u.inuse.domain;
+    struct domain *d = page_get_owner(pg);
     struct exec_domain *ed;
     void          *p;
     int cpu_mask = 0;

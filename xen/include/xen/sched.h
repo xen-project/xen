@@ -216,8 +216,8 @@ extern struct domain *do_createdomain(
 extern int construct_dom0(struct domain *d, 
                           unsigned long alloc_start,
                           unsigned long alloc_end,
-                          char *image_start, unsigned long image_len, 
-                          char *initrd_start, unsigned long initrd_len,
+                          unsigned long image_start, unsigned long image_len, 
+                          unsigned long initrd_start, unsigned long initrd_len,
                           char *cmdline);
 extern int final_setup_guestos(struct domain *d, dom0_builddomain_t *);
 

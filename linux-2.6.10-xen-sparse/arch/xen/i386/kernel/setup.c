@@ -1492,6 +1492,10 @@ void __init setup_arch(char **cmdline_p)
 		get_smp_config();
 #endif
 
+	/* XXX Disable irqdebug until we have a way to avoid interrupt
+	 * conflicts. */
+	noirqdebug_setup("");
+
 	register_memory(max_low_pfn);
 
 	/* If we are a privileged guest OS then we should request IO privs. */

@@ -78,4 +78,51 @@
 
 #endif
 
+#define BUILD_SMP_INTERRUPT(x,v) XBUILD_SMP_INTERRUPT(x,v)
+#define XBUILD_SMP_INTERRUPT(x,v)\
+asmlinkage void x(void); \
+__asm__( \
+    "\n"__ALIGN_STR"\n" \
+    SYMBOL_NAME_STR(x) ":\n\t" \
+    "pushl $"#v"<<16\n\t" \
+    SAVE_ALL(a) \
+    "call "SYMBOL_NAME_STR(smp_##x)"\n\t" \
+    "jmp ret_from_intr\n");
+
+#define BUILD_SMP_TIMER_INTERRUPT(x,v) XBUILD_SMP_TIMER_INTERRUPT(x,v)
+#define XBUILD_SMP_TIMER_INTERRUPT(x,v) \
+asmlinkage void x(struct xen_regs * regs); \
+__asm__( \
+"\n"__ALIGN_STR"\n" \
+SYMBOL_NAME_STR(x) ":\n\t" \
+    "pushl $"#v"<<16\n\t" \
+    SAVE_ALL(a) \
+    "movl %esp,%eax\n\t" \
+    "pushl %eax\n\t" \
+    "call "SYMBOL_NAME_STR(smp_##x)"\n\t" \
+    "addl $4,%esp\n\t" \
+    "jmp ret_from_intr\n");
+
+#define BUILD_COMMON_IRQ() \
+__asm__( \
+    "\n" __ALIGN_STR"\n" \
+    "common_interrupt:\n\t" \
+    SAVE_ALL(a) \
+    "movl %esp,%eax\n\t" \
+    "pushl %eax\n\t" \
+    "call " SYMBOL_NAME_STR(do_IRQ) "\n\t" \
+    "addl $4,%esp\n\t" \
+    "jmp ret_from_intr\n");
+
+#define IRQ_NAME2(nr) nr##_interrupt(void)
+#define IRQ_NAME(nr) IRQ_NAME2(IRQ##nr)
+
+#define BUILD_IRQ(nr) \
+asmlinkage void IRQ_NAME(nr); \
+__asm__( \
+"\n"__ALIGN_STR"\n" \
+SYMBOL_NAME_STR(IRQ) #nr "_interrupt:\n\t" \
+    "pushl $"#nr"<<16\n\t" \
+    "jmp common_interrupt");
+
 #endif /* __X86_32_ASM_DEFNS_H__ */

@@ -201,7 +201,7 @@ int main(int argc, char **argv)
 
         if ( in32_ehdr.e_phnum != 1 )
         {
-            fprintf(stderr, "Expect precisly 1 program header; found %d.\n",
+            fprintf(stderr, "Expect precisely 1 program header; found %d.\n",
                     (int)in32_ehdr.e_phnum);
             return 1;
         }

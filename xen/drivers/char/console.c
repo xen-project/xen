@@ -21,7 +21,7 @@
 #include <asm/mm.h>
 
 /* opt_console: comma-separated list of console outputs. */
-static unsigned char opt_console[30] = "com1,vga";
+static unsigned char opt_console[30] = OPT_CONSOLE_STR;
 string_param("console", opt_console);
 
 /* opt_conswitch: a character pair controlling console switching. */
@@ -506,6 +506,7 @@ void panic(const char *fmt, ...)
     __putstr("Reboot in five seconds...\n");
     spin_unlock_irqrestore(&console_lock, flags);
 
+    watchdog_on = 0;
     mdelay(5000);
     machine_restart(0);
 }

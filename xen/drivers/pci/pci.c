@@ -1126,7 +1126,7 @@ static struct pci_bus * __devinit pci_alloc_bus(void)
 {
 	struct pci_bus *b;
 
-	b = xmalloc(sizeof(*b));
+	b = xmalloc(struct pci_bus);
 	if (b) {
 		memset(b, 0, sizeof(*b));
 		INIT_LIST_HEAD(&b->children);
@@ -1351,7 +1351,7 @@ struct pci_dev * __devinit pci_scan_device(struct pci_dev *temp)
 	if (l == 0xffffffff || l == 0x00000000 || l == 0x0000ffff || l == 0xffff0000)
 		return NULL;
 
-	dev = xmalloc(sizeof(*dev));
+	dev = xmalloc(struct pci_dev);
 	if (!dev)
 		return NULL;
 
@@ -1431,7 +1431,7 @@ unsigned int __devinit pci_do_scan_bus(struct pci_bus *bus)
 	max = bus->secondary;
 
 	/* Create a device template */
-	dev0 = xmalloc(sizeof(struct pci_dev));
+	dev0 = xmalloc(struct pci_dev);
 	if(!dev0) {
 	  panic("Out of memory scanning PCI bus!\n");
 	}

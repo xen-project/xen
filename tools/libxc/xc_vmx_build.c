@@ -46,8 +46,70 @@ loadelfsymtab(
     char *elfbase, int xch, u32 dom, unsigned long *parray,
     struct domain_setup_info *dsi);
 
+static void build_e820map(struct mem_map *mem_mapp, unsigned long mem_size)
+{
+    int nr_map = 0;
+
+    /* XXX: Doesn't work for > 4GB yet */
+    mem_mapp->map[0].addr = 0x0;
+    mem_mapp->map[0].size = 0x9F800;
+    mem_mapp->map[0].type = E820_RAM;
+    mem_mapp->map[0].caching_attr = MEMMAP_WB;
+    nr_map++;
+
+    mem_mapp->map[1].addr = 0x9F800;
+    mem_mapp->map[1].size = 0x800;
+    mem_mapp->map[1].type = E820_RESERVED;
+    mem_mapp->map[1].caching_attr = MEMMAP_UC;
+    nr_map++;
+
+    mem_mapp->map[2].addr = 0xA0000;
+    mem_mapp->map[2].size = 0x20000;
+    mem_mapp->map[2].type = E820_IO;
+    mem_mapp->map[2].caching_attr = MEMMAP_UC;
+    nr_map++;
+
+    mem_mapp->map[3].addr = 0xF0000;
+    mem_mapp->map[3].size = 0x10000;
+    mem_mapp->map[3].type = E820_RESERVED;
+    mem_mapp->map[3].caching_attr = MEMMAP_UC;
+    nr_map++;
+
+    mem_mapp->map[4].addr = 0x100000;
+    mem_mapp->map[4].size = mem_size - 0x100000 - PAGE_SIZE;
+    mem_mapp->map[4].type = E820_RAM;
+    mem_mapp->map[4].caching_attr = MEMMAP_WB;
+    nr_map++;
+
+    mem_mapp->map[5].addr = mem_size - PAGE_SIZE;
+    mem_mapp->map[5].size = PAGE_SIZE;
+    mem_mapp->map[5].type = E820_SHARED;
+    mem_mapp->map[5].caching_attr = MEMMAP_WB;
+    nr_map++;
+
+    mem_mapp->map[6].addr = mem_size;
+    mem_mapp->map[6].size = 0x3 * PAGE_SIZE;
+    mem_mapp->map[6].type = E820_NVS;
+    mem_mapp->map[6].caching_attr = MEMMAP_UC;
+    nr_map++;
+
+    mem_mapp->map[7].addr = mem_size + 0x3 * PAGE_SIZE;
+    mem_mapp->map[7].size = 0xA * PAGE_SIZE;
+    mem_mapp->map[7].type = E820_ACPI;
+    mem_mapp->map[7].caching_attr = MEMMAP_WB;
+    nr_map++;
+
+    mem_mapp->map[8].addr = 0xFEC00000;
+    mem_mapp->map[8].size = 0x1400000;
+    mem_mapp->map[8].type = E820_IO;
+    mem_mapp->map[8].caching_attr = MEMMAP_UC;
+    nr_map++;
+
+    mem_mapp->nr_map = nr_map;
+}
+
 static int setup_guestos(int xc_handle,
-                         u32 dom,
+                         u32 dom, int memsize,
                          char *image, unsigned long image_size,
                          gzFile initrd_gfd, unsigned long initrd_len,
                          unsigned long nr_pages,
@@ -110,20 +172,23 @@ static int setup_guestos(int xc_handle,
      * read-only). We have a pair of simultaneous equations in two unknowns, 
      * which we solve by exhaustive search.
      */
-    nr_pt_pages = 1 + (nr_pages >> (PAGE_SHIFT - 2));
     vboot_params_start = LINUX_BOOT_PARAMS_ADDR;
     vboot_params_end   = vboot_params_start + PAGE_SIZE;
     vboot_gdt_start    = vboot_params_end;
     vboot_gdt_end      = vboot_gdt_start + PAGE_SIZE;
-    v_end              = nr_pages << PAGE_SHIFT;
-    vpt_end            = v_end - (16 << PAGE_SHIFT); /* leaving the top 64k untouched */
-    vpt_start          = vpt_end - (nr_pt_pages << PAGE_SHIFT);
-    vinitrd_end        = vpt_start;
+
+    /* memsize is in megabytes */
+    v_end              = memsize << 20;
+    vinitrd_end        = v_end - PAGE_SIZE; /* leaving the top 4k untouched for IO requests page use */
     vinitrd_start      = vinitrd_end - initrd_len;
     vinitrd_start      = vinitrd_start & (~(PAGE_SIZE - 1));
 
     if(initrd_len == 0)
         vinitrd_start = vinitrd_end = 0;
+
+    nr_pt_pages = 1 + ((memsize + 3) >> 2);
+    vpt_start   = v_end;
+    vpt_end     = vpt_start + (nr_pt_pages * PAGE_SIZE);
 
     printf("VIRTUAL MEMORY ARRANGEMENT:\n"
            " Boot_params:   %08lx->%08lx\n"
@@ -218,9 +283,6 @@ static int setup_guestos(int xc_handle,
         }
 
         *vl1e = (page_array[count] << PAGE_SHIFT) | L1_PROT;
-        if ( (count >= ((vpt_start-dsi.v_start)>>PAGE_SHIFT)) && 
-             (count <  ((vpt_end  -dsi.v_start)>>PAGE_SHIFT)) )
-            *vl1e &= ~_PAGE_RW;
         vl1e++;
     }
     munmap(vl1tab, PAGE_SIZE);
@@ -267,7 +329,7 @@ static int setup_guestos(int xc_handle,
     boot_paramsp->initrd_start = vinitrd_start;
     boot_paramsp->initrd_size = initrd_len;
 
-    i = (nr_pages >> (PAGE_SHIFT - 10)) - (1 << 10) - 4;
+    i = ((memsize - 1) << 10) - 4;
     boot_paramsp->alt_mem_k = i; /* alt_mem_k */
     boot_paramsp->screen.overlap.ext_mem_k = i & 0xFFFF; /* ext_mem_k */
 
@@ -291,6 +353,8 @@ static int setup_guestos(int xc_handle,
     boot_paramsp->drive_info.dummy[2] = 4;
     boot_paramsp->drive_info.dummy[14] = 32;
 
+    /* memsize is in megabytes */
+    build_e820map(mem_mapp, memsize << 20);
     boot_paramsp->e820_map_nr = mem_mapp->nr_map;
     for (i=0; i<mem_mapp->nr_map; i++) {
         boot_paramsp->e820_map[i].addr = mem_mapp->map[i].addr; 
@@ -374,6 +438,7 @@ int vmx_identify(void)
 
 int xc_vmx_build(int xc_handle,
                    u32 domid,
+                   int memsize,
                    const char *image_name,
                    struct mem_map *mem_mapp,
                    const char *ramdisk_name,
@@ -445,7 +510,7 @@ int xc_vmx_build(int xc_handle,
         goto error_out;
     }
 
-    if ( setup_guestos(xc_handle, domid, image, image_size, 
+    if ( setup_guestos(xc_handle, domid, memsize, image, image_size, 
                        initrd_gfd, initrd_size, nr_pages, 
                        ctxt, cmdline,
                        op.u.getdomaininfo.shared_info_frame,

@@ -71,8 +71,6 @@ struct bvt_cpu_info
 #define TIME_SLOP      (s32)MICROSECS(50)     /* allow time to slip a bit */
 static s32 ctx_allow = (s32)MILLISECS(5);     /* context switch allowance */
 
-static xmem_cache_t *dom_info_cache;
-
 static inline void __add_to_runqueue_head(struct exec_domain *d)
 {
     list_add(RUNLIST(d), RUNQUEUE(d->processor));
@@ -173,7 +171,7 @@ int bvt_alloc_task(struct exec_domain *ed)
 {
     struct domain *d = ed->domain;
     if ( (d->sched_priv == NULL) ) {
-        if ( (d->sched_priv = xmem_cache_alloc(dom_info_cache)) == NULL )
+        if ( (d->sched_priv = xmalloc(struct bvt_dom_info)) == NULL )
             return -1;
         memset(d->sched_priv, 0, sizeof(struct bvt_dom_info));
     }
@@ -295,7 +293,7 @@ static void bvt_sleep(struct exec_domain *d)
 void bvt_free_task(struct domain *d)
 {
     ASSERT(d->sched_priv != NULL);
-    xmem_cache_free(dom_info_cache, d->sched_priv);
+    xfree(d->sched_priv);
 }
 
 /* Control the scheduler. */
@@ -557,7 +555,7 @@ int bvt_init_scheduler()
 
     for ( i = 0; i < NR_CPUS; i++ )
     {
-        schedule_data[i].sched_priv = xmalloc(sizeof(struct bvt_cpu_info));
+        schedule_data[i].sched_priv = xmalloc(struct bvt_cpu_info);
        
         if ( schedule_data[i].sched_priv == NULL )
         {
@@ -568,14 +566,6 @@ int bvt_init_scheduler()
         INIT_LIST_HEAD(RUNQUEUE(i));
         
         CPU_SVT(i) = 0; /* XXX do I really need to do this? */
-    }
-
-    dom_info_cache = xmem_cache_create(
-        "BVT dom info", sizeof(struct bvt_dom_info), 0, 0, NULL, NULL);
-    if ( dom_info_cache == NULL )
-    {
-        printk("BVT: Failed to allocate domain info SLAB cache");
-        return -1;
     }
 
     return 0;

@@ -174,20 +174,16 @@ BX_MEM_C::init_memory(int memsize)
 
 #define PAGE_SHIFT 12
 #define PAGE_SIZE  (1 << PAGE_SHIFT)
-#define round_pgup(x)	(((x) + PAGE_SIZE-1) & ~ (PAGE_SIZE-1))
 
-    int npte_pages = 1 + (round_pgup(nr_pages * 4) / PAGE_SIZE); 
-
-    /* We don't map pte pages and the top 64k -- XXX: this could be a problem */
     if ((vector = (Bit8u *) xc_map_foreign_batch(xc_handle, domid,
                                                  PROT_READ|PROT_WRITE,
                                                  page_array,
-                                                 nr_pages - npte_pages - 16)) == 0) {
+                                                 nr_pages - 1)) == 0) {
         BX_ERROR(("Could not map guest physical"));
         return;
     }
 
-    BX_MEM_THIS dma_limit = (nr_pages - npte_pages - 16) << PAGE_SHIFT;
+    BX_MEM_THIS dma_limit = (nr_pages - 1) << PAGE_SHIFT;
     BX_INFO(("DMA limit: %lx", BX_MEM_THIS dma_limit));
 
     shared_page = xc_map_foreign_range(xc_handle, domid, PAGE_SIZE, 

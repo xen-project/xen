@@ -16,6 +16,7 @@
 #include <asm/pdb.h>
 #include <xen/config.h>
 #include <xen/spinlock.h>
+#include <xen/cache.h>
 #include <asm/vmx_vmcs.h>
 #include <public/xen.h>
 #endif
@@ -110,6 +111,7 @@
 #define TRAP_alignment_check 17
 #define TRAP_machine_check   18
 #define TRAP_simd_error      19
+#define TRAP_deferred_nmi    31
 
 /*
  * Non-fatal fault/trap handlers return an error code to the caller. If the
@@ -377,7 +379,7 @@ struct tss_struct {
     u8  io_bitmap[IOBMP_BYTES+1];
     /* Pads the TSS to be cacheline-aligned (total size is 0x2080). */
     u8 __cacheline_filler[23];
-};
+} __cacheline_aligned PACKED;
 
 struct trap_bounce {
     unsigned long  error_code;
@@ -411,11 +413,11 @@ struct thread_struct {
      * for segment registers %ds, %es, %fs and %gs:
      * 	%ds, %es, %fs, %gs, %eip, %cs, %eflags [, %oldesp, %oldss]
      */
-    unsigned long event_selector;    /* 08: entry CS  */
-    unsigned long event_address;     /* 12: entry EIP */
+    unsigned long event_selector;    /* entry CS  */
+    unsigned long event_address;     /* entry EIP */
 
-    unsigned long failsafe_selector; /* 16: entry CS  */
-    unsigned long failsafe_address;  /* 20: entry EIP */
+    unsigned long failsafe_selector; /* entry CS  */
+    unsigned long failsafe_address;  /* entry EIP */
 
     /* Bounce information for propagating an exception to guest OS. */
     struct trap_bounce trap_bounce;
@@ -426,7 +428,7 @@ struct thread_struct {
     u8 *io_bitmap; /* Pointer to task's IO bitmap or NULL */
 
     /* Trap info. */
-#ifdef __i386__
+#ifdef ARCH_HAS_FAST_TRAP
     int                fast_trap_idx;
     struct desc_struct fast_trap_desc;
 #endif
@@ -434,13 +436,13 @@ struct thread_struct {
 #ifdef CONFIG_VMX
     struct arch_vmx_struct arch_vmx; /* Virtual Machine Extensions */
 #endif
-};
+} __cacheline_aligned;
 
 #define IDT_ENTRIES 256
-extern struct desc_struct idt_table[];
-extern struct desc_struct *idt_tables[];
+extern idt_entry_t idt_table[];
+extern idt_entry_t *idt_tables[];
 
-#if defined(__i386__)
+#ifdef ARCH_HAS_FAST_TRAP
 
 #define SET_DEFAULT_FAST_TRAP(_p) \
     (_p)->fast_trap_idx = 0x20;   \
@@ -463,6 +465,13 @@ extern struct desc_struct *idt_tables[];
 #endif
 
 long set_fast_trap(struct exec_domain *p, int idx);
+
+#else
+
+#define SET_DEFAULT_FAST_TRAP(_p) ((void)0)
+#define CLEAR_FAST_TRAP(_p)       ((void)0)
+#define SET_FAST_TRAP(_p)         ((void)0)
+#define set_fast_trap(_p, _i)     (0)
 
 #endif
 
@@ -634,6 +643,7 @@ void show_guest_stack();
 void show_trace(unsigned long *esp);
 void show_stack(unsigned long *esp);
 void show_registers(struct xen_regs *regs);
+void show_page_walk(unsigned long addr);
 asmlinkage void fatal_trap(int trapnr, struct xen_regs *regs);
 
 #endif /* !__ASSEMBLY__ */

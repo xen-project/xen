@@ -163,13 +163,24 @@ void netif_create(netif_be_create_t *create)
     /* Disable queuing. */
     dev->tx_queue_len = 0;
 
-    /*
-     * Initialise a dummy MAC address. We choose the numerically largest
-     * non-broadcast address to prevent the address getting stolen by an 
-     * Ethernet bridge for STP purposes. (FE:FF:FF:FF:FF:FF)
-     */
-    memset(dev->dev_addr, 0xFF, ETH_ALEN);
-    dev->dev_addr[0] &= ~0x01;
+    if ( (create->be_mac[0] == 0) && (create->be_mac[1] == 0) &&
+         (create->be_mac[2] == 0) && (create->be_mac[3] == 0) &&
+         (create->be_mac[4] == 0) && (create->be_mac[5] == 0) )
+    {
+        /*
+         * Initialise a dummy MAC address. We choose the numerically largest
+         * non-broadcast address to prevent the address getting stolen by an
+         * Ethernet bridge for STP purposes. (FE:FF:FF:FF:FF:FF)
+         */ 
+        memset(dev->dev_addr, 0xFF, ETH_ALEN);
+        dev->dev_addr[0] &= ~0x01;
+    }
+    else
+    {
+        memcpy(dev->dev_addr, create->be_mac, ETH_ALEN);
+    }
+
+    memcpy(netif->fe_dev_addr, create->mac, ETH_ALEN);
 
     rtnl_lock();
     err = register_netdevice(dev);

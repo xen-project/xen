@@ -15,6 +15,8 @@ struct mem_map {
 #define E820_RESERVED   2
 #define E820_ACPI       3 /* usable as RAM once ACPI tables have been read */
 #define E820_NVS        4
+#define E820_IO         16
+#define E820_SHARED     17
 
         unsigned long caching_attr;    /* used by hypervisor */
 #define MEMMAP_UC	0

@@ -30,7 +30,8 @@ void __dummy__(void)
     OFFSET(XREGS_rdx, struct xen_regs, rdx);
     OFFSET(XREGS_rsi, struct xen_regs, rsi);
     OFFSET(XREGS_rdi, struct xen_regs, rdi);
-    OFFSET(XREGS_orig_rax, struct xen_regs, orig_rax);
+    OFFSET(XREGS_error_code, struct xen_regs, error_code);
+    OFFSET(XREGS_entry_vector, struct xen_regs, entry_vector);
     OFFSET(XREGS_rip, struct xen_regs, rip);
     OFFSET(XREGS_cs, struct xen_regs, cs);
     OFFSET(XREGS_eflags, struct xen_regs, eflags);

@@ -69,7 +69,7 @@ mk-symlinks:
 install: all
 	[ -d $(DESTDIR)/usr/lib ] || $(INSTALL_DIR) $(DESTDIR)/usr/lib
 	[ -d $(DESTDIR)/usr/include ] || $(INSTALL_DIR) $(DESTDIR)/usr/include
-	$(INSTALL_PROG) $(LIB) $(DESTDIR)/usr/lib
+	$(INSTALL_PROG) libxc.so.$(MAJOR).$(MINOR) $(DESTDIR)/usr/lib
 	ln -sf libxc.so.$(MAJOR).$(MINOR) $(DESTDIR)/usr/lib/libxc.so.$(MAJOR)
 	ln -sf libxc.so.$(MAJOR) $(DESTDIR)/usr/lib/libxc.so
 	$(INSTALL_DATA) xc.h $(DESTDIR)/usr/include

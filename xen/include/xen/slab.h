@@ -18,6 +18,7 @@ typedef struct xmem_cache_s xmem_cache_t;
 
 #include <xen/mm.h>
 #include <xen/cache.h>
+#include <xen/types.h>
 
 /* Flags to pass to xmem_cache_create(). */
 /* NB. The first 3 are only valid when built with SLAB_DEBUG_SUPPORT. */
@@ -45,12 +46,23 @@ extern int xmem_cache_shrink(xmem_cache_t *);
 extern void *xmem_cache_alloc(xmem_cache_t *);
 extern void xmem_cache_free(xmem_cache_t *, void *);
 
-extern void *xmalloc(size_t);
+extern void *_xmalloc(size_t);
 extern void xfree(const void *);
 
 extern int xmem_cache_reap(void);
 
 extern void dump_slabinfo();
+
+/* Allocate space for typed object. */
+#define xmalloc(_type) ((_type *)_xmalloc(sizeof(_type)))
+
+/* Allocate space for array of typed objects. */
+#define xmalloc_array(_type, _num)                 \
+((_type *)(((_num) > (UINT_MAX / sizeof(_type))) ? \
+           NULL : _xmalloc((_num) * sizeof(_type))))
+
+/* Allocate untyped storage. */
+#define xmalloc_bytes(_bytes) (_xmalloc(_bytes))
 
 #endif /* __ARCH_HAS_SLAB_ALLOCATOR */
 

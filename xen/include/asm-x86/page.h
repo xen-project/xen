@@ -46,7 +46,6 @@ typedef struct { unsigned long l1_lo; } l1_pgentry_t;
 typedef struct { unsigned long l2_lo; } l2_pgentry_t;
 typedef struct { unsigned long l3_lo; } l3_pgentry_t;
 typedef struct { unsigned long l4_lo; } l4_pgentry_t;
-typedef struct { unsigned long pt_lo; } pagetable_t;
 #endif /* !__ASSEMBLY__ */
 
 /* Strip type from a table entry. */
@@ -54,14 +53,12 @@ typedef struct { unsigned long pt_lo; } pagetable_t;
 #define l2_pgentry_val(_x) ((_x).l2_lo)
 #define l3_pgentry_val(_x) ((_x).l3_lo)
 #define l4_pgentry_val(_x) ((_x).l4_lo)
-#define pagetable_val(_x)  ((_x).pt_lo)
 
 /* Add type to a table entry. */
 #define mk_l1_pgentry(_x)  ( (l1_pgentry_t) { (_x) } )
 #define mk_l2_pgentry(_x)  ( (l2_pgentry_t) { (_x) } )
 #define mk_l3_pgentry(_x)  ( (l3_pgentry_t) { (_x) } )
 #define mk_l4_pgentry(_x)  ( (l4_pgentry_t) { (_x) } )
-#define mk_pagetable(_x)   ( (pagetable_t) { (_x) } )
 
 /* Turn a typed table entry into a page index. */
 #define l1_pgentry_to_pagenr(_x) (l1_pgentry_val(_x) >> PAGE_SHIFT) 
@@ -91,11 +88,23 @@ typedef struct { unsigned long pt_lo; } pagetable_t;
   ((_a) >> L2_PAGETABLE_SHIFT)
 #elif defined(__x86_64__)
 #define l2_table_offset(_a) \
-  (((_a) >> L2_PAGETABLE_SHIFT) & (ENTRIES_PER_L2_PAGETABLE -1))
+  (((_a) >> L2_PAGETABLE_SHIFT) & (ENTRIES_PER_L2_PAGETABLE - 1))
 #define l3_table_offset(_a) \
-  (((_a) >> L3_PAGETABLE_SHIFT) & (ENTRIES_PER_L3_PAGETABLE -1))
+  (((_a) >> L3_PAGETABLE_SHIFT) & (ENTRIES_PER_L3_PAGETABLE - 1))
 #define l4_table_offset(_a) \
-  ((_a) >> L4_PAGETABLE_SHIFT)
+  (((_a) >> L4_PAGETABLE_SHIFT) & (ENTRIES_PER_L4_PAGETABLE - 1))
+#endif
+
+#if defined(__i386__)
+#define pagetable_t l2_pgentry_t
+#define pagetable_val(_x)  ((_x).l2_lo)
+#define mk_pagetable(_x)   ( (l2_pgentry_t) { (_x) } )
+#define ENTRIES_PER_PAGETABLE ENTRIES_PER_L2_PAGETABLE
+#elif defined(__x86_64__)
+#define pagetable_t l4_pgentry_t
+#define pagetable_val(_x)  ((_x).l4_lo)
+#define mk_pagetable(_x)   ( (l4_pgentry_t) { (_x) } )
+#define ENTRIES_PER_PAGETABLE ENTRIES_PER_L4_PAGETABLE
 #endif
 
 #define PAGE_OFFSET		((unsigned long)__PAGE_OFFSET)
@@ -131,11 +140,7 @@ typedef struct { unsigned long pt_lo; } pagetable_t;
 
 #define va_to_l1mfn(_va) (l2_pgentry_val(linear_l2_table[_va>>L2_PAGETABLE_SHIFT]) >> PAGE_SHIFT)
 
-#ifdef __i386__
-extern l2_pgentry_t idle_pg_table[ENTRIES_PER_L2_PAGETABLE];
-#else
-extern l4_pgentry_t idle_pg_table[ENTRIES_PER_L4_PAGETABLE];
-#endif
+extern pagetable_t idle_pg_table[ENTRIES_PER_PAGETABLE];
 
 extern void paging_init(void);
 
@@ -191,6 +196,7 @@ __asm__ __volatile__("invlpg %0": :"m" (*(char *) (__addr)))
 #define PAGE_HYPERVISOR_NOCACHE MAKE_GLOBAL(__PAGE_HYPERVISOR_NOCACHE)
 
 #ifndef __ASSEMBLY__
+
 static __inline__ int get_order(unsigned long size)
 {
     int order;
@@ -205,6 +211,16 @@ static __inline__ int get_order(unsigned long size)
 }
 
 extern void zap_low_mappings(void);
-#endif
+
+/* Map physical byte range (@p, @p+@s) at virt address @v in pagetable @pt. */
+extern int
+map_pages(
+    pagetable_t *pt,
+    unsigned long v,
+    unsigned long p,
+    unsigned long s,
+    unsigned long flags);
+
+#endif /* !__ASSEMBLY__ */
 
 #endif /* __I386_PAGE_H__ */

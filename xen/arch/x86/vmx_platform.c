@@ -372,7 +372,7 @@ static int inst_copy_from_guest(char *buf, unsigned long guest_eip, int inst_len
         ma = (mfn << PAGE_SHIFT) | (guest_eip & (PAGE_SIZE - 1));
         inst_start = (unsigned char *)map_domain_mem(ma);
                 
-        strncpy(buf, inst_start, inst_len);
+        memcpy(buf, inst_start, inst_len);
         unmap_domain_mem(inst_start);
     } else {
         // Todo: In two page frames

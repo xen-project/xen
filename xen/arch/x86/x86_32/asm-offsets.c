@@ -65,4 +65,7 @@ void __dummy__(void)
     OFFSET(MULTICALL_arg3, multicall_entry_t, args[3]);
     OFFSET(MULTICALL_arg4, multicall_entry_t, args[4]);
     OFFSET(MULTICALL_result, multicall_entry_t, args[5]);
+    BLANK();
+
+    DEFINE(FIXMAP_apic_base, fix_to_virt(FIX_APIC_BASE));
 }

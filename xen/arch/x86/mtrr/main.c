@@ -136,8 +136,7 @@ static void __init init_table(void)
 	int i, max;
 
 	max = num_var_ranges;
-	if ((usage_table = xmalloc(max * sizeof *usage_table))
-	    == NULL) {
+	if ((usage_table = xmalloc_array(unsigned int, max)) == NULL) {
 		printk(KERN_ERR "mtrr: could not allocate\n");
 		return;
 	}

@@ -405,15 +405,18 @@ static PyObject *pyxc_vmx_build(PyObject *self,
     PyObject *memmap;
     int   control_evtchn, flags = 0;
     int numItems, i;
+    int memsize;
     struct mem_map mem_map;
 
-    static char *kwd_list[] = { "dom", "control_evtchn", 
+    static char *kwd_list[] = { "dom", "control_evtchn",
+                                "memsize",
                                 "image", "memmap",
 				"ramdisk", "cmdline", "flags",
                                 NULL };
 
-    if ( !PyArg_ParseTupleAndKeywords(args, kwds, "iisO!|ssi", kwd_list, 
+    if ( !PyArg_ParseTupleAndKeywords(args, kwds, "iiisO!|ssi", kwd_list, 
                                       &dom, &control_evtchn, 
+                                      &memsize,
                                       &image, &PyList_Type, &memmap,
 				      &ramdisk, &cmdline, &flags) )
         return NULL;
@@ -467,7 +470,7 @@ static PyObject *pyxc_vmx_build(PyObject *self,
             mem_map.map[i-1].caching_attr = lf4;
     }
 
-    if ( xc_vmx_build(xc->xc_handle, dom, image, &mem_map,
+    if ( xc_vmx_build(xc->xc_handle, dom, memsize, image, &mem_map,
                         ramdisk, cmdline, control_evtchn, flags) != 0 )
         return PyErr_SetFromErrno(xc_error);
     

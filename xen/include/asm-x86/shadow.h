@@ -189,7 +189,7 @@ static inline int __mark_dirty( struct mm_struct *m, unsigned int mfn)
         SH_LOG("mark_dirty OOR! mfn=%x pfn=%lx max=%x (mm %p)",
                mfn, pfn, m->shadow_dirty_bitmap_size, m );
         SH_LOG("dom=%p caf=%08x taf=%08x\n", 
-               frame_table[mfn].u.inuse.domain,
+               page_get_owner(&frame_table[mfn]),
                frame_table[mfn].count_info, 
                frame_table[mfn].u.inuse.type_info );
     }
@@ -616,7 +616,7 @@ static inline void set_shadow_status(
     {
         SH_LOG("Allocate more shadow hashtable blocks.");
 
-        extra = xmalloc(
+        extra = xmalloc_bytes(
             sizeof(void *) + (shadow_ht_extra_size * sizeof(*x)));
 
         /* XXX Should be more graceful here. */
