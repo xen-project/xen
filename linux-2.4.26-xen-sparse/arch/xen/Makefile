@@ -16,15 +16,11 @@
 #           Added '-march' and '-mpreferred-stack-boundary' support
 #
 
-override EXTRAVERSION := $(subst linux-$(VERSION).$(PATCHLEVEL).$(SUBLEVEL),,$(shell basename $(TOPDIR)))$(EXTRAVERSION)
+override EXTRAVERSION:=$(subst linux-$(VERSION).$(PATCHLEVEL).$(SUBLEVEL),,$(shell basename $(TOPDIR)))$(EXTRAVERSION)
 
-# This following is pretty horrid, but I think the ends justify the
-# means: if no .config file exists copy the appropriate defconfig-XXX
-# file to .config so that we use it in preference to the plain
-# defconfig file. It would be much better if there was a hook in the
-# main Makefile to do this, but this works.
+# If no .config file exists then use the appropriate defconfig-* file
 ifneq (.config,$(wildcard .config))
-X=$(shell cp arch/xen/defconfig$(EXTRAVERSION) .config)
+X:=$(shell cp arch/xen/defconfig$(EXTRAVERSION) .config 2>/dev/null)
 -include .config
 endif
 
