@@ -492,18 +492,17 @@ static void s_timer_fn(unsigned long unused)
 static void t_timer_fn(unsigned long unused)
 {
     struct exec_domain *ed = current;
-    struct domain *d = ed->domain;
 
     TRACE_0D(TRC_SCHED_T_TIMER_FN);
 
-    if ( !is_idle_task(d) )
+    if ( !is_idle_task(ed->domain) )
     {
-        update_dom_time(d);
+        update_dom_time(ed->domain);
         send_guest_virq(ed, VIRQ_TIMER);
     }
 
-    t_timer[d->processor].expires = NOW() + MILLISECS(10);
-    add_ac_timer(&t_timer[d->processor]);
+    t_timer[ed->processor].expires = NOW() + MILLISECS(10);
+    add_ac_timer(&t_timer[ed->processor]);
 }
 
 /* Domain timer function, sends a virtual timer interrupt to domain */
