@@ -69,7 +69,9 @@ net_vif_t *create_net_vif(int domain)
     net_vif_t *new_vif = NULL;
     net_ring_t *new_ring = NULL;
     struct task_struct *p = NULL;
-    unsigned long flags;
+    unsigned long flags, vmac_hash;
+    unsigned char vmac_key[ETH_ALEN + 4 + 2];
+    extern int opt_phys_bootmac;
 
     if ( !(p = find_domain_by_id(domain)) )
         return NULL;
@@ -104,13 +106,40 @@ net_vif_t *create_net_vif(int domain)
     spin_lock_init(&new_vif->rx_lock);
     spin_lock_init(&new_vif->tx_lock);
 
-    /*
-     * Virtual MAC is a hash of the real physical MAC. Chosen so that the 
-     * first vif of domain 0 gets the physical MAC address.
-     */
-    memcpy(new_vif->vmac, the_dev->dev_addr, ETH_ALEN);
-    ((unsigned short *)new_vif->vmac)[1] ^= htons(p->domain);
-    ((unsigned short *)new_vif->vmac)[2] ^= htons(dom_vif_idx);
+    if ( opt_phys_bootmac && (p->domain == 0) && (dom_vif_idx == 0) )
+    {
+        /*
+         * DOM0/VIF0 may get the real physical MAC address, so that
+         * users can easily get a Xenoserver up and running by using an
+         * existing DHCP entry.
+         */
+        memcpy(new_vif->vmac, the_dev->dev_addr, ETH_ALEN);
+    }
+    else
+    {
+        /*
+         * Most VIFs get a random MAC address with a "special" vendor id.
+         * We try to get MAC addresses to be unique across multiple servers
+         * by including the physical MAC address in the hash.
+         * However, the same machine with the same dom_id and vif_id should
+         * always get the same virtual MAC address.
+         * 
+         * NB. The vendor is currently an "obsolete" one that used to belong
+         * to DEC (AA-00-00). Using it is probably a bit rude :-)
+         * 
+         * NB2. The first bit of the first random octet is set to zero for
+         * all dynamic MAC addresses. This may allow us to manually specify
+         * MAC addresses for some VIFs with no fear of clashes.
+         */
+        memcpy(&vmac_key[0], the_dev->dev_addr, ETH_ALEN);
+        *(__u32 *)(&vmac_key[ETH_ALEN+0]) = htonl(p->domain);
+        *(__u16 *)(&vmac_key[ETH_ALEN+4]) = htons(dom_vif_idx);
+        vmac_hash = hash(vmac_key, ETH_ALEN+4+2);
+        memcpy(new_vif->vmac, "\xaa\x00\x00", 3);
+        new_vif->vmac[3] = (vmac_hash >> 16) & 0xef; /* First bit is zero. */
+        new_vif->vmac[4] = (vmac_hash >>  8) & 0xff;
+        new_vif->vmac[5] = (vmac_hash >>  0) & 0xff;
+    }
 
     p->net_vif_list[dom_vif_idx] = new_vif;
     

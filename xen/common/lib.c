@@ -525,3 +525,67 @@ __udivdi3(a, b)
 
         return (__qdivrem(a, b, (u64 *)0));
 }
+
+
+
+
+/* HASH/RANDOMISATION FUNCTION
+ * Based on lookup2.c, by Bob Jenkins, December 1996, Public Domain.
+ * You can use this free for any purpose.  It has no warranty.
+ * See http://burlteburtle.net/bob/hash/evahash.html 
+ */
+
+typedef unsigned long ub4;
+
+#define mix(a,b,c)                                      \
+    do {                                                \
+        a -= b; a -= c; a ^= (c>>13);                   \
+        b -= c; b -= a; b ^= (a<< 8);                   \
+        c -= a; c -= b; c ^= ((b&0xffffffff)>>13);      \
+        a -= b; a -= c; a ^= ((c&0xffffffff)>>12);      \
+        b -= c; b -= a; b = (b ^ (a<<16)) & 0xffffffff; \
+        c -= a; c -= b; c = (c ^ (b>> 5)) & 0xffffffff; \
+        a -= b; a -= c; a = (a ^ (c>> 3)) & 0xffffffff; \
+        b -= c; b -= a; b = (b ^ (a<<10)) & 0xffffffff; \
+        c -= a; c -= b; c = (c ^ (b>>15)) & 0xffffffff; \
+    } while ( 0 )
+
+unsigned long hash(unsigned char *k, unsigned long len)
+{
+    unsigned long a, b, c, l;
+
+    l = len;
+    a = b = 0x9e3779b9;  /* the golden ratio; an arbitrary value */
+    c = 0xa5a5a5a5;      /* another arbitrary value (KAF, 13/5/03) */
+
+    while ( l >= 12 )
+    {
+        a += (k[0] + ((ub4)k[1]<<8) + ((ub4)k[2]<<16)  + ((ub4)k[3]<<24));
+        b += (k[4] + ((ub4)k[5]<<8) + ((ub4)k[6]<<16)  + ((ub4)k[7]<<24));
+        c += (k[8] + ((ub4)k[9]<<8) + ((ub4)k[10]<<16) + ((ub4)k[11]<<24));
+        mix(a,b,c);
+        k += 12; l -= 12;
+    }
+
+    c += len;
+    switch ( l )
+    {
+    case 11: c+=((ub4)k[10]<<24);
+    case 10: c+=((ub4)k[9]<<16);
+    case 9 : c+=((ub4)k[8]<<8);
+        /* the first byte of c is reserved for the length */
+    case 8 : b+=((ub4)k[7]<<24);
+    case 7 : b+=((ub4)k[6]<<16);
+    case 6 : b+=((ub4)k[5]<<8);
+    case 5 : b+=k[4];
+    case 4 : a+=((ub4)k[3]<<24);
+    case 3 : a+=((ub4)k[2]<<16);
+    case 2 : a+=((ub4)k[1]<<8);
+    case 1 : a+=k[0];
+        /* case 0: nothing left to add */
+    }
+
+    mix(a,b,c);
+
+    return c;
+}
