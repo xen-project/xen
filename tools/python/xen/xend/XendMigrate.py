@@ -111,7 +111,7 @@ class XfrdInfo:
             fn = self.unknown
         val = fn(xfrd, val)
         if val is not None:
-            sxp.show(val, out=self.transport)
+            sxp.show(val, out=xfrd.transport)
 
     def unknown(self, xfrd, val):
         print 'unknown>', val
