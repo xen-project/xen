@@ -579,9 +579,9 @@ class ProgAtropos(Prog):
         print "\nSet atropos parameters."
 
     def main(self, args):
-        if len(args) != 5: self.err("%s: Invalid argument(s)" % args[0])
+        if len(args) != 6: self.err("%s: Invalid argument(s)" % args[0])
         dom = args[1]
-        v = map(int, args[2:5])
+        v = map(int, args[2:6])
         server.xend_domain_cpu_atropos_set(dom, *v)
 
 xm.prog(ProgAtropos)
