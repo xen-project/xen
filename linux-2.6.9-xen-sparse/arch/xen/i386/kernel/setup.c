@@ -350,8 +350,6 @@ int nr_multicall_ents = 0;
 /* Raw start-of-day parameters from the hypervisor. */
 union xen_start_info_union xen_start_info_union;
 
-extern void (*pm_idle)(void);
-
 static void __init limit_regions(unsigned long long size)
 {
 	unsigned long long current_addr = 0;
@@ -1323,8 +1321,6 @@ void __init setup_arch(char **cmdline_p)
 
 	HYPERVISOR_vm_assist(VMASST_CMD_enable,
 			     VMASST_TYPE_4gb_segments);
-
-	pm_idle = xen_cpu_idle;
 
 	memcpy(&boot_cpu_data, &new_cpu_data, sizeof(new_cpu_data));
 	early_cpu_init();

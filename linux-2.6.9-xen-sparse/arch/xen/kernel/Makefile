@@ -9,5 +9,5 @@ $(obj)/vmlinux.lds:
 
 extra-y += vmlinux.lds
 
-obj-y	:= ctrl_if.o evtchn.o fixup.o process.o reboot.o xen_proc.o empty.o \
+obj-y	:= ctrl_if.o evtchn.o fixup.o reboot.o xen_proc.o empty.o \
            gnttab.o skbuff.o
