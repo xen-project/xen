@@ -68,7 +68,7 @@ class CtrlMsgRcvr:
     @type responders: {int:Responder}
     """
 
-    def __init__(self, remote_port = 0):
+    def __init__(self, remote_port=0):
         self.channelFactory = channel.channelFactory()
         self.majorTypes = {}
         self.dom = None
