@@ -383,21 +383,10 @@ void ctrl_if_suspend(void)
     unbind_evtchn_from_irq(ctrl_if_evtchn);
 }
 
-/** Reset the control interface progress pointers.
- * Marks the queues empty if 'clear' non-zero.
- */
-void ctrl_if_reset(int clear){
-    control_if_t *ctrl_if = get_ctrl_if();
-
-    if(clear){
-        *ctrl_if = (control_if_t){};
-    }
-    ctrl_if_tx_resp_cons = ctrl_if->tx_resp_prod;
-    ctrl_if_rx_req_cons  = ctrl_if->rx_resp_prod;
-}
-
 void ctrl_if_resume(void)
 {
+    control_if_t *ctrl_if = get_ctrl_if();
+
     if ( start_info.flags & SIF_INITDOMAIN )
     {
         /*
@@ -415,7 +404,9 @@ void ctrl_if_resume(void)
         initdom_ctrlif_domcontroller_port   = op.u.bind_interdomain.port2;
     }
 
-    ctrl_if_reset(0);
+    /* Sync up with shared indexes. */
+    ctrl_if_tx_resp_cons = ctrl_if->tx_resp_prod;
+    ctrl_if_rx_req_cons  = ctrl_if->rx_resp_prod;
 
     ctrl_if_evtchn = start_info.domain_controller_evtchn;
     ctrl_if_irq    = bind_evtchn_to_irq(ctrl_if_evtchn);
@@ -444,7 +435,6 @@ void __init ctrl_if_init(void)
 
     spin_lock_init(&ctrl_if_lock);
 
-    ctrl_if_reset(1);
     ctrl_if_resume();
 }
 
@@ -455,8 +445,8 @@ static int __init ctrl_if_late_setup(void)
     safe_to_schedule_task = 1;
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,0)
     ctrl_if_tx_wq = create_workqueue("ctrl_if_tx");
-    if (ctrl_if_tx_wq == NULL)
-        return 1;                 /* XXX */
+    if ( ctrl_if_tx_wq == NULL )
+        return 1;
 #endif
     return 0;
 }
