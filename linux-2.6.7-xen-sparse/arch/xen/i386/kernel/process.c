@@ -193,7 +193,8 @@ void __init select_idle_routine(const struct cpuinfo_x86 *c)
 		}
 		return;
 	}
-	pm_idle = xen_cpu_idle;
+	if (!pm_idle)
+		pm_idle = default_idle;
 	return;
 }
 
