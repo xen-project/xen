@@ -213,22 +213,22 @@ void __init init_frametable(unsigned long nr_pages)
 }
 
 
-static void __invalidate_shadow_ldt(void)
+static void __invalidate_shadow_ldt(struct task_struct *p)
 {
     int i, cpu = smp_processor_id();
     unsigned long pfn;
     struct pfn_info *page;
     
-    current->mm.shadow_ldt_mapcnt = 0;
+    p->mm.shadow_ldt_mapcnt = 0;
 
     for ( i = 16; i < 32; i++ )
     {
-        pfn = l1_pgentry_to_pagenr(current->mm.perdomain_pt[i]);
+        pfn = l1_pgentry_to_pagenr(p->mm.perdomain_pt[i]);
         if ( pfn == 0 ) continue;
-        current->mm.perdomain_pt[i] = mk_l1_pgentry(0);
+        p->mm.perdomain_pt[i] = mk_l1_pgentry(0);
         page = frame_table + pfn;
         ASSERT((page->flags & PG_type_mask) == PGT_ldt_page);
-        ASSERT((page->flags & PG_domain_mask) == current->domain);
+        ASSERT((page->flags & PG_domain_mask) == p->domain);
         ASSERT((page->type_count != 0) && (page->tot_count != 0));
         put_page_type(page);
         put_page_tot(page);                
@@ -242,8 +242,9 @@ static void __invalidate_shadow_ldt(void)
 
 static inline void invalidate_shadow_ldt(void)
 {
-    if ( current->mm.shadow_ldt_mapcnt != 0 )
-        __invalidate_shadow_ldt();
+    struct task_struct *p = current;
+    if ( p->mm.shadow_ldt_mapcnt != 0 )
+        __invalidate_shadow_ldt(p);
 }
 
 
@@ -252,11 +253,11 @@ int map_ldt_shadow_page(unsigned int off)
 {
     struct task_struct *p = current;
     unsigned long addr = p->mm.ldt_base + (off << PAGE_SHIFT);
-    unsigned long l1e, *ldt_page;
+    unsigned long l1e, *ldt_page, flags;
     struct pfn_info *page;
     int i, ret = -1;
 
-    spin_lock(&p->page_lock);
+    spin_lock_irqsave(&p->page_lock, flags);
 
     __get_user(l1e, (unsigned long *)(linear_pg_table+(addr>>PAGE_SHIFT)));
     if ( unlikely(!(l1e & _PAGE_PRESENT)) )
@@ -294,7 +295,7 @@ int map_ldt_shadow_page(unsigned int off)
     ret = 0;
 
  out:
-    spin_unlock(&p->page_lock);
+    spin_unlock_irqrestore(&p->page_lock, flags);
     return ret;
 }
 
