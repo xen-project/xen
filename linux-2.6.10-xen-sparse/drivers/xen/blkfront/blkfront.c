@@ -420,14 +420,14 @@ static irqreturn_t blkif_int(int irq, void *dev_id, struct pt_regs *ptregs)
 
     for ( i = blk_ring.rsp_cons; i != rp; i++ )
     {
-	unsigned long id;
+        unsigned long id;
 
         bret = RING_GET_RESPONSE(BLKIF_RING, &blk_ring, i);
-	id = bret->id;
-	req = (struct request *)rec_ring[id].id;
-	blkif_completion( &rec_ring[id] );
+        id = bret->id;
+        req = (struct request *)rec_ring[id].id;
+        blkif_completion( &rec_ring[id] );
 
-	ADD_ID_TO_FREELIST(id); /* overwrites req */
+        ADD_ID_TO_FREELIST(id); /* overwrites req */
 
         switch ( bret->operation )
         {
@@ -436,7 +436,7 @@ static irqreturn_t blkif_int(int irq, void *dev_id, struct pt_regs *ptregs)
             if ( unlikely(bret->status != BLKIF_RSP_OKAY) )
                 DPRINTK("Bad return from blkdev data request: %x\n",
                         bret->status);
-	    
+     
             if ( unlikely(end_that_request_first
                           (req, 
                            (bret->status == BLKIF_RSP_OKAY),
@@ -509,7 +509,7 @@ static void kick_pending_request_queues(void)
     /* We kick pending request queues if the ring is reasonably empty. */
     if ( (nr_pending != 0) && 
          (RING_PENDING_REQUESTS(BLKIF_RING, &blk_ring) < 
-            (RING_SIZE(BLKIF_RING, &blk_ring) >> 1)) )
+          (RING_SIZE(BLKIF_RING, &blk_ring) >> 1)) )
     {
         /* Attempt to drain the queue, but bail if the ring becomes full. */
         while ( (nr_pending != 0) && !RING_FULL(BLKIF_RING, &blk_ring) )
@@ -632,7 +632,7 @@ int blkif_ioctl(struct inode *inode, struct file *filep,
         if (!argument) return -EINVAL;
 
         /* We don't have real geometry info, but let's at least return
-	   values consistent with the size of the device */
+           values consistent with the size of the device */
 
         heads = 0xff;
         sectors = 0x3f; 
@@ -650,7 +650,7 @@ int blkif_ioctl(struct inode *inode, struct file *filep,
         if (!argument) return -EINVAL;
 
         /* We don't have real geometry info, but let's at least return
-	   values consistent with the size of the device */
+           values consistent with the size of the device */
 
         heads = 0xff;
         sectors = 0x3f; 
@@ -807,13 +807,13 @@ static int blkif_queue_request(unsigned long   id,
              (sg_next_sect == sector_number) )
         {
             req = RING_GET_REQUEST(BLKIF_RING, &blk_ring, 
-                    blk_ring.req_prod_pvt - 1);
+                                   blk_ring.req_prod_pvt - 1);
             bh = (struct buffer_head *)id;
-	    
+     
             bh->b_reqnext = (struct buffer_head *)rec_ring[req->id].id;
-	    
+     
 
-	    rec_ring[req->id].id = id;
+            rec_ring[req->id].id = id;
 
             req->frame_and_sects[req->nr_segments] = 
                 buffer_ma | (fsect<<3) | lsect;
@@ -966,16 +966,16 @@ static void blkif_int(int irq, void *dev_id, struct pt_regs *ptregs)
 
     for ( i = blk_ring.rsp_cons; i != rp; i++ )
     {
-	unsigned long id;
+        unsigned long id;
         blkif_response_t *bret;
         
         bret = RING_GET_RESPONSE(BLKIF_RING, &blk_ring, i);
-	id = bret->id;
-	bh = (struct buffer_head *)rec_ring[id].id; 
+        id = bret->id;
+        bh = (struct buffer_head *)rec_ring[id].id; 
 
-	blkif_completion( &rec_ring[id] );
+        blkif_completion( &rec_ring[id] );
 
-	ADD_ID_TO_FREELIST(id);
+        ADD_ID_TO_FREELIST(id);
 
         switch ( bret->operation )
         {
@@ -1000,7 +1000,7 @@ static void blkif_int(int irq, void *dev_id, struct pt_regs *ptregs)
             BUG();
         }
 
-	}
+    }
     blk_ring.rsp_cons = i;
     
     kick_pending_request_queues();
@@ -1149,7 +1149,7 @@ static void blkif_recover(void)
         if ( rec_ring[i].id >= PAGE_OFFSET )
         {
             req = RING_GET_REQUEST(BLKIF_RING, &blk_ring, 
-                    blk_ring.req_prod_pvt);
+                                   blk_ring.req_prod_pvt);
             translate_req_to_mfn(req, &rec_ring[i]);
             blk_ring.req_prod_pvt++;
         }
@@ -1159,7 +1159,7 @@ static void blkif_recover(void)
     for ( i = 0; i < blk_ring.req_prod_pvt; i++ ) 
     {
         req = RING_GET_REQUEST(BLKIF_RING, &blk_ring, i);
-        rec_ring[i].id = req->id;		
+        rec_ring[i].id = req->id;  
         req->id = i;
         translate_req_to_pfn(&rec_ring[i], req);
     }
@@ -1283,7 +1283,7 @@ static void blkif_status(blkif_fe_interface_status_t *status)
         }
         break;
 
-   case BLKIF_INTERFACE_STATUS_CHANGED:
+    case BLKIF_INTERFACE_STATUS_CHANGED:
         switch ( blkif_state )
         {
         case BLKIF_STATE_CLOSED:
@@ -1294,7 +1294,7 @@ static void blkif_status(blkif_fe_interface_status_t *status)
             vbd_update();
             break;
         }
-       break;
+        break;
 
     default:
         WPRINTK(" Invalid blkif status: %d\n", status->status);
@@ -1362,7 +1362,7 @@ int __init xlblk_init(void)
 
     rec_ring_free = 0;
     for ( i = 0; i < RING_SIZE(BLKIF_RING, &blk_ring); i++ )
-	rec_ring[i].id = i+1;
+        rec_ring[i].id = i+1;
     rec_ring[RING_SIZE(BLKIF_RING, &blk_ring)-1].id = 0x0fffffff;
 
     (void)ctrl_if_register_receiver(CMSG_BLKIF_FE, blkif_ctrlif_rx,
@@ -1391,13 +1391,13 @@ void blkif_completion(blkif_request_t *req)
     switch ( req->operation )
     {
     case BLKIF_OP_READ:
-	for ( i = 0; i < req->nr_segments; i++ )
-	{
-	    unsigned long pfn = req->frame_and_sects[i] >> PAGE_SHIFT;
-	    unsigned long mfn = phys_to_machine_mapping[pfn];
-	    xen_machphys_update(mfn, pfn);
-	}
-	break;
+        for ( i = 0; i < req->nr_segments; i++ )
+        {
+            unsigned long pfn = req->frame_and_sects[i] >> PAGE_SHIFT;
+            unsigned long mfn = phys_to_machine_mapping[pfn];
+            xen_machphys_update(mfn, pfn);
+        }
+        break;
     }
     
 }
