@@ -116,7 +116,7 @@ static inline int __mark_dirty( struct mm_struct *m, unsigned int mfn)
 #ifndef NDEBUG
     else if ( mfn < max_page )
     {
-        SH_LOG("mark_dirty OOR! mfn=%x pfn=%x max=%x (mm %p)",
+        SH_LOG("mark_dirty OOR! mfn=%x pfn=%lx max=%x (mm %p)",
                mfn, pfn, m->shadow_dirty_bitmap_size, m );
         SH_LOG("dom=%p caf=%08x taf=%08x\n", 
                frame_table[mfn].u.inuse.domain,
