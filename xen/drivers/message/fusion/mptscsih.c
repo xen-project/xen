@@ -2248,6 +2248,7 @@ struct info_str {
 	int   pos;
 };
 
+#if 0 /* XEN */
 static void copy_mem_info(struct info_str *info, char *data, int len)
 {
 	if (info->pos + len > info->length)
@@ -2282,6 +2283,7 @@ static int copy_info(struct info_str *info, char *fmt, ...)
 	copy_mem_info(info, buf, len);
 	return len;
 }
+#endif /* 0 (XEN) */
 
 /* SAE: For some reason off_t is not in any of the types.. */
 #ifndef off_t

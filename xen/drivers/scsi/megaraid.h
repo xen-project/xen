@@ -1012,14 +1012,14 @@ static void mega_build_kernel_sg (char *barea, ulong xfersize, mega_scb * pScb,
 static int megadev_open (struct inode *, struct file *);
 static int megadev_ioctl_entry (struct inode *, struct file *,
 				unsigned int, unsigned long);
-#endif
 static int megadev_ioctl (struct inode *, struct file *,
 			  unsigned int, unsigned long);
+#endif
 static mega_scb *megadev_doioctl (mega_host_config *, Scsi_Cmnd *);
 #if 0
 static int megadev_close (struct inode *, struct file *);
-#endif
 static void megadev_ioctl_done (Scsi_Cmnd *);
+#endif
 static int mega_init_scb (mega_host_config *);
 static void enq_scb_freelist (mega_host_config *, mega_scb *,
 			      int lock, int intr);
@@ -1041,7 +1041,7 @@ static int mega_partsize(Disk *, kdev_t, int *);
 static void mega_get_boot_drv(mega_host_config *);
 static int mega_get_ldrv_num(mega_host_config *, Scsi_Cmnd *, int);
 static int mega_support_random_del(mega_host_config *);
-static int mega_del_logdrv(mega_host_config *, int);
+/*static int mega_del_logdrv(mega_host_config *, int);*/
 /*static int mega_do_del_logdrv(mega_host_config *, int);*/
 
 #endif

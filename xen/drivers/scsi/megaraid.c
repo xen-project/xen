@@ -815,10 +815,10 @@ static struct file_operations megadev_fops = {
  */
 static struct mcontroller mcontroller[MAX_CONTROLLERS];
 
+#if XEN_KILLED
 /* The current driver version */
 static u32 driver_ver = 0x118C;
 
-#if XEN_KILLED
 /* major number used by the device for character interface */
 static int major;
 
@@ -4745,7 +4745,6 @@ static int megadev_ioctl_entry (struct inode *inode, struct file *filep,
 	return ret;
 
 }
-#endif /* 0 (XEN) */
 
 static int megadev_ioctl (struct inode *inode, struct file *filep,
 	       unsigned int cmd, unsigned long arg)
@@ -5177,10 +5176,9 @@ static int megadev_ioctl (struct inode *inode, struct file *filep,
 static void
 megadev_ioctl_done(Scsi_Cmnd *sc)
 {
-#if XEN_KILLED
 	up (&mimd_ioctl_sem);
-#endif
 }
+#endif /* 0 (XEN) */
 
 static mega_scb *
 megadev_doioctl (mega_host_config * megacfg, Scsi_Cmnd * sc)
@@ -5339,11 +5337,10 @@ mega_support_random_del(mega_host_config *this_hba)
 	return 0; // no support for random deletions
 }
 
+#if 0 /* XEN */
 static int
 mega_del_logdrv(mega_host_config *this_hba, int logdrv)
 {
-  return -ENOSYS;
-#if XEN_KILLED_DELLOGDRV
 	int		rval;
 	IO_LOCK_T;
 	DECLARE_WAIT_QUEUE_HEAD(wq);
@@ -5410,10 +5407,8 @@ mega_del_logdrv(mega_host_config *this_hba, int logdrv)
 	IO_UNLOCK;
 
 	return rval;
-#endif
 }
 
-#if XEN_KILLED_DELLOGDRV
 static int
 mega_do_del_logdrv(mega_host_config *this_hba, int logdrv)
 {
@@ -5448,7 +5443,7 @@ mega_do_del_logdrv(mega_host_config *this_hba, int logdrv)
 
 	return rval;
 }
-#endif
+#endif /* 0 (XEN) */
 
 #if LINUX_VERSION_CODE < KERNEL_VERSION(2,4,0)
 void *
