@@ -104,11 +104,13 @@ void do_task_queues(u_char key, void *dev_id, struct pt_regs *regs)
     read_unlock_irqrestore(&tasklist_lock, flags); 
 }
 
-extern void perfc_printall (u_char key, void *dev_id, struct pt_regs *regs);
-extern void perfc_reset (u_char key, void *dev_id, struct pt_regs *regs);
 extern void dump_runq(u_char key, void *dev_id, struct pt_regs *regs);
 extern void print_sched_histo(u_char key, void *dev_id, struct pt_regs *regs);
 extern void reset_sched_histo(u_char key, void *dev_id, struct pt_regs *regs);
+#ifndef NPERFC
+extern void perfc_printall (u_char key, void *dev_id, struct pt_regs *regs);
+extern void perfc_reset (u_char key, void *dev_id, struct pt_regs *regs);
+#endif
 #ifndef NDEBUG
 void reaudit_pages(u_char key, void *dev_id, struct pt_regs *regs);
 void audit_all_pages(u_char key, void *dev_id, struct pt_regs *regs);
@@ -128,12 +130,14 @@ void initialize_keytable(void)
     add_key_handler('h', show_handlers, "show this message");
     add_key_handler('l', print_sched_histo, "print sched latency histogram");
     add_key_handler('L', reset_sched_histo, "reset sched latency histogram");
-    add_key_handler('p', perfc_printall, "print performance counters"); 
-    add_key_handler('P', perfc_reset,    "reset performance counters"); 
     add_key_handler('q', do_task_queues, "dump task queues + guest state");
     add_key_handler('r', dump_runq,      "dump run queues");
     add_key_handler('B', kill_dom0,      "reboot machine gracefully"); 
     add_key_handler('R', halt_machine,   "reboot machine ungracefully"); 
+#ifndef NPERFC
+    add_key_handler('p', perfc_printall, "print performance counters"); 
+    add_key_handler('P', perfc_reset,    "reset performance counters"); 
+#endif
 #ifndef NDEBUG
     add_key_handler('m', reaudit_pages, "re-audit pages");
     add_key_handler('M', audit_all_pages, "audit all pages");

@@ -476,15 +476,17 @@ asmlinkage unsigned int do_IRQ(struct pt_regs regs)
      * handled by some other CPU. (or is disabled)
      */
     int irq = regs.orig_eax & 0xff; /* high bits used in ret_from_ code  */
-    int cpu = smp_processor_id();
     irq_desc_t *desc = irq_desc + irq;
     struct irqaction * action;
     unsigned int status;
 
-    u32     cc_start, cc_end;
+#ifndef NPERFC
+    int cpu = smp_processor_id();
+    u32 cc_start, cc_end;
 
     perfc_incra(irqs, cpu);
     rdtscl(cc_start);
+#endif
 
     spin_lock(&desc->lock);
     desc->handler->ack(irq);
@@ -550,6 +552,7 @@ asmlinkage unsigned int do_IRQ(struct pt_regs regs)
     desc->handler->end(irq);
     spin_unlock(&desc->lock);
 
+#ifndef NPERFC
     rdtscl(cc_end);
 
     if ( !action || (!(action->flags & SA_NOPROFILE)) )
@@ -560,6 +563,7 @@ asmlinkage unsigned int do_IRQ(struct pt_regs regs)
             printk("Long interrupt %08x -> %08x\n", cc_start, cc_end);
 #endif
     }
+#endif /* NPERFC */
 
     return 1;
 }

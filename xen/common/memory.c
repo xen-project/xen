@@ -164,7 +164,7 @@ static void free_l1_table(struct pfn_info *page);
 static int mod_l2_entry(l2_pgentry_t *, l2_pgentry_t, unsigned long);
 static int mod_l1_entry(l1_pgentry_t *, l1_pgentry_t);
 
-/* frame table size and its size in pages */
+/* Frame table and its size in pages. */
 struct pfn_info *frame_table;
 unsigned long frame_table_size;
 unsigned long max_page;
@@ -770,17 +770,19 @@ void free_page_type(struct pfn_info *page, unsigned int type)
              (get_shadow_status(&current->mm, 
                                 page-frame_table) & PSH_shadowed) )
         {
-            /* using 'current-mm' is safe because page type changes only
-               occur within the context of the currently running domain as 
-               pagetable pages can not be shared across domains. The one
-               exception is when destroying a domain. However, we get away 
-               with this as there's no way the current domain can have this
-               mfn shadowed, so we won't get here... Phew! */
-
+            /*
+             * Using 'current->mm' is safe and correct because page-table pages 
+             * are not shared across domains. Updates to such pages' types are 
+             * thus only done within the context of the owning domain. The one 
+             * exception is when destroying a domain; however, this is not a 
+             * problem as the currently-executing domain will not have this 
+             * MFN shadowed, and at domain end-of-day we explicitly unshadow 
+             * everything so that nothing will get left lying around.
+             */
             unshadow_table( page-frame_table, type );
             put_shadow_status(&current->mm);
         }
-        return;
+        break;
 
     case PGT_l2_page_table:
         free_l2_table(page);
@@ -791,7 +793,7 @@ void free_page_type(struct pfn_info *page, unsigned int type)
             unshadow_table( page-frame_table, type );
             put_shadow_status(&current->mm);
         }
-        return;
+        break;
 
     default:
         BUG();
@@ -1150,7 +1152,7 @@ int do_update_va_mapping(unsigned long page_nr,
             perfc_incrc(shadow_update_va_fail);
         }
 
-        check_pagetable( p, p->mm.pagetable, "va" ); /* debug */
+        check_pagetable(p, p->mm.pagetable, "va"); /* debug */
     }
 
     deferred_ops = percpu_info[cpu].deferred_ops;

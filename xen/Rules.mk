@@ -36,6 +36,14 @@ HOSTCFLAGS = -Wall -Wstrict-prototypes -O2 -fomit-frame-pointer
 
 include $(BASEDIR)/arch/$(TARGET_ARCH)/Rules.mk
 
+ifneq ($(debug),y)
+CFLAGS += -DNDEBUG
+endif
+
+ifeq ($(nperfc),y)
+CFLAGS += -DNPERFC
+endif
+
 ifeq ($(nodev),y)
 CFLAGS += -DNO_DEVICES_IN_XEN
 CFLAGS := $(subst -Werror,,$(CFLAGS))
