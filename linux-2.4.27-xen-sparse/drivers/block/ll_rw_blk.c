@@ -1626,7 +1626,7 @@ int __init blk_dev_init(void)
 	jsfd_init();
 #endif
 
-#if defined(CONFIG_XEN)
+#if defined(CONFIG_XEN_BLKDEV_FRONTEND)
     xlblk_init();
 #endif
 
