@@ -73,11 +73,9 @@ typedef struct _phys_dev_st {
 static phys_dev_t *find_pdev(struct domain *p, struct pci_dev *dev)
 {
     phys_dev_t *t, *res = NULL;
-    struct list_head *tmp;
 
-    list_for_each(tmp, &p->pcidev_list)
+    list_for_each_entry ( t, &p->pcidev_list, node )
     {
-        t = list_entry(tmp,  phys_dev_t, node);
         if ( dev == t->dev )
         {
             res = t;
@@ -149,9 +147,9 @@ int physdev_pci_access_modify(
 
     /* Make the domain privileged. */
     set_bit(DF_PHYSDEV, &p->flags);
-	/* FIXME: MAW for now make the domain REALLY privileged so that it
-	 * can run a backend driver (hw access should work OK otherwise) */
-	set_bit(DF_PRIVILEGED, &p->flags);
+    /* FIXME: MAW for now make the domain REALLY privileged so that it
+     * can run a backend driver (hw access should work OK otherwise) */
+    set_bit(DF_PRIVILEGED, &p->flags);
 
     /* Grant write access to the specified device. */
     if ( (pdev = pci_find_slot(bus, PCI_DEVFN(dev, func))) == NULL )
@@ -214,17 +212,16 @@ int physdev_pci_access_modify(
 int domain_iomem_in_pfn(struct domain *p, unsigned long pfn)
 {
     int ret = 0;
-    struct list_head *l;
+    phys_dev_t *phys_dev;
 
     VERBOSE_INFO("Checking if physdev-capable domain %u needs access to "
                  "pfn %08lx\n", p->id, pfn);
     
     spin_lock(&p->pcidev_lock);
 
-    list_for_each(l, &p->pcidev_list)
+    list_for_each_entry ( phys_dev, &p->pcidev_list, node )
     {
         int i;
-        phys_dev_t *phys_dev = list_entry(l, phys_dev_t, node);
         struct pci_dev *pci_dev = phys_dev->dev;
 
         for ( i = 0; (i < DEVICE_COUNT_RESOURCE) && (ret == 0); i++ )
@@ -619,15 +616,11 @@ static long pci_cfgreg_write(int bus, int dev, int func, int reg,
 static long pci_probe_root_buses(u32 *busmask)
 {
     phys_dev_t *pdev;
-    struct list_head *tmp;
 
     memset(busmask, 0, 256/8);
 
-    list_for_each ( tmp, &current->pcidev_list )
-    {
-        pdev = list_entry(tmp, phys_dev_t, node);
+    list_for_each_entry ( pdev, &current->pcidev_list, node )
         set_bit(pdev->dev->bus->number, busmask);
-    }
 
     return 0;
 }
