@@ -30,6 +30,8 @@
 
 /* -------[ debug / pretty printing ]--------------------------------- */
 
+#define PRINTK(_f, _a...) printk(KERN_ALERT "(file=%s, line=%d) " _f, \
+                           __FILE__ , __LINE__ , ## _a )
 #if 0
 #define DPRINTK(_f, _a...) printk(KERN_ALERT "(file=%s, line=%d) " _f, \
                            __FILE__ , __LINE__ , ## _a )

@@ -299,7 +299,7 @@ int blktap_write_fe_ring(blkif_request_t *req)
     }
 
     if ( RING_FULL(&blktap_ufe_ring) ) {
-        DPRINTK("blktap: fe_ring is full, can't add.\n");
+        PRINTK("blktap: fe_ring is full, can't add.\n");
         return 0;
     }
 
@@ -383,10 +383,9 @@ static int blktap_read_fe_ring(void)
             zap_page_range(blktap_vma, MMAP_VADDR(ID_TO_IDX(resp_s->id), 0), 
                     ar->nr_pages << PAGE_SHIFT, NULL);
             write_resp_to_fe_ring(blkif, resp_s);
+            blktap_ufe_ring.rsp_cons = i + 1;
             kick_fe_domain(blkif);
         }
-        
-        blktap_ufe_ring.rsp_cons = i;
     }
     return 0;
 }
