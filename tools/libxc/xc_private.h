@@ -209,4 +209,7 @@ int xc_domain_getfullinfo(int xc_handle,
                           u32 domid,
                           dom0_op_t *op,
                           full_execution_context_t *ctxt );
+
+unsigned long xc_get_m2p_start_mfn ( int xc_handle );
+
 #endif /* __XC_PRIVATE_H__ */

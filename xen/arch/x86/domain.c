@@ -219,6 +219,8 @@ void arch_do_createdomain(struct domain *d)
 {
     d->shared_info = (void *)alloc_xenheap_page();
     memset(d->shared_info, 0, PAGE_SIZE);
+    d->shared_info->arch.mfn_to_pfn_start = 
+	virt_to_phys(&machine_to_phys_mapping[0])>>PAGE_SHIFT;
     SHARE_PFN_WITH_DOMAIN(virt_to_page(d->shared_info), d);
     machine_to_phys_mapping[virt_to_phys(d->shared_info) >> 
                            PAGE_SHIFT] = 0x80000000UL;  /* debug */

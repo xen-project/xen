@@ -60,7 +60,7 @@ static int errno;
  */
 shared_info_t *HYPERVISOR_shared_info = (shared_info_t *)empty_zero_page;
 
-unsigned long *phys_to_machine_mapping;
+unsigned long *phys_to_machine_mapping, *pfn_to_mfn_frame_list;
 
 multicall_entry_t multicall_list[8];
 int nr_multicall_ents = 0;
@@ -194,6 +194,7 @@ int xen_module_init(struct module *mod)
 
 void __init setup_arch(char **cmdline_p)
 {
+    int i,j;
     unsigned long bootmap_size, start_pfn, max_low_pfn;
 
     extern void hypervisor_callback(void);
@@ -342,6 +343,22 @@ void __init setup_arch(char **cmdline_p)
 #endif
 
     paging_init();
+
+    pfn_to_mfn_frame_list = alloc_bootmem_low_pages(PAGE_SIZE);
+    for ( i=0, j=0; i < max_pfn; i+=(PAGE_SIZE/sizeof(unsigned long)), j++ )
+    {	
+        pfn_to_mfn_frame_list[j] = 
+            virt_to_machine(&phys_to_machine_mapping[i]) >> PAGE_SHIFT;
+    }
+//pfn_to_mfn_frame_list[0] = 0xdeadbeff;
+printk("Hsi %lx %lx :: %lx\n",    pfn_to_mfn_frame_list,
+       virt_to_machine(pfn_to_mfn_frame_list),
+HYPERVISOR_shared_info->arch.mfn_to_pfn_start
+       );
+    HYPERVISOR_shared_info->arch.pfn_to_mfn_frame_list =
+	virt_to_machine(pfn_to_mfn_frame_list) >> PAGE_SHIFT;
+
+
 
     /* If we are a privileged guest OS then we should request IO privileges. */
     if ( start_info.flags & SIF_PRIVILEGED ) 
@@ -1167,50 +1184,16 @@ static void __do_suspend(void)
     extern void time_suspend(void);
     extern void time_resume(void);
 
-    unsigned long *pfn_to_mfn_frame_list = NULL;
     suspend_record_t *suspend_record     = NULL;
-    struct net_device *dev;
-    char name[6];
-    int i, j;
 
-    if ( (pfn_to_mfn_frame_list = (unsigned long *)__get_free_page(GFP_KERNEL))
-         == NULL )
-        goto out;
     if ( (suspend_record = (suspend_record_t *)__get_free_page(GFP_KERNEL))
          == NULL )
         goto out;
 
-    suspend_record->pfn_to_mfn_frame_list = 
-        virt_to_machine(pfn_to_mfn_frame_list) >> PAGE_SHIFT;
-    suspend_record->nr_pfns = max_pfn;
+    suspend_record->nr_pfns = max_pfn; /* final number of pfns */
 
-    for ( i=0, j=0; i < max_pfn; i+=(PAGE_SIZE/sizeof(unsigned long)), j++ )
-    {	
-        pfn_to_mfn_frame_list[j] = 
-            virt_to_machine(&phys_to_machine_mapping[i]) >> PAGE_SHIFT;
-    }
-    /*
-     * NB. This is /not/ a full dev_close() as that loses route information!
-     * Instead we do essentialy the same as dev_close() but without notifying
-     * various registered subsystems about the NETDEV_DOWN event.
-     */
-    rtnl_lock();
-    for ( i = 0; i < 10; i++ )
-    {
-        sprintf(name, "eth%d", i);
-        if ( ((dev = __dev_get_by_name(name)) != NULL) &&
-             (dev->flags & IFF_UP) )
-        {
-            dev_deactivate(dev);
-            clear_bit(__LINK_STATE_START, &dev->state);
-            if ( dev->stop != NULL )
-                dev->stop(dev);
-            dev->flags &= ~IFF_UP;
-        }
-    }
-    rtnl_unlock();
-
-    blkdev_suspend();
+    //netdev_suspend();
+    //blkdev_suspend();
 
     __cli();
 
@@ -1245,36 +1228,10 @@ static void __do_suspend(void)
 
     __sti();
 
-    blkdev_resume();
-
-    /*
-     * We now do the opposite of the network suspend code. Basically it's
-     * dev_open() but without notifying anyone about NETDEV_UP.
-     */
-    rtnl_lock();
-    for ( i = 0; i < 10; i++ )
-    {
-        sprintf(name, "eth%d", i);
-        if ( ((dev = __dev_get_by_name(name)) != NULL) &&
-             !(dev->flags & IFF_UP) )
-        {
-            set_bit(__LINK_STATE_START, &dev->state);
-            if ( (dev->open == NULL) || (dev->open(dev) == 0) )
-            {
-                dev->flags |= IFF_UP;
-                dev_activate(dev);
-            }
-            else
-            {
-                clear_bit(__LINK_STATE_START, &dev->state);
-            } 
-        }
-    }
-    rtnl_unlock();
+    //blkdev_resume();
+    //netdev_resume();
 
  out:
-    if ( pfn_to_mfn_frame_list != NULL )
-        free_page((unsigned long)pfn_to_mfn_frame_list);
     if ( suspend_record != NULL )
         free_page((unsigned long)suspend_record);
 }

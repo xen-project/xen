@@ -12,7 +12,7 @@
 
 #define BATCH_SIZE 1024   /* 1024 pages (4MB) at a time */
 
-#define DEBUG 0
+#define DEBUG 1
 #define DDEBUG 0
 
 #if DEBUG
@@ -32,6 +32,8 @@
  * in the guest's pseudophysical map.
  * 0x80000000-3 mark the shared_info, and blk/net rings
  */
+
+#if 0 
 #define MFN_IS_IN_PSEUDOPHYS_MAP(_mfn)                                    \
     (((_mfn) < (1024*1024)) &&                                            \
      (((live_mfn_to_pfn_table[_mfn] < nr_pfns) &&                         \
@@ -39,7 +41,13 @@
       ((live_mfn_to_pfn_table[_mfn] >= 0x80000000) &&                     \
        (live_mfn_to_pfn_table[_mfn] <= 0x80000003)) ||                    \
       (live_pfn_to_mfn_table[live_mfn_to_pfn_table[_mfn]] == 0x80000004)))
-     
+#endif
+#define MFN_IS_IN_PSEUDOPHYS_MAP(_mfn)                                    \
+    (((_mfn) < (1024*1024)) &&                                            \
+     ((live_mfn_to_pfn_table[_mfn] < nr_pfns) &&                         \
+       (live_pfn_to_mfn_table[live_mfn_to_pfn_table[_mfn]] == (_mfn))))
+
+ 
 /* Returns TRUE if MFN is successfully converted to a PFN. */
 #define translate_mfn_to_pfn(_pmfn)            \
 ({                                             \
@@ -238,7 +246,7 @@ int xc_linux_save(int xc_handle, XcIOContext *ioctxt)
     int rc = 1, i, j, k, last_iter, iter = 0;
     unsigned long mfn;
     u32 domid = ioctxt->domain;
-    int live = (ioctxt->flags & XCFLAGS_LIVE);
+    int live = 0; // (ioctxt->flags & XCFLAGS_LIVE);
     int debug = (ioctxt->flags & XCFLAGS_DEBUG);
     int sent_last_iter, skip_this_iter;
 
@@ -270,9 +278,10 @@ int xc_linux_save(int xc_handle, XcIOContext *ioctxt)
     unsigned long *live_pfn_to_mfn_table = NULL;
     /* Live mapping of system MFN to PFN table. */
     unsigned long *live_mfn_to_pfn_table = NULL;
+    unsigned long mfn_to_pfn_table_start_mfn;
     
     /* Live mapping of shared info structure */
-    unsigned long *live_shinfo;
+    shared_info_t *live_shinfo;
 
     /* base of the region in which domain memory is mapped */
     unsigned char *region_base = NULL;
@@ -302,12 +311,6 @@ int xc_linux_save(int xc_handle, XcIOContext *ioctxt)
         return 1;
     }
 
-    /* Ensure that the domain exists, and that it is stopped. */
-    if ( xc_domain_pause(xc_handle, domid) ){
-        xcio_perror(ioctxt, "Could not pause domain");
-        goto out;
-    }
-
     if ( xc_domain_getfullinfo( xc_handle, domid, &op, &ctxt) )
     {
         xcio_error(ioctxt, "Could not get full domain info");
@@ -321,18 +324,8 @@ int xc_linux_save(int xc_handle, XcIOContext *ioctxt)
         xcio_error(ioctxt, "Domain is not in a valid Linux guest OS state");
         goto out;
     }
-
-    /* Map the suspend-record MFN to pin it. The page must be owned by 
-       domid for this to succeed. */
-    p_srec = mfn_mapper_map_single(xc_handle, domid,
-                                   sizeof(*p_srec), PROT_READ, 
-                                   ctxt.cpu_ctxt.esi);
-    if (!p_srec){
-        xcio_error(ioctxt, "Couldn't map state record");
-        goto out;
-    }
-
-    nr_pfns = p_srec->nr_pfns;
+    
+    nr_pfns = op.u.getdomaininfo.max_pages; 
 
     /* cheesy sanity check */
     if ( nr_pfns > 1024*1024 ){
@@ -340,34 +333,28 @@ int xc_linux_save(int xc_handle, XcIOContext *ioctxt)
         goto out;
     }
 
+
+    /* Map the shared info frame */
+    live_shinfo = mfn_mapper_map_single(xc_handle, domid,
+                                        PAGE_SIZE, PROT_READ,
+                                        shared_info_frame);
+
+    if (!live_shinfo){
+        xcio_error(ioctxt, "Couldn't map live_shinfo");
+        goto out;
+    }
+
     /* the pfn_to_mfn_frame_list fits in a single page */
     live_pfn_to_mfn_frame_list = 
         mfn_mapper_map_single(xc_handle, domid, 
                               PAGE_SIZE, PROT_READ, 
-                              p_srec->pfn_to_mfn_frame_list );
+                              live_shinfo->arch.pfn_to_mfn_frame_list );
 
     if (!live_pfn_to_mfn_frame_list){
         xcio_error(ioctxt, "Couldn't map pfn_to_mfn_frame_list");
         goto out;
     }
 
-    /* Track the mfn_to_pfn table down from the domains PT */
-    {
-        unsigned long *pgd;
-        unsigned long mfn_to_pfn_table_start_mfn;
-
-        pgd = mfn_mapper_map_single(xc_handle, domid, 
-                                    PAGE_SIZE, PROT_READ, 
-                                    ctxt.pt_base>>PAGE_SHIFT);
-
-        mfn_to_pfn_table_start_mfn = 
-            pgd[HYPERVISOR_VIRT_START>>L2_PAGETABLE_SHIFT]>>PAGE_SHIFT;
-
-        live_mfn_to_pfn_table = 
-            mfn_mapper_map_single(xc_handle, ~0UL, 
-                                  PAGE_SIZE*1024, PROT_READ, 
-                                  mfn_to_pfn_table_start_mfn );
-    }
 
     /* Map all the frames of the pfn->mfn table. For migrate to succeed, 
        the guest must not change which frames are used for this purpose. 
@@ -383,9 +370,17 @@ int xc_linux_save(int xc_handle, XcIOContext *ioctxt)
         goto out;
     }
 
+    /* Setup the mfn_to_pfn table mapping */
+    mfn_to_pfn_table_start_mfn = xc_get_m2p_start_mfn( xc_handle );
+
+    live_mfn_to_pfn_table = 
+	mfn_mapper_map_single(xc_handle, 0x7FFFFFFF, 
+			      PAGE_SIZE*1024, PROT_READ, 
+			      mfn_to_pfn_table_start_mfn );
 
     /* Canonicalise the pfn-to-mfn table frame-number list. */
     memcpy( pfn_to_mfn_frame_list, live_pfn_to_mfn_frame_list, PAGE_SIZE );
+
     for ( i = 0; i < nr_pfns; i += 1024 ){
         if ( !translate_mfn_to_pfn(&pfn_to_mfn_frame_list[i/1024]) ){
             xcio_error(ioctxt, "Frame # in pfn-to-mfn frame list is not in pseudophys");
@@ -393,8 +388,8 @@ int xc_linux_save(int xc_handle, XcIOContext *ioctxt)
         }
     }
 
-    /* At this point, we can start the domain again if we're doing a
-       live suspend */
+
+    /* Domain is still running at this point */
 
     if( live ){ 
         if ( xc_shadow_control( xc_handle, domid, 
@@ -404,15 +399,31 @@ int xc_linux_save(int xc_handle, XcIOContext *ioctxt)
             goto out;
         }
 
-        if ( xc_domain_unpause(xc_handle, domid) < 0 ){
-            xcio_error(ioctxt, "Couldn't unpause domain");
-            goto out;
-        }
-
         last_iter = 0;
         sent_last_iter = 1<<20; /* 4GB of pages */
     } else{
+	/* This is a non-live suspend. Issue the call back to get the
+	 domain suspended */
+
         last_iter = 1;
+
+	xcio_suspend_domain(ioctxt);
+
+	if ( xc_domain_getfullinfo( xc_handle, domid, &op, &ctxt) )
+	{
+	    xcio_error(ioctxt, "Could not get full domain info");
+	    goto out;
+	}
+
+	if ( (op.u.getdomaininfo.flags & 
+	     ( DOMFLAGS_SHUTDOWN | (SHUTDOWN_suspend<<DOMFLAGS_SHUTDOWNSHIFT) ))
+	     != ( DOMFLAGS_SHUTDOWN | (SHUTDOWN_suspend<<DOMFLAGS_SHUTDOWNSHIFT) ))
+	{
+	    xcio_error(ioctxt, "Domain appears not to have suspended: %lx",
+		       op.u.getdomaininfo.flags);
+	    goto out;
+	}
+
     }
 
     /* calculate the power of 2 order of nr_pfns, e.g.
@@ -421,7 +432,11 @@ int xc_linux_save(int xc_handle, XcIOContext *ioctxt)
 
     /* Setup to_send bitmap */
     {
-        int sz = (nr_pfns/8) + 8; /* includes slop at end of array */
+	/* size these for a maximal 4GB domain, to make interaction
+	   with balloon driver easier. It's only user space memory,
+	   ater all... (3x 128KB) */
+
+        int sz = ( 1<<20 ) / 8;
  
         to_send = malloc( sz );
         to_fix  = calloc( 1, sz );
@@ -469,24 +484,23 @@ int xc_linux_save(int xc_handle, XcIOContext *ioctxt)
      * Quick belt and braces sanity check.
      */
 #if DEBUG
-    for ( i = 0; i < nr_pfns; i++ ){
-        mfn = live_pfn_to_mfn_table[i];
-
-        if( (live_mfn_to_pfn_table[mfn] != i) && (mfn != 0x80000004) )
-            printf("i=0x%x mfn=%x live_mfn_to_pfn_table=%x\n",
-                   i,mfn,live_mfn_to_pfn_table[mfn]);
+    {
+	int err=0;
+	for ( i = 0; i < nr_pfns; i++ )
+	{
+	    mfn = live_pfn_to_mfn_table[i];
+	    
+	    if( (live_mfn_to_pfn_table[mfn] != i) && (mfn != 0x80000001) )
+	    {
+		printf("i=0x%x mfn=%lx live_mfn_to_pfn_table=%lx\n",
+		       i,mfn,live_mfn_to_pfn_table[mfn]);
+		err++;
+	    }
+	}
+	printf("Had %d unexplained entries in p2m table\n",err);
     }
 #endif
 
-    /* Map the shared info frame */
-    live_shinfo = mfn_mapper_map_single(xc_handle, domid,
-                                        PAGE_SIZE, PROT_READ,
-                                        shared_info_frame);
-
-    if (!live_shinfo){
-        xcio_error(ioctxt, "Couldn't map live_shinfo");
-        goto out;
-    }
 
     /* Start writing out the saved-domain record. */
 
@@ -529,9 +543,10 @@ int xc_linux_save(int xc_handle, XcIOContext *ioctxt)
                but this is fast enough for the moment. */
 
             if ( !last_iter && 
-                 xc_shadow_control(xc_handle, domid, 
+		 xc_shadow_control(xc_handle, domid, 
                                    DOM0_SHADOW_CONTROL_OP_PEEK,
-                                   to_skip, nr_pfns, NULL) != nr_pfns ) {
+                                   to_skip, nr_pfns, NULL) != nr_pfns )
+	    {
                 xcio_error(ioctxt, "Error peeking shadow bitmap");
                 goto out;
             }
@@ -591,7 +606,7 @@ int xc_linux_save(int xc_handle, XcIOContext *ioctxt)
                      !test_bit(n, to_send) )
                 {
                     needed_to_fix++;
-                    DPRINTF("Fix! iter %d, pfn %lx. mfn %lx\n",
+                    DPRINTF("Fix! iter %d, pfn %x. mfn %lx\n",
                             iter,n,pfn_type[batch]);
                 }
 
@@ -764,7 +779,26 @@ int xc_linux_save(int xc_handle, XcIOContext *ioctxt)
                 DPRINTF("Start last iteration\n");
                 last_iter = 1;
 
-                xc_domain_pause( xc_handle, domid );
+		xcio_suspend_domain(ioctxt);
+		
+		if ( xc_domain_getfullinfo( xc_handle, domid, &op, &ctxt) )
+		{
+		    xcio_error(ioctxt, "Could not get full domain info");
+		    goto out;
+		}
+		
+		if ( (op.u.getdomaininfo.flags & 
+		      ( DOMFLAGS_SHUTDOWN |
+			(SHUTDOWN_suspend<<DOMFLAGS_SHUTDOWNSHIFT) ))
+		     != ( DOMFLAGS_SHUTDOWN |
+			  (SHUTDOWN_suspend<<DOMFLAGS_SHUTDOWNSHIFT) ))
+		{
+		    xcio_error(ioctxt, 
+			       "Domain appears not to have suspended: %lx",
+			       op.u.getdomaininfo.flags);
+		    goto out;
+		}
+
             } 
 
             if ( xc_shadow_control( xc_handle, domid, 
@@ -796,19 +830,36 @@ int xc_linux_save(int xc_handle, XcIOContext *ioctxt)
         goto out;
     }
 
-    /* Get the final execution context */
-    if ( xc_domain_getfullinfo( xc_handle, domid, &op, &ctxt) )
+printf("SUSPPPPPPPP flags %08lx shinfo %08lx eip %08lx esi %08lx\n", 
+       op.u.getdomaininfo.flags, op.u.getdomaininfo.shared_info_frame,
+       ctxt.cpu_ctxt.eip, ctxt.cpu_ctxt.esi );
+
+    /* Map the suspend-record MFN to pin it. The page must be owned by 
+       domid for this to succeed. */
+    p_srec = mfn_mapper_map_single(xc_handle, domid,
+                                   sizeof(*p_srec), PROT_READ, 
+                                   ctxt.cpu_ctxt.esi);
+    if (!p_srec){
+        xcio_error(ioctxt, "Couldn't map suspend record");
+        goto out;
+    }
+
+
+printf("nrpfns according to suspend record is %ld\n", p_srec->nr_pfns );
+
+    if (nr_pfns != p_srec->nr_pfns )
     {
-        xcio_perror(ioctxt, "Could not get full domain info");
+	xcio_error(ioctxt, "Suspend record nr_pfns unexpected (%ld != %ld)",
+		   p_srec->nr_pfns, nr_pfns);
         goto out;
     }
 
     /* Canonicalise the suspend-record frame number. */
     if ( !translate_mfn_to_pfn(&ctxt.cpu_ctxt.esi) ){
-        xcio_error(ioctxt, "State record is not in range of pseudophys map");
+        xcio_error(ioctxt, "Suspend record is not in range of pseudophys map");
         goto out;
     }
-
+       
     /* Canonicalise each GDT frame number. */
     for ( i = 0; i < ctxt.gdt_ents; i += 512 ) {
         if ( !translate_mfn_to_pfn(&ctxt.gdt_frames[i]) ) {
@@ -831,7 +882,7 @@ int xc_linux_save(int xc_handle, XcIOContext *ioctxt)
         goto out;
     }
     munmap(live_shinfo, PAGE_SIZE);
-
+printf("Everything saved OK!\n");
  out:
     if ( pfn_type != NULL ) free(pfn_type);
     DPRINTF("Save exit rc=%d\n",rc);

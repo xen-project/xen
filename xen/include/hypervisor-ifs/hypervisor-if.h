@@ -318,6 +318,8 @@ typedef struct shared_info_st
 
     execution_context_t execution_context; /* 328 */
 
+    arch_shared_info_t arch;
+
 } PACKED shared_info_t;
 
 /*
