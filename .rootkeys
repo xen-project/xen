@@ -235,6 +235,7 @@
 3ddb79c0tWiE8xIFHszxipeVCGKTSA xen/drivers/net/Makefile
 3f0c4247730LYUgz3p5ziYqy-s_glw xen/drivers/net/SUPPORTED_CARDS
 3ddb79bfU-H1Hms4BuJEPPydjXUEaQ xen/drivers/net/Space.c
+3f574c95CQT9g-GDSJJ4YqiwCEQ72Q xen/drivers/net/dummy.c
 3f0c428e41JP96bh-J0jnX59vJyUeQ xen/drivers/net/e100/LICENSE
 3f0c428es_xrZnnZQXXHhjzuqj9CTg xen/drivers/net/e100/Makefile
 3f0c428eCEnifr-r6XCZKUkzIEHdYw xen/drivers/net/e100/e100.h

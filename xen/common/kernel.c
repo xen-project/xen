@@ -570,7 +570,9 @@ long do_console_write(char *str, unsigned int count)
     spin_unlock_irqrestore(&console_lock, flags);
     
     exported_str[j++]='\0';
-    console_export(exported_str, j);
+    
+    if ( current->domain != 0 )
+        console_export(exported_str, j);
     
     return(0);
 }
