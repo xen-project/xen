@@ -22,7 +22,7 @@ UTS_MACHINE := $(XENARCH)
 
 core-y	+= arch/xen/kernel/
 
-include/.asm-ignore:
+include/.asm-ignore: include/asm
 	@rm -f include/.asm-ignore
 	@mv include/asm include/.asm-ignore
 	@echo '  SYMLINK include/asm -> include/asm-$(XENARCH)'
