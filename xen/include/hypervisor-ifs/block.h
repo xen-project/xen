@@ -9,28 +9,6 @@
 #define __BLOCK_H__
 
 /*
- * Device numbers
- */
-
-#define XENDEV_TYPE_MASK      0xf000
-#define XENDEV_IDX_MASK       0x0fff
-#define XENDEV_TYPE_SHIFT     12
-#define XENDEV_IDX_SHIFT      0
-
-#define XENDEV_IDE            (1 << XENDEV_TYPE_SHIFT)
-#define XENDEV_SCSI           (2 << XENDEV_TYPE_SHIFT)
-#define XENDEV_VIRTUAL        (3 << XENDEV_TYPE_SHIFT)
-
-#define IS_IDE_XENDEV(_d)     (((_d) & XENDEV_TYPE_MASK) == XENDEV_IDE)
-#define IS_SCSI_XENDEV(_d)    (((_d) & XENDEV_TYPE_MASK) == XENDEV_SCSI)
-#define IS_VIRTUAL_XENDEV(_d) (((_d) & XENDEV_TYPE_MASK) == XENDEV_VIRTUAL)
-
-#define MK_IDE_XENDEV(_i)     ((_i) | XENDEV_IDE)
-#define MK_SCSI_XENDEV(_i)    ((_i) | XENDEV_SCSI)
-#define MK_VIRTUAL_XENDEV(_i) ((_i) | XENDEV_VIRTUAL)
-
-
-/*
  *
  * These are the ring data structures for buffering messages between 
  * the hypervisor and guestos's.  

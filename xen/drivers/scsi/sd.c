@@ -1321,17 +1321,34 @@ static void sd_finish()
 ** easiest place to hook it in :-( 
 **
 */
+
+#define NR_SCSI_DEVS 16
+
+static kdev_t scsi_devs[NR_SCSI_DEVS] = { 
+    MKDEV(SCSI_DISK0_MAJOR,   0), MKDEV(SCSI_DISK0_MAJOR,  16), /* sda, sdb */
+    MKDEV(SCSI_DISK0_MAJOR,  32), MKDEV(SCSI_DISK0_MAJOR,  48), /* sdc, sdd */
+    MKDEV(SCSI_DISK0_MAJOR,  64), MKDEV(SCSI_DISK0_MAJOR,  80), /* sde, sdf */
+    MKDEV(SCSI_DISK0_MAJOR,  96), MKDEV(SCSI_DISK0_MAJOR, 112), /* sdg, sdh */
+    MKDEV(SCSI_DISK0_MAJOR, 128), MKDEV(SCSI_DISK0_MAJOR, 144), /* sdi, sdj */
+    MKDEV(SCSI_DISK0_MAJOR, 160), MKDEV(SCSI_DISK0_MAJOR, 176), /* sdk, sdl */
+    MKDEV(SCSI_DISK0_MAJOR, 192), MKDEV(SCSI_DISK0_MAJOR, 208), /* sdm, sdn */
+    MKDEV(SCSI_DISK0_MAJOR, 224), MKDEV(SCSI_DISK0_MAJOR, 240), /* sdo, sdp */
+};
+
+
 void scsi_probe_devices(xen_disk_info_t *xdi)
 {
     Scsi_Disk *sd; 
     int i;
-    unsigned long capacity, device;
+    unsigned short device;
+    unsigned long capacity;
 
     for ( sd = rscsi_disks, i = 0; i < sd_template.dev_max; i++, sd++ )
     {
         if ( sd->device == NULL ) continue;
 
-        device   = MK_SCSI_XENDEV(i);
+	/* SMH: we export 'raw' linux device numbers to domain 0 */
+	device   = scsi_devs[i]; 
         capacity = sd->capacity;
 
 	/* XXX SMH: if make generic, need to properly determine 'type' */

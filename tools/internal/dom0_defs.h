@@ -58,18 +58,6 @@ static inline int do_privcmd(unsigned int cmd, unsigned long data)
     return ret;
 }
 
-static inline int xldev_to_physdev(int xldev)
-{
-    return do_privcmd(IOCTL_PRIVCMD_LINDEV_TO_XENDEV, 
-                      (unsigned long)xldev);
-}
-
-static inline int physdev_to_xldev(int physdev)
-{
-    return do_privcmd(IOCTL_PRIVCMD_XENDEV_TO_LINDEV, 
-                      (unsigned long)physdev);
-}
-
 static inline int do_xen_blkmsg(privcmd_blkmsg_t *blkmsg)
 {
     return do_privcmd(IOCTL_PRIVCMD_BLKMSG, (unsigned long)blkmsg);
@@ -116,6 +104,30 @@ static inline int do_network_op(network_op_t *op)
     privcmd_hypercall_t hypercall;
 
     hypercall.op     = __HYPERVISOR_network_op;
+    hypercall.arg[0] = (unsigned long)op;
+
+    if ( mlock(op, sizeof(*op)) != 0 )
+    {
+        PERROR("Could not lock memory for Xen hypercall");
+        goto out1;
+    }
+
+    if ( do_xen_hypercall(&hypercall) < 0 )
+        goto out2;
+
+    ret = 0;
+
+ out2: (void)munlock(op, sizeof(*op));
+ out1: return ret;
+}
+
+
+static inline int do_block_io_op(block_io_op_t *op)
+{
+    int ret = -1;
+    privcmd_hypercall_t hypercall;
+
+    hypercall.op     = __HYPERVISOR_block_io_op;
     hypercall.arg[0] = (unsigned long)op;
 
     if ( mlock(op, sizeof(*op)) != 0 )

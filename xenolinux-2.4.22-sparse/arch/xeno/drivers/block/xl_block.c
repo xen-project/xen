@@ -55,95 +55,11 @@ static inline void signal_requests_to_xen(void)
     return;
 }
 
-
-inline kdev_t physdev_to_xldev(unsigned short physdev)
-{
-    switch (physdev & XENDEV_TYPE_MASK) {
-    case XENDEV_IDE:
-        if ( (physdev & XENDEV_IDX_MASK) < XLIDE_DEVS_PER_MAJOR) {
-	    return MKDEV(XLIDE_MAJOR_0,
-			 (physdev & XENDEV_IDX_MASK) << XLIDE_PARTN_SHIFT);
-	} else if ( (physdev & XENDEV_IDX_MASK) < (XLIDE_DEVS_PER_MAJOR * 2)) {
-	    return MKDEV(XLIDE_MAJOR_1,
-			 (physdev & XENDEV_IDX_MASK) << XLIDE_PARTN_SHIFT);
-	}
-	break;
-    case XENDEV_SCSI:
-	return MKDEV(XLSCSI_MAJOR,
-		     (physdev & XENDEV_IDX_MASK) << XLSCSI_PARTN_SHIFT);
-    case XENDEV_VIRTUAL:
-	return MKDEV(XLVIRT_MAJOR,
-		     (physdev & XENDEV_IDX_MASK) << XLVIRT_PARTN_SHIFT);
-    }
-
-    return 0;
-}
-
-
-/* Convert from a XenoLinux major device to the Xen-level 'physical' device */
-inline unsigned short xldev_to_physdev(kdev_t xldev) 
-{
-    unsigned short physdev = 0;
-
-    switch ( MAJOR(xldev) ) 
-    { 
-    case XLIDE_MAJOR_0: 
-        physdev = XENDEV_IDE + (0*XLIDE_DEVS_PER_MAJOR) +
-            (MINOR(xldev) >> XLIDE_PARTN_SHIFT);
-	break; 
-
-    case XLIDE_MAJOR_1:
-	physdev = XENDEV_IDE + (1*XLIDE_DEVS_PER_MAJOR) +
-            (MINOR(xldev) >> XLIDE_PARTN_SHIFT);
-        break;
-
-    case XLSCSI_MAJOR: 
-        physdev = XENDEV_SCSI + (MINOR(xldev) >> XLSCSI_PARTN_SHIFT);
-	break; 
-
-    case XLVIRT_MAJOR:
-        physdev = XENDEV_VIRTUAL + (MINOR(xldev) >> XLVIRT_PARTN_SHIFT);
-        break;
-    } 
-
-    return physdev;
-}
-
-
-static inline struct gendisk *xldev_to_gendisk(kdev_t xldev) 
-{
-    struct gendisk *gd = NULL;
-
-    switch ( MAJOR(xldev) ) 
-    { 
-    case XLIDE_MAJOR_0: 
-        gd = xlide_gendisk[0];
-	break; 
-	
-    case XLIDE_MAJOR_1: 
-        gd = xlide_gendisk[1];
-	break; 
-	
-    case XLSCSI_MAJOR: 
-        gd = xlscsi_gendisk;
-	break; 
-
-    case XLVIRT_MAJOR:
-        gd = xlvbd_gendisk;
-        break;
-    }
-
-    if ( gd == NULL ) BUG();
-
-    return gd;
-}
-
-
 static inline xl_disk_t *xldev_to_xldisk(kdev_t xldev)
 {
     struct gendisk *gd = xldev_to_gendisk(xldev);
     return (xl_disk_t *)gd->real_devices + 
-        (MINOR(xldev) >> PARTN_SHIFT(xldev));
+        (MINOR(xldev) >> gd->minor_shift);
 }
 
 
@@ -192,27 +108,7 @@ int xenolinux_block_ioctl(struct inode *inode, struct file *filep,
         return xenolinux_block_revalidate(dev);
 
     case BLKSSZGET:
-	switch ( MAJOR(dev) )
-        {
-	case XLIDE_MAJOR_0: 
-	    DPRINTK_IOCTL("   BLKSSZGET: %x 0x%x\n", BLKSSZGET, 
-			  xlide_hwsect(MINOR(dev)));
-	    return xlide_hwsect(MINOR(dev)); 
-
-	case XLSCSI_MAJOR: 
-	    DPRINTK_IOCTL("   BLKSSZGET: %x 0x%x\n", BLKSSZGET,
-			  xlscsi_hwsect(MINOR(dev)));
-	    return xlscsi_hwsect(MINOR(dev)); 
-
-        case XLVIRT_MAJOR:
-	    DPRINTK_IOCTL("   BLKSSZGET: %x 0x%x\n", BLKSSZGET, 
-			  xlsbd_hwsect(MINOR(dev)));
-	    return xlvbd_hwsect(MINOR(dev)); 
-
-	default: 
-	    printk(KERN_ALERT "BLKSSZGET ioctl() on bogus disk!\n"); 
-            return 0;
-	}
+	return hardsect_size[MAJOR(dev)][MINOR(dev)]; 
 
     case BLKBSZGET:                                        /* get block size */
         DPRINTK_IOCTL("   BLKBSZGET: %x\n", BLKBSZGET);
@@ -275,7 +171,7 @@ int xenolinux_block_revalidate(kdev_t dev)
     struct gendisk *gd = xldev_to_gendisk(dev);
     xl_disk_t *disk = xldev_to_xldisk(dev);
     unsigned long flags;
-    int i, partn_shift = PARTN_SHIFT(dev), disk_nr = MINOR(dev) >> partn_shift;
+    int i, disk_nr = MINOR(dev) >> gd->minor_shift; 
     
     DPRINTK("xenolinux_block_revalidate: %d\n", dev);
 
@@ -287,13 +183,14 @@ int xenolinux_block_revalidate(kdev_t dev)
     }
     spin_unlock_irqrestore(&io_request_lock, flags);
 
-    for ( i = (1 << partn_shift) - 1; i >= 0; i-- )
+    for ( i = gd->nr_real - 1; i >= 0; i-- )
     {
         invalidate_device(dev+i, 1);
         gd->part[MINOR(dev+i)].start_sect = 0;
         gd->part[MINOR(dev+i)].nr_sects = 0;
     }
 
+#if 0
     /* VBDs can change under our feet. Check if that has happened. */
     if ( MAJOR(dev) == XLVIRT_MAJOR )
     {
@@ -311,9 +208,9 @@ int xenolinux_block_revalidate(kdev_t dev)
             kfree(xdi);
         }
     }
+#endif
 
-    grok_partitions(gd, disk_nr,
-                    1 << partn_shift, disk->capacity);
+    grok_partitions(gd, disk_nr, gd->nr_real, disk->capacity);
 
     return 0;
 }
@@ -337,7 +234,6 @@ static int hypervisor_request(unsigned long   id,
                               kdev_t          device)
 {
     unsigned long buffer_ma = phys_to_machine(virt_to_phys(buffer)); 
-    kdev_t phys_device = (kdev_t) 0;
     struct gendisk *gd;
     blk_ring_req_entry_t *req;
     struct buffer_head *bh;
@@ -350,25 +246,20 @@ static int hypervisor_request(unsigned long   id,
 
     switch ( operation )
     {
-    case XEN_BLOCK_VBD_CREATE:
-    case XEN_BLOCK_VBD_DELETE:
-    case XEN_BLOCK_PHYSDEV_GRANT:
-    case XEN_BLOCK_PHYSDEV_PROBE:
+//    case XEN_BLOCK_PHYSDEV_GRANT:
+//    case XEN_BLOCK_PHYSDEV_PROBE:
     case XEN_BLOCK_PROBE:
         if ( RING_PLUGGED ) return 1;
-	phys_device = (kdev_t) 0;
 	sector_number = 0;
         DISABLE_SCATTERGATHER();
         break;
 
     case XEN_BLOCK_READ:
     case XEN_BLOCK_WRITE:
-        phys_device = xldev_to_physdev(device);
 	gd = xldev_to_gendisk(device); 
-
 	sector_number += gd->part[MINOR(device)].start_sect;
         if ( (sg_operation == operation) &&
-             (sg_dev == phys_device) &&
+             (sg_dev == device) &&
              (sg_next_sect == sector_number) )
         {
             req = &blk_ring->ring[(req_prod-1)&(BLK_RING_SIZE-1)].req;
@@ -389,7 +280,7 @@ static int hypervisor_request(unsigned long   id,
         else
         {
             sg_operation = operation;
-            sg_dev       = phys_device;
+            sg_dev       = device;
             sg_next_sect = sector_number + nr_sectors;
         }
         break;
@@ -403,7 +294,7 @@ static int hypervisor_request(unsigned long   id,
     req->id            = id;
     req->operation     = operation;
     req->sector_number = sector_number;
-    req->device        = phys_device;
+    req->device        = device; 
     req->nr_segments   = 1;
     req->buffer_and_sects[0] = buffer_ma | nr_sectors;
     req_prod = BLK_RING_INC(req_prod);
@@ -542,9 +433,11 @@ static void xlblk_response_int(int irq, void *dev_id, struct pt_regs *ptregs)
 	    
         case XEN_BLOCK_VBD_CREATE:
         case XEN_BLOCK_VBD_DELETE:
-        case XEN_BLOCK_PROBE:
 	case XEN_BLOCK_PHYSDEV_GRANT:
 	case XEN_BLOCK_PHYSDEV_PROBE:
+	    printk(KERN_ALERT "response for bogus operation %d\n", 
+		   bret->operation); 
+        case XEN_BLOCK_PROBE:
             xlblk_control_msg_pending = bret->status;
             break;
 	  
@@ -637,24 +530,7 @@ int __init xlblk_init(void)
         goto fail;
     }
 
-    { 
-	int i; 
-	printk(KERN_ALERT "xlblk_init: xen returned info for %d disks\n", 
-	       xlblk_disk_info.count); 
-	for(i=0; i < xlblk_disk_info.count; i++) { 
-            printk("%d -- device no=%x, type=%d, capacity=%ldMB\n",
-                   i, xlblk_disk_info.disks[i].device, 
-		   xlblk_disk_info.disks[i].type, 
-		   xlblk_disk_info.disks[i].capacity >> 11); 
-
-	}
-	
-    }	
-    /* Pass the information to our fake IDE and SCSI susbystems. */
-    xlide_init(&xlblk_disk_info);
-    xlscsi_init(&xlblk_disk_info);
-
-    /* And do the same for the 'virtual block device' world */
+    /* Pass the information to our virtual block device susbystem. */
     xlvbd_init(&xlblk_disk_info);
 
     return 0;
@@ -666,8 +542,6 @@ int __init xlblk_init(void)
 static void __exit xlblk_cleanup(void)
 {
     xlvbd_cleanup();
-    xlscsi_cleanup();
-    xlide_cleanup();
     free_irq(XLBLK_RESPONSE_IRQ, NULL);
 }
 

@@ -24,9 +24,5 @@ typedef struct privcmd_blkmsg
     _IOC(_IOC_NONE, 'P', 0, sizeof(privcmd_hypercall_t))
 #define IOCTL_PRIVCMD_BLKMSG           \
     _IOC(_IOC_NONE, 'P', 1, sizeof(privcmd_blkmsg_t))
-#define IOCTL_PRIVCMD_LINDEV_TO_XENDEV \
-    _IOC(_IOC_NONE, 'P', 2, sizeof(unsigned short))
-#define IOCTL_PRIVCMD_XENDEV_TO_LINDEV \
-    _IOC(_IOC_NONE, 'P', 3, sizeof(unsigned short))
 
 #endif /* __PROC_CMD_H__ */

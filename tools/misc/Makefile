@@ -9,7 +9,7 @@ OBJS     = $(patsubst %.c,%.o,$(SRCS))
 
 TARGETS  = xen_read_console xen_log xen_cpuperf xen_refresh_dev
 
-INSTALL  = $(TARGETS) xen-mkdevnodes xen-clone xen_log
+INSTALL  = $(TARGETS) xen-mkdevnodes xen-clone 
 
 all: $(TARGETS)
 	$(MAKE) -C miniterm	
