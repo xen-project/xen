@@ -73,6 +73,9 @@ unsigned char opt_pdb[10] = "none";
 unsigned int opt_tbuf_size = 1;
 /* opt_sched: scheduler - default to Borrowed Virtual Time */
 char opt_sched[10] = "bvt";
+/* opt_physdev_dom0_hide: list of PCI slots to hide from dom0
+ * Should have the format '(%02x:%02x.%1x)(%02x:%02x.%1x)...etc' */
+char opt_physdev_dom0_hide[20] = "";
 
 static struct {
     unsigned char *name;
@@ -94,6 +97,7 @@ static struct {
     { "pdb",              OPT_STR,  &opt_pdb },
     { "tbuf_size",        OPT_UINT, &opt_tbuf_size },
     { "sched",            OPT_STR,  &opt_sched },
+    { "physdev_dom0_hide",OPT_STR,  &opt_physdev_dom0_hide },
     { NULL,               0,        NULL     }
 };
 
