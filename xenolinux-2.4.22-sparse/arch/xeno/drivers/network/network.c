@@ -249,7 +249,7 @@ static void network_alloc_rx_buffers(struct net_device *dev)
     /* Batch Xen notifications. */
     if ( np->rx_bufs_to_notify > (RX_MAX_ENTRIES/4) )
     {
-        HYPERVISOR_net_update();
+        HYPERVISOR_net_io_op(NETOP_PUSH_BUFFERS, np->idx);
         np->rx_bufs_to_notify = 0;
     }
 }
@@ -322,7 +322,7 @@ static int network_start_xmit(struct sk_buff *skb, struct net_device *dev)
     /* Only notify Xen if there are no outstanding responses. */
     mb();
     if ( np->net_idx->tx_resp_prod == i )
-        HYPERVISOR_net_update();
+        HYPERVISOR_net_io_op(NETOP_PUSH_BUFFERS, np->idx);
 
     return 0;
 }

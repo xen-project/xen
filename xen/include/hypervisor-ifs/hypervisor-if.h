@@ -19,9 +19,9 @@
  * NB. The reserved range is inclusive (that is, both FIRST_RESERVED_GDT_ENTRY
  * and LAST_RESERVED_GDT_ENTRY are reserved).
  */
-#define NR_RESERVED_GDT_ENTRIES         40
-#define FIRST_RESERVED_GDT_ENTRY	256
-#define LAST_RESERVED_GDT_ENTRY         \
+#define NR_RESERVED_GDT_ENTRIES    40
+#define FIRST_RESERVED_GDT_ENTRY   256
+#define LAST_RESERVED_GDT_ENTRY    \
   (FIRST_RESERVED_GDT_ENTRY + NR_RESERVED_GDT_ENTRIES - 1)
 
 /*
@@ -29,10 +29,10 @@
  * are also present in the initial GDT, many OSes will be able to avoid
  * installing their own GDT.
  */
-#define FLAT_RING1_CS		0x0819
-#define FLAT_RING1_DS		0x0821
-#define FLAT_RING3_CS		0x082b
-#define FLAT_RING3_DS		0x0833
+#define FLAT_RING1_CS 0x0819
+#define FLAT_RING1_DS 0x0821
+#define FLAT_RING3_CS 0x082b
+#define FLAT_RING3_DS 0x0833
 
 
 /*
@@ -40,25 +40,25 @@
  */
 
 /* EAX = vector; EBX, ECX, EDX, ESI, EDI = args 1, 2, 3, 4, 5. */
-#define __HYPERVISOR_set_trap_table	   0
-#define __HYPERVISOR_mmu_update		   1
-#define __HYPERVISOR_console_write	   2
-#define __HYPERVISOR_set_gdt		   3
+#define __HYPERVISOR_set_trap_table        0
+#define __HYPERVISOR_mmu_update            1
+#define __HYPERVISOR_console_write         2
+#define __HYPERVISOR_set_gdt               3
 #define __HYPERVISOR_stack_switch          4
 #define __HYPERVISOR_set_callbacks         5
-#define __HYPERVISOR_net_update		   6
-#define __HYPERVISOR_fpu_taskswitch	   7
-#define __HYPERVISOR_yield		   8
-#define __HYPERVISOR_exit		   9
-#define __HYPERVISOR_dom0_op		  10
-#define __HYPERVISOR_network_op		  11
-#define __HYPERVISOR_block_io_op	  12
-#define __HYPERVISOR_set_debugreg	  13
-#define __HYPERVISOR_get_debugreg	  14
-#define __HYPERVISOR_update_descriptor	  15
-#define __HYPERVISOR_set_fast_trap	  16
-#define __HYPERVISOR_dom_mem_op		  17
-#define __HYPERVISOR_multicall		  18
+#define __HYPERVISOR_net_io_op             6
+#define __HYPERVISOR_fpu_taskswitch        7
+#define __HYPERVISOR_yield                 8
+#define __HYPERVISOR_exit                  9
+#define __HYPERVISOR_dom0_op              10
+#define __HYPERVISOR_network_op           11
+#define __HYPERVISOR_block_io_op          12
+#define __HYPERVISOR_set_debugreg         13
+#define __HYPERVISOR_get_debugreg         14
+#define __HYPERVISOR_update_descriptor    15
+#define __HYPERVISOR_set_fast_trap        16
+#define __HYPERVISOR_dom_mem_op           17
+#define __HYPERVISOR_multicall            18
 #define __HYPERVISOR_kbd_op               19
 #define __HYPERVISOR_update_va_mapping    20
 
@@ -276,19 +276,19 @@ typedef struct shared_info_st {
  * NB. We expect that this struct is smaller than a page.
  */
 typedef struct start_info_st {
-    unsigned long nr_pages;	  /* total pages allocated to this domain */
-    shared_info_t *shared_info;	  /* VIRTUAL address of shared info struct */
-    unsigned long  pt_base;	  /* VIRTUAL address of page directory */
-    unsigned long mod_start;	  /* VIRTUAL address of pre-loaded module */
-    unsigned long mod_len;	  /* size (bytes) of pre-loaded module */
-    /* Machine address of net rings for each VIF. Will be page aligned. */
-    unsigned long net_rings[MAX_DOMAIN_VIFS];
-    unsigned char net_vmac[MAX_DOMAIN_VIFS][6];
-    /* Machine address of block-device ring. Will be page aligned. */
-    unsigned long blk_ring;
-    unsigned int  dom_id;
-    unsigned long flags; 
-    unsigned char cmd_line[1];	  /* variable-length */
+    /* THE FOLLOWING ARE ONLY FILLED IN ON INITIAL BOOT (NOT RESUME).      */
+    unsigned long pt_base;	  /* VIRTUAL address of page directory.    */
+    unsigned long mod_start;	  /* VIRTUAL address of pre-loaded module. */
+    unsigned long mod_len;	  /* Size (bytes) of pre-loaded module.    */
+    /* THE FOLLOWING ARE FILLED IN BOTH ON INITIAL BOOT AND ON RESUME.     */
+    unsigned long nr_pages;	  /* total pages allocated to this domain. */
+    unsigned long shared_info;	  /* MACHINE address of shared info struct.*/
+    unsigned int  dom_id;         /* Domain identifier.                    */
+    unsigned long flags;          /* SIF_xxx flags.                        */
+    unsigned long net_rings[MAX_DOMAIN_VIFS];   /* MACHINE address of ring.*/
+    unsigned char net_vmac[MAX_DOMAIN_VIFS][6]; /* MAC address of VIF.     */
+    unsigned long blk_ring;       /* MACHINE address of blkdev ring.       */
+    unsigned char cmd_line[1];	  /* Variable-length options.              */
 } start_info_t;
 
 /* These flags are passed in the 'flags' field of start_info_t. */

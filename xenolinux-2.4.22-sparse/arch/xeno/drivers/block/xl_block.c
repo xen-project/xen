@@ -40,7 +40,7 @@ static inline void signal_requests_to_xen(void)
 {
     DISABLE_SCATTERGATHER();
     blk_ring->req_prod = req_prod;
-    HYPERVISOR_block_io_op();
+    HYPERVISOR_block_io_op(BLKOP_PUSH_BUFFERS);
 }
 
 

@@ -57,7 +57,6 @@ typedef struct domain_launch
     unsigned int  domain;
     unsigned long l2_pgt_addr;
     unsigned long virt_load_addr;
-    unsigned long virt_shinfo_addr;
     unsigned long virt_startinfo_addr;
     unsigned int num_vifs;
     char cmd_line[MAX_CMD_LEN];

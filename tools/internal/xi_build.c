@@ -230,12 +230,8 @@ static int setup_guestos(
 
     alloc_index = tot_pages - 1;
 
-    /*
-     * Count bottom-level PTs, rounding up. Include one PTE for shared info. We
-     * therefore add 1024 because 1 is for shared_info, 1023 is to round up.
-     */
-    num_pt_pages = 
-        (l1_table_offset(virt_load_addr) + tot_pages + 1024) / 1024;
+    /* Count bottom-level PTs, rounding up. */
+    num_pt_pages = (l1_table_offset(virt_load_addr) + tot_pages + 1023) / 1024;
 
     /* We must also count the page directory. */
     num_pt_pages++;
@@ -250,7 +246,6 @@ static int setup_guestos(
     l2tab = page_array[alloc_index] << PAGE_SHIFT;
     alloc_index--;
     meminfo->l2_pgt_addr = l2tab;
-    meminfo->virt_shinfo_addr = virt_load_addr + (tot_pages << PAGE_SHIFT);
 
     /*
      * Pin down l2tab addr as page dir page - causes hypervisor to provide
@@ -261,16 +256,12 @@ static int setup_guestos(
     pgt_updates++;
     num_pgt_updates++;
 
-    /*
-     * Initialise the page tables. The final iteration is for the shared_info
-     * PTE -- we break out before filling in the entry, as that is done by
-     * Xen during final setup.
-     */
+    /* Initialise the page tables. */
     if ( (vl2tab = map_pfn(l2tab >> PAGE_SHIFT)) == NULL )
         goto error_out;
     memset(vl2tab, 0, PAGE_SIZE);
     vl2e = vl2tab + l2_table_offset(virt_load_addr);
-    for ( count = 0; count < (tot_pages + 1); count++ )
+    for ( count = 0; count < tot_pages; count++ )
     {    
         if ( ((unsigned long)vl1e & (PAGE_SIZE-1)) == 0 ) 
         {
@@ -291,9 +282,6 @@ static int setup_guestos(
             vl2e++;
         }
 
-        /* The last PTE we consider is filled in later by Xen. */
-        if ( count == tot_pages ) break;
-		
         if ( count < pt_start )
         {
             pgt_updates->ptr = (unsigned long)vl1e;

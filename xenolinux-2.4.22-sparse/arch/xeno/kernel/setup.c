@@ -46,7 +46,11 @@
 #include <asm/hypervisor.h>
 #include <asm/hypervisor-ifs/dom0_ops.h>
 
-shared_info_t *HYPERVISOR_shared_info;
+/*
+ * Point at the empty zero page to start with. We map the real shared_info
+ * page as soon as fixmap is up and running.
+ */
+shared_info_t *HYPERVISOR_shared_info = empty_zero_page;
 
 unsigned long *phys_to_machine_mapping;
 

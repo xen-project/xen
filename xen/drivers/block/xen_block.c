@@ -241,11 +241,26 @@ static void end_block_io_op(struct buffer_head *bh, int uptodate)
  * GUEST-OS SYSCALL -- Indicates there are requests outstanding.
  */
 
-long do_block_io_op(void)
+long do_block_io_op(unsigned int op)
 {
-    add_to_blkdev_list_tail(current);
-    maybe_trigger_io_schedule();
-    return 0L;
+    long ret = 0;
+
+    switch ( op )
+    {
+    case BLKOP_PUSH_BUFFERS:
+        add_to_blkdev_list_tail(current);
+        maybe_trigger_io_schedule();
+        break;
+
+    case BLKOP_FLUSH_BUFFERS:
+        break;
+
+    default:
+        ret = -EINVAL;
+        break;
+    }
+
+    return ret;
 }
 
 

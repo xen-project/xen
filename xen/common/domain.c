@@ -347,7 +347,6 @@ void release_task(struct task_struct *p)
 int final_setup_guestos(struct task_struct * p, dom_meminfo_t * meminfo)
 {
     l2_pgentry_t * l2tab;
-    l1_pgentry_t * l1tab;
     start_info_t * virt_startinfo_addr;
     unsigned long virt_stack_addr;
     unsigned long phys_l2tab;
@@ -374,19 +373,9 @@ int final_setup_guestos(struct task_struct * p, dom_meminfo_t * meminfo)
     p->mm.pagetable = mk_pagetable(phys_l2tab);
     unmap_domain_mem(l2tab);
 
-    /* map in the shared info structure */
-    phys_l2tab = pagetable_val(p->mm.pagetable); 
-    l2tab = map_domain_mem(phys_l2tab);
-    l2tab += l2_table_offset(meminfo->virt_shinfo_addr);
-    l1tab = map_domain_mem(l2_pgentry_to_phys(*l2tab));
-    l1tab += l1_table_offset(meminfo->virt_shinfo_addr);
-    *l1tab = mk_l1_pgentry(__pa(p->shared_info) | L1_PROT);
-    unmap_domain_mem((void *)((unsigned long)l2tab & PAGE_MASK));
-    unmap_domain_mem((void *)((unsigned long)l1tab & PAGE_MASK));
-
     /* set up the shared info structure */
     update_dom_time(p->shared_info);
-    p->shared_info->domain_time  = 0;
+    p->shared_info->domain_time = 0;
 
     /* we pass start info struct to guest os as function parameter on stack */
     virt_startinfo_addr = (start_info_t *)meminfo->virt_startinfo_addr;
@@ -401,7 +390,7 @@ int final_setup_guestos(struct task_struct * p, dom_meminfo_t * meminfo)
 
     memset(virt_startinfo_addr, 0, sizeof(*virt_startinfo_addr));
     virt_startinfo_addr->nr_pages = p->tot_pages;
-    virt_startinfo_addr->shared_info = (shared_info_t *)meminfo->virt_shinfo_addr;
+    virt_startinfo_addr->shared_info = virt_to_phys(p->shared_info);
     virt_startinfo_addr->pt_base = meminfo->virt_load_addr + 
                     ((p->tot_pages - 1) << PAGE_SHIFT);
    
@@ -474,7 +463,7 @@ int setup_guestos(struct task_struct *p, dom0_newdomain_t *params,
     int i, dom = p->domain;
     unsigned long phys_l1tab, phys_l2tab;
     unsigned long cur_address, alloc_address;
-    unsigned long virt_load_address, virt_stack_address, virt_shinfo_address;
+    unsigned long virt_load_address, virt_stack_address;
     start_info_t  *virt_startinfo_address;
     unsigned long count;
     unsigned long alloc_index;
@@ -551,16 +540,11 @@ int setup_guestos(struct task_struct *p, dom0_newdomain_t *params,
     memset(l2tab, 0, DOMAIN_ENTRIES_PER_L2_PAGETABLE*sizeof(l2_pgentry_t));
     p->mm.pagetable = mk_pagetable(phys_l2tab);
 
-    /*
-     * NB. The upper limit on this loop does one extra page. This is to make 
-     * sure a pte exists when we want to map the shared_info struct.
-     */
-
     l2tab += l2_table_offset(virt_load_address);
     cur_address = list_entry(p->pg_head.next, struct pfn_info, list) -
         frame_table;
     cur_address <<= PAGE_SHIFT;
-    for ( count = 0; count < p->tot_pages + 1; count++ )
+    for ( count = 0; count < p->tot_pages; count++ )
     {
         if ( !((unsigned long)l1tab & (PAGE_SIZE-1)) )
         {
@@ -574,14 +558,11 @@ int setup_guestos(struct task_struct *p, dom0_newdomain_t *params,
         }
         *l1tab++ = mk_l1_pgentry(cur_address|L1_PROT);
         
-        if ( count < p->tot_pages )
-        {
-            page = frame_table + (cur_address >> PAGE_SHIFT);
-            page->flags = dom | PGT_writeable_page | PG_need_flush;
-            page->type_count = page->tot_count = 1;
-            /* Set up the MPT entry. */
-            machine_to_phys_mapping[cur_address >> PAGE_SHIFT] = count;
-        }
+        page = frame_table + (cur_address >> PAGE_SHIFT);
+        page->flags = dom | PGT_writeable_page | PG_need_flush;
+        page->type_count = page->tot_count = 1;
+        /* Set up the MPT entry. */
+        machine_to_phys_mapping[cur_address >> PAGE_SHIFT] = count;
 
         list_ent = frame_table[cur_address >> PAGE_SHIFT].list.next;
         cur_address = list_entry(list_ent, struct pfn_info, list) -
@@ -630,17 +611,9 @@ int setup_guestos(struct task_struct *p, dom0_newdomain_t *params,
     page->flags = dom | PGT_l2_page_table;
     unmap_domain_mem(l1start);
 
-    /* Map in the the shared info structure. */
-    virt_shinfo_address = virt_load_address + (p->tot_pages << PAGE_SHIFT); 
-    l2tab = l2start + l2_table_offset(virt_shinfo_address);
-    l1start = l1tab = map_domain_mem(l2_pgentry_to_phys(*l2tab));
-    l1tab += l1_table_offset(virt_shinfo_address);
-    *l1tab = mk_l1_pgentry(__pa(p->shared_info)|L1_PROT);
-    unmap_domain_mem(l1start);
-
     /* Set up shared info area. */
     update_dom_time(p->shared_info);
-    p->shared_info->domain_time  = 0;
+    p->shared_info->domain_time = 0;
 
     virt_startinfo_address = (start_info_t *)
         (virt_load_address + ((alloc_index - 1) << PAGE_SHIFT));
@@ -671,8 +644,7 @@ int setup_guestos(struct task_struct *p, dom0_newdomain_t *params,
     /* Set up start info area. */
     memset(virt_startinfo_address, 0, sizeof(*virt_startinfo_address));
     virt_startinfo_address->nr_pages = p->tot_pages;
-    virt_startinfo_address->shared_info = 
-        (shared_info_t *)virt_shinfo_address;
+    virt_startinfo_address->shared_info = virt_to_phys(p->shared_info);
     virt_startinfo_address->pt_base = virt_load_address + 
         ((p->tot_pages - 1) << PAGE_SHIFT); 
 

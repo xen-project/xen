@@ -1,9 +1,8 @@
 #include <os.h>
 
 /* Offsets in start_info structure */
-#define SHARED_INFO  4
-#define MOD_START   12
-#define MOD_LEN     16
+#define MOD_START    4
+#define MOD_LEN      8
 
 #define ENTRY(X) .globl X ; X :
 
@@ -31,10 +30,10 @@ _start:
 
         /* Clear BSS first so that there are no surprises... */
 2:      xorl %eax,%eax
-	    movl $__bss_start,%edi
-	    movl $_end,%ecx
-	    subl %edi,%ecx
-	    rep stosb
+        movl $__bss_start,%edi
+        movl $_end,%ecx
+        subl %edi,%ecx
+        rep stosb
 
         push %esi 
         call start_kernel

@@ -103,12 +103,13 @@ static inline int HYPERVISOR_set_callbacks(
     return ret;
 }
 
-static inline int HYPERVISOR_net_update(void)
+static inline int HYPERVISOR_net_io_op(unsigned int op, unsigned int idx)
 {
     int ret;
     __asm__ __volatile__ (
         TRAP_INSTR
-        : "=a" (ret) : "0" (__HYPERVISOR_net_update) );
+        : "=a" (ret) : "0" (__HYPERVISOR_net_io_op),
+        "b" (op), "c" (idx) );
 
     return ret;
 }
@@ -165,12 +166,13 @@ static inline int HYPERVISOR_network_op(void *network_op)
     return ret;
 }
 
-static inline int HYPERVISOR_block_io_op(void)
+static inline int HYPERVISOR_block_io_op(unsigned int op)
 {
     int ret;
     __asm__ __volatile__ (
         TRAP_INSTR
-        : "=a" (ret) : "0" (__HYPERVISOR_block_io_op) ); 
+        : "=a" (ret) : "0" (__HYPERVISOR_block_io_op),
+        "b" (op) ); 
 
     return ret;
 }

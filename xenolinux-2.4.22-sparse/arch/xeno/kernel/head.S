@@ -9,9 +9,8 @@
 #include <asm/desc.h>
 
 /* Offsets in start_info structure */
-#define SHARED_INFO  4
-#define MOD_START   12
-#define MOD_LEN     16
+#define MOD_START   4
+#define MOD_LEN     8
                 
 startup_32:
         cld
@@ -35,19 +34,16 @@ startup_32:
                 
         /* Clear BSS first so that there are no surprises... */
 2:      xorl %eax,%eax
-	movl $SYMBOL_NAME(__bss_start),%edi
-	movl $SYMBOL_NAME(_end),%ecx
-	subl %edi,%ecx
-	rep stosb
+        movl $SYMBOL_NAME(__bss_start),%edi
+        movl $SYMBOL_NAME(_end),%ecx
+        subl %edi,%ecx
+        rep stosb
 
         /* Copy the necessary stuff from start_info structure. */
-        /* We need to copy shared_info early, so that sti/cli work */
-        mov  SHARED_INFO(%esi),%eax
-        mov  %eax,SYMBOL_NAME(HYPERVISOR_shared_info)
         mov  $SYMBOL_NAME(start_info_union),%edi
         mov  $128,%ecx
         rep movsl
-                
+                        
         jmp SYMBOL_NAME(start_kernel)
 
 ENTRY(stack_start)

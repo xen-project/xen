@@ -12,6 +12,14 @@
 #ifndef __RING_H__
 #define __RING_H__
 
+/*
+ * Command values for block_io_op()
+ */
+
+#define NETOP_PUSH_BUFFERS    0  /* Notify Xen of new buffers on the rings. */
+#define NETOP_FLUSH_BUFFERS   1  /* Flush all pending request buffers.      */
+
+
 typedef struct tx_req_entry_st
 {
     unsigned short id;

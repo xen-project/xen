@@ -159,40 +159,10 @@ net_vif_t *create_net_vif(int domain)
 
 void destroy_net_vif(net_vif_t *vif)
 {
-    int i;
-    unsigned long *pte, flags;
-    struct pfn_info *page;
+    extern long flush_bufs_for_vif(net_vif_t *vif);
     struct task_struct *p = vif->domain;
-
-    /* Return any outstanding receive buffers to the guest OS. */
-    spin_lock_irqsave(&p->page_lock, flags);
-    for ( i = vif->rx_cons; i != vif->rx_prod; i = ((i+1) & (RX_RING_SIZE-1)) )
-    {
-        rx_shadow_entry_t *rx = vif->rx_shadow_ring + i;
-
-        /* Release the page-table page. */
-        page = frame_table + (rx->pte_ptr >> PAGE_SHIFT);
-        put_page_type(page);
-        put_page_tot(page);
-
-        /* Give the buffer page back to the domain. */
-        page = frame_table + rx->buf_pfn;
-        list_add(&page->list, &p->pg_head);
-        page->flags = vif->domain->domain;
-
-        /* Patch up the PTE if it hasn't changed under our feet. */
-        pte = map_domain_mem(rx->pte_ptr);
-        if ( !(*pte & _PAGE_PRESENT) )
-        {
-            *pte = (rx->buf_pfn<<PAGE_SHIFT) | (*pte & ~PAGE_MASK) | 
-                _PAGE_RW | _PAGE_PRESENT;
-            page->flags |= PGT_writeable_page | PG_need_flush;
-            page->type_count = page->tot_count = 1;
-        }
-        unmap_domain_mem(pte);
-    }
-    spin_unlock_irqrestore(&p->page_lock, flags);
-
+    (void)flush_bufs_for_vif(vif);
+    UNSHARE_PFN(virt_to_page(vif->shared_rings));
     kmem_cache_free(net_vif_cache, vif);
     put_task_struct(p);
 }
