@@ -1739,7 +1739,7 @@ int ptwr_do_page_fault(unsigned long addr)
                 PTWR_PT_INACTIVE : PTWR_PT_ACTIVE;
 
             PTWR_PRINTK("[%c] page_fault on l1 pt at va %08lx, pt for %08x, "
-                        "pt for %08x, pfn %08lx\n", PTWR_PRINT_WHICH,
+                        "pfn %08lx\n", PTWR_PRINT_WHICH,
                         addr, va_mask << L2_PAGETABLE_SHIFT, pfn);
 
             if ( ptwr_info[cpu].ptinfo[which].l1va )
