@@ -738,8 +738,13 @@ static int __init xencons_init(void)
 
     if ( (rc = tty_register_driver(DRV(xencons_driver))) != 0 )
     {
-        printk("Couldn't register Xen virtual console driver as %s\n",
-               DRV(xencons_driver)->name);
+        printk("WARNING: Failed to register Xen virtual "
+               "console driver as '%s%d'\n",
+               DRV(xencons_driver)->name, DRV(xencons_driver)->name_base);
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,0)
+        put_tty_driver(xencons_driver);
+        xencons_driver = NULL;
+#endif
         return rc;
     }
 
@@ -764,27 +769,4 @@ static int __init xencons_init(void)
     return 0;
 }
 
-static void __exit xencons_fini(void)
-{
-    int ret;
-
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,0)
-    tty_unregister_device(xencons_driver, 0);
-#endif
-
-    if ( (ret = tty_unregister_driver(DRV(xencons_driver))) != 0 )
-        printk(KERN_ERR "Unable to unregister Xen console driver: %d\n", ret);
-
-    if ( xen_start_info.flags & SIF_INITDOMAIN )
-    {
-        free_irq(xencons_priv_irq, NULL);
-        unbind_virq_from_irq(VIRQ_CONSOLE);
-    }
-    else
-    {
-        ctrl_if_unregister_receiver(CMSG_CONSOLE, xencons_rx);
-    }
-}
-
 module_init(xencons_init);
-module_exit(xencons_fini);

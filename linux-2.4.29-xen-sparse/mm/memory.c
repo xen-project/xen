@@ -997,7 +997,8 @@ static int do_wp_page(struct mm_struct *mm, struct vm_area_struct * vma,
 		if (PageReserved(old_page))
 			++mm->rss;
 		break_cow(vma, new_page, address, page_table);
-		lru_cache_add(new_page);
+		if (vm_anon_lru)
+			lru_cache_add(new_page);
 
 		/* Free the old page.. */
 		new_page = old_page;
@@ -1238,7 +1239,8 @@ static int do_anonymous_page(struct mm_struct * mm, struct vm_area_struct * vma,
 		mm->rss++;
 		flush_page_to_ram(page);
 		entry = pte_mkwrite(pte_mkdirty(mk_pte(page, vma->vm_page_prot)));
-		lru_cache_add(page);
+		if (vm_anon_lru)
+			lru_cache_add(page);
 		mark_page_accessed(page);
 	}
 
@@ -1303,7 +1305,8 @@ static int do_no_page(struct mm_struct * mm, struct vm_area_struct * vma,
 		}
 		copy_user_highpage(page, new_page, address);
 		page_cache_release(new_page);
-		lru_cache_add(page);
+		if (vm_anon_lru)
+			lru_cache_add(page);
 		new_page = page;
 	}
 
