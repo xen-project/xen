@@ -55,16 +55,16 @@ int xlscsi_init(xen_disk_info_t *xdi)
     /* Initialize global arrays. */
     for ( i = 0; i < XLSCSI_MAX; i++ )
     {
-	xlscsi_blksize_size[i]  = 512;
+	xlscsi_blksize_size[i]  = 1024; //XXX 512;
 	xlscsi_hardsect_size[i] = 512;
-	xlscsi_max_sectors[i]   = 128;
+	xlscsi_max_sectors[i]   = 128*8; //XXX 128
     }
 
     blk_size[XLSCSI_MAJOR]      = NULL;
     blksize_size[XLSCSI_MAJOR]  = xlscsi_blksize_size;
     hardsect_size[XLSCSI_MAJOR] = xlscsi_hardsect_size;
     max_sectors[XLSCSI_MAJOR]   = xlscsi_max_sectors;
-    read_ahead[XLSCSI_MAJOR]    = 8;
+    read_ahead[XLSCSI_MAJOR]    = NULL; //XXX8;
 
     blk_init_queue(BLK_DEFAULT_QUEUE(XLSCSI_MAJOR), do_xlblk_request);
 
