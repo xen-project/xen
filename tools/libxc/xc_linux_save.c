@@ -6,6 +6,7 @@
  * Copyright (c) 2003, K A Fraser.
  */
 
+#include <inttypes.h>
 #include <sys/time.h>
 #include "xc_private.h"
 #include <xen/linux/suspend.h>
@@ -245,7 +246,7 @@ static int print_stats( int xc_handle, u32 domid,
 
     if ( print )
         printf("delta %lldms, dom0 %d%%, target %d%%, sent %dMb/s, "
-               "dirtied %dMb/s %ld pages\n",
+               "dirtied %dMb/s %" PRId32 " pages\n",
                wall_delta, 
                (int)((d0_cpu_delta*100)/wall_delta),
                (int)((d1_cpu_delta*100)/wall_delta),
@@ -307,8 +308,8 @@ static int analysis_phase( int xc_handle, u32 domid,
                                DOM0_SHADOW_CONTROL_OP_PEEK,
                                NULL, 0, &stats);
 
-            printf("now= %lld faults= %ld dirty= %ld dirty_net= %ld "
-                   "dirty_block= %ld\n", 
+            printf("now= %lld faults= %" PRId32 " dirty= %" PRId32
+                   " dirty_net= %" PRId32 " dirty_block= %" PRId32"\n", 
                    ((now-start)+500)/1000, 
                    stats.fault_count, stats.dirty_count,
                    stats.dirty_net_count, stats.dirty_block_count);

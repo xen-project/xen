@@ -5,7 +5,7 @@
 
 #include <xen/config.h>
 #include <asm/atomic.h>
-#include <asm/x86_32/asm_defns.h>
+#include <asm/asm_defns.h>
 
 extern void disable_irq(unsigned int);
 extern void disable_irq_nosync(unsigned int);

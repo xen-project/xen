@@ -2,6 +2,8 @@
  * arch-x86_64.h
  * 
  * Guest OS interface to x86 64-bit Xen.
+ * 
+ * Copyright (c) 2004, K A Fraser
  */
 
 #ifndef __XEN_PUBLIC_ARCH_X86_64_H__

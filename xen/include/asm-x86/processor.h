@@ -255,18 +255,18 @@ static inline unsigned int cpuid_edx(unsigned int op)
 })
 
 #define write_cr0(x) \
-	__asm__("mov"__OS" %0,%%cr0": :"r" (x));
+	__asm__("mov"__OS" %0,%%cr0": :"r" ((unsigned long)x));
 
 #define read_cr4() ({ \
-	unsigned int __dummy; \
+	unsigned long __dummy; \
 	__asm__( \
-		"movl %%cr4,%0\n\t" \
+		"mov"__OS" %%cr4,%0\n\t" \
 		:"=r" (__dummy)); \
 	__dummy; \
 })
 
 #define write_cr4(x) \
-	__asm__("movl %0,%%cr4": :"r" (x));
+	__asm__("mov"__OS" %0,%%cr4": :"r" ((unsigned long)x));
 
 /*
  * Save the cr4 feature set we're using (ie
@@ -291,7 +291,7 @@ static inline void clear_in_cr4 (unsigned long mask)
     mmu_cr4_features &= ~mask;
     __asm__("mov"__OS" %%cr4,%%"__OP"ax\n\t"
             "and"__OS" %0,%%"__OP"ax\n\t"
-            "movl"__OS" %%"__OP"ax,%%cr4\n"
+            "mov"__OS" %%"__OP"ax,%%cr4\n"
             : : "irg" (~mask)
             :"ax");
 }
@@ -400,6 +400,8 @@ struct thread_struct {
     /* general user-visible register state */
     execution_context_t user_ctxt;
 
+    void (*schedule_tail) (struct domain *);
+
     /*
      * Return vectors pushed to us by guest OS.
      * The stack frame for events is exactly that of an x86 hardware interrupt.
@@ -457,13 +459,9 @@ extern struct desc_struct *idt_tables[];
 
 long set_fast_trap(struct exec_domain *p, int idx);
 
-#define INIT_THREAD  { fast_trap_idx: 0x20 }
-
-#elif defined(__x86_64__)
+#endif
 
 #define INIT_THREAD { 0 }
-
-#endif /* __x86_64__ */
 
 extern int gpf_emulate_4gb(struct xen_regs *regs);
 

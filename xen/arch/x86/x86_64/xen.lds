@@ -28,6 +28,11 @@ SECTIONS
   __ex_table : { *(__ex_table) } :text
   __stop___ex_table = .;
 
+  . = ALIGN(16);                /* Pre-exception table */
+  __start___pre_ex_table = .;
+  __pre_ex_table : { *(__pre_ex_table) } :text
+  __stop___pre_ex_table = .;
+
   __start___ksymtab = .;	/* Kernel symbol table */
   __ksymtab : { *(__ksymtab) } :text
   __stop___ksymtab = .;
