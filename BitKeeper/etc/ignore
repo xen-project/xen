@@ -25,3 +25,6 @@ xen/include/xen/compile.h
 xen/tools/elf-reloc
 xen/tools/figlet/figlet
 TAGS
+install/*
+linux-*.tar.gz
+linux-*-xen/*
