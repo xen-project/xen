@@ -335,6 +335,7 @@ __asm__ __volatile__(
 return dest;
 }
 
+#define __HAVE_ARCH_MEMCMP
 #define memcmp __builtin_memcmp
 
 #define __HAVE_ARCH_MEMCHR

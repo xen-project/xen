@@ -47,14 +47,14 @@ static inline unsigned long __xchg(unsigned long x, volatile void * ptr, int siz
 				:"m" (*__xg(ptr)), "0" (x)
 				:"memory");
 			break;
-#ifdef x86_32
+#if defined(__i386__)
 		case 4:
 			__asm__ __volatile__("xchgl %0,%1"
 				:"=r" (x)
 				:"m" (*__xg(ptr)), "0" (x)
 				:"memory");
 			break;
-#else
+#elif defined(__x86_64__)
 		case 4:
 			__asm__ __volatile__("xchgl %k0,%1"
 				:"=r" (x)
@@ -95,14 +95,14 @@ static inline unsigned long __cmpxchg(volatile void *ptr, unsigned long old,
 				     : "q"(new), "m"(*__xg(ptr)), "0"(old)
 				     : "memory");
 		return prev;
-#ifdef x86_32
+#if defined(__i386__)
 	case 4:
 		__asm__ __volatile__(LOCK_PREFIX "cmpxchgl %1,%2"
 				     : "=a"(prev)
 				     : "q"(new), "m"(*__xg(ptr)), "0"(old)
 				     : "memory");
 		return prev;
-#else
+#elif defined(__x86_64__)
 	case 4:
 		__asm__ __volatile__(LOCK_PREFIX "cmpxchgl %k1,%2"
 				     : "=a"(prev)
@@ -192,12 +192,12 @@ static inline unsigned long __cmpxchg(volatile void *ptr, unsigned long old,
 #define set_wmb(var, value) do { var = value; wmb(); } while (0)
 
 /* interrupt control.. */
-#ifdef x86_64
-#define __save_flags(x)		do { warn_if_not_ulong(x); __asm__ __volatile__("# save_flags \n\t pushfq ; popq %q0":"=g" (x): /* no input */ :"memory"); } while (0)
-#define __restore_flags(x) 	__asm__ __volatile__("# restore_flags \n\t pushq %0 ; popfq": /* no output */ :"g" (x):"memory", "cc")
-#else
+#if defined(__i386__)
 #define __save_flags(x)		__asm__ __volatile__("pushfl ; popl %0":"=g" (x): /* no input */)
 #define __restore_flags(x) 	__asm__ __volatile__("pushl %0 ; popfl": /* no output */ :"g" (x):"memory", "cc")
+#elif defined(__x86_64__)
+#define __save_flags(x)		do { __asm__ __volatile__("# save_flags \n\t pushfq ; popq %q0":"=g" (x): /* no input */ :"memory"); } while (0)
+#define __restore_flags(x) 	__asm__ __volatile__("# restore_flags \n\t pushq %0 ; popfq": /* no output */ :"g" (x):"memory", "cc")
 #endif
 #define __cli() 		__asm__ __volatile__("cli": : :"memory")
 #define __sti()			__asm__ __volatile__("sti": : :"memory")
@@ -205,12 +205,12 @@ static inline unsigned long __cmpxchg(volatile void *ptr, unsigned long old,
 #define safe_halt()		__asm__ __volatile__("sti; hlt": : :"memory")
 
 /* For spinlocks etc */
-#ifdef x86_64
-#define local_irq_save(x) 	do { warn_if_not_ulong(x); __asm__ __volatile__("# local_irq_save \n\t pushfq ; popq %0 ; cli":"=g" (x): /* no input */ :"memory"); } while (0)
-#define local_irq_restore(x)	__asm__ __volatile__("# local_irq_restore \n\t pushq %0 ; popfq": /* no output */ :"g" (x):"memory")
-#else
+#if defined(__i386__)
 #define local_irq_save(x)	__asm__ __volatile__("pushfl ; popl %0 ; cli":"=g" (x): /* no input */ :"memory")
 #define local_irq_restore(x)	__restore_flags(x)
+#elif defined(__x86_64__)
+#define local_irq_save(x) 	do { __asm__ __volatile__("# local_irq_save \n\t pushfq ; popq %0 ; cli":"=g" (x): /* no input */ :"memory"); } while (0)
+#define local_irq_restore(x)	__asm__ __volatile__("# local_irq_restore \n\t pushq %0 ; popfq": /* no output */ :"g" (x):"memory")
 #endif
 #define local_irq_disable()	__cli()
 #define local_irq_enable()	__sti()

@@ -115,9 +115,6 @@ archclean:
 	@$(MAKEBOOT) clean
 
 archmrproper:
-	rm -f include/asm-xen/hypervisor-ifs/arch
 
 archdep:
-	rm -f include/asm-xen/hypervisor-ifs/arch
-	( cd include/asm-xen/hypervisor-ifs ; rm -rf arch ; ln -sf arch-x86 arch)
 	@$(MAKEBOOT) dep

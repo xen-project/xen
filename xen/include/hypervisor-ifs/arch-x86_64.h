@@ -8,7 +8,8 @@
 #define __HYPERVISOR_IF_X86_64_H__
 
 /* Pointers are naturally 64 bits in this architecture; no padding needed. */
-#define MEMORY_PADDING()    ((void)0)
+#define _MEMORY_PADDING(_X)
+#define MEMORY_PADDING 
 
 /*
  * SEGMENT DESCRIPTOR TABLES
