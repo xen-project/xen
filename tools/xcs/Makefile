@@ -2,7 +2,7 @@
 # Andrew Warfield, 2004
 
 XEN_ROOT=../..
-include $(XEN_ROOT)/tools/Make.defs
+include $(XEN_ROOT)/tools/Rules.mk
 
 XCS_INSTALL_DIR = /usr/sbin
 
