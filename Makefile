@@ -40,7 +40,8 @@ kernels.install:
 	cp -dR $(INSTALL_DIR)/lib/modules/* $(prefix)/lib/modules/
 
 docs.install:
-	sh ./docs/check_pkgs &&	$(MAKE) -C docs install || true
+	sh ./docs/check_pkgs
+	-$(MAKE) -C docs install
 
 xen.install tools.install: %.install:
 	$(MAKE) -C $* install
@@ -65,8 +66,8 @@ tools:
 kernels: $(addsuffix -build,$(XKERNELS))
 
 docs:
-	sh ./docs/check_pkgs && \
-		$(MAKE) prefix=$(INSTALL_DIR) dist=yes -C docs install || true
+	sh ./docs/check_pkgs
+	-$(MAKE) dist=yes -C docs install
 
 # Build all the various kernels and modules
 kbuild: kernels
@@ -101,20 +102,19 @@ mrproper: clean $(addsuffix -delete,$(ALLKERNELS)) $(addsuffix -mrproper,$(ALLSP
 install-twisted:
 	wget http://www.twistedmatrix.com/products/get-current.epy
 	tar -zxf Twisted-*.tar.gz
-	( cd Twisted-* ; python setup.py install )
+	cd Twisted-* && python setup.py install
 
 install-logging: LOGGING=logging-0.4.9.2
 install-logging:
 	[ -f $(LOGGING).tar.gz ] || wget http://www.red-dove.com/$(LOGGING).tar.gz
 	tar -zxf $(LOGGING).tar.gz
-	( cd $(LOGGING) && python setup.py install )
+	cd $(LOGGING) && python setup.py install
 
 # handy target to upgrade iptables (use rpm or apt-get in preference)
 install-iptables:
 	wget http://www.netfilter.org/files/iptables-1.2.11.tar.bz2
-	tar -jxf iptables-*.tar.bz2
-	( cd iptables-* ; \
-	  make PREFIX= KERNEL_DIR=../linux-$(LINUX_VER)-xen0 install)
+	tar -jxf iptables-1.2.11.tar.bz2
+	$(MAKE) -C iptables-1.2.11 PREFIX= KERNEL_DIR=../linux-$(LINUX_VER)-xen0 install
 
 help:
 	@echo 'Installation targets:'
