@@ -66,3 +66,5 @@ PERFCOUNTER_CPU(validate_pte_calls,                "calls to validate_pte_change
 PERFCOUNTER_CPU(validate_pte_changes,              "validate_pte makes changes")
 PERFCOUNTER_CPU(validate_pde_calls,                "calls to validate_pde_change")
 PERFCOUNTER_CPU(validate_pde_changes,              "validate_pde makes changes")
+PERFCOUNTER_CPU(shadow_hl2_other_domain,           "shadow_hl2 from other domain")
+PERFCOUNTER_CPU(gpfn_to_mfn_safe,                  "calls to gpfn_to_mfn_safe")

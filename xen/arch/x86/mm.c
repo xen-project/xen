@@ -268,7 +268,7 @@ int map_ldt_shadow_page(unsigned int off)
     if ( unlikely(shadow_mode_enabled(d)) )
     {
         shadow_lock(d);
-        shadow_remove_all_write_access(d, PGT_l1_shadow, PGT_l1_shadow, gpfn);
+        shadow_remove_all_write_access(d, PGT_l1_shadow, PGT_l1_shadow, gpfn, gmfn);
     }
 
     res = get_page_and_type(&frame_table[gmfn], d, PGT_ldt_page);

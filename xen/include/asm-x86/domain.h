@@ -50,6 +50,8 @@ struct arch_domain
     struct out_of_sync_entry *out_of_sync_extras;
     unsigned int out_of_sync_extras_count;
 
+    pagetable_t  phys_table;               /* guest 1:1 pagetable */
+
 } __cacheline_aligned;
 
 struct arch_exec_domain
@@ -114,8 +116,6 @@ struct arch_exec_domain
     pagetable_t  guest_table;           /* (MA) guest notion of cr3 */
     pagetable_t  shadow_table;          /* (MA) shadow of guest */
     pagetable_t  monitor_table;         /* (MA) used in hypervisor */
-
-    pagetable_t  phys_table;            /* guest 1:1 pagetable */
 
     l2_pgentry_t *guest_vtable;         /* virtual address of pagetable */
     l2_pgentry_t *shadow_vtable;        /* virtual address of shadow_table */

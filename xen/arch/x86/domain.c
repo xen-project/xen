@@ -344,8 +344,6 @@ static int vmx_final_setup_guest(struct exec_domain *ed,
         shadow_mode_enable(ed->domain, SHM_enable|SHM_translate|SHM_external);
     }
 
-    update_pagetables(ed);
-
     return 0;
 
 out:
@@ -416,7 +414,7 @@ int arch_final_setup_guest(
     ed->arch.failsafe_address  = c->failsafe_callback_eip;
 
     phys_basetab = c->pt_base;
-    ed->arch.guest_table = ed->arch.phys_table = mk_pagetable(phys_basetab);
+    ed->arch.guest_table = mk_pagetable(phys_basetab);
 
     if ( !get_page_and_type(&frame_table[phys_basetab>>PAGE_SHIFT], d, 
                             PGT_base_page_table) )
@@ -435,8 +433,22 @@ int arch_final_setup_guest(
     }
 
 #ifdef CONFIG_VMX
-    if (c->flags & ECF_VMX_GUEST)
-        return vmx_final_setup_guest(ed, c);
+    if ( c->flags & ECF_VMX_GUEST )
+    {
+        int error;
+
+        // VMX uses the initially provided page tables as the P2M map.
+        //
+        // XXX: This creates a security issue -- Xen can't necessarily
+        //      trust the VMX domain builder.  Xen should validate this
+        //      page table, and/or build the table itself, or ???
+        //
+        if ( !pagetable_val(d->arch.phys_table) )
+            d->arch.phys_table = ed->arch.guest_table;
+
+        if ( (error = vmx_final_setup_guest(ed, c)) )
+            return error;
+    }
 #endif
 
     update_pagetables(ed);

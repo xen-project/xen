@@ -391,7 +391,7 @@ void vmx_do_resume(struct exec_domain *d)
         __vmwrite(GUEST_CR3, pagetable_val(d->arch.shadow_table));
     else
         // paging is not enabled in the guest
-        __vmwrite(GUEST_CR3, pagetable_val(d->arch.phys_table));
+        __vmwrite(GUEST_CR3, pagetable_val(d->domain->arch.phys_table));
 
     __vmwrite(HOST_CR3, pagetable_val(d->arch.monitor_table));
     __vmwrite(HOST_ESP, (unsigned long)get_stack_bottom());

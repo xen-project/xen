@@ -169,7 +169,8 @@ static inline void shadow_mode_disable(struct domain *d)
 
 #define __gpfn_to_mfn(_d, gpfn)                        \
     ( (shadow_mode_translate(_d))                      \
-      ? phys_to_machine_mapping(gpfn)                  \
+      ? ({ ASSERT(current->domain == (_d));            \
+           phys_to_machine_mapping(gpfn); })           \
       : (gpfn) )
 
 /************************************************************************/
@@ -541,10 +542,6 @@ static inline void l1pte_propagate_from_guest(
     unsigned long mfn = __gpfn_to_mfn(d, pfn);
     unsigned long spte;
 
-#if SHADOW_VERBOSE_DEBUG
-    unsigned long old_spte = *spte_p;
-#endif
-
     spte = 0;
 
     if ( mfn &&
@@ -560,12 +557,12 @@ static inline void l1pte_propagate_from_guest(
             spte &= ~_PAGE_RW;
         }
     }
+#if 0
 
-#if SHADOW_VERBOSE_DEBUG
-    if ( old_spte || spte || gpte )
-        SH_VLOG("l1pte_propagate_from_guest: gpte=0x%p, old spte=0x%p, new spte=0x%p", gpte, old_spte, spte);
+    if ( spte || gpte )
+        SH_VLOG("%s: gpte=0x%p, new spte=0x%p", __func__, gpte, spte);
+
 #endif
-
     *spte_p = spte;
 }
 
@@ -582,7 +579,7 @@ static inline void l2pde_general(
     if ( (gpde & _PAGE_PRESENT) && (sl1mfn != 0) )
     {
         spde = (gpde & ~PAGE_MASK) | (sl1mfn << PAGE_SHIFT) | 
-            _PAGE_RW | _PAGE_ACCESSED | _PAGE_DIRTY;
+            _PAGE_RW | _PAGE_ACCESSED;
         gpde |= _PAGE_ACCESSED; /* N.B. PDEs do not have a dirty bit. */
 
         // XXX mafetter: Hmm...
@@ -591,6 +588,9 @@ static inline void l2pde_general(
         //
         *gpde_p = gpde;
     }
+
+    if ( spde || gpde )
+        SH_VLOG("%s: gpde=0x%p, new spde=0x%p", __func__, gpde, spde);
 
     *spde_p = spde;
 }
@@ -828,7 +828,9 @@ static inline unsigned long ___shadow_status(
 static inline unsigned long __shadow_status(
     struct domain *d, unsigned long gpfn, unsigned long stype)
 {
-    unsigned long gmfn = __gpfn_to_mfn(d, gpfn);
+    unsigned long gmfn = ((current->domain == d)
+                          ? __gpfn_to_mfn(d, gpfn)
+                          : 0);
 
     ASSERT(spin_is_locked(&d->arch.shadow_lock));
     ASSERT(gpfn == (gpfn & PGT_mfn_mask));
@@ -843,7 +845,7 @@ static inline unsigned long __shadow_status(
         return 0;
     }
 
-    return ___shadow_status(d, gmfn, stype);
+    return ___shadow_status(d, gpfn, stype);
 }
 
 /*
@@ -1014,13 +1016,14 @@ static inline void delete_shadow_status(
 }
 
 static inline void set_shadow_status(
-    struct domain *d, unsigned long gpfn,
+    struct domain *d, unsigned long gpfn, unsigned long gmfn,
     unsigned long smfn, unsigned long stype)
 {
     struct shadow_status *x, *head, *extra;
     int i;
-    unsigned long gmfn = __gpfn_to_mfn(d, gpfn);
     unsigned long key = gpfn | stype;
+
+    SH_VVLOG("set gpfn=%p gmfn=%p smfn=%p t=%p\n", gpfn, gmfn, smfn, stype);
 
     ASSERT(spin_is_locked(&d->arch.shadow_lock));
     ASSERT(gpfn && !(gpfn & ~PGT_mfn_mask));

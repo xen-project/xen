@@ -155,7 +155,7 @@ void free_page_type(struct pfn_info *page, unsigned int type);
 extern void invalidate_shadow_ldt(struct exec_domain *d);
 extern u32 shadow_remove_all_write_access(
     struct domain *d, unsigned min_type, unsigned max_type,
-    unsigned long gpfn);
+    unsigned long gpfn, unsigned long gmfn);
 extern u32 shadow_remove_all_access( struct domain *d, unsigned long gmfn);
 
 static inline void put_page(struct pfn_info *page)
@@ -361,15 +361,15 @@ int audit_adjust_pgtables(struct domain *d, int dir, int noisy);
 #define AUDIT_ERRORS_OK      ( 1u << 1 )
 #define AUDIT_QUIET          ( 1u << 2 )
 
-void _audit_domain(struct domain *d, int flags, const char *file, int line);
-#define audit_domain(_d) _audit_domain((_d), 0, __FILE__, __LINE__)
+void _audit_domain(struct domain *d, int flags);
+#define audit_domain(_d) _audit_domain((_d), 0)
 void audit_domains(void);
 
 #else
 
-#define _audit_domain(_d, _f, _file, _line) ((void)0)
-#define audit_domain(_d) ((void)0)
-#define audit_domains()  ((void)0)
+#define _audit_domain(_d, _f) ((void)0)
+#define audit_domain(_d)      ((void)0)
+#define audit_domains()       ((void)0)
 
 #endif
 

@@ -36,6 +36,7 @@ static int ttot=0, ctot=0, io_mappings=0, lowmem_mappings=0;
 static int l1, l2, oos_count, page_count;
 
 #define FILE_AND_LINE 0
+//#define MFN_TO_WATCH 0x4700
 
 #if FILE_AND_LINE
 #define adjust(_p, _a) _adjust((_p), (_a), __FILE__, __LINE__)
@@ -51,9 +52,17 @@ int audit_adjust_pgtables(struct domain *d, int dir, int noisy)
 {
     int errors = 0;
     int shadow_enabled = shadow_mode_enabled(d) ? 1 : 0;
+    int l2limit;
 
     void _adjust(struct pfn_info *page, int adjtype ADJUST_EXTRA_ARGS)
     {
+#ifdef MFN_TO_WATCH
+        if (page_to_pfn(page) == MFN_TO_WATCH)
+        {
+            APRINTK("adjust(mfn=%p, dir=%d, adjtype=%d) MFN_TO_WATCH",
+                    page_to_pfn(page), dir, adjtype);
+        }
+#endif
         if ( adjtype )
         {
             // adjust the type count
@@ -97,7 +106,7 @@ int audit_adjust_pgtables(struct domain *d, int dir, int noisy)
 
         if ( count < 0 )
         {
-            APRINTK("Audit %d: general count went below zero pfn=%x t=%x ot=%x",
+            APRINTK("Audit %d: general count went below zero mfn=%x t=%x ot=%x",
                     d->id, page-frame_table,
                     page->u.inuse.type_info,
                     page->tlbflush_timestamp);
@@ -105,7 +114,7 @@ int audit_adjust_pgtables(struct domain *d, int dir, int noisy)
         }
         else if ( (count & ~PGT_count_mask) != 0 )
         {
-            APRINTK("Audit %d: general count overflowed pfn=%x t=%x ot=%x",
+            APRINTK("Audit %d: general count overflowed mfn=%x t=%x ot=%x",
                     d->id, page-frame_table,
                     page->u.inuse.type_info,
                     page->tlbflush_timestamp);
@@ -115,17 +124,12 @@ int audit_adjust_pgtables(struct domain *d, int dir, int noisy)
             page->count_info += dir;
     }
 
-    void adjust_l2_page(unsigned long mfn, int adjtype)
+    void adjust_l2_page(unsigned long mfn)
     {
         unsigned long *pt = map_domain_mem(mfn << PAGE_SHIFT);
-        int i, limit;
+        int i;
 
-        if ( shadow_mode_external(d) )
-            limit = L2_PAGETABLE_ENTRIES;
-        else
-            limit = DOMAIN_ENTRIES_PER_L2_PAGETABLE;
-
-        for ( i = 0; i < limit; i++ )
+        for ( i = 0; i < l2limit; i++ )
         {
             if ( pt[i] & _PAGE_PRESENT )
             {
@@ -180,7 +184,61 @@ int audit_adjust_pgtables(struct domain *d, int dir, int noisy)
                     }
                 }
 
-                adjust(l1page, adjtype);
+                adjust(l1page, !shadow_enabled);
+            }
+        }
+
+        if ( shadow_mode_translate(d) && !shadow_mode_external(d) )
+        {
+            unsigned long hl2mfn =
+                pt[l2_table_offset(LINEAR_PT_VIRT_START)] >> PAGE_SHIFT;
+            struct pfn_info *hl2page = pfn_to_page(hl2mfn);
+            adjust(hl2page, 0);
+        }
+
+        unmap_domain_mem(pt);
+    }
+
+    void adjust_hl2_page(unsigned long hl2mfn)
+    {
+        unsigned long *pt = map_domain_mem(hl2mfn << PAGE_SHIFT);
+        int i;
+
+        for ( i = 0; i < l2limit; i++ )
+        {
+            if ( pt[i] & _PAGE_PRESENT )
+            {
+                unsigned long gmfn = pt[i] >> PAGE_SHIFT;
+                struct pfn_info *gpage = pfn_to_page(gmfn);
+
+                if ( gmfn < 0x100 )
+                {
+                    lowmem_mappings++;
+                    continue;
+                }
+
+                if ( gmfn > max_page )
+                {
+                    io_mappings++;
+                    continue;
+                }
+
+                if ( noisy )
+                {
+                    if ( page_get_owner(gpage) != d )
+                    {
+                        printk("Audit %d: [hl2mfn=%p,i=%x] Skip foreign page "
+                               "dom=%p (id=%d) mfn=%p c=%08x t=%08x\n",
+                               d->id, hl2mfn, i,
+                               page_get_owner(gpage),
+                               page_get_owner(gpage)->id,
+                               gmfn,
+                               gpage->count_info,
+                               gpage->u.inuse.type_info);
+                        continue;
+                    }
+                }
+                adjust(gpage, 0);
             }
         }
 
@@ -281,13 +339,17 @@ int audit_adjust_pgtables(struct domain *d, int dir, int noisy)
                 case PGT_snapshot:
                     break;
                 case PGT_l1_shadow:
-                case PGT_hl2_shadow:
                     adjust_l1_page(smfn);
                     if ( page->u.inuse.type_info & PGT_pinned )
                         adjust(page, 0);
                     break;
+                case PGT_hl2_shadow:
+                    adjust_hl2_page(smfn);
+                    if ( page->u.inuse.type_info & PGT_pinned )
+                        adjust(page, 0);
+                    break;
                 case PGT_l2_shadow:
-                    adjust_l2_page(smfn, 0);
+                    adjust_l2_page(smfn);
                     if ( page->u.inuse.type_info & PGT_pinned )
                         adjust(page, 0);
                     break;
@@ -316,6 +378,9 @@ int audit_adjust_pgtables(struct domain *d, int dir, int noisy)
             //
             if ( !(oos->writable_pl1e & (sizeof(l1_pgentry_t)-1)) )
                 adjust(pfn_to_page(oos->writable_pl1e >> PAGE_SHIFT), 0);
+
+            if ( oos->snapshot_mfn != SHADOW_SNAPSHOT_ELSEWHERE )
+                adjust(pfn_to_page(oos->snapshot_mfn), 0);
 
             oos = oos->next;
             oos_count++;
@@ -400,7 +465,7 @@ int audit_adjust_pgtables(struct domain *d, int dir, int noisy)
                     adjust(page, 1);
 
                 if ( page->u.inuse.type_info & PGT_validated )
-                    adjust_l2_page(mfn, 1);
+                    adjust_l2_page(mfn);
 
                 break;
 
@@ -468,6 +533,11 @@ int audit_adjust_pgtables(struct domain *d, int dir, int noisy)
         }
     }
 
+    if ( shadow_mode_external(d) )
+        l2limit = L2_PAGETABLE_ENTRIES;
+    else
+        l2limit = DOMAIN_ENTRIES_PER_L2_PAGETABLE;
+
     adjust_for_pgtbase();
 
     adjust_guest_pages();
@@ -484,7 +554,7 @@ int audit_adjust_pgtables(struct domain *d, int dir, int noisy)
 
 #ifndef NDEBUG
 
-void _audit_domain(struct domain *d, int flags, const char *file, int line)
+void _audit_domain(struct domain *d, int flags)
 {
     void scan_for_pfn_in_mfn(struct domain *d, unsigned long xmfn,
                              unsigned long mfn)
@@ -568,6 +638,14 @@ void _audit_domain(struct domain *d, int flags, const char *file, int line)
     struct list_head *list_ent;
     struct pfn_info *page;
     int errors = 0;
+
+    if ( (d != current->domain) && shadow_mode_translate(d) )
+    {
+        printk("skipping audit domain of translated domain %d "
+               "from other context\n",
+               d->id);
+        return;
+    }
 
     if ( d != current->domain )
         domain_pause(d);
@@ -740,11 +818,10 @@ void _audit_domain(struct domain *d, int flags, const char *file, int line)
                 page_type = a->gpfn_and_flags & PGT_type_mask;
 
                 switch ( page_type ) {
-                case PGT_snapshot:
-                    // XXX -- what should we check here?
-                    break;
                 case PGT_l1_shadow:
                 case PGT_l2_shadow:
+                case PGT_hl2_shadow:
+                case PGT_snapshot:
                     if ( ((page->u.inuse.type_info & PGT_type_mask) != page_type ) ||
                          (page->count_info != 0) )
                     {
@@ -756,7 +833,6 @@ void _audit_domain(struct domain *d, int flags, const char *file, int line)
                     }
                     break;
 
-                case PGT_hl2_shadow: // haven't thought about this case yet.
                 default:
                     BUG();
                     break;
@@ -781,9 +857,9 @@ void _audit_domain(struct domain *d, int flags, const char *file, int line)
     spin_unlock(&d->page_alloc_lock);
 
     if ( !(flags & AUDIT_QUIET) )
-        printk("Audit dom%d (%s:%d) Done. "
+        printk("Audit dom%d Done. "
                "pages=%d oos=%d l1=%d l2=%d ctot=%d ttot=%d\n",
-               d->id, file, line, page_count, oos_count, l1, l2, ctot, ttot );
+               d->id, page_count, oos_count, l1, l2, ctot, ttot);
 
     if ( !(flags & AUDIT_ALREADY_LOCKED) )
         shadow_unlock(d);
