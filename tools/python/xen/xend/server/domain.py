@@ -28,7 +28,8 @@ class DomainController(controller.Controller):
     """
     reasons = {'poweroff' : 'shutdown_poweroff_t',
                'reboot'   : 'shutdown_reboot_t',
-               'suspend'  : 'shutdown_suspend_t' }
+               'suspend'  : 'shutdown_suspend_t',
+               'sysrq'    : 'shutdown_sysrq_t' }
 
     def __init__(self, factory, dom):
         controller.Controller.__init__(self, factory, dom)
@@ -36,16 +37,19 @@ class DomainController(controller.Controller):
         self.addMethod(CMSG_MEM_REQUEST, 0, None)
         self.registerChannel()
 
-    def shutdown(self, reason):
+    def shutdown(self, reason, key=None):
         """Shutdown a domain.
 
         reason shutdown reason
+        key    sysrq key (only if reason is 'sysrq')
         """
         msgtype = self.reasons.get(reason)
         if not msgtype:
             raise XendError('invalid reason:' + reason)
-        msg = packMsg(msgtype, {})
-        self.writeRequest(msg)
+        extra = {}
+        if reason == 'sysrq': extra['key'] = key
+        print extra
+        self.writeRequest(packMsg(msgtype, extra))
 
     def mem_target_set(self, target):
         """Set domain memory target in pages.

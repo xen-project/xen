@@ -197,10 +197,12 @@ CMSG_SHUTDOWN = 6
 CMSG_SHUTDOWN_POWEROFF  = 0
 CMSG_SHUTDOWN_REBOOT    = 1
 CMSG_SHUTDOWN_SUSPEND   = 2
+CMSG_SHUTDOWN_SYSRQ     = 3
 
 STOPCODE_shutdown       = 0
 STOPCODE_reboot         = 1
 STOPCODE_suspend        = 2
+STOPCODE_sysrq          = 3
 
 shutdown_formats = {
     'shutdown_poweroff_t':
@@ -211,6 +213,9 @@ shutdown_formats = {
 
     'shutdown_suspend_t':
     (CMSG_SHUTDOWN, CMSG_SHUTDOWN_SUSPEND),
+    
+    'shutdown_sysrq_t':
+    (CMSG_SHUTDOWN, CMSG_SHUTDOWN_SYSRQ)
     }
 
 msg_formats.update(shutdown_formats)

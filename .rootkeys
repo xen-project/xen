@@ -527,6 +527,7 @@
 411b2c1ehdEGO_CwG0tvn85Q-Tfh5g tools/python/xen/xm/migrate.py
 40cf2937PSslwBliN1g7ofDy2H_RhA tools/python/xen/xm/opts.py
 40cf2937Z8WCNOnO2FcWdubvEAF9QQ tools/python/xen/xm/shutdown.py
+41b88ba6_C4---jeA895Efg9YFZgKA tools/python/xen/xm/sysrq.py
 40fcefb2K1xqVVT4D-p7nL2GzS4scg tools/sv/Main.rpy
 40ffbcb66Dj5F-1kCK9BcgSqCWkt1w tools/sv/Makefile
 4120b0e5L_nW-u0MWRfIdXg4ng4OjA tools/sv/images/destroy.png
