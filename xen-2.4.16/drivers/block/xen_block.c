@@ -30,9 +30,9 @@ static kmem_cache_t *blk_request_cachep;
 static atomic_t nr_pending;
 
 static int do_block_io_op_domain(struct task_struct* task, int max_to_do);
-static int dispatch_rw_block_io(int index);
-static int dispatch_probe_block_io(int index);
-static int dispatch_debug_block_io(int index);
+static int dispatch_rw_block_io(struct task_struct *p, int index);
+static int dispatch_probe_block_io(struct task_struct *p, int index);
+static int dispatch_debug_block_io(struct task_struct *p, int index);
 
 static spinlock_t io_schedule_lock;
 static struct list_head io_schedule_list;
@@ -179,15 +179,15 @@ static int do_block_io_op_domain(struct task_struct* task, int max_to_do)
 
 	case XEN_BLOCK_READ:
 	case XEN_BLOCK_WRITE:
-	    status = dispatch_rw_block_io(loop);
+	    status = dispatch_rw_block_io(task, loop);
 	    break;
 
 	case XEN_BLOCK_PROBE:
-	    status = dispatch_probe_block_io(loop);
+	    status = dispatch_probe_block_io(task, loop);
 	    break;
 
 	case XEN_BLOCK_DEBUG:
-	    status = dispatch_debug_block_io(loop);
+	    status = dispatch_debug_block_io(task, loop);
 	    break;
 
 	default:
@@ -204,17 +204,17 @@ static int do_block_io_op_domain(struct task_struct* task, int max_to_do)
 }
 
 
-static int dispatch_debug_block_io (int index)
+static int dispatch_debug_block_io(struct task_struct *p, int index)
 {
     printk (KERN_ALERT "dispatch_debug_block_io: UNIMPL\n"); 
     return 1; 
 }
 
 
-static int dispatch_probe_block_io (int index)
+static int dispatch_probe_block_io(struct task_struct *p, int index)
 {
     extern void ide_probe_devices(xen_disk_info_t *xdi);
-    blk_ring_t *blk_ring = current->blk_ring_base;
+    blk_ring_t *blk_ring = p->blk_ring_base;
     xen_disk_info_t *xdi;
     
     xdi = phys_to_virt((unsigned long)blk_ring->req_ring[index].buffer);
@@ -229,10 +229,10 @@ static int dispatch_probe_block_io (int index)
 }
 
 
-static int dispatch_rw_block_io (int index)
+static int dispatch_rw_block_io(struct task_struct *p, int index)
 {
     extern void ll_rw_block(int rw, int nr, struct buffer_head * bhs[]); 
-    blk_ring_t *blk_ring = current->blk_ring_base;
+    blk_ring_t *blk_ring = p->blk_ring_base;
     struct buffer_head *bh;
     struct request_queue *rq;
     int operation;
@@ -263,9 +263,6 @@ static int dispatch_rw_block_io (int index)
 		"sync" : "async"));
     }
 
-    /* XXX KAF: A bit racey maybe? The whole wake-up pending needs fixing. */
-    if ( atomic_read(&nr_pending) >= MAX_PENDING_REQS )
-        return 1;
     atomic_inc(&nr_pending);
     blk_request = kmem_cache_alloc(blk_request_cachep, GFP_ATOMIC);
 
@@ -301,7 +298,7 @@ static int dispatch_rw_block_io (int index)
     /* save meta data about request */
     blk_request->id     = blk_ring->req_ring[index].id;
     blk_request->bh     = bh;
-    blk_request->domain = current; 
+    blk_request->domain = p; 
     
     /* dispatch single block request */
     ll_rw_block(operation, 1, &bh);       /* linux top half */
