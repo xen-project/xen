@@ -301,7 +301,6 @@ asmlinkage void do_double_fault(void)
     for ( ; ; ) ;
 }
 
-
 asmlinkage void do_page_fault(struct pt_regs *regs, long error_code)
 {
     struct guest_trap_bounce *gtb = guest_trap_bounce+smp_processor_id();
