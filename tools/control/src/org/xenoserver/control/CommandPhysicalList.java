@@ -12,13 +12,17 @@ import java.util.StringTokenizer;
  * to modes.
  */
 public class CommandPhysicalList extends Command {
+    /** Domain to list details for */
     private int domain_id;
+    /** Defaults instance to use. */
     private Defaults d;
+    /** Map of extents to access modes */
     private Map map = new HashMap();
 
     /**
      * Constructor for CommandDomainList.
      * @param d Defaults object to use.
+     * @param domain_id Domain ID to query for
      */
     public CommandPhysicalList(Defaults d, int domain_id) {
         this.d = d;
@@ -28,6 +32,7 @@ public class CommandPhysicalList extends Command {
     /**
      * Retrieves the list of extents.
      * @return null, call extents() to get the list.
+     * @throws CommandFailedException if the list could not be retrieved.
      */
     public String execute() throws CommandFailedException {
         Runtime r = Runtime.getRuntime();
@@ -39,7 +44,7 @@ public class CommandPhysicalList extends Command {
             Process start_p;
             String start_cmdarray[] = new String[2];
             int start_rc;
-            start_cmdarray[0] = d.XIToolsDir + "xi_phys_probe";
+            start_cmdarray[0] = d.xiToolsDir + "xi_phys_probe";
             start_cmdarray[1] = Integer.toString(domain_id);
 
             if (Settings.TEST) {
@@ -48,7 +53,7 @@ public class CommandPhysicalList extends Command {
                 start_p = r.exec(start_cmdarray);
                 start_rc = start_p.waitFor();
                 if (start_rc != 0) {
-                    throw CommandFailedException.XICommandFailed(
+                    throw CommandFailedException.xiCommandFailed(
                         "Could not get extent list",
                         start_cmdarray);
                 }
@@ -62,7 +67,7 @@ public class CommandPhysicalList extends Command {
                     int disk = -1;
                     long offset = -1;
                     long size = -1;
-                    
+
                     StringTokenizer st = new StringTokenizer(outline);
                     if (st.hasMoreTokens()) {
                         disk = Short.parseShort(st.nextToken(), 16);
@@ -75,14 +80,15 @@ public class CommandPhysicalList extends Command {
                     }
                     if (st.hasMoreTokens()) {
                         String mode = st.nextToken();
-                        Extent extent = new Extent(disk,offset,size);
-                        if (mode.equals("rw"))
+                        Extent extent = new Extent(disk, offset, size);
+                        if (mode.equals("rw")) {
                             map.put(extent, Mode.READ_WRITE);
-                        else if (mode.equals("r"))
+                        } else if (mode.equals("r")) {
                             map.put(extent, Mode.READ_ONLY);
-                        else
+                        } else {
                             throw new CommandFailedException(
                                 "Could not parse access mode " + mode);
+                        }
                     }
 
                     outline = in.readLine();
@@ -100,6 +106,9 @@ public class CommandPhysicalList extends Command {
         return output;
     }
 
+    /**
+     * @return Map of extents to access modes.
+     */
     public Map extents() {
         return map;
     }

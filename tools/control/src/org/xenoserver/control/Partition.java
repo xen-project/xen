@@ -182,4 +182,19 @@ public class Partition {
             throw new IllegalArgumentException("Don't know how to convert " + name + "into a disk number");
         }
     }
+    
+    /**
+     * @return Partition index on disk for this partition.
+     */
+    public int getPartitionIndex() {
+        if ( name.startsWith("hd") ) {
+            // low 6 bits of minor are partition no
+            return minor & 0x3F; 
+        } else if ( name.startsWith("sd") ) {
+            // low 4 bits of minor are partition no
+            return minor & 0x0F;
+        } else {
+            throw new IllegalArgumentException("Don't know how to convert " + name + "into a partition number");
+        }
+    }
 }

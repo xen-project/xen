@@ -16,12 +16,12 @@ public class ParseDomainNew extends CommandParser {
     int vifs = getIntParameter(args, 'v', d.domainVIFs);
     String bargs = getStringParameter (args, 'a', d.args) + " ";
     String root_dev = getStringParameter (args, 'd', d.rootDevice);
-    String nfs_root_path = getStringParameter (args, 'f', d.NWNFSRoot);
-    String nw_ip = getStringParameter (args, '4', d.NWIP);
-    String nw_gw = getStringParameter (args, 'g', d.NWGW);
-    String nw_mask = getStringParameter (args, 'm', d.NWMask);
-    String nw_nfs_server = getStringParameter (args, 's', d.NWNFSServer);
-    String nw_host = getStringParameter (args, 'h', d.NWHost);
+    String nfs_root_path = getStringParameter (args, 'f', d.nwNFSRoot);
+    String nw_ip = getStringParameter (args, '4', d.nwIP);
+    String nw_gw = getStringParameter (args, 'g', d.nwGateway);
+    String nw_mask = getStringParameter (args, 'm', d.nwMask);
+    String nw_nfs_server = getStringParameter (args, 's', d.nwNFSServer);
+    String nw_host = getStringParameter (args, 'h', d.nwHost);
 
     d.describe();
 
