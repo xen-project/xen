@@ -46,8 +46,10 @@ static devfs_handle_t xen_dev_dir;
 static unsigned long evtchn_dev_inuse;
 
 /* Notification ring, accessed via /dev/xen/evtchn. */
-#define RING_SIZE     2048  /* 2048 16-bit entries */
-#define RING_MASK(_i) ((_i)&(RING_SIZE-1))
+
+#define EVTCHN_RING_SIZE     2048  /* 2048 16-bit entries */
+
+#define EVTCHN_RING_MASK(_i) ((_i)&(EVTCHN_RING_SIZE-1))
 static uint16_t *ring;
 static unsigned int ring_cons, ring_prod, ring_overflow;
 
@@ -76,8 +78,8 @@ evtchn_device_upcall(int port)
     clear_evtchn(port);
 
     if ( ring != NULL ) {
-        if ( (ring_prod - ring_cons) < RING_SIZE ) {
-            ring[RING_MASK(ring_prod)] = (uint16_t)port;
+        if ( (ring_prod - ring_cons) < EVTCHN_RING_SIZE ) {
+            ring[EVTCHN_RING_MASK(ring_prod)] = (uint16_t)port;
             if ( ring_cons == ring_prod++ ) {
 		wakeup(evtchn_waddr);
             }
@@ -136,9 +138,9 @@ evtchn_read(struct cdev *dev, struct uio *uio, int ioflag)
     }
 
     /* Byte lengths of two chunks. Chunk split (if any) is at ring wrap. */
-    if ( ((c ^ p) & RING_SIZE) != 0 ) {
-        bytes1 = (RING_SIZE - RING_MASK(c)) * sizeof(uint16_t);
-        bytes2 = RING_MASK(p) * sizeof(uint16_t);
+    if ( ((c ^ p) & EVTCHN_RING_SIZE) != 0 ) {
+        bytes1 = (EVTCHN_RING_SIZE - EVTCHN_RING_MASK(c)) * sizeof(uint16_t);
+        bytes2 = EVTCHN_RING_MASK(p) * sizeof(uint16_t);
     }
     else {
         bytes1 = (p - c) * sizeof(uint16_t);
@@ -154,7 +156,7 @@ evtchn_read(struct cdev *dev, struct uio *uio, int ioflag)
         bytes2 = count - bytes1;
     }
     
-    if ( uiomove(&ring[RING_MASK(c)], bytes1, uio) ||
+    if ( uiomove(&ring[EVTCHN_RING_MASK(c)], bytes1, uio) ||
          ((bytes2 != 0) && uiomove(&ring[0], bytes2, uio)))
 	  /* keeping this around as its replacement is not equivalent 
 	   * copyout(&ring[0], &buf[bytes1], bytes2) 

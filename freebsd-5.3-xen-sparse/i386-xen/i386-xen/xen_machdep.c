@@ -381,156 +381,152 @@ printk(const char *fmt, ...)
         (void)HYPERVISOR_console_write(buf, ret);
 }
 
-#define XPQUEUE_SIZE 2048
+#define XPQUEUE_SIZE 128
 
-typedef struct xpq_queue {
-    uint32_t ptr; 
-    uint32_t val;
-} xpq_queue_t;
+#define MCLQUEUE_SIZE 32
+#ifdef SMP
+/* per-cpu queues and indices */
+static multicall_entry_t mcl_queue[MAX_VIRT_CPUS][MCLQUEUE_SIZE];
+static mmu_update_t xpq_queue[MAX_VIRT_CPUS][XPQUEUE_SIZE];
+static int mcl_idx[MAX_VIRT_CPUS];  
+static int xpq_idx[MAX_VIRT_CPUS];  
 
-#define MCLQUEUE_SIZE 512
+#define MCL_QUEUE mcl_queue[vcpu]
+#define XPQ_QUEUE xpq_queue[vcpu]
+#define MCL_IDX mcl_idx[vcpu]
+#define XPQ_IDX xpq_idx[vcpu]
+#define SET_VCPU() int vcpu = smp_processor_id()
+#else
 static multicall_entry_t mcl_queue[MCLQUEUE_SIZE];
+static mmu_update_t xpq_queue[XPQUEUE_SIZE];
 static int mcl_idx = 0;
-
-static xpq_queue_t xpq_queue[XPQUEUE_SIZE];
-static boolean_t xpq_initialized;
-static struct mtx update_lock;
 static int xpq_idx = 0;
 
-/*
- * Don't attempt to lock until after lock & memory initialization
- */
-#define XPQ_LOCK(lock, flags)		\
-	if (likely(xpq_initialized))	\
-    		mtx_lock_irqsave(lock, flags)
-#define XPQ_UNLOCK(lock, flags)		\
-	if (likely(xpq_initialized))	\
-    		mtx_unlock_irqrestore(lock, flags)
+#define MCL_QUEUE mcl_queue
+#define XPQ_QUEUE xpq_queue
+#define MCL_IDX mcl_idx
+#define XPQ_IDX xpq_idx
+#define SET_VCPU()
+#endif
+#define XPQ_IDX_INC atomic_add_int(&XPQ_IDX, 1);
+#define MCL_IDX_INC atomic_add_int(&MCL_IDX, 1);
 
-void 
-xpq_init(void)
-{
-    xpq_initialized = TRUE;
-    mtx_init(&update_lock, "mmu", "MMU LOCK", MTX_SPIN);
-}
 
 static __inline void
 _xpq_flush_queue(void)
 {
-    	int _xpq_idx = xpq_idx;
-	int error, i;
+    SET_VCPU();
+    int _xpq_idx = XPQ_IDX;
+    int error, i;
+    /* window of vulnerability here? */
 
-	xpq_idx = 0;
-	/* Make sure index is cleared first to avoid double updates. */
-	error = HYPERVISOR_mmu_update((mmu_update_t *)xpq_queue, _xpq_idx, 
-				       NULL);
-	
-    	if (__predict_false(error < 0)) {
-	    for (i = 0; i < _xpq_idx; i++)
-		printk("val: %x ptr: %p\n", xpq_queue[i].val, xpq_queue[i].ptr);
-	    panic("Failed to execute MMU updates: %d", error);
-	}
+    XPQ_IDX = 0;
+    /* Make sure index is cleared first to avoid double updates. */
+    error = HYPERVISOR_mmu_update((mmu_update_t *)&XPQ_QUEUE,
+				  _xpq_idx, NULL);
+    
+    if (__predict_false(error < 0)) {
+	for (i = 0; i < _xpq_idx; i++)
+	    printk("val: %x ptr: %p\n", XPQ_QUEUE[i].val, XPQ_QUEUE[i].ptr);
+	panic("Failed to execute MMU updates: %d", error);
+    }
 
 }
 static void
 xpq_flush_queue(void)
 {
-	unsigned long flags = 0;
+    SET_VCPU();
 
-	XPQ_LOCK(&update_lock, flags);
-	if (xpq_idx != 0) _xpq_flush_queue();
-	XPQ_UNLOCK(&update_lock, flags);
+    if (XPQ_IDX != 0) _xpq_flush_queue();
 }
 
 static __inline void
 _mcl_flush_queue(void)
 {
-    	int _mcl_idx = mcl_idx;
-	mcl_idx = 0;
-	(void)HYPERVISOR_multicall(mcl_queue, _mcl_idx);
+    SET_VCPU();
+    int _mcl_idx = MCL_IDX;
+
+    MCL_IDX = 0;
+    (void)HYPERVISOR_multicall(&MCL_QUEUE, _mcl_idx);
 }
 
 void
 mcl_flush_queue(void)
 {
-	unsigned long flags = 0;
-
-	XPQ_LOCK(&update_lock, flags);
-	if (__predict_true(mcl_idx != 0)) _mcl_flush_queue();
-	XPQ_UNLOCK(&update_lock, flags);
-	/* XXX: until we can remove the  pervasive 
-	 * __HYPERVISOR_update_va_mapping calls, we have 2 queues.  In order
-	 * to ensure that they never get out of sync, only 1 flush interface
-	 * is provided.
-	 */
-	xpq_flush_queue();
+    
+    if (__predict_true(mcl_idx != 0)) _mcl_flush_queue();
+    /* XXX: until we can remove the  pervasive 
+     * __HYPERVISOR_update_va_mapping calls, we have 2 queues.  In order
+     * to ensure that they never get out of sync, only 1 flush interface
+     * is provided.
+     */
+    xpq_flush_queue();
 }
 
 
 static __inline void
 xpq_increment_idx(void)
 {
-    xpq_idx++;
-    if (__predict_false(xpq_idx == XPQUEUE_SIZE))
+    SET_VCPU();
+
+    XPQ_IDX++;
+    if (__predict_false(XPQ_IDX == XPQUEUE_SIZE))
 	xpq_flush_queue();
 }
 
 static __inline void
 mcl_increment_idx(void)
 {
-    mcl_idx++;
-    if (__predict_false(mcl_idx == MCLQUEUE_SIZE))
+    SET_VCPU();
+    MCL_IDX++;
+
+    if (__predict_false(MCL_IDX == MCLQUEUE_SIZE))
 	mcl_flush_queue();
 }
 
 void
 xpq_queue_invlpg(vm_offset_t va)
 {
-	unsigned long flags = 0;
-
-	XPQ_LOCK(&update_lock, flags);
-	xpq_queue[xpq_idx].ptr = (va & ~PAGE_MASK) | MMU_EXTENDED_COMMAND;
-	xpq_queue[xpq_idx].val = MMUEXT_INVLPG;
-	xpq_increment_idx();
-	XPQ_UNLOCK(&update_lock, flags);
+    SET_VCPU();
+    
+    XPQ_QUEUE[XPQ_IDX].ptr = (va & ~PAGE_MASK) | MMU_EXTENDED_COMMAND;
+    XPQ_QUEUE[XPQ_IDX].val = MMUEXT_INVLPG;
+    xpq_increment_idx();
 }
 
 void
 load_cr3(uint32_t val)
 {
-	xpq_queue_pt_switch(val);
-	xpq_flush_queue();
+    xpq_queue_pt_switch(val);
+    xpq_flush_queue();
 }
 
 void
 xen_set_ldt(vm_offset_t base, uint32_t entries)
 {
-	xpq_queue_set_ldt(base, entries);
-	_xpq_flush_queue();
+    xpq_queue_set_ldt(base, entries);
+    _xpq_flush_queue();
 }
 
 void
 xen_machphys_update(unsigned long mfn, unsigned long pfn)
 {
-    	unsigned long flags = 0;
-	XPQ_LOCK(&update_lock, flags);
-	xpq_queue[xpq_idx].ptr = (mfn << PAGE_SHIFT) | MMU_MACHPHYS_UPDATE;
-	xpq_queue[xpq_idx].val = pfn;
-	xpq_increment_idx();
-	_xpq_flush_queue();
-	XPQ_UNLOCK(&update_lock, flags);
+    SET_VCPU();
+    
+    XPQ_QUEUE[XPQ_IDX].ptr = (mfn << PAGE_SHIFT) | MMU_MACHPHYS_UPDATE;
+    XPQ_QUEUE[XPQ_IDX].val = pfn;
+    xpq_increment_idx();
+    _xpq_flush_queue();
 }
 
 void
 xpq_queue_pt_update(pt_entry_t *ptr, pt_entry_t val)
 {
-	unsigned long flags = 0;
-
-	XPQ_LOCK(&update_lock, flags);
-    	xpq_queue[xpq_idx].ptr = (uint32_t)ptr;
-    	xpq_queue[xpq_idx].val = val;
-    	xpq_increment_idx();
-	XPQ_UNLOCK(&update_lock, flags);
+    SET_VCPU();
+    
+    XPQ_QUEUE[XPQ_IDX].ptr = (memory_t)ptr;
+    XPQ_QUEUE[XPQ_IDX].val = (memory_t)val;
+    xpq_increment_idx();
 }
 
 void 
@@ -539,14 +535,13 @@ mcl_queue_pt_update(vm_offset_t va, vm_paddr_t ma)
 #if 0
     printf("setting va %x to ma %x\n", va, ma); 
 #endif
-        unsigned long flags = 0;
-        XPQ_LOCK(&update_lock, flags);
-	mcl_queue[mcl_idx].op = __HYPERVISOR_update_va_mapping;
-	mcl_queue[mcl_idx].args[0] = (unsigned long)(va >> PAGE_SHIFT);
-	mcl_queue[mcl_idx].args[1] = (unsigned long)ma;
-	mcl_queue[mcl_idx].args[2] = 0;
-    	mcl_increment_idx();
-	XPQ_UNLOCK(&update_lock, flags);
+    SET_VCPU();
+    
+    MCL_QUEUE[MCL_IDX].op = __HYPERVISOR_update_va_mapping;
+    MCL_QUEUE[MCL_IDX].args[0] = (unsigned long)va;
+    MCL_QUEUE[MCL_IDX].args[1] = (unsigned long)ma;
+    MCL_QUEUE[MCL_IDX].args[2] = UVMF_INVLPG;
+    mcl_increment_idx();
 }
 
 
@@ -554,72 +549,63 @@ mcl_queue_pt_update(vm_offset_t va, vm_paddr_t ma)
 void
 xpq_queue_pt_switch(uint32_t val)
 {
-	unsigned long flags = 0;
-	vm_paddr_t ma = xpmap_ptom(val) & PG_FRAME;
-
-	XPQ_LOCK(&update_lock, flags);
-	xpq_queue[xpq_idx].ptr = ma | MMU_EXTENDED_COMMAND;
-	xpq_queue[xpq_idx].val = MMUEXT_NEW_BASEPTR;
-	xpq_increment_idx();
-	XPQ_UNLOCK(&update_lock, flags);
+    vm_paddr_t ma = xpmap_ptom(val) & PG_FRAME;
+    SET_VCPU();
+    
+    XPQ_QUEUE[XPQ_IDX].ptr = ma | MMU_EXTENDED_COMMAND;
+    XPQ_QUEUE[XPQ_IDX].val = MMUEXT_NEW_BASEPTR;
+    xpq_increment_idx();
 }
 
 
 void
 xpq_queue_pin_table(uint32_t pa, int type)
 {
-	unsigned long flags = 0;
-	XPQ_LOCK(&update_lock, flags);
-	xpq_queue[xpq_idx].ptr = pa | MMU_EXTENDED_COMMAND;
-	switch (type) {
-	case XPQ_PIN_L1_TABLE:
-		xpq_queue[xpq_idx].val = MMUEXT_PIN_L1_TABLE;
-		break;
-	case XPQ_PIN_L2_TABLE:
-		xpq_queue[xpq_idx].val = MMUEXT_PIN_L2_TABLE;
-		break;
-	}
-	xpq_increment_idx();
-	XPQ_UNLOCK(&update_lock, flags);
+    SET_VCPU();
+    
+    
+    XPQ_QUEUE[XPQ_IDX].ptr = pa | MMU_EXTENDED_COMMAND;
+    switch (type) {
+    case XPQ_PIN_L1_TABLE:
+	XPQ_QUEUE[XPQ_IDX].val = MMUEXT_PIN_L1_TABLE;
+	break;
+    case XPQ_PIN_L2_TABLE:
+	XPQ_QUEUE[XPQ_IDX].val = MMUEXT_PIN_L2_TABLE;
+	break;
+    }
+    xpq_increment_idx();
 }
 
 void
 xpq_queue_unpin_table(uint32_t pa)
 {
-	unsigned long flags = 0;
-
-	XPQ_LOCK(&update_lock, flags);
-	xpq_queue[xpq_idx].ptr = pa | MMU_EXTENDED_COMMAND;
-	xpq_queue[xpq_idx].val = MMUEXT_UNPIN_TABLE;
-	xpq_increment_idx();
-	XPQ_UNLOCK(&update_lock, flags);
+    SET_VCPU();
+    
+    XPQ_QUEUE[XPQ_IDX].ptr = pa | MMU_EXTENDED_COMMAND;
+    XPQ_QUEUE[XPQ_IDX].val = MMUEXT_UNPIN_TABLE;
+    xpq_increment_idx();
 }
 
 void
 xpq_queue_set_ldt(vm_offset_t va, uint32_t entries)
 {
-	unsigned long flags = 0;
-
-	XPQ_LOCK(&update_lock, flags);
-	KASSERT(va == (va & PG_FRAME), ("ldt not page aligned"));
-	xpq_queue[xpq_idx].ptr = MMU_EXTENDED_COMMAND | va;
-	xpq_queue[xpq_idx].val = MMUEXT_SET_LDT |
-		(entries << MMUEXT_CMD_SHIFT);
-	xpq_increment_idx();
-	XPQ_UNLOCK(&update_lock, flags);
+    SET_VCPU();
+    
+    KASSERT(va == (va & PG_FRAME), ("ldt not page aligned"));
+    XPQ_QUEUE[XPQ_IDX].ptr = MMU_EXTENDED_COMMAND | va;
+    XPQ_QUEUE[XPQ_IDX].val = MMUEXT_SET_LDT |
+	(entries << MMUEXT_CMD_SHIFT);
+    xpq_increment_idx();
 }
 
 void
 xpq_queue_tlb_flush()
 {
-	unsigned long flags = 0;
-
-	XPQ_LOCK(&update_lock, flags);
-
-	xpq_queue[xpq_idx].ptr = MMU_EXTENDED_COMMAND;
-	xpq_queue[xpq_idx].val = MMUEXT_TLB_FLUSH;
-	xpq_increment_idx();
-	XPQ_UNLOCK(&update_lock, flags);
+    SET_VCPU();
+    
+    XPQ_QUEUE[XPQ_IDX].ptr = MMU_EXTENDED_COMMAND;
+    XPQ_QUEUE[XPQ_IDX].val = MMUEXT_TLB_FLUSH;
+    xpq_increment_idx();
 }
 
 

@@ -94,11 +94,12 @@ __FBSDID("$FreeBSD: src/sys/i386/i386/vm_machdep.c,v 1.219 2003/11/17 18:22:24 a
 #endif
 
 #include <machine/xenfunc.h>
-
+#if 0
 #ifdef SMP
 static void	cpu_reset_proxy(void);
 static u_int	cpu_reset_proxyid;
 static volatile u_int	cpu_reset_proxy_active;
+#endif
 #endif
 static void	sf_buf_init(void *arg);
 SYSINIT(sock_sf, SI_SUB_MBUF, SI_ORDER_ANY, sf_buf_init, NULL)
@@ -462,6 +463,7 @@ kvtop(void *addr)
  * Force reset the processor by invalidating the entire address space!
  */
 
+#if 0
 #ifdef SMP
 static void
 cpu_reset_proxy()
@@ -473,10 +475,10 @@ cpu_reset_proxy()
 	stop_cpus((1<<cpu_reset_proxyid));
 	printf("cpu_reset_proxy: Stopped CPU %d\n", cpu_reset_proxyid);
 	DELAY(1000000);
-	cpu_reset_real();
+	cpu_reset();
 }
 #endif
-
+#endif
 void
 cpu_reset()
 {

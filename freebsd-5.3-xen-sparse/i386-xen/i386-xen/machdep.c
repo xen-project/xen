@@ -214,19 +214,7 @@ static struct trapframe proc0_tf;
 #ifndef SMP
 static struct pcpu __pcpu;
 #endif
-
-static void 
-map_range(void *physptr, unsigned long physptrindex, 
-	  unsigned long physindex, int count, unsigned int flags) {
-    int i;
-    unsigned long pte, ppa;
-    for (i = 0; i < count; i++) {
-	pte = ((unsigned long)physptr) + (physptrindex << 2) + (i << 2); 
-	ppa = (PTOM(physindex + i) << PAGE_SHIFT) | flags | PG_V | PG_A;
-	xpq_queue_pt_update((pt_entry_t *)pte, ppa); 
-    }
-    mcl_flush_queue();
-}
+struct mtx icu_lock;
 
 struct mem_range_softc mem_range_softc;
 
@@ -1377,20 +1365,18 @@ getmemsize(void)
     pmap_bootstrap((init_first)<< PAGE_SHIFT, 0);
     for (i = 0; i < 10; i++)
 	phys_avail[i] = 0;
-#ifdef MAXMEM
-    if (MAXMEM/4 < Maxmem)
-	Maxmem = MAXMEM/4;
-#endif
     physmem = Maxmem;
     avail_end = ptoa(Maxmem) - round_page(MSGBUF_SIZE);
     phys_avail[0] = init_first << PAGE_SHIFT;
     phys_avail[1] = avail_end;
 }
 
-extern pt_entry_t *KPTphys;
-extern int kernbase;
+extern unsigned long cpu0prvpage;
+extern unsigned long *SMPpt;
 pteinfo_t *pteinfo_list;
 unsigned long *xen_machine_phys = ((unsigned long *)VADDR(1008, 0));
+int preemptable;
+int gdt_set;
 
 /* Linux infection */
 #define PAGE_OFFSET  KERNBASE
@@ -1406,8 +1392,6 @@ initvalues(start_info_t *startinfo)
     xendebug_flags = 0xffffffff;
     /* pre-zero unused mapped pages */
     bzero((char *)(KERNBASE + (tmpindex << PAGE_SHIFT)), (1024 - tmpindex)*PAGE_SIZE); 
-    
-    KPTphys = (pt_entry_t *)xpmap_ptom(__pa(startinfo->pt_base + PAGE_SIZE));
     IdlePTD = (pd_entry_t *)xpmap_ptom(__pa(startinfo->pt_base));
     XENPRINTF("IdlePTD %p\n", IdlePTD);
     XENPRINTF("nr_pages: %ld shared_info: 0x%lx flags: 0x%lx pt_base: 0x%lx "
@@ -1416,6 +1400,10 @@ initvalues(start_info_t *startinfo)
 	      xen_start_info->flags, xen_start_info->pt_base, 
 	      xen_start_info->mod_start, xen_start_info->mod_len);
     
+    /* setup self-referential mapping first so vtomach will work */
+    xpq_queue_pt_update(IdlePTD + PTDPTDI , (unsigned long)IdlePTD | 
+			PG_V | PG_A);
+    mcl_flush_queue();
     /* Map proc0's UPAGES */
     proc0uarea = (struct user *)(KERNBASE + (tmpindex << PAGE_SHIFT));
     tmpindex += UAREA_PAGES;
@@ -1431,6 +1419,25 @@ initvalues(start_info_t *startinfo)
     /* allocate page for ldt */
     ldt = (union descriptor *)(KERNBASE + (tmpindex << PAGE_SHIFT));
     tmpindex++; 
+#ifdef SMP
+    /* allocate cpu0 private page */
+    cpu0prvpage = (KERNBASE + (tmpindex << PAGE_SHIFT));
+    tmpindex++; 
+
+    /* allocate SMP page table */
+    SMPpt = (unsigned long *)(KERNBASE + (tmpindex << PAGE_SHIFT));
+
+    /* Map the private page into the SMP page table */
+    SMPpt[0] = vtomach(cpu0prvpage) | PG_RW | PG_M | PG_V | PG_A;
+
+    /* map SMP page table RO */
+    PT_SET_MA(SMPpt, vtomach(SMPpt) & ~PG_RW, TRUE);
+
+    /* put the page table into the pde */
+    xpq_queue_pt_update(IdlePTD + MPPTDI, xpmap_ptom((tmpindex << PAGE_SHIFT))| PG_M | PG_RW | PG_V | PG_A);
+
+    tmpindex++;
+#endif
 
 #ifdef PMAP_DEBUG    
     pteinfo_list = (pteinfo_t *)(KERNBASE + (tmpindex << PAGE_SHIFT));
@@ -1444,17 +1451,20 @@ initvalues(start_info_t *startinfo)
 	PT_CLEAR(KERNBASE + (i << PAGE_SHIFT), TRUE);
 
     /* allocate remainder of NKPT pages */
-    map_range(IdlePTD, KPTDI + 1, tmpindex, NKPT-1, PG_U | PG_M | PG_RW);
+    for (i = 0; i < NKPT-1; i++, tmpindex++)
+	xpq_queue_pt_update(IdlePTD + KPTDI + i + 1, xpmap_ptom((tmpindex << PAGE_SHIFT))| PG_M | PG_RW | PG_V | PG_A);
     tmpindex += NKPT-1;
-    map_range(IdlePTD, PTDPTDI, __pa(xen_start_info->pt_base) >> PAGE_SHIFT, 1, 0);
 
-    xpq_queue_pt_update(KPTphys + tmpindex, xen_start_info->shared_info | PG_A | PG_V | PG_RW);
+
+
+    tmpindex += NKPT-1;
+    PT_UPDATES_FLUSH();
+
     HYPERVISOR_shared_info = (shared_info_t *)(KERNBASE + (tmpindex << PAGE_SHIFT));
+    PT_SET_MA(HYPERVISOR_shared_info, xen_start_info->shared_info | PG_A | PG_V | PG_RW | PG_M, TRUE);
     tmpindex++;
 
-    mcl_flush_queue();
     HYPERVISOR_shared_info->arch.pfn_to_mfn_frame_list = (unsigned long)xen_phys_machine;
-    HYPERVISOR_shared_info->arch.mfn_to_pfn_start = (unsigned long)xen_machine_phys;
     
     init_first = tmpindex;
     
@@ -1465,6 +1475,7 @@ init386(void)
 {
 	int gsel_tss, metadata_missing, off, x, error;
 	struct pcpu *pc;
+	unsigned long gdtmachpfn;
 	trap_info_t trap_table[] = {
 	    { 0,   0, GSEL(GCODE_SEL, SEL_KPL), (unsigned long) &IDTVEC(div)},
 	    { 1,   0, GSEL(GCODE_SEL, SEL_KPL), (unsigned long) &IDTVEC(dbg)},
@@ -1541,6 +1552,9 @@ init386(void)
 	gdt_segs[GDATA_SEL].ssd_limit = atop(0 - ((1 << 26) - (1 << 22) + (1 << 16))); 
 #endif
 #ifdef SMP
+	/* this correspond to the cpu private page as mapped into the SMP page 
+	 * table in initvalues
+	 */
 	pc = &SMP_prvspace[0].pcpu;
 	gdt_segs[GPRIV_SEL].ssd_limit =
 		atop(sizeof(struct privatespace) - 1);
@@ -1553,17 +1567,15 @@ init386(void)
 	gdt_segs[GPROC0_SEL].ssd_base = (int) &pc->pc_common_tss;
 	for (x = 0; x < NGDT; x++)
 	    ssdtosd(&gdt_segs[x], &gdt[x].sd);
-	/* re-map GDT read-only */
-	{
-	    unsigned long gdtindex = (((unsigned long)gdt - KERNBASE) >> PAGE_SHIFT);
-	    unsigned long gdtphys = PTOM(gdtindex);
-	    map_range(KPTphys, gdtindex, gdtindex, 1, 0);
-	    mcl_flush_queue();
-	    if (HYPERVISOR_set_gdt(&gdtphys, LAST_RESERVED_GDT_ENTRY + 1)) {
-		panic("set_gdt failed\n");
-	    }
-	    lgdt_finish();
+
+	PT_SET_MA(gdt, *vtopte((unsigned long)gdt) & ~PG_RW, TRUE); 
+	gdtmachpfn = vtomach(gdt) >> PAGE_SHIFT;
+	if (HYPERVISOR_set_gdt(&gdtmachpfn, LAST_RESERVED_GDT_ENTRY + 1)) {
+	    XENPRINTF("set_gdt failed\n");
+
 	}
+	lgdt_finish();
+	gdt_set = 1;
 
 	if ((error = HYPERVISOR_set_trap_table(trap_table)) != 0) {
 		panic("set_trap_table failed - error %d\n", error);
@@ -1580,13 +1592,17 @@ init386(void)
 	PCPU_SET(prvspace, pc);
 	PCPU_SET(curthread, &thread0);
 	PCPU_SET(curpcb, thread0.td_pcb);
-	PCPU_SET(trap_nesting, 0);
 	PCPU_SET(pdir, (unsigned long)IdlePTD);
 	/*
 	 * Initialize mutexes.
 	 *
 	 */
 	mutex_init();
+
+	mtx_init(&clock_lock, "clk", NULL, MTX_SPIN);
+	mtx_init(&icu_lock, "icu", NULL, MTX_SPIN | MTX_NOWITNESS);
+
+
 
 	/* make ldt memory segments */
 	/*
@@ -1600,14 +1616,11 @@ init386(void)
 	default_proc_ldt.ldt_base = (caddr_t)ldt;
 	default_proc_ldt.ldt_len = 6;
 	_default_ldt = (int)&default_proc_ldt;
-	PCPU_SET(currentldt, _default_ldt);
-	{
-	    unsigned long ldtindex = (((unsigned long)ldt - KERNBASE) >> PAGE_SHIFT);
-	    map_range(KPTphys, ldtindex, ldtindex, 1, 0);
-	    mcl_flush_queue();
-	    xen_set_ldt((unsigned long) ldt, (sizeof ldt_segs / sizeof ldt_segs[0]));
-	}
- 
+	PCPU_SET(currentldt, _default_ldt)
+	PT_SET_MA(ldt, *vtopte((unsigned long)ldt) & ~PG_RW, TRUE);
+	xen_set_ldt((unsigned long) ldt, (sizeof ldt_segs / sizeof ldt_segs[0]));
+
+
 	/*
 	 * Initialize the console before we print anything out.
 	 */
@@ -1638,11 +1651,14 @@ init386(void)
 	    KSTACK_PAGES * PAGE_SIZE - sizeof(struct pcb) - 16);
 	PCPU_SET(common_tss.tss_ss0, GSEL(GDATA_SEL, SEL_KPL));
 	gsel_tss = GSEL(GPROC0_SEL, SEL_KPL);
+#if 0
 	private_tss = 0;
 	PCPU_SET(tss_gdt, &gdt[GPROC0_SEL].sd);
 	PCPU_SET(common_tssd, *PCPU_GET(tss_gdt));
 	PCPU_SET(common_tss.tss_ioopt, (sizeof (struct i386tss)) << 16);
+#endif
 	HYPERVISOR_stack_switch(GSEL(GDATA_SEL, SEL_KPL), PCPU_GET(common_tss.tss_esp0));
+
 
 	dblfault_tss.tss_esp = dblfault_tss.tss_esp0 = dblfault_tss.tss_esp1 =
 	    dblfault_tss.tss_esp2 = (int)&dblfault_stack[sizeof(dblfault_stack)];
@@ -1667,7 +1683,6 @@ init386(void)
 	PT_UPDATES_FLUSH();
 
 	/* safe to enable xen page queue locking */
-    	xpq_init();
 
 	msgbufinit(msgbufp, MSGBUF_SIZE);
 	/* XXX KMM I don't think we need call gates */

@@ -100,8 +100,10 @@ static unsigned int blkif_irq;
 static int blkif_control_rsp_valid;
 static blkif_response_t blkif_control_rsp;
 
-static unsigned long xb_rec_ring_free;		
-blkif_request_t xb_rec_ring[BLKIF_RING_SIZE];	/* shadow recovery ring */
+static blkif_front_ring_t   blk_ring;
+
+static unsigned long rec_ring_free;		
+blkif_request_t rec_ring[RING_SIZE(&blk_ring)];	/* shadow recovery ring */
 
 /* XXX move to xb_vbd.c when VBD update support is added */
 #define MAX_VBDS 64
@@ -115,16 +117,10 @@ static unsigned int xb_kick_pending;
 
 static struct mtx blkif_io_lock;
 
-static blkif_ring_t   *xb_blk_ring;
-static BLKIF_RING_IDX xb_resp_cons; /* Response consumer for comms ring. */
-static BLKIF_RING_IDX xb_req_prod;  /* Private request producer */
 
 static int xb_recovery = 0;           /* "Recovery in progress" flag.  Protected
                                        * by the blkif_io_lock */
 
-/* We plug the I/O ring if the driver is suspended or if the ring is full. */
-#define BLKIF_RING_FULL (((xb_req_prod - xb_resp_cons) == BLKIF_RING_SIZE) || \
-                         (blkif_state != BLKIF_STATE_CONNECTED))
 
 void blkif_completion(blkif_request_t *req);
 void xb_response_intr(void *);
@@ -135,13 +131,13 @@ void xb_response_intr(void *);
 static inline int 
 GET_ID_FROM_FREELIST( void )
 {
-    unsigned long free = xb_rec_ring_free;
+    unsigned long free = rec_ring_free;
 
-    KASSERT(free <= BLKIF_RING_SIZE, ("free %lu > BLKIF_RING_SIZE", free));
+    KASSERT(free <= RING_SIZE(&blk_ring), ("free %lu > RING_SIZE", free));
 
-    xb_rec_ring_free = xb_rec_ring[free].id;
+    rec_ring_free = rec_ring[free].id;
 
-    xb_rec_ring[free].id = 0x0fffffee; /* debug */
+    rec_ring[free].id = 0x0fffffee; /* debug */
 
     return free;
 }
@@ -149,8 +145,8 @@ GET_ID_FROM_FREELIST( void )
 static inline void 
 ADD_ID_TO_FREELIST( unsigned long id )
 {
-    xb_rec_ring[id].id = xb_rec_ring_free;
-    xb_rec_ring_free = id;
+    rec_ring[id].id = rec_ring_free;
+    rec_ring_free = id;
 }
 
 static inline void translate_req_to_pfn(blkif_request_t *xreq,
@@ -188,7 +184,7 @@ static inline void translate_req_to_mfn(blkif_request_t *xreq,
 
 static inline void flush_requests(void)
 {
-    xb_blk_ring->req_prod = xb_req_prod;
+    RING_PUSH_REQUESTS(&blk_ring);
     notify_via_evtchn(blkif_evtchn);
 }
 
@@ -207,12 +203,9 @@ xb_response_intr(void *xsc)
     struct xb_softc *sc = NULL;
     struct bio *bp;
     blkif_response_t *bret;
-    BLKIF_RING_IDX i, rp; 
+    RING_IDX i, rp; 
     unsigned long flags;
     
-    if (blkif_state == BLKIF_STATE_CLOSED)
-	return;
-
     mtx_lock_irqsave(&blkif_io_lock, flags);
 
     if ( unlikely(blkif_state == BLKIF_STATE_CLOSED) || 
@@ -221,20 +214,20 @@ xb_response_intr(void *xsc)
         return;
     }
 
-    rp = xb_blk_ring->resp_prod;
+    rp = blk_ring.sring->rsp_prod;
     rmb(); /* Ensure we see queued responses up to 'rp'. */
 
     /* sometimes we seem to lose i/o.  stay in the interrupt handler while
      * there is stuff to process: continually recheck the response producer.
      */
-    for ( i = xb_resp_cons; i != (rp = xb_blk_ring->resp_prod); i++ ) {
+    for ( i = blk_ring.rsp_cons; i != (rp = blk_ring.sring->rsp_prod); i++ ) {
 	unsigned long id;
-        bret = &xb_blk_ring->ring[MASK_BLKIF_IDX(i)].resp;
+        bret = RING_GET_RESPONSE(&blk_ring, i);
 
 	id = bret->id;
-	bp = (struct bio *)xb_rec_ring[id].id;
+	bp = (struct bio *)rec_ring[id].id;
 
-	blkif_completion(&xb_rec_ring[id]);
+	blkif_completion(&rec_ring[id]);
 
 	ADD_ID_TO_FREELIST(id);	/* overwrites req */
 
@@ -277,7 +270,7 @@ xb_response_intr(void *xsc)
         }
     }
     
-    xb_resp_cons = i;
+    blk_ring.rsp_cons = i;
 
     if (sc && xb_kick_pending) {
     	xb_kick_pending = FALSE;
@@ -323,8 +316,6 @@ xb_ioctl(struct disk *dp, u_long cmd, void *addr, int flag, struct thread *td)
 {
     struct xb_softc	*sc = (struct xb_softc *)dp->d_drv1;
 
-    TRACE_ENTER;
-	
     if (sc == NULL)
 	return (ENXIO);
 
@@ -355,8 +346,8 @@ xb_startio(struct xb_softc *sc)
     s = splbio();
 
     for (bp = bioq_first(&sc->xb_bioq);
-         bp && !BLKIF_RING_FULL;
-	 xb_req_prod++, queued++, bp = bioq_first(&sc->xb_bioq)) {
+         bp && !RING_FULL(&blk_ring);
+	 blk_ring.req_prod_pvt++, queued++, bp = bioq_first(&sc->xb_bioq)) {
 	
 	/* Check if the buffer is properly aligned */
 	if ((vm_offset_t)bp->bio_data & PAGE_MASK) {
@@ -388,9 +379,10 @@ xb_startio(struct xb_softc *sc)
 	buffer_ma &= ~PAGE_MASK;
 
     	/* Fill out a communications ring structure. */
-    	req 		  = &xb_blk_ring->ring[MASK_BLKIF_IDX(xb_req_prod)].req;
+    	req 		  = RING_GET_REQUEST(&blk_ring, 
+					     blk_ring.req_prod_pvt);
 	id		  = GET_ID_FROM_FREELIST();
-	xb_rec_ring[id].id= (unsigned long)bp;
+	rec_ring[id].id= (unsigned long)bp;
 
     	req->id 	  = id;
     	req->operation 	  = (bp->bio_cmd == BIO_READ) ? BLKIF_OP_READ :
@@ -409,11 +401,11 @@ xb_startio(struct xb_softc *sc)
 	req->frame_and_sects[0] = buffer_ma | (fsect << 3) | lsect; 
 
 	/* Keep a private copy so we can reissue requests when recovering. */
-	translate_req_to_pfn( &xb_rec_ring[id], req);
+	translate_req_to_pfn( &rec_ring[id], req);
 
     }
 
-    if (BLKIF_RING_FULL)
+    if (RING_FULL(&blk_ring))
 	xb_kick_pending = TRUE;
     
     if (queued != 0) 
@@ -503,8 +495,6 @@ xb_vbdinit(void)
     blkif_response_t rsp; 
     vdisk_t *buf;
 
-    TRACE_ENTER;
-
     buf = (vdisk_t *)malloc(PAGE_SIZE, M_DEVBUF, M_WAITOK);
 
     /* Probe for disk information. */
@@ -538,28 +528,31 @@ void
 blkif_control_send(blkif_request_t *req, blkif_response_t *rsp)
 {
     unsigned long flags, id;
+    blkif_request_t *req_d;
 
  retry:
-    while ( (xb_req_prod - xb_resp_cons) == BLKIF_RING_SIZE ) {
+    while ( RING_FULL(&blk_ring) )
+    {
 	tsleep( req, PWAIT | PCATCH, "blkif", hz);
     }
 
     mtx_lock_irqsave(&blkif_io_lock, flags);
-    if ( (xb_req_prod - xb_resp_cons) == BLKIF_RING_SIZE )
+    if (  RING_FULL(&blk_ring) )
     {
         mtx_unlock_irqrestore(&blkif_io_lock, flags);
         goto retry;
     }
 
-    xb_blk_ring->ring[MASK_BLKIF_IDX(xb_req_prod)].req = *req;    
+    req_d = RING_GET_REQUEST(&blk_ring, blk_ring.req_prod_pvt);
+    *req_d = *req;    
 
     id = GET_ID_FROM_FREELIST();
-    xb_blk_ring->ring[MASK_BLKIF_IDX(xb_req_prod)].req.id = id;
-    xb_rec_ring[id].id = (unsigned long) req;
+    req_d->id = id;
+    rec_ring[id].id = (unsigned long) req;
 
-    translate_req_to_pfn( &xb_rec_ring[id], req );
+    translate_req_to_pfn( &rec_ring[id], req );
 
-    xb_req_prod++;
+    blk_ring.req_prod_pvt++;
     flush_requests();
 
     mtx_unlock_irqrestore(&blkif_io_lock, flags);
@@ -602,7 +595,7 @@ blkif_send_interface_connect(void)
     blkif_fe_interface_connect_t *msg = (void*)cmsg.msg;
     
     msg->handle      = 0;
-    msg->shmem_frame = (vtomach(xb_blk_ring) >> PAGE_SHIFT);
+    msg->shmem_frame = (vtomach(blk_ring.sring) >> PAGE_SHIFT);
     
     ctrl_if_send_message_block(&cmsg, NULL, 0, TASK_UNINTERRUPTIBLE);
 }
@@ -622,9 +615,9 @@ blkif_free(void)
     mtx_unlock_irqrestore(&blkif_io_lock, flags);
 
     /* Free resources associated with old device channel. */
-    if (xb_blk_ring) {
-        free(xb_blk_ring, M_DEVBUF);
-        xb_blk_ring = NULL;
+    if (blk_ring.sring != NULL) {
+        free(blk_ring.sring, M_DEVBUF);
+        blk_ring.sring = NULL;
     }
     /* free_irq(blkif_irq, NULL);*/
     blkif_irq = 0;
@@ -642,10 +635,10 @@ blkif_close(void)
 static void 
 blkif_disconnect(void)
 {
-    if (xb_blk_ring) free(xb_blk_ring, M_DEVBUF);
-    xb_blk_ring = (blkif_ring_t *)malloc(PAGE_SIZE, M_DEVBUF, M_WAITOK);
-    xb_blk_ring->req_prod = xb_blk_ring->resp_prod = 0;
-    xb_resp_cons = xb_req_prod = 0;
+    if (blk_ring.sring) free(blk_ring.sring, M_DEVBUF);
+    blk_ring.sring = (blkif_sring_t *)malloc(PAGE_SIZE, M_DEVBUF, M_WAITOK);
+    SHARED_RING_INIT(blk_ring.sring);
+    FRONT_RING_INIT(&blk_ring, blk_ring.sring);
     blkif_state  = BLKIF_STATE_DISCONNECTED;
     blkif_send_interface_connect();
 }
@@ -663,36 +656,39 @@ blkif_recover(void)
 {
 
     int i;
+    blkif_request_t *req;
 
     /* Hmm, requests might be re-ordered when we re-issue them.
      * This will need to be fixed once we have barriers */
 
     /* Stage 1 : Find active and move to safety. */
-    for ( i = 0; i < BLKIF_RING_SIZE; i++ ) {
-        if ( xb_rec_ring[i].id >= KERNBASE ) {
-            translate_req_to_mfn(
-                &xb_blk_ring->ring[xb_req_prod].req, &xb_rec_ring[i]);
-            xb_req_prod++;
+    for ( i = 0; i < RING_SIZE(&blk_ring); i++ ) {
+        if ( rec_ring[i].id >= KERNBASE ) {
+	    req = RING_GET_REQUEST(&blk_ring, 
+                                   blk_ring.req_prod_pvt);
+	    translate_req_to_mfn(req, &rec_ring[i]);
+            blk_ring.req_prod_pvt++;
         }
     }
 
-    printk("blkfront: recovered %d descriptors\n",xb_req_prod);
+    printk("blkfront: recovered %d descriptors\n",blk_ring.req_prod_pvt);
 	    
     /* Stage 2 : Set up shadow list. */
-    for ( i = 0; i < xb_req_prod; i++ ) {
-        xb_rec_ring[i].id = xb_blk_ring->ring[i].req.id;		
-        xb_blk_ring->ring[i].req.id = i;
-        translate_req_to_pfn(&xb_rec_ring[i], &xb_blk_ring->ring[i].req);
+    for ( i = 0; i < blk_ring.req_prod_pvt; i++ ) {
+	req = RING_GET_REQUEST(&blk_ring, i);
+	rec_ring[i].id = req->id;
+        req->id = i;
+        translate_req_to_pfn(&rec_ring[i], req);
     }
 
     /* Stage 3 : Set up free list. */
-    for ( ; i < BLKIF_RING_SIZE; i++ ){
-        xb_rec_ring[i].id = i+1;
+    for ( ; i < RING_SIZE(&blk_ring); i++ ){
+        rec_ring[i].id = i+1;
     }
-    xb_rec_ring_free = xb_req_prod;
-    xb_rec_ring[BLKIF_RING_SIZE-1].id = 0x0fffffff;
+    rec_ring_free = blk_ring.req_prod_pvt;
+    rec_ring[RING_SIZE(&blk_ring)-1].id = 0x0fffffff;
 
-    /* xb_blk_ring->req_prod will be set when we flush_requests().*/
+    /* blk_ring.req_prod will be set when we flush_requests().*/
     wmb();
 
     /* Switch off recovery mode, using a memory barrier to ensure that
@@ -877,11 +873,11 @@ xb_init(void *unused)
 
     printk("[XEN] Initialising virtual block device driver\n");
 
-    xb_rec_ring_free = 0;
-    for (i = 0; i < BLKIF_RING_SIZE; i++) {
-	xb_rec_ring[i].id = i+1;
+    rec_ring_free = 0;
+    for (i = 0; i < RING_SIZE(&blk_ring); i++) {
+	rec_ring[i].id = i+1;
     }
-    xb_rec_ring[BLKIF_RING_SIZE-1].id = 0x0fffffff;
+    rec_ring[RING_SIZE(&blk_ring)-1].id = 0x0fffffff;
 
     (void)ctrl_if_register_receiver(CMSG_BLKIF_FE, blkif_ctrlif_rx, 0);
 
@@ -921,5 +917,5 @@ blkif_completion(blkif_request_t *req)
     }
     
 }
-MTX_SYSINIT(ioreq, &blkif_io_lock, "BIO LOCK", MTX_SPIN); 
+MTX_SYSINIT(ioreq, &blkif_io_lock, "BIO LOCK", MTX_SPIN | MTX_NOWITNESS); /* XXX how does one enroll a lock? */
 SYSINIT(xbdev, SI_SUB_PSEUDO, SI_ORDER_ANY, xb_init, NULL)

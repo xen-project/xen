@@ -105,6 +105,8 @@ int	statclock_disable;
 #define TIMER_FREQ   1193182
 #endif
 u_int	timer_freq = TIMER_FREQ;
+struct mtx clock_lock;
+
 
 static	const u_char daysinmonth[] = {31,28,31,30,31,30,31,31,30,31,30,31};
 

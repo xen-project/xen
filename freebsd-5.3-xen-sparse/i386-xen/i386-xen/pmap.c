@@ -642,6 +642,7 @@ pmap_invalidate_page(pmap_t pmap, vm_offset_t va)
 		mtx_unlock_spin(&smp_rv_mtx);
 	else
 		critical_exit();
+	PT_UPDATES_FLUSH();
 }
 
 void
@@ -681,6 +682,7 @@ pmap_invalidate_range(pmap_t pmap, vm_offset_t sva, vm_offset_t eva)
 		mtx_unlock_spin(&smp_rv_mtx);
 	else
 		critical_exit();
+	PT_UPDATES_FLUSH();
 }
 
 void
@@ -716,6 +718,7 @@ pmap_invalidate_all(pmap_t pmap)
 		mtx_unlock_spin(&smp_rv_mtx);
 	else
 		critical_exit();
+	PT_UPDATES_FLUSH();
 }
 #else /* !SMP */
 /*

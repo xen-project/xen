@@ -54,9 +54,10 @@ evtchn_do_upcall(struct intrframe *frame)
 {
     unsigned long  l1, l2;
     unsigned int   l1i, l2i, port;
-    int            irq, owned;
+    int            irq;
     unsigned long  flags;
     shared_info_t *s = HYPERVISOR_shared_info;
+    vcpu_info_t   *vcpu_info = &s->vcpu_data[smp_processor_id()];
 
     local_irq_save(flags);
 
@@ -64,7 +65,7 @@ evtchn_do_upcall(struct intrframe *frame)
     {
         s->vcpu_data[0].evtchn_upcall_pending = 0;
         /* NB. No need for a barrier here -- XCHG is a barrier on x86. */
-        l1 = xen_xchg(&s->evtchn_pending_sel, 0);
+        l1 = xen_xchg(&vcpu_info->evtchn_pending_sel, 0);
         while ( (l1i = ffs(l1)) != 0 )
         {
             l1i--;
@@ -77,17 +78,12 @@ evtchn_do_upcall(struct intrframe *frame)
                 l2 &= ~(1 << l2i);
             
                 port = (l1i << 5) + l2i;
-		if ((owned = mtx_owned(&sched_lock)) != 0)
-		    mtx_unlock_spin_flags(&sched_lock, MTX_QUIET);
                 if ( (irq = evtchn_to_irq[port]) != -1 ) {
 		    struct intsrc *isrc = intr_lookup_source(irq);
 		    intr_execute_handlers(isrc, frame);
-
 		} else {
                     evtchn_device_upcall(port);
 		}
-		if (owned)
-		    mtx_lock_spin_flags(&sched_lock, MTX_QUIET);
             }
         }
     }
@@ -451,12 +447,12 @@ static struct hw_interrupt_type pirq_type = {
 };
 #endif
 
-
+#if 0
 static void 
 misdirect_interrupt(void *sc)
 {
 }
-
+#endif
 void irq_suspend(void)
 {
     int virq, irq, evtchn;
@@ -572,9 +568,12 @@ evtchn_init(void *dummy __unused)
     }
 
 #endif
+#if 0
     (void) intr_add_handler("xb_mis", bind_virq_to_irq(VIRQ_MISDIRECT),
 	    	            (driver_intr_t *)misdirect_interrupt, 
 			    NULL, INTR_TYPE_MISC, NULL);
+
+#endif
 }
 
 SYSINIT(evtchn_init, SI_SUB_INTR, SI_ORDER_ANY, evtchn_init, NULL);

@@ -6,6 +6,7 @@
 
 #ifndef _OS_H_
 #define _OS_H_
+#include <machine/param.h>
 
 #ifndef NULL
 #define NULL (void *)0
@@ -58,6 +59,11 @@ void printk(const char *fmt, ...);
 /* some function prototypes */
 void trap_init(void);
 
+extern int preemptable;
+#define preempt_disable() (preemptable = 0)
+#define preempt_enable() (preemptable = 1)
+#define preempt_enable_no_resched() (preemptable = 1)
+
 
 /*
  * STI/CLI equivalents. These basically set and clear the virtual
@@ -68,70 +74,74 @@ void trap_init(void);
 #define likely(x)  __builtin_expect((x),1)
 #define unlikely(x)  __builtin_expect((x),0)
 
-#define __cli()                                                               \
-do {                                                                          \
-    HYPERVISOR_shared_info->vcpu_data[0].evtchn_upcall_mask = 1;              \
-    barrier();                                                                \
+
+
+#define __cli()                                                         \
+do {                                                                    \
+        vcpu_info_t *_vcpu;                                             \
+        preempt_disable();                                              \
+        _vcpu = &HYPERVISOR_shared_info->vcpu_data[smp_processor_id()]; \
+        _vcpu->evtchn_upcall_mask = 1;                                  \
+        preempt_enable_no_resched();                                    \
+        barrier();                                                      \
 } while (0)
 
-#define __sti()                                                               \
-do {                                                                          \
-    shared_info_t *_shared = HYPERVISOR_shared_info;                          \
-    barrier();                                                                \
-    _shared->vcpu_data[0].evtchn_upcall_mask = 0;                             \
-    barrier(); /* unmask then check (avoid races) */                          \
-    if ( unlikely(_shared->vcpu_data[0].evtchn_upcall_pending) )              \
-        force_evtchn_callback();                                              \
+#define __sti()                                                         \
+do {                                                                    \
+        vcpu_info_t *_vcpu;                                             \
+        barrier();                                                      \
+        preempt_disable();                                              \
+        _vcpu = &HYPERVISOR_shared_info->vcpu_data[smp_processor_id()]; \
+        _vcpu->evtchn_upcall_mask = 0;                                  \
+        barrier(); /* unmask then check (avoid races) */                \
+        if ( unlikely(_vcpu->evtchn_upcall_pending) )                   \
+                force_evtchn_callback();                                \
+        preempt_enable();                                               \
 } while (0)
+
 
 #define __save_flags(x)                                                       \
 do {                                                                          \
-    (x) = HYPERVISOR_shared_info->vcpu_data[0].evtchn_upcall_mask;            \
+    vcpu_info_t *vcpu;                                                        \
+    vcpu = HYPERVISOR_shared_info->vcpu_data[smp_processor_id()];             \
+    (x) = _vcpu->evtchn_upcall_mask;                                          \
 } while (0)
 
-#define __restore_flags(x)                                                    \
-do {                                                                          \
-    shared_info_t *_shared = HYPERVISOR_shared_info;                          \
-    barrier();                                                                \
-    if ( (_shared->vcpu_data[0].evtchn_upcall_mask = (x)) == 0 ) {            \
-        barrier(); /* unmask then check (avoid races) */                      \
-        if ( unlikely(_shared->vcpu_data[0].evtchn_upcall_pending) )          \
-            force_evtchn_callback();                                          \
-    }                                                                         \
+#define __restore_flags(x)                                              \
+do {                                                                    \
+        vcpu_info_t *_vcpu;                                             \
+        barrier();                                                      \
+        preempt_disable();                                              \
+        _vcpu = &HYPERVISOR_shared_info->vcpu_data[smp_processor_id()]; \
+        if ((_vcpu->evtchn_upcall_mask = (x)) == 0) {                   \
+                barrier(); /* unmask then check (avoid races) */        \
+                if ( unlikely(_vcpu->evtchn_upcall_pending) )           \
+                        force_evtchn_callback();                        \
+                preempt_enable();                                       \
+        } else                                                          \
+                preempt_enable_no_resched();                            \
 } while (0)
 
-#define __save_and_cli(x)                                                     \
-do {                                                                          \
-    (x) = HYPERVISOR_shared_info->vcpu_data[0].evtchn_upcall_mask;            \
-    HYPERVISOR_shared_info->vcpu_data[0].evtchn_upcall_mask = 1;              \
-    barrier();                                                                \
+
+#define __save_and_cli(x)                                               \
+do {                                                                    \
+        vcpu_info_t *_vcpu;                                             \
+        preempt_disable();                                              \
+        _vcpu = &HYPERVISOR_shared_info->vcpu_data[smp_processor_id()]; \
+        (x) = _vcpu->evtchn_upcall_mask;                                \
+        _vcpu->evtchn_upcall_mask = 1;                                  \
+        preempt_enable_no_resched();                                    \
+        barrier();                                                      \
 } while (0)
 
-#define __save_and_sti(x)                                                     \
-do {                                                                          \
-    shared_info_t *_shared = HYPERVISOR_shared_info;                          \
-    barrier();                                                                \
-    (x) = _shared->vcpu_data[0].evtchn_upcall_mask;                           \
-    _shared->vcpu_data[0].evtchn_upcall_mask = 0;                             \
-    barrier(); /* unmask then check (avoid races) */                          \
-    if ( unlikely(_shared->vcpu_data[0].evtchn_upcall_pending) )              \
-        force_evtchn_callback();                                              \
-} while (0)
-
-#ifdef SMP
-/* extra macros need for the SMP case */
-#error "global_irq_* not defined"
-#endif
 
 #define cli() __cli()
 #define sti() __sti()
 #define save_flags(x) __save_flags(x)
 #define restore_flags(x) __restore_flags(x)
 #define save_and_cli(x) __save_and_cli(x)
-#define save_and_sti(x) __save_and_sti(x)
 
 #define local_irq_save(x)       __save_and_cli(x)
-#define local_irq_set(x)        __save_and_sti(x)
 #define local_irq_restore(x)    __restore_flags(x)
 #define local_irq_disable()     __cli()
 #define local_irq_enable()      __sti()
@@ -141,9 +151,20 @@ do {                                                                          \
 
 #define mb()
 #define rmb()
-#define smp_mb() 
 #define wmb()
-
+#ifdef SMP
+#define smp_mb() mb() 
+#define smp_rmb() rmb()
+#define smp_wmb() wmb()
+#define smp_read_barrier_depends()      read_barrier_depends()
+#define set_mb(var, value) do { xchg(&var, value); } while (0)
+#else
+#define smp_mb()        barrier()
+#define smp_rmb()       barrier()
+#define smp_wmb()       barrier()
+#define smp_read_barrier_depends()      do { } while(0)
+#define set_mb(var, value) do { var = value; barrier(); } while (0)
+#endif
 
 
 /* This is a barrier for the compiler only, NOT the processor! */

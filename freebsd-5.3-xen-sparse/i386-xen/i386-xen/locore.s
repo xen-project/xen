@@ -56,7 +56,7 @@
 #include "assym.s"
 
 .section __xen_guest
-	    .asciz "LOADER=generic,GUEST_VER=5.2.1,XEN_VER=2.0,BSD_SYMTAB"
+	    .asciz "LOADER=generic,GUEST_VER=5.3,XEN_VER=3.0,BSD_SYMTAB"
 	
 	
 /*
