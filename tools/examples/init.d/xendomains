@@ -17,7 +17,7 @@
 
 RETVAL=0
 
-INITD=/etc/init.d/
+INITD=/etc/init.d
 
 AUTODIR=/etc/xen/auto
 LOCKFILE=/var/lock/subsys/xendomains
@@ -36,7 +36,7 @@ if [ -e /lib/lsb ]; then
 	    log_failure_msg
 	fi
     }
-else
+elif [ -r $INITD/functions ]; then
     # assume a Redhat-like distro
     . $INITD/functions # source Redhat functions
 
@@ -48,6 +48,14 @@ else
 	    failure
 	fi
 	
+	echo
+    }
+else
+    # none of the above
+    LOCKFILE=/var/lock/xendomains
+
+    on_fn_exit()
+    {
 	echo
     }
 fi
@@ -66,7 +74,7 @@ start() {
 	
        # Create all domains with config files in AUTODIR.
 	for dom in  $AUTODIR/*; do
-	    xm create --quiet --defaults $dom
+	    xm create --quiet --defconfig $dom
 	    if [ $? -ne 0 ]; then
 		RETVAL=$?
 	    fi
@@ -86,7 +94,7 @@ stop()
     
     echo -n $"Shutting down all Xen domains:"
 
-    xm shutdown --all --wait --norestart
+    xm shutdown --all --wait --halt
 
     RETVAL=$?
 
