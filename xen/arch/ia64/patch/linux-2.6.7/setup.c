@@ -1,5 +1,5 @@
 --- ../../linux-2.6.7/arch/ia64/kernel/setup.c	2004-06-15 23:18:58.000000000 -0600
-+++ arch/ia64/setup.c	2005-03-23 14:54:06.000000000 -0700
++++ arch/ia64/setup.c	2005-04-04 22:31:09.000000000 -0600
 @@ -21,6 +21,9 @@
  #include <linux/init.h>
  
@@ -180,7 +180,19 @@
  	seq_printf(m,
  		   "processor  : %d\n"
  		   "vendor     : %s\n"
-@@ -667,6 +702,8 @@
+@@ -616,7 +651,11 @@
+ 					| IA64_DCR_DA | IA64_DCR_DD | IA64_DCR_LC));
+ 	atomic_inc(&init_mm.mm_count);
+ 	current->active_mm = &init_mm;
++#ifdef XEN
++	if (current->domain->arch.mm)
++#else
+ 	if (current->mm)
++#endif
+ 		BUG();
+ 
+ 	ia64_mmu_init(ia64_imva(cpu_data));
+@@ -667,6 +706,8 @@
  void
  check_bugs (void)
  {

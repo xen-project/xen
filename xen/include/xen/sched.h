@@ -68,10 +68,6 @@ struct exec_domain
     struct exec_domain *ed_next_list;
     int eid;
 
-#ifdef ARCH_HAS_EXEC_DOMAIN_MM_PTR
-    struct mm_struct *mm;
-#endif
-
     struct ac_timer  timer;         /* one-shot timer for timeout values */
     unsigned long    sleep_tick;    /* tick at which this vcpu started sleep */
 
