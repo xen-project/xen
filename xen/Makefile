@@ -59,7 +59,7 @@ include/xen/compile.h:
 	@LANG=C echo \#define XEN_COMPILE_BY \"`whoami`\" >> $@
 	@LANG=C echo \#define XEN_COMPILE_DOMAIN \"`([ -x /bin/dnsdomainname ] && /bin/dnsdomainname) || ([ -x /bin/domainname ] && /bin/domainname || echo [unknown])`\" >> $@
 	@LANG=C echo \#define XEN_COMPILE_HOST \"`hostname`\" >> $@
-	@LANG=C echo \#define XEN_COMPILER \"`$(CC) $(CFLAGS) -v 2>&1 | tail -1`\" >> $@
+	@LANG=C echo \#define XEN_COMPILER \"`$(CC) $(CFLAGS) -v 2>&1 | tail -n 1`\" >> $@
 	@LANG=C echo >> $@
 	@LANG=C echo \#define XEN_VERSION\ \ \ \ \ \ $(XEN_VERSION) >> $@
 	@LANG=C echo \#define XEN_SUBVERSION\ \ \ $(XEN_SUBVERSION) >> $@
