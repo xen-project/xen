@@ -38,8 +38,8 @@ module modules:
 
 .PHONY: install install-module modules_install
 install install-module modules_install: module
-	install -m 0755 -d $(DESTDIR)$(KERNEL_MODULE_DIR)
-	install -m 0554 $(KERNEL_MODULE) $(DESTDIR)$(KERNEL_MODULE_DIR)
+	install -m 0755 -d $(DESTDIR)$(KERNEL_MODULE_DIR)/xen
+	install -m 0554 $(KERNEL_MODULE) $(DESTDIR)$(KERNEL_MODULE_DIR)/xen
 
 .PHONY: clean
 clean:

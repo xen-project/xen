@@ -102,11 +102,11 @@ int varp_send(Conn *conn, uint16_t opcode, uint32_t vnet, Vmac *vmac, uint32_t a
     int varp_n = sizeof(VarpHdr);
     VarpHdr varph = {};
 
-    varph.id     = htons(VARP_ID);
-    varph.opcode = htons(opcode);
-    varph.vnet   = vnet;
-    varph.vmac   = *vmac;
-    varph.addr   = addr;
+    varph.vnetmsghdr.id     = htons(VARP_ID);
+    varph.vnetmsghdr.opcode = htons(opcode);
+    varph.vnet              = vnet;
+    varph.vmac              = *vmac;
+    varph.addr              = addr;
 
     if(0){
         struct sockaddr_in self;
@@ -503,7 +503,7 @@ void VarpCache_sweep(VarpCache *z, int all){
  * @param local whether it's local or not
  */
 void vcache_forward_varp(VarpHdr *varph, int local){
-    uint16_t opcode = ntohs(varph->opcode);
+    uint16_t opcode = ntohs(varph->vnetmsghdr.opcode);
     if(local){
         ConnList *l;
         for(l = vnetd->connections; l; l = l->next){
@@ -611,7 +611,7 @@ int vcache_handle_message(IPMessage *msg, int local){
         dprintf("> opcode=%d vnet=%u vmac=" MACFMT "\n",
                 ntohs(varph->opcode), ntohl(varph->vnet), MAC6TUPLE(varph->vmac.mac));
     }
-    switch(ntohs(varph->opcode)){
+    switch(ntohs(varph->vnetmsghdr.opcode)){
     case VARP_OP_REQUEST:
         err = vcache_handle_request(msg, varph, local);
         break;

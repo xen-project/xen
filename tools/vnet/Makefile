@@ -12,6 +12,7 @@ export prefix?=$(shell cd ../../dist/install && pwd)
 all: compile
 
 compile: vnetd vnet-module
+#compile: vnet-module
 
 gc.tar.gz:
 	wget http://www.hpl.hp.com/personal/Hans_Boehm/gc/gc_source/$@
@@ -20,10 +21,8 @@ gc: gc.tar.gz
 	tar xfz gc.tar.gz
 	ln -sf gc?.? gc
 
-gc/Makefile:
-	(cd gc && ./configure --prefix=`pwd`/install)
-
-gc-install: gc gc/Makefile
+gc-install: gc 
+	(cd gc && make test && ./configure --prefix=`pwd`/install)
 	make -C gc
 	make -C gc install
 
@@ -47,5 +46,6 @@ install: compile
 clean:
 	-$(MAKE) -C vnetd clean
 	-$(MAKE) -C vnet-module clean
-
+	-rm -rf gc?.? gc
+	
 pristine: clean gc-pristine
