@@ -313,6 +313,9 @@ class Opts:
                     print >>sys.stderr, "Error: Unknown option:", k
                     self.usage()
 
+            if not args:
+                break
+            
             # then process the 1st arg 
             (arg,args) = (args[0], args[1:])
 

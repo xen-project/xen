@@ -465,6 +465,8 @@ def main(argv):
     else:
         opts.load_defconfig()
         preprocess(opts, opts.vals)
+        if not opts.getopt('name') and opts.getopt('defconfig'):
+            opts.setopt('name', os.path.basename(opts.getopt('defconfig')))
         config = make_config(opts.vals)
     if opts.vals.dryrun:
         PrettyPrint.prettyprint(config)
