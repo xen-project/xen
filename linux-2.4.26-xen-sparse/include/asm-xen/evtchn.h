@@ -57,12 +57,6 @@ static inline void clear_evtchn(int port)
     synch_clear_bit(port, &s->evtchn_pending[0]);
 }
 
-static inline void clear_evtchn_exception(int port)
-{
-    shared_info_t *s = HYPERVISOR_shared_info;
-    synch_clear_bit(port, &s->evtchn_exception[0]);
-}
-
 static inline void notify_via_evtchn(int port)
 {
     evtchn_op_t op;
@@ -74,10 +68,6 @@ static inline void notify_via_evtchn(int port)
 /*
  * CHARACTER-DEVICE DEFINITIONS
  */
-
-#define PORT_NORMAL    0x0000
-#define PORT_EXCEPTION 0x8000
-#define PORTIDX_MASK   0x7fff
 
 /* /dev/xen/evtchn resides at device number major=10, minor=200 */
 #define EVTCHN_MINOR 200

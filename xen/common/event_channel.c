@@ -126,9 +126,6 @@ static long evtchn_bind_interdomain(evtchn_bind_interdomain_t *bind)
     d2->event_channel[port2].u.remote.port = (u16)port1;
     d2->event_channel[port2].state         = ECS_INTERDOMAIN;
 
-    evtchn_set_pending(d1, port1);
-    evtchn_set_pending(d2, port2);
-    
  out:
     spin_unlock(&d1->event_channel_lock);
     if ( d1 != d2 )
@@ -299,8 +296,6 @@ static long __evtchn_close(struct domain *d1, int port1)
             BUG();
 
         chn2[port2].state = ECS_UNBOUND;
-        evtchn_set_exception(d2, port2);
-
         break;
 
     default:
@@ -308,7 +303,6 @@ static long __evtchn_close(struct domain *d1, int port1)
     }
 
     chn1[port1].state = ECS_FREE;
-    evtchn_set_exception(d1, port1);
 
  out:
     if ( d2 != NULL )

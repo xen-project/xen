@@ -268,14 +268,10 @@ typedef struct shared_info_st
      *     device or the emergency console.
      * 
      * Event channels are addressed by a "port index" between 0 and 1023.
-     * Each channel is associated with three bits of information:
+     * Each channel is associated with two bits of information:
      *  1. PENDING -- notifies the domain that there is a pending notification
      *     to be processed. This bit is cleared by the guest.
-     *  2. EXCEPTION -- notifies the domain that there has been some
-     *     exceptional event associated with this channel (e.g. remote
-     *     disconnect, physical IRQ error). This bit is cleared by the guest.
-     *     A 0->1 transition of this bit will cause the PENDING bit to be set.
-     *  3. MASK -- if this bit is clear then a 0->1 transition of PENDING
+     *  2. MASK -- if this bit is clear then a 0->1 transition of PENDING
      *     will cause an asynchronous upcall to be scheduled. This bit is only
      *     updated by the guest. It is read-only within Xen. If a channel
      *     becomes pending while the channel is masked then the 'edge' is lost
@@ -289,14 +285,13 @@ typedef struct shared_info_st
      */
     u32 evtchn_pending[32];             /*   4 */
     u32 evtchn_pending_sel;             /* 132 */
-    u32 evtchn_exception[32];           /* 136 */
-    u32 evtchn_mask[32];                /* 264 */
+    u32 evtchn_mask[32];                /* 136 */
 
     /*
      * Time: The following abstractions are exposed: System Time, Clock Time,
      * Domain Virtual Time. Domains can access Cycle counter time directly.
      */
-    u64                cpu_freq;        /* 392: CPU frequency (Hz).          */
+    u64                cpu_freq;        /* 264: CPU frequency (Hz).          */
 
     /*
      * The following values are updated periodically (and not necessarily
@@ -305,8 +300,8 @@ typedef struct shared_info_st
      * incremented immediately after. See the Xen-specific Linux code for an
      * example of how to read these values safely (arch/xen/kernel/time.c).
      */
-    u32                time_version1;   /* 400 */
-    u32                time_version2;   /* 404 */
+    u32                time_version1;   /* 272 */
+    u32                time_version2;   /* 276 */
     tsc_timestamp_t    tsc_timestamp;   /* TSC at last update of time vals.  */
     u64                system_time;     /* Time, in nanosecs, since boot.    */
     u32                wc_sec;          /* Secs  00:00:00 UTC, Jan 1, 1970.  */
@@ -318,10 +313,10 @@ typedef struct shared_info_st
      * Allow a domain to specify a timeout value in system time and 
      * domain virtual time.
      */
-    u64                wall_timeout;    /* 440 */
-    u64                domain_timeout;  /* 448 */
+    u64                wall_timeout;    /* 312 */
+    u64                domain_timeout;  /* 320 */
 
-    execution_context_t execution_context; /* 456 */
+    execution_context_t execution_context; /* 328 */
 
 } PACKED shared_info_t;
 

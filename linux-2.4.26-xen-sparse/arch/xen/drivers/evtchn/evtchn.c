@@ -47,7 +47,6 @@ static spinlock_t lock;
 
 void evtchn_device_upcall(int port)
 {
-    u16 port_subtype;
     shared_info_t *s = HYPERVISOR_shared_info;
 
     spin_lock(&lock);
@@ -55,16 +54,11 @@ void evtchn_device_upcall(int port)
     mask_evtchn(port);
     clear_evtchn(port);
 
-    if ( likely(!synch_test_and_clear_bit(port, &s->evtchn_exception[0])) )
-        port_subtype = PORT_NORMAL;
-    else
-        port_subtype = PORT_EXCEPTION;
-
     if ( ring != NULL )
     {
         if ( (ring_prod - ring_cons) < RING_SIZE )
         {
-            ring[RING_MASK(ring_prod)] = (u16)port | port_subtype;
+            ring[RING_MASK(ring_prod)] = (u16)port;
             if ( ring_cons == ring_prod++ )
             {
                 wake_up_interruptible(&evtchn_wait);

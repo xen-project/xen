@@ -46,12 +46,6 @@ static inline void evtchn_set_pending(struct domain *d, int port)
     }
 }
 
-static inline void evtchn_set_exception(struct domain *d, int port)
-{
-    if ( !test_and_set_bit(port, &d->shared_info->evtchn_exception[0]) )
-        evtchn_set_pending(d, port);
-}
-
 /*
  * send_guest_virq:
  *  @d:        Domain to which virtual IRQ should be sent
