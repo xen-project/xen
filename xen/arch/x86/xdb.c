@@ -110,8 +110,6 @@ receive_command(char *recv_buf)
 static void
 u32_to_hex_u8(unsigned char val, char *buf)
 {
-	if (val >= 256)
-		BUG();
 	sprintf(buf, "%.02x\n", val);
 }
 
@@ -124,7 +122,7 @@ u32_to_hex_u32(unsigned val, char *buf)
 static void
 xendbg_send_hex_u8(unsigned char val)
 {
-	char buf[2];
+	char buf[3];
 	u32_to_hex_u8(val, buf);
 	xendbg_send(buf, 2);
 }
@@ -168,7 +166,7 @@ xendbg_finish_reply(void)
 static void
 xendbg_sendrep_hex_u8(unsigned val)
 {
-	char buf[2];
+	char buf[3];
 	u32_to_hex_u8(val, buf);
 	xendbg_sendrep_data(buf, 2);
 }
@@ -176,7 +174,7 @@ xendbg_sendrep_hex_u8(unsigned val)
 static void
 xendbg_sendrep_hex_u32(unsigned val)
 {
-	char buf[8];
+	char buf[9];
 	u32_to_hex_u32(val, buf);
 	xendbg_sendrep_data(buf, 8);
 }
@@ -200,7 +198,7 @@ handle_memory_read_command(unsigned long addr, unsigned long length)
 	unsigned old_s_limit;
 
 	dbg_printk("Memory read starting at %lx, length %lx.\n", addr,
-	       length);
+		   length);
 	old_s_limit = current->addr_limit.seg;
 	current->addr_limit.seg = ~0;
 	xendbg_start_reply();
