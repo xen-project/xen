@@ -11,9 +11,12 @@
 #define STR_MAX  64
 
 static struct { 
-    key_handler *handler; 
+    key_handler *handler;
+    int          flags;
     char         desc[STR_MAX]; 
 } key_table[KEY_MAX]; 
+
+#define KEYHANDLER_NO_DEFER 0x1
 
 static unsigned char keypress_key;
 
@@ -25,17 +28,31 @@ void keypress_softirq(void)
         (*h)(key);
 }
 
-void handle_keypress(unsigned char key)
+void handle_keypress(unsigned char key, struct xen_regs *regs)
 {
+    key_handler  *h;
+
     keypress_key = key;
-    raise_softirq(KEYPRESS_SOFTIRQ);
+    if ( (key_table[key].flags & KEYHANDLER_NO_DEFER) &&
+         ((h = key_table[key].handler) != NULL) )
+        ((void (*)(unsigned char, struct xen_regs *))*h)(key, regs);
+    else
+        raise_softirq(KEYPRESS_SOFTIRQ);
 }
 
 void add_key_handler(unsigned char key, key_handler *handler, char *desc)
 {
-    key_table[key].handler = handler; 
+    key_table[key].handler = handler;
+    key_table[key].flags = 0;
     strncpy(key_table[key].desc, desc, STR_MAX);
     key_table[key].desc[STR_MAX-1] = '\0'; 
+}
+
+void add_key_handler_no_defer(unsigned char key, key_handler *handler,
+                              char *desc)
+{
+    add_key_handler(key, handler, desc);
+    key_table[key].flags |= KEYHANDLER_NO_DEFER;
 }
 
 static void show_handlers(unsigned char key)
