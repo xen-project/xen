@@ -57,7 +57,7 @@ class ConsoleProtocol(protocol.Protocol):
                  self.idx, str(self.addr[0]), str(self.addr[1]))
         eserver.inject('xend.console.disconnect',
                        [self.idx, self.addr[0], self.addr[1]])
-        self.controller.disconnect()
+        self.controller.disconnect(conn=self)
 
     def loseConnection(self):
         self.transport.loseConnection()
@@ -211,9 +211,10 @@ class ConsoleController(controller.Controller):
         self.handleOutput()
         return 0
 
-    def disconnect(self):
+    def disconnect(self, conn=None):
         """Disconnect the TCP connection to the console.
         """
+        if conn and conn != self.conn: return
         if self.conn:
             self.conn.loseConnection()
         self.addr = None
