@@ -135,11 +135,14 @@ typedef struct xv_extent
   unsigned long size;                                      /* size in blocks */
 } xv_extent_t;
 
+#define XEN_SEGMENT_KEYSIZE 10
+
 typedef struct xv_disk
 {
   int mode;                     /* XEN_DISK_READ_WRITE or XEN_DISK_READ_ONLY */
   int domain;                                                      /* domain */
   int segment;                                             /* segment number */
+  char key[XEN_SEGMENT_KEYSIZE];        /* key for benefit of dom0 userspace */
   int ext_count;                          /* number of xv_extent_t to follow */
   xv_extent_t extents[XEN_MAX_DISK_COUNT];    /* arbitrary reuse of constant */
 } xv_disk_t;

@@ -33,4 +33,4 @@ struct dom0_dopgupdates_args
     unsigned long num_pgt_updates;
 };
 
-#endif __DOM0_H__ /* __DOM0_H__ */
+#endif /* __DOM0_H__ */

@@ -162,7 +162,7 @@ void xen_segment_probe(struct task_struct *p, xen_disk_info_t *raw_xdi)
     for ( loop = 0; loop < XEN_MAX_SEGMENTS; loop++ )
     {
         if ( (xsegments[loop].mode == XEN_SEGMENT_UNUSED) ||
-             (p && xsegments[loop].domain != p->domain) )
+             (xsegments[loop].domain != p->domain) )
             continue;
 
         device = MK_VIRTUAL_XENDEV(xsegments[loop].segment_number);
@@ -175,6 +175,39 @@ void xen_segment_probe(struct task_struct *p, xen_disk_info_t *raw_xdi)
     }
 
     unmap_domain_mem(xdi);
+}
+
+/*
+ * xen_segment_probe_all
+ *
+ * return a list of all segments to domain 0
+ */
+void xen_segment_probe_all(xen_segment_info_t *raw_xsi)
+{
+    int loop;
+    xen_segment_info_t *xsi = map_domain_mem(virt_to_phys(raw_xsi));
+    unsigned long device;
+
+    xsi->count = 0;
+    for ( loop = 0; loop < XEN_MAX_SEGMENTS; loop++ )
+    {
+	if ( xsegments[loop].mode == XEN_SEGMENT_UNUSED )
+	    continue;
+
+        device = MK_VIRTUAL_XENDEV(xsegments[loop].segment_number);
+
+	printk("Doing seg %d.\n", xsi->count);
+	xsi->segments[xsi->count].device = device;
+	xsi->segments[xsi->count].domain = xsegments[loop].domain;
+	memcpy(xsi->segments[xsi->count].key,
+	       xsegments[loop].key,
+	       XEN_SEGMENT_KEYSIZE);
+	xsi->segments[xsi->count].seg_nr = xsegments[loop].segment_number;
+	printk("Done.\n");
+        xsi->count++;	
+    }
+
+    unmap_domain_mem(xsi);
 }
 
 /*
@@ -230,6 +263,7 @@ int xen_segment_create(xv_disk_t *xvd_in)
     xsegments[idx].mode = xvd->mode;
     xsegments[idx].domain = xvd->domain;
     xsegments[idx].segment_number = xvd->segment;
+    memcpy(xsegments[idx].key, xvd->key, XEN_SEGMENT_KEYSIZE);
     xsegments[idx].num_extents = xvd->ext_count;
     xsegments[idx].extents = (extent_t *)kmalloc(
         sizeof(extent_t)*xvd->ext_count,

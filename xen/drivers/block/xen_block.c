@@ -571,10 +571,8 @@ static void dispatch_probe_blk(struct task_struct *p, int index)
     make_response(p, blk_ring->ring[index].req.id, XEN_BLOCK_PROBE_BLK, rc);
 }
 
-static void dispatch_probe_seg_common(struct task_struct *p,
-				      struct task_struct *target,
-				      int type,
-				      int index)
+static void dispatch_probe_seg(struct task_struct *p,
+			       int index)
 {
     extern void xen_segment_probe(struct task_struct *, xen_disk_info_t *);
 
@@ -597,22 +595,43 @@ static void dispatch_probe_seg_common(struct task_struct *p,
     spin_unlock_irqrestore(&p->page_lock, flags);
 
     xdi = phys_to_virt(buffer);
-    xen_segment_probe(target, xdi);
+    xen_segment_probe(p, xdi);
 
     unlock_buffer(p, buffer, sizeof(xen_disk_info_t), 1);
 
  out:
-    make_response(p, blk_ring->ring[index].req.id, type, rc);
-}
-
-static void dispatch_probe_seg(struct task_struct *p, int index)
-{
-    dispatch_probe_seg_common(p, p, XEN_BLOCK_PROBE_SEG, index);
+    make_response(p, blk_ring->ring[index].req.id, XEN_BLOCK_PROBE_SEG, rc);
 }
 
 static void dispatch_probe_seg_all(struct task_struct *p, int index)
 {
-    dispatch_probe_seg_common(p, NULL, XEN_BLOCK_PROBE_SEG_ALL, index);
+    extern void xen_segment_probe_all(xen_segment_info_t *);
+
+    blk_ring_t *blk_ring = p->blk_ring_base;
+    xen_segment_info_t *xsi;
+    unsigned long flags, buffer;
+    int rc = 0;
+
+    buffer = blk_ring->ring[index].req.buffer_and_sects[0] & ~0x1FF;
+
+    spin_lock_irqsave(&p->page_lock, flags);
+    if ( !__buffer_is_valid(p, buffer, sizeof(xen_segment_info_t), 1) )
+    {
+        DPRINTK("Bad buffer in dispatch_probe_seg_all\n");
+        spin_unlock_irqrestore(&p->page_lock, flags);
+        rc = 1;
+        goto out;
+    }
+    __lock_buffer(buffer, sizeof(xen_segment_info_t), 1);
+    spin_unlock_irqrestore(&p->page_lock, flags);
+
+    xsi = phys_to_virt(buffer);
+    xen_segment_probe_all(xsi);
+
+    unlock_buffer(p, buffer, sizeof(xen_segment_info_t), 1);
+
+ out:
+    make_response(p, blk_ring->ring[index].req.id, XEN_BLOCK_PROBE_SEG_ALL, rc);
 }
 
 static void dispatch_rw_block_io(struct task_struct *p, int index)

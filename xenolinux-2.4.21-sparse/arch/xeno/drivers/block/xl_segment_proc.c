@@ -8,6 +8,7 @@
 #include <linux/proc_fs.h>
 #include <linux/delay.h>
 #include <linux/seq_file.h>
+#include <asm/hypervisor-ifs/segment.h>
 
 static struct proc_dir_entry *vhd;
 
@@ -15,7 +16,7 @@ extern unsigned short xldev_to_physdev(kdev_t xldev);
 
 static void *proc_vhd_next(struct seq_file *s, void *v, loff_t *pos)
 {
-    xen_disk_info_t *data;
+    xen_segment_info_t *data;
 
     if ( pos != NULL )
         ++(*pos); 
@@ -27,7 +28,7 @@ static void *proc_vhd_next(struct seq_file *s, void *v, loff_t *pos)
 static void *proc_vhd_start(struct seq_file *s, loff_t *ppos)
 {
     loff_t pos = *ppos;
-    xen_disk_info_t *data;
+    xen_segment_info_t *data;
 
     data = kmalloc(sizeof(*data), GFP_KERNEL);
     xenolinux_control_msg(XEN_BLOCK_PROBE_SEG_ALL, (char *)data, sizeof(*data));
@@ -42,13 +43,14 @@ static void *proc_vhd_start(struct seq_file *s, loff_t *ppos)
 
 static int proc_vhd_show(struct seq_file *s, void *v)
 { 
-    xen_disk_info_t *data = v;
+    xen_segment_info_t *data = v;
 
     seq_printf (s,
-		"%4x %4x %lx\n",
-		data->disks[data->count - 1].device,
-		data->disks[data->count - 1].type,
-		data->disks[data->count - 1].capacity);
+		"%x %x %10.10s %x\n",
+		data->segments[data->count - 1].domain,
+		data->segments[data->count - 1].seg_nr,
+		data->segments[data->count - 1].key,
+		data->segments[data->count - 1].device);
 
     return 0;
 }
@@ -200,6 +202,22 @@ static int proc_write_vhd(struct file *file, const char *buffer,
 	goto out;
     }
     xvd.segment = (int) to_number(string);
+
+    string = get_string(NULL);                           /* look for key */
+    if (string == NULL || (*string != 'k' && *string != 'K'))
+    {
+        printk (KERN_ALERT 
+                "error: key specifier missing [%s]. should be \"key\".\n",
+                string);
+	goto out;
+    }
+    string = get_string(NULL);
+    if (string == NULL || strlen(string) != XEN_SEGMENT_KEYSIZE)
+    {
+	printk (KERN_ALERT "error: key missing\n");
+	goto out;
+    }
+    memcpy(xvd.key, string, XEN_SEGMENT_KEYSIZE);
 
     string = get_string(NULL);                           /* look for Extents */
     if (string == NULL || (*string != 'e' && *string != 'E'))
