@@ -232,7 +232,7 @@ struct page *pte_alloc_one(struct mm_struct *mm, unsigned long address)
 	pte = alloc_pages(GFP_KERNEL|__GFP_HIGHMEM|__GFP_REPEAT|__GFP_ZERO, 0);
 	if (pte == NULL)
 		return pte;
-	if (pte >= highmem_start_page)
+	if (PageHighMem(pte))
 		return pte;
 	/* not a highmem page -- free page and grab one from the cache */
 	__free_page(pte);
@@ -247,7 +247,7 @@ void pte_free(struct page *pte)
 {
 	set_page_count(pte, 1);
 #ifdef CONFIG_HIGHPTE
-	if (pte < highmem_start_page)
+	if (!PageHighMem(pte))
 #endif
 		kmem_cache_free(pte_cache,
 				phys_to_virt(page_to_pseudophys(pte)));
