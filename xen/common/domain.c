@@ -157,7 +157,7 @@ void domain_shutdown(u8 reason)
         extern void machine_restart(char *);
         extern void machine_halt(void);
 
-        if ( reason == 0 ) 
+        if ( reason == SHUTDOWN_poweroff ) 
         {
             printk("Domain 0 halted: halting machine.\n");
             machine_halt();
@@ -170,7 +170,10 @@ void domain_shutdown(u8 reason)
     }
 
     if ( reason == SHUTDOWN_crash )
-        domain_crash();  /* we will not return */  
+    {
+        domain_crash();
+        BUG();
+    }
 
     current->shutdown_code = reason;
     set_bit(DF_SHUTDOWN, &current->flags);
