@@ -115,6 +115,11 @@ extern void perfc_reset(unsigned char key, void *dev_id,
                         struct pt_regs *regs);
 #endif
 
+void do_panic_key(unsigned char key, void *dev_id, struct pt_regs *regs)
+{
+    panic("Panic requested from console");
+}
+
 void initialize_keytable(void)
 {
     add_key_handler('d', dump_registers, "dump registers"); 
@@ -128,4 +133,5 @@ void initialize_keytable(void)
     add_key_handler('p', perfc_printall, "print performance counters"); 
     add_key_handler('P', perfc_reset,    "reset performance counters"); 
 #endif
+    add_key_handler('%', do_panic_key,   "Panic Xen");
 }

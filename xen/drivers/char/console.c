@@ -440,6 +440,8 @@ void console_endboot(int disable_vga)
  * **************************************************************
  */
 
+extern void trap_to_xendbg(void);
+
 void panic(const char *fmt, ...)
 {
     va_list args;
@@ -450,7 +452,9 @@ void panic(const char *fmt, ...)
     va_start(args, fmt);
     (void)vsnprintf(buf, sizeof(buf), fmt, args);
     va_end(args);
-    
+
+    trap_to_xendbg();
+
     /* Spit out multiline message in one go. */
     spin_lock_irqsave(&console_lock, flags);
     __putstr("\n****************************************\n");

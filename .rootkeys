@@ -449,10 +449,12 @@
 3ddb79bcecupHj56ZbTa3B0FxDowMg xen/arch/x86/x86_32/entry.S
 3ddb79bcHwuCQDjBICDTSis52hWguw xen/arch/x86/x86_32/mm.c
 3ddb79bc4nTpGQOe6_-MbyZzkhlhFQ xen/arch/x86/x86_32/usercopy.c
+4107c15e_NqNYew2EXroXz2mgTAMWQ xen/arch/x86/x86_32/xdb_trap.S
 3ddb79bcOMCu9-5mKpjIh5d0qqBDPg xen/arch/x86/x86_32/xen.lds
 40e96d3aLDI-nViMuYneD7VKYlZrVg xen/arch/x86/x86_64/entry.S
 40e96d3ahBTZqbTViInnq0lM03vs7A xen/arch/x86/x86_64/usercopy.c
 40e96d3akN3Hu_J5Bk-WXD8OGscrYQ xen/arch/x86/x86_64/xen.lds
+4107c15e-VmEcLsE-7JCXZaabI8C7A xen/arch/x86/xdb.c
 3ddb79bdff-gj-jFGKjOejeHLqL8Lg xen/common/Makefile
 3e397e66AyyD5fYraAySWuwi9uqSXg xen/common/ac_timer.c
 4022a73c_BbDFd2YJ_NQYVvKX5Oz7w xen/common/debug-linux.c

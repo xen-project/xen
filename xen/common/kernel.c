@@ -64,6 +64,8 @@ int opt_ignorebiostables=0;
 int opt_watchdog=0;
 /* opt_pdb: Name of serial port for Xen pervasive debugger (and enable pdb) */
 unsigned char opt_pdb[10] = "none";
+/* opt_pdb: Name of serial port for Xen debugger (and enable xendbg) */
+unsigned char opt_xendbg[10] = "none";
 /* opt_tbuf_size: trace buffer size (in pages) */
 unsigned int opt_tbuf_size = 10;
 /* opt_sched: scheduler - default to Borrowed Virtual Time */
@@ -98,6 +100,7 @@ static struct {
     { "ignorebiostables",  OPT_BOOL, &opt_ignorebiostables },
     { "watchdog",          OPT_BOOL, &opt_watchdog },
     { "pdb",               OPT_STR,  &opt_pdb },
+    { "xendbg",            OPT_STR,  &opt_xendbg },
     { "tbuf_size",         OPT_UINT, &opt_tbuf_size },
     { "sched",             OPT_STR,  &opt_sched },
     { "physdev_dom0_hide", OPT_STR,  &opt_physdev_dom0_hide },
@@ -107,6 +110,9 @@ static struct {
     { NULL,               0,        NULL     }
 };
 
+
+void initialize_xendbg(void);
+void trap_to_xendbg(void);
 
 void cmain(multiboot_info_t *mbi)
 {
@@ -162,6 +168,8 @@ void cmain(multiboot_info_t *mbi)
     serial_init_stage1();
 
     init_console();
+
+    initialize_xendbg();
 
     /* HELLO WORLD --- start-of-day banner text. */
     printk(XEN_BANNER);
@@ -290,6 +298,10 @@ void cmain(multiboot_info_t *mbi)
     set_bit(DF_PRIVILEGED, &new_dom->flags);
 
     shadow_mode_init();
+
+    printk("Trapping to debugger.\n");
+    trap_to_xendbg();
+    printk("Trapped to debugger and came back.\n");
 
     /*
      * We're going to setup domain0 using the module(s) that we stashed safely
