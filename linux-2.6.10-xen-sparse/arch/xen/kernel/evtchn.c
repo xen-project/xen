@@ -92,42 +92,36 @@ void force_evtchn_callback(void)
     (void)HYPERVISOR_xen_version(0);
 }
 
+/* NB. Interrupts are disabled on entry. */
 asmlinkage void evtchn_do_upcall(struct pt_regs *regs)
 {
     unsigned long  l1, l2;
     unsigned int   l1i, l2i, port;
     int            irq;
-    unsigned long  flags;
     shared_info_t *s = HYPERVISOR_shared_info;
 
-    local_irq_save(flags);
-    
-    while ( s->vcpu_data[0].evtchn_upcall_pending )
+    s->vcpu_data[0].evtchn_upcall_pending = 0;
+
+    /* NB. No need for a barrier here -- XCHG is a barrier on x86. */
+    l1 = xchg(&s->evtchn_pending_sel, 0);
+    while ( l1 != 0 )
     {
-        s->vcpu_data[0].evtchn_upcall_pending = 0;
-        /* NB. No need for a barrier here -- XCHG is a barrier on x86. */
-        l1 = xchg(&s->evtchn_pending_sel, 0);
-        while ( (l1i = ffs(l1)) != 0 )
-        {
-            l1i--;
-            l1 &= ~(1 << l1i);
+        l1i = __ffs(l1);
+        l1 &= ~(1 << l1i);
         
-            l2 = s->evtchn_pending[l1i] & ~s->evtchn_mask[l1i];
-            while ( (l2i = ffs(l2)) != 0 )
-            {
-                l2i--;
-                l2 &= ~(1 << l2i);
+        l2 = s->evtchn_pending[l1i] & ~s->evtchn_mask[l1i];
+        while ( l2 != 0 )
+        {
+            l2i = __ffs(l2);
+            l2 &= ~(1 << l2i);
             
-                port = (l1i << 5) + l2i;
-                if ( (irq = evtchn_to_irq[port]) != -1 )
-                    do_IRQ(irq, regs);
-                else
-                    evtchn_device_upcall(port);
-            }
+            port = (l1i << 5) + l2i;
+            if ( (irq = evtchn_to_irq[port]) != -1 )
+                do_IRQ(irq, regs);
+            else
+                evtchn_device_upcall(port);
         }
     }
-
-    local_irq_restore(flags);
 }
 
 static int find_unbound_irq(void)
