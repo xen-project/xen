@@ -524,6 +524,7 @@ typedef struct {
 #define AuxInfo		Aux64Info
 #endif
 
+struct domain_setup_info;
 extern int loadelfimage(char *);
 extern int parseelfimage(char *, unsigned long, struct domain_setup_info *);
 
