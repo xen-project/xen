@@ -286,10 +286,9 @@ asmlinkage void do_page_fault(struct pt_regs *regs, long error_code)
 {
     struct guest_trap_bounce *gtb = guest_trap_bounce+smp_processor_id();
     trap_info_t *ti;
-    unsigned long addr, off, fixup, l1e, *ldt_page;
+    unsigned long addr, fixup;
     struct task_struct *p = current;
-    struct pfn_info *page;
-    int i;
+    extern int map_ldt_shadow_page(unsigned int);
 
     __asm__ __volatile__ ("movl %%cr2,%0" : "=r" (addr) : );
 
@@ -320,56 +319,10 @@ asmlinkage void do_page_fault(struct pt_regs *regs, long error_code)
  fault_in_xen_space:
 
     if ( (addr < LDT_VIRT_START) || 
-         (addr >= (LDT_VIRT_START + (p->mm.ldt_ents*LDT_ENTRY_SIZE))) )
+         (addr >= (LDT_VIRT_START + (p->mm.ldt_ents*LDT_ENTRY_SIZE))) ||
+         map_ldt_shadow_page((addr - LDT_VIRT_START) >> PAGE_SHIFT) )
         goto propagate_fault;
-
-    off  = addr - LDT_VIRT_START;
-    addr = p->mm.ldt_base + off;
-
-    spin_lock(&p->page_lock);
-
-    __get_user(l1e, (unsigned long *)(linear_pg_table+(addr>>PAGE_SHIFT)));
-    if ( !(l1e & _PAGE_PRESENT) )
-        goto unlock_and_propagate_fault;
-
-    page = frame_table + (l1e >> PAGE_SHIFT);
-    if ( (page->flags & PG_type_mask) != PGT_ldt_page )
-    {
-        if ( page->type_count != 0 )
-            goto unlock_and_propagate_fault;
-
-        /* Check all potential LDT entries in the page. */
-        ldt_page = (unsigned long *)(addr & PAGE_MASK);
-        for ( i = 0; i < 512; i++ )
-            if ( !check_descriptor(ldt_page[i*2], ldt_page[i*2+1]) )
-                goto unlock_and_propagate_fault;
-
-        if ( page->flags & PG_need_flush )
-        {
-            perfc_incrc(need_flush_tlb_flush);
-            local_flush_tlb();
-            page->flags &= ~PG_need_flush;
-        }
-
-        page->flags &= ~PG_type_mask;
-        page->flags |= PGT_ldt_page;
-    }
-
-    /* Success! */
-    get_page_type(page);
-    get_page_tot(page);
-    p->mm.perdomain_pt[l1_table_offset(off)+16] = mk_l1_pgentry(l1e|_PAGE_RW);
-    p->mm.shadow_ldt_mapcnt++;
-
-    spin_unlock(&p->page_lock);
     return;
-
-
- unlock_and_propagate_fault:
-
-    spin_unlock(&p->page_lock);
-    goto propagate_fault;
-
 
  fault_in_hypervisor:
 

@@ -172,8 +172,10 @@ spinlock_t free_list_lock = SPIN_LOCK_UNLOCKED;
 unsigned int free_pfns;
 
 /* Used to defer flushing of memory structures. */
-static int flush_tlb[NR_CPUS] __cacheline_aligned;
-
+static struct {
+    int flush_tlb;
+    int refresh_ldt;
+} deferred_op[NR_CPUS] __cacheline_aligned;
 
 /*
  * init_frametable:
@@ -186,7 +188,7 @@ void __init init_frametable(unsigned long nr_pages)
     unsigned long page_index;
     unsigned long flags;
 
-    memset(flush_tlb, 0, sizeof(flush_tlb));
+    memset(deferred_op, 0, sizeof(deferred_op));
 
     max_page = nr_pages;
     frame_table_size = nr_pages * sizeof(struct pfn_info);
@@ -213,7 +215,7 @@ void __init init_frametable(unsigned long nr_pages)
 
 static void __invalidate_shadow_ldt(void)
 {
-    int i;
+    int i, cpu = smp_processor_id();
     unsigned long pfn;
     struct pfn_info *page;
     
@@ -233,7 +235,8 @@ static void __invalidate_shadow_ldt(void)
     }
 
     /* Dispose of the (now possibly invalid) mappings from the TLB.  */
-    flush_tlb[smp_processor_id()] = 1;
+    deferred_op[cpu].flush_tlb   = 1;
+    deferred_op[cpu].refresh_ldt = 1;
 }
 
 
@@ -241,6 +244,58 @@ static inline void invalidate_shadow_ldt(void)
 {
     if ( current->mm.shadow_ldt_mapcnt != 0 )
         __invalidate_shadow_ldt();
+}
+
+
+/* Map shadow page at offset @off. Returns 0 on success. */
+int map_ldt_shadow_page(unsigned int off)
+{
+    struct task_struct *p = current;
+    unsigned long addr = p->mm.ldt_base + (off << PAGE_SHIFT);
+    unsigned long l1e, *ldt_page;
+    struct pfn_info *page;
+    int i, ret = -1;
+
+    spin_lock(&p->page_lock);
+
+    __get_user(l1e, (unsigned long *)(linear_pg_table+(addr>>PAGE_SHIFT)));
+    if ( unlikely(!(l1e & _PAGE_PRESENT)) )
+        goto out;
+
+    page = frame_table + (l1e >> PAGE_SHIFT);
+    if ( unlikely((page->flags & PG_type_mask) != PGT_ldt_page) )
+    {
+        if ( unlikely(page->type_count != 0) )
+            goto out;
+
+        /* Check all potential LDT entries in the page. */
+        ldt_page = (unsigned long *)addr;
+        for ( i = 0; i < 512; i++ )
+            if ( unlikely(!check_descriptor(ldt_page[i*2], ldt_page[i*2+1])) )
+                goto out;
+
+        if ( unlikely(page->flags & PG_need_flush) )
+        {
+            perfc_incrc(need_flush_tlb_flush);
+            __write_cr3_counted(pagetable_val(p->mm.pagetable));
+            page->flags &= ~PG_need_flush;
+        }
+
+        page->flags &= ~PG_type_mask;
+        page->flags |= PGT_ldt_page;
+    }
+
+    /* Success! */
+    get_page_type(page);
+    get_page_tot(page);
+    p->mm.perdomain_pt[l1_table_offset(off)+16] = mk_l1_pgentry(l1e|_PAGE_RW);
+    p->mm.shadow_ldt_mapcnt++;
+
+    ret = 0;
+
+ out:
+    spin_unlock(&p->page_lock);
+    return ret;
 }
 
 
@@ -274,7 +329,7 @@ static int inc_page_refcnt(unsigned long page_nr, unsigned int type)
 
         if ( unlikely(flags & PG_need_flush) )
         {
-            flush_tlb[smp_processor_id()] = 1;
+            deferred_op[smp_processor_id()].flush_tlb = 1;
             page->flags &= ~PG_need_flush;
             perfc_incrc(need_flush_tlb_flush);
         }
@@ -628,7 +683,7 @@ static int mod_l1_entry(l1_pgentry_t *p_l1_entry, l1_pgentry_t new_l1_entry)
 
 static int do_extended_command(unsigned long ptr, unsigned long val)
 {
-    int err = 0;
+    int err = 0, cpu = smp_processor_id();
     unsigned int cmd = val & PGEXT_CMD_MASK;
     unsigned long pfn = ptr >> PAGE_SHIFT;
     struct pfn_info *page = frame_table + pfn;
@@ -694,7 +749,7 @@ static int do_extended_command(unsigned long ptr, unsigned long val)
             put_l2_table(pagetable_val(current->mm.pagetable) >> PAGE_SHIFT);
             current->mm.pagetable = mk_pagetable(pfn << PAGE_SHIFT);
             invalidate_shadow_ldt();
-            flush_tlb[smp_processor_id()] = 1;
+            deferred_op[cpu].flush_tlb = 1;
         }
         else
         {
@@ -703,7 +758,7 @@ static int do_extended_command(unsigned long ptr, unsigned long val)
         break;
         
     case PGEXT_TLB_FLUSH:
-        flush_tlb[smp_processor_id()] = 1;
+        deferred_op[cpu].flush_tlb = 1;
         break;
     
     case PGEXT_INVLPG:
@@ -729,6 +784,7 @@ static int do_extended_command(unsigned long ptr, unsigned long val)
             current->mm.ldt_base = ptr;
             current->mm.ldt_ents = ents;
             load_LDT(current);
+            deferred_op[cpu].refresh_ldt = (ents != 0);
         }
         break;
     }
@@ -748,7 +804,7 @@ int do_process_page_updates(page_update_request_t *ureqs, int count)
     page_update_request_t req;
     unsigned long flags, pfn, l1e;
     struct pfn_info *page;
-    int err = 0, i;
+    int err = 0, i, cpu = smp_processor_id();
     unsigned int cmd;
     unsigned long cr0 = 0;
 
@@ -884,11 +940,16 @@ int do_process_page_updates(page_update_request_t *ureqs, int count)
         ureqs++;
     }
 
-    if ( flush_tlb[smp_processor_id()] )
+    if ( deferred_op[cpu].flush_tlb )
     {
-        flush_tlb[smp_processor_id()] = 0;
+        deferred_op[cpu].flush_tlb = 0;
         __write_cr3_counted(pagetable_val(current->mm.pagetable));
+    }
 
+    if ( deferred_op[cpu].refresh_ldt )
+    {
+        deferred_op[cpu].refresh_ldt = 0;
+        (void)map_ldt_shadow_page(0);
     }
 
     if ( cr0 != 0 )
