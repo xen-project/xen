@@ -174,7 +174,8 @@ shadow_demote(struct domain *d, unsigned long gpfn, unsigned long gmfn)
  * don't want to let those disappear just because no CR3 is currently pointing
  * at it.
  *
- * tlbflush_timestamp holds a pickled pointer to the domain.
+ * tlbflush_timestamp holds a min & max index of valid page table entries
+ * within the shadow page.
  */
 
 static inline unsigned long
@@ -204,7 +205,7 @@ alloc_shadow_page(struct domain *d,
     ASSERT( (gmfn & ~PGT_mfn_mask) == 0 );
     page->u.inuse.type_info = psh_type | gmfn;
     page->count_info = 0;
-    page->tlbflush_timestamp = pickle_domptr(d);
+    page->tlbflush_timestamp = 0;
 
     switch ( psh_type )
     {
@@ -325,8 +326,8 @@ free_shadow_l2_table(struct domain *d, unsigned long smfn)
 void free_shadow_page(unsigned long smfn)
 {
     struct pfn_info *page = &frame_table[smfn];
-    struct domain *d = unpickle_domptr(page->tlbflush_timestamp);
     unsigned long gmfn = page->u.inuse.type_info & PGT_mfn_mask;
+    struct domain *d = page_get_owner(pfn_to_page(gmfn));
     unsigned long gpfn = __mfn_to_gpfn(d, gmfn);
     unsigned long type = page->u.inuse.type_info & PGT_type_mask;
 
@@ -1431,25 +1432,34 @@ void shadow_map_l1_into_current_l2(unsigned long va)
 
         unsigned long sl1e;
         int index = l1_table_offset(va);
-
-        l1pte_propagate_from_guest(d, gpl1e[index], &sl1e);
-        if ( (sl1e & _PAGE_PRESENT) &&
-             !shadow_get_page_from_l1e(mk_l1_pgentry(sl1e), d) )
-            sl1e = 0;
-        spl1e[index] = sl1e;
+        int min = 1, max = 0;
 
         for ( i = 0; i < L1_PAGETABLE_ENTRIES; i++ )
         {
-            if ( i == index )
-                continue;
             l1pte_propagate_from_guest(d, gpl1e[i], &sl1e);
             if ( (sl1e & _PAGE_PRESENT) &&
                  !shadow_get_page_from_l1e(mk_l1_pgentry(sl1e), d) )
                 sl1e = 0;
             if ( sl1e == 0 )
+            {
+                // First copy entries from 0 until first invalid.
+                // Then copy entries from index until first invalid.
+                //
+                if ( i < index ) {
+                    i = index - 1;
+                    continue;
+                }
                 break;
+            }
             spl1e[i] = sl1e;
+            if ( unlikely(i < min) )
+                min = i;
+            if ( likely(i > max) )
+                max = i;
         }
+
+        frame_table[sl1mfn].tlbflush_timestamp =
+            SHADOW_ENCODE_MIN_MAX(min, max);
     }
 }
 
@@ -1996,6 +2006,8 @@ static int resync_all(struct domain *d, u32 stype)
     unsigned long *guest, *shadow, *snapshot;
     int need_flush = 0, external = shadow_mode_external(d);
     int unshadow;
+    unsigned long min_max;
+    int min, max;
 
     ASSERT(spin_is_locked(&d->arch.shadow_lock));
 
@@ -2020,7 +2032,10 @@ static int resync_all(struct domain *d, u32 stype)
 
         switch ( stype ) {
         case PGT_l1_shadow:
-            for ( i = 0; i < L1_PAGETABLE_ENTRIES; i++ )
+            min_max = pfn_to_page(smfn)->tlbflush_timestamp;
+            min = SHADOW_MIN(min_max);
+            max = SHADOW_MAX(min_max);
+            for ( i = min; i <= max; i++ )
             {
                 unsigned new_pte = guest[i];
                 if ( new_pte != snapshot[i] )

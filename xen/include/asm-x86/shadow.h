@@ -52,6 +52,10 @@
 #define shadow_lock(_d)      do { ASSERT(!spin_is_locked(&(_d)->arch.shadow_lock)); spin_lock(&(_d)->arch.shadow_lock); } while (0)
 #define shadow_unlock(_d)    spin_unlock(&(_d)->arch.shadow_lock)
 
+#define SHADOW_ENCODE_MIN_MAX(_min, _max) (((L1_PAGETABLE_ENTRIES - (_max)) << 16) | (_min))
+#define SHADOW_MIN(_encoded) ((_encoded) & ((1u<<16) - 1))
+#define SHADOW_MAX(_encoded) (L1_PAGETABLE_ENTRIES - ((_encoded) >> 16))
+
 extern void shadow_mode_init(void);
 extern int shadow_mode_control(struct domain *p, dom0_shadow_control_t *sc);
 extern int shadow_fault(unsigned long va, struct xen_regs *regs);
@@ -187,13 +191,9 @@ extern unsigned long gpfn_to_mfn_safe(
 /************************************************************************/
 
 struct shadow_status {
-    unsigned long gpfn_and_flags; /* Guest pfn plus flags. */
     struct shadow_status *next;   /* Pull-to-front list per hash bucket. */
+    unsigned long gpfn_and_flags; /* Guest pfn plus flags. */
     unsigned long smfn;           /* Shadow mfn.           */
-
-    // Pull-to-front list of L1s/L2s from which we check when removing
-    // write access to a page.
-    //struct list_head next_to_check;
 };
 
 #define shadow_ht_extra_size 128
@@ -1290,6 +1290,29 @@ static inline void set_shadow_status(
 
 /************************************************************************/
 
+void static inline
+shadow_update_min_max(unsigned long smfn, int index)
+{
+    struct pfn_info *sl1page = pfn_to_page(smfn);
+    unsigned long min_max = sl1page->tlbflush_timestamp;
+    int min = SHADOW_MIN(min_max);
+    int max = SHADOW_MAX(min_max);
+    int update = 0;
+
+    if ( index < min )
+    {
+        min = index;
+        update = 1;
+    }
+    if ( index > max )
+    {
+        max = index;
+        update = 1;
+    }
+    if ( update )
+        sl1page->tlbflush_timestamp = SHADOW_ENCODE_MIN_MAX(min, max);
+}
+
 extern void shadow_map_l1_into_current_l2(unsigned long va);
 
 void static inline
@@ -1357,6 +1380,8 @@ shadow_set_l1e(unsigned long va, unsigned long new_spte, int create_l1_shadow)
     }
 
     shadow_linear_pg_table[l1_linear_offset(va)] = mk_l1_pgentry(new_spte);
+
+    shadow_update_min_max(sl2e >> PAGE_SHIFT, l1_table_offset(va));
 }
 
 /************************************************************************/
