@@ -50,8 +50,6 @@
 #include <asm/tlb.h>
 #include <linux/list.h>
 
-#define MIN_TARGET ((16 << 20) >> PAGE_SHIFT) /* 16MB */
-
 static struct proc_dir_entry *balloon_pde;
 
 static DECLARE_MUTEX(balloon_mutex);
@@ -93,6 +91,7 @@ static struct timer_list balloon_timer;
 #define LIST_TO_PAGE(l) ( list_entry(l, struct page, list) )
 #define UNLIST_PAGE(p)  ( list_del(&p->list) )
 #define pte_offset_kernel pte_offset
+#define subsys_initcall(_fn) __initcall(fn)
 #endif
 
 #define IPRINTK(fmt, args...) \
@@ -159,8 +158,6 @@ static unsigned long current_target(void)
     unsigned long target = min(target_pages, hard_limit);
     if ( target > (current_pages + balloon_low + balloon_high) )
         target = current_pages + balloon_low + balloon_high;
-    if ( target < MIN_TARGET )
-        target = MIN_TARGET;
     return target;
 }
 
@@ -443,7 +440,7 @@ static int __init balloon_init(void)
     return 0;
 }
 
-__initcall(balloon_init);
+subsys_initcall(balloon_init);
 
 void balloon_update_driver_allowance(long delta)
 {
