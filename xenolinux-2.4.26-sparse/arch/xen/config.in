@@ -15,7 +15,10 @@ define_bool CONFIG_UID16 y
 mainmenu_option next_comment
 comment 'Xen'
 bool 'Support for privileged operations (domain 0)' CONFIG_XEN_PRIVILEGED_GUEST
-bool 'Support for direct physical device access' CONFIG_XEN_PHYSDEV_ACCESS
+bool 'New I/O model (no drivers in Xen) [EXPERIMENTAL]' CONFIG_XEN_NEWIO
+if [ "$CONFIG_XEN_NEWIO" = "y" ]; then
+  bool 'Device-driver domain (physical device access)' CONFIG_XEN_PHYSDEV_ACCESS
+fi
 endmenu
 # The IBM S/390 patch needs this.
 define_bool CONFIG_NO_IDLE_HZ y
@@ -155,24 +158,7 @@ if [ "$CONFIG_NET" = "y" ]; then
    source net/Config.in
 fi
 
-if [ "$CONFIG_XEN_PHYSDEV_ACCESS" = "n" ]; then
-   #
-   # Block device driver configuration
-   #
-   mainmenu_option next_comment
-   comment 'Block devices'
-   tristate 'Loopback device support' CONFIG_BLK_DEV_LOOP
-   dep_tristate 'Network block device support' CONFIG_BLK_DEV_NBD $CONFIG_NET
-   tristate 'RAM disk support' CONFIG_BLK_DEV_RAM
-   if [ "$CONFIG_BLK_DEV_RAM" = "y" -o "$CONFIG_BLK_DEV_RAM" = "m" ]; then
-      int '  Default RAM disk size' CONFIG_BLK_DEV_RAM_SIZE 4096
-   fi
-   dep_bool '  Initial RAM disk (initrd) support' CONFIG_BLK_DEV_INITRD $CONFIG_BLK_DEV_RAM
-   bool 'Per partition statistics in /proc/partitions' CONFIG_BLK_STATS
-   bool 'XenoLinux virtual block device support' CONFIG_XEN_VBD
-   define_bool CONFIG_BLK_DEV_HD n
-   endmenu
-else
+if [ "$CONFIG_XEN_PHYSDEV_ACCESS" = "y" ]; then
    mainmenu_option next_comment
    comment 'ATA/IDE/MFM/RLL support'
 
@@ -244,6 +230,23 @@ else
    # input before char - char/joystick depends on it. As does USB.
    #
    source drivers/input/Config.in
+else
+   #
+   # Block device driver configuration
+   #
+   mainmenu_option next_comment
+   comment 'Block devices'
+   tristate 'Loopback device support' CONFIG_BLK_DEV_LOOP
+   dep_tristate 'Network block device support' CONFIG_BLK_DEV_NBD $CONFIG_NET
+   tristate 'RAM disk support' CONFIG_BLK_DEV_RAM
+   if [ "$CONFIG_BLK_DEV_RAM" = "y" -o "$CONFIG_BLK_DEV_RAM" = "m" ]; then
+      int '  Default RAM disk size' CONFIG_BLK_DEV_RAM_SIZE 4096
+   fi
+   dep_bool '  Initial RAM disk (initrd) support' CONFIG_BLK_DEV_INITRD $CONFIG_BLK_DEV_RAM
+   bool 'Per partition statistics in /proc/partitions' CONFIG_BLK_STATS
+   bool 'XenoLinux virtual block device support' CONFIG_XEN_VBD
+   define_bool CONFIG_BLK_DEV_HD n
+   endmenu
 fi
 
 source drivers/char/Config.in
