@@ -481,7 +481,6 @@ static void dispatch_rw_block_io(blkif_t *blkif, blkif_request_t *req)
     for ( i = 0; i < nr_psegs; i++ )
     {
         struct bio *bio;
-        struct bio_vec *bv;
 
         bio = bio_alloc(GFP_ATOMIC, 1);
         if ( unlikely(bio == NULL) )
@@ -494,17 +493,14 @@ static void dispatch_rw_block_io(blkif_t *blkif, blkif_request_t *req)
         bio->bi_private = pending_req;
         bio->bi_end_io  = end_block_io_op;
         bio->bi_sector  = phys_seg[i].sector_number;
-        bio->bi_rw      = operation;
 
-        bv = bio_iovec_idx(bio, 0);
-        bv->bv_page   = virt_to_page(MMAP_VADDR(pending_idx, i));
-        bv->bv_len    = phys_seg[i].nr_sects << 9;
-        bv->bv_offset = phys_seg[i].buffer & ~PAGE_MASK;
+        bio_add_page(
+            bio,
+            virt_to_page(MMAP_VADDR(pending_idx, i)),
+            phys_seg[i].nr_sects << 9,
+            phys_seg[i].buffer & ~PAGE_MASK);
 
-        bio->bi_size    = bv->bv_len;
-        bio->bi_vcnt++;
-
-        submit_bio(operation, bio);
+        submit_bio(operation | (1 << BIO_RW_SYNC), bio);
     }
 #endif
 
