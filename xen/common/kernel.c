@@ -108,7 +108,7 @@ static struct {
 };
 
 
-void cmain(unsigned long magic, multiboot_info_t *mbi)
+void cmain(multiboot_info_t *mbi)
 {
     struct domain *new_dom;
     unsigned long max_page;
@@ -172,12 +172,6 @@ void cmain(unsigned long magic, multiboot_info_t *mbi)
            XEN_COMPILE_BY, XEN_COMPILE_DOMAIN,
            XEN_COMPILER, XEN_COMPILE_DATE);
     set_printk_prefix("(XEN) ");
-
-    if ( magic != MULTIBOOT_BOOTLOADER_MAGIC )
-    {
-        printk("FATAL ERROR: Invalid magic number: 0x%08lx\n", magic);
-        for ( ; ; ) ;
-    }
 
     /* We require memory and module information. */
     if ( (mbi->flags & 9) != 9 )

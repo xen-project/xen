@@ -21,9 +21,15 @@ ENTRY(start)
         .long   -0x1BADB004
 
         .org    0x010
-        .asciz "Bad CPU: does not support 64-bit (long) mode."
+        .asciz "ERR: Not a 64-bit CPU!"
+        .org    0x028
+        .asciz "ERR: Not a Multiboot bootloader!"
 bad_cpu:
         mov     $0x100010,%esi # Error message
+        jmp     print_err
+not_multiboot:
+        mov     $0x100028,%esi # Error message
+print_err:
         mov     $0xB8000,%edi  # VGA framebuffer
 1:      mov     (%esi),%bl
         test    %bl,%bl        # Terminate on '\0' sentinel
@@ -50,6 +56,16 @@ __start:
         mov     %ecx,%ds
         mov     %ecx,%es
 
+        /* Check for Multiboot bootloader */
+        cmp     $(SECONDARY_CPU_FLAG),%ebx
+        je      skip_multiboot_check
+        cmp     $0x2BADB002,%eax
+        jne     not_multiboot
+skip_multiboot_check:
+        
+        /* Save the Multiboot info structure for later use. */
+        mov     %ebx,0x1001e0
+
         /* We begin by interrogating the CPU for the presence of long mode. */
         mov     $0x80000000,%eax
         cpuid
@@ -66,9 +82,6 @@ __start:
         /* Enable PAE in CR4. */
         mov     $0x20,%ecx # X86_CR4_PAE
         mov     %ecx,%cr4
-
-        mov     %ebx,0x1001e0 /* Multiboot info struct */
-        mov     %eax,0x1001e4 /* Multiboot magic value */
 
         /* Load pagetable base register. */
         mov     $0x101000,%eax   /* idle_pg_table */
@@ -138,14 +151,11 @@ __high_start:
         add     $8,%rdi
         loop    1b
 
-        mov     0x1001e0,%eax /* Multiboot info struct */
-        lea     start(%rip),%rbx
-        sub     $0x100000,%rbx
-        add     %rbx,%rax
-        push    %rax
-        mov     0x1001e4,%eax /* Multiboot magic value */
-        push    %rax
-        
+        /* Pass off the Multiboot info structure to C land. */
+        mov     0x1001e0,%edi
+        lea     start(%rip),%rax
+        sub     $0x100000,%rax
+        add     %rax,%rdi
         call    cmain
 
 /* This is the default interrupt handler. */
@@ -156,8 +166,7 @@ ignore_int:
         mov     $(__HYPERVISOR_DS),%eax
         mov     %eax,%ds
         mov     %eax,%es
-        lea     int_msg(%rip),%rax
-        push    %rax
+        lea     int_msg(%rip),%rdi
         call    SYMBOL_NAME(printf)
 1:      jmp     1b
 
@@ -267,9 +276,11 @@ continue_nonidle_task:
 __get_user_1:
 paging_init:
 trap_init: 
-.globl __get_user_8, zap_low_mappings, set_debugreg
+.globl __get_user_8, zap_low_mappings, set_debugreg,synchronise_pagetables
 __get_user_8:
 zap_low_mappings:
 set_debugreg:
-        
+synchronise_pagetables:
+.globl destroy_gdt
+destroy_gdt:    
         
