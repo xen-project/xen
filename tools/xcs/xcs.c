@@ -743,7 +743,7 @@ int main (int argc, char *argv[])
             int size;
             memset (&remote_addr, 0, sizeof (remote_addr));
             size = sizeof remote_addr;
-            ret = accept(listen_fd, (struct sockaddr *)&remote_addr, &size);
+            ret = accept(listen_fd, (struct sockaddr *)&remote_addr, (socklen_t *)&size);
             if ( ret < 0 )
             {
                 perror("accept()");

@@ -283,7 +283,7 @@ int unpack_sxpr(IOStream *io, Sxpr *x){
         err = unpack_cons(io, &val);
         break;
     case T_BOOL:
-        err = unpack_bool(io, &u);
+        err = unpack_bool(io, (int *)&u);
         if(err) goto exit;
         val = (u ? OTRUE : OFALSE);
         break;

@@ -773,7 +773,7 @@ static PyObject *xu_message_get_payload(PyObject *self, PyObject *args)
         return dict;
     }
 
-    return PyString_FromStringAndSize(xum->msg.msg, xum->msg.length);
+    return PyString_FromStringAndSize((char *)xum->msg.msg, xum->msg.length);
 }
 
 static PyObject *xu_message_get_header(PyObject *self, PyObject *args)

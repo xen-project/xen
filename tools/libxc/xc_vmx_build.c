@@ -339,7 +339,7 @@ static int setup_guest(int xc_handle,
         page_array[(vboot_params_start-dsi.v_start)>>PAGE_SHIFT]);
     memset(boot_paramsp, 0, sizeof(*boot_paramsp));
 
-    strncpy(boot_paramsp->cmd_line, cmdline, 0x800);
+    strncpy((char *)boot_paramsp->cmd_line, cmdline, 0x800);
     boot_paramsp->cmd_line[0x800-1] = '\0';
     boot_paramsp->cmd_line_ptr = ((unsigned long) vboot_params_start) + offsetof(struct linux_boot_params, cmd_line);
 

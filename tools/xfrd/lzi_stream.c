@@ -242,7 +242,7 @@ int read_block(LZIState *s){
     int err = 0, k = 0;
     //dprintf(">\n");
     if(s->eof) goto exit;
-    err = unmarshal_uint32(s->io, &k);
+    err = unmarshal_uint32(s->io, (unsigned int *)&k);
     if(err) goto exit;
     if(k > s->inbuf_size){
         err = -EINVAL;

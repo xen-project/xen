@@ -81,14 +81,14 @@ void
 plan9header(Exec * header)
 {
 	/* header is big-endian */
-	swabby(&header->magic, "magic");
-	swabby(&header->text, "text");
-	swabby(&header->data, "data");
-	swabby(&header->bss, "bss");
-	swabby(&header->syms, "syms");
-	swabby(&header->entry, "entry");
-	swabby(&header->spsz, "spsz");
-	swabby(&header->pcsz, "pcsz");
+	swabby((unsigned long *)&header->magic, "magic");
+	swabby((unsigned long *)&header->text, "text");
+	swabby((unsigned long *)&header->data, "data");
+	swabby((unsigned long *)&header->bss, "bss");
+	swabby((unsigned long *)&header->syms, "syms");
+	swabby((unsigned long *)&header->entry, "entry");
+	swabby((unsigned long *)&header->spsz, "spsz");
+	swabby((unsigned long *)&header->pcsz, "pcsz");
 
 }
 
@@ -132,8 +132,8 @@ setup_guest(int xc_handle,
 	unsigned long ksize;
 	mmu_t *mmu = NULL;
 	int i;
-	unsigned long first_page_after_kernel, 
-	  first_data_page, 
+	unsigned long first_page_after_kernel = 0, 
+	  first_data_page = 0, 
 	  page_array_page;
 	unsigned long cpu0pdb, cpu0pte, cpu0ptelast;
 	unsigned long /*last_pfn, */ tot_pte_pages;
@@ -358,7 +358,7 @@ setup_guest(int xc_handle,
 	start_info->flags = 0;
 	DPRINTF((" control event channel is %d\n", control_evtchn));
 	start_info->domain_controller_evtchn = control_evtchn;
-	strncpy(start_info->cmd_line, cmdline, MAX_CMDLINE);
+	strncpy((char *)start_info->cmd_line, cmdline, MAX_CMDLINE);
 	start_info->cmd_line[MAX_CMDLINE - 1] = '\0';
 	munmap(start_info, PAGE_SIZE);
 
@@ -407,7 +407,7 @@ xc_plan9_build(int xc_handle,
 	       unsigned int control_evtchn, unsigned long flags)
 {
 	dom0_op_t launch_op, op;
-	unsigned long load_addr;
+	unsigned long load_addr = 0;
 	long tot_pages;
 	int kernel_fd = -1;
 	gzFile kernel_gfd = NULL;

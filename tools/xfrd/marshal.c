@@ -166,7 +166,7 @@ int marshal_string(IOStream *io, char *s, uint32_t s_n){
 int unmarshal_string(IOStream *io, char *s, uint32_t s_n){
     int err = 0, val_n = 0;
     //dprintf(">\n");
-    err = unmarshal_uint32(io, &val_n);
+    err = unmarshal_uint32(io, (unsigned int *)&val_n);
     if(err) goto exit;
     if(val_n >= s_n){
         err = -EINVAL;
@@ -184,7 +184,7 @@ int unmarshal_new_string(IOStream *io, char **s, uint32_t *s_n){
     int err = 0, val_n = 0;
     char *val = NULL;
     //dprintf(">\n");
-    err = unmarshal_uint32(io, &val_n);
+    err = unmarshal_uint32(io, (unsigned int *)&val_n);
     if(err) goto exit;
     val = allocate(val_n + 1);
     if(!val){

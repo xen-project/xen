@@ -481,9 +481,9 @@ int xfr_hello(Conn *conn){
         err = -EINVAL;
         goto exit;
     }
-    err = intof(sxpr_childN(sxpr, 0, ONONE), &hello_major);
+    err = intof(sxpr_childN(sxpr, 0, ONONE), (int *)&hello_major);
     if(err) goto exit;
-    err = intof(sxpr_childN(sxpr, 1, ONONE), &hello_minor);
+    err = intof(sxpr_childN(sxpr, 1, ONONE), (int *)&hello_minor);
     if(err) goto exit;
     if(hello_major != major || hello_minor != minor){
         eprintf("> Wanted protocol version %d.%d, got %d.%d",
@@ -646,7 +646,7 @@ int xfr_send_state(XfrState *state, Conn *xend, Conn *peer){
         if(!err) err = errcode;
     } else if(sxpr_elementp(sxpr, oxfr_xfr_ok)){
         // Ok - get the new domain id.
-        err = intof(sxpr_childN(sxpr, 0, ONONE), &state->vmid_new);
+        err = intof(sxpr_childN(sxpr, 0, ONONE), (int *)&state->vmid_new);
         xfr_error(peer, err);
     } else {
         // Anything else is invalid. But it may be too late.
@@ -917,7 +917,7 @@ int xfrd_service(Args *args, int peersock, struct sockaddr_in peer_in){
         int n = 0;
 
         dprintf("> xfr.migrate\n");
-        err = intof(sxpr_childN(sxpr, n++, ONONE), &state->vmid);
+        err = intof(sxpr_childN(sxpr, n++, ONONE), (int *)&state->vmid);
         if(err) goto exit;
         err = stringof(sxpr_childN(sxpr, n++, ONONE), &state->vmconfig);
         if(err) goto exit;
@@ -939,7 +939,7 @@ int xfrd_service(Args *args, int peersock, struct sockaddr_in peer_in){
         int n = 0;
 
         dprintf("> xfr.save\n");
-        err = intof(sxpr_childN(sxpr, n++, ONONE), &state->vmid);
+        err = intof(sxpr_childN(sxpr, n++, ONONE), (int *)&state->vmid);
         if(err) goto exit;
         err = stringof(sxpr_childN(sxpr, n++, ONONE), &state->vmconfig);
         if(err) goto exit;
@@ -965,7 +965,7 @@ int xfrd_service(Args *args, int peersock, struct sockaddr_in peer_in){
         int n = 0;
 
         dprintf("> xfr.xfr\n");
-        err = intof(sxpr_childN(sxpr, n++, ONONE), &state->vmid);
+        err = intof(sxpr_childN(sxpr, n++, ONONE), (int *)&state->vmid);
         if(err) goto exit;
         err = xfr_recv(args, state, conn);
 
