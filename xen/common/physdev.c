@@ -169,16 +169,16 @@ int physdev_pci_access_modify(
 
     /* Now, setup access to the IO ports and memory regions for the device. */
 
-    if ( p->io_bitmap == NULL )
+    if ( p->thread.io_bitmap == NULL )
     {
-        if ( (p->io_bitmap = xmalloc(IO_BITMAP_BYTES)) == NULL )
+        if ( (p->thread.io_bitmap = xmalloc(IOBMP_BYTES)) == NULL )
         {
             rc = -ENOMEM;
             goto out;
         }
-        memset(p->io_bitmap, 0xFF, IO_BITMAP_BYTES);
+        memset(p->thread.io_bitmap, 0xFF, IOBMP_BYTES);
 
-        p->io_bitmap_sel = ~0ULL;
+        p->thread.io_bitmap_sel = ~0ULL;
     }
 
     for ( i = 0; i < DEVICE_COUNT_RESOURCE; i++ )
@@ -195,13 +195,8 @@ int physdev_pci_access_modify(
                  "for device %s\n", dom, r->start, r->end, pdev->slot_name);
             for ( j = r->start; j < r->end + 1; j++ )
             {
-                clear_bit(j, p->io_bitmap);
-                /* Record that we cleared a bit using bit n of the selector:
-                 * n = (j / (4 bytes in a word * 8 bits in a byte))
-                 *     / number of words per selector bit
-                 */
-                clear_bit((j / (8 * 4)) / IOBMP_SELBIT_LWORDS,
-                          &p->io_bitmap_sel);
+                clear_bit(j, p->thread.io_bitmap);
+                clear_bit(j / IOBMP_BITS_PER_SELBIT, &p->thread.io_bitmap_sel);
             }
         }
 
