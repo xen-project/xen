@@ -102,6 +102,9 @@ struct domain
     u16 virq_to_evtchn[NR_VIRQS];
     u32 pirq_mask[NR_PIRQS/32];
 
+    /* Last point at which timestamp info was propagated to the guest. */
+    u64 last_propagated_timestamp;
+
     /* Physical I/O */
     spinlock_t       pcidev_lock;
     struct list_head pcidev_list;

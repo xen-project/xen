@@ -869,9 +869,6 @@ int construct_dom0(struct domain *p,
             l1start = l1tab = (l1_pgentry_t *)l2_pgentry_to_phys(*l2tab);
     }
 
-    /* Set up shared-info area. */
-    update_dom_time(p->shared_info);
-    p->shared_info->domain_time = 0;
     /* Mask all upcalls... */
     for ( i = 0; i < MAX_VIRT_CPUS; i++ )
         p->shared_info->vcpu_data[i].evtchn_upcall_mask = 1;
