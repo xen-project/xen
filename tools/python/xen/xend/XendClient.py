@@ -338,25 +338,25 @@ class Xend:
         return self.client.xendPost(url, data)
 
     def nodeurl(self, id=''):
-        return self.url.relative('node/' + id)
+        return self.url.relative('node/' + str(id))
 
     def domainurl(self, id=''):
-        return self.url.relative('domain/' + id)
+        return self.url.relative('domain/' + str(id))
 
     def consoleurl(self, id=''):
-        return self.url.relative('console/' + id)
+        return self.url.relative('console/' + str(id))
 
     def deviceurl(self, id=''):
-        return self.url.relative('device/' + id)
+        return self.url.relative('device/' + str(id))
 
     def vneturl(self, id=''):
-        return self.url.relative('vnet/' + id)
+        return self.url.relative('vnet/' + str(id))
 
     def eventurl(self, id=''):
-        return self.url.relative('event/' + id)
+        return self.url.relative('event/' + str(id))
 
     def dmesgurl(self, id=''):
-        return self.url.relative('node/dmesg/' + id)
+        return self.url.relative('node/dmesg/' + str(id))
 
     def xend(self):
         return self.xendGet(self.url)
