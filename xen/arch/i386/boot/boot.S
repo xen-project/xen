@@ -76,9 +76,9 @@ hal_entry:
 #endif
         
 continue_boot_cpu:
-        add     $__PAGE_OFFSET,%ebx
-	push 	%ebx /* Multiboot info struct */
-	push 	%eax /* Multiboot magic value */
+	add     $__PAGE_OFFSET,%ebx
+        push    %ebx /* Multiboot info struct */
+        push    %eax /* Multiboot magic value */
 
         /* Initialize BSS (no nasty surprises!) */
         mov     $__bss_start-__PAGE_OFFSET,%edi
@@ -86,6 +86,44 @@ continue_boot_cpu:
         sub     %edi,%ecx
         xor     %eax,%eax
         rep     stosb
+
+        /* Copy all modules (dom0 + initrd if presetn) to safety, above 48MB */
+        mov     (%esp),%eax
+        cmp     $0x2BADB002,%eax
+        jne     2f                           /* skip if magic no good */
+
+        sub     $__PAGE_OFFSET,%ebx	     /* turn back into a physaddr */
+
+	mov     0x14(%ebx),%edi              /* mbi->mods_count */
+        dec     %edi                         /* count-- */
+
+	jb	2f			     /* if num modules was zero !!! */
+
+        mov     0x18(%ebx),%eax              /* mbi->mods_addr */
+
+	mov     (%eax),%ebx                  /* mod[0]->mod_start */
+
+        shl     $4,%edi                      /* count*16 */
+        add     %edi,%eax
+        
+        mov     0x4(%eax),%eax               /* mod[mod_count-1]->end */
+
+        mov     %eax,%ecx
+        sub     %ebx,%ecx		     /* length in byte */
+
+        mov     $(MAX_DIRECTMAP_ADDRESS), %edi
+        add     %ecx, %edi		     /* src + length */
+        
+        shr     $2,%ecx                      /* ecx is length/4 */
+
+1:
+        sub     $4,%eax                      /* eax = src, edi = dst */
+        sub     $4,%edi
+        mov     (%eax),%ebx
+        mov     %ebx,(%edi)
+        loop 1b
+
+2:              
 
         /* Initialize low and high mappings of all memory with 4MB pages */
         mov     $idle0_pg_table-__PAGE_OFFSET,%edi

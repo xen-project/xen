@@ -214,7 +214,8 @@ extern struct task_struct first_task_struct;
 extern struct task_struct *do_newdomain(unsigned int dom_id, unsigned int cpu);
 extern int setup_guestos(
     struct task_struct *p, dom0_newdomain_t *params,
-    char *data_start, unsigned long data_len, char *cmdline);
+    char *data_start, unsigned long data_len, 
+    char *cmdline, unsigned long initrd_len);
 extern int final_setup_guestos(struct task_struct *p, dom_meminfo_t *);
 
 struct task_struct *find_domain_by_id(unsigned int dom);
