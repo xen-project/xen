@@ -16,7 +16,7 @@ asmlinkage int sys_iopl(unsigned long unused)
 {
     struct pt_regs *regs = (struct pt_regs *)&unused;
     unsigned int new_io_pl = regs->ebx & 3;
-    unsigned int old_io_pl = (regs->eflags >> 12) & 3;
+    unsigned int old_io_pl = current->thread.io_pl;
     unsigned int new_hypercall_pl = (regs->ebx >> 2) & 3;
     unsigned int old_hypercall_pl = current->thread.hypercall_pl;
 
@@ -32,11 +32,11 @@ asmlinkage int sys_iopl(unsigned long unused)
     /* Maintain OS privileges even if user attempts to relinquish them. */
     if ( new_hypercall_pl == 0 )
         new_hypercall_pl = 1;
-    if ( (new_io_pl == 0) && !(start_info.flags & SIF_PRIVILEGED) )
+    if ( (new_io_pl == 0) && (start_info.flags & SIF_PRIVILEGED) )
         new_io_pl = 1;
 
     /* Change our version of the privilege levels. */
-    regs->eflags = (regs->eflags & 0xffffcfff) | (old_io_pl << 12);
+    current->thread.io_pl        = new_io_pl;
     current->thread.hypercall_pl = new_hypercall_pl;
 
     /* Force the change at ring 0. */

@@ -252,6 +252,7 @@ int copy_thread(int nr, unsigned long clone_flags, unsigned long esp,
                 struct task_struct * p, struct pt_regs * regs)
 {
     struct pt_regs * childregs;
+    unsigned long eflags;
 
     childregs = ((struct pt_regs *) (THREAD_SIZE + (unsigned long) p)) - 1;
     struct_cpy(childregs, regs);
@@ -268,6 +269,10 @@ int copy_thread(int nr, unsigned long clone_flags, unsigned long esp,
 
     unlazy_fpu(current);
     struct_cpy(&p->thread.i387, &current->thread.i387);
+
+
+    __asm__ __volatile__ ( "pushfl; popl %0" : "=r" (eflags) : );
+    p->thread.io_pl = (eflags >> 12) & 3;
 
     /* We're careful with hypercall privileges. Don't allow inheritance. */
     p->thread.hypercall_pl = 1;
@@ -368,8 +373,7 @@ void __switch_to(struct task_struct *prev_p, struct task_struct *next_p)
     queue_multicall2(__HYPERVISOR_stack_switch, __KERNEL_DS, next->esp0);
     /* Next call will silently fail if we are a non-privileged guest OS. */
     queue_multicall2(__HYPERVISOR_set_priv_levels,
-                     ((((struct pt_regs *)next->esp0)-1)->eflags>>12)&3,
-                     next->hypercall_pl);
+                     next->io_pl, next->hypercall_pl);
 
     /* EXECUTE ALL TASK SWITCH XEN SYSCALLS AT THIS POINT. */
     execute_multicall_list();
