@@ -45,8 +45,6 @@ struct domain *do_createdomain(domid_t dom_id, unsigned int cpu)
     ed->processor  = cpu;
     d->create_time = NOW();
  
-    memcpy(&ed->arch, &idle0_exec_domain.arch, sizeof(ed->arch));
-
     spin_lock_init(&d->time_lock);
 
     spin_lock_init(&d->big_lock);

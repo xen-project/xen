@@ -11,16 +11,25 @@
 #include <asm/apicdef.h>
 #include <public/xen.h>
 
+
+/*
+ * %rax                            = hypercall vector
+ * %rdi, %rsi, %rdx, %r10, %r8, %9 = hypercall arguments
+ * %r11, %rcx                      = SYSCALL-saved %rflags and %rip
+ * NB. We must move %r10 to %rcx for C function-calling ABI.
+ */
 ENTRY(hypercall)
-        movl  $0x0833,8(%rsp)
+        sti
+        movl  $__GUEST_SS,8(%rsp)
         pushq %r11
-        pushq $0x082b
+        pushq $__GUEST_CS
         pushq %rcx
         pushq $0
         SAVE_ALL
-	andq  $(NR_hypercalls-1),%rax
-        leaq  SYMBOL_NAME(exception_table)(%rip),%rcx
-        callq *(%rcx,%rax,8)
+        movq  %r10,%rcx
+        andq  $(NR_hypercalls-1),%rax
+        leaq  SYMBOL_NAME(hypercall_table)(%rip),%rbx
+        callq *(%rbx,%rax,8)
         RESTORE_ALL
         addq  $8,%rsp
         popq  %rcx
@@ -38,11 +47,12 @@ restore_all_xen:
 
 error_code:
         SAVE_ALL
+        sti
         movq  %rsp,%rdi
         movl  XREGS_entry_vector(%rsp),%eax
         leaq  SYMBOL_NAME(exception_table)(%rip),%rdx
         callq *(%rdx,%rax,8)
-	jmp   restore_all_xen
+        jmp   restore_all_xen
 
 ENTRY(divide_error)
         pushq $0
@@ -133,7 +143,13 @@ ENTRY(double_fault)
         jmp   error_code
 
 ENTRY(nmi)
-        iretq
+        pushq $0
+        SAVE_ALL
+        inb   $0x61,%al
+        movl  %eax,%esi # reason
+        movq  %rsp,%rdi # regs
+        call  SYMBOL_NAME(do_nmi)
+	jmp   restore_all_xen
 
 .data
 

@@ -36,6 +36,8 @@
 #include <asm/vmx_vmcs.h>
 #include <public/io/ioreq.h>
 
+#ifdef CONFIG_VMX
+
 int vmcs_size;
 unsigned int opt_vmx_debug_level;
 
@@ -123,13 +125,13 @@ static int vmx_do_page_fault(unsigned long va, unsigned long error_code)
     /*
      * Set up guest page directory cache to make linear_pt_table[] work.
      */
-    __guest_get_pl2e(ed, va, &gpde);
+    __guest_get_l2e(ed, va, &gpde);
     if (!(gpde & _PAGE_PRESENT))
         return 0;
 
     index = (va >> L2_PAGETABLE_SHIFT);
     if (!l2_pgentry_val(ed->arch.guest_pl2e_cache[index])) {
-        pfn = phys_to_machine_mapping[gpde >> PAGE_SHIFT];
+        pfn = phys_to_machine_mapping(gpde >> PAGE_SHIFT);
 
         VMX_DBG_LOG(DBG_LEVEL_VMMU, "vmx_do_page_fault: pagetable = %lx\n",
                 pagetable_val(ed->arch.pagetable));
@@ -301,10 +303,10 @@ inline unsigned long gva_to_gpa(unsigned long gva)
     unsigned long gpde, gpte, pfn, index;
     struct exec_domain *ed = current;
 
-    __guest_get_pl2e(ed, gva, &gpde);
+    __guest_get_l2e(ed, gva, &gpde);
     index = (gva >> L2_PAGETABLE_SHIFT);
 
-    pfn = phys_to_machine_mapping[gpde >> PAGE_SHIFT];
+    pfn = phys_to_machine_mapping(gpde >> PAGE_SHIFT);
 
     ed->arch.guest_pl2e_cache[index] = 
             mk_l2_pgentry((pfn << PAGE_SHIFT) | __PAGE_HYPERVISOR);
@@ -451,8 +453,8 @@ static void mov_to_cr(int gp, int cr, struct xen_regs *regs)
             /*
              * The guest CR3 must be pointing to the guest physical.
              */
-            if (!(pfn = phys_to_machine_mapping[
-                      d->arch.arch_vmx.cpu_cr3 >> PAGE_SHIFT])) 
+            if (!(pfn = phys_to_machine_mapping(
+                      d->arch.arch_vmx.cpu_cr3 >> PAGE_SHIFT))) 
             {
                 VMX_DBG_LOG(DBG_LEVEL_VMMU, "Invalid CR3 value = %lx\n", 
                         d->arch.arch_vmx.cpu_cr3);
@@ -504,7 +506,7 @@ static void mov_to_cr(int gp, int cr, struct xen_regs *regs)
              * removed some translation or changed page attributes.
              * We simply invalidate the shadow.
              */
-            pfn = phys_to_machine_mapping[value >> PAGE_SHIFT];
+            pfn = phys_to_machine_mapping(value >> PAGE_SHIFT);
             if ((pfn << PAGE_SHIFT) != pagetable_val(d->arch.pagetable))
                 __vmx_bug(regs);
             vmx_shadow_clear_state(d->domain);
@@ -521,7 +523,7 @@ static void mov_to_cr(int gp, int cr, struct xen_regs *regs)
                         "Invalid CR3 value=%lx\n", value);
                 domain_crash(); /* need to take a clean path */
             }
-            pfn = phys_to_machine_mapping[value >> PAGE_SHIFT];
+            pfn = phys_to_machine_mapping(value >> PAGE_SHIFT);
             vmx_shadow_clear_state(d->domain);
             d->arch.pagetable = mk_pagetable(pfn << PAGE_SHIFT);
             shadow_mk_pagetable(d);
@@ -927,6 +929,8 @@ asmlinkage void vmx_vmexit_handler(struct xen_regs regs)
     default:
         __vmx_bug(&regs);       /* should not happen */
     }
+
+    vmx_intr_assist(d);
     return;
 }
 
@@ -937,3 +941,5 @@ asmlinkage void load_cr2(void)
     local_irq_disable();        
     asm volatile("movl %0,%%cr2": :"r" (d->arch.arch_vmx.cpu_cr2));
 }
+
+#endif /* CONFIG_VMX */

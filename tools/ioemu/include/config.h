@@ -687,13 +687,13 @@ typedef
 #define BX_NUM_SIMULATORS 1
 
 // limited i440FX PCI support
-#define BX_PCI_SUPPORT 0
+#define BX_PCI_SUPPORT 1
 
 // Experimental VGA on PCI
 #define BX_PCI_VGA_SUPPORT 1
 
 // limited USB on PCI
-#define BX_PCI_USB_SUPPORT 0
+#define BX_PCI_USB_SUPPORT 1
 
 #if (BX_PCI_USB_SUPPORT && !BX_PCI_SUPPORT)
 #error To enable USB, you must also enable PCI

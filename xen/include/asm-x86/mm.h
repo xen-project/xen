@@ -13,6 +13,7 @@
 #include <asm/desc.h>
 #include <asm/flushtlb.h>
 #include <asm/io.h>
+#include <asm/uaccess.h>
 
 #include <public/xen.h>
 
@@ -218,7 +219,7 @@ static inline int get_page_and_type(struct pfn_info *page,
     ASSERT(((_p)->count_info & PGC_count_mask) != 0);          \
     ASSERT(page_get_owner(_p) == (_d))
 
-int check_descriptor(unsigned long *d);
+int check_descriptor(struct desc_struct *d);
 
 /*
  * Use currently-executing domain's pagetables on the specified CPUs.
@@ -241,8 +242,20 @@ void synchronise_pagetables(unsigned long cpu_mask);
 #undef  phys_to_machine_mapping
 
 #define machine_to_phys_mapping ((unsigned long *)RDWR_MPT_VIRT_START)
-#define phys_to_machine_mapping ((unsigned long *)PERDOMAIN_VIRT_START)
+#define __phys_to_machine_mapping ((unsigned long *)PERDOMAIN_VIRT_START)
+/* Returns the machine physical */
+static inline unsigned long phys_to_machine_mapping(unsigned long pfn) 
+{
+    unsigned long mfn;
+    l1_pgentry_t pte;
 
+   if (__get_user(l1_pgentry_val(pte), (__phys_to_machine_mapping + pfn))) {
+       return 0;
+   }
+               
+   mfn = l1_pgentry_to_phys(pte) >> PAGE_SHIFT;
+   return mfn; 
+}
 #define set_machinetophys(_mfn, _pfn) machine_to_phys_mapping[(_mfn)] = (_pfn)
 
 #define DEFAULT_GDT_ENTRIES     (LAST_RESERVED_GDT_ENTRY+1)

@@ -388,23 +388,11 @@ static int cpucount;
 void __init start_secondary(void)
 {
     unsigned int cpu = cpucount;
-    /* 6 bytes suitable for passing to LIDT instruction. */
-    unsigned char idt_load[6];
 
+    extern void percpu_traps_init(void);
     extern void cpu_init(void);
 
     set_current(idle_task[cpu]);
-
-    /*
-     * Dont put anything before smp_callin(), SMP
-     * booting is too fragile that we want to limit the
-     * things done here to the most necessary things.
-     */
-    cpu_init();
-    smp_callin();
-
-    while (!atomic_read(&smp_commenced))
-        rep_nop();
 
     /*
      * At this point, boot CPU has fully initialised the IDT. It is
@@ -412,9 +400,15 @@ void __init start_secondary(void)
      */
     idt_tables[cpu] = xmalloc_array(idt_entry_t, IDT_ENTRIES);
     memcpy(idt_tables[cpu], idt_table, IDT_ENTRIES*sizeof(idt_entry_t));
-    *(unsigned short *)(&idt_load[0]) = (IDT_ENTRIES*sizeof(idt_entry_t))-1;
-    *(unsigned long  *)(&idt_load[2]) = (unsigned long)idt_tables[cpu];
-    __asm__ __volatile__ ( "lidt %0" : "=m" (idt_load) );
+
+    percpu_traps_init();
+
+    cpu_init();
+
+    smp_callin();
+
+    while (!atomic_read(&smp_commenced))
+        rep_nop();
 
     /*
      * low-memory mappings have been cleared, flush them from the local TLBs 

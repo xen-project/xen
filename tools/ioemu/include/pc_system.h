@@ -45,6 +45,13 @@ BOCHSAPI extern class bx_pc_system_c bx_pc_system;
 extern double m_ips;
 #endif
 
+#ifdef BX_USE_VMX
+extern unsigned int tsc_per_bx_tick;
+
+#define rdtscll(val) \
+     __asm__ __volatile__("rdtsc" : "=A" (val))
+#endif
+
 class BOCHSAPI bx_pc_system_c : private logfunctions {
 private:
 
@@ -87,6 +94,26 @@ private:
   double     m_ips; // Millions of Instructions Per Second
 #endif
 
+#ifdef BX_USE_VMX
+  static Bit64s get_clock(void) {
+    struct timeval tv;
+    gettimeofday(&tv, NULL);
+    return tv.tv_sec * 1000000LL + tv.tv_usec;
+    }
+
+  static Bit64u cpu_calibrate_ticks(void) {
+    Bit64s usec, t1, t2;
+
+    usec = get_clock();
+    rdtscll(t1);
+
+    usleep(50 * 1000);
+    usec = get_clock() - usec;
+    rdtscll(t2);
+
+    return (((t2 - t1) * 1000000LL + (usec >> 1)) / usec);
+    }
+#endif
   // This handler is called when the function which decrements the clock
   // ticks finds that an event has occurred.
   void   countdownEvent(void);

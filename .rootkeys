@@ -867,8 +867,8 @@
 3ddb79bcBit4xJXbwtX0kb1hh2uO1Q xen/arch/x86/idle0_task.c
 3ddb79bcKIkRR0kqWaJhe5VUDkMdxg xen/arch/x86/io_apic.c
 3ddb79bdqfIcjkz_h9Hvtp8Tk_19Zw xen/arch/x86/irq.c
-40ec29ffuOa1ZvmJHzFKyZn4k_RcXg xen/arch/x86/memory.c
 41d54a76qfpO0VnbL2tYs0Jgt3W3XA xen/arch/x86/microcode.c
+40ec29ffuOa1ZvmJHzFKyZn4k_RcXg xen/arch/x86/mm.c
 3ddb79bdS4UeWWXDH-FaBKqcpMFcnw xen/arch/x86/mpparse.c
 41aaf566Z4sTDgJ77eEg0TzzQ1ka6Q xen/arch/x86/mtrr/amd.c
 41aaf566TOpOBXT00wwQGUh20f1rlA xen/arch/x86/mtrr/centaur.c
@@ -1038,6 +1038,7 @@
 418fbcfe_WliJPToeVM-9VStvym-hw xen/include/asm-x86/x86_32/asm_defns.h
 3ddb79c2ADvRmdexd9y3AYK9_NTx-Q xen/include/asm-x86/x86_32/current.h
 3e20b82fl1jmQiKdLy7fxMcutfpjWA xen/include/asm-x86/x86_32/domain_page.h
+4208e2a3ZNFroNXbX9OYaOB-xtUyDQ xen/include/asm-x86/x86_32/page.h
 3ddb79c3mbqEM7QQr3zVq7NiBNhouA xen/include/asm-x86/x86_32/regs.h
 3e7f358aG11EvMI9VJ4_9hD4LUO7rQ xen/include/asm-x86/x86_32/string.h
 3ddb79c3M2n1ROZH6xk3HbyN4CPDqg xen/include/asm-x86/x86_32/uaccess.h
@@ -1045,6 +1046,7 @@
 404f1b9ceJeGVaPNIENm2FkK0AgEOQ xen/include/asm-x86/x86_64/current.h
 41febc4b1aCGLsm0Y0b_82h7lFtrEA xen/include/asm-x86/x86_64/domain_page.h
 404f1badfXZJZ2sU8sh9PS2EZvd19Q xen/include/asm-x86/x86_64/ldt.h
+4208e2a3Fktw4ZttKdDxbhvTQ6brfQ xen/include/asm-x86/x86_64/page.h
 404f1bb86rAXB3aLS1vYdcqpJiEcyg xen/include/asm-x86/x86_64/regs.h
 40e1966azOJZfNI6Ilthe6Q-T3Hewg xen/include/asm-x86/x86_64/string.h
 404f1bc4tWkB9Qr8RkKtZGW5eMQzhw xen/include/asm-x86/x86_64/uaccess.h

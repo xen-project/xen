@@ -7,7 +7,6 @@
 #include <xen/config.h>
 #include <xen/compiler.h>
 #include <xen/errno.h>
-#include <xen/sched.h>
 #include <xen/prefetch.h>
 #include <asm/page.h>
 
@@ -16,34 +15,19 @@
 #define VERIFY_READ 0
 #define VERIFY_WRITE 1
 
-#define __addr_ok(addr) ((unsigned long)(addr) < HYPERVISOR_VIRT_START)
-
 /*
- * Test whether a block of memory is a valid user space address.
- * Returns 0 if the range is valid, nonzero otherwise.
- *
- * This is equivalent to the following test:
- * ((u65)addr >= (u65)HYPERVISOR_VIRT_END) ?
- * (((u65)addr + (u65)size) >= ((u65)1 << 64)) :
- * (((u65)addr + (u65)size) >= ((u65)HYPERVISOR_VIRT_START))
+ * Valid if in +ve half of 48-bit address space, or above Xen-reserved area.
+ * This is also valid for range checks (addr, addr+size). As long as the
+ * start address is outside the Xen-reserved area then we will access a
+ * non-canonical address (and thus fault) before ever reaching VIRT_START.
  */
-#define __range_not_ok(addr,size) ({ \
-    unsigned long flag,sum; \
-    if ((unsigned long)addr >= HYPERVISOR_VIRT_END) \
-        asm("addq %3,%1 ; sbbq %0,%0" \
-            :"=&r" (flag), "=r" (sum) \
-            :"1" (addr),"g" ((long)(size))); \
-    else \
-        asm("addq %3,%1 ; sbbq %0,%0 ; cmpq %1,%4 ; sbbq $0,%0"  \
-            :"=&r" (flag), "=r" (sum) \
-            :"1" (addr),"g" ((long)(size)),"r" (HYPERVISOR_VIRT_START)); \
-    flag; })
+#define __addr_ok(addr) \
+    (((unsigned long)(addr) < (1UL<<48)) || \
+     ((unsigned long)(addr) >= HYPERVISOR_VIRT_END))
 
-#define access_ok(type, addr, size) (__range_not_ok(addr,size) == 0)
+#define access_ok(type, addr, size) (__addr_ok(addr))
 
-#define array_access_ok(type,addr,count,size)                    \
-    (likely(sizeof(count) <= 4) /* disallow 64-bit counts */ &&  \
-     access_ok(type,addr,(unsigned long)count*(unsigned long)size))
+#define array_access_ok(type,addr,count,size) (__addr_ok(addr))
 
 extern long __get_user_bad(void);
 extern void __put_user_bad(void);

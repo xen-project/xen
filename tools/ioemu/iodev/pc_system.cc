@@ -44,6 +44,10 @@ unsigned long ips_count=0;
 double     m_ips; // Millions of Instructions Per Second
 #endif
 
+#ifdef BX_USE_VMX
+unsigned int tsc_per_bx_tick;
+#endif
+
 // Option for turning off BX_TIMER_DEBUG?
 // Check out m_ips and ips
 
@@ -96,6 +100,16 @@ bx_pc_system_c::init_ips(Bit32u ips)
   a20_mask   =   0xffffff;
 #else /* 386+ */
   a20_mask   = 0xffffffff;
+#endif
+
+#ifdef BX_USE_VMX
+  Bit64u phy_cpu_freq = cpu_calibrate_ticks();
+ 
+  if (ips == 500000) {  //default ips: we use fixed scaling factor to calulate ips
+    tsc_per_bx_tick = 2000;
+    ips = phy_cpu_freq / tsc_per_bx_tick;
+  } else  //use uesr defined ips to calulate factor
+    tsc_per_bx_tick = ((phy_cpu_freq + (ips>>1)) / ips);
 #endif
 
   // parameter 'ips' is the processor speed in Instructions-Per-Second

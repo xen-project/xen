@@ -193,8 +193,8 @@ ENTRY(gdt_table)
         .quad 0x00af9a000000ffff     /* 0x0810 ring 0 code, 64-bit mode   */
         .quad 0x00cf92000000ffff     /* 0x0818 ring 0 data                */
         .quad 0x00cffa000000ffff     /* 0x0823 ring 3 code, compatibility */
-        .quad 0x00affa000000ffff     /* 0x082b ring 3 code, 64-bit mode   */
-        .quad 0x00cff2000000ffff     /* 0x0833 ring 3 data                */
+        .quad 0x00cff2000000ffff     /* 0x082b ring 3 data                */
+        .quad 0x00affa000000ffff     /* 0x0833 ring 3 code, 64-bit mode   */
         .quad 0x0000000000000000     /* unused                            */
         .fill 4*NR_CPUS,8,0          /* space for TSS and LDT per CPU     */
 
@@ -243,8 +243,8 @@ ENTRY(idle_pg_table_l2)
         identmap /* Too orangey for crows :-) */
 
         .org 0x4000
-ENTRY(cpu0_stack)    # Initial stack is 8kB
+ENTRY(cpu0_stack)
 
-        .org 0x6000
+        .org 0x4000 + STACK_SIZE
 ENTRY(stext)
 ENTRY(_stext)

@@ -34,6 +34,8 @@
 #include <xen/sched.h>
 #include <asm/current.h>
 
+#ifdef CONFIG_VMX
+
 #define DECODE_success  1
 #define DECODE_failure  0
 
@@ -369,7 +371,7 @@ static int inst_copy_from_guest(char *buf, unsigned long guest_eip, int inst_len
                 printk("inst_copy_from_guest- EXIT: read gpte faulted" );
                 return 0;
             }
-        mfn = phys_to_machine_mapping[gpte >> PAGE_SHIFT];
+        mfn = phys_to_machine_mapping(gpte >> PAGE_SHIFT);
         ma = (mfn << PAGE_SHIFT) | (guest_eip & (PAGE_SIZE - 1));
         inst_start = (unsigned char *)map_domain_mem(ma);
                 
@@ -553,3 +555,4 @@ void handle_mmio(unsigned long va, unsigned long gpte, unsigned long gpa)
     domain_crash();
 }
 
+#endif /* CONFIG_VMX */

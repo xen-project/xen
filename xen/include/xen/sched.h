@@ -262,8 +262,32 @@ int idle_cpu(int cpu); /* Is CPU 'cpu' idle right now? */
 
 void startup_cpu_idle_loop(void);
 
-unsigned long hypercall_create_continuation(
+unsigned long __hypercall_create_continuation(
     unsigned int op, unsigned int nr_args, ...);
+#define hypercall0_create_continuation(_op)                               \
+    __hypercall_create_continuation((_op), 0)
+#define hypercall1_create_continuation(_op, _a1)                          \
+    __hypercall_create_continuation((_op), 1,                             \
+        (unsigned long)(_a1))
+#define hypercall2_create_continuation(_op, _a1, _a2)                     \
+    __hypercall_create_continuation((_op), 2,                             \
+        (unsigned long)(_a1), (unsigned long)(_a2))
+#define hypercall3_create_continuation(_op, _a1, _a2, _a3)                \
+    __hypercall_create_continuation((_op), 3,                             \
+        (unsigned long)(_a1), (unsigned long)(_a2), (unsigned long)(_a3))
+#define hypercall4_create_continuation(_op, _a1, _a2, _a3, _a4)           \
+    __hypercall_create_continuation((_op), 4,                             \
+        (unsigned long)(_a1), (unsigned long)(_a2), (unsigned long)(_a3), \
+        (unsigned long)(_a4))
+#define hypercall5_create_continuation(_op, _a1, _a2, _a3, _a4, _a5)      \
+    __hypercall_create_continuation((_op), 5,                             \
+        (unsigned long)(_a1), (unsigned long)(_a2), (unsigned long)(_a3), \
+        (unsigned long)(_a4), (unsigned long)(_a5))
+#define hypercall6_create_continuation(_op, _a1, _a2, _a3, _a4, _a5, _a6) \
+    __hypercall_create_continuation((_op), 6,                             \
+        (unsigned long)(_a1), (unsigned long)(_a2), (unsigned long)(_a3), \
+        (unsigned long)(_a4), (unsigned long)(_a5), (unsigned long)(_a6))
+
 #define hypercall_preempt_check() \
     (unlikely(softirq_pending(smp_processor_id())))
 

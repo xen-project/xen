@@ -304,7 +304,7 @@ void arch_vmx_do_launch(struct exec_domain *ed)
 static void monitor_mk_pagetable(struct exec_domain *ed)
 {
     unsigned long mpfn;
-    l2_pgentry_t *mpl2e;
+    l2_pgentry_t *mpl2e, *phys_table;
     struct pfn_info *mpfn_info;
     struct domain *d = ed->domain;
 
@@ -312,20 +312,26 @@ static void monitor_mk_pagetable(struct exec_domain *ed)
     ASSERT( mpfn_info ); 
 
     mpfn = (unsigned long) (mpfn_info - frame_table);
-    mpl2e = (l2_pgentry_t *) map_domain_mem(mpfn << L1_PAGETABLE_SHIFT);
+    mpl2e = (l2_pgentry_t *) map_domain_mem(mpfn << PAGE_SHIFT);
     memset(mpl2e, 0, PAGE_SIZE);
 
     memcpy(&mpl2e[DOMAIN_ENTRIES_PER_L2_PAGETABLE], 
            &idle_pg_table[DOMAIN_ENTRIES_PER_L2_PAGETABLE],
            HYPERVISOR_ENTRIES_PER_L2_PAGETABLE * sizeof(l2_pgentry_t));
 
-    ed->arch.monitor_table = mk_pagetable(mpfn << L1_PAGETABLE_SHIFT);
+    ed->arch.monitor_table = mk_pagetable(mpfn << PAGE_SHIFT);
     d->arch.shadow_mode = SHM_full_32;
 
     mpl2e[PERDOMAIN_VIRT_START >> L2_PAGETABLE_SHIFT] =
         mk_l2_pgentry((__pa(d->arch.mm_perdomain_pt) & PAGE_MASK) 
                       | __PAGE_HYPERVISOR);
 
+    phys_table = (l2_pgentry_t *) map_domain_mem(pagetable_val(
+                                        ed->arch.phys_table));
+    memcpy(d->arch.mm_perdomain_pt, phys_table,
+           ENTRIES_PER_L1_PAGETABLE * sizeof(l1_pgentry_t));
+
+    unmap_domain_mem(phys_table);
     unmap_domain_mem(mpl2e);
 }
 
@@ -466,6 +472,7 @@ int arch_final_setup_guestos(
     
     phys_basetab = c->pt_base;
     d->arch.pagetable = mk_pagetable(phys_basetab);
+    d->arch.phys_table = d->arch.pagetable;
     if ( !get_page_and_type(&frame_table[phys_basetab>>PAGE_SHIFT], d->domain, 
                             PGT_base_page_table) )
         return -EINVAL;
@@ -628,12 +635,11 @@ long do_iopl(domid_t domain, unsigned int new_io_pl)
     return 0;
 }
 
-unsigned long hypercall_create_continuation(
+unsigned long __hypercall_create_continuation(
     unsigned int op, unsigned int nr_args, ...)
 {
     struct mc_state *mcs = &mc_state[smp_processor_id()];
     execution_context_t *ec;
-    unsigned long *preg;
     unsigned int i;
     va_list args;
 
@@ -653,10 +659,34 @@ unsigned long hypercall_create_continuation(
         ec->eax  = op;
         ec->eip -= 2;  /* re-execute 'int 0x82' */
         
-        for ( i = 0, preg = &ec->ebx; i < nr_args; i++, preg++ )
-            *preg = va_arg(args, unsigned long);
-#else
-        preg = NULL; /* XXX x86/64 */
+        for ( i = 0; i < nr_args; i++ )
+        {
+            switch ( i )
+            {
+            case 0: ec->ebx = va_arg(args, unsigned long); break;
+            case 1: ec->ecx = va_arg(args, unsigned long); break;
+            case 2: ec->edx = va_arg(args, unsigned long); break;
+            case 3: ec->esi = va_arg(args, unsigned long); break;
+            case 4: ec->edi = va_arg(args, unsigned long); break;
+            case 5: ec->ebp = va_arg(args, unsigned long); break;
+            }
+        }
+#elif defined(__x86_64__)
+        ec->rax  = op;
+        ec->rip -= 2;  /* re-execute 'syscall' */
+        
+        for ( i = 0; i < nr_args; i++ )
+        {
+            switch ( i )
+            {
+            case 0: ec->rdi = va_arg(args, unsigned long); break;
+            case 1: ec->rsi = va_arg(args, unsigned long); break;
+            case 2: ec->rdx = va_arg(args, unsigned long); break;
+            case 3: ec->r10 = va_arg(args, unsigned long); break;
+            case 4: ec->r8  = va_arg(args, unsigned long); break;
+            case 5: ec->r9  = va_arg(args, unsigned long); break;
+            }
+        }
 #endif
     }
 
@@ -726,8 +756,6 @@ static void relinquish_list(struct domain *d, struct list_head *list)
 #ifdef CONFIG_VMX
 static void vmx_domain_relinquish_memory(struct exec_domain *ed)
 {
-    struct domain *d = ed->domain;
-
     /*
      * Free VMCS
      */
@@ -736,22 +764,6 @@ static void vmx_domain_relinquish_memory(struct exec_domain *ed)
     ed->arch.arch_vmx.vmcs = 0;
     
     monitor_rm_pagetable(ed);
-
-    if (ed == d->exec_domain[0]) {
-        int i;
-        unsigned long pfn;
-
-        for (i = 0; i < ENTRIES_PER_L1_PAGETABLE; i++) {
-            unsigned long l1e;
-            
-            l1e = l1_pgentry_val(d->arch.mm_perdomain_pt[i]);
-            if (l1e & _PAGE_PRESENT) {
-                pfn = l1e >> PAGE_SHIFT;
-                free_domheap_page(&frame_table[pfn]);
-            }
-        }
-    }
-
 }
 #endif
 

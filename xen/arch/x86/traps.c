@@ -149,6 +149,11 @@ static inline int do_trap(int trapnr, char *str,
     if ( !GUEST_FAULT(regs) )
         goto xen_fault;
 
+#ifndef NDEBUG
+    if ( (ed->arch.traps[trapnr].address == 0) && (ed->domain->id == 0) )
+        goto xen_fault;
+#endif
+
     ti = current->arch.traps + trapnr;
     tb->flags = TBF_EXCEPTION;
     tb->cs    = ti->cs;
@@ -267,6 +272,12 @@ asmlinkage int do_page_fault(struct xen_regs *regs)
 
     perfc_incrc(page_faults);
 
+#if 0
+    printk("do_page_fault(addr=0x%08lx, error_code=%d)\n",
+           addr, regs->error_code);
+    show_registers(regs);
+#endif
+
     if ( likely(VM_ASSIST(d, VMASST_TYPE_writable_pagetables)) )
     {
         LOCK_BIGLOCK(d);
@@ -313,6 +324,11 @@ asmlinkage int do_page_fault(struct xen_regs *regs)
 
     if ( !GUEST_FAULT(regs) )
         goto xen_fault;
+
+#ifndef NDEBUG
+    if ( (ed->arch.traps[TRAP_page_fault].address == 0) && (d->id == 0) )
+        goto xen_fault;
+#endif
 
     propagate_page_fault(addr, regs->error_code);
     return 0; 
@@ -512,7 +528,7 @@ asmlinkage int do_general_protection(struct xen_regs *regs)
 
     /* Emulate some simple privileged instructions when exec'ed in ring 1. */
     if ( (regs->error_code == 0) &&
-         RING_1(regs) &&
+         GUESTOS_FAULT(regs) &&
          emulate_privileged_op(regs) )
         return 0;
 
@@ -521,6 +537,12 @@ asmlinkage int do_general_protection(struct xen_regs *regs)
          (regs->error_code == 0) && 
          gpf_emulate_4gb(regs) )
         return 0;
+#endif
+
+#ifndef NDEBUG
+    if ( (ed->arch.traps[TRAP_gp_fault].address == 0) &&
+         (ed->domain->id == 0) )
+        goto gp_in_kernel;
 #endif
 
     /* Pass on GPF as is. */
@@ -553,19 +575,55 @@ asmlinkage int do_general_protection(struct xen_regs *regs)
     return 0;
 }
 
+unsigned long nmi_softirq_reason;
+static void nmi_softirq(void)
+{
+    if ( dom0 == NULL )
+        return;
+
+    if ( test_and_clear_bit(0, &nmi_softirq_reason) )
+        send_guest_virq(dom0->exec_domain[0], VIRQ_PARITY_ERR);
+
+    if ( test_and_clear_bit(1, &nmi_softirq_reason) )
+        send_guest_virq(dom0->exec_domain[0], VIRQ_IO_ERR);
+}
+
 asmlinkage void mem_parity_error(struct xen_regs *regs)
 {
-    console_force_unlock();
-    printk("\n\nNMI - MEMORY ERROR\n");
-    fatal_trap(TRAP_nmi, regs);
+    /* Clear and disable the parity-error line. */
+    outb((inb(0x61)&15)|4,0x61);
+
+    switch ( opt_nmi[0] )
+    {
+    case 'd': /* 'dom0' */
+        set_bit(0, &nmi_softirq_reason);
+        raise_softirq(NMI_SOFTIRQ);
+    case 'i': /* 'ignore' */
+        break;
+    default:  /* 'fatal' */
+        console_force_unlock();
+        printk("\n\nNMI - MEMORY ERROR\n");
+        fatal_trap(TRAP_nmi, regs);
+    }
 }
 
 asmlinkage void io_check_error(struct xen_regs *regs)
 {
-    console_force_unlock();
+    /* Clear and disable the I/O-error line. */
+    outb((inb(0x61)&15)|8,0x61);
 
-    printk("\n\nNMI - I/O ERROR\n");
-    fatal_trap(TRAP_nmi, regs);
+    switch ( opt_nmi[0] )
+    {
+    case 'd': /* 'dom0' */
+        set_bit(0, &nmi_softirq_reason);
+        raise_softirq(NMI_SOFTIRQ);
+    case 'i': /* 'ignore' */
+        break;
+    default:  /* 'fatal' */
+        console_force_unlock();
+        printk("\n\nNMI - I/O ERROR\n");
+        fatal_trap(TRAP_nmi, regs);
+    }
 }
 
 static void unknown_nmi_error(unsigned char reason)
@@ -579,25 +637,15 @@ asmlinkage void do_nmi(struct xen_regs *regs, unsigned long reason)
 {
     ++nmi_count(smp_processor_id());
 
-#if CONFIG_X86_LOCAL_APIC
     if ( nmi_watchdog )
         nmi_watchdog_tick(regs);
-    else
-#endif
+
+    if ( reason & 0x80 )
+        mem_parity_error(regs);
+    else if ( reason & 0x40 )
+        io_check_error(regs);
+    else if ( !nmi_watchdog )
         unknown_nmi_error((unsigned char)(reason&0xff));
-}
-
-unsigned long nmi_softirq_reason;
-static void nmi_softirq(void)
-{
-    if ( dom0 == NULL )
-        return;
-
-    if ( test_and_clear_bit(0, &nmi_softirq_reason) )
-        send_guest_virq(dom0->exec_domain[0], VIRQ_PARITY_ERR);
-
-    if ( test_and_clear_bit(1, &nmi_softirq_reason) )
-        send_guest_virq(dom0->exec_domain[0], VIRQ_IO_ERR);
 }
 
 asmlinkage int math_state_restore(struct xen_regs *regs)
@@ -706,8 +754,8 @@ void set_tss_desc(unsigned int n, void *addr)
 
 void __init trap_init(void)
 {
-    extern void doublefault_init(void);
-    doublefault_init();
+    extern void percpu_traps_init(void);
+    extern void cpu_init(void);
 
     /*
      * Note that interrupt gates are always used, rather than trap gates. We 
@@ -745,13 +793,9 @@ void __init trap_init(void)
     /* CPU0 uses the master IDT. */
     idt_tables[0] = idt_table;
 
-    /*
-     * Should be a barrier for any external CPU state.
-     */
-    {
-        extern void cpu_init(void);
-        cpu_init();
-    }
+    percpu_traps_init();
+
+    cpu_init();
 
     open_softirq(NMI_SOFTIRQ, nmi_softirq);
 }
@@ -769,8 +813,8 @@ long do_set_trap_table(trap_info_t *traps)
         if ( hypercall_preempt_check() )
         {
             UNLOCK_BIGLOCK(current->domain);
-            return hypercall_create_continuation(
-                __HYPERVISOR_set_trap_table, 1, traps);
+            return hypercall1_create_continuation(
+                __HYPERVISOR_set_trap_table, traps);
         }
 
         if ( copy_from_user(&cur, traps, sizeof(cur)) ) return -EFAULT;
@@ -816,6 +860,13 @@ long do_fpu_taskswitch(void)
 }
 
 
+#if defined(__i386__)
+#define DB_VALID_ADDR(_a) \
+    ((_a) <= (PAGE_OFFSET - 4))
+#elif defined(__x86_64__)
+#define DB_VALID_ADDR(_a) \
+    ((_a) >= HYPERVISOR_VIRT_END) || ((_a) <= (HYPERVISOR_VIRT_START-8))
+#endif
 long set_debugreg(struct exec_domain *p, int reg, unsigned long value)
 {
     int i;
@@ -823,22 +874,22 @@ long set_debugreg(struct exec_domain *p, int reg, unsigned long value)
     switch ( reg )
     {
     case 0: 
-        if ( value > (PAGE_OFFSET-4) ) return -EPERM;
+        if ( !DB_VALID_ADDR(value) ) return -EPERM;
         if ( p == current ) 
             __asm__ ( "mov %0, %%db0" : : "r" (value) );
         break;
     case 1: 
-        if ( value > (PAGE_OFFSET-4) ) return -EPERM;
+        if ( !DB_VALID_ADDR(value) ) return -EPERM;
         if ( p == current ) 
             __asm__ ( "mov %0, %%db1" : : "r" (value) );
         break;
     case 2: 
-        if ( value > (PAGE_OFFSET-4) ) return -EPERM;
+        if ( !DB_VALID_ADDR(value) ) return -EPERM;
         if ( p == current ) 
             __asm__ ( "mov %0, %%db2" : : "r" (value) );
         break;
     case 3:
-        if ( value > (PAGE_OFFSET-4) ) return -EPERM;
+        if ( !DB_VALID_ADDR(value) ) return -EPERM;
         if ( p == current ) 
             __asm__ ( "mov %0, %%db3" : : "r" (value) );
         break;

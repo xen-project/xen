@@ -596,7 +596,7 @@ ENTRY(nmi)
         # Okay, its almost a normal NMI tick. We can only process it if:
         #  A. We are the outermost Xen activation (in which case we have
         #     the selectors safely saved on our stack)
-        #  B. DS-GS all contain sane Xen values.
+        #  B. DS and ES contain sane Xen values.
         # In all other cases we bail without touching DS-GS, as we have
         # interrupted an enclosing Xen activation in tricky prologue or
         # epilogue code.
@@ -644,11 +644,11 @@ nmi_parity_err:
         orb  $0x4,%al
         outb %al,$0x61
         cmpb $'i',%ss:SYMBOL_NAME(opt_nmi) # nmi=ignore
-        je   restore_all_xen
+        je   nmi_out
         bts  $0,%ss:SYMBOL_NAME(nmi_softirq_reason)
         bts  $NMI_SOFTIRQ,%ss:SYMBOL_NAME(irq_stat)
         cmpb $'d',%ss:SYMBOL_NAME(opt_nmi) # nmi=dom0
-        je   restore_all_xen
+        je   nmi_out
         movl $(__HYPERVISOR_DS),%edx       # nmi=fatal
         movl %edx,%ds
         movl %edx,%es
@@ -656,7 +656,15 @@ nmi_parity_err:
         push %edx
         call SYMBOL_NAME(mem_parity_error)
         addl $4,%esp
-        jmp  ret_from_intr
+nmi_out:movl  %ss:XREGS_eflags(%esp),%eax
+        movb  %ss:XREGS_cs(%esp),%al
+        testl $(3|X86_EFLAGS_VM),%eax
+	jz    restore_all_xen
+        movl  $(__HYPERVISOR_DS),%edx
+        movl  %edx,%ds
+        movl  %edx,%es
+        GET_CURRENT(%ebx)
+        jmp   test_all_events
                 
 nmi_io_err: 
         # Clear and disable the I/O-error line
@@ -664,11 +672,11 @@ nmi_io_err:
         orb  $0x8,%al
         outb %al,$0x61
         cmpb $'i',%ss:SYMBOL_NAME(opt_nmi) # nmi=ignore
-        je   restore_all_xen
+        je   nmi_out
         bts  $1,%ss:SYMBOL_NAME(nmi_softirq_reason)
         bts  $NMI_SOFTIRQ,%ss:SYMBOL_NAME(irq_stat)
         cmpb $'d',%ss:SYMBOL_NAME(opt_nmi) # nmi=dom0
-        je   restore_all_xen
+        je   nmi_out
         movl $(__HYPERVISOR_DS),%edx       # nmi=fatal
         movl %edx,%ds
         movl %edx,%es
@@ -676,7 +684,7 @@ nmi_io_err:
         push %edx
         call SYMBOL_NAME(io_check_error)                        
         addl $4,%esp
-        jmp  ret_from_intr
+        jmp  nmi_out
 
 
 ENTRY(setup_vm86_frame)

@@ -376,7 +376,7 @@ void arch_getdomaininfo_ctxt(
     {
         for ( i = 0; i < 16; i++ )
             c->gdt_frames[i] = 
-                l1_pgentry_to_pagenr(ed->arch.perdomain_ptes[i]);
+                l1_pgentry_to_pfn(ed->arch.perdomain_ptes[i]);
         c->gdt_ents = GET_GDT_ENTRIES(ed);
     }
     c->guestos_ss  = ed->arch.guestos_ss;

@@ -915,7 +915,7 @@ static inline void establish_pte(struct vm_area_struct * vma, unsigned long addr
 #ifdef CONFIG_XEN
 	if ( likely(vma->vm_mm == current->mm) ) {
 		XEN_flush_page_update_queue();
-		HYPERVISOR_update_va_mapping(address>>PAGE_SHIFT, entry, UVMF_INVLPG);
+		HYPERVISOR_update_va_mapping(address, entry, UVMF_INVLPG);
 	} else {
 		set_pte(page_table, entry);
 		flush_tlb_page(vma, address);
@@ -1191,7 +1191,7 @@ static int do_swap_page(struct mm_struct * mm,
 #ifdef CONFIG_XEN
 	if ( likely(vma->vm_mm == current->mm) ) {
 		XEN_flush_page_update_queue();
-		HYPERVISOR_update_va_mapping(address>>PAGE_SHIFT, pte, 0);
+		HYPERVISOR_update_va_mapping(address, pte, 0);
 	} else {
 		set_pte(page_table, pte);
 		XEN_flush_page_update_queue();
@@ -1247,7 +1247,7 @@ static int do_anonymous_page(struct mm_struct * mm, struct vm_area_struct * vma,
 #ifdef CONFIG_XEN
 	if ( likely(vma->vm_mm == current->mm) ) {
 		XEN_flush_page_update_queue();
-		HYPERVISOR_update_va_mapping(addr>>PAGE_SHIFT, entry, 0);
+		HYPERVISOR_update_va_mapping(addr, entry, 0);
 	} else {
 		set_pte(page_table, entry);
 		XEN_flush_page_update_queue();
@@ -1333,7 +1333,7 @@ static int do_no_page(struct mm_struct * mm, struct vm_area_struct * vma,
 #ifdef CONFIG_XEN
 		if ( likely(vma->vm_mm == current->mm) ) {
 			XEN_flush_page_update_queue();
-			HYPERVISOR_update_va_mapping(address>>PAGE_SHIFT, entry, 0);
+			HYPERVISOR_update_va_mapping(address, entry, 0);
 		} else {
 			set_pte(page_table, entry);
 			XEN_flush_page_update_queue();

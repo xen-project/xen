@@ -10,10 +10,6 @@
  
 #include "blktap.h"
 
-#define BLKIF_STATE_CLOSED       0
-#define BLKIF_STATE_DISCONNECTED 1
-#define BLKIF_STATE_CONNECTED    2
-
 static char *blkif_state_name[] = {
     [BLKIF_STATE_CLOSED]       = "closed",
     [BLKIF_STATE_DISCONNECTED] = "disconnected",
@@ -26,9 +22,10 @@ static char * blkif_status_name[] = {
     [BLKIF_INTERFACE_STATUS_CONNECTED]    = "connected",
     [BLKIF_INTERFACE_STATUS_CHANGED]      = "changed",
 };
-static unsigned int blkif_pt_state = BLKIF_STATE_CLOSED;
-static unsigned blkif_ptbe_irq;
-unsigned int blkif_ptbe_evtchn;
+
+static unsigned blktap_be_irq;
+unsigned int    blktap_be_state = BLKIF_STATE_CLOSED;
+unsigned int    blktap_be_evtchn;
 
 /*-----[ Control Messages to/from Frontend VMs ]--------------------------*/
 
@@ -306,7 +303,7 @@ static void blkif_ptbe_disconnect(void)
     sring = (blkif_sring_t *)__get_free_page(GFP_KERNEL);
     SHARED_RING_INIT(BLKIF_RING, sring);
     FRONT_RING_INIT(BLKIF_RING, &blktap_be_ring, sring);
-    blkif_pt_state  = BLKIF_STATE_DISCONNECTED;
+    blktap_be_state  = BLKIF_STATE_DISCONNECTED;
     DPRINTK("Blkif-Passthrough-BE is now DISCONNECTED.\n");
     blkif_ptbe_send_interface_connect();
 }
@@ -315,10 +312,10 @@ static void blkif_ptbe_connect(blkif_fe_interface_status_t *status)
 {
     int err = 0;
     
-    blkif_ptbe_evtchn = status->evtchn;
-    blkif_ptbe_irq    = bind_evtchn_to_irq(blkif_ptbe_evtchn);
+    blktap_be_evtchn = status->evtchn;
+    blktap_be_irq    = bind_evtchn_to_irq(blktap_be_evtchn);
 
-    err = request_irq(blkif_ptbe_irq, blkif_ptbe_int, 
+    err = request_irq(blktap_be_irq, blkif_ptbe_int, 
                       SA_SAMPLE_RANDOM, "blkif", NULL);
     if ( err ) {
 	WPRINTK("blkfront request_irq failed (%d)\n", err);
@@ -326,7 +323,7 @@ static void blkif_ptbe_connect(blkif_fe_interface_status_t *status)
     } else {
 	/* transtion to connected in case we need to do a 
            a partion probe on a whole disk */
-        blkif_pt_state = BLKIF_STATE_CONNECTED;
+        blktap_be_state = BLKIF_STATE_CONNECTED;
     }
 }
 
@@ -334,7 +331,7 @@ static void unexpected(blkif_fe_interface_status_t *status)
 {
     WPRINTK(" TAP: Unexpected blkif status %s in state %s\n", 
            blkif_status_name[status->status],
-           blkif_state_name[blkif_pt_state]);
+           blkif_state_name[blktap_be_state]);
 }
 
 static void blkif_ptbe_status(
@@ -352,7 +349,7 @@ static void blkif_ptbe_status(
     switch ( status->status )
     {
     case BLKIF_INTERFACE_STATUS_CLOSED:
-        switch ( blkif_pt_state )
+        switch ( blktap_be_state )
         {
         case BLKIF_STATE_CLOSED:
             unexpected(status);
@@ -366,7 +363,7 @@ static void blkif_ptbe_status(
         break;
         
     case BLKIF_INTERFACE_STATUS_DISCONNECTED:
-        switch ( blkif_pt_state )
+        switch ( blktap_be_state )
         {
         case BLKIF_STATE_CLOSED:
             blkif_ptbe_disconnect();
@@ -380,7 +377,7 @@ static void blkif_ptbe_status(
         break;
         
     case BLKIF_INTERFACE_STATUS_CONNECTED:
-        switch ( blkif_pt_state )
+        switch ( blktap_be_state )
         {
         case BLKIF_STATE_CLOSED:
             unexpected(status);
@@ -398,7 +395,7 @@ static void blkif_ptbe_status(
         break;
 
    case BLKIF_INTERFACE_STATUS_CHANGED:
-        switch ( blkif_pt_state )
+        switch ( blktap_be_state )
         {
         case BLKIF_STATE_CLOSED:
         case BLKIF_STATE_DISCONNECTED:
@@ -439,6 +436,14 @@ void blkif_ctrlif_rx(ctrl_msg_t *msg, unsigned long id)
         }
 
     case CMSG_BLKIF_BE:
+        
+        /* send a copy of the message to user if wanted */
+        
+        if ( (blktap_mode & BLKTAP_MODE_INTERCEPT_FE) ||
+             (blktap_mode & BLKTAP_MODE_COPY_FE) ) {
+            
+            blktap_write_ctrl_ring(msg);
+        }
         
         switch ( msg->subtype )
         {
@@ -500,11 +505,13 @@ void blkif_ctrlif_rx(ctrl_msg_t *msg, unsigned long id)
     ctrl_if_send_response(msg);
 }
 
-/*-----[ All control messages enter here: ]-------------------------------*/
+/*-----[ Initialization ]-------------------------------------------------*/
 
 void __init blkif_interface_init(void)
 {
     blkif_cachep = kmem_cache_create("blkif_cache", sizeof(blkif_t), 
                                      0, 0, NULL, NULL);
     memset(blkif_hash, 0, sizeof(blkif_hash));
+    
+    blktap_be_ring.sring = NULL;
 }

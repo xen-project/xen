@@ -298,19 +298,21 @@ void __init identify_cpu(struct cpuinfo_x86 *c)
 unsigned long cpu_initialized;
 void __init cpu_init(void)
 {
-    extern void percpu_traps_init(void);
     int nr = smp_processor_id();
     struct tss_struct *t = &init_tss[nr];
+    unsigned char idt_load[10];
 
     if ( test_and_set_bit(nr, &cpu_initialized) )
         panic("CPU#%d already initialized!!!\n", nr);
     printk("Initializing CPU#%d\n", nr);
 
-    /* Set up GDT and IDT. */
     SET_GDT_ENTRIES(current, DEFAULT_GDT_ENTRIES);
     SET_GDT_ADDRESS(current, DEFAULT_GDT_ADDRESS);
     __asm__ __volatile__ ( "lgdt %0" : "=m" (*current->arch.gdt) );
-    __asm__ __volatile__ ( "lidt %0" : "=m" (idt_descr) );
+
+    *(unsigned short *)(&idt_load[0]) = (IDT_ENTRIES*sizeof(idt_entry_t))-1;
+    *(unsigned long  *)(&idt_load[2]) = (unsigned long)idt_tables[nr];
+    __asm__ __volatile__ ( "lidt %0" : "=m" (idt_load) );
 
     /* No nested task. */
     __asm__ __volatile__ ( "pushf ; andw $0xbfff,(%"__OP"sp) ; popf" );
@@ -335,8 +337,6 @@ void __init cpu_init(void)
 #define CD(register) __asm__ ( "mov %0,%%db" #register : : "r" (0UL) );
     CD(0); CD(1); CD(2); CD(3); /* no db4 and db5 */; CD(6); CD(7);
 #undef CD
-
-    percpu_traps_init();
 
     /* Install correct page table. */
     write_ptbase(current);

@@ -214,7 +214,7 @@ ENTRY(gdt_table)
         .org 0x1000
 ENTRY(idle_pg_table) # Initial page directory is 4kB
         .org 0x2000
-ENTRY(cpu0_stack)    # Initial stack is 8kB
-        .org 0x4000
+ENTRY(cpu0_stack)
+        .org 0x2000 + STACK_SIZE
 ENTRY(stext)
 ENTRY(_stext)

@@ -13,10 +13,8 @@
 
 #ifdef CONFIG_X86
 #define FORCE_XENELF_IMAGE 1
-#define ELF_ADDR           p_vaddr
 #elif defined(__ia64__)
 #define FORCE_XENELF_IMAGE 0
-#define ELF_ADDR           p_paddr
 #endif
 
 static inline int is_loadable_phdr(Elf_Phdr *phdr)
@@ -100,10 +98,10 @@ int parseelfimage(char *elfbase,
         phdr = (Elf_Phdr *)(elfbase + ehdr->e_phoff + (h*ehdr->e_phentsize));
         if ( !is_loadable_phdr(phdr) )
             continue;
-        if ( phdr->ELF_ADDR < kernstart )
-            kernstart = phdr->ELF_ADDR;
-        if ( (phdr->ELF_ADDR + phdr->p_memsz) > kernend )
-            kernend = phdr->ELF_ADDR + phdr->p_memsz;
+        if ( phdr->p_paddr < kernstart )
+            kernstart = phdr->p_paddr;
+        if ( (phdr->p_paddr + phdr->p_memsz) > kernend )
+            kernend = phdr->p_paddr + phdr->p_memsz;
     }
 
     if ( (kernstart > kernend) || 
@@ -144,10 +142,10 @@ int loadelfimage(char *elfbase)
         if ( !is_loadable_phdr(phdr) )
             continue;
         if ( phdr->p_filesz != 0 )
-            memcpy((char *)phdr->ELF_ADDR, elfbase + phdr->p_offset, 
+            memcpy((char *)phdr->p_paddr, elfbase + phdr->p_offset, 
                    phdr->p_filesz);
         if ( phdr->p_memsz > phdr->p_filesz )
-            memset((char *)phdr->ELF_ADDR + phdr->p_filesz, 0, 
+            memset((char *)phdr->p_paddr + phdr->p_filesz, 0, 
                    phdr->p_memsz - phdr->p_filesz);
     }
 

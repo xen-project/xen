@@ -8,7 +8,6 @@
 #include <xen/errno.h>
 #include <xen/prefetch.h>
 #include <xen/string.h>
-#include <xen/sched.h>
 
 #define __user
 

@@ -32,6 +32,8 @@
 #include <public/io/ioreq.h>
 #include <asm/vmx_platform.h>
 
+#ifdef CONFIG_VMX
+
 extern long do_block();
   
 #if defined (__i386__)
@@ -386,3 +388,5 @@ void vmx_do_resume(struct exec_domain *d)
     if (!test_bit(ARCH_VMX_IO_WAIT, &d->arch.arch_vmx.flags))
         vmx_intr_assist(d);
 }
+
+#endif /* CONFIG_VMX */

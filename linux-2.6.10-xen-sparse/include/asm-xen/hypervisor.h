@@ -438,7 +438,7 @@ HYPERVISOR_multicall(
 
 static inline int
 HYPERVISOR_update_va_mapping(
-    unsigned long page_nr, pte_t new_val, unsigned long flags)
+    unsigned long nr, pte_t new_val, unsigned long flags)
 {
     int ret;
     unsigned long ign1, ign2, ign3;
@@ -447,13 +447,13 @@ HYPERVISOR_update_va_mapping(
         TRAP_INSTR
         : "=a" (ret), "=b" (ign1), "=c" (ign2), "=d" (ign3)
 	: "0" (__HYPERVISOR_update_va_mapping), 
-          "1" (page_nr), "2" ((new_val).pte_low), "3" (flags)
+          "1" (va), "2" ((new_val).pte_low), "3" (flags)
 	: "memory" );
 
     if ( unlikely(ret < 0) )
     {
         printk(KERN_ALERT "Failed update VA mapping: %08lx, %08lx, %08lx\n",
-               page_nr, (new_val).pte_low, flags);
+               va, (new_val).pte_low, flags);
         BUG();
     }
 
@@ -540,7 +540,7 @@ HYPERVISOR_grant_table_op(
 
 static inline int
 HYPERVISOR_update_va_mapping_otherdomain(
-    unsigned long page_nr, pte_t new_val, unsigned long flags, domid_t domid)
+    unsigned long va, pte_t new_val, unsigned long flags, domid_t domid)
 {
     int ret;
     unsigned long ign1, ign2, ign3, ign4;
@@ -549,7 +549,7 @@ HYPERVISOR_update_va_mapping_otherdomain(
         TRAP_INSTR
         : "=a" (ret), "=b" (ign1), "=c" (ign2), "=d" (ign3), "=S" (ign4)
 	: "0" (__HYPERVISOR_update_va_mapping_otherdomain),
-          "1" (page_nr), "2" ((new_val).pte_low), "3" (flags), "4" (domid) :
+          "1" (va), "2" ((new_val).pte_low), "3" (flags), "4" (domid) :
         "memory" );
     
     return ret;
