@@ -373,13 +373,19 @@ critical_fixup_table:
 ENTRY(failsafe_callback)
 1:      pop  %ds
 2:      pop  %es
-3:      iret
+3:      pop  %fs
+4:      pop  %gs
+5:      iret
 .section .fixup,"ax";	\
-4:	movl $0,(%esp);	\
+6:	movl $0,(%esp);	\
 	jmp 1b;		\
-5:	movl $0,(%esp);	\
+7:	movl $0,(%esp);	\
 	jmp 2b;		\
-6:	pushl %ss;	\
+8:	movl $0,(%esp);	\
+	jmp 3b;		\
+9:	movl $0,(%esp);	\
+	jmp 4b;		\
+10:	pushl %ss;	\
 	popl %ds;	\
 	pushl %ss;	\
 	popl %es;	\
@@ -388,9 +394,11 @@ ENTRY(failsafe_callback)
 .previous;		\
 .section __ex_table,"a";\
 	.align 4;	\
-	.long 1b,4b;	\
-	.long 2b,5b;	\
-	.long 3b,6b;	\
+	.long 1b,6b;	\
+	.long 2b,7b;	\
+	.long 3b,8b;	\
+	.long 4b,9b;	\
+	.long 5b,10b;	\
 .previous
         
 ENTRY(coprocessor_error)

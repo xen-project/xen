@@ -227,6 +227,9 @@ long do_set_gdt(unsigned long *frame_list, unsigned int entries)
         current->mm.perdomain_pt[i] = mk_l1_pgentry(0);
         if ( pfn == 0 ) continue;
         page = frame_table + pfn;
+        ASSERT((page->flags & PG_type_mask) == PGT_gdt_page);
+        ASSERT((page->flags & PG_domain_mask) == current->domain);
+        ASSERT((page->type_count != 0) && (page->tot_count != 0));
         put_page_type(page);
         put_page_tot(page);
     }

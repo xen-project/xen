@@ -19,12 +19,14 @@
  *	18(%esp) - %eax
  *	1C(%esp) - %ds
  *	20(%esp) - %es
- *	24(%esp) - orig_eax
- *	28(%esp) - %eip
- *	2C(%esp) - %cs
- *	30(%esp) - %eflags
- *	34(%esp) - %oldesp
- *	38(%esp) - %oldss
+ *	24(%esp) - %fs
+ *	28(%esp) - %gs
+ *	2C(%esp) - orig_eax
+ *	30(%esp) - %eip
+ *	34(%esp) - %cs
+ *	38(%esp) - %eflags
+ *	3C(%esp) - %oldesp
+ *	40(%esp) - %oldss
  *
  * "current" is in register %ebx during any slow entries.
  */
@@ -56,13 +58,14 @@
  * of the frame does an inter-privilege interrupt-return.
  * 
  * Note that the "failsafe callback" uses a special stackframe:
- * { return_DS, return_ES, return_EIP, return_CS, return_EFLAGS, ... }
- * That is, original values for DS/ES are placed on stack rather than
- * in DS/ES themselves. Why? It saves us loading them, only to have them
+ * { return_DS, return_ES, return_FS, return_GS, return_EIP,
+ *   return_CS, return_EFLAGS[, return_ESP, return_SS] }
+ * That is, original values for DS/ES/FS/GS are placed on stack rather than
+ * in DS/ES/FS/GS themselves. Why? It saves us loading them, only to have them
  * saved/restored in guest OS. Furthermore, if we load them we may cause
  * a fault if they are invalid, which is a hassle to deal with. We avoid
  * that problem if we don't load them :-) This property allows us to use
- * the failsafe callback as a fallback: if we ever fault on loading DS/ES
+ * the failsafe callback as a fallback: if we ever fault on loading DS/ES/FS/GS
  * on return to ring != 0, we can simply package it up as a return via
  * the failsafe callback, and let the guest OS sort it out (perhaps by
  * killing an application process). Note that we also do this for any
@@ -90,12 +93,14 @@ EBP		= 0x14
 EAX		= 0x18
 DS		= 0x1C
 ES		= 0x20
-ORIG_EAX	= 0x24
-EIP		= 0x28
-CS		= 0x2C
-EFLAGS		= 0x30
-OLDESP		= 0x34
-OLDSS		= 0x38
+FS              = 0x24
+GS              = 0x28
+ORIG_EAX	= 0x2C
+EIP		= 0x30
+CS		= 0x34
+EFLAGS		= 0x38
+OLDESP		= 0x3C
+OLDSS		= 0x40
 
 /* Offsets in task_struct */
 PROCESSOR       =  0
@@ -113,14 +118,14 @@ EVENTS          =  0
 EVENTS_ENABLE   =  4
 
 /* Offsets in guest_trap_bounce */
-GTB_ERROR_CODE  =  0
-GTB_CR2         =  4
-GTB_FLAGS       =  8
-GTB_CS          = 10
-GTB_EIP         = 12
-GTBF_TRAP       =  1
-GTBF_TRAP_NOCODE = 2
-GTBF_TRAP_CR2   = 4
+GTB_ERROR_CODE   =  0
+GTB_CR2          =  4
+GTB_FLAGS        =  8
+GTB_CS           = 10
+GTB_EIP          = 12
+GTBF_TRAP        =  1
+GTBF_TRAP_NOCODE =  2
+GTBF_TRAP_CR2    =  4
                         
 CF_MASK		= 0x00000001
 IF_MASK		= 0x00000200
@@ -128,6 +133,8 @@ NT_MASK		= 0x00004000
 
 #define SAVE_ALL \
 	cld; \
+	pushl %gs; \
+	pushl %fs; \
 	pushl %es; \
 	pushl %ds; \
 	pushl %eax; \
@@ -139,7 +146,8 @@ NT_MASK		= 0x00004000
 	pushl %ebx; \
 	movl $(__HYPERVISOR_DS),%edx; \
 	movl %edx,%ds; \
-	movl %edx,%es;
+	movl %edx,%es; \
+        sti; 
 
 #define RESTORE_ALL	\
 	popl %ebx;	\
@@ -151,13 +159,17 @@ NT_MASK		= 0x00004000
 	popl %eax;	\
 1:	popl %ds;	\
 2:	popl %es;	\
+3:	popl %fs;	\
+4:	popl %gs;	\
         addl $4,%esp;	\
-3:      iret;		\
+5:      iret;		\
 .section .fixup,"ax";	\
-6:      subl $4,%esp;   \
-        pushl %es;      \
-5:      pushl %ds;      \
-4:      pushl %eax;     \
+10:     subl $4,%esp;   \
+        pushl %gs;      \
+9:      pushl %fs;      \
+8:      pushl %es;      \
+7:      pushl %ds;      \
+6:      pushl %eax;     \
 	pushl %ebp;     \
 	pushl %edi;     \
 	pushl %esi;     \
@@ -172,9 +184,11 @@ NT_MASK		= 0x00004000
 .previous;                           \
 .section __ex_table,"a";             \
 	.align 4;	             \
-	.long 1b,4b;       	     \
-	.long 2b,5b;	             \
-	.long 3b,6b;	             \
+	.long 1b,6b;       	     \
+	.long 2b,7b;	             \
+	.long 3b,8b;	             \
+	.long 4b,9b;	             \
+	.long 5b,10b;	             \
 .previous
 
 #define GET_CURRENT(reg)  \
@@ -315,7 +329,22 @@ process_hyp_events:
 
 /* No special register assumptions */
 failsafe_callback:
-        GET_CURRENT(%ebx)
+        # Check that we are actually returning to ring != 0 because
+        # we may fault when returning to another ring 0 activation.
+        # This can only occur when restoring FS and GS, which can be avoided
+        # by zeroing those registers and trying again. The outermost ring 0
+        # activation will do a full failsafe callback to the guest OS.
+        # Note that the outermost activation certainly has the "bad" selector
+        # value saved away, since interrupts are always disabled in ring 0
+        # until all segment registers have been saved.
+        movb CS(%esp),%al
+        test $3,%al
+        jnz  1f
+        xorl %eax,%eax
+        movl %eax,FS(%esp)
+        movl %eax,GS(%esp)
+        jmp  restore_all   
+1:      GET_CURRENT(%ebx)
         mov  PROCESSOR(%ebx),%eax
         shl  $4,%eax
         lea  guest_trap_bounce(%eax),%edx
@@ -324,11 +353,15 @@ failsafe_callback:
         movl FAILSAFE_SEL(%ebx),%eax
         movw %ax,GTB_CS(%edx)
         call create_bounce_frame
-        subl $8,%esi                 # add DS/ES to failsafe stack frame
+        subl $16,%esi                # add DS/ES/FS/GS to failsafe stack frame
         movl DS(%esp),%eax
 FAULT1: movl %eax,(%esi) 
         movl ES(%esp),%eax
 FAULT2: movl %eax,4(%esi)
+        movl FS(%esp),%eax
+FAULT3: movl %eax,8(%esi) 
+        movl GS(%esp),%eax
+FAULT4: movl %eax,12(%esi)
         movl %esi,OLDESP(%esp)
         popl %ebx
         popl %ecx
@@ -337,8 +370,8 @@ FAULT2: movl %eax,4(%esi)
         popl %edi
         popl %ebp
         popl %eax
-        addl $12,%esp
-FAULT3: iret 
+        addl $20,%esp                # skip DS/ES/FS/GS/ORIG_EAX
+FAULT5: iret 
 
         
 /* CREATE A BASIC EXCEPTION FRAME ON GUEST OS (RING-1) STACK:         */
@@ -354,25 +387,25 @@ create_bounce_frame:
         shll $8,%eax /* multiply by 256 */
         addl $init_tss + 12,%eax
         movl (%eax),%esi /* tss->esp1 */
-FAULT4: movl 4(%eax),%ds /* tss->ss1  */
+FAULT6: movl 4(%eax),%ds /* tss->ss1  */
         /* base of stack frame must contain ss/esp (inter-priv iret) */
         subl $8,%esi
         movl OLDESP+4(%esp),%eax
-FAULT5: movl %eax,(%esi) 
+FAULT7: movl %eax,(%esi) 
         movl OLDSS+4(%esp),%eax
-FAULT6: movl %eax,4(%esi) 
+FAULT8: movl %eax,4(%esi) 
         jmp 2f
 1:      /* obtain ss/esp from oldss/oldesp -- a ring-1 activation exists */
         movl OLDESP+4(%esp),%esi
-FAULT7: movl OLDSS+4(%esp),%ds 
+FAULT9: movl OLDSS+4(%esp),%ds 
 2:      /* Construct a stack frame: EFLAGS, CS/EIP */
         subl $12,%esi
         movl EIP+4(%esp),%eax
-FAULT8: movl %eax,(%esi) 
+FAULT10:movl %eax,(%esi) 
         movl CS+4(%esp),%eax
-FAULT9: movl %eax,4(%esi) 
+FAULT11:movl %eax,4(%esi) 
         movl EFLAGS+4(%esp),%eax
-FAULT10:movl %eax,8(%esi)
+FAULT12:movl %eax,8(%esi)
         /* Rewrite our stack frame and return to ring 1. */
         /* IA32 Ref. Vol. 3: TF, VM, RF and NT flags are cleared on trap. */
         andl $0xfffcbeff,%eax
@@ -390,16 +423,18 @@ FAULT10:movl %eax,8(%esi)
         .align 4
         .long FAULT1, kill_domain_fixup3 # Fault writing to ring-1 stack
         .long FAULT2, kill_domain_fixup3 # Fault writing to ring-1 stack
-        .long FAULT3, kill_domain_fixup1 # Fault executing failsafe iret
-        .long FAULT4, kill_domain_fixup2 # Fault loading ring-1 stack selector
-        .long FAULT5, kill_domain_fixup2 # Fault writing to ring-1 stack
-        .long FAULT6, kill_domain_fixup2 # Fault writing to ring-1 stack
-        .long FAULT7, kill_domain_fixup2 # Fault loading ring-1 stack selector
+        .long FAULT3, kill_domain_fixup3 # Fault writing to ring-1 stack
+        .long FAULT4, kill_domain_fixup3 # Fault writing to ring-1 stack
+        .long FAULT5, kill_domain_fixup1 # Fault executing failsafe iret
+        .long FAULT6, kill_domain_fixup2 # Fault loading ring-1 stack selector
+        .long FAULT7, kill_domain_fixup2 # Fault writing to ring-1 stack
         .long FAULT8, kill_domain_fixup2 # Fault writing to ring-1 stack
-        .long FAULT9, kill_domain_fixup2 # Fault writing to ring-1 stack
+        .long FAULT9, kill_domain_fixup2 # Fault loading ring-1 stack selector
         .long FAULT10,kill_domain_fixup2 # Fault writing to ring-1 stack
-        .long FAULT11,kill_domain_fixup3 # Fault writing to ring-1 stack
-        .long FAULT12,kill_domain_fixup3 # Fault writing to ring-1 stack
+        .long FAULT11,kill_domain_fixup2 # Fault writing to ring-1 stack
+        .long FAULT12,kill_domain_fixup2 # Fault writing to ring-1 stack
+        .long FAULT13,kill_domain_fixup3 # Fault writing to ring-1 stack
+        .long FAULT14,kill_domain_fixup3 # Fault writing to ring-1 stack
 .previous
                
 # This handler kills domains which experience unrecoverable faults.
@@ -429,12 +464,12 @@ process_guest_exception_and_events:
         jnz  2f
         subl $4,%esi                    # push error_code onto guest frame
         movl %es:GTB_ERROR_CODE(%edx),%eax
-FAULT11:movl %eax,(%esi)
+FAULT13:movl %eax,(%esi)
         test $GTBF_TRAP_CR2,%cl
         jz   1f
         subl $4,%esi                    # push %cr2 onto guest frame
         movl %es:GTB_CR2(%edx),%eax
-FAULT12:movl %eax,(%esi)
+FAULT14:movl %eax,(%esi)
 1:      movl %esi,OLDESP(%esp)        
 2:      push %es                        # unclobber %ds
         pop  %ds 
@@ -463,31 +498,36 @@ ENTRY(divide_error)
 	pushl $ SYMBOL_NAME(do_divide_error)
 	ALIGN
 error_code:
+	pushl %fs
+	pushl %es
 	pushl %ds
 	pushl %eax
-	xorl %eax,%eax
+	xorl  %eax,%eax
 	pushl %ebp
 	pushl %edi
 	pushl %esi
 	pushl %edx
-	decl %eax			# eax = -1
+	decl  %eax			# eax = -1
 	pushl %ecx
 	pushl %ebx
 	cld
-	movl %es,%ecx
-	movl ORIG_EAX(%esp), %esi	# get the error code
-	movl ES(%esp), %edi		# get the function address
-	movl %eax, ORIG_EAX(%esp)
-	movl %ecx, ES(%esp)
-	movl %esp,%edx
+	movl  %gs,%ecx
+	movl  ORIG_EAX(%esp), %esi	# get the error code
+	movl  GS(%esp), %edi		# get the function address
+	movl  %eax, ORIG_EAX(%esp)
+	movl  %ecx, GS(%esp)
+	movl  %esp,%edx
 	pushl %esi			# push the error code
 	pushl %edx			# push the pt_regs pointer
-	movl $(__HYPERVISOR_DS),%edx
-	movl %edx,%ds
-	movl %edx,%es
+	movl  $(__HYPERVISOR_DS),%edx
+	movl  %edx,%ds
+	movl  %edx,%es
 	GET_CURRENT(%ebx)
-	call *%edi
-	addl $8,%esp
+	call  *%edi
+        # NB. We reenable interrupts AFTER exception processing, as that is
+        #     required by the page fault handler (needs to save %cr2)
+        sti
+        addl  $8,%esp
 	jmp ret_from_exception
 
 ENTRY(coprocessor_error)

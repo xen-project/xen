@@ -199,8 +199,9 @@ void show_regs(struct pt_regs * regs)
            regs->eax,regs->ebx,regs->ecx,regs->edx);
     printk("ESI: %08lx EDI: %08lx EBP: %08lx",
            regs->esi, regs->edi, regs->ebp);
-    printk(" DS: %04x ES: %04x\n",
-           0xffff & regs->xds,0xffff & regs->xes);
+    printk(" DS: %04x ES: %04x FS: %04x GS: %04x\n",
+           0xffff & regs->xds, 0xffff & regs->xes,
+           0xffff & regs->xfs, 0xffff & regs->xgs);
 
     __asm__("movl %%cr0, %0": "=r" (cr0));
     __asm__("movl %%cr2, %0": "=r" (cr2));
@@ -260,7 +261,7 @@ void new_thread(struct task_struct *p,
      *  [EAX,EBX,ECX,EDX,EDI,EBP are zero]
      */
     p->thread.fs = p->thread.gs = FLAT_RING1_DS;
-    regs->xds = regs->xes = regs->xss = FLAT_RING1_DS;
+    regs->xds = regs->xes = regs->xfs = regs->xgs = regs->xss = FLAT_RING1_DS;
     regs->xcs = FLAT_RING1_CS;
     regs->eip = start_pc;
     regs->esp = start_stack;
@@ -313,8 +314,7 @@ void new_thread(struct task_struct *p,
 /* NB. prev_p passed in %eax, next_p passed in %edx */
 void __switch_to(struct task_struct *prev_p, struct task_struct *next_p)
 {
-    struct thread_struct *prev = &prev_p->thread,
-        *next = &next_p->thread;
+    struct thread_struct *next = &next_p->thread;
     struct tss_struct *tss = init_tss + smp_processor_id();
 
     unlazy_fpu(prev_p);
@@ -327,22 +327,9 @@ void __switch_to(struct task_struct *prev_p, struct task_struct *next_p)
     tss->esp1 = next->esp1;
     tss->ss1  = next->ss1;
 
-    /*
-     * Save away %fs and %gs. No need to save %es and %ds, as
-     * those are always kernel segments while inside the kernel.
-     */
-    asm volatile("movl %%fs,%0":"=m" (*(int *)&prev->fs));
-    asm volatile("movl %%gs,%0":"=m" (*(int *)&prev->gs));
-
     /* Switch GDT and LDT. */
     __asm__ __volatile__ ("lgdt %0" : "=m" (*next_p->mm.gdt));
     load_LDT();
-
-    /*
-     * Restore %fs and %gs.
-     */
-    loadsegment(fs, next->fs);
-    loadsegment(gs, next->gs);
 
     /*
      * Now maybe reload the debug registers

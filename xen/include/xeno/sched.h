@@ -80,8 +80,8 @@ struct task_struct {
      * Return vectors pushed to us by guest OS.
      * The stack frame for events is exactly that of an x86 hardware interrupt.
      * The stack frame for a failsafe callback is augmented with saved values
-     * for segment registers %ds and %es:
-     * 	%ds, %es, %eip, %cs, %eflags [, %oldesp, %oldss]
+     * for segment registers %ds, %es, %fs and %gs:
+     * 	%ds, %es, %fs, %gs, %eip, %cs, %eflags [, %oldesp, %oldss]
      */
     unsigned long event_selector;    /* 20: entry CS  */
     unsigned long event_address;     /* 24: entry EIP */

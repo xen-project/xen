@@ -7,31 +7,7 @@ longer-term goals.
  -- Keir (16/3/03)
 
 
-1. ASSIGNING DOMAINS TO PROCESSORS
-----------------------------------
-More intelligent assignment of domains to processors. In
-particular, we don't play well with hyperthreading: we will assign
-domains to virtual processors on the same package, rather then
-spreading them across processor packages.
-
-What we need to do is port code from Linux which stores information on
-relationships between processors in the system (eg. which ones are
-siblings in the same package). We then use this to balance domains
-across packages, and across virtual processors within a package.
-
-2. PROPER DESTRUCTION OF DOMAINS
---------------------------------
-Currently we do not free resources when destroying a domain. This is
-because they may be tied up in subsystems, and there is no way of
-pulling them back in a safe manner.
-
-The fix is probably to reference count resources and automatically
-free them when the count reaches zero. We may get away with one count
-per domain (for all its resources). When this reaches zero we know it
-is safe to free everything: block-device rings, network rings, and all
-the rest.
-
-3. FIX HANDLING OF NETWORK RINGS
+1. FIX HANDLING OF NETWORK RINGS
 --------------------------------
 Handling of the transmit rings is currently very broken (for example,
 sending an inter-domain packet will wedge the hypervisor). This is
@@ -44,24 +20,45 @@ order to requests, just as we already do with block-device
 rings. We'll need to add an opaque identifier to ring entries,
 allowing matching of requests and responses, but that's about it.
 
-4. NETWORK CHECKSUM OFFLOAD 
+2. ACCURATE TIMERS AND WALL-CLOCK TIME
+--------------------------------------
+Currently our long-term timebase free runs on CPU0, with no external
+calibration. We should run ntpd on domain 0 and allow this to warp
+Xen's timebase. Once this is done, we can have a timebase per CPU and
+not worry about relative drift (since they'll all get sync'ed
+periodically by ntp).
+
+3. ASSIGNING DOMAINS TO PROCESSORS
+----------------------------------
+More intelligent assignment of domains to processors. In
+particular, we don't play well with hyperthreading: we will assign
+domains to virtual processors on the same package, rather then
+spreading them across processor packages.
+
+What we need to do is port code from Linux which stores information on
+relationships between processors in the system (eg. which ones are
+siblings in the same package). We then use this to balance domains
+across packages, and across virtual processors within a package.
+
+4. PROPER DESTRUCTION OF DOMAINS
+--------------------------------
+Currently we do not free resources when destroying a domain. This is
+because they may be tied up in subsystems, and there is no way of
+pulling them back in a safe manner.
+
+The fix is probably to reference count resources and automatically
+free them when the count reaches zero. We may get away with one count
+per domain (for all its resources). When this reaches zero we know it
+is safe to free everything: block-device rings, network rings, and all
+the rest.
+
+5. NETWORK CHECKSUM OFFLOAD 
 --------------------------- 
 All the NICs that we support can checksum packets on behalf of guest
 OSes. We need to add appropriate flags to and from each domain to
 indicate, on transmit, which packets need the checksum added and, on
 receive, which packets have been checked out as okay. We can steal
 Linux's interface, which is entirely sane given NIC limitations.
-
-5. GDT AND LDT VIRTUALISATION 
------------------------------ 
-We do not allow modification of the GDT, or any use of the LDT. This
-is necessary for support of unmodified applications (eg. Linux uses
-LDT in threaded applications, while Windows needs to update GDT
-entries).
-
-I have some text on how to do this:
-/usr/groups/xeno/discussion-docs/memory_management/segment_tables.txt
-It's already half implemented, but the rest is still to do.
 
 6. DOMAIN 0 MANAGEMENT DAEMON
 -----------------------------
@@ -70,15 +67,7 @@ track of machine resources and can make sensible policy choices. This
 may require support in Xen; for example, notifications (eg. DOMn is
 killed), and requests (eg. can DOMn allocate x frames of memory?).
 
-7. ACCURATE TIMERS AND WALL-CLOCK TIME
---------------------------------------
-Currently our long-term timebase free runs on CPU0, with no external
-calibration. We should run ntpd on domain 0 and allow this to warp
-Xen's timebase. Once this is done, we can have a timebase per CPU and
-not worry about relative drift (since they'll all get sync'ed
-periodically by ntp).
-
-8. MODULE SUPPORT FOR XEN
+7. MODULE SUPPORT FOR XEN
 -------------------------
 Network and blkdev drivers are bloating Xen. At some point we want to
 build drivers as modules, stick them in a cheesy ramfs, then relocate
@@ -90,7 +79,7 @@ which drivers to load.
 Most of the hard stuff (relocating and the like) is done for us by
 Linux's module system.
 
-9. NEW DESIGN FEATURES
+8. NEW DESIGN FEATURES
 ----------------------
 This includes the last-chance page cache, and the unified buffer cache.
 
@@ -98,35 +87,6 @@ This includes the last-chance page cache, and the unified buffer cache.
 
 Graveyard
 *********
-
-Following is some description how some of the above might be
-implemented. Some of it is superceded and/or out of date, so follow
-with caution.
-
-Segment descriptor tables
--------------------------
-We want to allow guest OSes to specify GDT and LDT tables using their
-own pages of memory (just like with page tables). So allow the following:
- * new_table_entry(ptr, val)
-   [Allows insertion of a code, data, or LDT descriptor into given
-    location. Can simply be checked then poked, with no need to look at
-    page type.]
- * new_GDT() -- relevent virtual pages are resolved to frames. Either
-    (i) page not present; or (ii) page is only mapped read-only and checks
-    out okay (then marked as special page). Old table is resolved first,
-    and the pages are unmarked (no longer special type).
- * new_LDT() -- same as for new_GDT(), with same special page type.
-
-Page table updates must be hooked, so we look for updates to virtual page
-addresses in the GDT/LDT range. If map to not present, then old physpage
-has type_count decremented. If map to present, ensure read-only, check the
-page, and set special type.
-
-Merge set_{LDT,GDT} into update_baseptr, by passing four args:
- update_baseptrs(mask, ptab, gdttab, ldttab);
-Update of ptab requires update of gtab (or set to internal default).
-Update of gtab requires update of ltab (or set to internal default).
-
 
 The hypervisor page cache
 -------------------------

@@ -159,8 +159,9 @@ void show_registers(struct pt_regs *regs)
            regs->eax, regs->ebx, regs->ecx, regs->edx);
     printk("esi: %08lx   edi: %08lx   ebp: %08lx   esp: %08lx\n",
            regs->esi, regs->edi, regs->ebp, esp);
-    printk("ds: %04x   es: %04x   ss: %04x\n",
-           regs->xds & 0xffff, regs->xes & 0xffff, ss);
+    printk("ds: %04x   es: %04x   fs: %04x   gs: %04x   ss: %04x\n",
+           regs->xds & 0xffff, regs->xes & 0xffff, 
+           regs->xfs & 0xffff, regs->xgs & 0xffff, ss);
 
     show_stack(&regs->esp);
 }	
@@ -170,10 +171,11 @@ spinlock_t die_lock = SPIN_LOCK_UNLOCKED;
 
 void die(const char * str, struct pt_regs * regs, long err)
 {
-    spin_lock_irq(&die_lock);
+    unsigned long flags;
+    spin_lock_irqsave(&die_lock, flags);
     printk("%s: %04lx,%04lx\n", str, err >> 16, err & 0xffff);
     show_registers(regs);
-    spin_unlock_irq(&die_lock);
+    spin_unlock_irqrestore(&die_lock, flags);
     panic("HYPERVISOR DEATH!!\n");
 }
 
@@ -205,6 +207,7 @@ static void inline do_trap(int trapnr, char *str,
     if ( (fixup = search_exception_table(regs->eip)) != 0 )
     {
         regs->eip = fixup;
+        regs->xfs = regs->xgs = 0;
         return;
     }
 
@@ -264,9 +267,6 @@ asmlinkage void do_page_fault(struct pt_regs *regs, long error_code)
 
  bounce_fault:
 
-    if ( (regs->xcs &3) == 1 )
-        printk("Fault at %08x (%08x)\n", addr, regs->eip); /* XXX */
-
     ti = p->thread.traps + 14;
     gtb->flags = GTBF_TRAP_CR2; /* page fault pushes %cr2 */
     gtb->cr2        = addr;
@@ -285,7 +285,7 @@ asmlinkage void do_page_fault(struct pt_regs *regs, long error_code)
     off  = addr - LDT_VIRT_START;
     addr = p->mm.ldt_base + off;
 
-    spin_lock_irq(&p->page_lock);
+    spin_lock(&p->page_lock);
 
     pl2e  = map_domain_mem(pagetable_val(p->mm.pagetable));
     l2e   = l2_pgentry_val(pl2e[l2_table_offset(addr)]);
@@ -303,34 +303,30 @@ asmlinkage void do_page_fault(struct pt_regs *regs, long error_code)
     if ( (page->flags & PG_type_mask) != PGT_ldt_page )
     {
         if ( page->type_count != 0 )
-        { /* XXX */
-            printk("BOGO TYPE %08lx %ld\n", page->flags, page->type_count);
             goto unlock_and_bounce_fault;
-        }
+
         /* Check all potential LDT entries in the page. */
         ldt_page = map_domain_mem(l1e & PAGE_MASK);
         for ( i = 0; i < 512; i++ )
             if ( !check_descriptor(ldt_page[i*2], ldt_page[i*2+1]) )
-            { /* XXX */
-                printk("Bad desc!!!!!\n");
                 goto unlock_and_bounce_fault;
-            }
         unmap_domain_mem(ldt_page);
+
         page->flags &= ~PG_type_mask;
         page->flags |= PGT_ldt_page;
-        get_page_type(page);
-        get_page_tot(page);
     }
 
-    p->mm.perdomain_pt[l1_table_offset(off)+16] = mk_l1_pgentry(l1e);
+    get_page_type(page);
+    get_page_tot(page);
+    p->mm.perdomain_pt[l1_table_offset(off)+16] = mk_l1_pgentry(l1e|_PAGE_RW);
 
-    spin_unlock_irq(&p->page_lock);
+    spin_unlock(&p->page_lock);
     return;
 
 
  unlock_and_bounce_fault:
 
-    spin_unlock_irq(&p->page_lock);
+    spin_unlock(&p->page_lock);
     goto bounce_fault;
 
 
@@ -339,6 +335,7 @@ asmlinkage void do_page_fault(struct pt_regs *regs, long error_code)
     if ( (fixup = search_exception_table(regs->eip)) != 0 )
     {
         regs->eip = fixup;
+        regs->xfs = regs->xgs = 0;
         return;
     }
 
@@ -420,8 +417,8 @@ asmlinkage void do_general_protection(struct pt_regs *regs, long error_code)
 
     if ( (fixup = search_exception_table(regs->eip)) != 0 )
     {
-        printk("Hmmmm %08lx -> %08lx (%04lx)\n", regs->eip, fixup, error_code);
         regs->eip = fixup;
+        regs->xfs = regs->xgs = 0;
         return;
     }
 
@@ -565,31 +562,14 @@ do { \
 	 "3" ((char *) (addr)),"2" (__HYPERVISOR_CS << 16)); \
 } while (0)
 
-
-/*
- * This needs to use 'idt_table' rather than 'idt', and
- * thus use the _nonmapped_ version of the IDT, as the
- * Pentium F0 0F bugfix can have resulted in the mapped
- * IDT being write-protected.
- */
 void set_intr_gate(unsigned int n, void *addr)
 {
     _set_gate(idt_table+n,14,0,addr);
 }
 
-static void __init set_trap_gate(unsigned int n, void *addr)
-{
-    _set_gate(idt_table+n,15,0,addr);
-}
-
 static void __init set_system_gate(unsigned int n, void *addr)
 {
-    _set_gate(idt_table+n,15,3,addr);
-}
-
-static void __init set_call_gate(void *a, void *addr)
-{
-    _set_gate(a,12,3,addr);
+    _set_gate(idt_table+n,14,3,addr);
 }
 
 #define _set_seg_desc(gate_addr,type,dpl,base,limit) {\
@@ -620,29 +600,37 @@ void set_tss_desc(unsigned int n, void *addr)
 
 void __init trap_init(void)
 {
-    set_trap_gate(0,&divide_error);
-    set_trap_gate(1,&debug);
+    /*
+     * Note that interrupt gates are always used, rather than trap gates. We 
+     * must have interrupts disabled until DS/ES/FS/GS are saved because the 
+     * first activation must have the "bad" value(s) for these registers and 
+     * we may lose them if another activation is installed before they are 
+     * saved. The page-fault handler also needs interrupts disabled until %cr2 
+     * has been read and saved on the stack.
+     */
+    set_intr_gate(0,&divide_error);
+    set_intr_gate(1,&debug);
     set_intr_gate(2,&nmi);
     set_system_gate(3,&int3);     /* usable from all privilege levels */
     set_system_gate(4,&overflow); /* usable from all privilege levels */
-    set_trap_gate(5,&bounds);
-    set_trap_gate(6,&invalid_op);
-    set_trap_gate(7,&device_not_available);
-    set_trap_gate(8,&double_fault);
-    set_trap_gate(9,&coprocessor_segment_overrun);
-    set_trap_gate(10,&invalid_TSS);
-    set_trap_gate(11,&segment_not_present);
-    set_trap_gate(12,&stack_segment);
-    set_trap_gate(13,&general_protection);
+    set_intr_gate(5,&bounds);
+    set_intr_gate(6,&invalid_op);
+    set_intr_gate(7,&device_not_available);
+    set_intr_gate(8,&double_fault);
+    set_intr_gate(9,&coprocessor_segment_overrun);
+    set_intr_gate(10,&invalid_TSS);
+    set_intr_gate(11,&segment_not_present);
+    set_intr_gate(12,&stack_segment);
+    set_intr_gate(13,&general_protection);
     set_intr_gate(14,&page_fault);
-    set_trap_gate(15,&spurious_interrupt_bug);
-    set_trap_gate(16,&coprocessor_error);
-    set_trap_gate(17,&alignment_check);
-    set_trap_gate(18,&machine_check);
-    set_trap_gate(19,&simd_coprocessor_error);
+    set_intr_gate(15,&spurious_interrupt_bug);
+    set_intr_gate(16,&coprocessor_error);
+    set_intr_gate(17,&alignment_check);
+    set_intr_gate(18,&machine_check);
+    set_intr_gate(19,&simd_coprocessor_error);
 
     /* Only ring 1 can access monitor services. */
-    _set_gate(idt_table+HYPERVISOR_CALL_VECTOR,15,1,&hypervisor_call);
+    _set_gate(idt_table+HYPERVISOR_CALL_VECTOR,14,1,&hypervisor_call);
 
     /* CPU0 uses the master IDT. */
     idt_tables[0] = idt_table;

@@ -102,6 +102,8 @@ extern char _stext, _etext;
 
 #define SAVE_ALL \
 	"cld\n\t" \
+	"pushl %gs\n\t" \
+	"pushl %fs\n\t" \
 	"pushl %es\n\t" \
 	"pushl %ds\n\t" \
 	"pushl %eax\n\t" \

@@ -521,7 +521,7 @@ void deliver_packet(struct sk_buff *skb, net_vif_t *vif)
     g_pfn->tot_count = g_pfn->type_count = 0;
     h_pfn->flags = g_pfn->flags & ~PG_type_mask;
         
-    if (*g_pte & _PAGE_RW) h_pfn->flags |= PGT_writeable_page;
+    if (*g_pte & _PAGE_RW) h_pfn->flags |= PGT_writeable_page | PG_need_flush;
     g_pfn->flags = 0;
         
     /* Point the guest at the new machine frame. */
@@ -567,7 +567,6 @@ int netif_rx(struct sk_buff *skb)
     local_irq_save(flags);
 
     ASSERT(skb->skb_type == SKB_ZERO_COPY);
-    ASSERT((skb->data - skb->head) == (18 + ETH_HLEN));
 
     /*
      * Offset will include 16 bytes padding from dev_alloc_skb, 14 bytes for 

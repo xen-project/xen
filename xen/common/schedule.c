@@ -394,7 +394,7 @@ asmlinkage void schedule(void)
 
 #ifndef NDEBUG
     if (r_time < ctx_allow) {
-        printk("[%02d]: %lx\n", this_cpu, r_time);
+        printk("[%02d]: %lx\n", this_cpu, (unsigned long)r_time);
         dump_rqueue(&schedule_data[this_cpu].runqueue, "foo");
     }
 #endif

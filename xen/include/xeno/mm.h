@@ -67,12 +67,14 @@ typedef struct pfn_info {
 #define REFCNT_PIN_BIT 0x40000000UL
 
 #define get_page_tot(p)		 ((p)->tot_count++)
-#define put_page_tot(p)		 (--(p)->tot_count)
+#define put_page_tot(p)		 \
+    ({ ASSERT((p)->tot_count != 0); --(p)->tot_count; })
 #define page_tot_count(p)	 ((p)->tot_count)
 #define set_page_tot_count(p,v)  ((p)->tot_count = v)
 
 #define get_page_type(p)	 ((p)->type_count++)
-#define put_page_type(p)	 (--(p)->type_count)
+#define put_page_type(p)	 \
+    ({ ASSERT((p)->type_count != 0); --(p)->type_count; })
 #define page_type_count(p)	 ((p)->type_count)
 #define set_page_type_count(p,v) ((p)->type_count = v)
 
@@ -95,18 +97,18 @@ typedef struct pfn_info {
 #define PGT_gdt_page        (5<<24) /* using this page in a GDT? */
 #define PGT_ldt_page        (6<<24) /* using this page in an LDT? */
 #define PGT_writeable_page  (7<<24) /* has writable mappings of this page? */
-#define PGT_net_rx_buf      (8<<24) /* this page has been pirated by the net code. */
+#define PGT_net_rx_buf      (8<<24) /* this page taken by the net code. */
 
 /*
  * This bit indicates that the TLB must be flushed when the type count of this
  * frame drops to zero. This is needed on current x86 processors only for
- * frames which have guestos-accessible writeable mappings. In this case we must 
- * prevent stale TLB entries allowing the frame to be written if it used for a
- * page table, for example.
+ * frames which have guestos-accessible writeable mappings. In this case we
+ * must prevent stale TLB entries allowing the frame to be written if it used
+ * for a page table, for example.
  * 
- * We have this bit because the writeable type is actually also used to pin a page
- * when it is used as a disk read buffer. This doesn't require a TLB flush because
- * the frame never has a mapping in the TLB.
+ * We have this bit because the writeable type is actually also used to pin a
+ * page when it is used as a disk read buffer. This doesn't require a TLB flush
+ * because the frame never has a mapping in the TLB.
  */
 #define PG_need_flush       (1<<28)
 
@@ -114,10 +116,10 @@ typedef struct pfn_info {
 #define PageSetSlab(page)	set_bit(PG_slab, &(page)->flags)
 #define PageClearSlab(page)	clear_bit(PG_slab, &(page)->flags)
 
-#define SHARE_PFN_WITH_DOMAIN(_pfn, _dom)            \
-    do {                                             \
-        (_pfn)->flags = (_dom) | PGT_writeable_page; \
-        (_pfn)->tot_count = (_pfn)->type_count = 1;  \
+#define SHARE_PFN_WITH_DOMAIN(_pfn, _dom)                            \
+    do {                                                             \
+        (_pfn)->flags = (_dom) | PGT_writeable_page | PG_need_flush; \
+        (_pfn)->tot_count = (_pfn)->type_count = 2;                  \
     } while ( 0 )
 
 #define UNSHARE_PFN(_pfn) \

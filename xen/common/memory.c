@@ -176,7 +176,7 @@
 #include <asm/uaccess.h>
 #include <asm/domain_page.h>
 
-#if 1
+#if 0
 #define MEM_LOG(_f, _a...) printk("DOM%d: (file=memory.c, line=%d) " _f "\n", current->domain, __LINE__, ## _a )
 #else
 #define MEM_LOG(_f, _a...) ((void)0)
@@ -724,6 +724,9 @@ static int do_extended_command(unsigned long ptr, unsigned long val)
                     if ( pfn == 0 ) continue;
                     current->mm.perdomain_pt[i] = mk_l1_pgentry(0);
                     page = frame_table + pfn;
+                    ASSERT((page->flags & PG_type_mask) == PGT_ldt_page);
+                    ASSERT((page->flags & PG_domain_mask) == current->domain);
+                    ASSERT((page->type_count != 0) && (page->tot_count != 0));
                     put_page_type(page);
                     put_page_tot(page);                
                 }

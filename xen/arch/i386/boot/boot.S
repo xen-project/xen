@@ -87,43 +87,30 @@ continue_boot_cpu:
         xor     %eax,%eax
         rep     stosb
 
-        /* Copy all modules (dom0 + initrd if presetn) to safety, above 48MB */
+        /* Copy all modules (dom0 + initrd if present) out of the Xen heap */
         mov     (%esp),%eax
         cmp     $0x2BADB002,%eax
-        jne     2f                           /* skip if magic no good */
-
-        sub     $__PAGE_OFFSET,%ebx	     /* turn back into a physaddr */
-
-	mov     0x14(%ebx),%edi              /* mbi->mods_count */
-        dec     %edi                         /* count-- */
-
-	jb	2f			     /* if num modules was zero !!! */
-
+        jne     skip_dom0_copy
+        sub     $__PAGE_OFFSET,%ebx          /* turn back into a phys addr */
+        mov     0x14(%ebx),%edi              /* mb->mods_count */
+        dec     %edi                         /* mbi->mods_count-- */
+        jb      skip_dom0_copy               /* skip if no modules */
         mov     0x18(%ebx),%eax              /* mbi->mods_addr */
-
-	mov     (%eax),%ebx                  /* mod[0]->mod_start */
-
-        shl     $4,%edi                      /* count*16 */
+        mov     (%eax),%ebx                  /* %ebx = mod[0]->mod_start */
+        shl     $4,%edi                    
         add     %edi,%eax
-        
-        mov     0x4(%eax),%eax               /* mod[mod_count-1]->end */
-
+        mov     0x4(%eax),%eax               /* %eax = mod[mod_count-1]->end */
         mov     %eax,%ecx
-        sub     %ebx,%ecx		     /* length in byte */
-
+        sub     %ebx,%ecx                    /* %ecx = byte len of all mods */
         mov     $(MAX_DIRECTMAP_ADDRESS), %edi
-        add     %ecx, %edi		     /* src + length */
-        
-        shr     $2,%ecx                      /* ecx is length/4 */
-
-1:
-        sub     $4,%eax                      /* eax = src, edi = dst */
+        add     %ecx, %edi                   /* %edi = src + length */        
+        shr     $2,%ecx                      /* %ecx = length/4 */
+1:      sub     $4,%eax                      /* %eax = src, %edi = dst */
         sub     $4,%edi
         mov     (%eax),%ebx
         mov     %ebx,(%edi)
         loop 1b
-
-2:              
+skip_dom0_copy:              
 
         /* Initialize low and high mappings of all memory with 4MB pages */
         mov     $idle0_pg_table-__PAGE_OFFSET,%edi

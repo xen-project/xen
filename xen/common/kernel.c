@@ -192,18 +192,18 @@ void cmain (unsigned long magic, multiboot_info_t *mbi)
     new_dom = do_newdomain(0, 0);
     if ( new_dom == NULL ) panic("Error creating domain 0\n");
 
-    /* We're going to setup domain0 using the module(s) that we
-       stashed safely above our MAX_DIRECTMAP_ADDRESS in boot/Boot.S
-
-       The second module, if present, is an initrd ramdisk
+    /*
+     * We're going to setup domain0 using the module(s) that we stashed safely 
+     * above our MAX_DIRECTMAP_ADDRESS in boot/Boot.S The second module, if 
+     * present, is an initrd ramdisk
      */
-
     if ( setup_guestos(new_dom, 
                        &dom0_params, 
-                       MAX_DIRECTMAP_ADDRESS, 
-                       mod[mbi->mods_count-1].mod_end - mod[0].mod_start, 		              __va(mod[0].string),
-		       (mbi->mods_count==2)?
-		           (mod[1].mod_end - mod[1].mod_start):0)
+                       (char *)MAX_DIRECTMAP_ADDRESS, 
+                       mod[mbi->mods_count-1].mod_end - mod[0].mod_start,
+                       __va(mod[0].string),
+		       (mbi->mods_count == 2) ?
+                       (mod[1].mod_end - mod[1].mod_start):0)
          != 0 ) panic("Could not set up DOM0 guest OS\n");
 
     update_dom_time(new_dom->shared_info);
