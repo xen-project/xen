@@ -29,8 +29,8 @@ struct mm_struct {
      */
     l1_pgentry_t *perdomain_pt;
     pagetable_t  pagetable;
-    /* Current LDT descriptor. */
-    unsigned long ldt[2];
+    /* Current LDT details. */
+    unsigned long ldt_base, ldt_ents;
     /* Next entry is passed to LGDT on domain switch. */
     char gdt[6];
 };
@@ -282,5 +282,27 @@ void cpu_idle(void);   /* Idle loop. */
         } while (0)
 
 extern void update_process_times(int user);
+
+#include <asm/desc.h>
+static inline void load_LDT(void)
+{
+    unsigned int cpu;
+    struct desc_struct *desc;
+    unsigned long ents;
+
+    if ( (ents = current->mm.ldt_ents) == 0 )
+    {
+        __asm__ __volatile__ ( "lldt %%ax" : : "a" (0) );
+    }
+    else
+    {
+        cpu = smp_processor_id();
+        desc = (struct desc_struct *)GET_GDT_ADDRESS(current) + __LDT(cpu);
+        desc->a = ((LDT_VIRT_START&0xffff)<<16) | (ents*8-1);
+        desc->b = (LDT_VIRT_START&(0xff<<24)) | 0x8200 | 
+            ((LDT_VIRT_START&0xff0000)>>16);
+        __asm__ __volatile__ ( "lldt %%ax" : : "a" (__LDT(cpu)<<3) );
+    }
+}
 
 #endif

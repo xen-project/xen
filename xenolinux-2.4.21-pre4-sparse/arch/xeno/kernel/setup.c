@@ -968,6 +968,9 @@ void __init cpu_init (void)
 
     HYPERVISOR_stack_switch(__KERNEL_DS, current->thread.esp0);
 
+    load_LDT(&init_mm);
+    flush_page_update_queue();
+
     /* Force FPU initialization. */
     current->flags &= ~PF_USEDFPU;
     current->used_math = 0;

@@ -176,7 +176,7 @@
 #include <asm/uaccess.h>
 #include <asm/domain_page.h>
 
-#if 0
+#if 1
 #define MEM_LOG(_f, _a...) printk("DOM%d: (file=memory.c, line=%d) " _f "\n", current->domain, __LINE__, ## _a )
 #else
 #define MEM_LOG(_f, _a...) ((void)0)
@@ -621,10 +621,15 @@ static int mod_l1_entry(unsigned long pa, l1_pgentry_t new_l1_entry)
 static int do_extended_command(unsigned long ptr, unsigned long val)
 {
     int err = 0;
+    unsigned int cmd = val & PGEXT_CMD_MASK;
     unsigned long pfn = ptr >> PAGE_SHIFT;
     struct pfn_info *page = frame_table + pfn;
 
-    switch ( (val & PGEXT_CMD_MASK) )
+    /* 'ptr' must be in range except where it isn't a machine address. */
+    if ( (pfn >= max_page) && (cmd != PGEXT_SET_LDT) )
+        return 1;
+
+    switch ( cmd )
     {
     case PGEXT_PIN_L1_TABLE:
         err = get_l1_table(pfn);
@@ -695,6 +700,42 @@ static int do_extended_command(unsigned long ptr, unsigned long val)
         __flush_tlb_one(val & ~PGEXT_CMD_MASK);
         break;
 
+    case PGEXT_SET_LDT:
+    {
+        int i;
+        unsigned long ents = val >> PGEXT_CMD_SHIFT;
+        if ( ((ptr & (PAGE_SIZE-1)) != 0) || 
+             (ents > 8192) ||
+             ((ptr+ents*LDT_ENTRY_SIZE) < ptr) ||
+             ((ptr+ents*LDT_ENTRY_SIZE) > PAGE_OFFSET) )
+        {
+            err = 1;
+            MEM_LOG("Bad args to SET_LDT: ptr=%08lx, ents=%08lx", ptr, ents);
+        }
+        else if ( (current->mm.ldt_ents != ents) || 
+                  (current->mm.ldt_base != ptr) )
+        {
+            if ( current->mm.ldt_ents != 0 )
+            {
+                /* Tear down the old LDT. */
+                for ( i = 16; i < 32; i++ )
+                {
+                    pfn = l1_pgentry_to_pagenr(current->mm.perdomain_pt[i]);
+                    if ( pfn == 0 ) continue;
+                    current->mm.perdomain_pt[i] = mk_l1_pgentry(0);
+                    page = frame_table + pfn;
+                    put_page_type(page);
+                    put_page_tot(page);                
+                }
+                tlb_flush[smp_processor_id()] = 1;
+            }
+            current->mm.ldt_base = ptr;
+            current->mm.ldt_ents = ents;
+            load_LDT();
+        }
+        break;
+    }
+
     default:
         MEM_LOG("Invalid extended pt command 0x%08lx", val & PGEXT_CMD_MASK);
         err = 1;
@@ -710,6 +751,7 @@ int do_process_page_updates(page_update_request_t *ureqs, int count)
     unsigned long flags, pfn;
     struct pfn_info *page;
     int err = 0, i;
+    unsigned int cmd;
 
     for ( i = 0; i < count; i++ )
     {
@@ -718,8 +760,11 @@ int do_process_page_updates(page_update_request_t *ureqs, int count)
             kill_domain_with_errmsg("Cannot read page update request");
         } 
 
+        cmd = req.ptr & (sizeof(l1_pgentry_t)-1);
+
+        /* All normal commands must have 'ptr' in range. */
         pfn = req.ptr >> PAGE_SHIFT;
-        if ( pfn >= max_page )
+        if ( (pfn >= max_page) && (cmd != PGREQ_EXTENDED_COMMAND) )
         {
             MEM_LOG("Page out of range (%08lx > %08lx)", pfn, max_page);
             kill_domain_with_errmsg("Page update request out of range");
@@ -729,7 +774,7 @@ int do_process_page_updates(page_update_request_t *ureqs, int count)
 
         /* Least significant bits of 'ptr' demux the operation type. */
         spin_lock_irq(&current->page_lock);
-        switch ( req.ptr & (sizeof(l1_pgentry_t)-1) )
+        switch ( cmd )
         {
             /*
              * PGREQ_NORMAL: Normal update to any level of page table.

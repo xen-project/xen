@@ -81,12 +81,6 @@ static void DEBUG_disallow_pt_read(unsigned long pa)
 
 
 /*
- * This is the current pagetable base pointer, which is updated
- * on context switch.
- */
-unsigned long pt_baseptr;
-
-/*
  * MULTICALL_flush_page_update_queue:
  *   This is a version of the flush which queues as part of a multicall.
  */
@@ -229,6 +223,16 @@ void queue_pte_unpin(unsigned long ptr)
     update_queue[idx].ptr  = phys_to_machine(ptr);
     update_queue[idx].ptr |= PGREQ_EXTENDED_COMMAND;
     update_queue[idx].val  = PGEXT_UNPIN_TABLE;
+    increment_index();
+    spin_unlock_irqrestore(&update_lock, flags);
+}
+
+void queue_set_ldt(unsigned long ptr, unsigned long len)
+{
+    unsigned long flags;
+    spin_lock_irqsave(&update_lock, flags);
+    update_queue[idx].ptr  = PGREQ_EXTENDED_COMMAND | ptr;
+    update_queue[idx].val  = PGEXT_SET_LDT | (len << PGEXT_CMD_SHIFT);
     increment_index();
     spin_unlock_irqrestore(&update_lock, flags);
 }

@@ -133,6 +133,55 @@ ENOSYS = 38
 	movl $-8192, reg; \
 	andl %esp, reg
 
+ENTRY(lcall7)
+	pushfl			# We get a different stack layout with call
+	pushl %eax		# gates, which has to be cleaned up later..
+	SAVE_ALL
+	movl EIP(%esp),%eax	# due to call gates, this is eflags, not eip..
+	movl CS(%esp),%edx	# this is eip..
+	movl EFLAGS(%esp),%ecx	# and this is cs..
+	movl %eax,EFLAGS(%esp)	#
+	andl $~(NT_MASK|TF_MASK|DF_MASK), %eax
+	pushl %eax
+	popfl
+	movl %edx,EIP(%esp)	# Now we move them to their "normal" places
+	movl %ecx,CS(%esp)	#
+	movl %esp,%ebx
+	pushl %ebx
+	andl $-8192,%ebx	# GET_CURRENT
+	movl exec_domain(%ebx),%edx	# Get the execution domain
+	movl 4(%edx),%edx	# Get the lcall7 handler for the domain
+	pushl $0x7
+	call *%edx
+	addl $4, %esp
+	popl %eax
+	jmp ret_from_sys_call
+
+ENTRY(lcall27)
+	pushfl			# We get a different stack layout with call
+	pushl %eax		# gates, which has to be cleaned up later..
+	SAVE_ALL
+	movl EIP(%esp),%eax	# due to call gates, this is eflags, not eip..
+	movl CS(%esp),%edx	# this is eip..
+	movl EFLAGS(%esp),%ecx	# and this is cs..
+	movl %eax,EFLAGS(%esp)	#
+	andl $~(NT_MASK|TF_MASK|DF_MASK), %eax
+	pushl %eax
+	popfl
+	movl %edx,EIP(%esp)	# Now we move them to their "normal" places
+	movl %ecx,CS(%esp)	#
+	movl %esp,%ebx
+	pushl %ebx
+	andl $-8192,%ebx	# GET_CURRENT
+	movl exec_domain(%ebx),%edx	# Get the execution domain
+	movl 4(%edx),%edx	# Get the lcall7 handler for the domain
+	pushl $0x27
+	call *%edx
+	addl $4, %esp
+	popl %eax
+	jmp ret_from_sys_call
+
+        
 ENTRY(ret_from_fork)
 	pushl %ebx
 	call SYMBOL_NAME(schedule_tail)

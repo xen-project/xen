@@ -134,6 +134,8 @@ extern unsigned int free_pfns;
 extern unsigned long max_page;
 void init_frametable(unsigned long nr_pages);
 
+int check_descriptor(unsigned long a, unsigned long b);
+
 /*
  * The MPT (machine->physical mapping table) is an array of word-sized
  * values, indexed on machine frame number. It is expected that guest OSes

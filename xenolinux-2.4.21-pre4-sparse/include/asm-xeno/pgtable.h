@@ -99,6 +99,7 @@ extern void pgtable_cache_init(void);
 #ifndef __ASSEMBLY__
 /* 4MB is just a nice "safety zone". Also, we align to a fresh pde. */
 #define VMALLOC_OFFSET	(4*1024*1024)
+extern void * high_memory;
 #define VMALLOC_START	(((unsigned long) high_memory + 2*VMALLOC_OFFSET-1) & \
 						~(VMALLOC_OFFSET-1))
 #define VMALLOC_VMADDR(x) ((unsigned long)(x))
@@ -290,6 +291,71 @@ static inline pte_t pte_modify(pte_t pte, pgprot_t newprot)
 
 struct page;
 int change_page_attr(struct page *, int, pgprot_t prot);
+
+static inline void __make_page_readonly(void *va)
+{
+    pgd_t *pgd = pgd_offset_k((unsigned long)va);
+    pmd_t *pmd = pmd_offset(pgd, (unsigned long)va);
+    pte_t *pte = pte_offset(pmd, (unsigned long)va);
+    queue_l1_entry_update(__pa(pte), (*(unsigned long *)pte)&~_PAGE_RW);
+}
+
+static inline void __make_page_writeable(void *va)
+{
+    pgd_t *pgd = pgd_offset_k((unsigned long)va);
+    pmd_t *pmd = pmd_offset(pgd, (unsigned long)va);
+    pte_t *pte = pte_offset(pmd, (unsigned long)va);
+    queue_l1_entry_update(__pa(pte), (*(unsigned long *)pte)|_PAGE_RW);
+}
+
+static inline void make_page_readonly(void *va)
+{
+    pgd_t *pgd = pgd_offset_k((unsigned long)va);
+    pmd_t *pmd = pmd_offset(pgd, (unsigned long)va);
+    pte_t *pte = pte_offset(pmd, (unsigned long)va);
+    queue_l1_entry_update(__pa(pte), (*(unsigned long *)pte)&~_PAGE_RW);
+    if ( (unsigned long)va >= VMALLOC_START )
+        __make_page_readonly(machine_to_virt(
+            *(unsigned long *)pte&PAGE_MASK));
+}
+
+static inline void make_page_writeable(void *va)
+{
+    pgd_t *pgd = pgd_offset_k((unsigned long)va);
+    pmd_t *pmd = pmd_offset(pgd, (unsigned long)va);
+    pte_t *pte = pte_offset(pmd, (unsigned long)va);
+    queue_l1_entry_update(__pa(pte), (*(unsigned long *)pte)|_PAGE_RW);
+    if ( (unsigned long)va >= VMALLOC_START )
+        __make_page_writeable(machine_to_virt(
+            *(unsigned long *)pte&PAGE_MASK));
+}
+
+static inline void make_pages_readonly(void *va, unsigned int nr)
+{
+    while ( nr-- != 0 )
+    {
+        make_page_readonly(va);
+        va = (void *)((unsigned long)va + PAGE_SIZE);
+    }
+}
+
+static inline void make_pages_writeable(void *va, unsigned int nr)
+{
+    while ( nr-- != 0 )
+    {
+        make_page_writeable(va);
+        va = (void *)((unsigned long)va + PAGE_SIZE);
+    }
+}
+
+static inline unsigned long arbitrary_virt_to_phys(void *va)
+{
+    pgd_t *pgd = pgd_offset_k((unsigned long)va);
+    pmd_t *pmd = pmd_offset(pgd, (unsigned long)va);
+    pte_t *pte = pte_offset(pmd, (unsigned long)va);
+    unsigned long pa = (*(unsigned long *)pte) & PAGE_MASK;
+    return pa | ((unsigned long)va & (PAGE_SIZE-1));
+}
 
 #endif /* !__ASSEMBLY__ */
 

@@ -42,6 +42,8 @@
 #include <linux/module.h>
 
 asmlinkage int system_call(void);
+asmlinkage void lcall7(void);
+asmlinkage void lcall27(void);
 
 asmlinkage void divide_error(void);
 asmlinkage void debug(void);
@@ -530,6 +532,26 @@ asmlinkage void math_state_restore(struct pt_regs regs)
 	current->flags |= PF_USEDFPU;	/* So we fnsave on switch_to() */
 }
 
+
+#define _set_gate(gate_addr,type,dpl,addr) \
+do { \
+  int __d0, __d1; \
+  __asm__ __volatile__ ("movw %%dx,%%ax\n\t" \
+	"movw %4,%%dx\n\t" \
+	"movl %%eax,%0\n\t" \
+	"movl %%edx,%1" \
+	:"=m" (*((long *) (gate_addr))), \
+	 "=m" (*(1+(long *) (gate_addr))), "=&a" (__d0), "=&d" (__d1) \
+	:"i" ((short) (0x8000+(dpl<<13)+(type<<8))), \
+	 "3" ((char *) (addr)),"2" (__KERNEL_CS << 16)); \
+} while (0)
+
+static void __init set_call_gate(void *a, void *addr)
+{
+	_set_gate(a,12,3,addr);
+}
+
+
 static trap_info_t trap_table[] = {
     {  0, 0, __KERNEL_CS, (unsigned long)divide_error                },
     {  1, 0, __KERNEL_CS, (unsigned long)debug                       },
@@ -561,5 +583,15 @@ void __init trap_init(void)
 {
     HYPERVISOR_set_trap_table(trap_table);    
     HYPERVISOR_set_fast_trap(SYSCALL_VECTOR);
+
+    /*
+     * The default LDT is a single-entry callgate to lcall7 for iBCS and a
+     * callgate to lcall27 for Solaris/x86 binaries.
+     */
+    clear_page(&default_ldt[0]);
+    set_call_gate(&default_ldt[0],lcall7);
+    set_call_gate(&default_ldt[4],lcall27);
+    __make_page_readonly(&default_ldt[0]);
+
     cpu_init();
 }
