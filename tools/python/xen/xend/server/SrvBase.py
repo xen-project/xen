@@ -8,17 +8,18 @@ import types
 import StringIO
 
 from twisted.internet import defer
-#defer.Deferred.debug = 1
 from twisted.internet import reactor
 from twisted.protocols import http
 from twisted.web import error
 from twisted.web import resource
 from twisted.web import server
+from twisted.python.failure import Failure
 
 from xen.xend import sxp
 from xen.xend import PrettyPrint
 from xen.xend.Args import ArgError
 from xen.xend.XendError import XendError
+from xen.xend.XendLogging import log
 
 def uri_pathlist(p):
     """Split a path into a list.
@@ -105,17 +106,17 @@ class SrvBase(resource.Resource):
         try:
             val = op_method(op, req)
         except Exception, err:
-            return self._perform_err(err, req)
+            return self._perform_err(err, op, req)
             
         if isinstance(val, defer.Deferred):
-            val.addCallback(self._perform_cb, req, dfr=1)
-            val.addErrback(self._perform_err, req, dfr=1)
+            val.addCallback(self._perform_cb, op, req, dfr=1)
+            val.addErrback(self._perform_err, op, req, dfr=1)
             return server.NOT_DONE_YET
         else:
-            self._perform_cb(val, req, 0)
+            self._perform_cb(val, op, req, dfr=0)
             return ''
 
-    def _perform_cb(self, val, req, dfr):
+    def _perform_cb(self, val, op, req, dfr=0):
         """Callback to complete the request.
         May be called from a Deferred.
 
@@ -141,7 +142,7 @@ class SrvBase(resource.Resource):
         if dfr:
             req.finish()
 
-    def _perform_err(self, err, req, dfr=0):
+    def _perform_err(self, err, op, req, dfr=0):
         """Error callback to complete a request.
         May be called from a Deferred.
 
@@ -149,13 +150,16 @@ class SrvBase(resource.Resource):
         @param req: request causing the error
         @param dfr: deferred flag
         """
-        if not (isinstance(err, ArgError) or
-                isinstance(err, sxp.ParseError) or
-                isinstance(err, XendError)):
+        if isinstance(err, Failure):
+            err = err.getErrorMessage()
+        elif not (isinstance(err, ArgError) or
+                  isinstance(err, sxp.ParseError) or
+                  isinstance(err, XendError)):
             if dfr:
                 return err
             else:
                 raise
+        log.exception("op=%s: %s", op, str(err))
         if self.use_sxp(req):
             req.setHeader("Content-Type", sxp.mime_type)
             sxp.show(['xend.err', str(err)], out=req)
