@@ -6,6 +6,24 @@
 #include <asm/domain_page.h>
 #include <asm/io.h>
 
+#define NR_IDE_DEVS  20
+
+static kdev_t ide_devs[NR_IDE_DEVS] = { 
+    MKDEV(IDE0_MAJOR, 0), MKDEV(IDE0_MAJOR, 64),                /* hda, hdb */
+    MKDEV(IDE1_MAJOR, 0), MKDEV(IDE1_MAJOR, 64),                /* hdc, hdd */
+    MKDEV(IDE2_MAJOR, 0), MKDEV(IDE2_MAJOR, 64),                /* hde, hdf */
+    MKDEV(IDE3_MAJOR, 0), MKDEV(IDE3_MAJOR, 64),                /* hdg, hdh */
+    MKDEV(IDE4_MAJOR, 0), MKDEV(IDE4_MAJOR, 64),                /* hdi, hdj */
+    MKDEV(IDE5_MAJOR, 0), MKDEV(IDE5_MAJOR, 64),                /* hdk, hdl */
+    MKDEV(IDE6_MAJOR, 0), MKDEV(IDE6_MAJOR, 64),                /* hdm, hdn */
+    MKDEV(IDE7_MAJOR, 0), MKDEV(IDE7_MAJOR, 64),                /* hdo, hdp */
+    MKDEV(IDE8_MAJOR, 0), MKDEV(IDE8_MAJOR, 64),                /* hdq, hdr */
+    MKDEV(IDE9_MAJOR, 0), MKDEV(IDE9_MAJOR, 64)                 /* hds, hdt */
+};
+
+
+
+
 void ide_probe_devices(xen_disk_info_t* xdi)
 {
     int loop;
@@ -30,8 +48,10 @@ void ide_probe_devices(xen_disk_info_t* xdi)
 	    ** as our 'type' field (XD_TYPE_DISK, XD_TYPE_CDROM, etc). 
 	    ** Hence must ensure these are kept in sync. 
 	    */
+
+	    /* SMH: we export 'raw' linux device numbers to domain 0 */
+            device   = ide_devs[(loop * MAX_DRIVES) + unit]; 
 	    type     = drive->media; 
-            device   = MK_IDE_XENDEV((loop * MAX_DRIVES) + unit);
             capacity = current_capacity(drive);
 
             xdi->disks[xdi->count].device   = device; 

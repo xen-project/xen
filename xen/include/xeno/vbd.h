@@ -9,7 +9,34 @@
 #include <hypervisor-ifs/block.h>
 #include <hypervisor-ifs/vbd.h>
 
-/* Describes a physical disk extent. */
+/* an entry in a list of xen_extent's */
+typedef struct _xen_extent_le { 
+    xen_extent_t           extent;     // an individual extent  
+    struct _xen_extent_le *next;       // and a pointer to the next 
+} xen_extent_le_t; 
+
+
+/*
+** This is what a vbd looks like from the pov of xen: essentially a list 
+** of xen_extents which a given domain refers to by a particular 16bit id. 
+** Each domain has a hash table to map from these to the relevant VBD. 
+*/
+typedef struct _vbd { 
+    unsigned short    vdevice;   // what the domain refers to this vbd as 
+    xen_extent_le_t  *extents;   // list of xen_extents making up this vbd
+    struct _vbd      *next;      // for chaining in the hash table
+} vbd_t; 
+
+#define VBD_HTAB_SZ  16       // no. of entries in the vbd hash table. 
+
+void xen_vbd_initialize(void);
+void xen_refresh_vbd_list (struct task_struct *p);
+long vbd_create(vbd_create_t *create_info); 
+long vbd_add(vbd_add_t *add_info); 
+long vbd_remove(vbd_remove_t *remove_info);
+long vbd_delete(vbd_delete_t *delete_info); 
+
+/* Describes a physical disk extent (part of a block io request) */
 typedef struct {
     unsigned short dev;
     unsigned short nr_sects;
@@ -17,34 +44,12 @@ typedef struct {
     unsigned long  buffer;
 } phys_seg_t;
 
-struct task_struct;
 
-void xen_vbd_initialize(void);
-void xen_refresh_vbd_list (struct task_struct *p);
-int xen_vbd_create(xv_disk_t *xvd);
-int xen_vbd_delete(struct task_struct *p, int segnr);
-int xen_vbd_map_request(
-    phys_seg_t *pseg, struct task_struct *p, int operation,
-    unsigned short vbd_number,
-    unsigned long sect_nr, unsigned long buffer, unsigned short nr_sects);
+int vbd_translate(phys_seg_t * pseg, int *nr_segs, 
+		  struct task_struct *p, int operation); 
 
-typedef struct vbd
-{
-    int mode;                         /* UNUSED, RO, or RW */
-    int domain;
-    int vbd_number;               /* vbd number for domain */
-    char key[XEN_VBD_KEYSIZE];    /* for the userspace tools in dom0 */
-    int num_extents;                  /* number of extents */
-    extent_t *extents;
-} vbd_t;
 
-#endif
-
-#ifndef PHYSDISK_ACES__
-#define PHYSDISK_ACES__
-
-struct task_struct;
-
+#if 0
 void destroy_physdisk_aces(struct task_struct *p);
 
 int xen_physdisk_grant(xp_disk_t *);
@@ -52,5 +57,7 @@ int xen_physdisk_probe(struct task_struct *requesting_task,
 		       physdisk_probebuf_t *);
 int xen_physdisk_access_okay(phys_seg_t *pseg, struct task_struct *p,
 			     int operation);
+#endif
+
 
 #endif /* PHYSDISK_ACES__ */

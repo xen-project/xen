@@ -169,8 +169,6 @@
 3ec43c5dmQxGDvgJJXbV1yLxT30Y1A tools/internal/xi_helper
 3f108ad5wQm0ZaQ4GXFoUhH1W1aW9w tools/internal/xi_list.c
 3f0458aaXhD8BQAggO81gv30RQ-ifA tools/internal/xi_phys_grant.c
-3f0458aaJHmlzkDwf0qxEzAcjX55sg tools/internal/xi_phys_probe.c
-3f0458aaVAbFSwptQbQAnDOiZlwQ3w tools/internal/xi_phys_revoke.c
 3f108adb2b5OkKL6-faG3lMiOYDf_w tools/internal/xi_sched_domain.c
 3f108ade1v8weyh1sKx890VTd240Hw tools/internal/xi_sched_global.c
 3eb781fd8oRfPgH7qTh7xvgmwD6NgA tools/internal/xi_start.c
@@ -571,8 +569,6 @@
 3f689056Vxx_8K8DQTRysOxx_ikmLg xenolinux-2.4.22-sparse/arch/xeno/drivers/block/info.c
 3e5a4e65pP5spJErBW69pJxSSdK9RA xenolinux-2.4.22-sparse/arch/xeno/drivers/block/xl_block.c
 3e67f822FOPwqHiaRKbrskgWgoNL5g xenolinux-2.4.22-sparse/arch/xeno/drivers/block/xl_block.h
-3e677190SjkzJIvFifRVeYpIZOCtYA xenolinux-2.4.22-sparse/arch/xeno/drivers/block/xl_ide.c
-3e677193nOKKTLJzcAu4SYdbZaia8g xenolinux-2.4.22-sparse/arch/xeno/drivers/block/xl_scsi.c
 3e676eb5RXnHzSHgA1BvM0B1aIm4qg xenolinux-2.4.22-sparse/arch/xeno/drivers/block/xl_vbd.c
 3e5a4e65G3e2s0ghPMgiJ-gBTUJ0uQ xenolinux-2.4.22-sparse/arch/xeno/drivers/console/Makefile
 3e5a4e651TH-SXHoufurnWjgl5bfOA xenolinux-2.4.22-sparse/arch/xeno/drivers/console/console.c
@@ -607,11 +603,6 @@
 3f108aeaLcGDgQdFAANLTUEid0a05w xenolinux-2.4.22-sparse/drivers/char/mem.c
 3e5a4e66rw65CxyolW9PKz4GG42RcA xenolinux-2.4.22-sparse/drivers/char/tty_io.c
 3e5a4e669uzIE54VwucPYtGwXLAbzA xenolinux-2.4.22-sparse/fs/exec.c
-3f05a939l8s0eQb_fpMvYiI06cTGlA xenolinux-2.4.22-sparse/fs/partitions/Config.in
-3f05a939W65febbeWrBtuQgsQDK2Bg xenolinux-2.4.22-sparse/fs/partitions/Makefile
-3f05a939phguW4R5PelNQZ8o_EcYZA xenolinux-2.4.22-sparse/fs/partitions/check.c
-3f05a939ZSKN7gX2sfTLzPcYJvPkcQ xenolinux-2.4.22-sparse/fs/partitions/xeno.c
-3f05a939_I9vPADPgyVBwUDUxtoeOQ xenolinux-2.4.22-sparse/fs/partitions/xeno.h
 3e5a4e66wbeCpsJgVf_U8Jde-CNcsA xenolinux-2.4.22-sparse/include/asm-xeno/bugs.h
 3e5a4e66HdSkvIV6SJ1evG_xmTmXHA xenolinux-2.4.22-sparse/include/asm-xeno/desc.h
 3e5a4e66SYp_UpAVcF8Lc1wa3Qtgzw xenolinux-2.4.22-sparse/include/asm-xeno/fixmap.h

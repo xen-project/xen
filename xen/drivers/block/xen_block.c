@@ -20,7 +20,7 @@
 #include <xeno/vbd.h>
 #include <xeno/slab.h>
 
-#if 0
+#if 1
 #define DPRINTK(_f, _a...) printk( _f , ## _a )
 #else
 #define DPRINTK(_f, _a...) ((void)0)
@@ -58,33 +58,6 @@ static spinlock_t pend_prod_lock = SPIN_LOCK_UNLOCKED;
 static kmem_cache_t *buffer_head_cachep;
 static atomic_t nr_pending;
 
-#define NR_IDE_DEVS  20
-#define NR_SCSI_DEVS 16
-
-static kdev_t ide_devs[NR_IDE_DEVS] = { 
-    MKDEV(IDE0_MAJOR, 0), MKDEV(IDE0_MAJOR, 64),                /* hda, hdb */
-    MKDEV(IDE1_MAJOR, 0), MKDEV(IDE1_MAJOR, 64),                /* hdc, hdd */
-    MKDEV(IDE2_MAJOR, 0), MKDEV(IDE2_MAJOR, 64),                /* hde, hdf */
-    MKDEV(IDE3_MAJOR, 0), MKDEV(IDE3_MAJOR, 64),                /* hdg, hdh */
-    MKDEV(IDE4_MAJOR, 0), MKDEV(IDE4_MAJOR, 64),                /* hdi, hdj */
-    MKDEV(IDE5_MAJOR, 0), MKDEV(IDE5_MAJOR, 64),                /* hdk, hdl */
-    MKDEV(IDE6_MAJOR, 0), MKDEV(IDE6_MAJOR, 64),                /* hdm, hdn */
-    MKDEV(IDE7_MAJOR, 0), MKDEV(IDE7_MAJOR, 64),                /* hdo, hdp */
-    MKDEV(IDE8_MAJOR, 0), MKDEV(IDE8_MAJOR, 64),                /* hdq, hdr */
-    MKDEV(IDE9_MAJOR, 0), MKDEV(IDE9_MAJOR, 64)                 /* hds, hdt */
-};
-
-static kdev_t scsi_devs[NR_SCSI_DEVS] = { 
-    MKDEV(SCSI_DISK0_MAJOR,   0), MKDEV(SCSI_DISK0_MAJOR,  16), /* sda, sdb */
-    MKDEV(SCSI_DISK0_MAJOR,  32), MKDEV(SCSI_DISK0_MAJOR,  48), /* sdc, sdd */
-    MKDEV(SCSI_DISK0_MAJOR,  64), MKDEV(SCSI_DISK0_MAJOR,  80), /* sde, sdf */
-    MKDEV(SCSI_DISK0_MAJOR,  96), MKDEV(SCSI_DISK0_MAJOR, 112), /* sdg, sdh */
-    MKDEV(SCSI_DISK0_MAJOR, 128), MKDEV(SCSI_DISK0_MAJOR, 144), /* sdi, sdj */
-    MKDEV(SCSI_DISK0_MAJOR, 160), MKDEV(SCSI_DISK0_MAJOR, 176), /* sdk, sdl */
-    MKDEV(SCSI_DISK0_MAJOR, 192), MKDEV(SCSI_DISK0_MAJOR, 208), /* sdm, sdn */
-    MKDEV(SCSI_DISK0_MAJOR, 224), MKDEV(SCSI_DISK0_MAJOR, 240), /* sdo, sdp */
-};
-
 static int __buffer_is_valid(struct task_struct *p, 
                              unsigned long buffer, 
                              unsigned short size,
@@ -102,10 +75,6 @@ static int do_block_io_op_domain(struct task_struct *p, int max_to_do);
 static void dispatch_rw_block_io(struct task_struct *p, int index);
 static void dispatch_probe(struct task_struct *p, int index);
 static void dispatch_debug_block_io(struct task_struct *p, int index);
-static void dispatch_create_vbd(struct task_struct *p, int index);
-static void dispatch_delete_vbd(struct task_struct *p, int index);
-static void dispatch_grant_physdev(struct task_struct *p, int index);
-static void dispatch_probe_physdev(struct task_struct *p, int index);
 static void make_response(struct task_struct *p, unsigned long id, 
                           unsigned short op, unsigned long st);
 
@@ -232,14 +201,6 @@ static void end_block_io_op(struct buffer_head *bh, int uptodate)
 
     kmem_cache_free(buffer_head_cachep, bh);
 }
-
-
-long vbd_attach(vbd_attach_t *info) 
-{
-    printk("vbd_attach called!!!\n"); 
-    return -ENOSYS; 
-}
-
 /* ----[ Syscall Interface ]------------------------------------------------*/
 
 long do_block_io_op(block_io_op_t *u_block_io_op)
@@ -257,13 +218,6 @@ long do_block_io_op(block_io_op_t *u_block_io_op)
 	/* simply indicates there're reqs outstanding => add current to list */
 	add_to_blkdev_list_tail(p);
 	maybe_trigger_io_schedule();
-	break; 
-
-    case BLOCK_IO_OP_ATTACH_VBD:  
-	/* attach a VBD to a given domain; caller must be privileged  */
-	if( !IS_PRIV(p) )
-	    return -EPERM; 
-	ret = vbd_attach(&op.u.attach_info); 
 	break; 
 
     case BLOCK_IO_OP_RESET:
@@ -285,6 +239,34 @@ long do_block_io_op(block_io_op_t *u_block_io_op)
         op.u.ring_mfn = virt_to_phys(p->blk_ring_base) >> PAGE_SHIFT;
         ret = copy_to_user(u_block_io_op, &op, sizeof(op)) ? -EFAULT : 0;
         break;
+
+    case BLOCK_IO_OP_VBD_CREATE:  
+	/* create a new VBD for a given domain; caller must be privileged  */
+	if(!IS_PRIV(p))
+	    return -EPERM; 
+	ret = vbd_create(&op.u.create_info); 
+	break; 
+
+    case BLOCK_IO_OP_VBD_ADD:  
+	/* add an extent to a VBD; caller must be privileged  */
+	if(!IS_PRIV(p))
+	    return -EPERM; 
+	ret = vbd_add(&op.u.add_info); 
+	break; 
+
+    case BLOCK_IO_OP_VBD_REMOVE:  
+	/* remove an extnet from a VBD; caller must be privileged  */
+	if(!IS_PRIV(p))
+	    return -EPERM; 
+	ret = vbd_remove(&op.u.remove_info); 
+	break; 
+
+    case BLOCK_IO_OP_VBD_DELETE:  
+	/* delete a VBD; caller must be privileged */
+	if(!IS_PRIV(p))
+	    return -EPERM; 
+	ret = vbd_delete(&op.u.delete_info); 
+	break; 
 
     default: 
 	ret = -ENOSYS; 
@@ -429,22 +411,6 @@ static int do_block_io_op_domain(struct task_struct *p, int max_to_do)
 	    dispatch_debug_block_io(p, i);
 	    break;
 
-	case XEN_BLOCK_VBD_CREATE:
-	    dispatch_create_vbd(p, i);
-	    break;
-
-	case XEN_BLOCK_VBD_DELETE:
-	    dispatch_delete_vbd(p, i);
-	    break;
-
-	case XEN_BLOCK_PHYSDEV_GRANT:
-  	    dispatch_grant_physdev(p, i);
-	    break;
-
-	case XEN_BLOCK_PHYSDEV_PROBE:
- 	    dispatch_probe_physdev(p, i);
-	    break;
-
 	default:
             DPRINTK("error: unknown block io operation [%d]\n",
                     blk_ring->ring[i].req.operation);
@@ -463,113 +429,6 @@ static void dispatch_debug_block_io(struct task_struct *p, int index)
     DPRINTK("dispatch_debug_block_io: unimplemented\n"); 
 }
 
-static void dispatch_probe_physdev(struct task_struct *p, int index)
-{
-    blk_ring_t *blk_ring = p->blk_ring_base;
-    unsigned long flags, buffer;
-    physdisk_probebuf_t *buf;
-    int result;
-
-    buffer = blk_ring->ring[index].req.buffer_and_sects[0] & ~0x1FF;
-
-    spin_lock_irqsave(&p->page_lock, flags);
-    if ( !__buffer_is_valid(p, buffer, sizeof(*buf), 1) )
-    {
-        spin_unlock_irqrestore(&p->page_lock, flags);
-        result = 1;
-        goto out;
-    }
-    __lock_buffer(buffer, sizeof(*buf), 1);
-    spin_unlock_irqrestore(&p->page_lock, flags);
-
-    buf = phys_to_virt(buffer);
-    result = xen_physdisk_probe(p, buf);
-
-    unlock_buffer(p, buffer, sizeof(*buf), 1);
-
- out:
-    make_response(p, blk_ring->ring[index].req.id, 
-                  XEN_BLOCK_PHYSDEV_PROBE, result); 
-}
-
-static void dispatch_grant_physdev(struct task_struct *p, int index)
-{
-    blk_ring_t *blk_ring = p->blk_ring_base;
-    unsigned long flags, buffer;
-    xp_disk_t *xpd;
-    int result;
-
-    if ( p->domain != 0 )
-    {
-        DPRINTK("dispatch_grant_physdev called by dom%d\n", p->domain);
-        result = 1;
-        goto out;
-    }
-
-    buffer = blk_ring->ring[index].req.buffer_and_sects[0] & ~0x1FF;
-
-    spin_lock_irqsave(&p->page_lock, flags);
-    if ( !__buffer_is_valid(p, buffer, sizeof(xv_disk_t), 1) )
-    {
-        DPRINTK("Bad buffer in dispatch_grant_physdev\n");
-        spin_unlock_irqrestore(&p->page_lock, flags);
-        result = 1;
-        goto out;
-    }
-    __lock_buffer(buffer, sizeof(xv_disk_t), 1);
-    spin_unlock_irqrestore(&p->page_lock, flags);
-
-    xpd = phys_to_virt(buffer);
-    result = xen_physdisk_grant(xpd);
-
-    unlock_buffer(p, buffer, sizeof(xp_disk_t), 1);
-
- out:
-    make_response(p, blk_ring->ring[index].req.id, 
-                  XEN_BLOCK_PHYSDEV_GRANT, result); 
-}
-  
-static void dispatch_create_vbd(struct task_struct *p, int index)
-{
-    blk_ring_t *blk_ring = p->blk_ring_base;
-    unsigned long flags, buffer;
-    xv_disk_t *xvd;
-    int result;
-
-    if ( p->domain != 0 )
-    {
-        DPRINTK("dispatch_create_vbd called by dom%d\n", p->domain);
-        result = 1;
-        goto out;
-    }
-
-    buffer = blk_ring->ring[index].req.buffer_and_sects[0] & ~0x1FF;
-
-    spin_lock_irqsave(&p->page_lock, flags);
-    if ( !__buffer_is_valid(p, buffer, sizeof(xv_disk_t), 1) )
-    {
-        DPRINTK("Bad buffer in dispatch_create_vbd\n");
-        spin_unlock_irqrestore(&p->page_lock, flags);
-        result = 1;
-        goto out;
-    }
-    __lock_buffer(buffer, sizeof(xv_disk_t), 1);
-    spin_unlock_irqrestore(&p->page_lock, flags);
-
-    xvd = phys_to_virt(buffer);
-    result = xen_vbd_create(xvd);
-
-    unlock_buffer(p, buffer, sizeof(xv_disk_t), 1);    
-
- out:
-    make_response(p, blk_ring->ring[index].req.id, 
-                  XEN_BLOCK_VBD_CREATE, result); 
-}
-
-static void dispatch_delete_vbd(struct task_struct *p, int index)
-{
-    DPRINTK("dispatch_delete_vbd: unimplemented\n"); 
-}
 
 static void dispatch_probe(struct task_struct *p, int index)
 {
@@ -604,15 +463,12 @@ static void dispatch_probe(struct task_struct *p, int index)
     */
     xdi = map_domain_mem(buffer);
     xdi->count = 0; 
-#if 0 // XXX SMH: fix below once done proper vbd/physd rewrit
+
     if(IS_PRIV(p)) { 
-#endif
-	/* privilege domains always gets access to the 'real' devices */
+	/* privileged domains always get access to the 'real' devices */
 	ide_probe_devices(xdi);
 	scsi_probe_devices(xdi);
-#if 0
     } 
-#endif
     vbd_probe_devices(xdi, p); 
     unmap_domain_mem(xdi);
 
@@ -631,7 +487,7 @@ static void dispatch_rw_block_io(struct task_struct *p, int index)
     int operation = (req->operation == XEN_BLOCK_WRITE) ? WRITE : READ;
     unsigned short nr_sects;
     unsigned long buffer, flags;
-    int i, tot_sects;
+    int i, rc, tot_sects;
     pending_req_t *pending_req;
 
     /* We map virtual scatter/gather segments to physical segments. */
@@ -670,41 +526,25 @@ static void dispatch_rw_block_io(struct task_struct *p, int index)
             goto bad_descriptor;
 	}
 
-        /* Get the physical device and block index. */
-        if ( (req->device & XENDEV_TYPE_MASK) == XENDEV_VIRTUAL )
-        {
-            new_segs = xen_vbd_map_request(
-                &phys_seg[nr_psegs], p, operation,
-                req->device, 
-                req->sector_number + tot_sects,
-                buffer, nr_sects);
-            if ( new_segs <= 0 ) 
-	    {
-	        DPRINTK("bogus xen_vbd_map_request\n");
-		goto bad_descriptor;
-	    }
-        }
-        else
-        {
-	    phys_seg[nr_psegs].dev           = req->device;
-            phys_seg[nr_psegs].sector_number = req->sector_number + tot_sects;
-            phys_seg[nr_psegs].buffer        = buffer;
-            phys_seg[nr_psegs].nr_sects      = nr_sects;
-	    if (p->domain != 0 &&
-		!xen_physdisk_access_okay(&phys_seg[nr_psegs], p, operation)) {
-                DPRINTK("access denied: dev=%04x off=%ld nr=%ld\n",
-                        req->device, req->sector_number + tot_sects, nr_sects);
-                goto bad_descriptor;
-	    }
-	    phys_seg[nr_psegs].dev           = xendev_to_physdev(req->device);
-            if ( phys_seg[nr_psegs].dev == 0 ) 
-	    {
-	        DPRINTK("bad device: %04x\n", req->device);
-	        goto bad_descriptor;
-	    }
-            new_segs = 1;
-        }
-        
+	phys_seg[nr_psegs].dev           = req->device;
+	phys_seg[nr_psegs].sector_number = req->sector_number + tot_sects;
+	phys_seg[nr_psegs].buffer        = buffer;
+	phys_seg[nr_psegs].nr_sects      = nr_sects;
+
+        /* Translate the request into the relevant 'physical device' */
+	new_segs = 1; 
+	rc = vbd_translate(&phys_seg[nr_psegs], &new_segs, p, operation); 
+
+	/* If it fails we bail (unless the caller is priv => has raw access) */
+	if(rc && !IS_PRIV(p)) { 
+	    printk("access denied: attempted %s of [%ld,%ld] on dev=%04x\n", 
+		   operation == READ ? "read" : "write", 
+		   req->sector_number + tot_sects, 
+		   req->sector_number + tot_sects + nr_sects, 
+		   req->device); 
+	    goto bad_descriptor;
+	}
+	    
         nr_psegs += new_segs;
         if ( nr_psegs >= (MAX_BLK_SEGS*2) ) BUG();
     }
@@ -767,36 +607,6 @@ static void dispatch_rw_block_io(struct task_struct *p, int index)
  * MISCELLANEOUS SETUP / TEARDOWN / DEBUGGING
  */
 
-kdev_t xendev_to_physdev(unsigned short xendev)
-{
-    switch ( (xendev & XENDEV_TYPE_MASK) )
-    {
-    case XENDEV_IDE:
-        xendev &= XENDEV_IDX_MASK;
-        if ( xendev >= NR_IDE_DEVS )
-        {
-            DPRINTK("IDE device number out of range %d\n", xendev);
-            goto fail;
-        }
-        return ide_devs[xendev];
-        
-    case XENDEV_SCSI:
-        xendev &= XENDEV_IDX_MASK;
-        if ( xendev >= NR_SCSI_DEVS )
-        {
-            DPRINTK("SCSI device number out of range %d\n", xendev);
-            goto fail;
-        }
-        return scsi_devs[xendev];
-        
-    case XENDEV_VIRTUAL:
-    default:
-        DPRINTK("xendev_to_physdev: unknown device %d\n", xendev);
-    }
-
- fail:
-    return (kdev_t)0;
-}
 
 static void make_response(struct task_struct *p, unsigned long id, 
 			  unsigned short op, unsigned long st)
@@ -853,11 +663,6 @@ void init_blkdev_info(struct task_struct *p)
     clear_page(p->blk_ring_base);
     SHARE_PFN_WITH_DOMAIN(virt_to_page(p->blk_ring_base), p->domain);
     p->blkdev_list.next = NULL;
-
-    memset(p->vbd_list, 0, sizeof(p->vbd_list));
-
-    /* Get any previously created segments. */
-    xen_refresh_vbd_list(p);
 }
 
 /* End-of-day teardown for a domain. */
@@ -898,7 +703,5 @@ void initialize_block_io ()
         "buffer_head_cache", sizeof(struct buffer_head),
         0, SLAB_HWCACHE_ALIGN, NULL, NULL);
 
-    xen_vbd_initialize();
-    
     add_key_handler('b', dump_blockq, "dump xen ide blkdev statistics");
 }

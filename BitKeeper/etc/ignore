@@ -480,3 +480,4 @@ tools/misc/xen_log
 tools/misc/xen_refresh_dev
 xenolinux-2.4.22-sparse/arch/xeno/drivers/block/device
 xen/common/debug.c~
+xen/common/debug.o

@@ -39,37 +39,9 @@
 #define DPRINTK_IOCTL(_f, _a...) ((void)0)
 #endif
 
-/* XL IDE and SCSI use same major/minor numbers as normal Linux devices. */
-#define XLIDE_MAJOR_0 IDE0_MAJOR
-#define XLIDE_MAJOR_1 IDE1_MAJOR
-#define XLSCSI_MAJOR SCSI_DISK0_MAJOR
-
-#define XLIDE_PARTN_SHIFT  6
-#define XLSCSI_PARTN_SHIFT 4
-#define XLVIRT_PARTN_SHIFT 4
-
-static inline int PARTN_SHIFT(kdev_t dev)
-{
-    switch ( MAJOR(dev) )
-    {
-    case XLIDE_MAJOR_0:
-    case XLIDE_MAJOR_1:
-        return XLIDE_PARTN_SHIFT;
-    case XLSCSI_MAJOR:
-        return XLSCSI_PARTN_SHIFT;
-    case XLVIRT_MAJOR:
-        return XLVIRT_PARTN_SHIFT;
-    default:
-        BUG();
-    }
-}
-
-#define XLIDE_DEVS_PER_MAJOR   2
-#define XLSCSI_DEVS_PER_MAJOR 16
-#define XLVIRT_DEVS_PER_MAJOR 16
 
 /*
- * We have one of these per XL-IDE, XL-SCSI, and XL-VIRT device.
+ * We have one of these per vbd, whether ide, scsi or 'other'.
  * They hang in an array off the gendisk structure. We may end up putting
  * all kinds of interesting stuff here :-)
  */
@@ -88,25 +60,10 @@ extern int xenolinux_block_check(kdev_t dev);
 extern int xenolinux_block_revalidate(kdev_t dev);
 extern void do_xlblk_request (request_queue_t *rq); 
 
-/* Fake IDE subsystem. */
-extern int  xlide_init(xen_disk_info_t *xdi);
-extern int  xlide_hwsect(int minor); 
-extern void xlide_cleanup(void); 
-extern struct gendisk *xlide_gendisk[];
-
-/* Fake SCSI subsystem. */
-extern int  xlscsi_init(xen_disk_info_t *xdi);
-extern int  xlscsi_hwsect(int minor); 
-extern void xlscsi_cleanup(void); 
-extern struct gendisk *xlscsi_gendisk;
 
 /* Virtual block-device subsystem. */
 extern int  xlvbd_init(xen_disk_info_t *xdi);
-extern int  xlvbd_hwsect(int minor); 
 extern void xlvbd_cleanup(void); 
-extern struct gendisk *xlvbd_gendisk;
-
-extern unsigned short xldev_to_physdev(kdev_t xldev);
-extern kdev_t physdev_to_xldev(unsigned short physdev);
+extern struct gendisk *xldev_to_gendisk(kdev_t xldev);
 
 #endif /* __XL_BLOCK_H__ */
