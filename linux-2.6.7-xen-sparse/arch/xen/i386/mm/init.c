@@ -422,15 +422,21 @@ void zap_low_mappings (void)
 void __init zone_sizes_init(void)
 {
 	unsigned long zones_size[MAX_NR_ZONES] = {0, 0, 0};
-	unsigned int high, low;
+	unsigned int max_dma, high, low;
 	
+	max_dma = virt_to_phys((char *)MAX_DMA_ADDRESS) >> PAGE_SHIFT;
 	low = max_low_pfn;
 	high = highend_pfn;
 	
-	zones_size[ZONE_NORMAL] = low;
+	if (low < max_dma)
+		zones_size[ZONE_DMA] = low;
+	else {
+		zones_size[ZONE_DMA] = max_dma;
+		zones_size[ZONE_NORMAL] = low - max_dma;
 #ifdef CONFIG_HIGHMEM
-	zones_size[ZONE_HIGHMEM] = high - low;
+		zones_size[ZONE_HIGHMEM] = high - low;
 #endif
+	}
 	free_area_init(zones_size);	
 }
 #else
