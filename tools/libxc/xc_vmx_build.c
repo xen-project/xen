@@ -46,6 +46,68 @@ loadelfsymtab(
     char *elfbase, int xch, u32 dom, unsigned long *parray,
     struct domain_setup_info *dsi);
 
+static void build_e820map(struct mem_map *mem_mapp, unsigned long mem_size)
+{
+    int nr_map = 0;
+
+    /* XXX: Doesn't work for > 4GB yet */
+    mem_mapp->map[0].addr = 0x0;
+    mem_mapp->map[0].size = 0x9F800;
+    mem_mapp->map[0].type = E820_RAM;
+    mem_mapp->map[0].caching_attr = MEMMAP_WB;
+    nr_map++;
+
+    mem_mapp->map[1].addr = 0x9F800;
+    mem_mapp->map[1].size = 0x800;
+    mem_mapp->map[1].type = E820_RESERVED;
+    mem_mapp->map[1].caching_attr = MEMMAP_UC;
+    nr_map++;
+
+    mem_mapp->map[2].addr = 0xA0000;
+    mem_mapp->map[2].size = 0x20000;
+    mem_mapp->map[2].type = E820_IO;
+    mem_mapp->map[2].caching_attr = MEMMAP_UC;
+    nr_map++;
+
+    mem_mapp->map[3].addr = 0xF0000;
+    mem_mapp->map[3].size = 0x10000;
+    mem_mapp->map[3].type = E820_RESERVED;
+    mem_mapp->map[3].caching_attr = MEMMAP_UC;
+    nr_map++;
+
+    mem_mapp->map[4].addr = 0x100000;
+    mem_mapp->map[4].size = mem_size - 0x100000 - PAGE_SIZE;
+    mem_mapp->map[4].type = E820_RAM;
+    mem_mapp->map[4].caching_attr = MEMMAP_WB;
+    nr_map++;
+
+    mem_mapp->map[5].addr = mem_size - PAGE_SIZE;
+    mem_mapp->map[5].size = PAGE_SIZE;
+    mem_mapp->map[5].type = E820_SHARED;
+    mem_mapp->map[5].caching_attr = MEMMAP_WB;
+    nr_map++;
+
+    mem_mapp->map[6].addr = mem_size;
+    mem_mapp->map[6].size = 0x3 * PAGE_SIZE;
+    mem_mapp->map[6].type = E820_NVS;
+    mem_mapp->map[6].caching_attr = MEMMAP_UC;
+    nr_map++;
+
+    mem_mapp->map[7].addr = mem_size + 0x3 * PAGE_SIZE;
+    mem_mapp->map[7].size = 0xA * PAGE_SIZE;
+    mem_mapp->map[7].type = E820_ACPI;
+    mem_mapp->map[7].caching_attr = MEMMAP_WB;
+    nr_map++;
+
+    mem_mapp->map[8].addr = 0xFEC00000;
+    mem_mapp->map[8].size = 0x1400000;
+    mem_mapp->map[8].type = E820_IO;
+    mem_mapp->map[8].caching_attr = MEMMAP_UC;
+    nr_map++;
+
+    mem_mapp->nr_map = nr_map;
+}
+
 static int setup_guestos(int xc_handle,
                          u32 dom, int memsize,
                          char *image, unsigned long image_size,
@@ -115,6 +177,7 @@ static int setup_guestos(int xc_handle,
     vboot_gdt_start    = vboot_params_end;
     vboot_gdt_end      = vboot_gdt_start + PAGE_SIZE;
 
+    /* memsize is in megabytes */
     v_end              = memsize << 20;
     vinitrd_end        = v_end - PAGE_SIZE; /* leaving the top 4k untouched for IO requests page use */
     vinitrd_start      = vinitrd_end - initrd_len;
@@ -290,6 +353,8 @@ static int setup_guestos(int xc_handle,
     boot_paramsp->drive_info.dummy[2] = 4;
     boot_paramsp->drive_info.dummy[14] = 32;
 
+    /* memsize is in megabytes */
+    build_e820map(mem_mapp, memsize << 20);
     boot_paramsp->e820_map_nr = mem_mapp->nr_map;
     for (i=0; i<mem_mapp->nr_map; i++) {
         boot_paramsp->e820_map[i].addr = mem_mapp->map[i].addr; 
