@@ -506,11 +506,6 @@ available in {\tt Sched-HOWTO.txt}.
 
 
 
-\hypercall{physdev\_op(void *physdev\_op)}
-
-
-\hypercall{vm\_assist(unsigned int cmd, unsigned int type)}
-
 
 
 
@@ -892,7 +887,13 @@ Safe sharing of memory pages between guest OSes is carried out granting
 access on a per page basis to individual domains. This is achieved 
 by using the {\tt grant\_table\_op()} hypercall. 
 
-%\hypercall{grant\_table\_op(unsigned int cmd, void *uop, unsigned int count)}
+XXX SMH: damn, found some more calls - needs little bit more yet.
+
+\hypercall{grant\_table\_op(unsigned int cmd, void *uop, unsigned int count)}
+
+\hypercall{physdev\_op(void *physdev\_op)}
+
+\hypercall{vm\_assist(unsigned int cmd, unsigned int type)}
 
 
 \section{Administrative Operations}
