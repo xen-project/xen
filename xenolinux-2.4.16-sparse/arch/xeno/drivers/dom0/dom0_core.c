@@ -194,6 +194,9 @@ static int dom_map_mem(unsigned int dom, unsigned long pfn, int tot_pages)
     proc_memdata_t * memdata;
 
     while(pd != NULL){
+
+		printk(KERN_ALERT "bd240 debug: dom_map: proc %d\n", ((dom_procdata_t *)pd->data)->domain);
+
         if(((dom_procdata_t *)pd->data)->domain == dom){
 
             /* check if there is already an entry for mem and if so
