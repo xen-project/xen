@@ -338,7 +338,20 @@ static int vmx_decode(const unsigned char *inst, struct instruction *thread_inst
     switch (*inst) {
                     
         /* movz */
+        case 0xb6:
+            index = get_index((inst + 1));
+            if (thread_inst->op_size == WORD) {
+                thread_inst->operand[1] = mk_operand(WORD, index, 0, REGISTER);
+            } else {
+                thread_inst->operand[1] = mk_operand(LONG, index, 0, REGISTER);
+                
+            }
+            thread_inst->op_size = BYTE;
+            strcpy(thread_inst->i_name, "movzb");
+            
+            return DECODE_success;
         case 0xb7:
+            thread_inst->op_size = WORD;
             index = get_index((inst + 1));
             thread_inst->operand[1] = mk_operand(LONG, index, 0, REGISTER);
             strcpy(thread_inst->i_name, "movzw");
@@ -495,28 +508,15 @@ void handle_mmio(unsigned long va, unsigned long gpte, unsigned long gpa)
     store_xen_regs(inst_decoder_regs);
 
     // Only handle "mov" and "movs" instructions!
-    if (!strncmp(mmio_inst.i_name, "movzw", 5)) {
-        long value = 0;
-        int index;
-
+    if (!strncmp(mmio_inst.i_name, "movz", 4)) {
         if (read_from_mmio(&mmio_inst)) {
             // Send the request and waiting for return value.
             mpci_p->mmio_target = mmio_inst.operand[1] | WZEROEXTEND;
-            mmio_inst.op_size = WORD;       
-            send_mmio_req(gpa, &mmio_inst, value, 1, 0);
+            send_mmio_req(gpa, &mmio_inst, 0, 1, 0);
+            return ;
         } else {
-            // Write to MMIO
-            if (mmio_inst.operand[0] & IMMEDIATE) {
-                value = mmio_inst.immediate;
-            } else if (mmio_inst.operand[0] & REGISTER) {
-                index = operand_index(mmio_inst.operand[0]);
-                value = get_reg_value(WORD, index, 0, inst_decoder_regs);
-            } else {
-                domain_crash();
-            }
-            mmio_inst.op_size = WORD;
-            send_mmio_req(gpa, &mmio_inst, value, 0, 0);
-            return; 
+            printk("handle_mmio - EXIT: movz error!\n");
+            domain_crash();
         }
     }
 
