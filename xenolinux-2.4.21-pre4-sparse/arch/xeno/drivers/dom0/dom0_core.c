@@ -23,6 +23,7 @@
 #include <linux/iobuf.h>
 #include <linux/highmem.h>
 #include <linux/pagemap.h>
+#include <linux/seq_file.h>
 
 #include <asm/pgalloc.h>
 #include <asm/pgtable.h>
@@ -30,6 +31,9 @@
 #include <asm/tlb.h>
 
 #include "dom0_ops.h"
+
+#define TRUE  1
+#define FALSE 0
 
 /* Private proc-file data structures. */
 typedef struct proc_data {
@@ -45,6 +49,7 @@ typedef struct proc_mem_data {
 #define XENO_BASE       "xeno"
 #define DOM0_CMD_INTF   "dom0_cmd"
 #define DOM0_NEWDOM     "new_dom_data"
+#define DOM_LIST_INTF   "domains"
 
 #define MAX_LEN         16
 #define DOM_DIR         "dom"
@@ -56,6 +61,7 @@ typedef struct proc_mem_data {
 struct proc_dir_entry *xeno_base;
 static struct proc_dir_entry *dom0_cmd_intf;
 static struct proc_dir_entry *proc_ft;
+static struct proc_dir_entry *dom_list_intf;
 
 unsigned long direct_mmap(unsigned long, unsigned long, pgprot_t, int, int);
 int direct_unmap(unsigned long, unsigned long);
@@ -266,7 +272,7 @@ static int cmd_write_proc(struct file *file, const char *buffer,
         ret = HYPERVISOR_dom0_op(&op);
 
         /* if new domain created, create proc entries */
-        if(op.cmd == DOM0_NEWDOMAIN){
+        if(op.cmd == DOM0_CREATEDOMAIN) {
             create_proc_dom_entries(ret);
 
             params = (dom0_newdomain_t *)kmalloc(sizeof(dom0_newdomain_t),
@@ -295,6 +301,94 @@ out:
     
 }
 
+/***********************************************************************
+ *
+ * Implementation of /proc/xeno/domains
+ */
+
+static dom0_op_t proc_domains_op;
+static int proc_domains_finished;
+static rwlock_t proc_xeno_domains_lock = RW_LOCK_UNLOCKED;
+
+static void *xeno_domains_next(struct seq_file *s, void *v, loff_t *pos)
+{
+  int ret;
+
+  if (pos != NULL) { ++ (*pos); }
+  if (!proc_domains_finished) {
+    proc_domains_op.u.getdominfo.domain ++;
+    ret = HYPERVISOR_dom0_op(&proc_domains_op);
+    if (ret < 0) proc_domains_finished = TRUE;
+  }
+  
+  return (proc_domains_finished) ? NULL : &proc_domains_op;
+}
+
+static void *xeno_domains_start(struct seq_file *s, loff_t *ppos)
+{ 
+  loff_t pos = *ppos;
+  
+  write_lock (&proc_xeno_domains_lock);
+  proc_domains_op.cmd = DOM0_GETDOMAININFO;
+  proc_domains_op.u.getdominfo.domain = 0;
+  (void)HYPERVISOR_dom0_op(&proc_domains_op);
+  proc_domains_finished = FALSE;
+  
+  while (pos > 0) {
+    pos --;
+    xeno_domains_next (s, NULL, NULL);
+  }
+  
+  return (proc_domains_finished) ? NULL : &proc_domains_op;
+}
+
+static void xeno_domains_stop(struct seq_file *s, void *v)
+{ 
+  write_unlock (&proc_xeno_domains_lock);
+}
+
+static int xeno_domains_show(struct seq_file *s, void *v)
+{ 
+  dom0_op_t *di = v;
+  
+  seq_printf (s, 
+              "%8d %2d %1d %2d %8d %8ld %p %8d %s\n",
+              di -> u.getdominfo.domain, 
+              di -> u.getdominfo.processor,
+              di -> u.getdominfo.has_cpu,
+              di -> u.getdominfo.state,
+              di -> u.getdominfo.hyp_events,
+              di -> u.getdominfo.mcu_advance,
+              di -> u.getdominfo.pg_head,
+              di -> u.getdominfo.tot_pages,
+              di -> u.getdominfo.name);
+
+  return 0;
+}
+
+struct seq_operations xeno_domains_op = {
+        .start          = xeno_domains_start,
+        .next           = xeno_domains_next,
+        .stop           = xeno_domains_stop,
+        .show           = xeno_domains_show,
+};
+
+static int xeno_domains_open(struct inode *inode, struct file *file)
+{
+        return seq_open(file, &xeno_domains_op);
+}
+
+static struct file_operations proc_xeno_domains_operations = {
+        open:           xeno_domains_open,
+        read:           seq_read,
+        llseek:         seq_lseek,
+        release:        seq_release,
+};
+
+/***********************************************************************/
+
+
+
 static int __init init_module(void)
 {
     /* xeno proc root setup */
@@ -310,6 +404,15 @@ static int __init init_module(void)
         dom0_cmd_intf->read_proc  = cmd_read_proc;
         dom0_cmd_intf->write_proc = cmd_write_proc;
     }
+
+    /* domain list interface */
+    dom_list_intf = create_proc_entry (DOM_LIST_INTF, 0400, xeno_base);
+    if ( dom_list_intf != NULL )
+      {
+        dom_list_intf -> owner = THIS_MODULE;
+        dom_list_intf -> nlink = 1;
+        dom_list_intf -> proc_fops = &proc_xeno_domains_operations;
+      }
 
     /* set up /proc entries for dom 0 */
     create_proc_dom_entries(0);

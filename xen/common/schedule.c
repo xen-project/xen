@@ -349,6 +349,7 @@ asmlinkage void schedule(void)
     case TASK_UNINTERRUPTIBLE:
     case TASK_WAIT:
     case TASK_DYING:
+    case TASK_SUSPENDED:
     default:
         /* done if not running. Else, continue */
         goto deschedule_done;

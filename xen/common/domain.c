@@ -175,6 +175,29 @@ long kill_other_domain(unsigned int dom, int force)
     return 0;
 }
 
+void stop_domain(void)
+{
+  current -> state = TASK_SUSPENDED;
+  clear_bit(_HYP_EVENT_STOP, &(current->hyp_events));
+  schedule ();
+}
+
+long stop_other_domain(unsigned int dom)
+{
+  unsigned long cpu_mask;
+  struct task_struct *p;
+
+  p = find_domain_by_id (dom);
+  if ( p == NULL) return -ESRCH;
+
+  if ( p -> state != TASK_SUSPENDED )
+    {
+      cpu_mask = mark_hyp_event(p, _HYP_EVENT_STOP);
+      hyp_event_notify(cpu_mask);
+    }
+
+  return 0;
+}
 
 unsigned int alloc_new_dom_mem(struct task_struct *p, unsigned int kbytes)
 {

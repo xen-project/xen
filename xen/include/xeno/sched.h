@@ -16,6 +16,8 @@
 #include <xeno/time.h>
 #include <xeno/ac_timer.h>
 
+#define MAX_DOMAIN_NAME 16
+
 extern unsigned long volatile jiffies;
 extern rwlock_t tasklist_lock;
 
@@ -51,6 +53,7 @@ extern struct mm_struct init_mm;
 
 #define _HYP_EVENT_NEED_RESCHED 0
 #define _HYP_EVENT_DIE          1
+#define _HYP_EVENT_STOP         2
 
 #define PF_DONEFPUINIT  0x1  /* Has the FPU been initialised for this task? */
 #define PF_USEDFPU      0x2  /* Has this task used the FPU since last save? */
@@ -141,6 +144,8 @@ struct task_struct
                                        0-0xFFFFFFFF for kernel-thread
                                      */
 
+    char name[MAX_DOMAIN_NAME];
+
     /*
      * active_mm stays for now. It's entangled in the tricky TLB flushing
      * stuff which I haven't addressed yet. It stays until I'm man enough
@@ -223,6 +228,8 @@ extern void __kill_domain(struct task_struct *p);
 extern void kill_domain(void);
 extern void kill_domain_with_errmsg(const char *err);
 extern long kill_other_domain(unsigned int dom, int force);
+extern void stop_domain(void);
+extern long stop_other_domain(unsigned int dom);
 
 /* arch/process.c */
 void new_thread(struct task_struct *p,

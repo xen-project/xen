@@ -13,7 +13,23 @@
 #include "dom0_ops.h"
 #include "dom0_defs.h"
 
-#define PERR_STRING "Xen Domain Killer"
+/***********************************************************************/
+
+static char *argv0 = "internal_domain_stop";
+
+static void ERROR (char *message)
+{
+  fprintf (stderr, "%s: %s\n", argv0, message);
+  exit (-1);
+}
+
+static void PERROR (char *message)
+{
+  fprintf (stderr, "%s: %s (%s)\n", argv0, message, sys_errlist[errno]);
+  exit (-1);
+}
+
+/***********************************************************************/
 
 static int do_kill_domain(int dom_id, int force)
 {
@@ -29,8 +45,7 @@ static int do_kill_domain(int dom_id, int force)
     sprintf(cmd_path, "%s%s%s%s", "/proc/", PROC_XENO_ROOT, "/", PROC_CMD);
     cmd_fd = open(cmd_path, O_WRONLY);
     if(cmd_fd < 0){
-        perror(PERR_STRING);
-        return -1;
+        PERROR ("Count not open PROC_CMD interface");
     }
 
     write(cmd_fd, &dop, sizeof(dom0_op_t));
@@ -41,13 +56,18 @@ static int do_kill_domain(int dom_id, int force)
 
 int main(int argc, char **argv)
 {
-    int ret;
+  int ret;
 
-    if ( (argc < 2) || (argc > 3) )
+  if (argv[0] != NULL) 
+    {
+      argv0 = argv[0];
+    }
+
+  if ( (argc < 2) || (argc > 3) )
     {
     usage:
-        printf("Usage: kill_domain [-f] <domain_id>\n");
-        printf("  -f: Forces immediate destruction of specified domain\n");
+        fprintf(stderr, "Usage: %s [-f] <domain_id>\n", argv0);
+        fprintf(stderr, " -f: Forces immediate destruction of specified domain\n");
         ret = -1;
         goto out;
     }

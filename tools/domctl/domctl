@@ -1,0 +1,31 @@
+#!/bin/bash -x
+
+if [ -z "$DEFAULTS_FILE" ] ; then DEFAULTS_FILE=domctl.xml ; fi
+if [ -z "$DEFAULTS_PATH" ] ; then DEFAULTS_PATH=.:/etc ; fi
+if [ -z "$QUERY_DEV" ] ; then QUERY_DEV=eth0 ; fi
+if [ -z "$IFCONFIG" ] ; then IFCONFIG=/sbin/ifconfig ; fi
+if [ -z "$ROUTE" ] ; then ROUTE=/sbin/route ; fi
+if [ -z "$JAVA" ] ; then JAVA=java ; fi
+
+if [ ! -x "$IFCONFIG" ]; then
+  echo Could not find executable $IFCONFIG
+  exit 1
+fi
+
+if [ ! -x "$ROUTE" ]; then
+  echo Could not find executable $ROUTE
+  exit 1
+fi
+
+# Try to determine dom0 network settings to avoid hard-coding
+# particular machines in the defaults file
+LOCAL_IP=$(/sbin/ifconfig $QUERY_DEV | grep 'inet addr' | tr ':' '\t' | awk '{print $3}')
+LOCAL_MASK=$(/sbin/ifconfig $QUERY_DEV | grep 'Mask' | tr ':' '\t' | awk '{print $7}')
+LOCAL_ROUTE=$(/sbin/route -n | grep $QUERY_DEV | grep 'G' | awk '{print $2}')
+
+
+#ARGS="-DTEST -DDEFAULTS_FILE=$DEFAULTS_FILE -DDEFAULTS_PATH=$DEFAULTS_PATH -DLOCAL_IP=$LOCAL_IP -DLOCAL_MASK=$LOCAL_MASK -DLOCAL_ROUTE=$LOCAL_ROUTE"
+ARGS="-DDEFAULTS_FILE=$DEFAULTS_FILE -DDEFAULTS_PATH=$DEFAULTS_PATH -DLOCAL_IP=$LOCAL_IP -DLOCAL_MASK=$LOCAL_MASK -DLOCAL_ROUTE=$LOCAL_ROUTE"
+
+
+$JAVA $ARGS -jar domctl.jar $*

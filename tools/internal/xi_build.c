@@ -43,29 +43,6 @@ static void dbstatus(char * msg)
     printf("Domain Builder: %s\n", msg);
 }
 
-static int do_kill_domain(int dom_id, int force)
-{
-    char cmd_path[MAX_PATH];
-    dom0_op_t dop;
-    int cmd_fd;
-
-    dop.cmd = DOM0_DESTROYDOMAIN;
-    dop.u.killdomain.domain = dom_id;
-    dop.u.killdomain.force  = force;
-
-    /* open the /proc command interface */
-    sprintf(cmd_path, "%s%s%s%s", "/proc/", PROC_XENO_ROOT, "/", PROC_CMD);
-    cmd_fd = open(cmd_path, O_WRONLY);
-    if(cmd_fd < 0){
-        perror(PERR_STRING);
-        return -1;
-    }
-
-    write(cmd_fd, &dop, sizeof(dom0_op_t));
-    close(cmd_fd);
-
-    return 0;
-}
 
 /* clean up domain's memory allocations */
 static void dom_mem_cleanup(dom_mem_t * dom_mem)
@@ -160,45 +137,6 @@ static int map_dom_mem(unsigned long pfn, int pages, int dom,
     return 0;
 }
 
-/* create new domain */
-static dom0_newdomain_t * create_new_domain(long req_mem)
-{
-    dom0_newdomain_t * dom_data;
-    char cmd_path[MAX_PATH];
-    char dom_id_path[MAX_PATH];
-    dom0_op_t dop;
-    int cmd_fd;
-    int id_fd;
-
-    /* open the /proc command interface */
-    sprintf(cmd_path, "%s%s%s%s", "/proc/", PROC_XENO_ROOT, "/", PROC_CMD);
-    cmd_fd = open(cmd_path, O_WRONLY);
-    if(cmd_fd < 0){
-        perror(PERR_STRING);
-        return 0;
-    }
-
-    dop.cmd = DOM0_CREATEDOMAIN;
-    dop.u.newdomain.memory_kb = req_mem;
-    dop.u.newdomain.name[0] = 0;
-
-    write(cmd_fd, &dop, sizeof(dom0_op_t));
-    close(cmd_fd);
-
-    sprintf(dom_id_path, "%s%s%s%s", "/proc/", PROC_XENO_ROOT, "/", 
-        PROC_DOM_DATA);
-    while((id_fd = open(dom_id_path, O_RDONLY)) < 0) continue;
-    dom_data = (dom0_newdomain_t *)malloc(sizeof(dom0_newdomain_t));
-    read(id_fd, dom_data, sizeof(dom0_newdomain_t));
-    close(id_fd);
-    
-    sprintf(cmd_path, "Reserved %ld kbytes memory and assigned id %d to the"
-	    " new domain.", req_mem, dom_data->domain);
-    dbstatus(cmd_path);
-
-    return dom_data;
-}    
-
 /* open kernel image and do some sanity checks */
 static int do_kernel_chcks(char *image, long dom_size, 
     unsigned long * load_addr, size_t * ksize)
@@ -244,10 +182,6 @@ static int do_kernel_chcks(char *image, long dom_size,
     read(fd, load_addr, sizeof(unsigned long));
 
     *ksize = stat.st_size - SIG_LEN - sizeof(unsigned long);
-
-    sprintf(status, "Kernel image %s valid, kernel virtual load address %lx", 
-        image, *load_addr);
-    dbstatus(status);
 
     ret = fd;
 
@@ -439,21 +373,55 @@ static int launch_domain(dom_meminfo_t  * meminfo)
     dop.cmd = DOM0_BUILDDOMAIN;
     memcpy(&dop.u.meminfo, meminfo, sizeof(dom_meminfo_t));
     write(cmd_fd, &dop, sizeof(dom0_op_t));
-
-    dop.cmd = DOM0_STARTDOMAIN;
-    memcpy(&dop.u.meminfo, meminfo, sizeof(dom_meminfo_t));
-    write(cmd_fd, &dop, sizeof(dom0_op_t));
-
-    dbstatus("Launched the new domain!");
-
     close(cmd_fd);
+
     return 0;
 }
+
+static int get_domain_info (int domain_id,
+                            int *pg_head,
+                            int *tot_pages)
+{
+  FILE *f; 
+  char domains_path[MAX_PATH];
+  char domains_line[256];
+  int rc = -1;
+  int read_id;
+
+  sprintf (domains_path, "%s%s%s%s", "/proc/", PROC_XENO_ROOT, "/", PROC_DOMAINS
+);
+
+  f = fopen (domains_path, "r");
+  if (f == NULL) goto out;
+
+  read_id = -1;
+  while (fgets (domains_line, 256, f) != 0)
+    { 
+      int trans;
+      trans = sscanf (domains_line, "%d %*d %*d %*d %*d %*d %x %d %*s", &read_id
+, pg_head, tot_pages);
+      if (trans == 3) {
+        if (read_id == domain_id) {
+          rc = 0;
+          break;
+        }
+      }
+    }
+
+  if (read_id == -1) {
+    errno = ESRCH;
+  }
+
+  fclose (f);
+
+ out:
+  return rc;
+}
+
 
 int main(int argc, char **argv)
 {
 
-    dom0_newdomain_t * dom_data;
     dom_mem_t dom_os_image;
     dom_mem_t dom_pgt; 
     dom_meminfo_t * meminfo;
@@ -466,30 +434,36 @@ int main(int argc, char **argv)
     int rc = -1;
     int args_start = 4;
     char initrd_name[1024];
+    int domain_id;
+    int pg_head;
+    int tot_pages;
 
     unsigned long addr;
 
     /**** this argument parsing code is really _gross_. rewrite me! ****/
 
     if(argc < 4) {
-        dberr("Usage: dom_builder <kbytes_mem> <image> <num_vifs> "
+        dberr("Usage: dom_builder <domain_id> <image> <num_vifs> "
 	      "[<initrd=initrd_name>] <boot_params>\n");
         return -1;
     }
 
-    /* create new domain and set up all the neccessary mappings */
-
-    kernel_fd = do_kernel_chcks(argv[2], atol(argv[1]), &load_addr, &ksize);
+    /* Look up information about the domain */
+    domain_id = atol(argv[1]);
+    if (get_domain_info (domain_id, &pg_head, &tot_pages) != 0) {
+      perror ("Could not find domain information");
+      rc = -1;
+      goto out;
+    }
+	     
+    kernel_fd = do_kernel_chcks(argv[2], tot_pages << (PAGE_SHIFT - 10), &load_addr, &ksize);
     if(kernel_fd < 0)
 	return -1;
     
-    /* request the creation of new domain */
-    if(!(dom_data = create_new_domain(atol(argv[1])))) 
-        return -1;
 
     /* map domain's memory */
-    if(map_dom_mem(dom_data->pg_head, dom_data->memory_kb >> (PAGE_SHIFT-10), 
-		   dom_data->domain, &dom_os_image))
+    if(map_dom_mem(pg_head, tot_pages,
+		   domain_id, &dom_os_image))
         goto out;
 
     if( strncmp("initrd=", argv[args_start], 7) == 0 )
@@ -507,7 +481,7 @@ int main(int argc, char **argv)
       }
 
     /* the following code does the actual domain building */
-    meminfo = setup_guestos(dom_data->domain, kernel_fd, initrd_fd, load_addr, 
+    meminfo = setup_guestos(domain_id, kernel_fd, initrd_fd, load_addr, 
 			    ksize, &dom_os_image); 
     
     /* and unmap the new domain's memory image since we no longer need it */
@@ -532,7 +506,7 @@ int main(int argc, char **argv)
         cmd_len += strlen(argv[count] + 1);
     }
 
-    sprintf(status, 
+    /*    sprintf(status, 
 	    "About to launch new domain %d with folowing parameters:\n"
 	    " * page table base: %lx \n * load address: %lx \n"
 	    " * shared info address: %lx \n * start info address: %lx \n"
@@ -540,20 +514,11 @@ int main(int argc, char **argv)
 	    meminfo->l2_pgt_addr, meminfo->virt_load_addr, 
 	    meminfo->virt_shinfo_addr, meminfo->virt_startinfo_addr, 
 	    meminfo->num_vifs, meminfo->cmd_line);
-    dbstatus(status);
+	    dbstatus(status);*/
     
     /* and launch the domain */
     rc = launch_domain(meminfo); 
     
 out:
-    if( rc >= 0 )
-    {
-        return meminfo->domain;
-    }
-    else 
-    {
-        if ( dom_data->domain != 0 )
-            do_kill_domain(dom_data->domain, 1);
-        return rc;
-    }
+    return rc;
 }

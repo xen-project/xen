@@ -1,0 +1,25 @@
+#!/bin/bash
+#
+# vifinit 
+#
+# This is a silly little script to dump a couple of simple rules down to 
+# the hypervisor to assign a full static IP to a given virtual interface.
+# 
+# Usage is:
+#
+#   vifinit [vif dom] [vif idx] [dotted decimal ip address]
+#
+if [ $# -ne 3 ] ; 
+then
+        echo "usage: $0 <domain_id> <vid_ifx> <dotted_decimal_ip_address>"
+        exit
+fi
+
+#outbound rule:
+echo "ADD ACCEPT srcaddr=$3 srcaddrmask=255.255.255.255 srcdom=$1 srcidx=$2 dst=PHYS proto=any" > /proc/vfr
+
+#inbound rule:
+echo "ADD ACCEPT dstaddr=$3 dstaddrmask=255.255.255.255 src=ANY dstdom=$1 dstidx=$2 proto=any" > /proc/vfr
+
+#----] done.
+
