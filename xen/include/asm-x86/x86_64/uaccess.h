@@ -7,7 +7,6 @@
 #include <xen/config.h>
 #include <xen/compiler.h>
 #include <xen/errno.h>
-#include <xen/sched.h>
 #include <xen/prefetch.h>
 #include <asm/page.h>
 

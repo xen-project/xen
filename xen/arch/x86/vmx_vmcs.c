@@ -131,48 +131,16 @@ int vmx_setup_platform(struct exec_domain *d, execution_context_t *context)
     }
 
     if (gpfn == 0) {
-        VMX_DBG_LOG(DBG_LEVEL_1, "No shared Page ?\n");
+        printk("No shared Page ?\n");
+        unmap_domain_mem(p);        
         return -1;
     }   
     unmap_domain_mem(p);        
 
     mpfn = phys_to_machine_mapping(gpfn);
     p = map_domain_mem(mpfn << PAGE_SHIFT);
+    ASSERT(p != NULL);
     d->arch.arch_vmx.vmx_platform.shared_page_va = (unsigned long) p;
-
-    return 0;
-}
-
-
-/*
- * Add <guest pfn, machine pfn> mapping to per-domain mapping. Full
- * virtualization does not need per-domain mapping.
- */
-static int add_mapping_perdomain(struct exec_domain *d, unsigned long gpfn, 
-                                 unsigned long mpfn)
-{
-    struct pfn_info *page;
-    unsigned long pfn = 0;
-
-    /*
-     * We support up to 4GB memory for a guest at this point
-     */
-    if (gpfn > ENTRIES_PER_L2_PAGETABLE * ENTRIES_PER_L1_PAGETABLE)
-        return -1;
-
-    if (!(l1_pgentry_val(d->domain->arch.mm_perdomain_pt[
-            gpfn >> (L2_PAGETABLE_SHIFT - L1_PAGETABLE_SHIFT)]) & _PAGE_PRESENT))
-    {
-        page = (struct pfn_info *) alloc_domheap_page(NULL);
-        if (!page) {
-            return -1;
-        }
-
-        pfn = (unsigned long) (page - frame_table);
-        d->domain->arch.mm_perdomain_pt[gpfn >> (L2_PAGETABLE_SHIFT - L1_PAGETABLE_SHIFT)] = 
-            mk_l1_pgentry((pfn << PAGE_SHIFT) | __PAGE_HYPERVISOR);
-    }
-    __phys_to_machine_mapping[gpfn] = mpfn;
 
     return 0;
 }
@@ -204,7 +172,6 @@ void vmx_do_launch(struct exec_domain *ed)
         d->arch.min_pfn = min(d->arch.min_pfn, pfn);
         d->arch.max_pfn = max(d->arch.max_pfn, pfn);
         list_ent = frame_table[pfn].list.next;
-        add_mapping_perdomain(ed, i, pfn);
     }
 
     spin_unlock(&d->page_alloc_lock);

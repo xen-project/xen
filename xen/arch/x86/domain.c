@@ -304,7 +304,7 @@ void arch_vmx_do_launch(struct exec_domain *ed)
 static void monitor_mk_pagetable(struct exec_domain *ed)
 {
     unsigned long mpfn;
-    l2_pgentry_t *mpl2e;
+    l2_pgentry_t *mpl2e, *phys_table;
     struct pfn_info *mpfn_info;
     struct domain *d = ed->domain;
 
@@ -326,6 +326,12 @@ static void monitor_mk_pagetable(struct exec_domain *ed)
         mk_l2_pgentry((__pa(d->arch.mm_perdomain_pt) & PAGE_MASK) 
                       | __PAGE_HYPERVISOR);
 
+    phys_table = (l2_pgentry_t *) map_domain_mem(pagetable_val(
+                                        ed->arch.phys_table));
+    memcpy(d->arch.mm_perdomain_pt, phys_table,
+           ENTRIES_PER_L2_PAGETABLE * sizeof(l2_pgentry_t));
+
+    unmap_domain_mem(phys_table);
     unmap_domain_mem(mpl2e);
 }
 
@@ -466,6 +472,7 @@ int arch_final_setup_guestos(
     
     phys_basetab = c->pt_base;
     d->arch.pagetable = mk_pagetable(phys_basetab);
+    d->arch.phys_table = d->arch.pagetable;
     if ( !get_page_and_type(&frame_table[phys_basetab>>PAGE_SHIFT], d->domain, 
                             PGT_base_page_table) )
         return -EINVAL;
@@ -749,8 +756,6 @@ static void relinquish_list(struct domain *d, struct list_head *list)
 #ifdef CONFIG_VMX
 static void vmx_domain_relinquish_memory(struct exec_domain *ed)
 {
-    struct domain *d = ed->domain;
-
     /*
      * Free VMCS
      */
@@ -759,22 +764,6 @@ static void vmx_domain_relinquish_memory(struct exec_domain *ed)
     ed->arch.arch_vmx.vmcs = 0;
     
     monitor_rm_pagetable(ed);
-
-    if (ed == d->exec_domain[0]) {
-        int i;
-        unsigned long pfn;
-
-        for (i = 0; i < ENTRIES_PER_L1_PAGETABLE; i++) {
-            unsigned long l1e;
-            
-            l1e = l1_pgentry_val(d->arch.mm_perdomain_pt[i]);
-            if (l1e & _PAGE_PRESENT) {
-                pfn = l1e >> PAGE_SHIFT;
-                free_domheap_page(&frame_table[pfn]);
-            }
-        }
-    }
-
 }
 #endif
 

@@ -96,6 +96,7 @@ struct arch_exec_domain
     pagetable_t  pagetable;
 
     pagetable_t  monitor_table;
+    pagetable_t  phys_table;            /* 1:1 pagetable */
     pagetable_t  shadow_table;
     l2_pgentry_t *vpagetable;	        /* virtual address of pagetable */
     l2_pgentry_t *shadow_vtable;	/* virtual address of shadow_table */
