@@ -1,6 +1,26 @@
-        
 #include <os.h>
 
+.section __xen_guest
+        .asciz  "XEN_VER=2.0,LOADER=generic,PT_MODE_WRITABLE"
+.text
+
+.globl _start, shared_info
+                        
+_start:
+        cld
+        lss stack_start,%esp
+        push %esi 
+        call start_kernel
+
+stack_start:
+	.long stack+8192, __KERNEL_SS
+
+        /* Unpleasant -- the PTE that maps this page is actually overwritten */
+        /* to map the real shared-info page! :-)                             */
+        .org 0x1000
+shared_info:
+        .org 0x2000
+        
 ES		= 0x20
 ORIG_EAX	= 0x24
 EIP		= 0x28
@@ -92,7 +112,7 @@ ENTRY(hypervisor_callback)
         cmpl $ecrit,%eax
         jb   critical_region_fixup
 11:     push %esp
-        call do_hypervisor_callback
+#        call do_hypervisor_callback
         add  $4,%esp
         movl HYPERVISOR_shared_info,%esi
         xorl %eax,%eax

@@ -64,8 +64,8 @@ extern char shared_info[PAGE_SIZE];
 
 static shared_info_t *map_shared_info(unsigned long pa)
 {
-    if ( HYPERVISOR_update_va_mapping((unsigned long)shared_info >> PAGE_SHIFT,
-                                      pa | 3, UVMF_INVLPG) )
+    if ( HYPERVISOR_update_va_mapping(
+        (unsigned long)shared_info, pa | 3, UVMF_INVLPG) )
     {
         printk("Failed to map shared_info!!\n");
         *(int*)0=0;
@@ -79,6 +79,9 @@ static shared_info_t *map_shared_info(unsigned long pa)
  */
 void start_kernel(start_info_t *si)
 {
+    static char hello[] = "Bootstrapping...\n";
+    (void)HYPERVISOR_console_io(CONSOLEIO_write, strlen(hello), hello);
+
     /* Copy the start_info struct to a globally-accessible area. */
     memcpy(&start_info, si, sizeof(*si));
 
@@ -86,9 +89,15 @@ void start_kernel(start_info_t *si)
     HYPERVISOR_shared_info = map_shared_info(start_info.shared_info);
 
     /* Set up event and failsafe callback addresses. */
+#ifdef __i386__
     HYPERVISOR_set_callbacks(
         __KERNEL_CS, (unsigned long)hypervisor_callback,
         __KERNEL_CS, (unsigned long)failsafe_callback);
+#else
+    HYPERVISOR_set_callbacks(
+        (unsigned long)hypervisor_callback,
+        (unsigned long)failsafe_callback, 0);
+#endif
 
     trap_init();
 
@@ -117,7 +126,7 @@ void start_kernel(start_info_t *si)
     init_mm();
 
     /* set up events */
-    init_events();
+//    init_events();
 
     /*
      * These need to be replaced with event-channel/control-interface
@@ -135,7 +144,7 @@ void start_kernel(start_info_t *si)
 #endif
 
     /* init time and timers */
-    init_time();
+//    init_time();
 
     /* do nothing */
     for ( ; ; ) HYPERVISOR_yield();

@@ -510,7 +510,7 @@ asmlinkage int do_general_protection(struct xen_regs *regs)
     {
         /* This fault must be due to <INT n> instruction. */
         ti = current->arch.traps + (regs->error_code>>3);
-        if ( TI_GET_DPL(ti) >= (VM86_MODE(regs) ? 3 : (regs->cs & 3)) )
+        if ( PERMIT_SOFTINT(TI_GET_DPL(ti), ed, regs) )
         {
             tb->flags = TBF_EXCEPTION;
             regs->eip += 2;

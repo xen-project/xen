@@ -9,116 +9,108 @@
 
 #define NULL 0
 
-/* Somewhere in the middle of the GCC 2.96 development cycle, we implemented
-   a mechanism by which the user can annotate likely branch directions and
-   expect the blocks to be reordered appropriately.  Define __builtin_expect
-   to nothing for earlier compilers.  */
-
 #if __GNUC__ == 2 && __GNUC_MINOR__ < 96
 #define __builtin_expect(x, expected_value) (x)
 #endif
+#define unlikely(x)  __builtin_expect((x),0)
 
-/*
- * These are the segment descriptors provided for us by the hypervisor.
- * For now, these are hardwired -- guest OSes cannot update the GDT
- * or LDT.
- * 
- * It shouldn't be hard to support descriptor-table frobbing -- let me 
- * know if the BSD or XP ports require flexibility here.
- */
+#define smp_processor_id() 0
+#define preempt_disable() ((void)0)
+#define preempt_enable() ((void)0)
 
+#define force_evtchn_callback() ((void)HYPERVISOR_xen_version(0))
 
-/*
- * these are also defined in xen-public/xen.h but can't be pulled in as
- * they are used in start of day assembly. Need to clean up the .h files
- * a bit more...
- */
-
-#ifndef FLAT_RING1_CS
-#define FLAT_RING1_CS		0x0819
-#define FLAT_RING1_DS		0x0821
-#define FLAT_RING3_CS		0x082b
-#define FLAT_RING3_DS		0x0833
+#ifndef __ASSEMBLY__
+#include <types.h>
 #endif
+#include <xen-public/xen.h>
 
-#define __KERNEL_CS        FLAT_RING1_CS
-#define __KERNEL_DS        FLAT_RING1_DS
+#define __KERNEL_CS  FLAT_KERNEL_CS
+#define __KERNEL_DS  FLAT_KERNEL_DS
+#define __KERNEL_SS  FLAT_KERNEL_SS
 
 /* Everything below this point is not included by assembler (.S) files. */
 #ifndef __ASSEMBLY__
 
-#include <types.h>
-#include <xen-public/xen.h>
+#define pt_regs xen_regs
 
-
-/* this struct defines the way the registers are stored on the 
-   stack during an exception or interrupt. */
-struct pt_regs {
-	long ebx;
-	long ecx;
-	long edx;
-	long esi;
-	long edi;
-	long ebp;
-	long eax;
-	int  xds;
-	int  xes;
-	long orig_eax;
-	long eip;
-	int  xcs;
-	long eflags;
-	long esp;
-	int  xss;
-};
-
-/* some function prototypes */
 void trap_init(void);
 void dump_regs(struct pt_regs *regs);
 
-
-/*
- * STI/CLI equivalents. These basically set and clear the virtual
- * event_enable flag in teh shared_info structure. Note that when
- * the enable bit is set, there may be pending events to be handled.
- * We may therefore call into do_hypervisor_callback() directly.
+/* 
+ * The use of 'barrier' in the following reflects their use as local-lock
+ * operations. Reentrancy must be prevented (e.g., __cli()) /before/ following
+ * critical operations are executed. All critical operations must complete
+ * /before/ reentrancy is permitted (e.g., __sti()). Alpha architecture also
+ * includes these barriers, for example.
  */
-#define unlikely(x)  __builtin_expect((x),0)
-#define __save_flags(x)                                                       \
-do {                                                                          \
-    (x) = test_bit(EVENTS_MASTER_ENABLE_BIT,                                  \
-                   &HYPERVISOR_shared_info->events_mask);                     \
-    barrier();                                                                \
+
+#define __cli()								\
+do {									\
+	vcpu_info_t *_vcpu;						\
+	preempt_disable();						\
+	_vcpu = &HYPERVISOR_shared_info->vcpu_data[smp_processor_id()];	\
+	_vcpu->evtchn_upcall_mask = 1;					\
+	preempt_enable_no_resched();					\
+	barrier();							\
 } while (0)
 
-#define __restore_flags(x)                                                    \
-do {                                                                          \
-    shared_info_t *_shared = HYPERVISOR_shared_info;                          \
-    if (x) set_bit(EVENTS_MASTER_ENABLE_BIT, &_shared->events_mask);          \
-    barrier();                                                                \
-    if ( unlikely(_shared->events) && (x) ) do_hypervisor_callback(NULL);     \
+#define __sti()								\
+do {									\
+	vcpu_info_t *_vcpu;						\
+	barrier();							\
+	preempt_disable();						\
+	_vcpu = &HYPERVISOR_shared_info->vcpu_data[smp_processor_id()];	\
+	_vcpu->evtchn_upcall_mask = 0;					\
+	barrier(); /* unmask then check (avoid races) */		\
+	if ( unlikely(_vcpu->evtchn_upcall_pending) )			\
+		force_evtchn_callback();				\
+	preempt_enable();						\
 } while (0)
 
-#define __cli()                                                               \
-do {                                                                          \
-    clear_bit(EVENTS_MASTER_ENABLE_BIT, &HYPERVISOR_shared_info->events_mask);\
-    barrier();                                                                \
+#define __save_flags(x)							\
+do {									\
+	vcpu_info_t *_vcpu;						\
+	_vcpu = &HYPERVISOR_shared_info->vcpu_data[smp_processor_id()];	\
+	(x) = _vcpu->evtchn_upcall_mask;				\
 } while (0)
 
-#define __sti()                                                               \
-do {                                                                          \
-    shared_info_t *_shared = HYPERVISOR_shared_info;                          \
-    set_bit(EVENTS_MASTER_ENABLE_BIT, &_shared->events_mask);                 \
-    barrier();                                                                \
-    if ( unlikely(_shared->events) ) do_hypervisor_callback(NULL);            \
+#define __restore_flags(x)						\
+do {									\
+	vcpu_info_t *_vcpu;						\
+	barrier();							\
+	preempt_disable();						\
+	_vcpu = &HYPERVISOR_shared_info->vcpu_data[smp_processor_id()];	\
+	if ((_vcpu->evtchn_upcall_mask = (x)) == 0) {			\
+		barrier(); /* unmask then check (avoid races) */	\
+		if ( unlikely(_vcpu->evtchn_upcall_pending) )		\
+			force_evtchn_callback();			\
+		preempt_enable();					\
+	} else								\
+		preempt_enable_no_resched();				\
 } while (0)
-#define cli() __cli()
-#define sti() __sti()
-#define save_flags(x) __save_flags(x)
-#define restore_flags(x) __restore_flags(x)
-#define save_and_cli(x) __save_and_cli(x)
-#define save_and_sti(x) __save_and_sti(x)
 
+#define safe_halt()		((void)0)
 
+#define __save_and_cli(x)						\
+do {									\
+	vcpu_info_t *_vcpu;						\
+	preempt_disable();						\
+	_vcpu = &HYPERVISOR_shared_info->vcpu_data[smp_processor_id()];	\
+	(x) = _vcpu->evtchn_upcall_mask;				\
+	_vcpu->evtchn_upcall_mask = 1;					\
+	preempt_enable_no_resched();					\
+	barrier();							\
+} while (0)
+
+#define local_irq_save(x)	__save_and_cli(x)
+#define local_irq_restore(x)	__restore_flags(x)
+#define local_save_flags(x)	__save_flags(x)
+#define local_irq_disable()	__cli()
+#define local_irq_enable()	__sti()
+
+#define irqs_disabled()			\
+    HYPERVISOR_shared_info->vcpu_data[smp_processor_id()].evtchn_upcall_mask
 
 /* This is a barrier for the compiler only, NOT the processor! */
 #define barrier() __asm__ __volatile__("": : :"memory")

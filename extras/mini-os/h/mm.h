@@ -64,7 +64,11 @@ static __inline__ unsigned long machine_to_phys(unsigned long machine)
     return phys;
 }
 
+#ifdef __x86_64__
+#define VIRT_START              0xFFFFFFFF00000000UL
+#else
 #define VIRT_START              0xC0000000UL
+#endif
 
 #define to_phys(x)                 ((unsigned long)(x)-VIRT_START)
 #define to_virt(x)                 ((void *)((unsigned long)(x)+VIRT_START))

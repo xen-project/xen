@@ -96,14 +96,14 @@ union uu {
  * (sizeof(long)*CHAR_BIT/2).
  */
 #define HHALF(x)        ((x) >> HALF_BITS)
-#define LHALF(x)        ((x) & ((1 << HALF_BITS) - 1))
+#define LHALF(x)        ((x) & ((1UL << HALF_BITS) - 1))
 #define LHUP(x)         ((x) << HALF_BITS)
 
 /*
  * Multiprecision divide.  This algorithm is from Knuth vol. 2 (2nd ed),
  * section 4.3.1, pp. 257--259.
  */
-#define	B	(1 << HALF_BITS)	/* digit base */
+#define	B	(1UL << HALF_BITS)	/* digit base */
 
 /* Combine two `digits' to make a single two-digit number. */
 #define	COMBINE(a, b) (((u_long)(a) << HALF_BITS) | (b))

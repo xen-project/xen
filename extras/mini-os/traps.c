@@ -33,38 +33,38 @@ extern void do_exit(void);
 
 void dump_regs(struct pt_regs *regs)
 {
-	int in_kernel = 1;
-	unsigned long esp;
-	unsigned short ss;
+    int in_kernel = 1;
+    unsigned long esp;
+    unsigned short ss;
 
-	esp = (unsigned long) (&regs->esp);
-	ss = __KERNEL_DS;
-	if (regs->xcs & 2) {
-		in_kernel = 0;
-		esp = regs->esp;
-		ss = regs->xss & 0xffff;
-	}
-	printf("EIP:    %04x:[<%08lx>]\n",
-	       0xffff & regs->xcs, regs->eip);
-	printf("EFLAGS: %08lx\n",regs->eflags);
-	printf("eax: %08lx   ebx: %08lx   ecx: %08lx   edx: %08lx\n",
-		regs->eax, regs->ebx, regs->ecx, regs->edx);
-	printf("esi: %08lx   edi: %08lx   ebp: %08lx   esp: %08lx\n",
-		regs->esi, regs->edi, regs->ebp, esp);
-	printf("ds: %04x   es: %04x   ss: %04x\n",
-		regs->xds & 0xffff, regs->xes & 0xffff, ss);
-	printf("\n");
+    esp = (unsigned long) (&regs->esp);
+    ss = __KERNEL_DS;
+    if (regs->cs & 2) {
+        in_kernel = 0;
+        esp = regs->esp;
+        ss = regs->ss & 0xffff;
+    }
+    printf("EIP:    %04x:[<%p>]\n",
+           0xffff & regs->cs , regs->eip);
+    printf("EFLAGS: %p\n",regs->eflags);
+    printf("eax: %p   ebx: %p   ecx: %p   edx: %p\n",
+           regs->eax, regs->ebx, regs->ecx, regs->edx);
+    printf("esi: %p   edi: %p   ebp: %p   esp: %p\n",
+           regs->esi, regs->edi, regs->ebp, esp);
+    printf("ds: %04x   es: %04x   ss: %04x\n",
+           regs->ds & 0xffff, regs->es & 0xffff, ss);
+    printf("\n");
 }	
 
 
-static __inline__ void dump_code(unsigned eip)
+static __inline__ void dump_code(unsigned long eip)
 {
-  unsigned *ptr = (unsigned *)eip;
-  int x;
-
-  printk("Bytes at eip:\n");
-  for (x = -4; x < 5; x++)
-      printf("%x", ptr[x]);
+    unsigned *ptr = (unsigned *)eip;
+    int x;
+    
+    printk("Bytes at eip:\n");
+    for (x = -4; x < 5; x++)
+        printf("%p", ptr[x]);
 }
 
 
@@ -81,14 +81,14 @@ static __inline__ void dump_code(unsigned eip)
  */
 
 static void __inline__ do_trap(int trapnr, char *str,
-			   struct pt_regs * regs, long error_code)
+                               struct pt_regs * regs, long error_code)
 {
-  printk("FATAL:  Unhandled Trap (see mini-os:traps.c)");
-  printf("%d %s", trapnr, str);
-  dump_regs(regs);
-  dump_code(regs->eip);
+    printk("FATAL:  Unhandled Trap (see mini-os:traps.c)");
+    printf("%d %s", trapnr, str);
+    dump_regs(regs);
+    dump_code(regs->eip);
 
-  do_exit();
+    do_exit();
 }
 
 #define DO_ERROR(trapnr, str, name) \
@@ -104,38 +104,36 @@ void do_##name(struct pt_regs * regs, long error_code) \
 }
 
 DO_ERROR_INFO( 0, "divide error", divide_error, FPE_INTDIV, regs->eip)
-DO_ERROR( 3, "int3", int3)
-DO_ERROR( 4, "overflow", overflow)
-DO_ERROR( 5, "bounds", bounds)
-DO_ERROR_INFO( 6, "invalid operand", invalid_op, ILL_ILLOPN, regs->eip)
-DO_ERROR( 7, "device not available", device_not_available)
-DO_ERROR( 8, "double fault", double_fault)
-DO_ERROR( 9, "coprocessor segment overrun", coprocessor_segment_overrun)
-DO_ERROR(10, "invalid TSS", invalid_TSS)
-DO_ERROR(11, "segment not present", segment_not_present)
-DO_ERROR(12, "stack segment", stack_segment)
-DO_ERROR_INFO(17, "alignment check", alignment_check, BUS_ADRALN, 0)
-DO_ERROR(18, "machine check", machine_check)
+    DO_ERROR( 3, "int3", int3)
+    DO_ERROR( 4, "overflow", overflow)
+    DO_ERROR( 5, "bounds", bounds)
+    DO_ERROR_INFO( 6, "invalid operand", invalid_op, ILL_ILLOPN, regs->eip)
+    DO_ERROR( 7, "device not available", device_not_available)
+    DO_ERROR( 8, "double fault", double_fault)
+    DO_ERROR( 9, "coprocessor segment overrun", coprocessor_segment_overrun)
+    DO_ERROR(10, "invalid TSS", invalid_TSS)
+    DO_ERROR(11, "segment not present", segment_not_present)
+    DO_ERROR(12, "stack segment", stack_segment)
+    DO_ERROR_INFO(17, "alignment check", alignment_check, BUS_ADRALN, 0)
+    DO_ERROR(18, "machine check", machine_check)
 
-void do_page_fault(struct pt_regs *regs, long error_code,
-                   unsigned long address)
+    void do_page_fault(struct pt_regs *regs, long error_code,
+                       unsigned long address)
 {
     printk("Page fault\n");
-    printk("Address: 0x%lx", address);
-    printk("Error Code: 0x%lx", error_code);
-    printk("eip: \t 0x%lx", regs->eip);
+    printk("Address: 0x%p", address);
+    printk("Error Code: 0x%p", error_code);
+    printk("eip: \t 0x%p", regs->eip);
     do_exit();
 }
 
 void do_general_protection(struct pt_regs * regs, long error_code)
 {
-
-  HYPERVISOR_shared_info->events_mask = 0;
-  printk("GPF\n");
-  printk("Error Code: 0x%lx", error_code);
-  dump_regs(regs);
-  dump_code(regs->eip);
-  do_exit();
+    printk("GPF\n");
+    printk("Error Code: 0x%p", error_code);
+    dump_regs(regs);
+    dump_code(regs->eip);
+    do_exit();
 }
 
 
@@ -180,26 +178,29 @@ void do_spurious_interrupt_bug(struct pt_regs * regs,
  * The 'privilege ring' field specifies the least-privileged ring that
  * can trap to that vector using a software-interrupt instruction (INT).
  */
+#ifdef __x86_64__
+#define _P 0,
+#endif
 static trap_info_t trap_table[] = {
-    {  0, 0, __KERNEL_CS, (unsigned long)divide_error                },
-    {  1, 0, __KERNEL_CS, (unsigned long)debug                       },
-    {  3, 3, __KERNEL_CS, (unsigned long)int3                        },
-    {  4, 3, __KERNEL_CS, (unsigned long)overflow                    },
-    {  5, 3, __KERNEL_CS, (unsigned long)bounds                      },
-    {  6, 0, __KERNEL_CS, (unsigned long)invalid_op                  },
-    {  7, 0, __KERNEL_CS, (unsigned long)device_not_available        },
-    {  8, 0, __KERNEL_CS, (unsigned long)double_fault                },
-    {  9, 0, __KERNEL_CS, (unsigned long)coprocessor_segment_overrun },
-    { 10, 0, __KERNEL_CS, (unsigned long)invalid_TSS                 },
-    { 11, 0, __KERNEL_CS, (unsigned long)segment_not_present         },
-    { 12, 0, __KERNEL_CS, (unsigned long)stack_segment               },
-    { 13, 0, __KERNEL_CS, (unsigned long)general_protection          },
-    { 14, 0, __KERNEL_CS, (unsigned long)page_fault                  },
-    { 15, 0, __KERNEL_CS, (unsigned long)spurious_interrupt_bug      },
-    { 16, 0, __KERNEL_CS, (unsigned long)coprocessor_error           },
-    { 17, 0, __KERNEL_CS, (unsigned long)alignment_check             },
-    { 18, 0, __KERNEL_CS, (unsigned long)machine_check               },
-    { 19, 0, __KERNEL_CS, (unsigned long)simd_coprocessor_error      },
+    {  0, 0, __KERNEL_CS, _P (unsigned long)divide_error                },
+    {  1, 0, __KERNEL_CS, _P (unsigned long)debug                       },
+    {  3, 3, __KERNEL_CS, _P (unsigned long)int3                        },
+    {  4, 3, __KERNEL_CS, _P (unsigned long)overflow                    },
+    {  5, 3, __KERNEL_CS, _P (unsigned long)bounds                      },
+    {  6, 0, __KERNEL_CS, _P (unsigned long)invalid_op                  },
+    {  7, 0, __KERNEL_CS, _P (unsigned long)device_not_available        },
+    {  8, 0, __KERNEL_CS, _P (unsigned long)double_fault                },
+    {  9, 0, __KERNEL_CS, _P (unsigned long)coprocessor_segment_overrun },
+    { 10, 0, __KERNEL_CS, _P (unsigned long)invalid_TSS                 },
+    { 11, 0, __KERNEL_CS, _P (unsigned long)segment_not_present         },
+    { 12, 0, __KERNEL_CS, _P (unsigned long)stack_segment               },
+    { 13, 0, __KERNEL_CS, _P (unsigned long)general_protection          },
+    { 14, 0, __KERNEL_CS, _P (unsigned long)page_fault                  },
+    { 15, 0, __KERNEL_CS, _P (unsigned long)spurious_interrupt_bug      },
+    { 16, 0, __KERNEL_CS, _P (unsigned long)coprocessor_error           },
+    { 17, 0, __KERNEL_CS, _P (unsigned long)alignment_check             },
+    { 18, 0, __KERNEL_CS, _P (unsigned long)machine_check               },
+    { 19, 0, __KERNEL_CS, _P (unsigned long)simd_coprocessor_error      },
     {  0, 0,           0, 0                           }
 };
     

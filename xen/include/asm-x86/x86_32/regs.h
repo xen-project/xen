@@ -12,4 +12,7 @@
 
 #define KERNEL_MODE(_e, _r) (!VM86_MODE(_r) && RING_1(_r))
 
+#define PERMIT_SOFTINT(_dpl, _e, _r) \
+    ((_dpl) >= (VM86_MODE(_r) ? 3 : ((_r)->cs & 3)))
+
 #endif

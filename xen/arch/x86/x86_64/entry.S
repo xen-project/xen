@@ -85,6 +85,7 @@ FIX2:   pushq %rbx
         orb   $TF_failsafe_return,EDOMAIN_thread_flags(%rbx)
         popq  %rbx
         jmp   FIX1
+.previous
 .section __pre_ex_table,"a"
 	.quad FLT2,FIX2
 .previous
@@ -287,8 +288,11 @@ error_code:
         movq  %rsp,%rdi
         movl  XREGS_entry_vector(%rsp),%eax
         leaq  SYMBOL_NAME(exception_table)(%rip),%rdx
+        GET_CURRENT(%rbx)
         callq *(%rdx,%rax,8)
-        jmp   restore_all_xen
+        testb $3,XREGS_cs(%rsp)
+        jz    restore_all_xen
+        jmp   process_guest_exception_and_events
 
 exception_with_ints_disabled:
         testb $3,XREGS_cs(%rsp)         # interrupts disabled outside Xen?
@@ -299,12 +303,15 @@ exception_with_ints_disabled:
         testq %rax,%rax                 # no fixup code for faulting EIP?
         jz    FATAL_exception_with_ints_disabled
         movq  %rax,XREGS_rip(%rsp)
+        subq  $8,XREGS_rsp(%rsp)        # add ec/ev to previous stack frame
+        testb $15,XREGS_rsp(%rsp)       # return %rsp is now aligned?
+        jz    1f                        # then there is a pad quadword already
         movq  %rsp,%rsi
         subq  $8,%rsp
         movq  %rsp,%rdi
         movq  $XREGS_kernel_sizeof/8,%rcx
-        rep;  movsq                     # make room for error_code/entry_vector
-        movq  XREGS_error_code(%rsp),%rax # error_code/entry_vector
+        rep;  movsq                     # make room for ec/ev
+1:      movq  XREGS_error_code(%rsp),%rax # ec/ev
         movq  %rax,XREGS_kernel_sizeof(%rsp)
         jmp   restore_all_xen           # return to fixup code
 
