@@ -22,10 +22,11 @@
 #define XEN_BLOCK_WRITE 1
 #define XEN_BLOCK_READA 2                                /* currently unused */
 #define XEN_BLOCK_SPECIAL 4                              /* currently unused */
-#define XEN_BLOCK_PROBE 8      /* determine io configuration from hypervisor */
-#define XEN_BLOCK_DEBUG 16                                          /* debug */
+#define XEN_BLOCK_PROBE_BLK  8             /* get xhd config from hypervisor */
+#define XEN_BLOCK_DEBUG      16                                     /* debug */
 #define XEN_BLOCK_SEG_CREATE 32                      /* create segment (vhd) */
 #define XEN_BLOCK_SEG_DELETE 64                      /* delete segment (vhd) */
+#define XEN_BLOCK_PROBE_SEG  128           /* get vhd config from hypervisor */
 
 #define BLK_RING_SIZE        128
 #define BLK_RING_MAX_ENTRIES (BLK_RING_SIZE - 2)
@@ -70,6 +71,7 @@ typedef struct blk_ring_st
 
 #define XEN_DISK_IDE  1
 #define XEN_DISK_SCSI 2
+#define XEN_DISK_VIRTUAL 3                                            /* vhd */
 
 typedef struct xen_disk                                     /* physical disk */
 {

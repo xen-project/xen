@@ -328,6 +328,13 @@ static void floppy_off(unsigned int nr);
 /* #define DEVICE_INTR */
 #define DEVICE_NR(device) (MINOR(device))
 
+#elif (MAJOR_NR == XLSEG_MAJOR)
+
+#define DEVICE_NAME "xeno segment"
+#define DEVICE_REQUEST do_xlseg_request
+/* #define DEVICE_INTR */
+#define DEVICE_NR(device) (MINOR(device))
+
 #endif /* MAJOR_NR == whatever */
 
 /* provide DEVICE_xxx defaults, if not explicitly defined

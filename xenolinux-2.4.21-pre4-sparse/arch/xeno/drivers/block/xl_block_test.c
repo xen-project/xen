@@ -206,7 +206,8 @@ int proc_write_bdt(struct file *file, const char *buffer,
   /* submit request */
   hypervisor_request(0, meta.operation, meta.buffer, 
 		     meta.block_number, meta.block_size,
-		     meta.device);
+		     meta.device, 
+		     (struct gendisk *) NULL);
   HYPERVISOR_block_io_op();
   mdelay(1000); /* should wait for a proper acknowledgement/response. */
 

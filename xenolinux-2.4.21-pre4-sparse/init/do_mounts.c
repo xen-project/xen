@@ -235,6 +235,10 @@ static struct dev_name_struct {
         { "xhdb",    0x7C00 },
         { "xhdc",    0x7D00 },
         { "xhdd",    0x7E00 },
+        { "vhda",    0xEA00 },
+        { "vhdb",    0xEB00 },
+        { "vhdc",    0xEC00 },
+        { "vhdd",    0xED00 },
 #endif
 	{ "nftla", 0x5d00 },
 	{ "nftlb", 0x5d10 },

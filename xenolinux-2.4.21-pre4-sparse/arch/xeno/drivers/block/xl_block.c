@@ -1,7 +1,7 @@
 /******************************************************************************
  * xl_block.c
  * 
- * Xenolinux virtual block-device driver.
+ * Xenolinux virtual block-device driver (xhd).
  * 
  */
 
@@ -32,8 +32,6 @@ static int xlblk_major = XLBLK_MAJOR;
 /* Copied from linux/ide.h */
 typedef unsigned char	byte; 
 
-void xlblk_ide_register_disk(int, unsigned long);
-
 #define XLBLK_MAX 32 /* Maximum minor devices we support */
 #define XLBLK_MAJOR_NAME "xhd"
 #define IDE_PARTN_BITS 6                           /* from ide.h::PARTN_BITS */
@@ -58,15 +56,18 @@ static int xlblk_max_sectors[XLBLK_MAX];
 
 static blk_ring_t *blk_ring;
 static unsigned int resp_cons; /* Response consumer for comms ring. */
-static xen_disk_info_t xen_disk_info;
+static xen_disk_info_t xlblk_disk_info;
 atomic_t xlblk_control_count;
 
-int hypervisor_request(void *         id,
-                       int            operation,
-                       char *         buffer,
-                       unsigned long  block_number,
-                       unsigned short block_size,
-                       kdev_t         device);
+void xlblk_ide_register_disk(int, unsigned long);
+void do_xlseg_requestX (request_queue_t *rq);
+int hypervisor_request(void *          id,
+                       int             operation,
+                       char *          buffer,
+                       unsigned long   block_number,
+                       unsigned short  block_size,
+                       kdev_t          device,
+		       struct gendisk *gd);
 
 
 /* ------------------------------------------------------------------------
@@ -103,22 +104,39 @@ static int xenolinux_block_ioctl(struct inode *inode, struct file *filep,
   
     switch (command)
     {
-    case BLKGETSIZE:
+    case BLKGETSIZE:                                             /* get size */
         DPRINTK_IOCTL("   BLKGETSIZE: %x %lx\n", BLKGETSIZE, 
-                      (long) xen_disk_info.disks[0].capacity); 
-	return put_user(xen_disk_info.disks[0].capacity, 
+                      (long) xlblk_disk_info.disks[0].capacity); 
+	return put_user(xlblk_disk_info.disks[0].capacity, 
 			(unsigned long *) argument);
 
-    case BLKRRPART:
+    case BLKRRPART:                               /* re-read partition table */
         DPRINTK_IOCTL("   BLKRRPART: %x\n", BLKRRPART); 
 	break;
 
-    case BLKSSZGET:
+    case BLKBSZGET:                                        /* get block size */
+        DPRINTK_IOCTL("   BLKBSZGET: %x\n", BLKBSZGET);
+	break;
+
+    case BLKBSZSET:                                        /* set block size */
+        DPRINTK_IOCTL("   BLKBSZSET: %x\n", BLKBSZSET);
+	break;
+
+    case BLKRASET:                                         /* set read-ahead */
+        DPRINTK_IOCTL("   BLKRASET: %x\n", BLKRASET);
+	break;
+
+    case BLKRAGET:                                         /* get read-ahead */
+        DPRINTK_IOCTL("   BLKRAFET: %x\n", BLKRAGET);
+	break;
+
+    case BLKSSZGET:                                       /* get sector size */
         DPRINTK_IOCTL("   BLKSSZGET: %x 0x%x\n", BLKSSZGET,
                       xlblk_hardsect_size[minor_dev]);
 	return xlblk_hardsect_size[minor_dev]; 
 
     case HDIO_GETGEO:
+        /* note: these values are complete garbage */
         DPRINTK_IOCTL("   HDIO_GETGEO: %x\n", HDIO_GETGEO);
 	if (!argument) return -EINVAL;
 	if (put_user(0x00,  (unsigned long *) &geo->start)) return -EFAULT;
@@ -128,13 +146,13 @@ static int xenolinux_block_ioctl(struct inode *inode, struct file *filep,
 	return 0;
 
     case HDIO_GETGEO_BIG: 
+        /* note: these values are complete garbage */
         DPRINTK_IOCTL("   HDIO_GETGEO_BIG: %x\n", HDIO_GETGEO_BIG);
 	if (!argument) return -EINVAL;
 	if (put_user(0x00,  (unsigned long *) &geo->start))  return -EFAULT;
 	if (put_user(0xff,  (byte *)&geo->heads))   return -EFAULT;
 	if (put_user(0x3f,  (byte *)&geo->sectors)) return -EFAULT;
 	if (put_user(0x106, (unsigned int *) &geo->cylinders)) return -EFAULT;
-
 	return 0;
 
     default:
@@ -163,26 +181,27 @@ static int xenolinux_block_revalidate(kdev_t dev)
  * request block io 
  * 
  * id: for guest use only.
- * operation: XEN_BLOCK_READ, XEN_BLOCK_WRITE or XEN_BLOCK_PROBE
+ * operation: XEN_BLOCK_{READ,WRITE,PROBE*,SEG*}
  * buffer: buffer to read/write into. this should be a
  *   virtual address in the guest os.
  * block_number:  block to read
  * block_size:  size of each block
- * device:  ide/hda is 768 or 0x300           should be disk#!!!
+ * device:  xhd or vhd
+ * gd: partition information if XEN_BLOCK_{READ,WRITE}
  */
-int hypervisor_request(void *         id,
-                       int            operation,
-                       char *         buffer,
-                       unsigned long  block_number,
-                       unsigned short block_size,
-                       kdev_t         device)
+int hypervisor_request(void *          id,
+                       int             operation,
+                       char *          buffer,
+                       unsigned long   block_number,
+                       unsigned short  block_size,
+                       kdev_t          device,
+		       struct gendisk *gd)
 {
     int position;
     void *buffer_ma; 
     kdev_t phys_device = (kdev_t) 0;
     unsigned long sector_number = 0;
-    struct gendisk *gd;     
-
+ 
     /*
      * Bail if there's no room in the request communication ring. This may be 
      * because we have a whole bunch of outstanding responses to process. No 
@@ -197,21 +216,38 @@ int hypervisor_request(void *         id,
     {
     case XEN_BLOCK_SEG_CREATE:
     case XEN_BLOCK_SEG_DELETE:
-    case XEN_BLOCK_PROBE:
+    case XEN_BLOCK_PROBE_BLK:
+    case XEN_BLOCK_PROBE_SEG:
 	phys_device = (kdev_t) 0;
 	sector_number = 0;
         break;
 
     case XEN_BLOCK_READ:
     case XEN_BLOCK_WRITE:
-	if ( MAJOR(device) != XLBLK_MAJOR ) 
+        /* only accept requests for xhd and vhd devices */
+	if (!IS_XHD_MAJOR(MAJOR(device)) && !IS_VHD_MAJOR(MAJOR(device)))
 	    panic("error: xl_block::hypervisor_request: "
                   "unknown device [0x%x]\n", device);
-        phys_device = MKDEV(IDE0_MAJOR, 0);
-	/* Compute real buffer location on disk */
+	phys_device = MAJOR(device);
+
+	/* Compute real buffer location on disk.
+	 * note: gd will be null when we read the partition table.
+	 */
 	sector_number = block_number;
-	if ( (gd = (struct gendisk *)xen_disk_info.disks[0].gendisk) != NULL )
-	    sector_number += gd->part[MINOR(device)&IDE_PARTN_MASK].start_sect;
+	if ( gd != NULL )
+	{
+	  sector_number += gd->part[MINOR(device)&IDE_PARTN_MASK].start_sect;
+	}
+
+	/*
+	if (IS_VHD_MAJOR(MAJOR(device)))
+	{
+	  printk (KERN_ALERT "%lx + %lx = %lx (%x)\n",
+		  block_number,
+		  gd->part[MINOR(device)&IDE_PARTN_MASK].start_sect,
+		  sector_number, device);
+	}
+	*/
         break;
 
     default:
@@ -266,8 +302,9 @@ static void do_xlblk_request (request_queue_t *rq)
 	{
             full = hypervisor_request(
                 bh, (rw == READ) ? XEN_BLOCK_READ : XEN_BLOCK_WRITE, 
-                bh->b_data, bh->b_rsector, bh->b_size, bh->b_dev);
-            
+                bh->b_data, bh->b_rsector, bh->b_size, bh->b_dev,
+		(struct gendisk *)xlblk_disk_info.disks[0].gendisk);
+
             if ( full ) goto out;
 
             queued++;
@@ -334,6 +371,7 @@ static void xlblk_response_int(int irq, void *dev_id, struct pt_regs *ptregs)
 	    
 	  case XEN_BLOCK_SEG_CREATE :
 	  case XEN_BLOCK_SEG_DELETE :
+	  case XEN_BLOCK_PROBE_SEG :
 	    atomic_dec(&xlblk_control_count);
 	    break;
 	  
@@ -345,7 +383,9 @@ static void xlblk_response_int(int irq, void *dev_id, struct pt_regs *ptregs)
     resp_cons = i;
 
     /* KAF: We can push work down at this point. We have the lock. */
-    do_xlblk_request(BLK_DEFAULT_QUEUE(MAJOR_NR));
+    /* aho: okay, so this is a bit of a hack.  we'll kick every queue... */
+    do_xlblk_request(BLK_DEFAULT_QUEUE(XLBLK_MAJOR));
+    do_xlseg_requestX(BLK_DEFAULT_QUEUE(XLSEG_MAJOR));
     
     spin_unlock_irqrestore(&io_request_lock, flags);
 }
@@ -368,20 +408,23 @@ int __init xlblk_init(void)
 	goto fail;
     }
 
-    memset (&xen_disk_info, 0, sizeof(xen_disk_info));
-    xen_disk_info.count = 0;
+    /* probe for disk information */
+    memset (&xlblk_disk_info, 0, sizeof(xlblk_disk_info));
+    xlblk_disk_info.count = 0;
 
-    if ( hypervisor_request(NULL, XEN_BLOCK_PROBE, (char *) &xen_disk_info,
-                            0, 0, (kdev_t) 0) )
+    if ( hypervisor_request(NULL, XEN_BLOCK_PROBE_BLK, 
+			    (char *) &xlblk_disk_info,
+                            0, 0, (kdev_t) 0, 
+			    (struct gendisk *) NULL))
         BUG();
     HYPERVISOR_block_io_op();
     while ( blk_ring->resp_prod != 1 ) barrier();
-    printk (KERN_ALERT "block device probe:\n");
-    for ( i = 0; i < xen_disk_info.count; i++ )
+    printk (KERN_ALERT "xhd block device probe:\n");
+    for ( i = 0; i < xlblk_disk_info.count; i++ )
     { 
 	printk (KERN_ALERT "  %2d: type: %d, capacity: %ld\n",
-		i, xen_disk_info.disks[i].type, 
-		xen_disk_info.disks[i].capacity);
+		i, xlblk_disk_info.disks[i].type, 
+		xlblk_disk_info.disks[i].capacity);
     }
     
     SET_MODULE_OWNER(&xenolinux_block_fops);
@@ -394,7 +437,7 @@ int __init xlblk_init(void)
 
     /* initialize global arrays in drivers/block/ll_rw_block.c */
     for (i = 0; i < XLBLK_MAX; i++) {
-	xlblk_blk_size[i]      = xen_disk_info.disks[0].capacity;
+	xlblk_blk_size[i]      = xlblk_disk_info.disks[0].capacity;
 	xlblk_blksize_size[i]  = 512;
 	xlblk_hardsect_size[i] = 512;
 	xlblk_max_sectors[i]   = 128;
@@ -415,7 +458,7 @@ int __init xlblk_init(void)
      */
     blk_queue_headactive(BLK_DEFAULT_QUEUE(xlblk_major), 0);
 
-    xlblk_ide_register_disk(0, xen_disk_info.disks[0].capacity);
+    xlblk_ide_register_disk(0, xlblk_disk_info.disks[0].capacity);
 
     printk(KERN_ALERT 
 	   "XenoLinux Virtual Block Device Driver installed [device: %d]\n",
@@ -461,12 +504,25 @@ void xlblk_ide_register_disk(int idx, unsigned long capacity)
 
     add_gendisk(gd);
 
-    xen_disk_info.disks[idx].gendisk = gd;
+    xlblk_disk_info.disks[idx].gendisk = gd;
 
-    /* default disk size is just a big number.  in the future, we
-       need a message to probe the devices to determine the actual size */
     register_disk(gd, MKDEV(xlblk_major, 0), 1<<IDE_PARTN_BITS,
 		  &xenolinux_block_fops, capacity);
+
+    {
+      int loop = 0;
+      printk (KERN_ALERT "Partition Table: (capacity: %lx)\n", capacity);
+      for (loop = 0; loop < minors; loop++)
+      {
+	if (gd->part[loop].start_sect && gd->part[loop].nr_sects)
+	{
+	  printk (KERN_ALERT 
+		  "  %2d: 0x%6lx %8ld    0x%6lx %7ld\n", loop,
+		  gd->part[loop].start_sect, gd->part[loop].start_sect,
+		  gd->part[loop].nr_sects, gd->part[loop].nr_sects);
+	}
+      }
+    }
 
     return;
 }
