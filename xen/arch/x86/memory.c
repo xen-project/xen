@@ -1632,10 +1632,11 @@ ptwr_info_t ptwr_info[NR_CPUS] =
 
 #ifdef VERBOSE
 int ptwr_debug = 0x0;
-#define PTWR_PRINTK(x) if ( unlikely(ptwr_debug) ) printk x
+#define PTWR_PRINTK(_f, _a...) \
+ do { if ( unlikely(ptwr_debug) ) printk( _f , ## _a ); } while ( 0 )
 #define PTWR_PRINT_WHICH (which ? 'I' : 'A')
 #else
-#define PTWR_PRINTK(w, x)
+#define PTWR_PRINTK(_f, _a...) ((void)0)
 #endif
 
 void ptwr_flush(const int which)
@@ -1654,8 +1655,8 @@ void ptwr_flush(const int which)
         MEM_LOG("ptwr: Could not read pte at %p\n", ptep);
         domain_crash();
     }
-    PTWR_PRINTK(("[%c] disconnected_l1va at %p is %08lx\n",
-                 PTWR_PRINT_WHICH, ptep, pte));
+    PTWR_PRINTK("[%c] disconnected_l1va at %p is %08lx\n",
+                PTWR_PRINT_WHICH, ptep, pte);
     pte &= ~_PAGE_RW;
 
     if ( unlikely(current->mm.shadow_mode) ) {
@@ -1670,8 +1671,8 @@ void ptwr_flush(const int which)
         domain_crash();
     }
     __flush_tlb_one(l1va);
-    PTWR_PRINTK(("[%c] disconnected_l1va at %p now %08lx\n",
-                 PTWR_PRINT_WHICH, ptep, pte));
+    PTWR_PRINTK("[%c] disconnected_l1va at %p now %08lx\n",
+                PTWR_PRINT_WHICH, ptep, pte);
 
     pl1e = ptwr_info[cpu].ptinfo[which].pl1e;
     for ( i = 0; i < ENTRIES_PER_L1_PAGETABLE; i++ ) {
@@ -1736,8 +1737,8 @@ int ptwr_do_page_fault(unsigned long addr)
     int which;
 
 #if 0
-    PTWR_PRINTK(("get user %p for va %08lx\n",
-                 &linear_pg_table[addr>>PAGE_SHIFT], addr));
+    PTWR_PRINTK("get user %p for va %08lx\n",
+                &linear_pg_table[addr>>PAGE_SHIFT], addr);
 #endif
 
     /* Testing for page_present in the L2 avoids lots of unncessary fixups */
@@ -1751,8 +1752,8 @@ int ptwr_do_page_fault(unsigned long addr)
 
         pfn = pte >> PAGE_SHIFT;
 #if 0
-        PTWR_PRINTK(("check pte %08lx = pfn %08lx for va %08lx\n",
-                     pte, pfn, addr));
+        PTWR_PRINTK("check pte %08lx = pfn %08lx for va %08lx\n",
+                    pte, pfn, addr);
 #endif
         page = &frame_table[pfn];
         if ( (page->u.inuse.type_info & PGT_type_mask) == PGT_l1_page_table )
@@ -1768,9 +1769,9 @@ int ptwr_do_page_fault(unsigned long addr)
             which = (l2_pgentry_val(*pl2e) >> PAGE_SHIFT != pfn) ?
                 PTWR_PT_INACTIVE : PTWR_PT_ACTIVE;
 
-            PTWR_PRINTK(("[%c] page_fault on l1 pt at va %08lx, pt for %08x, "
-                         "pt for %08x, pfn %08lx\n", PTWR_PRINT_WHICH,
-                         addr, va_mask << L2_PAGETABLE_SHIFT, pfn));
+            PTWR_PRINTK("[%c] page_fault on l1 pt at va %08lx, pt for %08x, "
+                        "pt for %08x, pfn %08lx\n", PTWR_PRINT_WHICH,
+                        addr, va_mask << L2_PAGETABLE_SHIFT, pfn);
 
             if ( ptwr_info[cpu].ptinfo[which].l1va )
                 ptwr_flush(which);
@@ -1795,8 +1796,8 @@ int ptwr_do_page_fault(unsigned long addr)
 
             /* make pt page writable */
             pte |= _PAGE_RW;
-            PTWR_PRINTK(("[%c] update %p pte to %08lx\n", PTWR_PRINT_WHICH,
-                         &linear_pg_table[addr>>PAGE_SHIFT], pte));
+            PTWR_PRINTK("[%c] update %p pte to %08lx\n", PTWR_PRINT_WHICH,
+                        &linear_pg_table[addr>>PAGE_SHIFT], pte);
             if ( unlikely(__put_user(pte, (unsigned long *)
                                      &linear_pg_table[addr>>PAGE_SHIFT])) ) {
                 MEM_LOG("ptwr: Could not update pte at %p\n", (unsigned long *)
