@@ -355,8 +355,7 @@ static struct irqaction misdirect_action = {
 
 void irq_suspend(void)
 {
-    evtchn_op_t op;
-    int         virq, irq, evtchn;
+    int virq, irq, evtchn;
 
     /* Unbind VIRQs from event channels. */
     for ( virq = 0; virq < NR_VIRQS; virq++ )
@@ -364,13 +363,6 @@ void irq_suspend(void)
         if ( (irq = virq_to_irq[virq]) == -1 )
             continue;
         evtchn = irq_to_evtchn[irq];
-
-        /* Inform Xen that we are unbinding. */
-        op.cmd          = EVTCHNOP_close;
-        op.u.close.dom  = DOMID_SELF;
-        op.u.close.port = evtchn;
-        if ( HYPERVISOR_event_channel_op(&op) != 0 )
-            panic("Failed to unbind virtual IRQ %d\n", virq);
 
         /* Mark the event channel as unused in our table. */
         evtchn_to_irq[evtchn] = -1;
