@@ -77,6 +77,13 @@ enum pdb_bwcpoint_type
   PDB_WP_ACCESS   = 4
 };
 
+enum pdb_bwcpoint_action
+{
+  PDB_BWC_UNKNOWN = 0,                                            /* default */
+  PDB_BWC_STOP,         /* stop execution and return control to the debugger */
+  PDB_BWC_DELETE                                    /* delete the breakpoint */
+};
+
 typedef struct pdb_bwcpoint
 {
   struct list_head list;
@@ -84,10 +91,11 @@ typedef struct pdb_bwcpoint
   int length;
   enum pdb_bwcpoint_type type;                            /* how implemented */
   enum pdb_bwcpoint_type user_type;                    /* what was requested */
+  enum pdb_bwcpoint_action action;                         /* action to take */
   pdb_context_t context;
 
-  /* original value for breakpoint, one byte for x86 */
-  unsigned char original;
+  unsigned char original; /* original value for breakpoint, one byte for x86 */
+  char *comments;                                                /* comments */
 } pdb_bwcpoint_t, *pdb_bwcpoint_p;
 
 void pdb_bwc_list_add (pdb_bwcpoint_p bwc);
@@ -95,8 +103,7 @@ void pdb_bwc_list_remove (pdb_bwcpoint_p bwc);
 pdb_bwcpoint_p pdb_bwcpoint_search (unsigned long cr3, unsigned long address);
 
 int pdb_set_breakpoint (pdb_bwcpoint_p bwc);
-int pdb_clear_breakpoint (unsigned long address, int length, 
-			  pdb_context_p ctx);
+int pdb_clear_breakpoint (unsigned long address, pdb_context_p ctx);
 
 
 /* Conversions. */

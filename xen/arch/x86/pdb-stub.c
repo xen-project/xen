@@ -69,7 +69,8 @@ enum pdb_visit_page_action
   PDB_VISIT_PAGE_PROCESS_WRITE,
 };
 static char *pdb_visit_page_action_s[] =
-  { "xen rd", "xen wr", "dom rd", "dom wr", "proc rd", "proc wr" };
+  { "xen read", "xen write", "domain read", "domain write", 
+    "process read", "process write" };
 
 int pdb_visit_page (int action, unsigned long addr, int length,
                     pdb_context_p ctx, int offset, void *s);
@@ -136,7 +137,7 @@ typedef struct pdb_invoke_args
  */
 
 int
-pdb_invoke(pdb_invoke_ftype *function, pdb_invoke_args_p args)
+pdb_invoke (pdb_invoke_ftype *function, pdb_invoke_args_p args)
 {
   int remaining;
   int bytes = 0;
@@ -164,6 +165,9 @@ pdb_invoke(pdb_invoke_ftype *function, pdb_invoke_args_p args)
 char *pdb_bwcpoint_type_s[] =                      /* enum pdb_bwcpoint_type */
   { "BP_SOFTWARE", "BP_HARDWARE", "WP_WRITE", "WP_READ", "WP_ACCESS" };
 
+char *pdb_bwcpoint_action_s[] =                  /* enum pdb_bwcpoint_action */
+  { "UNKNOWN", "STOP", "DELETE" };
+
 int pdb_set_watchpoint (pdb_bwcpoint_p bwc); 
 int pdb_clear_watchpoint (pdb_bwcpoint_p bwc);
 
@@ -172,62 +176,68 @@ struct list_head pdb_bwc_list = LIST_HEAD_INIT(pdb_bwc_list);
 void
 pdb_bwc_list_add (pdb_bwcpoint_p bwc)
 {
-  list_add_tail(&bwc->list, &pdb_bwc_list);
+    list_add_tail(&bwc->list, &pdb_bwc_list);
 }
 
 void
 pdb_bwc_list_remove (pdb_bwcpoint_p bwc)
 {
-  list_del(&bwc->list);
+    list_del(&bwc->list);
 }
 
 pdb_bwcpoint_p
 pdb_bwc_list_search (unsigned long address, int length, pdb_context_p ctx)
 {
-  struct list_head *ptr;
+    struct list_head *ptr;
 
-  list_for_each (ptr, &pdb_bwc_list)
-  {
-    pdb_bwcpoint_p bwc = list_entry(ptr, pdb_bwcpoint_t, list);
-
-    if (bwc->address == address &&
-        bwc->length  == length)
+    list_for_each(ptr, &pdb_bwc_list)
     {
-      return bwc;
+        pdb_bwcpoint_p bwc = list_entry(ptr, pdb_bwcpoint_t, list);
+
+	if (bwc->address == address &&
+	    bwc->length  == length)
+	{
+	    return bwc;
+	}
     }
-  }
-  return (pdb_bwcpoint_p) 0;
+    return (pdb_bwcpoint_p) 0;
 }
 
 pdb_bwcpoint_p
 pdb_bwcpoint_search (unsigned long cr3, unsigned long address)
 {
-  pdb_context_t ctx;
+    pdb_context_t ctx;
 
-  ctx.ptbr = cr3;
-  return pdb_bwc_list_search (address, pdb_x86_bkpt_length, &ctx);
+    ctx.ptbr = cr3;
+    return pdb_bwc_list_search(address, pdb_x86_bkpt_length, &ctx);
 }
 
 void
 pdb_bwc_print (pdb_bwcpoint_p bwc)
 {
-    printk ("address: 0x%08lx, length: 0x%02x, type: 0x%x %s", 
+    printk ("addr:0x%08lx, len:0x%02x, type:0x%x %s, action:0x%x %s [%s]",
 	    bwc->address, bwc->length,
-	    bwc->type, pdb_bwcpoint_type_s[bwc->type]);
+	    bwc->type, pdb_bwcpoint_type_s[bwc->type],
+	    bwc->action, pdb_bwcpoint_action_s[bwc->action], bwc->comments);
 }
 
 void
 pdb_bwc_print_list ()
 {
-  struct list_head *ptr;
-  int counter = 0;
+    struct list_head *ptr;
+    int counter = 0;
 
-  list_for_each (ptr, &pdb_bwc_list)
-  {
-    pdb_bwcpoint_p bwc = list_entry(ptr, pdb_bwcpoint_t, list);
-    printk ("  [%02d]  ", counter);   pdb_bwc_print(bwc);   printk ("\n");
-    counter++;
-  }
+    list_for_each (ptr, &pdb_bwc_list)
+    {
+        pdb_bwcpoint_p bwc = list_entry(ptr, pdb_bwcpoint_t, list);
+	printk ("  [%02d]  ", counter);   pdb_bwc_print(bwc);   printk ("\n");
+	counter++;
+    }
+    
+    if (counter == 0)
+    {
+        printk ("  empty list\n");
+    }
 }
 
 /***********************************************************************/
@@ -312,35 +322,33 @@ pdb_process_z (int onoff, char *ptr)
 	{
 	    if (onoff == 1)
 	    {
-	        pdb_bwcpoint_p bwc = (pdb_bwcpoint_p) xmalloc(sizeof(pdb_bwcpoint_t));
+	        pdb_bwcpoint_p bwc;
+
+		bwc = (pdb_bwcpoint_p) xmalloc(sizeof(pdb_bwcpoint_t));
+		if (!bwc)
+		{
+		    printk ("pdb error: can't allocate bwc %d\n", __LINE__);
+		    break;
+		}
 
 		bwc->address = addr;
 		bwc->length = pdb_x86_bkpt_length;
 		bwc->type = PDB_BP_SOFTWARE;
 		bwc->user_type = type;
-		memcpy (&bwc->context, &pdb_ctx, sizeof(pdb_context_t));
+		bwc->action = PDB_BWC_STOP;
+		bwc->comments = "gdb breakpoint";
+		memcpy(&bwc->context, &pdb_ctx, sizeof(pdb_context_t));
 
 		if (length != pdb_x86_bkpt_length)
 		{
 		    printk("pdb warning: x86 bkpt length should be 1\n");
 		}
 
-		pdb_set_breakpoint (bwc);
+		pdb_set_breakpoint(bwc);
 	    }
 	    else
 	    {
-	        pdb_clear_breakpoint (addr, pdb_x86_bkpt_length, &pdb_ctx);
-	        pdb_bwcpoint_p bwc = pdb_bwc_list_search (addr, 1, &pdb_ctx);
-
-		if (bwc == 0)
-		{
-		    error = "E03";                   /* breakpoint not found */
-		    break;
-		}
-
-		pdb_write_memory (addr, 1, &bwc->original, &pdb_ctx);
-
-		pdb_bwc_list_remove (bwc);
+	        pdb_clear_breakpoint(addr, &pdb_ctx);
 	    }
 	    break;
 	}
@@ -350,12 +358,21 @@ pdb_process_z (int onoff, char *ptr)
 	{
 	    if (onoff == 1)
 	    {
-	        pdb_bwcpoint_p bwc = (pdb_bwcpoint_p) xmalloc(sizeof(pdb_bwcpoint_t));
+	        pdb_bwcpoint_p bwc;
+
+		bwc = (pdb_bwcpoint_p) xmalloc(sizeof(pdb_bwcpoint_t));
+		if (!bwc)
+		{
+		    printk ("pdb error: can't allocate bwc %d\n", __LINE__);
+		    break;
+		}
 
 		bwc->address = addr;
 		bwc->length = length;
 		bwc->type = type;
 		bwc->user_type = type;
+		bwc->action = PDB_BWC_UNKNOWN;
+		bwc->comments = "gdb writepoint";
 		memcpy (&bwc->context, &pdb_ctx, sizeof(pdb_context_t));
 
 		pdb_set_watchpoint (bwc);
@@ -373,8 +390,8 @@ pdb_process_z (int onoff, char *ptr)
 		}
 
 		pdb_clear_watchpoint (bwc);
-
 		pdb_bwc_list_remove (bwc);
+		xfree (bwc);
 	    }
 	    break;
 	}
@@ -724,20 +741,20 @@ pdb_process_command (char *ptr, struct pt_regs *regs, unsigned long cr3,
     case 'm':
     {
         /* TRY TO READ %x,%x.  IF SUCCEED, SET PTR = 0 */
-        if (hexToInt (&ptr, (int *)&addr))
-            if (*(ptr++) == ',')
-                if (hexToInt (&ptr, &length))
-                {
-                    ptr = 0;
+        if (   hexToInt (&ptr, (int *)&addr)
+	    && *(ptr++) == ','
+	    && hexToInt (&ptr, &length))
+	{
+	    ptr = 0;
 
-		    pdb_page_fault_possible = 2;
-		    pdb_page_fault = 0;
+	    pdb_page_fault_possible = 2;
+	    pdb_page_fault = 0;
 
 	    {
 	        u_char *buffer = (u_char *) xmalloc (length);
 		if (!buffer)
 		{
-		    printk ("pdb error: xmalloc failure\n");
+		    printk ("pdb error: xmalloc failure %d\n", __LINE__);
 		    break;
 		}
 		pdb_read_memory (addr, length, buffer, &pdb_ctx);
@@ -745,12 +762,12 @@ pdb_process_command (char *ptr, struct pt_regs *regs, unsigned long cr3,
 		xfree(buffer);
 	    }
 
-		    pdb_page_fault_possible = 0;
-		    if (pdb_page_fault)
-		    {
-                        strcpy (pdb_out_buffer, "E03");
-		    }
-                }
+	    pdb_page_fault_possible = 0;
+	    if (pdb_page_fault)
+	    {
+	        strcpy (pdb_out_buffer, "E03");
+	    }
+	}
 	    
         if (ptr)
         {
@@ -775,7 +792,7 @@ pdb_process_command (char *ptr, struct pt_regs *regs, unsigned long cr3,
 	        u_char *buffer = (u_char *) xmalloc (length);
 		if (!buffer)
 		{
-		    printk ("pdb error: xmalloc failure\n");
+		    printk ("pdb error: xmalloc failure %d\n", __LINE__);
 		    break;
 		}
 	        hex2mem (ptr, buffer, length);
@@ -1268,8 +1285,10 @@ exit2:
 int
 pdb_set_breakpoint (pdb_bwcpoint_p bwc)
 {
-    pdb_read_memory (bwc->address, 1, &bwc->original, &bwc->context);
-    pdb_write_memory (bwc->address, 1, &pdb_x86_bkpt, &bwc->context);
+    pdb_read_memory (bwc->address, pdb_x86_bkpt_length, 
+		     &bwc->original, &bwc->context);
+    pdb_write_memory (bwc->address, pdb_x86_bkpt_length, 
+		      &pdb_x86_bkpt, &bwc->context);
 
     pdb_bwc_list_add (bwc);
 
@@ -1277,21 +1296,22 @@ pdb_set_breakpoint (pdb_bwcpoint_p bwc)
 }
 
 int
-pdb_clear_breakpoint (unsigned long address, int length, pdb_context_p ctx)
+pdb_clear_breakpoint (unsigned long address, pdb_context_p ctx)
 {
-    int error = 0;
-    pdb_bwcpoint_p bwc = pdb_bwc_list_search (address, 1, &pdb_ctx);
+    pdb_bwcpoint_p bwc = pdb_bwc_list_search(address, pdb_x86_bkpt_length,
+					     ctx);
 
     if (bwc == 0)
     {
-      error = 3;                                     /* breakpoint not found */
+        printk("pdb error: unknown breakpoint 0x%lx\n", address);
+	return 0;
     }
 
-    pdb_write_memory (address, 1, &bwc->original, &pdb_ctx);
-    
+    pdb_write_memory (address, pdb_x86_bkpt_length, &bwc->original, ctx);
     pdb_bwc_list_remove (bwc);
+    xfree (bwc);
 
-    return error;
+    return 0;
 }
 
 /***********************************************************************/
@@ -1537,8 +1557,8 @@ PDBTRC(4,printk("    system_call: 0x%x\n", pdb_system_call));
 	 (exceptionVector != KEYPRESS_EXCEPTION) &&
 	 xen_regs->eip < 0xc0000000)  /* Linux-specific for now! */
     {
-        PDBTRC(1,printk("pdb: user bkpt (0x%x) at 0x%lx:0x%lx\n", 
-		     exceptionVector, cr3, xen_regs->eip));
+        PDBTRC(1, printk("pdb: user bkpt (0x%x) at 0x%lx:0x%lx\n", 
+			 exceptionVector, cr3, xen_regs->eip));
 	return 1;
     }
 
@@ -1572,25 +1592,19 @@ PDBTRC(4,printk("    system_call: 0x%x\n", pdb_system_call));
     /* returning to user space after a system call */
     if ( xen_regs->eip == pdb_system_call_next_addr + 1)
     {
-	 printk("BUG ******** \n");
-         printk("BUG return to user space bug\n");
-	 printk("BUG ******** \n");
-
-        /*
-	 * BUG: remember to delete the breakpoint!!!
-	 *       
-	 */
-
         /* this is always in a process context */
+	 /*
         pdb_write_memory (pdb_system_call_next_addr,
 			  sizeof(pdb_system_call_leave_instr),
 			  &pdb_system_call_leave_instr, &pdb_ctx);
+	 */
+        printk ("RETURNING TO USER SPACE AFTER SYSTEM CALL\n");
+	pdb_bwc_print_list();
+        pdb_clear_breakpoint(pdb_system_call_next_addr, &pdb_ctx);
+	pdb_bwc_print_list();
  
 	pdb_system_call_next_addr = 0;
 	pdb_system_call_leave_instr = 0;
-
-	/* manually rewind eip */
-	xen_regs->eip--;
 
 	/* if the user doesn't care about breaking when returning 
 	   to user space after a system call then we'll just ignore 
