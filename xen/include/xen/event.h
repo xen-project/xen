@@ -57,7 +57,7 @@ static inline void evtchn_set_pending(struct exec_domain *ed, int port)
  */
 static inline void send_guest_virq(struct exec_domain *ed, int virq)
 {
-    evtchn_set_pending(ed, ed->domain->virq_to_evtchn[virq]);
+    evtchn_set_pending(ed, ed->virq_to_evtchn[virq]);
 }
 
 /*

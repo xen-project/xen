@@ -98,6 +98,8 @@ struct exec_domain
 
     unsigned long ed_flags;
 
+    u16 virq_to_evtchn[NR_VIRQS];
+
     atomic_t pausecnt;
 
 };
@@ -136,7 +138,6 @@ struct domain {
      */
 #define NR_PIRQS 128 /* Put this somewhere sane! */
     u16 pirq_to_evtchn[NR_PIRQS];
-    u16 virq_to_evtchn[NR_VIRQS];
     u32 pirq_mask[NR_PIRQS/32];
 
     /* Physical I/O */

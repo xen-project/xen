@@ -239,10 +239,11 @@ static long evtchn_bind_interdomain(evtchn_bind_interdomain_t *bind)
 
 static long evtchn_bind_virq(evtchn_bind_virq_t *bind)
 {
-    struct domain *d = current->domain;
+    struct exec_domain *ed = current;
+    struct domain *d = ed->domain;
     int            port, virq = bind->virq;
 
-    if ( virq >= ARRAY_SIZE(d->virq_to_evtchn) )
+    if ( virq >= ARRAY_SIZE(ed->virq_to_evtchn) )
         return -EINVAL;
 
     spin_lock(&d->event_channel_lock);
@@ -252,7 +253,7 @@ static long evtchn_bind_virq(evtchn_bind_virq_t *bind)
      * bound yet. The exception is the 'misdirect VIRQ', which is permanently 
      * bound to port 0.
      */
-    if ( ((port = d->virq_to_evtchn[virq]) != 0) ||
+    if ( ((port = ed->virq_to_evtchn[virq]) != 0) ||
          (virq == VIRQ_MISDIRECT) ||
          ((port = get_free_port(d)) < 0) )
         goto out;
@@ -260,7 +261,7 @@ static long evtchn_bind_virq(evtchn_bind_virq_t *bind)
     d->event_channel[port].state  = ECS_VIRQ;
     d->event_channel[port].u.virq = virq;
 
-    d->virq_to_evtchn[virq] = port;
+    ed->virq_to_evtchn[virq] = port;
 
  out:
     spin_unlock(&d->event_channel_lock);
@@ -313,6 +314,7 @@ static long evtchn_bind_pirq(evtchn_bind_pirq_t *bind)
 static long __evtchn_close(struct domain *d1, int port1)
 {
     struct domain   *d2 = NULL;
+    struct exec_domain *ed;
     event_channel_t *chn1, *chn2;
     int              port2;
     long             rc = 0;
@@ -344,7 +346,10 @@ static long __evtchn_close(struct domain *d1, int port1)
         break;
 
     case ECS_VIRQ:
-        d1->virq_to_evtchn[chn1[port1].u.virq] = 0;
+        /* XXX could store exec_domain in chn1[port1].u */
+        for_each_exec_domain(d1, ed)
+            if (ed->virq_to_evtchn[chn1[port1].u.virq] == port1)
+                ed->virq_to_evtchn[chn1[port1].u.virq] = 0;
         break;
 
     case ECS_INTERDOMAIN:
