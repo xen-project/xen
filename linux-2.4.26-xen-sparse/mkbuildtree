@@ -213,7 +213,6 @@ ln -sf ../../${LINUX_26}/include/asm-xen/xen_proc.h
 cd ${AD}/arch/xen/kernel
 ln -sf ../../i386/kernel/i387.c
 ln -sf ../../i386/kernel/init_task.c
-ln -sf ../../i386/kernel/pci-dma.c
 ln -sf ../../i386/kernel/pci-i386.c
 ln -sf ../../i386/kernel/pci-i386.h
 ln -sf ../../i386/kernel/ptrace.c
