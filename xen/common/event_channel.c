@@ -256,11 +256,9 @@ static long evtchn_bind_virq(evtchn_bind_virq_t *bind)
 
     /*
      * Port 0 is the fallback port for VIRQs that haven't been explicitly
-     * bound yet. The exception is the 'misdirect VIRQ', which is permanently 
-     * bound to port 0.
+     * bound yet.
      */
     if ( ((port = ed->virq_to_evtchn[virq]) != 0) ||
-         (virq == VIRQ_MISDIRECT) ||
          ((port = get_free_port(ed)) < 0) )
         goto out;
 
@@ -353,8 +351,7 @@ static long __evtchn_close(struct domain *d1, int port1)
 
     chn1 = d1->event_channel;
 
-    /* NB. Port 0 is special (VIRQ_MISDIRECT). Never let it be closed. */
-    if ( (port1 <= 0) || (port1 >= d1->max_event_channel) )
+    if ( (port1 < 0) || (port1 >= d1->max_event_channel) )
     {
         rc = -EINVAL;
         goto out;
@@ -363,6 +360,7 @@ static long __evtchn_close(struct domain *d1, int port1)
     switch ( chn1[port1].state )
     {
     case ECS_FREE:
+    case ECS_RESERVED:
         rc = -EINVAL;
         goto out;
 
@@ -541,6 +539,7 @@ static long evtchn_status(evtchn_status_t *status)
     switch ( chn[port].state )
     {
     case ECS_FREE:
+    case ECS_RESERVED:
         status->status = EVTCHNSTAT_closed;
         break;
     case ECS_UNBOUND:
@@ -645,8 +644,7 @@ int init_event_channels(struct domain *d)
     /* Call get_free_port to initialize d->event_channel */
     if ( get_free_port(d->exec_domain[0]) != 0 )
         return -EINVAL;
-    d->event_channel[0].state  = ECS_VIRQ;
-    d->event_channel[0].u.virq = VIRQ_MISDIRECT;
+    d->event_channel[0].state = ECS_RESERVED;
     return 0;
 }
 
