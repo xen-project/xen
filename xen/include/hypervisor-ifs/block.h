@@ -34,37 +34,42 @@
  */
 
 /* the first four definitions match fs.h */
-#define XEN_BLOCK_READ  0
-#define XEN_BLOCK_WRITE 1
-#define XEN_BLOCK_READA 2                                /* currently unused */
-#define XEN_BLOCK_SPECIAL 4                              /* currently unused */
-#define XEN_BLOCK_PROBE_BLK  8             /* get xhd config from hypervisor */
-#define XEN_BLOCK_DEBUG      16                                     /* debug */
-#define XEN_BLOCK_SEG_CREATE 32                      /* create segment (vhd) */
-#define XEN_BLOCK_SEG_DELETE 64                      /* delete segment (vhd) */
-#define XEN_BLOCK_PROBE_SEG  128           /* get vhd config from hypervisor */
+#define XEN_BLOCK_READ         0
+#define XEN_BLOCK_WRITE        1
+#define XEN_BLOCK_READA        2
+#define XEN_BLOCK_SPECIAL      4
+#define XEN_BLOCK_PROBE_BLK    5  /* get xhd config from hypervisor */
+#define XEN_BLOCK_DEBUG        6  /* debug */
+#define XEN_BLOCK_SEG_CREATE   7  /* create segment (vhd) */
+#define XEN_BLOCK_SEG_DELETE   8  /* delete segment (vhd) */
+#define XEN_BLOCK_PROBE_SEG    9  /* get vhd config from hypervisor */
 
-#define BLK_RING_SIZE        128
-#define BLK_RING_MAX_ENTRIES (BLK_RING_SIZE - 2)
+/* NB. Ring size must be small enough for sizeof(blk_ring_t) <= PAGE_SIZE. */
+#define BLK_RING_SIZE        64
 #define BLK_RING_INC(_i)     (((_i)+1) & (BLK_RING_SIZE-1))
-#define BLK_RING_ADD(_i,_j)  (((_i)+(_j)) & (BLK_RING_SIZE-1))
+
+/*
+ * Maximum scatter/gather segments per request.
+ * This is carefully chosen so that sizeof(blk_ring_t) <= PAGE_SIZE.
+ */
+#define MAX_BLK_SEGS 12
 
 typedef struct blk_ring_req_entry 
 {
-    void *          id;                /* for guest os use */
-    int             operation;         /* from above */
-    char *          buffer;
-    unsigned long   block_number;      /* block number */
-    unsigned short  block_size;        /* block size */
-    unsigned short  device;
-    unsigned long   sector_number;     /* real buffer location on disk */
+    unsigned long  id;                     /* private guest os value       */
+    unsigned long  sector_number;          /* start sector idx on disk     */
+    unsigned short device;                 /* XENDEV_??? + idx             */
+    unsigned char  operation;              /* XEN_BLOCK_???                */
+    unsigned char  nr_segments;            /* number of segments           */
+    /* Least 9 bits is 'nr_sects'. High 23 bits are the address.           */
+    unsigned long  buffer_and_sects[MAX_BLK_SEGS];
 } blk_ring_req_entry_t;
 
 typedef struct blk_ring_resp_entry
 {
-    void *          id;                                  /* for guest os use */
-    int             operation;                                 /* from above */
-    unsigned long   status;
+    unsigned long   id;                   /* copied from request          */
+    unsigned short  operation;            /* copied from request          */
+    unsigned long   status;               /* cuurently boolean good/bad   */
 } blk_ring_resp_entry_t;
 
 typedef struct blk_ring_st 

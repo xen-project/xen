@@ -78,7 +78,8 @@ struct task_struct {
 
     /* Block I/O */
     blk_ring_t *blk_ring_base;
-    unsigned int blk_req_cons; /* request consumer */
+    unsigned int blk_req_cons;  /* request consumer */
+    unsigned int blk_resp_prod; /* (private version of) response producer */
     struct list_head blkdev_list;
     spinlock_t blk_ring_lock;
     segment_t *segment_list[XEN_MAX_SEGMENTS];                        /* vhd */
@@ -89,6 +90,8 @@ struct task_struct {
     struct list_head run_list;
     
     struct mm_struct mm;
+    /* We need this lock to check page types and frob reference counts. */
+    spinlock_t page_lock;
 
     mm_segment_t addr_limit;        /* thread address space:
                                        0-0xBFFFFFFF for user-thead

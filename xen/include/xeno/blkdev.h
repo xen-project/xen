@@ -15,6 +15,15 @@
 #define BLOCK_SIZE_BITS 10
 #define BLOCK_SIZE (1<<BLOCK_SIZE_BITS)
 
+typedef struct {
+    struct task_struct *domain;
+    unsigned long       id;
+    atomic_t            pendcnt;
+    unsigned short      operation;
+} pending_req_t;
+
+extern kdev_t xendev_to_physdev(unsigned short xendev);
+
 extern void init_blkdev_info(struct task_struct *);
 extern void destroy_blkdev_info(struct task_struct *);
 
@@ -61,27 +70,17 @@ enum bh_state_bits {
 };
 
 struct buffer_head {
-        unsigned long b_blocknr;        /* block number */
-        unsigned short b_size;          /* block size */
-        unsigned short b_list;          /* List that this buffer appears */
-        kdev_t b_dev;                   /* device (B_FREE = free) */
-
-        atomic_t b_count;               /* users using this block */
-        kdev_t b_rdev;                  /* Real device */
-        unsigned long b_state;          /* buffer state bitmap (see above) */
-
-        struct buffer_head *b_reqnext;  /* request queue */
-
-        char * b_data;                  /* pointer to data block */
-        struct pfn_info *b_page;            /* the page this bh is mapped to */
-        void (*b_end_io)(struct buffer_head *bh, int uptodate);
-
         unsigned long b_rsector;        /* Real buffer location on disk */
-
-        /* Both used by b_end_io function in xen_block.c */
-        void *b_xen_domain;
-        void *b_xen_id;
+        unsigned short b_size;          /* block size */
+        kdev_t b_dev;                   /* device (B_FREE = free) */
+        unsigned long b_state;          /* buffer state bitmap (see above) */
+        struct buffer_head *b_reqnext;  /* request queue */
+        char *b_data;                  /* pointer to data block */
+        void (*b_end_io)(struct buffer_head *bh, int uptodate);
+        pending_req_t *pending_req;
 };
+
+#define b_rdev b_dev /* In Xen, there's no device layering (eg. s/w RAID). */
 
 typedef void (bh_end_io_t)(struct buffer_head *bh, int uptodate);
 void init_buffer(struct buffer_head *, bh_end_io_t *, void *);
@@ -100,8 +99,6 @@ void init_buffer(struct buffer_head *, bh_end_io_t *, void *);
 #define bh_offset(bh)           ((unsigned long)(bh)->b_data & ~PAGE_MASK)
 
 extern void set_bh_page(struct buffer_head *bh, struct pfn_info *page, unsigned long offset);
-
-#define touch_buffer(bh)        mark_page_accessed(bh->b_page)
 
 #define atomic_set_buffer_clean(bh) test_and_clear_bit(BH_Dirty, &(bh)->b_state)
 
@@ -260,8 +257,6 @@ struct request_queue
 	wait_queue_head_t	wait_for_requests[2];
 #endif
 };
-
-#define bh_phys(bh)            (page_to_phys((bh)->b_page) + bh_offset((bh)))
 
 struct blk_dev_struct {
 	/*

@@ -1224,7 +1224,7 @@ void ll_rw_block(int rw, int nr, struct buffer_head * bhs[])
 			continue;
 
 		/* We have the buffer lock */
-		atomic_inc(&bh->b_count);
+		/*atomic_inc(&bh->b_count);*/
 
 		switch(rw) {
 		case WRITE:

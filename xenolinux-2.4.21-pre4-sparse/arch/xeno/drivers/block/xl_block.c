@@ -19,10 +19,11 @@ typedef unsigned char byte; /* from linux/ide.h */
 
 static blk_ring_t *blk_ring;
 static unsigned int resp_cons; /* Response consumer for comms ring. */
+static unsigned int req_prod;  /* Private request producer.         */
 static xen_disk_info_t xlblk_disk_info;
 static int xlblk_control_msg_pending;
 
-#define RING_FULL (BLK_RING_INC(blk_ring->req_prod) == resp_cons)
+#define RING_FULL (BLK_RING_INC(req_prod) == resp_cons)
 
 /*
  * Request queues with outstanding work, but ring is currently full.
@@ -32,6 +33,18 @@ static int xlblk_control_msg_pending;
 #define MAX_PENDING 8
 static request_queue_t *pending_queues[MAX_PENDING];
 static int nr_pending;
+
+static kdev_t        sg_dev;
+static int           sg_operation = -1;
+static unsigned long sg_next_sect;
+#define DISABLE_SCATTERGATHER() (sg_operation = -1)
+
+static inline void signal_requests_to_xen(void)
+{
+    DISABLE_SCATTERGATHER();
+    blk_ring->req_prod = req_prod;
+    HYPERVISOR_block_io_op();
+}
 
 /* Convert from a XenoLinux major device to the Xen-level 'physical' device */
 static inline unsigned short xldev_to_physdev(kdev_t xldev) 
@@ -253,31 +266,22 @@ int xenolinux_block_revalidate(kdev_t dev)
  * operation: XEN_BLOCK_{READ,WRITE,PROBE*,SEG*}
  * buffer: buffer to read/write into. this should be a
  *   virtual address in the guest os.
- * block_number:  block to read
- * block_size:  size of each block
- * device:  xhd*, ksd*, xvd*, ...
  */
-static int hypervisor_request(void *          id,
+static int hypervisor_request(unsigned long   id,
                               int             operation,
                               char *          buffer,
-                              unsigned long   block_number,
-                              unsigned short  block_size,
+                              unsigned long   sector_number,
+                              unsigned short  nr_sectors,
                               kdev_t          device)
 {
-    int position;
-    void *buffer_ma; 
+    unsigned long buffer_ma = phys_to_machine(virt_to_phys(buffer)); 
     kdev_t phys_device = (kdev_t) 0;
-    unsigned long sector_number = 0;
     struct gendisk *gd;
- 
-    /*
-     * Bail if there's no room in the request communication ring. This may be 
-     * because we have a whole bunch of outstanding responses to process. No 
-     * matter, as the response handler will kick the request queue.
-     */
-    if ( RING_FULL ) return 1;
+    blk_ring_req_entry_t *req;
+    struct buffer_head *bh;
 
-    buffer_ma = (void *)phys_to_machine(virt_to_phys(buffer)); 
+    if ( nr_sectors >= (1<<9) ) BUG();
+    if ( (buffer_ma & ((1<<9)-1)) != 0 ) BUG();
 
     switch ( operation )
     {
@@ -285,17 +289,42 @@ static int hypervisor_request(void *          id,
     case XEN_BLOCK_SEG_DELETE:
     case XEN_BLOCK_PROBE_BLK:
     case XEN_BLOCK_PROBE_SEG:
+        if ( RING_FULL ) return 1;
 	phys_device = (kdev_t) 0;
 	sector_number = 0;
+        DISABLE_SCATTERGATHER();
         break;
 
     case XEN_BLOCK_READ:
     case XEN_BLOCK_WRITE:
         phys_device = xldev_to_physdev(device);
-	/* Compute real buffer location on disk */
-	sector_number = block_number;
 	gd = xldev_to_gendisk(device); 
 	sector_number += gd->part[MINOR(device)].start_sect;
+        if ( (sg_operation == operation) &&
+             (sg_dev == phys_device) &&
+             (sg_next_sect == sector_number) )
+        {
+            req = &blk_ring->ring[(req_prod-1)&(BLK_RING_SIZE-1)].req;
+            bh = (struct buffer_head *)id;
+            bh->b_reqnext = (struct buffer_head *)req->id;
+            req->id = id;
+            req->buffer_and_sects[req->nr_segments] = buffer_ma | nr_sectors;
+            if ( ++req->nr_segments < MAX_BLK_SEGS )
+                sg_next_sect += nr_sectors;
+            else
+                DISABLE_SCATTERGATHER();
+            return 0;
+        }
+        else if ( RING_FULL )
+        {
+            return 1;
+        }
+        else
+        {
+            sg_operation = operation;
+            sg_dev       = phys_device;
+            sg_next_sect = sector_number + nr_sectors;
+        }
         break;
 
     default:
@@ -303,16 +332,14 @@ static int hypervisor_request(void *          id,
     }
 
     /* Fill out a communications ring structure. */
-    position = blk_ring->req_prod;
-    blk_ring->ring[position].req.id            = id;
-    blk_ring->ring[position].req.operation     = operation;
-    blk_ring->ring[position].req.buffer        = buffer_ma;
-    blk_ring->ring[position].req.block_number  = block_number;
-    blk_ring->ring[position].req.block_size    = block_size;
-    blk_ring->ring[position].req.device        = phys_device;
-    blk_ring->ring[position].req.sector_number = sector_number;
-
-    blk_ring->req_prod = BLK_RING_INC(position);
+    req = &blk_ring->ring[req_prod].req;
+    req->id            = id;
+    req->operation     = operation;
+    req->sector_number = sector_number;
+    req->device        = phys_device;
+    req->nr_segments   = 1;
+    req->buffer_and_sects[0] = buffer_ma | nr_sectors;
+    req_prod = BLK_RING_INC(req_prod);
 
     return 0;
 }
@@ -325,7 +352,7 @@ static int hypervisor_request(void *          id,
 void do_xlblk_request(request_queue_t *rq)
 {
     struct request *req;
-    struct buffer_head *bh;
+    struct buffer_head *bh, *next_bh;
     int rw, nsect, full, queued = 0;
     
     DPRINTK("xlblk.c::do_xlblk_request for '%s'\n", DEVICE_NAME); 
@@ -349,12 +376,17 @@ void do_xlblk_request(request_queue_t *rq)
         bh = req->bh;
         while ( bh != NULL )
 	{
+            next_bh = bh->b_reqnext;
+            bh->b_reqnext = NULL;
+
             full = hypervisor_request(
-                bh, (rw == READ) ? XEN_BLOCK_READ : XEN_BLOCK_WRITE, 
-                bh->b_data, bh->b_rsector, bh->b_size, bh->b_dev);
+                (unsigned long)bh,
+                (rw == READ) ? XEN_BLOCK_READ : XEN_BLOCK_WRITE, 
+                bh->b_data, bh->b_rsector, bh->b_size>>9, bh->b_rdev);
 
             if ( full )
             {
+                bh->b_reqnext = next_bh;
                 pending_queues[nr_pending++] = rq;
                 if ( nr_pending >= MAX_PENDING ) BUG();
                 goto out;
@@ -364,9 +396,7 @@ void do_xlblk_request(request_queue_t *rq)
 
             /* Dequeue the buffer head from the request. */
             nsect = bh->b_size >> 9;
-            req->bh = bh->b_reqnext;
-            bh->b_reqnext = NULL;
-            bh = req->bh;
+            bh = req->bh = next_bh;
             
             if ( bh != NULL )
             {
@@ -389,7 +419,7 @@ void do_xlblk_request(request_queue_t *rq)
     }
 
  out:
-    if ( queued != 0 ) HYPERVISOR_block_io_op();
+    if ( queued != 0 ) signal_requests_to_xen();
 }
 
 
@@ -397,7 +427,7 @@ static void xlblk_response_int(int irq, void *dev_id, struct pt_regs *ptregs)
 {
     int i; 
     unsigned long flags; 
-    struct buffer_head *bh;
+    struct buffer_head *bh, *next_bh;
     
     spin_lock_irqsave(&io_request_lock, flags);	    
 
@@ -410,7 +440,14 @@ static void xlblk_response_int(int irq, void *dev_id, struct pt_regs *ptregs)
 	{
         case XEN_BLOCK_READ:
         case XEN_BLOCK_WRITE:
-	    if ( (bh = bret->id) != NULL ) bh->b_end_io(bh, 1);
+            for ( bh = (struct buffer_head *)bret->id; 
+                  bh != NULL; 
+                  bh = next_bh )
+            {
+                next_bh = bh->b_reqnext;
+                bh->b_reqnext = NULL;
+                bh->b_end_io(bh, 1);
+            }
 	    break;
 	    
         case XEN_BLOCK_SEG_CREATE:
@@ -429,7 +466,7 @@ static void xlblk_response_int(int irq, void *dev_id, struct pt_regs *ptregs)
 
     /* We kick pending request queues if the ring is reasonably empty. */
     if ( (nr_pending != 0) && 
-         (((blk_ring->req_prod - resp_cons) & (BLK_RING_SIZE - 1)) < 
+         (((req_prod - resp_cons) & (BLK_RING_SIZE - 1)) < 
           (BLK_RING_SIZE >> 1)) )
     {
         /* Attempt to drain the queue, but bail if the ring becomes full. */
@@ -445,13 +482,27 @@ static void xlblk_response_int(int irq, void *dev_id, struct pt_regs *ptregs)
 
 
 /* Send a synchronous message to Xen. */
-int xenolinux_control_msg(int operation, char *buffer)
+int xenolinux_control_msg(int operation, char *buffer, int size)
 {
-    xlblk_control_msg_pending = 1; barrier();
-    if ( hypervisor_request(NULL, operation, buffer, 0, 0, 0) )
+    unsigned long flags;
+    char *aligned_buf;
+
+    /* We copy from an aligned buffer, as interface needs sector alignment. */
+    aligned_buf = get_free_page(GFP_KERNEL);
+    if ( aligned_buf == NULL ) BUG();
+
+    xlblk_control_msg_pending = 1;
+    spin_lock_irqsave(&io_request_lock, flags);
+    /* Note that size gets rounded up to a sector-sized boundary. */
+    if ( hypervisor_request(0, operation, aligned_buf, 0, (size+511)/512, 0) )
         return -EAGAIN;
-    HYPERVISOR_block_io_op();
-    while ( xlblk_control_msg_pending ) barrier();    
+    signal_requests_to_xen();
+    spin_unlock_irqrestore(&io_request_lock, flags);
+    while ( xlblk_control_msg_pending ) barrier();
+
+    memcpy(buffer, aligned_buf, size);
+    free_page(aligned_buf);
+    
     return 0;
 }
 
@@ -465,7 +516,7 @@ int __init xlblk_init(void)
 
     /* This mapping was created early at boot time. */
     blk_ring = (blk_ring_t *)fix_to_virt(FIX_BLKRING_BASE);
-    blk_ring->req_prod = blk_ring->resp_prod = resp_cons = 0;
+    blk_ring->req_prod = blk_ring->resp_prod = resp_cons = req_prod = 0;
     
     error = request_irq(XLBLK_RESPONSE_IRQ, xlblk_response_int, 0, 
 			"xlblk-response", NULL);
@@ -478,7 +529,8 @@ int __init xlblk_init(void)
     /* Probe for disk information. */
     memset(&xlblk_disk_info, 0, sizeof(xlblk_disk_info));
     error = xenolinux_control_msg(XEN_BLOCK_PROBE_BLK, 
-                                  (char *)&xlblk_disk_info);
+                                  (char *)&xlblk_disk_info,
+                                  sizeof(xen_disk_info_t));
     if ( error )
     {
         printk(KERN_ALERT "Could not probe disks (%d)\n", error);

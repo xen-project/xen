@@ -726,6 +726,7 @@ int do_process_page_updates(page_update_request_t *ureqs, int count)
         err = 1;
 
         /* Least significant bits of 'ptr' demux the operation type. */
+        spin_lock_irq(&current->page_lock);
         switch ( req.ptr & (sizeof(l1_pgentry_t)-1) )
         {
             /*
@@ -799,6 +800,7 @@ int do_process_page_updates(page_update_request_t *ureqs, int count)
             MEM_LOG("Invalid page update command %08lx", req.ptr);
             break;
         }
+        spin_unlock_irq(&current->page_lock);
 
         if ( err )
         {

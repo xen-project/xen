@@ -37,6 +37,7 @@ static long alloc_dom_mem(struct task_struct *p, balloon_def_op_t bop)
         return -ENOMEM;
     
     spin_lock_irqsave(&free_list_lock, flags);
+    spin_lock(&p->page_lock);
     
     temp = free_list.next;
     for ( i = 0; i < bop.size; i++ )
@@ -63,6 +64,7 @@ static long alloc_dom_mem(struct task_struct *p, balloon_def_op_t bop)
         unmap_domain_mem(va);
     }
 
+    spin_unlock(&p->page_lock);
     spin_unlock_irqrestore(&free_list_lock, flags);
     
     return bop.size;
@@ -78,7 +80,8 @@ static long free_dom_mem(struct task_struct *p, balloon_inf_op_t bop)
     long              rc = 0;
 
     spin_lock_irqsave(&free_list_lock, flags);
-    
+    spin_lock(&p->page_lock);
+
     temp = free_list.next;
     for ( i = 0; i < bop.size; i++ )
     {
@@ -94,7 +97,7 @@ static long free_dom_mem(struct task_struct *p, balloon_inf_op_t bop)
 
         pf = &frame_table[mpfn];
         if ( (pf->type_count != 0) || 
-             (pf->type_count != 0) ||
+             (pf->tot_count != 0) ||
              (pf->flags != p->domain) )
         {
             DPRINTK("Bad page free for domain %d (%ld, %ld, %08lx)\n",
@@ -113,6 +116,7 @@ static long free_dom_mem(struct task_struct *p, balloon_inf_op_t bop)
     }
 
  out:
+    spin_unlock(&p->page_lock);
     spin_unlock_irqrestore(&free_list_lock, flags);
     
     return rc ? rc : bop.size;

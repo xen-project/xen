@@ -46,6 +46,7 @@ struct task_struct *do_newdomain(unsigned int dom_id, unsigned int cpu)
     p->processor = cpu;
 
     spin_lock_init(&p->blk_ring_lock);
+    spin_lock_init(&p->page_lock);
 
     p->shared_info = (void *)get_free_page(GFP_KERNEL);
     memset(p->shared_info, 0, PAGE_SIZE);

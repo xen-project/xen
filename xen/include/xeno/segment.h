@@ -3,18 +3,21 @@
 
 #include <hypervisor-ifs/block.h>
 
+/* Describes a physical disk extent. */
+typedef struct {
+    unsigned short dev;
+    unsigned short nr_sects;
+    unsigned long  sector_number;
+    unsigned long  buffer;
+} phys_seg_t;
+
 void xen_segment_initialize(void);
 void xen_refresh_segment_list (struct task_struct *p);
 int xen_segment_create(xv_disk_t *xvd);
 int xen_segment_map_request(
-    int *phys_device,                         /* out */
-    unsigned long *block_number,              /* out */
-    unsigned long *sector_number,             /* out */
-    struct task_struct *domain,
-    int operation,
-    int segment_number,
-    int xen_block_number,
-    int xen_sector_number);
+    phys_seg_t *pseg, struct task_struct *p, int operation,
+    unsigned short segment_number,
+    unsigned long sect_nr, unsigned long buffer, unsigned short nr_sects);
 
 #define XEN_MAX_SEGMENTS 100     /* total number of segments across all doms */
 

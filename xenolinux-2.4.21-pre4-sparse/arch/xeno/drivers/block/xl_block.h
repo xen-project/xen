@@ -46,7 +46,7 @@ typedef struct xl_disk {
 } xl_disk_t;
 
 /* Generic layer. */
-extern int xenolinux_control_msg(int operration, char *buffer);
+extern int xenolinux_control_msg(int operration, char *buffer, int size);
 extern int xenolinux_block_open(struct inode *inode, struct file *filep);
 extern int xenolinux_block_release(struct inode *inode, struct file *filep);
 extern int xenolinux_block_ioctl(struct inode *inode, struct file *filep,

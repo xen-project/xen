@@ -210,7 +210,7 @@ static int proc_write_vhd(struct file *file, const char *buffer,
         xvd.extents[loop].size =  to_number(string);
     }
 
-    xenolinux_control_msg(XEN_BLOCK_SEG_CREATE, (char *)&xvd);
+    xenolinux_control_msg(XEN_BLOCK_SEG_CREATE, (char *)&xvd, sizeof(xvd));
 
     return count;
 }

@@ -18,7 +18,7 @@
 #include <xeno/interrupt.h>
 #include <xeno/segment.h>
 
-#if 0
+#if 1
 #define DPRINTK(_f, _a...) printk( _f , ## _a )
 #else
 #define DPRINTK(_f, _a...) ((void)0)
@@ -28,12 +28,30 @@
  * These are rather arbitrary. They are fairly large because adjacent
  * requests pulled from a communication ring are quite likely to end
  * up being part of the same scatter/gather request at the disc.
- * It might be a good idea to add scatter/gather support explicitly to
- * the scatter/gather ring (eg. each request has an array of N pointers);
- * then these values would better reflect real costs at the disc.
+ * 
+ * ** TRY INCREASING 'MAX_PENDING_REQS' IF WRITE SPEEDS SEEM TOO LOW **
+ * This will increase the chances of being able to write whole tracks.
+ * '64' should be enough to keep us competitive with Linux.
  */
-#define MAX_PENDING_REQS 32
-#define BATCH_PER_DOMAIN 8
+#define MAX_PENDING_REQS 64
+#define BATCH_PER_DOMAIN 16
+
+/*
+ * Each outstanding request which we've passed to the lower device layers
+ * has a 'pending_req' allocated to it. Each buffer_head that completes
+ * decrements the pendcnt towards zero. When it hits zero, the specified
+ * domain has a response queued for it, with the saved 'id' passed back.
+ * 
+ * We can't allocate pending_req's in order, since they may complete out
+ * of order. We therefore maintain an allocation ring. This ring also 
+ * indicates when enough work has been passed down -- at that point the
+ * allocation ring will be empty.
+ */
+static pending_req_t pending_reqs[MAX_PENDING_REQS];
+static unsigned char pending_ring[MAX_PENDING_REQS];
+static unsigned int pending_prod, pending_cons;
+static spinlock_t pend_prod_lock = SPIN_LOCK_UNLOCKED;
+#define PENDREQ_IDX_INC(_i) ((_i) = ((_i)+1) & (MAX_PENDING_REQS-1))
 
 static kmem_cache_t *buffer_head_cachep;
 static atomic_t nr_pending;
@@ -65,6 +83,18 @@ static kdev_t scsi_devs[NR_SCSI_DEVS] = {
     MKDEV(SCSI_DISK0_MAJOR, 224), MKDEV(SCSI_DISK0_MAJOR, 240), /* sdo, sdp */
 };
 
+static int __buffer_is_valid(struct task_struct *p, 
+                             unsigned long buffer, 
+                             unsigned short size,
+                             int writeable_buffer);
+static void __lock_buffer(unsigned long buffer,
+                          unsigned short size,
+                          int writeable_buffer);
+static void unlock_buffer(struct task_struct *p,
+                          unsigned long buffer,
+                          unsigned short size,
+                          int writeable_buffer);
+
 static void io_schedule(unsigned long unused);
 static int do_block_io_op_domain(struct task_struct *p, int max_to_do);
 static void dispatch_rw_block_io(struct task_struct *p, int index);
@@ -73,8 +103,8 @@ static void dispatch_probe_seg(struct task_struct *p, int index);
 static void dispatch_debug_block_io(struct task_struct *p, int index);
 static void dispatch_create_segment(struct task_struct *p, int index);
 static void dispatch_delete_segment(struct task_struct *p, int index);
-static void make_response(struct task_struct *p, void *id, int op, 
-			  unsigned long st);
+static void make_response(struct task_struct *p, unsigned long id, 
+                          unsigned short op, unsigned long st);
 
 
 /******************************************************************
@@ -165,28 +195,27 @@ static void maybe_trigger_io_schedule(void)
 
 static void end_block_io_op(struct buffer_head *bh, int uptodate)
 {
-    struct pfn_info *page;
-    unsigned long pfn;
+    unsigned long flags;
+    pending_req_t *pending_req = bh->pending_req;
 
-    for ( pfn = virt_to_phys(bh->b_data) >> PAGE_SHIFT; 
-          pfn < ((virt_to_phys(bh->b_data) + bh->b_size + PAGE_SIZE - 1) >> 
-                 PAGE_SHIFT);
-          pfn++ )
+    unlock_buffer(pending_req->domain, 
+                  virt_to_phys(bh->b_data), 
+                  bh->b_size, 
+                  (pending_req->operation==READ));
+
+    if ( atomic_dec_and_test(&pending_req->pendcnt) )
     {
-        page = frame_table + pfn;
-        if ( ((bh->b_state & (1 << BH_Read)) != 0) &&
-             (put_page_type(page) == 0) )
-            page->flags &= ~PG_type_mask;
-        put_page_tot(page);
+        make_response(pending_req->domain, pending_req->id,
+                      pending_req->operation, uptodate ? 0 : 1);
+        spin_lock_irqsave(&pend_prod_lock, flags);
+        pending_ring[pending_prod] = pending_req - pending_reqs;
+        PENDREQ_IDX_INC(pending_prod);
+        spin_unlock_irqrestore(&pend_prod_lock, flags);
+        atomic_dec(&nr_pending);
+        maybe_trigger_io_schedule();
     }
 
-    atomic_dec(&nr_pending);
-    make_response(bh->b_xen_domain, bh->b_xen_id, 
-		  XEN_BLOCK_READ, uptodate ? 0 : 1);
-
     kmem_cache_free(buffer_head_cachep, bh);
-
-    maybe_trigger_io_schedule();
 }
 
 
@@ -208,16 +237,105 @@ long do_block_io_op(void)
  * DOWNWARD CALLS -- These interface with the block-device layer proper.
  */
 
-static int do_block_io_op_domain(struct task_struct* p, int max_to_do)
+static int __buffer_is_valid(struct task_struct *p, 
+                             unsigned long buffer, 
+                             unsigned short size,
+                             int writeable_buffer)
+{
+    unsigned long    pfn;
+    struct pfn_info *page;
+    int rc = 0;
+
+    /* A request may span multiple page frames. Each must be checked. */
+    for ( pfn = buffer >> PAGE_SHIFT; 
+          pfn < ((buffer + size + PAGE_SIZE - 1) >> PAGE_SHIFT);
+          pfn++ )
+    {
+        /* Each frame must be within bounds of machine memory. */
+        if ( pfn >= max_page )
+        {
+            DPRINTK("pfn out of range: %08lx\n", pfn);
+            goto out;
+        }
+
+        page = frame_table + pfn;
+
+        /* Each frame must belong to the requesting domain. */
+        if ( (page->flags & PG_domain_mask) != p->domain )
+        {
+            DPRINTK("bad domain: expected %d, got %ld\n", 
+                    p->domain, page->flags & PG_domain_mask);
+            goto out;
+        }
+
+        /* If reading into the frame, the frame must be writeable. */
+        if ( writeable_buffer &&
+             ((page->flags & PG_type_mask) != PGT_writeable_page) )
+        {
+            DPRINTK("non-writeable page passed for block read\n");
+            goto out;
+        }
+    }    
+
+    rc = 1;
+ out:
+    return rc;
+}
+
+static void __lock_buffer(unsigned long buffer,
+                          unsigned short size,
+                          int writeable_buffer)
+{
+    unsigned long    pfn;
+    struct pfn_info *page;
+
+    for ( pfn = buffer >> PAGE_SHIFT; 
+          pfn < ((buffer + size + PAGE_SIZE - 1) >> PAGE_SHIFT);
+          pfn++ )
+    {
+        page = frame_table + pfn;
+        if ( writeable_buffer ) get_page_type(page);
+        get_page_tot(page);
+    }
+}
+
+static void unlock_buffer(struct task_struct *p,
+                          unsigned long buffer,
+                          unsigned short size,
+                          int writeable_buffer)
+{
+    unsigned long    pfn, flags;
+    struct pfn_info *page;
+
+    spin_lock_irqsave(&p->page_lock, flags);
+    for ( pfn = buffer >> PAGE_SHIFT; 
+          pfn < ((buffer + size + PAGE_SIZE - 1) >> PAGE_SHIFT);
+          pfn++ )
+    {
+        page = frame_table + pfn;
+        if ( writeable_buffer && (put_page_type(page) == 0) )
+            page->flags &= ~PG_type_mask;
+        put_page_tot(page);
+    }
+    spin_unlock_irqrestore(&p->page_lock, flags);
+}
+
+static int do_block_io_op_domain(struct task_struct *p, int max_to_do)
 {
     blk_ring_t *blk_ring = p->blk_ring_base;
     int i, more_to_do = 0;
 
+    /*
+     * Take items off the comms ring, taking care not to catch up
+     * with the response-producer index.
+     */
     for ( i = p->blk_req_cons; 
-	  i != blk_ring->req_prod; 
+	  (i != blk_ring->req_prod) &&
+              (((p->blk_resp_prod-i) & (BLK_RING_SIZE-1)) != 1); 
 	  i = BLK_RING_INC(i) ) 
     {
-        if ( max_to_do-- == 0 )
+        if ( (max_to_do-- == 0) || 
+             (atomic_read(&nr_pending) == MAX_PENDING_REQS) )
         {
             more_to_do = 1;
             break;
@@ -251,8 +369,11 @@ static int do_block_io_op_domain(struct task_struct* p, int max_to_do)
 	    break;
 
 	default:
-	    panic("error: unknown block io operation [%d]\n",
-                  blk_ring->ring[i].req.operation);
+            DPRINTK("error: unknown block io operation [%d]\n",
+                    blk_ring->ring[i].req.operation);
+            make_response(p, blk_ring->ring[i].req.id, 
+                          blk_ring->ring[i].req.operation, 1);
+            break;
 	}
     }
 
@@ -268,23 +389,38 @@ static void dispatch_debug_block_io(struct task_struct *p, int index)
 static void dispatch_create_segment(struct task_struct *p, int index)
 {
     blk_ring_t *blk_ring = p->blk_ring_base;
+    unsigned long flags, buffer;
     xv_disk_t *xvd;
     int result;
 
-    if (p->domain != 0)
+    if ( p->domain != 0 )
     {
         DPRINTK("dispatch_create_segment called by dom%d\n", p->domain);
-        make_response(p, blk_ring->ring[index].req.id, 
-                      XEN_BLOCK_SEG_CREATE, 1); 
-        return;
+        result = 1;
+        goto out;
     }
 
-    xvd = phys_to_virt((unsigned long)blk_ring->ring[index].req.buffer);    
+    buffer = blk_ring->ring[index].req.buffer_and_sects[0] & ~0x1FF;
+
+    spin_lock_irqsave(&p->page_lock, flags);
+    if ( !__buffer_is_valid(p, buffer, sizeof(xv_disk_t), 1) )
+    {
+        DPRINTK("Bad buffer in dispatch_create_segment\n");
+        spin_unlock_irqrestore(&p->page_lock, flags);
+        result = 1;
+        goto out;
+    }
+    __lock_buffer(buffer, sizeof(xv_disk_t), 1);
+    spin_unlock_irqrestore(&p->page_lock, flags);
+
+    xvd = phys_to_virt(buffer);
     result = xen_segment_create(xvd);
 
+    unlock_buffer(p, buffer, sizeof(xv_disk_t), 1);    
+
+ out:
     make_response(p, blk_ring->ring[index].req.id, 
                   XEN_BLOCK_SEG_CREATE, result); 
-    return;
 }
 
 static void dispatch_delete_segment(struct task_struct *p, int index)
@@ -299,13 +435,30 @@ static void dispatch_probe_blk(struct task_struct *p, int index)
 
     blk_ring_t *blk_ring = p->blk_ring_base;
     xen_disk_info_t *xdi;
+    unsigned long flags, buffer;
+    int rc = 0;
+    
+    buffer = blk_ring->ring[index].req.buffer_and_sects[0] & ~0x1FF;
 
-    xdi = phys_to_virt((unsigned long)blk_ring->ring[index].req.buffer);    
+    spin_lock_irqsave(&p->page_lock, flags);
+    if ( !__buffer_is_valid(p, buffer, sizeof(xen_disk_info_t), 1) )
+    {
+        DPRINTK("Bad buffer in dispatch_probe_blk\n");
+        spin_unlock_irqrestore(&p->page_lock, flags);
+        rc = 1;
+        goto out;
+    }
+    __lock_buffer(buffer, sizeof(xen_disk_info_t), 1);
+    spin_unlock_irqrestore(&p->page_lock, flags);
 
+    xdi = phys_to_virt(buffer);
     ide_probe_devices(xdi);
     scsi_probe_devices(xdi);
 
-    make_response(p, blk_ring->ring[index].req.id, XEN_BLOCK_PROBE_BLK, 0);
+    unlock_buffer(p, buffer, sizeof(xen_disk_info_t), 1);
+
+ out:
+    make_response(p, blk_ring->ring[index].req.id, XEN_BLOCK_PROBE_BLK, rc);
 }
 
 static void dispatch_probe_seg(struct task_struct *p, int index)
@@ -313,175 +466,147 @@ static void dispatch_probe_seg(struct task_struct *p, int index)
     extern void xen_segment_probe(xen_disk_info_t *xdi);
     blk_ring_t *blk_ring = p->blk_ring_base;
     xen_disk_info_t *xdi;
+    unsigned long flags, buffer;
+    int rc = 0;
 
-    xdi = phys_to_virt((unsigned long)blk_ring->ring[index].req.buffer);    
+    buffer = blk_ring->ring[index].req.buffer_and_sects[0] & ~0x1FF;
+
+    spin_lock_irqsave(&p->page_lock, flags);
+    if ( !__buffer_is_valid(p, buffer, sizeof(xen_disk_info_t), 1) )
+    {
+        DPRINTK("Bad buffer in dispatch_probe_seg\n");
+        spin_unlock_irqrestore(&p->page_lock, flags);
+        rc = 1;
+        goto out;
+    }
+    __lock_buffer(buffer, sizeof(xen_disk_info_t), 1);
+    spin_unlock_irqrestore(&p->page_lock, flags);
+
+    xdi = phys_to_virt(buffer);
     xen_segment_probe(xdi);
 
-    make_response(p, blk_ring->ring[index].req.id, XEN_BLOCK_PROBE_SEG, 0);
+    unlock_buffer(p, buffer, sizeof(xen_disk_info_t), 1);
+
+ out:
+    make_response(p, blk_ring->ring[index].req.id, XEN_BLOCK_PROBE_SEG, rc);
 }
 
 static void dispatch_rw_block_io(struct task_struct *p, int index)
 {
     extern void ll_rw_block(int rw, int nr, struct buffer_head * bhs[]); 
     blk_ring_t *blk_ring = p->blk_ring_base;
+    blk_ring_req_entry_t *req = &blk_ring->ring[index].req;
     struct buffer_head *bh;
-    int operation;
-    unsigned short size;
-    unsigned long  block_number = 0L;
-    unsigned long  sector_number = 0L;
-    unsigned long buffer, pfn;
-    struct pfn_info *page;
-    int s, xen_device, phys_device = 0;
+    int operation = (req->operation == XEN_BLOCK_WRITE) ? WRITE : READ;
+    unsigned short nr_sects;
+    unsigned long buffer, flags;
+    int i, tot_sects;
+    pending_req_t *pending_req;
 
-    operation = (blk_ring->ring[index].req.operation == XEN_BLOCK_WRITE) ? 
-        WRITE : READ;
+    /* We map virtual scatter/gather segments to physical segments. */
+    int new_segs, nr_psegs = 0;
+    phys_seg_t phys_seg[MAX_BLK_SEGS * 2];
 
-    /* Sectors are 512 bytes. Make sure request size is a multiple. */
-    size = blk_ring->ring[index].req.block_size; 
-    if ( (size == 0) || (size & (0x200 - 1)) != 0 )
+    spin_lock_irqsave(&p->page_lock, flags);
+
+    /* Check that number of segments is sane. */
+    if ( (req->nr_segments == 0) || (req->nr_segments > MAX_BLK_SEGS) )
     {
-	DPRINTK("dodgy block size: %d\n", 
-                blk_ring->ring[index].req.block_size);
+        DPRINTK("Bad number of segments in request (%d)\n", req->nr_segments);
         goto bad_descriptor;
     }
 
-    /* Buffer address should be sector aligned. */
-    buffer = (unsigned long)blk_ring->ring[index].req.buffer;
-    if ( (buffer & (0x200 - 1)) != 0 )
+    /*
+     * Check each address/size pair is sane, and convert into a
+     * physical device and block offset. Note that if the offset and size
+     * crosses a virtual extent boundary, we may end up with more
+     * physical scatter/gather segments than virtual segments.
+     */
+    for ( i = tot_sects = 0; i < req->nr_segments; i++, tot_sects += nr_sects )
     {
-        DPRINTK("unaligned buffer %08lx\n", buffer);
-        goto bad_descriptor;
+        buffer   = req->buffer_and_sects[i] & ~0x1FF;
+        nr_sects = req->buffer_and_sects[i] &  0x1FF;
+
+        if ( nr_sects == 0 )
+        {
+            DPRINTK("zero-sized data request\n");
+            goto bad_descriptor;
+        }
+
+        if ( !__buffer_is_valid(p, buffer, nr_sects<<9, (operation==READ)) )
+            goto bad_descriptor;
+
+        /* Get the physical device and block index. */
+        if ( (req->device & XENDEV_TYPE_MASK) == XENDEV_VIRTUAL )
+        {
+            new_segs = xen_segment_map_request(
+                &phys_seg[nr_psegs], p, operation,
+                req->device, 
+                req->sector_number + tot_sects,
+                buffer, nr_sects);
+            if ( new_segs <= 0 ) goto bad_descriptor;
+        }
+        else
+        {
+            phys_seg[nr_psegs].dev           = xendev_to_physdev(req->device);
+            phys_seg[nr_psegs].sector_number = req->sector_number + tot_sects;
+            phys_seg[nr_psegs].buffer        = buffer;
+            phys_seg[nr_psegs].nr_sects      = nr_sects;
+            if ( phys_seg[nr_psegs].dev == 0 ) goto bad_descriptor;
+            new_segs = 1;
+        }
+        
+        nr_psegs += new_segs;
+        if ( nr_psegs >= (MAX_BLK_SEGS*2) ) BUG();
     }
 
-    /* A request may span multiple page frames. Each must be checked. */
-    for ( pfn = buffer >> PAGE_SHIFT; 
-          pfn < ((buffer + size + PAGE_SIZE - 1) >> PAGE_SHIFT);
-          pfn++ )
-    {
-        /* Each frame must be within bounds of machine memory. */
-        if ( pfn >= max_page )
-        {
-            DPRINTK("pfn out of range: %08lx\n", pfn);
-            goto bad_descriptor_free_frames;
-        }
-
-        page = frame_table + pfn;
-
-        /* Each frame must belong to the requesting domain. */
-        if ( (page->flags & PG_domain_mask) != p->domain )
-        {
-            DPRINTK("bad domain: expected %d, got %ld\n", 
-                    p->domain, page->flags & PG_domain_mask);
-            goto bad_descriptor_free_frames;
-        }
-
-        /* If reading into the frame, the frame must be writeable. */
-        if ( operation == READ )
-        {
-            if ( (page->flags & PG_type_mask) != PGT_writeable_page )
-            {
-                DPRINTK("non-writeable page passed for block read\n");
-                goto bad_descriptor_free_frames;
-            }
-            get_page_type(page);
-        }
-
-        /* Xen holds a frame reference until the operation is complete. */
-        get_page_tot(page);
-    }
+    /* Lock pages associated with each buffer head. */
+    for ( i = 0; i < nr_psegs; i++ )
+        __lock_buffer(phys_seg[i].buffer, phys_seg[i].nr_sects<<9, 
+                      (operation==READ));
+    spin_unlock_irqrestore(&p->page_lock, flags);
 
     atomic_inc(&nr_pending);
-    bh = kmem_cache_alloc(buffer_head_cachep, GFP_KERNEL);
-    if ( bh == NULL ) panic("bh is null\n");
+    pending_req = pending_reqs + pending_ring[pending_cons];
+    PENDREQ_IDX_INC(pending_cons);
+    pending_req->domain    = p;
+    pending_req->id        = req->id;
+    pending_req->operation = operation;
+    atomic_set(&pending_req->pendcnt, nr_psegs);
 
-    /* set just the important bits of the buffer header */
-    memset (bh, 0, sizeof (struct buffer_head));
-
-    xen_device = blk_ring->ring[index].req.device;
-
- again:
-    switch ( (xen_device & XENDEV_TYPE_MASK) )
+    /* Now we pass each segment down to the real blkdev layer. */
+    for ( i = 0; i < nr_psegs; i++ )
     {
-    case XENDEV_IDE:
-        xen_device &= XENDEV_IDX_MASK;
-        if ( xen_device >= NR_IDE_DEVS )
-        {
-            DPRINTK("IDE device number out of range %d\n", xen_device);
-            goto bad_descriptor_free_frames;
-        }
-        phys_device   = ide_devs[xen_device];
-        block_number  = blk_ring->ring[index].req.block_number;
-        sector_number = blk_ring->ring[index].req.sector_number;
-        break;
-
-    case XENDEV_SCSI:
-        xen_device &= XENDEV_IDX_MASK;
-        if ( xen_device >= NR_SCSI_DEVS )
-        {
-            DPRINTK("SCSI device number out of range %d\n", xen_device);
-            goto bad_descriptor_free_frames;
-        }
-        phys_device   = scsi_devs[xen_device];
-        block_number  = blk_ring->ring[index].req.block_number;
-        sector_number = blk_ring->ring[index].req.sector_number;
-        break;
-
-    case XENDEV_VIRTUAL:
-        xen_device &= XENDEV_IDX_MASK;
-        s = xen_segment_map_request(
-            &xen_device, &block_number, &sector_number,
-            p, operation, xen_device,
-            blk_ring->ring[index].req.block_number,
-            blk_ring->ring[index].req.sector_number);
-        if ( s != 0 )
-        {
-            DPRINTK("xen_seg_map_request status: %d\n", s);
-            goto bad_descriptor_free_frames;
-        }
-        goto again; /* Loop round to convert the virt IDE/SCSI identifier. */
-
-    default:
-        DPRINTK("dispatch_rw_block_io: unknown device %d\n", xen_device);
-        goto bad_descriptor_free_frames;
-    }
+        bh = kmem_cache_alloc(buffer_head_cachep, GFP_KERNEL);
+        if ( bh == NULL ) panic("bh is null\n");
+        memset (bh, 0, sizeof (struct buffer_head));
     
-    bh->b_blocknr       = block_number;
-    bh->b_size          = size;
-    bh->b_dev           = phys_device;
-    bh->b_rsector       = sector_number;
-    bh->b_data          = phys_to_virt(buffer);
-    bh->b_count.counter = 1;
-    bh->b_end_io        = end_block_io_op;
+        bh->b_size          = phys_seg[i].nr_sects << 9;
+        bh->b_dev           = phys_seg[i].dev;
+        bh->b_rsector       = phys_seg[i].sector_number;
+        bh->b_data          = phys_to_virt(phys_seg[i].buffer);
+        bh->b_end_io        = end_block_io_op;
+        bh->pending_req     = pending_req;
 
-    /* Save meta data about request. */
-    bh->b_xen_domain    = p;
-    bh->b_xen_id        = blk_ring->ring[index].req.id;
+        if ( operation == WRITE )
+        {
+            bh->b_state = (1 << BH_JBD) | (1 << BH_Mapped) | (1 << BH_Req) |
+                (1 << BH_Dirty) | (1 << BH_Uptodate) | (1 << BH_Write);
+        } 
+        else
+        {
+            bh->b_state = (1 << BH_Mapped) | (1 << BH_Read);
+        }
 
-    if ( operation == WRITE )
-    {
-	bh->b_state = (1 << BH_JBD) | (1 << BH_Mapped) | (1 << BH_Req) |
-            (1 << BH_Dirty) | (1 << BH_Uptodate) | (1 << BH_Write);
-    } 
-    else
-    {
-	bh->b_state = (1 << BH_Mapped) | (1 << BH_Read);
+        /* Dispatch a single request. We'll flush it to disc later. */
+        ll_rw_block(operation, 1, &bh);
     }
 
-    /* Dispatch a single request. We'll flush it to disc later. */
-    ll_rw_block(operation, 1, &bh);
     return;
 
- bad_descriptor_free_frames:
-    while ( pfn > (buffer >> PAGE_SHIFT) )
-    {
-        page = frame_table + --pfn;
-        put_page_tot(page);
-        if ( operation == READ ) put_page_type(page);
-    }
-
- bad_descriptor: 
-    DPRINTK("dispatch rw blockio bad descriptor\n");
-    make_response(p, blk_ring->ring[index].req.id, XEN_BLOCK_READ, 1);
+ bad_descriptor:
+    spin_unlock_irqrestore(&p->page_lock, flags);
+    make_response(p, req->id, req->operation, 1);
 } 
 
 
@@ -490,8 +615,38 @@ static void dispatch_rw_block_io(struct task_struct *p, int index)
  * MISCELLANEOUS SETUP / TEARDOWN / DEBUGGING
  */
 
-static void make_response(struct task_struct *p, void *id, 
-			  int op, unsigned long st)
+kdev_t xendev_to_physdev(unsigned short xendev)
+{
+    switch ( (xendev & XENDEV_TYPE_MASK) )
+    {
+    case XENDEV_IDE:
+        xendev &= XENDEV_IDX_MASK;
+        if ( xendev >= NR_IDE_DEVS )
+        {
+            DPRINTK("IDE device number out of range %d\n", xendev);
+            goto fail;
+        }
+        return ide_devs[xendev];
+        
+    case XENDEV_SCSI:
+        xendev &= XENDEV_IDX_MASK;
+        if ( xendev >= NR_SCSI_DEVS )
+        {
+            DPRINTK("SCSI device number out of range %d\n", xendev);
+            goto fail;
+        }
+        return scsi_devs[xendev];
+        
+    default:
+        DPRINTK("xendev_to_physdev: unknown device %d\n", xendev);
+    }
+
+ fail:
+    return (kdev_t)0;
+}
+
+static void make_response(struct task_struct *p, unsigned long id, 
+			  unsigned short op, unsigned long st)
 {
     unsigned long cpu_mask, flags;
     int position;
@@ -500,11 +655,11 @@ static void make_response(struct task_struct *p, void *id,
     /* Place on the response ring for the relevant domain. */ 
     spin_lock_irqsave(&p->blk_ring_lock, flags);
     blk_ring = p->blk_ring_base;
-    position = blk_ring->resp_prod;
+    position = p->blk_resp_prod;
     blk_ring->ring[position].resp.id        = id;
     blk_ring->ring[position].resp.operation = op;
     blk_ring->ring[position].resp.status    = st;
-    blk_ring->resp_prod = BLK_RING_INC(position);
+    p->blk_resp_prod = blk_ring->resp_prod = BLK_RING_INC(position);
     spin_unlock_irqrestore(&p->blk_ring_lock, flags);
     
     /* Kick the relevant domain. */
@@ -517,18 +672,22 @@ static void dump_blockq(u_char key, void *dev_id, struct pt_regs *regs)
     struct task_struct *p;
     blk_ring_t *blk_ring ;
 
-    printk("Dumping block queue stats: nr_pending = %d\n",
-           atomic_read(&nr_pending));
+    printk("Dumping block queue stats: nr_pending = %d (prod=%d,cons=%d)\n",
+           atomic_read(&nr_pending), pending_prod, pending_cons);
 
     p = current->next_task;
     do
     {
-        printk (KERN_ALERT "Domain: %d\n", p->domain);
-        blk_ring = p->blk_ring_base;
-
-        printk("  req_prod:%d, resp_prod:%d, req_cons:%d\n",
-               blk_ring->req_prod, blk_ring->resp_prod, p->blk_req_cons);
-
+        if ( !is_idle_task(p) )
+        {
+            printk("Domain: %d\n", p->domain);
+            blk_ring = p->blk_ring_base;
+            
+            printk("  req_prod:%d, req_cons:%d resp_prod:%d/%d on_list=%d\n",
+                   blk_ring->req_prod, p->blk_req_cons,
+                   blk_ring->resp_prod, p->blk_resp_prod,
+                   __on_blkdev_list(p));
+        }
         p = p->next_task;
     } while (p != current);
 }
@@ -545,7 +704,8 @@ void init_blkdev_info(struct task_struct *p)
     memset(p->segment_list, 0, sizeof(p->segment_list));
     p->segment_count = 0;
 
-    xen_refresh_segment_list(p);      /* get any previously created segments */
+    /* Get any previously created segments. */
+    xen_refresh_segment_list(p);
 }
 
 /* End-of-day teardown for a domain. XXX Outstanding requests? */
@@ -558,7 +718,12 @@ void destroy_blkdev_info(struct task_struct *p)
 
 void initialize_block_io ()
 {
+    int i;
+
     atomic_set(&nr_pending, 0);
+    pending_prod = pending_cons = 0;
+    memset(pending_reqs, 0, sizeof(pending_reqs));
+    for ( i = 0; i < MAX_PENDING_REQS; i++ ) pending_ring[i] = i;
 
     spin_lock_init(&io_schedule_list_lock);
     INIT_LIST_HEAD(&io_schedule_list);

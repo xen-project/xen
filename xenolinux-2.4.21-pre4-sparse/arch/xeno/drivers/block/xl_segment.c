@@ -51,7 +51,7 @@ int __init xlseg_init(void)
 
     /* Probe for disk information. */
     memset(xdi, 0, sizeof(*xdi));
-    xenolinux_control_msg(XEN_BLOCK_PROBE_SEG, (char *)xdi);
+    xenolinux_control_msg(XEN_BLOCK_PROBE_SEG, (char *)xdi, sizeof(*xdi));
 
     DPRINTK("vhd block device probe:\n");
     for ( i = 0; i < xdi->count; i++ )

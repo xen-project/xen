@@ -271,7 +271,7 @@ static int ide_build_sglist (ide_hwif_t *hwif, struct request *rq)
 		/*
 		 * continue segment from before?
 		 */
-		if (bh_phys(bh) == lastdataend) {
+		if (virt_to_phys(bh->b_data) == lastdataend) {
 			sg[nents - 1].length += bh->b_size;
 			lastdataend += bh->b_size;
 			continue;
@@ -285,25 +285,9 @@ static int ide_build_sglist (ide_hwif_t *hwif, struct request *rq)
 
 		sge = &sg[nents];
 		memset(sge, 0, sizeof(*sge));
-
-		if (bh->b_page) {
-			sge->page = bh->b_page;
-			sge->offset = bh_offset(bh);
-		} else {
-
-		   
-#if 0 
-		    /* below is wrong for xen since b_data is actually
-		       a 'physical / virtual' thingy. Ask KAF. */
-			if (((unsigned long) bh->b_data) < PAGE_SIZE)
-				BUG();
-#endif
-
-			sge->address = bh->b_data;
-		}
-
+		sge->address = bh->b_data;
 		sge->length = bh->b_size;
-		lastdataend = bh_phys(bh) + bh->b_size;
+		lastdataend = virt_to_phys(bh->b_data) + bh->b_size;
 		nents++;
 	} while ((bh = bh->b_reqnext) != NULL);
 

@@ -23,70 +23,73 @@ segment_t xsegments[XEN_MAX_SEGMENTS];
  * xen_device must be a valid device.
  */
 
+/*
+ * NB. Al offsets and sizes here are in sector units.
+ * eg. 'size == 1' means an actual size of 512 bytes.
+ */
 int xen_segment_map_request(
-    int *phys_device,                         /* out */
-    unsigned long *block_number,              /* out */
-    unsigned long *sector_number,             /* out */
-    struct task_struct *domain,
-    int operation,
-    int segment_number,
-    int xen_block_number,
-    int xen_sector_number)
+    phys_seg_t *pseg, struct task_struct *p, int operation,
+    unsigned short segment_number,
+    unsigned long sect_nr, unsigned long buffer, unsigned short nr_sects)
 {
     segment_t *seg;
-    int sum; 
-    int loop;
+    extent_t  *ext;
+    int sum, i;
 
-    if ( segment_number >= XEN_MAX_SEGMENTS )
-    {
-        /* No VHD. */
-        return 1;
-    }
+    if ( segment_number >= XEN_MAX_SEGMENTS ) goto fail;
 
-    seg = domain->segment_list[segment_number];
-    
-    if (seg == NULL)
-    {
-        /* oops.  no vhd exists! */
-        return 1;
-    }
+    seg = p->segment_list[segment_number];
+    if ( seg == NULL ) goto fail;
 
     /* check domain permissions */
-    if (seg->domain != domain->domain)
-    {
-        /* domain doesn't own segment */
-        return 2;
-    }
+    if ( seg->domain != p->domain ) goto fail;
 
     /* check rw access */
     if ((operation == WRITE && seg->mode != XEN_SEGMENT_RW) ||
         (operation == READ  && seg->mode == XEN_SEGMENT_UNUSED))
-    {
-        /* access violation */
-        return 3;
-    }
+        goto fail;
 
     /* find extent, check size */
     sum = 0; 
-    loop = 0;
-    while (loop < seg->num_extents && sum <= xen_block_number)
+    i = 0;
+    ext = seg->extents;
+    while ( (i < seg->num_extents) && ((sum + ext->size) <= sect_nr) )
     {
-        sum += seg->extents[loop++].size;
+        sum += ext->size;
+        ext++; i++;
     }
-    sum -= seg->extents[--loop].size;
 
-    if (sum + seg->extents[loop].size <= xen_block_number)
-    {
-        /* tried to read past the end of the segment */
-        return 4;
-    }
-    *block_number = xen_block_number - sum + seg->extents[loop].offset;
-    *sector_number = xen_sector_number - sum + seg->extents[loop].offset;;
+    if ( (sum + ext->size) <= sect_nr ) goto fail;
 
-    /* This actually needs to be passed thru one more indirection :-) */
-    *phys_device = seg->extents[loop].disk;
+    pseg->sector_number = sect_nr + ext->offset - sum;
+    pseg->buffer        = buffer;
+    pseg->nr_sects      = nr_sects;
+    pseg->dev           = xendev_to_physdev(ext->disk);
+    if ( pseg->dev == 0 ) goto fail;
 
-    return 0;
+    /* We're finished if the virtual extent didn't overrun the phys extent. */
+    if ( (sum + ext->size) >= (sect_nr + nr_sects) )
+        return 1; /* Just one more physical extent. */
+
+    /* Hmmm... make sure there's another extent to overrun onto! */
+    if ( (i+1) == seg->num_extents ) goto fail;
+
+    pseg[1].nr_sects = (sect_nr + nr_sects) - (sum + ext->size);
+    pseg[0].nr_sects = sum + ext->size - sect_nr;
+    pseg[1].buffer = buffer + (pseg->nr_sects << 9);
+    pseg[1].sector_number = ext[1].offset;
+    pseg[1].dev = xendev_to_physdev(ext[1].disk);
+    if ( pseg[1].dev == 0 ) goto fail;
+
+    /* We don't allow overrun onto a third physical extent. */
+    if ( (sum + ext[0].size + ext[1].size) < 
+         (pseg[1].sector_number + pseg[1].nr_sects) )
+        goto fail;    
+
+    return 2; /* We overran onto a second physical es\xtent. */
+
+ fail:
+    return -1;
 }
 
 /*

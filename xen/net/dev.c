@@ -489,6 +489,7 @@ void deliver_packet(struct sk_buff *skb, net_vif_t *vif)
     unsigned long *g_pte; 
     struct pfn_info *g_pfn, *h_pfn;
     unsigned int i; 
+    unsigned long flags;
 
     memset(skb->mac.ethernet->h_dest, 0, ETH_ALEN);
     if ( ntohs(skb->mac.ethernet->h_proto) == ETH_P_ARP )
@@ -508,6 +509,8 @@ void deliver_packet(struct sk_buff *skb, net_vif_t *vif)
     if ( (skb->len + ETH_HLEN) < rx->size )
         rx->size = skb->len + ETH_HLEN;
             
+    spin_lock_irqsave(&vif->domain->page_lock, flags);
+
     g_pte = map_domain_mem(rx->addr);
 
     g_pfn = frame_table + (*g_pte >> PAGE_SHIFT);
@@ -526,9 +529,11 @@ void deliver_packet(struct sk_buff *skb, net_vif_t *vif)
     *g_pte = (*g_pte & ~PAGE_MASK) 
         | (((h_pfn - frame_table) << PAGE_SHIFT) & PAGE_MASK);
     *g_pte |= _PAGE_PRESENT;
-        
+    
     unmap_domain_mem(g_pte);
 
+    spin_unlock_irqrestore(&vif->domain->page_lock, flags);
+    
     /* Our skbuff now points at the guest's old frame. */
     skb->pf = g_pfn;
 
@@ -661,10 +666,12 @@ static void tx_skb_release(struct sk_buff *skb)
     net_vif_t *vif = sys_vif_list[skb->src_vif];
     unsigned int idx;
     tx_shadow_entry_t *tx;
-    unsigned long cpu_mask;
+    unsigned long cpu_mask, flags;
     
+    spin_lock_irqsave(&vif->domain->page_lock, flags);
     for ( i = 0; i < skb_shinfo(skb)->nr_frags; i++ )
         put_page_tot(skb_shinfo(skb)->frags[i].page);
+    spin_unlock_irqrestore(&vif->domain->page_lock, flags);
 
     if ( skb->skb_type == SKB_NODATA )
         kmem_cache_free(net_header_cachep, skb->head);
@@ -713,8 +720,7 @@ static void tx_skb_release(struct sk_buff *skb)
     /* Send a transmit event if requested. */
     if ( send )
     {
-        cpu_mask = mark_guest_event(
-            sys_vif_list[skb->src_vif]->domain, _EVENT_NET_TX);
+        cpu_mask = mark_guest_event(vif->domain, _EVENT_NET_TX);
         guest_event_notify(cpu_mask);
     }
 }
@@ -1870,10 +1876,12 @@ long do_net_update(void)
 
             pfn  = tx.addr >> PAGE_SHIFT;
             page = frame_table + pfn;
+            spin_lock_irq(&current->page_lock);
             if ( (pfn >= max_page) || 
                  ((page->flags & PG_domain_mask) != current->domain) ) 
             {
                 DPRINTK("Bad page frame\n");
+                spin_unlock_irq(&current->page_lock);
                 continue;
             }
             
@@ -1882,7 +1890,7 @@ long do_net_update(void)
             protocol = __constant_htons(
                 init_tx_header(g_data, tx.size, the_dev));
             if ( protocol == 0 )
-                goto unmap_and_continue;
+                goto tx_unmap_and_continue;
 
             target = __net_get_target_vif(g_data, tx.size, current_vif->id);
 
@@ -1890,7 +1898,7 @@ long do_net_update(void)
             {
                 /* Local delivery */
                 if ( (skb = dev_alloc_skb(tx.size)) == NULL ) 
-                    goto unmap_and_continue;
+                    goto tx_unmap_and_continue;
                 
                 skb->destructor = tx_skb_release;
 
@@ -1915,15 +1923,16 @@ long do_net_update(void)
                 shadow_ring->tx_ring[i].header = 
                     kmem_cache_alloc(net_header_cachep, GFP_KERNEL);
                 if ( shadow_ring->tx_ring[i].header == NULL ) 
-                    goto unmap_and_continue;
+                    goto tx_unmap_and_continue;
                 memcpy(shadow_ring->tx_ring[i].header, g_data, PKT_PROT_LEN);
                 shadow_ring->tx_ring[i].payload = tx.addr + PKT_PROT_LEN;
                 shadow_ring->tx_ring[i].status = RING_STATUS_OK;
                 get_page_tot(page);
             }
 
-        unmap_and_continue:
+        tx_unmap_and_continue:
             unmap_domain_mem(g_data);
+            spin_unlock_irq(&current->page_lock);
         }
 
         if ( shadow_ring->tx_prod != i )
@@ -1966,10 +1975,12 @@ long do_net_update(void)
             
             shadow_ring->rx_ring[i].status = RING_STATUS_BAD_PAGE;
             
+            spin_lock_irq(&current->page_lock);
             if ( (pfn >= max_page) || 
                  (page->flags != (PGT_l1_page_table | current->domain)) ) 
             {
                 DPRINTK("Bad page frame containing ppte\n");
+                spin_unlock_irq(&current->page_lock);
                 continue;
             }
             
@@ -1978,8 +1989,7 @@ long do_net_update(void)
             if (!(*g_pte & _PAGE_PRESENT))
             {
                 DPRINTK("Inavlid PTE passed down (not present)\n");
-                unmap_domain_mem(g_pte);
-                continue;
+                goto rx_unmap_and_continue;
             }
             
             page = (*g_pte >> PAGE_SHIFT) + frame_table;
@@ -1987,8 +1997,7 @@ long do_net_update(void)
             if (page->tot_count != 1) 
             {
                 DPRINTK("An rx page must be mapped exactly once\n");
-                unmap_domain_mem(g_pte);
-                continue;
+                goto rx_unmap_and_continue;
             }
             
             /* The pte they passed was good, so take it away from them. */
@@ -1997,7 +2006,9 @@ long do_net_update(void)
             page->flags = (page->flags & ~PG_type_mask) | PGT_net_rx_buf;
             rx->flush_count = tlb_flush_count[smp_processor_id()];
             
+        rx_unmap_and_continue:
             unmap_domain_mem(g_pte);
+            spin_unlock_irq(&current->page_lock);
         }
 
         if ( shadow_ring->rx_prod != i )
