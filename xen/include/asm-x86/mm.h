@@ -182,8 +182,13 @@ static inline int get_page(struct pfn_info *page,
     return 1;
 }
 
-void put_page_type(struct pfn_info *page);
+void put_page_types(struct pfn_info *page, u32 decrement);
 int  get_page_type(struct pfn_info *page, u32 type);
+
+static inline void put_page_type(struct pfn_info *page)
+{
+    put_page_types(page, 1);
+}
 
 static inline void put_page_and_type(struct pfn_info *page)
 {
@@ -335,5 +340,15 @@ void audit_domains(void);
 #endif
 
 void propagate_page_fault(unsigned long addr, u16 error_code);
+
+/* update_grant_va_mapping
+ * Caller must own d's BIGLOCK, is responsible for flushing the TLB,
+ * and have already get_page'd */
+int update_grant_va_mapping(unsigned long va,
+                            unsigned long val,
+                            struct domain *d,
+                            struct exec_domain *ed);
+#define GNTUPDVA_prev_ro 1
+#define GNTUPDVA_prev_rw 2
 
 #endif /* __ASM_X86_MM_H__ */

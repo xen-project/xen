@@ -61,6 +61,62 @@ extern void vmx_shadow_clear_state(struct domain *);
       ? phys_to_machine_mapping(gpfn)                  \
       : (gpfn) )
 
+#define __translate_gpfn_to_mfn(_d, gpfn)              \
+    ( (shadow_mode_translate(_d))                      \
+      ? translate_gpfn_to_mfn(_d, gpfn)                \
+      : (gpfn) )
+
+static inline unsigned long
+translate_gpfn_to_mfn(struct domain *rd, unsigned long gpfn)
+{
+    unsigned long       ma_of_phys_to_mach;
+    l2_pgentry_t       *l2_table;
+    l2_pgentry_t        l2_entry;
+    unsigned long       ma_of_l1_table;
+    l1_pgentry_t       *l1_table;
+    l1_pgentry_t        pte;
+    unsigned long       mfn = 0;
+
+    /*
+     * translation of: (domain, gpfn) -> mfn
+     * where domain != current, and is in translate shadow mode
+     */
+
+    ASSERT( shadow_mode_translate(rd) );
+
+    shadow_lock(rd);
+
+    /* TODO: check using shadow_lock is correct
+     * TODO: move arch.phys_table from exec_domain to domain
+     *       - use of zero index is a hack - FIXME
+     */
+
+    ma_of_phys_to_mach = pagetable_val( (rd->exec_domain[0])->arch.phys_table );
+
+    l2_table = (l2_pgentry_t *) map_domain_mem( ma_of_phys_to_mach );
+    l2_entry = l2_table[ gpfn >> (L2_PAGETABLE_SHIFT - PAGE_SHIFT) ];
+
+    unmap_domain_mem( l2_table );
+
+    if ( l2_pgentry_val(l2_entry) == 0 )
+        goto unlock_out;
+
+    ma_of_l1_table = l2_pgentry_to_phys( l2_entry );
+
+    l1_table = (l1_pgentry_t *) map_domain_mem( ma_of_l1_table );
+    pte      = l1_table[ (gpfn >> (L1_PAGETABLE_SHIFT - PAGE_SHIFT)) &
+                         (L1_PAGETABLE_ENTRIES - 1 ) ];
+
+    unmap_domain_mem( l1_table );
+
+    mfn = l1_pgentry_to_pfn(pte);
+
+unlock_out:
+    shadow_unlock(rd);
+
+    return mfn;
+}
+
 extern void __shadow_mode_disable(struct domain *d);
 static inline void shadow_mode_disable(struct domain *d)
 {

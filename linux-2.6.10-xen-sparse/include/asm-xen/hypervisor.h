@@ -536,7 +536,7 @@ HYPERVISOR_grant_table_op(
     __asm__ __volatile__ (
         TRAP_INSTR
         : "=a" (ret), "=b" (ign1), "=c" (ign2), "=d" (ign3)
-	: "0" (__HYPERVISOR_grant_table_op), "1" (cmd), "2" (count), "3" (uop)
+	: "0" (__HYPERVISOR_grant_table_op), "1" (cmd), "2" (uop), "3" (count)
 	: "memory" );
 
     return ret;
