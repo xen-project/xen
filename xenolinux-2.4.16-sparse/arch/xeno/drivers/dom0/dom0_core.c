@@ -165,6 +165,9 @@ static ssize_t dom_mem_read(struct file * file, char * buff, size_t size, loff_t
 {
     unsigned long addr;
     pgprot_t prot;
+
+	printk(KERN_ALERT "bd240 debug: dom_mem_read invoked!\n");
+
     proc_memdata_t * mem_data = (proc_memdata_t *)((struct proc_dir_entry *)file->f_dentry->d_inode->u.generic_ip)->data;
 
     prot = PAGE_SHARED; 
@@ -193,6 +196,8 @@ static int dom_map_mem(unsigned int dom, unsigned long pfn, int tot_pages)
     struct proc_dir_entry * file;
     proc_memdata_t * memdata;
 
+	printk("bd240 debug: dom_map_mem invoked, xeno_base %lx, subdir %lx\n", xeno_base, xeno_base->subdir);
+ 
     while(pd != NULL){
 
 		printk(KERN_ALERT "bd240 debug: dom_map: proc %d\n", ((dom_procdata_t *)pd->data)->domain);
