@@ -166,7 +166,7 @@
 #include <asm/io.h>
 #include <asm/uaccess.h>
 
-#if 1
+#if 0
 #define MEM_LOG(_f, _a...) printk("DOM%d: (file=memory.c, line=%d) " _f "\n", current->domain, __LINE__, ## _a )
 #else
 #define MEM_LOG(_f, _a...) ((void)0)

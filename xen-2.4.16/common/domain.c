@@ -402,7 +402,7 @@ int setup_guestos(struct task_struct *p, dom0_newdomain_t *params)
     unsigned long cur_address, end_address, alloc_address, vaddr;
     unsigned long virt_load_address, virt_stack_address, virt_shinfo_address;
     unsigned long virt_ftable_start_addr = 0, virt_ftable_end_addr;
-    unsigned long ft_mapping = frame_table;
+    unsigned long ft_mapping = (unsigned long)frame_table;
     unsigned int ft_size = 0;
     start_info_t  *virt_startinfo_address;
     unsigned long long time;
@@ -410,7 +410,6 @@ int setup_guestos(struct task_struct *p, dom0_newdomain_t *params)
     l1_pgentry_t *l1tab = NULL;
     struct pfn_info *page = NULL;
     net_ring_t *net_ring;
-    blk_ring_t *blk_ring;
 
     if ( strncmp(__va(mod[0].mod_start), "XenoGues", 8) )
     {
@@ -578,11 +577,18 @@ int setup_guestos(struct task_struct *p, dom0_newdomain_t *params)
         net_ring = create_net_vif(dom);
         if (!net_ring) panic("no network ring!\n");
     }
-    virt_startinfo_address->net_rings = p->net_ring_base;
+
+/* XXX SMH: horrible hack to convert hypervisor VAs in SHIP to guest VAs  */
+#define SHIP2GUEST(_x) (virt_shinfo_address | (((unsigned long)(_x)) & 0xFFF))
+
+    virt_startinfo_address->net_rings = 
+	(net_ring_t *)SHIP2GUEST(p->net_ring_base); 
     virt_startinfo_address->num_net_rings = p->num_net_vifs;
 
     /* Add block io interface */
-    virt_startinfo_address->blk_ring = p->blk_ring_base;
+    virt_startinfo_address->blk_ring = 
+	(blk_ring_t *)SHIP2GUEST(p->blk_ring_base); 
+
 
     /* We tell OS about any modules we were given. */
     if ( nr_mods > 1 )
