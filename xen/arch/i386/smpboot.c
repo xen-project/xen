@@ -699,6 +699,8 @@ static void __init do_boot_cpu (int apicid)
 
     SET_DEFAULT_FAST_TRAP(&idle->thread);
 
+    idle_task[cpu] = idle;
+
     /* start_eip had better be page-aligned! */
     start_eip = setup_trampoline();
 

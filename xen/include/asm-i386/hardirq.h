@@ -10,6 +10,7 @@ typedef struct {
 	unsigned int __local_irq_count;
 	unsigned int __local_bh_count;
 	unsigned int __syscall_count;
+	unsigned long idle_timestamp;
 } ____cacheline_aligned irq_cpustat_t;
 
 #include <xeno/irq_cpustat.h>	/* Standard mappings for irq_cpustat_t above */

@@ -20,6 +20,7 @@ unsigned long wait_init_idle;
 
 /* Basic page table for each CPU in the system. */
 l2_pgentry_t *idle_pg_table[NR_CPUS] = { idle0_pg_table };
+struct task_struct *idle_task[NR_CPUS] = { &idle0_task };
 
 /* for asm/domain_page.h, map_domain_page() */
 unsigned long *mapcache[NR_CPUS];
