@@ -347,7 +347,7 @@ class Opts:
 
     def var_usage(self):
         if self.vars:
-            print 'The defconfig defines the following variables:'
+            print 'The config file defines the following variables:'
             for var in self.vars:
                 var.show()
                 print
@@ -372,11 +372,11 @@ class Opts:
             else:
                 p = self.vals.defconfig
             if os.path.exists(p):
-                self.info('Using defconfig file %s.' % p)
+                self.info('Using config file "%s".' % p)
                 self.load(p, help)
                 break
         else:
-            self.err("Cannot open defconfig file %s" % self.vals.defconfig)
+            self.err('Cannot open config file "%s"' % self.vals.defconfig)
 
     def load(self, defconfig, help):
         """Load a defconfig file. Local variables in the file

@@ -5,9 +5,8 @@ XEND_INITD = init.d/xend
 # Xen configuration dir and configs to go there.
 XEN_CONFIG_DIR = /etc/xen
 XEN_CONFIGS = xend-config.sxp
-XEN_CONFIGS += xmdefconfig 
-XEN_CONFIGS += xmdefconfig-example
-XEN_CONFIGS += xmdefconfig-netbsd
+XEN_CONFIGS += xmexample1 
+XEN_CONFIGS += xmexample2
 
 # Xen script dir and scripts to go there.
 XEN_SCRIPT_DIR = /etc/xen/scripts
