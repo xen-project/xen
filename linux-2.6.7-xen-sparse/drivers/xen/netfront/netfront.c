@@ -546,7 +546,7 @@ static void network_connect(struct net_device *dev,
 
     /* Step 1: Reinitialise variables. */
     np->rx_resp_cons = np->tx_resp_cons = np->tx_full = 0;
-    np->rx->event = 1;
+    np->rx->event = np->tx->event = 1;
 
     /* Step 2: Rebuild the RX and TX ring contents.
      * NB. We could just free the queued TX packets now but we hope
@@ -776,12 +776,13 @@ static int create_netdev(int handle, struct net_device **val)
  * Initialize the network control interface. Set the number of network devices
  * and create them.
  */
+
 static void netif_driver_status_change(
     netif_fe_driver_status_changed_t *status)
 {
     int err = 0;
     int i;
-    
+
     netctrl.interface_n = status->nr_interfaces;
     netctrl.connected_n = 0;
 
@@ -874,11 +875,75 @@ static int __init netif_init(void)
     return err;
 }
 
+void netif_suspend(void)
+{
+#if 1 /* XXX THIS IS TEMPORARY */
+    struct net_device *dev = NULL;
+    struct net_private *np = NULL;
+    int i;
+
+/* avoid having tx/rx stuff happen until we're ready */
+
+    for(i=0;i<netctrl.interface_n;i++)
+    {
+	char name[32];
+
+	sprintf(name,"eth%d",i);
+	dev = __dev_get_by_name(name);
+
+	if ( dev && (dev->flags & IFF_UP) )
+	{
+	    np  = dev->priv;
+
+	    free_irq(np->irq, dev);
+            unbind_evtchn_from_irq(np->evtchn);
+	}    
+    }
+#endif
+}
+
 void netif_resume(void)
 {
     ctrl_msg_t                       cmsg;
-    netif_fe_driver_status_changed_t st;
+    netif_fe_interface_connect_t     up;
+//    netif_fe_driver_status_changed_t   st;
+    struct net_device *dev = NULL;
+    struct net_private *np = NULL;
+    int i;
 
+#if 1
+    /* XXX THIS IS TEMPORARY */
+
+    for(i=0;i<netctrl.interface_n;i++)    
+    {
+	char name[32];
+
+	sprintf(name,"eth%d",i);
+	dev = __dev_get_by_name(name);
+
+	if ( dev ) // connect regardless of whether IFF_UP flag set
+	{
+	    np  = dev->priv;
+
+	    // stop bad things from happening until we're back up
+	    np->backend_state = BEST_DISCONNECTED;
+
+	    cmsg.type      = CMSG_NETIF_FE;
+	    cmsg.subtype   = CMSG_NETIF_FE_INTERFACE_CONNECT;
+	    cmsg.length    = sizeof(netif_fe_interface_connect_t);
+	    up.handle      = np->handle;
+	    up.tx_shmem_frame = virt_to_machine(np->tx) >> PAGE_SHIFT;
+	    up.rx_shmem_frame = virt_to_machine(np->rx) >> PAGE_SHIFT;
+	    memcpy(cmsg.msg, &up, sizeof(up));
+
+	    /* Tell the controller to bring up the interface. */
+	    ctrl_if_send_message_block(&cmsg, NULL, 0, TASK_UNINTERRUPTIBLE);
+	}
+    }
+#endif	    
+
+
+#if 0
     /* Send a driver-UP notification to the domain controller. */
     cmsg.type      = CMSG_NETIF_FE;
     cmsg.subtype   = CMSG_NETIF_FE_DRIVER_STATUS_CHANGED;
@@ -887,6 +952,8 @@ void netif_resume(void)
     st.nr_interfaces = 0;
     memcpy(cmsg.msg, &st, sizeof(st));
     ctrl_if_send_message_block(&cmsg, NULL, 0, TASK_UNINTERRUPTIBLE);
+#endif
+
 
 }
 
