@@ -1,6 +1,6 @@
-/*
- * xen performance counters
- */
+
+#ifndef __XENO_PERFC_H__
+#define __XENO_PERFC_H__
 
 #include <asm/atomic.h>
 
@@ -53,3 +53,4 @@ extern struct perfcounter_t perfcounters;
 #define perfc_addc(x,y)   atomic_add((y), &perfcounters.x[smp_processor_id()])
 #define perfc_adda(x,y,z) atomic_add((z), &perfcounters.x[y])
 
+#endif /* __XENO_PERFC_H__ */

@@ -44,19 +44,20 @@ static int check_pfn_ownership(int xc_handle,
 {
     dom0_op_t op;
     op.cmd = DOM0_GETPAGEFRAMEINFO;
-    op.u.getpageframeinfo.pfn = mfn;
-    if ( (do_dom0_op(xc_handle, &op) < 0) || 
-         (op.u.getpageframeinfo.domain != dom) )
-        return 0;
-    return 1;
+    op.u.getpageframeinfo.pfn    = mfn;
+    op.u.getpageframeinfo.domain = dom;
+    return (do_dom0_op(xc_handle, &op) >= 0);
 }
 
 #define GETPFN_ERR (~0U)
-static unsigned int get_pfn_type(int xc_handle, unsigned long mfn)
+static unsigned int get_pfn_type(int xc_handle, 
+                                 unsigned long mfn, 
+                                 unsigned int dom)
 {
     dom0_op_t op;
     op.cmd = DOM0_GETPAGEFRAMEINFO;
-    op.u.getpageframeinfo.pfn = mfn;
+    op.u.getpageframeinfo.pfn    = mfn;
+    op.u.getpageframeinfo.domain = dom;
     if ( do_dom0_op(xc_handle, &op) < 0 )
     {
         PERROR("Unexpected failure when getting page frame info!");
@@ -259,7 +260,8 @@ int xc_linux_save(int xc_handle,
         mfn_to_pfn_table[mfn] = i;
 
         /* Query page type by MFN, but store it by PFN. */
-        if ( (pfn_type[i] = get_pfn_type(xc_handle, mfn)) == GETPFN_ERR )
+        if ( (pfn_type[i] = get_pfn_type(xc_handle, mfn, domid)) == 
+             GETPFN_ERR )
             goto out;
     }
 

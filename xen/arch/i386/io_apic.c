@@ -28,6 +28,8 @@
 #include <xeno/config.h>
 #include <asm/mc146818rtc.h>
 #include <asm/io.h>
+#include <asm/mpspec.h>
+#include <asm/io_apic.h>
 #include <asm/smp.h>
 #include <asm/desc.h>
 #include <asm/smpboot.h>

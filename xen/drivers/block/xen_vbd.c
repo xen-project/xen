@@ -23,13 +23,6 @@
 extern int ide_probe_devices(xen_disk_info_t *xdi);
 extern int scsi_probe_devices(xen_disk_info_t *xdi);
 
-
-#if 0
-#define DPRINTK(_f, _a...) printk( _f , ## _a )
-#else
-#define DPRINTK(_f, _a...) ((void)0)
-#endif
-
 /* XXX SMH: crappy 'hash function' .. fix when care. */
 #define HSH(_x) ((_x) & (VBD_HTAB_SZ - 1))
 
@@ -447,16 +440,9 @@ long vbd_probe(vbd_probe_t *probe)
     if ( (probe->domain == VBD_PROBE_ALL) || IS_PRIV(p) )
     { 
         /* Privileged domains always get access to the 'real' devices. */
-        if ( (ret = ide_probe_devices(&probe->xdi)) != 0 ) 
-        {
-            DPRINTK("vbd_probe: error %d in probing ide devices\n", ret); 
+        if ( ((ret = ide_probe_devices(&probe->xdi)) != 0) ||
+             ((ret = scsi_probe_devices(&probe->xdi)) != 0) )
             goto out; 
-        }
-        if ( (ret = scsi_probe_devices(&probe->xdi)) != 0 )
-        { 
-            DPRINTK("vbd_probe: error %d in probing scsi devices\n", ret); 
-            goto out; 
-        }
     } 
 
     if ( probe->domain == VBD_PROBE_ALL )
@@ -469,8 +455,6 @@ long vbd_probe(vbd_probe_t *probe)
             { 
                 if( (ret = vbd_probe_devices(&probe->xdi, p)) != 0 )
                 { 
-                    DPRINTK("vbd_probe: error %d in probing virtual devices\n",
-                            ret); 
                     read_unlock_irqrestore(&tasklist_lock, flags);
                     goto out; 
                 }
@@ -478,17 +462,12 @@ long vbd_probe(vbd_probe_t *probe)
         }
         read_unlock_irqrestore(&tasklist_lock, flags);
     } 
-    else 
-    { 
-        if ( (ret = vbd_probe_devices(&probe->xdi, p)) )
-        { 
-            DPRINTK("vbd_probe: error %d in probing virtual devices\n", ret); 
-            goto out; 
-        }
-
-    }
+    else if ( (ret = vbd_probe_devices(&probe->xdi, p)) != 0 )
+        goto out; 
 
  out: 
+    if ( ret != 0 )
+        DPRINTK("vbd_probe: err %ld in probing virtual devices\n", ret); 
     if ( p != NULL )
         put_task_struct(p); 
     return ret; 

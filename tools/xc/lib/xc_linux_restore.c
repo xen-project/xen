@@ -301,7 +301,8 @@ int xc_linux_restore(int xc_handle,
                     page[j] |= pfn_to_mfn_table[pfn] << PAGE_SHIFT;
                 }
                 if ( add_mmu_update(xc_handle, mmu_updates, &mmu_update_idx,
-                                    (unsigned long)&ppage[j], page[j]) )
+                                    (mfn<<PAGE_SHIFT)+(j*sizeof(l1_pgentry_t)),
+                                    page[j]) )
                     goto out;
             }
             break;
@@ -337,7 +338,8 @@ int xc_linux_restore(int xc_handle,
                     page[j] |= pfn_to_mfn_table[pfn] << PAGE_SHIFT;
                 }
                 if ( add_mmu_update(xc_handle, mmu_updates, &mmu_update_idx,
-                                    (unsigned long)&ppage[j], page[j]) )
+                                    (mfn<<PAGE_SHIFT)+(j*sizeof(l2_pgentry_t)),
+                                    page[j]) )
                     goto out;
             }
             break;
@@ -345,9 +347,6 @@ int xc_linux_restore(int xc_handle,
             memcpy(ppage, page, PAGE_SIZE);
             break;
         }
-        /* NB. Must flush before unmapping page, as pass VAs to Xen. */
-        if ( flush_mmu_updates(xc_handle, mmu_updates, &mmu_update_idx) )
-            goto out;
         unmap_pfn(pm_handle, ppage);
 
         if ( add_mmu_update(xc_handle, mmu_updates, &mmu_update_idx,

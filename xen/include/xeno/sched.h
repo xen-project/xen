@@ -4,7 +4,6 @@
 #include <xeno/config.h>
 #include <xeno/types.h>
 #include <xeno/spinlock.h>
-#include <asm/page.h>
 #include <asm/ptrace.h>
 #include <xeno/smp.h>
 #include <asm/processor.h>
@@ -16,7 +15,6 @@
 #include <xeno/time.h>
 #include <xeno/ac_timer.h>
 #include <xeno/delay.h>
-#include <xeno/slab.h>
 
 #define MAX_DOMAIN_NAME 16
 
@@ -94,9 +92,10 @@ struct task_struct
     
     unsigned int domain;        /* domain id */
 
-    struct list_head pg_head;
-    unsigned int tot_pages;     /* number of pages currently possesed */
-    unsigned int max_pages;     /* max number of pages that can be possesed */
+    spinlock_t       page_list_lock;
+    struct list_head page_list;
+    unsigned int     tot_pages; /* number of pages currently possesed */
+    unsigned int     max_pages; /* max number of pages that can be possesed */
 
     /* scheduling */
     struct list_head run_list;
@@ -132,8 +131,6 @@ struct task_struct
 
     /* VM */
     struct mm_struct mm;
-    /* We need this lock to check page types and frob reference counts. */
-    spinlock_t page_lock;
 
     mm_segment_t addr_limit;
 
@@ -193,6 +190,8 @@ extern struct task_struct *idle_task[NR_CPUS];
 #define is_idle_task(_p) ((_p)->domain == IDLE_DOMAIN_ID)
 
 #define STACK_SIZE PAGE_SIZE
+
+#include <xeno/slab.h>
 
 extern kmem_cache_t *task_struct_cachep;
 #define alloc_task_struct()  \

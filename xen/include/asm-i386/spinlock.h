@@ -1,11 +1,10 @@
 #ifndef __ASM_SPINLOCK_H
 #define __ASM_SPINLOCK_H
 
-#include <asm/atomic.h>
-#include <asm/rwlock.h>
-#include <asm/page.h>
 #include <xeno/config.h>
 #include <xeno/lib.h>
+#include <asm/atomic.h>
+#include <asm/rwlock.h>
 
 #if 0
 #define SPINLOCK_DEBUG	1

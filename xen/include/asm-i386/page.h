@@ -92,7 +92,7 @@ typedef struct { unsigned long pt_lo; } pagetable_t;
 extern l2_pgentry_t idle_pg_table[ENTRIES_PER_L2_PAGETABLE];
 extern void paging_init(void);
 
-#define __flush_tlb() __flush_tlb_counted()
+#define __flush_tlb() flush_tlb_counted()
 
 /* Flush global pages as well. */
 
@@ -111,10 +111,10 @@ extern void paging_init(void);
         } while (0)
 
 
-#define __flush_tlb_all()						\
+#define __flush_tlb_pge()						\
 	do {								\
                 __pge_off();                                            \
-		__flush_tlb_counted();					\
+		flush_tlb_counted();					\
                 __pge_on();                                             \
 	} while (0)
 

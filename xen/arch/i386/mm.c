@@ -27,8 +27,8 @@
 #include <asm/fixmap.h>
 #include <asm/domain_page.h>
 
-static inline void set_pte_phys (unsigned long vaddr,
-                                 l1_pgentry_t entry)
+static inline void set_pte_phys(unsigned long vaddr,
+                                l1_pgentry_t entry)
 {
     l2_pgentry_t *l2ent;
     l1_pgentry_t *l1ent;
@@ -41,20 +41,22 @@ static inline void set_pte_phys (unsigned long vaddr,
     __flush_tlb_one(vaddr);
 }
 
-void __set_fixmap (enum fixed_addresses idx, 
-                   l1_pgentry_t entry)
+
+void __set_fixmap(enum fixed_addresses idx, 
+                  l1_pgentry_t entry)
 {
     unsigned long address = __fix_to_virt(idx);
 
-    if (idx >= __end_of_fixed_addresses) {
+    if ( likely(idx < __end_of_fixed_addresses) )
+        set_pte_phys(address, entry);
+    else
         printk("Invalid __set_fixmap\n");
-        return;
-    }
-    set_pte_phys(address, entry);
 }
 
-static void __init fixrange_init (unsigned long start, 
-                                  unsigned long end, l2_pgentry_t *pg_base)
+
+static void __init fixrange_init(unsigned long start, 
+                                 unsigned long end, 
+                                 l2_pgentry_t *pg_base)
 {
     l2_pgentry_t *l2e;
     int i;
@@ -66,7 +68,8 @@ static void __init fixrange_init (unsigned long start,
 
     for ( ; (i < ENTRIES_PER_L2_PAGETABLE) && (vaddr != end); l2e++, i++ ) 
     {
-        if ( !l2_pgentry_empty(*l2e) ) continue;
+        if ( !l2_pgentry_empty(*l2e) )
+            continue;
         page = (unsigned long)get_free_page(GFP_KERNEL);
         clear_page(page);
         *l2e = mk_l2_pgentry(__pa(page) | __PAGE_HYPERVISOR);
@@ -78,11 +81,6 @@ void __init paging_init(void)
 {
     unsigned long addr;
     void *ioremap_pt;
-
-    /* XXX initialised in boot.S */
-    /*if ( cpu_has_pge ) set_in_cr4(X86_CR4_PGE);*/
-    /*if ( cpu_has_pse ) set_in_cr4(X86_CR4_PSE);*/
-    /*if ( cpu_has_pae ) set_in_cr4(X86_CR4_PAE);*/
 
     /*
      * Fixed mappings, only the page table structure has to be
@@ -115,12 +113,12 @@ void __init paging_init(void)
 
 }
 
-void __init zap_low_mappings (void)
+void __init zap_low_mappings(void)
 {
     int i;
     for ( i = 0; i < DOMAIN_ENTRIES_PER_L2_PAGETABLE; i++ )
         idle_pg_table[i] = mk_l2_pgentry(0);
-    flush_tlb_all();
+    flush_tlb_all_pge();
 }
 
 
@@ -212,86 +210,54 @@ long set_gdt(struct task_struct *p,
              unsigned int entries)
 {
     /* NB. There are 512 8-byte entries per GDT page. */
-    unsigned int i, j, nr_pages = (entries + 511) / 512;
-    unsigned long pfn, *gdt_page;
-    long ret = -EINVAL;
-    struct pfn_info *page;
+    int i, nr_pages = (entries + 511) / 512;
+    unsigned long pfn;
     struct desc_struct *vgdt;
-
-    spin_lock(&p->page_lock);
 
     /* Check the new GDT. */
     for ( i = 0; i < nr_pages; i++ )
     {
-        if ( frames[i] >= max_page ) 
-            goto out;
-        
-        page = frame_table + frames[i];
-        if ( (page->flags & PG_domain_mask) != p->domain )
-            goto out;
-
-        if ( (page->flags & PG_type_mask) != PGT_gdt_page )
-        {
-            if ( page_type_count(page) != 0 )
-                goto out;
-
-            /* Check all potential GDT entries in the page. */
-            gdt_page = map_domain_mem(frames[0] << PAGE_SHIFT);
-            for ( j = 0; j < 512; j++ )
-                if ( !check_descriptor(gdt_page[j*2], gdt_page[j*2+1]) )
-                    goto out;
-            unmap_domain_mem(gdt_page);
-        }
-    }
-
-    /* Tear down the old GDT. */
-    for ( i = 0; i < 16; i++ )
-    {
-        pfn = l1_pgentry_to_pagenr(p->mm.perdomain_pt[i]);
-        p->mm.perdomain_pt[i] = mk_l1_pgentry(0);
-        if ( pfn == 0 ) continue;
-        page = frame_table + pfn;
-        ASSERT((page->flags & PG_type_mask) == PGT_gdt_page);
-        ASSERT((page->flags & PG_domain_mask) == p->domain);
-        ASSERT((page_type_count(page) != 0) && (page_tot_count(page) != 0));
-        put_page_type(page);
-        put_page_tot(page);
-    }
-
-    /* Install the new GDT. */
-    for ( i = 0; i < nr_pages; i++ )
-    {
-        p->mm.perdomain_pt[i] =
-            mk_l1_pgentry((frames[i] << PAGE_SHIFT) | __PAGE_HYPERVISOR);
-        
-        page = frame_table + frames[i];
-        page->flags &= ~(PG_type_mask | PG_need_flush);
-        page->flags |= PGT_gdt_page;
-        get_page_type(page);
-        get_page_tot(page);
+        if ( unlikely(frames[i] >= max_page) ||
+             unlikely(!get_page_and_type(&frame_table[frames[i]], 
+                                         p, PGT_gdt_page)) )
+            goto fail;
     }
 
     /* Copy reserved GDT entries to the new GDT. */
-    vgdt = map_domain_mem(frames[i] << PAGE_SHIFT);
+    vgdt = map_domain_mem(frames[0] << PAGE_SHIFT);
     memcpy(vgdt + FIRST_RESERVED_GDT_ENTRY, 
            gdt_table + FIRST_RESERVED_GDT_ENTRY, 
            NR_RESERVED_GDT_ENTRIES*8);
     unmap_domain_mem(vgdt);
 
+    /* Tear down the old GDT. */
+    for ( i = 0; i < 16; i++ )
+    {
+        if ( (pfn = l1_pgentry_to_pagenr(p->mm.perdomain_pt[i])) != 0 )
+            put_page_and_type(&frame_table[pfn]);
+        p->mm.perdomain_pt[i] = mk_l1_pgentry(0);
+    }
+
+    /* Install the new GDT. */
+    for ( i = 0; i < nr_pages; i++ )
+        p->mm.perdomain_pt[i] =
+            mk_l1_pgentry((frames[i] << PAGE_SHIFT) | __PAGE_HYPERVISOR);
+
     SET_GDT_ADDRESS(p, GDT_VIRT_START);
     SET_GDT_ENTRIES(p, (entries*8)-1);
 
-    ret = 0; /* success */
+    return 0;
 
- out:
-    spin_unlock(&p->page_lock);
-    return ret;
+ fail:
+    while ( i-- > 0 )
+        put_page_and_type(&frame_table[frames[i]]);
+    return -EINVAL;
 }
 
 
 long do_set_gdt(unsigned long *frame_list, unsigned int entries)
 {
-    unsigned int nr_pages = (entries + 511) / 512;
+    int nr_pages = (entries + 511) / 512;
     unsigned long frames[16];
     long ret;
 
@@ -321,14 +287,12 @@ long do_update_descriptor(
     if ( (pa & 7) || (pfn >= max_page) || !check_descriptor(word1, word2) )
         return -EINVAL;
 
-    spin_lock(&current->page_lock);
-
-    page = frame_table + pfn;
-    if ( (page->flags & PG_domain_mask) != current->domain )
+    page = &frame_table[pfn];
+    if ( unlikely(!get_page(page, current)) )
         goto out;
 
     /* Check if the given frame is in use in an unsafe context. */
-    switch ( (page->flags & PG_type_mask) )
+    switch ( page->type_and_flags & PGT_type_mask )
     {
     case PGT_gdt_page:
         /* Disallow updates of Xen-reserved descriptors in the current GDT. */
@@ -336,12 +300,17 @@ long do_update_descriptor(
              (((pa&(PAGE_SIZE-1))>>3) >= FIRST_RESERVED_GDT_ENTRY) &&
              (((pa&(PAGE_SIZE-1))>>3) <= LAST_RESERVED_GDT_ENTRY) )
             goto out;
+        if ( unlikely(!get_page_type(page, PGT_gdt_page)) )
+            goto out;
+        break;
     case PGT_ldt_page:
-    case PGT_writeable_page:
+        if ( unlikely(!get_page_type(page, PGT_ldt_page)) )
+            goto out;
         break;
     default:
-        if ( page_type_count(page) != 0 )
+        if ( unlikely(!get_page_type(page, PGT_writeable_page)) )
             goto out;
+        break;
     }
 
     /* All is good so make the update. */
@@ -350,9 +319,11 @@ long do_update_descriptor(
     gdt_pent[1] = word2;
     unmap_domain_mem(gdt_pent);
 
+    put_page_type(page);
+
     ret = 0; /* success */
 
  out:
-    spin_unlock(&current->page_lock);
+    put_page(page);
     return ret;
 }

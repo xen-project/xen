@@ -51,12 +51,11 @@ struct task_struct *do_createdomain(unsigned int dom_id, unsigned int cpu)
     sprintf(p->name, "Domain-%d", dom_id);
 
     spin_lock_init(&p->blk_ring_lock);
-    spin_lock_init(&p->page_lock);
     spin_lock_init(&p->event_channel_lock);
 
     p->shared_info = (void *)get_free_page(GFP_KERNEL);
     memset(p->shared_info, 0, PAGE_SIZE);
-    SHARE_PFN_WITH_DOMAIN(virt_to_page(p->shared_info), dom_id);
+    SHARE_PFN_WITH_DOMAIN(virt_to_page(p->shared_info), p);
 
     p->mm.perdomain_pt = (l1_pgentry_t *)get_free_page(GFP_KERNEL);
     memset(p->mm.perdomain_pt, 0, PAGE_SIZE);
@@ -67,8 +66,10 @@ struct task_struct *do_createdomain(unsigned int dom_id, unsigned int cpu)
 
     sched_add_domain(p);
 
-    INIT_LIST_HEAD(&p->pg_head);
+    spin_lock_init(&p->page_list_lock);
+    INIT_LIST_HEAD(&p->page_list);
     p->max_pages = p->tot_pages = 0;
+
     write_lock_irqsave(&tasklist_lock, flags);
     SET_LINKS(p);
     p->next_hash = task_hash[TASK_HASH(dom_id)];
@@ -218,76 +219,202 @@ long stop_other_domain(unsigned int dom)
     return 0;
 }
 
-unsigned int alloc_new_dom_mem(struct task_struct *p, unsigned int kbytes)
+struct pfn_info *alloc_domain_page(struct task_struct *p)
 {
-    struct list_head *temp;
-    struct pfn_info *pf;
-    unsigned int alloc_pfns;
-    unsigned int req_pages;
-    unsigned long flags;
-
-    /* how many pages do we need to alloc? */
-    req_pages = kbytes >> (PAGE_SHIFT - 10);
+    struct pfn_info *page = NULL;
+    unsigned long flags, mask, pfn_stamp, cpu_stamp;
+    int i;
 
     spin_lock_irqsave(&free_list_lock, flags);
-    
-    /* is there enough mem to serve the request? */   
-    if ( (req_pages + (SLACK_DOMAIN_MEM_KILOBYTES >> (PAGE_SHIFT-10))) >
-         free_pfns )
+    if ( likely(!list_empty(&free_list)) )
     {
-        spin_unlock_irqrestore(&free_list_lock, flags);
-        return -1;
+        page = list_entry(free_list.next, struct pfn_info, list);
+        list_del(&page->list);
+        free_pfns--;
+    }
+    spin_unlock_irqrestore(&free_list_lock, flags);
+
+    if ( unlikely(page == NULL) )
+        return NULL;
+
+    if ( unlikely((mask = page->u.cpu_mask) != 0) )
+    {
+        pfn_stamp = page->tlbflush_timestamp;
+        for ( i = 0; mask != 0; i++ )
+        {
+            if ( unlikely(mask & (1<<i)) )
+            {
+                cpu_stamp = tlbflush_time[i];
+                if ( !NEED_FLUSH(cpu_stamp, pfn_stamp) )
+                    mask &= ~(1<<i);
+            }
+        }
+
+        if ( unlikely(mask != 0) )
+        {
+            if ( unlikely(in_irq()) )
+            {
+                DPRINTK("Returning NULL from alloc_domain_page: in_irq\n");
+                goto free_and_exit;
+            }
+            perfc_incrc(need_flush_tlb_flush);
+            flush_tlb_mask(mask);
+        }
     }
 
-    /* allocate pages and build a thread through frame_table */
-    temp = free_list.next;
-    for ( alloc_pfns = 0; alloc_pfns < req_pages; alloc_pfns++ )
+    page->u.domain = p;
+    page->type_and_flags = 0;
+    if ( p != NULL )
     {
-        pf = list_entry(temp, struct pfn_info, list);
-        pf->flags = p->domain;
-        set_page_type_count(pf, 0);
-        set_page_tot_count(pf, 0);
-        temp = temp->next;
-        list_del(&pf->list);
-        list_add_tail(&pf->list, &p->pg_head);
-        free_pfns--;
-        ASSERT(free_pfns != 0);
+        if ( unlikely(in_irq()) )
+            BUG();
+        wmb(); /* Domain pointer must be visible before updating refcnt. */
+        spin_lock(&p->page_list_lock);
+        if ( unlikely(p->tot_pages >= p->max_pages) )
+        {
+            spin_unlock(&p->page_list_lock);
+            goto free_and_exit;
+        }
+        list_add_tail(&page->list, &p->page_list);
+        p->tot_pages++;
+        page->count_and_flags = PGC_allocated | 1;
+        spin_unlock(&p->page_list_lock);
     }
-   
+
+    return page;
+
+ free_and_exit:
+    spin_lock_irqsave(&free_list_lock, flags);
+    list_add(&page->list, &free_list);
+    free_pfns++;
     spin_unlock_irqrestore(&free_list_lock, flags);
-    
-    p->tot_pages = req_pages;
+    return NULL;
+}
+
+void free_domain_page(struct pfn_info *page)
+{
+    unsigned long flags;
+    struct task_struct *p = page->u.domain;
+
+    if ( unlikely(in_irq()) )
+        BUG();
+
+    if ( likely(!IS_XEN_HEAP_FRAME(page)) )
+    {
+        /*
+         * No race with setting of zombie bit. If it wasn't set before the
+         * last reference was dropped, then it can't be set now.
+         */
+        page->u.cpu_mask = 0;
+        if ( !(page->count_and_flags & PGC_zombie) )
+        {
+            page->tlbflush_timestamp = tlbflush_clock;
+            page->u.cpu_mask = 1 << p->processor;
+
+            spin_lock(&p->page_list_lock);
+            list_del(&page->list);
+            p->tot_pages--;
+            spin_unlock(&p->page_list_lock);
+        }
+
+        page->count_and_flags = 0;
+
+        spin_lock_irqsave(&free_list_lock, flags);
+        list_add(&page->list, &free_list);
+        free_pfns++;
+        spin_unlock_irqrestore(&free_list_lock, flags);
+    }
+    else
+    {
+        /*
+         * No need for a TLB flush. Non-domain pages are always co-held by Xen,
+         * and the Xen reference is not dropped until the domain is dead.
+         * DOM0 may hold references, but it's trusted so no need to flush.
+         */
+        page->u.cpu_mask = 0;
+        page->count_and_flags = 0;
+        free_page((unsigned long)page_to_virt(page));
+    }
+}
+
+
+void free_all_dom_mem(struct task_struct *p)
+{
+    struct list_head *ent, zombies;
+    struct pfn_info *page;
+
+    INIT_LIST_HEAD(&zombies);
+
+    spin_lock(&p->page_list_lock);
+    while ( (ent = p->page_list.next) != &p->page_list )
+    {
+        page = list_entry(ent, struct pfn_info, list);
+
+        if ( unlikely(!get_page(page, p)) )
+        {
+            /*
+             * Another CPU has dropped the last reference and is responsible 
+             * for removing the page from this list. Wait for them to do so.
+             */
+            spin_unlock(&p->page_list_lock);
+            while ( p->page_list.next == ent )
+                barrier();
+            spin_lock(&p->page_list_lock);
+            continue;
+        }
+
+        set_bit(_PGC_zombie, &page->count_and_flags);
+
+        list_del(&page->list);
+        p->tot_pages--;
+
+        list_add(&page->list, &zombies);
+    }
+    spin_unlock(&p->page_list_lock);
+
+    /* We do the potentially complex 'put' operations with no lock held. */
+    while ( (ent = zombies.next) != &zombies )
+    {
+        page = list_entry(ent, struct pfn_info, list);
+
+        list_del(&page->list);
+        
+        if ( test_and_clear_bit(_PGC_guest_pinned, &page->count_and_flags) )
+            put_page_and_type(page);
+
+        if ( test_and_clear_bit(_PGC_allocated, &page->count_and_flags) )
+            put_page(page);
+
+        put_page(page);
+    }
+}
+
+
+unsigned int alloc_new_dom_mem(struct task_struct *p, unsigned int kbytes)
+{
+    unsigned int alloc_pfns, nr_pages;
+
+    nr_pages = kbytes >> (PAGE_SHIFT - 10);
 
     /* TEMPORARY: max_pages should be explicitly specified. */
-    p->max_pages = p->tot_pages;
+    p->max_pages = nr_pages;
+
+    for ( alloc_pfns = 0; alloc_pfns < nr_pages; alloc_pfns++ )
+    {
+        if ( unlikely(alloc_domain_page(p) == NULL) ||
+             unlikely(free_pfns < (SLACK_DOMAIN_MEM_KILOBYTES >> 
+                                   (PAGE_SHIFT-10))) )
+        {
+            free_all_dom_mem(p);
+            return -1;
+        }
+    }
+
+    p->tot_pages = nr_pages;
 
     return 0;
 }
  
-
-void free_all_dom_mem(struct task_struct *p)
-{
-    struct list_head *ent;
-    unsigned long flags;
-
-    spin_lock_irqsave(&free_list_lock, flags);
-    while ( (ent = p->pg_head.next) != &p->pg_head )
-    {
-        struct pfn_info *pf = list_entry(ent, struct pfn_info, list);
-        set_page_type_count(pf, 0);
-        set_page_tot_count(pf, 0);
-        pf->flags = 0;
-        ASSERT(ent->next->prev == ent);
-        ASSERT(ent->prev->next == ent);
-        list_del(ent);
-        list_add(ent, &free_list);
-        free_pfns++;
-    }
-    spin_unlock_irqrestore(&free_list_lock, flags);
-
-    p->tot_pages = 0;
-}
-
 
 /* Release resources belonging to task @p. */
 void release_task(struct task_struct *p)
@@ -309,7 +436,6 @@ void release_task(struct task_struct *p)
     destroy_event_channels(p);
     free_page((unsigned long)p->mm.perdomain_pt);
     UNSHARE_PFN(virt_to_page(p->shared_info));
-    free_page((unsigned long)p->shared_info);
     free_all_dom_mem(p);
 
     kmem_cache_free(task_struct_cachep, p);
@@ -360,11 +486,10 @@ int final_setup_guestos(struct task_struct *p, dom0_builddomain_t *builddomain)
     p->failsafe_selector = builddomain->ctxt.failsafe_callback_cs;
     p->failsafe_address  = builddomain->ctxt.failsafe_callback_eip;
     
-    /* NB. Page base must already be pinned! */
     phys_l2tab = builddomain->ctxt.pt_base;
     p->mm.pagetable = mk_pagetable(phys_l2tab);
-    get_page_type(&frame_table[phys_l2tab>>PAGE_SHIFT]);
-    get_page_tot(&frame_table[phys_l2tab>>PAGE_SHIFT]);
+    get_page_and_type(&frame_table[phys_l2tab>>PAGE_SHIFT], p, 
+                      PGT_l2_page_table);
 
     /* Set up the shared info structure. */
     update_dom_time(p->shared_info);
@@ -449,7 +574,7 @@ int setup_guestos(struct task_struct *p, dom0_createdomain_t *params,
         return -ENOMEM;
     }
 
-    alloc_address = list_entry(p->pg_head.prev, struct pfn_info, list) -
+    alloc_address = list_entry(p->page_list.prev, struct pfn_info, list) -
         frame_table;
     alloc_address <<= PAGE_SHIFT;
     alloc_index = p->tot_pages;
@@ -497,7 +622,7 @@ int setup_guestos(struct task_struct *p, dom0_createdomain_t *params,
     p->mm.pagetable = mk_pagetable(phys_l2tab);
 
     l2tab += l2_table_offset(virt_load_address);
-    cur_address = list_entry(p->pg_head.next, struct pfn_info, list) -
+    cur_address = list_entry(p->page_list.next, struct pfn_info, list) -
         frame_table;
     cur_address <<= PAGE_SHIFT;
     for ( count = 0; count < p->tot_pages; count++ )
@@ -514,10 +639,10 @@ int setup_guestos(struct task_struct *p, dom0_createdomain_t *params,
         }
         *l1tab++ = mk_l1_pgentry(cur_address|L1_PROT);
         
-        page = frame_table + (cur_address >> PAGE_SHIFT);
-        page->flags = dom | PGT_writeable_page | PG_need_flush;
-        set_page_type_count(page, 1);
-        set_page_tot_count(page, 1);
+        page = &frame_table[cur_address >> PAGE_SHIFT];
+        set_bit(_PGC_tlb_flush_on_type_change, &page->count_and_flags);
+        if ( !get_page_and_type(page, p, PGT_writeable_page) )
+            BUG();
         /* Set up the MPT entry. */
         machine_to_phys_mapping[cur_address >> PAGE_SHIFT] = count;
 
@@ -538,8 +663,9 @@ int setup_guestos(struct task_struct *p, dom0_createdomain_t *params,
     {
         *l1tab = mk_l1_pgentry(l1_pgentry_val(*l1tab) & ~_PAGE_RW);
         page = frame_table + l1_pgentry_to_pagenr(*l1tab);
-        page->flags = dom | PGT_l1_page_table;
-        get_page_tot(page);
+        page->type_and_flags &= ~PGT_type_mask;
+        page->type_and_flags |= PGT_l1_page_table;
+        get_page(page, p); /* an extra ref because of readable mapping */
         l1tab++;
         if( !((unsigned long)l1tab & (PAGE_SIZE - 1)) )
         {
@@ -548,9 +674,13 @@ int setup_guestos(struct task_struct *p, dom0_createdomain_t *params,
             l2tab++;
         }
     }
-    get_page_type(page); /* guest_pinned */
-    get_page_tot(page);  /* guest_pinned */
-    page->flags = dom | PG_guest_pinned | PGT_l2_page_table;
+    /* Rewrite last L1 page to be a L2 page. */
+    page->type_and_flags &= ~PGT_type_mask;
+    page->type_and_flags |= PGT_l2_page_table;
+    /* Get another ref to L2 page so that it can be pinned. */
+    if ( !get_page_and_type(page, p, PGT_l2_page_table) )
+        BUG();
+    set_bit(_PGC_guest_pinned, &page->count_and_flags);
     unmap_domain_mem(l1start);
 
     /* Set up shared info area. */
@@ -565,7 +695,7 @@ int setup_guestos(struct task_struct *p, dom0_createdomain_t *params,
 
     /* Install the new page tables. */
     __cli();
-    __write_cr3_counted(pagetable_val(p->mm.pagetable));
+    write_cr3_counted(pagetable_val(p->mm.pagetable));
 
     /* Copy the guest OS image. */    
     src  = (char *)(phy_data_start + 12);
@@ -632,7 +762,7 @@ int setup_guestos(struct task_struct *p, dom0_createdomain_t *params,
 
 
     /* Reinstate the caller's page tables. */
-    __write_cr3_counted(pagetable_val(current->mm.pagetable));
+    write_cr3_counted(pagetable_val(current->mm.pagetable));
     __sti();
 
     p->flags |= PF_CONSTRUCTED;

@@ -211,6 +211,7 @@ static inline void do_trap(int trapnr, char *str,
 
     if ( likely((fixup = search_exception_table(regs->eip)) != 0) )
     {
+        DPRINTK("Trap %d: %08lx -> %08lx\n", trapnr, regs->eip, fixup);
         regs->eip = fixup;
         regs->xds = regs->xes = regs->xfs = regs->xgs = __HYPERVISOR_DS;
         return;
@@ -328,6 +329,7 @@ asmlinkage void do_page_fault(struct pt_regs *regs, long error_code)
 
     if ( likely((fixup = search_exception_table(regs->eip)) != 0) )
     {
+        DPRINTK("Page fault: %08lx -> %08lx\n", regs->eip, fixup);
         regs->eip = fixup;
         regs->xds = regs->xes = regs->xfs = regs->xgs = __HYPERVISOR_DS;
         return;
@@ -411,6 +413,7 @@ asmlinkage void do_general_protection(struct pt_regs *regs, long error_code)
 
     if ( likely((fixup = search_exception_table(regs->eip)) != 0) )
     {
+        DPRINTK("GPF (%04lx): %08lx -> %08lx\n", error_code, regs->eip, fixup);
         regs->eip = fixup;
         regs->xds = regs->xes = regs->xfs = regs->xgs = __HYPERVISOR_DS;
         return;

@@ -1816,10 +1816,12 @@ e1000_xmit_frame(struct sk_buff *skb, struct net_device *netdev)
 static void
 e1000_tx_timeout(struct net_device *netdev)
 {
+#if 0
 	struct e1000_adapter *adapter = netdev->priv;
 
 	/* Do the reset outside of interrupt context */
-	//schedule_work(&adapter->tx_timeout_task);
+	schedule_work(&adapter->tx_timeout_task);
+#endif
 	e1000_tx_timeout_task(netdev); // XXXX HACK!!! XEN
 }
 

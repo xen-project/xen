@@ -125,9 +125,9 @@
  *  which shifts the least bits out.
  */
 /* A normal page-table update request. */
-#define MMU_NORMAL_PT_UPDATE     0 /* checked '*ptr = val'. ptr is VA.      */
+#define MMU_NORMAL_PT_UPDATE     0 /* checked '*ptr = val'. ptr is MA.      */
 /* DOM0 can make entirely unchecked updates which do not affect refcnts. */
-#define MMU_UNCHECKED_PT_UPDATE  1 /* unchecked '*ptr = val'. ptr is VA.    */
+#define MMU_UNCHECKED_PT_UPDATE  1 /* unchecked '*ptr = val'. ptr is MA.    */
 /* Update an entry in the machine->physical mapping table. */
 #define MMU_MACHPHYS_UPDATE      2 /* ptr = MA of frame to modify entry for */
 /* An extended command. */
