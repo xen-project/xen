@@ -61,6 +61,19 @@ static void exit_handler(int ev, struct pt_regs *regs);
 static void debug_handler(int ev, struct pt_regs *regs);
 
 
+static shared_info_t *map_shared_info(unsigned long pa)
+{
+    extern char shared_info[PAGE_SIZE];
+    if ( HYPERVISOR_update_va_mapping((unsigned long)shared_info >> PAGE_SHIFT,
+                                      pa | 3, UVMF_INVLPG) )
+    {
+        printk("Failed to map shared_info!!\n");
+        *(int*)0=0;
+    }
+    return (shared_info_t *)shared_info;
+}
+
+
 /*
  * INITIAL C ENTRY POINT.
  */
@@ -72,16 +85,14 @@ void start_kernel(start_info_t *si)
     memcpy(&start_info, si, sizeof(*si));
 
     /* Grab the shared_info pointer and put it in a safe place. */
-    HYPERVISOR_shared_info = start_info.shared_info;
+    HYPERVISOR_shared_info = map_shared_info(start_info.shared_info);
 
     /* Set up event and failsafe callback addresses. */
     HYPERVISOR_set_callbacks(
         __KERNEL_CS, (unsigned long)hypervisor_callback,
         __KERNEL_CS, (unsigned long)failsafe_callback);
 
-
     trap_init();
-
 
     /* ENABLE EVENT DELIVERY. This is disabled at start of day. */
     __sti();
@@ -89,8 +100,8 @@ void start_kernel(start_info_t *si)
     /* print out some useful information  */
     printk("Xeno Minimal OS!\n");
     printk("start_info:   %p\n",  si);
-    printk("  nr_pages:   %lu",   si->nr_pages);
-    printk("  shared_inf: %p\n",  si->shared_info);
+    printk("  nr_pages:   %lu",     si->nr_pages);
+    printk("  shared_inf: %08lx\n", si->shared_info);
     printk("  pt_base:    %p",    (void *)si->pt_base); 
     printk("  mod_start:  0x%lx\n", si->mod_start);
     printk("  mod_len:    %lu\n", si->mod_len); 
@@ -142,7 +153,7 @@ void start_kernel(start_info_t *si)
 void do_exit(void)
 {
     printk("do_exit called!\n");
-    for ( ;; ) ;
+    for ( ;; ) HYPERVISOR_exit();
 }
 static void exit_handler(int ev, struct pt_regs *regs) {
     do_exit();

@@ -4,9 +4,8 @@
 #define MOD_START    4
 #define MOD_LEN      8
 
-#define ENTRY(X) .globl X ; X :
-
-.globl _start                
+.globl _start, shared_info
+                        
 _start:
         cld
         
@@ -43,3 +42,7 @@ stack_start:
 	.long stack+8192, __KERNEL_DS
 
 
+        /* Unpleasant -- we actually use this PTE to map shared_info :-) */
+        .org 0x1000
+shared_info:
+        .org 0x2000
