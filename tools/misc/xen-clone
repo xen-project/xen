@@ -35,7 +35,7 @@ TOP=`/bin/pwd`
 
 # site-specific set up of installation directories
 case "$SITE" in
-CL)
+UCCL)
 	PATH=$PATH:/usr/groups/xeno/build_tools/bin
 	mkdir -p install/boot
 	cd install/boot
