@@ -22,6 +22,7 @@
 #include <xen/lib.h>
 #include <xen/trace.h>
 #include <xen/sched.h>
+#include <xen/softirq.h>
 #include <asm/current.h>
 #include <asm/io.h>
 #include <asm/irq.h>
@@ -314,7 +315,7 @@ static void vmx_io_instruction(struct xen_regs *regs,
     vio = (vcpu_iodata_t *) d->arch.arch_vmx.vmx_platform.shared_page_va;
     if (vio == 0) {
         VMX_DBG_LOG(DBG_LEVEL_1, "bad shared page: %lx", (unsigned long) vio);
-        domain_crash(); 
+        domain_crash_synchronous(); 
     }
     p = &vio->vp_ioreq;
     p->dir = test_bit(3, &exit_qualification);  
@@ -340,7 +341,7 @@ static void vmx_io_instruction(struct xen_regs *regs,
             printk("stringio crosses page boundary!\n");
             if (p->u.data & (p->size - 1)) {
                 printk("Not aligned I/O!\n");
-                domain_crash();     
+                domain_crash_synchronous();     
             }
             p->count = (PAGE_SIZE - (p->u.data & ~PAGE_MASK)) / p->size;
         } else {
@@ -424,7 +425,7 @@ static void mov_to_cr(int gp, int cr, struct xen_regs *regs)
             {
                 VMX_DBG_LOG(DBG_LEVEL_VMMU, "Invalid CR3 value = %lx", 
                         d->arch.arch_vmx.cpu_cr3);
-                domain_crash(); /* need to take a clean path */
+                domain_crash_synchronous(); /* need to take a clean path */
             }
             old_base_mfn = pagetable_val(d->arch.guest_table) >> PAGE_SHIFT;
 
@@ -494,7 +495,7 @@ static void mov_to_cr(int gp, int cr, struct xen_regs *regs)
             {
                 VMX_DBG_LOG(DBG_LEVEL_VMMU, 
                         "Invalid CR3 value=%lx", value);
-                domain_crash(); /* need to take a clean path */
+                domain_crash_synchronous(); /* need to take a clean path */
             }
             mfn = phys_to_machine_mapping(value >> PAGE_SHIFT);
             vmx_shadow_clear_state(d->domain);
@@ -620,24 +621,24 @@ static inline void vmx_do_msr_read(struct xen_regs *regs)
 /*
  * Need to use this exit to rescheule
  */
-static inline void vmx_vmexit_do_hlt()
+static inline void vmx_vmexit_do_hlt(void)
 {
 #if VMX_DEBUG
     unsigned long eip;
     __vmread(GUEST_EIP, &eip);
 #endif
     VMX_DBG_LOG(DBG_LEVEL_1, "vmx_vmexit_do_hlt:eip=%p", eip);
-    __enter_scheduler();
+    raise_softirq(SCHEDULE_SOFTIRQ);
 }
 
-static inline void vmx_vmexit_do_mwait()
+static inline void vmx_vmexit_do_mwait(void)
 {
 #if VMX_DEBUG
     unsigned long eip;
     __vmread(GUEST_EIP, &eip);
 #endif
     VMX_DBG_LOG(DBG_LEVEL_1, "vmx_vmexit_do_mwait:eip=%p", eip);
-    __enter_scheduler();
+    raise_softirq(SCHEDULE_SOFTIRQ);
 }
 
 #define BUF_SIZ     256
@@ -736,7 +737,7 @@ asmlinkage void vmx_vmexit_handler(struct xen_regs regs)
         VMX_DBG_LOG(DBG_LEVEL_0, "exit reason = %x", exit_reason);
 
     if (exit_reason & VMX_EXIT_REASONS_FAILED_VMENTRY) {
-        domain_crash();         
+        domain_crash_synchronous();         
         return;
     }
 
