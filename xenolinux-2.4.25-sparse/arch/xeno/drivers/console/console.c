@@ -151,7 +151,6 @@ static struct tty_struct *xeno_console_table[1];
 static struct termios *xeno_console_termios[1];
 static struct termios *xeno_console_termios_locked[1];
 static struct tty_struct *xeno_console_tty;
-static int xeno_console_use_count;
 
 #define WBUF_SIZE     1024
 #define WBUF_MASK(_i) ((_i)&(WBUF_SIZE-1))
@@ -164,7 +163,7 @@ static void __do_console_io(void)
     control_msg_t   *msg;
     evtchn_op_t      evtchn_op;
     CONTROL_RING_IDX c;
-    int              i, len, work_done = 0;
+    int              i, l, work_done = 0;
     static char      rbuf[16];
 
     if ( xeno_console_tty == NULL )
@@ -174,20 +173,24 @@ static void __do_console_io(void)
     if ( start_info.flags & SIF_INITDOMAIN )
     {
         /* Receive work. */
-        while ( (len = HYPERVISOR_console_io(CONSOLEIO_read, 16, rbuf)) > 0 )
-            for ( i = 0; i < len; i++ )
+        while ( (l = HYPERVISOR_console_io(CONSOLEIO_read, 16, rbuf)) > 0 )
+            for ( i = 0; i < l; i++ )
                 tty_insert_flip_char(xeno_console_tty, rbuf[i], 0);
         if ( xeno_console_tty->flip.count != 0 )
             tty_flip_buffer_push(xeno_console_tty);
 
         /* Transmit work. */
-        if ( wc != wp )
+        while ( wc != wp )
         {
-            len = wp - wc;
-            if ( len > (WBUF_SIZE - WBUF_MASK(wc)) )
-                len = WBUF_SIZE - WBUF_MASK(wc);
-            priv_conwrite(&wbuf[WBUF_MASK(wc)], len);
-            wc += len;
+            l = wp - wc;
+            if ( l > (WBUF_SIZE - WBUF_MASK(wc)) )
+                l = WBUF_SIZE - WBUF_MASK(wc);
+            priv_conwrite(&wbuf[WBUF_MASK(wc)], l);
+            wc += l;
+            wake_up_interruptible(&xeno_console_tty->write_wait);
+            if ( (xeno_console_tty->flags & (1 << TTY_DO_WRITE_WAKEUP)) &&
+                 (xeno_console_tty->ldisc.write_wakeup != NULL) )
+                (xeno_console_tty->ldisc.write_wakeup)(xeno_console_tty);
         }
 
         return;
@@ -228,32 +231,33 @@ static void __do_console_io(void)
         msg->type    = CMSG_CONSOLE;
         msg->subtype = CMSG_CONSOLE_DATA;
         msg->id      = 0xaa;
-        len = 0;
+        l = 0;
         if ( x_char != 0 ) /* Handle XON/XOFF urgently. */
         {
-            msg->msg[len++] = x_char;
+            msg->msg[l++] = x_char;
             x_char = 0;
         }
-        while ( (len < sizeof(msg->msg)) && (wc != wp) )
-            msg->msg[len++] = wbuf[WBUF_MASK(wc++)];
-        msg->length = len;
+        while ( (l < sizeof(msg->msg)) && (wc != wp) )
+            msg->msg[l++] = wbuf[WBUF_MASK(wc++)];
+        msg->length = l;
     }
     if ( ctrl_if->tx_req_prod != c )
     {
         ctrl_if->tx_req_prod = c;
         work_done = 1;
+        /* There might be something for waiters to do. */
+        wake_up_interruptible(&xeno_console_tty->write_wait);
+        if ( (xeno_console_tty->flags & (1 << TTY_DO_WRITE_WAKEUP)) &&
+             (xeno_console_tty->ldisc.write_wakeup != NULL) )
+            (xeno_console_tty->ldisc.write_wakeup)(xeno_console_tty);
     }
-        
+
     if ( work_done )
     {
         /* Send a notification to the controller. */
         evtchn_op.cmd = EVTCHNOP_send;
         evtchn_op.u.send.local_port = 0;
         (void)HYPERVISOR_event_channel_op(&evtchn_op);
-
-        /* There might be something for waiters to do. */
-        if ( xeno_console_tty != NULL )
-            wake_up_interruptible(&xeno_console_tty->write_wait);
     }
 }
 
@@ -374,35 +378,64 @@ static void xeno_console_flush_chars(struct tty_struct *tty)
     spin_unlock_irqrestore(&xeno_console_lock, flags);    
 }
 
+static void xeno_console_wait_until_sent(struct tty_struct *tty, int timeout)
+{
+    unsigned long orig_jiffies = jiffies;
+
+    while ( tty->driver.chars_in_buffer(tty) )
+    {
+        set_current_state(TASK_INTERRUPTIBLE);
+        schedule_timeout(1);
+        if ( signal_pending(current) )
+            break;
+        if ( (timeout != 0) && time_after(jiffies, orig_jiffies + timeout) )
+            break;
+    }
+    
+    set_current_state(TASK_RUNNING);
+}
+
 static int xeno_console_open(struct tty_struct *tty, struct file *filp)
 {
     int line;
+    unsigned long flags;
 
     MOD_INC_USE_COUNT;
     line = MINOR(tty->device) - tty->driver.minor_start;
-    if ( line )
+    if ( line != 0 )
     {
         MOD_DEC_USE_COUNT;
         return -ENODEV;
     }
 
+    spin_lock_irqsave(&xeno_console_lock, flags);
     tty->driver_data = NULL;
     if ( xeno_console_tty == NULL )
-    {
         xeno_console_tty = tty;
-        wc = wp = 0;
-        __do_console_io();
-    }
-
-    xeno_console_use_count++;
+    __do_console_io();
+    spin_unlock_irqrestore(&xeno_console_lock, flags);    
 
     return 0;
 }
 
 static void xeno_console_close(struct tty_struct *tty, struct file *filp)
 {
-    if ( --xeno_console_use_count == 0 )
+    unsigned long flags;
+
+    if ( tty->count == 1 )
+    {
+        tty->closing = 1;
+        tty_wait_until_sent(tty, 0);
+        if ( tty->driver.flush_buffer != NULL )
+            tty->driver.flush_buffer(tty);
+        if ( tty->ldisc.flush_buffer != NULL )
+            tty->ldisc.flush_buffer(tty);
+        tty->closing = 0;
+        spin_lock_irqsave(&xeno_console_lock, flags);
         xeno_console_tty = NULL;
+        spin_unlock_irqrestore(&xeno_console_lock, flags);    
+    }
+
     MOD_DEC_USE_COUNT;
 }
 
@@ -417,7 +450,8 @@ int __init xeno_con_init(void)
     xeno_console_driver.type            = TTY_DRIVER_TYPE_SERIAL;
     xeno_console_driver.subtype         = SERIAL_TYPE_NORMAL;
     xeno_console_driver.init_termios    = tty_std_termios;
-    xeno_console_driver.flags           = TTY_DRIVER_REAL_RAW;
+    xeno_console_driver.flags           = 
+        TTY_DRIVER_REAL_RAW | TTY_DRIVER_RESET_TERMIOS | TTY_DRIVER_NO_DEVFS;
     xeno_console_driver.refcount        = &xeno_console_refcount;
     xeno_console_driver.table           = xeno_console_table;
     xeno_console_driver.termios         = xeno_console_termios;
@@ -434,6 +468,7 @@ int __init xeno_con_init(void)
     xeno_console_driver.flush_buffer    = xeno_console_flush_buffer;
     xeno_console_driver.throttle        = xeno_console_throttle;
     xeno_console_driver.unthrottle      = xeno_console_unthrottle;
+    xeno_console_driver.wait_until_sent = xeno_console_wait_until_sent;
 
     if ( tty_register_driver(&xeno_console_driver) )
         panic("Couldn't register Xeno console driver\n");

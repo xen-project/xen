@@ -38,7 +38,13 @@ def __send_to_sock(sock):
         data = os.read(0,1)
         if ord(data[0]) == ord(']')-64:
             break
-        sock.send(data)
+        try:
+            sock.send(data)
+        except socket.error, error:
+            if error[0] == errno.EPIPE:
+                sys.exit(0)
+            if error[0] != errno.EINTR:
+                raise
     sys.exit(0)
 
 def connect(host,port):
@@ -69,6 +75,7 @@ def connect(host,port):
             print
             print "************ REMOTE CONSOLE EXITED *****************"
     else:
+        signal.signal(signal.SIGPIPE, signal.SIG_IGN)
         __send_to_sock(sock)
 
 if __name__ == '__main__':
