@@ -1,6 +1,7 @@
 package uk.ac.cam.cl.xeno.domctl;
 
 import java.io.*;
+import java.util.zip.*;
 import java.net.*;
 
 public class CommandNew extends Command
@@ -27,129 +28,147 @@ public class CommandNew extends Command
     DataInputStream dis;
     int idx;
     int i;
+    File image_tmp = null;
+    File initrd_tmp = null;
 
     d.describe ();
 
     try
       {
-	/* Some initial sanity checks */
-	if (root_dev.equals ("/dev/nfs") && (vifs == 0)) {
-	  return reportError ("Cannot use NFS root without VIFs configured");
-	}
-
-	/* Create a new empty domain */
-	Process create_p;
-	String create_cmdarray[] = new String[3];
-	int create_rc;
-	create_cmdarray[0] = d.XIToolsDir + "xi_create";
-	create_cmdarray[1] = "" + size;
-	create_cmdarray[2] = name;
-	if (Settings.TEST) {
-	  reportCommand (create_cmdarray);
-	  domain_id=1;
-	  create_rc=0;
-	} else {
-	  create_p = r.exec (create_cmdarray);
-	  dis = new DataInputStream (new BufferedInputStream (create_p.getInputStream ()));
-	  domain_id = Integer.parseInt (dis.readLine ());
-	  create_rc = create_p.waitFor ();
-	}
-
-	if (create_rc != 0) {
-	  return reportXIError ("Failed to create domain", create_cmdarray);
-	} else if (domain_id > d.MaxDomainNumber) {
-	  return reportError ("Cannot configure more than " + 
-			      d.MaxDomainNumber + " domains");
-	}
-
-	/* Set up boot parameters to pass to xi_build. */
-	if (root_dev.equals ("/dev/nfs")) {
-	  if (vifs == 0) {
-	    return reportError ("Cannot use NFS root without VIFs configured");
-	  }
-	  if (nfs_root_path == null) {
-	    return reportError ("No NFS root specified");
-	  }
-	  if (nw_nfs_server == null) {
-	    return reportError ("No NFS server specified");
-	  }
-	  bargs = (bargs + 
-		   "root=/dev/nfs " +
-		   "nfsroot=" + StringPattern.parse(nfs_root_path).resolve(domain_id) +
-		   " ");
-	} else {
-	  bargs = (bargs + 
-		   "root=" + StringPattern.parse(root_dev).resolve(domain_id) +
-		   " ");
-
-	}
-	
-	if (vifs > 0) {
-	  domain_ip = InetAddressPattern.parse(nw_ip).resolve(domain_id);
-	  if (nw_host == null) {
-	    try {
-	      nw_host = InetAddress.getByName(domain_ip).getHostName();
-	    } catch (UnknownHostException uhe) {
-	      nw_host = "" + nw_ip;
+	try
+	  {
+	    /* Some initial sanity checks */
+	    if (root_dev.equals ("/dev/nfs") && (vifs == 0)) {
+	      return reportError ("Cannot use NFS root without VIFs configured");
 	    }
 	    
+	    /* Uncompress the image and initrd */
+	    if (image.endsWith (".gz")) {
+	      image_tmp = getUncompressed ("xen-image-", image);
+	      image = image_tmp.getPath ();
+	    }
+	    
+	    if (initrd != null && initrd.endsWith (".gz")) {
+	      initrd_tmp = getUncompressed ("xen-initrd-", initrd);
+	      initrd = initrd_tmp.getPath ();
+	    }
+	    
+	    /* Create a new empty domain */
+	    Process create_p;
+	    String create_cmdarray[] = new String[3];
+	    int create_rc;
+	    create_cmdarray[0] = d.XIToolsDir + "xi_create";
+	    create_cmdarray[1] = "" + size;
+	    create_cmdarray[2] = name;
+	    if (Settings.TEST) {
+	      reportCommand (create_cmdarray);
+	      domain_id=1;
+	      create_rc=0;
+	    } else {
+	      create_p = r.exec (create_cmdarray);
+	      dis = new DataInputStream (new BufferedInputStream (create_p.getInputStream ()));
+	      domain_id = Integer.parseInt (dis.readLine ());
+	      create_rc = create_p.waitFor ();
+	    }
+	    
+	    if (create_rc != 0) {
+	      return reportXIError ("Failed to create domain", create_cmdarray);
+	    } else if (domain_id > d.MaxDomainNumber) {
+	      return reportError ("Cannot configure more than " + 
+				  d.MaxDomainNumber + " domains");
+	    }
+	    
+	    /* Set up boot parameters to pass to xi_build. */
+	    if (root_dev.equals ("/dev/nfs")) {
+	      if (vifs == 0) {
+		return reportError ("Cannot use NFS root without VIFs configured");
+	      }
+	      if (nfs_root_path == null) {
+		return reportError ("No NFS root specified");
+	      }
+	      if (nw_nfs_server == null) {
+		return reportError ("No NFS server specified");
+	      }
+	      bargs = (bargs + 
+		       "root=/dev/nfs " +
+		       "nfsroot=" + StringPattern.parse(nfs_root_path).resolve(domain_id) +
+		       " ");
+	    } else {
+	      bargs = (bargs + 
+		       "root=" + StringPattern.parse(root_dev).resolve(domain_id) +
+		       " ");
+	      
+	    }
+	    
+	    if (vifs > 0) {
+	      domain_ip = InetAddressPattern.parse(nw_ip).resolve(domain_id);
+	      if (nw_host == null) {
+		try {
+		  nw_host = InetAddress.getByName(domain_ip).getHostName();
+		} catch (UnknownHostException uhe) {
+		  nw_host = "" + nw_ip;
+		}
+		
+	      }
+	      bargs = ("ip=" + domain_ip +
+		       ":" + ((nw_nfs_server == null) ? "" : (InetAddressPattern.parse(nw_nfs_server).resolve(domain_id))) +
+		       ":" + ((nw_gw == null) ? "" : (InetAddressPattern.parse(nw_gw).resolve(domain_id))) + 
+		       ":" + ((nw_mask == null) ? "" : InetAddressPattern.parse(nw_mask).resolve(domain_id)) +
+		       ":" + ((nw_host == null) ? "" : nw_host) + 
+		       ":eth0:off " + bargs);
+	    }
+	    
+	    /* Build the domain */
+	    Process build_p;
+	    String build_cmdarray[] = new String[6];
+	    int build_rc;
+	    idx = 0;
+	    for (i = 0; i < build_cmdarray.length; i ++) 
+	      build_cmdarray[i] = "";
+	    build_cmdarray[idx ++] = d.XIToolsDir + "xi_build";
+	    build_cmdarray[idx ++] = "" + domain_id;
+	    build_cmdarray[idx ++] = "" + image;
+	    build_cmdarray[idx ++] = "" + vifs;
+	    if (initrd != null) build_cmdarray[idx ++] = "initrd=" + initrd;
+	    build_cmdarray[idx ++] = "" + bargs;
+	    System.out.println ("Build args: " + bargs);
+	    if (Settings.TEST) {
+	      reportCommand (build_cmdarray);
+	      build_rc = 0;
+	    } else {
+	      build_p = r.exec (build_cmdarray);
+	      build_rc = build_p.waitFor ();
+	    }
+	    
+	    if (build_rc != 0) {
+	      return reportXIError ("Failed to build domain", build_cmdarray);
+	    }
+	    
+	    /* Set up the first VIF if necessary */
+	    if (vifs > 0) {
+	      Process vifinit_p;
+	      String vifinit_cmdarray[] = new String[4];
+	      int vifinit_rc;
+	      vifinit_cmdarray[0] = d.XIToolsDir + "xi_vifinit";
+	      vifinit_cmdarray[1] = "" + domain_id;
+	      vifinit_cmdarray[2] = "0";
+	      vifinit_cmdarray[3] = domain_ip;
+	      if (Settings.TEST) {
+		reportCommand (vifinit_cmdarray);
+		vifinit_rc = 0;
+	      } else {
+		vifinit_p = r.exec (vifinit_cmdarray);
+		vifinit_rc = vifinit_p.waitFor ();
+	      }
+	      
+	      if (vifinit_rc != 0) {
+		return reportXIError ("Failed to initialise VIF 0", vifinit_cmdarray);
+	      }
+	    }
+	  } finally {
+	    if (image_tmp != null) image_tmp.delete();
+	    if (initrd_tmp != null) initrd_tmp.delete ();
 	  }
-	  bargs = ("ip=" + domain_ip +
-		   ":" + ((nw_nfs_server == null) ? "" : (InetAddressPattern.parse(nw_nfs_server).resolve(domain_id))) +
-		   ":" + ((nw_gw == null) ? "" : (InetAddressPattern.parse(nw_gw).resolve(domain_id))) + 
-		   ":" + ((nw_mask == null) ? "" : InetAddressPattern.parse(nw_mask).resolve(domain_id)) +
-		   ":" + ((nw_host == null) ? "" : nw_host) + 
-		   ":eth0:off " + bargs);
-	}
-	
-	/* Build the domain */
-	Process build_p;
-	String build_cmdarray[] = new String[6];
-	int build_rc;
-	idx = 0;
-	for (i = 0; i < build_cmdarray.length; i ++) 
-	  build_cmdarray[i] = "";
-	build_cmdarray[idx ++] = d.XIToolsDir + "xi_build";
-	build_cmdarray[idx ++] = "" + domain_id;
-	build_cmdarray[idx ++] = "" + image;
-	build_cmdarray[idx ++] = "" + vifs;
-	if (initrd != null) build_cmdarray[idx ++] = "initrd=" + initrd;
-	build_cmdarray[idx ++] = "" + bargs;
-	System.out.println ("Build args: " + bargs);
-	if (Settings.TEST) {
-	  reportCommand (build_cmdarray);
-	  build_rc = 0;
-	} else {
-	  build_p = r.exec (build_cmdarray);
-	  build_rc = build_p.waitFor ();
-	}
-
-	if (build_rc != 0) {
-	  return reportXIError ("Failed to build domain", build_cmdarray);
-	}
-
-
-	/* Set up the first VIF if necessary */
-	if (vifs > 0) {
-	  Process vifinit_p;
-	  String vifinit_cmdarray[] = new String[4];
-	  int vifinit_rc;
-	  vifinit_cmdarray[0] = d.XIToolsDir + "xi_vifinit";
-	  vifinit_cmdarray[1] = "" + domain_id;
-	  vifinit_cmdarray[2] = "0";
-	  vifinit_cmdarray[3] = domain_ip;
-	  if (Settings.TEST) {
-	    reportCommand (vifinit_cmdarray);
-	    vifinit_rc = 0;
-	  } else {
-	    vifinit_p = r.exec (vifinit_cmdarray);
-	    vifinit_rc = vifinit_p.waitFor ();
-	  }
-	  
-	  if (vifinit_rc != 0) {
-	    return reportXIError ("Failed to initialise VIF 0", vifinit_cmdarray);
-	  }
-	}
       }
     catch (Exception e) 
       {
@@ -163,6 +182,29 @@ public class CommandNew extends Command
     }
 
     return rc;
+  }
+
+  File getUncompressed (String prefix, String original) throws IOException {
+    FileOutputStream fos;
+    GZIPInputStream gis;
+    File result;
+    byte buffer[] = new byte[1024];
+    int l;
+    
+    result = File.createTempFile (prefix, null);
+    
+    try {
+      fos = new FileOutputStream (result);
+      gis = new GZIPInputStream (new FileInputStream (original));
+      while ((l = gis.read(buffer, 0, buffer.length)) != -1) {
+	fos.write (buffer, 0, l);
+      }	  
+    } catch (IOException ioe) {
+      result.delete ();
+      throw ioe;
+    }
+
+    return result;
   }
 
   public String getName()
