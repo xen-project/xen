@@ -330,24 +330,34 @@ long do_dom0_op(dom0_op_t *u_dom0_op)
 
     case DOM0_GETPAGEFRAMEINFO:
     {
-        struct pfn_info *page = frame_table + op.u.getpageframeinfo.pfn;
+        struct pfn_info *page;
+        unsigned long pfn = op.u.getpageframeinfo.pfn;
         
-        op.u.getpageframeinfo.domain = page->flags & PG_domain_mask;
-        op.u.getpageframeinfo.type   = NONE;
-        if ( page->type_count & REFCNT_PIN_BIT )
+        if ( pfn >= max_page )
         {
-            switch ( page->flags & PG_type_mask )
-            {
-            case PGT_l1_page_table:
-                op.u.getpageframeinfo.type = L1TAB;
-                break;
-            case PGT_l2_page_table:
-                op.u.getpageframeinfo.type = L2TAB;
-                break;
-            }
+            ret = -EINVAL;
         }
+        else
+        {
+            page = frame_table + pfn;
+            
+            op.u.getpageframeinfo.domain = page->flags & PG_domain_mask;
+            op.u.getpageframeinfo.type   = NONE;
+            if ( page->type_count & REFCNT_PIN_BIT )
+            {
+                switch ( page->flags & PG_type_mask )
+                {
+                case PGT_l1_page_table:
+                    op.u.getpageframeinfo.type = L1TAB;
+                    break;
+                case PGT_l2_page_table:
+                    op.u.getpageframeinfo.type = L2TAB;
+                    break;
+                }
+            }
 
-        copy_to_user(u_dom0_op, &op, sizeof(op));
+            copy_to_user(u_dom0_op, &op, sizeof(op));
+        }
     }
     break;
 

@@ -169,6 +169,8 @@
 3ec43c5dmQxGDvgJJXbV1yLxT30Y1A tools/internal/xi_helper
 3f108ad5wQm0ZaQ4GXFoUhH1W1aW9w tools/internal/xi_list.c
 3f0458aaXhD8BQAggO81gv30RQ-ifA tools/internal/xi_phys_grant.c
+3fa9861aBdNV1yCjfY4cLPr4Mtrpuw tools/internal/xi_restore_linux.c
+3fa98615LWZfagwDBp7XfuC-u9wi3w tools/internal/xi_save_linux.c
 3f108adb2b5OkKL6-faG3lMiOYDf_w tools/internal/xi_sched_domain.c
 3f108ade1v8weyh1sKx890VTd240Hw tools/internal/xi_sched_global.c
 3eb781fd8oRfPgH7qTh7xvgmwD6NgA tools/internal/xi_start.c
