@@ -786,7 +786,7 @@ static int do_extended_command(unsigned long ptr, unsigned long val)
 int do_process_page_updates(page_update_request_t *ureqs, int count)
 {
     page_update_request_t req;
-    unsigned long flags, pfn;
+    unsigned long flags, pfn, *ptr;
     struct pfn_info *page;
     int err = 0, i;
     unsigned int cmd;
@@ -833,6 +833,10 @@ int do_process_page_updates(page_update_request_t *ureqs, int count)
                     break;
                 default:
                     MEM_LOG("Update to non-pt page %08lx", req.ptr);
+                    ptr = map_domain_mem(req.ptr);
+                    *ptr = req.val;
+                    unmap_domain_mem(ptr);
+                    err = 0;
                     break;
                 }
             }
@@ -870,7 +874,7 @@ int do_process_page_updates(page_update_request_t *ureqs, int count)
             req.ptr &= ~(sizeof(l1_pgentry_t) - 1);
             if ( current->domain == 0 )
             {
-                unsigned long *ptr = map_domain_mem(req.ptr);
+                ptr = map_domain_mem(req.ptr);
                 *ptr = req.val;
                 unmap_domain_mem(ptr);
                 err = 0;
