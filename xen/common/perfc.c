@@ -31,7 +31,7 @@ static struct {
 
 #define NR_PERFCTRS (sizeof(perfc_info) / sizeof(perfc_info[0]))
 
-struct perfcounter_t perfcounters;
+struct perfcounter perfcounters;
 
 void perfc_printall(unsigned char key)
 {

@@ -46,12 +46,11 @@
 #define PERFSTATUS_ARRAY( var, name, size ) \
   atomic_t var[size];
 
-struct perfcounter_t 
-{
+struct perfcounter {
 #include <xen/perfc_defn.h>
 };
 
-extern struct perfcounter_t perfcounters;
+extern struct perfcounter perfcounters;
 
 #define perfc_value(x)    atomic_read(&perfcounters.x[0])
 #define perfc_valuec(x)   atomic_read(&perfcounters.x[smp_processor_id()])
