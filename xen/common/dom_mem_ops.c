@@ -35,6 +35,12 @@ static long alloc_dom_mem(struct domain *d,
 
     for ( i = 0; i < nr_extents; i++ )
     {
+        hypercall_may_preempt(
+            __HYPERVISOR_dom_mem_op, 5,
+            MEMOP_increase_reservation,
+            &extent_list[i], nr_extents-i, extent_order,
+            (d == current) ? DOMID_SELF : d->id);
+
         if ( unlikely((page = alloc_domheap_pages(d, extent_order)) == NULL) )
         {
             DPRINTK("Could not allocate a frame\n");
@@ -63,6 +69,12 @@ static long free_dom_mem(struct domain *d,
 
     for ( i = 0; i < nr_extents; i++ )
     {
+        hypercall_may_preempt(
+            __HYPERVISOR_dom_mem_op, 5,
+            MEMOP_decrease_reservation,
+            &extent_list[i], nr_extents-i, extent_order,
+            (d == current) ? DOMID_SELF : d->id);
+
         if ( unlikely(__get_user(mpfn, &extent_list[i]) != 0) )
             return i;
 

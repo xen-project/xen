@@ -426,6 +426,22 @@ long do_iopl(domid_t domain, unsigned int new_io_pl)
     return 0;
 }
 
+void hypercall_create_continuation(unsigned int op, unsigned int nr_args, ...)
+{
+    execution_context_t *ec = get_execution_context();
+    unsigned long *preg = &ec->ebx;
+    unsigned int i;
+    va_list args;
+
+    ec->eax  = op;
+    ec->eip -= 2;  /* re-execute 'int 0x82' */
+
+    va_start(args, nr_args);
+    for ( i = 0; i < nr_args; i++ )
+        *preg++ = va_arg(args, unsigned long);
+    va_end(args);
+}
+
 #endif
 
 
