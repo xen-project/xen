@@ -970,6 +970,10 @@ void domain_relinquish_memory(struct domain *d)
     /* Ensure that noone is running over the dead domain's page tables. */
     synchronise_pagetables(~0UL);
 
+    /* Release device mappings of other domains */
+    gnttab_release_dev_mappings( d->grant_table );
+
+
     /* Exit shadow mode before deconstructing final guest page table. */
     shadow_mode_disable(d);
 
