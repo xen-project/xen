@@ -2039,7 +2039,7 @@ void audit_domain(struct domain *d)
             scan_for_pfn( e, xpfn );            
     }   
 
-    int i;
+    int i, l1, l2;
     unsigned long pfn;
     struct list_head *list_ent;
     struct pfn_info *page;
@@ -2280,6 +2280,7 @@ void audit_domain(struct domain *d)
 
     /* PHASE 3 */
     list_ent = d->page_list.next;
+    l1 = l2 = 0;
     for ( i = 0; (list_ent != &d->page_list); i++ )
     {
         unsigned long *pt;
@@ -2289,6 +2290,7 @@ void audit_domain(struct domain *d)
         switch ( page->u.inuse.type_info & PGT_type_mask )
         {
         case PGT_l2_page_table:
+	    l2++;
             if ( (page->u.inuse.type_info & PGT_pinned) == PGT_pinned )
                 adjust( page, 1, 1 );          
 
@@ -2315,6 +2317,7 @@ void audit_domain(struct domain *d)
             break;
 
         case PGT_l1_page_table:
+	    l1++;
             if ( (page->u.inuse.type_info & PGT_pinned) == PGT_pinned )
                 adjust( page, 1, 1 );
 
@@ -2355,7 +2358,7 @@ void audit_domain(struct domain *d)
     if( pagetable_val(d->mm.pagetable) )
 	adjust(&frame_table[pagetable_val(d->mm.pagetable)>>PAGE_SHIFT], 1, 1);
 
-    printk("Audit %d: Done. pages=%d ctot=%d ttot=%d\n", i, d->id, ctot, ttot );
+    printk("Audit %d: Done. pages=%d l1=%d l2=%d ctot=%d ttot=%d\n", d->id, i, l1, l2, ctot, ttot );
 
     if ( d != current )
         domain_unpause(d);
