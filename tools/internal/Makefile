@@ -1,5 +1,5 @@
 CC = gcc
-CFLAGS = -Wall -I../../xen/include
+CFLAGS = -Wall -I../../xen/include -I../../xenolinux-2.4.21-sparse/include
 XI_CREATE = xi_create
 XI_START = xi_start
 XI_STOP = xi_stop

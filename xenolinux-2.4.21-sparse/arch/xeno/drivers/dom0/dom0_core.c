@@ -29,6 +29,7 @@
 #include <asm/pgtable.h>
 #include <asm/uaccess.h>
 #include <asm/tlb.h>
+#include <asm/dom0.h>
 
 #include "dom0_ops.h"
 

@@ -539,6 +539,7 @@
 3f05a939_I9vPADPgyVBwUDUxtoeOQ xenolinux-2.4.21-sparse/fs/partitions/xeno.h
 3e5a4e66wbeCpsJgVf_U8Jde-CNcsA xenolinux-2.4.21-sparse/include/asm-xeno/bugs.h
 3e5a4e66HdSkvIV6SJ1evG_xmTmXHA xenolinux-2.4.21-sparse/include/asm-xeno/desc.h
+3f0c3721E5WAnbeoPp7PE35J_Ndxaw xenolinux-2.4.21-sparse/include/asm-xeno/dom0.h
 3e5a4e66SYp_UpAVcF8Lc1wa3Qtgzw xenolinux-2.4.21-sparse/include/asm-xeno/fixmap.h
 3e5a4e67w_DWgjIJ17Tlossu1LGujQ xenolinux-2.4.21-sparse/include/asm-xeno/highmem.h
 3e5a4e67YtcyDLQsShhCfQwPSELfvA xenolinux-2.4.21-sparse/include/asm-xeno/hw_irq.h

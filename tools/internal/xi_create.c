@@ -19,6 +19,7 @@
 #include "dom0_ops.h"
 #include "dom0_defs.h"
 #include "mem_defs.h"
+#include "asm-xeno/dom0.h"
 
 /***********************************************************************/
 
