@@ -35,6 +35,16 @@
 #define DPRINTK_IOCTL(_f, _a...) ((void)0)
 #endif
 
+/*
+ * We have one of these per XL-IDE, XL-SCSI, and XL-VIRT device.
+ * They hang in an array off the gendisk structure. We may end up putting
+ * all kinds of interesting stuff here :-)
+ */
+typedef struct xl_disk {
+    int usage;
+    unsigned long capacity;
+} xl_disk_t;
+
 /* Generic layer. */
 extern int xenolinux_control_msg(int operration, char *buffer);
 extern int xenolinux_block_open(struct inode *inode, struct file *filep);

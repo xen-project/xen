@@ -34,7 +34,7 @@ static int nr_pending;
 /* Convert from a XenoLinux major device to the Xen-level 'physical' device */
 static inline unsigned short xldev_to_physdev(kdev_t xldev) 
 {
-    unsigned short physdev;
+    unsigned short physdev = 0;
 
     switch ( MAJOR(xldev) ) 
     { 
@@ -49,10 +49,9 @@ static inline unsigned short xldev_to_physdev(kdev_t xldev)
     case XLVIRT_MAJOR:
         physdev = XENDEV_VIRTUAL;
         break;
-
-    default: 
-        BUG();
     } 
+
+    if ( physdev == 0 ) BUG();
 
     physdev += (MINOR(xldev) >> PARTN_SHIFT);
 
@@ -84,23 +83,36 @@ static inline struct gendisk *xldev_to_gendisk(kdev_t xldev)
     return gd;
 }
 
+
+static inline xl_disk_t *xldev_to_xldisk(kdev_t xldev)
+{
+    struct gendisk *gd = xldev_to_gendisk(xldev);
+    return (xl_disk_t *)gd->real_devices + (MINOR(xldev) >> PARTN_SHIFT);
+}
+
+
 int xenolinux_block_open(struct inode *inode, struct file *filep)
 {
-    DPRINTK("xenolinux_block_open\n"); 
+    xl_disk_t *disk = xldev_to_xldisk(inode->i_rdev);
+    disk->usage++;
+    DPRINTK("xenolinux_block_open\n");
     return 0;
 }
 
+
 int xenolinux_block_release(struct inode *inode, struct file *filep)
 {
+    xl_disk_t *disk = xldev_to_xldisk(inode->i_rdev);
+    disk->usage--;
     DPRINTK("xenolinux_block_release\n");
     return 0;
 }
 
 
-
 int xenolinux_block_ioctl(struct inode *inode, struct file *filep,
 			  unsigned command, unsigned long argument)
 {
+    kdev_t dev = inode->i_rdev;
     struct hd_geometry *geo = (struct hd_geometry *)argument;
     struct gendisk *gd;     
     struct hd_struct *part; 
@@ -112,10 +124,10 @@ int xenolinux_block_ioctl(struct inode *inode, struct file *filep,
     if (!inode)                  return -EINVAL;
 
     DPRINTK_IOCTL("command: 0x%x, argument: 0x%lx, dev: 0x%04x\n",
-                  command, (long) argument, inode->i_rdev); 
+                  command, (long) argument, dev); 
   
-    gd = xldev_to_gendisk(inode->i_rdev);
-    part = &gd->part[MINOR(inode->i_rdev)]; 
+    gd = xldev_to_gendisk(dev);
+    part = &gd->part[MINOR(dev)]; 
 
     switch ( command )
     {
@@ -125,25 +137,26 @@ int xenolinux_block_ioctl(struct inode *inode, struct file *filep,
 
     case BLKRRPART:                               /* re-read partition table */
         DPRINTK_IOCTL("   BLKRRPART: %x\n", BLKRRPART); 
-	break;
+        if ( !capable(CAP_SYS_ADMIN) ) return -EACCES;
+        return xenolinux_block_revalidate(dev);
 
     case BLKSSZGET:
-	switch ( MAJOR(inode->i_rdev) )
+	switch ( MAJOR(dev) )
         {
 	case XLIDE_MAJOR: 
 	    DPRINTK_IOCTL("   BLKSSZGET: %x 0x%x\n", BLKSSZGET, 
-			  xlide_hwsect(MINOR(inode->i_rdev)));
-	    return xlide_hwsect(MINOR(inode->i_rdev)); 
+			  xlide_hwsect(MINOR(dev)));
+	    return xlide_hwsect(MINOR(dev)); 
 
 	case XLSCSI_MAJOR: 
 	    DPRINTK_IOCTL("   BLKSSZGET: %x 0x%x\n", BLKSSZGET,
-			  xlscsi_hwsect(MINOR(inode->i_rdev)));
-	    return xlscsi_hwsect(MINOR(inode->i_rdev)); 
+			  xlscsi_hwsect(MINOR(dev)));
+	    return xlscsi_hwsect(MINOR(dev)); 
 
         case XLVIRT_MAJOR:
 	    DPRINTK_IOCTL("   BLKSSZGET: %x 0x%x\n", BLKSSZGET, 
-			  xlsegment_hwsect(MINOR(inode->i_rdev)));
-	    return xlsegment_hwsect(MINOR(inode->i_rdev)); 
+			  xlsegment_hwsect(MINOR(dev)));
+	    return xlsegment_hwsect(MINOR(dev)); 
 
 	default: 
 	    printk(KERN_ALERT "BLKSSZGET ioctl() on bogus disk!\n"); 
@@ -202,9 +215,32 @@ int xenolinux_block_check(kdev_t dev)
 
 int xenolinux_block_revalidate(kdev_t dev)
 {
-    DPRINTK("xenolinux_block_revalidate\n"); 
+    struct gendisk *gd = xldev_to_gendisk(dev);
+    xl_disk_t *disk = xldev_to_xldisk(dev);
+    unsigned long flags;
+    int i;
+    
+    spin_lock_irqsave(&io_request_lock, flags);
+    if ( disk->usage > 1 )
+    {
+        spin_unlock_irqrestore(&io_request_lock, flags);
+        return -EBUSY;
+    }
+    spin_unlock_irqrestore(&io_request_lock, flags);
+
+    for ( i = 0; i < (1 << PARTN_SHIFT); i++ )
+    {
+        invalidate_device(dev + i, 1);
+        gd->part[dev + i].start_sect = 0;
+        gd->part[dev + i].nr_sects = 0;
+    }
+
+    grok_partitions(gd, MINOR(dev) >> PARTN_SHIFT,
+                    1 << PARTN_SHIFT, disk->capacity);
+
     return 0;
 }
+
 
 /*
  * hypervisor_request

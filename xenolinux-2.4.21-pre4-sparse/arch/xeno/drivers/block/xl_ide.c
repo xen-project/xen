@@ -78,6 +78,8 @@ int xlide_init(xen_disk_info_t *xdi)
     for ( i = 0; i < xdi->count; i++ )
         if ( xdi->disks[i].type == XEN_DISK_IDE ) units++;
 
+    if ( units == 0 ) return 0;
+
     /* Construct an appropriate gendisk structure. */
     minors    = units * (1<<IDE_PARTN_BITS);
     gd        = kmalloc(sizeof(struct gendisk), GFP_KERNEL);
@@ -88,7 +90,7 @@ int xlide_init(xen_disk_info_t *xdi)
     gd->minor_shift  = IDE_PARTN_BITS; 
     gd->max_p	     = 1<<IDE_PARTN_BITS;
     gd->nr_real	     = units;           
-    gd->real_devices = NULL;          
+    gd->real_devices = kmalloc(units * sizeof(xl_disk_t), GFP_KERNEL);
     gd->next	     = NULL;            
     gd->fops         = &xlide_block_fops;
     gd->de_arr       = kmalloc(sizeof(*gd->de_arr) * units, GFP_KERNEL);
@@ -97,14 +99,17 @@ int xlide_init(xen_disk_info_t *xdi)
     memset(gd->part,  0, minors * sizeof(struct hd_struct));
     memset(gd->de_arr, 0, sizeof(*gd->de_arr) * units);
     memset(gd->flags, 0, sizeof(*gd->flags) * units);
+    memset(gd->real_devices, 0, sizeof(xl_disk_t) * units);
     xlide_gendisk = gd;
     add_gendisk(gd);
-
+    
     /* Now register each disk in turn. */
     disk = 0;
     for ( i = 0; i < xdi->count; i++ )
     {
         if ( xdi->disks[i].type != XEN_DISK_IDE ) continue;
+        ((xl_disk_t *)gd->real_devices)[disk].capacity =
+            xdi->disks[i].capacity;
         register_disk(gd, 
                       MKDEV(XLIDE_MAJOR, disk<<IDE_PARTN_BITS), 
                       1<<IDE_PARTN_BITS, 
@@ -112,7 +117,7 @@ int xlide_init(xen_disk_info_t *xdi)
                       xdi->disks[i].capacity);
         disk++;
     }
-   
+
     printk(KERN_ALERT 
 	   "XenoLinux Virtual IDE Device Driver installed [device: %d]\n",
 	   XLIDE_MAJOR);

@@ -96,6 +96,8 @@ int __init xlseg_init(void)
     for ( i = 0; i < xdi->count; i++ )
         if ( xdi->disks[i].type == XEN_DISK_VIRTUAL ) units++;
 
+    if ( units == 0 ) return 0;
+
     /* Construct an appropriate gendisk structure. */
     minors    = units * (1<<VIRT_PARTN_BITS);
     gd        = kmalloc(sizeof(struct gendisk), GFP_KERNEL);
@@ -106,7 +108,7 @@ int __init xlseg_init(void)
     gd->minor_shift  = VIRT_PARTN_BITS; 
     gd->max_p	     = 1<<VIRT_PARTN_BITS;
     gd->nr_real	     = units;           
-    gd->real_devices = NULL;          
+    gd->real_devices = kmalloc(units * sizeof(xl_disk_t), GFP_KERNEL);
     gd->next	     = NULL;            
     gd->fops         = &xlsegment_block_fops;
     gd->de_arr       = kmalloc(sizeof(*gd->de_arr) * units, GFP_KERNEL);
@@ -115,6 +117,7 @@ int __init xlseg_init(void)
     memset(gd->part,  0, minors * sizeof(struct hd_struct));
     memset(gd->de_arr, 0, sizeof(*gd->de_arr) * units);
     memset(gd->flags, 0, sizeof(*gd->flags) * units);
+    memset(gd->real_devices, 0, sizeof(xl_disk_t) * units);
     xlsegment_gendisk = gd;
     add_gendisk(gd);
 
@@ -123,6 +126,8 @@ int __init xlseg_init(void)
     for ( i = 0; i < xdi->count; i++ )
     {
         if ( xdi->disks[i].type != XEN_DISK_VIRTUAL ) continue;
+        ((xl_disk_t *)gd->real_devices)[disk].capacity =
+            xdi->disks[i].capacity;
         register_disk(gd, 
                       MKDEV(XLVIRT_MAJOR, disk<<VIRT_PARTN_BITS), 
                       1<<VIRT_PARTN_BITS, 

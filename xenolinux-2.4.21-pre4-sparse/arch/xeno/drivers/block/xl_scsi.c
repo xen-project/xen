@@ -79,6 +79,8 @@ int xlscsi_init(xen_disk_info_t *xdi)
     for ( i = 0; i < xdi->count; i++ )
         if ( xdi->disks[i].type == XEN_DISK_SCSI ) units++;
 
+    if ( units == 0 ) return 0;
+
     /* Construct an appropriate gendisk structure. */
     minors    = units * (1<<SCSI_PARTN_BITS);
     gd        = kmalloc(sizeof(struct gendisk), GFP_KERNEL);
@@ -89,7 +91,7 @@ int xlscsi_init(xen_disk_info_t *xdi)
     gd->minor_shift  = SCSI_PARTN_BITS; 
     gd->max_p	     = 1<<SCSI_PARTN_BITS;
     gd->nr_real	     = units;           
-    gd->real_devices = NULL;          
+    gd->real_devices = kmalloc(units * sizeof(xl_disk_t), GFP_KERNEL);
     gd->next	     = NULL;            
     gd->fops         = &xlscsi_block_fops;
     gd->de_arr       = kmalloc(sizeof(*gd->de_arr) * units, GFP_KERNEL);
@@ -98,6 +100,7 @@ int xlscsi_init(xen_disk_info_t *xdi)
     memset(gd->part,  0, minors * sizeof(struct hd_struct));
     memset(gd->de_arr, 0, sizeof(*gd->de_arr) * units);
     memset(gd->flags, 0, sizeof(*gd->flags) * units);
+    memset(gd->real_devices, 0, sizeof(xl_disk_t) * units);
     xlscsi_gendisk = gd;
     add_gendisk(gd);
 
@@ -106,6 +109,8 @@ int xlscsi_init(xen_disk_info_t *xdi)
     for ( i = 0; i < xdi->count; i++ )
     {
         if ( xdi->disks[i].type != XEN_DISK_SCSI ) continue;
+        ((xl_disk_t *)gd->real_devices)[disk].capacity =
+            xdi->disks[i].capacity;
         register_disk(gd,
                       MKDEV(XLSCSI_MAJOR, disk<<SCSI_PARTN_BITS), 
                       1<<SCSI_PARTN_BITS, 
