@@ -34,7 +34,7 @@ $(NETBSD_DIR)/.valid: pristine-netbsd-$(NETBSD_VER)
 netbsd-xen%: $(NETBSD_DIR)/.valid netbsd-$(NETBSD_RELEASE)-tools
 	$(MAKE) -C netbsd-$(FULLVERSION) config
 	$(MAKE) -C netbsd-$(FULLVERSION) netbsd
-	$(MAKE) -C netbsd-$(FULLVERSION) INSTALL_PATH=$(INSTALL_DIR) INSTALL_NAME=boot/netbsd-$(NETBSD_VER)-xen$* install
+	$(MAKE) -C netbsd-$(FULLVERSION) INSTALL_PATH=$(DESTDIR) INSTALL_NAME=boot/netbsd-$(NETBSD_VER)-xen$* install
 
 clean:
 	$(MAKE) -C netbsd-$(FULLVERSION) clean

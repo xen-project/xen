@@ -8,7 +8,7 @@
 #define __ASM_X86_CPUFEATURE_H
 
 /* Sample usage: CPU_FEATURE_P(cpu.x86_capability, FPU) */
-#define CPU_FEATURE_P(CAP, FEATURE) test_bit(CAP, X86_FEATURE_##FEATURE ##_BIT)
+#define CPU_FEATURE_P(CAP, FEATURE) test_bit(CAP, X86_FEATURE_##FEATURE)
 
 #define NCAPINTS	6	/* Currently we have 6 32-bit words worth of info */
 

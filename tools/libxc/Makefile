@@ -1,5 +1,9 @@
+INSTALL		= install
+INSTALL_PROG	= $(INSTALL) -m0755
+INSTALL_DATA	= $(INSTALL) -m0644
+INSTALL_DIR	= $(INSTALL) -d -m0755
 
-MAJOR    = 2.0
+MAJOR    = 3.0
 MINOR    = 0
 SONAME   = libxc.so.$(MAJOR)
 
@@ -63,15 +67,15 @@ mk-symlinks:
 	  ln -sf ../../$(LINUX_ROOT)/include/asm-xen/linux-public/*.h . )
 
 install: all
-	mkdir -p $(prefix)/usr/lib
-	mkdir -p $(prefix)/usr/include
-	install -m0755 $(LIB) $(prefix)/usr/lib
-	ln -sf libxc.so.$(MAJOR).$(MINOR) $(prefix)/usr/lib/libxc.so.$(MAJOR)
-	ln -sf libxc.so.$(MAJOR) $(prefix)/usr/lib/libxc.so
-	install -m0644 xc.h $(prefix)/usr/include
+	$(INSTALL_DIR) $(DESTDIR)/usr/lib
+	$(INSTALL_DIR) $(DESTDIR)/usr/include
+	$(INSTALL_PROG) $(LIB) $(DESTDIR)/usr/lib
+	ln -sf $(LIB_NAME).so.$(MAJOR).$(MINOR) $(DESTDIR)/usr/lib/$(LIB_NAME).so.$(MAJOR)
+	ln -sf $(LIB_NAME).so.$(MAJOR) $(DESTDIR)/usr/lib/$(LIB_NAME).so
+	$(INSTALL_DATA) xc.h $(DESTDIR)/usr/include
 
 clean:
-	rm -rf *.a *.so *.o *.rpm $(LIB) *~ $(DEPS) xen TAGS
+	rm -rf *.a *.so *.o *.rpm $(LIB) *~ $(DEPS) xen
 
 rpm: all
 	rm -rf staging
@@ -88,9 +92,5 @@ libxc.so.$(MAJOR):
 	ln -sf libxc.so.$(MAJOR).$(MINOR) $@
 libxc.so.$(MAJOR).$(MINOR): $(OBJS)
 	$(CC) -Wl,-soname -Wl,$(SONAME) -shared -o $@ $^ -L../libxutil -lxutil -lz
-
-.PHONY: TAGS clean install mk-symlinks rpm
-TAGS:
-	etags -t $(SRCS) *.h
 
 -include $(DEPS)

@@ -13,9 +13,11 @@ include buildconfigs/Rules.mk
 
 # The real action starts here!
 build: $(LINUX_DIR)/include/linux/autoconf.h
-	$(MAKE) -C $(LINUX_DIR) ARCH=xen modules
-	$(MAKE) -C $(LINUX_DIR) ARCH=xen INSTALL_MOD_PATH=$(INSTALL_DIR) modules_install
-	$(MAKE) -C $(LINUX_DIR) ARCH=xen INSTALL_PATH=$(INSTALL_DIR) install
+	if grep "^CONFIG_MODULES=" $(LINUX_DIR)/.config ; then \
+	    $(MAKE) -C $(LINUX_DIR) ARCH=xen modules ; \
+	    $(MAKE) -C $(LINUX_DIR) ARCH=xen INSTALL_MOD_PATH=$(DESTDIR) modules_install ; \
+	fi
+	$(MAKE) -C $(LINUX_DIR) ARCH=xen INSTALL_PATH=$(DESTDIR) install
 
 patches/tmp/ebtables.diff:
 	mkdir -p patches/tmp
@@ -35,8 +37,8 @@ $(LINUX_DIR)/include/linux/autoconf.h: pristine-linux-$(LINUX_VER)
 	# add ebtables patch
 	( cd $(LINUX_DIR) ; patch -p1 -F3 < ../patches/tmp/ebtables.diff )
 	# Re-use config from install dir if one exits else use default config
-	[ -r $(INSTALL_DIR)/boot/config-$(FULLVERSION) ] && \
-	  cp $(INSTALL_DIR)/boot/config-$(FULLVERSION) $(LINUX_DIR)/.config \
+	[ -r $(DESTDIR)/boot/config-$(FULLVERSION) ] && \
+	  cp $(DESTDIR)/boot/config-$(FULLVERSION) $(LINUX_DIR)/.config \
 	  || cp $(LINUX_DIR)/arch/xen/defconfig-$(EXTRAVERSION) \
 		$(LINUX_DIR)/.config
 	make -C $(LINUX_DIR) ARCH=xen oldconfig

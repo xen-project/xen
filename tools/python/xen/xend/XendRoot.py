@@ -20,7 +20,7 @@ class XendRoot:
     """Root of the management classes."""
 
     """Default path to the root of the database."""
-    dbroot_default = "/var/xen/xend-db"
+    dbroot_default = "/var/lib/xen/xend-db"
 
     """Default path to the config file."""
     config_default = "/etc/xen/xend-config.sxp"

@@ -4,6 +4,10 @@
 # Mike Wray <mike.wray@hp.com>
 #============================================================================
 
+INSTALL		= install
+INSTALL_PROG	= $(INSTALL) -m0755
+INSTALL_DIR	= $(INSTALL) -d -m0755
+
 XEN_ROOT  = ../..
 include $(XEN_ROOT)/tools/Make.defs
 
@@ -68,8 +72,8 @@ xfrd: $(XFRD_PROG_OBJ)
 
 .PHONY: install
 install: xfrd
-	mkdir -p $(prefix)/$(XFRD_INSTALL_DIR)
-	install -m 0755 xfrd $(prefix)/$(XFRD_INSTALL_DIR)
+	$(INSTALL_DIR) $(DESTDIR)$(XFRD_INSTALL_DIR)
+	$(INSTALL_PROG) xfrd $(DESTDIR)$(XFRD_INSTALL_DIR)
 
 .PHONY: libutil
 libutil: $(UTIL_LIB)

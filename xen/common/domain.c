@@ -305,8 +305,8 @@ long do_boot_vcpu(unsigned long vcpu, full_execution_context_t *ctxt)
     int rc = 0;
     full_execution_context_t *c;
 
-    if ( d->exec_domain[vcpu] != NULL )
-        return EINVAL;
+    if ( (vcpu >= MAX_VIRT_CPUS) || (d->exec_domain[vcpu] != NULL) )
+        return -EINVAL;
 
     if ( alloc_exec_domain_struct(d, vcpu) == NULL )
         return -ENOMEM;

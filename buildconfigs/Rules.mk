@@ -1,8 +1,8 @@
 
 # We expect these two to already be set if people 
 # are using the top-level Makefile
-DIST_DIR	?= $(shell pwd)/dist
-INSTALL_DIR	?= $(DIST_DIR)/install
+DISTDIR	?= $(CURDIR)/dist
+DESTDIR	?= $(DISTDIR)/install
 
 .PHONY:	mkpatches mrproper
 

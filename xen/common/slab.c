@@ -774,11 +774,9 @@ xmem_cache_create (const char *name, size_t size, size_t offset,
     /* Need the semaphore to access the chain. */
     down(&cache_chain_sem);
     {
-        struct list_head *p;
+	xmem_cache_t *pc;
 
-        list_for_each(p, &cache_chain) {
-            xmem_cache_t *pc = list_entry(p, xmem_cache_t, next);
-
+        list_for_each_entry(pc, &cache_chain, next) {
             /* The name field is constant - no lock needed. */
             if (!strcmp(pc->name, name))
                 BUG();
@@ -802,14 +800,14 @@ xmem_cache_create (const char *name, size_t size, size_t offset,
  */
 static int is_chained_xmem_cache(xmem_cache_t * cachep)
 {
-    struct list_head *p;
+    xmem_cache_t *pc;
     int ret = 0;
     unsigned long spin_flags;
 
     /* Find the cache in the chain of caches. */
     down(&cache_chain_sem);
-    list_for_each(p, &cache_chain) {
-        if (p == &cachep->next) {
+    list_for_each_entry(pc, &cache_chain, next) {
+        if (pc == &cachep) {
             ret = 1;
             break;
         }
@@ -1765,7 +1763,6 @@ void dump_slabinfo()
     p = &cache_cache.next;
     do {
         xmem_cache_t	*cachep;
-        struct list_head *q;
         slab_t		*slabp;
         unsigned long	active_objs;
         unsigned long	num_objs;
@@ -1776,22 +1773,19 @@ void dump_slabinfo()
         spin_lock_irq(&cachep->spinlock);
         active_objs = 0;
         num_slabs = 0;
-        list_for_each(q,&cachep->slabs_full) {
-            slabp = list_entry(q, slab_t, list);
+        list_for_each_entry(slabp, &cachep->slabs_full, list) {
             if (slabp->inuse != cachep->num)
                 BUG();
             active_objs += cachep->num;
             active_slabs++;
         }
-        list_for_each(q,&cachep->slabs_partial) {
-            slabp = list_entry(q, slab_t, list);
+        list_for_each_entry(slabp, &cachep->slabs_partial, list) {
             if (slabp->inuse == cachep->num || !slabp->inuse)
                 BUG();
             active_objs += slabp->inuse;
             active_slabs++;
         }
-        list_for_each(q,&cachep->slabs_free) {
-            slabp = list_entry(q, slab_t, list);
+        list_for_each_entry(slabp, &cachep->slabs_free, list) {
             if (slabp->inuse)
                 BUG();
             num_slabs++;

@@ -48,9 +48,6 @@ extern int logical_proc_id[];
 #define P6_EVENT_CPU_CLOCKS_NOT_HALTED	0x79
 #define P6_NMI_EVENT		P6_EVENT_CPU_CLOCKS_NOT_HALTED
 
-#define MSR_P4_MISC_ENABLE	0x1A0
-#define MSR_P4_MISC_ENABLE_PERF_AVAIL	(1<<7)
-#define MSR_P4_MISC_ENABLE_PEBS_UNAVAIL	(1<<12)
 #define MSR_P4_PERFCTR0		0x300
 #define MSR_P4_CCCR0		0x360
 #define P4_ESCR_EVENT_SELECT(N)	((N)<<25)
@@ -186,15 +183,15 @@ static int __pminit setup_p4_watchdog(void)
 {
     unsigned int misc_enable, dummy;
 
-    rdmsr(MSR_P4_MISC_ENABLE, misc_enable, dummy);
-    if (!(misc_enable & MSR_P4_MISC_ENABLE_PERF_AVAIL))
+    rdmsr(MSR_IA32_MISC_ENABLE, misc_enable, dummy);
+    if (!(misc_enable & MSR_IA32_MISC_ENABLE_PERF_AVAIL))
         return 0;
 
     nmi_perfctr_msr = MSR_P4_IQ_COUNTER0;
 
     if ( logical_proc_id[smp_processor_id()] == 0 )
     {
-        if (!(misc_enable & MSR_P4_MISC_ENABLE_PEBS_UNAVAIL))
+        if (!(misc_enable & MSR_IA32_MISC_ENABLE_PEBS_UNAVAIL))
             clear_msr_range(0x3F1, 2);
         /* MSR 0x3F0 seems to have a default value of 0xFC00, but current
            docs doesn't fully define it, so leave it alone for now. */

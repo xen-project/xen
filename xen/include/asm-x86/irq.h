@@ -134,11 +134,6 @@ SYMBOL_NAME_STR(IRQ) #nr "_interrupt:\n\t" \
 	"push"__OS" $"#nr"<<16\n\t" \
 	"jmp common_interrupt");
 
-extern unsigned long prof_cpu_mask;
-extern unsigned int *prof_buffer;
-extern unsigned long prof_len;
-extern unsigned long prof_shift;
-
 #include <xen/irq.h>
 
 static inline void hw_resend_irq(struct hw_interrupt_type *h, unsigned int i)

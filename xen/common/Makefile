@@ -24,7 +24,8 @@ endif
 OBJS := $(subst sched_atropos.o,,$(OBJS))
 OBJS := $(subst sched_rrobin.o,,$(OBJS))
 
-default: $(OBJS)
+default: common.o
+common.o: $(OBJS)
 	$(LD) $(LDFLAGS) -r -o common.o $(OBJS)
 
 clean:

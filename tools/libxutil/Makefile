@@ -1,4 +1,9 @@
 XEN_ROOT = ../..
+INSTALL		= install
+INSTALL_DATA	= $(INSTALL) -m0644
+INSTALL_PROG	= $(INSTALL) -m0755
+INSTALL_DIR	= $(INSTALL) -d -m0755
+
 include $(XEN_ROOT)/tools/Make.defs
 
 CC = gcc
@@ -20,17 +25,13 @@ LIB_SRCS += util.c
 
 LIB_OBJS := $(LIB_SRCS:.c=.o)
 
-CFLAGS   += -Wall
-CFLAGS   += -Werror
-CFLAGS   += -g
-CFLAGS   += -O3
-CFLAGS   += -fno-strict-aliasing
+CFLAGS   += -Wall -Werror -O3 -fno-strict-aliasing
 
 # Get gcc to generate the dependencies for us.
 CFLAGS   += -Wp,-MD,.$(@F).d
 DEPS     = .*.d
 
-MAJOR    := 2.0
+MAJOR    := 3.0
 MINOR    := 0
 LIB_NAME := libxutil
 LIB      := $(LIB_NAME).so 
@@ -62,10 +63,10 @@ check-for-zlib:
 	fi
 
 install: all
-	mkdir -p $(prefix)/usr/lib
-	install -m0755 $(LIB) $(prefix)/usr/lib
-	ln -sf $(LIB_NAME).so.$(MAJOR).$(MINOR) $(prefix)/usr/lib/$(LIB_NAME).so.$(MAJOR)
-	ln -sf $(LIB_NAME).so.$(MAJOR) $(prefix)/usr/lib/$(LIB_NAME).so
+	$(INSTALL_DIR) -p $(DESTDIR)/usr/lib
+	$(INSTALL_PROG) $(LIB) $(DESTDIR)/usr/lib
+	ln -sf $(LIB_NAME).so.$(MAJOR).$(MINOR) $(DESTDIR)/usr/lib/$(LIB_NAME).so.$(MAJOR)
+	ln -sf $(LIB_NAME).so.$(MAJOR) $(DESTDIR)/usr/lib/$(LIB_NAME).so
 
 clean:
 	$(RM) *.a *.so *.so.* *.o *.rpm 

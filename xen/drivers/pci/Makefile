@@ -28,7 +28,8 @@ OBJS := pci.o quirks.o compat.o names.o setup-res.o
 #obj-y += syscall.o
 #endif
 
-default: $(OBJS)
+default: driver.o
+driver.o: $(OBJS)
 	$(LD) $(LDFLAGS) -r -o driver.o $(OBJS)
 
 clean:
