@@ -50,6 +50,7 @@ static struct proc_dir_entry *dom_list_intf;
 int direct_unmap(struct mm_struct *, unsigned long, unsigned long);
 unsigned long direct_mmap(unsigned long phys_addr, unsigned long size, 
 			  pgprot_t prot, int flag, int tot_pages);
+struct list_head * find_direct(struct list_head *, unsigned long);
 
 static ssize_t dom_usage_read(struct file * file, char * buff, size_t size, loff_t * off)
 {
@@ -350,15 +351,25 @@ static int handle_dom0_cmd_unmapdommem(unsigned long data)
 
 static int handle_dom0_cmd_dopgupdates(unsigned long data)
 {
-  struct dom0_dopgupdates_args argbuf;
+    struct dom0_dopgupdates_args argbuf;
+    struct list_head *entry;
+    direct_mmap_node_t *node;
 
-  if (copy_from_user(&argbuf, (void *)data, sizeof(argbuf)))
-    return -EFAULT;
+    if (copy_from_user(&argbuf, (void *)data, sizeof(argbuf)))
+	return -EFAULT;
 
-  /* argbuf.pgt_update_arr had better be direct mapped... */
-  /* XXX check this */
-  return HYPERVISOR_pt_update((void *)argbuf.pgt_update_arr,
-			      argbuf.num_pgt_updates);
+    /* argbuf.pgt_update_arr had better be direct mapped... */
+    entry = find_direct(&current->mm->context.direct_list,
+			argbuf.pgt_update_arr);
+    if (entry == &current->mm->context.direct_list)
+	return -EINVAL;
+    node = list_entry(entry, direct_mmap_node_t, list);
+    if (node->vm_start > argbuf.pgt_update_arr ||
+	node->vm_end <= argbuf.pgt_update_arr * sizeof(page_update_request_t))
+	return -EINVAL;
+    
+    return HYPERVISOR_pt_update((void *)argbuf.pgt_update_arr,
+				argbuf.num_pgt_updates);
 }
 
 static int dom0_cmd_ioctl(struct inode *inode, struct file *file,
