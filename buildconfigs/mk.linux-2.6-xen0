@@ -11,13 +11,13 @@ include buildconfigs/Rules.mk
 
 .PHONY: build clean delete
 
-build: $(LINUX_DIR)
+build: $(LINUX_DIR)/include/linux/autoconf.h
 	$(MAKE) -C $(LINUX_DIR) ARCH=xen modules
 	$(MAKE) -C $(LINUX_DIR) ARCH=xen INSTALL_MOD_PATH=$(INSTALL_DIR) modules_install
 	$(MAKE) -C $(LINUX_DIR) ARCH=xen INSTALL_PATH=$(INSTALL_DIR) install
 
 # The real action starts here!
-$(LINUX_DIR):  pristine-linux-$(LINUX_VER)
+$(LINUX_DIR)/include/linux/autoconf.h: pristine-linux-$(LINUX_VER)
 	rm -rf $(LINUX_DIR)
 	cp -al pristine-linux-$(LINUX_VER) $(LINUX_DIR)
 	# Apply arch-xen patches
