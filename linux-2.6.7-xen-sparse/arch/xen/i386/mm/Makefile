@@ -6,7 +6,7 @@ XENARCH	:= $(subst ",,$(CONFIG_XENARCH))
 
 CFLAGS	+= -Iarch/$(XENARCH)/mm
 
-obj-y	:= init.o fault.o ioremap.o pgtable.o hypervisor.o mmap.o
+obj-y	:= init.o fault.o ioremap.o pgtable.o hypervisor.o
 c-obj-y	:= extable.o pageattr.o 
 
 c-obj-$(CONFIG_DISCONTIGMEM)	+= discontig.o

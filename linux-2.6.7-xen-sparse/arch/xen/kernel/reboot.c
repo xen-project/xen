@@ -14,10 +14,7 @@ static int errno;
 #include <asm-xen/hypervisor.h>
 #include <asm-xen/hypervisor-ifs/dom0_ops.h>
 #include <asm-xen/suspend.h>
-
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,0)
-int reboot_thru_bios = 0;	/* for dmi_scan.c */
-#endif
+#include <asm-xen/queues.h>
 
 void machine_restart(char * __unused)
 {
@@ -27,18 +24,10 @@ void machine_restart(char * __unused)
 	HYPERVISOR_reboot();
 }
 
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,0)
-EXPORT_SYMBOL(machine_restart);
-#endif
-
 void machine_halt(void)
 {
 	machine_power_off();
 }
-
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,0)
-EXPORT_SYMBOL(machine_halt);
-#endif
 
 void machine_power_off(void)
 {
@@ -49,9 +38,11 @@ void machine_power_off(void)
 }
 
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,0)
+int reboot_thru_bios = 0;	/* for dmi_scan.c */
+EXPORT_SYMBOL(machine_restart);
+EXPORT_SYMBOL(machine_halt);
 EXPORT_SYMBOL(machine_power_off);
 #endif
-
 
 
 /******************************************************************************
@@ -65,7 +56,9 @@ static int shutting_down = -1;
 
 static void __do_suspend(void)
 {
-    int i,j;
+    int i, j;
+    suspend_record_t *suspend_record;
+
     /* Hmmm... a cleaner interface to suspend/resume blkdevs would be nice. */
     extern void blkdev_suspend(void);
     extern void blkdev_resume(void);
@@ -76,10 +69,8 @@ static void __do_suspend(void)
     extern unsigned long max_pfn;
     extern unsigned long *pfn_to_mfn_frame_list;
 
-    suspend_record_t *suspend_record     = NULL;
-
-    if ( (suspend_record = (suspend_record_t *)__get_free_page(GFP_KERNEL))
-         == NULL )
+    suspend_record = (suspend_record_t *)__get_free_page(GFP_KERNEL);
+    if ( suspend_record == NULL )
         goto out;
 
     suspend_record->nr_pfns = max_pfn; /* final number of pfns */
@@ -205,11 +196,7 @@ static void __shutdown_handler(void *unused)
 
 static void shutdown_handler(ctrl_msg_t *msg, unsigned long id)
 {
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,0)
     static DECLARE_WORK(shutdown_work, __shutdown_handler, NULL);
-#else
-    static struct tq_struct shutdown_tq;
-#endif
 
     if ( (shutting_down == -1) &&
          ((msg->subtype == CMSG_SHUTDOWN_POWEROFF) ||
@@ -217,12 +204,7 @@ static void shutdown_handler(ctrl_msg_t *msg, unsigned long id)
           (msg->subtype == CMSG_SHUTDOWN_SUSPEND)) )
     {
         shutting_down = msg->subtype;
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,0)
         schedule_work(&shutdown_work);
-#else
-        shutdown_tq.routine = __shutdown_handler;
-        schedule_task(&shutdown_tq);
-#endif
     }
     else
     {

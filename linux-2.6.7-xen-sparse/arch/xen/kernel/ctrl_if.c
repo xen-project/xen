@@ -58,13 +58,14 @@ static struct {
     unsigned long      id;
 } ctrl_if_txmsg_id_mapping[CONTROL_RING_SIZE];
 
-#if LINUX_VERSION_CODE < KERNEL_VERSION(2,6,0)
-static struct tq_struct ctrl_if_rxmsg_deferred_tq;
+/* For received messages that must be deferred to process context. */
+static void __ctrl_if_rxmsg_deferred(void *unused);
+static DECLARE_WORK(ctrl_if_rxmsg_deferred_work,
+                    __ctrl_if_rxmsg_deferred,
+                    NULL);
+
+/* Deferred callbacks for people waiting for space in the transmit ring. */
 static DECLARE_TASK_QUEUE(ctrl_if_tx_tq);
-#else
-static struct work_struct ctrl_if_rxmsg_deferred_work;
-static struct workqueue_struct *ctrl_if_tx_wq = NULL;
-#endif
 
 static DECLARE_WAIT_QUEUE_HEAD(ctrl_if_tx_wait);
 static void __ctrl_if_tx_tasklet(unsigned long data);
@@ -127,9 +128,7 @@ static void __ctrl_if_tx_tasklet(unsigned long data)
     if ( was_full && !TX_FULL(ctrl_if) )
     {
         wake_up(&ctrl_if_tx_wait);
-#if LINUX_VERSION_CODE < KERNEL_VERSION(2,6,0)
         run_task_queue(&ctrl_if_tx_tq);
-#endif
     }
 }
 
@@ -184,11 +183,7 @@ static void __ctrl_if_rx_tasklet(unsigned long data)
     {
         wmb();
         ctrl_if_rxmsg_deferred_prod = dp;
-#if LINUX_VERSION_CODE < KERNEL_VERSION(2,6,0)
-        schedule_task(&ctrl_if_rxmsg_deferred_tq);
-#else
         schedule_work(&ctrl_if_rxmsg_deferred_work);
-#endif
     }
 }
 
@@ -285,7 +280,7 @@ int ctrl_if_send_message_block(
     return rc;
 }
 
-int ctrl_if_enqueue_space_callback(struct work_struct *work)
+int ctrl_if_enqueue_space_callback(struct tq_struct *task)
 {
     control_if_t *ctrl_if = get_ctrl_if();
 
@@ -293,14 +288,7 @@ int ctrl_if_enqueue_space_callback(struct work_struct *work)
     if ( !TX_FULL(ctrl_if) )
         return 0;
 
-#if LINUX_VERSION_CODE < KERNEL_VERSION(2,6,0)
-    (void)queue_task(work, &ctrl_if_tx_tq);
-#else
-    if ( ctrl_if_tx_wq )
-        (void)queue_work(ctrl_if_tx_wq, work);
-    else
-        return 1;
-#endif
+    (void)queue_task(task, &ctrl_if_tx_tq);
 
     /*
      * We may race execution of the task queue, so return re-checked status. If
@@ -439,13 +427,6 @@ void __init ctrl_if_init(void)
 
     for ( i = 0; i < 256; i++ )
         ctrl_if_rxmsg_handler[i] = ctrl_if_rxmsg_default_handler;
-#if LINUX_VERSION_CODE < KERNEL_VERSION(2,6,0)
-    ctrl_if_rxmsg_deferred_tq.routine = __ctrl_if_rxmsg_deferred;
-#else
-    INIT_WORK(&ctrl_if_rxmsg_deferred_work,
-              (void *)__ctrl_if_rxmsg_deferred,
-              NULL);
-#endif
 
     spin_lock_init(&ctrl_if_lock);
 
@@ -457,11 +438,6 @@ void __init ctrl_if_init(void)
 static int __init ctrl_if_late_setup(void)
 {
     safe_to_schedule_task = 1;
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,0)
-    ctrl_if_tx_wq = create_workqueue("ctrl_if_tx");
-    if ( ctrl_if_tx_wq == NULL )
-        return 1;
-#endif
     return 0;
 }
 __initcall(ctrl_if_late_setup);
