@@ -3,7 +3,7 @@
  * 
  * Virtual network driver for XenoLinux.
  * 
- * Copyright (c) 2002, K A Fraser
+ * Copyright (c) 2002-2003, K A Fraser
  */
 
 #include <linux/config.h>
@@ -47,21 +47,14 @@ static void cleanup_module(void);
 
 static struct list_head dev_list;
 
-/*
- * RX RING:   RX_IDX <= rx_cons <= rx_prod
- * TX RING:   TX_IDX <= tx_cons <= tx_prod
- * (*_IDX allocated privately here, *_cons & *_prod shared with hypervisor)
- */
 struct net_private
 {
     struct list_head list;
     struct net_device *dev;
 
     struct net_device_stats stats;
-    struct sk_buff **tx_skb_ring;
-    struct sk_buff **rx_skb_ring;
     atomic_t tx_entries;
-    unsigned int rx_idx, tx_idx, tx_full;
+    unsigned int rx_resp_cons, tx_resp_cons, tx_full;
     net_ring_t *net_ring;
     spinlock_t tx_lock;
 };
@@ -71,10 +64,10 @@ static void dbg_network_int(int irq, void *dev_id, struct pt_regs *ptregs)
 {
     struct net_device *dev = (struct net_device *)dev_id;
     struct net_private *np = dev->priv;
-    printk(KERN_ALERT "tx_full = %d, tx_entries = %d, tx_idx = %d,"
-           " tx_cons = %d, tx_prod = %d, tx_event = %d, state=%d\n",
-           np->tx_full, atomic_read(&np->tx_entries), np->tx_idx, 
-           np->net_ring->tx_cons, np->net_ring->tx_prod, 
+    printk(KERN_ALERT "tx_full = %d, tx_entries = %d, tx_resp_cons = %d,"
+           " tx_req_prod = %d, tx_resp_prod = %d, tx_event = %d, state=%d\n",
+           np->tx_full, atomic_read(&np->tx_entries), np->tx_resp_cons, 
+           np->net_ring->tx_req_prod, np->net_ring->tx_resp_prod, 
            np->net_ring->tx_event,
            test_bit(__LINK_STATE_XOFF, &dev->state));
 }
@@ -85,29 +78,17 @@ static int network_open(struct net_device *dev)
     struct net_private *np = dev->priv;
     int error = 0;
 
-    np->rx_idx = np->tx_idx = np->tx_full = 0;
-
+    np->rx_resp_cons = np->tx_resp_cons = np->tx_full = 0;
     memset(&np->stats, 0, sizeof(np->stats));
-
     spin_lock_init(&np->tx_lock);
-
     atomic_set(&np->tx_entries, 0);
+    memset(np->net_ring, 0, sizeof(*np->net_ring));
 
-    np->net_ring->tx_prod = np->net_ring->tx_cons = np->net_ring->tx_event = 0;
-    np->net_ring->rx_prod = np->net_ring->rx_cons = np->net_ring->rx_event = 0;
-    np->net_ring->tx_ring = NULL;
-    np->net_ring->rx_ring = NULL;
-
-    np->tx_skb_ring = kmalloc(TX_RING_SIZE * sizeof(struct sk_buff *),
-                              GFP_KERNEL);
-    np->rx_skb_ring = kmalloc(RX_RING_SIZE * sizeof(struct sk_buff *),
-                              GFP_KERNEL);
     np->net_ring->tx_ring = kmalloc(TX_RING_SIZE * sizeof(tx_entry_t), 
                                     GFP_KERNEL);
     np->net_ring->rx_ring = kmalloc(RX_RING_SIZE * sizeof(rx_entry_t), 
                                     GFP_KERNEL);
-    if ( (np->tx_skb_ring == NULL) || (np->rx_skb_ring == NULL) ||
-         (np->net_ring->tx_ring == NULL) || (np->net_ring->rx_ring == NULL) )
+    if ( (np->net_ring->tx_ring == NULL) || (np->net_ring->rx_ring == NULL) )
     {
         printk(KERN_WARNING "%s; Could not allocate ring memory\n", dev->name);
         error = -ENOBUFS;
@@ -156,8 +137,6 @@ static int network_open(struct net_device *dev)
  fail:
     if ( np->net_ring->rx_ring ) kfree(np->net_ring->rx_ring);
     if ( np->net_ring->tx_ring ) kfree(np->net_ring->tx_ring);
-    if ( np->rx_skb_ring ) kfree(np->rx_skb_ring);
-    if ( np->tx_skb_ring ) kfree(np->tx_skb_ring);
     kfree(np);
     return error;
 }
@@ -169,28 +148,29 @@ static void network_tx_buf_gc(struct net_device *dev)
     struct net_private *np = dev->priv;
     struct sk_buff *skb;
     unsigned long flags;
-    unsigned int cons;
+    unsigned int prod;
+    tx_entry_t *tx_ring = np->net_ring->tx_ring;
 
     spin_lock_irqsave(&np->tx_lock, flags);
 
     do {
-        cons = np->net_ring->tx_cons;
+        prod = np->net_ring->tx_resp_prod;
 
-        for ( i = np->tx_idx; i != cons; i = TX_RING_INC(i) )
+        for ( i = np->tx_resp_cons; i != prod; i = TX_RING_INC(i) )
         {
-            skb = np->tx_skb_ring[i];
+            skb = (struct sk_buff *)tx_ring[i].resp.id;
             dev_kfree_skb_any(skb);
             atomic_dec(&np->tx_entries);
         }
         
-        np->tx_idx = i;
+        np->tx_resp_cons = prod;
         
         /* Set a new event, then check for race with update of tx_cons. */
         np->net_ring->tx_event =
-            TX_RING_ADD(cons, (atomic_read(&np->tx_entries)>>1) + 1);
+            TX_RING_ADD(prod, (atomic_read(&np->tx_entries)>>1) + 1);
         smp_mb();
     }
-    while ( cons != np->net_ring->tx_cons );
+    while ( prod != np->net_ring->tx_resp_prod );
 
     if ( np->tx_full && (atomic_read(&np->tx_entries) < TX_MAX_ENTRIES) )
     {
@@ -201,21 +181,13 @@ static void network_tx_buf_gc(struct net_device *dev)
     spin_unlock_irqrestore(&np->tx_lock, flags);
 }
 
-inline unsigned long get_ppte(unsigned long addr)
+inline pte_t *get_ppte(void *addr)
 {
-    unsigned long ppte;
-    pgd_t *pgd; pmd_t *pmd; pte_t *ptep;
-    pgd = pgd_offset_k(addr);
-
-    if ( pgd_none(*pgd) || pgd_bad(*pgd) ) BUG();
-        
-    pmd = pmd_offset(pgd, addr);
-    if ( pmd_none(*pmd) || pmd_bad(*pmd) ) BUG(); 
-        
-    ptep = pte_offset(pmd, addr);
-    ppte = (unsigned long)phys_to_machine(virt_to_phys(ptep));
-
-    return ppte;
+    pgd_t *pgd; pmd_t *pmd; pte_t *pte;
+    pgd = pgd_offset_k(   (unsigned long)addr);
+    pmd = pmd_offset(pgd, (unsigned long)addr);
+    pte = pte_offset(pmd, (unsigned long)addr);
+    return pte;
 }
 
 static void network_alloc_rx_buffers(struct net_device *dev)
@@ -223,21 +195,21 @@ static void network_alloc_rx_buffers(struct net_device *dev)
     unsigned int i;
     struct net_private *np = dev->priv;
     struct sk_buff *skb;
-    unsigned int end = RX_RING_ADD(np->rx_idx, RX_MAX_ENTRIES);    
+    unsigned int end = RX_RING_ADD(np->rx_resp_cons, RX_MAX_ENTRIES);    
 
-    for ( i = np->net_ring->rx_prod; i != end; i = RX_RING_INC(i) )
+    for ( i = np->net_ring->rx_req_prod; i != end; i = RX_RING_INC(i) )
     {
         skb = dev_alloc_skb(RX_BUF_SIZE);
         if ( skb == NULL ) break;
         skb->dev = dev;
-        np->rx_skb_ring[i] = skb;
-        np->net_ring->rx_ring[i].addr = get_ppte((unsigned long)skb->head); 
-        np->net_ring->rx_ring[i].size = RX_BUF_SIZE - 16; /* arbitrary */
+        np->net_ring->rx_ring[i].req.id   = (unsigned long)skb;
+        np->net_ring->rx_ring[i].req.addr = 
+            virt_to_machine(get_ppte(skb->head));
     }
 
-    np->net_ring->rx_prod = i;
+    np->net_ring->rx_req_prod = i;
 
-    np->net_ring->rx_event = RX_RING_INC(np->rx_idx);
+    np->net_ring->rx_event = RX_RING_INC(np->rx_resp_cons);
 
     /*
      * We may have allocated buffers which have entries outstanding in
@@ -254,9 +226,11 @@ static void network_free_rx_buffers(struct net_device *dev)
     struct net_private *np = dev->priv;
     struct sk_buff *skb;    
 
-    for ( i = np->rx_idx; i != np->net_ring->rx_prod; i = RX_RING_INC(i) )
+    for ( i  = np->rx_resp_cons; 
+          i != np->net_ring->rx_req_prod; 
+          i  = RX_RING_INC(i) )
     {
-        skb = np->rx_skb_ring[i];
+        skb = (struct sk_buff *)np->net_ring->rx_ring[i].req.id;
         dev_kfree_skb_any(skb);
     }
 }
@@ -272,7 +246,7 @@ static int network_start_xmit(struct sk_buff *skb, struct net_device *dev)
         netif_stop_queue(dev);
         return -ENOBUFS;
     }
-    i = np->net_ring->tx_prod;
+    i = np->net_ring->tx_req_prod;
 
     if ( (((unsigned long)skb->data & ~PAGE_MASK) + skb->len) >= PAGE_SIZE )
     {
@@ -284,11 +258,11 @@ static int network_start_xmit(struct sk_buff *skb, struct net_device *dev)
         skb = new_skb;
     }   
     
-    np->tx_skb_ring[i] = skb;
-    np->net_ring->tx_ring[i].addr =
-        (unsigned long)phys_to_machine(virt_to_phys(skb->data));
-    np->net_ring->tx_ring[i].size = skb->len;
-    np->net_ring->tx_prod = TX_RING_INC(i);
+    np->net_ring->tx_ring[i].req.id   = (unsigned long)skb;
+    np->net_ring->tx_ring[i].req.addr =
+        phys_to_machine(virt_to_phys(skb->data));
+    np->net_ring->tx_ring[i].req.size = skb->len;
+    np->net_ring->tx_req_prod = TX_RING_INC(i);
     atomic_inc(&np->tx_entries);
 
     np->stats.tx_bytes += skb->len;
@@ -316,13 +290,15 @@ static void network_rx_int(int irq, void *dev_id, struct pt_regs *ptregs)
     struct net_device *dev = (struct net_device *)dev_id;
     struct net_private *np = dev->priv;
     struct sk_buff *skb;
-    rx_entry_t *rx;
+    rx_resp_entry_t *rx;
     
  again:
-    for ( i = np->rx_idx; i != np->net_ring->rx_cons; i = RX_RING_INC(i) )
+    for ( i  = np->rx_resp_cons; 
+          i != np->net_ring->rx_resp_prod; 
+          i  = RX_RING_INC(i) )
     {
-        rx  = &np->net_ring->rx_ring[i];
-        skb = np->rx_skb_ring[i];
+        rx  = &np->net_ring->rx_ring[i].resp;
+        skb = (struct sk_buff *)rx->id;
 
         if ( rx->status != RING_STATUS_OK )
         {
@@ -341,8 +317,7 @@ static void network_rx_int(int irq, void *dev_id, struct pt_regs *ptregs)
         skb_shinfo(skb)->frag_list = NULL;
                                 
         phys_to_machine_mapping[virt_to_phys(skb->head) >> PAGE_SHIFT] =
-            (*(unsigned long *)phys_to_virt(machine_to_phys(rx->addr))
-                ) >> PAGE_SHIFT;
+            (*(unsigned long *)get_ppte(skb->head)) >> PAGE_SHIFT;
 
         if ( rx->offset < 16 )
         {
@@ -353,23 +328,23 @@ static void network_rx_int(int irq, void *dev_id, struct pt_regs *ptregs)
         
         skb_reserve(skb, rx->offset - 16);
 
-        skb_put(skb, np->net_ring->rx_ring[i].size);
+        skb_put(skb, rx->size);
         skb->protocol = eth_type_trans(skb, dev);
 
         np->stats.rx_packets++;
 
-        np->stats.rx_bytes += np->net_ring->rx_ring[i].size;
+        np->stats.rx_bytes += rx->size;
         netif_rx(skb);
         dev->last_rx = jiffies;
     }
 
-    np->rx_idx = i;
+    np->rx_resp_cons = i;
 
     network_alloc_rx_buffers(dev);
     
     /* Deal with hypervisor racing our resetting of rx_event. */
     smp_mb();
-    if ( np->net_ring->rx_cons != i ) goto again;
+    if ( np->net_ring->rx_resp_prod != i ) goto again;
 }
 
 
@@ -382,8 +357,6 @@ static void network_tx_int(int irq, void *dev_id, struct pt_regs *ptregs)
 
 int network_close(struct net_device *dev)
 {
-    struct net_private *np = dev->priv;
-
     netif_stop_queue(dev);
 
     free_irq(NET_RX_IRQ, dev);
@@ -400,9 +373,6 @@ int network_close(struct net_device *dev)
     kfree(np->net_ring->rx_ring);
     kfree(np->net_ring->tx_ring);
 #endif
-
-    kfree(np->rx_skb_ring);
-    kfree(np->tx_skb_ring);
 
     MOD_DEC_USE_COUNT;
 

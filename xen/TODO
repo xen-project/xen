@@ -7,20 +7,7 @@ longer-term goals.
  -- Keir (16/3/03)
 
 
-1. FIX HANDLING OF NETWORK RINGS
---------------------------------
-Handling of the transmit rings is currently very broken (for example,
-sending an inter-domain packet will wedge the hypervisor). This is
-because we may handle packets out of order (eg. inter-domain packets
-are handled eagerly, while packets for real interfaces are queued),
-but our current ring design really assumes in-order handling.
-
-A neat fix will be to allow responses to be queued in a different
-order to requests, just as we already do with block-device
-rings. We'll need to add an opaque identifier to ring entries,
-allowing matching of requests and responses, but that's about it.
-
-2. ACCURATE TIMERS AND WALL-CLOCK TIME
+1. ACCURATE TIMERS AND WALL-CLOCK TIME
 --------------------------------------
 Currently our long-term timebase free runs on CPU0, with no external
 calibration. We should run ntpd on domain 0 and allow this to warp
@@ -28,7 +15,7 @@ Xen's timebase. Once this is done, we can have a timebase per CPU and
 not worry about relative drift (since they'll all get sync'ed
 periodically by ntp).
 
-3. ASSIGNING DOMAINS TO PROCESSORS
+2. ASSIGNING DOMAINS TO PROCESSORS
 ----------------------------------
 More intelligent assignment of domains to processors. In
 particular, we don't play well with hyperthreading: we will assign
@@ -40,17 +27,17 @@ relationships between processors in the system (eg. which ones are
 siblings in the same package). We then use this to balance domains
 across packages, and across virtual processors within a package.
 
-4. PROPER DESTRUCTION OF DOMAINS
---------------------------------
-Currently we do not free resources when destroying a domain. This is
-because they may be tied up in subsystems, and there is no way of
-pulling them back in a safe manner.
+3. DOMAIN 0 MANAGEMENT DAEMON
+-----------------------------
+A better control daemon is required for domain 0, which keeps proper
+track of machine resources and can make sensible policy choices. This
+may require support in Xen; for example, notifications (eg. DOMn is
+killed), and requests (eg. can DOMn allocate x frames of memory?).
 
-The fix is probably to reference count resources and automatically
-free them when the count reaches zero. We may get away with one count
-per domain (for all its resources). When this reaches zero we know it
-is safe to free everything: block-device rings, network rings, and all
-the rest.
+4. SANE NETWORK ROUTING
+-----------------------
+The current virtual firewall/router is completely broken. Needs a new
+design and implementation!
 
 5. NETWORK CHECKSUM OFFLOAD 
 --------------------------- 
@@ -60,14 +47,7 @@ indicate, on transmit, which packets need the checksum added and, on
 receive, which packets have been checked out as okay. We can steal
 Linux's interface, which is entirely sane given NIC limitations.
 
-6. DOMAIN 0 MANAGEMENT DAEMON
------------------------------
-A better control daemon is required for domain 0, which keeps proper
-track of machine resources and can make sensible policy choices. This
-may require support in Xen; for example, notifications (eg. DOMn is
-killed), and requests (eg. can DOMn allocate x frames of memory?).
-
-7. MODULE SUPPORT FOR XEN
+6. MODULE SUPPORT FOR XEN
 -------------------------
 Network and blkdev drivers are bloating Xen. At some point we want to
 build drivers as modules, stick them in a cheesy ramfs, then relocate
@@ -79,7 +59,7 @@ which drivers to load.
 Most of the hard stuff (relocating and the like) is done for us by
 Linux's module system.
 
-8. NEW DESIGN FEATURES
+7. NEW DESIGN FEATURES
 ----------------------
 This includes the last-chance page cache, and the unified buffer cache.
 

@@ -50,7 +50,7 @@ extern struct mm_struct init_mm;
 }
 
 #define _HYP_EVENT_NEED_RESCHED 0
-#define _HYP_EVENT_NET_RX       1
+#define _HYP_EVENT_NET          1
 #define _HYP_EVENT_DIE          2
 
 #define PF_DONEFPUINIT  0x1  /* Has the FPU been initialised for this task? */

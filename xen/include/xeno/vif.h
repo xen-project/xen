@@ -3,7 +3,7 @@
  * This is the hypervisor end of the network code.  The net_ring structure
  * stored in each vif is placed on a shared page to interact with the guest VM.
  *
- * Copyright (c) 2002, A K Warfield and K A Fraser
+ * Copyright (c) 2002-2003, A K Warfield and K A Fraser
  */
 
 /* virtual network interface struct and associated defines. */
@@ -25,45 +25,51 @@
  * TX_RING_SIZE and RX_RING_SIZE are defined in the shared network.h.
  */
 
-typedef struct rx_shadow_entry_st {
+typedef struct rx_shadow_entry_st 
+{
+    unsigned long  id;
+    /* IN vars */
     unsigned long  addr;
+    /* OUT vars */
     unsigned short size;
     unsigned char  status;
     unsigned char  offset;
+    /* PRIVATE vars */
     unsigned long  flush_count;
 } rx_shadow_entry_t;
 
-typedef struct tx_shadow_entry_st {
+typedef struct tx_shadow_entry_st 
+{
+    unsigned long  id;
+    /* IN vars */
     void          *header;
     unsigned long  payload;
     unsigned short size;
+    /* OUT vars */
     unsigned char  status;
-    unsigned char  _unused;
 } tx_shadow_entry_t;
 
 typedef struct net_shadow_ring_st {
     rx_shadow_entry_t *rx_ring;
+    unsigned int rx_prod;  /* More buffers for filling go here. */
+    unsigned int rx_idx;   /* Next buffer to fill is here. */
+    unsigned int rx_cons;  /* Next buffer to create response for is here. */
+
     tx_shadow_entry_t *tx_ring;
-
     /*
-     * Private copy of producer. Follows guest OS version, but never
-     * catches up with our consumer index.
+     * These cannot be derived from shared variables, as not all packets
+     * will end up on the shadow ring (eg. locally delivered packets).
      */
-    unsigned int rx_prod;
-    /* Points at next buffer to be filled by NIC. Chases rx_prod. */
-    unsigned int rx_idx;
-    /* Points at next buffer to be returned to the guest OS. Chases rx_idx. */
-    unsigned int rx_cons;
+    unsigned int tx_prod;  /* More packets for sending go here. */
+    unsigned int tx_idx;   /* Next packet to send is here. */
+    unsigned int tx_transmitted_prod; /* Next packet to finish transmission. */
+    unsigned int tx_cons;  /* Next packet to create response for is here. */
 
-    /*
-     * Private copy of producer. Follows guest OS version, but never
-     * catches up with our consumer index.
-     */
-    unsigned int tx_prod;
-    /* Points at next buffer to be scheduled. Chases tx_prod. */
-    unsigned int tx_idx;
-    /* Points at next buffer to be returned to the guest OS. Chases tx_idx. */
-    unsigned int tx_cons;
+    /* Indexes into shared ring. */
+    unsigned int rx_req_cons;
+    unsigned int rx_resp_prod; /* private version of shared variable */
+    unsigned int tx_req_cons;
+    unsigned int tx_resp_prod; /* private version of shared variable */
 } net_shadow_ring_t;
 
 typedef struct net_vif_st {
