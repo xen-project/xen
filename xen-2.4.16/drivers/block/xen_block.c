@@ -15,78 +15,118 @@
 #include <asm-i386/io.h>
 #include <asm/spinlock.h>
 #include <xeno/keyhandler.h>
+#include <xeno/interrupt.h>
 
 #define XEN_BLK_DEBUG 0
 #define XEN_BLK_DEBUG_LEVEL KERN_ALERT
 
-typedef struct blk_request {
+typedef struct blk_request
+{
     struct buffer_head *bh;
     void               *id;
     struct task_struct *domain;
 } blk_request_t;
+
 #define MAX_PENDING_REQS 32
 #define BATCH_PER_DOMAIN 8
+
 static kmem_cache_t *blk_request_cachep;
 static atomic_t nr_pending;
 
+static void io_schedule(unsigned long unused);
 static int do_block_io_op_domain(struct task_struct* task, int max_to_do);
-static int dispatch_rw_block_io(struct task_struct *p, int index);
-static int dispatch_probe_block_io(struct task_struct *p, int index);
-static int dispatch_debug_block_io(struct task_struct *p, int index);
+static void dispatch_rw_block_io(struct task_struct *p, int index);
+static void dispatch_probe_block_io(struct task_struct *p, int index);
+static void dispatch_debug_block_io(struct task_struct *p, int index);
 
-static spinlock_t io_schedule_lock;
+
+/******************************************************************
+ * BLOCK-DEVICE SCHEDULER LIST MAINTENANCE
+ */
+
 static struct list_head io_schedule_list;
+static spinlock_t io_schedule_list_lock;
 
-static int on_blkdev_list(struct task_struct *p)
+static int __on_blkdev_list(struct task_struct *p)
 {
     return p->blkdev_list.next != NULL;
 }
 
 static void remove_from_blkdev_list(struct task_struct *p)
 {
-    list_del(&p->blkdev_list);
-    p->blkdev_list.next = NULL;
+    unsigned long flags;
+    if ( !__on_blkdev_list(p) ) return;
+    spin_lock_irqsave(&io_schedule_list_lock, flags);
+    if ( __on_blkdev_list(p) )
+    {
+        list_del(&p->blkdev_list);
+        p->blkdev_list.next = NULL;
+    }
+    spin_unlock_irqrestore(&io_schedule_list_lock, flags);
 }
 
 static void add_to_blkdev_list(struct task_struct *p)
 {
-    list_add(&p->blkdev_list, &io_schedule_list);
+    unsigned long flags;
+    if ( __on_blkdev_list(p) ) return;
+    spin_lock_irqsave(&io_schedule_list_lock, flags);
+    if ( !__on_blkdev_list(p) )
+    {
+        list_add(&p->blkdev_list, &io_schedule_list);
+    }
+    spin_unlock_irqrestore(&io_schedule_list_lock, flags);
 }
 
 static void add_to_blkdev_list_tail(struct task_struct *p)
 {
-    list_add_tail(&p->blkdev_list, &io_schedule_list);
+    unsigned long flags;
+    if ( __on_blkdev_list(p) ) return;
+    spin_lock_irqsave(&io_schedule_list_lock, flags);
+    if ( !__on_blkdev_list(p) )
+    {
+        list_add_tail(&p->blkdev_list, &io_schedule_list);
+    }
+    spin_unlock_irqrestore(&io_schedule_list_lock, flags);
 }
 
-static void io_schedule(void)
+
+/******************************************************************
+ * SCHEDULER FUNCTIONS
+ */
+
+static DECLARE_TASKLET(io_schedule_tasklet, io_schedule, 0);
+
+static void io_schedule(unsigned long unused)
 {
     struct task_struct *p;
     struct list_head *ent;
 
-    while ( (atomic_read(&nr_pending) < (MAX_PENDING_REQS / 2)) &&
-            !list_empty(&io_schedule_list) &&
-            spin_trylock(&io_schedule_lock) )
+    while ( (atomic_read(&nr_pending) < MAX_PENDING_REQS) &&
+            !list_empty(&io_schedule_list) )
     {
-        while ( (atomic_read(&nr_pending) < MAX_PENDING_REQS) &&
-                !list_empty(&io_schedule_list) )
-        {
-            ent = io_schedule_list.next;
-            p = list_entry(ent, struct task_struct, blkdev_list);
-            remove_from_blkdev_list(p);
-            if ( do_block_io_op_domain(p, BATCH_PER_DOMAIN) )
-                add_to_blkdev_list_tail(p);
-        }
-        spin_unlock(&io_schedule_lock);
+        ent = io_schedule_list.next;
+        p = list_entry(ent, struct task_struct, blkdev_list);
+        remove_from_blkdev_list(p);
+        if ( do_block_io_op_domain(p, BATCH_PER_DOMAIN) )
+            add_to_blkdev_list_tail(p);
+    }
+}
+
+static void maybe_trigger_io_schedule(void)
+{
+    if ( (atomic_read(&nr_pending) < (MAX_PENDING_REQS/2)) &&
+         !list_empty(&io_schedule_list) )
+    {
+        tasklet_schedule(&io_schedule_tasklet);
     }
 }
 
 
-/*
- * end_block_io_op:
- *  IO has completed.  Need to notify the guest operating system.
- *  Called from ll_rw_block -- currently /DIRECTLY/ -- XXX FIXME 
- *  (e.g. hook into proper end processing of ll_rw) 
+
+/******************************************************************
+ * COMPLETION CALLBACK -- XXX Hook properly into bh->b_end_io
  */
+
 void end_block_io_op(struct buffer_head * bh)
 {
     unsigned long cpu_mask;
@@ -96,12 +136,13 @@ void end_block_io_op(struct buffer_head * bh)
     int position = 0;
     blk_ring_t *blk_ring;
 
-    if (XEN_BLK_DEBUG)  
+    if ( XEN_BLK_DEBUG )  
 	printk(XEN_BLK_DEBUG_LEVEL "XEN end_block_io_op,  bh: %lx\n",
 	       (unsigned long)bh);
     
     if ( (blk_request = (blk_request_t *)bh->b_xen_request) == NULL) 
         goto bad_interrupt;
+
     atomic_dec(&nr_pending);
     
     p = blk_request->domain;
@@ -124,8 +165,7 @@ void end_block_io_op(struct buffer_head * bh)
         kfree(blk_request->bh);     
     kmem_cache_free(blk_request_cachep, blk_request);
 
-    /* Get more work to do. */
-    io_schedule();
+    maybe_trigger_io_schedule();
 
     return;
 
@@ -138,30 +178,28 @@ void end_block_io_op(struct buffer_head * bh)
 }
 
 
-/*
- * do_block_io_op:
- *  Accept a block io request from a guest operating system.
- *  There is an entry in the hypervisor_call_table (xen/arch/i386/entry.S).
+
+/******************************************************************
+ * GUEST-OS SYSCALL -- Indicates there are requests outstanding.
  */
+
 long do_block_io_op(void)
 {
-    if ( !on_blkdev_list(current) )
-    {
-        spin_lock_irq(&io_schedule_lock);
-        add_to_blkdev_list_tail(current);
-        spin_unlock_irq(&io_schedule_lock);
-    }
-
-    io_schedule();
-
+    add_to_blkdev_list_tail(current);
+    maybe_trigger_io_schedule();
     return 0L;
 }
 
 
+
+/******************************************************************
+ * DOWNWARD CALLS -- These interface with the block-device layer proper.
+ */
+
 static int do_block_io_op_domain(struct task_struct* task, int max_to_do)
 {
     blk_ring_t *blk_ring = task->blk_ring_base;
-    int loop, status = 0;
+    int loop, more_to_do = 0;
 
     if (XEN_BLK_DEBUG)  
 	printk(XEN_BLK_DEBUG_LEVEL "XEN do_block_io_op %d %d\n",
@@ -171,23 +209,25 @@ static int do_block_io_op_domain(struct task_struct* task, int max_to_do)
 	  loop != blk_ring->req_prod; 
 	  loop = BLK_REQ_RING_INC(loop) ) 
     {
-	status = 1;
-
-        if ( max_to_do-- == 0 ) break;
+        if ( max_to_do-- == 0 )
+        {
+            more_to_do = 1;
+            break;
+        }
         
-	switch (blk_ring->req_ring[loop].operation) {
-
+	switch (blk_ring->req_ring[loop].operation)
+        {
 	case XEN_BLOCK_READ:
 	case XEN_BLOCK_WRITE:
-	    status = dispatch_rw_block_io(task, loop);
+	    dispatch_rw_block_io(task, loop);
 	    break;
 
 	case XEN_BLOCK_PROBE:
-	    status = dispatch_probe_block_io(task, loop);
+	    dispatch_probe_block_io(task, loop);
 	    break;
 
 	case XEN_BLOCK_DEBUG:
-	    status = dispatch_debug_block_io(task, loop);
+	    dispatch_debug_block_io(task, loop);
 	    break;
 
 	default:
@@ -195,23 +235,18 @@ static int do_block_io_op_domain(struct task_struct* task, int max_to_do)
 		    blk_ring->req_ring[loop].operation);
 	    BUG();
 	}
-
-	if ( status ) break;
     }
 
     blk_ring->req_cons = loop;
-    return status;
+    return more_to_do;
 }
 
-
-static int dispatch_debug_block_io(struct task_struct *p, int index)
+static void dispatch_debug_block_io(struct task_struct *p, int index)
 {
     printk (KERN_ALERT "dispatch_debug_block_io: UNIMPL\n"); 
-    return 1; 
 }
 
-
-static int dispatch_probe_block_io(struct task_struct *p, int index)
+static void dispatch_probe_block_io(struct task_struct *p, int index)
 {
     extern void ide_probe_devices(xen_disk_info_t *xdi);
     blk_ring_t *blk_ring = p->blk_ring_base;
@@ -224,12 +259,9 @@ static int dispatch_probe_block_io(struct task_struct *p, int index)
     blk_ring->resp_ring[blk_ring->resp_prod].id = blk_ring->req_ring[index].id;
     blk_ring->resp_ring[blk_ring->resp_prod].status = 0;
     blk_ring->resp_prod = BLK_RESP_RING_INC(blk_ring->resp_prod);
-    
-    return 0;
 }
 
-
-static int dispatch_rw_block_io(struct task_struct *p, int index)
+static void dispatch_rw_block_io(struct task_struct *p, int index)
 {
     extern void ll_rw_block(int rw, int nr, struct buffer_head * bhs[]); 
     blk_ring_t *blk_ring = p->blk_ring_base;
@@ -242,18 +274,20 @@ static int dispatch_rw_block_io(struct task_struct *p, int index)
      * check to make sure that the block request seems at least
      * a bit legitimate
      */
-    if ((blk_ring->req_ring[index].block_size & (0x200 - 1)) != 0) {
+    if ( (blk_ring->req_ring[index].block_size & (0x200 - 1)) != 0 )
+    {
 	printk(KERN_ALERT "    error: dodgy block size: %d\n", 
 	       blk_ring->req_ring[index].block_size);
 	BUG();
     }
     
-    if(blk_ring->req_ring[index].buffer == NULL) { 
+    if ( blk_ring->req_ring[index].buffer == NULL )
+    { 
 	printk(KERN_ALERT "xen_block: bogus buffer from guestOS\n"); 
 	BUG();
     }
 
-    if (XEN_BLK_DEBUG) {
+    if (XEN_BLK_DEBUG)
 	printk(XEN_BLK_DEBUG_LEVEL "    req_cons: %d  req_prod %d  index: %d "
 	       "op: %s, pri: %s\n", blk_ring->req_cons, blk_ring->req_prod, 
 	       index, 
@@ -261,7 +295,6 @@ static int dispatch_rw_block_io(struct task_struct *p, int index)
 		"read" : "write"), 
 	       (blk_ring->req_ring[index].priority == XEN_BLOCK_SYNC ? 
 		"sync" : "async"));
-    }
 
     atomic_inc(&nr_pending);
     blk_request = kmem_cache_alloc(blk_request_cachep, GFP_ATOMIC);
@@ -269,7 +302,8 @@ static int dispatch_rw_block_io(struct task_struct *p, int index)
     /* we'll be doing this frequently, would a cache be appropriate? */
     bh = (struct buffer_head *) kmalloc(sizeof(struct buffer_head), 
 					GFP_KERNEL);
-    if (!bh) {
+    if ( bh == NULL )
+    {
 	printk(KERN_ALERT "ERROR: bh is null\n");
 	BUG();
     }
@@ -286,11 +320,14 @@ static int dispatch_rw_block_io(struct task_struct *p, int index)
     bh->b_count.counter = 1;
     bh->b_xen_request   = (void *)blk_request;  
     
-    if (blk_ring->req_ring[index].operation == XEN_BLOCK_WRITE) {
+    if (blk_ring->req_ring[index].operation == XEN_BLOCK_WRITE)
+    {
 	bh->b_state = ((1 << BH_JBD) | (1 << BH_Mapped) | (1 << BH_Req) |
 		       (1 << BH_Dirty) | (1 << BH_Uptodate));
 	operation = WRITE;
-    } else {
+    } 
+    else
+    {
 	bh->b_state = (1 << BH_Mapped);
 	operation = READ;
     }
@@ -304,17 +341,19 @@ static int dispatch_rw_block_io(struct task_struct *p, int index)
     ll_rw_block(operation, 1, &bh);       /* linux top half */
     rq = blk_get_queue(bh->b_rdev);                         
     generic_unplug_device(rq);            /* linux bottom half */
-
-    return 0;
 }
 
+
+
+/******************************************************************
+ * MISCELLANEOUS SETUP / TEARDOWN / DEBUGGING
+ */
 
 static void dump_blockq(u_char key, void *dev_id, struct pt_regs *regs) 
 {
     printk("Dumping block queue stats: nr_pending = %d\n",
            atomic_read(&nr_pending));
 }
-
 
 /* Start-of-day initialisation for a new domain. */
 void init_blkdev_info(struct task_struct *p)
@@ -326,27 +365,19 @@ void init_blkdev_info(struct task_struct *p)
     p->blkdev_list.next = NULL;
 }
 
-
 /* End-of-day teardown for a domain. XXX Outstanding requests? */
 void destroy_blkdev_info(struct task_struct *p)
 {
-    unsigned long flags;
-    if ( on_blkdev_list(p) )
-    {
-        spin_lock_irqsave(&io_schedule_lock, flags);
-        if ( on_blkdev_list(p) ) remove_from_blkdev_list(p);
-        spin_unlock_irqrestore(&io_schedule_lock, flags);
-    }
+    remove_from_blkdev_list(p);
     UNSHARE_PFN(virt_to_page(p->blk_ring_base));
     free_page((unsigned long)p->blk_ring_base);
 }
-
 
 void initialize_block_io ()
 {
     atomic_set(&nr_pending, 0);
 
-    spin_lock_init(&io_schedule_lock);
+    spin_lock_init(&io_schedule_list_lock);
     INIT_LIST_HEAD(&io_schedule_list);
 
     blk_request_cachep = kmem_cache_create(

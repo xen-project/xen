@@ -19,7 +19,7 @@ void __perfc_print (unsigned long counter[], int offset)
   int loop;
   int total_size = 0;
   int element_size = 0;
-  int num;
+  int num = 0;
 
   for (loop = 0; loop < sizeof(perfc_name) / sizeof(char *); loop++)
   {

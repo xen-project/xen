@@ -30,7 +30,7 @@ typedef unsigned char	byte;
 
 void xlblk_ide_register_disk(int, unsigned long);
 
-#define XLBLK_MAX 2                                /* very arbitrary */
+#define XLBLK_MAX 32 /* Maximum minor devices we support */
 #define XLBLK_MAJOR_NAME "xhd"
 #define IDE_PARTN_BITS 6                           /* from ide.h::PARTN_BITS */
 #define IDE_PARTN_MASK ((1<<IDE_PARTN_BITS)-1)     /* from ide.h::PARTN_MASK */
