@@ -46,6 +46,8 @@
 #include <asm/i387.h>
 #include <asm/irq.h>
 #include <asm/desc.h>
+#include <asm-xen/multicall.h>
+#include <asm/hypervisor-ifs/dom0_ops.h>
 #ifdef CONFIG_MATH_EMULATION
 #include <asm/math_emu.h>
 #endif
@@ -501,6 +503,7 @@ struct task_struct fastcall * __switch_to(struct task_struct *prev_p, struct tas
 	int cpu = smp_processor_id();
 	struct tss_struct *tss = init_tss + cpu;
 	unsigned long flags;
+	dom0_op_t op;
 
 	local_irq_save(flags);
 
@@ -522,29 +525,50 @@ struct task_struct fastcall * __switch_to(struct task_struct *prev_p, struct tas
 		"xorl %%eax,%%eax; movl %%eax,%%fs; movl %%eax,%%gs" : : :
 		"eax" );
 
-	flush_page_update_queue();
+	MULTICALL_flush_page_update_queue();
 
 	/* never put a printk in __switch_to... printk() calls wake_up*() indirectly */
 
-	__unlazy_fpu(prev_p);
+	/*
+	 * This is basically '__unlazy_fpu', except that we queue a
+	 * multicall to indicate FPU task switch, rather than
+	 * synchronously trapping to Xen.
+	 */
+	if (prev_p->thread_info->status & TS_USEDFPU) {
+		save_init_fpu(prev_p);
+		queue_multicall0(__HYPERVISOR_fpu_taskswitch);
+	}
 
 	/*
 	 * Reload esp0, LDT and the page table pointer:
+	 * This is load_esp0(tss, next) with a multicall.
 	 */
-	load_esp0(tss, next);
+	tss->esp0 = next->esp0;
+	/* This can only happen when SEP is enabled, no need to test
+	 * "SEP"arately */
+	if (unlikely(tss->ss1 != next->sysenter_cs)) {
+		tss->ss1 = next->sysenter_cs;
+		wrmsr(MSR_IA32_SYSENTER_CS, next->sysenter_cs, 0);
+	}
+	queue_multicall2(__HYPERVISOR_stack_switch, tss->ss0, tss->esp0);
 
 	/*
 	 * Load the per-thread Thread-Local Storage descriptor.
+	 * This is load_TLS(next, cpu) with multicalls.
 	 */
-	load_TLS(next, cpu);
+#define C(i) queue_multicall3(__HYPERVISOR_update_descriptor, virt_to_machine(&get_cpu_gdt_table(cpu)[GDT_ENTRY_TLS_MIN + i]), ((u32 *)&next->tls_array[i])[0], ((u32 *)&next->tls_array[i])[1])
+	C(0); C(1); C(2);
+#undef C
 
 	if (start_info.flags & SIF_PRIVILEGED) {
-		dom0_op_t op;
 		op.cmd           = DOM0_IOPL;
 		op.u.iopl.domain = DOMID_SELF;
 		op.u.iopl.iopl   = next->io_pl;
-		HYPERVISOR_dom0_op(&op);
+		queue_multicall1(__HYPERVISOR_dom0_op, (unsigned long)&op);
 	}
+
+	/* EXECUTE ALL TASK SWITCH XEN SYSCALLS AT THIS POINT. */
+	execute_multicall_list();
 
 	local_irq_restore(flags);
 

@@ -159,6 +159,7 @@
 40f562383SKvDStdtrvzr5fyCbW4rw linux-2.6.7-xen-sparse/arch/xen/i386/mm/hypervisor.c
 40f56239xcNylAxuGsQHwi1AyMLV8w linux-2.6.7-xen-sparse/arch/xen/i386/mm/init.c
 41062ab7CjxC1UBaFhOMWWdhHkIUyg linux-2.6.7-xen-sparse/arch/xen/i386/mm/ioremap.c
+411b9db3oFpYQc4C-_mO2lRTcSz8UQ linux-2.6.7-xen-sparse/arch/xen/i386/mm/mmap.c
 40f5623906UYHv1rsVUeRc0tFT0dWw linux-2.6.7-xen-sparse/arch/xen/i386/mm/pgtable.c
 4107adf12ndy94MidCaivDibJ3pPAg linux-2.6.7-xen-sparse/arch/xen/i386/pci/Makefile
 4107adf1WcCgkhsdLTRGX52cOG1vJg linux-2.6.7-xen-sparse/arch/xen/i386/pci/direct.c
@@ -241,6 +242,7 @@
 3fa8e3f0kBLeE4To2vpdi3cpJbIkbQ linux-2.6.7-xen-sparse/include/asm-xen/suspend.h
 3f689063BoW-HWV3auUJ-OqXfcGArw linux-2.6.7-xen-sparse/include/asm-xen/xen_proc.h
 40f56a0ddHCSs3501MY4hRf22tctOw linux-2.6.7-xen-sparse/mkbuildtree
+411b9db3dpQAK-pcP8WwcRHZGn2eKg linux-2.6.7-xen-sparse/mm/mmap.c
 410a94a4KT6I6X0LVc7djB39tRDp4g linux-2.6.7-xen-sparse/mm/page_alloc.c
 40e1b09db5mN69Ijj0X_Eol-S7dXiw tools/Make.defs
 3f776bd1Hy9rn69ntXBhPReUFw9IEA tools/Makefile

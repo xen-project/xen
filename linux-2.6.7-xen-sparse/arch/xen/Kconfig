@@ -36,6 +36,12 @@ config XEN_PHYSDEV_ACCESS
 	help
 	  Device-driver domain (physical device access)
 
+config XEN_WRITABLE_PAGETABLES
+	bool "Use writable pagetables"
+	default n
+	help
+	  Use writable L1 pagetables
+
 endmenu
 
 # Xen's block device backend driver needs 2^12 pages

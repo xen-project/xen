@@ -268,13 +268,15 @@ static int do_block_io_op(blkif_t *blkif, int max_to_do)
 {
     blkif_ring_t *blk_ring = blkif->blk_ring_base;
     blkif_request_t *req;
-    BLKIF_RING_IDX i;
+    BLKIF_RING_IDX i, rp;
     int more_to_do = 0;
+
+    rp = blk_ring->req_prod;
+    rmb(); /* Ensure we see queued requests up to 'rp'. */
 
     /* Take items off the comms ring, taking care not to overflow. */
     for ( i = blkif->blk_req_cons; 
-          (i != blk_ring->req_prod) && ((i-blkif->blk_resp_prod) != 
-                                        BLKIF_RING_SIZE);
+          (i != rp) && ((i-blkif->blk_resp_prod) != BLKIF_RING_SIZE);
           i++ )
     {
         if ( (max_to_do-- == 0) || (NR_PENDING_REQS == MAX_PENDING_REQS) )
@@ -533,7 +535,7 @@ static void make_response(blkif_t *blkif, unsigned long id,
     resp->id        = id;
     resp->operation = op;
     resp->status    = st;
-    wmb();
+    wmb(); /* Ensure other side can see the response fields. */
     blkif->blk_ring_base->resp_prod = ++blkif->blk_resp_prod;
     spin_unlock_irqrestore(&blkif->blk_ring_lock, flags);
 

@@ -49,6 +49,13 @@
 /* Size of a machine page frame. */
 #define PAGE_SIZE 4096
 
+#if defined(__i386__)
+#define rmb() __asm__ __volatile__ ( "lock; addl $0,0(%%esp)" : : : "memory" )
+#define wmb() __asm__ __volatile__ ( "" : : : "memory" )
+#else
+#error "Define barriers"
+#endif
+
 
 /*
  * *********************** NOTIFIER ***********************
@@ -710,6 +717,9 @@ static PyObject *xu_port_read_request(PyObject *self, PyObject *args)
         return NULL;
     }
 
+    /* Need to ensure we see the request, despite seeing the index update.*/
+    rmb();
+
     cmsg = &cif->tx_ring[MASK_CONTROL_IDX(c)];
     xum = PyObject_New(xu_message_object, &xu_message_type);
     memcpy(&xum->msg, cmsg, sizeof(*cmsg));
@@ -745,6 +755,7 @@ static PyObject *xu_port_write_request(PyObject *self, PyObject *args)
     cmsg = &cif->rx_ring[MASK_CONTROL_IDX(p)];
     memcpy(cmsg, &xum->msg, sizeof(*cmsg));
 
+    wmb();
     xup->rx_req_prod = cif->rx_req_prod = p + 1;
 
     Py_INCREF(Py_None);
@@ -767,6 +778,9 @@ static PyObject *xu_port_read_response(PyObject *self, PyObject *args)
         PyErr_SetString(port_error, "no response to read");
         return NULL;
     }
+
+    /* Need to ensure we see the response, despite seeing the index update.*/
+    rmb();
 
     cmsg = &cif->rx_ring[MASK_CONTROL_IDX(c)];
     xum = PyObject_New(xu_message_object, &xu_message_type);
@@ -803,6 +817,7 @@ static PyObject *xu_port_write_response(PyObject *self, PyObject *args)
     cmsg = &cif->tx_ring[MASK_CONTROL_IDX(p)];
     memcpy(cmsg, &xum->msg, sizeof(*cmsg));
 
+    wmb();
     xup->tx_resp_prod = cif->tx_resp_prod = p + 1;
 
     Py_INCREF(Py_None);
