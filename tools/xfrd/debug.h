@@ -45,6 +45,7 @@
 #else
 
 #include <stdio.h>
+#include <unistd.h>
 
 #ifdef DEBUG
 
