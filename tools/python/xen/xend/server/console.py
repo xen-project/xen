@@ -48,7 +48,6 @@ class ConsoleProtocol(protocol.Protocol):
             self.loseConnection()
 
     def write(self, data):
-        #if not self.connected: return -1
         self.transport.write(data)
         return len(data)
 
@@ -81,14 +80,13 @@ class ConsoleControllerFactory(controller.ControllerFactory):
     """Factory for creating console controllers.
     """
 
-    def createController(self, dom, console_port=None, remote_port=0):
+    def createController(self, dom, console_port=None):
         if console_port is None:
             console_port = CONSOLE_PORT_BASE + dom
         for c in self.getControllers():
             if c.console_port == console_port:
                 raise XendError('console port in use: ' + str(console_port))
-        console = ConsoleController(self, dom, console_port,
-                                    remote_port=remote_port)
+        console = ConsoleController(self, dom, console_port)
         self.addController(console)
         log.info("Created console id=%s domain=%d port=%d",
                  console.idx, console.dom, console.console_port)
@@ -112,9 +110,8 @@ class ConsoleController(controller.Controller):
     STATUS_CONNECTED = 'connected'
     STATUS_LISTENING = 'listening'
 
-    def __init__(self, factory, dom, console_port, remote_port=0):
-        controller.Controller.__init__(self, factory, dom,
-                                       remote_port=remote_port)
+    def __init__(self, factory, dom, console_port):
+        controller.Controller.__init__(self, factory, dom)
         self.addMethod(CMSG_CONSOLE, 0, None)
         self.status = self.STATUS_NEW
         self.addr = None
