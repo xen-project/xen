@@ -83,18 +83,16 @@ typedef struct {
     /* IN variables. */
     domid_t  domain;                  /*  0 */ /* NB. IN/OUT variable. */
     /* OUT variables. */
-#define DOMSTATE_CRASHED     0 /* Crashed domain; frozen for postmortem.     */
-#define DOMSTATE_SUSPENDED   1 /* Domain voluntarily halted it execution.    */
-#define DOMSTATE_PAUSED      2 /* Currently paused (forced non-schedulable). */
-#define DOMSTATE_BLOCKED     3 /* Currently blocked pending a wake-up event. */
-#define DOMSTATE_RUNNABLE    4 /* Currently runnable.                        */
-#define DOMSTATE_RUNNING     5 /* Currently running.                         */
-#define DOMFLAGS_STATEMASK   7 /* One of the DOMSTATE_??? values.            */
-#define DOMFLAGS_STATESHIFT  0
-#define DOMFLAGS_CPUMASK   255 /* CPU to which this domain is bound.         */
-#define DOMFLAGS_CPUSHIFT    3
-#define DOMFLAGS_GUESTMASK 255 /* DOMSTATE_STOPPED -> Guest-supplied code.   */
-#define DOMFLAGS_GUESTSHIFT 11
+#define DOMFLAGS_DYING     (1<<0) /* Domain is scheduled to die.             */
+#define DOMFLAGS_CRASHED   (1<<1) /* Crashed domain; frozen for postmortem.  */
+#define DOMFLAGS_SUSPENDED (1<<2) /* Domain voluntarily halted it execution. */
+#define DOMFLAGS_STOPPED   (1<<3) /* Currently stopped by control software.  */
+#define DOMFLAGS_BLOCKED   (1<<4) /* Currently blocked pending an event.     */
+#define DOMFLAGS_RUNNING   (1<<5) /* Domain is currently running.            */
+#define DOMFLAGS_CPUMASK      255 /* CPU to which this domain is bound.      */
+#define DOMFLAGS_CPUSHIFT       8
+#define DOMFLAGS_SUSPCODEMASK 255 /* DOMSTATE_SUSPENDED guest-supplied code. */
+#define DOMFLAGS_SUSPCODESHIFT 16
     u32      flags;                   /*  4 */
     u8       name[MAX_DOMAIN_NAME];   /*  8 */
     full_execution_context_t *ctxt;   /* 24 */ /* NB. IN/OUT variable. */

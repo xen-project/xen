@@ -96,7 +96,7 @@ struct domain
 
     /* Scheduling. */
     struct list_head run_list;
-    int              stop_code;     /* stop code from OS (if DF_STOPPED). */
+    int              suspend_code;  /* code value from OS (if DF_SUSPENDED). */
     s_time_t         lastschd;      /* time this domain was last scheduled */
     s_time_t         lastdeschd;    /* time this domain was last descheduled */
     s_time_t         cpu_time;      /* total CPU time received till now */

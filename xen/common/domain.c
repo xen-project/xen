@@ -204,12 +204,7 @@ void domain_suspend(u8 reason)
         machine_restart(0);
     }
 
-    current->stop_code = reason;
-    memcpy(&current->shared_info->execution_context, 
-           get_execution_context(), 
-           sizeof(execution_context_t));
-    unlazy_fpu(current);
-    wmb(); /* All CPUs must see saved info when suspended. */
+    current->suspend_code = reason;
     set_bit(DF_SUSPENDED, &current->flags);
 
     d = find_domain_by_id(0);

@@ -25,8 +25,8 @@ int xc_interface_close(int xc_handle);
 typedef struct {
     u32           domid;
     unsigned int  cpu;
-    int           has_cpu;
-    int           stopped;
+    unsigned int  dying:1, crashed:1, suspended:1, 
+                  stopped:1, blocked:1, running:1;
     unsigned long nr_pages;
     unsigned long shared_info_frame;
     u64           cpu_time;

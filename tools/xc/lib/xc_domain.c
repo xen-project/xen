@@ -93,11 +93,13 @@ int xc_domain_getinfo(int xc_handle,
 
         info->cpu     =
             (op.u.getdomaininfo.flags>>DOMFLAGS_CPUSHIFT) & DOMFLAGS_CPUMASK;
-        info->has_cpu =
-            (op.u.getdomaininfo.flags&DOMFLAGS_STATEMASK) == DOMSTATE_RUNNING;
-        info->stopped = 
-            (op.u.getdomaininfo.flags&DOMFLAGS_STATEMASK)
-            == DOMSTATE_SUSPENDED;
+
+        info->dying     = (op.u.getdomaininfo.flags & DOMFLAGS_DYING);
+        info->crashed   = (op.u.getdomaininfo.flags & DOMFLAGS_CRASHED);
+        info->suspended = (op.u.getdomaininfo.flags & DOMFLAGS_SUSPENDED);
+        info->stopped   = (op.u.getdomaininfo.flags & DOMFLAGS_STOPPED);
+        info->blocked   = (op.u.getdomaininfo.flags & DOMFLAGS_BLOCKED);
+        info->running   = (op.u.getdomaininfo.flags & DOMFLAGS_RUNNING);
 
         info->nr_pages = op.u.getdomaininfo.tot_pages;
         info->max_memkb = op.u.getdomaininfo.max_pages<<(PAGE_SHIFT-10);

@@ -167,14 +167,18 @@ static PyObject *pyxc_domain_getinfo(PyObject *self,
         PyList_SetItem(
             list, i, 
             Py_BuildValue("{s:i,s:i,s:i,s:i,s:l,s:L,s:s,s:l}",
-                          "dom",      info[i].domid,
-                          "cpu",      info[i].cpu,
-                          "running",  info[i].has_cpu,
-                          "stopped",  info[i].stopped,
-                          "mem_kb",   info[i].nr_pages*4,
-                          "cpu_time", info[i].cpu_time,
-                          "name",     info[i].name,
-                          "maxmem_kb",info[i].max_memkb
+                          "dom",       info[i].domid,
+                          "cpu",       info[i].cpu,
+                          "dying",     info[i].dying,
+                          "crashed",   info[i].crashed,
+                          "suspended", info[i].suspended,
+                          "stopped",   info[i].stopped,
+                          "blocked",   info[i].blocked,
+                          "running",   info[i].running,
+                          "mem_kb",    info[i].nr_pages*4,
+                          "cpu_time",  info[i].cpu_time,
+                          "name",      info[i].name,
+                          "maxmem_kb", info[i].max_memkb
                 ));
     }
 
@@ -1053,8 +1057,12 @@ static PyMethodDef pyxc_methods[] = {
       "         domain-id space was reached.\n"
       " dom      [int]: Identifier of domain to which this info pertains\n"
       " cpu      [int]:  CPU to which this domain is bound\n"
+      " dying    [int]:  Bool - is the domain dying?\n"
+      " crashed  [int]:  Bool - has the domain crashed?\n"
+      " suspended[int]:  Bool - has the domain suspended itself?\n"
+      " stopped  [int]:  Bool - is the domain stopped by control software?\n"
+      " blocked  [int]:  Bool - is the domain blocked waiting for an event?\n"
       " running  [int]:  Bool - is the domain currently running?\n"
-      " stopped  [int]:  Bool - is the domain suspended?\n"
       " mem_kb   [int]:  Memory reservation, in kilobytes\n"
       " cpu_time [long]: CPU time consumed, in nanoseconds\n"
       " name     [str]:  Identifying name\n" },
