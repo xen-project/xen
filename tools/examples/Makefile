@@ -1,6 +1,7 @@
 
 # Init scripts.
 XEND_INITD = init.d/xend
+XENDOMAINS_INITD = init.d/xendomains
 
 # Xen configuration dir and configs to go there.
 XEN_CONFIG_DIR = /etc/xen
@@ -22,6 +23,7 @@ install: all install-initd install-configs install-scripts
 install-initd:
 	install -d $(prefix)/etc/init.d
 	install -m0755 $(XEND_INITD) $(prefix)/etc/init.d
+	install -m0755 $(XENDOMAINS_INITD) $(prefix)/etc/init.d
 
 install-configs:
 	install -d $(prefix)$(XEN_CONFIG_DIR)
