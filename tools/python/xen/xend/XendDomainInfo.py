@@ -710,6 +710,10 @@ class XendDomainInfo:
         """Build the domain boot image.
         """
         if self.recreate or self.restore: return
+        if not os.path.isfile(kernel):
+            raise VmError('Kernel image does not exist: %s' % kernel)
+        if ramdisk and not os.path.isfile(ramdisk):
+            raise VmError('Kernel ramdisk does not exist: %s' % ramdisk)
         if len(cmdline) >= 256:
             log.warning('kernel cmdline too long, domain %d', self.dom)
         dom = self.dom
@@ -735,11 +739,6 @@ class XendDomainInfo:
         @param ramdisk: kernel ramdisk
         @param cmdline: kernel commandline
         """
-        if not self.recreate:
-            if not os.path.isfile(kernel):
-                raise VmError('Kernel image does not exist: %s' % kernel)
-            if ramdisk and not os.path.isfile(ramdisk):
-                raise VmError('Kernel ramdisk does not exist: %s' % ramdisk)
         #self.init_domain()
         if self.console:
             self.console.registerChannel()
