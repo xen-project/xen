@@ -241,6 +241,7 @@ static void serial_rx(unsigned char c, struct pt_regs *regs)
     if ( c == CTRL_A )
     {
         xen_rx = !xen_rx;
+        serial_putc(sercon_handle, '\n');
         printk("*** Serial input -> %s "
                "(type 'CTRL-a' to switch input to %s).\n",
                input_str[xen_rx], input_str[!xen_rx]);
@@ -422,6 +423,13 @@ long do_console_write(char *str, unsigned int count)
 
     return 0;
 #else
+    if ( !test_and_set_bit(PF_CONSOLEWRITEBUG, &current->flags) )
+    {
+        printk("DOM%llu is attempting to use the deprecated "
+               "HYPERVISOR_console_write() interface.\n", current->domain);
+        printk(" - For testing, create a debug build of Xen\n");
+        printk(" - For production, your OS must use the new console model\n");
+    }
     return -ENOSYS;
 #endif
 }

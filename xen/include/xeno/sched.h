@@ -39,6 +39,7 @@ extern struct mm_struct init_mm;
 #define PF_CONSTRUCTED  3 /* Has the guest OS been fully built yet?      */
 #define PF_IDLETASK     4 /* Is this one of the per-CPU idle domains?    */
 #define PF_PRIVILEGED   5 /* Is this domain privileged?                  */
+#define PF_CONSOLEWRITEBUG 6 /* Has this domain used the obsolete console? */
 
 #include <xeno/vif.h>
 #include <xeno/vbd.h>

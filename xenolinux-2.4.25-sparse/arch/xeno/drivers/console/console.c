@@ -41,11 +41,8 @@ static void nonpriv_conwrite(const char *s, unsigned int count)
     control_if_t *ctrl_if;
     evtchn_op_t   evtchn_op;
     int           src, dst, p;
-    unsigned long flags;
 
     ctrl_if = (control_if_t *)((char *)HYPERVISOR_shared_info + 2048);
-
-    spin_lock_irqsave(&xeno_console_lock, flags);
 
     while ( count != 0 )
     {
@@ -74,8 +71,6 @@ static void nonpriv_conwrite(const char *s, unsigned int count)
         s     += src;
         count -= src;
     }
-
-    spin_unlock_irqrestore(&xeno_console_lock, flags);
 }
 
 static void priv_conwrite(const char *s, unsigned int count)
@@ -95,10 +90,13 @@ static void priv_conwrite(const char *s, unsigned int count)
 static void xen_console_write(struct console *co, const char *s, 
                               unsigned int count)
 {
+    unsigned long flags;
+    spin_lock_irqsave(&xeno_console_lock, flags);
     if ( !(start_info.flags & SIF_INITDOMAIN) )
         nonpriv_conwrite(s, count);
     else
         priv_conwrite(s, count);
+    spin_unlock_irqrestore(&xeno_console_lock, flags);
 }
 
 static kdev_t xen_console_device(struct console *c)
@@ -167,9 +165,33 @@ static void __do_console_io(void)
     evtchn_op_t      evtchn_op;
     CONTROL_RING_IDX c;
     int              i, len, work_done = 0;
+    static char      rbuf[16];
 
-    if ( (start_info.flags & SIF_INITDOMAIN) || (xeno_console_tty == NULL) )
+    if ( xeno_console_tty == NULL )
         return;
+
+    /* Special-case I/O handling for domain 0. */
+    if ( start_info.flags & SIF_INITDOMAIN )
+    {
+        /* Receive work. */
+        while ( (len = HYPERVISOR_serial_io(SERIALIO_read, 16, rbuf)) > 0 )
+            for ( i = 0; i < len; i++ )
+                tty_insert_flip_char(xeno_console_tty, rbuf[i], 0);
+        if ( xeno_console_tty->flip.count != 0 )
+            tty_flip_buffer_push(xeno_console_tty);
+
+        /* Transmit work. */
+        if ( wc != wp )
+        {
+            len = wp - wc;
+            if ( len > (WBUF_SIZE - WBUF_MASK(wc)) )
+                len = WBUF_SIZE - WBUF_MASK(wc);
+            priv_conwrite(&wbuf[WBUF_MASK(wc)], len);
+            wc += len;
+        }
+
+        return;
+    }
 
     /* Acknowledge the notification. */
     evtchn_clear_port(0);
@@ -235,12 +257,22 @@ static void __do_console_io(void)
     }
 }
 
+/* This is the callback entry point for domains != 0. */
 static void control_event(unsigned int port)
 {
     unsigned long flags;
     spin_lock_irqsave(&xeno_console_lock, flags);
     __do_console_io();
     spin_unlock_irqrestore(&xeno_console_lock, flags);
+}
+
+/* This is the callback entry point for domain 0. */
+static void control_irq(int irq, void *dev_id, struct pt_regs *regs)
+{
+    unsigned long flags;
+    spin_lock_irqsave(&xeno_console_lock, flags);
+    __do_console_io();
+    spin_unlock_irqrestore(&xeno_console_lock, flags);    
 }
 
 static int xeno_console_write_room(struct tty_struct *tty)
@@ -290,13 +322,6 @@ static void xeno_console_flush_buffer(struct tty_struct *tty)
 static inline int __xeno_console_put_char(int ch)
 {
     char _ch = (char)ch;
-
-    if ( start_info.flags & SIF_INITDOMAIN )
-    {
-        priv_conwrite(&_ch, 1);
-        return 1;
-    }
-
     if ( (wp - wc) == WBUF_SIZE )
         return 0;
     wbuf[WBUF_MASK(wp++)] = _ch;
@@ -345,7 +370,6 @@ static void xeno_console_flush_chars(struct tty_struct *tty)
 {
     unsigned long flags;
     spin_lock_irqsave(&xeno_console_lock, flags);
-
     __do_console_io();
     spin_unlock_irqrestore(&xeno_console_lock, flags);    
 }
@@ -418,8 +442,12 @@ int __init xeno_con_init(void)
     {
         if ( evtchn_request_port(0, control_event) != 0 )
             BUG();
-        /* Kickstart event delivery. */
-        control_event(0);
+        control_event(0); /* kickstart the console */
+    }
+    else
+    {
+        request_irq(_EVENT_CONSOLE, control_irq, 0, "console", NULL);
+        control_irq(0, NULL, NULL); /* kickstart the console */
     }
 
     printk("Xeno console successfully installed\n");
