@@ -118,6 +118,43 @@ install-iptables:
 	( cd iptables-* ; \
 	  make PREFIX= KERNEL_DIR=../linux-$(LINUX_VER)-xen0 install)
 
+help:
+	@echo 'Installation targets:'
+	@echo '  install          - install everything'
+	@echo '  install-xen      - install the Xen hypervisor'
+	@echo '  install-tools    - install the control tools'
+	@echo '  install-kernels  - install guest kernels'
+	@echo '  install-docs     - install documentation'
+	@echo ''
+	@echo 'Building targets:'
+	@echo '  dist             - build everything and place in dist/'
+	@echo '  world            - clean everything, delete guest kernel build'
+	@echo '                     trees then make dist'
+	@echo '  xen              - build Xen hypervisor and place in dist/'
+	@echo '  tools            - build tools and place in dist/'
+	@echo '  kernels          - build guest kernels and place in dist/'
+	@echo '  kbuild           - synonym for make kernels'
+	@echo '  docs             - build docs and place in dist/'
+	@echo ''
+	@echo 'Cleaning targets:'
+	@echo '  clean            - clean the Xen, tools and docs (but not'
+	@echo '                     guest kernel) trees'
+	@echo '  mrproper         - clean plus delete kernel tarballs and kernel'
+	@echo '                     build trees'
+	@echo '  kdelete          - delete guest kernel build trees'
+	@echo '  kclean           - clean guest kernel build trees'
+	@echo ''
+	@echo 'Dependency installation targets:'
+	@echo '  install-twisted  - install the Twisted Matrix Framework'
+	@echo '  install-logging  - install the Python Logging package'
+	@echo '  install-iptables - install iptables tools'
+	@echo ''
+	@echo 'Miscellaneous targets:'
+	@echo '  mkpatches        - make patches against vanilla kernels from'
+	@echo '                     sparse trees'
+	@echo '  uninstall        - attempt to remove installed Xen tools (use'
+	@echo '                     with extreme care!)'
+
 # Use this target with extreme care!
 uninstall:
 	cp -a /etc/xen /etc/xen.old && rm -rf /etc/xen 
