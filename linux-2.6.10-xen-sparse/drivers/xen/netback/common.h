@@ -59,6 +59,7 @@ typedef struct netif_st {
 
     /* Miscellaneous private stuff. */
     enum { DISCONNECTED, DISCONNECTING, CONNECTED } status;
+    int active;
     /*
      * DISCONNECT response is deferred until pending requests are ack'ed.
      * We therefore need to store the id from the original request.
@@ -67,7 +68,6 @@ typedef struct netif_st {
     struct netif_st *hash_next;
     struct list_head list;  /* scheduling list */
     atomic_t         refcnt;
-    spinlock_t       rx_lock, tx_lock;
     struct net_device *dev;
     struct net_device_stats stats;
 
@@ -90,7 +90,8 @@ netif_t *netif_find_by_handle(domid_t domid, unsigned int handle);
 void netif_interface_init(void);
 void netif_ctrlif_init(void);
 
-void netif_deschedule(netif_t *netif);
+void netif_schedule_work(netif_t *netif);
+void netif_deschedule_work(netif_t *netif);
 
 int netif_be_start_xmit(struct sk_buff *skb, struct net_device *dev);
 struct net_device_stats *netif_be_get_stats(struct net_device *dev);
