@@ -308,15 +308,21 @@ void arch_do_createdomain(struct exec_domain *ed)
 }
 
 #ifdef CONFIG_VMX
-void arch_vmx_do_resume(struct exec_domain *d) 
+void arch_vmx_do_resume(struct exec_domain *ed) 
 {
-    vmx_do_resume(d);
+    u64 vmcs_phys_ptr = (u64) virt_to_phys(ed->thread.arch_vmx.vmcs);
+
+    load_vmcs(&ed->thread.arch_vmx, vmcs_phys_ptr);
+    vmx_do_resume(ed);
     reset_stack_and_jump(vmx_asm_do_resume);
 }
 
-void arch_vmx_do_launch(struct exec_domain *d) 
+void arch_vmx_do_launch(struct exec_domain *ed) 
 {
-    vmx_do_launch(d);
+    u64 vmcs_phys_ptr = (u64) virt_to_phys(ed->thread.arch_vmx.vmcs);
+
+    load_vmcs(&ed->thread.arch_vmx, vmcs_phys_ptr);
+    vmx_do_launch(ed);
     reset_stack_and_jump(vmx_asm_do_launch);
 }
 
@@ -332,14 +338,14 @@ static void monitor_mk_pagetable(struct exec_domain *ed)
     ASSERT( mpfn_info ); 
 
     mpfn = (unsigned long) (mpfn_info - frame_table);
-    mpl2e = (l2_pgentry_t *) map_domain_mem(mpfn << PAGE_SHIFT);
+    mpl2e = (l2_pgentry_t *) map_domain_mem(mpfn << L1_PAGETABLE_SHIFT);
     memset(mpl2e, 0, PAGE_SIZE);
 
     memcpy(&mpl2e[DOMAIN_ENTRIES_PER_L2_PAGETABLE], 
            &idle_pg_table[DOMAIN_ENTRIES_PER_L2_PAGETABLE],
            HYPERVISOR_ENTRIES_PER_L2_PAGETABLE * sizeof(l2_pgentry_t));
 
-    m->monitor_table = mk_pagetable(mpfn << PAGE_SHIFT);
+    m->monitor_table = mk_pagetable(mpfn << L1_PAGETABLE_SHIFT);
     m->shadow_mode = SHM_full_32;
 
     mpl2e[PERDOMAIN_VIRT_START >> L2_PAGETABLE_SHIFT] =
@@ -349,13 +355,42 @@ static void monitor_mk_pagetable(struct exec_domain *ed)
     unmap_domain_mem(mpl2e);
 }
 
-static int vmx_final_setup_guestos(struct exec_domain *d,
+/*
+ * Free the pages for monitor_table and guest_pl2e_cache
+ */
+static void monitor_rm_pagetable(struct exec_domain *ed)
+{
+    struct mm_struct *m = &ed->mm;
+    l2_pgentry_t *mpl2e;
+    unsigned long mpfn;
+
+    ASSERT( m->monitor_table );
+    
+    mpl2e = (l2_pgentry_t *) map_domain_mem(pagetable_val(m->monitor_table));
+    /*
+     * First get the pfn for guest_pl2e_cache by looking at monitor_table
+     */
+    mpfn = l2_pgentry_val(mpl2e[LINEAR_PT_VIRT_START >> L2_PAGETABLE_SHIFT])
+        >> PAGE_SHIFT;
+
+    free_domheap_page(&frame_table[mpfn]);
+    unmap_domain_mem(mpl2e);
+
+    /*
+     * Then free monitor_table.
+     */
+    mpfn = (pagetable_val(m->monitor_table)) >> PAGE_SHIFT;
+    free_domheap_page(&frame_table[mpfn]);
+
+    m->monitor_table = mk_pagetable(0);
+}
+
+static int vmx_final_setup_guestos(struct exec_domain *ed,
                                    full_execution_context_t *full_context)
 {
     int error;
     execution_context_t *context;
     struct vmcs_struct *vmcs;
-    unsigned long guest_pa;
 
     context = &full_context->cpu_ctxt;
 
@@ -367,33 +402,38 @@ static int vmx_final_setup_guestos(struct exec_domain *d,
         return -ENOMEM;
     }
 
-    memset(&d->thread.arch_vmx, 0, sizeof (struct arch_vmx_struct));
+    memset(&ed->thread.arch_vmx, 0, sizeof (struct arch_vmx_struct));
 
-    d->thread.arch_vmx.vmcs = vmcs;
-    error = construct_vmcs(&d->thread.arch_vmx, context, full_context, VMCS_USE_HOST_ENV);
+    ed->thread.arch_vmx.vmcs = vmcs;
+    error = construct_vmcs(&ed->thread.arch_vmx, context, full_context, VMCS_USE_HOST_ENV);
     if (error < 0) {
         printk("Failed to construct a new VMCS\n");
         goto out;
     }
 
-    monitor_mk_pagetable(d);
-    guest_pa = pagetable_val(d->mm.pagetable);
-    clear_bit(VMX_CPU_STATE_PG_ENABLED, &d->thread.arch_vmx.cpu_state);
+    monitor_mk_pagetable(ed);
+    ed->thread.schedule_tail = arch_vmx_do_launch;
+    clear_bit(VMX_CPU_STATE_PG_ENABLED, &ed->thread.arch_vmx.cpu_state);
 
-    d->thread.arch_vmx.vmx_platform.real_mode_data = 
+#if defined (__i386)
+    ed->thread.arch_vmx.vmx_platform.real_mode_data = 
         (unsigned long *) context->esi;
+#endif
 
-    memset(&d->domain->shared_info->evtchn_mask[0], 0xff, 
-           sizeof(d->domain->shared_info->evtchn_mask));
-    clear_bit(IOPACKET_PORT, &d->domain->shared_info->evtchn_mask[0]);
-
-    d->thread.schedule_tail = arch_vmx_do_launch;
+    if (ed == ed->domain->exec_domain[0]) {
+        /* 
+         * Required to do this once per domain
+         */
+        memset(&ed->domain->shared_info->evtchn_mask[0], 0xff, 
+               sizeof(ed->domain->shared_info->evtchn_mask));
+        clear_bit(IOPACKET_PORT, &ed->domain->shared_info->evtchn_mask[0]);
+    }
 
     return 0;
 
 out:
     free_vmcs(vmcs);
-    d->thread.arch_vmx.vmcs = 0;
+    ed->thread.arch_vmx.vmcs = 0;
     return error;
 }
 #endif
@@ -707,6 +747,35 @@ static void relinquish_list(struct domain *d, struct list_head *list)
     spin_unlock_recursive(&d->page_alloc_lock);
 }
 
+static void vmx_domain_relinquish_memory(struct exec_domain *ed)
+{
+    struct domain *d = ed->domain;
+
+    /*
+     * Free VMCS
+     */
+    ASSERT(ed->thread.arch_vmx.vmcs);
+    free_vmcs(ed->thread.arch_vmx.vmcs);
+    ed->thread.arch_vmx.vmcs = 0;
+    
+    monitor_rm_pagetable(ed);
+
+    if (ed == d->exec_domain[0]) {
+        int i;
+        unsigned long pfn;
+
+        for (i = 0; i < ENTRIES_PER_L1_PAGETABLE; i++) {
+            unsigned long l1e;
+            
+            l1e = l1_pgentry_val(d->mm_perdomain_pt[i]);
+            if (l1e & _PAGE_PRESENT) {
+                pfn = l1e >> PAGE_SHIFT;
+                free_domheap_page(&frame_table[pfn]);
+            }
+        }
+    }
+
+}
 
 void domain_relinquish_memory(struct domain *d)
 {
@@ -724,6 +793,10 @@ void domain_relinquish_memory(struct domain *d)
             put_page_and_type(&frame_table[pagetable_val(ed->mm.pagetable) >>
                                            PAGE_SHIFT]);
     }
+
+    if (VMX_DOMAIN(d->exec_domain[0]))
+        for_each_exec_domain(d, ed)
+            vmx_domain_relinquish_memory(ed);
 
     /*
      * Relinquish GDT mappings. No need for explicit unmapping of the LDT as 
