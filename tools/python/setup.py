@@ -3,7 +3,7 @@ from distutils.core import setup, Extension
 
 XEN_ROOT = "../.."
 
-extra_compile_args  = ["-fno-strict-aliasing"]
+extra_compile_args  = [ "-fno-strict-aliasing", "-Wall", "-Werror" ]
 
 
 include_dirs = [ XEN_ROOT + "/xen/include/hypervisor-ifs",

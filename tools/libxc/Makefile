@@ -20,26 +20,6 @@ INCLUDES += -I $(XEN_XU)
 vpath %c       $(XEN_LIBXUTIL)
 INCLUDES += -I $(XEN_LIBXUTIL)
 
-LIB_SRCS :=
-LIB_SRCS += allocate.c
-#LIB_SRCS += enum.c
-LIB_SRCS += file_stream.c
-LIB_SRCS += gzip_stream.c
-#LIB_SRCS += hash_table.c
-LIB_SRCS += iostream.c
-#LIB_SRCS += kernel_stream.c
-#LIB_SRCS += lexis.c
-#LIB_SRCS += lzi_stream.c
-#LIB_SRCS += lzo_stream.c
-#LIB_SRCS += marshal.c
-#LIB_SRCS += socket_stream.c
-#LIB_SRCS += string_stream.c
-#LIB_SRCS += sxpr.c
-#LIB_SRCS += sxpr_parser.c
-LIB_SRCS += sys_net.c
-LIB_SRCS += sys_string.c
-#LIB_SRCS += xdr.c
-
 SRCS     :=
 SRCS     += xc_atropos.c
 SRCS     += xc_bvtsched.c
@@ -55,11 +35,8 @@ SRCS     += xc_physdev.c
 SRCS     += xc_private.c
 SRCS     += xc_rrobin.c
 
-#SRCS     += $(LIB_SRCS)
-
 CFLAGS   += -Wall
 CFLAGS   += -Werror
-CFLAGS   += -g
 CFLAGS   += -O3
 CFLAGS   += -fno-strict-aliasing
 CFLAGS   += $(INCLUDES)
@@ -106,10 +83,6 @@ libxc.so:
 libxc.so.$(MAJOR):
 	ln -sf libxc.so.$(MAJOR).$(MINOR) $@
 libxc.so.$(MAJOR).$(MINOR): $(OBJS)
-	$(CC) -Wl,-soname -Wl,$(SONAME) -shared -o $@ $^ ../libxutil/libxutil.a -lz 
-
-%.o: %.c Makefile
-
-#	$(CC) $(CFLAGS) -o $@ $<
+	$(CC) -Wl,-soname -Wl,$(SONAME) -shared -o $@ $^ -L../libxutil -lxutil -lz
 
 -include $(DEPS)

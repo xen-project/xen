@@ -191,32 +191,42 @@ static PyObject *pyxc_domain_getinfo(PyObject *self,
     return list;
 }
 
-static int file_save(XcObject *xc, XcIOContext *ctxt, char *state_file){
+static int file_save(XcObject *xc, XcIOContext *ctxt, char *state_file)
+{
     int rc = -1;
     int fd = -1;
     int open_flags = (O_CREAT | O_EXCL | O_WRONLY);
     int open_mode = 0644;
 
     printf("%s>\n", __FUNCTION__);
-    fd = open(state_file, open_flags, open_mode);
-    if(fd < 0){
+
+    if ( (fd = open(state_file, open_flags, open_mode)) < 0 )
+    {
         xcio_perror(ctxt, "Could not open file for writing");
         goto exit;
     }
+
+    printf("%s>gzip_stream_fdopen... \n", __FUNCTION__);
+
     /* Compression rate 1: we want speed over compression. 
      * We're mainly going for those zero pages, after all.
      */
-    printf("%s>gzip_stream_fdopen... \n", __FUNCTION__);
     ctxt->io = gzip_stream_fdopen(fd, "wb1");
-    if(!ctxt->io){
+    if ( ctxt->io == NULL )
+    {
         xcio_perror(ctxt, "Could not allocate compression state");
         goto exit;
     }
+
     printf("%s> xc_linux_save...\n", __FUNCTION__);
+
     rc = xc_linux_save(xc->xc_handle, ctxt);
+
   exit:
-    if(ctxt->io) IOStream_close(ctxt->io);
-    if(fd >= 0) close(fd);
+    if ( ctxt->io != NULL )
+        IOStream_close(ctxt->io);
+    if ( fd >= 0 )
+        close(fd);
     unlink(state_file);
     printf("%s> rc=%d\n", __FUNCTION__, rc);
     return rc;
@@ -228,53 +238,62 @@ static PyObject *pyxc_linux_save(PyObject *self,
 {
     XcObject *xc = (XcObject *)self;
 
-    u32 dom;
     char *state_file;
     int progress = 1, debug = 0;
-    unsigned int flags = 0;
     PyObject *val = NULL;
     int rc = -1;
     XcIOContext ioctxt = { .info = iostdout, .err = iostderr };
 
     static char *kwd_list[] = { "dom", "state_file", "vmconfig", "progress", "debug", NULL };
 
-    if (!PyArg_ParseTupleAndKeywords(args, kwds, "is|sii", kwd_list, 
-                                     &ioctxt.domain,
-                                     &state_file,
-                                     &ioctxt.vmconfig,
-                                     &progress, 
-                                     &debug)){
+    if ( !PyArg_ParseTupleAndKeywords(args, kwds, "is|sii", kwd_list, 
+                                      &ioctxt.domain,
+                                      &state_file,
+                                      &ioctxt.vmconfig,
+                                      &progress, 
+                                      &debug) )
         goto exit;
-    }
+
     ioctxt.vmconfig_n = (ioctxt.vmconfig ? strlen(ioctxt.vmconfig) : 0);
-    if (progress)  ioctxt.flags |= XCFLAGS_VERBOSE;
-    if (debug)     ioctxt.flags |= XCFLAGS_DEBUG;
-    if(!state_file || state_file[0] == '\0') goto exit;
+
+    if ( progress )
+        ioctxt.flags |= XCFLAGS_VERBOSE;
+    if ( debug )
+        ioctxt.flags |= XCFLAGS_DEBUG;
+
+    if ( (state_file == NULL) || (state_file[0] == '\0') )
+        goto exit;
+    
     rc = file_save(xc, &ioctxt, state_file);
-    if(rc){
+    if ( rc != 0 )
+    {
         PyErr_SetFromErrno(xc_error);
         goto exit;
     } 
-    //xc_domain_destroy(xc->xc_handle, dom);
+
     Py_INCREF(zero);
     val = zero;
+
   exit:
     return val;
 }
 
 
-static int file_restore(XcObject *xc, XcIOContext *ioctxt, char *state_file){
+static int file_restore(XcObject *xc, XcIOContext *ioctxt, char *state_file)
+{
     int rc = -1;
 
     ioctxt->io = gzip_stream_fopen(state_file, "rb");
-    if (!ioctxt->io) {
+    if ( ioctxt->io == NULL )
+    {
         xcio_perror(ioctxt, "Could not open file for reading");
-        goto exit;
+        return rc;
     }
 
     rc = xc_linux_restore(xc->xc_handle, ioctxt);
-  exit:
-    if(ioctxt->io) IOStream_close(ioctxt->io);
+
+    IOStream_close(ioctxt->io);
+    
     return rc;
 }
 
@@ -285,33 +304,38 @@ static PyObject *pyxc_linux_restore(PyObject *self,
     XcObject *xc = (XcObject *)self;
     char *state_file;
     int progress = 1, debug = 0;
-    u32 dom;
     PyObject *val = NULL;
     XcIOContext ioctxt = { .info = iostdout, .err = iostderr };
     int rc =-1;
 
     static char *kwd_list[] = { "state_file", "progress", "debug", NULL };
 
-    if (!PyArg_ParseTupleAndKeywords(args, kwds, "is|ii", kwd_list, 
-                                     &ioctxt.domain,
-                                     &state_file,
-                                     &progress,
-                                     &debug)){
+    if ( !PyArg_ParseTupleAndKeywords(args, kwds, "is|ii", kwd_list,
+                                      &ioctxt.domain,
+                                      &state_file,
+                                      &progress,
+                                      &debug) )
         goto exit;
-    }
-    if (progress) ioctxt.flags |= XCFLAGS_VERBOSE;
-    if (debug)    ioctxt.flags |= XCFLAGS_DEBUG;
 
-    if(!state_file || state_file[0] == '\0') goto exit;
+    if ( progress )
+        ioctxt.flags |= XCFLAGS_VERBOSE;
+    if ( debug )
+        ioctxt.flags |= XCFLAGS_DEBUG;
+
+    if ( (state_file == NULL) || (state_file[0] == '\0') )
+        goto exit;
+
     rc = file_restore(xc, &ioctxt, state_file);
-    if(rc){
+    if ( rc != 0 )
+    {
         PyErr_SetFromErrno(xc_error);
         goto exit;
     }
+
     val = Py_BuildValue("{s:i,s:s}",
                         "dom", ioctxt.domain,
                         "vmconfig", ioctxt.vmconfig);
-    //? free(ioctxt.vmconfig);
+
   exit:
     return val;
 }

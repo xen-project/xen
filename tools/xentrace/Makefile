@@ -3,7 +3,7 @@ XEN_ROOT=../..
 include $(XEN_ROOT)/tools/Make.defs
 
 CC       = gcc
-CFLAGS   = -Wall -O3 -Werror
+CFLAGS   = -Wall -Werror -O3
 
 CFLAGS  += -I $(XEN_HYPERVISOR_IFS)
 CFLAGS  += -I $(XEN_LINUX_INCLUDE)
@@ -34,4 +34,4 @@ clean:
 	$(RM) *.a *.so *.o *.rpm $(BIN)
 
 %: %.c $(HDRS) Makefile
-	$(CC) $(CFLAGS) -o $@ $< -L$(XEN_LIBXC) -lxc
+	$(CC) $(CFLAGS) -o $@ $< -L$(XEN_LIBXC) -L$(XEN_LIBXUTIL) -lxc -lxutil
