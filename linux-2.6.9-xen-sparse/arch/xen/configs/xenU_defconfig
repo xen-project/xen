@@ -1,7 +1,7 @@
 #
 # Automatically generated make config: don't edit
-# Linux kernel version: 2.6.9-xen0
-# Sun Oct 31 21:32:23 2004
+# Linux kernel version: 2.6.9-xenU
+# Wed Dec  1 09:22:09 2004
 #
 CONFIG_XEN=y
 CONFIG_ARCH_XEN=y
@@ -47,6 +47,7 @@ CONFIG_HOTPLUG=y
 # CONFIG_IKCONFIG is not set
 # CONFIG_EMBEDDED is not set
 CONFIG_KALLSYMS=y
+# CONFIG_KALLSYMS_ALL is not set
 # CONFIG_KALLSYMS_EXTRA_PASS is not set
 CONFIG_FUTEX=y
 CONFIG_EPOLL=y
@@ -116,8 +117,15 @@ CONFIG_HAVE_DEC_LOCK=y
 #
 # Kernel hacking
 #
-# CONFIG_DEBUG_KERNEL is not set
+CONFIG_DEBUG_KERNEL=y
 CONFIG_EARLY_PRINTK=y
+# CONFIG_DEBUG_STACKOVERFLOW is not set
+# CONFIG_DEBUG_STACK_USAGE is not set
+CONFIG_DEBUG_SLAB=y
+# CONFIG_MAGIC_SYSRQ is not set
+# CONFIG_DEBUG_SPINLOCK is not set
+CONFIG_DEBUG_PAGEALLOC=y
+# CONFIG_DEBUG_INFO is not set
 # CONFIG_DEBUG_SPINLOCK_SLEEP is not set
 # CONFIG_FRAME_POINTER is not set
 # CONFIG_4KSTACKS is not set
@@ -142,6 +150,7 @@ CONFIG_BINFMT_ELF=y
 CONFIG_STANDALONE=y
 CONFIG_PREVENT_FIRMWARE_BUILD=y
 # CONFIG_FW_LOADER is not set
+# CONFIG_DEBUG_DRIVER is not set
 
 #
 # Block devices
