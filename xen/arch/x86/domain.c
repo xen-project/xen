@@ -199,12 +199,7 @@ void machine_restart(char * __unused)
 
 void machine_halt(void)
 {
-    machine_restart(0);
-}
-
-void machine_power_off(void)
-{
-    machine_restart(0);
+    while(1){ safe_halt(); }
 }
 
 void arch_do_createdomain(struct domain *d)

@@ -170,8 +170,18 @@ void domain_shutdown(u8 reason)
     if ( current->domain == 0 )
     {
         extern void machine_restart(char *);
-        printk("Domain 0 shutdown: rebooting machine!\n");
-        machine_restart(0);
+        extern void machine_halt(void);
+
+        if ( reason == 0 ) 
+        {
+            printk("Domain 0 halted: Our work here is done.\n");
+            machine_halt();
+        }
+        else
+        {
+            printk("Domain 0 shutdown: rebooting machine!\n");
+            machine_restart(0);
+        }
     }
 
     current->shutdown_code = reason;
