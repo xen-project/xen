@@ -1,4 +1,4 @@
-/* -*-  Mode:C++; c-set-style:BSD; c-basic-offset:4; tab-width:4 -*- */
+/* -*-  Mode:C++; c-file-style:BSD; c-basic-offset:4; tab-width:4 -*- */
 
 #include <xen/config.h>
 #include <xen/types.h>
@@ -27,9 +27,9 @@ hypercall lock anyhow (at least initially).
 ********/
 
 static inline void free_shadow_page( struct mm_struct *m, 
-									 struct pfn_info *pfn_info )
+				     struct pfn_info *pfn_info )
 {
-    unsigned long flags;
+	unsigned long flags;
     unsigned long type = pfn_info->type_and_flags & PGT_type_mask;
 
     m->shadow_page_count--;
@@ -289,8 +289,8 @@ static void shadow_mode_table_op( struct task_struct *p, unsigned int op )
    
     case DOM0_SHADOW_CONTROL_OP_CLEAN:
 		__scan_shadow_table( m, op );
-		if( m->shadow_dirty_bitmap )
-			memset(m->shadow_dirty_bitmap,0,m->shadow_dirty_bitmap_size/8);
+		// we used to bzero dirty bitmap here, but now leave this to user space
+		// if we were double buffering we'd do the flip here
 		break;
     }
 
@@ -355,6 +355,25 @@ static inline struct pfn_info *alloc_shadow_page( struct mm_struct *m )
 
 /************************************************************************/
 
+static inline void mark_dirty( struct mm_struct *m, unsigned int mfn )
+{
+	unsigned int pfn = machine_to_phys_mapping[mfn];
+	ASSERT(m->shadow_dirty_bitmap);
+	if( likely(pfn<m->shadow_dirty_bitmap_size) )
+	{
+		// XXX use setbit
+		m->shadow_dirty_bitmap[pfn/(sizeof(int)*8)] |= 
+			(1<<(pfn%(sizeof(int)*8)));
+	}
+	else
+	{
+		printk("XXXX mark dirty overflow!");
+	}
+
+}
+
+/************************************************************************/
+
 static inline void l1pte_write_fault( struct mm_struct *m, 
 									  unsigned long *gpte_p, unsigned long *spte_p )
 { 
@@ -370,6 +389,10 @@ static inline void l1pte_write_fault( struct mm_struct *m,
 		break;
 
     case SHM_logdirty:
+		spte = gpte;
+		gpte |= _PAGE_DIRTY | _PAGE_ACCESSED;
+		spte |= _PAGE_RW | _PAGE_DIRTY | _PAGE_ACCESSED; 			
+		mark_dirty( m, gpte >> PAGE_SHIFT );
 		break;
     }
 
@@ -394,6 +417,10 @@ static inline void l1pte_read_fault( struct mm_struct *m,
 		break;
 
     case SHM_logdirty:
+		spte = gpte;
+		gpte |= _PAGE_ACCESSED;
+		spte |= _PAGE_ACCESSED; 			
+		spte &= ~ _PAGE_RW;
 		break;
     }
 
@@ -414,17 +441,53 @@ static inline void l1pte_no_fault( struct mm_struct *m,
 		if ( (gpte & (_PAGE_PRESENT|_PAGE_ACCESSED) ) == 
 			 (_PAGE_PRESENT|_PAGE_ACCESSED) )
 		{
+			spte = gpte;
 			if ( ! (gpte & _PAGE_DIRTY ) )
 				spte &= ~ _PAGE_RW;
 		}
 		break;
 
     case SHM_logdirty:
+		spte = 0;
+		if ( (gpte & (_PAGE_PRESENT|_PAGE_ACCESSED) ) == 
+			 (_PAGE_PRESENT|_PAGE_ACCESSED) )
+		{
+			spte = gpte;
+			spte &= ~ _PAGE_RW;
+		}
+
 		break;
     }
 
     *gpte_p = gpte;
     *spte_p = spte;
+}
+
+static inline void l2pde_general( struct mm_struct *m, 
+			   unsigned long *gpde_p, unsigned long *spde_p,
+			   unsigned long sl1pfn)
+{
+    unsigned long gpde = *gpde_p;
+    unsigned long spde = *spde_p;
+
+	spde = 0;
+
+	if ( sl1pfn )
+	{
+		spde = (gpde & ~PAGE_MASK) | (sl1pfn<<PAGE_SHIFT) | 
+			_PAGE_RW | _PAGE_ACCESSED | _PAGE_DIRTY;
+		gpde = gpde | _PAGE_ACCESSED | _PAGE_DIRTY;
+
+		if ( unlikely( (sl1pfn<<PAGE_SHIFT) == (gpde & PAGE_MASK)  ) )
+		{   
+			// detect linear map, and keep pointing at guest
+			SH_VLOG("4c: linear mapping ( %08lx )",sl1pfn);
+			spde = gpde & ~_PAGE_RW;
+		}
+	}
+
+    *gpde_p = gpde;
+    *spde_p = spde;
 }
 
 /*********************************************************************/
@@ -447,19 +510,6 @@ void unshadow_table( unsigned long gpfn, unsigned int type )
     spfn = __shadow_status(&current->mm, gpfn) & PSH_pfn_mask;
 
     delete_shadow_status(&current->mm, gpfn);
-
-#if 0 // XXX leave as might be useful for later debugging
-    { 
-		int i;
-		unsigned long * spl1e = map_domain_mem( spfn<<PAGE_SHIFT );
-
-		for ( i = 0; i < ENTRIES_PER_L1_PAGETABLE; i++ )
-		{
-			spl1e[i] = 0xdead0000;
-		}
-		unmap_domain_mem( spl1e );
-    }
-#endif
 
     free_shadow_page( &current->mm, &frame_table[spfn] );
 
@@ -526,21 +576,7 @@ unsigned long shadow_l2_table(
 			unsigned long s_sh = 
 				__shadow_status(p, gpte>>PAGE_SHIFT);
 
-			if( s_sh & PSH_shadowed ) // PSH_shadowed
-			{
-				if ( unlikely( (__shadow_status(p, gpte>>PAGE_SHIFT) & PGT_type_mask) == PGT_l2_page_table) )
-                {
-					printk("Linear mapping detected\n");
-					spte = gpte & ~_PAGE_RW;
-                }
-				else
-                {
-					spte = ( gpte & ~PAGE_MASK ) | (s_sh<<PAGE_SHIFT) |
-						_PAGE_RW | _PAGE_DIRTY | _PAGE_ACCESSED ;
-				}
-				// XXX should probably update guest to ACCESSED|DIRTY too...
-
-			}
+			l2pde_general( m, &gpte, &spte, s_sh );
 
 		}
 #endif
@@ -662,9 +698,7 @@ int shadow_fault( unsigned long va, long error_code )
 
 			set_shadow_status(&current->mm, gl1pfn, PSH_shadowed | sl1pfn);
 
-			gpde = gpde | _PAGE_ACCESSED | _PAGE_DIRTY;
-			spde = (gpde & ~PAGE_MASK) | _PAGE_RW | (sl1pfn<<PAGE_SHIFT);
-        
+			l2pde_general( m, &gpde, &spde, sl1pfn );
 
 			linear_l2_table[va>>L2_PAGETABLE_SHIFT] = mk_l2_pgentry(gpde);
 			shadow_linear_l2_table[va>>L2_PAGETABLE_SHIFT] =  mk_l2_pgentry(spde);
@@ -690,16 +724,7 @@ int shadow_fault( unsigned long va, long error_code )
 
 			SH_VVLOG("4b: was shadowed, l2 missing ( %08lx )",sl1pfn);
 
-			spde = (gpde & ~PAGE_MASK) | (sl1pfn<<PAGE_SHIFT) | _PAGE_RW | _PAGE_ACCESSED | _PAGE_DIRTY;
-
-			gpde = gpde | _PAGE_ACCESSED | _PAGE_DIRTY;
-
-
-			if ( unlikely( (sl1pfn<<PAGE_SHIFT) == (gl1pfn<<PAGE_SHIFT)  ) )
-			{   // detect linear map, and keep pointing at guest
-				SH_VLOG("4c: linear mapping ( %08lx )",sl1pfn);
-				spde = (spde & ~PAGE_MASK) | (gl1pfn<<PAGE_SHIFT);
-			}
+			l2pde_general( m, &gpde, &spde, sl1pfn );
 
 			linear_l2_table[va>>L2_PAGETABLE_SHIFT] = mk_l2_pgentry(gpde);
 			shadow_linear_l2_table[va>>L2_PAGETABLE_SHIFT] = mk_l2_pgentry(spde);
@@ -781,18 +806,8 @@ void shadow_l2_normal_pt_update( unsigned long pa, unsigned long gpte )
 
     sp2le = (l2_pgentry_t *) map_domain_mem( spfn << PAGE_SHIFT );
     // no real need for a cache here
-		
-    if ( s_sh ) // PSH_shadowed
-    {
-		if ( unlikely( (frame_table[gpte>>PAGE_SHIFT].type_and_flags & PGT_type_mask) == PGT_l2_page_table) )
-		{ 
-			// linear page table case
-			spte = (gpte & ~_PAGE_RW) | _PAGE_DIRTY | _PAGE_ACCESSED; 
-		}
-		else
-			spte = (gpte & ~PAGE_MASK) | (s_sh<<PAGE_SHIFT) | _PAGE_RW | _PAGE_DIRTY | _PAGE_ACCESSED;
 
-    }
+	l2pde_general( &current->mm, &gpte, &spte, s_sh );
 
     // XXXX Should mark guest pte as DIRTY and ACCESSED too!!!!!
 

@@ -1128,21 +1128,11 @@ int do_update_va_mapping(unsigned long page_nr,
 
     if ( unlikely(p->mm.shadow_mode) )
     {
-        unsigned long sval = 0;
+        unsigned long sval;
 
-	// XXX this only works for l1 entries, with no translation
+	l1pte_no_fault( &current->mm, &val, &sval );
 
-        if ( (val & _PAGE_PRESENT) && (val & _PAGE_ACCESSED) )
-        {
-	    sval = val;
-            if ( !(val & _PAGE_DIRTY) ) 
-	        sval &= ~_PAGE_RW;
-	}
-
-	/*	printk("update_va_map: page_nr=%08lx val =%08lx sval =%08lx\n", 
-	       page_nr, val, sval);*/
-
-	if ( __put_user( sval, ((unsigned long *) (&shadow_linear_pg_table[page_nr])) ) )
+	if ( unlikely(__put_user( sval, ((unsigned long *) (&shadow_linear_pg_table[page_nr])) ) ) )
 	{
 	    // Since L2's are guranteed RW, failure indicates the page
 	    // was not shadowed, so ignore.
