@@ -4,6 +4,9 @@
 #include <xen/config.h>
 #include <xen/types.h>
 #include <xen/spinlock.h>
+#include <xen/config.h>
+#include <xen/types.h>
+#include <xen/spinlock.h>
 #include <asm/ptrace.h>
 #include <xen/smp.h>
 #include <asm/page.h>
@@ -161,8 +164,10 @@ struct task_struct
      * domain's event-channel spinlock. Read accesses can also synchronise on 
      * the lock, but races don't usually matter.
      */
-    u16 pirq_to_evtchn[64];
+#define NR_PIRQS 128 /* Put this somewhere sane! */
+    u16 pirq_to_evtchn[NR_PIRQS];
     u16 virq_to_evtchn[NR_VIRQS];
+    u32 pirq_mask[NR_PIRQS/32];
 
     /* Physical I/O */
     spinlock_t       pcidev_lock;
@@ -224,10 +229,13 @@ struct task_struct *alloc_task_struct();
 
 extern struct task_struct *do_createdomain(
     domid_t dom_id, unsigned int cpu);
-extern int setup_guestos(
-    struct task_struct *p, dom0_createdomain_t *params, unsigned int num_vifs,
-    char *data_start, unsigned long data_len, 
-    char *cmdline, unsigned long initrd_len);
+extern int construct_dom0(struct task_struct *p, 
+                          unsigned long alloc_start,
+                          unsigned long alloc_end,
+                          unsigned int num_vifs,
+                          char *image_start, unsigned long image_len, 
+                          char *initrd_start, unsigned long initrd_len,
+                          char *cmdline);
 extern int final_setup_guestos(struct task_struct *p, dom0_builddomain_t *);
 
 struct task_struct *find_domain_by_id(domid_t dom);
@@ -266,6 +274,7 @@ void sched_add_domain(struct task_struct *p);
 int  sched_rem_domain(struct task_struct *p);
 long sched_ctl(struct sched_ctl_cmd *);
 long sched_adjdom(struct sched_adjdom_cmd *);
+int  sched_id();
 void sched_pause_sync(struct task_struct *);
 void init_idle_task(void);
 void __wake_up(struct task_struct *p);
@@ -290,10 +299,10 @@ static inline long schedule_timeout(long timeout)
     return 0;
 }
 
-#define signal_pending(_p) \
-    (((_p)->hyp_events != 0) ||                                 \
-     (test_bit(0, &(_p)->shared_info->evtchn_upcall_pending) && \
-      !test_bit(0, &(_p)->shared_info->evtchn_upcall_mask)))
+#define signal_pending(_p)                                      \
+    ( (_p)->hyp_events ||                                       \
+      ((_p)->shared_info->vcpu_data[0].evtchn_upcall_pending && \
+       !(_p)->shared_info->vcpu_data[0].evtchn_upcall_mask) )
 
 void domain_init(void);
 
@@ -303,6 +312,7 @@ void startup_cpu_idle_loop(void);
 void continue_cpu_idle_loop(void);
 
 void continue_nonidle_task(void);
+void sched_prn_state(int state);
 
 /* This task_hash and task_list are protected by the tasklist_lock. */
 #define TASK_HASH_SIZE 256

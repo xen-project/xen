@@ -549,6 +549,14 @@ asmlinkage void do_spurious_interrupt_bug(struct pt_regs * regs,
  */
 asmlinkage void math_state_restore(struct pt_regs regs)
 {
+	/*
+	 * A trap in kernel mode can be ignored. It'll be the fast XOR or
+	 * copying libraries, which will correctly save/restore state and
+	 * reset the TS bit in CR0.
+	 */
+	if ( (regs.xcs & 2) == 0 )
+		return;
+
 	if (current->used_math) {
 		restore_fpu(current);
 	} else {

@@ -170,7 +170,7 @@ unsigned long frame_table_size;
 unsigned long max_page;
 
 struct list_head free_list;
-spinlock_t free_list_lock = SPIN_LOCK_UNLOCKED;
+spinlock_t free_list_lock;
 unsigned int free_pfns;
 
 /* Used to defer flushing of memory structures. */
@@ -191,10 +191,6 @@ static struct {
  */
 void __init init_frametable(unsigned long nr_pages)
 {
-    struct pfn_info *pf;
-    unsigned long page_index;
-    unsigned long flags;
-
     memset(percpu_info, 0, sizeof(percpu_info));
 
     max_page = nr_pages;
@@ -203,22 +199,27 @@ void __init init_frametable(unsigned long nr_pages)
     frame_table = (struct pfn_info *)FRAMETABLE_VIRT_START;
     memset(frame_table, 0, frame_table_size);
 
+    spin_lock_init(&free_list_lock);
+    INIT_LIST_HEAD(&free_list);    
     free_pfns = 0;
 
-    /* Put all domain-allocatable memory on a free list. */
+}
+
+void add_to_domain_alloc_list(unsigned long ps, unsigned long pe)
+{
+    struct pfn_info *pf;
+    unsigned long i;
+    unsigned long flags;
+
     spin_lock_irqsave(&free_list_lock, flags);
-    INIT_LIST_HEAD(&free_list);
-    for( page_index = (__pa(frame_table) + frame_table_size) >> PAGE_SHIFT; 
-         page_index < nr_pages;
-         page_index++ )      
+    for ( i = ps >> PAGE_SHIFT; i < (pe >> PAGE_SHIFT); i++ )
     {
-        pf = list_entry(&frame_table[page_index].list, struct pfn_info, list);
+        pf = list_entry(&frame_table[i].list, struct pfn_info, list);
         list_add_tail(&pf->list, &free_list);
         free_pfns++;
     }
     spin_unlock_irqrestore(&free_list_lock, flags);
 }
-
 
 static void __invalidate_shadow_ldt(struct task_struct *p)
 {

@@ -1,6 +1,8 @@
 COMPILE_ARCH := $(shell uname -m | sed -e s/i.86/i386/)
 TARGET_ARCH  ?= $(COMPILE_ARCH)
 
+nodev ?= n
+
 TARGET  := $(BASEDIR)/xen
 HDRS    := $(wildcard $(BASEDIR)/include/xen/*.h)
 HDRS    += $(wildcard $(BASEDIR)/include/scsi/*.h)
@@ -20,17 +22,24 @@ ALL_OBJS += $(BASEDIR)/net/network.o
 ALL_OBJS += $(BASEDIR)/drivers/char/driver.o
 ALL_OBJS += $(BASEDIR)/drivers/pci/driver.o
 ALL_OBJS += $(BASEDIR)/drivers/net/driver.o
+ifneq ($(nodev),y)
 ALL_OBJS += $(BASEDIR)/drivers/block/driver.o
 ALL_OBJS += $(BASEDIR)/drivers/cdrom/driver.o
 ALL_OBJS += $(BASEDIR)/drivers/ide/driver.o
 ALL_OBJS += $(BASEDIR)/drivers/scsi/driver.o
 ALL_OBJS += $(BASEDIR)/drivers/message/fusion/driver.o
+endif
 ALL_OBJS += $(BASEDIR)/arch/$(TARGET_ARCH)/arch.o
 
 HOSTCC     = gcc
 HOSTCFLAGS = -Wall -Wstrict-prototypes -O2 -fomit-frame-pointer 
 
 include $(BASEDIR)/arch/$(TARGET_ARCH)/Rules.mk
+
+ifeq ($(nodev),y)
+CFLAGS += -DNO_DEVICES_IN_XEN
+CFLAGS := $(subst -Werror,,$(CFLAGS))
+endif
 
 %.o: %.c $(HDRS) Makefile
 	$(CC) $(CFLAGS) -c $< -o $@

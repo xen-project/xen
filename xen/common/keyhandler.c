@@ -4,6 +4,7 @@
 #include <xen/event.h>
 #include <xen/console.h>
 #include <xen/serial.h>
+#include <xen/sched.h>
 
 #define KEY_MAX 256
 #define STR_MAX  64
@@ -74,29 +75,6 @@ static void kill_dom0(u_char key, void *dev_id, struct pt_regs *regs)
     kill_other_domain(0, 0);
 }
 
-
-/* XXX SMH: this is keir's fault */
-static char *task_states[] = 
-{ 
-    "Runnable  ", 
-    "Int Sleep ", 
-    "UInt Sleep", 
-    NULL,
-    "Stopped   ", 
-    NULL,
-    NULL,
-    NULL,
-    "Dying     ",
-    NULL,
-    NULL,
-    NULL,
-    NULL,
-    NULL,
-    NULL,
-    NULL,
-    "Sched priv"
-}; 
-
 void do_task_queues(u_char key, void *dev_id, struct pt_regs *regs) 
 {
     unsigned long       flags;
@@ -111,13 +89,14 @@ void do_task_queues(u_char key, void *dev_id, struct pt_regs *regs)
 
     for_each_domain ( p )
     {
-        printk("Xen: DOM %llu, CPU %d [has=%c], state = %s, "
-               "hyp_events = %08x\n", 
-               p->domain, p->processor, p->has_cpu ? 'T':'F', 
-               task_states[p->state], p->hyp_events); 
+        printk("Xen: DOM %llu, CPU %d [has=%c], state = ",
+               p->domain, p->processor, p->has_cpu ? 'T':'F'); 
+        sched_prn_state(p ->state);
+	printk(", hyp_events = %08x\n", p->hyp_events);
         s = p->shared_info; 
-        printk("Guest: upcall_pend = %08lx, upcall_mask = %08lx\n", 
-               s->evtchn_upcall_pending, s->evtchn_upcall_mask);
+        printk("Guest: upcall_pend = %02x, upcall_mask = %02x\n", 
+               s->vcpu_data[0].evtchn_upcall_pending, 
+               s->vcpu_data[0].evtchn_upcall_mask);
         printk("Notifying guest...\n"); 
         send_guest_virq(p, VIRQ_DEBUG);
     }

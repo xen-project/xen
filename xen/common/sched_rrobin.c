@@ -1,5 +1,5 @@
 /****************************************************************************
- * Very stupid Round Robin Scheduler for Xen
+ * Round Robin Scheduler for Xen
  *
  * by Mark Williamson (C) 2004 Intel Research Cambridge
  */
@@ -33,7 +33,15 @@ static task_slice_t rr_do_schedule(s_time_t now)
 
 static int rr_ctl(struct sched_ctl_cmd *cmd)
 {
-    rr_slice = cmd->u.rrobin.slice;
+    if(cmd->direction == SCHED_INFO_PUT)
+    {
+        rr_slice = cmd->u.rrobin.slice;
+    }
+    else /* cmd->direction == SCHED_INFO_GET */
+    {
+        cmd->u.rrobin.slice = rr_slice;
+    }
+    
     return 0;
 }
 

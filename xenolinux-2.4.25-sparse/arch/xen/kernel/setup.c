@@ -69,7 +69,6 @@ char ignore_irq13;		/* set if exception 16 works */
 struct cpuinfo_x86 boot_cpu_data = { 0, 0, 0, 0, -1, 1, 0, 0, -1 };
 
 unsigned long mmu_cr4_features;
-//EXPORT_SYMBOL(mmu_cr4_features);
 
 unsigned char * vgacon_mmap;
 
@@ -105,6 +104,8 @@ unsigned char aux_device_present;
 
 extern int root_mountflags;
 extern char _text, _etext, _edata, _end;
+
+extern int blk_nohighio;
 
 int enable_acpi_smp_table;
 
@@ -160,13 +161,16 @@ static void __init parse_mem_cmdline (char ** cmdline_p)
 void __init setup_arch(char **cmdline_p)
 {
     unsigned long bootmap_size, start_pfn, max_low_pfn;
-    unsigned long i;
 
     extern void hypervisor_callback(void);
     extern void failsafe_callback(void);
 
     extern unsigned long cpu0_pte_quicklist[];
     extern unsigned long cpu0_pgd_quicklist[];
+
+#ifndef CONFIG_HIGHIO
+    blk_nohighio = 1;
+#endif
 
     HYPERVISOR_set_callbacks(
         __KERNEL_CS, (unsigned long)hypervisor_callback,
@@ -208,7 +212,7 @@ void __init setup_arch(char **cmdline_p)
 #define PFN_PHYS(x)	((x) << PAGE_SHIFT)
 
 /*
- * 128MB for vmalloc and initrd
+ * 128MB for vmalloc(), iomap(), kmap(), and fixaddr mappings.
  */
 #define VMALLOC_RESERVE	(unsigned long)(128 << 20)
 #define MAXMEM		(unsigned long)(HYPERVISOR_VIRT_START-PAGE_OFFSET-VMALLOC_RESERVE)
@@ -216,21 +220,9 @@ void __init setup_arch(char **cmdline_p)
 #define MAX_NONPAE_PFN	(1 << 20)
 
     /*
-     * partially used pages are not usable - thus
-     * we are rounding upwards:
-     */
-#ifdef CONFIG_BLK_DEV_INITRD
-    if ( start_info.mod_start )
-        start_pfn = PFN_UP(__pa(start_info.mod_start + start_info.mod_len));
-    else
-#endif
-    start_pfn = PFN_UP(__pa(&_end));
-    max_pfn = start_info.nr_pages;
-
-    /*
      * Determine low and high memory ranges:
      */
-    max_low_pfn = max_pfn;
+    max_low_pfn = max_pfn = start_info.nr_pages;
     if (max_low_pfn > MAXMEM_PFN) {
         max_low_pfn = MAXMEM_PFN;
 #ifndef CONFIG_HIGHMEM
@@ -261,51 +253,36 @@ void __init setup_arch(char **cmdline_p)
     }
 #endif
 
+    phys_to_machine_mapping = (unsigned long *)start_info.mfn_list;
+    cur_pgd = init_mm.pgd = (pgd_t *)start_info.pt_base;
+
+    start_pfn = (__pa(start_info.pt_base) >> PAGE_SHIFT) + 
+        start_info.nr_pt_frames;
+
     /*
-     * Initialize the boot-time allocator, and free up all RAM.
-     * Then reserve space for OS image, and the bootmem bitmap.
+     * Initialize the boot-time allocator, and free up all RAM. Then reserve 
+     * space for OS image, initrd, phys->machine table, bootstrap page table,
+     * and the bootmem bitmap. 
+     * NB. There is definitely enough room for the bootmem bitmap in the
+     * bootstrap page table. We are guaranteed to get >=512kB unused 'padding'
+     * for our own use after all bootstrap elements (see hypervisor-if.h).
      */
     bootmap_size = init_bootmem(start_pfn, max_low_pfn);
     free_bootmem(0, PFN_PHYS(max_low_pfn));
     reserve_bootmem(0, PFN_PHYS(start_pfn) + bootmap_size + PAGE_SIZE-1);
 
-    /* Now reserve space for the hypervisor-provided page tables. */
-    {
-        unsigned long *pgd = (unsigned long *)start_info.pt_base;
-        unsigned long  pte;
-        int i;
-        reserve_bootmem(__pa(pgd), PAGE_SIZE);
-        for ( i = 0; i < (HYPERVISOR_VIRT_START>>22); i++ )
-        {
-            unsigned long pgde = *pgd++;
-            if ( !(pgde & 1) ) continue;
-            pte = machine_to_phys(pgde & PAGE_MASK);
-            reserve_bootmem(pte, PAGE_SIZE);
-        }
-    }
-    cur_pgd = init_mm.pgd = (pgd_t *)start_info.pt_base;
-
-    /* Now initialise the physical->machine mapping table. */
-    phys_to_machine_mapping = alloc_bootmem(max_pfn * sizeof(unsigned long));
-    for ( i = 0; i < max_pfn; i++ )
-    {
-        unsigned long pgde, *ppte;
-        unsigned long pfn = i + (PAGE_OFFSET >> PAGE_SHIFT);
-        pgde = *((unsigned long *)start_info.pt_base + (pfn >> 10));
-        ppte = (unsigned long *)machine_to_phys(pgde & PAGE_MASK) + (pfn&1023);
-        phys_to_machine_mapping[i] = 
-            (*(unsigned long *)__va(ppte)) >> PAGE_SHIFT;
-    }
-
 #ifdef CONFIG_BLK_DEV_INITRD
-    if (start_info.mod_start) {
-        if ((__pa(start_info.mod_start) + start_info.mod_len) <= 
-            (max_low_pfn << PAGE_SHIFT)) {
+    if ( start_info.mod_start != 0 )
+    {
+        if ( (__pa(start_info.mod_start) + start_info.mod_len) <= 
+             (max_low_pfn << PAGE_SHIFT) )
+        {
             initrd_start = start_info.mod_start;
             initrd_end   = initrd_start + start_info.mod_len;
             initrd_below_start_ok = 1;
         }
-        else {
+        else
+        {
             printk(KERN_ERR "initrd extends beyond end of memory "
                    "(0x%08lx > 0x%08lx)\ndisabling initrd\n",
                    __pa(start_info.mod_start) + start_info.mod_len,
@@ -317,7 +294,7 @@ void __init setup_arch(char **cmdline_p)
 
     paging_init();
 
-    /* We are privileged guest os - should have IO privileges. */
+    /* If we are a privileged guest OS then we should request IO privileges. */
     if ( start_info.flags & SIF_PRIVILEGED ) 
     {
         dom0_op_t op;
@@ -352,6 +329,13 @@ static int __init cachesize_setup(char *str)
 }
 __setup("cachesize=", cachesize_setup);
 
+static int __init highio_setup(char *str)
+{
+    printk("i386: disabling HIGHMEM block I/O\n");
+    blk_nohighio = 1;
+    return 1;
+}
+__setup("nohighio", highio_setup);
 
 static int __init get_model_name(struct cpuinfo_x86 *c)
 {

@@ -3,11 +3,13 @@ default:
 	$(MAKE) -C char
 	$(MAKE) -C pci
 	$(MAKE) -C net
-	$(MAKE) -C block
-	$(MAKE) -C cdrom
-	$(MAKE) -C ide
-	$(MAKE) -C scsi
-	$(MAKE) -C message/fusion
+	if [ "$(nodev)" != "y" ]; then \
+	$(MAKE) -C block ; \
+	$(MAKE) -C cdrom ; \
+	$(MAKE) -C ide ; \
+	$(MAKE) -C scsi ; \
+	$(MAKE) -C message/fusion ; \
+	fi
 
 clean:
 	$(MAKE) -C char clean

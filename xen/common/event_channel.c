@@ -21,6 +21,7 @@
 #include <xen/errno.h>
 #include <xen/sched.h>
 #include <xen/event.h>
+#include <xen/irq.h>
 
 #include <hypervisor-ifs/hypervisor-if.h>
 #include <hypervisor-ifs/event_channel.h>
@@ -45,7 +46,7 @@ static int get_free_port(struct task_struct *p)
         if ( max == MAX_EVENT_CHANNELS )
             return -ENOSPC;
         
-        max = (max == 0) ? 4 : (max * 2);
+        max *= 2;
         
         chn = kmalloc(max * sizeof(event_channel_t), GFP_KERNEL);
         if ( unlikely(chn == NULL) )
@@ -153,11 +154,11 @@ static long evtchn_bind_virq(evtchn_bind_virq_t *bind)
 
     /*
      * Port 0 is the fallback port for VIRQs that haven't been explicitly
-     * bound yet. The exception is the 'error VIRQ', which is permanently 
+     * bound yet. The exception is the 'misdirect VIRQ', which is permanently 
      * bound to port 0.
      */
     if ( ((port = p->virq_to_evtchn[virq]) != 0) ||
-         (virq == VIRQ_ERROR) ||
+         (virq == VIRQ_MISDIRECT) ||
          ((port = get_free_port(p)) < 0) )
         goto out;
 
@@ -181,27 +182,35 @@ static long evtchn_bind_pirq(evtchn_bind_pirq_t *bind)
 {
     struct task_struct *p = current;
     int pirq = bind->pirq;
-    int port;
+    int port, rc;
 
     if ( pirq >= ARRAY_SIZE(p->pirq_to_evtchn) )
         return -EINVAL;
 
     spin_lock(&p->event_channel_lock);
 
-    if ( ((port = p->pirq_to_evtchn[pirq]) != 0) ||
-         ((port = get_free_port(p)) < 0) )
+    if ( ((rc = port = p->pirq_to_evtchn[pirq]) != 0) ||
+         ((rc = port = get_free_port(p)) < 0) )
         goto out;
+
+    p->pirq_to_evtchn[pirq] = port;
+    rc = pirq_guest_bind(p, pirq, 
+                         !!(bind->flags & BIND_PIRQ__WILL_SHARE));
+    if ( rc != 0 )
+    {
+        p->pirq_to_evtchn[pirq] = 0;
+        DPRINTK("Couldn't bind to PIRQ %d (error=%d)\n", pirq, rc);
+        goto out;
+    }
 
     p->event_channel[port].state  = ECS_PIRQ;
     p->event_channel[port].u.pirq = pirq;
 
-    p->pirq_to_evtchn[pirq] = port;
-
  out:
     spin_unlock(&p->event_channel_lock);
 
-    if ( port < 0 )
-        return port;
+    if ( rc < 0 )
+        return rc;
 
     bind->port = port;
     return 0;
@@ -220,7 +229,7 @@ static long __evtchn_close(struct task_struct *p1, int port1)
 
     chn1 = p1->event_channel;
 
-    /* NB. Port 0 is special (VIRQ_ERROR). Never let it be closed. */
+    /* NB. Port 0 is special (VIRQ_MISDIRECT). Never let it be closed. */
     if ( (port1 <= 0) || (port1 >= p1->max_event_channel) )
     {
         rc = -EINVAL;
@@ -237,7 +246,8 @@ static long __evtchn_close(struct task_struct *p1, int port1)
         break;
 
     case ECS_PIRQ:
-        p1->pirq_to_evtchn[chn1[port1].u.pirq] = 0;
+        if ( (rc = pirq_guest_unbind(p1, chn1[port1].u.pirq)) == 0 )
+            p1->pirq_to_evtchn[chn1[port1].u.pirq] = 0;
         break;
 
     case ECS_VIRQ:
@@ -277,10 +287,7 @@ static long __evtchn_close(struct task_struct *p1, int port1)
         if ( chn2[port2].u.remote.dom != p1 )
             BUG();
 
-        chn2[port2].state         = ECS_UNBOUND;
-        chn2[port2].u.remote.dom  = NULL;
-        chn2[port2].u.remote.port = 0xFFFF;
-
+        chn2[port2].state = ECS_UNBOUND;
         evtchn_set_exception(p2, port2);
 
         break;
@@ -289,10 +296,7 @@ static long __evtchn_close(struct task_struct *p1, int port1)
         BUG();
     }
 
-    chn1[port1].state         = ECS_FREE;
-    chn1[port1].u.remote.dom  = NULL;
-    chn1[port1].u.remote.port = 0xFFFF;
-    
+    chn1[port1].state = ECS_FREE;
     evtchn_set_exception(p1, port1);
 
  out:
@@ -366,6 +370,7 @@ static long evtchn_status(evtchn_status_t *status)
     domid_t             dom = status->dom;
     int                 port = status->port;
     event_channel_t    *chn;
+    long                rc = 0;
 
     if ( dom == DOMID_SELF )
         dom = current->domain;
@@ -381,8 +386,8 @@ static long evtchn_status(evtchn_status_t *status)
 
     if ( (port < 0) || (port >= p->max_event_channel) )
     {
-        spin_unlock(&p->event_channel_lock);
-        return -EINVAL;
+        rc = -EINVAL;
+        goto out;
     }
 
     switch ( chn[port].state )
@@ -410,8 +415,10 @@ static long evtchn_status(evtchn_status_t *status)
         BUG();
     }
 
+ out:
     spin_unlock(&p->event_channel_lock);
-    return 0;
+    put_task_struct(p);
+    return rc;
 }
 
 
@@ -476,7 +483,7 @@ int init_event_channels(struct task_struct *p)
     p->max_event_channel = INIT_EVENT_CHANNELS;
     memset(p->event_channel, 0, INIT_EVENT_CHANNELS * sizeof(event_channel_t));
     p->event_channel[0].state  = ECS_VIRQ;
-    p->event_channel[0].u.virq = VIRQ_ERROR;
+    p->event_channel[0].u.virq = VIRQ_MISDIRECT;
     return 0;
 }
 

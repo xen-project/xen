@@ -80,7 +80,7 @@ processor	= 52
 
 /* Offsets into shared_info_t. */
 #define evtchn_upcall_pending /* 0 */
-#define evtchn_upcall_mask       4
+#define evtchn_upcall_mask       1
 
 ENOSYS = 38
 
@@ -210,18 +210,18 @@ ENTRY(system_call)
 	movl %eax,EAX(%esp)		# save the return value
 ENTRY(ret_from_sys_call)
         movl SYMBOL_NAME(HYPERVISOR_shared_info),%esi
-        lock btsl $0,evtchn_upcall_mask(%esi) # make tests atomic
+        movb $1,evtchn_upcall_mask(%esi) # make tests atomic
 ret_syscall_tests:
 	cmpl $0,need_resched(%ebx)
 	jne reschedule
 	cmpl $0,sigpending(%ebx)
 	je   safesti                    # ensure need_resched updates are seen
 signal_return:
-	lock btrl $0,evtchn_upcall_mask(%esi) # reenable event callbacks
+	movb $0,evtchn_upcall_mask(%esi) # reenable event callbacks
 	movl %esp,%eax
 	xorl %edx,%edx
 	call SYMBOL_NAME(do_signal)
-	jmp  ret_from_sys_call
+	jmp  safesti
 
 	ALIGN
 restore_all:
@@ -254,9 +254,9 @@ ret_from_exception:
 
 	ALIGN
 reschedule:
-        lock btrl $0,evtchn_upcall_mask(%esi)  # reenable event callbacks
-	call SYMBOL_NAME(schedule)             # test
-	jmp ret_from_sys_call
+        movb $0,evtchn_upcall_mask(%esi)  # reenable event callbacks
+	call SYMBOL_NAME(schedule)        # test
+	jmp  ret_from_sys_call
 
 ENTRY(divide_error)
 	pushl $0		# no error code
@@ -317,12 +317,12 @@ ENTRY(hypervisor_callback)
         movb CS(%esp),%cl
 	test $2,%cl          # slow return to ring 2 or 3
 	jne  ret_syscall_tests
-safesti:lock btrl $0,evtchn_upcall_mask(%esi) # reenable event callbacks
+safesti:movb $0,evtchn_upcall_mask(%esi) # reenable event callbacks
 scrit:  /**** START OF CRITICAL REGION ****/
-        testb $1,evtchn_upcall_pending(%esi)
+        testb $0xFF,evtchn_upcall_pending(%esi)
         jnz  14f              # process more events if necessary...
         RESTORE_ALL
-14:     lock btsl $0,evtchn_upcall_mask(%esi)
+14:     movb $1,evtchn_upcall_mask(%esi)
         jmp  11b
 ecrit:  /**** END OF CRITICAL REGION ****/
 # [How we do the fixup]. We want to merge the current stack frame with the
@@ -351,7 +351,7 @@ critical_region_fixup:
         jmp  11b
         
 critical_fixup_table:        
-        .byte 0x00,0x00,0x00                  # testb $1,(%esi)
+        .byte 0x00,0x00,0x00                  # testb $0xFF,(%esi)
         .byte 0x00,0x00                       # jnz  14f
         .byte 0x00                            # pop  %ebx
         .byte 0x04                            # pop  %ecx
@@ -364,26 +364,33 @@ critical_fixup_table:
         .byte 0x20                            # pop  %es
         .byte 0x24,0x24,0x24                  # add  $4,%esp
         .byte 0x28                            # iret
-        .byte 0x00,0x00,0x00,0x00,0x00,0x00   # lock btsl $0,4(%esi)
+        .byte 0x00,0x00,0x00,0x00             # movb $1,4(%esi)
         .byte 0x00,0x00                       # jmp  11b
 
 # Hypervisor uses this for application faults while it executes.
 ENTRY(failsafe_callback)
+        pushal
         call SYMBOL_NAME(install_safe_pf_handler)
-1:      pop  %ds
-2:      pop  %es
-3:      pop  %fs
-4:      pop  %gs
+        movl 32(%esp),%ebx
+1:      movl %ebx,%ds
+        movl 36(%esp),%ebx
+2:      movl %ebx,%es
+        movl 40(%esp),%ebx
+3:      movl %ebx,%fs
+        movl 44(%esp),%ebx
+4:      movl %ebx,%gs
         call SYMBOL_NAME(install_normal_pf_handler)
+        popal
+        addl $16,%esp
 5:      iret
 .section .fixup,"ax";	\
-6:	movl $0,(%esp);	\
+6:	xorl %ebx,%ebx;	\
 	jmp 1b;		\
-7:	movl $0,(%esp);	\
+7:	xorl %ebx,%ebx;	\
 	jmp 2b;		\
-8:	movl $0,(%esp);	\
+8:	xorl %ebx,%ebx;	\
 	jmp 3b;		\
-9:	movl $0,(%esp);	\
+9:	xorl %ebx,%ebx;	\
 	jmp 4b;		\
 10:	pushl %ss;	\
 	popl %ds;	\

@@ -81,6 +81,13 @@ void __init paging_init(void)
 {
     unsigned long addr;
     void *ioremap_pt;
+    int i;
+
+    /* Idle page table 1:1 maps the first part of physical memory. */
+    for ( i = 0; i < DOMAIN_ENTRIES_PER_L2_PAGETABLE; i++ )
+        idle_pg_table[i] = 
+            mk_l2_pgentry((i << L2_PAGETABLE_SHIFT) | 
+                          __PAGE_HYPERVISOR | _PAGE_PSE);
 
     /*
      * Fixed mappings, only the page table structure has to be

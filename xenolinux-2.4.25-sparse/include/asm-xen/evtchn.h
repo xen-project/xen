@@ -23,7 +23,7 @@
 void evtchn_do_upcall(struct pt_regs *regs);
 
 /* Entry point for notifications into the userland character device. */
-void evtchn_device_upcall(int port, int exception);
+void evtchn_device_upcall(int port);
 
 static inline void mask_evtchn(int port)
 {
@@ -34,7 +34,6 @@ static inline void mask_evtchn(int port)
 static inline void unmask_evtchn(int port)
 {
     shared_info_t *s = HYPERVISOR_shared_info;
-    int need_upcall = 0;
 
     synch_clear_bit(port, &s->evtchn_mask[0]);
 
@@ -42,22 +41,13 @@ static inline void unmask_evtchn(int port)
      * The following is basically the equivalent of 'hw_resend_irq'. Just like
      * a real IO-APIC we 'lose the interrupt edge' if the channel is masked.
      */
-
-    /* Asserted a standard notification? */
     if (  synch_test_bit        (port,    &s->evtchn_pending[0]) && 
          !synch_test_and_set_bit(port>>5, &s->evtchn_pending_sel) )
-        need_upcall = 1;
-
-    /* Asserted an exceptional notification? */
-    if (  synch_test_bit        (port,    &s->evtchn_exception[0]) && 
-         !synch_test_and_set_bit(port>>5, &s->evtchn_exception_sel) )
-        need_upcall = 1;
-
-    /* If asserted either type of notification, check the master flags. */
-    if ( need_upcall &&
-         !synch_test_and_set_bit(0,       &s->evtchn_upcall_pending) &&
-         !synch_test_bit        (0,       &s->evtchn_upcall_mask) )
-        evtchn_do_upcall(NULL);
+    {
+        s->vcpu_data[0].evtchn_upcall_pending = 1;
+        if ( !s->vcpu_data[0].evtchn_upcall_mask )
+            evtchn_do_upcall(NULL);
+    }
 }
 
 static inline void clear_evtchn(int port)
@@ -70,16 +60,6 @@ static inline void clear_evtchn_exception(int port)
 {
     shared_info_t *s = HYPERVISOR_shared_info;
     synch_clear_bit(port, &s->evtchn_exception[0]);
-}
-
-static inline void evtchn_clear_error_virq(void)
-{
-    /*
-     * XXX This prevents a bogus 'VIRQ_ERROR' when interrupts are enabled
-     * for the first time. This works because by this point all important
-     * VIRQs (eg. timer) have been properly bound.
-     */
-    synch_clear_bit(0, &HYPERVISOR_shared_info->evtchn_pending[0]);
 }
 
 /*
@@ -95,6 +75,10 @@ static inline void evtchn_clear_error_virq(void)
 
 /* /dev/xen/evtchn ioctls: */
 /* EVTCHN_RESET: Clear and reinit the event buffer. Clear error condition. */
-#define EVTCHN_RESET _IO('E', 1)
+#define EVTCHN_RESET  _IO('E', 1)
+/* EVTCHN_BIND: Bind to teh specified event-channel port. */
+#define EVTCHN_BIND   _IO('E', 2)
+/* EVTCHN_UNBIND: Unbind from the specified event-channel port. */
+#define EVTCHN_UNBIND _IO('E', 3)
 
 #endif /* __ASM_EVTCHN_H__ */

@@ -1,4 +1,7 @@
 
+.section __xen_guest
+    .asciz "GUEST_OS=linux,GUEST_VER=2.4,XEN_VER=1.3"
+
 .text
 #include <linux/config.h>
 #include <linux/threads.h>
@@ -8,42 +11,14 @@
 #include <asm/pgtable.h>
 #include <asm/desc.h>
 
-/* Offsets in start_info structure */
-#define MOD_START 16
-#define MOD_LEN   20
-                
-startup_32:
+ENTRY(stext)
+ENTRY(_stext)
         cld
-        
         lss stack_start,%esp
-
-        /* Copy initrd somewhere safe before it's clobbered by BSS. */
-        mov  MOD_LEN(%esi),%ecx
-        shr  $2,%ecx
-        jz   2f        /* bail from copy loop if no initrd */
-        mov  $SYMBOL_NAME(_end),%edi
-        add  MOD_LEN(%esi),%edi
-        mov  MOD_START(%esi),%eax
-        add  MOD_LEN(%esi),%eax
-1:      sub  $4,%eax
-        sub  $4,%edi
-        mov  (%eax),%ebx
-        mov  %ebx,(%edi)
-        loop 1b
-        mov  %edi,MOD_START(%esi)
-                
-        /* Clear BSS first so that there are no surprises... */
-2:      xorl %eax,%eax
-        movl $SYMBOL_NAME(__bss_start),%edi
-        movl $SYMBOL_NAME(_end),%ecx
-        subl %edi,%ecx
-        rep stosb
-
         /* Copy the necessary stuff from start_info structure. */
-        mov  $SYMBOL_NAME(start_info_union),%edi
-        mov  $128,%ecx
+        mov $SYMBOL_NAME(start_info_union),%edi
+        mov $128,%ecx
         rep movsl
-                        
         jmp SYMBOL_NAME(start_kernel)
 
 ENTRY(stack_start)
@@ -62,5 +37,3 @@ ENTRY(cpu0_pte_quicklist)
 ENTRY(cpu0_pgd_quicklist)
         
 .org 0x3800
-ENTRY(stext)
-ENTRY(_stext)

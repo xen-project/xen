@@ -281,6 +281,23 @@ static PyObject *pyxc_bvtsched_global_set(PyObject *self,
     return zero;
 }
 
+static PyObject *pyxc_bvtsched_global_get(PyObject *self,
+					  PyObject *args,
+					  PyObject *kwds)
+{
+    XcObject *xc = (XcObject *)self;
+    
+    unsigned long ctx_allow;
+    
+    if ( !PyArg_ParseTuple(args, "") )
+        return NULL;
+    
+    if ( xc_bvtsched_global_get(xc->xc_handle, &ctx_allow) != 0 )
+        return PyErr_SetFromErrno(xc_error);
+    
+    return Py_BuildValue("s:l", "ctx_allow", ctx_allow);
+}
+
 static PyObject *pyxc_bvtsched_domain_set(PyObject *self,
                                           PyObject *args,
                                           PyObject *kwds)
@@ -303,6 +320,31 @@ static PyObject *pyxc_bvtsched_domain_set(PyObject *self,
     
     Py_INCREF(zero);
     return zero;
+}
+
+static PyObject *pyxc_bvtsched_domain_get(PyObject *self,
+                                          PyObject *args,
+                                          PyObject *kwds)
+{
+    XcObject *xc = (XcObject *)self;
+    u64 dom;
+    unsigned long mcuadv, warp, warpl, warpu;
+    
+    static char *kwd_list[] = { "dom", NULL };
+
+    if ( !PyArg_ParseTupleAndKeywords(args, kwds, "L", kwd_list, &dom) )
+        return NULL;
+    
+    if ( xc_bvtsched_domain_get(xc->xc_handle, dom, &mcuadv, &warp,
+                                &warpl, &warpu) != 0 )
+        return PyErr_SetFromErrno(xc_error);
+
+    return Py_BuildValue("{s:L,s:l,s:l,s:l,s:l}",
+                         "domain", dom,
+                         "mcuadv", mcuadv,
+                         "warp",   warp,
+                         "warpl",  warpl,
+                         "warpu",  warpu);
 }
 
 static PyObject *pyxc_vif_scheduler_set(PyObject *self,
@@ -879,21 +921,51 @@ static PyObject *pyxc_atropos_domain_set(PyObject *self,
                                          PyObject *kwds)
 {
     XcObject *xc = (XcObject *)self;
-    int xtratime;
     u64 domid;
+    u64 period, slice, latency;
+    int xtratime;
 
-    static char *kwd_list[] = { "dom", "xtratime", NULL };
+    static char *kwd_list[] = { "dom", "period", "slice", "latency",
+				"xtratime", NULL };
     
-    if( !PyArg_ParseTupleAndKeywords(args, kwds, "Li", kwd_list, &domid,
-                                     &xtratime) )
+    if( !PyArg_ParseTupleAndKeywords(args, kwds, "LLLLi", kwd_list, &domid,
+                                     &period, &slice, &latency, &xtratime) )
         return NULL;
    
-    if ( xc_atropos_domain_set(xc->xc_handle, domid, xtratime) != 0 )
+    if ( xc_atropos_domain_set(xc->xc_handle, domid, period, slice,
+			       latency, xtratime) != 0 )
         return PyErr_SetFromErrno(xc_error);
 
     Py_INCREF(zero);
     return zero;
 }
+
+static PyObject *pyxc_atropos_domain_get(PyObject *self,
+                                         PyObject *args,
+                                         PyObject *kwds)
+{
+    XcObject *xc = (XcObject *)self;
+    u64 domid;
+    u64 period, slice, latency;
+    int xtratime;
+    
+    static char *kwd_list[] = { "dom", NULL };
+
+    if( !PyArg_ParseTupleAndKeywords(args, kwds, "L", kwd_list, &domid) )
+        return NULL;
+    
+    if ( xc_atropos_domain_get( xc->xc_handle, domid, &period,
+                                &slice, &latency, &xtratime ) )
+        return PyErr_SetFromErrno(xc_error);
+
+    return Py_BuildValue("{s:L,s:L,s:L,s:L,s:i}",
+                         "domain",  domid,
+                         "period",  period,
+                         "slice",   slice,
+                         "latency", latency,
+                         "xtratime", xtratime);
+}
+
 
 static PyObject *pyxc_rrobin_global_set(PyObject *self,
                                         PyObject *args,
@@ -934,6 +1006,22 @@ static PyObject *pyxc_shadow_control(PyObject *self,
     
     Py_INCREF(zero);
     return zero;
+}
+
+static PyObject *pyxc_rrobin_global_get(PyObject *self,
+                                        PyObject *args,
+                                        PyObject *kwds)
+{
+    XcObject *xc = (XcObject *)self;
+    u64 slice;
+
+    if ( !PyArg_ParseTuple(args, "") )
+        return NULL;
+
+    if ( xc_rrobin_global_get(xc->xc_handle, &slice) != 0 )
+        return PyErr_SetFromErrno(xc_error);
+    
+    return Py_BuildValue("s:L", "slice", slice);
 }
 
 
@@ -1037,6 +1125,13 @@ static PyMethodDef pyxc_methods[] = {
       " ctx_allow [int]: Minimal guaranteed quantum (I think!).\n\n"
       "Returns: [int] 0 on success; -1 on error.\n" },
 
+    { "bvtsched_global_get",
+      (PyCFunction)pyxc_bvtsched_global_get,
+      METH_KEYWORDS, "\n"
+      "Get global tuning parameters for BVT scheduler.\n"
+      "Returns: [dict]:\n"
+      " ctx_allow [int]: context switch allowance\n" },
+
     { "bvtsched_domain_set",
       (PyCFunction)pyxc_bvtsched_domain_set,
       METH_VARARGS | METH_KEYWORDS, "\n"
@@ -1048,21 +1143,56 @@ static PyMethodDef pyxc_methods[] = {
       " warpu  [int]:  Internal BVT parameter.\n\n"
       "Returns: [int] 0 on success; -1 on error.\n" },
 
+    { "bvtsched_domain_get",
+      (PyCFunction)pyxc_bvtsched_domain_get,
+      METH_KEYWORDS, "\n"
+      "Get per-domain tuning parameters under the BVT scheduler.\n"
+      " dom [long]: Identifier of domain to be queried.\n"
+      "Returns [dict]:\n"
+      " domain [long]: Domain ID.\n"
+      " mcuadv [long]: MCU Advance.\n"
+      " warp   [long]: Warp.\n"
+      " warpu  [long]:\n"
+      " warpl  [long]: Warp limit,\n"
+    },
+
     { "atropos_domain_set",
       (PyCFunction)pyxc_atropos_domain_set,
-      METH_VARARGS | METH_KEYWORDS, "\n"
-      "Set the extra time flag for a domain when running with Atropos.\n"
-      " dom [long]: domain to set\n"
+      METH_KEYWORDS, "\n"
+      "Set the scheduling parameters for a domain when running with Atropos.\n"
+      " dom      [long]: domain to set\n"
+      " period   [long]: domain's scheduling period\n"
+      " slice    [long]: domain's slice per period\n"
+      " latency  [long]: wakeup latency hint\n"
       " xtratime [int]: boolean\n"
       "Returns: [int] 0 on success; -1 on error.\n" },
+
+    { "atropos_domain_get",
+      (PyCFunction)pyxc_atropos_domain_get,
+      METH_KEYWORDS, "\n"
+      "Get the current scheduling parameters for a domain when running with\n"
+      "the Atropos scheduler."
+      " dom      [long]: domain to query\n"
+      "Returns:  [dict]\n"
+      " domain   [long]: domain ID\n"
+      " period   [long]: scheduler period\n"
+      " slice    [long]: CPU reservation per period\n"
+      " latency  [long]: unblocking latency hint\n"
+      " xtratime [int] : 0 if not using slack time, nonzero otherwise\n" },
 
     { "rrobin_global_set",
       (PyCFunction)pyxc_rrobin_global_set,
       METH_KEYWORDS, "\n"
       "Set Round Robin scheduler slice.\n"
       " slice [long]: Round Robin scheduler slice\n"
-      "Returns: [int] 0 on success, throws an exception on failure\n"
-    },
+      "Returns: [int] 0 on success, throws an exception on failure\n" },
+
+    { "rrobin_global_get",
+      (PyCFunction)pyxc_rrobin_global_get,
+      METH_KEYWORDS, "\n"
+      "Get Round Robin scheduler settings\n"
+      "Returns [dict]:\n"
+      " slice  [long]: Scheduler time slice.\n" },    
 
     { "vif_scheduler_set", 
       (PyCFunction)pyxc_vif_scheduler_set, 

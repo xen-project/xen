@@ -55,11 +55,12 @@ typedef unsigned long l2_pgentry_t;
 #define l2_table_offset(_a) \
           ((_a) >> L2_PAGETABLE_SHIFT)
 
-#define ERROR(_m)  \
-    fprintf(stderr, "ERROR: %s\n", (_m))
+#define ERROR(_m, _a...)  \
+    fprintf(stderr, "ERROR: " _m "\n" , ## _a )
 
-#define PERROR(_m) \
-    fprintf(stderr, "ERROR: %s (%d = %s)\n", (_m), errno, strerror(errno))
+#define PERROR(_m, _a...) \
+    fprintf(stderr, "ERROR: " _m " (%d = %s)\n" , ## _a , \
+            errno, strerror(errno))
 
 static inline int do_privcmd(int xc_handle,
                              unsigned int cmd, 

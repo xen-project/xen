@@ -206,7 +206,7 @@ static inline void do_trap(int trapnr, char *str,
     gtb->cs         = ti->cs;
     gtb->eip        = ti->address;
     if ( TI_GET_IF(ti) )
-        set_bit(0, &p->shared_info->evtchn_upcall_mask);
+        p->shared_info->vcpu_data[0].evtchn_upcall_mask = 1;
     return; 
 
  fault_in_hypervisor:
@@ -277,9 +277,7 @@ asmlinkage void do_int3(struct pt_regs *regs, long error_code)
     gtb->cs         = ti->cs;
     gtb->eip        = ti->address;
     if ( TI_GET_IF(ti) )
-        set_bit(0, &p->shared_info->evtchn_upcall_mask);
-    return;
-
+        p->shared_info->vcpu_data[0].evtchn_upcall_mask = 1;
 }
 
 asmlinkage void do_double_fault(void)
@@ -339,11 +337,9 @@ asmlinkage void do_page_fault(struct pt_regs *regs, long error_code)
             return; /* successfully copied the mapping */
     }
 
-    if ( unlikely( p->mm.shadow_mode ) && addr < PAGE_OFFSET &&
-	 shadow_fault( addr, error_code ) )
-      {
-	return; // return true if fault was handled 
-      }
+    if ( unlikely(p->mm.shadow_mode) && 
+         (addr < PAGE_OFFSET) && shadow_fault(addr, error_code) )
+	return; /* Return TRUE if fault was handled. */
 
     if ( unlikely(!(regs->xcs & 3)) )
         goto fault_in_hypervisor;
@@ -355,7 +351,7 @@ asmlinkage void do_page_fault(struct pt_regs *regs, long error_code)
     gtb->cs         = ti->cs;
     gtb->eip        = ti->address;
     if ( TI_GET_IF(ti) )
-        set_bit(0, &p->shared_info->evtchn_upcall_mask);
+        p->shared_info->vcpu_data[0].evtchn_upcall_mask = 1;
     return; 
 
  fault_in_hypervisor:
@@ -363,7 +359,8 @@ asmlinkage void do_page_fault(struct pt_regs *regs, long error_code)
     if ( likely((fixup = search_exception_table(regs->eip)) != 0) )
     {
         perfc_incrc(copy_user_faults);
-        //DPRINTK("copy_user fault: %08lx -> %08lx\n", regs->eip, fixup);
+        if ( !p->mm.shadow_mode )
+            DPRINTK("Page fault: %08lx -> %08lx\n", regs->eip, fixup);
         regs->eip = fixup;
         regs->xds = regs->xes = regs->xfs = regs->xgs = __HYPERVISOR_DS;
         return;
@@ -384,6 +381,15 @@ asmlinkage void do_page_fault(struct pt_regs *regs, long error_code)
         if ( !(error_code & 1) )
             printk(" -- POSSIBLY AN ACCESS TO FREED MEMORY? --\n");
 #endif
+    }
+
+    if (pdb_page_fault_possible)
+    {
+        pdb_page_fault = 1;
+	/* make eax & edx valid to complete the instruction */
+	regs->eax = (long)&pdb_page_fault_scratch;
+	regs->edx = (long)&pdb_page_fault_scratch;
+	return;
     }
 
     show_registers(regs);
@@ -444,7 +450,7 @@ asmlinkage void do_general_protection(struct pt_regs *regs, long error_code)
     gtb->cs         = ti->cs;
     gtb->eip        = ti->address;
     if ( TI_GET_IF(ti) )
-        set_bit(0, &p->shared_info->evtchn_upcall_mask);
+        p->shared_info->vcpu_data[0].evtchn_upcall_mask = 1;
     return;
 
  gp_in_kernel:

@@ -16,7 +16,7 @@ typedef void irqreturn_t;
 #define IRQ_NONE
 #define IRQ_HANDLED
 #define IRQ_RETVAL(x)
-                                                                                
+
 struct irqaction {
 	void (*handler)(int, void *, struct pt_regs *);
 	unsigned long flags;
@@ -25,7 +25,6 @@ struct irqaction {
 	void *dev_id;
 	struct irqaction *next;
 };
-
 
 enum {
 	TIMER_BH = 0,

@@ -33,9 +33,15 @@
 #define EVTCHN_DEV_MAJOR 10
 #define EVTCHN_DEV_MINOR 200
 #define PORT_NORMAL     0x0000   /* A standard event notification.      */ 
-#define PORT_DISCONNECT 0x8000   /* A port-disconnect notification.     */
+#define PORT_EXCEPTION  0x8000   /* An exceptional notification.        */
 #define PORTIDX_MASK    0x7fff   /* Strip subtype to obtain port index. */
-#define EVTCHN_RESET _IO('E', 1) /* Clear notification buffer. Clear errors. */
+/* /dev/xen/evtchn ioctls: */
+/* EVTCHN_RESET: Clear and reinit the event buffer. Clear error condition. */
+#define EVTCHN_RESET  _IO('E', 1)
+/* EVTCHN_BIND: Bind to teh specified event-channel port. */
+#define EVTCHN_BIND   _IO('E', 2)
+/* EVTCHN_UNBIND: Unbind from the specified event-channel port. */
+#define EVTCHN_UNBIND _IO('E', 3)
 
 /* Size of a machine page frame. */
 #define PAGE_SIZE 4096
@@ -76,18 +82,48 @@ static PyObject *xu_notifier_read(PyObject *self, PyObject *args)
     return Py_None;
 }
 
-static PyObject *xu_notifier_clear(PyObject *self, PyObject *args)
+static PyObject *xu_notifier_unmask(PyObject *self, PyObject *args)
 {
     xu_notifier_object *xun = (xu_notifier_object *)self;
     u16 v;
-    int idx, type;
+    int idx;
 
-    if ( !PyArg_ParseTuple(args, "ii", &idx, &type) )
+    if ( !PyArg_ParseTuple(args, "i", &idx) )
         return NULL;
-    
-    v = (u16)idx | (u16)type;
 
+    v = (u16)idx;
+    
     (void)write(xun->evtchn_fd, &v, sizeof(v));
+
+    Py_INCREF(Py_None);
+    return Py_None;
+}
+
+static PyObject *xu_notifier_bind(PyObject *self, PyObject *args)
+{
+    xu_notifier_object *xun = (xu_notifier_object *)self;
+    int idx;
+
+    if ( !PyArg_ParseTuple(args, "i", &idx) )
+        return NULL;
+
+    if ( ioctl(xun->evtchn_fd, EVTCHN_BIND, idx) != 0 )
+        return PyErr_SetFromErrno(PyExc_IOError);
+
+    Py_INCREF(Py_None);
+    return Py_None;
+}
+
+static PyObject *xu_notifier_unbind(PyObject *self, PyObject *args)
+{
+    xu_notifier_object *xun = (xu_notifier_object *)self;
+    int idx;
+
+    if ( !PyArg_ParseTuple(args, "i", &idx) )
+        return NULL;
+
+    if ( ioctl(xun->evtchn_fd, EVTCHN_UNBIND, idx) != 0 )
+        return PyErr_SetFromErrno(PyExc_IOError);
 
     Py_INCREF(Py_None);
     return Py_None;
@@ -105,10 +141,20 @@ static PyMethodDef xu_notifier_methods[] = {
       METH_VARARGS,
       "Read a (@port, @type) pair.\n" },
 
-    { "clear", 
-      (PyCFunction)xu_notifier_clear,
+    { "unmask", 
+      (PyCFunction)xu_notifier_unmask,
       METH_VARARGS,
-      "Clear a (@port, @type) pair.\n" },
+      "Unmask notifications for a @port.\n" },
+
+    { "bind", 
+      (PyCFunction)xu_notifier_bind,
+      METH_VARARGS,
+      "Get notifications for a @port.\n" },
+
+    { "unbind", 
+      (PyCFunction)xu_notifier_unbind,
+      METH_VARARGS,
+      "No longer get notifications for a @port.\n" },
 
     { "fileno", 
       (PyCFunction)xu_notifier_fileno,
@@ -147,8 +193,8 @@ static PyObject *xu_notifier_new(PyObject *self, PyObject *args)
 
 static PyObject *xu_notifier_getattr(PyObject *obj, char *name)
 {
-    if ( strcmp(name, "DISCONNECT") == 0 )
-        return PyInt_FromLong(PORT_DISCONNECT);
+    if ( strcmp(name, "EXCEPTION") == 0 )
+        return PyInt_FromLong(PORT_EXCEPTION);
     if ( strcmp(name, "NORMAL") == 0 )
         return PyInt_FromLong(PORT_NORMAL);
     return Py_FindMethod(xu_notifier_methods, obj, name);

@@ -18,7 +18,7 @@
  * This makes sure that old versions of dom0 tools will stop working in a
  * well-defined way (rather than crashing the machine, for instance).
  */
-#define DOM0_INTERFACE_VERSION   0xAAAA000A
+#define DOM0_INTERFACE_VERSION   0xAAAA000B
 
 #define MAX_CMD_LEN       256
 #define MAX_DOMAIN_NAME    16
@@ -96,7 +96,6 @@ typedef struct dom0_getdomaininfo_st
 #define DOMSTATE_STOPPED             1
     int state;
     int hyp_events;
-    unsigned long mcu_advance;
     unsigned int tot_pages;
     long long cpu_time;
     unsigned long shared_info_frame;  /* MFN of shared_info struct */
@@ -214,10 +213,20 @@ typedef struct dom0_pcidev_access_st
     int          enable;
 } dom0_pcidev_access_t;
 
+/*
+ * Get the ID of the current scheduler.
+ */
+#define DOM0_SCHED_ID        24
+typedef struct dom0_sched_id_st
+{
+    /* OUT variable */
+    int sched_id;
+} dom0_sched_id_t;
+
 /* 
  * Control shadow pagetables operation
  */
-#define DOM0_SHADOW_CONTROL   24
+#define DOM0_SHADOW_CONTROL   25
 
 #define DOM0_SHADOW_CONTROL_OP_OFF         0
 #define DOM0_SHADOW_CONTROL_OP_ENABLE_TEST 1
@@ -257,6 +266,7 @@ typedef struct dom0_op_st
         dom0_gettbufs_t         gettbufs;
         dom0_physinfo_t         physinfo;
         dom0_pcidev_access_t    pcidev_access;
+        dom0_sched_id_t         sched_id;
 	dom0_shadow_control_t   shadow_control;
     } u;
 } dom0_op_t;

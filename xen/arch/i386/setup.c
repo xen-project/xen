@@ -411,8 +411,6 @@ void __init start_of_day(void)
 
     check_nmi_watchdog();
 
-    zap_low_mappings();
-
 #ifdef CONFIG_PCI
     pci_init();
 #endif
@@ -420,7 +418,9 @@ void __init start_of_day(void)
     if ( !setup_network_devices() )
         panic("Must have a network device!\n");
     net_init();            /* initializes virtual network system. */
+#ifndef NO_DEVICES_IN_XEN
     initialize_block_io(); /* setup block devices */
+#endif
 
 #ifdef CONFIG_SMP
     wait_init_idle = cpu_online_map;

@@ -1,7 +1,7 @@
 Pervasive Debugging 
 ===================
 
-040205 Alex Ho (alex.ho at cl.cam.ac.uk)
+Alex Ho (alex.ho at cl.cam.ac.uk)
 
 Introduction
 ------------
@@ -79,12 +79,32 @@ Serial Port Configuration
 
   See:  xeno.bk/tools/nsplitd
 
+  nsplitd configuration
+  ---------------------
+  hostname$ more /etc/xinetd.d/nsplit
+  service nsplit1
+  {
+        socket_type             = stream
+        protocol                = tcp
+        wait                    = no
+        user                    = wanda
+        server                  = /usr/sbin/in.nsplitd
+        server_args             = serial.cl.cam.ac.uk:wcons00
+        disable                 = no
+        only_from               = 128.232.0.0/17 127.0.0.1
+  }
+
+  hostname$ egrep 'wcons00|nsplit1' /etc/services
+  wcons00         9600/tcp        # Wanda remote console
+  nsplit1         12010/tcp       # Nemesis console splitter ports.
+
   Note: nsplitd was originally written for the Nemesis project
   at Cambridge.
 
-  After nsplitd accepts a connection on <port>, it starts listening
-  on port <port + 1>.  Characters sent to the <port + 1> will have the
-  high bit set and vice versa for characters received.
+  After nsplitd accepts a connection on <port> (12010 in the above
+  example), it starts listening on port <port + 1>.  Characters sent 
+  to the <port + 1> will have the high bit set and vice versa for 
+  characters received.
 
   You can connect to the nsplitd using
   'tools/xenctl/lib/console_client.py <host> <port>'
@@ -100,8 +120,9 @@ Usage
 1. Boot Xen and Linux
 2. Interrupt Xen by pressing 'D' at the console
    You should see the console message: 
-   pdb_handle_exception [0x88][0xfc5c9d88]
-   At this point Xen is waiting for gdb commands on the serial line.
+   (XEN) pdb_handle_exception [0x88][0x101000:0xfc5e72ac]
+   At this point Xen is frozen and the pdb stub is waiting for gdb commands 
+   on the serial line.
 3. Attach with gdb
    (gdb) file xeno.bk/xen/xen
    Reading symbols from xeno.bk/xen/xen...done.
@@ -146,60 +167,107 @@ Usage
    Program received signal SIGTRAP, Trace/breakpoint trap.
    release_task (p=0xc2da0000) at exit.c:51
    (gdb) print *p
-$3 = {state = 4, flags = 4, sigpending = 0, addr_limit = {seg = 3221225472}, 
-  exec_domain = 0xc016a040, need_resched = 0, ptrace = 0, lock_depth = -1, 
-  counter = 1, nice = 0, policy = 0, mm = 0x0, processor = 0, 
-  cpus_runnable = 1, cpus_allowed = 4294967295, run_list = {next = 0x0, 
-    prev = 0x0}, sleep_time = 18995, next_task = 0xc017c000, 
-  prev_task = 0xc2f94000, active_mm = 0x0, local_pages = {next = 0xc2da0054, 
-    prev = 0xc2da0054}, allocation_order = 0, nr_local_pages = 0, 
-  binfmt = 0xc016c6a0, exit_code = 0, exit_signal = 17, pdeath_signal = 0, 
-  personality = 0, did_exec = -1, task_dumpable = 1, pid = 917, pgrp = 914, 
-  tty_old_pgrp = 0, session = 914, tgid = 917, leader = 0, 
-  p_opptr = 0xc2f94000, p_pptr = 0xc2f94000, p_cptr = 0x0, p_ysptr = 0x0, 
-  p_osptr = 0x0, thread_group = {next = 0xc2da00a8, prev = 0xc2da00a8}, 
-  pidhash_next = 0x0, pidhash_pprev = 0xc01900b8, wait_chldexit = {
-    lock = <incomplete type>, task_list = {next = 0xc2da00b8, 
-      prev = 0xc2da00b8}}, vfork_done = 0x0, rt_priority = 0, 
-  it_real_value = 0, it_prof_value = 0, it_virt_value = 0, it_real_incr = 0, 
-  it_prof_incr = 0, it_virt_incr = 0, real_timer = {list = {next = 0x0, 
-      prev = 0x0}, expires = 18950, data = 3269066752, 
-    function = 0xc000ce30 <it_real_fn>}, times = {tms_utime = 0, 
-    tms_stime = 0, tms_cutime = 0, tms_cstime = 0}, start_time = 18989, 
-  per_cpu_utime = {1}, per_cpu_stime = {310}, min_flt = 13, maj_flt = 104, 
-  nswap = 0, cmin_flt = 0, cmaj_flt = 0, cnswap = 0, swappable = -1, uid = 0, 
-  euid = 0, suid = 0, fsuid = 0, gid = 0, egid = 0, sgid = 0, fsgid = 0, 
-  ngroups = 7, groups = {0, 1, 2, 3, 4, 6, 10, 0 <repeats 25 times>}, 
-  cap_effective = 4294967039, cap_inheritable = 0, cap_permitted = 4294967039, 
-  keep_capabilities = 0, user = 0xc016b18c, rlim = {{rlim_cur = 4294967295, 
-      rlim_max = 4294967295}, {rlim_cur = 4294967295, rlim_max = 4294967295}, {
-      rlim_cur = 4294967295, rlim_max = 4294967295}, {rlim_cur = 8388608, 
-      rlim_max = 4294967295}, {rlim_cur = 0, rlim_max = 4294967295}, {
-      rlim_cur = 4294967295, rlim_max = 4294967295}, {rlim_cur = 512, 
-      rlim_max = 512}, {rlim_cur = 1024, rlim_max = 1024}, {
-      rlim_cur = 4294967295, rlim_max = 4294967295}, {rlim_cur = 4294967295, 
-      rlim_max = 4294967295}, {rlim_cur = 4294967295, rlim_max = 4294967295}}, 
-  used_math = 0, comm = "id\000h\000og\000\000\000\000\000\000\000\000", 
-  link_count = 0, total_link_count = 1, tty = 0xc3ed1000, locks = 0, 
-  semundo = 0x0, semsleeping = 0x0, thread = {esp0 = 3269074944, 
-    eip = 3221249046, esp = 3269074792, fs = 0, gs = 0, io_pl = 3, debugreg = {
-      0, 0, 0, 0, 0, 0, 0, 0}, cr2 = 0, trap_no = 0, error_code = 0, i387 = {
-      fsave = {cwd = 2098047, swd = 125632512, twd = 1073944696, fip = 2091, 
-        fcs = -1073745032, foo = 2099, fos = 8064, st_space = {
-          0 <repeats 20 times>}, status = 0}, fxsave = {cwd = 895, swd = 32, 
-        twd = 0, fop = 1917, fip = 1073944696, fcs = 2091, foo = -1073745032, 
-        fos = 2099, mxcsr = 8064, reserved = 0, st_space = {
-          0 <repeats 24 times>, 1449431204, -1774489361, 16383, 0, 1, 
-          -1891252224, 16404, 0}, xmm_space = {0 <repeats 32 times>}, 
-        padding = {0 <repeats 56 times>}}, soft = {cwd = 2098047, 
-        swd = 125632512, twd = 1073944696, fip = 2091, fcs = -1073745032, 
-        foo = 2099, fos = 8064, st_space = {0 <repeats 20 times>}, 
-        ftop = 0 '\0', changed = 0 '\0', lookahead = 0 '\0', 
-        no_update = 0 '\0', rm = 0 '\0', alimit = 0 '\0', info = 0x0, 
-        entry_eip = 0}}, vm86_info = 0x0, screen_bitmap = 0, v86flags = 0, 
-    v86mask = 0, saved_esp0 = 0}, fs = 0x0, files = 0x0, namespace = 0x0, 
-  sigmask_lock = <incomplete type>, sig = 0x0, blocked = {sig = {0, 0}}, 
-  pending = {head = 0x0, tail = 0xc2da04f8, signal = {sig = {0, 0}}}, 
-  sas_ss_sp = 0, sas_ss_size = 0, notifier = 0, notifier_data = 0x0, 
-  notifier_mask = 0x0, parent_exec_id = 7, self_exec_id = 8, 
-  alloc_lock = <incomplete type>, journal_info = 0x0}
+   $3 = {state = 4, flags = 4, sigpending = 0, addr_limit = {seg = 3221225472},
+     exec_domain = 0xc016a040, need_resched = 0, ptrace = 0, lock_depth = -1, 
+     counter = 1, nice = 0, policy = 0, mm = 0x0, processor = 0, 
+     cpus_runnable = 1, cpus_allowed = 4294967295, run_list = {next = 0x0, 
+       prev = 0x0}, sleep_time = 18995, next_task = 0xc017c000, 
+     prev_task = 0xc2f94000, active_mm = 0x0, local_pages = {next = 0xc2da0054,
+       prev = 0xc2da0054}, allocation_order = 0, nr_local_pages = 0, 
+     ...
+5. To resume Xen, enter the "continue" command to gdb.
+   This sends the packet $c#63 along the serial channel.
+
+   (gdb) cont
+   Continuing.
+
+Debugging Multiple Domains & Processes
+--------------------------------------
+
+pdb supports debugging multiple domains & processes.  You can switch
+between different domains and processes within domains and examine
+variables in each.
+
+The pdb context identifies the current debug target.  It is stored
+in the xen variable pdb_ctx and defaults to xen.
+
+   target    pdb_ctx.domain    pdb_ctx.process
+   ------    --------------    ---------------
+    xen           -1                 -1
+  guest os      0,1,2,...            -1
+   process      0,1,2,...          0,1,2,...
+
+Unfortunately, gdb doesn't understand debugging multiple process
+simultaneously (we're working on it), so at present you are limited 
+to just one set of symbols for symbolic debugging.  When debugging
+processes, pdb currently supports just Linux 2.4.
+
+   define setup
+      file xeno-clone/xeno.bk/xen/xen
+      add-sym xeno-clone/xenolinux-2.4.25/vmlinux
+      add-sym ~ach61/a.out
+   end
+
+
+1. Connect with gdb as before.  A couple of Linux-specific 
+   symbols need to be defined.
+
+   (gdb) target remote <hostname>:<port + 1>              /* contact nsplitd */
+   Remote debugging using serial.srg:12131
+   continue_cpu_idle_loop () at current.h:10
+   warning: shared library handler failed to enable breakpoint
+   (gdb) set pdb_pidhash_addr = &pidhash
+   (gdb) set pdb_init_task_union_addr = &init_task_union
+
+2. The pdb context defaults to Xen and we can read Xen's memory.
+   An attempt to access domain 0 memory fails.
+  
+   (gdb) print pdb_ctx
+   $1 = {valid = 0, domain = -1, process = -1, ptbr = 1052672}
+   (gdb) print hexchars
+   $2 = "0123456789abcdef"
+   (gdb) print cpu_vendor_names
+   Cannot access memory at address 0xc0191f80
+
+3. Now we change to domain 0.  In addition to changing pdb_ctx.domain,
+   we need to change pdb_ctx.valid to signal pdb of the change.
+   It is now possible to examine Xen and Linux memory.
+
+   (gdb) set pdb_ctx.domain=0
+   (gdb) set pdb_ctx.valid=1
+   (gdb) print hexchars
+   $3 = "0123456789abcdef"
+   (gdb) print cpu_vendor_names
+   $4 = {0xc0158b46 "Intel", 0xc0158c37 "Cyrix", 0xc0158b55 "AMD", 
+     0xc0158c3d "UMC", 0xc0158c41 "NexGen", 0xc0158c48 "Centaur", 
+     0xc0158c50 "Rise", 0xc0158c55 "Transmeta"}
+
+4. Now change to a process within domain 0.  Again, we need to
+   change pdb_ctx.valid in addition to pdb_ctx.process.
+
+   (gdb) set pdb_ctx.process=962
+   (gdb) set pdb_ctx.valid =1
+   (gdb) print pdb_ctx
+   $1 = {valid = 0, domain = 0, process = 962, ptbr = 52998144}
+   (gdb) print aho_a
+   $2 = 20
+
+5. Now we can read the same variable from another process running
+   the same executable in another domain.
+
+   (gdb) set pdb_ctx.domain=1
+   (gdb) set pdb_ctx.process=1210
+   (gdb) set pdb_ctx.valid=1
+   (gdb) print pdb_ctx
+   $3 = {valid = 0, domain = 1, process = 1210, ptbr = 70574080}
+   (gdb) print aho_a
+   $4 = 27
+
+
+
+
+Changes
+-------
+
+04.02.05 aho creation
+04.03.31 aho add description on debugging multiple domains

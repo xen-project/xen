@@ -1,6 +1,7 @@
 
 /*
  * pervasive debugger
+ * www.cl.cam.ac.uk/netos/pdb
  *
  * alex ho
  * 2004
@@ -13,18 +14,22 @@
 
 #include <asm/ptrace.h>
 #include <xen/list.h>
+#include <hypervisor-ifs/hypervisor-if.h>                   /* for domain id */
 
 extern int pdb_initialized;
 extern int pdb_com_port;
 extern int pdb_high_bit;
+extern int pdb_page_fault_possible;
+extern int pdb_page_fault_scratch;
+extern int pdb_page_fault;
 
 extern void initialize_pdb(void);
 
 /* Get/set values from generic debug interface. */
-extern int pdb_set_values(domid_t domain, u_char *buffer, 
-                          unsigned long addr, int length);
-extern int pdb_get_values(domid_t domain, u_char *buffer,
-                          unsigned long addr, int length);
+extern int pdb_set_values(u_char *buffer, int length,
+                          unsigned long cr3, unsigned long addr);
+extern int pdb_get_values(u_char *buffer, int length,
+                          unsigned long cr3, unsigned long addr);
 
 /* External entry points. */
 extern int pdb_handle_exception(int exceptionVector,
@@ -37,10 +42,13 @@ struct pdb_breakpoint
 {
     struct list_head list;
     unsigned long address;
+    unsigned long cr3;
+    domid_t domain;
 };
-extern void pdb_bkpt_add (unsigned long address);
-extern struct pdb_breakpoint* pdb_bkpt_search (unsigned long address);
-extern int pdb_bkpt_remove (unsigned long address);
+extern void pdb_bkpt_add (unsigned long cr3, unsigned long address);
+extern struct pdb_breakpoint* pdb_bkpt_search (unsigned long cr3, 
+					       unsigned long address);
+extern int pdb_bkpt_remove (unsigned long cr3, unsigned long address);
 
 /* Conversions. */
 extern int   hex (char);

@@ -40,35 +40,25 @@ static unsigned int ring_cons, ring_prod, ring_overflow;
 static DECLARE_WAIT_QUEUE_HEAD(evtchn_wait);
 static struct fasync_struct *evtchn_async_queue;
 
-/*
- * Pending normal notifications and pending exceptional notifications.
- * 'Pending' means that we received an upcall but this is not yet ack'ed
- * from userspace by writing to /dev/xen/evtchn.
- */
-static u32 pend_nrm[32], pend_exc[32];
+/* Which ports is user-space bound to? */
+static u32 bound_ports[32];
 
 static spinlock_t lock;
 
-void evtchn_device_upcall(int port, int exception)
+void evtchn_device_upcall(int port)
 {
     u16 port_subtype;
+    shared_info_t *s = HYPERVISOR_shared_info;
 
     spin_lock(&lock);
 
     mask_evtchn(port);
+    clear_evtchn(port);
 
-    if ( likely(!exception) )
-    {
-        clear_evtchn(port);
-        set_bit(port, &pend_nrm[0]);
+    if ( likely(!synch_test_and_clear_bit(port, &s->evtchn_exception[0])) )
         port_subtype = PORT_NORMAL;
-    }
     else
-    {
-        clear_evtchn_exception(port);
-        set_bit(port, &pend_exc[0]);
         port_subtype = PORT_EXCEPTION;
-    }
 
     if ( ring != NULL )
     {
@@ -92,28 +82,8 @@ void evtchn_device_upcall(int port, int exception)
 
 static void __evtchn_reset_buffer_ring(void)
 {
-    u32          m;
-    unsigned int i, j;
-
-    /* Initialise the ring with currently outstanding notifications. */
+    /* Initialise the ring to empty. Clear errors. */
     ring_cons = ring_prod = ring_overflow = 0;
-
-    for ( i = 0; i < 32; i++ )
-    {
-        m = pend_exc[i];
-        while ( (j = ffs(m)) != 0 )
-        {
-            m &= ~(1 << --j);
-            ring[ring_prod++] = (u16)(((i * 32) + j) | PORT_EXCEPTION);
-        }
-
-        m = pend_nrm[i];
-        while ( (j = ffs(m)) != 0 )
-        {
-            m &= ~(1 << --j);
-            ring[ring_prod++] = (u16)(((i * 32) + j) | PORT_NORMAL);
-        }
-    }
 }
 
 static ssize_t evtchn_read(struct file *file, char *buf,
@@ -232,11 +202,8 @@ static ssize_t evtchn_write(struct file *file, const char *buf,
 
     spin_lock_irq(&lock);
     for ( i = 0; i < (count/2); i++ )
-    {
-        clear_bit(kbuf[i]&PORTIDX_MASK, 
-                  (kbuf[i]&PORT_EXCEPTION) ? &pend_exc[0] : &pend_nrm[0]);
-        unmask_evtchn(kbuf[i]&PORTIDX_MASK);
-    }
+        if ( test_bit(kbuf[i], &bound_ports[0]) )
+            unmask_evtchn(kbuf[i]);
     spin_unlock_irq(&lock);
 
     rc = count;
@@ -249,14 +216,35 @@ static ssize_t evtchn_write(struct file *file, const char *buf,
 static int evtchn_ioctl(struct inode *inode, struct file *file,
                         unsigned int cmd, unsigned long arg)
 {
-    if ( cmd != EVTCHN_RESET )
-        return -EINVAL;
-
+    int rc = 0;
+    
     spin_lock_irq(&lock);
-    __evtchn_reset_buffer_ring();
+    
+    switch ( cmd )
+    {
+    case EVTCHN_RESET:
+        __evtchn_reset_buffer_ring();
+        break;
+    case EVTCHN_BIND:
+        if ( !test_and_set_bit(arg, &bound_ports[0]) )
+            unmask_evtchn(arg);
+        else
+            rc = -EINVAL;
+        break;
+    case EVTCHN_UNBIND:
+        if ( test_and_clear_bit(arg, &bound_ports[0]) )
+            mask_evtchn(arg);
+        else
+            rc = -EINVAL;
+        break;
+    default:
+        rc = -ENOSYS;
+        break;
+    }
+
     spin_unlock_irq(&lock);   
 
-    return 0;
+    return rc;
 }
 
 static unsigned int evtchn_poll(struct file *file, poll_table *wait)
@@ -298,12 +286,17 @@ static int evtchn_open(struct inode *inode, struct file *filp)
 
 static int evtchn_release(struct inode *inode, struct file *filp)
 {
+    int i;
+
     spin_lock_irq(&lock);
     if ( ring != NULL )
     {
         free_page((unsigned long)ring);
         ring = NULL;
     }
+    for ( i = 0; i < NR_EVENT_CHANNELS; i++ )
+        if ( test_and_clear_bit(i, &bound_ports[0]) )
+            mask_evtchn(i);
     spin_unlock_irq(&lock);
 
     evtchn_dev_inuse = 0;

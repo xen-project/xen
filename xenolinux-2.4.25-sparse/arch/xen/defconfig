@@ -12,6 +12,7 @@ CONFIG_UID16=y
 #
 # support for privileged domains
 CONFIG_XEN_PRIVILEGED_GUEST=y
+# CONFIG_XEN_PHYSDEV_ACCESS is not set
 # on-demand timer setting (taken from s390 patch set)
 CONFIG_NO_IDLE_HZ=y
 
@@ -434,6 +435,7 @@ CONFIG_DUMMY_CONSOLE=y
 # Kernel hacking
 #
 CONFIG_DEBUG_KERNEL=y
+# CONFIG_DEBUG_STACKOVERFLOW is not set
 # CONFIG_DEBUG_HIGHMEM is not set
 # CONFIG_DEBUG_SLAB is not set
 # CONFIG_DEBUG_IOVIRT is not set

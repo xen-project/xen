@@ -56,19 +56,19 @@
  * Virtual interrupts that a guest OS may receive from the hypervisor.
  */
 
-#define VIRQ_BLKDEV    0  /* A block device response has been queued. */
-#define VIRQ_TIMER     1  /* A timeout has been updated. */
-#define VIRQ_DIE       2  /* OS is about to be killed. Clean up please! */
-#define VIRQ_DEBUG     3  /* Request guest to dump debug info (gross!) */
-#define VIRQ_NET       4  /* There are packets for transmission. */
-#define VIRQ_PS2       5  /* PS/2 keyboard or mouse event(s) */
-#define VIRQ_STOP      6  /* Prepare for stopping and possible pickling */
-#define VIRQ_EVTCHN    7  /* Event pending on an event channel */
-#define VIRQ_VBD_UPD   8  /* Event to signal VBDs should be reprobed */
-#define VIRQ_CONSOLE   9  /* This is only for domain-0 initial console. */
-#define VIRQ_PHYSIRQ  10  /* Event to signal pending physical IRQs. */
-#define VIRQ_ERROR    11  /* Catch-all virtual interrupt. */
-#define NR_VIRQS      12
+#define VIRQ_BLKDEV     0  /* A block device response has been queued. */
+#define VIRQ_TIMER      1  /* A timeout has been updated. */
+#define VIRQ_DIE        2  /* OS is about to be killed. Clean up please! */
+#define VIRQ_DEBUG      3  /* Request guest to dump debug info (gross!) */
+#define VIRQ_NET        4  /* There are packets for transmission. */
+#define VIRQ_PS2        5  /* PS/2 keyboard or mouse event(s) */
+#define VIRQ_STOP       6  /* Prepare for stopping and possible pickling */
+#define VIRQ_EVTCHN     7  /* Event pending on an event channel */
+#define VIRQ_VBD_UPD    8  /* Event to signal VBDs should be reprobed */
+#define VIRQ_CONSOLE    9  /* This is only for domain-0 initial console. */
+#define VIRQ_PHYSIRQ   10  /* Event to signal pending physical IRQs. */
+#define VIRQ_MISDIRECT 11  /* Catch-all virtual interrupt. */
+#define NR_VIRQS       12
 
 /*
  * MMU_XXX: specified in least 2 bits of 'ptr' field. These bits are masked
@@ -150,6 +150,9 @@ typedef struct
 /* Event channel endpoints per domain. */
 #define NR_EVENT_CHANNELS 1024
 
+/* No support for multi-processor guests. */
+#define MAX_VIRT_CPUS 1
+
 /*
  * Xen/guestos shared data -- pointer provided in start_info.
  * NB. We expect that this struct is smaller than a page.
@@ -157,13 +160,39 @@ typedef struct
 typedef struct shared_info_st
 {
     /*
-     * If bit 0 in evtchn_upcall_pending is transitioned 0->1, and bit 0 in 
-     * evtchn_upcall_mask is clear, then an asynchronous upcall is scheduled. 
-     * The upcall mask can be used to prevent unbounded reentrancy and stack 
-     * overflow (in this way, acts as a kind of interrupt-enable flag).
+     * Per-VCPU information goes here. This will be cleaned up more when Xen 
+     * actually supports multi-VCPU guests.
      */
-    unsigned long evtchn_upcall_pending;
-    unsigned long evtchn_upcall_mask;
+    struct {
+        /*
+         * 'evtchn_upcall_pending' is written non-zero by Xen to indicate
+         * a pending notification for a particular VCPU. It is then cleared 
+         * by the guest OS /before/ checking for pending work, thus avoiding
+         * a set-and-check race. Note that the mask is only accessed by Xen
+         * on the CPU that is currently hosting the VCPU. This means that the
+         * pending and mask flags can be updated by the guest without special
+         * synchronisation (i.e., no need for the x86 LOCK prefix).
+         * This may seem suboptimal because if the pending flag is set by
+         * a different CPU then an IPI may be scheduled even when the mask
+         * is set. However, note:
+         *  1. The task of 'interrupt holdoff' is covered by the per-event-
+         *     channel mask bits. A 'noisy' event that is continually being
+         *     triggered can be masked at source at this very precise
+         *     granularity.
+         *  2. The main purpose of the per-VCPU mask is therefore to restrict
+         *     reentrant execution: whether for concurrency control, or to
+         *     prevent unbounded stack usage. Whatever the purpose, we expect
+         *     that the mask will be asserted only for short periods at a time,
+         *     and so the likelihood of a 'spurious' IPI is suitably small.
+         * The mask is read before making an event upcall to the guest: a
+         * non-zero mask therefore guarantees that the VCPU will not receive
+         * an upcall activation. The mask is cleared when the VCPU requests
+         * to block: this avoids wakeup-waiting races.
+         */
+        u8 evtchn_upcall_pending;
+        u8 evtchn_upcall_mask;
+        u8 pad0, pad1;
+    } vcpu_data[MAX_VIRT_CPUS];
 
     /*
      * A domain can have up to 1024 "event channels" on which it can send
@@ -187,23 +216,22 @@ typedef struct shared_info_st
      *  2. EXCEPTION -- notifies the domain that there has been some
      *     exceptional event associated with this channel (e.g. remote
      *     disconnect, physical IRQ error). This bit is cleared by the guest.
+     *     A 0->1 transition of this bit will cause the PENDING bit to be set.
      *  3. MASK -- if this bit is clear then a 0->1 transition of PENDING
-     *     or EXCEPTION will cause an asynchronous upcall to be scheduled.
-     *     This bit is only updated by the guest. It is read-only within Xen.
-     *     If a channel becomes pending or an exceptional event occurs while
-     *     the channel is masked then the 'edge' is lost (i.e., when the
-     *     channel is unmasked, the guest must manually handle pending
-     *     notifications as no upcall will be scheduled by Xen).
+     *     will cause an asynchronous upcall to be scheduled. This bit is only
+     *     updated by the guest. It is read-only within Xen. If a channel
+     *     becomes pending while the channel is masked then the 'edge' is lost
+     *     (i.e., when the channel is unmasked, the guest must manually handle
+     *     pending notifications as no upcall will be scheduled by Xen).
      * 
-     * To expedite scanning of pending notifications and exceptions, any 
-     * 0->1 transition on an unmasked channel causes a corresponding bit in
-     * a 32-bit selector to be set. Each bit in the selector covers a 32-bit
-     * word in the PENDING or EXCEPTION bitfield array.
+     * To expedite scanning of pending notifications, any 0->1 pending
+     * transition on an unmasked channel causes a corresponding bit in a
+     * 32-bit selector to be set. Each bit in the selector covers a 32-bit
+     * word in the PENDING bitfield array.
      */
     u32 evtchn_pending[32];
     u32 evtchn_pending_sel;
     u32 evtchn_exception[32];
-    u32 evtchn_exception_sel;
     u32 evtchn_mask[32];
 
     /*
@@ -248,18 +276,41 @@ typedef struct shared_info_st
 } shared_info_t;
 
 /*
- * NB. We expect that this struct is smaller than a page.
+ * Start-of-day memory layout for the initial domain (DOM0):
+ *  1. The domain is started within contiguous virtual-memory region.
+ *  2. The contiguous region begins and ends on an aligned 4MB boundary.
+ *  3. The region start corresponds to the load address of the OS image.
+ *     If the load address is not 4MB aligned then the address is rounded down.
+ *  4. This the order of bootstrap elements in the initial virtual region:
+ *      a. relocated kernel image
+ *      b. initial ram disk              [mod_start, mod_len]
+ *      c. list of allocated page frames [mfn_list, nr_pages]
+ *      d. bootstrap page tables         [pt_base, CR3 (x86)]
+ *      e. start_info_t structure        [register ESI (x86)]
+ *      f. bootstrap stack               [register ESP (x86)]
+ *  5. Bootstrap elements are packed together, but each is 4kB-aligned.
+ *  6. The initial ram disk may be omitted.
+ *  7. The list of page frames forms a contiguous 'pseudo-physical' memory
+ *     layout for the domain. In particular, the bootstrap virtual-memory
+ *     region is a 1:1 mapping to the first section of the pseudo-physical map.
+ *  8. All bootstrap elements are mapped read-writeable for the guest OS. The
+ *     only exception is the bootstrap page table, which is mapped read-only.
+ *  9. There is guaranteed to be at least 512kB padding after the final
+ *     bootstrap element. If necessary, the bootstrap virtual region is
+ *     extended by an extra 4MB to ensure this.
  */
 typedef struct start_info_st {
     /* THE FOLLOWING ARE FILLED IN BOTH ON INITIAL BOOT AND ON RESUME.     */
-    unsigned long nr_pages;	  /* total pages allocated to this domain. */
-    unsigned long shared_info;	  /* MACHINE address of shared info struct.*/
+    unsigned long nr_pages;       /* total pages allocated to this domain. */
+    unsigned long shared_info;    /* MACHINE address of shared info struct.*/
     unsigned long flags;          /* SIF_xxx flags.                        */
     /* THE FOLLOWING ARE ONLY FILLED IN ON INITIAL BOOT (NOT RESUME).      */
-    unsigned long pt_base;	  /* VIRTUAL address of page directory.    */
-    unsigned long mod_start;	  /* VIRTUAL address of pre-loaded module. */
-    unsigned long mod_len;	  /* Size (bytes) of pre-loaded module.    */
-    unsigned char cmd_line[1];	  /* Variable-length options.              */
+    unsigned long pt_base;        /* VIRTUAL address of page directory.    */
+    unsigned long nr_pt_frames;   /* Number of bootstrap p.t. frames.      */
+    unsigned long mfn_list;       /* VIRTUAL address of page-frame list.   */
+    unsigned long mod_start;      /* VIRTUAL address of pre-loaded module. */
+    unsigned long mod_len;        /* Size (bytes) of pre-loaded module.    */
+    unsigned char cmd_line[1];    /* Variable-length options.              */
 } start_info_t;
 
 /* These flags are passed in the 'flags' field of start_info_t. */

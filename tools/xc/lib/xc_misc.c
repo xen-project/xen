@@ -68,3 +68,20 @@ int xc_physinfo(int xc_handle,
     return 0;
 }
 
+
+int xc_sched_id(int xc_handle,
+                int *sched_id)
+{
+    int ret;
+    dom0_op_t op;
+    
+    op.cmd = DOM0_SCHED_ID;
+    op.interface_version = DOM0_INTERFACE_VERSION;
+    
+    if((ret = do_dom0_op(xc_handle, &op))) return ret;
+    
+    *sched_id = op.u.sched_id.sched_id;
+    
+    return 0;
+}
+

@@ -277,12 +277,11 @@ static void serial_rx(unsigned char c, struct pt_regs *regs)
     }
     else
     {
-        /* Flush any pending CTRL-a's. They weren't for us. */
-        for ( ; ctrl_a_count != 0; ctrl_a_count-- )
-            __serial_rx(CTRL_A, regs);
-        /* Finally process the just-received character. */
-        __serial_rx(c, regs);
+        ctrl_a_count = 0;
     }
+
+    /* Finally process the just-received character. */
+    __serial_rx(c, regs);
 }
 
 long do_console_io(int cmd, int count, char *buffer)

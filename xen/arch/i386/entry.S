@@ -112,8 +112,8 @@ FAILSAFE_SEL    = 32
 FAILSAFE_ADDR   = 36
 
 /* Offsets in shared_info_t */
-UPCALL_PENDING  = 0
-UPCALL_MASK     = 4
+#define UPCALL_PENDING /* 0 */
+#define UPCALL_MASK       1
 
 /* Offsets in guest_trap_bounce */
 GTB_ERROR_CODE   =  0
@@ -368,12 +368,11 @@ test_all_events:
         jnz  process_hyp_events
 /*test_guest_events:*/
         movl SHARED_INFO(%ebx),%eax
-        movl UPCALL_MASK(%eax),%ecx
-        notl %ecx
-        andl UPCALL_PENDING(%eax),%ecx  # ECX = pending & ~mask
-        andl $1,%ecx                    # Is bit 0 pending and not masked?
+        testb $0xFF,UPCALL_MASK(%eax)
+        jnz  restore_all_guest
+        testb $0xFF,UPCALL_PENDING(%eax)
         jz   restore_all_guest
-        lock btsl $0,UPCALL_MASK(%eax)  # Upcalls are masked during delivery
+        movb $1,UPCALL_MASK(%eax)       # Upcalls are masked during delivery
 /*process_guest_events:*/
         movzwl PROCESSOR(%ebx),%edx
         shl  $4,%edx                    # sizeof(guest_trap_bounce) == 16
@@ -712,7 +711,11 @@ ENTRY(hypervisor_call_table)
         .long SYMBOL_NAME(do_sched_op)
         .long SYMBOL_NAME(do_dom0_op)
         .long SYMBOL_NAME(do_network_op)         /* 10 */
+#ifndef NO_DEVICES_IN_XEN
         .long SYMBOL_NAME(do_block_io_op)
+#else
+        .long SYMBOL_NAME(do_ni_syscall)
+#endif
         .long SYMBOL_NAME(do_set_debugreg)
         .long SYMBOL_NAME(do_get_debugreg)
         .long SYMBOL_NAME(do_update_descriptor)

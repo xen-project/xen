@@ -86,7 +86,25 @@ static unsigned int startup_none(unsigned int irq) { return 0; }
 static void disable_none(unsigned int irq) { }
 static void ack_none(unsigned int irq)
 {
+/*
+ * 'what should we do if we get a hw irq event on an illegal vector'.
+ * each architecture has to answer this themselves, it doesnt deserve
+ * a generic callback i think.
+ */
+#if CONFIG_X86
 	printk("unexpected IRQ trap at vector %02x\n", irq);
+#ifdef CONFIG_X86_LOCAL_APIC
+	/*
+	 * Currently unexpected vectors happen only on SMP and APIC.
+	 * We _must_ ack these because every local APIC has only N
+	 * irq slots per priority level, and a 'hanging, unacked' IRQ
+	 * holds up an irq slot - in excessive cases (when multiple
+	 * unexpected vectors occur) that might lock up the APIC
+	 * completely.
+	 */
+	ack_APIC_irq();
+#endif
+#endif
 }
 
 /* startup is the same as "enable", shutdown is same as "disable" */
@@ -322,14 +340,38 @@ static inline void get_irqlock(int cpu)
 	global_irq_holder = cpu;
 }
 
+/*
+ * A global "cli()" while in an interrupt context
+ * turns into just a local cli(). Interrupts
+ * should use spinlocks for the (very unlikely)
+ * case that they ever want to protect against
+ * each other.
+ *
+ * If we already have local interrupts disabled,
+ * this will not turn a local disable into a
+ * global one (problems with spinlocks: this makes
+ * save_flags+cli+sti usable inside a spinlock).
+ */
 void __global_cli(void)
 {
-    panic("__global_cli");
+	unsigned int flags;
+
+	__save_flags(flags);
+	if (!flags) {
+		int cpu = smp_processor_id();
+		__cli();
+		if (!local_irq_count(cpu))
+			get_irqlock(cpu);
+	}
 }
 
 void __global_sti(void)
 {
-    panic("__global_sti");
+	int cpu = smp_processor_id();
+
+	if (!local_irq_count(cpu))
+		release_irqlock(cpu);
+	__sti();
 }
 
 /*
@@ -341,12 +383,45 @@ void __global_sti(void)
  */
 unsigned long __global_save_flags(void)
 {
-    panic("__global_save_flags");
+	int retval;
+	int local_enabled;
+	unsigned long flags;
+	int cpu = smp_processor_id();
+
+	__save_flags(flags);
+	local_enabled = !flags;
+	/* default to local */
+	retval = 2 + local_enabled;
+
+	/* check for global flags if we're not in an interrupt */
+	if (!local_irq_count(cpu)) {
+		if (local_enabled)
+			retval = 1;
+		if (global_irq_holder == cpu)
+			retval = 0;
+	}
+	return retval;
 }
 
 void __global_restore_flags(unsigned long flags)
 {
-    panic("__global_restore_flags");
+	switch (flags) {
+	case 0:
+		__global_cli();
+		break;
+	case 1:
+		__global_sti();
+		break;
+	case 2:
+		__cli();
+		break;
+	case 3:
+		__sti();
+		break;
+	default:
+		printk("global_restore_flags: %08lx (%08lx)\n",
+			flags, (&flags)[-1]);
+	}
 }
 
 #endif
@@ -749,7 +824,7 @@ unsigned long probe_irq_on(void)
 	 * something may have generated an irq long ago and we want to
 	 * flush such a longstanding irq before considering it as spurious. 
 	 */
-	for (i = NR_IRQS-1; i > 0; i--)  {
+	for (i = NR_PIRQS-1; i > 0; i--)  {
 		desc = irq_desc + i;
 
 		spin_lock_irq(&desc->lock);
@@ -767,7 +842,7 @@ unsigned long probe_irq_on(void)
 	 * (we must startup again here because if a longstanding irq
 	 * happened in the previous stage, it may have masked itself)
 	 */
-	for (i = NR_IRQS-1; i > 0; i--) {
+	for (i = NR_PIRQS-1; i > 0; i--) {
 		desc = irq_desc + i;
 
 		spin_lock_irq(&desc->lock);
@@ -789,7 +864,7 @@ unsigned long probe_irq_on(void)
 	 * Now filter out any obviously spurious interrupts
 	 */
 	val = 0;
-	for (i = 0; i < NR_IRQS; i++) {
+	for (i = 0; i < NR_PIRQS; i++) {
 		irq_desc_t *desc = irq_desc + i;
 		unsigned int status;
 
@@ -834,7 +909,7 @@ unsigned int probe_irq_mask(unsigned long val)
 	unsigned int mask;
 
 	mask = 0;
-	for (i = 0; i < NR_IRQS; i++) {
+	for (i = 0; i < NR_PIRQS; i++) {
 		irq_desc_t *desc = irq_desc + i;
 		unsigned int status;
 
@@ -884,7 +959,7 @@ int probe_irq_off(unsigned long val)
 
 	nr_irqs = 0;
 	irq_found = 0;
-	for (i = 0; i < NR_IRQS; i++) {
+	for (i = 0; i < NR_PIRQS; i++) {
 		irq_desc_t *desc = irq_desc + i;
 		unsigned int status;
 

@@ -126,6 +126,7 @@ extern spinlock_t free_list_lock;
 extern unsigned int free_pfns;
 extern unsigned long max_page;
 void init_frametable(unsigned long nr_pages);
+void add_to_domain_alloc_list(unsigned long ps, unsigned long pe);
 
 struct pfn_info *alloc_domain_page(struct task_struct *p);
 void free_domain_page(struct pfn_info *page);

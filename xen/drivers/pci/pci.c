@@ -656,6 +656,7 @@ out:
 int
 pci_register_driver(struct pci_driver *drv)
 {
+#ifndef NO_DEVICES_IN_XEN
 	struct pci_dev *dev;
 	int count = 0;
 
@@ -665,6 +666,9 @@ pci_register_driver(struct pci_driver *drv)
 			count += pci_announce_device(drv, dev);
 	}
 	return count;
+#else
+	return 0;
+#endif
 }
 
 /**
@@ -680,6 +684,7 @@ pci_register_driver(struct pci_driver *drv)
 void
 pci_unregister_driver(struct pci_driver *drv)
 {
+#ifndef NO_DEVICES_IN_XEN
 	struct pci_dev *dev;
 
 	list_del(&drv->node);
@@ -690,6 +695,7 @@ pci_unregister_driver(struct pci_driver *drv)
 			dev->driver = NULL;
 		}
 	}
+#endif
 }
 
 #ifdef CONFIG_HOTPLUG

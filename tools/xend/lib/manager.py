@@ -14,10 +14,9 @@ import xend.console, xend.main, xend.utils
 ##  automatically allocated.
 ##
 def new_control_interface(dom, console_port=-1):
-    # Allocate an event channel. Clear pending notifications.
+    # Allocate an event channel and binbd to it.
     port = xend.utils.port(dom)
-    xend.main.notifier.clear(port.local_port, xend.main.notifier.NORMAL)
-    xend.main.notifier.clear(port.local_port, xend.main.notifier.DISCONNECT)
+    xend.main.notifier.bind(port.local_port)
     
     # If necessary, compute a suitable TCP port for console I/O.
     if console_port < 0:

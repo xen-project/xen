@@ -41,7 +41,7 @@
 #define TIME_SLOP      (s32)MICROSECS(50)     /* allow time to slip a bit */
 
 /*
- * XXX Pull trace-related #defines out of here and into an auto-generated
+ * TODO MAW pull trace-related #defines out of here and into an auto-generated
  * header file later on!
  */
 #define TRC_SCHED_DOM_ADD             0x00010000
@@ -68,23 +68,25 @@ static void t_timer_fn(unsigned long unused);
 static void dom_timer_fn(unsigned long data);
 static void fallback_timer_fn(unsigned long unused);
 
-/* This is global for now so that private implementations can reach it. */
+/* This is global for now so that private implementations can reach it */
 schedule_data_t schedule_data[NR_CPUS];
 
 /*
- * XXX It would be nice if the schedulers array could get populated
+ * TODO: It would be nice if the schedulers array could get populated
  * automagically without having to hack the code in here.
  */
-extern struct scheduler sched_bvt_def, sched_rrobin_def;
+extern struct scheduler sched_bvt_def, sched_rrobin_def, sched_atropos_def;
 static struct scheduler *schedulers[] = { &sched_bvt_def,
                                           &sched_rrobin_def,
+                                          &sched_atropos_def,
                                           NULL};
 
 /* Operations for the current scheduler. */
 static struct scheduler ops;
 
-#define SCHED_FN(fn, ...) \
-    ((ops.fn != NULL) ? (ops.fn(__VA_ARGS__)) : (typeof(ops.fn(__VA_ARGS__)))0)
+#define SCHED_OP(fn, ...)                                 \
+         (( ops.fn != NULL ) ? ops.fn( __VA_ARGS__ )      \
+          : (typeof(ops.fn(__VA_ARGS__)))0 )
 
 spinlock_t schedule_lock[NR_CPUS] __cacheline_aligned;
 
@@ -101,7 +103,7 @@ extern kmem_cache_t *task_struct_cachep;
 
 void free_task_struct(struct task_struct *p)
 {
-    SCHED_FN(free_task, p);
+    SCHED_OP(free_task, p);
     kmem_cache_free(task_struct_cachep, p);
 }
 
@@ -114,15 +116,15 @@ struct task_struct *alloc_task_struct(void)
 
     if ( (p = kmem_cache_alloc(task_struct_cachep,GFP_KERNEL)) == NULL )
         return NULL;
+    
+    memset(p, 0, sizeof(*p));
 
-    memset(p, 0, sizeof(*p));    
-
-    if ( SCHED_FN(alloc_task, p) < 0)
+    if ( SCHED_OP(alloc_task, p) < 0 )
     {
-        kmem_cache_free(task_struct_cachep, p);
+        kmem_cache_free(task_struct_cachep,p);
         return NULL;
     }
-    
+
     return p;
 }
 
@@ -146,7 +148,7 @@ void sched_add_domain(struct task_struct *p)
         schedule_data[p->processor].idle = p;
     }
 
-    SCHED_FN(add_task, p);
+    SCHED_OP(add_task, p);
 
     TRACE_3D(TRC_SCHED_DOM_ADD, _HIGH32(p->domain), _LOW32(p->domain), p);
 }
@@ -160,7 +162,7 @@ int sched_rem_domain(struct task_struct *p)
 
     rem_ac_timer(&p->timer);
 
-    SCHED_FN(rem_task, p);
+    SCHED_OP(rem_task, p);
 
     TRACE_3D(TRC_SCHED_DOM_REM, _HIGH32(p->domain), _LOW32(p->domain), p);
 
@@ -172,9 +174,9 @@ void init_idle_task(void)
     unsigned long flags;
     struct task_struct *p = current;
 
-    if ( SCHED_FN(alloc_task, p) < 0 )
-        panic("Failed to allocate scheduler private data for idle task");
-    SCHED_FN(add_task, p);
+    if ( SCHED_OP(alloc_task, p) < 0)
+		panic("Failed to allocate scheduler private data for idle task");
+    SCHED_OP(add_task, p);
 
     spin_lock_irqsave(&schedule_lock[p->processor], flags);
     p->has_cpu = 1;
@@ -190,12 +192,12 @@ void __wake_up(struct task_struct *p)
 
     ASSERT(p->state != TASK_DYING);
 
-    if ( unlikely(__task_on_runqueue(p)) )
+    if ( unlikely(__task_on_runqueue(p)) )        
         return;
 
     p->state = TASK_RUNNING;
 
-    SCHED_FN(wake_up, p);
+    SCHED_OP(wake_up, p);
 
 #ifdef WAKEUP_HISTO
     p->wokenup = NOW();
@@ -217,7 +219,7 @@ void wake_up(struct task_struct *p)
 static long do_block(void)
 {
     ASSERT(current->domain != IDLE_DOMAIN_ID);
-    clear_bit(0, &current->shared_info->evtchn_upcall_mask);
+    current->shared_info->vcpu_data[0].evtchn_upcall_mask = 0;
     current->state = TASK_INTERRUPTIBLE;
     TRACE_2D(TRC_SCHED_BLOCK, current->domain, current);
     __enter_scheduler();
@@ -327,15 +329,12 @@ long do_set_timer_op(unsigned long timeout_hi, unsigned long timeout_lo)
     return 0;
 }
 
+/** sched_id - fetch ID of current scheduler */
+int sched_id()
+{
+    return ops.sched_id;
+}
 
-/**
- * sched_ctl - dispatch a scheduler control operation
- * @cmd:       the command passed in the dom0 op
- *
- * Given a generic scheduler control operation, call the control function for
- * the scheduler in use, passing the appropriate control information from the
- * union supplied.
- */
 long sched_ctl(struct sched_ctl_cmd *cmd)
 {
     TRACE_0D(TRC_SCHED_CTL);
@@ -343,7 +342,7 @@ long sched_ctl(struct sched_ctl_cmd *cmd)
     if ( cmd->sched_id != ops.sched_id )
         return -EINVAL;
 
-    return SCHED_FN(control, cmd);
+    return SCHED_OP(control, cmd);
 }
 
 
@@ -355,6 +354,9 @@ long sched_adjdom(struct sched_adjdom_cmd *cmd)
     if ( cmd->sched_id != ops.sched_id )
         return -EINVAL;
 
+    if ( cmd->direction != SCHED_INFO_PUT && cmd->direction != SCHED_INFO_GET )
+        return -EINVAL;
+
     p = find_domain_by_id(cmd->domain);
 
     if( p == NULL )
@@ -362,7 +364,7 @@ long sched_adjdom(struct sched_adjdom_cmd *cmd)
 
     TRACE_2D(TRC_SCHED_ADJDOM, _HIGH32(p->domain), _LOW32(p->domain));
 
-    SCHED_FN(adjdom, p, cmd);
+    SCHED_OP(adjdom, p, cmd);
 
     put_task_struct(p); 
     return 0;
@@ -378,7 +380,7 @@ long sched_adjdom(struct sched_adjdom_cmd *cmd)
  */
 unsigned long __reschedule(struct task_struct *p)
 {
-    int cpu = p->processor;
+       int cpu = p->processor;
     struct task_struct *curr;
     s_time_t now, min_time;
 
@@ -403,7 +405,7 @@ unsigned long __reschedule(struct task_struct *p)
     if ( schedule_data[cpu].s_timer.expires > min_time + TIME_SLOP )
         mod_ac_timer(&schedule_data[cpu].s_timer, min_time);
 
-    return SCHED_FN(reschedule, p);
+    return SCHED_OP(reschedule, p);
 }
 
 void reschedule(struct task_struct *p)
@@ -412,6 +414,7 @@ void reschedule(struct task_struct *p)
 
     spin_lock_irqsave(&schedule_lock[p->processor], flags);
     cpu_mask = __reschedule(p);
+
     spin_unlock_irqrestore(&schedule_lock[p->processor], flags);
 
 #ifdef CONFIG_SMP
@@ -447,7 +450,6 @@ asmlinkage void __enter_scheduler(void)
     ASSERT(!in_interrupt());
     ASSERT(__task_on_runqueue(prev));
     ASSERT(prev->state != TASK_UNINTERRUPTIBLE);
-    ASSERT(prev != NULL);
 
     if ( prev->state == TASK_INTERRUPTIBLE )
     {
@@ -455,19 +457,16 @@ asmlinkage void __enter_scheduler(void)
         if ( signal_pending(prev) )
             prev->state = TASK_RUNNING;
         else
-            SCHED_FN(do_block, prev);
+            SCHED_OP(do_block, prev);
     }
+
+    prev->cpu_time += now - prev->lastschd;
 
     /* get policy-specific decision on scheduling... */
     next_slice = ops.do_schedule(now);
 
     r_time = next_slice.time;
-    next   = next_slice.task;
-
-    if ( likely(!is_idle_task(prev)) ) 
-        prev->cpu_time += (now - prev->lastschd);
-
-    /* now, switch to the new task... */
+    next = next_slice.task;
 
     prev->has_cpu = 0;
     next->has_cpu = 1;
@@ -511,8 +510,6 @@ asmlinkage void __enter_scheduler(void)
 
     TRACE_2D(TRC_SCHED_SWITCH, next->domain, next);
 
-    ASSERT(next->processor == current->processor);
-
     switch_to(prev, next);
     
     if ( unlikely(prev->state == TASK_DYING) ) 
@@ -547,7 +544,6 @@ int idle_cpu(int cpu)
 static void s_timer_fn(unsigned long unused)
 {
     TRACE_0D(TRC_SCHED_S_TIMER_FN);
-    
     set_bit(_HYP_EVENT_NEED_RESCHED, &current->hyp_events);
     perfc_incrc(sched_irq);
 }
@@ -556,6 +552,8 @@ static void s_timer_fn(unsigned long unused)
 static void t_timer_fn(unsigned long unused)
 {
     struct task_struct *p = current;
+
+    TRACE_0D(TRC_SCHED_T_TIMER_FN);
 
     TRACE_0D(TRC_SCHED_T_TIMER_FN);
 
@@ -638,10 +636,8 @@ void __init scheduler_init(void)
     if ( ops.do_schedule == NULL)
         panic("Chosen scheduler has NULL do_schedule!");
 
-    if ( SCHED_FN(init_scheduler) < 0 )
+    if ( SCHED_OP(init_scheduler) < 0 )
         panic("Initialising scheduler failed!");
-
-    SCHED_FN(add_task, &idle0_task);
 }
 
 /*
@@ -681,7 +677,7 @@ static void dump_rqueue(struct list_head *queue, char *name)
     list_for_each (list, queue) {
         p = list_entry(list, struct task_struct, run_list);
         printk("%3d: %llu has=%c ", loop++, p->domain, p->has_cpu ? 'T':'F');
-        SCHED_FN(dump_runq_el, p);
+        SCHED_OP(dump_runq_el, p);
         printk("c=0x%X%08X\n", (u32)(p->cpu_time>>32), (u32)p->cpu_time);
         printk("         l: %lx n: %lx  p: %lx\n",
                (unsigned long)list, (unsigned long)list->next,
@@ -697,16 +693,46 @@ void dump_runq(u_char key, void *dev_id, struct pt_regs *regs)
     int i;
 
     printk("Scheduler: %s (%s)\n", ops.name, ops.opt_name);
-    SCHED_FN(dump_settings);
+    SCHED_OP(dump_settings);
     printk("NOW=0x%08X%08X\n",  (u32)(now>>32), (u32)now); 
     for (i = 0; i < smp_num_cpus; i++) {
         spin_lock_irqsave(&schedule_lock[i], flags);
         printk("CPU[%02d] ", i);
-        SCHED_FN(dump_cpu_state,i);
+        SCHED_OP(dump_cpu_state,i);
         dump_rqueue(&schedule_data[i].runqueue, "rq"); 
         spin_unlock_irqrestore(&schedule_lock[i], flags);
     }
     return; 
+}
+
+/* print human-readable "state", given the numeric code for that state */
+void sched_prn_state(int state)
+{
+    int ret = 0;
+    
+    switch(state)
+    {
+    case TASK_RUNNING:
+        printk("Running");
+        break;
+    case TASK_INTERRUPTIBLE:
+        printk("Int sleep");
+        break;
+    case TASK_UNINTERRUPTIBLE:
+        printk("UInt sleep");
+        break;
+    case TASK_STOPPED:
+        printk("Stopped");
+        break;
+    case TASK_DYING:
+        printk("Dying");
+        break;
+    default:
+        ret = SCHED_OP(prn_state, state);
+    }
+
+    if ( ret != 0 )
+        printk("Unknown");
 }
 
 #if defined(WAKEUP_HISTO) || defined(BLOCKTIME_HISTO)
