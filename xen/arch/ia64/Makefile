@@ -3,7 +3,7 @@ include $(BASEDIR)/Rules.mk
 # libs-y	+= arch/ia64/lib/lib.a
 
 OBJS = xensetup.o setup.o time.o irq.o ia64_ksyms.o process.o smp.o \
-	xenmisc.o pdb-stub.o acpi.o \
+	xenmisc.o pdb-stub.o acpi.o hypercall.o \
 	machvec.o dom0_ops.o domain.o \
 	idle0_task.o pal.o hpsim.o efi.o efi_stub.o ivt.o mm_contig.o \
 	mm_bootmem.o sal.o cmdline.o mm_init.o tlb.o page_alloc.o slab.o \

@@ -639,6 +639,10 @@ IA64FAULT vcpu_get_ivr(VCPU *vcpu, UINT64 *pval)
 	PSCB(vcpu,irr[i]) &= ~mask;
 	PSCB(vcpu,pending_interruption)--;
 	*pval = vector;
+	// if delivering a timer interrupt, remember domain_itm
+	if (vector == (PSCB(vcpu,itv) & 0xff)) {
+		PSCB(vcpu,domain_itm_last) = PSCB(vcpu,domain_itm);
+	}
 	return IA64_NO_FAULT;
 }
 
@@ -978,8 +982,13 @@ void vcpu_pend_timer(VCPU *vcpu)
 	UINT64 itv = PSCB(vcpu,itv) & 0xff;
 
 	if (vcpu_timer_disabled(vcpu)) return;
-	if (vcpu_timer_inservice(vcpu)) return;
-#if 1
+	//if (vcpu_timer_inservice(vcpu)) return;
+	if (PSCB(vcpu,domain_itm_last) == PSCB(vcpu,domain_itm)) {
+		// already delivered an interrupt for this so
+		// don't deliver another
+		return;
+	}
+#if 0
 	// attempt to flag "timer tick before its due" source
 	{
 	UINT64 itm = PSCB(vcpu,domain_itm);

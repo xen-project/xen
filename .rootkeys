@@ -895,6 +895,7 @@
 421098b2PHgzf_Gg4R65YRNi_QzMKQ xen/arch/ia64/dom0_ops.c
 421098b2O7jsNfzQXA1v3rbAc1QhpA xen/arch/ia64/dom_fw.c
 421098b2ZlaBcyiuuPr3WpzaSDwg6Q xen/arch/ia64/domain.c
+4239e98a_HX-FCIcXtVqY0BbrDqVug xen/arch/ia64/hypercall.c
 421098b3LYAS8xJkQiGP7tiTlyBt0Q xen/arch/ia64/idle0_task.c
 421098b3ys5GAr4z6_H1jD33oem82g xen/arch/ia64/irq.c
 421098b3Heh72KuoVlND3CH6c0B0aA xen/arch/ia64/lib/Makefile
