@@ -178,13 +178,19 @@ unsigned long __get_free_pages(int mask, int order)
 
     spin_lock_irqsave(&alloc_lock, flags);
 
-    /* Found smallest order which can satisfy the request. */
-    for ( i = order; FREELIST_EMPTY(free_list[i]); i++ ) 
-    {
-        if ( i == FREELIST_SIZE ) 
-            panic("Out of memory!\n");
+
+    /* Find smallest order which can satisfy the request. */
+    for ( i = order; i < FREELIST_SIZE; i++ ) {
+	if ( !FREELIST_EMPTY(free_list[i]) ) 
+	    break;
     }
 
+    if ( i == FREELIST_SIZE )
+    {
+        printk("Cannot handle page request order %d!\n", order);
+	return NULL; 
+    }
+ 
     /* Unlink a chunk. */
     alloc_ch = free_list[i];
     free_list[i] = alloc_ch->next;
