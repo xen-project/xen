@@ -15,16 +15,27 @@
 #include <asm/domain_page.h>
 #include <hypervisor-ifs/block.h>
 
+/* Global list of all possible segments.  This can be changed in
+   the following way:
+
+   1) UNUSED segment -> RO or RW segment.  This requires the spinlock.
+
+   2) RO or RW -> UNUSED.  This requires the lock and can only happen
+   during process teardown.
+
+   This means that processes can access entries in the list safely
+   without having to hold any lock at all: they already have an entry
+   allocated, and we know that entry can't become unused, as segments
+   are only torn down when the domain is dieing, by which point it
+   can't be accessing them anymore. */
 static segment_t xsegments[XEN_MAX_SEGMENTS];
+static spinlock_t xsegment_lock = SPIN_LOCK_UNLOCKED;
 
 #if 0
 #define DPRINTK(_f, _a...) printk( _f , ## _a )
 #else
 #define DPRINTK(_f, _a...) ((void)0)
 #endif
-
-/* XXX XXX XXX Why are there absolutely no calls to any locking
-   primitives anywhere in this? */
 
 /*
  * xen_segment_map_request
@@ -33,6 +44,12 @@ static segment_t xsegments[XEN_MAX_SEGMENTS];
  * 
  * NB. All offsets and sizes here are in sector units.
  * eg. 'size == 1' means an actual size of 512 bytes.
+ *
+ * Note that no locking is performed here whatsoever --
+ * we rely on the fact that once segment information is
+ * established, it is only modified by domain shutdown,
+ * and so if this is being called, noone is trying
+ * to modify the segment list.
  */
 int xen_segment_map_request(
     phys_seg_t *pseg, struct task_struct *p, int operation,
@@ -162,6 +179,8 @@ void xen_segment_probe(struct task_struct *p, xen_disk_info_t *raw_xdi)
     xen_disk_info_t *xdi = map_domain_mem(virt_to_phys(raw_xdi));
     unsigned long capacity = 0, device;
 
+    spin_lock(&xsegment_lock);
+    xdi->count = 0;
     for ( loop = 0; loop < XEN_MAX_SEGMENTS; loop++ )
     {
         if ( (xsegments[loop].mode == XEN_SEGMENT_UNUSED) ||
@@ -176,6 +195,7 @@ void xen_segment_probe(struct task_struct *p, xen_disk_info_t *raw_xdi)
         xdi->disks[xdi->count].capacity = capacity;
         xdi->count++;
     }
+    spin_unlock(&xsegment_lock);
 
     unmap_domain_mem(xdi);
 }
@@ -190,6 +210,7 @@ void xen_segment_probe_all(xen_segment_info_t *raw_xsi)
     int loop;
     xen_segment_info_t *xsi = map_domain_mem(virt_to_phys(raw_xsi));
 
+    spin_lock(&xsegment_lock);
     xsi->count = 0;
     for ( loop = 0; loop < XEN_MAX_SEGMENTS; loop++ )
     {
@@ -204,6 +225,7 @@ void xen_segment_probe_all(xen_segment_info_t *raw_xsi)
 	xsi->segments[xsi->count].seg_nr = xsegments[loop].segment_number;
         xsi->count++;	
     }
+    spin_unlock(&xsegment_lock);
 
     unmap_domain_mem(xsi);
 }
@@ -213,11 +235,13 @@ void xen_segment_probe_all(xen_segment_info_t *raw_xsi)
  *
  * find all segments associated with a domain and assign
  * them to the domain
+ *
  */
 void xen_refresh_segment_list (struct task_struct *p)
 {
     int loop;
 
+    spin_lock(&xsegment_lock);
     for (loop = 0; loop < XEN_MAX_SEGMENTS; loop++)
     {
         if ( (xsegments[loop].mode == XEN_SEGMENT_UNUSED) ||
@@ -226,6 +250,7 @@ void xen_refresh_segment_list (struct task_struct *p)
 
         p->segment_list[xsegments[loop].segment_number] = &xsegments[loop];
     }
+    spin_unlock(&xsegment_lock);
 }
 
 /*
@@ -244,6 +269,7 @@ int xen_segment_create(xv_disk_t *xvd_in)
     xv_disk_t *xvd = map_domain_mem(virt_to_phys(xvd_in));
     struct task_struct *p;
 
+    spin_lock(&xsegment_lock);
     for (idx = 0; idx < XEN_MAX_SEGMENTS; idx++)
     {
         if (xsegments[idx].mode == XEN_SEGMENT_UNUSED ||
@@ -262,8 +288,10 @@ int xen_segment_create(xv_disk_t *xvd_in)
     xsegments[idx].segment_number = xvd->segment;
     memcpy(xsegments[idx].key, xvd->key, XEN_SEGMENT_KEYSIZE);
     xsegments[idx].num_extents = xvd->ext_count;
+
+
     if (xsegments[idx].extents)
-	kfree(xsegments[idx].extents);
+	kfree(xsegments[idx].extents);    
     xsegments[idx].extents = (extent_t *)kmalloc(
         sizeof(extent_t)*xvd->ext_count,
         GFP_KERNEL);
@@ -290,6 +318,8 @@ int xen_segment_create(xv_disk_t *xvd_in)
         put_task_struct(p);
     }
 
+    spin_unlock(&xsegment_lock);
+
     unmap_domain_mem(xvd);
     return 0;
 }
@@ -299,6 +329,8 @@ int xen_segment_create(xv_disk_t *xvd_in)
  *
  * return 0 on success, 1 on failure
  *
+ * This should *only* be called from domain shutdown, or else we
+ * race with access checking.
  */
 int xen_segment_delete(struct task_struct *p, int segnr)
 {
@@ -330,11 +362,15 @@ int xen_segment_delete(struct task_struct *p, int segnr)
 	return 1;
     }
 
+    spin_lock(&xsegment_lock);
+
     p->segment_list[segnr] = NULL;
     seg->domain = -1;
     seg->segment_number = -1;
     kfree(seg->extents);
     seg->mode = XEN_SEGMENT_UNUSED;
+
+    spin_unlock(&xsegment_lock);
 
     return 0;
 }
