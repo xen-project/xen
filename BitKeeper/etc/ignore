@@ -534,3 +534,4 @@ xen/drivers/scsi/sym53c8xx_2/sym_hipd.o
 xen/drivers/scsi/sym53c8xx_2/sym_malloc.o
 xen/drivers/scsi/sym53c8xx_2/sym_misc.o
 xen/drivers/scsi/sym53c8xx_2/sym_nvram.o
+xen/arch/i386/flushtlb.o
