@@ -297,6 +297,7 @@
 3ddb79c0c0cX_DZE209-Bb-Rx1v-Aw xen/include/xeno/cache.h
 3e9c248aEG_nCngztiFmv5CfayNkcA xen/include/xeno/cdrom.h
 3ddb79c259jh8hE7vre_8NuE7nwNSA xen/include/xeno/config.h
+3eb165e0eawr3R-p2ZQtSdLWtLRN_A xen/include/xeno/console.h
 3ddb79c1V44RD26YqCUm-kqIupM37A xen/include/xeno/ctype.h
 3ddb79c05DdHQ0UxX_jKsXdR4QlMCA xen/include/xeno/delay.h
 3ddb79c2PMeWTK86y4C3F4MzHw4A1g xen/include/xeno/dom0_ops.h
@@ -415,7 +416,6 @@
 3ea53c6em6uzVHSiGqrbbAVofyRY_g xenolinux-2.4.21-pre4-sparse/drivers/block/genhd.c
 3e5a4e66mrtlmV75L1tjKDg8RaM5gA xenolinux-2.4.21-pre4-sparse/drivers/block/ll_rw_blk.c
 3ead095dEkj9JJWYYBnbvW3OYbKFxg xenolinux-2.4.21-pre4-sparse/drivers/char/Config.in
-3ead095d00j61GCBaYdu_SwmY-vdSQ xenolinux-2.4.21-pre4-sparse/drivers/char/Makefile
 3ead095dPseRoFELVf_xcnVXjq02hw xenolinux-2.4.21-pre4-sparse/drivers/char/dummy_console.c
 3e5a4e66rw65CxyolW9PKz4GG42RcA xenolinux-2.4.21-pre4-sparse/drivers/char/tty_io.c
 3e5a4e669uzIE54VwucPYtGwXLAbzA xenolinux-2.4.21-pre4-sparse/fs/exec.c

@@ -31,10 +31,12 @@
 
 #define AUX_IRQ 12
 
+#undef KBD_DEBUG
 
 /* THIS SECTION DEALS WITH CONFIG_XEN_ATTENTION_KEY */
 
-// always set for now.  potentially moved to config.in later.
+// always set for now.  potentially moved to a central config later.
+// this should really affect common/keyhandler.c too
 #define CONFIG_XEN_ATTENTION_KEY
 
 #ifdef CONFIG_XEN_ATTENTION_KEY
@@ -42,8 +44,6 @@
 static int xen_attention_key_down = 0;
 #define XEN_ATTENTION_KEY 0x46 // scroll lock
 #define KBD_SCANCODE_KEYUP_MASK 0x80
-
-#undef KBD_DEBUG
 
 /* naive scancode -> key mappings for internal xen use */
 
@@ -144,7 +144,7 @@ static unsigned char convert_scancode (unsigned char scancode)
 #endif /* CONFIG_XEN_ATTENTION_KEY */
 
 
-/* THIS SECTION DEALS WITH STORING A RING OF PENDING EVENTS */
+/* THIS SECTION DEALS WITH STORING A RING OF PENDING KBD EVENTS */
 
 // store kbd events waiting to be processed by guest os
 #define KBD_RING_SIZE        64 
@@ -179,9 +179,7 @@ static int kbd_ring_pop() {
 
 /* THIS SECTION DEALS WITH COMMUNICATING PS2 EVENTS/CMDS WITH GUEST OS */
 
-// ownership of keyboard - current defaulting to dom0
-#define KBD_ISOWNER(p) (p->domain == 0) 
-#define KBD_OWNER find_domain_by_id(0) 
+#include <xeno/console.h>
 
 // need lock as there may be _two_ interrupts at play, keyboard and mouse, as well as guest os actions
 static spinlock_t kbd_lock;
@@ -194,7 +192,7 @@ long do_kbd_op(unsigned char op, unsigned char val)
   printk("do_kbd_op: op %2x, val %2x, prod %d, cons %d\n", op, val, kbd_ring_prod, kbd_ring_cons); 
 #endif
 
-  if ( !KBD_ISOWNER(current) ) return -EPERM;  
+  if ( !CONSOLE_ISOWNER(current) ) return -EPERM;  
 
   switch(op) {
   case KBD_OP_WRITEOUTPUT:
@@ -225,6 +223,7 @@ static void keyboard_interrupt(int irq, void *dev_id, struct pt_regs *regs)
   unsigned long flags;
   spin_lock_irqsave(&kbd_lock, flags);
   status = kbd_read_status();
+
 #ifdef KBD_DEBUG
     printk("keyboard_interrupt irq %d, status 0x%2x\n", irq, status);
 #endif
@@ -241,10 +240,14 @@ static void keyboard_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 	  //printk("xen_attention_key_down %d\n", xen_attention_key_down);
 	} else if (xen_attention_key_down) {
 	  key_handler *handler; 
-	  unsigned char key = convert_scancode(scancode); 
+	  unsigned char key;
+
+	  spin_unlock_irqrestore(&kbd_lock, flags);
+	  key = convert_scancode(scancode); 
 	  if(key && (handler = get_key_handler(key))) 
 	    (*handler)(key, dev_id, regs); 
 	  
+	  spin_lock_irqsave(&kbd_lock, flags);
 	  status = kbd_read_status();
 	  continue; // do not send key to guest os
 	}
@@ -254,11 +257,11 @@ static void keyboard_interrupt(int irq, void *dev_id, struct pt_regs *regs)
       if (!(status & (KBD_STAT_GTO | KBD_STAT_PERR))) {
 	kbd_ring_push(status, scancode);
 
-	cpu_mask = mark_guest_event(KBD_OWNER, _EVENT_KBD);
+	cpu_mask = mark_guest_event(CONSOLE_OWNER, _EVENT_KBD);
         guest_event_notify(cpu_mask);
 
 	status = kbd_read_status();
-	scancode = kbd_read_input();
+	//scancode = kbd_read_input();
       }
     }
     

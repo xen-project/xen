@@ -15,6 +15,7 @@
 #include <asm/byteorder.h>
 #include <linux/if_ether.h>
 #include <asm/domain_page.h>
+#include <xeno/console.h>
 
 static int xpos, ypos;
 static volatile unsigned char *video;
@@ -32,6 +33,7 @@ void init_serial(void);
 void start_of_day(void);
 
 /* Command line options and variables. */
+int opt_console = 1;
 unsigned int opt_ser_baud = 9600;  /* default baud for COM1 */
 unsigned int opt_dom0_mem = 16000; /* default kbytes for DOM0 */
 unsigned int opt_ne_base = 0; /* NE2k NICs cannot be probed */
@@ -43,6 +45,7 @@ static struct {
     int type;
     void *var;
 } opts[] = {
+    { "console",  OPT_BOOL, &opt_console },
     { "ser_baud", OPT_UINT, &opt_ser_baud },
     { "dom0_mem", OPT_UINT, &opt_dom0_mem }, 
     { "ne_base",  OPT_UINT, &opt_ne_base },
@@ -219,6 +222,7 @@ void cmain (unsigned long magic, multiboot_info_t *mbi)
 
 void init_serial(void)
 {
+#ifdef CONFIG_OUTPUT_SERIAL
     /* 'opt_ser_baud' baud, no parity, 1 stop bit, 8 data bits. */
     outb(0x83, SERIAL_BASE+DATA_FORMAT);
     outb(115200/opt_ser_baud, SERIAL_BASE+DIVISOR_LO);
@@ -227,15 +231,18 @@ void init_serial(void)
 
     /* No interrupts. */
     outb(0x00, SERIAL_BASE+INT_ENABLE);
+#endif
 }
 
 
 void putchar_serial(unsigned char c)
 {
+#ifdef CONFIG_OUTPUT_SERIAL
     if ( c == '\n' ) putchar_serial('\r');
     if ( (c != '\n') && (c != '\r') && ((c < 32) || (c > 126)) ) return;
     while ( !(inb(SERIAL_BASE+LINE_STATUS)&(1<<5)) ) barrier();
     outb(c, SERIAL_BASE+TX_HOLD);
+#endif
 }
 
 
@@ -248,6 +255,7 @@ void putchar_serial(unsigned char c)
 /* This is actually code from vgaHWRestore in an old version of XFree86 :-) */
 void init_vga(void)
 {
+#ifdef CONFIG_OUTPUT_CONSOLE
     /* The following VGA state was saved from a chip in text mode 3. */
     static unsigned char regs[] = {
         /* Sequencer registers */
@@ -266,79 +274,92 @@ void init_vga(void)
     int i, j = 0;
     volatile unsigned char tmp;
 
-    tmp = inb(0x3da);
-    outb(0x00, 0x3c0);
-
-    for ( i = 0; i < 5;  i++ )
+    if(opt_console) {
+      tmp = inb(0x3da);
+      outb(0x00, 0x3c0);
+      
+      for ( i = 0; i < 5;  i++ )
         outw((regs[j++] << 8) | i, 0x3c4);
-  
-    /* Ensure CRTC registers 0-7 are unlocked by clearing bit 7 of CRTC[17]. */
-    outw(((regs[5+17] & 0x7F) << 8) | 17, 0x3d4);
-    
-    for ( i = 0; i < 25; i++ ) 
+      
+      /* Ensure CRTC registers 0-7 are unlocked by clearing bit 7 of CRTC[17]. */
+      outw(((regs[5+17] & 0x7F) << 8) | 17, 0x3d4);
+      
+      for ( i = 0; i < 25; i++ ) 
         outw((regs[j++] << 8) | i, 0x3d4);
-    
-    for ( i = 0; i < 9;  i++ )
+      
+      for ( i = 0; i < 9;  i++ )
         outw((regs[j++] << 8) | i, 0x3ce);
-    
-    for ( i = 0; i < 21; i++ )
-    {
-        tmp = inb(0x3da);
-        outb(i, 0x3c0); 
-        outb(regs[j++], 0x3c0);
+      
+      for ( i = 0; i < 21; i++ )
+	{
+	  tmp = inb(0x3da);
+	  outb(i, 0x3c0); 
+	  outb(regs[j++], 0x3c0);
+	}
+      
+      tmp = inb(0x3da);
+      outb(0x20, 0x3c0);
     }
-
-    tmp = inb(0x3da);
-    outb(0x20, 0x3c0);
+#endif
 }
 
 
 /* Clear the screen and initialize VIDEO, XPOS and YPOS.  */
 void cls(void)
 {
+#ifdef CONFIG_OUTPUT_CONSOLE
     int i;
 
-    video = (unsigned char *) VIDEO;
-  
-    for (i = 0; i < COLUMNS * LINES * 2; i++)
+    if(opt_console) {
+      video = (unsigned char *) VIDEO;
+      
+      for (i = 0; i < COLUMNS * LINES * 2; i++)
         *(video + i) = 0;
-
-    xpos = 0;
-    ypos = 0;
-
-    outw(10+(1<<(5+8)), 0x3d4); /* cursor off */
+      
+      xpos = 0;
+      ypos = 0;
+      
+      outw(10+(1<<(5+8)), 0x3d4); /* cursor off */
+    }
+#endif
 }
 
 
 /* Put the character C on the screen.  */
 static void putchar (int c)
 {
+#ifdef CONFIG_OUTPUT_CONSOLE
     static char zeroarr[2*COLUMNS] = { 0 };
+#endif
 
     putchar_serial(c);
 
-    if (c == '\n' || c == '\r')
-    {
-    newline:
-        xpos = 0;
-        ypos++;
-        if (ypos >= LINES)
-        {
-            ypos = LINES-1;
-            memcpy((char*)video, 
-                   (char*)video + 2*COLUMNS, (LINES-1)*2*COLUMNS);
-            memcpy((char*)video + (LINES-1)*2*COLUMNS, 
-                   zeroarr, 2*COLUMNS);
-        }
-        return;
-    }
-
-    *(video + (xpos + ypos * COLUMNS) * 2) = c & 0xFF;
-    *(video + (xpos + ypos * COLUMNS) * 2 + 1) = ATTRIBUTE;
-
-    xpos++;
-    if (xpos >= COLUMNS)
+#ifdef CONFIG_OUTPUT_CONSOLE
+    if(opt_console) {
+      if (c == '\n' || c == '\r')
+	{
+	newline:
+	  xpos = 0;
+	  ypos++;
+	  if (ypos >= LINES)
+	    {
+	      ypos = LINES-1;
+	      memcpy((char*)video, 
+		     (char*)video + 2*COLUMNS, (LINES-1)*2*COLUMNS);
+	      memcpy((char*)video + (LINES-1)*2*COLUMNS, 
+		     zeroarr, 2*COLUMNS);
+	    }
+	  return;
+	}
+      
+      *(video + (xpos + ypos * COLUMNS) * 2) = c & 0xFF;
+      *(video + (xpos + ypos * COLUMNS) * 2 + 1) = ATTRIBUTE;
+      
+      xpos++;
+      if (xpos >= COLUMNS)
         goto newline;
+    }
+#endif
 }
 
 static inline void __putstr(const char *str)
