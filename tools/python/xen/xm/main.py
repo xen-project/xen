@@ -444,5 +444,15 @@ class ProgConsole(Prog):
 
 xm.prog(ProgConsole)
 
+class ProgDmesg(Prog):
+    group = 'host'
+    name  =  "dmesg"
+    info  = """Print Xen boot output."""
+
+    def main(self, args):
+        print server.xend_dmesg()[1]
+
+xm.prog(ProgDmesg)
+
 def main(args):
     xm.main(args)

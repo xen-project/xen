@@ -252,6 +252,7 @@
 40c9c4688m3eqnC8fhLu1APm36VOVA tools/python/xen/xend/XendClient.py
 40c9c468t6iIKTjwuYoe-UMCikDcOQ tools/python/xen/xend/XendConsole.py
 40c9c468WnXs6eOUSff23IIGI4kMfQ tools/python/xen/xend/XendDB.py
+40eee3a0sPO-WUu34uHUXOC7HliDGw tools/python/xen/xend/XendDmesg.py
 40c9c468fSl3H3IypyT0ppkbb0ZT9A tools/python/xen/xend/XendDomain.py
 40c9c468bbKq3uC7_fuNUkiMMjArdw tools/python/xen/xend/XendDomainConfig.py
 40c9c4685ykq87_n1kVUbMr9flx9fg tools/python/xen/xend/XendDomainInfo.py
@@ -267,6 +268,7 @@
 40c9c468woSmBByfeXA4o_jGf2gCgA tools/python/xen/xend/server/SrvDaemon.py
 40c9c468kACsmkqjxBWKHRo071L26w tools/python/xen/xend/server/SrvDeviceDir.py
 40c9c468EQZJVkCLds-OhesJVVyZbQ tools/python/xen/xend/server/SrvDir.py
+40eee3a0m38EwYXfCSFIjWNwG6jx_A tools/python/xen/xend/server/SrvDmesg.py
 40c9c468TyHZUq8sk0FF_vxM6Sozrg tools/python/xen/xend/server/SrvDomain.py
 40c9c469WzajDjutou3X7FmL9hMf3g tools/python/xen/xend/server/SrvDomainDir.py
 40c9c469-8mYEJJTAR6w_ClrJRAfwQ tools/python/xen/xend/server/SrvEventDir.py

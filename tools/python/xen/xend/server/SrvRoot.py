@@ -15,6 +15,7 @@ class SrvRoot(SrvDir):
     subdirs = [
         ('node',    'SrvNode'       ),
         ('domain',  'SrvDomainDir'  ),
+        ('dmesg',   'SrvDmesg'      ),
         ('console', 'SrvConsoleDir' ),
         ('event',   'SrvEventDir'   ),
         ('device',  'SrvDeviceDir'  ),
