@@ -1933,9 +1933,7 @@ vortex_start_xmit(struct sk_buff *skb, struct net_device *dev)
 		/* netif_wake_queue() will be called at the DMADone interrupt. */
 	} else {
 		/* ... and the packet rounded to a doubleword. */
-		char *vdata = map_domain_mem(__pa(skb->data));
-		outsl(ioaddr + TX_FIFO, vdata, (skb->len + 3) >> 2);
-		unmap_domain_mem(vdata);
+		outsl(ioaddr + TX_FIFO, skb->data, (skb->len + 3) >> 2);
 		dev_kfree_skb (skb);
 		if (inw(ioaddr + TxFree) > 1536) {
 			netif_start_queue (dev);	/* AKPM: redundant? */
