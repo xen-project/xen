@@ -50,6 +50,17 @@ static int vgacon_enabled = 0;
 
 spinlock_t console_lock = SPIN_LOCK_UNLOCKED;
 
+#ifndef NDEBUG
+static unsigned char *sercon_buffer      = NULL;
+static unsigned char *sercon_buffer_end  = NULL;
+static unsigned char *sercon_buffer_head = NULL;
+static unsigned char *sercon_buffer_next = NULL;
+
+static unsigned int opt_sercon_buffer_size = 128; /* kbytes */
+integer_param("conbuf", opt_sercon_buffer_size);
+
+static void sercon_buffer_puts(const unsigned char *s);
+#endif
 
 /*
  * *******************************************************
@@ -253,9 +264,13 @@ static void switch_serial_input(void)
     static char *input_str[2] = { "DOM0", "Xen" };
     xen_rx = !xen_rx;
     if ( SWITCH_CODE != 0 )
+    {
+        int buffer_enable = sercon_buffer_bypass();
         printk("*** Serial input -> %s "
                "(type 'CTRL-%c' three times to switch input to %s).\n",
                input_str[xen_rx], opt_conswitch[0], input_str[!xen_rx]);
+        sercon_buffer_set(buffer_enable);
+    }
 }
 
 static void __serial_rx(unsigned char c, struct xen_regs *regs)
@@ -352,7 +367,14 @@ long do_console_io(int cmd, int count, char *buffer)
 static inline void __putstr(const char *str)
 {
     int c;
-    serial_puts(sercon_handle, str);
+
+#ifndef NDEBUG
+    if ( sercon_handle & SERHND_BUFFERED )
+        sercon_buffer_puts(str);
+    else
+#endif
+        serial_puts(sercon_handle, str);
+
     while ( (c = *str++) != '\0' )
     {
         putchar_console(c);
@@ -462,20 +484,134 @@ void console_force_lock(void)
     spin_lock(&console_lock);
 }
 
+// 09Feb2005: this appears to be unused...
 void console_putc(char c)
 {
     serial_putc(sercon_handle, c);
 }
 
+// 09Feb2005: this appears to be unused...
 int console_getc(void)
 {
     return serial_getc(sercon_handle);
 }
 
+// 09Feb2005: this appears to be unused...
 int irq_console_getc(void)
 {
     return irq_serial_getc(sercon_handle);
 }
+
+
+/*
+ * **************************************************************
+ * *************** serial console ring buffer *******************
+ * **************************************************************
+ */
+
+#ifndef NDEBUG
+static void sercon_buffer_putc(const unsigned char c)
+{
+    if ( !sercon_buffer )
+        return;
+    if ( !c )
+        return;
+
+    if ( sercon_buffer_next == sercon_buffer_end )
+    {
+        // buffer wrap-around case...
+        sercon_buffer_head = sercon_buffer + 1;
+        sercon_buffer_next = sercon_buffer;
+    }
+    if ( sercon_buffer_head == sercon_buffer_next + 1 )
+    {
+        // the buffer is already full...
+        sercon_buffer_head++;
+    }
+    *sercon_buffer_next++ = c;
+    *sercon_buffer_next = 0;
+}
+
+static void sercon_buffer_puts(const unsigned char *s)
+{
+    // inefficient but simple...
+    while ( *s )
+        sercon_buffer_putc(*s++);
+}
+
+static void sercon_buffer_reset(void)
+{
+    sercon_buffer_head = sercon_buffer;
+    sercon_buffer_next = sercon_buffer;
+    sercon_buffer_head[0] = 0;
+}
+
+static void sercon_buffer_flush(void)
+{
+    serial_puts(sercon_handle, sercon_buffer_head);
+    if ( sercon_buffer_head != sercon_buffer )
+        serial_puts(sercon_handle, sercon_buffer);
+    sercon_buffer_reset();
+}
+
+void _sercon_buffer_dump(void)
+{
+    sercon_buffer_flush();
+    sercon_handle &= ~SERHND_BUFFERED;
+}
+
+void sercon_buffer_toggle(unsigned char key)
+{
+    if ( !sercon_buffer )
+    {
+        printk("serial console buffer not allocated\n");
+        return;
+    }
+
+    if ( sercon_handle & SERHND_BUFFERED )
+        sercon_buffer_flush();
+    sercon_handle ^= SERHND_BUFFERED;
+}
+
+void _sercon_buffer_set(int enable)
+{
+    if (enable)
+        sercon_handle |= SERHND_BUFFERED;
+    else
+        sercon_handle &= ~SERHND_BUFFERED;
+}
+
+int _sercon_buffer_bypass(void)
+{
+    int buffering = !!(sercon_handle & SERHND_BUFFERED);
+    sercon_handle &= ~SERHND_BUFFERED;
+
+    return buffering;
+}
+
+static int __init sercon_buffer_init(void)
+{
+    int order;
+    int kbytes = opt_sercon_buffer_size;
+
+    if ( !kbytes )
+        return 0;
+
+    order = get_order(kbytes * 1024);
+    sercon_buffer = (void *)alloc_xenheap_pages(order);
+    ASSERT( sercon_buffer );
+
+    sercon_buffer_end = sercon_buffer + kbytes*1024 - 1;
+    *sercon_buffer_end = 0;
+
+    sercon_buffer_reset();
+    sercon_handle |= SERHND_BUFFERED;
+
+    return 0;
+}
+__initcall(sercon_buffer_init);
+
+#endif /* not NDEBUG */
 
 
 /*
@@ -508,6 +644,8 @@ void panic(const char *fmt, ...)
     spin_unlock_irqrestore(&console_lock, flags);
 
     watchdog_on = 0;
+    sercon_buffer_dump();
+
     mdelay(5000);
     machine_restart(0);
 }
