@@ -670,6 +670,50 @@ administration privileges.
 IO privileges can be assigned to allow a domain to drive PCI devices
 itself.  This is used for to support driver domains.
 
+Setting backend privileges is currently only supported in SXP format
+config files (??? is this true - there's nothing in xmdefaults,
+anyhow).  To allow a domain to function as a backend for others,
+somewhere within the {\tt vm} element of its configuration file must
+be a {\tt backend} element of the form {\tt (backend ({\em type}))}
+where {\tt \em type} may be either {\tt netif} or {\tt blkif},
+according to the type of virtual device this domain will service.
+After this domain has been built, Xend will connect all new and
+existing {\em virtual} devices (of the appropriate type) to that
+backend.
+
+Note that:
+\begin{itemize}
+\item a block backend cannot import virtual block devices from other
+domains
+\item a network backend cannot import virtual network devices from
+other domains
+\end{itemize}
+
+Thus (particularly in the case of block backends, which cannot import
+a virtual block device as their root filesystem), you may need to boot
+a backend domain from a ramdisk or a network device.
+
+The privilege to drive PCI devices may also be specified on a
+per-device basis.  Xen will assign the minimal set of hardware
+privileges to a domain that are required to control its devices.  This
+can be configured in either format of configuration file:
+
+\begin{itemize}
+\item SXP Format:
+  Include {\tt device} elements
+  {\tt (device (pci (bus {\em x}) (dev {\em y}) (func {\em z}))) } \\
+  inside the top-level {\tt vm} element.  Each one specifies the address
+  of a device this domain is allowed to drive ---
+  the numbers {\em x},{\em y} and {\em z} may be in either decimal or
+  hexadecimal format.
+\item Flat Format: Include a list of PCI device addresses of the
+  format: \\ {\tt pci = ['x,y,z', ...] } \\ where each element in the
+  list is a string specifying the components of the PCI device
+  address, separated by commas.  The components ({\tt \em x}, {\tt \em
+  y} and {\tt \em z}) of the list may be formatted as either decimal
+  or hexadecimal.
+\end{itemize}
+
 \section{Administration Domains}
 
 Administration privileges allow a domain to use the ``dom0
@@ -811,5 +855,45 @@ taking ownership of them so that they can be driven by another
 domain).  Device IDs should be given in hex format.  Bridge devices do
 not need to be hidden --- they are hidden implicitly, since guest OSes
 do not need to configure them.
+
+\chapter{Further Support}
+
+If you have questions that are not answered by this manual, the
+sources of information listed below may be of interest to you.  Note
+that bug reports, suggestions and contributions related to the
+software (or the documentation) should be sent to the Xen developers'
+mailing list (address below).
+
+\section{Other documentation}
+
+For developers interested in porting operating systems to Xen, the
+{\em Xen Interface Manual} is distributed in the \path{docs/}
+directory of the Xen source distribution.
+
+\section{Online references}
+
+The official Xen web site is found at: \\
+{\tt
+http://www.cl.cam.ac.uk/Research/SRG/netos/xen/] }.
+
+Links to other
+documentation sources are listed at: \\ {\tt
+http://www.cl.cam.ac.uk/Research/SRG/netos/xen/documentation.html}.
+
+\section{Mailing lists}
+
+There are currently two official Xen mailing lists:
+
+\begin{description}
+\item[xen-devel@lists.sourceforge.net] Used for development
+discussions and requests for help.  Subscribe at: \\
+http://lists.sourceforge.net/mailman/listinfo/xen-devel
+\item[xen-announce@lists.sourceforge.net] Used for announcements only.
+Subscribe at: \\ http://lists.sourceforge.net/mailman/listinfo/xen-announce
+\end{description}
+
+Although there is no specific user support list, the developers try to
+assist users who post on xen-devel.  As the bulk of traffic on this
+list increases, a dedicated user support list may be introduced.
 
 \end{document}
