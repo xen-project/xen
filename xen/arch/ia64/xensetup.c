@@ -20,6 +20,7 @@
 //#include <xen/console.h>
 //#include <xen/serial.h>
 #include <xen/trace.h>
+#include <linux/interrupt.h>
 //#include <asm/shadow.h>
 //#include <asm/io.h>
 //#include <asm/uaccess.h>
@@ -291,6 +292,7 @@ void cmain(multiboot_info_t *mbi)
 			SLAB_HWCACHE_ALIGN|SLAB_PANIC, NULL, NULL);
 printk("About to call scheduler_init()\n");
     scheduler_init();
+    cli();
 printk("About to call time_init()\n");
     time_init();
 printk("About to call ac_timer_init()\n");
@@ -410,6 +412,7 @@ printk("About to call init_trace_bufs()\n");
 #endif
     domain_unpause_by_systemcontroller(dom0);
     domain0_ready = 1;
+    sti();
 printk("About to call startup_cpu_idle_loop()\n");
     startup_cpu_idle_loop();
 }
