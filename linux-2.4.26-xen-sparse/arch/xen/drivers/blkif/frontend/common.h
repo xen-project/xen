@@ -22,7 +22,6 @@
 #include <linux/major.h>
 
 #include <asm/hypervisor-ifs/hypervisor-if.h>
-#include <asm/hypervisor-ifs/vbd.h>
 #include <asm/io.h>
 #include <asm/atomic.h>
 #include <asm/uaccess.h>

@@ -69,9 +69,9 @@ extern struct perfcounter_t perfcounters;
 
 #else /* PERF_COUNTERS */
 
-#define perfc_value(x)    ((void)0)
-#define perfc_valuec(x)   ((void)0)
-#define perfc_valuea(x,y) ((void)0)
+#define perfc_value(x)    (0)
+#define perfc_valuec(x)   (0)
+#define perfc_valuea(x,y) (0)
 #define perfc_set(x,v)    ((void)0)
 #define perfc_setc(x,v)   ((void)0)
 #define perfc_seta(x,y,v) ((void)0)

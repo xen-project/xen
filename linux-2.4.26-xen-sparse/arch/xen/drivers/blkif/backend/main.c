@@ -239,13 +239,13 @@ static int do_block_io_op(blkif_t *blkif, int max_to_do)
 {
     blkif_ring_t *blk_ring = blkif->blk_ring_base;
     blkif_request_t *req;
-    BLK_RING_IDX i;
+    BLKIF_RING_IDX i;
     int more_to_do = 0;
 
     /* Take items off the comms ring, taking care not to overflow. */
     for ( i = blkif->blk_req_cons; 
           (i != blk_ring->req_prod) && ((i-blkif->blk_resp_prod) != 
-                                        BLK_RING_SIZE);
+                                        BLKIF_RING_SIZE);
           i++ )
     {
         if ( (max_to_do-- == 0) || (NR_PENDING_REQS == MAX_PENDING_REQS) )
@@ -254,7 +254,7 @@ static int do_block_io_op(blkif_t *blkif, int max_to_do)
             break;
         }
         
-        req = &blk_ring->ring[MASK_BLK_IDX(i)].req;
+        req = &blk_ring->ring[MASK_BLKIF_IDX(i)].req;
         switch ( req->operation )
         {
         case BLKIF_OP_READ:
@@ -466,7 +466,7 @@ static void make_response(blkif_t *blkif, unsigned long id,
     /* Place on the response ring for the relevant domain. */ 
     spin_lock_irqsave(&blkif->blk_ring_lock, flags);
     resp = &blkif->blk_ring_base->
-        ring[MASK_BLK_IDX(blkif->blk_resp_prod)].resp;
+        ring[MASK_BLKIF_IDX(blkif->blk_resp_prod)].resp;
     resp->id        = id;
     resp->operation = op;
     resp->status    = st;

@@ -335,7 +335,6 @@ int xc_netbsd_build(int xc_handle,
     memset( &launch_op, 0, sizeof(launch_op) );
 
     launch_op.u.builddomain.domain   = (domid_t)domid;
-    launch_op.u.builddomain.num_vifs = 1;
     launch_op.u.builddomain.ctxt = ctxt;
     launch_op.cmd = DOM0_BUILDDOMAIN;
     rc = do_dom0_op(xc_handle, &launch_op);

@@ -592,7 +592,6 @@ int xc_linux_restore(int xc_handle,
    
     op.cmd = DOM0_BUILDDOMAIN;
     op.u.builddomain.domain   = (domid_t)dom;
-    op.u.builddomain.num_vifs = 1;
     op.u.builddomain.ctxt = &ctxt;
     rc = do_dom0_op(xc_handle, &op);
 

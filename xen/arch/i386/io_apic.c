@@ -208,78 +208,7 @@ static void set_ioapic_affinity (unsigned int irq, unsigned long mask)
 	spin_unlock_irqrestore(&ioapic_lock, flags);
 }
 
-/*
- * In new I/O model, the interrupt is pinned to the CPU of the first
- * device-driver domain that attaches. Dynamic balancing is pointless.
- */
-#if defined(CONFIG_SMP) && defined(OLD_DRIVERS)
-
-typedef struct {
-	unsigned int cpu;
-	unsigned long timestamp;
-} ____cacheline_aligned irq_balance_t;
-
-static irq_balance_t irq_balance[NR_IRQS] __cacheline_aligned
-			= { [ 0 ... NR_IRQS-1 ] = { 0, 0 } };
-
-extern unsigned long irq_affinity [NR_IRQS];
-
-#define IDLE_ENOUGH(cpu,now) \
-		(idle_cpu(cpu) && ((now) - irq_stat[(cpu)].idle_timestamp > 1))
-
-#define IRQ_ALLOWED(cpu,allowed_mask) \
-		((1 << cpu) & (allowed_mask))
-
-static unsigned long move(int curr_cpu, unsigned long allowed_mask, unsigned long now, int direction)
-{
-	int search_idle = 1;
-	int cpu = curr_cpu;
-
-	goto inside;
-
-	do {
-		if (unlikely(cpu == curr_cpu))
-			search_idle = 0;
-inside:
-		if (direction == 1) {
-			cpu++;
-			if (cpu >= smp_num_cpus)
-				cpu = 0;
-		} else {
-			cpu--;
-			if (cpu == -1)
-				cpu = smp_num_cpus-1;
-		}
-	} while (!IRQ_ALLOWED(cpu,allowed_mask) ||
-			(search_idle && !IDLE_ENOUGH(cpu,now)));
-
-	return cpu;
-}
-
-static inline void balance_irq(int irq)
-{
-	irq_balance_t *entry = irq_balance + irq;
-	unsigned long now = jiffies;
-
-	if (unlikely(entry->timestamp != now)) {
-		unsigned long allowed_mask;
-		int random_number;
-
-		rdtscl(random_number);
-		random_number &= 1;
-
-		allowed_mask = cpu_online_map & irq_affinity[irq];
-		entry->timestamp = now;
-		entry->cpu = move(entry->cpu, allowed_mask, now, random_number);
-		set_ioapic_affinity(irq, apicid_to_phys_cpu_present(entry->cpu));
-	}
-}
-
-#else
-
 #define balance_irq(_irq) ((void)0)
-
-#endif
 
 /*
  * support for broken MP BIOSs, enables hand-redirection of PIRQ0-7 to

@@ -137,7 +137,7 @@ static int xlvbd_init_device(vdisk_t *xd)
 	major_name = XLSCSI_MAJOR_NAME;
 	max_part   = XLSCSI_MAX_PART;
 
-    } else if (XD_VIRTUAL(xd->info)) {
+    } else if (VDISK_VIRTUAL(xd->info)) {
 
 	major_name = XLVBD_MAJOR_NAME;
 	max_part   = XLVBD_MAX_PART;
@@ -248,7 +248,7 @@ static int xlvbd_init_device(vdisk_t *xd)
         blk_size[major] = gd->sizes;
     }
 
-    if ( XD_READONLY(xd->info) )
+    if ( VDISK_READONLY(xd->info) )
         set_device_ro(device, 1); 
 
     gd->flags[minor >> gd->minor_shift] |= GENHD_FL_XEN;
@@ -298,20 +298,20 @@ static int xlvbd_init_device(vdisk_t *xd)
         gd->sizes[minor] = capacity>>(BLOCK_SIZE_BITS-9);
         
         /* Some final fix-ups depending on the device type */
-        switch ( XD_TYPE(xd->info) )
+        switch ( VDISK_TYPE(xd->info) )
         { 
-        case XD_TYPE_CDROM:
-        case XD_TYPE_FLOPPY: 
-        case XD_TYPE_TAPE:
+        case VDISK_TYPE_CDROM:
+        case VDISK_TYPE_FLOPPY: 
+        case VDISK_TYPE_TAPE:
             gd->flags[minor >> gd->minor_shift] |= GENHD_FL_REMOVABLE; 
             printk(KERN_ALERT 
                    "Skipping partition check on %s /dev/%s\n", 
-                   XD_TYPE(xd->info)==XD_TYPE_CDROM ? "cdrom" : 
-                   (XD_TYPE(xd->info)==XD_TYPE_TAPE ? "tape" : 
+                   VDISK_TYPE(xd->info)==VDISK_TYPE_CDROM ? "cdrom" : 
+                   (VDISK_TYPE(xd->info)==VDISK_TYPE_TAPE ? "tape" : 
                     "floppy"), disk_name(gd, MINOR(device), buf)); 
             break; 
 
-        case XD_TYPE_DISK:
+        case VDISK_TYPE_DISK:
             /* Only check partitions on real discs (not virtual!). */
             if ( gd->flags[minor>>gd->minor_shift] & GENHD_FL_VIRT_PARTNS )
             {
@@ -325,7 +325,7 @@ static int xlvbd_init_device(vdisk_t *xd)
 
         default:
             printk(KERN_ALERT "XenoLinux: unknown device type %d\n", 
-                   XD_TYPE(xd->info)); 
+                   VDISK_TYPE(xd->info)); 
             break; 
         }
     }

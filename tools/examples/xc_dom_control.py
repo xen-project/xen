@@ -26,13 +26,6 @@ Usage: %s [command] <params>
   cpu_atropos_set [dom] [period] [slice] [latency] [xtratime]
                          -- set Atropos scheduling parameters for domain
   cpu_rrobin_slice [slice] -- set Round Robin scheduler slice
-  vif_stats [dom] [vif]  -- get stats for a given network vif
-  vif_addip [dom] [vif] [ip]  -- add an IP address to a given vif
-  vif_setsched [dom] [vif] [bytes] [usecs] -- rate limit vif bandwidth
-  vif_getsched [dom] [vif] -- print vif's scheduling parameters
-  vbd_add [dom] [uname] [dev] [mode] -- make disk/partition uname available to 
-                            domain as dev e.g. 'vbd_add 2 phy:sda3 hda1 w'
-  vbd_remove [dom] [dev] -- remove disk or partition attached as 'dev' 
 """ % sys.argv[0]
 
 import Xc, sys, re, string, time, os, signal
@@ -159,102 +152,6 @@ elif cmd == 'cpu_bvtset':
 
     rc = xc.bvtsched_domain_set(dom=dom, mcuadv=mcuadv, warp=warp,
                                 warpl=warpl, warpu=warpu)
-elif cmd == 'vif_stats':
-    if len(sys.argv) < 4:
-        usage()
-        sys.exit(-1)
-
-    vif = int(sys.argv[3])
-
-    print xc.vif_stats_get(dom=dom, vif=vif)
-
-elif cmd == 'vif_addip':
-    if len(sys.argv) < 5:
-        usage()
-        sys.exit(-1)
-
-    vif = int(sys.argv[3])
-    ip  = sys.argv[4]
-
-    # XXX This function should be moved to Xc once we sort out the VFR
-    import xenctl.utils
-    xenctl.utils.setup_vfr_rules_for_vif( dom, vif, ip )
-
-elif cmd == 'vif_setsched':
-    if len(sys.argv) < 6:
-        usage()
-        sys.exit(-1)
-
-    vif = int(sys.argv[3])
-    credit_bytes = int(sys.argv[4])
-    credit_usecs = int(sys.argv[5])
-
-    rc = xc.xc_vif_scheduler_set(dom=dom, vif=vif, 
-				 credit_bytes=credit_bytes, 
-				 credit_usecs=credit_usecs)
-
-elif cmd == 'vif_getsched':
-    if len(sys.argv) < 4:
-        usage()
-        sys.exit(-1)
-
-    vif = int(sys.argv[3])
-
-    print xc.vif_scheduler_get(dom=dom, vif=vif)
-
-
-elif cmd == 'vbd_add':
-    import xenctl.utils
-    
-    xenctl.utils.VBD_EXPERT_LEVEL = 0 # sets the allowed level of potentially unsafe mappings
-
-    if len(sys.argv) < 6:
-	usage()
-	sys.exit(1)
-
-    uname = sys.argv[3]
-    dev = sys.argv[4]
-    mode = sys.argv[5]
-
-    writeable = 0
-    if mode == 'rw' or mode == 'w':
-	writeable = 1;
-
-    segments = xenctl.utils.lookup_disk_uname(uname)
-
-    if not segments:
-        print "Lookup Failed"
-        sys.exit(1)
-
-    if xenctl.utils.vd_extents_validate(segments,writeable) < 0:
-	print "That mapping is too unsafe for the current VBD expertise level"
-	sys.exit(1)
-
-    virt_dev = xenctl.utils.blkdev_name_to_number(dev)
-
-    xc.vbd_create(dom,virt_dev,writeable)
-
-    if xc.vbd_setextents( dom, virt_dev, segments ):
-	print "Error populating VBD vbd=%d\n" % virt_dev
-	sys.exit(1)
-
-    print "Added disk/partition %s to domain %d as device %s (%x)" % (uname, dom, dev, virt_dev)
-
-elif cmd == 'vbd_remove':
-    import xenctl.utils
-
-    if len(sys.argv) < 4:
-	usage()
-	sys.exit(1)
-
-    dev = sys.argv[3]
-    virt_dev = xenctl.utils.blkdev_name_to_number(dev)
-
-    if not xc.vbd_destroy(dom,virt_dev):
-	print "Removed disk/partition attached as device %s (%x) in domain %d" % (dev, virt_dev, dom)
-    else:
-	print "Failed"
-	sys.exit(1)
 
 elif cmd == 'cpu_atropos_set': # args: dom period slice latency xtratime
     if len(sys.argv) < 6:

@@ -7,6 +7,7 @@
 #include <xen/pci.h>
 #include <xen/serial.h>
 #include <xen/acpi.h>
+#include <xen/module.h>
 #include <asm/bitops.h>
 #include <asm/smp.h>
 #include <asm/processor.h>
@@ -328,11 +329,6 @@ void __init start_of_day(void)
     extern void timer_bh(void);
     extern void init_timervecs(void);
     extern void ac_timer_init(void);
-#ifdef OLD_DRIVERS
-    extern int  setup_network_devices(void);
-    extern void net_init(void);
-    extern void initialize_block_io(void);
-#endif
     extern void initialize_keytable(); 
     extern void initialize_keyboard(void);
     extern int opt_nosmp, opt_watchdog, opt_noacpi, opt_ignorebiostables;
@@ -437,12 +433,6 @@ void __init start_of_day(void)
     pci_init();
 #endif
     do_initcalls();
-#ifdef OLD_DRIVERS
-    if ( !setup_network_devices() )
-        panic("Must have a network device!\n");
-    net_init();            /* initializes virtual network system. */
-    initialize_block_io(); /* setup block devices */
-#endif
 
 #ifdef CONFIG_SMP
     wait_init_idle = cpu_online_map;

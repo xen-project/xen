@@ -49,12 +49,6 @@ to 'n' or off):
                applications. For more information see the 
                XenDebugger-HOWTO.
 
- old_drivers=y -- Enable the old hardware-device architecture, in
-               which network and block devices are managed by
-               Xen. The new (and default) model requires such
-               devices to be managed by a suitably-privileged
-               guest OS (e.g., within domain 0).
-
  perfc=y    -- Enable performance-counters for significant events
                within Xen. The counts can be reset or displayed
                on Xen's console via console control keys.

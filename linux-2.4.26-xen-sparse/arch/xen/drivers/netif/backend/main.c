@@ -612,7 +612,7 @@ static void netif_page_release(struct page *page)
 #if 0
 long flush_bufs_for_netif(netif_t *netif)
 {
-    NET_RING_IDX i;
+    NETIF_RING_IDX i;
 
     /* Return any outstanding receive buffers to the guest OS. */
     spin_lock(&netif->rx_lock);
@@ -663,7 +663,7 @@ static void make_tx_response(netif_t *netif,
                              u16      id,
                              s8       st)
 {
-    NET_RING_IDX i = netif->tx_resp_prod;
+    NETIF_RING_IDX i = netif->tx_resp_prod;
     netif_tx_response_t *resp;
 
     resp = &netif->tx->ring[MASK_NETIF_TX_IDX(i)].resp;
@@ -683,7 +683,7 @@ static int make_rx_response(netif_t *netif,
                             memory_t addr,
                             u16      size)
 {
-    NET_RING_IDX i = netif->rx_resp_prod;
+    NETIF_RING_IDX i = netif->rx_resp_prod;
     netif_rx_response_t *resp;
 
     resp = &netif->rx->ring[MASK_NETIF_RX_IDX(i)].resp;

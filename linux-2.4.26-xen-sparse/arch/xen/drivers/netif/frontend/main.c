@@ -145,7 +145,7 @@ static void network_tx_buf_gc(struct net_device *dev)
 
         for ( i = np->tx_resp_cons; i != prod; i++ )
         {
-            id  = np->tx->ring[MASK_NET_TX_IDX(i)].resp.id;
+            id  = np->tx->ring[MASK_NETIF_TX_IDX(i)].resp.id;
             skb = np->tx_skbs[id];
             ADD_ID_TO_FREELIST(np->tx_skbs, id);
             dev_kfree_skb_any(skb);
@@ -204,7 +204,7 @@ static void network_alloc_rx_buffers(struct net_device *dev)
 
         np->rx_skbs[id] = skb;
         
-        np->rx->ring[MASK_NET_RX_IDX(i)].req.id = id;
+        np->rx->ring[MASK_NETIF_RX_IDX(i)].req.id = id;
         
         rx_pfn_array[nr_pfns] = virt_to_machine(skb->head) >> PAGE_SHIFT;
 
@@ -283,7 +283,7 @@ static int network_start_xmit(struct sk_buff *skb, struct net_device *dev)
     id = GET_ID_FROM_FREELIST(np->tx_skbs);
     np->tx_skbs[id] = skb;
 
-    tx = &np->tx->ring[MASK_NET_TX_IDX(i)].req;
+    tx = &np->tx->ring[MASK_NETIF_TX_IDX(i)].req;
 
     tx->id   = id;
     tx->addr = virt_to_machine(skb->data);
@@ -366,7 +366,7 @@ static int netif_poll(struct net_device *dev, int *pbudget)
           (i != np->rx->resp_prod) && (work_done < budget); 
           i++, work_done++ )
     {
-        rx = &np->rx->ring[MASK_NET_RX_IDX(i)].resp;
+        rx = &np->rx->ring[MASK_NETIF_RX_IDX(i)].resp;
 
         skb = np->rx_skbs[rx->id];
         ADD_ID_TO_FREELIST(np->rx_skbs, rx->id);
@@ -701,8 +701,8 @@ static int __init init_module(void)
     struct net_device *dev;
     struct net_private *np;
 
-    if ( start_info.flags & SIF_INITDOMAIN
-         || start_info.flags & SIF_NET_BE_DOMAIN )
+    if ( (start_info.flags & SIF_INITDOMAIN) ||
+         (start_info.flags & SIF_NET_BE_DOMAIN) )
         return 0;
 
     printk("Initialising Xen virtual ethernet frontend driver");

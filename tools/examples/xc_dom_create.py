@@ -200,15 +200,6 @@ output('VM cmdline         : "%s"' % cmdline)
 if dryrun:
     sys.exit(1)
 
-##### HACK HACK HACK
-##### Until everyone moves to the new I/O world, and a more robust domain
-##### controller (xend), we use this little trick to discover whether we
-##### are in a testing environment for new I/O stuff.
-new_io_world = True
-for line in os.popen('cat /proc/interrupts').readlines():
-    if re.search('blkdev', line):
-        new_io_world = False
-
 ##### Code beyond this point is actually used to manage the mechanics of
 ##### starting (and watching if necessary) guest virtual machines.
 
@@ -275,17 +266,16 @@ def make_domain():
     xenctl.utils.VBD_EXPERT_MODE = vbd_expert
 
     if not (flags & 1<<4): # It's not a block backend (or it's old IO world)
-        if new_io_world:
-            cmsg = 'new_block_interface(dom='+str(id)+')'
-            xend_response = xenctl.utils.xend_control_message(cmsg)
-            if not xend_response['success']:
-                print "Error creating block interface"
-                print "Error type: " + xend_response['error_type']
-                if xend_response['error_type'] == 'exception':
-                    print "Exception type: " + xend_response['exception_type']
-                    print "Exception val:  " + xend_response['exception_value']
-                xc.domain_destroy ( dom=id )
-                sys.exit()
+        cmsg = 'new_block_interface(dom='+str(id)+')'
+        xend_response = xenctl.utils.xend_control_message(cmsg)
+        if not xend_response['success']:
+            print "Error creating block interface"
+            print "Error type: " + xend_response['error_type']
+            if xend_response['error_type'] == 'exception':
+                print "Exception type: " + xend_response['exception_type']
+                print "Exception val:  " + xend_response['exception_value']
+            xc.domain_destroy ( dom=id )
+            sys.exit()
 
         for ( uname, virt_name, rw ) in vbd_list:
             virt_dev = xenctl.utils.blkdev_name_to_number( virt_name )
@@ -296,47 +286,26 @@ def make_domain():
                 xc.domain_destroy ( dom=id )
                 sys.exit()
 
-            if new_io_world:
-                if len(segments) > 1:
-                    print "New I/O world cannot deal with multi-extent vdisks"
-                    xc.domain_destroy ( dom=id )
-                    sys.exit()
-                seg = segments[0]
-                cmsg = 'new_block_device(dom=' + str(id) + \
-                       ',handle=0,vdev=' + str(virt_dev) + \
-                       ',pdev=' + str(seg['device']) + \
-                       ',start_sect=' + str(seg['start_sector']) + \
-                       ',nr_sect=' + str(seg['nr_sectors']) + \
-                       ',readonly=' + str(not re.match('w',rw)) + ')'
-                xend_response = xenctl.utils.xend_control_message(cmsg)
-                if not xend_response['success']:
-                    print "Error creating virtual block device"
-                    print "Error type: " + xend_response['error_type']
-                    if xend_response['error_type'] == 'exception':
-                        print "Exception type: " + xend_response['exception_type']
-                        print "Exception val:  " + xend_response['exception_value']
-                    xc.domain_destroy ( dom=id )
-                    sys.exit()
-            else:
-                # check that setting up this VBD won't violate the sharing
-                # allowed by the current VBD expertise level
-                if xenctl.utils.vd_extents_validate(segments,
-                                                    rw=='w' or rw=='rw') < 0:
-                    xc.domain_destroy( dom = id )
-                    sys.exit()
-            
-                if xc.vbd_create( dom=id, vbd=virt_dev,
-                                  writeable= rw=='w' or rw=='rw' ):
-                    print "Error creating VBD %d (writeable=%d)\n" % (virt_dev,rw)
-                    xc.domain_destroy ( dom=id )
-                    sys.exit()
-	
-                if xc.vbd_setextents( dom=id,
-                                      vbd=virt_dev,
-                                      extents=segments):
-                    print "Error populating VBD vbd=%d\n" % virt_dev
-                    xc.domain_destroy ( dom=id )
-                    sys.exit()
+            if len(segments) > 1:
+                print "New I/O world cannot deal with multi-extent vdisks"
+                xc.domain_destroy ( dom=id )
+                sys.exit()
+            seg = segments[0]
+            cmsg = 'new_block_device(dom=' + str(id) + \
+                   ',handle=0,vdev=' + str(virt_dev) + \
+                   ',pdev=' + str(seg['device']) + \
+                   ',start_sect=' + str(seg['start_sector']) + \
+                   ',nr_sect=' + str(seg['nr_sectors']) + \
+                   ',readonly=' + str(not re.match('w',rw)) + ')'
+            xend_response = xenctl.utils.xend_control_message(cmsg)
+            if not xend_response['success']:
+                print "Error creating virtual block device"
+                print "Error type: " + xend_response['error_type']
+                if xend_response['error_type'] == 'exception':
+                    print "Exception type: " + xend_response['exception_type']
+                    print "Exception val:  " + xend_response['exception_value']
+                xc.domain_destroy ( dom=id )
+                sys.exit()
     else: # It's a block backend - notify Xend.
         cmsg = 'set_block_backend(dom='+str(id)+')'
         xend_response = xenctl.utils.xend_control_message(cmsg)
@@ -349,44 +318,38 @@ def make_domain():
                 xc.domain_destroy ( dom=id )
                 sys.exit()
 
-    if new_io_world:
-        if not (flags & 1<<5): # If it's not the net backend, give it a frontend.
-            cmsg = 'new_network_interface(dom='+str(id)+')'
-            xend_response = xenctl.utils.xend_control_message(cmsg)
-            if not xend_response['success']:
-                print "Error creating network interface"
-                print "Error type: " + xend_response['error_type']
-                if xend_response['error_type'] == 'exception':
-                    print "Exception type: " + xend_response['exception_type']
-                    print "Exception val:  " + xend_response['exception_value']
-                    xc.domain_destroy ( dom=id )
-                    sys.exit()
-        else: # It's a new net backend - notify Xend.
-            cmsg = 'set_network_backend(dom='+str(id)+')'
-            xend_response = xenctl.utils.xend_control_message(cmsg)
-            if not xend_response['success']:
-                print "Error registering network backend"
-                print "Error type: " + xend_response['error_type']
-                if xend_response['error_type'] == 'exception':
-                    print "Exception type: " + xend_response['exception_type']
-                    print "Exception val:  " + xend_response['exception_value']
-                    xc.domain_destroy ( dom=id )
-                    sys.exit()
-    else:
-        # setup virtual firewall rules for all aliases
-        for ip in vfr_ipaddr:
-            xenctl.utils.setup_vfr_rules_for_vif( id, 0, ip )
+    if not (flags & 1<<5): # If it's not the net backend, give it a frontend.
+        cmsg = 'new_network_interface(dom='+str(id)+')'
+        xend_response = xenctl.utils.xend_control_message(cmsg)
+        if not xend_response['success']:
+            print "Error creating network interface"
+            print "Error type: " + xend_response['error_type']
+            if xend_response['error_type'] == 'exception':
+                print "Exception type: " + xend_response['exception_type']
+                print "Exception val:  " + xend_response['exception_value']
+                xc.domain_destroy ( dom=id )
+                sys.exit()
+    else: # It's a new net backend - notify Xend.
+        cmsg = 'set_network_backend(dom='+str(id)+')'
+        xend_response = xenctl.utils.xend_control_message(cmsg)
+        if not xend_response['success']:
+            print "Error registering network backend"
+            print "Error type: " + xend_response['error_type']
+            if xend_response['error_type'] == 'exception':
+                print "Exception type: " + xend_response['exception_type']
+                print "Exception val:  " + xend_response['exception_value']
+                xc.domain_destroy ( dom=id )
+                sys.exit()
 
-    if new_io_world:
-        # check for physical device access
-        for (pci_bus, pci_dev, pci_func) in pci_device_list:
-            if xc.physdev_pci_access_modify(
-                dom=id, bus=pci_bus, dev=pci_dev,
-                func=pci_func, enable=1 ) < 0:
-                print "Non-fatal error enabling PCI device access."
-            else:
-                print "Enabled PCI access (%d:%d:%d)." % \
-                      (pci_bus,pci_dev,pci_func)
+    # check for physical device access
+    for (pci_bus, pci_dev, pci_func) in pci_device_list:
+        if xc.physdev_pci_access_modify(
+            dom=id, bus=pci_bus, dev=pci_dev,
+            func=pci_func, enable=1 ) < 0:
+            print "Non-fatal error enabling PCI device access."
+        else:
+            print "Enabled PCI access (%d:%d:%d)." % \
+                  (pci_bus,pci_dev,pci_func)
 		
     if restore:
 	# send an unsolicited ARP reply for all non link-local IPs

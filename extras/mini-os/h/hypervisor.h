@@ -12,8 +12,6 @@
 #include <types.h>
 
 /* include the hypervisor interface */
-#include <hypervisor-ifs/network.h>
-#include <hypervisor-ifs/block.h>
 #include <hypervisor-ifs/hypervisor-if.h>
 #include "../../../tools/xend/lib/domain_controller.h"
 
@@ -112,17 +110,6 @@ static __inline__ int HYPERVISOR_set_callbacks(
     return ret;
 }
 
-static __inline__ int HYPERVISOR_net_io_op(netop_t *op)
-{
-    int ret;
-    __asm__ __volatile__ (
-        TRAP_INSTR
-        : "=a" (ret) : "0" (__HYPERVISOR_net_io_op),
-        "b" (op) : "memory" );
-
-    return ret;
-}
-
 static __inline__ int HYPERVISOR_fpu_taskswitch(void)
 {
     int ret;
@@ -210,28 +197,6 @@ static __inline__ int HYPERVISOR_dom0_op(void *dom0_op)
         TRAP_INSTR
         : "=a" (ret) : "0" (__HYPERVISOR_dom0_op),
         "b" (dom0_op) : "memory" );
-
-    return ret;
-}
-
-static __inline__ int HYPERVISOR_network_op(void *network_op)
-{
-    int ret;
-    __asm__ __volatile__ (
-        TRAP_INSTR
-        : "=a" (ret) : "0" (__HYPERVISOR_network_op),
-        "b" (network_op) : "memory" );
-
-    return ret;
-}
-
-static __inline__ int HYPERVISOR_block_io_op(unsigned int op)
-{
-    int ret;
-    __asm__ __volatile__ (
-        TRAP_INSTR
-        : "=a" (ret) : "0" (__HYPERVISOR_block_io_op),
-        "b" (op) : "memory" ); 
 
     return ret;
 }

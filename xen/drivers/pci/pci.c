@@ -619,86 +619,11 @@ pci_match_device(const struct pci_device_id *ids, const struct pci_dev *dev)
 	return NULL;
 }
 
-#ifdef OLD_DRIVERS
-static int
-pci_announce_device(struct pci_driver *drv, struct pci_dev *dev)
-{
-	const struct pci_device_id *id;
-	int ret = 0;
-
-	if (drv->id_table) {
-		id = pci_match_device(drv->id_table, dev);
-		if (!id) {
-			ret = 0;
-			goto out;
-		}
-	} else
-		id = NULL;
-
-	dev_probe_lock();
-	if (drv->probe(dev, id) >= 0) {
-		dev->driver = drv;
-		ret = 1;
-	}
-	dev_probe_unlock();
-out:
-	return ret;
-}
-#endif /* OLD_DRIVERS */
-
-/**
- * pci_register_driver - register a new pci driver
- * @drv: the driver structure to register
- * 
- * Adds the driver structure to the list of registered drivers
- * Returns the number of pci devices which were claimed by the driver
- * during registration.  The driver remains registered even if the
- * return value is zero.
- */
-int
-pci_register_driver(struct pci_driver *drv)
-{
-#ifdef OLD_DRIVERS
-	struct pci_dev *dev;
-	int count = 0;
-
-	list_add_tail(&drv->node, &pci_drivers);
-	pci_for_each_dev(dev) {
-		if (!pci_dev_driver(dev))
-			count += pci_announce_device(drv, dev);
-	}
-	return count;
-#else
-	return 0;
+#if 0 /* NOT IN XEN */
+static int pci_announce_device(struct pci_driver *drv, struct pci_dev *dev)
+int pci_register_driver(struct pci_driver *drv)
+void pci_unregister_driver(struct pci_driver *drv)
 #endif
-}
-
-/**
- * pci_unregister_driver - unregister a pci driver
- * @drv: the driver structure to unregister
- * 
- * Deletes the driver structure from the list of registered PCI drivers,
- * gives it a chance to clean up by calling its remove() function for
- * each device it was responsible for, and marks those devices as
- * driverless.
- */
-
-void
-pci_unregister_driver(struct pci_driver *drv)
-{
-#ifdef OLD_DRIVERS
-	struct pci_dev *dev;
-
-	list_del(&drv->node);
-	pci_for_each_dev(dev) {
-		if (dev->driver == drv) {
-			if (drv->remove)
-				drv->remove(dev);
-			dev->driver = NULL;
-		}
-	}
-#endif
-}
 
 #ifdef CONFIG_HOTPLUG
 

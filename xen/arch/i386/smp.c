@@ -222,33 +222,6 @@ asmlinkage void smp_invalidate_interrupt(void)
         local_flush_tlb();
 }
 
-#ifdef OLD_DRIVERS
-int try_flush_tlb_mask(unsigned long mask)
-{
-    if ( mask & (1 << smp_processor_id()) )
-    {
-        local_flush_tlb();
-        mask &= ~(1 << smp_processor_id());
-    }
-
-    if ( mask != 0 )
-    {
-        if ( unlikely(!spin_trylock(&flush_lock)) )
-            return 0;
-        flush_cpumask = mask;
-        send_IPI_mask(mask, INVALIDATE_TLB_VECTOR);
-        while ( flush_cpumask != 0 )
-        {
-            rep_nop();
-            barrier();
-        }
-        spin_unlock(&flush_lock);
-    }
-
-    return 1;
-}
-#endif
-
 void flush_tlb_mask(unsigned long mask)
 {
     ASSERT(!in_irq());

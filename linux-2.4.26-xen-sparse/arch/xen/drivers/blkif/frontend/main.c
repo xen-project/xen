@@ -30,20 +30,19 @@ static int blkif_control_rsp_valid;
 static blkif_response_t blkif_control_rsp;
 
 static blkif_ring_t *blk_ring;
-static BLK_RING_IDX resp_cons; /* Response consumer for comms ring. */
-static BLK_RING_IDX req_prod;  /* Private request producer.         */
-
+static BLKIF_RING_IDX resp_cons; /* Response consumer for comms ring. */
+static BLKIF_RING_IDX req_prod;  /* Private request producer.         */
 
 static blkif_ring_t *blk_ring_rec; /* Private copy of requests, used for
                                     * recovery.  Responses not stored here. */
-static BLK_RING_IDX resp_cons_rec; /* Copy of response consumer, used for
-                                    * recovery */
+static BLKIF_RING_IDX resp_cons_rec; /* Copy of response consumer, used for
+                                      * recovery */
 static int recovery = 0;           /* "Recovery in progress" flag.  Protected
                                     * by the io_request_lock */
 
 
 /* We plug the I/O ring if the driver is suspended or if the ring is full. */
-#define RING_PLUGGED (((req_prod - resp_cons) == BLK_RING_SIZE) || \
+#define RING_PLUGGED (((req_prod - resp_cons) == BLKIF_RING_SIZE) || \
                       (blkif_state != BLKIF_STATE_CONNECTED))
 
 
@@ -353,7 +352,7 @@ static int blkif_queue_request(unsigned long   id,
              (sg_dev == device) &&
              (sg_next_sect == sector_number) )
         {
-            req = &blk_ring->ring[MASK_BLK_IDX(req_prod-1)].req;
+            req = &blk_ring->ring[MASK_BLKIF_IDX(req_prod-1)].req;
             bh = (struct buffer_head *)id;
             bh->b_reqnext = (struct buffer_head *)req->id;
             req->id = id;
@@ -365,7 +364,7 @@ static int blkif_queue_request(unsigned long   id,
                 DISABLE_SCATTERGATHER();
 
             /* Update the copy of the request in the recovery ring. */
-            blk_ring_rec->ring[MASK_BLK_IDX(blk_ring_rec->req_prod - 1)].req
+            blk_ring_rec->ring[MASK_BLKIF_IDX(blk_ring_rec->req_prod - 1)].req
                 = *req;
 
             return 0;
@@ -387,7 +386,7 @@ static int blkif_queue_request(unsigned long   id,
     }
 
     /* Fill out a communications ring structure. */
-    req = &blk_ring->ring[MASK_BLK_IDX(req_prod)].req;
+    req = &blk_ring->ring[MASK_BLKIF_IDX(req_prod)].req;
     req->id            = id;
     req->operation     = operation;
     req->sector_number = (blkif_sector_t)sector_number;
@@ -397,7 +396,7 @@ static int blkif_queue_request(unsigned long   id,
     req_prod++;
 
     /* Keep a private copy so we can reissue requests when recovering. */
-    blk_ring_rec->ring[MASK_BLK_IDX(blk_ring_rec->req_prod)].req = *req;
+    blk_ring_rec->ring[MASK_BLKIF_IDX(blk_ring_rec->req_prod)].req = *req;
     blk_ring_rec->req_prod++;
 
     return 0;
@@ -490,7 +489,7 @@ static void kick_pending_request_queues(void)
 {
     /* We kick pending request queues if the ring is reasonably empty. */
     if ( (nr_pending != 0) && 
-         ((req_prod - resp_cons) < (BLK_RING_SIZE >> 1)) )
+         ((req_prod - resp_cons) < (BLKIF_RING_SIZE >> 1)) )
     {
         /* Attempt to drain the queue, but bail if the ring becomes full. */
         while ( (nr_pending != 0) && !RING_PLUGGED )
@@ -501,12 +500,10 @@ static void kick_pending_request_queues(void)
 
 static void blkif_int(int irq, void *dev_id, struct pt_regs *ptregs)
 {
-    BLK_RING_IDX i; 
+    BLKIF_RING_IDX i; 
     unsigned long flags; 
     struct buffer_head *bh, *next_bh;
     
-//    printk(KERN_ALERT "blkif_int\n");
-
     spin_lock_irqsave(&io_request_lock, flags);     
 
     if ( unlikely(blkif_state == BLKIF_STATE_CLOSED || recovery) )
@@ -519,7 +516,7 @@ static void blkif_int(int irq, void *dev_id, struct pt_regs *ptregs)
 
     for ( i = resp_cons; i != blk_ring->resp_prod; i++ )
     {
-        blkif_response_t *bret = &blk_ring->ring[MASK_BLK_IDX(i)].resp;
+        blkif_response_t *bret = &blk_ring->ring[MASK_BLKIF_IDX(i)].resp;
         switch ( bret->operation )
         {
         case BLKIF_OP_READ:
@@ -559,22 +556,22 @@ void blkif_control_send(blkif_request_t *req, blkif_response_t *rsp)
     unsigned long flags;
 
  retry:
-    while ( (req_prod - resp_cons) == BLK_RING_SIZE )
+    while ( (req_prod - resp_cons) == BLKIF_RING_SIZE )
     {
         set_current_state(TASK_INTERRUPTIBLE);
         schedule_timeout(1);
     }
 
     spin_lock_irqsave(&io_request_lock, flags);
-    if ( (req_prod - resp_cons) == BLK_RING_SIZE )
+    if ( (req_prod - resp_cons) == BLKIF_RING_SIZE )
     {
         spin_unlock_irqrestore(&io_request_lock, flags);
         goto retry;
     }
 
     DISABLE_SCATTERGATHER();
-    memcpy(&blk_ring->ring[MASK_BLK_IDX(req_prod)].req, req, sizeof(*req));
-    memcpy(&blk_ring_rec->ring[MASK_BLK_IDX(blk_ring_rec->req_prod++)].req,
+    memcpy(&blk_ring->ring[MASK_BLKIF_IDX(req_prod)].req, req, sizeof(*req));
+    memcpy(&blk_ring_rec->ring[MASK_BLKIF_IDX(blk_ring_rec->req_prod++)].req,
            req, sizeof(*req));
     req_prod++;
     flush_requests();
@@ -674,7 +671,7 @@ static void blkif_status_change(blkif_fe_interface_status_changed_t *status)
                   resp_cons_rec++, i++ )
             {
                 blk_ring->ring[i].req
-                    = blk_ring_rec->ring[MASK_BLK_IDX(resp_cons_rec)].req;
+                    = blk_ring_rec->ring[MASK_BLKIF_IDX(resp_cons_rec)].req;
             }
 
             /* Reset the private block ring to match the new ring. */

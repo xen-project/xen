@@ -4,9 +4,6 @@
 #include <xen/config.h>
 #include <xen/types.h>
 #include <xen/spinlock.h>
-#include <xen/config.h>
-#include <xen/types.h>
-#include <xen/spinlock.h>
 #include <asm/ptrace.h>
 #include <xen/smp.h>
 #include <asm/page.h>
@@ -18,7 +15,6 @@
 #include <xen/time.h>
 #include <xen/ac_timer.h>
 #include <xen/delay.h>
-#include <xen/rbtree.h>
 
 #define STACK_SIZE (2*PAGE_SIZE)
 #include <asm/current.h>
@@ -45,9 +41,6 @@ extern struct mm_struct init_mm;
 #define PF_PRIVILEGED   5 /* Is this domain privileged?                  */
 #define PF_CONSOLEWRITEBUG 6 /* Has this domain used the obsolete console? */
 #define PF_PHYSDEV      7 /* May this domain do IO to physical devices? */
-
-#include <xen/vif.h>
-#include <xen/vbd.h>
 
 #define IS_PRIV(_p) (test_bit(PF_PRIVILEGED, &(_p)->flags))
 #define IS_CAPABLE_PHYSDEV(_p) (test_bit(PF_PHYSDEV, &(_p)->flags))
@@ -135,19 +128,6 @@ struct task_struct
 
     void *sched_priv;               /* scheduler-specific data */
 
-    /* Network I/O */
-    net_vif_t *net_vif_list[MAX_DOMAIN_VIFS];
-
-    /* Block I/O */
-    blk_ring_t *blk_ring_base;
-    BLK_RING_IDX blk_req_cons;  /* request consumer */
-    BLK_RING_IDX blk_resp_prod; /* (private version of) response producer */
-    struct list_head blkdev_list;
-    spinlock_t blk_ring_lock;
-    rb_root_t  vbd_rb;          /* mapping from 16-bit vdevices to vbds */
-    spinlock_t vbd_lock;        /* protects VBD mapping */
-
-    /* VM */
     struct mm_struct mm;
 
     mm_segment_t addr_limit;
@@ -246,7 +226,6 @@ extern struct task_struct *do_createdomain(
 extern int construct_dom0(struct task_struct *p, 
                           unsigned long alloc_start,
                           unsigned long alloc_end,
-                          unsigned int num_vifs,
                           char *image_start, unsigned long image_len, 
                           char *initrd_start, unsigned long initrd_len,
                           char *cmdline);

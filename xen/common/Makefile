@@ -6,10 +6,6 @@ OBJS := $(subst debug.o,,$(OBJS))
 OBJS := $(subst debug-linux.o,,$(OBJS))
 endif
 
-ifneq ($(old_drivers),y)
-OBJS := $(subst network.o,,$(OBJS))
-endif
-
 ifneq ($(perfc),y)
 OBJS := $(subst perfc.o,,$(OBJS))
 endif

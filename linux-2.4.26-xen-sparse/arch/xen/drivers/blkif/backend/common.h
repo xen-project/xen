@@ -36,8 +36,8 @@ typedef struct blkif_st {
     int              irq;
     /* Comms information. */
     blkif_ring_t    *blk_ring_base; /* ioremap()'ed ptr to shmem_frame. */
-    BLK_RING_IDX     blk_req_cons;  /* Request consumer. */
-    BLK_RING_IDX     blk_resp_prod; /* Private version of response producer. */
+    BLKIF_RING_IDX     blk_req_cons;  /* Request consumer. */
+    BLKIF_RING_IDX     blk_resp_prod; /* Private version of resp. producer. */
     /* VBDs attached to this interface. */
     rb_root_t        vbd_rb;        /* Mapping from 16-bit vdevices to VBDs. */
     spinlock_t       vbd_lock;      /* Protects VBD mapping. */
@@ -76,7 +76,7 @@ typedef struct _blkif_extent_le {
 typedef struct _vbd { 
     blkif_vdev_t       vdevice;   /* what the domain refers to this vbd as */
     unsigned char      readonly;  /* Non-zero -> read-only */
-    unsigned char      type;      /* XD_TYPE_xxx */
+    unsigned char      type;      /* VDISK_TYPE_xxx */
     blkif_extent_le_t *extents;   /* list of xen_extents making up this vbd */
     rb_node_t          rb;        /* for linking into R-B tree lookup struct */
 } vbd_t; 
@@ -93,7 +93,7 @@ typedef struct {
     unsigned short dev;
     unsigned short nr_sects;
     unsigned long  buffer;
-    xen_sector_t   sector_number;
+    blkif_sector_t sector_number;
 } phys_seg_t;
 
 int vbd_translate(phys_seg_t *pseg, blkif_t *blkif, int operation); 

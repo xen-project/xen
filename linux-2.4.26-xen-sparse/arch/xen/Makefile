@@ -51,13 +51,8 @@ HEAD := arch/xen/kernel/head.o arch/xen/kernel/init_task.o
 SUBDIRS += arch/xen/kernel arch/xen/mm arch/xen/lib
 SUBDIRS += arch/xen/drivers/console 
 SUBDIRS += arch/xen/drivers/evtchn
-ifdef CONFIG_XEN_NEWIO
 SUBDIRS += arch/xen/drivers/blkif
 SUBDIRS += arch/xen/drivers/netif
-else
-SUBDIRS += arch/xen/drivers/block
-SUBDIRS += arch/xen/drivers/network
-endif
 SUBDIRS += arch/xen/drivers/balloon
 ifdef CONFIG_XEN_PRIVILEGED_GUEST
 SUBDIRS += arch/xen/drivers/dom0 
@@ -66,13 +61,8 @@ endif
 CORE_FILES += arch/xen/kernel/kernel.o arch/xen/mm/mm.o
 CORE_FILES += arch/xen/drivers/evtchn/drv.o
 CORE_FILES += arch/xen/drivers/console/drv.o
-ifdef CONFIG_XEN_NEWIO
 DRIVERS += arch/xen/drivers/blkif/drv.o
 DRIVERS += arch/xen/drivers/netif/drv.o
-else
-DRIVERS += arch/xen/drivers/block/drv.o
-DRIVERS += arch/xen/drivers/network/drv.o
-endif
 ifdef CONFIG_XEN_PRIVILEGED_GUEST
 CORE_FILES += arch/xen/drivers/dom0/drv.o
 endif

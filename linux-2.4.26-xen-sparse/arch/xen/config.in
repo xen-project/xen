@@ -15,10 +15,7 @@ define_bool CONFIG_UID16 y
 mainmenu_option next_comment
 comment 'Xen'
 bool 'Support for privileged operations (domain 0)' CONFIG_XEN_PRIVILEGED_GUEST
-bool 'New I/O model (no drivers in Xen) [EXPERIMENTAL]' CONFIG_XEN_NEWIO
-if [ "$CONFIG_XEN_NEWIO" = "y" ]; then
-  bool 'Device-driver domain (physical device access)' CONFIG_XEN_PHYSDEV_ACCESS
-fi
+bool 'Device-driver domain (physical device access)' CONFIG_XEN_PHYSDEV_ACCESS
 endmenu
 # The IBM S/390 patch needs this.
 define_bool CONFIG_NO_IDLE_HZ y
@@ -258,7 +255,6 @@ else
    fi
    dep_bool '  Initial RAM disk (initrd) support' CONFIG_BLK_DEV_INITRD $CONFIG_BLK_DEV_RAM
    bool 'Per partition statistics in /proc/partitions' CONFIG_BLK_STATS
-   bool 'XenoLinux virtual block device support' CONFIG_XEN_VBD
    define_bool CONFIG_BLK_DEV_HD n
    endmenu
 fi

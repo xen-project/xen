@@ -29,7 +29,6 @@ dist: $(TARGET)
 clean: delete-links
 	$(MAKE) -C tools clean
 	$(MAKE) -C common clean
-	$(MAKE) -C net clean
 	$(MAKE) -C drivers clean
 	$(MAKE) -C arch/$(TARGET_ARCH) clean
 	rm -f *.o $(TARGET)* *~ core $(GENERATED_FILES)
@@ -37,9 +36,6 @@ clean: delete-links
 $(TARGET): delete-unfresh-files make-links $(GENERATED_FILES)
 	$(MAKE) -C tools
 	$(MAKE) -C common
-	if [ "$(old_drivers)" == "y" ]; then \
-	$(MAKE) -C net ; \
-	fi
 	$(MAKE) -C drivers
 	$(MAKE) -C arch/$(TARGET_ARCH)
 
@@ -76,7 +72,7 @@ include/xen/compile.h:
 .PHONY: $(GENERATED_FILES) make-links delete-links default 
 .PHONY: debug install clean delete-unfresh-files
 
-SUBDIRS = arch common drivers net 
+SUBDIRS = arch common drivers 
 TAGS: 
 	etags `find include/asm-$(TARGET_ARCH) -name '*.h'`
 	find include -type d \( -name "asm-*" -o -name config \) -prune -o -name '*.h' -print | xargs etags -a

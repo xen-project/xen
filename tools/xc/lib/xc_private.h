@@ -19,13 +19,10 @@
 /* from xen/include/hypervisor-ifs */
 #include <hypervisor-if.h>
 #include <dom0_ops.h>
-#include <vbd.h>
 #include <event_channel.h>
 #include <sched_ctl.h>
 
 #include <asm-xen/proc_cmd.h>
-
-
 
 /* from xend/lib */
 #include <domain_controller.h>
@@ -128,49 +125,6 @@ static inline int do_multicall_op(int xc_handle,
         goto out1;
     }
 
- out1: return ret;
-}
-
-static inline int do_network_op(int xc_handle, network_op_t *op)
-{
-    int ret = -1;
-    privcmd_hypercall_t hypercall;
-
-    hypercall.op     = __HYPERVISOR_network_op;
-    hypercall.arg[0] = (unsigned long)op;
-
-    if ( mlock(op, sizeof(*op)) != 0 )
-    {
-        PERROR("Could not lock memory for Xen hypercall");
-        goto out1;
-    }
-
-    if ( (ret = do_xen_hypercall(xc_handle, &hypercall)) < 0 )
-        goto out2;
-
- out2: (void)munlock(op, sizeof(*op));
- out1: return ret;
-}
-
-
-static inline int do_block_io_op(int xc_handle, block_io_op_t *op)
-{
-    int ret = -1;
-    privcmd_hypercall_t hypercall;
-
-    hypercall.op     = __HYPERVISOR_block_io_op;
-    hypercall.arg[0] = (unsigned long)op;
-
-    if ( mlock(op, sizeof(*op)) != 0 )
-    {
-        PERROR("Could not lock memory for Xen hypercall");
-        goto out1;
-    }
-
-    if ( (ret = do_xen_hypercall(xc_handle, &hypercall)) < 0 )
-        goto out2;
-
- out2: (void)munlock(op, sizeof(*op));
  out1: return ret;
 }
 

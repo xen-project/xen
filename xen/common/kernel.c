@@ -16,23 +16,18 @@
 #include <xen/sched.h>
 #include <xen/mm.h>
 #include <xen/delay.h>
-#include <xen/skbuff.h>
 #include <xen/interrupt.h>
 #include <xen/compile.h>
 #include <xen/version.h>
-#include <xen/netdevice.h>
-#include <asm/io.h>
-#include <asm/msr.h>
-#include <asm/uaccess.h>
-#include <hypervisor-ifs/dom0_ops.h>
-#include <asm/byteorder.h>
-#include <xen/if_ether.h>
-#include <asm/domain_page.h>
 #include <xen/console.h>
-#include <xen/net_headers.h>
 #include <xen/serial.h>
 #include <xen/shadow.h>
 #include <xen/trace.h>
+#include <asm/io.h>
+#include <asm/msr.h>
+#include <asm/uaccess.h>
+#include <asm/domain_page.h>
+#include <hypervisor-ifs/dom0_ops.h>
 
 kmem_cache_t *task_struct_cachep;
 
@@ -283,7 +278,7 @@ void cmain(unsigned long magic, multiboot_info_t *mbi)
      * above our MAX_DIRECTMAP_ADDRESS in boot/boot.S. The second module, if
      * present, is an initrd ramdisk.
      */
-    if ( construct_dom0(new_dom, dom0_memory_start, dom0_memory_end, 1,
+    if ( construct_dom0(new_dom, dom0_memory_start, dom0_memory_end,
                         (char *)initial_images_start, 
                         mod[0].mod_end-mod[0].mod_start,
                         (mbi->mods_count == 1) ? 0 :

@@ -23,12 +23,9 @@
 #define __HYPERVISOR_set_gdt               3
 #define __HYPERVISOR_stack_switch          4
 #define __HYPERVISOR_set_callbacks         5
-#define __HYPERVISOR_net_io_op             6
 #define __HYPERVISOR_fpu_taskswitch        7
 #define __HYPERVISOR_sched_op              8
 #define __HYPERVISOR_dom0_op               9
-#define __HYPERVISOR_network_op           10
-#define __HYPERVISOR_block_io_op          11
 #define __HYPERVISOR_set_debugreg         12
 #define __HYPERVISOR_get_debugreg         13
 #define __HYPERVISOR_update_descriptor    14
@@ -192,9 +189,6 @@ typedef u32 domid_t;
 /* DOMID_SELF is used in certain contexts to refer to oneself. */
 #define DOMID_SELF (0x7FFFFFFEU)
 
-#include "network.h"
-#include "block.h"
-
 /*
  * Send an array of these to HYPERVISOR_mmu_update().
  * NB. The fields are natural pointer/address size for this architecture.
@@ -331,15 +325,7 @@ typedef struct shared_info_st
     u64                wall_timeout;    /* 440 */
     u64                domain_timeout;  /* 448 */
 
-    /*
-     * The index structures are all stored here for convenience. The rings 
-     * themselves are allocated by Xen but the guestos must create its own 
-     * mapping -- the machine address is given in the startinfo structure to 
-     * allow this to happen.
-     */
-    net_idx_t net_idx[MAX_DOMAIN_VIFS];
-
-    execution_context_t execution_context;
+    execution_context_t execution_context; /* 456 */
 
 } PACKED shared_info_t;
 

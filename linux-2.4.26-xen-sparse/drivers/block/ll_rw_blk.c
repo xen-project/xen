@@ -1626,7 +1626,7 @@ int __init blk_dev_init(void)
 	jsfd_init();
 #endif
 
-#if defined(CONFIG_XEN_VBD) || defined(CONFIG_XEN_NEWIO)
+#if defined(CONFIG_XEN)
     xlblk_init();
 #endif
 

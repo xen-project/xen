@@ -116,7 +116,7 @@ typedef struct {
 typedef struct {
     /* IN variables. */
     domid_t                 domain;   /*  0 */
-    u32                     num_vifs; /*  4 */
+    u32                     __pad;    /*  4 */
     /* IN/OUT parameters */
     full_execution_context_t *ctxt;   /*  8 */
     MEMORY_PADDING;
