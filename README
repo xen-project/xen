@@ -1,14 +1,14 @@
-#############################
- __  __            _   _____ 
- \ \/ /___ _ __   / | |___ / 
-  \  // _ \ '_ \  | |   |_ \ 
-  /  \  __/ | | | | |_ ___) |
- /_/\_\___|_| |_| |_(_)____/ 
-                                              
-#############################
+###############################
+__  __            ____    ___
+\ \/ /___ _ __   |___ \  / _ \
+ \  // _ \ '_ \    __) || | | |
+ /  \  __/ | | |  / __/ | |_| |
+/_/\_\___|_| |_| |_____(_)___/
+
+###############################
 
 University of Cambridge Computer Laboratory
-15 Jun 2004
+28 Aug 2004
 
 http://www.cl.cam.ac.uk/netos/xen
 
@@ -149,10 +149,10 @@ Building Xen and XenLinux
 =========================
 
 The public master BK repository for the 2.0 release lives at: 
-bk://xen.bkbits.net/xeno-2.0.bk
+bk://xen.bkbits.net/xen-2.0.bk
 
 To fetch a local copy, install the BitKeeper tools, then run: 
-'bk clone bk://xen.bkbits.net/xeno-2.0.bk'
+'bk clone bk://xen.bkbits.net/xen-2.0.bk'
 
 You can do a complete build of Xen, the control tools, and the
 XenLinux kernel images with "make world". This can take 10 minutes
@@ -164,8 +164,8 @@ can then install everything to the standard system directories
 
 Take a look in install/boot/:
  install/boot/xen.gz               The Xen 'kernel' (formerly image.gz)
- install/boot/vmlinuz-2.4.26-xen0  Domain 0 XenLinux kernel (xenolinux.gz)
- install/boot/vmlinuz-2.4.26-xenU  Unprivileged XenLinux kernel
+ install/boot/vmlinuz-2.4.27-xen0  Domain 0 XenLinux kernel (xenolinux.gz)
+ install/boot/vmlinuz-2.4.27-xenU  Unprivileged XenLinux kernel
 
 The difference between the two Linux kernels that are built is
 due to the configuration file used for each. The "U" suffixed
@@ -176,7 +176,7 @@ your non-privileged domains.
 The install/boot directory will also contain the config files
 used for building the XenLinux kernels, and also versions of Xen
 and XenLinux kernels that contain debug symbols (xen-syms and
-vmlinux-syms-2.4.26-xen0) which are essential for interpreting crash
+vmlinux-syms-2.4.27-xen0) which are essential for interpreting crash
 dumps.
 
 Inspect the Makefile if you want to see what goes on during a
@@ -185,7 +185,7 @@ more complicated. The makefile needs a 'pristine' linux kernel tree
 which it will then add the Xen architecture files to. You can tell the
 makefile the location of the appropriate linux compressed tar file by
 setting the LINUX_SRC environment variable
-(e.g. "LINUX_SRC=/tmp/linux-2.4.26.tar.gz make world") or by placing
+(e.g. "LINUX_SRC=/tmp/linux-2.4.27.tar.gz make world") or by placing
 the tar file somewhere in the search path of LINUX_SRC_PATH which
 defaults to ".:..". If the makefile can't find a suitable kernel tar
 file it attempts to download it from kernel.org, but this won't work

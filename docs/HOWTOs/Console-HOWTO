@@ -1,10 +1,10 @@
-    New console I/O infrastructure in Xen 1.3
+    New console I/O infrastructure in Xen 2.0
     =========================================
 
     Keir Fraser, University of Cambridge, 3rd June 2004
 
  I thought I'd write a quick note about using the new console I/O
- infrastructure in Xen 1.3. Significant new features compared with 1.2,
+ infrastructure in Xen 2.0. Significant new features compared with 1.2,
  and with older revisions of 1.3, include:
   - bi-directional console access
   - log in to a Xenolinux guest OS via its virtual console
@@ -80,6 +80,6 @@ Virtual console for other domains
   # xencons localhost 9600
 
  An alternative to manually running a terminal client is to specify
- '-c' to xc_dom_create.py, or add 'auto_console=True' to the defaults
- file. This will cause xc_dom_create.py to automatically become the
+ '-c' to xm create, or add 'auto_console=True' to the defaults
+ file. This will cause xm create to automatically become the
  console terminal after starting the domain.

@@ -69,9 +69,9 @@ int parseelfimage(char *elfbase,
         printk("Xen-ELF header found: '%s'\n", guestinfo);
 
         if ( (strstr(guestinfo, "GUEST_OS=linux") == NULL) ||
-             (strstr(guestinfo, "XEN_VER=1.3") == NULL) )
+             (strstr(guestinfo, "XEN_VER=2.0") == NULL) )
         {
-            printk("ERROR: Xen will only load Linux built for Xen v1.3\n");
+            printk("ERROR: Xen will only load Linux built for Xen v2.0\n");
             return -EINVAL;
         }
 
