@@ -270,21 +270,18 @@ ret_from_hypervisor_call:
         movl %eax,EAX(%esp)		# save the return value
 
 test_all_events:
-        mov  PROCESSOR(%ebx),%eax
-        shl  $4,%eax                    # sizeof(guest_trapo_bounce) == 16
-        lea  guest_trap_bounce(%eax),%edx
-        cli                             # tests must not race interrupts
         xorl %ecx,%ecx
         notl %ecx
-test_softirqs:  
+        cli                             # tests must not race interrupts
+/*test_softirqs:*/  
         mov  PROCESSOR(%ebx),%eax
         shl  $6,%eax                    # sizeof(irq_cpustat) == 64
         test %ecx,SYMBOL_NAME(irq_stat)(%eax,1)
         jnz  process_softirqs
-test_hyp_events:        
+/*test_hyp_events:*/
         test %ecx, HYP_EVENTS(%ebx)
         jnz  process_hyp_events
-test_guest_events:      
+/*test_guest_events:*/
         movl SHARED_INFO(%ebx),%eax
         test %ecx,EVENTS(%eax)
         jz   restore_all
@@ -293,8 +290,11 @@ test_guest_events:
         /* Prevent unnecessary reentry of event callback (stack overflow!) */
         xorl %ecx,%ecx
         movl %ecx,EVENTS_ENABLE(%eax)      
-/* %eax == shared_info, %ebx == task_struct, %edx == guest_trap_bounce */
+/* %eax == shared_info, %ebx == task_struct */
 process_guest_events:   
+        mov  PROCESSOR(%ebx),%edx
+        shl  $4,%edx                    # sizeof(guest_trap_bounce) == 16
+        lea  guest_trap_bounce(%edx),%edx
         movl EVENT_ADDR(%eax),%eax
         movl %eax,GTB_EIP(%edx)
         movw $__GUEST_CS,GTB_CS(%edx)
@@ -302,11 +302,10 @@ process_guest_events:
         jmp  restore_all
 
         ALIGN
-process_softirqs:       
-        push %edx
+process_softirqs:
+        sti       
         call SYMBOL_NAME(do_softirq)
-        pop  %edx
-        jmp  test_hyp_events
+        jmp  test_all_events
         
         ALIGN
 process_hyp_events:
