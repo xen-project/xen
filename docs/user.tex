@@ -76,29 +76,28 @@ Xen support is available for increasingly many operating systems.  The
 following OSs have either been ported already or a port is in
 progress:
 \begin{itemize}
-\item Dragonfly BSD
-\item FreeBSD 5.3
 \item Linux 2.4
 \item Linux 2.6
 \item NetBSD 2.0
+\item Dragonfly BSD
+\item FreeBSD 5.3
 \item Plan 9
-\item Windows XP
+% \item Windows XP
 \end{itemize}
 
-Right now, Linux 2.4 and 2.6 are available for Xen 2.0.  NetBSD
-port will be updated to run on Xen 2.0, hopefully in time for the NetBSD
-2.0 release.  It is intended that Xen support be integrated into the
-official releases of Linux 2.6, NetBSD 2.0, FreeBSD and Dragonfly BSD.
+Right now, Linux 2.4, Linux 2.6 and NetBSD are available for Xen 2.0.
+It is intended that Xen support be integrated into the official
+releases of Linux 2.6, NetBSD 2.0, FreeBSD and Dragonfly BSD.
 
 Even running multiple copies of Linux can be very useful, providing a
 means of containing faults to one OS image, providing performance
 isolation between the various OS instances and trying out multiple
 distros.
 
-The Windows XP port is only available to those who have signed the
-Microsoft Academic Source License.  Publically available XP support
-will not be available for the foreseeable future (this may change when
-Intel's Vanderpool Technology becomes available).
+% The Windows XP port is only available to those who have signed the
+% Microsoft Academic Source License.  Publically available XP support
+% will not be available for the foreseeable future (this may change when
+% Intel's Vanderpool Technology becomes available).
 
 Possible usage scenarios for Xen include:
 \begin{description}
@@ -170,19 +169,12 @@ at:\\
 {\tt http://www.cl.cam.ac.uk/netos/papers/2003-xensosp.pdf}\\
 Work to port Xen to x86\_64 and IA64 is currently underway.
 
-Xen is targeted at server-class machines, and the current list of
-supported hardware very much reflects this, avoiding the need for us
-to write drivers for "legacy" hardware. It is likely that some desktop
-chipsets will fail to work properly with the default Xen
-configuration: specifying {\tt noacpi} or {\tt ignorebiostables} when
-booting Xen may help in these cases.
-
 Xen requires a ``P6'' or newer processor (e.g. Pentium Pro, Celeron,
 Pentium II, Pentium III, Pentium IV, Xeon, AMD Athlon, AMD Duron).
 Multiprocessor machines are supported, and we also have basic support
 for HyperThreading (SMT), although this remains a topic for ongoing
-research. We're also working on an x86\_64 port (though Xen should
-already run on these systems just fine in 32-bit mode).
+research.  We're also working on an x86\_64 port (though Xen already
+runs on these systems just fine in 32-bit mode).
 
 Xen can currently use up to 4GB of memory.  It is possible for x86
 machines to address up to 64GB of physical memory but (unless an
@@ -190,13 +182,16 @@ external developer volunteers) there are no plans to support these
 systems.  The x86\_64 port is the planned route to supporting more
 than 4GB of memory.
 
-In contrast to previous Xen versions, in Xen 2.0 device drivers run
-within a privileged guest OS rather than within Xen itself. This means
-that we should be compatible with the majority of device hardware
-supported by Linux.  The default XenLinux build contains support for
-relatively modern server-class network and disk hardware, but you can
-add support for other hardware by configuring your XenLinux kernel in
-the normal way (e.g. \verb_# make ARCH=xen xconfig_).
+Xen offloads most of the hardware support issues to the guest OS
+running in Domain 0.  Xen itself only contains code to detect and
+start additional processors, setup interrupt routing and perform PCI
+bus enumeration.  Device drivers run within a privileged guest OS
+rather than within Xen itself.  This means that we should be
+compatible with the majority of device hardware supported by Linux.
+The default XenLinux build contains support for relatively modern
+server-class network and disk hardware, but you can add support for
+other hardware by configuring your XenLinux kernel in the normal way
+(e.g. \verb_# make ARCH=xen menuconfig_).
 
 \section{History}
 
@@ -218,9 +213,9 @@ Xen has since grown into a project in its own right, enabling us to
 investigate interesting research issues regarding the best techniques
 for virtualizing resources such as the CPU, memory, disk and network.
 The project has been bolstered by support from Intel Research
-Cambridge, and HP Labs, who are now working closely with us. We're
-also in receipt of support from Microsoft Research Cambridge to port
-Windows XP to run on Xen.
+Cambridge, and HP Labs, who are now working closely with us.
+% We're also in receipt of support from Microsoft Research Cambridge to
+% port Windows XP to run on Xen.
 
 Xen was first described in the 2003 paper at SOSP \\
 ({\tt http://www.cl.cam.ac.uk/netos/papers/2003-xensosp.pdf}).
@@ -241,7 +236,7 @@ will work to conclusively achieve that position.
 
 \chapter{Installation}
 
-The Xen distribution includes three main components: Xen itself,
+The Xen distribution includes three main components:  Xen itself,
 utilities to convert a standard Linux tree to run on Xen and the
 userspace tools required to operate a Xen-based system.
 
@@ -259,14 +254,14 @@ http://www.twistedmatrix.com}).  There may be a package available for
 your distribution; alternatively it can be installed by running {\tt \#
 make install-twisted} in the root of the Xen source tree.
 \item The Linux bridge control tools (see {\tt
-http://bridge.sourceforge.net}).  There may be a packages of these
-tools available for your distribution.
+http://bridge.sourceforge.net}).  There may be packages of these tools
+available for your distribution.
 \item Linux IP Routing Tools
 \item make
-\item python-dev
 \item gcc
-\item zlib-dev
 \item libcurl
+\item zlib-dev
+\item python-dev
 \item python2.3-pycurl
 \item python2.3-twisted
 \end{itemize}
@@ -302,11 +297,11 @@ run:
 # bk clone bk://xen.bkbits.net/xen-2.0.bk
 \end{verbatim}
 
-Under your current directory, a new directory named `xen-2.0.bk'
-has been created, which contains all the source code for the Xen
-hypervisor and the Xen tools.  The directory also contains `sparse'
-Linux source trees, containing only the files that differ between
-XenLinux and standard Linux.
+Under your current directory, a new directory named `xen-2.0.bk' has
+been created, which contains all the source code for the Xen
+hypervisor and the Xen tools.  The directory also contains `sparse' OS
+source trees, containing only the files that require changes to allow
+the OS to run on Xen.
 
 Once you have cloned the repository, you can update to the newest
 changes to the repository by running:
@@ -330,8 +325,9 @@ The Xen source code repository is structured as follows:
 \item[\path{tools/}] Xen node controller daemon (Xend), command line tools, 
   control libraries
 \item[\path{xen/}] The Xen hypervisor itself.
-\item[\path{linux-2.4.27-xen/}] Linux 2.4 support for Xen
-\item[\path{linux-2.6.8.1-xen/}] Linux 2.6 support for Xen
+\item[\path{linux-2.4.27-xen/}] Xen support for Linux 2.4
+\item[\path{linux-2.6.8.1-xen/}] Xen support for Linux 2.6
+\item[\path{netbsd-2.0-xen-sparse/}] Xen support for NetBSD 2.0
 \item[\path{docs/}] various documentation files for users and developers
 \item[\path{extras/}] currently this contains the Mini OS, aimed at developers
 \end{description}
@@ -351,37 +347,46 @@ following:
       unprivileged virtual machines.
 \end{itemize}
 
-Inspect the Makefile if you want to see what goes on during a
-build. Building Xen and the tools is straightforward, but XenLinux is
-more complicated. The makefile needs a `pristine' linux kernel tree
-which it will then add the Xen architecture files to. You can tell the
+Inspect the Makefile if you want to see what goes on during a build.
+Building Xen and the tools is straightforward, but XenLinux is more
+complicated.  The makefile needs a `pristine' linux kernel tree which
+it will then add the Xen architecture files to.  You can tell the
 makefile the location of the appropriate linux compressed tar file by
 setting the LINUX\_SRC environment variable, e.g. \\
 \verb!# LINUX_SRC=/tmp/linux-2.6.8.1.tar.bz2 make world! \\ or by
-placing the tar file somewhere in the search path of {\tt LINUX\_SRC\_PATH}
-which defaults to ``{\tt .:..}". If the makefile can't find a suitable
-kernel tar file it attempts to download it from kernel.org (this won't
-work if you're behind a firewall).
+placing the tar file somewhere in the search path of {\tt
+LINUX\_SRC\_PATH} which defaults to ``{\tt .:..}".  If the makefile
+can't find a suitable kernel tar file it attempts to download it from
+kernel.org (this won't work if you're behind a firewall).
 
 After untaring the pristine kernel tree, the makefile uses the {\tt
-mkbuildtree} script to add the Xen patches the kernel. It then builds
-two different XenLinux images, one with a ``-xen0'' extension which
-contains hardware device drivers and drivers for Xen's virtual devices,
-and one with a ``-xenU'' extension that just contains the virtual ones.
+mkbuildtree} script to add the Xen patches to the kernel.  It then
+builds two different XenLinux images, one with a ``-xen0'' extension
+which contains hardware device drivers and drivers for Xen's virtual
+devices, and one with a ``-xenU'' extension that just contains the
+virtual ones.
 
 The procedure is similar to build the Linux 2.4 port: \\
 \verb!# LINUX_SRC=/path/to/linux2.4/source make linux24!
 
-In both cases, if you have an SMP machine you may wish to give the
-{\tt '-j4'} argument to make to get a parallel build.
+The NetBSD port can be built using: \\ \verb!# make netbsd! \\ The
+NetBSD port is built using a snapshot of the netbsd-2-0 cvs branch.
+The snapshot is downloaded as part of the build process, if it is not
+yet present in the {\tt NETBSD_SRC_PATH} search path.  The build
+process also downloads a toolchain which includes all the tools
+necessary to build the NetBSD kernel under Linux.
+
+If you have an SMP machine you may wish to give the {\tt '-j4'}
+argument to make to get a parallel build.
 
 XXX Insert details on customising the kernel to be built.
 i.e. merging config files
 
-If you have an existing kernel configuration that you would like to
-use for domain 0, you should copy it to
+If you have an existing Linux kernel configuration that you would like
+to use for domain 0, you should copy it to
 install/boot/config-2.6.8.1-xen0.  During the first build, you may be
-asked about some Xen-specific options.
+asked about some Xen-specific options.  We advised accepting the
+defaults for these options.
 
 \framebox{\parbox{5in}{
 {\bf Distro specific:} \\
@@ -395,10 +400,10 @@ locations, do: \\
 \verb_# make install_
 
 Alternatively, users with special installation requirements may wish
-to install them manually by copying file to their appropriate
+to install them manually by copying the files to their appropriate
 destinations.
 
-Take a look at the files in \path{install/boot/}:
+Files in \path{install/boot/} include:
 \begin{itemize}
 \item \path{install/boot/xen.gz} The Xen 'kernel'
 \item \path{install/boot/vmlinuz-2.6.8.1-xen0}  Domain 0 XenLinux kernel
@@ -406,7 +411,7 @@ Take a look at the files in \path{install/boot/}:
 \end{itemize}
 
 The difference between the two Linux kernels that are built is due to
-the configuration file used for each. The "U" suffixed unprivileged
+the configuration file used for each.  The "U" suffixed unprivileged
 version doesn't contain any of the physical hardware device drivers
 --- it is 30\% smaller and hence may be preferred for your
 non-privileged domains.  The ``0'' suffixed privileged version can be
@@ -472,7 +477,7 @@ serial console.  Add the line:
 Users of the XenLinux 2.6 kernel should disable Thread Local Storage
 (e.g. by doing a {\tt mv /lib/tls /lib/tls.disabled}) before
 attempting to run with a XenLinux kernel.  You can always reenable it
-my restoring the directory to its original location (i.e. {\tt mv
+by restoring the directory to its original location (i.e. {\tt mv
   /lib/tls.disabled /lib/tls}).
 
 The TLS implementation uses segmentation in a way that is not
@@ -504,7 +509,8 @@ should still be able to reboot with your normal Linux kernel.
 
 The first step in creating a new domain is to prepare a root
 filesystem for it to boot off.  Typically, this might be stored in a
-normal partition, a disk file and LVM volume, or on an NFS server.
+normal partition, an LVM or other volume manager partition, a disk
+file or on an NFS server.
 
 A simple way to do this is simply to boot from your standard OS
 install CD and install the distribution into another partition on your
@@ -513,7 +519,7 @@ hard drive.
 {\em N.b } you can boot with Xen and XenLinux without installing any
 special userspace tools but will need to have the prerequisites
 described in Section~\ref{sec:prerequisites} and the Xen control tools
-are installed before you proceed.
+installed before you proceed.
 
 \section{From the web interface}
 
@@ -535,10 +541,10 @@ require a more complex setup, you will want to write a custom
 configuration file --- details of the configuration file formats are
 included in Chapter~\ref{cha:config}.
 
-The \path{xmdefconfig1} file is a simple template configuration file
+The \path{xmexample1} file is a simple template configuration file
 for describing a single VM.
 
-The \path{xmdefconfig2} file is a template description that is intended
+The \path{xmexample2} file is a template description that is intended
 to be reused for multiple virtual machines.  Setting the value of the
 {\tt vmid} variable on the {\tt xm} command line
 fills in parts of this template.
@@ -600,8 +606,8 @@ kernel = "/boot/vmlinuz-2.6.8.1-xenU" # or a 2.4 kernel or a xen0 kernel
 memory = 64
 name = "ttylinux"
 cpu = -1 # leave to Xen to pick
-nics=1
-ip="1.2.3.4"
+nics = 1
+ip = "1.2.3.4"
 disk = ['file:/path/to/ttylinux-disk,sda1,w']
 root = "/dev/sda1 ro"
 \end{verbatim}
@@ -667,11 +673,11 @@ e.g. \verb_# xm console 1_ (open console to domain 1)
 \subsection{\tt xm list}
 
 The output of {\tt xm list} is in rows of the following format:\\
-\verb_domid name memory cpu state cputime_
+\verb_name domid memory cpu state cputime console_
 
 \begin{description}
-\item[domid] The number of the domain ID this virtual machine is running in.
 \item[name]  The descriptive name of the virtual machine.
+\item[domid] The number of the domain ID this virtual machine is running in.
 \item[memory] Memory size in megabytes.
 \item[cpu]   The CPU this domain is running on.
 \item[state] Domain state consists of 5 fields:
@@ -683,6 +689,7 @@ The output of {\tt xm list} is in rows of the following format:\\
   \item[c] crashed
   \end{description}
 \item[cputime] How much CPU time (in seconds) the domain has used so far.
+\item[console] TCP port accepting connections to the domain's console.
 \end{description}
 
 The {\tt xm list} command also supports a long output format when the
@@ -702,8 +709,8 @@ It is possible to use a file in Domain 0 as the primary storage for a
 virtual machine.  As well as being convenient, this also has the
 advantage that the virtual block device will be {\em sparse} --- space
 will only really be allocated as parts of the file are used.  So if a
-virtual machine uses only half its disk space then the file really
-takes up a half of the size allocated.
+virtual machine uses only half of its disk space then the file really
+takes up half of the size allocated.
 
 For example, to create a 2GB sparse file-backed virtual block device
 (actually only consumes 1KB of disk):
@@ -717,7 +724,7 @@ Make a file system in the disk file: \\
 
 Populate the file system e.g. by copying from the current root:
 \begin{verbatim}
-# mount vm1disk /mnt -o loop
+# mount -o loop vm1disk /mnt
 # cp -ax / /mnt
 \end{verbatim}
 Tailor the file system by editing \path{/etc/fstab},
@@ -728,8 +735,6 @@ this example put \path{/dev/sda1} to root in fstab.
 
 Now unmount (this is important!):\\
 \verb_# umount /mnt_
-
-And detach the file from its loop device:
 
 In the configuration file set:\\
 \verb_disk = ['file:/full/path/to/vm1disk,sda1,w']_
@@ -784,7 +789,7 @@ order to handle the {\tt vmid} variable.
 
 
 \chapter{Xend (Node control daemon)}
-\label{cha:xensv}
+\label{cha:xend}
 
 The Xen Daemon (Xend) performs system management functions related to
 virtual machines.  It forms a central point of control for a machine
@@ -801,11 +806,10 @@ Xend command line:
 \verb_# xend restart_ & restart Xend if running, otherwise start it \\
 \end{tabular}
 
-An SysV init script called {\tt xend} is provided to start Xend at
-boot time.  The {\tt make install} will install this script in
-{\path{/etc/init.d} automatically.  To enable it, you can make
-symbolic links in the appropriate runlevel directories or use the {\tt
-chkconfig} tool, where available.
+A SysV init script called {\tt xend} is provided to start Xend at boot
+time.  {\tt make install} installs this script in {\path{/etc/init.d}.
+To enable it, you have to make symbolic links in the appropriate
+runlevel directories or use the {\tt chkconfig} tool, where available.
 
 Once Xend is running, more sophisticated administration can be done
 using the Xensv web interface (see Chapter~\ref{cha:xensv}).
@@ -822,7 +826,7 @@ It will automatically start Xend if it is not already running.
 
 By default, Xensv will serve out the web interface on port 8080.  This
 can be changed by editing {\tt
-/usr/lib/python2.2/site-packages/xen/sv/params.py}.
+/usr/lib/python2.3/site-packages/xen/sv/params.py}.
 
 Once Xensv is running, the web interface can be used to manage running
 domains and provides a user friendly domain creation wizard.
@@ -839,13 +843,13 @@ The general format of an xm command line is:
 # xm command [switches] [arguments] [variables]
 \end{verbatim}
 
-The available {\em switches } and {\em arguments}are dependent on the
+The available {\em switches } and {\em arguments} are dependent on the
 {\em command} chosen.  The {\em variables} may be set using
-declarations of the form {\tt variable=value} and may be used to set /
-override any of the values in the configuration file being used,
-including the standard variables described above and any custom
-variables (for instance, the \path{xmdefconfig} file uses a {\tt vmid}
-variable).
+declarations of the form {\tt variable=value} and command line
+declarations override any of the values in the configuration file
+being used, including the standard variables described above and any
+custom variables (for instance, the \path{xmdefconfig} file uses a
+{\tt vmid} variable).
 
 The available commands are as follows:
 
@@ -1050,7 +1054,7 @@ domains), so the FBVT derivative has been included as an alternative.
 \item[ctx\_allow]
   the context switch allowance is similar to the "quantum"
   in traditional schedulers.  It is the minimum time that
-  a scheduled domain will be allowed to run before be
+  a scheduled domain will be allowed to run before being
   pre-empted.  This prevents thrashing of the CPU.
 \end{description}
 
@@ -1124,13 +1128,13 @@ higher throughput.
 
 \chapter{Privileged domains}
 
-There are two possible types of privileges: IO privileges and
+There are two possible types of privileges:  IO privileges and
 administration privileges.
 
 \section{Driver domains (IO Privileges)}
 
 IO privileges can be assigned to allow a domain to drive PCI devices
-itself.  This is used for to support driver domains.
+itself.  This is used to support driver domains.
 
 Setting backend privileges is currently only supported in SXP format
 config files (??? is this true - there's nothing in xmdefconfig,
@@ -1201,8 +1205,11 @@ make option1=y option2=y
 
 \section{List of options}
 
+{\bf verbose=y }\\
+Enable debugging messages when Xen detects an unexpected condition.
+Also enables console output from all domains. \\
 {\bf debug=y }\\
-Enable debug assertions and console output.
+Enable debug assertions.  Implies {\bf verbose=y }.
 (Primarily useful for tracing bugs in Xen).        \\
 {\bf debugger=y }\\
 Enable the in-Xen pervasive debugger (PDB).
@@ -1253,12 +1260,12 @@ editing \path{grub.conf}.
  Disable Hyperthreading. \\
 
 {\bf badpage=$<$page number$>$[,$<$page number$>$] } \\
-                  Specify a list of pages not to be allocated for use 
-                  because they contain bad bytes. For example, if your
-                  memory tester says that byte 0x12345678 is bad, you would
-                  place 'badpage=0x12345' on Xen's command line (i.e., the
-                  last three digits of the byte address are not
-                  included!). \\
+ Specify a list of pages not to be allocated for use 
+ because they contain bad bytes. For example, if your
+ memory tester says that byte 0x12345678 is bad, you would
+ place 'badpage=0x12345' on Xen's command line (i.e., the
+ last three digits of the byte address are not
+ included!). \\
 
 {\bf com1=$<$baud$>$,DPS[,$<$io\_base$>$,$<$irq$>$] \\
  com2=$<$baud$>$,DPS[,$<$io\_base$>$,$<$irq$>$] } \\
@@ -1294,7 +1301,7 @@ editing \path{grub.conf}.
  pressed three times. Specifying '`' disables switching.
  The <auto-switch-char> specifies whether Xen should
  auto-switch input to DOM0 when it boots -- if it is 'x'
- then auto-switching is disabled. Any other value, or
+ then auto-switching is disabled.  Any other value, or
  omitting the character, enables auto-switching.
  [NB. Default for this option is 'a'] \\
 
@@ -1398,17 +1405,19 @@ Xen domain:
 \item Set up Xen 2.0 and test that it's working, as described earlier in
       this manual.
 
-\item Create disk images for root-fs and swap (alternatively, you might create
-      dedicated partitions, LVM logical volumes, etc. if that suits your setup).
+\item Create disk images for root-fs and swap (alternatively, you
+      might create dedicated partitions, LVM logical volumes, etc. if
+      that suits your setup).
 \begin{verbatim}  
 dd if=/dev/zero of=/path/diskimage bs=1024k count=size_in_mbytes
 dd if=/dev/zero of=/path/swapimage bs=1024k count=size_in_mbytes
 \end{verbatim}
-      If you're going to use this filesystem / diskimage only as a `template' for
-      other vm diskimages, something like 300 MB should be enough.. (of course it 
-      depends what kind of packages you are planning to install to the template)
+      If you're going to use this filesystem / diskimage only as a
+      `template' for other vm diskimages, something like 300 MB should
+      be enough.. (of course it depends what kind of packages you are
+      planning to install to the template)
 
-\item Create filesystem and swap to the images
+\item Create the filesystem and initialise the swap image
 \begin{verbatim}
 mkfs.ext3 /path/diskimage
 mkswap /path/swapimage
@@ -1421,7 +1430,7 @@ mount -o loop /path/diskimage /mnt/disk
 
 \item Install {\tt debootstrap}
 
-Make sure you have debootstrap installed on the host. If you are
+Make sure you have debootstrap installed on the host.  If you are
 running Debian sarge (3.1 / testing) or unstable you can install it by
 running {\tt apt-get install debootstrap}.  Otherwise, it can be
 downloaded from the Debian project website.
@@ -1439,7 +1448,7 @@ You can use any other Debian http/ftp mirror you want.
 chroot /mnt/disk /bin/bash
 \end{verbatim}
 
-Edit the following files using vi or nano and make needed settings:
+Edit the following files using vi or nano and make needed changes:
 \begin{verbatim}
 /etc/hostname
 /etc/hosts
@@ -1460,7 +1469,7 @@ Add Debian mirror to:
 /etc/apt/sources.list
 \end{verbatim}
 
-And create fstab like this:
+Create fstab like this:
 \begin{verbatim}
 /dev/sda1       /       ext3    errors=remount-ro       0       1
 /dev/sda2       none    swap    sw                      0       0
@@ -1474,8 +1483,8 @@ Logout
 umount /mnt/disk
 \end{verbatim}
 
-\item      Create Xen 2.0 configuration file for the new domain. You can use the
-        example-configurations coming with xen as a template.
+\item Create Xen 2.0 configuration file for the new domain. You can
+        use the example-configurations coming with xen as a template.
 
         Make sure you have the following set up:
 \begin{verbatim}
@@ -1500,9 +1509,9 @@ xm list
 Started domain testdomain2, console on port 9626
 \end{verbatim}
         
-        There you can see the ID of the console: 26. You can also
-        list the consoles with {\tt xm consoles"}. (ID is the last two digits of
-        the portnumber.)
+        There you can see the ID of the console: 26. You can also list
+        the consoles with {\tt xm consoles"}. (ID is the last two
+        digits of the portnumber.)
 
         Attach to the console:
 
@@ -1510,14 +1519,15 @@ Started domain testdomain2, console on port 9626
 xm console 26
 \end{verbatim}
 
-        or by telnetting to the port 9626 of localhost (the xm console progam works better).
+        or by telnetting to the port 9626 of localhost (the xm console
+        progam works better).
 
 \item   Log in and run base-config
 
         As a default there's no password for the root.
 
         Check that everything looks OK, and the system started without
-        errors. Check that the swap is active, and the network settings are
+        errors.  Check that the swap is active, and the network settings are
         correct.
 
         Run {\tt /usr/sbin/base-config} to set up the Debian settings.
@@ -1535,4 +1545,3 @@ simply copying the image file.  Once this is done, modify the
 image-specific settings (hostname, network settings, etc).
 
 \end{document}
-
