@@ -23,7 +23,7 @@ export DESTDIR
 
 # Export target architecture overrides to Xen and Linux sub-trees.
 ifneq ($(TARGET_ARCH),)
-SUBARCH := $(subst x86_32,i386,$(ARCH))
+SUBARCH := $(subst x86_32,i386,$(TARGET_ARCH))
 export TARGET_ARCH SUBARCH
 endif
 
