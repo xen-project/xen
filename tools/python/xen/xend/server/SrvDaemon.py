@@ -711,7 +711,7 @@ class Daemon:
             raise XendError('Invalid console id')
         console.disconnect()
 
-    def domain_shutdown(self, dom, reason, key=None):
+    def domain_shutdown(self, dom, reason, key=0):
         """Shutdown a domain.
         """
         dom = int(dom)

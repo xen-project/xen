@@ -37,7 +37,7 @@ class DomainController(controller.Controller):
         self.addMethod(CMSG_MEM_REQUEST, 0, None)
         self.registerChannel()
 
-    def shutdown(self, reason, key=None):
+    def shutdown(self, reason, key=0):
         """Shutdown a domain.
 
         reason shutdown reason

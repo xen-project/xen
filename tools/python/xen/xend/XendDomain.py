@@ -455,7 +455,7 @@ class XendDomain:
         except Exception, ex:
             raise XendError(str(ex))
     
-    def domain_shutdown(self, id, reason='poweroff', key=None):
+    def domain_shutdown(self, id, reason='poweroff', key=0):
         """Shutdown domain (nicely).
          - poweroff: restart according to exit code and restart mode
          - reboot:   restart on exit
