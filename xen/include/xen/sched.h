@@ -32,11 +32,12 @@ extern struct domain *dom0;
 typedef struct event_channel_st
 {
 #define ECS_FREE         0 /* Channel is available for use.                  */
-#define ECS_UNBOUND      1 /* Channel is waiting to bind to a remote domain. */
-#define ECS_INTERDOMAIN  2 /* Channel is bound to another domain.            */
-#define ECS_PIRQ         3 /* Channel is bound to a physical IRQ line.       */
-#define ECS_VIRQ         4 /* Channel is bound to a virtual IRQ line.        */
-#define ECS_IPI          5 /* Channel is bound to a virtual IPI line.        */
+#define ECS_RESERVED     1 /* Channel is reserved.                           */
+#define ECS_UNBOUND      2 /* Channel is waiting to bind to a remote domain. */
+#define ECS_INTERDOMAIN  3 /* Channel is bound to another domain.            */
+#define ECS_PIRQ         4 /* Channel is bound to a physical IRQ line.       */
+#define ECS_VIRQ         5 /* Channel is bound to a virtual IRQ line.        */
+#define ECS_IPI          6 /* Channel is bound to a virtual IPI line.        */
     u16 state;
     union {
         struct {
