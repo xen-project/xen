@@ -243,7 +243,7 @@ void domain_destruct(struct domain *d)
 
     for_each_exec_domain(d, ed)
         free_perdomain_pt(ed);
-    free_xenheap_page((unsigned long)d->exec_domain[0]->shared_info);
+    free_xenheap_page((unsigned long)d->shared_info);
 
     free_domain_struct(d);
 }
@@ -278,7 +278,7 @@ int final_setup_guestos(struct domain *p, dom0_builddomain_t *builddomain)
         goto out;
 
     /* Set up the shared info structure. */
-    update_dom_time(p->exec_domain[0]->shared_info);
+    update_dom_time(p->shared_info);
 
     set_bit(DF_CONSTRUCTED, &p->d_flags);
 

@@ -372,7 +372,7 @@ long do_dom0_op(dom0_op_t *u_dom0_op)
         op->u.getdomaininfo.max_pages   = d->max_pages;
         op->u.getdomaininfo.cpu_time    = ed->cpu_time;
         op->u.getdomaininfo.shared_info_frame = 
-            __pa(ed->shared_info) >> PAGE_SHIFT;
+            __pa(d->shared_info) >> PAGE_SHIFT;
 
         if ( op->u.getdomaininfo.ctxt != NULL )
         {

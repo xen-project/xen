@@ -318,7 +318,7 @@ void do_settime(unsigned long secs, unsigned long usecs, u64 system_time_base)
 
     write_unlock_irq(&time_lock);
 
-    update_dom_time(current->shared_info);
+    update_dom_time(current->domain->shared_info);
 }
 
 

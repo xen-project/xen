@@ -23,7 +23,7 @@
 static inline void evtchn_set_pending(struct domain *d, int port)
 {
     struct exec_domain *ed = d->exec_domain[0];
-    shared_info_t *s = ed->shared_info;
+    shared_info_t *s = d->shared_info;
     int            running;
 
     /* These three operations must happen in strict order. */
@@ -32,7 +32,7 @@ static inline void evtchn_set_pending(struct domain *d, int port)
          !test_and_set_bit(port>>5, &s->evtchn_pending_sel) )
     {
         /* The VCPU pending flag must be set /after/ update to evtchn-pend. */
-        set_bit(0, &s->vcpu_data[0].evtchn_upcall_pending);
+        set_bit(0, &ed->vcpu_info->evtchn_upcall_pending);
 
         /*
          * NB1. 'flags' and 'processor' must be checked /after/ update of
@@ -72,7 +72,7 @@ static inline void send_guest_pirq(struct domain *d, int pirq)
 }
 
 #define event_pending(_d)                                     \
-    ((_d)->shared_info->vcpu_data[0].evtchn_upcall_pending && \
-     !(_d)->shared_info->vcpu_data[0].evtchn_upcall_mask)
+    ((_d)->vcpu_info->evtchn_upcall_pending && \
+     !(_d)->vcpu_info->evtchn_upcall_mask)
 
 #endif /* __XEN_EVENT_H__ */

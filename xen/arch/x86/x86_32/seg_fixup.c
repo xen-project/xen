@@ -472,7 +472,7 @@ int gpf_emulate_4gb(struct xen_regs *regs)
         gtb->cs         = ti->cs;
         gtb->eip        = ti->address;
         if ( TI_GET_IF(ti) )
-            d->shared_info->vcpu_data[0].evtchn_upcall_mask = 1;
+            d->vcpu_info->evtchn_upcall_mask = 1;
     }
 
     return 1;

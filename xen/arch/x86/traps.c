@@ -231,7 +231,7 @@ static inline void do_trap(int trapnr, char *str,
     gtb->cs         = ti->cs;
     gtb->eip        = ti->address;
     if ( TI_GET_IF(ti) )
-        ed->shared_info->vcpu_data[0].evtchn_upcall_mask = 1;
+        ed->vcpu_info->evtchn_upcall_mask = 1;
     return; 
 
  xen_fault:
@@ -302,7 +302,7 @@ asmlinkage void do_int3(struct xen_regs *regs, long error_code)
     gtb->cs         = ti->cs;
     gtb->eip        = ti->address;
     if ( TI_GET_IF(ti) )
-        ed->shared_info->vcpu_data[0].evtchn_upcall_mask = 1;
+        ed->vcpu_info->evtchn_upcall_mask = 1;
 }
 
 asmlinkage void do_double_fault(void)
@@ -393,7 +393,7 @@ asmlinkage void do_page_fault(struct xen_regs *regs, long error_code)
     gtb->cs         = ti->cs;
     gtb->eip        = ti->address;
     if ( TI_GET_IF(ti) )
-        ed->shared_info->vcpu_data[0].evtchn_upcall_mask = 1;
+        ed->vcpu_info->evtchn_upcall_mask = 1;
     return; 
 
  xen_fault:
@@ -510,7 +510,7 @@ asmlinkage void do_general_protection(struct xen_regs *regs, long error_code)
     gtb->cs         = ti->cs;
     gtb->eip        = ti->address;
     if ( TI_GET_IF(ti) )
-        ed->shared_info->vcpu_data[0].evtchn_upcall_mask = 1;
+        ed->vcpu_info->evtchn_upcall_mask = 1;
     return;
 
  gp_in_kernel:

@@ -63,7 +63,7 @@ struct exec_domain
     u32 processor;               /* 00: current processor */
 
     /* An unsafe pointer into a shared data area. */
-    shared_info_t *shared_info;  /* 04: shared data area */
+    vcpu_info_t *vcpu_info;      /* 04: vcpu info pointer */
 
     /*
      * Return vectors pushed to us by guest OS.
@@ -105,6 +105,8 @@ struct exec_domain
 struct domain {
     domid_t  id;
     s_time_t create_time;
+
+    shared_info_t *shared_info;       /* shared data area */
 
     spinlock_t       page_alloc_lock; /* protects all the following fields  */
     struct list_head page_list;       /* linked list, of size tot_pages     */

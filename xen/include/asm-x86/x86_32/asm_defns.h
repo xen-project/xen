@@ -20,17 +20,17 @@
 #define XREGS_fs       0x3C
 #define XREGS_gs       0x40
 
-/* Offsets in 'struct domain' --- AUTO-GENERATE ME! */
-#define DOMAIN_processor       0
-#define DOMAIN_shared_info     4
-#define DOMAIN_event_sel       8
-#define DOMAIN_event_addr     12
-#define DOMAIN_failsafe_sel   16
-#define DOMAIN_failsafe_addr  20
+/* Offsets in 'struct exec_domain' --- AUTO-GENERATE ME! */
+#define EDOMAIN_processor       0
+#define EDOMAIN_vcpu_info       4
+#define EDOMAIN_event_sel       8
+#define EDOMAIN_event_addr     12
+#define EDOMAIN_failsafe_sel   16
+#define EDOMAIN_failsafe_addr  20
 
-/* Offsets in shared_info_t --- AUTO-GENERATE ME! */
-#define SHINFO_upcall_pending /* 0 */
-#define SHINFO_upcall_mask       1
+/* Offsets in vcpu_info_t --- AUTO-GENERATE ME! */
+#define VCPUINFO_upcall_pending /* 0 */
+#define VCPUINFO_upcall_mask       1
 
 /* Offsets in 'struct guest_trap_bounce' --- AUTO-GENERATE ME! */
 #define GTB_error_code    0

@@ -212,7 +212,7 @@ int pirq_guest_unmask(struct domain *d)
     irq_desc_t    *desc;
     unsigned int   i, j, pirq;
     u32            m;
-    shared_info_t *s = d->exec_domain[0]->shared_info;
+    shared_info_t *s = d->shared_info;
 
     for ( i = 0; i < ARRAY_SIZE(d->pirq_mask); i++ )
     {

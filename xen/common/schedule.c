@@ -222,7 +222,7 @@ void domain_wake(struct exec_domain *d)
 long do_block(void)
 {
     ASSERT(current->id != IDLE_DOMAIN_ID);
-    current->shared_info->vcpu_data[0].evtchn_upcall_mask = 0;
+    current->vcpu_info->evtchn_upcall_mask = 0;
     set_bit(EDF_BLOCKED, &current->ed_flags);
     TRACE_2D(TRC_SCHED_BLOCK, current->id, current);
     __enter_scheduler();
@@ -390,7 +390,7 @@ void __enter_scheduler(void)
 
     /* Ensure that the domain has an up-to-date time base. */
     if ( !is_idle_task(next->domain) )
-        update_dom_time(next->shared_info);
+        update_dom_time(next->domain->shared_info);
 
     if ( unlikely(prev == next) )
         return;
@@ -468,7 +468,7 @@ static void t_timer_fn(unsigned long unused)
     TRACE_0D(TRC_SCHED_T_TIMER_FN);
 
     if ( !is_idle_task(p->domain) ) {
-        update_dom_time(p->shared_info);
+        update_dom_time(p->domain->shared_info);
         send_guest_virq(p, VIRQ_TIMER);
     }
 
@@ -482,7 +482,7 @@ static void dom_timer_fn(unsigned long data)
     struct domain *p = (struct domain *)data;
     struct exec_domain *ed = p->exec_domain[0];
     TRACE_0D(TRC_SCHED_DOM_TIMER_FN);
-    update_dom_time(ed->shared_info);
+    update_dom_time(p->shared_info);
     send_guest_virq(ed, VIRQ_TIMER);
 }
 
@@ -496,7 +496,7 @@ static void fallback_timer_fn(unsigned long unused)
     TRACE_0D(TRC_SCHED_FALLBACK_TIMER_FN);
 
     if ( !is_idle_task(p) )
-        update_dom_time(ed->shared_info);
+        update_dom_time(p->shared_info);
 
     fallback_timer[ed->processor].expires = NOW() + MILLISECS(500);
     add_ac_timer(&fallback_timer[ed->processor]);

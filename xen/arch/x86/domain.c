@@ -215,19 +215,21 @@ void free_perdomain_pt(struct exec_domain *d)
     free_xenheap_page((unsigned long)d->mm.perdomain_pt);
 }
 
-void arch_do_createdomain(struct exec_domain *d)
+void arch_do_createdomain(struct exec_domain *ed)
 {
+    struct domain *d = ed->domain;
     d->shared_info = (void *)alloc_xenheap_page();
     memset(d->shared_info, 0, PAGE_SIZE);
+    ed->vcpu_info = &d->shared_info->vcpu_data[ed->eid];
     d->shared_info->arch.mfn_to_pfn_start = 
 	virt_to_phys(&machine_to_phys_mapping[0])>>PAGE_SHIFT;
-    SHARE_PFN_WITH_DOMAIN(virt_to_page(d->shared_info), d->domain);
+    SHARE_PFN_WITH_DOMAIN(virt_to_page(d->shared_info), d);
     machine_to_phys_mapping[virt_to_phys(d->shared_info) >> 
                            PAGE_SHIFT] = INVALID_P2M_ENTRY;
 
-    d->mm.perdomain_pt = (l1_pgentry_t *)alloc_xenheap_page();
-    memset(d->mm.perdomain_pt, 0, PAGE_SIZE);
-    machine_to_phys_mapping[virt_to_phys(d->mm.perdomain_pt) >> 
+    ed->mm.perdomain_pt = (l1_pgentry_t *)alloc_xenheap_page();
+    memset(ed->mm.perdomain_pt, 0, PAGE_SIZE);
+    machine_to_phys_mapping[virt_to_phys(ed->mm.perdomain_pt) >> 
                            PAGE_SHIFT] = INVALID_P2M_ENTRY;
 }
 
@@ -826,12 +828,12 @@ int construct_dom0(struct domain *p,
     }
 
     /* Set up shared-info area. */
-    update_dom_time(ed->shared_info);
-    ed->shared_info->domain_time = 0;
+    update_dom_time(p->shared_info);
+    p->shared_info->domain_time = 0;
     /* Mask all upcalls... */
     for ( i = 0; i < MAX_VIRT_CPUS; i++ )
-        ed->shared_info->vcpu_data[i].evtchn_upcall_mask = 1;
-    ed->shared_info->n_vcpu = 1;
+        p->shared_info->vcpu_data[i].evtchn_upcall_mask = 1;
+    p->shared_info->n_vcpu = 1;
 
     /* Install the new page tables. */
     __cli();
@@ -848,7 +850,7 @@ int construct_dom0(struct domain *p,
     si = (start_info_t *)vstartinfo_start;
     memset(si, 0, PAGE_SIZE);
     si->nr_pages     = p->tot_pages;
-    si->shared_info  = virt_to_phys(ed->shared_info);
+    si->shared_info  = virt_to_phys(p->shared_info);
     si->flags        = SIF_PRIVILEGED | SIF_INITDOMAIN;
     si->pt_base      = vpt_start;
     si->nr_pt_frames = nr_pt_pages;
