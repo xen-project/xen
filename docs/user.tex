@@ -85,15 +85,15 @@ progress:
 \item Windows XP
 \end{itemize}
 
-Right now, Linux 2.4 and 2.6 are available for on Xen 2.0 (the
-modifications to Linux are distributed with Xen).  The NetBSD port
-will be updated to run on Xen 2.0, hopefully in time for the Xen 2.0
-release.  Even running multiple copies of the same OS can be very
-useful, as it provides a means of containing faults to one OS image,
-and also for providing performance isolation between the various OS,
-enabling you to either restrict, or reserve resources for, particular
-VM instances.  It is intended that Xen support be integrated into the
-official releases of Linux 2.6, NetBSD 2.0, FreeBSD and Dragonfly.
+Right now, Linux 2.4 and 2.6 are available for on Xen 2.0.  NetBSD
+port will be updated to run on Xen 2.0, hopefully in time for the Xen
+2.0 release.  It is intended that Xen support be integrated into the
+official releases of Linux 2.6, NetBSD 2.0, FreeBSD and Dragonfly BSD.
+
+Even running multiple copies of Linux can be very useful, providing a
+means of containing faults to one OS image, providing performance
+isolation between the various OS instances and trying out multiple
+distros.
 
 The Windows XP port is only available to those who have signed the
 Microsoft Academic Source License.
@@ -164,8 +164,8 @@ ported to others. In fact, it would have been rather easier to write
 Xen for pretty much any other architecture as x86 is particularly
 tricky to handle. A good description of Xen's design, implementation
 and performance is contained in the October 2003 SOSP paper, available
-at:
-{\tt http://www.cl.cam.ac.uk/netos/papers/2003-xensosp.pdf}
+at:\\
+{\tt http://www.cl.cam.ac.uk/netos/papers/2003-xensosp.pdf}\\
 Work to port Xen to x86\_64 and IA64 is currently underway.
 
 Xen is targetted at server-class machines, and the current list of
@@ -179,7 +179,7 @@ Xen requires a ``P6'' or newer processor (e.g. Pentium Pro, Celeron,
 Pentium II, Pentium III, Pentium IV, Xeon, AMD Athlon, AMD Duron).
 Multiprocessor machines are supported, and we also have basic support
 for HyperThreading (SMT), although this remains a topic for ongoing
-research. We're also working on an x86_64 port (though Xen should
+research. We're also working on an x86\_64 port (though Xen should
 already run on these systems just fine in 32-bit mode).
 
 Xen can currently use up to 4GB of memory.  It is possible for x86
@@ -220,7 +220,7 @@ Cambridge, and HP Labs, who are now working closely with us. We're
 also in receipt of support from Microsoft Research Cambridge to port
 Windows XP to run on Xen.
 
-Xen was first described in the 2003 paper at SOSP
+Xen was first described in the 2003 paper at SOSP \\
 ({\tt http://www.cl.cam.ac.uk/netos/papers/2003-xensosp.pdf}).
 The first public release of Xen (1.0) was made in October 2003.  Xen
 was developed as a research project by the University of Cambridge
@@ -253,11 +253,11 @@ operating system distribution.
 \item A working installation of your favourite Linux distribution.
 \item A working installation of the GRUB bootloader.
 \item An installation of Twisted v1.3 or above (see {\tt
-http://www.twistedmatrix.com}.  There may be a package available for
+http://www.twistedmatrix.com}).  There may be a package available for
 your distribution; alternatively it can be installed by running {\tt \#
 make install-twisted} in the root of the Xen source tree.
 \item The Linux bridge control tools (see {\tt
-http://bridge.sourceforge.net }).  There may be a packages of these
+http://bridge.sourceforge.net}).  There may be a packages of these
 tools available for your distribution.
 \item Linux IP Routing Tools
 \item make
@@ -277,9 +277,8 @@ for additional Xend logging functionality.
 
 \section{Install Bitkeeper (Optional)}
 
-To fetch a local copy, first download the BitKeeper tools at: {\tt
-http://www.bitmover.com/download } with username 'bitkeeper' and
-password 'get bitkeeper'.
+To fetch a local copy, first download the BitKeeper tools at: \\ {\tt
+http://www.bitmover.com/download }
 
 The BitKeeper install program is designed to be run with X.  If X is
 not available, you can specify the install directory on the command
@@ -327,10 +326,10 @@ The Xen source code repository is structured as follows:
 \item[\path{tools/}] Xen node controller daemon (Xend), command line tools, 
   control libraries
 \item[\path{xen/}] The Xen hypervisor itself.
-\item[\path{linux-2.4.26-xen}] Linux 2.4 support for Xen
-\item[\path{linux-2.6.7-xen}] Linux 2.6 support for Xen
-\item[\path{doc}] various documentation files for users and developers
-\item[\path{extras}] currently this contains the Mini OS, aimed at developers
+\item[\path{linux-2.4.26-xen/}] Linux 2.4 support for Xen
+\item[\path{linux-2.6.7-xen/}] Linux 2.6 support for Xen
+\item[\path{doc/}] various documentation files for users and developers
+\item[\path{extras/}] currently this contains the Mini OS, aimed at developers
 \end{description}
 
 \section{Build and install}
@@ -355,12 +354,11 @@ more complicated. The makefile needs a `pristine' linux kernel tree
 which it will then add the Xen architecture files to. You can tell the
 makefile the location of the appropriate linux compressed tar file by
 setting the LINUX\_SRC environment variable, e.g. \\
-\verb!# LINUX\_SRC=/tmp/linux-2.4.26.tar.gz make world! \\
-or by placing
-the tar file somewhere in the search path of LINUX_SRC_PATH which
-defaults to ".:..". If the makefile can't find a suitable kernel tar
-file it attempts to download it from kernel.org (this won't work if
-you're behind a firewall).
+\verb!# LINUX\_SRC=/tmp/linux-2.4.26.tar.gz make world! \\ or by
+placing the tar file somewhere in the search path of LINUX\_SRC\_PATH
+which defaults to ``{\tt .:..}". If the makefile can't find a suitable
+kernel tar file it attempts to download it from kernel.org (this won't
+work if you're behind a firewall).
 
 After untaring the pristine kernel tree, the makefile uses the {\tt
 mkbuildtree} script to add the Xen patches the kernel. It then builds
@@ -370,7 +368,7 @@ first virtual machine (``domain 0''), and one with a ``-xenU''
 extension that just contains virtual-device drivers.
 
 The procedure is similar to build the Linux 2.6 port: \\
-\verb!LINUX\_SRC=/path/to/linux2.6/source make linux26!
+\verb!# LINUX\_SRC=/path/to/linux2.6/source make linux26!
 
 In both cases, if you have an SMP machine you may wish to give the
 {\tt '-j4'} argument to make to get a parallel build.
@@ -417,8 +415,8 @@ distribution.  The entry should look something like the following:
 
 \begin{verbatim}
 title Xen 2.0 / XenoLinux 2.4.26
-        kernel /boot/xen.gz dom0_mem=131072 com1=115200,8n1
-        module /boot/xenolinux.gz root=/dev/sda4 ro console=tty0 console=ttyS0
+  kernel /boot/xen.gz dom0_mem=131072 com1=115200,8n1
+  module /boot/xenolinux.gz root=/dev/sda4 ro console=tty0 console=ttyS0
 \end{verbatim}
 
 The first line of the configuration (kernel...) tells GRUB where to
@@ -577,6 +575,7 @@ The output of {\tt xm list} is in rows of the following format:\\
   \item[c] crashed
   \end{description}
 \item[cputime] How much CPU time (in seconds) the domain has used so far.
+\end{description}
 
 The {\tt xm list} command also supports a long output format when the
 {\tt -l} switch is used.  This outputs the fulls details of the
@@ -1157,7 +1156,9 @@ mailing list (address below).
 
 For developers interested in porting operating systems to Xen, the
 {\em Xen Interface Manual} is distributed in the \path{docs/}
-directory of the Xen source distribution.
+directory of the Xen source distribution.  Various HOWTOs are
+available in \path{docs/HOWTOS} but this content is being integrated
+into this manual.
 
 \section{Online references}
 
@@ -1176,9 +1177,10 @@ There are currently two official Xen mailing lists:
 \begin{description}
 \item[xen-devel@lists.sourceforge.net] Used for development
 discussions and requests for help.  Subscribe at: \\
-http://lists.sourceforge.net/mailman/listinfo/xen-devel
+{\tt http://lists.sourceforge.net/mailman/listinfo/xen-devel}
 \item[xen-announce@lists.sourceforge.net] Used for announcements only.
-Subscribe at: \\ http://lists.sourceforge.net/mailman/listinfo/xen-announce
+Subscribe at: \\
+{\tt http://lists.sourceforge.net/mailman/listinfo/xen-announce}
 \end{description}
 
 Although there is no specific user support list, the developers try to
