@@ -40,14 +40,9 @@ asmlinkage int sys_iopl(unsigned int new_io_pl)
 
 asmlinkage int sys_ioperm(unsigned long from, unsigned long num, int turn_on)
 {
-    if ( turn_on )
-        {
-        printk("ioperm not fully supported - set iopl to 3\n");
-        return sys_iopl(3);
-	}
-    else
-	 printk("ioperm not fully supported - ignore resource release\n");
-    return 0;
+    printk(KERN_INFO "ioperm not fully supported - %s\n",
+           turn_on ? "set iopl to 3" : "ignore resource release");
+    return turn_on ? sys_iopl(3) : 0;
 }
 
 
