@@ -170,6 +170,7 @@ ln -sf ../asm-i386/parport.h
 ln -sf ../asm-i386/pgtable-3level.h 
 ln -sf ../asm-i386/poll.h 
 ln -sf ../asm-i386/posix_types.h 
+ln -sf ../asm-i386/ptrace.h 
 ln -sf ../asm-i386/resource.h 
 ln -sf ../asm-i386/rwlock.h 
 ln -sf ../asm-i386/rwsem.h 
@@ -202,6 +203,7 @@ ln -sf ../asm-i386/ucontext.h
 ln -sf ../asm-i386/unaligned.h
 ln -sf ../asm-i386/unistd.h 
 ln -sf ../asm-i386/user.h 
+ln -sf ../asm-i386/vm86.h 
 ln -sf ../../${LINUX_26}/include/asm-xen/ctrl_if.h
 ln -sf ../../${LINUX_26}/include/asm-xen/evtchn.h
 ln -sf ../../${LINUX_26}/include/asm-xen/hypervisor.h

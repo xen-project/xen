@@ -20,6 +20,9 @@
  * LOW-LEVEL DEFINITIONS
  */
 
+/* Force a proper event-channel callback from Xen. */
+void force_evtchn_callback(void);
+
 /* Entry point for notifications into Linux subsystems. */
 void evtchn_do_upcall(struct pt_regs *regs);
 
@@ -47,7 +50,7 @@ static inline void unmask_evtchn(int port)
     {
         s->vcpu_data[0].evtchn_upcall_pending = 1;
         if ( !s->vcpu_data[0].evtchn_upcall_mask )
-            evtchn_do_upcall(NULL);
+            force_evtchn_callback();
     }
 }
 
