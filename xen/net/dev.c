@@ -2111,6 +2111,7 @@ static void __make_tx_response(net_vif_t     *vif,
     resp->status = st;
     pos = TX_RING_INC(pos);
     vif->tx_resp_prod = vif->shared_idxs->tx_resp_prod = pos;
+    smp_mb(); /* Update producer before checking event threshold. */
     if ( pos == vif->shared_idxs->tx_event )
     {
         unsigned long cpu_mask = mark_guest_event(vif->domain, _EVENT_NET);
@@ -2139,6 +2140,7 @@ static void make_rx_response(net_vif_t     *vif,
     resp->offset = off;
     pos = RX_RING_INC(pos);
     vif->rx_resp_prod = vif->shared_idxs->rx_resp_prod = pos;
+    smp_mb(); /* Update producer before checking event threshold. */
     if ( pos == vif->shared_idxs->rx_event )
     {
         unsigned long cpu_mask = mark_guest_event(vif->domain, _EVENT_NET);

@@ -89,12 +89,15 @@ static char *task_states[] =
 
 void do_task_queues(u_char key, void *dev_id, struct pt_regs *regs) 
 {
-    u_long flags; 
+    unsigned long       flags; 
     struct task_struct *p; 
-    shared_info_t *s; 
+    shared_info_t      *s; 
+    net_vif_t          *v;
 
     printk("'%c' pressed -> dumping task queues\n", key); 
+
     read_lock_irqsave(&tasklist_lock, flags); 
+
     p = &idle0_task;
     do {
         printk("Xen: DOM %d, CPU %d [has=%c], state = %s, "
@@ -102,17 +105,21 @@ void do_task_queues(u_char key, void *dev_id, struct pt_regs *regs)
 	       p->domain, p->processor, p->has_cpu ? 'T':'F', 
 	       task_states[p->state], p->hyp_events); 
 	s = p->shared_info; 
-	if(!is_idle_task(p)) {
-	  net_vif_t *v = find_vif_by_id((p->domain)<<VIF_DOMAIN_SHIFT);
+	if( !is_idle_task(p) )
+        {
+            net_vif_t *v = find_vif_by_id((p->domain)<<VIF_DOMAIN_SHIFT);
 	    printk("Guest: events = %08lx, events_mask = %08lx\n", 
 		   s->events, s->events_mask); 
 	  
-	    if (v) {	      
-	      printk("rx_prod=%d ,rx_cons=%d, tx_prod=%d, tx_cons=%d\n",
-		   v->rx_prod,v->rx_cons,v->tx_prod,v->tx_cons );
-	      printk("rx_req_cons=%d, rx_resp_prod=%d, tx_req_cons=%d, tx_resp_prod=%d\n", 
-		   v->rx_req_cons,v->rx_resp_prod,v->tx_req_cons,v->tx_resp_prod);
-	      put_vif(v);
+	    if ( v != NULL )
+            {
+                printk("rx_prod=%d ,rx_cons=%d, tx_prod=%d, tx_cons=%d\n",
+                       v->rx_prod, v->rx_cons, v->tx_prod, v->tx_cons );
+                printk("rx_req_cons=%d, rx_resp_prod=%d, "
+                       "tx_req_cons=%d, tx_resp_prod=%d\n", 
+                       v->rx_req_cons, v->rx_resp_prod, 
+                       v->tx_req_cons, v->tx_resp_prod);
+                put_vif(v);
 	    }
 	    printk("Notifying guest...\n"); 
 	    set_bit(_EVENT_DEBUG, &s->events); 
