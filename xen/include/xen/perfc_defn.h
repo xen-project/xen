@@ -55,12 +55,14 @@ PERFCOUNTER_CPU( shadow_set_l1e_force_map, "shadow_set_l1e forced to map l1" )
 PERFCOUNTER_CPU( shadow_set_l1e_unlinked,  "shadow_set_l1e found unlinked l1" )
 PERFCOUNTER_CPU( shadow_set_l1e_fail,      "shadow_set_l1e failed (no sl1)" )
 PERFCOUNTER_CPU( shadow_invlpg_faults,     "shadow_invlpg's get_user faulted")
+PERFCOUNTER_CPU( unshadow_l2_count,        "unpinned L2 count")
 
 
 /* STATUS counters do not reset when 'P' is hit */
 PERFSTATUS( snapshot_pages,  "current # fshadow snapshot pages" )
 
-PERFCOUNTER_CPU(shadow_status_calls,    "calls to __shadow_status" )
+PERFCOUNTER_CPU(shadow_status_shortcut, "fastpath miss on shadow cache")
+PERFCOUNTER_CPU(shadow_status_calls,    "calls to ___shadow_status" )
 PERFCOUNTER_CPU(shadow_status_miss,     "missed shadow cache" )
 PERFCOUNTER_CPU(shadow_status_hit_head, "hits on head of bucket" )
 
@@ -68,6 +70,7 @@ PERFCOUNTER_CPU(shadow_sync_all,                   "calls to shadow_sync_all")
 PERFCOUNTER_CPU(shadow_make_snapshot,              "snapshots created")
 PERFCOUNTER_CPU(shadow_mark_mfn_out_of_sync_calls, "calls to shadow_mk_out_of_sync")
 PERFCOUNTER_CPU(shadow_out_of_sync_calls,          "calls to shadow_out_of_sync")
+PERFCOUNTER_CPU(extra_va_update_sync,              "extra syncs for bug in chk_pgtb")
 PERFCOUNTER_CPU(snapshot_entry_matches_calls,      "calls to ss_entry_matches")
 PERFCOUNTER_CPU(snapshot_entry_matches_true,       "ss_entry_matches returns true")
 
@@ -76,5 +79,7 @@ PERFCOUNTER_CPU(shadow_fault_bail_pde_not_present, "sf bailed due to pde not pre
 PERFCOUNTER_CPU(shadow_fault_bail_pte_not_present, "sf bailed due to pte not present")
 PERFCOUNTER_CPU(shadow_fault_bail_ro_mapping,      "sf bailed due to a ro mapping")
 PERFCOUNTER_CPU(shadow_fault_fixed,                "sf fixed the pgfault")
-PERFCOUNTER_CPU(validate_pte_change,               "calls to validate_pte_change")
-PERFCOUNTER_CPU(validate_pde_change,               "calls to validate_pde_change")
+PERFCOUNTER_CPU(validate_pte_calls,                "calls to validate_pte_change")
+PERFCOUNTER_CPU(validate_pte_changes,              "validate_pte makes changes")
+PERFCOUNTER_CPU(validate_pde_calls,                "calls to validate_pde_change")
+PERFCOUNTER_CPU(validate_pde_changes,              "validate_pde makes changes")

@@ -188,7 +188,7 @@ void initialize_keytable(void)
     register_keyhandler(
         'o', audit_domains_key,  "audit domains >0 EXPERIMENTAL");
     register_keyhandler(
-        'T', debugtrace_key, "dump debugtrace");
+        'T', debugtrace_key, "toggle debugtrace to console/buffer");
 #endif
 
 #ifdef PERF_COUNTERS
