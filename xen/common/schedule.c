@@ -612,10 +612,13 @@ long schedule_timeout(long timeout)
 {
     struct timer_list timer;
     unsigned long expire;
-    
+
     switch (timeout)
     {
     case MAX_SCHEDULE_TIMEOUT:
+        /* Sanity! This just wouldn't make sense. */
+        if ( is_idle_task(current) )
+            panic("Arbitrary sleep in idle task!");
         /*
          * These two special cases are useful to be comfortable in the caller.
          * Nothing more. We could take MAX_SCHEDULE_TIMEOUT from one of the
@@ -624,6 +627,7 @@ long schedule_timeout(long timeout)
          */
         schedule();
         goto out;
+
     default:
         /*
          * Another bit of PARANOID. Note that the retval will be 0 since no
@@ -644,17 +648,34 @@ long schedule_timeout(long timeout)
     
     expire = timeout + jiffies;
     
-    init_timer(&timer);
-    timer.expires = expire;
-    timer.data = (unsigned long) current;
-    timer.function = process_timeout;
-    
-    add_timer(&timer);
-    schedule();
-    del_timer_sync(&timer);
-    
-    timeout = expire - jiffies;
-    
+    if ( is_idle_task(current) )
+    {
+        /*
+         * If the idle task is calling in then it shouldn't ever sleep. We 
+         * therefore force it to TASK_RUNNING here and busy-wait. We spin on 
+         * schedule to give other domains a chance meanwhile.
+         */
+        set_current_state(TASK_RUNNING);
+        do { 
+            schedule();
+            timeout = expire - jiffies;
+        } 
+        while ( (timeout > 0) && is_idle_task(current) );
+    }
+    else
+    {
+        init_timer(&timer);
+        timer.expires = expire;
+        timer.data = (unsigned long) current;
+        timer.function = process_timeout;
+        
+        add_timer(&timer);
+        schedule();
+        del_timer_sync(&timer);
+        
+        timeout = expire - jiffies;
+    }
+
  out:
     return timeout < 0 ? 0 : timeout;
 }
