@@ -14,7 +14,6 @@ import StringIO
 sys.path.append("/home/mjw/repos-bk/xeno-unstable.bk/tools/python")
 
 import xen.xend.sxp as sxp
-from xen.xend.packing import SxpPacker, SxpUnpacker
 
 XFRD_PORT = 8002
 
