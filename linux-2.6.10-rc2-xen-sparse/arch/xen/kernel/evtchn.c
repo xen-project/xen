@@ -68,7 +68,13 @@ static int irq_bindcount[NR_IRQS];
 static unsigned long pirq_needs_unmask_notify[NR_PIRQS/sizeof(unsigned long)];
 
 /* Upcall to generic IRQ layer. */
-extern unsigned int do_IRQ(int irq, struct pt_regs *regs);
+#ifdef CONFIG_X86
+extern fastcall unsigned int do_IRQ(struct pt_regs *regs);
+#define do_IRQ(irq, regs) do {		\
+    (regs)->orig_eax = (irq);		\
+    do_IRQ((regs));			\
+} while (0)
+#endif
 
 #define VALID_EVTCHN(_chn) ((_chn) != -1)
 

@@ -45,8 +45,10 @@ static union irq_ctx *softirq_ctx[NR_CPUS];
  * SMP cross-CPU interrupts have their own specific
  * handlers).
  */
-unsigned int do_IRQ(int irq, struct pt_regs *regs)
-{
+fastcall unsigned int do_IRQ(struct pt_regs *regs)
+{	
+	/* high bits used in ret_from_ code */
+	int irq = regs->orig_eax & 0xff;
 #ifdef CONFIG_4KSTACKS
 	union irq_ctx *curctx, *irqctx;
 	u32 *isp;
