@@ -290,6 +290,9 @@ class ProgRestore(Prog):
         savefile = os.path.abspath(args[1])
         info = server.xend_domain_restore(savefile)
         PrettyPrint.prettyprint(info)
+        id = sxp.child_value(info, 'id')
+        if id is not None:
+            server.xend_domain_unpause(id)
 
 xm.prog(ProgRestore)
 

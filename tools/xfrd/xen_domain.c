@@ -127,6 +127,9 @@ int xen_domain_rcv(IOStream *io, uint32_t *dom, char **vmconfig, int *vmconfig_n
     ioctxt->err = iostderr;
 
     err = xc_linux_restore(xcinit(), ioctxt);
+    *dom = ioctxt->domain;
+    *vmconfig = ioctxt->vmconfig;
+    *vmconfig_n = ioctxt->vmconfig_n;
 #endif   
     dprintf("< err=%d\n", err);
     return err;
