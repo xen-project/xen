@@ -18,16 +18,16 @@
 #define DRV_VERSION	"0.9.15-pre12"
 #define DRV_RELDATE	"Aug 9, 2002"
 
-#include <xeno/config.h>
-#include <xeno/module.h>
+#include <xen/config.h>
+#include <xen/module.h>
 #include "tulip.h"
-#include <xeno/pci.h>
-#include <xeno/init.h>
-#include <xeno/etherdevice.h>
-#include <xeno/delay.h>
-#include <xeno/mii.h>
-#include <xeno/ethtool.h>
-#include <xeno/crc32.h>
+#include <xen/pci.h>
+#include <xen/init.h>
+#include <xen/etherdevice.h>
+#include <xen/delay.h>
+#include <xen/mii.h>
+#include <xen/ethtool.h>
+#include <xen/crc32.h>
 #include <asm/unaligned.h>
 #include <asm/uaccess.h>
 

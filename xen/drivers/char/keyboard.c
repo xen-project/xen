@@ -8,13 +8,13 @@
 
 #include <asm-i386/io.h>
 #include <asm-i386/irq.h>
-#include <xeno/sched.h>
-#include <xeno/keyhandler.h>  
+#include <xen/sched.h>
+#include <xen/keyhandler.h>  
 #include <hypervisor-ifs/kbd.h>
-#include <xeno/event.h>
-#include <xeno/console.h>
+#include <xen/event.h>
+#include <xen/console.h>
 
-/* Hash-defines torn from <xeno/pc_keyb.h> and <asm/keyboard.h> */
+/* Hash-defines torn from <xen/pc_keyb.h> and <asm/keyboard.h> */
 
 #define KBD_STATUS_REG	     0x64 /* Status register (R) */
 #define KBD_CNTL_REG	     0x64 /* Controller command register (W) */

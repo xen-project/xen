@@ -1,7 +1,7 @@
 #ifndef __ARCH_X86_64_ATOMIC__
 #define __ARCH_X86_64_ATOMIC__
 
-#include <xeno/config.h>
+#include <xen/config.h>
 
 /*
  * Atomic operations that C can't guarantee us.  Useful for

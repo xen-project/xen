@@ -22,7 +22,7 @@ typedef unsigned int __u32;
 typedef __signed__ long long __s64;
 typedef unsigned long long __u64;
 
-#include <xeno/config.h>
+#include <xen/config.h>
 
 typedef signed char s8;
 typedef unsigned char u8;

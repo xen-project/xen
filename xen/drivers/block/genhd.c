@@ -14,14 +14,14 @@
  * TODO:  rip out the remaining init crap from this file  --hch
  */
 
-#include <xeno/config.h>
-#include <xeno/module.h>
-/*#include <xeno/fs.h>*/
-#include <xeno/genhd.h>
-#include <xeno/lib.h>
-#include <xeno/blk.h>
-#include <xeno/init.h>
-#include <xeno/spinlock.h>
+#include <xen/config.h>
+#include <xen/module.h>
+/*#include <xen/fs.h>*/
+#include <xen/genhd.h>
+#include <xen/lib.h>
+#include <xen/blk.h>
+#include <xen/init.h>
+#include <xen/spinlock.h>
 
 
 static rwlock_t gendisk_lock;

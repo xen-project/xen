@@ -20,13 +20,13 @@
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
 
-#include <xeno/config.h>
-#include <xeno/init.h>
-#include <xeno/types.h>
-#include <xeno/lib.h>
+#include <xen/config.h>
+#include <xen/init.h>
+#include <xen/types.h>
+#include <xen/lib.h>
 #include <asm/page.h>
-#include <xeno/spinlock.h>
-#include <xeno/slab.h>
+#include <xen/spinlock.h>
+#include <xen/slab.h>
 
 static spinlock_t alloc_lock = SPIN_LOCK_UNLOCKED;
 

@@ -8,29 +8,29 @@
  */
 
 #include <stdarg.h>
-#include <xeno/config.h>
-#include <xeno/lib.h>
-#include <xeno/errno.h>
-#include <xeno/spinlock.h>
-#include <xeno/multiboot.h>
-#include <xeno/sched.h>
-#include <xeno/mm.h>
-#include <xeno/delay.h>
-#include <xeno/skbuff.h>
-#include <xeno/interrupt.h>
-#include <xeno/compile.h>
-#include <xeno/version.h>
-#include <xeno/netdevice.h>
+#include <xen/config.h>
+#include <xen/lib.h>
+#include <xen/errno.h>
+#include <xen/spinlock.h>
+#include <xen/multiboot.h>
+#include <xen/sched.h>
+#include <xen/mm.h>
+#include <xen/delay.h>
+#include <xen/skbuff.h>
+#include <xen/interrupt.h>
+#include <xen/compile.h>
+#include <xen/version.h>
+#include <xen/netdevice.h>
 #include <asm/io.h>
 #include <asm/msr.h>
 #include <asm/uaccess.h>
 #include <hypervisor-ifs/dom0_ops.h>
 #include <asm/byteorder.h>
-#include <xeno/if_ether.h>
+#include <xen/if_ether.h>
 #include <asm/domain_page.h>
-#include <xeno/console.h>
-#include <xeno/net_headers.h>
-#include <xeno/serial.h>
+#include <xen/console.h>
+#include <xen/net_headers.h>
+#include <xen/serial.h>
 
 kmem_cache_t *task_struct_cachep;
 

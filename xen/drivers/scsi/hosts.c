@@ -25,17 +25,17 @@
  */
 
 #define __NO_VERSION__
-#include <xeno/module.h>
-#include <xeno/blk.h>
-/*  #include <xeno/kernel.h> */
-/*  #include <xeno/string.h> */
-/*  #include <xeno/mm.h> */
-/*  #include <xeno/proc_fs.h> */
-#include <xeno/init.h>
+#include <xen/module.h>
+#include <xen/blk.h>
+/*  #include <xen/kernel.h> */
+/*  #include <xen/string.h> */
+/*  #include <xen/mm.h> */
+/*  #include <xen/proc_fs.h> */
+#include <xen/init.h>
 
 #define __KERNEL_SYSCALLS__
 
-/* #include <xeno/unistd.h> */
+/* #include <xen/unistd.h> */
 
 #include "scsi.h"
 #include "hosts.h"

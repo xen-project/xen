@@ -20,7 +20,7 @@
 #endif
 
 #ifndef _GENDISK_H
-#include <xeno/genhd.h>
+#include <xen/genhd.h>
 #endif
 
 typedef struct scsi_disk {

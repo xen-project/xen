@@ -1,11 +1,11 @@
 
-#include <xeno/config.h>
-#include <xeno/init.h>
-#include <xeno/interrupt.h>
-#include <xeno/lib.h>
-#include <xeno/sched.h>
-#include <xeno/pci.h>
-#include <xeno/serial.h>
+#include <xen/config.h>
+#include <xen/init.h>
+#include <xen/interrupt.h>
+#include <xen/lib.h>
+#include <xen/sched.h>
+#include <xen/pci.h>
+#include <xen/serial.h>
 #include <asm/bitops.h>
 #include <asm/smp.h>
 #include <asm/processor.h>
@@ -14,7 +14,7 @@
 #include <asm/desc.h>
 #include <asm/domain_page.h>
 #include <asm/pdb.h>
-#include <xeno/trace.h>
+#include <xen/trace.h>
 
 struct cpuinfo_x86 boot_cpu_data = { 0 };
 /* Lots of nice things, since we only target PPro+. */
@@ -404,7 +404,7 @@ void __init start_of_day(void)
     }
 
     ac_timer_init();    /* init accurate timers */
-    init_xeno_time();	/* initialise the time */
+    init_xen_time();	/* initialise the time */
     schedulers_start(); /* start scheduler for each CPU */
 
     sti();

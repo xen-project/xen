@@ -7,8 +7,8 @@
 #ifndef __ASM_DOMAIN_PAGE_H__
 #define __ASM_DOMAIN_PAGE_H__
 
-#include <xeno/config.h>
-#include <xeno/sched.h>
+#include <xen/config.h>
+#include <xen/sched.h>
 #include <asm/page.h>
 
 /*

@@ -7,8 +7,8 @@
 #ifndef __ASM_DOMAIN_PAGE_H__
 #define __ASM_DOMAIN_PAGE_H__
 
-#include <xeno/config.h>
-#include <xeno/sched.h>
+#include <xen/config.h>
+#include <xen/sched.h>
 
 extern unsigned long *mapcache;
 #define MAPCACHE_ENTRIES        1024

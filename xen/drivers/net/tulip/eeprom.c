@@ -15,7 +15,7 @@
 */
 
 #include "tulip.h"
-#include <xeno/init.h>
+#include <xen/init.h>
 #include <asm/unaligned.h>
 
 

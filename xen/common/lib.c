@@ -1,6 +1,6 @@
 
-#include <xeno/ctype.h>
-#include <xeno/lib.h>
+#include <xen/ctype.h>
+#include <xen/lib.h>
 
 
 /* for inc/ctype.h */

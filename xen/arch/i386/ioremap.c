@@ -8,9 +8,9 @@
  * (C) Copyright 1995 1996 Linus Torvalds
  */
 
-#include <xeno/config.h>
-#include <xeno/lib.h>
-#include <xeno/mm.h>
+#include <xen/config.h>
+#include <xen/lib.h>
+#include <xen/mm.h>
 #include <asm/io.h>
 #include <asm/pgalloc.h>
 #include <asm/page.h>

@@ -19,18 +19,18 @@
  *  Copyright (C) 1991, 1992, 1995  Linus Torvalds
  */
 
-#include <xeno/errno.h>
-#include <xeno/sched.h>
-#include <xeno/lib.h>
-#include <xeno/config.h>
-#include <xeno/init.h>
-#include <xeno/interrupt.h>
-#include <xeno/time.h>
-#include <xeno/ac_timer.h>
+#include <xen/errno.h>
+#include <xen/sched.h>
+#include <xen/lib.h>
+#include <xen/config.h>
+#include <xen/init.h>
+#include <xen/interrupt.h>
+#include <xen/time.h>
+#include <xen/ac_timer.h>
 
 #include <asm/io.h>
-#include <xeno/smp.h>
-#include <xeno/irq.h>
+#include <xen/smp.h>
+#include <xen/irq.h>
 #include <asm/msr.h>
 #include <asm/mpspec.h>
 #include <asm/processor.h>
@@ -329,7 +329,7 @@ void do_settime(unsigned long secs, unsigned long usecs, u64 system_time_base)
 
 
 /* Late init function (after all CPUs are booted). */
-int __init init_xeno_time()
+int __init init_xen_time()
 {
     u64      scale;
     u64      full_tsc;

@@ -515,37 +515,37 @@
  *===================================================================*/
 
 
-#include <xeno/config.h>
-#include <xeno/version.h>
-#include <xeno/module.h>
-#include <xeno/types.h>
-#include <xeno/errno.h>
-#include <xeno/string.h>
-#include <xeno/lib.h>
-#include <xeno/kernel.h>
-#include <xeno/ioport.h>
-//#include <xeno/fcntl.h>
-#include <xeno/delay.h>
-#include <xeno/pci.h>
-//#include <xeno/proc_fs.h>
-#include <xeno/blk.h>
-//#include <xeno/wait.h>
-#include <xeno/tqueue.h>
-#include <xeno/interrupt.h>
-#include <xeno/mm.h>
+#include <xen/config.h>
+#include <xen/version.h>
+#include <xen/module.h>
+#include <xen/types.h>
+#include <xen/errno.h>
+#include <xen/string.h>
+#include <xen/lib.h>
+#include <xen/kernel.h>
+#include <xen/ioport.h>
+//#include <xen/fcntl.h>
+#include <xen/delay.h>
+#include <xen/pci.h>
+//#include <xen/proc_fs.h>
+#include <xen/blk.h>
+//#include <xen/wait.h>
+#include <xen/tqueue.h>
+#include <xen/interrupt.h>
+#include <xen/mm.h>
 //#include <asm/pgtable.h>
 
 #include <asm/ioctl.h>
-#include <xeno/sched.h>
-//#include <xeno/stat.h>
-#include <xeno/slab.h>	/* for kmalloc() */
+#include <xen/sched.h>
+//#include <xen/stat.h>
+#include <xen/slab.h>	/* for kmalloc() */
 #if LINUX_VERSION_CODE < KERNEL_VERSION(2,1,0)	/* 0x20100 */
-#include <xeno/bios32.h>
+#include <xen/bios32.h>
 #else
 #if LINUX_VERSION_CODE < KERNEL_VERSION(2,3,0)	/* 0x20300 */
 #include <asm/spinlock.h>
 #else
-#include <xeno/spinlock.h>
+#include <xen/spinlock.h>
 #endif
 #endif
 
@@ -559,9 +559,9 @@
 /*
  * These header files are required for Shutdown Notification routines
  */
-#include <xeno/notifier.h>
-#include <xeno/reboot.h>
-#include <xeno/init.h>
+#include <xen/notifier.h>
+#include <xen/reboot.h>
+#include <xen/init.h>
 
 #include "sd.h"
 #include "scsi.h"
@@ -599,7 +599,7 @@ static void WROUTDOOR (mega_host_config * megaCfg, ulong value)
 }
 
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(2,2,0)	/* 0x020200 */
-#include <xeno/smp.h>
+#include <xen/smp.h>
 #define cpuid smp_processor_id()
 #endif
 

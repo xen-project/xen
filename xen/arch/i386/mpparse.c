@@ -12,17 +12,17 @@
  *	Maciej W. Rozycki	:	Bits for default MP configurations
  */
 
-#include <xeno/config.h>
-#include <xeno/init.h>
-#include <xeno/lib.h>
+#include <xen/config.h>
+#include <xen/init.h>
+#include <xen/lib.h>
 #include <asm/io.h>
-#include <xeno/irq.h>
-#include <xeno/smp.h>
+#include <xen/irq.h>
+#include <xen/smp.h>
 #include <asm/apic.h>
 #include <asm/mpspec.h>
 #include <asm/pgalloc.h>
 #include <asm/smpboot.h>
-#include <xeno/kernel.h>
+#include <xen/kernel.h>
 
 int numnodes = 1; /* XXX Xen */
 

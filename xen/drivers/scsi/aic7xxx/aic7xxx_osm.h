@@ -61,21 +61,21 @@
 
 #ifndef _AIC7XXX_LINUX_H_
 #define _AIC7XXX_LINUX_H_
-#include <xeno/lib.h>
-#include <xeno/string.h>
-#include <xeno/types.h>
-#include <xeno/blk.h>
-#include <xeno/blkdev.h>
-#include <xeno/delay.h>
-#include <xeno/ioport.h>
-#include <xeno/pci.h>
-//#include <xeno/version.h>
+#include <xen/lib.h>
+#include <xen/string.h>
+#include <xen/types.h>
+#include <xen/blk.h>
+#include <xen/blkdev.h>
+#include <xen/delay.h>
+#include <xen/ioport.h>
+#include <xen/pci.h>
+//#include <xen/version.h>
 #ifndef AHC_MODVERSION_FILE
 #define __NO_VERSION__
 #endif
-#include <xeno/module.h>
+#include <xen/module.h>
 #include <asm/byteorder.h>
-#include <xeno/notifier.h>
+#include <xen/notifier.h>
 
 #ifndef KERNEL_VERSION
 #define KERNEL_VERSION(x,y,z) (((x)<<16)+((y)<<8)+(z))
@@ -84,11 +84,11 @@
 #define LINUX_VERSION_CODE KERNEL_VERSION(2,4,20)
 
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(2,4,0)
-#include <xeno/interrupt.h> /* For tasklet support. */
-#include <xeno/config.h>
-#include <xeno/slab.h>
+#include <xen/interrupt.h> /* For tasklet support. */
+#include <xen/config.h>
+#include <xen/slab.h>
 #else
-#include <xeno/malloc.h>
+#include <xen/malloc.h>
 #endif
 
 /* Core SCSI definitions */
@@ -409,9 +409,9 @@ struct scsi_inquiry_data
 
 /* SMP support */
 //#if LINUX_VERSION_CODE >= KERNEL_VERSION(2,3,17)
-#include <xeno/spinlock.h>
+#include <xen/spinlock.h>
 //#elif LINUX_VERSION_CODE >= KERNEL_VERSION(2,1,93)
-//#include <xeno/smp.h>
+//#include <xen/smp.h>
 //#endif
 
 #define AIC7XXX_DRIVER_VERSION  "6.2.8"
@@ -926,7 +926,7 @@ int			 aic7770_map_int(struct ahc_softc *ahc, u_int irq);
 #if defined(__sparc_v9__) || defined(__powerpc__)
 #error "PPC and Sparc platforms are only support under 2.1.92 and above"
 #endif
-#include <xeno/bios32.h>
+#include <xen/bios32.h>
 #endif
 
 int			 ahc_linux_pci_probe(Scsi_Host_Template *);

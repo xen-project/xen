@@ -20,13 +20,13 @@
  *
  */
 
-#include <xeno/config.h>
-#include <xeno/types.h>
-/*#include <xeno/fs.h>*/
-#include <xeno/blkdev.h>
-#include <xeno/elevator.h>
-#include <xeno/blk.h>
-#include <xeno/module.h>
+#include <xen/config.h>
+#include <xen/types.h>
+/*#include <xen/fs.h>*/
+#include <xen/blkdev.h>
+#include <xen/elevator.h>
+#include <xen/blk.h>
+#include <xen/module.h>
 #include <asm/uaccess.h>
 
 /*

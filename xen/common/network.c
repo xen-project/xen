@@ -23,15 +23,15 @@
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
 
-#include <xeno/sched.h>
-#include <xeno/errno.h>
-#include <xeno/init.h>
-#include <xeno/slab.h>
-#include <xeno/spinlock.h>
-#include <xeno/if_ether.h>
-#include <xeno/skbuff.h>
-#include <xeno/netdevice.h>
-#include <xeno/in.h>
+#include <xen/sched.h>
+#include <xen/errno.h>
+#include <xen/init.h>
+#include <xen/slab.h>
+#include <xen/spinlock.h>
+#include <xen/if_ether.h>
+#include <xen/skbuff.h>
+#include <xen/netdevice.h>
+#include <xen/in.h>
 #include <asm/domain_page.h>
 #include <asm/io.h>
 #include <hypervisor-ifs/network.h>

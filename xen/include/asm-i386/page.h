@@ -20,7 +20,7 @@
 #define copy_page(_t,_f)         memcpy((void *)(_t), (void *)(_f), PAGE_SIZE)
 
 #ifndef __ASSEMBLY__
-#include <xeno/config.h>
+#include <xen/config.h>
 typedef struct { unsigned long l1_lo; } l1_pgentry_t;
 typedef struct { unsigned long l2_lo; } l2_pgentry_t;
 typedef l1_pgentry_t *l1_pagetable_t;

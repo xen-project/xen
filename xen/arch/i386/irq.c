@@ -17,13 +17,13 @@
  * Naturally it's not a 1:1 relation, but there are similarities.
  */
 
-#include <xeno/config.h>
-#include <xeno/init.h>
-#include <xeno/errno.h>
-#include <xeno/sched.h>
-#include <xeno/interrupt.h>
-#include <xeno/irq.h>
-#include <xeno/slab.h>
+#include <xen/config.h>
+#include <xen/init.h>
+#include <xen/errno.h>
+#include <xen/sched.h>
+#include <xen/interrupt.h>
+#include <xen/irq.h>
+#include <xen/slab.h>
 #include <asm/mpspec.h>
 #include <asm/io_apic.h>
 #include <asm/msr.h>
@@ -35,9 +35,9 @@
 #include <asm/system.h>
 #include <asm/bitops.h>
 #include <asm/pgalloc.h>
-#include <xeno/delay.h>
-#include <xeno/timex.h>
-#include <xeno/perfc.h>
+#include <xen/delay.h>
+#include <xen/timex.h>
+#include <xen/perfc.h>
 
 /*
  * Linux has a controller-independent x86 interrupt architecture.

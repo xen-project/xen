@@ -6,14 +6,14 @@
  * Copyright (c) 2003, B Dragovic & K A Fraser.
  */
 
-#include <xeno/config.h>
-#include <xeno/types.h>
-#include <xeno/lib.h>
-#include <xeno/mm.h>
+#include <xen/config.h>
+#include <xen/types.h>
+#include <xen/lib.h>
+#include <xen/mm.h>
 #include <hypervisor-ifs/dom_mem_ops.h>
-#include <xeno/perfc.h>
-#include <xeno/sched.h>
-#include <xeno/event.h>
+#include <xen/perfc.h>
+#include <xen/sched.h>
+#include <xen/event.h>
 #include <asm/domain_page.h>
 
 static long alloc_dom_mem(struct task_struct *p, reservation_increase_t op)

@@ -1,8 +1,8 @@
 #ifndef __ASM_IO_APIC_H
 #define __ASM_IO_APIC_H
 
-#include <xeno/config.h>
-#include <xeno/types.h>
+#include <xen/config.h>
+#include <xen/types.h>
 
 /*
  * Intel IO-APIC support for SMP and UP systems.

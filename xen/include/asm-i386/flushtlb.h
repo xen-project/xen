@@ -10,7 +10,7 @@
 #ifndef __FLUSHTLB_H__
 #define __FLUSHTLB_H__
 
-#include <xeno/smp.h>
+#include <xen/smp.h>
 
 /*
  * Every GLOBAL_FLUSH_PERIOD ticks of the tlbflush clock, every TLB in the

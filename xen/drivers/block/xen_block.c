@@ -4,21 +4,21 @@
  * process incoming block io requests from guestos's.
  */
 
-#include <xeno/config.h>
-#include <xeno/types.h>
-#include <xeno/lib.h>
-#include <xeno/sched.h>
-#include <xeno/blkdev.h>
-#include <xeno/event.h>
+#include <xen/config.h>
+#include <xen/types.h>
+#include <xen/lib.h>
+#include <xen/sched.h>
+#include <xen/blkdev.h>
+#include <xen/event.h>
 #include <hypervisor-ifs/block.h>
 #include <hypervisor-ifs/hypervisor-if.h>
 #include <asm-i386/io.h>
 #include <asm/domain_page.h>
-#include <xeno/spinlock.h>
-#include <xeno/keyhandler.h>
-#include <xeno/interrupt.h>
-#include <xeno/vbd.h>
-#include <xeno/slab.h>
+#include <xen/spinlock.h>
+#include <xen/keyhandler.h>
+#include <xen/interrupt.h>
+#include <xen/vbd.h>
+#include <xen/slab.h>
 
 /*
  * These are rather arbitrary. They are fairly large because adjacent requests

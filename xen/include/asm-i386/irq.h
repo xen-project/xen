@@ -3,7 +3,7 @@
 
 /* (C) 1992, 1993 Linus Torvalds, (C) 1997 Ingo Molnar */
 
-#include <xeno/config.h>
+#include <xen/config.h>
 #include <asm/atomic.h>
 
 #define SA_INTERRUPT    0x20000000
@@ -190,7 +190,7 @@ extern unsigned int * prof_buffer;
 extern unsigned long prof_len;
 extern unsigned long prof_shift;
 
-#include <xeno/irq.h>
+#include <xen/irq.h>
 
 #ifdef CONFIG_SMP /*more of this file should probably be ifdefed SMP */
 static inline void hw_resend_irq(struct hw_interrupt_type *h, unsigned int i) {

@@ -21,7 +21,7 @@
   file called LICENSE.
   
   Contact Information:
-  Linux NICS <xeno.nics@intel.com>
+  Linux NICS <linux.nics@intel.com>
   Intel Corporation, 5200 N.E. Elam Young Parkway, Hillsboro, OR 97124-6497
 
 *******************************************************************************/
@@ -32,48 +32,48 @@
 #ifndef _E1000_H_
 #define _E1000_H_
 
-//#include <xeno/stddef.h>
-#include <xeno/config.h>
-#include <xeno/module.h>
-#include <xeno/types.h>
+//#include <xen/stddef.h>
+#include <xen/config.h>
+#include <xen/module.h>
+#include <xen/types.h>
 #include <asm/byteorder.h>
-#include <xeno/init.h>
-#include <xeno/mm.h>
-#include <xeno/errno.h>
-#include <xeno/ioport.h>
-#include <xeno/pci.h>
-#include <xeno/kernel.h>
-#include <xeno/netdevice.h>
-#include <xeno/etherdevice.h>
-#include <xeno/skbuff.h>
-#include <xeno/delay.h>
-#include <xeno/timer.h>
-#include <xeno/slab.h>
-#include <xeno/interrupt.h>
-#include <xeno/string.h>
-//#include <xeno/pagemap.h>
+#include <xen/init.h>
+#include <xen/mm.h>
+#include <xen/errno.h>
+#include <xen/ioport.h>
+#include <xen/pci.h>
+#include <xen/kernel.h>
+#include <xen/netdevice.h>
+#include <xen/etherdevice.h>
+#include <xen/skbuff.h>
+#include <xen/delay.h>
+#include <xen/timer.h>
+#include <xen/slab.h>
+#include <xen/interrupt.h>
+#include <xen/string.h>
+//#include <xen/pagemap.h>
 #include <asm/bitops.h>
 #include <asm/io.h>
 #include <asm/irq.h>
-//#include <xeno/capability.h>
-#include <xeno/in.h>
-//#include <xeno/ip.h>
-//#include <xeno/tcp.h>
-//#include <xeno/udp.h>
+//#include <xen/capability.h>
+#include <xen/in.h>
+//#include <xen/ip.h>
+//#include <xen/tcp.h>
+//#include <xen/udp.h>
 //#include <net/pkt_sched.h>
-#include <xeno/list.h>
-#include <xeno/reboot.h>
+#include <xen/list.h>
+#include <xen/reboot.h>
 #ifdef NETIF_F_TSO
 #include <net/checksum.h>
 #endif
 #ifdef SIOCGMIIPHY
-#include <xeno/mii.h>
+#include <xen/mii.h>
 #endif
 #ifdef SIOCETHTOOL
-#include <xeno/ethtool.h>
+#include <xen/ethtool.h>
 #endif
 #ifdef NETIF_F_HW_VLAN_TX
-#include <xeno/if_vlan.h>
+#include <xen/if_vlan.h>
 #endif
 
 #define BAR_0		0

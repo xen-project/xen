@@ -31,26 +31,26 @@
  */
 
 
-#include <xeno/config.h>
-#include <xeno/init.h>
-#include <xeno/sched.h>
-#include <xeno/irq.h>
-#include <xeno/delay.h>
+#include <xen/config.h>
+#include <xen/init.h>
+#include <xen/sched.h>
+#include <xen/irq.h>
+#include <xen/delay.h>
 #include <asm/mc146818rtc.h>
 #include <asm/msr.h>
-#include <xeno/errno.h>
+#include <xen/errno.h>
 #include <asm/atomic.h>
-#include <xeno/smp.h>
-#include <xeno/interrupt.h>
+#include <xen/smp.h>
+#include <xen/interrupt.h>
 #include <asm/mpspec.h>
 #include <asm/pgalloc.h>
 #include <asm/hardirq.h>
 #include <asm/apic.h>
-#include <xeno/mm.h>
+#include <xen/mm.h>
 #include <asm/io_apic.h>
 #include <asm/timex.h>
-#include <xeno/ac_timer.h>
-#include <xeno/perfc.h>
+#include <xen/ac_timer.h>
+#include <xen/perfc.h>
 
 #undef APIC_TIME_TRACE
 #ifdef APIC_TIME_TRACE

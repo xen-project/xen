@@ -51,7 +51,7 @@
  */
 #define SYM_GLUE_C
 
-#include <xeno/module.h>
+#include <xen/module.h>
 #include "sym_glue.h"
 
 #define NAME53C		"sym53c"

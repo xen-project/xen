@@ -8,8 +8,8 @@
  *	Gareth Hughes <gareth@valinux.com>, May 2000
  */
 
-#include <xeno/config.h>
-#include <xeno/sched.h>
+#include <xen/config.h>
+#include <xen/sched.h>
 #include <asm/processor.h>
 #include <asm/i387.h>
 

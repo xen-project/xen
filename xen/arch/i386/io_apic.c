@@ -19,13 +19,13 @@
  *					for testing these extensively
  */
 
-#include <xeno/config.h>
-#include <xeno/init.h>
-#include <xeno/interrupt.h>
-#include <xeno/irq.h>
-#include <xeno/delay.h>
-#include <xeno/sched.h>
-#include <xeno/config.h>
+#include <xen/config.h>
+#include <xen/init.h>
+#include <xen/interrupt.h>
+#include <xen/irq.h>
+#include <xen/delay.h>
+#include <xen/sched.h>
+#include <xen/config.h>
 #include <asm/mc146818rtc.h>
 #include <asm/io.h>
 #include <asm/mpspec.h>

@@ -35,19 +35,19 @@
 
 #undef REALLY_SLOW_IO		/* most systems can safely undef this */
 
-#include <xeno/config.h>
-#include <xeno/module.h>
-#include <xeno/types.h>
-#include <xeno/lib.h>
-#include <xeno/timer.h>
-#include <xeno/mm.h>
-#include <xeno/interrupt.h>
-#include <xeno/major.h>
-#include <xeno/errno.h>
-#include <xeno/genhd.h>
-#include <xeno/slab.h>
-#include <xeno/delay.h>
-#include <xeno/ide.h>
+#include <xen/config.h>
+#include <xen/module.h>
+#include <xen/types.h>
+#include <xen/lib.h>
+#include <xen/timer.h>
+#include <xen/mm.h>
+#include <xen/interrupt.h>
+#include <xen/major.h>
+#include <xen/errno.h>
+#include <xen/genhd.h>
+#include <xen/slab.h>
+#include <xen/delay.h>
+#include <xen/ide.h>
 
 #include <asm/byteorder.h>
 #include <asm/irq.h>

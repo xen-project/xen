@@ -16,13 +16,13 @@
 #ifndef __NET_TULIP_H__
 #define __NET_TULIP_H__
 
-#include <xeno/config.h>
-#include <xeno/kernel.h>
-#include <xeno/types.h>
-#include <xeno/spinlock.h>
-#include <xeno/netdevice.h>
-#include <xeno/timer.h>
-#include <xeno/delay.h>
+#include <xen/config.h>
+#include <xen/kernel.h>
+#include <xen/types.h>
+#include <xen/spinlock.h>
+#include <xen/netdevice.h>
+#include <xen/timer.h>
+#include <xen/delay.h>
 #include <asm/io.h>
 #include <asm/irq.h>
 

@@ -5,7 +5,7 @@
 #define _ASM_MC146818RTC_H
 
 #include <asm/io.h>
-#include <xeno/spinlock.h>
+#include <xen/spinlock.h>
 
 extern spinlock_t rtc_lock;             /* serialize CMOS RAM access */
 

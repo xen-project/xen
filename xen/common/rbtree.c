@@ -19,7 +19,7 @@
   linux/lib/rbtree.c
 */
 
-#include <xeno/rbtree.h>
+#include <xen/rbtree.h>
 
 static void __rb_rotate_left(rb_node_t * node, rb_root_t * root)
 {

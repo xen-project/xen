@@ -7,8 +7,8 @@
  * Copyright (c) 2003, K A Fraser
  */
 
-#include <xeno/config.h>
-#include <xeno/sched.h>
+#include <xen/config.h>
+#include <xen/sched.h>
 #include <asm/flushtlb.h>
 
 unsigned long tlbflush_mask;

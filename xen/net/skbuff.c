@@ -32,18 +32,18 @@
  *	2 of the License, or (at your option) any later version.
  */
 
-#include <xeno/config.h>
-#include <xeno/lib.h>
-#include <xeno/errno.h>
-#include <xeno/types.h>
-#include <xeno/sched.h>
-#include <xeno/mm.h>
-#include <xeno/interrupt.h>
-#include <xeno/slab.h>
-#include <xeno/netdevice.h>
-#include <xeno/skbuff.h>
-#include <xeno/cache.h>
-#include <xeno/init.h>
+#include <xen/config.h>
+#include <xen/lib.h>
+#include <xen/errno.h>
+#include <xen/types.h>
+#include <xen/sched.h>
+#include <xen/mm.h>
+#include <xen/interrupt.h>
+#include <xen/slab.h>
+#include <xen/netdevice.h>
+#include <xen/skbuff.h>
+#include <xen/cache.h>
+#include <xen/init.h>
 
 #include <asm/uaccess.h>
 #include <asm/system.h>

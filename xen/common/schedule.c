@@ -14,20 +14,20 @@
  *
  */
 
-#include <xeno/config.h>
-#include <xeno/init.h>
-#include <xeno/lib.h>
-#include <xeno/sched.h>
-#include <xeno/delay.h>
-#include <xeno/event.h>
-#include <xeno/time.h>
-#include <xeno/ac_timer.h>
-#include <xeno/interrupt.h>
-#include <xeno/timer.h>
-#include <xeno/perfc.h>
-#include <xeno/sched-if.h>
+#include <xen/config.h>
+#include <xen/init.h>
+#include <xen/lib.h>
+#include <xen/sched.h>
+#include <xen/delay.h>
+#include <xen/event.h>
+#include <xen/time.h>
+#include <xen/ac_timer.h>
+#include <xen/interrupt.h>
+#include <xen/timer.h>
+#include <xen/perfc.h>
+#include <xen/sched-if.h>
 #include <hypervisor-ifs/sched_ctl.h>
-#include <xeno/trace.h>
+#include <xen/trace.h>
 
 /*#define WAKEUP_HISTO*/
 /*#define BLOCKTIME_HISTO*/

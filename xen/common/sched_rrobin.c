@@ -4,11 +4,11 @@
  * by Mark Williamson (C) 2004 Intel Research Cambridge
  */
 
-#include <xeno/sched.h>
-#include <xeno/sched-if.h>
+#include <xen/sched.h>
+#include <xen/sched-if.h>
 #include <hypervisor-ifs/sched_ctl.h>
-#include <xeno/ac_timer.h>
-#include <xeno/time.h>
+#include <xen/ac_timer.h>
+#include <xen/time.h>
 
 static s_time_t rr_slice = MILLISECS(10);
 

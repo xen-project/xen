@@ -10,12 +10,12 @@
  */
 
 
-#include <xeno/init.h>
-#include <xeno/kernel.h>
-#include <xeno/pci.h>
-#include <xeno/errno.h>
-#include <xeno/ioport.h>
-#include <xeno/cache.h>
+#include <xen/init.h>
+#include <xen/kernel.h>
+#include <xen/pci.h>
+#include <xen/errno.h>
+#include <xen/ioport.h>
+#include <xen/cache.h>
 
 
 #define DEBUG_CONFIG 0

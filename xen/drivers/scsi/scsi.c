@@ -39,30 +39,30 @@
 #define REVISION	"Revision: 1.00"
 #define VERSION		"Id: scsi.c 1.00 2000/09/26"
 
-#include <xeno/config.h>
-#include <xeno/module.h>
+#include <xen/config.h>
+#include <xen/module.h>
 
-#include <xeno/sched.h>
-#include <xeno/timer.h>
-#include <xeno/lib.h>
-#include <xeno/slab.h>
-#include <xeno/ioport.h>
-/*#include <xeno/stat.h>*/
-#include <xeno/blk.h>
-#include <xeno/interrupt.h>
-#include <xeno/delay.h>
-#include <xeno/init.h>
-/*#include <xeno/smp_lock.h>*/
-/*#include <xeno/completion.h>*/
+#include <xen/sched.h>
+#include <xen/timer.h>
+#include <xen/lib.h>
+#include <xen/slab.h>
+#include <xen/ioport.h>
+/*#include <xen/stat.h>*/
+#include <xen/blk.h>
+#include <xen/interrupt.h>
+#include <xen/delay.h>
+#include <xen/init.h>
+/*#include <xen/smp_lock.h>*/
+/*#include <xen/completion.h>*/
 
-/* for xeno scsi_probe() stuff... maybe punt somewhere else? */
+/* for xen scsi_probe() stuff... maybe punt somewhere else? */
 #include <hypervisor-ifs/block.h>
-#include <xeno/blkdev.h>
+#include <xen/blkdev.h>
 
 #define __KERNEL_SYSCALLS__
 
-/*#include <xeno/unistd.h>*/
-#include <xeno/spinlock.h>
+/*#include <xen/unistd.h>*/
+#include <xen/spinlock.h>
 
 #include <asm/system.h>
 #include <asm/irq.h>
@@ -74,7 +74,7 @@
 #include "constants.h"
 
 #ifdef CONFIG_KMOD
-#include <xeno/kmod.h>
+#include <xen/kmod.h>
 #endif
 
 #undef USE_STATIC_SCSI_MEMORY

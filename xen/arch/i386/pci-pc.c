@@ -4,13 +4,13 @@
  *	(c) 1999--2000 Martin Mares <mj@ucw.cz>
  */
 
-#include <xeno/config.h>
-#include <xeno/types.h>
-/*#include <xeno/kernel.h>*/
-#include <xeno/sched.h>
-#include <xeno/pci.h>
-#include <xeno/init.h>
-#include <xeno/ioport.h>
+#include <xen/config.h>
+#include <xen/types.h>
+/*#include <xen/kernel.h>*/
+#include <xen/sched.h>
+#include <xen/pci.h>
+#include <xen/init.h>
+#include <xen/ioport.h>
 
 /*#include <asm/segment.h>*/
 #include <asm/io.h>

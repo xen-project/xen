@@ -30,19 +30,19 @@
  *       Fix problem where removable media could be ejected after sd_open.
  */
 
-#include <xeno/config.h>
-#include <xeno/module.h>
-#include <xeno/sched.h>
-#include <xeno/hdreg.h>
-#include <xeno/init.h>
+#include <xen/config.h>
+#include <xen/module.h>
+#include <xen/sched.h>
+#include <xen/hdreg.h>
+#include <xen/init.h>
 
 #include <asm/uaccess.h>
 #include <asm/system.h>
 #include <asm/io.h>
 
 #define MAJOR_NR SCSI_DISK0_MAJOR
-#include <xeno/blk.h>
-#include <xeno/blkpg.h>
+#include <xen/blk.h>
+#include <xen/blkpg.h>
 #include "scsi.h"
 #include "hosts.h"
 #include "sd.h"
@@ -50,7 +50,7 @@
 #include "constants.h"
 #include <scsi/scsicam.h>	/* must follow "hosts.h" */
 
-#include <xeno/genhd.h>
+#include <xen/genhd.h>
 
 #include <asm/domain_page.h>    /* SMH: for [un_]map_domain_mem() */
 
@@ -1306,7 +1306,7 @@ static void sd_finish()
 ** add the scsi block devices for this domain to a xen_disk_info_t; 
 ** we assume xdi->count points to the first unused place in the array. 
 **
-** XXX SMH: this is a rather gross 'probe' function to allow xeno world 
+** XXX SMH: this is a rather gross 'probe' function to allow xen world 
 ** to grope us; this should really not be in the disk-specific code as 
 ** it should report tapes, CDs, etc. But for now this looks like the 
 ** easiest place to hook it in :-( 

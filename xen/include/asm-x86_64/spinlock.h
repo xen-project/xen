@@ -1,8 +1,8 @@
 #ifndef __ASM_SPINLOCK_H
 #define __ASM_SPINLOCK_H
 
-#include <xeno/config.h>
-#include <xeno/lib.h>
+#include <xen/config.h>
+#include <xen/lib.h>
 #include <asm/atomic.h>
 #include <asm/rwlock.h>
 

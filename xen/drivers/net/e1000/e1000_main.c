@@ -21,7 +21,7 @@
   file called LICENSE.
   
   Contact Information:
-  Linux NICS <xeno.nics@intel.com>
+  Linux NICS <linux.nics@intel.com>
   Intel Corporation, 5200 N.E. Elam Young Parkway, Hillsboro, OR 97124-6497
 
 *******************************************************************************/
@@ -204,7 +204,7 @@ static struct pci_driver e1000_driver = {
 #endif
 };
 
-MODULE_AUTHOR("Intel Corporation, <xeno.nics@intel.com>");
+MODULE_AUTHOR("Intel Corporation, <linux.nics@intel.com>");
 MODULE_DESCRIPTION("Intel(R) PRO/1000 Network Driver");
 MODULE_LICENSE("GPL");
 

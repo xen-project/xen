@@ -3,17 +3,17 @@
  * a module.
  */
 #define __NO_VERSION__
-#include <xeno/config.h>
-#include <xeno/module.h>
+#include <xen/config.h>
+#include <xen/module.h>
 
-#include <xeno/sched.h>
-#include <xeno/timer.h>
-/*  #include <xeno/string.h> */
-/*  #include <xeno/slab.h> */
-/*  #include <xeno/ioport.h> */
-/*  #include <xeno/kernel.h> */
-#include <xeno/blk.h>
-/* #include <xeno/fs.h> */
+#include <xen/sched.h>
+#include <xen/timer.h>
+/*  #include <xen/string.h> */
+/*  #include <xen/slab.h> */
+/*  #include <xen/ioport.h> */
+/*  #include <xen/kernel.h> */
+#include <xen/blk.h>
+/* #include <xen/fs.h> */
 
 #include <asm/system.h>
 #include <asm/irq.h>

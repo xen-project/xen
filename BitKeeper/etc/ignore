@@ -21,7 +21,7 @@ xen/drivers/pci/devlist.h
 xen/drivers/pci/gen-devlist
 xen/include/asm
 xen/include/hypervisor-ifs/arch
-xen/include/xeno/compile.h
+xen/include/xen/compile.h
 xen/tools/elf-reloc
 xen/tools/figlet/figlet
 TAGS

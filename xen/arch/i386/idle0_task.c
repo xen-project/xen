@@ -1,5 +1,5 @@
-#include <xeno/config.h>
-#include <xeno/sched.h>
+#include <xen/config.h>
+#include <xen/sched.h>
 #include <asm/desc.h>
 
 struct task_struct idle0_task = IDLE0_TASK(idle0_task);

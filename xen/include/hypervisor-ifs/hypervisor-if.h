@@ -223,7 +223,7 @@ typedef struct shared_info_st {
      * atomically!). The guest OS detects this because 'time_version1' is
      * incremented just before updating these values, and 'time_version2' is
      * incremented immediately after. See Xenolinux code for an example of how 
-     * to read these values safely (arch/xeno/kernel/time.c).
+     * to read these values safely (arch/xen/kernel/time.c).
      */
     unsigned long      time_version1;   /* A version number for info below.  */
     unsigned long      time_version2;   /* A version number for info below.  */

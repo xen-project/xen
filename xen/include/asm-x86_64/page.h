@@ -47,7 +47,7 @@
 #define copy_page(_t,_f)         memcpy((void *)(_t), (void *)(_f), PAGE_SIZE)
 
 #ifndef __ASSEMBLY__
-#include <xeno/config.h>
+#include <xen/config.h>
 typedef struct { unsigned long l1_lo; } l1_pgentry_t;
 typedef struct { unsigned long l2_lo; } l2_pgentry_t;
 typedef struct { unsigned long l3_lo; } l3_pgentry_t;
@@ -191,7 +191,7 @@ extern void paging_init(void);
 #define __flush_tlb_one(__addr) \
 __asm__ __volatile__("invlpg %0": :"m" (*(char *) (__addr)))
 
-#include <xeno/config.h>
+#include <xen/config.h>
 
 /*
  * Tell the user there is some problem.  The exception handler decodes this frame.

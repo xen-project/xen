@@ -224,26 +224,26 @@ static int vortex_debug = 1;
 #error You must compile this driver with "-O".
 #endif
 
-#include <xeno/config.h>
-#include <xeno/lib.h>
-#include <xeno/module.h>
-//#include <xeno/kernel.h>
-#include <xeno/sched.h>
-//#include <xeno/string.h>
-#include <xeno/timer.h>
-#include <xeno/errno.h>
-//#include <xeno/in.h>
-#include <xeno/ioport.h>
-#include <xeno/slab.h>
-#include <xeno/interrupt.h>
-#include <xeno/pci.h>
-#include <xeno/mii.h>
-#include <xeno/init.h>
-#include <xeno/netdevice.h>
-#include <xeno/etherdevice.h>
-#include <xeno/skbuff.h>
-#include <xeno/ethtool.h>
-//#include <xeno/highmem.h>
+#include <xen/config.h>
+#include <xen/lib.h>
+#include <xen/module.h>
+//#include <xen/kernel.h>
+#include <xen/sched.h>
+//#include <xen/string.h>
+#include <xen/timer.h>
+#include <xen/errno.h>
+//#include <xen/in.h>
+#include <xen/ioport.h>
+#include <xen/slab.h>
+#include <xen/interrupt.h>
+#include <xen/pci.h>
+#include <xen/mii.h>
+#include <xen/init.h>
+#include <xen/netdevice.h>
+#include <xen/etherdevice.h>
+#include <xen/skbuff.h>
+#include <xen/ethtool.h>
+//#include <xen/highmem.h>
 #include <asm/irq.h>			/* For NR_IRQS only. */
 #include <asm/bitops.h>
 #include <asm/io.h>
@@ -262,7 +262,7 @@ static int vortex_debug = 1;
 
 #define RUN_AT(x) (jiffies + (x))
 
-#include <xeno/delay.h>
+#include <xen/delay.h>
 
 
 static char version[] __devinitdata =

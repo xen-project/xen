@@ -1,4 +1,4 @@
-#include <xeno/config.h>
+#include <xen/config.h>
 #include <hypervisor-ifs/hypervisor-if.h>
 #include <asm/page.h>
 

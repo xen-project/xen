@@ -1,12 +1,12 @@
 #ifndef _ASM_IO_H
 #define _ASM_IO_H
 
-#include <xeno/config.h>
+#include <xen/config.h>
 #include <asm/page.h>
 
 #define IO_SPACE_LIMIT 0xffff
 
-/*#include <xeno/vmalloc.h>*/
+/*#include <xen/vmalloc.h>*/
 
 /*
  * Temporary debugging check to catch old code using

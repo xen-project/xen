@@ -32,23 +32,23 @@
  *		Martin J. Bligh	: 	Added support for multi-quad systems
  */
 
-#include <xeno/config.h>
-#include <xeno/init.h>
-#include <xeno/interrupt.h>
-#include <xeno/irq.h>
-#include <xeno/mm.h>
-#include <xeno/slab.h>
+#include <xen/config.h>
+#include <xen/init.h>
+#include <xen/interrupt.h>
+#include <xen/irq.h>
+#include <xen/mm.h>
+#include <xen/slab.h>
 #include <asm/pgalloc.h>
 #include <asm/mc146818rtc.h>
 #include <asm/smpboot.h>
-#include <xeno/smp.h>
+#include <xen/smp.h>
 #include <asm/msr.h>
 #include <asm/system.h>
 #include <asm/mpspec.h>
 #include <asm/io_apic.h>
-#include <xeno/sched.h>
-#include <xeno/delay.h>
-#include <xeno/lib.h>
+#include <xen/sched.h>
+#include <xen/delay.h>
+#include <xen/lib.h>
 
 #ifdef CONFIG_SMP
 

@@ -29,30 +29,30 @@
 static const char *version =
 DRV_NAME ".c:v" DRV_VERSION " " DRV_RELDATE " tsbogend@alpha.franken.de\n";
 
-#include <xeno/module.h>
+#include <xen/module.h>
 
-#include <xeno/kernel.h>
-#include <xeno/sched.h>
-#include <xeno/string.h>
-#include <xeno/errno.h>
-#include <xeno/ioport.h>
-#include <xeno/slab.h>
-#include <xeno/interrupt.h>
-#include <xeno/pci.h>
-#include <xeno/delay.h>
-#include <xeno/init.h>
-#include <xeno/ethtool.h>
-#include <xeno/mii.h>
-#include <xeno/crc32.h>
+#include <xen/kernel.h>
+#include <xen/sched.h>
+#include <xen/string.h>
+#include <xen/errno.h>
+#include <xen/ioport.h>
+#include <xen/slab.h>
+#include <xen/interrupt.h>
+#include <xen/pci.h>
+#include <xen/delay.h>
+#include <xen/init.h>
+#include <xen/ethtool.h>
+#include <xen/mii.h>
+#include <xen/crc32.h>
 #include <asm/bitops.h>
 #include <asm/io.h>
 #include <asm/dma.h>
 #include <asm/uaccess.h>
 
-#include <xeno/netdevice.h>
-#include <xeno/etherdevice.h>
-#include <xeno/skbuff.h>
-#include <xeno/spinlock.h>
+#include <xen/netdevice.h>
+#include <xen/etherdevice.h>
+#include <xen/skbuff.h>
+#include <xen/spinlock.h>
 
 #undef TX_RING_SIZE
 #undef RX_RING_SIZE

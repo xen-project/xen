@@ -10,12 +10,12 @@
  * Copyright (C) 1992 Linus Torvalds
  */
 
-#include <xeno/config.h>
-#include <xeno/mm.h>
-#include <xeno/sched.h>
-#include <xeno/interrupt.h>
-#include <xeno/init.h>
-#include <xeno/tqueue.h>
+#include <xen/config.h>
+#include <xen/mm.h>
+#include <xen/sched.h>
+#include <xen/interrupt.h>
+#include <xen/init.h>
+#include <xen/tqueue.h>
 
 irq_cpustat_t irq_stat[NR_CPUS];
 

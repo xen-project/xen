@@ -6,12 +6,12 @@
  *	Copyright (c) 1997--1999 Martin Mares <mj@ucw.cz>
  */
 
-#include <xeno/types.h>
-#include <xeno/kernel.h>
-#include <xeno/pci.h>
-#include <xeno/proc_fs.h>
-#include <xeno/init.h>
-#include <xeno/seq_file.h>
+#include <xen/types.h>
+#include <xen/kernel.h>
+#include <xen/pci.h>
+#include <xen/proc_fs.h>
+#include <xen/init.h>
+#include <xen/seq_file.h>
 
 #include <asm/uaccess.h>
 #include <asm/byteorder.h>

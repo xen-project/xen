@@ -8,10 +8,10 @@
  *	later.
  */
 
-#include <xeno/irq.h>
-#include <xeno/sched.h>
-#include <xeno/delay.h>
-#include <xeno/spinlock.h>
+#include <xen/irq.h>
+#include <xen/sched.h>
+#include <xen/delay.h>
+#include <xen/spinlock.h>
 #include <asm/smp.h>
 #include <asm/mc146818rtc.h>
 #include <asm/pgalloc.h>

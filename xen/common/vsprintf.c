@@ -15,8 +15,8 @@
  */
 
 #include <stdarg.h>
-#include <xeno/ctype.h>
-#include <xeno/lib.h>
+#include <xen/ctype.h>
+#include <xen/lib.h>
 
 /**
  * simple_strtoul - convert a string to an unsigned long

@@ -11,10 +11,10 @@
  * Copyright (C) 1999 Ingo Molnar <mingo@redhat.com>
  */
 
-#include <xeno/config.h>
-#include <xeno/sched.h>
-#include <xeno/mm.h>
-#include <xeno/perfc.h>
+#include <xen/config.h>
+#include <xen/sched.h>
+#include <xen/mm.h>
+#include <xen/perfc.h>
 #include <asm/domain_page.h>
 #include <asm/pgalloc.h>
 

@@ -6,20 +6,20 @@
  * Copyright (c) 2003-2004, Keir Fraser & Steve Hand
  */
 
-#include <xeno/config.h>
-#include <xeno/types.h>
-#include <xeno/lib.h>
+#include <xen/config.h>
+#include <xen/types.h>
+#include <xen/lib.h>
 #include <asm/io.h>
-#include <xeno/slab.h>
-#include <xeno/sched.h>
-#include <xeno/vbd.h>
-#include <xeno/blkdev.h>
-#include <xeno/keyhandler.h>
+#include <xen/slab.h>
+#include <xen/sched.h>
+#include <xen/vbd.h>
+#include <xen/blkdev.h>
+#include <xen/keyhandler.h>
 #include <asm/current.h>
 #include <asm/domain_page.h>
 
 #include <hypervisor-ifs/hypervisor-if.h>
-#include <xeno/event.h>
+#include <xen/event.h>
 
 long __vbd_create(struct task_struct *p,
                   unsigned short vdevice,

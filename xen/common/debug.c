@@ -4,12 +4,12 @@
  * xen pervasive debugger
  */
 
-#include <xeno/config.h>
-#include <xeno/types.h>
-#include <xeno/lib.h>
+#include <xen/config.h>
+#include <xen/types.h>
+#include <xen/lib.h>
 #include <hypervisor-ifs/dom0_ops.h>
-#include <xeno/sched.h>
-#include <xeno/event.h>
+#include <xen/sched.h>
+#include <xen/event.h>
 #include <asm/page.h>
 #include <asm/domain_page.h>                           /* [un]map_domain_mem */
 #include <asm/pdb.h>

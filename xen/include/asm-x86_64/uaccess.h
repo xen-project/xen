@@ -4,10 +4,10 @@
 /*
  * User space memory access functions
  */
-#include <xeno/config.h>
-#include <xeno/sched.h>
-#include <xeno/prefetch.h>
-#include <xeno/errno.h>
+#include <xen/config.h>
+#include <xen/sched.h>
+#include <xen/prefetch.h>
+#include <xen/errno.h>
 #include <asm/page.h>
 
 #define VERIFY_READ 0

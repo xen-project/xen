@@ -79,16 +79,16 @@
  * FORCED_DEBUG	- 1 enables SLAB_RED_ZONE and SLAB_POISON (if possible)
  */
 
-#include <xeno/config.h>
-#include <xeno/init.h>
-#include <xeno/types.h>
-#include <xeno/lib.h>
-#include <xeno/slab.h>
-#include <xeno/list.h>
-#include <xeno/spinlock.h>
-#include <xeno/errno.h>
-#include <xeno/smp.h>
-#include <xeno/sched.h>
+#include <xen/config.h>
+#include <xen/init.h>
+#include <xen/types.h>
+#include <xen/lib.h>
+#include <xen/slab.h>
+#include <xen/list.h>
+#include <xen/spinlock.h>
+#include <xen/errno.h>
+#include <xen/smp.h>
+#include <xen/sched.h>
 
 
 #ifdef CONFIG_DEBUG_SLAB

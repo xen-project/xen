@@ -1,7 +1,7 @@
 #ifndef __x8664_PCI_H
 #define __x8664_PCI_H
 
-#include <xeno/config.h>
+#include <xen/config.h>
 #include <asm/io.h>
 
 
@@ -24,8 +24,8 @@ void pcibios_penalize_isa_irq(int irq);
 struct irq_routing_table *pcibios_get_irq_routing_table(void);
 int pcibios_set_irq_routing(struct pci_dev *dev, int pin, int irq);
 
-#include <xeno/types.h>
-#include <xeno/slab.h>
+#include <xen/types.h>
+#include <xen/slab.h>
 #include <asm/scatterlist.h>
 #include <asm/io.h>
 #include <asm/page.h>

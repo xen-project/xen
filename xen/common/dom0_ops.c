@@ -6,18 +6,18 @@
  * Copyright (c) 2002, K A Fraser
  */
 
-#include <xeno/config.h>
-#include <xeno/types.h>
-#include <xeno/lib.h>
-#include <xeno/mm.h>
+#include <xen/config.h>
+#include <xen/types.h>
+#include <xen/lib.h>
+#include <xen/mm.h>
 #include <hypervisor-ifs/dom0_ops.h>
-#include <xeno/sched.h>
-#include <xeno/event.h>
+#include <xen/sched.h>
+#include <xen/event.h>
 #include <asm/domain_page.h>
 #include <asm/msr.h>
 #include <asm/pdb.h>
-#include <xeno/trace.h>
-#include <xeno/console.h>
+#include <xen/trace.h>
+#include <xen/console.h>
 #include <hypervisor-ifs/sched_ctl.h>
 
 extern unsigned int alloc_new_dom_mem(struct task_struct *, unsigned int);

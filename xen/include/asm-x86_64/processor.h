@@ -11,7 +11,7 @@
 #include <asm/types.h>
 #include <asm/cpufeature.h>
 #include <asm/desc.h>
-#include <xeno/config.h>
+#include <xen/config.h>
 #include <hypervisor-ifs/hypervisor-if.h>
 
 struct task_struct;

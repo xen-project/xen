@@ -15,6 +15,6 @@ CFLAGS  += -Wno-pointer-arith -Wredundant-decls -m32
 TARGET_CPU := i686
 CFLAGS += -march=$(TARGET_CPU)
 LDARCHFLAGS := --oformat elf32-i386 
-LDFLAGS := -T xeno.lds -N 
+LDFLAGS := -T xen.lds -N 
 
 

@@ -1,8 +1,8 @@
 #ifndef __ASM_HARDIRQ_H
 #define __ASM_HARDIRQ_H
 
-#include <xeno/config.h>
-#include <xeno/irq.h>
+#include <xen/config.h>
+#include <xen/irq.h>
 
 /* assembly code in softirq.h is sensitive to the offsets of these fields */
 typedef struct {
@@ -14,7 +14,7 @@ typedef struct {
 	unsigned long idle_timestamp;
 } ____cacheline_aligned irq_cpustat_t;
 
-#include <xeno/irq_cpustat.h>	/* Standard mappings for irq_cpustat_t above */
+#include <xen/irq_cpustat.h>	/* Standard mappings for irq_cpustat_t above */
 
 /*
  * Are we in an interrupt context? Either doing bottom half

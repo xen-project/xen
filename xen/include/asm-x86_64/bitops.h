@@ -5,7 +5,7 @@
  * Copyright 1992, Linus Torvalds.
  */
 
-#include <xeno/config.h>
+#include <xen/config.h>
 
 /*
  * These have to be done with inline assembly: that way the bit-setting

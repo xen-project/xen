@@ -53,15 +53,15 @@
  *
  */
 
-#include <xeno/config.h>
-#include <xeno/types.h>
-#include <xeno/kernel.h>
-#include <xeno/ioport.h>
-#include <xeno/pci.h>
-#include <xeno/hdreg.h>
-#include <xeno/ide.h>
-#include <xeno/delay.h>
-#include <xeno/init.h>
+#include <xen/config.h>
+#include <xen/types.h>
+#include <xen/kernel.h>
+#include <xen/ioport.h>
+#include <xen/pci.h>
+#include <xen/hdreg.h>
+#include <xen/ide.h>
+#include <xen/delay.h>
+#include <xen/init.h>
 
 #include <asm/io.h>
 
@@ -72,8 +72,8 @@
 #define DISPLAY_PIIX_TIMINGS
 
 #if defined(DISPLAY_PIIX_TIMINGS) && defined(CONFIG_PROC_FS)
-#include <xeno/stat.h>
-#include <xeno/proc_fs.h>
+#include <xen/stat.h>
+#include <xen/proc_fs.h>
 
 static int piix_get_info(char *, char **, off_t, int);
 extern int (*piix_display_info)(char *, char **, off_t, int); /* ide-proc.c */

@@ -7,10 +7,10 @@
  * magic northbridge registers..
  */
 
-#include <xeno/sched.h>
-#include <xeno/errno.h>
-#include <xeno/pci.h>
-#include <xeno/smp_lock.h>
+#include <xen/sched.h>
+#include <xen/errno.h>
+#include <xen/pci.h>
+#include <xen/smp_lock.h>
 #include <asm/uaccess.h>
 
 

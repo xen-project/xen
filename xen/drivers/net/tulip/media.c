@@ -14,10 +14,10 @@
 
 */
 
-#include <xeno/kernel.h>
-#include <xeno/mii.h>
-#include <xeno/init.h>
-#include <xeno/delay.h>
+#include <xen/kernel.h>
+#include <xen/mii.h>
+#include <xen/init.h>
+#include <xen/delay.h>
 #include "tulip.h"
 
 

@@ -12,18 +12,18 @@
  * Description: Accurate timer for the Hypervisor
  */
 
-#include <xeno/config.h>
-#include <xeno/init.h>
-#include <xeno/types.h>
-#include <xeno/errno.h>
-#include <xeno/sched.h>
-#include <xeno/lib.h>
-#include <xeno/smp.h>
-#include <xeno/perfc.h>
-#include <xeno/time.h>
-#include <xeno/interrupt.h>
-#include <xeno/ac_timer.h>
-#include <xeno/keyhandler.h>
+#include <xen/config.h>
+#include <xen/init.h>
+#include <xen/types.h>
+#include <xen/errno.h>
+#include <xen/sched.h>
+#include <xen/lib.h>
+#include <xen/smp.h>
+#include <xen/perfc.h>
+#include <xen/time.h>
+#include <xen/interrupt.h>
+#include <xen/ac_timer.h>
+#include <xen/keyhandler.h>
 #include <asm/system.h>
 #include <asm/desc.h>
 

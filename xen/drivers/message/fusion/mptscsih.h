@@ -62,8 +62,8 @@
 #define SCSIHOST_H_INCLUDED
 /*=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=*/
 
-#include <xeno/tqueue.h>
-#include <xeno/version.h>
+#include <xen/tqueue.h>
+#include <xen/version.h>
 
 /*=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=*/
 /*
@@ -155,7 +155,7 @@ struct mptscsih_driver_setup
 		 *	Super HACK!  -by sralston:-(
 		 *	(good grief; heaven help me!)
 		 */
-#		include <xeno/capability.h>
+#		include <xen/capability.h>
 #		if !defined(CAP_LEASE) && !defined(MODULE)
 #			undef MPT_SCSIHOST_NEED_ENTRY_EXIT_HOOKUPS
 #		endif
@@ -168,12 +168,12 @@ struct mptscsih_driver_setup
 
 /*
  *	tq_scheduler disappeared @ lk-2.4.0-test12
- *	(right when <xeno/sched.h> newly defined TQ_ACTIVE)
+ *	(right when <xen/sched.h> newly defined TQ_ACTIVE)
  *	tq_struct reworked in 2.5.41. Include workqueue.h.
  */
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(2,5,41)
-#	include <xeno/sched.h>
-#	include <xeno/workqueue.h>
+#	include <xen/sched.h>
+#	include <xen/workqueue.h>
 #define SCHEDULE_TASK(x)		\
 	if (schedule_work(x) == 0) {	\
 		/*MOD_DEC_USE_COUNT*/;	\
@@ -181,7 +181,7 @@ struct mptscsih_driver_setup
 #else
 #define HAVE_TQ_SCHED	1
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(2,4,0)
-#	include <xeno/sched.h>
+#	include <xen/sched.h>
 #	ifdef TQ_ACTIVE
 #		undef HAVE_TQ_SCHED
 #	endif

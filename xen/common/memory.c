@@ -125,14 +125,14 @@
  * to more aggressive flush types.
  */
 
-#include <xeno/config.h>
-#include <xeno/init.h>
-#include <xeno/lib.h>
-#include <xeno/mm.h>
-#include <xeno/sched.h>
-#include <xeno/errno.h>
-#include <xeno/perfc.h>
-#include <xeno/interrupt.h>
+#include <xen/config.h>
+#include <xen/init.h>
+#include <xen/lib.h>
+#include <xen/mm.h>
+#include <xen/sched.h>
+#include <xen/errno.h>
+#include <xen/perfc.h>
+#include <xen/interrupt.h>
 #include <asm/page.h>
 #include <asm/flushtlb.h>
 #include <asm/io.h>

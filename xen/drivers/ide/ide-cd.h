@@ -7,7 +7,7 @@
 #ifndef _IDE_CD_H
 #define _IDE_CD_H
 
-#include <xeno/cdrom.h>
+#include <xen/cdrom.h>
 #include <asm/byteorder.h>
 
 /* Turn this on to have the driver print out the meanings of the

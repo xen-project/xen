@@ -65,19 +65,19 @@
 */
 /*=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=*/
 
-#include <xeno/types.h>	/* SAE: Necessary... */
-#include <xeno/module.h>
-#include <xeno/version.h>
-#include <xeno/kernel.h>
-#include <xeno/init.h>
-#include <xeno/errno.h>
-#include <xeno/kdev_t.h>
-#include <xeno/blkdev.h>
-#include <xeno/blk.h>		/* for io_request_lock (spinlock) decl */
-#include <xeno/delay.h>	/* for mdelay */
-#include <xeno/interrupt.h>	/* needed for in_interrupt() proto */
-#include <xeno/reboot.h>	/* notifier code */
-#include <xeno/tqueue.h>
+#include <xen/types.h>	/* SAE: Necessary... */
+#include <xen/module.h>
+#include <xen/version.h>
+#include <xen/kernel.h>
+#include <xen/init.h>
+#include <xen/errno.h>
+#include <xen/kdev_t.h>
+#include <xen/blkdev.h>
+#include <xen/blk.h>		/* for io_request_lock (spinlock) decl */
+#include <xen/delay.h>	/* for mdelay */
+#include <xen/interrupt.h>	/* needed for in_interrupt() proto */
+#include <xen/reboot.h>	/* notifier code */
+#include <xen/tqueue.h>
 #include <asm/byteorder.h>	/* SAE: Necessary... */
 #include "../../scsi/scsi.h"
 #include "../../scsi/hosts.h"

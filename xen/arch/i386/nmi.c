@@ -12,16 +12,16 @@
  *  Keir Fraser         : Pentium 4 Hyperthreading support
  */
 
-#include <xeno/config.h>
-#include <xeno/init.h>
-#include <xeno/lib.h>
-#include <xeno/mm.h>
-#include <xeno/irq.h>
-#include <xeno/delay.h>
-#include <xeno/interrupt.h>
-#include <xeno/time.h>
-#include <xeno/timex.h>
-#include <xeno/sched.h>
+#include <xen/config.h>
+#include <xen/init.h>
+#include <xen/lib.h>
+#include <xen/mm.h>
+#include <xen/irq.h>
+#include <xen/delay.h>
+#include <xen/interrupt.h>
+#include <xen/time.h>
+#include <xen/timex.h>
+#include <xen/sched.h>
 
 #include <asm/mc146818rtc.h>
 #include <asm/smp.h>

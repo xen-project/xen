@@ -5,27 +5,27 @@
  * Copyright (C) 2001, 2002, 2003 Jeff Garzik (jgarzik@pobox.com)
  */
 
-#include <xeno/config.h>
+#include <xen/config.h>
 
-#include <xeno/module.h>
+#include <xen/module.h>
 
-#include <xeno/kernel.h>
-#include <xeno/types.h>
-#include <xeno/tqueue.h> // Xen
-#include <xeno/compiler.h>
-#include <xeno/slab.h>
-#include <xeno/delay.h>
-#include <xeno/init.h>
-#include <xeno/ioport.h>
-#include <xeno/pci.h>
-#include <xeno/netdevice.h>
-#include <xeno/etherdevice.h>
-#include <xeno/skbuff.h>
-#include <xeno/ethtool.h>
-#include <xeno/mii.h>
-#include <xeno/if_vlan.h>
-//#include <xeno/ip.h>
-//#include <xeno/tcp.h>
+#include <xen/kernel.h>
+#include <xen/types.h>
+#include <xen/tqueue.h> // Xen
+#include <xen/compiler.h>
+#include <xen/slab.h>
+#include <xen/delay.h>
+#include <xen/init.h>
+#include <xen/ioport.h>
+#include <xen/pci.h>
+#include <xen/netdevice.h>
+#include <xen/etherdevice.h>
+#include <xen/skbuff.h>
+#include <xen/ethtool.h>
+#include <xen/mii.h>
+#include <xen/if_vlan.h>
+//#include <xen/ip.h>
+//#include <xen/tcp.h>
 
 //#include <net/checksum.h>
 

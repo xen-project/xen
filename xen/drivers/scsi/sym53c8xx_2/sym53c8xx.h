@@ -54,9 +54,9 @@
 #define SYM53C8XX_H
 
 #if !defined(LINUX_VERSION_CODE)
-#include <xeno/version.h>
+#include <xen/version.h>
 #endif
-#include <xeno/config.h>
+#include <xen/config.h>
 
 /*
  *  Compatibility with ncr53c8xx and sym53c8xx configuration options.

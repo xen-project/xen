@@ -20,18 +20,18 @@
 #include <asm/uaccess.h>
 #include <asm/system.h>
 #include <asm/bitops.h>
-#include <xeno/config.h>
-#include <xeno/types.h>
-#include <xeno/sched.h>
-#include <xeno/lib.h>
-#include <xeno/mm.h>
-#include <xeno/socket.h>
-#include <xeno/sockios.h>
-#include <xeno/errno.h>
-#include <xeno/interrupt.h>
-#include <xeno/netdevice.h>
-#include <xeno/skbuff.h>
-#include <xeno/init.h>
+#include <xen/config.h>
+#include <xen/types.h>
+#include <xen/sched.h>
+#include <xen/lib.h>
+#include <xen/mm.h>
+#include <xen/socket.h>
+#include <xen/sockios.h>
+#include <xen/errno.h>
+#include <xen/interrupt.h>
+#include <xen/netdevice.h>
+#include <xen/skbuff.h>
+#include <xen/init.h>
 
 static void dev_watchdog(unsigned long arg)
 {

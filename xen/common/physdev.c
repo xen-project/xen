@@ -36,13 +36,13 @@
  */
 
 
-#include <xeno/config.h>
-#include <xeno/lib.h>
-#include <xeno/types.h>
-#include <xeno/sched.h>
-#include <xeno/pci.h>
-#include <xeno/irq.h>
-#include <xeno/event.h>
+#include <xen/config.h>
+#include <xen/lib.h>
+#include <xen/types.h>
+#include <xen/sched.h>
+#include <xen/pci.h>
+#include <xen/irq.h>
+#include <xen/event.h>
 #include <asm/pci.h>
 #include <hypervisor-ifs/hypervisor-if.h>
 #include <hypervisor-ifs/physdev.h>

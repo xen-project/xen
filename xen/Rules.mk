@@ -2,12 +2,12 @@ COMPILE_ARCH := $(shell uname -m | sed -e s/i.86/i386/)
 TARGET_ARCH  ?= $(COMPILE_ARCH)
 
 TARGET  := $(BASEDIR)/xen
-HDRS    := $(wildcard $(BASEDIR)/include/xeno/*.h)
+HDRS    := $(wildcard $(BASEDIR)/include/xen/*.h)
 HDRS    += $(wildcard $(BASEDIR)/include/scsi/*.h)
 HDRS    += $(wildcard $(BASEDIR)/include/hypervisor-ifs/*.h)
 HDRS    += $(wildcard $(BASEDIR)/include/asm-$(TARGET_ARCH)/*.h)
 # compile.h is always regenerated, but other files shouldn't be rebuilt
-HDRS    := $(subst $(BASEDIR)/include/xeno/compile.h,,$(HDRS))
+HDRS    := $(subst $(BASEDIR)/include/xen/compile.h,,$(HDRS))
 
 C_SRCS  := $(wildcard *.c)
 S_SRCS  := $(wildcard *.S)

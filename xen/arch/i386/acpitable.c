@@ -27,12 +27,12 @@
  *
  * $Id: acpitable.c,v 1.7 2001/11/04 12:21:18 fenrus Exp $
  */
-#include <xeno/config.h>
-#include <xeno/kernel.h>
-#include <xeno/init.h>
-#include <xeno/types.h>
-#include <xeno/slab.h>
-#include <xeno/pci.h>
+#include <xen/config.h>
+#include <xen/kernel.h>
+#include <xen/init.h>
+#include <xen/types.h>
+#include <xen/slab.h>
+#include <xen/pci.h>
 #include <asm/mpspec.h>
 #include <asm/io.h>
 #include <asm/apic.h>

@@ -10,18 +10,18 @@
 /*
  * This handles all read/write requests to block devices
  */
-#include <xeno/config.h>
-#include <xeno/types.h>
-#include <xeno/lib.h>
-#include <xeno/sched.h>
-#include <xeno/errno.h>
-#include <xeno/mm.h>
-#include <xeno/init.h>
+#include <xen/config.h>
+#include <xen/types.h>
+#include <xen/lib.h>
+#include <xen/sched.h>
+#include <xen/errno.h>
+#include <xen/mm.h>
+#include <xen/init.h>
 #include <asm/system.h>
 #include <asm/io.h>
-#include <xeno/blk.h>
-#include <xeno/slab.h>
-#include <xeno/module.h>
+#include <xen/blk.h>
+#include <xen/slab.h>
+#include <xen/module.h>
 
 /* This will die as all synchronous stuff is coming to an end */
 #if 0 

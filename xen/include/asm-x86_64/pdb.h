@@ -12,7 +12,7 @@
 #define __PDB_H__
 
 #include <asm/ptrace.h>
-#include <xeno/list.h>
+#include <xen/list.h>
 
 extern int pdb_initialized;
 extern int pdb_com_port;

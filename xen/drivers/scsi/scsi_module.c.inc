@@ -29,8 +29,8 @@
  * scsi_register.
  */
 
-#include <xeno/module.h>
-#include <xeno/init.h>
+#include <xen/module.h>
+#include <xen/init.h>
 
 extern int scsi_register_module(int, void *);
 extern int scsi_unregister_module(int, void *);

@@ -25,9 +25,9 @@
     $Header: /vger/u4/cvs/linux/drivers/scsi/hosts.h,v 1.6 1997/01/19 23:07:13 davem Exp $
 */
 
-#include <xeno/config.h>
-/*#include <xeno/proc_fs.h>*/
-#include <xeno/pci.h>
+#include <xen/config.h>
+/*#include <xen/proc_fs.h>*/
+#include <xen/pci.h>
 
 /* It is senseless to set SG_ALL any higher than this - the performance
  *  does not get any better, and it wastes memory

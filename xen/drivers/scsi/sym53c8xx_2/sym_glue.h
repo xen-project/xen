@@ -58,7 +58,7 @@
 #endif
 
 #define LinuxVersionCode(v, p, s) (((v)<<16)+((p)<<8)+(s))
-#include <xeno/version.h>
+#include <xen/version.h>
 #if	LINUX_VERSION_CODE < LinuxVersionCode(2, 2, 0)
 #error	"This driver requires a kernel version not lower than 2.2.0"
 #endif
@@ -67,36 +67,36 @@
 #include <asm/io.h>
 #include <asm/system.h>
 #if LINUX_VERSION_CODE >= LinuxVersionCode(2,3,17)
-#include <xeno/spinlock.h>
+#include <xen/spinlock.h>
 #else
 #include <asm/spinlock.h>
 #endif
-#include <xeno/delay.h>
+#include <xen/delay.h>
 
 /* SAE: Not here... */
 #ifdef XENO_KILLED
-#include <xeno/signal.h>
+#include <xen/signal.h>
 #endif
 
-#include <xeno/sched.h>
-#include <xeno/errno.h>
-#include <xeno/pci.h>
-#include <xeno/string.h>
-#include <xeno/mm.h>
-#include <xeno/ioport.h>
-#include <xeno/time.h>
-#include <xeno/timer.h>
+#include <xen/sched.h>
+#include <xen/errno.h>
+#include <xen/pci.h>
+#include <xen/string.h>
+#include <xen/mm.h>
+#include <xen/ioport.h>
+#include <xen/time.h>
+#include <xen/timer.h>
 /* SAE */
 #ifdef XENO_KILLED
-#include <xeno/stat.h>
+#include <xen/stat.h>
 #endif
 
-#include <xeno/blk.h>
+#include <xen/blk.h>
 
 #ifdef __sparc__
 #  include <asm/irq.h>
 #endif
-#include <xeno/init.h>
+#include <xen/init.h>
 
 #ifndef	__init
 #define	__init
@@ -110,7 +110,7 @@
 #include "../constants.h"
 #include "../sd.h"
 
-#include <xeno/types.h>
+#include <xen/types.h>
 
 /*
  *  Define BITS_PER_LONG for earlier linux versions.

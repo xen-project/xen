@@ -15,12 +15,12 @@
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
 
-#include <xeno/config.h>
-#include <xeno/init.h>
-#include <xeno/lib.h>
-#include <xeno/errno.h>
-#include <xeno/sched.h>
-#include <xeno/event.h>
+#include <xen/config.h>
+#include <xen/init.h>
+#include <xen/lib.h>
+#include <xen/errno.h>
+#include <xen/sched.h>
+#include <xen/event.h>
 
 #include <hypervisor-ifs/hypervisor-if.h>
 #include <hypervisor-ifs/event_channel.h>

@@ -1,7 +1,7 @@
 #ifndef __ASM_SMP_H
 #define __ASM_SMP_H
 
-#include <xeno/config.h>
+#include <xen/config.h>
 #include <asm/ptrace.h>
 
 #ifdef CONFIG_SMP

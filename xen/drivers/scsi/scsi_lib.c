@@ -18,25 +18,25 @@
  */
 
 #define __NO_VERSION__
-#include <xeno/module.h>
+#include <xen/module.h>
 
-#include <xeno/sched.h>
-#include <xeno/timer.h>
-/*  #include <xeno/string.h> */
-/*  #include <xeno/slab.h> */
-/*  #include <xeno/ioport.h> */
-/*  #include <xeno/kernel.h> */
-/*  #include <xeno/stat.h> */
-#include <xeno/blk.h>
-/*  #include <xeno/interrupt.h> */
-/*  #include <xeno/delay.h> */
-/*  #include <xeno/smp_lock.h> */
-/*  #include <xeno/completion.h> */
+#include <xen/sched.h>
+#include <xen/timer.h>
+/*  #include <xen/string.h> */
+/*  #include <xen/slab.h> */
+/*  #include <xen/ioport.h> */
+/*  #include <xen/kernel.h> */
+/*  #include <xen/stat.h> */
+#include <xen/blk.h>
+/*  #include <xen/interrupt.h> */
+/*  #include <xen/delay.h> */
+/*  #include <xen/smp_lock.h> */
+/*  #include <xen/completion.h> */
 
 
 #define __KERNEL_SYSCALLS__
 
-/* #include <xeno/unistd.h> */
+/* #include <xen/unistd.h> */
 
 #include <asm/system.h>
 #include <asm/irq.h>

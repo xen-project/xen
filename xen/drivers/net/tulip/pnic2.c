@@ -77,8 +77,8 @@
 
 
 #include "tulip.h"
-#include <xeno/pci.h>
-#include <xeno/delay.h>
+#include <xen/pci.h>
+#include <xen/delay.h>
 
 
 void pnic2_timer(unsigned long data)

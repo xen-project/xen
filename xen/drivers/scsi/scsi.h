@@ -15,9 +15,9 @@
 #ifndef _SCSI_H
 #define _SCSI_H
 
-#include <xeno/config.h>	/* for CONFIG_SCSI_LOGGING */
-#include <xeno/timer.h>
-/*#include <xeno/proc_fs.h>*/
+#include <xen/config.h>	/* for CONFIG_SCSI_LOGGING */
+#include <xen/timer.h>
+/*#include <xen/proc_fs.h>*/
 
 /*
  * Some of the public constants are being moved to this file.
@@ -25,7 +25,7 @@
  */
 #include <scsi/scsi.h>
 
-/*#include <xeno/random.h>*/
+/*#include <xen/random.h>*/
 
 #include <asm/hardirq.h>
 #include <asm/scatterlist.h>
@@ -44,7 +44,7 @@
 #define SCSI_DATA_NONE          3
 
 #ifdef CONFIG_PCI
-#include <xeno/pci.h>
+#include <xen/pci.h>
 #if ((SCSI_DATA_UNKNOWN == PCI_DMA_BIDIRECTIONAL) && (SCSI_DATA_WRITE == PCI_DMA_TODEVICE) && (SCSI_DATA_READ == PCI_DMA_FROMDEVICE) && (SCSI_DATA_NONE == PCI_DMA_NONE))
 #define scsi_to_pci_dma_dir(scsi_dir)	((int)(scsi_dir))
 #else

@@ -1,7 +1,7 @@
 #ifndef __ASM_SYSTEM_H
 #define __ASM_SYSTEM_H
 
-#include <xeno/config.h>
+#include <xen/config.h>
 #include <asm/bitops.h>
 
 /* Clear and set 'TS' bit respectively */

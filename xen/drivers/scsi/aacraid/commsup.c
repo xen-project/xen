@@ -31,21 +31,21 @@
  *
  */
 
-#include <xeno/config.h>
-#include <xeno/kernel.h>
-#include <xeno/init.h>
-#include <xeno/types.h>
-#include <xeno/sched.h>
-#include <xeno/pci.h>
-#include <xeno/spinlock.h>
-#include <xeno/slab.h>
-/*#include <xeno/completion.h>*/
+#include <xen/config.h>
+#include <xen/kernel.h>
+#include <xen/init.h>
+#include <xen/types.h>
+#include <xen/sched.h>
+#include <xen/pci.h>
+#include <xen/spinlock.h>
+#include <xen/slab.h>
+/*#include <xen/completion.h>*/
 /*#include <asm/semaphore.h>*/
-#include <xeno/blk.h>
+#include <xen/blk.h>
 #include <asm/uaccess.h>
 
-#include <xeno/interrupt.h>
-#include <xeno/delay.h>
+#include <xen/interrupt.h>
+#include <xen/delay.h>
 
 #include "scsi.h"
 #include "hosts.h"

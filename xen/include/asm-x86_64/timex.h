@@ -6,7 +6,7 @@
 #ifndef _ASMx8664_TIMEX_H
 #define _ASMx8664_TIMEX_H
 
-#include <xeno/config.h>
+#include <xen/config.h>
 #include <asm/msr.h>
 
 #define CLOCK_TICK_RATE (vxtime_hz)

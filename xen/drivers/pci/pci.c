@@ -9,17 +9,17 @@
  *	Copyright 1997 -- 2000 Martin Mares <mj@ucw.cz>
  */
 
-#include <xeno/config.h>
-#include <xeno/sched.h>
-#include <xeno/module.h>
-#include <xeno/types.h>
-#include <xeno/pci.h>
-#include <xeno/init.h>
-#include <xeno/slab.h>
-#include <xeno/ioport.h>
-#include <xeno/spinlock.h>
-#include <xeno/delay.h>
-#include <xeno/cache.h>
+#include <xen/config.h>
+#include <xen/sched.h>
+#include <xen/module.h>
+#include <xen/types.h>
+#include <xen/pci.h>
+#include <xen/init.h>
+#include <xen/slab.h>
+#include <xen/ioport.h>
+#include <xen/spinlock.h>
+#include <xen/delay.h>
+#include <xen/cache.h>
 #include <asm/page.h>
 
 #undef DEBUG

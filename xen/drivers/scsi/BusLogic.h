@@ -26,7 +26,7 @@
 */
 
 
-#include <xeno/config.h>
+#include <xen/config.h>
 
 
 /*

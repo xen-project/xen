@@ -12,14 +12,14 @@
  */
 
 #define __KERNEL_SYSCALLS__
-#include <xeno/config.h>
-#include <xeno/lib.h>
-#include <xeno/errno.h>
-#include <xeno/sched.h>
-#include <xeno/smp.h>
+#include <xen/config.h>
+#include <xen/lib.h>
+#include <xen/errno.h>
+#include <xen/sched.h>
+#include <xen/smp.h>
 #include <asm/ptrace.h>
-#include <xeno/delay.h>
-#include <xeno/interrupt.h>
+#include <xen/delay.h>
+#include <xen/interrupt.h>
 #include <asm/mc146818rtc.h>
 
 #include <asm/system.h>
@@ -30,8 +30,8 @@
 #include <asm/mpspec.h>
 #include <asm/ldt.h>
 
-#include <xeno/irq.h>
-#include <xeno/event.h>
+#include <xen/irq.h>
+#include <xen/event.h>
 
 int hlt_counter;
 

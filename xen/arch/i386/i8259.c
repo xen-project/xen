@@ -5,20 +5,20 @@
  * tables for IO APICS as well as uniprocessor 8259-alikes.
  */
 
-#include <xeno/config.h>
-#include <xeno/init.h>
+#include <xen/config.h>
+#include <xen/init.h>
 #include <asm/ptrace.h>
-#include <xeno/errno.h>
-#include <xeno/sched.h>
-#include <xeno/interrupt.h>
-#include <xeno/irq.h>
+#include <xen/errno.h>
+#include <xen/sched.h>
+#include <xen/interrupt.h>
+#include <xen/irq.h>
 
 #include <asm/atomic.h>
 #include <asm/system.h>
 #include <asm/io.h>
 #include <asm/desc.h>
 #include <asm/bitops.h>
-#include <xeno/delay.h>
+#include <xen/delay.h>
 #include <asm/apic.h>
 
 

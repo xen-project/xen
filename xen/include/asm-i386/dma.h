@@ -8,10 +8,10 @@
 #ifndef _ASM_DMA_H
 #define _ASM_DMA_H
 
-#include <xeno/config.h>
-#include <xeno/spinlock.h>	/* And spinlocks */
+#include <xen/config.h>
+#include <xen/spinlock.h>	/* And spinlocks */
 #include <asm/io.h>		/* need byte IO */
-#include <xeno/delay.h>
+#include <xen/delay.h>
 
 
 #ifdef HAVE_REALLY_SLOW_DMA_CONTROLLER

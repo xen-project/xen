@@ -128,26 +128,26 @@
 
 #define _IDE_C			/* Tell ide.h it's really us */
 
-#include <xeno/config.h>
-#include <xeno/module.h>
-#include <xeno/types.h>
-#include <xeno/lib.h>
-/*#include <xeno/kernel.h>*/
-#include <xeno/timer.h>
-#include <xeno/mm.h>
-#include <xeno/interrupt.h>
-#include <xeno/major.h>
-#include <xeno/errno.h>
-#include <xeno/genhd.h>
-#include <xeno/blkpg.h>
-#include <xeno/slab.h>
-#include <xeno/init.h>
-#include <xeno/pci.h>
-#include <xeno/delay.h>
-#include <xeno/ide.h>
-/*#include <xeno/devfs_fs_kernel.h>*/
-/*#include <xeno/completion.h>*/
-/*#include <xeno/reboot.h>*/
+#include <xen/config.h>
+#include <xen/module.h>
+#include <xen/types.h>
+#include <xen/lib.h>
+/*#include <xen/kernel.h>*/
+#include <xen/timer.h>
+#include <xen/mm.h>
+#include <xen/interrupt.h>
+#include <xen/major.h>
+#include <xen/errno.h>
+#include <xen/genhd.h>
+#include <xen/blkpg.h>
+#include <xen/slab.h>
+#include <xen/init.h>
+#include <xen/pci.h>
+#include <xen/delay.h>
+#include <xen/ide.h>
+/*#include <xen/devfs_fs_kernel.h>*/
+/*#include <xen/completion.h>*/
+/*#include <xen/reboot.h>*/
 
 #include <asm/domain_page.h>
 #include <asm/byteorder.h>
@@ -159,7 +159,7 @@
 #include "ide_modes.h"
 
 #ifdef CONFIG_KMOD
-#include <xeno/kmod.h>
+#include <xen/kmod.h>
 #endif /* CONFIG_KMOD */
 
 #ifdef CONFIG_IDE_TASKFILE_IO

@@ -6,11 +6,11 @@
  */
 
 #define __NO_VERSION__
-#include <xeno/module.h>
+#include <xen/module.h>
 
-#include <xeno/config.h>
-#include <xeno/blk.h>
-/*#include <xeno/kernel.h> */
+#include <xen/config.h>
+#include <xen/blk.h>
+/*#include <xen/kernel.h> */
 #include "scsi.h"
 #include "hosts.h"
 

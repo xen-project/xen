@@ -9,11 +9,11 @@
  */
 
 #include <asm-i386/io.h>
-#include <xeno/sched.h>
-#include <xeno/keyhandler.h> 
-#include <xeno/reboot.h>
-#include <xeno/irq.h>
-#include <xeno/serial.h>
+#include <xen/sched.h>
+#include <xen/keyhandler.h> 
+#include <xen/reboot.h>
+#include <xen/irq.h>
+#include <xen/serial.h>
 #include <asm/pdb.h>
 
 /* Register offsets */

@@ -4,7 +4,7 @@
 #endif
 
 #include <asm/byteorder.h>
-#include <xeno/interrupt.h>
+#include <xen/interrupt.h>
 
 /*------------------------------------------------------------------------------
  *              D E F I N E S

@@ -1,9 +1,9 @@
 
-#include <xeno/lib.h>
-#include <xeno/smp.h>
-#include <xeno/time.h>
-#include <xeno/perfc.h>
-#include <xeno/keyhandler.h> 
+#include <xen/lib.h>
+#include <xen/smp.h>
+#include <xen/time.h>
+#include <xen/perfc.h>
+#include <xen/keyhandler.h> 
 
 #undef  PERFCOUNTER
 #undef  PERFCOUNTER_CPU
@@ -16,7 +16,7 @@ static struct {
     enum { TYPE_SINGLE, TYPE_CPU, TYPE_ARRAY } type;
     int nr_elements;
 } perfc_info[] = {
-#include <xeno/perfc_defn.h>
+#include <xen/perfc_defn.h>
 };
 
 #define NR_PERFCTRS (sizeof(perfc_info) / sizeof(perfc_info[0]))

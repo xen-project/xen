@@ -2,9 +2,9 @@
  * linux/arch/i386/mm/extable.c
  */
 
-#include <xeno/config.h>
-#include <xeno/module.h>
-#include <xeno/spinlock.h>
+#include <xen/config.h>
+#include <xen/module.h>
+#include <xen/spinlock.h>
 #include <asm/uaccess.h>
 
 extern const struct exception_table_entry __start___ex_table[];

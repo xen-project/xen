@@ -9,23 +9,23 @@
  * IDE_DEBUG(__LINE__);
  */
 
-#include <xeno/config.h>
+#include <xen/config.h>
 #define __NO_VERSION__
-#include <xeno/module.h>
-#include <xeno/types.h>
-#include <xeno/lib.h>
-#include <xeno/timer.h>
-#include <xeno/mm.h>
-#include <xeno/interrupt.h>
-#include <xeno/major.h>
-#include <xeno/errno.h>
-#include <xeno/genhd.h>
-#include <xeno/blkpg.h>
-#include <xeno/slab.h>
-#include <xeno/pci.h>
-#include <xeno/delay.h>
-#include <xeno/hdreg.h>
-#include <xeno/ide.h>
+#include <xen/module.h>
+#include <xen/types.h>
+#include <xen/lib.h>
+#include <xen/timer.h>
+#include <xen/mm.h>
+#include <xen/interrupt.h>
+#include <xen/major.h>
+#include <xen/errno.h>
+#include <xen/genhd.h>
+#include <xen/blkpg.h>
+#include <xen/slab.h>
+#include <xen/pci.h>
+#include <xen/delay.h>
+#include <xen/hdreg.h>
+#include <xen/ide.h>
 
 #include <asm/domain_page.h>
 #include <asm/byteorder.h>

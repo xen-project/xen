@@ -296,18 +296,18 @@
  
 #define IDECD_VERSION "4.59"
 
-#include <xeno/config.h>
-#include <xeno/module.h>
-#include <xeno/types.h>
-#include <xeno/kernel.h>
-#include <xeno/delay.h>
-#include <xeno/timer.h>
-#include <xeno/slab.h>
-#include <xeno/interrupt.h>
-#include <xeno/errno.h>
-#include <xeno/cdrom.h>
-#include <xeno/ide.h>
-// #include <xeno/completion.h>
+#include <xen/config.h>
+#include <xen/module.h>
+#include <xen/types.h>
+#include <xen/kernel.h>
+#include <xen/delay.h>
+#include <xen/timer.h>
+#include <xen/slab.h>
+#include <xen/interrupt.h>
+#include <xen/errno.h>
+#include <xen/cdrom.h>
+#include <xen/ide.h>
+// #include <xen/completion.h>
 
 #include <asm/irq.h>
 #include <asm/io.h>

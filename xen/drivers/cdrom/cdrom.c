@@ -251,19 +251,19 @@
 /* #define ERRLOGMASK (CD_WARNING|CD_OPEN|CD_COUNT_TRACKS|CD_CLOSE) */
 /* #define ERRLOGMASK (CD_WARNING|CD_REG_UNREG|CD_DO_IOCTL|CD_OPEN|CD_CLOSE|CD_COUNT_TRACKS) */
 
-#include <xeno/config.h>
-#include <xeno/module.h>
-/* #include <xeno/fs.h> */
-#include <xeno/major.h>
-#include <xeno/types.h>
-#include <xeno/errno.h>
-#include <xeno/kernel.h>
-#include <xeno/mm.h>
-#include <xeno/slab.h> 
-#include <xeno/cdrom.h>
-/* #include <xeno/sysctl.h> */
-/* #include <xeno/proc_fs.h> */
-#include <xeno/init.h>
+#include <xen/config.h>
+#include <xen/module.h>
+/* #include <xen/fs.h> */
+#include <xen/major.h>
+#include <xen/types.h>
+#include <xen/errno.h>
+#include <xen/kernel.h>
+#include <xen/mm.h>
+#include <xen/slab.h> 
+#include <xen/cdrom.h>
+/* #include <xen/sysctl.h> */
+/* #include <xen/proc_fs.h> */
+#include <xen/init.h>
 
 /* #include <asm/fcntl.h> */
 /* #include <asm/segment.h> */

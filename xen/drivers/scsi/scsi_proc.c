@@ -16,17 +16,17 @@
  * Michael A. Griffith <grif@acm.org>
  */
 
-#include <xeno/config.h>	/* for CONFIG_PROC_FS */
+#include <xen/config.h>	/* for CONFIG_PROC_FS */
 #define __NO_VERSION__
-#include <xeno/module.h>
+#include <xen/module.h>
 
-/*  #include <xeno/string.h> */
-/*  #include <xeno/mm.h> */
-/*  #include <xeno/slab.h> */
-/*  #include <xeno/proc_fs.h> */
-/*  #include <xeno/errno.h> */
-/*  #include <xeno/stat.h> */
-#include <xeno/blk.h>
+/*  #include <xen/string.h> */
+/*  #include <xen/mm.h> */
+/*  #include <xen/slab.h> */
+/*  #include <xen/proc_fs.h> */
+/*  #include <xen/errno.h> */
+/*  #include <xen/stat.h> */
+#include <xen/blk.h>
 
 #include <asm/uaccess.h>
 

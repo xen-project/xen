@@ -21,7 +21,7 @@
   file called LICENSE.
   
   Contact Information:
-  Linux NICS <xeno.nics@intel.com>
+  Linux NICS <linux.nics@intel.com>
   Intel Corporation, 5200 N.E. Elam Young Parkway, Hillsboro, OR 97124-6497
 
 *******************************************************************************/
@@ -34,12 +34,12 @@
 #ifndef _E1000_OSDEP_H_
 #define _E1000_OSDEP_H_
 
-#include <xeno/types.h>
-#include <xeno/pci.h>
-#include <xeno/delay.h>
+#include <xen/types.h>
+#include <xen/pci.h>
+#include <xen/delay.h>
 #include <asm/io.h>
-#include <xeno/interrupt.h>
-#include <xeno/sched.h>
+#include <xen/interrupt.h>
+#include <xen/sched.h>
 #include "kcompat.h"
 
 #define usec_delay(x) udelay(x)

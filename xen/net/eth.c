@@ -37,22 +37,22 @@
  *		as published by the Free Software Foundation; either version
  *		2 of the License, or (at your option) any later version.
  */
-#include <xeno/types.h>
-//#include <xeno/kernel.h>
-#include <xeno/sched.h>
-//#include <xeno/string.h>
-#include <xeno/mm.h>
-#include <xeno/socket.h>
-//#include <xeno/in.h>
-//#include <xeno/inet.h>
-//#include <xeno/ip.h>
-#include <xeno/netdevice.h>
-#include <xeno/etherdevice.h>
-#include <xeno/skbuff.h>
-#include <xeno/errno.h>
-#include <xeno/config.h>
-#include <xeno/lib.h>
-#include <xeno/init.h>
+#include <xen/types.h>
+//#include <xen/kernel.h>
+#include <xen/sched.h>
+//#include <xen/string.h>
+#include <xen/mm.h>
+#include <xen/socket.h>
+//#include <xen/in.h>
+//#include <xen/inet.h>
+//#include <xen/ip.h>
+#include <xen/netdevice.h>
+#include <xen/etherdevice.h>
+#include <xen/skbuff.h>
+#include <xen/errno.h>
+#include <xen/config.h>
+#include <xen/lib.h>
+#include <xen/init.h>
 //#include <net/dst.h>
 //#include <net/arp.h>
 //#include <net/sock.h>

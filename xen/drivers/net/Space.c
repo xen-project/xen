@@ -11,8 +11,8 @@
  *		Fred N. van Kempen, <waltje@uWalt.NL.Mugnet.ORG>
  *		Donald J. Becker, <becker@scyld.com>
  */
-#include <xeno/config.h>
-#include <xeno/netdevice.h>
+#include <xen/config.h>
+#include <xen/netdevice.h>
 
 /*
  * KAF (23/7/02): All the probe shit is gone from here -- each network

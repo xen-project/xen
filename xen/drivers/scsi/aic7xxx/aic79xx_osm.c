@@ -52,12 +52,12 @@
 #include "aic79xx_inline.h"
 
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(2,3,0)
-#include <xeno/init.h>		/* __setup */
+#include <xen/init.h>		/* __setup */
 #endif
 
 #include "../sd.h"		/* For geometry detection */
 
-#include <xeno/mm.h>		/* For fetching system memory size */
+#include <xen/mm.h>		/* For fetching system memory size */
 
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(2,1,0)
 /*
@@ -648,8 +648,8 @@ ahd_runq_tasklet(unsigned long data)
 }
 
 /************************ Shutdown/halt/reboot hook ***************************/
-#include <xeno/notifier.h>
-#include <xeno/reboot.h>
+#include <xen/notifier.h>
+#include <xen/reboot.h>
 /* SAE: */
 /*
 static struct notifier_block ahd_linux_notifier = {

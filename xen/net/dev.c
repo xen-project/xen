@@ -10,28 +10,28 @@
 #include <asm/uaccess.h>
 #include <asm/system.h>
 #include <asm/bitops.h>
-#include <xeno/config.h>
-#include <xeno/delay.h>
-#include <xeno/lib.h>
-#include <xeno/types.h>
-#include <xeno/sched.h>
-#include <xeno/mm.h>
-#include <xeno/socket.h>
-#include <xeno/sockios.h>
-#include <xeno/errno.h>
-#include <xeno/interrupt.h>
-#include <xeno/if_ether.h>
-#include <xeno/netdevice.h>
-#include <xeno/etherdevice.h>
-#include <xeno/skbuff.h>
-#include <xeno/brlock.h>
-#include <xeno/init.h>
-#include <xeno/module.h>
-#include <xeno/event.h>
+#include <xen/config.h>
+#include <xen/delay.h>
+#include <xen/lib.h>
+#include <xen/types.h>
+#include <xen/sched.h>
+#include <xen/mm.h>
+#include <xen/socket.h>
+#include <xen/sockios.h>
+#include <xen/errno.h>
+#include <xen/interrupt.h>
+#include <xen/if_ether.h>
+#include <xen/netdevice.h>
+#include <xen/etherdevice.h>
+#include <xen/skbuff.h>
+#include <xen/brlock.h>
+#include <xen/init.h>
+#include <xen/module.h>
+#include <xen/event.h>
 #include <asm/domain_page.h>
 #include <asm/pgalloc.h>
 #include <asm/io.h>
-#include <xeno/perfc.h>
+#include <xen/perfc.h>
 
 #define BUG_TRAP ASSERT
 #define notifier_call_chain(_a,_b,_c) ((void)0)

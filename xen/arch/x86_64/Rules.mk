@@ -13,6 +13,6 @@ CFLAGS  += -fomit-frame-pointer -I$(BASEDIR)/include -D__KERNEL__ -DNDEBUG
 #CFLAGS  += -fomit-frame-pointer -I$(BASEDIR)/include -D__KERNEL__
 CFLAGS  += -Wno-pointer-arith -Wredundant-decls -m64
 LDARCHFLAGS := 
-LDFLAGS := -T xeno.lds -N 
+LDFLAGS := -T xen.lds -N 
 
 

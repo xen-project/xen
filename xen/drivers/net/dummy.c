@@ -4,11 +4,11 @@
  * A cut down version of Linux's dummy network driver. GPLed and all that.
  */
 
-#include <xeno/config.h>
-#include <xeno/module.h>
-#include <xeno/kernel.h>
-#include <xeno/netdevice.h>
-#include <xeno/init.h>
+#include <xen/config.h>
+#include <xen/module.h>
+#include <xen/kernel.h>
+#include <xen/netdevice.h>
+#include <xen/init.h>
 
 static int dummy_xmit(struct sk_buff *skb, struct net_device *dev);
 static struct net_device_stats *dummy_get_stats(struct net_device *dev);

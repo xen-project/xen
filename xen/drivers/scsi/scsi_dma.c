@@ -6,9 +6,9 @@
  */
 
 #define __NO_VERSION__
-#include <xeno/config.h>
-#include <xeno/module.h>
-#include <xeno/blk.h>
+#include <xen/config.h>
+#include <xen/module.h>
+#include <xen/blk.h>
 
 
 #include "scsi.h"
@@ -16,7 +16,7 @@
 #include "constants.h"
 
 #ifdef CONFIG_KMOD
-#include <xeno/kmod.h>
+#include <xen/kmod.h>
 #endif
 
 /*

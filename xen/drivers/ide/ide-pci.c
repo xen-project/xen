@@ -12,15 +12,15 @@
  *  configuration of all PCI IDE interfaces present in a system.  
  */
 
-#include <xeno/config.h>
-#include <xeno/types.h>
-#include <xeno/kernel.h>
-#include <xeno/timer.h>
-#include <xeno/mm.h>
-#include <xeno/interrupt.h>
-#include <xeno/pci.h>
-#include <xeno/init.h>
-#include <xeno/ide.h>
+#include <xen/config.h>
+#include <xen/types.h>
+#include <xen/kernel.h>
+#include <xen/timer.h>
+#include <xen/mm.h>
+#include <xen/interrupt.h>
+#include <xen/pci.h>
+#include <xen/init.h>
+#include <xen/ide.h>
 
 #include <asm/io.h>
 #include <asm/irq.h>

@@ -18,10 +18,10 @@
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
 
-#include <xeno/config.h>
-#include <xeno/lib.h>
-#include <xeno/init.h>
-#include <xeno/mm.h>
+#include <xen/config.h>
+#include <xen/lib.h>
+#include <xen/init.h>
+#include <xen/mm.h>
 #include <asm/page.h>
 #include <asm/pgalloc.h>
 #include <asm/fixmap.h>

@@ -55,7 +55,7 @@
 #define MPTBASE_H_INCLUDED
 /*{-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=*/
 
-#include <xeno/timer.h>
+#include <xen/timer.h>
 
 #include "linux_compat.h"	/* linux-2.2.x (vs. -2.4.x) tweaks */
 #include "scsi3.h"		/* SCSI defines */
@@ -157,7 +157,7 @@
 
 /* SAE: Xen doesn't have a proc filesystem */
 #if defined(CONFIG_PROC_FS)
-#include <xeno/proc_fs.h>
+#include <xen/proc_fs.h>
 #endif
 
 /*=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=*/

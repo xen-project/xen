@@ -13,7 +13,7 @@
 
 #ifdef __KERNEL__
 
-#include <xeno/config.h>
+#include <xen/config.h>
 
 #ifndef MAX_HWIFS
 # ifdef CONFIG_BLK_DEV_IDEPCI

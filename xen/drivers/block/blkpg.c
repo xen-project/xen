@@ -28,16 +28,16 @@
  * For today, only the partition stuff - aeb, 990515
  */
 
-#include <xeno/config.h>
-#include <xeno/types.h>
-#include <xeno/errno.h>
-/*#include <xeno/fs.h>	*/		/* for BLKRASET, ... */
-#include <xeno/sched.h>		/* for capable() */
-#include <xeno/blk.h>			/* for set_device_ro() */
-#include <xeno/blkpg.h>
-#include <xeno/genhd.h>
-/*#include <xeno/swap.h>*/			/* for is_swap_partition() */
-#include <xeno/module.h>               /* for EXPORT_SYMBOL */
+#include <xen/config.h>
+#include <xen/types.h>
+#include <xen/errno.h>
+/*#include <xen/fs.h>	*/		/* for BLKRASET, ... */
+#include <xen/sched.h>		/* for capable() */
+#include <xen/blk.h>			/* for set_device_ro() */
+#include <xen/blkpg.h>
+#include <xen/genhd.h>
+/*#include <xen/swap.h>*/			/* for is_swap_partition() */
+#include <xen/module.h>               /* for EXPORT_SYMBOL */
 
 #include <asm/uaccess.h>
 

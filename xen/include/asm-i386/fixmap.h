@@ -13,7 +13,7 @@
 #ifndef _ASM_FIXMAP_H
 #define _ASM_FIXMAP_H
 
-#include <xeno/config.h>
+#include <xen/config.h>
 #include <asm/apicdef.h>
 #include <asm/page.h>
 

@@ -5,11 +5,11 @@
  *	David Mosberger-Tang, Martin Mares
  */
 
-#include <xeno/config.h>
-#include <xeno/types.h>
-/*#include <xeno/kernel.h>*/
-#include <xeno/pci.h>
-#include <xeno/init.h>
+#include <xen/config.h>
+#include <xen/types.h>
+/*#include <xen/kernel.h>*/
+#include <xen/pci.h>
+#include <xen/init.h>
 
 #ifdef CONFIG_PCI_NAMES
 

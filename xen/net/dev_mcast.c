@@ -21,30 +21,30 @@
  *	2 of the License, or (at your option) any later version.
  */
 
-#include <xeno/config.h> 
-#include <xeno/lib.h> 
+#include <xen/config.h> 
+#include <xen/lib.h> 
 #include <asm/uaccess.h>
 #include <asm/system.h>
 #include <asm/bitops.h>
-#include <xeno/types.h>
-//#include <xeno/kernel.h>
-#include <xeno/sched.h>
-//#include <xeno/string.h>
-#include <xeno/mm.h>
-#include <xeno/socket.h>
-#include <xeno/sockios.h>
-//#include <xeno/in.h>
-#include <xeno/errno.h>
-#include <xeno/interrupt.h>
-#include <xeno/if_ether.h>
-//#include <xeno/inet.h>
-#include <xeno/netdevice.h>
-#include <xeno/etherdevice.h>
-//#include <xeno/proc_fs.h>
-#include <xeno/init.h>
+#include <xen/types.h>
+//#include <xen/kernel.h>
+#include <xen/sched.h>
+//#include <xen/string.h>
+#include <xen/mm.h>
+#include <xen/socket.h>
+#include <xen/sockios.h>
+//#include <xen/in.h>
+#include <xen/errno.h>
+#include <xen/interrupt.h>
+#include <xen/if_ether.h>
+//#include <xen/inet.h>
+#include <xen/netdevice.h>
+#include <xen/etherdevice.h>
+//#include <xen/proc_fs.h>
+#include <xen/init.h>
 //#include <net/ip.h>
 //#include <net/route.h>
-#include <xeno/skbuff.h>
+#include <xen/skbuff.h>
 //#include <net/sock.h>
 //#include <net/arp.h>
 

@@ -79,8 +79,8 @@
  * handler in good order (absolutely no faults allowed!).
  */
 
-#include <xeno/config.h>
-#include <xeno/errno.h>
+#include <xen/config.h>
+#include <xen/errno.h>
 #include <hypervisor-ifs/hypervisor-if.h>
 
 EBX		= 0x00

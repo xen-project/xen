@@ -10,8 +10,8 @@
  *	we have to worry about.
  */
 
-#include <xeno/config.h>
-#include <xeno/delay.h>
+#include <xen/config.h>
+#include <xen/delay.h>
 #include <asm/msr.h>
 #include <asm/processor.h>
 

@@ -4,14 +4,14 @@
  *	(c) 1999--2000 Martin Mares <mj@ucw.cz>
  */
 
-#include <xeno/config.h>
-#include <xeno/types.h>
-#include <xeno/pci.h>
-#include <xeno/init.h>
-#include <xeno/slab.h>
-#include <xeno/interrupt.h>
-#include <xeno/irq.h>
-#include <xeno/sched.h>
+#include <xen/config.h>
+#include <xen/types.h>
+#include <xen/pci.h>
+#include <xen/init.h>
+#include <xen/slab.h>
+#include <xen/interrupt.h>
+#include <xen/irq.h>
+#include <xen/sched.h>
 #include <asm/io.h>
 #include <asm/smp.h>
 #include <asm/mpspec.h>

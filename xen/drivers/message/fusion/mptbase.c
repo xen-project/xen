@@ -88,19 +88,19 @@
 */
 /*=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=*/
 
-#include <xeno/config.h>
-#include <xeno/version.h>
-#include <xeno/kernel.h>
-#include <xeno/module.h>
-#include <xeno/errno.h>
-#include <xeno/init.h>
-#include <xeno/slab.h>
-#include <xeno/types.h>
-#include <xeno/pci.h>
-#include <xeno/kdev_t.h>
-#include <xeno/blkdev.h>
-#include <xeno/delay.h>
-#include <xeno/interrupt.h>		/* needed for in_interrupt() proto */
+#include <xen/config.h>
+#include <xen/version.h>
+#include <xen/kernel.h>
+#include <xen/module.h>
+#include <xen/errno.h>
+#include <xen/init.h>
+#include <xen/slab.h>
+#include <xen/types.h>
+#include <xen/pci.h>
+#include <xen/kdev_t.h>
+#include <xen/blkdev.h>
+#include <xen/delay.h>
+#include <xen/interrupt.h>		/* needed for in_interrupt() proto */
 #include <asm/byteorder.h>	/* SAE: Necessary... */
 #include <asm/io.h>
 #ifdef CONFIG_MTRR

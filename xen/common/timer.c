@@ -15,16 +15,16 @@
  *  1999-03-10  Improved NTP compatibility by Ulrich Windl
  */
 
-#include <xeno/config.h>
-#include <xeno/mm.h>
-#include <xeno/time.h>
-#include <xeno/timer.h>
-#include <xeno/timex.h>
-#include <xeno/tqueue.h>
-#include <xeno/delay.h>
-#include <xeno/interrupt.h>
+#include <xen/config.h>
+#include <xen/mm.h>
+#include <xen/time.h>
+#include <xen/timer.h>
+#include <xen/timex.h>
+#include <xen/tqueue.h>
+#include <xen/delay.h>
+#include <xen/interrupt.h>
 
-#include <xeno/event.h>
+#include <xen/event.h>
 
 #include <asm/uaccess.h>
 

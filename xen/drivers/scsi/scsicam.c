@@ -12,14 +12,14 @@
 
 #define __NO_VERSION__
 
-#include <xeno/config.h>
-#include <xeno/module.h>
+#include <xen/config.h>
+#include <xen/module.h>
 
 
-/*#include <xeno/fs.h>*/
-/*#include <xeno/genhd.h>*/
-#include <xeno/blk.h>
-/*#include <xeno/kernel.h>*/
+/*#include <xen/fs.h>*/
+/*#include <xen/genhd.h>*/
+#include <xen/blk.h>
+/*#include <xen/kernel.h>*/
 #include <asm/unaligned.h>
 #include "scsi.h"
 #include "hosts.h"

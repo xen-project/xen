@@ -11,7 +11,7 @@
 #ifndef __ASM_I386_I387_H
 #define __ASM_I386_I387_H
 
-#include <xeno/sched.h>
+#include <xen/sched.h>
 #include <asm/processor.h>
 
 extern void init_fpu(void);

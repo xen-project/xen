@@ -12,24 +12,24 @@
  * generated on UP / SMP machines.  Each trace entry is timestamped so that
  * it's possible to reconstruct a chronological record of trace events.
  *
- * See also include/xeno/trace.h and the dom0 op in
+ * See also include/xen/trace.h and the dom0 op in
  * include/hypervisor-ifs/dom0_ops.h
  */
 
-#include <xeno/config.h>
+#include <xen/config.h>
 
 #ifdef TRACE_BUFFER
 
 #include <asm/timex.h>
 #include <asm/types.h>
 #include <asm/io.h>
-#include <xeno/lib.h>
-#include <xeno/sched.h>
-#include <xeno/slab.h>
-#include <xeno/smp.h>
-#include <xeno/spinlock.h>
-#include <xeno/trace.h>
-#include <xeno/errno.h>
+#include <xen/lib.h>
+#include <xen/sched.h>
+#include <xen/slab.h>
+#include <xen/smp.h>
+#include <xen/spinlock.h>
+#include <xen/trace.h>
+#include <xen/errno.h>
 #include <asm/atomic.h>
 #include <hypervisor-ifs/dom0_ops.h>
 
@@ -44,7 +44,7 @@ int tb_init_done = 0;
  *
  * This function is called at start of day in order to initialise the per-cpu
  * trace buffers.  The trace buffers are then available for debugging use, via
- * the %TRACE_xD macros exported in <xeno/trace.h>.
+ * the %TRACE_xD macros exported in <xen/trace.h>.
  */
 void init_trace_bufs(void)
 {

@@ -21,44 +21,44 @@
   file called LICENSE.
   
   Contact Information:
-  Linux NICS <xeno.nics@intel.com>
+  Linux NICS <linux.nics@intel.com>
   Intel Corporation, 5200 N.E. Elam Young Parkway, Hillsboro, OR 97124-6497
 *******************************************************************************/
 
 #ifndef _E100_INC_
 #define _E100_INC_
 
-#include <xeno/module.h>
-#include <xeno/types.h>
-#include <xeno/init.h>
-#include <xeno/mm.h>
-#include <xeno/errno.h>
-#include <xeno/ioport.h>
-#include <xeno/pci.h>
-#include <xeno/kernel.h>
-#include <xeno/netdevice.h>
-#include <xeno/etherdevice.h>
-#include <xeno/skbuff.h>
-#include <xeno/delay.h>
-#include <xeno/timer.h>
-#include <xeno/slab.h>
-#include <xeno/interrupt.h>
-#include <xeno/version.h>
-#include <xeno/string.h>
-/*#include <xeno/wait.h>*/
-#include <xeno/reboot.h>
+#include <xen/module.h>
+#include <xen/types.h>
+#include <xen/init.h>
+#include <xen/mm.h>
+#include <xen/errno.h>
+#include <xen/ioport.h>
+#include <xen/pci.h>
+#include <xen/kernel.h>
+#include <xen/netdevice.h>
+#include <xen/etherdevice.h>
+#include <xen/skbuff.h>
+#include <xen/delay.h>
+#include <xen/timer.h>
+#include <xen/slab.h>
+#include <xen/interrupt.h>
+#include <xen/version.h>
+#include <xen/string.h>
+/*#include <xen/wait.h>*/
+#include <xen/reboot.h>
 #include <asm/io.h>
 #include <asm/unaligned.h>
 #include <asm/processor.h>
-#include <xeno/ethtool.h>
-/*#include <xeno/inetdevice.h>*/
+#include <xen/ethtool.h>
+/*#include <xen/inetdevice.h>*/
 #include <asm/bitops.h>
 
-#include <xeno/if.h>
+#include <xen/if.h>
 #include <asm/uaccess.h>
-/*#include <xeno/ip.h>*/
-#include <xeno/if_vlan.h>
-#include <xeno/mii.h>
+/*#include <xen/ip.h>*/
+#include <xen/if_vlan.h>
+#include <xen/mii.h>
 
 #define yield() ((void)0)
 

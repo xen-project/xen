@@ -21,7 +21,7 @@
  *  Includes
  */
 #ifdef __KERNEL__
-#include <xeno/types.h>
+#include <xen/types.h>
 #else
     #ifndef U_STUFF_DEFINED
     #define U_STUFF_DEFINED

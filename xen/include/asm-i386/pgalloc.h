@@ -1,8 +1,8 @@
 #ifndef _I386_PGALLOC_H
 #define _I386_PGALLOC_H
 
-#include <xeno/config.h>
-#include <xeno/sched.h>
+#include <xen/config.h>
+#include <xen/sched.h>
 #include <asm/processor.h>
 #include <asm/fixmap.h>
 
@@ -57,7 +57,7 @@
 
 #else
 
-#include <xeno/smp.h>
+#include <xen/smp.h>
 
 extern int try_flush_tlb_mask(unsigned long mask);
 extern void flush_tlb_mask(unsigned long mask);

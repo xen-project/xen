@@ -1,11 +1,11 @@
-#include <xeno/lib.h>
-#include <xeno/sched.h>
+#include <xen/lib.h>
+#include <xen/sched.h>
 #include <asm-i386/ptrace.h>
-#include <xeno/keyhandler.h> 
+#include <xen/keyhandler.h> 
 #include <asm/apic.h>
 #include <asm/pdb.h>
-#include <xeno/list.h>
-#include <xeno/serial.h>
+#include <xen/list.h>
+#include <xen/serial.h>
 
 #define BUFMAX 400
 

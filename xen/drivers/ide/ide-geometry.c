@@ -1,8 +1,8 @@
 /*
  * linux/drivers/ide/ide-geometry.c
  */
-#include <xeno/config.h>
-#include <xeno/ide.h>
+#include <xen/config.h>
+#include <xen/ide.h>
 #include <asm/mc146818rtc.h>
 #include <asm/io.h>
 

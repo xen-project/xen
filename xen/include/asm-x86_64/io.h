@@ -1,7 +1,7 @@
 #ifndef _ASM_IO_H
 #define _ASM_IO_H
 
-#include <xeno/config.h>
+#include <xen/config.h>
 #include <asm/page.h>
 
 /*

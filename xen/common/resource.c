@@ -7,14 +7,14 @@
  * Arbitrary resource management.
  */
 
-#include <xeno/config.h>
-#include <xeno/lib.h>
-#include <xeno/sched.h>
-#include <xeno/errno.h>
-#include <xeno/ioport.h>
-#include <xeno/init.h>
-#include <xeno/slab.h>
-#include <xeno/spinlock.h>
+#include <xen/config.h>
+#include <xen/lib.h>
+#include <xen/sched.h>
+#include <xen/errno.h>
+#include <xen/ioport.h>
+#include <xen/init.h>
+#include <xen/slab.h>
+#include <xen/spinlock.h>
 #include <asm/io.h>
 
 struct resource ioport_resource = { "PCI IO", 0x0000, IO_SPACE_LIMIT, IORESOURCE_IO };

@@ -27,18 +27,18 @@
  *	Gareth Hughes <gareth@valinux.com>, May 2000
  */
 
-#include <xeno/config.h>
-#include <xeno/init.h>
-#include <xeno/interrupt.h>
-#include <xeno/sched.h>
-#include <xeno/lib.h>
-#include <xeno/errno.h>
-#include <xeno/mm.h>
+#include <xen/config.h>
+#include <xen/init.h>
+#include <xen/interrupt.h>
+#include <xen/sched.h>
+#include <xen/lib.h>
+#include <xen/errno.h>
+#include <xen/mm.h>
 #include <asm/ptrace.h>
-#include <xeno/delay.h>
-#include <xeno/spinlock.h>
-#include <xeno/irq.h>
-#include <xeno/perfc.h>
+#include <xen/delay.h>
+#include <xen/spinlock.h>
+#include <xen/irq.h>
+#include <xen/perfc.h>
 #include <asm/domain_page.h>
 #include <asm/system.h>
 #include <asm/io.h>

@@ -7,14 +7,14 @@
  */
 
 #include <stdarg.h>
-#include <xeno/config.h>
-#include <xeno/lib.h>
-#include <xeno/errno.h>
-#include <xeno/event.h>
-#include <xeno/spinlock.h>
-#include <xeno/console.h>
-#include <xeno/serial.h>
-#include <xeno/keyhandler.h>
+#include <xen/config.h>
+#include <xen/lib.h>
+#include <xen/errno.h>
+#include <xen/event.h>
+#include <xen/spinlock.h>
+#include <xen/console.h>
+#include <xen/serial.h>
+#include <xen/keyhandler.h>
 #include <asm/uaccess.h>
 
 static int xpos, ypos;

@@ -1,9 +1,9 @@
 
-#include <xeno/keyhandler.h> 
-#include <xeno/reboot.h>
-#include <xeno/event.h>
-#include <xeno/console.h>
-#include <xeno/serial.h>
+#include <xen/keyhandler.h> 
+#include <xen/reboot.h>
+#include <xen/event.h>
+#include <xen/console.h>
+#include <xen/serial.h>
 
 #define KEY_MAX 256
 #define STR_MAX  64

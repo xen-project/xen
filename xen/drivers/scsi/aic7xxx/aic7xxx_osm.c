@@ -125,19 +125,19 @@
  */
 //#define AHC_MODVERSION_FILE
 
-#include <xeno/lib.h>
-#include <xeno/string.h>
+#include <xen/lib.h>
+#include <xen/string.h>
 #include "aic7xxx_osm.h"
 #include "aic7xxx_inline.h"
 
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(2,3,0)
-#include <xeno/init.h>		/* __setup */
+#include <xen/init.h>		/* __setup */
 #endif
 
 #include "../sd.h"		/* For geometry detection */
 
-#include <xeno/mm.h>		/* For fetching system memory size */
-#include <xeno/blk.h>		/* For block_size() */
+#include <xen/mm.h>		/* For fetching system memory size */
+#include <xen/blk.h>		/* For block_size() */
 
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(2,1,0)
 /*
@@ -718,8 +718,8 @@ ahc_runq_tasklet(unsigned long data)
 }
 
 /************************ Shutdown/halt/reboot hook ***************************/
-#include <xeno/notifier.h>
-#include <xeno/reboot.h>
+#include <xen/notifier.h>
+#include <xen/reboot.h>
 
 #if XENO_KILLED
 static struct notifier_block ahc_linux_notifier = {
@@ -1141,7 +1141,7 @@ ahc_linux_detect(Scsi_Host_Template *template)
 		aic7xxx_setup(aic7xxx);
 	if (dummy_buffer[0] != 'P')
 		printf(KERN_WARNING
-"aic7xxx: Please read the file /usr/src/xeno/drivers/scsi/README.aic7xxx\n"
+"aic7xxx: Please read the file /usr/src/xen/drivers/scsi/README.aic7xxx\n"
 "aic7xxx: to see the proper way to specify options to the aic7xxx module\n"
 "aic7xxx: Specifically, don't use any commas when passing arguments to\n"
 "aic7xxx: insmod or else it might trash certain memory areas.\n");

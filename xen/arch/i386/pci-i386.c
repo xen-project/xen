@@ -85,12 +85,12 @@
  * Oct  8, 1999 : Split to pci-i386.c, pci-pc.c and pci-visws.c. [mj]
  */
 
-#include <xeno/types.h>
-#include <xeno/lib.h>
-#include <xeno/pci.h>
-#include <xeno/init.h>
-#include <xeno/ioport.h>
-#include <xeno/errno.h>
+#include <xen/types.h>
+#include <xen/lib.h>
+#include <xen/pci.h>
+#include <xen/init.h>
+#include <xen/ioport.h>
+#include <xen/errno.h>
 
 #include "pci-i386.h"
 
