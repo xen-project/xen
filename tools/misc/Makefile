@@ -18,6 +18,7 @@ install: all
 	mkdir -p ../../../install/bin
 	cp -a $(INSTALL) ../../../install/bin
 	chmod 755 ../../../install/bin/xen-mkdevnodes
+	chmod 755 ../../../install/bin/xen_nat_enable
 	chmod 755 ../../../install/bin/xen-clone
 	$(MAKE) -C miniterm install
 
