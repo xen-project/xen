@@ -14,3 +14,5 @@ module.extra_objects = ["../lib/libxc.a"]
 module.libraries     = ["z"]
 
 setup(name = "Xc", version = "1.0", ext_modules = [module])
+
+setup(name = "XenoUtil", version = "1.0", py_modules = ["XenoUtil"])

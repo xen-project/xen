@@ -6,4 +6,4 @@ install:
 	python setup.py install
 
 clean:
-	rm -rf build
+	rm -rf build *.pyc *.pyo *.o *.a *~
