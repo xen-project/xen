@@ -745,6 +745,9 @@ int construct_dom0(struct domain *p,
         {
             page->u.inuse.type_info &= ~PGT_type_mask;
             page->u.inuse.type_info |= PGT_l1_page_table;
+	    page->u.inuse.type_info |= 
+		((v_start>>L2_PAGETABLE_SHIFT)+(count-1))<<PGT_va_shift;
+
             get_page(page, p); /* an extra ref because of readable mapping */
         }
         l1tab++;

@@ -74,6 +74,7 @@ struct pfn_info
  /* 10-bit most significant bits of va address if used as l1 page table */
 #define PGT_va_shift        18
 #define PGT_va_mask         (((1<<10)-1)<<PGT_va_shift)
+#define PGT_va_mutable      PGT_va_mask /* va backpointer is still mutable */
  /* 18-bit count of uses of this frame as its current type. */
 #define PGT_count_mask      ((1<<18)-1)
 
@@ -198,6 +199,13 @@ static inline void put_page_type(struct pfn_info *page)
                 nx &= ~PGT_validated;
             }
         }
+	else if ( unlikely( ((nx & PGT_count_mask) == 1) && 
+	    test_bit(_PGC_guest_pinned, &page->count_info)) )
+	{
+	    /* if the page is pinned, but we're dropping the last reference
+	       then make the va backpointer mutable again */
+	    nx |= PGT_va_mutable;
+	}
     }
     while ( unlikely((y = cmpxchg(&page->u.inuse.type_info, x, nx)) != x) );
 }
@@ -217,22 +225,35 @@ static inline int get_page_type(struct pfn_info *page, u32 type)
         }
         else if ( unlikely((x & PGT_count_mask) == 0) )
         {
-            if ( (x & PGT_type_mask) != type )
+            if ( (x & (PGT_type_mask|PGT_va_mask)) != type )
             {
-                nx &= ~(PGT_type_mask | PGT_validated);
+                nx &= ~(PGT_type_mask | PGT_va_mask | PGT_validated);
                 nx |= type;
                 /* No extra validation needed for writable pages. */
-                if ( type == PGT_writable_page )
+                if ( (type & PGT_type_mask) == PGT_writable_page )
                     nx |= PGT_validated;
             }
         }
-        else if ( unlikely((x & PGT_type_mask) != type) )
+        else if ( unlikely((x & PGT_type_mask) != (type & PGT_type_mask) ) )
         {
             DPRINTK("Unexpected type (saw %08x != exp %08x) for pfn %08lx\n",
                     x & PGT_type_mask, type, page_to_pfn(page));
             return 0;
         }
-        else if ( unlikely(!(x & PGT_validated)) )
+	else if ( (x & PGT_va_mask) == PGT_va_mutable )
+	{
+	    /* The va_backpointer is currently mutable, hence we update it. */
+	    nx &= ~PGT_va_mask;
+	    nx |= type; /* we know the actual type is correct */
+	}
+        else if ( unlikely((x & PGT_va_mask) != (type & PGT_va_mask) ) )
+        {
+	    /* The va backpointer wasn't mutable, and is different :-( */
+            DPRINTK("Unexpected va backpointer (saw %08x != exp %08x) for pfn %08lx\n",
+                    x, type, page_to_pfn(page));
+            return 0;
+        }
+	else if ( unlikely(!(x & PGT_validated)) )
         {
             /* Someone else is updating validation of this page. Wait... */
             while ( (y = page->u.inuse.type_info) != x )
@@ -248,7 +269,7 @@ static inline int get_page_type(struct pfn_info *page, u32 type)
     if ( unlikely(!(nx & PGT_validated)) )
     {
         /* Try to validate page type; drop the new reference on failure. */
-        if ( unlikely(!alloc_page_type(page, type)) )
+        if ( unlikely(!alloc_page_type(page, type & PGT_type_mask)) )
         {
             DPRINTK("Error while validating pfn %08lx for type %08x."
                     " caf=%08x taf=%08x\n",
@@ -258,8 +279,58 @@ static inline int get_page_type(struct pfn_info *page, u32 type)
             put_page_type(page);
             return 0;
         }
+
         set_bit(_PGT_validated, &page->u.inuse.type_info);
     }
+
+    return 1;
+}
+
+/* This 'passive' version of get_page_type doesn't attempt to validate
+the page, but just checks the type and increments the type count.  The
+function is called while doing a NORMAL_PT_UPDATE of an entry in an L1
+page table: We want to 'lock' the page for the brief beriod while
+we're doing the update, but we're not actually linking it in to a
+pagetable. */
+
+static inline int passive_get_page_type(struct pfn_info *page, u32 type)
+{
+    u32 nx, x, y = page->u.inuse.type_info;
+ again:
+    do {
+        x  = y;
+        nx = x + 1;
+        if ( unlikely((nx & PGT_count_mask) == 0) )
+        {
+            DPRINTK("Type count overflow on pfn %08lx\n", page_to_pfn(page));
+            return 0;
+        }
+        else if ( unlikely((x & PGT_count_mask) == 0) )
+        {
+            if ( (x & (PGT_type_mask|PGT_va_mask)) != type )
+            {
+                nx &= ~(PGT_type_mask | PGT_va_mask | PGT_validated);
+                nx |= type;
+            }
+        }
+        else if ( unlikely((x & PGT_type_mask) != (type & PGT_type_mask) ) )
+        {
+            DPRINTK("Unexpected type (saw %08x != exp %08x) for pfn %08lx\n",
+                    x & PGT_type_mask, type, page_to_pfn(page));
+            return 0;
+        }
+	else if ( unlikely(!(x & PGT_validated)) )
+        {
+            /* Someone else is updating validation of this page. Wait... */
+            while ( (y = page->u.inuse.type_info) != x )
+            {
+                rep_nop();
+                barrier();
+            }
+            goto again;
+        }
+    }
+    while ( unlikely((y = cmpxchg(&page->u.inuse.type_info, x, nx)) != x) );
 
     return 1;
 }
