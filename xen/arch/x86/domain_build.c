@@ -178,7 +178,13 @@ int construct_dom0(struct domain *d,
     if ( (v_end - dsi.v_start) > (alloc_end - alloc_start) )
         panic("Insufficient contiguous RAM to build kernel image.\n");
 
-    printk("VIRTUAL MEMORY ARRANGEMENT:\n"
+    printk("PHYSICAL MEMORY ARRANGEMENT:\n"
+           " Dom0 alloc.:   %p->%p",
+           alloc_start, alloc_end);
+    if ( d->tot_pages < nr_pages )
+        printk(" (%d pages to be allocated)",
+               nr_pages - d->tot_pages);
+    printk("\nVIRTUAL MEMORY ARRANGEMENT:\n"
            " Loaded kernel: %p->%p\n"
            " Init. ramdisk: %p->%p\n"
            " Phys-Mach map: %p->%p\n"
