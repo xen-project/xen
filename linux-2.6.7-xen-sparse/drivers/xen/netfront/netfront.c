@@ -26,6 +26,12 @@
 #include <asm-xen/hypervisor-ifs/io/netif.h>
 #include <asm/page.h>
 
+#if 0
+#define dprintf(fmt, args...) printk(KERN_INFO "[XEN] %s" fmt, __FUNCTION__, ##args)
+#else
+#define dprintf(fmt, args...) do {} while(0)
+#endif
+
 #define RX_BUF_SIZE ((PAGE_SIZE/2)+1) /* Fool the slab allocator :-) */
 
 static void network_tx_buf_gc(struct net_device *dev);
@@ -157,6 +163,8 @@ static int netctrl_connected_count(void)
     }
 
     netctrl.connected_n = connected;
+    dprintf("> connected_n=%d interface_n=%d\n",
+            netctrl.connected_n, netctrl.interface_n);
     return connected;
 }
 
@@ -628,6 +636,13 @@ static void netif_status_change(netif_fe_interface_status_changed_t *status)
     struct net_device *dev;
     struct net_private *np;
     
+    dprintf(">\n");
+    dprintf("> status=%d handle=%d mac=%02x:%02x:%02x:%02x:%02x:%02x\n",
+           status->status,
+           status->handle,
+           status->mac[0], status->mac[1], status->mac[2],
+           status->mac[3], status->mac[4], status->mac[5]);
+
     if ( netctrl.interface_n <= 0 )
     {
         printk(KERN_WARNING "Status change: no interfaces\n");
@@ -797,6 +812,8 @@ static void netif_driver_status_change(
     int err = 0;
     int i;
 
+    dprintf("> nr_interfaces=%d\n", status->nr_interfaces);
+
     netctrl.interface_n = status->nr_interfaces;
     netctrl.connected_n = 0;
 
@@ -828,8 +845,6 @@ static void netif_ctrlif_rx(ctrl_msg_t *msg, unsigned long id)
             goto error;
         netif_driver_status_change((netif_fe_driver_status_changed_t *)
                                    &msg->msg[0]);
-        /* Message is a response */
-        respond = 0;
         break;
 
     error:
@@ -843,17 +858,40 @@ static void netif_ctrlif_rx(ctrl_msg_t *msg, unsigned long id)
 }
 
 
+/* Wait for all interfaces to be connected. */
+static int wait_for_interfaces(void)
+{
+    int err = 0, conn = 0;
+    int wait_i, wait_n = 100;
+
+    dprintf(">\n");
+    for ( wait_i = 0; wait_i < wait_n; wait_i++)
+    { 
+        dprintf("> wait_i=%d\n", wait_i);
+        conn = netctrl_connected();
+        if(conn) break;
+        set_current_state(TASK_INTERRUPTIBLE);
+        schedule_timeout(10);
+    }
+    if(conn <= 0){
+        err = netctrl_err(-ENETDOWN);
+        printk(KERN_WARNING "[XEN] Failed to connect all virtual interfaces: err=%d\n", err);
+    }
+    dprintf("< err=%d\n", err);
+    return err;
+}
+
 static int __init netif_init(void)
 {
     ctrl_msg_t                       cmsg;
     netif_fe_driver_status_changed_t st;
-    int err = 0, wait_i, wait_n = 20;
+    int err = 0;
 
     if ( (start_info.flags & SIF_INITDOMAIN) ||
          (start_info.flags & SIF_NET_BE_DOMAIN) )
         return 0;
 
-    printk("Initialising Xen virtual ethernet frontend driver");
+    printk(KERN_INFO "Initialising Xen virtual ethernet frontend driver.\n");
 
     INIT_LIST_HEAD(&dev_list);
 
@@ -871,18 +909,7 @@ static int __init netif_init(void)
     memcpy(cmsg.msg, &st, sizeof(st));
     ctrl_if_send_message_block(&cmsg, NULL, 0, TASK_UNINTERRUPTIBLE);
 
-    /* Wait for all interfaces to be connected. */
-    for ( wait_i = 0; ; wait_i++)
-    {
-        if ( (err = (wait_i < wait_n) ? netctrl_connected() : -ENETDOWN) != 0 )
-        {
-            err = (err > 0) ? 0 : err;
-            break;
-        }
-        set_current_state(TASK_INTERRUPTIBLE);
-        schedule_timeout(1);
-     }
-
+    err = wait_for_interfaces();
     if ( err )
         ctrl_if_unregister_receiver(CMSG_NETIF_FE, netif_ctrlif_rx);
 
