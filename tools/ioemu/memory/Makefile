@@ -9,3 +9,4 @@ libmemory.a: $(OBJS)
 
 include $(TOPDIR)/mk/helix.mk
 
+install:: all
