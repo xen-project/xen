@@ -242,7 +242,7 @@ static void shutdown_handler(ctrl_msg_t *msg, unsigned long id)
     else if ( (pending_sysrq == -1) && 
               (msg->subtype == CMSG_SHUTDOWN_SYSRQ) )
     {
-        pending_sysrq = msg->msg[0];
+        pending_sysrq = ((shutdown_sysrq_t *)&msg->msg[0])->key;
         schedule_work(&sysrq_work);
     }
     else

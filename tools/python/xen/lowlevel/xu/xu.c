@@ -671,6 +671,9 @@ static PyObject *xu_message_new(PyObject *self, PyObject *args)
         P2C(mem_request_t, target, u32);
         P2C(mem_request_t, status, u32);
         break;
+    case TYPE(CMSG_SHUTDOWN, CMSG_SHUTDOWN_SYSRQ):
+        P2C(shutdown_sysrq_t, key, char);
+        break;
     }
 
     if ( dict_items_parsed != PyDict_Size(payload) )
