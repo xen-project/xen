@@ -31,7 +31,7 @@ BIN      = xcs
 all: $(BIN) xcsdump
 
 clean:
-	$(RM) *.a *.so *.o *.rpm $(BIN) ctrl_dump
+	$(RM) *.a *.so *.o *.rpm $(BIN) xcsdump
 
 xcsdump: xcsdump.c
 	$(CC) $(CFLAGS) -o xcsdump xcsdump.c -L$(XEN_LIBXC) -L$(XEN_LIBXUTIL) \

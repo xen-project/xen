@@ -1,12 +1,4 @@
 
-ifndef BUILD_PIC_LIBS
-ifeq ($(wildcard /etc/debian_version),)
-BUILD_PIC_LIBS=n
-else
-BUILD_PIC_LIBS=y
-endif
-endif
-
 INSTALL		= install
 INSTALL_PROG	= $(INSTALL) -m0755
 INSTALL_DATA	= $(INSTALL) -m0644
@@ -101,9 +93,6 @@ rpm: all
 	mv staging/i386/*.rpm .
 	rm -rf staging
 
-$(PIC_OBJS): %.opic: %.c
-	$(CC) $(CPPFLAGS) -DPIC $(CFLAGS) -fPIC -c -o $@ $<
-
 libxc.a: $(OBJS)
 	$(AR) rc $@ $^
 
@@ -112,12 +101,7 @@ libxc.so: libxc.so.$(MAJOR)
 libxc.so.$(MAJOR): libxc.so.$(MAJOR).$(MINOR)
 	ln -sf $< $@
 
-ifeq ($(BUILD_PIC_LIBS),y)
 libxc.so.$(MAJOR).$(MINOR): $(PIC_OBJS)
 	$(CC) -Wl,-soname -Wl,libxc.so.$(MAJOR) -shared -o $@ $^ -L../libxutil -lxutil -lz
-else
-libxc.so.$(MAJOR).$(MINOR): $(LIB_OBJS)
-	$(CC) -Wl,-soname -Wl,libxc.so.$(MAJOR) -shared -o $@ $^ -L../libxutil -lxutil -lz
-endif
 
 -include $(DEPS)

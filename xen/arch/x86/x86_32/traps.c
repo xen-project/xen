@@ -1,4 +1,3 @@
-/* -*-  Mode:C; c-basic-offset:4; tab-width:4; indent-tabs-mode:nil -*- */
 
 #include <xen/config.h>
 #include <xen/init.h>
@@ -8,6 +7,10 @@
 #include <xen/mm.h>
 #include <xen/irq.h>
 #include <asm/flushtlb.h>
+
+#ifdef CONFIG_VMX
+#include <asm/vmx.h>
+#endif
 
 /* All CPUs have their own IDT to allow set_fast_trap(). */
 idt_entry_t *idt_tables[NR_CPUS] = { 0 };
@@ -88,37 +91,63 @@ void show_stack(unsigned long *esp)
 
 void show_registers(struct xen_regs *regs)
 {
-    unsigned long esp;
-    unsigned short ss, ds, es, fs, gs;
+    unsigned long ss, ds, es, fs, gs, cs;
+    unsigned long eip, esp, eflags;
+    const char *context;
 
-    if ( GUEST_MODE(regs) )
+#ifdef CONFIG_VMX
+    if ( VMX_DOMAIN(current) && (regs->eflags == 0) )
     {
-        esp = regs->esp;
-        ss  = regs->ss & 0xffff;
-        ds  = regs->ds & 0xffff;
-        es  = regs->es & 0xffff;
-        fs  = regs->fs & 0xffff;
-        gs  = regs->gs & 0xffff;
+        __vmread(GUEST_EIP, &eip);
+        __vmread(GUEST_ESP, &esp);
+        __vmread(GUEST_EFLAGS, &eflags);
+        __vmread(GUEST_SS_SELECTOR, &ss);
+        __vmread(GUEST_DS_SELECTOR, &ds);
+        __vmread(GUEST_ES_SELECTOR, &es);
+        __vmread(GUEST_FS_SELECTOR, &fs);
+        __vmread(GUEST_GS_SELECTOR, &gs);
+        __vmread(GUEST_CS_SELECTOR, &cs);
+        context = "vmx guest";
     }
     else
+#endif
     {
-        esp = (unsigned long)(&regs->esp);
-        ss  = __HYPERVISOR_DS;
-        ds  = __HYPERVISOR_DS;
-        es  = __HYPERVISOR_DS;
-        fs  = __HYPERVISOR_DS;
-        gs  = __HYPERVISOR_DS;
+        eip = regs->eip;
+        eflags = regs->eflags;
+
+        if ( GUEST_MODE(regs) )
+        {
+            esp = regs->esp;
+            ss  = regs->ss & 0xffff;
+            ds  = regs->ds & 0xffff;
+            es  = regs->es & 0xffff;
+            fs  = regs->fs & 0xffff;
+            gs  = regs->gs & 0xffff;
+            cs  = regs->cs & 0xffff;
+            context = "guest";
+        }
+        else
+        {
+            esp = (unsigned long)(&regs->esp);
+            ss  = __HYPERVISOR_DS;
+            ds  = __HYPERVISOR_DS;
+            es  = __HYPERVISOR_DS;
+            fs  = __HYPERVISOR_DS;
+            gs  = __HYPERVISOR_DS;
+            cs  = __HYPERVISOR_CS;
+            
+            context = "hypervisor";
+        }
     }
 
-    printk("CPU:    %d\nEIP:    %04lx:[<%p>]      \nEFLAGS: %p\n",
-           smp_processor_id(), 0xffff & regs->cs, regs->eip, regs->eflags);
+    printk("CPU:    %d\nEIP:    %04lx:[<%p>]      \nEFLAGS: %p   CONTEXT: %s\n",
+           smp_processor_id(), 0xffff & regs->cs, eip, eflags, context);
     printk("eax: %p   ebx: %p   ecx: %p   edx: %p\n",
            regs->eax, regs->ebx, regs->ecx, regs->edx);
     printk("esi: %p   edi: %p   ebp: %p   esp: %p\n",
            regs->esi, regs->edi, regs->ebp, esp);
-    printk("ds: %04x   es: %04x   fs: %04x   gs: %04x   ss: %04x\n",
-           ds, es, fs, gs, ss);
-    printk("cr3: %08lx\n", read_cr3());
+    printk("ds: %04x   es: %04x   fs: %04x   gs: %04x   ss: %04x   cs: %04x\n",
+           ds, es, fs, gs, ss, cs);
 
     show_stack((unsigned long *)&regs->esp);
 } 
@@ -292,3 +321,12 @@ long do_set_callbacks(unsigned long event_selector,
 
     return 0;
 }
+
+/*
+ * Local variables:
+ * mode: C
+ * c-set-style: "BSD"
+ * c-basic-offset: 4
+ * tab-width: 4
+ * indent-tabs-mode: nil
+ */

@@ -1,4 +1,3 @@
-/* -*-  Mode:C; c-basic-offset:4; tab-width:4; indent-tabs-mode:nil -*- */
 /******************************************************************************
  * arch/x86/domain.c
  * 
@@ -296,7 +295,7 @@ void arch_vmx_do_launch(struct exec_domain *ed)
     reset_stack_and_jump(vmx_asm_do_launch);
 }
 
-static void alloc_monitor_pagetable(struct exec_domain *ed)
+unsigned long alloc_monitor_pagetable(struct exec_domain *ed)
 {
     unsigned long mmfn;
     l2_pgentry_t *mpl2e;
@@ -320,12 +319,13 @@ static void alloc_monitor_pagetable(struct exec_domain *ed)
         mk_l2_pgentry((__pa(d->arch.mm_perdomain_pt) & PAGE_MASK) 
                       | __PAGE_HYPERVISOR);
 
-    ed->arch.monitor_table = mk_pagetable(mmfn << PAGE_SHIFT);
     ed->arch.monitor_vtable = mpl2e;
 
     // map the phys_to_machine map into the Read-Only MPT space for this domain
     mpl2e[l2_table_offset(RO_MPT_VIRT_START)] =
         mk_l2_pgentry(pagetable_val(ed->arch.phys_table) | __PAGE_HYPERVISOR);
+
+    return mmfn;
 }
 
 /*
@@ -409,13 +409,7 @@ static int vmx_final_setup_guest(struct exec_domain *ed,
         shadow_mode_enable(ed->domain, SHM_enable|SHM_translate|SHM_external);
     }
 
-    /* We don't call update_pagetables() as we actively want fields such as 
-     * the linear_pg_table to be null so that we bail out early of 
-     * shadow_fault in case the vmx guest tries illegal accesses with
-     * paging turned off. 
-     */
-    //update_pagetables(ed);     /* this assigns shadow_pagetable */
-    alloc_monitor_pagetable(ed); /* this assigns monitor_pagetable */
+    update_pagetables(ed);
 
     return 0;
 
@@ -724,9 +718,6 @@ void switch_to(struct exec_domain *prev_p, struct exec_domain *next_p)
     struct tss_struct *tss = init_tss + smp_processor_id();
     execution_context_t *stack_ec = get_execution_context();
     int i;
-#ifdef CONFIG_VMX
-    unsigned long vmx_domain = next_p->arch.arch_vmx.flags; 
-#endif
 
     __cli();
 
@@ -759,7 +750,7 @@ void switch_to(struct exec_domain *prev_p, struct exec_domain *next_p)
         }
 
 #ifdef CONFIG_VMX
-        if ( vmx_domain )
+        if ( VMX_DOMAIN(next_p) )
         {
             /* Switch page tables. */
             write_ptbase(next_p);
@@ -1005,3 +996,12 @@ void domain_relinquish_memory(struct domain *d)
     relinquish_list(d, &d->page_list);
 }
 
+
+/*
+ * Local variables:
+ * mode: C
+ * c-set-style: "BSD"
+ * c-basic-offset: 4
+ * tab-width: 4
+ * indent-tabs-mode: nil
+ */

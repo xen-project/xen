@@ -1,4 +1,3 @@
-/* -*-  Mode:C; c-basic-offset:8; tab-width:8; indent-tabs-mode:t -*- */
 /*
  *	linux/kernel/resource.c
  *
@@ -318,3 +317,12 @@ static int __init reserve_setup(char *str)
 
 __setup("reserve=", reserve_setup);
 #endif
+
+/*
+ * Local variables:
+ * mode: C
+ * c-set-style: "BSD"
+ * c-basic-offset: 8
+ * tab-width: 8
+ * indent-tabs-mode: t
+ */

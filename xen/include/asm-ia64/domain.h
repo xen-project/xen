@@ -1,4 +1,3 @@
-/* -*-  Mode:C; c-basic-offset:4; tab-width:4; indent-tabs-mode:nil -*- */
 #ifndef __ASM_DOMAIN_H__
 #define __ASM_DOMAIN_H__
 
@@ -99,3 +98,12 @@ extern struct mm_struct init_mm;
 #include <asm/pgtable.h>
 
 #endif /* __ASM_DOMAIN_H__ */
+
+/*
+ * Local variables:
+ * mode: C
+ * c-set-style: "BSD"
+ * c-basic-offset: 4
+ * tab-width: 4
+ * indent-tabs-mode: nil
+ */

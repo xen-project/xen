@@ -1,5 +1,4 @@
-/* -*-  Mode:C; c-basic-offset:4; tab-width:4; indent-tabs-mode:nil -*-
- ****************************************************************************
+/****************************************************************************
  * (C) 2002-2003 - Rolf Neugebauer - Intel Research Cambridge
  * (C) 2002-2003 University of Cambridge
  * (C) 2004      - Mark Williamson - Intel Research Cambridge
@@ -589,3 +588,12 @@ struct scheduler sched_bvt_def = {
     .sleep          = bvt_sleep,
     .wake           = bvt_wake,
 };
+
+/*
+ * Local variables:
+ * mode: C
+ * c-set-style: "BSD"
+ * c-basic-offset: 4
+ * tab-width: 4
+ * indent-tabs-mode: nil
+ */

@@ -75,7 +75,7 @@ root = "/dev/hda1 ro"
 #nfs_root   = '/full/path/to/root/directory'
 
 # Sets runlevel 4.
-extra = "1"
+extra = "acpi=off 1"
 
 #----------------------------------------------------------------------------
 # Set according to whether you want the domain restarted when it exits.

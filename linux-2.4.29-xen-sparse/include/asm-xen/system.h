@@ -109,7 +109,7 @@ static inline unsigned long _get_base(char * addr)
 
 /* NB. 'clts' is done for us by Xen during virtual trap. */
 #define clts() ((void)0)
-#define stts() (HYPERVISOR_fpu_taskswitch())
+#define stts() (HYPERVISOR_fpu_taskswitch(1))
 
 #endif	/* __KERNEL__ */
 

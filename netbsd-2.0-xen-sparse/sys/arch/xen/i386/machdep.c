@@ -412,7 +412,7 @@ i386_proc0_tss_ldt_init()
 	ltr(lwp0.l_md.md_tss_sel);
 	lldt(pcb->pcb_ldt_sel);
 #else
-	HYPERVISOR_fpu_taskswitch();
+	HYPERVISOR_fpu_taskswitch(1);
 	XENPRINTF(("lwp tss sp %p ss %04x/%04x\n",
 		      (void *)pcb->pcb_tss.tss_esp0,
 		      pcb->pcb_tss.tss_ss0, IDXSEL(pcb->pcb_tss.tss_ss0)));
@@ -455,7 +455,7 @@ i386_switch_context(struct pcb *new)
 
 	ci = curcpu();
 	if (ci->ci_fpused) {
-		HYPERVISOR_fpu_taskswitch();
+		HYPERVISOR_fpu_taskswitch(1);
 		ci->ci_fpused = 0;
 	}
 

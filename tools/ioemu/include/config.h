@@ -388,8 +388,8 @@
 #define BX_WITH_MACOS 0
 #define BX_WITH_CARBON 0
 #define BX_WITH_NOGUI 0
-#define BX_WITH_TERM 0
-#define BX_WITH_RFB 0
+#define BX_WITH_TERM 1
+#define BX_WITH_RFB 1
 #define BX_WITH_AMIGAOS 0
 #define BX_WITH_SDL 0
 #define BX_WITH_SVGA 0

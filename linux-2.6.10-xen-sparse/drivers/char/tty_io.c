@@ -1772,7 +1772,7 @@ retry_open:
 		goto got_driver;
 	}
 #ifdef CONFIG_VT
-	if (device == MKDEV(TTY_MAJOR,0)) {
+	if (console_use_vt && (device == MKDEV(TTY_MAJOR,0))) {
 		extern int fg_console;
 		extern struct tty_driver *console_driver;
 		driver = console_driver;

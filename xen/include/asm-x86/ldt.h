@@ -1,4 +1,3 @@
-/* -*-  Mode:C; c-basic-offset:4; tab-width:4; indent-tabs-mode:nil -*- */
 
 #ifndef __ARCH_LDT_H
 #define __ARCH_LDT_H
@@ -29,3 +28,12 @@ static inline void load_LDT(struct exec_domain *ed)
 #endif /* !__ASSEMBLY__ */
 
 #endif
+
+/*
+ * Local variables:
+ * mode: C
+ * c-set-style: "BSD"
+ * c-basic-offset: 4
+ * tab-width: 4
+ * indent-tabs-mode: nil
+ */

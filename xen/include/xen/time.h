@@ -1,5 +1,4 @@
-/* -*-  Mode:C; c-basic-offset:4; tab-width:4 -*-
- ****************************************************************************
+/****************************************************************************
  * (C) 2002 - Rolf Neugebauer - Intel Research Cambridge
  ****************************************************************************
  *
@@ -60,3 +59,12 @@ extern void do_settime(unsigned long secs, unsigned long usecs,
                        u64 system_time_base);
 
 #endif /* __XEN_TIME_H__ */
+
+/*
+ * Local variables:
+ * mode: C
+ * c-set-style: "BSD"
+ * c-basic-offset: 4
+ * tab-width: 4
+ * indent-tabs-mode: nil
+ */

@@ -1,4 +1,3 @@
-/* -*-  Mode:C; c-basic-offset:4; tab-width:4; indent-tabs-mode:nil -*- */
 
 #ifndef __X86_PAGE_H__
 #define __X86_PAGE_H__
@@ -146,3 +145,12 @@ map_pages(
 #endif /* !__ASSEMBLY__ */
 
 #endif /* __I386_PAGE_H__ */
+
+/*
+ * Local variables:
+ * mode: C
+ * c-set-style: "BSD"
+ * c-basic-offset: 4
+ * tab-width: 4
+ * indent-tabs-mode: nil
+ */

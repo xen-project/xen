@@ -1,4 +1,3 @@
-/* -*-  Mode:C; c-basic-offset:4; tab-width:4; indent-tabs-mode:nil -*- */
 /******************************************************************************
  * multicall.c
  */
@@ -80,3 +79,12 @@ long do_multicall(multicall_entry_t *call_list, unsigned int nr_calls)
     mcs->flags = 0;
     return -EFAULT;
 }
+
+/*
+ * Local variables:
+ * mode: C
+ * c-set-style: "BSD"
+ * c-basic-offset: 4
+ * tab-width: 4
+ * indent-tabs-mode: nil
+ */

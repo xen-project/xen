@@ -1,4 +1,3 @@
-/* -*-  Mode:C; c-basic-offset:4; tab-width:4; indent-tabs-mode:nil -*- */
 
 #ifndef __ASM_X86_SERIAL_H__
 #define __ASM_X86_SERIAL_H__
@@ -11,3 +10,12 @@
       (outb((_c), (_uart)->io_base + THR), 1) : 0 )
 
 #endif /* __ASM_X86_SERIAL_H__ */
+
+/*
+ * Local variables:
+ * mode: C
+ * c-set-style: "BSD"
+ * c-basic-offset: 4
+ * tab-width: 4
+ * indent-tabs-mode: nil
+ */

@@ -1,4 +1,3 @@
-/* -*-  Mode:C; c-basic-offset:4; tab-width:4; indent-tabs-mode:nil -*- */
 /*
  * atropos.c
  * ---------
@@ -684,3 +683,12 @@ struct scheduler sched_atropos_def = {
     .dump_cpu_state = at_dump_cpu_state,
     .prn_state      = at_prn_state,
 };
+
+/*
+ * Local variables:
+ * mode: C
+ * c-set-style: "BSD"
+ * c-basic-offset: 4
+ * tab-width: 4
+ * indent-tabs-mode: nil
+ */

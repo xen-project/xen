@@ -1,4 +1,3 @@
-/* -*-  Mode:C; c-basic-offset:4; tab-width:4; indent-tabs-mode:nil -*- */
 /******************************************************************************
  * arch/x86/traps.c
  * 
@@ -349,9 +348,27 @@ asmlinkage int do_page_fault(struct xen_regs *regs)
     return 0;
 }
 
+long do_fpu_taskswitch(int set)
+{
+    struct exec_domain *ed = current;
+
+    if ( set )
+    {
+        set_bit(EDF_GUEST_STTS, &ed->ed_flags);
+        stts();
+    }
+    else
+    {
+        clear_bit(EDF_GUEST_STTS, &ed->ed_flags);
+        if ( test_bit(EDF_USEDFPU, &ed->ed_flags) )
+            clts();
+    }
+
+    return 0;
+}
+
 static int emulate_privileged_op(struct xen_regs *regs)
 {
-    extern long do_fpu_taskswitch(void);
     extern void *decode_reg(struct xen_regs *regs, u8 b);
 
     struct exec_domain *ed = current;
@@ -371,7 +388,7 @@ static int emulate_privileged_op(struct xen_regs *regs)
     switch ( opcode )
     {
     case 0x06: /* CLTS */
-        (void)do_fpu_taskswitch();
+        (void)do_fpu_taskswitch(0);
         break;
 
     case 0x09: /* WBINVD */
@@ -420,8 +437,7 @@ static int emulate_privileged_op(struct xen_regs *regs)
         switch ( (opcode >> 3) & 7 )
         {
         case 0: /* Write CR0 */
-            if ( *reg & X86_CR0_TS ) /* XXX ignore all but TS bit */
-                (void)do_fpu_taskswitch;
+            (void)do_fpu_taskswitch(!!(*reg & X86_CR0_TS));
             break;
 
         case 2: /* Write CR2 */
@@ -818,14 +834,6 @@ long do_set_trap_table(trap_info_t *traps)
 }
 
 
-long do_fpu_taskswitch(void)
-{
-    set_bit(EDF_GUEST_STTS, &current->ed_flags);
-    stts();
-    return 0;
-}
-
-
 #if defined(__i386__)
 #define DB_VALID_ADDR(_a) \
     ((_a) <= (PAGE_OFFSET - 4))
@@ -908,3 +916,12 @@ unsigned long do_get_debugreg(int reg)
     if ( (reg < 0) || (reg > 7) ) return -EINVAL;
     return current->arch.debugreg[reg];
 }
+
+/*
+ * Local variables:
+ * mode: C
+ * c-set-style: "BSD"
+ * c-basic-offset: 4
+ * tab-width: 4
+ * indent-tabs-mode: nil
+ */

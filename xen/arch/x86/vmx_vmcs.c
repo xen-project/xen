@@ -1,4 +1,3 @@
-/* -*-  Mode:C; c-basic-offset:4; tab-width:4; indent-tabs-mode:nil -*- */
 /*
  * vmx_vmcs.c: VMCS management
  * Copyright (c) 2004, Intel Corporation.
@@ -162,7 +161,6 @@ void vmx_do_launch(struct exec_domain *ed)
     struct host_execution_env host_env;
     struct Xgt_desc_struct desc;
     struct list_head *list_ent;
-    l2_pgentry_t *mpl2e, *hl2_vtable;
     unsigned long i, pfn = 0;
     struct pfn_info *page;
     execution_context_t *ec = get_execution_context();
@@ -173,8 +171,6 @@ void vmx_do_launch(struct exec_domain *ed)
 
     spin_lock(&d->page_alloc_lock);
     list_ent = d->page_list.next;
-
-    mpl2e = (l2_pgentry_t *)map_domain_mem(pagetable_val(ed->arch.monitor_table));
 
     for ( i = 0; list_ent != &d->page_list; i++ )
     {
@@ -188,18 +184,6 @@ void vmx_do_launch(struct exec_domain *ed)
 
     page = (struct pfn_info *) alloc_domheap_page(NULL);
     pfn = (unsigned long) (page - frame_table);
-
-    /*
-     * make linear_pt_table work for guest ptes
-     */
-    mpl2e[LINEAR_PT_VIRT_START >> L2_PAGETABLE_SHIFT] =
-        mk_l2_pgentry((pfn << PAGE_SHIFT)| __PAGE_HYPERVISOR);
-
-    hl2_vtable = map_domain_mem(pfn << PAGE_SHIFT);
-    memset(hl2_vtable, 0, PAGE_SIZE); /* clean it up */
-    ed->arch.hl2_vtable = hl2_vtable; 
-        
-    unmap_domain_mem(mpl2e);
 
     vmx_setup_platform(ed, ec);
 
@@ -479,3 +463,12 @@ void vm_resume_fail(unsigned long eflags)
 }
 
 #endif /* CONFIG_VMX */
+
+/*
+ * Local variables:
+ * mode: C
+ * c-set-style: "BSD"
+ * c-basic-offset: 4
+ * tab-width: 4
+ * indent-tabs-mode: nil
+ */

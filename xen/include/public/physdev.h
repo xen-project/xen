@@ -1,5 +1,4 @@
-/* -*-  Mode:C; c-basic-offset:4; tab-width:4 -*-
- ****************************************************************************
+/****************************************************************************
  * (c) 2004 - Rolf Neugebauer - Intel Research Cambridge
  * (c) 2004 - Keir Fraser - University of Cambridge
  ****************************************************************************
@@ -78,3 +77,12 @@ typedef struct _physdev_op_st
 } PACKED physdev_op_t; /* 40 bytes */
 
 #endif /* __XEN_PUBLIC_PHYSDEV_H__ */
+
+/*
+ * Local variables:
+ * mode: C
+ * c-set-style: "BSD"
+ * c-basic-offset: 4
+ * tab-width: 4
+ * indent-tabs-mode: nil
+ */

@@ -1,4 +1,3 @@
-/* -*-  Mode:C; c-basic-offset:4; tab-width:4; indent-tabs-mode:nil -*- */
 
 #ifndef __SCHED_H__
 #define __SCHED_H__
@@ -402,3 +401,12 @@ static inline void domain_unpause_by_systemcontroller(struct domain *d)
 
 
 #endif /* __SCHED_H__ */
+
+/*
+ * Local variables:
+ * mode: C
+ * c-set-style: "BSD"
+ * c-basic-offset: 4
+ * tab-width: 4
+ * indent-tabs-mode: nil
+ */

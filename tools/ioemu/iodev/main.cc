@@ -1964,6 +1964,10 @@ bx_bool load_and_init_display_lib () {
   if (!strcmp (gui_name, "x")) 
     PLUG_load_plugin (x, PLUGTYPE_OPTIONAL);
 #endif
+#if BX_WITH_TERM
+  if (!strcmp (gui_name, "term"))
+    PLUG_load_plugin (term, PLUGTYPE_OPTIONAL);
+#endif
 
 #if BX_GUI_SIGHANDLER
   // set the flag for guis requiring a GUI sighandler.

@@ -1,4 +1,3 @@
-/* -*-  Mode:C; c-basic-offset:8; tab-width:8; indent-tabs-mode:t -*- */
 
 #include <xen/ctype.h>
 #include <xen/lib.h>
@@ -441,3 +440,12 @@ s64 __moddi3(s64 a, s64 b)
 }
 
 #endif /* BITS_PER_LONG == 32 */
+
+/*
+ * Local variables:
+ * mode: C
+ * c-set-style: "BSD"
+ * c-basic-offset: 8
+ * tab-width: 8
+ * indent-tabs-mode: t
+ */

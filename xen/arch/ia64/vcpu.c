@@ -1265,7 +1265,7 @@ unsigned long vcpu_get_rr_ve(VCPU *vcpu,UINT64 vadr)
 	
 	ia64_rr rr;
 
-	rr.rrval = PSCB(vcpu,rrs[vadr)>>61];
+	rr.rrval = PSCB(vcpu,rrs)[vadr>>61];
 	return(rr.ve);
 }
 
@@ -1275,7 +1275,7 @@ unsigned long vcpu_get_rr_ps(VCPU *vcpu,UINT64 vadr)
 	
 	ia64_rr rr;
 
-	rr.rrval = PSCB(vcpu,rrs[vadr)>>61];
+	rr.rrval = PSCB(vcpu,rrs)[vadr>>61];
 	return(rr.ps);
 }
 
@@ -1285,7 +1285,7 @@ unsigned long vcpu_get_rr_rid(VCPU *vcpu,UINT64 vadr)
 	
 	ia64_rr rr;
 
-	rr.rrval = PSCB(vcpu,rrs[vadr)>>61];
+	rr.rrval = PSCB(vcpu,rrs)[vadr>>61];
 	return(rr.rid);
 }
 
@@ -1293,7 +1293,7 @@ unsigned long vcpu_get_rr_rid(VCPU *vcpu,UINT64 vadr)
 IA64FAULT vcpu_set_rr(VCPU *vcpu, UINT64 reg, UINT64 val)
 {
 	extern void set_one_rr(UINT64, UINT64);
-	PSCB(vcpu,rrs[reg)>>61] = val;
+	PSCB(vcpu,rrs)[reg>>61] = val;
 	// warning: set_one_rr() does it "live"
 	set_one_rr(reg,val);
 	return (IA64_NO_FAULT);
@@ -1301,7 +1301,7 @@ IA64FAULT vcpu_set_rr(VCPU *vcpu, UINT64 reg, UINT64 val)
 
 IA64FAULT vcpu_get_rr(VCPU *vcpu, UINT64 reg, UINT64 *pval)
 {
-	UINT val = PSCB(vcpu,rrs[reg)>>61];
+	UINT val = PSCB(vcpu,rrs)[reg>>61];
 	*pval = val;
 	return (IA64_NO_FAULT);
 }

@@ -1,4 +1,3 @@
-/* -*-  Mode:C; c-basic-offset:4; tab-width:4; indent-tabs-mode:nil -*- */
 /******************************************************************************
  * serial.h
  * 
@@ -52,3 +51,12 @@ unsigned char irq_serial_getc(int handle);
 void serial_force_unlock(int handle);
 
 #endif /* __XEN_SERIAL_H__ */
+
+/*
+ * Local variables:
+ * mode: C
+ * c-set-style: "BSD"
+ * c-basic-offset: 4
+ * tab-width: 4
+ * indent-tabs-mode: nil
+ */

@@ -258,7 +258,6 @@
 40f5623bVdKP7Dt7qm8twu3NcnGNbA linux-2.6.10-xen-sparse/include/asm-xen/asm-i386/system.h
 40f5623bc8LKPRO09wY5dGDnY_YCpw linux-2.6.10-xen-sparse/include/asm-xen/asm-i386/tlbflush.h
 41062ab7uFxnCq-KtPeAm-aV8CicgA linux-2.6.10-xen-sparse/include/asm-xen/asm-i386/vga.h
-40f5623bxUbeGjkRrjDguCy_Gm8RLw linux-2.6.10-xen-sparse/include/asm-xen/asm-i386/xor.h
 41af4017PDMuSmMWtSRU5UC9Vylw5g linux-2.6.10-xen-sparse/include/asm-xen/balloon.h
 40f5623bYNP7tHE2zX6YQxp9Zq2utQ linux-2.6.10-xen-sparse/include/asm-xen/ctrl_if.h
 40f5623b3Eqs8pAc5WpPX8_jTzV2qw linux-2.6.10-xen-sparse/include/asm-xen/evtchn.h

@@ -15,24 +15,17 @@
 #include <asm/processor.h>
 
 extern void init_fpu(void);
-extern void save_init_fpu( struct exec_domain *tsk );
-extern void restore_fpu( struct exec_domain *tsk );
+extern void save_init_fpu(struct exec_domain *tsk);
+extern void restore_fpu(struct exec_domain *tsk);
 
-#define unlazy_fpu( tsk ) do { \
-	if ( test_bit(EDF_USEDFPU, &tsk->ed_flags) ) \
-		save_init_fpu( tsk ); \
-} while (0)
-
-#define clear_fpu( tsk ) do { \
-	if ( test_and_clear_bit(EDF_USEDFPU, &tsk->ed_flags) ) { \
-		asm volatile("fwait"); \
-		stts(); \
-	} \
-} while (0)
+#define unlazy_fpu(_tsk) do { \
+    if ( test_bit(EDF_USEDFPU, &(_tsk)->ed_flags) ) \
+        save_init_fpu(_tsk); \
+} while ( 0 )
 
 #define load_mxcsr( val ) do { \
-        unsigned long __mxcsr = ((unsigned long)(val) & 0xffbf); \
-        asm volatile( "ldmxcsr %0" : : "m" (__mxcsr) ); \
-} while (0)
+    unsigned long __mxcsr = ((unsigned long)(val) & 0xffbf); \
+    __asm__ __volatile__ ( "ldmxcsr %0" : : "m" (__mxcsr) ); \
+} while ( 0 )
 
 #endif /* __ASM_I386_I387_H */

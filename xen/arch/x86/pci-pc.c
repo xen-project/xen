@@ -1,4 +1,3 @@
-/* -*-  Mode:C; c-basic-offset:8; tab-width:8; indent-tabs-mode:t -*- */
 /*
  *	Low-Level PCI Support for PC
  *
@@ -1546,3 +1545,12 @@ int pcibios_enable_device(struct pci_dev *dev, int mask)
 
 	return 0;
 }
+
+/*
+ * Local variables:
+ * mode: C
+ * c-set-style: "BSD"
+ * c-basic-offset: 8
+ * tab-width: 8
+ * indent-tabs-mode: t
+ */

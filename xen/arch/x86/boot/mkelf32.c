@@ -107,6 +107,94 @@ static Elf32_Shdr out_shdr[] = {
     }
 };
 
+#define swap16(_v) ((((u16)(_v)>>8)&0xff)|(((u16)(_v)&0xff)<<8))
+#define swap32(_v) (((u32)swap16((u16)(_v))<<16)|(u32)swap16((u32)((_v)>>16)))
+#define swap64(_v) (((u64)swap32((u32)(_v))<<32)|(u64)swap32((u32)((_v)>>32)))
+
+static int big_endian;
+
+static void endianadjust_ehdr32(Elf32_Ehdr *eh)
+{
+    if ( !big_endian )
+        return;
+    eh->e_type      = swap16(eh->e_type);
+    eh->e_machine   = swap16(eh->e_machine);
+    eh->e_version   = swap32(eh->e_version);
+    eh->e_entry     = swap32(eh->e_entry);
+    eh->e_phoff     = swap32(eh->e_phoff);
+    eh->e_shoff     = swap32(eh->e_shoff);
+    eh->e_flags     = swap32(eh->e_flags);
+    eh->e_ehsize    = swap16(eh->e_ehsize);
+    eh->e_phentsize = swap16(eh->e_phentsize);
+    eh->e_phnum     = swap16(eh->e_phnum);
+    eh->e_shentsize = swap16(eh->e_shentsize);
+    eh->e_shnum     = swap16(eh->e_shnum);
+    eh->e_shstrndx  = swap16(eh->e_shstrndx);
+}
+
+static void endianadjust_ehdr64(Elf64_Ehdr *eh)
+{
+    if ( !big_endian )
+        return;
+    eh->e_type      = swap16(eh->e_type);
+    eh->e_machine   = swap16(eh->e_machine);
+    eh->e_version   = swap32(eh->e_version);
+    eh->e_entry     = swap64(eh->e_entry);
+    eh->e_phoff     = swap64(eh->e_phoff);
+    eh->e_shoff     = swap64(eh->e_shoff);
+    eh->e_flags     = swap32(eh->e_flags);
+    eh->e_ehsize    = swap16(eh->e_ehsize);
+    eh->e_phentsize = swap16(eh->e_phentsize);
+    eh->e_phnum     = swap16(eh->e_phnum);
+    eh->e_shentsize = swap16(eh->e_shentsize);
+    eh->e_shnum     = swap16(eh->e_shnum);
+    eh->e_shstrndx  = swap16(eh->e_shstrndx);
+}
+
+static void endianadjust_phdr32(Elf32_Phdr *ph)
+{
+    if ( !big_endian )
+        return;
+    ph->p_type      = swap32(ph->p_type);
+    ph->p_offset    = swap32(ph->p_offset);
+    ph->p_vaddr     = swap32(ph->p_vaddr);
+    ph->p_paddr     = swap32(ph->p_paddr);
+    ph->p_filesz    = swap32(ph->p_filesz);
+    ph->p_memsz     = swap32(ph->p_memsz);
+    ph->p_flags     = swap32(ph->p_flags);
+    ph->p_align     = swap32(ph->p_align);       
+}
+
+static void endianadjust_phdr64(Elf64_Phdr *ph)
+{
+    if ( !big_endian )
+        return;
+    ph->p_type      = swap32(ph->p_type);
+    ph->p_flags     = swap32(ph->p_flags);
+    ph->p_offset    = swap64(ph->p_offset);
+    ph->p_vaddr     = swap64(ph->p_vaddr);
+    ph->p_paddr     = swap64(ph->p_paddr);
+    ph->p_filesz    = swap64(ph->p_filesz);
+    ph->p_memsz     = swap64(ph->p_memsz);
+    ph->p_align     = swap64(ph->p_align);       
+}
+
+static void endianadjust_shdr32(Elf32_Shdr *sh)
+{
+    if ( !big_endian )
+        return;
+    sh->sh_name     = swap32(sh->sh_name);
+    sh->sh_type     = swap32(sh->sh_type);
+    sh->sh_flags    = swap32(sh->sh_flags);
+    sh->sh_addr     = swap32(sh->sh_addr);
+    sh->sh_offset   = swap32(sh->sh_offset);
+    sh->sh_size     = swap32(sh->sh_size);
+    sh->sh_link     = swap32(sh->sh_link);
+    sh->sh_info     = swap32(sh->sh_info);
+    sh->sh_addralign = swap32(sh->sh_addralign);
+    sh->sh_entsize  = swap32(sh->sh_entsize);
+}
+
 static void do_write(int fd, void *data, int len)
 {
     int   done, left = len;
@@ -155,7 +243,7 @@ int main(int argc, char **argv)
     char      *inimage, *outimage;
     int        infd, outfd;
     char       buffer[1024];
-    int        bytes, todo;
+    int        bytes, todo, i;
 
     Elf32_Ehdr in32_ehdr;
     Elf32_Phdr in32_phdr;
@@ -189,6 +277,9 @@ int main(int argc, char **argv)
         return 1;
     }
 
+    big_endian = (*(u16 *)in32_ehdr.e_ident == ((ELFMAG0 << 8) | ELFMAG1));
+
+    endianadjust_ehdr32(&in32_ehdr);
     switch ( in32_ehdr.e_ident[EI_CLASS] )
     {
     case ELFCLASS32:
@@ -208,6 +299,7 @@ int main(int argc, char **argv)
 
         (void)lseek(infd, in32_ehdr.e_phoff, SEEK_SET);
         do_read(infd, &in32_phdr, sizeof(in32_phdr));
+        endianadjust_phdr32(&in32_phdr);
 
         (void)lseek(infd, in32_phdr.p_offset, SEEK_SET);
         dat_siz = (u32)in32_phdr.p_filesz;
@@ -217,6 +309,7 @@ int main(int argc, char **argv)
     case ELFCLASS64:
         (void)lseek(infd, 0, SEEK_SET);
         do_read(infd, &in64_ehdr, sizeof(in64_ehdr));
+        endianadjust_ehdr64(&in64_ehdr);
 
         if ( in64_ehdr.e_phentsize != sizeof(in64_phdr) )
         {
@@ -234,6 +327,7 @@ int main(int argc, char **argv)
 
         (void)lseek(infd, in64_ehdr.e_phoff, SEEK_SET);
         do_read(infd, &in64_phdr, sizeof(in64_phdr));
+        endianadjust_phdr64(&in64_phdr);
 
         (void)lseek(infd, in64_phdr.p_offset, SEEK_SET);
         dat_siz = (u32)in64_phdr.p_filesz;
@@ -271,7 +365,10 @@ int main(int argc, char **argv)
         return 1;
     }
 
+    endianadjust_ehdr32(&out_ehdr);
     do_write(outfd, &out_ehdr, sizeof(out_ehdr));
+
+    endianadjust_phdr32(&out_phdr);
     do_write(outfd, &out_phdr, sizeof(out_phdr));
     
     if ( (bytes = RAW_OFFSET - sizeof(out_ehdr) - sizeof(out_phdr)) < 0 )
@@ -289,7 +386,10 @@ int main(int argc, char **argv)
         do_write(outfd, buffer, todo);
     }
 
+    for ( i = 0; i < (sizeof(out_shdr) / sizeof(out_shdr[0])); i++ )
+        endianadjust_shdr32(&out_shdr[i]);
     do_write(outfd, &out_shdr[0], sizeof(out_shdr));
+
     do_write(outfd, out_shstrtab, sizeof(out_shstrtab));
     do_write(outfd, buffer, 4-((sizeof(out_shstrtab)+dat_siz)&3));
 
@@ -298,3 +398,12 @@ int main(int argc, char **argv)
 
     return 0;
 }
+
+/*
+ * Local variables:
+ * mode: C
+ * c-set-style: "BSD"
+ * c-basic-offset: 4
+ * tab-width: 4
+ * indent-tabs-mode: nil
+ */

@@ -1,4 +1,3 @@
-/* -*-  Mode:C; c-basic-offset:4; tab-width:4; indent-tabs-mode:nil -*- */
 
 #ifndef __X86_64_PAGE_H__
 #define __X86_64_PAGE_H__
@@ -99,3 +98,12 @@ typedef l4_pgentry_t root_pgentry_t;
 #define L4_DISALLOW_MASK ((cpu_has_nx?0:(1UL<<63)) | (7UL << 7))
 
 #endif /* __X86_64_PAGE_H__ */
+
+/*
+ * Local variables:
+ * mode: C
+ * c-set-style: "BSD"
+ * c-basic-offset: 4
+ * tab-width: 4
+ * indent-tabs-mode: nil
+ */

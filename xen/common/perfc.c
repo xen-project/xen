@@ -1,4 +1,3 @@
-/* -*-  Mode:C; c-basic-offset:4; tab-width:4; indent-tabs-mode:nil -*- */
 
 #include <xen/lib.h>
 #include <xen/smp.h>
@@ -32,7 +31,7 @@ static struct {
 
 #define NR_PERFCTRS (sizeof(perfc_info) / sizeof(perfc_info[0]))
 
-struct perfcounter_t perfcounters;
+struct perfcounter perfcounters;
 
 void perfc_printall(unsigned char key)
 {
@@ -221,3 +220,12 @@ int perfc_control(dom0_perfccontrol_t *pc)
 
     return rc;
 }
+
+/*
+ * Local variables:
+ * mode: C
+ * c-set-style: "BSD"
+ * c-basic-offset: 4
+ * tab-width: 4
+ * indent-tabs-mode: nil
+ */

@@ -1,4 +1,3 @@
-/* -*-  Mode:C; c-basic-offset:4; tab-width:4; indent-tabs-mode:nil -*- */
 
 #ifndef __ASM_DOMAIN_H__
 #define __ASM_DOMAIN_H__
@@ -129,3 +128,12 @@ struct arch_exec_domain
 }
 
 #endif /* __ASM_DOMAIN_H__ */
+
+/*
+ * Local variables:
+ * mode: C
+ * c-set-style: "BSD"
+ * c-basic-offset: 4
+ * tab-width: 4
+ * indent-tabs-mode: nil
+ */

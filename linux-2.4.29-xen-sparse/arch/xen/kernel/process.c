@@ -334,7 +334,7 @@ void fastcall __switch_to(struct task_struct *prev_p, struct task_struct *next_p
             asm volatile( "fnsave %0 ; fwait"
                           : "=m" (prev_p->thread.i387.fsave) );
 	prev_p->flags &= ~PF_USEDFPU;
-        queue_multicall0(__HYPERVISOR_fpu_taskswitch);
+        queue_multicall1(__HYPERVISOR_fpu_taskswitch, 1);
     }
 
     queue_multicall2(__HYPERVISOR_stack_switch, __KERNEL_DS, next->esp0);
