@@ -18,8 +18,8 @@
 
 #define __PAGE_OFFSET           (0xFFFF830000000000)
 
-/* These may increase in future (phys. bits in particular). */
-#define PADDR_BITS              40
+/* These are page-table limitations. Current CPUs support only 40-bit phys. */
+#define PADDR_BITS              52
 #define VADDR_BITS              48
 #define PADDR_MASK              ((1UL << PADDR_BITS)-1)
 #define VADDR_MASK              ((1UL << VADDR_BITS)-1)
@@ -34,28 +34,32 @@ typedef l4_pgentry_t root_pgentry_t;
 #endif /* !__ASSEMBLY__ */
 
 /* Strip type from a table entry. */
-#define l1_pgentry_val(_x) ((_x).l1_lo)
-#define l2_pgentry_val(_x) ((_x).l2_lo)
-#define l3_pgentry_val(_x) ((_x).l3_lo)
-#define l4_pgentry_val(_x) ((_x).l4_lo)
+#define l1_pgentry_val(_x)   ((_x).l1_lo)
+#define l2_pgentry_val(_x)   ((_x).l2_lo)
+#define l3_pgentry_val(_x)   ((_x).l3_lo)
+#define l4_pgentry_val(_x)   ((_x).l4_lo)
+#define root_pgentry_val(_x) (l4_pgentry_val(_x))
 
 /* Add type to a table entry. */
-#define mk_l1_pgentry(_x)  ( (l1_pgentry_t) { (_x) } )
-#define mk_l2_pgentry(_x)  ( (l2_pgentry_t) { (_x) } )
-#define mk_l3_pgentry(_x)  ( (l3_pgentry_t) { (_x) } )
-#define mk_l4_pgentry(_x)  ( (l4_pgentry_t) { (_x) } )
+#define mk_l1_pgentry(_x)   ( (l1_pgentry_t) { (_x) } )
+#define mk_l2_pgentry(_x)   ( (l2_pgentry_t) { (_x) } )
+#define mk_l3_pgentry(_x)   ( (l3_pgentry_t) { (_x) } )
+#define mk_l4_pgentry(_x)   ( (l4_pgentry_t) { (_x) } )
+#define mk_root_pgentry(_x) (mk_l4_pgentry(_x))
 
 /* Turn a typed table entry into a physical address. */
-#define l1_pgentry_to_phys(_x) (l1_pgentry_val(_x) & (PADDR_MASK & PAGE_MASK))
-#define l2_pgentry_to_phys(_x) (l2_pgentry_val(_x) & (PADDR_MASK & PAGE_MASK))
-#define l3_pgentry_to_phys(_x) (l3_pgentry_val(_x) & (PADDR_MASK & PAGE_MASK))
-#define l4_pgentry_to_phys(_x) (l4_pgentry_val(_x) & (PADDR_MASK & PAGE_MASK))
+#define l1_pgentry_to_phys(_x)   (l1_pgentry_val(_x) & (PADDR_MASK&PAGE_MASK))
+#define l2_pgentry_to_phys(_x)   (l2_pgentry_val(_x) & (PADDR_MASK&PAGE_MASK))
+#define l3_pgentry_to_phys(_x)   (l3_pgentry_val(_x) & (PADDR_MASK&PAGE_MASK))
+#define l4_pgentry_to_phys(_x)   (l4_pgentry_val(_x) & (PADDR_MASK&PAGE_MASK))
+#define root_pgentry_to_phys(_x) (l4_pgentry_to_phys(_x))
 
 /* Turn a typed table entry into a page index. */
-#define l1_pgentry_to_pfn(_x) (l1_pgentry_val(_x) >> PAGE_SHIFT) 
-#define l2_pgentry_to_pfn(_x) (l2_pgentry_val(_x) >> PAGE_SHIFT)
-#define l3_pgentry_to_pfn(_x) (l3_pgentry_val(_x) >> PAGE_SHIFT)
-#define l4_pgentry_to_pfn(_x) (l4_pgentry_val(_x) >> PAGE_SHIFT)
+#define l1_pgentry_to_pfn(_x)   (l1_pgentry_val(_x) >> PAGE_SHIFT) 
+#define l2_pgentry_to_pfn(_x)   (l2_pgentry_val(_x) >> PAGE_SHIFT)
+#define l3_pgentry_to_pfn(_x)   (l3_pgentry_val(_x) >> PAGE_SHIFT)
+#define l4_pgentry_to_pfn(_x)   (l4_pgentry_val(_x) >> PAGE_SHIFT)
+#define root_pgentry_to_pfn(_x) (l4_pgentry_to_pfn(_x))
 
 /* Pagetable walking. */
 #define l2_pgentry_to_l1(_x) \
@@ -77,5 +81,14 @@ typedef l4_pgentry_t root_pgentry_t;
 
 /* Given a virtual address, get an entry offset into a linear page table. */
 #define l1_linear_offset(_a) (((_a) & VADDR_MASK) >> PAGE_SHIFT)
+
+#define PGT_root_page_table PGT_l4_page_table
+
+#define _PAGE_NX         (cpu_has_nx ? (1UL<<63) : 0UL)
+
+#define L1_DISALLOW_MASK ((cpu_has_nx?0:(1UL<<63)) | (3UL << 7))
+#define L2_DISALLOW_MASK ((cpu_has_nx?0:(1UL<<63)) | (7UL << 7))
+#define L3_DISALLOW_MASK ((cpu_has_nx?0:(1UL<<63)) | (7UL << 7))
+#define L4_DISALLOW_MASK ((cpu_has_nx?0:(1UL<<63)) | (7UL << 7))
 
 #endif /* __X86_64_PAGE_H__ */

@@ -27,20 +27,24 @@ typedef l2_pgentry_t root_pgentry_t;
 #endif /* !__ASSEMBLY__ */
 
 /* Strip type from a table entry. */
-#define l1_pgentry_val(_x) ((_x).l1_lo)
-#define l2_pgentry_val(_x) ((_x).l2_lo)
+#define l1_pgentry_val(_x)   ((_x).l1_lo)
+#define l2_pgentry_val(_x)   ((_x).l2_lo)
+#define root_pgentry_val(_x) (l2_pgentry_val(_x))
 
 /* Add type to a table entry. */
-#define mk_l1_pgentry(_x)  ( (l1_pgentry_t) { (_x) } )
-#define mk_l2_pgentry(_x)  ( (l2_pgentry_t) { (_x) } )
+#define mk_l1_pgentry(_x)   ( (l1_pgentry_t) { (_x) } )
+#define mk_l2_pgentry(_x)   ( (l2_pgentry_t) { (_x) } )
+#define mk_root_pgentry(_x) (mk_l2_pgentry(_x))
 
 /* Turn a typed table entry into a physical address. */
-#define l1_pgentry_to_phys(_x) (l1_pgentry_val(_x) & PAGE_MASK)
-#define l2_pgentry_to_phys(_x) (l2_pgentry_val(_x) & PAGE_MASK)
+#define l1_pgentry_to_phys(_x)   (l1_pgentry_val(_x) & PAGE_MASK)
+#define l2_pgentry_to_phys(_x)   (l2_pgentry_val(_x) & PAGE_MASK)
+#define root_pgentry_to_phys(_x) (l2_pgentry_to_phys(_x))
 
 /* Turn a typed table entry into a page index. */
-#define l1_pgentry_to_pfn(_x) (l1_pgentry_val(_x) >> PAGE_SHIFT) 
-#define l2_pgentry_to_pfn(_x) (l2_pgentry_val(_x) >> PAGE_SHIFT)
+#define l1_pgentry_to_pfn(_x)   (l1_pgentry_val(_x) >> PAGE_SHIFT) 
+#define l2_pgentry_to_pfn(_x)   (l2_pgentry_val(_x) >> PAGE_SHIFT)
+#define root_pgentry_to_pfn(_x) (l2_pgentry_to_pfn(_x))
 
 /* Pagetable walking. */
 #define l2_pgentry_to_l1(_x) \
@@ -54,5 +58,14 @@ typedef l2_pgentry_t root_pgentry_t;
 
 /* Given a virtual address, get an entry offset into a linear page table. */
 #define l1_linear_offset(_a) ((_a) >> PAGE_SHIFT)
+
+#define PGT_root_page_table PGT_l2_page_table
+
+#define _PAGE_NX         0UL
+
+#define L1_DISALLOW_MASK (3UL << 7)
+#define L2_DISALLOW_MASK (7UL << 7)
+#define L3_DISALLOW_MASK (7UL << 7)
+#define L2_DISALLOW_MASK (7UL << 7)
 
 #endif /* __X86_32_PAGE_H__ */
