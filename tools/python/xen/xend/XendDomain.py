@@ -413,10 +413,7 @@ class XendDomain:
 
     def domain_exists(self, name):
         name = str(name)
-        if self.domain_by_name.get(name) or self.domain_by_id.get(name):
-            return 1
-        else:
-            return 0
+        return self.domain_by_name.get(name) or self.domain_by_id.get(name):
 
     def domain_unpause(self, id):
         """Unpause domain execution.
