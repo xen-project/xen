@@ -97,11 +97,11 @@ long do_dom0_op(dom0_op_t *u_dom0_op)
 
     case DOM0_BUILDDOMAIN:
     {
-        struct task_struct * p = find_domain_by_id(op.u.meminfo.domain);
+        struct task_struct * p = find_domain_by_id(op.u.builddomain.domain);
         ret = -EINVAL;
         if ( p != NULL )
         {
-            if ( (ret = final_setup_guestos(p, &op.u.meminfo)) == 0 )
+            if ( (ret = final_setup_guestos(p, &op.u.builddomain)) == 0 )
                 ret = p->domain;
             put_task_struct(p);
         }
@@ -110,7 +110,7 @@ long do_dom0_op(dom0_op_t *u_dom0_op)
 
     case DOM0_STARTDOMAIN:
     {
-        struct task_struct * p = find_domain_by_id(op.u.meminfo.domain);
+        struct task_struct * p = find_domain_by_id(op.u.startdomain.domain);
         ret = -EINVAL;
         if ( p != NULL )
         {
@@ -127,7 +127,7 @@ long do_dom0_op(dom0_op_t *u_dom0_op)
 
     case DOM0_STOPDOMAIN:
     {
-        ret = stop_other_domain(op.u.meminfo.domain);
+        ret = stop_other_domain(op.u.stopdomain.domain);
     }
     break;
 
@@ -268,12 +268,38 @@ long do_dom0_op(dom0_op_t *u_dom0_op)
             op.u.getdominfo.mcu_advance = p->mcu_advance;
             op.u.getdominfo.tot_pages   = p->tot_pages;
             op.u.getdominfo.cpu_time    = p->cpu_time;
+            memcpy(&op.u.getdominfo.ctxt, 
+                   &p->shared_info->execution_context,
+                   sizeof(execution_context_t));
         }
 
         read_unlock_irqrestore(&tasklist_lock, flags);
         copy_to_user(u_dom0_op, &op, sizeof(op));
-        break;
     }
+    break;
+
+    case DOM0_GETPAGEFRAMEINFO:
+    {
+        struct pfn_info *page = frame_table + op.u.getpageframeinfo.pfn;
+        
+        op.u.getpageframeinfo.domain = page->flags & PG_domain_mask;
+        op.u.getpageframeinfo.type   = NONE;
+        if ( page->type_count & REFCNT_PIN_BIT )
+        {
+            switch ( page->flags & PG_type_mask )
+            {
+            case PGT_l1_page_table:
+                op.u.getpageframeinfo.type = L1TAB;
+                break;
+            case PGT_l2_page_table:
+                op.u.getpageframeinfo.type = L2TAB;
+                break;
+            }
+        }
+
+        copy_to_user(u_dom0_op, &op, sizeof(op));
+    }
+    break;
 
     case DOM0_IOPL:
     {

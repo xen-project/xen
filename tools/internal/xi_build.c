@@ -146,7 +146,8 @@ static int copy_to_domain_page(unsigned long dst_pfn, void *src_page)
 
 static int setup_guestos(
     int dom, int kernel_fd, int initrd_fd, unsigned long tot_pages,
-    unsigned long virt_load_addr, size_t ksize, dom_meminfo_t *meminfo)
+    unsigned long virt_load_addr, size_t ksize, 
+    dom0_builddomain_t *builddomain)
 {
     l1_pgentry_t *vl1tab = NULL, *vl1e = NULL;
     l2_pgentry_t *vl2tab = NULL, *vl2e = NULL;
@@ -158,7 +159,7 @@ static int setup_guestos(
     unsigned long num_pgt_updates = 0;
     unsigned long count, pt_start, i, j;
 
-    memset(meminfo, 0, sizeof(*meminfo));
+    memset(builddomain, 0, sizeof(*builddomain));
 
     if ( init_pfn_mapper() < 0 )
         goto error_out;
@@ -211,8 +212,8 @@ static int setup_guestos(
         }
 
         /* 'i' is 'ksize' rounded up to a page boundary. */
-        meminfo->virt_mod_addr = virt_load_addr + i;
-        meminfo->virt_mod_len  = isize;
+        builddomain->virt_mod_addr = virt_load_addr + i;
+        builddomain->virt_mod_len  = isize;
 
         for ( j = 0; j < isize; j += PAGE_SIZE, i += PAGE_SIZE )
         {
@@ -245,7 +246,7 @@ static int setup_guestos(
      */
     l2tab = page_array[alloc_index] << PAGE_SHIFT;
     alloc_index--;
-    meminfo->l2_pgt_addr = l2tab;
+    builddomain->l2_pgt_addr = l2tab;
 
     /*
      * Pin down l2tab addr as page dir page - causes hypervisor to provide
@@ -307,7 +308,7 @@ static int setup_guestos(
         num_pgt_updates++;
     }
 
-    meminfo->virt_startinfo_addr =
+    builddomain->virt_startinfo_addr =
         virt_load_addr + ((alloc_index-1)<<PAGE_SHIFT);
 
     /* Send the page update requests down to the hypervisor. */
@@ -397,17 +398,17 @@ int main(int argc, char **argv)
     }
 
     if ( setup_guestos(domain_id, kernel_fd, initrd_fd, tot_pages,
-                       load_addr, ksize, &launch_op.u.meminfo) < 0 )
+                       load_addr, ksize, &launch_op.u.builddomain) < 0 )
         return 1;
 
     if ( initrd_fd >= 0 )
 	close(initrd_fd);
     close(kernel_fd);
 
-    launch_op.u.meminfo.domain         = domain_id;
-    launch_op.u.meminfo.virt_load_addr = load_addr;
-    launch_op.u.meminfo.num_vifs       = atoi(argv[3]);
-    launch_op.u.meminfo.cmd_line[0]    = '\0';
+    launch_op.u.builddomain.domain         = domain_id;
+    launch_op.u.builddomain.virt_load_addr = load_addr;
+    launch_op.u.builddomain.num_vifs       = atoi(argv[3]);
+    launch_op.u.builddomain.cmd_line[0]    = '\0';
     cmd_len = 0;
     for ( count = args_start; count < argc; count++ )
     {
@@ -416,8 +417,8 @@ int main(int argc, char **argv)
             ERROR("Size of image boot params too big!\n");
             break;
         }
-        strcat(launch_op.u.meminfo.cmd_line, argv[count]);
-        strcat(launch_op.u.meminfo.cmd_line, " ");
+        strcat(launch_op.u.builddomain.cmd_line, argv[count]);
+        strcat(launch_op.u.builddomain.cmd_line, " ");
         cmd_len += strlen(argv[count] + 1);
     }
 

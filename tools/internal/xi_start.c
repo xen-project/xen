@@ -10,7 +10,7 @@ static int start_domain(int id)
     dom0_op_t op;
 
     op.cmd = DOM0_STARTDOMAIN;
-    op.u.meminfo.domain = id;
+    op.u.startdomain.domain = id;
 
     err = do_dom0_op(&op);
 

@@ -328,7 +328,6 @@ asmlinkage void __enter_scheduler(void)
 
     /* do some accounting */
     ranfor = (s32)(now - prev->lastschd);
-    ASSERT((ranfor>0));
     prev->cpu_time += ranfor;
     
     /* calculate mcu and update avt */

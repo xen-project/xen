@@ -343,9 +343,8 @@ void release_task(struct task_struct *p)
  *      <one page>
  */
 
-int final_setup_guestos(struct task_struct * p, dom_meminfo_t * meminfo)
+int final_setup_guestos(struct task_struct *p, dom0_builddomain_t *builddomain)
 {
-    l2_pgentry_t * l2tab;
     start_info_t * virt_startinfo_addr;
     unsigned long virt_stack_addr;
     unsigned long phys_l2tab;
@@ -356,28 +355,18 @@ int final_setup_guestos(struct task_struct * p, dom_meminfo_t * meminfo)
     if ( (p->flags & PF_CONSTRUCTED) )
         return -EINVAL;
 
-    /* High entries in page table must contain hypervisor
-     * mem mappings - set them up.
-     */
-    phys_l2tab = meminfo->l2_pgt_addr;
-    l2tab = map_domain_mem(phys_l2tab); 
-    memcpy(&l2tab[DOMAIN_ENTRIES_PER_L2_PAGETABLE], 
-        &idle_pg_table[DOMAIN_ENTRIES_PER_L2_PAGETABLE],
-        (ENTRIES_PER_L2_PAGETABLE - DOMAIN_ENTRIES_PER_L2_PAGETABLE) 
-        * sizeof(l2_pgentry_t));
-    l2tab[PERDOMAIN_VIRT_START >> L2_PAGETABLE_SHIFT] = 
-        mk_l2_pgentry(__pa(p->mm.perdomain_pt) | __PAGE_HYPERVISOR);
-    l2tab[LINEAR_PT_VIRT_START >> L2_PAGETABLE_SHIFT] =
-        mk_l2_pgentry(phys_l2tab | __PAGE_HYPERVISOR);
+    /* NB. Page base must already be pinned! */
+    phys_l2tab = builddomain->l2_pgt_addr;
     p->mm.pagetable = mk_pagetable(phys_l2tab);
-    unmap_domain_mem(l2tab);
+    get_page_type(&frame_table[phys_l2tab>>PAGE_SHIFT]);
+    get_page_tot(&frame_table[phys_l2tab>>PAGE_SHIFT]);
 
     /* set up the shared info structure */
     update_dom_time(p->shared_info);
     p->shared_info->domain_time = 0;
 
     /* we pass start info struct to guest os as function parameter on stack */
-    virt_startinfo_addr = (start_info_t *)meminfo->virt_startinfo_addr;
+    virt_startinfo_addr = (start_info_t *)builddomain->virt_startinfo_addr;
     virt_stack_addr = (unsigned long)virt_startinfo_addr;       
 
     /* we need to populate start_info struct within the context of the
@@ -390,19 +379,19 @@ int final_setup_guestos(struct task_struct * p, dom_meminfo_t * meminfo)
     memset(virt_startinfo_addr, 0, sizeof(*virt_startinfo_addr));
     virt_startinfo_addr->nr_pages = p->tot_pages;
     virt_startinfo_addr->shared_info = virt_to_phys(p->shared_info);
-    virt_startinfo_addr->pt_base = meminfo->virt_load_addr + 
+    virt_startinfo_addr->pt_base = builddomain->virt_load_addr + 
                     ((p->tot_pages - 1) << PAGE_SHIFT);
    
     /* module size and length */
 
-    virt_startinfo_addr->mod_start = meminfo->virt_mod_addr;
-    virt_startinfo_addr->mod_len   = meminfo->virt_mod_len;
+    virt_startinfo_addr->mod_start = builddomain->virt_mod_addr;
+    virt_startinfo_addr->mod_len   = builddomain->virt_mod_len;
 
     virt_startinfo_addr->dom_id = p->domain;
     virt_startinfo_addr->flags  = IS_PRIV(p) ? SIF_PRIVILEGED : 0;
 
     /* Add virtual network interfaces and point to them in startinfo. */
-    while (meminfo->num_vifs-- > 0) {
+    while (builddomain->num_vifs-- > 0) {
         net_vif = create_net_vif(p->domain);
         shared_rings = net_vif->shared_rings;
         if (!shared_rings) panic("no network ring!\n");
@@ -421,7 +410,7 @@ int final_setup_guestos(struct task_struct * p, dom_meminfo_t * meminfo)
     virt_startinfo_addr->blk_ring = virt_to_phys(p->blk_ring_base);
 
     /* Copy the command line */
-    strcpy(virt_startinfo_addr->cmd_line, meminfo->cmd_line);
+    strcpy(virt_startinfo_addr->cmd_line, builddomain->cmd_line);
 
     /* Reinstate the caller's page tables. */
     __asm__ __volatile__ (
@@ -431,7 +420,7 @@ int final_setup_guestos(struct task_struct * p, dom_meminfo_t * meminfo)
     p->flags |= PF_CONSTRUCTED;
     
     new_thread(p, 
-               (unsigned long)meminfo->virt_load_addr, 
+               (unsigned long)builddomain->virt_load_addr, 
                (unsigned long)virt_stack_addr, 
                (unsigned long)virt_startinfo_addr);
 
@@ -571,17 +560,6 @@ int setup_guestos(struct task_struct *p, dom0_newdomain_t *params,
     unmap_domain_mem(l1start);
 
     /* pages that are part of page tables must be read only */
-    cur_address = list_entry(p->pg_head.next, struct pfn_info, list) -
-        frame_table;
-    cur_address <<= PAGE_SHIFT;
-    for ( count = 0; count < alloc_index; count++ ) 
-    {
-        list_ent = frame_table[cur_address >> PAGE_SHIFT].list.next;
-        cur_address = list_entry(list_ent, struct pfn_info, list) -
-            frame_table;
-        cur_address <<= PAGE_SHIFT;
-    }
-
     l2tab = l2start + l2_table_offset(virt_load_address + 
         (alloc_index << PAGE_SHIFT));
     l1start = l1tab = map_domain_mem(l2_pgentry_to_phys(*l2tab));
@@ -589,21 +567,17 @@ int setup_guestos(struct task_struct *p, dom0_newdomain_t *params,
     l2tab++;
     for ( count = alloc_index; count < p->tot_pages; count++ ) 
     {
-        *l1tab++ = mk_l1_pgentry(l1_pgentry_val(*l1tab) & ~_PAGE_RW);
+        *l1tab = mk_l1_pgentry(l1_pgentry_val(*l1tab) & ~_PAGE_RW);
+        page = frame_table + l1_pgentry_to_pagenr(*l1tab);
+        page->flags = dom | PGT_l1_page_table;
+        page->tot_count++;
+        l1tab++;
         if( !((unsigned long)l1tab & (PAGE_SIZE - 1)) )
         {
             unmap_domain_mem(l1start);
             l1start = l1tab = map_domain_mem(l2_pgentry_to_phys(*l2tab));
             l2tab++;
         }
-        page = frame_table + (cur_address >> PAGE_SHIFT);
-        page->flags = dom | PGT_l1_page_table;
-        page->tot_count++;
-        
-        list_ent = frame_table[cur_address >> PAGE_SHIFT].list.next;
-        cur_address = list_entry(list_ent, struct pfn_info, list) -
-            frame_table;
-        cur_address <<= PAGE_SHIFT;
     }
     page->type_count |= REFCNT_PIN_BIT;
     page->tot_count  |= REFCNT_PIN_BIT;

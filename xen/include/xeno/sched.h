@@ -223,7 +223,7 @@ extern int setup_guestos(
     struct task_struct *p, dom0_newdomain_t *params, unsigned int num_vifs,
     char *data_start, unsigned long data_len, 
     char *cmdline, unsigned long initrd_len);
-extern int final_setup_guestos(struct task_struct *p, dom_meminfo_t *);
+extern int final_setup_guestos(struct task_struct *p, dom0_builddomain_t *);
 
 struct task_struct *find_domain_by_id(unsigned int dom);
 extern void release_task(struct task_struct *);

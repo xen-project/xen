@@ -363,7 +363,7 @@ static int dec_page_refcnt(unsigned long page_nr, unsigned int type)
                 type);
         return -1;
     }
-    ASSERT(page_type_count(page) != 0);
+    ASSERT((page_type_count(page) & ~REFCNT_PIN_BIT) != 0);
     put_page_tot(page);
     return put_page_type(page);
 }
@@ -568,7 +568,7 @@ static void put_page(unsigned long page_nr, int writeable)
     page = frame_table + page_nr;
     ASSERT(DOMAIN_OKAY(page->flags));
     ASSERT((!writeable) || 
-           ((page_type_count(page) != 0) && 
+           (((page_type_count(page) & ~REFCNT_PIN_BIT) != 0) && 
             ((page->flags & PG_type_mask) == PGT_writeable_page) &&
             ((page->flags & PG_need_flush) == PG_need_flush)));
     if ( writeable )
