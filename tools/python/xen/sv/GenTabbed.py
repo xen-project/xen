@@ -2,35 +2,31 @@ import types
 
 from xen.sv.HTMLBase import HTMLBase
 from xen.sv.TabView import TabView
+from xen.sv.util import getVar
 
 class GenTabbed( HTMLBase ):
 
     def __init__( self, title, urlWriter, tabStrings, tabObjects ):
         HTMLBase.__init__(self)
-        self.tab = 0;
         self.tabStrings = tabStrings
         self.tabObjects = tabObjects
         self.urlWriter = urlWriter
         self.title = title
 
     def write_BODY( self, request, urlWriter = None ):
-        tab = request.args.get('tab')
-        
-        if tab is None or len( tab) != 1:
-            self.tab = 0
-        else:
-            self.tab = int( tab[0] )
+    
+        tab = int( getVar( 'tab', request, 0 ) )
             
         request.write( "<table style='' width='100%' border='0' cellspacing='0' cellpadding='0'>" )
         request.write( "<tr><td>" )
         
         request.write( "<p align='center'><u>%s</u></p>" % self.title )
         
-        TabView( self.tab, self.tabStrings, self.urlWriter ).write_BODY( request )
+        TabView( tab, self.tabStrings, self.urlWriter ).write_BODY( request )
         
         request.write( "</td></tr><tr><td>" )
         
-        render_tab = self.tabObjects[ self.tab ]
+        render_tab = self.tabObjects[ tab ]
                 
         if render_tab is None:
             request.write( "<p>Bad Tab</p>" )
@@ -41,14 +37,9 @@ class GenTabbed( HTMLBase ):
         request.write( "</td></tr></table>" )
        
     def perform( self, request ):
-        tab = request.args.get('tab')
-        
-        if tab is None or len( tab) != 1:
-            self.tab = 0
-        else:
-            self.tab = int( tab[0] )
+        tab = int( getVar( 'tab', request, 0 ) )
             
-        op_tab = self.tabObjects[ self.tab ]
+        op_tab = self.tabObjects[ tab ]
         
         if op_tab:
             op_tab().perform( request )

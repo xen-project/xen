@@ -2,35 +2,40 @@ from xen.sv.HTMLBase import HTMLBase
 from xen.sv.DomList  import DomList
 from xen.sv.NodeInfo import NodeInfo
 from xen.sv.DomInfo  import DomInfo
+from xen.sv.CreateDomain import CreateDomain
+
+from xen.sv.util import getVar
 
 class Main( HTMLBase ):
     
     isLeaf = True
 
     def __init__( self, urlWriter = None ):
-        self.modules = { "node": ( "Node details", NodeInfo ), 
-                         "list": ( "Domain summary", DomList ), 
-                         "info": ( "Domain info", DomInfo ) }
+        self.modules = { "node": NodeInfo, 
+                         "list": DomList, 
+                         "info": DomInfo,
+                         "create": CreateDomain }
         HTMLBase.__init__(self)
         
     def render_POST( self, request ):
     
     	#decide what module post'd the action
 
-        mod = request.args.get('mod')
+        mod = getVar( 'mod', request )
                 
-        if not mod is None and len(mod) == 1:
-            modTup = self.modules[ mod[0] ]
+        if not mod is None:
+            module = self.modules[ mod ]
             #check module exists
-            if modTup:
-               (modName, module) = modTup
+            if module:
                module( self.mainUrlWriter ).perform( request )     
     
         return self.render_GET( request )
 
-    def mainUrlWriter( self, s ):
-        return "Main.rpy?%s" % s
-
+    def mainUrlWriter( self, module ):
+    	def fun( f ):
+            return "Main.rpy?mod=%s%s" % ( module, f )
+        return fun    
+        
     def write_BODY( self, request ):
     
         request.write( "\n<table style='border:0px solid black; background: url(images/orb_01.jpg) no-repeat' cellspacing='0' cellpadding='0' border='0' width='780px' height='536px'>\n" )
@@ -43,8 +48,8 @@ class Main( HTMLBase ):
         request.write( "   <tr><td height='60px' align='center'><p class='small'>SV Web Interface<br/>(C) <a href='mailto:tw275@cam.ac.uk'>Tom Wilkie</a> 2004</p></td></tr>")
         request.write( "   <tr><td align='center' valign='top'>" )
         
-        for (modName, (modTitle, module)) in self.modules.items():
-            module( self.mainUrlWriter ).write_MENU( request )
+        for (modName, module) in self.modules.items():
+            module( self.mainUrlWriter( modName ) ).write_MENU( request )
 
         request.write( "   </td></tr>" )
         request.write( "  </table>" )
@@ -56,15 +61,14 @@ class Main( HTMLBase ):
         request.write( "   <tr><td height='20px'></td></tr>" )
         request.write( "   <tr><td align='center' valign='top'>" )
         
-        mod = request.args.get('mod')
+        modName = getVar('mod', request)
         
-        if mod is None or len(mod) != 1:
+        if modName is None:
             request.write( '<p>Please select a module</p>' )
         else:
-            modTup = self.modules[ mod[0] ]
-            if modTup:
-               (modName, module) = modTup
-               module( self.mainUrlWriter ).write_BODY( request )  
+            module = self.modules[ modName ]
+            if module:
+               module( self.mainUrlWriter( modName ) ).write_BODY( request )  
             else:
                request.write( '<p>Invalid module. Please select another</p>' )
     

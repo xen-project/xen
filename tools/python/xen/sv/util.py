@@ -18,9 +18,9 @@ def sxp2hash( s ):
         else:
             sxphash[ child[0] ] = child[1]
         
-    return sxphash
+    return sxphash   
     
-def sxp2string( sxp ):
+def sxp2prettystring( sxp ):
     class tmp:
         def __init__( self ):
                 self.str = ""
@@ -30,14 +30,14 @@ def sxp2string( sxp ):
     PrettyPrint.prettyprint( sxp, out=temp )
     return temp.str
 
-def getVar( var, request ):
+def getVar( var, request, default=None ):
    
     arg = request.args.get( var )
 
-    if arg is None or len(arg) != 1:
-        return None
+    if arg is None:
+        return default
     else:
-        return arg[0]
+        return arg[ len( arg )-1 ]
 
 def bigTimeFormatter( time ):
     time = float( time )
