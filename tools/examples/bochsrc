@@ -16,4 +16,3 @@ error: action=report
 panic: action=ask
 
 mouse: enabled=0
-ips: 1500000

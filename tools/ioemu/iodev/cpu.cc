@@ -167,9 +167,6 @@ bx_cpu_c::timer_handler(void)
 #define rdtscl(low) \
      __asm__ __volatile__("rdtsc" : "=a" (low) : : "edx")
 
-#define rdtscll(val) \
-     __asm__ __volatile__("rdtsc" : "=A" (val))
-
 void
 bx_cpu_c::cpu_loop(int max_instr_count)
 {
@@ -211,9 +208,9 @@ bx_cpu_c::cpu_loop(int max_instr_count)
 #endif
 
 		if (t2 <= t1)
-			BX_TICKN((t2 + ULONGLONG_MAX - t1));
+			BX_TICKN((t2 + ULONGLONG_MAX - t1) / tsc_per_bx_tick);
 		else
-			BX_TICKN((t2 - t1));
+			BX_TICKN((t2 - t1) / tsc_per_bx_tick);
 		t1 = t2;
 
 		timer_handler();
