@@ -1,7 +1,7 @@
 #!/usr/bin/python
 #  -*- mode: python; -*-
 #============================================================================
-# Xen vif control script.
+# Xen vif control script. Lives in /etc/xen/xend.
 #
 # vifctl init [bridge=<bridge>] [interface=<interface>]
 #

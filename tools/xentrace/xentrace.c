@@ -21,7 +21,7 @@
 #include <argp.h>
 #include <signal.h>
 
-#include "../xc/lib/xc_private.h"
+#include "xc_private.h"
 
 /* from xen/include/hypervisor-ifs */
 #include <trace.h>

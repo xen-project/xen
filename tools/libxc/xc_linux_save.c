@@ -310,7 +310,7 @@ int xc_linux_save(int xc_handle, XcIOContext *ioctxt)
 
     if ( xc_domain_getfullinfo( xc_handle, domid, &op, &ctxt) )
     {
-        PERROR("Could not get full domain info");
+        xcio_error(ioctxt, "Could not get full domain info");
         goto out;
     }
     memcpy(name, op.u.getdomaininfo.name, sizeof(name));
@@ -336,7 +336,7 @@ int xc_linux_save(int xc_handle, XcIOContext *ioctxt)
 
     /* cheesy sanity check */
     if ( nr_pfns > 1024*1024 ){
-        xcio_error(ioctxt, "Invalid state record -- pfn count out of range");
+        xcio_error(ioctxt, "Invalid state record -- pfn count out of range: %lu", nr_pfns);
         goto out;
     }
 

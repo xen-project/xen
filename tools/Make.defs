@@ -1,0 +1,7 @@
+#  -*- mode: Makefile; -*-
+XEN_HYPERVISOR_IFS = $(XEN_ROOT)/xen/include/hypervisor-ifs
+XEN_LINUX_INCLUDE  = $(XEN_ROOT)/linux-xen-sparse/include
+XEN_XU             = $(XEN_ROOT)/tools/python/xen/ext/xu
+XEN_XC             = $(XEN_ROOT)/tools/python/xen/ext/xc
+XEN_LIBXC          = $(XEN_ROOT)/tools/libxc
+XEN_LIBXUTIL       = $(XEN_ROOT)/tools/libxutil

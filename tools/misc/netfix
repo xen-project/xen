@@ -1,5 +1,6 @@
-#!/usr/bin/python
+#!/usr/bin/env python
 #  -*- mode: python; -*-
+#============================================================================
 # Copyright (C) 2004 Mike Wray <mike.wray@hp.com>
 #============================================================================
 # Move the IP address from eth0 onto the Xen bridge (nbe-br).
@@ -7,7 +8,7 @@
 #============================================================================
 
 from getopt import getopt
-from xen.xend.XendBridge import *
+from xen.util.Brctl import *
 
 short_options = 'hvqni:b:c'
 long_options  = ['help', 'verbose', 'quiet',
