@@ -87,7 +87,7 @@ image=''; ramdisk=''; builder_fn=''; restore=0; state_file=''
 mem_size=0; domain_name=''; vfr_ipaddr=[];
 vbd_expert=0; auto_restart=False;
 vbd_list = []; cmdline_ip = ''; cmdline_root=''; cmdline_extra=''
-pci_device_list = []
+pci_device_list = []; console_port = -1
 auto_console = False
 
 ##### Determine location of defautls file
@@ -234,7 +234,8 @@ def make_domain():
             print "Error creating domain"
             sys.exit()
             
-        cmsg = 'new_control_interface(dom='+str(id)+')'
+        cmsg = 'new_control_interface(dom='+str(id)+', console_port='+str(console_port)+')'
+
         xend_response = xenctl.utils.xend_control_message(cmsg)
         if not xend_response['success']:
             print "Error creating initial event channel"

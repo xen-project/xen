@@ -87,3 +87,7 @@ cmdline_extra = "4 VMID=%d usr=/dev/sda6" % vmid
 
 auto_restart = False
 #auto_restart = True
+
+# STEP 8. (Optional) Define a console port number for the new domain.
+
+# console_port = 9610+vmid
