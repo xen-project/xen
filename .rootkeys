@@ -191,6 +191,8 @@
 3ddb79beXZxwKh7cGyPfr40bhDyRrA xen/drivers/scsi/constants.h
 3e564120ZeinH9nf3IVSerB80T7dHg xen/drivers/scsi/hosts.c
 3ddb79beGiGljlTNq_kRnCBZECgC9Q xen/drivers/scsi/hosts.h
+3e8827bdE8FgsI-QxZ4zKzYTRmACOQ xen/drivers/scsi/megaraid.c
+3e8827bdEMIzjyF9OHnDRmJGp_O68g xen/drivers/scsi/megaraid.h
 3ddb79bexarQo1tQ541PPUyK9HXNDA xen/drivers/scsi/scsi.c
 3ddb79beBOiYxQUiWTHosepRlJyuGA xen/drivers/scsi/scsi.h
 3ddb79beVTYJj6_KMxYLJmCP7p9MuQ xen/drivers/scsi/scsi_dma.c
@@ -331,6 +333,7 @@
 3ddb79c2_m8lT9jDKse_tePj7zcnNQ xen/include/xeno/timex.h
 3ddb79c2e2C14HkndNEJlYwXaPrF5A xen/include/xeno/tqueue.h
 3ddb79c1-kVvF8cVa0k3ZHDdBMj01Q xen/include/xeno/types.h
+3e8827bdaqPeZAWGVOwswgY9bWSx4g xen/include/xeno/version.h
 3ddb79c2Ae5KpzhC9LCYG7mP_Vi4Aw xen/include/xeno/vif.h
 3ddb79c4YQCQ6r0xNLLu0jfbM7pVmA xen/net/Makefile
 3ddb79c4AkfDkTCw0comx4L8wsUOMg xen/net/dev.c
