@@ -162,7 +162,8 @@ This manual describes how to install the Xen 2.0 distribution from
 source.  Alternatively, there may be packages available for your
 operating system distribution.
 
-Prerequisites:
+\section{Prerequisites}
+\label{sec:prerequisites}
 \begin{itemize}
 \item A working installation of your favourite Linux distribution.
 \item A working installation of the GRUB bootloader.
@@ -173,33 +174,53 @@ make install-twisted} in the root of the Xen source tree.
 \item The Linux bridge control tools (see {\tt
 http://bridge.sourceforge.net }).  There may be a packages of these
 tools available for your distribution.
+\item Linux IP Routing Tools
+\item make
+\item python-dev
+\item gcc
+\item zlib-dev
+\item libcurl
+\item python2.3-pycurl
+\item python2.3-twisted
 \end{itemize}
 
-Optional:
+\section{Optional}
 \begin{itemize}
 \item The Python logging package (see {\tt http://www.red-dove.com/})
 for additional Xend logging functionality.
 \end{itemize}
 
-\section{Download the Xen source code}
-
-The public master BK repository for the 2.0 release lives at:
-{\tt bk://xen.bkbits.net/xeno-unstable.bk}.
+\section{Install Bitkeeper (Optional)}
 
 To fetch a local copy, first download the BitKeeper tools at: {\tt
 http://www.bitmover.com/download } with username 'bitkeeper' and
 password 'get bitkeeper'.
 
-Then install the tools and then run:
+The BitKeeper install program is designed to be run with X.  If X is
+not available, you can specify the install directory on the command
+line.
+
+\section{Download the Xen source code}
+
+\subsection{Using Bitkeeper}
+
+The public master BK repository for the 2.0 release lives at:
+{\tt bk://xen.bkbits.net/xeno-unstable.bk}.
+
+Change to the directory in which you want to put the source code, then
+run:
 \begin{verbatim}
 # bk clone bk://xen.bkbits.net/xeno-unstable.bk
 \end{verbatim}
 
 Under your current directory, a new directory named 'xeno-unstable.bk'
-has been created, which contains all the necessary source code for the
-Xen hypervisor and Linux guest OSes.
+has been created, which contains all the source code for the Xen
+hypervisor and the Xen tools.  The directory also contains `sparse'
+Linux source trees, containing only the files that differ between
+XenLinux and standard Linux.
 
-To update to the newest changes to the repository, run
+Once you have cloned the repository, you can update to the newest
+changes to the repository by running:
 \begin{verbatim}
 # cd xeno-unstable.bk # to change into the local repository
 # bk pull             # to update the repository
@@ -227,7 +248,7 @@ following:
 \begin{itemize}
 \item Build Xen
 \item Build the control tools, including Xend
-\item Download the ebtables patch
+\item Download the ebtables patch for Linux 2.4
 \item Download (if necessary) and unpack the Linux 2.4 source code,
       and patch it for use with Xen
 \item Build a Linux kernel to use in domain 0 and a smaller
@@ -258,16 +279,17 @@ destinations.
 
 \section{Configuration}
 
-\subsection{\path{grub.conf}}
+\subsection{GRUB Configuration}
 
 An entry should be added to \path{grub.conf} (often found under
-\path{/boot/grub.conf} or \path{/boot/grub/grub.conf}) to allow Xen /
-XenLinux to boot.  The entry should look something like the following:
+\path{/boot/} or \path{/boot/grub/}) to allow Xen / XenLinux to boot.
+This file is sometimes called \path{menu.lst}, depending on your
+distribution.  The entry should look something like the following:
 
 \begin{verbatim}
 title Xen 2.0 / XenoLinux 2.4.26
         kernel /boot/xen.gz dom0_mem=131072 com1=115200,8n1
-        module /boot/xenolinux.gz root=/dev/sda4 ro console=tty0
+        module /boot/xenolinux.gz root=/dev/sda4 ro console=tty0 console=ttyS0
 \end{verbatim}
 
 The first line of the configuration (kernel...) tells GRUB where to
@@ -275,6 +297,11 @@ find Xen itself and what boot parameters should be passed to it.  The
 second line of the configuration describes the location of the
 XenoLinux kernel that Xen should start and the parameters that should
 be passed to it.
+
+As always when installing a new kernel, it is recommended that you do
+not remove the original contents of \path{grub.conf} --- you may want
+to boot up with your old Linux kernel in future, particularly if you
+have problems.
 
 \subsection{Serial Console}
 
@@ -285,6 +312,26 @@ serial console.  Add the line:
 
 {\tt c:2345:respawn:/sbin/mingetty ttyS0}
 
+\section{Test the new install}
+
+It should now be possible to restart the system and use Xen.  Reboot
+as usual but choose the new Xen option when the Grub screen appears.
+
+What follows should look much like a conventional Linux boot.  The
+first portion of the output comes from Xen itself, supplying low level
+information about itself and the machine it is running on.  The
+following portion of the output comes from XenLinux itself.
+
+You may see some errors during the XenLinux boot.  These are not
+necessarily anything to worry about --- they may result from kernel
+configuration differences between your XenLinux kernel and the one you
+usually use.
+
+When the boot completes, you should be able to log into your system as
+usual.  If you are unable to log in to your system running Xen, you
+should still be able to reboot with your normal Linux kernel.
+
+
 \chapter{Starting a domain}
 
 The first step in creating a new domain is to prepare a root
@@ -294,6 +341,11 @@ normal partition, a disk file and LVM volume, or on an NFS server.
 A simple way to do this is simply to boot from your standard OS
 install CD and install the distribution into another partition on your
 hard drive.
+
+{\em N.b } you can boot with Xen and XenLinux without installing any
+special userspace tools but will need to have the prerequisites
+described in Section~\ref{sec:prerequisites} and the Xen control tools
+are installed before you proceed.
 
 \section{From the web interface}
 
@@ -335,6 +387,12 @@ domains). [i.e. {\tt disk = ['phy:your\_hard\_drive\%d,sda1,w' \%
 receive its IP address from a DHCP server. [i.e. {\tt dhcp=''dhcp''}]
 \end{description}
 
+You may also want to edit the {\bf vif} variable in order to choose
+the MAC address of the virtual ethernet interface yourself.  For
+example: \\ \verb_vif = [`mac=00:06:AA:F6:BB:B3']_\\ If you do not set
+this variable, Xend will automatically generate a random MAC address
+from an unused range.
+
 \subsection{Starting the domain}
 
 The {\tt xm} tool provides a variety of commands for managing domains.
@@ -351,7 +409,85 @@ the {\tt xmdefaults} file.  The tool uses the
 \path{/etc/xen/xmdefaults} file, since no custom configuration file
 was specified on the command line.
 
+\chapter{Domain management tasks}
+
+The previous chapter described a simple example of how to configure
+and start a domain.  This chapter summarises the tools available to
+manage running domains.
+
+\section{Command line management}
+
+Command line management tasks are also performed using the {\tt xm}
+tool.  For online help for the commands available, type:\\
+\verb_# xm help_
+
+\subsection{Basic management commands}
+
+The most important {\tt xm} commands are: \\
+\verb_# xm list_ : Lists all domains running. \\
+\verb_# xm consoles_ : Gives information about the domain consoles. \\
+\verb_# xm console_: open a console to a domain.
+e.g. \verb_# xm console 1_ (open console to domain 1)
+
  XXX More explanation needed here...
+
+\chapter{Other kinds of storage}
+
+It is possible to use any Linux block device to store virtual machine
+disk images.  This chapter covers some of the possibilities; note that
+it is also possible to use network-based block devices and other
+unconventional block devices.
+
+\section{File-backed virtual block devices}
+
+It is possible to use a file in Domain 0 as the primary storage for a
+virtual machine.  As well as being convenient, this also has the
+advantage that the virtual block device will be {\em sparse} --- space
+will only really be allocated as parts of the file are used.  So if a
+virtual machine uses only half its disk space then the file really
+takes up a half of the size allocated.
+
+For example, to create a 2GB sparse file-backed virtual block device
+(actually only consumes 1KB of disk):
+
+\verb_# dd if=/dev/zero of=vm1disk bs=1k seek=2048k count=1_
+
+Choose a free loop back device, and attach file: \\
+\verb_# losetup /dev/loop0 vm1disk_ \\
+Make a file system on the loop back device: \\
+\verb_# mkfs ­t ext3 /dev/loop0_
+
+Populate the file system e.g. by copying from the current root:
+\begin{verbatim}
+# mount /dev/loop0 /mnt
+# cp -ax / /mnt
+\end{verbatim}
+Tailor the file system by editing \path{/etc/fstab},
+\path{/etc/hostname}, etc (don't forget to edit the files in the
+mounted file system, instead of your domain 0 filesystem, e.g. you
+would edit \path{/mnt/etc/fstab} instead of \path{/etc/fstab} ).  For
+this example put \path{/dev/sda1} to root in fstab.
+
+Now unmount (this is important!):\\
+\verb_# umount /dev/loop0_
+
+In the configuration file set:\\
+\verb_disk = [`phy:loop0,sda1,w']_
+
+As the virtual machine writes to its `disk', the sparse file will be
+filled in and consume more space up to the original 2GB.
+
+{\em NB.} You will need to use {\tt losetup} to bind the file to
+\path{/dev/loop0} (or whatever loopback device you chose) each time
+you reboot domain 0.  In the near future, Xend will track which loop
+devices are currently free and do binding itself, making this manual
+effort unnecessary.
+
+\section{LVM-backed virtual block devices}
+
+XXX Put some simple examples here - would be nice if an LVM user could
+contribute some, although obviously users would have to read the LVM
+docs to do advanced stuff.
 
 \part{Quick Reference}
 
