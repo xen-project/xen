@@ -5,18 +5,13 @@
 #include <linux/mm.h>
 #include <asm/processor.h>
 
-#define __flush_tlb() do {						\
-	xen_tlb_flush();						\
-} while (/*CONSTCOND*/0)
+#define __flush_tlb() xen_tlb_flush()
 
 /*
  * Global pages have to be flushed a bit differently. Not a real
  * performance problem because this does not happen often.
  */
-#define __flush_tlb_global()						\
-	do {								\
-		xen_tlb_flush();					\
-	} while (0)
+#define __flush_tlb_global() xen_tlb_flush()
 
 extern unsigned long pgkern_mask;
 
@@ -30,11 +25,9 @@ extern unsigned long pgkern_mask;
 
 #define cpu_has_invlpg	(boot_cpu_data.x86 > 3)
 
-#define __flush_tlb_single(addr) do {					\
-	xen_invlpg(addr);						\
-} while (/* CONSTCOND */0)
+#define __flush_tlb_single(addr) xen_invlpg(addr)
 
-# define __flush_tlb_one(addr) __flush_tlb_single(addr)
+#define __flush_tlb_one(addr) __flush_tlb_single(addr)
 
 /*
  * TLB flushing:

@@ -90,14 +90,17 @@ static inline void * phys_to_virt(unsigned long address)
  * Change "struct page" to physical address.
  */
 #define page_to_pseudophys(page) ((dma_addr_t)page_to_pfn(page) << PAGE_SHIFT)
-#define page_to_phys(page)       (phys_to_machine(page_to_pseudophys(page)))
+#define page_to_phys(page)	 (phys_to_machine(page_to_pseudophys(page)))
 
-#define bio_to_pseudophys(bio)	(page_to_pseudophys(bio_page((bio))) + (unsigned long) bio_offset((bio)))
-#define bvec_to_pseudophys(bv)	(page_to_pseudophys((bv)->bv_page) + (unsigned long) (bv)->bv_offset)
+#define bio_to_pseudophys(bio)	 (page_to_pseudophys(bio_page((bio))) + \
+				  (unsigned long) bio_offset((bio)))
+#define bvec_to_pseudophys(bv)	 (page_to_pseudophys((bv)->bv_page) + \
+				  (unsigned long) (bv)->bv_offset)
 
 #define BIOVEC_PHYS_MERGEABLE(vec1, vec2)	\
 	(((bvec_to_phys((vec1)) + (vec1)->bv_len) == bvec_to_phys((vec2))) && \
-	 ((bvec_to_pseudophys((vec1)) + (vec1)->bv_len) == bvec_to_pseudophys((vec2))))
+	 ((bvec_to_pseudophys((vec1)) + (vec1)->bv_len) == \
+	  bvec_to_pseudophys((vec2))))
 
 extern void __iomem * __ioremap(unsigned long offset, unsigned long size, unsigned long flags);
 
@@ -135,7 +138,8 @@ extern void bt_iounmap(void *addr, unsigned long size);
 #define isa_virt_to_bus(_x) isa_virt_to_bus_is_UNSUPPORTED->x
 #define isa_page_to_bus(_x) isa_page_to_bus_is_UNSUPPORTED->x
 #ifdef CONFIG_XEN_PRIVILEGED_GUEST
-#define isa_bus_to_virt(_x) (void *)__fix_to_virt(FIX_ISAMAP_BEGIN - ((_x) >> PAGE_SHIFT))
+#define isa_bus_to_virt(_x) (void *)__fix_to_virt(FIX_ISAMAP_BEGIN - \
+						  ((_x) >> PAGE_SHIFT))
 #else
 #define isa_bus_to_virt(_x) isa_bus_to_virt_needs_PRIVILEGED_BUILD
 #endif
@@ -367,7 +371,7 @@ static inline unsigned type in##bwl##_quad(int port, int quad) { \
 static inline unsigned type in##bwl(int port) { \
 	return in##bwl##_quad(port, 0); \
 }
-#else 
+#else
 #define __BUILDIO(bwl,bw,type) \
 static inline void out##bwl(unsigned type value, int port) { \
 	out##bwl##_local(value, port); \

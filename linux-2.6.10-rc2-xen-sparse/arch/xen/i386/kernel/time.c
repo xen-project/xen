@@ -616,7 +616,7 @@ void __init hpet_time_init(void)
 #endif
 
 /* Dynamically-mapped IRQ. */
-static int time_irq;
+static int TIMER_IRQ;
 
 static struct irqaction irq_timer = {
 	timer_interrupt, SA_INTERRUPT, CPU_MASK_NONE, "timer",
@@ -646,9 +646,9 @@ void __init time_init(void)
 		BUG();
 	printk(KERN_INFO "Using %s for high-res timesource\n",cur_timer->name);
 
-	time_irq = bind_virq_to_irq(VIRQ_TIMER);
+	TIMER_IRQ = bind_virq_to_irq(VIRQ_TIMER);
 
-	(void)setup_irq(time_irq, &irq_timer);
+	(void)setup_irq(TIMER_IRQ, &irq_timer);
 }
 
 /* Convert jiffies to system time. Call with xtime_lock held for reading. */

@@ -166,7 +166,7 @@ nodata:
 /**
  *	alloc_skb_from_cache	-	allocate a network buffer
  *	@cp: kmem_cache from which to allocate the data area
- *           (object size must be big enough for @size bytes + skb overheads)
+ *	     (object size must be big enough for @size bytes + skb overheads)
  *	@size: size to allocate
  *	@gfp_mask: allocation mask
  *
