@@ -12,14 +12,15 @@
 #include <public/xen.h>
 
 ENTRY(hypercall)
+        sti
         movl  $__GUEST_SS,8(%rsp)
         pushq %r11
         pushq $__GUEST_CS
         pushq %rcx
         pushq $0
         SAVE_ALL
-	andq  $(NR_hypercalls-1),%rax
-        leaq  SYMBOL_NAME(exception_table)(%rip),%rcx
+        andq  $(NR_hypercalls-1),%rax
+        leaq  SYMBOL_NAME(hypercall_table)(%rip),%rcx
         callq *(%rcx,%rax,8)
         RESTORE_ALL
         addq  $8,%rsp
@@ -42,7 +43,7 @@ error_code:
         movl  XREGS_entry_vector(%rsp),%eax
         leaq  SYMBOL_NAME(exception_table)(%rip),%rdx
         callq *(%rdx,%rax,8)
-	jmp   restore_all_xen
+        jmp   restore_all_xen
 
 ENTRY(divide_error)
         pushq $0

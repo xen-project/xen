@@ -221,7 +221,7 @@ void __init percpu_traps_init(void)
      * Common SYSCALL parameters.
      */
 
-    wrmsr(MSR_STAR,  0, (FLAT_RING3_CS64<<16) | __HYPERVISOR_CS); 
+    wrmsr(MSR_STAR, 0, (FLAT_RING3_CS32<<16) | __HYPERVISOR_CS);
     wrmsr(MSR_SYSCALL_MASK, ~EF_IE, 0U); /* disable interrupts */
 }
 

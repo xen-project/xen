@@ -191,9 +191,9 @@ extern void __out_of_line_bug(int line) __attribute__((noreturn));
 #define __HYPERVISOR_DS32 0x0818
 #define __HYPERVISOR_DS   __HYPERVISOR_DS64
 
-#define __GUEST_CS        0x082b
+#define __GUEST_CS        0x0833
 #define __GUEST_DS        0x0000
-#define __GUEST_SS        0x0833
+#define __GUEST_SS        0x082b
 
 /* For generic assembly code: use macros to define operation/operand sizes. */
 #define __OS "q"  /* Operation Suffix */
