@@ -558,8 +558,11 @@ struct scsi_device {
 	 */
 	struct scsi_device *next;	/* Used for linked list */
 	struct scsi_device *prev;	/* Used for linked list */
+#if 0
 	wait_queue_head_t   scpnt_wait;	/* Used to wait if
 					   device is busy */
+#endif
+
 	struct Scsi_Host *host;
 	request_queue_t request_queue;
         atomic_t                device_active; /* commands checked out for device */
@@ -580,7 +583,9 @@ struct scsi_device {
 	int access_count;	/* Count of open channels/mounts */
 
 	void *hostdata;		/* available to low-level driver */
+#if 0
 	devfs_handle_t de;      /* directory for the device      */
+#endif
 	char type;
 	char scsi_level;
 	char vendor[8], model[16], rev[4];
@@ -650,29 +655,32 @@ typedef struct scsi_pointer {
  * of the queue and being sent to the driver.
  */
 struct scsi_request {
-	int     sr_magic;
-	int     sr_result;	/* Status code from lower level driver */
-	unsigned char sr_sense_buffer[SCSI_SENSE_BUFFERSIZE];		/* obtained by REQUEST SENSE
-						 * when CHECK CONDITION is
-						 * received on original command 
-						 * (auto-sense) */
-
-	struct Scsi_Host *sr_host;
-	Scsi_Device *sr_device;
-	Scsi_Cmnd *sr_command;
-	struct request sr_request;	/* A copy of the command we are
+    int     sr_magic;
+    int     sr_result;	/* Status code from lower level driver */
+    unsigned char sr_sense_buffer[SCSI_SENSE_BUFFERSIZE]; 
+    /* obtained by REQUEST SENSE when CHECK CONDITION is received 
+       on original command (auto-sense) */
+    
+    struct Scsi_Host *sr_host;
+    Scsi_Device *sr_device;
+    Scsi_Cmnd *sr_command;
+#define SMHHACK
+#ifdef SMHHACK 
+    void *freeaddr; 
+#endif
+    struct request sr_request;	/* A copy of the command we are
 				   working on */
-	unsigned sr_bufflen;	/* Size of data buffer */
-	void *sr_buffer;		/* Data buffer */
-	int sr_allowed;
-	unsigned char sr_data_direction;
-	unsigned char sr_cmd_len;
-	unsigned char sr_cmnd[MAX_COMMAND_SIZE];
-	void (*sr_done) (struct scsi_cmnd *);	/* Mid-level done function */
-	int sr_timeout_per_command;
-	unsigned short sr_use_sg;	/* Number of pieces of scatter-gather */
-	unsigned short sr_sglist_len;	/* size of malloc'd scatter-gather list */
-	unsigned sr_underflow;	/* Return error if less than
+    unsigned sr_bufflen;	/* Size of data buffer */
+    void *sr_buffer;		/* Data buffer */
+    int sr_allowed;
+    unsigned char sr_data_direction;
+    unsigned char sr_cmd_len;
+    unsigned char sr_cmnd[MAX_COMMAND_SIZE];
+    void (*sr_done) (struct scsi_cmnd *);	/* Mid-level done function */
+    int sr_timeout_per_command;
+    unsigned short sr_use_sg;	/* Number of pieces of scatter-gather */
+    unsigned short sr_sglist_len;	/* size of malloc'd scatter-gather list */
+    unsigned sr_underflow;	/* Return error if less than
 				   this amount is transferred */
 };
 
@@ -830,6 +838,7 @@ struct scsi_cmnd {
 #define SCSI_MLQUEUE_HOST_BUSY   0x1055
 #define SCSI_MLQUEUE_DEVICE_BUSY 0x1056
 
+#if 0
 #define SCSI_SLEEP(QUEUE, CONDITION) {		    \
     if (CONDITION) {			            \
 	DECLARE_WAITQUEUE(wait, current);	    \
@@ -848,6 +857,12 @@ struct scsi_cmnd {
 	remove_wait_queue(QUEUE, &wait);\
 	current->state = TASK_RUNNING;	\
     }; }
+#else
+#define SCSI_SLEEP(QUEUE, CONDITION) { printk("SCSI_SLEEP!\n"); BUG(); } 
+#endif
+
+
+
 
 /*
  * old style reset request from external source

@@ -18,25 +18,25 @@
  */
 
 #define __NO_VERSION__
-#include <linux/module.h>
+#include <xeno/module.h>
 
-#include <linux/sched.h>
-#include <linux/timer.h>
-#include <linux/string.h>
-#include <linux/slab.h>
-#include <linux/ioport.h>
-#include <linux/kernel.h>
-#include <linux/stat.h>
-#include <linux/blk.h>
-#include <linux/interrupt.h>
-#include <linux/delay.h>
-#include <linux/smp_lock.h>
-#include <linux/completion.h>
+#include <xeno/sched.h>
+#include <xeno/timer.h>
+/*  #include <xeno/string.h> */
+/*  #include <xeno/slab.h> */
+/*  #include <xeno/ioport.h> */
+/*  #include <xeno/kernel.h> */
+/*  #include <xeno/stat.h> */
+#include <xeno/blk.h>
+/*  #include <xeno/interrupt.h> */
+/*  #include <xeno/delay.h> */
+/*  #include <xeno/smp_lock.h> */
+/*  #include <xeno/completion.h> */
 
 
 #define __KERNEL_SYSCALLS__
 
-#include <linux/unistd.h>
+/* #include <xeno/unistd.h> */
 
 #include <asm/system.h>
 #include <asm/irq.h>
@@ -46,6 +46,8 @@
 #include "hosts.h"
 #include "constants.h"
 #include <scsi/scsi_ioctl.h>
+
+#define SPECIAL XEN_BLOCK_SPECIAL
 
 /*
  * This entire source file deals with the new queueing code.
@@ -68,31 +70,31 @@
 static void __scsi_insert_special(request_queue_t *q, struct request *rq,
 				  void *data, int at_head)
 {
-	unsigned long flags;
-
-	ASSERT_LOCK(&io_request_lock, 0);
-
-	rq->cmd = SPECIAL;
-	rq->special = data;
-	rq->q = NULL;
-	rq->nr_segments = 0;
-	rq->elevator_sequence = 0;
-
-	/*
-	 * We have the option of inserting the head or the tail of the queue.
-	 * Typically we use the tail for new ioctls and so forth.  We use the
-	 * head of the queue for things like a QUEUE_FULL message from a
-	 * device, or a host that is unable to accept a particular command.
-	 */
-	spin_lock_irqsave(&io_request_lock, flags);
-
-	if (at_head)
-		list_add(&rq->queue, &q->queue_head);
-	else
-		list_add_tail(&rq->queue, &q->queue_head);
-
-	q->request_fn(q);
-	spin_unlock_irqrestore(&io_request_lock, flags);
+    unsigned long flags;
+    
+    ASSERT_LOCK(&io_request_lock, 0);
+    
+    rq->cmd = SPECIAL;
+    rq->special = data;
+    rq->q = NULL;
+    rq->nr_segments = 0;
+    rq->elevator_sequence = 0;
+    
+    /*
+     * We have the option of inserting the head or the tail of the queue.
+     * Typically we use the tail for new ioctls and so forth.  We use the
+     * head of the queue for things like a QUEUE_FULL message from a
+     * device, or a host that is unable to accept a particular command.
+     */
+    spin_lock_irqsave(&io_request_lock, flags);
+    
+    if (at_head)
+	list_add(&rq->queue, &q->queue_head);
+    else
+	list_add_tail(&rq->queue, &q->queue_head);
+    
+    q->request_fn(q);
+    spin_unlock_irqrestore(&io_request_lock, flags);
 }
 
 
@@ -118,10 +120,10 @@ static void __scsi_insert_special(request_queue_t *q, struct request *rq,
  */
 int scsi_insert_special_cmd(Scsi_Cmnd * SCpnt, int at_head)
 {
-	request_queue_t *q = &SCpnt->device->request_queue;
-
-	__scsi_insert_special(q, &SCpnt->request, SCpnt, at_head);
-	return 0;
+    request_queue_t *q = &SCpnt->device->request_queue;
+    
+    __scsi_insert_special(q, &SCpnt->request, SCpnt, at_head);
+    return 0;
 }
 
 /*
@@ -146,10 +148,10 @@ int scsi_insert_special_cmd(Scsi_Cmnd * SCpnt, int at_head)
  */
 int scsi_insert_special_req(Scsi_Request * SRpnt, int at_head)
 {
-	request_queue_t *q = &SRpnt->sr_device->request_queue;
-
-	__scsi_insert_special(q, &SRpnt->sr_request, SRpnt, at_head);
-	return 0;
+    request_queue_t *q = &SRpnt->sr_device->request_queue;
+    
+    __scsi_insert_special(q, &SRpnt->sr_request, SRpnt, at_head);
+    return 0;
 }
 
 /*
@@ -167,44 +169,44 @@ int scsi_insert_special_req(Scsi_Request * SRpnt, int at_head)
  */
 int scsi_init_cmd_errh(Scsi_Cmnd * SCpnt)
 {
-	ASSERT_LOCK(&io_request_lock, 0);
+    ASSERT_LOCK(&io_request_lock, 0);
+    
+    SCpnt->owner = SCSI_OWNER_MIDLEVEL;
+    SCpnt->reset_chain = NULL;
+    SCpnt->serial_number = 0;
+    SCpnt->serial_number_at_timeout = 0;
+    SCpnt->flags = 0;
+    SCpnt->retries = 0;
 
-	SCpnt->owner = SCSI_OWNER_MIDLEVEL;
-	SCpnt->reset_chain = NULL;
-	SCpnt->serial_number = 0;
-	SCpnt->serial_number_at_timeout = 0;
-	SCpnt->flags = 0;
-	SCpnt->retries = 0;
+    SCpnt->abort_reason = 0;
+    
+    memset((void *) SCpnt->sense_buffer, 0, sizeof SCpnt->sense_buffer);
+    
+    if (SCpnt->cmd_len == 0)
+	SCpnt->cmd_len = COMMAND_SIZE(SCpnt->cmnd[0]);
+    
+    /*
+     * We need saved copies of a number of fields - this is because
+     * error handling may need to overwrite these with different values
+     * to run different commands, and once error handling is complete,
+     * we will need to restore these values prior to running the actual
+     * command.
+     */
+    SCpnt->old_use_sg = SCpnt->use_sg;
+    SCpnt->old_cmd_len = SCpnt->cmd_len;
+    SCpnt->sc_old_data_direction = SCpnt->sc_data_direction;
+    SCpnt->old_underflow = SCpnt->underflow;
+    memcpy((void *) SCpnt->data_cmnd,
+	   (const void *) SCpnt->cmnd, sizeof(SCpnt->cmnd));
+    SCpnt->buffer = SCpnt->request_buffer;
+    SCpnt->bufflen = SCpnt->request_bufflen;
+    
+    SCpnt->reset_chain = NULL;
+    
+    SCpnt->internal_timeout = NORMAL_TIMEOUT;
+    SCpnt->abort_reason = 0;
 
-	SCpnt->abort_reason = 0;
-
-	memset((void *) SCpnt->sense_buffer, 0, sizeof SCpnt->sense_buffer);
-
-	if (SCpnt->cmd_len == 0)
-		SCpnt->cmd_len = COMMAND_SIZE(SCpnt->cmnd[0]);
-
-	/*
-	 * We need saved copies of a number of fields - this is because
-	 * error handling may need to overwrite these with different values
-	 * to run different commands, and once error handling is complete,
-	 * we will need to restore these values prior to running the actual
-	 * command.
-	 */
-	SCpnt->old_use_sg = SCpnt->use_sg;
-	SCpnt->old_cmd_len = SCpnt->cmd_len;
-	SCpnt->sc_old_data_direction = SCpnt->sc_data_direction;
-	SCpnt->old_underflow = SCpnt->underflow;
-	memcpy((void *) SCpnt->data_cmnd,
-	       (const void *) SCpnt->cmnd, sizeof(SCpnt->cmnd));
-	SCpnt->buffer = SCpnt->request_buffer;
-	SCpnt->bufflen = SCpnt->request_bufflen;
-
-	SCpnt->reset_chain = NULL;
-
-	SCpnt->internal_timeout = NORMAL_TIMEOUT;
-	SCpnt->abort_reason = 0;
-
-	return 1;
+    return 1;
 }
 
 /*
@@ -245,90 +247,90 @@ int scsi_init_cmd_errh(Scsi_Cmnd * SCpnt)
  */
 void scsi_queue_next_request(request_queue_t * q, Scsi_Cmnd * SCpnt)
 {
-	int all_clear;
-	unsigned long flags;
-	Scsi_Device *SDpnt;
-	struct Scsi_Host *SHpnt;
-
-	ASSERT_LOCK(&io_request_lock, 0);
-
-	spin_lock_irqsave(&io_request_lock, flags);
-	if (SCpnt != NULL) {
-
-		/*
-		 * For some reason, we are not done with this request.
-		 * This happens for I/O errors in the middle of the request,
-		 * in which case we need to request the blocks that come after
-		 * the bad sector.
-		 */
-		SCpnt->request.special = (void *) SCpnt;
-		list_add(&SCpnt->request.queue, &q->queue_head);
-	}
-
+    int all_clear;
+    unsigned long flags;
+    Scsi_Device *SDpnt;
+    struct Scsi_Host *SHpnt;
+    
+    ASSERT_LOCK(&io_request_lock, 0);
+    
+    spin_lock_irqsave(&io_request_lock, flags);
+    if (SCpnt != NULL) {
+	
 	/*
-	 * Just hit the requeue function for the queue.
+	 * For some reason, we are not done with this request.
+	 * This happens for I/O errors in the middle of the request,
+	 * in which case we need to request the blocks that come after
+	 * the bad sector.
 	 */
-	q->request_fn(q);
-
-	SDpnt = (Scsi_Device *) q->queuedata;
-	SHpnt = SDpnt->host;
-
-	/*
-	 * If this is a single-lun device, and we are currently finished
-	 * with this device, then see if we need to get another device
-	 * started.  FIXME(eric) - if this function gets too cluttered
-	 * with special case code, then spin off separate versions and
-	 * use function pointers to pick the right one.
-	 */
-	if (SDpnt->single_lun
-	    && list_empty(&q->queue_head)
-	    && SDpnt->device_busy == 0) {
-		request_queue_t *q;
-
-		for (SDpnt = SHpnt->host_queue;
-		     SDpnt;
-		     SDpnt = SDpnt->next) {
-			if (((SHpnt->can_queue > 0)
-			     && (SHpnt->host_busy >= SHpnt->can_queue))
-			    || (SHpnt->host_blocked)
-			    || (SHpnt->host_self_blocked)
-			    || (SDpnt->device_blocked)) {
-				break;
-			}
-			q = &SDpnt->request_queue;
-			q->request_fn(q);
-		}
+	SCpnt->request.special = (void *) SCpnt;
+	list_add(&SCpnt->request.queue, &q->queue_head);
+    }
+    
+    /*
+     * Just hit the requeue function for the queue.
+     */
+    q->request_fn(q);
+    
+    SDpnt = (Scsi_Device *) q->queuedata;
+    SHpnt = SDpnt->host;
+    
+    /*
+     * If this is a single-lun device, and we are currently finished
+     * with this device, then see if we need to get another device
+     * started.  FIXME(eric) - if this function gets too cluttered
+     * with special case code, then spin off separate versions and
+     * use function pointers to pick the right one.
+     */
+    if (SDpnt->single_lun
+	&& list_empty(&q->queue_head)
+	&& SDpnt->device_busy == 0) {
+	request_queue_t *q;
+	
+	for (SDpnt = SHpnt->host_queue;
+	     SDpnt;
+	     SDpnt = SDpnt->next) {
+	    if (((SHpnt->can_queue > 0)
+		 && (SHpnt->host_busy >= SHpnt->can_queue))
+		|| (SHpnt->host_blocked)
+		|| (SHpnt->host_self_blocked)
+		|| (SDpnt->device_blocked)) {
+		break;
+	    }
+	    q = &SDpnt->request_queue;
+	    q->request_fn(q);
 	}
-
-	/*
-	 * Now see whether there are other devices on the bus which
-	 * might be starved.  If so, hit the request function.  If we
-	 * don't find any, then it is safe to reset the flag.  If we
-	 * find any device that it is starved, it isn't safe to reset the
-	 * flag as the queue function releases the lock and thus some
-	 * other device might have become starved along the way.
-	 */
-	all_clear = 1;
-	if (SHpnt->some_device_starved) {
-		for (SDpnt = SHpnt->host_queue; SDpnt; SDpnt = SDpnt->next) {
-			request_queue_t *q;
-			if ((SHpnt->can_queue > 0 && (SHpnt->host_busy >= SHpnt->can_queue))
-			    || (SHpnt->host_blocked) 
-			    || (SHpnt->host_self_blocked)) {
-				break;
-			}
-			if (SDpnt->device_blocked || !SDpnt->starved) {
-				continue;
-			}
-			q = &SDpnt->request_queue;
-			q->request_fn(q);
-			all_clear = 0;
-		}
-		if (SDpnt == NULL && all_clear) {
-			SHpnt->some_device_starved = 0;
-		}
+    }
+    
+    /*
+     * Now see whether there are other devices on the bus which
+     * might be starved.  If so, hit the request function.  If we
+     * don't find any, then it is safe to reset the flag.  If we
+     * find any device that it is starved, it isn't safe to reset the
+     * flag as the queue function releases the lock and thus some
+     * other device might have become starved along the way.
+     */
+    all_clear = 1;
+    if (SHpnt->some_device_starved) {
+	for (SDpnt = SHpnt->host_queue; SDpnt; SDpnt = SDpnt->next) {
+	    request_queue_t *q;
+	    if ((SHpnt->can_queue > 0 &&(SHpnt->host_busy >= SHpnt->can_queue))
+		|| (SHpnt->host_blocked) 
+		|| (SHpnt->host_self_blocked)) {
+		break;
+	    }
+	    if (SDpnt->device_blocked || !SDpnt->starved) {
+		continue;
+	    }
+	    q = &SDpnt->request_queue;
+	    q->request_fn(q);
+	    all_clear = 0;
 	}
-	spin_unlock_irqrestore(&io_request_lock, flags);
+	if (SDpnt == NULL && all_clear) {
+	    SHpnt->some_device_starved = 0;
+	}
+    }
+    spin_unlock_irqrestore(&io_request_lock, flags);
 }
 
 /*
@@ -418,6 +420,7 @@ static Scsi_Cmnd *__scsi_end_request(Scsi_Cmnd * SCpnt,
 		scsi_queue_next_request(q, SCpnt);
 		return SCpnt;
 	}
+#if 0
 	/*
 	 * This request is done.  If there is someone blocked waiting for this
 	 * request, wake them up.  Typically used to wake up processes trying
@@ -426,6 +429,7 @@ static Scsi_Cmnd *__scsi_end_request(Scsi_Cmnd * SCpnt,
 	if (req->waiting != NULL) {
 		complete(req->waiting);
 	}
+#endif
 	req_finished_io(req);
 	add_blkdev_randomness(MAJOR(req->rq_dev));
 

@@ -58,7 +58,8 @@ enum
 	HI_SOFTIRQ=0,
 	NET_TX_SOFTIRQ,
 	NET_RX_SOFTIRQ,
-	TASKLET_SOFTIRQ
+	TASKLET_SOFTIRQ, 
+	SCSI_LOW_SOFTIRQ,
 };
 
 /* softirq mask and active fields moved to irq_cpustat_t in

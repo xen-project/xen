@@ -5,7 +5,7 @@ default:
 	$(MAKE) -C net
 	$(MAKE) -C block
 	$(MAKE) -C ide
-#	$(MAKE) -C scsi
+	$(MAKE) -C scsi
 
 clean:
 	$(MAKE) -C char clean
@@ -13,4 +13,4 @@ clean:
 	$(MAKE) -C net clean
 	$(MAKE) -C block clean
 	$(MAKE) -C ide clean
-#	$(MAKE) -C scsi clean
+	$(MAKE) -C scsi clean

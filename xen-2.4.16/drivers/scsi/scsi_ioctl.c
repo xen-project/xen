@@ -5,21 +5,21 @@
  *   for the ones that remain
  */
 #define __NO_VERSION__
-#include <linux/module.h>
+#include <xeno/module.h>
 
 #include <asm/io.h>
 #include <asm/uaccess.h>
 #include <asm/system.h>
 #include <asm/page.h>
 
-#include <linux/interrupt.h>
-#include <linux/errno.h>
-#include <linux/kernel.h>
-#include <linux/sched.h>
-#include <linux/mm.h>
-#include <linux/string.h>
+/*  #include <linux/interrupt.h> */
+/*  #include <linux/errno.h> */
+/*  #include <linux/kernel.h> */
+#include <xeno/sched.h>
+/*  #include <linux/mm.h> */
+/*  #include <linux/string.h> */
 
-#include <linux/blk.h>
+#include <xeno/blk.h>
 #include "scsi.h"
 #include "hosts.h"
 #include <scsi/scsi_ioctl.h>

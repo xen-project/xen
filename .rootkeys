@@ -122,7 +122,21 @@
 3ddb79bfJaf0bkE1Y67bnll8-kjEPg xen-2.4.16/drivers/pci/setup-res.c
 3ddb79bfIcCWJsBDNcQQE3ok2Azn-Q xen-2.4.16/drivers/pci/syscall.c
 3ddb79be3kwzyKagpMHGoXZFdan7dg xen-2.4.16/drivers/scsi/Makefile
+3e564137sVLmo7rTnKLNzLSCvuUz8g xen-2.4.16/drivers/scsi/aacraid/Makefile
+3e5641379FXvLDjV-0OrRNOBTwL_Lw xen-2.4.16/drivers/scsi/aacraid/README
+3e564137MAHzHSRYoWGNmIferNjFVA xen-2.4.16/drivers/scsi/aacraid/TODO
+3e564137QLUGVlcwTpnMYATKahDmCg xen-2.4.16/drivers/scsi/aacraid/aachba.c
+3e564137Tm_t6rMYyxFtnY9yo_abMg xen-2.4.16/drivers/scsi/aacraid/aacraid.h
+3e564137AtfQtRJZiS9B00To0AmKSg xen-2.4.16/drivers/scsi/aacraid/commctrl.c
+3e564137a9aOGMOFgQ5CYQJBOD3DvQ xen-2.4.16/drivers/scsi/aacraid/comminit.c
+3e564137fw_bPuKcvVi0qwntc_RB-Q xen-2.4.16/drivers/scsi/aacraid/commsup.c
+3e564137iEHmY_e6xGZ7TLsjy5yS-g xen-2.4.16/drivers/scsi/aacraid/dpcsup.c
+3e564137taxQbEVa39h3mEVLFxRydQ xen-2.4.16/drivers/scsi/aacraid/linit.c
+3e564137vmALxpfK7vNINqEklSmQ1A xen-2.4.16/drivers/scsi/aacraid/rx.c
+3e564137EuYUJgvqnOunPERWxnp_mw xen-2.4.16/drivers/scsi/aacraid/sa.c
+3e56411aOLzeD5CRbuXquOrX0lRijw xen-2.4.16/drivers/scsi/constants.c
 3ddb79beXZxwKh7cGyPfr40bhDyRrA xen-2.4.16/drivers/scsi/constants.h
+3e564120ZeinH9nf3IVSerB80T7dHg xen-2.4.16/drivers/scsi/hosts.c
 3ddb79beGiGljlTNq_kRnCBZECgC9Q xen-2.4.16/drivers/scsi/hosts.h
 3ddb79bexarQo1tQ541PPUyK9HXNDA xen-2.4.16/drivers/scsi/scsi.c
 3ddb79beBOiYxQUiWTHosepRlJyuGA xen-2.4.16/drivers/scsi/scsi.h
@@ -132,6 +146,7 @@
 3ddb79berPStE_-ILQHgcl1BLDLywA xen-2.4.16/drivers/scsi/scsi_lib.c
 3ddb79beRXjB7_nNUbJMIRyjDmeByQ xen-2.4.16/drivers/scsi/scsi_merge.c
 3ddb79beGNb7Es1bATZAGsPZEu5F2Q xen-2.4.16/drivers/scsi/scsi_module.c
+3e56412a_O2cnz-e36volrKvofGe-Q xen-2.4.16/drivers/scsi/scsi_module.c.inc
 3ddb79beZ--AZB0twliIm3qmQJO8Zg xen-2.4.16/drivers/scsi/scsi_obsolete.c
 3ddb79beQgG_st0eBZUX8AQI7kBkHA xen-2.4.16/drivers/scsi/scsi_obsolete.h
 3ddb79beK65cNRldY0CFGXjZ3-A74Q xen-2.4.16/drivers/scsi/scsi_proc.c
@@ -152,6 +167,7 @@
 3ddb79c2jFkPAZTDmU35L6IUssYMgQ xen-2.4.16/include/asm-i386/debugreg.h
 3ddb79c3r9-31dIsewPV3P3i8HALsQ xen-2.4.16/include/asm-i386/delay.h
 3ddb79c34BFiXjBJ_cCKB0aCsV1IDw xen-2.4.16/include/asm-i386/desc.h
+3e564149UkU91RX7onzpCAmbj_IFjw xen-2.4.16/include/asm-i386/dma.h
 3e20b82fl1jmQiKdLy7fxMcutfpjWA xen-2.4.16/include/asm-i386/domain_page.h
 3ddb79c2O729EttZTYu1c8LcsUO_GQ xen-2.4.16/include/asm-i386/elf.h
 3ddb79c3NU8Zy40OTrq3D-i30Y3t4A xen-2.4.16/include/asm-i386/fixmap.h

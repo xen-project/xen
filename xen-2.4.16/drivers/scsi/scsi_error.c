@@ -9,23 +9,23 @@
  */
 
 #define __NO_VERSION__
-#include <linux/module.h>
+#include <xeno/module.h>
 
-#include <linux/sched.h>
-#include <linux/timer.h>
-#include <linux/string.h>
-#include <linux/slab.h>
-#include <linux/ioport.h>
-#include <linux/kernel.h>
-#include <linux/stat.h>
-#include <linux/blk.h>
-#include <linux/interrupt.h>
-#include <linux/delay.h>
-#include <linux/smp_lock.h>
+#include <xeno/sched.h>
+#include <xeno/timer.h>
+/*#include <xeno/string.h>*/
+#include <xeno/slab.h>
+#include <xeno/ioport.h>
+#include <xeno/kernel.h>
+/*#include <xeno/stat.h>*/
+#include <xeno/blk.h>
+#include <xeno/interrupt.h>
+#include <xeno/delay.h>
+/*#include <xeno/smp_lock.h>*/
 
 #define __KERNEL_SYSCALLS__
 
-#include <linux/unistd.h>
+/*#include <xeno/unistd.h>*/
 
 #include <asm/system.h>
 #include <asm/irq.h>
@@ -226,6 +226,7 @@ void scsi_times_out(Scsi_Cmnd * SCpnt)
 				   SCpnt->host->host_busy,
 				   SCpnt->host->host_failed));
 
+#if 0
 	/*
 	 * If the host is having troubles, then look to see if this was the last
 	 * command that might have failed.  If so, wake up the error handler.
@@ -237,6 +238,7 @@ void scsi_times_out(Scsi_Cmnd * SCpnt)
 	if (SCpnt->host->host_busy == SCpnt->host->host_failed) {
 		up(SCpnt->host->eh_wait);
 	}
+#endif
 }
 
 /*
@@ -283,9 +285,11 @@ void scsi_eh_times_out(Scsi_Cmnd * SCpnt)
 	SCpnt->eh_state = SCSI_STATE_TIMEOUT;
 	SCSI_LOG_ERROR_RECOVERY(5, printk("In scsi_eh_times_out %p\n", SCpnt));
 
+#if 0
 	if (SCpnt->host->eh_action != NULL)
 		up(SCpnt->host->eh_action);
 	else
+#endif
 		printk("Missing scsi error handler thread\n");
 }
 
@@ -329,8 +333,10 @@ void scsi_eh_done(Scsi_Cmnd * SCpnt)
 	SCSI_LOG_ERROR_RECOVERY(5, printk("In eh_done %p result:%x\n", SCpnt,
 					  SCpnt->result));
 
+#if 0
 	if (SCpnt->host->eh_action != NULL)
 		up(SCpnt->host->eh_action);
+#endif
 }
 
 /*
@@ -352,9 +358,10 @@ void scsi_eh_action_done(Scsi_Cmnd * SCpnt, int answer)
 
 	SCpnt->owner = SCSI_OWNER_ERROR_HANDLER;
 	SCpnt->eh_state = (answer ? SUCCESS : FAILED);
-
+#if 0
 	if (SCpnt->host->eh_action != NULL)
 		up(SCpnt->host->eh_action);
+#endif
 }
 
 /*
@@ -548,18 +555,26 @@ STATIC int scsi_test_unit_ready(Scsi_Cmnd * SCpnt)
 STATIC
 void scsi_sleep_done(struct semaphore *sem)
 {
+#if 0
 	if (sem != NULL) {
 		up(sem);
 	}
+#endif
 }
 
 void scsi_sleep(int timeout)
 {
+#if 0 
 	DECLARE_MUTEX_LOCKED(sem);
+#endif
 	struct timer_list timer;
 
 	init_timer(&timer);
+#if 0
 	timer.data = (unsigned long) &sem;
+#else 
+        timer.data = 0xDEADBEEF; 
+#endif
 	timer.expires = jiffies + timeout;
 	timer.function = (void (*)(unsigned long)) scsi_sleep_done;
 
@@ -567,7 +582,9 @@ void scsi_sleep(int timeout)
 
 	add_timer(&timer);
 
+#if 0
 	down(&sem);
+#endif
 	del_timer(&timer);
 }
 
@@ -597,23 +614,29 @@ STATIC void scsi_send_eh_cmnd(Scsi_Cmnd * SCpnt, int timeout)
 	SCpnt->owner = SCSI_OWNER_LOWLEVEL;
 
 	if (host->can_queue) {
+#if 0
 		DECLARE_MUTEX_LOCKED(sem);
+#endif
 
 		SCpnt->eh_state = SCSI_STATE_QUEUED;
 
 		scsi_add_timer(SCpnt, timeout, scsi_eh_times_out);
 
+#if 0
 		/*
 		 * Set up the semaphore so we wait for the command to complete.
 		 */
 		SCpnt->host->eh_action = &sem;
+#endif
 		SCpnt->request.rq_status = RQ_SCSI_BUSY;
 
 		spin_lock_irqsave(&io_request_lock, flags);
 		host->hostt->queuecommand(SCpnt, scsi_eh_done);
 		spin_unlock_irqrestore(&io_request_lock, flags);
 
+#if 0
 		down(&sem);
+#endif
 
 		SCpnt->host->eh_action = NULL;
 
@@ -1246,8 +1269,9 @@ STATIC void scsi_restart_operations(struct Scsi_Host *host)
 	 * block devices.
 	 */
 	SCSI_LOG_ERROR_RECOVERY(5, printk("scsi_error.c: Waking up host to restart\n"));
-
+#if 0
 	wake_up(&host->host_wait);
+#endif
 
 	/*
 	 * Finally we need to re-initiate requests that may be pending.  We will
@@ -1848,6 +1872,7 @@ void scsi_error_handler(void *data)
 {
 	struct Scsi_Host *host = (struct Scsi_Host *) data;
 	int rtn;
+#if 0
 	DECLARE_MUTEX_LOCKED(sem);
 
         /*
@@ -1877,16 +1902,23 @@ void scsi_error_handler(void *data)
 	sprintf(current->comm, "scsi_eh_%d", host->host_no);
 
 	host->eh_wait = &sem;
+#else
+	host->eh_wait = (void *)0xDEADBEEF; 
+#endif
 	host->ehandler = current;
 
+#if 0
 	unlock_kernel();
+#endif
 
 	/*
 	 * Wake up the thread that created us.
 	 */
 	SCSI_LOG_ERROR_RECOVERY(3, printk("Wake up parent %d\n", host->eh_notify->count.counter));
 
+#if 0
 	up(host->eh_notify);
+#endif
 
 	while (1) {
 		/*
@@ -1896,6 +1928,7 @@ void scsi_error_handler(void *data)
 		 */
 		SCSI_LOG_ERROR_RECOVERY(1, printk("Error handler sleeping\n"));
 
+#if 0
 		/*
 		 * Note - we always use down_interruptible with the semaphore
 		 * even if the module was loaded as part of the kernel.  The
@@ -1906,6 +1939,7 @@ void scsi_error_handler(void *data)
 		 * semaphores isn't unreasonable.
 		 */
 		down_interruptible(&sem);
+#endif
 		if( host->loaded_as_module ) {
 			if (signal_pending(current))
 				break;
@@ -1956,6 +1990,7 @@ void scsi_error_handler(void *data)
 	host->eh_active = 0;
 	host->ehandler = NULL;
 
+#if 0
 	/*
 	 * If anyone is waiting for us to exit (i.e. someone trying to unload
 	 * a driver), then wake up that process to let them know we are on
@@ -1966,6 +2001,7 @@ void scsi_error_handler(void *data)
 	 */
 	if (host->eh_notify != NULL)
 		up(host->eh_notify);
+#endif
 }
 
 /*

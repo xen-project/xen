@@ -20,6 +20,7 @@ ALL_OBJS += $(BASEDIR)/drivers/pci/driver.o
 ALL_OBJS += $(BASEDIR)/drivers/net/driver.o
 ALL_OBJS += $(BASEDIR)/drivers/block/driver.o
 ALL_OBJS += $(BASEDIR)/drivers/ide/driver.o
+#ALL_OBJS += $(BASEDIR)/drivers/scsi/driver.o
 ALL_OBJS += $(BASEDIR)/arch/$(ARCH)/arch.o
 
 HOSTCC     = gcc

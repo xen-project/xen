@@ -11,12 +11,15 @@
  */
 
 #define __NO_VERSION__
-#include <linux/module.h>
 
-#include <linux/fs.h>
-#include <linux/genhd.h>
-#include <linux/kernel.h>
-#include <linux/blk.h>
+#include <xeno/config.h>
+#include <xeno/module.h>
+
+
+/*#include <linux/fs.h>*/
+/*#include <linux/genhd.h>*/
+#include <xeno/blk.h>
+/*#include <linux/kernel.h>*/
 #include <asm/unaligned.h>
 #include "scsi.h"
 #include "hosts.h"
@@ -47,13 +50,21 @@ int scsicam_bios_param(Disk * disk,	/* SCSI disk */
 	int size = disk->capacity;
 	unsigned long temp_cyl;
 
+#if 0
 	if (!(bh = bread(MKDEV(MAJOR(dev), MINOR(dev)&~0xf), 0, block_size(dev))))
 		return -1;
+#else 
+	bh = NULL; 
+	printk("scsicam_bios_param: bread not avail!\n"); 
+	BUG(); 
+#endif
 
 	/* try to infer mapping from partition table */
 	ret_code = scsi_partsize(bh, (unsigned long) size, (unsigned int *) ip + 2,
 		       (unsigned int *) ip + 0, (unsigned int *) ip + 1);
+#if 0
 	brelse(bh);
+#endif
 
 	if (ret_code == -1) {
 		/* pick some standard mapping with at most 1024 cylinders,

@@ -9,11 +9,11 @@
  */
 
 #define __NO_VERSION__
-#include <linux/config.h>
-#include <linux/module.h>
-#include <linux/init.h>
+#include <xeno/config.h>
+#include <xeno/module.h>
+#include <xeno/init.h>
 
-#include <linux/blk.h>
+#include <xeno/blk.h>
 
 #include "scsi.h"
 #include "hosts.h"
@@ -205,6 +205,7 @@ MODULE_PARM_DESC(max_scsi_luns, "last scsi LUN (should be between 1 and 2^32-1)"
 
 static int __init scsi_luns_setup(char *str)
 {
+#if 0
 	unsigned int tmp;
 
 	if (get_option(&str, &tmp) == 1) {
@@ -215,6 +216,9 @@ static int __init scsi_luns_setup(char *str)
 		       "(n should be between 1 and 2^32-1)\n");
 		return 0;
 	}
+#else
+	return 0;
+#endif
 }
 
 __setup("max_scsi_luns=", scsi_luns_setup);
@@ -343,10 +347,12 @@ void scan_scsis(struct Scsi_Host *shpnt,
 
 	initialize_merge_fn(SDpnt);
 
+#if 0
         /*
          * Initialize the object that we will use to wait for command blocks.
          */
 	init_waitqueue_head(&SDpnt->scpnt_wait);
+#endif
 
 	/*
 	 * Next, hook the device to the host in question.
@@ -525,7 +531,9 @@ static int scan_scsis_single(unsigned int channel, unsigned int dev,
 	Scsi_Device *SDtail, *SDpnt = *SDpnt2;
 	Scsi_Request * SRpnt;
 	int bflags, type = -1;
+#ifdef DEVFS_MUST_DIE
 	extern devfs_handle_t scsi_devfs_handle;
+#endif
 	int scsi_level;
 
 	SDpnt->host = shpnt;
@@ -686,8 +694,10 @@ static int scan_scsis_single(unsigned int channel, unsigned int dev,
 
         sprintf (devname, "host%d/bus%d/target%d/lun%d",
                  SDpnt->host->host_no, SDpnt->channel, SDpnt->id, SDpnt->lun);
+#ifdef DEVFS_MUST_DIE
         if (SDpnt->de) printk ("DEBUG: dir: \"%s\" already exists\n", devname);
         else SDpnt->de = devfs_mk_dir (scsi_devfs_handle, devname, NULL);
+#endif
 
 	for (sdtpnt = scsi_devicelist; sdtpnt;
 	     sdtpnt = sdtpnt->next)
@@ -796,10 +806,12 @@ static int scan_scsis_single(unsigned int channel, unsigned int dev,
 	 */
 	SDpnt->online = TRUE;
 
+#if 0
         /*
          * Initialize the object that we will use to wait for command blocks.
          */
 	init_waitqueue_head(&SDpnt->scpnt_wait);
+#endif
 
 	/*
 	 * Since we just found one device, there had damn well better be one in the list

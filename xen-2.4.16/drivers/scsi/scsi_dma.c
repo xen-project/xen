@@ -6,9 +6,9 @@
  */
 
 #define __NO_VERSION__
-#include <linux/config.h>
-#include <linux/module.h>
-#include <linux/blk.h>
+#include <xeno/config.h>
+#include <xeno/module.h>
+#include <xeno/blk.h>
 
 
 #include "scsi.h"
@@ -165,6 +165,7 @@ int scsi_free(void *obj, unsigned int len)
 		}
 	}
 	panic("scsi_free:Bad offset");
+	return -1; 
 }
 
 
@@ -206,7 +207,8 @@ void scsi_resize_dma_pool(void)
 		 * Free up the DMA pool.
 		 */
 		if (scsi_dma_free_sectors != dma_sectors)
-			panic("SCSI DMA pool memory leak %d %d\n", scsi_dma_free_sectors, dma_sectors);
+			panic("SCSI DMA pool memory leak %d %d\n", 
+			      scsi_dma_free_sectors, dma_sectors);
 
 		for (i = 0; i < dma_sectors / SECTORS_PER_PAGE; i++)
 			free_pages((unsigned long) dma_malloc_pages[i], 0);
@@ -225,9 +227,11 @@ void scsi_resize_dma_pool(void)
 
 	new_dma_sectors = 2 * SECTORS_PER_PAGE;		/* Base value we use */
 
+#if 0 
 	if (__pa(high_memory) - 1 > ISA_DMA_THRESHOLD)
 		need_isa_bounce_buffers = 1;
 	else
+#endif
 		need_isa_bounce_buffers = 0;
 
 	if (scsi_devicelist)

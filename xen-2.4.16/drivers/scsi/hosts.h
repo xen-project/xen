@@ -64,6 +64,7 @@ typedef struct	SHT
     /* Used with loadable modules so that we know when it is safe to unload */
     struct module * module;
 
+#ifdef CONFIG_PROC_FS
     /* The pointer to the /proc/scsi directory entry */
     struct proc_dir_entry *proc_dir;
 
@@ -73,6 +74,7 @@ typedef struct	SHT
      * to feed the driver with information. Check eata_dma_proc.c for reference
      */
     int (*proc_info)(char *, char **, off_t, int, int, int);
+#endif
 
     /*
      * The name pointer is a pointer to the name of the SCSI
@@ -326,7 +328,9 @@ struct Scsi_Host
                                           host. */
     unsigned int            eh_active:1; /* Indicates the eh thread is awake and active if
                                           this is true. */
+#if 0 
     wait_queue_head_t       host_wait;
+#endif
     Scsi_Host_Template    * hostt;
     atomic_t                host_active; /* commands checked out */
     volatile unsigned short host_busy;   /* commands actually active on low-level */
@@ -528,9 +532,11 @@ void  scsi_initialize_queue(Scsi_Device * SDpnt, struct Scsi_Host * SHpnt);
 int scsi_register_device(struct Scsi_Device_Template * sdpnt);
 void scsi_deregister_device(struct Scsi_Device_Template * tpnt);
 
+#if 0 
 /* These are used by loadable modules */
 extern int scsi_register_module(int, void *);
 extern int scsi_unregister_module(int, void *);
+#endif
 
 /* The different types of modules that we can load and unload */
 #define MODULE_SCSI_HA 1
