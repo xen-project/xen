@@ -334,6 +334,9 @@
 3ddb79bfl1H1arbB0pzAEC2uPmY_3g xen/drivers/pci/setup-irq.c
 3ddb79bfJaf0bkE1Y67bnll8-kjEPg xen/drivers/pci/setup-res.c
 3ddb79bfIcCWJsBDNcQQE3ok2Azn-Q xen/drivers/pci/syscall.c
+3facce119oL2_kMylnMRUQlTsUw-OA xen/drivers/scsi/BusLogic.c
+3facce12hrTrkdXJQR0MjOG3ud0K0A xen/drivers/scsi/BusLogic.h
+3facce0dDkxv278IqO4gxypPDiw3Ow xen/drivers/scsi/FlashPoint.c.inc
 3ddb79be3kwzyKagpMHGoXZFdan7dg xen/drivers/scsi/Makefile
 3e564137sVLmo7rTnKLNzLSCvuUz8g xen/drivers/scsi/aacraid/Makefile
 3e5641379FXvLDjV-0OrRNOBTwL_Lw xen/drivers/scsi/aacraid/README

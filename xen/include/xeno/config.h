@@ -119,14 +119,14 @@
 #endif
 
 /* syslog levels ==> nothing! */
-#define KERN_NOTICE
-#define KERN_WARNING
-#define KERN_DEBUG
-#define KERN_INFO
-#define KERN_ERR
-#define KERN_CRIT
-#define KERN_EMERG
-#define KERN_ALERT
+#define KERN_NOTICE  ""
+#define KERN_WARNING ""
+#define KERN_DEBUG   ""
+#define KERN_INFO    ""
+#define KERN_ERR     ""
+#define KERN_CRIT    ""
+#define KERN_EMERG   ""
+#define KERN_ALERT   ""
 
 #define barrier() __asm__ __volatile__("": : :"memory")
 
