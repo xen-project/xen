@@ -71,9 +71,19 @@ then
  export LINUX_SRC_PATH=${LINUX_DIR}
 
  cd ${DEST_BK_REP} 
- ln -sf ../install install
+
+ # Recent repositories install into 'dist/install' rather than 'install'.
+ if [ -f install.sh ]
+ then
+  mkdir -p dist
+  ln -sf ../../install dist/install
+ else
+  ln -sf ../install install
+ fi
+
  make -j4 world
  make -j4 linux24
+ make -j4 dist
  cd ../install/boot
  [ -r vmlinuz-2.6.*-xen0 ] && ln -s vmlinuz-2.6.*-xen0 xenolinux.gz
   
