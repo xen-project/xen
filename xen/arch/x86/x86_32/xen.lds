@@ -25,12 +25,12 @@ SECTIONS
   .rodata : { *(.rodata) *(.rodata.*) } :text
   .kstrtab : { *(.kstrtab) } :text
 
-  . = ALIGN(16);		/* Exception table */
+  . = ALIGN(32);		/* Exception table */
   __start___ex_table = .;
   __ex_table : { *(__ex_table) } :text
   __stop___ex_table = .;
 
-  . = ALIGN(16);		/* Pre-exception table */
+  . = ALIGN(32);		/* Pre-exception table */
   __start___pre_ex_table = .;
   __pre_ex_table : { *(__pre_ex_table) } :text
   __stop___pre_ex_table = .;
@@ -57,7 +57,7 @@ SECTIONS
   __init_begin = .;
   .text.init : { *(.text.init) } :text
   .data.init : { *(.data.init) } :text
-  . = ALIGN(16);
+  . = ALIGN(32);
   __setup_start = .;
   .setup.init : { *(.setup.init) } :text
   __setup_end = .;

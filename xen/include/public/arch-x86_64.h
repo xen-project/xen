@@ -115,6 +115,7 @@ typedef u64 tsc_timestamp_t; /* RDTSC timestamp */
  */
 typedef struct {
 #define ECF_I387_VALID (1<<0)
+#define ECF_VMX_GUEST  (2<<0)
     unsigned long flags;
     execution_context_t cpu_ctxt;           /* User-level CPU registers     */
     char          fpu_ctxt[512];            /* User-level FPU registers     */

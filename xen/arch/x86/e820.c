@@ -305,17 +305,11 @@ static unsigned long __init find_max_pfn(void)
     return max_pfn;
 }
 
-static void __init machine_specific_memory_setup(
-    struct e820entry *raw, int raw_nr)
+#ifdef __i386__
+static void __init clip_4gb(void)
 {
-    char nr = (char)raw_nr;
     int i;
 
-    sanitize_e820_map(raw, &nr);
-
-    (void)copy_e820_map(raw, nr);
-
-#ifdef __i386__
     /* 32-bit systems restricted to a 4GB physical memory map. */
     for ( i = 0; i < e820.nr_map; i++ )
     {
@@ -335,7 +329,18 @@ static void __init machine_specific_memory_setup(
             e820.nr_map = i + 1;                
         }            
     }
+}
+#else
+#define clip_4gb() ((void)0)
 #endif
+
+static void __init machine_specific_memory_setup(
+    struct e820entry *raw, int raw_nr)
+{
+    char nr = (char)raw_nr;
+    sanitize_e820_map(raw, &nr);
+    (void)copy_e820_map(raw, nr);
+    clip_4gb();
 }
 
 unsigned long init_e820(struct e820entry *raw, int raw_nr)
