@@ -35,6 +35,7 @@
 #include <linux/raw.h>
 #include <linux/tty.h>
 #include <linux/capability.h>
+#include <linux/ptrace.h>
 
 #include <asm/uaccess.h>
 #include <asm/io.h>
@@ -536,16 +537,23 @@ static loff_t null_lseek(struct file * file, loff_t offset, int orig)
  */
 static loff_t memory_lseek(struct file * file, loff_t offset, int orig)
 {
+	loff_t ret;
+
 	switch (orig) {
 		case 0:
 			file->f_pos = offset;
-			return file->f_pos;
+			ret = file->f_pos;
+			force_successful_syscall_return();
+			break;
 		case 1:
 			file->f_pos += offset;
-			return file->f_pos;
+			ret = file->f_pos;
+			force_successful_syscall_return();
+			break;
 		default:
-			return -EINVAL;
+			ret = -EINVAL;
 	}
+	return ret;
 }
 
 static int open_port(struct inode * inode, struct file * filp)

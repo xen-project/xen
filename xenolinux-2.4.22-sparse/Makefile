@@ -1,6 +1,6 @@
 VERSION = 2
 PATCHLEVEL = 4
-SUBLEVEL = 22
+SUBLEVEL = 23
 EXTRAVERSION = -xeno
 
 KERNELRELEASE=$(VERSION).$(PATCHLEVEL).$(SUBLEVEL)$(EXTRAVERSION)
@@ -186,6 +186,7 @@ DRIVERS-$(CONFIG_PARIDE) += drivers/block/paride/paride.a
 DRIVERS-$(CONFIG_HAMRADIO) += drivers/net/hamradio/hamradio.o
 DRIVERS-$(CONFIG_TC) += drivers/tc/tc.a
 DRIVERS-$(CONFIG_USB) += drivers/usb/usbdrv.o
+DRIVERS-$(CONFIG_USB_GADGET) += drivers/usb/gadget/built-in.o
 DRIVERS-y +=drivers/media/media.o
 DRIVERS-$(CONFIG_INPUT) += drivers/input/inputdrv.o
 DRIVERS-$(CONFIG_HIL) += drivers/hil/hil.o

@@ -158,6 +158,7 @@ extern void tub3270_init(void);
 extern void rs285_console_init(void);
 extern void sa1100_rs_console_init(void);
 extern void sgi_serial_console_init(void);
+extern void sn_sal_serial_console_init(void);
 extern void sci_console_init(void);
 extern void dec_serial_console_init(void);
 extern void tx3912_console_init(void);
@@ -458,8 +459,6 @@ void do_tty_hangup(void *data)
 		redirect = NULL;
 	}
 	spin_unlock(&redirect_lock);
-	if (f)
-		fput(f);
 	
 	check_tty_count(tty, "do_tty_hangup");
 	file_list_lock();
@@ -546,6 +545,8 @@ void do_tty_hangup(void *data)
 	} else if (tty->driver.hangup)
 		(tty->driver.hangup)(tty);
 	unlock_kernel();
+	if (f)
+		fput(f);
 }
 
 void tty_hangup(struct tty_struct * tty)
@@ -1052,7 +1053,7 @@ static void release_mem(struct tty_struct *tty, int idx)
 		}
 		o_tty->magic = 0;
 		(*o_tty->driver.refcount)--;
-		list_del(&o_tty->tty_files);
+		list_del_init(&o_tty->tty_files);
 		free_tty_struct(o_tty);
 	}
 
@@ -1064,7 +1065,7 @@ static void release_mem(struct tty_struct *tty, int idx)
 	}
 	tty->magic = 0;
 	(*tty->driver.refcount)--;
-	list_del(&tty->tty_files);
+	list_del_init(&tty->tty_files);
 	free_tty_struct(tty);
 }
 
@@ -2400,6 +2401,12 @@ void __init tty_init(void)
 	kbd_init();
 #endif
 
+#ifdef CONFIG_SGI_L1_SERIAL_CONSOLE
+	if (ia64_platform_is("sn2")) {
+		sn_sal_serial_console_init();
+		return; /* only one console right now for SN2 */
+	}
+#endif
 #ifdef CONFIG_ESPSERIAL  /* init ESP before rs, so rs doesn't see the port */
 	espserial_init();
 #endif

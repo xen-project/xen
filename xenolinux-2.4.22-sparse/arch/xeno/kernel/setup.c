@@ -707,6 +707,23 @@ static int __init have_cpuid_p(void)
 
 
 
+#if defined(CONFIG_EDD) || defined(CONFIG_EDD_MODULE)
+unsigned char eddnr;
+struct edd_info edd[EDDMAXNR];
+/**
+ * copy_edd() - Copy the BIOS EDD information
+ *              from empty_zero_page into a safe place.
+ *
+ */
+static inline void copy_edd(void)
+{
+     eddnr = EDD_NR;
+     memcpy(edd, EDD_BUF, sizeof(edd));
+}
+#else
+static inline void copy_edd(void) {}
+#endif
+
 /*
  * This does the hard work of actually picking apart the CPU stuff...
  */
@@ -742,11 +759,17 @@ void __init identify_cpu(struct cpuinfo_x86 *c)
 
         /* Intel-defined flags: level 0x00000001 */
         if ( c->cpuid_level >= 0x00000001 ) {
-            cpuid(0x00000001, &tfms, &junk, &junk,
-                  &c->x86_capability[0]);
-            c->x86 = (tfms >> 8) & 15;
-            c->x86_model = (tfms >> 4) & 15;
-            c->x86_mask = tfms & 15;
+                        u32 capability, excap;
+                        cpuid(0x00000001, &tfms, &junk, &excap, &capability);
+                        c->x86_capability[0] = capability;
+                        c->x86_capability[4] = excap;
+                        c->x86 = (tfms >> 8) & 15;
+                        c->x86_model = (tfms >> 4) & 15;
+                        if (c->x86 == 0xf) {
+                                c->x86 += (tfms >> 20) & 0xff;
+                                c->x86_model += ((tfms >> 16) & 0xF) << 4;
+                        }
+                        c->x86_mask = tfms & 15;
         } else {
             /* Have CPUID level 0 only - unheard of */
             c->x86 = 4;
@@ -891,12 +914,12 @@ static int show_cpuinfo(struct seq_file *m, void *v)
         "fpu", "vme", "de", "pse", "tsc", "msr", "pae", "mce",
         "cx8", "apic", NULL, "sep", "mtrr", "pge", "mca", "cmov",
         "pat", "pse36", "pn", "clflush", NULL, "dts", "acpi", "mmx",
-        "fxsr", "sse", "sse2", "ss", NULL, "tm", "ia64", NULL,
+        "fxsr", "sse", "sse2", "ss", "ht", "tm", "ia64", "pbe",
 
         /* AMD-defined */
         NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL,
         NULL, NULL, NULL, "syscall", NULL, NULL, NULL, NULL,
-        NULL, NULL, NULL, NULL, NULL, NULL, "mmxext", NULL,
+        NULL, NULL, NULL, "mp", NULL, NULL, "mmxext", NULL,
         NULL, NULL, NULL, NULL, NULL, "lm", "3dnowext", "3dnow",
 
         /* Transmeta-defined */
@@ -906,10 +929,24 @@ static int show_cpuinfo(struct seq_file *m, void *v)
         NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL,
 
         /* Other (Linux-defined) */
-        "cxmmx", "k6_mtrr", "cyrix_arr", "centaur_mcr", NULL, NULL, NULL, NULL,
+        "cxmmx", "k6_mtrr", "cyrix_arr", "centaur_mcr", 
+	NULL, NULL, NULL, NULL,
         NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL,
         NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL,
         NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL,
+
+        /* Intel-defined (#2) */
+        "pni", NULL, NULL, "monitor", "ds_cpl", NULL, NULL, "tm2",
+        "est", NULL, "cid", NULL, NULL, NULL, NULL, NULL,
+        NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL,
+        NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL,
+
+        /* VIA/Cyrix/Centaur-defined */
+        NULL, NULL, "xstore", NULL, NULL, NULL, NULL, NULL,
+        NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL,
+        NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL,
+        NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL,
+
     };
     struct cpuinfo_x86 *c = v;
     int i, n = c - cpu_data;
