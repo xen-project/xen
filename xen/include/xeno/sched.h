@@ -51,9 +51,9 @@ typedef struct event_channel_st
 {
     struct task_struct *remote_dom;
     u16                 remote_port;
-#define ECS_FREE      0 /* Available for use.                            */
-#define ECS_ZOMBIE    1 /* Connection is closed. Remote is disconnected. */
-#define ECS_CONNECTED 2 /* Connected to remote end.                      */
+#define ECS_FREE         0 /* Available for use.                            */
+#define ECS_DISCONNECTED 1 /* Connection is closed. Remote is disconnected. */
+#define ECS_CONNECTED    2 /* Connected to remote end.                      */
     u16                 state;
 } event_channel_t;
 

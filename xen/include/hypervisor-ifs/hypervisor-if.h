@@ -129,23 +129,24 @@
  *  which shifts the least bits out.
  */
 /* A normal page-table update request. */
-#define MMU_NORMAL_PT_UPDATE     0 /* checked '*ptr = val'. ptr is MA.      */
-/* DOM0 can make entirely unchecked updates which do not affect refcnts. */
-#define MMU_UNCHECKED_PT_UPDATE  1 /* unchecked '*ptr = val'. ptr is MA.    */
+#define MMU_NORMAL_PT_UPDATE     0 /* checked '*ptr = val'. ptr is MA.       */
 /* Update an entry in the machine->physical mapping table. */
-#define MMU_MACHPHYS_UPDATE      2 /* ptr = MA of frame to modify entry for */
+#define MMU_MACHPHYS_UPDATE      2 /* ptr = MA of frame to modify entry for  */
 /* An extended command. */
-#define MMU_EXTENDED_COMMAND     3 /* least 8 bits of val demux further     */
+#define MMU_EXTENDED_COMMAND     3 /* least 8 bits of val demux further      */
 /* Extended commands: */
-#define MMUEXT_PIN_L1_TABLE      0 /* ptr = MA of frame to pin              */
-#define MMUEXT_PIN_L2_TABLE      1 /* ptr = MA of frame to pin              */
-#define MMUEXT_PIN_L3_TABLE      2 /* ptr = MA of frame to pin              */
-#define MMUEXT_PIN_L4_TABLE      3 /* ptr = MA of frame to pin              */
-#define MMUEXT_UNPIN_TABLE       4 /* ptr = MA of frame to unpin            */
-#define MMUEXT_NEW_BASEPTR       5 /* ptr = MA of new pagetable base        */
-#define MMUEXT_TLB_FLUSH         6 /* ptr = NULL                            */
-#define MMUEXT_INVLPG            7 /* ptr = NULL ; val = VA to invalidate   */
-#define MMUEXT_SET_LDT           8 /* ptr = VA of table; val = # entries    */
+#define MMUEXT_PIN_L1_TABLE      0 /* ptr = MA of frame to pin               */
+#define MMUEXT_PIN_L2_TABLE      1 /* ptr = MA of frame to pin               */
+#define MMUEXT_PIN_L3_TABLE      2 /* ptr = MA of frame to pin               */
+#define MMUEXT_PIN_L4_TABLE      3 /* ptr = MA of frame to pin               */
+#define MMUEXT_UNPIN_TABLE       4 /* ptr = MA of frame to unpin             */
+#define MMUEXT_NEW_BASEPTR       5 /* ptr = MA of new pagetable base         */
+#define MMUEXT_TLB_FLUSH         6 /* ptr = NULL                             */
+#define MMUEXT_INVLPG            7 /* ptr = NULL ; val = VA to invalidate    */
+#define MMUEXT_SET_LDT           8 /* ptr = VA of table; val = # entries     */
+/* NB. MMUEXT_SET_SUBJECTDOM must consist of *_L followed immediately by *_H */
+#define MMUEXT_SET_SUBJECTDOM_L  9 /* (ptr[31:15],val[31:15]) = dom[31:0]    */
+#define MMUEXT_SET_SUBJECTDOM_H 10 /* (ptr[31:15],val[31:15]) = dom[63:32]   */
 #define MMUEXT_CMD_MASK        255
 #define MMUEXT_CMD_SHIFT         8
 

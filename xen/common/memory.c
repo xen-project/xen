@@ -1,7 +1,7 @@
 /******************************************************************************
  * memory.c
  * 
- * Copyright (c) 2002 K A Fraser
+ * Copyright (c) 2002-2004 K A Fraser
  * 
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -149,9 +149,12 @@
 
 static int alloc_l2_table(struct pfn_info *page);
 static int alloc_l1_table(struct pfn_info *page);
-static int get_page_from_pagenr(unsigned long page_nr);
+static int get_page_from_pagenr(unsigned long page_nr, int check_level);
 static int get_page_and_type_from_pagenr(unsigned long page_nr, 
-                                         unsigned int type);
+                                         unsigned int type,
+                                         int check_level);
+#define CHECK_STRICT 0 /* Subject domain must own the page                  */
+#define CHECK_ANYDOM 1 /* Any domain may own the page (if subject is priv.) */
 
 static void free_l2_table(struct pfn_info *page);
 static void free_l1_table(struct pfn_info *page);
@@ -172,9 +175,11 @@ unsigned int free_pfns;
 static struct {
 #define DOP_FLUSH_TLB   (1<<0) /* Flush the TLB.                 */
 #define DOP_RELOAD_LDT  (1<<1) /* Reload the LDT shadow mapping. */
-    unsigned long flags;
-    unsigned long cr0;
-} deferred_op[NR_CPUS] __cacheline_aligned;
+    unsigned long       deferred_ops;
+    unsigned long       cr0;
+    domid_t             subject_id;
+    struct task_struct *subject_p;
+} percpu_info[NR_CPUS] __cacheline_aligned;
 
 /*
  * init_frametable:
@@ -187,7 +192,7 @@ void __init init_frametable(unsigned long nr_pages)
     unsigned long page_index;
     unsigned long flags;
 
-    memset(deferred_op, 0, sizeof(deferred_op));
+    memset(percpu_info, 0, sizeof(percpu_info));
 
     max_page = nr_pages;
     frame_table_size = nr_pages * sizeof(struct pfn_info);
@@ -232,7 +237,7 @@ static void __invalidate_shadow_ldt(struct task_struct *p)
     }
 
     /* Dispose of the (now possibly invalid) mappings from the TLB.  */
-    deferred_op[p->processor].flags |= DOP_FLUSH_TLB | DOP_RELOAD_LDT;
+    percpu_info[p->processor].deferred_ops |= DOP_FLUSH_TLB | DOP_RELOAD_LDT;
 }
 
 
@@ -286,39 +291,49 @@ int map_ldt_shadow_page(unsigned int off)
 }
 
 
-/* Domain 0 is allowed to build page tables on others' behalf. */
-static inline int dom0_get_page(struct pfn_info *page)
+static int get_page_from_pagenr(unsigned long page_nr, int check_level)
 {
-    unsigned long x, nx, y = page->count_and_flags;
-
-    do {
-        x  = y;
-        nx = x + 1;
-        if ( unlikely((x & PGC_count_mask) == 0) ||
-             unlikely((nx & PGC_count_mask) == 0) )
-            return 0;
-    }
-    while ( unlikely((y = cmpxchg(&page->count_and_flags, x, nx)) != x) );
-
-    return 1;
-}
-
-
-static int get_page_from_pagenr(unsigned long page_nr)
-{
+    struct task_struct *p = current;
     struct pfn_info *page = &frame_table[page_nr];
+    unsigned long y, x, nx;
 
-    if ( unlikely(page_nr >= max_page) )
+    if ( unlikely(!pfn_is_ram(page_nr)) )
     {
-        MEM_LOG("Page out of range (%08lx>%08lx)", page_nr, max_page);
+        MEM_LOG("Pfn %08lx is not RAM", page_nr);
         return 0;
     }
 
-    if ( unlikely(!get_page(page, current)) &&
-         unlikely((current->domain != 0) || !dom0_get_page(page)) )
+    /* Find the correct subject domain. */
+    if ( unlikely(percpu_info[p->processor].subject_p != NULL) )
+        p = percpu_info[p->processor].subject_p;
+
+    /* Demote ANYDOM to STRICT if subject domain is not privileged. */
+    if ( check_level == CHECK_ANYDOM && !IS_PRIV(p) )
+        check_level = CHECK_STRICT;
+
+    switch ( check_level )
     {
-        MEM_LOG("Could not get page reference for pfn %08lx\n", page_nr);
-        return 0;
+    case CHECK_STRICT:
+        if ( unlikely(!get_page(page, p)) )
+        {
+            MEM_LOG("Could not get page ref for pfn %08lx\n", page_nr);
+            return 0;
+        }
+        break;
+    case CHECK_ANYDOM:
+        y = page->count_and_flags;
+        do {
+            x  = y;
+            nx = x + 1;
+            if ( unlikely((x & PGC_count_mask) == 0) ||
+                 unlikely((nx & PGC_count_mask) == 0) )
+            {
+                MEM_LOG("Could not get page ref for pfn %08lx\n", page_nr);
+                return 0;
+            }
+        }
+        while ( unlikely((y = cmpxchg(&page->count_and_flags, x, nx)) != x) );
+        break;
     }
 
     return 1;
@@ -326,11 +341,12 @@ static int get_page_from_pagenr(unsigned long page_nr)
 
 
 static int get_page_and_type_from_pagenr(unsigned long page_nr, 
-                                         unsigned int type)
+                                         unsigned int type,
+                                         int check_level)
 {
     struct pfn_info *page = &frame_table[page_nr];
 
-    if ( unlikely(!get_page_from_pagenr(page_nr)) )
+    if ( unlikely(!get_page_from_pagenr(page_nr, check_level)) )
         return 0;
 
     if ( unlikely(!get_page_type(page, type)) )
@@ -371,7 +387,8 @@ static int get_linear_pagetable(l2_pgentry_t l2e, unsigned long pfn)
     if ( (l2_pgentry_val(l2e) >> PAGE_SHIFT) != pfn )
     {
         /* Make sure the mapped frame belongs to the correct domain. */
-        if ( unlikely(!get_page_from_pagenr(l2_pgentry_to_pagenr(l2e))) )
+        if ( unlikely(!get_page_from_pagenr(l2_pgentry_to_pagenr(l2e), 
+                                            CHECK_STRICT)) )
             return 0;
 
         /*
@@ -399,33 +416,45 @@ static int get_linear_pagetable(l2_pgentry_t l2e, unsigned long pfn)
 
 static int get_page_from_l1e(l1_pgentry_t l1e)
 {
-    ASSERT(l1_pgentry_val(l1e) & _PAGE_PRESENT);
+    unsigned long l1v = l1_pgentry_val(l1e);
+    unsigned long pfn = l1_pgentry_to_pagenr(l1e);
 
-    if ( unlikely((l1_pgentry_val(l1e) & (_PAGE_GLOBAL|_PAGE_PAT))) )
+    if ( !(l1v & _PAGE_PRESENT) )
+        return 1;
+
+    if ( unlikely(l1v & (_PAGE_GLOBAL|_PAGE_PAT)) )
     {
-        MEM_LOG("Bad L1 page type settings %04lx",
-                l1_pgentry_val(l1e) & (_PAGE_GLOBAL|_PAGE_PAT));
+        MEM_LOG("Bad L1 type settings %04lx", l1v & (_PAGE_GLOBAL|_PAGE_PAT));
         return 0;
     }
 
-    if ( l1_pgentry_val(l1e) & _PAGE_RW )
+    if ( unlikely(!pfn_is_ram(pfn)) )
+    {
+        if ( IS_PRIV(current) )
+            return 1;
+        MEM_LOG("Non-privileged attempt to map I/O space %08lx", pfn);
+        return 0;
+    }
+
+    if ( l1v & _PAGE_RW )
     {
         if ( unlikely(!get_page_and_type_from_pagenr(
-            l1_pgentry_to_pagenr(l1e), PGT_writeable_page)) )
+            pfn, PGT_writeable_page, CHECK_ANYDOM)) )
             return 0;
         set_bit(_PGC_tlb_flush_on_type_change, 
-                &frame_table[l1_pgentry_to_pagenr(l1e)].count_and_flags);
+                &frame_table[pfn].count_and_flags);
         return 1;
     }
 
-    return get_page_from_pagenr(l1_pgentry_to_pagenr(l1e));
+    return get_page_from_pagenr(pfn, CHECK_ANYDOM);
 }
 
 
 /* NB. Virtual address 'l2e' maps to a machine address within frame 'pfn'. */
 static int get_page_from_l2e(l2_pgentry_t l2e, unsigned long pfn)
 {
-    ASSERT(l2_pgentry_val(l2e) & _PAGE_PRESENT);
+    if ( !(l2_pgentry_val(l2e) & _PAGE_PRESENT) )
+        return 1;
 
     if ( unlikely((l2_pgentry_val(l2e) & (_PAGE_GLOBAL|_PAGE_PSE))) )
     {
@@ -435,7 +464,7 @@ static int get_page_from_l2e(l2_pgentry_t l2e, unsigned long pfn)
     }
 
     if ( unlikely(!get_page_and_type_from_pagenr(
-        l2_pgentry_to_pagenr(l2e), PGT_l1_page_table)) )
+        l2_pgentry_to_pagenr(l2e), PGT_l1_page_table, CHECK_STRICT)) )
         return get_linear_pagetable(l2e, pfn);
 
     return 1;
@@ -445,10 +474,12 @@ static int get_page_from_l2e(l2_pgentry_t l2e, unsigned long pfn)
 static void put_page_from_l1e(l1_pgentry_t l1e)
 {
     struct pfn_info *page = &frame_table[l1_pgentry_to_pagenr(l1e)];
+    unsigned long    l1v  = l1_pgentry_val(l1e);
 
-    ASSERT(l1_pgentry_val(l1e) & _PAGE_PRESENT);
+    if ( !(l1v & _PAGE_PRESENT) || !pfn_is_ram(l1v >> PAGE_SHIFT) )
+        return;
 
-    if ( l1_pgentry_val(l1e) & _PAGE_RW )
+    if ( l1v & _PAGE_RW )
     {
         put_page_and_type(page);
     }
@@ -470,8 +501,6 @@ static void put_page_from_l1e(l1_pgentry_t l1e)
  */
 static void put_page_from_l2e(l2_pgentry_t l2e, unsigned long pfn)
 {
-    ASSERT(l2_pgentry_val(l2e) & _PAGE_PRESENT);
-
     if ( (l2_pgentry_val(l2e) & _PAGE_PRESENT) && 
          ((l2_pgentry_val(l2e) >> PAGE_SHIFT) != pfn) )
         put_page_and_type(&frame_table[l2_pgentry_to_pagenr(l2e)]);
@@ -481,21 +510,14 @@ static void put_page_from_l2e(l2_pgentry_t l2e, unsigned long pfn)
 static int alloc_l2_table(struct pfn_info *page)
 {
     unsigned long page_nr = page - frame_table;
-    l2_pgentry_t *pl2e, l2e;
+    l2_pgentry_t *pl2e;
     int i;
    
     pl2e = map_domain_mem(page_nr << PAGE_SHIFT);
 
     for ( i = 0; i < DOMAIN_ENTRIES_PER_L2_PAGETABLE; i++ )
-    {
-        l2e = pl2e[i];
-
-        if ( !(l2_pgentry_val(l2e) & _PAGE_PRESENT) ) 
-            continue;
-
-        if ( unlikely(!get_page_from_l2e(l2e, page_nr)) )
+        if ( unlikely(!get_page_from_l2e(pl2e[i], page_nr)) )
             goto fail;
-    }
     
     /* Now we add our private high mappings. */
     memcpy(&pl2e[DOMAIN_ENTRIES_PER_L2_PAGETABLE], 
@@ -512,11 +534,7 @@ static int alloc_l2_table(struct pfn_info *page)
 
  fail:
     while ( i-- > 0 )
-    {
-        l2e = pl2e[i];
-        if ( l2_pgentry_val(l2e) & _PAGE_PRESENT )
-            put_page_from_l2e(l2e, page_nr);
-    }
+        put_page_from_l2e(pl2e[i], page_nr);
 
     unmap_domain_mem(pl2e);
     return 0;
@@ -526,34 +544,21 @@ static int alloc_l2_table(struct pfn_info *page)
 static int alloc_l1_table(struct pfn_info *page)
 {
     unsigned long page_nr = page - frame_table;
-    l1_pgentry_t *pl1e, l1e;
+    l1_pgentry_t *pl1e;
     int i;
 
     pl1e = map_domain_mem(page_nr << PAGE_SHIFT);
 
     for ( i = 0; i < ENTRIES_PER_L1_PAGETABLE; i++ )
-    {
-        l1e = pl1e[i];
-
-        if ( !(l1_pgentry_val(l1e) & _PAGE_PRESENT) ) 
-            continue;
-
-        if ( unlikely(!get_page_from_l1e(l1e)) )
+        if ( unlikely(!get_page_from_l1e(pl1e[i])) )
             goto fail;
-    }
 
-    /* Make sure we unmap the right page! */
     unmap_domain_mem(pl1e);
     return 1;
 
  fail:
     while ( i-- > 0 )
-    {
-        l1e = pl1e[i];
-        if ( !(l1_pgentry_val(l1e) & _PAGE_PRESENT) )
-            continue;
-        put_page_from_l1e(l1e);
-    }
+        put_page_from_l1e(pl1e[i]);
 
     unmap_domain_mem(pl1e);
     return 0;
@@ -563,18 +568,13 @@ static int alloc_l1_table(struct pfn_info *page)
 static void free_l2_table(struct pfn_info *page)
 {
     unsigned long page_nr = page - frame_table;
-    l2_pgentry_t *pl2e, l2e;
+    l2_pgentry_t *pl2e;
     int i;
 
     pl2e = map_domain_mem(page_nr << PAGE_SHIFT);
 
     for ( i = 0; i < DOMAIN_ENTRIES_PER_L2_PAGETABLE; i++ )
-    {
-        l2e = pl2e[i];
-        if ( (l2_pgentry_val(l2e) & _PAGE_PRESENT) &&
-             unlikely((l2_pgentry_val(l2e) >> PAGE_SHIFT) != page_nr) )
-            put_page_and_type(&frame_table[l2_pgentry_to_pagenr(l2e)]);
-    }
+        put_page_from_l2e(pl2e[i], page_nr);
 
     unmap_domain_mem(pl2e);
 }
@@ -583,18 +583,13 @@ static void free_l2_table(struct pfn_info *page)
 static void free_l1_table(struct pfn_info *page)
 {
     unsigned long page_nr = page - frame_table;
-    l1_pgentry_t *pl1e, l1e;
+    l1_pgentry_t *pl1e;
     int i;
 
     pl1e = map_domain_mem(page_nr << PAGE_SHIFT);
 
     for ( i = 0; i < ENTRIES_PER_L1_PAGETABLE; i++ )
-    {
-        l1e = pl1e[i];
-        if ( !(l1_pgentry_val(l1e) & _PAGE_PRESENT) ) 
-            continue;
-        put_page_from_l1e(l1e);
-    }
+        put_page_from_l1e(pl1e[i]);
 
     unmap_domain_mem(pl1e);
 }
@@ -648,18 +643,14 @@ static int mod_l2_entry(l2_pgentry_t *pl2e,
             return 0;
         }
         
-        if ( l2_pgentry_val(ol2e) & _PAGE_PRESENT )
-            put_page_from_l2e(ol2e, pfn);
-        
+        put_page_from_l2e(ol2e, pfn);
         return 1;
     }
 
     if ( unlikely(!update_l2e(pl2e, ol2e, nl2e)) )
         return 0;
 
-    if ( l2_pgentry_val(ol2e) & _PAGE_PRESENT )
-        put_page_from_l2e(ol2e, pfn);
-
+    put_page_from_l2e(ol2e, pfn);
     return 1;
 }
 
@@ -712,18 +703,14 @@ static int mod_l1_entry(l1_pgentry_t *pl1e, l1_pgentry_t nl1e)
             return 0;
         }
         
-        if ( l1_pgentry_val(ol1e) & _PAGE_PRESENT )
-            put_page_from_l1e(ol1e);
-        
+        put_page_from_l1e(ol1e);
         return 1;
     }
 
     if ( unlikely(!update_l1e(pl1e, ol1e, nl1e)) )
         return 0;
     
-    if ( l1_pgentry_val(ol1e) & _PAGE_PRESENT )
-        put_page_from_l1e(ol1e);
-
+    put_page_from_l1e(ol1e);
     return 1;
 }
 
@@ -790,24 +777,18 @@ static int do_extended_command(unsigned long ptr, unsigned long val)
     unsigned long pfn = ptr >> PAGE_SHIFT;
     struct pfn_info *page = &frame_table[pfn];
 
-    /* 'ptr' must be in range except where it isn't a machine address. */
-    if ( (pfn >= max_page) && (cmd != MMUEXT_SET_LDT) )
-    {
-        MEM_LOG("Ptr out of range for extended MMU command");
-        return 1;
-    }
-
     switch ( cmd )
     {
     case MMUEXT_PIN_L1_TABLE:
     case MMUEXT_PIN_L2_TABLE:
-        okay = get_page_and_type_from_pagenr(pfn, 
-                                             (cmd == MMUEXT_PIN_L2_TABLE) ? 
-                                             PGT_l2_page_table : 
-                                             PGT_l1_page_table);
+        okay = get_page_and_type_from_pagenr(
+            pfn, (cmd == MMUEXT_PIN_L2_TABLE) ? PGT_l2_page_table : 
+                                                PGT_l1_page_table,
+            CHECK_STRICT);
         if ( unlikely(!okay) )
         {
             MEM_LOG("Error while pinning pfn %08lx", pfn);
+            put_page(page);
             break;
         }
 
@@ -823,7 +804,7 @@ static int do_extended_command(unsigned long ptr, unsigned long val)
         break;
 
     case MMUEXT_UNPIN_TABLE:
-        if ( unlikely(!(okay = get_page_from_pagenr(pfn))) )
+        if ( unlikely(!(okay = get_page_from_pagenr(pfn, CHECK_STRICT))) )
         {
             MEM_LOG("Page %08lx bad domain (dom=%p)",
                     ptr, page->u.domain);
@@ -843,14 +824,15 @@ static int do_extended_command(unsigned long ptr, unsigned long val)
         break;
 
     case MMUEXT_NEW_BASEPTR:
-        okay = get_page_and_type_from_pagenr(pfn, PGT_l2_page_table);
+        okay = get_page_and_type_from_pagenr(pfn, PGT_l2_page_table, 
+                                             CHECK_STRICT);
         if ( likely(okay) )
         {
             put_page_and_type(&frame_table[pagetable_val(current->mm.pagetable)
                                           >> PAGE_SHIFT]);
             current->mm.pagetable = mk_pagetable(pfn << PAGE_SHIFT);
             invalidate_shadow_ldt();
-            deferred_op[cpu].flags |= DOP_FLUSH_TLB;
+            percpu_info[cpu].deferred_ops |= DOP_FLUSH_TLB;
         }
         else
         {
@@ -859,7 +841,7 @@ static int do_extended_command(unsigned long ptr, unsigned long val)
         break;
         
     case MMUEXT_TLB_FLUSH:
-        deferred_op[cpu].flags |= DOP_FLUSH_TLB;
+        percpu_info[cpu].deferred_ops |= DOP_FLUSH_TLB;
         break;
     
     case MMUEXT_INVLPG:
@@ -884,12 +866,38 @@ static int do_extended_command(unsigned long ptr, unsigned long val)
             current->mm.ldt_base = ptr;
             current->mm.ldt_ents = ents;
             load_LDT(current);
-            deferred_op[cpu].flags &= ~DOP_RELOAD_LDT;
+            percpu_info[cpu].deferred_ops &= ~DOP_RELOAD_LDT;
             if ( ents != 0 )
-                deferred_op[cpu].flags |= DOP_RELOAD_LDT;
+                percpu_info[cpu].deferred_ops |= DOP_RELOAD_LDT;
         }
         break;
     }
+
+    case MMUEXT_SET_SUBJECTDOM_L:
+        percpu_info[cpu].subject_id = (domid_t)((ptr&~0xFFFF)|(val>>16));
+        break;
+
+    case MMUEXT_SET_SUBJECTDOM_H:
+        percpu_info[cpu].subject_id |= (domid_t)((ptr&~0xFFFF)|(val>>16))<<32;
+        if ( !IS_PRIV(current) )
+        {
+            MEM_LOG("Dom %llu has no privilege to set subject domain",
+                    current->domain);
+            okay = 0;
+        }
+        else
+        {
+            if ( percpu_info[cpu].subject_p != NULL )
+                put_task_struct(percpu_info[cpu].subject_p);
+            percpu_info[cpu].subject_p = find_domain_by_id(
+                percpu_info[cpu].subject_id);
+            if ( percpu_info[cpu].subject_p == NULL )
+            {
+                MEM_LOG("Unknown domain '%llu'", percpu_info[cpu].subject_id);
+                okay = 0;
+            }
+        }
+        break;
 
     default:
         MEM_LOG("Invalid extended pt command 0x%08lx", val & MMUEXT_CMD_MASK);
@@ -904,7 +912,7 @@ static int do_extended_command(unsigned long ptr, unsigned long val)
 int do_mmu_update(mmu_update_t *ureqs, int count)
 {
     mmu_update_t req;
-    unsigned long va = 0, flags, pfn, prev_pfn = 0;
+    unsigned long va = 0, deferred_ops, pfn, prev_pfn = 0;
     struct pfn_info *page;
     int rc = 0, okay = 1, i, cpu = smp_processor_id();
     unsigned int cmd;
@@ -932,16 +940,7 @@ int do_mmu_update(mmu_update_t *ureqs, int count)
              * MMU_NORMAL_PT_UPDATE: Normal update to any level of page table.
              */
         case MMU_NORMAL_PT_UPDATE:
-            page = &frame_table[pfn];
-
-            if ( unlikely(pfn >= max_page) )
-            {
-                MEM_LOG("Page out of range (%08lx > %08lx)", pfn, max_page);
-                break;
-            }
-
-            if ( unlikely(!get_page(page, current)) &&
-                 ((current->domain != 0) || !dom0_get_page(page)) )
+            if ( unlikely(!get_page_from_pagenr(pfn, CHECK_STRICT)) )
             {
                 MEM_LOG("Could not get page for normal update");
                 break;
@@ -959,6 +958,7 @@ int do_mmu_update(mmu_update_t *ureqs, int count)
                 prev_pfn = pfn;
             }
 
+            page = &frame_table[pfn];
             switch ( (page->type_and_flags & PGT_type_mask) )
             {
             case PGT_l1_page_table: 
@@ -992,43 +992,16 @@ int do_mmu_update(mmu_update_t *ureqs, int count)
 
             break;
 
-        case MMU_UNCHECKED_PT_UPDATE:
-            req.ptr &= ~(sizeof(l1_pgentry_t) - 1);
-            if ( likely(IS_PRIV(current)) )
-            {
-                if ( likely(prev_pfn == pfn) )
-                {
-                    va = (va & PAGE_MASK) | (req.ptr & ~PAGE_MASK);
-                }
-                else
-                {
-                    if ( prev_pfn != 0 )
-                        unmap_domain_mem((void *)va);
-                    va = (unsigned long)map_domain_mem(req.ptr);
-                    prev_pfn = pfn;
-                }
-                *(unsigned long *)va = req.val;
-                okay = 1;
-            }
-            else
-            {
-                MEM_LOG("Bad unchecked update attempt");
-            }
-            break;
-            
         case MMU_MACHPHYS_UPDATE:
-            page = &frame_table[pfn];
-            if ( unlikely(pfn >= max_page) )
+            if ( unlikely(!get_page_from_pagenr(pfn, CHECK_STRICT)) )
             {
-                MEM_LOG("Page out of range (%08lx > %08lx)", pfn, max_page);
+                MEM_LOG("Could not get page for mach->phys update");
+                break;
             }
-            else if ( likely(get_page(page, current)) ||
-                      ((current->domain == 0) && dom0_get_page(page)) )
-            {
-                machine_to_phys_mapping[pfn] = req.val;
-                okay = 1;
-                put_page(page);
-            }
+
+            machine_to_phys_mapping[pfn] = req.val;
+            okay = 1;
+            put_page(&frame_table[pfn]);
             break;
 
             /*
@@ -1057,14 +1030,20 @@ int do_mmu_update(mmu_update_t *ureqs, int count)
     if ( prev_pfn != 0 )
         unmap_domain_mem((void *)va);
 
-    flags = deferred_op[cpu].flags;
-    deferred_op[cpu].flags = 0;
+    deferred_ops = percpu_info[cpu].deferred_ops;
+    percpu_info[cpu].deferred_ops = 0;
 
-    if ( flags & DOP_FLUSH_TLB )
+    if ( deferred_ops & DOP_FLUSH_TLB )
         write_cr3_counted(pagetable_val(current->mm.pagetable));
 
-    if ( flags & DOP_RELOAD_LDT )
+    if ( deferred_ops & DOP_RELOAD_LDT )
         (void)map_ldt_shadow_page(0);
+
+    if ( unlikely(percpu_info[cpu].subject_p != NULL) )
+    {
+        put_task_struct(percpu_info[cpu].subject_p);
+        percpu_info[cpu].subject_p = NULL;
+    }
 
     return rc;
 }
@@ -1072,12 +1051,12 @@ int do_mmu_update(mmu_update_t *ureqs, int count)
 
 int do_update_va_mapping(unsigned long page_nr, 
                          unsigned long val, 
-                         unsigned long caller_flags)
+                         unsigned long flags)
 {
     struct task_struct *p = current;
     int err = 0;
     unsigned int cpu = p->processor;
-    unsigned long defer_flags;
+    unsigned long deferred_ops;
 
     if ( unlikely(page_nr >= (HYPERVISOR_VIRT_START >> PAGE_SHIFT)) )
         return -EINVAL;
@@ -1086,16 +1065,16 @@ int do_update_va_mapping(unsigned long page_nr,
                                 mk_l1_pgentry(val))) )
         err = -EINVAL;
 
-    defer_flags = deferred_op[cpu].flags;
-    deferred_op[cpu].flags = 0;
+    deferred_ops = percpu_info[cpu].deferred_ops;
+    percpu_info[cpu].deferred_ops = 0;
 
-    if ( unlikely(defer_flags & DOP_FLUSH_TLB) || 
-         unlikely(caller_flags & UVMF_FLUSH_TLB) )
+    if ( unlikely(deferred_ops & DOP_FLUSH_TLB) || 
+         unlikely(flags & UVMF_FLUSH_TLB) )
         write_cr3_counted(pagetable_val(p->mm.pagetable));
-    else if ( unlikely(caller_flags & UVMF_INVLPG) )
+    else if ( unlikely(flags & UVMF_INVLPG) )
         __flush_tlb_one(page_nr << PAGE_SHIFT);
 
-    if ( unlikely(defer_flags & DOP_RELOAD_LDT) )
+    if ( unlikely(deferred_ops & DOP_RELOAD_LDT) )
         (void)map_ldt_shadow_page(0);
     
     return err;
@@ -1215,7 +1194,7 @@ void reaudit_pages(u_char key, void *dev_id, struct pt_regs *regs)
  * - check for pages with corrupt ref-count
  * Interrupts are diabled completely. use with care.
  */
-void audit_all_pages (u_char key, void *dev_id, struct pt_regs *regs)
+void audit_all_pages(u_char key, void *dev_id, struct pt_regs *regs)
 {
     unsigned long     i, j, k;
     unsigned long     ref_count;
@@ -1228,7 +1207,6 @@ void audit_all_pages (u_char key, void *dev_id, struct pt_regs *regs)
     /* walk the frame table */
     for ( i = 0; i < max_page; i++ )
     {
-
         /* check for zombies */
         if ( ((frame_table[i].count_and_flags & PGC_count_mask) != 0) &&
              ((frame_table[i].count_and_flags & PGC_zombie) != 0) )

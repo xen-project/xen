@@ -153,4 +153,18 @@ void *map_pfn_writeable(int pm_handle, unsigned long pfn);
 void *map_pfn_readonly(int pm_handle, unsigned long pfn);
 void unmap_pfn(int pm_handle, void *vaddr);
 
+/*
+ * MMU updates.
+ */
+#define MAX_MMU_UPDATES 1024
+typedef struct {
+    mmu_update_t updates[MAX_MMU_UPDATES];
+    int          idx;
+    domid_t      subject;
+} mmu_t;
+mmu_t *init_mmu_updates(int xc_handle, domid_t dom);
+int add_mmu_update(int xc_handle, mmu_t *mmu, 
+                   unsigned long ptr, unsigned long val);
+int finish_mmu_updates(int xc_handle, mmu_t *mmu);
+
 #endif /* __XC_PRIVATE_H__ */

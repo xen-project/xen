@@ -1,14 +1,10 @@
 #ifndef _I386_PAGE_H
 #define _I386_PAGE_H
 
-
-#ifndef __ASSEMBLY__
 #define BUG() do {					\
 	printk("BUG at %s:%d\n", __FILE__, __LINE__);	\
 	__asm__ __volatile__("ud2");			\
 } while (0)
-#endif /* __ASSEMBLY__ */
-
 
 #define L1_PAGETABLE_SHIFT       12
 #define L2_PAGETABLE_SHIFT       22
@@ -74,6 +70,13 @@ typedef struct { unsigned long pt_lo; } pagetable_t;
 #define page_address(_p)        (__va(((_p) - frame_table) << PAGE_SHIFT))
 #define virt_to_page(kaddr)	(frame_table + (__pa(kaddr) >> PAGE_SHIFT))
 #define VALID_PAGE(page)	((page - frame_table) < max_mapnr)
+
+/*
+ * NB. We don't currently track I/O holes in the physical RAM space.
+ * For now we guess that I/O devices will be mapped in the first 1MB
+ * (e.g., VGA buffers) or beyond the end of physical RAM.
+ */
+#define pfn_is_ram(_pfn)        (((_pfn) > 0x100) && ((_pfn) < max_page))
 
 /* High table entries are reserved by the hypervisor. */
 #define DOMAIN_ENTRIES_PER_L2_PAGETABLE	    \

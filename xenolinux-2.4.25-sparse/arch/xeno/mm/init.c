@@ -113,10 +113,7 @@ static inline void set_pte_phys (unsigned long vaddr,
     }
     pte = pte_offset(pmd, vaddr);
 
-    if ( pte_io(*pte) || (pgprot_val(prot) & _PAGE_IO) )
-        queue_unchecked_mmu_update(pte, phys | pgprot_val(prot));
-    else
-        queue_l1_entry_update(pte, phys | pgprot_val(prot));
+    queue_l1_entry_update(pte, phys | pgprot_val(prot));
 
     /*
      * It's enough to flush this one mapping.

@@ -49,9 +49,6 @@ void queue_pte_unpin(unsigned long ptr);
 void queue_set_ldt(unsigned long ptr, unsigned long bytes);
 #define MMU_UPDATE_DEBUG 0
 
-#define queue_unchecked_mmu_update(_p,_v) queue_l1_entry_update( \
-  (pte_t *)((unsigned long)(_p)|MMU_UNCHECKED_PT_UPDATE),(_v))
-
 #if MMU_UPDATE_DEBUG > 0
 typedef struct {
     void *ptr;

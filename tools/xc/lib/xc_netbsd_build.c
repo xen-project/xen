@@ -53,27 +53,6 @@ static int get_pfn_list(int xc_handle,
     return (ret < 0) ? -1 : op.u.getmemlist.num_pfns;
 }
 
-static int send_pgupdates(int xc_handle, mmu_update_t *updates, int nr_updates)
-{
-    int ret = -1;
-    privcmd_hypercall_t hypercall;
-
-    hypercall.op     = __HYPERVISOR_mmu_update;
-    hypercall.arg[0] = (unsigned long)updates;
-    hypercall.arg[1] = (unsigned long)nr_updates;
-
-    if ( mlock(updates, nr_updates * sizeof(*updates)) != 0 )
-        goto out1;
-
-    if ( do_xen_hypercall(xc_handle, &hypercall) < 0 )
-        goto out2;
-
-    ret = 0;
-
- out2: (void)munlock(updates, nr_updates * sizeof(*updates));
- out1: return ret;
-}
-
 static int setup_guestos(int xc_handle,
                          u64 dom, 
                          gzFile kernel_gfd, 
@@ -87,16 +66,15 @@ static int setup_guestos(int xc_handle,
     l1_pgentry_t *vl1tab=NULL, *vl1e=NULL;
     l2_pgentry_t *vl2tab=NULL, *vl2e=NULL;
     unsigned long *page_array = NULL;
-    mmu_update_t *pgt_update_arr = NULL, *pgt_updates = NULL;
     int alloc_index, num_pt_pages;
     unsigned long l2tab;
     unsigned long l1tab;
-    unsigned long num_pgt_updates = 0;
     unsigned long count, pt_start;
     unsigned long symtab_addr = 0, symtab_len = 0;
     start_info_t *start_info;
     shared_info_t *shared_info;
     unsigned long ksize;
+    mmu_t *mmu = NULL;
     int pm_handle;
 
     memset(builddomain, 0, sizeof(*builddomain));
@@ -104,10 +82,7 @@ static int setup_guestos(int xc_handle,
     if ( (pm_handle = init_pfn_mapper()) < 0 )
         goto error_out;
 
-    pgt_updates = malloc((tot_pages + 1) * sizeof(mmu_update_t));
-    page_array = malloc(tot_pages * sizeof(unsigned long));
-    pgt_update_arr = pgt_updates;
-    if ( (pgt_update_arr == NULL) || (page_array == NULL) )
+    if ( (page_array = malloc(tot_pages * sizeof(unsigned long))) == NULL )
     {
         PERROR("Could not allocate memory");
         goto error_out;
@@ -144,7 +119,10 @@ static int setup_guestos(int xc_handle,
     l2tab = page_array[alloc_index] << PAGE_SHIFT;
     alloc_index--;
     builddomain->ctxt.pt_base = l2tab;
-
+    
+    if ( (mmu = init_mmu_updates(xc_handle, dom)) == NULL )
+        goto error_out;
+    
     /* Initialise the page tables. */
     if ( (vl2tab = map_pfn_writeable(pm_handle, l2tab >> PAGE_SHIFT)) == NULL )
         goto error_out;
@@ -171,11 +149,10 @@ static int setup_guestos(int xc_handle,
             *vl1e &= ~_PAGE_RW;
         vl1e++;
 
-        pgt_updates->ptr = 
-            (page_array[count] << PAGE_SHIFT) | MMU_MACHPHYS_UPDATE;
-        pgt_updates->val = count;
-        pgt_updates++;
-        num_pgt_updates++;
+        if ( add_mmu_update(xc_handle, mmu,
+                            (page_array[count] << PAGE_SHIFT) | 
+                            MMU_MACHPHYS_UPDATE, count) )
+            goto error_out;
     }
     unmap_pfn(pm_handle, vl1tab);
     unmap_pfn(pm_handle, vl2tab);
@@ -184,10 +161,9 @@ static int setup_guestos(int xc_handle,
      * Pin down l2tab addr as page dir page - causes hypervisor to provide
      * correct protection for the page
      */ 
-    pgt_updates->ptr = l2tab | MMU_EXTENDED_COMMAND;
-    pgt_updates->val = MMUEXT_PIN_L2_TABLE;
-    pgt_updates++;
-    num_pgt_updates++;
+    if ( add_mmu_update(xc_handle, mmu,
+                        l2tab | MMU_EXTENDED_COMMAND, MMUEXT_PIN_L2_TABLE) )
+        goto error_out;
 
     *virt_startinfo_addr =
         *virt_load_addr + ((alloc_index-1) << PAGE_SHIFT);
@@ -202,7 +178,6 @@ static int setup_guestos(int xc_handle,
     start_info->flags       = 0;
     strncpy(start_info->cmd_line, cmdline, MAX_CMD_LEN);
     start_info->cmd_line[MAX_CMD_LEN-1] = '\0';
-
     unmap_pfn(pm_handle, start_info);
 
     /* shared_info page starts its life empty. */
@@ -211,20 +186,21 @@ static int setup_guestos(int xc_handle,
     unmap_pfn(pm_handle, shared_info);
 
     /* Send the page update requests down to the hypervisor. */
-    if ( send_pgupdates(xc_handle, pgt_update_arr, num_pgt_updates) < 0 )
+    if ( finish_mmu_updates(xc_handle, mmu) )
         goto error_out;
 
+    free(mmu);
+    (void)close_pfn_mapper(pm_handle);
     free(page_array);
-    free(pgt_update_arr);
     return 0;
 
  error_out:
+    if ( mmu != NULL )
+        free(mmu);
     if ( pm_handle >= 0 )
         (void)close_pfn_mapper(pm_handle);
     if ( page_array == NULL )
         free(page_array);
-    if ( pgt_update_arr == NULL )
-        free(pgt_update_arr);
     return -1;
 }
 

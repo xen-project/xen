@@ -165,7 +165,7 @@ static long __event_channel_close(struct task_struct *p1, int port1)
     struct task_struct *p2 = NULL;
     event_channel_t    *chn1, *chn2;
     int                 port2;
-    unsigned long       cpu_mask;
+    unsigned long       cpu_mask = 0;
     long                rc = 0;
 
  again:
@@ -214,19 +214,20 @@ static long __event_channel_close(struct task_struct *p1, int port1)
         if ( chn2[port2].remote_dom != p1 )
             BUG();
 
-        chn2[port2].state       = ECS_ZOMBIE;
+        chn2[port2].state       = ECS_DISCONNECTED;
         chn2[port2].remote_dom  = NULL;
         chn2[port2].remote_port = 0xFFFF;
 
-        cpu_mask  = set_event_disc(p1, port1);
         cpu_mask |= set_event_disc(p2, port2);
-        guest_event_notify(cpu_mask);
     }
 
     chn1[port1].state       = ECS_FREE;
     chn1[port1].remote_dom  = NULL;
     chn1[port1].remote_port = 0xFFFF;
     
+    cpu_mask |= set_event_disc(p1, port1);
+    guest_event_notify(cpu_mask);
+
  out:
     spin_unlock(&p1->event_channel_lock);
     put_task_struct(p1);
@@ -324,7 +325,7 @@ static long event_channel_status(evtchn_status_t *status)
     case ECS_FREE:
         status->status = EVTCHNSTAT_closed;
         break;
-    case ECS_ZOMBIE:
+    case ECS_DISCONNECTED:
         status->status = EVTCHNSTAT_disconnected;
         break;
     case ECS_CONNECTED:

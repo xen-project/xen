@@ -20,13 +20,12 @@
 
 #if defined(CONFIG_XENO_PRIV)
 
-#define direct_set_pte(_p, _v) queue_unchecked_mmu_update((_p), (_v).pte_low)
+/* These hacky macros avoid phys->machine translations. */
 #define __direct_pte(x) ((pte_t) { (x) } )
 #define __direct_mk_pte(page_nr,pgprot) \
   __direct_pte(((page_nr) << PAGE_SHIFT) | pgprot_val(pgprot))
 #define direct_mk_pte_phys(physpage, pgprot) \
   __direct_mk_pte((physpage) >> PAGE_SHIFT, pgprot)
-
 
 static inline void direct_remap_area_pte(pte_t *pte, 
                                          unsigned long address, 
@@ -47,7 +46,7 @@ static inline void direct_remap_area_pte(pte_t *pte,
             printk("direct_remap_area_pte: page already exists\n");
             BUG();
         }
-        direct_set_pte(pte, pte_mkio(direct_mk_pte_phys(machine_addr, prot))); 
+        set_pte(pte, pte_mkio(direct_mk_pte_phys(machine_addr, prot))); 
         address += PAGE_SIZE;
         machine_addr += PAGE_SIZE;
         pte++;

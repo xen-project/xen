@@ -43,56 +43,6 @@ static int get_pfn_list(int xc_handle,
     return (ret < 0) ? -1 : op.u.getmemlist.num_pfns;
 }
 
-#define MAX_MMU_UPDATES 1024
-
-static int flush_mmu_updates(int xc_handle,
-                             mmu_update_t *mmu_updates,
-                             int *mmu_update_idx)
-{
-    int err = 0;
-    privcmd_hypercall_t hypercall;
-
-    if ( *mmu_update_idx == 0 )
-        return 0;
-
-    hypercall.op     = __HYPERVISOR_mmu_update;
-    hypercall.arg[0] = (unsigned long)mmu_updates;
-    hypercall.arg[1] = (unsigned long)*mmu_update_idx;
-
-    if ( mlock(mmu_updates, sizeof(mmu_updates)) != 0 )
-    {
-        PERROR("Could not lock pagetable update array");
-        err = 1;
-        goto out;
-    }
-
-    if ( do_xen_hypercall(xc_handle, &hypercall) < 0 )
-    {
-        ERROR("Failure when submitting mmu updates");
-        err = 1;
-    }
-
-    *mmu_update_idx = 0;
-    
-    (void)munlock(mmu_updates, sizeof(mmu_updates));
-
- out:
-    return err;
-}
-
-static int add_mmu_update(int xc_handle,
-                          mmu_update_t *mmu_updates,
-                          int *mmu_update_idx,
-                          unsigned long ptr, 
-                          unsigned long val)
-{
-    mmu_updates[*mmu_update_idx].ptr = ptr;
-    mmu_updates[*mmu_update_idx].val = val;
-    if ( ++*mmu_update_idx == MAX_MMU_UPDATES )
-        return flush_mmu_updates(xc_handle, mmu_updates, mmu_update_idx);
-    return 0;
-}
-
 static int checked_read(gzFile fd, void *buf, size_t count)
 {
     int rc;
@@ -147,8 +97,7 @@ int xc_linux_restore(int xc_handle,
     int    fd;
     gzFile gfd;
 
-    mmu_update_t mmu_updates[MAX_MMU_UPDATES];
-    int mmu_update_idx = 0;
+    mmu_t *mmu = NULL;
 
     int pm_handle = -1;
 
@@ -252,6 +201,12 @@ int xc_linux_restore(int xc_handle,
         goto out;
     }
 
+    if ( (mmu = init_mmu_updates(xc_handle, dom)) == NULL )
+    {
+        ERROR("Could not initialise for MMU updates");
+        goto out;
+    }
+
     verbose_printf("Reloading memory pages:   0%%");
 
     /*
@@ -323,7 +278,7 @@ int xc_linux_restore(int xc_handle,
 
         unmap_pfn(pm_handle, ppage);
 
-        if ( add_mmu_update(xc_handle, mmu_updates, &mmu_update_idx,
+        if ( add_mmu_update(xc_handle, mmu,
                             (mfn<<PAGE_SHIFT) | MMU_MACHPHYS_UPDATE, i) )
             goto out;
     }
@@ -336,7 +291,7 @@ int xc_linux_restore(int xc_handle,
     {
         if ( pfn_type[i] == L1TAB )
         {
-            if ( add_mmu_update(xc_handle, mmu_updates, &mmu_update_idx,
+            if ( add_mmu_update(xc_handle, mmu,
                                 (pfn_to_mfn_table[i]<<PAGE_SHIFT) | 
                                 MMU_EXTENDED_COMMAND,
                                 MMUEXT_PIN_L1_TABLE) )
@@ -344,7 +299,7 @@ int xc_linux_restore(int xc_handle,
         }
         else if ( pfn_type[i] == L2TAB )
         {
-            if ( add_mmu_update(xc_handle, mmu_updates, &mmu_update_idx,
+            if ( add_mmu_update(xc_handle, mmu,
                                 (pfn_to_mfn_table[i]<<PAGE_SHIFT) | 
                                 MMU_EXTENDED_COMMAND,
                                 MMUEXT_PIN_L2_TABLE) )
@@ -352,8 +307,7 @@ int xc_linux_restore(int xc_handle,
         }
     }
 
-
-    if ( flush_mmu_updates(xc_handle, mmu_updates, &mmu_update_idx) )
+    if ( finish_mmu_updates(xc_handle, mmu) )
         goto out;
 
     verbose_printf("\b\b\b\b100%%\nMemory reloaded.\n");
@@ -455,6 +409,9 @@ int xc_linux_restore(int xc_handle,
     rc = do_dom0_op(xc_handle, &op);
 
  out:
+    if ( mmu != NULL )
+        free(mmu);
+
     if ( rc != 0 )
     {
         if ( dom != 0 )
