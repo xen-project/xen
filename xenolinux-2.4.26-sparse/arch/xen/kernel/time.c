@@ -62,6 +62,7 @@
 #include <linux/smp.h>
 #include <linux/irq.h>
 #include <linux/sysctl.h>
+#include <linux/sysrq.h>
 
 spinlock_t rtc_lock = SPIN_LOCK_UNLOCKED;
 extern rwlock_t xtime_lock;
@@ -581,6 +582,10 @@ static void dbg_time_int(int irq, void *dev_id, struct pt_regs *ptregs)
            timer->expires,(u32)(t_st>>32), (u32)t_st);
     printk(KERN_ALERT "time: processed_system_time=0x%X:%08X\n",
            (u32)(processed_system_time>>32), (u32)processed_system_time);
+
+
+    handle_sysrq('t',NULL,NULL,NULL);
+
 }
 
 static struct irqaction dbg_time = {

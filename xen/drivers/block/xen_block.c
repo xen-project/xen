@@ -19,6 +19,7 @@
 #include <xen/interrupt.h>
 #include <xen/vbd.h>
 #include <xen/slab.h>
+#include <xen/shadow.h>
 
 /*
  * These are rather arbitrary. They are fairly large because adjacent requests
@@ -358,9 +359,18 @@ static void unlock_buffer(unsigned long buffer,
           pfn < ((buffer + size + PAGE_SIZE - 1) >> PAGE_SHIFT);
           pfn++ )
     {
+
+	/* Find the domain from the frame_table. Yuk... */
+	struct task_struct *p = frame_table[pfn].u.domain;
+
+	if( p->mm.shadow_mode == SHM_logdirty )
+	    mark_dirty( &p->mm, pfn );	
+
+
         if ( writeable_buffer )
             put_page_type(&frame_table[pfn]);
         put_page(&frame_table[pfn]);
+
     }
 }
 
@@ -597,6 +607,10 @@ void init_blkdev_info(struct task_struct *p)
     p->blk_ring_base = (blk_ring_t *)get_free_page(GFP_KERNEL);
     clear_page(p->blk_ring_base);
     SHARE_PFN_WITH_DOMAIN(virt_to_page(p->blk_ring_base), p);
+
+    machine_to_phys_mapping[virt_to_phys(p->blk_ring_base)>>PAGE_SHIFT] =
+	0x80000002; // magic value aids debugging
+
     p->blkdev_list.next = NULL;
     spin_lock_init(&p->vbd_lock);
 }

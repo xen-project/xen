@@ -111,6 +111,9 @@ net_vif_t *create_net_vif(domid_t dom)
     clear_page(new_ring);
     SHARE_PFN_WITH_DOMAIN(virt_to_page(new_ring), p);
 
+    machine_to_phys_mapping[virt_to_phys(new_ring)>>PAGE_SHIFT] = 
+	0x80000001; // magic value aids debugging
+
     /*
      * Fill in the new vif struct. Note that, while the vif's refcnt is
      * non-zero, we hold a reference to the task structure.

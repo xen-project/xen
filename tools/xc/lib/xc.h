@@ -57,7 +57,10 @@ int xc_domain_getinfo(int xc_handle,
 
 int xc_shadow_control(int xc_handle,
                       u64 domid, 
-                      unsigned int sop);
+                      unsigned int sop,
+		      unsigned long *dirty_bitmap,
+		      unsigned long pages);
+
 
 #define XCFLAGS_VERBOSE 1
 #define XCFLAGS_LIVE    2
@@ -246,11 +249,6 @@ int xc_readconsolering(int xc_handle,
 
 int xc_physinfo(int xc_handle,
                 xc_physinfo_t *info);
-
-
-int xc_shadow_control(int xc_handle,
-                      u64 domid, 
-                      unsigned int sop);
 
 int xc_domain_setname(int xc_handle,
                       u64 domid, 

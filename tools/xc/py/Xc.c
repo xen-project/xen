@@ -190,16 +190,17 @@ static PyObject *pyxc_linux_save(PyObject *self,
 
     u64   dom;
     char *state_file;
-    int   progress = 1;
+    int   progress = 1, live = 0;
     unsigned int flags = 0;
 
-    static char *kwd_list[] = { "dom", "state_file", "progress", NULL };
+    static char *kwd_list[] = { "dom", "state_file", "progress", "live", NULL };
 
-    if ( !PyArg_ParseTupleAndKeywords(args, kwds, "Ls|i", kwd_list, 
-                                      &dom, &state_file, &progress) )
+    if ( !PyArg_ParseTupleAndKeywords(args, kwds, "Ls|ii", kwd_list, 
+                                      &dom, &state_file, &progress, &live) )
         return NULL;
 
     if (progress) flags |= XCFLAGS_VERBOSE;
+    if (live)     flags |= XCFLAGS_LIVE;
 
     if (strncmp(state_file,"tcp:", strlen("tcp:")) == 0)
     {
@@ -1273,7 +1274,7 @@ static PyObject *pyxc_shadow_control(PyObject *self,
                                       &dom, &op) )
         return NULL;
 
-    if ( xc_shadow_control(xc->xc_handle, dom, op) != 0 )
+    if ( xc_shadow_control(xc->xc_handle, dom, op, NULL, 0) < 0 )
         return PyErr_SetFromErrno(xc_error);
     
     Py_INCREF(zero);

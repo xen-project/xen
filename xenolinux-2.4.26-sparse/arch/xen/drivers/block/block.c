@@ -527,8 +527,6 @@ static void reset_xlblk_interface(void)
 {
     block_io_op_t op; 
 
-    nr_pending = 0;
-
     op.cmd = BLOCK_IO_OP_RESET;
     if ( HYPERVISOR_block_io_op(&op) != 0 )
         printk(KERN_ALERT "Possible blkdev trouble: couldn't reset ring\n");
@@ -548,6 +546,8 @@ static void reset_xlblk_interface(void)
 int __init xlblk_init(void)
 {
     int error; 
+
+    nr_pending = 0;
 
     reset_xlblk_interface();
 

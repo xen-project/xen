@@ -123,6 +123,7 @@ static inline int shadow_page_op( struct mm_struct *m, unsigned int op,
     }
     return work;
 }
+
 static void __scan_shadow_table( struct mm_struct *m, unsigned int op )
 {
     int j, work=0;
@@ -150,7 +151,7 @@ static void __scan_shadow_table( struct mm_struct *m, unsigned int op )
         }
         shadow_audit(m,0);
     }
-    SH_LOG("Scan shadow table. Work=%d l1=%d l2=%d", work, perfc_value(shadow_l1_pages), perfc_value(shadow_l2_pages));
+    SH_VLOG("Scan shadow table. Work=%d l1=%d l2=%d", work, perfc_value(shadow_l1_pages), perfc_value(shadow_l2_pages));
 }
 
 
@@ -159,7 +160,6 @@ int shadow_mode_enable( struct task_struct *p, unsigned int mode )
     struct mm_struct *m = &p->mm;
     struct shadow_status **fptr;
     int i;
-
 
     spin_lock_init(&m->shadow_lock);
     spin_lock(&m->shadow_lock);
@@ -217,7 +217,6 @@ int shadow_mode_enable( struct task_struct *p, unsigned int mode )
 
     // call shadow_mk_pagetable
     shadow_mk_pagetable( m );
-
     return 0;
 
  nomem:
@@ -260,9 +259,12 @@ void shadow_mode_disable( struct task_struct *p )
     kfree( &m->shadow_ht[0] );
 }
 
-static void shadow_mode_table_op( struct task_struct *p, unsigned int op )
+static int shadow_mode_table_op( struct task_struct *p, 
+								  dom0_shadow_control_t *sc )
 {
+	unsigned int op = sc->op;
     struct mm_struct *m = &p->mm;
+	int rc = 0;
 
     // since Dom0 did the hypercall, we should be running with it's page
     // tables right now. Calling flush on yourself would be really
@@ -271,13 +273,13 @@ static void shadow_mode_table_op( struct task_struct *p, unsigned int op )
     if ( m == &current->mm )
     {
         printk("Don't try and flush your own page tables!\n");
-        return;
+        return -EINVAL;
     }
    
 
     spin_lock(&m->shadow_lock);
 
-    SH_LOG("shadow mode table op %08lx %08lx count %d",pagetable_val( m->pagetable),pagetable_val(m->shadow_table), m->shadow_page_count);
+    SH_VLOG("shadow mode table op %08lx %08lx count %d",pagetable_val( m->pagetable),pagetable_val(m->shadow_table), m->shadow_page_count);
 
     shadow_audit(m,1);
 
@@ -288,27 +290,60 @@ static void shadow_mode_table_op( struct task_struct *p, unsigned int op )
         break;
    
     case DOM0_SHADOW_CONTROL_OP_CLEAN:
-        __scan_shadow_table( m, op );
-        // we used to bzero dirty bitmap here, but now leave this to user space
-        // if we were double buffering we'd do the flip here
+	{
+		int i;
+
+	    __scan_shadow_table( m, op );
+
+	    if( p->tot_pages > sc->pages || 
+			!sc->dirty_bitmap || !p->mm.shadow_dirty_bitmap )
+	    {
+			rc = -EINVAL;
+			goto out;
+	    }
+	    
+	    sc->pages = p->tot_pages;
+	   
+#define chunk (8*1024) // do this in 1KB chunks for L1 cache
+
+	    for(i=0;i<p->tot_pages;i+=chunk)
+	    {
+			int bytes = ((  ((p->tot_pages-i) > (chunk))?
+				(chunk):(p->tot_pages-i) ) + 7) / 8;
+
+			copy_to_user( sc->dirty_bitmap + (i/(8*sizeof(unsigned long))),
+						  p->mm.shadow_dirty_bitmap +(i/(8*sizeof(unsigned long))),
+						  bytes );
+
+			memset( p->mm.shadow_dirty_bitmap +(i/(8*sizeof(unsigned long))),
+				   0, bytes);
+		}
+
         break;
+	}
     }
+
+
+out:
 
     spin_unlock(&m->shadow_lock);
 
-    SH_LOG("shadow mode table op : page count %d", m->shadow_page_count);
+    SH_VLOG("shadow mode table op : page count %d", m->shadow_page_count);
 
     shadow_audit(m,1);
 
     // call shadow_mk_pagetable
     shadow_mk_pagetable( m );
 
+	return rc;
 }
 
 
-int shadow_mode_control( struct task_struct *p, unsigned int op )
+int shadow_mode_control( struct task_struct *p, dom0_shadow_control_t *sc )
 {
     int  we_paused = 0;
+	unsigned int cmd = sc->op;
+	int rc = 0;
  
     // don't call if already shadowed...
 
@@ -321,18 +356,23 @@ int shadow_mode_control( struct task_struct *p, unsigned int op )
         we_paused = 1;
     }
 
-    if ( p->mm.shadow_mode && op == DOM0_SHADOW_CONTROL_OP_OFF )
+    if ( p->mm.shadow_mode && cmd == DOM0_SHADOW_CONTROL_OP_OFF )
     {
         shadow_mode_disable(p);
     }
-    else if ( op == DOM0_SHADOW_CONTROL_OP_ENABLE_TEST )
+    else if ( cmd == DOM0_SHADOW_CONTROL_OP_ENABLE_TEST )
     {
         if(p->mm.shadow_mode) shadow_mode_disable(p);
         shadow_mode_enable(p, SHM_test);
     } 
-    else if ( p->mm.shadow_mode && op >= DOM0_SHADOW_CONTROL_OP_FLUSH && op<=DOM0_SHADOW_CONTROL_OP_CLEAN )
+    else if ( cmd == DOM0_SHADOW_CONTROL_OP_ENABLE_LOGDIRTY )
     {
-        shadow_mode_table_op(p, op);
+        if(p->mm.shadow_mode) shadow_mode_disable(p);
+        shadow_mode_enable(p, SHM_logdirty);
+    } 
+    else if ( p->mm.shadow_mode && cmd >= DOM0_SHADOW_CONTROL_OP_FLUSH && cmd<=DOM0_SHADOW_CONTROL_OP_CLEAN )
+    {
+        rc = shadow_mode_table_op(p, sc);
     }
     else
     {
@@ -341,7 +381,7 @@ int shadow_mode_control( struct task_struct *p, unsigned int op )
     }
 
     if ( we_paused ) wake_up(p);
-    return 0;
+    return rc;
 }
 
 

@@ -27,16 +27,12 @@
 #define direct_mk_pte_phys(physpage, pgprot) \
   __direct_mk_pte((physpage) >> PAGE_SHIFT, pgprot)
 
-static inline int direct_remap_area_pte(pte_t *pte, 
+static inline void direct_remap_area_pte(pte_t *pte, 
                                         unsigned long address, 
                                         unsigned long size,
-                                        unsigned long machine_addr, 
-                                        pgprot_t prot,
-                                        domid_t  domid)
+					mmu_update_t **v)
 {
     unsigned long end;
-#define MAX_DIRECTMAP_MMU_QUEUE 130
-    mmu_update_t u[MAX_DIRECTMAP_MMU_QUEUE], *v, *w;
 
     address &= ~PMD_MASK;
     end = address + size;
@@ -45,7 +41,87 @@ static inline int direct_remap_area_pte(pte_t *pte,
     if (address >= end)
         BUG();
 
-    /* If not I/O mapping then specify General-Purpose Subject Domain (GPS). */
+    do {
+#if 0 // XXX
+        if (!pte_none(*pte)) {
+            printk("direct_remap_area_pte: page already exists\n");
+            BUG();
+        }
+#endif
+        (*v)->ptr = virt_to_machine(pte);
+        (*v)++;
+        address += PAGE_SIZE;
+        pte++;
+    } while (address && (address < end));
+    return ;
+}
+
+static inline int direct_remap_area_pmd(struct mm_struct *mm,
+                                        pmd_t *pmd, 
+                                        unsigned long address, 
+                                        unsigned long size,
+					mmu_update_t **v)
+{
+    unsigned long end;
+
+    address &= ~PGDIR_MASK;
+    end = address + size;
+    if (end > PGDIR_SIZE)
+        end = PGDIR_SIZE;
+    if (address >= end)
+        BUG();
+    do {
+        pte_t * pte = pte_alloc(mm, pmd, address);
+        if (!pte)
+            return -ENOMEM;
+        direct_remap_area_pte(pte, address, end - address, v);
+
+        address = (address + PMD_SIZE) & PMD_MASK;
+        pmd++;
+    } while (address && (address < end));
+    return 0;
+}
+ 
+int __direct_remap_area_pages(struct mm_struct *mm,
+			      unsigned long address, 
+			      unsigned long size, 
+			      mmu_update_t *v)
+{
+    pgd_t * dir;
+    unsigned long end = address + size;
+
+    dir = pgd_offset(mm, address);
+    flush_cache_all();
+    if (address >= end)
+        BUG();
+    spin_lock(&mm->page_table_lock);
+    do {
+        pmd_t *pmd = pmd_alloc(mm, dir, address);
+        if (!pmd)
+	    return -ENOMEM;
+        direct_remap_area_pmd(mm, pmd, address, end - address, &v);
+        address = (address + PGDIR_SIZE) & PGDIR_MASK;
+        dir++;
+
+    } while (address && (address < end));
+    spin_unlock(&mm->page_table_lock);
+    flush_tlb_all();
+    return 0;
+}
+
+
+int direct_remap_area_pages(struct mm_struct *mm,
+                            unsigned long address, 
+                            unsigned long machine_addr,
+                            unsigned long size, 
+                            pgprot_t prot,
+                            domid_t  domid)
+{
+    int i, count;
+    unsigned long start_address;
+#define MAX_DIRECTMAP_MMU_QUEUE 130
+    mmu_update_t u[MAX_DIRECTMAP_MMU_QUEUE], *w, *v;
+
     if ( domid != 0 )
     {
         u[0].val  = (unsigned long)(domid<<16) & ~0xFFFFUL;
@@ -63,98 +139,46 @@ static inline int direct_remap_area_pte(pte_t *pte,
         v = w = &u[0];
     }
 
-    do {
-        if ( (v-u) == MAX_DIRECTMAP_MMU_QUEUE )
-        {
-            if ( HYPERVISOR_mmu_update(u, MAX_DIRECTMAP_MMU_QUEUE) < 0 )
-                return -EFAULT;
-            v = w;
-        }
-#if 0  /* thanks to new ioctl mmaping interface this is no longer a bug */
-        if (!pte_none(*pte)) {
-            printk("direct_remap_area_pte: page already exists\n");
-            BUG();
-        }
-#endif
-        v->ptr = virt_to_machine(pte);
+    start_address = address;
+
+    for(i=0; i<size; 
+	i+=PAGE_SIZE, machine_addr+=PAGE_SIZE, address+=PAGE_SIZE, v++)
+    {
+	if( (v-u) == MAX_DIRECTMAP_MMU_QUEUE )
+	{
+	    /* get the ptep's filled in */
+	    __direct_remap_area_pages( mm,
+				       start_address, 
+				       address-start_address, 
+				       w);
+	    
+	    count = v-u;
+	    if ( HYPERVISOR_mmu_update(u, &count) < 0 )
+		return -EFAULT;	    
+	    v=w;
+	    start_address = address;
+	}
+
+	/* fill in the machine addresses */
         v->val = (machine_addr & PAGE_MASK) | pgprot_val(prot) | _PAGE_IO;
-        v++;
-        address += PAGE_SIZE;
-        machine_addr += PAGE_SIZE;
-        pte++;
-    } while (address && (address < end));
+    }
 
-    if ( ((v-w) != 0) && (HYPERVISOR_mmu_update(u, v-u) < 0) )
-        return -EFAULT;
+    if(v!=w)
+    {
+	/* get the ptep's filled in */
+	__direct_remap_area_pages( mm,
+				   start_address, 
+				   address-start_address, 
+				   w);	 
+	count = v-u;
+	if ( HYPERVISOR_mmu_update(u, &count) < 0 )
+	    return -EFAULT;	    
 
+    }
+    
     return 0;
 }
 
-static inline int direct_remap_area_pmd(struct mm_struct *mm,
-                                        pmd_t *pmd, 
-                                        unsigned long address, 
-                                        unsigned long size,
-                                        unsigned long machine_addr,
-                                        pgprot_t prot,
-                                        domid_t  domid)
-{
-    int error = 0;
-    unsigned long end;
-
-    address &= ~PGDIR_MASK;
-    end = address + size;
-    if (end > PGDIR_SIZE)
-        end = PGDIR_SIZE;
-    machine_addr -= address;
-    if (address >= end)
-        BUG();
-    do {
-        pte_t * pte = pte_alloc(mm, pmd, address);
-        if (!pte)
-            return -ENOMEM;
-        error = direct_remap_area_pte(pte, address, end - address, 
-                                      address + machine_addr, prot, domid);
-        if ( error )
-            break;
-        address = (address + PMD_SIZE) & PMD_MASK;
-        pmd++;
-    } while (address && (address < end));
-    return error;
-}
- 
-int direct_remap_area_pages(struct mm_struct *mm,
-                            unsigned long address, 
-                            unsigned long machine_addr,
-                            unsigned long size, 
-                            pgprot_t prot,
-                            domid_t  domid)
-{
-    int error = 0;
-    pgd_t * dir;
-    unsigned long end = address + size;
-
-    machine_addr -= address;
-    dir = pgd_offset(mm, address);
-    flush_cache_all();
-    if (address >= end)
-        BUG();
-    spin_lock(&mm->page_table_lock);
-    do {
-        pmd_t *pmd = pmd_alloc(mm, dir, address);
-        error = -ENOMEM;
-        if (!pmd)
-            break;
-        error = direct_remap_area_pmd(mm, pmd, address, end - address,
-                                      machine_addr + address, prot, domid);
-        if (error)
-            break;
-        address = (address + PGDIR_SIZE) & PGDIR_MASK;
-        dir++;
-    } while (address && (address < end));
-    spin_unlock(&mm->page_table_lock);
-    flush_tlb_all();
-    return error;
-}
 
 #endif /* CONFIG_XEN_PRIVILEGED_GUEST */
 

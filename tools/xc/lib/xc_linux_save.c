@@ -22,11 +22,17 @@
 /*
  * Returns TRUE if the given machine frame number has a unique mapping
  * in the guest's pseudophysical map.
+ * 0x80000000-3 mark the shared_info, and blk/net rings
  */
 #define MFN_IS_IN_PSEUDOPHYS_MAP(_mfn) \
-    (((_mfn) < (1024*1024)) &&          \
-     (live_pfn_to_mfn_table[live_mfn_to_pfn_table[_mfn]] == (_mfn)))
-
+    (((_mfn) < (1024*1024)) && \
+     ( ( (live_mfn_to_pfn_table[_mfn] < nr_pfns) && \
+       (live_pfn_to_mfn_table[live_mfn_to_pfn_table[_mfn]] == (_mfn)) ) || \
+\
+       (live_mfn_to_pfn_table[_mfn] >= 0x80000000 && \
+	live_mfn_to_pfn_table[_mfn] <= 0x80000003 ) || \
+	live_pfn_to_mfn_table[live_mfn_to_pfn_table[_mfn]] == 0x80000004 )  )
+     
 /* Returns TRUE if MFN is successfully converted to a PFN. */
 #define translate_mfn_to_pfn(_pmfn)         \
 ({                                          \
@@ -40,6 +46,14 @@
 })
 
 
+/* test_bit */
+inline int test_bit ( int nr, volatile void * addr)
+{
+    return ( ((unsigned long*)addr)[nr/(sizeof(unsigned long)*8)] >> 
+	     (nr % (sizeof(unsigned long)*8) ) ) & 1;
+}
+
+
 int xc_linux_save(int xc_handle,
                   u64 domid, 
 		  unsigned int flags,
@@ -47,14 +61,11 @@ int xc_linux_save(int xc_handle,
 		  void *writerst )
 {
     dom0_op_t op;
-    int rc = 1, i, j, k, n;
+    int rc = 1, i, j, k, n, last_iter, iter = 0;
     unsigned long mfn;
-    unsigned int prev_pc, this_pc;
     int verbose = flags & XCFLAGS_VERBOSE;
-    //int live = flags & XCFLAGS_LIVE;
-
-    /* state of the new MFN mapper */
-    mfn_mapper_t *mapper_handle1, *mapper_handle2;
+    int live = 1; //flags & XCFLAGS_LIVE;     // XXXXXXXXXXXXXXXXXXX
+    int sent_last_iter, sent_this_iter, max_iters;
 
     /* Remember if we stopped the guest, so we can restart it on exit. */
     int we_stopped_it = 0;
@@ -90,8 +101,13 @@ int xc_linux_save(int xc_handle,
     unsigned char *region_base;
 
     /* A temporary mapping, and a copy, of the guest's suspend record. */
-    suspend_record_t *p_srec, srec;
+    suspend_record_t *p_srec;
 
+    /* number of pages we're dealing with */
+    unsigned long nr_pfns;
+
+    /* bitmap of pages left to send */
+    unsigned long *to_send;
 
     if ( mlock(&ctxt, sizeof(ctxt) ) )
     {
@@ -129,21 +145,24 @@ int xc_linux_save(int xc_handle,
             goto out;
         }
 
-        sleep(1);
+        usleep(1000); // 1ms
+	printf("Sleep for 1ms\n");
     }
 
+#if 1
     /* A cheesy test to see whether the domain contains valid state. */
     if ( ctxt.pt_base == 0 )
     {
         ERROR("Domain is not in a valid Linux guest OS state");
         goto out;
     }
+#endif
 
 
     /* Map the suspend-record MFN to pin it. The page must be owned by 
        domid for this to succeed. */
     p_srec = mfn_mapper_map_single(xc_handle, domid,
-				 sizeof(srec), PROT_READ, 
+				 sizeof(*p_srec), PROT_READ, 
 				 ctxt.cpu_ctxt.esi );
 
     if (!p_srec)
@@ -152,10 +171,10 @@ int xc_linux_save(int xc_handle,
         goto out;
     }
 
-    memcpy( &srec, p_srec, sizeof(srec) );
+    nr_pfns = p_srec->nr_pfns;
 
     /* cheesy sanity check */
-    if ( srec.nr_pfns > 1024*1024 )
+    if ( nr_pfns > 1024*1024 )
     {
         ERROR("Invalid state record -- pfn count out of range");
         goto out;
@@ -165,55 +184,13 @@ int xc_linux_save(int xc_handle,
     live_pfn_to_mfn_frame_list = 
 	mfn_mapper_map_single(xc_handle, domid, 
 			      PAGE_SIZE, PROT_READ, 
-			      srec.pfn_to_mfn_frame_list );
+			      p_srec->pfn_to_mfn_frame_list );
 
     if (!live_pfn_to_mfn_frame_list)
     {
         ERROR("Couldn't map pfn_to_mfn_frame_list");
         goto out;
     }
-   
-
-    if ( (mapper_handle1 = mfn_mapper_init(xc_handle, domid,
-					   1024*1024, PROT_READ )) 
-	 == NULL )
-        goto out;
-	
-    for ( i = 0; i < (srec.nr_pfns+1023)/1024; i++ )
-    {
-	/* Grab a copy of the pfn-to-mfn table frame list. 
-	 This has the effect of preventing the page from being freed and
-	 given to another domain. (though the domain is stopped anyway...) */
-	mfn_mapper_queue_entry( mapper_handle1, i<<PAGE_SHIFT, 
-				live_pfn_to_mfn_frame_list[i],
-				PAGE_SIZE );
-    }
-    
-    if ( mfn_mapper_flush_queue(mapper_handle1) )
-    {
-        ERROR("Couldn't map pfn_to_mfn table");
-        goto out;
-    }
-
-    live_pfn_to_mfn_table = mfn_mapper_base( mapper_handle1 );
-
-
-
-    /* We want zeroed memory so use calloc rather than malloc. */
-    pfn_type = calloc(BATCH_SIZE, sizeof(unsigned long));
-
-    if ( (pfn_type == NULL) )
-    {
-        errno = ENOMEM;
-        goto out;
-    }
-
-    if ( mlock( pfn_type, BATCH_SIZE * sizeof(unsigned long) ) )
-    {
-	ERROR("Unable to mlock");
-	goto out;
-    }
-
 
     /* Track the mfn_to_pfn table down from the domains PT */
     {
@@ -233,49 +210,106 @@ int xc_linux_save(int xc_handle,
 				  mfn_to_pfn_table_start_mfn );
     }
 
+    /* Map all the frames of the pfn->mfn table. For migrate to succeed, 
+       the guest must not change which frames are used for this purpose. 
+       (its not clear why it would want to change them, and we'll be OK
+       from a safety POV anyhow. */
+
+    live_pfn_to_mfn_table = mfn_mapper_map_batch( xc_handle, domid, 
+						  PROT_READ,
+						  live_pfn_to_mfn_frame_list,
+						  (nr_pfns+1023)/1024 );  
+    if( !live_pfn_to_mfn_table )
+    {
+        PERROR("Couldn't map pfn_to_mfn table");
+        goto out;
+    }
+
+    for(i=0;i<(nr_pfns+1023)/1024 ;i++)
+	printf("LF: %d %x\n",i,live_pfn_to_mfn_frame_list[i]);
+
+
+    /* At this point, we can start the domain again if we're doign a
+       live suspend */
+
+    if( live )
+    { 
+#if 1
+	if ( xc_shadow_control( xc_handle, domid, 
+			   DOM0_SHADOW_CONTROL_OP_ENABLE_LOGDIRTY,
+			   NULL, 0 ) < 0 )
+	{
+	    ERROR("Couldn't enable shadow mode");
+	    goto out;
+	}
+#endif 
+	if ( xc_domain_start( xc_handle, domid ) < 0 )
+	{
+	    ERROR("Couldn't restart domain");
+	    goto out;
+	}
+//exit(-1);
+	last_iter = 0;
+	sent_last_iter = 1<<20; // 4GB's worth of pages
+	max_iters = 8; // limit us to 9 time round loop
+    }
+    else
+	last_iter = 1;
+
+
+    /* Setup to_send bitmap */
+    {
+	int sz = (nr_pfns/8) + 8; // includes slop at end of array
+	
+	to_send = malloc( sz );
+
+	if (!to_send)
+	{
+	    ERROR("Couldn't allocate to_send array");
+	    goto out;
+	}
+	memset( to_send, 0xff, sz );
+
+	if ( mlock( to_send, sz ) )
+	{
+	    PERROR("Unable to mlock to_send");
+	    return 1;
+	}
+    }
+
+
+    /* We want zeroed memory so use calloc rather than malloc. */
+    pfn_type = calloc(BATCH_SIZE, sizeof(unsigned long));
+
+    if ( (pfn_type == NULL) )
+    {
+        errno = ENOMEM;
+        goto out;
+    }
+
+    if ( mlock( pfn_type, BATCH_SIZE * sizeof(unsigned long) ) )
+    {
+	ERROR("Unable to mlock");
+	goto out;
+    }
+
 
     /*
      * Quick belt and braces sanity check.
      */
 
-    for ( i = 0; i < srec.nr_pfns; i++ )
+    for ( i = 0; i < nr_pfns; i++ )
     {
         mfn = live_pfn_to_mfn_table[i];
 
-	if( live_mfn_to_pfn_table[mfn] != i )
-	    printf("i=%d mfn=%d live_mfn_to_pfn_table=%d\n",
+	if( (live_mfn_to_pfn_table[mfn] != i) && (mfn != 0x80000004) )
+	    printf("i=0x%x mfn=%x live_mfn_to_pfn_table=%x\n",
 		   i,mfn,live_mfn_to_pfn_table[mfn]);
     }
 
-
-    /* Canonicalise the suspend-record frame number. */
-    if ( !translate_mfn_to_pfn(&ctxt.cpu_ctxt.esi) )
-    {
-        ERROR("State record is not in range of pseudophys map");
-        goto out;
-    }
-
-    /* Canonicalise each GDT frame number. */
-    for ( i = 0; i < ctxt.gdt_ents; i += 512 )
-    {
-        if ( !translate_mfn_to_pfn(&ctxt.gdt_frames[i]) )
-        {
-            ERROR("GDT frame is not in range of pseudophys map");
-            goto out;
-        }
-    }
-
-    /* Canonicalise the page table base pointer. */
-    if ( !MFN_IS_IN_PSEUDOPHYS_MAP(ctxt.pt_base >> PAGE_SHIFT) )
-    {
-        ERROR("PT base is not in range of pseudophys map");
-        goto out;
-    }
-    ctxt.pt_base = live_mfn_to_pfn_table[ctxt.pt_base >> PAGE_SHIFT] << PAGE_SHIFT;
-
     /* Canonicalise the pfn-to-mfn table frame-number list. */
     memcpy( pfn_to_mfn_frame_list, live_pfn_to_mfn_frame_list, PAGE_SIZE );
-    for ( i = 0; i < srec.nr_pfns; i += 1024 )
+    for ( i = 0; i < nr_pfns; i += 1024 )
     {
         if ( !translate_mfn_to_pfn(&pfn_to_mfn_frame_list[i/1024]) )
         {
@@ -284,7 +318,7 @@ int xc_linux_save(int xc_handle,
         }
     }
 
-    /* Start writing out the saved-domain record. */
+    /* Map the shared info frame */
     live_shinfo = mfn_mapper_map_single(xc_handle, domid,
 					PAGE_SIZE, PROT_READ,
 					shared_info_frame);
@@ -295,164 +329,290 @@ int xc_linux_save(int xc_handle,
         goto out;
     }
 
+    /* Start writing out the saved-domain record. */
+
     if ( (*writerfn)(writerst, "LinuxGuestRecord",    16) ||
          (*writerfn)(writerst, name,                  sizeof(name)) ||
-         (*writerfn)(writerst, &srec.nr_pfns,         sizeof(unsigned long)) ||
-         (*writerfn)(writerst, &ctxt,                 sizeof(ctxt)) ||
-         (*writerfn)(writerst, live_shinfo,           PAGE_SIZE) ||
+         (*writerfn)(writerst, &nr_pfns,              sizeof(unsigned long)) ||
          (*writerfn)(writerst, pfn_to_mfn_frame_list, PAGE_SIZE) )
     {
         ERROR("Error when writing to state file (1)");
         goto out;
     }
-    munmap(live_shinfo, PAGE_SIZE);
-
-    verbose_printf("Saving memory pages:   0%%");
-
-    if ( (mapper_handle2 = mfn_mapper_init(xc_handle, domid,
-					   BATCH_SIZE*4096, PROT_READ )) 
-	 == NULL )
-        goto out;
-
-    region_base = mfn_mapper_base( mapper_handle2 );
 
     /* Now write out each data page, canonicalising page tables as we go... */
-    prev_pc = 0;
-    for ( n = 0; n < srec.nr_pfns; )
+
+    while(1)
     {
-        this_pc = (n * 100) / srec.nr_pfns;
-        if ( (this_pc - prev_pc) >= 5 )
-        {
-            verbose_printf("\b\b\b\b%3d%%", this_pc);
-            prev_pc = this_pc;
-        }
+	unsigned int prev_pc, batch, sent_this_iter;
 
-	for( j = 0, i = n; j < BATCH_SIZE && i < srec.nr_pfns ; j++, i++ )
-	{		
-	    pfn_type[j] = live_pfn_to_mfn_table[i];
-	}
+	iter++;
 
+	sent_this_iter = 0;
+	prev_pc = 0;
+	verbose_printf("Saving memory pages: iter %d   0%%", iter);
 
-	for( j = 0, i = n; j < BATCH_SIZE && i < srec.nr_pfns ; j++, i++ )
+	n=0;
+	while( n < nr_pfns )
 	{
-	    /* queue up mappings for all of the pages in this batch */
-
-//printf("region n=%d j=%d i=%d mfn=%d\n",n,j,i,live_pfn_to_mfn_table[i]);
-	    mfn_mapper_queue_entry( mapper_handle2, j<<PAGE_SHIFT, 
-				    live_pfn_to_mfn_table[i],
-				    PAGE_SIZE );
-	}
-
-	if( mfn_mapper_flush_queue(mapper_handle2) )
-	{
-	    ERROR("Couldn't map page region");
-	    goto out;
-	}
-
-	if ( get_pfn_type_batch(xc_handle, domid, j, pfn_type) )
-	{
-	    ERROR("get_pfn_type_batch failed");
-	    goto out;
-	}
-	
-	for( j = 0, i = n; j < BATCH_SIZE && i < srec.nr_pfns ; j++, i++ )
-	{
-	    if((pfn_type[j]>>29) == 7)
+	    unsigned int this_pc = (n * 100) / nr_pfns;
+	    if ( (this_pc - prev_pc) >= 5 )
 	    {
-		ERROR("bogus page");
+		verbose_printf("\b\b\b\b%3d%%", this_pc);
+		prev_pc = this_pc;
+	    }
+
+
+	    /* load pfn_type[] with the mfn of all the pages we're doing in
+	       this batch. */
+
+	    for( batch = 0; batch < BATCH_SIZE && n < nr_pfns ; n++ )
+	    {
+		if ( !test_bit(n, to_send ) ) continue;
+
+		pfn_type[batch] = live_pfn_to_mfn_table[n];
+
+		if( pfn_type[batch] == 0x80000004 )
+		{
+		    //printf("Skip netbuf pfn %lx. mfn %lx\n",n,pfn_type[batch]);
+		    continue;
+		}
+
+//if(iter>1) printf("pfn=%x mfn=%x\n",n,pfn_type[batch]);
+		
+		batch++;
+	    }
+
+	    for( j = 0; j < batch; j++ )
+	    {
+
+		if( (pfn_type[j] &0xfffff) == 0x0000004 )
+		{
+		    printf("XXXXXXXXSkip netbuf entry %d mfn %lx\n",j,pfn_type[j]);
+		}
+
+		
+	    }
+
+	    
+	    printf("batch %d:%d (n=%d)\n",iter,batch,n);
+
+	    if(batch == 0) goto skip; // vanishingly unlikely...
+ 	    
+	    if ( (region_base = mfn_mapper_map_batch( xc_handle, domid, 
+						      PROT_READ,
+						      pfn_type,
+						      batch )) == 0)
+	    {
+		PERROR("map batch failed");
+		goto out;
+	    }
+	    
+	    if ( get_pfn_type_batch(xc_handle, domid, batch, pfn_type) )
+	    {
+		ERROR("get_pfn_type_batch failed");
+		goto out;
+	    }
+	    
+	    for( j = 0; j < batch; j++ )
+	    {
+		if((pfn_type[j]>>29) == 7)
+		{
+		    //printf("type fail: page %i mfn %08lx\n",j,pfn_type[j]);
+		    continue;
+		}
+//if((pfn_type[j] & PGT_type_mask) == L2TAB) printf("L2 pfn=%08lx mfn=%lx\n",pfn_type[j],live_mfn_to_pfn_table[pfn_type[j]&~PGT_type_mask]);
+		
+		/* canonicalise mfn->pfn */
+		pfn_type[j] = (pfn_type[j] & PGT_type_mask) |
+		    live_mfn_to_pfn_table[pfn_type[j]&~PGT_type_mask];
+	    }
+	    
+	    
+	    if ( (*writerfn)(writerst, &batch, sizeof(int) ) )
+	    {
+		ERROR("Error when writing to state file (2)");
 		goto out;
 	    }
 
-	    /* canonicalise mfn->pfn */
-	    pfn_type[j] = (pfn_type[j] & PGT_type_mask) |
-		live_mfn_to_pfn_table[pfn_type[j]&~PGT_type_mask];
-	    
-/*	    if(pfn_type[j]>>29)
-		    printf("i=%d type=%d\n",i,pfn_type[i]);    */
-	}
-
-
-	if ( (*writerfn)(writerst, &j, sizeof(int) ) )
-	{
-	    ERROR("Error when writing to state file (2)");
-	    goto out;
-	}
-
-	if ( (*writerfn)(writerst, pfn_type, sizeof(unsigned long)*j ) )
-	{
-	    ERROR("Error when writing to state file (3)");
-	    goto out;
-	}
-
-
-	for( j = 0, i = n; j < BATCH_SIZE && i < srec.nr_pfns ; j++, i++ )
-	{
-	    /* write out pages in batch */
-
-	    if ( ((pfn_type[j] & PGT_type_mask) == L1TAB) || 
-		 ((pfn_type[j] & PGT_type_mask) == L2TAB) )
+	    if ( (*writerfn)(writerst, pfn_type, sizeof(unsigned long)*j ) )
 	    {
+		ERROR("Error when writing to state file (3)");
+		goto out;
+	    }
+	    
+	    /* entering this loop, pfn_type is now in pfns (Not mfns) */
+	    for( j = 0; j < batch; j++ )
+	    {
+		/* write out pages in batch */
 		
-		memcpy(page, region_base + (PAGE_SIZE*j), PAGE_SIZE);
-
-		for ( k = 0; 
-		      k < (((pfn_type[j] & PGT_type_mask) == L2TAB) ? 
-			   (HYPERVISOR_VIRT_START >> L2_PAGETABLE_SHIFT) : 1024); 
-		      k++ )
+		if((pfn_type[j]>>29) == 7)
 		{
-		    if ( !(page[k] & _PAGE_PRESENT) ) continue;
-		    mfn = page[k] >> PAGE_SHIFT;		    
-
-		    if ( !MFN_IS_IN_PSEUDOPHYS_MAP(mfn) )
+		    //printf("SKIP BOGUS page %i mfn %08lx\n",j,pfn_type[j]);
+		    continue;
+		}
+		
+		if ( ((pfn_type[j] & PGT_type_mask) == L1TAB) || 
+		     ((pfn_type[j] & PGT_type_mask) == L2TAB) )
+		{
+		    
+		    memcpy(page, region_base + (PAGE_SIZE*j), PAGE_SIZE);
+		    
+		    for ( k = 0; 
+			  k < (((pfn_type[j] & PGT_type_mask) == L2TAB) ? 
+		       (HYPERVISOR_VIRT_START >> L2_PAGETABLE_SHIFT) : 1024); 
+			  k++ )
 		    {
-			ERROR("Frame number in pagetable page is invalid");
+			unsigned long pfn;
+
+			if ( !(page[k] & _PAGE_PRESENT) ) continue;
+			mfn = page[k] >> PAGE_SHIFT;		    
+			pfn = live_mfn_to_pfn_table[mfn];
+
+			if ( !MFN_IS_IN_PSEUDOPHYS_MAP(mfn) )
+			{
+			    printf("FNI %d : [%08lx,%d] pte=%08lx, mfn=%08lx, pfn=%08lx [mfn]=%08lx\n",
+				   j, pfn_type[j], k,
+				   page[k], mfn, live_mfn_to_pfn_table[mfn],
+				   (live_mfn_to_pfn_table[mfn]<nr_pfns)? 
+				live_pfn_to_mfn_table[live_mfn_to_pfn_table[mfn]]: 0xdeadbeef);
+			    pfn = 0; // be suspicious
+			    
+//			    ERROR("Frame number in pagetable page is invalid");
+//			    goto out;
+
+
+			}
+			page[k] &= PAGE_SIZE - 1;
+			page[k] |= pfn << PAGE_SHIFT;
+			
+			/*
+			  printf("L%d i=%d pfn=%d mfn=%d k=%d pte=%08lx xpfn=%d\n",
+			  pfn_type[j]>>29,
+			  j,i,mfn,k,page[k],page[k]>>PAGE_SHIFT);
+			  */
+			
+		    } /* end of page table rewrite for loop */
+		    
+		    if ( (*writerfn)(writerst, page, PAGE_SIZE) )
+		    {
+			ERROR("Error when writing to state file (4)");
 			goto out;
 		    }
-		    page[k] &= PAGE_SIZE - 1;
- 		    page[k] |= live_mfn_to_pfn_table[mfn] << PAGE_SHIFT;
-
-		    /*
-		    printf("L%d i=%d pfn=%d mfn=%d k=%d pte=%08lx xpfn=%d\n",
-			   pfn_type[j]>>29,
-			   j,i,mfn,k,page[k],page[k]>>PAGE_SHIFT);
-			   */
-
+		    
+		}  /* end of it's a PT page */
+		else
+		{  /* normal page */
+		    if ( (*writerfn)(writerst, region_base + (PAGE_SIZE*j), PAGE_SIZE) )
+		    {
+			ERROR("Error when writing to state file (5)");
+			goto out;
+		    }
 		}
+	    } /* end of the write out for this batch */
+	    
+	    sent_this_iter += batch;
 
-		if ( (*writerfn)(writerst, page, PAGE_SIZE) )
-		{
-		    ERROR("Error when writing to state file (4)");
-		    goto out;
-		}
+	} /* end of this while loop for this iteration */
 
+	munmap(region_base, batch*PAGE_SIZE);
 
+    skip: 
+	
+	verbose_printf("\b\b\b\b100%% (%d pages)\n", sent_this_iter );
+	
+	if ( last_iter )
+	    break;
+
+	if ( live )
+	{
+	    if ( sent_this_iter < (sent_last_iter * 0.95) && iter < max_iters )
+	    {
+		// we seem to be doing OK, keep going
 	    }
 	    else
 	    {
-		if ( (*writerfn)(writerst, region_base + (PAGE_SIZE*j), PAGE_SIZE) )
-		{
-		    ERROR("Error when writing to state file (5)");
-		    goto out;
-		}
-	    }
-	}
-	
-	n+=j; /* i is the master loop counter */
-    }
+		printf("Start last iteration\n");
+		last_iter = 1;
 
-    verbose_printf("\b\b\b\b100%%\nMemory saved.\n");
+		xc_domain_stop_sync( xc_handle, domid );
+
+	    } 
+
+	    if ( xc_shadow_control( xc_handle, domid, 
+				    DOM0_SHADOW_CONTROL_OP_CLEAN,
+				    to_send, nr_pfns ) != nr_pfns ) 
+	    {
+		ERROR("Error flushing shadow PT");
+		goto out;
+	    }
+
+#if 0
+	    if(last_iter) memset(to_send, 0xff, (nr_pfns+7)/8 );
+#endif
+
+	    sent_last_iter = sent_this_iter;
+	}
+
+
+    } /* end of while 1 */
+
+printf("All memory is saved\n");
 
     /* Success! */
     rc = 0;
-
+    
     /* Zero terminate */
     if ( (*writerfn)(writerst, &rc, sizeof(int)) )
     {
 	ERROR("Error when writing to state file (6)");
 	goto out;
     }
-    
 
+    /* Get the final execution context */
+    op.cmd = DOM0_GETDOMAININFO;
+    op.u.getdomaininfo.domain = (domid_t)domid;
+    op.u.getdomaininfo.ctxt = &ctxt;
+    if ( (do_dom0_op(xc_handle, &op) < 0) || 
+	 ((u64)op.u.getdomaininfo.domain != domid) )
+    {
+	PERROR("Could not get info on domain");
+	goto out;
+    }
+printf("A\n");    
+    /* Canonicalise the suspend-record frame number. */
+    if ( !translate_mfn_to_pfn(&ctxt.cpu_ctxt.esi) )
+    {
+        ERROR("State record is not in range of pseudophys map");
+        goto out;
+    }
+printf("B\n");    
+    /* Canonicalise each GDT frame number. */
+    for ( i = 0; i < ctxt.gdt_ents; i += 512 )
+    {
+        if ( !translate_mfn_to_pfn(&ctxt.gdt_frames[i]) )
+        {
+            ERROR("GDT frame is not in range of pseudophys map");
+            goto out;
+        }
+    }
+printf("C\n");    
+    /* Canonicalise the page table base pointer. */
+    if ( !MFN_IS_IN_PSEUDOPHYS_MAP(ctxt.pt_base >> PAGE_SHIFT) )
+    {
+        ERROR("PT base is not in range of pseudophys map");
+        goto out;
+    }
+    ctxt.pt_base = live_mfn_to_pfn_table[ctxt.pt_base >> PAGE_SHIFT] << PAGE_SHIFT;
+printf("D\n");    
+    if ( (*writerfn)(writerst, &ctxt,                 sizeof(ctxt)) ||
+         (*writerfn)(writerst, live_shinfo,           PAGE_SIZE) )
+    {
+        ERROR("Error when writing to state file (1)");
+        goto out;
+    }
+    munmap(live_shinfo, PAGE_SIZE);
+printf("E\n");        
 out:
     /* Restart the domain if we had to stop it to save its state. */
     if ( we_stopped_it )

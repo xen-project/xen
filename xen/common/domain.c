@@ -89,9 +89,15 @@ struct task_struct *do_createdomain(domid_t dom_id, unsigned int cpu)
         memset(p->shared_info, 0, PAGE_SIZE);
         SHARE_PFN_WITH_DOMAIN(virt_to_page(p->shared_info), p);
         
+	machine_to_phys_mapping[virt_to_phys(p->shared_info) >> PAGE_SHIFT] =
+	    0x80000000UL;  // set m2p table to magic marker (helps debug)
+
         p->mm.perdomain_pt = (l1_pgentry_t *)get_free_page(GFP_KERNEL);
         memset(p->mm.perdomain_pt, 0, PAGE_SIZE);
         
+	machine_to_phys_mapping[virt_to_phys(p->mm.perdomain_pt) >> PAGE_SHIFT] =
+	    0x0fffdeadUL;  // set m2p table to magic marker (helps debug)
+
         init_blkdev_info(p);
         
         /* Per-domain PCI-device list. */
@@ -486,6 +492,7 @@ void free_all_dom_mem(struct task_struct *p)
 unsigned int alloc_new_dom_mem(struct task_struct *p, unsigned int kbytes)
 {
     unsigned int alloc_pfns, nr_pages;
+    struct pfn_info *page;
 
     nr_pages = (kbytes + ((PAGE_SIZE-1)>>10)) >> (PAGE_SHIFT - 10);
     p->max_pages = nr_pages; /* this can now be controlled independently */
@@ -493,13 +500,16 @@ unsigned int alloc_new_dom_mem(struct task_struct *p, unsigned int kbytes)
     /* grow the allocation if necessary */
     for ( alloc_pfns = p->tot_pages; alloc_pfns < nr_pages; alloc_pfns++ )
     {
-        if ( unlikely(alloc_domain_page(p) == NULL) ||
+        if ( unlikely((page=alloc_domain_page(p)) == NULL) ||
              unlikely(free_pfns < (SLACK_DOMAIN_MEM_KILOBYTES >> 
                                    (PAGE_SHIFT-10))) )
         {
             free_all_dom_mem(p);
             return -ENOMEM;
         }
+
+	/* initialise to machine_to_phys_mapping table to likely pfn */
+	machine_to_phys_mapping[page-frame_table] = alloc_pfns;
     }
 
     p->tot_pages = nr_pages;

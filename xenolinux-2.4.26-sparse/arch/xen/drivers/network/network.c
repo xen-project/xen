@@ -248,6 +248,8 @@ static void network_alloc_rx_buffers(struct net_device *dev)
         np->net_ring->rx_ring[MASK_NET_RX_IDX(i)].req.addr = 
             virt_to_machine(get_ppte(skb->head));
 
+	/* Shadow optimisation: disown this page from p->m map */
+	phys_to_machine_mapping[virt_to_phys(skb->head)>>PAGE_SHIFT] = 0x80000004;
         np->rx_bufs_to_notify++;
     }
     while ( (++i - np->rx_resp_cons) != XENNET_RX_RING_SIZE );
@@ -364,6 +366,9 @@ static inline void _network_interrupt(struct net_device *dev)
         skb = np->rx_skbs[rx->id];
         ADD_ID_TO_FREELIST(np->rx_skbs, rx->id);
 
+        phys_to_machine_mapping[virt_to_phys(skb->head) >> PAGE_SHIFT] =
+            (*(unsigned long *)get_ppte(skb->head)) >> PAGE_SHIFT;
+
         if ( unlikely(rx->status != RING_STATUS_OK) )
         {
             /* Gate this error. We get a (valid) slew of them on suspend. */
@@ -382,9 +387,6 @@ static inline void _network_interrupt(struct net_device *dev)
         skb_shinfo(skb)->nr_frags = 0;
         skb_shinfo(skb)->frag_list = NULL;
                                 
-        phys_to_machine_mapping[virt_to_phys(skb->head) >> PAGE_SHIFT] =
-            (*(unsigned long *)get_ppte(skb->head)) >> PAGE_SHIFT;
-
         skb->data = skb->tail = skb->head + rx->offset;
         skb_put(skb, rx->size);
         skb->protocol = eth_type_trans(skb, dev);

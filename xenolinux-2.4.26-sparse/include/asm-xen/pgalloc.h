@@ -276,4 +276,11 @@ extern int direct_remap_area_pages(struct mm_struct *mm,
                                    pgprot_t prot,
                                    domid_t  domid);
 
+extern int __direct_remap_area_pages(struct mm_struct *mm,
+				     unsigned long address, 
+				     unsigned long size, 
+				     mmu_update_t *v);
+
+
+
 #endif /* _I386_PGALLOC_H */

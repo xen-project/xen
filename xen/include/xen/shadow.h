@@ -23,7 +23,7 @@
 #define shadow_linear_pg_table ((l1_pgentry_t *)SH_LINEAR_PT_VIRT_START)
 #define shadow_linear_l2_table ((l2_pgentry_t *)(SH_LINEAR_PT_VIRT_START+(SH_LINEAR_PT_VIRT_START>>(L2_PAGETABLE_SHIFT-L1_PAGETABLE_SHIFT))))
 
-extern int shadow_mode_control( struct task_struct *p, unsigned int op );
+extern int shadow_mode_control( struct task_struct *p, dom0_shadow_control_t *sc );
 extern int shadow_fault( unsigned long va, long error_code );
 extern void shadow_l1_normal_pt_update( unsigned long pa, unsigned long gpte, 
 										unsigned long *prev_spfn_ptr,
@@ -50,7 +50,7 @@ struct shadow_status {
 
 #ifndef NDEBUG
 #define SH_LOG(_f, _a...)                             \
-  printk("DOM%llu: (file=shadow.c, line=%d) " _f "\n", \
+  printk("DOM%lld: (file=shadow.c, line=%d) " _f "\n", \
          current->domain , __LINE__ , ## _a )
 #else
 #define SH_LOG(_f, _a...) 
@@ -58,7 +58,7 @@ struct shadow_status {
 
 #if SHADOW_DEBUG
 #define SH_VLOG(_f, _a...)                             \
-  printk("DOM%llu: (file=shadow.c, line=%d) " _f "\n", \
+  printk("DOM%lld: (file=shadow.c, line=%d) " _f "\n", \
          current->domain , __LINE__ , ## _a )
 #else
 #define SH_VLOG(_f, _a...) 
@@ -66,19 +66,27 @@ struct shadow_status {
 
 #if 0
 #define SH_VVLOG(_f, _a...)                             \
-  printk("DOM%llu: (file=shadow.c, line=%d) " _f "\n", \
+  printk("DOM%lld: (file=shadow.c, line=%d) " _f "\n", \
          current->domain , __LINE__ , ## _a )
 #else
 #define SH_VVLOG(_f, _a...) 
 #endif
 
 
-
 /************************************************************************/
 
 static inline void mark_dirty( struct mm_struct *m, unsigned int mfn )
 {
-	unsigned int pfn = machine_to_phys_mapping[mfn];
+	unsigned int pfn;
+
+	pfn = machine_to_phys_mapping[mfn];
+
+	/* We use values with the top bit set to mark MFNs that aren't
+	   really part of the domain's psuedo-physical memory map e.g.
+           the shared info frame. Nothing to do here...
+         */
+	if ( unlikely(pfn & 0x80000000U) ) return; 
+
 	ASSERT(m->shadow_dirty_bitmap);
 	if( likely(pfn<m->shadow_dirty_bitmap_size) )
 	{
@@ -91,7 +99,14 @@ static inline void mark_dirty( struct mm_struct *m, unsigned int mfn )
 	}
 	else
 	{
-		SH_LOG("mark_dirty pfn out of range attempt!");
+		extern void show_traceX(void);
+		SH_LOG("mark_dirty OOR! mfn=%x pfn=%x max=%x (mm %p)",
+			   mfn, pfn, m->shadow_dirty_bitmap_size, m );
+		SH_LOG("dom=%lld caf=%08x taf=%08x\n", 
+			   frame_table[mfn].u.domain->domain,
+			   frame_table[mfn].count_and_flags, 
+			   frame_table[mfn].type_and_flags );
+		//show_traceX();
 	}
 
 }
@@ -116,7 +131,7 @@ static inline void l1pte_write_fault( struct mm_struct *m,
 		spte = gpte;
 		gpte |= _PAGE_DIRTY | _PAGE_ACCESSED;
 		spte |= _PAGE_RW | _PAGE_DIRTY | _PAGE_ACCESSED; 			
-		mark_dirty( m, gpte >> PAGE_SHIFT );
+		mark_dirty( m, (gpte >> PAGE_SHIFT) );
 		break;
     }
 
@@ -343,7 +358,7 @@ static inline unsigned long get_shadow_status( struct mm_struct *m,
 
 	if( m->shadow_mode == SHM_logdirty )
 		mark_dirty( m, gpfn );
-
+	
 	spin_lock(&m->shadow_lock);
 	res = __shadow_status( m, gpfn );
 	if (!res) spin_unlock(&m->shadow_lock);

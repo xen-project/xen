@@ -109,13 +109,24 @@ int xc_domain_getinfo(int xc_handle,
 
 int xc_shadow_control(int xc_handle,
                       u64 domid, 
-                      unsigned int sop)
+                      unsigned int sop,
+		      unsigned long *dirty_bitmap,
+		      unsigned long pages)
 {
+    int rc;
     dom0_op_t op;
     op.cmd = DOM0_SHADOW_CONTROL;
     op.u.shadow_control.domain = (domid_t)domid;
     op.u.shadow_control.op     = sop;
-    return do_dom0_op(xc_handle, &op);
+    op.u.shadow_control.dirty_bitmap = dirty_bitmap;
+    op.u.shadow_control.pages  = pages;
+
+    rc = do_dom0_op(xc_handle, &op);
+
+    if ( rc == 0 )
+	return op.u.shadow_control.pages;
+    else
+	return rc;
 }
 
 int xc_domain_setname(int xc_handle,

@@ -232,6 +232,9 @@ typedef struct mfn_mapper {
 void * mfn_mapper_map_single(int xc_handle, domid_t dom, int size, int prot, 
 			     unsigned long mfn );
 
+void * mfn_mapper_map_batch(int xc_handle, domid_t dom, int prot,
+			    unsigned long *arr, int num );
+
 mfn_mapper_t * mfn_mapper_init(int xc_handle, domid_t dom, int size, int prot);
 
 void * mfn_mapper_base(mfn_mapper_t *t);
@@ -245,5 +248,6 @@ void * mfn_mapper_queue_entry(mfn_mapper_t *t, int offset,
 
 /*********************/
 
+int xc_domain_stop_sync( int xc_handle, domid_t dom );
 
 #endif /* __XC_PRIVATE_H__ */

@@ -47,6 +47,31 @@ void unmap_pfn(int pm_handle, void *vaddr)
 
 /*******************/
 
+void * mfn_mapper_map_batch(int xc_handle, domid_t dom, int prot,
+			    unsigned long *arr, int num )
+{
+    privcmd_mmapbatch_t ioctlx; 
+    void *addr;
+    addr = mmap( NULL, num*PAGE_SIZE, prot, MAP_SHARED, xc_handle, 0 );
+    if (addr)
+    {
+	ioctlx.num=num;
+	ioctlx.dom=dom;
+	ioctlx.addr=(unsigned long)addr;
+	ioctlx.arr=arr;
+	if ( ioctl( xc_handle, IOCTL_PRIVCMD_MMAPBATCH, &ioctlx ) <0 )
+	{
+	    perror("XXXXXXXX");
+	    munmap(addr, num*PAGE_SIZE);
+	    return 0;
+	}
+    }
+    return addr;
+
+}
+
+/*******************/
+
 void * mfn_mapper_map_single(int xc_handle, domid_t dom,
 			     int size, int prot,
 			     unsigned long mfn )
@@ -64,7 +89,10 @@ void * mfn_mapper_map_single(int xc_handle, domid_t dom,
 	entry.mfn=mfn;
 	entry.npages=(size+PAGE_SIZE-1)>>PAGE_SHIFT;
 	if ( ioctl( xc_handle, IOCTL_PRIVCMD_MMAP, &ioctlx ) <0 )
+	{
+	    munmap(addr, size);
 	    return 0;
+	}
     }
     return addr;
 }
@@ -295,7 +323,7 @@ static int flush_mmu_updates(int xc_handle, mmu_t *mmu)
 
     hypercall.op     = __HYPERVISOR_mmu_update;
     hypercall.arg[0] = (unsigned long)mmu->updates;
-    hypercall.arg[1] = (unsigned long)mmu->idx;
+    hypercall.arg[1] = (unsigned long)&(mmu->idx);
 
     if ( mlock(mmu->updates, sizeof(mmu->updates)) != 0 )
     {
@@ -341,4 +369,48 @@ int add_mmu_update(int xc_handle, mmu_t *mmu,
 int finish_mmu_updates(int xc_handle, mmu_t *mmu)
 {
     return flush_mmu_updates(xc_handle, mmu);
+}
+
+
+/***********************************************************/
+
+/* this function is a hack until we get proper synchronous domain stop */
+
+int xc_domain_stop_sync( int xc_handle, domid_t domid )
+{
+    dom0_op_t op;
+
+    while (1)
+    {
+        op.cmd = DOM0_STOPDOMAIN;
+        op.u.stopdomain.domain = (domid_t)domid;
+        if ( do_dom0_op(xc_handle, &op) != 0 )
+        {
+            PERROR("Stopping target domain failed");
+            goto out;
+        }
+
+        usleep(1000); // 1ms
+	printf("Sleep for 1ms\n");
+
+        op.cmd = DOM0_GETDOMAININFO;
+        op.u.getdomaininfo.domain = (domid_t)domid;
+        op.u.getdomaininfo.ctxt = NULL;
+        if ( (do_dom0_op(xc_handle, &op) < 0) || 
+             ((u64)op.u.getdomaininfo.domain != domid) )
+        {
+            PERROR("Could not get info on domain");
+            goto out;
+        }
+
+        if ( op.u.getdomaininfo.state == DOMSTATE_STOPPED )
+	{
+	    printf("Domain %lld stopped\n",domid);
+            return 0;
+	}
+
+    }
+
+out:
+    return -1;    
 }

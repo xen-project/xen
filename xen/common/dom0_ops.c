@@ -525,10 +525,10 @@ long do_dom0_op(dom0_op_t *u_dom0_op)
 	p = find_domain_by_id( op->u.shadow_control.domain );
 	if ( p )
 	{
-            ret = shadow_mode_control(p, op->u.shadow_control.op );
+            ret = shadow_mode_control(p, &op->u.shadow_control );
 	    put_task_struct(p);
-        }
-	
+	    copy_to_user(u_dom0_op, op, sizeof(*op));
+        }	
     }
     break;
 

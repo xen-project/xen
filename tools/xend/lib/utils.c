@@ -723,6 +723,11 @@ static PyObject *xu_port_new(PyObject *self, PyObject *args)
         goto fail4;
     }
 
+    xup->interface->tx_resp_prod = 0;
+    xup->interface->rx_req_prod  = 0;
+    xup->interface->tx_req_prod = 0;
+    xup->interface->rx_resp_prod = 0;
+
     xup->tx_req_cons  = 0;
     xup->tx_resp_prod = 0;
     xup->rx_req_prod  = 0;

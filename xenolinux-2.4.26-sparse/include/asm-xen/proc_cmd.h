@@ -25,6 +25,13 @@ typedef struct privcmd_mmap {
     privcmd_mmap_entry_t *entry;
 } privcmd_mmap_t; 
 
+typedef struct privcmd_mmapbatch {
+    int num;     // number of pages to populate
+    domid_t dom; // target domain 
+    unsigned long addr;  // virtual address
+    unsigned long *arr; // array of mfns - top nibble set on err
+} privcmd_mmapbatch_t; 
+
 typedef struct privcmd_blkmsg
 {
     unsigned long op;
@@ -50,5 +57,7 @@ typedef struct privcmd_blkmsg
     _IOC(_IOC_NONE, 'P', 1, 0)
 #define IOCTL_PRIVCMD_MMAP             \
     _IOC(_IOC_NONE, 'P', 2, sizeof(privcmd_mmap_t))
+#define IOCTL_PRIVCMD_MMAPBATCH             \
+    _IOC(_IOC_NONE, 'P', 2, sizeof(privcmd_mmapbatch_t))
 
 #endif /* __PROC_CMD_H__ */

@@ -243,6 +243,9 @@ typedef struct dom0_shadow_control_st
     /* IN variables. */
     domid_t      domain;
     int          op;
+    unsigned long  *dirty_bitmap; // pointe to mlocked buffer
+    /* IN/OUT variables */
+    unsigned long  pages;  // size of buffer, updated with actual size
 } dom0_shadow_control_t;
 
 #define DOM0_SETDOMAINNAME     26

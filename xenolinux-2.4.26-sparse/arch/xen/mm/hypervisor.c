@@ -37,12 +37,13 @@ static void DEBUG_allow_pt_reads(void)
     int i;
     for ( i = idx-1; i >= 0; i-- )
     {
+	int count = 1;
         pte = update_debug_queue[i].ptep;
         if ( pte == NULL ) continue;
         update_debug_queue[i].ptep = NULL;
         update.ptr = virt_to_machine(pte);
         update.val = update_debug_queue[i].pteval;
-        HYPERVISOR_mmu_update(&update, 1);
+        HYPERVISOR_mmu_update(&update, &count);
     }
 }
 static void DEBUG_disallow_pt_read(unsigned long va)
@@ -51,6 +52,7 @@ static void DEBUG_disallow_pt_read(unsigned long va)
     pmd_t *pmd;
     pgd_t *pgd;
     unsigned long pteval;
+    int count = 1;
     /*
      * We may fault because of an already outstanding update.
      * That's okay -- it'll get fixed up in the fault handler.
@@ -62,7 +64,7 @@ static void DEBUG_disallow_pt_read(unsigned long va)
     update.ptr = virt_to_machine(pte);
     pteval = *(unsigned long *)pte;
     update.val = pteval & ~_PAGE_PRESENT;
-    HYPERVISOR_mmu_update(&update, 1);
+    HYPERVISOR_mmu_update(&update, &count);
     update_debug_queue[idx].ptep = pte;
     update_debug_queue[idx].pteval = pteval;
 }
@@ -100,7 +102,7 @@ void MULTICALL_flush_page_update_queue(void)
         wmb(); /* Make sure index is cleared first to avoid double updates. */
         queue_multicall2(__HYPERVISOR_mmu_update, 
                          (unsigned long)update_queue, 
-                         _idx);
+                         &_idx);
     }
     spin_unlock_irqrestore(&update_lock, flags);
 }
@@ -116,7 +118,7 @@ static inline void __flush_page_update_queue(void)
 #endif
     idx = 0;
     wmb(); /* Make sure index is cleared first to avoid double updates. */
-    if ( unlikely(HYPERVISOR_mmu_update(update_queue, _idx) < 0) )
+    if ( unlikely(HYPERVISOR_mmu_update(update_queue, &_idx) < 0) )
         panic("Failed to execute MMU updates");
 }
 

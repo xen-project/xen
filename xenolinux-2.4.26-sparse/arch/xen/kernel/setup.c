@@ -1161,11 +1161,11 @@ static void stop_task(void *unused)
         virt_to_machine(pfn_to_mfn_frame_list) >> PAGE_SHIFT;
     suspend_record->nr_pfns = max_pfn;
 
-    j = 0;
-    for ( i = 0; i < max_pfn; i += (PAGE_SIZE / sizeof(unsigned long)) )
-        pfn_to_mfn_frame_list[j++] = 
+    for ( i=0, j=0; i < max_pfn; i+=(PAGE_SIZE/sizeof(unsigned long)), j++ )
+    {	
+        pfn_to_mfn_frame_list[j] = 
             virt_to_machine(&phys_to_machine_mapping[i]) >> PAGE_SHIFT;
-
+    }
     /*
      * NB. This is /not/ a full dev_close() as that loses route information!
      * Instead we do essentialy the same as dev_close() but without notifying
@@ -1207,7 +1207,9 @@ static void stop_task(void *unused)
     memcpy(&start_info, &suspend_record->resume_info, sizeof(start_info));
 
     set_fixmap(FIX_SHARED_INFO, start_info.shared_info);
+
     HYPERVISOR_shared_info = (shared_info_t *)fix_to_virt(FIX_SHARED_INFO);
+
     memset(empty_zero_page, 0, PAGE_SIZE);
 
     irq_resume();

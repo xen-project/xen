@@ -547,6 +547,9 @@ void deliver_packet(struct sk_buff *skb, net_vif_t *vif)
         goto out;
     }
 
+    machine_to_phys_mapping[new_page - frame_table] = 
+	machine_to_phys_mapping[old_page - frame_table];
+
     if ( p->mm.shadow_mode && 
 	 (spte_pfn=get_shadow_status(&p->mm, pte_page-frame_table)) )
     {
@@ -557,16 +560,14 @@ void deliver_packet(struct sk_buff *skb, net_vif_t *vif)
 	*sptr = new_pte;
 	unmap_domain_mem(sptr);
 
-	if( p->mm.shadow_mode == SHM_logdirty )
-		mark_dirty( &p->mm, new_page-frame_table );
-
 	put_shadow_status(&p->mm);
     }
-
-    machine_to_phys_mapping[new_page - frame_table] 
-        = machine_to_phys_mapping[old_page - frame_table];
     
     unmap_domain_mem(ptep);
+
+    /* if in shadow mode, mark the buffer as dirty */
+    if( p->mm.shadow_mode == SHM_logdirty )
+	mark_dirty( &p->mm, (new_page-frame_table) );
 
     /* Updates must happen before releasing the descriptor. */
     smp_wmb();
@@ -2143,8 +2144,6 @@ static void get_rx_bufs(net_vif_t *vif)
             put_page_and_type(pte_page);
             make_rx_response(vif, rx.id, 0, RING_STATUS_BAD_PAGE, 0);
             goto rx_unmap_and_continue;
-
-	    /* XXX IAP should SHADOW_CONFIG do something here? */
         }
 
         /*
@@ -2156,9 +2155,11 @@ static void get_rx_bufs(net_vif_t *vif)
                               0) != 
                       (PGC_allocated | PGC_tlb_flush_on_type_change | 2)) )
         {
-            DPRINTK("Page held more than once %08x %s\n", 
+            DPRINTK("Page held more than once mfn=%x %08x %s\n", 
+		    buf_page-frame_table,
                     buf_page->count_and_flags,
 		    (buf_page->u.domain)?buf_page->u.domain->name:"None");
+
             if ( !get_page_type(buf_page, PGT_writeable_page) )
                 put_page(buf_page);
             else if ( cmpxchg(ptep, pte & ~_PAGE_PRESENT, pte) !=
@@ -2263,6 +2264,13 @@ long flush_bufs_for_vif(net_vif_t *vif)
         unmap_domain_mem(ptep);
 
         put_page_and_type(&frame_table[rx->pte_ptr >> PAGE_SHIFT]);
+
+	/* if in shadow mode, mark the PTE as dirty */
+	if( p->mm.shadow_mode == SHM_logdirty )
+	    mark_dirty( &p->mm, rx->pte_ptr>>PAGE_SHIFT );
+	/* assume the shadow page table is about to be blown away,
+	   and that its not worth marking the buffer as dirty */
+
 
         make_rx_response(vif, rx->id, 0, RING_STATUS_DROPPED, 0);
     }

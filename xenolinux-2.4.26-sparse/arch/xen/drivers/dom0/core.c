@@ -103,18 +103,103 @@ static int privcmd_ioctl(struct inode *inode, struct file *file,
 		if (msg[j].va + (msg[j].npages<<PAGE_SHIFT) > vma->vm_end)
 		    return -EINVAL;
 
-		if (rc = direct_remap_area_pages(vma->vm_mm, 
+		if ( (rc = direct_remap_area_pages(vma->vm_mm, 
 					    msg[j].va&PAGE_MASK, 
 					    msg[j].mfn<<PAGE_SHIFT, 
 					    msg[j].npages<<PAGE_SHIFT, 
 					    vma->vm_page_prot,
-					    mmapcmd.dom))
+					    mmapcmd.dom)) <0)
 		    return rc;
 	    }
 	}
 	ret = 0;
     }
     break;
+
+    case IOCTL_PRIVCMD_MMAPBATCH:
+    {
+#define MAX_DIRECTMAP_MMU_QUEUE 130
+	mmu_update_t u[MAX_DIRECTMAP_MMU_QUEUE], *w, *v;
+	privcmd_mmapbatch_t m;
+	struct vm_area_struct *vma = NULL;
+	unsigned long *p, addr;
+	unsigned long mfn;
+	int i;
+
+        if ( copy_from_user(&m, (void *)data, sizeof(m)) )
+	{ ret = -EFAULT; goto batch_err; }
+
+	vma = find_vma( current->mm, m.addr );
+
+	if (!vma)
+	{ ret = -EINVAL; goto batch_err; }
+
+	if (m.addr > PAGE_OFFSET)
+	{ ret = -EFAULT; goto batch_err; }
+
+	if (m.addr + (m.num<<PAGE_SHIFT) > vma->vm_end)
+	{ ret = -EFAULT; goto batch_err; }
+
+	// everything fits inside the vma
+
+//printk("direct_r_a_p sx=%ld address=%lx macaddr=%lx dom=%lld\n",size,address,machine_addr,domid);
+//    memset( u, 0, sizeof(mmu_update_t)*MAX_DIRECTMAP_MMU_QUEUE );// XXX
+
+
+	if ( m.dom != 0 )
+	{
+	    u[0].val  = (unsigned long)(m.dom<<16) & ~0xFFFFUL;
+	    u[0].ptr  = (unsigned long)(m.dom<< 0) & ~0xFFFFUL;
+	    u[1].val  = (unsigned long)(m.dom>>16) & ~0xFFFFUL;
+	    u[1].ptr  = (unsigned long)(m.dom>>32) & ~0xFFFFUL;
+	    u[0].ptr |= MMU_EXTENDED_COMMAND;
+	    u[0].val |= MMUEXT_SET_SUBJECTDOM_L;
+	    u[1].ptr |= MMU_EXTENDED_COMMAND;
+	    u[1].val |= MMUEXT_SET_SUBJECTDOM_H;
+	    v = w = &u[2];
+	}
+	else
+	{
+	    v = w = &u[0];
+	}
+
+	p = m.arr;
+	addr = m.addr;
+//printk("BATCH: arr=%p addr=%lx num=%d u=%p,w=%p\n",p,addr,m.num,u,w);
+	for (i=0; i<m.num; i++, addr+=PAGE_SIZE, p++)
+	{
+	    unsigned int count;
+	    if ( get_user(mfn, p) ) return -EFAULT;
+
+	    v->val = (mfn << PAGE_SHIFT) | pgprot_val(vma->vm_page_prot) |
+		_PAGE_IO;
+
+	    __direct_remap_area_pages( vma->vm_mm,
+				       addr, 
+				       PAGE_SIZE, 
+				       v);
+	    v++;
+	    count = v-u;
+//printk("Q i=%d mfn=%x co=%d v=%p : %lx %lx\n",i,mfn,count,v, w->val,w->ptr);
+
+	    if ( HYPERVISOR_mmu_update(u, &count) < 0 )
+	    {
+		//printk("Fail %d->%d mfn=%lx\n",v-u,count, w->val);
+		put_user( 0xe0000000 | mfn, p );
+	    }
+	    v=w;
+	}
+	ret = 0;
+	break;
+
+    batch_err:
+	printk("batch_err ret=%d vma=%p addr=%lx num=%d arr=%lx %lx-%lx\n", 
+	       ret, vma, m.addr, m.num, m.arr, vma->vm_start, vma->vm_end);
+	break;
+    }
+    break;
+
+
 
     default:
         ret = -EINVAL;

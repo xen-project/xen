@@ -164,8 +164,8 @@ static inline int get_page(struct pfn_info *page,
              unlikely(x & PGC_zombie) ||             /* Zombie? */
              unlikely(p != domain) )                 /* Wrong owner? */
         {
-            DPRINTK("Error pfn %08lx: ed=%p(%lld), sd=%p(%lld), caf=%08x\n",
-                    page_to_pfn(page), domain, (domain)?domain->domain:1234, p, (p)?p->domain:1234, x);
+            DPRINTK("Error pfn %08lx: ed=%p(%lld), sd=%p(%lld), caf=%08x, taf=%08x\n",
+                    page_to_pfn(page), domain, (domain)?domain->domain:999, p, (p && !((x & PGC_count_mask) == 0))?p->domain:999, x, page->type_and_flags);
             return 0;
         }
         __asm__ __volatile__(
@@ -314,7 +314,7 @@ int check_descriptor(unsigned long a, unsigned long b);
 #define machine_to_phys_mapping ((unsigned long *)RDWR_MPT_VIRT_START)
 
 /* Part of the domain API. */
-int do_mmu_update(mmu_update_t *updates, int count);
+int do_mmu_update(mmu_update_t *updates, int *count);
 
 #define DEFAULT_GDT_ENTRIES     ((LAST_RESERVED_GDT_ENTRY*8)+7)
 #define DEFAULT_GDT_ADDRESS     ((unsigned long)gdt_table)
