@@ -164,7 +164,7 @@ class NetDev(controller.Dev):
     def get_mac(self):
         """Get the MAC address as a string.
         """
-        return ':'.join(map(lambda x: "%x" % x, self.mac))
+        return ':'.join(map(lambda x: "%02x" % x, self.mac))
 
     def vifctl_params(self, vmname=None):
         dom = self.controller.dom
