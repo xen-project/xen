@@ -362,7 +362,9 @@ int __direct_remap_area_pages(struct mm_struct *mm,
 	spin_lock(&mm->page_table_lock);
 	do {
 		error = -ENOMEM;
-		pmd_t *pmd = pmd_alloc(mm, dir, address);
+		pmd_t *pmd;
+
+		pmd = pmd_alloc(mm, dir, address);
 		if (!pmd)
 			break;
 		error = 0;
