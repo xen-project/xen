@@ -683,6 +683,13 @@ int reprogram_ac_timer(s_time_t timeout)
         return 0;       /* timeout value in the past */
     }
 
+    /*
+     * If we don't have local APIC then we just poll the timer list off the
+     * PIT interrupt. Cheesy but good enough to work on eg. VMware :-)
+     */
+    if ( !cpu_has_apic )
+        return 1;
+
     /* conversion to bus units */
     apic_tmict = (((u64)bus_scale) * expire)>>18;
 
