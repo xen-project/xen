@@ -105,7 +105,10 @@ class SrvDomainDir(SrvDir):
 
     def op_restore(self, op, req):
         """Restore a domain from file.
+
+        @return: deferred
         """
+        #todo: return is deferred. May need ok and err callbacks.
         fn = FormFn(self.xd.domain_restore,
                     [['file', 'str']])
         val = fn(req.args)
@@ -154,9 +157,10 @@ class SrvDomainDir(SrvDir):
         req.write('<button type="submit" name="op" value="create">Create Domain</button>')
         req.write('Config <input type="file" name="config"><br>')
         req.write('</form>')
+        
         req.write('<form method="post" action="%s" enctype="multipart/form-data">'
                   % req.prePathURL())
-        req.write('<button type="submit" name="op" value="create">Restore Domain</button>')
+        req.write('<button type="submit" name="op" value="restore">Restore Domain</button>')
         req.write('State <input type="string" name="state"><br>')
         req.write('</form>')
         

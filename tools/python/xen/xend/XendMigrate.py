@@ -1,5 +1,6 @@
 # Copyright (C) 2004 Mike Wray <mike.wray@hp.com>
 
+import errno
 import sys
 import socket
 import time
@@ -14,9 +15,12 @@ import sxp
 import XendDB
 import EventServer; eserver = EventServer.instance()
 
+"""The port for the migrate/save daemon xfrd."""
 XFRD_PORT = 8002
 
+"""The transfer protocol major version number."""
 XFR_PROTO_MAJOR = 1
+"""The transfer protocol minor version number."""
 XFR_PROTO_MINOR = 0
 
 class Xfrd(Protocol):
@@ -55,16 +59,16 @@ class XfrdClientFactory(ClientFactory):
     """Factory for clients of the migration/save daemon xfrd.
     """
 
-    def __init__(self, minfo):
+    def __init__(self, xinfo):
         #ClientFactory.__init__(self)
-        self.minfo = minfo
+        self.xinfo = xinfo
 
     def startedConnecting(self, connector):
         print 'Started to connect', 'self=', self, 'connector=', connector
 
     def buildProtocol(self, addr):
         print 'buildProtocol>', addr
-        return Migrate(self.minfo)
+        return Xfrd(self.xinfo)
 
     def clientConnectionLost(self, connector, reason):
         print 'clientConnectionLost>', 'connector=', connector, 'reason=', reason
@@ -76,13 +80,15 @@ class XfrdInfo:
     """Abstract class for info about a session with xfrd.
     Has subclasses for save and migrate.
     """
-    
+
+    def __init__(self):
+        from xen.xend import XendDomain
+        self.xd = XendDomain.instance()
+        self.deferred = defer.Deferred()
+        
     def vmconfig(self):
         print 'vmconfig>'
-        from xen.xend import XendDomain
-        xd = XendDomain.instance()
-
-        dominfo = xd.domain_get(self.src_dom)
+        dominfo = self.xd.domain_get(self.src_dom)
         print 'vmconfig>', type(dominfo), dominfo
         if dominfo:
             val = sxp.to_string(dominfo.sxpr())
@@ -93,6 +99,8 @@ class XfrdInfo:
 
     def error(self, err):
         self.state = 'error'
+        if not self.deferred.called:
+            self.deferred.errback(err)
 
     def dispatch(self, xfrd, val):
         op = sxp.name(val)
@@ -100,14 +108,18 @@ class XfrdInfo:
         if op.startswith('xfr_'):
             fn = getattr(self, op, self.unknown)
         else:
-            fn = self.unknown()
-        fn(xfrd, val)
+            fn = self.unknown
+        val = fn(xfrd, val)
+        if val is not None:
+            sxp.show(val, out=self.transport)
 
     def unknown(self, xfrd, val):
         print 'unknown>', val
+        xfrd.loseConnection()
+        return None
 
     def xfr_err(self, xfrd, val):
-        # If we get an error with non-zero code the migrate failed.
+        # If we get an error with non-zero code the operation failed.
         # An error with code zero indicates hello success.
         print 'xfr_err>', val
         v = sxp.child(val)
@@ -116,21 +128,49 @@ class XfrdInfo:
         if not err: return
         self.error(err);
         xfrd.loseConnection()
+        #try:
+        #    self.xd.domain_unpause(self.src_dom)
+        #except:
+        #    print >>sys.stdout, "Error unpausing domain:", self.src_dom
+        return None
 
     def xfr_progress(self, val):
         print 'xfr_progress>', val
+        return None
 
-    def xfr_domain_pause(self, val):
-        print 'xfr__domain_pause>', val
+    def xfr_vm_pause(self, val):
+        print 'xfr_vm_pause>', val
+        try:
+            vmid = sxp.child0(val)
+            val = self.xd.domain_pause(vmid)
+        except:
+            val = errno.EINVAL
+        return ['xfr.err', val]
 
-    def xfr_domain_suspend(self, val):
-        print 'xfr_domain_suspend>', val
+    def xfr_vm_unpause(self, val):
+        print 'xfr_vm_unpause>', val
+        try:
+            vmid = sxp.child0(val)
+            val = self.xd.domain_unpause(vmid)
+        except:
+            val = errno.EINVAL
+        return ['xfr.err', val]
+
+    def xfr_vm_suspend(self, val):
+        print 'xfr_vm_suspend>', val
+        try:
+            vmid = sxp.child0(val)
+            val = self.xd.domain_shutdown(vmid, reason='suspend')
+        except:
+            val = errno.EINVAL
+        return ['xfr.err', val]
 
 class XendMigrateInfo(XfrdInfo):
     """Representation of a migrate in-progress and its interaction with xfrd.
     """
 
     def __init__(self, id, dom, host, port):
+        XfrdInfo.__init__(self)
         self.id = id
         self.state = 'begin'
         self.src_host = socket.gethostname()
@@ -139,7 +179,6 @@ class XendMigrateInfo(XfrdInfo):
         self.dst_port = port
         self.dst_dom = None
         self.start = 0
-        self.deferred = defer.Deferred()
         
     def sxpr(self):
         sxpr = ['migrate', ['id', self.id], ['state', self.state] ]
@@ -160,12 +199,15 @@ class XendMigrateInfo(XfrdInfo):
                       self.src_dom,
                       vmconfig,
                       self.dst_host,
-                      self.d.dst_port])
+                      self.dst_port])
         
     def xfr_migrate_ok(self, val):
         dom = int(sxp.child0(val))
         self.state = 'ok'
         self.dst_dom = dom
+        self.xd_domain_destroy(self.src_dom)
+        if not self.deferred.called:
+            self.deferred.callback(self)
 
     def connectionLost(self, reason=None):
         if self.state =='ok':
@@ -179,12 +221,12 @@ class XendSaveInfo(XfrdInfo):
     """
     
     def __init__(self, id, dom, file):
+        XfrdInfo.__init__(self)
         self.id = id
         self.state = 'begin'
         self.src_dom = dom
         self.file = file
         self.start = 0
-        self.deferred = defer.Deferred()
         
     def sxpr(self):
         sxpr = ['save',
@@ -204,6 +246,9 @@ class XendSaveInfo(XfrdInfo):
     def xfr_save_ok(self, val):
         dom = int(sxp.child0(val))
         self.state = 'ok'
+        self.xd_domain_destroy(self.src_dom)
+        if not self.deferred.called:
+            self.deferred.callback(self)
 
     def connectionLost(self, reason=None):
         if self.state =='ok':
@@ -217,7 +262,6 @@ class XendMigrate:
     """External api for interaction with xfrd for migrate and save.
     Singleton.
     """
-    # Represents migration in progress.
     # Use log for indications of begin/end/errors?
     # Need logging of: domain create/halt, migrate begin/end/fail
     # Log via event server?
@@ -226,8 +270,8 @@ class XendMigrate:
     
     def __init__(self):
         self.db = XendDB.XendDB(self.dbpath)
-        self.migrate = {}
-        self.migrate_db = self.db.fetchall("")
+        self.session = {}
+        self.session_db = self.db.fetchall("")
         self.id = 0
 
     def nextid(self):
@@ -235,44 +279,67 @@ class XendMigrate:
         return "%d" % self.id
 
     def sync(self):
-        self.db.saveall("", self.migrate_db)
+        self.db.saveall("", self.session_db)
 
-    def sync_migrate(self, id):
-        self.db.save(id, self.migrate_db[id])
+    def sync_session(self, id):
+        self.db.save(id, self.session_db[id])
 
     def close(self):
         pass
 
-    def _add_migrate(self, id, info):
-        self.migrate[id] = info
-        self.migrate_db[id] = info.sxpr()
-        self.sync_migrate(id)
+    def _add_session(self, id, info):
+        self.session[id] = info
+        self.session_db[id] = info.sxpr()
+        self.sync_session(id)
         #eserver.inject('xend.migrate.begin', info.sxpr())
 
-    def _delete_migrate(self, id):
+    def _delete_session(self, id):
         #eserver.inject('xend.migrate.end', id)
-        del self.migrate[id]
-        del self.migrate_db[id]
+        del self.session[id]
+        del self.session_db[id]
         self.db.delete(id)
 
-    def migrate_ls(self):
-        return self.migrate.keys()
+    def session_ls(self):
+        return self.session.keys()
 
-    def migrates(self):
-        return self.migrate.values()
+    def sessions(self):
+        return self.session.values()
 
-    def migrate_get(self, id):
-        return self.migrate.get(id)
+    def session_get(self, id):
+        return self.session.get(id)
+
+    def session_begin(self, info):
+        self._add_session(id, info)
+        mcf = XfrdClientFactory(info)
+        reactor.connectTCP('localhost', XFRD_PORT, mcf)
+        return info
     
     def migrate_begin(self, dom, host, port=XFRD_PORT):
+        """Begin to migrate a domain to another host.
+
+        @param dom:  domain
+        @param host: destination host
+        @param port: destination port
+        @return: deferred
+        """
         # Check dom for existence, not migrating already.
         # Subscribe to migrate notifications (for updating).
         id = self.nextid()
         info = XendMigrateInfo(id, dom, host, port)
-        self._add_migrate(id, info)
-        mcf = XfrdClientFactory(info)
-        reactor.connectTCP('localhost', XFRD_PORT, mcf)
-        return info
+        self.session_begin(info)
+        return info.deferred
+
+    def save_begin(self, dom, file):
+        """Begin saving a domain to file.
+
+        @param dom:  domain
+        @param file: destination file
+        @return: deferred
+        """
+        id = self.nextid()
+        info = XendSaveInfo(id, dom, file)
+        self.session_begin(info)
+        return info.deferred
 
 def instance():
     global inst

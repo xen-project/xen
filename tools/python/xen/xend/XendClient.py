@@ -225,6 +225,11 @@ class Xend:
     def xend_domain(self, id):
         return xend_get(self.domainurl(id))
 
+    def xend_domain_configure(self, id, config):
+        return xend_call(self.domainurl(id),
+                         {'op'      : 'configure',
+                          'config'  : fileof(conf) })
+
     def xend_domain_unpause(self, id):
         return xend_call(self.domainurl(id),
                          {'op'      : 'unpause'})
