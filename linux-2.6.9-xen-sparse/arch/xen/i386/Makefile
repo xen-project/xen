@@ -84,7 +84,8 @@ obj-	+= kernel/ mm/ pci/
 #../../i386/$(mcore-y)/
 #obj-	+= ../../i386/pci/ ../../i386/oprofile/ ../../i386/power/
 
-xenflags-y += -Iinclude/asm-xen/asm-i386/mach-xen
+xenflags-y += -Iinclude/asm-xen/asm-i386/mach-xen \
+		-Iinclude/asm-i386/mach-default
 CFLAGS += $(xenflags-y)
 AFLAGS += $(xenflags-y)
 
