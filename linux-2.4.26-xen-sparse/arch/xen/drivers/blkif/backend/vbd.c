@@ -79,6 +79,8 @@ void vbd_grow(blkif_be_vbd_grow_t *grow)
     vbd_t              *vbd = NULL;
     rb_node_t          *rb;
     blkif_vdev_t        vdevice = grow->vdevice;
+    struct gendisk     *gd;
+    struct hd_struct   *hd;
 
     blkif = blkif_find_by_handle(grow->domid, grow->blkif_handle);
     if ( unlikely(blkif == NULL) )
@@ -122,6 +124,35 @@ void vbd_grow(blkif_be_vbd_grow_t *grow)
     x->extent.sector_start  = grow->extent.sector_start; 
     x->extent.sector_length = grow->extent.sector_length; 
     x->next                 = (blkif_extent_le_t *)NULL; 
+
+    gd = get_gendisk(x->extent.device);
+
+    if (!gd || !gd->part)
+    {
+        grow->status = BLKIF_BE_STATUS_VBD_NOT_FOUND; 
+        DPRINTK("vbd_grow: device %08x doesn't exist.\n", x->extent.device);
+        goto out;
+    }
+
+    hd = &gd->part[MINOR(x->extent.device)];
+
+    if (!hd)
+    {
+        grow->status = BLKIF_BE_STATUS_VBD_NOT_FOUND; 
+        DPRINTK("vbd_grow: HD device %08x doesn't exist.\n", x->extent.device);
+        goto out;
+    }
+
+    printk("vbd_grow: requested_len %llu actual_len %lu\n", 
+	   x->extent.sector_length,  hd->nr_sects );
+
+    /* this test assumes sector_start is zero, which in the new
+       IO world it always will be -- We need to simpligy the 
+       grow/shrink interface as we'll always be deadling with whole
+       devices
+    */
+    if ( x->extent.sector_length > hd->nr_sects )
+	x->extent.sector_length = hd->nr_sects;    
 
     for ( px = &vbd->extents; *px != NULL; px = &(*px)->next ) 
         continue;
