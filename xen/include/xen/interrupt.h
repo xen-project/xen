@@ -42,7 +42,8 @@ enum
 	AC_TIMER_SOFTIRQ,
 	TASKLET_SOFTIRQ,
         BLKDEV_RESPONSE_SOFTIRQ,
-        NET_TX_SOFTIRQ
+        NET_TX_SOFTIRQ,
+        NEW_TLBFLUSH_CLOCK_PERIOD_SOFTIRQ
 };
 
 /* softirq mask and active fields moved to irq_cpustat_t in

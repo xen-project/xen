@@ -9,6 +9,7 @@
 
 #include <xen/config.h>
 #include <xen/sched.h>
+#include <xen/interrupt.h>
 #include <asm/flushtlb.h>
 
 u32 tlbflush_clock;
@@ -24,7 +25,7 @@ void tlb_clocktick(void)
 #ifdef CONFIG_SMP
         if ( unlikely(((y = ny+1) & TLBCLOCK_EPOCH_MASK) == 0) )
         {
-            new_tlbflush_clock_period();
+            raise_softirq(NEW_TLBFLUSH_CLOCK_PERIOD_SOFTIRQ);
             y = tlbflush_clock;
             break;
         }

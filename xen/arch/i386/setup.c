@@ -345,6 +345,10 @@ void __init start_of_day(void)
     memguard_guard_range(cpu0_stack, PAGE_SIZE);
 #endif
 
+    open_softirq(NEW_TLBFLUSH_CLOCK_PERIOD_SOFTIRQ, 
+                 (void *)new_tlbflush_clock_period,
+                 NULL);
+
     if ( opt_watchdog ) 
         nmi_watchdog = NMI_LOCAL_APIC;
 

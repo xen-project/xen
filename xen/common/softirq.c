@@ -61,7 +61,7 @@ inline void cpu_raise_softirq(unsigned int cpu, unsigned int nr)
 
 void raise_softirq(unsigned int nr)
 {
-    cpu_raise_softirq(smp_processor_id(), nr);
+    __cpu_raise_softirq(smp_processor_id(), nr);
 }
 
 void open_softirq(int nr, void (*action)(struct softirq_action*), void *data)

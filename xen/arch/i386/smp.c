@@ -288,11 +288,13 @@ void flush_tlb_mask(unsigned long mask)
     }
 }
 
+/*
+ * NB. Must be called with no locks held and interrupts enabled.
+ *     (e.g., softirq context).
+ */
 void new_tlbflush_clock_period(void)
 {
-    /* Avoid deadlock because we might be reentering a flush_lock region. */
-    if ( unlikely(!spin_trylock(&flush_lock)) )
-        return;
+    spin_lock(&flush_lock);
 
     /* Someone may acquire the lock and execute the flush before us. */
     if ( ((tlbflush_clock+1) & TLBCLOCK_EPOCH_MASK) != 0 )
