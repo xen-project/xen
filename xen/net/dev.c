@@ -522,6 +522,8 @@ void deliver_packet(struct sk_buff *skb, net_vif_t *vif)
     old_page = &frame_table[rx->buf_pfn];
     new_page = skb->pf;
     
+    skb->pf = old_page;
+
     ptep = map_domain_mem(rx->pte_ptr);
 
     new_page->u.domain = p;
@@ -541,6 +543,8 @@ void deliver_packet(struct sk_buff *skb, net_vif_t *vif)
                           ((new_page - frame_table) << PAGE_SHIFT))) != pte )
     {
         unmap_domain_mem(ptep);
+        /* At some point maybe should have 'new_page' in error response. */
+        put_page_and_type(new_page);
         status = RING_STATUS_BAD_PAGE;
         goto out;
     }
@@ -549,9 +553,6 @@ void deliver_packet(struct sk_buff *skb, net_vif_t *vif)
         = machine_to_phys_mapping[old_page - frame_table];
     
     unmap_domain_mem(ptep);
-
-    /* Our skbuff now points at the guest's old frame. */
-    skb->pf = old_page;
 
     /* Updates must happen before releasing the descriptor. */
     smp_wmb();
@@ -2078,17 +2079,13 @@ static void get_rx_bufs(net_vif_t *vif)
          * just once as a writeable page.
          */
         if ( unlikely(buf_page->u.domain != p) ||
-             unlikely(!test_and_clear_bit(_PGC_allocated, 
-                                          &buf_page->count_and_flags)) ||
              unlikely(cmpxchg(&buf_page->type_and_flags, 
                               PGT_writeable_page|PGT_validated|1,
                               0) != (PGT_writeable_page|PGT_validated|1)) )
         {
             DPRINTK("Bad domain or page mapped writeable more than once.\n");
-            if ( buf_page->u.domain == p )
-                set_bit(_PGC_allocated, &buf_page->count_and_flags);
-            if ( unlikely(cmpxchg(ptep, pte & ~_PAGE_PRESENT, pte) !=
-                          (pte & ~_PAGE_PRESENT)) )
+            if ( cmpxchg(ptep, pte & ~_PAGE_PRESENT, pte) != 
+                 (pte & ~_PAGE_PRESENT) )
                 put_page_and_type(buf_page);
             make_rx_response(vif, rx.id, 0, RING_STATUS_BAD_PAGE, 0);
             goto rx_unmap_and_continue;
@@ -2099,11 +2096,17 @@ static void get_rx_bufs(net_vif_t *vif)
          * The final count should be 2, because of PGC_allocated.
          */
         if ( unlikely(cmpxchg(&buf_page->count_and_flags, 
-                              PGC_tlb_flush_on_type_change | 2, 0) != 
-                      (PGC_tlb_flush_on_type_change | 2)) )
+                              PGC_allocated | PGC_tlb_flush_on_type_change | 2,
+                              0) != 
+                      (PGC_allocated | PGC_tlb_flush_on_type_change | 2)) )
         {
-            DPRINTK("Page held more than once\n");
-            /* Leave the page unmapped at 'ptep'. Stoopid domain! */
+            DPRINTK("Page held more than once %08lx\n", 
+                    buf_page->count_and_flags);
+            if ( get_page_type(buf_page, PGT_writeable_page) &&
+                 (cmpxchg(ptep, pte & ~_PAGE_PRESENT, pte) !=
+                  (pte & ~_PAGE_PRESENT)) )
+                put_page_and_type(buf_page);
+            /* NB. If we fail to remap the page, we should probably flag it. */
             make_rx_response(vif, rx.id, 0, RING_STATUS_BAD_PAGE, 0);
             goto rx_unmap_and_continue;
         }

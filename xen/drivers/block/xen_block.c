@@ -433,7 +433,8 @@ static void dispatch_rw_block_io(struct task_struct *p, int index)
     phys_seg_t phys_seg[MAX_BLK_SEGS * 2];
 
     /* Check that number of segments is sane. */
-    if ( (req->nr_segments == 0) || (req->nr_segments > MAX_BLK_SEGS) )
+    if ( unlikely(req->nr_segments == 0) || 
+         unlikely(req->nr_segments > MAX_BLK_SEGS) )
     {
         DPRINTK("Bad number of segments in request (%d)\n", req->nr_segments);
         goto bad_descriptor;
@@ -450,17 +451,11 @@ static void dispatch_rw_block_io(struct task_struct *p, int index)
         buffer   = req->buffer_and_sects[i] & ~0x1FF;
         nr_sects = req->buffer_and_sects[i] &  0x1FF;
 
-        if ( nr_sects == 0 )
+        if ( unlikely(nr_sects == 0) )
         {
             DPRINTK("zero-sized data request\n");
             goto bad_descriptor;
         }
-
-        if ( !lock_buffer(p, buffer, nr_sects<<9, (operation==READ)) )
-	{
-            DPRINTK("invalid buffer\n");
-            goto bad_descriptor;
-	}
 
 	phys_seg[nr_psegs].dev           = req->device;
 	phys_seg[nr_psegs].sector_number = req->sector_number + tot_sects;
@@ -480,7 +475,6 @@ static void dispatch_rw_block_io(struct task_struct *p, int index)
                         req->sector_number + tot_sects, 
                         req->sector_number + tot_sects + nr_sects, 
                         req->device); 
-                unlock_buffer(buffer, nr_sects<<9, (operation==READ));
                 goto bad_descriptor;
             }
 
@@ -494,7 +488,22 @@ static void dispatch_rw_block_io(struct task_struct *p, int index)
         }
 	 
         nr_psegs += new_segs;
-        if ( nr_psegs >= (MAX_BLK_SEGS*2) ) BUG();
+        ASSERT(nr_psegs <= MAX_BLK_SEGS*2);
+    }
+
+    for ( i = 0; i < nr_psegs; i++ )
+    {
+        if ( unlikely(!lock_buffer(p, phys_seg[i].buffer, 
+                                   phys_seg[i].nr_sects << 9,
+                                   operation==READ)) )
+	{
+            DPRINTK("invalid buffer\n");
+            while ( i-- > 0 )
+                unlock_buffer(phys_seg[i].buffer, 
+                              phys_seg[i].nr_sects << 9,
+                              operation==READ);
+            goto bad_descriptor;
+	}
     }
 
     atomic_inc(&nr_pending);
@@ -512,8 +521,9 @@ static void dispatch_rw_block_io(struct task_struct *p, int index)
     for ( i = 0; i < nr_psegs; i++ )
     {
         bh = kmem_cache_alloc(buffer_head_cachep, GFP_KERNEL);
-        if ( bh == NULL ) panic("bh is null\n");
-        memset (bh, 0, sizeof (struct buffer_head));
+        if ( unlikely(bh == NULL) )
+            panic("bh is null\n");
+        memset(bh, 0, sizeof (struct buffer_head));
     
         bh->b_size          = phys_seg[i].nr_sects << 9;
         bh->b_dev           = phys_seg[i].dev;
