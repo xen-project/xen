@@ -9,7 +9,7 @@
 3eb781edFwm_pW9FwnQACIe68viLOw tools/control/Makefile
 3eca6a96a31IwaKtkEa4jmzwTWlm8Q tools/control/README-xenctl
 3eb781fceEYkUi1XHKf2V0KX7si2JA tools/control/build-cmdline.xml
-3ec41f7cWCxQ8pdH8ZWqhhv-38qQ1w tools/control/build-xen.xml
+3ec41f7cWCxQ8pdH8ZWqhhv-38qQ1w tools/control/build-web.xml
 3ec41f7ca6IBXDSe0HVcMPp3PPloOQ tools/control/build.properties
 3ec4ebe0g_MI1VqkbbyNB8gt6m0Adg tools/control/docs/empty_dir
 3eb781fcabCKRogwxJA3-jJKstw9Vg tools/control/domctl.xml
@@ -70,8 +70,8 @@
 3ec41f7dKX9YpwrfH7BZ7BogyWqqLA tools/control/src/org/xenoserver/control/VirtualDiskManager.java
 3ec41f7dUPpYTwYL5QVpRBv6PLKPrg tools/control/src/org/xenoserver/control/XML.java
 3ec41f7d7Try-2zmfnpaALwJjY0GCA tools/control/src/org/xenoserver/control/XMLHelper.java
-3ec41f7dOVZgjP4sQS6vjuBnExdlMQ tools/control/src/uk/ac/cam/cl/xeno/xenctl/RootBean.java
-3ec41f7dvPdszb0frNEkMnEdJUBVjA tools/control/src/uk/ac/cam/cl/xeno/xenctl/SystemConfigurationBean.java
+3ec41f7dOVZgjP4sQS6vjuBnExdlMQ tools/control/src/org/xenoserver/web/RootBean.java
+3ec41f7dvPdszb0frNEkMnEdJUBVjA tools/control/src/org/xenoserver/web/SystemConfigurationBean.java
 3ec41f7dO6IuKGGLG4VRUhMDmkTn5g tools/control/web/WEB-INF/web.xml
 3ec41f7dRAPXBA0jQUd1k6MB3xVidg tools/control/web/img/cambridge.gif
 3ec41f7dvxVe1Vb3kVOLZcN5Jra2tQ tools/control/web/img/help.gif
@@ -95,7 +95,6 @@
 3ec41f7eTqbaFqMGU7lJG09vlEt0TQ tools/control/web/tmpl/index.tmpl
 3ec41f7ed6_QZ1mg0vuA9Xu1wu1plw tools/control/web/tmpl/install.pl
 3ec41f7emmAnjM4gsW6JWkqsjfi4Rg tools/control/web/tmpl/makefile
-3ec41f7eGeQD-tCpxZNxNVcnKt6HfA tools/control/web/tmpl/newdom.tmpl
 3ec41f7eoDHD2raa4x6dBINr4QLO3A tools/control/web/tmpl/vd-fv.tmpl
 3ec41f7eawycxV05Ow3LfZtOlHZJPA tools/control/web/tmpl/vd-pa.tmpl
 3ec41f7ef4mVT4vwOEL40MKIzS4EeA tools/control/web/tmpl/vd-par.tmpl

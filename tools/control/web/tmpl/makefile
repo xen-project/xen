@@ -1,5 +1,5 @@
 src0 = xenostyle.css
-src1 = index.jsp newdom.jsp about.jsp help.jsp vd.jsp \
+src1 = index.jsp about.jsp help.jsp vd.jsp \
        vd-pv.jsp vd-pa.jsp vd-vdv.jsp vd-vdc.jsp vd-vdd.jsp vd-vdr.jsp \
        vd-fv.jsp vd-vbdv.jsp vd-vbdc.jsp vd-vbdd.jsp vd-vbdf.jsp \
        vd-par.jsp vd-vdcr.jsp vd-vddr.jsp vd-vdrr.jsp \
@@ -7,7 +7,8 @@ src1 = index.jsp newdom.jsp about.jsp help.jsp vd.jsp \
        dom.jsp dom-lis.jsp dom-new.jsp dom-newr.jsp dom-sta.jsp dom-star.jsp \
        dom-stp.jsp dom-stpr.jsp dom-del.jsp dom-delr.jsp
 target = ..
-target1 = $(target)/index.jsp $(target)/newdom.jsp $(target)/vd.jsp \
+target0 = $(target)/xenostyle.css
+target1 = $(target)/index.jsp $(target)/vd.jsp \
           $(target)/vd-pv.jsp $(target)/vd-pa.jsp $(target)/vd-vdv.jsp \
           $(target)/vd-vdc.jsp $(target)/vd-vdd.jsp $(target)/vd-vdr.jsp \
           $(target)/vd-fv.jsp $(target)/vd-vbdv.jsp $(target)/vd-vbdc.jsp \
@@ -22,14 +23,18 @@ target1 = $(target)/index.jsp $(target)/newdom.jsp $(target)/vd.jsp \
 
 .SUFFIXES: .tmpl .jsp
 
-.tmpl.jsp:
-	./install.pl $*
+all: $(target1) $(target0)
 
-all: $(src0) $(src1)
+$(target)/index.jsp: index.tmpl
 	./install.pl -s -home index
-	mv *.jsp  $(target)
+	mv index.jsp $(target)
+
+$(target)/%.jsp: %.tmpl
+	./install.pl $*
+	mv $*.jsp $(target)
+	
+$(target0): $(src0)
 	cp -f $(src0) $(target)
 
 clean:
-	rm -f $(target1)
-	rm -f $(target)/$(src0)
+	rm -f $(target1) $(target0)

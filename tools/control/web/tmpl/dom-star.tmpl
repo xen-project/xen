@@ -17,7 +17,6 @@ INCLUDE&dommenu.tmpl
 <%
   HttpServletRequestWrapper hsrw = new HttpServletRequestWrapper(request);
   Defaults d = sc.getDefaults(); 
-  CommandStart command_start = new CommandStart();
 
   String domains[] = hsrw.getParameterValues("dom");
 
@@ -32,8 +31,8 @@ Error: no domain specified.<br>
     for (int i = 0; i < domains.length; i++)
     {
 %>
-result <%= domains[i] %> =<br>
-<%= command_start.executeCommand(d, Integer.parseInt(domains[i])) %> <br>
+result <%= domains[i] %> =
+<%= new CommandDomainStart(d, Integer.parseInt(domains[i])).executeWeb() %><br>
 <%
     }
   }

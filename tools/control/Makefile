@@ -1,8 +1,8 @@
-default: cmdline
+default: cmdline web
 
-install: install-cmdline
+install: install-cmdline install-web
 
-clean: clean-cmdline
+clean: clean-cmdline clean-web
 
 
 
@@ -19,17 +19,15 @@ clean-cmdline:
 
 
 
-xenctl: FORCE
-	(cd web/tmpl; make)
-	ant -buildfile build-xen.xml dist
+web: FORCE
+	ant -buildfile build-web.xml dist
 
-install-xenctl: xenctl
-	-ant -buildfile build-xen.xml remove
-	ant -buildfile build-xen.xml install
+install-web: xenctl
+	ant -buildfile build-web.xml remove || true
+	ant -buildfile build-web.xml install
 
-clean-xenctl:
-	(cd web/tmpl; make clean)
-	ant -buildfile build-xen.xml clean
-	rm -f xenctl.jar
+clean-web:
+	ant -buildfile build-web.xml clean
+	rm -f xenctl-web.jar
 
 FORCE:

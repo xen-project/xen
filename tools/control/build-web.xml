@@ -30,7 +30,7 @@
      set to the current working directory.
 -->
 
-<project name="My Project" default="compile" basedir=".">
+<project name="xenctl web interface" default="compile" basedir=".">
 
 
 
@@ -112,9 +112,9 @@
   <property name="app.name"      value="myapp"/>
   <property name="app.path"      value="/${app.name}"/>
   <property name="app.version"   value="0.1-dev"/>
-  <property name="build.home"    value="${basedir}/build"/>
+  <property name="build.home"    value="${basedir}/build-web"/>
   <property name="catalina.home" value="../../../.."/> <!-- UPDATE THIS! -->
-  <property name="dist.home"     value="${basedir}/dist"/>
+  <property name="dist.home"     value="${basedir}/dist-web"/>
   <property name="docs.home"     value="${basedir}/docs"/>
 <!--  <property name="manager.url"   value="http://localhost:8080/manager"/> -->
   <property name="src.home"      value="${basedir}/src"/>
@@ -261,6 +261,7 @@
    description="Delete old build and dist directories">
     <delete dir="${build.home}"/>
     <delete dir="${dist.home}"/>
+    <exec executable="make" dir="${web.home}/tmpl"><arg value="clean"/></exec>
   </target>
 
 
@@ -287,6 +288,8 @@
       deprecation="${compile.deprecation}"
          optimize="${compile.optimize}">
         <classpath refid="compile.classpath"/>
+        <include name="org/xenoserver/control/**"/>
+        <include name="org/xenoserver/web/**"/>
     </javac>
 
     <!-- Copy application resources -->
@@ -314,7 +317,7 @@
 
 -->
 
-  <target name="dist" depends="compile,javadoc"
+  <target name="dist" depends="compile"
    description="Create binary distribution">
 
     <!-- Copy documentation subdirectories -->
@@ -432,6 +435,8 @@
     <mkdir  dir="${build.home}/WEB-INF"/>
     <mkdir  dir="${build.home}/WEB-INF/classes"/>
 
+	<!-- create templates -->
+	<exec executable="make" dir="${web.home}/tmpl"/>
 
     <!-- Copy static content of this web application -->
     <copy todir="${build.home}">

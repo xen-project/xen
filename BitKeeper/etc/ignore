@@ -436,3 +436,5 @@ xen/drivers/block/xen_physdisk.c~
 tools/internal/xi_phys_grant.c~
 tools/internal/xi_phys_probe.c~
 tools/internal/xi_phys_revoke.c~
+tools/control/dist-web/**
+tools/control/build-web/**

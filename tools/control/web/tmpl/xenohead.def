@@ -1,13 +1,13 @@
 <!DOCTYPE html PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
 
 <jsp:useBean id="root" scope="application"
-             class="uk.ac.cam.cl.xeno.xenctl.RootBean" />
+             class="org.xenoserver.web.RootBean" />
 <jsp:useBean id="sc" scope="application"
-             class="uk.ac.cam.cl.xeno.xenctl.SystemConfigurationBean" />
+             class="org.xenoserver.web.SystemConfigurationBean" />
 <%@ page session="false" %>
-<%@ page import="uk.ac.cam.cl.xeno.xenctl.*" %>
-<%@ page import="uk.ac.cam.cl.xeno.domctl.*" %>
-<%@ page import="java.util.Enumeration" %>
+<%@ page import="org.xenoserver.web.*" %>
+<%@ page import="org.xenoserver.control.*" %>
+<%@ page import="java.util.Iterator" %>
 <%@ page import="javax.servlet.http.HttpServletRequestWrapper" %>
 
 <html lang="en">
@@ -20,7 +20,7 @@
 
 <head>
 
-<title>##SECTION## ##SECTIONBREAK## ##TITLE## <%= root.getDebugCounter() %></title>
+<title>##SECTION## ##SECTIONBREAK## ##TITLE##</title>
 
 <link rel="stylesheet" type="text/css" href="xenostyle.css">
 
