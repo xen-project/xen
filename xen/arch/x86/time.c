@@ -54,7 +54,7 @@ static void timer_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 {
     u64 full_tsc;
 
-    write_lock(&time_lock);
+    write_lock_irq(&time_lock);
 
 #ifdef CONFIG_X86_IO_APIC
     if ( timer_ack ) 
@@ -89,15 +89,14 @@ static void timer_interrupt(int irq, void *dev_id, struct pt_regs *regs)
     /* Updates system time (nanoseconds since boot). */
     stime_irq += MILLISECS(1000/HZ);
 
-    write_unlock(&time_lock);
+    write_unlock_irq(&time_lock);
 
     /* Rough hack to allow accurate timers to sort-of-work with no APIC. */
     if ( do_timer_lists_from_pit )
         __cpu_raise_softirq(smp_processor_id(), AC_TIMER_SOFTIRQ);
 }
 
-static struct irqaction irq0  = { timer_interrupt, SA_INTERRUPT, 0,
-                                  "timer", NULL, NULL};
+static struct irqaction irq0 = { timer_interrupt, "timer", NULL};
 
 /* ------ Calibrate the TSC ------- 
  * Return processor ticks per second / CALIBRATE_FRAC.

@@ -12,9 +12,7 @@
 #define IRQ_DISABLED	2	/* IRQ disabled - do not enter! */
 #define IRQ_PENDING	4	/* IRQ pending - replay on enable */
 #define IRQ_REPLAY	8	/* IRQ has been replayed but not acked yet */
-#define IRQ_AUTODETECT	16	/* IRQ is being autodetected */
-#define IRQ_WAITING	32	/* IRQ not yet seen - for autodetection */
-#define IRQ_GUEST       64      /* IRQ is handled by guest OS(es) */
+#define IRQ_GUEST       16      /* IRQ is handled by guest OS(es) */
 
 /*
  * Interrupt controller descriptor. This is all we need
@@ -53,6 +51,7 @@ typedef struct {
 extern irq_desc_t irq_desc[NR_IRQS];
 
 extern int setup_irq(unsigned int, struct irqaction *);
+extern void free_irq(unsigned int);
 
 extern hw_irq_controller no_irq_type;
 extern void no_action(int cpl, void *dev_id, struct pt_regs *regs);
@@ -61,5 +60,6 @@ struct task_struct;
 extern int pirq_guest_unmask(struct task_struct *p);
 extern int pirq_guest_bind(struct task_struct *p, int irq, int will_share);
 extern int pirq_guest_unbind(struct task_struct *p, int irq);
+extern int pirq_guest_bindable(int irq, int will_share);
 
 #endif /* __XEN_IRQ_H__ */

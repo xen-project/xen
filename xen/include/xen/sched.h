@@ -242,12 +242,6 @@ void new_thread(struct task_struct *p,
                 unsigned long start_stack,
                 unsigned long start_info);
 
-/* Linux puts these here for some reason! */
-extern int request_irq(unsigned int,
-                       void (*handler)(int, void *, struct pt_regs *),
-                       unsigned long, const char *, void *);
-extern void free_irq(unsigned int, void *);
-
 extern unsigned long wait_init_idle;
 #define init_idle() clear_bit(smp_processor_id(), &wait_init_idle);
 
