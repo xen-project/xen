@@ -169,7 +169,7 @@ int linearise_address(u16 seg, unsigned long off, unsigned long *linear)
     return 1;
 }
 
-int fixup_seg(u16 seg, int positive_access)
+int fixup_seg(u16 seg, unsigned long offset)
 {
     struct domain *d = current;
     unsigned long *table, a, b, base, limit;
@@ -208,7 +208,7 @@ int fixup_seg(u16 seg, int positive_access)
 
     /* We only parse 32-bit page-granularity non-privileged data segments. */
     if ( (b & (_SEGMENT_P|_SEGMENT_S|_SEGMENT_DB|
-               _SEGMENT_G|(1<<11)|_SEGMENT_DPL)) != 
+               _SEGMENT_G|_SEGMENT_CODE|_SEGMENT_DPL)) != 
          (_SEGMENT_P|_SEGMENT_S|_SEGMENT_DB|_SEGMENT_G|_SEGMENT_DPL) )
     {
         DPRINTK("Bad segment %08lx:%08lx\n", a, b);
@@ -219,10 +219,10 @@ int fixup_seg(u16 seg, int positive_access)
     base  = (b&(0xff<<24)) | ((b&0xff)<<16) | (a>>16);
     limit = (((b & 0xf0000) | (a & 0x0ffff)) + 1) << 12;
 
-    if ( b & (1 << 10) )
+    if ( b & _SEGMENT_EC )
     {
         /* Expands-down: All the way to zero? Assume 4GB if so. */
-        if ( ((base + limit) < PAGE_SIZE) && positive_access )
+        if ( ((base + limit) < PAGE_SIZE) && (offset <= limit)  )
         {
             /* Flip to expands-up. */
             limit = PAGE_OFFSET - base;
@@ -231,8 +231,16 @@ int fixup_seg(u16 seg, int positive_access)
     }
     else
     {
-        /* Expands-up: All the way to Xen space? Assume 4GB if so. */
-        if ( ((PAGE_OFFSET - (base + limit)) < PAGE_SIZE) && !positive_access )
+        /*
+         * Expands-up: All the way to Xen space? Assume 4GB if so.
+         * NB: we compare offset with limit-15, instead of the "real"
+         * comparison of offset+15 (worst case) with limit,
+         * to avoid possible unsigned int overflow of offset+15.
+         * limit-15 will not underflow here because we don't allow expand-up
+         * segments with maxlimit.
+         */
+        if ( ((PAGE_OFFSET - (base + limit)) < PAGE_SIZE) &&
+             ((offset) > (limit-15)) )
         {
             /* Flip to expands-down. */
             limit = -(base & PAGE_MASK);
@@ -250,7 +258,7 @@ int fixup_seg(u16 seg, int positive_access)
     limit = (limit >> 12) - 1;
     a &= ~0x0ffff; a |= limit & 0x0ffff;
     b &= ~0xf0000; b |= limit & 0xf0000;
-    b ^= 1 << 10; /* grows-up <-> grows-down */
+    b ^= _SEGMENT_EC; /* grows-up <-> grows-down */
     /* NB. These can't fault. Checked readable above; must also be writable. */
     table[2*idx+0] = a;
     table[2*idx+1] = b;
@@ -317,37 +325,40 @@ int gpf_emulate_4gb(struct xen_regs *regs)
             goto fail;
         }
 
-        if ( (pb - eip) == 4 )
-            break;
-        
+        if ( (pb - eip) >= 15 )
+        {
+            DPRINTK("Too many instruction prefixes for a legal instruction\n");
+            goto fail;
+        }
+
         switch ( b )
         {
-        case 0xf0: /* LOCK */
-        case 0xf2: /* REPNE/REPNZ */
-        case 0xf3: /* REP/REPE/REPZ */
         case 0x67: /* Address-size override */
             DPRINTK("Unhandleable prefix byte %02x\n", b);
             goto fixme;
         case 0x66: /* Operand-size override */
-            break;
+        case 0xf0: /* LOCK */
+        case 0xf2: /* REPNE/REPNZ */
+        case 0xf3: /* REP/REPE/REPZ */
+            continue;
         case 0x2e: /* CS override */
             pseg = &regs->cs;
-            break;
+            continue;
         case 0x3e: /* DS override */
             pseg = &regs->ds;
-            break;
+            continue;
         case 0x26: /* ES override */
             pseg = &regs->es;
-            break;
+            continue;
         case 0x64: /* FS override */
             pseg = &regs->fs;
-            break;
+            continue;
         case 0x65: /* GS override */
             pseg = &regs->gs;
-            break;
+            continue;
         case 0x36: /* SS override */
             pseg = &regs->ss;
-            break;
+            continue;
         default: /* Not a prefix byte */
             goto done_prefix;
         }
@@ -455,7 +466,7 @@ int gpf_emulate_4gb(struct xen_regs *regs)
         offset += *(u32 *)memreg;
 
  skip_modrm:
-    if ( !fixup_seg((u16)(*pseg), (signed long)offset >= 0) )
+    if ( !fixup_seg((u16)(*pseg), offset) )
         goto fail;
 
     /* Success! */
