@@ -98,8 +98,11 @@ long do_dom_mem_op(unsigned int   op,
     struct domain *d;
     long           rc;
 
-    d = ( (domid == DOMID_SELF) || (!IS_PRIV(current)) ) ? current : find_domain_by_id(domid);
-    if ( d == NULL )
+    if ( likely(domid == DOMID_SELF) )
+        d = current;
+    else if ( unlikely(!IS_PRIV(current)) )
+        return -EPERM;
+    else if ( unlikely((d = find_domain_by_id(domid)) == NULL) )
 	return -ESRCH;
 
     switch ( op )
@@ -115,7 +118,7 @@ long do_dom_mem_op(unsigned int   op,
         break;
     }
 
-    if ( domid != DOMID_SELF )
+    if ( unlikely(domid != DOMID_SELF) )
 	put_domain(d);
 
     return rc;
