@@ -6,7 +6,7 @@
 #include <xen/string.h>
 
 #ifndef NDEBUG
-#define ASSERT(_p) if ( !(_p) ) { printk("Assertion '%s' failed, line %d, file %s", #_p , __LINE__, __FILE__); *(int*)0=0; }
+#define ASSERT(_p) if ( !(_p) ) { printk("Assertion '%s' failed, line %d, file %s\n", #_p , __LINE__, __FILE__); *(int*)0=0; }
 #else
 #define ASSERT(_p) ((void)0)
 #endif

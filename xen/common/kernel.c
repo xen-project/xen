@@ -91,32 +91,40 @@ char opt_nmi[10] = "dom0";
 #else
 char opt_nmi[10] = "fatal";
 #endif
+/*
+ * Comma-separated list of hexadecimal page numbers containing bad bytes.
+ * e.g. 'badpage=0x3f45,0x8a321'.
+ */
+char opt_badpage[100] = "";
 
 static struct {
     unsigned char *name;
     enum { OPT_STR, OPT_UINT, OPT_BOOL } type;
     void *var;
+    unsigned int len;
 } opts[] = {
-    { "console",           OPT_STR,  &opt_console },
-    { "conswitch",         OPT_STR,  &opt_conswitch },
-    { "com1",              OPT_STR,  &opt_com1 },
-    { "com2",              OPT_STR,  &opt_com2 },
-    { "dom0_mem",          OPT_UINT, &opt_dom0_mem }, 
-    { "noht",              OPT_BOOL, &opt_noht },
-    { "noacpi",            OPT_BOOL, &opt_noacpi },
-    { "nosmp",             OPT_BOOL, &opt_nosmp },
-    { "noreboot",          OPT_BOOL, &opt_noreboot },
-    { "ignorebiostables",  OPT_BOOL, &opt_ignorebiostables },
-    { "watchdog",          OPT_BOOL, &opt_watchdog },
-    { "pdb",               OPT_STR,  &opt_pdb },
-    { "tbuf_size",         OPT_UINT, &opt_tbuf_size },
-    { "sched",             OPT_STR,  &opt_sched },
-    { "physdev_dom0_hide", OPT_STR,  &opt_physdev_dom0_hide },
-    { "leveltrigger",      OPT_STR,  &opt_leveltrigger },
-    { "edgetrigger",       OPT_STR,  &opt_edgetrigger },
-    { "xenheap_megabytes", OPT_UINT, &opt_xenheap_megabytes },
-    { "nmi",               OPT_STR,  &opt_nmi },
-    { NULL,               0,        NULL     }
+#define V(_x) &_x, sizeof(_x)
+    { "console",           OPT_STR,  V(opt_console) },
+    { "conswitch",         OPT_STR,  V(opt_conswitch) },
+    { "com1",              OPT_STR,  V(opt_com1) },
+    { "com2",              OPT_STR,  V(opt_com2) },
+    { "dom0_mem",          OPT_UINT, V(opt_dom0_mem) },
+    { "noht",              OPT_BOOL, V(opt_noht) },
+    { "noacpi",            OPT_BOOL, V(opt_noacpi) },
+    { "nosmp",             OPT_BOOL, V(opt_nosmp) },
+    { "noreboot",          OPT_BOOL, V(opt_noreboot) },
+    { "ignorebiostables",  OPT_BOOL, V(opt_ignorebiostables) },
+    { "watchdog",          OPT_BOOL, V(opt_watchdog) },
+    { "pdb",               OPT_STR,  V(opt_pdb) },
+    { "tbuf_size",         OPT_UINT, V(opt_tbuf_size) },
+    { "sched",             OPT_STR,  V(opt_sched) },
+    { "physdev_dom0_hide", OPT_STR,  V(opt_physdev_dom0_hide) },
+    { "leveltrigger",      OPT_STR,  V(opt_leveltrigger) },
+    { "edgetrigger",       OPT_STR,  V(opt_edgetrigger) },
+    { "xenheap_megabytes", OPT_UINT, V(opt_xenheap_megabytes) },
+    { "nmi",               OPT_STR,  V(opt_nmi) },
+    { "badpage",           OPT_STR,  V(opt_badpage) },
+    { NULL,                0,        NULL, 0 }
 };
 
 
@@ -154,7 +162,10 @@ void cmain(multiboot_info_t *mbi)
                 {
                 case OPT_STR:
                     if ( opt != NULL )
-                        strcpy(opts[i].var, opt);
+                    {
+                        strncpy(opts[i].var, opt, opts[i].len);
+                        ((char *)opts[i].var)[opts[i].len-1] = '\0';
+                    }
                     break;
                 case OPT_UINT:
                     if ( opt != NULL )

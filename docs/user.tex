@@ -1140,6 +1140,14 @@ editting \path{grub.conf}.
 {\bf noht } \\
  Disable Hyperthreading. \\
 
+{\bf badpage=$<$page number$>$[,$<$page number$>$] } \\
+                  Specify a list of pages not to be allocated for use 
+                  because they contain bad bytes. For example, if your
+                  memory tester says that byte 0x12345678 is bad, you would
+                  place 'badpage=0x12345' on Xen's command line (i.e., the
+                  last three digits of the byte address are not
+                  included!). \\
+
 {\bf com1=$<$baud$>$,DPS[,$<$io\_base$>$,$<$irq$>$] \\
  com2=$<$baud$>$,DPS[,$<$io\_base$>$,$<$irq$>$] } \\
  Xen supports up to two 16550-compatible serial ports.

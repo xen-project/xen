@@ -29,6 +29,7 @@
 #include <xen/slab.h>
 #include <xen/irq.h>
 
+extern char opt_badpage[];
 
 /*********************
  * ALLOCATION BITMAP
@@ -137,7 +138,8 @@ unsigned long init_heap_allocator(
     unsigned long bitmap_start, unsigned long max_pages)
 {
     int i, j;
-    unsigned long bitmap_size;
+    unsigned long bitmap_size, bad_pfn;
+    char *p;
 
     memset(avail, 0, sizeof(avail));
 
@@ -155,40 +157,42 @@ unsigned long init_heap_allocator(
     /* All allocated by default. */
     memset(alloc_bitmap, ~0, bitmap_size);
 
+    /*
+     * Process the bad-page list. Marking the page free in the bitmap will
+     * indicate to init_heap_pages() that it should not be placed on the 
+     * buddy lists.
+     */
+    p = opt_badpage;
+    while ( *p != '\0' )
+    {
+        bad_pfn = simple_strtoul(p, &p, 0);
+
+        if ( *p == ',' )
+            p++;
+        else if ( *p != '\0' )
+            break;
+
+        if ( (bad_pfn < max_pages) && allocated_in_map(bad_pfn) )
+        {
+            printk("Marking page %08lx as bad\n", bad_pfn);
+            map_free(bad_pfn, 1);
+        }
+    }
+
     return bitmap_start + bitmap_size;
 }
 
 /* Hand the specified arbitrary page range to the specified heap zone. */
 void init_heap_pages(int zone, struct pfn_info *pg, unsigned long nr_pages)
 {
-    int i;
-    unsigned long flags;
+    unsigned long i, pfn = page_to_pfn(pg);
 
-    spin_lock_irqsave(&heap_lock, flags);
-
-    /* Free up the memory we've been given to play with. */
-    map_free(page_to_pfn(pg), nr_pages);
-    avail[zone] += nr_pages;
-    
-    while ( nr_pages != 0 )
+    /* Process each page in turn, skipping bad pages. */
+    for ( i = 0; i < nr_pages; i++ )
     {
-        /*
-         * Next chunk is limited by alignment of pg, but also must not be
-         * bigger than remaining bytes.
-         */
-        for ( i = 0; i < MAX_ORDER; i++ )
-            if ( ((page_to_pfn(pg) & (1 << i)) != 0) ||
-                 ((1 << (i + 1)) > nr_pages) )
-                break;
-
-        PFN_ORDER(pg) = i;
-        list_add_tail(&pg->list, &heap[zone][i]);
-
-        pg       += 1 << i;
-        nr_pages -= 1 << i;
+        if ( likely(allocated_in_map(pfn+i)) ) /* bad page? */
+            free_heap_pages(zone, pg+i, 0);
     }
-
-    spin_unlock_irqrestore(&heap_lock, flags);
 }
 
 

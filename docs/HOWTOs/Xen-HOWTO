@@ -223,6 +223,13 @@ The following is a list of command line arguments to pass to Xen:
 
  noht             Disable Hyperthreading.
 
+ badpage=<page number>[,<page number>]*
+                  Specify a list of pages not to be allocated for use 
+                  because they contain bad bytes. For example, if your
+                  memory tester says that byte 0x12345678 is bad, you would
+                  place 'badpage=0x12345' on Xen's command line (i.e., the
+                  last three digits of the byte address are not included!).
+
  com1=<baud>,DPS[,<io_base>,<irq>]
  com2=<baud>,DPS[,<io_base>,<irq>]
                   Xen supports up to two 16550-compatible serial ports.
