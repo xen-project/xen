@@ -131,7 +131,7 @@ other domains and manages their virtual devices. It also performs
 administrative tasks such as suspending, resuming and migrating other
 virtual machines.
 
-Within domain 0, a process called \xend runs to manage the system.
+Within domain 0, a process called \emph{xend} runs to manage the system.
 \Xend is responsible for managing virtual machines and providing access
 to their consoles.  Commands are issued to \xend over an HTTP
 interface, either from a command-line tool or from a web browser.
@@ -155,7 +155,7 @@ current plans to support these systems: The x86/64 port is the
 planned route to supporting larger memory sizes.
 
 Xen offloads most of the hardware support issues to the guest OS
-running in Domain 0.  Xen itself contains only the code required to
+running in Domain~0.  Xen itself contains only the code required to
 detect and start secondary processors, set up interrupt routing, and
 perform PCI bus enumeration.  Device drivers run within a privileged
 guest OS rather than within Xen itself. This approach provides
@@ -367,7 +367,7 @@ KERNELS ?= mk.linux-2.6-xen0 mk.linux-2.6-xenU
 
 You can edit this line to include any set of operating system kernels
 which have configurations in the top-level \path{buildconfigs/}
-directory, for example {\tt mk.linux-2.4-xenU} to build a Linux 2.4
+directory, for example \path{mk.linux-2.4-xenU} to build a Linux 2.4
 kernel containing only virtual device drivers.
 
 %% Inspect the Makefile if you want to see what goes on during a build.
@@ -562,10 +562,13 @@ as root over the serial line will require adding \path{ttyS0} to
 \subsection{TLS Libraries}
 
 Users of the XenLinux 2.6 kernel should disable Thread Local Storage
-(e.g. by doing a \path{mv /lib/tls /lib/tls.disabled}) before
-attempting to run with a XenLinux kernel.  You can always reenable it
-by restoring the directory to its original location (i.e. 
-\path{mv /lib/tls.disabled /lib/tls}).
+(e.g.\ by doing a \path{mv /lib/tls /lib/tls.disabled}) before
+attempting to run with a XenLinux kernel\footnote{If you boot without first
+disabling TLS, you will get a warning message during the boot
+process. In this case, simply perform the rename after the machine is
+up and then run \texttt{/sbin/ldconfig} to make it take effect.}.  You can
+always reenable it by restoring the directory to its original location
+(i.e.\ \path{mv /lib/tls.disabled /lib/tls}).
 
 The reason for this is that the current TLS implementation uses
 segmentation in a way that is not permissible under Xen.  If TLS is
@@ -691,7 +694,7 @@ machine ID~1 you should type:
 
 The \path{-c} switch causes \path{xm} to turn into the domain's
 console after creation.  The \path{vmid=1} sets the \path{vmid}
-variable used in the \path{myvmconf} file.
+variable used in the \path{myvmconf} file. 
 
 
 You should see the console boot messages from the new domain 
@@ -840,16 +843,10 @@ port for the ttylinux domain is 9605.  This can be connected to by TCP
 using a terminal program (e.g. \path{telnet} or, better, 
 \path{xencons}).  The simplest way to connect is to use the \path{xm console}
 command, specifying the domain name or ID.  To connect to the console
-of the ttylinux domain, we could use:
+of the ttylinux domain, we could use any of the following: 
 \begin{verbatim}
 # xm console ttylinux
-\end{verbatim}
-or:
-\begin{verbatim}
 # xm console 5
-\end{verbatim}
-or:
-\begin{verbatim}
 # xencons localhost 9605
 \end{verbatim}
 
@@ -911,12 +908,12 @@ the command:
 # xm migrate --live mydomain destination.ournetwork.com
 \end{verbatim}
 
-Without the {\tt --live} flag, \xend simply stops the domain and
+Without the \path{--live} flag, \xend simply stops the domain and
 copies the memory image over to the new node and restarts it. Since
 domains can have large allocations this can be quite time consuming,
-even on a Gigabit network. With the {\tt --live} flag \xend attempts
+even on a Gigabit network. With the \path{--live} flag \xend attempts
 to keep the domain running while the migration is in progress,
-resulting in typical 'downtimes' of just 60 -- 300ms.
+resulting in typical `downtimes' of just 60--300ms.
 
 For now it will be necessary to reconnect to the domain's console on
 the new machine using the \path{xm console} command.  If a migrated
@@ -1162,7 +1159,7 @@ and then issue an \path{lvextend}.
 In principle, it is possible to continue writing to the volume
 that has been cloned (the changes will not be visible to the
 clones), but we wouldn't recommend this: have the cloned volume
-as a 'pristine' file system install that isn't mounted directly
+as a `pristine' file system install that isn't mounted directly
 by any of the virtual machines.
 
 
@@ -1176,9 +1173,11 @@ Now configure the NFS server to export this filesystem over the
 network by adding a line to \path{/etc/exports}, for instance:
 
 \begin{quote}
+\begin{small}
 \begin{verbatim}
 /export/vm1root      1.2.3.4/24 (rw,sync,no_root_squash)
 \end{verbatim}
+\end{small}
 \end{quote}
 
 Finally, configure the domain to use NFS root.  In addition to the
@@ -1242,8 +1241,9 @@ Once \xend is running, more sophisticated administration can be done
 using the xm tool (see Section~\ref{s:xm}) and the experimental
 Xensv web interface (see Section~\ref{s:xensv}).
 
-As \xend runs, events will be logged to {\tt /var/log/xend.log} and
-{\tt /var/log/xfrd.log}, and these may be useful for troubleshooting
+As \xend runs, events will be logged to \path{/var/log/xend.log} and, 
+if the migration assistant daemon (\path{xfrd}) has been started, 
+\path{/var/log/xfrd.log}. These may be of use for troubleshooting
 problems.
 
 \section{Xm (command line interface)}
@@ -1304,12 +1304,18 @@ Xensv is the experimental web control interface for managing a Xen
 machine.  It can be used to perform some (but not yet all) of the
 management tasks that can be done using the xm tool.
 
-It can be started using:\\ \verb_# xensv start_ \\ and
-stopped using: \verb_# xensv stop_ \\
+It can be started using:
+\begin{quote}
+\verb_# xensv start_
+\end{quote}
+and stopped using: 
+\begin{quote}
+\verb_# xensv stop_
+\end{quote}
 
 By default, Xensv will serve out the web interface on port 8080.  This
-can be changed by editing {\tt
-/usr/lib/python2.3/site-packages/xen/sv/params.py}.
+can be changed by editing 
+\path{/usr/lib/python2.3/site-packages/xen/sv/params.py}.
 
 Once Xensv is running, the web interface can be used to create and
 manage running domains.
@@ -1329,7 +1335,8 @@ driver domain and general scheduling behaviour.
 
 Xen configuration files contain the following standard variables.
 Unless otherwise stated, configuration items should be enclosed in
-quotes: see \path{/etc/xen/xmexample1} for an example. 
+quotes: see \path{/etc/xen/xmexample1} and \path{/etc/xen/xmexample2} 
+for concrete examples of the syntax.
 
 \begin{description}
 \item[kernel] Path to the kernel image 
@@ -1376,8 +1383,8 @@ vif = [ 'mac=aa:00:00:00:00:11, bridge=xen-br0',
 
 For additional flexibility, it is also possible to include Python
 scripting commands in configuration files.  An example of this is the
-\path{xmexample2} file, which uses Python code to handle the {\tt
-vmid} variable.
+\path{xmexample2} file, which uses Python code to handle the 
+\path{vmid} variable.
 
 
 %\part{Advanced Topics}
@@ -1668,7 +1675,7 @@ editing \path{grub.conf}.
 \item [com1=$<$baud$>$,DPS,$<$io\_base$>$,$<$irq$>$
  com2=$<$baud$>$,DPS,$<$io\_base$>$,$<$irq$>$ ] \mbox{}\\ 
  Xen supports up to two 16550-compatible serial ports.
- For example: 'com1=9600,8n1,0x408,5' maps COM1 to a
+ For example: `com1=9600, 8n1, 0x408, 5' maps COM1 to a
  9600-baud port, 8 data bits, no parity, 1 stop bit,
  I/O port base 0x408, IRQ 5.
  If the I/O base and IRQ are standard (com1:0x3f8,4;
@@ -1761,7 +1768,7 @@ specified a baud rate on the Xen command line) or ScrollLock-h on the
 keyboard to get a list of supported commands.
 
 If you have a crash you'll likely get a crash dump containing an EIP
-(PC) which, along with an 'objdump -d image', can be useful in
+(PC) which, along with an \path{objdump -d image}, can be useful in
 figuring out what's happened.  Debug a Xenlinux image just as you
 would any other Linux kernel.
 
@@ -1800,7 +1807,7 @@ The official Xen web site is found at:
 \end{quote}
 
 This contains links to the latest versions of all on-line 
-documentation. 
+documentation (including the lateset version of the FAQ). 
 
 \section{Mailing Lists}
 
