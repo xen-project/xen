@@ -9,7 +9,6 @@
 #include <unistd.h>
 #include <fcntl.h>
 #include <signal.h>
-#include <sys/wait.h>
 #include <string.h>
 
 #include "dom0_defs.h"
