@@ -178,12 +178,7 @@ void domain_sleep(struct domain *d)
 
     spin_lock_irqsave(&schedule_lock[cpu], flags);
     if ( likely(!domain_runnable(d)) )
-    {
-        if ( test_bit(DF_RUNNING, &d->flags) )
-            cpu_raise_softirq(cpu, SCHEDULE_SOFTIRQ);
-        else if ( __task_on_runqueue(d) )
-            __del_from_runqueue(d);
-    }
+        SCHED_OP(sleep, d);
     spin_unlock_irqrestore(&schedule_lock[cpu], flags);
 
     /* Synchronous. */
@@ -198,51 +193,17 @@ void domain_wake(struct domain *d)
 {
     unsigned long       flags;
     int                 cpu = d->processor;
-    struct domain      *curr;
-    s_time_t            now, min_time;
 
     spin_lock_irqsave(&schedule_lock[cpu], flags);
-
-    if ( likely(domain_runnable(d)) && likely(!__task_on_runqueue(d)) )
+    if ( likely(domain_runnable(d)) )
     {
-        TRACE_2D(TRC_SCHED_WAKE,d->domain, d);
-        SCHED_OP(wake_up, d);
+        TRACE_2D(TRC_SCHED_WAKE, d->domain, d);
+        SCHED_OP(wake, d);
 #ifdef WAKE_HISTO
-        p->wokenup = NOW();
+        d->wokenup = NOW();
 #endif
-
-        now = NOW();
-        curr = schedule_data[cpu].curr;
-
-        /* Currently-running domain should run at least for ctx_allow. */
-        min_time = curr->lastschd + curr->min_slice;
-
-        if ( is_idle_task(curr) || (min_time <= now) )
-            cpu_raise_softirq(cpu, SCHEDULE_SOFTIRQ);
-        else if ( schedule_data[cpu].s_timer.expires > (min_time + TIME_SLOP) )
-            mod_ac_timer(&schedule_data[cpu].s_timer, min_time);
     }
-
     spin_unlock_irqrestore(&schedule_lock[cpu], flags);
-}
-
-/*
- * Pausing a domain.
- */
-void pause_domain(struct domain *domain)
-{
-	domain_sleep(domain);
-	SCHED_OP(pause, domain);	
-}
-
-
-/*
- * Unpauseing a domain
- */
-void unpause_domain(struct domain *domain)
-{
-	SCHED_OP(unpause, domain);
-	domain_wake(domain);
 }
 
 /* Block the currently-executing domain until a pertinent event occurs. */

@@ -25,6 +25,7 @@
 #include <xen/perfc.h>
 #include <xen/sched-if.h>
 #include <xen/slab.h>
+#include <xen/softirq.h>
 
 /* all per-domain BVT-specific scheduling info is stored here */
 struct bvt_dom_info
@@ -144,24 +145,6 @@ void bvt_free_task(struct domain *p)
     kmem_cache_free( dom_info_cache, p->sched_priv );
 }
 
-
-void bvt_wake_up(struct domain *p)
-{
-    struct bvt_dom_info *inf = BVT_INFO(p);
-
-    ASSERT(inf != NULL);
-    
-
-    /* set the BVT parameters */
-    if (inf->avt < CPU_SVT(p->processor))
-        inf->avt = CPU_SVT(p->processor);
-
-    /* deal with warping here */
-    inf->warpback  = 1;
-    inf->warped    = NOW();
-    __calc_evt(inf);
-    __add_to_runqueue_head(p);
-}
 
 /* 
  * Block the currently-executing domain until a pertinent event occurs.
@@ -433,10 +416,47 @@ int bvt_init_scheduler()
     return 0;
 }
 
-static void bvt_pause(struct domain *p)
+static void bvt_sleep(struct domain *d)
 {
-    if( __task_on_runqueue(p) )
-        __del_from_runqueue(p);
+    if ( test_bit(DF_RUNNING, &d->flags) )
+        cpu_raise_softirq(d->processor, SCHEDULE_SOFTIRQ);
+    else if ( __task_on_runqueue(d) )
+        __del_from_runqueue(d);
+}
+
+void bvt_wake(struct domain *d)
+{
+    struct bvt_dom_info *inf = BVT_INFO(d);
+    struct domain       *curr;
+    s_time_t             now, min_time;
+    int                  cpu = d->processor;
+
+    /* If on the runqueue already then someone has done the wakeup work. */
+    if ( unlikely(__task_on_runqueue(d)) )
+        return;
+
+    __add_to_runqueue_head(d);
+
+    now = NOW();
+
+    /* Set the BVT parameters. */
+    if ( inf->avt < CPU_SVT(cpu) )
+        inf->avt = CPU_SVT(cpu);
+
+    /* Deal with warping here. */
+    inf->warpback  = 1;
+    inf->warped    = now;
+    __calc_evt(inf);
+
+    curr = schedule_data[cpu].curr;
+
+    /* Currently-running domain should run at least for ctx_allow. */
+    min_time = curr->lastschd + curr->min_slice;
+    
+    if ( is_idle_task(curr) || (min_time <= now) )
+        cpu_raise_softirq(cpu, SCHEDULE_SOFTIRQ);
+    else if ( schedule_data[cpu].s_timer.expires > (min_time + TIME_SLOP) )
+        mod_ac_timer(&schedule_data[cpu].s_timer, min_time);
 }
 
 struct scheduler sched_bvt_def = {
@@ -448,7 +468,6 @@ struct scheduler sched_bvt_def = {
     .alloc_task     = bvt_alloc_task,
     .add_task       = bvt_add_task,
     .free_task      = bvt_free_task,
-    .wake_up        = bvt_wake_up,
     .do_block       = bvt_do_block,
     .do_schedule    = bvt_do_schedule,
     .control        = bvt_ctl,
@@ -456,6 +475,7 @@ struct scheduler sched_bvt_def = {
     .dump_settings  = bvt_dump_settings,
     .dump_cpu_state = bvt_dump_cpu_state,
     .dump_runq_el   = bvt_dump_runq_el,
-    .pause          = bvt_pause,
+    .sleep          = bvt_sleep,
+    .wake           = bvt_wake,
 };
 
