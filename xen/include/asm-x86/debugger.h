@@ -30,7 +30,6 @@
 #ifndef __X86_DEBUGGER_H__
 #define __X86_DEBUGGER_H__
 
-#include <xen/softirq.h>
 #include <asm/processor.h>
 
 /* The main trap handlers use these helper macros which include early bail. */
@@ -49,6 +48,8 @@ extern int __trap_to_cdb(struct xen_regs *r);
 #define debugger_trap_immediate() call_with_registers(__trap_to_cdb)
 
 #elif defined(DOMU_DEBUG)
+
+#include <xen/softirq.h>
 
 static inline int debugger_trap_entry(
     unsigned int vector, struct xen_regs *regs)
