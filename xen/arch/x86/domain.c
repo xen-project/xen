@@ -636,13 +636,13 @@ int construct_dom0(struct domain *p,
      * read-only). We have a pair of simultaneous equations in two unknowns, 
      * which we solve by exhaustive search.
      */
+    vinitrd_start    = round_pgup(dsi.v_kernend);
+    vinitrd_end      = vinitrd_start + initrd_len;
+    vphysmap_start   = round_pgup(vinitrd_end);
+    vphysmap_end     = vphysmap_start + (nr_pages * sizeof(unsigned long));
+    vpt_start        = round_pgup(vphysmap_end);
     for ( nr_pt_pages = 2; ; nr_pt_pages++ )
     {
-        vinitrd_start    = round_pgup(dsi.v_kernend);
-        vinitrd_end      = vinitrd_start + initrd_len;
-        vphysmap_start   = round_pgup(vinitrd_end);
-        vphysmap_end     = vphysmap_start + (nr_pages * sizeof(unsigned long));
-        vpt_start        = round_pgup(vphysmap_end);
         vpt_end          = vpt_start + (nr_pt_pages * PAGE_SIZE);
         vstartinfo_start = vpt_end;
         vstartinfo_end   = vstartinfo_start + PAGE_SIZE;
