@@ -18,6 +18,10 @@ extern unsigned int alloc_new_dom_mem(struct task_struct *, unsigned int);
 
 static unsigned int get_domnr(void)
 {
+#if 1
+    static unsigned int domnr = 0;
+    return ++domnr;
+#else
     struct task_struct *p = &idle0_task;
     unsigned long dom_mask = 0;
     read_lock_irq(&tasklist_lock);
@@ -28,6 +32,7 @@ static unsigned int get_domnr(void)
     while ( (p = p->next_task) != &idle0_task );   
     read_unlock_irq(&tasklist_lock);
     return (dom_mask == ~0UL) ? 0 : ffz(dom_mask);
+#endif
 }
 
 static void build_page_list(struct task_struct *p)
