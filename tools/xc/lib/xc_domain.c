@@ -46,6 +46,7 @@ int xc_domain_stop(int xc_handle,
     dom0_op_t op;
     op.cmd = DOM0_STOPDOMAIN;
     op.u.stopdomain.domain = (domid_t)domid;
+    op.u.stopdomain.sync = 0; // async
     return do_dom0_op(xc_handle, &op);
 }    
 

@@ -82,6 +82,67 @@ inline void set_bit ( int nr, volatile void * addr)
 	(1 << (nr % (sizeof(unsigned long)*8) ) );
 }
 
+long long tv_to_us( struct timeval *new )
+{
+    return (new->tv_sec * 1000000) + new->tv_usec;
+}
+
+long long tvdelta( struct timeval *new, struct timeval *old )
+{
+    return ((new->tv_sec - old->tv_sec)*1000000 ) + 
+	(new->tv_usec - old->tv_usec);
+}
+
+int track_cpu_usage_dom0( int xc_handle, int print )
+{
+    static struct timeval wall_last;
+    static long long      cpu_last;
+
+    struct timeval        wall_now;
+    long long             cpu_now, wall_delta, cpu_delta;
+
+    gettimeofday(&wall_now, NULL);
+
+    cpu_now = xc_domain_get_cpu_usage( xc_handle, 0 )/1000;
+
+    wall_delta = tvdelta(&wall_now,&wall_last)/1000;
+    cpu_delta  = (cpu_now - cpu_last)/1000;
+
+    if(print)
+	printf("Dom0  : wall delta %lldms, cpu delta %lldms    : %d%%\n",
+	   wall_delta, cpu_delta, (cpu_delta*100)/wall_delta);
+
+    cpu_last  = cpu_now;
+    wall_last = wall_now;	
+
+    return 0;
+}
+
+int track_cpu_usage_target( int xc_handle, u64 domid, int print )
+{
+    static struct timeval wall_last;
+    static long long      cpu_last;
+
+    struct timeval        wall_now;
+    long long             cpu_now, wall_delta, cpu_delta;
+
+    gettimeofday(&wall_now, NULL);
+
+    cpu_now = xc_domain_get_cpu_usage( xc_handle, domid )/1000;
+
+    wall_delta = tvdelta(&wall_now,&wall_last)/1000;
+    cpu_delta  = (cpu_now - cpu_last)/1000;
+
+    if(print)
+	printf("Target: wall delta %lldms, cpu delta %lldms    : %d%%\n",
+	   wall_delta, cpu_delta, (cpu_delta*100)/wall_delta);
+
+    cpu_last  = cpu_now;
+    wall_last = wall_now;	
+
+    return 0;
+}
+
 
 int xc_linux_save(int xc_handle,
                   u64 domid, 
@@ -95,10 +156,11 @@ int xc_linux_save(int xc_handle,
     int verbose = flags & XCFLAGS_VERBOSE;
     int live = flags & XCFLAGS_LIVE;
     int debug = flags & XCFLAGS_DEBUG;
-    int sent_last_iter, sent_this_iter, skip_this_iter, max_iters;
-
-    /* Remember if we stopped the guest, so we can restart it on exit. */
-    int we_stopped_it = 0;
+    int sent_last_iter, sent_this_iter, skip_this_iter;
+    
+    /* Important tuning parameters */
+    int max_iters  = 29; // limit us to 30 times round loop
+    int max_factor = 3;  // never send more than 3x nr_pfns 
 
     /* The new domain's shared-info frame number. */
     unsigned long shared_info_frame;
@@ -153,38 +215,15 @@ int xc_linux_save(int xc_handle,
     }
 
     /* Ensure that the domain exists, and that it is stopped. */
-    for ( ; ; )
+
+    if ( xc_domain_stop_sync( xc_handle, domid, &op, &ctxt ) )
     {
-        op.cmd = DOM0_GETDOMAININFO;
-        op.u.getdomaininfo.domain = (domid_t)domid;
-        op.u.getdomaininfo.ctxt = &ctxt;
-        if ( (do_dom0_op(xc_handle, &op) < 0) || 
-             ((u64)op.u.getdomaininfo.domain != domid) )
-        {
-            PERROR("Could not get info on domain");
-            goto out;
-        }
-
-        memcpy(name, op.u.getdomaininfo.name, sizeof(name));
-        shared_info_frame = op.u.getdomaininfo.shared_info_frame;
-
-        if ( op.u.getdomaininfo.state == DOMSTATE_STOPPED )
-            break;
-
-        we_stopped_it = 1;
-
-        op.cmd = DOM0_STOPDOMAIN;
-        op.u.stopdomain.domain = (domid_t)domid;
-        if ( do_dom0_op(xc_handle, &op) != 0 )
-        {
-            we_stopped_it = 0;
-            PERROR("Stopping target domain failed");
-            goto out;
-        }
-
-        usleep(1000); // 1ms
-	printf("Sleep for 1ms\n");
+	PERROR("Could not sync stop domain");
+	goto out;
     }
+
+    memcpy(name, op.u.getdomaininfo.name, sizeof(name));
+    shared_info_frame = op.u.getdomaininfo.shared_info_frame;
 
     /* A cheesy test to see whether the domain contains valid state. */
     if ( ctxt.pt_base == 0 )
@@ -292,7 +331,6 @@ int xc_linux_save(int xc_handle,
 
 	last_iter = 0;
 	sent_last_iter = 1<<20; // 4GB's worth of pages
-	max_iters = 29; // limit us to 30 times round loop
     }
     else
 	last_iter = 1;
@@ -384,8 +422,11 @@ int xc_linux_save(int xc_handle,
         goto out;
     }
 
-    /* Now write out each data page, canonicalising page tables as we go... */
+    track_cpu_usage_dom0(xc_handle, 0);
+    track_cpu_usage_target( xc_handle, domid, 0);
 
+    /* Now write out each data page, canonicalising page tables as we go... */
+    
     while(1)
     {
 	unsigned int prev_pc, batch, sent_this_iter;
@@ -615,6 +656,10 @@ int xc_linux_save(int xc_handle,
 
 	verbose_printf("\b\b\b\b100%% (pages sent= %d, skipped= %d )\n", 
 		       sent_this_iter, skip_this_iter );
+
+	track_cpu_usage_dom0(xc_handle, 1);
+	track_cpu_usage_target( xc_handle, domid, 1);
+
 	
 	if ( last_iter )
 	{
@@ -649,12 +694,12 @@ int xc_linux_save(int xc_handle,
 		 // ( sent_this_iter > (sent_last_iter * 0.95) ) ||		 
 		 (iter >= max_iters) || 
 		 (sent_this_iter+skip_this_iter < 10) || 
-		 (total_sent > nr_pfns*2) )
+		 (total_sent > nr_pfns*max_factor) )
 	    {
 		DPRINTF("Start last iteration\n");
 		last_iter = 1;
 
-		xc_domain_stop_sync( xc_handle, domid );
+		xc_domain_stop_sync( xc_handle, domid, &op, NULL );
 
 	    } 
 

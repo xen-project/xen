@@ -102,6 +102,20 @@ long do_dom0_op(dom0_op_t *u_dom0_op)
     case DOM0_STOPDOMAIN:
     {
         ret = stop_other_domain(op->u.stopdomain.domain);
+	
+	/* This is grim, but helps for live migrate. It's also unsafe
+	   in the strict sense as we're not explicitly setting a
+	   timeout, but dom0 is bound to have other timers going off to
+	   wake us back up. 
+	   We go to sleep so that the other domain can stop quicker, hence
+	   we have less total down time in a migrate.
+	 */
+	if( ret == 0 && op->u.stopdomain.sync == 1 )
+	{
+	    extern long do_block( void );
+	    printk("T\n");
+	    do_block(); // Yuk...
+	}
     }
     break;
 

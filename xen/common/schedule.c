@@ -27,6 +27,9 @@
 #include <xen/perfc.h>
 #include <xen/sched-if.h>
 #include <hypervisor-ifs/sched_ctl.h>
+
+#undef  TRACE_BUFFER
+
 #include <xen/trace.h>
 
 /*#define WAKEUP_HISTO*/
@@ -216,7 +219,7 @@ void wake_up(struct task_struct *p)
 /* 
  * Block the currently-executing domain until a pertinent event occurs.
  */
-static long do_block(void)
+long do_block(void)
 {
     ASSERT(current->domain != IDLE_DOMAIN_ID);
     current->shared_info->vcpu_data[0].evtchn_upcall_mask = 0;

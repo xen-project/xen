@@ -248,6 +248,9 @@ void * mfn_mapper_queue_entry(mfn_mapper_t *t, int offset,
 
 /*********************/
 
-int xc_domain_stop_sync( int xc_handle, domid_t dom );
+int xc_domain_stop_sync( int xc_handle, domid_t dom, 
+			 dom0_op_t *op, full_execution_context_t *ctxt );
+
+long long  xc_domain_get_cpu_usage( int xc_handle, domid_t domid );
 
 #endif /* __XC_PRIVATE_H__ */

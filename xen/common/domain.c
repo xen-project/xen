@@ -266,6 +266,16 @@ void stop_domain(void)
     unlazy_fpu(current);
     wmb(); /* All CPUs must see saved info in state TASK_STOPPED. */
     set_current_state(TASK_STOPPED);
+
+    /* OK, this is grim, but helps speed up live migrate. When a domain stops,
+       kick Dom0 */
+    {
+	struct task_struct *p;
+	printk("S\n");
+	guest_schedule_to_run( p = find_domain_by_id(0ULL) );
+	put_task_struct(p);
+    }
+
     __enter_scheduler();
 }
 
