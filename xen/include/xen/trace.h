@@ -18,8 +18,8 @@
  * See also common/trace.c and the dom0 op in include/hypervisor-ifs/dom0_ops.h
  */
 
-#ifndef __XENO_TRACE_H__
-#define __XENO_TRACE_H__
+#ifndef __XEN_TRACE_H__
+#define __XEN_TRACE_H__
 
 #include <hypervisor-ifs/trace.h>
 
@@ -122,4 +122,4 @@ static inline int trace(u32 event, u32 d1, u32 d2, u32 d3, u32 d4, u32 d5)
 
 #endif /* TRACE_BUFFER */
 
-#endif /* __XENO_TRACE_H__ */
+#endif /* __XEN_TRACE_H__ */

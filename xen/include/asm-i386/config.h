@@ -4,8 +4,8 @@
  * A Linux-style configuration list.
  */
 
-#ifndef __XENO_I386_CONFIG_H__
-#define __XENO_I386_CONFIG_H__
+#ifndef __XEN_I386_CONFIG_H__
+#define __XEN_I386_CONFIG_H__
 
 #define CONFIG_X86 1
 
@@ -138,4 +138,4 @@ extern void __out_of_line_bug(int line) __attribute__((noreturn));
 #define out_of_line_bug() __out_of_line_bug(__LINE__)
 #endif /* __ASSEMBLY__ */
 
-#endif /* __XENO_I386_CONFIG_H__ */
+#endif /* __XEN_I386_CONFIG_H__ */

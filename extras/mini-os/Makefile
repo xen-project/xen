@@ -27,8 +27,8 @@ $(TARGET): hypervisor-ifs head.o $(OBJS)
 	# Image will load at 0xC0000000. First bytes from head.o
 	#$(LD) -N -Ttext 0xC0000000 head.o $(OBJS) -o $@.elf
 	$(LD) -N -T minios.lds head.o $(OBJS) -o $@.elf
-	# Guest OS header -- first 8 bytes are identifier 'XenoGues'.
-	echo -e -n 'XenoGues' >$@ 
+	# Guest OS header -- first 8 bytes are identifier 'XenGuest'.
+	echo -e -n 'XenGuest' >$@ 
 	# Guest OS header -- next 4 bytes are load address (0xC0000000).
 	echo -e -n '\000\000\000\300' >>$@
 	# Create a raw bag of bytes from the ELF image.

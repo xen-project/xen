@@ -74,7 +74,7 @@
 #include <xen/delay.h>
 
 /* SAE: Not here... */
-#ifdef XENO_KILLED
+#ifdef XEN_KILLED
 #include <xen/signal.h>
 #endif
 
@@ -87,7 +87,7 @@
 #include <xen/time.h>
 #include <xen/timer.h>
 /* SAE */
-#ifdef XENO_KILLED
+#ifdef XEN_KILLED
 #include <xen/stat.h>
 #endif
 

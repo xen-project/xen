@@ -6,7 +6,7 @@
 #include <zlib.h>
 
 /* This string is written to the head of every guest kernel image. */
-#define GUEST_SIG   "XenoGues"
+#define GUEST_SIG   "XenGuest"
 #define SIG_LEN    8
 
 #define L1_PROT (_PAGE_PRESENT|_PAGE_RW|_PAGE_ACCESSED)
@@ -56,7 +56,7 @@ static int read_kernel_header(gzFile gfd, long dom_size,
         return -1;
     }
 
-    /* Read the load address which immediately follows the Xeno signature. */
+    /* Read the load address which immediately follows the Xen signature. */
     gzread(gfd, load_addr, sizeof(unsigned long));
 
     return 0;

@@ -239,9 +239,9 @@
     use_new_eh_code:    1,                      /* Uses new error handling code */\
   }
 #endif
-// XENO: REMOVED     command:	  	megaraid_command,	/* Command Function		*/
-// XENO: REMOVED     proc_info:		megaraid_proc_info,     /* /proc driver info		*/
-// XENO: REMOVED	highmem_io:		1, /* enable HIGHMEM I/O */ 
+// XEN: REMOVED     command:	  	megaraid_command,	/* Command Function		*/
+// XEN: REMOVED     proc_info:		megaraid_proc_info,     /* /proc driver info		*/
+// XEN: REMOVED	highmem_io:		1, /* enable HIGHMEM I/O */ 
 
 
 /***********************************************************************
@@ -784,7 +784,7 @@ typedef struct _mega_host_config {
 	u8 max_cmds;
 	mega_scb scbList[MAX_COMMANDS];
 
-#if XENO_KILLED
+#if XEN_KILLED
 #define PROCBUFSIZE 4096
 	char procbuf[PROCBUFSIZE];
 	int procidx;
@@ -803,7 +803,7 @@ typedef struct _mega_host_config {
 	int		support_random_del;	/* Do we support random deletion of logdrvs */
 	int		read_ldidmap;	/* set after logical drive deltion. The logical
 								drive number must be read from the map */
-#if XENO_KILLED_DELLOGDRV
+#if XEN_KILLED_DELLOGDRV
 	int		quiescent;	/* a stage reached when delete logical drive needs to
 						   be done. Stop sending requests to the hba till
 						   delete operation is completed */

@@ -315,7 +315,7 @@ typedef dma_addr_t	bus_addr_t;
  */
 struct sym_eh_wait {
 /* SAE: */
-#ifdef XENO_KILLED
+#ifdef XEN_KILLED
 	struct semaphore sem;
 #endif
 	struct timer_list timer;
@@ -1091,7 +1091,7 @@ static void __sym_eh_done(Scsi_Cmnd *cmd, int timed_out)
 
 	/* Wake up the eh thread if it wants to sleep */
 /* SAE: No sleeping... */
-#ifdef XENO_KILLED
+#ifdef XEN_KILLED
 	if (ep->to_do == SYM_EH_DO_WAIT)
 		up(&ep->sem);
 #endif
@@ -1160,13 +1160,13 @@ prepare:
 		break;
 	case SYM_EH_DO_WAIT:
 /* SAE: */
-#ifdef XENO_KILLED
+#ifdef XEN_KILLED
 #if LINUX_VERSION_CODE > LinuxVersionCode(2,3,0)
 		init_MUTEX_LOCKED(&ep->sem);
 #else
 		ep->sem = MUTEX_LOCKED;
 #endif
-#endif /* XENO_KILLED */
+#endif /* XEN_KILLED */
 		/* SAE: ??? */	
 		mdelay(10); 
 		/* fall through */
@@ -1216,7 +1216,7 @@ finish:
 	/* Wait for completion with locks released, as required by kernel */
 	if (to_do == SYM_EH_DO_WAIT) {
 /* SAE: */
-#ifdef XENO_KILLED
+#ifdef XEN_KILLED
 		init_timer(&ep->timer);
 		ep->timer.expires = jiffies + (5*HZ);
 		ep->timer.function = sym_eh_timeout;
@@ -1955,7 +1955,7 @@ sym_attach (Scsi_Host_Template *tpnt, int unit, sym_device *dev)
 		dev->s.irq);
 
 /* SAE: No sparc in Xen... */
-#ifdef XENO_KILLED
+#ifdef XEN_KILLED
 #ifdef __sparc__
 		"irq %s\n",
 #else
@@ -1969,7 +1969,7 @@ sym_attach (Scsi_Host_Template *tpnt, int unit, sym_device *dev)
 #else
 		dev->s.irq);
 #endif
-#endif /* XENO_KILLED */
+#endif /* XEN_KILLED */
 
 	/*
 	 *  Get the firmware for this chip.
@@ -2171,7 +2171,7 @@ sym_attach (Scsi_Host_Template *tpnt, int unit, sym_device *dev)
 #endif
 	instance->select_queue_depths = sym53c8xx_select_queue_depths;
 /* SAE */
-#ifdef XENO_KILLED
+#ifdef XEN_KILLED
 	instance->highmem_io	= 1;
 #endif
 
@@ -2771,7 +2771,7 @@ int __init sym53c8xx_detect(Scsi_Host_Template *tpnt)
 	 *    Initialize driver general stuff.
 	 */
 /* SAE: No proc */
-#ifdef XENO_KILLED
+#ifdef XEN_KILLED
 #ifdef SYM_LINUX_PROC_INFO_SUPPORT
 #if LINUX_VERSION_CODE < LinuxVersionCode(2,3,27)
      tpnt->proc_dir  = &proc_scsi_sym53c8xx;
@@ -2780,7 +2780,7 @@ int __init sym53c8xx_detect(Scsi_Host_Template *tpnt)
 #endif
      tpnt->proc_info = sym53c8xx_proc_info;
 #endif
-#endif /* XENO_KILLED */
+#endif /* XEN_KILLED */
 
 #ifdef SYM_LINUX_BOOT_COMMAND_LINE_SUPPORT
 #ifdef MODULE

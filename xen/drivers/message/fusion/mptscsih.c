@@ -207,7 +207,7 @@ static void	mptscsih_fillbuf(char *buffer, int size, int index, int width);
 /*static int	mptscsih_setup(char *str);*/
 static int	mptscsih_halt(struct notifier_block *nb, ulong event, void *buf);
 
-#if XENO_KILLED
+#if XEN_KILLED
 /*
  *	Reboot Notification
  */
@@ -262,7 +262,7 @@ static struct mpt_work_struct	mptscsih_dvTask;
 #endif
 
 /* SAE: No wait queues in Xen */
-#ifdef XENO_KILLED
+#ifdef XEN_KILLED
 /*
  * Wait Queue setup
  */
@@ -1961,7 +1961,7 @@ mptscsih_detect(Scsi_Host_Template *tpnt)
 done:
 	if (mpt_scsi_hosts > 0) {
 /* SAE: */
-#if XENO_KILLED
+#if XEN_KILLED
 		register_reboot_notifier(&mptscsih_notifier);
 #endif
 	}
@@ -2020,7 +2020,7 @@ mptscsih_release(struct Scsi_Host *host)
 
 		while(mytaskQ_bh_active && --count) {
 /* SAE: */
-#ifdef XENO_KILLED
+#ifdef XEN_KILLED
 			set_current_state(TASK_INTERRUPTIBLE);
 			schedule_timeout(1);
 #else
@@ -2043,7 +2043,7 @@ mptscsih_release(struct Scsi_Host *host)
 		spin_unlock_irqrestore(&dvtaskQ_lock, flags);
 		while(dvtaskQ_active && --count) {
 /* SAE: */
-#ifdef XENO_KILLED
+#ifdef XEN_KILLED
 			set_current_state(TASK_INTERRUPTIBLE);
 			schedule_timeout(1);
 #else
@@ -2062,7 +2062,7 @@ mptscsih_release(struct Scsi_Host *host)
 #endif
 
 /* SAE: */
-#if XENO_KILLED
+#if XEN_KILLED
 	unregister_reboot_notifier(&mptscsih_notifier);
 #endif
 
@@ -2204,7 +2204,7 @@ mptscsih_halt(struct notifier_block *nb, ulong event, void *buf)
 	}
 
 /* SAE: Gone */
-#if XENO_KILLED 
+#if XEN_KILLED 
 	unregister_reboot_notifier(&mptscsih_notifier);
 #endif
 	return NOTIFY_OK;
@@ -3660,7 +3660,7 @@ mptscsih_taskmgmt_bh(void *sc)
 
 	do {
 /* SAE: Not in kernel thread */
-#ifdef XENO_KILLED
+#ifdef XEN_KILLED
 		set_current_state(TASK_INTERRUPTIBLE);
 		schedule_timeout(HZ/4);
 #else
@@ -4373,7 +4373,7 @@ mptscsih_ioc_reset(MPT_ADAPTER *ioc, int reset_phase)
 			hd->pLocal->completion = MPT_SCANDV_DID_RESET;
 			scandv_wait_done = 1;
 /* SAE: No wait queues */
-#ifdef XENO_KILLED
+#ifdef XEN_KILLED
 			wake_up(&scandv_waitq);
 #else
 			mdelay(100);
@@ -5793,7 +5793,7 @@ wakeup:
 	 */
 	scandv_wait_done = 1;
 /* SAE: No wait queues */
-#ifdef XENO_KILLED
+#ifdef XEN_KILLED
 	wake_up(&scandv_waitq);
 #else
 	mdelay(100);
@@ -5931,7 +5931,7 @@ mptscsih_do_raid(MPT_SCSI_HOST *hd, u8 action, INTERNAL_CMD *io)
 	add_timer(&hd->timer);
 	mptscsih_put_msgframe(ScsiScanDvCtx, hd->ioc->id, mf);
 /* SAE: No wait queues */
-#ifdef XENO_KILLED
+#ifdef XEN_KILLED
 	wait_event(scandv_waitq, scandv_wait_done);
 #else
 	/* SAE: Decrease the wait time: 100 -> 1 */
@@ -6177,7 +6177,7 @@ mptscsih_do_cmd(MPT_SCSI_HOST *hd, INTERNAL_CMD *io)
 	add_timer(&hd->timer);
 	mptscsih_put_msgframe(ScsiScanDvCtx, hd->ioc->id, mf);
 /* SAE: No wait queues */
-#ifdef XENO_KILLED
+#ifdef XEN_KILLED
 	wait_event(scandv_waitq, scandv_wait_done);
 #else
 	/* SAE: Decrease the wait time: 100 -> 1 */
@@ -6399,7 +6399,7 @@ mptscsih_domainValidation(void *arg)
 			spin_unlock_irqrestore(&dvtaskQ_lock, flags);
 
 /* SAE: */
-#ifdef XENO_KILLED
+#ifdef XEN_KILLED
 			set_current_state(TASK_INTERRUPTIBLE);
 			schedule_timeout(HZ/4);
 #else
@@ -6454,7 +6454,7 @@ mptscsih_domainValidation(void *arg)
 					hd->ioc->spi_data.dvStatus[id] &= ~MPT_SCSICFG_NEED_DV;
 
 /* SAE: */
-#ifdef XENO_KILLED
+#ifdef XEN_KILLED
 					set_current_state(TASK_INTERRUPTIBLE);
 					schedule_timeout(HZ/4);
 #else

@@ -1,6 +1,6 @@
 
-#ifndef __XENO_MM_H__
-#define __XENO_MM_H__
+#ifndef __XEN_MM_H__
+#define __XEN_MM_H__
 
 #include <xen/config.h>
 #include <xen/list.h>
@@ -328,4 +328,4 @@ int memguard_is_guarded(void *p);
 #define memguard_is_guarded(_p)        (0)
 #endif
 
-#endif /* __XENO_MM_H__ */
+#endif /* __XEN_MM_H__ */

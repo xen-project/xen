@@ -621,9 +621,9 @@ int setup_guestos(struct task_struct *p, dom0_createdomain_t *params,
 
     data_start = map_domain_mem((unsigned long)phy_data_start);
 
-    if ( strncmp(data_start, "XenoGues", 8) )
+    if ( strncmp(data_start, "XenGuest", 8) )
     {
-        printk("DOM%llu: Invalid guest OS image\n", dom);
+        printk("DOM%llu: Invalid guest OS image - bad signature\n", dom);
         unmap_domain_mem(data_start);
         return -1;
     }
@@ -821,7 +821,7 @@ int setup_guestos(struct task_struct *p, dom0_createdomain_t *params,
     }
     *dst = '\0';
 
-    /* NB: Give up the VGA console iff the Xenolinux DOM0 wants it. */
+    /* NB: Give up the VGA console if DOM0 is ocnfigured to grab it. */
     console_endboot(strstr(cmdline, "tty0") != NULL);
 
     /* Reinstate the caller's page tables. */

@@ -131,9 +131,9 @@ net_vif_t *create_net_vif(domid_t dom)
     if ( (p->domain == 0) && (idx == 0) )
     {
         /*
-         * DOM0/VIF0 gets the real physical MAC address, so that users can 
-         * easily get a Xenoserver up and running by using an existing DHCP 
-         * entry.
+         * DOM0/VIF0 gets the real physical MAC address, so that users can
+         * easily get a Xen-based machine up and running by using an existing
+         * DHCP entry.
          */
         memcpy(new_vif->vmac, the_dev->dev_addr, ETH_ALEN);
     }

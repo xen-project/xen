@@ -6,8 +6,8 @@
  * Copyright (c) 2002-2003, A K Warfield and K A Fraser
  */
 
-#ifndef __XENO_VIF_H__
-#define __XENO_VIF_H__
+#ifndef __XEN_VIF_H__
+#define __XEN_VIF_H__
 
 /* virtual network interface struct and associated defines. */
 /* net_vif_st is the larger struct that describes a virtual network interface
@@ -112,5 +112,5 @@ void delete_all_domain_vfr_rules(struct task_struct *p);
 #define VIF_DROP  ((net_vif_t *)1)
 #define VIF_LOCAL(_vif) ((unsigned long)(_vif) > 1)
 
-#endif /* __XENO_VIF_H__ */
+#endif /* __XEN_VIF_H__ */
 

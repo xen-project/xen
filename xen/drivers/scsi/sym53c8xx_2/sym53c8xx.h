@@ -122,7 +122,7 @@ int sym53c8xx_release(struct Scsi_Host *);
 	use_clustering:		DISABLE_CLUSTERING,			\
 	}
 /* SAE */
-#ifdef XENO_KILLED
+#ifdef XEN_KILLED
 	highmem_io:		1}
 #endif
 

@@ -1,7 +1,7 @@
 /******************************************************************************
  * hypervisor-if.h
  * 
- * Interface to Xeno hypervisor.
+ * Guest OS interface to Xen.
  */
 
 #ifndef __HYPERVISOR_IF_H__
@@ -222,8 +222,8 @@ typedef struct shared_info_st {
      * The following values are updated periodically (and not necessarily
      * atomically!). The guest OS detects this because 'time_version1' is
      * incremented just before updating these values, and 'time_version2' is
-     * incremented immediately after. See Xenolinux code for an example of how 
-     * to read these values safely (arch/xen/kernel/time.c).
+     * incremented immediately after. See the Xen-specific Linux code for an
+     * example of how to read these values safely (arch/xen/kernel/time.c).
      */
     unsigned long      time_version1;   /* A version number for info below.  */
     unsigned long      time_version2;   /* A version number for info below.  */

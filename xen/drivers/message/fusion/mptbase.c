@@ -180,7 +180,7 @@ static int	last_drv_idx = -1;
 static int	isense_idx = -1;
 
 /* SAE: No wait queues or threads */
-#ifdef XENO_KILLED
+#ifdef XEN_KILLED
 static DECLARE_WAIT_QUEUE_HEAD(mpt_waitq);
 #endif
 
@@ -627,7 +627,7 @@ mpt_base_reply(MPT_ADAPTER *ioc, MPT_FRAME_HDR *mf, MPT_FRAME_HDR *reply)
 			 *	Wake up the original calling thread
 			 */
 			pCfg->wait_done = 1;
-#ifdef XENO_KILLED
+#ifdef XEN_KILLED
 			 wake_up(&mpt_waitq);
 #else
 			mdelay(250);
@@ -2194,7 +2194,7 @@ MakeIocReady(MPT_ADAPTER *ioc, int force, int sleepFlag)
 
 		if (sleepFlag == CAN_SLEEP) {
 /* SAE: Can't do this in the hypervisor */
-#if XENO_KILLED
+#if XEN_KILLED
 			set_current_state(TASK_INTERRUPTIBLE);
 			schedule_timeout(1);
 #else
@@ -2546,7 +2546,7 @@ SendIocInit(MPT_ADAPTER *ioc, int sleepFlag)
 	while (state != MPI_IOC_STATE_OPERATIONAL && --cntdn) {
 		if (sleepFlag == CAN_SLEEP) {
 /* SAE: Can't do this in the hypervisor */
-#if XENO_KILLED
+#if XEN_KILLED
 			set_current_state(TASK_INTERRUPTIBLE);
 			schedule_timeout(1);
 #else
@@ -2980,7 +2980,7 @@ mpt_downloadboot(MPT_ADAPTER *ioc, int sleepFlag)
 		/* wait 100 msec */
 		if (sleepFlag == CAN_SLEEP) {
 /* SAE: Can't do this in the hypervisor */
-#if XENO_KILLED
+#if XEN_KILLED
 			set_current_state(TASK_INTERRUPTIBLE);
 			schedule_timeout(100 * HZ / 1000);
 #else
@@ -3219,7 +3219,7 @@ KickStart(MPT_ADAPTER *ioc, int force, int sleepFlag)
 
 		if (sleepFlag == CAN_SLEEP) {
 /* SAE: Can't do this in the hypervisor */
-#if XENO_KILLED
+#if XEN_KILLED
 			schedule_timeout(HZ);
 #else
 			mdelay(1000);
@@ -3244,7 +3244,7 @@ KickStart(MPT_ADAPTER *ioc, int force, int sleepFlag)
 		}
 		if (sleepFlag == CAN_SLEEP) {
 /* SAE: Can't do this in the hypervisor */
-#if XENO_KILLED
+#if XEN_KILLED
 			set_current_state(TASK_INTERRUPTIBLE);
 			schedule_timeout(1);
 #else
@@ -3321,7 +3321,7 @@ mpt_diag_reset(MPT_ADAPTER *ioc, int ignore, int sleepFlag)
 			/* wait 100 msec */
 			if (sleepFlag == CAN_SLEEP) {
 /* SAE: Can't do this in the hypervisor */
-#if XENO_KILLED
+#if XEN_KILLED
 				set_current_state(TASK_INTERRUPTIBLE);
 				schedule_timeout(100 * HZ / 1000);
 #else
@@ -3419,7 +3419,7 @@ mpt_diag_reset(MPT_ADAPTER *ioc, int ignore, int sleepFlag)
 				/* wait 1 sec */
 				if (sleepFlag == CAN_SLEEP) {
 /* SAE: Can't do this in the hypervisor */
-#if XENO_KILLED
+#if XEN_KILLED
 					set_current_state(TASK_INTERRUPTIBLE);
 					schedule_timeout(HZ);
 #else
@@ -3452,7 +3452,7 @@ mpt_diag_reset(MPT_ADAPTER *ioc, int ignore, int sleepFlag)
 				/* wait 1 sec */
 				if (sleepFlag == CAN_SLEEP) {
 /* SAE: Can't do this in the hypervisor */
-#if XENO_KILLED
+#if XEN_KILLED
 					set_current_state(TASK_INTERRUPTIBLE);
 					schedule_timeout(HZ);
 #else
@@ -3491,7 +3491,7 @@ mpt_diag_reset(MPT_ADAPTER *ioc, int ignore, int sleepFlag)
 		/* wait 100 msec */
 		if (sleepFlag == CAN_SLEEP) {
 /* SAE: Can't do this in the hypervisor */
-#if XENO_KILLED
+#if XEN_KILLED
 			set_current_state(TASK_INTERRUPTIBLE);
 			schedule_timeout(100 * HZ / 1000);
 #else
@@ -3591,7 +3591,7 @@ SendIocReset(MPT_ADAPTER *ioc, u8 reset_type, int sleepFlag)
 
 		if (sleepFlag == CAN_SLEEP) {
 /* SAE: Can't do this in the hypervisor */
-#if XENO_KILLED
+#if XEN_KILLED
 			set_current_state(TASK_INTERRUPTIBLE);
 			schedule_timeout(1);
 #else
@@ -3930,7 +3930,7 @@ WaitForDoorbellAck(MPT_ADAPTER *ioc, int howlong, int sleepFlag)
 			if (! (intstat & MPI_HIS_IOP_DOORBELL_STATUS))
 				break;
 /* SAE: Can't do this in the hypervisor */
-#if XENO_KILLED
+#if XEN_KILLED
 			set_current_state(TASK_INTERRUPTIBLE);
 			schedule_timeout(1);
 #else
@@ -3985,7 +3985,7 @@ WaitForDoorbellInt(MPT_ADAPTER *ioc, int howlong, int sleepFlag)
 			if (intstat & MPI_HIS_DOORBELL_INTERRUPT)
 				break;
 /* SAE: Can't do this in the hypervisor */
-#if XENO_KILLED
+#if XEN_KILLED
 			set_current_state(TASK_INTERRUPTIBLE);
 			schedule_timeout(1);
 #else
@@ -4986,7 +4986,7 @@ mpt_config(MPT_ADAPTER *ioc, CONFIGPARMS *pCfg)
 
 	mpt_put_msg_frame(mpt_base_index, ioc->id, mf);
 /* SAE: No wait queues */
-#ifdef XENO_KILLED
+#ifdef XEN_KILLED
 	wait_event(mpt_waitq, pCfg->wait_done);
 #else
 	/* SAE: We'll just wait a bit */
@@ -5080,7 +5080,7 @@ mpt_ioc_reset(MPT_ADAPTER *ioc, int reset_phase)
 
 				pCfg->status = MPT_CONFIG_ERROR;
 				pCfg->wait_done = 1;
-#ifdef XENO_KILLED
+#ifdef XEN_KILLED
 				wake_up(&mpt_waitq);
 #else
 				mdelay(250);

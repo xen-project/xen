@@ -24,8 +24,8 @@
 
 
 
-#ifndef __XENO_TIME_H__
-#define __XENO_TIME_H__
+#ifndef __XEN_TIME_H__
+#define __XEN_TIME_H__
 
 #include <asm/ptrace.h>  /* XXX Only used for do_timer which should be moved */
 #include <asm/time.h>    /* pull in architecture specific time definition */
@@ -67,4 +67,4 @@ extern void do_settime(unsigned long secs, unsigned long usecs,
                        u64 system_time_base);
 extern void do_timer(struct pt_regs *regs);
 
-#endif /* __XENO_TIME_H__ */
+#endif /* __XEN_TIME_H__ */

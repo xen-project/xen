@@ -1,7 +1,7 @@
 /******************************************************************************
  * page_alloc.c
  * 
- * Simple buddy allocator for Xenoserver hypervisor.
+ * Simple buddy heap allocator for Xen.
  * 
  * Copyright (c) 2002 K A Fraser
  * 

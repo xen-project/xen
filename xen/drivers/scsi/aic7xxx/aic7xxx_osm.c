@@ -721,7 +721,7 @@ ahc_runq_tasklet(unsigned long data)
 #include <xen/notifier.h>
 #include <xen/reboot.h>
 
-#if XENO_KILLED
+#if XEN_KILLED
 static struct notifier_block ahc_linux_notifier = {
 	ahc_linux_halt, NULL, 0
 };
@@ -1376,7 +1376,7 @@ ahc_platform_alloc(struct ahc_softc *ahc, void *platform_arg)
 #endif
 	ahc->seltime = (aic7xxx_seltime & 0x3) << 4;
 	ahc->seltime_b = (aic7xxx_seltime & 0x3) << 4;
-#if XENO_KILLED
+#if XEN_KILLED
 	if (TAILQ_EMPTY(&ahc_tailq))
 		register_reboot_notifier(&ahc_linux_notifier);
 #endif
@@ -1417,7 +1417,7 @@ ahc_platform_free(struct ahc_softc *ahc)
 		free(ahc->platform_data, M_DEVBUF);
 	}
 	if (TAILQ_EMPTY(&ahc_tailq)) {
-#ifdef XENO_KILLED
+#ifdef XEN_KILLED
 	  unregister_reboot_notifier(&ahc_linux_notifier);
 #endif
 #ifdef CONFIG_PCI

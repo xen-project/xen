@@ -1,7 +1,7 @@
 /******************************************************************************
  * arch-i386/hypervisor-if.h
  * 
- * Interface to x86 32-bit Xeno hypervisor.
+ * Guest OS interface to x86 32-bit Xen.
  */
 
 #ifndef __HYPERVISOR_IF_I386_H__

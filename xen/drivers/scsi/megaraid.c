@@ -777,7 +777,7 @@ MODULE_PARM (megaraid, "s");
 static int skip_id = -1;
 static int numCtlrs = 0;
 static mega_host_config *megaCtlrs[FC_MAX_CHANNELS] = { 0 };
-#if XENO_KILLED
+#if XEN_KILLED
 static struct proc_dir_entry *mega_proc_dir_entry;
 #endif
 
@@ -786,7 +786,7 @@ static u32 maxCmdTime = 0;
 #endif
 
 static mega_scb *pLastScb = NULL;
-#if XENO_KILLED
+#if XEN_KILLED
 static struct notifier_block mega_notifier = {
 	megaraid_reboot_notify,
 	NULL,
@@ -801,7 +801,7 @@ struct mega_hbas mega_hbas[MAX_CONTROLLERS];
  * The File Operations structure for the serial/ioctl interface of the driver
  */
 /* For controller re-ordering */ 
-#if XENO_KILLED
+#if XEN_KILLED
 static struct file_operations megadev_fops = {
 	ioctl:megadev_ioctl_entry,
 	open:megadev_open,
@@ -818,7 +818,7 @@ static struct mcontroller mcontroller[MAX_CONTROLLERS];
 /* The current driver version */
 static u32 driver_ver = 0x118C;
 
-#if XENO_KILLED
+#if XEN_KILLED
 /* major number used by the device for character interface */
 static int major;
 
@@ -2330,7 +2330,7 @@ static void megaraid_isr (int irq, void *devp, struct pt_regs *regs)
 				if (pScb->SCpnt->cmnd[0] == M_RD_IOCTL_CMD_NEW) {
 					/* save the status byte for the queue routine to use */
 					pScb->SCpnt->result = qStatus;
-#if XENO_KILLED
+#if XEN_KILLED
 					up (&pScb->ioctl_sem);
 #endif
 				} else {
@@ -2939,7 +2939,7 @@ static int mega_i_query_adapter (mega_host_config * megaCfg)
 /*----------------------------------------------------------
  * Returns data to be displayed in /proc/scsi/megaraid/X
  *----------------------------------------------------------*/
-#if XENO_KILLED
+#if XEN_KILLED
 int megaraid_proc_info (char *buffer, char **start, off_t offset,
 		    int length, int host_no, int inout)
 {
@@ -3118,7 +3118,7 @@ static int mega_findCard (Scsi_Host_Template * pHostTmpl,
 		megaCfg->lock_pend = SPIN_LOCK_UNLOCKED;
 		megaCfg->lock_scsicmd = SPIN_LOCK_UNLOCKED;
 		megaCfg->flag = flag;
-#if XENO_KILLED_DELLOGDRV
+#if XEN_KILLED_DELLOGDRV
 		megaCfg->int_qh = NULL;
 		megaCfg->int_qt = NULL;
 		megaCfg->int_qlen = 0;
@@ -3326,7 +3326,7 @@ static int mega_findCard (Scsi_Host_Template * pHostTmpl,
 
 int megaraid_detect (Scsi_Host_Template * pHostTmpl)
 {
-#if XENO_KILLED
+#if XEN_KILLED
   int ctlridx = 0;
 #endif
   int count = 0;
@@ -3409,7 +3409,7 @@ int megaraid_detect (Scsi_Host_Template * pHostTmpl)
 	 * First argument (major) to register_chrdev implies a dynamic major
 	 * number allocation.
 	 */
-#if XENO_KILLED
+#if XEN_KILLED
 	if (count) {
 		major = register_chrdev (0, "megadev", &megadev_fops);
 
@@ -3499,7 +3499,7 @@ int megaraid_release (struct Scsi_Host *pSHost)
 	 * register_chrdev() routine.
 	 */
 
-#if XENO_KILLED
+#if XEN_KILLED
 	unregister_chrdev (major, "megadev");
 	unregister_reboot_notifier (&mega_notifier);
 #endif
@@ -3959,7 +3959,7 @@ int megaraid_queue (Scsi_Cmnd * SCpnt, void (*pktComp) (Scsi_Cmnd *))
 		 * logical drive opertion. If it is, queue the commands in the
 		 * internal queue until the delete operation is complete.
 		 */
-#if XENO_KILLED_DELLOGDRV
+#if XEN_KILLED_DELLOGDRV
 		if( ! megaCfg->quiescent ) {
 #endif
 			/* Add SCB to the head of the pending queue */
@@ -3976,7 +3976,7 @@ int megaraid_queue (Scsi_Cmnd * SCpnt, void (*pktComp) (Scsi_Cmnd *))
 				DRIVER_UNLOCK (megaCfg);
 				return 0;
 			}
-#if XENO_KILLED_DELLOGDRV
+#if XEN_KILLED_DELLOGDRV
 		}
 		else {
 			/* Add SCB to the internal queue */
@@ -3992,11 +3992,11 @@ int megaraid_queue (Scsi_Cmnd * SCpnt, void (*pktComp) (Scsi_Cmnd *))
 #endif
 
 		if (pScb->SCpnt->cmnd[0] == M_RD_IOCTL_CMD_NEW) {
-#if XENO_KILLED
+#if XEN_KILLED
 			init_MUTEX_LOCKED (&pScb->ioctl_sem);
 #endif
 			spin_unlock_irq (&io_request_lock);
-#if XENO_KILLED
+#if XEN_KILLED
 			down (&pScb->ioctl_sem);
 #endif
     		user_area = (char *)*((u32*)&pScb->SCpnt->cmnd[4]);
@@ -4027,7 +4027,7 @@ int megaraid_queue (Scsi_Cmnd * SCpnt, void (*pktComp) (Scsi_Cmnd *))
 /*----------------------------------------------------------------------
  * Issue a blocking command to the controller
  *----------------------------------------------------------------------*/
-#if XENO_KILLED
+#if XEN_KILLED
 volatile static int internal_done_flag = 0;
 volatile static int internal_done_errcode = 0;
 
@@ -4489,7 +4489,7 @@ int megaraid_biosparam (Disk * disk, kdev_t dev, int *geom)
 static int
 mega_partsize(Disk * disk, kdev_t dev, int *geom)
 {
-#if XENO_KILLED
+#if XEN_KILLED
 	struct buffer_head *bh;
 	struct partition *p, *largest = NULL;
 	int i, largest_cyl;
@@ -4731,7 +4731,7 @@ static int megadev_ioctl_entry (struct inode *inode, struct file *filep,
 	/*
 	 * We do not allow parallel ioctls to the driver as of now.
 	 */
-#if XENO_KILLED // XXX JWS killed the locking!
+#if XEN_KILLED // XXX JWS killed the locking!
 	down (&mimd_entry_mtx);
 	ret = megadev_ioctl (inode, filep, cmd, arg);
 	up (&mimd_entry_mtx);
@@ -4949,7 +4949,7 @@ static int megadev_ioctl (struct inode *inode, struct file *filep,
 		scsicmd->cmnd[0] = MEGADEVIOC;
 		scsicmd->request_buffer = (void *)&ioc;
 
-#if XENO_KILLED
+#if XEN_KILLED
 		init_MUTEX_LOCKED(&mimd_ioctl_sem);
 #endif
 
@@ -4957,7 +4957,7 @@ static int megadev_ioctl (struct inode *inode, struct file *filep,
 		megaraid_queue(scsicmd, megadev_ioctl_done);
 
 		IO_UNLOCK;
-#if XENO_KILLED
+#if XEN_KILLED
 		down(&mimd_ioctl_sem);
 #endif
 		if( !scsicmd->result && outlen ) {
@@ -5104,7 +5104,7 @@ static int megadev_ioctl (struct inode *inode, struct file *filep,
 		scsicmd->cmnd[0] = MEGADEVIOC;
 		scsicmd->request_buffer = (void *) &ioc;
 
-#if XENO_KILLED
+#if XEN_KILLED
 		init_MUTEX_LOCKED (&mimd_ioctl_sem);
 #endif
 
@@ -5112,7 +5112,7 @@ static int megadev_ioctl (struct inode *inode, struct file *filep,
 		megaraid_queue (scsicmd, megadev_ioctl_done);
 
 		IO_UNLOCK;
-#if XENO_KILLED
+#if XEN_KILLED
 		down (&mimd_ioctl_sem);
 #endif
 
@@ -5173,7 +5173,7 @@ static int megadev_ioctl (struct inode *inode, struct file *filep,
 static void
 megadev_ioctl_done(Scsi_Cmnd *sc)
 {
-#if XENO_KILLED
+#if XEN_KILLED
 	up (&mimd_ioctl_sem);
 #endif
 }
@@ -5311,7 +5311,7 @@ mega_support_ext_cdb(mega_host_config *this_hba)
 static int
 mega_support_random_del(mega_host_config *this_hba)
 {
-#if XENO_KILLED
+#if XEN_KILLED
 	mega_mailbox *mboxpnt;
 	unsigned char mbox[16];
 	int ret;
@@ -5337,7 +5337,7 @@ static int
 mega_del_logdrv(mega_host_config *this_hba, int logdrv)
 {
   return -ENOSYS;
-#if XENO_KILLED_DELLOGDRV
+#if XEN_KILLED_DELLOGDRV
 	int		rval;
 	IO_LOCK_T;
 	DECLARE_WAIT_QUEUE_HEAD(wq);
@@ -5407,7 +5407,7 @@ mega_del_logdrv(mega_host_config *this_hba, int logdrv)
 #endif
 }
 
-#if XENO_KILLED_DELLOGDRV
+#if XEN_KILLED_DELLOGDRV
 static int
 mega_do_del_logdrv(mega_host_config *this_hba, int logdrv)
 {

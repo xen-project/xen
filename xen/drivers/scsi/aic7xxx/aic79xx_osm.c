@@ -374,7 +374,7 @@ static void ahd_linux_filter_command(struct ahd_softc*, Scsi_Cmnd*,
 				     struct scb*);
 static void ahd_linux_dev_timed_unfreeze(u_long arg);
 /* SAE */
-#if XENO_KILLED
+#if XEN_KILLED
 static void ahd_linux_sem_timeout(u_long arg);
 static int  ahd_linux_queue_recovery_cmd(Scsi_Cmnd *cmd, scb_flag flag);
 #endif
@@ -1306,7 +1306,7 @@ ahd_platform_alloc(struct ahd_softc *ahd, void *platform_arg)
 	ahd_lockinit(ahd);
 	ahd_done_lockinit(ahd);
 /* SAE */
-#if XENO_KILLED
+#if XEN_KILLED
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(2,3,0)
 	init_MUTEX_LOCKED(&ahd->platform_data->eh_sem);
 #else
@@ -1319,7 +1319,7 @@ ahd_platform_alloc(struct ahd_softc *ahd, void *platform_arg)
 #endif
 	ahd->seltime = (aic79xx_seltime & 0x3) << 4;
 /* SAE */
-#if XENO_KILLED
+#if XEN_KILLED
 	if (TAILQ_EMPTY(&ahd_tailq))
 		register_reboot_notifier(&ahd_linux_notifier);
 #endif
@@ -2106,7 +2106,7 @@ ahd_done(struct ahd_softc *ahd, struct scb * scb)
 	if ((scb->flags & SCB_RECOVERY_SCB) != 0) {
 		printf("Recovery SCB completes\n");
 /* SAE: */
-#if XENO_KILLED
+#if XEN_KILLED
 		up(&ahd->platform_data->eh_sem);
 #endif
 	}
@@ -2449,7 +2449,7 @@ ahd_release_simq(struct ahd_softc *ahd)
 }
 
 /* SAE */
-#if XENO_KILLED
+#if XEN_KILLED
 static void
 ahd_linux_sem_timeout(u_long arg)
 {
@@ -2702,7 +2702,7 @@ done:
 /* SAE */
 		printf("SAE: aic79xxx: recovery failed\n");
 		retval=FAILED;
-#if XENO_KILLED
+#if XEN_KILLED
 		struct timer_list timer;
 		int ret;
 
@@ -2732,7 +2732,7 @@ done:
 	spin_lock_irq(&io_request_lock);
 	return (retval);
 }
-#endif /* XENO_KILLED */
+#endif /* XEN_KILLED */
 
 static void
 ahd_linux_dev_timed_unfreeze(u_long arg)
@@ -2856,19 +2856,19 @@ ahd_linux_biosparam(Disk *disk, kdev_t dev, int geom[])
 	int	sectors;
 	int	cylinders;
 /* SAE */
-#if XENO_KILLED
+#if XEN_KILLED
 	int	ret;
 #endif
 	int	extended;
 	struct	ahd_softc *ahd;
 /* SAE */
-#if XENO_KILLED
+#if XEN_KILLED
 	struct	buffer_head *bh;
 #endif
 
 	ahd = *((struct ahd_softc **)disk->device->host->hostdata);
 /* SAE: */
-#if XENO_KILLED
+#if XEN_KILLED
 	bh = bread(MKDEV(MAJOR(dev), MINOR(dev) & ~0xf), 0, 1024);
 
 	if (bh) {

@@ -50,7 +50,7 @@
 #include <xen/ioport.h>
 #include <xen/pci.h>
 /* SAE */
-#if XENO_KILLED
+#if XEN_KILLED
 #include <xen/version.h>
 #endif
 #ifndef AHD_MODVERSION_FILE
@@ -151,7 +151,7 @@ extern Scsi_Host_Template* aic79xx_driver_template;
 /***************************** Bus Space/DMA **********************************/
 /* SAE */
 typedef dma_addr_t bus_addr_t;
-#if XENO_KILLED
+#if XEN_KILLED
 #if LINUX_VERSION_CODE > KERNEL_VERSION(2,2,17)
 typedef dma_addr_t bus_addr_t;
 #else
@@ -610,7 +610,7 @@ struct scb_platform_data {
 	uint32_t		 xfer_len;
 /* SAE */
 	uint32_t		 resid;		/* Transfer residual */
-#if XENO_KILLED
+#if XEN_KILLED
 #if LINUX_VERSION_CODE < KERNEL_VERSION(2,3,0)
 	uint32_t		 resid;		/* Transfer residual */
 #endif
@@ -634,7 +634,7 @@ struct ahd_platform_data {
 /* SAE */
 	spinlock_t		 spin_lock;
 	struct tasklet_struct	 runq_tasklet;
-#if XENO_KILLED
+#if XEN_KILLED
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(2,1,0)
 	spinlock_t		 spin_lock;
 #endif
@@ -645,7 +645,7 @@ struct ahd_platform_data {
 	u_int			 qfrozen;
 	struct timer_list	 reset_timer;
 /* SAE: No semaphores */
-#if XENO_KILLED
+#if XEN_KILLED
 	struct semaphore	 eh_sem;
 #endif
 	struct Scsi_Host        *host;		/* pointer to scsi host */

@@ -4,8 +4,8 @@
  * A Linux-style configuration list.
  */
 
-#ifndef __XENO_CONFIG_H__
-#define __XENO_CONFIG_H__
+#ifndef __XEN_CONFIG_H__
+#define __XEN_CONFIG_H__
 
 #include <asm/config.h>
 
@@ -42,4 +42,4 @@ extern unsigned int opt_ser_baud;
 #define SERIAL_ENABLED (opt_ser_baud != 0)
 #endif
 
-#endif /* __XENO_CONFIG_H__ */
+#endif /* __XEN_CONFIG_H__ */

@@ -199,7 +199,7 @@ struct mptscsih_driver_setup
 /* SAE: mdelay */
 #define SCHEDULE_TASK(x) mdelay(100)
 
-#if XENO_KILLED
+#if XEN_KILLED
 
 #define SCHEDULE_TASK(x)		\
 	*MOD_INC_USE_COUNT*;		\

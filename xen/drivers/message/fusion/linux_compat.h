@@ -148,7 +148,7 @@ typedef void (*__cleanup_module_func_t)(void);
 
 /* PCI/driver subsystem { */
 /* SAE: Why not just use Linux's PCI stuff */
-#if XENO_KILLED
+#if XEN_KILLED
 /*#ifndef pci_for_each_dev*/
 #define pci_for_each_dev(dev)		for((dev)=pci_devices; (dev)!=NULL; (dev)=(dev)->next)
 #define pci_peek_next_dev(dev)		((dev)->next ? (dev)->next : NULL)
@@ -172,7 +172,7 @@ typedef void (*__cleanup_module_func_t)(void);
 })
 #else
 /* SAE: Is Linux's PCI stuff not good enough? */
-#if XENO_KILLED
+#if XEN_KILLED
 
 #define pci_peek_next_dev(dev)		((dev) != pci_dev_g(&pci_devices) ? pci_dev_g((dev)->global_list.next) : NULL)
 #define PCI_BASEADDR_FLAGS(idx)         resource[idx].flags
@@ -185,7 +185,7 @@ typedef void (*__cleanup_module_func_t)(void);
 
 /* Compatability for the 2.3.x PCI DMA API. */
 /* SAE: No need for this */
-#if XENO_KILLED
+#if XEN_KILLED
 /*#ifndef PCI_DMA_BIDIRECTIONAL*/
 /*{-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=*/
 
