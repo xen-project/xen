@@ -64,12 +64,12 @@
 #endif
 
 struct xlbd_type_info {
-	int partn_shift;
-	int partn_per_major;
-	int devs_per_major;
-	int hardsect_size;
-	int max_sectors;
-	char *name;
+    int partn_shift;
+    int partn_per_major;
+    int devs_per_major;
+    int hardsect_size;
+    int max_sectors;
+    char *name;
 };
 
 /*
@@ -78,19 +78,19 @@ struct xlbd_type_info {
  * putting all kinds of interesting stuff here :-)
  */
 struct xlbd_major_info {
-	int major;
-	int index;
-	int usage;
-	struct xlbd_type_info *type;
+    int major;
+    int index;
+    int usage;
+    struct xlbd_type_info *type;
 };
 
 struct xlbd_disk_info {
-	int xd_device;
-	struct xlbd_major_info *mi;
+    int xd_device;
+    struct xlbd_major_info *mi;
 };
 
 typedef struct xen_block {
-	int usage;
+    int usage;
 } xen_block_t;
 
 extern struct request_queue *xlbd_blk_queue;
@@ -99,7 +99,7 @@ extern spinlock_t blkif_io_lock;
 extern int blkif_open(struct inode *inode, struct file *filep);
 extern int blkif_release(struct inode *inode, struct file *filep);
 extern int blkif_ioctl(struct inode *inode, struct file *filep,
-                           unsigned command, unsigned long argument);
+                       unsigned command, unsigned long argument);
 extern int blkif_check(dev_t dev);
 extern int blkif_revalidate(dev_t dev);
 extern void blkif_control_send(blkif_request_t *req, blkif_response_t *rsp);
