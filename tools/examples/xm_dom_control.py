@@ -129,7 +129,9 @@ elif cmd == 'pincpu':
 
 elif cmd == 'list':
     print 'Dom  Name             Mem(MB)  CPU  State  Time(s)'
-    for dom in server.xend_domains():
+    doms = server.xend_domains()
+    doms.sort()
+    for dom in doms:
         info = server.xend_domain(dom)
         d = {}
         d['dom'] = int(dom)

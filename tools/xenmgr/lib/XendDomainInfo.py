@@ -116,7 +116,7 @@ class XendDomainInfo:
             state = run + stop
             sxpr.append(['cpu', self.info['cpu']])
             sxpr.append(['state', state])
-            sxpr.append(['cpu_time', self.info['cpu_time']/1e8])
+            sxpr.append(['cpu_time', self.info['cpu_time']/1e9])
         if self.console:
             sxpr.append(self.console.sxpr())
         if self.config:
