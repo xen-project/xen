@@ -748,7 +748,7 @@ loadp9image(gzFile kernel_gfd, int xc_handle, u32 dom,
 	memcpy(&args.data[0x200 + 64], cmdline, strlen(cmdline));
 	printf("Copied :%s: to page for args\n", cmdline);
 	ret = memcpy_toguest(xc_handle, dom, &args, sizeof(args), page_array,1);
-	dumpit(xc_handle, dom, 0 /*0x100000>>12*/, 4, page_array) ;
+	//dumpit(xc_handle, dom, 0 /*0x100000>>12*/, 4, page_array) ;
       out:
 	if (image)
 		free(image);
