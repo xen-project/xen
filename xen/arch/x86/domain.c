@@ -199,13 +199,11 @@ void machine_halt(void)
 void dump_pageframe_info(struct domain *d)
 {
     struct pfn_info *page;
-    struct list_head *ent;
 
     if ( d->tot_pages < 10 )
     {
-        list_for_each ( ent, &d->page_list )
+        list_for_each_entry ( page, &d->page_list, list )
         {
-            page = list_entry(ent, struct pfn_info, list);
             printk("Page %08x: caf=%08x, taf=%08x\n",
                    page_to_phys(page), page->count_info,
                    page->u.inuse.type_info);

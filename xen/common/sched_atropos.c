@@ -1,6 +1,6 @@
 /*
- *	atropos.c
- *	---------
+ * atropos.c
+ * ---------
  *
  * Copyright (c) 1994 University of Cambridge Computer Laboratory.
  * This is part of Nemesis; consult your contract for terms and conditions.
@@ -98,8 +98,9 @@ static inline int __task_on_runqueue(struct domain *d)
 static int q_len(struct list_head *q) 
 {
     int i = 0;
-    struct list_head *tmp;
-    list_for_each(tmp, q) i++;
+    struct at_dom_info *tmp;
+    list_for_each_entry ( tmp, q, waitq )
+        i++;
     return i;
 }
 
@@ -129,60 +130,39 @@ static inline struct domain *waitq_el(struct list_head *l)
  */
 static void requeue(struct domain *sdom)
 {
-    struct at_dom_info *inf = DOM_INFO(sdom);
-    struct list_head *prev;
-    struct list_head *next;
+    struct at_dom_info *i, *inf = DOM_INFO(sdom);
 
-
-    if(!domain_runnable(sdom)) return;
+    if ( !domain_runnable(sdom) )
+        return;
     
-    if(inf->state == ATROPOS_TASK_WAIT ||
-        inf->state == ATROPOS_TASK_UNBLOCKED)
+    if ( (inf->state == ATROPOS_TASK_WAIT) ||
+         (inf->state == ATROPOS_TASK_UNBLOCKED) )
     {
-        prev = WAITQ(sdom->processor);
-
-        list_for_each(next, WAITQ(sdom->processor))
+        list_for_each_entry ( i, WAITQ(sdom->processor), waitq )
         {
-            struct at_dom_info *i = 
-                list_entry(next, struct at_dom_info, waitq);
             if ( i->deadline > inf->deadline )
             {
-                __list_add(&inf->waitq, prev, next);
+                __list_add(&inf->waitq, i->waitq.prev, &i->waitq);
                 break;
             }
-
-            prev = next;
         }
 
-        /* put the domain on the end of the list if it hasn't been put
-         * elsewhere */
-        if ( next == WAITQ(sdom->processor) )
+        if ( &i->waitq == WAITQ(sdom->processor) )
             list_add_tail(&inf->waitq, WAITQ(sdom->processor));
     }
     else if ( domain_runnable(sdom) )
     {
-        /* insert into ordered run queue */
-        
-        prev = RUNQ(sdom->processor);
-
-        list_for_each(next, RUNQ(sdom->processor))
+        list_for_each_entry ( i, RUNQ(sdom->processor), run_list )
         {
-            struct at_dom_info *p = list_entry(next, struct at_dom_info,
-                                               run_list);
-
-            if( p->deadline > inf->deadline || is_idle_task(p->owner) )
+            if ( (i->deadline > inf->deadline) || is_idle_task(i->owner) )
             {
-                __list_add(&inf->run_list, prev, next);
+                __list_add(&inf->run_list, i->run_list.prev, &i->run_list);
                 break;
             }
-
-            prev = next;
         }
 
-        if ( next == RUNQ(sdom->processor) )
+        if ( &i->waitq == RUNQ(sdom->processor) )
             list_add_tail(&inf->run_list, RUNQ(sdom->processor));
-        
-    
     }
     /* silently ignore tasks in other states like BLOCKED, DYING, STOPPED, etc
      * - they shouldn't be on any queue */
@@ -194,7 +174,7 @@ static int at_alloc_task(struct domain *p)
     ASSERT(p != NULL);
     
     p->sched_priv = xmem_cache_alloc(dom_info_cache);
-    if( p->sched_priv == NULL )
+    if ( p->sched_priv == NULL )
         return -1;
     
     return 0;
@@ -294,26 +274,26 @@ static void unblock(struct domain *sdom)
     {
         /* Long blocking case */
 
-	    /* The sdom has passed its deadline since it was blocked. 
-	       Give it its new deadline based on the latency value. */
-	    inf->prevddln = time;
+        /* The sdom has passed its deadline since it was blocked. 
+           Give it its new deadline based on the latency value. */
+        inf->prevddln = time;
 
         /* Scale the scheduling parameters as requested by the latency hint. */
-	    inf->deadline = time + inf->latency;
+        inf->deadline = time + inf->latency;
         inf->slice = inf->nat_slice / ( inf->nat_period / inf->latency );
         inf->period = inf->latency;
-	    inf->remain = inf->slice;
+        inf->remain = inf->slice;
     }
     else 
     {
         /* Short blocking case */
 
-	    /* We leave REMAIN intact, but put this domain on the WAIT
-	        queue marked as recently unblocked.  It will be given
-	        priority over other domains on the wait queue until while
-	        REMAIN>0 in a generous attempt to help it make up for its
-	        own foolishness. */
-	    if(inf->remain > 0)
+        /* We leave REMAIN intact, but put this domain on the WAIT
+           queue marked as recently unblocked.  It will be given
+           priority over other domains on the wait queue until while
+           REMAIN>0 in a generous attempt to help it make up for its
+           own foolishness. */
+        if(inf->remain > 0)
             inf->state = ATROPOS_TASK_UNBLOCKED;
         else
             inf->state = ATROPOS_TASK_WAIT;
@@ -349,10 +329,10 @@ static void block(struct domain* sdom)
  */
 task_slice_t ksched_scheduler(s_time_t time)
 {
-    struct domain	*cur_sdom = current;  /* Current sdom           */
-    s_time_t     newtime;
-    s_time_t      ranfor;	        /* How long the domain ran      */
-    struct domain	*sdom;	        /* tmp. scheduling domain	*/
+    struct domain *cur_sdom = current;  /* Current sdom           */
+    s_time_t       newtime;
+    s_time_t       ranfor;              /* How long the domain ran      */
+    struct domain *sdom;                /* tmp. scheduling domain       */
     int cpu = cur_sdom->processor;      /* current CPU                  */
     struct at_dom_info *cur_info;
     static unsigned long waitq_rrobin = 0;
@@ -367,7 +347,7 @@ task_slice_t ksched_scheduler(s_time_t time)
     /* If we were spinning in the idle loop, there is no current
      * domain to deschedule. */
     if (is_idle_task(cur_sdom))
-	goto deschedule_done;
+        goto deschedule_done;
 
     /*****************************
      * 
@@ -375,7 +355,7 @@ task_slice_t ksched_scheduler(s_time_t time)
      *
      ****************************/
 
-   /* Record the time the domain was preempted and for how long it
+    /* Record the time the domain was preempted and for how long it
        ran.  Work out if the domain is going to be blocked to save
        some pointless queue shuffling */
     cur_sdom->lastdeschd = time;
@@ -388,26 +368,26 @@ task_slice_t ksched_scheduler(s_time_t time)
          (cur_info->state == ATROPOS_TASK_UNBLOCKED) )
     {
 
-	    /* In this block, we are doing accounting for an sdom which has 
-	        been running in contracted time.  Note that this could now happen
-	        even if the domain is on the wait queue (i.e. if it blocked) */
+        /* In this block, we are doing accounting for an sdom which has 
+           been running in contracted time.  Note that this could now happen
+           even if the domain is on the wait queue (i.e. if it blocked) */
 
-	    /* Deduct guaranteed time from the domain */
-	    cur_info->remain  -= ranfor;
+        /* Deduct guaranteed time from the domain */
+        cur_info->remain  -= ranfor;
 
-	    /* If guaranteed time has run out... */
-	    if ( cur_info->remain <= 0 )
+        /* If guaranteed time has run out... */
+        if ( cur_info->remain <= 0 )
         {
-	        /* Move domain to correct position in WAIT queue */
+            /* Move domain to correct position in WAIT queue */
             /* XXX sdom_unblocked doesn't need this since it is 
                already in the correct place. */
-	        cur_info->state = ATROPOS_TASK_WAIT;
-	    }
+            cur_info->state = ATROPOS_TASK_WAIT;
+        }
     }
 
     requeue(cur_sdom);
 
-deschedule_done:
+ deschedule_done:
     /*****************************
      * 
      * We have now successfully descheduled the current sdom.
@@ -424,10 +404,10 @@ deschedule_done:
      ****************************/
     
     while(!list_empty(WAITQ(cpu)) && 
-	    DOM_INFO(sdom = waitq_el(WAITQ(cpu)->next))->deadline <= time ) 
+          DOM_INFO(sdom = waitq_el(WAITQ(cpu)->next))->deadline <= time ) 
     {
 
-	    struct at_dom_info *inf = DOM_INFO(sdom);
+        struct at_dom_info *inf = DOM_INFO(sdom);
         dequeue(sdom);
         
         if ( inf->period != inf->nat_period )
@@ -444,22 +424,22 @@ deschedule_done:
             }
         }
 
-	    /* Domain begins a new period and receives a slice of CPU 
-	     * If this domain has been blocking then throw away the
-	     * rest of it's remain - it can't be trusted */
-	    if (inf->remain > 0) 
-	        inf->remain = inf->slice;
+        /* Domain begins a new period and receives a slice of CPU 
+         * If this domain has been blocking then throw away the
+         * rest of it's remain - it can't be trusted */
+        if (inf->remain > 0) 
+            inf->remain = inf->slice;
         else 
-	        inf->remain += inf->slice;
+            inf->remain += inf->slice;
 
-	    inf->prevddln = inf->deadline;
-	    inf->deadline += inf->period;
+        inf->prevddln = inf->deadline;
+        inf->deadline += inf->period;
 
         if ( inf->remain <= 0 )
             inf->state = ATROPOS_TASK_WAIT;
 
-	    /* Place on the appropriate queue */
-	    requeue(sdom);
+        /* Place on the appropriate queue */
+        requeue(sdom);
     }
 
     /*****************************
@@ -484,30 +464,27 @@ deschedule_done:
      * queue */
     if (cur_sdom->id == IDLE_DOMAIN_ID && !list_empty(WAITQ(cpu)))
     {
-        struct list_head *item;
+        struct at_dom_info *inf;
 
-	    /* Try running a domain on the WAIT queue - this part of the
-	        scheduler isn't particularly efficient but then again, we
-	        don't have any guaranteed domains to worry about. */
-	
-	    /* See if there are any unblocked domains on the WAIT
-	        queue who we can give preferential treatment to. */
+        /* Try running a domain on the WAIT queue - this part of the
+           scheduler isn't particularly efficient but then again, we
+           don't have any guaranteed domains to worry about. */
+
+        /* See if there are any unblocked domains on the WAIT
+           queue who we can give preferential treatment to. */
         
-        list_for_each(item, WAITQ(cpu))
+        list_for_each_entry ( inf, WAITQ(cpu), waitq )
         {
-            struct at_dom_info *inf =
-                list_entry(item, struct at_dom_info, waitq);
-
             sdom = inf->owner;
             
-	        if (inf->state == ATROPOS_TASK_UNBLOCKED) 
+            if (inf->state == ATROPOS_TASK_UNBLOCKED) 
             { 
-		        cur_sdom = sdom;
-    		    cur_info  = inf;
-	    	    newtime  = time + inf->remain;
-		        goto found;
-	        }
-	    }
+                cur_sdom = sdom;
+                cur_info  = inf;
+                newtime  = time + inf->remain;
+                goto found;
+            }
+        }
 
         /* init values needed to approximate round-robin for slack time */
         i = 0;
@@ -515,14 +492,11 @@ deschedule_done:
             waitq_rrobin = 0;
         
         
-	    /* Last chance: pick a domain on the wait queue with the XTRA
-	        flag set.  The NEXT_OPTM field is used to cheaply achieve
-	        an approximation of round-robin order */
-        list_for_each(item, WAITQ(cpu))
+        /* Last chance: pick a domain on the wait queue with the XTRA
+           flag set.  The NEXT_OPTM field is used to cheaply achieve
+           an approximation of round-robin order */
+        list_for_each_entry ( inf, WAITQ(cpu), waitq )
         {
-            struct at_dom_info *inf =
-                list_entry(item, struct at_dom_info, waitq);
-            
             sdom = inf->owner;
             
             if (inf->xtratime && i >= waitq_rrobin) 
@@ -538,7 +512,7 @@ deschedule_done:
         }
     }
 
-    found:
+ found:
     /**********************
      * 
      * We now have to work out the time when we next need to
@@ -554,7 +528,7 @@ deschedule_done:
     /* exhausted its time, cut short the time allocation */
     if (!list_empty(WAITQ(cpu)))
     {
-	    newtime = MIN(newtime,
+        newtime = MIN(newtime,
                       DOM_INFO(waitq_el(WAITQ(cpu)->next))->deadline);
     }
 
@@ -603,44 +577,44 @@ static void at_dump_runq_el(struct domain *p)
 /* dump relevant per-cpu state for a run queue dump */
 static void at_dump_cpu_state(int cpu)
 {
-    struct list_head *list, *queue;
+    struct list_head *queue;
     int loop = 0;
     struct at_dom_info *d_inf;
     struct domain *d;
 
     queue = RUNQ(cpu);
     printk("\nRUNQUEUE rq %lx   n: %lx, p: %lx\n",  (unsigned long)queue,
-    (unsigned long) queue->next, (unsigned long) queue->prev);
+           (unsigned long) queue->next, (unsigned long) queue->prev);
 
-    list_for_each ( list, queue )
+    list_for_each_entry ( d_inf, queue, run_list )
     {
-        d_inf = list_entry(list, struct at_dom_info, run_list);
         d = d_inf->owner;
         printk("%3d: %d has=%c ", loop++, d->id, 
-                                    test_bit(DF_RUNNING, &d->flags) ? 'T':'F');
+               test_bit(DF_RUNNING, &d->flags) ? 'T':'F');
         at_dump_runq_el(d);
         printk("c=0x%X%08X\n", (u32)(d->cpu_time>>32), (u32)d->cpu_time);
         printk("         l: %lx n: %lx  p: %lx\n",
-                        (unsigned long)list, (unsigned long)list->next,
-                        (unsigned long)list->prev);
+               (unsigned long)&d_inf->run_list,
+               (unsigned long)d_inf->run_list.next,
+               (unsigned long)d_inf->run_list.prev);
     }
 
 
     queue = WAITQ(cpu);
     printk("\nWAITQUEUE rq %lx   n: %lx, p: %lx\n",  (unsigned long)queue,
-    (unsigned long) queue->next, (unsigned long) queue->prev);
+           (unsigned long) queue->next, (unsigned long) queue->prev);
 
-    list_for_each ( list, queue )
+    list_for_each_entry ( d_inf, queue, waitq )
     {
-        d_inf = list_entry(list, struct at_dom_info, waitq);
         d = d_inf->owner;
         printk("%3d: %d has=%c ", loop++, d->id, 
-                                    test_bit(DF_RUNNING, &d->flags) ? 'T':'F');
+               test_bit(DF_RUNNING, &d->flags) ? 'T':'F');
         at_dump_runq_el(d);
         printk("c=0x%X%08X\n", (u32)(d->cpu_time>>32), (u32)d->cpu_time);
         printk("         l: %lx n: %lx  p: %lx\n",
-                        (unsigned long)list, (unsigned long)list->next,
-                        (unsigned long)list->prev);
+               (unsigned long)&d_inf->waitq,
+               (unsigned long)d_inf->waitq.next,
+               (unsigned long)d_inf->waitq.prev);
     }
        
 }

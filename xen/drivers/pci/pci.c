@@ -1565,15 +1565,15 @@ static int pci_pm_resume_device(struct pci_dev *dev)
 
 static int pci_pm_save_state_bus(struct pci_bus *bus, u32 state)
 {
-	struct list_head *list;
+	struct pci_bus *i;
 	int error = 0;
 
-	list_for_each(list, &bus->children) {
-		error = pci_pm_save_state_bus(pci_bus_b(list),state);
+	list_for_each_entry(i, &bus->children, node) {
+		error = pci_pm_save_state_bus(i, state);
 		if (error) return error;
 	}
-	list_for_each(list, &bus->devices) {
-		error = pci_pm_save_state_device(pci_dev_b(list),state);
+	list_for_each_entry(i, &bus->devices, node) {
+		error = pci_pm_save_state_device(i, state);
 		if (error) return error;
 	}
 	return 0;
@@ -1581,40 +1581,38 @@ static int pci_pm_save_state_bus(struct pci_bus *bus, u32 state)
 
 static int pci_pm_suspend_bus(struct pci_bus *bus, u32 state)
 {
-	struct list_head *list;
+	struct pci_bus *i;
 
 	/* Walk the bus children list */
-	list_for_each(list, &bus->children) 
-		pci_pm_suspend_bus(pci_bus_b(list),state);
+	list_for_each_entry(i, &bus->children, node) 
+		pci_pm_suspend_bus(i, state);
 
 	/* Walk the device children list */
-	list_for_each(list, &bus->devices)
-		pci_pm_suspend_device(pci_dev_b(list),state);
+	list_for_each_entry(i, &bus->devices, node)
+		pci_pm_suspend_device(i, state);
 	return 0;
 }
 
 static int pci_pm_resume_bus(struct pci_bus *bus)
 {
-	struct list_head *list;
+	struct pci_bus *i;
 
 	/* Walk the device children list */
-	list_for_each(list, &bus->devices)
-		pci_pm_resume_device(pci_dev_b(list));
+	list_for_each_entry(i, &bus->devices, node)
+		pci_pm_resume_device(i);
 
 	/* And then walk the bus children */
-	list_for_each(list, &bus->children)
-		pci_pm_resume_bus(pci_bus_b(list));
+	list_for_each_entry(i, &bus->children, node)
+		pci_pm_resume_bus(i);
 	return 0;
 }
 
 static int pci_pm_save_state(u32 state)
 {
-	struct list_head *list;
 	struct pci_bus *bus;
 	int error = 0;
 
-	list_for_each(list, &pci_root_buses) {
-		bus = pci_bus_b(list);
+	list_for_each_entry(bus, &pci_root_buses, node) {
 		error = pci_pm_save_state_bus(bus,state);
 		if (!error)
 			error = pci_pm_save_state_device(bus->self,state);
@@ -1624,11 +1622,9 @@ static int pci_pm_save_state(u32 state)
 
 static int pci_pm_suspend(u32 state)
 {
-	struct list_head *list;
 	struct pci_bus *bus;
 
-	list_for_each(list, &pci_root_buses) {
-		bus = pci_bus_b(list);
+	list_for_each_entry(bus, &pci_root_buses, node) {
 		pci_pm_suspend_bus(bus,state);
 		pci_pm_suspend_device(bus->self,state);
 	}
@@ -1637,11 +1633,9 @@ static int pci_pm_suspend(u32 state)
 
 int pci_pm_resume(void)
 {
-	struct list_head *list;
 	struct pci_bus *bus;
 
-	list_for_each(list, &pci_root_buses) {
-		bus = pci_bus_b(list);
+	list_for_each_entry(bus, &pci_root_buses, node) {
 		pci_pm_resume_device(bus->self);
 		pci_pm_resume_bus(bus);
 	}
