@@ -248,6 +248,10 @@ int arch_final_setup_guestos(struct exec_domain *d, full_execution_context_t *c)
            &c->cpu_ctxt,
            sizeof(d->thread.user_ctxt));
 
+    /* Clear IOPL for unprivileged domains. */
+    if (!IS_PRIV(d->domain))
+        d->thread.user_ctxt.eflags &= 0xffffcfff;
+
     /*
      * This is sufficient! If the descriptor DPL differs from CS RPL then we'll
      * #GP. If DS, ES, FS, GS are DPL 0 then they'll be cleared automatically.

@@ -880,7 +880,7 @@ static int __init do_boot_cpu(int apicid)
 	ctxt.cpu_ctxt.cs = __KERNEL_CS;
 	ctxt.cpu_ctxt.eip = start_eip;
 	ctxt.cpu_ctxt.esp = idle->thread.esp;
-	ctxt.cpu_ctxt.eflags = (1<<9) | (1<<2);
+	ctxt.cpu_ctxt.eflags = (1<<9) | (1<<2) | (idle->thread.io_pl<<12);
 
 	/* FPU is set up to default initial state. */
 	memset(ctxt.fpu_ctxt, 0, sizeof(ctxt.fpu_ctxt));
