@@ -703,10 +703,14 @@ class XendDomainInfo:
             return
         memory = self.memory
         name = self.name
-        cpu = int(sxp.child_value(self.config, 'cpu', '-1'))
+        try:
+            cpu = int(sxp.child_value(self.config, 'cpu', '-1'))
+        except:
+            raise VmError('invalid cpu')
         cpu_weight = self.cpu_weight
         dom = self.dom or 0
-        dom = xc.domain_create(dom= dom, mem_kb= memory * 1024, name= name, cpu= cpu, cpu_weight= cpu_weight)
+        dom = xc.domain_create(dom= dom, mem_kb= memory * 1024,
+                               name= name, cpu= cpu, cpu_weight= cpu_weight)
         if dom <= 0:
             raise VmError('Creating domain failed: name=%s memory=%d'
                           % (name, memory))
