@@ -32,13 +32,12 @@ install: $(TARGET).gz
 dist: $(TARGET)
 	$(MAKE) prefix=`pwd`/../dist/install dist=yes install
 
-clean:
-	$(MAKE) -C tools clean
-	$(MAKE) -C common clean
-	$(MAKE) -C drivers clean
-	$(MAKE) -C arch/$(TARGET_ARCH) clean
+clean: tools.clean common.clean drivers.clean arch/$(TARGET_ARCH).clean
 	rm -f include/asm *.o $(TARGET)* *~ core include/xen/compile.h
 	rm -f include/asm-*/asm-offsets.h
+
+tools.clean common.clean drivers.clean arch/$(TARGET_ARCH).clean : %.clean:
+	$(MAKE) -C $* clean
 
 $(TARGET): delete-unfresh-files
 	[ -e include/asm ] || ln -sf asm-$(TARGET_ARCH) include/asm
