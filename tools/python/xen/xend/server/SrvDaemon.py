@@ -374,6 +374,7 @@ class EventProtocol(protocol.Protocol):
         id = sxp.child_value(req, 'id')
         if not id:
             raise XendError('Missing console id')
+        id = int(id)
         self.daemon.console_disconnect(id)
         return ['ok']
 
@@ -652,17 +653,17 @@ class Daemon:
         return self.channelF.getDomChannel(dom)
 
     def blkif_create(self, dom, recreate=0):
-        """Create a block device interface controller.
+        """Create or get a block device interface controller.
         
         Returns controller
         """
-        return self.blkifCF.createInstance(dom, recreate=recreate)
+        return self.blkifCF.getController(dom)
 
     def blkifs(self):
-        return [ x.sxpr() for x in self.blkifCF.getInstances() ]
+        return [ x.sxpr() for x in self.blkifCF.getControllers() ]
 
     def blkif_get(self, dom):
-        return self.blkifCF.getInstanceByDom(dom)
+        return self.blkifCF.getControllerByDom(dom)
 
     def blkif_dev(self, dom, vdev):
         return self.blkifCF.getDomainDevice(dom, vdev)
@@ -672,29 +673,29 @@ class Daemon:
         
         Returns Deferred
         """
-        ctrl = self.blkifCF.getInstanceByDom(dom)
+        ctrl = self.blkifCF.getControllerByDom(dom)
         if not ctrl:
             raise XendError('No blkif controller: %d' % dom)
         d = ctrl.attachDevice(config, vdev, mode, segment, recreate=recreate)
         return d
 
     def netif_create(self, dom, recreate=0):
-        """Create a network interface controller.
+        """Create or get a network interface controller.
         
         """
-        return self.netifCF.createInstance(dom, recreate=recreate)
+        return self.netifCF.getController(dom)
 
     def netifs(self):
-        return [ x.sxpr() for x in self.netifCF.getInstances() ]
+        return [ x.sxpr() for x in self.netifCF.getControllers() ]
 
     def netif_get(self, dom):
-        return self.netifCF.getInstanceByDom(dom)
+        return self.netifCF.getControllerByDom(dom)
 
     def netif_dev_create(self, dom, vif, config, recreate=0):
         """Create a network device.
 
         """
-        ctrl = self.netifCF.getInstanceByDom(dom)
+        ctrl = self.netifCF.getControllerByDom(dom)
         if not ctrl:
             raise XendError('No netif controller: %d' % dom)
         d = ctrl.attachDevice(vif, config, recreate=recreate)
@@ -706,22 +707,22 @@ class Daemon:
     def console_create(self, dom, console_port=None):
         """Create a console for a domain.
         """
-        console = self.consoleCF.getInstanceByDom(dom)
+        console = self.consoleCF.getControllerByDom(dom)
         if console is None:
-            console = self.consoleCF.createInstance(dom, console_port)
+            console = self.consoleCF.createController(dom, console_port)
         return console
 
     def consoles(self):
-        return [ c.sxpr() for c in self.consoleCF.getInstances() ]
+        return [ c.sxpr() for c in self.consoleCF.getControllers() ]
 
     def get_consoles(self):
-        return self.consoleCF.getInstances()
+        return self.consoleCF.getControllers()
 
     def get_console(self, id):
-        return self.consoleCF.getInstance(id)
+        return self.consoleCF.getControllerByIndex(id)
 
     def get_domain_console(self, dom):
-        return self.consoleCF.getInstanceByDom(dom)
+        return self.consoleCF.getControllerByDom(dom)
 
     def console_disconnect(self, id):
         """Disconnect any connected console client.
@@ -734,9 +735,10 @@ class Daemon:
     def domain_shutdown(self, dom, reason):
         """Shutdown a domain.
         """
-        ctrl = self.domainCF.getInstanceByDom(dom)
+        dom = int(dom)
+        ctrl = self.domainCF.getController(dom)
         if not ctrl:
-            raise XendError('No domain controller: %d' % dom)
+            raise XendError('No domain controller: %s' % dom)
         ctrl.shutdown(reason)
         return 0
         
