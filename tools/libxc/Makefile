@@ -52,7 +52,7 @@ check-for-zlib:
 	fi
 
 mk-symlinks:
-	ln -sf $(XEN_HYPERVISOR_IFS) xen
+	[ -e xen ] || ln -sf $(XEN_HYPERVISOR_IFS) xen
 
 install: all
 	mkdir -p $(prefix)/usr/lib
