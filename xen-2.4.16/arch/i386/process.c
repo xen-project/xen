@@ -12,8 +12,6 @@
  */
 
 #define __KERNEL_SYSCALLS__
-#include <stdarg.h>
-
 #include <xeno/config.h>
 #include <xeno/lib.h>
 #include <xeno/errno.h>

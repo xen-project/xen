@@ -38,6 +38,7 @@
 #include <linux/config.h>
 
 struct divert_blk;
+struct vlan_group;
 
 #define HAVE_ALLOC_NETDEV		/* feature macro: alloc_xxxdev
 					   functions are available. */
@@ -311,6 +312,12 @@ struct net_device
 	void                    *ip6_ptr;       /* IPv6 specific data */
 	void			*ec_ptr;	/* Econet specific data	*/
 
+						/* IAP: add fields but
+						nothing else */		
+	struct list_head        poll_list;      /* Link to poll list    */
+	int                     quota;
+	int                     weight;
+
 	struct Qdisc		*qdisc;
 	struct Qdisc		*qdisc_sleeping;
 	struct Qdisc		*qdisc_list;
@@ -339,6 +346,10 @@ struct net_device
 #define NETIF_F_DYNALLOC	16	/* Self-dectructable device. */
 #define NETIF_F_HIGHDMA		32	/* Can DMA to high memory. */
 #define NETIF_F_FRAGLIST	64	/* Scatter/gather IO. */
+#define NETIF_F_HW_VLAN_TX      128     /* Transmit VLAN hw acceleration */
+#define NETIF_F_HW_VLAN_RX      256     /* Receive VLAN hw acceleration */
+#define NETIF_F_HW_VLAN_FILTER  512     /* Receive filtering on VLAN */
+#define NETIF_F_VLAN_CHALLENGED 1024    /* Device cannot handle VLAN packets */
 
 	/* Called after device is detached from network. */
 	void			(*uninit)(struct net_device *dev);
@@ -350,6 +361,7 @@ struct net_device
 	int			(*stop)(struct net_device *dev);
 	int			(*hard_start_xmit) (struct sk_buff *skb,
 						    struct net_device *dev);
+	int                     (*poll) (struct net_device *dev, int *quota); /* XXX IAP */
 	int			(*hard_header) (struct sk_buff *skb,
 						struct net_device *dev,
 						unsigned short type,
@@ -379,6 +391,13 @@ struct net_device
 
 #define HAVE_TX_TIMEOUT
 	void			(*tx_timeout) (struct net_device *dev);
+
+        void                    (*vlan_rx_register)(struct net_device *dev,
+                                                    struct vlan_group *grp);
+        void                    (*vlan_rx_add_vid)(struct net_device *dev,
+                                                   unsigned short vid);
+        void                    (*vlan_rx_kill_vid)(struct net_device *dev,
+                                                    unsigned short vid);
 
 	int			(*hard_header_parse)(struct sk_buff *skb,
 						     unsigned char *haddr);
