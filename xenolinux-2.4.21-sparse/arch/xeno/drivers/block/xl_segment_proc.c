@@ -7,16 +7,69 @@
 #include "xl_block.h"
 #include <linux/proc_fs.h>
 #include <linux/delay.h>
+#include <linux/seq_file.h>
 
 static struct proc_dir_entry *vhd;
 
 extern unsigned short xldev_to_physdev(kdev_t xldev);
 
-static int proc_read_vhd(char *page, char **start, off_t off,
-			 int count, int *eof, void *data)
+static void *proc_vhd_next(struct seq_file *s, void *v, loff_t *pos)
 {
+    xen_disk_info_t *data;
+
+    if ( pos != NULL )
+        ++(*pos); 
+
+    data = v;
+    return data->count-- ? NULL : v;
+}
+
+static void *proc_vhd_start(struct seq_file *s, loff_t *ppos)
+{
+    loff_t pos = *ppos;
+    xen_disk_info_t *data;
+
+    data = kmalloc(sizeof(*data), GFP_KERNEL);
+    xenolinux_control_msg(XEN_BLOCK_PROBE_SEG_ALL, (char *)data, sizeof(*data));
+    data->count -= pos;
+
+    if (data->count > 0)
+	return data;
+
+    kfree(data);
+    return NULL;
+}
+
+static int proc_vhd_show(struct seq_file *s, void *v)
+{ 
+    xen_disk_info_t *data = v;
+
+    seq_printf (s,
+		"%4x %4x %lx\n",
+		data->disks[data->count - 1].device,
+		data->disks[data->count - 1].type,
+		data->disks[data->count - 1].capacity);
+
     return 0;
 }
+
+static void proc_vhd_stop(struct seq_file *s, void *v)
+{
+  kfree(v);
+}
+
+static struct seq_operations proc_vhd_op = {
+    .start         = proc_vhd_start,
+    .next          = proc_vhd_next,
+    .show          = proc_vhd_show,
+    .stop          = proc_vhd_stop
+};
+
+static int proc_open_vhd(struct inode *inode, struct file *file)
+{
+    return seq_open(file, &proc_vhd_op);
+}
+
 
 #define isdelim(c) \
   (c==' '||c==','||c=='\n'||c=='\r'||c=='\t'||c==':'||c=='('||c==')' ? 1 : 0)
@@ -72,7 +125,7 @@ unsigned long to_number(char *string)                                /* atoi */
 }
 
 static int proc_write_vhd(struct file *file, const char *buffer,
-			  unsigned long count, void *data)
+			  size_t count, loff_t *offp)
 {
     char *local = kmalloc((count + 1) * sizeof(char), GFP_KERNEL);
     char *string;
@@ -226,6 +279,14 @@ static int proc_write_vhd(struct file *file, const char *buffer,
     return res;
 }
 
+static struct file_operations proc_vhd_operations = {
+    open:         proc_open_vhd,
+    read:         seq_read,
+    llseek:       seq_lseek,
+    release:      seq_release,
+    write:        proc_write_vhd
+};
+
 /******************************************************************/
 
 int __init xlseg_proc_init(void)
@@ -236,8 +297,7 @@ int __init xlseg_proc_init(void)
         panic ("xlseg_init: unable to create vhd proc entry\n");
     }
     vhd->data       = NULL;
-    vhd->read_proc  = proc_read_vhd;
-    vhd->write_proc = proc_write_vhd;
+    vhd->proc_fops  = &proc_vhd_operations;
     vhd->owner      = THIS_MODULE;
 
     printk(KERN_ALERT "XenoLinux Virtual Disk Device Monitor installed\n");

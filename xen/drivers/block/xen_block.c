@@ -102,6 +102,7 @@ static int do_block_io_op_domain(struct task_struct *p, int max_to_do);
 static void dispatch_rw_block_io(struct task_struct *p, int index);
 static void dispatch_probe_blk(struct task_struct *p, int index);
 static void dispatch_probe_seg(struct task_struct *p, int index);
+static void dispatch_probe_seg_all(struct task_struct *p, int index);
 static void dispatch_debug_block_io(struct task_struct *p, int index);
 static void dispatch_create_segment(struct task_struct *p, int index);
 static void dispatch_delete_segment(struct task_struct *p, int index);
@@ -387,6 +388,10 @@ static int do_block_io_op_domain(struct task_struct *p, int max_to_do)
 	    dispatch_probe_seg(p, i);
 	    break;
 
+	case XEN_BLOCK_PROBE_SEG_ALL:
+	    dispatch_probe_seg_all(p, i);
+	    break;
+
 	case XEN_BLOCK_DEBUG:
 	    dispatch_debug_block_io(p, i);
 	    break;
@@ -566,7 +571,10 @@ static void dispatch_probe_blk(struct task_struct *p, int index)
     make_response(p, blk_ring->ring[index].req.id, XEN_BLOCK_PROBE_BLK, rc);
 }
 
-static void dispatch_probe_seg(struct task_struct *p, int index)
+static void dispatch_probe_seg_common(struct task_struct *p,
+				      struct task_struct *target,
+				      int type,
+				      int index)
 {
     extern void xen_segment_probe(struct task_struct *, xen_disk_info_t *);
 
@@ -589,12 +597,22 @@ static void dispatch_probe_seg(struct task_struct *p, int index)
     spin_unlock_irqrestore(&p->page_lock, flags);
 
     xdi = phys_to_virt(buffer);
-    xen_segment_probe(p, xdi);
+    xen_segment_probe(target, xdi);
 
     unlock_buffer(p, buffer, sizeof(xen_disk_info_t), 1);
 
  out:
-    make_response(p, blk_ring->ring[index].req.id, XEN_BLOCK_PROBE_SEG, rc);
+    make_response(p, blk_ring->ring[index].req.id, type, rc);
+}
+
+static void dispatch_probe_seg(struct task_struct *p, int index)
+{
+    dispatch_probe_seg_common(p, p, XEN_BLOCK_PROBE_SEG, index);
+}
+
+static void dispatch_probe_seg_all(struct task_struct *p, int index)
+{
+    dispatch_probe_seg_common(p, NULL, XEN_BLOCK_PROBE_SEG_ALL, index);
 }
 
 static void dispatch_rw_block_io(struct task_struct *p, int index)

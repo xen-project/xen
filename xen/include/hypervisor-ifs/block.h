@@ -50,6 +50,8 @@
 #define XEN_BLOCK_PHYSDEV_GRANT 10 /* grant access to range of disk blocks */
 #define XEN_BLOCK_PHYSDEV_PROBE 11 /* probe for a domain's physdev
 				      accesses */
+#define XEN_BLOCK_PROBE_SEG_ALL 12 /* prove for every domain's segments,
+				      not just ours. */
 
 /* NB. Ring size must be small enough for sizeof(blk_ring_t) <= PAGE_SIZE. */
 #define BLK_RING_SIZE        64

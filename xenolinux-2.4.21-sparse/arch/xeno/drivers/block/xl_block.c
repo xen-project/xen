@@ -311,6 +311,7 @@ static int hypervisor_request(unsigned long   id,
     case XEN_BLOCK_PHYSDEV_PROBE:
     case XEN_BLOCK_PROBE_BLK:
     case XEN_BLOCK_PROBE_SEG:
+    case XEN_BLOCK_PROBE_SEG_ALL:
         if ( RING_FULL ) return 1;
 	phys_device = (kdev_t) 0;
 	sector_number = 0;
@@ -479,6 +480,7 @@ static void xlblk_response_int(int irq, void *dev_id, struct pt_regs *ptregs)
         case XEN_BLOCK_SEG_CREATE:
         case XEN_BLOCK_SEG_DELETE:
         case XEN_BLOCK_PROBE_SEG:
+	case XEN_BLOCK_PROBE_SEG_ALL:
         case XEN_BLOCK_PROBE_BLK:
 	case XEN_BLOCK_PHYSDEV_GRANT:
 	case XEN_BLOCK_PHYSDEV_PROBE:

@@ -162,7 +162,7 @@ void xen_segment_probe(struct task_struct *p, xen_disk_info_t *raw_xdi)
     for ( loop = 0; loop < XEN_MAX_SEGMENTS; loop++ )
     {
         if ( (xsegments[loop].mode == XEN_SEGMENT_UNUSED) ||
-             (xsegments[loop].domain != p->domain) )
+             (p && xsegments[loop].domain != p->domain) )
             continue;
 
         device = MK_VIRTUAL_XENDEV(xsegments[loop].segment_number);
