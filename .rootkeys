@@ -314,7 +314,9 @@
 405ff55dawQyCHFEnJ067ChPRoXBBA tools/examples/init.d/xend
 40278d94cIUWl2eRgnwZtr4hTyWT1Q tools/examples/init.d/xendomains
 40ee75a9xFz6S05sDKu-JCLqyVTkDA tools/examples/network
+41e661e1giIEKbJ25qfiP-ke8u8hFA tools/examples/network-route
 40ee75a967sxgcRY4Q7zXoVUaJ4flA tools/examples/vif-bridge
+41e661e1ooiRKlOfwumG6wwzc0PdhQ tools/examples/vif-route
 40ee75a93cqxHp6MiYXxxwR5j2_8QQ tools/examples/xend-config.sxp
 41090ec8Pj_bkgCBpg2W7WfmNkumEA tools/examples/xmexample1
 40cf2937oKlROYOJTN8GWwWM5AmjBg tools/examples/xmexample2

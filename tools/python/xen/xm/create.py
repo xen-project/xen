@@ -283,14 +283,18 @@ def configure_vifs(config_devs, vals):
         if idx < len(vifs):
             d = vifs[idx]
             mac = d.get('mac')
+            if not mac:
+                mac = randomMAC()
             bridge = d.get('bridge')
             script = d.get('script')
             backend = d.get('backend')
+            ip = d.get('ip')
         else:
             mac = randomMAC()
             bridge = None
             script = None
             backend = None
+            ip = None
         config_vif = ['vif']
         config_vif.append(['mac', mac])
         if bridge:
@@ -299,6 +303,8 @@ def configure_vifs(config_devs, vals):
             config_vif.append(['script', script])
         if backend:
             config_vif.append(['backend', backend])
+        if ip:
+            config_vif.append(['ip', ip])
         config_devs.append(['device', config_vif])
 
 def configure_vfr(config, vals):
@@ -377,7 +383,7 @@ def preprocess_vifs(opts, vals):
             (k, v) = b.strip().split('=', 1)
             k = k.strip()
             v = v.strip()
-            if k not in ['mac', 'bridge', 'script', 'backend']:
+            if k not in ['mac', 'bridge', 'script', 'backend', 'ip']:
                 opts.err('Invalid vif specifier: ' + vif)
             d[k] = v
         vifs.append(d)
