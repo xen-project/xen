@@ -31,7 +31,9 @@
 3f05631dMY7PMkwSY7zBFelGJ8goVg tools/control/src/org/xenoserver/cmdline/ParsePhysicalList.java
 3f05631dYDFXv6mwNFAgz3ta9kShJA tools/control/src/org/xenoserver/cmdline/ParsePhysicalRevoke.java
 3f098761TRsbDk9woUM846Q6_F7EmA tools/control/src/org/xenoserver/cmdline/ParseVdCreate.java
+3f099009pmH9MFkRYwP2V1DfsqEwdg tools/control/src/org/xenoserver/cmdline/ParseVdDelete.java
 3f098761zh9WTV6LpRqcet3gqlXdtg tools/control/src/org/xenoserver/cmdline/ParseVdFree.java
+3f099009lDK_5xXO4gPyPpCTUhgnCA tools/control/src/org/xenoserver/cmdline/ParseVdRefresh.java
 3f098761vY4hzt_QKskmvMcibN0zYQ tools/control/src/org/xenoserver/cmdline/ParseVdShow.java
 3f042c35V-Bf3dlIe1r5mZs8ZTPSvA tools/control/src/org/xenoserver/control/Command.java
 3f042c35U_4O2eovLKUgo2avPPHKUw tools/control/src/org/xenoserver/control/CommandDomainDestroy.java
@@ -45,6 +47,8 @@
 3f05631e_G6wzHhEnpihX0pIkEsbMw tools/control/src/org/xenoserver/control/CommandPhysicalList.java
 3f05631eGWxq7bojQbMa-tGxsENIhw tools/control/src/org/xenoserver/control/CommandPhysicalRevoke.java
 3f098761c5-idlmf9vWEMOlDw0VCHg tools/control/src/org/xenoserver/control/CommandVdCreate.java
+3f0990096KcyQw77qJmjTu941smS8A tools/control/src/org/xenoserver/control/CommandVdDelete.java
+3f0990093VJUL7QjxGigR5GPXf_Fkw tools/control/src/org/xenoserver/control/CommandVdRefresh.java
 3eb781fdBRXfSlWzK6GXlIQIlHFoaQ tools/control/src/org/xenoserver/control/Defaults.java
 3ec41f7cQ7Ug739JBDrsVH-7KJ5MvQ tools/control/src/org/xenoserver/control/Domain.java
 3ec41f7cAzdBu0lkuTTQx92rqSM9Qw tools/control/src/org/xenoserver/control/Extent.java

@@ -25,6 +25,8 @@ public class Main {
     };
   static final CommandParser vdcommands[] =
     { new ParseVdCreate(),
+      new ParseVdDelete(),
+      new ParseVdRefresh(),
       new ParseVdShow(),
       new ParseVdFree()
     };
