@@ -495,7 +495,7 @@ static void net_tx_action(unsigned long unused)
 
         pending_idx = pending_ring[MASK_PEND_IDX(pending_cons)];
 
-        if ( unlikely((skb = alloc_skb(PKT_PROT_LEN, GFP_ATOMIC)) == NULL) )
+        if ( unlikely((skb = dev_alloc_skb(PKT_PROT_LEN)) == NULL) )
         {
             DPRINTK("Can't allocate a skb in start_xmit.\n");
             make_tx_response(netif, txreq.id, NETIF_RSP_ERROR);
