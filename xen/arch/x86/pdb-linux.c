@@ -99,22 +99,22 @@ pdb_linux_syscall_exit_bkpt (struct pt_regs *regs, struct pdb_context *pdb_ctx)
 
     /* set a breakpoint when we exit */
     {
-        pdb_bwcpoint_p bwc = (pdb_bwcpoint_p) xmalloc(sizeof(pdb_bwcpoint_t));
+        pdb_bwcpoint_p bwc;
+
+	bwc = (pdb_bwcpoint_p) xmalloc(sizeof(pdb_bwcpoint_t));
+	if (!bwc)
+	{
+	    printk ("pdb error: can't allocate bwc %d\n", __LINE__);
+	}
 
 	bwc->address = pdb_system_call_next_addr;
 	bwc->length = 1;
 	bwc->type = PDB_BP_SOFTWARE;
 	bwc->user_type = PDB_BP_SOFTWARE;
-	bwc->original = pdb_system_call_leave_instr;
+	bwc->action = PDB_BWC_DELETE;
+	bwc->comments = "pdb linux syscall exit";
 	memcpy (&bwc->context, pdb_ctx, sizeof(pdb_context_t));
 
-	/* this is always in a process context */
-	pdb_read_memory (pdb_system_call_next_addr, 1, 
-			 &pdb_system_call_leave_instr,
-			 (pdb_context_p) pdb_ctx);
-	pdb_write_memory (pdb_system_call_next_addr, pdb_x86_bkpt_length,
-			  &pdb_x86_bkpt, (pdb_context_p) pdb_ctx);
-
-	pdb_bwc_list_add (bwc);
+	pdb_set_breakpoint(bwc);
     }
 }
