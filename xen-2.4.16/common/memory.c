@@ -658,6 +658,8 @@ int do_process_page_updates(page_update_request_t *updates, int count)
 
         if ( err )
         {
+			printk(KERN_ALERT "bd240 debug: unchecked %d\n", cur.ptr & (sizeof(l1_pgentry_t) -1));
+			printk(KERN_ALERT "bd240 debug: update: ptr %lx, val %lx\n", cur.ptr, cur.val);
             kill_domain_with_errmsg("Illegal page update request");
         }
 
