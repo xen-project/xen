@@ -110,11 +110,12 @@ struct task_struct {
     unsigned long mcu_advance;      /* inverse of weight */
     s32  avt;                       /* actual virtual time */
     s32  evt;                       /* effective virtual time */
+    int  warpback;                  /* warp?  */
     long warp;                      /* virtual time warp */
     long warpl;                     /* warp limit */
     long warpu;                     /* unwarp time requirement */
-    long warped;                    /* time it ran warped last time */
-    long uwarped;                   /* time it ran unwarped last time */
+    s_time_t warped;                /* time it ran warped last time */
+    s_time_t uwarped;               /* time it ran unwarped last time */
 
     /* Network I/O */
     net_vif_t *net_vif_list[MAX_DOMAIN_VIFS];
