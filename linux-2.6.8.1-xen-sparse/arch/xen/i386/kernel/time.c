@@ -364,7 +364,6 @@ static inline void do_timer_interrupt(int irq, void *dev_id,
 					struct pt_regs *regs)
 {
 	s64 delta;
-	unsigned int ticks = 0;
 	long sec_diff;
 
 	__get_time_values_from_xen();
@@ -379,14 +378,9 @@ static inline void do_timer_interrupt(int irq, void *dev_id,
 
 	/* Process elapsed jiffies since last call. */
 	while (delta >= NS_PER_TICK) {
-		ticks++;
 		delta -= NS_PER_TICK;
 		processed_system_time += NS_PER_TICK;
-	}
-
-	if (ticks != 0) {
-		jiffies_64 += ticks - 1;
-		do_timer_interrupt_hook(regs); /* implicit 'jiffies_64++' */
+		do_timer_interrupt_hook(regs);
 	}
 
 	/*
