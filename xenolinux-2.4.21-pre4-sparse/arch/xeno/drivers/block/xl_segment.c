@@ -13,7 +13,6 @@
 /* Copied from linux/ide.h */
 typedef unsigned char byte; 
 
-/* We support up to 16 devices of up to 16 partitions each. */
 #define XLVIRT_MAX        256
 #define XLVIRT_MAJOR_NAME "xvd"
 static int xlseg_blksize_size[XLVIRT_MAX];
@@ -119,8 +118,8 @@ int __init xlseg_init(void)
     {
         disk = xdi->disks[i].device & XENDEV_IDX_MASK;
 
-        /* We can use the first 16 IDE devices. */
-        if ( !IS_VIRTUAL_XENDEV(xdi->disks[i].device) || (disk >= 16) )
+        if ( !IS_VIRTUAL_XENDEV(xdi->disks[i].device) || 
+             (disk >= XLVIRT_DEVS_PER_MAJOR) )
             continue;
 
         ((xl_disk_t *)gd->real_devices)[disk].capacity =

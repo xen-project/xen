@@ -2,7 +2,6 @@
  * xl_scsi.c
  * 
  * Xenolinux virtual SCSI block-device driver.
- * 
  */
 
 #include "xl_block.h"
@@ -10,9 +9,8 @@
 #define MAJOR_NR XLSCSI_MAJOR
 #include <linux/blk.h>
 
-/* We support up to 16 devices of up to 16 partitions each. */
 #define XLSCSI_MAX        256
-#define XLSCSI_MAJOR_NAME "xsd"
+#define XLSCSI_MAJOR_NAME "sd"
 static int xlscsi_blksize_size[XLSCSI_MAX];
 static int xlscsi_hardsect_size[XLSCSI_MAX];
 static int xlscsi_max_sectors[XLSCSI_MAX];
@@ -45,7 +43,9 @@ int xlscsi_init(xen_disk_info_t *xdi)
     units = 0;
     for ( i = 0; i < xdi->count; i++ )
         if ( IS_SCSI_XENDEV(xdi->disks[i].device) &&
-             ((xdi->disks[i].device & XENDEV_IDX_MASK) < 16) ) units++;
+             ((xdi->disks[i].device & XENDEV_IDX_MASK) <
+              XLSCSI_DEVS_PER_MAJOR) ) 
+            units++;
     if ( units == 0 ) return 0;
 
     SET_MODULE_OWNER(&xlscsi_block_fops);
@@ -110,8 +110,9 @@ int xlscsi_init(xen_disk_info_t *xdi)
     {
         disk = xdi->disks[i].device & XENDEV_IDX_MASK;
 
-        /* We can use the first 16 IDE devices. */
-        if ( !IS_SCSI_XENDEV(xdi->disks[i].device) || (disk >= 16) ) continue;
+        if ( !IS_SCSI_XENDEV(xdi->disks[i].device) || 
+             (disk >= XLSCSI_DEVS_PER_MAJOR) )
+            continue;
 
         ((xl_disk_t *)gd->real_devices)[disk].capacity =
             xdi->disks[i].capacity;
