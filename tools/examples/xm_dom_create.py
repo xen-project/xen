@@ -9,7 +9,8 @@ import socket
 import getopt
 import signal
 import syslog
-
+import xenctl.ip
+import xenctl.utils
 import xenctl.console_client
 
 from xenmgr import sxp

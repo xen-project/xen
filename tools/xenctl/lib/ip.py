@@ -10,7 +10,7 @@ def get_current_ipaddr(dev='eth0'):
     network interface (default 'eth0').
     """
     fd = os.popen( '/sbin/ifconfig ' + dev + ' 2>/dev/null' )
-    lines = readlines(fd)
+    lines = fd.readlines()
     for line in lines:
         m = re.search( '^\s+inet addr:([0-9]+\.[0-9]+\.[0-9]+\.[0-9]+).*',
                        line )
@@ -23,7 +23,7 @@ def get_current_ipmask(dev='eth0'):
     network interface (default 'eth0').
     """
     fd = os.popen( '/sbin/ifconfig ' + dev + ' 2>/dev/null' )
-    lines = readlines(fd)
+    lines = fd.readlines()
     for line in lines:
         m = re.search( '^.+Mask:([0-9]+\.[0-9]+\.[0-9]+\.[0-9]+).*',
                        line )
@@ -36,7 +36,7 @@ def get_current_ipgw(dev='eth0'):
     network interface (default 'eth0').
     """
     fd = os.popen( '/sbin/route -n' )
-    lines = readlines(fd)
+    lines = fd.readlines()
     for line in lines:
         m = re.search( '^\S+\s+([0-9]+\.[0-9]+\.[0-9]+\.[0-9]+)' +
                        '\s+\S+\s+\S*G.*' + dev + '.*', line )

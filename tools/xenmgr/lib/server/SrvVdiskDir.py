@@ -9,7 +9,7 @@ class SrvVdiskDir(SrvDir):
 
     def __init__(self):
         SrvDir.__init__(self)
-        self.xvdisk = XendVdisk.instance()
+        #self.xvdisk = XendVdisk.instance()
 
     def vdisk(self, x):
         val = None

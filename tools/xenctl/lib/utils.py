@@ -1,4 +1,4 @@
-import os, re, socket, string, sys, tempfile
+import os, re, socket, string, sys, tempfile, xenctl.ip
 
 ##### Module variables
 
@@ -28,32 +28,22 @@ except ImportError:
 
 ##### Networking-related functions
 
-def get_current_ipgw():
-    """Return a string containing the default IP gateway."""
-    fd = os.popen( '/sbin/route -n' )
-    lines = fd.readlines()
-    for line in lines:
-        m = re.search( '^0.0.0.0+\s+([0-9]+\.[0-9]+\.[0-9]+\.[0-9]+)' +
-                       '\s+0.0.0.0+\s+\S*G.*', line )
-        if m:
-            return m.group(1)
-    return None
-
+def get_current_ipaddr(dev='eth0'):
+    return xenctl.ip.get_current_ipaddr(dev)
+def get_current_ipmask(dev='eth0'):
+    return xenctl.ip.get_current_ipmask(dev)
+def get_current_ipgw(dev='eth0'):
+    return xenctl.ip.get_current_ipgw(dev)
+def setup_vfr_rules_for_vif(dom,vif,addr):
+    return xenctl.ip.setup_vfr_rules_for_vif(dom,vif,addr)
+def inet_aton(addr):
+    return xenctl.ip.inet_aton(addr)
+def inet_ntoa(n):
+    return xenctl.ip.inet_ntoa(n)
+def add_offset_to_ip(addr, offset):
+    return xenctl.ip.add_offset_to_ip(addr, offset)
 def check_subnet( ip, network, netmask ):
-    l = string.split(ip,'.')
-    n_ip = ( (string.atoi(l[0])<<24) | (string.atoi(l[1])<<16) | 
-	   (string.atoi(l[2])<<8)  | string.atoi(l[3]) ) 
-
-    l = string.split(network,'.')
-    n_net = ( (string.atoi(l[0])<<24) | (string.atoi(l[1])<<16) | 
-	   (string.atoi(l[2])<<8)  | string.atoi(l[3]) )
-
-    l = string.split(netmask,'.')
-    n_mask = ( (string.atoi(l[0])<<24) | (string.atoi(l[1])<<16) | 
-	   (string.atoi(l[2])<<8)  | string.atoi(l[3]) )
-    
-    return (n_ip&n_mask)==(n_net&n_mask)
-
+    return xenctl.ip.check_subnet( ip, network, netmask )
 
 ##### VBD-related Functions
 
