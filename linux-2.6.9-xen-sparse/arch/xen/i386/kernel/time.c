@@ -703,6 +703,8 @@ void time_resume(void)
 }
 
 #ifdef CONFIG_SMP
+#define xxprint(msg) HYPERVISOR_console_io(CONSOLEIO_write, strlen(msg), msg)
+
 static irqreturn_t local_timer_interrupt(int irq, void *dev_id,
 					 struct pt_regs *regs)
 {
