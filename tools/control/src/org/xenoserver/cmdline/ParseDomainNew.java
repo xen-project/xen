@@ -62,7 +62,7 @@ public class ParseDomainNew extends CommandParser {
             }
         }
         
-        if (usr_dev != null && (usr_dev.startsWith("/dev/sda")) || usr_dev.startsWith("/dev/hda")) {
+        if (usr_dev != null && ((usr_dev.startsWith("/dev/sda")) || usr_dev.startsWith("/dev/hda"))) {
             String real_usr = StringPattern.parse(usr_dev).resolve(c.domain_id());
             String device = real_usr.substring(real_usr.indexOf('/',1)+1);
             CommandPhysicalGrant cg = new CommandPhysicalGrant(d,c.domain_id(),device,Mode.READ_ONLY,false);

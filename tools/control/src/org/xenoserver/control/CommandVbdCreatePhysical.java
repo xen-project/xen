@@ -38,7 +38,7 @@ public class CommandVbdCreatePhysical extends Command {
      * @see org.xenoserver.control.Command#execute()
      */
     public String execute() throws CommandFailedException {
-        Partition partition = PartitionManager.IT.getPartition(partition_name);
+        Partition partition = PartitionManager.IT.getPartition(StringPattern.parse(partition_name).resolve(domain_id));
         if (partition == null) {
             throw new CommandFailedException(
                 "No partition " + partition_name + " exists");

@@ -43,7 +43,7 @@ public class CommandPhysicalGrant extends Command {
         Runtime r = Runtime.getRuntime();
         String output = null;
 
-        Partition partition = PartitionManager.IT.getPartition(partition_name);
+        Partition partition = PartitionManager.IT.getPartition(StringPattern.parse(partition_name).resolve(domain_id));
     
         if ( partition == null ) {
           throw new CommandFailedException("Partition " + partition_name + " does not exist.");
