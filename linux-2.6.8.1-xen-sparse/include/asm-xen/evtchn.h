@@ -72,8 +72,8 @@ static inline void notify_via_evtchn(int port)
  * CHARACTER-DEVICE DEFINITIONS
  */
 
-/* /dev/xen/evtchn resides at device number major=10, minor=200 */
-#define EVTCHN_MINOR 200
+/* /dev/xen/evtchn resides at device number major=10, minor=201 */
+#define EVTCHN_MINOR 201
 
 /* /dev/xen/evtchn ioctls: */
 /* EVTCHN_RESET: Clear and reinit the event buffer. Clear error condition. */

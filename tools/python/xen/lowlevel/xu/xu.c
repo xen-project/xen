@@ -15,6 +15,7 @@
 #include <sys/socket.h>
 #include <sys/mman.h>
 #include <sys/poll.h>
+#include <sys/sysmacros.h>
 #include <netinet/in.h>
 #include <fcntl.h>
 #include <unistd.h>
@@ -37,7 +38,7 @@
 /* NB. The following should be kept in sync with the kernel's evtchn driver. */
 #define EVTCHN_DEV_NAME  "/dev/xen/evtchn"
 #define EVTCHN_DEV_MAJOR 10
-#define EVTCHN_DEV_MINOR 200
+#define EVTCHN_DEV_MINOR 201
 /* /dev/xen/evtchn ioctls: */
 /* EVTCHN_RESET: Clear and reinit the event buffer. Clear error condition. */
 #define EVTCHN_RESET  _IO('E', 1)
@@ -192,11 +193,18 @@ staticforward PyTypeObject xu_notifier_type;
 static PyObject *xu_notifier_new(PyObject *self, PyObject *args)
 {
     xu_notifier_object *xun;
+    struct stat st;
 
     if ( !PyArg_ParseTuple(args, "") )
         return NULL;
 
     xun = PyObject_New(xu_notifier_object, &xu_notifier_type);
+
+    /* Make sure any existing device file links to correct device. */
+    if ( (lstat(EVTCHN_DEV_NAME, &st) != 0) ||
+         !S_ISCHR(st.st_mode) ||
+         (st.st_rdev != makedev(EVTCHN_DEV_MAJOR, EVTCHN_DEV_MINOR)) )
+        (void)unlink(EVTCHN_DEV_NAME);
 
  reopen:
     xun->evtchn_fd = open(EVTCHN_DEV_NAME, O_NONBLOCK|O_RDWR);
@@ -205,7 +213,7 @@ static PyObject *xu_notifier_new(PyObject *self, PyObject *args)
         if ( (errno == ENOENT) &&
              ((mkdir("/dev/xen", 0755) == 0) || (errno == EEXIST)) &&
              (mknod(EVTCHN_DEV_NAME, S_IFCHR|0600, 
-                    (EVTCHN_DEV_MAJOR << 8) | EVTCHN_DEV_MINOR) == 0) )
+                    makedev(EVTCHN_DEV_MAJOR,EVTCHN_DEV_MINOR)) == 0) )
             goto reopen;
         PyObject_Del((PyObject *)xun);
         return PyErr_SetFromErrno(PyExc_IOError);
