@@ -224,8 +224,7 @@ int xc_linux_restore(int xc_handle, XcIOContext *ioctxt)
 
     /* XXX create domain on CPU=-1 so that in future it auto load ballances by default */
     if ( xc_domain_create( xc_handle,  nr_pfns * (PAGE_SIZE / 1024),
-			   name,
-			   -1, 1, &dom ) )
+			   name, -1, &dom ) )
     {
 	xcio_error(ioctxt, "Could not create domain. pfns=%d, %dKB",
 		   nr_pfns,nr_pfns * (PAGE_SIZE / 1024));
