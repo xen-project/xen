@@ -42,6 +42,11 @@ int xeno_partition(struct gendisk *hd,
   for (i = 0; i < buf->n_aces; i++) {
     if ((buf->entries[i].device & 0x1f) == 0)
       continue;
+    /* Make sure the partition is actually supposed to be on this
+       disk.  This assumes that Xen and XenoLinux block device
+       numbers match up. */
+    if ((buf->entries[i].device & ~0x1f) != bdev->bd_dev)
+      continue;
     /* This is a bit of a hack - the partition numbers are specified
        by the hypervisor, and if we want them to match up, this is
        what we need to do. */
@@ -52,5 +57,6 @@ int xeno_partition(struct gendisk *hd,
 		     buf->entries[i].n_sectors);
   }
   kfree(buf);
+  printk("\n");
   return 1;
 }
