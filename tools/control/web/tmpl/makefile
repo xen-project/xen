@@ -28,7 +28,7 @@ target1 = $(target)/index.jsp $(target)/newdom.jsp $(target)/vd.jsp \
 all: $(src0) $(src1)
 	./install.pl -s -home index
 	mv *.jsp  $(target)
-	cp $(src0) $(target)
+	cp -f $(src0) $(target)
 
 clean:
 	rm -f $(target1)
