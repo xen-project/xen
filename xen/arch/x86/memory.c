@@ -1864,7 +1864,7 @@ void ptwr_status(void)
 
 void audit_domain( struct domain *d)
 {
-    int ttot=0, ctot=0;
+    int ttot=0, ctot=0, io_mappings=0, lowmem_mappings=0;
     void adjust ( struct pfn_info *page, int dir, int adjtype )
     {
         int count = page->count_info & PGC_count_mask;
@@ -2059,7 +2059,7 @@ void audit_domain( struct domain *d)
 
                     if ( l1page->u.inuse.domain != d )
                     {
-                        printk("Skip page belowing to other dom %p\n",
+                        printk("L2: Skip bizare page belowing to other dom %p\n",
                                l1page->u.inuse.domain);    
                         continue;
                     }
@@ -2128,6 +2128,18 @@ void audit_domain( struct domain *d)
                     unsigned long l1pfn = pt[i]>>PAGE_SHIFT;
                     struct pfn_info *l1page = &frame_table[l1pfn];
 
+		    if ( l1pfn < 0x100 )
+		    {
+			lowmem_mappings++;
+			continue;
+		    }
+
+		    if ( l1pfn > max_page )
+		    {
+			io_mappings++;
+			continue;
+		    }
+
                     if ( pt[i] & _PAGE_RW )
                     {
 
@@ -2144,8 +2156,13 @@ void audit_domain( struct domain *d)
 
                     if ( l1page->u.inuse.domain != d )
                     {
-                        printk("Skip page belowing to other dom %p\n",
-                               l1page->u.inuse.domain);    
+                        printk("Audit %d: [%lx,%x] Skip foreign page dom=%lx pfn=%lx c=%08x t=%08x m2p=%lx\n",
+			       d->domain, pfn, i,
+                               (unsigned long)l1page->u.inuse.domain,
+			       l1pfn,
+			       l1page->count_info,
+			       l1page->u.inuse.type_info,
+			       machine_to_phys_mapping[l1pfn]);    
                         continue;
                     }
 
@@ -2156,12 +2173,14 @@ void audit_domain( struct domain *d)
             unmap_domain_mem(pt);
 
             break;
-        }
-        
-
+        }       
 
         list_ent = frame_table[pfn].list.next;
     }
+
+    if ( io_mappings>0 || lowmem_mappings>0 )
+	printk("Audit %d: Found %d lowmem mappings and %d io mappings\n",
+	       d->domain, lowmem_mappings, io_mappings);
 
     /* phase 2 */
 
@@ -2252,8 +2271,11 @@ void audit_domain( struct domain *d)
                     unsigned long l1pfn = pt[i]>>PAGE_SHIFT;
                     struct pfn_info *l1page = &frame_table[l1pfn];
 
-                    if ( l1page->u.inuse.domain == d)
-                        adjust( l1page, 1, 0 );
+                    if ( l1page->u.inuse.domain != d) continue;
+		    if ( l1pfn < 0x100 ) continue;
+		    if ( l1pfn > max_page ) continue;
+
+		    adjust( l1page, 1, 0 );
 #endif
                 }
             }
@@ -2286,8 +2308,7 @@ void audit_domains(void)
 
     for_each_domain ( d )
     {
-        if ( d->domain > 0 )
-            audit_domain(d);
+	audit_domain(d);
     }
 }
 
