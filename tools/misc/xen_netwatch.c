@@ -1,7 +1,13 @@
 /******************************************************************************
- * netwatch.c
+ * xen_netwatch.c
  * 
- * Watch for network interfaces needing frobbing.
+ * Watch for network interfaces changing state (IFF_UP), and call a standard
+ * script '/etc/xen/netwatch <ifname> up|down'. Logging from the netwatch
+ * daemon is written to '/var/xen/netwatch' -- other programs can therefore
+ * watch that file to take action on interface state changes.
+ * 
+ * Note that, apart from the names of the default action script and log file,
+ * this program is not actually Xen-dependent.
  * 
  * Copyright (c) 2003, K A Fraser
  */
@@ -23,6 +29,9 @@
 #include <stdio.h>
 #include <unistd.h>
 #include <time.h>
+
+#define DEFAULT_SCRIPT  "/var/xen/netwatch"
+#define DEFAULT_LOGFILE "/etc/xen/netwatch"
 
 #define LOG(_f, _a...)                                  \
     do {                                                \
@@ -56,11 +65,10 @@ void handle_child_death(int dummy)
 
 int main(int argc, char **argv)
 {
-    char *logfile = "/var/xen/netwatch";
-    char *scriptfile = "/etc/xen/netwatch";
+    char *logfile = DEFAULT_LOGFILE;
+    char *scriptfile = DEFAULT_SCRIPT;
     FILE *logfd;
-    int nlfd, unixfd, bytes;
-    int last_index = ~0;
+    int i, nlfd, unixfd, bytes, last_index = ~0;
     unsigned int last_flags = ~0;
     char buffer[8192];
     struct sockaddr_nl nladdr;
@@ -68,6 +76,25 @@ int main(int argc, char **argv)
     struct ifinfomsg *ifi;
     struct ifreq ifr;
     struct sigaction sigchld;
+
+    for ( i = 1; i < argc; i++ )
+    {
+        if ( strncmp("-s", argv[i], 2) == 0 )
+        {
+            scriptfile = argv[i] + 2;
+        }
+        else if ( strncmp("-l", argv[i], 2) == 0 )
+        {
+            logfile = argv[i] + 2;
+        }
+        else
+        {
+            printf("Usage: %s [-s<script>] [-l<logfile>]\n", argv[0]);
+            printf("Default script:   %s\n", scriptfile);
+            printf("Default log file: %s\n", logfile);
+            return 0;
+        }
+    }
 
     /* Ensure that zombie children are reaped. */
     memset(&sigchld, 0, sizeof(sigchld));
@@ -145,7 +172,10 @@ int main(int argc, char **argv)
               !(nlmsg->nlmsg_flags & NLMSG_DONE);
               nlmsg = NLMSG_NEXT(nlmsg, bytes) )
         {
-            /* This termination condition works. NLMSG_DONE doesn't always. */
+            /*
+             * This termination condition works. NLMSG_DONE doesn't always.
+             * This therefore works around a Linux bug.
+             */
             if ( nlmsg->nlmsg_len == 0 )
                 break;
 
@@ -161,7 +191,7 @@ int main(int argc, char **argv)
             if ( !(ifi->ifi_change & IFF_UP) )
                 continue;
 
-            /* Ignore duplicate messages. */
+            /* Ignore duplicate messages. This works around a Linux bug.*/
             if ( (last_index == ifr.ifr_ifindex) &&
                  (last_flags == ifi->ifi_flags) )
                 continue;
@@ -184,7 +214,6 @@ int main(int argc, char **argv)
                 return 1;
             case -1:
                 LOG("Error forking to exec script");
-                break;
             default:
                 break;
             }
