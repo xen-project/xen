@@ -33,9 +33,9 @@
 #include <linux/blkdev.h>
 
 /*
- * For convenience we distinguish between ide, scsi and 'other' (i.e.
- * potentially combinations of the two) in the naming scheme and in a few 
- * other places (like default readahead, etc).
+ * For convenience we distinguish between ide, scsi and 'other' (i.e.,
+ * potentially combinations of the two) in the naming scheme and in a few other
+ * places.
  */
 
 #define NUM_IDE_MAJORS 10
@@ -45,10 +45,6 @@
 static struct xlbd_type_info xlbd_ide_type = {
     .partn_shift = 6,
     .partn_per_major = 2,
-    // XXXcl todo blksize_size[major]  = 1024;
-    .hardsect_size = 512,
-    .max_sectors = 128,  /* 'hwif->rqsize' if we knew it */
-    // XXXcl todo read_ahead[major]    = 8; /* from drivers/ide/ide-probe.c */
     .devname = "ide",
     .diskname = "hd",
 };
@@ -56,10 +52,6 @@ static struct xlbd_type_info xlbd_ide_type = {
 static struct xlbd_type_info xlbd_scsi_type = {
     .partn_shift = 4,
     .partn_per_major = 16,
-    // XXXcl todo blksize_size[major]  = 1024; /* XXX 512; */
-    .hardsect_size = 512,
-    .max_sectors = 128*8, /* XXX 128; */
-    // XXXcl todo read_ahead[major]    = 0; /* XXX 8; -- guessing */
     .devname = "sd",
     .diskname = "sd",
 };
@@ -67,10 +59,6 @@ static struct xlbd_type_info xlbd_scsi_type = {
 static struct xlbd_type_info xlbd_vbd_type = {
     .partn_shift = 4,
     .partn_per_major = 16,
-    // XXXcl todo blksize_size[major]  = 512;
-    .hardsect_size = 512,
-    .max_sectors = 128,
-    // XXXcl todo read_ahead[major]    = 8;
     .devname = "xvd",
     .diskname = "xvd",
 };
@@ -245,17 +233,13 @@ static struct gendisk *xlvbd_get_gendisk(struct xlbd_major_info *mi,
         elevator_init(xlbd_blk_queue, "noop");
 
         /*
-         * Turn off barking 'headactive' mode. We dequeue
-         * buffer heads as soon as we pass them to back-end
-         * driver.
+         * Turn off barking 'headactive' mode. We dequeue buffer heads as soon 
+         * as we pass them to back-end driver.
          */
         blk_queue_headactive(xlbd_blk_queue, 0);
 
-        /* Hard sector size and max sectors impersonate the equiv. hardware. */
-        blk_queue_hardsect_size(
-            xlbd_blk_queue, mi->type->hardsect_size);
-        blk_queue_max_sectors(
-            xlbd_blk_queue, mi->type->max_sectors);
+        blk_queue_hardsect_size(xlbd_blk_queue, 512);
+        blk_queue_max_sectors(xlbd_blk_queue, 512);
 
         /* Each segment in a request is up to an aligned page in size. */
         blk_queue_segment_boundary(xlbd_blk_queue, PAGE_SIZE - 1);
