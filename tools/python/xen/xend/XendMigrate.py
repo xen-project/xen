@@ -295,11 +295,6 @@ class XendMigrateInfo(XfrdInfo):
         eserver.inject('xend.domain.migrate',
                        [ self.dominfo.name, self.dominfo.id,
                          "begin", self.sxpr() ])
-        # Special case for localhost: destroy all devices early.
-        if 0 and self.dst_host in ["localhost", "127.0.0.1"]:
-            self.dominfo.restart_cancel()
-            self.dominfo.cleanup()
-            #self.dominfo.destroy_console()
         xfrd.request(['xfr.migrate',
                       self.src_dom,
                       vmconfig,
@@ -307,6 +302,19 @@ class XendMigrateInfo(XfrdInfo):
                       self.dst_port,
                       self.live ])
         
+    def xfr_vm_suspend(self, xfrd, val):
+        def cbok(val):
+            # Special case for localhost: destroy devices early.
+            if self.dst_host in ["localhost", "127.0.0.1"]:
+                self.dominfo.restart_cancel()
+                self.dominfo.cleanup()
+                self.dominfo.destroy_console()
+            return val
+            
+        d = XfrdInfo.xfr_vm_suspend(self, xfrd, val)
+        d.addCallback(cbok)
+        return d
+    
     def xfr_migrate_ok(self, xfrd, val):
         dom = int(sxp.child0(val))
         self.state = 'ok'
@@ -381,7 +389,35 @@ class XendSaveInfo(XfrdInfo):
                        [ self.dominfo.name, self.dominfo.id,
                          self.state, self.sxpr() ])
     
+class XendRestoreInfo(XfrdInfo):
+    """Representation of a restore in-progress and its interaction with xfrd.
+    """
 
+    def __init__(self, xid, file):
+        XfrdInfo.__init__(self)
+        self.xid = xid
+        self.state = 'begin'
+        self.file = file
+
+    def sxpr(self):
+         sxpr = ['restore',
+                 ['id', self.xid],
+                 ['file', self.file] ]
+         return sxpr
+
+    def request(self, xfrd):
+        print '***request>', self.file
+        log.info('restore BEGIN: ' + str(self.sxpr()))
+        xfrd.request(['xfr.restore', self.file ])
+        
+    def xfr_restore_ok(self, xfrd, val):
+        dom = int(sxp.child0(val))
+        dominfo = self.xd.domain_get(dom)
+        self.state = 'ok'
+        if not self.deferred.called:
+            self.deferred.callback(dominfo)
+
+         
 class XendMigrate:
     """External api for interaction with xfrd for migrate and save.
     Singleton.
@@ -476,6 +512,12 @@ class XendMigrate:
         xid = self.nextid()
         info = XendSaveInfo(xid, dominfo, file)
         return self.session_begin(info)
+
+    def restore_begin(self, file):
+        xid = self.nextid()
+        info = XendRestoreInfo(xid, file)
+        return self.session_begin(info)
+        
 
 def instance():
     global inst

@@ -245,6 +245,15 @@ int xc_linux_restore(int xc_handle, XcIOContext *ioctxt)
     }
     shared_info_frame = op.u.getdomaininfo.shared_info_frame;
 
+    if(ioctxt->flags & XCFLAGS_CONFIGURE)
+    {
+        if(xcio_configure_domain(ioctxt))
+        {
+           xcio_error(ioctxt, "Configuring domain failed"); 
+           goto out;
+        }
+    }
+
     if ( (pm_handle = init_pfn_mapper((domid_t)dom)) == NULL )
         goto out;
 

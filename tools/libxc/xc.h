@@ -75,9 +75,10 @@ int xc_shadow_control(int xc_handle,
                       xc_shadow_control_stats_t *stats);
 
 
-#define XCFLAGS_VERBOSE 1
-#define XCFLAGS_LIVE    2
-#define XCFLAGS_DEBUG   4
+#define XCFLAGS_VERBOSE   1
+#define XCFLAGS_LIVE      2
+#define XCFLAGS_DEBUG     4
+#define XCFLAGS_CONFIGURE 8
 
 struct XcIOContext;
 int xc_linux_save(int xc_handle, struct XcIOContext *ioctxt);

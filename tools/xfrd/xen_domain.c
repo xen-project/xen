@@ -108,7 +108,10 @@ int xen_domain_snd(Conn *xend, IOStream *io,
 /** Receive domain state.
  * Create a new domain and store the received state into it.
  */
-int xen_domain_rcv(IOStream *io, uint32_t *dom, char **vmconfig, int *vmconfig_n){
+int xen_domain_rcv(IOStream *io,
+                   uint32_t *dom,
+                   char **vmconfig, int *vmconfig_n,
+                   int *configured){
     int err = 0;
 #ifdef _XEN_XFR_STUB_
     char buf[1024];
@@ -135,11 +138,13 @@ int xen_domain_rcv(IOStream *io, uint32_t *dom, char **vmconfig, int *vmconfig_n
     ioctxt->info = iostdout;
     ioctxt->err = iostderr;
     ioctxt->configure = domain_configure;
+    ioctxt->flags |= XCFLAGS_CONFIGURE;
 
     err = xc_linux_restore(xcinit(), ioctxt);
     *dom = ioctxt->domain;
     *vmconfig = ioctxt->vmconfig;
     *vmconfig_n = ioctxt->vmconfig_n;
+    *configured = (ioctxt->flags & XCFLAGS_CONFIGURE);
 #endif   
     dprintf("< err=%d\n", err);
     return err;
