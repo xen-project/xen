@@ -159,8 +159,6 @@ static long evtchn_bind_interdomain(evtchn_bind_interdomain_t *bind)
     switch ( d1->event_channel[port1].state )
     {
     case ECS_FREE:
-        if ( !IS_PRIV(current) && (dom2 != DOMID_SELF) )
-            ERROR_EXIT(-EPERM);
         break;
 
     case ECS_UNBOUND:
@@ -182,6 +180,8 @@ static long evtchn_bind_interdomain(evtchn_bind_interdomain_t *bind)
     switch ( d2->event_channel[port2].state )
     {
     case ECS_FREE:
+        if ( !IS_PRIV(current) && (dom2 != DOMID_SELF) )
+            ERROR_EXIT(-EPERM);
         break;
 
     case ECS_UNBOUND:
