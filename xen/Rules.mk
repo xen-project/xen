@@ -6,6 +6,8 @@ HDRS    := $(wildcard $(BASEDIR)/include/xeno/*.h)
 HDRS    += $(wildcard $(BASEDIR)/include/scsi/*.h)
 HDRS    += $(wildcard $(BASEDIR)/include/hypervisor-ifs/*.h)
 HDRS    += $(wildcard $(BASEDIR)/include/asm-$(ARCH)/*.h)
+# compile.h is always regenerated, but other files shouldn't be rebuilt
+HDRS    := $(subst $(BASEDIR)/include/xeno/compile.h,,$(HDRS))
 
 C_SRCS  := $(wildcard *.c)
 S_SRCS  := $(wildcard *.S)

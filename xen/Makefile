@@ -1,6 +1,8 @@
 
 export BASEDIR := $(shell pwd)
 
+GENERATED_FILES := include/xeno/compile.h
+
 include Rules.mk
 
 default: $(TARGET)
@@ -19,9 +21,9 @@ clean: delete-links
 	$(MAKE) -C net clean
 	$(MAKE) -C drivers clean
 	$(MAKE) -C arch/$(ARCH) clean
-	rm -f *.o $(TARGET)* *~ core
+	rm -f *.o $(TARGET)* *~ core $(GENERATED_FILES)
 
-$(TARGET): make-links
+$(TARGET): delete-unfresh-files make-links $(GENERATED_FILES)
 	$(MAKE) -C tools
 	$(MAKE) -C common
 	$(MAKE) -C net
@@ -34,6 +36,23 @@ make-links: delete-links
 
 delete-links:
 	rm -f include/linux include/asm
+
+# NB. kernel.o is blown away as the build date is stored statically within it
+#     Basically it's the only file dependent on compile.h -- we blow that
+#     dependency away for all other files in Rules.mk.
+delete-unfresh-files:
+	rm -f $(GENERATED_FILES) common/kernel.o
+
+include/xeno/compile.h:
+	@LANG=C echo \#define XEN_COMPILE_DATE \"`date`\" > $@
+	@LANG=C echo \#define XEN_COMPILE_TIME \"`date +%T`\" >> $@
+	@LANG=C echo \#define XEN_COMPILE_BY \"`whoami`\" >> $@
+	@LANG=C echo \#define XEN_COMPILE_DOMAIN \"`([ -x /bin/dnsdomainname ] && /bin/dnsdomainname) || ([ -x /bin/domainname ] && /bin/domainname || echo [unknown])`\" >> $@
+	@LANG=C echo \#define XEN_COMPILE_HOST \"`hostname`\" >> $@
+	@LANG=C echo \#define XEN_COMPILER \"`$(CC) $(CFLAGS) -v 2>&1 | tail -1`\" >> $@
+
+.PHONY: $(GENERATED_FILES) make-links delete-links default debug install clean delete-unfresh-files
+
 
 SUBDIRS         =arch common drivers net 
 TAGS: 
