@@ -521,7 +521,7 @@ static PyObject *pyxc_linux_build(PyObject *self,
 
     static char *kwd_list[] = { "dom", "control_evtchn", 
                                 "image", "ramdisk", "cmdline", "flags",
-				NULL };
+                                NULL };
 
     if ( !PyArg_ParseTupleAndKeywords(args, kwds, "iis|ssi", kwd_list, 
                                       &dom, &control_evtchn, 

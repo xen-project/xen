@@ -47,7 +47,7 @@ typedef struct xc_shadow_control_stats_st
 int xc_domain_create(int xc_handle, 
                      unsigned int mem_kb, 
                      const char *name,
-		     int cpu,
+                     int cpu,
                      u32 *pdomid);
 int xc_domain_pause(int xc_handle, 
                     u32 domid);
@@ -66,9 +66,9 @@ int xc_domain_getinfo(int xc_handle,
 int xc_shadow_control(int xc_handle,
                       u32 domid, 
                       unsigned int sop,
-		      unsigned long *dirty_bitmap,
-		      unsigned long pages,
-		      xc_shadow_control_stats_t *stats);
+                      unsigned long *dirty_bitmap,
+                      unsigned long pages,
+                      xc_shadow_control_stats_t *stats);
 
 
 #define XCFLAGS_VERBOSE 1
@@ -78,14 +78,14 @@ int xc_shadow_control(int xc_handle,
 int xc_linux_save(int xc_handle,
                   u32 domid, 
                   unsigned int flags,
-		  int (*writerfn)(void *, const void *, size_t),
-		  void *writerst );
+                  int (*writerfn)(void *, const void *, size_t),
+                  void *writerst);
 
 int xc_linux_restore(int xc_handle,
                      u32 domid,
-                     unsigned int flags,		     
-		     int (*readerfn)(void *, void *, size_t),
-		     void *readerst,
+                     unsigned int flags,
+                     int (*readerfn)(void *, void *, size_t),
+                     void *readerst,
                      u32 *pdomid);
 
 int xc_linux_build(int xc_handle,
@@ -94,7 +94,7 @@ int xc_linux_build(int xc_handle,
                    const char *ramdisk_name,
                    const char *cmdline,
                    unsigned int control_evtchn,
-		   unsigned long flags);
+                   unsigned long flags);
 
 int xc_netbsd_build(int xc_handle,
                     u32 domid,
