@@ -110,7 +110,7 @@ struct gdb_regs {
 
 
 #define vtopdi(va) ((va) >> PDRSHIFT)
-#define vtopti(va) (((va) >> PAGE_SHIFT) & BSD_PAGE_MASK)
+#define vtopti(va) (((va) >> PAGE_SHIFT) & 0x3ff)
 
 /* XXX application state */
 
@@ -134,7 +134,14 @@ map_domain_va(unsigned long domid, void * guest_va)
     static unsigned long *pde_virt;
     static unsigned long page_phys;
     static unsigned long *page_virt;
-
+    if (!regs_valid) 
+    {
+	int retval = xc_domain_getfullinfo(xc_handle, domid, 0, NULL, &ctxt);
+	if (retval)
+	    goto error_out;
+	cr3 = ctxt.pt_base;
+	regs_valid = 1;
+    }
     if (cr3 != cr3_phys) 
     {
 	cr3_phys = cr3;
@@ -145,7 +152,8 @@ map_domain_va(unsigned long domid, void * guest_va)
 					     cr3_phys >> PAGE_SHIFT)) == NULL)
 	    goto error_out;
     } 
-    pde = cr3_virt[vtopdi(va)];
+    if ((pde = cr3_virt[vtopdi(va)]) == 0)
+	goto error_out;
     if (pde != pde_phys) 
     {
 	pde_phys = pde;
@@ -156,7 +164,8 @@ map_domain_va(unsigned long domid, void * guest_va)
 					     pde_phys >> PAGE_SHIFT)) == NULL)
 	    goto error_out;
     }
-    page = pde_virt[vtopti(va)];
+    if ((page = pde_virt[vtopti(va)]) == 0)
+	goto error_out;
     if (page != page_phys) 
     {
 	page_phys = page;
@@ -164,8 +173,10 @@ map_domain_va(unsigned long domid, void * guest_va)
 	    munmap(page_virt, PAGE_SIZE);
 	if ((page_virt = xc_map_foreign_range(xc_handle, domid, PAGE_SIZE,
 					     PROT_READ|PROT_WRITE,
-					     page_phys >> PAGE_SHIFT)) == NULL)
+					      page_phys >> PAGE_SHIFT)) == NULL) {
+	    printf("cr3 %lx pde %lx page %lx pti %lx\n", cr3, pde, page, vtopti(va));
 	    goto error_out;
+	}
     }	
     return (void *)(((unsigned long)page_virt) | (va & BSD_PAGE_MASK));
 
@@ -238,8 +249,10 @@ xc_ptrace(enum __ptrace_request request, pid_t pid, void *addr, void *data)
     case PTRACE_PEEKDATA:
     case PTRACE_POKETEXT:
     case PTRACE_POKEDATA:
-	if ((guest_va = (unsigned long *)map_domain_va(pid, addr)) == NULL)
+	if ((guest_va = (unsigned long *)map_domain_va(pid, addr)) == NULL) {
+	    status = EFAULT;
 	    goto done;
+	}
 
 	if (request == PTRACE_PEEKTEXT || request == PTRACE_PEEKDATA)
 	    retval = *guest_va;
