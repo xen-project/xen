@@ -366,6 +366,12 @@ static int __init free_pages_init(void)
 
     /* this will put all low memory onto the freelists */
     totalram_pages += free_all_bootmem();
+    /* XEN: init and count low-mem pages outside initial allocation. */
+    for (pfn = boot_pfn; pfn < max_low_pfn; pfn++) {
+        ClearPageReserved(&mem_map[pfn]);
+        atomic_set(&mem_map[pfn].count, 1);
+        totalram_pages++;
+    }
 
     reservedpages = 0;
     for (pfn = 0; pfn < boot_pfn ; pfn++) {
