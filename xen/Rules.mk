@@ -1,7 +1,6 @@
-
 ARCH    := i386
 
-TARGET  := $(BASEDIR)/image
+TARGET  := $(BASEDIR)/xen
 HDRS    := $(wildcard $(BASEDIR)/include/xeno/*.h)
 HDRS    += $(wildcard $(BASEDIR)/include/scsi/*.h)
 HDRS    += $(wildcard $(BASEDIR)/include/hypervisor-ifs/*.h)

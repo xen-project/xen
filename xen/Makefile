@@ -15,7 +15,7 @@ default: $(TARGET)
 	gzip -f -9 < $(TARGET) > $(TARGET).gz
 
 debug:	
-	objdump -D -S image >image.s
+	objdump -D -S $(TARGET) > $(TARGET).s
 
 install: $(TARGET)
 	gzip -f -9 < $(TARGET) > $(TARGET).gz
@@ -76,5 +76,5 @@ TAGS:
 	find include -type d \( -name "asm-*" -o -name config \) -prune -o -name '*.h' -print | xargs etags -a
 	find $(SUBDIRS) -name '*.[ch]' | xargs etags -a
 MAP:
-	nm image | grep -v '\(compiled\)\|\(\.o$$\)\|\( [aUw] \)\|\(\.\.ng$$\)\|\(LASH[RL]DI\)' | sort > System.map
+	nm $(TARGET) | grep -v '\(compiled\)\|\(\.o$$\)\|\( [aUw] \)\|\(\.\.ng$$\)\|\(LASH[RL]DI\)' | sort > System.map
 
