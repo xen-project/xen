@@ -37,14 +37,8 @@ struct pfn_info *frame_table;
 unsigned long frame_table_size;
 unsigned long max_page;
 
-extern void arch_init_memory(void);
-
 void __init init_frametable(void *frametable_vstart, unsigned long nr_pages)
 {
-    unsigned long mfn;
-
-    arch_init_memory();
-
     max_page = nr_pages;
     frame_table_size = nr_pages * sizeof(struct pfn_info);
     frame_table_size = (frame_table_size + PAGE_SIZE - 1) & PAGE_MASK;
@@ -54,17 +48,4 @@ void __init init_frametable(void *frametable_vstart, unsigned long nr_pages)
         panic("Not enough memory for frame table - reduce Xen heap size?\n");
 
     memset(frame_table, 0, frame_table_size);
-
-    /* Initialise to a magic of 0x55555555 so easier to spot bugs later. */
-    memset(machine_to_phys_mapping, 0x55, 4<<20);
-
-    /* Pin the ownership of the MP table so that DOM0 can map it later. */
-    for ( mfn = virt_to_phys(&machine_to_phys_mapping[0<<20])>>PAGE_SHIFT;
-          mfn < virt_to_phys(&machine_to_phys_mapping[1<<20])>>PAGE_SHIFT;
-          mfn++ )
-    {
-        frame_table[mfn].u.inuse.count_info = 1 | PGC_allocated;
-        frame_table[mfn].u.inuse.type_info = 1 | PGT_gdt_page; /* non-RW */
-        frame_table[mfn].u.inuse.domain = &idle0_task;
-    }
 }

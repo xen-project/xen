@@ -423,7 +423,7 @@ int xc_linux_save(int xc_handle, XcIOContext *ioctxt)
     mfn_to_pfn_table_start_mfn = xc_get_m2p_start_mfn( xc_handle );
 
     live_mfn_to_pfn_table = 
-	mfn_mapper_map_single(xc_handle, 0x7FFFU, 
+	mfn_mapper_map_single(xc_handle, DOMID_XEN, 
 			      PAGE_SIZE*1024, PROT_READ, 
 			      mfn_to_pfn_table_start_mfn );
 

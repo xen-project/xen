@@ -393,7 +393,7 @@ struct pfn_info *alloc_domheap_pages(struct domain *d, int order)
     }
 
     if ( unlikely(d->tot_pages == 0) )
-        get_domain(d);
+        get_knownalive_domain(d);
 
     d->tot_pages += 1 << order;
 

@@ -39,10 +39,17 @@ struct domain *do_createdomain(domid_t dom_id, unsigned int cpu)
     d->domain    = dom_id;
     d->processor = cpu;
     d->create_time = NOW();
-    /* Initialise the sleep_lock */
     spin_lock_init(&d->sleep_lock);
  
     memcpy(&d->thread, &idle0_task.thread, sizeof(d->thread));
+
+    spin_lock_init(&d->page_alloc_lock);
+    INIT_LIST_HEAD(&d->page_list);
+    d->max_pages = d->tot_pages = 0;
+
+    /* Per-domain PCI-device list. */
+    spin_lock_init(&d->pcidev_lock);
+    INIT_LIST_HEAD(&d->pcidev_list);
 
     if ( d->domain != IDLE_DOMAIN_ID )
     {
@@ -59,15 +66,7 @@ struct domain *do_createdomain(domid_t dom_id, unsigned int cpu)
 
         d->addr_limit = USER_DS;
         
-        spin_lock_init(&d->page_alloc_lock);
-        INIT_LIST_HEAD(&d->page_list);
-        d->max_pages = d->tot_pages = 0;
-
 	arch_do_createdomain(d);
-
-        /* Per-domain PCI-device list. */
-        spin_lock_init(&d->pcidev_lock);
-        INIT_LIST_HEAD(&d->pcidev_list);
 
         sched_add_domain(d);
 

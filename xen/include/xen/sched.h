@@ -164,10 +164,25 @@ struct domain *alloc_domain_struct();
 #define DOMAIN_DESTRUCTED (1<<31) /* assumes atomic_t is >= 32 bits */
 #define put_domain(_d) \
   if ( atomic_dec_and_test(&(_d)->refcnt) ) domain_destruct(_d)
+
+/*
+ * Use this when you don't have an existing reference to @d. It returns
+ * FALSE if @d is being destructed.
+ */
 static inline int get_domain(struct domain *d)
 {
     atomic_inc(&d->refcnt);
     return !(atomic_read(&d->refcnt) & DOMAIN_DESTRUCTED);
+}
+
+/*
+ * Use this when you already have, or are borrowing, a reference to @d.
+ * In this case we know that @d cannot be destructed under our feet.
+ */
+static inline void get_knownalive_domain(struct domain *d)
+{
+    atomic_inc(&d->refcnt);
+    ASSERT(!(atomic_read(&d->refcnt) & DOMAIN_DESTRUCTED));
 }
   
 extern struct domain *do_createdomain(

@@ -25,13 +25,14 @@
 
 extern unsigned int alloc_new_dom_mem(struct domain *, unsigned int);
 extern long arch_do_dom0_op(dom0_op_t *op, dom0_op_t *u_dom0_op);
-extern void arch_getdomaininfo_ctxt(struct domain *, full_execution_context_t *);
+extern void arch_getdomaininfo_ctxt(
+    struct domain *, full_execution_context_t *);
 
 static inline int is_free_domid(domid_t dom)
 {
     struct domain *d;
 
-    if ( dom >= DOMID_SELF )
+    if ( dom >= DOMID_FIRST_RESERVED )
         return 0;
 
     if ( (d = find_domain_by_id(dom)) == NULL )
@@ -66,7 +67,7 @@ static int allocate_domid(domid_t *pdom)
     }
 
     /* Couldn't find a free domain id in 0..topdom, try higher. */
-    for ( dom = topdom; dom < DOMID_SELF; dom++ )
+    for ( dom = topdom; dom < DOMID_FIRST_RESERVED; dom++ )
     {
         if ( is_free_domid(dom) )
         {
@@ -167,7 +168,7 @@ long do_dom0_op(dom0_op_t *u_dom0_op)
         domid_t           dom;
 
         dom = op->u.createdomain.domain;
-        if ( (dom > 0) && (dom < DOMID_SELF) )
+        if ( (dom > 0) && (dom < DOMID_FIRST_RESERVED) )
         {
             ret = -EINVAL;
             if ( !is_free_domid(dom) )
