@@ -35,6 +35,7 @@ $(TARGET): hypervisor-ifs head.o $(OBJS)
 clean:
 	find . -type f -name '*.o' | xargs rm -f
 	rm -f *.o *~ core $(TARGET).elf $(TARGET).raw $(TARGET) $(TARGET).gz
+	find . -type l | xargs rm -f
 
 %.o: %.c $(HDRS) Makefile
 	$(CC) $(CFLAGS) -c $< -o $@

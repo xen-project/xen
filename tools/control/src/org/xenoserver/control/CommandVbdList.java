@@ -35,7 +35,7 @@ public class CommandVbdList extends Command {
                     key = st.nextToken();
                 }
                 if (st.hasMoreTokens()) {
-                    if (Integer.parseInt(st.nextToken()) == 2) {
+                    if (Integer.parseInt(st.nextToken()) == 1) {
                         mode = Mode.READ_WRITE;
                     }
                 }
