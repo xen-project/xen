@@ -17,6 +17,7 @@ import sxp
 import XendDB
 import EventServer; eserver = EventServer.instance()
 from XendError import XendError
+from XendLogging import log
         
 """The port for the migrate/save daemon xfrd."""
 XFRD_PORT = 8002
@@ -289,6 +290,8 @@ class XendMigrateInfo(XfrdInfo):
         if not vmconfig:
             xfrd.loseConnection()
             return
+        log.info('Migrate BEGIN: ' + str(self.sxpr()))
+        eserver.inject('xend.migrate.begin', self.sxpr())
         xfrd.request(['xfr.migrate',
                       self.src_dom,
                       vmconfig,
@@ -308,10 +311,12 @@ class XendMigrateInfo(XfrdInfo):
         print 'XfrdMigrateInfo>connectionLost>', reason
         XfrdInfo.connectionLost(self, reason)
         if self.state =='ok':
+            log.info('Migrate OK: ' + str(self.sxpr()))
             eserver.inject('xend.migrate.ok', self.sxpr())
         else:
             self.state = 'error'
             self.error(XendError("migrate failed"))
+            log.info('Migrate ERROR: ' + str(self.sxpr()))
             eserver.inject('xend.migrate.error', self.sxpr())
 
 class XendSaveInfo(XfrdInfo):
@@ -335,10 +340,14 @@ class XendSaveInfo(XfrdInfo):
         return sxpr
 
     def request(self, xfrd):
+        print '***request>', self.vmconfig()
         vmconfig = self.vmconfig()
         if not vmconfig:
             xfrd.loseConnection()
             return
+        print '***request> begin'
+        log.info('Save BEGIN: ' + str(self.sxpr()))
+        eserver.inject('xend.save.begin', self.sxpr())
         xfrd.request(['xfr.save', self.src_dom, vmconfig, self.file ])
         
     def xfr_save_ok(self, xfrd, val):
@@ -351,10 +360,12 @@ class XendSaveInfo(XfrdInfo):
         print 'XfrdSaveInfo>connectionLost>', reason
         XfrdInfo.connectionLost(self, reason)
         if self.state =='ok':
+            log.info('Save OK: ' + str(self.sxpr()))
             eserver.inject('xend.save.ok', self.sxpr())
         else:
             self.state = 'error'
             self.error(XendError("save failed"))
+            log.info('Save ERROR: ' + str(self.sxpr()))
             eserver.inject('xend.save.error', self.sxpr())
     
 
@@ -388,17 +399,19 @@ class XendMigrate:
     def close(self):
         pass
 
-    def _add_session(self, xid, info):
+    def _add_session(self, info):
+        xid = info.xid
         self.session[xid] = info
         self.session_db[xid] = info.sxpr()
         self.sync_session(xid)
-        #eserver.inject('xend.migrate.begin', info.sxpr())
 
     def _delete_session(self, xid):
-        #eserver.inject('xend.migrate.end', xid)
-        del self.session[xid]
-        del self.session_db[xid]
-        self.db.delete(xid)
+        print '***_delete_session>', xid
+        if xid in self.session:
+            del self.session[xid]
+        if xid in self.session_db:
+            del self.session_db[xid]
+            self.db.delete(xid)
 
     def session_ls(self):
         return self.session.keys()
@@ -410,10 +423,23 @@ class XendMigrate:
         return self.session.get(xid)
 
     def session_begin(self, info):
-        self._add_session(info.xid, info)
+        """Add the session to the table and start it.
+        Set up callbacks to remove the session from the table
+        when it finishes.
+
+        @param info: session
+        @return: deferred
+        """
+        def cbremove(val):
+            print '***cbremove>', val
+            self._delete_session(info.xid)
+            return val
+        self._add_session(info)
+        info.deferred.addCallback(cbremove)
+        info.deferred.addErrback(cbremove)
         xcf = XfrdClientFactory(info)
         reactor.connectTCP('localhost', XFRD_PORT, xcf)
-        return info
+        return info.deferred
     
     def migrate_begin(self, dom, host, port=XFRD_PORT, live=0):
         """Begin to migrate a domain to another host.
@@ -423,12 +449,9 @@ class XendMigrate:
         @param port: destination port
         @return: deferred
         """
-        # Check dom for existence, not migrating already.
-        # Subscribe to migrate notifications (for updating).
         xid = self.nextid()
         info = XendMigrateInfo(xid, dom, host, port, live)
-        self.session_begin(info)
-        return info.deferred
+        return self.session_begin(info)
 
     def save_begin(self, dom, file):
         """Begin saving a domain to file.
@@ -439,8 +462,7 @@ class XendMigrate:
         """
         xid = self.nextid()
         info = XendSaveInfo(xid, dom, file)
-        self.session_begin(info)
-        return info.deferred
+        return self.session_begin(info)
 
 def instance():
     global inst

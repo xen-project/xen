@@ -256,7 +256,10 @@ class XendDomain:
                         eserver.inject('xend.domain.suspended', [name, id])
                         continue
                 if reason in ['poweroff', 'reboot']:
+                    eserver.inject('xend.domain.exit', [name, id, reason])
                     self.domain_restart_schedule(id, reason)
+            else:
+               eserver.inject('xend.domain.exit', [name, id, 'crash']) 
             destroyed += 1
             self.final_domain_destroy(id)
         if self.domain_restarts_exist():
