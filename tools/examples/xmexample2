@@ -36,7 +36,7 @@ xm_vars.check()
 
 #----------------------------------------------------------------------------
 # Kernel image file.
-kernel = "/boot/vmlinuz-2.4.26-xenU"
+kernel = "/boot/vmlinuz-2.6.8.1-xenU"
 
 # Optional ramdisk.
 #ramdisk = "/boot/initrd.gz"
