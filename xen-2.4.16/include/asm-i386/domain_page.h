@@ -35,7 +35,7 @@ static inline void *map_domain_mem(unsigned long pa)
                         (pa & ~PAGE_MASK));
     if ( (*pent & PAGE_MASK) != (pfn << PAGE_SHIFT) )
     {
-        *pent = (pfn << PAGE_SHIFT) | PAGE_HYPERVISOR;
+        *pent = (pfn << PAGE_SHIFT) | __PAGE_HYPERVISOR;
         __flush_tlb_one(va);
     }
     return va;
