@@ -4,7 +4,8 @@
 # Xfig and tgif diagrams should be in the fig/ subdirectory.
 # DOCUMENTS should be a list of the target Postscript files.
 
-DOCUMENTS = interface.ps interface.pdf user.ps user.pdf
+DOCUMENTS = interface.ps interface.pdf interface.html user.ps \
+	    user.pdf user.html
 
 GFX  = $(patsubst %.obj, %.eps, $(wildcard figs/*.obj))
 GFX += $(patsubst %.fig, %.eps, $(wildcard figs/*.fig))
@@ -18,6 +19,8 @@ clean:
 	rm -f .word_count *.aux *.dvi *.bbl *.blg *.glo *.idx *~ 
 	rm -f *.ilg *.log *.ind *.toc *.bak core
 	rm -f figs/*.eps $(DOCUMENTS)
+	rm -rf user/
+	rm -rf interface/
 
 install: $(DOCUMENTS)
 	mkdir -p $(prefix)/usr/share/doc/xen
@@ -39,4 +42,5 @@ install: $(DOCUMENTS)
 %.eps: %.obj
 	tgif -print -color -eps $<
 
-
+%.html: %.tex
+	latex2html --split 0 --nonavigation --noinfo --math $<
