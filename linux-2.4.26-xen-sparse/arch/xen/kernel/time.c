@@ -391,7 +391,8 @@ static inline void do_timer_interrupt(int irq, void *dev_id,
 
     __get_time_values_from_xen();
 
-    if ( (delta = (s64)(shadow_system_time - processed_system_time)) < 0 )
+    if ( (delta = (s64)(shadow_system_time + __get_time_delta_usecs() * 1000 -
+						processed_system_time)) < 0 )
     {
         printk("Timer ISR: Time went backwards: %lld\n", delta);
         return;
