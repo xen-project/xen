@@ -22,6 +22,8 @@ static unsigned int resp_cons; /* Response consumer for comms ring. */
 static xen_disk_info_t xlblk_disk_info;
 static int xlblk_control_msg_pending;
 
+#define RING_FULL (BLK_RING_INC(blk_ring->req_prod) == resp_cons)
+
 /*
  * Request queues with outstanding work, but ring is currently full.
  * We need no special lock here, as we always access this with the
@@ -273,8 +275,7 @@ static int hypervisor_request(void *          id,
      * because we have a whole bunch of outstanding responses to process. No 
      * matter, as the response handler will kick the request queue.
      */
-    if ( BLK_RING_INC(blk_ring->req_prod) == resp_cons )
-        return 1;
+    if ( RING_FULL ) return 1;
 
     buffer_ma = (void *)phys_to_machine(virt_to_phys(buffer)); 
 
@@ -431,8 +432,12 @@ static void xlblk_response_int(int irq, void *dev_id, struct pt_regs *ptregs)
          (((blk_ring->req_prod - resp_cons) & (BLK_RING_SIZE - 1)) < 
           (BLK_RING_SIZE >> 1)) )
     {
-        do { do_xlblk_request(pending_queues[--nr_pending]); }
-        while ( nr_pending != 0 );
+        /* Attempt to drain the queue, but bail if the ring becomes full. */
+        while ( nr_pending != 0 )
+        {
+            do_xlblk_request(pending_queues[--nr_pending]);
+            if ( RING_FULL ) break;
+        }
     }
 
     spin_unlock_irqrestore(&io_request_lock, flags);
