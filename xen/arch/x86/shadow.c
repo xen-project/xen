@@ -431,7 +431,7 @@ unsigned long shadow_l2_table(
 
     perfc_incrc(shadow_l2_table_count);
 
-    if ( (spfn_info = alloc_shadow_page(m)) != NULL )
+    if ( (spfn_info = alloc_shadow_page(m)) == NULL )
         BUG(); /* XXX Deal gracefully with failure. */
 
     spfn_info->u.inuse.type_info = PGT_l2_page_table;
