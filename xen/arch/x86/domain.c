@@ -764,6 +764,7 @@ int construct_dom0(struct domain *p,
     printk("done.\n");
 
     /* Construct a frame-allocation list for the initial domain. */
+    p->max_pages = ~0U;
     for ( mfn = (alloc_start>>PAGE_SHIFT); 
           mfn < (alloc_end>>PAGE_SHIFT); 
           mfn++ )
@@ -773,7 +774,7 @@ int construct_dom0(struct domain *p,
         page->u.inuse.type_info = 0;
         page->count_info        = PGC_allocated | 1;
         list_add_tail(&page->list, &p->page_list);
-        p->tot_pages++; p->max_pages++;
+        p->tot_pages++; 
     }
 
     mpt_alloc = (vpt_start - dsi.v_start) + alloc_start;
