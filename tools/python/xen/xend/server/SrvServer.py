@@ -25,8 +25,8 @@
 # todo Support security settings etc. in the config file.
 # todo Support command-line args.
 
-from twisted.web import server
-from twisted.web import resource
+from twisted.web import server, static
+from twisted.web import resource, script
 from twisted.internet import reactor
 
 from xen.xend import XendRoot
@@ -44,8 +44,12 @@ def create(port=None, interface=None, bridge=0):
     if bridge or xroot.rebooted:
         Vifctl.network('start')
     root = resource.Resource()
+    sv = static.File( "/usr/lib/python2.2/site-packages/xen/xend/sv/" )
+    sv.indexNames=['Main.rpy']
+    sv.processors={'.rpy':script.ResourceScript}
     xend = SrvRoot()
     root.putChild('xend', xend)
+    root.putChild('sv', sv)
     site = server.Site(root)
     reactor.listenTCP(port, site, interface=interface)
 

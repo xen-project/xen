@@ -105,8 +105,23 @@ class Xm:
 
     def getprog(self, name, val=None):
         """Get a sub-program.
+        name  Name of the sub-program (or optionally, an unambiguous
+              prefix of its name)
+        val   Default return value if no (unique) match is found
         """
-        return self.progs.get(name, val)
+
+        match = None
+        for progname in self.progs.keys():
+            if progname == name:
+                match = progname
+                break
+            if progname.startswith(name):
+                if not match:
+                    match = progname
+                else:
+                    return val # name is ambiguous - bail out
+
+        return self.progs.get(match, val)
 
     def proglist(self):
         """Get a list of sub-programs, ordered by group.
