@@ -262,7 +262,7 @@ int alloc_segdesc_page(struct pfn_info *page)
 }
 
 
-/* Map shadow page at offset @off. Returns 0 on success. */
+/* Map shadow page at offset @off. */
 int map_ldt_shadow_page(unsigned int off)
 {
     struct task_struct *p = current;

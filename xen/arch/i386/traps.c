@@ -332,7 +332,7 @@ asmlinkage void do_page_fault(struct pt_regs *regs, long error_code)
          */
         off  = addr - LDT_VIRT_START;
         addr = p->mm.ldt_base + off;
-        if ( likely(map_ldt_shadow_page(off >> PAGE_SHIFT) == 0) )
+        if ( likely(map_ldt_shadow_page(off >> PAGE_SHIFT)) )
             return; /* successfully copied the mapping */
     }
 
