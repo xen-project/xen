@@ -57,7 +57,7 @@ static void default_idle(void)
         __sti();
 }
 
-void idle_loop(void)
+static __attribute_used__ void idle_loop(void)
 {
     int cpu = smp_processor_id();
     for ( ; ; )
