@@ -362,9 +362,11 @@ printk("About to call construct_dom0()\n");
 #ifdef CLONE_DOMAIN0
     {
     int i;
+    dom0_memory_start = __va(ia64_boot_param->initrd_start);
+    dom0_memory_end = ia64_boot_param->initrd_size;
     for (i = 0; i < CLONE_DOMAIN0; i++) {
 printk("CONSTRUCTING DOMAIN0 CLONE #%d\n",i+1);
-        if ( construct_dom0(clones[i], dom0_memory_start, dom0_memory_end,
+        if ( construct_domN(clones[i], dom0_memory_start, dom0_memory_end,
                         0, 
                         0,
 			0) != 0)
@@ -389,7 +391,7 @@ printk("About to call init_trace_bufs()\n");
     console_endboot(cmdline && strstr(cmdline, "tty0"));
 #endif
 
-    domain_unpause_by_systemcontroller(current);
+    domain_unpause_by_systemcontroller(current->domain);
 #ifdef CLONE_DOMAIN0
     {
     int i;

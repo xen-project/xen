@@ -1,8 +1,6 @@
 // control flags for turning on/off features under test
 #undef CLONE_DOMAIN0
-//#define CLONE_DOMAIN0 1
-//#undef CLONE_DOMAIN0
-#define USER_ACCESS
+//#define CLONE_DOMAIN0 5
 
 // manufactured from component pieces
 

@@ -511,6 +511,13 @@ void vcpu_pend_interrupt(VCPU *vcpu, UINT64 vector)
 	set_bit(vector,PSCB(vcpu,irr));
 }
 
+void early_tick(VCPU *vcpu)
+{
+	UINT64 *p = &PSCB(vcpu,irr[3]);
+	printf("vcpu_check_pending: about to deliver early tick\n");
+	printf("&irr[0]=%p, irr[0]=0x%lx\n",p,*p);
+}
+
 #define	IA64_TPR_MMI	0x10000
 #define	IA64_TPR_MIC	0x000f0
 
@@ -563,6 +570,14 @@ UINT64 vcpu_check_pending_interrupts(VCPU *vcpu)
 	}
 
 //printf("returned to caller\n");
+#if 0
+if (vector == (PSCB(vcpu,itv) & 0xff)) {
+	UINT64 now = ia64_get_itc();
+	UINT64 itm = PSCB(vcpu,domain_itm);
+	if (now < itm) early_tick(vcpu);
+	
+}
+#endif
 	return vector;
 }
 
@@ -570,6 +585,12 @@ UINT64 vcpu_deliverable_interrupts(VCPU *vcpu)
 {
 	return (vcpu_get_psr_i(vcpu) &&
 		vcpu_check_pending_interrupts(vcpu) != SPURIOUS_VECTOR);
+}
+
+UINT64 vcpu_deliverable_timer(VCPU *vcpu)
+{
+	return (vcpu_get_psr_i(vcpu) &&
+		vcpu_check_pending_interrupts(vcpu) == PSCB(vcpu,itv));
 }
 
 IA64FAULT vcpu_get_lid(VCPU *vcpu, UINT64 *pval)
@@ -618,6 +639,10 @@ IA64FAULT vcpu_get_ivr(VCPU *vcpu, UINT64 *pval)
 	PSCB(vcpu,irr[i]) &= ~mask;
 	PSCB(vcpu,pending_interruption)--;
 	*pval = vector;
+	// if delivering a timer interrupt, remember domain_itm
+	if (vector == (PSCB(vcpu,itv) & 0xff)) {
+		PSCB(vcpu,domain_itm_last) = PSCB(vcpu,domain_itm);
+	}
 	return IA64_NO_FAULT;
 }
 
@@ -809,14 +834,21 @@ BOOLEAN vcpu_timer_disabled(VCPU *vcpu)
 	return(!itv || !!(itv & 0x10000));
 }
 
+BOOLEAN vcpu_timer_inservice(VCPU *vcpu)
+{
+	UINT64 itv = PSCB(vcpu,itv);
+	return (test_bit(itv, PSCB(vcpu,insvc)));
+}
+
 BOOLEAN vcpu_timer_expired(VCPU *vcpu)
 {
 	unsigned long domain_itm = PSCB(vcpu,domain_itm);
 	unsigned long now = ia64_get_itc();
  
-	if (domain_itm && (now > domain_itm) &&
-		!vcpu_timer_disabled(vcpu)) return TRUE;
-	return FALSE;
+	if (!domain_itm) return FALSE;
+	if (now < domain_itm) return FALSE;
+	if (vcpu_timer_disabled(vcpu)) return FALSE;
+	return TRUE;
 }
 
 void vcpu_safe_set_itm(unsigned long val)
@@ -950,7 +982,32 @@ void vcpu_pend_timer(VCPU *vcpu)
 	UINT64 itv = PSCB(vcpu,itv) & 0xff;
 
 	if (vcpu_timer_disabled(vcpu)) return;
+	//if (vcpu_timer_inservice(vcpu)) return;
+	if (PSCB(vcpu,domain_itm_last) == PSCB(vcpu,domain_itm)) {
+		// already delivered an interrupt for this so
+		// don't deliver another
+		return;
+	}
+#if 0
+	// attempt to flag "timer tick before its due" source
+	{
+	UINT64 itm = PSCB(vcpu,domain_itm);
+	UINT64 now = ia64_get_itc();
+	if (now < itm) printf("******* vcpu_pend_timer: pending before due!\n");
+	}
+#endif
 	vcpu_pend_interrupt(vcpu, itv);
+}
+
+// returns true if ready to deliver a timer interrupt too early
+UINT64 vcpu_timer_pending_early(VCPU *vcpu)
+{
+	UINT64 now = ia64_get_itc();
+	UINT64 itm = PSCB(vcpu,domain_itm);
+
+	if (vcpu_timer_disabled(vcpu)) return 0;
+	if (!itm) return 0;
+	return (vcpu_deliverable_timer(vcpu) && (now < itm));
 }
 
 //FIXME: This is a hack because everything dies if a timer tick is lost
@@ -974,7 +1031,7 @@ void vcpu_poke_timer(VCPU *vcpu)
 			if (irr & (1L<<(0xef-0xc0))) return;
 if (now-itm>0x800000)
 printf("*** poking timer: now=%lx,vitm=%lx,xitm=%lx,itm=%lx\n",now,itm,local_cpu_data->itm_next,ia64_get_itm());
-			vcpu_pend_interrupt(vcpu, 0xefL);
+			vcpu_pend_timer(vcpu);
 		}
 	}
 }
@@ -1046,6 +1103,7 @@ while(1);
 
 IA64FAULT vcpu_cover(VCPU *vcpu)
 {
+	// TODO: Only allowed for current vcpu
 	REGS *regs = vcpu_regs(vcpu);
 
 	if (!PSCB(vcpu,interrupt_collection_enabled)) {
@@ -1204,6 +1262,7 @@ IA64FAULT vcpu_get_pmd(VCPU *vcpu, UINT64 reg, UINT64 *pval)
 
 IA64FAULT vcpu_bsw0(VCPU *vcpu)
 {
+	// TODO: Only allowed for current vcpu
 	REGS *regs = vcpu_regs(vcpu);
 	unsigned long *r = &regs->r16;
 	unsigned long *b0 = &PSCB(vcpu,bank0_regs[0]);
@@ -1219,6 +1278,7 @@ IA64FAULT vcpu_bsw0(VCPU *vcpu)
 
 IA64FAULT vcpu_bsw1(VCPU *vcpu)
 {
+	// TODO: Only allowed for current vcpu
 	REGS *regs = vcpu_regs(vcpu);
 	unsigned long *r = &regs->r16;
 	unsigned long *b0 = &PSCB(vcpu,bank0_regs[0]);
@@ -1510,6 +1570,7 @@ IA64FAULT vcpu_ptc_l(VCPU *vcpu, UINT64 vadr, UINT64 addr_range)
 // on the physical address, which is guaranteed to flush the same cache line
 IA64FAULT vcpu_fc(VCPU *vcpu, UINT64 vadr)
 {
+	// TODO: Only allowed for current vcpu
 	UINT64 mpaddr, ps;
 	IA64FAULT fault;
 	unsigned long match_dtlb(VCPU *, unsigned long, unsigned long *, unsigned long *);

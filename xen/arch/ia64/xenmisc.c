@@ -203,7 +203,7 @@ char * __devinit  pcibios_setup(char *str)
 
 void show_registers(struct pt_regs *regs)
 {
-	dummy();
+	printf("*** ADD REGISTER DUMP HERE FOR DEBUGGING\n");
 }	
 
 ///////////////////////////////
@@ -240,12 +240,43 @@ void *module_text_address(unsigned long addr)
 	return NULL;
 }
 
+void cs10foo(void) {}
+void cs01foo(void) {}
+
 // context_switch
 void context_switch(struct exec_domain *prev, struct exec_domain *next)
 {
-	switch_to(prev,next);
+//printk("@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@\n");
+//printk("@@@@@@ context switch from domain %d (%x) to domain %d (%x)\n",
+//prev->domain->id,(long)prev&0xffffff,next->domain->id,(long)next&0xffffff);
+//printk("@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@\n");
+//if (prev->domain->id == 1 && next->domain->id == 0) cs10foo();
+//if (prev->domain->id == 0 && next->domain->id == 1) cs01foo();
+	switch_to(prev,next,prev);
 	clear_bit(EDF_RUNNING, &prev->ed_flags);
 	//if (!is_idle_task(next->domain) )
 		//send_guest_virq(next, VIRQ_TIMER);
-	schedule_tail(next);
+	load_region_regs(current);
+	if (vcpu_timer_expired(current)) vcpu_pend_timer(current);
+}
+
+void panic_domain(struct pt_regs *regs, const char *fmt, ...)
+{
+	va_list args;
+	char buf[128];
+	struct exec_domain *ed = current;
+	static volatile int test = 1;	// so can continue easily in debug
+	extern spinlock_t console_lock;
+	unsigned long flags;
+    
+	printf("$$$$$ PANIC in domain %d (k6=%p): ",
+		ed->domain->id, ia64_get_kr(IA64_KR_CURRENT));
+	va_start(args, fmt);
+	(void)vsnprintf(buf, sizeof(buf), fmt, args);
+	va_end(args);
+	printf(buf);
+	if (regs) show_registers(regs);
+	domain_pause_by_systemcontroller(current->domain);
+	set_bit(DF_CRASHED, ed->domain->d_flags);
+	//while(test);
 }
