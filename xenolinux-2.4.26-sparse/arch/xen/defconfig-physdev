@@ -89,19 +89,7 @@ CONFIG_BINFMT_ELF=y
 #
 # Parallel port support
 #
-CONFIG_PARPORT=y
-CONFIG_PARPORT_PC=y
-# CONFIG_PARPORT_PC_FIFO is not set
-# CONFIG_PARPORT_PC_SUPERIO is not set
-# CONFIG_PARPORT_PC_PCMCIA is not set
-# CONFIG_PARPORT_AMIGA is not set
-# CONFIG_PARPORT_MFC3 is not set
-# CONFIG_PARPORT_ATARI is not set
-# CONFIG_PARPORT_GSC is not set
-# CONFIG_PARPORT_SUNBPP is not set
-# CONFIG_PARPORT_IP22 is not set
-# CONFIG_PARPORT_OTHER is not set
-CONFIG_PARPORT_1284=y
+# CONFIG_PARPORT is not set
 
 #
 # Plug and Play configuration
@@ -112,7 +100,7 @@ CONFIG_PNP=y
 #
 # Block devices
 #
-CONFIG_BLK_DEV_FD=y
+# CONFIG_BLK_DEV_FD is not set
 # CONFIG_BLK_DEV_XD is not set
 # CONFIG_PARIDE is not set
 # CONFIG_BLK_CPQ_DA is not set
@@ -131,14 +119,14 @@ CONFIG_BLK_DEV_INITRD=y
 #
 # Multi-device support (RAID and LVM)
 #
-CONFIG_MD=y
-CONFIG_BLK_DEV_MD=y
-CONFIG_MD_LINEAR=y
-CONFIG_MD_RAID0=y
-CONFIG_MD_RAID1=y
-CONFIG_MD_RAID5=y
-CONFIG_MD_MULTIPATH=y
-CONFIG_BLK_DEV_LVM=y
+# CONFIG_MD is not set
+# CONFIG_BLK_DEV_MD is not set
+# CONFIG_MD_LINEAR is not set
+# CONFIG_MD_RAID0 is not set
+# CONFIG_MD_RAID1 is not set
+# CONFIG_MD_RAID5 is not set
+# CONFIG_MD_MULTIPATH is not set
+# CONFIG_BLK_DEV_LVM is not set
 
 #
 # Networking options
@@ -234,7 +222,7 @@ CONFIG_IP_NF_TARGET_ULOG=y
 #
 # CONFIG_DEV_APPLETALK is not set
 # CONFIG_DECNET is not set
-# CONFIG_BRIDGE is not set
+CONFIG_BRIDGE=y
 # CONFIG_X25 is not set
 # CONFIG_LAPB is not set
 # CONFIG_LLC is not set
@@ -380,14 +368,7 @@ CONFIG_CHR_DEV_SG=y
 # CONFIG_SCSI_AHA1740 is not set
 CONFIG_SCSI_AACRAID=y
 # CONFIG_SCSI_AIC7XXX is not set
-CONFIG_SCSI_AIC79XX=y
-CONFIG_AIC79XX_CMDS_PER_DEVICE=32
-CONFIG_AIC79XX_RESET_DELAY_MS=15000
-# CONFIG_AIC79XX_BUILD_FIRMWARE is not set
-# CONFIG_AIC79XX_ENABLE_RD_STRM is not set
-CONFIG_AIC79XX_DEBUG_ENABLE=y
-CONFIG_AIC79XX_DEBUG_MASK=0
-# CONFIG_AIC79XX_REG_PRETTY_PRINT is not set
+# CONFIG_SCSI_AIC79XX is not set
 # CONFIG_SCSI_AIC7XXX_OLD is not set
 # CONFIG_SCSI_DPT_I2O is not set
 # CONFIG_SCSI_ADVANSYS is not set
@@ -397,9 +378,9 @@ CONFIG_SCSI_MEGARAID=y
 # CONFIG_SCSI_MEGARAID2 is not set
 CONFIG_SCSI_BUSLOGIC=y
 # CONFIG_SCSI_OMIT_FLASHPOINT is not set
-CONFIG_SCSI_CPQFCTS=y
+# CONFIG_SCSI_CPQFCTS is not set
 # CONFIG_SCSI_DMX3191D is not set
-CONFIG_SCSI_DTC3280=y
+# CONFIG_SCSI_DTC3280 is not set
 # CONFIG_SCSI_EATA is not set
 # CONFIG_SCSI_EATA_DMA is not set
 # CONFIG_SCSI_EATA_PIO is not set
@@ -409,15 +390,11 @@ CONFIG_SCSI_DTC3280=y
 # CONFIG_SCSI_IPS is not set
 # CONFIG_SCSI_INITIO is not set
 # CONFIG_SCSI_INIA100 is not set
-# CONFIG_SCSI_PPA is not set
-# CONFIG_SCSI_IMM is not set
 # CONFIG_SCSI_NCR53C406A is not set
 # CONFIG_SCSI_NCR53C7xx is not set
-CONFIG_SCSI_SYM53C8XX_2=y
-CONFIG_SCSI_SYM53C8XX_DMA_ADDRESSING_MODE=1
-CONFIG_SCSI_SYM53C8XX_DEFAULT_TAGS=16
-CONFIG_SCSI_SYM53C8XX_MAX_TAGS=64
-# CONFIG_SCSI_SYM53C8XX_IOMAPPED is not set
+# CONFIG_SCSI_SYM53C8XX_2 is not set
+# CONFIG_SCSI_NCR53C8XX is not set
+# CONFIG_SCSI_SYM53C8XX is not set
 # CONFIG_SCSI_PAS16 is not set
 # CONFIG_SCSI_PCI2000 is not set
 # CONFIG_SCSI_PCI2220I is not set
@@ -510,9 +487,7 @@ CONFIG_PCNET32=y
 # CONFIG_APRICOT is not set
 # CONFIG_B44 is not set
 # CONFIG_CS89x0 is not set
-CONFIG_TULIP=y
-# CONFIG_TULIP_MWI is not set
-# CONFIG_TULIP_MMIO is not set
+# CONFIG_TULIP is not set
 # CONFIG_DE4X5 is not set
 # CONFIG_DGRS is not set
 # CONFIG_DM9102 is not set
@@ -545,8 +520,7 @@ CONFIG_TULIP=y
 #
 # Ethernet (1000 Mbit)
 #
-CONFIG_ACENIC=y
-# CONFIG_ACENIC_OMIT_TIGON_I is not set
+# CONFIG_ACENIC is not set
 # CONFIG_DL2K is not set
 CONFIG_E1000=y
 # CONFIG_E1000_NAPI is not set
@@ -621,9 +595,6 @@ CONFIG_VT_CONSOLE=y
 # CONFIG_SERIAL_NONSTANDARD is not set
 CONFIG_UNIX98_PTYS=y
 CONFIG_UNIX98_PTY_COUNT=256
-# CONFIG_PRINTER is not set
-# CONFIG_PPDEV is not set
-# CONFIG_TIPAR is not set
 
 #
 # I2C support
@@ -869,107 +840,7 @@ CONFIG_DUMMY_CONSOLE=y
 #
 # USB support
 #
-CONFIG_USB=y
-CONFIG_USB_DEBUG=y
-
-#
-# Miscellaneous USB options
-#
-# CONFIG_USB_DEVICEFS is not set
-# CONFIG_USB_BANDWIDTH is not set
-
-#
-# USB Host Controller Drivers
-#
-# CONFIG_USB_EHCI_HCD is not set
-CONFIG_USB_UHCI=y
-# CONFIG_USB_UHCI_ALT is not set
-CONFIG_USB_OHCI=y
-# CONFIG_USB_SL811HS_ALT is not set
-# CONFIG_USB_SL811HS is not set
-
-#
-# USB Device Class drivers
-#
-# CONFIG_USB_AUDIO is not set
-# CONFIG_USB_EMI26 is not set
-# CONFIG_USB_BLUETOOTH is not set
-# CONFIG_USB_MIDI is not set
-# CONFIG_USB_STORAGE is not set
-# CONFIG_USB_STORAGE_DEBUG is not set
-# CONFIG_USB_STORAGE_DATAFAB is not set
-# CONFIG_USB_STORAGE_FREECOM is not set
-# CONFIG_USB_STORAGE_ISD200 is not set
-# CONFIG_USB_STORAGE_DPCM is not set
-# CONFIG_USB_STORAGE_HP8200e is not set
-# CONFIG_USB_STORAGE_SDDR09 is not set
-# CONFIG_USB_STORAGE_SDDR55 is not set
-# CONFIG_USB_STORAGE_JUMPSHOT is not set
-# CONFIG_USB_ACM is not set
-# CONFIG_USB_PRINTER is not set
-
-#
-# USB Human Interface Devices (HID)
-#
-# CONFIG_USB_HID is not set
-
-#
-#     Input core support is needed for USB HID input layer or HIDBP support
-#
-# CONFIG_USB_HIDINPUT is not set
-# CONFIG_USB_HIDDEV is not set
-# CONFIG_USB_KBD is not set
-# CONFIG_USB_MOUSE is not set
-# CONFIG_USB_AIPTEK is not set
-# CONFIG_USB_WACOM is not set
-# CONFIG_USB_KBTAB is not set
-# CONFIG_USB_POWERMATE is not set
-
-#
-# USB Imaging devices
-#
-# CONFIG_USB_DC2XX is not set
-# CONFIG_USB_MDC800 is not set
-# CONFIG_USB_SCANNER is not set
-# CONFIG_USB_MICROTEK is not set
-# CONFIG_USB_HPUSBSCSI is not set
-
-#
-# USB Multimedia devices
-#
-
-#
-#   Video4Linux support is needed for USB Multimedia device support
-#
-
-#
-# USB Network adaptors
-#
-# CONFIG_USB_PEGASUS is not set
-# CONFIG_USB_RTL8150 is not set
-# CONFIG_USB_KAWETH is not set
-# CONFIG_USB_CATC is not set
-# CONFIG_USB_CDCETHER is not set
-# CONFIG_USB_USBNET is not set
-
-#
-# USB port drivers
-#
-# CONFIG_USB_USS720 is not set
-
-#
-# USB Serial Converter support
-#
-# CONFIG_USB_SERIAL is not set
-
-#
-# USB Miscellaneous drivers
-#
-# CONFIG_USB_RIO500 is not set
-# CONFIG_USB_AUERSWALD is not set
-# CONFIG_USB_TIGL is not set
-# CONFIG_USB_BRLVGER is not set
-# CONFIG_USB_LCD is not set
+# CONFIG_USB is not set
 
 #
 # Support for USB gadgets

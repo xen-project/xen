@@ -8,7 +8,10 @@
 
 #include <linux/config.h>
 #include <linux/sched.h>
+#include <linux/mm.h>
+#include <linux/vmalloc.h>
 #include <asm/hypervisor.h>
+#include <asm/hypervisor-ifs/dom_mem_ops.h>
 #include <asm/page.h>
 #include <asm/pgtable.h>
 #include <asm/multicall.h>
@@ -242,3 +245,105 @@ void queue_set_ldt(unsigned long ptr, unsigned long len)
     increment_index();
     spin_unlock_irqrestore(&update_lock, flags);
 }
+
+void queue_machphys_update(unsigned long mfn, unsigned long pfn)
+{
+    unsigned long flags;
+    spin_lock_irqsave(&update_lock, flags);
+    update_queue[idx].ptr = (mfn << PAGE_SHIFT) | MMU_MACHPHYS_UPDATE;
+    update_queue[idx].val = pfn;
+    increment_index();
+    spin_unlock_irqrestore(&update_lock, flags);
+}
+
+#ifdef CONFIG_XEN_PHYSDEV_ACCESS
+
+unsigned long allocate_empty_lowmem_region(unsigned long pages)
+{
+    pgd_t         *pgd; 
+    pmd_t         *pmd;
+    pte_t         *pte;
+    unsigned long *pfn_array;
+    unsigned long  vstart;
+    unsigned long  i;
+    int            ret;
+    unsigned int   order = get_order(pages*PAGE_SIZE);
+    dom_mem_op_t   dom_mem_op;
+
+    vstart = __get_free_pages(GFP_KERNEL, order);
+    if ( vstart == 0 )
+        return 0UL;
+
+    pfn_array = vmalloc((1<<order) * sizeof(*pfn_array));
+    if ( pfn_array == NULL )
+        BUG();
+
+    for ( i = 0; i < (1<<order); i++ )
+    {
+        pgd = pgd_offset_k(   (vstart + (i*PAGE_SIZE)));
+        pmd = pmd_offset(pgd, (vstart + (i*PAGE_SIZE)));
+        pte = pte_offset(pmd, (vstart + (i*PAGE_SIZE))); 
+        pfn_array[i] = pte->pte_low >> PAGE_SHIFT;
+        queue_l1_entry_update(pte, 0);
+        phys_to_machine_mapping[__pa(vstart)>>PAGE_SHIFT] = 0xdeadbeef;
+    }
+
+    flush_page_update_queue();
+
+    dom_mem_op.op = MEMOP_RESERVATION_DECREASE;
+    dom_mem_op.u.decrease.size  = 1<<order;
+    dom_mem_op.u.decrease.pages = pfn_array;
+    if ( (ret = HYPERVISOR_dom_mem_op(&dom_mem_op)) != (1<<order) )
+    {
+        printk(KERN_WARNING "Unable to reduce memory reservation (%d)\n", ret);
+        BUG();
+    }
+
+    vfree(pfn_array);
+
+    return vstart;
+}
+
+void deallocate_lowmem_region(unsigned long vstart, unsigned long pages)
+{
+    pgd_t         *pgd; 
+    pmd_t         *pmd;
+    pte_t         *pte;
+    unsigned long *pfn_array;
+    unsigned long  i;
+    int            ret;
+    unsigned int   order = get_order(pages*PAGE_SIZE);
+    dom_mem_op_t   dom_mem_op;
+
+    pfn_array = vmalloc((1<<order) * sizeof(*pfn_array));
+    if ( pfn_array == NULL )
+        BUG();
+
+    dom_mem_op.op = MEMOP_RESERVATION_INCREASE;
+    dom_mem_op.u.increase.size  = 1<<order;
+    dom_mem_op.u.increase.pages = pfn_array;
+    if ( (ret = HYPERVISOR_dom_mem_op(&dom_mem_op)) != (1<<order) )
+    {
+        printk(KERN_WARNING "Unable to increase memory reservation (%d)\n",
+               ret);
+        BUG();
+    }
+
+    for ( i = 0; i < (1<<order); i++ )
+    {
+        pgd = pgd_offset_k(   (vstart + (i*PAGE_SIZE)));
+        pmd = pmd_offset(pgd, (vstart + (i*PAGE_SIZE)));
+        pte = pte_offset(pmd, (vstart + (i*PAGE_SIZE)));
+        queue_l1_entry_update(pte, (pfn_array[i]<<PAGE_SHIFT)|__PAGE_KERNEL);
+        queue_machphys_update(pfn_array[i], __pa(vstart)>>PAGE_SHIFT);
+        phys_to_machine_mapping[__pa(vstart)>>PAGE_SHIFT] = pfn_array[i];
+    }
+
+    flush_page_update_queue();
+
+    vfree(pfn_array);
+
+    free_pages(vstart, order);
+}
+
+#endif /* CONFIG_XEN_PHYSDEV_ACCESS */

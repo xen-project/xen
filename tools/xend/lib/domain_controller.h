@@ -342,6 +342,7 @@ typedef struct {
     unsigned int handle;
     unsigned int status;
     unsigned int evtchn; /* status == NETIF_INTERFACE_STATUS_CONNECTED */
+    u8           mac[6]; /* status == NETIF_INTERFACE_STATUS_CONNECTED */
 } netif_fe_interface_status_changed_t;
 
 /*
@@ -373,7 +374,8 @@ typedef struct {
  */
 typedef struct {
     unsigned int  handle;
-    unsigned long shmem_frame;
+    unsigned long tx_shmem_frame;
+    unsigned long rx_shmem_frame;
 } netif_fe_interface_connect_t;
 
 /*
@@ -434,6 +436,7 @@ typedef struct {
     /* IN */
     domid_t        domid;             /* Domain attached to new interface.   */
     unsigned int   netif_handle;      /* Domain-specific interface handle.   */
+    u8             mac[6];
     /* OUT */
     unsigned int   status;
 } netif_be_create_t; 
@@ -463,7 +466,9 @@ typedef struct {
     domid_t        domid;             /* Domain attached to new interface.   */
     unsigned int   netif_handle;      /* Domain-specific interface handle.   */
     unsigned int   evtchn;            /* Event channel for notifications.    */
-    unsigned long  shmem_frame;       /* Page cont. shared comms window.     */
+    unsigned long  tx_shmem_frame;    /* Page cont. tx shared comms window.  */
+    unsigned long  rx_shmem_frame;    /* Page cont. rx shared comms window.  */
+    unsigned long  shmem_frame;       
     /* OUT */
     unsigned int   status;
 } netif_be_connect_t; 

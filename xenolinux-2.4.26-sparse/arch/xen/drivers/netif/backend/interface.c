@@ -12,8 +12,8 @@
 #define NETIF_HASH(_d,_h) \
     (((int)(_d)^(int)((_d)>>32)^(int)(_h))&(NETIF_HASHSZ-1))
 
-static kmem_cache_t *netif_cachep;
-static netif_t      *netif_hash[NETIF_HASHSZ];
+static netif_t *netif_hash[NETIF_HASHSZ];
+static struct net_device *bridge_dev;
 
 netif_t *netif_find_by_handle(domid_t domid, unsigned int handle)
 {
@@ -35,7 +35,9 @@ void __netif_disconnect_complete(netif_t *netif)
      * must still be notified to the remote driver.
      */
     unbind_evtchn_from_irq(netif->evtchn);
-    vfree(netif->net_ring_base);
+    vfree(netif->tx); /* Frees netif->rx as well. */
+    (void)br_del_if((struct net_bridge *)bridge_dev->priv, netif->dev);
+    (void)dev_close(netif->dev);
 
     /* Construct the deferred response message. */
     cmsg.type         = CMSG_NETIF_BE;
@@ -66,24 +68,32 @@ void __netif_disconnect_complete(netif_t *netif)
 
 void netif_create(netif_be_create_t *create)
 {
-    domid_t       domid  = create->domid;
-    unsigned int  handle = create->netif_handle;
-    netif_t     **pnetif, *netif;
+    domid_t            domid  = create->domid;
+    unsigned int       handle = create->netif_handle;
+    struct net_device *dev;
+    netif_t          **pnetif, *netif;
 
-    if ( (netif = kmem_cache_alloc(netif_cachep, GFP_ATOMIC)) == NULL )
+    dev = alloc_netdev(sizeof(netif_t), "netif-be-%d", ether_setup);
+    if ( dev == NULL )
     {
         DPRINTK("Could not create netif: out of memory\n");
         create->status = NETIF_BE_STATUS_OUT_OF_MEMORY;
         return;
     }
 
+    netif = dev->priv;
     memset(netif, 0, sizeof(*netif));
     netif->domid  = domid;
     netif->handle = handle;
     netif->status = DISCONNECTED;
-    spin_lock_init(&netif->vbd_lock);
-    spin_lock_init(&netif->net_ring_lock);
+    spin_lock_init(&netif->rx_lock);
+    spin_lock_init(&netif->tx_lock);
     atomic_set(&netif->refcnt, 0);
+    netif->dev = dev;
+
+    netif->credit_bytes = netif->remaining_credit = ~0UL;
+    netif->credit_usec  = 0UL;
+    /*init_ac_timer(&new_vif->credit_timeout);*/
 
     pnetif = &netif_hash[NETIF_HASH(domid, handle)];
     while ( *pnetif != NULL )
@@ -92,10 +102,22 @@ void netif_create(netif_be_create_t *create)
         {
             DPRINTK("Could not create netif: already exists\n");
             create->status = NETIF_BE_STATUS_INTERFACE_EXISTS;
-            kmem_cache_free(netif_cachep, netif);
+            kfree(dev);
             return;
         }
         pnetif = &(*pnetif)->hash_next;
+    }
+
+    dev->hard_start_xmit = netif_be_start_xmit;
+    dev->get_stats       = netif_be_get_stats;
+    memcpy(dev->dev_addr, create->mac, ETH_ALEN);
+    
+    if ( register_netdev(dev) != 0 )
+    {
+        DPRINTK("Could not register new net device\n");
+        create->status = NETIF_BE_STATUS_OUT_OF_MEMORY;
+        kfree(dev);
+        return;
     }
 
     netif->hash_next = *pnetif;
@@ -132,8 +154,8 @@ void netif_destroy(netif_be_destroy_t *destroy)
 
  destroy:
     *pnetif = netif->hash_next;
-    destroy_all_vbds(netif);
-    kmem_cache_free(netif_cachep, netif);
+    unregister_netdev(netif->dev);
+    kfree(netif->dev);
     destroy->status = NETIF_BE_STATUS_OKAY;
 }
 
@@ -142,11 +164,13 @@ void netif_connect(netif_be_connect_t *connect)
     domid_t       domid  = connect->domid;
     unsigned int  handle = connect->netif_handle;
     unsigned int  evtchn = connect->evtchn;
-    unsigned long shmem_frame = connect->shmem_frame;
+    unsigned long tx_shmem_frame = connect->tx_shmem_frame;
+    unsigned long rx_shmem_frame = connect->rx_shmem_frame;
     struct vm_struct *vma;
     pgprot_t      prot;
     int           error;
     netif_t      *netif;
+    struct net_device *eth0_dev;
 
     netif = netif_find_by_handle(domid, handle);
     if ( unlikely(netif == NULL) )
@@ -157,16 +181,27 @@ void netif_connect(netif_be_connect_t *connect)
         return;
     }
 
-    if ( (vma = get_vm_area(PAGE_SIZE, VM_IOREMAP)) == NULL )
+    if ( netif->status != DISCONNECTED )
+    {
+        connect->status = NETIF_BE_STATUS_INTERFACE_CONNECTED;
+        return;
+    }
+
+    if ( (vma = get_vm_area(2*PAGE_SIZE, VM_IOREMAP)) == NULL )
     {
         connect->status = NETIF_BE_STATUS_OUT_OF_MEMORY;
         return;
     }
 
     prot = __pgprot(_PAGE_PRESENT | _PAGE_RW | _PAGE_DIRTY | _PAGE_ACCESSED);
-    error = direct_remap_area_pages(&init_mm, VMALLOC_VMADDR(vma->addr),
-                                    shmem_frame<<PAGE_SHIFT, PAGE_SIZE,
-                                    prot, domid);
+    error  = direct_remap_area_pages(&init_mm, 
+                                     VMALLOC_VMADDR(vma->addr),
+                                     tx_shmem_frame<<PAGE_SHIFT, PAGE_SIZE,
+                                     prot, domid);
+    error |= direct_remap_area_pages(&init_mm, 
+                                     VMALLOC_VMADDR(vma->addr) + PAGE_SIZE,
+                                     rx_shmem_frame<<PAGE_SHIFT, PAGE_SIZE,
+                                     prot, domid);
     if ( error != 0 )
     {
         if ( error == -ENOMEM )
@@ -179,21 +214,27 @@ void netif_connect(netif_be_connect_t *connect)
         return;
     }
 
-    if ( netif->status != DISCONNECTED )
-    {
-        connect->status = NETIF_BE_STATUS_INTERFACE_CONNECTED;
-        vfree(vma->addr);
-        return;
-    }
-
-    netif->evtchn        = evtchn;
-    netif->irq           = bind_evtchn_to_irq(evtchn);
-    netif->shmem_frame   = shmem_frame;
-    netif->net_ring_base = (netif_ring_t *)vma->addr;
-    netif->status        = CONNECTED;
+    netif->evtchn         = evtchn;
+    netif->irq            = bind_evtchn_to_irq(evtchn);
+    netif->tx_shmem_frame = tx_shmem_frame;
+    netif->rx_shmem_frame = rx_shmem_frame;
+    netif->tx             = 
+        (netif_tx_interface_t *)vma->addr;
+    netif->rx             = 
+        (netif_rx_interface_t *)((char *)vma->addr + PAGE_SIZE);
+    netif->status         = CONNECTED;
     netif_get(netif);
 
-    request_irq(netif->irq, netif_be_int, 0, "netif-backend", netif);
+    (void)dev_open(netif->dev);
+    (void)br_add_if((struct net_bridge *)bridge_dev->priv, netif->dev);
+    /* At this point we try to ensure that eth0 is attached to the bridge. */
+    if ( (eth0_dev = __dev_get_by_name("eth0")) != NULL )
+    {
+        (void)dev_open(eth0_dev);
+        (void)br_add_if((struct net_bridge *)bridge_dev->priv, eth0_dev);
+    }
+    (void)request_irq(netif->irq, netif_be_int, 0, "netif-backend", netif);
+    netif_start_queue(netif->dev);
 
     connect->status = NETIF_BE_STATUS_OKAY;
 }
@@ -218,6 +259,7 @@ int netif_disconnect(netif_be_disconnect_t *disconnect, u8 rsp_id)
         netif->status = DISCONNECTING;
         netif->disconnect_rspid = rsp_id;
         wmb(); /* Let other CPUs see the status change. */
+        netif_stop_queue(netif->dev);
         free_irq(netif->irq, NULL);
         netif_deschedule(netif);
         netif_put(netif);
@@ -226,105 +268,11 @@ int netif_disconnect(netif_be_disconnect_t *disconnect, u8 rsp_id)
     return 0; /* Caller should not send response message. */
 }
 
-net_vif_t *create_net_vif(domid_t dom)
-{
-    unsigned int idx;
-    net_vif_t *new_vif = NULL;
-    net_ring_t *new_ring = NULL;
-    struct task_struct *p = NULL;
-    unsigned long flags, vmac_hash;
-    unsigned char vmac_key[ETH_ALEN + 2 + MAX_DOMAIN_NAME];
-
-    if ( (p = find_domain_by_id(dom)) == NULL )
-        return NULL;
-    
-    write_lock_irqsave(&tasklist_lock, flags);
-
-    for ( idx = 0; idx < MAX_DOMAIN_VIFS; idx++ )
-        if ( p->net_vif_list[idx] == NULL )
-            break;
-    if ( idx == MAX_DOMAIN_VIFS )
-        goto fail;
-
-    if ( (new_vif = kmem_cache_alloc(net_vif_cache, GFP_KERNEL)) == NULL )
-        goto fail;
-
-    memset(new_vif, 0, sizeof(*new_vif));
-    
-    if ( sizeof(net_ring_t) > PAGE_SIZE )
-        BUG();
-    new_ring = (net_ring_t *)get_free_page(GFP_KERNEL);
-    clear_page(new_ring);
-    SHARE_PFN_WITH_DOMAIN(virt_to_page(new_ring), p);
-
-    /*
-     * Fill in the new vif struct. Note that, while the vif's refcnt is
-     * non-zero, we hold a reference to the task structure.
-     */
-    atomic_set(&new_vif->refcnt, 1);
-    new_vif->shared_rings = new_ring;
-    new_vif->shared_idxs  = &p->shared_info->net_idx[idx];
-    new_vif->domain       = p;
-    new_vif->idx          = idx;
-    new_vif->list.next    = NULL;
-    spin_lock_init(&new_vif->rx_lock);
-    spin_lock_init(&new_vif->tx_lock);
-
-    new_vif->credit_bytes = new_vif->remaining_credit = ~0UL;
-    new_vif->credit_usec  = 0UL;
-    init_ac_timer(&new_vif->credit_timeout);
-
-    if ( (p->domain == 0) && (idx == 0) )
-    {
-        /*
-         * DOM0/VIF0 gets the real physical MAC address, so that users can
-         * easily get a Xen-based machine up and running by using an existing
-         * DHCP entry.
-         */
-        memcpy(new_vif->vmac, the_dev->dev_addr, ETH_ALEN);
-    }
-    else
-    {
-        /*
-         * Most VIFs get a random MAC address with a "special" vendor id.
-         * We try to get MAC addresses to be unique across multiple servers
-         * by including the physical MAC address in the hash. The hash also
-         * includes the vif index and the domain's name.
-         * 
-         * NB. The vendor is currently an "obsolete" one that used to belong
-         * to DEC (AA-00-00). Using it is probably a bit rude :-)
-         * 
-         * NB2. The first bit of the first random octet is set to zero for
-         * all dynamic MAC addresses. This may allow us to manually specify
-         * MAC addresses for some VIFs with no fear of clashes.
-         */
-        memcpy(&vmac_key[0], the_dev->dev_addr, ETH_ALEN);
-        *(__u16 *)(&vmac_key[ETH_ALEN]) = htons(idx);
-        strcpy(&vmac_key[ETH_ALEN+2], p->name);
-        vmac_hash = hash(vmac_key, ETH_ALEN + 2 + strlen(p->name));
-        memcpy(new_vif->vmac, "\xaa\x00\x00", 3);
-        new_vif->vmac[3] = (vmac_hash >> 16) & 0xef; /* First bit is zero. */
-        new_vif->vmac[4] = (vmac_hash >>  8) & 0xff;
-        new_vif->vmac[5] = (vmac_hash >>  0) & 0xff;
-    }
-
-    p->net_vif_list[idx] = new_vif;
-    
-    write_unlock_irqrestore(&tasklist_lock, flags);
-    return new_vif;
-    
- fail:
-    write_unlock_irqrestore(&tasklist_lock, flags);
-    if ( new_vif != NULL )
-        kmem_cache_free(net_vif_cache, new_vif);
-    if ( p != NULL )
-        put_task_struct(p);
-    return NULL;
-}
-
 void netif_interface_init(void)
 {
-    netif_cachep = kmem_cache_create("netif_cache", sizeof(netif_t), 
-                                     0, 0, NULL, NULL);
     memset(netif_hash, 0, sizeof(netif_hash));
+    if ( br_add_bridge("netif-backend") != 0 )
+        BUG();
+    bridge_dev = __dev_get_by_name("netif-be-bridge");
+    (void)dev_open(bridge_dev);
 }

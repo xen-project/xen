@@ -127,6 +127,12 @@
  *   (ptr[31:15],val[31:15]) -- dom[63:32]
  *   NB. This command must be immediately preceded by SET_SUBJECTDOM_L.
  * 
+ *   val[7:0] == MMUEXT_REASSIGN_PAGE:
+ *   ptr[:2]  -- machine address within page to be reassigned to the GPS.
+ * 
+ *   val[7:0] == MMUEXT_RESET_SUBJECTDOM:
+ *   Resets both the GPS and the PTS to their defaults (i.e., calling domain).
+ * 
  * Notes on constraints on the above arguments:
  *  [1] The page frame containing the machine address must belong to the PTS.
  *  [2] If the PTE is valid (i.e., bit 0 is set) then the specified page frame
@@ -151,6 +157,8 @@
 #define MMUEXT_SET_SUBJECTDOM_L  9 /* (ptr[31:15],val[31:15]) = dom[31:0]    */
 #define MMUEXT_SET_SUBJECTDOM_H 10 /* (ptr[31:15],val[31:15]) = dom[63:32]   */
 #define SET_PAGETABLE_SUBJECTDOM (1<<14) /* OR into 'val' arg of SUBJECTDOM_H*/
+#define MMUEXT_REASSIGN_PAGE    11
+#define MMUEXT_RESET_SUBJECTDOM 12
 #define MMUEXT_CMD_MASK        255
 #define MMUEXT_CMD_SHIFT         8
 

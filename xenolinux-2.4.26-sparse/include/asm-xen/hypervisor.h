@@ -44,6 +44,7 @@ void queue_pgd_unpin(unsigned long ptr);
 void queue_pte_pin(unsigned long ptr);
 void queue_pte_unpin(unsigned long ptr);
 void queue_set_ldt(unsigned long ptr, unsigned long bytes);
+void queue_machphys_update(unsigned long mfn, unsigned long pfn);
 #define MMU_UPDATE_DEBUG 0
 
 #if MMU_UPDATE_DEBUG > 0
@@ -137,6 +138,12 @@ static inline int flush_page_update_queue(void)
 #define XEN_flush_page_update_queue() (_flush_page_update_queue())
 void MULTICALL_flush_page_update_queue(void);
 
+#ifdef CONFIG_XEN_PHYSDEV_ACCESS
+/* Allocate a contiguous empty region of low memory. Return virtual start. */
+unsigned long allocate_empty_lowmem_region(unsigned long pages);
+/* Deallocate a contiguous region of low memory. Return it to the allocator. */
+void deallocate_lowmem_region(unsigned long vstart, unsigned long pages);
+#endif
 
 /*
  * Assembler stubs for hyper-calls.
