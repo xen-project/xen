@@ -154,7 +154,7 @@ static inline int HYPERVISOR_set_trap_table(trap_info_t *table)
     __asm__ __volatile__ (
         TRAP_INSTR
         : "=a" (ret) : "0" (__HYPERVISOR_set_trap_table),
-        "b" (table) );
+        "b" (table) : "memory" );
 
     return ret;
 }
@@ -166,7 +166,7 @@ static inline int HYPERVISOR_mmu_update(mmu_update_t *req, int count)
     __asm__ __volatile__ (
         TRAP_INSTR
         : "=a" (ret) : "0" (__HYPERVISOR_mmu_update), 
-        "b" (req), "c" (count) );
+        "b" (req), "c" (count) : "memory" );
 
     if ( unlikely(ret < 0) )
         panic("Failed mmu update: %p, %d", req, count);
@@ -181,7 +181,7 @@ static inline int HYPERVISOR_console_write(const char *str, int count)
     __asm__ __volatile__ (
         TRAP_INSTR
         : "=a" (ret) : "0" (__HYPERVISOR_console_write), 
-        "b" (str), "c" (count) );
+        "b" (str), "c" (count) : "memory" );
 
 
     return ret;
@@ -193,7 +193,7 @@ static inline int HYPERVISOR_set_gdt(unsigned long *frame_list, int entries)
     __asm__ __volatile__ (
         TRAP_INSTR
         : "=a" (ret) : "0" (__HYPERVISOR_set_gdt), 
-        "b" (frame_list), "c" (entries) );
+        "b" (frame_list), "c" (entries) : "memory" );
 
 
     return ret;
@@ -240,7 +240,7 @@ static inline int HYPERVISOR_fpu_taskswitch(void)
     int ret;
     __asm__ __volatile__ (
         TRAP_INSTR
-        : "=a" (ret) : "0" (__HYPERVISOR_fpu_taskswitch) );
+        : "=a" (ret) : "0" (__HYPERVISOR_fpu_taskswitch) : "memory" );
 
     return ret;
 }
@@ -251,7 +251,7 @@ static inline int HYPERVISOR_yield(void)
     __asm__ __volatile__ (
         TRAP_INSTR
         : "=a" (ret) : "0" (__HYPERVISOR_sched_op),
-        "b" (SCHEDOP_yield) );
+        "b" (SCHEDOP_yield) : "memory" );
 
     return ret;
 }
@@ -262,7 +262,7 @@ static inline int HYPERVISOR_block(void)
     __asm__ __volatile__ (
         TRAP_INSTR
         : "=a" (ret) : "0" (__HYPERVISOR_sched_op),
-        "b" (SCHEDOP_block) );
+        "b" (SCHEDOP_block) : "memory" );
 
     return ret;
 }
@@ -273,7 +273,7 @@ static inline int HYPERVISOR_exit(void)
     __asm__ __volatile__ (
         TRAP_INSTR
         : "=a" (ret) : "0" (__HYPERVISOR_sched_op),
-        "b" (SCHEDOP_exit) );
+        "b" (SCHEDOP_exit) : "memory" );
 
     return ret;
 }
@@ -343,7 +343,7 @@ static inline int HYPERVISOR_set_debugreg(int reg, unsigned long value)
     __asm__ __volatile__ (
         TRAP_INSTR
         : "=a" (ret) : "0" (__HYPERVISOR_set_debugreg),
-        "b" (reg), "c" (value) );
+        "b" (reg), "c" (value) : "memory" );
 
     return ret;
 }
@@ -354,7 +354,7 @@ static inline unsigned long HYPERVISOR_get_debugreg(int reg)
     __asm__ __volatile__ (
         TRAP_INSTR
         : "=a" (ret) : "0" (__HYPERVISOR_get_debugreg),
-        "b" (reg) );
+        "b" (reg) : "memory" );
 
     return ret;
 }
@@ -366,7 +366,7 @@ static inline int HYPERVISOR_update_descriptor(
     __asm__ __volatile__ (
         TRAP_INSTR
         : "=a" (ret) : "0" (__HYPERVISOR_update_descriptor), 
-        "b" (pa), "c" (word1), "d" (word2) );
+        "b" (pa), "c" (word1), "d" (word2) : "memory" );
 
     return ret;
 }
@@ -377,7 +377,7 @@ static inline int HYPERVISOR_set_fast_trap(int idx)
     __asm__ __volatile__ (
         TRAP_INSTR
         : "=a" (ret) : "0" (__HYPERVISOR_set_fast_trap), 
-        "b" (idx) );
+        "b" (idx) : "memory" );
 
     return ret;
 }
@@ -410,7 +410,7 @@ static inline long HYPERVISOR_kbd_op(unsigned char op, unsigned char val)
     __asm__ __volatile__ (
         TRAP_INSTR
         : "=a" (ret) : "0" (__HYPERVISOR_kbd_op),
-        "b" (op), "c" (val) );
+        "b" (op), "c" (val) : "memory" );
 
     return ret;
 }
@@ -422,7 +422,7 @@ static inline int HYPERVISOR_update_va_mapping(
     __asm__ __volatile__ (
         TRAP_INSTR
         : "=a" (ret) : "0" (__HYPERVISOR_update_va_mapping), 
-        "b" (page_nr), "c" ((new_val).pte_low), "d" (flags) );
+        "b" (page_nr), "c" ((new_val).pte_low), "d" (flags) : "memory" );
 
     if ( unlikely(ret < 0) )
         panic("Failed update VA mapping: %08lx, %08lx, %08lx",
