@@ -228,7 +228,7 @@ asmlinkage void fatal_trap(int trapnr, struct xen_regs *regs, long error_code)
         __asm__ __volatile__ ( "hlt" );
 }
 
-static inline void do_trap(int trapnr, char *str,
+static inline int do_trap(int trapnr, char *str,
                            struct xen_regs *regs, 
                            long error_code, int use_error_code)
 {
@@ -249,7 +249,7 @@ static inline void do_trap(int trapnr, char *str,
     tb->eip        = ti->address;
     if ( TI_GET_IF(ti) )
         d->shared_info->vcpu_data[0].evtchn_upcall_mask = 1;
-    return; 
+    return 0;
 
  xen_fault:
 
@@ -257,7 +257,7 @@ static inline void do_trap(int trapnr, char *str,
     {
         DPRINTK("Trap %d: %08lx -> %08lx\n", trapnr, regs->eip, fixup);
         regs->eip = fixup;
-        return;
+        return 0;
     }
 
     DEBUGGER_trap_fatal(trapnr, regs, error_code);
@@ -266,18 +266,19 @@ static inline void do_trap(int trapnr, char *str,
     panic("CPU%d FATAL TRAP: vector = %d (%s)\n"
           "[error_code=%08x]\n",
           smp_processor_id(), trapnr, str, error_code);
+    return 0;
 }
 
 #define DO_ERROR_NOCODE(trapnr, str, name) \
-asmlinkage void do_##name(struct xen_regs * regs, long error_code) \
+asmlinkage int do_##name(struct xen_regs * regs, long error_code) \
 { \
-    do_trap(trapnr, str, regs, error_code, 0); \
+    return do_trap(trapnr, str, regs, error_code, 0); \
 }
 
 #define DO_ERROR(trapnr, str, name) \
-asmlinkage void do_##name(struct xen_regs * regs, long error_code) \
+asmlinkage int do_##name(struct xen_regs * regs, long error_code) \
 { \
-    do_trap(trapnr, str, regs, error_code, 1); \
+    return do_trap(trapnr, str, regs, error_code, 1); \
 }
 
 DO_ERROR_NOCODE( 0, "divide error", divide_error)
@@ -292,7 +293,7 @@ DO_ERROR_NOCODE(16, "fpu error", coprocessor_error)
 DO_ERROR(17, "alignment check", alignment_check)
 DO_ERROR_NOCODE(19, "simd error", simd_coprocessor_error)
 
-asmlinkage void do_int3(struct xen_regs *regs, long error_code)
+asmlinkage int do_int3(struct xen_regs *regs, long error_code)
 {
     struct domain *d = current;
     struct trap_bounce *tb = &d->thread.trap_bounce;
@@ -316,6 +317,8 @@ asmlinkage void do_int3(struct xen_regs *regs, long error_code)
     tb->eip        = ti->address;
     if ( TI_GET_IF(ti) )
         d->shared_info->vcpu_data[0].evtchn_upcall_mask = 1;
+
+    return 0;
 }
 
 asmlinkage void do_double_fault(void)
@@ -355,7 +358,7 @@ asmlinkage void do_machine_check(struct xen_regs *regs, long error_code)
     fatal_trap(TRAP_machine_check, regs, error_code);
 }
 
-asmlinkage void do_page_fault(struct xen_regs *regs, long error_code)
+asmlinkage int do_page_fault(struct xen_regs *regs, long error_code)
 {
     trap_info_t *ti;
     unsigned long off, addr, fixup;
@@ -377,18 +380,22 @@ asmlinkage void do_page_fault(struct xen_regs *regs, long error_code)
                       ptwr_info[cpu].ptinfo[PTWR_PT_ACTIVE].l2_idx) )
         {
             ptwr_flush(PTWR_PT_ACTIVE);
-            return;
+            return EXCRET_fault_fixed;
         }
 
         if ( (addr < PAGE_OFFSET) &&
              ((error_code & 3) == 3) && /* write-protection fault */
              ptwr_do_page_fault(addr) )
-            return;
+        {
+            if ( unlikely(d->mm.shadow_mode) )
+                (void)shadow_fault(addr, error_code);
+            return EXCRET_fault_fixed;
+        }
     }
 
     if ( unlikely(d->mm.shadow_mode) && 
          (addr < PAGE_OFFSET) && shadow_fault(addr, error_code) )
-        return; /* Returns TRUE if fault was handled. */
+        return EXCRET_fault_fixed;
 
     if ( unlikely(addr >= LDT_VIRT_START) && 
          (addr < (LDT_VIRT_START + (d->mm.ldt_ents*LDT_ENTRY_SIZE))) )
@@ -400,7 +407,7 @@ asmlinkage void do_page_fault(struct xen_regs *regs, long error_code)
         off  = addr - LDT_VIRT_START;
         addr = d->mm.ldt_base + off;
         if ( likely(map_ldt_shadow_page(off >> PAGE_SHIFT)) )
-            return; /* successfully copied the mapping */
+            return EXCRET_fault_fixed; /* successfully copied the mapping */
     }
 
     if ( unlikely(!(regs->cs & 3)) )
@@ -414,7 +421,7 @@ asmlinkage void do_page_fault(struct xen_regs *regs, long error_code)
     tb->eip        = ti->address;
     if ( TI_GET_IF(ti) )
         d->shared_info->vcpu_data[0].evtchn_upcall_mask = 1;
-    return; 
+    return 0; 
 
  xen_fault:
 
@@ -424,7 +431,7 @@ asmlinkage void do_page_fault(struct xen_regs *regs, long error_code)
         if ( !d->mm.shadow_mode )
             DPRINTK("Page fault: %08lx -> %08lx\n", regs->eip, fixup);
         regs->eip = fixup;
-        return;
+        return 0;
     }
 
     DEBUGGER_trap_fatal(TRAP_page_fault, regs, error_code);
@@ -451,9 +458,10 @@ asmlinkage void do_page_fault(struct xen_regs *regs, long error_code)
           "[error_code=%08x]\n"
           "Faulting linear address might be %08lx\n",
           smp_processor_id(), error_code, addr);
+    return 0;
 }
 
-asmlinkage void do_general_protection(struct xen_regs *regs, long error_code)
+asmlinkage int do_general_protection(struct xen_regs *regs, long error_code)
 {
     struct domain *d = current;
     struct trap_bounce *tb = &d->thread.trap_bounce;
@@ -502,7 +510,7 @@ asmlinkage void do_general_protection(struct xen_regs *regs, long error_code)
     if ( VM_ASSIST(d, VMASST_TYPE_4gb_segments) && 
          (error_code == 0) && 
          gpf_emulate_4gb(regs) )
-        return;
+        return 0;
 #endif
 
     /* Pass on GPF as is. */
@@ -514,7 +522,7 @@ asmlinkage void do_general_protection(struct xen_regs *regs, long error_code)
     tb->eip        = ti->address;
     if ( TI_GET_IF(ti) )
         d->shared_info->vcpu_data[0].evtchn_upcall_mask = 1;
-    return;
+    return 0;
 
  gp_in_kernel:
 
@@ -522,7 +530,7 @@ asmlinkage void do_general_protection(struct xen_regs *regs, long error_code)
     {
         DPRINTK("GPF (%04lx): %08lx -> %08lx\n", error_code, regs->eip, fixup);
         regs->eip = fixup;
-        return;
+        return 0;
     }
 
     DEBUGGER_trap_fatal(TRAP_gp_fault, regs, error_code);
@@ -530,6 +538,7 @@ asmlinkage void do_general_protection(struct xen_regs *regs, long error_code)
     show_registers(regs);
     panic("CPU%d GENERAL PROTECTION FAULT\n"
           "[error_code=%08x]\n", smp_processor_id(), error_code);
+    return 0;
 }
 
 asmlinkage void mem_parity_error(struct xen_regs *regs)
@@ -549,8 +558,6 @@ asmlinkage void io_check_error(struct xen_regs *regs)
 
 static void unknown_nmi_error(unsigned char reason, struct xen_regs * regs)
 {
-    DEBUGGER_trap_entry(TRAP_nmi, regs, 0);
-
     printk("Uhhuh. NMI received for unknown reason %02x.\n", reason);
     printk("Dazed and confused, but trying to continue\n");
     printk("Do you have a strange power saving mode enabled?\n");
@@ -581,7 +588,7 @@ static void nmi_softirq(void)
         send_guest_virq(dom0, VIRQ_IO_ERR);
 }
 
-asmlinkage void math_state_restore(struct xen_regs *regs, long error_code)
+asmlinkage int math_state_restore(struct xen_regs *regs, long error_code)
 {
     /* Prevent recursion. */
     clts();
@@ -602,9 +609,11 @@ asmlinkage void math_state_restore(struct xen_regs *regs, long error_code)
         tb->cs         = current->thread.traps[7].cs;
         tb->eip        = current->thread.traps[7].address;
     }
+
+    return EXCRET_fault_fixed;
 }
 
-asmlinkage void do_debug(struct xen_regs *regs, long error_code)
+asmlinkage int do_debug(struct xen_regs *regs, long error_code)
 {
     unsigned int condition;
     struct domain *d = current;
@@ -619,7 +628,7 @@ asmlinkage void do_debug(struct xen_regs *regs, long error_code)
          (d->thread.debugreg[7] == 0) )
     {
         __asm__("movl %0,%%db7" : : "r" (0));
-        return;
+        goto out;
     }
 
     if ( (regs->cs & 3) == 0 )
@@ -632,7 +641,7 @@ asmlinkage void do_debug(struct xen_regs *regs, long error_code)
          * on it. No need to bump EIP; the only faulting trap is an instruction
          * breakpoint, which can't happen to us.
          */
-        return;
+        goto out;
     }
 
     /* Save debug status register where guest OS can peek at it */
@@ -641,13 +650,16 @@ asmlinkage void do_debug(struct xen_regs *regs, long error_code)
     tb->flags = TBF_TRAP_NOCODE;
     tb->cs    = d->thread.traps[1].cs;
     tb->eip   = d->thread.traps[1].address;
+
+ out:
+    return EXCRET_not_a_fault;
 }
 
-
-asmlinkage void do_spurious_interrupt_bug(struct xen_regs * regs,
-                                          long error_code)
-{ /* nothing */ }
-
+asmlinkage int do_spurious_interrupt_bug(
+    struct xen_regs * regs, long error_code)
+{
+    return EXCRET_not_a_fault;
+}
 
 #define _set_gate(gate_addr,type,dpl,addr) \
 do { \
