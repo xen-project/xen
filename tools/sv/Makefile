@@ -2,53 +2,29 @@ sv_insdir := $(prefix)/var/xen/sv
 
 all:
 
+IMAGES	 = xen.png orb_01.jpg orb_02.jpg
+IMAGES	+= left-end-highlight.jpg left-end-no-highlight.jpg
+IMAGES	+= right-end-highlight.jpg right-end-no-highlight.jpg
+IMAGES	+= middle-highlight.jpg middle-no-highlight.jpg
+IMAGES	+= seperator.jpg
+IMAGES	+= seperator-left-highlight.jpg seperator-right-highlight.jpg
+IMAGES	+= shutdown.png reboot.png pause.png unpause.png destroy.png
+IMAGES	+= small-destroy.png small-pause.png small-unpause.png
+IMAGES	+= next.png previous.png finish.png
+
 install:
-	# make parent directory
-	mkdir -p $(sv_insdir)
-	
-	# copy Main.rpy file - references xen.sv.Main class
-	install -m0644 Main.rpy $(sv_insdir)
+	# copy XenSV Main.rpy file
+	@mkdir -p $(sv_insdir)
+	@install -m0644 Main.rpy $(sv_insdir)
 
-	# make images folder
-	mkdir -p $(sv_insdir)/images
-	
-	# copy images
-	install -m0644 images/xen.png $(sv_insdir)/images
-	install -m0644 images/orb_01.jpg $(sv_insdir)/images
-	install -m0644 images/orb_02.jpg $(sv_insdir)/images
-	
-	install -m0644 images/left-end-highlight.jpg $(sv_insdir)/images
-	install -m0644 images/left-end-no-highlight.jpg $(sv_insdir)/images
-	install -m0644 images/right-end-highlight.jpg $(sv_insdir)/images
-	install -m0644 images/right-end-no-highlight.jpg $(sv_insdir)/images
+	# copy XenSV images
+	@mkdir -p $(sv_insdir)/images
+	@(cd images && install -m0644 $(IMAGES) $(sv_insdir)/images)
 
-	install -m0644 images/middle-highlight.jpg $(sv_insdir)/images
-	install -m0644 images/middle-no-highlight.jpg $(sv_insdir)/images
-	
-	install -m0644 images/seperator.jpg $(sv_insdir)/images
-	install -m0644 images/seperator-left-highlight.jpg $(sv_insdir)/images
-	install -m0644 images/seperator-right-highlight.jpg $(sv_insdir)/images
-	
-	install -m0644 images/shutdown.png $(sv_insdir)/images
-	install -m0644 images/reboot.png $(sv_insdir)/images
-	install -m0644 images/pause.png $(sv_insdir)/images
-	install -m0644 images/unpause.png $(sv_insdir)/images
-	install -m0644 images/destroy.png $(sv_insdir)/images
-        
-	install -m0644 images/small-destroy.png $(sv_insdir)/images        
-	install -m0644 images/small-pause.png $(sv_insdir)/images   
-	install -m0644 images/small-unpause.png $(sv_insdir)/images
-                        
-	install -m0644 images/next.png $(sv_insdir)/images
-	install -m0644 images/previous.png $(sv_insdir)/images        
-	install -m0644 images/finish.png $(sv_insdir)/images 
-        
-	# make include folder
-	mkdir -p $(sv_insdir)/inc
-	
-	# copy stylesheet
-	install -m0644 inc/style.css $(sv_insdir)/inc
-	install -m0644 inc/script.js $(sv_insdir)/inc
+	# copy XenSV stylesheet
+	@mkdir -p $(sv_insdir)/inc
+	@install -m0644 inc/style.css $(sv_insdir)/inc
+	@install -m0644 inc/script.js $(sv_insdir)/inc
 
 clean:
 
