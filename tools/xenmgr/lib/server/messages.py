@@ -67,6 +67,9 @@ blkif_formats = {
     'blkif_be_create_t':
     (CMSG_BLKIF_BE, CMSG_BLKIF_BE_CREATE),
 
+    'blkif_be_disconnect_t':
+    (CMSG_BLKIF_BE, CMSG_BLKIF_BE_DISCONNECT),
+
     'blkif_be_destroy_t':
     (CMSG_BLKIF_BE, CMSG_BLKIF_BE_DESTROY),
 
@@ -123,11 +126,11 @@ netif_formats = {
     'netif_be_create_t':
     (CMSG_NETIF_BE, CMSG_NETIF_BE_CREATE),
 
-    'netif_be_destroy_t':
-    (CMSG_NETIF_BE, CMSG_NETIF_BE_DESTROY),
-
     'netif_be_disconnect_t':
     (CMSG_NETIF_BE, CMSG_NETIF_BE_DISCONNECT),
+
+    'netif_be_destroy_t':
+    (CMSG_NETIF_BE, CMSG_NETIF_BE_DESTROY),
 
     'netif_be_driver_status_changed_t':
     (CMSG_NETIF_BE, CMSG_NETIF_BE_DRIVER_STATUS_CHANGED),

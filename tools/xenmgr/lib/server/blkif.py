@@ -215,8 +215,12 @@ class BlkifController(controller.Controller):
 
     def destroy(self):
         print 'BlkifController>destroy> dom=', self.dom
-        self.destroyDevices()
-        self.send_be_destroy()
+        def cb_destroy(val):
+            self.send_be_destroy()
+        d = self.factory.addDeferred()
+        d.addCallback(cb_destroy)
+        self.send_be_disconnect()
+        #self.destroyDevices()
 
     def destroyDevices(self):
         for dev in self.getDevices():
@@ -286,6 +290,13 @@ class BlkifController(controller.Controller):
 
     def send_be_create(self):
         msg = packMsg('blkif_be_create_t',
+                      { 'domid'        : self.dom,
+                        'blkif_handle' : 0 })
+        self.factory.writeRequest(msg)
+
+    def send_be_disconnect(self):
+        print '>BlkifController>send_be_disconnect>', 'dom=', self.dom
+        msg = packMsg('blkif_be_disconnect_t',
                       { 'domid'        : self.dom,
                         'blkif_handle' : 0 })
         self.factory.writeRequest(msg)

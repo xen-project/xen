@@ -137,10 +137,15 @@ class NetDev(controller.Dev):
         self.bridge = None
 
     def destroy(self):
+        def cb_destroy(val):
+            self.controller.send_be_destroy(self.vif)
         print 'NetDev>destroy>', 'vif=', self.vif
         PrettyPrint.prettyprint(self.sxpr())
         self.bridge_rem()
-        self.controller.send_be_destroy(self.vif)
+        d = self.controller.factory.addDeferred()
+        d.addCallback(cb_destroy)
+        self.controller.send_be_disconnect(self.vif)
+        #self.controller.send_be_destroy(self.vif)
         
 
 class NetifController(controller.Controller):
@@ -279,6 +284,13 @@ class NetifController(controller.Controller):
                       { 'domid'        : self.dom,
                         'netif_handle' : dev.vif,
                         'mac'          : dev.mac })
+        self.factory.writeRequest(msg)
+
+    def send_be_disconnect(self, vif):
+        dev = self.devices[vif]
+        msg = packMsg('netif_be_disconnect_t',
+                      { 'domid'        : self.dom,
+                        'netif_handle' : dev.vif })
         self.factory.writeRequest(msg)
 
     def send_be_destroy(self, vif):
