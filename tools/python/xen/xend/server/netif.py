@@ -288,6 +288,8 @@ class NetDev(controller.SplitDev):
             if change:
                 self.reportStatus()
         log.debug("Destroying vif domain=%d vif=%d", self.controller.dom, self.vif)
+        if self.evtchn:
+            channel.eventChannelClose(self.evtchn)
         self.vifctl('down')
         d = self.send_be_disconnect()
         d.addCallback(cb_destroy)
