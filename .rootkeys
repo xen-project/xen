@@ -317,7 +317,6 @@
 3ddb79bcJfHdwrPsjqgI33_OsGdVCg xenolinux-2.4.16-sparse/drivers/block/rd.c
 3ddb79bcpVu-IbnqwQqpRqsEbLpsuw xenolinux-2.4.16-sparse/drivers/char/tty_io.c
 3e15d5273gfR2fbcYe05kqBSAvCX_w xenolinux-2.4.16-sparse/fs/exec.c
-3ddb79bba_zKpuurHVeWfgDkyPoq8A xenolinux-2.4.16-sparse/fs/nfs/nfsroot.c
 3ddb79b8VFtfWSCrXKPN2K21zd_vtw xenolinux-2.4.16-sparse/include/asm-xeno/a.out.h
 3ddb79b8Zzi13p3OAPV25QgiC3THAQ xenolinux-2.4.16-sparse/include/asm-xeno/apic.h
 3ddb79baZDlsdV_m6C5CXnWMl15p1g xenolinux-2.4.16-sparse/include/asm-xeno/apicdef.h
