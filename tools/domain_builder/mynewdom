@@ -31,7 +31,8 @@ echo $LOOKUP | grep 'domain name pointer' && NEWNAME=`echo $LOOKUP | sed -e 's!.
 echo New IP address : ${NEWADDR}  name : ${NEWNAME}
 
 #SITE_GW=`netstat -rn|while read a b c;do case "$a" in 0.0.0.0)echo "$b";;esac;done`
-
+NEWNAME=''
+#${NEWADDR}
 IP_CONFIG="ip=${NEWADDR}:${SITE_NFS}:${SITE_GW}:${SITE_MASK}:${NEWNAME}:eth0:off"
 echo IP_CONFIG : ${IP_CONFIG}
 
