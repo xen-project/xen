@@ -22,6 +22,8 @@
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
 
+#define GRANT_DEBUG 1
+
 #include <xen/config.h>
 #include <xen/sched.h>
 #include <asm-x86/mm.h>
@@ -702,8 +704,8 @@ gnttab_check_unmap(
     /* TODO: beat the caller around the head with a brick.
      *       have to walk the grant tables to find this thing.
      */
-    DPRINTK("gnttab_check_unmap remote dom(%d) local dom(%d) frame (%x) flags(%x).\n",
-            rd->id, ld->id, frame, readonly);
+    /*DPRINTK("gnttab_check_unmap remote dom(%d) local dom(%d) frame (%x) flags(%x).\n",
+            rd->id, ld->id, frame, readonly);*/
     return 0;
 }
 
