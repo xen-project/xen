@@ -78,17 +78,6 @@ static inline void * phys_to_virt(unsigned long address)
  * These are equally trivial.
  */
 
-static inline unsigned long virt_to_mach(volatile void * address)
-{
-       return __pa(address) + (unsigned long) start_info.phys_base;
-}
-
-static inline void *mach_to_virt(unsigned long address)
-{
-        return __va(address) - (unsigned long) start_info.phys_base;
-}
-
-
 /*
  * Change "struct page" to physical address.
  */

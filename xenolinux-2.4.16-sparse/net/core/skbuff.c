@@ -64,12 +64,13 @@
 #include <asm/system.h>
 
 /* zc globals: */
+/*
 char *net_page_chunk;
 struct net_page_info *net_page_table;
 struct list_head net_page_list;
 spinlock_t net_page_list_lock = SPIN_LOCK_UNLOCKED;
 unsigned int net_pages;
-
+*/
 
 
 int sysctl_hot_list_len = 128;
@@ -229,7 +230,7 @@ nohead:
 }
 
 /* begin zc code additions: */
-
+/*
 void init_net_pages(unsigned long order_pages)
 {
         int i;
@@ -248,16 +249,16 @@ void init_net_pages(unsigned long order_pages)
                 np->virt_addr = (unsigned long)net_page_chunk + (i * PAGE_SIZE);
 
                 // now fill the pte pointer:
-                np->ppte = 0xdeadbeef;
-                pgd = pgd_offset_k(np->virt_addr);
-                if (pgd_none(*pgd) || pgd_bad(*pgd)) BUG();
+                //np->ppte = 0xdeadbeef;
+                //pgd = pgd_offset_k(np->virt_addr);
+                //if (pgd_none(*pgd) || pgd_bad(*pgd)) BUG();
 
-                if (pmd_none(*pmd)) BUG(); 
-                if (pmd_bad(*pmd)) BUG();
+                //if (pmd_none(*pmd)) BUG(); 
+                //if (pmd_bad(*pmd)) BUG();
 
-                ptep = pte_offset(pmd, np->virt_addr);
-                np->ppte = (unsigned long)virt_to_mach(ptep);
-
+                //ptep = pte_offset(pmd, np->virt_addr);
+                //np->ppte = phys_to_machine(virt_to_phys(ptep));
+                
                 list_add_tail(&np->list, &net_page_list);
         }
         net_pages = nr_pages;
@@ -267,6 +268,7 @@ void init_net_pages(unsigned long order_pages)
 
 struct net_page_info *get_net_page(void)
 {
+
     struct list_head *list_ptr;
     struct net_page_info *np;
     unsigned long flags;
@@ -301,7 +303,7 @@ void free_net_page(struct net_page_info *np)
     spin_unlock_irqrestore(&net_page_list_lock, flags);
 
 }
-
+*/
 struct sk_buff *alloc_zc_skb(unsigned int size,int gfp_mask)
 {
 	struct sk_buff *skb;
@@ -332,12 +334,13 @@ struct sk_buff *alloc_zc_skb(unsigned int size,int gfp_mask)
                 printk("alloc_zc_skb called with unruly size.\n");
                 size = PAGE_SIZE;
         }
-	skb->net_page = get_net_page();
+	/*skb->net_page = get_net_page();
         if (skb->net_page == NULL)
         {
                 goto nodata;
         }
-        data = (u8 *)skb->net_page->virt_addr;
+        data = (u8 *)skb->net_page->virt_addr;*/
+        data = (char *)__get_free_page(gfp_mask);
 	if (data == NULL)
 		goto nodata;
 	/* XXX: does not include slab overhead */ 
@@ -443,7 +446,9 @@ static void skb_release_data(struct sk_buff *skb)
                 {
 		    kfree(skb->head);
                 } else {// SKB_ZERO_COPY
-                    free_net_page(skb->net_page);
+                    //free_net_page(skb->net_page);
+//printk(KERN_ALERT "<%p>\n", phys_to_machine(virt_to_phys(skb->head)));
+                    free_page((void *)skb->head);
                 }
 	}
 
@@ -559,7 +564,7 @@ struct sk_buff *skb_clone(struct sk_buff *skb, int gfp_mask)
 	C(tc_index);
 #endif
         C(skb_type);
-        C(net_page);
+        //C(net_page);
 	atomic_inc(&(skb_shinfo(skb)->dataref));
 	skb->cloned = 1;
 #ifdef CONFIG_NETFILTER
@@ -1361,7 +1366,7 @@ void __init skb_init(void)
 	if (!skbuff_head_cache)
 		panic("cannot create skbuff cache");
 
-        init_net_pages(NUM_NET_PAGES);
+        //init_net_pages(NUM_NET_PAGES);
 
 	for (i=0; i<NR_CPUS; i++)
 		skb_queue_head_init(&skb_head_pool[i].list);

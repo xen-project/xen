@@ -89,7 +89,7 @@ typedef struct pfn_info {
  * references exist of teh current type. A change in type can only occur
  * when type_count == 0.
  */
-#define PG_type_mask        (7<<24) /* bits 24-26 */
+#define PG_type_mask        (15<<24) /* bits 24-27 */
 #define PGT_none            (0<<24) /* no special uses of this page */
 #define PGT_l1_page_table   (1<<24) /* using this page as an L1 page table? */
 #define PGT_l2_page_table   (2<<24) /* using this page as an L2 page table? */
@@ -98,6 +98,7 @@ typedef struct pfn_info {
 #define PGT_gdt_page        (5<<24) /* using this page in a GDT? */
 #define PGT_ldt_page        (6<<24) /* using this page in an LDT? */
 #define PGT_writeable_page  (7<<24) /* has writable mappings of this page? */
+#define PGT_net_rx_buf      (8<<24) /* this page has been pirated by the net code. */
 
 #define PageSlab(page)		test_bit(PG_slab, &(page)->flags)
 #define PageSetSlab(page)	set_bit(PG_slab, &(page)->flags)
@@ -120,6 +121,7 @@ void init_frametable(unsigned long nr_pages);
  * will use it to store a "physical" frame number to give the appearance of
  * contiguous (or near contiguous) physical memory.
  */
+#undef machine_to_phys_mapping
 #define machine_to_phys_mapping ((unsigned long *)RDWR_MPT_VIRT_START)
 
 /* Part of the domain API. */

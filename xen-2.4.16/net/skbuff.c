@@ -163,7 +163,7 @@ static inline u8 *alloc_skb_data_page(struct sk_buff *skb)
         pf = list_entry(list_ptr, struct pfn_info, list);
         pf->flags = 0; // owned by dom0
         list_del(&pf->list);
-        pf->next = pf->prev = (pf - frame_table);
+        //pf->next = pf->prev = (pf - frame_table);
         free_pfns--;
 
         spin_unlock_irqrestore(&free_list_lock, flags);

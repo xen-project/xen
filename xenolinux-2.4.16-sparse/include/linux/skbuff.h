@@ -43,7 +43,8 @@
 #define SKB_ZERO_COPY       1
 
 #define NUM_NET_PAGES       9 // about 1Meg of buffers. (2^9)
-struct net_page_info {
+
+/*struct net_page_info {
         struct list_head list;
         unsigned long   virt_addr;
         unsigned long   ppte;
@@ -54,7 +55,7 @@ extern struct net_page_info *net_page_table;
 extern struct list_head net_page_list;
 extern spinlock_t net_page_list_lock;
 extern unsigned int net_pages;
-
+*/
 /* End zero copy additions */
 
 #define HAVE_ALLOC_SKB		/* For the drivers to know */

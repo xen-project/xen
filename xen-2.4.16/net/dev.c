@@ -714,8 +714,7 @@ void deliver_packet(struct sk_buff *skb, net_vif_t *vif)
             if ( (skb->len + ETH_HLEN) < rx->size )
                 rx->size = skb->len + ETH_HLEN;
                         
-            if (rx->flush_count == tlb_flush_count[smp_processor_id()])
-                flush_tlb_all();
+            
             
             g_pte = map_domain_mem(rx->addr);
 
@@ -723,15 +722,21 @@ void deliver_packet(struct sk_buff *skb, net_vif_t *vif)
             h_pfn = skb->pf;
 
             //flip and/or set relevant pf_info fields.
-            tmp = g_pfn->next; g_pfn->next = h_pfn->next; h_pfn->next = tmp;
-            tmp = g_pfn->prev; g_pfn->prev = h_pfn->prev; h_pfn->prev = tmp;
+            //tmp = g_pfn->next; g_pfn->next = h_pfn->next; h_pfn->next = tmp;
+            //tmp = g_pfn->prev; g_pfn->prev = h_pfn->prev; h_pfn->prev = tmp;
             tmp = g_pfn->flags; g_pfn->flags = h_pfn->flags; h_pfn->flags = tmp;
-            h_pfn->tot_count = 1;
-            h_pfn->type_count = g_pfn->type_count;
+            h_pfn->tot_count = h_pfn->type_count = 1;
             g_pfn->tot_count = g_pfn->type_count = 0;
-            h_pfn->flags = current->domain | PGT_l1_page_table;
-            g_pfn->flags = PGT_l1_page_table;
+            h_pfn->flags = g_pfn->flags & ~ PG_type_mask;
+            if (*g_pte & _PAGE_RW) h_pfn->flags |= PGT_writeable_page;
+            g_pfn->flags = 0;
             //point guest pte at the new page:
+
+//printk("newmpfn: %lx, old mpfn: %lx,  old:(%lx) new:(%lx)\n", h_pfn - frame_table, *g_pte >> PAGE_SHIFT, machine_to_phys_mapping[h_pfn - frame_table], machine_to_phys_mapping[*g_pte >> PAGE_SHIFT]);
+
+            machine_to_phys_mapping[h_pfn - frame_table] 
+                    = machine_to_phys_mapping[g_pfn - frame_table];
+
             *g_pte = (*g_pte & ~PAGE_MASK) 
                 | (((h_pfn - frame_table) << PAGE_SHIFT) & PAGE_MASK);
             *g_pte |= _PAGE_PRESENT;
@@ -1000,6 +1005,9 @@ void update_shared_ring(void)
             shadow_ring->rx_idx = RX_RING_INC(shadow_ring->rx_idx);
             net_ring->rx_cons   = RX_RING_INC(net_ring->rx_cons);
 
+            if (rx->flush_count == tlb_flush_count[smp_processor_id()])
+                __flush_tlb();
+
             if ( net_ring->rx_cons == net_ring->rx_event )
                 set_bit(_EVENT_NET_RX_FOR_VIF(nvif), &s->events);
             
@@ -1124,8 +1132,8 @@ void flush_rx_queue(void)
                         h_pfn = skb->pf;
 
 
-                        tmp = g_pfn->next; g_pfn->next = h_pfn->next; h_pfn->next = tmp;
-                        tmp = g_pfn->prev; g_pfn->prev = h_pfn->prev; h_pfn->prev = tmp;
+                        //tmp = g_pfn->next; g_pfn->next = h_pfn->next; h_pfn->next = tmp;
+                        //tmp = g_pfn->prev; g_pfn->prev = h_pfn->prev; h_pfn->prev = tmp;
                         tmp = g_pfn->flags; g_pfn->flags = h_pfn->flags; h_pfn->flags = tmp;
                         
                         h_pfn->tot_count = 1;
@@ -2244,23 +2252,39 @@ printk("LOCAL DELIVERY!\n");
                 pfn = rx->addr >> PAGE_SHIFT;
                 page = frame_table + pfn;
                 
-                shadow_ring->rx_ring[i].status = RING_STATUS_OK;
+                shadow_ring->rx_ring[i].status = RING_STATUS_BAD_PAGE;
 
-               if  (!(page->flags & PGT_l1_page_table) 
-                    || !((page->flags & PG_domain_mask) == current->domain))
-                       shadow_ring->rx_ring[i].status = RING_STATUS_BAD_PAGE; 
+                if  ( page->flags != (PGT_l1_page_table | current->domain) ) 
+                {
+BUG();
+                       continue;
+                }
 
 
                 g_pte = map_domain_mem(rx->addr);
 
                 if (!(*g_pte & _PAGE_PRESENT))
-                        shadow_ring->rx_ring[i].status = RING_STATUS_BAD_PAGE;
-                page = (*g_pte >> PAGE_SHIFT) + frame_table;
-                if (page->tot_count != 1) 
-                        shadow_ring->rx_ring[i].status = RING_STATUS_BAD_PAGE;
+                {
+BUG();
+                        unmap_domain_mem(g_pte);
+                        continue;
+                }
                 
+                page = (*g_pte >> PAGE_SHIFT) + frame_table;
+                
+                if (page->tot_count != 1) 
+                {
+printk("!\n");
+                        unmap_domain_mem(g_pte);
+                        continue;
+                }
+                
+                // The pte they passed was good, so we take it away from them.
+                shadow_ring->rx_ring[i].status = RING_STATUS_OK;
                 *g_pte &= ~_PAGE_PRESENT;
+                page->flags = (page->flags & ~PG_type_mask) | PGT_net_rx_buf;
                 rx->flush_count = tlb_flush_count[smp_processor_id()];
+
                 unmap_domain_mem(g_pte);
             }
         }

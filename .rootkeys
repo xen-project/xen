@@ -67,10 +67,8 @@
 3ddb79bdDWFwINnKn29RlFDwGJhjYg xen-2.4.16/drivers/ide/ide-taskfile.c
 3ddb79bdkDY1bSOYkToP1Cc49VdBxg xen-2.4.16/drivers/ide/ide.c
 3ddb79bdPyAvT_WZTAFhaX0jp-yXSw xen-2.4.16/drivers/ide/ide_modes.h
-3ddb79bfogeJNHTIepPjd8fy1TyoTw xen-2.4.16/drivers/net/3c509.c
 3ddb79bfMlOcWUwjtg6oMYhGySHDDw xen-2.4.16/drivers/net/3c59x.c
 3ddb79bfl_DWxZQFKiJ2BXrSedV4lg xen-2.4.16/drivers/net/8139cp.c
-3ddb79bfLVGtyXNJS4NQg-lP21rndA xen-2.4.16/drivers/net/8139too.c
 3ddb79c0tWiE8xIFHszxipeVCGKTSA xen-2.4.16/drivers/net/Makefile
 3ddb79bfU-H1Hms4BuJEPPydjXUEaQ xen-2.4.16/drivers/net/Space.c
 3ddb79c0GejJrp1U6W4G6dYi-RiH4A xen-2.4.16/drivers/net/eepro100.c
