@@ -2,7 +2,7 @@
 #ifndef __XEN_PERFC_H__
 #define __XEN_PERFC_H__
 
-#ifndef NPERFC
+#ifdef PERF_COUNTERS
 
 #include <asm/atomic.h>
 
@@ -67,7 +67,7 @@ extern struct perfcounter_t perfcounters;
 #define perfc_addc(x,y)   atomic_add((y), &perfcounters.x[smp_processor_id()])
 #define perfc_adda(x,y,z) atomic_add((z), &perfcounters.x[y])
 
-#else /* !NPERFC */
+#else /* PERF_COUNTERS */
 
 #define perfc_value(x)    ((void)0)
 #define perfc_valuec(x)   ((void)0)
@@ -83,6 +83,6 @@ extern struct perfcounter_t perfcounters;
 #define perfc_addc(x,y)   ((void)0)
 #define perfc_adda(x,y,z) ((void)0)
 
-#endif /* !NPERFC */
+#endif /* PERF_COUNTERS */
 
 #endif /* __XEN_PERFC_H__ */

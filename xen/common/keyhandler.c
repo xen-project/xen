@@ -107,7 +107,7 @@ void do_task_queues(u_char key, void *dev_id, struct pt_regs *regs)
 extern void dump_runq(u_char key, void *dev_id, struct pt_regs *regs);
 extern void print_sched_histo(u_char key, void *dev_id, struct pt_regs *regs);
 extern void reset_sched_histo(u_char key, void *dev_id, struct pt_regs *regs);
-#ifndef NPERFC
+#ifdef PERF_COUNTERS
 extern void perfc_printall (u_char key, void *dev_id, struct pt_regs *regs);
 extern void perfc_reset (u_char key, void *dev_id, struct pt_regs *regs);
 #endif
@@ -134,7 +134,7 @@ void initialize_keytable(void)
     add_key_handler('r', dump_runq,      "dump run queues");
     add_key_handler('B', kill_dom0,      "reboot machine gracefully"); 
     add_key_handler('R', halt_machine,   "reboot machine ungracefully"); 
-#ifndef NPERFC
+#ifdef PERF_COUNTERS
     add_key_handler('p', perfc_printall, "print performance counters"); 
     add_key_handler('P', perfc_reset,    "reset performance counters"); 
 #endif

@@ -27,9 +27,6 @@
 #include <xen/perfc.h>
 #include <xen/sched-if.h>
 #include <hypervisor-ifs/sched_ctl.h>
-
-#undef  TRACE_BUFFER
-
 #include <xen/trace.h>
 
 /*#define WAKEUP_HISTO*/

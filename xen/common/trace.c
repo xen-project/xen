@@ -17,9 +17,6 @@
  */
 
 #include <xen/config.h>
-
-#ifdef TRACE_BUFFER
-
 #include <asm/timex.h>
 #include <asm/types.h>
 #include <asm/io.h>
@@ -127,5 +124,3 @@ int get_tb_info(dom0_gettbufs_t *st)
         return -ENODATA;
     }
 }
-
-#endif /* TRACE_BUFFER */

@@ -473,6 +473,7 @@ long do_dom0_op(dom0_op_t *u_dom0_op)
     }
     break;
 
+#ifdef XEN_DEBUGGER
     case DOM0_DEBUG:
     {
         pdb_do_debug(op);
@@ -480,6 +481,7 @@ long do_dom0_op(dom0_op_t *u_dom0_op)
         ret = 0;
     }
     break;
+#endif
 
     case DOM0_SETTIME:
     {

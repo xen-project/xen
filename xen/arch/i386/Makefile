@@ -1,6 +1,11 @@
 
 include $(BASEDIR)/Rules.mk
 
+ifneq ($(debugger),y)
+OBJS := $(subst pdb-linux.o,,$(OBJS))
+OBJS := $(subst pdb-stub.o,,$(OBJS))
+endif
+
 # What happens here? We link monitor object files together, starting
 # at MONITOR_BASE (a very high address). But bootloader cannot put
 # things there, so we initially load at LOAD_BASE. A hacky little

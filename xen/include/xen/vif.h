@@ -95,7 +95,7 @@ do {                                                               \
 } while (0)                                                        \
 
 /* vif prototypes */
-#ifndef NO_DEVICES_IN_XEN
+#ifdef OLD_DRIVERS
 net_vif_t *create_net_vif(domid_t dom);
 void destroy_net_vif(net_vif_t *vif);
 void unlink_net_vif(net_vif_t *vif);

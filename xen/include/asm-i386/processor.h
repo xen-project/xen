@@ -406,10 +406,16 @@ extern struct desc_struct *idt_tables[];
     (memset(idt_tables[smp_processor_id()] + (_p)->fast_trap_idx, \
      0, 8))
 
+#ifdef XEN_DEBUGGER
 #define SET_FAST_TRAP(_p)   \
     (pdb_initialized ? (void *) 0 : \
        (memcpy(idt_tables[smp_processor_id()] + (_p)->fast_trap_idx, \
-	       &((_p)->fast_trap_desc), 8)))
+               &((_p)->fast_trap_desc), 8)))
+#else
+#define SET_FAST_TRAP(_p)   \
+    (memcpy(idt_tables[smp_processor_id()] + (_p)->fast_trap_idx, \
+            &((_p)->fast_trap_desc), 8))
+#endif
 
 long set_fast_trap(struct task_struct *p, int idx);
 

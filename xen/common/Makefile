@@ -1,12 +1,21 @@
 
 include $(BASEDIR)/Rules.mk
 
-ifeq ($(nperfc),y)
+ifneq ($(debugger),y)
+OBJS := $(subst debug.o,,$(OBJS))
+OBJS := $(subst debug-linux.o,,$(OBJS))
+endif
+
+ifneq ($(old_drivers),y)
+OBJS := $(subst network.o,,$(OBJS))
+endif
+
+ifneq ($(perfc),y)
 OBJS := $(subst perfc.o,,$(OBJS))
 endif
 
-ifeq ($(nodev),y)
-OBJS := $(subst network.o,,$(OBJS))
+ifneq ($(trace),y)
+OBJS := $(subst trace.o,,$(OBJS))
 endif
 
 default: $(OBJS)

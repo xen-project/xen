@@ -212,7 +212,7 @@ static void set_ioapic_affinity (unsigned int irq, unsigned long mask)
  * In new I/O model, the interrupt is pinned to the CPU of the first
  * device-driver domain that attaches. Dynamic balancing is pointless.
  */
-#if defined(CONFIG_SMP) && !defined(NO_DEVICES_IN_XEN)
+#if defined(CONFIG_SMP) && defined(OLD_DRIVERS)
 
 typedef struct {
 	unsigned int cpu;

@@ -37,7 +37,7 @@ clean: delete-links
 $(TARGET): delete-unfresh-files make-links $(GENERATED_FILES)
 	$(MAKE) -C tools
 	$(MAKE) -C common
-	if [ "$(nodev)" != "y" ]; then \
+	if [ "$(old_drivers)" == "y" ]; then \
 	$(MAKE) -C net ; \
 	fi
 	$(MAKE) -C drivers

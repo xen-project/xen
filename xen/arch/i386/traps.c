@@ -24,7 +24,7 @@
  *  Copyright (C) 1991, 1992  Linus Torvalds
  *
  *  Pentium III FXSR, SSE support
- *	Gareth Hughes <gareth@valinux.com>, May 2000
+ * Gareth Hughes <gareth@valinux.com>, May 2000
  */
 
 #include <xen/config.h>
@@ -167,7 +167,7 @@ void show_registers(struct pt_regs *regs)
            regs->xfs & 0xffff, regs->xgs & 0xffff, ss);
 
     show_stack(&regs->esp);
-}	
+} 
 
 
 spinlock_t die_lock = SPIN_LOCK_UNLOCKED;
@@ -184,7 +184,7 @@ void die(const char * str, struct pt_regs * regs, long err)
 
 
 static inline void do_trap(int trapnr, char *str,
-			   struct pt_regs *regs, 
+                           struct pt_regs *regs, 
                            long error_code, int use_error_code)
 {
     struct task_struct *p = current;
@@ -233,27 +233,30 @@ do_trap(trapnr, str, regs, error_code, 1); \
 }
 
 DO_ERROR_NOCODE( 0, "divide error", divide_error)
-DO_ERROR_NOCODE( 4, "overflow", overflow)
-DO_ERROR_NOCODE( 5, "bounds", bounds)
-DO_ERROR_NOCODE( 6, "invalid operand", invalid_op)
-DO_ERROR_NOCODE( 9, "coprocessor segment overrun", coprocessor_segment_overrun)
-DO_ERROR(10, "invalid TSS", invalid_TSS)
-DO_ERROR(11, "segment not present", segment_not_present)
-DO_ERROR(12, "stack segment", stack_segment)
+    DO_ERROR_NOCODE( 4, "overflow", overflow)
+    DO_ERROR_NOCODE( 5, "bounds", bounds)
+    DO_ERROR_NOCODE( 6, "invalid operand", invalid_op)
+    DO_ERROR_NOCODE( 9, "coprocessor segment overrun", coprocessor_segment_overrun)
+    DO_ERROR(10, "invalid TSS", invalid_TSS)
+    DO_ERROR(11, "segment not present", segment_not_present)
+    DO_ERROR(12, "stack segment", stack_segment)
 /* Vector 15 reserved by Intel */
-DO_ERROR_NOCODE(16, "fpu error", coprocessor_error)
-DO_ERROR(17, "alignment check", alignment_check)
-DO_ERROR_NOCODE(18, "machine check", machine_check)
-DO_ERROR_NOCODE(19, "simd error", simd_coprocessor_error)
+    DO_ERROR_NOCODE(16, "fpu error", coprocessor_error)
+    DO_ERROR(17, "alignment check", alignment_check)
+    DO_ERROR_NOCODE(18, "machine check", machine_check)
+    DO_ERROR_NOCODE(19, "simd error", simd_coprocessor_error)
 
-asmlinkage void do_int3(struct pt_regs *regs, long error_code)
+    asmlinkage void do_int3(struct pt_regs *regs, long error_code)
 {
     struct task_struct *p = current;
     struct guest_trap_bounce *gtb = guest_trap_bounce+smp_processor_id();
     trap_info_t *ti;
 
+#ifdef XEN_DEBUGGER
     if ( pdb_initialized && pdb_handle_exception(3, regs) == 0 )
         return;
+#endif
+
     if ( (regs->xcs & 3) != 3 )
     {
         if ( unlikely((regs->xcs & 3) == 0) )
@@ -333,7 +336,7 @@ asmlinkage void do_page_fault(struct pt_regs *regs, long error_code)
 
     if ( unlikely(p->mm.shadow_mode) && 
          (addr < PAGE_OFFSET) && shadow_fault(addr, error_code) )
-	return; /* Returns TRUE if fault was handled. */
+        return; /* Returns TRUE if fault was handled. */
 
     if ( unlikely(!(regs->xcs & 3)) )
         goto fault_in_hypervisor;
@@ -377,14 +380,16 @@ asmlinkage void do_page_fault(struct pt_regs *regs, long error_code)
 #endif
     }
 
-    if (pdb_page_fault_possible)                 /* implicit pdb_initialized */
+#ifdef XEN_DEBUGGER
+    if ( pdb_page_fault_possible )
     {
         pdb_page_fault = 1;
-	/* make eax & edx valid to complete the instruction */
-	regs->eax = (long)&pdb_page_fault_scratch;
-	regs->edx = (long)&pdb_page_fault_scratch;
-	return;
+        /* make eax & edx valid to complete the instruction */
+        regs->eax = (long)&pdb_page_fault_scratch;
+        regs->edx = (long)&pdb_page_fault_scratch;
+        return;
     }
+#endif
 
     show_registers(regs);
     panic("CPU%d FATAL PAGE FAULT\n"
@@ -430,14 +435,15 @@ asmlinkage void do_general_protection(struct pt_regs *regs, long error_code)
         ti = current->thread.traps + (error_code>>3);
         if ( TI_GET_DPL(ti) >= (regs->xcs & 3) )
         {
-	    unsigned long cr3;
-	
-	    __asm__ __volatile__ ("movl %%cr3,%0" : "=r" (cr3) : );
-	    if (pdb_initialized && pdb_ctx.system_call != 0 &&
-		cr3 == pdb_ctx.ptbr)
-	    {
-	        pdb_linux_syscall_enter_bkpt(regs, error_code, ti);
-	    }
+#ifdef XEN_DEBUGGER
+            if ( pdb_initialized && (pdb_ctx.system_call != 0) )
+            {
+                unsigned long cr3; 
+                __asm__ __volatile__ ("movl %%cr3,%0" : "=r" (cr3) : );
+                if ( cr3 == pdb_ctx.ptbr )
+                    pdb_linux_syscall_enter_bkpt(regs, error_code, ti);
+            }
+#endif
 
             gtb->flags = GTBF_TRAP_NOCODE;
             regs->eip += 2;
@@ -535,11 +541,39 @@ asmlinkage void math_state_restore(struct pt_regs *regs, long error_code)
     }
 }
 
-asmlinkage void do_debug_orig(struct pt_regs *regs, long error_code)
+#ifdef XEN_DEBUGGER
+asmlinkage void do_pdb_debug(struct pt_regs *regs, long error_code)
 {
     unsigned int condition;
     struct task_struct *tsk = current;
     struct guest_trap_bounce *gtb = guest_trap_bounce+smp_processor_id();
+
+    __asm__ __volatile__("movl %%db6,%0" : "=r" (condition));
+    if ( (condition & (1 << 14)) != (1 << 14) )
+        printk("\nwarning: debug trap w/o BS bit [0x%x]\n\n", condition);
+    __asm__("movl %0,%%db6" : : "r" (0));
+
+    if ( pdb_handle_exception(1, regs) != 0 )
+    {
+        tsk->thread.debugreg[6] = condition;
+
+        gtb->flags = GTBF_TRAP_NOCODE;
+        gtb->cs    = tsk->thread.traps[1].cs;
+        gtb->eip   = tsk->thread.traps[1].address;
+    }
+}
+#endif
+
+asmlinkage void do_debug(struct pt_regs *regs, long error_code)
+{
+    unsigned int condition;
+    struct task_struct *tsk = current;
+    struct guest_trap_bounce *gtb = guest_trap_bounce+smp_processor_id();
+
+#ifdef XEN_DEBUGGER
+    if ( pdb_initialized )
+        return do_pdb_debug(regs, error_code);
+#endif
 
     __asm__ __volatile__("movl %%db6,%0" : "=r" (condition));
 
@@ -574,37 +608,8 @@ asmlinkage void do_debug_orig(struct pt_regs *regs, long error_code)
 }
 
 
-asmlinkage void do_debug(struct pt_regs *regs, long error_code)
-{
-    unsigned int condition;
-    struct task_struct *tsk = current;
-    struct guest_trap_bounce *gtb = guest_trap_bounce+smp_processor_id();
-
-    /* This handler is broken! Only use it if PDB is enabled. */
-    if ( !pdb_initialized )
-    {
-        do_debug_orig(regs, error_code);
-        return;
-    }
-
-    __asm__ __volatile__("movl %%db6,%0" : "=r" (condition));
-    if ( (condition & (1 << 14)) != (1 << 14) )
-        printk("\nwarning: debug trap w/o BS bit [0x%x]\n\n", condition);
-    __asm__("movl %0,%%db6" : : "r" (0));
-
-    if ( pdb_handle_exception(1, regs) != 0 )
-    {
-        tsk->thread.debugreg[6] = condition;
-
-	gtb->flags = GTBF_TRAP_NOCODE;
-	gtb->cs    = tsk->thread.traps[1].cs;
-	gtb->eip   = tsk->thread.traps[1].address;
-    }
-}
-
-
 asmlinkage void do_spurious_interrupt_bug(struct pt_regs * regs,
-					  long error_code)
+                                          long error_code)
 { /* nothing */ }
 
 
@@ -612,13 +617,13 @@ asmlinkage void do_spurious_interrupt_bug(struct pt_regs * regs,
 do { \
   int __d0, __d1; \
   __asm__ __volatile__ ("movw %%dx,%%ax\n\t" \
-	"movw %4,%%dx\n\t" \
-	"movl %%eax,%0\n\t" \
-	"movl %%edx,%1" \
-	:"=m" (*((long *) (gate_addr))), \
-	 "=m" (*(1+(long *) (gate_addr))), "=&a" (__d0), "=&d" (__d1) \
-	:"i" ((short) (0x8000+(dpl<<13)+(type<<8))), \
-	 "3" ((char *) (addr)),"2" (__HYPERVISOR_CS << 16)); \
+ "movw %4,%%dx\n\t" \
+ "movl %%eax,%0\n\t" \
+ "movl %%edx,%1" \
+ :"=m" (*((long *) (gate_addr))), \
+  "=m" (*(1+(long *) (gate_addr))), "=&a" (__d0), "=&d" (__d1) \
+ :"i" ((short) (0x8000+(dpl<<13)+(type<<8))), \
+  "3" ((char *) (addr)),"2" (__HYPERVISOR_CS << 16)); \
 } while (0)
 
 void set_intr_gate(unsigned int n, void *addr)
@@ -638,25 +643,25 @@ static void set_task_gate(unsigned int n, unsigned int sel)
 }
 
 #define _set_seg_desc(gate_addr,type,dpl,base,limit) {\
-	*((gate_addr)+1) = ((base) & 0xff000000) | \
-		(((base) & 0x00ff0000)>>16) | \
-		((limit) & 0xf0000) | \
-		((dpl)<<13) | \
-		(0x00408000) | \
-		((type)<<8); \
-	*(gate_addr) = (((base) & 0x0000ffff)<<16) | \
-		((limit) & 0x0ffff); }
+ *((gate_addr)+1) = ((base) & 0xff000000) | \
+  (((base) & 0x00ff0000)>>16) | \
+  ((limit) & 0xf0000) | \
+  ((dpl)<<13) | \
+  (0x00408000) | \
+  ((type)<<8); \
+ *(gate_addr) = (((base) & 0x0000ffff)<<16) | \
+  ((limit) & 0x0ffff); }
 
 #define _set_tssldt_desc(n,addr,limit,type) \
 __asm__ __volatile__ ("movw %w3,0(%2)\n\t" \
-	"movw %%ax,2(%2)\n\t" \
-	"rorl $16,%%eax\n\t" \
-	"movb %%al,4(%2)\n\t" \
-	"movb %4,5(%2)\n\t" \
-	"movb $0,6(%2)\n\t" \
-	"movb %%ah,7(%2)\n\t" \
-	"rorl $16,%%eax" \
-	: "=m"(*(n)) : "a" (addr), "r"(n), "ir"(limit), "i"(type))
+ "movw %%ax,2(%2)\n\t" \
+ "rorl $16,%%eax\n\t" \
+ "movb %%al,4(%2)\n\t" \
+ "movb %4,5(%2)\n\t" \
+ "movb $0,6(%2)\n\t" \
+ "movb %%ah,7(%2)\n\t" \
+ "rorl $16,%%eax" \
+ : "=m"(*(n)) : "a" (addr), "r"(n), "ir"(limit), "i"(type))
 
 void set_tss_desc(unsigned int n, void *addr)
 {

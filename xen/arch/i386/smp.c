@@ -222,7 +222,7 @@ asmlinkage void smp_invalidate_interrupt(void)
         local_flush_tlb();
 }
 
-#ifndef NO_DEVICES_IN_XEN
+#ifdef OLD_DRIVERS
 int try_flush_tlb_mask(unsigned long mask)
 {
     if ( mask & (1 << smp_processor_id()) )

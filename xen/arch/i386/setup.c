@@ -328,7 +328,7 @@ void __init start_of_day(void)
     extern void timer_bh(void);
     extern void init_timervecs(void);
     extern void ac_timer_init(void);
-#ifndef NO_DEVICES_IN_XEN
+#ifdef OLD_DRIVERS
     extern int  setup_network_devices(void);
     extern void net_init(void);
     extern void initialize_block_io(void);
@@ -415,7 +415,10 @@ void __init start_of_day(void)
 
     serial_init_stage2();
     initialize_keyboard(); /* setup keyboard (also for debugging)   */
+
+#ifdef XEN_DEBUGGER
     initialize_pdb();      /* pervasive debugger */
+#endif
 
     if ( !cpu_has_apic )
     {
@@ -434,7 +437,7 @@ void __init start_of_day(void)
     pci_init();
 #endif
     do_initcalls();
-#ifndef NO_DEVICES_IN_XEN
+#ifdef OLD_DRIVERS
     if ( !setup_network_devices() )
         panic("Must have a network device!\n");
     net_init();            /* initializes virtual network system. */

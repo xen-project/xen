@@ -1,9 +1,12 @@
+
+debug       ?= n
+debugger    ?= n
+old_drivers ?= n
+perfc       ?= n
+trace       ?= n
+
 COMPILE_ARCH := $(shell uname -m | sed -e s/i.86/i386/)
 TARGET_ARCH  ?= $(COMPILE_ARCH)
-
-nodev ?= n
-debug ?= n
-trace ?= n
 
 TARGET  := $(BASEDIR)/xen
 HDRS    := $(wildcard $(BASEDIR)/include/xen/*.h)
@@ -23,7 +26,7 @@ ALL_OBJS := $(BASEDIR)/common/common.o
 ALL_OBJS += $(BASEDIR)/drivers/char/driver.o
 ALL_OBJS += $(BASEDIR)/drivers/acpi/driver.o
 ALL_OBJS += $(BASEDIR)/drivers/pci/driver.o
-ifneq ($(nodev),y)
+ifeq ($(old_drivers),y)
 ALL_OBJS += $(BASEDIR)/net/network.o
 ALL_OBJS += $(BASEDIR)/drivers/net/driver.o
 ALL_OBJS += $(BASEDIR)/drivers/block/driver.o
@@ -43,12 +46,16 @@ ifneq ($(debug),y)
 CFLAGS += -DNDEBUG
 endif
 
-ifeq ($(nperfc),y)
-CFLAGS += -DNPERFC
+ifeq ($(debugger),y)
+CFLAGS += -DXEN_DEBUGGER
 endif
 
-ifeq ($(nodev),y)
-CFLAGS += -DNO_DEVICES_IN_XEN
+ifeq ($(old_drivers),y)
+CFLAGS += -DOLD_DRIVERS
+endif
+
+ifeq ($(perfc),y)
+CFLAGS += -DPERF_COUNTERS
 endif
 
 ifeq ($(trace),y)

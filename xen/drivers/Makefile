@@ -3,7 +3,7 @@ default:
 	$(MAKE) -C char
 	$(MAKE) -C acpi
 	$(MAKE) -C pci
-	if [ "$(nodev)" != "y" ]; then \
+	if [ "$(old_drivers)" == "y" ]; then \
 	$(MAKE) -C net ; \
 	$(MAKE) -C block ; \
 	$(MAKE) -C cdrom ; \

@@ -281,7 +281,6 @@
 
 #ifndef NDEBUG
 #define MEMORY_GUARD
-#define TRACE_BUFFER
 #endif
 
 #ifndef __ASSEMBLY__

@@ -26,7 +26,7 @@ typedef struct {
 
 extern kdev_t xendev_to_physdev(unsigned short xendev);
 
-#ifndef NO_DEVICES_IN_XEN
+#ifdef OLD_DRIVERS
 extern void init_blkdev_info(struct task_struct *);
 extern void unlink_blkdev_info(struct task_struct *);
 extern void destroy_blkdev_info(struct task_struct *);

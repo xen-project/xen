@@ -481,7 +481,7 @@ asmlinkage unsigned int do_IRQ(struct pt_regs regs)
     struct irqaction * action;
     unsigned int status;
 
-#ifndef NPERFC
+#ifdef PERF_COUNTERS
     int cpu = smp_processor_id();
     u32 cc_start, cc_end;
 
@@ -553,7 +553,7 @@ asmlinkage unsigned int do_IRQ(struct pt_regs regs)
     desc->handler->end(irq);
     spin_unlock(&desc->lock);
 
-#ifndef NPERFC
+#ifdef PERF_COUNTERS
     rdtscl(cc_end);
 
     if ( !action || (!(action->flags & SA_NOPROFILE)) )
@@ -564,7 +564,7 @@ asmlinkage unsigned int do_IRQ(struct pt_regs regs)
             printk("Long interrupt %08x -> %08x\n", cc_start, cc_end);
 #endif
     }
-#endif /* NPERFC */
+#endif
 
     return 1;
 }

@@ -299,10 +299,10 @@ struct pfn_info *alloc_domain_page(struct task_struct *p)
     unsigned long flags, mask, pfn_stamp, cpu_stamp;
     int i;
 
-#ifdef NO_DEVICES_IN_XEN
-    ASSERT(!in_irq());
-#else
+#ifdef OLD_DRIVERS
     ASSERT((p == NULL) || !in_irq());
+#else
+    ASSERT(!in_irq());
 #endif
 
     spin_lock_irqsave(&free_list_lock, flags);
@@ -332,14 +332,14 @@ struct pfn_info *alloc_domain_page(struct task_struct *p)
 
         if ( unlikely(mask != 0) )
         {
-#ifdef NO_DEVICES_IN_XEN
-            flush_tlb_mask(mask);
-#else
+#ifdef OLD_DRIVERS
             /* In IRQ ctxt, flushing is best-effort only, to avoid deadlock. */
             if ( likely(!in_irq()) )
                 flush_tlb_mask(mask);
             else if ( unlikely(!try_flush_tlb_mask(mask)) )
                 goto free_and_exit;
+#else
+            flush_tlb_mask(mask);
 #endif
             perfc_incrc(need_flush_tlb_flush);
         }
@@ -815,7 +815,7 @@ int construct_dom0(struct task_struct *p,
 
     extern void physdev_init_dom0(struct task_struct *);
 
-#ifndef NO_DEVICES_IN_XEN
+#ifdef OLD_DRIVERS
     extern void ide_probe_devices(xen_disk_info_t *);
     extern void scsi_probe_devices(xen_disk_info_t *);
     extern void cciss_probe_devices(xen_disk_info_t *);
@@ -1078,7 +1078,7 @@ int construct_dom0(struct task_struct *p,
     while ( num_vifs-- > 0 )
         (void)create_net_vif(0);
 
-#ifndef NO_DEVICES_IN_XEN
+#ifdef OLD_DRIVERS
     /* DOM0 gets access to all real block devices. */
 #define MAX_REAL_DISKS 256
     xd = kmalloc(MAX_REAL_DISKS * sizeof(xen_disk_t), GFP_KERNEL);

@@ -619,7 +619,7 @@ pci_match_device(const struct pci_device_id *ids, const struct pci_dev *dev)
 	return NULL;
 }
 
-#ifndef NO_DEVICES_IN_XEN
+#ifdef OLD_DRIVERS
 static int
 pci_announce_device(struct pci_driver *drv, struct pci_dev *dev)
 {
@@ -644,7 +644,7 @@ pci_announce_device(struct pci_driver *drv, struct pci_dev *dev)
 out:
 	return ret;
 }
-#endif /* !NO_DEVICES_IN_XEN */
+#endif /* OLD_DRIVERS */
 
 /**
  * pci_register_driver - register a new pci driver
@@ -658,7 +658,7 @@ out:
 int
 pci_register_driver(struct pci_driver *drv)
 {
-#ifndef NO_DEVICES_IN_XEN
+#ifdef OLD_DRIVERS
 	struct pci_dev *dev;
 	int count = 0;
 
@@ -686,7 +686,7 @@ pci_register_driver(struct pci_driver *drv)
 void
 pci_unregister_driver(struct pci_driver *drv)
 {
-#ifndef NO_DEVICES_IN_XEN
+#ifdef OLD_DRIVERS
 	struct pci_dev *dev;
 
 	list_del(&drv->node);
