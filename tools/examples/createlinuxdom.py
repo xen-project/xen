@@ -27,9 +27,10 @@ gateway = XenoUtil.get_current_ipgw()
 nfsserv = "ADDRESS"
 nfspath = "FULL_PATH_TO_ROOT_DIR"
 
-# STEP 5b. Specify root (and possibly /usr) on local disc (if not NFS booting)
+# STEP 5b. Specify root partition on local disc (if not NFS booting)
 #root_partn = "/dev/sda2"
-#usr_partn  = "/dev/sda6"
+# (NB. The following is only needed for a separate shared read-only /usr)
+# (usr_partn  = "/dev/sda6")
 
 # STEP 6. Check that the following cmdline setup is to your taste.
 cmdline = "ip="+ipaddr+":"+nfsserv+":"+gateway+":"+netmask+"::eth0:off"
