@@ -333,22 +333,26 @@ int audit_adjust_pgtables(struct domain *d, int dir, int noisy)
                 smfn = a->smfn;
                 page = &frame_table[smfn];
 
-                adjust(pfn_to_page(gmfn), 0);
-
                 switch ( a->gpfn_and_flags & PGT_type_mask ) {
+                case PGT_writable_pred:
+                    break;
                 case PGT_snapshot:
+                    adjust(pfn_to_page(gmfn), 0);
                     break;
                 case PGT_l1_shadow:
+                    adjust(pfn_to_page(gmfn), 0);
                     adjust_l1_page(smfn);
                     if ( page->u.inuse.type_info & PGT_pinned )
                         adjust(page, 0);
                     break;
                 case PGT_hl2_shadow:
+                    adjust(pfn_to_page(gmfn), 0);
                     adjust_hl2_page(smfn);
                     if ( page->u.inuse.type_info & PGT_pinned )
                         adjust(page, 0);
                     break;
                 case PGT_l2_shadow:
+                    adjust(pfn_to_page(gmfn), 0);
                     adjust_l2_page(smfn);
                     if ( page->u.inuse.type_info & PGT_pinned )
                         adjust(page, 0);
@@ -619,6 +623,7 @@ void _audit_domain(struct domain *d, int flags)
                         scan_for_pfn_in_mfn(d, xmfn, a->smfn);
                         break;
                     case PGT_snapshot:
+                    case PGT_writable_pred:
                         break;
                     default:
                         BUG();
@@ -834,6 +839,9 @@ void _audit_domain(struct domain *d, int flags)
                                page->count_info);
                         errors++;
                     }
+                    break;
+                case PGT_writable_pred:
+                    // XXX - nothing to check?
                     break;
 
                 default:

@@ -65,6 +65,7 @@ extern struct perfcounter perfcounters;
 #define perfc_incr(x)     atomic_inc(&perfcounters.x[0])
 #define perfc_decr(x)     atomic_dec(&perfcounters.x[0])
 #define perfc_incrc(x)    atomic_inc(&perfcounters.x[smp_processor_id()])
+#define perfc_decrc(x)    atomic_dec(&perfcounters.x[smp_processor_id()])
 #define perfc_incra(x,y)  \
   { if(y<(sizeof(perfcounters.x)/sizeof(*perfcounters.x))) \
     atomic_inc(&perfcounters.x[y]); }

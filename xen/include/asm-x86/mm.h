@@ -76,6 +76,7 @@ struct pfn_info
 #define PGT_l4_shadow       PGT_l4_page_table
 #define PGT_hl2_shadow      (5<<29)
 #define PGT_snapshot        (6<<29)
+#define PGT_writable_pred   (7<<29) /* predicted gpfn with writable ref */
 
 #define PGT_type_mask       (7<<29) /* Bits 29-31. */
 
@@ -95,7 +96,10 @@ struct pfn_info
  /* 17-bit count of uses of this frame as its current type. */
 #define PGT_count_mask      ((1U<<17)-1)
 
-#define PGT_mfn_mask        ((1U<<21)-1) /* mfn mask for shadow types */
+#define PGT_mfn_mask        ((1U<<20)-1) /* mfn mask for shadow types */
+
+#define PGT_score_shift     20
+#define PGT_score_mask      (((1U<<4)-1)<<PGT_score_shift)
 
  /* Cleared when the owning guest 'frees' this page. */
 #define _PGC_allocated      31
@@ -169,8 +173,7 @@ int alloc_page_type(struct pfn_info *page, unsigned int type);
 void free_page_type(struct pfn_info *page, unsigned int type);
 extern void invalidate_shadow_ldt(struct exec_domain *d);
 extern int shadow_remove_all_write_access(
-    struct domain *d, unsigned min_type, unsigned max_type,
-    unsigned long gpfn, unsigned long gmfn);
+    struct domain *d, unsigned long gpfn, unsigned long gmfn);
 extern u32 shadow_remove_all_access( struct domain *d, unsigned long gmfn);
 
 static inline void put_page(struct pfn_info *page)

@@ -182,8 +182,12 @@ extern unsigned long gpfn_to_mfn_safe(
 
 struct shadow_status {
     unsigned long gpfn_and_flags; /* Guest pfn plus flags. */
-    struct shadow_status *next;   /* Pull-to-front list.   */
+    struct shadow_status *next;   /* Pull-to-front list per hash bucket. */
     unsigned long smfn;           /* Shadow mfn.           */
+
+    // Pull-to-front list of L1s/L2s from which we check when removing
+    // write access to a page.
+    //struct list_head next_to_check;
 };
 
 #define shadow_ht_extra_size 128
@@ -625,7 +629,7 @@ static inline void hl2e_propagate_from_guest(
         else
             mfn = __gpfn_to_mfn(d, pfn);
 
-        if ( VALID_MFN(mfn) )
+        if ( VALID_MFN(mfn) && (mfn < max_page) )
             hl2e = (mfn << PAGE_SHIFT) | __PAGE_HYPERVISOR;
     }
 
@@ -838,17 +842,19 @@ static void shadow_audit(struct domain *d, int print)
         perfc_value(shadow_l1_pages) +
         perfc_value(shadow_l2_pages) +
         perfc_value(hl2_table_pages) +
-        perfc_value(snapshot_pages)
+        perfc_value(snapshot_pages) +
+        perfc_value(writable_pte_predictions)
         ) - live;
 #ifdef PERF_COUNTERS
     if ( (abs < -1) || (abs > 1) )
     {
-        printk("live=%d free=%d l1=%d l2=%d hl2=%d snapshot=%d\n",
+        printk("live=%d free=%d l1=%d l2=%d hl2=%d snapshot=%d writable_ptes=%d\n",
                live, free,
                perfc_value(shadow_l1_pages),
                perfc_value(shadow_l2_pages),
                perfc_value(hl2_table_pages),
-               perfc_value(snapshot_pages));
+               perfc_value(snapshot_pages),
+               perfc_value(writable_pte_predictions));
         BUG();
     }
 #endif
@@ -941,13 +947,22 @@ static inline unsigned long __shadow_status(
     ASSERT(gpfn == (gpfn & PGT_mfn_mask));
     ASSERT(stype && !(stype & ~PGT_type_mask));
 
-    if ( VALID_MFN(gmfn) &&
-         ((stype != PGT_snapshot)
-          ? !mfn_is_page_table(gmfn)
-          : !mfn_out_of_sync(gmfn)) )
+    if ( VALID_MFN(gmfn) && (gmfn < max_page) &&
+         (stype != PGT_writable_pred) &&
+         ((stype == PGT_snapshot)
+          ? !mfn_out_of_sync(gmfn)
+          : !mfn_is_page_table(gmfn)) )
     {
         perfc_incrc(shadow_status_shortcut);
+#ifndef NDEBUG
         ASSERT(___shadow_status(d, gpfn, stype) == 0);
+
+        // Undo the affects of the above ASSERT on ___shadow_status()'s perf
+        // counters.
+        //
+        perfc_decrc(shadow_status_calls);
+        perfc_decrc(shadow_status_miss);
+#endif
         return 0;
     }
 
@@ -978,21 +993,26 @@ shadow_max_pgtable_type(struct domain *d, unsigned long gpfn)
         {
             type = x->gpfn_and_flags & PGT_type_mask;
 
-            // Treat an HL2 as if it's an L1
-            //
-            if ( type == PGT_hl2_shadow )
+            switch ( type )
+            {
+            case PGT_hl2_shadow:
+                // Treat an HL2 as if it's an L1
+                //
                 type = PGT_l1_shadow;
-
-            // Ignore snapshots -- they don't in and of themselves constitute
-            // treating a page as a page table
-            //
-            if ( type == PGT_snapshot )
+                break;
+            case PGT_snapshot:
+            case PGT_writable_pred:
+                // Ignore snapshots -- they don't in and of themselves constitute
+                // treating a page as a page table
+                //
                 goto next;
-
-            // Early exit if we found the max possible value
-            //
-            if ( type == PGT_base_page_table )
+            case PGT_base_page_table:
+                // Early exit if we found the max possible value
+                //
                 return type;
+            default:
+                break;
+            }
 
             if ( type > pttype )
                 pttype = type;
@@ -1116,7 +1136,8 @@ static inline void delete_shadow_status(
 
  found:
     // release ref to page
-    put_page(pfn_to_page(gmfn));
+    if ( stype != PGT_writable_pred )
+        put_page(pfn_to_page(gmfn));
 
     shadow_audit(d, 0);
 }
@@ -1129,15 +1150,16 @@ static inline void set_shadow_status(
     int i;
     unsigned long key = gpfn | stype;
 
-    SH_VVLOG("set gpfn=%p gmfn=%p smfn=%p t=%p\n", gpfn, gmfn, smfn, stype);
+    SH_VVLOG("set gpfn=%p gmfn=%p smfn=%p t=%p", gpfn, gmfn, smfn, stype);
 
     ASSERT(spin_is_locked(&d->arch.shadow_lock));
 
     ASSERT(shadow_mode_translate(d) || gpfn);
     ASSERT(!(gpfn & ~PGT_mfn_mask));
-    
-    ASSERT(pfn_is_ram(gmfn)); // XXX need to be more graceful
-    ASSERT(smfn && !(smfn & ~PGT_mfn_mask));
+
+    // XXX - need to be more graceful.
+    ASSERT(VALID_MFN(gmfn));
+
     ASSERT(stype && !(stype & ~PGT_type_mask));
 
     x = head = hash_bucket(d, gpfn);
@@ -1149,17 +1171,24 @@ static inline void set_shadow_status(
     // grab a reference to the guest page to represent the entry in the shadow
     // hash table
     //
-    get_page(pfn_to_page(gmfn), d);
+    // XXX - Should PGT_writable_pred grab a page ref?
+    //     - Who/how are these hash table entry refs flushed if/when a page
+    //       is given away by the domain?
+    //
+    if ( stype != PGT_writable_pred )
+        get_page(pfn_to_page(gmfn), d);
 
     /*
      * STEP 1. If page is already in the table, update it in place.
      */
     do
     {
-        if ( x->gpfn_and_flags == key )
+        if ( unlikely(x->gpfn_and_flags == key) )
         {
-            BUG();
+            if ( stype != PGT_writable_pred )
+                BUG(); // we should never replace entries into the hash table
             x->smfn = smfn;
+            put_page(pfn_to_page(gmfn)); // already had a ref...
             goto done;
         }
 
@@ -1221,6 +1250,13 @@ static inline void set_shadow_status(
 
  done:
     shadow_audit(d, 0);
+
+    if ( stype <= PGT_l4_shadow )
+    {
+        // add to front of list of pages to check when removing write
+        // permissions for a page...
+        //
+    }
 }
 
 /************************************************************************/
