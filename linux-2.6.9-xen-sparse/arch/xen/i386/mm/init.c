@@ -77,12 +77,7 @@ static pte_t * __init one_page_table_init(pmd_t *pmd)
 {
 	if (pmd_none(*pmd)) {
 		pte_t *page_table = (pte_t *) alloc_bootmem_low_pages(PAGE_SIZE);
-		/* XEN: Make the new p.t. read-only. */
-		pgd_t *kpgd = pgd_offset_k((unsigned long)page_table);
-		pmd_t *kpmd = pmd_offset(kpgd, (unsigned long)page_table);
-		pte_t *kpte = pte_offset_kernel(kpmd, (unsigned long)page_table);
-		xen_l1_entry_update(
-			kpte, (*(unsigned long *)kpte)&~_PAGE_RW);
+		make_page_readonly(page_table);
 		set_pmd(pmd, __pmd(__pa(page_table) | _PAGE_TABLE));
 		if (page_table != pte_offset_kernel(pmd, 0))
 			BUG();	
@@ -129,22 +124,6 @@ static void __init page_table_range_init (unsigned long start, unsigned long end
 		}
 		pmd_idx = 0;
 	}
-}
-
-void __init protect_page(pgd_t *pgd, void *page, int mode)
-{
-	pmd_t *pmd;
-	pte_t *pte;
-	unsigned long addr;
-
-	addr = (unsigned long)page;
-	pgd += pgd_index(addr);
-	pmd = pmd_offset(pgd, addr);
-	pte = pte_offset_kernel(pmd, addr);
-	if (!pte_present(*pte))
-		return;
-	queue_l1_entry_update(pte, mode ? pte_val_ma(*pte) & ~_PAGE_RW :
-					pte_val_ma(*pte) | _PAGE_RW);
 }
 
 static inline int is_kernel_text(unsigned long addr)
@@ -370,12 +349,12 @@ static void __init pagetable_init (void)
 	 * it. We clean up by write-enabling and then freeing the old page dir.
 	 */
 	memcpy(new_pgd, old_pgd, PTRS_PER_PGD_NO_HV*sizeof(pgd_t));
-	protect_page(new_pgd, new_pgd, PROT_ON);
+	make_page_readonly(new_pgd);
 	queue_pgd_pin(__pa(new_pgd));
 	load_cr3(new_pgd);
 	queue_pgd_unpin(__pa(old_pgd));
 	__flush_tlb_all(); /* implicit flush */
-	protect_page(new_pgd, old_pgd, PROT_OFF);
+	make_page_writable(old_pgd);
 	flush_page_update_queue();
 	free_bootmem(__pa(old_pgd), PAGE_SIZE);
 

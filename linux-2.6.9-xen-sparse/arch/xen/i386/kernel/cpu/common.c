@@ -513,7 +513,7 @@ void __init cpu_gdt_init(struct Xgt_desc_struct *gdt_descr)
 	     va < gdt_descr->address + gdt_descr->size;
 	     va += PAGE_SIZE, f++) {
 		frames[f] = virt_to_machine(va) >> PAGE_SHIFT;
-		protect_page(swapper_pg_dir, (void *)va, PROT_ON);
+		make_page_readonly((void *)va);
 	}
 	flush_page_update_queue();
 	if (HYPERVISOR_set_gdt(frames, gdt_descr->size / 8))

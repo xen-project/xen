@@ -54,12 +54,6 @@ void xen_cpu_idle (void);
 /* arch/xen/i386/kernel/hypervisor.c */
 void do_hypervisor_callback(struct pt_regs *regs);
 
-/* arch/xen/i386/mm/init.c */
-/* NOTE: caller must call flush_page_update_queue() */
-#define PROT_ON  1
-#define PROT_OFF 0
-void /* __init */ protect_page(pgd_t *dpgd, void *page, int mode);
-
 /* arch/xen/i386/kernel/head.S */
 void lgdt_finish(void);
 
