@@ -85,10 +85,12 @@ VM_MASK		= 0x00020000
 #ifdef CONFIG_SMP
 #define XEN_GET_VCPU_INFO(reg)	movl TI_cpu(%ebp),reg			; \
 				shl  $sizeof_vcpu_shift,reg		; \
-    				addl HYPERVISOR_shared_info,reg
+				addl HYPERVISOR_shared_info,reg
+#define XEN_GET_VCPU_INFO_IF_SMP(reg) XEN_GET_VCPU_INFO(reg)
 #define GET_THREAD_INFO_IF_SMP(reg) GET_THREAD_INFO(reg)
 #else
 #define XEN_GET_VCPU_INFO(reg)	movl HYPERVISOR_shared_info,reg
+#define XEN_GET_VCPU_INFO_IF_SMP(reg)
 #define GET_THREAD_INFO_IF_SMP(reg)
 #endif
 
@@ -207,7 +209,7 @@ ENTRY(ret_from_fork)
 	call schedule_tail
 	GET_THREAD_INFO(%ebp)
 	popl %eax
-	movl HYPERVISOR_shared_info, %esi
+	XEN_GET_VCPU_INFO(%esi)
 	jmp syscall_exit
 
 /*
@@ -220,6 +222,7 @@ ENTRY(ret_from_fork)
 	# userspace resumption stub bypassing syscall exit tracing
 	ALIGN
 ret_from_exception:
+	XEN_GET_VCPU_INFO_IF_SMP(%esi)
 	preempt_stop
 ret_from_intr:
 	GET_THREAD_INFO(%ebp)
@@ -228,7 +231,7 @@ ret_from_intr:
 	testl $(VM_MASK | 2), %eax
 	jz resume_kernel		# returning to kernel or vm86-space
 ENTRY(resume_userspace)
-	movl HYPERVISOR_shared_info, %esi
+	XEN_GET_VCPU_INFO(%esi)
 	XEN_BLOCK_EVENTS(%esi)		# make sure we don't miss an interrupt
 					# setting need_resched or sigpending
 					# between sampling and the iret
@@ -240,7 +243,7 @@ ENTRY(resume_userspace)
 
 #ifdef CONFIG_PREEMPT
 ENTRY(resume_kernel)
-	movl HYPERVISOR_shared_info, %esi
+	XEN_GET_VCPU_INFO(%esi)
 	cmpl $0,TI_preempt_count(%ebp)	# non-zero preempt_count ?
 	jnz restore_all
 need_resched:
@@ -253,6 +256,7 @@ need_resched:
 	XEN_UNBLOCK_EVENTS(%esi)
 	call schedule
 	movl $0,TI_preempt_count(%ebp)
+	XEN_GET_VCPU_INFO_IF_SMP(%esi)
 	XEN_BLOCK_EVENTS(%esi)
 	jmp need_resched
 #endif
@@ -318,6 +322,7 @@ syscall_call:
 	call *sys_call_table(,%eax,4)
 	movl %eax,EAX(%esp)		# store the return value
 syscall_exit:
+	XEN_GET_VCPU_INFO_IF_SMP(%esi)
 	XEN_BLOCK_EVENTS(%esi)		# make sure we don't miss an interrupt
 					# setting need_resched or sigpending
 					# between sampling and the iret
@@ -349,6 +354,7 @@ work_pending:
 	jz work_notifysig
 work_resched:
 	call schedule
+	XEN_GET_VCPU_INFO_IF_SMP(%esi)
 	XEN_BLOCK_EVENTS(%esi)		# make sure we don't miss an interrupt
 					# setting need_resched or sigpending
 					# between sampling and the iret
@@ -394,6 +400,7 @@ syscall_trace_entry:
 	# perform syscall exit tracing
 	ALIGN
 syscall_exit_work:
+	XEN_GET_VCPU_INFO_IF_SMP(%esi)
 	testb $(_TIF_SYSCALL_TRACE|_TIF_SYSCALL_AUDIT|_TIF_SINGLESTEP), %cl
 	jz work_pending
 	XEN_UNBLOCK_EVENTS(%esi)	# could let do_syscall_trace() call
@@ -705,6 +712,7 @@ ENTRY(int3)
 	pushl %edx
 	call do_int3
 	addl $8,%esp
+	XEN_GET_VCPU_INFO_IF_SMP(%esi)
 	testl %eax,%eax
 	jnz restore_all
 	jmp ret_from_exception
