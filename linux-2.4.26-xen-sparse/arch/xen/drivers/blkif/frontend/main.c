@@ -616,7 +616,7 @@ static void blkif_status_change(blkif_fe_interface_status_changed_t *status)
 
             printk(KERN_INFO "VBD driver recovery in progress\n");
             
-            /* Prevent new requests being issued until we've fixed things up. */
+            /* Prevent new requests being issued until we fix things up. */
             spin_lock_irq(&io_request_lock);
             recovery = 1;
             blkif_state = BLKIF_STATE_DISCONNECTED;

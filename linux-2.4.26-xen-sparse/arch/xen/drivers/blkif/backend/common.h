@@ -15,11 +15,11 @@
 #include <asm/io.h>
 #include "../blkif.h"
 
-#if 0
+#if 1
 #define ASSERT(_p) \
     if ( !(_p) ) { printk("Assertion '%s' failed, line %d, file %s", #_p , \
     __LINE__, __FILE__); *(int*)0=0; }
-#define DPRINTK(_f, _a...) printk("(file=%s, line=%d) " _f, \
+#define DPRINTK(_f, _a...) printk(KERN_ALERT "(file=%s, line=%d) " _f, \
                            __FILE__ , __LINE__ , ## _a )
 #else
 #define ASSERT(_p) ((void)0)
