@@ -7,17 +7,18 @@ CFLAGS  += -I../../xenolinux-sparse/include
 HDRS     = $(wildcard *.h)
 OBJS     = $(patsubst %.c,%.o,$(wildcard *.c))
 
-BIN      = xentrace
-SCRIPTS  = $(wildcard *.py)
+BIN      = xentrace xentrace_cpusplit xentrace_format
+MAN1     = $(wildcard *.1)
+MAN8     = $(wildcard *.8)
 
 all: $(BIN)
 
 install: all
 	mkdir -p /usr/bin
 	cp $(BIN) /usr/bin
-	cp $(SCRIPTS) /usr/bin
-	chmod 755 /usr/bin/$(BIN)
-	for i in $(SCRIPTS); do chmod 755 /usr/bin/$$i; done
+	for i in $(BIN); do chmod 755 /usr/bin/$$i; done
+	for i in $(MAN1); do cp $$i /usr/man/man1/$$i; done
+	for i in $(MAN8); do cp $$i /usr/man/man8/$$i; done
 
 dist: all
 	mkdir -p ../../../install/bin

@@ -90,9 +90,12 @@
 40431ac64Hj4ixUnKmlugZKhXPFE_Q tools/xend/Makefile
 40431ac8wrUEj-XM7B8smFtx_HA7lQ tools/xend/xend_utils.c
 403a3edbrr8RE34gkbR40zep98SXbg tools/xentrace/Makefile
+4050c413PhhLNAYk3TEwP37i_iLw9Q tools/xentrace/xentrace.8
 403a3edbVpV2E_wq1zeEkJ_n4Uu2eg tools/xentrace/xentrace.c
-403a3edb0lzD0Fojc-NYNoXr3SYrnA tools/xentrace/xentrace_cpusplit.py
-403a3edblCUrzSj0mmKhO5HOPrOrSQ tools/xentrace/xentrace_format.py
+403a3edb0lzD0Fojc-NYNoXr3SYrnA tools/xentrace/xentrace_cpusplit
+4050c413BnzzZZlZRI1ai6oFXOsHLQ tools/xentrace/xentrace_cpusplit.1
+403a3edblCUrzSj0mmKhO5HOPrOrSQ tools/xentrace/xentrace_format
+4050c413NtuyIq5lsYJV4P7KIjujXw tools/xentrace/xentrace_format.1
 3f72f1bdJPsV3JCnBqs9ddL9tr6D2g xen/COPYING
 3ddb79bcbOVHh38VJzc97-JEGD4dJQ xen/Makefile
 3ddb79bcWnTwYsQRWl_PaneJfa6p0w xen/Rules.mk
