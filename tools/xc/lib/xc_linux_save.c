@@ -174,7 +174,7 @@ int xc_linux_save(int xc_handle,
     /* A cheesy test to see whether the domain contains valid state. */
     if ( ctxt.pt_base == 0 )
     {
-        ERROR("Domain is not in a valid Xenolinux state");
+        ERROR("Domain is not in a valid Linux guest OS state");
         goto out;
     }
 
@@ -308,7 +308,7 @@ int xc_linux_save(int xc_handle,
 
     /* Start writing out the saved-domain record. */
     ppage = map_pfn_readonly(pm_handle, shared_info_frame);
-    if ( !checked_write(gfd, "XenoLinuxSuspend",    16) ||
+    if ( !checked_write(gfd, "LinuxGuestRecord",    16) ||
          !checked_write(gfd, name,                  sizeof(name)) ||
          !checked_write(gfd, &srec.nr_pfns,         sizeof(unsigned long)) ||
          !checked_write(gfd, &ctxt,                 sizeof(ctxt)) ||

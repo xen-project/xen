@@ -1,7 +1,7 @@
 
 # Grand Unified Makefile for Xen.
 #
-# Builds everything except Xenolinux:
+# Builds everything except Linux:
 #  cd xenolinux-<version>-sparse
 #  ./mkbuildtree <build dir>
 #  cd <build dir>

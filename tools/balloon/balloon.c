@@ -19,15 +19,14 @@
 #define INFLATE_BALLOON      "inflate"   /* return mem to hypervisor */
 #define DEFLATE_BALLOON      "deflate"   /* claim mem from hypervisor */
 
-/* THIS IS TAKEN FROM XENOLINUX BALLOON DRIVER */
+/* THIS IS SHARED WITH THE LINUX BALLOON DRIVER */
 #define USER_INFLATE_BALLOON  1   /* return mem to hypervisor */
 #define USER_DEFLATE_BALLOON  2   /* claim mem from hypervisor */
 typedef struct user_balloon_op {
     unsigned int    op;
     unsigned long   size;
 } user_balloon_op_t;
-/* END OF CODE TAKEN FROM XENOLINUX BALLOON DRIVER */
-
+/* END OF CODE SHARED WITH THE LINUX BALLOON DRIVER */
 
 static int open_balloon_proc()
 {

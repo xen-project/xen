@@ -62,7 +62,7 @@ int xc_linux_restore(int xc_handle,
     u64 dom = 0ULL;
     unsigned int prev_pc, this_pc;
     
-    /* Number of page frames in use by this XenoLinux session. */
+    /* Number of page frames in use by this Linux session. */
     unsigned long nr_pfns;
 
     /* The new domain's shared-info frame number. */
@@ -72,7 +72,7 @@ int xc_linux_restore(int xc_handle,
     /* A copy of the CPU context of the guest. */
     full_execution_context_t ctxt;
 
-    /* First 16 bytes of the state file must contain 'XenoLinuxSuspend'. */
+    /* First 16 bytes of the state file must contain 'LinuxGuestRecord'. */
     char signature[16];
     
     /* A copy of the domain's name. */
@@ -116,7 +116,7 @@ int xc_linux_restore(int xc_handle,
 
     /* Start writing out the saved-domain record. */
     if ( !checked_read(gfd, signature, 16) ||
-         (memcmp(signature, "XenoLinuxSuspend", 16) != 0) )
+         (memcmp(signature, "LinuxGuestRecord", 16) != 0) )
     {
         ERROR("Unrecognised state format -- no signature found");
         goto out;
