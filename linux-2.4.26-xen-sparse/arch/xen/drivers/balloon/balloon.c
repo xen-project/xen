@@ -228,7 +228,8 @@ static int balloon_write(struct file *file, const char *buffer,
                          u_long count, void *data)
 {
     char memstring[64], *endchar;
-    int len, i, pages;
+    int len, i;
+    unsigned long pages;
     unsigned long long target;
 
     /* Only admin can play with the balloon :) */
@@ -259,7 +260,7 @@ static int balloon_write(struct file *file, const char *buffer,
 	    if (change<0) return change;
 
 	    current_pages -= change;
-    	    printk("Relinquish %dMB to xen. Domain now has %dMB\n",
+    	    printk("Relinquish %dMB to xen. Domain now has %ldMB\n",
 		    change>>PAGE_TO_MB_SHIFT, current_pages>>PAGE_TO_MB_SHIFT);
     }
     else if (pages > current_pages) {
@@ -267,7 +268,7 @@ static int balloon_write(struct file *file, const char *buffer,
 	    if (change<0) return change;
 
 	    current_pages += change;
-    	    printk("Reclaim %dMB from xen. Domain now has %dMB\n",
+    	    printk("Reclaim %dMB from xen. Domain now has %ldMB\n",
 		    change>>PAGE_TO_MB_SHIFT, current_pages>>PAGE_TO_MB_SHIFT);
     }
 
@@ -279,7 +280,7 @@ static int balloon_read(char *page, char **start, off_t off,
 	  int count, int *eof, void *data)
 {
 	int len;
-	len = sprintf(page,"%ul\n",current_pages<<PAGE_SHIFT);
+	len = sprintf(page,"%lu\n",current_pages<<PAGE_SHIFT);
 
 	if (len <= off+count) *eof = 1;
 	*start = page + off;
