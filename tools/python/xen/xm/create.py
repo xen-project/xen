@@ -126,19 +126,12 @@ gopts.var('netif', val='no|yes',
           fn=set_bool, default=0,
           use="Make the domain a network interface backend.")
 
-gopts.var('vbd_backend', val='DOM',
-          fn=set_value, default=None,
-          use='Set the domain to use for the vbd backend.')
-
-gopts.var('vif_backend', val='DOM',
-          fn=set_value, default=None,
-          use='Set the domain to use for the vif backend.')
-
-gopts.var('disk', val='phy:DEV,VDEV,MODE',
+gopts.var('disk', val='phy:DEV,VDEV,MODE[,DOM]',
           fn=append_value, default=[],
           use="""Add a disk device to a domain. The physical device is DEV,
          which is exported to the domain as VDEV. The disk is read-only if MODE
-         is 'r', read-write if MODE is 'w'.
+         is 'r', read-write if MODE is 'w'. If DOM is specified it defines the
+         backend driver domain to use for the disk.
          The option may be repeated to add more than one disk.
          """)
 
@@ -153,13 +146,14 @@ gopts.var('ipaddr', val="IPADDR",
           fn=append_value, default=[],
           use="Add an IP address to the domain.")
 
-gopts.var('vif', val="mac=MAC,bridge=BRIDGE,script=SCRIPT",
+gopts.var('vif', val="mac=MAC,bridge=BRIDGE,script=SCRIPT,backend=DOM",
           fn=append_value, default=[],
           use="""Add a network interface with the given MAC address and bridge.
          The vif is configured by calling the given configuration script.
          If mac is not specified a random MAC address is used.
          If bridge is not specified the default bridge is used.
          If script is not specified the default script is used.
+         If backend is not specified the default backend driver domain is used.
          This option may be repeated to add more than one vif.
          Specifying vifs will increase the number of interfaces as needed.
          """)
@@ -241,11 +235,13 @@ def configure_image(config, vals):
 def configure_disks(config_devs, vals):
     """Create the config for disks (virtual block devices).
     """
-    for (uname, dev, mode) in vals.disk:
+    for (uname, dev, mode, backend) in vals.disk:
         config_vbd = ['vbd',
                       ['uname', uname],
                       ['dev', dev ],
                       ['mode', mode ] ]
+        if backend:
+            config_vbd.append(['backend', backend])
         config_devs.append(['device', config_vbd])
 
 def configure_pci(config_devs, vals):
@@ -285,16 +281,20 @@ def configure_vifs(config_devs, vals):
             mac = d.get('mac')
             bridge = d.get('bridge')
             script = d.get('script')
+            backend = d.get('backend')
         else:
             mac = randomMAC()
             bridge = None
             script = None
+            backend = None
         config_vif = ['vif']
         config_vif.append(['mac', mac])
         if bridge:
             config_vif.append(['bridge', bridge])
         if script:
             config_vif.append(['script', script])
+        if backend:
+            config_vif.append(['backend', backend])
         config_devs.append(['device', config_vif])
 
 def configure_vfr(config, vals):
@@ -320,10 +320,6 @@ def make_config(vals):
         config.append(['backend', ['blkif']])
     if vals.netif:
         config.append(['backend', ['netif']])
-    if vals.vbd_backend:
-        config.append(['backend', ['vbd', ['dom', vals.vbd_backend]]])
-    if vals.vif_backend:
-        config.append(['backend', ['vif', ['dom', vals.vif_backend]]])
     if vals.restart:
         config.append(['restart', vals.restart])
     if vals.console:
@@ -342,7 +338,12 @@ def preprocess_disk(opts, vals):
     disk = []
     for v in vals.disk:
         d = v.split(',')
-        if len(d) != 3:
+        n = len(d)
+        if n == 3:
+            d.append(none)
+        elif n == 4:
+            pass
+        else:
             opts.err('Invalid disk specifier: ' + v)
         disk.append(d)
     vals.disk = disk
@@ -369,7 +370,7 @@ def preprocess_vifs(opts, vals):
             (k, v) = b.strip().split('=', 1)
             k = k.strip()
             v = v.strip()
-            if k not in ['mac', 'bridge']:
+            if k not in ['mac', 'bridge', 'script', 'backend']:
                 opts.err('Invalid vif specifier: ' + vif)
             d[k] = v
         vifs.append(d)

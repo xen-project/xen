@@ -651,23 +651,12 @@ class Daemon:
         """
         return self.channelF.getDomChannel(dom)
 
-    def blkif_set_control_domain(self, dom, recreate=0):
-        """Set the block device backend control domain.
-        """
-        return self.blkifCF.setControlDomain(dom, recreate=recreate)
-    
-    def blkif_get_control_domain(self, dom):
-        """Get the block device backend control domain.
-        """
-        return self.blkifCF.getControlDomain()
-    
-    def blkif_create(self, dom, recreate=0, backend=0):
+    def blkif_create(self, dom, recreate=0):
         """Create a block device interface controller.
         
-        Returns Deferred
+        Returns controller
         """
-        d = self.blkifCF.createInstance(dom, recreate=recreate, backend=backend)
-        return d
+        return self.blkifCF.createInstance(dom, recreate=recreate)
 
     def blkifs(self):
         return [ x.sxpr() for x in self.blkifCF.getInstances() ]
@@ -678,7 +667,7 @@ class Daemon:
     def blkif_dev(self, dom, vdev):
         return self.blkifCF.getDomainDevice(dom, vdev)
 
-    def blkif_dev_create(self, dom, vdev, mode, segment, recreate=0):
+    def blkif_dev_create(self, dom, config, vdev, mode, segment, recreate=0):
         """Create a block device.
         
         Returns Deferred
@@ -686,24 +675,14 @@ class Daemon:
         ctrl = self.blkifCF.getInstanceByDom(dom)
         if not ctrl:
             raise XendError('No blkif controller: %d' % dom)
-        d = ctrl.attachDevice(vdev, mode, segment, recreate=recreate)
+        d = ctrl.attachDevice(config, vdev, mode, segment, recreate=recreate)
         return d
 
-    def netif_set_control_domain(self, dom, recreate=0):
-        """Set the network interface backend control domain.
-        """
-        return self.netifCF.setControlDomain(dom, recreate=recreate)
-
-    def netif_get_control_domain(self, dom):
-        """Get the network interface backend control domain.
-        """
-        return self.netifCF.getControlDomain()
-    
-    def netif_create(self, dom, recreate=0, backend=0):
+    def netif_create(self, dom, recreate=0):
         """Create a network interface controller.
         
         """
-        return self.netifCF.createInstance(dom, recreate=recreate, backend=backend)
+        return self.netifCF.createInstance(dom, recreate=recreate)
 
     def netifs(self):
         return [ x.sxpr() for x in self.netifCF.getInstances() ]
