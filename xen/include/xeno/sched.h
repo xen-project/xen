@@ -60,7 +60,7 @@ struct task_struct {
 
     int processor;
     int state;
-	int hyp_events;
+    int hyp_events;
     unsigned int domain;
 
     /* An unsafe pointer into a shared data area. */
@@ -101,6 +101,8 @@ struct task_struct {
     struct task_struct *prev_task, *next_task;
     
     unsigned long flags;
+
+    atomic_t refcnt;
 };
 
 /*
@@ -163,7 +165,7 @@ struct task_struct *find_domain_by_id(unsigned int dom);
 extern void release_task(struct task_struct *);
 extern void kill_domain(void);
 extern void kill_domain_with_errmsg(const char *err);
-extern long kill_other_domain(unsigned int dom);
+extern long kill_other_domain(unsigned int dom, int force);
 
 /* arch/process.c */
 void new_thread(struct task_struct *p,

@@ -81,7 +81,7 @@ net_vif_t *create_net_vif(int domain)
     new_vif->net_ring = new_ring;
     new_vif->shadow_ring = shadow_ring;
     
-    new_vif->domain = find_domain_by_id(domain);
+    new_vif->domain = dom_task;
 
     new_vif->list.next = NULL;
     
@@ -93,6 +93,7 @@ net_vif_t *create_net_vif(int domain)
     dom_task->net_vif_list[dom_task->num_net_vifs] = new_vif;
     dom_task->num_net_vifs++;
     
+    free_task_struct(dom_task);
     return new_vif;
     
 fail:
@@ -103,6 +104,8 @@ fail:
         if ( shadow_ring->tx_ring ) kfree(shadow_ring->tx_ring);
         kfree(shadow_ring);
     }
+
+    free_task_struct(dom_task);
     return NULL;
 }
 
@@ -149,6 +152,7 @@ void vif_query(vif_query_t *vq)
 
     copy_to_user(vq->buf, buf, strlen(buf) + 1);
     
+    free_task_struct(dom_task);
 }
         
 

@@ -81,6 +81,7 @@ long do_dom0_op(dom0_op_t *u_dom0_op)
         wake_up(p);
         reschedule(p);
         ret = p->domain;
+        free_task_struct(p);
     }
     break;
 
@@ -113,13 +114,14 @@ long do_dom0_op(dom0_op_t *u_dom0_op)
     case DOM0_KILLDOMAIN:
     {
         unsigned int dom = op.u.killdomain.domain;
+        int force = op.u.killdomain.force;
         if ( dom == IDLE_DOMAIN_ID )
         {
             ret = -EPERM;
         }
         else
         {
-            ret = kill_other_domain(dom);
+            ret = kill_other_domain(dom, force);
         }
     }
     break;

@@ -15,7 +15,7 @@
 
 #define PERR_STRING "Xen Domain Killer"
 
-static int do_kill_domain(int dom_id)
+static int do_kill_domain(int dom_id, int force)
 {
     char cmd_path[MAX_PATH];
     dom0_op_t dop;
@@ -23,6 +23,7 @@ static int do_kill_domain(int dom_id)
 
     dop.cmd = DOM0_KILLDOMAIN;
     dop.u.killdomain.domain = dom_id;
+    dop.u.killdomain.force  = force;
 
     /* open the /proc command interface */
     sprintf(cmd_path, "%s%s%s%s", "/proc/", PROC_XENO_ROOT, "/", PROC_CMD);
@@ -42,13 +43,18 @@ int main(int argc, char **argv)
 {
     int ret;
 
-    if(argc < 2){
-        printf("Usage: kill_domain <domain_id>\n");
+    if ( (argc < 2) || (argc > 3) )
+    {
+    usage:
+        printf("Usage: kill_domain [-f] <domain_id>\n");
+        printf("  -f: Forces immediate destruction of specified domain\n");
         ret = -1;
         goto out;
     }
 
-    ret = do_kill_domain(atoi(argv[1]));
+    if ( (argc == 3) && strcmp("-f", argv[1]) ) goto usage;
+
+    ret = do_kill_domain(atoi(argv[argc-1]), argc == 3);
 
 out:
     return ret;

@@ -440,9 +440,12 @@ unsigned long get_wchan(struct task_struct *p);
 #define KSTK_ESP(tsk)	(((unsigned long *)(4096+(unsigned long)(tsk)))[1022])
 
 #define THREAD_SIZE (2*PAGE_SIZE)
-#define alloc_task_struct() ((struct task_struct *) __get_free_pages(GFP_KERNEL,1))
-#define free_task_struct(p) free_pages((unsigned long) (p), 1)
-#define get_task_struct(tsk)      atomic_inc(&virt_to_page(tsk)->count)
+#define alloc_task_struct()  \
+  ((struct task_struct *) __get_free_pages(GFP_KERNEL,1))
+#define free_task_struct(_p) \
+  if ( atomic_dec_and_test(&(_p)->refcnt) ) free_pages((unsigned long)(_p), 1)
+#define get_task_struct(_p)  \
+  atomic_inc(&(_p)->refcnt)
 
 #define idle0_task	(idle0_task_union.task)
 #define idle0_stack	(idle0_task_union.stack)

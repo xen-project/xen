@@ -27,6 +27,7 @@ typedef struct dom0_newdomain_st
 typedef struct dom0_killdomain_st
 {
     unsigned int domain;
+    int          force;
 } dom0_killdomain_t;
 
 typedef struct dom0_getmemlist_st

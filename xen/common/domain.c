@@ -40,6 +40,8 @@ struct task_struct *do_newdomain(unsigned int dom_id, unsigned int cpu)
     if (!p) goto newdomain_out;
     memset(p, 0, sizeof(*p));
 
+    atomic_set(&p->refcnt, 1);
+
     p->domain    = dom_id;
     p->processor = cpu;
 
@@ -82,6 +84,7 @@ struct task_struct *find_domain_by_id(unsigned int dom)
     read_lock_irq(&tasklist_lock);
     do {
         if ( (p->domain == dom) ) {
+            get_task_struct(p); /* increment the refcnt for caller */
             read_unlock_irq(&tasklist_lock);
             return (p);
         }
@@ -117,27 +120,27 @@ void kill_domain(void)
 }
 
 
-long kill_other_domain(unsigned int dom)
+long kill_other_domain(unsigned int dom, int force)
 {
-    struct task_struct *p = &idle0_task;
+    struct task_struct *p;
     unsigned long cpu_mask = 0;
-    long ret = -ESRCH;
 
-    read_lock_irq(&tasklist_lock);
-    do {
-        if ( p->domain == dom )
-        {
-            cpu_mask = mark_guest_event(p, _EVENT_DIE);
-            ret = 0;
-            break;
-        }
+    p = find_domain_by_id(dom);
+    if ( p == NULL ) return -ESRCH;
+
+    if ( force )
+    {
+        cpu_mask = mark_hyp_event(p, _HYP_EVENT_DIE);
+        hyp_event_notify(cpu_mask);
     }
-    while ( (p = p->next_task) != &idle0_task );
-    read_unlock_irq(&tasklist_lock);
+    else
+    {
+        cpu_mask = mark_guest_event(p, _EVENT_DIE);
+        guest_event_notify(cpu_mask);
+    }
 
-    hyp_event_notify(cpu_mask);
-
-    return ret;
+    free_task_struct(p);
+    return 0;
 }
 
 
