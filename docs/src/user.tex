@@ -56,13 +56,13 @@ Contributions of material, suggestions and corrections are welcome.
 \renewcommand{\floatpagefraction}{.8}
 \setstretch{1.1}
 
-\newcommand{\path}[1]{{\tt #1}}
+\newcommand{\path}[1]{{\small {\tt #1}}}
 
 
 \part{Introduction and Tutorial}
 \chapter{Introduction}
 
-Xen is a { \em paravirtualising } virtual machine monitor (VMM), or
+Xen is a {\em paravirtualising} virtual machine monitor (VMM), or
 `hypervisor', for the x86 processor architecture.  Xen can securely
 execute multiple virtual machines on a single physical system with
 close-to-native performance.  The virtual machine technology
@@ -171,7 +171,7 @@ multiple independent clients to run their operating systems and
 applications in an environment providing protection, resource
 isolation and accounting.  The project web page contains further
 information along with pointers to papers and technical reports:
-{\tt http://www.cl.cam.ac.uk/xeno}
+{\small {\tt http://www.cl.cam.ac.uk/xeno}}
 
 Xen has since grown into a fully-fledgd project in its own right,
 enabling us to investigate interesting research issues regarding the
@@ -291,52 +291,61 @@ following:
       unprivileged virtual machines.
 \end{itemize}
 
-Inspect the Makefile if you want to see what goes on during a build.
-Building Xen and the tools is straightforward, but XenLinux is more
-complicated.  The makefile needs a `pristine' Linux kernel tree to which
-it will then add the Xen architecture files.  You can tell the
-makefile the location of the appropriate Linux compressed tar file by
-setting the LINUX\_SRC environment variable, e.g. \\
-\verb!# LINUX_SRC=/tmp/linux-2.6.9.tar.bz2 make world! \\ or by
-placing the tar file somewhere in the search path of {\tt
-LINUX\_SRC\_PATH} which defaults to `{\tt .:..}'.  If the makefile
-can't find a suitable kernel tar file it attempts to download it from
-kernel.org (this won't work if you're behind a firewall).
+%% Inspect the Makefile if you want to see what goes on during a build.
+%% Building Xen and the tools is straightforward, but XenLinux is more
+%% complicated.  The makefile needs a `pristine' Linux kernel tree to which
+%% it will then add the Xen architecture files.  You can tell the
+%% makefile the location of the appropriate Linux compressed tar file by
+%% setting the LINUX\_SRC environment variable, e.g. \\
+%% \verb!# LINUX_SRC=/tmp/linux-2.6.9.tar.bz2 make world! \\ or by
+%% placing the tar file somewhere in the search path of {\tt
+%% LINUX\_SRC\_PATH} which defaults to `{\tt .:..}'.  If the makefile
+%% can't find a suitable kernel tar file it attempts to download it from
+%% kernel.org (this won't work if you're behind a firewall).
 
-After untaring the pristine kernel tree, the makefile uses the {\tt
-mkbuildtree} script to add the Xen patches to the kernel.  It then
-builds two different XenLinux images, one with a `-xen0' extension
+%% After untaring the pristine kernel tree, the makefile uses the {\tt
+%% mkbuildtree} script to add the Xen patches to the kernel. 
+
+After the build has completed you should have a top-level 
+directory called {\tt dist/} in which all resulting targets 
+will be placed; of particular interest are the two kernels 
+XenLinux kernel images, one with a `-xen0' extension
 which contains hardware device drivers and drivers for Xen's virtual
 devices, and one with a `-xenU' extension that just contains the
-virtual ones.
+virtual ones. These are found in \path{dist/install/boot/} along
+with the image for Xen itself and the configuration files used
+during the build. 
 
-The procedure is similar to build the Linux 2.4 port: \\
-\verb!# LINUX_SRC=/path/to/linux2.4/source make linux24!
+%% The procedure is similar to build the Linux 2.4 port: \\
+%% \verb!# LINUX_SRC=/path/to/linux2.4/source make linux24!
 
-The NetBSD port can be built using: \\ \verb!# make netbsd! \\ The
+The NetBSD port can be built using: \\ \verb!# make netbsd20! \\ The
 NetBSD port is built using a snapshot of the netbsd-2-0 cvs branch.
 The snapshot is downloaded as part of the build process, if it is not
 yet present in the {\tt NETBSD\_SRC\_PATH} search path.  The build
 process also downloads a toolchain which includes all the tools
 necessary to build the NetBSD kernel under Linux.
 
-If you have an SMP machine you may wish to give the {\tt '-j4'}
-argument to make to get a parallel build.
+% If you have an SMP machine you may wish to give the {\tt '-j4'}
+% argument to make to get a parallel build.
+
 
 If you have an existing Linux kernel configuration that you would like
 to use for domain 0, you should copy it to
-install/boot/config-2.6.9-xen0.  During the first build, you may be
-asked about some Xen-specific options.  We advise accepting the
-defaults for these options.
+\path{dist/install/boot/config-2.6.9-xen0}; for example, certain
+distributions require a kernel with either {\tt udev} or {\tt devfs}
+support at boot time.  During the first build, you may be prompted with
+some Xen-specific options.  We advise accepting the defaults for
+these options.
 
-\framebox{\parbox{5in}{
-{\bf Distro specific:} \\
-{\it Gentoo} --- if not using udev (most installations, currently), you'll need
-to enable devfs and devfs mount at boot time in the xen0 config.
-}}
+%% \framebox{\parbox{5in}{
+%% {\bf Distro specific:} \\
+%% {\it Gentoo} --- if not using udev (most installations, currently), you'll need
+%% to enable devfs and devfs mount at boot time in the xen0 config.
+%% }}
 
 The files produced by the build process are stored under the
-\path{install/} directory.  To install them in their default
+\path{dist/install/} directory.  To install them in their default
 locations, do: \\
 \verb_# make install_
 
@@ -344,12 +353,12 @@ Alternatively, users with special installation requirements may wish
 to install them manually by copying the files to their appropriate
 destinations.
 
-Files in \path{install/boot/} include:
-\begin{itemize}
-\item \path{install/boot/xen.gz} The Xen 'kernel'
-\item \path{install/boot/vmlinuz-2.6.9-xen0}  Domain 0 XenLinux kernel
-\item \path{install/boot/vmlinuz-2.6.9-xenU}  Unprivileged XenLinux kernel
-\end{itemize}
+%% Files in \path{install/boot/} include:
+%% \begin{itemize}
+%% \item \path{install/boot/xen.gz} The Xen 'kernel'
+%% \item \path{install/boot/vmlinuz-2.6.9-xen0}  Domain 0 XenLinux kernel
+%% \item \path{install/boot/vmlinuz-2.6.9-xenU}  Unprivileged XenLinux kernel
+%% \end{itemize}
 
 The difference between the two Linux kernels that are built is due to
 the configuration file used for each.  The "U" suffixed unprivileged
@@ -359,7 +368,7 @@ non-privileged domains.  The `0' suffixed privileged version can be
 used to boot the system, as well as in driver domains and unprivileged
 domains.
 
-The \path{install/boot} directory will also contain the config files
+The \path{dist/install/boot} directory will also contain the config files
 used for building the XenLinux kernels, and also versions of Xen and
 XenLinux kernels that contain debug symbols (\path{xen-syms} and
 \path{vmlinux-syms-2.6.9-xen0}) which are essential for interpreting crash
@@ -368,6 +377,9 @@ you post on the mailing list.
 
 \section{Configuration}
 
+Once you have built and installed the Xen distribution, it is 
+simple to prepare the machine for booting and running Xen. 
+
 \subsection{GRUB Configuration}
 
 An entry should be added to \path{grub.conf} (often found under
@@ -375,62 +387,97 @@ An entry should be added to \path{grub.conf} (often found under
 This file is sometimes called \path{menu.lst}, depending on your
 distribution.  The entry should look something like the following:
 
+{\small
 \begin{verbatim}
 title Xen 2.0 / XenLinux 2.6.9
-  kernel /boot/xen.gz dom0_mem=131072 com1=115200,8n1
-  module /boot/vmlinuz-2.6.9-xen0 root=/dev/sda4 ro console=tty0 console=ttyS0
+  kernel /boot/xen.gz dom0_mem=131072
+  module /boot/vmlinuz-2.6.9-xen0 root=/dev/sda4 ro console=tty0
 \end{verbatim}
+}
 
-The first line of the configuration (kernel...) tells GRUB where to
-find Xen itself and what boot parameters should be passed to it (in
-this case, setting domain 0's memory allocation and the settings for
-the serial port).
+The kernel line tells GRUB where to find Xen itself and what boot
+parameters should be passed to it (in this case, setting domain 0's
+memory allocation and the settings for the serial port). For more
+details on the various Xen boot parameters see Section~\ref{s:xboot}. 
 
-The second line of the configuration describes the location of the
+The module line of the configuration describes the location of the
 XenLinux kernel that Xen should start and the parameters that should
 be passed to it (these are standard Linux parameters, identifying the
 root device and specifying it be initially mounted read only and
 instructing that console output be sent both to the screen and to the
-serial port).
+serial port). Some distributions such as SUSE do not require the 
+{\small {\tt ro}} parameter. 
 
-If you want to use an initrd, just add another {\tt module} line to
+%% \framebox{\parbox{5in}{
+%% {\bf Distro specific:} \\
+%% {\it SuSE} --- Omit the {\tt ro} option from the XenLinux kernel
+%% command line, since the partition won't be remounted rw during boot.
+%% }}
+
+
+If you want to use an initrd, just add another {\small {\tt module}} line to
 the configuration, as usual:
+{\small
 \begin{verbatim}
   module /boot/my_initrd.gz
 \end{verbatim}
+}
 
 As always when installing a new kernel, it is recommended that you do
-not remove the original contents of \path{menu.lst} --- you may want
-to boot up with your old Linux kernel in future, particularly if you
+not delete existing menu options from \path{menu.lst} --- you may want
+to boot your old Linux kernel in future, particularly if you
 have problems.
 
-\framebox{\parbox{5in}{
-{\bf Distro specific:} \\
-{\it SuSE} --- Omit the {\tt ro} option from the XenLinux kernel
-command line, since the partition won't be remounted rw during boot.
-}}
 
-\subsection{Serial Console}
+\subsection{Serial Console (optional)}
 
-In order to configure serial console output, it is necessary to add a
-line into \path{/etc/inittab}.  The XenLinux console driver is
-designed to make this procedure the same as configuring a normal
-serial console.  Add the line:
+%%   kernel /boot/xen.gz dom0_mem=131072 com1=115200,8n1
+%%   module /boot/vmlinuz-2.6.9-xen0 root=/dev/sda4 ro 
 
+
+In order to configure Xen serial console output, it is necessary to add 
+an boot option to your GRUB config; e.g. replace the above kernel line 
+with: 
+\begin{quote}
+{\small
+\begin{verbatim}
+   kernel /boot/xen.gz dom0_mem=131072 com1=115200,8n1
+\end{verbatim}}
+\end{quote} 
+
+This configures Xen to output on COM1 at 115,200 baud, 8 data bits, 
+1 stop bit and no parity. Modify these parameters for your set up. 
+
+One can also configure XenLinux to share the serial console; to 
+achieve this append ``\path{console=ttyS0}'' to your 
+module line. 
+
+
+If you wish to be able to log in over the XenLinux serial console it
+is necessary to add a line into \path{/etc/inittab}, just as per 
+regular Linux. Simply add the line:
+\begin{quote}
+{\small 
 {\tt c:2345:respawn:/sbin/mingetty ttyS0}
+}
+\end{quote} 
+
+and you should be able to log in. Note that to successfully log in 
+as root over the serial will require adding \path{ttyS0} to
+\path{/etc/securetty} in most modern distributions. 
 
 \subsection{TLS Libraries}
 
 Users of the XenLinux 2.6 kernel should disable Thread Local Storage
-(e.g. by doing a {\tt mv /lib/tls /lib/tls.disabled}) before
+(e.g. by doing a {\small {\tt mv /lib/tls /lib/tls.disabled}}) before
 attempting to run with a XenLinux kernel.  You can always reenable it
-by restoring the directory to its original location (i.e. {\tt mv
-  /lib/tls.disabled /lib/tls}).
+by restoring the directory to its original location (i.e. {\small 
+{\tt mv /lib/tls.disabled /lib/tls}}).
 
-The TLS implementation uses segmentation in a way that is not
-permissable under Xen.  If TLS is not disabled, an emulation mode is
-used within Xen which reduces performance substantially and is not
-guaranteed to work perfectly.
+The reason for this is that the current TLS implementation uses
+segmentation in a way that is not permissable under Xen.  If TLS is
+not disabled, an emulation mode is used within Xen which reduces
+performance substantially and is not guaranteed to work perfectly.
 
 \section{Test the new install}
 
@@ -513,7 +560,7 @@ variables in \path{/etc/xen/xmdefconfig}:
               with Xen. [e.g. {\tt kernel =
               '/root/xen-2.0.bk/install/boot/vmlinuz-2.4.27-xenU'}]
 \item[memory] Set this to the size of the domain's memory in
-megabytes. [e.g. {\tt memory = 64 } ]
+megabytes. [e.g. {\tt memory = 64} ]
 \item[disk] Set the first entry in this list to calculate the offset
 of the domain's root partition, based on the domain ID.  Set the
 second to the location of \path{/usr} (if you are sharing it between
@@ -712,7 +759,7 @@ To perform a live migration, both hosts must be running Xen / \xend and
 the destination host must have sufficient resources (e.g. memory
 capacity) to accommodate the domain after the move.
 
-A domain may be migrated using the {\tt xm migrate } command.  To
+A domain may be migrated using the {\tt xm migrate} command.  To
 migrate the example ttylinux domain to another machine, we would use
 the command:
 
@@ -931,7 +978,7 @@ The general format of an xm command line is:
 # xm command [switches] [arguments] [variables]
 \end{verbatim}
 
-The available {\em switches } and {\em arguments} are dependent on the
+The available {\em switches} and {\em arguments} are dependent on the
 {\em command} chosen.  The {\em variables} may be set using
 declarations of the form {\tt variable=value} and command line
 declarations override any of the values in the configuration file
@@ -966,10 +1013,11 @@ The available commands are as follows:
 
 For a detailed overview of switches, arguments and variables to each command
 try
+\begin{quote}
 \begin{verbatim}
 # xm help command
 \end{verbatim}
-
+\end{quote}
 
 \section{Xensv (Web control interface)}
 \label{s:xensv}
@@ -1043,7 +1091,7 @@ vif = [ 'mac=aa:00:00:00:00:11, bridge=xen-br0',
   \item[always] Always restart the domain, no matter what
                 its exit code is.
   \item[never]  Never restart the domain.
-  \item[onreboot] (restart the domain if it requests reboot).
+  \item[onreboot] Restart the domain iff it requests reboot.
   \end{description}
 \end{description}
 
@@ -1126,14 +1174,14 @@ format of configuration file:
 
 \begin{itemize}
 \item SXP Format: Include device elements of the form: \\
-\centerline{  {\tt (device (pci (bus {\em x}) (dev {\em y}) (func {\em z}))) }} \\
+\centerline{  {\tt (device (pci (bus {\em x}) (dev {\em y}) (func {\em z})))}} \\
   inside the top-level {\tt vm} element.  Each one specifies the address
   of a device this domain is allowed to access ---
   the numbers {\em x},{\em y} and {\em z} may be in either decimal or
   hexadecimal format.
 \item Flat Format: Include a list of PCI device addresses of the
   format: \\ 
-\centerline{{\tt pci = ['x,y,z', ...] }} \\ 
+\centerline{{\tt pci = ['x,y,z', ...]}} \\ 
 where each element in the
   list is a string specifying the components of the PCI device
   address, separated by commas.  The components ({\tt \em x}, {\tt \em
@@ -1171,7 +1219,7 @@ scheduler is the recommended choice.
 
 \subsection{Borrowed Virtual Time}
 
-{\tt sched=bvt } (the default) \\ 
+{\tt sched=bvt} (the default) \\ 
 
 BVT provides proportional fair shares of the CPU time.  It has been
 observed to penalise domains that block frequently (e.g. I/O intensive
@@ -1206,7 +1254,7 @@ domains), but this can be compensated for by using warping.
 
 \subsection{Atropos}
 
-{\tt sched=atropos } \\
+{\tt sched=atropos} \\
 
 Atropos is a soft real time scheduler.  It provides guarantees about
 absolute shares of the CPU, with a facility for sharing
@@ -1245,7 +1293,7 @@ slightly less than 100\% in order to ensure predictable behaviour).
 
 \section{Round Robin}
 
-{\tt sched=rrobin } \\
+{\tt sched=rrobin} \\
 
 The round robin scheduler is included as a simple demonstration of
 Xen's internal scheduler API.  It is not intended for production use. 
@@ -1299,6 +1347,7 @@ software.
 \end{description} 
 
 \section{Xen boot options}
+\label{s:xboot}
 
 These options are used to configure Xen's behaviour at runtime.  They
 should be appended to Xen's command line, either manually or by
@@ -1660,27 +1709,29 @@ to update the hwclock, change the console font, update the keytable
 map, start apmd (power management), or gpm (mouse cursor).  Either
 ignore the errors (they should be harmless), or remove them from the
 startup scripts.  Deleting the following links are a good start:
-\path{S24pcmcia}, \path{S09isdn}, \path{S17keytable}, \path{S26apmd},
-\path{S85gpm}.
+{\small\path{S24pcmcia}}, {\small\path{S09isdn}},
+{\small\path{S17keytable}}, {\small\path{S26apmd}},
+{\small\path{S85gpm}}.
 
 If you want to use a single root file system that works cleanly for
-domain0 and domains>0, a useful trick is to use different 'init' run
-levels. For example, on the Xen Demo CD we use run level 3 for domain
-0, and run level 4 for domains>0. This enables different startup
-scripts to be run in depending on the run level number passed on the
-kernel command line.
+both domain 0 and unprivileged domains, a useful trick is to use
+different 'init' run levels. For example, on the Xen Demo CD we use
+run level 3 for domain 0, and run level 4 for other domains. This
+enables different startup scripts to be run in depending on the run
+level number passed on the kernel command line.
 
-If you're going to use NFS root files systems mounted either from an
+If using NFS root files systems mounted either from an
 external server or from domain0 there are a couple of other gotchas.
-The default \path{/etc/sysconfig/iptables} rules block NFS, so part
+The default {\small\path{/etc/sysconfig/iptables}} rules block NFS, so part
 way through the boot sequence things will suddenly go dead.
 
-If you're planning on having a separate NFS \path{/usr} partition, the
+If you're planning on having a separate NFS {\small\path{/usr}} partition, the
 RH9 boot scripts don't make life easy - they attempt to mount NFS file
 systems way to late in the boot process. The easiest way I found to do
-this was to have a \path{/linuxrc} script run ahead of
-\path{/sbin/init} that mounts \path{/usr}:
+this was to have a {\small\path{/linuxrc}} script run ahead of
+{\small\path{/sbin/init}} that mounts {\small\path{/usr}}:
 
+\begin{quote}
 \begin{small}\begin{verbatim}
  #!/bin/bash
  /sbin/ipconfig lo 127.0.0.1
@@ -1688,25 +1739,27 @@ this was to have a \path{/linuxrc} script run ahead of
  /bin/mount /usr
  exec /sbin/init "$@" <>/dev/console 2>&1
 \end{verbatim}\end{small}
+\end{quote}
 
 %$ XXX SMH: font lock fix :-)  
 
 The one slight complication with the above is that
-\path{/sbin/portmap} is dynamically linked against
-\path{/usr/lib/libwrap.so.0} Since this is in \path{/usr}, it won't
-work. This can be solved by copying the file (and link) below the /usr
-mount point, and just let the file be 'covered' when the mount
-happens.
+{\small\path{/sbin/portmap}} is dynamically linked against
+{\small\path{/usr/lib/libwrap.so.0}} Since this is in
+{\small\path{/usr}}, it won't work. This can be solved by copying the
+file (and link) below the /usr mount point, and just let the file be
+'covered' when the mount happens.
 
-In some installations, where a shared read-only \path{/usr} is being
-used, it may be desirable to move other large directories over into
-the read-only \path{/usr}. For example, you might replace \path{/bin},
-\path{/lib} and \path{/sbin} with links into \path{/usr/root/bin},
-\path{/usr/root/lib} and \path{/usr/root/sbin} respectively. This
-creates other problems for running the \path{/linuxrc} script,
-requiring bash, portmap, mount, ifconfig, and a handful of other
-shared libraries to be copied below the mount point - a little
-statically linked C program would solve this problem.
+In some installations, where a shared read-only {\small\path{/usr}} is
+being used, it may be desirable to move other large directories over
+into the read-only {\small\path{/usr}}. For example, you might replace
+{\small\path{/bin}}, {\small\path{/lib}} and {\small\path{/sbin}} with
+links into {\small\path{/usr/root/bin}}, {\small\path{/usr/root/lib}}
+and {\small\path{/usr/root/sbin}} respectively. This creates other
+problems for running the {\small\path{/linuxrc}} script, requiring
+bash, portmap, mount, ifconfig, and a handful of other shared
+libraries to be copied below the mount point --- a simple
+statically-linked C program would solve this problem.
 
 
 
@@ -1731,7 +1784,7 @@ statically linked C program would solve this problem.
                            specifically to run multiple conventional OSs.
 
 \item[Domain]              A domain is the execution context that
-                           contains a running { \bf virtual machine }.
+                           contains a running {\bf virtual machine}.
                            The relationship between virtual machines
                            and domains on Xen is similar to that between
                            programs and processes in an operating
@@ -1739,13 +1792,13 @@ statically linked C program would solve this problem.
                            entity that resides on disk (somewhat like
                            a program).  When it is loaded for execution,
                            it runs in a domain.  Each domain has a
-                           { \bf domain ID }.
+                           {\bf domain ID}.
 
 \item[Domain 0]            The first domain to be started on a Xen
                            machine.  Domain 0 is responsible for managing
                            the system.
 
-\item[Domain ID]           A unique identifier for a { \bf domain },
+\item[Domain ID]           A unique identifier for a {\bf domain},
                            analogous to a process ID in an operating
                            system.  Apart from domain
 
@@ -1754,7 +1807,7 @@ statically linked C program would solve this problem.
                            operating system, providing the illusion of
                            a complete system of real hardware devices.
 
-\item[Hypervisor]          An alternative term for { \bf VMM }, used
+\item[Hypervisor]          An alternative term for {\bf VMM}, used
                            because it means `beyond supervisor',
                            since it is responsible for managing multiple
                            `supervisor' kernels.
@@ -1784,7 +1837,7 @@ statically linked C program would solve this problem.
 
 \item[Shadow pagetables]   A technique for hiding the layout of machine
                            memory from a virtual machine's operating
-                           system.  Used in some {\bf VMM}s to provide
+                           system.  Used in some {\bf VMMs} to provide
                            the illusion of contiguous physical memory,
                            in Xen this is used during
                            {\bf live migration}.
@@ -1793,8 +1846,8 @@ statically linked C program would solve this problem.
                            system runs, providing the abstraction of a
                            dedicated machine.  A virtual machine may
                            be identical to the underlying hardware (as
-                           in { \bf full virtualisation }, or it may
-                           differ, as in { \bf paravirtualisation }.
+                           in {\bf full virtualisation}, or it may
+                           differ, as in {\bf paravirtualisation}.
 
 \item[VMM]                 Virtual Machine Monitor - the software that
                            allows multiple virtual machines to be
