@@ -195,7 +195,7 @@ struct page *pte_alloc_one(struct mm_struct *mm, unsigned long address)
 #endif
 	if (pte) {
 		clear_highpage(pte);
-		__make_page_readonly(phys_to_virt(page_to_phys(pte)));
+		__make_page_readonly(phys_to_virt(page_to_pseudophys(pte)));
 				/* XXXcl highmem */
 	}
 	return pte;

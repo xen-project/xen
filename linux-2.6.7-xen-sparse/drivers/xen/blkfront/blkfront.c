@@ -225,8 +225,7 @@ static int blkif_queue_request(struct request *req)
 	ring_req->nr_segments = 0;
 	rq_for_each_bio(bio, req) {
 		bio_for_each_segment(bvec, bio, idx) {
-			buffer_ma =
-                                phys_to_machine(page_to_phys(bvec->bv_page));
+			buffer_ma = page_to_phys(bvec->bv_page);
 			if (unlikely((buffer_ma & ((1<<9)-1)) != 0))
 				BUG();
 
