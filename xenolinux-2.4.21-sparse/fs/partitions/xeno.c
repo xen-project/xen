@@ -18,6 +18,7 @@ int xeno_partition(struct gendisk *hd,
   physdisk_probebuf_t *buf;
   int i;
   int minor;
+  int count;
 
   buf = kmalloc(sizeof(*buf), GFP_KERNEL);
   if (!buf)
@@ -39,6 +40,8 @@ int xeno_partition(struct gendisk *hd,
     return 0;
   }
 
+  count = 0;
+
   for (i = 0; i < buf->n_aces; i++) {
     if ((buf->entries[i].device & 0x1f) == 0)
       continue;
@@ -50,13 +53,20 @@ int xeno_partition(struct gendisk *hd,
     /* This is a bit of a hack - the partition numbers are specified
        by the hypervisor, and if we want them to match up, this is
        what we need to do. */
+    count ++;
     minor = (buf->entries[i].device & 0x1f) + first_part_minor - 1;
     add_gd_partition(hd,
 		     minor,
 		     buf->entries[i].start_sect,
 		     buf->entries[i].n_sectors);
-  }
+  }  
   kfree(buf);
+
+  /* If we didn't find any suitable Xeno partitions, try the other
+     types. */
+  if (!count)
+    return 0;
+
   printk("\n");
   return 1;
 }
