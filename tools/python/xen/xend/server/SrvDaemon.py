@@ -42,6 +42,7 @@ import console
 import domain
 from params import *
 
+DAEMONIZE = 1
 DEBUG = 1
 
 class NotifierProtocol(protocol.Protocol):
@@ -464,16 +465,9 @@ class Daemon:
         else:
             # Child
             os.execl("/usr/sbin/xfrd", "xfrd")
-            
-    def start(self, trace=0):
-        """Attempts to start the daemons.
-        The return value is defined by the LSB:
-        0  Success
-        4  Insufficient privileges
-        """
-        xend_pid = self.cleanup_xend()
-        xfrd_pid = self.cleanup_xfrd()
 
+    def daemonize(self):
+        if not DAEMONIZE: return
         # Detach from TTY.
         os.setsid()
 
@@ -492,7 +486,19 @@ class Daemon:
             os.open('/dev/null', os.O_RDWR)
             os.dup(0)
         os.dup(1)
+        
+    def start(self, trace=0):
+        """Attempts to start the daemons.
+        The return value is defined by the LSB:
+        0  Success
+        4  Insufficient privileges
+        """
+        xend_pid = self.cleanup_xend()
+        xfrd_pid = self.cleanup_xfrd()
 
+
+        self.daemonize()
+        
         if self.set_user():
             return 4
         os.chdir("/")
