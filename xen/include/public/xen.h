@@ -9,11 +9,6 @@
 #ifndef __XEN_PUBLIC_XEN_H__
 #define __XEN_PUBLIC_XEN_H__
 
-#ifndef PACKED
-/* GCC-specific way to pack structure definitions (no implicit padding). */
-#define PACKED __attribute__ ((packed))
-#endif
-
 #if defined(__i386__)
 #include "arch-x86_32.h"
 #elif defined(__x86_64__)

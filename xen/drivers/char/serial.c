@@ -100,6 +100,16 @@ static uart_t com[2] = {
 #define UART_ENABLED(_u) ((_u)->baud != 0)
 #define DISABLE_UART(_u) ((_u)->baud = 0)
 
+#ifdef CONFIG_X86
+static inline int arch_serial_putc(uart_t *uart, unsigned char c)
+{
+    int space;
+    if ( (space = (inb(uart->io_base + LSR) & LSR_THRE)) )
+        outb(c, uart->io_base + THR);
+    return space;
+}
+#endif
+
 
 /***********************
  * PRIVATE FUNCTIONS
@@ -151,8 +161,7 @@ static inline void __serial_putc(uart_t *uart, int handle, unsigned char c)
 
     do { 
         spin_lock_irqsave(&uart->lock, flags);
-        if ( (space = (inb(uart->io_base + LSR) & LSR_THRE)) )
-            outb(c, uart->io_base + THR);
+        space = arch_serial_putc(uart, c);
         spin_unlock_irqrestore(&uart->lock, flags);
     }
     while ( !space );

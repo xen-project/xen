@@ -6,6 +6,14 @@
 #ifndef __SLAB_H__
 #define __SLAB_H__
 
+#include <xen/config.h>
+
+#ifdef __ARCH_HAS_SLAB_ALLOCATOR
+
+#include <asm/slab.h>
+
+#else
+
 typedef struct xmem_cache_s xmem_cache_t;
 
 #include <xen/mm.h>
@@ -43,5 +51,7 @@ extern void xfree(const void *);
 extern int xmem_cache_reap(void);
 
 extern void dump_slabinfo();
+
+#endif /* __ARCH_HAS_SLAB_ALLOCATOR */
 
 #endif /* __SLAB_H__ */

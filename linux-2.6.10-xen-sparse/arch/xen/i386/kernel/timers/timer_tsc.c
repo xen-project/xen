@@ -326,7 +326,7 @@ static inline void cpufreq_delayed_get(void) { return; }
 #endif 
 
 
-static int __init init_tsc(char* override)
+static int init_tsc(char* override)
 {
 	u64 __cpu_khz;
 
@@ -373,7 +373,7 @@ struct timer_opts timer_tsc = {
 	.delay = delay_tsc,
 };
 
-struct init_timer_opts __initdata timer_tsc_init = {
+struct init_timer_opts timer_tsc_init = {
 	.init = init_tsc,
 	.opts = &timer_tsc,
 };
