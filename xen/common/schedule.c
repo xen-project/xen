@@ -477,7 +477,7 @@ asmlinkage void schedule(void)
     
     prev->policy &= ~SCHED_YIELD;
     if ( prev->state == TASK_DYING ) 
-        free_task_struct(prev);
+        put_task_struct(prev);
 
  same_process:
     /* update the domains notion of time  */

@@ -432,7 +432,7 @@ unsigned long get_wchan(struct task_struct *p);
 #define THREAD_SIZE (2*PAGE_SIZE)
 #define alloc_task_struct()  \
   ((struct task_struct *) __get_free_pages(GFP_KERNEL,1))
-#define free_task_struct(_p) \
+#define put_task_struct(_p) \
   if ( atomic_dec_and_test(&(_p)->refcnt) ) release_task(_p)
 #define get_task_struct(_p)  \
   atomic_inc(&(_p)->refcnt)

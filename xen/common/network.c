@@ -149,7 +149,7 @@ net_vif_t *create_net_vif(int domain)
     if ( new_vif != NULL )
         kmem_cache_free(net_vif_cache, new_vif);
     if ( p != NULL )
-        free_task_struct(p);
+        put_task_struct(p);
     return NULL;
 }
 
@@ -190,7 +190,7 @@ void destroy_net_vif(net_vif_t *vif)
     spin_unlock_irqrestore(&p->page_lock, flags);
 
     kmem_cache_free(net_vif_cache, vif);
-    free_task_struct(p);
+    put_task_struct(p);
 }
 
 void unlink_net_vif(net_vif_t *vif)
@@ -232,7 +232,7 @@ void vif_query(vif_query_t *vq)
 
     copy_to_user(vq->buf, buf, strlen(buf) + 1);
     
-    free_task_struct(p);
+    put_task_struct(p);
 }
         
 /* ----[ Net Rule Functions ]-----------------------------------------------*/

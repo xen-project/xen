@@ -129,7 +129,7 @@ static void remove_from_blkdev_list(struct task_struct *p)
     {
         list_del(&p->blkdev_list);
         p->blkdev_list.next = NULL;
-        free_task_struct(p);
+        put_task_struct(p);
     }
     spin_unlock_irqrestore(&io_schedule_list_lock, flags);
 }
@@ -169,7 +169,7 @@ static void io_schedule(unsigned long unused)
         remove_from_blkdev_list(p);
         if ( do_block_io_op_domain(p, BATCH_PER_DOMAIN) )
             add_to_blkdev_list_tail(p);
-        free_task_struct(p);
+        put_task_struct(p);
     }
 
     /* Push the batch through to disc. */
@@ -219,7 +219,7 @@ static void end_block_io_op(struct buffer_head *bh, int uptodate)
     {
         make_response(pending_req->domain, pending_req->id,
                       pending_req->operation, pending_req->status);
-        free_task_struct(pending_req->domain);
+        put_task_struct(pending_req->domain);
         spin_lock_irqsave(&pend_prod_lock, flags);
         pending_ring[pending_prod] = pending_req - pending_reqs;
         PENDREQ_IDX_INC(pending_prod);
@@ -768,7 +768,7 @@ void unlink_blkdev_info(struct task_struct *p)
     {
         list_del(&p->blkdev_list);
         p->blkdev_list.next = (void *)0xdeadbeef; /* prevent reinsertion */
-        free_task_struct(p);
+        put_task_struct(p);
     }
     spin_unlock_irqrestore(&io_schedule_list_lock, flags);
 }
