@@ -1,3 +1,4 @@
+
 /******************************************************************************
  * dom0_core.c
  * 
@@ -40,6 +41,8 @@
 #define DOM_DIR         "dom"
 #define DOM_MEM         "mem"
 
+#define MAP_DISCONT     1
+
 frame_table_t * frame_table;
 
 static struct proc_dir_entry *xeno_base;
@@ -65,7 +68,6 @@ static int cmd_read_proc(char *page, char **start, off_t off,
 static void create_proc_dom_entries(int dom)
 {
     struct proc_dir_entry * dir;
-    struct proc_dir_entry * file;
     dom_procdata_t * dom_data;
     char dir_name[MAX_LEN];
 
@@ -104,12 +106,8 @@ static ssize_t dom_mem_read(struct file * file, char * buff, size_t size, loff_t
 
     /* remap the range using xen specific routines */
 
-    printk(KERN_ALERT "bd240 debug: dmw entered %lx, %lx\n", mem_data->pfn, mem_data->tot_pages);
-
-    addr = direct_mmap(mem_data->pfn << PAGE_SHIFT, mem_data->tot_pages << PAGE_SHIFT, prot, 0, 0);
+    addr = direct_mmap(mem_data->pfn << PAGE_SHIFT, mem_data->tot_pages << PAGE_SHIFT, prot, MAP_DISCONT, mem_data->tot_pages);
     
-    printk(KERN_ALERT "bd240 debug: dmw exit %lx, %lx\n", mem_data->pfn, mem_data->tot_pages);
-
     copy_to_user((unsigned long *)buff, &addr, sizeof(addr));
 
     return sizeof(addr);
@@ -214,8 +212,6 @@ static int cmd_write_proc(struct file *file, const char *buffer,
             params->pg_head = op.u.newdomain.pg_head;
             params->num_vifs = op.u.newdomain.num_vifs;
             params->domain = op.u.newdomain.domain;
-
-            printk(KERN_ALERT "bd240 debug: cmd_write: %lx, %d, %d\n", params->pg_head, params->memory_kb, params->domain); 
 
             /* now notify user space of the new domain's id */
             new_dom_id = create_proc_entry(DOM0_NEWDOM, 0600, xeno_base);

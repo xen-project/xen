@@ -361,6 +361,7 @@ unsigned int alloc_new_dom_mem(struct task_struct *p, unsigned int kbytes)
     temp = temp->next;
     list_del(&pf->list);
     pf->next = pf->prev = p->pg_head = (pf - frame_table);
+    pf->type_count = pf->tot_count = 0;
     free_pfns--;
     pf_head = pf;
 
@@ -375,6 +376,7 @@ unsigned int alloc_new_dom_mem(struct task_struct *p, unsigned int kbytes)
         pf->prev = pf_head->prev;
         (frame_table + pf_head->prev)->next = (pf - frame_table);
         pf_head->prev = (pf - frame_table);
+        pf->type_count = pf->tot_count = 0;
 
         free_pfns--;
     }
@@ -409,7 +411,7 @@ int final_setup_guestos(struct task_struct * p, dom_meminfo_t * meminfo)
     start_info_t * virt_startinfo_addr;
     unsigned long virt_stack_addr;
     unsigned long long time;
-    unsigned long phys_l1tab, phys_l2tab;
+    unsigned long phys_l2tab;
     page_update_request_t * pgt_updates;
     unsigned long curr_update_phys;
     unsigned long count;
@@ -432,6 +434,7 @@ int final_setup_guestos(struct task_struct * p, dom_meminfo_t * meminfo)
             pgt_updates = (page_update_request_t *)map_domain_mem(curr_update_phys);
         }
     }
+    unmap_domain_mem((void *)((unsigned long)(pgt_updates-1) & PAGE_MASK));
 
     /* entries 0xe0000000 onwards in page table must contain hypervisor
      * mem mappings - set them up.
@@ -452,12 +455,11 @@ int final_setup_guestos(struct task_struct * p, dom_meminfo_t * meminfo)
     phys_l2tab = pagetable_val(p->mm.pagetable); 
     l2tab = map_domain_mem(phys_l2tab);
     l2tab += l2_table_offset(meminfo->virt_shinfo_addr);
-    phys_l1tab = l2_pgentry_to_phys(*l2tab) + 
-        (l1_table_offset(meminfo->virt_shinfo_addr) * sizeof(l1_pgentry_t));
-    l1tab = map_domain_mem(phys_l1tab);
+    l1tab = map_domain_mem(l2_pgentry_to_phys(*l2tab));
+    l1tab += l1_table_offset(meminfo->virt_shinfo_addr);
     *l1tab = mk_l1_pgentry(__pa(p->shared_info) | L1_PROT);
-    unmap_domain_mem(l2tab);
-    unmap_domain_mem(l1tab);
+    unmap_domain_mem((void *)((unsigned long)l2tab & PAGE_MASK));
+    unmap_domain_mem((void *)((unsigned long)l1tab & PAGE_MASK));
 
     /* set up the shared info structure */
     rdtscll(time);
@@ -535,8 +537,7 @@ int final_setup_guestos(struct task_struct * p, dom_meminfo_t * meminfo)
     __asm__ __volatile__ (
         "mov %%eax,%%cr3" : : "a" (pagetable_val(current->mm.pagetable)));    
     __sti();
-
-
+    
     new_thread(p, 
                (unsigned long)meminfo->virt_load_addr, 
                (unsigned long)virt_stack_addr, 
@@ -570,7 +571,7 @@ int setup_guestos(struct task_struct *p, dom0_newdomain_t *params)
     unsigned long alloc_index;
     unsigned long ft_pages;
     l2_pgentry_t *l2tab, *l2start;
-    l1_pgentry_t *l1tab = NULL;
+    l1_pgentry_t *l1tab = NULL, *l1start = NULL;
     struct pfn_info *page = NULL;
     net_ring_t *net_ring;
     net_vif_t *net_vif;
@@ -627,53 +628,74 @@ int setup_guestos(struct task_struct *p, dom0_newdomain_t *params)
      * and frame table struct.
      */
 
-    ft_pages = (frame_table_size + (PAGE_SIZE - 1)) << PAGE_SHIFT;
+    ft_pages = frame_table_size >> PAGE_SHIFT;
     l2tab += l2_table_offset(virt_load_address);
     cur_address = p->pg_head << PAGE_SHIFT;
     for ( count  = 0;
-          count < p->tot_pages + 1;
+          count < p->tot_pages + 1 + ft_pages;
           count++)
     {
         if ( !((unsigned long)l1tab & (PAGE_SIZE-1)) )
         {
-            if ( l1tab != NULL ) unmap_domain_mem(l1tab-1);
+            if ( l1tab != NULL ) unmap_domain_mem(l1start);
             phys_l1tab = alloc_page_from_domain(&alloc_address, &alloc_index);
             *l2tab++ = mk_l2_pgentry(phys_l1tab|L2_PROT);
-            l1tab = map_domain_mem(phys_l1tab);
+            l1start = l1tab = map_domain_mem(phys_l1tab);
             clear_page(l1tab);
             l1tab += l1_table_offset(
                 virt_load_address + (count << PAGE_SHIFT));
         }
+        *l1tab++ = mk_l1_pgentry(cur_address|L1_PROT);
         
-        if( count < alloc_index )
+        if(count < p->tot_pages)
         {
-            *l1tab++ = mk_l1_pgentry(cur_address|L1_PROT);
             page = frame_table + (cur_address >> PAGE_SHIFT);
             page->flags = dom | PGT_writeable_page;
             page->type_count = page->tot_count = 1;
-        } 
-        else 
-        {
-            *l1tab++ = mk_l1_pgentry((cur_address|L1_PROT) & ~_PAGE_RW);
-            page = frame_table + (cur_address >> PAGE_SHIFT);
-            page->flags = dom | PGT_l1_page_table;
-            page->type_count = 1;
-            page->tot_count = 2; 
         }
 
         cur_address = ((frame_table + (cur_address >> PAGE_SHIFT))->next) << PAGE_SHIFT;
     }
-    unmap_domain_mem(l1tab-1);
-    page = frame_table + (frame_table + p->pg_head)->prev; 
+    unmap_domain_mem(l1start);
+
+    /* pages that are part of page tables must be read only */
+    cur_address = p->pg_head << PAGE_SHIFT;
+    for(count = 0;
+        count < alloc_index;
+        count++){
+        cur_address = ((frame_table + (cur_address >> PAGE_SHIFT))->next) << PAGE_SHIFT;
+    }
+
+    l2tab = l2start + l2_table_offset(virt_load_address + 
+        (alloc_index << PAGE_SHIFT));
+    l1start = l1tab = map_domain_mem(l2_pgentry_to_phys(*l2tab));
+    l1tab += l1_table_offset(virt_load_address + (alloc_index << PAGE_SHIFT));
+    l2tab++;
+    for(count = alloc_index;
+        count < p->tot_pages;
+        count++){
+        *l1tab++ = mk_l1_pgentry(l1_pgentry_val(*l1tab) & ~_PAGE_RW);
+        if(!((unsigned long)l1tab & (PAGE_SIZE - 1))){
+            unmap_domain_mem(l1start);
+            l1start = l1tab = map_domain_mem(l2_pgentry_to_phys(*l2tab));
+            l2tab++;
+        }
+        page = frame_table + (cur_address >> PAGE_SHIFT);
+        page->flags = dom | PGT_l1_page_table;
+        page->tot_count++;
+        
+        cur_address = ((frame_table + (cur_address >> PAGE_SHIFT))->next) << PAGE_SHIFT;
+    }
     page->flags = dom | PGT_l2_page_table;
+    unmap_domain_mem(l1start);
 
     /* Map in the the shared info structure. */
     virt_shinfo_address = virt_load_address + (p->tot_pages << PAGE_SHIFT); 
     l2tab = l2start + l2_table_offset(virt_shinfo_address);
-    l1tab = map_domain_mem(l2_pgentry_to_phys(*l2tab));
+    l1start = l1tab = map_domain_mem(l2_pgentry_to_phys(*l2tab));
     l1tab += l1_table_offset(virt_shinfo_address);
     *l1tab = mk_l1_pgentry(__pa(p->shared_info)|L1_PROT);
-    unmap_domain_mem(l1tab);
+    unmap_domain_mem(l1start);
 
     /* Set up shared info area. */
     rdtscll(time);
@@ -693,10 +715,10 @@ int setup_guestos(struct task_struct *p, dom0_newdomain_t *params)
         cur_address < virt_ftable_end;
         cur_address += PAGE_SIZE){
         l2tab = l2start + l2_table_offset(cur_address);
-        l1tab = map_domain_mem(l2_pgentry_to_phys(*l2tab));
+        l1start = l1tab = map_domain_mem(l2_pgentry_to_phys(*l2tab));
         l1tab += l1_table_offset(cur_address);
         *l1tab = mk_l1_pgentry(__pa(ft_mapping)|L1_PROT);
-        unmap_domain_mem(l1tab);
+        unmap_domain_mem(l1start);
         ft_mapping += PAGE_SIZE;
     }
     
@@ -791,7 +813,6 @@ int setup_guestos(struct task_struct *p, dom0_newdomain_t *params)
     return 0;
 }
 
-
 void __init domain_init(void)
 {
     int i;
@@ -803,16 +824,3 @@ void __init domain_init(void)
         schedule_data[i].curr = &idle0_task;
     }
 }
-
-
-
-#if 0
-    unsigned long s = (mod[        0].mod_start + (PAGE_SIZE-1)) & PAGE_MASK;
-    unsigned long e = (mod[nr_mods-1].mod_end   + (PAGE_SIZE-1)) & PAGE_MASK;
-    while ( s != e ) 
-    { 
-        free_pages((unsigned long)__va(s), 0); 
-        s += PAGE_SIZE;
-    }
-#endif
-

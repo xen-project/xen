@@ -269,6 +269,7 @@ static int inc_page_refcnt(unsigned long page_nr, unsigned int type)
                     flags & PG_type_mask, type, page_type_count(page));
             return -1;
         }
+
         page->flags |= type;
     }
 
@@ -332,7 +333,7 @@ static int get_l2_table(unsigned long page_nr)
 {
     l2_pgentry_t *p_l2_entry, l2_entry;
     int i, ret=0;
-    
+   
     ret = inc_page_refcnt(page_nr, PGT_l2_page_table);
     if ( ret != 0 ) return (ret < 0) ? ret : 0;
     
@@ -354,7 +355,7 @@ static int get_l2_table(unsigned long page_nr)
         if ( ret ) ret = get_twisted_l2_table(page_nr, l2_entry);
         if ( ret ) goto out;
     }
-
+    
     /* Now we simply slap in our high mapping. */
     memcpy(p_l2_entry, 
            idle_pg_table[smp_processor_id()] + DOMAIN_ENTRIES_PER_L2_PAGETABLE,
@@ -570,8 +571,6 @@ static int mod_l1_entry(unsigned long pa, l1_pgentry_t new_l1_entry)
               (_PAGE_GLOBAL|_PAGE_PAT)) ) 
         {
 
-            printk(KERN_ALERT "bd240 debug: bad l1 entry val %lx\n", l1_pgentry_val(new_l1_entry) & (_PAGE_GLOBAL | _PAGE_PAT));
-
             MEM_LOG("Bad L1 entry val %04lx",
                     l1_pgentry_val(new_l1_entry) & 
                     (_PAGE_GLOBAL|_PAGE_PAT));
@@ -592,7 +591,6 @@ static int mod_l1_entry(unsigned long pa, l1_pgentry_t new_l1_entry)
             
             if ( get_page(l1_pgentry_to_pagenr(new_l1_entry),
                           l1_pgentry_val(new_l1_entry) & _PAGE_RW) ){
-                printk(KERN_ALERT "bd240 debug: get_page err\n");
                 goto fail;
             }
         } 
@@ -765,30 +763,6 @@ int do_process_page_updates_bh(page_update_request_t * cur, int count)
             break;
 
             /*
-             * PGREQ_UNCHECKED_UPDATE: Make an unchecked update to a
-             * bottom-level page-table entry.
-             * Restrictions apply:
-             *  1. Update only allowed by domain 0.
-             *  2. Update must be to a level-1 pte belonging to dom0.
-             */
-        case PGREQ_UNCHECKED_UPDATE:
-            cur->ptr &= ~(sizeof(l1_pgentry_t) - 1);
-            page = frame_table + pfn;
-            flags = page->flags;
-            if ( (flags | current->domain) == PGT_l1_page_table )
-            {
-                
-                *(unsigned long *)map_domain_mem(cur->ptr) = cur->val;
-                err = 0;
-            }
-            else
-            {
-                MEM_LOG("UNCHECKED_UPDATE: Bad domain %d, or"
-                        " bad pte type %08lx", current->domain, flags);
-            }
-            break;
-
-            /*
              * PGREQ_EXTENDED_COMMAND: Extended command is specified
              * in the least-siginificant bits of the 'value' field.
              */
@@ -804,7 +778,6 @@ int do_process_page_updates_bh(page_update_request_t * cur, int count)
 
         if ( err )
         {
-            page = frame_table + (cur->ptr >> PAGE_SHIFT);
             kill_domain_with_errmsg("Illegal page update request");
         }
 

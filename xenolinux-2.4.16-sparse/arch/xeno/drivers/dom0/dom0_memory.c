@@ -27,9 +27,9 @@ extern struct list_head * find_direct(struct list_head *, unsigned long);
  * management applications such as domain builder etc.
  */
 
-#define direct_set_pte(pteptr, pteval) queue_l1_entry_update(__pa(pteptr) | PGREQ_UNCHECKED_UPDATE, (pteval).pte_low)
+#define direct_set_pte(pteptr, pteval) queue_l1_entry_update(__pa(pteptr), (pteval).pte_low)
 
-#define direct_pte_clear(pteptr) queue_l1_entry_update(__pa(pteptr) | PGREQ_UNCHECKED_UPDATE, 0)
+#define direct_pte_clear(pteptr) queue_l1_entry_update(__pa(pteptr), 0)
 
 #define __direct_pte(x) ((pte_t) { (x) } )
 #define __direct_mk_pte(page_nr,pgprot) __direct_pte(((page_nr) << PAGE_SHIFT) | pgprot_val(pgprot))
@@ -55,6 +55,7 @@ static inline void direct_remappte_range(pte_t * pte, unsigned long address, uns
 	do {
 		pte_t oldpage;
 		oldpage = ptep_get_and_clear(pte);
+
  		direct_set_pte(pte, direct_mk_pte_phys(phys_addr, prot));
 
 		forget_pte(oldpage);
@@ -122,18 +123,19 @@ int direct_remap_page_range(unsigned long from, unsigned long phys_addr, unsigne
  * used for remapping discontiguous bits of domain's memory, pages to map are
  * found from frame table beginning at the given first_pg index
  */ 
-int direct_remap_disc_page_range(unsigned long from, unsigned long first_pg,
-                int tot_pages, pgprot_t prot)
+int direct_remap_disc_page_range(unsigned long from, 
+                unsigned long first_pg, int tot_pages, pgprot_t prot)
 {
     frame_table_t * current_ft;
     unsigned long current_pfn;
     unsigned long start = from;
     int count = 0;
 
-    current_ft = (frame_table_t *)(frame_table + first_pg);
+    current_ft = frame_table + first_pg;
     current_pfn = first_pg; 
     while(count < tot_pages){
-            if(direct_remap_page_range(start, current_pfn << PAGE_SHIFT, PAGE_SIZE, prot))
+            if(direct_remap_page_range(start, current_pfn << PAGE_SHIFT, 
+                PAGE_SIZE, prot))
                 goto out;
             start += PAGE_SIZE;
             current_pfn = current_ft->next;
@@ -187,10 +189,9 @@ unsigned long direct_mmap(unsigned long phys_addr, unsigned long size,
 
     /* and perform the mapping */
     if(flag == MAP_DISCONT){
-        printk(KERN_ALERT "bd240 debug: call direct_remap_disc_page_range\n");
-        ret = direct_remap_disc_page_range(addr, phys_addr, tot_pages, prot);
+        ret = direct_remap_disc_page_range(addr, phys_addr >> PAGE_SHIFT, 
+            tot_pages, prot);
     } else {
-        printk(KERN_ALERT "bd240 debug: call direct_remap_page_range\n");
         ret = direct_remap_page_range(addr, phys_addr, size, prot);
     }
 
