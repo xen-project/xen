@@ -106,28 +106,6 @@ static inline int do_dom0_op(int xc_handle, dom0_op_t *op)
  out1: return ret;
 }
 
-static inline int do_multicall_op(int xc_handle, 
-				  void *call_list, int nr_calls) 
-{
-    int ret = -1;
-    privcmd_hypercall_t hypercall;
-
-    hypercall.op     = __HYPERVISOR_multicall;
-    hypercall.arg[0] = (unsigned long)call_list;
-    hypercall.arg[1] = (unsigned long)nr_calls;
-
-    if ( (ret = do_xen_hypercall(xc_handle, &hypercall)) < 0 )
-    {
-        if ( errno == EACCES )
-            fprintf(stderr, "Dom0 operation failed -- need to"
-                    " rebuild the user-space tool set?\n");
-        goto out1;
-    }
-
- out1: return ret;
-}
-
-
 static inline int do_dom_mem_op(int            xc_handle,
 				unsigned int   memop, 
 				unsigned int *extent_list, 

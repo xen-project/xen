@@ -77,7 +77,7 @@ following OSs have either been ported already or a port is in
 progress:
 \begin{itemize}
 \item Dragonfly BSD
-\item FreeBSD 4.8
+\item FreeBSD 5.3
 \item Linux 2.4
 \item Linux 2.6
 \item NetBSD 2.0
@@ -85,8 +85,8 @@ progress:
 \item Windows XP
 \end{itemize}
 
-Right now, Linux 2.4 and 2.6 are available for on Xen 2.0.  NetBSD
-port will be updated to run on Xen 2.0, hopefully in time for the Xen
+Right now, Linux 2.4 and 2.6 are available for Xen 2.0.  NetBSD
+port will be updated to run on Xen 2.0, hopefully in time for the NetBSD
 2.0 release.  It is intended that Xen support be integrated into the
 official releases of Linux 2.6, NetBSD 2.0, FreeBSD and Dragonfly BSD.
 
@@ -289,16 +289,16 @@ line.
 \subsection{Using Bitkeeper}
 
 The public master BK repository for the 2.0 release lives at: \\
-{\tt bk://xen.bkbits.net/xeno-unstable.bk}.  You can use Bitkeeper to
+{\tt bk://xen.bkbits.net/xen-2.0.bk}.  You can use Bitkeeper to
 download it and keep it updated with the latest features and fixes.
 
 Change to the directory in which you want to put the source code, then
 run:
 \begin{verbatim}
-# bk clone bk://xen.bkbits.net/xeno-unstable.bk
+# bk clone bk://xen.bkbits.net/xen-2.0.bk
 \end{verbatim}
 
-Under your current directory, a new directory named 'xeno-unstable.bk'
+Under your current directory, a new directory named `xen-2.0.bk'
 has been created, which contains all the source code for the Xen
 hypervisor and the Xen tools.  The directory also contains `sparse'
 Linux source trees, containing only the files that differ between
@@ -307,8 +307,8 @@ XenLinux and standard Linux.
 Once you have cloned the repository, you can update to the newest
 changes to the repository by running:
 \begin{verbatim}
-# cd xeno-unstable.bk # to change into the local repository
-# bk pull             # to update the repository
+# cd xen-2.0.bk # to change into the local repository
+# bk pull        # to update the repository
 \end{verbatim}
 
 \subsection{Without Bitkeeper}
@@ -494,18 +494,22 @@ require a more complex setup, you will want to write a custom
 configuration file --- details of the configuration file formats are
 included in Chapter~\ref{cha:config}.
 
-The \path{xmdefaults} file is a template description that is intended
+The \path{xmdefconfig1} file is a simple template configuration file
+for describing a single VM.
+
+The \path{xmdefconfig2} file is a template description that is intended
 to be reused for multiple virtual machines.  Setting the value of the
-{\tt vmid} variable fills in parts of this template.
+{\tt vmid} variable on the {\tt xm} command line
+fills in parts of this template.
 
-\subsection{Editing \path{xmdefaults}}
+\subsection{Editing \path{xmdefconfig}}
 
-At minimum, you should edit the following variables in \path{xmdefaults}:
+At minimum, you should edit the following variables in \path{xmdefconfig}:
 
 \begin{description}
 \item[kernel] Set this to the path of the kernel you compiled for use
               with Xen. [e.g. {\tt kernel =
-              '/root/xeno-unstable.bk/install/boot/vmlinuz-2.4.27-xenU'}]
+              '/root/xen-2.0.bk/install/boot/vmlinuz-2.4.27-xenU'}]
 \item[memory] Set this to the size of the domain's memory in
 megabytes. [e.g. {\tt memory = 64 } ]
 \item[disk] Set the first entry in this list to calculate the offset
@@ -535,8 +539,8 @@ virtual machine with virtual machine ID 1.
 
 The {\tt -c} switch causes {\tt xm} to turn into the domain's console
 after creation.  The {\tt vmid=1} sets the {\tt vmid} variable used in
-the {\tt xmdefaults} file.  The tool uses the
-\path{/etc/xen/xmdefaults} file, since no custom configuration file
+the {\tt xmdefconfig} file.  The tool uses the
+\path{/etc/xen/xmdefconfig} file, since no custom configuration file
 was specified on the command line.
 
 \chapter{Domain management tasks}
@@ -678,7 +682,7 @@ Xen configuration files contain the following standard variables:
 \end{description}
 
 It is also possible to include Python scripting commands in
-configuration files.  This is done in the \path{xmdefaults} file in
+configuration files.  This is done in the \path{xmdefconfig} file in
 order to handle the {\tt vmid} variable.
 
 
@@ -743,7 +747,7 @@ The available {\em switches } and {\em arguments}are dependent on the
 declarations of the form {\tt variable=value} and may be used to set /
 override any of the values in the configuration file being used,
 including the standard variables described above and any custom
-variables (for instance, the \path{xmdefaults} file uses a {\tt vmid}
+variables (for instance, the \path{xmdefconfig} file uses a {\tt vmid}
 variable).
 
 The available commands are as follows:
@@ -1021,7 +1025,7 @@ IO privileges can be assigned to allow a domain to drive PCI devices
 itself.  This is used for to support driver domains.
 
 Setting backend privileges is currently only supported in SXP format
-config files (??? is this true - there's nothing in xmdefaults,
+config files (??? is this true - there's nothing in xmdefconfig,
 anyhow).  To allow a domain to function as a backend for others,
 somewhere within the {\tt vm} element of its configuration file must
 be a {\tt backend} element of the form {\tt (backend ({\em type}))}

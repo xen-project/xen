@@ -183,6 +183,9 @@ void cmain(multiboot_info_t *mbi)
         }
     }
 
+    /* Must do this early -- e.g., spinlocks rely on get_current(). */
+    set_current(&idle0_task);
+
     /* We initialise the serial devices very early so we can get debugging. */
     serial_init_stage1();
 
@@ -217,8 +220,6 @@ void cmain(multiboot_info_t *mbi)
         printk("Xen heap size is too small to safely continue!\n");
         for ( ; ; ) ;
     }
-
-    set_current(&idle0_task);
 
     xenheap_phys_end = opt_xenheap_megabytes << 20;
 
@@ -389,3 +390,48 @@ long do_ni_hypercall(void)
     /* No-op hypercall. */
     return -ENOSYS;
 }
+
+/*
+ * Lock debugging
+ */
+
+#ifndef NDEBUG
+
+static int crit_count[NR_CPUS], crit_checking_disabled[NR_CPUS];
+
+void disable_criticalregion_checking(void)
+{
+    int cpu = smp_processor_id();
+    crit_checking_disabled[cpu]++;
+}
+
+void criticalregion_enter(void)
+{
+    int cpu = smp_processor_id();
+    if ( crit_checking_disabled[cpu] )
+        return;
+    ASSERT(crit_count[cpu] >= 0);
+    crit_count[cpu]++;
+}
+
+void criticalregion_exit(void)
+{
+    int cpu = smp_processor_id();
+    if ( crit_checking_disabled[cpu] )
+        return;
+    crit_count[cpu]--;
+    ASSERT(crit_count[cpu] >= 0);
+}
+
+void ASSERT_no_criticalregion(void)
+{
+    int cpu = smp_processor_id();
+    if ( (crit_count[cpu] == 0) || crit_checking_disabled[cpu] )
+        return;
+    disable_criticalregion_checking();
+    ASSERT(crit_count[cpu] >= 0); /* -ve count is a special kind of bogus! */
+    ASSERT(crit_count[cpu] == 0); /* we should definitely take this path   */
+    ASSERT(1); /* NEVER GET HERE! */
+}
+
+#endif /* !NDEBUG */

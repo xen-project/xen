@@ -354,8 +354,9 @@ class NetifController(controller.SplitController):
     def recv_fe_driver_status_changed(self, msg, req):
         if not req: return
         msg = packMsg('netif_fe_driver_status_changed_t',
-                      { 'status'        : NETIF_DRIVER_STATUS_UP,
-                        'nr_interfaces' : len(self.devices) })
+                      { 'status'     : NETIF_DRIVER_STATUS_UP,
+                        ## FIXME: max_handle should be max active interface id
+                        'max_handle' : len(self.devices) })
         self.writeRequest(msg)
         for dev in self.devices.values():
             dev.attach_fe_device()

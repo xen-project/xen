@@ -52,7 +52,7 @@ enum fixed_addresses {
 	FIX_NETRING2_BASE,
 	FIX_NETRING3_BASE,
         FIX_SHARED_INFO,
-
+	FIX_GNTTAB,
 #ifdef CONFIG_VGA_CONSOLE
 #define NR_FIX_BTMAPS   32  /* 128KB For the Dom0 VGA Console A0000-C0000 */
 #else

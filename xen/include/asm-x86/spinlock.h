@@ -17,7 +17,7 @@ typedef struct {
 #define spin_lock_init(x)	do { *(x) = SPIN_LOCK_UNLOCKED; } while(0)
 #define spin_is_locked(x)	(*(volatile char *)(&(x)->lock) <= 0)
 
-static inline void spin_lock(spinlock_t *lock)
+static inline void _raw_spin_lock(spinlock_t *lock)
 {
     __asm__ __volatile__ (
         "1:  lock; decb %0         \n"
@@ -31,7 +31,7 @@ static inline void spin_lock(spinlock_t *lock)
         : "=m" (lock->lock) : : "memory" );
 }
 
-static inline void spin_unlock(spinlock_t *lock)
+static inline void _raw_spin_unlock(spinlock_t *lock)
 {
 #if !defined(CONFIG_X86_OOSTORE)
     ASSERT(spin_is_locked(lock));
@@ -47,7 +47,7 @@ static inline void spin_unlock(spinlock_t *lock)
 #endif
 }
 
-static inline int spin_trylock(spinlock_t *lock)
+static inline int _raw_spin_trylock(spinlock_t *lock)
 {
     char oldval;
     __asm__ __volatile__(
@@ -64,7 +64,7 @@ static inline int spin_trylock(spinlock_t *lock)
  * are any critical regions that cannot form part of such a set, they can use
  * standard spin_[un]lock().
  */
-#define spin_lock_recursive(_lock)                 \
+#define _raw_spin_lock_recursive(_lock)            \
     do {                                           \
         int cpu = smp_processor_id();              \
         if ( likely((_lock)->recurse_cpu != cpu) ) \
@@ -75,7 +75,7 @@ static inline int spin_trylock(spinlock_t *lock)
         (_lock)->recurse_cnt++;                    \
     } while ( 0 )
 
-#define spin_unlock_recursive(_lock)               \
+#define _raw_spin_unlock_recursive(_lock)          \
     do {                                           \
         if ( likely(--(_lock)->recurse_cnt == 0) ) \
         {                                          \
@@ -97,32 +97,23 @@ typedef struct {
  * On x86, we implement read-write locks as a 32-bit counter
  * with the high bit (sign) being the "contended" bit.
  */
-static inline void read_lock(rwlock_t *rw)
+static inline void _raw_read_lock(rwlock_t *rw)
 {
     __build_read_lock(rw, "__read_lock_failed");
 }
 
-static inline void write_lock(rwlock_t *rw)
+static inline void _raw_write_lock(rwlock_t *rw)
 {
     __build_write_lock(rw, "__write_lock_failed");
 }
 
-#define read_unlock(rw)                            \
+#define _raw_read_unlock(rw)                       \
     __asm__ __volatile__ (                         \
         "lock ; incl %0" :                         \
         "=m" ((rw)->lock) : : "memory" )
-#define write_unlock(rw)                           \
+#define _raw_write_unlock(rw)                      \
     __asm__ __volatile__ (                         \
         "lock ; addl $" RW_LOCK_BIAS_STR ",%0" :   \
         "=m" ((rw)->lock) : : "memory" )
-
-static inline int write_trylock(rwlock_t *lock)
-{
-    atomic_t *count = (atomic_t *)lock;
-    if ( atomic_sub_and_test(RW_LOCK_BIAS, count) )
-        return 1;
-    atomic_add(RW_LOCK_BIAS, count);
-    return 0;
-}
 
 #endif /* __ASM_SPINLOCK_H */

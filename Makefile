@@ -27,7 +27,7 @@ dist: all
 	$(MAKE) linux-xenU
 	$(MAKE) linux-xen0
 
-LINUX_RELEASE    ?= 2.4
+LINUX_RELEASE    ?= 2.6
 LINUX_VER        ?= $(shell ( /bin/ls -ld linux-$(LINUX_RELEASE).*-xen-sparse ) 2>/dev/null | \
 		      sed -e 's!^.*linux-\(.\+\)-xen-sparse!\1!' )
 LINUX26_VER      ?= $(shell ( /bin/ls -ld linux-2.6.*-xen-sparse ) 2>/dev/null | \
@@ -123,6 +123,12 @@ linux26:
 	$(MAKE) LINUX_RELEASE=2.6 config-xen0
 	$(MAKE) LINUX_RELEASE=2.6 linux-xen0
 
+linux24:
+	$(MAKE) LINUX_RELEASE=2.4 mk-linux-trees
+	$(MAKE) LINUX_RELEASE=2.4 config-xenU
+	$(MAKE) LINUX_RELEASE=2.4 linux-xenU
+	$(MAKE) LINUX_RELEASE=2.4 config-xen0
+	$(MAKE) LINUX_RELEASE=2.4 linux-xen0
 
 clean: delete-symlinks
 	$(MAKE) -C xen clean

@@ -325,10 +325,10 @@ static PyObject *xu_message_set_response_fields(PyObject *self, PyObject *args)
     switch ( TYPE(xum->msg.type, xum->msg.subtype) )
     {
     case TYPE(CMSG_BLKIF_FE, CMSG_BLKIF_FE_DRIVER_STATUS_CHANGED):
-        P2C(blkif_fe_driver_status_changed_t, nr_interfaces, u32);
+        P2C(blkif_fe_driver_status_changed_t, max_handle, u32);
         break;
     case TYPE(CMSG_NETIF_FE, CMSG_NETIF_FE_DRIVER_STATUS_CHANGED):
-        P2C(netif_fe_driver_status_changed_t, nr_interfaces, u32);
+        P2C(netif_fe_driver_status_changed_t, max_handle, u32);
         break;
     }
 
@@ -435,7 +435,7 @@ static PyObject *xu_message_get_payload(PyObject *self, PyObject *args)
         return dict;
     case TYPE(CMSG_NETIF_FE, CMSG_NETIF_FE_DRIVER_STATUS_CHANGED):
         C2P(netif_fe_driver_status_changed_t, status,        Int, Long);
-        C2P(netif_fe_driver_status_changed_t, nr_interfaces, Int, Long);
+        C2P(netif_fe_driver_status_changed_t, max_handle,    Int, Long);
         return dict;
     case TYPE(CMSG_NETIF_FE, CMSG_NETIF_FE_INTERFACE_CONNECT):
         C2P(netif_fe_interface_connect_t, handle,         Int, Long);
@@ -630,7 +630,7 @@ static PyObject *xu_message_new(PyObject *self, PyObject *args)
         break;
     case TYPE(CMSG_NETIF_FE, CMSG_NETIF_FE_DRIVER_STATUS_CHANGED):
         P2C(netif_fe_driver_status_changed_t, status,        u32);
-        P2C(netif_fe_driver_status_changed_t, nr_interfaces, u32);
+        P2C(netif_fe_driver_status_changed_t, max_handle,    u32);
         break;
     }
 

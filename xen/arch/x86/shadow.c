@@ -443,7 +443,7 @@ int shadow_mode_control(struct domain *d, dom0_shadow_control_t *sc)
     domain_pause(d);
     synchronise_pagetables(~0UL);
 
-    spin_lock(&d->mm.shadow_lock);
+    shadow_lock(&d->mm);
 
     if ( cmd == DOM0_SHADOW_CONTROL_OP_OFF )
     {
@@ -470,7 +470,7 @@ int shadow_mode_control(struct domain *d, dom0_shadow_control_t *sc)
         rc = -EINVAL;
     }
 
-    spin_unlock(&d->mm.shadow_lock);
+    shadow_unlock(&d->mm);
 
     domain_unpause(d);
 
@@ -620,19 +620,19 @@ int shadow_fault( unsigned long va, long error_code )
 
     // take the lock and reread gpte
 
-	spin_lock(&current->mm.shadow_lock);
+    shadow_lock(m);
 	
     if ( unlikely(__get_user(gpte, (unsigned long*)&linear_pg_table[va>>PAGE_SHIFT])) )
     {
         SH_VVLOG("shadow_fault - EXIT: read gpte faulted" );
-        spin_unlock(&m->shadow_lock);
+        shadow_unlock(m);
         return 0;  // propagate to guest
     }
 
     if ( unlikely(!(gpte & _PAGE_PRESENT)) )
     {
         SH_VVLOG("shadow_fault - EXIT: gpte not present (%lx)",gpte );
-        spin_unlock(&m->shadow_lock);
+        shadow_unlock(m);
         return 0;  // we're not going to be able to help
     }
 
@@ -645,7 +645,7 @@ int shadow_fault( unsigned long va, long error_code )
         else
         {   // write fault on RO page
             SH_VVLOG("shadow_fault - EXIT: write fault on RO page (%lx)",gpte );
-            spin_unlock(&m->shadow_lock);
+            shadow_unlock(m);
             return 0; // propagate to guest
             // not clear whether we should set accessed bit here...
         }
@@ -737,7 +737,7 @@ int shadow_fault( unsigned long va, long error_code )
 
     check_pagetable( current, current->mm.pagetable, "post-sf" );
 
-    spin_unlock(&m->shadow_lock);
+    shadow_unlock(m);
 
     return 1; // let's try the faulting instruction again...
 

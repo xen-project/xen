@@ -1042,7 +1042,7 @@ static int do_extended_command(unsigned long ptr, unsigned long val)
         if ( unlikely(e->tot_pages == e->max_pages) ||
              unlikely(!gnttab_prepare_for_transfer(e, d, gntref)) )
         {
-            MEM_LOG("Transferee has no reservation headroom (%ld,%ld), or "
+            MEM_LOG("Transferee has no reservation headroom (%d,%d), or "
                     "provided a bad grant ref.\n", e->tot_pages, e->max_pages);
             spin_unlock(&e->page_alloc_lock);
             put_domain(e);
@@ -1488,8 +1488,10 @@ void ptwr_reconnect_disconnected(unsigned long addr)
                  addr, ptwr_info[cpu].disconnected << L2_PAGETABLE_SHIFT));
     pl2e = &linear_l2_table[ptwr_info[cpu].disconnected];
 
-    if (__get_user(pte, writable_pte))
-        BUG();
+    if (__get_user(pte, writable_pte)) {
+	MEM_LOG("ptwr: Could not read pte at %p\n", writable_pte);
+	domain_crash();
+    }
     pfn = pte >> PAGE_SHIFT;
     page = &frame_table[pfn];
 
@@ -1512,8 +1514,10 @@ void ptwr_reconnect_disconnected(unsigned long addr)
             continue;
         if (unlikely(l1_pgentry_val(ol1e) & _PAGE_PRESENT))
             put_page_from_l1e(ol1e, current);
-        if (unlikely(!get_page_from_l1e(nl1e, current)))
-            BUG();
+        if (unlikely(!get_page_from_l1e(nl1e, current))) {
+	    MEM_LOG("ptwr: Could not re-validate l1 page\n");
+	    domain_crash();
+	}
     }
     unmap_domain_mem(pl1e);
     update_l2e(pl2e, *pl2e, nl2e);
@@ -1525,13 +1529,17 @@ void ptwr_reconnect_disconnected(unsigned long addr)
                  frame_table[pfn].u.inuse.domain->domain));
     ptwr_info[cpu].disconnected = ENTRIES_PER_L2_PAGETABLE;
     /* make pt page write protected */
-    if (__get_user(pte, writable_pte))
-        BUG();
+    if (__get_user(pte, writable_pte)) {
+	MEM_LOG("ptwr: Could not read pte at %p\n", writable_pte);
+	domain_crash();
+    }
     PTWR_PRINTK(("[A] writable_l1 at %p is %08lx\n",
                  writable_pte, pte));
     pte &= ~_PAGE_RW;
-    if (__put_user(pte, writable_pte))
-        BUG();
+    if (__put_user(pte, writable_pte)) {
+	MEM_LOG("ptwr: Could not update pte at %p\n", writable_pte);
+	domain_crash();
+    }
     __flush_tlb_one(ptwr_info[cpu].writable_l1);
     PTWR_PRINTK(("[A] writable_l1 at %p now %08lx\n",
                  writable_pte, pte));
@@ -1564,8 +1572,10 @@ void ptwr_flush_inactive(void)
     for (idx = 0; idx < ptwr_info[cpu].writable_idx; idx++) {
         unsigned long *writable_pte = (unsigned long *)&linear_pg_table
             [ptwr_info[cpu].writables[idx]>>PAGE_SHIFT];
-        if (__get_user(pte, writable_pte))
-            BUG();
+        if (__get_user(pte, writable_pte)) {
+	    MEM_LOG("ptwr: Could not read pte at %p\n", writable_pte);
+	    domain_crash();
+	}
         pfn = pte >> PAGE_SHIFT;
         page = &frame_table[pfn];
         PTWR_PRINTK(("[I] alloc l1 page %p\n", page));
@@ -1579,8 +1589,10 @@ void ptwr_flush_inactive(void)
                 continue;
             if (unlikely(l1_pgentry_val(ol1e) & _PAGE_PRESENT))
                 put_page_from_l1e(ol1e, current);
-            if (unlikely(!get_page_from_l1e(nl1e, current)))
-                BUG();
+            if (unlikely(!get_page_from_l1e(nl1e, current))) {
+		MEM_LOG("ptwr: Could not re-validate l1 page\n");
+		domain_crash();
+	    }
         }
         unmap_domain_mem(pl1e);
 
@@ -1588,8 +1600,10 @@ void ptwr_flush_inactive(void)
         PTWR_PRINTK(("[I] writable_l1 at %p is %08lx\n",
                      writable_pte, pte));
         pte &= ~_PAGE_RW;
-        if (__put_user(pte, writable_pte))
-            BUG();
+        if (__put_user(pte, writable_pte)) {
+	    MEM_LOG("ptwr: Could not update pte at %p\n", writable_pte);
+	    domain_crash();
+	}
         __flush_tlb_one(ptwr_info[cpu].writables[idx]);
         PTWR_PRINTK(("[I] writable_l1 at %p now %08lx\n",
                      writable_pte, pte));
@@ -1690,8 +1704,11 @@ int ptwr_do_page_fault(unsigned long addr)
             PTWR_PRINTK(("update %p pte to %08lx\n",
                          &linear_pg_table[addr>>PAGE_SHIFT], pte));
             if ( __put_user(pte, (unsigned long *)
-                           &linear_pg_table[addr>>PAGE_SHIFT]) )
-                BUG();
+			    &linear_pg_table[addr>>PAGE_SHIFT]) ) {
+		MEM_LOG("ptwr: Could not update pte at %p\n", (unsigned long *)
+			&linear_pg_table[addr>>PAGE_SHIFT]);
+		domain_crash();
+	    }
             return 1;
         }
     }
@@ -1713,8 +1730,11 @@ static void ptwr_init_backpointers(void)
 
         page = &frame_table[pde >> PAGE_SHIFT];
         /* assert that page is an l1_page_table   XXXcl maybe l2? */
-        if ( (page->u.inuse.type_info & PGT_type_mask) != PGT_l1_page_table )
-            BUG();
+        if ( (page->u.inuse.type_info & PGT_type_mask) != PGT_l1_page_table ) {
+	    MEM_LOG("ptwr: Inconsistent pagetable: pde %lx not an l1 page\n",
+		    pde >> PAGE_SHIFT);
+	    domain_crash();
+	}
         page->u.inuse.type_info &= ~PGT_va_mask;
         page->u.inuse.type_info |= va_idx << PGT_va_shift;
     }
@@ -1739,8 +1759,10 @@ void ptwr_status(void)
         unsigned long *writable_pte = (unsigned long *)&linear_pg_table
             [ptwr_info[cpu].writables[i]>>PAGE_SHIFT];
 
-        if ( __get_user(pte, writable_pte) )
-            BUG();
+        if ( __get_user(pte, writable_pte) ) {
+	    MEM_LOG("ptwr: Could not read pte at %p\n", writable_pte);
+	    domain_crash();
+	}
 
         pfn = pte >> PAGE_SHIFT;
         page = &frame_table[pfn];
@@ -1757,8 +1779,11 @@ void ptwr_status(void)
            ptwr_info[cpu].disconnected << L2_PAGETABLE_SHIFT);
     pl2e = &linear_l2_table[ptwr_info[cpu].disconnected];
 
-    if ( __get_user(pte, (unsigned long *)ptwr_info[cpu].writable_l1) )
-        BUG();
+    if ( __get_user(pte, (unsigned long *)ptwr_info[cpu].writable_l1) ) {
+	MEM_LOG("ptwr: Could not read pte at %p\n", (unsigned long *)
+		ptwr_info[cpu].writable_l1);
+	domain_crash();
+    }
     pfn = pte >> PAGE_SHIFT;
     page = &frame_table[pfn];
 

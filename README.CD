@@ -1,15 +1,15 @@
-#############################
- __  __            _   _____ 
- \ \/ /___ _ __   / | |___ / 
-  \  // _ \ '_ \  | |   |_ \ 
-  /  \  __/ | | | | |_ ___) |
- /_/\_\___|_| |_| |_(_)____/ 
-                                              
-#############################
+###############################
+__  __            ____    ___
+\ \/ /___ _ __   |___ \  / _ \
+ \  // _ \ '_ \    __) || | | |
+ /  \  __/ | | |  / __/ | |_| |
+/_/\_\___|_| |_| |_____(_)___/
 
- XenDemoCD 1.3
+###############################
+
+ XenDemoCD 2.0
  University of Cambridge Computer Laboratory
- 24 Jan 2004
+ 28 Aug 2004
 
  http://www.cl.cam.ac.uk/netos/xen
 
@@ -18,10 +18,10 @@ Welcome to the Xen Demo CD!
 Executive Summary
 =================
 
-This CD is a standalone demo of the Xen Virtual Machine Monitor (VMM)
-and Linux-2.4 OS port (Xenlinux). It runs entirely off the CD,
-without requiring hard disk installation. This is achieved using a RAM
-disk to store mutable file system data while using the CD for
+This CD is a standalone demo of the Xen Virtual Machine Monitor (VMM),
+ Linux-2.4 and Linux-2.6 OS port (Xenlinux). It runs entirely off the
+CD, without requiring hard disk installation. This is achieved using a
+RAM disk to store mutable file system data while using the CD for
 everything else. The CD can also be used for installing Xen/Xenlinux
 to disk, and includes a source code snapshot along with all of the
 tools required to build it.
@@ -51,9 +51,9 @@ To try out the Demo, boot from CD (you may need to change your BIOS
 configuration to do this), then select one of the four boot options 
 from the Grub menu:
 
- Xen / linux-2.4.26
- Xen / linux-2.4.26 using cmdline IP configuration
- Xen / linux-2.4.26 in "safe mode"
+ Xen / linux-2.4.27
+ Xen / linux-2.4.27 using cmdline IP configuration
+ Xen / linux-2.4.27 in "safe mode"
  linux-2.4.22
 
 The last option is a plain linux kernel that runs on the bare machine,
@@ -119,7 +119,7 @@ work with Xen, and you'll only be able to configure a VGA X
 server. We're working on a fix for this for the next release.
 
 If you want to browse the Xen / Xenlinux source, it's all located
-under /usr/local/src/xeno-1.3, complete with BitKeeper
+under /usr/local/src/xen-2.0.bk, complete with BitKeeper
 repository. We've also included source code and configuration
 information for the various benchmarks we used in the SOSP paper.
 
@@ -149,7 +149,7 @@ high-level management tools will be developed in due course. Within
 the source repository the tools live in tools/examples/ but are
 installed in /usr/local/bin/ on the CD.
 
-Starting a new domain is achieved using xc_dom_create.py which
+Starting a new domain is achieved using the command 'xm create' which
 allocates resources to a new domain, populates it with a kernel image
 (and optionally a ramdisk) and then starts it.
 
@@ -177,17 +177,13 @@ The 'mem' variable can be used to change the default memory allocation
 of 64MB. For example to start a domain with two IP addresses and
 72MB:
 
-  xc_dom_create.py -Dip=128.23.45.34,169.254.1.1 -Dmem=72
+  xm create ip=128.23.45.34,169.254.1.1mem=72
 
-[multiple variables may also be set with a single '-D' flag by
-separating them with ':'. Also, it's possible to use DNS hostnames
-rather than IP addresses.]
-
-When invoked with the '-n' option xc_dom_create.py will do a dry run
+When invoked with the '-n' option 'xm create' will do a dry run
 and just print out what resources and configuration the domain will
 have e.g.:
 
-  [root@xendemo]# xc_dom_create.py -D ip=commando-1.xeno,169.254.2.3 -Dmem=100
+  [root@xendemo]# xm create -n ip=commando-1.xeno,169.254.2.3 mem=100
   Parsing config file 'defaults'
 
   VM image           : "/boot/xenlinux.gz"
@@ -197,15 +193,15 @@ have e.g.:
   VM block device(s) : "phy:cdrom,hdd,r"
   VM cmdline         : "ip=128.232.38.51:169.254.1.0:128.232.32.1:255.255.240.0::eth0:off root=/dev/ram0 rw init=/linuxrc 4 LOCALIP=169.254.2.3"
 
-xc_dom_create.py will print the local TCP port to which you should
+xm create will print the local TCP port to which you should
 connect to perform console I/O. A suitable console client is provided
 by the Python module xenctl.console_client: running this module from
 the command line with <host> and <port> parameters will start a
 terminal session. This module is also installed as /usr/bin/xencons,
 from a copy in tools/misc/xencons.  An alternative to manually running
-a terminal client is to specify '-c' to xc_dom_create.py, or add
+a terminal client is to specify '-c' to xm create, or add
 'auto_console=True' to the defaults file. This will cause
-xc_dom_create.py to automatically become the console terminal after
+'xm create' to automatically become the console terminal after
 starting the domain.
 
 The 169.254.x.x network is special in that it is the 'link local'
@@ -239,17 +235,18 @@ To access the new virtual machine remotely, use:
 
  ssh -p2201 root@IP.address.Of.Domain0  # use 2202 for domain 2 etc.
 
-You can manipulate running domains using the xc_dom_control.py tool.
+You can manipulate running domains using the xm tool.
 Invoking it without arguments prints some usage information.
 
-To see what domains are running, run 'xc_dom_control.py list'.  Using the
+To see what domains are running, run 'xm list'.  Using the
 tool you can change scheduling parameters, pause a domain, send it a
 shutdown request, or blow it away with the 'destroy' command. You can
 even suspend it to disk (but you probably won't have enough memory to
 do the latter if you're running off the demo CD).
 
-To find usage information for xc_dom_control.py, run the script with
-no arguments.
+To find usage information for xm, run the script with no arguments or
+with the 'help' argument.  To get help on a particular xm command, use
+'xm cmdname help'.
 
 
 Troubleshooting Problems
@@ -352,7 +349,7 @@ essentially involves copying the contents of the CD on to a suitably
 formated disk partition, and then installing or updating the Grub
 bootloader.
 
-This is a bootable CD that loads Xen, and then a Linux 2.4.22 OS image
+This is a bootable CD that loads Xen, and then a Linux 2.4.27 OS image
 ported to run on Xen. The CD contains a copy of a file system based on
 the RedHat 9 distribution that is able to run directly off the CD
 ("live ISO"), using a "tmpfs" RAM-based file system for root (/etc
@@ -400,9 +397,9 @@ config file.
 
 A typical Grub menu option might look like:
 
-title Xen / Xenlinux 2.4.26
+title Xen 2.0 / Xenlinux 2.4.27
         kernel /boot/xen.gz dom0_mem=131072 com1=115200 noht watchdog
-        module /boot/vmlinuz-2.4.26-xen0 root=/dev/sda4 ro
+        module /boot/vmlinuz-2.4.27-xen0 root=/dev/sda4 ro
 
 The first line specifies which Xen image to use, and what command line
 arguments to pass to Xen. In this case we set the maximum amount of
@@ -421,7 +418,7 @@ require a second "module" line.
 Installing the Xen tools and source
 ===================================
 
-The tools and source live in the /usr/local/src/xen-2.0 directory on
+The tools and source live in the /usr/local/src/xen-2.0.bk directory on
 the CD (and may also be downloaded from the project downloads
 page). You'll need to copy them to some mutable storage before using
 them.
@@ -480,9 +477,10 @@ Installing the file systems from the CD
 
 If you haven't got an existing Linux installation onto which you can
 just drop down the Xen and Xenlinux images, then the file systems on
-the CD provide a quick way of doing an install. However, you're
-probably better off in the long run doing a proper Redhat, Fedora,
-Debian etc install rather than just doing the hack described below:
+the CD provide a quick way of doing an install. However, you would be
+better off in the long run doing a proper install of your preferred
+distro and installing Xen onto that, rather than just doing the hack
+described below:
 
 Choose one or two partitions, depending on whether you want a separate
 /usr or not. Make file systems on it/them e.g.: 
@@ -529,7 +527,7 @@ figuring out what's happened.  Debug a Xenlinux image just as you
 would any other Linux kernel.
 
 We supply a handy debug terminal program which you can find in
-/usr/local/src/xen-1.0/xeno-1.0.bk/tools/misc/miniterm/
+/usr/local/src/xen-2.0.bk/tools/misc/miniterm/
 This should be built and executed on another machine that is connected
 via a null modem cable. Documentation is included.
 Alternatively, if the Xen machine is connected to a serial-port server
