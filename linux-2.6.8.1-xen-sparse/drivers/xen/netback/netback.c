@@ -411,16 +411,16 @@ static void net_tx_action(unsigned long unused)
         
         pending_ring[MASK_PEND_IDX(pending_prod++)] = pending_idx;
 
-#if 0        
         /*
          * Scheduling checks must happen after the above response is posted.
-         * This avoids a possible race with a guest OS on another CPU.
+         * This avoids a possible race with a guest OS on another CPU if that
+         * guest is testing against 'resp_prod' when deciding whether to notify
+         * us when it queues additional packets.
          */
         mb();
         if ( (netif->tx_req_cons != netif->tx->req_prod) &&
              ((netif->tx_req_cons-netif->tx_resp_prod) != NETIF_TX_RING_SIZE) )
             add_to_net_schedule_list_tail(netif);
-#endif
         
         netif_put(netif);
 
