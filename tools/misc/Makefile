@@ -19,10 +19,11 @@ TARGETS  = xenperf
 INSTALL_BIN  = $(TARGETS) xencons
 INSTALL_SBIN = netfix xm xend xensv xenperf
 
-all: $(TARGETS)
+all: build
+build: $(TARGETS)
 	$(MAKE) -C miniterm
 
-install: all
+install: build
 	[ -d $(DESTDIR)/usr/bin ] || $(INSTALL_DIR) $(DESTDIR)/usr/bin
 	[ -d $(DESTDIR)/usr/sbin ] || $(INSTALL_DIR) $(DESTDIR)/usr/sbin
 	$(INSTALL_PROG) $(INSTALL_BIN) $(DESTDIR)/usr/bin

@@ -24,6 +24,7 @@ XEN_SCRIPTS += block-file
 XEN_SCRIPTS += block-enbd
 
 all: 
+build:
 
 install: all install-initd install-configs install-scripts
 

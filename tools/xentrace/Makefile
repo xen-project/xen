@@ -21,9 +21,10 @@ SCRIPTS  = xentrace_format
 MAN1     = $(wildcard *.1)
 MAN8     = $(wildcard *.8)
 
-all: $(BIN)
+all: build
+build: $(BIN)
 
-install: all
+install: build
 	[ -d $(DESTDIR)/usr/bin ] || $(INSTALL_DIR) $(DESTDIR)/usr/bin
 	[ -d $(DESTDIR)/usr/man/man1 ] || \
 		$(INSTALL_DIR) $(DESTDIR)/usr/man/man1

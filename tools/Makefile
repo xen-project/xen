@@ -24,14 +24,14 @@ install:
 	$(MAKE) -C xcs install
 	$(MAKE) -C ioemu install
 
-clean:
-	$(MAKE) -C check clean
-	$(MAKE) -C libxutil clean
-	$(MAKE) -C libxc clean
-	$(MAKE) -C misc clean
-	$(MAKE) -C examples clean
-	$(MAKE) -C xentrace clean
-	$(MAKE) -C python clean
-	$(MAKE) -C xfrd clean
+clean build:
+	$(MAKE) -C check $@
+	$(MAKE) -C libxutil $@
+	$(MAKE) -C libxc $@
+	$(MAKE) -C misc $@
+	$(MAKE) -C examples $@
+	$(MAKE) -C xentrace $@
+	$(MAKE) -C python $@
+	$(MAKE) -C xfrd $@
 	$(MAKE) -C xcs clean
 	$(MAKE) -C ioemu clean
