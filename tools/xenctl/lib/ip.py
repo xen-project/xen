@@ -5,12 +5,42 @@ import struct
 
 ##### Networking-related functions
 
+def readlines(fd):
+    """Version of readlines safe against EINTR.
+    """
+    import errno
+    
+    lines = []
+    while 1:
+        try:
+            line = fd.readline()
+        except IOError, ex:
+            if ex.errno == errno.EINTR:
+                continue
+            else:
+                raise
+        if line == '': break
+        lines.append(line)
+    return lines
+
+def readline(fd):
+    """Version of readline safe against EINTR.
+    """
+    while 1:
+        try:
+            return fd.readline()
+        except IOError, ex:
+            if ex.errno == errno.EINTR:
+                continue
+            else:
+                raise
+        
 def get_current_ipaddr(dev='eth0'):
     """Return a string containing the primary IP address for the given
     network interface (default 'eth0').
     """
     fd = os.popen( '/sbin/ifconfig ' + dev + ' 2>/dev/null' )
-    lines = fd.readlines()
+    lines = readlines(fd)
     for line in lines:
         m = re.search( '^\s+inet addr:([0-9]+\.[0-9]+\.[0-9]+\.[0-9]+).*',
                        line )
@@ -23,7 +53,7 @@ def get_current_ipmask(dev='eth0'):
     network interface (default 'eth0').
     """
     fd = os.popen( '/sbin/ifconfig ' + dev + ' 2>/dev/null' )
-    lines = fd.readlines()
+    lines = readlines(fd)
     for line in lines:
         m = re.search( '^.+Mask:([0-9]+\.[0-9]+\.[0-9]+\.[0-9]+).*',
                        line )
@@ -36,7 +66,7 @@ def get_current_ipgw(dev='eth0'):
     network interface (default 'eth0').
     """
     fd = os.popen( '/sbin/route -n' )
-    lines = fd.readlines()
+    lines = readlines(fd)
     for line in lines:
         m = re.search( '^\S+\s+([0-9]+\.[0-9]+\.[0-9]+\.[0-9]+)' +
                        '\s+\S+\s+\S*G.*' + dev + '.*', line )
