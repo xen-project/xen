@@ -39,7 +39,12 @@
 
 #define HZ 100
 
-/* Just to keep compiler happy. */
+/*
+ * Just to keep compiler happy.
+ * NB. DO NOT CHANGE SMP_CACHE_BYTES WITHOUT FIXING arch/i386/entry.S!!!
+ * It depends on size of irq_cpustat_t, for example, being 64 bytes. :-)
+ * Mmmm... so niiiiiice....
+ */
 #define SMP_CACHE_BYTES 64
 #define NR_CPUS 16
 #define __cacheline_aligned __attribute__((__aligned__(SMP_CACHE_BYTES)))

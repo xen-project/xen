@@ -194,8 +194,6 @@ ENTRY(ret_from_newdomain)
  *   2. We cannot recursively call HYPERVISOR_multicall, or a malicious
  *      caller could cause our stack to blow up.
  */
-stringstring:
-        .asciz "%08x %08x %08x %08x %08x %08x %d\n"
 do_multicall:
         popl  %eax
         cmpl  $SYMBOL_NAME(ret_from_hypervisor_call),%eax
@@ -273,14 +271,14 @@ ret_from_hypervisor_call:
 
 test_all_events:
         mov  PROCESSOR(%ebx),%eax
-        shl  $4,%eax                    # sizeof(irq_cpustat) == 16
+        shl  $4,%eax                    # sizeof(guest_trapo_bounce) == 16
         lea  guest_trap_bounce(%eax),%edx
         cli                             # tests must not race interrupts
         xorl %ecx,%ecx
         notl %ecx
 test_softirqs:  
         mov  PROCESSOR(%ebx),%eax
-        shl  $4,%eax                    # sizeof(irq_cpustat) == 16
+        shl  $6,%eax                    # sizeof(irq_cpustat) == 64
         test %ecx,SYMBOL_NAME(irq_stat)(%eax,1)
         jnz  process_softirqs
 test_hyp_events:        
@@ -422,7 +420,7 @@ kill_domain_fixup3:
         ALIGN
 process_guest_exception_and_events:        
         mov  PROCESSOR(%ebx),%eax
-        shl  $4,%eax                    # sizeof(irq_cpustat) == 16
+        shl  $4,%eax
         lea  guest_trap_bounce(%eax),%edx
         testb $~0,GTB_FLAGS(%edx)
         jz   test_all_events
