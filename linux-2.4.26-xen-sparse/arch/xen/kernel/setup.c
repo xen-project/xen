@@ -1197,11 +1197,12 @@ static int shutting_down = -1;
 
 static void __do_suspend(void)
 {
+    int i,j;
     /* Hmmm... a cleaner interface to suspend/resume blkdevs would be nice. */
     extern void blkdev_suspend(void);
     extern void blkdev_resume(void);
-    extern void netif_resume(void);
-    
+    extern void netif_suspend(void);
+    extern void netif_resume(void);    
     extern void time_suspend(void);
     extern void time_resume(void);
 
@@ -1213,10 +1214,11 @@ static void __do_suspend(void)
 
     suspend_record->nr_pfns = max_pfn; /* final number of pfns */
 
-    //netdev_suspend();
-    //blkdev_suspend();
-
     __cli();
+
+    netif_suspend();
+
+    blkdev_suspend();
 
     time_suspend();
 
@@ -1241,16 +1243,27 @@ static void __do_suspend(void)
 
     memset(empty_zero_page, 0, PAGE_SIZE);
 
+    for ( i=0, j=0; i < max_pfn; i+=(PAGE_SIZE/sizeof(unsigned long)), j++ )
+    {	
+        pfn_to_mfn_frame_list[j] = 
+            virt_to_machine(&phys_to_machine_mapping[i]) >> PAGE_SHIFT;
+    }
+    HYPERVISOR_shared_info->arch.pfn_to_mfn_frame_list =
+	virt_to_machine(pfn_to_mfn_frame_list) >> PAGE_SHIFT;
+
+
     irq_resume();
 
     ctrl_if_resume();
 
     time_resume();
 
+    blkdev_resume();
+
+    netif_resume();
+
     __sti();
 
-    blkdev_resume();
-    netif_resume();
 
  out:
     if ( suspend_record != NULL )
