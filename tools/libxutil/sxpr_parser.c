@@ -43,6 +43,7 @@
  */
 
 #define dprintf(fmt, args...) IOStream_print(iostdout, "[DEBUG] %s" fmt, __FUNCTION__, ##args)
+#undef printf
 #define printf(fmt, args...)   IOStream_print(iostdout, fmt, ##args)
 
 static void reset(Parser *z);
