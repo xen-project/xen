@@ -16,10 +16,11 @@
  */
 
 /* Some rough guidelines on accessing and updating grant-table entries
- * in a concurreny-safe manner. For more information, Linux contains a
+ * in a concurrency-safe manner. For more information, Linux contains a
  * reference implementation for guest OSes (arch/xen/kernel/grant_table.c).
  * 
- * NB. WMB is a no-op on current-generation x86 processors.
+ * NB. WMB is a no-op on current-generation x86 processors. However, a
+ *     compiler barrier will still be required.
  * 
  * Introducing a valid entry into the grant table:
  *  1. Write ent->domid.
@@ -31,11 +32,13 @@
  *  1. flags = ent->flags.
  *  2. Observe that !(flags & (GTF_reading|GTF_writing)).
  *  3. Check result of SMP-safe CMPXCHG(&ent->flags, flags, 0).
- *  4. WMB.
+ *  NB. No need for WMB as reuse of entry is control-dependent on success of
+ *      step 3, and all architectures guarantee ordering of ctrl-dep writes.
  * 
  * Removing an unused GTF_accept_transfer entry:
- *  1. Clear ent->flags.
- *  2. WMB.
+ *  1. Check result of SMP-safe CMPXCHG(&ent->frame, 0, <any non-zero value>).
+ *  2. Clear ent->flags.
+ *  3. WMB (ordering of step 2 vs. steps 1,2 of introducing a new entry).
  * 
  * Changing a GTF_permit_access from writable to read-only:
  *  Use SMP-safe CMPXCHG to set GTF_readonly, while checking !GTF_writing.

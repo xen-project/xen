@@ -11,14 +11,6 @@
 #define wbinvd() \
 	__asm__ __volatile__ ("wbinvd": : :"memory");
 
-static inline unsigned long get_limit(unsigned long segment)
-{
-	unsigned long __limit;
-	__asm__("lsll %1,%0"
-		:"=r" (__limit):"r" (segment));
-	return __limit+1;
-}
-
 #define nop() __asm__ __volatile__ ("nop")
 
 #define xchg(ptr,v) ((__typeof__(*(ptr)))__xchg((unsigned long)(v),(ptr),sizeof(*(ptr))))
@@ -32,7 +24,7 @@ struct __xchg_dummy { unsigned long a[100]; };
  * Note 2: xchg has side effect, so that attribute volatile is necessary,
  *   but generally the primitive is invalid, *ptr is output argument. --ANK
  */
-static inline unsigned long __xchg(unsigned long x, volatile void * ptr, int size)
+static always_inline unsigned long __xchg(unsigned long x, volatile void * ptr, int size)
 {
 	switch (size) {
 		case 1:
@@ -78,7 +70,7 @@ static inline unsigned long __xchg(unsigned long x, volatile void * ptr, int siz
  * indicated by comparing RETURN with OLD.
  */
 
-static inline unsigned long __cmpxchg(volatile void *ptr, unsigned long old,
+static always_inline unsigned long __cmpxchg(volatile void *ptr, unsigned long old,
 				      unsigned long new, int size)
 {
 	unsigned long prev;
@@ -126,17 +118,14 @@ static inline unsigned long __cmpxchg(volatile void *ptr, unsigned long old,
 
 
 /*
- * This function causes longword _o to be changed to _n at location _p.
+ * This function causes value _o to be changed to _n at location _p.
  * If this access causes a fault then we return 1, otherwise we return 0.
- * If no fault occurs then _o is updated to teh value we saw at _p. If this
+ * If no fault occurs then _o is updated to the value we saw at _p. If this
  * is the same as the initial value of _o then _n is written to location _p.
  */
-#ifdef __i386__
-#define cmpxchg_user(_p,_o,_n)                                          \
-({                                                                      \
-    int _rc;                                                            \
+#define __cmpxchg_user(_p,_o,_n,_isuff,_oppre,_regtype)                 \
     __asm__ __volatile__ (                                              \
-        "1: " LOCK_PREFIX "cmpxchg"__OS" %2,%3\n"                       \
+        "1: " LOCK_PREFIX "cmpxchg"_isuff" %"_oppre"2,%3\n"             \
         "2:\n"                                                          \
         ".section .fixup,\"ax\"\n"                                      \
         "3:     movl $1,%1\n"                                           \
@@ -147,12 +136,45 @@ static inline unsigned long __cmpxchg(volatile void *ptr, unsigned long old,
         "       .long 1b,3b\n"                                          \
         ".previous"                                                     \
         : "=a" (_o), "=r" (_rc)                                         \
-        : "q" (_n), "m" (*__xg((volatile void *)_p)), "0" (_o), "1" (0) \
-        : "memory");                                                    \
+        : _regtype (_n), "m" (*__xg((volatile void *)_p)), "0" (_o), "1" (0) \
+        : "memory");
+#ifdef __i386__
+#define cmpxchg_user(_p,_o,_n)                                          \
+({                                                                      \
+    int _rc;                                                            \
+    switch ( sizeof(*(_p)) ) {                                          \
+    case 1:                                                             \
+        __cmpxchg_user(_p,_o,_n,"b","b","q");                           \
+        break;                                                          \
+    case 2:                                                             \
+        __cmpxchg_user(_p,_o,_n,"w","w","r");                           \
+        break;                                                          \
+    case 4:                                                             \
+        __cmpxchg_user(_p,_o,_n,"l","","r");                            \
+        break;                                                          \
+    }                                                                   \
     _rc;                                                                \
 })
 #else
-#define cmpxchg_user(_p,_o,_n) ({ __asm__ __volatile__ ( "" : : "r" (_p), "r" (_o), "r" (_n) ); BUG(); 0; })
+#define cmpxchg_user(_p,_o,_n)                                          \
+({                                                                      \
+    int _rc;                                                            \
+    switch ( sizeof(*(_p)) ) {                                          \
+    case 1:                                                             \
+        __cmpxchg_user(_p,_o,_n,"b","b","q");                           \
+        break;                                                          \
+    case 2:                                                             \
+        __cmpxchg_user(_p,_o,_n,"w","w","r");                           \
+        break;                                                          \
+    case 4:                                                             \
+        __cmpxchg_user(_p,_o,_n,"l","k","r");                           \
+        break;                                                          \
+    case 8:                                                             \
+        __cmpxchg_user(_p,_o,_n,"q","","r");                            \
+        break;                                                          \
+    }                                                                   \
+    _rc;                                                                \
+})
 #endif
 
 /*
