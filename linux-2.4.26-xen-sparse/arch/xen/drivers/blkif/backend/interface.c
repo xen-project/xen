@@ -217,7 +217,7 @@ int blkif_disconnect(blkif_be_disconnect_t *disconnect, u8 rsp_id)
         blkif->status = DISCONNECTING;
         blkif->disconnect_rspid = rsp_id;
         wmb(); /* Let other CPUs see the status change. */
-        free_irq(blkif->irq, NULL);
+        free_irq(blkif->irq, blkif);
         blkif_deschedule(blkif);
         blkif_put(blkif);
     }

@@ -23,6 +23,7 @@ from twisted.internet import reactor
 from twisted.internet import protocol
 from twisted.internet import abstract
 from twisted.internet import defer
+defer.Deferred.debug = 1
 
 from xen.lowlevel import xu
 

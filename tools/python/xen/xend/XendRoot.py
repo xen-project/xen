@@ -145,7 +145,7 @@ class XendRoot:
         val	default value (optional, defaults to None)
         returns value
         """
-        return sxp.child_value(self.config, name, val=val)
+        return sxp.child_value(self.config, name) or val
 
 def instance():
     global inst

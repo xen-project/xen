@@ -25,8 +25,6 @@
 #include "string_stream.h"
 #include "allocate.h"
 
-static int string_print(IOStream *io, const char *msg, va_list args);
-static int string_getc(IOStream *io);
 static int string_error(IOStream *io);
 static int string_close(IOStream *io);
 static void string_free(IOStream *io);
@@ -47,45 +45,6 @@ static IOMethods string_methods = {
  */
 static inline StringData *get_string_data(IOStream *io){
     return (StringData*)io->data;
-}
-
-/** Read a character from a string stream.
- *
- * @param io string stream
- * @return character read, IOSTREAM_EOF if no more input
- */
-static int string_getc(IOStream *io){
-    StringData *data = get_string_data(io);
-    int c = IOSTREAM_EOF;
-    char *s = data->in;
-
-    if(s && s < data->end){
-        c = (unsigned)*s;
-        data->in = s+1;
-    }
-    return c;
-}
-
-/** Print to a string stream.
- * Formats the data to an internal buffer and prints it.
- * The formatted data must fit into the internal buffer.
- *
- * @param io string stream
- * @param format print format
- * @param args print arguments
- * @return result of the print
- */
-static int string_print(IOStream *io, const char *msg, va_list args){
-    StringData *data = get_string_data(io);
-    int k = data->end - data->out;
-    int n = vsnprintf(data->out, k, (char*)msg, args);
-    if(n < 0 || n > k ){
-        n = k;
-        IOStream_close(io);
-    } else {
-        data->out += n;
-    }
-    return n;
 }
 
 /** Test if a string stream has an error.
@@ -118,7 +77,7 @@ static int string_close(IOStream *io){
  */
 static void string_free(IOStream *io){
     StringData *data = get_string_data(io);
-    zero(data, sizeof(*data));
+    memzero(data, sizeof(*data));
     deallocate(data);
 }
 
@@ -139,13 +98,13 @@ IOMethods *string_stream_get_methods(void){
  */
 void string_stream_init(IOStream *io, StringData *data, char *s, int n){
     if(data && io){
-        zero(data, sizeof(*data));
+        memzero(data, sizeof(*data));
         data->string = (char*)s;
         data->in = data->string;
         data->out = data->string;
         data->size = n;
         data->end = data->string + n;
-        zero(io, sizeof(*io));
+        memzero(io, sizeof(*io));
         io->methods = &string_methods;
         io->data = data;
     }

@@ -16,8 +16,8 @@
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
 
-#ifndef _XEN_LIB_SYS_STRING_H_
-#define _XEN_LIB_SYS_STRING_H_
+#ifndef _XUTIL_SYS_STRING_H_
+#define _XUTIL_SYS_STRING_H_
 /** @file
  * Replacement for standard string includes.
  * Works in user or kernel code.
@@ -88,4 +88,4 @@ static inline size_t strnlen(const char *s, size_t n){
 extern int convert_atoul(const char *s, unsigned long *v);
 extern int path_concat(char *s, char *t, char **val);
 
-#endif /* !_XEN_LIB_SYS_STRING_H_ */
+#endif /* !_XUTIL_SYS_STRING_H_ */
