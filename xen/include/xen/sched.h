@@ -152,9 +152,15 @@ struct domain
 struct domain_setup_info
 {
     unsigned long v_start;
+    unsigned long v_end;
     unsigned long v_kernstart;
     unsigned long v_kernend;
     unsigned long v_kernentry;
+
+    unsigned int load_bsd_symtab;
+
+    unsigned long symtab_addr;
+    unsigned long symtab_len;
 };
 
 #include <asm/uaccess.h> /* for KERNEL_DS */
