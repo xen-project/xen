@@ -118,7 +118,7 @@ int vmx_setup_platform(struct exec_domain *d, execution_context_t *context)
     addr = context->edi;
     offset = (addr & ~PAGE_MASK);
     addr = round_pgdown(addr);
-    mpfn = phys_to_machine_mapping[addr >> PAGE_SHIFT];
+    mpfn = phys_to_machine_mapping(addr >> PAGE_SHIFT);
     p = map_domain_mem(mpfn << PAGE_SHIFT);
 
     e820p = (struct e820entry *) ((unsigned long) p + offset); 
@@ -136,7 +136,7 @@ int vmx_setup_platform(struct exec_domain *d, execution_context_t *context)
     }   
     unmap_domain_mem(p);        
 
-    mpfn = phys_to_machine_mapping[gpfn];
+    mpfn = phys_to_machine_mapping(gpfn);
     p = map_domain_mem(mpfn << PAGE_SHIFT);
     d->arch.arch_vmx.vmx_platform.shared_page_va = (unsigned long) p;
 
@@ -172,7 +172,7 @@ static int add_mapping_perdomain(struct exec_domain *d, unsigned long gpfn,
         d->domain->arch.mm_perdomain_pt[gpfn >> (L2_PAGETABLE_SHIFT - L1_PAGETABLE_SHIFT)] = 
             mk_l1_pgentry((pfn << PAGE_SHIFT) | __PAGE_HYPERVISOR);
     }
-    phys_to_machine_mapping[gpfn] = mpfn;
+    __phys_to_machine_mapping[gpfn] = mpfn;
 
     return 0;
 }

@@ -369,7 +369,7 @@ static int inst_copy_from_guest(char *buf, unsigned long guest_eip, int inst_len
                 printk("inst_copy_from_guest- EXIT: read gpte faulted" );
                 return 0;
             }
-        mfn = phys_to_machine_mapping[gpte >> PAGE_SHIFT];
+        mfn = phys_to_machine_mapping(gpte >> PAGE_SHIFT);
         ma = (mfn << PAGE_SHIFT) | (guest_eip & (PAGE_SIZE - 1));
         inst_start = (unsigned char *)map_domain_mem(ma);
                 

@@ -576,7 +576,7 @@ void vmx_shadow_invlpg(struct domain *d, unsigned long va)
         return;
     }
 
-    host_pfn = phys_to_machine_mapping[gpte >> PAGE_SHIFT];
+    host_pfn = phys_to_machine_mapping(gpte >> PAGE_SHIFT);
     spte = (host_pfn << PAGE_SHIFT) | (gpte & ~PAGE_MASK);
 
     if (__put_user(spte, (unsigned long *)
@@ -813,7 +813,7 @@ static int check_pte(
 
         if (d->arch.shadow_mode == SHM_full_32) {
 
-            guest_gpfn = phys_to_machine_mapping[gpfn];
+            guest_gpfn = phys_to_machine_mapping(gpfn);
 
             if ( __shadow_status(d, guest_gpfn) != (PSH_shadowed | spfn) )
                 FAIL("spfn problem g.sf=%08lx", 
@@ -889,7 +889,7 @@ int check_pagetable(struct domain *d, pagetable_t pt, char *s)
 
     if (d->arch.shadow_mode == SHM_full_32) 
     {
-        host_gpfn = phys_to_machine_mapping[gpfn];
+        host_gpfn = phys_to_machine_mapping(gpfn);
         gpl2e = (l2_pgentry_t *) map_domain_mem( host_gpfn << PAGE_SHIFT );
 
     } else

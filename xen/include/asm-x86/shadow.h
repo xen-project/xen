@@ -51,7 +51,7 @@ extern void vmx_shadow_invlpg(struct domain *, unsigned long);
 
 #define  __get_phys_to_machine(_d, host_gpfn, gpfn)    \
     if ((_d)->arch.shadow_mode == SHM_full_32)         \
-        (host_gpfn) = phys_to_machine_mapping[(gpfn)]; \
+        (host_gpfn) = phys_to_machine_mapping(gpfn);   \
     else                                               \
         (host_gpfn) = (gpfn);
 
@@ -139,7 +139,7 @@ static inline void __guest_set_pl2e(
     {
         unsigned long pfn;
 
-        pfn = phys_to_machine_mapping[value >> PAGE_SHIFT];
+        pfn = phys_to_machine_mapping(value >> PAGE_SHIFT);
         ed->arch.guest_pl2e_cache[l2_table_offset(va)] =
             mk_l2_pgentry((pfn << PAGE_SHIFT) | __PAGE_HYPERVISOR);
 
@@ -231,7 +231,7 @@ static inline void l1pte_write_fault(
     {
         unsigned long host_pfn, host_gpte;
         
-        host_pfn = phys_to_machine_mapping[gpte >> PAGE_SHIFT];
+        host_pfn = phys_to_machine_mapping(gpte >> PAGE_SHIFT);
         host_gpte = (host_pfn << PAGE_SHIFT) | (gpte & ~PAGE_MASK);
         spte = host_gpte | _PAGE_RW;
     }
@@ -265,7 +265,7 @@ static inline void l1pte_read_fault(
     {
         unsigned long host_pfn, host_gpte;
         
-        host_pfn = phys_to_machine_mapping[gpte >> PAGE_SHIFT];
+        host_pfn = phys_to_machine_mapping(gpte >> PAGE_SHIFT);
         host_gpte = (host_pfn << PAGE_SHIFT) | (gpte & ~PAGE_MASK);
         spte = (host_gpte & _PAGE_DIRTY) ? host_gpte : (host_gpte & ~_PAGE_RW);
     }
@@ -309,7 +309,7 @@ static inline void l1pte_propagate_from_guest(
             return;
         }
         
-        host_pfn = phys_to_machine_mapping[gpte >> PAGE_SHIFT];
+        host_pfn = phys_to_machine_mapping(gpte >> PAGE_SHIFT);
         host_gpte = (host_pfn << PAGE_SHIFT) | (gpte & ~PAGE_MASK);
 
         if ( (host_gpte & (_PAGE_PRESENT|_PAGE_ACCESSED) ) == 

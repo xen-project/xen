@@ -241,8 +241,12 @@ void synchronise_pagetables(unsigned long cpu_mask);
 #undef  phys_to_machine_mapping
 
 #define machine_to_phys_mapping ((unsigned long *)RDWR_MPT_VIRT_START)
-#define phys_to_machine_mapping ((unsigned long *)PERDOMAIN_VIRT_START)
-
+#define __phys_to_machine_mapping ((unsigned long *)PERDOMAIN_VIRT_START)
+/* Returns the machine physical */
+static inline unsigned long phys_to_machine_mapping(unsigned long pfn) 
+{
+        return __phys_to_machine_mapping[pfn];
+}
 #define set_machinetophys(_mfn, _pfn) machine_to_phys_mapping[(_mfn)] = (_pfn)
 
 #define DEFAULT_GDT_ENTRIES     (LAST_RESERVED_GDT_ENTRY+1)
