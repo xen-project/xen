@@ -481,6 +481,8 @@ void ctrl_if_resume(void)
         op.cmd = EVTCHNOP_bind_interdomain;
         op.u.bind_interdomain.dom1 = DOMID_SELF;
         op.u.bind_interdomain.dom2 = DOMID_SELF;
+        op.u.bind_interdomain.port1 = 0;
+        op.u.bind_interdomain.port2 = 0;
         if ( HYPERVISOR_event_channel_op(&op) != 0 )
             BUG();
         xen_start_info.domain_controller_evtchn = op.u.bind_interdomain.port1;
