@@ -292,7 +292,7 @@ static int cmd_write_proc(struct file *file, const char *buffer,
 
     } else {
 
-		printk("bd240 debug: mapping dom %d, %lx, %lx\n", op.u.reqdommem.domain, op.u.reqdommem.start_pfn, op.u.reqdommem.tot_pages);
+		printk(KERN_ALERT "bd240 debug: mapping dom %d, %lx, %lx\n", op.u.reqdommem.domain, op.u.reqdommem.start_pfn, op.u.reqdommem.tot_pages);
 
         ret = dom_map_mem(op.u.reqdommem.domain, op.u.reqdommem.start_pfn, 
                         op.u.reqdommem.tot_pages); 
