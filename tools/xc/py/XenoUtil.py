@@ -8,17 +8,7 @@ def blkdev_name_to_number(name):
     if not re.match( '/dev/', name ):
         name = '/dev/' + name
         
-    fd = os.popen( '/bin/ls -lL ' + name + ' 2>/dev/null' )
-    line = fd.readline()
-
-    #brw-rw----    1 root     mail       8,   3 Aug 30  2001 /dev/sda3
-    m = re.search( '^b\S+\s+\d+\s+\S+\s+\S+\s+(\d+),\s+(\d+)\s+\S+\s+\d+' +
-                   '\s+\d+\s+' + name + '$', line )
-
-    if m:
-        # hack -- we just assume device minors are 8 bits
-        return (string.atol(m.group(1)) << 8) + string.atol(m.group(2))
-    return None
+    return os.stat(name).st_rdev
 
 
 # lookup_blkdev_partn_info( '/dev/sda3' )
