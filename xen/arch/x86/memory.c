@@ -168,7 +168,7 @@ void __init init_frametable(void)
 
 void arch_init_memory(void)
 {
-    unsigned long mfn, i;
+    unsigned long i;
 
     /*
      * We are rather picky about the layout of 'struct pfn_info'. The
@@ -211,13 +211,13 @@ void arch_init_memory(void)
     dom_io->id = DOMID_IO;
 
     /* M2P table is mappable read-only by privileged domains. */
-    mfn = l2_pgentry_to_pagenr(
-        idle_pg_table[RDWR_MPT_VIRT_START >> L2_PAGETABLE_SHIFT]);
     for ( i = 0; i < 1024; i++ )
     {
-        frame_table[mfn+i].count_info        = PGC_allocated | 1;
-        frame_table[mfn+i].u.inuse.type_info = PGT_gdt_page | 1; /* non-RW */
-        frame_table[mfn+i].u.inuse.domain    = dom_xen;
+        frame_table[m2p_start_mfn+i].count_info        = PGC_allocated | 1;
+	/* gdt to make sure it's only mapped read-only by non-privileged
+	   domains. */
+        frame_table[m2p_start_mfn+i].u.inuse.type_info = PGT_gdt_page | 1;
+        frame_table[m2p_start_mfn+i].u.inuse.domain    = dom_xen;
     }
 }
 
