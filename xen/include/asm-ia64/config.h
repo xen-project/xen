@@ -2,6 +2,7 @@
 // manufactured from component pieces
 
 // defined in linux/arch/ia64/defconfig
+//#define	CONFIG_IA64_GENERIC
 #define	CONFIG_IA64_HP_SIM
 #define	CONFIG_IA64_L1_CACHE_SHIFT 7
 // needed by include/asm-ia64/page.h
@@ -184,8 +185,6 @@ struct pci_bus_region {
     (likely(sizeof(count) <= 4) /* disallow 64-bit counts */ &&  \
      access_ok(type,addr,count*size))
 
-// see drivers/char/serial.c
-#define arch_serial_putc(uart,c)	ia64_serial_putc(c)
 // without this, uart_config_stageX does outb's which are non-portable
 #define NO_UART_CONFIG_OK
 
@@ -202,10 +201,6 @@ struct pci_bus_region {
 
 // x86 typedef still used in sched.h, may go away later
 //typedef unsigned long l1_pgentry_t;
-
-// removed from include/xen/types.h (why?)
-typedef unsigned long uint64_t;
-typedef unsigned int uint32_t;
 
 // see include/asm-ia64/mm.h, handle remaining pfn_info uses until gone
 #define pfn_info page

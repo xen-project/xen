@@ -142,23 +142,12 @@ void cmain(multiboot_info_t *mbi)
     /* Must do this early -- e.g., spinlocks rely on get_current(). */
     set_current(&idle0_exec_domain);
 
+    early_setup_arch();
+
     /* We initialise the serial devices very early so we can get debugging. */
     serial_init_stage1();
 
-    init_console();
-#if 0
-    /* HELLO WORLD --- start-of-day banner text. */
-    printk(XEN_BANNER);
-    printk(" http://www.cl.cam.ac.uk/netos/xen\n");
-    printk(" University of Cambridge Computer Laboratory\n\n");
-    printk(" Xen version %d.%d%s (%s@%s) (%s) %s\n",
-           XEN_VERSION, XEN_SUBVERSION, XEN_EXTRAVERSION,
-           XEN_COMPILE_BY, XEN_COMPILE_DOMAIN,
-           XEN_COMPILER, XEN_COMPILE_DATE);
-#endif
-#ifndef IA64
-    printk(" Latest ChangeSet: %s\n\n", XEN_CHANGESET);
-#endif
+    init_console(); 
     set_printk_prefix("(XEN) ");
 
 #ifdef IA64

@@ -6,7 +6,7 @@
  * it permits debugging of seriously-toasted machines (e.g., in situations
  * where a device driver within a guest OS would be inaccessible).
  * 
- * Copyright (c) 2003-2004, K A Fraser
+ * Copyright (c) 2003-2005, K A Fraser
  */
 
 #include <xen/config.h>
@@ -17,11 +17,6 @@
 #include <xen/sched.h>
 #include <xen/serial.h>
 #include <asm/io.h>
-
-/* opt_com[12]: Config serial port with a string <baud>,DPS,<io-base>,<irq>. */
-static unsigned char opt_com1[30] = "", opt_com2[30] = "";
-string_param("com1", opt_com1);
-string_param("com2", opt_com2);
 
 /* Register offsets */
 #define RBR             0x00    /* receive buffer       */
@@ -100,15 +95,13 @@ static uart_t com[2] = {
 #define UART_ENABLED(_u) ((_u)->baud != 0)
 #define DISABLE_UART(_u) ((_u)->baud = 0)
 
-#ifdef CONFIG_X86
-static inline int arch_serial_putc(uart_t *uart, unsigned char c)
-{
-    int space;
-    if ( (space = (inb(uart->io_base + LSR) & LSR_THRE)) )
-        outb(c, uart->io_base + THR);
-    return space;
-}
-#endif
+/* Architecture-specific private definitions. */
+#include <asm/serial.h>
+
+/* opt_com[12]: Config serial port with a string <baud>,DPS,<io-base>,<irq>. */
+static unsigned char opt_com1[30] = OPT_COM1_STR, opt_com2[30] = OPT_COM2_STR;
+string_param("com1", opt_com1);
+string_param("com2", opt_com2);
 
 
 /***********************

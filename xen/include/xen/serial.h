@@ -1,3 +1,4 @@
+/* -*-  Mode:C; c-basic-offset:4; tab-width:4; indent-tabs-mode:nil -*- */
 /******************************************************************************
  * serial.h
  * 
@@ -5,7 +6,10 @@
  * it permits debugging of seriously-toasted machines (e.g., in situations
  * where a device driver within a guest OS would be inaccessible).
  * 
- * Copyright (c) 2003-2004, K A Fraser
+ * This file contains public definitions. The arch-specific header
+ * contains only private hooks, and is not included from this file.
+ * 
+ * Copyright (c) 2003-2005, K A Fraser
  */
 
 #ifndef __XEN_SERIAL_H__
