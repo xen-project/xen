@@ -587,6 +587,34 @@ the {\tt xmdefconfig} file.  The tool uses the
 \path{/etc/xen/xmdefconfig} file, since no custom configuration file
 was specified on the command line.
 
+\section{Example: ttylinux}
+
+Ttylinux is a very small Linux distribution, designed to
+require very few resources.  We will use it as a concrete example of
+how to start a Xen domain.  Most users will probably want to install a
+more complex mainstream distribution once they have mastered the
+basics.
+
+\begin{enumerate}
+\item Download the ttylinux disk image from XXX where from?
+\item Create a configuration file like the following:
+\begin{verbatim}
+kernel = "/boot/vmlinuz-2.6.8.1-xenU" # or a 2.4 kernel or a xen0 kernel
+memory = 64
+name = "ttylinux"
+cpu = -1 # leave to Xen to pick
+nics=1
+ip="1.2.3.4"
+disk = ['file:/path/to/ttylinux-disk,sda1,w']
+root = "/dev/sda1 ro"
+\end{verbatim}
+\item Now start the domain and connect to its console:
+\begin{verbatim}
+xm create -f configfile -c
+\end{verbatim}
+\item Login as root, password root.
+\end{enumerate}
+
 \section{Starting / Stopping domains automatically}
 
 It is possible to have certain domains start automatically at boot
@@ -594,11 +622,11 @@ time and to have dom0 wait for all running domains to shutdown before
 it shuts down the system.
 
 To specify a domain is to start at boot-time, place its
-configuration file (or a link to it) under /etc/xen/auto/.
+configuration file (or a link to it) under \path{/etc/xen/auto/}.
 
 A Sys-V style init script for RedHat and LSB-compliant systems is
-provided and will be automatically copied to /etc/init.d/ during
-install.  You can then enable it in the appriate way for your
+provided and will be automatically copied to \path{/etc/init.d/}
+during install.  You can then enable it in the appriate way for your
 distribution.
 
 For instance, on RedHat:
@@ -608,7 +636,7 @@ For instance, on RedHat:
 By default, this will start the boot-time domains in runlevels 3, 4
 and 5.
 
-You can also use the "service" command to run this script manually, e.g:
+You can also use the {\tt service} command to run this script manually, e.g:
 
 \verb_# service xendomains start_
 
@@ -901,6 +929,10 @@ The available commands are as follows:
                            since it is responsible for managing multiple
                            ``supervisor'' kernels.
 
+\item[Live migration]      A technique for moving a running virtual
+                           machine to another physical host, without
+			   stopping it or the services running on it.
+
 \item[Microkernel]         A small base of code running at the highest
                            hardware privilege level.  A microkernel is
                            responsible for sharing CPU and memory (and
@@ -919,6 +951,13 @@ The available commands are as follows:
                            uses paravirtualisation but preserves
                            binary compatibility for user space
                            applications.
+
+\item[Shadow pagetables]   A technique for hiding the layout of machine
+                           memory from a virtual machine's operating
+			   system.  Used in some {\bf VMM}s to provide
+			   the illusion of contiguous physical memory,
+			   in Xen this is used during
+			   {\bf live migration}.
 
 \item[Virtual Machine]     The environment in which a hosted operating
                            system runs, providing the abstraction of a
