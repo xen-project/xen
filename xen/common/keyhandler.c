@@ -60,6 +60,8 @@ void do_task_queues(unsigned char key, void *dev_id,
     unsigned long  flags;
     struct domain *d;
     s_time_t       now = NOW();
+    struct list_head *ent;
+    struct pfn_info  *page;
 
     printk("'%c' pressed -> dumping task queues (now=0x%X:%08X)\n", key,
            (u32)(now>>32), (u32)now); 
@@ -68,10 +70,28 @@ void do_task_queues(unsigned char key, void *dev_id,
 
     for_each_domain ( d )
     {
-        printk("Xen: DOM %u, CPU %d [has=%c] refcnt=%d nr_pages=%d\n",
+        printk("Xen: DOM %u, CPU %d [has=%c] refcnt=%d nr_pages=%d "
+               "xenheap_pages=%d\n",
                d->domain, d->processor, 
                test_bit(DF_RUNNING, &d->flags) ? 'T':'F',
-               atomic_read(&d->refcnt), d->tot_pages);
+               atomic_read(&d->refcnt), d->tot_pages, d->xenheap_pages);
+
+        if ( d->tot_pages < 10 )
+        {
+            list_for_each ( ent, &d->page_list )
+            {
+                page = list_entry(ent, struct pfn_info, list);
+                printk("Page %08x: caf=%08x, taf=%08x\n",
+                       page_to_phys(page), page->count_and_flags,
+                       page->type_and_flags);
+            }
+        }
+
+        page = virt_to_page(d->shared_info);
+        printk("Shared_info@%08x: caf=%08x, taf=%08x\n",
+               page_to_phys(page), page->count_and_flags,
+               page->type_and_flags);
+               
         printk("Guest: upcall_pend = %02x, upcall_mask = %02x\n", 
                d->shared_info->vcpu_data[0].evtchn_upcall_pending, 
                d->shared_info->vcpu_data[0].evtchn_upcall_mask);

@@ -247,7 +247,7 @@ long do_dom0_op(dom0_op_t *u_dom0_op)
         {
             ret = 0;
 
-            spin_lock(&d->page_list_lock);
+            spin_lock(&d->page_alloc_lock);
             list_ent = d->page_list.next;
             for ( i = 0; (i < max_pfns) && (list_ent != &d->page_list); i++ )
             {
@@ -261,7 +261,7 @@ long do_dom0_op(dom0_op_t *u_dom0_op)
                 buffer++;
                 list_ent = frame_table[pfn].list.next;
             }
-            spin_unlock(&d->page_list_lock);
+            spin_unlock(&d->page_alloc_lock);
 
             op->u.getmemlist.num_pfns = i;
             copy_to_user(u_dom0_op, op, sizeof(*op));

@@ -91,11 +91,15 @@ struct pfn_info
 #define SHARE_PFN_WITH_DOMAIN(_pfn, _dom)                                   \
     do {                                                                    \
         (_pfn)->u.domain = (_dom);                                          \
-        wmb(); /* install valid domain ptr before updating refcnt. */       \
-        /* _dom holds an allocation reference */                            \
-        (_pfn)->count_and_flags = PGC_allocated | 1;                        \
         /* The incremented type count is intended to pin to 'writeable'. */ \
         (_pfn)->type_and_flags  = PGT_writeable_page | PGT_validated | 1;   \
+        wmb(); /* install valid domain ptr before updating refcnt. */       \
+        spin_lock(&(_dom)->page_alloc_lock);                                \
+        /* _dom holds an allocation reference */                            \
+        (_pfn)->count_and_flags = PGC_allocated | 1;                        \
+        if ( unlikely((_dom)->xenheap_pages++ == 0) )                       \
+            get_domain(_dom);                                               \
+        spin_unlock(&(_dom)->page_alloc_lock);                              \
     } while ( 0 )
 
 extern struct pfn_info *frame_table;

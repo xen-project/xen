@@ -80,7 +80,7 @@ struct domain *do_createdomain(domid_t dom_id, unsigned int cpu)
 
         d->addr_limit = USER_DS;
         
-        spin_lock_init(&d->page_list_lock);
+        spin_lock_init(&d->page_alloc_lock);
         INIT_LIST_HEAD(&d->page_list);
         d->max_pages = d->tot_pages = 0;
 
@@ -260,19 +260,19 @@ struct pfn_info *alloc_domain_page(struct domain *d)
     if ( d != NULL )
     {
         wmb(); /* Domain pointer must be visible before updating refcnt. */
-        spin_lock(&d->page_list_lock);
+        spin_lock(&d->page_alloc_lock);
         if ( unlikely(d->tot_pages >= d->max_pages) )
         {
             DPRINTK("Over-allocation for domain %u: %u >= %u\n",
                     d->domain, d->tot_pages, d->max_pages);
-            spin_unlock(&d->page_list_lock);
+            spin_unlock(&d->page_alloc_lock);
             goto free_and_exit;
         }
         list_add_tail(&page->list, &d->page_list);
         page->count_and_flags = PGC_allocated | 1;
         if ( unlikely(d->tot_pages++ == 0) )
             get_domain(d);
-        spin_unlock(&d->page_list_lock);
+        spin_unlock(&d->page_alloc_lock);
     }
 
     return page;
@@ -291,27 +291,33 @@ void free_domain_page(struct pfn_info *page)
     int            drop_dom_ref;
     struct domain *d = page->u.domain;
 
-    /* Deallocation of such pages is handled out of band. */
     if ( unlikely(IS_XEN_HEAP_FRAME(page)) )
-        return;
+    {
+        spin_lock_recursive(&d->page_alloc_lock);
+        drop_dom_ref = (--d->xenheap_pages == 0);
+        spin_unlock_recursive(&d->page_alloc_lock);
+    }
+    else
+    {
+        page->tlbflush_timestamp = tlbflush_clock;
+        page->u.cpu_mask = 1 << d->processor;
+        
+        /* NB. May recursively lock from domain_relinquish_memory(). */
+        spin_lock_recursive(&d->page_alloc_lock);
+        list_del(&page->list);
+        drop_dom_ref = (--d->tot_pages == 0);
+        spin_unlock_recursive(&d->page_alloc_lock);
 
-    page->tlbflush_timestamp = tlbflush_clock;
-    page->u.cpu_mask = 1 << d->processor;
+        page->count_and_flags = 0;
+        
+        spin_lock_irqsave(&free_list_lock, flags);
+        list_add(&page->list, &free_list);
+        free_pfns++;
+        spin_unlock_irqrestore(&free_list_lock, flags);
+    }
 
-    /* NB. May recursively lock from domain_relinquish_memory(). */
-    spin_lock_recursive(&d->page_list_lock);
-    list_del(&page->list);
-    drop_dom_ref = (--d->tot_pages == 0);
-    spin_unlock_recursive(&d->page_list_lock);
     if ( drop_dom_ref )
         put_domain(d);
-
-    page->count_and_flags = 0;
-    
-    spin_lock_irqsave(&free_list_lock, flags);
-    list_add(&page->list, &free_list);
-    free_pfns++;
-    spin_unlock_irqrestore(&free_list_lock, flags);
 }
 
 
@@ -337,8 +343,13 @@ void domain_relinquish_memory(struct domain *d)
         put_page_and_type(&frame_table[pagetable_val(d->mm.pagetable) >>
                                       PAGE_SHIFT]);
 
+    /* Relinquish Xen-heap pages. Currently this can only be 'shared_info'. */
+    page = virt_to_page(d->shared_info);
+    if ( test_and_clear_bit(_PGC_allocated, &page->count_and_flags) )
+        put_page(page);
+
     /* Relinquish all pages on the domain's allocation list. */
-    spin_lock_recursive(&d->page_list_lock); /* may enter free_domain_page() */
+    spin_lock_recursive(&d->page_alloc_lock); /* may enter free_domain_page */
     list_for_each_safe ( ent, tmp, &d->page_list )
     {
         page = list_entry(ent, struct pfn_info, list);
@@ -367,7 +378,7 @@ void domain_relinquish_memory(struct domain *d)
         }
         while ( unlikely(y != x) );
     }
-    spin_unlock_recursive(&d->page_list_lock);
+    spin_unlock_recursive(&d->page_alloc_lock);
 }
 
 
@@ -774,11 +785,11 @@ int construct_dom0(struct domain *p,
     }
 
     /* Construct a frame-allocation list for the initial domain. */
-    for ( pfn = (alloc_start>>PAGE_SHIFT); 
-          pfn < (alloc_end>>PAGE_SHIFT); 
-          pfn++ )
+    for ( mfn = (alloc_start>>PAGE_SHIFT); 
+          mfn < (alloc_end>>PAGE_SHIFT); 
+          mfn++ )
     {
-        page = &frame_table[pfn];
+        page = &frame_table[mfn];
         page->u.domain        = p;
         page->type_and_flags  = 0;
         page->count_and_flags = PGC_allocated | 1;
@@ -890,9 +901,11 @@ int construct_dom0(struct domain *p,
     si->mfn_list     = vphysmap_start;
 
     /* Write the phys->machine and machine->phys table entries. */
-    for ( pfn = 0; pfn < p->tot_pages; pfn++ )
+    for ( mfn = (alloc_start>>PAGE_SHIFT); 
+          mfn < (alloc_end>>PAGE_SHIFT); 
+          mfn++ )
     {
-        mfn = (alloc_start >> PAGE_SHIFT) + pfn;
+        pfn = mfn - (alloc_start>>PAGE_SHIFT);
         ((unsigned long *)vphysmap_start)[pfn] = mfn;
         machine_to_phys_mapping[mfn] = pfn;
     }
