@@ -34,6 +34,8 @@ extern int init_xen_time();
 
 extern unsigned long cpu_khz;
 
+struct domain;
+
 /*
  * System Time
  * 64 bit value containing the nanoseconds elapsed since boot time.
@@ -52,7 +54,7 @@ s_time_t get_s_time(void);
 #define MILLISECS(_ms)  (((s_time_t)(_ms)) * 1000000ULL )
 #define MICROSECS(_us)  (((s_time_t)(_us)) * 1000ULL )
 
-extern void update_dom_time(shared_info_t *si);
+extern void update_dom_time(struct domain *d);
 extern void do_settime(unsigned long secs, unsigned long usecs, 
                        u64 system_time_base);
 

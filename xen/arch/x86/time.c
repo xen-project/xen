@@ -274,8 +274,9 @@ s_time_t get_s_time(void)
 }
 
 
-void update_dom_time(shared_info_t *si)
+void update_dom_time(struct domain *d)
 {
+    shared_info_t *si = d->shared_info;
     unsigned long flags;
 
     read_lock_irqsave(&time_lock, flags);
@@ -318,7 +319,7 @@ void do_settime(unsigned long secs, unsigned long usecs, u64 system_time_base)
 
     write_unlock_irq(&time_lock);
 
-    update_dom_time(current->domain->shared_info);
+    update_dom_time(current->domain);
 }
 
 

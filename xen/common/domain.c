@@ -278,7 +278,7 @@ int final_setup_guestos(struct domain *p, dom0_builddomain_t *builddomain)
         goto out;
 
     /* Set up the shared info structure. */
-    update_dom_time(p->shared_info);
+    update_dom_time(p);
 
     set_bit(DF_CONSTRUCTED, &p->d_flags);
 

@@ -390,7 +390,7 @@ void __enter_scheduler(void)
 
     /* Ensure that the domain has an up-to-date time base. */
     if ( !is_idle_task(next->domain) )
-        update_dom_time(next->domain->shared_info);
+        update_dom_time(next->domain);
 
     if ( unlikely(prev == next) )
         return;
@@ -468,7 +468,7 @@ static void t_timer_fn(unsigned long unused)
     TRACE_0D(TRC_SCHED_T_TIMER_FN);
 
     if ( !is_idle_task(p->domain) ) {
-        update_dom_time(p->domain->shared_info);
+        update_dom_time(p->domain);
         send_guest_virq(p, VIRQ_TIMER);
     }
 
@@ -482,7 +482,7 @@ static void dom_timer_fn(unsigned long data)
     struct domain *p = (struct domain *)data;
     struct exec_domain *ed = p->exec_domain[0];
     TRACE_0D(TRC_SCHED_DOM_TIMER_FN);
-    update_dom_time(p->shared_info);
+    update_dom_time(p);
     send_guest_virq(ed, VIRQ_TIMER);
 }
 
@@ -496,7 +496,7 @@ static void fallback_timer_fn(unsigned long unused)
     TRACE_0D(TRC_SCHED_FALLBACK_TIMER_FN);
 
     if ( !is_idle_task(p) )
-        update_dom_time(p->shared_info);
+        update_dom_time(p);
 
     fallback_timer[ed->processor].expires = NOW() + MILLISECS(500);
     add_ac_timer(&fallback_timer[ed->processor]);
