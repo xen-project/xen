@@ -1279,14 +1279,20 @@ static int do_extended_command(unsigned long ptr, unsigned long val)
     return okay;
 }
 
-
-int do_mmu_update(mmu_update_t *ureqs, int count, int *success_count)
+int do_mmu_update(
+    mmu_update_t *ureqs, unsigned int count, unsigned int *pdone)
 {
+/*
+ * We steal the m.s.b. of the @count parameter to indicate whether this
+ * invocation of do_mmu_update() is resuming a previously preempted call.
+ */
+#define MMU_UPDATE_PREEMPTED  (~(~0U>>1))
+
     mmu_update_t req;
     unsigned long va = 0, deferred_ops, pfn, prev_pfn = 0;
     struct pfn_info *page;
     int rc = 0, okay = 1, i, cpu = smp_processor_id();
-    unsigned int cmd;
+    unsigned int cmd, done = 0;
     unsigned long prev_spfn = 0;
     l1_pgentry_t *prev_spl1e = 0;
     struct exec_domain *ed = current;
@@ -1300,15 +1306,32 @@ int do_mmu_update(mmu_update_t *ureqs, int count, int *success_count)
 
     cleanup_writable_pagetable(d, PTWR_CLEANUP_ACTIVE | PTWR_CLEANUP_INACTIVE);
 
-    if ( unlikely(!access_ok(VERIFY_READ, ureqs, count * sizeof(req))) ) {
+    /*
+     * If we are resuming after preemption, read how much work we have already
+     * done. This allows us to set the @done output parameter correctly.
+     */
+    if ( unlikely(count & MMU_UPDATE_PREEMPTED) )
+    {
+        count &= ~MMU_UPDATE_PREEMPTED;
+        if ( unlikely(pdone != NULL) )
+            (void)get_user(done, pdone);
+    }
+
+    if ( unlikely(!array_access_ok(VERIFY_READ, ureqs, count, sizeof(req))) )
         UNLOCK_BIGLOCK(d);
         return -EFAULT;
     }
 
     for ( i = 0; i < count; i++ )
     {
-        locked_hypercall_may_preempt(d,
-            __HYPERVISOR_mmu_update, 3, ureqs, count-i, success_count);
+        if ( hypercall_preempt_check() )
+        {
+            hypercall_create_continuation(
+                __HYPERVISOR_mmu_update, 3, ureqs, 
+                (count - i) | MMU_UPDATE_PREEMPTED, pdone);
+            rc = __HYPERVISOR_mmu_update;
+            break;
+        }
 
         if ( unlikely(__copy_from_user(&req, ureqs, sizeof(req)) != 0) )
         {
@@ -1464,8 +1487,9 @@ int do_mmu_update(mmu_update_t *ureqs, int count, int *success_count)
         percpu_info[cpu].foreign = NULL;
     }
 
-    if ( unlikely(success_count != NULL) )
-        put_user(i, success_count);
+    /* Add incremental work we have done to the @done output parameter. */
+    if ( unlikely(pdone != NULL) )
+        __put_user(done + i, pdone);
 
     UNLOCK_BIGLOCK(d);
     return rc;
@@ -1787,17 +1811,20 @@ int ptwr_do_page_fault(unsigned long addr)
     which = PTWR_PT_INACTIVE;
     if ( (l2e >> PAGE_SHIFT) == pfn )
     {
-        /*
-         * If the PRESENT bit is clear, we may be conflicting with the current 
-         * ACTIVE p.t. (it may be the same p.t. mapped at another virt addr).
-         */
-        if ( unlikely(!(l2e & _PAGE_PRESENT)) &&
-             ptwr_info[cpu].ptinfo[PTWR_PT_ACTIVE].l1va )
-            ptwr_flush(PTWR_PT_ACTIVE);
-        
-        /* Now do a final check of the PRESENT bit to set ACTIVE. */
+        /* Check the PRESENT bit to set ACTIVE. */
         if ( likely(l2e & _PAGE_PRESENT) )
             which = PTWR_PT_ACTIVE;
+        else {
+            /*
+             * If the PRESENT bit is clear, we may be conflicting with
+             * the current ACTIVE p.t. (it may be the same p.t. mapped
+             * at another virt addr).
+             * The ptwr_flush call below will restore the PRESENT bit.
+             */
+            if ( ptwr_info[cpu].ptinfo[PTWR_PT_ACTIVE].l1va &&
+                 l2_idx == ptwr_info[cpu].ptinfo[PTWR_PT_ACTIVE].l2_idx )
+                which = PTWR_PT_ACTIVE;
+        }
     }
     
     PTWR_PRINTK("[%c] page_fault on l1 pt at va %08lx, pt for %08x, "

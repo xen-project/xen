@@ -1,5 +1,13 @@
 
-export LINUX_RELEASE ?=2.6
+export LINUX_SERIES ?=2.6
+
+# Root path to install in.
+# Set to '/' to install relative to filesystem root.
+export prefix?=$(shell cd ../../dist/install && pwd)
+
+.PHONY: all compile
+.PHONY: gc-install gc-clean gc-prstine
+.PHONY: vnetd vnet-module install dist clean pristine
 
 all: compile
 
@@ -12,16 +20,18 @@ gc: gc.tar.gz
 	tar xfz gc.tar.gz
 	ln -sf gc?.? gc
 
-gc-install: gc
-	(cd gc && ./configure --prefix=`pwd`/install && make && make install)
+gc/Makefile:
+	(cd gc && ./configure --prefix=`pwd`/install)
+
+gc-install: gc gc/Makefile
+	make -C gc
+	make -C gc install
 
 gc-clean:
 	-$(MAKE) -C gc clean
 
 gc-pristine:
 	-rm -rf gc?.? gc
-
-.PHONY: vnetd vnet-module install dist clean
 
 vnetd: gc-install
 	$(MAKE) -C vnetd
@@ -35,8 +45,10 @@ install: compile
 	$(MAKE) -C examples install
 
 dist: $(TARGET)
-	$(MAKE) prefix=`pwd`/../../install dist=yes install
+	$(MAKE) install
 
 clean:
 	-$(MAKE) -C vnetd clean
 	-$(MAKE) -C vnet-module clean
+
+pristine: clean gc-pristine

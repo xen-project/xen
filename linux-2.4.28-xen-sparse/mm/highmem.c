@@ -130,7 +130,7 @@ start:
 	return vaddr;
 }
 
-void *kmap_high(struct page *page, int nonblocking)
+void fastcall *kmap_high(struct page *page, int nonblocking)
 {
 	unsigned long vaddr;
 
@@ -155,7 +155,7 @@ void *kmap_high(struct page *page, int nonblocking)
 	return (void*) vaddr;
 }
 
-void kunmap_high(struct page *page)
+void fastcall kunmap_high(struct page *page)
 {
 	unsigned long vaddr;
 	unsigned long nr;

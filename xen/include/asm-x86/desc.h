@@ -27,8 +27,11 @@
      (((_s)&3) == 1))
 #define VALID_CODESEL(_s) ((_s) == FLAT_RING1_CS || VALID_SEL(_s))
 
-/* These are bitmasks for the first 32 bits of a descriptor table entry. */
+/* These are bitmasks for the high 32 bits of a descriptor table entry. */
 #define _SEGMENT_TYPE    (15<< 8)
+#define _SEGMENT_EC      ( 1<<10) /* Expand-down or Conforming segment */
+#define _SEGMENT_CODE    ( 1<<11) /* Code (vs data) segment for non-system
+                                     segments */
 #define _SEGMENT_S       ( 1<<12) /* System descriptor (yes iff S==0) */
 #define _SEGMENT_DPL     ( 3<<13) /* Descriptor Privilege Level */
 #define _SEGMENT_P       ( 1<<15) /* Segment Present */

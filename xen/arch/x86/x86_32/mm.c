@@ -191,7 +191,7 @@ int check_descriptor(unsigned long *d)
     if ( (b & _SEGMENT_G) )
         limit <<= 12;
 
-    if ( (b & (3<<10)) == 1 )
+    if ( (b & (_SEGMENT_CODE | _SEGMENT_EC)) == _SEGMENT_EC )
     {
         /*
          * Grows-down limit check. 

@@ -309,11 +309,9 @@ typedef struct page {
 /* Make it prettier to test the above... */
 #define UnlockPage(page)	unlock_page(page)
 #define Page_Uptodate(page)	test_bit(PG_uptodate, &(page)->flags)
-#define SetPageUptodate(page) \
-	do {								\
-		arch_set_page_uptodate(page);				\
-		set_bit(PG_uptodate, &(page)->flags);			\
-	} while (0)
+#ifndef SetPageUptodate
+#define SetPageUptodate(page)	set_bit(PG_uptodate, &(page)->flags)
+#endif
 #define ClearPageUptodate(page)	clear_bit(PG_uptodate, &(page)->flags)
 #define PageDirty(page)		test_bit(PG_dirty, &(page)->flags)
 #define SetPageDirty(page)	set_bit(PG_dirty, &(page)->flags)

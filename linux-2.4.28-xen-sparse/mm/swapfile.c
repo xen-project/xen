@@ -256,7 +256,7 @@ static int exclusive_swap_page(struct page *page)
  * work, but we opportunistically check whether
  * we need to get all the locks first..
  */
-int can_share_swap_page(struct page *page)
+int fastcall can_share_swap_page(struct page *page)
 {
 	int retval = 0;
 
@@ -284,7 +284,7 @@ int can_share_swap_page(struct page *page)
  * Work out if there are any other processes sharing this
  * swap cache page. Free it if you can. Return success.
  */
-int remove_exclusive_swap_page(struct page *page)
+int fastcall remove_exclusive_swap_page(struct page *page)
 {
 	int retval;
 	struct swap_info_struct * p;

@@ -66,6 +66,9 @@ extern struct movsl_mask {
  */
 #define access_ok(type,addr,size) (likely(__range_ok(addr,size) == 0))
 
+#define array_access_ok(type,addr,count,size) \
+    (likely(count < (~0UL/size)) && access_ok(type,addr,count*size))
+
 /*
  * The exception table consists of pairs of addresses: the first is the
  * address of an instruction that is allowed to fault, and the second is

@@ -258,24 +258,8 @@ void continue_cpu_idle_loop(void);
 void continue_nonidle_task(void);
 
 void hypercall_create_continuation(unsigned int op, unsigned int nr_args, ...);
-#if 0
-#define hypercall_may_preempt(_op, _nr_args, _args...)               \
-    do {                                                             \
-        if ( unlikely(softirq_pending(smp_processor_id())) ) {       \
-            hypercall_create_continuation(_op , _nr_args , ##_args); \
-            return _op;                                              \
-    } } while ( 0 )
-#define locked_hypercall_may_preempt(_d, _op, _nr_args, _args...)    \
-    do {                                                             \
-        if ( unlikely(softirq_pending(smp_processor_id())) ) {       \
-            hypercall_create_continuation(_op , _nr_args , ##_args); \
-            UNLOCK_BIGLOCK(_d);                                      \
-            return _op;                                              \
-    } } while ( 0 )
-#else
-#define hypercall_may_preempt(_op, _nr_args, _args...)
-#define locked_hypercall_may_preempt(_d, _op, _nr_args, _args...)
-#endif
+#define hypercall_preempt_check() \
+    (unlikely(softirq_pending(smp_processor_id())))
 
 /* This domain_hash and domain_list are protected by the domlist_lock. */
 #define DOMAIN_HASH_SIZE 256

@@ -29,14 +29,14 @@ XEN_ROOT ?=../../..
 prefix ?=$(XEN_ROOT)/install/
 #----------------------------------------------------------------------------
 
-LINUX_RELEASE ?=2.6
+LINUX_SERIES ?=2.6
 KERNEL_MINOR ?=-xen0
 
-LINUX_VERSION ?= $(shell ( /bin/ls -ld $(XEN_ROOT)/linux-$(LINUX_RELEASE).*-xen-sparse ) 2>/dev/null | \
+LINUX_VERSION ?= $(shell ( /bin/ls -ld $(XEN_ROOT)/linux-$(LINUX_SERIES).*-xen-sparse ) 2>/dev/null | \
                       sed -e 's!^.*linux-\(.\+\)-xen-sparse!\1!' )
 
 ifeq ($(LINUX_VERSION),)
-$(error Kernel source for linux $(LINUX_RELEASE) not found)
+$(error Kernel source for linux $(LINUX_SERIES) not found)
 endif
 
 KERNEL_VERSION =$(LINUX_VERSION)$(KERNEL_MINOR)
