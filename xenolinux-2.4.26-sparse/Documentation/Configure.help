@@ -1167,6 +1167,14 @@ CONFIG_AMD74XX_OVERRIDE
   This effect can be also invoked by calling "idex=ata66"
   If unsure, say N.
 
+ATI IXP chipset IDE support
+CONFIG_BLK_DEV_ATIIXP
+  This driver adds explicit support for ATI IXP chipset.
+  This allows the kernel to change PIO, DMA and UDMA speeds
+  and to configure the chip to optimum performance.
+
+  Say Y here if you have an ATI IXP chipset IDE controller.
+
 CMD64X/CMD680 chipset support
 CONFIG_BLK_DEV_CMD64X
   Say Y here if you have an IDE controller which uses any of these
@@ -2092,6 +2100,40 @@ CONFIG_BLK_DEV_ATARAID_HPT
 
   If you choose to compile this as a module, the module will be called
   hptraid.o.
+
+CMD/Silicon Image Medley Software RAID
+CONFIG_BLK_DEV_ATARAID_MEDLEY
+  Say Y or M if you have a Silicon Image 3112 SATA RAID controller,
+  a CMD680 based controller, or another IDE RAID controller that uses
+  CMD's Medley software RAID, and want Linux to use the software RAID
+  feature of this card.  This driver uses /dev/ataraid/dXpY (X and Y
+  numbers) as device names.
+
+  This driver currently only supports RAID0 (striped) mode, so if you
+  are using RAID1 (mirroring) this will not work for you. In that
+  case, you may want to try the Silicon Image Medley Software RAID
+  driver (below).
+
+  Support for mirroring is planned in the future.
+
+  If you choose to compile this as a module, the module will be called
+  medley.o.
+
+Silicon Image Medley Software RAID (old driver)
+CONFIG_BLK_DEV_ATARAID_SII
+  Say Y or M if you have a Silicon Image SATARaid controller
+  and want Linux to use the softwareraid feature of this card.
+  This driver uses /dev/ataraid/dXpY (X and Y numbers) as device
+  names.
+
+  This driver does not reliably detect all Medley RAID sets, and could
+  be dangerous if you have a striped set with disks of different size.
+
+  You should use the new Medley RAID driver (above), unless you use
+  RAID1 (mirroring), which the new driver does not yet support.
+
+  If you choose to compile this as a module, the module will be called
+  silraid.o.
 
 Support for Acer PICA 1 chipset
 CONFIG_ACER_PICA_61
@@ -6214,17 +6256,6 @@ CONFIG_IP_SCTP
 
   If in doubt, say N.
 
-SCTP: Use old checksum (Adler-32)
-CONFIG_SCTP_ADLER32
-  RCF2960 currently specifies the Adler-32 checksum algorithm for SCTP.
-  This has been deprecated and replaced by an algorithm now referred
-  to as crc32c.
-
-  If you say Y, this will use the Adler-32 algorithm, this might be 
-  useful for interoperation with downlevel peers. 
-
-  If unsure, say N.  
-
 SCTP: Debug messages
 CONFIG_SCTP_DBG_MSG
   If you say Y, this will enable verbose debugging messages. 
@@ -6241,6 +6272,29 @@ CONFIG_SCTP_DBG_OBJCNT
   'cat /proc/net/sctp/sctp_dbg_objcnt'
 
   If unsure, say N
+
+#choice
+SCTP: HMAC algorithm
+CONFIG_SCTP_HMAC_NONE
+  Choose an HMAC algorithm to be used during association establishment.
+  It can be one of SHA1, MD5 or NONE. It is advised to use either HMAC-MD5
+  or HMAC-SHA1.
+  See configuration for Cryptographic API and enable these algorithms
+  to make usable by SCTP.
+
+SCTP: SHA1 HMAC algorithm
+CONFIG_SCTP_HMAC_SHA1
+  Enable the use of HMAC-SHA1 during association establishment.  It 
+  is advised to use either HMAC-MD5 or HMAC-SHA1.
+  See configuration for Cryptographic API and enable these algorithms
+  to make usable by SCTP.
+
+SCTP: MD5 HMAC algorithm
+config SCTP_HMAC_MD5
+  Enable the use of HMAC-MD5 during association establishment.  It is 
+  advised to use either HMAC-MD5 or HMAC-SHA1.
+  See configuration for Cryptographic API and enable these algorithms
+  to make usable by SCTP.
 
 Kernel httpd acceleration
 CONFIG_KHTTPD
@@ -7009,8 +7063,11 @@ CONFIG_PACKET
 
 Packet socket: mmapped IO
 CONFIG_PACKET_MMAP
-  If you say Y here, the Packet protocol driver will use an IO
-  mechanism that results in faster communication.
+  If you say Y here, the Packet protocol driver can use a faster and 
+  more efficient capture method. This feature also allows bigger 
+  receive buffers. To take advantage of this method who have to use 
+  a libpcap library that supports it. For more info see
+  <file:Documentation/networking/packet_mmap.txt>.
 
   If unsure, say N.
 
@@ -10245,6 +10302,19 @@ CONFIG_AIRO_CS
   say M here and read <file:Documentation/modules.txt>.  The module
   will be called airo_cs.o.
 
+Atmel at76c502/at76c504 PCMCIA cards
+CONFIG_PCMCIA_ATMEL
+  A driver for PCMCIA 802.11 wireless cards based on the 
+  Atmel fast-vnet chips. This driver supports standard
+  Linux wireless extensions. 
+
+  Many  cards based on this chipset do not have flash memory
+  and need their firmware loaded at start-up. If yours is 
+  one of these, you will need to provide a firmware image
+  to be loaded into the card by the driver. The Atmel
+  firmware package can be downloaded from
+  http://www.thekelleys.org.uk/atmel/atmel_firmware.tar.gz
+
 Aviator/Raytheon 2.4MHz wireless support
 CONFIG_PCMCIA_RAYCS
   Say Y here if you intend to attach an Aviator/Raytheon PCMCIA
@@ -10777,6 +10847,14 @@ CONFIG_NET_SCH_TBF
   which can be inserted in and removed from the running kernel
   whenever you want). If you want to compile it as a module, say M
   here and read <file:Documentation/modules.txt>.
+
+Network delay simualtor  
+CONFIG_NET_SCH_DELAY
+  Say Y if you want to delay packets by a fixed amount of
+  time. This is often useful to simulate network delay when
+  testing applications or protocols.
+  
+  This code is also available as a module called sch_delay.o
 
 Ingress Qdisc
 CONFIG_NET_SCH_INGRESS
@@ -12365,6 +12443,16 @@ CONFIG_B44
   say M here and read <file:Documentation/modules.txt> as well as
   <file:Documentation/networking/net-modules.txt>.  The module will be
   called b44.
+
+nForce Ethernet support (EXPERIMENTAL)
+CONFIG_FORCEDETH
+  If you have a network (Ethernet) controller of this type, say Y and
+  read the Ethernet-HOWTO, available from
+  <http://www.tldp.org/docs.html#howto>.
+
+  To compile this driver as a module, choose M here and read
+  <file:Documentation/networking/net-modules.txt>.  The module will be
+  called forcedeth.o.
 
 CS89x0 support (Daynaport CS and LC cards)
 CONFIG_CS89x0
@@ -19938,14 +20026,6 @@ CONFIG_ACPI_DEBUG
   of verbosity. Saying Y enables these statements. This will increase
   your kernel size by around 50K.
 
-ACPI Relaxed AML Checking
-CONFIG_ACPI_RELAXED_AML
-  If you say `Y' here, the ACPI interpreter will relax its checking
-  for valid AML and will ignore some AML mistakes, such as off-by-one
-  errors in region sizes.  Some laptops may require this option.  In
-  particular, many Toshiba laptops require this for correct operation
-  of the AC module.
-
 ACPI Button
 CONFIG_ACPI_BUTTON
   This driver registers for events based on buttons, such as the
@@ -23560,7 +23640,7 @@ CONFIG_OKTAGON_SCSI
   If you have the BSC Oktagon SCSI disk controller for the Amiga, say
   Y to this question.  If you're in doubt about whether you have one,
   see the picture at
-  <http://amiga.multigraph.com/photos/oktagon.html>.
+  <http://amiga.resource.cx/exp/search.pl?product=oktagon>.
 
 Atari native SCSI support
 CONFIG_ATARI_SCSI
@@ -28719,6 +28799,13 @@ CONFIG_CRYPTO_CAST6
   
   The CAST6 encryption algorithm (synonymous with CAST-256) is
   described in RFC2612.
+
+CONFIG_CRYPTO_ARC4
+  ARC4 cipher algorithm.
+  
+  This is a stream cipher using keys ranging from 8 bits to 2048
+  bits in length.  ARC4 is commonly used in protocols such as WEP 
+  and SSL.
 
 CONFIG_CRYPTO_DEFLATE
   This is the Deflate algorithm (RFC1951), specified for use in

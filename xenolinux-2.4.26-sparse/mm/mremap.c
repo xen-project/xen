@@ -77,12 +77,16 @@ static inline int copy_one_pte(struct mm_struct *mm, pte_t * src, pte_t * dst)
 static int move_one_page(struct mm_struct *mm, unsigned long old_addr, unsigned long new_addr)
 {
 	int error = 0;
-	pte_t * src;
+	pte_t * src, * dst;
 
 	spin_lock(&mm->page_table_lock);
 	src = get_one_pte(mm, old_addr);
-	if (src)
-		error = copy_one_pte(mm, src, alloc_one_pte(mm, new_addr));
+	if (src) {
+		dst = alloc_one_pte(mm, new_addr);
+		src = get_one_pte(mm, old_addr);
+		if (src) 
+			error = copy_one_pte(mm, src, dst);
+	}
 	spin_unlock(&mm->page_table_lock);
 	return error;
 }

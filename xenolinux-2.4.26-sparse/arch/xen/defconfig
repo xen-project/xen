@@ -8,12 +8,10 @@ CONFIG_ISA=y
 CONFIG_UID16=y
 
 #
-# Xenolinux options
+# Xen
 #
-# support for privileged domains
 CONFIG_XEN_PRIVILEGED_GUEST=y
 # CONFIG_XEN_PHYSDEV_ACCESS is not set
-# on-demand timer setting (taken from s390 patch set)
 CONFIG_NO_IDLE_HZ=y
 
 #
@@ -35,6 +33,8 @@ CONFIG_M686=y
 # CONFIG_MPENTIUMIII is not set
 # CONFIG_MPENTIUM4 is not set
 # CONFIG_MK7 is not set
+# CONFIG_MK8 is not set
+# CONFIG_MVIAC3_2 is not set
 CONFIG_X86_WP_WORKS_OK=y
 CONFIG_X86_INVLPG=y
 CONFIG_X86_CMPXCHG=y
@@ -50,14 +50,11 @@ CONFIG_X86_TSC=y
 CONFIG_X86_L1_CACHE_SHIFT=5
 CONFIG_NOHIGHMEM=y
 # CONFIG_HIGHMEM4G is not set
-# CONFIG_HIGHMEM64G is not set
 
 #
 # General setup
 #
 CONFIG_NET=y
-# CONFIG_PCI is not set
-# CONFIG_PCI_NAMES is not set
 CONFIG_SYSVIPC=y
 # CONFIG_BSD_PROCESS_ACCT is not set
 CONFIG_SYSCTL=y
