@@ -29,4 +29,4 @@
 #define CONFIG_OUTPUT_CONSOLE 1 // but see also opt_console
 #define CONFIG_OUTPUT_SERIAL  1
 
-extern int opt_console;
+extern unsigned int opt_console;
