@@ -60,8 +60,8 @@ struct net_private
      * {tx,rx}_skbs store outstanding skbuffs. The first entry in each
      * array is an index into a chain of free entries.
      */
-    struct sk_buff *tx_skbs[TX_RING_SIZE];
-    struct sk_buff *rx_skbs[RX_RING_SIZE];
+    struct sk_buff *tx_skbs[TX_RING_SIZE+1];
+    struct sk_buff *rx_skbs[RX_RING_SIZE+1];
 };
 
 /* Access macros for acquiring freeing slots in {tx,rx}_skbs[]. */
@@ -145,9 +145,9 @@ static int network_open(struct net_device *dev)
     memset(np->net_idx, 0, sizeof(*np->net_idx));
 
     /* Initialise {tx,rx}_skbs to be a free chain containing every entry. */
-    for ( i = 0; i < TX_RING_SIZE; i++ )
+    for ( i = 0; i <= TX_RING_SIZE; i++ )
         np->tx_skbs[i] = (void *)(i+1);
-    for ( i = 0; i < RX_RING_SIZE; i++ )
+    for ( i = 0; i <= RX_RING_SIZE; i++ )
         np->rx_skbs[i] = (void *)(i+1);
 
     wmb();

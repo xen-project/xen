@@ -17,7 +17,6 @@
 #include <xeno/blkdev.h>
 #include <xeno/console.h>
 #include <xeno/vbd.h>
-
 #include <asm/i387.h>
 
 /*
@@ -237,12 +236,12 @@ struct pfn_info *alloc_domain_page(struct task_struct *p)
     if ( unlikely(page == NULL) )
         return NULL;
 
-    if ( unlikely((mask = page->u.cpu_mask) != 0) )
+    if ( (mask = page->u.cpu_mask) != 0 )
     {
         pfn_stamp = page->tlbflush_timestamp;
         for ( i = 0; (mask != 0) && (i < NR_CPUS); i++ )
         {
-            if ( unlikely(mask & (1<<i)) )
+            if ( mask & (1<<i) )
             {
                 cpu_stamp = tlbflush_time[i];
                 if ( !NEED_FLUSH(cpu_stamp, pfn_stamp) )
@@ -252,13 +251,12 @@ struct pfn_info *alloc_domain_page(struct task_struct *p)
 
         if ( unlikely(mask != 0) )
         {
-            if ( unlikely(in_irq()) )
-            {
-                DPRINTK("Returning NULL from alloc_domain_page: in_irq\n");
+            /* In IRQ ctxt, flushing is best-effort only, to avoid deadlock. */
+            if ( likely(!in_irq()) )
+                flush_tlb_mask(mask);
+            else if ( unlikely(!try_flush_tlb_mask(mask)) )
                 goto free_and_exit;
-            }
             perfc_incrc(need_flush_tlb_flush);
-            flush_tlb_mask(mask);
         }
     }
 

@@ -269,8 +269,34 @@ asmlinkage void smp_invalidate_interrupt(void)
     local_flush_tlb();
 }
 
+int try_flush_tlb_mask(unsigned long mask)
+{
+    if ( mask & (1 << smp_processor_id()) )
+    {
+        local_flush_tlb();
+        mask &= ~(1 << smp_processor_id());
+    }
+
+    if ( mask != 0 )
+    {
+        if ( unlikely(!spin_trylock(&tlbstate_lock)) )
+            return 0;
+        flush_cpumask = mask;
+        send_IPI_mask(mask, INVALIDATE_TLB_VECTOR);
+        while ( flush_cpumask != 0 )
+        {
+            rep_nop();
+            barrier();
+        }
+        spin_unlock(&tlbstate_lock);
+    }
+
+    return 1;
+}
+
 void flush_tlb_mask(unsigned long mask)
 {
+    /* WARNING: Only try_flush_tlb_mask() is safe in IRQ context. */
     if ( unlikely(in_irq()) )
         BUG();
     

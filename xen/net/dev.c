@@ -535,6 +535,7 @@ void deliver_packet(struct sk_buff *skb, net_vif_t *vif)
                           (pte & ~PAGE_MASK) | _PAGE_RW | _PAGE_PRESENT |
                           ((new_page - frame_table) << PAGE_SHIFT))) != pte )
     {
+        DPRINTK("PTE was modified or reused! %08lx %08lx\n", pte, *ptep);
         unmap_domain_mem(ptep);
         /* At some point maybe should have 'new_page' in error response. */
         put_page_and_type(new_page);
@@ -2112,6 +2113,9 @@ static void get_rx_bufs(net_vif_t *vif)
             goto rx_unmap_and_continue;
         }
             
+        buf_page->tlbflush_timestamp = tlbflush_clock;
+        buf_page->u.cpu_mask = 1 << p->processor;
+
         /* Remove from the domain's allocation list. */
         spin_lock(&p->page_list_lock);
         list_del(&buf_page->list);
@@ -2167,7 +2171,7 @@ long flush_bufs_for_vif(net_vif_t *vif)
     for ( i = vif->rx_req_cons; 
           (i != shared_idxs->rx_req_prod) &&
               ((i-vif->rx_resp_prod) != RX_RING_SIZE);
-          i++ );
+          i++ )
     {
         make_rx_response(vif, shared_rings->rx_ring[MASK_NET_RX_IDX(i)].req.id,
                          0, RING_STATUS_DROPPED, 0);
@@ -2179,6 +2183,7 @@ long flush_bufs_for_vif(net_vif_t *vif)
 
         /* Give the buffer page back to the domain. */
         page = &frame_table[rx->buf_pfn];
+        page->u.domain = p;
         spin_lock(&p->page_list_lock);
         list_add(&page->list, &p->page_list);
         page->count_and_flags = PGC_allocated | 2;
@@ -2194,7 +2199,10 @@ long flush_bufs_for_vif(net_vif_t *vif)
              unlikely(cmpxchg(ptep, pte, (rx->buf_pfn<<PAGE_SHIFT) | 
                               (pte & ~PAGE_MASK) | _PAGE_RW | _PAGE_PRESENT)
                       != pte) )
+        {
+            DPRINTK("PTE was modified or reused! %08lx %08lx\n", pte, *ptep);
             put_page_and_type(page);
+        }
         unmap_domain_mem(ptep);
 
         put_page_and_type(&frame_table[rx->pte_ptr >> PAGE_SHIFT]);

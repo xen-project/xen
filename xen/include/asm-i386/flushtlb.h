@@ -24,8 +24,8 @@
  * used for a purpose that may have caused the CPU's TLB to become tainted.
  */
 #define NEED_FLUSH(_cpu_stamp, _lastuse_stamp) \
- (((_cpu_stamp) > (_lastuse_stamp)) ||         \
-  (((_lastuse_stamp) - (_cpu_stamp)) > (2*GLOBAL_FLUSH_PERIOD)))
+ (((_cpu_stamp) <= (_lastuse_stamp)) &&        \
+  (((_lastuse_stamp) - (_cpu_stamp)) <= (2*GLOBAL_FLUSH_PERIOD)))
 
 extern unsigned long tlbflush_mask;
 extern unsigned long tlbflush_clock;
