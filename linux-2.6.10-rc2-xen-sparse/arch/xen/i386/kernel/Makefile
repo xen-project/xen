@@ -6,7 +6,7 @@ XENARCH	:= $(subst ",,$(CONFIG_XENARCH))
 
 CFLAGS	+= -Iarch/$(XENARCH)/kernel
 
-extra-y := head.o init_task.o vmlinux.lds
+extra-y := head.o init_task.o
 
 obj-y	:= process.o signal.o entry.o traps.o \
 		time.o ioport.o ldt.o setup.o \
@@ -35,7 +35,7 @@ c-obj-$(CONFIG_X86_IO_APIC)	+= io_apic.o
 c-obj-$(CONFIG_X86_NUMAQ)	+= numaq.o
 c-obj-$(CONFIG_X86_SUMMIT_NUMA)	+= summit.o
 c-obj-$(CONFIG_MODULES)		+= module.o
-obj-y				+= sysenter.o
+c-obj-y				+= sysenter.o
 obj-y				+= vsyscall.o
 c-obj-$(CONFIG_ACPI_SRAT) 	+= srat.o
 c-obj-$(CONFIG_HPET_TIMER) 	+= time_hpet.o
@@ -45,8 +45,6 @@ c-obj-$(CONFIG_EARLY_PRINTK)	+= early_printk.o
 EXTRA_AFLAGS   := -traditional
 
 c-obj-$(CONFIG_SCx200)		+= scx200.o
-
-CPPFLAGS_vmlinux.lds += -U$(XENARCH)
 
 # vsyscall.o contains the vsyscall DSO images as __initdata.
 # We must build both images before we can assemble it.

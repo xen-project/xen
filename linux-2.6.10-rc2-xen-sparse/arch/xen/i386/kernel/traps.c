@@ -127,7 +127,7 @@ static inline unsigned long print_context_stack(struct thread_info *tinfo,
 		addr = *stack++;
 		if (__kernel_text_address(addr)) {
 			printk(" [<%08lx>]", addr);
-			print_symbol(" %s\n", addr);
+			print_symbol(" %s", addr);
 			printk("\n");
 		}
 	}
@@ -737,8 +737,8 @@ fastcall void do_debug(struct pt_regs * regs, long error_code)
 	/* If this is a kernel mode trap, save the user PC on entry to 
 	 * the kernel, that's what the debugger can make sense of.
 	 */
-	info.si_addr = ((regs->xcs & 2) == 0) ? (void __user *)tsk->thread.eip : 
-	                                        (void __user *)regs->eip;
+	info.si_addr = ((regs->xcs & 2) == 0) ? (void __user *)tsk->thread.eip
+	                                      : (void __user *)regs->eip;
 	force_sig_info(SIGTRAP, &info, tsk);
 
 	/* Disable additional traps. They'll be re-enabled when
@@ -954,58 +954,6 @@ void __init trap_init_f00f_bug(void)
 }
 #endif
 
-#define _set_gate(gate_addr,type,dpl,addr,seg) \
-do { \
-  int __d0, __d1; \
-  __asm__ __volatile__ ("movw %%dx,%%ax\n\t" \
-	"movw %4,%%dx\n\t" \
-	"movl %%eax,%0\n\t" \
-	"movl %%edx,%1" \
-	:"=m" (*((long *) (gate_addr))), \
-	 "=m" (*(1+(long *) (gate_addr))), "=&a" (__d0), "=&d" (__d1) \
-	:"i" ((short) (0x8000+(dpl<<13)+(type<<8))), \
-	 "3" ((char *) (addr)),"2" ((seg) << 16)); \
-} while (0)
-
-
-/*
- * This needs to use 'idt_table' rather than 'idt', and
- * thus use the _nonmapped_ version of the IDT, as the
- * Pentium F0 0F bugfix can have resulted in the mapped
- * IDT being write-protected.
- */
-void set_intr_gate(unsigned int n, void *addr)
-{
-	_set_gate(idt_table+n,14,0,addr,__KERNEL_CS);
-}
-
-#if 0
-/*
- * This routine sets up an interrupt gate at directory privilege level 3.
- */
-static inline void set_system_intr_gate(unsigned int n, void *addr)
-{
-	_set_gate(idt_table+n, 14, 3, addr, __KERNEL_CS);
-}
-
-static void __init set_trap_gate(unsigned int n, void *addr)
-{
-	_set_gate(idt_table+n,15,0,addr,__KERNEL_CS);
-}
-
-static void __init set_system_gate(unsigned int n, void *addr)
-{
-	_set_gate(idt_table+n,15,3,addr,__KERNEL_CS);
-}
-#endif
-
-#if 0
-static void __init set_task_gate(unsigned int n, unsigned int gdt_entry)
-{
-	_set_gate(idt_table+n,5,0,0,(gdt_entry<<3));
-}
-#endif
-
 
 /* NB. All these are "trap gates" (i.e. events_mask isn't cleared). */
 static trap_info_t trap_table[] = {
@@ -1030,14 +978,14 @@ static trap_info_t trap_table[] = {
 	{ 18, 0, __KERNEL_CS, (unsigned long)machine_check		},
 #endif
 	{ 19, 0, __KERNEL_CS, (unsigned long)simd_coprocessor_error	},
-	{ SYSCALL_VECTOR, 3, __KERNEL_CS, (unsigned long)system_call	},
-	{  0, 0,           0, 0						}
+	{ SYSCALL_VECTOR,  3, __KERNEL_CS, (unsigned long)system_call	},
+	{  0, 0,	   0, 0						}
 };
 
 void __init trap_init(void)
 {
-	HYPERVISOR_set_trap_table(trap_table);    
-        HYPERVISOR_set_fast_trap(SYSCALL_VECTOR);
+	HYPERVISOR_set_trap_table(trap_table);
+	HYPERVISOR_set_fast_trap(SYSCALL_VECTOR);
 
 	/*
 	 * default LDT is a single-entry callgate to lcall7 for iBCS

@@ -686,7 +686,7 @@ static void __init parse_cmdline_early (char ** cmdline_p)
 	int len = 0;
 	int userdef = 0;
 
-        memcpy(saved_command_line, xen_start_info.cmd_line, MAX_CMDLINE);
+	memcpy(saved_command_line, xen_start_info.cmd_line, MAX_CMDLINE);
 	/* Save unparsed command line copy for /proc/cmdline */
 	saved_command_line[COMMAND_LINE_SIZE-1] = '\0';
 

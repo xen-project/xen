@@ -4,9 +4,7 @@
 .section __xen_guest
 	.ascii	"GUEST_OS=linux,GUEST_VER=2.6,XEN_VER=2.0,VIRT_BASE=0xC0000000"
 	.ascii	",LOADER=generic"
-#ifdef CONFIG_XEN_WRITABLE_PAGETABLES
 	.ascii	",PT_MODE_WRITABLE"
-#endif
 	.byte	0
 
 .text
@@ -90,7 +88,6 @@ ENTRY(stack_start)
 	.long init_thread_union+THREAD_SIZE
 	.long __BOOT_DS
 
-# XXXcl
 .globl idt_descr
 .globl cpu_gdt_descr
 
@@ -99,7 +96,6 @@ ENTRY(stack_start)
 idt_descr:
 	.word IDT_ENTRIES*8-1		# idt contains 256 entries
 	.long idt_table
-# XXXcl
 
 # boot GDT descriptor (later on used by CPU#0):
 	.word 0				# 32 bit align gdt_desc.address

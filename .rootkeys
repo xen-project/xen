@@ -148,12 +148,10 @@
 40f56238a8iOVDEoostsbun_sy2i4g linux-2.6.10-rc2-xen-sparse/arch/xen/i386/kernel/process.c
 40f56238YQIJoYG2ehDGEcdTgLmGbg linux-2.6.10-rc2-xen-sparse/arch/xen/i386/kernel/setup.c
 40f56238nWMQg7CKbyTy0KJNvCzbtg linux-2.6.10-rc2-xen-sparse/arch/xen/i386/kernel/signal.c
-40f56238UL9uv78ODDzMwLL9yryeFw linux-2.6.10-rc2-xen-sparse/arch/xen/i386/kernel/sysenter.c
 40f56238qVGkpO_ycnQA8k03kQzAgA linux-2.6.10-rc2-xen-sparse/arch/xen/i386/kernel/time.c
 40f56238NzTgeO63RGoxHrW5NQeO3Q linux-2.6.10-rc2-xen-sparse/arch/xen/i386/kernel/timers/Makefile
 40f56238BMqG5PuSHufpjbvp_helBw linux-2.6.10-rc2-xen-sparse/arch/xen/i386/kernel/timers/timer_tsc.c
 40f562389xNa78YBZciUibQjyRU_Lg linux-2.6.10-rc2-xen-sparse/arch/xen/i386/kernel/traps.c
-40f56238qASEI_IOhCKWNuwFKNZrKQ linux-2.6.10-rc2-xen-sparse/arch/xen/i386/kernel/vmlinux.lds.S
 40f56238JypKAUG01ZojFwH7qnZ5uA linux-2.6.10-rc2-xen-sparse/arch/xen/i386/kernel/vsyscall.S
 40f56238wi6AdNQjm0RT57bSkwb6hg linux-2.6.10-rc2-xen-sparse/arch/xen/i386/kernel/vsyscall.lds
 40f56238a3w6-byOzexIlMgni76Lcg linux-2.6.10-rc2-xen-sparse/arch/xen/i386/mm/Makefile

@@ -67,10 +67,6 @@ static inline unsigned long long cycles_2_ns(unsigned long long cyc)
 	return (cyc * cyc2ns_scale) >> CYC2NS_SCALE_FACTOR;
 }
 
-#if 0
-static int count2; /* counter for mark_offset_tsc() */
-#endif
-
 /* Cached *multiplier* to convert TSC counts to microseconds.
  * (see the equation below).
  * Equal to 2^32 * (1 / (clocks per usec) ).
@@ -93,13 +89,13 @@ static unsigned long get_offset_tsc(void)
 	eax -= shadow_tsc_stamp;
 
 	/*
-	 * Time offset = (tsc_low delta) * fast_gettimeoffset_quotient
-	 *             = (tsc_low delta) * (usecs_per_clock)
-	 *             = (tsc_low delta) * (usecs_per_jiffy / clocks_per_jiffy)
+         * Time offset = (tsc_low delta) * fast_gettimeoffset_quotient
+         *             = (tsc_low delta) * (usecs_per_clock)
+         *             = (tsc_low delta) * (usecs_per_jiffy / clocks_per_jiffy)
 	 *
 	 * Using a mull instead of a divl saves up to 31 clock cycles
 	 * in the critical path.
-	 */
+         */
 
 	__asm__("mull %2"
 		:"=a" (eax), "=d" (edx)
