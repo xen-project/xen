@@ -197,20 +197,12 @@ void domain_shutdown(u8 reason)
 struct pfn_info *alloc_domain_page(struct domain *d)
 {
     struct pfn_info *page = NULL;
-    unsigned long flags, mask, pfn_stamp, cpu_stamp;
+    unsigned long mask, pfn_stamp, cpu_stamp;
     int i;
 
     ASSERT(!in_irq());
 
-    spin_lock_irqsave(&free_list_lock, flags);
-    if ( likely(!list_empty(&free_list)) )
-    {
-        page = list_entry(free_list.next, struct pfn_info, list);
-        list_del(&page->list);
-        free_pfns--;
-    }
-    spin_unlock_irqrestore(&free_list_lock, flags);
-
+    page = alloc_domheap_page();
     if ( unlikely(page == NULL) )
         return NULL;
 
@@ -245,6 +237,7 @@ struct pfn_info *alloc_domain_page(struct domain *d)
             DPRINTK("Over-allocation for domain %u: %u >= %u\n",
                     d->domain, d->tot_pages, d->max_pages);
             spin_unlock(&d->page_alloc_lock);
+            page->u.inuse.domain = NULL;
             goto free_and_exit;
         }
         list_add_tail(&page->list, &d->page_list);
@@ -257,16 +250,12 @@ struct pfn_info *alloc_domain_page(struct domain *d)
     return page;
 
  free_and_exit:
-    spin_lock_irqsave(&free_list_lock, flags);
-    list_add(&page->list, &free_list);
-    free_pfns++;
-    spin_unlock_irqrestore(&free_list_lock, flags);
+    free_domheap_page(page);
     return NULL;
 }
 
 void free_domain_page(struct pfn_info *page)
 {
-    unsigned long  flags;
     int            drop_dom_ref;
     struct domain *d = page->u.inuse.domain;
 
@@ -289,10 +278,7 @@ void free_domain_page(struct pfn_info *page)
 
         page->u.inuse.count_info = 0;
         
-        spin_lock_irqsave(&free_list_lock, flags);
-        list_add(&page->list, &free_list);
-        free_pfns++;
-        spin_unlock_irqrestore(&free_list_lock, flags);
+        free_domheap_page(page);
     }
 
     if ( drop_dom_ref )
@@ -310,9 +296,7 @@ unsigned int alloc_new_dom_mem(struct domain *d, unsigned int kbytes)
     /* Grow the allocation if necessary. */
     for ( alloc_pfns = d->tot_pages; alloc_pfns < nr_pages; alloc_pfns++ )
     {
-        if ( unlikely((page=alloc_domain_page(d)) == NULL) ||
-             unlikely(free_pfns < (SLACK_DOMAIN_MEM_KILOBYTES >> 
-                                   (PAGE_SHIFT-10))) )
+        if ( unlikely((page=alloc_domain_page(d)) == NULL) )
         {
             domain_relinquish_memory(d);
             return -ENOMEM;

@@ -28,8 +28,6 @@
 #include <xen/spinlock.h>
 #include <xen/slab.h>
 
-static spinlock_t alloc_lock = SPIN_LOCK_UNLOCKED;
-
 
 /*********************
  * ALLOCATION BITMAP
@@ -63,9 +61,6 @@ static void map_alloc(unsigned long first_page, unsigned long nr_pages)
         ASSERT(!allocated_in_map(first_page + i));
 #endif
 
-    memguard_unguard_range(phys_to_virt(first_page << PAGE_SHIFT), 
-                           nr_pages << PAGE_SHIFT);
-
     curr_idx  = first_page / PAGES_PER_MAPWORD;
     start_off = first_page & (PAGES_PER_MAPWORD-1);
     end_idx   = (first_page + nr_pages) / PAGES_PER_MAPWORD;
@@ -95,9 +90,6 @@ static void map_free(unsigned long first_page, unsigned long nr_pages)
         ASSERT(allocated_in_map(first_page + i));
 #endif
 
-    memguard_guard_range(phys_to_virt(first_page << PAGE_SHIFT), 
-                         nr_pages << PAGE_SHIFT);
-
     curr_idx = first_page / PAGES_PER_MAPWORD;
     start_off = first_page & (PAGES_PER_MAPWORD-1);
     end_idx   = (first_page + nr_pages) / PAGES_PER_MAPWORD;
@@ -121,127 +113,138 @@ static void map_free(unsigned long first_page, unsigned long nr_pages)
  * BINARY BUDDY ALLOCATOR
  */
 
-/* Linked lists of free chunks of different powers-of-two in size. */
-#define NR_ORDERS 11 /* Up to 2^10 pages can be allocated at once. */
-static struct list_head free_head[NR_ORDERS];
+#define MEMZONE_XEN 0
+#define MEMZONE_DOM 1
+#define NR_ZONES    2
+
+/* Up to 2^10 pages can be allocated at once. */
+#define MIN_ORDER  0
+#define MAX_ORDER 10
+#define NR_ORDERS (MAX_ORDER - MIN_ORDER + 1)
+static struct list_head heap[NR_ZONES][NR_ORDERS];
+
+static unsigned long avail[NR_ZONES];
 
 #define round_pgdown(_p)  ((_p)&PAGE_MASK)
 #define round_pgup(_p)    (((_p)+(PAGE_SIZE-1))&PAGE_MASK)
 
+static spinlock_t heap_lock = SPIN_LOCK_UNLOCKED;
 
-/*
- * Initialise allocator, placing addresses [@min,@max] in free pool.
- * @min and @max are PHYSICAL addresses.
- */
-void __init init_page_allocator(unsigned long min, unsigned long max)
+
+/* Initialise allocator to handle up to @max_pages. */
+unsigned long init_heap_allocator(
+    unsigned long bitmap_start, unsigned long max_pages)
 {
-    int i;
-    unsigned long range, bitmap_size;
-    struct pfn_info *pg;
+    int i, j;
+    unsigned long bitmap_size;
 
-    for ( i = 0; i < NR_ORDERS; i++ )
-        INIT_LIST_HEAD(&free_head[i]);
+    memset(avail, 0, sizeof(avail));
 
-    min = round_pgup  (min);
-    max = round_pgdown(max);
+    for ( i = 0; i < NR_ZONES; i++ )
+        for ( j = 0; j < NR_ORDERS; j++ )
+            INIT_LIST_HEAD(&heap[i][j]);
+
+    bitmap_start = round_pgup(bitmap_start);
 
     /* Allocate space for the allocation bitmap. */
-    bitmap_size  = (max+1) >> (PAGE_SHIFT+3);
+    bitmap_size  = max_pages / 8;
     bitmap_size  = round_pgup(bitmap_size);
-    alloc_bitmap = (unsigned long *)phys_to_virt(min);
-    min         += bitmap_size;
-    range        = max - min;
+    alloc_bitmap = (unsigned long *)phys_to_virt(bitmap_start);
 
     /* All allocated by default. */
     memset(alloc_bitmap, ~0, bitmap_size);
+
+    return bitmap_start + bitmap_size;
+}
+
+/* Hand the specified arbitrary page range to the specified heap zone. */
+void init_heap_pages(int zone, struct pfn_info *pg, unsigned long nr_pages)
+{
+    int i;
+    unsigned long flags;
+
+    spin_lock_irqsave(&heap_lock, flags);
+
     /* Free up the memory we've been given to play with. */
-    map_free(min>>PAGE_SHIFT, range>>PAGE_SHIFT);
+    map_free(page_to_pfn(pg), nr_pages);
+    avail[zone] += nr_pages;
     
-    pg = &frame_table[min >> PAGE_SHIFT];
-    while ( range != 0 )
+    while ( nr_pages != 0 )
     {
         /*
          * Next chunk is limited by alignment of pg, but also must not be
          * bigger than remaining bytes.
          */
-        for ( i = 0; i < NR_ORDERS; i++ )
+        for ( i = 0; i < MAX_ORDER; i++ )
             if ( ((page_to_pfn(pg) & (1 << i)) != 0) ||
-                 ((1 << (i + PAGE_SHIFT + 1)) > range) )
+                 ((1 << (i + 1)) > nr_pages) )
                 break;
 
         PFN_ORDER(pg) = i;
-        list_add_tail(&pg->list, &free_head[i]);
+        list_add_tail(&pg->list, &heap[zone][i]);
 
-        pg    += 1 << i;
-        range -= 1 << (i + PAGE_SHIFT);
+        pg       += 1 << i;
+        nr_pages -= 1 << i;
     }
+
+    spin_unlock_irqrestore(&heap_lock, flags);
 }
 
 
-/* Allocate 2^@order contiguous pages. Returns a VIRTUAL address. */
-unsigned long alloc_xenheap_pages(int order)
+/* Allocate 2^@order contiguous pages. */
+struct pfn_info *alloc_heap_pages(int zone, int order)
 {
-    int i, attempts = 0;
+    int i;
     struct pfn_info *pg;
     unsigned long flags;
 
-retry:
-    spin_lock_irqsave(&alloc_lock, flags);
+    spin_lock_irqsave(&heap_lock, flags);
 
     /* Find smallest order which can satisfy the request. */
     for ( i = order; i < NR_ORDERS; i++ )
-	if ( !list_empty(&free_head[i]) )
+	if ( !list_empty(&heap[zone][i]) )
 	    break;
 
     if ( i == NR_ORDERS ) 
         goto no_memory;
  
-    pg = list_entry(free_head[i].next, struct pfn_info, list);
+    pg = list_entry(heap[zone][i].next, struct pfn_info, list);
     list_del(&pg->list);
 
     /* We may have to halve the chunk a number of times. */
     while ( i != order )
     {
         PFN_ORDER(pg) = --i;
-        list_add_tail(&pg->list, &free_head[i]);
+        list_add_tail(&pg->list, &heap[zone][i]);
         pg += 1 << i;
     }
     
-    map_alloc(page_to_pfn(pg), 1<<order);
+    map_alloc(page_to_pfn(pg), 1 << order);
+    avail[zone] -= 1 << order;
 
-    spin_unlock_irqrestore(&alloc_lock, flags);
+    spin_unlock_irqrestore(&heap_lock, flags);
 
-    return (unsigned long)page_to_virt(pg);
+    return pg;
 
  no_memory:
-    spin_unlock_irqrestore(&alloc_lock, flags);
-        
-    if ( attempts++ < 8 )
-    {
-        xmem_cache_reap();
-        goto retry;
-    }
-
-    printk("Cannot handle page request order %d!\n", order);
-    dump_slabinfo();
-
-    return 0;
+    spin_unlock_irqrestore(&heap_lock, flags);
+    return NULL;
 }
 
 
-/* Free 2^@order pages at VIRTUAL address @p. */
-void free_xenheap_pages(unsigned long p, int order)
+/* Free 2^@order set of pages. */
+void free_heap_pages(int zone, struct pfn_info *pg, int order)
 {
     unsigned long mask;
-    struct pfn_info *pg = virt_to_page(p);
     unsigned long flags;
 
-    spin_lock_irqsave(&alloc_lock, flags);
+    spin_lock_irqsave(&heap_lock, flags);
 
-    map_free(page_to_pfn(pg), 1<<order);
+    map_free(page_to_pfn(pg), 1 << order);
+    avail[zone] += 1 << order;
     
     /* Merge chunks as far as possible. */
-    for ( ; ; )
+    while ( order < MAX_ORDER )
     {
         mask = 1 << order;
 
@@ -267,7 +270,79 @@ void free_xenheap_pages(unsigned long p, int order)
     }
 
     PFN_ORDER(pg) = order;
-    list_add_tail(&pg->list, &free_head[order]);
+    list_add_tail(&pg->list, &heap[zone][order]);
 
-    spin_unlock_irqrestore(&alloc_lock, flags);
+    spin_unlock_irqrestore(&heap_lock, flags);
+}
+
+
+
+/*************************
+ * XEN-HEAP SUB-ALLOCATOR
+ */
+
+void init_xenheap_pages(unsigned long ps, unsigned long pe)
+{
+    ps = round_pgup(ps);
+    pe = round_pgdown(pe);
+    memguard_guard_range(__va(ps), pe - ps);
+    init_heap_pages(MEMZONE_XEN, phys_to_page(ps), (pe - ps) >> PAGE_SHIFT);
+}
+
+unsigned long alloc_xenheap_pages(int order)
+{
+    struct pfn_info *pg;
+    int attempts = 0;
+
+ retry:
+    if ( unlikely((pg = alloc_heap_pages(MEMZONE_XEN, order)) == NULL) )
+        goto no_memory;
+    memguard_unguard_range(page_to_virt(pg), 1 << (order + PAGE_SHIFT));
+    return (unsigned long)page_to_virt(pg);
+
+ no_memory:
+    if ( attempts++ < 8 )
+    {
+        xmem_cache_reap();
+        goto retry;
+    }
+
+    printk("Cannot handle page request order %d!\n", order);
+    dump_slabinfo();
+    return 0;
+}
+
+void free_xenheap_pages(unsigned long p, int order)
+{
+    memguard_guard_range((void *)p, 1 << (order + PAGE_SHIFT));    
+    free_heap_pages(MEMZONE_XEN, virt_to_page(p), order);
+}
+
+
+
+/*************************
+ * DOMAIN-HEAP SUB-ALLOCATOR
+ */
+
+void init_domheap_pages(unsigned long ps, unsigned long pe)
+{
+    ps = round_pgup(ps);
+    pe = round_pgdown(pe);
+    init_heap_pages(MEMZONE_DOM, phys_to_page(ps), (pe - ps) >> PAGE_SHIFT);
+}
+
+struct pfn_info *alloc_domheap_pages(int order)
+{
+    struct pfn_info *pg = alloc_heap_pages(MEMZONE_DOM, order);
+    return pg;
+}
+
+void free_domheap_pages(struct pfn_info *pg, int order)
+{
+    free_heap_pages(MEMZONE_DOM, pg, order);
+}
+
+unsigned long avail_domheap_pages(void)
+{
+    return avail[MEMZONE_DOM];
 }

@@ -64,11 +64,10 @@ interrupts enabled. Nothing can go wrong ;-)
 
 **/
 
-static inline void free_shadow_page( struct mm_struct *m, 
-                                     struct pfn_info *pfn_info )
+static inline void free_shadow_page(struct mm_struct *m, 
+                                    struct pfn_info *page)
 {
-    unsigned long flags;
-    unsigned long type = pfn_info->u.inuse.type_info & PGT_type_mask;
+    unsigned long type = page->u.inuse.type_info & PGT_type_mask;
 
     m->shadow_page_count--;
 
@@ -77,14 +76,9 @@ static inline void free_shadow_page( struct mm_struct *m,
     else if (type == PGT_l2_page_table)
         perfc_decr(shadow_l2_pages);
     else printk("Free shadow weird page type pfn=%08x type=%08x\n",
-                frame_table-pfn_info, pfn_info->u.inuse.type_info);
+                frame_table-page, page->u.inuse.type_info);
     
-    pfn_info->u.inuse.type_info = 0;
-
-    spin_lock_irqsave(&free_list_lock, flags);
-    list_add(&pfn_info->list, &free_list);
-    free_pfns++;
-    spin_unlock_irqrestore(&free_list_lock, flags);
+    free_domheap_page(page);
 }
 
 static void __free_shadow_table( struct mm_struct *m )
@@ -518,7 +512,7 @@ int shadow_mode_control(struct domain *d, dom0_shadow_control_t *sc)
 static inline struct pfn_info *alloc_shadow_page(struct mm_struct *m)
 {
     m->shadow_page_count++;
-    return alloc_domain_page(NULL);
+    return alloc_domheap_page();
 }
 
 void unshadow_table( unsigned long gpfn, unsigned int type )

@@ -58,12 +58,6 @@
 #define __cacheline_aligned __attribute__((__aligned__(SMP_CACHE_BYTES)))
 #define ____cacheline_aligned __cacheline_aligned
 
-/*
- * Amount of slack domain memory to leave in system, in megabytes.
- * Prevents a hard out-of-memory crunch for things like network receive.
- */
-#define SLACK_DOMAIN_MEM_KILOBYTES 2048
-
 /* Linkage for x86 */
 #define asmlinkage        __attribute__((regparm(0)))
 #define __ALIGN .align 16,0x90
