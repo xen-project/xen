@@ -808,10 +808,14 @@ static void __context_switch(void)
         }
     }
 
-    set_bit(cpu, &n->domain->cpuset);
+    if ( p->domain != n->domain )
+        set_bit(cpu, &n->domain->cpuset);
+
     write_ptbase(n);
     __asm__ __volatile__ ( "lgdt %0" : "=m" (*n->arch.gdt) );
-    clear_bit(cpu, &p->domain->cpuset);
+
+    if ( p->domain != n->domain )
+        clear_bit(cpu, &p->domain->cpuset);
 
     percpu_ctxt[cpu].curr_ed = n;
 }
