@@ -426,7 +426,7 @@ int construct_dom0(struct domain *d,
         d->shared_info->vcpu_data[i].evtchn_upcall_mask = 1;
     d->shared_info->n_vcpu = smp_num_cpus;
 
-    /* setup monitor table */
+    /* Set up monitor table */
     update_pagetables(ed);
 
     /* Install the new page tables. */
@@ -472,12 +472,10 @@ int construct_dom0(struct domain *d,
     for ( pfn = 0; pfn < d->tot_pages; pfn++ )
     {
         mfn = pfn + (alloc_start>>PAGE_SHIFT);
-#if 0
 #ifndef NDEBUG
 #define REVERSE_START ((v_end - dsi.v_start) >> PAGE_SHIFT)
-        if ( pfn > REVERSE_START )
+        if ( !opt_dom0_translate && (pfn > REVERSE_START) )
             mfn = (alloc_end>>PAGE_SHIFT) - (pfn - REVERSE_START);
-#endif
 #endif
         ((u32 *)vphysmap_start)[pfn] = mfn;
         machine_to_phys_mapping[mfn] = pfn;

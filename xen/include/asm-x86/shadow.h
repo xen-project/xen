@@ -2,6 +2,7 @@
  * include/asm-x86/shadow.h
  * 
  * Copyright (c) 2005 Michael A Fetterman
+ * Based on an earlier implementation by Ian Pratt et al
  * 
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
