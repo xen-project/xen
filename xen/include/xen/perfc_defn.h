@@ -41,6 +41,8 @@ PERFCOUNTER_CPU( check_all_pagetables, "calls to check_all_pagetables" )
 PERFCOUNTER_ARRAY( wpt_updates, "writable pt updates", PERFC_MAX_PT_UPDATES )
 PERFCOUNTER_ARRAY( bpt_updates, "batched pt updates", PERFC_MAX_PT_UPDATES )
 
+PERFCOUNTER_ARRAY( hypercalls, "hypercalls", NR_hypercalls )
+PERFCOUNTER_ARRAY( exceptions, "exceptions", 32 ) /* XXX constant */
 
 #define VMX_PERF_EXIT_REASON_SIZE 37
 #define VMX_PERF_VECTOR_SIZE 0x20

@@ -66,7 +66,7 @@ void perfc_printall(unsigned char key)
         case TYPE_S_ARRAY:
             for ( j = sum = 0; j < perfc_info[i].nr_elements; j++ )
                 sum += atomic_read(&counters[j]);
-            printk("TOTAL[%10d]\n ", sum);
+            printk("TOTAL[%10d]  ", sum);
             for ( j = 0; j < perfc_info[i].nr_elements; j++ )
             {
                 printk("A%02d[%10d]  ", j, atomic_read(&counters[j]));

@@ -68,4 +68,7 @@ void __dummy__(void)
     BLANK();
 
     DEFINE(FIXMAP_apic_base, fix_to_virt(FIX_APIC_BASE));
+
+    OFFSET(PERFC_hypercalls, struct perfcounter_t, hypercalls);
+    OFFSET(PERFC_exceptions, struct perfcounter_t, exceptions);
 }

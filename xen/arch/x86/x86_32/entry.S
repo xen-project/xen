@@ -60,7 +60,7 @@
 #include <asm/apicdef.h>
 #include <asm/page.h>
 #include <public/xen.h>
-
+        
 #define GET_CURRENT(reg)         \
         movl $STACK_SIZE-4, reg; \
         orl  %esp, reg;          \
@@ -278,8 +278,11 @@ ENTRY(hypercall)
         subl $4,%esp
 	SAVE_ALL(b)
         sti
+#ifdef PERF_COUNTERS
+        lock incl SYMBOL_NAME(perfcounters)+PERFC_hypercalls(,%eax,4)
+#endif
         GET_CURRENT(%ebx)
-	andl $(NR_hypercalls-1),%eax
+        andl $(NR_hypercalls-1),%eax
 	call *SYMBOL_NAME(hypercall_table)(,%eax,4)
         movl %eax,XREGS_eax(%esp)       # save the return value
 
@@ -466,6 +469,9 @@ error_code:
         movw  XREGS_entry_vector(%esp),%ax
         movl  %esp,%edx
 	pushl %edx			# push the xen_regs pointer
+#ifdef PERF_COUNTERS
+        lock incl SYMBOL_NAME(perfcounters)+PERFC_exceptions(,%eax,4)
+#endif        
 	GET_CURRENT(%ebx)
 	call  *SYMBOL_NAME(exception_table)(,%eax,4)
         addl  $4,%esp
