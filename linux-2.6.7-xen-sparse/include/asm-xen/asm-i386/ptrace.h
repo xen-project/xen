@@ -55,7 +55,7 @@ struct pt_regs {
 #define PTRACE_SET_THREAD_AREA    26
 
 #ifdef __KERNEL__
-#define user_mode(regs) ((VM_MASK & (regs)->eflags) || (2 & (regs)->xcs))
+#define user_mode(regs) ((regs) && ((VM_MASK & (regs)->eflags) || (2 & (regs)->xcs)))
 #define instruction_pointer(regs) ((regs)->eip)
 #endif
 
