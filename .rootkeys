@@ -48,6 +48,7 @@
 40278d91ZjLhxdjjrGe8HEdwHLj5xQ tools/examples/netbsd
 401d7e16NpnVrFSsR7lKKKfTwCYvWA tools/examples/xc_dom_control.py
 401d7e16RJj-lbtsVEjua6HYAIiKiA tools/examples/xc_dom_create.py
+403b7cf7J7FsSSoEPGhx6gXR4pIdZg tools/examples/xc_physinfo.py
 401d7e16X4iojyKopo_j63AyzYZd2A tools/examples/xc_vd_tool.py
 40278d94cIUWl2eRgnwZtr4hTyWT1Q tools/examples/xendomains
 3f776bd2Xd-dUcPKlPN2vG89VGtfvQ tools/misc/Makefile

@@ -17,8 +17,7 @@
  * This makes sure that old versions of dom0 tools will stop working in a
  * well-defined way (rather than crashing the machine, for instance).
  */
-#define DOM0_INTERFACE_VERSION   0xAAAA0006
-
+#define DOM0_INTERFACE_VERSION   0xAAAA0007
 
 /*
  * The following is all CPU context. Note that the i387_ctxt block is filled 
@@ -218,6 +217,19 @@ typedef struct dom0_gettbufs_st
   unsigned long phys_addr;
 } dom0_gettbufs_t;
 
+/*
+ * Get physical information about the host machine
+ */
+#define DOM0_PHYSINFO         22
+typedef struct dom0_physinfo_st
+{
+    int ht_per_core;
+    int cores;
+    unsigned long cpu_khz;
+    unsigned long total_pages;
+    unsigned long free_pages;
+} dom0_physinfo_t;
+
 typedef struct dom0_op_st
 {
     unsigned long cmd;
@@ -241,6 +253,7 @@ typedef struct dom0_op_st
 	dom0_readconsole_t	readconsole;
 	dom0_pincpudomain_t     pincpudomain;
         dom0_gettbufs_t         gettbufs;
+        dom0_physinfo_t         physinfo;
     } u;
 } dom0_op_t;
 

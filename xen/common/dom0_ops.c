@@ -451,8 +451,31 @@ long do_dom0_op(dom0_op_t *u_dom0_op)
                          	op->u.readconsole.count,
 				op->u.readconsole.cmd); 
     }
-    break;    
+    break;
 
+    case DOM0_PHYSINFO:
+    {
+        extern int phys_proc_id[];
+        extern unsigned long cpu_khz;
+
+        dom0_physinfo_t *pi = &op->u.physinfo;
+
+        int old_id = phys_proc_id[0];
+        int ht = 0;
+
+        while( ( ht < smp_num_cpus ) && ( phys_proc_id[ht] == old_id ) ) ht++;
+
+        pi->ht_per_core = ht;
+        pi->cores       = smp_num_cpus / pi->ht_per_core;
+        pi->total_pages = max_page;
+        pi->free_pages  = free_pfns;
+        pi->cpu_khz     = cpu_khz;
+
+        copy_to_user(u_dom0_op, op, sizeof(*op));
+        ret = 0;
+    }
+    break;
+    
     default:
         ret = -ENOSYS;
 

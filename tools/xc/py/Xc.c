@@ -788,6 +788,34 @@ static PyObject *pyxc_readconsolering(PyObject *self,
     return PyString_FromStringAndSize(str, (ret < 0) ? 0 : ret);
 }
 
+static PyObject *pyxc_physinfo(PyObject *self,
+			       PyObject *args,
+			       PyObject *kwds)
+{
+    XcObject *xc = (XcObject *)self;
+    PyObject *ret_obj;
+    int xc_ret;
+    xc_physinfo_t info;
+    
+    xc_ret = xc_physinfo(xc->xc_handle, &info);
+
+    if(!xc_ret)
+    {
+        ret_obj = Py_BuildValue("{s:i,s:i,s:l,s:l,s:l}",
+                                "ht_per_core", info.ht_per_core,
+                                "cores",       info.cores,
+                                "total_pages", info.total_pages,
+                                "free_pages",  info.free_pages,
+                                "cpu_khz",     info.cpu_khz);
+    }
+    else
+    {
+        ret_obj = Py_BuildValue(""); /* None */
+    }
+    
+    return ret_obj;
+}
+
 static PyMethodDef pyxc_methods[] = {
     { "domain_create", 
       (PyCFunction)pyxc_domain_create, 
@@ -1009,6 +1037,13 @@ static PyMethodDef pyxc_methods[] = {
       "Read Xen's console ring.\n"
       " clear [int, 0]: Bool - clear the ring after reading from it?\n\n"
       "Returns: [str] string is empty on failure.\n" },
+
+    { "physinfo",
+      (PyCFunction)pyxc_physinfo,
+      METH_VARARGS, "\n"
+      "Get information about the physical host machine\n"
+      "Returns [dict]: information about the hardware"
+      "        [None]: on failure.\n" },
 
     { NULL, NULL, 0, NULL }
 };

@@ -118,6 +118,14 @@ typedef struct {
     u64            nr_sectors;
 } xc_vbdextent_t;
 
+typedef struct {
+    int ht_per_core;
+    int cores;
+    unsigned long total_pages;
+    unsigned long free_pages;
+    unsigned long cpu_khz;
+} xc_physinfo_t;
+
 int xc_vbd_create(int xc_handle,
                   u64 domid, 
                   unsigned short vbdid, 
@@ -153,5 +161,7 @@ int xc_readconsolering(int xc_handle,
                        unsigned int max_chars, 
                        int clear);
 
+int xc_physinfo(int xc_handle,
+		xc_physinfo_t *info);
 
 #endif /* __XC_H__ */
