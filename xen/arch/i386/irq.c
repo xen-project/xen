@@ -1,7 +1,7 @@
 /*
- *	linux/arch/i386/kernel/irq.c
+ *      linux/arch/i386/kernel/irq.c
  *
- *	Copyright (C) 1992, 1998 Linus Torvalds, Ingo Molnar
+ *      Copyright (C) 1992, 1998 Linus Torvalds, Ingo Molnar
  *
  * This file contains the code used by various IRQ handling routines:
  * asking for different IRQ's should be done through these routines
@@ -35,7 +35,7 @@
 #include <asm/bitops.h>
 #include <asm/pgalloc.h>
 #include <xeno/delay.h>
-
+#include <xeno/timex.h>
 #include <xeno/perfc.h>
 
 /*
@@ -89,21 +89,21 @@ static void ack_none(unsigned int irq)
     printk("unexpected IRQ trap at vector %02x\n", irq);
 #ifdef CONFIG_X86_LOCAL_APIC
     /*
-	 * Currently unexpected vectors happen only on SMP and APIC.
-	 * We _must_ ack these because every local APIC has only N
-	 * irq slots per priority level, and a 'hanging, unacked' IRQ
-	 * holds up an irq slot - in excessive cases (when multiple
-	 * unexpected vectors occur) that might lock up the APIC
-	 * completely.
-	 */
+         * Currently unexpected vectors happen only on SMP and APIC.
+         * We _must_ ack these because every local APIC has only N
+         * irq slots per priority level, and a 'hanging, unacked' IRQ
+         * holds up an irq slot - in excessive cases (when multiple
+         * unexpected vectors occur) that might lock up the APIC
+         * completely.
+         */
     ack_APIC_irq();
 #endif
 #endif
 }
 
 /* startup is the same as "enable", shutdown is same as "disable" */
-#define shutdown_none	disable_none
-#define end_none	enable_none
+#define shutdown_none   disable_none
+#define end_none        enable_none
 
 struct hw_interrupt_type no_irq_type = {
     "none",
@@ -134,7 +134,7 @@ atomic_t irq_mis_count;
 #ifdef CONFIG_SMP
 unsigned char global_irq_holder = 0xff;
 unsigned volatile long global_irq_lock; /* pendantic: long for set_bit --RR */
-	
+        
 #define MAXCOUNT 100000000
 
 /*
@@ -223,7 +223,7 @@ static inline void get_irqlock(int cpu)
             do {
                 rep_nop();
             } while (test_bit(0,&global_irq_lock));
-        } while (test_and_set_bit(0,&global_irq_lock));		
+        } while (test_and_set_bit(0,&global_irq_lock));         
     }
     /* 
      * We also to make sure that nobody else is running
@@ -339,7 +339,7 @@ int handle_IRQ_event(unsigned int irq, struct pt_regs * regs, struct irqaction *
 
     irq_enter(cpu, irq);
 
-    status = 1;	/* Force the "do bottom halves" bit */
+    status = 1; /* Force the "do bottom halves" bit */
 
     if (!(action->flags & SA_INTERRUPT))
         __sti();
@@ -365,15 +365,15 @@ int handle_IRQ_event(unsigned int irq, struct pt_regs * regs, struct irqaction *
  */
  
 /**
- *	disable_irq_nosync - disable an irq without waiting
- *	@irq: Interrupt to disable
+ *      disable_irq_nosync - disable an irq without waiting
+ *      @irq: Interrupt to disable
  *
- *	Disable the selected interrupt line.  Disables and Enables are
- *	nested.
- *	Unlike disable_irq(), this function does not ensure existing
- *	instances of the IRQ handler have completed before returning.
+ *      Disable the selected interrupt line.  Disables and Enables are
+ *      nested.
+ *      Unlike disable_irq(), this function does not ensure existing
+ *      instances of the IRQ handler have completed before returning.
  *
- *	This function may be called from IRQ context.
+ *      This function may be called from IRQ context.
  */
  
 inline void disable_irq_nosync(unsigned int irq)
@@ -390,16 +390,16 @@ inline void disable_irq_nosync(unsigned int irq)
 }
 
 /**
- *	disable_irq - disable an irq and wait for completion
- *	@irq: Interrupt to disable
+ *      disable_irq - disable an irq and wait for completion
+ *      @irq: Interrupt to disable
  *
- *	Disable the selected interrupt line.  Enables and Disables are
- *	nested.
- *	This function waits for any pending IRQ handlers for this interrupt
- *	to complete before returning. If you use this function while
- *	holding a resource the IRQ handler may need you will deadlock.
+ *      Disable the selected interrupt line.  Enables and Disables are
+ *      nested.
+ *      This function waits for any pending IRQ handlers for this interrupt
+ *      to complete before returning. If you use this function while
+ *      holding a resource the IRQ handler may need you will deadlock.
  *
- *	This function may be called - with care - from IRQ context.
+ *      This function may be called - with care - from IRQ context.
  */
  
 void disable_irq(unsigned int irq)
@@ -415,14 +415,14 @@ void disable_irq(unsigned int irq)
 }
 
 /**
- *	enable_irq - enable handling of an irq
- *	@irq: Interrupt to enable
+ *      enable_irq - enable handling of an irq
+ *      @irq: Interrupt to enable
  *
- *	Undoes the effect of one call to disable_irq().  If this
- *	matches the last disable, processing of interrupts on this
- *	IRQ line is re-enabled.
+ *      Undoes the effect of one call to disable_irq().  If this
+ *      matches the last disable, processing of interrupts on this
+ *      IRQ line is re-enabled.
  *
- *	This function may be called from IRQ context.
+ *      This function may be called from IRQ context.
  */
  
 void enable_irq(unsigned int irq)
@@ -458,7 +458,7 @@ void enable_irq(unsigned int irq)
  * handlers).
  */
 asmlinkage unsigned int do_IRQ(struct pt_regs regs)
-{	
+{       
     /* 
      * We ack quickly, we don't want the irq controller
      * thinking we're snobs just because some other CPU has
@@ -489,10 +489,10 @@ asmlinkage unsigned int do_IRQ(struct pt_regs regs)
     status = desc->status & ~(IRQ_REPLAY | IRQ_WAITING);
     status |= IRQ_PENDING; /* we _want_ to handle it */
 
-	/*
-	 * If the IRQ is disabled for whatever reason, we cannot
-	 * use the action we have.
-	 */
+    /*
+     * If the IRQ is disabled for whatever reason, we cannot use the action we 
+     * have.
+     */
     action = NULL;
     if (!(status & (IRQ_DISABLED | IRQ_INPROGRESS))) {
         action = desc->action;
@@ -501,30 +501,27 @@ asmlinkage unsigned int do_IRQ(struct pt_regs regs)
     }
     desc->status = status;
 
-	/*
-	 * If there is no IRQ handler or it was disabled, exit early.
-	   Since we set PENDING, if another processor is handling
-	   a different instance of this same irq, the other processor
-	   will take care of it.
-	 */
+    /*
+     * If there is no IRQ handler or it was disabled, exit early. Since we set 
+     * PENDING, if another processor is handling a different instance of this 
+     * same irq, the other processor will take care of it.
+     */
     if (!action)
         goto out;
 
-	/*
-	 * Edge triggered interrupts need to remember
-	 * pending events.
-	 * This applies to any hw interrupts that allow a second
-	 * instance of the same irq to arrive while we are in do_IRQ
-	 * or in the handler. But the code here only handles the _second_
-	 * instance of the irq, not the third or fourth. So it is mostly
-	 * useful for irq hardware that does not mask cleanly in an
-	 * SMP environment.
-	 */
+    /*
+     * Edge triggered interrupts need to remember pending events. This applies 
+     * to any hw interrupts that allow a second instance of the same irq to 
+     * arrive while we are in do_IRQ or in the handler. But the code here only 
+     * handles the _second_ instance of the irq, not the third or fourth. So 
+     * it is mostly useful for irq hardware that does not mask cleanly in an
+     * SMP environment.
+     */
     for (;;) {
         spin_unlock(&desc->lock);
         handle_IRQ_event(irq, &regs, action);
         spin_lock(&desc->lock);
-		
+                
         if (!(desc->status & IRQ_PENDING))
             break;
         desc->status &= ~IRQ_PENDING;
@@ -532,9 +529,9 @@ asmlinkage unsigned int do_IRQ(struct pt_regs regs)
     desc->status &= ~IRQ_INPROGRESS;
  out:
     /*
-	 * The ->end() handler has to deal with interrupts which got
-	 * disabled while the handler was running.
-	 */
+     * The ->end() handler has to deal with interrupts which got disabled 
+     * while the handler was running.
+     */
     desc->handler->end(irq);
     spin_unlock(&desc->lock);
 
@@ -543,46 +540,50 @@ asmlinkage unsigned int do_IRQ(struct pt_regs regs)
 
     rdtscl(cc_end);
 
-    if(!action || (!(action->flags & SA_NOPROFILE)) )
+    if ( !action || (!(action->flags & SA_NOPROFILE)) )
+    {
         perfc_adda(irq_time, cpu, cc_end - cc_start);
+        if ( (cc_end - cc_start) > (cpu_khz * 100) )
+            printk("Long interrupt %08x -> %08x\n", cc_start, cc_end);
+    }
 
     return 1;
 }
 
 /**
- *	request_irq - allocate an interrupt line
- *	@irq: Interrupt line to allocate
- *	@handler: Function to be called when the IRQ occurs
- *	@irqflags: Interrupt type flags
- *	@devname: An ascii name for the claiming device
- *	@dev_id: A cookie passed back to the handler function
+ *      request_irq - allocate an interrupt line
+ *      @irq: Interrupt line to allocate
+ *      @handler: Function to be called when the IRQ occurs
+ *      @irqflags: Interrupt type flags
+ *      @devname: An ascii name for the claiming device
+ *      @dev_id: A cookie passed back to the handler function
  *
- *	This call allocates interrupt resources and enables the
- *	interrupt line and IRQ handling. From the point this
- *	call is made your handler function may be invoked. Since
- *	your handler function must clear any interrupt the board 
- *	raises, you must take care both to initialise your hardware
- *	and to set up the interrupt handler in the right order.
+ *      This call allocates interrupt resources and enables the
+ *      interrupt line and IRQ handling. From the point this
+ *      call is made your handler function may be invoked. Since
+ *      your handler function must clear any interrupt the board 
+ *      raises, you must take care both to initialise your hardware
+ *      and to set up the interrupt handler in the right order.
  *
- *	Dev_id must be globally unique. Normally the address of the
- *	device data structure is used as the cookie. Since the handler
- *	receives this value it makes sense to use it.
+ *      Dev_id must be globally unique. Normally the address of the
+ *      device data structure is used as the cookie. Since the handler
+ *      receives this value it makes sense to use it.
  *
- *	If your interrupt is shared you must pass a non NULL dev_id
- *	as this is required when freeing the interrupt.
+ *      If your interrupt is shared you must pass a non NULL dev_id
+ *      as this is required when freeing the interrupt.
  *
- *	Flags:
+ *      Flags:
  *
- *	SA_SHIRQ		Interrupt is shared
+ *      SA_SHIRQ                Interrupt is shared
  *
- *	SA_INTERRUPT		Disable local interrupts while processing
+ *      SA_INTERRUPT            Disable local interrupts while processing
  */
  
 int request_irq(unsigned int irq, 
-		void (*handler)(int, void *, struct pt_regs *),
-		unsigned long irqflags, 
-		const char * devname,
-		void *dev_id)
+                void (*handler)(int, void *, struct pt_regs *),
+                unsigned long irqflags, 
+                const char * devname,
+                void *dev_id)
 {
     int retval;
     struct irqaction * action;
@@ -612,21 +613,21 @@ int request_irq(unsigned int irq,
 }
 
 /**
- *	free_irq - free an interrupt
- *	@irq: Interrupt line to free
- *	@dev_id: Device identity to free
+ *      free_irq - free an interrupt
+ *      @irq: Interrupt line to free
+ *      @dev_id: Device identity to free
  *
- *	Remove an interrupt handler. The handler is removed and if the
- *	interrupt line is no longer in use by any driver it is disabled.
- *	On a shared IRQ the caller must ensure the interrupt is disabled
- *	on the card it drives before calling this function. The function
- *	does not return until any executing interrupts for this IRQ
- *	have completed.
+ *      Remove an interrupt handler. The handler is removed and if the
+ *      interrupt line is no longer in use by any driver it is disabled.
+ *      On a shared IRQ the caller must ensure the interrupt is disabled
+ *      on the card it drives before calling this function. The function
+ *      does not return until any executing interrupts for this IRQ
+ *      have completed.
  *
- *	This function may be called from interrupt context. 
+ *      This function may be called from interrupt context. 
  *
- *	Bugs: Attempting to free an irq in a handler for the same irq hangs
- *	      the machine.
+ *      Bugs: Attempting to free an irq in a handler for the same irq hangs
+ *            the machine.
  */
  
 void free_irq(unsigned int irq, void *dev_id)
@@ -685,10 +686,10 @@ void free_irq(unsigned int irq, void *dev_id)
 static spinlock_t probe_sem = SPIN_LOCK_UNLOCKED;
 
 /**
- *	probe_irq_on	- begin an interrupt autodetect
+ *      probe_irq_on    - begin an interrupt autodetect
  *
- *	Commence probing for an interrupt. The interrupts are scanned
- *	and a mask of potential interrupt lines is returned.
+ *      Commence probing for an interrupt. The interrupts are scanned
+ *      and a mask of potential interrupt lines is returned.
  *
  */
  
@@ -778,16 +779,16 @@ unsigned long probe_irq_on(void)
  */
  
 /**
- *	probe_irq_mask - scan a bitmap of interrupt lines
- *	@val:	mask of interrupts to consider
+ *      probe_irq_mask - scan a bitmap of interrupt lines
+ *      @val:   mask of interrupts to consider
  *
- *	Scan the ISA bus interrupt lines and return a bitmap of
- *	active interrupts. The interrupt probe logic state is then
- *	returned to its previous value.
+ *      Scan the ISA bus interrupt lines and return a bitmap of
+ *      active interrupts. The interrupt probe logic state is then
+ *      returned to its previous value.
  *
- *	Note: we need to scan all the irq's even though we will
- *	only return ISA irq numbers - just so that we reset them
- *	all to a known state.
+ *      Note: we need to scan all the irq's even though we will
+ *      only return ISA irq numbers - just so that we reset them
+ *      all to a known state.
  */
 unsigned int probe_irq_mask(unsigned long val)
 {
@@ -822,21 +823,21 @@ unsigned int probe_irq_mask(unsigned long val)
  */
 
 /**
- *	probe_irq_off	- end an interrupt autodetect
- *	@val: mask of potential interrupts (unused)
+ *      probe_irq_off   - end an interrupt autodetect
+ *      @val: mask of potential interrupts (unused)
  *
- *	Scans the unused interrupt lines and returns the line which
- *	appears to have triggered the interrupt. If no interrupt was
- *	found then zero is returned. If more than one interrupt is
- *	found then minus the first candidate is returned to indicate
- *	their is doubt.
+ *      Scans the unused interrupt lines and returns the line which
+ *      appears to have triggered the interrupt. If no interrupt was
+ *      found then zero is returned. If more than one interrupt is
+ *      found then minus the first candidate is returned to indicate
+ *      their is doubt.
  *
- *	The interrupt probe logic state is returned to its previous
- *	value.
+ *      The interrupt probe logic state is returned to its previous
+ *      value.
  *
- *	BUGS: When used in a module (which arguably shouldnt happen)
- *	nothing prevents two IRQ probe callers from overlapping. The
- *	results of this are non-optimal.
+ *      BUGS: When used in a module (which arguably shouldnt happen)
+ *      nothing prevents two IRQ probe callers from overlapping. The
+ *      results of this are non-optimal.
  */
  
 int probe_irq_off(unsigned long val)
