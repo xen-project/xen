@@ -149,16 +149,16 @@
 #define MMUEXT_PIN_L2_TABLE      1 /* ptr = MA of frame to pin               */
 #define MMUEXT_PIN_L3_TABLE      2 /* ptr = MA of frame to pin               */
 #define MMUEXT_PIN_L4_TABLE      3 /* ptr = MA of frame to pin               */
-#define MMUEXT_UNPIN_TABLE       1 /* ptr = MA of frame to unpin             */
-#define MMUEXT_NEW_BASEPTR       2 /* ptr = MA of new pagetable base         */
-#define MMUEXT_TLB_FLUSH         3 /* ptr = NULL                             */
-#define MMUEXT_INVLPG            4 /* ptr = VA to invalidate                 */
-#define MMUEXT_FLUSH_CACHE       5
-#define MMUEXT_SET_LDT           6 /* ptr = VA of table; val = # entries     */
-#define MMUEXT_SET_FOREIGNDOM    7 /* val[31:16] = dom                       */
-#define MMUEXT_CLEAR_FOREIGNDOM  8
-#define MMUEXT_TRANSFER_PAGE     9 /* ptr = MA of frame; val[31:16] = dom    */
-#define MMUEXT_REASSIGN_PAGE    10
+#define MMUEXT_UNPIN_TABLE       4 /* ptr = MA of frame to unpin             */
+#define MMUEXT_NEW_BASEPTR       5 /* ptr = MA of new pagetable base         */
+#define MMUEXT_TLB_FLUSH         6 /* ptr = NULL                             */
+#define MMUEXT_INVLPG            7 /* ptr = VA to invalidate                 */
+#define MMUEXT_FLUSH_CACHE       8
+#define MMUEXT_SET_LDT           9 /* ptr = VA of table; val = # entries     */
+#define MMUEXT_SET_FOREIGNDOM   10 /* val[31:16] = dom                       */
+#define MMUEXT_CLEAR_FOREIGNDOM 11
+#define MMUEXT_TRANSFER_PAGE    12 /* ptr = MA of frame; val[31:16] = dom    */
+#define MMUEXT_REASSIGN_PAGE    13
 #define MMUEXT_CMD_MASK        255
 #define MMUEXT_CMD_SHIFT         8
 

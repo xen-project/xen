@@ -449,12 +449,94 @@ long do_iopl(domid_t domain, unsigned int new_io_pl)
 
 #endif
 
-void domain_relinquish_memory(struct domain *d)
+
+static void relinquish_list(struct domain *d, struct list_head *list)
 {
-    struct list_head *ent, *tmp;
+    struct list_head *ent;
     struct pfn_info  *page;
     unsigned long     x, y;
 
+    /* Use a recursive lock, as we may enter 'free_domheap_page'. */
+    spin_lock_recursive(&d->page_alloc_lock);
+
+    /*
+     * Careful! Any time we might decrement a page's reference count we
+     * might invalidate our page pointer or our pointer into the page list.
+     * In such cases we have to exit the current iteration of the loop and
+     * start back at the beginning of the list. We are guaranteed to make
+     * forward progress because nothign will get added to the list (the domain
+     * is dying) and no pages will become pinned after we unpin them.
+     */
+    ent = list->next;
+    while ( ent != list )
+    {
+        page = list_entry(ent, struct pfn_info, list);
+
+        if ( test_and_clear_bit(_PGT_pinned, &page->u.inuse.type_info) )
+        {
+            /* NB. Check the allocation pin /before/ put_page_and_type()! */
+            if ( test_and_clear_bit(_PGC_allocated, &page->count_info) )
+                put_page(page);
+            put_page_and_type(page);
+            /* May have lost our place in the list - start over. */
+            ent = list->next;
+            continue;
+        }
+
+        if ( test_and_clear_bit(_PGC_allocated, &page->count_info) )
+        {
+            put_page(page);
+            /* May have lost our place in the list - start over. */
+            ent = list->next;
+            continue;
+        }
+
+        /*
+         * Forcibly invalidate base page tables at this point to break circular
+         * 'linear page table' references. This is okay because MMU structures
+         * are not shared across domains and this domain is now dead. Thus base
+         * tables are not in use so a non-zero count means circular reference.
+         */
+        y = page->u.inuse.type_info;
+        do {
+            x = y;
+            if ( likely((x & (PGT_type_mask|PGT_validated)) != 
+                        (PGT_base_page_table|PGT_validated)) )
+            {
+                /*
+                 * We have done no work on this iteration, so it is safe
+                 * to move on to the next page in the list.
+                 */
+                ent = ent->next;
+                break;
+            }
+            y = cmpxchg(&page->u.inuse.type_info, x, x & ~PGT_validated);
+            if ( likely(y == x) )
+            {
+                free_page_type(page, PGT_base_page_table);
+                /* May have lost our place in the list - start over. */
+                ent = list->next;
+            }
+        }
+        while ( unlikely(y != x) );
+    }
+
+    spin_unlock_recursive(&d->page_alloc_lock);
+
+    /*
+     * Another CPU may have raced us to free some pages. Wait for those
+     * to trickle out now that we have released the lock.
+     */
+    while ( !list_empty(list) )
+    {
+        smp_mb();
+        cpu_relax();
+    }
+}
+
+
+void domain_relinquish_memory(struct domain *d)
+{
     /* Ensure that noone is running over the dead domain's page tables. */
     synchronise_pagetables(~0UL);
 
@@ -472,49 +554,9 @@ void domain_relinquish_memory(struct domain *d)
      */
     destroy_gdt(d);
 
-    /* Use a recursive lock, as we may enter 'free_domheap_page'. */
-    spin_lock_recursive(&d->page_alloc_lock);
-
-    /* Relinquish Xen-heap pages. */
-    list_for_each_safe ( ent, tmp, &d->xenpage_list )
-    {
-        page = list_entry(ent, struct pfn_info, list);
-
-        if ( test_and_clear_bit(_PGC_allocated, &page->count_info) )
-            put_page(page);
-    }
-
-    /* Relinquish all pages on the domain's allocation list. */
-    list_for_each_safe ( ent, tmp, &d->page_list )
-    {
-        page = list_entry(ent, struct pfn_info, list);
-
-        if ( test_and_clear_bit(_PGC_guest_pinned, &page->count_info) )
-            put_page_and_type(page);
-
-        if ( test_and_clear_bit(_PGC_allocated, &page->count_info) )
-            put_page(page);
-
-        /*
-         * Forcibly invalidate base page tables at this point to break circular
-         * 'linear page table' references. This is okay because MMU structures
-         * are not shared across domains and this domain is now dead. Thus base
-         * tables are not in use so a non-zero count means circular reference.
-         */
-        y = page->u.inuse.type_info;
-        do {
-            x = y;
-            if ( likely((x & (PGT_type_mask|PGT_validated)) != 
-                        (PGT_base_page_table|PGT_validated)) )
-                break;
-            y = cmpxchg(&page->u.inuse.type_info, x, x & ~PGT_validated);
-            if ( likely(y == x) )
-                free_page_type(page, PGT_base_page_table);
-        }
-        while ( unlikely(y != x) );
-    }
-
-    spin_unlock_recursive(&d->page_alloc_lock);
+    /* Relinquish every page of memory. */
+    relinquish_list(d, &d->xenpage_list);
+    relinquish_list(d, &d->page_list);
 }
 
 
@@ -739,7 +781,7 @@ int construct_dom0(struct domain *p,
             /* Get another ref to L2 page so that it can be pinned. */
             if ( !get_page_and_type(page, p, PGT_l2_page_table) )
                 BUG();
-            set_bit(_PGC_guest_pinned, &page->count_info);
+            set_bit(_PGT_pinned, &page->u.inuse.type_info);
         }
         else
         {
