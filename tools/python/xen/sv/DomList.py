@@ -63,11 +63,11 @@ class DomList( HTMLBase ):
             request.write( "<td class='domainInfo' align='center'>" )
             
             if domInfoHash[ 'state' ][ 2 ] == "-":
-                request.write( "<img src='images/small-pause.png' onclick='doOp2( \"pause\", \"%(dom)-4d\" )'>" % domInfoHash )
+                request.write( "<img src='images/small-pause.png' onclick='doOp2( \"pause\", \"%(dom)-4s\" )'>" % domInfoHash )
             else:
-                request.write( "<img src='images/small-unpause.png' onclick='doOp2( \"unpause\", \"%(dom)-4d\" )'>" % domInfoHash )              
+                request.write( "<img src='images/small-unpause.png' onclick='doOp2( \"unpause\", \"%(dom)-4s\" )'>" % domInfoHash )              
             
-            request.write( "<img src='images/small-destroy.png' onclick='doOp2( \"destroy\", \"%(dom)-4d\" )'></td>" % domInfoHash)
+            request.write( "<img src='images/small-destroy.png' onclick='doOp2( \"destroy\", \"%(dom)-4s\" )'></td>" % domInfoHash)
         else:
             request.write( "<td>&nbsp;</td>" )
 

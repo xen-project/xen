@@ -88,16 +88,16 @@ class Main( HTMLBase ):
         
                 
     def op_destroy( self, request ):
-    	dom = getVar( 'args', request )
+    	dom = getVar( 'dom', request )
         if not dom is None and dom != "0":
             server.xend_domain_destroy( int( dom ), "halt" ) 
                  
     def op_pause( self, request ):
-    	dom = getVar( 'args', request )
+    	dom = getVar( 'dom', request )
         if not dom is None and dom != "0":
             server.xend_domain_pause( int( dom ) )      
     
     def op_unpause( self, request ):
-    	dom = getVar( 'args', request )
+    	dom = getVar( 'dom', request )
         if not dom is None and dom != "0":
             server.xend_domain_unpause( int( dom ) )      
