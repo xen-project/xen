@@ -25,7 +25,7 @@ void kunmap(struct page *page)
  * However when holding an atomic kmap is is not legal to sleep, so atomic
  * kmaps are appropriate for short, tight code paths only.
  */
-void *kmap_atomic(struct page *page, enum km_type type)
+static void *__kmap_atomic(struct page *page, enum km_type type, pgprot_t prot)
 {
 	enum fixed_addresses idx;
 	unsigned long vaddr;
@@ -41,33 +41,21 @@ void *kmap_atomic(struct page *page, enum km_type type)
 	if (!pte_none(*(kmap_pte-idx)))
 		BUG();
 #endif
-	set_pte(kmap_pte-idx, mk_pte(page, kmap_prot));
+	set_pte(kmap_pte-idx, mk_pte(page, prot));
 	__flush_tlb_one(vaddr);
 
 	return (void*) vaddr;
 }
 
-/* Same as kmap_atomic but with PAGE_KERNEL_RO page protection */
+void *kmap_atomic(struct page *page, enum km_type type)
+{
+	return __kmap_atomic(page, type, kmap_prot);
+}
+
+/* Same as kmap_atomic but with PAGE_KERNEL_RO page protection. */
 void *kmap_atomic_pte(struct page *page, enum km_type type)
 {
-	enum fixed_addresses idx;
-	unsigned long vaddr;
-
-	/* even !CONFIG_PREEMPT needs this, for in_atomic in do_page_fault */
-	inc_preempt_count();
-	if (page < highmem_start_page)
-		return page_address(page);
-
-	idx = type + KM_TYPE_NR*smp_processor_id();
-	vaddr = __fix_to_virt(FIX_KMAP_BEGIN + idx);
-#ifdef CONFIG_DEBUG_HIGHMEM
-	if (!pte_none(*(kmap_pte-idx)))
-		BUG();
-#endif
-	set_pte(kmap_pte-idx, mk_pte(page, PAGE_KERNEL_RO));
-	__flush_tlb_one(vaddr);
-
-	return (void*) vaddr;
+	return __kmap_atomic(page, type, PAGE_KERNEL_RO);
 }
 
 void kunmap_atomic(void *kvaddr, enum km_type type)
@@ -92,31 +80,6 @@ void kunmap_atomic(void *kvaddr, enum km_type type)
 	pte_clear(kmap_pte-idx);
 	__flush_tlb_one(vaddr);
 #endif
-
-	dec_preempt_count();
-	preempt_check_resched();
-}
-
-void kunmap_atomic_force(void *kvaddr, enum km_type type)
-{
-	unsigned long vaddr = (unsigned long) kvaddr & PAGE_MASK;
-	enum fixed_addresses idx = type + KM_TYPE_NR*smp_processor_id();
-
-	if (vaddr < FIXADDR_START) { // FIXME
-		dec_preempt_count();
-		preempt_check_resched();
-		return;
-	}
-
-	if (vaddr != __fix_to_virt(FIX_KMAP_BEGIN+idx))
-		BUG();
-
-	/*
-	 * force other mappings to Oops if they'll try to access
-	 * this pte without first remap it
-	 */
-	pte_clear(kmap_pte-idx);
-	__flush_tlb_one(vaddr);
 
 	dec_preempt_count();
 	preempt_check_resched();
