@@ -477,7 +477,6 @@ static inline u64 __jiffies_to_st(unsigned long j)
 extern spinlock_t timerlist_lock;
 int set_timeout_timer(void)
 {
-    struct timer_list *timer;
     u64 alarm = 0;
     int ret = 0;
 
