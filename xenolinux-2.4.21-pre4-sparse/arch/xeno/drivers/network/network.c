@@ -65,15 +65,17 @@ struct net_private
     spinlock_t tx_lock;
 };
 
- 
+
 static void dbg_network_int(int irq, void *dev_id, struct pt_regs *ptregs)
 {
-  struct net_device *dev = (struct net_device *)dev_id;
-  struct net_private *np = dev->priv;
-  printk(KERN_ALERT "tx_full = %d, tx_entries = %d, tx_idx = %d, tx_cons = %d, tx_prod = %d, tx_event = %d, state=%d\n",
-	 np->tx_full, np->tx_entries, np->tx_idx, 
-	 np->net_ring->tx_cons,np->net_ring->tx_prod,np->net_ring->tx_event,
-	 test_bit(__LINK_STATE_XOFF, &dev->state));
+    struct net_device *dev = (struct net_device *)dev_id;
+    struct net_private *np = dev->priv;
+    printk(KERN_ALERT "tx_full = %d, tx_entries = %d, tx_idx = %d,"
+           " tx_cons = %d, tx_prod = %d, tx_event = %d, state=%d\n",
+           np->tx_full, atomic_read(&np->tx_entries), np->tx_idx, 
+           np->net_ring->tx_cons, np->net_ring->tx_prod, 
+           np->net_ring->tx_event,
+           test_bit(__LINK_STATE_XOFF, &dev->state));
 }
 
 
@@ -134,10 +136,13 @@ static int network_open(struct net_device *dev)
         goto fail;
     }
 
-#if 1
-    request_irq( _EVENT_DEBUG, dbg_network_int, SA_SHIRQ, "debug", dev);    
-#endif
-
+    error = request_irq(_EVENT_DEBUG, dbg_network_int, SA_SHIRQ,
+                        "debug", dev);
+    if ( error )
+    {
+        printk(KERN_WARNING "%s: Non-fatal error -- no debug interrupt\n",
+               dev->name);
+    }
 
     printk("XenoLinux Virtual Network Driver installed as %s\n", dev->name);
 
@@ -163,17 +168,27 @@ static void network_tx_buf_gc(struct net_device *dev)
     struct net_private *np = dev->priv;
     struct sk_buff *skb;
     unsigned long flags;
+    unsigned int cons;
 
     spin_lock_irqsave(&np->tx_lock, flags);
 
-    for ( i = np->tx_idx; i != np->net_ring->tx_cons; i = TX_RING_INC(i) )
-    {
-        skb = np->tx_skb_ring[i];
-        dev_kfree_skb_any(skb);
-        atomic_dec(&np->tx_entries);
-    }
+    do {
+        cons = np->net_ring->tx_cons;
 
-    np->tx_idx = i;
+        for ( i = np->tx_idx; i != cons; i = TX_RING_INC(i) )
+        {
+            skb = np->tx_skb_ring[i];
+            dev_kfree_skb_any(skb);
+            atomic_dec(&np->tx_entries);
+        }
+        
+        np->tx_idx = i;
+        
+        /* Set a new event, then check for race with update of tx_cons. */
+        np->net_ring->tx_event = TX_RING_INC(cons);
+        smp_mb();
+    }
+    while ( cons != np->net_ring->tx_cons );
 
     if ( np->tx_full && (atomic_read(&np->tx_entries) < TX_MAX_ENTRIES) )
     {
@@ -278,17 +293,9 @@ static int network_start_xmit(struct sk_buff *skb, struct net_device *dev)
     {
         np->tx_full = 1;
         netif_stop_queue(dev);
-        np->net_ring->tx_event = 
-            TX_RING_ADD(np->tx_idx, atomic_read(&np->tx_entries) >> 1);
-    }
-    else
-    {
-        /* Avoid unnecessary tx interrupts. */
-        np->net_ring->tx_event = np->net_ring->tx_prod;
     }
     spin_unlock_irq(&np->tx_lock);
 
-    /* Must do this after setting tx_event: race with updates of tx_cons. */
     network_tx_buf_gc(dev);
 
     HYPERVISOR_net_update();
