@@ -58,6 +58,7 @@
 3ddb79bdS39UXxUtZnaScie83-7VTQ xen-2.4.16/common/memory.c
 3ddb79bdN51qpRC-6bOH-v5hl_AK6A xen-2.4.16/common/network.c
 3ddb79bdD4SLmmdMD7yLW5HcUWucXw xen-2.4.16/common/page_alloc.c
+3e54c38dkHAev597bPr71-hGzTdocg xen-2.4.16/common/perfc.c
 3ddb79bdHqdQpATqC0rmUZNbsb6L6A xen-2.4.16/common/resource.c
 3e397e6619PgAfBbw2XFbXkewvUWgw xen-2.4.16/common/schedule.c
 3ddb79bdB9RNMnkQnUyZ5C9hhMSQQw xen-2.4.16/common/slab.c
@@ -241,6 +242,8 @@
 3e4540ccaugeWGdOuphJKj6WFw1jkw xen-2.4.16/include/xeno/notifier.h
 3ddb79c2Fg44_PBPVxHSC0gTOMq4Ow xen-2.4.16/include/xeno/pci.h
 3ddb79c0MOVXq8qZDQRGb6z64_xAwg xen-2.4.16/include/xeno/pci_ids.h
+3e54c38dlSCVdyVM4PKcrSfzLLxWUQ xen-2.4.16/include/xeno/perfc.h
+3e54c38de9SUSYSAwxDf_DwkpAnQFA xen-2.4.16/include/xeno/perfc_defn.h
 3ddb79c2byJwwNNkiES__A9H4Cvc4g xen-2.4.16/include/xeno/pkt_sched.h
 3ddb79c04nQVR3EYM5L4zxDV_MCo1g xen-2.4.16/include/xeno/prefetch.h
 3e4540ccU1sgCx8seIMGlahmMfv7yQ xen-2.4.16/include/xeno/reboot.h

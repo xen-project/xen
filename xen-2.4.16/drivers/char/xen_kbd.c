@@ -25,6 +25,7 @@
 
 static int keyboard_shift = 0;
 static int keyboard_control = 0;
+static int keyboard_echo = 0;
 
 /* the following is pretty gross... 
  * stop reading if you don't want to throw up!
@@ -107,6 +108,10 @@ static unsigned char convert_scancode (unsigned char scancode)
 
     switch (scancode) {
 
+    case 0xbb: /* F1 */
+	keyboard_echo = !keyboard_echo;
+	break;
+
     case 0xba: /* caps lock UP */
     case 0x9d: /* ctrl (left) UP */
 	keyboard_control = 0;
@@ -137,7 +142,7 @@ static unsigned char convert_scancode (unsigned char scancode)
 
     }
 
-    if (value) printk ("%c", value);
+    if (value && keyboard_echo) printk ("%c", value);
 
     return value;
 }
