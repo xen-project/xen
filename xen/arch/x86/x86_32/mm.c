@@ -62,7 +62,7 @@ void __init paging_init(void)
     /* Xen heap mappings can be GLOBAL. */
     if ( cpu_has_pge )
     {
-        for ( i = 0; i < DIRECTMAP_PHYS_END; i++ )
+        for ( i = 0; i < DIRECTMAP_PHYS_END; i += (1 << L2_PAGETABLE_SHIFT) )
             ((unsigned long *)idle_pg_table)
                 [(i + PAGE_OFFSET) >> L2_PAGETABLE_SHIFT] |= _PAGE_GLOBAL;
     }
