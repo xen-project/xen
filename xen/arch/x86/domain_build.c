@@ -23,7 +23,7 @@
 
 /* opt_dom0_mem: Kilobytes of memory allocated to domain 0. */
 static unsigned int opt_dom0_mem = 0;
-integer_param("dom0_mem", opt_dom0_mem);
+integer_unit_param("dom0_mem", opt_dom0_mem);
 
 #if defined(__i386__)
 /* No ring-3 access in initial leaf page tables. */

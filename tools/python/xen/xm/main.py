@@ -14,6 +14,31 @@ from xen.xend.XendClient import main as xend_client_main
 from xen.xm import create, destroy, migrate, shutdown, sysrq
 from xen.xm.opts import *
 
+def unit(c):
+    if not c.isalpha():
+        return 0
+    base = 1
+    if c == 'G' or c == 'g': base = 1024 * 1024 * 1024
+    elif c == 'M' or c == 'm': base = 1024 * 1024
+    elif c == 'K' or c == 'k': base = 1024
+    else:
+        print 'ignoring unknown unit'
+    return base
+
+def int_unit(str, dest):
+    base = unit(str[-1])
+    if not base:
+        return int(str)
+
+    value = int(str[:-1])
+    dst_base = unit(dest)
+    if dst_base == 0:
+        dst_base = 1
+    if dst_base > base:
+        return value / (dst_base / base)
+    else:
+        return value * (base / dst_base)
+
 class Group:
 
     name = ""
@@ -475,7 +500,7 @@ class ProgMaxmem(Prog):
     def main(self, args):
         if len(args) != 3: self.err("%s: Invalid argument(s)" % args[0])
         dom = args[1]
-        mem = int(args[2])
+        mem = int_unit(args[2], 'm')
         server.xend_domain_maxmem_set(dom, mem)
 
 xm.prog(ProgMaxmem)
@@ -493,7 +518,7 @@ MEMORY_TARGET megabytes"""
     def main(self, args):
         if len(args) != 3: self.err("%s: Invalid argument(s)" % args[0])
         dom = args[1]
-        mem_target = int(args[2])
+        mem_target = int_unit(args[2], 'm')
         server.xend_domain_mem_target_set(dom, mem_target)
 
 xm.prog(ProgBalloon)
