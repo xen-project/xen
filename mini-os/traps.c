@@ -1,6 +1,7 @@
 
 #include <os.h>
 #include <hypervisor.h>
+#include <mm.h>
 #include <lib.h>
 
 /*
@@ -31,6 +32,7 @@ void machine_check(void);
 extern void do_exit(void);
 
 int kstack_depth_to_print = 24;
+#define THREAD_SIZE (2*PAGE_SIZE)
 
 static inline int kernel_text_address(unsigned long addr)
 {
@@ -57,24 +59,49 @@ void show_trace(unsigned long * stack)
     printk("\n");
 }
 
-void dump_regs(struct pt_regs *regs) {
-  printk("Register dump:");
-  printk("ebx: \t 0x%lx",      regs->ebx);
-  printk("ecx: \t 0x%lx",      regs->ecx);
-  printk("edx: \t 0x%lx",      regs->edx);
-  printk("esi: \t 0x%lx",      regs->esi);
-  printk("edi: \t 0x%lx",      regs->edi);
-  printk("ebp: \t 0x%lx",      regs->ebp);
-  printk("eax: \t 0x%lx",      regs->eax);
-  printk("xds: \t 0x%x",      regs->xds);
-  printk("xes: \t 0x%x",      regs->xes);
-  printk("orig_eax: \t 0x%lx", regs->orig_eax);
-  printk("eip: \t 0x%lx",      regs->eip);
-  printk("xcs: \t 0x%x",      regs->xcs);
-  printk("eflags: \t 0x%lx",   regs->eflags);
-  printk("esp: \t 0x%lx",      regs->esp);
-  printk("xss: \t 0x%x",      regs->xss);
-};
+void show_stack(unsigned long * esp)
+{
+	unsigned long *stack;
+	int i;
+
+	if(esp==NULL)
+		esp=(unsigned long*)&esp;
+
+	stack = esp;
+	for(i=0; i < kstack_depth_to_print; i++) {
+		if (((long) stack & (THREAD_SIZE-1)) == 0)
+			break;
+		printk("%08lx ", *stack++);
+	}
+	printk("\n");
+	show_trace(esp);
+}
+
+void dump_regs(struct pt_regs *regs)
+{
+	int in_kernel = 1;
+	unsigned long esp;
+	unsigned short ss;
+
+	esp = (unsigned long) (&regs->esp);
+	ss = __KERNEL_DS;
+	if (regs->xcs & 2) {
+		in_kernel = 0;
+		esp = regs->esp;
+		ss = regs->xss & 0xffff;
+	}
+	printf("EIP:    %04x:[<%08lx>]\n",
+	       0xffff & regs->xcs, regs->eip);
+	printf("EFLAGS: %08lx\n",regs->eflags);
+	printf("eax: %08lx   ebx: %08lx   ecx: %08lx   edx: %08lx\n",
+		regs->eax, regs->ebx, regs->ecx, regs->edx);
+	printf("esi: %08lx   edi: %08lx   ebp: %08lx   esp: %08lx\n",
+		regs->esi, regs->edi, regs->ebp, esp);
+	printf("ds: %04x   es: %04x   ss: %04x\n",
+		regs->xds & 0xffff, regs->xes & 0xffff, ss);
+	printf("\n");
+}	
+
 
 static inline void dump_code(unsigned eip)
 {

@@ -63,6 +63,10 @@ struct pt_regs {
 	int  xss;
 };
 
+/* some function prototypes */
+void trap_init(void);
+void dump_regs(struct pt_regs *regs);
+
 
 /*
  * STI/CLI equivalents. These basically set and clear the virtual
