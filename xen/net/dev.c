@@ -836,6 +836,12 @@ static void tx_skb_release(struct sk_buff *skb)
     __make_tx_response(vif, skb->guest_id, RING_STATUS_OK);
     spin_unlock_irqrestore(&vif->tx_lock, flags);
 
+    /*
+     * Checks below must happen after the above response is posted.
+     * This avoids a possible race with a guest OS on another CPU.
+     */
+    smp_rmb();
+
     if ( (vif->tx_cons == vif->tx_prod) && get_tx_bufs(vif) )
     {
         add_to_net_schedule_list_tail(vif);
