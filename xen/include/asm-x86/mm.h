@@ -329,25 +329,39 @@ int memguard_is_guarded(void *p);
 #define memguard_is_guarded(_p)        (0)
 #endif
 
-/*  */
-extern unsigned long ptwr_disconnected[];
-extern int ptwr_writable_idx[];
+
+/* Writable Pagetables */
+#define	PTWR_NR_WRITABLES 1
+typedef struct {
+    unsigned long disconnected;
+    l1_pgentry_t disconnected_page[ENTRIES_PER_L1_PAGETABLE];
+    unsigned long *writable_l1;
+    unsigned long *writables[PTWR_NR_WRITABLES];
+    int writable_idx;
+    l1_pgentry_t writable_page[PTWR_NR_WRITABLES][ENTRIES_PER_L1_PAGETABLE];
+#ifdef PTWR_TRACK_DOMAIN
+    domid_t domain;
+#endif
+} __cacheline_aligned ptwr_info_t;
+
+extern ptwr_info_t ptwr_info[];
+
+#define PTWR_CLEANUP_ACTIVE	1
+#define PTWR_CLEANUP_INACTIVE	2
+
 void ptwr_reconnect_disconnected(unsigned long addr);
 void ptwr_flush_inactive(void);
 int ptwr_do_page_fault(unsigned long);
-
-#define PTRW_CLEANUP_ACTIVE	1
-#define PTRW_CLEANUP_INACTIVE	2
 
 static inline void cleanup_writable_pagetable(const int what)
 {
     int cpu = smp_processor_id();
 
-    if (what & PTRW_CLEANUP_ACTIVE)
-        if (ptwr_disconnected[cpu] != ENTRIES_PER_L2_PAGETABLE)
+    if (what & PTWR_CLEANUP_ACTIVE)
+        if (ptwr_info[cpu].disconnected != ENTRIES_PER_L2_PAGETABLE)
             ptwr_reconnect_disconnected(0L);
-    if (what & PTRW_CLEANUP_INACTIVE)
-        if (ptwr_writable_idx[cpu])
+    if (what & PTWR_CLEANUP_INACTIVE)
+        if (ptwr_info[cpu].writable_idx)
             ptwr_flush_inactive();
 }
 

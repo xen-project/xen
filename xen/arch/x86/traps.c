@@ -331,7 +331,7 @@ asmlinkage void do_page_fault(struct pt_regs *regs, long error_code)
             return; /* successfully copied the mapping */
     }
 
-    if ((addr >> L2_PAGETABLE_SHIFT) == ptwr_disconnected[cpu]) {
+    if ((addr >> L2_PAGETABLE_SHIFT) == ptwr_info[cpu].disconnected) {
         ptwr_reconnect_disconnected(addr);
         return;
     }
