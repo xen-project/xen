@@ -610,7 +610,7 @@ class XendDomain:
         """
         dominfo = self.domain_lookup(id)
         try:
-            return xc.domain_pincpu(itn(dominfo.id), cpu)
+            return xc.domain_pincpu(int(dominfo.id), cpu)
         except Exception, ex:
             raise XendError(str(ex))
 
