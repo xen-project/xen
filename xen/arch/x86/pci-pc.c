@@ -682,7 +682,9 @@ static int __devinit pci_bios_find_device (unsigned short vendor, unsigned short
 {
 	unsigned short bx;
 	unsigned short ret;
+	unsigned long flags;
 
+	__save_flags(flags); __cli();
 	__asm__("lcall *(%%edi); cld\n\t"
 		"jc 1f\n\t"
 		"xor %%ah, %%ah\n"
@@ -694,6 +696,7 @@ static int __devinit pci_bios_find_device (unsigned short vendor, unsigned short
 		  "d" (vendor),
 		  "S" ((int) index),
 		  "D" (&pci_indirect));
+	__restore_flags(flags);
 	*bus = (bx >> 8) & 0xff;
 	*device_fn = bx & 0xff;
 	return (int) (ret & 0xff00) >> 8;
@@ -1000,6 +1003,7 @@ struct irq_routing_table * __devinit pcibios_get_irq_routing_table(void)
 	struct irq_routing_table *rt = NULL;
 	int ret, map;
 	unsigned long page;
+	unsigned long flags;
 
 	if (!pci_bios_present)
 		return NULL;
@@ -1011,6 +1015,7 @@ struct irq_routing_table * __devinit pcibios_get_irq_routing_table(void)
 	opt.segment = __KERNEL_DS;
 
 	DBG("PCI: Fetching IRQ routing table... ");
+	__save_flags(flags); __cli();
 	__asm__("push %%es\n\t"
 		"push %%ds\n\t"
 		"pop  %%es\n\t"
@@ -1026,6 +1031,7 @@ struct irq_routing_table * __devinit pcibios_get_irq_routing_table(void)
 		  "D" (&opt),
 		  "S" (&pci_indirect)
                 : "memory");
+	__restore_flags(flags);
 	DBG("OK  ret=%d, size=%d, map=%x\n", ret, opt.size, map);
 	if (ret & 0xff00)
 		printk(KERN_ERR "PCI: Error %02x when fetching IRQ routing table.\n", (ret >> 8) & 0xff);
@@ -1047,7 +1053,9 @@ struct irq_routing_table * __devinit pcibios_get_irq_routing_table(void)
 int pcibios_set_irq_routing(struct pci_dev *dev, int pin, int irq)
 {
 	int ret;
+	unsigned long flags;
 
+	__save_flags(flags); __cli();
 	__asm__("lcall *(%%esi); cld\n\t"
 		"jc 1f\n\t"
 		"xor %%ah, %%ah\n"
@@ -1057,6 +1065,7 @@ int pcibios_set_irq_routing(struct pci_dev *dev, int pin, int irq)
 		  "b" ((dev->bus->number << 8) | dev->devfn),
 		  "c" ((irq << 8) | (pin + 10)),
 		  "S" (&pci_indirect));
+	__restore_flags(flags);
 	return !(ret & 0xff00);
 }
 

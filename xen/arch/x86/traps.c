@@ -63,8 +63,6 @@ static struct tss_struct doublefault_tss;
 static unsigned char doublefault_stack[DOUBLEFAULT_STACK_SIZE];
 
 asmlinkage int hypercall(void);
-asmlinkage void lcall7(void);
-asmlinkage void lcall27(void);
 
 /* Master table, and the one used by CPU0. */
 struct desc_struct idt_table[256] = { {0, 0}, };
