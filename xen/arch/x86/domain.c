@@ -363,9 +363,10 @@ int arch_final_setup_guestos(struct exec_domain *d, full_execution_context_t *c)
      * #GP. If DS, ES, FS, GS are DPL 0 then they'll be cleared automatically.
      * If SS RPL or DPL differs from CS RPL then we'll #GP.
      */
-    if ( ((d->thread.user_ctxt.cs & 3) == 0) ||
-         ((d->thread.user_ctxt.ss & 3) == 0) )
-        return -EINVAL;
+    if (!(c->flags & ECF_VMX_GUEST)) 
+        if ( ((d->thread.user_ctxt.cs & 3) == 0) ||
+             ((d->thread.user_ctxt.ss & 3) == 0) )
+                return -EINVAL;
 
     memcpy(&d->thread.i387,
            &c->fpu_ctxt,
@@ -412,10 +413,8 @@ int arch_final_setup_guestos(struct exec_domain *d, full_execution_context_t *c)
         }
     }
 
-#ifdef CONFIG_VMX
     if (c->flags & ECF_VMX_GUEST)
         return vmx_final_setup_guestos(d, c);
-#endif
 
     return 0;
 }
