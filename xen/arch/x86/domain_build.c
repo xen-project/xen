@@ -129,6 +129,9 @@ int construct_dom0(struct domain *d,
     if ( rc != 0 )
         return rc;
 
+    if (dsi.load_bsd_symtab)
+        loadelfsymtab(image_start, 0, &dsi);
+
     /* Align load address to 4MB boundary. */
     dsi.v_start &= ~((1UL<<22)-1);
 
@@ -139,7 +142,7 @@ int construct_dom0(struct domain *d,
      * read-only). We have a pair of simultaneous equations in two unknowns, 
      * which we solve by exhaustive search.
      */
-    vinitrd_start    = round_pgup(dsi.v_kernend);
+    vinitrd_start    = round_pgup(dsi.v_end);
     vinitrd_end      = vinitrd_start + initrd_len;
     vphysmap_start   = round_pgup(vinitrd_end);
     vphysmap_end     = vphysmap_start + (nr_pages * sizeof(u32));
@@ -422,6 +425,10 @@ int construct_dom0(struct domain *d,
 
     /* Copy the OS image and free temporary buffer. */
     (void)loadelfimage(image_start);
+
+    if (dsi.load_bsd_symtab)
+        loadelfsymtab(image_start, 1, &dsi);
+
     init_domheap_pages(
         _image_start, (_image_start+image_len+PAGE_SIZE-1) & PAGE_MASK);
 
