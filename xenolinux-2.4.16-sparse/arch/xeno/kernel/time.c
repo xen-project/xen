@@ -101,16 +101,12 @@ static inline long long get_s_time(void)
 
 	spin_lock_irqsave(&hyp_stime_lock, flags);
 
-    pcc = HYPERVISOR_shared_info->st_timestamp;
-	mb();	
-	if (pcc != shadow_st_pcc) {
-st_again:
-		shadow_st_pcc = HYPERVISOR_shared_info->st_timestamp;
+	while ((pcc = HYPERVISOR_shared_info->st_timestamp) != shadow_st_pcc)
+	{
+		barrier();
+		shadow_st_pcc = pcc;
 		shadow_st     = HYPERVISOR_shared_info->system_time;
-		pcc = HYPERVISOR_shared_info->st_timestamp;
-		mb();
-		if (pcc != shadow_st_pcc)
-			goto st_again;
+		barrier();
 	}
 
     now = shadow_st;
@@ -120,7 +116,9 @@ st_again:
 	delta = ((u64)delta_tsc * st_scale_f);
 	delta >>= 32;
 	delta += ((u64)delta_tsc * st_scale_i);
+
 	spin_unlock_irqrestore(&hyp_time_lock, flags);
+
     return now + delta; 
 
 }
@@ -145,19 +143,14 @@ void do_gettimeofday(struct timeval *tv)
 
 	spin_lock_irqsave(&hyp_wctime_lock, flags);
 
-	version = HYPERVISOR_shared_info->wc_version;
-	mb();
-	if (version != shadow_wc_version) {
-	wc_again:
-		shadow_wc_version   = HYPERVISOR_shared_info->wc_version;
+	while ((version = HYPERVISOR_shared_info->wc_version)!= shadow_wc_version)
+	{
+		barrier();
+		shadow_wc_version   = version;
 		shadow_tv_sec       = HYPERVISOR_shared_info->tv_sec;
 		shadow_tv_usec      = HYPERVISOR_shared_info->tv_usec;
 		shadow_wc_timestamp = HYPERVISOR_shared_info->wc_timestamp;
-		shadow_wc_version   = HYPERVISOR_shared_info->wc_version;
-		version =  HYPERVISOR_shared_info->wc_version;
-		mb();
-		if (version != shadow_wc_version)
-			goto wc_again;
+		barrier();
 	}
 
 	now   = NOW();
