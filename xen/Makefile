@@ -27,14 +27,13 @@ dist: $(TARGET)
 	$(MAKE) prefix=`pwd`/../install dist=yes install
 
 clean: delete-links
-	$(MAKE) -C tools clean
+	$(MAKE) -C figlet clean
 	$(MAKE) -C common clean
 	$(MAKE) -C drivers clean
 	$(MAKE) -C arch/$(TARGET_ARCH) clean
 	rm -f *.o $(TARGET)* *~ core $(GENERATED_FILES)
 
 $(TARGET): delete-unfresh-files make-links $(GENERATED_FILES)
-	$(MAKE) -C tools
 	$(MAKE) -C common
 	$(MAKE) -C drivers
 	$(MAKE) -C arch/$(TARGET_ARCH)
@@ -65,7 +64,7 @@ include/xen/compile.h:
 	@LANG=C echo \#define XEN_EXTRAVERSION \"$(XEN_EXTRAVERSION)\" >> $@
 	@LANG=C echo >> $@
 	@LANG=C echo \#define XEN_BANNER \\ >> $@
-	cd tools/figlet && make && ./figlet Xen $(XEN_VERSION).$(XEN_SUBVERSION)$(XEN_EXTRAVERSION) 1>>../../$@ && cd ../..
+	cd ./figlet && make && ./figlet Xen $(XEN_VERSION).$(XEN_SUBVERSION)$(XEN_EXTRAVERSION) 1>>../$@ && cd ..
 	@LANG=C echo >> $@
 
 .PHONY: $(GENERATED_FILES) make-links delete-links default 

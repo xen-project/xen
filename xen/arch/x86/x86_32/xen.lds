@@ -1,9 +1,14 @@
 /* ld script to make i386 Linux kernel
- * Written by Martin Mares <mj@atrey.karlin.mff.cuni.cz>;
+ * Written by Martin Mares <mj@atrey.karlin.mff.cuni.cz>
+ * Modifified for i386 Xen by Keir Fraser
  */
 OUTPUT_FORMAT("elf32-i386", "elf32-i386", "elf32-i386")
 OUTPUT_ARCH(i386)
 ENTRY(start)
+PHDRS
+{
+  text PT_LOAD ;
+}
 SECTIONS
 {
   . = 0xFC400000 + 0x100000;
@@ -12,61 +17,61 @@ SECTIONS
 	*(.text)
 	*(.fixup)
 	*(.gnu.warning)
-	} = 0x9090
-  .text.lock : { *(.text.lock) }	/* out-of-line lock text */
+	} :text =0x9090
+  .text.lock : { *(.text.lock) } :text	/* out-of-line lock text */
 
   _etext = .;			/* End of text section */
 
-  .rodata : { *(.rodata) *(.rodata.*) }
-  .kstrtab : { *(.kstrtab) }
+  .rodata : { *(.rodata) *(.rodata.*) } :text
+  .kstrtab : { *(.kstrtab) } :text
 
   . = ALIGN(16);		/* Exception table */
   __start___ex_table = .;
-  __ex_table : { *(__ex_table) }
+  __ex_table : { *(__ex_table) } :text
   __stop___ex_table = .;
 
   __start___ksymtab = .;	/* Kernel symbol table */
-  __ksymtab : { *(__ksymtab) }
+  __ksymtab : { *(__ksymtab) } :text
   __stop___ksymtab = .;
 
   __start___kallsyms = .;	/* All kernel symbols */
-  __kallsyms : { *(__kallsyms) }
+  __kallsyms : { *(__kallsyms) } :text
   __stop___kallsyms = .;
 
   .data : {			/* Data */
 	*(.data)
 	CONSTRUCTORS
-	}
+	} :text
 
   _edata = .;			/* End of data section */
 
   . = ALIGN(8192);		/* init_task */
-  .data.init_task : { *(.data.init_task) }
+  .data.init_task : { *(.data.init_task) } :text
 
   . = ALIGN(4096);		/* Init code and data */
   __init_begin = .;
-  .text.init : { *(.text.init) }
-  .data.init : { *(.data.init) }
+  .text.init : { *(.text.init) } :text
+  .data.init : { *(.data.init) } :text
   . = ALIGN(16);
   __setup_start = .;
-  .setup.init : { *(.setup.init) }
+  .setup.init : { *(.setup.init) } :text
   __setup_end = .;
   __initcall_start = .;
-  .initcall.init : { *(.initcall.init) }
+  .initcall.init : { *(.initcall.init) } :text
   __initcall_end = .;
   . = ALIGN(4096);
   __init_end = .;
 
   . = ALIGN(4096);
-  .data.page_aligned : { *(.data.idt) }
+  .data.page_aligned : { *(.data.idt) } :text
 
   . = ALIGN(32);
-  .data.cacheline_aligned : { *(.data.cacheline_aligned) }
+  .data.cacheline_aligned : { *(.data.cacheline_aligned) } :text
 
   __bss_start = .;		/* BSS */
   .bss : {
 	*(.bss)
-	}
+	} :text
   _end = . ;
 
   /* Sections to be discarded */

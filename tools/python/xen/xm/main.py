@@ -78,11 +78,10 @@ class Xm:
         """
         self.name = args[0]
         if len(args) < 2:
-            self.err("Missing command\nTry '%s help' for more information."
-                     % self.name)
-        help = self.helparg(args)
+        	args.append('help')
+	help = self.helparg(args)
         p = self.getprog(args[1], self.unknown)
-        if help:
+        if help or len(args) < 2: 
             p.help(args[1:])
         else:
             p.main(args[1:])
