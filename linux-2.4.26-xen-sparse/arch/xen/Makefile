@@ -104,15 +104,15 @@ bzImage: vmlinux
 
 install: bzImage
 	mkdir -p $(prefix)/boot
-	install -m0644 arch/$(ARCH)/boot/bzImage $(prefix)/boot/vmlinuz-$(KERNELRELEASE)$(INSTALLSUFFIX)
-	install -m0644 vmlinux $(prefix)/boot/vmlinux-syms-$(KERNELRELEASE)$(INSTALLSUFFIX)
-	install -m0664 .config $(prefix)/boot/config-$(KERNELRELEASE)$(INSTALLSUFFIX)
+	install -m0644 arch/$(ARCH)/boot/bzImage $(prefix)/boot/vmlinuz-$(INSTALL_NAME)
+	install -m0644 vmlinux $(prefix)/boot/vmlinux-syms-$(INSTALL_NAME)
+	install -m0664 .config $(prefix)/boot/config-$(INSTALL_NAME)
 
 dist: bzImage
 	mkdir -p ../install/boot
-	install -m0644 arch/$(ARCH)/boot/bzImage ../install/boot/vmlinuz-$(KERNELRELEASE)$(INSTALLSUFFIX)
-	install -m0644 vmlinux ../install/boot/vmlinux-syms-$(KERNELRELEASE)$(INSTALLSUFFIX)
-	install -m0664 .config ../install/boot/config-$(KERNELRELEASE)$(INSTALLSUFFIX)
+	install -m0644 arch/$(ARCH)/boot/bzImage ../install/boot/vmlinuz-$(INSTALL_NAME)
+	install -m0644 vmlinux ../install/boot/vmlinux-syms-$(INSTALL_NAME)
+	install -m0664 .config ../install/boot/config-$(INSTALL_NAME)
 
 %_config: arch/xen/defconfig-%
 	rm -f .config arch/xen/defconfig

@@ -68,16 +68,14 @@ then
  LINUX_VER=`( /bin/ls -ld ${DEST_BK_REP}/*linux-*-xen-sparse ) 2>/dev/null | sed -e 's!^.*linux-\(.\+\)-xen-sparse!\1!'`
 
  if [ -e ${LINUX_DIR}/linux-${LINUX_VER}.tar.gz ]  
-  LINUX_SRC=${LINUX_DIR}/linux-${LINUX_VER}.tar.gz
- elif
-  wget ftp://ftp.kernel.org/pub/linux/kernel/v2.4/linux-${LINUX_VER}.tar.gz -O- > linux-${LINUX_VER}.tar.gz
-  LINUX_SRC=''
+  export LINUX_SRC=${LINUX_DIR}/linux-${LINUX_VER}.tar.gz
  fi
 
  cd ${DEST_BK_REP} 
+ ln -sf ../install install
  make world
  cd ../install/boot
- ln -s vmlinux-${LINUX_VER}-xen0 xenolinux.gz
+ [ -r vmlinuz-${LINUX_VER}-xen0 ] && ln -s vmlinuz-${LINUX_VER}-xen0 xenolinux.gz
   
 else
  # old style repository without 'make world'
