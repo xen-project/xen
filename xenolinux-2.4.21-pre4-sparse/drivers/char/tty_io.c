@@ -2358,6 +2358,11 @@ void __init tty_init(void)
 		panic("Couldn't register /dev/tty0 driver\n");
 
 	kbd_init();
+#else
+	// the below is a dodgy hack to allow keyboard/mouse support without the console support, along with the file "dummy_console.c"
+#ifdef CONFIG_DUMMY_CONSOLE
+	kbd_init();
+#endif
 #endif
 
 #ifdef CONFIG_ESPSERIAL  /* init ESP before rs, so rs doesn't see the port */

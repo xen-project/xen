@@ -56,7 +56,6 @@ ln -sf ../asm-i386/ioctl.h
 ln -sf ../asm-i386/ioctls.h
 ln -sf ../asm-i386/ipcbuf.h
 ln -sf ../asm-i386/ipc.h 
-ln -sf ../asm-i386/keyboard.h
 ln -sf ../asm-i386/kmap_types.h
 ln -sf ../asm-i386/ldt.h 
 ln -sf ../asm-i386/linux_logo.h

@@ -353,4 +353,16 @@ static inline int HYPERVISOR_multicall(void *call_list, int nr_calls)
     return ret;
 }
 
+
+static inline long HYPERVISOR_kbd_op(unsigned char op, unsigned char val)
+{
+    int ret;
+    __asm__ __volatile__ (
+        TRAP_INSTR
+        : "=a" (ret) : "0" (__HYPERVISOR_kbd_op),
+        "b" (op), "c" (val) );
+
+    return ret;
+}
+
 #endif /* __HYPERVISOR_H__ */

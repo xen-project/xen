@@ -39,11 +39,19 @@
 #define DPRINTK_IOCTL(_f, _a...) ((void)0)
 #endif
 
-/* IDE/SCSI have <= 32 partitions per device. VIRT has <= 16. */
-#define PARTN_SHIFT(_dev) ((MAJOR(_dev)==XLVIRT_MAJOR) ? 4 : 5)
-#define XLIDE_PARTN_SHIFT  5
-#define XLSCSI_PARTN_SHIFT 5
+/* XL IDE and SCSI use same major/minor numbers as normal Linux devices. */
+#define XLIDE_MAJOR IDE0_MAJOR
+#define XLSCSI_MAJOR SCSI_DISK0_MAJOR
+
+/* IDE has < 64 partitions per device. VIRT and SCSI have < 16. */
+#define PARTN_SHIFT(_dev) ((MAJOR(_dev)==IDE0_MAJOR) ? 6 : 4)
+#define XLIDE_PARTN_SHIFT  6
+#define XLSCSI_PARTN_SHIFT 4
 #define XLVIRT_PARTN_SHIFT 4
+
+#define XLIDE_DEVS_PER_MAJOR  (256 >> XLIDE_PARTN_SHIFT)
+#define XLSCSI_DEVS_PER_MAJOR (256 >> XLSCSI_PARTN_SHIFT)
+#define XLVIRT_DEVS_PER_MAJOR (256 >> XLVIRT_PARTN_SHIFT)
 
 /*
  * We have one of these per XL-IDE, XL-SCSI, and XL-VIRT device.

@@ -107,6 +107,8 @@ source drivers/block/Config.in
 define_bool CONFIG_BLK_DEV_IDE_MODES n
 define_bool CONFIG_BLK_DEV_HD n
 
+source drivers/char/Config.in
+
 source fs/Config.in
 
 mainmenu_option next_comment

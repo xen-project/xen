@@ -46,6 +46,7 @@
 
 
 #define MCU          (s32)MICROSECS(100)    /* Minimum unit */
+#define MCU_ADVANCE  10                     /* default weight */
 #define TIME_SLOP    (s32)MICROSECS(50)     /* allow time to slip a bit */
 static s32 ctx_allow=(s32)MILLISECS(5);     /* context switch allowance */
 
@@ -102,13 +103,34 @@ static inline int __task_on_runqueue(struct task_struct *p)
 #define next_domain(p) \\
         list_entry((p)->run_list.next, struct task_struct, run_list)
 
+/* calculate evt  */
+static void __calc_evt(struct task_struct *p)
+{
+    s_time_t now = NOW();
+    if (p->warpback) {
+        if (((now - p->warped) < p->warpl) &&
+            ((now - p->uwarped) > p->warpu)) {
+            /* allowed to warp */
+            p->evt = p->avt - p->warp;
+        } else {
+            /* warped for too long -> unwarp */
+            p->evt      = p->avt;
+            p->uwarped  = now;
+            p->warpback = 0;
+        }
+    } else {
+        p->evt = p->avt;
+    }
+}
+
+
 /******************************************************************************
 * Add and remove a domain
 ******************************************************************************/
 void sched_add_domain(struct task_struct *p) 
 {
     p->state       = TASK_SUSPENDED;
-    p->mcu_advance = 10;
+    p->mcu_advance = MCU_ADVANCE;
 
     if (p->domain == IDLE_DOMAIN_ID) {
         p->avt = 0xffffffff;
@@ -118,7 +140,11 @@ void sched_add_domain(struct task_struct *p)
         /* set avt end evt to system virtual time */
         p->avt         = schedule_data[p->processor].svt;
         p->evt         = schedule_data[p->processor].svt;
-        /* RN: XXX BVT fill in other bits */
+        /* set some default values here */
+        p->warpback    = 0;
+        p->warp        = 0;
+        p->warpl       = 0;
+        p->warpu       = 0;
     }
 }
 
@@ -138,16 +164,23 @@ int wake_up(struct task_struct *p)
 
     spin_lock_irqsave(&schedule_data[p->processor].lock, flags);
 
+    /* XXX RN: should we warp here? Might be a good idea to also boost a 
+     * domain which currently is unwarped and on run queue and 
+     * the receives an event. */
     if ( __task_on_runqueue(p) ) goto out;
 
     p->state = TASK_RUNNING;
     __add_to_runqueue_head(p);
+    //__add_to_runqueue_tail(p);
 
     /* set the BVT parameters */
     if (p->avt < schedule_data[p->processor].svt)
         p->avt = schedule_data[p->processor].svt;
 
-    p->evt = p->avt; /* RN: XXX BVT deal with warping here */
+    /* deal with warping here */
+    p->warpback  = 1;
+    p->warped    = NOW();
+    __calc_evt(p);
 
 #ifdef SCHED_HISTO
     p->wokenup = NOW();
@@ -165,6 +198,7 @@ int wake_up(struct task_struct *p)
 long do_yield(void)
 {
     current->state = TASK_INTERRUPTIBLE;
+    current->warpback = 0; /* XXX should only do this when blocking */
     schedule();
     return 0;
 }
@@ -281,7 +315,6 @@ asmlinkage void schedule(void)
     now = NOW();
 
     /* remove timer, if till on list  */
-    //if (active_ac_timer(&schedule_data[this_cpu].s_timer))
     rem_ac_timer(&schedule_data[this_cpu].s_timer);
 
     /* deschedule the current domain */
@@ -301,7 +334,9 @@ asmlinkage void schedule(void)
     mcus = ranfor/MCU;
     if (ranfor % MCU) mcus ++;  /* always round up */
     prev->avt += mcus * prev->mcu_advance;
-    prev->evt = prev->avt; /* RN: XXX BVT deal with warping here */
+
+    /* recalculate evt */
+    __calc_evt(prev);
 
     /* dequeue */
     __del_from_runqueue(prev);

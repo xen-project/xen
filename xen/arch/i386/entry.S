@@ -646,6 +646,7 @@ ENTRY(hypervisor_call_table)
         .long SYMBOL_NAME(do_set_fast_trap)
         .long SYMBOL_NAME(do_dom_mem_op)
         .long SYMBOL_NAME(do_multicall)
+        .long SYMBOL_NAME(do_kbd_op)
         .rept NR_syscalls-((.-hypervisor_call_table)/4)
         .long SYMBOL_NAME(sys_ni_syscall)
 	.endr

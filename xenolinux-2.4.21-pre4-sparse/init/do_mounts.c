@@ -231,17 +231,6 @@ static struct dev_name_struct {
 	{ "ataraid/d14p",0x72E0 },
 	{ "ataraid/d15p",0x72F0 },
 #if defined(CONFIG_XENOLINUX_BLOCK)
-        /* XenoLinux IDE Devices */
-        { "xhda", 0x7B00 }, { "xhdb", 0x7B20 },
-        { "xhdc", 0x7B40 }, { "xhdd", 0x7B60 },
-        { "xhde", 0x7B80 }, { "xhdf", 0x7BA0 },
-        { "xhdg", 0x7BC0 }, { "xhdh", 0x7BE0 },
-        /* Xenolinux SCSI Devices */
-        { "xsda", 0x7C00 }, { "xsdb", 0x7C20 },
-        { "xsdc", 0x7C40 }, { "xsdd", 0x7C60 },
-        { "xsde", 0x7C80 }, { "xsdf", 0x7CA0 },
-        { "xsdg", 0x7CC0 }, { "xsdh", 0x7CE0 },
-        /* XenoLinux Virtual Devices */
         { "xvda", 0x7D00 }, { "xvdb", 0x7D10 },
         { "xvdc", 0x7D20 }, { "xvdd", 0x7D30 },
         { "xvde", 0x7D40 }, { "xvdf", 0x7D50 },

@@ -72,6 +72,10 @@ struct task_struct {
     int hyp_events;              /* 08: pending intra-Xen events */
     unsigned int domain;         /* 12: domain id */
 
+    // SMH: replace below when have explicit 'priv' flag or bitmask
+#define IS_PRIV(_p) ((_p)->domain == 0) 
+
+
     /* An unsafe pointer into a shared data area. */
     shared_info_t *shared_info;  /* 16: shared data area */
 
@@ -110,11 +114,12 @@ struct task_struct {
     unsigned long mcu_advance;      /* inverse of weight */
     s32  avt;                       /* actual virtual time */
     s32  evt;                       /* effective virtual time */
+    int  warpback;                  /* warp?  */
     long warp;                      /* virtual time warp */
     long warpl;                     /* warp limit */
     long warpu;                     /* unwarp time requirement */
-    long warped;                    /* time it ran warped last time */
-    long uwarped;                   /* time it ran unwarped last time */
+    s_time_t warped;                /* time it ran warped last time */
+    s_time_t uwarped;               /* time it ran unwarped last time */
 
     /* Network I/O */
     net_vif_t *net_vif_list[MAX_DOMAIN_VIFS];
