@@ -136,6 +136,7 @@ static inline void ADD_ID_TO_FREELIST( unsigned long id )
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,0)
 #define DISABLE_SCATTERGATHER() 
 #else
+static int sg_operation = -1;
 #define DISABLE_SCATTERGATHER() (sg_operation = -1)
 #endif
 
@@ -497,7 +498,6 @@ static irqreturn_t blkif_int(int irq, void *dev_id, struct pt_regs *ptregs)
 /**************************  KERNEL VERSION 2.4  **************************/
 
 static kdev_t        sg_dev;
-static int           sg_operation = -1;
 static unsigned long sg_next_sect;
 
 /*
