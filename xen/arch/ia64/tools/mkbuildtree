@@ -182,8 +182,8 @@ cp_patch include/asm-ia64/system.h include/asm-ia64/system.h system.h
 cp_patch include/asm-ia64/types.h include/asm-ia64/types.h types.h
 
 null include/asm-ia64/desc.h 
-null include/asm-ia64/domain_page.h
-null include/asm-ia64/flushtlb.h
+#null include/asm-ia64/domain_page.h
+#null include/asm-ia64/flushtlb.h
 null include/asm-ia64/io_apic.h
 null include/asm-ia64/pdb.h
 null include/asm-ia64/module.h
