@@ -97,7 +97,7 @@ static void map_dom_to_port(u32 dom, int port)
             exit(1);
         }
 
-        for (; dom_port_map_size < dom + 10; dom_port_map_size++) {
+        for (; dom_port_map_size < dom + 256; dom_port_map_size++) {
             dom_port_map[dom_port_map_size] = -1;
         }
     }
@@ -123,7 +123,7 @@ static control_channel_t *add_interface(u32 dom, int local_port,
     control_channel_t *cc=NULL, *oldcc;
     int ret;
     
-    if (cc_list[dom_to_port(dom)] != NULL)
+    if ((dom_to_port(dom) >= 0) && (cc_list[dom_to_port(dom)] != NULL))
     {
         return(cc_list[dom_to_port(dom)]);
     }
@@ -155,10 +155,13 @@ static control_channel_t *add_interface(u32 dom, int local_port,
         if ((oldcc->remote_dom != cc->remote_dom) ||
             (oldcc->remote_port != cc->remote_port))
         {
-            DPRINTF("CC conflict! (port: %d, old dom: %u, new dom: %u)\n",
-                    cc->local_port, oldcc->remote_dom, cc->remote_dom);
+            DPRINTF("CC conflict! (port: %d, old dom: %u, new dom: %u, "
+                    "old ref_count: %d)\n",
+                    cc->local_port, oldcc->remote_dom, cc->remote_dom, 
+                    oldcc->ref_count);
             map_dom_to_port(oldcc->remote_dom, -1);
             ctrl_chan_free(cc_list[cc->local_port]);
+            cc_list[cc->local_port] = NULL;
         }
     }
      
@@ -210,6 +213,8 @@ void put_interface(control_channel_t *cc)
         {
             DPRINTF("Freeing cc on port %d.\n", cc->local_port);
             (void)evtchn_unbind(cc->local_port);
+            cc_list[cc->local_port] = NULL;
+            map_dom_to_port(cc->remote_dom, -1);
             ctrl_chan_free(cc);
         }
     }
