@@ -100,6 +100,7 @@ Sxpr oxfr_migrate_ok;// (xfr.migrate.ok <value>)
 Sxpr oxfr_progress;  // (xfr.progress <percent> <rate: kb/s>)
 Sxpr oxfr_save;      // (xfr.save <vmid> <vmconfig> <file>)
 Sxpr oxfr_save_ok;   // (xfr.save.ok)
+Sxpr oxfr_vm_destroy;// (xfr.vm.destroy <vmid>)
 Sxpr oxfr_vm_suspend;// (xfr.vm.suspend <vmid>)
 Sxpr oxfr_xfr;       // (xfr.xfr <vmid>)
 Sxpr oxfr_xfr_ok;    // (xfr.xfr.ok <vmid>)
@@ -113,6 +114,7 @@ void xfr_init(void){
     oxfr_progress       = intern("xfr.progress");
     oxfr_save           = intern("xfr.save");
     oxfr_save_ok        = intern("xfr.save.ok");
+    oxfr_vm_destroy     = intern("xfr.vm.destroy");
     oxfr_vm_suspend     = intern("xfr.vm.suspend");
     oxfr_xfr            = intern("xfr.xfr");
     oxfr_xfr_ok         = intern("xfr.xfr.ok");
@@ -566,6 +568,28 @@ int xfr_vm_suspend(Conn *xend, uint32_t vmid){
     return err;
 }
 
+int xfr_send_destroy(Conn *conn, uint32_t vmid){
+    int err = 0;
+
+    err = IOStream_print(conn->out, "(%s %d)",
+                         atom_name(oxfr_vm_destroy), vmid);
+    return (err < 0 ? err : 0);
+}
+
+/** Destroy a vm on behalf of save/migrate.
+ */
+int xfr_vm_destroy(Conn *xend, uint32_t vmid){
+    int err = 0;
+    dprintf("> vmid=%u\n", vmid);
+    err = xfr_send_destroy(xend, vmid);
+    if(err) goto exit;
+    IOStream_flush(xend->out);
+    err = xfr_response(xend);
+  exit:
+    dprintf("< err=%d\n", err);
+    return err;
+}
+
 /** Get vm state. Send transfer message.
  *
  * @param peer connection
@@ -583,6 +607,10 @@ int xfr_send_state(XfrState *state, Conn *xend, Conn *peer){
     if(err) goto exit;
     err = xen_domain_snd(xend, peer->out,
                          state->vmid, state->vmconfig, state->vmconfig_n);
+    if(err) goto exit;
+    // Sending the domain suspends it, and there's no way back.
+    // So destroy it now. If anything goes wrong now it's too late.
+    err = xfr_vm_destroy(xend, state->vmid);
     if(err) goto exit;
     IOStream_flush(peer->out);
     // Read the response from the peer.

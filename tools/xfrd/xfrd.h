@@ -13,4 +13,5 @@
 
 struct Conn;
 extern int xfr_vm_suspend(struct Conn *xend, uint32_t vmid);
+extern int xfr_vm_destroy(struct Conn *xend, uint32_t vmid);
 #endif

@@ -1,5 +1,7 @@
 # Copyright (C) 2004 Mike Wray <mike.wray@hp.com>
 
+import traceback
+
 import errno
 import sys
 import socket
@@ -156,6 +158,19 @@ class XfrdInfo:
         print 'xfr_progress>', val
         return None
 
+    def xfr_vm_destroy(self, xfrd, val):
+        print 'xfr_vm_destroy>', val
+        try:
+            vmid = sxp.child0(val)
+            val = self.xd.domain_destroy(vmid)
+            if vmid in self.paused:
+                del self.paused[vmid]
+            if vmid in self.suspended:
+                del self.suspended[vmid]
+        except:
+            val = errno.EINVAL
+        return ['xfr.err', val]
+    
     def xfr_vm_pause(self, xfrd, val):
         print 'xfr_vm_pause>', val
         try:
@@ -221,7 +236,9 @@ class XfrdInfo:
             d.addErrback(cberr)
             d.setTimeout(self.timeout)
             return d
-        except:
+        except Exception, err:
+            print 'xfr_vm_suspend> Exception', err
+            traceback.print_exc()
             val = errno.EINVAL
         return ['xfr.err', val]
 
@@ -401,8 +418,6 @@ class XendMigrate:
         @param port: destination port
         @return: deferred
         """
-        if host in ['localhost', '127.0.0.1']:
-            raise XendError('cannot migrate to localhost')
         # Check dom for existence, not migrating already.
         # Subscribe to migrate notifications (for updating).
         xid = self.nextid()
