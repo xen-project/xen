@@ -17,7 +17,7 @@ UCCL)
 *)
 	BK_REP=${1:-bk://xen.bkbits.net/xeno-1.0.bk}
 	# BK_REP=${1:-ssh://xen@xen.bkbits.net/xeno-1.0.bk}
-	LINUX_DIR=${3:-..}
+	LINUX_DIR=${3:-.:..}
 ;;
 esac
 
@@ -65,12 +65,7 @@ if [ -d ${DEST_BK_REP}/linux-2.4.*-xen-sparse ]
 then
  # this is a new style Xen repository so building is dead easy
 
- LINUX_VER=`( /bin/ls -ld ${DEST_BK_REP}/*linux-2.4.*-xen-sparse ) 2>/dev/null | sed -e 's!^.*linux-\(.\+\)-xen-sparse!\1!'`
-
- if [ -e ${LINUX_DIR}/linux-${LINUX_VER}.tar.gz ] 
- then
-  export LINUX_SRC=${LINUX_DIR}/linux-${LINUX_VER}.tar.gz
- fi
+ export LINUX_SRC_PATH=${LINUX_DIR}
 
  cd ${DEST_BK_REP} 
  ln -sf ../install install
