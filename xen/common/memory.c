@@ -768,7 +768,7 @@ int do_process_page_updates(page_update_request_t *ureqs, int count)
             {
                 MEM_LOG("Bad domain MPT update (dom %d, pfn %ld)",
                         current->domain, pfn);
-            }
+            }            
             break;
 
             /*

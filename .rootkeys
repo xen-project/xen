@@ -176,6 +176,9 @@
 3e15d52e0_j129JPvo7xfYGndVFpwQ old/xenolinux-2.4.16-sparse/mm/memory.c
 3e15d535DLvpzTrLRUIerB69LpJD1g old/xenolinux-2.4.16-sparse/mm/mremap.c
 3e15d531m1Y1_W8ki64AFOU_ua4C4w old/xenolinux-2.4.16-sparse/mm/swapfile.c
+3e6377b24eQqYMsDi9XrFkIgTzZ47A tools/balloon/Makefile
+3e6377d6eiFjF1hHIS6JEIOFk62xSA tools/balloon/README
+3e6377dbGcgnisKw16DPCaND7oGO3Q tools/balloon/balloon.c
 3e4d00468-FN2VDeEHo96zxrMHK_mA tools/domain_builder/Makefile
 3e4d0046SPau_y0sw2WLJz8QkqNoRA tools/domain_builder/README
 3e4d0046bbdH0GsI9J_1Eb4ZQHfIiQ tools/domain_builder/dom0_defs.h
@@ -226,6 +229,7 @@
 3ddb79bddEYJbcURvqqcx99Yl2iAhQ xen/common/block.c
 3ddb79bdrqnW93GR9gZk1OJe1qK-iQ xen/common/brlock.c
 3ddb79bdLX_P6iB7ILiblRLWvebapg xen/common/dom0_ops.c
+3e6377e4i0c9GtKN65e99OtRbw3AZw xen/common/dom_mem_ops.c
 3ddb79bdYO5D8Av12NHqPeSviav7cg xen/common/domain.c
 3e32af9aRnYGl4GMOaDKp7JdfhOGhg xen/common/domain_page.c
 3ddb79bdeyutmaXEfpQvvxj7eQ0fCw xen/common/event.c
@@ -399,6 +403,7 @@
 3ddb79c1V44RD26YqCUm-kqIupM37A xen/include/xeno/ctype.h
 3ddb79c05DdHQ0UxX_jKsXdR4QlMCA xen/include/xeno/delay.h
 3ddb79c2PMeWTK86y4C3F4MzHw4A1g xen/include/xeno/dom0_ops.h
+3e6377eaioRoNm0m_HSDEAd4Vqrq_w xen/include/xeno/dom_mem_ops.h
 3ddb79c1uaWQZj551j1O0B5z8AnHOg xen/include/xeno/elevator.h
 3ddb79c0HIghfBF8zFUdmXhOU8i6hA xen/include/xeno/errno.h
 3ddb79c0rMjudDKkJku_mkm0J-BZgw xen/include/xeno/etherdevice.h
@@ -463,6 +468,9 @@
 3e5a4e65n-KhsEAs-A4ULiStBp-r6w xenolinux-2.4.21-pre4-sparse/arch/xeno/boot/Makefile
 3e5a4e65OV_j_DBtjzt5vej771AJsA xenolinux-2.4.21-pre4-sparse/arch/xeno/config.in
 3e5a4e65TNEycLeXqPSXQJQm_xGecA xenolinux-2.4.21-pre4-sparse/arch/xeno/defconfig
+3e6377f5xwPfYZkPHPrDbEq1PRN7uQ xenolinux-2.4.21-pre4-sparse/arch/xeno/drivers/balloon/Makefile
+3e6377f8Me8IqtvEhb70XFgOvqQH7A xenolinux-2.4.21-pre4-sparse/arch/xeno/drivers/balloon/balloon.c
+3e6377fbMjXWAQd0XN0FWv4fDEo6fg xenolinux-2.4.21-pre4-sparse/arch/xeno/drivers/balloon/dom_mem_ops.h
 3e5a4e65iHEuC5sjFhj42XALYbLVRw xenolinux-2.4.21-pre4-sparse/arch/xeno/drivers/block/Makefile
 3e5a4e65pP5spJErBW69pJxSSdK9RA xenolinux-2.4.21-pre4-sparse/arch/xeno/drivers/block/xl_block.c
 3e5a4e65GtI9JZRAjuRdXaxt_4ohyQ xenolinux-2.4.21-pre4-sparse/arch/xeno/drivers/block/xl_block_test.c

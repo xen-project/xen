@@ -38,13 +38,13 @@ typedef struct
  * Extended requests specify command in least 8 bits of 'value'.
  */
 /* A normal page-table update request. */
-#define PGREQ_NORMAL           0
+#define PGREQ_NORMAL            0
 /* Update an entry in the machine->physical mapping table. */
-#define PGREQ_MPT_UPDATE       1
+#define PGREQ_MPT_UPDATE        1
 /* An extended command. */
-#define PGREQ_EXTENDED_COMMAND 2
+#define PGREQ_EXTENDED_COMMAND  2
 /* DOM0 can make entirely unchecked updates which do not affect refcnts. */
-#define PGREQ_UNCHECKED_UPDATE 3
+#define PGREQ_UNCHECKED_UPDATE  3
     unsigned long ptr, val; /* *ptr = val */
 /* Announce a new top-level page table. */
 #define PGEXT_PIN_L1_TABLE      0
@@ -90,6 +90,7 @@ typedef struct
 #define __HYPERVISOR_get_debugreg         13
 #define __HYPERVISOR_update_descriptor    14
 #define __HYPERVISOR_set_fast_trap        15
+#define __HYPERVISOR_dom_mem_op           16
 
 #define TRAP_INSTR "int $0x82"
 
