@@ -245,7 +245,8 @@ unsigned int alloc_new_dom_mem(struct task_struct *p, unsigned int kbytes)
     {
         pf = list_entry(temp, struct pfn_info, list);
         pf->flags = p->domain;
-        pf->type_count = pf->tot_count = 0;
+        set_page_type_count(pf, 0);
+        set_page_tot_count(pf, 0);
         temp = temp->next;
         list_del(&pf->list);
         list_add_tail(&pf->list, &p->pg_head);
@@ -273,7 +274,9 @@ void free_all_dom_mem(struct task_struct *p)
     while ( (ent = p->pg_head.next) != &p->pg_head )
     {
         struct pfn_info *pf = list_entry(ent, struct pfn_info, list);
-        pf->type_count = pf->tot_count = pf->flags = 0;
+        set_page_type_count(pf, 0);
+        set_page_tot_count(pf, 0);
+        pf->flags = 0;
         ASSERT(ent->next->prev == ent);
         ASSERT(ent->prev->next == ent);
         list_del(ent);
@@ -513,7 +516,8 @@ int setup_guestos(struct task_struct *p, dom0_createdomain_t *params,
         
         page = frame_table + (cur_address >> PAGE_SHIFT);
         page->flags = dom | PGT_writeable_page | PG_need_flush;
-        page->type_count = page->tot_count = 1;
+        set_page_type_count(page, 1);
+        set_page_tot_count(page, 1);
         /* Set up the MPT entry. */
         machine_to_phys_mapping[cur_address >> PAGE_SHIFT] = count;
 
@@ -535,7 +539,7 @@ int setup_guestos(struct task_struct *p, dom0_createdomain_t *params,
         *l1tab = mk_l1_pgentry(l1_pgentry_val(*l1tab) & ~_PAGE_RW);
         page = frame_table + l1_pgentry_to_pagenr(*l1tab);
         page->flags = dom | PGT_l1_page_table;
-        page->tot_count++;
+        get_page_tot(page);
         l1tab++;
         if( !((unsigned long)l1tab & (PAGE_SIZE - 1)) )
         {
@@ -544,9 +548,9 @@ int setup_guestos(struct task_struct *p, dom0_createdomain_t *params,
             l2tab++;
         }
     }
-    page->type_count |= REFCNT_PIN_BIT;
-    page->tot_count  |= REFCNT_PIN_BIT;
-    page->flags = dom | PGT_l2_page_table;
+    get_page_type(page); /* guest_pinned */
+    get_page_tot(page);  /* guest_pinned */
+    page->flags = dom | PG_guest_pinned | PGT_l2_page_table;
     unmap_domain_mem(l1start);
 
     /* Set up shared info area. */

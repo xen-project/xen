@@ -59,13 +59,6 @@ typedef struct pfn_info {
     unsigned long type_count;   /* pagetable/dir, or domain-writeable refs. */
 } frame_table_t;
 
-/*
- * We use a high bit to indicate that a page is pinned.
- * We do not use the top bit as that would mean that we'd get confused with
- * -ve error numbers in some places in common/memory.c.
- */
-#define REFCNT_PIN_BIT 0x40000000UL
-
 #define get_page_tot(p)		 ((p)->tot_count++)
 #define put_page_tot(p)		 \
     ({ ASSERT((p)->tot_count != 0); --(p)->tot_count; })
@@ -83,9 +76,9 @@ typedef struct pfn_info {
 #define PG_slab	       24
 /* domain flags (domain != 0) */
 /*
- * NB. The following three flags are MUTUALLY EXCLUSIVE!
+ * NB. The following page types are MUTUALLY EXCLUSIVE.
  * At most one can be true at any point, and 'type_count' counts how many
- * references exist of teh current type. A change in type can only occur
+ * references exist of the current type. A change in type can only occur
  * when type_count == 0.
  */
 #define PG_type_mask        (15<<24) /* bits 24-27 */
@@ -111,6 +104,13 @@ typedef struct pfn_info {
  */
 #define PG_need_flush       (1<<28)
 
+/*
+ * This bit indicates that the guest OS has pinned the page to its current
+ * type. For page tables this can avoid the frame scanning and reference-count
+ * updates that occur when the type count falls to zero.
+ */
+#define PG_guest_pinned     (1<<29)
+
 #define PageSlab(page)		test_bit(PG_slab, &(page)->flags)
 #define PageSetSlab(page)	set_bit(PG_slab, &(page)->flags)
 #define PageClearSlab(page)	clear_bit(PG_slab, &(page)->flags)
@@ -118,11 +118,16 @@ typedef struct pfn_info {
 #define SHARE_PFN_WITH_DOMAIN(_pfn, _dom)                            \
     do {                                                             \
         (_pfn)->flags = (_dom) | PGT_writeable_page | PG_need_flush; \
-        (_pfn)->tot_count = (_pfn)->type_count = 2;                  \
+        set_page_tot_count((_pfn), 2);                               \
+        set_page_type_count((_pfn), 2);                              \
     } while ( 0 )
 
-#define UNSHARE_PFN(_pfn) \
-    (_pfn)->flags = (_pfn)->type_count = (_pfn)->tot_count = 0
+#define UNSHARE_PFN(_pfn)                                            \
+    do {                                                             \
+        (_pfn)->flags = 0;                                           \
+        set_page_tot_count((_pfn), 0);                               \
+        set_page_type_count((_pfn), 0);                              \
+    } while ( 0 )
 
 /* The array of struct pfn_info,  
  * free pfn list and number of free pfns in the free list

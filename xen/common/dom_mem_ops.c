@@ -57,7 +57,8 @@ static long alloc_dom_mem(struct task_struct *p, reservation_increase_t op)
         /* Get a free page and add it to the domain's page list. */
         pf = list_entry(temp, struct pfn_info, list);
         pf->flags |= p->domain;
-        pf->type_count = pf->tot_count = 0;
+        set_page_type_count(pf, 0);
+        set_page_tot_count(pf, 0);
         temp = temp->next;
         list_del(&pf->list);
         list_add_tail(&pf->list, &p->pg_head);
@@ -109,12 +110,13 @@ static long free_dom_mem(struct task_struct *p, reservation_decrease_t op)
         }
 
         pf = &frame_table[mpfn];
-        if ( (pf->type_count != 0) || 
-             (pf->tot_count != 0) ||
+        if ( (page_type_count(pf) != 0) || 
+             (page_tot_count(pf) != 0) ||
              ((pf->flags & PG_domain_mask) != p->domain) )
         {
             DPRINTK("Bad page free for domain %d (%ld, %ld, %08lx)\n",
-                    p->domain, pf->type_count, pf->tot_count, pf->flags);
+                    p->domain, page_type_count(pf), 
+                    page_tot_count(pf), pf->flags);
             rc = -EINVAL;
             goto out;
         }

@@ -232,7 +232,7 @@ long set_gdt(struct task_struct *p,
 
         if ( (page->flags & PG_type_mask) != PGT_gdt_page )
         {
-            if ( page->type_count != 0 )
+            if ( page_type_count(page) != 0 )
                 goto out;
 
             /* Check all potential GDT entries in the page. */
@@ -253,7 +253,7 @@ long set_gdt(struct task_struct *p,
         page = frame_table + pfn;
         ASSERT((page->flags & PG_type_mask) == PGT_gdt_page);
         ASSERT((page->flags & PG_domain_mask) == p->domain);
-        ASSERT((page->type_count != 0) && (page->tot_count != 0));
+        ASSERT((page_type_count(page) != 0) && (page_tot_count(page) != 0));
         put_page_type(page);
         put_page_tot(page);
     }
@@ -340,7 +340,7 @@ long do_update_descriptor(
     case PGT_writeable_page:
         break;
     default:
-        if ( page->type_count != 0 )
+        if ( page_type_count(page) != 0 )
             goto out;
     }
 

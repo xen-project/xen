@@ -33,7 +33,7 @@
  * physical page frame by a domain, including uses as a page directory,
  * a page table, or simple mappings via a PTE. This count prevents a
  * domain from releasing a frame back to the hypervisor's free pool when
- * it is still referencing it!
+ * it still holds a reference to it.
  * 
  * TYPE_COUNT is more subtle. A frame can be put to one of three
  * mutually-exclusive uses: it might be used as a page directory, or a
@@ -140,7 +140,9 @@
 #include <asm/domain_page.h>
 
 #if 0
-#define MEM_LOG(_f, _a...) printk("DOM%d: (file=memory.c, line=%d) " _f "\n", current->domain, __LINE__, ## _a )
+#define MEM_LOG(_f, _a...) 
+  printk("DOM%d: (file=memory.c, line=%d) " _f "\n", \
+         current->domain, __LINE__, ## _a )
 #else
 #define MEM_LOG(_f, _a...) ((void)0)
 #endif
@@ -230,7 +232,7 @@ static void __invalidate_shadow_ldt(struct task_struct *p)
         page = frame_table + pfn;
         ASSERT((page->flags & PG_type_mask) == PGT_ldt_page);
         ASSERT((page->flags & PG_domain_mask) == p->domain);
-        ASSERT((page->type_count != 0) && (page->tot_count != 0));
+        ASSERT((page_type_count(page) != 0) && (page_tot_count(page) != 0));
         put_page_type(page);
         put_page_tot(page);                
     }
@@ -271,7 +273,7 @@ int map_ldt_shadow_page(unsigned int off)
     page = frame_table + (l1e >> PAGE_SHIFT);
     if ( unlikely((page->flags & PG_type_mask) != PGT_ldt_page) )
     {
-        if ( unlikely(page->type_count != 0) )
+        if ( unlikely(page_type_count(page) != 0) )
             goto out;
 
         /* Check all potential LDT entries in the page. */
@@ -367,7 +369,7 @@ static int dec_page_refcnt(unsigned long page_nr, unsigned int type)
                 type);
         return -1;
     }
-    ASSERT((page_type_count(page) & ~REFCNT_PIN_BIT) != 0);
+    ASSERT(page_type_count(page) != 0);
     put_page_tot(page);
     return put_page_type(page);
 }
@@ -607,7 +609,7 @@ static void put_page(unsigned long page_nr, int writeable)
     page = frame_table + page_nr;
     ASSERT(DOMAIN_OKAY(page->flags));
     ASSERT((!writeable) || 
-           (((page_type_count(page) & ~REFCNT_PIN_BIT) != 0) && 
+           ((page_type_count(page) != 0) && 
             ((page->flags & PG_type_mask) == PGT_writeable_page) &&
             ((page->flags & PG_need_flush) == PG_need_flush)));
     if ( writeable )
@@ -735,7 +737,7 @@ static int do_extended_command(unsigned long ptr, unsigned long val)
     switch ( cmd )
     {
     case MMUEXT_PIN_L1_TABLE:
-        if ( unlikely(page->type_count & REFCNT_PIN_BIT) )
+        if ( unlikely(page->flags & PG_guest_pinned) )
         {
             MEM_LOG("Pfn %08lx already pinned", pfn);
             err = 1;
@@ -745,7 +747,7 @@ static int do_extended_command(unsigned long ptr, unsigned long val)
         goto mark_as_pinned;
 
     case MMUEXT_PIN_L2_TABLE:
-        if ( unlikely(page->type_count & REFCNT_PIN_BIT) )
+        if ( unlikely(page->flags & PG_guest_pinned) )
         {
             MEM_LOG("Pfn %08lx already pinned", pfn);
             err = 1;
@@ -759,25 +761,19 @@ static int do_extended_command(unsigned long ptr, unsigned long val)
             MEM_LOG("Error while pinning pfn %08lx", pfn);
             break;
         }
-        put_page_type(page);
-        put_page_tot(page);
-        page->type_count |= REFCNT_PIN_BIT;
-        page->tot_count  |= REFCNT_PIN_BIT;
+        page->flags |= PG_guest_pinned;
         break;
 
     case MMUEXT_UNPIN_TABLE:
-        if ( !DOMAIN_OKAY(page->flags) )
+        if ( unlikely(!DOMAIN_OKAY(page->flags)) )
         {
             err = 1;
             MEM_LOG("Page %08lx bad domain (dom=%ld)",
                     ptr, page->flags & PG_domain_mask);
         }
-        else if ( (page->type_count & REFCNT_PIN_BIT) )
+        else if ( likely(page->flags & PG_guest_pinned) )
         {
-            page->type_count &= ~REFCNT_PIN_BIT;
-            page->tot_count  &= ~REFCNT_PIN_BIT;
-            get_page_type(page);
-            get_page_tot(page);
+            page->flags &= ~PG_guest_pinned;
             ((page->flags & PG_type_mask) == PGT_l1_page_table) ?
                 put_l1_table(pfn) : put_l2_table(pfn);
         }
@@ -916,7 +912,7 @@ int do_mmu_update(mmu_update_t *ureqs, int count)
                                        mk_l2_pgentry(req.val)); 
                     break;                    
                 default:
-                    if ( page->type_count == 0 )
+                    if ( page_type_count(page) == 0 )
                     {
                         *(unsigned long *)req.ptr = req.val;
                         err = 0;

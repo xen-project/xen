@@ -344,7 +344,7 @@ long do_dom0_op(dom0_op_t *u_dom0_op)
             op.u.getpageframeinfo.domain = page->flags & PG_domain_mask;
             op.u.getpageframeinfo.type   = NONE;
 
-            if ( page->type_count != 0 )
+            if ( page_type_count(page) != 0 )
             {
                 switch ( page->flags & PG_type_mask )
                 {

@@ -550,7 +550,8 @@ void deliver_packet(struct sk_buff *skb, net_vif_t *vif)
     }
 
     /* Give the new page to the domain, marking it writeable. */
-    new_page->tot_count = new_page->type_count = 1;
+    set_page_type_count(new_page, 1);
+    set_page_tot_count(new_page, 1);
     new_page->flags = vif->domain->domain | PGT_writeable_page | PG_need_flush;
     list_add(&new_page->list, &vif->domain->pg_head);
     
@@ -2113,10 +2114,10 @@ static long get_bufs_from_vif(net_vif_t *vif)
 
         if ( ((buf_page->flags & (PG_type_mask | PG_domain_mask)) !=
               (PGT_writeable_page | p->domain)) || 
-             (buf_page->tot_count != 1) )
+             (page_tot_count(buf_page) != 1) )
         {
             DPRINTK("Need a mapped-once writeable page (%ld/%ld/%08lx)\n",
-                    buf_page->type_count, buf_page->tot_count, 
+                    page_type_count(buf_page), page_tot_count(buf_page), 
                     buf_page->flags);
             make_rx_response(vif, rx.id, 0, RING_STATUS_BAD_PAGE, 0);
             goto rx_unmap_and_continue;
@@ -2129,7 +2130,9 @@ static long get_bufs_from_vif(net_vif_t *vif)
         get_page_type(pte_page);
         get_page_tot(pte_page);
         *ptep &= ~_PAGE_PRESENT;
-        buf_page->flags = buf_page->type_count = buf_page->tot_count = 0;
+        buf_page->flags = 0;
+        set_page_type_count(buf_page, 0);
+        set_page_tot_count(buf_page, 0);
         list_del(&buf_page->list);
 
         vif->rx_shadow_ring[j].id          = rx.id;
@@ -2198,7 +2201,8 @@ long flush_bufs_for_vif(net_vif_t *vif)
             *pte = (rx->buf_pfn<<PAGE_SHIFT) | (*pte & ~PAGE_MASK) | 
                 _PAGE_RW | _PAGE_PRESENT;
             page->flags |= PGT_writeable_page | PG_need_flush;
-            page->type_count = page->tot_count = 1;
+            set_page_type_count(page, 1);
+            set_page_tot_count(page, 1);
         }
         unmap_domain_mem(pte);
 

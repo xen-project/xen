@@ -350,7 +350,7 @@ static int __buffer_is_valid(struct task_struct *p,
         /* If reading into the frame, the frame must be writeable. */
         if ( writeable_buffer &&
              ((page->flags & PG_type_mask) != PGT_writeable_page) &&
-             (page->type_count != 0) )
+             (page_type_count(page) != 0) )
         {
             DPRINTK("non-writeable page passed for block read\n");
             goto out;
@@ -376,7 +376,7 @@ static void __lock_buffer(unsigned long buffer,
         page = frame_table + pfn;
         if ( writeable_buffer )
         {
-            if ( page->type_count == 0 )
+            if ( page_type_count(page) == 0 )
             {
                 page->flags &= ~PG_type_mask;
                 /* No need for PG_need_flush here. */

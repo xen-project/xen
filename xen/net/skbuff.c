@@ -162,7 +162,9 @@ static inline void dealloc_skb_data_page(struct sk_buff *skb)
 
     spin_lock_irqsave(&free_list_lock, flags);
         
-    pf->flags = pf->type_count = pf->tot_count = 0;
+    pf->flags = 0;
+    set_page_type_count(pf, 0);
+    set_page_tot_count(pf, 0);
     list_add(&pf->list, &free_list);
     free_pfns++;
 
