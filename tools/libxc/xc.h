@@ -18,7 +18,7 @@ typedef signed short       s16;
 typedef signed long        s32;
 typedef signed long long   s64;
 
-#include "xen/hypervisor-if.h"
+#include "xen/xen.h"
 #include "xen/dom0_ops.h"
 #include "xen/event_channel.h"
 #include "xen/sched_ctl.h"

@@ -48,7 +48,7 @@ static int errno;
 #include <asm/mmu_context.h>
 #include <asm/ctrl_if.h>
 #include <asm/hypervisor.h>
-#include <asm/hypervisor-ifs/dom0_ops.h>
+#include <asm/xen-public/dom0_ops.h>
 #include <linux/netdevice.h>
 #include <linux/rtnetlink.h>
 #include <linux/tqueue.h>
@@ -335,7 +335,7 @@ void __init setup_arch(char **cmdline_p)
      * and the bootmem bitmap. 
      * NB. There is definitely enough room for the bootmem bitmap in the
      * bootstrap page table. We are guaranteed to get >=512kB unused 'padding'
-     * for our own use after all bootstrap elements (see hypervisor-if.h).
+     * for our own use after all bootstrap elements (see asm/xen-public/xen.h).
      */
     boot_pfn = min((int)xen_start_info.nr_pages,lmax_low_pfn);
     bootmap_size = init_bootmem(start_pfn,boot_pfn);

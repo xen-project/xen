@@ -26,7 +26,7 @@
 #include <xen/sched-if.h>
 #include <xen/softirq.h>
 #include <xen/trace.h>
-#include <hypervisor-ifs/sched_ctl.h>
+#include <public/sched_ctl.h>
 
 /*#define WAKE_HISTO*/
 /*#define BLOCKTIME_HISTO*/

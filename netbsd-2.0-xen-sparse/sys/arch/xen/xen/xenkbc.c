@@ -74,7 +74,7 @@ __KERNEL_RCSID(0, "$NetBSD: xenkbc.c,v 1.3.2.1 2004/05/22 15:57:43 he Exp $");
 #include <machine/xenkbcvar.h>
 #include <machine/xen.h>
 #include <machine/hypervisor.h>
-#include <machine/hypervisor-ifs/kbd.h>
+#include <machine/xen-public/kbd.h>
 #include <machine/evtchn.h>
 
 #define	KBC_DELAY	DELAY(1000)

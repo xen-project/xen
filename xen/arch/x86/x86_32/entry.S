@@ -59,7 +59,7 @@
 #include <xen/config.h>
 #include <xen/errno.h>
 #include <xen/softirq.h>
-#include <hypervisor-ifs/hypervisor-if.h>
+#include <public/xen.h>
 
 EBX		= 0x00
 ECX		= 0x04

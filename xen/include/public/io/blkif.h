@@ -6,8 +6,8 @@
  * Copyright (c) 2003-2004, Keir Fraser
  */
 
-#ifndef __SHARED_BLKIF_H__
-#define __SHARED_BLKIF_H__
+#ifndef __XEN_PUBLIC_IO_BLKIF_H__
+#define __XEN_PUBLIC_IO_BLKIF_H__
 
 #define blkif_vdev_t   u16
 #define blkif_sector_t u64
@@ -112,4 +112,4 @@ typedef struct {
     u16            info;         /* 10: Device type and flags (VDISK_*).     */
 } PACKED vdisk_t; /* 12 bytes */
 
-#endif /* __SHARED_BLKIF_H__ */
+#endif /* __XEN_PUBLIC_IO_BLKIF_H__ */

@@ -7,8 +7,8 @@
  * Copyright (c) 2004, K A Fraser
  */
 
-#ifndef __HYPERVISOR_IFS_GRANT_TABLE_H__
-#define __HYPERVISOR_IFS_GRANT_TABLE_H__
+#ifndef __XEN_PUBLIC_GRANT_TABLE_H__
+#define __XEN_PUBLIC_GRANT_TABLE_H__
 
 
 /***********************************
@@ -248,4 +248,4 @@ typedef struct {
 }
         
 
-#endif /* __HYPERVISOR_IFS_GRANT_TABLE_H__ */
+#endif /* __XEN_PUBLIC_GRANT_TABLE_H__ */

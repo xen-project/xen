@@ -1,21 +1,15 @@
 /******************************************************************************
- * arch-i386/hypervisor-if.h
+ * arch-x86_64.h
  * 
- * Guest OS interface to x86 32-bit Xen.
+ * Guest OS interface to x86 64-bit Xen.
  */
 
-#ifndef __HYPERVISOR_IF_I386_H__
-#define __HYPERVISOR_IF_I386_H__
+#ifndef __XEN_PUBLIC_ARCH_X86_64_H__
+#define __XEN_PUBLIC_ARCH_X86_64_H__
 
-/*
- * Pointers and other address fields inside interface structures are padded to
- * 64 bits. This means that field alignments aren't different between 32- and
- * 64-bit architectures. 
- */
-/* NB. Multi-level macro ensures __LINE__ is expanded before concatenation. */
-#define __MEMORY_PADDING(_X) u32 __pad_ ## _X
-#define _MEMORY_PADDING(_X)  __MEMORY_PADDING(_X)
-#define MEMORY_PADDING       _MEMORY_PADDING(__LINE__)
+/* Pointers are naturally 64 bits in this architecture; no padding needed. */
+#define _MEMORY_PADDING(_X)
+#define MEMORY_PADDING 
 
 /*
  * SEGMENT DESCRIPTOR TABLES
@@ -29,43 +23,41 @@
  * NB. The reserved range is inclusive (that is, both FIRST_RESERVED_GDT_ENTRY
  * and LAST_RESERVED_GDT_ENTRY are reserved).
  */
-#define NR_RESERVED_GDT_ENTRIES    40
+#define NR_RESERVED_GDT_ENTRIES    40 
 #define FIRST_RESERVED_GDT_ENTRY   256
 #define LAST_RESERVED_GDT_ENTRY    \
   (FIRST_RESERVED_GDT_ENTRY + NR_RESERVED_GDT_ENTRIES - 1)
 
-
 /*
+ * 64-bit segment selectors
  * These flat segments are in the Xen-private section of every GDT. Since these
  * are also present in the initial GDT, many OSes will be able to avoid
  * installing their own GDT.
  */
-#define FLAT_RING1_CS 0x0819    /* GDT index 259 */
-#define FLAT_RING1_DS 0x0821    /* GDT index 260 */
-#define FLAT_RING3_CS 0x082b    /* GDT index 261 */
-#define FLAT_RING3_DS 0x0833    /* GDT index 262 */
 
-#define FLAT_GUESTOS_CS FLAT_RING1_CS
-#define FLAT_GUESTOS_DS FLAT_RING1_DS
-#define FLAT_USER_CS    FLAT_RING3_CS
-#define FLAT_USER_DS    FLAT_RING3_DS
+#define FLAT_RING3_CS32 0x0823  /* GDT index 260 */
+#define FLAT_RING3_CS64 0x082b  /* GDT index 261 */
+#define FLAT_RING3_DS   0x0833  /* GDT index 262 */
+
+#define FLAT_GUESTOS_DS   FLAT_RING3_DS
+#define FLAT_GUESTOS_CS   FLAT_RING3_CS64
+#define FLAT_GUESTOS_CS32 FLAT_RING3_CS32
+
+#define FLAT_USER_DS      FLAT_RING3_DS
+#define FLAT_USER_CS      FLAT_RING3_CS64
+#define FLAT_USER_CS32    FLAT_RING3_CS32
 
 /* And the trap vector is... */
-#define TRAP_INSTR "int $0x82"
+#define TRAP_INSTR "syscall"
 
-
-/*
- * Virtual addresses beyond this are not modifiable by guest OSes. The 
- * machine->physical mapping table starts at this address, read-only.
- */
-#define HYPERVISOR_VIRT_START (0xFC000000UL)
+/* The machine->physical mapping table starts at this address, read-only. */
 #ifndef machine_to_phys_mapping
-#define machine_to_phys_mapping ((unsigned long *)HYPERVISOR_VIRT_START)
+#define machine_to_phys_mapping ((unsigned long *)0xffff810000000000ULL)
 #endif
 
 #ifndef __ASSEMBLY__
 
-/* NB. Both the following are 32 bits each. */
+/* NB. Both the following are 64 bits each. */
 typedef unsigned long memory_t;   /* Full-sized pointer/address/memory-size. */
 typedef unsigned long cpureg_t;   /* Full-sized register.                    */
 
@@ -80,27 +72,31 @@ typedef struct {
     u8       vector;  /* 0: exception vector                              */
     u8       flags;   /* 1: 0-3: privilege level; 4: clear event enable?  */
     u16      cs;      /* 2: code selector                                 */
-    memory_t address; /* 4: code address                                  */
-} PACKED trap_info_t; /* 8 bytes */
+    u32      __pad;   /* 4 */
+    memory_t address; /* 8: code address                                  */
+} PACKED trap_info_t; /* 16 bytes */
 
 typedef struct
 {
-    unsigned long ebx;
-    unsigned long ecx;
-    unsigned long edx;
-    unsigned long esi;
-    unsigned long edi;
-    unsigned long ebp;
-    unsigned long eax;
-    unsigned long ds;
-    unsigned long es;
-    unsigned long fs;
-    unsigned long gs;
-    unsigned long _unused;
-    unsigned long eip;
+    unsigned long r15;
+    unsigned long r14;
+    unsigned long r13;
+    unsigned long r12;
+    unsigned long rbp;
+    unsigned long rbx;
+    unsigned long r11;
+    unsigned long r10;
+    unsigned long r9;
+    unsigned long r8;
+    unsigned long rax;
+    unsigned long rcx;
+    unsigned long rdx;
+    unsigned long rsi;
+    unsigned long rdi;
+    unsigned long rip;
     unsigned long cs;
     unsigned long eflags;
-    unsigned long esp;
+    unsigned long rsp;
     unsigned long ss;
 } PACKED execution_context_t;
 
@@ -114,9 +110,8 @@ typedef struct {
 #define ECF_I387_VALID (1<<0)
     unsigned long flags;
     execution_context_t cpu_ctxt;           /* User-level CPU registers     */
-    char          fpu_ctxt[256];            /* User-level FPU registers     */
+    char          fpu_ctxt[512];            /* User-level FPU registers     */
     trap_info_t   trap_ctxt[256];           /* Virtual IDT                  */
-    unsigned int  fast_trap_idx;            /* "Fast trap" vector offset    */
     unsigned long ldt_base, ldt_ents;       /* LDT (linear address, # ents) */
     unsigned long gdt_frames[16], gdt_ents; /* GDT (machine frames, # ents) */
     unsigned long guestos_ss, guestos_esp;  /* Virtual TSS (only SS1/ESP1)  */
@@ -134,8 +129,6 @@ typedef struct {
 				  make up p2m table */
 } PACKED arch_shared_info_t;
 
-#define ARCH_HAS_FAST_TRAP
-
-#endif
+#endif /* !__ASSEMBLY__ */
 
 #endif

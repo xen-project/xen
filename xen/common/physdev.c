@@ -26,8 +26,8 @@
 #include <xen/irq.h>
 #include <xen/event.h>
 #include <asm/pci.h>
-#include <hypervisor-ifs/hypervisor-if.h>
-#include <hypervisor-ifs/physdev.h>
+#include <public/xen.h>
+#include <public/physdev.h>
 
 /* Called by PHYSDEV_PCI_INITIALISE_DEVICE to finalise IRQ routing. */
 extern void pcibios_enable_irq(struct pci_dev *dev);

@@ -11,9 +11,8 @@
 
 #include <types.h>
 
-/* include the hypervisor interface */
-#include <hypervisor-ifs/hypervisor-if.h>
-#include "../../../tools/xu/lib/domain_controller.h"
+#include <xen-public/xen.h>
+#include <xen-public/io/domain_controller.h>
 
 /*
  * a placeholder for the start of day information passed up from the hypervisor

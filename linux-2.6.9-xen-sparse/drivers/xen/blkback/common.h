@@ -14,7 +14,7 @@
 #include <asm/pgalloc.h>
 #include <asm-xen/ctrl_if.h>
 #include <asm-xen/hypervisor.h>
-#include <asm-xen/hypervisor-ifs/io/blkif.h>
+#include <asm-xen/xen-public/io/blkif.h>
 
 #if 0
 #define ASSERT(_p) \

@@ -23,9 +23,9 @@ install: $(TARGET)
 	install -m0644 $(TARGET).gz $(prefix)/boot
 	install -m0644 $(TARGET)-syms $(prefix)/boot
 	mkdir -p $(prefix)/usr/include/xen/io
-	install -m0644 include/hypervisor-ifs/*.h $(prefix)/usr/include/xen
-	install -m0644 include/hypervisor-ifs/io/*.h $(prefix)/usr/include/xen/io
-	install -m0644 include/hypervisor-ifs/COPYING $(prefix)/usr/include/xen
+	install -m0644 include/public/*.h $(prefix)/usr/include/xen
+	install -m0644 include/public/io/*.h $(prefix)/usr/include/xen/io
+	install -m0644 include/public/COPYING $(prefix)/usr/include/xen
 
 dist: $(TARGET)
 	$(MAKE) prefix=`pwd`/../install dist=yes install

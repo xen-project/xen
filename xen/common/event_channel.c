@@ -23,8 +23,8 @@
 #include <xen/event.h>
 #include <xen/irq.h>
 
-#include <hypervisor-ifs/hypervisor-if.h>
-#include <hypervisor-ifs/event_channel.h>
+#include <public/xen.h>
+#include <public/event_channel.h>
 
 #define INIT_EVENT_CHANNELS   16
 #define MAX_EVENT_CHANNELS  1024

@@ -13,7 +13,7 @@
 #include <xen/config.h>
 #include <xen/types.h>
 #include <xen/lib.h>
-#include <hypervisor-ifs/dom0_ops.h>
+#include <public/dom0_ops.h>
 #include <asm/pdb.h>
 
 /* from linux/sched.h */

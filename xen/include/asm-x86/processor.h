@@ -15,7 +15,7 @@
 #include <asm/pdb.h>
 #include <xen/config.h>
 #include <xen/spinlock.h>
-#include <hypervisor-ifs/hypervisor-if.h>
+#include <public/xen.h>
 
 struct domain;
 

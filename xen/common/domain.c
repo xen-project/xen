@@ -14,7 +14,7 @@
 #include <xen/time.h>
 #include <xen/console.h>
 #include <asm/shadow.h>
-#include <hypervisor-ifs/dom0_ops.h>
+#include <public/dom0_ops.h>
 #include <asm/domain_page.h>
 
 /* Both these structures are protected by the tasklist_lock. */

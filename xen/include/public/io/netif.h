@@ -6,8 +6,8 @@
  * Copyright (c) 2003-2004, Keir Fraser
  */
 
-#ifndef __SHARED_NETIF_H__
-#define __SHARED_NETIF_H__
+#ifndef __XEN_PUBLIC_IO_NETIF_H__
+#define __XEN_PUBLIC_IO_NETIF_H__
 
 typedef struct {
     memory_t addr;   /*  0: Machine address of packet.  */

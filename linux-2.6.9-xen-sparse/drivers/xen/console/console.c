@@ -47,7 +47,7 @@
 #include <asm/io.h>
 #include <asm/irq.h>
 #include <asm/uaccess.h>
-#include <asm/hypervisor-ifs/event_channel.h>
+#include <asm/xen-public/event_channel.h>
 #include <asm-xen/hypervisor.h>
 #include <asm-xen/evtchn.h>
 #include <asm-xen/ctrl_if.h>

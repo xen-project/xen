@@ -7,8 +7,8 @@
  * Copyright (c) 2004, K A Fraser
  */
 
-#ifndef __DOMAIN_CONTROLLER_H__
-#define __DOMAIN_CONTROLLER_H__
+#ifndef __XEN_PUBLIC_IO_DOMAIN_CONTROLLER_H__
+#define __XEN_PUBLIC_IO_DOMAIN_CONTROLLER_H__
 
 
 /*
@@ -575,4 +575,4 @@ typedef struct {
 } PACKED mem_request_t; /* 8 bytes */
 
 
-#endif /* __DOMAIN_CONTROLLER_H__ */
+#endif /* __XEN_PUBLIC_IO_DOMAIN_CONTROLLER_H__ */

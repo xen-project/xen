@@ -1,9 +1,9 @@
 /******************************************************************************
- * include/hypervisor-ifs/trace.h
+ * trace.h
  */
 
-#ifndef __HYPERVISOR_IFS_TRACE_H__
-#define __HYPERVISOR_IFS_TRACE_H__
+#ifndef __XEN_PUBLIC_TRACE_H__
+#define __XEN_PUBLIC_TRACE_H__
 
 /* This structure represents a single trace buffer record. */
 struct t_rec {
@@ -28,4 +28,4 @@ struct t_buf {
     struct t_rec *vdata;    /* virtual address pointer to data               */
 };
 
-#endif /* __HYPERVISOR_IFS_TRACE_H__ */
+#endif /* __XEN_PUBLIC_TRACE_H__ */

@@ -18,8 +18,8 @@
 #include <asm/segment.h>
 #include <asm/io.h>
 
-#include <asm/hypervisor-ifs/hypervisor-if.h>
-#include <asm/hypervisor-ifs/physdev.h>
+#include <asm/xen-public/xen.h>
+#include <asm/xen-public/physdev.h>
 
 #include "pci-i386.h"
 

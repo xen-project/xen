@@ -14,8 +14,8 @@
 
 #include <asm/ptrace.h>
 #include <xen/list.h>
-#include <hypervisor-ifs/dom0_ops.h>
-#include <hypervisor-ifs/hypervisor-if.h>                   /* for domain id */
+#include <public/dom0_ops.h>
+#include <public/xen.h>                   /* for domain id */
 
 extern int pdb_initialized;
 extern int pdb_com_port;

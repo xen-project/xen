@@ -7,7 +7,7 @@
 #include <xen/config.h>
 #include <xen/types.h>
 #include <xen/lib.h>
-#include <hypervisor-ifs/dom0_ops.h>
+#include <public/dom0_ops.h>
 #include <xen/sched.h>
 #include <xen/event.h>
 #include <asm/page.h>

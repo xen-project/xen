@@ -48,7 +48,7 @@
 #include <asm/smp.h>
 #include <asm/page.h>
 #include "irq_vectors.h"
-#include <asm/hypervisor-ifs/hypervisor-if.h>
+#include <asm/xen-public/xen.h>
 
 #define nr_syscalls ((syscall_table_size)/4)
 

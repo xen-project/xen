@@ -17,12 +17,11 @@ Xen guests, certain files in this repository are not subject to the
 GPL when distributed separately or included in software packages
 outside this repository. Instead we specify a much more relaxed
 BSD-style license. Affected files include the Xen interface headers
-(xen/include/hypervisor-ifs/COPYING), and various drivers, support
-functions and header files within the Linux sparse source trees. In
-all such cases, license terms are stated at the top of the file or in
-a COPYING file in the same directory. Note that _any_ file that is
-modified and then distributed within a Linux kernel is still subject
-to the GNU GPL!
+(xen/include/public/COPYING), and various drivers, support functions
+and header files within the Linux sparse source trees. In all such
+cases, license terms are stated at the top of the file or in a COPYING
+file in the same directory. Note that _any_ file that is modified and
+then distributed within a Linux kernel is still subject to the GNU GPL.
 
  -- Keir Fraser (on behalf of the Xen team)
 

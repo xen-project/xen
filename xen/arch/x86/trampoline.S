@@ -16,7 +16,7 @@
  */
 
 #include <xen/config.h>
-#include <hypervisor-ifs/hypervisor-if.h>
+#include <public/xen.h>
 #include <asm/page.h>
 
 #ifdef CONFIG_SMP

@@ -12,7 +12,7 @@ static int errno;
 #include <asm/mmu_context.h>
 #include <asm-xen/ctrl_if.h>
 #include <asm-xen/hypervisor.h>
-#include <asm-xen/hypervisor-ifs/dom0_ops.h>
+#include <asm-xen/xen-public/dom0_ops.h>
 #include <asm-xen/suspend.h>
 #include <asm-xen/queues.h>
 

@@ -20,7 +20,7 @@
 #include <xen/time.h>
 #include <xen/sched.h>
 #include <xen/sched-if.h>
-#include <hypervisor-ifs/sched_ctl.h>
+#include <public/sched_ctl.h>
 #include <xen/trace.h>
 
 #define ATROPOS_TASK_UNBLOCKED 16

@@ -6,8 +6,8 @@
  * Copyright (c) 2003-2004, K A Fraser.
  */
 
-#ifndef __HYPERVISOR_IFS__EVENT_CHANNEL_H__
-#define __HYPERVISOR_IFS__EVENT_CHANNEL_H__
+#ifndef __XEN_PUBLIC_EVENT_CHANNEL_H__
+#define __XEN_PUBLIC_EVENT_CHANNEL_H__
 
 /*
  * EVTCHNOP_alloc_unbound: Allocate a fresh local port and prepare
@@ -158,4 +158,4 @@ typedef struct {
     } PACKED u;
 } PACKED evtchn_op_t; /* 32 bytes */
 
-#endif /* __HYPERVISOR_IFS__EVENT_CHANNEL_H__ */
+#endif /* __XEN_PUBLIC_EVENT_CHANNEL_H__ */

@@ -44,8 +44,8 @@
 #include <linux/blkdev.h>
 #include <linux/major.h>
 #include <linux/devfs_fs_kernel.h>
-#include <asm/hypervisor-ifs/hypervisor-if.h>
-#include <asm-xen/hypervisor-ifs/io/blkif.h>
+#include <asm/xen-public/xen.h>
+#include <asm-xen/xen-public/io/blkif.h>
 #include <asm/io.h>
 #include <asm/atomic.h>
 #include <asm/uaccess.h>

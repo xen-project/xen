@@ -14,16 +14,16 @@ TARGET := mini-os
 LOBJS := lib/malloc.o lib/math.o lib/printf.o lib/string.o 
 OBJS  := entry.o kernel.o traps.o hypervisor.o mm.o events.o time.o ${LOBJS}
 
-HINTF := h/hypervisor-ifs/hypervisor-if.h
+HINTF := h/xen-public/xen.h
 HDRS  :=  h/os.h h/types.h h/hypervisor.h h/mm.h h/events.h h/time.h h/lib.h
 HDRS  += $(HINTF)
 
 default: $(TARGET)
 
-hypervisor-ifs:
-	ln -sf ../../../xen/include/hypervisor-ifs h/hypervisor-ifs
+xen-public:
+	[ -e h/xen-public] || ln -sf ../../../xen/include/public h/xen-public
 
-$(TARGET): hypervisor-ifs head.o $(OBJS)
+$(TARGET): xen-public head.o $(OBJS)
 	$(LD) -N -T minios.lds head.o $(OBJS) -o $@.elf
 	objcopy -R .note -R .comment $@.elf $@
 	gzip -f -9 -c $@ >$@.gz
