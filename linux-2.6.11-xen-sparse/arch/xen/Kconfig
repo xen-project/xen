@@ -153,6 +153,10 @@ if X86
 source "arch/xen/i386/Kconfig"
 endif
 
+if X86_64
+source "arch/xen/x86_64/Kconfig"
+endif
+
 menu "Executable file formats"
 
 source "fs/Kconfig.binfmt"
