@@ -46,6 +46,7 @@
 #include <linux/bcd.h>
 #include <linux/efi.h>
 #include <linux/sysctl.h>
+#include <linux/percpu.h>
 
 #include <asm/io.h>
 #include <asm/smp.h>
@@ -91,7 +92,6 @@ u32 shadow_tsc_stamp;
 u64 shadow_system_time;
 static u32 shadow_time_version;
 static struct timeval shadow_tv;
-extern u64 processed_system_time;
 
 /*
  * We use this to ensure that gettimeofday() is monotonically increasing. We
@@ -109,6 +109,7 @@ static long last_update_from_xen;   /* UTC seconds when last read Xen clock. */
 
 /* Keep track of last time we did processing/updating of jiffies and xtime. */
 u64 processed_system_time;   /* System time (ns) at last processing. */
+DEFINE_PER_CPU(u64, processed_system_time);
 
 #define NS_PER_TICK (1000000000ULL/HZ)
 
@@ -719,22 +720,39 @@ void time_resume(void)
 static irqreturn_t local_timer_interrupt(int irq, void *dev_id,
 					 struct pt_regs *regs)
 {
-#if 0
-	static int xxx = 0;
-	if ((xxx++ % 2000) == 0)
-		printk("local_timer_interrupt %d\n", xxx);
-#endif
+	s64 delta;
+	int cpu = smp_processor_id();
 
-	/*
-	 * update_process_times() expects us to have done irq_enter().
-	 * Besides, if we don't timer interrupts ignore the global
-	 * interrupt lock, which is the WrongThing (tm) to do.
-	 */
-	// irq_enter();
-	/* XXX add processed_system_time loop thingy */
-	if (regs)
-		update_process_times(user_mode(regs));
-	// irq_exit();
+	do {
+		__get_time_values_from_xen();
+
+		delta = (s64)(shadow_system_time +
+			      ((s64)cur_timer->get_offset() * 
+			       (s64)NSEC_PER_USEC) -
+			      per_cpu(processed_system_time, cpu));
+	}
+	while (!TIME_VALUES_UP_TO_DATE);
+
+	if (unlikely(delta < 0)) {
+		printk("Timer ISR/%d: Time went backwards: %lld %lld %lld %lld\n",
+		       cpu, delta, shadow_system_time,
+		       ((s64)cur_timer->get_offset() * (s64)NSEC_PER_USEC), 
+		       processed_system_time);
+		return IRQ_HANDLED;
+	}
+
+	/* Process elapsed jiffies since last call. */
+	while (delta >= NS_PER_TICK) {
+		delta -= NS_PER_TICK;
+		per_cpu(processed_system_time, cpu) += NS_PER_TICK;
+		if (regs)
+			update_process_times(user_mode(regs));
+#if 0
+		if (regs)
+			profile_tick(CPU_PROFILING, regs);
+#endif
+	}
+
 	if (smp_processor_id() == 0) {
 	    xxprint("bug bug\n");
 	    BUG();
@@ -750,7 +768,13 @@ static struct irqaction local_irq_timer = {
 
 void local_setup_timer(void)
 {
-	int time_irq;
+	int seq, time_irq;
+	int cpu = smp_processor_id();
+
+	do {
+	    seq = read_seqbegin(&xtime_lock);
+	    per_cpu(processed_system_time, cpu) = shadow_system_time;
+	} while (read_seqretry(&xtime_lock, seq));
 
 	time_irq = bind_virq_to_irq(VIRQ_TIMER);
 	(void)setup_irq(time_irq, &local_irq_timer);
