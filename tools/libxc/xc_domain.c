@@ -177,10 +177,10 @@ int xc_domain_setcpuweight(int xc_handle,
     int ret;
     
     /* Figure out which scheduler is currently used: */
-    if((ret = xc_sched_id(xc_handle, &sched_id)))
+    if ( (ret = xc_sched_id(xc_handle, &sched_id)) != 0 )
         return ret;
     
-    switch(sched_id)
+    switch ( sched_id )
     {
         case SCHED_BVT:
         {
@@ -192,28 +192,19 @@ int xc_domain_setcpuweight(int xc_handle,
 
             /* Preserve all the scheduling parameters apart 
                of MCU advance. */
-            if((ret = xc_bvtsched_domain_get(xc_handle, domid, &mcuadv, 
-                                &warpback, &warpvalue, &warpl, &warpu)))
+            if ( (ret = xc_bvtsched_domain_get(
+                xc_handle, domid, &mcuadv, 
+                &warpback, &warpvalue, &warpl, &warpu)) != 0 )
                 return ret;
             
             /* The MCU advance is inverse of the weight.
                Default value of the weight is 1, default mcuadv 10.
                The scaling factor is therefore 10. */
-            if(weight > 0) mcuadv = 10 / weight;
+            if ( weight > 0 )
+                mcuadv = 10 / weight;
             
             ret = xc_bvtsched_domain_set(xc_handle, domid, mcuadv, 
                                          warpback, warpvalue, warpl, warpu);
-            break;
-        }
-        
-        case SCHED_RROBIN:
-        {
-            /* The weight cannot be set for RRobin */
-            break;
-        }
-        case SCHED_ATROPOS:
-        {
-            /* TODO - can we set weights in Atropos? */
             break;
         }
     }

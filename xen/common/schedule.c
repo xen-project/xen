@@ -242,11 +242,19 @@ void domain_wake(struct exec_domain *ed)
 /* Block the currently-executing domain until a pertinent event occurs. */
 long do_block(void)
 {
-    ASSERT(current->domain->id != IDLE_DOMAIN_ID);
-    current->vcpu_info->evtchn_upcall_mask = 0;
-    set_bit(EDF_BLOCKED, &current->ed_flags);
-    TRACE_2D(TRC_SCHED_BLOCK, current->domain->id, current);
-    __enter_scheduler();
+    struct exec_domain *ed = current;
+
+    TRACE_2D(TRC_SCHED_BLOCK, ed->domain->id, ed);
+
+    ed->vcpu_info->evtchn_upcall_mask = 0;
+    set_bit(EDF_BLOCKED, &ed->ed_flags);
+
+    /* Check for events /after/ blocking: avoids wakeup waiting race. */
+    if ( event_pending(ed) )
+        clear_bit(EDF_BLOCKED, &ed->ed_flags);
+    else
+        __enter_scheduler();
+
     return 0;
 }
 
@@ -370,15 +378,6 @@ static void __enter_scheduler(void)
     rem_ac_timer(&schedule_data[cpu].s_timer);
     
     ASSERT(!in_irq());
-
-    if ( test_bit(EDF_BLOCKED, &prev->ed_flags) )
-    {
-        /* This check is needed to avoid a race condition. */
-        if ( event_pending(prev) )
-            clear_bit(EDF_BLOCKED, &prev->ed_flags);
-        else
-            SCHED_OP(do_block, prev);
-    }
 
     prev->cpu_time += now - prev->lastschd;
 

@@ -326,13 +326,10 @@ long do_boot_vcpu(unsigned long vcpu, full_execution_context_t *ctxt)
 
     arch_do_boot_vcpu(ed);
 
-    sched_add_domain(ed);
-
     if ( (rc = arch_set_info_guest(ed, c)) != 0 )
-    {
-        sched_rem_domain(ed);
         goto out;
-    }
+
+    sched_add_domain(ed);
 
     /* domain_unpause_by_systemcontroller */
     if ( test_and_clear_bit(EDF_CTRLPAUSE, &ed->ed_flags) )

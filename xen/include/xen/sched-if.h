@@ -30,7 +30,7 @@ struct scheduler {
     char *opt_name;         /* option name for this scheduler    */
     unsigned int sched_id;  /* ID for this scheduler             */
 
-    int          (*init_scheduler) ();
+    int          (*init_scheduler) (void);
     int          (*init_idle_task) (struct exec_domain *);
     int          (*alloc_task)     (struct exec_domain *);
     void         (*add_task)       (struct exec_domain *);
@@ -38,14 +38,12 @@ struct scheduler {
     void         (*rem_task)       (struct exec_domain *);
     void         (*sleep)          (struct exec_domain *);
     void         (*wake)           (struct exec_domain *);
-    void         (*do_block)       (struct exec_domain *);
     struct task_slice (*do_schedule) (s_time_t);
     int          (*control)        (struct sched_ctl_cmd *);
     int          (*adjdom)         (struct domain *,
                                     struct sched_adjdom_cmd *);
     void         (*dump_settings)  (void);
     void         (*dump_cpu_state) (int);
-    int          (*prn_state)      (int);
 };
 
 extern struct schedule_data schedule_data[];
