@@ -21,6 +21,9 @@
 #include <asm/shadow.h>
 #include <public/sched_ctl.h>
 
+#include <asm/mtrr.h>
+#include "mtrr/mtrr.h"
+
 #define TRC_DOM0OP_ENTER_BASE  0x00020000
 #define TRC_DOM0OP_LEAVE_BASE  0x00030000
 
@@ -90,6 +93,40 @@ long arch_do_dom0_op(dom0_op_t *op, dom0_op_t *u_dom0_op)
             put_domain(d);
             copy_to_user(u_dom0_op, op, sizeof(*op));
         } 
+    }
+    break;
+
+    case DOM0_ADD_MEMTYPE:
+    {
+        ret = mtrr_add_page(
+            op->u.add_memtype.pfn,
+            op->u.add_memtype.nr_pfns,
+            op->u.add_memtype.type,
+            1);
+    }
+    break;
+
+    case DOM0_DEL_MEMTYPE:
+    {
+        ret = mtrr_del_page(op->u.del_memtype.reg, 0, 0);
+    }
+    break;
+
+    case DOM0_READ_MEMTYPE:
+    {
+        unsigned long pfn;
+        unsigned int  nr_pfns;
+        mtrr_type     type;
+
+        ret = -EINVAL;
+        if ( op->u.read_memtype.reg < num_var_ranges )
+        {
+            mtrr_if->get(op->u.read_memtype.reg, &pfn, &nr_pfns, &type);
+            (void)__put_user(pfn, &u_dom0_op->u.read_memtype.pfn);
+            (void)__put_user(nr_pfns, &u_dom0_op->u.read_memtype.nr_pfns);
+            (void)__put_user(type, &u_dom0_op->u.read_memtype.type);
+            ret = 0;
+        }
     }
     break;
 

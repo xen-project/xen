@@ -1390,10 +1390,11 @@ void __init setup_arch(char **cmdline_p)
 	init_mm.end_data = (unsigned long) _edata;
 	init_mm.brk = (PFN_UP(__pa(xen_start_info.pt_base)) + xen_start_info.nr_pt_frames) << PAGE_SHIFT;
 
-	code_resource.start = virt_to_phys(_text);
-	code_resource.end = virt_to_phys(_etext)-1;
-	data_resource.start = virt_to_phys(_etext);
-	data_resource.end = virt_to_phys(_edata)-1;
+	/* XEN: This is nonsense: kernel may not even be contiguous in RAM. */
+	/*code_resource.start = virt_to_phys(_text);*/
+	/*code_resource.end = virt_to_phys(_etext)-1;*/
+	/*data_resource.start = virt_to_phys(_etext);*/
+	/*data_resource.end = virt_to_phys(_edata)-1;*/
 
 	parse_cmdline_early(cmdline_p);
 

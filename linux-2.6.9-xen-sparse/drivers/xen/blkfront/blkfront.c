@@ -783,7 +783,7 @@ static int blkif_queue_request(unsigned long   id,
                                unsigned short  nr_sectors,
                                kdev_t          device)
 {
-    unsigned long       buffer_ma = phys_to_machine(virt_to_phys(buffer)); 
+    unsigned long       buffer_ma = virt_to_bus(buffer);
     unsigned long       xid;
     struct gendisk     *gd;
     blkif_request_t    *req;

@@ -48,6 +48,9 @@ pristine-%: %.tar.bz2
 	mv tmp-$(@F)/* $@
 	touch $@ # update timestamp to avoid rebuild
 	@rm -rf tmp-$(@F)
+	[ -d patches/$* ] && \
+	  for i in patches/$*/*.patch ; do ( cd $@ ; patch -p1 <../$$i ) ; done || \
+	  true
 
 %-build:
 	$(MAKE) -f buildconfigs/mk.$* build

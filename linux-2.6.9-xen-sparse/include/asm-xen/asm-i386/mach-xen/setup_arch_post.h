@@ -28,8 +28,9 @@ void __init machine_specific_modify_cpu_capabilities(struct cpuinfo_x86 *c)
 	clear_bit(X86_FEATURE_DE, c->x86_capability);
 	clear_bit(X86_FEATURE_PSE, c->x86_capability);
 	clear_bit(X86_FEATURE_PGE, c->x86_capability);
-	clear_bit(X86_FEATURE_MTRR, c->x86_capability);
 	clear_bit(X86_FEATURE_FXSR, c->x86_capability);
+	if (!(xen_start_info.flags & SIF_PRIVILEGED))
+		clear_bit(X86_FEATURE_MTRR, c->x86_capability);
 }
 
 extern void hypervisor_callback(void);

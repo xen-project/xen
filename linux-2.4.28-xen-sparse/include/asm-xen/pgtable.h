@@ -350,7 +350,7 @@ static inline void make_pages_writable(void *va, unsigned int nr)
     }
 }
 
-static inline unsigned long arbitrary_virt_to_phys(void *va)
+static inline unsigned long arbitrary_virt_to_machine(void *va)
 {
     pgd_t *pgd = pgd_offset_k((unsigned long)va);
     pmd_t *pmd = pmd_offset(pgd, (unsigned long)va);
