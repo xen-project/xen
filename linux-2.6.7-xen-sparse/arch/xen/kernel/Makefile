@@ -9,4 +9,4 @@ $(obj)/vmlinux.lds.s: arch/$(ARCH)/$(XENARCH)/kernel/vmlinux.lds.s
 
 extra-y += vmlinux.lds.s
 
-obj-y	:= ctrl_if.o process.o reboot.o empty.o
+obj-y	:= ctrl_if.o process.o reboot.o xen_proc.o empty.o
