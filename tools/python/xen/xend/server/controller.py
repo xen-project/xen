@@ -180,7 +180,8 @@ class ControllerFactory(CtrlMsgRcvr):
         """
         if self.dlist:
             d = self.dlist.pop(0)
-            d.callback(*args)
+            if not d.called:
+                d.callback(*args)
 
     def errDeferred(self, *args):
         """Signal an error to the top deferred object.
@@ -189,7 +190,8 @@ class ControllerFactory(CtrlMsgRcvr):
         """
         if self.dlist:
             d = self.dlist.pop(0)
-            d.errback(*args)
+            if not d.called:
+                d.errback(*args)
 
 class Controller(CtrlMsgRcvr):
     """Abstract class for a device controller attached to a domain.
