@@ -788,7 +788,7 @@ void __init print_IO_APIC(void)
 	spin_unlock_irqrestore(&ioapic_lock, flags);
 
 	printk("\n");
-	printk(KERN_DEBUG "IO APIC #%d..XXXX....\n", mp_ioapics[apic].mpc_apicid);
+	printk(KERN_DEBUG "IO APIC #%d......\n", mp_ioapics[apic].mpc_apicid);
 	printk(KERN_DEBUG ".... register #00: %08X\n", *(int *)&reg_00);
 	printk(KERN_DEBUG ".......    : physical APIC id: %02X\n", reg_00.ID);
 	if (reg_00.__reserved_1 || reg_00.__reserved_2)
@@ -826,6 +826,7 @@ void __init print_IO_APIC(void)
 			UNEXPECTED_IO_APIC();
 	}
 
+#if 0
 	printk(KERN_DEBUG ".... IRQ redirection table:\n");
 
 	printk(KERN_DEBUG " NR Log Phy Mask Trig IRR Pol"
@@ -870,6 +871,7 @@ void __init print_IO_APIC(void)
 			entry = irq_2_pin + entry->next;
 		}
 		printk("\n");
+#endif
 	}
 
 	printk(KERN_INFO ".................................... done.\n");

@@ -580,7 +580,7 @@ int setup_guestos(struct task_struct *p, dom0_newdomain_t *params)
         unsigned char nfsroot[70];
         snprintf(nfsroot, 70, opt_nfsroot, dom); 
         snprintf(boot, 200,
-#if 1
+#if 0
                 " root=/dev/nfs ip=%s:%s:%s:%s::eth0:off nfsroot=%s",
 #else
                 " ro root=/dev/xhda7 ip=%s:%s:%s:%s::eth0:off arfle=%s",

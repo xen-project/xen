@@ -44,7 +44,6 @@
 #ifndef msec_delay
 #define msec_delay(x) {\
  	int s=jiffies+1+((x*HZ)/1000); \
-	printk("mdelay(%d) called -- spin\n",x); \
 	while(jiffies<s); }
 
 #if 0

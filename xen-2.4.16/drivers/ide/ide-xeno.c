@@ -8,14 +8,12 @@
 void ide_probe_devices (xen_disk_info_t* xdi)
 {
     int loop;
+    unsigned int unit;
     
     for (loop = 0; loop < MAX_HWIFS; ++loop) {
 
 	ide_hwif_t *hwif = &ide_hwifs[loop];
 	if (hwif->present) {
-
-	    struct gendisk *gd = hwif->gd;
-	    unsigned int unit;
 
 	    for (unit = 0; unit < MAX_DRIVES; ++unit) {
 		unsigned long capacity;
@@ -28,10 +26,10 @@ void ide_probe_devices (xen_disk_info_t* xdi)
 		    xdi->count++;
 
 		    printk (KERN_ALERT "IDE-XENO %d\n", xdi->count);
-		    printk (KERN_ALERT "  capacity  0x%x\n", capacity);
-		    printk (KERN_ALERT "  head      0x%x\n", drive->bios_head);
-		    printk (KERN_ALERT "  sector    0x%x\n", drive->bios_sect);
-		    printk (KERN_ALERT "  cylinder  0x%x\n", drive->bios_cyl);
+		    printk (KERN_ALERT "  capacity  0x%lx\n", capacity);
+		    printk (KERN_ALERT "  head      0x%x\n",  drive->bios_head);
+		    printk (KERN_ALERT "  sector    0x%x\n",  drive->bios_sect);
+		    printk (KERN_ALERT "  cylinder  0x%x\n",  drive->bios_cyl);
 		}
 	    }
 	}

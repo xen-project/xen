@@ -66,7 +66,7 @@ static act_stats_t act_stats[NR_CPUS];
 
 /* local prototypes */
 static int  detach_ac_timer(struct ac_timer *timer);
-static void ac_timer_debug(unsigned long);
+/*static void ac_timer_debug(unsigned long);*/
 
 /*
  * add a timer.

@@ -341,6 +341,6 @@ void schedulers_start(void) {
 	printk("Start schedulers\n");
 	__cli();
 	sched_timer(0);
-	smp_call_function(sched_timer, NULL, 1, 1);
+	smp_call_function((void *)sched_timer, NULL, 1, 1);
 	__sti();
 }
