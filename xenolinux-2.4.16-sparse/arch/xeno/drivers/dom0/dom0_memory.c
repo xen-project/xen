@@ -182,7 +182,7 @@ unsigned long direct_mmap(unsigned long phys_addr, unsigned long size,
     dmmap->addr = addr;
     list_add(&dmmap->list, &current->mm->context.direct_list);
 
-	printk("bd240 debug: direct_mmap: enlisting addr %lx\n", dmmap->addr);
+	printk(KERN_ALERT "bd240 debug: direct_mmap: enlisting addr %lx\n", dmmap->addr);
 
     /* and perform the mapping */
     if(flag == MAP_DISCONT){
@@ -332,13 +332,13 @@ int direct_disc_unmap(unsigned long from, unsigned long first_pg, int tot_pages)
     struct list_head * curr;
     struct list_head * direct_list = &current->mm->context.direct_list;    
 
-	printk("bd240 debug: direct_disc_unmap: from %lx\n", from);
+	printk(KERN_ALERT "bd240 debug: direct_disc_unmap: from %lx\n", from);
 
     curr = direct_list->next;
     while(curr != direct_list){
         node = list_entry(curr, direct_mmap_node_t, list);
 
-		printk("bd240 debug: direct_disc_unmap: node %lx\n", node->addr);
+		printk(KERN_ALERT "bd240 debug: direct_disc_unmap: node %lx\n", node->addr);
 
         if(node->addr == from)
             break;

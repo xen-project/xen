@@ -153,7 +153,7 @@ static ssize_t dom_mem_write(struct file * file, const char * buff,
     
     copy_from_user(&addr, (unsigned long *)buff, sizeof(addr));
     
-	printk("bd240 debug: dom_mem_write addr %lx\n", addr);
+	printk(KERN_ALERT "bd240 debug: dom_mem_write addr %lx\n", addr);
 
     if(direct_disc_unmap(addr, mem_data->pfn, mem_data->tot_pages) == 0){
         return sizeof(addr);
