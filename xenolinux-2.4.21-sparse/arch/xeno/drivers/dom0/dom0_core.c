@@ -32,6 +32,8 @@
 
 #include "dom0_ops.h"
 
+#define MAP_DISCONT 1
+
 /* Private proc-file data structures. */
 typedef struct proc_data {
     unsigned int domain;
@@ -47,7 +49,7 @@ static struct proc_dir_entry *dom_list_intf;
 
 int direct_unmap(struct mm_struct *, unsigned long, unsigned long);
 unsigned long direct_mmap(unsigned long phys_addr, unsigned long size, 
-			  pgprot_t prot, int tot_pages);
+			  pgprot_t prot, int flag, int tot_pages);
 
 static ssize_t dom_usage_read(struct file * file, char * buff, size_t size, loff_t * off)
 {
@@ -330,6 +332,7 @@ static unsigned long handle_dom0_cmd_mapdommem(unsigned long data)
   addr = direct_mmap(argbuf.start_pfn << PAGE_SHIFT,
 		     argbuf.tot_pages << PAGE_SHIFT,
 		     PAGE_SHARED,
+		     MAP_DISCONT,
 		     argbuf.tot_pages);
 
   return addr;
