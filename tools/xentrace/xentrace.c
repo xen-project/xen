@@ -227,10 +227,10 @@ struct t_rec **init_rec_ptrs(unsigned long tbufs_phys,
  * trace buffer.  Each entry in this table corresponds to the tail index for a
  * particular trace buffer.
  */
-int *init_tail_idxs(struct t_buf **bufs, unsigned int num)
+unsigned long *init_tail_idxs(struct t_buf **bufs, unsigned int num)
 {
     int i;
-    int *tails = calloc(num, sizeof(unsigned int));
+    unsigned long *tails = calloc(num, sizeof(unsigned int));
  
     if ( tails == NULL )
     {
@@ -276,15 +276,18 @@ unsigned int get_num_cpus()
  */
 int monitor_tbufs(FILE *logfile)
 {
-    int i, j;
+    int i;
+
     void *tbufs_mapped;          /* pointer to where the tbufs are mapped    */
     struct t_buf **meta;         /* pointers to the trace buffer metadata    */
     struct t_rec **data;         /* pointers to the trace buffer data areas
                                   * where they are mapped into user space.   */
-    int *tails;                  /* store tail indexes for the trace buffers */
+    unsigned long *cons;         /* store tail indexes for the trace buffers */
     unsigned long tbufs_phys;    /* physical address of the tbufs            */
     unsigned int  num;           /* number of trace buffers / logical CPUS   */
     unsigned long size;          /* size of a single trace buffer            */
+
+    int size_in_recs;
 
     /* get number of logical CPUs (and therefore number of trace buffers) */
     num = get_num_cpus();
@@ -293,39 +296,32 @@ int monitor_tbufs(FILE *logfile)
     get_tbufs(&tbufs_phys, &size);
     tbufs_mapped = map_tbufs(tbufs_phys, num, size);
 
+    size_in_recs = (size / sizeof(struct t_rec) )-1;
+
     /* build arrays of convenience ptrs */
     meta  = init_bufs_ptrs (tbufs_mapped, num, size);
     data  = init_rec_ptrs  (tbufs_phys, tbufs_mapped, meta, num);
-    tails = init_tail_idxs (meta, num);
+    cons  = init_tail_idxs (meta, num);
 
     /* now, scan buffers for events */
     while ( !interrupted )
     {
         for ( i = 0; ( i < num ) && !interrupted; i++ )
-        {
-            signed long newdata = meta[i]->head - tails[i];
-            signed long prewrap = newdata;
+        {	    
+/*	    printf("XX%d: cons=%ld head=%ld  %p\n", i,
+		   cons[i], meta[i]->head, data[i] + (cons[i] % size_in_recs) );
+		   */
+	    while( cons[i] < meta[i]->head )
+	    {
+/*
+		if( (cons[i] % 6  ) == 0 )
+		    printf("%d: cons=%ld head=%ld  %p\n", i,
+		       cons[i], meta[i]->head, data[i] + (cons[i] % size_in_recs) );
+		       */
+		write_rec(i, data[i] + (cons[i] % size_in_recs), logfile);
+		cons[i]++;
+	    }
 
-	    /* correct newdata and prewrap in case of a pointer wrap */
-            if ( newdata < 0 )
-            {
-                newdata += meta[i]->size;
-                prewrap  = meta[i]->size - tails[i];
-            }
-
-            if ( newdata >= opts.new_data_thresh )
-            {
-                /* output pre-wrap data */
-                for(j = 0; j < prewrap; j++)
-                    write_rec(i, data[i] + tails[i] + j, logfile);
-                
-                /* output post-wrap data, if any */                    
-                for(j = 0; j < (newdata - prewrap); j++)
-                    write_rec(i, data[i] + j, logfile);  
-                
-                tails[i] += newdata;
-                if(tails[i] >= meta[i]->size) tails[i] = 0;
-            }
         }
         nanosleep(&opts.poll_sleep, NULL);
     }
@@ -333,7 +329,7 @@ int monitor_tbufs(FILE *logfile)
     /* cleanup */
     free(meta);
     free(data);
-    free(tails);
+    free(cons);
     /* don't need to munmap - cleanup is automatic */
     fclose(logfile);
 

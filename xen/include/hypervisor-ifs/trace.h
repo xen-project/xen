@@ -20,13 +20,12 @@ struct t_buf {
     struct t_rec *data;     /* pointer to data area.  physical address
                              * for convenience in user space code            */
 
-    unsigned int size;      /* size of the data area, in t_recs              */
-    unsigned int head;      /* array index of the most recent record         */
+    unsigned long size;      /* size of the data area, in t_recs              */
+    unsigned long head;      /* array index of the most recent record         */
 
 #ifdef __KERNEL__
     struct t_rec *head_ptr; /* pointer to the head record                    */
     struct t_rec *vdata;    /* virtual address pointer to data               */
-    spinlock_t lock;        /* ensure mutually exlusive access (for inserts) */
 #endif
 
     /* never add anything here - the kernel stuff must be the last elements */

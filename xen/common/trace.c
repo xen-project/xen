@@ -27,7 +27,6 @@
 #include <xen/sched.h>
 #include <xen/slab.h>
 #include <xen/smp.h>
-#include <xen/spinlock.h>
 #include <xen/trace.h>
 #include <xen/errno.h>
 #include <asm/atomic.h>
@@ -86,7 +85,6 @@ void init_trace_bufs(void)
         /* For use in Xen. */
         buf->vdata    = (struct t_rec *)(buf+1);
         buf->head_ptr = buf->vdata;
-        spin_lock_init(&buf->lock);
         
         /* For use in user space. */
         buf->data = (struct t_rec *)__pa(buf->vdata);
