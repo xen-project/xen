@@ -74,31 +74,37 @@ unsigned char opt_pdb[10] = "none";
 unsigned int opt_tbuf_size = 1;
 /* opt_sched: scheduler - default to Borrowed Virtual Time */
 char opt_sched[10] = "bvt";
-/* opt_physdev_dom0_hide: list of PCI slots to hide from dom0
- * Should have the format '(%02x:%02x.%1x)(%02x:%02x.%1x)...etc' */
-char opt_physdev_dom0_hide[20] = "";
+/* opt_physdev_dom0_hide: list of PCI slots to hide from domain 0. */
+/* Format is '(%02x:%02x.%1x)(%02x:%02x.%1x)' and so on. */
+char opt_physdev_dom0_hide[200] = "";
+/* opt_leveltrigger, opt_edgetrigger: Force an IO-APIC-routed IRQ to be */
+/*                                    level- or edge-triggered.         */
+/* Example: 'leveltrigger=4,5,6,20 edgetrigger=21'. */
+char opt_leveltrigger[30] = "", opt_edgetrigger[30] = "";
 
 static struct {
     unsigned char *name;
     enum { OPT_IP, OPT_STR, OPT_UINT, OPT_BOOL } type;
     void *var;
 } opts[] = {
-    { "console",          OPT_STR,  &opt_console },
-    { "ser_baud",         OPT_UINT, &opt_ser_baud },
-    { "com1",             OPT_STR,  &opt_com1 },
-    { "com2",             OPT_STR,  &opt_com2 },
-    { "dom0_mem",         OPT_UINT, &opt_dom0_mem }, 
-    { "ifname",           OPT_STR,  &opt_ifname },
-    { "noht",             OPT_BOOL, &opt_noht },
-    { "noacpi",           OPT_BOOL, &opt_noacpi },
-    { "nosmp",            OPT_BOOL, &opt_nosmp },
-    { "noreboot",         OPT_BOOL, &opt_noreboot },
-    { "ignorebiostables", OPT_BOOL, &opt_ignorebiostables },
-    { "watchdog",         OPT_BOOL, &opt_watchdog },
-    { "pdb",              OPT_STR,  &opt_pdb },
-    { "tbuf_size",        OPT_UINT, &opt_tbuf_size },
-    { "sched",            OPT_STR,  &opt_sched },
-    { "physdev_dom0_hide",OPT_STR,  &opt_physdev_dom0_hide },
+    { "console",           OPT_STR,  &opt_console },
+    { "ser_baud",          OPT_UINT, &opt_ser_baud },
+    { "com1",              OPT_STR,  &opt_com1 },
+    { "com2",              OPT_STR,  &opt_com2 },
+    { "dom0_mem",          OPT_UINT, &opt_dom0_mem }, 
+    { "ifname",            OPT_STR,  &opt_ifname },
+    { "noht",              OPT_BOOL, &opt_noht },
+    { "noacpi",            OPT_BOOL, &opt_noacpi },
+    { "nosmp",             OPT_BOOL, &opt_nosmp },
+    { "noreboot",          OPT_BOOL, &opt_noreboot },
+    { "ignorebiostables",  OPT_BOOL, &opt_ignorebiostables },
+    { "watchdog",          OPT_BOOL, &opt_watchdog },
+    { "pdb",               OPT_STR,  &opt_pdb },
+    { "tbuf_size",         OPT_UINT, &opt_tbuf_size },
+    { "sched",             OPT_STR,  &opt_sched },
+    { "physdev_dom0_hide", OPT_STR,  &opt_physdev_dom0_hide },
+    { "leveltrigger",      OPT_STR,  &opt_leveltrigger },
+    { "edgetrigger",       OPT_STR,  &opt_edgetrigger },
     { NULL,               0,        NULL     }
 };
 

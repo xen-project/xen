@@ -39,6 +39,7 @@
 #include <xen/delay.h>
 #include <xen/timex.h>
 #include <xen/perfc.h>
+#include <asm/smpboot.h>
 
 /*
  * Linux has a controller-independent x86 interrupt architecture.
@@ -1034,6 +1035,11 @@ int pirq_guest_bind(struct task_struct *p, int irq, int will_share)
         desc->status |= IRQ_GUEST;
         desc->status &= ~(IRQ_DISABLED | IRQ_AUTODETECT | IRQ_WAITING);
         desc->handler->startup(irq);
+
+        /* Attempt to bind the interrupt target to the correct CPU. */
+        if ( desc->handler->set_affinity != NULL )
+            desc->handler->set_affinity(
+                irq, apicid_to_phys_cpu_present(p->processor));
     }
     else if ( !will_share || !action->shareable )
     {

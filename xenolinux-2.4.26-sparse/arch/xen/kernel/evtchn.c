@@ -36,6 +36,9 @@ static int virq_to_irq[NR_VIRQS];
 /* Reference counts for bindings to IRQs. */
 static int irq_bindcount[NR_IRQS];
 
+/* Bitmap indicating which PIRQs require Xen to be notified on unmask. */
+static unsigned long pirq_needs_unmask_notify[NR_PIRQS/sizeof(unsigned long)];
+
 /* Upcall to generic IRQ layer. */
 extern asmlinkage unsigned int do_IRQ(int irq, struct pt_regs *regs);
 
@@ -234,8 +237,22 @@ static struct hw_interrupt_type dynirq_type = {
 static inline void pirq_unmask_notify(int pirq)
 {
     physdev_op_t op;
-    op.cmd = PHYSDEVOP_UNMASK_IRQ;
+    if ( unlikely(test_bit(pirq, &pirq_needs_unmask_notify[0])) )
+    {
+        op.cmd = PHYSDEVOP_IRQ_UNMASK_NOTIFY;
+        (void)HYPERVISOR_physdev_op(&op);
+    }
+}
+
+static inline void pirq_query_unmask(int pirq)
+{
+    physdev_op_t op;
+    op.cmd = PHYSDEVOP_IRQ_STATUS_QUERY;
+    op.u.irq_status_query.irq = pirq;
     (void)HYPERVISOR_physdev_op(&op);
+    clear_bit(pirq, &pirq_needs_unmask_notify[0]);
+    if ( op.u.irq_status_query.flags & PHYSDEVOP_IRQ_NEEDS_UNMASK_NOTIFY )
+        set_bit(pirq, &pirq_needs_unmask_notify[0]);
 }
 
 /*
@@ -260,6 +277,8 @@ static unsigned int startup_pirq(unsigned int irq)
         return 0;
     }
     evtchn = op.u.bind_pirq.port;
+
+    pirq_query_unmask(irq_to_pirq(irq));
 
     evtchn_to_irq[evtchn] = irq;
     irq_to_evtchn[irq]    = evtchn;
