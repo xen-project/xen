@@ -221,6 +221,7 @@ ln -sf ../../i386/kernel/sys_i386.c
 ln -sf ../../../${LINUX_26}/arch/xen/kernel/ctrl_if.c
 ln -sf ../../../${LINUX_26}/arch/xen/kernel/evtchn.c
 ln -sf ../../../${LINUX_26}/arch/xen/i386/kernel/ioport.c
+ln -sf ../../../${LINUX_26}/arch/xen/i386/kernel/pci-dma.c
 
 cd ${AD}/arch/xen/lib
 ln -sf ../../i386/lib/checksum.S 

@@ -11,20 +11,34 @@
 #include <linux/mm.h>
 #include <linux/string.h>
 #include <linux/pci.h>
+#include <linux/version.h>
 #include <asm/io.h>
 
+#if LINUX_VERSION_CODE < KERNEL_VERSION(2,6,0)
+#define pte_offset_kernel pte_offset
+void *pci_alloc_consistent(struct pci_dev *hwdev, size_t size,
+			   dma_addr_t *dma_handle)
+#else
 void *dma_alloc_coherent(struct device *dev, size_t size,
 			   dma_addr_t *dma_handle, int gfp)
+#endif
 {
 	void *ret;
 	unsigned int order = get_order(size);
 	unsigned long vstart;
 
+#if LINUX_VERSION_CODE < KERNEL_VERSION(2,6,0)
+	int gfp = GFP_ATOMIC;
+
+	if (hwdev == NULL || ((u32)hwdev->dma_mask < 0xffffffff))
+		gfp |= GFP_DMA;
+#else
 	/* ignore region specifiers */
 	gfp &= ~(__GFP_DMA | __GFP_HIGHMEM);
 
 	if (dev == NULL || (dev->coherent_dma_mask < 0xffffffff))
 		gfp |= GFP_DMA;
+#endif
 
 	ret = (void *)vstart = __get_free_pages(gfp, order);
 	if (ret == NULL)
@@ -76,8 +90,13 @@ void *dma_alloc_coherent(struct device *dev, size_t size,
 	return ret;
 }
 
+#if LINUX_VERSION_CODE < KERNEL_VERSION(2,6,0)
+void pci_free_consistent(struct pci_dev *hwdev, size_t size,
+			 void *vaddr, dma_addr_t dma_handle)
+#else
 void dma_free_coherent(struct device *dev, size_t size,
 			 void *vaddr, dma_addr_t dma_handle)
+#endif
 {
 	free_pages((unsigned long)vaddr, get_order(size));
 }

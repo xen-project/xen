@@ -70,7 +70,6 @@
 3e5a4e65RMGcuA-HCn3-wNx3fFQwdg linux-2.4.26-xen-sparse/arch/xen/kernel/i386_ksyms.c
 3e5a4e653U6cELGv528IxOLHvCq8iA linux-2.4.26-xen-sparse/arch/xen/kernel/irq.c
 3e5a4e65muT6SU3ck47IP87Q7Ti5hA linux-2.4.26-xen-sparse/arch/xen/kernel/ldt.c
-4051db84bZeRX7a_Kh6VyyDuT5FOIg linux-2.4.26-xen-sparse/arch/xen/kernel/pci-dma.c
 4051db95N9N99FjsRwi49YKUNHWI8A linux-2.4.26-xen-sparse/arch/xen/kernel/pci-pc.c
 3e5a4e65IGt3WwQDNiL4h-gYWgNTWQ linux-2.4.26-xen-sparse/arch/xen/kernel/process.c
 3e5a4e66tR-qJMLj3MppcKqmvuI2XQ linux-2.4.26-xen-sparse/arch/xen/kernel/setup.c
