@@ -684,12 +684,27 @@ class XendDomain:
         self.update_domain(dominfo.id)
         return val
 
+    def domain_device_configure(self, id, devconfig, idx):
+        """Configure an existing device for a domain.
+
+        @param id:   domain id
+        @param devconfig: device configuration
+        @param idx:  device index
+        @return: updated device configuration
+        """
+        dominfo = self.domain_lookup(id)
+        self.refresh_schedule()
+        val = dominfo.device_configure(devconfig, idx)
+        self.update_domain(dominfo.id)
+        return val
+    
+
     def domain_device_destroy(self, id, type, idx):
         """Destroy a device.
 
         @param id:  domain id
-        @param type: device type
         @param idx:  device index
+        @param type: device type
         """
         dominfo = self.domain_lookup(id)
         self.refresh_schedule()
@@ -706,7 +721,6 @@ class XendDomain:
         """
         dominfo = self.domain_lookup(id)
         devs = dominfo.get_devices(type)
-        #return range(0, len(devs))
         return devs
 
     def domain_devtype_get(self, id, type, idx):

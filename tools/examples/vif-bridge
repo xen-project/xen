@@ -69,6 +69,11 @@ case $OP in
         ;;
 esac
 
+# Don't do anything if the bridge is "null".
+if [ "${bridge}" == "null" ] ; then
+    exit
+fi
+
 # Add/remove vif to/from bridge.
 brctl ${brcmd} ${bridge} ${vif}
 

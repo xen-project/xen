@@ -617,6 +617,9 @@ class Dev:
         """
         raise NotImplementedError()
 
+    def configure(self, config, change=0):
+        raise NotImplementedError()
+
 class SplitDev(Dev):
 
     def __init__(self, idx, controller):

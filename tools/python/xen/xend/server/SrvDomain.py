@@ -164,6 +164,14 @@ class SrvDomain(SrvDir):
         val = fn(req.args, {'dom': self.dom.id})
         return val
                 
+    def op_device_configure(self, op, req):
+        fn = FormFn(self.xd.domain_device_configure,
+                    [['dom', 'str'],
+                     ['config', 'sxpr'],
+                     ['idx', 'str']])
+        d = fn(req.args, {'dom': self.dom.id})
+        return d
+
     def op_vifs(self, op, req):
         devs = self.xd.domain_vif_ls(self.dom.id)
         return [ dev.sxpr() for dev in devs ]

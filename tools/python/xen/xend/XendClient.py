@@ -550,6 +550,12 @@ class Xend:
                               'type'    : type,
                               'idx'     : idx })
 
+    def xend_domain_device_configure(self, id, config, idx):
+        return self.xendPost(self.domainurl(id),
+                             {'op'      : 'device_configure',
+                              'idx'     : idx,
+                              'config'  : fileof(config) })
+
     def xend_consoles(self):
         return self.xendGet(self.consoleurl())
 

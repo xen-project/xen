@@ -104,30 +104,81 @@ class NetDev(controller.SplitDev):
         self.evtchn = None
         self.configure(config)
 
-    def configure(self, config):
+    def _get_config_mac(self, config):
+        vmac = sxp.child_value(config, 'mac')
+        if not vmac: return None
+        mac = [ int(x, 16) for x in vmac.split(':') ]
+        if len(mac) != 6: raise XendError("invalid mac")
+        return mac
+
+    def _get_config_ipaddr(self, config):
+        ips = sxp.children(config, elt='ip')
+        if ips:
+            val = []
+            for ipaddr in ips:
+                val.append(sxp.child0(ipaddr))
+        else:
+            val = None
+        return val
+
+    def configure(self, config, change=0):
+        if change:
+            return self.reconfigure(config)
         self.config = config
         self.mac = None
         self.bridge = None
         self.script = None
         self.ipaddr = []
-        
-        vmac = sxp.child_value(config, 'mac')
-        if not vmac: raise XendError("invalid mac")
-        mac = [ int(x, 16) for x in vmac.split(':') ]
-        if len(mac) != 6: raise XendError("invalid mac")
-        self.mac = mac
 
+        mac = self._get_config_mac(config)
+        if mac is None:
+            raise XendError("invalid mac")
+        self.mac = mac
         self.bridge = sxp.child_value(config, 'bridge')
         self.script = sxp.child_value(config, 'script')
-
-        ipaddrs = sxp.children(config, elt='ip')
-        for ipaddr in ipaddrs:
-            self.ipaddr.append(sxp.child0(ipaddr))
+        self.ipaddr = self._get_config_ipaddr(config) or []
         
         try:
             self.backendDomain = int(sxp.child_value(config, 'backend', '0'))
         except:
             raise XendError('invalid backend domain')
+
+    def reconfigure(self, config):
+        """Reconfigure the interface with new values.
+        Not all configuration parameters can be changed:
+        bridge, script and ip addresses can,
+        backend and mac cannot.
+
+        To leave a parameter unchanged, omit it from the changes.
+
+        @param config configuration changes
+        @return updated interface configuration
+        @raise XendError on errors
+        """
+        changes = {}
+        mac = self._get_config_mac(config)
+        bridge = sxp.child_value(config, 'bridge')
+        script = sxp.child_value(config, 'script')
+        ipaddr = self._get_config_ipaddr(config)
+        backendDomain = sxp.child_value(config, 'backend', '0')
+        if (mac is not None) and (mac != self.mac):
+            raise XendError("cannot change mac")
+        if (backendDomain is not None) and (backendDomain != str(self.backendDomain)):
+            raise XendError("cannot change backend")
+        if (bridge is not None) and (bridge != self.bridge):
+            changes['bridge'] = bridge
+        if (script is not None) and (script != self.script):
+            changes['script'] = script
+        if (ipaddr is not None) and (ipaddr != self.ipaddr):
+            changes['ipaddr'] = ipaddr
+
+        if changes:
+            self.vifctl("down")
+            for (k, v) in changes.items():
+                setattr(self, k, v)
+            self.config = sxp.merge(config, self.config)
+            self.vifctl("up")
+        return self.config
 
     def sxpr(self):
         vif = str(self.vif)

@@ -139,31 +139,44 @@ show_status () {
     echo '============================================================'
 }
 
+op_start () {
+    if [ "${bridge}" == "null" ] ; then
+        return
+    fi
+    # Create the bridge and give it the interface IP addresses.
+    # Move the interface routes onto the bridge.
+    create_bridge ${netdev} ${bridge}
+    transfer_addrs ${netdev} ${bridge}
+    transfer_routes ${netdev} ${bridge}
+    # Don't add $dev to $bridge if it's already on a bridge.
+    if ! brctl show | grep -q ${netdev} ; then
+        brctl addif ${bridge} ${netdev}
+    fi
+    
+    if [ ${antispoof} == 'yes' ] ; then
+        antispoofing ${netdev} ${bridge}
+    fi
+}
+
+op_stop () {
+    if [ "${bridge}" == "null" ] ; then
+        return
+    fi
+    # Remove the interface from the bridge.
+    # Move the routes back to the interface.
+    brctl delif ${bridge} ${netdev}
+    transfer_routes ${bridge} ${netdev}
+
+    # It's not our place to be enabling forwarding...
+}
+
 case ${OP} in
     start)
-        # Create the bridge and give it the interface IP addresses.
-        # Move the interface routes onto the bridge.
-        create_bridge ${netdev} ${bridge}
-        transfer_addrs ${netdev} ${bridge}
-        transfer_routes ${netdev} ${bridge}
-	# Don't add $dev to $bridge if it's already on a bridge.
-	if ! brctl show | grep -q ${netdev} ; then
-	    brctl addif ${bridge} ${netdev}
-	fi
-        
-        if [ ${antispoof} == 'yes' ] ; then
-            antispoofing ${netdev} ${bridge}
-        fi
-        
+        op_start
         ;;
     
     stop)
-        # Remove the interface from the bridge.
-        # Move the routes back to the interface.
-        brctl delif ${bridge} ${netdev}
-        transfer_routes ${bridge} ${netdev}
-
-        # It's not our place to be enabling forwarding...
+        op_stop
         ;;
 
     status)

@@ -825,6 +825,30 @@ class XendDomainInfo:
         d = dev_handler(self, dev_config, dev_index, change=1)
         return d
 
+    def device_configure(self, dev_config, idx):
+        """Configure an existing device.
+
+        @param dev_config: device configuration
+        @param idx:  device index
+        """
+        type = sxp.name(dev_config)
+        dev = self.get_device_by_index(type, idx)
+        if not dev:
+            raise VmError('invalid device: %s %s' % (type, idx))
+        new_config = dev.configure(dev_config, change=1)
+        devs = self.devices.get(type)
+        index = devs.index(dev)
+        # Patch new config into device configs.
+        dev_configs = self.config_devices(type)
+        old_config = dev_configs[index]
+        dev_configs[index] = new_config
+        # Patch new config into vm config.
+        new_full_config = ['device', new_config]
+        old_full_config = ['device', old_config]
+        old_index = self.config.index(old_full_config)
+        self.config[old_index] = new_full_config
+        return new_config
+        
     def device_destroy(self, type, idx):
         """Destroy a device.
 
