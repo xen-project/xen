@@ -2,6 +2,7 @@
 #include <xeno/ctype.h>
 #include <xeno/lib.h>
 
+#if 0 // jws - now in string.c, string.h, asm/string.h 
 int memcmp(const void * cs,const void * ct,size_t count)
 {
 	const unsigned char *su1, *su2;
@@ -119,7 +120,7 @@ char * strstr(const char * s1,const char * s2)
         }
         return NULL;
 }
-
+#endif
 
 /* for inc/ctype.h */
 unsigned char _ctype[] = {

@@ -14,6 +14,9 @@
 printk("Memory Reservation 0x%lx, %lu bytes\n", (_p), (_l))
 
 /* lib.c */
+#include <xeno/string.h>
+
+/* JWS - pulled over linux string library ({asm,linux}/string.h)
 int memcmp(const void * cs,const void * ct,size_t count);
 void * memcpy(void * dest,const void *src,size_t count);
 int strncmp(const char * cs,const char * ct,size_t count);
@@ -25,6 +28,8 @@ size_t strnlen(const char * s, size_t count);
 size_t strlen(const char * s);
 char * strchr(const char *,int);
 char * strstr(const char * s1,const char * s2);
+*/
+
 unsigned long str_to_quad(unsigned char *s);
 unsigned char *quad_to_str(unsigned long q, unsigned char *s);
 
@@ -46,6 +51,7 @@ extern int sscanf(const char *, const char *, ...)
 	__attribute__ ((format (scanf,2,3)));
 extern int vsscanf(const char *, const char *, va_list);
 long simple_strtol(const char *cp,char **endp,unsigned int base);
+unsigned long simple_strtoul(const char *cp,char **endp,unsigned int base);
 long long simple_strtoll(const char *cp,char **endp,unsigned int base);
 
 #endif /* __LIB_H__ */
