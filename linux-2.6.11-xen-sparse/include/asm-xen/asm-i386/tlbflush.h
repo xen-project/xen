@@ -6,22 +6,10 @@
 #include <asm/processor.h>
 
 #define __flush_tlb() xen_tlb_flush()
-
-/*
- * Global pages have to be flushed a bit differently. Not a real
- * performance problem because this does not happen often.
- */
 #define __flush_tlb_global() xen_tlb_flush()
+#define __flush_tlb_all() xen_tlb_flush()
 
 extern unsigned long pgkern_mask;
-
-# define __flush_tlb_all()						\
-	do {								\
-		if (cpu_has_pge)					\
-			__flush_tlb_global();				\
-		else							\
-			__flush_tlb();					\
-	} while (0)
 
 #define cpu_has_invlpg	(boot_cpu_data.x86 > 3)
 

@@ -407,7 +407,8 @@ extern void noexec_setup(const char *str);
 	do {								  \
 		if (__dirty) {						  \
 		        if ( likely((__vma)->vm_mm == current->mm) ) {    \
-			    HYPERVISOR_update_va_mapping((__address), (__entry), UVMF_INVLPG_LOCAL); \
+			    HYPERVISOR_update_va_mapping((__address), (__entry), 0); \
+			    flush_tlb_page((__vma), (__address));         \
 			} else {                                          \
                             xen_l1_entry_update((__ptep), (__entry).pte_low); \
 			    flush_tlb_page((__vma), (__address));         \

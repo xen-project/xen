@@ -33,6 +33,7 @@
 #include <linux/vmalloc.h>
 #include <asm/page.h>
 #include <asm/pgtable.h>
+#include <asm/tlbflush.h>
 #include <asm-xen/hypervisor.h>
 #include <asm-xen/balloon.h>
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,0)
@@ -93,6 +94,42 @@ void xen_invlpg(unsigned long ptr)
     op.linear_addr = ptr & PAGE_MASK;
     BUG_ON(HYPERVISOR_mmuext_op(&op, 1, NULL, DOMID_SELF) < 0);
 }
+
+#ifdef CONFIG_SMP
+
+void xen_tlb_flush_all(void)
+{
+    struct mmuext_op op;
+    op.cmd = MMUEXT_TLB_FLUSH_ALL;
+    BUG_ON(HYPERVISOR_mmuext_op(&op, 1, NULL, DOMID_SELF) < 0);
+}
+
+void xen_tlb_flush_mask(cpumask_t mask)
+{
+    struct mmuext_op op;
+    op.cmd = MMUEXT_TLB_FLUSH_MULTI;
+    op.cpuset = mask.bits[0];
+    BUG_ON(HYPERVISOR_mmuext_op(&op, 1, NULL, DOMID_SELF) < 0);
+}
+
+void xen_invlpg_all(unsigned long ptr)
+{
+    struct mmuext_op op;
+    op.cmd = MMUEXT_INVLPG_ALL;
+    op.linear_addr = ptr & PAGE_MASK;
+    BUG_ON(HYPERVISOR_mmuext_op(&op, 1, NULL, DOMID_SELF) < 0);
+}
+
+void xen_invlpg_mask(cpumask_t mask, unsigned long ptr)
+{
+    struct mmuext_op op;
+    op.cmd = MMUEXT_INVLPG_MULTI;
+    op.cpuset = mask.bits[0];
+    op.linear_addr = ptr & PAGE_MASK;
+    BUG_ON(HYPERVISOR_mmuext_op(&op, 1, NULL, DOMID_SELF) < 0);
+}
+
+#endif /* CONFIG_SMP */
 
 void xen_pgd_pin(unsigned long ptr)
 {
@@ -169,7 +206,7 @@ unsigned long allocate_empty_lowmem_region(unsigned long pages)
         phys_to_machine_mapping[__pa(vstart)>>PAGE_SHIFT] = INVALID_P2M_ENTRY;
     }
 
-    xen_tlb_flush();
+    flush_tlb_all();
 
     balloon_put_pages(pfn_array, 1 << order);
 

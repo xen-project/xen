@@ -260,8 +260,7 @@ static void balloon_process(void *unused)
 
         /* Ensure that ballooned highmem pages don't have cached mappings. */
         kmap_flush_unused();
-
-        xen_tlb_flush();
+        flush_tlb_all();
 
         /* No more mappings: invalidate pages in P2M and add to balloon. */
         for ( i = 0; i < debt; i++ )

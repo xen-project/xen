@@ -13,6 +13,7 @@
 #include <linux/pci.h>
 #include <linux/version.h>
 #include <asm/io.h>
+#include <asm/tlbflush.h>
 #include <asm-xen/balloon.h>
 
 #if LINUX_VERSION_CODE < KERNEL_VERSION(2,6,0)
@@ -78,9 +79,9 @@ xen_contig_memory(unsigned long vstart, unsigned int order)
 		phys_to_machine_mapping[(__pa(vstart)>>PAGE_SHIFT)+i] =
 			pfn+i;
 	}
-	xen_tlb_flush();
+	flush_tlb_all();
 
-        balloon_unlock(flags);
+	balloon_unlock(flags);
 }
 
 #if LINUX_VERSION_CODE < KERNEL_VERSION(2,6,0)
