@@ -2,6 +2,10 @@
 # Grand Unified Makefile for Xen.
 #
 
+# Default is to install to local 'dist' directory.
+DISTDIR ?= $(CURDIR)/dist
+DESTDIR ?= $(DISTDIR)/install
+
 INSTALL		:= install
 INSTALL_DIR	:= $(INSTALL) -d -m0755
 INSTALL_DATA	:= $(INSTALL) -m0644
@@ -27,6 +31,7 @@ all: dist
 
 # install everything into the standard system directories
 # NB: install explicitly does not check that everything is up to date!
+install: DESTDIR=
 install: xen checked-tools kernels docs
 
 # Only check for install req'mts on 'make install', not on 'make dist'.
@@ -35,8 +40,6 @@ checked-tools:
 	$(MAKE) -C tools install
 
 # build and install everything into local dist directory
-dist: DISTDIR=$(CURDIR)/dist
-dist: DESTDIR=$(DISTDIR)/install
 dist: xen tools kernels docs
 	$(INSTALL_DIR) $(DISTDIR)/check
 	$(INSTALL_DATA) ./COPYING $(DISTDIR)
