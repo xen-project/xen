@@ -15,6 +15,8 @@ from messages import *
 
 class BlkifBackendController(controller.BackendController):
     """ Handler for the 'back-end' channel to a device driver domain.
+    Must be connected using connect() before it can be used.
+    Do not create directly - use getBackend() on the BlkifController.
     """
 
     def __init__(self, ctrl, dom, handle):
@@ -287,7 +289,6 @@ class BlkifController(controller.SplitController):
     
     def __init__(self, factory, dom):
         """Create a block device controller.
-        The controller must be connected using connect() before it can be used.
         Do not call directly - use createInstance() on the factory instead.
         """
         controller.SplitController.__init__(self, factory, dom)

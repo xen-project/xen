@@ -466,7 +466,7 @@ class XendDomainInfo:
         # my domain id.
         if not dominfo:
             return
-        print 'check_name>', 'dom=', dominfo.name, dominfo.dom, 'self=', name, self.dom
+        #print 'check_name>', 'dom=', dominfo.name, dominfo.dom, 'self=', name, self.dom
         if dominfo.is_terminated():
             return
         if not self.dom or (dominfo.dom != self.dom):
@@ -922,12 +922,10 @@ class XendDomainInfo:
     def configure(self):
         """Configure a vm.
 
-        vm         virtual machine
-        config     configuration
-
-        returns Deferred - calls callback with vm
+        @return: deferred - calls callback with vm
         """
-        d = self.create_devices()
+        d = self.create_blkif()
+        d.addCallback(lambda x: self.create_devices())
         d.addCallback(self._configure)
         return d
 
@@ -942,16 +940,27 @@ class XendDomainInfo:
         d.addErrback(cberr)
         return d
 
+    def create_blkif(self):
+        """Create the block device interface (blkif) for the vm.
+        The vm needs a blkif even if it doesn't have any disks
+        at creation time, for example when it uses NFS root.
+
+        @return: deferred
+        """
+        ctrl = xend.blkif_create(self.dom, recreate=self.recreate)
+        back = ctrl.getBackend(0)
+        return back.connect(recreate=self.recreate)
+    
     def dom_construct(self, dom, config):
         """Construct a vm for an existing domain.
 
-        @param dom:    domain id
+        @param dom: domain id
+        @param config: domain configuration
         @return: deferred
         """
         d = dom_get(dom)
         if not d:
             raise VmError("Domain not found: %d" % dom)
-        print 'dom_construct>', dom, config
         try:
             self.restore = 1
             self.setdom(dom)
