@@ -235,7 +235,7 @@ void mod_ac_timer(struct ac_timer *timer, s_time_t new_time)
 }
 
 
-static void ac_timer_softirq_action(struct softirq_action *a)
+static void ac_timer_softirq_action(void)
 {
     int              cpu = smp_processor_id();
     struct ac_timer *t, **heap;
@@ -303,7 +303,7 @@ void __init ac_timer_init(void)
 
     printk ("ACT: Initialising Accurate timers\n");
 
-    open_softirq(AC_TIMER_SOFTIRQ, ac_timer_softirq_action, NULL);
+    open_softirq(AC_TIMER_SOFTIRQ, ac_timer_softirq_action);
 
     for ( i = 0; i < smp_num_cpus; i++ )
     {

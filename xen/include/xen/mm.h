@@ -55,7 +55,7 @@ struct pfn_info
     /* The following possible uses are context-dependent. */
     union {
         /* Page is in use and not a zombie: we keep a pointer to its owner. */
-        struct task_struct *domain;
+        struct domain *domain;
         /* Page is not currently allocated: mask of possibly-tainted TLBs. */
         unsigned long cpu_mask;
         /* Page is a zombie: this word currently has no use. */
@@ -127,7 +127,7 @@ extern unsigned long max_page;
 void init_frametable(unsigned long nr_pages);
 void add_to_domain_alloc_list(unsigned long ps, unsigned long pe);
 
-struct pfn_info *alloc_domain_page(struct task_struct *p);
+struct pfn_info *alloc_domain_page(struct domain *p);
 void free_domain_page(struct pfn_info *page);
 
 int alloc_page_type(struct pfn_info *page, unsigned int type);
@@ -149,10 +149,10 @@ static inline void put_page(struct pfn_info *page)
 
 
 static inline int get_page(struct pfn_info *page,
-                           struct task_struct *domain)
+                           struct domain *domain)
 {
     u32 x, nx, y = page->count_and_flags;
-    struct task_struct *p, *np = page->u.domain;
+    struct domain *p, *np = page->u.domain;
 
     do {
         x  = y;
@@ -283,7 +283,7 @@ static inline void put_page_and_type(struct pfn_info *page)
 
 
 static inline int get_page_and_type(struct pfn_info *page,
-                                    struct task_struct *domain,
+                                    struct domain *domain,
                                     u32 type)
 {
     int rc = get_page(page, domain);

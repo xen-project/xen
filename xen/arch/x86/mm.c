@@ -212,7 +212,7 @@ int check_descriptor(unsigned long a, unsigned long b)
 }
 
 
-long set_gdt(struct task_struct *p, 
+long set_gdt(struct domain *p, 
              unsigned long *frames,
              unsigned int entries)
 {

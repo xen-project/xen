@@ -69,16 +69,10 @@ static void halt_machine(u_char key, void *dev_id, struct pt_regs *regs)
     machine_restart(NULL); 
 }
 
-static void kill_dom0(u_char key, void *dev_id, struct pt_regs *regs) 
-{
-    printk("'%c' pressed -> gracefully rebooting machine\n", key); 
-    kill_other_domain(0, 0);
-}
-
 void do_task_queues(u_char key, void *dev_id, struct pt_regs *regs) 
 {
     unsigned long       flags;
-    struct task_struct *p; 
+    struct domain *p; 
     shared_info_t      *s; 
     s_time_t            now = NOW();
 
@@ -89,10 +83,8 @@ void do_task_queues(u_char key, void *dev_id, struct pt_regs *regs)
 
     for_each_domain ( p )
     {
-        printk("Xen: DOM %u, CPU %d [has=%c], state = ",
+        printk("Xen: DOM %u, CPU %d [has=%c]\n",
                p->domain, p->processor, p->has_cpu ? 'T':'F'); 
-        sched_prn_state(p ->state);
-        printk(", hyp_events = %08x\n", p->hyp_events);
         s = p->shared_info; 
         printk("Guest: upcall_pend = %02x, upcall_mask = %02x\n", 
                s->vcpu_data[0].evtchn_upcall_pending, 
@@ -132,8 +124,7 @@ void initialize_keytable(void)
     add_key_handler('L', reset_sched_histo, "reset sched latency histogram");
     add_key_handler('q', do_task_queues, "dump task queues + guest state");
     add_key_handler('r', dump_runq,      "dump run queues");
-    add_key_handler('B', kill_dom0,      "reboot machine gracefully"); 
-    add_key_handler('R', halt_machine,   "reboot machine ungracefully"); 
+    add_key_handler('R', halt_machine,   "reboot machine"); 
 #ifdef PERF_COUNTERS
     add_key_handler('p', perfc_printall, "print performance counters"); 
     add_key_handler('P', perfc_reset,    "reset performance counters"); 

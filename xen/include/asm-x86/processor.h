@@ -17,7 +17,7 @@
 #include <xen/spinlock.h>
 #include <hypervisor-ifs/hypervisor-if.h>
 
-struct task_struct;
+struct domain;
 
 /*
  * Default implementation of macro that returns current
@@ -233,8 +233,7 @@ static inline void clear_in_cr4 (unsigned long mask)
 /*
  * Size of io_bitmap in longwords:
  * For Xen we support the full 8kbyte IO bitmap but use the io_bitmap_sel field
- * of the task_struct to avoid a full 8kbyte copy when switching to / from
- * domains with bits cleared.
+ * to avoid a full 8kbyte copy when switching to domains with bits cleared.
  */
 #define IO_BITMAP_SIZE	2048
 #define IO_BITMAP_BYTES (IO_BITMAP_SIZE * 4)
@@ -330,7 +329,7 @@ extern struct desc_struct *idt_tables[];
             &((_p)->fast_trap_desc), 8))
 #endif
 
-long set_fast_trap(struct task_struct *p, int idx);
+long set_fast_trap(struct domain *p, int idx);
 
 #define INIT_THREAD  {						\
 	0, 0,		      		       			\
@@ -405,11 +404,11 @@ static inline void write_ptbase(struct mm_struct *mm)
 #define GET_GDT_ENTRIES(_p)     ((*(u16 *)((_p)->mm.gdt + 0)))
 #define GET_GDT_ADDRESS(_p)     ((*(unsigned long *)((_p)->mm.gdt + 2)))
 
-long set_gdt(struct task_struct *p, 
+long set_gdt(struct domain *p, 
              unsigned long *frames, 
              unsigned int entries);
 
-long set_debugreg(struct task_struct *p, int reg, unsigned long value);
+long set_debugreg(struct domain *p, int reg, unsigned long value);
 
 struct microcode {
     unsigned int hdrver;

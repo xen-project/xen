@@ -1,14 +1,14 @@
 #ifndef _X86_CURRENT_H
 #define _X86_CURRENT_H
 
-struct task_struct;
+struct domain;
 
 #define STACK_RESERVED \
-    (sizeof(execution_context_t) + sizeof(struct task_struct *))
+    (sizeof(execution_context_t) + sizeof(struct domain *))
 
-static inline struct task_struct * get_current(void)
+static inline struct domain * get_current(void)
 {
-    struct task_struct *current;
+    struct domain *current;
     __asm__ ( "orl %%esp,%0; andl $~3,%0; movl (%0),%0" 
               : "=r" (current) : "0" (STACK_SIZE-4) );
     return current;
@@ -16,7 +16,7 @@ static inline struct task_struct * get_current(void)
  
 #define current get_current()
 
-static inline void set_current(struct task_struct *p)
+static inline void set_current(struct domain *p)
 {
     __asm__ ( "orl %%esp,%0; andl $~3,%0; movl %1,(%0)" 
               : : "r" (STACK_SIZE-4), "r" (p) );    

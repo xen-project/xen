@@ -40,8 +40,6 @@
 
 #ifndef __ASSEMBLY__
 #include <xen/compiler.h>
-extern unsigned int opt_ser_baud;
-#define SERIAL_ENABLED (opt_ser_baud != 0)
 #endif
 
 #endif /* __XEN_CONFIG_H__ */

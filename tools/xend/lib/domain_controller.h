@@ -29,7 +29,7 @@ typedef struct {
 
 
 /*
- * Stop codes for SCHEDOP_stop. These are opaque to Xen but interpreted by
+ * Stop codes for SCHEDOP_suspend. These are opaque to Xen but interpreted by
  * control software to determine appropriate action.
  */
 
@@ -69,6 +69,8 @@ typedef struct {
 #define CMSG_BLKIF_FE       2  /* Block-device frontend   */
 #define CMSG_NETIF_BE       3  /* Network-device backend  */
 #define CMSG_NETIF_FE       4  /* Network-device frontend */
+#define CMSG_SUSPEND        5  /* Suspend messages        */
+#define CMSG_SHUTDOWN       6  /* Shutdown messages       */
 
 
 /******************************************************************************
@@ -514,5 +516,28 @@ typedef struct {
 typedef struct {
     u32        status;        /*  0: NETIF_DRIVER_STATUS_??? */
 } PACKED netif_be_driver_status_changed_t; /* 4 bytes */
+
+
+/******************************************************************************
+ * SUSPEND DEFINITIONS
+ */
+
+/*
+ * Subtypes for console messages.
+ */
+/* None. */
+
+
+/******************************************************************************
+ * CONSOLE DEFINITIONS
+ */
+
+/*
+ * Subtypes for console messages.
+ */
+#define CMSG_SHUTDOWN_HALT      0   /* Shutdown and halt (don't die). */
+#define CMSG_SHUTDOWN_POWEROFF  1   /* 'Poweroff' => clean death.     */
+#define CMSG_SHUTDOWN_REBOOT    2   /* Shutdown and restart.          */
+
 
 #endif /* __DOMAIN_CONTROLLER_H__ */

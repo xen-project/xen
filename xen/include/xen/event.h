@@ -18,27 +18,10 @@
  */
 
 /* Schedule an asynchronous callback for the specified domain. */
-static inline void guest_schedule_to_run(struct task_struct *p)
+static inline void guest_async_callback(struct domain *p)
 {
-#ifdef CONFIG_SMP
-    unsigned long flags, cpu_mask;
-
-    spin_lock_irqsave(&schedule_lock[p->processor], flags);
-    if ( p->state == TASK_INTERRUPTIBLE )
-        __wake_up(p);
-    cpu_mask = __reschedule(p);
-    if ( p->has_cpu )
-        cpu_mask |= 1 << p->processor;
-    spin_unlock_irqrestore(&schedule_lock[p->processor], flags);
-
-    cpu_mask &= ~(1 << smp_processor_id());
-    if ( cpu_mask != 0 )
-        smp_send_event_check_mask(cpu_mask);
-#else
-    if ( p->state == TASK_INTERRUPTIBLE )
-        wake_up(p);
-    reschedule(p);
-#endif
+    if ( !domain_unblock(p) && p->has_cpu && (p != current) )
+        smp_send_event_check_mask(1 << p->processor);
 }
 
 /*
@@ -48,7 +31,7 @@ static inline void guest_schedule_to_run(struct task_struct *p)
  * may require explicit memory barriers.
  */
 
-static inline void evtchn_set_pending(struct task_struct *p, int port)
+static inline void evtchn_set_pending(struct domain *p, int port)
 {
     shared_info_t *s = p->shared_info;
     if ( !test_and_set_bit(port,    &s->evtchn_pending[0]) &&
@@ -57,11 +40,11 @@ static inline void evtchn_set_pending(struct task_struct *p, int port)
     {
         /* The VCPU pending flag must be set /after/ update to evtchn-pend. */
         s->vcpu_data[0].evtchn_upcall_pending = 1;
-        guest_schedule_to_run(p);
+        guest_async_callback(p);
     }
 }
 
-static inline void evtchn_set_exception(struct task_struct *p, int port)
+static inline void evtchn_set_exception(struct domain *p, int port)
 {
     if ( !test_and_set_bit(port, &p->shared_info->evtchn_exception[0]) )
         evtchn_set_pending(p, port);
@@ -72,7 +55,7 @@ static inline void evtchn_set_exception(struct task_struct *p, int port)
  *  @p:        Domain to which virtual IRQ should be sent
  *  @virq:     Virtual IRQ number (VIRQ_*)
  */
-static inline void send_guest_virq(struct task_struct *p, int virq)
+static inline void send_guest_virq(struct domain *p, int virq)
 {
     evtchn_set_pending(p, p->virq_to_evtchn[virq]);
 }
@@ -82,23 +65,13 @@ static inline void send_guest_virq(struct task_struct *p, int virq)
  *  @p:        Domain to which physical IRQ should be sent
  *  @pirq:     Physical IRQ number
  */
-static inline void send_guest_pirq(struct task_struct *p, int pirq)
+static inline void send_guest_pirq(struct domain *p, int pirq)
 {
     evtchn_set_pending(p, p->pirq_to_evtchn[pirq]);
 }
 
-
-/*
- * HYPERVISOR-HANDLED EVENTS
- */
-
-static inline void send_hyp_event(struct task_struct *p, int event)
-{
-    if ( !test_and_set_bit(event, &p->hyp_events) )
-        guest_schedule_to_run(p);
-}
-
-/* Called on return from (architecture-dependent) entry.S. */
-void do_hyp_events(void);
+#define event_pending(_d)                                     \
+    ((_d)->shared_info->vcpu_data[0].evtchn_upcall_pending && \
+     !(_d)->shared_info->vcpu_data[0].evtchn_upcall_mask)
 
 #endif /* __XEN_EVENT_H__ */

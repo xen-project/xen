@@ -233,7 +233,7 @@ void shadow_mode_init(void)
 {
 }
 
-int shadow_mode_enable( struct task_struct *p, unsigned int mode )
+int shadow_mode_enable( struct domain *p, unsigned int mode )
 {
     struct mm_struct *m = &p->mm;
     struct shadow_status **fptr;
@@ -298,7 +298,7 @@ nomem:
     return -ENOMEM;
 }
 
-void shadow_mode_disable( struct task_struct *p )
+void shadow_mode_disable( struct domain *p )
 {
     struct mm_struct *m = &p->mm;
     struct shadow_status *next;
@@ -331,7 +331,7 @@ void shadow_mode_disable( struct task_struct *p )
     kfree( &m->shadow_ht[0] );
 }
 
-static int shadow_mode_table_op( struct task_struct *p, 
+static int shadow_mode_table_op( struct domain *p, 
 								 dom0_shadow_control_t *sc )
 {
     unsigned int op = sc->op;
@@ -415,12 +415,9 @@ static int shadow_mode_table_op( struct task_struct *p,
 					0, bytes);
 		}
 
-		if (zero)
-		{
-			/* might as well stop the domain as an optimization. */
-			if ( p->state != TASK_STOPPED )
-				send_guest_virq(p, VIRQ_STOP);
-		}
+        /* Might as well stop the domain as an optimization. */
+		if ( zero )
+            domain_controller_pause(p);
 
 		break;
     }
@@ -471,7 +468,7 @@ out:
     return rc;
 }
 
-int shadow_mode_control( struct task_struct *p, dom0_shadow_control_t *sc )
+int shadow_mode_control( struct domain *p, dom0_shadow_control_t *sc )
 {
     unsigned int cmd = sc->op;
     int rc = 0;

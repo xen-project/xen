@@ -243,7 +243,7 @@ static void switch_serial_input(void)
 static void __serial_rx(unsigned char c, struct pt_regs *regs)
 {
     key_handler *handler;
-    struct task_struct *p;
+    struct domain *p;
 
     if ( xen_rx )
     {
@@ -257,7 +257,7 @@ static void __serial_rx(unsigned char c, struct pt_regs *regs)
         {
             p = find_domain_by_id(0); /* only DOM0 reads the serial buffer */
             send_guest_virq(p, VIRQ_CONSOLE);
-            put_task_struct(p);
+            put_domain(p);
         }
     }
 }
@@ -445,7 +445,7 @@ long do_console_write(char *str, unsigned int count)
 
     return 0;
 #else
-    if ( !test_and_set_bit(PF_CONSOLEWRITEBUG, &current->flags) )
+    if ( !test_and_set_bit(DF_CONSOLEWRITEBUG, &current->flags) )
     {
         printk("DOM%u is attempting to use the deprecated "
                "HYPERVISOR_console_write() interface.\n", current->domain);

@@ -46,7 +46,6 @@ int xc_domain_stop(int xc_handle,
     dom0_op_t op;
     op.cmd = DOM0_STOPDOMAIN;
     op.u.stopdomain.domain = (domid_t)domid;
-    op.u.stopdomain.sync = 0; /* async */
     return do_dom0_op(xc_handle, &op);
 }    
 
@@ -97,7 +96,8 @@ int xc_domain_getinfo(int xc_handle,
         info->has_cpu =
             (op.u.getdomaininfo.flags&DOMFLAGS_STATEMASK) == DOMSTATE_RUNNING;
         info->stopped = 
-            (op.u.getdomaininfo.flags&DOMFLAGS_STATEMASK) == DOMSTATE_STOPPED;
+            (op.u.getdomaininfo.flags&DOMFLAGS_STATEMASK)
+            == DOMSTATE_SUSPENDED;
 
         info->nr_pages = op.u.getdomaininfo.tot_pages;
         info->max_memkb = op.u.getdomaininfo.max_pages<<(PAGE_SHIFT-10);

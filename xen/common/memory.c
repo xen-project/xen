@@ -151,10 +151,10 @@
 
 static int alloc_l2_table(struct pfn_info *page);
 static int alloc_l1_table(struct pfn_info *page);
-static int get_page_from_pagenr(unsigned long page_nr, struct task_struct *p);
+static int get_page_from_pagenr(unsigned long page_nr, struct domain *p);
 static int get_page_and_type_from_pagenr(unsigned long page_nr, 
                                          u32 type,
-                                         struct task_struct *p);
+                                         struct domain *p);
 
 static void free_l2_table(struct pfn_info *page);
 static void free_l1_table(struct pfn_info *page);
@@ -178,7 +178,7 @@ static struct {
     unsigned long       deferred_ops;
     unsigned long       cr0;
     /* General-Purpose Subject, Page-Table Subject */
-    struct task_struct *gps, *pts;
+    struct domain *gps, *pts;
 } percpu_info[NR_CPUS] __cacheline_aligned;
 
 /* Determine the current General-Purpose Subject or Page-Table Subject. */
@@ -241,7 +241,7 @@ void add_to_domain_alloc_list(unsigned long ps, unsigned long pe)
     spin_unlock_irqrestore(&free_list_lock, flags);
 }
 
-static void __invalidate_shadow_ldt(struct task_struct *p)
+static void __invalidate_shadow_ldt(struct domain *p)
 {
     int i;
     unsigned long pfn;
@@ -267,7 +267,7 @@ static void __invalidate_shadow_ldt(struct task_struct *p)
 
 static inline void invalidate_shadow_ldt(void)
 {
-    struct task_struct *p = current;
+    struct domain *p = current;
     if ( p->mm.shadow_ldt_mapcnt != 0 )
         __invalidate_shadow_ldt(p);
 }
@@ -294,10 +294,10 @@ int alloc_segdesc_page(struct pfn_info *page)
 /* Map shadow page at offset @off. */
 int map_ldt_shadow_page(unsigned int off)
 {
-    struct task_struct *p = current;
+    struct domain *p = current;
     unsigned long l1e;
 
-    if ( unlikely(in_interrupt()) )
+    if ( unlikely(in_irq()) )
         BUG();
 
     __get_user(l1e, (unsigned long *)&linear_pg_table[(p->mm.ldt_base >> 
@@ -315,7 +315,7 @@ int map_ldt_shadow_page(unsigned int off)
 }
 
 
-static int get_page_from_pagenr(unsigned long page_nr, struct task_struct *p)
+static int get_page_from_pagenr(unsigned long page_nr, struct domain *p)
 {
     struct pfn_info *page = &frame_table[page_nr];
 
@@ -337,7 +337,7 @@ static int get_page_from_pagenr(unsigned long page_nr, struct task_struct *p)
 
 static int get_page_and_type_from_pagenr(unsigned long page_nr, 
                                          u32 type,
-                                         struct task_struct *p)
+                                         struct domain *p)
 {
     struct pfn_info *page = &frame_table[page_nr];
 
@@ -412,7 +412,7 @@ static int get_page_from_l1e(l1_pgentry_t l1e)
 {
     unsigned long l1v = l1_pgentry_val(l1e);
     unsigned long pfn = l1_pgentry_to_pagenr(l1e);
-    extern int domain_iomem_in_pfn(struct task_struct *p, unsigned long pfn);
+    extern int domain_iomem_in_pfn(struct domain *p, unsigned long pfn);
 
     if ( !(l1v & _PAGE_PRESENT) )
         return 1;
@@ -719,7 +719,7 @@ int alloc_page_type(struct pfn_info *page, unsigned int type)
     if ( unlikely(test_and_clear_bit(_PGC_tlb_flush_on_type_change, 
                                      &page->count_and_flags)) )
     {
-        struct task_struct *p = page->u.domain;
+        struct domain *p = page->u.domain;
         mb(); /* Check zombie status before using domain ptr. */
         /*
          * NB. 'p' may no longer be valid by time we dereference it, so
@@ -803,7 +803,7 @@ static int do_extended_command(unsigned long ptr, unsigned long val)
     unsigned long pfn = ptr >> PAGE_SHIFT;
     unsigned long old_base_pfn;
     struct pfn_info *page = &frame_table[pfn];
-    struct task_struct *p = current, *q;
+    struct domain *p = current, *q;
     domid_t domid;
 
     switch ( cmd )
@@ -926,7 +926,7 @@ static int do_extended_command(unsigned long ptr, unsigned long val)
         else
         {
             if ( percpu_info[cpu].gps != NULL )
-                put_task_struct(percpu_info[cpu].gps);
+                put_domain(percpu_info[cpu].gps);
             percpu_info[cpu].gps = find_domain_by_id(domid);
             percpu_info[cpu].pts = (val & SET_PAGETABLE_SUBJECTDOM) ? 
                 percpu_info[cpu].gps : NULL;
@@ -968,7 +968,7 @@ static int do_extended_command(unsigned long ptr, unsigned long val)
 
     case MMUEXT_RESET_SUBJECTDOM:
         if ( percpu_info[cpu].gps != NULL )
-            put_task_struct(percpu_info[cpu].gps);
+            put_domain(percpu_info[cpu].gps);
         percpu_info[cpu].gps = percpu_info[cpu].pts = NULL;
         break;
 
@@ -1146,7 +1146,7 @@ int do_mmu_update(mmu_update_t *ureqs, int count, int *success_count)
 
     if ( unlikely(percpu_info[cpu].gps != NULL) )
     {
-        put_task_struct(percpu_info[cpu].gps);
+        put_domain(percpu_info[cpu].gps);
         percpu_info[cpu].gps = percpu_info[cpu].pts = NULL;
     }
 
@@ -1161,7 +1161,7 @@ int do_update_va_mapping(unsigned long page_nr,
                          unsigned long val, 
                          unsigned long flags)
 {
-    struct task_struct *p = current;
+    struct domain *p = current;
     int err = 0;
     unsigned int cpu = p->processor;
     unsigned long deferred_ops;
@@ -1228,7 +1228,7 @@ int do_update_va_mapping_otherdomain(unsigned long page_nr,
                                      domid_t domid)
 {
     unsigned int cpu = smp_processor_id();
-    struct task_struct *p;
+    struct domain *p;
     int rc;
 
     if ( unlikely(!IS_PRIV(current)) )
@@ -1243,7 +1243,7 @@ int do_update_va_mapping_otherdomain(unsigned long page_nr,
 
     rc = do_update_va_mapping(page_nr, val, flags);
 
-    put_task_struct(p);
+    put_domain(p);
     percpu_info[cpu].gps = NULL;
 
     return rc;

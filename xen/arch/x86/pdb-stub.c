@@ -100,7 +100,7 @@ pdb_process_query (char *ptr)
     else if (strcmp(ptr, "fThreadInfo") == 0)
     {
 #ifdef PDB_PAST
-        struct task_struct *p;
+        struct domain *p;
         u_long flags;
 #endif /* PDB_PAST */
 
@@ -197,11 +197,11 @@ pdb_process_query (char *ptr)
 #ifdef PDB_PAST
         int thread = 0;
 	char message[16];
-	struct task_struct *p;
+	struct domain *p;
 
 	p = find_domain_by_id(pdb_ctx[pdb_level].info);
 	strncpy (message, p->name, 16);
-	put_task_struct(p);
+	put_domain(p);
 
 	ptr += 16;
         if (hexToInt (&ptr, &thread))
@@ -327,7 +327,7 @@ pdb_process_command (char *ptr, struct pt_regs *regs, unsigned long cr3,
     {
         if (pdb_ctx.domain == -1)                        /* pdb context: xen */
 	{
-	    struct task_struct *p;
+	    struct domain *p;
 
 	    p = &idle0_task;
 	    if (p->mm.shadow_mode)
@@ -337,7 +337,7 @@ pdb_process_command (char *ptr, struct pt_regs *regs, unsigned long cr3,
 	}
 	else if (pdb_ctx.process == -1)             /* pdb context: guest os */
 	{
-	    struct task_struct *p;
+	    struct domain *p;
 
 	    if (pdb_ctx.domain == -2)
 	    {
@@ -358,11 +358,11 @@ pdb_process_command (char *ptr, struct pt_regs *regs, unsigned long cr3,
 	        pdb_ctx.ptbr = pagetable_val(p->mm.shadow_table);
 	    else
 	        pdb_ctx.ptbr = pagetable_val(p->mm.pagetable);
-	    put_task_struct(p);
+	    put_domain(p);
 	}
 	else                                         /* pdb context: process */
 	{
-	    struct task_struct *p;
+	    struct domain *p;
 	    unsigned long domain_ptbr;
 
 	    p = find_domain_by_id(pdb_ctx.domain);
@@ -378,7 +378,7 @@ pdb_process_command (char *ptr, struct pt_regs *regs, unsigned long cr3,
 	        domain_ptbr = pagetable_val(p->mm.shadow_table);
 	    else
 	        domain_ptbr = pagetable_val(p->mm.pagetable);
-	    put_task_struct(p);
+	    put_domain(p);
 
 	    pdb_ctx.ptbr = domain_ptbr;
 	    /*pdb_ctx.ptbr=pdb_linux_pid_ptbr(domain_ptbr, pdb_ctx.process);*/
@@ -603,13 +603,13 @@ pdb_process_command (char *ptr, struct pt_regs *regs, unsigned long cr3,
 	    {
 	        case PDB_LVL_XEN:
 		{
-		    struct task_struct *p;
+		    struct domain *p;
 		    id -= PDB_ID_OFFSET;
 		    if ( (p = find_domain_by_id(id)) == NULL)
 		        strcpy (pdb_out_buffer, "E00");
 		    else
 		        strcpy (pdb_out_buffer, "OK");
-		    put_task_struct(p);
+		    put_domain(p);
 
 		    pdb_level = PDB_LVL_GUESTOS;
 		    pdb_ctx[pdb_level].ctrl = id;
@@ -986,11 +986,11 @@ int pdb_change_values_one_page(u_char *buffer, int length,
 	}
 	else
 	{
-	    struct task_struct *p = find_domain_by_id(0);
+	    struct domain *p = find_domain_by_id(0);
 	    printk ("pdb error: cr3: 0x%lx    dom0cr3:  0x%lx\n",  cr3,
 		    p->mm.shadow_mode ? pagetable_val(p->mm.shadow_table)
 		    : pagetable_val(p->mm.pagetable));
-	    put_task_struct(p);
+	    put_domain(p);
 	    printk ("pdb error: L2:0x%p (0x%lx)\n", 
 		    l2_table, l2_pgentry_val(*l2_table));
 	}

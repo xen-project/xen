@@ -187,7 +187,7 @@ static inline void do_trap(int trapnr, char *str,
                            struct pt_regs *regs, 
                            long error_code, int use_error_code)
 {
-    struct task_struct *p = current;
+    struct domain *p = current;
     struct guest_trap_bounce *gtb = guest_trap_bounce+smp_processor_id();
     trap_info_t *ti;
     unsigned long fixup;
@@ -248,7 +248,7 @@ DO_ERROR_NOCODE( 0, "divide error", divide_error)
 
     asmlinkage void do_int3(struct pt_regs *regs, long error_code)
 {
-    struct task_struct *p = current;
+    struct domain *p = current;
     struct guest_trap_bounce *gtb = guest_trap_bounce+smp_processor_id();
     trap_info_t *ti;
 
@@ -314,7 +314,7 @@ asmlinkage void do_page_fault(struct pt_regs *regs, long error_code)
     struct guest_trap_bounce *gtb = guest_trap_bounce+smp_processor_id();
     trap_info_t *ti;
     unsigned long off, addr, fixup;
-    struct task_struct *p = current;
+    struct domain *p = current;
     extern int map_ldt_shadow_page(unsigned int);
 
     __asm__ __volatile__ ("movl %%cr2,%0" : "=r" (addr) : );
@@ -400,7 +400,7 @@ asmlinkage void do_page_fault(struct pt_regs *regs, long error_code)
 
 asmlinkage void do_general_protection(struct pt_regs *regs, long error_code)
 {
-    struct task_struct *p = current;
+    struct domain *p = current;
     struct guest_trap_bounce *gtb = guest_trap_bounce+smp_processor_id();
     trap_info_t *ti;
     unsigned long fixup;
@@ -523,16 +523,16 @@ asmlinkage void math_state_restore(struct pt_regs *regs, long error_code)
     /* Prevent recursion. */
     clts();
 
-    if ( !test_bit(PF_USEDFPU, &current->flags) )
+    if ( !test_bit(DF_USEDFPU, &current->flags) )
     {
-        if ( test_bit(PF_DONEFPUINIT, &current->flags) )
+        if ( test_bit(DF_DONEFPUINIT, &current->flags) )
             restore_fpu(current);
         else
             init_fpu();
-        set_bit(PF_USEDFPU, &current->flags); /* so we fnsave on switch_to() */
+        set_bit(DF_USEDFPU, &current->flags); /* so we fnsave on switch_to() */
     }
 
-    if ( test_and_clear_bit(PF_GUEST_STTS, &current->flags) )
+    if ( test_and_clear_bit(DF_GUEST_STTS, &current->flags) )
     {
         struct guest_trap_bounce *gtb = guest_trap_bounce+smp_processor_id();
         gtb->flags      = GTBF_TRAP_NOCODE;
@@ -545,7 +545,7 @@ asmlinkage void math_state_restore(struct pt_regs *regs, long error_code)
 asmlinkage void do_pdb_debug(struct pt_regs *regs, long error_code)
 {
     unsigned int condition;
-    struct task_struct *tsk = current;
+    struct domain *tsk = current;
     struct guest_trap_bounce *gtb = guest_trap_bounce+smp_processor_id();
 
     __asm__ __volatile__("movl %%db6,%0" : "=r" (condition));
@@ -567,7 +567,7 @@ asmlinkage void do_pdb_debug(struct pt_regs *regs, long error_code)
 asmlinkage void do_debug(struct pt_regs *regs, long error_code)
 {
     unsigned int condition;
-    struct task_struct *tsk = current;
+    struct domain *tsk = current;
     struct guest_trap_bounce *gtb = guest_trap_bounce+smp_processor_id();
 
 #ifdef XEN_DEBUGGER
@@ -760,7 +760,7 @@ long do_set_callbacks(unsigned long event_selector,
                       unsigned long failsafe_selector,
                       unsigned long failsafe_address)
 {
-    struct task_struct *p = current;
+    struct domain *p = current;
 
     if ( !VALID_CODESEL(event_selector) || !VALID_CODESEL(failsafe_selector) )
         return -EPERM;
@@ -774,7 +774,7 @@ long do_set_callbacks(unsigned long event_selector,
 }
 
 
-long set_fast_trap(struct task_struct *p, int idx)
+long set_fast_trap(struct domain *p, int idx)
 {
     trap_info_t *ti;
 
@@ -827,13 +827,13 @@ long do_set_fast_trap(int idx)
 
 long do_fpu_taskswitch(void)
 {
-    set_bit(PF_GUEST_STTS, &current->flags);
+    set_bit(DF_GUEST_STTS, &current->flags);
     stts();
     return 0;
 }
 
 
-long set_debugreg(struct task_struct *p, int reg, unsigned long value)
+long set_debugreg(struct domain *p, int reg, unsigned long value)
 {
     int i;
 

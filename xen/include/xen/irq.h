@@ -56,10 +56,10 @@ extern void free_irq(unsigned int);
 extern hw_irq_controller no_irq_type;
 extern void no_action(int cpl, void *dev_id, struct pt_regs *regs);
 
-struct task_struct;
-extern int pirq_guest_unmask(struct task_struct *p);
-extern int pirq_guest_bind(struct task_struct *p, int irq, int will_share);
-extern int pirq_guest_unbind(struct task_struct *p, int irq);
+struct domain;
+extern int pirq_guest_unmask(struct domain *p);
+extern int pirq_guest_bind(struct domain *p, int irq, int will_share);
+extern int pirq_guest_unbind(struct domain *p, int irq);
 extern int pirq_guest_bindable(int irq, int will_share);
 
 #endif /* __XEN_IRQ_H__ */

@@ -95,7 +95,7 @@ static void __calc_evt(struct bvt_dom_info *inf)
  *
  * Returns non-zero on failure.
  */
-int bvt_alloc_task(struct task_struct *p)
+int bvt_alloc_task(struct domain *p)
 {
     if ( (BVT_INFO(p) = kmem_cache_alloc(dom_info_cache,GFP_KERNEL)) == NULL )
         return -1;
@@ -106,7 +106,7 @@ int bvt_alloc_task(struct task_struct *p)
 /*
  * Add and remove a domain
  */
-void bvt_add_task(struct task_struct *p) 
+void bvt_add_task(struct domain *p) 
 {
     struct bvt_dom_info *inf = BVT_INFO(p);
 
@@ -138,14 +138,14 @@ void bvt_add_task(struct task_struct *p)
  * bvt_free_task - free BVT private structures for a task
  * @p:             task
  */
-void bvt_free_task(struct task_struct *p)
+void bvt_free_task(struct domain *p)
 {
     ASSERT( p->sched_priv != NULL );
     kmem_cache_free( dom_info_cache, p->sched_priv );
 }
 
 
-void bvt_wake_up(struct task_struct *p)
+void bvt_wake_up(struct domain *p)
 {
     struct bvt_dom_info *inf = BVT_INFO(p);
 
@@ -166,7 +166,7 @@ void bvt_wake_up(struct task_struct *p)
 /* 
  * Block the currently-executing domain until a pertinent event occurs.
  */
-static void bvt_do_block(struct task_struct *p)
+static void bvt_do_block(struct domain *p)
 {
     BVT_INFO(p)->warpback = 0; 
 }
@@ -189,7 +189,7 @@ int bvt_ctl(struct sched_ctl_cmd *cmd)
 }
 
 /* Adjust scheduling parameter for a given domain. */
-int bvt_adjdom(struct task_struct *p,
+int bvt_adjdom(struct domain *p,
                struct sched_adjdom_cmd *cmd)
 {
     struct bvt_adjdom *params = &cmd->u.bvt;
@@ -251,7 +251,7 @@ int bvt_adjdom(struct task_struct *p,
  */
 static task_slice_t bvt_do_schedule(s_time_t now)
 {
-    struct task_struct *prev = current, *next = NULL, *next_prime, *p;
+    struct domain *prev = current, *next = NULL, *next_prime, *p;
     struct list_head   *tmp;
     int                 cpu = prev->processor;
     s32                 r_time;     /* time for new dom to run */
@@ -278,7 +278,7 @@ static task_slice_t bvt_do_schedule(s_time_t now)
         
         __del_from_runqueue(prev);
         
-        if ( likely(prev->state == TASK_RUNNING) )
+        if ( domain_runnable(prev) )
             __add_to_runqueue_tail(prev);
     }
 
@@ -299,7 +299,7 @@ static task_slice_t bvt_do_schedule(s_time_t now)
 
     list_for_each ( tmp, &schedule_data[cpu].runqueue )
     {
-        p     = list_entry(tmp, struct task_struct, run_list);
+        p     = list_entry(tmp, struct domain, run_list);
         p_inf = BVT_INFO(p);
 
         if ( p_inf->evt < next_evt )
@@ -385,7 +385,7 @@ static task_slice_t bvt_do_schedule(s_time_t now)
 }
 
 
-static void bvt_dump_runq_el(struct task_struct *p)
+static void bvt_dump_runq_el(struct domain *p)
 {
     struct bvt_dom_info *inf = BVT_INFO(p);
     
@@ -435,7 +435,7 @@ int bvt_init_scheduler()
     return 0;
 }
 
-static void bvt_pause(struct task_struct *p)
+static void bvt_pause(struct domain *p)
 {
     if( __task_on_runqueue(p) )
         __del_from_runqueue(p);

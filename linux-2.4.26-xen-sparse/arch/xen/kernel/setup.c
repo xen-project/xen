@@ -62,9 +62,6 @@ unsigned long *phys_to_machine_mapping;
 multicall_entry_t multicall_list[8];
 int nr_multicall_ents = 0;
 
-/* used so we treat multiple stop requests as a single one */
-int suspending = 0;
-
 /*
  * Machine setup..
  */
@@ -1149,23 +1146,20 @@ void __init cpu_init (void)
  * Time-to-die callback handling.
  */
 
-/* Dynamically-mapped IRQ. */
-static int die_irq;
-
-static void die_interrupt(int irq, void *unused, struct pt_regs *regs)
+static void shutdown_handler(ctrl_msg_t *msg, unsigned long id)
 {
     extern void ctrl_alt_del(void);
+    ctrl_if_send_response(msg);
     ctrl_alt_del();
 }
 
-static int __init setup_die_event(void)
+static int __init setup_shutdown_event(void)
 {
-    die_irq = bind_virq_to_irq(VIRQ_DIE);
-    (void)request_irq(die_irq, die_interrupt, 0, "die", NULL);
+    ctrl_if_register_receiver(CMSG_SUSPEND, shutdown_handler, 0);
     return 0;
 }
 
-__initcall(setup_die_event);
+__initcall(setup_shutdown_event);
 
 
 /******************************************************************************
@@ -1174,7 +1168,10 @@ __initcall(setup_die_event);
 
 #include <asm/suspend.h>
 
-static void stop_task(void *unused)
+/* Treat multiple suspend requests as a single one. */
+static int suspending;
+
+static void suspend_task(void *unused)
 {
     /* Hmmm... a cleaner interface to suspend/resume blkdevs would be nice. */
     extern void blkdev_suspend(void);
@@ -1295,29 +1292,28 @@ static void stop_task(void *unused)
         free_page((unsigned long)suspend_record);
 }
 
-static struct tq_struct stop_tq;
+static struct tq_struct suspend_tq;
 
-/* Dynamically-mapped IRQ. */
-static int stop_irq;
-
-static void stop_interrupt(int irq, void *unused, struct pt_regs *regs)
+static void suspend_handler(ctrl_msg_t *msg, unsigned long id)
 {
-    if (!suspending)
+    if ( !suspending )
     {
 	suspending = 1;
-	stop_tq.routine = stop_task;
-	schedule_task(&stop_tq);	
+	suspend_tq.routine = suspend_task;
+	schedule_task(&suspend_tq);	
     }
     else
-	printk(KERN_ALERT"Ignore queued stop request\n");
+    {
+	printk(KERN_ALERT"Ignore queued suspend request\n");
+    }
+
+    ctrl_if_send_response(msg);
 }
 
-static int __init setup_stop_event(void)
+static int __init setup_suspend_event(void)
 {
-    stop_irq = bind_virq_to_irq(VIRQ_STOP);
-    (void)request_irq(stop_irq, stop_interrupt, 0, "stop", NULL);
+    ctrl_if_register_receiver(CMSG_SUSPEND, suspend_handler, 0);
     return 0;
 }
 
-__initcall(setup_stop_event);
-
+__initcall(setup_suspend_event);

@@ -51,9 +51,10 @@ void enable_hlt(void)
  */
 static void default_idle(void)
 {
-    if (!hlt_counter) {
+    if ( hlt_counter == 0 )
+    {
         __cli();
-        if (!current->hyp_events && !softirq_pending(smp_processor_id()))
+        if ( !softirq_pending(smp_processor_id()) )
             safe_halt();
         else
             __sti();
@@ -66,9 +67,8 @@ void continue_cpu_idle_loop(void)
     for ( ; ; )
     {
         irq_stat[cpu].idle_timestamp = jiffies;
-        while (!current->hyp_events && !softirq_pending(cpu))
+        while ( !softirq_pending(cpu) )
             default_idle();
-        do_hyp_events();
         do_softirq();
     }
 }
@@ -77,7 +77,7 @@ void startup_cpu_idle_loop(void)
 {
     /* Just some sanity to ensure that the scheduler is set up okay. */
     ASSERT(current->domain == IDLE_DOMAIN_ID);
-    (void)wake_up(current);
+    domain_controller_unpause(current);
     __enter_scheduler();
 
     /*
@@ -193,7 +193,7 @@ void machine_power_off(void)
     machine_restart(0);
 }
 
-void new_thread(struct task_struct *p,
+void new_thread(struct domain *p,
                 unsigned long start_pc,
                 unsigned long start_stack,
                 unsigned long start_info)
@@ -231,7 +231,7 @@ void new_thread(struct task_struct *p,
 			:"r" (thread->debugreg[register]))
 
 
-void switch_to(struct task_struct *prev_p, struct task_struct *next_p)
+void switch_to(struct domain *prev_p, struct domain *next_p)
 {
     struct thread_struct *next = &next_p->thread;
     struct tss_struct *tss = init_tss + smp_processor_id();

@@ -29,7 +29,7 @@
 #define INIT_EVENT_CHANNELS   16
 #define MAX_EVENT_CHANNELS  1024
 
-static int get_free_port(struct task_struct *p)
+static int get_free_port(struct domain *p)
 {
     int max, port;
     event_channel_t *chn;
@@ -69,7 +69,7 @@ static int get_free_port(struct task_struct *p)
 
 static long evtchn_bind_interdomain(evtchn_bind_interdomain_t *bind)
 {
-    struct task_struct *p1, *p2;
+    struct domain *p1, *p2;
     int                 port1 = 0, port2 = 0;
     domid_t             dom1 = bind->dom1, dom2 = bind->dom2;
     long                rc = 0;
@@ -86,7 +86,7 @@ static long evtchn_bind_interdomain(evtchn_bind_interdomain_t *bind)
          ((p2 = find_domain_by_id(dom2)) == NULL) )
     {
         if ( p1 != NULL )
-            put_task_struct(p1);
+            put_domain(p1);
         return -ESRCH;
     }
 
@@ -134,8 +134,8 @@ static long evtchn_bind_interdomain(evtchn_bind_interdomain_t *bind)
     if ( p1 != p2 )
         spin_unlock(&p2->event_channel_lock);
     
-    put_task_struct(p1);
-    put_task_struct(p2);
+    put_domain(p1);
+    put_domain(p2);
 
     bind->port1 = port1;
     bind->port2 = port2;
@@ -146,7 +146,7 @@ static long evtchn_bind_interdomain(evtchn_bind_interdomain_t *bind)
 
 static long evtchn_bind_virq(evtchn_bind_virq_t *bind)
 {
-    struct task_struct *p = current;
+    struct domain *p = current;
     int virq = bind->virq;
     int port;
 
@@ -183,7 +183,7 @@ static long evtchn_bind_virq(evtchn_bind_virq_t *bind)
 
 static long evtchn_bind_pirq(evtchn_bind_pirq_t *bind)
 {
-    struct task_struct *p = current;
+    struct domain *p = current;
     int pirq = bind->pirq;
     int port, rc;
 
@@ -220,9 +220,9 @@ static long evtchn_bind_pirq(evtchn_bind_pirq_t *bind)
 }
 
 
-static long __evtchn_close(struct task_struct *p1, int port1)
+static long __evtchn_close(struct domain *p1, int port1)
 {
-    struct task_struct *p2 = NULL;
+    struct domain *p2 = NULL;
     event_channel_t    *chn1, *chn2;
     int                 port2;
     long                rc = 0;
@@ -261,7 +261,17 @@ static long __evtchn_close(struct task_struct *p1, int port1)
         if ( p2 == NULL )
         {
             p2 = chn1[port1].u.remote.dom;
-            get_task_struct(p2);
+
+            /* If we unlock p1 then we could lose p2. Must get a reference. */
+            if ( unlikely(!get_domain(p2)) )
+            {
+                /*
+                 * Failed to obtain a reference. No matter: p2 must be dying
+                 * and so will close this event channel for us.
+                 */
+                p2 = NULL;
+                goto out;
+            }
 
             if ( p1->domain < p2->domain )
             {
@@ -279,7 +289,7 @@ static long __evtchn_close(struct task_struct *p1, int port1)
             rc = -EINVAL;
             goto out;
         }
-        
+    
         chn2  = p2->event_channel;
         port2 = chn1[port1].u.remote.port;
 
@@ -307,7 +317,7 @@ static long __evtchn_close(struct task_struct *p1, int port1)
     {
         if ( p1 != p2 )
             spin_unlock(&p2->event_channel_lock);
-        put_task_struct(p2);
+        put_domain(p2);
     }
     
     spin_unlock(&p1->event_channel_lock);
@@ -318,7 +328,7 @@ static long __evtchn_close(struct task_struct *p1, int port1)
 
 static long evtchn_close(evtchn_close_t *close)
 {
-    struct task_struct *p;
+    struct domain *p;
     long                rc;
     domid_t             dom = close->dom;
 
@@ -332,14 +342,14 @@ static long evtchn_close(evtchn_close_t *close)
 
     rc = __evtchn_close(p, close->port);
 
-    put_task_struct(p);
+    put_domain(p);
     return rc;
 }
 
 
 static long evtchn_send(int lport)
 {
-    struct task_struct *lp = current, *rp;
+    struct domain *lp = current, *rp;
     int                 rport;
 
     spin_lock(&lp->event_channel_lock);
@@ -355,13 +365,9 @@ static long evtchn_send(int lport)
     rp    = lp->event_channel[lport].u.remote.dom;
     rport = lp->event_channel[lport].u.remote.port;
 
-    get_task_struct(rp);
-
-    spin_unlock(&lp->event_channel_lock);
-
     evtchn_set_pending(rp, rport);
 
-    put_task_struct(rp);
+    spin_unlock(&lp->event_channel_lock);
 
     return 0;
 }
@@ -369,7 +375,7 @@ static long evtchn_send(int lport)
 
 static long evtchn_status(evtchn_status_t *status)
 {
-    struct task_struct *p;
+    struct domain *p;
     domid_t             dom = status->dom;
     int                 port = status->port;
     event_channel_t    *chn;
@@ -420,7 +426,7 @@ static long evtchn_status(evtchn_status_t *status)
 
  out:
     spin_unlock(&p->event_channel_lock);
-    put_task_struct(p);
+    put_domain(p);
     return rc;
 }
 
@@ -476,7 +482,7 @@ long do_event_channel_op(evtchn_op_t *uop)
 }
 
 
-int init_event_channels(struct task_struct *p)
+int init_event_channels(struct domain *p)
 {
     spin_lock_init(&p->event_channel_lock);
     p->event_channel = kmalloc(INIT_EVENT_CHANNELS * sizeof(event_channel_t), 
@@ -491,7 +497,7 @@ int init_event_channels(struct task_struct *p)
 }
 
 
-void destroy_event_channels(struct task_struct *p)
+void destroy_event_channels(struct domain *p)
 {
     int i;
     if ( p->event_channel != NULL )

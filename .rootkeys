@@ -115,7 +115,6 @@
 3e5a4e677VBavzM1UZIEcH1B-RlXMA linux-2.4.26-xen-sparse/include/asm-xen/hypervisor.h
 4060044fVx7-tokvNLKBf_6qBB4lqQ linux-2.4.26-xen-sparse/include/asm-xen/io.h
 3e5a4e673p7PEOyHFm3nHkYX6HQYBg linux-2.4.26-xen-sparse/include/asm-xen/irq.h
-3ead095db_LRUXnxaqs0dA1DWhPoQQ linux-2.4.26-xen-sparse/include/asm-xen/keyboard.h
 3e5a4e678ddsQOpbSiRdy1GRcDc9WA linux-2.4.26-xen-sparse/include/asm-xen/mmu_context.h
 40d06e5b2YWInUX1Xv9amVANwd_2Xg linux-2.4.26-xen-sparse/include/asm-xen/module.h
 3f8707e7ZmZ6TxyX0ZUEfvhA2Pb_xQ linux-2.4.26-xen-sparse/include/asm-xen/msr.h
@@ -325,7 +324,6 @@
 3ddb79bdLX_P6iB7ILiblRLWvebapg xen/common/dom0_ops.c
 3e6377e4i0c9GtKN65e99OtRbw3AZw xen/common/dom_mem_ops.c
 3ddb79bdYO5D8Av12NHqPeSviav7cg xen/common/domain.c
-3ddb79bdeyutmaXEfpQvvxj7eQ0fCw xen/common/event.c
 3fba5b96H0khoxNiKbjdi0inpXV-Pw xen/common/event_channel.c
 3ddb79bd9drcFPVxd4w2GPOIjLlXpA xen/common/kernel.c
 3e4cd9d8LAAghUY0hNIK72uc2ch_Nw xen/common/keyhandler.c
@@ -351,7 +349,6 @@
 40715b2cNVOegtvyft_AHFKJYRprfA xen/drivers/acpi/tables.c
 3e4a8cb7alzQCDKS7MlioPoHBKYkdQ xen/drivers/char/Makefile
 4049e6bfNSIq7s7OV-Bd69QD0RpR2Q xen/drivers/char/console.c
-3e4a8cb7WmiYdC-ASGiCSG_CL8vsqg xen/drivers/char/keyboard.c
 3e4a8cb7nMChlro4wvOBo76n__iCFA xen/drivers/char/serial.c
 3ddb79beUWngyIhMHgyPtuTem4o4JA xen/drivers/pci/Makefile
 3ddb79beU9td0Mnm0VUMklerBa37qQ xen/drivers/pci/compat.c
@@ -433,7 +430,6 @@
 3ddb79c2plf7ciNgoNjU-RsbUzawsw xen/include/asm-x86/rwlock.h
 3ddb79c3Hgbb2g8CyWLMCK-6_ZVQSQ xen/include/asm-x86/smp.h
 3ddb79c3jn8ALV_S9W5aeTYUQRKBpg xen/include/asm-x86/smpboot.h
-3ddb79c3e9DCEoR-WzNxcOQDzLu7BQ xen/include/asm-x86/softirq.h
 3ddb79c3NiyQE2vQnyGiaBnNjBO1rA xen/include/asm-x86/spinlock.h
 3e7f358aG11EvMI9VJ4_9hD4LUO7rQ xen/include/asm-x86/string.h
 3ddb79c3ezddh34MdelJpa5tNR00Dw xen/include/asm-x86/system.h
@@ -454,7 +450,6 @@
 3ddb79c2PMeWTK86y4C3F4MzHw4A1g xen/include/hypervisor-ifs/dom0_ops.h
 403cd194j2pyLqXD8FJ-ukvZzkPenw xen/include/hypervisor-ifs/event_channel.h
 3ddb79c25UE59iu4JJcbRalx95mvcg xen/include/hypervisor-ifs/hypervisor-if.h
-3ead095dE_VF-QA88rl_5cWYRWtRVQ xen/include/hypervisor-ifs/kbd.h
 4051db79512nOCGweabrFWO2M2h5ng xen/include/hypervisor-ifs/physdev.h
 40589968wmhPmV5-ENbBYmMjnedgKw xen/include/hypervisor-ifs/sched_ctl.h
 404f3d2eR2Owk-ZcGOx9ULGHg3nrww xen/include/hypervisor-ifs/trace.h

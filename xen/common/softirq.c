@@ -1,13 +1,12 @@
 /******************************************************************************
  * common/softirq.c
  * 
- * Modified from the Linux original. Softirqs in Xen are only executed in
- * an outermost activation (e.g., never within an interrupt activation).
- * This simplifies some things and generally seems a good thing.
+ * Softirqs in Xen are only executed in an outermost activation (e.g., never 
+ * within an interrupt activation). This simplifies some things and generally 
+ * seems a good thing.
  * 
  * Copyright (c) 2003, K A Fraser
- * 
- * Copyright (C) 1992 Linus Torvalds
+ * Copyright (c) 1992, Linus Torvalds
  */
 
 #include <xen/config.h>
@@ -18,35 +17,24 @@
 
 irq_cpustat_t irq_stat[NR_CPUS];
 
-static struct softirq_action softirq_vec[32] __cacheline_aligned;
+static softirq_handler softirq_handlers[NR_SOFTIRQS] __cacheline_aligned;
 
 asmlinkage void do_softirq()
 {
     unsigned int pending, cpu = smp_processor_id();
-    struct softirq_action *h;
-
-    if ( unlikely(in_interrupt()) )
-        BUG();
-
-    /*
-     * XEN: This isn't real mutual-exclusion: it just ensures that in_softirq()
-     * and in_interrupt() are both TRUE, allowing checks for erroneous reentry.
-     */
-    cpu_bh_disable(cpu);
+    softirq_handler *h;
 
     while ( (pending = xchg(&softirq_pending(cpu), 0)) != 0 )
     {
-        h = softirq_vec;
+        h = softirq_handlers;
         while ( pending )
         {
             if ( pending & 1 )
-                h->action(h);
+                (*h)();
             h++;
             pending >>= 1;
         }
     }
-
-    cpu_bh_enable(cpu);
 }
 
 inline void cpu_raise_softirq(unsigned int cpu, unsigned int nr)
@@ -63,140 +51,7 @@ void raise_softirq(unsigned int nr)
     __cpu_raise_softirq(smp_processor_id(), nr);
 }
 
-void open_softirq(int nr, void (*action)(struct softirq_action*), void *data)
+void open_softirq(int nr, softirq_handler handler)
 {
-    softirq_vec[nr].data = data;
-    softirq_vec[nr].action = action;
-}
-
-
-/* Tasklets */
-
-struct tasklet_head tasklet_vec[NR_CPUS] __cacheline_aligned;
-struct tasklet_head tasklet_hi_vec[NR_CPUS] __cacheline_aligned;
-
-void __tasklet_schedule(struct tasklet_struct *t)
-{
-    int cpu = smp_processor_id();
-    unsigned long flags;
-
-    local_irq_save(flags);
-    t->next = tasklet_vec[cpu].list;
-    tasklet_vec[cpu].list = t;
-    cpu_raise_softirq(cpu, TASKLET_SOFTIRQ);
-    local_irq_restore(flags);
-}
-
-void __tasklet_hi_schedule(struct tasklet_struct *t)
-{
-    int cpu = smp_processor_id();
-    unsigned long flags;
-
-    local_irq_save(flags);
-    t->next = tasklet_hi_vec[cpu].list;
-    tasklet_hi_vec[cpu].list = t;
-    cpu_raise_softirq(cpu, HI_SOFTIRQ);
-    local_irq_restore(flags);
-}
-
-static void tasklet_action(struct softirq_action *a)
-{
-    int cpu = smp_processor_id();
-    struct tasklet_struct *list;
-
-    local_irq_disable();
-    list = tasklet_vec[cpu].list;
-    tasklet_vec[cpu].list = NULL;
-    local_irq_enable();
-
-    while ( list != NULL )
-    {
-        struct tasklet_struct *t = list;
-
-        list = list->next;
-
-        if ( likely(tasklet_trylock(t)) )
-        {
-            if ( likely(!atomic_read(&t->count)) )
-            {
-                if ( unlikely(!test_and_clear_bit(TASKLET_STATE_SCHED, 
-                                                  &t->state)) )
-                    BUG();
-                t->func(t->data);
-            }
-            tasklet_unlock(t);
-            continue;
-        }
-
-        local_irq_disable();
-        t->next = tasklet_vec[cpu].list;
-        tasklet_vec[cpu].list = t;
-        __cpu_raise_softirq(cpu, TASKLET_SOFTIRQ);
-        local_irq_enable();
-    }
-}
-
-static void tasklet_hi_action(struct softirq_action *a)
-{
-    int cpu = smp_processor_id();
-    struct tasklet_struct *list;
-
-    local_irq_disable();
-    list = tasklet_hi_vec[cpu].list;
-    tasklet_hi_vec[cpu].list = NULL;
-    local_irq_enable();
-
-    while ( list != NULL )
-    {
-        struct tasklet_struct *t = list;
-
-        list = list->next;
-
-        if ( likely(tasklet_trylock(t)) )
-        {
-            if ( likely(!atomic_read(&t->count)) )
-            {
-                if ( unlikely(!test_and_clear_bit(TASKLET_STATE_SCHED, 
-                                                  &t->state)) )
-                    BUG();
-                t->func(t->data);
-            }
-            tasklet_unlock(t);
-            continue;
-        }
-
-        local_irq_disable();
-        t->next = tasklet_hi_vec[cpu].list;
-        tasklet_hi_vec[cpu].list = t;
-        __cpu_raise_softirq(cpu, HI_SOFTIRQ);
-        local_irq_enable();
-    }
-}
-
-
-void tasklet_init(struct tasklet_struct *t,
-		  void (*func)(unsigned long), unsigned long data)
-{
-    t->next = NULL;
-    t->state = 0;
-    atomic_set(&t->count, 0);
-    t->func = func;
-    t->data = data;
-}
-
-void tasklet_kill(struct tasklet_struct *t)
-{
-    if ( in_interrupt() )
-        BUG();
-    while ( test_and_set_bit(TASKLET_STATE_SCHED, &t->state) )
-        while ( test_bit(TASKLET_STATE_SCHED, &t->state) )
-            do_softirq();
-    tasklet_unlock_wait(t);
-    clear_bit(TASKLET_STATE_SCHED, &t->state);
-}
-
-void __init softirq_init()
-{
-    open_softirq(TASKLET_SOFTIRQ, tasklet_action, NULL);
-    open_softirq(HI_SOFTIRQ, tasklet_hi_action, NULL);
+    softirq_handlers[nr] = handler;
 }

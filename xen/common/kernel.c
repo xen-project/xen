@@ -28,7 +28,7 @@
 #include <asm/domain_page.h>
 #include <hypervisor-ifs/dom0_ops.h>
 
-kmem_cache_t *task_struct_cachep;
+kmem_cache_t *domain_struct_cachep;
 
 struct e820entry {
     unsigned long addr_lo, addr_hi;        /* start of memory segment */
@@ -103,7 +103,7 @@ static struct {
 
 void cmain(unsigned long magic, multiboot_info_t *mbi)
 {
-    struct task_struct *new_dom;
+    struct domain *new_dom;
     unsigned long max_page;
     unsigned char *cmdline;
     module_t *mod = (module_t *)__va(mbi->mods_addr);
@@ -245,10 +245,10 @@ void cmain(unsigned long magic, multiboot_info_t *mbi)
     kmem_cache_init();
     kmem_cache_sizes_init(max_page);
 
-    task_struct_cachep = kmem_cache_create(
-        "task_struct_cache", sizeof(struct task_struct),
+    domain_struct_cachep = kmem_cache_create(
+        "domain_cache", sizeof(struct domain),
         0, SLAB_HWCACHE_ALIGN, NULL, NULL);
-    if ( task_struct_cachep == NULL )
+    if ( domain_struct_cachep == NULL )
         panic("No slab cache for task structs.");
 
     start_of_day();
@@ -261,7 +261,7 @@ void cmain(unsigned long magic, multiboot_info_t *mbi)
     if ( new_dom == NULL )
         panic("Error creating domain 0\n");
 
-    set_bit(PF_PRIVILEGED, &new_dom->flags);
+    set_bit(DF_PRIVILEGED, &new_dom->flags);
 
     shadow_mode_init();
 
@@ -287,8 +287,8 @@ void cmain(unsigned long magic, multiboot_info_t *mbi)
 
     init_trace_bufs();
 
-    wake_up(new_dom);
-
+    domain_controller_unpause(current);
+    domain_controller_unpause(new_dom);
     startup_cpu_idle_loop();
 }
 

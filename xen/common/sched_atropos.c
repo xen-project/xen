@@ -23,6 +23,12 @@
 #include <hypervisor-ifs/sched_ctl.h>
 #include <xen/trace.h>
 
+/*
+ * KAF -- Atropos is broken by the new scheduler interfaces.
+ * It'll need fixing to get rid of use of ATROPOS_TASK__*
+ */
+#ifdef KAF_KILLED
+
 #define ATROPOS_TASK_UNBLOCKED 16
 #define ATROPOS_TASK_WAIT      32
 
@@ -34,7 +40,7 @@
 struct at_dom_info
 {
     /* MAW Xen additions */
-    struct task_struct *owner; /* the task_struct this data belongs to */
+    struct domain *owner;      /* the domain this data belongs to */
     struct list_head waitq;    /* wait queue                           */
     int reason;                /* reason domain was last scheduled     */
 
@@ -82,8 +88,8 @@ static int q_len(struct list_head *q)
 }
 
 
-/** waitq_el - get the task_struct that owns a wait queue list element */
-static inline struct task_struct * waitq_el(struct list_head *l)
+/** waitq_el - get the domain that owns a wait queue list element */
+static inline struct domain *waitq_el(struct list_head *l)
 {
     struct at_dom_info *inf;
     inf = list_entry(l, struct at_dom_info, waitq);
@@ -105,7 +111,7 @@ static inline struct task_struct * waitq_el(struct list_head *l)
  * These are scheduled in preference to domains with remain < 0 
  * in an attempt to improve interactive performance.
  */
-static void requeue(struct task_struct *sdom)
+static void requeue(struct domain *sdom)
 {
     struct at_dom_info *inf = DOM_INFO(sdom);
     struct list_head *prev = WAITQ(sdom->processor);
@@ -135,14 +141,14 @@ static void requeue(struct task_struct *sdom)
         if ( next == WAITQ(sdom->processor) )
             list_add_tail(&inf->waitq, WAITQ(sdom->processor));
     }
-    else if ( sdom->state == TASK_RUNNING )
+    else if ( domain_runnable(sdom) )
     {
         /* insert into ordered run queue */
         prev = RUNQ(sdom->processor);
 
         list_for_each(next, RUNQ(sdom->processor))
         {
-            struct task_struct *p = list_entry(next, struct task_struct,
+            struct domain *p = list_entry(next, struct domain,
                                                run_list);
 
             if( DOM_INFO(p)->deadline > inf->deadline || is_idle_task(p) )
@@ -162,7 +168,7 @@ static void requeue(struct task_struct *sdom)
 }
 
 /* prepare a task to be added to scheduling */
-static void at_add_task(struct task_struct *p)
+static void at_add_task(struct domain *p)
 {
     s_time_t now = NOW();
 
@@ -205,7 +211,7 @@ static void at_add_task(struct task_struct *p)
  * dequeue - remove a domain from any queues it is on.
  * @sdom:    the task to remove
  */
-static void dequeue(struct task_struct *sdom)
+static void dequeue(struct domain *sdom)
 {
     struct at_dom_info *inf = DOM_INFO(sdom);
 
@@ -244,7 +250,7 @@ static void dequeue(struct task_struct *sdom)
  *  idea is to give better response times to unblocking whilst preserving QoS
  *  guarantees to other domains.
  */
-static void unblock(struct task_struct *sdom)
+static void unblock(struct domain *sdom)
 {
     s_time_t time = NOW();
     struct at_dom_info *inf = DOM_INFO(sdom);
@@ -266,8 +272,6 @@ static void unblock(struct task_struct *sdom)
         inf->slice = inf->nat_slice / ( inf->nat_period / inf->latency );
         inf->period = inf->latency;
 	inf->remain = inf->slice;
-
-        sdom->state = TASK_RUNNING;
     }
     else
     {
@@ -293,10 +297,10 @@ static void unblock(struct task_struct *sdom)
  */
 task_slice_t ksched_scheduler(s_time_t time)
 {
-    struct task_struct	*cur_sdom = current;  /* Current sdom           */
+    struct domain	*cur_sdom = current;  /* Current sdom           */
     s_time_t     newtime;
     s_time_t      ranfor;	        /* How long the domain ran      */
-    struct task_struct	*sdom;	        /* tmp. scheduling domain	*/
+    struct domain	*sdom;	        /* tmp. scheduling domain	*/
     int   reason;                       /* reason for reschedule        */
     int cpu = cur_sdom->processor;      /* current CPU                  */
     struct at_dom_info *cur_info;
@@ -328,8 +332,8 @@ task_slice_t ksched_scheduler(s_time_t time)
 
     dequeue(cur_sdom);
 
-    if ((cur_sdom->state == TASK_RUNNING) ||
-        (cur_sdom->state == ATROPOS_TASK_UNBLOCKED))
+    if ( domain_runnable(cur_sdom) || 
+         (cur_sdom->state == ATROPOS_TASK_UNBLOCKED) )
     {
 
 	/* In this block, we are doing accounting for an sdom which has 
@@ -399,9 +403,7 @@ task_slice_t ksched_scheduler(s_time_t time)
 	inf->prevddln = inf->deadline;
 	inf->deadline += inf->period;
 
-        if(inf->remain > 0)
-            sdom->state = TASK_RUNNING;
-        else
+        if ( inf->remain <= 0 )
             sdom->state = ATROPOS_TASK_WAIT;
 
 	/* Place on the appropriate queue */
@@ -420,7 +422,7 @@ task_slice_t ksched_scheduler(s_time_t time)
     
     /* we guarantee there's always something on the runqueue */
     cur_sdom = list_entry(RUNQ(cpu)->next,
-                          struct task_struct, run_list);
+                          struct domain, run_list);
 
     cur_info = DOM_INFO(cur_sdom);
     newtime = time + cur_info->remain;
@@ -550,7 +552,7 @@ static void at_dump_cpu_state(int cpu)
 }
 
 /* print relevant per-domain info for a run queue dump */
-static void at_dump_runq_el(struct task_struct *p)
+static void at_dump_runq_el(struct domain *p)
 {
     printk("lastschd = %llu, xtratime = %d ",
            p->lastschd, DOM_INFO(p)->xtratime);
@@ -558,7 +560,7 @@ static void at_dump_runq_el(struct task_struct *p)
 
 
 /* set or fetch domain scheduling parameters */
-static int at_adjdom(struct task_struct *p, struct sched_adjdom_cmd *cmd)
+static int at_adjdom(struct domain *p, struct sched_adjdom_cmd *cmd)
 {
     if ( cmd->direction == SCHED_INFO_PUT )
     {
@@ -586,7 +588,7 @@ static int at_adjdom(struct task_struct *p, struct sched_adjdom_cmd *cmd)
 
 
 /** at_alloc_task - allocate private info for a task */
-static int at_alloc_task(struct task_struct *p)
+static int at_alloc_task(struct domain *p)
 {
     ASSERT(p != NULL);
 
@@ -601,7 +603,7 @@ static int at_alloc_task(struct task_struct *p)
 
 
 /* free memory associated with a task */
-static void at_free_task(struct task_struct *p)
+static void at_free_task(struct domain *p)
 {
     kmem_cache_free( dom_info_cache, DOM_INFO(p) );
 }
@@ -627,12 +629,13 @@ static int at_prn_state(int state)
     return ret;
 }
     
+#endif /* KAF_KILLED */
 
 struct scheduler sched_atropos_def = {
     .name           = "Atropos Soft Real Time Scheduler",
     .opt_name       = "atropos",
     .sched_id       = SCHED_ATROPOS,
-
+#ifdef KAF_KILLED
     .init_scheduler = at_init_scheduler,
     .alloc_task     = at_alloc_task,
     .add_task       = at_add_task,
@@ -643,4 +646,5 @@ struct scheduler sched_atropos_def = {
     .dump_cpu_state = at_dump_cpu_state,
     .dump_runq_el   = at_dump_runq_el,
     .prn_state      = at_prn_state,
+#endif /* KAF_KILLED */
 };

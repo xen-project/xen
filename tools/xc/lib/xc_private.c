@@ -206,43 +206,10 @@ int finish_mmu_updates(int xc_handle, mmu_t *mmu)
 int xc_domain_stop_sync( int xc_handle, domid_t domid,
                          dom0_op_t *op, full_execution_context_t *ctxt)
 {
-    int i;
-
-    printf("Sleep:");
-
-    for( i = 0; ; i++ )
-    {    
-
-        op->cmd = DOM0_STOPDOMAIN;
-        op->u.stopdomain.domain = (domid_t)domid;
-        op->u.stopdomain.sync = 1;
-        do_dom0_op(xc_handle, op);
-        /* can't trust return code due to sync stop hack :-(( */
-
-        op->cmd = DOM0_GETDOMAININFO;
-        op->u.getdomaininfo.domain = (domid_t)domid;
-        op->u.getdomaininfo.ctxt = ctxt;
-        if ( (do_dom0_op(xc_handle, op) < 0) || 
-             ((u32)op->u.getdomaininfo.domain != domid) )
-        {
-            PERROR("Could not get info on domain");
-            goto out;
-        }
-
-        if ( (op->u.getdomaininfo.flags & DOMFLAGS_STATEMASK) == 
-             DOMSTATE_STOPPED )
-        {
-            printf("Domain %u stopped\n",domid);
-            return 0;
-        }
- 
-        printf(".");
-    }
-
-    printf("\n");
-
- out:
-    return -1;    
+    op->cmd = DOM0_STOPDOMAIN;
+    op->u.stopdomain.domain = (domid_t)domid;
+    do_dom0_op(xc_handle, op);
+    return 0;
 }
 
 long long  xc_domain_get_cpu_usage( int xc_handle, domid_t domid )

@@ -2,23 +2,23 @@
 #define _X86_64_CURRENT_H
 
 #if !defined(__ASSEMBLY__)
-struct task_struct;
+struct domain;
 
 #include <asm/pda.h>
 
 #define STACK_RESERVED \
     (sizeof(execution_context_t))
 
-static inline struct task_struct * get_current(void)
+static inline struct domain * get_current(void)
 {
-    struct task_struct *current;
+    struct domain *current;
     current = read_pda(pcurrent);
     return current;
 }
  
 #define current get_current()
 
-static inline void set_current(struct task_struct *p)
+static inline void set_current(struct domain *p)
 {
     write_pda(pcurrent,p);
 }

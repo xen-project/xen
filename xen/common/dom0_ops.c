@@ -24,7 +24,7 @@
 #define TRC_DOM0OP_ENTER_BASE  0x00020000
 #define TRC_DOM0OP_LEAVE_BASE  0x00030000
 
-extern unsigned int alloc_new_dom_mem(struct task_struct *, unsigned int);
+extern unsigned int alloc_new_dom_mem(struct domain *, unsigned int);
 
 static int msr_cpu_mask;
 static unsigned long msr_addr;
@@ -70,56 +70,49 @@ long do_dom0_op(dom0_op_t *u_dom0_op)
 
     case DOM0_BUILDDOMAIN:
     {
-        struct task_struct * p = find_domain_by_id(op->u.builddomain.domain);
+        struct domain * p = find_domain_by_id(op->u.builddomain.domain);
         ret = -EINVAL;
         if ( p != NULL )
         {
             ret = final_setup_guestos(p, &op->u.builddomain);
-            put_task_struct(p);
+            put_domain(p);
         }
     }
     break;
 
     case DOM0_STARTDOMAIN:
     {
-        struct task_struct * p = find_domain_by_id(op->u.startdomain.domain);
-        ret = -EINVAL;
-        if ( p != NULL )
+        struct domain *d = find_domain_by_id(op->u.startdomain.domain);
+        ret = -ESRCH;
+        if ( d != NULL )
         {
-            if ( test_bit(PF_CONSTRUCTED, &p->flags) )
+            ret = -EINVAL;
+            if ( test_bit(DF_CONSTRUCTED, &d->flags) )
             {
-                wake_up(p);
-                reschedule(p);
+                domain_controller_unpause(d);
                 ret = 0;
             }
-            put_task_struct(p);
+            put_domain(d);
         }
     }
     break;
 
     case DOM0_STOPDOMAIN:
     {
-        ret = stop_other_domain(op->u.stopdomain.domain);
- 
-        /*
-         * This is grim, but helps for live migrate. It's also unsafe
-         * in the strict sense as we're not explicitly setting a
-         * timeout, but dom0 is bound to have other timers going off to
-         * wake us back up. 
-         * We go to sleep so that the other domain can stop quicker, hence
-         * we have less total down time in a migrate.
-         */
-        if( ret == 0 && op->u.stopdomain.sync == 1 )
+        struct domain *d = find_domain_by_id(op->u.stopdomain.domain);
+        ret = -ESRCH;
+        if ( d != NULL )
         {
-            extern long do_block( void );
-            do_block(); /* Yuk... */
+            domain_controller_pause(d);
+            put_domain(d);
+            ret = 0;
         }
     }
     break;
 
     case DOM0_CREATEDOMAIN:
     {
-        struct task_struct *p;
+        struct domain *p;
         static domid_t    domnr = 0;
         static spinlock_t domnr_lock = SPIN_LOCK_UNLOCKED;
         unsigned int pro;
@@ -137,7 +130,7 @@ long do_dom0_op(dom0_op_t *u_dom0_op)
 
             if ( (p = find_domain_by_id(dom)) == NULL )
                 break;
-            put_task_struct(p);
+            put_domain(p);
         }
 
         if (op->u.createdomain.cpu == -1 )
@@ -158,7 +151,7 @@ long do_dom0_op(dom0_op_t *u_dom0_op)
         ret = alloc_new_dom_mem(p, op->u.createdomain.memory_kb);
         if ( ret != 0 ) 
         {
-            __kill_domain(p);
+            domain_kill(p);
             break;
         }
 
@@ -171,9 +164,18 @@ long do_dom0_op(dom0_op_t *u_dom0_op)
 
     case DOM0_DESTROYDOMAIN:
     {
-        domid_t dom = op->u.destroydomain.domain;
-        int force = op->u.destroydomain.force;
-        ret = kill_other_domain(dom, force);
+        struct domain *d = find_domain_by_id(op->u.destroydomain.domain);
+        ret = -ESRCH;
+        if ( d != NULL )
+        {
+            ret = -EINVAL;
+            if ( d != current )
+            {
+                domain_kill(d);
+                put_domain(d);
+                ret = 0;
+            }
+        }
     }
     break;
 
@@ -185,9 +187,8 @@ long do_dom0_op(dom0_op_t *u_dom0_op)
             ret = -EINVAL;
         else
         {
-            struct task_struct * p = find_domain_by_id(dom);
+            struct domain * p = find_domain_by_id(dom);
             int cpu = op->u.pincpudomain.cpu;
-            int we_paused = 0;
             
             ret = -ESRCH;
             
@@ -196,30 +197,17 @@ long do_dom0_op(dom0_op_t *u_dom0_op)
                 if ( cpu == -1 )
                 {
                     p->cpupinned = 0;
-                    ret = 0;
                 }
                 else
                 {
-                    /* Pause domain if necessary. */
-                    if( !(p->state & TASK_STOPPED) && 
-                        !(p->state & TASK_PAUSED) )
-                    {
-                        sched_pause_sync(p);
-                        we_paused = 1;
-                    }
-                    
-                    /* We need a task structure lock here!!! 
-                       FIX ME!! */
+                    domain_pause(p);
                     cpu = cpu % smp_num_cpus;
                     p->processor = cpu;
-                    p->cpupinned = 1;
-                    
-                    if ( we_paused )
-                        wake_up(p);
-                    
-                    ret = 0;
+                    p->cpupinned = 1;                    
+                    domain_unpause(p);
                 }
-                put_task_struct(p);
+                put_domain(p);
+                ret = 0;
             }      
         }
     }
@@ -242,7 +230,7 @@ long do_dom0_op(dom0_op_t *u_dom0_op)
     case DOM0_GETMEMLIST:
     {
         int i;
-        struct task_struct *p = find_domain_by_id(op->u.getmemlist.domain);
+        struct domain *p = find_domain_by_id(op->u.getmemlist.domain);
         unsigned long max_pfns = op->u.getmemlist.max_pfns;
         unsigned long pfn;
         unsigned long *buffer = op->u.getmemlist.buffer;
@@ -272,7 +260,7 @@ long do_dom0_op(dom0_op_t *u_dom0_op)
             op->u.getmemlist.num_pfns = i;
             copy_to_user(u_dom0_op, op, sizeof(*op));
             
-            put_task_struct(p);
+            put_domain(p);
         }
     }
     break;
@@ -280,9 +268,9 @@ long do_dom0_op(dom0_op_t *u_dom0_op)
     case DOM0_GETDOMAININFO:
     { 
         full_execution_context_t *c;
-        struct task_struct       *p;
+        struct domain       *p;
         unsigned long             flags;
-        int                       i;
+        int                       i, dump_state = 0;
 
         read_lock_irqsave(&tasklist_lock, flags);
 
@@ -292,40 +280,42 @@ long do_dom0_op(dom0_op_t *u_dom0_op)
                 break;
         }
 
-        if ( (p == NULL) || (p->state == TASK_DYING) )
+        if ( p == NULL )
         {
             ret = -ESRCH;
             goto gdi_out;
         }
         else
         {
-            op->u.getdomaininfo.domain      = p->domain;
+            op->u.getdomaininfo.domain = p->domain;
             strcpy(op->u.getdomaininfo.name, p->name);
 
-            if ( p->state == TASK_RUNNING )
+            /* These are kind of in order of 'importance'. */
+            if ( test_bit(DF_CRASHED, &p->flags) )
+                op->u.getdomaininfo.flags = DOMSTATE_CRASHED;
+            else if ( test_bit(DF_SUSPENDED, &p->flags) )
+                op->u.getdomaininfo.flags = DOMSTATE_SUSPENDED;
+            else if ( test_bit(DF_CONTROLPAUSE, &p->flags) )
+                op->u.getdomaininfo.flags = DOMSTATE_PAUSED;
+            else if ( test_bit(DF_BLOCKED, &p->flags) )
+                op->u.getdomaininfo.flags = DOMSTATE_BLOCKED;
+            else
+            {
                 op->u.getdomaininfo.flags = 
                     p->has_cpu ? DOMSTATE_RUNNING : DOMSTATE_RUNNABLE;
-            else if ( (p->state == TASK_INTERRUPTIBLE) || 
-                      (p->state == TASK_UNINTERRUPTIBLE) )
-                op->u.getdomaininfo.flags = DOMSTATE_BLOCKED;
-            else if ( p->state == TASK_PAUSED )
-                op->u.getdomaininfo.flags = DOMSTATE_PAUSED;
-            else if ( p->state == TASK_CRASHED )
-                op->u.getdomaininfo.flags = DOMSTATE_CRASHED;
-            else
-                op->u.getdomaininfo.flags = DOMSTATE_STOPPED;
+                dump_state = 1;
+            }
+
             op->u.getdomaininfo.flags |= p->processor << DOMFLAGS_CPUSHIFT;
             op->u.getdomaininfo.flags |= p->stop_code << DOMFLAGS_GUESTSHIFT;
 
-            op->u.getdomaininfo.hyp_events  = p->hyp_events;
             op->u.getdomaininfo.tot_pages   = p->tot_pages;
             op->u.getdomaininfo.max_pages   = p->max_pages;
             op->u.getdomaininfo.cpu_time    = p->cpu_time;
             op->u.getdomaininfo.shared_info_frame = 
                 __pa(p->shared_info) >> PAGE_SHIFT;
 
-            if ( (p->state == TASK_STOPPED) &&
-                 (op->u.getdomaininfo.ctxt != NULL) )
+            if ( dump_state && (op->u.getdomaininfo.ctxt != NULL) )
             {
                 if ( (c = kmalloc(sizeof(*c), GFP_KERNEL)) == NULL )
                 {
@@ -338,7 +328,7 @@ long do_dom0_op(dom0_op_t *u_dom0_op)
                 memcpy(&c->cpu_ctxt, 
                        &p->shared_info->execution_context,
                        sizeof(p->shared_info->execution_context));
-                if ( test_bit(PF_DONEFPUINIT, &p->flags) )
+                if ( test_bit(DF_DONEFPUINIT, &p->flags) )
                     c->flags |= ECF_I387_VALID;
                 memcpy(&c->fpu_ctxt,
                        &p->thread.i387,
@@ -402,7 +392,7 @@ long do_dom0_op(dom0_op_t *u_dom0_op)
         struct pfn_info *page;
         unsigned long pfn = op->u.getpageframeinfo.pfn;
         domid_t dom = op->u.getpageframeinfo.domain;
-        struct task_struct *p;
+        struct domain *p;
 
         ret = -EINVAL;
 
@@ -440,7 +430,7 @@ long do_dom0_op(dom0_op_t *u_dom0_op)
             put_page(page);
         }
 
-        put_task_struct(p);
+        put_domain(p);
 
         copy_to_user(u_dom0_op, op, sizeof(*op));
     }
@@ -550,13 +540,13 @@ long do_dom0_op(dom0_op_t *u_dom0_op)
 
     case DOM0_SHADOW_CONTROL:
     {
-        struct task_struct *p; 
+        struct domain *p; 
         ret = -ESRCH;
         p = find_domain_by_id( op->u.shadow_control.domain );
         if ( p )
         {
             ret = shadow_mode_control(p, &op->u.shadow_control );
-            put_task_struct(p);
+            put_domain(p);
             copy_to_user(u_dom0_op, op, sizeof(*op));
         } 
     }
@@ -573,12 +563,12 @@ long do_dom0_op(dom0_op_t *u_dom0_op)
 
     case DOM0_SETDOMAINNAME:
     {
-        struct task_struct *p; 
+        struct domain *p; 
         p = find_domain_by_id( op->u.setdomainname.domain );
         if ( p )
         {
             strncpy(p->name, op->u.setdomainname.name, MAX_DOMAIN_NAME);
-            put_task_struct(p);
+            put_domain(p);
         }
         else 
             ret = -ESRCH;
@@ -587,31 +577,31 @@ long do_dom0_op(dom0_op_t *u_dom0_op)
 
     case DOM0_SETDOMAININITIALMEM:
     {
-        struct task_struct *p; 
+        struct domain *p; 
         ret = -ESRCH;
         p = find_domain_by_id( op->u.setdomaininitialmem.domain );
         if ( p )
         { 
             /* should only be used *before* domain is built. */
-            if ( ! test_bit(PF_CONSTRUCTED, &p->flags) )
+            if ( ! test_bit(DF_CONSTRUCTED, &p->flags) )
                 ret = alloc_new_dom_mem( 
                     p, op->u.setdomaininitialmem.initial_memkb );
             else
                 ret = -EINVAL;
-            put_task_struct(p);
+            put_domain(p);
         }
     }
     break;
 
     case DOM0_SETDOMAINMAXMEM:
     {
-        struct task_struct *p; 
+        struct domain *p; 
         p = find_domain_by_id( op->u.setdomainmaxmem.domain );
         if ( p )
         {
             p->max_pages = 
                 (op->u.setdomainmaxmem.max_memkb+PAGE_SIZE-1)>> PAGE_SHIFT;
-            put_task_struct(p);
+            put_domain(p);
         }
         else 
             ret = -ESRCH;
@@ -625,7 +615,7 @@ long do_dom0_op(dom0_op_t *u_dom0_op)
         int num = op->u.getpageframeinfo2.num;
         domid_t dom = op->u.getpageframeinfo2.domain;
         unsigned long *s_ptr = (unsigned long*) op->u.getpageframeinfo2.array;
-        struct task_struct *p;
+        struct domain *p;
         unsigned long l_arr[GPF2_BATCH];
         ret = -ESRCH;
 
@@ -697,7 +687,7 @@ long do_dom0_op(dom0_op_t *u_dom0_op)
             n+=j;     
         }
 
-        put_task_struct(p);
+        put_domain(p);
 
     }
     break;

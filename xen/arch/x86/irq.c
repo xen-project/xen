@@ -185,14 +185,14 @@ typedef struct {
     u8 nr_guests;
     u8 in_flight;
     u8 shareable;
-    struct task_struct *guest[IRQ_MAX_GUESTS];
+    struct domain *guest[IRQ_MAX_GUESTS];
 } irq_guest_action_t;
 
 static void __do_IRQ_guest(int irq)
 {
     irq_desc_t         *desc = &irq_desc[irq];
     irq_guest_action_t *action = (irq_guest_action_t *)desc->action;
-    struct task_struct *p;
+    struct domain *p;
     int                 i;
 
     for ( i = 0; i < action->nr_guests; i++ )
@@ -204,7 +204,7 @@ static void __do_IRQ_guest(int irq)
     }
 }
 
-int pirq_guest_unmask(struct task_struct *p)
+int pirq_guest_unmask(struct domain *p)
 {
     irq_desc_t    *desc;
     int            i, j, pirq;
@@ -231,7 +231,7 @@ int pirq_guest_unmask(struct task_struct *p)
     return 0;
 }
 
-int pirq_guest_bind(struct task_struct *p, int irq, int will_share)
+int pirq_guest_bind(struct domain *p, int irq, int will_share)
 {
     irq_desc_t         *desc = &irq_desc[irq];
     irq_guest_action_t *action;
@@ -299,7 +299,7 @@ int pirq_guest_bind(struct task_struct *p, int irq, int will_share)
     return rc;
 }
 
-int pirq_guest_unbind(struct task_struct *p, int irq)
+int pirq_guest_unbind(struct domain *p, int irq)
 {
     irq_desc_t         *desc = &irq_desc[irq];
     irq_guest_action_t *action;

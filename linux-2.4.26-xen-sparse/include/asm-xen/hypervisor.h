@@ -248,7 +248,7 @@ static inline int HYPERVISOR_shutdown(void)
     __asm__ __volatile__ (
         TRAP_INSTR
         : "=a" (ret) : "0" (__HYPERVISOR_sched_op),
-        "b" (SCHEDOP_stop | (STOPCODE_shutdown << SCHEDOP_reasonshift))
+        "b" (SCHEDOP_suspend | (STOPCODE_shutdown << SCHEDOP_reasonshift))
         : "memory" );
 
     return ret;
@@ -260,7 +260,7 @@ static inline int HYPERVISOR_reboot(void)
     __asm__ __volatile__ (
         TRAP_INSTR
         : "=a" (ret) : "0" (__HYPERVISOR_sched_op),
-        "b" (SCHEDOP_stop | (STOPCODE_reboot << SCHEDOP_reasonshift))
+        "b" (SCHEDOP_suspend | (STOPCODE_reboot << SCHEDOP_reasonshift))
         : "memory" );
 
     return ret;
@@ -273,7 +273,7 @@ static inline int HYPERVISOR_suspend(unsigned long srec)
     __asm__ __volatile__ (
         TRAP_INSTR
         : "=a" (ret) : "0" (__HYPERVISOR_sched_op),
-        "b" (SCHEDOP_stop | (STOPCODE_suspend << SCHEDOP_reasonshift)), 
+        "b" (SCHEDOP_suspend | (STOPCODE_suspend << SCHEDOP_reasonshift)), 
         "S" (srec) : "memory" );
 
     return ret;
@@ -369,17 +369,6 @@ static inline int HYPERVISOR_multicall(void *call_list, int nr_calls)
         TRAP_INSTR
         : "=a" (ret) : "0" (__HYPERVISOR_multicall),
         "b" (call_list), "c" (nr_calls) : "memory" );
-
-    return ret;
-}
-
-static inline long HYPERVISOR_kbd_op(unsigned char op, unsigned char val)
-{
-    int ret;
-    __asm__ __volatile__ (
-        TRAP_INSTR
-        : "=a" (ret) : "0" (__HYPERVISOR_kbd_op),
-        "b" (op), "c" (val) : "memory" );
 
     return ret;
 }

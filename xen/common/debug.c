@@ -49,15 +49,11 @@ void pdb_do_debug (dom0_op_t *op)
     {
         case 'c' :
 	{
-	    struct task_struct * p = find_domain_by_id(op->u.debug.domain);
+	    struct domain *p = find_domain_by_id(op->u.debug.domain);
 	    if ( p != NULL )
 	    {
-	        if ( test_bit(PF_CONSTRUCTED, &p->flags) )
-		{
-		    wake_up(p);
-		    reschedule(p);
-		}
-		put_task_struct(p);
+                domain_controller_unpause(p);
+		put_domain(p);
 	    }
 	    else
 	    {
@@ -70,7 +66,7 @@ void pdb_do_debug (dom0_op_t *op)
             int loop;
             u_char x;
 	    unsigned long cr3;
-	    struct task_struct *p;
+	    struct domain *p;
 
 	    p = find_domain_by_id(op->u.debug.domain);
 	    if (p->mm.shadow_mode)
@@ -89,20 +85,17 @@ void pdb_do_debug (dom0_op_t *op)
                 printk (" %02x", x);
             }
             printk ("\n");
-	    put_task_struct(p);
+	    put_domain(p);
             break;
         }
         case 's' :
 	{
-	    struct task_struct * p = find_domain_by_id(op->u.debug.domain);
+	    struct domain * p = find_domain_by_id(op->u.debug.domain);
 
 	    if (p != NULL)
 	    {
-	        if (p->state != TASK_STOPPED)
-		{
-		  send_guest_virq(p, VIRQ_STOP);
-		}
-		put_task_struct(p);
+                domain_controller_pause(p);
+		put_domain(p);
 	    }
 	    else
 	    {

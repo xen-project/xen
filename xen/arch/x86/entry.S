@@ -101,9 +101,8 @@ EFLAGS		= 0x38
 OLDESP		= 0x3C
 OLDSS		= 0x40
 
-/* Offsets in task_struct */
+/* Offsets in domain structure */
 PROCESSOR       =  0
-HYP_EVENTS      =  2
 SHARED_INFO     =  4
 EVENT_SEL       =  8
 EVENT_ADDR      = 12
@@ -292,7 +291,7 @@ restore_all_guest:
 /* No special register assumptions */
 failsafe_callback:
         GET_CURRENT(%ebx)
-        movzwl PROCESSOR(%ebx),%eax
+        movl PROCESSOR(%ebx),%eax
         shl  $4,%eax
         lea  guest_trap_bounce(%eax),%edx
         movl FAILSAFE_ADDR(%ebx),%eax
@@ -358,13 +357,10 @@ test_all_events:
         notl %ecx
         cli                             # tests must not race interrupts
 /*test_softirqs:*/  
-        movzwl PROCESSOR(%ebx),%eax
+        movl PROCESSOR(%ebx),%eax
         shl  $6,%eax                    # sizeof(irq_cpustat) == 64
         test %ecx,SYMBOL_NAME(irq_stat)(%eax,1)
         jnz  process_softirqs
-/*test_hyp_events:*/
-        testw %cx, HYP_EVENTS(%ebx)
-        jnz  process_hyp_events
 /*test_guest_events:*/
         movl SHARED_INFO(%ebx),%eax
         testb $0xFF,UPCALL_MASK(%eax)
@@ -373,7 +369,7 @@ test_all_events:
         jz   restore_all_guest
         movb $1,UPCALL_MASK(%eax)       # Upcalls are masked during delivery
 /*process_guest_events:*/
-        movzwl PROCESSOR(%ebx),%edx
+        movl PROCESSOR(%ebx),%edx
         shl  $4,%edx                    # sizeof(guest_trap_bounce) == 16
         lea  guest_trap_bounce(%edx),%edx
         movl EVENT_ADDR(%ebx),%eax
@@ -388,13 +384,7 @@ process_softirqs:
         sti       
         call SYMBOL_NAME(do_softirq)
         jmp  test_all_events
-        
-        ALIGN
-process_hyp_events:
-        sti
-        call SYMBOL_NAME(do_hyp_events)
-        jmp  test_all_events
-        
+                
 /* CREATE A BASIC EXCEPTION FRAME ON GUEST OS (RING-1) STACK:         */
 /*   {EIP, CS, EFLAGS, [ESP, SS]}                                     */
 /* %edx == guest_trap_bounce, %ebx == task_struct                     */
@@ -404,7 +394,7 @@ create_bounce_frame:
         test $2,%cl
         jz   1f /* jump if returning to an existing ring-1 activation */
         /* obtain ss/esp from TSS -- no current ring-1 activations */
-        movzwl PROCESSOR(%ebx),%eax
+        movl PROCESSOR(%ebx),%eax
         /* next 4 lines multiply %eax by 8320, which is sizeof(tss_struct) */
         movl %eax, %ecx
         shll $7, %ecx
@@ -467,18 +457,18 @@ FAULT12:movl %eax,8(%esi)
 crash_domain_fixup1:
         subl  $4,%esp
         SAVE_ALL
-        jmp   crash_domain
+        jmp   domain_crash
 crash_domain_fixup2:
         addl  $4,%esp                     
 crash_domain_fixup3:
         pushl %ss
         popl  %ds
-        jmp   crash_domain
+        jmp   domain_crash
 .previous
 
         ALIGN
 process_guest_exception_and_events:        
-        movzwl PROCESSOR(%ebx),%eax
+        movl PROCESSOR(%ebx),%eax
         shl  $4,%eax
         lea  guest_trap_bounce(%eax),%edx
         testb $~0,GTB_FLAGS(%edx)
@@ -723,7 +713,7 @@ ENTRY(hypervisor_call_table)
         .long SYMBOL_NAME(do_set_fast_trap)      /* 15 */
         .long SYMBOL_NAME(do_dom_mem_op)
         .long SYMBOL_NAME(do_multicall)
-        .long SYMBOL_NAME(do_kbd_op)
+        .long SYMBOL_NAME(do_ni_syscall)                    # do_kbd_op
         .long SYMBOL_NAME(do_update_va_mapping)
         .long SYMBOL_NAME(do_set_timer_op)       /* 20 */
         .long SYMBOL_NAME(do_event_channel_op)

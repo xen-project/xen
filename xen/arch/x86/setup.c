@@ -25,7 +25,7 @@ EXPORT_SYMBOL(mmu_cr4_features);
 
 unsigned long wait_init_idle;
 
-struct task_struct *idle_task[NR_CPUS] = { &idle0_task };
+struct domain *idle_task[NR_CPUS] = { &idle0_task };
 
 #ifdef	CONFIG_ACPI_INTERPRETER
 int acpi_disabled = 0;
@@ -304,8 +304,7 @@ void __init start_of_day(void)
     extern void trap_init(void);
     extern void time_init(void);
     extern void ac_timer_init(void);
-    extern void initialize_keytable(); 
-    extern void initialize_keyboard(void);
+    extern void initialize_keytable();
     extern int opt_nosmp, opt_watchdog, opt_noacpi, opt_ignorebiostables;
     extern int do_timer_lists_from_pit;
     unsigned long low_mem_size;
@@ -316,9 +315,7 @@ void __init start_of_day(void)
     memguard_guard_range(cpu0_stack, PAGE_SIZE);
 #endif
 
-    open_softirq(NEW_TLBFLUSH_CLOCK_PERIOD_SOFTIRQ, 
-                 (void *)new_tlbflush_clock_period,
-                 NULL);
+    open_softirq(NEW_TLBFLUSH_CLOCK_PERIOD_SOFTIRQ, new_tlbflush_clock_period);
 
     if ( opt_watchdog ) 
         nmi_watchdog = NMI_LOCAL_APIC;
@@ -353,7 +350,6 @@ void __init start_of_day(void)
     init_IRQ();  /* installs simple interrupt wrappers. Starts HZ clock. */
     trap_init();
     time_init(); /* installs software handler for HZ clock. */
-    softirq_init();
     init_apic_mappings(); /* make APICs addressable in our pagetables. */
 
 #ifndef CONFIG_SMP    
@@ -373,10 +369,9 @@ void __init start_of_day(void)
 
     __sti();
 
-    initialize_keytable(); /* call back handling for key codes      */
+    initialize_keytable(); /* call back handling for key codes */
 
     serial_init_stage2();
-    initialize_keyboard(); /* setup keyboard (also for debugging)   */
 
 #ifdef XEN_DEBUGGER
     initialize_pdb();      /* pervasive debugger */

@@ -1112,11 +1112,6 @@ static int kmem_cache_grow (kmem_cache_t * cachep, int flags)
 	if (flags & SLAB_NO_GROW)
 		return 0;
 
-#if 0
-	if (in_interrupt() && (flags & SLAB_LEVEL_MASK) != SLAB_ATOMIC)
-		BUG();
-#endif
-
 	ctor_flags = SLAB_CTOR_CONSTRUCTOR;
 	local_flags = (flags & SLAB_LEVEL_MASK);
 	if (local_flags == SLAB_ATOMIC)

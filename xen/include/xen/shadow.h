@@ -24,15 +24,15 @@
 #define shadow_linear_l2_table ((l2_pgentry_t *)(SH_LINEAR_PT_VIRT_START+(SH_LINEAR_PT_VIRT_START>>(L2_PAGETABLE_SHIFT-L1_PAGETABLE_SHIFT))))
 
 extern void shadow_mode_init(void);
-extern int shadow_mode_control( struct task_struct *p, dom0_shadow_control_t *sc );
+extern int shadow_mode_control( struct domain *p, dom0_shadow_control_t *sc );
 extern int shadow_fault( unsigned long va, long error_code );
 extern void shadow_l1_normal_pt_update( unsigned long pa, unsigned long gpte, 
                                         unsigned long *prev_spfn_ptr,
                                         l1_pgentry_t **prev_spl1e_ptr  );
 extern void shadow_l2_normal_pt_update( unsigned long pa, unsigned long gpte );
 extern void unshadow_table( unsigned long gpfn, unsigned int type );
-extern int shadow_mode_enable( struct task_struct *p, unsigned int mode );
-extern void shadow_mode_disable( struct task_struct *p );
+extern int shadow_mode_enable( struct domain *p, unsigned int mode );
+extern void shadow_mode_disable( struct domain *p );
 extern unsigned long shadow_l2_table( 
     struct mm_struct *m, unsigned long gpfn );
 

@@ -42,19 +42,20 @@
 
 /* Both these structures are protected by the tasklist_lock. */
 rwlock_t tasklist_lock __cacheline_aligned = RW_LOCK_UNLOCKED;
-struct task_struct *task_hash[TASK_HASH_SIZE];
-struct task_struct *task_list;
+struct domain *task_hash[TASK_HASH_SIZE];
+struct domain *task_list;
 
-struct task_struct *do_createdomain(domid_t dom_id, unsigned int cpu)
+struct domain *do_createdomain(domid_t dom_id, unsigned int cpu)
 {
     char buf[100];
-    struct task_struct *p, **pp;
+    struct domain *p, **pp;
     unsigned long flags;
 
-    if ( (p = alloc_task_struct()) == NULL )
+    if ( (p = alloc_domain_struct()) == NULL )
         return NULL;
 
     atomic_set(&p->refcnt, 1);
+    atomic_set(&p->pausecnt, 0);
 
     spin_lock_init(&p->mm.shadow_lock);
 
@@ -68,7 +69,7 @@ struct task_struct *do_createdomain(domid_t dom_id, unsigned int cpu)
     {
         if ( init_event_channels(p) != 0 )
         {
-            free_task_struct(p);
+            free_domain_struct(p);
             return NULL;
         }
         
@@ -98,6 +99,8 @@ struct task_struct *do_createdomain(domid_t dom_id, unsigned int cpu)
         spin_lock_init(&p->pcidev_lock);
         INIT_LIST_HEAD(&p->pcidev_list);
 
+        sched_add_domain(p);
+
         write_lock_irqsave(&tasklist_lock, flags);
         pp = &task_list; /* NB. task_list is maintained in order of dom_id. */
         for ( pp = &task_list; *pp != NULL; pp = &(*pp)->next_list )
@@ -112,17 +115,17 @@ struct task_struct *do_createdomain(domid_t dom_id, unsigned int cpu)
     else
     {
         sprintf(p->name, "Idle-%d", cpu);
+        sched_add_domain(p);
     }
 
-    sched_add_domain(p);
 
     return p;
 }
 
 
-struct task_struct *find_domain_by_id(domid_t dom)
+struct domain *find_domain_by_id(domid_t dom)
 {
-    struct task_struct *p;
+    struct domain *p;
     unsigned long flags;
 
     read_lock_irqsave(&tasklist_lock, flags);
@@ -131,7 +134,8 @@ struct task_struct *find_domain_by_id(domid_t dom)
     {
         if ( p->domain == dom )
         {
-            get_task_struct(p);
+            if ( unlikely(!get_domain(p)) )
+                p = NULL;
             break;
         }
         p = p->next_hash;
@@ -143,9 +147,9 @@ struct task_struct *find_domain_by_id(domid_t dom)
 
 
 /* return the most recent domain created */
-struct task_struct *find_last_domain(void)
+struct domain *find_last_domain(void)
 {
-    struct task_struct *p, *plast;
+    struct domain *p, *plast;
     unsigned long flags;
 
     read_lock_irqsave(&tasklist_lock, flags);
@@ -157,103 +161,42 @@ struct task_struct *find_last_domain(void)
             plast = p;
         p = p->next_list;
     }
-    get_task_struct(plast);
+    if ( !get_domain(plast) )
+        plast = NULL;
     read_unlock_irqrestore(&tasklist_lock, flags);
 
     return plast;
 }
 
 
-void __kill_domain(struct task_struct *p)
+void domain_kill(struct domain *d)
 {
-    struct task_struct **pp;
-    unsigned long flags;
-
-    if ( p->domain == 0 )
+    domain_pause(d);
+    if ( !test_and_set_bit(DF_DYING, &d->flags) )
     {
-        extern void machine_restart(char *);
-        printk("Domain 0 killed: rebooting machine!\n");
-        machine_restart(0);
-    }
-
-    /* Only allow the domain to be destroyed once. */
-    if ( !sched_rem_domain(p) )
-        return;
-
-    DPRINTK("Killing domain %u\n", p->domain);
-
-    destroy_event_channels(p);
-
-    /*
-     * Note this means that find_domain_by_id may fail, even when the caller
-     * holds a reference to the domain being queried. Take care!
-     */
-    write_lock_irqsave(&tasklist_lock, flags);
-    pp = &task_list;                       /* Delete from task_list. */
-    while ( *pp != p ) 
-        pp = &(*pp)->next_list;
-    *pp = p->next_list;
-    pp = &task_hash[TASK_HASH(p->domain)]; /* Delete from task_hash. */
-    while ( *pp != p ) 
-        pp = &(*pp)->next_hash;
-    *pp = p->next_hash;
-    write_unlock_irqrestore(&tasklist_lock, flags);
-
-    if ( p == current )
-    {
-        __enter_scheduler();
-        BUG(); /* never get here */
-    }
-    else
-    {
-        put_task_struct(p);
+        sched_rem_domain(d);
+        put_domain(d);
     }
 }
 
 
-void kill_domain(void)
+void domain_crash(void)
 {
-    __kill_domain(current);
-}
+    struct domain *d;
 
-
-long kill_other_domain(domid_t dom, int force)
-{
-    struct task_struct *p;
-
-    if ( (p = find_domain_by_id(dom)) == NULL )
-        return -ESRCH;
-
-    if ( (p->state == TASK_STOPPED) || (p->state == TASK_CRASHED) )
-        __kill_domain(p);
-    else if ( force )
-        send_hyp_event(p, _HYP_EVENT_DIE);
-    else
-        send_guest_virq(p, VIRQ_DIE);
-
-    put_task_struct(p);
-    return 0;
-}
-
-
-void crash_domain(void)
-{
-    struct task_struct *p;
-
-    set_current_state(TASK_CRASHED);
+    set_bit(DF_CRASHED, &current->flags);
     
-    p = find_domain_by_id(0);
-    send_guest_virq(p, VIRQ_DOM_EXC);
-    put_task_struct(p);
+    d = find_domain_by_id(0);
+    send_guest_virq(d, VIRQ_DOM_EXC);
+    put_domain(d);
     
     __enter_scheduler();
     BUG();
 }
 
-
-void stop_domain(u8 reason)
+void domain_suspend(u8 reason)
 {
-    struct task_struct *p;
+    struct domain *d;
 
     if ( current->domain == 0 )
     {
@@ -267,34 +210,17 @@ void stop_domain(u8 reason)
            get_execution_context(), 
            sizeof(execution_context_t));
     unlazy_fpu(current);
-    wmb(); /* All CPUs must see saved info in state TASK_STOPPED. */
-    set_current_state(TASK_STOPPED);
+    wmb(); /* All CPUs must see saved info when suspended. */
+    set_bit(DF_SUSPENDED, &current->flags);
 
-    p = find_domain_by_id(0);
-    send_guest_virq(p, VIRQ_DOM_EXC);
-    put_task_struct(p);
+    d = find_domain_by_id(0);
+    send_guest_virq(d, VIRQ_DOM_EXC);
+    put_domain(d);
 
     __enter_scheduler();
 }
 
-long stop_other_domain(domid_t dom)
-{
-    struct task_struct *p;
-    
-    if ( dom == 0 )
-        return -EINVAL;
-
-    p = find_domain_by_id(dom);
-    if ( p == NULL) return -ESRCH;
-    
-    if ( p->state != TASK_STOPPED )
-        send_guest_virq(p, VIRQ_STOP);
-    
-    put_task_struct(p);
-    return 0;
-}
-
-struct pfn_info *alloc_domain_page(struct task_struct *p)
+struct pfn_info *alloc_domain_page(struct domain *p)
 {
     struct pfn_info *page = NULL;
     unsigned long flags, mask, pfn_stamp, cpu_stamp;
@@ -366,7 +292,7 @@ struct pfn_info *alloc_domain_page(struct task_struct *p)
 void free_domain_page(struct pfn_info *page)
 {
     unsigned long flags;
-    struct task_struct *p = page->u.domain;
+    struct domain *p = page->u.domain;
 
     ASSERT(!in_irq());
 
@@ -411,7 +337,7 @@ void free_domain_page(struct pfn_info *page)
 }
 
 
-void free_all_dom_mem(struct task_struct *p)
+void free_all_dom_mem(struct domain *p)
 {
     struct list_head *ent, zombies;
     struct pfn_info *page;
@@ -501,7 +427,7 @@ void free_all_dom_mem(struct task_struct *p)
 }
 
 
-unsigned int alloc_new_dom_mem(struct task_struct *p, unsigned int kbytes)
+unsigned int alloc_new_dom_mem(struct domain *p, unsigned int kbytes)
 {
     unsigned int alloc_pfns, nr_pages;
     struct pfn_info *page;
@@ -541,19 +467,40 @@ unsigned int alloc_new_dom_mem(struct task_struct *p, unsigned int kbytes)
  
 
 /* Release resources belonging to task @p. */
-void release_task(struct task_struct *p)
+void domain_destruct(struct domain *p)
 {
-    ASSERT(p->state == TASK_DYING);
-    ASSERT(!p->has_cpu);
+    struct domain **pp;
+    unsigned long flags;
+
+    if ( !test_bit(DF_DYING, &p->flags) )
+        BUG();
+
+    /* May be already destructed, or get_domain() can race us. */
+    if ( cmpxchg(&p->refcnt.counter, 0, DOMAIN_DESTRUCTED) != 0 )
+        return;
 
     DPRINTK("Releasing task %u\n", p->domain);
+
+    /* Delete from task list and task hashtable. */
+    write_lock_irqsave(&tasklist_lock, flags);
+    pp = &task_list;
+    while ( *pp != p ) 
+        pp = &(*pp)->next_list;
+    *pp = p->next_list;
+    pp = &task_hash[TASK_HASH(p->domain)];
+    while ( *pp != p ) 
+        pp = &(*pp)->next_hash;
+    *pp = p->next_hash;
+    write_unlock_irqrestore(&tasklist_lock, flags);
+
+    destroy_event_channels(p);
 
     /* Free all memory associated with this domain. */
     free_page((unsigned long)p->mm.perdomain_pt);
     UNSHARE_PFN(virt_to_page(p->shared_info));
     free_all_dom_mem(p);
 
-    free_task_struct(p);
+    free_domain_struct(p);
 }
 
 
@@ -562,7 +509,7 @@ void release_task(struct task_struct *p)
  * than domain 0. ie. the domains that are being built by the userspace dom0
  * domain builder.
  */
-int final_setup_guestos(struct task_struct *p, dom0_builddomain_t *builddomain)
+int final_setup_guestos(struct domain *p, dom0_builddomain_t *builddomain)
 {
     unsigned long phys_basetab;
     int i, rc = 0;
@@ -571,7 +518,7 @@ int final_setup_guestos(struct task_struct *p, dom0_builddomain_t *builddomain)
     if ( (c = kmalloc(sizeof(*c), GFP_KERNEL)) == NULL )
         return -ENOMEM;
 
-    if ( test_bit(PF_CONSTRUCTED, &p->flags) )
+    if ( test_bit(DF_CONSTRUCTED, &p->flags) )
     {
         rc = -EINVAL;
         goto out;
@@ -583,9 +530,9 @@ int final_setup_guestos(struct task_struct *p, dom0_builddomain_t *builddomain)
         goto out;
     }
     
-    clear_bit(PF_DONEFPUINIT, &p->flags);
+    clear_bit(DF_DONEFPUINIT, &p->flags);
     if ( c->flags & ECF_I387_VALID )
-        set_bit(PF_DONEFPUINIT, &p->flags);
+        set_bit(DF_DONEFPUINIT, &p->flags);
     memcpy(&p->shared_info->execution_context,
            &c->cpu_ctxt,
            sizeof(p->shared_info->execution_context));
@@ -624,7 +571,7 @@ int final_setup_guestos(struct task_struct *p, dom0_builddomain_t *builddomain)
     /* Set up the shared info structure. */
     update_dom_time(p->shared_info);
 
-    set_bit(PF_CONSTRUCTED, &p->flags);
+    set_bit(DF_CONSTRUCTED, &p->flags);
 
  out:    
     if (c) kfree(c);
@@ -749,7 +696,7 @@ static int loadelfimage(char *elfbase)
     return 0;
 }
 
-int construct_dom0(struct task_struct *p, 
+int construct_dom0(struct domain *p, 
                    unsigned long alloc_start,
                    unsigned long alloc_end,
                    char *image_start, unsigned long image_len, 
@@ -791,12 +738,12 @@ int construct_dom0(struct task_struct *p,
     /* Machine address of next candidate page-table page. */
     unsigned long mpt_alloc;
 
-    extern void physdev_init_dom0(struct task_struct *);
+    extern void physdev_init_dom0(struct domain *);
 
     /* Sanity! */
     if ( p->domain != 0 ) 
         BUG();
-    if ( test_bit(PF_CONSTRUCTED, &p->flags) ) 
+    if ( test_bit(DF_CONSTRUCTED, &p->flags) ) 
         BUG();
 
     printk("*** LOADING DOMAIN 0 ***\n");
@@ -1047,7 +994,7 @@ int construct_dom0(struct task_struct *p,
     /* DOM0 gets access to everything. */
     physdev_init_dom0(p);
 
-    set_bit(PF_CONSTRUCTED, &p->flags);
+    set_bit(DF_CONSTRUCTED, &p->flags);
 
 #if 0 /* XXXXX DO NOT CHECK IN ENABLED !!! (but useful for testing so leave) */
     shadow_mode_enable(&p->mm, SHM_test); 

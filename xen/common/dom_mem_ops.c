@@ -15,7 +15,7 @@
 #include <xen/event.h>
 #include <asm/domain_page.h>
 
-static long alloc_dom_mem(struct task_struct *p, 
+static long alloc_dom_mem(struct domain *p, 
                           unsigned long      *pages, 
                           unsigned long       nr_pages)
 {
@@ -49,7 +49,7 @@ static long alloc_dom_mem(struct task_struct *p,
     return i;
 }
     
-static long free_dom_mem(struct task_struct *p, 
+static long free_dom_mem(struct domain *p, 
                          unsigned long      *pages, 
                          unsigned long       nr_pages)
 {

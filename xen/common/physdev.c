@@ -62,13 +62,13 @@ typedef struct _phys_dev_st {
     int flags;                       /* flags for access etc */
     struct pci_dev *dev;             /* the device */
     struct list_head node;           /* link to the list */
-    struct task_struct *owner;       /* 'owner of this device' */
+    struct domain *owner;       /* 'owner of this device' */
     int state;                       /* state for various checks */
 } phys_dev_t;
 
 
 /* Find a device on a per-domain device list. */
-static phys_dev_t *find_pdev(struct task_struct *p, struct pci_dev *dev)
+static phys_dev_t *find_pdev(struct domain *p, struct pci_dev *dev)
 {
     phys_dev_t *t, *res = NULL;
     struct list_head *tmp;
@@ -86,7 +86,7 @@ static phys_dev_t *find_pdev(struct task_struct *p, struct pci_dev *dev)
 }
 
 /* Add a device to a per-domain device-access list. */
-static void add_dev_to_task(struct task_struct *p, 
+static void add_dev_to_task(struct domain *p, 
                             struct pci_dev *dev, int acc)
 {
     phys_dev_t *pdev;
@@ -124,7 +124,7 @@ static void add_dev_to_task(struct task_struct *p,
 int physdev_pci_access_modify(
     domid_t dom, int bus, int dev, int func, int enable)
 {
-    struct task_struct *p;
+    struct domain *p;
     struct pci_dev *pdev;
     int i, j, rc = 0;
  
@@ -146,10 +146,10 @@ int physdev_pci_access_modify(
         return -ESRCH;
 
     /* Make the domain privileged. */
-    set_bit(PF_PHYSDEV, &p->flags);
+    set_bit(DF_PHYSDEV, &p->flags);
 	/* FIXME: MAW for now make the domain REALLY privileged so that it
 	 * can run a backend driver (hw access should work OK otherwise) */
-	set_bit(PF_PRIVILEGED, &p->flags);
+	set_bit(DF_PRIVILEGED, &p->flags);
 
     /* Grant write access to the specified device. */
     if ( (pdev = pci_find_slot(bus, PCI_DEVFN(dev, func))) == NULL )
@@ -209,13 +209,13 @@ int physdev_pci_access_modify(
         /* rights to IO memory regions are checked when the domain maps them */
     }
  out:
-    put_task_struct(p);
+    put_domain(p);
     return rc;
 }
 
 /* Check if a domain controls a device with IO memory within frame @pfn.
  * Returns: 1 if the domain should be allowed to map @pfn, 0 otherwise.  */
-int domain_iomem_in_pfn(struct task_struct *p, unsigned long pfn)
+int domain_iomem_in_pfn(struct domain *p, unsigned long pfn)
 {
     int ret = 0;
     struct list_head *l;
@@ -255,7 +255,7 @@ int domain_iomem_in_pfn(struct task_struct *p, unsigned long pfn)
 }
 
 /* check if a domain has general access to a device */
-inline static int check_dev_acc (struct task_struct *p,
+inline static int check_dev_acc (struct domain *p,
                                  int bus, int dev, int func,
                                  phys_dev_t **pdev) 
 {
@@ -720,7 +720,7 @@ int pcidev_dom0_hidden(struct pci_dev *dev)
 
 
 /* Domain 0 has read access to all devices. */
-void physdev_init_dom0(struct task_struct *p)
+void physdev_init_dom0(struct domain *p)
 {
     struct pci_dev *dev;
     phys_dev_t *pdev;
@@ -747,6 +747,6 @@ void physdev_init_dom0(struct task_struct *p)
         }
     }
 
-    set_bit(PF_PHYSDEV, &p->flags);
+    set_bit(DF_PHYSDEV, &p->flags);
 }
 

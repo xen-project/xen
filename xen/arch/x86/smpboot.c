@@ -644,7 +644,7 @@ static void __init do_boot_cpu (int apicid)
  * (ie clustered apic addressing mode), this is a LOGICAL apic ID.
  */
 {
-    struct task_struct *idle;
+    struct domain *idle;
     unsigned long boot_error = 0;
     int timeout, cpu;
     unsigned long start_eip, stack;
@@ -654,7 +654,7 @@ static void __init do_boot_cpu (int apicid)
     if ( (idle = do_createdomain(IDLE_DOMAIN_ID, cpu)) == NULL )
         panic("failed 'createdomain' for CPU %d", cpu);
 
-    set_bit(PF_IDLETASK, &idle->flags);
+    set_bit(DF_IDLETASK, &idle->flags);
 
     idle->mm.pagetable = mk_pagetable(__pa(idle_pg_table));
 

@@ -687,29 +687,30 @@ static int xup_connect(xu_port_object *xup, domid_t dom,
                        int local_port, int remote_port){
     // From our prespective rx = producer, tx = consumer.
     int err = 0;
-    printf("%s> dom=%u %d:%d\n", __FUNCTION__, dom, local_port, remote_port);
+    printf("%s> dom=%u %d:%d\n", __FUNCTION__, (unsigned int)dom, 
+           local_port, remote_port);
 
     // Consumer = tx.
     //xup->interface->tx_resp_prod = 0;
     //xup->interface->tx_req_prod = 0;
     xup->tx_resp_prod = xup->interface->tx_resp_prod;
     xup->tx_req_cons = xup->interface->tx_resp_prod;
-    printf("%s> tx: %p %p : %p %p\n", __FUNCTION__,
-           xup->interface->tx_resp_prod,
-           xup->tx_resp_prod,
-           xup->tx_req_cons,
-           xup->interface->tx_req_prod);
+    printf("%s> tx: %u %u : %u %u\n", __FUNCTION__,
+           (unsigned int)xup->interface->tx_resp_prod,
+           (unsigned int)xup->tx_resp_prod,
+           (unsigned int)xup->tx_req_cons,
+           (unsigned int)xup->interface->tx_req_prod);
 
     // Producer = rx.
     //xup->interface->rx_req_prod  = 0;
     //xup->interface->rx_resp_prod = 0;
     xup->rx_req_prod  = xup->interface->rx_req_prod;
     xup->rx_resp_cons = xup->interface->rx_resp_prod;
-    printf("%s> rx: %p %p : %p %p\n", __FUNCTION__,
-           xup->rx_resp_cons,
-           xup->interface->rx_resp_prod,
-           xup->interface->rx_req_prod,
-           xup->rx_req_prod);
+    printf("%s> rx: %u %u : %u %u\n", __FUNCTION__,
+           (unsigned int)xup->rx_resp_cons,
+           (unsigned int)xup->interface->rx_resp_prod,
+           (unsigned int)xup->interface->rx_req_prod,
+           (unsigned int)xup->rx_req_prod);
 
     xup->remote_dom   = dom;
     xup->local_port   = local_port;

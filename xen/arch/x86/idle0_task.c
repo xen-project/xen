@@ -2,7 +2,7 @@
 #include <xen/sched.h>
 #include <asm/desc.h>
 
-struct task_struct idle0_task = IDLE0_TASK(idle0_task);
+struct domain idle0_task = IDLE0_TASK(idle0_task);
 
 /*
  * per-CPU TSS segments. Threads are completely 'soft' on Linux,

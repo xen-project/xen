@@ -98,29 +98,26 @@ static struct ac_timer t_timer[NR_CPUS];
  */
 static struct ac_timer fallback_timer[NR_CPUS];
 
-extern kmem_cache_t *task_struct_cachep;
+extern kmem_cache_t *domain_struct_cachep;
 
-void free_task_struct(struct task_struct *p)
+void free_domain_struct(struct domain *p)
 {
     SCHED_OP(free_task, p);
-    kmem_cache_free(task_struct_cachep, p);
+    kmem_cache_free(domain_struct_cachep, p);
 }
 
-/**
- * alloc_task_struct - allocate a new task_struct and sched private structures
- */
-struct task_struct *alloc_task_struct(void)
+struct domain *alloc_domain_struct(void)
 {
-    struct task_struct *p;
+    struct domain *p;
 
-    if ( (p = kmem_cache_alloc(task_struct_cachep,GFP_KERNEL)) == NULL )
+    if ( (p = kmem_cache_alloc(domain_struct_cachep,GFP_KERNEL)) == NULL )
         return NULL;
     
     memset(p, 0, sizeof(*p));
 
     if ( SCHED_OP(alloc_task, p) < 0 )
     {
-        kmem_cache_free(task_struct_cachep,p);
+        kmem_cache_free(domain_struct_cachep,p);
         return NULL;
     }
 
@@ -130,9 +127,9 @@ struct task_struct *alloc_task_struct(void)
 /*
  * Add and remove a domain
  */
-void sched_add_domain(struct task_struct *p) 
+void sched_add_domain(struct domain *p) 
 {
-    p->state = TASK_STOPPED;
+    domain_controller_pause(p);
 
     if ( p->domain != IDLE_DOMAIN_ID )
     {
@@ -152,26 +149,17 @@ void sched_add_domain(struct task_struct *p)
     TRACE_3D(TRC_SCHED_DOM_ADD, _HIGH32(p->domain), _LOW32(p->domain), p);
 }
 
-int sched_rem_domain(struct task_struct *p) 
+void sched_rem_domain(struct domain *p) 
 {
-    int x, y = p->state;
-    do {
-        if ( (x = y) == TASK_DYING ) return 0;
-    } while ( (y = cmpxchg(&p->state, x, TASK_DYING)) != x );
-
     rem_ac_timer(&p->timer);
-
     SCHED_OP(rem_task, p);
-
     TRACE_3D(TRC_SCHED_DOM_REM, _HIGH32(p->domain), _LOW32(p->domain), p);
-
-    return 1;
 }
 
 void init_idle_task(void)
 {
     unsigned long flags;
-    struct task_struct *p = current;
+    struct domain *p = current;
 
     if ( SCHED_OP(alloc_task, p) < 0)
         panic("Failed to allocate scheduler private data for idle task");
@@ -179,47 +167,81 @@ void init_idle_task(void)
 
     spin_lock_irqsave(&schedule_lock[p->processor], flags);
     p->has_cpu = 1;
-    p->state = TASK_RUNNING;
     if ( !__task_on_runqueue(p) )
         __add_to_runqueue_head(p);
     spin_unlock_irqrestore(&schedule_lock[p->processor], flags);
 }
 
-void __wake_up(struct task_struct *p)
+/* Returns TRUE if the domain was actually woken up. */
+int domain_wakeup(struct domain *d)
 {
-    TRACE_3D(TRC_SCHED_WAKE, _HIGH32(p->domain), _LOW32(p->domain), p);
+    unsigned long       flags;
+    int                 cpu = d->processor, woken_up = 0;
+    struct domain      *curr;
+    s_time_t            now, min_time;
 
-    ASSERT(p->state != TASK_DYING);
+    spin_lock_irqsave(&schedule_lock[cpu], flags);
 
-    if ( unlikely(__task_on_runqueue(p)) )        
-        return;
+    if ( likely(domain_runnable(d)) && likely(!__task_on_runqueue(d)) )
+    {
+        woken_up = 1;
 
-    p->state = TASK_RUNNING;
-
-    SCHED_OP(wake_up, p);
-
+        TRACE_3D(TRC_SCHED_WAKE, _HIGH32(d->domain), _LOW32(d->domain), d);
+        SCHED_OP(wake_up, d);
 #ifdef WAKEUP_HISTO
-    p->wokenup = NOW();
+        p->wokenup = NOW();
 #endif
+
+        ASSERT(__task_on_runqueue(d));
+        ASSERT(!d->has_cpu);
+
+        now = NOW();
+        curr = schedule_data[cpu].curr;
+
+        /* Currently-running domain should run at least for ctx_allow. */
+        min_time = curr->lastschd + curr->min_slice;
+
+        if ( is_idle_task(curr) || (min_time <= now) )
+            cpu_raise_softirq(cpu, SCHEDULE_SOFTIRQ);
+        else if ( schedule_data[cpu].s_timer.expires > (min_time + TIME_SLOP) )
+            mod_ac_timer(&schedule_data[cpu].s_timer, min_time);
+    }
+
+    spin_unlock_irqrestore(&schedule_lock[cpu], flags);
+
+    return woken_up;
 }
 
 
-void wake_up(struct task_struct *p)
+void __domain_pause(struct domain *d)
 {
     unsigned long flags;
-    spin_lock_irqsave(&schedule_lock[p->processor], flags);
-    __wake_up(p);
-    spin_unlock_irqrestore(&schedule_lock[p->processor], flags);
+    int           cpu = d->processor;
+
+    spin_lock_irqsave(&schedule_lock[cpu], flags);
+
+    if ( d->has_cpu )
+        cpu_raise_softirq(cpu, SCHEDULE_SOFTIRQ);
+    else if ( __task_on_runqueue(d) )
+        __del_from_runqueue(d);
+
+    spin_unlock_irqrestore(&schedule_lock[cpu], flags);
+
+    /* Synchronous. */
+    while ( d->has_cpu )
+    {
+        smp_mb();
+        cpu_relax();
+    }
 }
 
-/* 
- * Block the currently-executing domain until a pertinent event occurs.
- */
+
+/* Block the currently-executing domain until a pertinent event occurs. */
 long do_block(void)
 {
     ASSERT(current->domain != IDLE_DOMAIN_ID);
     current->shared_info->vcpu_data[0].evtchn_upcall_mask = 0;
-    current->state = TASK_INTERRUPTIBLE;
+    set_bit(DF_BLOCKED, &current->flags);
     TRACE_2D(TRC_SCHED_BLOCK, current->domain, current);
     __enter_scheduler();
     return 0;
@@ -258,9 +280,9 @@ long do_sched_op(unsigned long op)
         break;
     }
 
-    case SCHEDOP_stop:
+    case SCHEDOP_suspend:
     {
-        stop_domain((u8)(op >> SCHEDOP_reasonshift));
+        domain_suspend((u8)(op >> SCHEDOP_reasonshift));
         break;
     }
 
@@ -271,41 +293,10 @@ long do_sched_op(unsigned long op)
     return ret;
 }
 
-
-/*
- * sched_pause_sync - synchronously pause a domain's execution.
- * XXXX This is horribly broken -- here just as a place holder at present,
- *                                 do not use.
- */
-void sched_pause_sync(struct task_struct *p)
-{
-    unsigned long flags;
-    int cpu = p->processor;
-
-    spin_lock_irqsave(&schedule_lock[cpu], flags);
-
-    /* If not the current task, we can remove it from scheduling now. */
-    if ( schedule_data[cpu].curr != p )
-        SCHED_OP(pause, p);
-
-    p->state = TASK_PAUSED;
-    
-    spin_unlock_irqrestore(&schedule_lock[cpu], flags);
-
-    /* Spin until domain is descheduled by its local scheduler. */
-    while ( schedule_data[cpu].curr == p )
-    {
-        send_hyp_event(p, _HYP_EVENT_NEED_RESCHED );
-        do_yield();
-    }
-        
-    /* The domain will not be scheduled again until we do a wake_up(). */
-}
-
 /* Per-domain one-shot-timer hypercall. */
 long do_set_timer_op(unsigned long timeout_hi, unsigned long timeout_lo)
 {
-    struct task_struct *p = current;
+    struct domain *p = current;
 
     rem_ac_timer(&p->timer);
     
@@ -341,7 +332,7 @@ long sched_ctl(struct sched_ctl_cmd *cmd)
 /* Adjust scheduling parameter for a given domain. */
 long sched_adjdom(struct sched_adjdom_cmd *cmd)
 {
-    struct task_struct *p;    
+    struct domain *p;    
     
     if ( cmd->sched_id != ops.sched_id )
         return -EINVAL;
@@ -358,62 +349,8 @@ long sched_adjdom(struct sched_adjdom_cmd *cmd)
 
     SCHED_OP(adjdom, p, cmd);
 
-    put_task_struct(p); 
+    put_domain(p); 
     return 0;
-}
-
-/*
- * cause a run through the scheduler when appropriate
- * Appropriate is:
- * - current task is idle task
- * - the current task already ran for it's context switch allowance
- * Otherwise we do a run through the scheduler after the current tasks 
- * context switch allowance is over.
- */
-unsigned long __reschedule(struct task_struct *p)
-{
-       int cpu = p->processor;
-    struct task_struct *curr;
-    s_time_t now, min_time;
-
-    TRACE_3D(TRC_SCHED_RESCHED, _HIGH32(p->domain), _LOW32(p->domain), p);
-
-    if ( unlikely(p->has_cpu || !__task_on_runqueue(p)) )
-        return 0;
-
-    now = NOW();
-    curr = schedule_data[cpu].curr;
-    /* domain should run at least for ctx_allow */
-    min_time = curr->lastschd + curr->min_slice;
-
-    if ( is_idle_task(curr) || (min_time <= now) )
-    {
-        set_bit(_HYP_EVENT_NEED_RESCHED, &curr->hyp_events);
-        return (1 << p->processor);
-    }
-
-    /* current hasn't been running for long enough -> reprogram timer.
-     * but don't bother if timer would go off soon anyway */
-    if ( schedule_data[cpu].s_timer.expires > min_time + TIME_SLOP )
-        mod_ac_timer(&schedule_data[cpu].s_timer, min_time);
-
-    return SCHED_OP(reschedule, p);
-}
-
-void reschedule(struct task_struct *p)
-{
-    unsigned long flags, cpu_mask;
-
-    spin_lock_irqsave(&schedule_lock[p->processor], flags);
-    cpu_mask = __reschedule(p);
-
-    spin_unlock_irqrestore(&schedule_lock[p->processor], flags);
-
-#ifdef CONFIG_SMP
-    cpu_mask &= ~(1 << smp_processor_id());
-    if ( cpu_mask != 0 )
-        smp_send_event_check_mask(cpu_mask);
-#endif
 }
 
 /* 
@@ -421,9 +358,9 @@ void reschedule(struct task_struct *p)
  * - deschedule the current domain (scheduler independent).
  * - pick a new domain (scheduler dependent).
  */
-asmlinkage void __enter_scheduler(void)
+void __enter_scheduler(void)
 {
-    struct task_struct *prev = current, *next = NULL;
+    struct domain *prev = current, *next = NULL;
     int                 cpu = prev->processor;
     s_time_t            now;
     task_slice_t        next_slice;
@@ -431,23 +368,20 @@ asmlinkage void __enter_scheduler(void)
 
     perfc_incrc(sched_run);
 
-    clear_bit(_HYP_EVENT_NEED_RESCHED, &prev->hyp_events);
-
     spin_lock_irq(&schedule_lock[cpu]);
 
     now = NOW();
 
     rem_ac_timer(&schedule_data[cpu].s_timer);
     
-    ASSERT(!in_interrupt());
+    ASSERT(!in_irq());
     ASSERT(__task_on_runqueue(prev));
-    ASSERT(prev->state != TASK_UNINTERRUPTIBLE);
 
-    if ( prev->state == TASK_INTERRUPTIBLE )
+    if ( test_bit(DF_BLOCKED, &prev->flags) )
     {
-        /* this check is needed to avoid a race condition */
-        if ( signal_pending(prev) )
-            prev->state = TASK_RUNNING;
+        /* This check is needed to avoid a race condition. */
+        if ( event_pending(prev) )
+            clear_bit(DF_BLOCKED, &prev->flags);
         else
             SCHED_OP(do_block, prev);
     }
@@ -504,9 +438,6 @@ asmlinkage void __enter_scheduler(void)
 
     switch_to(prev, next);
     
-    if ( unlikely(prev->state == TASK_DYING) ) 
-        put_task_struct(prev);
-
     /* Mark a timer event for the newly-scheduled domain. */
     if ( !is_idle_task(next) )
         send_guest_virq(next, VIRQ_TIMER);
@@ -519,7 +450,7 @@ asmlinkage void __enter_scheduler(void)
 /* No locking needed -- pointer comparison is safe :-) */
 int idle_cpu(int cpu)
 {
-    struct task_struct *p = schedule_data[cpu].curr;
+    struct domain *p = schedule_data[cpu].curr;
     return p == idle_task[cpu];
 }
 
@@ -536,14 +467,14 @@ int idle_cpu(int cpu)
 static void s_timer_fn(unsigned long unused)
 {
     TRACE_0D(TRC_SCHED_S_TIMER_FN);
-    set_bit(_HYP_EVENT_NEED_RESCHED, &current->hyp_events);
+    raise_softirq(SCHEDULE_SOFTIRQ);
     perfc_incrc(sched_irq);
 }
 
 /* Periodic tick timer: send timer event to current domain*/
 static void t_timer_fn(unsigned long unused)
 {
-    struct task_struct *p = current;
+    struct domain *p = current;
 
     TRACE_0D(TRC_SCHED_T_TIMER_FN);
 
@@ -557,7 +488,7 @@ static void t_timer_fn(unsigned long unused)
 /* Domain timer function, sends a virtual timer interrupt to domain */
 static void dom_timer_fn(unsigned long data)
 {
-    struct task_struct *p = (struct task_struct *)data;
+    struct domain *p = (struct domain *)data;
     TRACE_0D(TRC_SCHED_DOM_TIMER_FN);
     send_guest_virq(p, VIRQ_TIMER);
 }
@@ -566,7 +497,7 @@ static void dom_timer_fn(unsigned long data)
 /* Fallback timer to ensure guests get time updated 'often enough'. */
 static void fallback_timer_fn(unsigned long unused)
 {
-    struct task_struct *p = current;
+    struct domain *p = current;
 
     TRACE_0D(TRC_SCHED_FALLBACK_TIMER_FN);
 
@@ -581,6 +512,8 @@ static void fallback_timer_fn(unsigned long unused)
 void __init scheduler_init(void)
 {
     int i;
+
+    open_softirq(SCHEDULE_SOFTIRQ, __enter_scheduler);
 
     for ( i = 0; i < NR_CPUS; i++ )
     {
@@ -645,12 +578,12 @@ static void dump_rqueue(struct list_head *queue, char *name)
 {
     struct list_head *list;
     int loop = 0;
-    struct task_struct  *p;
+    struct domain  *p;
 
     printk ("QUEUE %s %lx   n: %lx, p: %lx\n", name,  (unsigned long)queue,
             (unsigned long) queue->next, (unsigned long) queue->prev);
     list_for_each (list, queue) {
-        p = list_entry(list, struct task_struct, run_list);
+        p = list_entry(list, struct domain, run_list);
         printk("%3d: %u has=%c ", loop++, p->domain, p->has_cpu ? 'T':'F');
         SCHED_OP(dump_runq_el, p);
         printk("c=0x%X%08X\n", (u32)(p->cpu_time>>32), (u32)p->cpu_time);
@@ -678,36 +611,6 @@ void dump_runq(u_char key, void *dev_id, struct pt_regs *regs)
         spin_unlock_irqrestore(&schedule_lock[i], flags);
     }
     return; 
-}
-
-/* print human-readable "state", given the numeric code for that state */
-void sched_prn_state(int state)
-{
-    int ret = 0;
-    
-    switch(state)
-    {
-    case TASK_RUNNING:
-        printk("Running");
-        break;
-    case TASK_INTERRUPTIBLE:
-        printk("Int sleep");
-        break;
-    case TASK_UNINTERRUPTIBLE:
-        printk("UInt sleep");
-        break;
-    case TASK_STOPPED:
-        printk("Stopped");
-        break;
-    case TASK_DYING:
-        printk("Dying");
-        break;
-    default:
-        ret = SCHED_OP(prn_state, state);
-    }
-
-    if ( ret != 0 )
-        printk("Unknown");
 }
 
 #if defined(WAKEUP_HISTO) || defined(BLOCKTIME_HISTO)

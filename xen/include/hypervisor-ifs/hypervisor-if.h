@@ -38,7 +38,6 @@
 #define __HYPERVISOR_set_fast_trap        15
 #define __HYPERVISOR_dom_mem_op           16
 #define __HYPERVISOR_multicall            17
-#define __HYPERVISOR_kbd_op               18
 #define __HYPERVISOR_update_va_mapping    19
 #define __HYPERVISOR_set_timer_op         20
 #define __HYPERVISOR_event_channel_op     21
@@ -62,20 +61,12 @@
  * 
  * Virtual interrupts that a guest OS may receive from the hypervisor.
  */
-#define VIRQ_BLKDEV     0  /* (OBS) A block device response has been queued. */
-#define VIRQ_TIMER      1  /* A timeout has been updated. */
-#define VIRQ_DIE        2  /* (OBS) OS is about to be killed. Clean up! */
-#define VIRQ_DEBUG      3  /* Request guest to dump debug info (gross!) */
-#define VIRQ_NET        4  /* (OBS) There are packets for transmission. */
-#define VIRQ_PS2        5  /* (OBS) PS/2 keyboard or mouse event(s) */
-#define VIRQ_STOP       6  /* (OBS) Prepare for stopping and pickling */
-#define VIRQ_EVTCHN     7  /* Event pending on an event channel */
-#define VIRQ_VBD_UPD    8  /* (OBS) Event to signal VBDs should be reprobed */
-#define VIRQ_CONSOLE    9  /* (DOM0) bytes received on master console. */
-#define VIRQ_PHYSIRQ   10  /* Pending physical IRQs. */
-#define VIRQ_MISDIRECT 11  /* Catch-all virtual interrupt. */
-#define VIRQ_DOM_EXC   12  /* (DOM0) Exceptional event for some domain. */
-#define NR_VIRQS       13
+#define VIRQ_MISDIRECT  0  /* Catch-all interrupt for unbound VIRQs.      */
+#define VIRQ_TIMER      1  /* Timebase update, and/or requested timeout.  */
+#define VIRQ_DEBUG      2  /* Request guest to dump debug info.           */
+#define VIRQ_CONSOLE    3  /* (DOM0) bytes received on emergency console. */
+#define VIRQ_DOM_EXC    4  /* (DOM0) Exceptional event for some domain.   */
+#define NR_VIRQS        5
 
 /*
  * MMU-UPDATE REQUESTS
@@ -171,11 +162,11 @@
 /*
  * Commands to HYPERVISOR_sched_op().
  */
-#define SCHEDOP_yield           0   /* Give up the CPU voluntarily.      */
-#define SCHEDOP_block           1   /* Block until an event is received. */
-#define SCHEDOP_stop            4   /* Stop executing this domain.       */
+#define SCHEDOP_yield           0   /* Give up the CPU voluntarily.       */
+#define SCHEDOP_block           1   /* Block until an event is received.  */
+#define SCHEDOP_suspend         2   /* Stop executing this domain.        */
 #define SCHEDOP_cmdmask       255   /* 8-bit command. */
-#define SCHEDOP_reasonshift     8   /* 8-bit stop code. (SCHEDOP_stop only) */
+#define SCHEDOP_reasonshift     8   /* 8-bit suspend code. (SCHEDOP_suspend) */
 
 /*
  * Commands to HYPERVISOR_console_io().

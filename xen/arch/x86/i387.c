@@ -17,10 +17,10 @@ void init_fpu(void)
 {
     __asm__("fninit");
     if ( cpu_has_xmm ) load_mxcsr(0x1f80);
-    set_bit(PF_DONEFPUINIT, &current->flags);
+    set_bit(DF_DONEFPUINIT, &current->flags);
 }
 
-static inline void __save_init_fpu( struct task_struct *tsk )
+static inline void __save_init_fpu( struct domain *tsk )
 {
     if ( cpu_has_fxsr ) {
         asm volatile( "fxsave %0 ; fnclex"
@@ -29,22 +29,22 @@ static inline void __save_init_fpu( struct task_struct *tsk )
         asm volatile( "fnsave %0 ; fwait"
                       : "=m" (tsk->thread.i387) );
     }
-    clear_bit(PF_USEDFPU, &tsk->flags);
+    clear_bit(DF_USEDFPU, &tsk->flags);
 }
 
-void save_init_fpu( struct task_struct *tsk )
+void save_init_fpu( struct domain *tsk )
 {
     /*
      * The guest OS may have set the 'virtual STTS' flag.
      * This causes us to set the real flag, so we'll need
      * to temporarily clear it while saving f-p state.
      */
-    if ( test_bit(PF_GUEST_STTS, &tsk->flags) ) clts();
+    if ( test_bit(DF_GUEST_STTS, &tsk->flags) ) clts();
     __save_init_fpu(tsk);
     stts();
 }
 
-void restore_fpu( struct task_struct *tsk )
+void restore_fpu( struct domain *tsk )
 {
     if ( cpu_has_fxsr ) {
         asm volatile( "fxrstor %0"

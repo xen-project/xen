@@ -48,7 +48,7 @@ void init_trace_bufs(void)
     unsigned long nr_pages;
     char         *rawbuf;
     struct t_buf *buf;
-    struct task_struct *dom0;
+    struct domain *dom0;
     
     if ( opt_tbuf_size == 0 )
     {
@@ -72,7 +72,7 @@ void init_trace_bufs(void)
     for( i = 0; i < nr_pages; i++)
         SHARE_PFN_WITH_DOMAIN(virt_to_page(rawbuf+(i*PAGE_SIZE)), dom0);
     
-    put_task_struct(dom0);
+    put_domain(dom0);
 
     for ( i = 0; i < smp_num_cpus; i++ )
     {

@@ -76,10 +76,7 @@ typedef struct {
 typedef struct {
     /* IN parameters. */
     domid_t domain;                   /*  0 */
-    /* hack to indicate that you want to wait for other domain -- replace
-       with proper sychronous stop soon! */
-    u32     sync;                     /*  4 */
-} PACKED dom0_stopdomain_t; /* 8 bytes */
+} PACKED dom0_stopdomain_t; /* 4 bytes */
 
 #define DOM0_GETDOMAININFO    12
 typedef struct {
@@ -87,7 +84,7 @@ typedef struct {
     domid_t  domain;                  /*  0 */ /* NB. IN/OUT variable. */
     /* OUT variables. */
 #define DOMSTATE_CRASHED     0 /* Crashed domain; frozen for postmortem.     */
-#define DOMSTATE_STOPPED     1 /* Domain voluntarily halted it execution.    */
+#define DOMSTATE_SUSPENDED   1 /* Domain voluntarily halted it execution.    */
 #define DOMSTATE_PAUSED      2 /* Currently paused (forced non-schedulable). */
 #define DOMSTATE_BLOCKED     3 /* Currently blocked pending a wake-up event. */
 #define DOMSTATE_RUNNABLE    4 /* Currently runnable.                        */
@@ -109,8 +106,7 @@ typedef struct {
     memory_t shared_info_frame;       /* 48: MFN of shared_info struct */
     MEMORY_PADDING;
     u64      cpu_time;                /* 56 */
-    u32      hyp_events;              /* 64 */
-} PACKED dom0_getdomaininfo_t; /* 68 bytes */
+} PACKED dom0_getdomaininfo_t; /* 64 bytes */
 
 #define DOM0_BUILDDOMAIN      13
 typedef struct {

@@ -14,17 +14,17 @@ static s_time_t rr_slice = MILLISECS(10);
 
 static task_slice_t rr_do_schedule(s_time_t now)
 {
-    struct task_struct *prev = current;
+    struct domain *prev = current;
     int cpu = current->processor;
     task_slice_t ret;
  
     __del_from_runqueue(prev);
     
-    if ( prev->state == TASK_RUNNING )
+    if ( domain_runnable(prev) )
       __add_to_runqueue_tail(prev);
     
     ret.task = list_entry(schedule_data[cpu].runqueue.next,
-                    struct task_struct, run_list);
+                    struct domain, run_list);
 
     ret.time = rr_slice;
 
@@ -50,7 +50,7 @@ static void rr_dump_settings()
     printk("rr_slice = %llu ", rr_slice);
 }
 
-static void rr_pause(struct task_struct *p)
+static void rr_pause(struct domain *p)
 {
     if ( __task_on_runqueue(p) )
         __del_from_runqueue(p);
