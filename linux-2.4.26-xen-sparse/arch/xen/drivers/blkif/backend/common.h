@@ -13,7 +13,7 @@
 #include <linux/blkdev.h>
 #include <asm/ctrl_if.h>
 #include <asm/io.h>
-#include "../blkif.h"
+#include <asm-xen/hypervisor-ifs/io/blkif.h>
 
 #if 0
 #define ASSERT(_p) \

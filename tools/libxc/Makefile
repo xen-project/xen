@@ -14,9 +14,6 @@ INCLUDES += -I $(XEN_HYPERVISOR_IFS)
 vpath %h       $(XEN_LINUX_INCLUDE)
 INCLUDES += -I $(XEN_LINUX_INCLUDE)
 
-vpath %.h      $(XEN_XU)
-INCLUDES += -I $(XEN_XU)
-
 vpath %c       $(XEN_LIBXUTIL)
 INCLUDES += -I $(XEN_LIBXUTIL)
 

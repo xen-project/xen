@@ -56,7 +56,6 @@
 4087cf0dvXL1PKX23t_LvO1wVPb7OA linux-2.4.26-xen-sparse/arch/xen/drivers/blkif/backend/interface.c
 4087cf0dkVF3I19gpT1cNubeJgQr7g linux-2.4.26-xen-sparse/arch/xen/drivers/blkif/backend/main.c
 4087cf0dlv1Dw4MAbeRStPPG8IvPPg linux-2.4.26-xen-sparse/arch/xen/drivers/blkif/backend/vbd.c
-40880cc6hHg6s2cPHbqPNQxENefjoQ linux-2.4.26-xen-sparse/arch/xen/drivers/blkif/blkif.h
 4075806dI5kfeMD5RV-DA0PYoThx_w linux-2.4.26-xen-sparse/arch/xen/drivers/blkif/frontend/Makefile
 4075806d4-j7vN0Mn0bklI1cRUX1vQ linux-2.4.26-xen-sparse/arch/xen/drivers/blkif/frontend/common.h
 4075806d3fJqqDC1pYYPTZPc575iKg linux-2.4.26-xen-sparse/arch/xen/drivers/blkif/frontend/main.c
@@ -68,7 +67,6 @@
 4083dc16-Kd5y9psK_yk161sme5j5Q linux-2.4.26-xen-sparse/arch/xen/drivers/netif/Makefile
 4083dc16UmHXxS9g_UFVnkUpN-oP2Q linux-2.4.26-xen-sparse/arch/xen/drivers/netif/backend/Makefile
 405853f2wg7JXZJNltspMwOZJklxgw linux-2.4.26-xen-sparse/arch/xen/drivers/netif/frontend/Makefile
-4097ba83Qy2eafeFUhGhm6_4iMIIDw linux-2.4.26-xen-sparse/arch/xen/drivers/netif/netif.h
 3e5a4e65lWzkiPXsZdzPt2RNnJGG1g linux-2.4.26-xen-sparse/arch/xen/kernel/Makefile
 4075806dE5mQwlVUf8-t3YXjiMMWDQ linux-2.4.26-xen-sparse/arch/xen/kernel/ctrl_if.c
 3e5a4e65_hqfuxtGG8IUy6wRM86Ecg linux-2.4.26-xen-sparse/arch/xen/kernel/entry.S
@@ -249,11 +247,9 @@
 40f5623bc8LKPRO09wY5dGDnY_YCpw linux-2.6.7-xen-sparse/include/asm-xen/asm-i386/tlbflush.h
 41062ab7uFxnCq-KtPeAm-aV8CicgA linux-2.6.7-xen-sparse/include/asm-xen/asm-i386/vga.h
 40f5623bxUbeGjkRrjDguCy_Gm8RLw linux-2.6.7-xen-sparse/include/asm-xen/asm-i386/xor.h
-40f5623bqoi4GEoBiiUc6TZk1HjsMg linux-2.6.7-xen-sparse/include/asm-xen/blkif.h
 40f5623bYNP7tHE2zX6YQxp9Zq2utQ linux-2.6.7-xen-sparse/include/asm-xen/ctrl_if.h
 40f5623b3Eqs8pAc5WpPX8_jTzV2qw linux-2.6.7-xen-sparse/include/asm-xen/evtchn.h
 40f5623cndVUFlkxpf7Lfx7xu8madQ linux-2.6.7-xen-sparse/include/asm-xen/multicall.h
-40f5623cTZ80EwjWUBlh44A9F9i_Lg linux-2.6.7-xen-sparse/include/asm-xen/netif.h
 3f108af1ylCIm82H052FVTfXACBHrw linux-2.6.7-xen-sparse/include/asm-xen/proc_cmd.h
 40f5623cBiQhPHILVLrl3xa6bDBaRg linux-2.6.7-xen-sparse/include/asm-xen/xen.h
 3f689063BoW-HWV3auUJ-OqXfcGArw linux-2.6.7-xen-sparse/include/asm-xen/xen_proc.h
@@ -382,7 +378,6 @@
 40dfd40aMOhnw_cQLve9462UR5yYxQ tools/python/xen/lowlevel/__init__.py
 3fbd0a42l40lM0IICw2jXbQBVZSdZg tools/python/xen/lowlevel/xc/xc.c
 40dc4076St6AmPTmQPrtQ6LGHPxGmw tools/python/xen/lowlevel/xu/__init__.py
-40dc4076pVeE1kEEWzcUaNZin65kCA tools/python/xen/lowlevel/xu/domain_controller.h
 40dc4076CwBYRTUQDdbdU1L6KcLgSw tools/python/xen/lowlevel/xu/xu.c
 41052eb84_irpx0E9N_kqBp9eoin5g tools/python/xen/sv/CreateDomain.py
 4107986egkTAMIHW7n-i4ShvCGWpLQ tools/python/xen/sv/Daemon.py
@@ -699,6 +694,9 @@
 3ddb79c2PMeWTK86y4C3F4MzHw4A1g xen/include/hypervisor-ifs/dom0_ops.h
 403cd194j2pyLqXD8FJ-ukvZzkPenw xen/include/hypervisor-ifs/event_channel.h
 3ddb79c25UE59iu4JJcbRalx95mvcg xen/include/hypervisor-ifs/hypervisor-if.h
+40f5623bqoi4GEoBiiUc6TZk1HjsMg xen/include/hypervisor-ifs/io/blkif.h
+40dc4076pVeE1kEEWzcUaNZin65kCA xen/include/hypervisor-ifs/io/domain_controller.h
+40f5623cTZ80EwjWUBlh44A9F9i_Lg xen/include/hypervisor-ifs/io/netif.h
 4051db79512nOCGweabrFWO2M2h5ng xen/include/hypervisor-ifs/physdev.h
 40589968wmhPmV5-ENbBYmMjnedgKw xen/include/hypervisor-ifs/sched_ctl.h
 404f3d2eR2Owk-ZcGOx9ULGHg3nrww xen/include/hypervisor-ifs/trace.h

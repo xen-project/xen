@@ -9,26 +9,21 @@
 
 #include <linux/config.h>
 #include <linux/module.h>
-
 #include <linux/kernel.h>
 #include <linux/sched.h>
 #include <linux/slab.h>
 #include <linux/string.h>
 #include <linux/errno.h>
-
 #include <linux/fs.h>
 #include <linux/hdreg.h>
 #include <linux/blkdev.h>
 #include <linux/major.h>
-
 #include <linux/devfs_fs_kernel.h>
-
 #include <asm/hypervisor-ifs/hypervisor-if.h>
+#include <asm-xen/hypervisor-ifs/io/blkif.h>
 #include <asm/io.h>
 #include <asm/atomic.h>
 #include <asm/uaccess.h>
-
-#include <asm-xen/blkif.h>
 
 #if 0
 #define DPRINTK(_f, _a...) printk ( KERN_ALERT _f , ## _a )
