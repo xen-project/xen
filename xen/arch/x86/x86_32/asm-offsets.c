@@ -59,4 +59,12 @@ void __dummy__(void)
     OFFSET(TRAPBOUNCE_cs, struct trap_bounce, cs);
     OFFSET(TRAPBOUNCE_eip, struct trap_bounce, eip);
     BLANK();
+
+    OFFSET(MULTICALL_op, multicall_entry_t, op);
+    OFFSET(MULTICALL_arg0, multicall_entry_t, args[0]);
+    OFFSET(MULTICALL_arg1, multicall_entry_t, args[1]);
+    OFFSET(MULTICALL_arg2, multicall_entry_t, args[2]);
+    OFFSET(MULTICALL_arg3, multicall_entry_t, args[3]);
+    OFFSET(MULTICALL_arg4, multicall_entry_t, args[4]);
+    OFFSET(MULTICALL_result, multicall_entry_t, args[5]);
 }

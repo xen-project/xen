@@ -446,14 +446,14 @@ do_grant_table_op(
     switch ( cmd )
     {
     case GNTTABOP_map_grant_ref:
-        if ( unlikely(!access_ok(VERIFY_WRITE, uop,
-                                 count * sizeof(gnttab_map_grant_ref_t))) )
+        if ( unlikely(!array_access_ok(
+            VERIFY_WRITE, uop, count, sizeof(gnttab_map_grant_ref_t))) )
             return -EFAULT;
         rc = gnttab_map_grant_ref((gnttab_map_grant_ref_t *)uop, count);
         break;
     case GNTTABOP_unmap_grant_ref:
-        if ( unlikely(!access_ok(VERIFY_WRITE, uop,
-                                 count * sizeof(gnttab_unmap_grant_ref_t))) )
+        if ( unlikely(!array_access_ok(
+            VERIFY_WRITE, uop, count, sizeof(gnttab_unmap_grant_ref_t))) )
             return -EFAULT;
         rc = gnttab_unmap_grant_ref((gnttab_unmap_grant_ref_t *)uop, count);
         break;

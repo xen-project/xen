@@ -32,6 +32,7 @@
 #include <asm/shadow.h>
 #include <xen/console.h>
 #include <xen/elf.h>
+#include <xen/multicall.h>
 
 #if !defined(CONFIG_X86_64BITMODE)
 /* No ring-3 access in initial page tables. */
@@ -428,17 +429,31 @@ long do_iopl(domid_t domain, unsigned int new_io_pl)
 
 void hypercall_create_continuation(unsigned int op, unsigned int nr_args, ...)
 {
-    execution_context_t *ec = get_execution_context();
-    unsigned long *preg = &ec->ebx;
+    struct mc_state *mcs = &mc_state[smp_processor_id()];
+    execution_context_t *ec;
+    unsigned long *preg;
     unsigned int i;
     va_list args;
 
-    ec->eax  = op;
-    ec->eip -= 2;  /* re-execute 'int 0x82' */
-
     va_start(args, nr_args);
-    for ( i = 0; i < nr_args; i++ )
-        *preg++ = va_arg(args, unsigned long);
+
+    if ( test_bit(_MCSF_in_multicall, &mcs->flags) )
+    {
+        __set_bit(_MCSF_call_preempted, &mcs->flags);
+
+        for ( i = 0; i < nr_args; i++ )
+            mcs->call.args[i] = va_arg(args, unsigned long);
+    }
+    else
+    {
+        ec       = get_execution_context();
+        ec->eax  = op;
+        ec->eip -= 2;  /* re-execute 'int 0x82' */
+        
+        for ( i = 0, preg = &ec->ebx; i < nr_args; i++, preg++ )
+            *preg = va_arg(args, unsigned long);
+    }
+
     va_end(args);
 }
 
