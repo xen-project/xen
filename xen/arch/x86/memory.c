@@ -1802,6 +1802,12 @@ static __init int ptwr_init(void)
             (void *)alloc_xenheap_page();
         ptwr_info[i].ptinfo[PTWR_PT_INACTIVE].page =
             (void *)alloc_xenheap_page();
+        machine_to_phys_mapping[virt_to_phys(
+	    ptwr_info[i].ptinfo[PTWR_PT_ACTIVE].page)>>PAGE_SHIFT] =
+	    INVALID_P2M_ENTRY;
+        machine_to_phys_mapping[virt_to_phys(
+	    ptwr_info[i].ptinfo[PTWR_PT_INACTIVE].page)>>PAGE_SHIFT] =
+	    INVALID_P2M_ENTRY; 
     }
 
     return 0;
