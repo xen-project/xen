@@ -365,14 +365,11 @@ void __switch_to(struct task_struct *prev_p, struct task_struct *next_p)
         queue_multicall0(__HYPERVISOR_fpu_taskswitch);
     }
 
-    if ( next->esp0 != 0 )
-    {
-        queue_multicall2(__HYPERVISOR_stack_switch, __KERNEL_DS, next->esp0);
-        /* Next call will silently fail if we are a non-privileged guest OS. */
-        queue_multicall2(__HYPERVISOR_set_priv_levels,
-                         ((((struct pt_regs *)next->esp0)-1)->eflags>>12)&3,
-                         next->hypercall_pl);
-    }
+    queue_multicall2(__HYPERVISOR_stack_switch, __KERNEL_DS, next->esp0);
+    /* Next call will silently fail if we are a non-privileged guest OS. */
+    queue_multicall2(__HYPERVISOR_set_priv_levels,
+                     ((((struct pt_regs *)next->esp0)-1)->eflags>>12)&3,
+                     next->hypercall_pl);
 
     /* EXECUTE ALL TASK SWITCH XEN SYSCALLS AT THIS POINT. */
     execute_multicall_list();

@@ -302,7 +302,6 @@ void __init setup_arch(char **cmdline_p)
 
     paging_init();
 
-    /* Set privilege level gubbins. */
     regs->eflags &= ~(3<<12);
     if ( start_info.flags & SIF_PRIVILEGED ) {
         /* We are privileged guest os - should have IO privileges. */
@@ -310,7 +309,6 @@ void __init setup_arch(char **cmdline_p)
             panic("Unable to obtain IOPL, despite being SIF_PRIVILEGED");
         regs->eflags |= 1<<12;
     }
-    current->thread.hypercall_pl = 1;
 
     if(start_info.flags & SIF_CONSOLE)
     {
