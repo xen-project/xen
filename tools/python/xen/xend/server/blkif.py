@@ -194,6 +194,12 @@ class BlkifControllerFactory(controller.ControllerFactory):
         """
         val = unpackMsg('blkif_be_vbd_grow_t', msg)
         # Check status?
+	status = val['status']
+	if status != BLKIF_BE_STATUS_OKAY:
+            log.debug("Error: Adding extent to vbd failed! (device %x)",
+		      val['extent.device'])
+            # what to do here to abort????
+
         if self.attached:
             if d:
                 d.callback(dev)

@@ -83,9 +83,18 @@ def blkdev_name_to_number(name):
     'hda') and return the device number used by the OS. """
 
     if not re.match( '^/dev/', name ):
-        name = '/dev/' + name
+        n = '/dev/' + name
         
-    return os.stat(name).st_rdev
+    try:
+	return os.stat(n).st_rdev
+    except:
+	pass
+
+    # see if this is a hex device number
+    if re.match( '^(0x)?[0-9a-fA-F]+$', name ):
+	return string.atoi(name,16)
+	
+    return None
 
 def lookup_raw_partn(name):
     """Take the given block-device name (e.g., '/dev/sda1', 'hda')
@@ -97,27 +106,14 @@ def lookup_raw_partn(name):
         type:         'Disk' or identifying name for partition type
     """
 
-    p = name
-
-    if not re.match( '^/dev/', name ):
-        p = '/dev/' + name
-	        
-    fd = os.popen( '/sbin/sfdisk -s ' + p + ' 2>/dev/null' )
-    line = _readline(fd)
-    if line:
-	return [ { 'device' : blkdev_name_to_number(p),
+    n = blkdev_name_to_number(name)
+    if n:
+	return [ { 'device' : n,
 		   'start_sector' : long(0),
 		   'nr_sectors' : long(1L<<63),
 		   'type' : 'Disk' } ]
     else:
-	# see if this is a hex device number
-	if re.match( '^(0x)?[0-9a-fA-F]+$', name ):
-	    return [ { 'device' : string.atoi(name,16),
-		   'start_sector' : long(0),
-		   'nr_sectors' : long(1L<<63),
-		   'type' : 'Disk' } ]
-	
-    return None
+	return None
 
 def lookup_disk_uname(uname):
     """Lookup a list of segments for a physical device.
