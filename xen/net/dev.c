@@ -582,18 +582,13 @@ int netif_rx(struct sk_buff *skb)
     unsigned long flags;
 
     local_irq_save(flags);
-
-    if ( unlikely(skb_queue[cpu].rx_qlen > 100) )
+    if ( unlikely(skb_queue_len(&skb_queue[cpu].rx) > 100) )
     {
         local_irq_restore(flags);
         perfc_incr(net_rx_congestion_drop);
         return NET_RX_DROP;
     }
-
-    skb->next = skb_queue[cpu].rx;
-    skb_queue[cpu].rx = skb;
-    skb_queue[cpu].rx_qlen++;
-
+    __skb_queue_tail(&skb_queue[cpu].rx, skb);
     local_irq_restore(flags);
 
     __cpu_raise_softirq(cpu, NET_RX_SOFTIRQ);
@@ -604,15 +599,25 @@ int netif_rx(struct sk_buff *skb)
 static void net_rx_action(struct softirq_action *h)
 {
     int offset, cpu = smp_processor_id();
-    struct sk_buff *skb, *nskb;
+    struct sk_buff_head list, *q = &skb_queue[cpu].rx;
+    struct sk_buff *skb;
 
     local_irq_disable();
-    skb = skb_queue[cpu].rx;
-    skb_queue[cpu].rx = NULL;
-    skb_queue[cpu].rx_qlen = 0;
+    /* Code to patch to the private list header is invalid if list is empty! */
+    if ( unlikely(skb_queue_len(q) == 0) )
+    {
+        local_irq_enable();
+        return;
+    }
+    /* Patch the head and tail skbuffs to point at the private list header. */
+    q->next->prev = (struct sk_buff *)&list;
+    q->prev->next = (struct sk_buff *)&list;
+    /* Move the list to our private header. The public header is reinit'ed. */
+    list = *q;
+    skb_queue_head_init(q);
     local_irq_enable();
 
-    while ( skb != NULL )
+    while ( (skb = __skb_dequeue(&list)) != NULL )
     {
         ASSERT(skb->skb_type == SKB_ZERO_COPY);
 
@@ -646,9 +651,7 @@ static void net_rx_action(struct softirq_action *h)
 
         unmap_domain_mem(skb->head);
 
-        nskb = skb->next;
         kfree_skb(skb);
-        skb = nskb;
     }
 }
 
@@ -2336,10 +2339,12 @@ static void make_rx_response(net_vif_t     *vif,
 
 int setup_network_devices(void)
 {
-    int ret;
+    int i, ret;
     extern char opt_ifname[];
 
     memset(skb_queue, 0, sizeof(skb_queue));
+    for ( i = 0; i < smp_num_cpus; i++ )
+        skb_queue_head_init(&skb_queue[i].rx);
 
     /* Actual receive processing happens in softirq context. */
     open_softirq(NET_RX_SOFTIRQ, net_rx_action, NULL);

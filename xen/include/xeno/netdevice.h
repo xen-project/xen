@@ -30,7 +30,7 @@
 #include <xeno/if_packet.h>
 #include <xeno/sched.h>
 #include <xeno/interrupt.h>
-
+#include <xeno/skbuff.h>
 #include <asm/atomic.h>
 #include <asm/cache.h>
 #include <asm/byteorder.h>
@@ -41,9 +41,8 @@
 struct vlan_group;
 
 extern struct skb_completion_queues {
-    struct sk_buff *rx; /* Packets received in interrupt context. */
-    unsigned int rx_qlen;
-    struct sk_buff *tx; /* Tx buffers defunct in interrupt context. */
+    struct sk_buff_head rx;  /* Packets received in interrupt context.   */
+    struct sk_buff     *tx;  /* Tx buffers defunct in interrupt context. */
 } skb_queue[NR_CPUS] __cacheline_aligned;
 
 /* Backlog congestion levels */

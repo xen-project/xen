@@ -23,7 +23,6 @@
 #include <asm/system.h>
 #include <asm/atomic.h>
 #include <asm/types.h>
-#include <linux/spinlock.h>
 #include <linux/mm.h>
 #include <xeno/vif.h>
 
@@ -88,9 +87,7 @@ struct sk_buff_head {
     /* These two members must be first. */
     struct sk_buff	* next;
     struct sk_buff	* prev;
-
     __u32		qlen;
-    spinlock_t	lock;
 };
 
 #define MAX_SKB_FRAGS 1 /* KAF: was 6 */
@@ -204,7 +201,6 @@ static inline __u32 skb_queue_len(struct sk_buff_head *list_)
 
 static inline void skb_queue_head_init(struct sk_buff_head *list)
 {
-    spin_lock_init(&list->lock);
     list->prev = (struct sk_buff *)list;
     list->next = (struct sk_buff *)list;
     list->qlen = 0;
@@ -214,9 +210,6 @@ static inline void skb_queue_head_init(struct sk_buff_head *list)
  *	__skb_queue_head - queue a buffer at the list head
  *	@list: list to use
  *	@newsk: buffer to queue
- *
- *	Queue a buffer at the start of a list. This function takes no locks
- *	and you must therefore hold required locks before calling it.
  *
  *	A buffer cannot be placed on two lists at the same time.
  */	
@@ -239,9 +232,6 @@ static inline void __skb_queue_head(struct sk_buff_head *list, struct sk_buff *n
  *      __skb_queue_tail - queue a buffer at the list tail
  *      @list: list to use
  *      @newsk: buffer to queue
- *
- *      Queue a buffer at the end of a list. This function takes no locks
- *      and you must therefore hold required locks before calling it.
  *
  *      A buffer cannot be placed on two lists at the same time.
  */ 
