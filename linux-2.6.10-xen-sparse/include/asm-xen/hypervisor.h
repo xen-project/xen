@@ -438,7 +438,7 @@ HYPERVISOR_multicall(
 
 static inline int
 HYPERVISOR_update_va_mapping(
-    unsigned long nr, pte_t new_val, unsigned long flags)
+    unsigned long va, pte_t new_val, unsigned long flags)
 {
     int ret;
     unsigned long ign1, ign2, ign3;
