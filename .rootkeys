@@ -244,16 +244,7 @@
 40f5623bxUbeGjkRrjDguCy_Gm8RLw linux-2.6.7-xen-sparse/include/asm-xen/asm-i386/xor.h
 40f5623bqoi4GEoBiiUc6TZk1HjsMg linux-2.6.7-xen-sparse/include/asm-xen/blkif.h
 40f5623bYNP7tHE2zX6YQxp9Zq2utQ linux-2.6.7-xen-sparse/include/asm-xen/ctrl_if.h
-40f5623bDU2mp4xcHrO0ThodQ9Vs7w linux-2.6.7-xen-sparse/include/asm-xen/domain_controller.h
 40f5623b3Eqs8pAc5WpPX8_jTzV2qw linux-2.6.7-xen-sparse/include/asm-xen/evtchn.h
-40f5623bSHoOzh_pYP9ovjpUz019Aw linux-2.6.7-xen-sparse/include/asm-xen/hypervisor-ifs/arch-x86_32.h
-40f5623c1uIAB_OVr5AFdoOac7zxHA linux-2.6.7-xen-sparse/include/asm-xen/hypervisor-ifs/arch-x86_64.h
-40f5623cEbvTM2QIJ8G6kJoYMLvFpw linux-2.6.7-xen-sparse/include/asm-xen/hypervisor-ifs/dom0_ops.h
-40f5623cBiv7JBB2bwezpyMwyDGN_w linux-2.6.7-xen-sparse/include/asm-xen/hypervisor-ifs/event_channel.h
-40f5623cvr4j1BQI1I82_K5wRocUKg linux-2.6.7-xen-sparse/include/asm-xen/hypervisor-ifs/hypervisor-if.h
-40f5623cfHK4EBsPz922OqMVkZX6OA linux-2.6.7-xen-sparse/include/asm-xen/hypervisor-ifs/physdev.h
-40f5623cFINsV23lGJNQNbhO5kus_Q linux-2.6.7-xen-sparse/include/asm-xen/hypervisor-ifs/sched_ctl.h
-40f5623cb_pJrLt3h_nAzvJsjsV0rQ linux-2.6.7-xen-sparse/include/asm-xen/hypervisor-ifs/trace.h
 40f5623cndVUFlkxpf7Lfx7xu8madQ linux-2.6.7-xen-sparse/include/asm-xen/multicall.h
 40f5623cTZ80EwjWUBlh44A9F9i_Lg linux-2.6.7-xen-sparse/include/asm-xen/netif.h
 3f108af1ylCIm82H052FVTfXACBHrw linux-2.6.7-xen-sparse/include/asm-xen/proc_cmd.h

@@ -104,21 +104,24 @@ rm -f mkbuildtree
 
 LINUX_26=${RS}/../linux-2.6.7-xen-sparse
 
-## There are a whole bunch of special symlinks, mostly for files
-## which are identical in the i386 and xen-i386 architecture-dependent
-## subdirectories.
 
-# This first symlink is special: it links to shared files in Xen's source tree
+# Create links to the shared definitions of the hypervisor interface
 rm -rf ${AD}/include/asm-xen/hypervisor-ifs
 mkdir  ${AD}/include/asm-xen/hypervisor-ifs
 cd     ${AD}/include/asm-xen/hypervisor-ifs
 relative_lndir ../../../${RS}/../xen/include/hypervisor-ifs
 
-# Another special symlink: to the shared definitions for the control interface
-cd ..
+# Create a link to the shared definitions for the control interface
+cd ${AD}/include/asm-xen
 ln -sf ../../${RS}/../tools/python/xen/lowlevel/xu/domain_controller.h
 
-# The remainder are the i386 -> xen-i386 links
+
+## Symlinks for files:
+## - which are identical in the i386 and xen-i386 architecture-dependent
+##   subdirectories.
+## - which are identical in the Linux 2.6 and Linux 2.4 ports.
+
+cd ${AD}/include/asm-xen
 ln -sf ../asm-i386/a.out.h 
 ln -sf ../asm-i386/apicdef.h 
 ln -sf ../asm-i386/apic.h 
@@ -201,7 +204,7 @@ ln -sf ../asm-i386/unistd.h
 ln -sf ../asm-i386/user.h 
 ln -sf ../../${LINUX_26}/include/asm-xen/xen_proc.h
 
-cd ../../arch/xen/kernel
+cd ${AD}/arch/xen/kernel
 ln -sf ../../i386/kernel/i387.c
 ln -sf ../../i386/kernel/init_task.c
 ln -sf ../../i386/kernel/pci-dma.c
@@ -211,7 +214,8 @@ ln -sf ../../i386/kernel/ptrace.c
 ln -sf ../../i386/kernel/semaphore.c 
 ln -sf ../../i386/kernel/sys_i386.c 
 ln -sf ../../../${LINUX_26}/arch/xen/i386/kernel/ioport.c
-cd ../lib
+
+cd ${AD}/arch/xen/lib
 ln -sf ../../i386/lib/checksum.S 
 ln -sf ../../i386/lib/dec_and_lock.c 
 ln -sf ../../i386/lib/getuser.S 
@@ -222,12 +226,16 @@ ln -sf ../../i386/lib/old-checksum.c
 ln -sf ../../i386/lib/strstr.c 
 ln -sf ../../i386/lib/usercopy.c 
 ln -sf ../../../${LINUX_26}/arch/xen/kernel/xen_proc.c
-cd ../mm
+
+cd ${AD}/arch/xen/mm
 ln -sf ../../i386/mm/extable.c 
 ln -sf ../../i386/mm/pageattr.c 
-cd ../drivers/console
+
+cd ${AD}/arch/xen/drivers/console
 ln -sf ../../../../${LINUX_26}/drivers/xen/console/console.c 
-cd ../dom0
+
+cd ${AD}/arch/xen/drivers/dom0
 ln -sf ../../../../${LINUX_26}/drivers/xen/privcmd/privcmd.c core.c
-cd ../netif/frontend
+
+cd ${AD}/arch/xen/drivers/netif/frontend
 ln -sf ../../../../../${LINUX_26}/drivers/xen/net/network.c main.c
