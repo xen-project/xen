@@ -8,7 +8,6 @@
 
 #define BUG() do {					\
     printk("BUG at %s:%d\n", __FILE__, __LINE__);	\
-    debugtrace_dump();                                  \
     FORCE_CRASH();                                      \
 } while ( 0 )
 

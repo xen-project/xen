@@ -108,6 +108,8 @@ asmlinkage void fatal_trap(int trapnr, struct xen_regs *regs)
         "machine check", "simd error"
     };
 
+    watchdog_on = 0;
+
     show_registers(regs);
 
     if ( trapnr == TRAP_page_fault )

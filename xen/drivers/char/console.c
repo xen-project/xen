@@ -598,6 +598,7 @@ void panic(const char *fmt, ...)
 
     debugtrace_dump();
 
+    watchdog_on = 0;
     mdelay(5000);
     machine_restart(0);
 }
