@@ -1,8 +1,21 @@
-default: domctl xenctl
+default: cmdline
 
-install: install-domctl install-xenctl
+install: install-cmdline
 
-clean: clean-domctl clean-xenctl
+clean: clean-cmdline
+
+
+
+cmdline: FORCE
+	ant -buildfile build-cmdline.xml dist
+
+install-cmdline: domctl
+	cp xenctl-cmdline.jar xenctl ../../../install/bin
+	chmod 755 ../../../install/bin/xenctl
+
+clean-cmdline:
+	ant -buildfile build-cmdline.xml clean
+	rm -f xenctl-cmdline.jar
 
 
 
