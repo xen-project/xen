@@ -137,7 +137,7 @@ def lookup_disk_uname(uname):
         segments = None
     return segments
 
-def make_disk(vm, uname, dev, mode, recreate=0):
+def make_disk(vm, config, uname, dev, mode, recreate=0):
     """Create a virtual disk device for a domain.
 
     @param vm:       vm
@@ -154,13 +154,8 @@ def make_disk(vm, uname, dev, mode, recreate=0):
         raise VmError("vbd: Multi-segment vdisk: uname=%s" % uname)
     segment = segments[0]
     vdev = blkdev_name_to_number(dev)
-    backend = vm.get_device_backend('vbd')
-    ctrl = xend.blkif_create(vm.dom, recreate=recreate, backend=backend)
-    
-    def fn(ctrl):
-        return xend.blkif_dev_create(vm.dom, vdev, mode, segment, recreate=recreate)
-    ctrl.addCallback(fn)
-    return ctrl
+    ctrl = xend.blkif_create(vm.dom, recreate=recreate)
+    return ctrl.attachDevice(config, vdev, mode, segment, recreate=recreate)
         
 def vif_up(iplist):
     """send an unsolicited ARP reply for all non link-local IP addresses.
@@ -340,22 +335,6 @@ def append_deferred(dlist, v):
     if isinstance(v, defer.Deferred):
         dlist.append(v)
 
-def _vm_configure1(val, vm):
-    d = vm.create_devices()
-    d.addCallback(_vm_configure2, vm)
-    return d
-
-def _vm_configure2(val, vm):
-    d = vm.configure_fields()
-    def cbok(results):
-        return vm
-    def cberr(err):
-        vm.destroy()
-        return err
-    d.addCallback(cbok)
-    d.addErrback(cberr)
-    return d
-
 class XendDomainInfo:
     """Virtual machine object."""
 
@@ -379,7 +358,6 @@ class XendDomainInfo:
         self.console = None
         self.devices = {}
         self.device_index = {}
-        self.device_backends = {}
         self.configs = []
         self.info = None
         self.ipaddrs = []
@@ -675,7 +653,6 @@ class XendDomainInfo:
         
         self.devices = {}
         self.device_index = {}
-        self.device_backends = {}
         self.configs = []
         self.ipaddrs = []
 
@@ -915,25 +892,6 @@ class XendDomainInfo:
             self.restart_state = None
         return d
 
-    def configure_device_backend(self, type, sxpr):
-        """Configure the backend domain to use for devices of a given type.
-
-        @param type: device type
-        @param sxpr: config
-        @raise: VmError if the domain id is missing
-        @raise: VmError if the domain does not exist
-        """
-        dom = sxp.child_value(sxpr, 'domain')
-        if dom is None:
-            raise VmError('missing backend domain')
-        dominfo = domain_exists(dom)
-        if dominfo is None:
-            raise VmError('invalid backend domain:' + dom)
-        self.device_backends[type] = dominfo.dom
-
-    def get_device_backend(self, type):
-        return self.device_backends.get(type, 0)
-
     def configure_backends(self):
         """Set configuration flags if the vm is a backend for netif or blkif.
         Configure the backends to use for vbd and vif if specified.
@@ -945,21 +903,9 @@ class XendDomainInfo:
                 self.blkif_backend = 1
             elif name == 'netif':
                 self.netif_backend = 1
-            elif name == 'vbd':
-                self.configure_device_backend('vbd', v)
-            elif name == 'vif':
-                self.configure_device_backend('vif', v)
             else:
                 raise VmError('invalid backend type:' + str(name))
 
-    def create_backends(self):
-        """Setup the netif and blkif backends.
-        """
-        if self.blkif_backend:
-            xend.blkif_set_control_domain(self.dom, recreate=self.recreate)
-        if self.netif_backend:
-            xend.netif_set_control_domain(self.dom, recreate=self.recreate)
-            
     def configure(self):
         """Configure a vm.
 
@@ -968,12 +914,19 @@ class XendDomainInfo:
 
         returns Deferred - calls callback with vm
         """
-        if self.blkif_backend:
-            d = defer.Deferred()
-            d.callback(self)
-        else:
-            d = xend.blkif_create(self.dom, recreate=self.recreate)
-        d.addCallback(_vm_configure1, self)
+        d = self.create_devices()
+        d.addCallback(self._configure)
+        return d
+
+    def _configure(self, val):
+        d = self.configure_fields()
+        def cbok(results):
+            return self
+        def cberr(err):
+            self.destroy()
+            return err
+        d.addCallback(cbok)
+        d.addErrback(cberr)
         return d
 
     def dom_construct(self, dom, config):
@@ -1074,20 +1027,18 @@ def vm_dev_vif(vm, val, index):
     @param index:     vif index
     @return: deferred
     """
-    if vm.netif_backend:
-        raise VmError('vif: vif in netif backend domain')
+    #if vm.netif_backend:
+    #    raise VmError('vif: vif in netif backend domain')
     vif = vm.next_device_index('vif')
     vmac = sxp.child_value(val, "mac")
-    backend = vm.get_device_backend('vif')
-    xend.netif_create(vm.dom, recreate=vm.recreate, backend=backend)
+    ctrl = xend.netif_create(vm.dom, recreate=vm.recreate)
     log.debug("Creating vif dom=%d vif=%d mac=%s", vm.dom, vif, str(vmac))
-    defer = xend.netif_dev_create(vm.dom, vif, val, recreate=vm.recreate)
-    def fn(id):
-        dev = xend.netif_dev(vm.dom, vif)
+    defer = ctrl.attachDevice(vif, val, recreate=vm.recreate)
+    def cbok(dev):
         dev.vifctl('up', vmname=vm.name)
         vm.add_device('vif', dev)
-        return id
-    defer.addCallback(fn)
+        return dev
+    defer.addCallback(cbok)
     return defer
 
 def vm_dev_vbd(vm, val, index):
@@ -1098,8 +1049,8 @@ def vm_dev_vbd(vm, val, index):
     @param index:     vbd index
     @return: deferred
     """
-    if vm.blkif_backend:
-        raise VmError('vbd: vbd in blkif backend domain')
+    #if vm.blkif_backend:
+    #    raise VmError('vbd: vbd in blkif backend domain')
     uname = sxp.child_value(val, 'uname')
     if not uname:
         raise VmError('vbd: Missing uname')
@@ -1108,7 +1059,7 @@ def vm_dev_vbd(vm, val, index):
         raise VmError('vbd: Missing dev')
     mode = sxp.child_value(val, 'mode', 'r')
     log.debug("Creating vbd dom=%d uname=%s dev=%s", vm.dom, uname, dev)
-    defer = make_disk(vm, uname, dev, mode, vm.recreate)
+    defer = make_disk(vm, val, uname, dev, mode, vm.recreate)
     def fn(vbd):
         vbd.dev = dev
         vbd.uname = uname

@@ -22,6 +22,10 @@ gopts.opt('help', short='h',
          fn=set_true, default=0,
          use="Print this help.")
 
+gopts.opt('live', short='l',
+          fn=set_true, default=0,
+          use="Use live migration.")
+
 def help(argv):
     gopts.argv = argv
     gopts.usage()
@@ -33,10 +37,10 @@ def main(argv):
         opts.usage()
         return
     if len(args) != 2:
-        opts.err('Invalid arguments')
+        opts.err('Invalid arguments: ' + str(args))
     dom = args[0]
     dst = args[1]
     if dom in [DOM0_NAME, DOM0_ID]:
         opts.err('Cannot migrate ' + dom)
-    server.xend_domain_migrate(dom, dst)
+    server.xend_domain_migrate(dom, dst, opts.vals.live)
         

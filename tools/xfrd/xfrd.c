@@ -81,7 +81,7 @@ receiver:
         (xfr.hello <major> <minor>)
         (xfr.err <code> <reason>)
 
-        xend->xfrd (xfr.migrate  <domain> <vmconfig> <host> <port>)
+        xend->xfrd (xfr.migrate  <domain> <vmconfig> <host> <port> <live>)
                    (xfr.save <domain> <vmconfig> <file>)
         xfrd->xend (xfr.suspend <domain>)
         xfrd->xend (xfr.progress <percent> <rate: kb/s>)
@@ -95,7 +95,7 @@ receiver:
 Sxpr oxfr_configure; // (xfr.configure <vmid> <vmconfig>)
 Sxpr oxfr_err;       // (xfr.err <code>)
 Sxpr oxfr_hello;     // (xfr.hello <major> <minor>)
-Sxpr oxfr_migrate;   // (xfr.migrate <vmid> <vmconfig> <host> <port>)
+Sxpr oxfr_migrate;   // (xfr.migrate <vmid> <vmconfig> <host> <port> <live>)
 Sxpr oxfr_migrate_ok;// (xfr.migrate.ok <value>)
 Sxpr oxfr_progress;  // (xfr.progress <percent> <rate: kb/s>)
 Sxpr oxfr_save;      // (xfr.save <vmid> <vmconfig> <file>)
@@ -235,6 +235,7 @@ typedef struct XfrState {
     unsigned long xfr_port;
     char *xfr_host;
     uint32_t vmid_new;
+    int live;
 } XfrState;
 
 /** Get the name of a transfer state.
@@ -607,7 +608,9 @@ int xfr_send_state(XfrState *state, Conn *xend, Conn *peer){
     if(err) goto exit;
     dprintf(">*** Sending domain %u\n", state->vmid);
     err = xen_domain_snd(xend, peer->out,
-                         state->vmid, state->vmconfig, state->vmconfig_n);
+                         state->vmid,
+                         state->vmconfig, state->vmconfig_n,
+                         state->live);
     dprintf(">*** Sent domain %u\n", state->vmid);
     if(err) goto exit;
     // Sending the domain suspends it, and there's no way back.
@@ -752,7 +755,10 @@ int xfr_save(Args *args, XfrState *state, Conn *xend, char *file){
         err = -EINVAL;
         goto exit;
     }
-    err = xen_domain_snd(xend, io, state->vmid, state->vmconfig, state->vmconfig_n);
+    err = xen_domain_snd(xend, io,
+                         state->vmid,
+                         state->vmconfig, state->vmconfig_n,
+                         0);
     if(err){
         err = xfr_error(xend, err);
     } else {
@@ -851,6 +857,8 @@ int xfrd_service(Args *args, int peersock, struct sockaddr_in peer_in){
         err = addrof(sxpr_childN(sxpr, n++, ONONE), &addr);
         if(err) goto exit;
         err = portof(sxpr_childN(sxpr, n++, ONONE), &port);
+        if(err) goto exit;
+        err = intof(sxpr_childN(sxpr, n++, ONONE), &state->live);
         if(err) goto exit;
         err = xfr_send(args, state, conn, addr, port);
 
