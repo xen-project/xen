@@ -123,7 +123,7 @@ asmlinkage void fatal_trap(int trapnr, struct xen_regs *regs)
     printk("System shutting down -- need manual reset.\n");
     printk("************************************\n");
 
-    debugger_trap_fatal(trapnr, regs);
+    (void)debugger_trap_fatal(trapnr, regs);
 
     /* Lock up the console to prevent spurious output from other CPUs. */
     console_force_lock();
