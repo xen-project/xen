@@ -57,6 +57,9 @@ static int max_cpus = -1;
 /* Total count of live CPUs */
 int smp_num_cpus = 1;
 
+/* Number of hyperthreads per core */
+int ht_per_core = 1;
+
 /* Bitmask of currently online CPUs */
 unsigned long cpu_online_map;
 
@@ -866,6 +869,12 @@ void __init smp_boot_cpus(void)
          * Don't even attempt to start the boot CPU!
          */
         if (apicid == boot_cpu_apicid)
+            continue;
+
+        /* 
+         * Don't start hyperthreads if option noht requested.
+         */
+        if (opt_noht && (apicid & (ht_per_core - 1)))
             continue;
 
         if (!(phys_cpu_present_map & (1 << bit)))

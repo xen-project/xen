@@ -23,7 +23,7 @@ extern void time_init(void);
 extern void ac_timer_init(void);
 extern void initialize_keytable();
 extern int opt_nosmp, opt_watchdog, opt_noacpi;
-extern int opt_ignorebiostables, opt_noht;
+extern int opt_ignorebiostables;
 extern int do_timer_lists_from_pit;
 
 char ignore_irq13;		/* set if exception 16 works */
@@ -116,12 +116,6 @@ static void __init init_intel(struct cpuinfo_x86 *c)
     if ( c->x86 == 6 && c->x86_model < 3 && c->x86_mask < 3 )
         clear_bit(X86_FEATURE_SEP, &c->x86_capability);
 
-    if ( opt_noht )
-    {
-        opt_noacpi = 1; /* Virtual CPUs only appear in ACPI tables. */
-        clear_bit(X86_FEATURE_HT, &c->x86_capability[0]);
-    }
-
 #ifdef CONFIG_SMP
     if ( test_bit(X86_FEATURE_HT, &c->x86_capability) )
     {
@@ -129,8 +123,11 @@ static void __init init_intel(struct cpuinfo_x86 *c)
         int     initial_apic_id, siblings, cpu = smp_processor_id();
         
         cpuid(1, &eax, &ebx, &ecx, &edx);
-        siblings = (ebx & 0xff0000) >> 16;
-        
+        ht_per_core = siblings = (ebx & 0xff0000) >> 16;
+
+        if ( opt_noht )
+            clear_bit(X86_FEATURE_HT, &c->x86_capability[0]);
+
         if ( siblings <= 1 )
         {
             printk(KERN_INFO  "CPU#%d: Hyper-Threading is disabled\n", cpu);

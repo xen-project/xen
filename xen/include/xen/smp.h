@@ -52,6 +52,8 @@ extern int smp_call_function (void (*func) (void *info), void *info,
 extern int smp_threads_ready;
 
 extern int smp_num_cpus;
+extern int ht_per_core;
+extern int opt_noht;
 
 extern volatile unsigned long smp_msg_data;
 extern volatile int smp_src_cpu;

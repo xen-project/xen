@@ -498,16 +498,9 @@ long do_dom0_op(dom0_op_t *u_dom0_op)
 
     case DOM0_PHYSINFO:
     {
-        extern int phys_proc_id[];
-
         dom0_physinfo_t *pi = &op->u.physinfo;
 
-        int old_id = phys_proc_id[0];
-        int ht = 0;
-
-        while( ( ht < smp_num_cpus ) && ( phys_proc_id[ht] == old_id ) ) ht++;
-
-        pi->ht_per_core = ht;
+        pi->ht_per_core = opt_noht ? 1 : ht_per_core;
         pi->cores       = smp_num_cpus / pi->ht_per_core;
         pi->total_pages = max_page;
         pi->free_pages  = avail_domheap_pages();
