@@ -37,10 +37,6 @@ struct pfn_info *frame_table;
 unsigned long frame_table_size;
 unsigned long max_page;
 
-struct list_head free_list;
-spinlock_t free_list_lock;
-unsigned int free_pfns;
-
 extern void init_percpu_info(void);
 
 void __init init_frametable(void *frametable_vstart, unsigned long nr_pages)
@@ -59,10 +55,6 @@ void __init init_frametable(void *frametable_vstart, unsigned long nr_pages)
 
     memset(frame_table, 0, frame_table_size);
 
-    spin_lock_init(&free_list_lock);
-    INIT_LIST_HEAD(&free_list);    
-    free_pfns = 0;
-
     /* Initialise to a magic of 0x55555555 so easier to spot bugs later. */
     memset(machine_to_phys_mapping, 0x55, 4<<20);
 
@@ -71,23 +63,8 @@ void __init init_frametable(void *frametable_vstart, unsigned long nr_pages)
           mfn < virt_to_phys(&machine_to_phys_mapping[1<<20])>>PAGE_SHIFT;
           mfn++ )
     {
-        frame_table[mfn].count_and_flags = 1 | PGC_allocated;
-        frame_table[mfn].type_and_flags = 1 | PGT_gdt_page; /* non-RW type */
-        frame_table[mfn].u.domain = &idle0_task;
+        frame_table[mfn].u.inuse.count_info = 1 | PGC_allocated;
+        frame_table[mfn].u.inuse.type_info = 1 | PGT_gdt_page; /* non-RW */
+        frame_table[mfn].u.inuse.domain = &idle0_task;
     }
-}
-
-
-void add_to_domain_alloc_list(unsigned long ps, unsigned long pe)
-{
-    unsigned long i;
-    unsigned long flags;
-
-    spin_lock_irqsave(&free_list_lock, flags);
-    for ( i = ps >> PAGE_SHIFT; i < (pe >> PAGE_SHIFT); i++ )
-    {
-        list_add_tail(&frame_table[i].list, &free_list);
-        free_pfns++;
-    }
-    spin_unlock_irqrestore(&free_list_lock, flags);
 }

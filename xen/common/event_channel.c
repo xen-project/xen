@@ -197,7 +197,6 @@ static long evtchn_bind_pirq(evtchn_bind_pirq_t *bind)
     if ( rc != 0 )
     {
         d->pirq_to_evtchn[pirq] = 0;
-        DPRINTK("Couldn't bind to PIRQ %d (error=%d)\n", pirq, rc);
         goto out;
     }
 

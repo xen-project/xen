@@ -338,7 +338,7 @@ long do_update_descriptor(
         return -EINVAL;
 
     /* Check if the given frame is in use in an unsafe context. */
-    switch ( page->type_and_flags & PGT_type_mask )
+    switch ( page->u.inuse.type_info & PGT_type_mask )
     {
     case PGT_gdt_page:
         /* Disallow updates of Xen-reserved descriptors in the current GDT. */

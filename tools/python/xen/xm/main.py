@@ -351,6 +351,22 @@ class ProgPincpu(Prog):
 
 xm.prog(ProgPincpu)
 
+class ProgMaxmem(Prog):
+    group = 'domain'
+    name = 'maxmem'
+    info = """Set domain memory limit."""
+
+    def help(self, args):
+        print args[0], "DOM MEMORY"
+        print "\nSet the memory limit for domain DOM to MEMORY megabytes."
+
+    def main(self, args):
+        if len(args) != 3: self.err("%s: Invalid argument(s)" % args[0])
+        v = map(int, args[1:3])
+        server.xend_domain_maxmem_set(*v)
+
+xm.prog(ProgMaxmem)
+
 class ProgBvt(Prog):
     group = 'scheduler'
     name = "bvt"
@@ -529,7 +545,7 @@ class ProgDmesg(Prog):
     info  = """Print Xen boot output."""
 
     def main(self, args):
-        print server.xend_dmesg()[1]
+        print server.xend_node_dmesg()[1]
 
 xm.prog(ProgDmesg)
 

@@ -11,8 +11,10 @@
 
 typedef struct schedule_data_st
 {
-    struct domain *curr;           /* current task */
-    struct domain *idle;           /* idle task for this cpu */
+    spinlock_t          schedule_lock;  /* spinlock protecting curr pointer
+                                            TODO check this */
+    struct domain       *curr;          /* current task */
+    struct domain       *idle;          /* idle task for this cpu */
     void *              sched_priv;
     struct ac_timer     s_timer;        /* scheduling timer  */
 #ifdef BUCKETS

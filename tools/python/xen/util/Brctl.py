@@ -61,6 +61,7 @@ def bridge_create(bridge, **kwd):
     if kwd.get('stp', None) is None:
         kwd['stp'] = 'off'
     bridge_set(bridge, **kwd)
+    cmd(CMD_IFCONFIG, "%s up" % bridge)
 
 def bridge_set(bridge, hello=None, fd=None, stp=None):
     """Set bridge parameters.
