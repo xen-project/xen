@@ -1320,17 +1320,21 @@ void scsi_probe_devices(xen_disk_info_t *xdi)
     Scsi_Disk *sd; 
     int i;
     xen_disk_info_t *xen_xdi = map_domain_mem(virt_to_phys(xdi));
+    unsigned long capacity, device;
 
     for ( sd = rscsi_disks, i = 0; i < sd_template.dev_max; i++, sd++ )
     {
         if ( sd->device == NULL ) continue;
 
-        xen_xdi->disks[xen_xdi->count].device   = MK_SCSI_XENDEV(i);
-        xen_xdi->disks[xen_xdi->count].capacity = sd->capacity; 
+        device   = MK_SCSI_XENDEV(i);
+        capacity = sd->capacity;
+
+        xen_xdi->disks[xen_xdi->count].device   = device;
+        xen_xdi->disks[xen_xdi->count].capacity = capacity; 
         xen_xdi->count++; 
                 
         printk("Disk %d: SCSI-XENO capacity %dkB (%dMB)\n",
-               xen_xdi->count, sd->capacity>>1, sd->capacity>>11);
+               xen_xdi->count, capacity>>1, capacity>>11);
     }
 
     unmap_domain_mem(xen_xdi);

@@ -42,7 +42,7 @@ key_handler *get_key_handler(u_char key)
 }
 
 
-void show_handlers(u_char key, void *dev_id, struct pt_regs *regs) 
+static void show_handlers(u_char key, void *dev_id, struct pt_regs *regs) 
 {
     int i; 
 
@@ -56,7 +56,7 @@ void show_handlers(u_char key, void *dev_id, struct pt_regs *regs)
 }
 
 
-void dump_registers(u_char key, void *dev_id, struct pt_regs *regs) 
+static void dump_registers(u_char key, void *dev_id, struct pt_regs *regs) 
 {
     extern void show_registers(struct pt_regs *regs); 
 
@@ -65,13 +65,19 @@ void dump_registers(u_char key, void *dev_id, struct pt_regs *regs)
     return; 
 }
 
-void halt_machine(u_char key, void *dev_id, struct pt_regs *regs) 
+static void halt_machine(u_char key, void *dev_id, struct pt_regs *regs) 
 {
     printk("'%c' pressed -> rebooting machine\n", key); 
     machine_restart(NULL); 
     return; 
 }
 
+static void kill_dom0(u_char key, void *dev_id, struct pt_regs *regs) 
+{
+    printk("'%c' pressed -> gracefully rebooting machine\n", key); 
+    kill_other_domain(0, 0);
+    return;
+}
 
 
 /* XXX SMH: this is keir's fault */
@@ -125,6 +131,7 @@ void initialize_keytable()
     add_key_handler('p', perfc_printall, "print performance counters"); 
     add_key_handler('P', perfc_reset,    "reset performance counters"); 
     add_key_handler('q', do_task_queues, "dump task queues + guest state");
+    add_key_handler('B', kill_dom0, "reboot machine gracefully"); 
     add_key_handler('R', halt_machine, "reboot machine ungracefully"); 
     
     return; 

@@ -522,8 +522,8 @@ int __init xlblk_init(void)
     blk_ring = (blk_ring_t *)fix_to_virt(FIX_BLKRING_BASE);
     blk_ring->req_prod = blk_ring->resp_prod = resp_cons = req_prod = 0;
     
-    error = request_irq(XLBLK_RESPONSE_IRQ, xlblk_response_int, 0, 
-			"xlblk-response", NULL);
+    error = request_irq(XLBLK_RESPONSE_IRQ, xlblk_response_int, 
+                        SA_SAMPLE_RANDOM, "xlblk-response", NULL);
     if ( error )
     {
 	printk(KERN_ALERT "Could not allocate receive interrupt\n");

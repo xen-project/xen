@@ -101,6 +101,7 @@ void xen_segment_probe(struct task_struct *p, xen_disk_info_t *raw_xdi)
 {
     int loop, i;
     xen_disk_info_t *xdi = map_domain_mem(virt_to_phys(raw_xdi));
+    unsigned long capacity = 0, device;
 
     for ( loop = 0; loop < XEN_MAX_SEGMENTS; loop++ )
     {
@@ -108,13 +109,12 @@ void xen_segment_probe(struct task_struct *p, xen_disk_info_t *raw_xdi)
              (xsegments[loop].domain != p->domain) )
             continue;
 
-        xdi->disks[xdi->count].device = 
-            MK_VIRTUAL_XENDEV(xsegments[loop].segment_number);
+        device = MK_VIRTUAL_XENDEV(xsegments[loop].segment_number);
         for ( i = 0; i < xsegments[loop].num_extents; i++ )
-        {
-            xdi->disks[xdi->count].capacity += 
-                xsegments[loop].extents[i].size;
-        }
+            capacity += xsegments[loop].extents[i].size;
+
+        xdi->disks[xdi->count].device   = device;
+        xdi->disks[xdi->count].capacity = capacity;
         xdi->count++;
     }
 

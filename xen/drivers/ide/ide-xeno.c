@@ -12,7 +12,7 @@ void ide_probe_devices(xen_disk_info_t* xdi)
     int loop;
     unsigned int unit;
     xen_disk_info_t *xen_xdi = map_domain_mem(virt_to_phys(xdi));
-    unsigned long capacity;
+    unsigned long capacity, device;
     ide_drive_t *drive;
     
     for ( loop = 0; loop < MAX_HWIFS; loop++ )
@@ -25,9 +25,10 @@ void ide_probe_devices(xen_disk_info_t* xdi)
             drive = &hwif->drives[unit];
             if ( !drive->present ) continue;
             
+            device   = MK_IDE_XENDEV((loop * MAX_DRIVES) + unit);
             capacity = current_capacity(drive);
-            xen_xdi->disks[xen_xdi->count].device =
-                MK_IDE_XENDEV((loop * MAX_DRIVES) + unit);
+
+            xen_xdi->disks[xen_xdi->count].device   = device;
             xen_xdi->disks[xen_xdi->count].capacity = capacity;
             xen_xdi->count++;
 
