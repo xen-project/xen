@@ -133,14 +133,6 @@ typedef struct { unsigned long pt_lo; } pagetable_t;
 extern l2_pgentry_t idle_pg_table[ENTRIES_PER_L2_PAGETABLE];
 extern void paging_init(void);
 
-#define __flush_tlb()                                             \
-    do {                                                          \
-        __asm__ __volatile__ (                                    \
-            "mov %%cr3, %%"__OP"ax; mov %%"__OP"ax, %%cr3"        \
-            : : : "memory", __OP"ax" );                           \
-        tlb_clocktick();                                          \
-    } while ( 0 )
-
 /* Flush global pages as well. */
 
 #define __pge_off()                                                     \

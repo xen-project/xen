@@ -404,7 +404,7 @@ static inline void write_ptbase(struct mm_struct *mm)
     else
         pa = pagetable_val(mm->pagetable);
 
-    __asm__ __volatile__ ( "mov"__OS" %0, %%cr3" : : "r" (pa) : "memory" );
+    write_cr3(pa);
 }
 
 #define IDLE0_MM                                                    \

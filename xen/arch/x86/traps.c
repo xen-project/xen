@@ -475,8 +475,7 @@ asmlinkage void do_general_protection(struct pt_regs *regs, long error_code)
 #ifdef XEN_DEBUGGER
             if ( pdb_initialized && (pdb_ctx.system_call != 0) )
             {
-                unsigned long cr3; 
-                __asm__ __volatile__ ("movl %%cr3,%0" : "=r" (cr3) : );
+                unsigned long cr3 = read_cr3();
                 if ( cr3 == pdb_ctx.ptbr )
                     pdb_linux_syscall_enter_bkpt(regs, error_code, ti);
             }

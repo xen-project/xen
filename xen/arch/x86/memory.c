@@ -781,7 +781,7 @@ void put_page_type(struct pfn_info *page)
         if ( unlikely((nx & PGT_count_mask) == 0) )
         {
             /* Record TLB information for flush later. Races are harmless. */
-            page->tlbflush_timestamp = tlbflush_clock;
+            page->tlbflush_timestamp = tlbflush_current_time();
             
             if ( unlikely((nx & PGT_type_mask) <= PGT_l4_page_table) &&
                  likely(nx & PGT_validated) )
@@ -989,13 +989,7 @@ static int do_extended_command(unsigned long ptr, unsigned long val)
 
             write_ptbase(&d->mm);
 
-            put_page_and_type(&frame_table[old_base_pfn]);    
-
-            /*
-             * Note that we tick the clock /after/ dropping the old base's
-             * reference count. If the page tables got freed then this will
-             * avoid unnecessary TLB flushes when the pages are reused.  */
-            tlb_clocktick();
+            put_page_and_type(&frame_table[old_base_pfn]);
         }
         else
         {

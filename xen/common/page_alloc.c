@@ -451,7 +451,7 @@ void free_domheap_pages(struct pfn_info *pg, int order)
         for ( i = 0; i < (1 << order); i++ )
         {
             ASSERT((pg[i].u.inuse.type_info & PGT_count_mask) == 0);
-            pg[i].tlbflush_timestamp  = tlbflush_clock;
+            pg[i].tlbflush_timestamp  = tlbflush_current_time();
             pg[i].u.free.cpu_mask     = 1 << d->processor;
             list_del(&pg[i].list);
 

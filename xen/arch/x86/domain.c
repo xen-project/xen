@@ -387,7 +387,6 @@ void switch_to(struct domain *prev_p, struct domain *next_p)
 
         /* Switch page tables. */
         write_ptbase(&next_p->mm);
-        tlb_clocktick();
     }
 
     if ( unlikely(prev_p->io_bitmap != NULL) || 

@@ -1089,9 +1089,7 @@ int pdb_handle_exception(int exceptionVector,
     int signal = 0;
     struct pdb_breakpoint* bkpt;
     int watchdog_save;
-    unsigned long cr3;
-
-    __asm__ __volatile__ ("movl %%cr3,%0" : "=r" (cr3) : );
+    unsigned long cr3 = read_cr3();
 
     /* If the exception is an int3 from user space then pdb is only
        interested if it re-wrote an instruction set the breakpoint.

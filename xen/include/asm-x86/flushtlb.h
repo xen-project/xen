@@ -15,13 +15,9 @@
 
 /*
  * Every time the TLB clock passes an "epoch", every CPU's TLB is flushed.
- * Therefore, if the current TLB time and a previously-read timestamp differ
- * in their significant bits (i.e., ~TLBCLOCK_EPOCH_MASK), then the TLB clock
- * has wrapped at least once and every CPU's TLB is guaranteed to have been
- * flushed meanwhile.
  * This allows us to deal gracefully with a bounded (a.k.a. wrapping) clock.
  */
-#define TLBCLOCK_EPOCH_MASK ((1U<<16)-1)
+#define TLBCLOCK_EPOCH_MASK ((1U<<20)-1)
 
 /*
  * 'cpu_stamp' is the current timestamp for the CPU we are testing.
@@ -32,21 +28,38 @@ static inline int NEED_FLUSH(u32 cpu_stamp, u32 lastuse_stamp)
 {
     /*
      * Worst case in which a flush really is required:
-     *  CPU has not flushed since end of last epoch (cpu_stamp = 0x0000ffff).
-     *  Clock has run to end of current epoch (clock = 0x0001ffff).
-     *  Therefore maximum valid difference is 0x10000 (EPOCH_MASK + 1).
+     *  1. CPU has not flushed since end of last epoch.
+     *  2. Clock has run to end of current epoch.
+     *  THEREFORE: Maximum valid difference is (EPOCH_MASK + 1).
      * N.B. The clock cannot run further until the CPU has flushed once more
-     * and updated its stamp to 0x1ffff, so this is as 'far out' as it can get.
+     * and updated to current time, so this is as 'far out' as it can get.
      */
     return ((lastuse_stamp - cpu_stamp) <= (TLBCLOCK_EPOCH_MASK + 1));
 }
 
-extern unsigned long tlbflush_epoch_changing;
+/*
+ * The least significant bit of the clock indicates whether an epoch-change
+ * is in progress. All other bits form the counter that is incremented on
+ * each clock tick.
+ */
 extern u32 tlbflush_clock;
 extern u32 tlbflush_time[NR_CPUS];
 
-extern void tlb_clocktick(void);
+#define tlbflush_current_time() tlbflush_clock
+
 extern void new_tlbflush_clock_period(void);
+
+/* Read pagetable base. */
+static inline unsigned long read_cr3(void)
+{
+    unsigned long cr3;
+    __asm__ __volatile__ (
+        "mov"__OS" %%cr3, %0" : "=r" (cr3) : );
+    return cr3;
+}
+
+/* Write pagetable base and implicitly tick the tlbflush clock. */
+extern void write_cr3(unsigned long cr3);
 
 /*
  * TLB flushing:
@@ -58,6 +71,12 @@ extern void new_tlbflush_clock_period(void);
  * ..but the i386 has somewhat limited tlb flushing capabilities,
  * and page-granular flushes are available only on i486 and up.
  */
+
+#define __flush_tlb()                                             \
+    do {                                                          \
+        unsigned long cr3 = read_cr3();                           \
+        write_cr3(cr3);                                           \
+    } while ( 0 )
 
 #ifndef CONFIG_SMP
 

@@ -12,38 +12,47 @@
 #include <xen/softirq.h>
 #include <asm/flushtlb.h>
 
-unsigned long tlbflush_epoch_changing;
 u32 tlbflush_clock;
 u32 tlbflush_time[NR_CPUS];
 
-void tlb_clocktick(void)
+void write_cr3(unsigned long cr3)
 {
-    u32 y, ny;
+    u32 t, t1, t2;
     unsigned long flags;
 
     local_irq_save(flags);
 
-    /* Tick the clock. 'y' contains the current time after the tick. */
-    ny = tlbflush_clock;
+    /*
+     * Tick the clock, which is incremented by two each time. The L.S.B. is
+     * used to decide who will control the epoch change, when one is required.
+     */
+    t = tlbflush_clock;
     do {
-#ifdef CONFIG_SMP
-        if ( unlikely(((y = ny+1) & TLBCLOCK_EPOCH_MASK) == 0) )
+        t1 = t;      /* t1: Time before this clock tick. */
+        t2 = t + 2;  /* t2: Time after this clock tick. */
+        if ( unlikely(t2 & 1) )
         {
-            /* Epoch is changing: the first to detect this is the leader. */
-            if ( unlikely(!test_and_set_bit(0, &tlbflush_epoch_changing)) )
-                raise_softirq(NEW_TLBFLUSH_CLOCK_PERIOD_SOFTIRQ);
-            /* The clock doesn't tick again until end of the epoch change. */
-            y--;
-            break;
+            /* Epoch change: someone else is leader. */
+            t2 = t; /* no tick */
+            goto skip_clocktick;
         }
-#else
-        y = ny+1;
-#endif
+        else if ( unlikely((t2 & TLBCLOCK_EPOCH_MASK) == 0) )
+        {
+            /* Epoch change: we may become leader. */
+            t2--; /* half tick */
+        }
     }
-    while ( unlikely((ny = cmpxchg(&tlbflush_clock, y-1, y)) != y-1) );
+    while ( unlikely((t = cmpxchg(&tlbflush_clock, t1, t2)) != t1) );
+
+    /* Epoch change: we are the leader. */
+    if ( unlikely(t2 & 1) )
+        raise_softirq(NEW_TLBFLUSH_CLOCK_PERIOD_SOFTIRQ);
+
+ skip_clocktick:
+    __asm__ __volatile__ ( "mov"__OS" %0, %%cr3" : : "r" (cr3) : "memory" );
 
     /* Update this CPU's timestamp to new time. */
-    tlbflush_time[smp_processor_id()] = y;
+    tlbflush_time[smp_processor_id()] = t2;
 
     local_irq_restore(flags);
 }

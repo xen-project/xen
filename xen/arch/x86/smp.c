@@ -286,13 +286,6 @@ void new_tlbflush_clock_period(void)
 
     /* No need for atomicity: we are the only possible updater. */
     tlbflush_clock++;
-
-    /* Finally, signal the end of the epoch-change protocol. */
-    wmb();
-    tlbflush_epoch_changing = 0;
-
-    /* In case we got to the end of the next epoch already. */
-    tlb_clocktick();
 }
 
 static void flush_tlb_all_pge_ipi(void* info)
