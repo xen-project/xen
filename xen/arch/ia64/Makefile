@@ -6,7 +6,7 @@ OBJS = xensetup.o setup.o time.o irq.o ia64_ksyms.o process.o smp.o \
 	xenmisc.o pdb-stub.o acpi.o hypercall.o \
 	machvec.o dom0_ops.o domain.o \
 	idle0_task.o pal.o hpsim.o efi.o efi_stub.o ivt.o mm_contig.o \
-	mm_bootmem.o sal.o cmdline.o mm_init.o tlb.o page_alloc.o slab.o \
+	sal.o cmdline.o mm_init.o tlb.o \
 	extable.o linuxextable.o \
 	regionreg.o entry.o unaligned.o privop.o vcpu.o \
 	irq_ia64.o irq_lsapic.o hpsim_irq.o vhpt.o xenasm.o dom_fw.o
@@ -32,8 +32,21 @@ default: $(OBJS) head.o ia64lib.o xen.lds.s
 	$(OBJCOPY) -R .note -R .comment -S $(TARGET)-syms $(TARGET)
 #	$(BASEDIR)/tools/elf-reloc $(MONITOR_BASE) $(LOAD_BASE) $(TARGET)
 
-asm-offsets.s: asm-offsets.c
+asm-offsets.s: asm-offsets.c $(BASEDIR)/include/asm-ia64/.offsets.h.stamp
 	$(CC) $(CFLAGS) -S -o $@ $<
+
+$(BASEDIR)/include/asm-ia64/.offsets.h.stamp:
+# Need such symbol link to make linux headers available
+	[ -e $(BASEDIR)/include/linux ] \
+	 || ln -s $(BASEDIR)/include/xen $(BASEDIR)/include/linux
+	[ -e $(BASEDIR)/include/asm-ia64/xen ] \
+	 || ln -s $(BASEDIR)/include/asm-ia64/linux $(BASEDIR)/include/asm-ia64/xen
+# Solve circular reference on asm-offsets.h
+	[ -f $(BASEDIR)/include/asm-ia64/asm-offsets.h ] \
+	 || echo "#define IA64_TASK_SIZE 0" > $(BASEDIR)/include/asm-ia64/asm-offsets.h
+#Bad hack. Force asm-offsets.h out-of-date
+	 sleep 1
+	 touch $@
 
 # I'm sure a Makefile wizard would know a better way to do this
 xen.lds.s: xen.lds.S
@@ -44,7 +57,7 @@ ia64lib.o:
 	$(MAKE) -C lib && cp lib/ia64lib.o .
 
 clean:
-	rm -f *.o *~ core  xen.lds.s
+	rm -f *.o *~ core  xen.lds.s $(BASEDIR)/include/asm-ia64/.offsets.h.stamp
 	$(MAKE) -C lib clean
 
 # setup.o contains bits of compile.h so it must be blown away

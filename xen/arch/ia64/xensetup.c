@@ -25,34 +25,20 @@
 //#include <asm/uaccess.h>
 //#include <asm/domain_page.h>
 //#include <public/dom0_ops.h>
+#include <asm/meminit.h>
+#include <asm/page.h>
 
 unsigned long xenheap_phys_end;
 
 struct exec_domain *idle_task[NR_CPUS] = { &idle0_exec_domain };
 
-xmem_cache_t *domain_struct_cachep;
-#ifdef IA64
-kmem_cache_t *mm_cachep;
-kmem_cache_t *vm_area_cachep;
 #ifdef CLONE_DOMAIN0
 struct domain *clones[CLONE_DOMAIN0];
-#endif
 #endif
 extern struct domain *dom0;
 extern unsigned long domain0_ready;
 
-#ifndef IA64
-vm_assist_info_t vm_assist_info[MAX_VMASST_TYPE + 1];
-#endif
-
-#ifndef IA64
-struct e820entry {
-    unsigned long addr_lo, addr_hi;        /* start of memory segment */
-    unsigned long size_lo, size_hi;        /* size of memory segment */
-    unsigned long type;                    /* type of memory segment */
-};
-#endif
-
+int find_max_pfn (unsigned long, unsigned long, void *);
 void start_of_day(void);
 
 /* opt_console: comma-separated list of console outputs. */
@@ -97,10 +83,17 @@ char opt_physdev_dom0_hide[200] = "";
 /* Example: 'leveltrigger=4,5,6,20 edgetrigger=21'. */
 char opt_leveltrigger[30] = "", opt_edgetrigger[30] = "";
 /*
- * opt_xenheap_megabytes: Size of Xen heap in megabytes, excluding the
- * pfn_info table and allocation bitmap.
+ * opt_xenheap_megabytes: Size of Xen heap in megabytes, including:
+ * 	xen image
+ *	bootmap bits
+ *	xen heap
+ * Note: To allow xenheap size configurable, the prerequisite is
+ * to configure elilo allowing relocation defaultly. Then since
+ * elilo chooses 256M as alignment when relocating, alignment issue
+ * on IPF can be addressed.
  */
 unsigned int opt_xenheap_megabytes = XENHEAP_DEFAULT_MB;
+unsigned long xenheap_size = XENHEAP_DEFAULT_SIZE;
 /*
  * opt_nmi: one of 'ignore', 'dom0', or 'fatal'.
  *  fatal:  Xen prints diagnostic message and then hangs.
@@ -119,30 +112,55 @@ char opt_nmi[10] = "fatal";
 char opt_badpage[100] = "";
 
 extern long running_on_sim;
+unsigned long xen_pstart;
+
+static int
+xen_count_pages(u64 start, u64 end, void *arg)
+{
+    unsigned long *count = arg;
+
+    /* FIXME: do we need consider difference between DMA-usable memory and
+     * normal memory? Seems that HV has no requirement to operate DMA which
+     * is owned by Dom0? */
+    *count += (end - start) >> PAGE_SHIFT;
+    return 0;
+}
+
+/* Find first hole after trunk for xen image */
+static int
+xen_find_first_hole(u64 start, u64 end, void *arg)
+{
+    unsigned long *first_hole = arg;
+
+    if ((*first_hole) == 0) {
+	if ((start <= KERNEL_START) && (KERNEL_START < end))
+	    *first_hole = __pa(end);
+    }
+
+    return 0;
+}
+
+
 
 void cmain(multiboot_info_t *mbi)
 {
-    unsigned long max_page;
     unsigned char *cmdline;
     module_t *mod = (module_t *)__va(mbi->mods_addr);
     void *heap_start;
     int i;
-    unsigned long max_mem;
+    unsigned long max_mem, nr_pages, firsthole_start;
     unsigned long dom0_memory_start, dom0_memory_end;
     unsigned long initial_images_start, initial_images_end;
 
-
     running_on_sim = is_platform_hp_ski();
-
-    /* Parse the command-line options. */
-    cmdline = (unsigned char *)(mbi->cmdline ? __va(mbi->cmdline) : NULL);
-    cmdline_parse(cmdline);
+    /* Kernel may be relocated by EFI loader */
+    xen_pstart = ia64_tpa(KERNEL_START);
 
     /* Must do this early -- e.g., spinlocks rely on get_current(). */
     set_current(&idle0_exec_domain);
     idle0_exec_domain.domain = &idle0_domain;
 
-    early_setup_arch();
+    early_setup_arch(&cmdline);
 
     /* We initialise the serial devices very early so we can get debugging. */
     serial_init_stage1();
@@ -150,135 +168,69 @@ void cmain(multiboot_info_t *mbi)
     init_console(); 
     set_printk_prefix("(XEN) ");
 
-#ifdef IA64
-	//set_current(&idle0_exec_domain);
-	{ char *cmdline;
-	setup_arch(&cmdline);
-	}
-	setup_per_cpu_areas();
-	build_all_zonelists();
-	mem_init();
-	//show_mem();	// call to dump lots of memory info for debug
-#else
-    /* We require memory and module information. */
-    if ( (mbi->flags & 9) != 9 )
-    {
-        printk("FATAL ERROR: Bad flags passed by bootloader: 0x%x\n", 
-               (unsigned)mbi->flags);
-        for ( ; ; ) ;
+    /* xenheap should be in same TR-covered range with xen image */
+    xenheap_phys_end = xen_pstart + xenheap_size;
+    printk("xen image pstart: 0x%lx, xenheap pend: 0x%lx\n",
+	    xen_pstart, xenheap_phys_end);
+
+    /* Find next hole */
+    firsthole_start = 0;
+    efi_memmap_walk(xen_find_first_hole, &firsthole_start);
+
+    initial_images_start = xenheap_phys_end;
+    initial_images_end = initial_images_start + ia64_boot_param->initrd_size;
+
+    /* Later may find another memory trunk, even away from xen image... */
+    if (initial_images_end > firsthole_start) {
+	printk("Not enough memory to stash the DOM0 kernel image.\n");
+	printk("First hole:0x%lx, relocation end: 0x%lx\n",
+		firsthole_start, initial_images_end);
+	for ( ; ; );
     }
 
-    if ( mbi->mods_count == 0 )
-    {
-        printk("Require at least one Multiboot module!\n");
-        for ( ; ; ) ;
-    }
-
-    if ( opt_xenheap_megabytes < 4 )
-    {
-        printk("Xen heap size is too small to safely continue!\n");
-        for ( ; ; ) ;
-    }
-
-    xenheap_phys_end = opt_xenheap_megabytes << 20;
-
-    max_mem = max_page = (mbi->mem_upper+1024) >> (PAGE_SHIFT - 10);
-#endif
-
-#if defined(__i386__)
-
-    initial_images_start = DIRECTMAP_PHYS_END;
-    initial_images_end   = initial_images_start + 
-        (mod[mbi->mods_count-1].mod_end - mod[0].mod_start);
-    if ( initial_images_end > (max_page << PAGE_SHIFT) )
-    {
-        printk("Not enough memory to stash the DOM0 kernel image.\n");
-        for ( ; ; ) ;
-    }
-    memmove((void *)initial_images_start,  /* use low mapping */
-            (void *)mod[0].mod_start,      /* use low mapping */
-            mod[mbi->mods_count-1].mod_end - mod[0].mod_start);
-
-    if ( opt_xenheap_megabytes > XENHEAP_DEFAULT_MB )
-    {
-        printk("Xen heap size is limited to %dMB - you specified %dMB.\n",
-               XENHEAP_DEFAULT_MB, opt_xenheap_megabytes);
-        for ( ; ; ) ;
-    }
-
-    ASSERT((sizeof(struct pfn_info) << 20) <=
-           (FRAMETABLE_VIRT_END - FRAMETABLE_VIRT_START));
-
-    init_frametable((void *)FRAMETABLE_VIRT_START, max_page);
-
-#elif defined(__x86_64__)
-
-    init_frametable(__va(xenheap_phys_end), max_page);
-
-    initial_images_start = __pa(frame_table) + frame_table_size;
-    initial_images_end   = initial_images_start + 
-        (mod[mbi->mods_count-1].mod_end - mod[0].mod_start);
-    if ( initial_images_end > (max_page << PAGE_SHIFT) )
-    {
-        printk("Not enough memory to stash the DOM0 kernel image.\n");
-        for ( ; ; ) ;
-    }
+    /* This copy is time consuming, but elilo may load Dom0 image
+     * within xenheap range */
+    printk("ready to move Dom0 to 0x%lx...", initial_images_start);
     memmove(__va(initial_images_start),
-            __va(mod[0].mod_start),
-            mod[mbi->mods_count-1].mod_end - mod[0].mod_start);
-
-#endif
-
-#ifndef IA64
-    dom0_memory_start    = (initial_images_end + ((4<<20)-1)) & ~((4<<20)-1);
-    dom0_memory_end      = dom0_memory_start + (opt_dom0_mem << 10);
-    dom0_memory_end      = (dom0_memory_end + PAGE_SIZE - 1) & PAGE_MASK;
+	   __va(ia64_boot_param->initrd_start),
+	   ia64_boot_param->initrd_size);
+    ia64_boot_param->initrd_start = initial_images_start;
+    printk("Done\n");
     
-    /* Cheesy sanity check: enough memory for DOM0 allocation + some slack? */
-    if ( (dom0_memory_end + (8<<20)) > (max_page << PAGE_SHIFT) )
-    {
-        printk("Not enough memory for DOM0 memory reservation.\n");
-        for ( ; ; ) ;
-    }
-#endif
+    /* first find highest page frame number */
+    max_page = 0;
+    efi_memmap_walk(find_max_pfn, &max_page);
+    printf("find_memory: efi_memmap_walk returns max_page=%lx\n",max_page);
 
-    printk("Initialised %luMB memory (%lu pages) on a %luMB machine\n",
-           max_page >> (20-PAGE_SHIFT), max_page,
-	   max_mem  >> (20-PAGE_SHIFT));
-
-#ifndef IA64
     heap_start = memguard_init(&_end);
-    heap_start = __va(init_heap_allocator(__pa(heap_start), max_page));
- 
+    printf("Before heap_start: 0x%lx\n", heap_start);
+    heap_start = __va(init_boot_allocator(__pa(heap_start)));
+    printf("After heap_start: 0x%lx\n", heap_start);
+
+    reserve_memory();
+
+    efi_memmap_walk(filter_rsvd_memory, init_boot_pages);
+    efi_memmap_walk(xen_count_pages, &nr_pages);
+
+    printk("System RAM: %luMB (%lukB)\n", 
+	nr_pages >> (20 - PAGE_SHIFT),
+	nr_pages << (PAGE_SHIFT - 10));
+
+    init_frametable();
+
+    alloc_dom0();
+
+    end_boot_allocator();
+
     init_xenheap_pages(__pa(heap_start), xenheap_phys_end);
-    printk("Xen heap size is %luKB\n", 
-	   (xenheap_phys_end-__pa(heap_start))/1024 );
+    printk("Xen heap: %luMB (%lukB)\n",
+	(xenheap_phys_end-__pa(heap_start)) >> 20,
+	(xenheap_phys_end-__pa(heap_start)) >> 10);
 
-    init_domheap_pages(dom0_memory_end, max_page << PAGE_SHIFT);
-#endif
+    setup_arch();
+    setup_per_cpu_areas();
+    mem_init();
 
-    /* Initialise the slab allocator. */
-#ifdef IA64
-    kmem_cache_init();
-#else
-    xmem_cache_init();
-    xmem_cache_sizes_init(max_page);
-#endif
-
-    domain_struct_cachep = xmem_cache_create(
-        "domain_cache", sizeof(struct domain),
-        0, SLAB_HWCACHE_ALIGN, NULL, NULL);
-    if ( domain_struct_cachep == NULL )
-        panic("No slab cache for task structs.");
-
-#ifdef IA64
-    // following from proc_caches_init in linux/kernel/fork.c
-    vm_area_cachep = kmem_cache_create("vm_area_struct",
-			sizeof(struct vm_area_struct), 0,
-			SLAB_PANIC, NULL, NULL);
-    mm_cachep = kmem_cache_create("mm_struct",
-			sizeof(struct mm_struct), 0,
-			SLAB_HWCACHE_ALIGN|SLAB_PANIC, NULL, NULL);
 printk("About to call scheduler_init()\n");
     scheduler_init();
     local_irq_disable();
@@ -291,11 +243,6 @@ printk("About to call ac_timer_init()\n");
 // do_initcalls(); ???
 printk("About to call sort_main_extable()\n");
     sort_main_extable();
-#else
-    start_of_day();
-
-    grant_table_init();
-#endif
 
     /* Create initial domain 0. */
 printk("About to call do_createdomain()\n");
@@ -325,39 +272,15 @@ printk("About to call init_idle_task()\n");
 //printk("About to call shadow_mode_init()\n");
 //    shadow_mode_init();
 
-    /* Grab the DOM0 command line. Skip past the image name. */
-printk("About to  process command line\n");
-#ifndef IA64
-    cmdline = (unsigned char *)(mod[0].string ? __va(mod[0].string) : NULL);
-    if ( cmdline != NULL )
-    {
-        while ( *cmdline == ' ' ) cmdline++;
-        if ( (cmdline = strchr(cmdline, ' ')) != NULL )
-            while ( *cmdline == ' ' ) cmdline++;
-    }
-#endif
-
     /*
      * We're going to setup domain0 using the module(s) that we stashed safely
      * above our heap. The second module, if present, is an initrd ramdisk.
      */
-#ifdef IA64
 printk("About to call construct_dom0()\n");
     if ( construct_dom0(dom0, dom0_memory_start, dom0_memory_end,
 			0,
                         0,
 			0) != 0)
-#else
-    if ( construct_dom0(dom0, dom0_memory_start, dom0_memory_end,
-                        (char *)initial_images_start, 
-                        mod[0].mod_end-mod[0].mod_start,
-                        (mbi->mods_count == 1) ? 0 :
-                        (char *)initial_images_start + 
-                        (mod[1].mod_start-mod[0].mod_start),
-                        (mbi->mods_count == 1) ? 0 :
-                        mod[mbi->mods_count-1].mod_end - mod[1].mod_start,
-                        cmdline) != 0)
-#endif
         panic("Could not set up DOM0 guest OS\n");
 #ifdef CLONE_DOMAIN0
     {
@@ -376,12 +299,9 @@ printk("CONSTRUCTING DOMAIN0 CLONE #%d\n",i+1);
 #endif
 
     /* The stash space for the initial kernel image can now be freed up. */
-#ifndef IA64
-    init_domheap_pages(__pa(frame_table) + frame_table_size,
-                       dom0_memory_start);
-
+    init_domheap_pages(ia64_boot_param->initrd_start,
+		       ia64_boot_param->initrd_start + ia64_boot_param->initrd_size);
     scrub_heap_pages();
-#endif
 
 printk("About to call init_trace_bufs()\n");
     init_trace_bufs();

@@ -932,11 +932,13 @@
 421098b5pZw41QuBTvhjvSol6aAHDw xen/arch/ia64/patch/linux-2.6.7/mmzone.h
 421098b5B_dClZDGuPYeY3IXo8Hlbw xen/arch/ia64/patch/linux-2.6.7/page.h
 421098b5saClfxPj36l47H9Um7h1Fw xen/arch/ia64/patch/linux-2.6.7/page_alloc.c
+4241ed05l9ZdG7Aj0tygIxIwPRXhog xen/arch/ia64/patch/linux-2.6.7/pgalloc.h
 421098b5OkmcjMBq8gxs7ZrTa4Ao6g xen/arch/ia64/patch/linux-2.6.7/processor.h
 421098b51RLB6jWr6rIlpB2SNObxZg xen/arch/ia64/patch/linux-2.6.7/sal.h
 421098b5WFeRnwGtZnHkSvHVzA4blg xen/arch/ia64/patch/linux-2.6.7/setup.c
 421098b5Jm2i8abzb0mpT6mlEiKZDg xen/arch/ia64/patch/linux-2.6.7/slab.c
 421098b5w6MBnluEpQJAWDTBFrbWSQ xen/arch/ia64/patch/linux-2.6.7/slab.h
+4241eb584dcZqssR_Uuz2-PgMJXZ5Q xen/arch/ia64/patch/linux-2.6.7/swiotlb.c
 421098b5Cg7nbIXm3RhUF-uG3SKaUA xen/arch/ia64/patch/linux-2.6.7/system.h
 421098b5XrkDYW_Nd9lg5CDgNzHLmg xen/arch/ia64/patch/linux-2.6.7/time.c
 421098b5_kFbvZIIPM3bdCES1Ocqnw xen/arch/ia64/patch/linux-2.6.7/tlb.c
@@ -1099,6 +1101,8 @@
 421098b6ZcIrn_gdqjUtdJyCE0YkZQ xen/include/asm-ia64/debugger.h
 421098b6z0zSuW1rcSJK1gR8RUi-fw xen/include/asm-ia64/dom_fw.h
 421098b6Nn0I7hGB8Mkd1Cis0KMkhA xen/include/asm-ia64/domain.h
+4241e879ry316Y_teC18DuK7mGKaQw xen/include/asm-ia64/domain_page.h
+4241e880hAyo_dk0PPDYj3LsMIvf-Q xen/include/asm-ia64/flushtlb.h
 421098b6X3Fs2yht42TE2ufgKqt2Fw xen/include/asm-ia64/ia64_int.h
 421098b7psFAn8kbeR-vcRCdc860Vw xen/include/asm-ia64/init.h
 421098b7XC1A5PhA-lrU9pIO3sSSmA xen/include/asm-ia64/mm.h

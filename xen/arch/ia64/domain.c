@@ -39,8 +39,6 @@ unsigned long dom0_size = 512*1024*1024; //FIXME: Should be configurable
 //FIXME: alignment should be 256MB, lest Linux use a 256MB page size
 unsigned long dom0_align = 64*1024*1024;
 
-extern kmem_cache_t *domain_struct_cachep;
-
 // initialized by arch/ia64/setup.c:find_initrd()
 unsigned long initrd_start = 0, initrd_end = 0;
 
@@ -136,22 +134,24 @@ void startup_cpu_idle_loop(void)
 
 struct domain *arch_alloc_domain_struct(void)
 {
-	return xmem_cache_alloc(domain_struct_cachep);
+	return xmalloc(struct domain);
 }
 
 void arch_free_domain_struct(struct domain *d)
 {
-	xmem_cache_free(domain_struct_cachep,d);
+	xfree(d);
 }
 
 struct exec_domain *arch_alloc_exec_domain_struct(void)
 {
-	return alloc_task_struct();
+	/* Per-vp stack is used here. So we need keep exec_domain
+	 * same page as per-vp stack */
+	return alloc_xenheap_pages(KERNEL_STACK_SIZE_ORDER);
 }
 
 void arch_free_exec_domain_struct(struct exec_domain *ed)
 {
-	free_task_struct(ed);
+	free_xenheap_pages(ed, KERNEL_STACK_SIZE_ORDER);
 }
 
 void arch_do_createdomain(struct exec_domain *ed)
@@ -307,7 +307,7 @@ extern unsigned long vhpt_paddr, vhpt_pend;
 		if (d == dom0) p = map_new_domain0_page(mpaddr);
 		else
 #endif
-			p = alloc_page(GFP_KERNEL);
+			p = alloc_domheap_page(d);
 		if (unlikely(!p)) {
 printf("map_new_domain_page: Can't alloc!!!! Aaaargh!\n");
 			return(p);
@@ -509,7 +509,13 @@ void alloc_dom0(void)
 	dom0_size = 128*1024*1024; //FIXME: Should be configurable
 	}
 	printf("alloc_dom0: starting (initializing %d MB...)\n",dom0_size/(1024*1024));
-	dom0_start = __alloc_bootmem(dom0_size,dom0_align,__pa(MAX_DMA_ADDRESS));
+ 
+     /* FIXME: The first trunk (say 256M) should always be assigned to
+      * Dom0, since Dom0's physical == machine address for DMA purpose.
+      * Some old version linux, like 2.4, assumes physical memory existing
+      * in 2nd 64M space.
+      */
+     dom0_start = alloc_boot_pages(dom0_size,dom0_align);
 	if (!dom0_start) {
 	printf("construct_dom0: can't allocate contiguous memory size=%p\n",
 		dom0_size);
@@ -611,7 +617,7 @@ int construct_dom0(struct domain *d,
 
 	// prepare domain0 pagetable (maps METAphysical to physical)
 	// following is roughly mm_init() in linux/kernel/fork.c
-	d->arch.mm = kmem_cache_alloc(mm_cachep, SLAB_KERNEL);
+	d->arch.mm = xmalloc(struct mm_struct);
 	if (unlikely(!d->arch.mm)) {
 	    	printk("Can't allocate mm_struct for domain0\n");
 	    	return -ENOMEM;
@@ -721,7 +727,7 @@ int construct_domN(struct domain *d,
 	printk("parsedomainelfimage returns %d\n",rc);
 	if ( rc != 0 ) return rc;
 
-	d->arch.mm = kmem_cache_alloc(mm_cachep, SLAB_KERNEL);
+	d->arch.mm = xmalloc(struct mm_struct);
 	if (unlikely(!d->arch.mm)) {
 	    	printk("Can't allocate mm_struct for domain %d\n",d->id);
 	    	return -ENOMEM;

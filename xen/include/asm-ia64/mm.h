@@ -23,20 +23,7 @@
  * The following is for page_alloc.c.
  */
 
-//void init_page_allocator(unsigned long min, unsigned long max);
-//unsigned long __get_free_pages(int order);
-unsigned long __get_free_pages(unsigned int flags, unsigned int order);
-//void __free_pages(unsigned long p, int order);
-#define get_free_page()   (__get_free_pages(GFP_KERNEL,0))
-//#define __get_free_page() (__get_free_pages(0))
-//#define free_pages(_p,_o) (__free_pages(_p,_o))
-#define free_xenheap_page(_p)     (__free_pages(_p,0))
-#define	free_xenheap_pages(a,b)	(__free_pages(a,b))
-#define	alloc_xenheap_page()	(__get_free_pages(GFP_KERNEL,0))
-
 typedef unsigned long page_flags_t;
-
-#define xmem_cache_t	kmem_cache_t
 
 // from linux/include/linux/mm.h
 
@@ -101,15 +88,20 @@ struct page
 {
     /* Each frame can be threaded onto a doubly-linked list. */
     struct list_head list;
+
+    /* Timestamp from 'TLB clock', used to reduce need for safety flushes. */
+    u32 tlbflush_timestamp;
+
+    /* Reference count and various PGC_xxx flags and fields. */
+    u32 count_info;
+
     /* Context-dependent fields follow... */
     union {
 
         /* Page is in use by a domain. */
         struct {
             /* Owner of this page. */
-            struct domain *domain;
-            /* Reference count and various PGC_xxx flags and fields. */
-            u32 count_info;
+            u64	_domain;
             /* Type reference count and various PGT_xxx flags and fields. */
             u32 type_info;
         } inuse;
@@ -117,16 +109,12 @@ struct page
         /* Page is on a free list. */
         struct {
             /* Mask of possibly-tainted TLBs. */
-            unsigned long cpu_mask;
-            /* Must be at same offset as 'u.inuse.count_flags'. */
-            u32 __unavailable;
+            u64 cpu_mask;
             /* Order-size of the free chunk this page is the head of. */
             u8 order;
         } free;
 
     } u;
-    /* Timestamp from 'TLB clock', used to reduce need for safety flushes. */
-    u32 tlbflush_timestamp;
 // following added for Linux compiling
     page_flags_t flags;
     atomic_t _count;
@@ -152,13 +140,32 @@ struct page
  /* 28-bit count of uses of this frame as its current type. */
 #define PGT_count_mask      ((1<<28)-1)
 
+/* Cleared when the owning guest 'frees' this page. */
+#define _PGC_allocated      31
+#define PGC_allocated       (1U<<_PGC_allocated)
+#define PFN_ORDER(_pfn)	((_pfn)->u.free.order)
+
+#define IS_XEN_HEAP_FRAME(_pfn) ((page_to_phys(_pfn) < xenheap_phys_end) \
+				 && (page_to_phys(_pfn) >= xen_pstart))
+
+#define pickle_domptr(_d)	((u64)(_d))
+#define unpickle_domptr(_d)	((struct domain*)(_d))
+
+#define page_get_owner(_p)	(unpickle_domptr((_p)->u.inuse._domain))
+#define page_set_owner(_p, _d)	((_p)->u.inuse._domain = pickle_domptr(_d))
+
 extern struct pfn_info *frame_table;
 extern unsigned long frame_table_size;
 extern struct list_head free_list;
 extern spinlock_t free_list_lock;
 extern unsigned int free_pfns;
 extern unsigned long max_page;
-void init_frametable(void *frametable_vstart, unsigned long nr_pages);
+
+#ifdef CONFIG_VIRTUAL_MEM_MAP
+void __init init_frametable(void *frametable_vstart, unsigned long nr_pages);
+#else
+extern void __init init_frametable(void);
+#endif
 void add_to_domain_alloc_list(unsigned long ps, unsigned long pe);
 
 static inline void put_page(struct pfn_info *page)
@@ -175,6 +182,18 @@ static inline int get_page(struct pfn_info *page,
 
 // see alloc_new_dom_mem() in common/domain.c
 #define	set_machinetophys(_mfn, _pfn) do { } while(0);
+
+#ifdef MEMORY_GUARD
+void *memguard_init(void *heap_start);
+void memguard_guard_stack(void *p);
+void memguard_guard_range(void *p, unsigned long l);
+void memguard_unguard_range(void *p, unsigned long l);
+#else
+#define memguard_init(_s)              (_s)
+#define memguard_guard_stack(_p)       ((void)0)
+#define memguard_guard_range(_p,_l)    ((void)0)
+#define memguard_unguard_range(_p,_l)  ((void)0)
+#endif
 
 // FOLLOWING FROM linux-2.6.7/include/mm.h
 
