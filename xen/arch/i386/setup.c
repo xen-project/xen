@@ -317,9 +317,11 @@ void __init start_of_day(void)
     extern void timer_bh(void);
     extern void init_timervecs(void);
     extern void ac_timer_init(void);
+#ifndef NO_DEVICES_IN_XEN
     extern int  setup_network_devices(void);
     extern void net_init(void);
     extern void initialize_block_io(void);
+#endif
     extern void initialize_keytable(); 
     extern void initialize_keyboard(void);
     extern int opt_nosmp, opt_watchdog, opt_noacpi, opt_ignorebiostables;
@@ -415,10 +417,10 @@ void __init start_of_day(void)
     pci_init();
 #endif
     do_initcalls();
+#ifndef NO_DEVICES_IN_XEN
     if ( !setup_network_devices() )
         panic("Must have a network device!\n");
     net_init();            /* initializes virtual network system. */
-#ifndef NO_DEVICES_IN_XEN
     initialize_block_io(); /* setup block devices */
 #endif
 

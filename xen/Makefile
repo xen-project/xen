@@ -36,7 +36,9 @@ clean: delete-links
 $(TARGET): delete-unfresh-files make-links $(GENERATED_FILES)
 	$(MAKE) -C tools
 	$(MAKE) -C common
-	$(MAKE) -C net
+	if [ "$(nodev)" != "y" ]; then \
+	$(MAKE) -C net ; \
+	fi
 	$(MAKE) -C drivers
 	$(MAKE) -C arch/$(TARGET_ARCH)
 

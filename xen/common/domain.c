@@ -695,7 +695,6 @@ int construct_dom0(struct task_struct *p,
 {
     char *dst;
     int i, rc;
-    domid_t dom = p->domain;
     unsigned long pfn, mfn;
     unsigned long nr_pages = (alloc_end - alloc_start) >> PAGE_SHIFT;
     unsigned long nr_pt_pages;
@@ -730,11 +729,14 @@ int construct_dom0(struct task_struct *p,
     unsigned long mpt_alloc;
 
     extern void physdev_init_dom0(struct task_struct *);
+
+#ifndef NO_DEVICES_IN_XEN
     extern void ide_probe_devices(xen_disk_info_t *);
     extern void scsi_probe_devices(xen_disk_info_t *);
     extern void cciss_probe_devices(xen_disk_info_t *);
     xen_disk_info_t xdi;
     xen_disk_t *xd;
+#endif
 
     /* Sanity! */
     if ( p->domain != 0 ) 
@@ -989,7 +991,7 @@ int construct_dom0(struct task_struct *p,
 
     /* Add virtual network interfaces. */
     while ( num_vifs-- > 0 )
-        (void)create_net_vif(dom);
+        (void)create_net_vif(0);
 
 #ifndef NO_DEVICES_IN_XEN
     /* DOM0 gets access to all real block devices. */
