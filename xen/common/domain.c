@@ -65,7 +65,7 @@ struct domain *do_createdomain(domid_t dom_id, unsigned int cpu)
         strncpy(d->name, buf, MAX_DOMAIN_NAME);
         d->name[MAX_DOMAIN_NAME-1] = '\0';
 
-	arch_do_createdomain(d);
+        arch_do_createdomain(d);
 
         sched_add_domain(d);
 
@@ -152,8 +152,8 @@ void domain_crash(void)
 {
     struct domain *d;
 
-    if (current->domain == 0)
-	BUG();
+    if ( current->domain == 0 )
+        BUG();
 
     set_bit(DF_CRASHED, &current->flags);
 

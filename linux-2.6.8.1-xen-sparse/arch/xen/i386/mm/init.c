@@ -76,11 +76,9 @@ static pte_t * __init one_page_table_init(pmd_t *pmd)
 	if (pmd_none(*pmd)) {
 		pte_t *page_table = (pte_t *) alloc_bootmem_low_pages(PAGE_SIZE);
 		set_pmd(pmd, __pmd(__pa(page_table) | _PAGE_TABLE));
-		flush_page_update_queue();
 		if (page_table != pte_offset_kernel(pmd, 0))
 			BUG();	
 
-		wrprotect_bootpt((pgd_t *)start_info.pt_base, page_table, 1);
 		return page_table;
 	}
 	
@@ -125,8 +123,7 @@ static void __init page_table_range_init (unsigned long start, unsigned long end
 	}
 }
 
-/* NOTE: caller must call flush_page_update_queue() */
-void __init wrprotect_bootpt(pgd_t *pgd, void *page, int set)
+void __init protect_page(pgd_t *pgd, void *page, int mode)
 {
 	pmd_t *pmd;
 	pte_t *pte;
@@ -138,31 +135,25 @@ void __init wrprotect_bootpt(pgd_t *pgd, void *page, int set)
 	pte = pte_offset_kernel(pmd, addr);
 	if (!pte_present(*pte))
 		return;
-	queue_l1_entry_update(pte, set ? pte_val_ma(*pte) & ~_PAGE_RW :
-	    pte_val_ma(*pte) | _PAGE_RW);
+	queue_l1_entry_update(pte, mode ? pte_val_ma(*pte) & ~_PAGE_RW :
+					pte_val_ma(*pte) | _PAGE_RW);
 }
 
-/* NOTE: caller must call flush_page_update_queue() */
-static void __init protect_bootpt_entries(pgd_t *spgd, pgd_t *dpgd, int set,
-    int pmdupdate, int pmdset)
+void __init protect_pagetable(pgd_t *dpgd, pgd_t *spgd, int mode)
 {
 	pmd_t *pmd;
 	pte_t *pte;
 	int pgd_idx, pmd_idx;
 
+	protect_page(dpgd, spgd, mode);
+
 	for (pgd_idx = 0; pgd_idx < PTRS_PER_PGD_NO_HV; spgd++, pgd_idx++) {
 		pmd = pmd_offset(spgd, 0);
 		if (pmd_none(*pmd))
 			continue;
-		if (pmdupdate)
-			wrprotect_bootpt(dpgd, pmd, pmdset);
 		for (pmd_idx = 0; pmd_idx < PTRS_PER_PMD; pmd++, pmd_idx++) {
-			if (cpu_has_pse) {
-				/* XXX */
-			} else {
-				pte = pte_offset_kernel(pmd, 0);
-				wrprotect_bootpt(dpgd, pte, set);
-			}
+			pte = pte_offset_kernel(pmd, 0);
+			protect_page(dpgd, pte, mode);
 		}
 	}
 }
@@ -537,18 +528,6 @@ out:
 #endif
 
 /*
- * - write protect new L1 pages in old pgd
- * - write protect new pgd page in old pgd
- * - write protect new pgd page in new pgd
- * - write protect new L1 pages in new pgd
- * - write protect old L1 pages in new pgd and write protect old pgd in
- *   new pgd
- * - pin new pgd
- * - switch to new pgd
- * - unpin old pgd
- * - make old L1 pages and old pgd page writeable in new pgd
- */
-/*
  * paging_init() sets up the page tables - note that the first 8MB are
  * already mapped by head.S.
  *
@@ -557,6 +536,8 @@ out:
  */
 void __init paging_init(void)
 {
+	pgd_t *old_pgd = (pgd_t *)start_info.pt_base;
+	pgd_t *new_pgd = swapper_pg_dir;
 #ifdef CONFIG_XEN_PHYSDEV_ACCESS
 	int i;
 #endif
@@ -569,20 +550,24 @@ void __init paging_init(void)
 
 	pagetable_init();
 
-	wrprotect_bootpt((pgd_t *)start_info.pt_base, swapper_pg_dir, 1);
-	wrprotect_bootpt(swapper_pg_dir, swapper_pg_dir, 1);
-	flush_page_update_queue();
-	protect_bootpt_entries(swapper_pg_dir, swapper_pg_dir, 1, 0, 0);
-	protect_bootpt_entries((pgd_t *)start_info.pt_base, swapper_pg_dir,
-	    1, 1, 1);
-	queue_pgd_pin(__pa(swapper_pg_dir));
-	load_cr3(swapper_pg_dir);
+	/*
+	 * Write-protect both page tables within both page tables.
+	 * That's three ops, as the old p.t. is already protected
+	 * within the old p.t. Then pin the new table, switch tables,
+	 * and unprotect the old table.
+	 */
+	protect_pagetable(new_pgd, old_pgd, PROT_ON);
+	protect_pagetable(new_pgd, new_pgd, PROT_ON);
+	protect_pagetable(old_pgd, new_pgd, PROT_ON);
+	queue_pgd_pin(__pa(new_pgd));
+	load_cr3(new_pgd);
+	queue_pgd_unpin(__pa(old_pgd));
 	__flush_tlb_all(); /* implicit flush */
-	queue_pgd_unpin(__pa(start_info.pt_base));
-	protect_bootpt_entries((pgd_t *)start_info.pt_base, swapper_pg_dir,
-	    0, 1, 0);
-	wrprotect_bootpt((pgd_t *)start_info.pt_base, swapper_pg_dir, 0);
+	protect_pagetable(new_pgd, old_pgd, PROT_OFF);
 	flush_page_update_queue();
+
+	/* Completely detached from old tables, so free them. */
+	free_bootmem(__pa(old_pgd), start_info.nr_pt_frames << PAGE_SHIFT);
 
 #ifdef CONFIG_X86_PAE
 	/*
