@@ -413,3 +413,4 @@ tools/vdmanager/vdmanager.jar
 xen/image.dis
 xen/include/xeno/compile.h
 xen/tools/figlet/figlet
+xen/drivers/block/xen_physdisk.o
