@@ -436,7 +436,7 @@ xentrace\_cpusplit} (used to split trace data out into per-cpu log files) and
 {\tt xentrace\_format} (used to pretty-print trace data).
 
 For more information, see the manual pages for {\tt xentrace},
-{\tt xentrace_format} and {\tt xentrace_cpusplit}.
+{\tt xentrace\_format} and {\tt xentrace\_cpusplit}.
 
 
 \chapter{Hypervisor calls}
@@ -512,17 +512,26 @@ in kilobytes.
 
 {\it DOM0\_GETDOMAINFO}: get statistics about the domain
 
+{\it DOM0\_GETPAGEFRAMEINFO}:
+
 {\it DOM0\_IOPL}:
 
 {\it DOM0\_MSR}:
 
-{\it DOM0\_DEBUG}:
+{\it DOM0\_DEBUG}: interactively call pervasive debugger
 
 {\it DOM0\_SETTIME}: set system time
 
-{\it DOMO\_READCONSOLE}: read console content from hypervisor buffer ring
+{\it DOM0\_READCONSOLE}: read console content from hypervisor buffer ring
 
-{\it DOMO\_PINCPUDOMAIN}: pin domain to a particular CPU
+{\it DOM0\_PINCPUDOMAIN}: pin domain to a particular CPU
+
+{\it DOM0\_GETTBUFS}: get information about the size and location of
+                      the trace buffers (only on trace-buffer enabled builds)
+
+{\it DOM0\_PHYSINFO}: get information about the host machine
+
+{\it DOM0\_PCIDEV\_ACCESS}: modify PCI device access permissions
 
 
 \section{network\_op(network\_op\_t *op)} 
