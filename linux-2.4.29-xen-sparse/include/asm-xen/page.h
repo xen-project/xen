@@ -88,6 +88,7 @@ static inline unsigned long pmd_val(pmd_t x)
     if ( (ret & 1) ) ret = machine_to_phys(ret);
     return ret;
 }
+#define pmd_val_ma(x)   ((x).pmd)
 #define pgd_val(x)	({ BUG(); (unsigned long)0; })
 #define pgprot_val(x)	((x).pgprot)
 

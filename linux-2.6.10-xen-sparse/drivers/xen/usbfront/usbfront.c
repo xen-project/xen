@@ -331,6 +331,9 @@ static int xhci_port_reset(usbif_vdev_t port)
                 xhci_drain_ring();
         }
 
+	xhci->rh.ports[port].pe = 1;
+	xhci->rh.ports[port].pe_chg = 1;
+
         return xhci->awaiting_reset;
 }
 
