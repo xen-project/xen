@@ -115,6 +115,15 @@ extern void perfc_reset(unsigned char key, void *dev_id,
                         struct pt_regs *regs);
 #endif
 
+void do_debug_key(unsigned char key, void *dev_id, struct pt_regs *regs)
+{
+    extern void trap_to_xendbg(void);
+    trap_to_xendbg();
+    asm volatile ("nop"); /* Prevent the compiler doing tail call
+			     optimisation, as that confuses xendbg a
+			     bit. */
+}
+
 void initialize_keytable(void)
 {
     add_key_handler('d', dump_registers, "dump registers"); 
@@ -128,4 +137,5 @@ void initialize_keytable(void)
     add_key_handler('p', perfc_printall, "print performance counters"); 
     add_key_handler('P', perfc_reset,    "reset performance counters"); 
 #endif
+    add_key_handler('%', do_debug_key,   "Trap to xendbg");
 }
