@@ -212,7 +212,7 @@ bx_linux_pktmover_c::bx_linux_pktmover_c(const char *netif,
   this->filter[3].k = (macaddr[0] & 0xff) << 8 | (macaddr[1] & 0xff);
   fp.len = BX_LSF_ICNT;
   fp.filter = this->filter;
-  BX_INFO(("eth_linux: fp.len=%d fp.filter=%x", fp.len, (unsigned) fp.filter));
+  BX_INFO(("eth_linux: fp.len=%d fp.filter=%x", fp.len, (unsigned long) fp.filter));
   if (setsockopt(this->fd, SOL_SOCKET, SO_ATTACH_FILTER, &fp, sizeof(fp)) < 0) {
     BX_PANIC(("eth_linux: could not set socket filter: %s", strerror(errno)));
     close(this->fd);
