@@ -129,9 +129,15 @@ static PyObject *xu_notifier_new(PyObject *self, PyObject *args)
 
     xun = PyObject_New(xu_notifier_object, &xu_notifier_type);
 
+ reopen:
     xun->evtchn_fd = open(EVTCHN_DEV_NAME, O_NONBLOCK|O_RDWR);
     if ( xun->evtchn_fd == -1 )
     {
+        if ( (errno == ENOENT) &&
+             ((mkdir("/dev/xen", 0755) == 0) || (errno == EEXIST)) &&
+             (mknod(EVTCHN_DEV_NAME, S_IFCHR|0600, 
+                    (EVTCHN_DEV_MAJOR << 8) | EVTCHN_DEV_MINOR) == 0) )
+            goto reopen;
         PyObject_Del((PyObject *)xun);
         return PyErr_SetFromErrno(PyExc_IOError);
     }
