@@ -82,7 +82,7 @@ void force_evtchn_callback(void)
     (void)HYPERVISOR_xen_version(0);
 }
 
-void evtchn_do_upcall(struct pt_regs *regs)
+asmlinkage void evtchn_do_upcall(struct pt_regs *regs)
 {
     unsigned long  l1, l2;
     unsigned int   l1i, l2i, port;
