@@ -116,11 +116,11 @@ class XendDomainInfo:
                 ['name', self.name],
                 ['memory', self.memory] ]
         if self.info:
-            run   = (self.info['running'] and 'r') or '-'
-            block = (self.info['blocked'] and 'b') or '-'
-            stop  = (self.info['paused']  and 'p') or '-'
-            susp  = (self.info['shutdown'] and 's') or '-'
-            crash = (self.info['crashed'] and 'c') or '-'
+            run   = (self.info['running'] and 'R') or 'r'
+            block = (self.info['blocked'] and 'B') or 'b'
+            stop  = (self.info['paused']  and 'P') or 'p'
+            susp  = (self.info['shutdown'] and 'S') or 's'
+            crash = (self.info['crashed'] and 'C') or 'c'
             state = run + block + stop + susp + crash
             sxpr.append(['state', state])
             if self.info['shutdown']:

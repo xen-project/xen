@@ -88,11 +88,11 @@ elif cmd == 'list':
     print 'Dom  Name             Mem(kb)  CPU  State  Time(ms)'
     for domain in xc.domain_getinfo():
 
-	run   = (domain['running'] and 'r') or '-'
-        block = (domain['blocked'] and 'b') or '-'
-	stop  = (domain['paused']  and 'p') or '-'
-	susp  = (domain['shutdown'] and 's') or '-'
-	crash = (domain['crashed'] and 'c') or '-'
+	run   = (domain['running'] and 'R') or 'r'
+        block = (domain['blocked'] and 'B') or 'b'
+	stop  = (domain['paused']  and 'P') or 'p'
+	susp  = (domain['shutdown'] and 'S') or 's'
+	crash = (domain['crashed'] and 'C') or 'c'
 
         domain['state'] = run + block + stop + susp + crash
         domain['cpu_time'] = domain['cpu_time']/1e6
