@@ -211,6 +211,8 @@ struct sk_buff *alloc_skb(unsigned int size,int gfp_mask)
 	skb->len = 0;
 	skb->cloned = 0;
 	skb->data_len = 0;
+        skb->src_vif = VIF_UNKNOWN_INTERFACE;
+        skb->dst_vif = VIF_UNKNOWN_INTERFACE;
 
 	atomic_set(&skb->users, 1); 
 	atomic_set(&(skb_shinfo(skb)->dataref), 1);

@@ -165,21 +165,41 @@ static inline int HYPERVISOR_network_op(void *network_op)
     return ret;
 }
 
+/* Event message note:
+ *
+ * Here, as in the interrupts to the guestos, additional network interfaces
+ * are defined.  These definitions server as placeholders for the event bits,
+ * however, in the code these events will allways be referred to as shifted
+ * offsets from the base NET events.
+ */
+
 /* Events that a guest OS may receive from the hypervisor. */
-#define EVENT_NET_TX  0x01 /* packets for transmission. */
-#define EVENT_NET_RX  0x02 /* empty buffers for receive. */
-#define EVENT_TIMER   0x04 /* a timeout has been updated. */
-#define EVENT_DIE     0x08 /* OS is about to be killed. Clean up please! */
-#define EVENT_BLK_TX  0x10 /* packets for transmission. */
-#define EVENT_BLK_RX  0x20 /* empty buffers for receive. */
+#define EVENT_BLK_TX   0x01 /* packets for transmission. */
+#define EVENT_BLK_RX   0x02 /* empty buffers for receive. */
+#define EVENT_TIMER    0x04 /* a timeout has been updated. */
+#define EVENT_DIE      0x08 /* OS is about to be killed. Clean up please! */
+#define EVENT_NET_TX   0x10 /* packets for transmission. */
+#define EVENT_NET_RX   0x20 /* empty buffers for receive. */
+#define EVENT_NET2_TX  0x40 /* packets for transmission. */
+#define EVENT_NET2_RX  0x80 /* empty buffers for receive. */
+
+/* should these macros and the ones below test for range violation? */
+#define EVENT_NET_TX_FOR_VIF(x)    (EVENT_NET_TX << (2 * x))
+#define EVENT_NET_RX_FOR_VIF(x)    (EVENT_NET_RX << (2 * x))
+
 
 /* Bit offsets, as opposed to the above masks. */
-#define _EVENT_NET_TX 0
-#define _EVENT_NET_RX 1
-#define _EVENT_TIMER  2
-#define _EVENT_DIE    3
-#define _EVENT_BLK_TX 4
-#define _EVENT_BLK_RX 5
+#define _EVENT_BLK_TX  0
+#define _EVENT_BLK_RX  1
+#define _EVENT_TIMER   2
+#define _EVENT_DIE     3
+#define _EVENT_NET_TX  4
+#define _EVENT_NET_RX  5
+#define _EVENT_NET2_TX 6
+#define _EVENT_NET2_RX 7
+
+#define _EVENT_NET_TX_FOR_VIF(x)    (_EVENT_NET_TX + (2 * x))
+#define _EVENT_NET_RX_FOR_VIF(x)    (_EVENT_NET_RX + (2 * x))
 
 /*
  * NB. We expect that this struct is smaller than a page.
@@ -263,6 +283,7 @@ typedef struct start_info_st {
     int num_net_rings;
     blk_ring_t *blk_ring;         /* block io communication rings */
     unsigned char cmd_line[1];    /* variable-length */
+    unsigned long frame_table;    /* mapping of the frame_table for dom0 */
 } start_info_t;
 
 /* For use in guest OSes. */

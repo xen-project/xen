@@ -28,6 +28,12 @@
 #include <linux/mm.h>
 //#include <linux/highmem.h>
 
+// vif special values.
+#define VIF_PHYSICAL_INTERFACE  -1
+#define VIF_UNKNOWN_INTERFACE   -2
+#define VIF_DROP                -3
+#define VIF_ANY_INTERFACE       -4
+
 #define HAVE_ALLOC_SKB		/* For the drivers to know */
 #define HAVE_ALIGNABLE_SKB	/* Ditto 8)		   */
 #define SLAB_SKB 		/* Slabified skbuffs 	   */
@@ -196,6 +202,12 @@ struct sk_buff {
 	unsigned char 	*end;			/* End pointer					*/
 
 	void 		(*destructor)(struct sk_buff *);	/* Destruct function		*/
+
+        int src_vif;                            /* vif we came from */
+        int dst_vif;                            /* vif we are bound for */
+
+                
+        
 #ifdef CONFIG_NETFILTER
 	/* Can be used for communication between hooks. */
         unsigned long	nfmark;
