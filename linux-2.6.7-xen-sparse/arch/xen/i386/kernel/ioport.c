@@ -15,14 +15,14 @@ asmlinkage long sys_iopl(unsigned int new_io_pl)
 	unsigned int old_io_pl = current->thread.io_pl;
 	dom0_op_t op;
 
-	if (!(start_info.flags & SIF_PRIVILEGED))
-		return -EPERM;
-
 	if (new_io_pl > 3)
 		return -EINVAL;
 
 	/* Need "raw I/O" privileges for direct port access. */
 	if ((new_io_pl > old_io_pl) && !capable(CAP_SYS_RAWIO))
+		return -EPERM;
+
+	if (!(start_info.flags & SIF_PRIVILEGED))
 		return -EPERM;
 
 	/* Maintain OS privileges even if user attempts to relinquish them. */
