@@ -4,7 +4,9 @@
  * Backend for the Xen virtual USB driver - provides an abstraction of a
  * USB host controller to the corresponding frontend driver.
  *
- * by Mark Williamson, Copyright (c) 2004 Intel Research Cambridge
+ * by Mark Williamson
+ * Copyright (c) 2004 Intel Research Cambridge
+ * Copyright (c) 2004, 2005 Mark Williamson
  *
  * Based on arch/xen/drivers/blkif/backend/main.c
  * Copyright (c) 2003-2004, Keir Fraser & Steve Hand
@@ -39,7 +41,6 @@ static unsigned long mmap_vstart;
      ((_req) * MMAP_PAGES_PER_REQUEST * PAGE_SIZE) + \
      ((_seg) * PAGE_SIZE))
 
-#define MIN(x,y) ( ( x < y ) ? x : y )
 
 static spinlock_t owned_ports_lock;
 LIST_HEAD(owned_ports);
@@ -83,7 +84,7 @@ typedef struct {
  */
 static pending_req_t pending_reqs[MAX_PENDING_REQS];
 static unsigned char pending_ring[MAX_PENDING_REQS];
-static spinlock_t pend_prod_lock = SPIN_LOCK_UNLOCKED;
+static spinlock_t pend_prod_lock;
 
 /* NB. We use a different index type to differentiate from shared blk rings. */
 typedef unsigned int PEND_RING_IDX;
@@ -100,20 +101,87 @@ static void dispatch_usb_io(usbif_priv_t *up, usbif_request_t *req);
 static void dispatch_usb_reset(usbif_priv_t *up, unsigned long portid);
 static owned_port_t *usbif_find_port(char *);
 
+/******************************************************************
+ * PRIVATE DEBUG FUNCTIONS
+ */
 
-void dump_port(owned_port_t *p)
+#undef DEBUG
+#ifdef DEBUG
+
+static void dump_port(owned_port_t *p)
 {
-    printk("owned_port_t @ %p\n", p);
-    printk("  usbif_priv @ %p\n", p->usbif_priv);
-    printk("  path: %s\n", p->path);
-    printk("  guest_port: %d\n", p->guest_port);
-    printk("  guest_address: %ld\n", p->guest_address);
-    printk("  dev_present: %d\n", p->dev_present);
-    printk("  dev @ %p\n", p->dev);
-    printk("  ifaces: 0x%lx\n", p->ifaces);
+    printk(KERN_DEBUG "owned_port_t @ %p\n"
+	   "  usbif_priv @ %p\n"
+	   "  path: %s\n"
+	   "  guest_port: %d\n"
+	   "  guest_address: %ld\n"
+	   "  dev_present: %d\n"
+	   "  dev @ %p\n"
+	   "  ifaces: 0x%lx\n",
+	   p, p->usbif_priv, p->path, p->guest_port, p->guest_address,
+	   p->dev_present, p->dev, p->ifaces);
 }
 
 
+static void dump_request(usbif_request_t *req)
+{    
+    printk(KERN_DEBUG "id = 0x%lx\n"
+	   "devnum %d\n"
+	   "endpoint 0x%x\n"
+	   "direction %d\n"
+	   "speed %d\n"
+	   "pipe_type 0x%x\n"
+	   "transfer_buffer 0x%lx\n"
+	   "length 0x%lx\n"
+	   "transfer_flags 0x%lx\n"
+	   "setup = { 0x%x, 0x%x, 0x%x, 0x%x, 0x%x, 0x%x, 0x%x, 0x%x }\n"
+	   "iso_schedule = 0x%lx\n"
+	   "num_iso %ld\n",
+	   req->id, req->devnum, req->endpoint, req->direction, req->speed,
+	   req->pipe_type, req->transfer_buffer, req->length,
+	   req->transfer_flags, req->setup[0], req->setup[1], req->setup[2],
+	   req->setup[3], req->setup[4], req->setup[5], req->setup[6],
+	   req->setup[7], req->iso_schedule, req->num_iso);
+}
+
+static void dump_urb(struct urb *urb)
+{
+    printk(KERN_DEBUG "dumping urb @ %p\n", urb);
+
+#define DUMP_URB_FIELD(name, format) \
+    printk(KERN_DEBUG "  " # name " " format "\n", urb-> name)
+    
+    DUMP_URB_FIELD(pipe, "0x%x");
+    DUMP_URB_FIELD(status, "%d");
+    DUMP_URB_FIELD(transfer_flags, "0x%x");    
+    DUMP_URB_FIELD(transfer_buffer, "%p");
+    DUMP_URB_FIELD(transfer_buffer_length, "%d");
+    DUMP_URB_FIELD(actual_length, "%d");
+}
+
+static void dump_response(usbif_response_t *resp)
+{
+    printk(KERN_DEBUG "usbback: Sending response:\n"
+	   "         id = 0x%x\n"
+	   "         op = %d\n"
+	   "         status = %d\n"
+	   "         data = %d\n"
+	   "         length = %d\n",
+	   resp->id, resp->op, resp->status, resp->data, resp->length);
+}
+
+#else /* DEBUG */
+
+#define dump_port(blah)     ((void)0)
+#define dump_request(blah)   ((void)0)
+#define dump_urb(blah)      ((void)0)
+#define dump_response(blah) ((void)0)
+
+#endif /* DEBUG */
+
+/******************************************************************
+ * MEMORY MANAGEMENT
+ */
 
 static void fast_flush_area(int idx, int nr_pages)
 {
@@ -173,6 +241,15 @@ static void add_to_usbif_list_tail(usbif_priv_t *up)
     spin_unlock_irqrestore(&usbio_schedule_list_lock, flags);
 }
 
+void free_pending(int pending_idx)
+{
+    unsigned long flags;
+
+    /* Free the pending request. */
+    spin_lock_irqsave(&pend_prod_lock, flags);
+    pending_ring[MASK_PEND_IDX(pending_prod++)] = pending_idx;
+    spin_unlock_irqrestore(&pend_prod_lock, flags);
+}
 
 /******************************************************************
  * COMPLETION CALLBACK -- Called as urb->complete()
@@ -182,16 +259,10 @@ static void maybe_trigger_usbio_schedule(void);
 
 static void __end_usb_io_op(struct urb *purb)
 {
-    unsigned long flags;
     pending_req_t *pending_req;
     int pending_idx;
 
     pending_req = purb->context;
-
-/*     printk("Completed for id = %p to 0x%lx - 0x%lx\n", pending_req->id, */
-/*            virt_to_machine(purb->transfer_buffer), */
-/*            virt_to_machine(purb->transfer_buffer) */
-/*            + pending_req->nr_pages * PAGE_SIZE); */
 
     pending_idx = pending_req - pending_reqs;
 
@@ -201,7 +272,7 @@ static void __end_usb_io_op(struct urb *purb)
     /* An error fails the entire request. */
     if ( purb->status )
     {
-        printk("URB @ %p failed. Status %d\n", purb, purb->status);
+        printk(KERN_WARNING "URB @ %p failed. Status %d\n", purb, purb->status);
     }
 
     if ( usb_pipetype(purb->pipe) == 0 )
@@ -210,8 +281,6 @@ static void __end_usb_io_op(struct urb *purb)
         usbif_iso_t *sched = (usbif_iso_t *)MMAP_VADDR(pending_idx, pending_req->nr_pages - 1);
 
         ASSERT(sched == pending_req->sched);
-
-	//	printk("writing back schedule at %p\n", sched);
 
         /* If we're dealing with an iso pipe, we need to copy back the schedule. */
         for ( i = 0; i < purb->number_of_packets; i++ )
@@ -223,24 +292,18 @@ static void __end_usb_io_op(struct urb *purb)
         }
     }
     
-    //    printk("Flushing %d pages\n", pending_req->nr_pages);
     fast_flush_area(pending_req - pending_reqs, pending_req->nr_pages);
 
     kfree(purb->setup_packet);
 
-    spin_lock_irqsave(&pending_req->usbif_priv->usb_ring_lock, flags);
     make_response(pending_req->usbif_priv, pending_req->id,
 		  pending_req->operation, pending_req->status, 0, purb->actual_length);
-    spin_unlock_irqrestore(&pending_req->usbif_priv->usb_ring_lock, flags);
     usbif_put(pending_req->usbif_priv);
 
     usb_free_urb(purb);
 
-    /* Free the pending request. */
-    spin_lock_irqsave(&pend_prod_lock, flags);
-    pending_ring[MASK_PEND_IDX(pending_prod++)] = pending_idx;
-    spin_unlock_irqrestore(&pend_prod_lock, flags);
-
+    free_pending(pending_idx);
+    
     rmb();
 
     /* Check for anything still waiting in the rings, having freed a request... */
@@ -332,9 +395,6 @@ static int do_usb_io_op(usbif_priv_t *up, int max_to_do)
     usbif_request_t *req;
     USBIF_RING_IDX i, rp;
     int more_to_do = 0;
-    unsigned long flags;
-
-    spin_lock_irqsave(&up->usb_ring_lock, flags);
 
     rp = usb_ring->req_prod;
     rmb(); /* Ensure we see queued requests up to 'rp'. */
@@ -377,8 +437,6 @@ static int do_usb_io_op(usbif_priv_t *up, int max_to_do)
 
     up->usb_req_cons = i;
 
-    spin_unlock_irqrestore(&up->usb_ring_lock, flags);
-
     return more_to_do;
 }
 
@@ -412,11 +470,7 @@ static void dispatch_usb_reset(usbif_priv_t *up, unsigned long portid)
      * than it's worth.  We just fake it out in software but we will do a real
      * reset when the interface is destroyed. */
 
-#if 0
-    printk("Reset port %d\n", portid);
-
     dump_port(port);
-#endif
 
     port->guest_address = 0;
     /* If there's an attached device then the port is now enabled. */
@@ -438,8 +492,8 @@ static void dispatch_usb_probe(usbif_priv_t *up, unsigned long id, unsigned long
     else
     {
         ret = -EINVAL;
-        printk("dispatch_usb_probe(): invalid port probe request (port %ld)\n",
-	       portid);
+        printk(KERN_INFO "dispatch_usb_probe(): invalid port probe request "
+	       "(port %ld)\n", portid);
     }
 
     /* Probe result is sent back in-band.  Probes don't have an associated id
@@ -448,40 +502,6 @@ static void dispatch_usb_probe(usbif_priv_t *up, unsigned long id, unsigned long
 }
 
 owned_port_t *find_port_for_request(usbif_priv_t *up, usbif_request_t *req);
-
-static void dump_request(usbif_request_t *req)
-{    
-    printk("id = 0x%lx\n", req->id);
-    
-	printk("devnum %d\n", req->devnum);
-	printk("endpoint 0x%x\n", req->endpoint);
-	printk("direction %d\n", req->direction);
-	printk("speed %d\n", req->speed);
-        printk("pipe_type 0x%x\n", req->pipe_type);
-        printk("transfer_buffer 0x%lx\n", req->transfer_buffer);
-        printk("length 0x%lx\n", req->length);
-        printk("transfer_flags 0x%lx\n", req->transfer_flags);
-        printk("setup = { 0x%x, 0x%x, 0x%x, 0x%x, 0x%x, 0x%x, 0x%x, 0x%x\n",
-               req->setup[0], req->setup[1], req->setup[2], req->setup[3],
-               req->setup[4], req->setup[5], req->setup[6], req->setup[7]);
-        printk("iso_schedule = 0x%lx\n", req->iso_schedule);
-        printk("num_iso %ld\n", req->num_iso);
-}
-
-void dump_urb(struct urb *urb)
-{
-    printk("dumping urb @ %p\n", urb);
-
-#define DUMP_URB_FIELD(name, format) printk("  " # name " " format "\n", urb-> name)
-    
-    DUMP_URB_FIELD(pipe, "0x%x");
-    DUMP_URB_FIELD(status, "%d");
-    DUMP_URB_FIELD(transfer_flags, "0x%x");    
-    DUMP_URB_FIELD(transfer_buffer, "%p");
-    DUMP_URB_FIELD(transfer_buffer_length, "%d");
-    DUMP_URB_FIELD(actual_length, "%d");
-}
-
 
 static void dispatch_usb_io(usbif_priv_t *up, usbif_request_t *req)
 {
@@ -495,27 +515,36 @@ static void dispatch_usb_io(usbif_priv_t *up, usbif_request_t *req)
     owned_port_t *port;
     unsigned char *setup;    
 
-//    dump_request(req);
+    dump_request(req);
 
     if ( NR_PENDING_REQS == MAX_PENDING_REQS )
     {
-        printk("usbback: Max requests already queued.  Now giving up!\n");
+        printk(KERN_WARNING "usbback: Max requests already queued. "
+	       "Giving up!\n");
         
         return;
     }
 
     port = find_port_for_request(up, req);
 
-    if(port == NULL)
+    if ( port == NULL )
     {
-	printk("No such device! (%d)\n", req->devnum);
+	printk(KERN_WARNING "No such device! (%d)\n", req->devnum);
 	dump_request(req);
 
         make_response(up, req->id, req->operation, -ENODEV, 0, 0);
 	return;
     }
+    else if ( !port->dev_present )
+    {
+        /* In normal operation, we'll only get here if a device is unplugged
+         * and the frontend hasn't noticed yet. */
+        make_response(up, req->id, req->operation, -ENODEV, 0, 0);
+	return;
+    }
+        
 
-    setup = kmalloc(8, GFP_ATOMIC | GFP_NOIO);
+    setup = kmalloc(8, GFP_KERNEL);
 
     if ( setup == NULL )
         goto no_mem;
@@ -552,7 +581,7 @@ static void dispatch_usb_io(usbif_priv_t *up, usbif_request_t *req)
 
       /* Ignore configuration setting and hope that the host kernel
 	 did it right. */
-      //        usb_set_configuration(port->dev, setup[2]);
+        /* usb_set_configuration(port->dev, setup[2]); */
 
         make_response(up, req->id, req->operation, 0, 0, 0);
 
@@ -579,7 +608,8 @@ static void dispatch_usb_io(usbif_priv_t *up, usbif_request_t *req)
 	   + req->length )
 	 > MMAP_PAGES_PER_REQUEST * PAGE_SIZE )
     {
-        printk("usbback: request of %d bytes too large, failing it\n", req->length);
+        printk(KERN_WARNING "usbback: request of %lu bytes too large\n",
+	       req->length);
         make_response(up, req->id, req->operation, -EINVAL, 0, 0);
         kfree(setup);
         return;
@@ -599,8 +629,6 @@ static void dispatch_usb_io(usbif_priv_t *up, usbif_request_t *req)
     for ( i = 0, offset = 0; offset < req->length;
           i++, offset += PAGE_SIZE )
     {
-      //        printk("length = %d, offset = %d, looping!\n", req->length, offset);
-        
 	mcl[i].op = __HYPERVISOR_update_va_mapping_otherdomain;
 	mcl[i].args[0] = MMAP_VADDR(pending_idx, i) >> PAGE_SHIFT;
         mcl[i].args[1] = ((buffer_mach & PAGE_MASK) + offset) | remap_prot;
@@ -609,7 +637,6 @@ static void dispatch_usb_io(usbif_priv_t *up, usbif_request_t *req)
         
         phys_to_machine_mapping[__pa(MMAP_VADDR(pending_idx, i))>>PAGE_SHIFT] =
             FOREIGN_FRAME((buffer_mach + offset) >> PAGE_SHIFT);
-	//	printk("i = %d\n", i);
 
         ASSERT(virt_to_machine(MMAP_VADDR(pending_idx, i))
                == buffer_mach + i << PAGE_SHIFT);
@@ -617,7 +644,6 @@ static void dispatch_usb_io(usbif_priv_t *up, usbif_request_t *req)
 
     if ( req->pipe_type == 0 && req->num_iso > 0 ) /* Maybe schedule ISO... */
     {
-      //      printk("for iso, i = %d\n", i);
         /* Map in ISO schedule, if necessary. */
         mcl[i].op = __HYPERVISOR_update_va_mapping_otherdomain;
         mcl[i].args[0] = MMAP_VADDR(pending_idx, i) >> PAGE_SHIFT;
@@ -628,11 +654,8 @@ static void dispatch_usb_io(usbif_priv_t *up, usbif_request_t *req)
         phys_to_machine_mapping[__pa(MMAP_VADDR(pending_idx, i))>>PAGE_SHIFT] =
             FOREIGN_FRAME(req->iso_schedule >> PAGE_SHIFT);
     
-        //    printk("Mapped iso at %p\n", MMAP_VADDR(pending_idx, i));
         i++;
     }
-
-    //    printk("Well we got this far!\n");
 
     if ( unlikely(HYPERVISOR_multicall(mcl, i) != 0) )
         BUG();
@@ -643,9 +666,9 @@ static void dispatch_usb_io(usbif_priv_t *up, usbif_request_t *req)
         {
             if ( unlikely(mcl[j].args[5] != 0) )
             {
-                printk("invalid buffer %d -- could not remap it\n", j);
+                printk(KERN_WARNING
+		       "invalid buffer %d -- could not remap it\n", j);
                 fast_flush_area(pending_idx, i);
-		printk("sending invalid descriptor\n");
                 goto bad_descriptor;
             }
 	}
@@ -663,8 +686,6 @@ static void dispatch_usb_io(usbif_priv_t *up, usbif_request_t *req)
     pending_req->operation = req->operation;
     pending_req->nr_pages  = i;
 
-
-
     pending_cons++;
 
     usbif_get(up);
@@ -673,19 +694,21 @@ static void dispatch_usb_io(usbif_priv_t *up, usbif_request_t *req)
     purb = usb_alloc_urb(req->num_iso);
 
     if ( purb == NULL )
+    {
+        usbif_put(up);
+        free_pending(pending_idx);
         goto no_mem;
+    }
 
     purb->dev = port->dev;
     purb->context = pending_req;
-    purb->transfer_buffer = (void *)MMAP_VADDR(pending_idx, 0) + (buffer_mach & ~PAGE_MASK);
+    purb->transfer_buffer =
+        (void *)MMAP_VADDR(pending_idx, 0) + (buffer_mach & ~PAGE_MASK);
     if(buffer_mach == 0)
       purb->transfer_buffer = NULL;
     purb->complete = __end_usb_io_op;
     purb->transfer_buffer_length = req->length;
     purb->transfer_flags = req->transfer_flags;
-
-/*     if ( req->transfer_flags != 0 ) */
-/*       dump_request(req); */
 
     purb->pipe = 0;
     purb->pipe |= req->direction << 7;
@@ -707,8 +730,6 @@ static void dispatch_usb_io(usbif_priv_t *up, usbif_request_t *req)
         int j;
         usbif_iso_t *iso_sched = (usbif_iso_t *)MMAP_VADDR(pending_idx, i - 1);
 
-	//	printk("Reading iso sched at %p\n", iso_sched);
-
         /* If we're dealing with an iso pipe, we need to copy in a schedule. */
         for ( j = 0; j < req->num_iso; j++ )
         {
@@ -720,13 +741,17 @@ static void dispatch_usb_io(usbif_priv_t *up, usbif_request_t *req)
     }
 
     {
-      int ret;
-      ret = usb_submit_urb(purb);
-
-      //      dump_urb(purb);
-
-      if ( ret != 0 )
-          goto bad_descriptor; /* XXX free pending here! */
+        int ret;
+        ret = usb_submit_urb(purb);
+        
+        dump_urb(purb);
+        
+        if ( ret != 0 )
+        {
+            usbif_put(up);
+            free_pending(pending_idx);
+            goto bad_descriptor;
+        }
     }
     
     return;
@@ -759,15 +784,6 @@ static void make_response(usbif_priv_t *up, unsigned long id,
     usbif_response_t *resp;
     unsigned long     flags;
 
-#if 0
-    printk("usbback: Sending response:\n");
-    printk("         id = 0x%x\n", id);
-    printk("         op = %d\n", op);
-    printk("         status = %d\n", st);
-    printk("         data = %d\n", inband);
-    printk("         length = %d\n", length);
-#endif
-
     /* Place on the response ring for the relevant domain. */ 
     spin_lock_irqsave(&up->usb_ring_lock, flags);
     resp = &up->usb_ring_base->
@@ -778,6 +794,9 @@ static void make_response(usbif_priv_t *up, unsigned long id,
     resp->data      = inband;
     resp->length = length;
     wmb(); /* Ensure other side can see the response fields. */
+
+    dump_response(resp);
+
     up->usb_ring_base->resp_prod = ++up->usb_resp_prod;
     spin_unlock_irqrestore(&up->usb_ring_lock, flags);
 
@@ -798,15 +817,16 @@ int usbif_claim_port(usbif_be_claim_port_t *msg)
     /* Sanity... */
     if ( usbif_find_port(msg->path) != NULL )
     {
-        printk("usbback: Attempted to claim USB port "
+        printk(KERN_WARNING "usbback: Attempted to claim USB port "
                "we already own!\n");
         return -EINVAL;
     }
 
-    spin_lock_irq(&owned_ports_lock);
-    
     /* No need for a slab cache - this should be infrequent. */
     o_p = kmalloc(sizeof(owned_port_t), GFP_KERNEL);
+
+    if ( o_p == NULL )
+        return -ENOMEM;
 
     o_p->enabled = 0;
     o_p->usbif_priv = usbif_find(msg->domid);
@@ -816,12 +836,14 @@ int usbif_claim_port(usbif_be_claim_port_t *msg)
 
     strcpy(o_p->path, msg->path);
 
+    spin_lock_irq(&owned_ports_lock);
+    
     list_add(&o_p->list, &owned_ports);
 
-    printk("usbback: Claimed USB port (%s) for %d.%d\n", o_p->path,
-	   msg->domid, msg->usbif_port);
-
     spin_unlock_irq(&owned_ports_lock);
+
+    printk(KERN_INFO "usbback: Claimed USB port (%s) for %d.%d\n", o_p->path,
+	   msg->domid, msg->usbif_port);
 
     /* Force a reprobe for unclaimed devices. */
     usb_scan_devices();
@@ -843,11 +865,9 @@ owned_port_t *find_port_for_request(usbif_priv_t *up, usbif_request_t *req)
         owned_port_t *p = list_entry(port, owned_port_t, list);
         if(p->usbif_priv == up && p->guest_address == req->devnum && p->enabled )
 	  {
-#if 0
-              printk("Found port for devnum %d\n", req->devnum);
-
               dump_port(p);
-#endif
+
+	      spin_unlock_irqrestore(&owned_ports_lock, flags);
               return p;
 	  }
     }
@@ -856,29 +876,37 @@ owned_port_t *find_port_for_request(usbif_priv_t *up, usbif_request_t *req)
     return NULL;    
 }
 
-owned_port_t *usbif_find_port(char *path)
+owned_port_t *__usbif_find_port(char *path)
 {
     struct list_head *port;
-    unsigned long flags;
 
-    spin_lock_irqsave(&owned_ports_lock, flags);
     list_for_each(port, &owned_ports)
     {
         owned_port_t *p = list_entry(port, owned_port_t, list);
         if(!strcmp(path, p->path))
         {
-            spin_unlock_irqrestore(&owned_ports_lock, flags);
             return p;
         }
     }
-    spin_unlock_irqrestore(&owned_ports_lock, flags);
 
     return NULL;
 }
 
+owned_port_t *usbif_find_port(char *path)
+{
+    owned_port_t *ret;
+    unsigned long flags;
+
+    spin_lock_irqsave(&owned_ports_lock, flags);
+    ret = __usbif_find_port(path);    
+    spin_unlock_irqrestore(&owned_ports_lock, flags);
+
+    return ret;
+}
+
 
 static void *probe(struct usb_device *dev, unsigned iface,
-	    const struct usb_device_id *id)
+                   const struct usb_device_id *id)
 {
     owned_port_t *p;
 
@@ -887,7 +915,7 @@ static void *probe(struct usb_device *dev, unsigned iface,
      * the device actually is ;-) */
     if ( ( p = usbif_find_port(dev->devpath) ) != NULL )
     {
-        printk("usbback: claimed device attached to owned port\n");
+        printk(KERN_INFO "usbback: claimed device attached to owned port\n");
 
         p->dev_present = 1;
         p->dev = dev;
@@ -896,7 +924,8 @@ static void *probe(struct usb_device *dev, unsigned iface,
         return p->usbif_priv;
     }
     else
-        printk("usbback: hotplug for non-owned port (%s), ignoring\n", dev->devpath);
+        printk(KERN_INFO "usbback: hotplug for non-owned port (%s), ignoring\n",
+	       dev->devpath);
    
 
     return NULL;
@@ -938,6 +967,10 @@ void __usbif_release_port(owned_port_t *p)
      * drivers in this kernel because we assume the device is completely under
      * the control of ourselves (i.e. the guest!).  This should ensure that the
      * device is in a sane state for the next customer ;-) */
+
+    /* MAW NB: we're not resetting the real device here.  This looks perfectly
+     * valid to me but it causes memory corruption.  We seem to get away with not
+     * resetting for now, although it'd be nice to have this tracked down. */
 /*     if ( p->dev != NULL) */
 /*         usb_reset_device(p->dev); */
 
@@ -953,7 +986,7 @@ void usbif_release_port(usbif_be_release_port_t *msg)
     owned_port_t *p;
 
     spin_lock_irq(&owned_ports_lock);
-    p = usbif_find_port(msg->path);
+    p = __usbif_find_port(msg->path);
     __usbif_release_port(p);
     spin_unlock_irq(&owned_ports_lock);
 }
@@ -981,12 +1014,6 @@ static int __init usbif_init(void)
          !(xen_start_info.flags & SIF_USB_BE_DOMAIN) )
         return 0;
     
-    INIT_LIST_HEAD(&owned_ports);
-
-    usb_register(&driver);
-
-    usbif_interface_init();
-
     if ( (mmap_vstart = allocate_empty_lowmem_region(MMAP_PAGES)) == 0 )
         BUG();
 
@@ -996,17 +1023,24 @@ static int __init usbif_init(void)
     for ( i = 0; i < MAX_PENDING_REQS; i++ )
         pending_ring[i] = i;
 
+    spin_lock_init(&pend_prod_lock);
+
+    spin_lock_init(&owned_ports_lock);
+    INIT_LIST_HEAD(&owned_ports);
+
     spin_lock_init(&usbio_schedule_list_lock);
     INIT_LIST_HEAD(&usbio_schedule_list);
 
     if ( kernel_thread(usbio_schedule, 0, CLONE_FS | CLONE_FILES) < 0 )
         BUG();
     
+    usbif_interface_init();
+
     usbif_ctrlif_init();
 
-    spin_lock_init(&owned_ports_lock);
+    usb_register(&driver);
 
-    printk("Xen USB Backend Initialised");
+    printk(KERN_INFO "Xen USB Backend Initialised");
 
     return 0;
 }
