@@ -9,7 +9,6 @@ export XEN_SUBVERSION    = 0
 export XEN_EXTRAVERSION  = ""
 
 export BASEDIR          := $(CURDIR)
-DESTDIR			:= $(CURDIR)/../dist/install
 
 include Rules.mk
 
@@ -29,8 +28,6 @@ install: $(TARGET).gz
 	$(INSTALL_DATA) include/public/*.h $(DESTDIR)/usr/include/xen
 	$(INSTALL_DATA) include/public/io/*.h $(DESTDIR)/usr/include/xen/io
 	$(INSTALL_DATA) include/public/COPYING $(DESTDIR)/usr/include/xen
-
-dist: install
 
 clean:
 	$(MAKE) -C tools clean

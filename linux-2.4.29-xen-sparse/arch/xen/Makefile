@@ -118,9 +118,6 @@ install: bzImage
 	install -m0664 .config $(INSTALL_PATH)/boot/config-$(INSTALL_NAME)$(INSTALL_SUFFIX)
 	install -m0664 System.map $(INSTALL_PATH)/boot/System.map-$(INSTALL_NAME)$(INSTALL_SUFFIX)
 
-dist: 
-	$(MAKE) INSTALL_PATH=../dist/install install
-
 %_config: arch/xen/defconfig-%
 	rm -f .config arch/xen/defconfig
 	cp -f arch/xen/defconfig-$(@:_config=) arch/xen/defconfig

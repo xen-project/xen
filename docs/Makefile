@@ -10,10 +10,7 @@ FIG2DEV		:= fig2dev
 TGIF		:= tgif
 LATEX2HTML	:= latex2html
 
-package		= xen
-prefix		= /usr
-docdir		= $(prefix)/share/doc
-pkgdocdir	= $(docdir)/$(package)
+pkgdocdir	:= /usr/share/doc/xen
 
 DOC_TEX		:= $(wildcard src/*.tex)
 DOC_PS		:= $(patsubst src/%.tex,ps/%.ps,$(DOC_TEX))

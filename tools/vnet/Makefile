@@ -44,9 +44,6 @@ install: compile
 	$(MAKE) -C vnet-module install
 	$(MAKE) -C examples install
 
-dist: $(TARGET)
-	$(MAKE) install
-
 clean:
 	-$(MAKE) -C vnetd clean
 	-$(MAKE) -C vnet-module clean

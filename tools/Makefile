@@ -10,9 +10,7 @@ all:
 	$(MAKE) -C xfrd
 
 install: 
-ifneq ($(dist),yes)
-	$(MAKE) -C check install
-endif
+	$(MAKE) -C check
 	$(MAKE) -C libxutil install
 	$(MAKE) -C libxc install
 	$(MAKE) -C misc install
@@ -21,10 +19,6 @@ endif
 	$(MAKE) -C python install
 	$(MAKE) -C xfrd install
 	$(MAKE) -C sv install
-
-dist: $(TARGET)
-	$(MAKE) prefix=$(CURDIR)/../dist/install dist=yes install
-
 
 clean:
 	$(MAKE) -C libxutil clean
