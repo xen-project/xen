@@ -100,9 +100,8 @@
 #define _EVENT_PS2      5
 
 /*
- * Virtual addresses beyond this are not modifiable by guest OSes.
- * The machine->physical mapping table starts at this address, read-only
- * to all domains except DOM0.
+ * Virtual addresses beyond this are not modifiable by guest OSes. The 
+ * machine->physical mapping table starts at this address, read-only.
  */
 #define HYPERVISOR_VIRT_START (0xFC000000UL)
 #ifndef machine_to_phys_mapping
