@@ -236,7 +236,7 @@ def vm_recreate(savedinfo, info):
     if config:
         d = vm.construct(config)
     else:
-        vm.name = sxp.child_value(savedinfo, 'name')
+        vm.name = sxp.child_value(savedinfo, 'name', "Domain-%d" % info['dom'])
         d = defer.succeed(vm)
     vm.recreate = 0
     return d
