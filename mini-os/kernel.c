@@ -39,6 +39,8 @@ void failsafe_callback(void);
 /* default exit event handler */
 static void exit_handler(int ev, struct pt_regs *regs);
 
+extern void trap_init(void);
+
 /*
  * INITIAL C ENTRY POINT.
  */
@@ -56,6 +58,9 @@ void start_kernel(start_info_t *si)
     HYPERVISOR_set_callbacks(
         __KERNEL_CS, (unsigned long)hypervisor_callback,
         __KERNEL_CS, (unsigned long)failsafe_callback);
+
+
+    trap_init();
 
 
     /* ENABLE EVENT DELIVERY. This is disabled at start of day. */
@@ -77,6 +82,12 @@ void start_kernel(start_info_t *si)
     printk("  dom_id:     %d\n",  si->dom_id);
     printk("  flags:      0x%lx\n", si->flags);
     printk("  cmd_line:   %s\n",  si->cmd_line ? (const char *)si->cmd_line : "NULL");
+
+
+    /*
+     * If used for porting another OS, start here to figure out your
+     * guest os entry point. Otherwise continue below...
+     */
 
     /* init memory management */
     init_mm();

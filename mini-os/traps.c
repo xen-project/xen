@@ -27,6 +27,66 @@ void alignment_check(void);
 void spurious_interrupt_bug(void);
 void machine_check(void);
 
+
+extern void do_exit(void);
+
+int kstack_depth_to_print = 24;
+
+static inline int kernel_text_address(unsigned long addr)
+{
+    return ( (addr >> 20) > 0x800 && (addr >> 20) < 0x804 );
+}
+
+void show_trace(unsigned long * stack)
+{
+    int i;
+    unsigned long addr;
+
+    if (!stack)
+        stack = (unsigned long*)&stack;
+
+    printk("Call Trace: ");
+    i = 1;
+    while (((long) stack & (4095)) != 0) {
+        addr = *stack++;
+        if (kernel_text_address(addr)) {
+            printf("0x%lx", addr);
+            i++;
+        }
+    }
+    printk("\n");
+}
+
+void dump_regs(struct pt_regs *regs) {
+  printk("Register dump:");
+  printk("ebx: \t 0x%lx",      regs->ebx);
+  printk("ecx: \t 0x%lx",      regs->ecx);
+  printk("edx: \t 0x%lx",      regs->edx);
+  printk("esi: \t 0x%lx",      regs->esi);
+  printk("edi: \t 0x%lx",      regs->edi);
+  printk("ebp: \t 0x%lx",      regs->ebp);
+  printk("eax: \t 0x%lx",      regs->eax);
+  printk("xds: \t 0x%x",      regs->xds);
+  printk("xes: \t 0x%x",      regs->xes);
+  printk("orig_eax: \t 0x%lx", regs->orig_eax);
+  printk("eip: \t 0x%lx",      regs->eip);
+  printk("xcs: \t 0x%x",      regs->xcs);
+  printk("eflags: \t 0x%lx",   regs->eflags);
+  printk("esp: \t 0x%lx",      regs->esp);
+  printk("xss: \t 0x%x",      regs->xss);
+};
+
+static inline void dump_code(unsigned eip)
+{
+  unsigned *ptr = (unsigned *)eip;
+  int x;
+
+  printk("Bytes at eip:\n");
+  for (x = -4; x < 5; x++)
+      printf("%x", ptr[x]);
+}
+
+
 /*
  * C handlers here have their parameter-list constructed by the
  * assembler stubs above. Each one gets a pointer to a list
@@ -42,7 +102,13 @@ void machine_check(void);
 static void inline do_trap(int trapnr, char *str,
 			   struct pt_regs * regs, long error_code)
 {
-    printk("Trap\n");
+  printk("FATAL:  Unhandled Trap (see mini-os:traps.c)");
+  printf("%d %s", trapnr, str);
+  dump_regs(regs);
+  show_trace((void *)regs->esp);
+  dump_code(regs->eip);
+
+  do_exit();
 }
 
 #define DO_ERROR(trapnr, str, name) \
@@ -75,11 +141,21 @@ void do_page_fault(struct pt_regs * regs, long error_code,
                    unsigned long address)
 {
     printk("Page fault\n");
+    printk("Address: 0x%lx", address);
+    printk("Error Code: 0x%lx", error_code);
+    printk("eip: \t 0x%lx", regs->eip);
+    do_exit();
 }
 
 void do_general_protection(struct pt_regs * regs, long error_code)
 {
-    printk("GPF\n");
+
+  HYPERVISOR_shared_info->events_mask = 0;
+  printk("GPF\n");
+  printk("Error Code: 0x%lx", error_code);
+  dump_regs(regs);
+  dump_code(regs->eip);
+  do_exit();
 }
 
 
@@ -88,6 +164,8 @@ void do_debug(struct pt_regs * regs, long error_code)
     printk("Debug exception\n");
 #define TF_MASK 0x100
     regs->eflags &= ~TF_MASK;
+    dump_regs(regs);
+    do_exit();
 }
 
 
@@ -95,6 +173,9 @@ void do_debug(struct pt_regs * regs, long error_code)
 void do_coprocessor_error(struct pt_regs * regs, long error_code)
 {
     printk("Copro error\n");
+    dump_regs(regs);
+    dump_code(regs->eip);
+    do_exit();
 }
 
 void simd_math_error(void *eip)
