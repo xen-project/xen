@@ -162,10 +162,9 @@
 40278d91ZjLhxdjjrGe8HEdwHLj5xQ tools/examples/netbsd
 401d7e16NpnVrFSsR7lKKKfTwCYvWA tools/examples/xc_dom_control.py
 401d7e16RJj-lbtsVEjua6HYAIiKiA tools/examples/xc_dom_create.py
-403b7cf7J7FsSSoEPGhx6gXR4pIdZg tools/examples/xc_physinfo.py
-40c9c4684Wfg8VgMKtRFa_ULi2e_tQ tools/examples/xm_dom_control.py
 40c9c468pXANclL7slGaoD0kSrIwoQ tools/examples/xm_dom_create.py
 40cf2937oKlROYOJTN8GWwWM5AmjBg tools/examples/xmdefaults
+40dfd40auJwNnb8NoiSnRkvZaaXkUg tools/examples/xmnetbsd
 3f776bd2Xd-dUcPKlPN2vG89VGtfvQ tools/misc/Makefile
 40ab2cfawIw8tsYo0dQKtp83h4qfTQ tools/misc/fakei386xen
 3f6dc136ZKOjd8PIqLbFBl_v-rnkGg tools/misc/miniterm/Makefile
@@ -200,6 +199,11 @@
 3fbd0a40yT6G3M9hMpaz5xTUdl0E4g tools/xc/py/setup.py
 40c9c468icGyC5RAF1bRKsCXPDCvsA tools/xen/Makefile
 40dc4076hGpwa8-sWRN0jtXZeQJuKg tools/xen/lib/__init__.py
+40dfd40aMOhnw_cQLve9462UR5yYxQ tools/xen/lib/ext/__init__.py
+40dfd40aGqGkiopOOgJxSF4iCbHM0Q tools/xen/lib/util/__init__.py
+4055ee4dwy4l0MghZosxoiu6zmhc9Q tools/xen/lib/util/console_client.py
+40c9c468IienauFHQ_xJIcqnPJ8giQ tools/xen/lib/util/ip.py
+4059c6a0pnxhG8hwSOivXybbGOwuXw tools/xen/lib/util/tempfile.py
 40c9c468SNuObE_YWARyS0hzTPSzKg tools/xen/lib/xend/Args.py
 40c9c468Um_qc66OQeLEceIz1pgD5g tools/xen/lib/xend/EventServer.py
 40c9c468U8EVl0d3G--8YXVg6VJD3g tools/xen/lib/xend/EventTypes.py
@@ -250,13 +254,6 @@
 40c9c469n2RRwCmjWdjdyyVRWKmgWg tools/xen/setup.py
 40c9c4697z76HDfkCLdMhmaEwzFoNQ tools/xen/xend
 40cf2937dqM1jWW87O5OoOYND8leuA tools/xen/xm
-4055ee41IfFazrwadCH2J72nz-A9YA tools/xenctl/Makefile
-4055ee4b_4Rvns_KzE12csI14EKK6Q tools/xenctl/lib/__init__.py
-4055ee4dwy4l0MghZosxoiu6zmhc9Q tools/xenctl/lib/console_client.py
-40c9c468IienauFHQ_xJIcqnPJ8giQ tools/xenctl/lib/ip.py
-4059c6a0pnxhG8hwSOivXybbGOwuXw tools/xenctl/lib/tempfile.py
-3fbd4bd6GtGwZGxYUJPOheYIR7bPaA tools/xenctl/lib/utils.py
-4055ee44Bu6oP7U0WxxXypbUt4dNPQ tools/xenctl/setup.py
 40431ac64Hj4ixUnKmlugZKhXPFE_Q tools/xend-old/Makefile
 4055ad95Se-FqttgxollqOAAHB94zA tools/xend-old/lib/__init__.py
 4092738fMRGC9fFBcPRCWaJaj9U3ag tools/xend-old/lib/blkif.py
@@ -274,6 +271,7 @@
 403a3edbVpV2E_wq1zeEkJ_n4Uu2eg tools/xentrace/xentrace.c
 403a3edblCUrzSj0mmKhO5HOPrOrSQ tools/xentrace/xentrace_format
 4050c413NtuyIq5lsYJV4P7KIjujXw tools/xentrace/xentrace_format.1
+40dfd40a0QtsSGigB9TCpVGWZmhlNA tools/xu/Makefile
 40dc4076St6AmPTmQPrtQ6LGHPxGmw tools/xu/lib/__init__.py
 40dc4076pVeE1kEEWzcUaNZin65kCA tools/xu/lib/domain_controller.h
 40dc4076CwBYRTUQDdbdU1L6KcLgSw tools/xu/lib/xu.c

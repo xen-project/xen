@@ -5,17 +5,14 @@ all:
 	$(MAKE) -C misc
 	$(MAKE) -C examples
 	$(MAKE) -C xentrace
-	$(MAKE) -C xenctl
 	$(MAKE) -C xen
 
 install: all
 	$(MAKE) -C xc install
 	$(MAKE) -C xu install
 	$(MAKE) -C misc install
-	$(MAKE) -C xenctl install
 	$(MAKE) -C examples install
 	$(MAKE) -C xentrace install
-	$(MAKE) -C xenctl install
 	$(MAKE) -C xen install
 
 dist: $(TARGET)
@@ -28,6 +25,5 @@ clean:
 	$(MAKE) -C misc clean
 	$(MAKE) -C examples clean
 	$(MAKE) -C xentrace clean
-	$(MAKE) -C xenctl clean
 	$(MAKE) -C xen clean
 

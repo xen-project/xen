@@ -439,7 +439,7 @@ class ProgConsole(Prog):
         if not console:
             self.err("No console information")
         port = sxp.child_value(console, "port")
-        from xenctl import console_client
+        from xen.util import console_client
         console_client.connect("localhost", int(port))
 
 xm.prog(ProgConsole)

@@ -12,4 +12,4 @@ install: all
 	fi
 
 clean:
-	rm -rf build *.pyc *.pyo *.o *.a *~
+	rm -rf build *.pyc *.pyo *.a *.so *.o *~ *.rpm 
