@@ -48,7 +48,6 @@
 #define __HYPERVISOR_dom_mem_op		  17
 #define __HYPERVISOR_multicall		  18
 #define __HYPERVISOR_kbd_op               19
-#define __HYPERVISOR_set_priv_levels      20
 
 /* And the trap vector is... */
 #define TRAP_INSTR "int $0x82"

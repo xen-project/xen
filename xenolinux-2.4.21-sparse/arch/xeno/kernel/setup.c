@@ -43,6 +43,7 @@
 #include <asm/mpspec.h>
 #include <asm/mmu_context.h>
 #include <asm/hypervisor.h>
+#include <asm/hypervisor-ifs/dom0_ops.h>
 
 shared_info_t *HYPERVISOR_shared_info;
 
@@ -301,12 +302,16 @@ void __init setup_arch(char **cmdline_p)
 
     paging_init();
 
-    current->thread.hypercall_pl = 1;
-    if ( start_info.flags & SIF_PRIVILEGED ) {
-        current->thread.io_pl = 1;
-        /* We are privileged guest os - should have IO privileges. */
-        if( HYPERVISOR_set_priv_levels(1, 1) )
+    /* We are privileged guest os - should have IO privileges. */
+    if ( start_info.flags & SIF_PRIVILEGED ) 
+    {
+        dom0_op_t op;
+        op.cmd           = DOM0_IOPL;
+        op.u.iopl.domain = start_info.dom_id;
+        op.u.iopl.iopl   = 1;
+        if( HYPERVISOR_dom0_op(&op) != 0 )
             panic("Unable to obtain IOPL, despite being SIF_PRIVILEGED");
+        current->thread.io_pl = 1;
     }
 
     if(start_info.flags & SIF_CONSOLE)

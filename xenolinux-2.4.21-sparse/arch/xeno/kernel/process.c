@@ -44,6 +44,7 @@
 #include <asm/desc.h>
 #include <asm/mmu_context.h>
 #include <asm/multicall.h>
+#include <asm/hypervisor-ifs/dom0_ops.h>
 
 #include <linux/irq.h>
 
@@ -274,9 +275,6 @@ int copy_thread(int nr, unsigned long clone_flags, unsigned long esp,
     __asm__ __volatile__ ( "pushfl; popl %0" : "=r" (eflags) : );
     p->thread.io_pl = (eflags >> 12) & 3;
 
-    /* We're careful with hypercall privileges. Don't allow inheritance. */
-    p->thread.hypercall_pl = 1;
-
     return 0;
 }
 
@@ -371,9 +369,14 @@ void __switch_to(struct task_struct *prev_p, struct task_struct *next_p)
     }
 
     queue_multicall2(__HYPERVISOR_stack_switch, __KERNEL_DS, next->esp0);
-    /* Next call will silently fail if we are a non-privileged guest OS. */
-    queue_multicall2(__HYPERVISOR_set_priv_levels,
-                     next->io_pl, next->hypercall_pl);
+    if ( start_info.flags & SIF_PRIVILEGED ) 
+    {
+        dom0_op_t op;
+        op.cmd           = DOM0_IOPL;
+        op.u.iopl.domain = start_info.dom_id;
+        op.u.iopl.iopl   = next->io_pl;
+        queue_multicall1(__HYPERVISOR_dom0_op, (unsigned long)&op);
+    }
 
     /* EXECUTE ALL TASK SWITCH XEN SYSCALLS AT THIS POINT. */
     execute_multicall_list();

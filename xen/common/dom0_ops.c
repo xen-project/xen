@@ -67,7 +67,7 @@ long do_dom0_op(dom0_op_t *u_dom0_op)
     long ret = 0;
     dom0_op_t op;
 
-    if ( current->domain != 0 )
+    if ( !IS_PRIV(current) )
         return -EPERM;
 
     if ( copy_from_user(&op, u_dom0_op, sizeof(op)) )
@@ -238,6 +238,13 @@ long do_dom0_op(dom0_op_t *u_dom0_op)
         copy_to_user(u_dom0_op, &op, sizeof(op));
         break;
     }
+
+    case DOM0_IOPL:
+    {
+        extern long do_iopl(unsigned int, unsigned int);
+        ret = do_iopl(op.u.iopl.domain, op.u.iopl.iopl);
+    }
+    break;
 
     default:
         ret = -ENOSYS;

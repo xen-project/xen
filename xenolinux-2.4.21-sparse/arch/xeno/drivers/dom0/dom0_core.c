@@ -334,12 +334,6 @@ static int cmd_write_proc(struct file *file, const char *buffer,
     
     copy_from_user(&op, buffer, sizeof(dom0_op_t));
 
-    /* do some sanity checks */
-    if(op.cmd > MAX_CMD){
-        ret = -ENOSYS;
-        goto out;
-    }
-
     if ( op.cmd == MAP_DOM_MEM )
     {
         ret = dom_map_mem(op.u.dommem.domain, op.u.dommem.start_pfn, 
