@@ -832,10 +832,12 @@ static int do_extended_command(unsigned long ptr, unsigned long val)
                                             &page->count_and_flags)) )
         {
             put_page_and_type(page);
+            put_page(page);
         }
         else
         {
             okay = 0;
+            put_page(page);
             MEM_LOG("Pfn %08lx not pinned", pfn);
         }
         break;
@@ -931,6 +933,12 @@ int do_mmu_update(mmu_update_t *ureqs, int count)
              */
         case MMU_NORMAL_PT_UPDATE:
             page = &frame_table[pfn];
+
+            if ( unlikely(pfn >= max_page) )
+            {
+                MEM_LOG("Page out of range (%08lx > %08lx)", pfn, max_page);
+                break;
+            }
 
             if ( unlikely(!get_page(page, current)) &&
                  ((current->domain != 0) || !dom0_get_page(page)) )
