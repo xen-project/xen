@@ -99,7 +99,7 @@ pdb_linux_syscall_exit_bkpt (struct pt_regs *regs, struct pdb_context *pdb_ctx)
 
     /* set a breakpoint when we exit */
     {
-        pdb_bwcpoint_p bwc = (pdb_bwcpoint_p) kmalloc(sizeof(pdb_bwcpoint_t));
+        pdb_bwcpoint_p bwc = (pdb_bwcpoint_p) xmalloc(sizeof(pdb_bwcpoint_t));
 
 	bwc->address = pdb_system_call_next_addr;
 	bwc->length = 1;
