@@ -63,6 +63,12 @@ def blkdev_name_to_number(name):
         log.debug("exception looking up device number for %s: %s", name, ex)
 	pass
 
+    if re.match( '/dev/sd[a-p]([0-9]|1[0-5])', n):
+        return 8 * 256 + 16 * (ord(n[7:8]) - ord('a')) + int(n[8:])
+
+    if re.match( '/dev/hd[a-p]([0-9]|[1-5][0-9]|6[0-3])', n):
+        return 3 * 256 + 16 * (ord(n[7:8]) - ord('a')) + int(n[8:])        
+
     # see if this is a hex device number
     if re.match( '^(0x)?[0-9a-fA-F]+$', name ):
 	return string.atoi(name,16)
