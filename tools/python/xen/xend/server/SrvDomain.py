@@ -1,5 +1,7 @@
 # Copyright (C) 2004 Mike Wray <mike.wray@hp.com>
 
+from twisted.protocols import http
+
 from xen.xend import sxp
 from xen.xend import XendDomain
 from xen.xend import XendConsole
@@ -19,14 +21,17 @@ class SrvDomain(SrvDir):
         self.xconsole = XendConsole.instance()
 
     def op_configure(self, op, req):
-        print 'op_configure>', op, req.args
         fn = FormFn(self.xd.domain_configure,
                     [['dom', 'int'],
                      ['config', 'sxpr']])
-        val = fn(req.args, {'dom': self.dom.id})
-        #todo: may need to add ok and err callbacks.
-        return val
+        deferred = fn(req.args, {'dom': self.dom.id})
+        deferred.addErrback(self._op_configure_err, req)
+        return deferred
 
+    def _op_configure_err(self, err, req):
+        req.setResponseCode(http.BAD_REQUEST, "Error: "+ str(err))
+        return str(err)
+        
     def op_unpause(self, op, req):
         val = self.xd.domain_unpause(self.dom.id)
         return val
@@ -40,7 +45,7 @@ class SrvDomain(SrvDir):
                     [['dom', 'int'],
                      ['reason', 'str']])
         val = fn(req.args, {'dom': self.dom.id})
-        req.setResponseCode(202)
+        req.setResponseCode(http.ACCEPTED)
         req.setHeader("Location", "%s/.." % req.prePathURL())
         return val
 
@@ -53,19 +58,40 @@ class SrvDomain(SrvDir):
         fn = FormFn(self.xd.domain_save,
                     [['dom', 'int'],
                      ['file', 'str']])
-        val = fn(req.args, {'dom': self.dom.id})
-        return val
+        deferred = fn(req.args, {'dom': self.dom.id})
+        deferred.addCallback(self._op_save_cb, req)
+        deferred.addErrback(self._op_save_err, req)
+        return deferred
 
+    def _op_save_cb(self, val, req):
+        return 0
+
+    def _op_save_err(self, err, req):
+        req.setResponseCode(http.BAD_REQUEST, "Error: "+ str(err))
+        return str(err)
+        
     def op_migrate(self, op, req):
         fn = FormFn(self.xd.domain_migrate,
                     [['dom', 'int'],
                      ['destination', 'str']])
-        val = fn(req.args, {'dom': self.dom.id})
-        val = 0 # Some migrate id.
-        req.setResponseCode(202)
-        #req.send_header("Location", "%s/.." % self.path) # Some migrate url.
-        return val
+        deferred = fn(req.args, {'dom': self.dom.id})
+        deferred.addCallback(self._op_migrate_cb, req)
+        deferred.addErrback(self._op_migrate_err, req)
+        return deferred
 
+    def _op_migrate_cb(self, info, req):
+        #req.setResponseCode(http.ACCEPTED)
+        host = info.dst_host
+        port = info.dst_port
+        dom  = info.dst_dom
+        url = "http://%s:%d/xend/domain/%d" % (host, port, dom)
+        req.setHeader("Location", url)
+        return url
+
+    def _op_migrate_err(self, err, req):
+        req.setResponseCode(http.BAD_REQUEST, "Error: "+ str(err))
+        return str(err)
+        
     def op_pincpu(self, op, req):
         fn = FormFn(self.xd.domain_pincpu,
                     [['dom', 'int'],
@@ -113,40 +139,6 @@ class SrvDomain(SrvDir):
         val = fn(req.args, {'dom': self.dom.id})
         return val
 
-    def op_vif_stats(self, op, req):
-        #todo
-        fn = FormFn(self.xd.domain_vif_stats,
-                    [['dom', 'int'],
-                     ['vif', 'int']])
-        #val = fn(req.args, {'dom': self.dom.id})
-        val = 999
-        #return val
-        return val
-
-    def op_vif_ip_add(self, op, req):
-        fn = FormFn(self.xd.domain_vif_ip_add,
-                    [['dom', 'int'],
-                     ['vif', 'int'],
-                     ['ip', 'str']])
-        val = fn(req.args, {'dom': self.dom.id})
-        return val
-
-    def op_vif_scheduler_set(self, op, req):
-        fn = FormFn(self.xd.domain_vif_scheduler_set,
-                    [['dom', 'int'],
-                     ['vif', 'int'],
-                     ['bytes', 'int'],
-                     ['usecs', 'int']])
-        val = fn(req.args, {'dom': self.dom.id})
-        return val
-
-    def op_vif_scheduler_get(self, op, req):
-        fn = FormFn(self.xd.domain_vif_scheduler_set,
-                    [['dom', 'int'],
-                     ['vif', 'int']])
-        val = fn(req.args, {'dom': self.dom.id})
-        return val
-
     def op_vbds(self, op, req):
         return self.xd.domain_vbd_ls(self.dom.id)
 
@@ -178,7 +170,7 @@ class SrvDomain(SrvDir):
         
     def render_GET(self, req):
         op = req.args.get('op')
-        if op and op[0] in ['vifs', 'vif', 'vif_stats', 'vbds', 'vbd']:
+        if op and op[0] in ['vifs', 'vif', 'vbds', 'vbd']:
             return self.perform(req)
         if self.use_sxp(req):
             req.setHeader("Content-Type", sxp.mime_type)
@@ -200,32 +192,31 @@ class SrvDomain(SrvDir):
                 req.write("<code><pre>")
                 PrettyPrint.prettyprint(self.dom.config, out=req)
                 req.write("</pre></code>")
-            req.write('<a href="%s?op=vif_stats&vif=0">vif 0 stats</a>'
-                      % req.prePathURL())
             self.form(req)
             req.write('</body></html>')
         return ''
 
     def form(self, req):
-        req.write('<form method="post" action="%s">' % req.prePathURL())
+        url = req.prePathURL()
+        req.write('<form method="post" action="%s">' % url)
         req.write('<input type="submit" name="op" value="unpause">')
         req.write('<input type="submit" name="op" value="pause">')
         req.write('<input type="submit" name="op" value="destroy">')
         req.write('</form>')
 
-        req.write('<form method="post" action="%s">' % req.prePathURL())
+        req.write('<form method="post" action="%s">' % url)
         req.write('<input type="submit" name="op" value="shutdown">')
-        req.write('<input type="radio" name="reason" value="poweroff" checked>Poweroff<br>')
-        req.write('<input type="radio" name="reason" value="halt">Halt<br>')
-        req.write('<input type="radio" name="reason" value="reboot">Reboot<br>')
+        req.write('<input type="radio" name="reason" value="poweroff" checked>Poweroff')
+        req.write('<input type="radio" name="reason" value="halt">Halt')
+        req.write('<input type="radio" name="reason" value="reboot">Reboot')
         req.write('</form>')
         
-        req.write('<form method="post" action="%s">' % req.prePathURL())
+        req.write('<form method="post" action="%s">' % url)
         req.write('<br><input type="submit" name="op" value="save">')
-        req.write('To file: <input type="text" name="file">')
+        req.write(' To file: <input type="text" name="file">')
         req.write('</form>')
         
-        req.write('<form method="post" action="%s">' % req.prePathURL())
+        req.write('<form method="post" action="%s">' % url)
         req.write('<br><input type="submit" name="op" value="migrate">')
-        req.write('To host: <input type="text" name="destination">')
+        req.write(' To host: <input type="text" name="destination">')
         req.write('</form>')

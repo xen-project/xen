@@ -81,7 +81,7 @@ class SrvDomainDir(SrvDir):
         """
         dom = dominfo.id
         domurl = "%s/%s" % (req.prePathURL(), dom)
-        req.setResponseCode(201, "created")
+        req.setResponseCode(http.CREATED, "created")
         req.setHeader("Location", domurl)
         if self.use_sxp(req):
             return dominfo.sxpr()
@@ -111,8 +111,30 @@ class SrvDomainDir(SrvDir):
         #todo: return is deferred. May need ok and err callbacks.
         fn = FormFn(self.xd.domain_restore,
                     [['file', 'str']])
-        val = fn(req.args)
-        return val
+        deferred = fn(req.args)
+        deferred.addCallback(self._op_restore_cb, req)
+        deferred.addErrback(self._op_restore_err, req)
+        return deferred
+
+    def _op_restore_cb(self, dominfo, req):
+        dom = dominfo.id
+        domurl = "%s/%s" % (req.prePathURL(), dom)
+        req.setResponseCode(http.CREATED)
+        req.setHeader("Location", domurl)
+        if self.use_sxp(req):
+            return dominfo.sxpr()
+        else:
+            out = StringIO()
+            print >> out, ('<p> Created <a href="%s">Domain %s</a></p>'
+                           % (domurl, dom))
+            val = out.getvalue()
+            out.close()
+            return val
+
+    def _op_restore_err(self, err, req):
+        print 'op_create> Deferred Exception restoring domain:', err
+        req.setResponseCode(http.BAD_REQUEST, "Error restoring domain: "+ str(err))
+        return str(err)
         
     def render_POST(self, req):
         return self.perform(req)
