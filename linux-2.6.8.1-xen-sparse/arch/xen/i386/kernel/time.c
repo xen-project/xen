@@ -126,14 +126,14 @@ u64 processed_system_time;   /* System time (ns) at last processing. */
 		(_tv).tv_sec++;			\
 	}					\
 } while (0)
-static inline void __normalize_time(time_t *sec, s64 *usec)
+static inline void __normalize_time(time_t *sec, s64 *nsec)
 {
-	while (*usec >= NSEC_PER_SEC) {
-		(*usec) -= NSEC_PER_SEC;
+	while (*nsec >= NSEC_PER_SEC) {
+		(*nsec) -= NSEC_PER_SEC;
 		(*sec)++;
 	}
-	while (*usec < NSEC_PER_SEC) {
-		(*usec) += NSEC_PER_SEC;
+	while (*nsec < 0) {
+		(*nsec) += NSEC_PER_SEC;
 		(*sec)--;
 	}
 }

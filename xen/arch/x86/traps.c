@@ -344,18 +344,6 @@ asmlinkage void do_page_fault(struct pt_regs *regs, long error_code)
 
     ASSERT_no_criticalregion();
 
-    if ( unlikely(addr >= LDT_VIRT_START) && 
-         (addr < (LDT_VIRT_START + (d->mm.ldt_ents*LDT_ENTRY_SIZE))) )
-    {
-        /*
-         * Copy a mapping from the guest's LDT, if it is valid. Otherwise we
-         * send the fault up to the guest OS to be handled.
-         */
-        off  = addr - LDT_VIRT_START;
-        addr = d->mm.ldt_base + off;
-        if ( likely(map_ldt_shadow_page(off >> PAGE_SHIFT)) )
-            return; /* successfully copied the mapping */
-    }
 
     if ( likely(VM_ASSIST(d, VMASST_TYPE_writable_pagetables)) )
     {
@@ -376,6 +364,19 @@ asmlinkage void do_page_fault(struct pt_regs *regs, long error_code)
     if ( unlikely(d->mm.shadow_mode) && 
          (addr < PAGE_OFFSET) && shadow_fault(addr, error_code) )
         return; /* Returns TRUE if fault was handled. */
+
+    if ( unlikely(addr >= LDT_VIRT_START) && 
+         (addr < (LDT_VIRT_START + (d->mm.ldt_ents*LDT_ENTRY_SIZE))) )
+    {
+        /*
+         * Copy a mapping from the guest's LDT, if it is valid. Otherwise we
+         * send the fault up to the guest OS to be handled.
+         */
+        off  = addr - LDT_VIRT_START;
+        addr = d->mm.ldt_base + off;
+        if ( likely(map_ldt_shadow_page(off >> PAGE_SHIFT)) )
+            return; /* successfully copied the mapping */
+    }
 
     if ( unlikely(!(regs->xcs & 3)) )
         goto xen_fault;

@@ -554,6 +554,8 @@ int blkif_ioctl(struct inode *inode, struct file *filep,
     struct gendisk *gd;     
     struct hd_struct *part; 
     int i;
+    unsigned short cylinders;
+    byte heads, sectors;
 
     /* NB. No need to check permissions. That is done for us. */
     
@@ -598,23 +600,39 @@ int blkif_ioctl(struct inode *inode, struct file *filep,
         break;
 
     case HDIO_GETGEO:
-        /* note: these values are complete garbage */
         DPRINTK_IOCTL("   HDIO_GETGEO: %x\n", HDIO_GETGEO);
         if (!argument) return -EINVAL;
+
+        /* We don't have real geometry info, but let's at least return
+	   values consistent with the size of the device */
+
+        heads = 0xff;
+        sectors = 0x3f; 
+        cylinders = part->nr_sects / (heads * sectors);
+
         if (put_user(0x00,  (unsigned long *) &geo->start)) return -EFAULT;
-        if (put_user(0xff,  (byte *)&geo->heads)) return -EFAULT;
-        if (put_user(0x3f,  (byte *)&geo->sectors)) return -EFAULT;
-        if (put_user(0x106, (unsigned short *)&geo->cylinders)) return -EFAULT;
+        if (put_user(heads,  (byte *)&geo->heads)) return -EFAULT;
+        if (put_user(sectors,  (byte *)&geo->sectors)) return -EFAULT;
+        if (put_user(cylinders, (unsigned short *)&geo->cylinders)) return -EFAULT;
+
         return 0;
 
     case HDIO_GETGEO_BIG: 
-        /* note: these values are complete garbage */
         DPRINTK_IOCTL("   HDIO_GETGEO_BIG: %x\n", HDIO_GETGEO_BIG);
         if (!argument) return -EINVAL;
+
+        /* We don't have real geometry info, but let's at least return
+	   values consistent with the size of the device */
+
+        heads = 0xff;
+        sectors = 0x3f; 
+        cylinders = part->nr_sects / (heads * sectors);
+
         if (put_user(0x00,  (unsigned long *) &geo->start))  return -EFAULT;
-        if (put_user(0xff,  (byte *)&geo->heads))   return -EFAULT;
-        if (put_user(0x3f,  (byte *)&geo->sectors)) return -EFAULT;
-        if (put_user(0x106, (unsigned int *) &geo->cylinders)) return -EFAULT;
+        if (put_user(heads,  (byte *)&geo->heads))   return -EFAULT;
+        if (put_user(sectors,  (byte *)&geo->sectors)) return -EFAULT;
+        if (put_user(cylinders, (unsigned int *) &geo->cylinders)) return -EFAULT;
+
         return 0;
 
     case CDROMMULTISESSION:
