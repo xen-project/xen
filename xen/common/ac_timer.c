@@ -277,30 +277,32 @@ static void ac_timer_softirq_action(struct softirq_action *a)
     unsigned long flags;
     struct ac_timer *t;
     struct list_head *tlist;
+    int process_timer_list = 0;
 
     spin_lock_irqsave(&ac_timers[cpu].lock, flags);
     
     tlist = &ac_timers[cpu].timers;
     if ( list_empty(tlist) ) 
     {
+        /* No deadline to program the timer with.*/
         reprogram_ac_timer((s_time_t)0);
-        spin_unlock_irqrestore(&ac_timers[cpu].lock, flags);
-        return;
     }
-
-    t = list_entry(tlist, struct ac_timer, timer_list);
-
-    if ( (t->expires < (NOW() + TIMER_SLOP)) ||
-         !reprogram_ac_timer(t->expires) ) 
+    else
     {
         /*
-         * Timer handler needs protecting from local APIC interrupts, but takes
-         * the spinlock itself, so we release that before calling in.
+         * Reprogram timer with earliest deadline. If that has already passed
+         * then we will process the timer list as soon as we release the lock.
          */
-        spin_unlock(&ac_timers[cpu].lock);
-        do_ac_timer();
-        local_irq_restore(flags);
+        t = list_entry(tlist, struct ac_timer, timer_list);
+        if ( (t->expires < (NOW() + TIMER_SLOP)) ||
+             !reprogram_ac_timer(t->expires) )
+            process_timer_list = 1;
     }
+
+    spin_unlock_irqrestore(&ac_timers[cpu].lock, flags);
+
+    if ( process_timer_list )
+        do_ac_timer();
 }
 
 
