@@ -38,6 +38,8 @@
 #define CONFIG_SD_EXTRA_DEVS 40
 #define CONFIG_SCSI_MULTI_LUN 1
 
+#define CONFIG_XEN_ATTENTION_KEY 1
+
 #define HZ 100
 
 /*
