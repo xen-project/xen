@@ -1100,7 +1100,7 @@ static PyMethodDef pyxc_methods[] = {
       "Returns: [int] 0 on success; -1 on error.\n" },
 
     { "domain_setmaxmem", 
-      (PyCFunction)pyxc_domain_setname, 
+      (PyCFunction)pyxc_domain_setmaxmem, 
       METH_VARARGS | METH_KEYWORDS, "\n"
       "Set a domain's memory limit\n"
       " dom [int]: Identifier of domain.\n"
