@@ -1343,4 +1343,5 @@ void netif_resume(void)
 }
 
 
-__initcall(netif_init);
+module_init(netif_init);
+

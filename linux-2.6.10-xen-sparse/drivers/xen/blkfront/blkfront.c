@@ -167,7 +167,7 @@ static inline void flush_requests(void)
 
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,0)
 
-__initcall(xlblk_init);
+module_init(xlblk_init);
 
 #if ENABLE_VBD_UPDATE
 static void vbd_update(void)
