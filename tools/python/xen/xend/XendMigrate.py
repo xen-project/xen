@@ -2,22 +2,124 @@
 
 import sys
 import socket
+import time
+
+from twisted.internet import reactor
+from twisted.internet import defer
+from twisted.internet.protocol import Protocol
+from twisted.internet.protocol import ClientFactory
 
 import sxp
 import XendDB
 import EventServer; eserver = EventServer.instance()
 
+from xen.xend.packing import SxpPacker, SxpUnpacker
+from xen.xend import XendDomain
+xd = XendDomain.instance()
+
+
+XFRD_PORT = 8002
+
+XFR_PROTO_MAJOR = 1
+XFR_PROTO_MINOR = 0
+
+class Migrate(Protocol):
+
+    def __init__(self, minfo):
+        self.packer = None
+        self.unpacker = None
+        self.minfo = minfo
+
+    def connectionMade(self):
+        self.packer = SxpPacker(self.transport)
+        self.unpacker = SxpPacker()
+        # Send hello.
+        self.packer.pack(['xfr.hello', XFR_PROTO_MAJOR, XFR_PROTO_MINOR])
+        # Send migrate.
+        vmconfig = self.minfo.vmconfig()
+        if not vmconfig:
+            self.loseConnection()
+            return
+        self.packer.pack(['xfr.migrate',
+                          self.minfo.src_dom,
+                          vmconfig,
+                          self.minfo.dst_host,
+                          self.minfo.dst_port])
+
+    def connectionLost(self, reason):
+        self.minfo.closed(reason)
+
+    def dataReceived(self, data):
+        try:
+            self.unpacker.reset(data)
+            val = self.unpacker.unpack()
+            print 'dataReceived>', 'val=', val
+            op = val[0]
+            op.replace('.', '_')
+            if op.startwith('xfr_'):
+                fn = getattr(self, op, self.unknown)
+            else:
+                fn = self.unknown
+            fn(val)
+        except Exception, ex:
+            print 'dataReceived>', ex
+            pass
+
+    def unknown(self, val):
+        print 'unknown>', val
+
+    def xfr_progress(self, val):
+        print 'xfr_progress>', val
+
+    def xfr_error(self, val):
+        # If we get an error with non-zero code the migrate failed.
+        # An error with code zero indicates hello success.
+        err = int(val[1])
+        if not err: return
+        self.minfo.error(err);
+        self.loseConnection()
+
+    def xfr_ok(self, val):
+        # An ok indicates migrate completed successfully, and contains
+        # the new domain id on the remote system.
+        dom = int(val[1])
+        self.minfo.ok(dom)
+        self.loseConnection()
+
+class MigrateClientFactory(ClientFactory):
+
+    def __init__(self, minfo):
+        ClientFactory.__init__(self)
+        self.minfo = minfo
+
+    def startedConnecting(self, connector):
+        print 'Started to connect', 'self=', self, 'connector=', connector
+
+    def buildProtocol(self, addr):
+        print 'buildProtocol>', addr
+        return Migrate(self.minfo)
+
+    def clientConnectionLost(self, connector, reason):
+        print 'clientConnectionLost>', 'connector=', connector, 'reason=', reason
+
+    def clientConnectionFailed(self, connector, reason):
+        print 'clientConnectionFailed>', 'connector=', connector, 'reason=', reason
+
+
 class XendMigrateInfo:
 
     # states: begin, active, failed, succeeded?
 
-    def __init__(self, id, dom, dst):
+    def __init__(self, id, dom, host, port):
         self.id = id
         self.state = 'begin'
         self.src_host = socket.gethostname()
         self.src_dom = dom
         self.dst_host = dst
+        self.dst_port = port
         self.dst_dom = None
+        self.start = 0
+        self.deferred = defer.Deferred()
         
     def set_state(self, state):
         self.state = state
@@ -29,12 +131,33 @@ class XendMigrateInfo:
         sxpr = ['migrate', ['id', self.id], ['state', self.state] ]
         sxpr_src = ['src', ['host', self.src_host], ['domain', self.src_dom] ]
         sxpr.append(sxpr_src)
-        sxpr_dst = ['dst', ['host', self.dst] ]
+        sxpr_dst = ['dst', ['host', self.dst_host] ]
         if self.dst_dom:
             sxpr_dst.append(['domain', self.dst_dom])
         sxpr.append(sxpr_dst)
         return sxpr
-    
+
+    def vmconfig(self):
+        dominfo = xd.domain_get(self.dom)
+        if dominfo:
+            val = return sxp.to_string(dominfo)
+        else:
+            val = None
+        return None
+
+    def error(self, err):
+        self.state = 'error'
+
+    def ok(self, dom):
+        self.state = 'ok'
+        self.dst_dom = dom
+
+    def close(self):
+        if self.state =='ok':
+            eserver.inject('xend.migrate.ok', self.sxpr())
+        else:
+            self.state = 'error'
+            eserver.inject('xend.migrate.error', self.sxpr())
 
 class XendMigrate:
     # Represents migration in progress.
@@ -84,15 +207,15 @@ class XendMigrate:
     def migrate_get(self, id):
         return self.migrate.get(id)
     
-    def migrate_begin(self, dom, dst):
+    def migrate_begin(self, dom, host):
         # Check dom for existence, not migrating already.
-        # Create migrate info, tell xend to migrate it?
-        # - or fork migrate command ourselves?
         # Subscribe to migrate notifications (for updating).
         id = self.nextid()
-        info = XenMigrateInfo(id, dom, dst)
+        info = XenMigrateInfo(id, dom, host, XFRD_PORT)
         self._add_migrate(id, info)
-        return id
+        mcf = MigrateClientFactory(info)
+        reactor.connectTCP('localhost', XFRD_PORT, mcf)
+        return info.deferred
 
 def instance():
     global inst
