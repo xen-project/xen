@@ -214,10 +214,6 @@ void __kill_domain(struct task_struct *p)
     *pp = p->next_hash;
     write_unlock_irqrestore(&tasklist_lock, flags);
 
-    if ( atomic_read(&p->refcnt) >2 )
-	DPRINTK("Domain refcnt>1 so kil deferred. Missing put_task? p=%p cur=%p cnt=%d\n",p,current,atomic_read(&p->refcnt));
-
-
     if ( p == current )
     {
         __enter_scheduler();
@@ -412,7 +408,16 @@ void free_all_dom_mem(struct task_struct *p)
 
     INIT_LIST_HEAD(&zombies);
 
-    if ( p->mm.shadow_mode ) shadow_mode_disable(p);
+    /*
+     * If we're executing the idle task then we may still be running over the 
+     * dead domain's page tables. We'd better fix that before freeing them!
+     */
+    if ( is_idle_task(current) )
+        write_ptbase(&current->mm);
+
+    /* Exit shadow mode before deconstructing final guest page table. */
+    if ( p->mm.shadow_mode )
+        shadow_mode_disable(p);
 
     /* STEP 1. Drop the in-use reference to the page-table base. */
     put_page_and_type(&frame_table[pagetable_val(p->mm.pagetable) >>
@@ -1066,7 +1071,7 @@ int construct_dom0(struct task_struct *p,
 
     set_bit(PF_CONSTRUCTED, &p->flags);
 
-#if 0 // XXXXX DO NOT CHECK IN ENABLED !!! (but useful for testing so leave) 
+#if 0 /* XXXXX DO NOT CHECK IN ENABLED !!! (but useful for testing so leave) */
     shadow_mode_enable(&p->mm, SHM_test); 
 #endif
 
