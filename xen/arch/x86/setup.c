@@ -268,7 +268,7 @@ void __init cpu_init(void)
         panic("CPU#%d already initialized!!!\n", nr);
     printk("Initializing CPU#%d\n", nr);
 
-    t->bitmap = INVALID_IO_BITMAP_OFFSET;
+    t->bitmap = IOBMP_INVALID_OFFSET;
     memset(t->io_bitmap, ~0, sizeof(t->io_bitmap));
 
     /* Set up GDT and IDT. */

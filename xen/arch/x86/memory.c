@@ -1846,8 +1846,7 @@ int ptwr_do_page_fault(unsigned long addr)
     
     UNLOCK_BIGLOCK(d);
 
-    /* Maybe fall through to shadow mode to propagate writable L1. */
-    return !current->mm.shadow_mode;
+    return EXCRET_fault_fixed;
 }
 
 static __init int ptwr_init(void)

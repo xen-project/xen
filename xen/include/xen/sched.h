@@ -137,14 +137,6 @@ struct domain {
     spinlock_t       pcidev_lock;
     struct list_head pcidev_list;
 
-    /* The following IO bitmap stuff is x86-dependent. */
-    u64 io_bitmap_sel; /* Selector to tell us which part of the IO bitmap are
-                        * "interesting" (i.e. have clear bits) */
-
-    /* Handy macro - number of bytes of the IO bitmap, per selector bit. */
-#define IOBMP_SELBIT_LWORDS (IO_BITMAP_SIZE / 64)
-    unsigned long *io_bitmap; /* Pointer to task's IO bitmap or NULL */
-
     unsigned long d_flags;
     unsigned long vm_assist;
 

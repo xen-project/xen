@@ -75,7 +75,7 @@ static unsigned long pirq_needs_unmask_notify[NR_PIRQS/sizeof(unsigned long)];
 /* Upcall to generic IRQ layer. */
 extern asmlinkage unsigned int do_IRQ(int irq, struct pt_regs *regs);
 
-#define VALID_EVTCHN(_chn) ((_chn) != -1)
+#define VALID_EVTCHN(_chn) ((_chn) >= 0)
 
 /*
  * Force a proper event-channel callback from Xen after clearing the
@@ -291,35 +291,51 @@ void unbind_evtchn_from_irq(int evtchn)
 
 static unsigned int startup_dynirq(unsigned int irq)
 {
-    unmask_evtchn(irq_to_evtchn[irq]);
+    int evtchn = irq_to_evtchn[irq];
+
+    if ( !VALID_EVTCHN(evtchn) )
+        return 0;
+    unmask_evtchn(evtchn);
     return 0;
 }
 
 static void shutdown_dynirq(unsigned int irq)
 {
-    mask_evtchn(irq_to_evtchn[irq]);
+    int evtchn = irq_to_evtchn[irq];
+
+    if ( !VALID_EVTCHN(evtchn) )
+        return;
+    mask_evtchn(evtchn);
 }
 
 static void enable_dynirq(unsigned int irq)
 {
-    unmask_evtchn(irq_to_evtchn[irq]);
+    int evtchn = irq_to_evtchn[irq];
+
+    unmask_evtchn(evtchn);
 }
 
 static void disable_dynirq(unsigned int irq)
 {
-    mask_evtchn(irq_to_evtchn[irq]);
+    int evtchn = irq_to_evtchn[irq];
+
+    mask_evtchn(evtchn);
 }
 
 static void ack_dynirq(unsigned int irq)
 {
-    mask_evtchn(irq_to_evtchn[irq]);
-    clear_evtchn(irq_to_evtchn[irq]);
+    int evtchn = irq_to_evtchn[irq];
+
+    mask_evtchn(evtchn);
+    clear_evtchn(evtchn);
 }
 
 static void end_dynirq(unsigned int irq)
 {
+    int evtchn = irq_to_evtchn[irq];
+
     if ( !(irq_desc[irq].status & IRQ_DISABLED) )
-        unmask_evtchn(irq_to_evtchn[irq]);
+        unmask_evtchn(evtchn);
 }
 
 static struct hw_interrupt_type dynirq_type = {
