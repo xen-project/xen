@@ -354,7 +354,7 @@ long do_boot_vcpu(unsigned long vcpu, full_execution_context_t *ctxt)
  out:
     if ( c != NULL )
         xfree(c);
-    xmem_cache_free(exec_domain_struct_cachep, d->exec_domain[vcpu]);
+    arch_free_exec_domain_struct(d->exec_domain[vcpu]);
     d->exec_domain[vcpu] = NULL;
     return rc;
 }

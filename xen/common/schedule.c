@@ -89,17 +89,14 @@ static struct scheduler ops;
 /* Per-CPU periodic timer sends an event to the currently-executing domain. */
 static struct ac_timer t_timer[NR_CPUS]; 
 
-extern xmem_cache_t *domain_struct_cachep;
-extern xmem_cache_t *exec_domain_struct_cachep;
-
 void free_domain_struct(struct domain *d)
 {
     struct exec_domain *ed;
 
     SCHED_OP(free_task, d);
     for_each_exec_domain(d, ed)
-        xmem_cache_free(exec_domain_struct_cachep, ed);
-    xmem_cache_free(domain_struct_cachep, d);
+        arch_free_exec_domain_struct(ed);
+    arch_free_domain_struct(d);
 }
 
 struct exec_domain *alloc_exec_domain_struct(struct domain *d,
@@ -109,7 +106,7 @@ struct exec_domain *alloc_exec_domain_struct(struct domain *d,
 
     ASSERT( d->exec_domain[vcpu] == NULL );
 
-    if ( (ed = xmem_cache_alloc(exec_domain_struct_cachep)) == NULL )
+    if ( (ed = arch_alloc_exec_domain_struct()) == NULL )
         return NULL;
 
     memset(ed, 0, sizeof(*ed));
@@ -143,7 +140,7 @@ struct exec_domain *alloc_exec_domain_struct(struct domain *d,
 
  out:
     d->exec_domain[vcpu] = NULL;
-    xmem_cache_free(exec_domain_struct_cachep, ed);
+    arch_free_exec_domain_struct(ed);
 
     return NULL;
 }
@@ -152,7 +149,7 @@ struct domain *alloc_domain_struct(void)
 {
     struct domain *d;
 
-    if ( (d = xmem_cache_alloc(domain_struct_cachep)) == NULL )
+    if ( (d = arch_alloc_domain_struct()) == NULL )
         return NULL;
     
     memset(d, 0, sizeof(*d));
@@ -163,7 +160,7 @@ struct domain *alloc_domain_struct(void)
     return d;
 
  out:
-    xmem_cache_free(domain_struct_cachep, d);
+    arch_free_domain_struct(d);
     return NULL;
 }
 
@@ -379,8 +376,7 @@ void __enter_scheduler(void)
     if ( !is_idle_task(current->domain) )
     {
         LOCK_BIGLOCK(current->domain);
-        cleanup_writable_pagetable(
-            prev->domain, PTWR_CLEANUP_ACTIVE | PTWR_CLEANUP_INACTIVE);
+        cleanup_writable_pagetable(prev->domain);
         UNLOCK_BIGLOCK(current->domain);
     }
 

@@ -226,6 +226,8 @@ void dump_pageframe_info(struct domain *d)
 }
 
 xmem_cache_t *domain_struct_cachep;
+xmem_cache_t *exec_domain_struct_cachep;
+
 void __init domain_startofday(void)
 {
     domain_struct_cachep = xmem_cache_create(
@@ -233,6 +235,12 @@ void __init domain_startofday(void)
         0, SLAB_HWCACHE_ALIGN, NULL, NULL);
     if ( domain_struct_cachep == NULL )
         panic("No slab cache for domain structs.");
+
+    exec_domain_struct_cachep = xmem_cache_create(
+        "exec_dom_cache", sizeof(struct exec_domain),
+        0, SLAB_HWCACHE_ALIGN, NULL, NULL);
+    if ( exec_domain_struct_cachep == NULL )
+        BUG();
 }
 
 struct domain *arch_alloc_domain_struct(void)
@@ -243,6 +251,16 @@ struct domain *arch_alloc_domain_struct(void)
 void arch_free_domain_struct(struct domain *d)
 {
     xmem_cache_free(domain_struct_cachep, d);
+}
+
+struct exec_domain *arch_alloc_exec_domain_struct(void)
+{
+    return xmem_cache_alloc(exec_domain_struct_cachep);
+}
+
+void arch_free_exec_domain_struct(struct exec_domain *ed)
+{
+    xmem_cache_free(exec_domain_struct_cachep, ed);
 }
 
 void free_perdomain_pt(struct domain *d)
