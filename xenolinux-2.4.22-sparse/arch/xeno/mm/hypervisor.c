@@ -40,12 +40,12 @@ static void DEBUG_allow_pt_reads(void)
         pte = update_debug_queue[i].ptep;
         if ( pte == NULL ) continue;
         update_debug_queue[i].ptep = NULL;
-        update.ptr = phys_to_machine(__pa(pte));
+        update.ptr = pte;
         update.val = update_debug_queue[i].pteval;
         HYPERVISOR_pt_update(&update, 1);
     }
 }
-static void DEBUG_disallow_pt_read(unsigned long pa)
+static void DEBUG_disallow_pt_read(unsigned long va)
 {
     pte_t *pte;
     pmd_t *pmd;
@@ -56,11 +56,10 @@ static void DEBUG_disallow_pt_read(unsigned long pa)
      * That's okay -- it'll get fixed up in the fault handler.
      */
     page_update_request_t update;
-    unsigned long va = (unsigned long)__va(pa);
     pgd = pgd_offset_k(va);
     pmd = pmd_offset(pgd, va);
     pte = pte_offset(pmd, va);
-    update.ptr = phys_to_machine(__pa(pte));
+    update.ptr = pte;
     pteval = *(unsigned long *)pte;
     update.val = pteval & ~_PAGE_PRESENT;
     HYPERVISOR_pt_update(&update, 1);
@@ -128,24 +127,24 @@ static inline void increment_index(void)
     if ( unlikely(idx == QUEUE_SIZE) ) __flush_page_update_queue();
 }
 
-void queue_l1_entry_update(unsigned long ptr, unsigned long val)
+void queue_l1_entry_update(pte_t *ptr, unsigned long val)
 {
     unsigned long flags;
     spin_lock_irqsave(&update_lock, flags);
 #if PT_UPDATE_DEBUG > 0
-    DEBUG_disallow_pt_read(ptr);
+    DEBUG_disallow_pt_read((unsigned long)ptr);
 #endif
-    update_queue[idx].ptr = phys_to_machine(ptr);
+    update_queue[idx].ptr = (unsigned long)ptr;
     update_queue[idx].val = val;
     increment_index();
     spin_unlock_irqrestore(&update_lock, flags);
 }
 
-void queue_l2_entry_update(unsigned long ptr, unsigned long val)
+void queue_l2_entry_update(pmd_t *ptr, unsigned long val)
 {
     unsigned long flags;
     spin_lock_irqsave(&update_lock, flags);
-    update_queue[idx].ptr = phys_to_machine(ptr);
+    update_queue[idx].ptr = (unsigned long)ptr;
     update_queue[idx].val = val;
     increment_index();
     spin_unlock_irqrestore(&update_lock, flags);

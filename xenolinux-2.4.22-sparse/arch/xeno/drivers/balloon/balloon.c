@@ -41,9 +41,8 @@ typedef struct user_balloon_op {
 static struct proc_dir_entry *balloon_pde;
 unsigned long credit;
 
-static inline unsigned long get_ppte(unsigned long addr)
+static inline pte_t *get_ptep(unsigned long addr)
 {
-    unsigned long ppte;
     pgd_t *pgd; pmd_t *pmd; pte_t *ptep;
     pgd = pgd_offset_k(addr);
 
@@ -53,9 +52,8 @@ static inline unsigned long get_ppte(unsigned long addr)
     if ( pmd_none(*pmd) || pmd_bad(*pmd) ) BUG();
 
     ptep = pte_offset(pmd, addr);
-    ppte = (unsigned long)__pa(ptep);
 
-    return ppte;
+    return ptep;
 }
 
 /* main function for relinquishing bit of memory */
@@ -100,7 +98,7 @@ static unsigned long inflate_balloon(unsigned long num_pages)
     {
         curraddr = *currp;
         *currp = virt_to_machine(*currp) >> PAGE_SHIFT;
-        queue_l1_entry_update(get_ppte(curraddr) | PGREQ_NORMAL, 0);
+        queue_l1_entry_update(get_ptep(curraddr), 0);
         phys_to_machine_mapping[__pa(curraddr) >> PAGE_SHIFT] = DEAD;
         currp++;
     }
@@ -149,11 +147,11 @@ static unsigned long process_new_pages(unsigned long * parray,
     {
         if ( phys_to_machine_mapping[i] == DEAD )
         {
-            printk(KERN_ALERT "bd240 debug: proc_new_pages: i %lx, mpt %lx, %lx\n", i, i << PAGE_SHIFT, get_ppte((unsigned long)__va(i << PAGE_SHIFT)) | PGREQ_NORMAL);
             phys_to_machine_mapping[i] = *curr;
-            queue_l1_entry_update((i << PAGE_SHIFT) | PGREQ_MPT_UPDATE, i);
             queue_l1_entry_update(
-                get_ppte((unsigned long)__va(i << PAGE_SHIFT)) | PGREQ_NORMAL, 
+                (pte_t *)((i << PAGE_SHIFT) | PGREQ_MPT_UPDATE), i);
+            queue_l1_entry_update(
+                get_ptep((unsigned long)__va(i << PAGE_SHIFT)),
                 ((*curr) << PAGE_SHIFT) | L1_PROT);
 
             *curr = (unsigned long)__va(i << PAGE_SHIFT);

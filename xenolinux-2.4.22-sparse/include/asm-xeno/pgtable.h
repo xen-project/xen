@@ -177,7 +177,7 @@ extern void * high_memory;
 #define __S111	PAGE_SHARED
 
 #define pte_present(x)	((x).pte_low & (_PAGE_PRESENT | _PAGE_PROTNONE))
-#define pte_clear(xp)	queue_l1_entry_update(__pa(xp), 0)
+#define pte_clear(xp)	queue_l1_entry_update(xp, 0)
 
 #define pmd_none(x)	(!(x).pmd)
 #define pmd_present(x)	((x).pmd & _PAGE_PRESENT)
@@ -214,27 +214,27 @@ static inline int ptep_test_and_clear_dirty(pte_t *ptep)
 {
     unsigned long pteval = *(unsigned long *)ptep;
     int ret = pteval & _PAGE_DIRTY;
-    if ( ret ) queue_l1_entry_update(__pa(ptep), pteval & ~_PAGE_DIRTY);
+    if ( ret ) queue_l1_entry_update(ptep, pteval & ~_PAGE_DIRTY);
     return ret;
 }
 static inline  int ptep_test_and_clear_young(pte_t *ptep)
 {
     unsigned long pteval = *(unsigned long *)ptep;
     int ret = pteval & _PAGE_ACCESSED;
-    if ( ret ) queue_l1_entry_update(__pa(ptep), pteval & ~_PAGE_ACCESSED);
+    if ( ret ) queue_l1_entry_update(ptep, pteval & ~_PAGE_ACCESSED);
     return ret;
 }
 static inline void ptep_set_wrprotect(pte_t *ptep)
 {
     unsigned long pteval = *(unsigned long *)ptep;
     if ( (pteval & _PAGE_RW) )
-        queue_l1_entry_update(__pa(ptep), pteval & ~_PAGE_RW);
+        queue_l1_entry_update(ptep, pteval & ~_PAGE_RW);
 }
 static inline void ptep_mkdirty(pte_t *ptep)
 {
     unsigned long pteval = *(unsigned long *)ptep;
     if ( !(pteval & _PAGE_DIRTY) )
-        queue_l1_entry_update(__pa(ptep), pteval | _PAGE_DIRTY);
+        queue_l1_entry_update(ptep, pteval | _PAGE_DIRTY);
 }
 
 /*
@@ -299,7 +299,7 @@ static inline void __make_page_readonly(void *va)
     pgd_t *pgd = pgd_offset_k((unsigned long)va);
     pmd_t *pmd = pmd_offset(pgd, (unsigned long)va);
     pte_t *pte = pte_offset(pmd, (unsigned long)va);
-    queue_l1_entry_update(__pa(pte), (*(unsigned long *)pte)&~_PAGE_RW);
+    queue_l1_entry_update(pte, (*(unsigned long *)pte)&~_PAGE_RW);
 }
 
 static inline void __make_page_writeable(void *va)
@@ -307,7 +307,7 @@ static inline void __make_page_writeable(void *va)
     pgd_t *pgd = pgd_offset_k((unsigned long)va);
     pmd_t *pmd = pmd_offset(pgd, (unsigned long)va);
     pte_t *pte = pte_offset(pmd, (unsigned long)va);
-    queue_l1_entry_update(__pa(pte), (*(unsigned long *)pte)|_PAGE_RW);
+    queue_l1_entry_update(pte, (*(unsigned long *)pte)|_PAGE_RW);
 }
 
 static inline void make_page_readonly(void *va)
@@ -315,7 +315,7 @@ static inline void make_page_readonly(void *va)
     pgd_t *pgd = pgd_offset_k((unsigned long)va);
     pmd_t *pmd = pmd_offset(pgd, (unsigned long)va);
     pte_t *pte = pte_offset(pmd, (unsigned long)va);
-    queue_l1_entry_update(__pa(pte), (*(unsigned long *)pte)&~_PAGE_RW);
+    queue_l1_entry_update(pte, (*(unsigned long *)pte)&~_PAGE_RW);
     if ( (unsigned long)va >= VMALLOC_START )
         __make_page_readonly(machine_to_virt(
             *(unsigned long *)pte&PAGE_MASK));
@@ -326,7 +326,7 @@ static inline void make_page_writeable(void *va)
     pgd_t *pgd = pgd_offset_k((unsigned long)va);
     pmd_t *pmd = pmd_offset(pgd, (unsigned long)va);
     pte_t *pte = pte_offset(pmd, (unsigned long)va);
-    queue_l1_entry_update(__pa(pte), (*(unsigned long *)pte)|_PAGE_RW);
+    queue_l1_entry_update(pte, (*(unsigned long *)pte)|_PAGE_RW);
     if ( (unsigned long)va >= VMALLOC_START )
         __make_page_writeable(machine_to_virt(
             *(unsigned long *)pte&PAGE_MASK));

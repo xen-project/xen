@@ -102,7 +102,7 @@ static inline void set_pte_phys (unsigned long vaddr,
 	pmd_t *pmd;
 	pte_t *pte;
 
-    pgd = init_mm.pgd + __pgd_offset(vaddr);
+	pgd = init_mm.pgd + __pgd_offset(vaddr);
 	if (pgd_none(*pgd)) {
 		printk("PAE BUG #00!\n");
 		return;
@@ -120,7 +120,7 @@ static inline void set_pte_phys (unsigned long vaddr,
 	pgprot_val(prot) = pgprot_val(PAGE_KERNEL) | pgprot_val(flags);
 
 	/* We queue directly, avoiding hidden phys->machine translation. */
-	queue_l1_entry_update(__pa(pte), phys | pgprot_val(prot));
+	queue_l1_entry_update(pte, phys | pgprot_val(prot));
 
 	/*
 	 * It's enough to flush this one mapping.
@@ -174,7 +174,7 @@ static void __init fixrange_init (unsigned long start,
 				kpgd = pgd_offset_k((unsigned long)pte);
                 		kpmd = pmd_offset(kpgd, (unsigned long)pte);
                 		kpte = pte_offset(kpmd, (unsigned long)pte);
-                		queue_l1_entry_update(__pa(kpte),
+                		queue_l1_entry_update(kpte,
                                       (*(unsigned long *)kpte)&~_PAGE_RW);
 
 				set_pmd(pmd, __pmd(_KERNPG_TABLE + __pa(pte)));

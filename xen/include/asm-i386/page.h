@@ -87,6 +87,8 @@ typedef struct { unsigned long pt_lo; } pagetable_t;
 #include <asm/bitops.h>
 #include <asm/flushtlb.h>
 
+#define linear_pg_table ((l1_pgentry_t *)LINEAR_PT_VIRT_START)
+
 extern l2_pgentry_t idle0_pg_table[ENTRIES_PER_L2_PAGETABLE];
 extern l2_pgentry_t *idle_pg_table[NR_CPUS];
 extern void paging_init(void);

@@ -20,8 +20,7 @@
 
 #if defined(CONFIG_XENO_PRIV)
 
-#define direct_set_pte(pteptr, pteval) \
-  queue_l1_entry_update(__pa(pteptr)|PGREQ_UNCHECKED_UPDATE, (pteval).pte_low)
+#define direct_set_pte(_p, _v) queue_unchecked_pt_update((_p), (_v).pte_low)
 #define __direct_pte(x) ((pte_t) { (x) } )
 #define __direct_mk_pte(page_nr,pgprot) \
   __direct_pte(((page_nr) << PAGE_SHIFT) | pgprot_val(pgprot))

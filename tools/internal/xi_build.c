@@ -130,16 +130,6 @@ static void unmap_pfn(void *vaddr)
     (void)munmap(vaddr, PAGE_SIZE);
 }
 
-static int clear_domain_page(unsigned long pfn)
-{
-    void *vaddr = map_pfn(pfn);
-    if ( vaddr == NULL )
-        return -1;
-    memset(vaddr, 0, PAGE_SIZE);
-    unmap_pfn(vaddr);
-    return 0;
-}
-
 static int copy_to_domain_page(unsigned long dst_pfn, void *src_page)
 {
     void *vaddr = map_pfn(dst_pfn);
@@ -154,6 +144,8 @@ static int setup_guestos(
     int dom, int kernel_fd, int initrd_fd, unsigned long tot_pages,
     unsigned long virt_load_addr, size_t ksize, dom_meminfo_t *meminfo)
 {
+    l1_pgentry_t *vl1tab = NULL, *vl1e = NULL;
+    l2_pgentry_t *vl2tab = NULL, *vl2e = NULL;
     unsigned long *page_array = NULL;
     page_update_request_t *pgt_update_arr = NULL, *pgt_updates = NULL;
     int alloc_index, num_pt_pages;
@@ -252,8 +244,6 @@ static int setup_guestos(
      * of the allocated physical address space.
      */
     l2tab = page_array[alloc_index] << PAGE_SHIFT;
-    if ( clear_domain_page(page_array[alloc_index]) < 0 )
-        goto error_out;
     alloc_index--;
     meminfo->l2_pgt_addr = l2tab;
     meminfo->virt_shinfo_addr = virt_load_addr + (tot_pages << PAGE_SHIFT);
@@ -272,25 +262,29 @@ static int setup_guestos(
      * PTE -- we break out before filling in the entry, as that is done by
      * Xen during final setup.
      */
-    l2tab += l2_table_offset(virt_load_addr) * sizeof(l2_pgentry_t);
+    if ( (vl2tab = map_pfn(l2tab >> PAGE_SHIFT)) == NULL )
+        goto error_out;
+    memset(vl2tab, 0, PAGE_SIZE);
+    vl2e = vl2tab + l2_table_offset(virt_load_addr);
     for ( count = 0; count < (tot_pages + 1); count++ )
     {    
-        if ( !((unsigned long)l1tab & (PAGE_SIZE-1)) ) 
+        if ( ((unsigned long)vl1e & (PAGE_SIZE-1)) == 0 ) 
         {
             l1tab = page_array[alloc_index] << PAGE_SHIFT;
-            if ( clear_domain_page(page_array[alloc_index]) < 0 )
+            if ( (vl1tab = map_pfn(l1tab >> PAGE_SHIFT)) == NULL )
                 goto error_out;
+            memset(vl1tab, 0, PAGE_SIZE);
             alloc_index--;
 			
-            l1tab += l1_table_offset(virt_load_addr + (count << PAGE_SHIFT)) 
-                * sizeof(l1_pgentry_t);
+            vl1e = vl1tab + l1_table_offset(virt_load_addr + 
+                                            (count << PAGE_SHIFT));
 
             /* make apropriate entry in the page directory */
-            pgt_updates->ptr = l2tab;
+            pgt_updates->ptr = (unsigned long)vl2e;
             pgt_updates->val = l1tab | L2_PROT;
             pgt_updates++;
             num_pgt_updates++;
-            l2tab += sizeof(l2_pgentry_t);
+            vl2e++;
         }
 
         /* The last PTE we consider is filled in later by Xen. */
@@ -298,20 +292,20 @@ static int setup_guestos(
 		
         if ( count < pt_start )
         {
-            pgt_updates->ptr = l1tab;
+            pgt_updates->ptr = (unsigned long)vl1e;
             pgt_updates->val = (page_array[count] << PAGE_SHIFT) | L1_PROT;
             pgt_updates++;
             num_pgt_updates++;
-            l1tab += sizeof(l1_pgentry_t);
+            vl1e++;
         }
         else
         {
-            pgt_updates->ptr = l1tab;
+            pgt_updates->ptr = (unsigned long)vl1e;
             pgt_updates->val = 
 		((page_array[count] << PAGE_SHIFT) | L1_PROT) & ~_PAGE_RW;
             pgt_updates++;
             num_pgt_updates++;
-            l1tab += sizeof(l1_pgentry_t);
+            vl1e++;
         }
 
         pgt_updates->ptr = 

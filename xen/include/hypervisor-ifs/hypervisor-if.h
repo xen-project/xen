@@ -114,33 +114,33 @@
  * 
  * PGREQ_XXX: specified in least 2 bits of 'ptr' field. These bits are masked
  *  off to get the real 'ptr' value.
- * All requests specify relevent machine address in 'ptr'.
+ * All requests specify relevent address in 'ptr'. This is either a
+ * machine/physical address (PA), or linear/virtual address (VA).
  * Normal requests specify update value in 'value'.
  * Extended requests specify command in least 8 bits of 'value'. These bits
  *  are masked off to get the real 'val' value. Except for PGEXT_SET_LDT 
  *  which shifts the least bits out.
  */
 /* A normal page-table update request. */
-#define PGREQ_NORMAL		0 /* does a checked form of '*ptr = val'   */
-/* Update an entry in the machine->physical mapping table. */
-#define PGREQ_MPT_UPDATE	1 /* ptr = frame to modify table entry for */
-/* An extended command. */
-#define PGREQ_EXTENDED_COMMAND	2 /* least 8 bits of val demux further     */
+#define PGREQ_NORMAL_UPDATE     0 /* checked '*ptr = val'. ptr is VA.      */
 /* DOM0 can make entirely unchecked updates which do not affect refcnts. */
-#define PGREQ_UNCHECKED_UPDATE	3 /* does an unchecked '*ptr = val'        */
+#define PGREQ_UNCHECKED_UPDATE  1 /* unchecked '*ptr = val'. ptr is VA.    */
+/* Update an entry in the machine->physical mapping table. */
+#define PGREQ_MPT_UPDATE        2 /* ptr = PA of frame to modify entry for */
+/* An extended command. */
+#define PGREQ_EXTENDED_COMMAND  3 /* least 8 bits of val demux further     */
 /* Extended commands: */
-#define PGEXT_PIN_L1_TABLE	0 /* ptr = frame to pin                    */
-#define PGEXT_PIN_L2_TABLE	1 /* ptr = frame to pin                    */
-#define PGEXT_PIN_L3_TABLE	2 /* ptr = frame to pin                    */
-#define PGEXT_PIN_L4_TABLE	3 /* ptr = frame to pin                    */
-#define PGEXT_UNPIN_TABLE	4 /* ptr = frame to unpin                  */
-#define PGEXT_NEW_BASEPTR	5 /* ptr = new pagetable base to install   */
-#define PGEXT_TLB_FLUSH		6 /* ptr = NULL                            */
-#define PGEXT_INVLPG		7 /* ptr = NULL ; val = page to invalidate */
-#define PGEXT_SET_LDT           8 /* ptr = linear address; val = # entries */
-#define PGEXT_CMD_MASK	      255
-#define PGEXT_CMD_SHIFT		8
-
+#define PGEXT_PIN_L1_TABLE      0 /* ptr = PA of frame to pin              */
+#define PGEXT_PIN_L2_TABLE      1 /* ptr = PA of frame to pin              */
+#define PGEXT_PIN_L3_TABLE      2 /* ptr = PA of frame to pin              */
+#define PGEXT_PIN_L4_TABLE      3 /* ptr = PA of frame to pin              */
+#define PGEXT_UNPIN_TABLE       4 /* ptr = PA of frame to unpin            */
+#define PGEXT_NEW_BASEPTR       5 /* ptr = PA of new pagetable base        */
+#define PGEXT_TLB_FLUSH         6 /* ptr = NULL                            */
+#define PGEXT_INVLPG            7 /* ptr = NULL ; val = page to invalidate */
+#define PGEXT_SET_LDT           8 /* ptr = VA of table; val = # entries    */
+#define PGEXT_CMD_MASK        255
+#define PGEXT_CMD_SHIFT         8
 
 /*
  * Master "switch" for enabling/disabling event delivery.

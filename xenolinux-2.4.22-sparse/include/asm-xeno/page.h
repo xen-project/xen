@@ -10,7 +10,6 @@
 #ifndef __ASSEMBLY__
 
 #include <linux/config.h>
-#include <asm/hypervisor.h>
 
 #ifdef CONFIG_X86_USE_3DNOW
 

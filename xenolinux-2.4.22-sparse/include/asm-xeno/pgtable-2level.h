@@ -34,9 +34,9 @@ static inline int pgd_bad(pgd_t pgd)		{ return 0; }
 static inline int pgd_present(pgd_t pgd)	{ return 1; }
 #define pgd_clear(xp)				do { } while (0)
 
-#define set_pte(pteptr, pteval) queue_l1_entry_update(__pa(pteptr), (pteval).pte_low)
-#define set_pte_atomic(pteptr, pteval) queue_l1_entry_update(__pa(pteptr), (pteval).pte_low)
-#define set_pmd(pmdptr, pmdval) queue_l2_entry_update(__pa(pmdptr), (pmdval).pmd)
+#define set_pte(pteptr, pteval) queue_l1_entry_update(pteptr, (pteval).pte_low)
+#define set_pte_atomic(pteptr, pteval) queue_l1_entry_update(pteptr, (pteval).pte_low)
+#define set_pmd(pmdptr, pmdval) queue_l2_entry_update((pmdptr), (pmdval).pmd)
 #define set_pgd(pgdptr, pgdval) ((void)0)
 
 #define pgd_page(pgd) \
@@ -59,7 +59,7 @@ static inline pmd_t * pmd_offset(pgd_t * dir, unsigned long address)
 static inline pte_t ptep_get_and_clear(pte_t *xp)
 {
     pte_t pte = *xp;
-    queue_l1_entry_update(__pa(xp), 0);
+    queue_l1_entry_update(xp, 0);
     return pte;
 }
 

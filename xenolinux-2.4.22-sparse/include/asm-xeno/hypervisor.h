@@ -12,6 +12,7 @@
 #include <linux/types.h>
 #include <asm/hypervisor-ifs/hypervisor-if.h>
 #include <asm/ptrace.h>
+#include <asm/page.h>
 
 /* arch/xeno/kernel/setup.c */
 union start_info_union
@@ -34,8 +35,8 @@ void do_hypervisor_callback(struct pt_regs *regs);
 
 extern unsigned int pt_update_queue_idx;
 
-void queue_l1_entry_update(unsigned long ptr, unsigned long val);
-void queue_l2_entry_update(unsigned long ptr, unsigned long val);
+void queue_l1_entry_update(pte_t *ptr, unsigned long val);
+void queue_l2_entry_update(pmd_t *ptr, unsigned long val);
 void queue_pt_switch(unsigned long ptr);
 void queue_tlb_flush(void);
 void queue_invlpg(unsigned long ptr);
@@ -46,9 +47,13 @@ void queue_pte_unpin(unsigned long ptr);
 void queue_set_ldt(unsigned long ptr, unsigned long bytes);
 #define PT_UPDATE_DEBUG 0
 
+#define queue_unchecked_pt_update(_p,_v) queue_l1_entry_update( \
+  (pte_t *)((unsigned long)(_p)|PGREQ_UNCHECKED_UPDATE),(_v))
+
 #if PT_UPDATE_DEBUG > 0
 typedef struct {
-    unsigned long ptr, val, pteval;
+    void *ptr;
+    unsigned long val, pteval;
     void *ptep;
     int line; char *file;
 } page_update_debug_t;
@@ -78,7 +83,7 @@ extern page_update_debug_t update_debug_queue[];
  update_debug_queue[pt_update_queue_idx].line = __LINE__;         \
  update_debug_queue[pt_update_queue_idx].file = __FILE__;         \
  printk("L1 %s %d: %08lx (%08lx -> %08lx)\n", __FILE__, __LINE__, \
-        phys_to_machine(_p), *(unsigned long *)__va(_p),          \
+        (_p), pte_val(_p),                                        \
         (unsigned long)(_v));                                     \
  queue_l1_entry_update((_p),(_v));                                \
 })
@@ -88,7 +93,7 @@ extern page_update_debug_t update_debug_queue[];
  update_debug_queue[pt_update_queue_idx].line = __LINE__;         \
  update_debug_queue[pt_update_queue_idx].file = __FILE__;         \
  printk("L2 %s %d: %08lx (%08lx -> %08lx)\n", __FILE__, __LINE__, \
-        phys_to_machine(_p), *(unsigned long *)__va(_p),          \
+        (_p), pmd_val(_p),                                        \
         (unsigned long)(_v));                                     \
  queue_l2_entry_update((_p),(_v));                                \
 })

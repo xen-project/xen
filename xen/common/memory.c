@@ -159,8 +159,8 @@ static void put_l1_table(unsigned long page_nr);
 static void put_page(unsigned long page_nr, int writeable);
 static int dec_page_refcnt(unsigned long page_nr, unsigned int type);
 
-static int mod_l2_entry(unsigned long, l2_pgentry_t);
-static int mod_l1_entry(unsigned long, l1_pgentry_t);
+static int mod_l2_entry(l2_pgentry_t *, l2_pgentry_t);
+static int mod_l1_entry(l1_pgentry_t *, l1_pgentry_t);
 
 /* frame table size and its size in pages */
 frame_table_t * frame_table;
@@ -524,12 +524,9 @@ static void put_page(unsigned long page_nr, int writeable)
 }
 
 
-static int mod_l2_entry(unsigned long pa, l2_pgentry_t new_l2_entry)
+static int mod_l2_entry(l2_pgentry_t *p_l2_entry, l2_pgentry_t new_l2_entry)
 {
-    l2_pgentry_t *p_l2_entry, old_l2_entry;
-
-    p_l2_entry = map_domain_mem(pa);
-    old_l2_entry = *p_l2_entry;
+    l2_pgentry_t old_l2_entry = *p_l2_entry;
 
     if ( (((unsigned long)p_l2_entry & (PAGE_SIZE-1)) >> 2) >=
          DOMAIN_ENTRIES_PER_L2_PAGETABLE )
@@ -558,9 +555,14 @@ static int mod_l2_entry(unsigned long pa, l2_pgentry_t new_l2_entry)
             }
             
             /* Assume we're mapping an L1 table, falling back to twisted L2. */
-            if ( get_l1_table(l2_pgentry_to_pagenr(new_l2_entry)) &&
-                 get_twisted_l2_table(pa >> PAGE_SHIFT, new_l2_entry) )
-                goto fail;
+            if ( unlikely(get_l1_table(l2_pgentry_to_pagenr(new_l2_entry))) )
+            {
+                /* NB. No need to sanity-check the VA: done already. */
+                unsigned long l1e = l1_pgentry_val(
+                    linear_pg_table[(unsigned long)p_l2_entry >> PAGE_SHIFT]);
+                if ( get_twisted_l2_table(l1e >> PAGE_SHIFT, new_l2_entry) )
+                    goto fail;
+            }
         } 
     }
     else if ( (l2_pgentry_val(old_l2_entry) & _PAGE_PRESENT) )
@@ -569,21 +571,16 @@ static int mod_l2_entry(unsigned long pa, l2_pgentry_t new_l2_entry)
     }
     
     *p_l2_entry = new_l2_entry;
-    unmap_domain_mem(p_l2_entry);
     return 0;
 
  fail:
-    unmap_domain_mem(p_l2_entry);
     return -1;
 }
 
 
-static int mod_l1_entry(unsigned long pa, l1_pgentry_t new_l1_entry)
+static int mod_l1_entry(l1_pgentry_t *p_l1_entry, l1_pgentry_t new_l1_entry)
 {
-    l1_pgentry_t *p_l1_entry, old_l1_entry;
-
-    p_l1_entry = map_domain_mem(pa);
-    old_l1_entry = *p_l1_entry;
+    l1_pgentry_t old_l1_entry = *p_l1_entry;
 
     if ( (l1_pgentry_val(new_l1_entry) & _PAGE_PRESENT) )
     {
@@ -622,11 +619,9 @@ static int mod_l1_entry(unsigned long pa, l1_pgentry_t new_l1_entry)
     }
 
     *p_l1_entry = new_l1_entry;
-    unmap_domain_mem(p_l1_entry);
     return 0;
 
  fail:
-    unmap_domain_mem(p_l1_entry);
     return -1;
 }
 
@@ -754,10 +749,14 @@ static int do_extended_command(unsigned long ptr, unsigned long val)
 int do_process_page_updates(page_update_request_t *ureqs, int count)
 {
     page_update_request_t req;
-    unsigned long flags, pfn, *ptr;
+    unsigned long flags, pfn, l1e;
     struct pfn_info *page;
     int err = 0, i;
     unsigned int cmd;
+    unsigned long cr0 = read_cr0();
+
+    /* Clear the WP bit so that we can write even read-only page mappings. */
+    write_cr0(cr0 & ~X86_CR0_WP);
 
     for ( i = 0; i < count; i++ )
     {
@@ -767,26 +766,43 @@ int do_process_page_updates(page_update_request_t *ureqs, int count)
         } 
 
         cmd = req.ptr & (sizeof(l1_pgentry_t)-1);
-
-        /* All normal commands must have 'ptr' in range. */
         pfn = req.ptr >> PAGE_SHIFT;
-        if ( (pfn >= max_page) && (cmd != PGREQ_EXTENDED_COMMAND) )
-        {
-            MEM_LOG("Page out of range (%08lx > %08lx)", pfn, max_page);
-            kill_domain_with_errmsg("Page update request out of range");
-        }
 
         err = 1;
 
-        /* Least significant bits of 'ptr' demux the operation type. */
         spin_lock_irq(&current->page_lock);
+
+        /* Get the page-frame number that a non-extended command references. */
+        if ( likely(cmd != PGREQ_EXTENDED_COMMAND) )
+        {
+            if ( likely(cmd != PGREQ_MPT_UPDATE) )
+            {
+                /* Need to use 'get_user' since the VA's PGD may be absent. */
+                __get_user(l1e, (unsigned long *)(linear_pg_table+pfn));
+                /* Now check that the VA's PTE isn't absent. */
+                if ( !(l1e & _PAGE_PRESENT) )
+                {
+                    MEM_LOG("L1E n.p. at VA %08lx (%08lx)", req.ptr&~3, l1e);
+                    goto unlock;
+                }
+                /* Finally, get the underlying machine address. */
+                pfn = l1e >> PAGE_SHIFT;
+            }
+            else if ( pfn >= max_page )
+            {
+                MEM_LOG("Page out of range (%08lx > %08lx)", pfn, max_page);
+                goto unlock;
+            }
+        }
+
+        /* Least significant bits of 'ptr' demux the operation type. */
         switch ( cmd )
         {
             /*
-             * PGREQ_NORMAL: Normal update to any level of page table.
+             * PGREQ_NORMAL_UPDATE: Normal update to any level of page table.
              */
-        case PGREQ_NORMAL:
-            page = frame_table + pfn;
+        case PGREQ_NORMAL_UPDATE:
+            page  = frame_table + pfn;
             flags = page->flags;
 
             if ( DOMAIN_OKAY(flags) )
@@ -794,16 +810,16 @@ int do_process_page_updates(page_update_request_t *ureqs, int count)
                 switch ( (flags & PG_type_mask) )
                 {
                 case PGT_l1_page_table: 
-                    err = mod_l1_entry(req.ptr, mk_l1_pgentry(req.val)); 
+                    err = mod_l1_entry((l1_pgentry_t *)req.ptr, 
+                                       mk_l1_pgentry(req.val)); 
                     break;
                 case PGT_l2_page_table: 
-                    err = mod_l2_entry(req.ptr, mk_l2_pgentry(req.val)); 
+                    err = mod_l2_entry((l2_pgentry_t *)req.ptr, 
+                                       mk_l2_pgentry(req.val)); 
                     break;
                 default:
                     MEM_LOG("Update to non-pt page %08lx", req.ptr);
-                    ptr = map_domain_mem(req.ptr);
-                    *ptr = req.val;
-                    unmap_domain_mem(ptr);
+                    *(unsigned long *)req.ptr = req.val;
                     err = 0;
                     break;
                 }
@@ -815,6 +831,19 @@ int do_process_page_updates(page_update_request_t *ureqs, int count)
             }
             break;
 
+        case PGREQ_UNCHECKED_UPDATE:
+            req.ptr &= ~(sizeof(l1_pgentry_t) - 1);
+            if ( IS_PRIV(current) )
+            {
+                *(unsigned long *)req.ptr = req.val;
+                err = 0;
+            }
+            else
+            {
+                MEM_LOG("Bad unchecked update attempt");
+            }
+            break;
+            
         case PGREQ_MPT_UPDATE:
             page = frame_table + pfn;
             if ( DOMAIN_OKAY(page->flags) )
@@ -838,31 +867,16 @@ int do_process_page_updates(page_update_request_t *ureqs, int count)
             err = do_extended_command(req.ptr, req.val);
             break;
 
-        case PGREQ_UNCHECKED_UPDATE:
-            req.ptr &= ~(sizeof(l1_pgentry_t) - 1);
-            if ( current->domain == 0 )
-            {
-                ptr = map_domain_mem(req.ptr);
-                *ptr = req.val;
-                unmap_domain_mem(ptr);
-                err = 0;
-            }
-            else
-            {
-                MEM_LOG("Bad unchecked update attempt");
-            }
-            break;
-            
         default:
             MEM_LOG("Invalid page update command %08lx", req.ptr);
             break;
         }
+
+    unlock:
         spin_unlock_irq(&current->page_lock);
 
         if ( err )
-        {
             kill_domain_with_errmsg("Illegal page update request");
-        }
 
         ureqs++;
     }
@@ -873,6 +887,9 @@ int do_process_page_updates(page_update_request_t *ureqs, int count)
         __write_cr3_counted(pagetable_val(current->mm.pagetable));
 
     }
+
+    /* Restore the WP bit before returning to guest. */
+    write_cr0(cr0);
 
     return 0;
 }

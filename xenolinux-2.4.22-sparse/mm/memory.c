@@ -320,8 +320,7 @@ static inline int zap_pte_range(mmu_gather_t *tlb, pmd_t * pmd, unsigned long ad
 			struct page *page = pte_page(pte);
 #if defined(CONFIG_XENO_PRIV)
 			if (pte_io(pte)) {
-				queue_l1_entry_update(
-					__pa(ptep)|PGREQ_UNCHECKED_UPDATE, 0);
+				queue_unchecked_pt_update(ptep, 0);
 				continue;
 			}
 #endif
