@@ -1976,13 +1976,6 @@ int update_grant_va_mapping(unsigned long va,
      * . check PTE being installed isn't DISALLOWED
      */
 
-    /* Return value:
-     * -ve : error
-     * 0   : done
-     * GNTUPDVA_prev_ro : done & prior mapping was ro to same frame
-     * GNTUPDVA_prev_rw : done & prior mapping was rw to same frame
-     */
-
     int             rc = 0;
     l1_pgentry_t   *pl1e;
     unsigned long   _ol1e;
@@ -1998,18 +1991,7 @@ int update_grant_va_mapping(unsigned long va,
         l1_pgentry_t ol1e = mk_l1_pgentry(_ol1e);
 
         if ( update_l1e(pl1e, ol1e, mk_l1_pgentry(_nl1e)) )
-        {
-            /* overwrote different mfn?  */
-            if (((_ol1e ^ _nl1e) & (PADDR_MASK & PAGE_MASK)) != 0)
-                put_page_from_l1e(ol1e, d);
-
-            else if (_ol1e & _PAGE_PRESENT)
-                rc = ((_ol1e & _PAGE_RW) ? GNTUPDVA_prev_rw
-                                         : GNTUPDVA_prev_ro );
-                /* use return code to avoid nasty grant table
-                 * slow path in put_page_from_l1e -- caller
-                 * must handle grant ref count instead. */
-        }
+            put_page_from_l1e(ol1e, d);
         else
             rc = -EINVAL;
     }
