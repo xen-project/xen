@@ -200,9 +200,10 @@ struct e1000_adapter {
 	struct e1000_phy_info phy_info;
 	struct e1000_phy_stats phy_stats;
 
-
-
 	uint32_t pci_state[16];
 	char ifname[IFNAMSIZ];
+
+	/* All new definitions should go below this point! */
+	spinlock_t tx_lock;
 };
 #endif /* _E1000_H_ */

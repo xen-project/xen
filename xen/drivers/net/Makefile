@@ -8,6 +8,7 @@ default: $(OBJS)
 
 clean:
 	$(MAKE) -C ne clean
+	$(MAKE) -C e1000 clean
 	rm -f *.o *~ core
 
 .PHONY: default clean

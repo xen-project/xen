@@ -362,6 +362,7 @@ e1000_probe(struct pci_dev *pdev,
 	adapter->netdev = netdev;
 	adapter->pdev = pdev;
 	adapter->hw.back = adapter;
+	spin_lock_init(&adapter->tx_lock);
 
 	mmio_start = pci_resource_start(pdev, BAR_0);
 	mmio_len = pci_resource_len(pdev, BAR_0);
@@ -1439,6 +1440,7 @@ e1000_xmit_frame(struct sk_buff *skb, struct net_device *netdev)
 		count++;
 
 	if(E1000_DESC_UNUSED(&adapter->tx_ring) < count) {
+		printk("%s: BUG! Ring full with queue awake!\n", netdev->name);
 		netif_stop_queue(netdev);
 		return 1;
 	}
@@ -1448,14 +1450,21 @@ e1000_xmit_frame(struct sk_buff *skb, struct net_device *netdev)
 
 	if(adapter->vlgrp && vlan_tx_tag_present(skb)) {
 		tx_flags |= E1000_TX_FLAGS_VLAN;
-		tx_flags |= (vlan_tx_tag_get(skb) << E1000_TX_FLAGS_VLAN_SHIFT);
+		tx_flags |= (vlan_tx_tag_get(skb)<<E1000_TX_FLAGS_VLAN_SHIFT);
 	}
+
+	spin_lock_irq(&adapter->tx_lock);
 
 	count = e1000_tx_map(adapter, skb);
 
 	e1000_tx_queue(adapter, count, tx_flags);
 
 	netdev->trans_start = jiffies;
+
+	if(E1000_DESC_UNUSED(&adapter->tx_ring) < (MAX_SKB_FRAGS + 1))
+		netif_stop_queue(netdev);
+
+	spin_unlock_irq(&adapter->tx_lock);
 
 	return 0;
 }
@@ -1759,6 +1768,9 @@ e1000_clean_tx_irq(struct e1000_adapter *adapter)
 	struct pci_dev *pdev = adapter->pdev;
 	struct e1000_tx_desc *tx_desc;
 	int i;
+	unsigned long flags;
+
+	spin_lock_irqsave(&adapter->tx_lock, flags);
 
 	i = tx_ring->next_to_clean;
 	tx_desc = E1000_TX_DESC(*tx_ring, i);
@@ -1795,6 +1807,8 @@ e1000_clean_tx_irq(struct e1000_adapter *adapter)
 
 		netif_wake_queue(netdev);
 	}
+
+	spin_unlock_irqrestore(&adapter->tx_lock, flags);
 }
 
 /**
