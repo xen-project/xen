@@ -313,7 +313,7 @@ static int get_page_and_type_from_pagenr(unsigned long page_nr,
     if ( unlikely(!get_page_type(page, type)) )
     {
 #ifdef VERBOSE
-	if (type != PGT_l1_page_table)
+	if ((type & PGT_type_mask) != PGT_l1_page_table)
 	    MEM_LOG("Bad page type for pfn %08lx (%08x)", 
 		    page_nr, page->u.inuse.type_info);
 #endif
