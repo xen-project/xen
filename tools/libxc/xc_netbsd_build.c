@@ -13,7 +13,7 @@
 #define DPRINTF(x)
 #endif
 
-static int loadelfimage(gzFile, void *, unsigned long *, unsigned long,
+static int loadelfimage(gzFile, int, u32, unsigned long *, unsigned long,
                         unsigned long *, unsigned long *,
                         unsigned long *, unsigned long *);
 
@@ -77,11 +77,7 @@ static int setup_guestos(int xc_handle,
     shared_info_t *shared_info;
     unsigned long ksize;
     mmu_t *mmu = NULL;
-    void  *pm_handle = NULL;
     int i;
-
-    if ( (pm_handle = init_pfn_mapper((domid_t)dom)) == NULL )
-        goto error_out;
 
     if ( (page_array = malloc(tot_pages * sizeof(unsigned long))) == NULL )
     {
@@ -95,7 +91,7 @@ static int setup_guestos(int xc_handle,
         goto error_out;
     }
 
-    if (loadelfimage(kernel_gfd, pm_handle, page_array, tot_pages,
+    if (loadelfimage(kernel_gfd, xc_handle, dom, page_array, tot_pages,
                      virt_load_addr, &ksize, &symtab_addr, &symtab_len))
         goto error_out;
 
@@ -125,7 +121,9 @@ static int setup_guestos(int xc_handle,
         goto error_out;
     
     /* Initialise the page tables. */
-    if ( (vl2tab = map_pfn_writeable(pm_handle, l2tab >> PAGE_SHIFT)) == NULL )
+    if ( (vl2tab = xc_map_foreign_range(xc_handle, dom, PAGE_SIZE,
+                                        PROT_READ|PROT_WRITE,
+                                        l2tab >> PAGE_SHIFT)) == NULL )
         goto error_out;
     memset(vl2tab, 0, PAGE_SIZE);
     vl2e = &vl2tab[l2_table_offset(*virt_load_addr)];
@@ -135,10 +133,14 @@ static int setup_guestos(int xc_handle,
         {
             l1tab = page_array[alloc_index--] << PAGE_SHIFT;
             if ( vl1tab != NULL )
-                unmap_pfn(pm_handle, vl1tab);
-            if ( (vl1tab = map_pfn_writeable(pm_handle,
-                                             l1tab >> PAGE_SHIFT)) == NULL )
+                munmap(vl1tab, PAGE_SIZE);
+            if ( (vl1tab = xc_map_foreign_range(xc_handle, dom, PAGE_SIZE,
+                                                PROT_READ|PROT_WRITE,
+                                                l1tab >> PAGE_SHIFT)) == NULL )
+            {
+                munmap(vl2tab, PAGE_SIZE);
                 goto error_out;
+            }
             memset(vl1tab, 0, PAGE_SIZE);
             vl1e = &vl1tab[l1_table_offset(*virt_load_addr + 
                                            (count<<PAGE_SHIFT))];
@@ -153,10 +155,14 @@ static int setup_guestos(int xc_handle,
         if ( add_mmu_update(xc_handle, mmu,
                             (page_array[count] << PAGE_SHIFT) | 
                             MMU_MACHPHYS_UPDATE, count) )
+        {
+            munmap(vl1tab, PAGE_SIZE);
+            munmap(vl2tab, PAGE_SIZE);
             goto error_out;
+        }
     }
-    unmap_pfn(pm_handle, vl1tab);
-    unmap_pfn(pm_handle, vl2tab);
+    munmap(vl1tab, PAGE_SIZE);
+    munmap(vl2tab, PAGE_SIZE);
 
     /*
      * Pin down l2tab addr as page dir page - causes hypervisor to provide
@@ -169,7 +175,8 @@ static int setup_guestos(int xc_handle,
     *virt_startinfo_addr =
         *virt_load_addr + ((alloc_index-1) << PAGE_SHIFT);
 
-    start_info = map_pfn_writeable(pm_handle, page_array[alloc_index-1]);
+    start_info = xc_map_foreign_range(
+        xc_handle, dom, PAGE_SIZE, PROT_WRITE, page_array[alloc_index-1]);
     memset(start_info, 0, sizeof(*start_info));
     start_info->pt_base     = *virt_load_addr + ((tot_pages-1) << PAGE_SHIFT);
     start_info->mod_start   = symtab_addr;
@@ -180,30 +187,28 @@ static int setup_guestos(int xc_handle,
     start_info->domain_controller_evtchn = control_evtchn;
     strncpy(start_info->cmd_line, cmdline, MAX_CMDLINE);
     start_info->cmd_line[MAX_CMDLINE-1] = '\0';
-    unmap_pfn(pm_handle, start_info);
+    munmap(start_info, PAGE_SIZE);
 
     /* shared_info page starts its life empty. */
-    shared_info = map_pfn_writeable(pm_handle, shared_info_frame);
+    shared_info = xc_map_foreign_range(
+        xc_handle, dom, PAGE_SIZE, PROT_WRITE, shared_info_frame);
     memset(shared_info, 0, PAGE_SIZE);
     /* Mask all upcalls... */
     for ( i = 0; i < MAX_VIRT_CPUS; i++ )
         shared_info->vcpu_data[i].evtchn_upcall_mask = 1;
-    unmap_pfn(pm_handle, shared_info);
+    munmap(shared_info, PAGE_SIZE);
 
     /* Send the page update requests down to the hypervisor. */
     if ( finish_mmu_updates(xc_handle, mmu) )
         goto error_out;
 
     free(mmu);
-    (void)close_pfn_mapper(pm_handle);
     free(page_array);
     return 0;
 
  error_out:
     if ( mmu != NULL )
         free(mmu);
-    if ( pm_handle != NULL )
-        (void)close_pfn_mapper(pm_handle);
     if ( page_array == NULL )
         free(page_array);
     return -1;
@@ -413,7 +418,7 @@ myseek(gzFile gfd, off_t offset, int whence)
 #define IS_BSS(p) (p.p_filesz < p.p_memsz)
 
 static int
-loadelfimage(gzFile kernel_gfd, void *pm_handle, unsigned long *page_array,
+loadelfimage(gzFile kernel_gfd, int xch, u32 dom, unsigned long *page_array,
              unsigned long tot_pages, unsigned long *virt_load_addr,
              unsigned long *ksize, unsigned long *symtab_addr,
              unsigned long *symtab_len)
@@ -512,9 +517,9 @@ loadelfimage(gzFile kernel_gfd, void *pm_handle, unsigned long *page_array,
                     goto out;
                 }
                 curpos += c;
-                vaddr = map_pfn_writeable(pm_handle, 
-                                          page_array[(iva - *virt_load_addr)
-                                                    >> PAGE_SHIFT]);
+                vaddr = xc_map_foreign_range(
+                    xch, dom, PAGE_SIZE, PROT_WRITE, 
+                    page_array[(iva - *virt_load_addr) >> PAGE_SHIFT]);
                 if ( vaddr == NULL )
                 {
                     ERROR("Couldn't map guest memory");
@@ -523,7 +528,7 @@ loadelfimage(gzFile kernel_gfd, void *pm_handle, unsigned long *page_array,
                 DPRINTF(("copy page %p to %p, count 0x%x\n", (void *)iva,
                          vaddr + (iva & (PAGE_SIZE - 1)), c));
                 memcpy(vaddr + (iva & (PAGE_SIZE - 1)), page, c);
-                unmap_pfn(pm_handle, vaddr);
+                munmap(vaddr, PAGE_SIZE);
             }
 
             if ( phdr[h].p_vaddr + phdr[h].p_filesz > maxva )
@@ -621,9 +626,9 @@ loadelfimage(gzFile kernel_gfd, void *pm_handle, unsigned long *page_array,
                 }
                 curpos += c;
 
-                vaddr = map_pfn_writeable(pm_handle, 
-                                          page_array[(maxva - *virt_load_addr)
-                                                    >> PAGE_SHIFT]);
+                vaddr = xc_map_foreign_range(
+                    xch, dom, PAGE_SIZE, PROT_WRITE,
+                    page_array[(maxva - *virt_load_addr) >> PAGE_SHIFT]);
                 if ( vaddr == NULL )
                 {
                     ERROR("Couldn't map guest memory");
@@ -632,7 +637,7 @@ loadelfimage(gzFile kernel_gfd, void *pm_handle, unsigned long *page_array,
                 DPRINTF(("copy page %p to %p, count 0x%x\n", (void *)maxva,
                          vaddr + (maxva & (PAGE_SIZE - 1)), c));
                 memcpy(vaddr + (maxva & (PAGE_SIZE - 1)), page, c);
-                unmap_pfn(pm_handle, vaddr);
+                munmap(vaddr, PAGE_SIZE);
             }
 
             *symtab_len += shdr[h].sh_size;
@@ -668,9 +673,9 @@ loadelfimage(gzFile kernel_gfd, void *pm_handle, unsigned long *page_array,
         c = PAGE_SIZE - (symva & (PAGE_SIZE - 1));
         if ( c > s - i )
             c = s - i;
-        vaddr = map_pfn_writeable(pm_handle, 
-                                  page_array[(symva - *virt_load_addr)
-                                            >> PAGE_SHIFT]);
+        vaddr = xc_map_foreign_range(
+            xch, dom, PAGE_SIZE, PROT_WRITE,
+            page_array[(symva - *virt_load_addr) >> PAGE_SHIFT]);
         if ( vaddr == NULL )
         {
             ERROR("Couldn't map guest memory");
@@ -678,9 +683,8 @@ loadelfimage(gzFile kernel_gfd, void *pm_handle, unsigned long *page_array,
         }
         DPRINTF(("copy page %p to %p, count 0x%x\n", (void *)symva,
                  vaddr + (symva & (PAGE_SIZE - 1)), c));
-        memcpy(vaddr + (symva & (PAGE_SIZE - 1)), p + i,
-               c);
-        unmap_pfn(pm_handle, vaddr);
+        memcpy(vaddr + (symva & (PAGE_SIZE - 1)), p + i, c);
+        munmap(vaddr, PAGE_SIZE);
     }
 
     *symtab_len = maxva - *symtab_addr;

@@ -144,11 +144,6 @@ static inline int do_dom_mem_op(int            xc_handle,
 /*
  * PFN mapping.
  */
-void *init_pfn_mapper(domid_t domid);
-int close_pfn_mapper(void *pm_handle);
-void *map_pfn_writeable(void *pm_handle, unsigned long pfn);
-void *map_pfn_readonly(void *pm_handle, unsigned long pfn);
-void unmap_pfn(void *pm_handle, void *vaddr);
 int get_pfn_type_batch(int xc_handle, u32 dom, int num, unsigned long *arr);
 unsigned long csum_page (void * page);
 

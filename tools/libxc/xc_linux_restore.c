@@ -130,8 +130,6 @@ int xc_linux_restore(int xc_handle, XcIOContext *ioctxt)
 
     mmu_t *mmu = NULL;
 
-    void *pm_handle = NULL;
-
     /* used by debug verify code */
     unsigned long buf[PAGE_SIZE/sizeof(unsigned long)];
 
@@ -244,9 +242,6 @@ int xc_linux_restore(int xc_handle, XcIOContext *ioctxt)
         goto out;
     }
     shared_info_frame = op.u.getdomaininfo.shared_info_frame;
-
-    if ( (pm_handle = init_pfn_mapper((domid_t)dom)) == NULL )
-        goto out;
 
     /* Build the pfn-to-mfn table. We choose MFN ordering returned by Xen. */
     if ( get_pfn_list(xc_handle, dom, pfn_to_mfn_table, nr_pfns) != nr_pfns )
@@ -511,6 +506,7 @@ int xc_linux_restore(int xc_handle, XcIOContext *ioctxt)
     {
 	unsigned int count, *pfntab;
 	int rc;
+
 	if ( xcio_read(ioctxt, &count, sizeof(count)) )
 	{
 	    xcio_error(ioctxt, "Error when reading from state file");
@@ -518,7 +514,7 @@ int xc_linux_restore(int xc_handle, XcIOContext *ioctxt)
 	}
 
 	pfntab = malloc( sizeof(unsigned int) * count );
-	if ( !pfntab )
+	if ( pfntab == NULL )
 	{
 	    xcio_error(ioctxt, "Out of memory");
 	    goto out;
@@ -530,14 +526,14 @@ int xc_linux_restore(int xc_handle, XcIOContext *ioctxt)
 	    goto out;
 	}
 
-	for(i=0;i<count;i++)
+	for ( i = 0; i < count; i++ )
 	{
 	    unsigned long pfn = pfntab[i];
 	    pfntab[i]=pfn_to_mfn_table[pfn];
 	    pfn_to_mfn_table[pfn] = 0x80000001;  // not in pmap
 	}
 
-	if ( count>0 )
+	if ( count > 0 )
 	{
 	    if ( (rc = do_dom_mem_op( xc_handle,
 				       MEMOP_decrease_reservation,
@@ -550,11 +546,8 @@ int xc_linux_restore(int xc_handle, XcIOContext *ioctxt)
 	    {
 		printf("Decreased reservation by %d pages\n", count);
 	    }
-	}
-	
+	}	
     }
-
-
 
     if ( xcio_read(ioctxt, &ctxt,       sizeof(ctxt)) ||
          xcio_read(ioctxt, shared_info, PAGE_SIZE) )
@@ -571,11 +564,12 @@ int xc_linux_restore(int xc_handle, XcIOContext *ioctxt)
         goto out;
     }
     ctxt.cpu_ctxt.esi = mfn = pfn_to_mfn_table[pfn];
-    p_srec = map_pfn_writeable(pm_handle, mfn);
+    p_srec = xc_map_foreign_range(
+        xc_handle, dom, PAGE_SIZE, PROT_WRITE, mfn);
     p_srec->resume_info.nr_pages    = nr_pfns;
     p_srec->resume_info.shared_info = shared_info_frame << PAGE_SHIFT;
     p_srec->resume_info.flags       = 0;
-    unmap_pfn(pm_handle, p_srec);
+    munmap(p_srec, PAGE_SIZE);
 
     /* Uncanonicalise each GDT frame number. */
     if ( ctxt.gdt_ents > 8192 )
@@ -606,17 +600,16 @@ int xc_linux_restore(int xc_handle, XcIOContext *ioctxt)
     }
     ctxt.pt_base = pfn_to_mfn_table[pfn] << PAGE_SHIFT;
 
-
     /* clear any pending events and the selector */
-    memset( &(((shared_info_t *)shared_info)->evtchn_pending[0]),
-            0, sizeof (((shared_info_t *)shared_info)->evtchn_pending)+
-            sizeof(((shared_info_t *)shared_info)->evtchn_pending_sel) );
+    memset(&(((shared_info_t *)shared_info)->evtchn_pending[0]),
+           0, sizeof (((shared_info_t *)shared_info)->evtchn_pending)+
+           sizeof(((shared_info_t *)shared_info)->evtchn_pending_sel));
 
     /* Copy saved contents of shared-info page. No checking needed. */
-    ppage = map_pfn_writeable(pm_handle, shared_info_frame);
+    ppage = xc_map_foreign_range(
+        xc_handle, dom, PAGE_SIZE, PROT_WRITE, shared_info_frame);
     memcpy(ppage, shared_info, sizeof(shared_info_t));
-    unmap_pfn(pm_handle, ppage);
-
+    munmap(ppage, PAGE_SIZE);
 
     /* Uncanonicalise the pfn-to-mfn table frame-number list. */
     for ( i = 0; i < (nr_pfns+1023)/1024; i++ )
@@ -702,8 +695,6 @@ int xc_linux_restore(int xc_handle, XcIOContext *ioctxt)
         xc_domain_destroy(xc_handle, dom);
     if ( mmu != NULL )
         free(mmu);
-    if ( pm_handle != NULL )
-        (void)close_pfn_mapper(pm_handle);
     if ( pfn_to_mfn_table != NULL )
         free(pfn_to_mfn_table);
     if ( pfn_type != NULL )
