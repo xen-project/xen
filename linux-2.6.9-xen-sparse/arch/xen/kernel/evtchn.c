@@ -476,27 +476,6 @@ static struct hw_interrupt_type pirq_type = {
     NULL
 };
 
-static irqreturn_t misdirect_interrupt(int irq, void *dev_id,
-                                       struct pt_regs *regs)
-{
-    /* nothing */
-    return IRQ_HANDLED;
-}
-
-static struct irqaction misdirect_action = {
-    misdirect_interrupt, 
-    SA_INTERRUPT, 
-    CPU_MASK_NONE, 
-    "misdirect", 
-    NULL, 
-    NULL
-};
-
-void setup_misdirect_virq(void)
-{
-    (void)setup_irq(bind_virq_to_irq(VIRQ_MISDIRECT), &misdirect_action);
-}
-
 void irq_suspend(void)
 {
     int pirq, virq, irq, evtchn;
@@ -598,8 +577,6 @@ void __init init_IRQ(void)
         irq_desc[pirq_to_irq(i)].depth   = 1;
         irq_desc[pirq_to_irq(i)].handler = &pirq_type;
     }
-
-    (void)setup_misdirect_virq();
 
     /* This needs to be done early, but after the IRQ subsystem is alive. */
     ctrl_if_init();
