@@ -439,6 +439,9 @@ class XendDomainInfo:
             self.memory = int(sxp.child_value(config, 'memory'))
             if self.memory is None:
                 raise VmError('missing memory size')
+            cpu = sxp.child_value(config, 'cpu')
+            if self.dom and cpu is not None:
+                xc.domain_pincpu(self.dom, int(cpu))
 
             self.init_domain()
             self.configure_console()
