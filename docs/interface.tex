@@ -19,7 +19,7 @@
 
 {\Large Xen is Copyright (c) 2004, The Xen Team} \\[3mm]
 {\Large University of Cambridge, UK} \\[20mm]
-{\large Last updated on 18th January, 2004}
+{\large Last updated on 11th March, 2004}
 \end{tabular}
 \vfill
 \end{center}
@@ -378,6 +378,64 @@ giving the page back to the hypervisor, or to use them for storing page tables.
 {\it Domain0} is responsible for building all other domains on the server
 and providing control interfaces for managing scheduling, networking, and
 blocks.
+
+
+\chapter{Debugging}
+
+Xen provides tools for debugging both Xen and guest OSes.  Currently, the
+Pervasive Debugger provides a GDB stub, which provides facilities for symbolic
+debugging of Xen itself and of OS kernels running on top of Xen.  The Trace
+Buffer provides a lightweight means to log data about Xen's internal state and
+behaviour at runtime, for later analysis.
+
+\section{Pervasive Debugger}
+
+Information on using the pervasive debugger is available in pdb.txt.
+
+
+\section{Trace Buffer}
+
+The trace buffer provides a means to observe Xen's operation from domain 0.
+Trace events, inserted at key points in Xen's code, record data that can be
+read by the {\tt xentrace} tool.  Recording these events has a low overhead
+and hence the trace buffer may be useful for debugging timing-sensitive
+behaviours.
+
+\subsection{Internal API}
+
+To use the trace buffer functionality from within Xen, you must {\tt \#include
+<xeno/trace.h>}, which contains definitions related to the trace buffer.  Trace
+events are inserted into the buffer using the {\tt TRACE\_xD} ({\tt x} = 0, 1,
+2, 3, 4 or 5) macros.  These all take an event number, plus {\tt x} additional
+(32-bit) data as their arguments.  For trace buffer-enabled builds of Xen these
+will insert the event ID and data into the trace buffer, along with the current
+value of the CPU cycle-counter.  For builds without the trace buffer enabled,
+the macros expand to no-ops and thus can be left in place without incurring
+overheads.
+
+\subsection{Enabling tracing}
+
+By default, the trace buffer is enabled only in debug builds (i.e. {\tt NDEBUG}
+is not defined).  It can be enabled separately by defining {\tt TRACE\_BUFFER},
+either in {\tt <xeno/config.h>} or on the gcc command line.
+
+\subsection{Dumping trace data}
+
+When running a trace buffer build of Xen, trace data are written continuously
+into the buffer data areas, with newer data overwriting older data.  This data
+can be captured using the {\tt xentrace} program in Domain 0.
+
+The {\tt xentrace} tool uses {\tt /dev/mem} in domain 0 to map the trace
+buffers into its address space.  It then periodically polls all the buffers for
+new data, dumping out any new records from each buffer in turn.  As a result,
+for machines with multiple (logical) CPUs, the trace buffer output will not be
+in overall chronological order.
+
+The output from {\tt xentrace} can be post-processed using {\tt
+xentrace\_split.py} (used to split trace data out into per-cpu log files) and
+{\tt xentrace\_format.py} (used to pretty-print trace data).
+
+For more information, see the {\tt xentrace} manual page.
 
 
 \chapter{Hypervisor calls}
