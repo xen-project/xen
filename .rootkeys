@@ -202,6 +202,7 @@
 405853f6nbeazrNyEWNHBuoSg2PiPA linux-2.6.8.1-xen-sparse/drivers/xen/netfront/netfront.c
 4108f5c1ppFXVpQzCOAZ6xXYubsjKA linux-2.6.8.1-xen-sparse/drivers/xen/privcmd/Makefile
 3e5a4e65IUfzzMu2kZFlGEB8-rpTaA linux-2.6.8.1-xen-sparse/drivers/xen/privcmd/privcmd.c
+412f47e4RKD-R5IS5gEXvcT8L4v8gA linux-2.6.8.1-xen-sparse/include/asm-generic/pgtable.h
 40f56239YAjS52QG2FIAQpHDZAdGHg linux-2.6.8.1-xen-sparse/include/asm-xen/asm-i386/desc.h
 4107adf1E5O4ztGHNGMzCCNhcvqNow linux-2.6.8.1-xen-sparse/include/asm-xen/asm-i386/dma-mapping.h
 40f5623anSzpuEHgiNmQ56fIRfCoaQ linux-2.6.8.1-xen-sparse/include/asm-xen/asm-i386/e820.h
@@ -252,6 +253,7 @@
 4124f66fp5QwbDHEfoUIa7pqO5Xhag linux-2.6.8.1-xen-sparse/include/linux/page-flags.h
 4124f66f4NaKNa0xPiGGykn9QaZk3w linux-2.6.8.1-xen-sparse/include/linux/skbuff.h
 40f56a0ddHCSs3501MY4hRf22tctOw linux-2.6.8.1-xen-sparse/mkbuildtree
+412f46c0LJuKAgSPGoC0Z1DEkLfuLA linux-2.6.8.1-xen-sparse/mm/memory.c
 410a94a4KT6I6X0LVc7djB39tRDp4g linux-2.6.8.1-xen-sparse/mm/page_alloc.c
 40e1b09db5mN69Ijj0X_Eol-S7dXiw tools/Make.defs
 3f776bd1Hy9rn69ntXBhPReUFw9IEA tools/Makefile

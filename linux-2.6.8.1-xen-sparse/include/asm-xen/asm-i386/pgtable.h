@@ -436,11 +436,30 @@ extern pte_t *lookup_address(unsigned long address);
 			    HYPERVISOR_update_va_mapping(address>>PAGE_SHIFT, entry, UVMF_INVLPG); \
 			} else {                                          \
                             xen_l1_entry_update((__ptep), (__entry).pte_low); \
+			    flush_tlb_page(__vma, __address);             \
 			}                                                 \
 		}							  \
 	} while (0)
 
 #endif
+
+#define __HAVE_ARCH_PTEP_ESTABLISH
+#define ptep_establish(__vma, __address, __ptep, __entry)		\
+do {				  					\
+	ptep_set_access_flags(__vma, __address, __ptep, __entry, 1);	\
+} while (0)
+
+#define __HAVE_ARCH_PTEP_ESTABLISH_NEW
+#define ptep_establish_new(__vma, __address, __ptep, __entry)		\
+do {				  					\
+	if ( likely((__vma)->vm_mm == current->mm) ) {			\
+		xen_flush_page_update_queue();				\
+		HYPERVISOR_update_va_mapping((__address)>>PAGE_SHIFT,	\
+					     __entry, 0);		\
+	} else {							\
+		xen_l1_entry_update((__ptep), (__entry).pte_low);	\
+	}								\
+} while (0)
 
 /* Encode and de-code a swap entry */
 #define __swp_type(x)			(((x).val >> 1) & 0x1f)
