@@ -34,7 +34,7 @@ CONFIG_SYSVIPC=y
 CONFIG_SYSCTL=y
 # CONFIG_AUDIT is not set
 CONFIG_LOG_BUF_SHIFT=14
-# CONFIG_HOTPLUG is not set
+CONFIG_HOTPLUG=y
 # CONFIG_IKCONFIG is not set
 # CONFIG_EMBEDDED is not set
 CONFIG_KALLSYMS=y
@@ -127,6 +127,7 @@ CONFIG_BINFMT_ELF=y
 #
 # Generic Driver Options
 #
+# CONFIG_FW_LOADER is not set
 
 #
 # SCSI device support
