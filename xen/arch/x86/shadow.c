@@ -200,8 +200,6 @@ int shadow_mode_enable( struct domain *p, unsigned int mode )
     struct shadow_status **fptr;
     int i;
 
-    m->shadow_mode = mode;
- 
     // allocate hashtable
     m->shadow_ht = xmalloc(shadow_ht_buckets * 
                            sizeof(struct shadow_status));
@@ -241,16 +239,25 @@ int shadow_mode_enable( struct domain *p, unsigned int mode )
         if( m->shadow_dirty_bitmap == NULL )
         {
             m->shadow_dirty_bitmap_size = 0;
+			BUG();
             goto nomem;
         }
         memset(m->shadow_dirty_bitmap,0,m->shadow_dirty_bitmap_size/8);
     }
+
+    m->shadow_mode = mode;
 
     // call shadow_mk_pagetable
     __shadow_mk_pagetable( m );
     return 0;
 
 nomem:
+    if( m->shadow_ht ) {
+		xfree( m->shadow_ht ); m->shadow_ht = NULL; };
+
+    if( m->shadow_ht_extras )  {
+		xfree( m->shadow_ht_extras ); m->shadow_ht_extras = NULL; };
+
     return -ENOMEM;
 }
 
@@ -285,7 +292,10 @@ void __shadow_mode_disable(struct domain *d)
     }
 
     // free the hashtable itself
-    xfree( &m->shadow_ht[0] );
+    xfree( m->shadow_ht );
+
+	m->shadow_ht = NULL;
+	m->shadow_ht_extras = NULL;
 }
 
 static int shadow_mode_table_op(struct domain *d, 
@@ -314,8 +324,6 @@ static int shadow_mode_table_op(struct domain *d,
     switch(op)
     {
     case DOM0_SHADOW_CONTROL_OP_FLUSH:
-        // XXX THIS IS VERY DANGEROUS : MUST ENSURE THE PTs ARE NOT IN USE ON
-		// OTHER CPU -- fix when we get sched sync pause.
         __free_shadow_table( m );  
         break;
    
@@ -452,12 +460,12 @@ int shadow_mode_control(struct domain *d, dom0_shadow_control_t *sc)
     else if ( cmd == DOM0_SHADOW_CONTROL_OP_ENABLE_TEST )
     {
         shadow_mode_disable(d);
-        shadow_mode_enable(d, SHM_test);
+        rc = shadow_mode_enable(d, SHM_test);
     } 
     else if ( cmd == DOM0_SHADOW_CONTROL_OP_ENABLE_LOGDIRTY )
     {
         shadow_mode_disable(d);
-        shadow_mode_enable(d, SHM_logdirty);
+        rc = shadow_mode_enable(d, SHM_logdirty);
     } 
     else if ( shadow_mode(d) && 
               (cmd >= DOM0_SHADOW_CONTROL_OP_FLUSH) && 

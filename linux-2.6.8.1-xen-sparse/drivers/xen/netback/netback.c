@@ -13,6 +13,7 @@
 #include "common.h"
 
 static void netif_page_release(struct page *page);
+static void netif_skb_release(struct sk_buff *skb);
 static void make_tx_response(netif_t *netif, 
                              u16      id,
                              s8       st);
@@ -40,7 +41,8 @@ static unsigned char rx_notify[NR_EVENT_CHANNELS];
 static unsigned long mmap_vstart;
 #define MMAP_VADDR(_req) (mmap_vstart + ((_req) * PAGE_SIZE))
 
-#define PKT_PROT_LEN (ETH_HLEN + 20)
+#define PKT_MIN_LEN (ETH_HLEN + 20)
+#define PKT_PROT_LEN 64
 
 static struct {
     netif_tx_request_t req;
@@ -385,6 +387,7 @@ static void net_tx_action(unsigned long unused)
     NETIF_RING_IDX i;
     multicall_entry_t *mcl;
     PEND_RING_IDX dc, dp;
+    unsigned int data_len;
 
     if ( (dc = dealloc_cons) == (dp = dealloc_prod) )
         goto skip_dealloc;
@@ -497,7 +500,7 @@ static void net_tx_action(unsigned long unused)
 
         netif_schedule_work(netif);
 
-        if ( unlikely(txreq.size <= PKT_PROT_LEN) || 
+        if ( unlikely(txreq.size <= PKT_MIN_LEN) || 
              unlikely(txreq.size > ETH_FRAME_LEN) )
         {
             DPRINTK("Bad packet size: %d\n", txreq.size);
@@ -519,7 +522,9 @@ static void net_tx_action(unsigned long unused)
 
         pending_idx = pending_ring[MASK_PEND_IDX(pending_cons)];
 
-        if ( unlikely((skb = alloc_skb(PKT_PROT_LEN+16, GFP_ATOMIC)) == NULL) )
+        data_len = txreq.size > PKT_PROT_LEN ? PKT_PROT_LEN : txreq.size;
+
+        if ( unlikely((skb = alloc_skb(data_len+16, GFP_ATOMIC)) == NULL) )
         {
             DPRINTK("Can't allocate a skb in start_xmit.\n");
             make_tx_response(netif, txreq.id, NETIF_RSP_ERROR);
@@ -578,19 +583,28 @@ static void net_tx_action(unsigned long unused)
         phys_to_machine_mapping[__pa(MMAP_VADDR(pending_idx)) >> PAGE_SHIFT] =
             FOREIGN_FRAME(txreq.addr >> PAGE_SHIFT);
 
-        __skb_put(skb, PKT_PROT_LEN);
+        data_len = txreq.size > PKT_PROT_LEN ? PKT_PROT_LEN : txreq.size;
+
+        __skb_put(skb, data_len);
         memcpy(skb->data, 
                (void *)(MMAP_VADDR(pending_idx)|(txreq.addr&~PAGE_MASK)),
-               PKT_PROT_LEN);
+               data_len);
 
-        /* Append the packet payload as a fragment. */
-        skb_shinfo(skb)->frags[0].page        = 
-            virt_to_page(MMAP_VADDR(pending_idx));
-        skb_shinfo(skb)->frags[0].size        = txreq.size - PKT_PROT_LEN;
-        skb_shinfo(skb)->frags[0].page_offset = 
-            (txreq.addr + PKT_PROT_LEN) & ~PAGE_MASK;
-        skb_shinfo(skb)->nr_frags = 1;
-        skb->data_len  = txreq.size - PKT_PROT_LEN;
+        if (data_len < txreq.size) {
+            /* Append the packet payload as a fragment. */
+            skb_shinfo(skb)->frags[0].page        = 
+                virt_to_page(MMAP_VADDR(pending_idx));
+            skb_shinfo(skb)->frags[0].size        = txreq.size - data_len;
+            skb_shinfo(skb)->frags[0].page_offset = 
+                (txreq.addr + data_len) & ~PAGE_MASK;
+            skb_shinfo(skb)->nr_frags = 1;
+        } else {
+            skb_shinfo(skb)->frags[0].page        = 
+                virt_to_page(MMAP_VADDR(pending_idx));
+            skb->destructor = netif_skb_release;
+        }
+
+        skb->data_len  = txreq.size - data_len;
         skb->len      += skb->data_len;
 
         skb->dev      = netif->dev;
@@ -606,19 +620,33 @@ static void net_tx_action(unsigned long unused)
     }
 }
 
-static void netif_page_release(struct page *page)
+static void netif_idx_release(u16 pending_idx)
 {
     unsigned long flags;
-    u16 pending_idx = page - virt_to_page(mmap_vstart);
-
-    /* Ready for next use. */
-    set_page_count(page, 1);
 
     spin_lock_irqsave(&dealloc_lock, flags);
     dealloc_ring[MASK_PEND_IDX(dealloc_prod++)] = pending_idx;
     spin_unlock_irqrestore(&dealloc_lock, flags);
 
     tasklet_schedule(&net_tx_tasklet);
+}
+
+static void netif_page_release(struct page *page)
+{
+    u16 pending_idx = page - virt_to_page(mmap_vstart);
+
+    /* Ready for next use. */
+    set_page_count(page, 1);
+
+    netif_idx_release(pending_idx);
+}
+
+static void netif_skb_release(struct sk_buff *skb)
+{
+    struct page *page = skb_shinfo(skb)->frags[0].page;
+    u16 pending_idx = page - virt_to_page(mmap_vstart);
+
+    netif_idx_release(pending_idx);
 }
 
 #if 0

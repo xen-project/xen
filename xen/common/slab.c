@@ -321,6 +321,8 @@ static cache_sizes_t cache_sizes[] = {
     {  4096,	NULL},
     {  8192,	NULL},
     { 16384,	NULL},
+    { 32768,	NULL},
+    { 65536,	NULL},
     {     0,	NULL}
 };
 

@@ -17,6 +17,8 @@ comment 'Xen'
 bool 'Support for privileged operations (domain 0)' CONFIG_XEN_PRIVILEGED_GUEST
 bool 'Device-driver domain (physical device access)' CONFIG_XEN_PHYSDEV_ACCESS
 bool 'Scrub memory before freeing it to Xen' CONFIG_XEN_SCRUB_PAGES
+bool 'Network-device frontend driver' CONFIG_XEN_NETDEV_FRONTEND
+bool 'Block-device frontend driver' CONFIG_XEN_BLKDEV_FRONTEND
 endmenu
 # The IBM S/390 patch needs this.
 define_bool CONFIG_NO_IDLE_HZ y
