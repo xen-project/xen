@@ -538,44 +538,58 @@ int console_export(char *str, int len)
 long do_console_write(char *str, unsigned int count)
 {
 #define SIZEOF_BUF 256
-    unsigned char safe_str[SIZEOF_BUF];
-    unsigned char exported_str[SIZEOF_BUF+1];
+    unsigned char safe_str[SIZEOF_BUF+1];
+    unsigned char exported_str[SIZEOF_BUF+2];
     unsigned char dom_id[5];
+    unsigned char *p;
     unsigned long flags;
-    int i=0;
-    int j=0;
-    unsigned char prev = '\n';
+    int j;
     
-    if ( count > SIZEOF_BUF ) count = SIZEOF_BUF;
+    if ( count == 0 )
+        return 0;
+
+    if ( count > SIZEOF_BUF ) 
+        count = SIZEOF_BUF;
     
     if ( copy_from_user(safe_str, str, count) )
         return -EFAULT;
+    safe_str[count] = '\0';
     
-    spin_lock_irqsave(&console_lock, flags);
-
-    __putstr("DOM"); 
-    sprintf(dom_id, "%d", current->domain);
-    __putstr(dom_id);
-    __putstr(": ");
-    
-    for ( i = 0; i < count; i++ )
+    p = safe_str;
+    while ( *p != '\0' )
     {
-	exported_str[j++]=safe_str[i];
-	
-        if ( !safe_str[i] ) break;
-        putchar(prev = safe_str[i]);
+        j = 0;
+
+        spin_lock_irqsave(&console_lock, flags);
+        
+        __putstr("DOM"); 
+        sprintf(dom_id, "%d", current->domain);
+        __putstr(dom_id);
+        __putstr(": ");
+        
+        while ( (*p != '\0') && (*p != '\n') )
+        {
+            exported_str[j++] = *p;
+            putchar(*p);
+            p++;
+        }
+
+        if ( *p == '\n' )
+            p++;
+
+        putchar('\n');
+        
+        spin_unlock_irqrestore(&console_lock, flags);
+
+        if ( current->domain != 0 )
+        {
+            exported_str[j++] = '\n';
+            exported_str[j++] = '\0';
+            console_export(exported_str, j);
+        }
     }
-    
-    if ( prev != '\n' ) putchar('\n');
-    
-    spin_unlock_irqrestore(&console_lock, flags);
-    
-    exported_str[j++]='\0';
-    
-    if ( current->domain != 0 )
-        console_export(exported_str, j);
-    
-    return(0);
+
+    return 0;
 }
 
 
