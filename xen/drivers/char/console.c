@@ -245,8 +245,6 @@ static void switch_serial_input(void)
 
 static void __serial_rx(unsigned char c, struct pt_regs *regs)
 {
-    struct domain *d;
-
     if ( xen_rx )
     {
         handle_keypress(c);
@@ -255,11 +253,7 @@ static void __serial_rx(unsigned char c, struct pt_regs *regs)
     {
         serial_rx_ring[SERIAL_RX_MASK(serial_rx_prod)] = c;
         if ( serial_rx_prod++ == serial_rx_cons )
-        {
-            d = find_domain_by_id(0); /* only DOM0 reads the serial buffer */
-            send_guest_virq(d, VIRQ_CONSOLE);
-            put_domain(d);
-        }
+            send_guest_virq(dom0, VIRQ_CONSOLE);
     }
 }
 

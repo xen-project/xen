@@ -440,7 +440,7 @@ static task_slice_t bvt_do_schedule(s_time_t now)
     {
         ASSERT(!local_irq_is_enabled());
 
-        write_lock(&tasklist_lock);
+        write_lock(&domlist_lock);
         
         for_each_domain ( p )
         {
@@ -452,7 +452,7 @@ static task_slice_t bvt_do_schedule(s_time_t now)
             }
         } 
         
-        write_unlock(&tasklist_lock);
+        write_unlock(&domlist_lock);
         
         CPU_SVT(cpu) -= 0xe0000000;
     }

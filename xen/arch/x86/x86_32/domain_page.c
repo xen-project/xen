@@ -17,6 +17,7 @@
 #include <xen/perfc.h>
 #include <asm/domain_page.h>
 #include <asm/flushtlb.h>
+#include <asm/hardirq.h>
 
 unsigned long *mapcache;
 static unsigned int map_idx, epoch, shadow_epoch[NR_CPUS];
@@ -43,11 +44,11 @@ void *map_domain_mem(unsigned long pa)
     unsigned long va;
     unsigned int idx, cpu = smp_processor_id();
     unsigned long *cache = mapcache;
-    unsigned long flags;
 
+    ASSERT(!in_irq());
     perfc_incrc(map_domain_mem_count);
 
-    spin_lock_irqsave(&map_lock, flags);
+    spin_lock(&map_lock);
 
     /* Has some other CPU caused a wrap? We must flush if so. */
     if ( epoch != shadow_epoch[cpu] )
@@ -71,7 +72,7 @@ void *map_domain_mem(unsigned long pa)
 
     cache[idx] = (pa & PAGE_MASK) | __PAGE_HYPERVISOR;
 
-    spin_unlock_irqrestore(&map_lock, flags);
+    spin_unlock(&map_lock);
 
     va = MAPCACHE_VIRT_START + (idx << PAGE_SHIFT) + (pa & ~PAGE_MASK);
     return (void *)va;

@@ -5,7 +5,7 @@
 struct domain;
 struct pfn_info;
 
-/* Generic allocator */
+/* Generic allocator. These functions are *not* interrupt-safe. */
 unsigned long init_heap_allocator(
     unsigned long bitmap_start, unsigned long max_pages);
 void init_heap_pages(int zone, struct pfn_info *pg, unsigned long nr_pages);
@@ -13,14 +13,14 @@ struct pfn_info *alloc_heap_pages(int zone, int order);
 void free_heap_pages(int zone, struct pfn_info *pg, int order);
 void scrub_heap_pages(void);
 
-/* Xen suballocator */
+/* Xen suballocator. These functions are interrupt-safe. */
 void init_xenheap_pages(unsigned long ps, unsigned long pe);
 unsigned long alloc_xenheap_pages(int order);
 void free_xenheap_pages(unsigned long p, int order);
 #define alloc_xenheap_page() (alloc_xenheap_pages(0))
 #define free_xenheap_page(_p) (free_xenheap_pages(_p,0))
 
-/* Domain suballocator */
+/* Domain suballocator. These functions are *not* interrupt-safe.*/
 void init_domheap_pages(unsigned long ps, unsigned long pe);
 struct pfn_info *alloc_domheap_pages(struct domain *d, int order);
 void free_domheap_pages(struct pfn_info *pg, int order);

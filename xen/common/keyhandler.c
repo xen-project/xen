@@ -66,7 +66,6 @@ static void halt_machine(unsigned char key)
 
 void do_task_queues(unsigned char key)
 {
-    unsigned long  flags;
     struct domain *d;
     s_time_t       now = NOW();
     struct list_head *ent;
@@ -75,7 +74,7 @@ void do_task_queues(unsigned char key)
     printk("'%c' pressed -> dumping task queues (now=0x%X:%08X)\n", key,
            (u32)(now>>32), (u32)now); 
 
-    read_lock_irqsave(&tasklist_lock, flags); 
+    read_lock(&domlist_lock);
 
     for_each_domain ( d )
     {
@@ -108,7 +107,7 @@ void do_task_queues(unsigned char key)
         send_guest_virq(d, VIRQ_DEBUG);
     }
 
-    read_unlock_irqrestore(&tasklist_lock, flags); 
+    read_unlock(&domlist_lock);
 }
 
 extern void dump_runq(unsigned char key);

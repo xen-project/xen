@@ -29,6 +29,7 @@
 unsigned long xenheap_phys_end;
 
 xmem_cache_t *domain_struct_cachep;
+struct domain *dom0;
 
 vm_assist_info_t vm_assist_info[MAX_VMASST_TYPE + 1];
 
@@ -132,7 +133,6 @@ static struct {
 
 void cmain(multiboot_info_t *mbi)
 {
-    struct domain *new_dom;
     unsigned long max_page;
     unsigned char *cmdline;
     module_t *mod = (module_t *)__va(mbi->mods_addr);
@@ -308,11 +308,11 @@ void cmain(multiboot_info_t *mbi)
     grant_table_init();
 
     /* Create initial domain 0. */
-    new_dom = do_createdomain(0, 0);
-    if ( new_dom == NULL )
+    dom0 = do_createdomain(0, 0);
+    if ( dom0 == NULL )
         panic("Error creating domain 0\n");
 
-    set_bit(DF_PRIVILEGED, &new_dom->flags);
+    set_bit(DF_PRIVILEGED, &dom0->flags);
 
     shadow_mode_init();
 
@@ -329,7 +329,7 @@ void cmain(multiboot_info_t *mbi)
      * We're going to setup domain0 using the module(s) that we stashed safely
      * above our heap. The second module, if present, is an initrd ramdisk.
      */
-    if ( construct_dom0(new_dom, dom0_memory_start, dom0_memory_end,
+    if ( construct_dom0(dom0, dom0_memory_start, dom0_memory_end,
                         (char *)initial_images_start, 
                         mod[0].mod_end-mod[0].mod_start,
                         (mbi->mods_count == 1) ? 0 :
@@ -349,7 +349,7 @@ void cmain(multiboot_info_t *mbi)
     init_trace_bufs();
 
     domain_unpause_by_systemcontroller(current);
-    domain_unpause_by_systemcontroller(new_dom);
+    domain_unpause_by_systemcontroller(dom0);
     startup_cpu_idle_loop();
 }
 

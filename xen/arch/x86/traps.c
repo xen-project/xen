@@ -578,18 +578,14 @@ asmlinkage void do_nmi(struct pt_regs * regs, unsigned long reason)
 unsigned long nmi_softirq_reason;
 static void nmi_softirq(void)
 {
-    struct domain *d = find_domain_by_id(0);
-
-    if ( d == NULL )
+    if ( dom0 == NULL )
         return;
 
     if ( test_and_clear_bit(0, &nmi_softirq_reason) )
-        send_guest_virq(d, VIRQ_PARITY_ERR);
+        send_guest_virq(dom0, VIRQ_PARITY_ERR);
 
     if ( test_and_clear_bit(1, &nmi_softirq_reason) )
-        send_guest_virq(d, VIRQ_IO_ERR);
-
-    put_domain(d);
+        send_guest_virq(dom0, VIRQ_IO_ERR);
 }
 
 asmlinkage void math_state_restore(struct pt_regs *regs, long error_code)

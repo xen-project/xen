@@ -44,7 +44,6 @@ static unsigned long *alloc_bitmap;
 #define allocated_in_map(_pn) \
 (alloc_bitmap[(_pn)/PAGES_PER_MAPWORD] & (1<<((_pn)&(PAGES_PER_MAPWORD-1))))
 
-
 /*
  * Hint regarding bitwise arithmetic in map_{alloc,free}:
  *  -(1<<n)  sets all bits >= n. 
@@ -134,7 +133,6 @@ static unsigned long avail[NR_ZONES];
 
 static spinlock_t heap_lock = SPIN_LOCK_UNLOCKED;
 
-
 /* Initialise allocator to handle up to @max_pages. */
 unsigned long init_heap_allocator(
     unsigned long bitmap_start, unsigned long max_pages)
@@ -184,6 +182,7 @@ unsigned long init_heap_allocator(
     return bitmap_start + bitmap_size;
 }
 
+
 /* Hand the specified arbitrary page range to the specified heap zone. */
 void init_heap_pages(int zone, struct pfn_info *pg, unsigned long nr_pages)
 {
@@ -203,12 +202,11 @@ struct pfn_info *alloc_heap_pages(int zone, int order)
 {
     int i;
     struct pfn_info *pg;
-    unsigned long flags;
 
     if ( unlikely(order < MIN_ORDER) || unlikely(order > MAX_ORDER) )
         return NULL;
 
-    spin_lock_irqsave(&heap_lock, flags);
+    spin_lock(&heap_lock);
 
     /* Find smallest order which can satisfy the request. */
     for ( i = order; i < NR_ORDERS; i++ )
@@ -232,12 +230,12 @@ struct pfn_info *alloc_heap_pages(int zone, int order)
     map_alloc(page_to_pfn(pg), 1 << order);
     avail[zone] -= 1 << order;
 
-    spin_unlock_irqrestore(&heap_lock, flags);
+    spin_unlock(&heap_lock);
 
     return pg;
 
  no_memory:
-    spin_unlock_irqrestore(&heap_lock, flags);
+    spin_unlock(&heap_lock);
     return NULL;
 }
 
@@ -246,9 +244,8 @@ struct pfn_info *alloc_heap_pages(int zone, int order)
 void free_heap_pages(int zone, struct pfn_info *pg, int order)
 {
     unsigned long mask;
-    unsigned long flags;
 
-    spin_lock_irqsave(&heap_lock, flags);
+    spin_lock(&heap_lock);
 
     map_free(page_to_pfn(pg), 1 << order);
     avail[zone] += 1 << order;
@@ -282,7 +279,7 @@ void free_heap_pages(int zone, struct pfn_info *pg, int order)
     PFN_ORDER(pg) = order;
     list_add_tail(&pg->list, &heap[zone][order]);
 
-    spin_unlock_irqrestore(&heap_lock, flags);
+    spin_unlock(&heap_lock);
 }
 
 
@@ -324,19 +321,31 @@ void scrub_heap_pages(void)
 
 void init_xenheap_pages(unsigned long ps, unsigned long pe)
 {
+    unsigned long flags;
+
     ps = round_pgup(ps);
     pe = round_pgdown(pe);
+
     memguard_guard_range(__va(ps), pe - ps);
+
+    local_irq_save(flags);
     init_heap_pages(MEMZONE_XEN, phys_to_page(ps), (pe - ps) >> PAGE_SHIFT);
+    local_irq_restore(flags);
 }
+
 
 unsigned long alloc_xenheap_pages(int order)
 {
+    unsigned long flags;
     struct pfn_info *pg;
     int i, attempts = 0;
 
  retry:
-    if ( unlikely((pg = alloc_heap_pages(MEMZONE_XEN, order)) == NULL) )
+    local_irq_save(flags);
+    pg = alloc_heap_pages(MEMZONE_XEN, order);
+    local_irq_restore(flags);
+
+    if ( unlikely(pg == NULL) )
         goto no_memory;
 
     memguard_unguard_range(page_to_virt(pg), 1 << (order + PAGE_SHIFT));
@@ -362,10 +371,16 @@ unsigned long alloc_xenheap_pages(int order)
     return 0;
 }
 
+
 void free_xenheap_pages(unsigned long p, int order)
 {
+    unsigned long flags;
+
     memguard_guard_range((void *)p, 1 << (order + PAGE_SHIFT));    
+
+    local_irq_save(flags);
     free_heap_pages(MEMZONE_XEN, virt_to_page(p), order);
+    local_irq_restore(flags);
 }
 
 
@@ -376,10 +391,14 @@ void free_xenheap_pages(unsigned long p, int order)
 
 void init_domheap_pages(unsigned long ps, unsigned long pe)
 {
+    ASSERT(!in_irq());
+
     ps = round_pgup(ps);
     pe = round_pgdown(pe);
+
     init_heap_pages(MEMZONE_DOM, phys_to_page(ps), (pe - ps) >> PAGE_SHIFT);
 }
+
 
 struct pfn_info *alloc_domheap_pages(struct domain *d, int order)
 {
@@ -456,11 +475,14 @@ struct pfn_info *alloc_domheap_pages(struct domain *d, int order)
     return pg;
 }
 
+
 void free_domheap_pages(struct pfn_info *pg, int order)
 {
     int            i, drop_dom_ref;
     struct domain *d = pg->u.inuse.domain;
     void          *p;
+
+    ASSERT(!in_irq());
 
     if ( unlikely(IS_XEN_HEAP_FRAME(pg)) )
     {
@@ -518,8 +540,8 @@ void free_domheap_pages(struct pfn_info *pg, int order)
         put_domain(d);
 }
 
+
 unsigned long avail_domheap_pages(void)
 {
     return avail[MEMZONE_DOM];
 }
-

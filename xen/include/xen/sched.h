@@ -22,9 +22,12 @@
 #include <xen/grant_table.h>
 
 extern unsigned long volatile jiffies;
-extern rwlock_t tasklist_lock;
+extern rwlock_t domlist_lock;
 
 struct domain;
+
+/* A global pointer to the initial domain (DOM0). */
+extern struct domain *dom0;
 
 typedef struct event_channel_st
 {
@@ -251,14 +254,14 @@ void continue_cpu_idle_loop(void);
 
 void continue_nonidle_task(void);
 
-/* This task_hash and task_list are protected by the tasklist_lock. */
-#define TASK_HASH_SIZE 256
-#define TASK_HASH(_id) ((int)(_id)&(TASK_HASH_SIZE-1))
-extern struct domain *task_hash[TASK_HASH_SIZE];
-extern struct domain *task_list;
+/* This domain_hash and domain_list are protected by the domlist_lock. */
+#define DOMAIN_HASH_SIZE 256
+#define DOMAIN_HASH(_id) ((int)(_id)&(DOMAIN_HASH_SIZE-1))
+extern struct domain *domain_hash[DOMAIN_HASH_SIZE];
+extern struct domain *domain_list;
 
 #define for_each_domain(_p) \
- for ( (_p) = task_list; (_p) != NULL; (_p) = (_p)->next_list )
+ for ( (_p) = domain_list; (_p) != NULL; (_p) = (_p)->next_list )
 
 #define DF_DONEFPUINIT  0 /* Has the FPU been initialised for this task?    */
 #define DF_USEDFPU      1 /* Has this task used the FPU since last save?    */

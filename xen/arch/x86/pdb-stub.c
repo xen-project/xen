@@ -99,7 +99,6 @@ pdb_process_query (char *ptr)
     {
 #ifdef PDB_PAST
         struct domain *p;
-        u_long flags;
 #endif /* PDB_PAST */
 
         int buf_idx = 0;
@@ -114,7 +113,7 @@ pdb_process_query (char *ptr)
 	{
 	    int count = 0;
 
-	    read_lock_irqsave (&tasklist_lock, flags);
+	    read_lock(&domlist_lock);
 
 	    pdb_out_buffer[buf_idx++] = 'm';
 	    for_each_domain ( p )
@@ -134,7 +133,7 @@ pdb_process_query (char *ptr)
 	    }
 	    pdb_out_buffer[buf_idx++] = 0;
 
-	    read_unlock_irqrestore(&tasklist_lock, flags);
+	    read_unlock(&domlist_lock);
 	    break;
 	}
 	case PDB_LVL_GUESTOS:                  /* return a list of processes */
@@ -197,9 +196,7 @@ pdb_process_query (char *ptr)
 	char message[16];
 	struct domain *p;
 
-	p = find_domain_by_id(pdb_ctx[pdb_level].info);
-	strncpy (message, p->name, 16);
-	put_domain(p);
+	strncpy (message, dom0->name, 16);
 
 	ptr += 16;
         if (hexToInt (&ptr, &thread))
@@ -914,11 +911,9 @@ int pdb_change_values_one_page(u_char *buffer, int length,
 	}
 	else
 	{
-	    struct domain *p = find_domain_by_id(0);
 	    printk ("pdb error: cr3: 0x%lx    dom0cr3:  0x%lx\n",  cr3,
-		    p->mm.shadow_mode ? pagetable_val(p->mm.shadow_table)
-		    : pagetable_val(p->mm.pagetable));
-	    put_domain(p);
+		    dom0->mm.shadow_mode ? pagetable_val(dom0->mm.shadow_table)
+		    : pagetable_val(dom0->mm.pagetable));
 	    printk ("pdb error: L2:0x%p (0x%lx)\n", 
 		    l2_table, l2_pgentry_val(*l2_table));
 	}

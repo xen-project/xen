@@ -17,15 +17,14 @@
 #include <public/dom0_ops.h>
 #include <asm/domain_page.h>
 
-/* Both these structures are protected by the tasklist_lock. */
-rwlock_t tasklist_lock __cacheline_aligned = RW_LOCK_UNLOCKED;
-struct domain *task_hash[TASK_HASH_SIZE];
-struct domain *task_list;
+/* Both these structures are protected by the domlist_lock. */
+rwlock_t domlist_lock __cacheline_aligned = RW_LOCK_UNLOCKED;
+struct domain *domain_hash[DOMAIN_HASH_SIZE];
+struct domain *domain_list;
 
 struct domain *do_createdomain(domid_t dom_id, unsigned int cpu)
 {
     struct domain *d, **pd;
-    unsigned long flags;
 
     if ( (d = alloc_domain_struct()) == NULL )
         return NULL;
@@ -62,16 +61,16 @@ struct domain *do_createdomain(domid_t dom_id, unsigned int cpu)
 
         sched_add_domain(d);
 
-        write_lock_irqsave(&tasklist_lock, flags);
-        pd = &task_list; /* NB. task_list is maintained in order of dom_id. */
-        for ( pd = &task_list; *pd != NULL; pd = &(*pd)->next_list )
+        write_lock(&domlist_lock);
+        pd = &domain_list; /* NB. domain_list maintained in order of dom_id. */
+        for ( pd = &domain_list; *pd != NULL; pd = &(*pd)->next_list )
             if ( (*pd)->id > d->id )
                 break;
         d->next_list = *pd;
         *pd = d;
-        d->next_hash = task_hash[TASK_HASH(dom_id)];
-        task_hash[TASK_HASH(dom_id)] = d;
-        write_unlock_irqrestore(&tasklist_lock, flags);
+        d->next_hash = domain_hash[DOMAIN_HASH(dom_id)];
+        domain_hash[DOMAIN_HASH(dom_id)] = d;
+        write_unlock(&domlist_lock);
     }
     else
     {
@@ -85,10 +84,9 @@ struct domain *do_createdomain(domid_t dom_id, unsigned int cpu)
 struct domain *find_domain_by_id(domid_t dom)
 {
     struct domain *d;
-    unsigned long flags;
 
-    read_lock_irqsave(&tasklist_lock, flags);
-    d = task_hash[TASK_HASH(dom)];
+    read_lock(&domlist_lock);
+    d = domain_hash[DOMAIN_HASH(dom)];
     while ( d != NULL )
     {
         if ( d->id == dom )
@@ -99,7 +97,7 @@ struct domain *find_domain_by_id(domid_t dom)
         }
         d = d->next_hash;
     }
-    read_unlock_irqrestore(&tasklist_lock, flags);
+    read_unlock(&domlist_lock);
 
     return d;
 }
@@ -109,10 +107,9 @@ struct domain *find_domain_by_id(domid_t dom)
 struct domain *find_last_domain(void)
 {
     struct domain *d, *dlast;
-    unsigned long flags;
 
-    read_lock_irqsave(&tasklist_lock, flags);
-    dlast = task_list;
+    read_lock(&domlist_lock);
+    dlast = domain_list;
     d = dlast->next_list;
     while ( d != NULL )
     {
@@ -122,7 +119,7 @@ struct domain *find_last_domain(void)
     }
     if ( !get_domain(dlast) )
         dlast = NULL;
-    read_unlock_irqrestore(&tasklist_lock, flags);
+    read_unlock(&domlist_lock);
 
     return dlast;
 }
@@ -142,16 +139,12 @@ void domain_kill(struct domain *d)
 
 void domain_crash(void)
 {
-    struct domain *d;
-
     if ( current->id == 0 )
         BUG();
 
     set_bit(DF_CRASHED, &current->flags);
 
-    d = find_domain_by_id(0);
-    send_guest_virq(d, VIRQ_DOM_EXC);
-    put_domain(d);
+    send_guest_virq(dom0, VIRQ_DOM_EXC);
     
     __enter_scheduler();
     BUG();
@@ -159,8 +152,6 @@ void domain_crash(void)
 
 void domain_shutdown(u8 reason)
 {
-    struct domain *d;
-
     if ( current->id == 0 )
     {
         extern void machine_restart(char *);
@@ -181,9 +172,7 @@ void domain_shutdown(u8 reason)
     current->shutdown_code = reason;
     set_bit(DF_SHUTDOWN, &current->flags);
 
-    d = find_domain_by_id(0);
-    send_guest_virq(d, VIRQ_DOM_EXC);
-    put_domain(d);
+    send_guest_virq(dom0, VIRQ_DOM_EXC);
 
     __enter_scheduler();
 }
@@ -217,7 +206,6 @@ unsigned int alloc_new_dom_mem(struct domain *d, unsigned int kbytes)
 void domain_destruct(struct domain *d)
 {
     struct domain **pd;
-    unsigned long flags;
     atomic_t      old, new;
 
     if ( !test_bit(DF_DYING, &d->flags) )
@@ -231,16 +219,16 @@ void domain_destruct(struct domain *d)
         return;
 
     /* Delete from task list and task hashtable. */
-    write_lock_irqsave(&tasklist_lock, flags);
-    pd = &task_list;
+    write_lock(&domlist_lock);
+    pd = &domain_list;
     while ( *pd != d ) 
         pd = &(*pd)->next_list;
     *pd = d->next_list;
-    pd = &task_hash[TASK_HASH(d->id)];
+    pd = &domain_hash[DOMAIN_HASH(d->id)];
     while ( *pd != d ) 
         pd = &(*pd)->next_hash;
     *pd = d->next_hash;
-    write_unlock_irqrestore(&tasklist_lock, flags);
+    write_unlock(&domlist_lock);
 
     destroy_event_channels(d);
     grant_table_destroy(d);

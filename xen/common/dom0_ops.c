@@ -180,10 +180,10 @@ long do_dom0_op(dom0_op_t *u_dom0_op)
             struct domain *d;
             unsigned int i, cnt[NR_CPUS] = { 0 };
 
-            read_lock_irq(&tasklist_lock);
+            read_lock(&domlist_lock);
             for_each_domain ( d )
                 cnt[d->processor]++;
-            read_unlock_irq(&tasklist_lock);
+            read_unlock(&domlist_lock);
 
             for ( i = 0; i < smp_num_cpus; i++ )
                 if ( cnt[i] < cnt[pro] )
@@ -321,9 +321,8 @@ long do_dom0_op(dom0_op_t *u_dom0_op)
     { 
         full_execution_context_t *c;
         struct domain            *d;
-        unsigned long             flags;
 
-        read_lock_irqsave(&tasklist_lock, flags);
+        read_lock(&domlist_lock);
 
         for_each_domain ( d )
         {
@@ -333,12 +332,12 @@ long do_dom0_op(dom0_op_t *u_dom0_op)
 
         if ( (d == NULL) || !get_domain(d) )
         {
-            read_unlock_irqrestore(&tasklist_lock, flags);
+            read_unlock(&domlist_lock);
             ret = -ESRCH;
             break;
         }
 
-        read_unlock_irqrestore(&tasklist_lock, flags);
+        read_unlock(&domlist_lock);
 
         op->u.getdomaininfo.domain = d->id;
         
