@@ -124,7 +124,7 @@ shadow_demote(struct domain *d, unsigned long gpfn, unsigned long gmfn)
 {
     ASSERT(frame_table[gmfn].count_info & PGC_page_table);
 
-    if ( shadow_max_pgtable_type(d, gpfn) == PGT_none )
+    if ( shadow_max_pgtable_type(d, gpfn, NULL) == PGT_none )
     {
         clear_bit(_PGC_page_table, &frame_table[gmfn].count_info);
 
@@ -273,6 +273,10 @@ alloc_shadow_page(struct domain *d,
         BUG();
         break;
     }
+
+    // Don't add a new shadow of something that already has a snapshot.
+    //
+    ASSERT( (psh_type == PGT_snapshot) || !mfn_out_of_sync(gmfn) );
 
     set_shadow_status(d, gpfn, gmfn, smfn, psh_type);
 
@@ -1566,8 +1570,10 @@ static inline unsigned long
 shadow_make_snapshot(
     struct domain *d, unsigned long gpfn, unsigned long gmfn)
 {
-    unsigned long smfn;
+    unsigned long smfn, sl1mfn;
     void *original, *snapshot;
+    u32 min_max = 0;
+    int min, max, length;
 
     if ( test_and_set_bit(_PGC_out_of_sync, &frame_table[gmfn].count_info) )
     {
@@ -1588,9 +1594,21 @@ shadow_make_snapshot(
     if ( !get_shadow_ref(smfn) )
         BUG();
 
+    if ( shadow_max_pgtable_type(d, gpfn, &sl1mfn) == PGT_l1_shadow )
+        min_max = pfn_to_page(sl1mfn)->tlbflush_timestamp;
+    pfn_to_page(smfn)->tlbflush_timestamp = min_max;
+
+    min = SHADOW_MIN(min_max);
+    max = SHADOW_MAX(min_max);
+    length = max - min + 1;
+    perfc_incr_histo(snapshot_copies, length, PT_UPDATES);
+
+    min *= sizeof(l1_pgentry_t);
+    length *= sizeof(l1_pgentry_t);
+
     original = map_domain_mem(gmfn << PAGE_SHIFT);
     snapshot = map_domain_mem(smfn << PAGE_SHIFT);
-    memcpy(snapshot, original, PAGE_SIZE);
+    memcpy(snapshot + min, original + min, length);
     unmap_domain_mem(original);
     unmap_domain_mem(snapshot);
 
@@ -2037,8 +2055,7 @@ static int resync_all(struct domain *d, u32 stype)
     unsigned long *guest, *shadow, *snapshot;
     int need_flush = 0, external = shadow_mode_external(d);
     int unshadow;
-    u32 min_max;
-    int min, max;
+    int changed;
 
     ASSERT(spin_is_locked(&d->arch.shadow_lock));
 
@@ -2063,31 +2080,49 @@ static int resync_all(struct domain *d, u32 stype)
 
         switch ( stype ) {
         case PGT_l1_shadow:
-            min_max = pfn_to_page(smfn)->tlbflush_timestamp;
-            min = SHADOW_MIN(min_max);
-            max = SHADOW_MAX(min_max);
-            for ( i = min; i <= max; i++ )
+        {
+            u32 min_max_shadow = pfn_to_page(smfn)->tlbflush_timestamp;
+            int min_shadow = SHADOW_MIN(min_max_shadow);
+            int max_shadow = SHADOW_MAX(min_max_shadow);
+
+            u32 min_max_snapshot =
+                pfn_to_page(entry->snapshot_mfn)->tlbflush_timestamp;
+            int min_snapshot = SHADOW_MIN(min_max_snapshot);
+            int max_snapshot = SHADOW_MAX(min_max_snapshot);
+
+            changed = 0;
+
+            for ( i = min_shadow; i <= max_shadow; i++ )
             {
-                unsigned new_pte = guest[i];
-                if ( new_pte != snapshot[i] )
+                if ( (i < min_snapshot) || (i > max_snapshot) ||
+                     (guest[i] != snapshot[i]) )
                 {
-                    need_flush |= validate_pte_change(d, new_pte, &shadow[i]);
+                    need_flush |= validate_pte_change(d, guest[i], &shadow[i]);
 
                     // can't update snapshots of linear page tables -- they
                     // are used multiple times...
                     //
                     // snapshot[i] = new_pte;
+
+                    changed++;
                 }
             }
+            perfc_incrc(resync_l1);
+            perfc_incr_histo(wpt_updates, changed, PT_UPDATES);
+            perfc_incr_histo(l1_entries_checked, max_shadow - min_shadow + 1, PT_UPDATES);
             break;
+        }
         case PGT_l2_shadow:
-            max = -1;
+        {
+            int max = -1;
+
+            changed = 0;
             for ( i = 0; i < L2_PAGETABLE_ENTRIES; i++ )
             {
                 if ( !is_guest_l2_slot(i) && !external )
                     continue;
 
-                unsigned new_pde = guest[i];
+                unsigned long new_pde = guest[i];
                 if ( new_pde != snapshot[i] )
                 {
                     need_flush |= validate_pde_change(d, new_pde, &shadow[i]);
@@ -2096,6 +2131,8 @@ static int resync_all(struct domain *d, u32 stype)
                     // are used multiple times...
                     //
                     // snapshot[i] = new_pde;
+
+                    changed++;
                 }
                 if ( new_pde != 0 )
                     max = i;
@@ -2109,14 +2146,18 @@ static int resync_all(struct domain *d, u32 stype)
             }
             if ( max == -1 )
                 unshadow = 1;
+            perfc_incrc(resync_l2);
+            perfc_incr_histo(shm_l2_updates, changed, PT_UPDATES);
             break;
-        default:
+        }
+        case PGT_hl2_shadow:
+            changed = 0;
             for ( i = 0; i < L2_PAGETABLE_ENTRIES; i++ )
             {
                 if ( !is_guest_l2_slot(i) && !external )
                     continue;
 
-                unsigned new_pde = guest[i];
+                unsigned long new_pde = guest[i];
                 if ( new_pde != snapshot[i] )
                 {
                     need_flush |= validate_hl2e_change(d, new_pde, &shadow[i]);
@@ -2125,9 +2166,15 @@ static int resync_all(struct domain *d, u32 stype)
                     // are used multiple times...
                     //
                     // snapshot[i] = new_pde;
+
+                    changed++;
                 }
             }
+            perfc_incrc(resync_hl2);
+            perfc_incr_histo(shm_hl2_updates, changed, PT_UPDATES);
             break;
+        default:
+            BUG();
         }
 
         unmap_domain_mem(shadow);
@@ -2176,7 +2223,7 @@ void __shadow_sync_all(struct domain *d)
         unmap_domain_mem(ppte);
     }
 
-    // XXX mafetter: SMP perf bug.
+    // XXX mafetter: SMP
     //
     // With the current algorithm, we've gotta flush all the TLBs
     // before we can safely continue.  I don't think we want to
@@ -2186,7 +2233,10 @@ void __shadow_sync_all(struct domain *d)
     // (any path from a PTE that grants write access to an out-of-sync
     // page table page needs to be vcpu private).
     //
-    flush_tlb_all();
+#if 0 // this should be enabled for SMP guests...
+    flush_tlb_mask(((1 << smp_num_cpus) - 1) & ~(1 << smp_processor_id()));
+#endif
+    need_flush = 1;
 
     // Second, resync all L1 pages, then L2 pages, etc...
     //
@@ -2195,7 +2245,7 @@ void __shadow_sync_all(struct domain *d)
         need_flush |= resync_all(d, PGT_hl2_shadow);
     need_flush |= resync_all(d, PGT_l2_shadow);
 
-    if ( need_flush )
+    if ( need_flush && !unlikely(shadow_mode_external(d)) )
         local_flush_tlb();
 
     free_out_of_sync_state(d);

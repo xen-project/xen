@@ -52,9 +52,9 @@
 #define shadow_lock(_d)      do { ASSERT(!spin_is_locked(&(_d)->arch.shadow_lock)); spin_lock(&(_d)->arch.shadow_lock); } while (0)
 #define shadow_unlock(_d)    spin_unlock(&(_d)->arch.shadow_lock)
 
-#define SHADOW_ENCODE_MIN_MAX(_min, _max) (((L1_PAGETABLE_ENTRIES - (_max)) << 16) | (_min))
+#define SHADOW_ENCODE_MIN_MAX(_min, _max) ((((L1_PAGETABLE_ENTRIES - 1) - (_max)) << 16) | (_min))
 #define SHADOW_MIN(_encoded) ((_encoded) & ((1u<<16) - 1))
-#define SHADOW_MAX(_encoded) (L1_PAGETABLE_ENTRIES - ((_encoded) >> 16))
+#define SHADOW_MAX(_encoded) ((L1_PAGETABLE_ENTRIES - 1) - ((_encoded) >> 16))
 
 extern void shadow_mode_init(void);
 extern int shadow_mode_control(struct domain *p, dom0_shadow_control_t *sc);
@@ -122,6 +122,8 @@ __shadow_sync_va(struct exec_domain *ed, unsigned long va)
 
     if ( d->arch.out_of_sync && __shadow_out_of_sync(ed, va) )
     {
+        perfc_incrc(shadow_sync_va);
+
         // XXX - could be smarter
         //
         __shadow_sync_all(ed->domain);
@@ -1006,13 +1008,16 @@ static inline unsigned long __shadow_status(
  * Either returns PGT_none, or PGT_l{1,2,3,4}_page_table.
  */
 static inline unsigned long
-shadow_max_pgtable_type(struct domain *d, unsigned long gpfn)
+shadow_max_pgtable_type(struct domain *d, unsigned long gpfn,
+                        unsigned long *smfn)
 {
     struct shadow_status *x;
     unsigned long pttype = PGT_none, type;
 
     ASSERT(spin_is_locked(&d->arch.shadow_lock));
     ASSERT(gpfn == (gpfn & PGT_mfn_mask));
+
+    perfc_incrc(shadow_max_type);
 
     x = hash_bucket(d, gpfn);
 
@@ -1044,7 +1049,11 @@ shadow_max_pgtable_type(struct domain *d, unsigned long gpfn)
             }
 
             if ( type > pttype )
+            {
                 pttype = type;
+                if ( smfn )
+                    *smfn = x->smfn;
+            }
         }
     next:
         x = x->next;
