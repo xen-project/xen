@@ -1,8 +1,12 @@
 
+#include <linux/version.h>
 #include <linux/module.h>
+#include <linux/reboot.h>
 #include <asm-xen/hypervisor.h>
 
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,0)
 int reboot_thru_bios = 0;	/* for dmi_scan.c */
+#endif
 
 void machine_restart(char * __unused)
 {
@@ -12,21 +16,18 @@ void machine_restart(char * __unused)
 	HYPERVISOR_reboot();
 }
 
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,0)
 EXPORT_SYMBOL(machine_restart);
+#endif
 
 void machine_halt(void)
 {
-	/* We really want to get pending console data out before we die. */
-	extern void xencons_force_flush(void);
-	xencons_force_flush();
-	for ( ; ; ) /* loop without wasting cpu cycles */
-	{
-		HYPERVISOR_shared_info->vcpu_data[0].evtchn_upcall_pending = 0;
-		HYPERVISOR_block();
-	}
+	machine_power_off();
 }
 
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,0)
 EXPORT_SYMBOL(machine_halt);
+#endif
 
 void machine_power_off(void)
 {
@@ -36,4 +37,6 @@ void machine_power_off(void)
 	HYPERVISOR_shutdown();
 }
 
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,0)
 EXPORT_SYMBOL(machine_power_off);
+#endif
