@@ -316,4 +316,24 @@ int memguard_is_guarded(void *p);
 #define memguard_is_guarded(_p)        (0)
 #endif
 
+/*  */
+extern unsigned long ptwr_disconnected;
+extern int ptwr_writable_idx;
+void ptwr_reconnect_disconnected(unsigned long addr);
+void ptwr_flush_inactive(void);
+int ptwr_do_page_fault(unsigned long);
+
+#define PTRW_CLEANUP_ACTIVE	1
+#define PTRW_CLEANUP_INACTIVE	2
+
+static inline void cleanup_writable_pagetable(const int what)
+{
+    if (what & PTRW_CLEANUP_ACTIVE)
+        if (ptwr_disconnected != ENTRIES_PER_L2_PAGETABLE)
+            ptwr_reconnect_disconnected(0L);
+    if (what & PTRW_CLEANUP_INACTIVE)
+        if (ptwr_writable_idx)
+            ptwr_flush_inactive();
+}
+
 #endif /* __ASM_X86_MM_H__ */
