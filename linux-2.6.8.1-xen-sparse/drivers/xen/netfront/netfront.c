@@ -814,9 +814,10 @@ static void netif_driver_status_change(
     int err = 0;
     int i;
 
-    DPRINTK("> nr_interfaces=%d\n", status->nr_interfaces);
+    DPRINTK("> max_handle=%d\n", status->max_handle);
 
-    netctrl.interface_n = status->nr_interfaces;
+    /* XXX FIXME: Abuse of 'max_handle' as interface count. */
+    netctrl.interface_n = status->max_handle;
     netctrl.connected_n = 0;
 
     for ( i = 0; i < netctrl.interface_n; i++ )
@@ -913,7 +914,7 @@ static int __init netif_init(void)
     cmsg.subtype   = CMSG_NETIF_FE_DRIVER_STATUS_CHANGED;
     cmsg.length    = sizeof(netif_fe_driver_status_changed_t);
     st.status      = NETIF_DRIVER_STATUS_UP;
-    st.nr_interfaces = 0;
+    st.max_handle  = 0;
     memcpy(cmsg.msg, &st, sizeof(st));
     ctrl_if_send_message_block(&cmsg, NULL, 0, TASK_UNINTERRUPTIBLE);
 
@@ -999,7 +1000,7 @@ void netif_resume(void)
     cmsg.subtype   = CMSG_NETIF_FE_DRIVER_STATUS_CHANGED;
     cmsg.length    = sizeof(netif_fe_driver_status_changed_t);
     st.status      = NETIF_DRIVER_STATUS_UP;
-    st.nr_interfaces = 0;
+    st.max_handle  = 0;
     memcpy(cmsg.msg, &st, sizeof(st));
     ctrl_if_send_message_block(&cmsg, NULL, 0, TASK_UNINTERRUPTIBLE);
 #endif
