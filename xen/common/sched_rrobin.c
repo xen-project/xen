@@ -6,7 +6,7 @@
 
 #include <xen/sched.h>
 #include <xen/sched-if.h>
-#include <hypervisor-ifs/sched_ctl.h>
+#include <public/sched_ctl.h>
 #include <xen/ac_timer.h>
 #include <xen/softirq.h>
 #include <xen/time.h>

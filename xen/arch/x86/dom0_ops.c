@@ -10,7 +10,7 @@
 #include <xen/types.h>
 #include <xen/lib.h>
 #include <xen/mm.h>
-#include <hypervisor-ifs/dom0_ops.h>
+#include <public/dom0_ops.h>
 #include <xen/sched.h>
 #include <xen/event.h>
 #include <asm/domain_page.h>
@@ -19,7 +19,7 @@
 #include <xen/trace.h>
 #include <xen/console.h>
 #include <asm/shadow.h>
-#include <hypervisor-ifs/sched_ctl.h>
+#include <public/sched_ctl.h>
 
 #define TRC_DOM0OP_ENTER_BASE  0x00020000
 #define TRC_DOM0OP_LEAVE_BASE  0x00030000

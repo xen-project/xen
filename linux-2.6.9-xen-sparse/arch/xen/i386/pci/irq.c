@@ -19,8 +19,8 @@
 
 #include "pci.h"
 
-#include <asm/hypervisor-ifs/hypervisor-if.h>
-#include <asm/hypervisor-ifs/physdev.h>
+#include <asm/xen-public/xen.h>
+#include <asm/xen-public/physdev.h>
 
 /*
  * Never use: 0, 1, 2 (timer, keyboard, and cascade)

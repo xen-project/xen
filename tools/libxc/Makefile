@@ -8,9 +8,6 @@ CC       = gcc
 XEN_ROOT = ../..
 include $(XEN_ROOT)/tools/Make.defs
 
-vpath %.h      $(XEN_HYPERVISOR_IFS)
-INCLUDES += -I $(XEN_HYPERVISOR_IFS)
-
 vpath %h       $(XEN_LINUX_INCLUDE)
 INCLUDES += -I $(XEN_LINUX_INCLUDE)
 
@@ -44,7 +41,7 @@ OBJS     = $(patsubst %.c,%.o,$(SRCS))
 
 LIB      = libxc.so libxc.so.$(MAJOR) libxc.so.$(MAJOR).$(MINOR)
 
-all: check-for-zlib $(LIB)
+all: check-for-zlib mk-symlinks $(LIB)
 
 check-for-zlib:
 	@if [ ! -e /usr/include/zlib.h ]; then \
@@ -54,6 +51,9 @@ check-for-zlib:
 	false; \
 	fi
 
+mk-symlinks:
+	[ -e xen ] || ln -sf $(XEN_HYPERVISOR_IFS) xen
+
 install: all
 	mkdir -p $(prefix)/usr/lib
 	mkdir -p $(prefix)/usr/include
@@ -61,9 +61,7 @@ install: all
 	install -m0644 xc.h $(prefix)/usr/include
 
 clean:
-	$(RM) *.a *.so *.o *.rpm $(LIB)
-	$(RM) *~
-	$(RM) $(DEPS)
+	$(RM) *.a *.so *.o *.rpm $(LIB) *~ $(DEPS) xen
 
 rpm: all
 	rm -rf staging

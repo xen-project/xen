@@ -244,8 +244,8 @@ records.  Pointers may only advance, and may not pass one another.
 By adopting the convention that every request will receive a response,
 not all four pointers need be shared and flow control on the ring
 becomes very easy to manage.  Each domain manages its own
-consumer pointer, and the two producer pointers are visible to both (Xen/include/hypervisor-ifs/io/blkif.h):
-
+consumer pointer, and the two producer pointers are visible to both
+(xen/include/public/io/blkif.h):
 
 
 /* NB. Ring size must be small enough for sizeof(blkif_ring_t) <=PAGE_SIZE.*/

@@ -52,18 +52,14 @@ int xc_physinfo(int xc_handle,
 {
     int ret;
     dom0_op_t op;
-    dom0_physinfo_t *got_info = &op.u.physinfo;
     
     op.cmd = DOM0_PHYSINFO;
     op.interface_version = DOM0_INTERFACE_VERSION;
 
-    if((ret = do_dom0_op(xc_handle, &op))) return ret;
+    if ( (ret = do_dom0_op(xc_handle, &op)) != 0 )
+        return ret;
 
-    put_info->ht_per_core = got_info->ht_per_core;
-    put_info->cores       = got_info->cores;
-    put_info->total_pages = got_info->total_pages;
-    put_info->free_pages  = got_info->free_pages;
-    put_info->cpu_khz     = got_info->cpu_khz;
+    memcpy(put_info, &op.u.physinfo, sizeof(*put_info));
 
     return 0;
 }

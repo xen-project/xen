@@ -8,10 +8,10 @@
  */
 
 
-#ifndef __DOM0_OPS_H__
-#define __DOM0_OPS_H__
+#ifndef __XEN_PUBLIC_DOM0_OPS_H__
+#define __XEN_PUBLIC_DOM0_OPS_H__
 
-#include "hypervisor-if.h"
+#include "xen.h"
 #include "sched_ctl.h"
 
 /*
@@ -369,4 +369,4 @@ typedef struct {
     } PACKED u;
 } PACKED dom0_op_t; /* 80 bytes */
 
-#endif /* __DOM0_OPS_H__ */
+#endif /* __XEN_PUBLIC_DOM0_OPS_H__ */

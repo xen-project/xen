@@ -107,11 +107,11 @@ set ${RS}/../linux-2.6.*-xen-sparse
 LINUX_26="$1"
 
 
-# Create links to the shared definitions of the hypervisor interface
-rm -rf ${AD}/include/asm-xen/hypervisor-ifs
-mkdir  ${AD}/include/asm-xen/hypervisor-ifs
-cd     ${AD}/include/asm-xen/hypervisor-ifs
-relative_lndir ../../../${RS}/../xen/include/hypervisor-ifs
+# Create links to the shared definitions of the Xen interfaces.
+rm -rf ${AD}/include/asm-xen/xen-public
+mkdir  ${AD}/include/asm-xen/xen-public
+cd     ${AD}/include/asm-xen/xen-public
+relative_lndir ../../../${RS}/../xen/include/public
 
 # Create a link to the shared definitions for the control interface
 cd ${AD}/include/asm-xen

@@ -33,9 +33,9 @@
 #include <linux/types.h>
 #include <linux/kernel.h>
 #include <linux/version.h>
-#include <asm/hypervisor-ifs/hypervisor-if.h>
-#include <asm/hypervisor-ifs/dom0_ops.h>
-#include <asm/hypervisor-ifs/io/domain_controller.h>
+#include <asm/xen-public/xen.h>
+#include <asm/xen-public/dom0_ops.h>
+#include <asm/xen-public/io/domain_controller.h>
 #include <asm/ptrace.h>
 #include <asm/page.h>
 

@@ -103,11 +103,11 @@ relative_lndir ${RS}
 rm -f mkbuildtree
 
 
-# Create links to the shared definitions of the hypervisor interface
-rm -rf ${AD}/sys/arch/xen/include/hypervisor-ifs
-mkdir  ${AD}/sys/arch/xen/include/hypervisor-ifs
-cd     ${AD}/sys/arch/xen/include/hypervisor-ifs
-relative_lndir ../../../../../${RS}/../xen/include/hypervisor-ifs
+# Create links to the shared definitions of the Xen interface
+rm -rf ${AD}/sys/arch/xen/include/xen-public
+mkdir  ${AD}/sys/arch/xen/include/xen-public
+cd     ${AD}/sys/arch/xen/include/xen-public
+relative_lndir ../../../../../${RS}/../xen/include/public
 
 # Remove files which don't exist anymore
 rm -rf ${AD}/sys/arch/xen/xen/events.c

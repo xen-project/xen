@@ -14,7 +14,7 @@
 
 #include <linux/config.h>
 #include <asm-xen/hypervisor.h>
-#include <asm-xen/hypervisor-ifs/grant_table.h>
+#include <asm-xen/xen-public/grant_table.h>
 
 int
 gnttab_grant_foreign_access(

@@ -26,7 +26,7 @@
 
 #include <xen/config.h>
 #include <xen/mm.h>
-#include <hypervisor-ifs/grant_table.h>
+#include <public/grant_table.h>
 
 /* Active grant entry - used for shadowing GTF_permit_access grants. */
 typedef struct {
@@ -68,7 +68,7 @@ typedef struct {
 
 /* Per-domain grant information. */
 typedef struct {
-    /* Shared grant table (see include/hypervisor-ifs/grant_table.h). */
+    /* Shared grant table (see include/public/grant_table.h). */
     grant_entry_t        *shared;
     /* Active grant table. */
     active_grant_entry_t *active;

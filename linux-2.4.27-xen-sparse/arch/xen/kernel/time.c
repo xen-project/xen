@@ -52,7 +52,7 @@
 
 #include <asm/div64.h>
 #include <asm/hypervisor.h>
-#include <asm/hypervisor-ifs/dom0_ops.h>
+#include <asm/xen-public/dom0_ops.h>
 
 #include <linux/mc146818rtc.h>
 #include <linux/kernel.h>

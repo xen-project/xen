@@ -3,7 +3,7 @@
  * 
  * A library for low-level access to the Xen control interfaces.
  * 
- * Copyright (c) 2003, K A Fraser.
+ * Copyright (c) 2003-2004, K A Fraser.
  */
 
 #ifndef __XC_H__
@@ -17,6 +17,12 @@ typedef signed char        s8;
 typedef signed short       s16;
 typedef signed long        s32;
 typedef signed long long   s64;
+
+#include "xen/xen.h"
+#include "xen/dom0_ops.h"
+#include "xen/event_channel.h"
+#include "xen/sched_ctl.h"
+#include "xen/io/domain_controller.h"
 
 /* Obtain or relinquish a handle on the 'xc' library. */
 int xc_interface_open(void);
@@ -34,14 +40,7 @@ typedef struct {
     unsigned long max_memkb;
 } xc_dominfo_t;
 
-typedef struct xc_shadow_control_stats_st
-{
-    unsigned long fault_count;
-    unsigned long dirty_count;
-    unsigned long dirty_net_count;     
-    unsigned long dirty_block_count;     
-} xc_shadow_control_stats_t;
-
+typedef dom0_getdomaininfo_t xc_domaininfo_t;
 int xc_domain_create(int xc_handle, 
                      unsigned int mem_kb, 
                      int cpu,
@@ -60,10 +59,18 @@ int xc_domain_getinfo(int xc_handle,
                       u32 first_domid, 
                       unsigned int max_doms,
                       xc_dominfo_t *info);
+int xc_domain_getfullinfo(int xc_handle,
+                          u32 domid,
+                          xc_domaininfo_t *info,
+                          full_execution_context_t *ctxt);
 int xc_domain_setcpuweight(int xc_handle,
                            u32 domid,
                            float weight);
+long long xc_domain_get_cpu_usage(int xc_handle,
+                                  domid_t domid);
 
+
+typedef dom0_shadow_control_stats_t xc_shadow_control_stats_t;
 int xc_shadow_control(int xc_handle,
                       u32 domid, 
                       unsigned int sop,
@@ -125,27 +132,7 @@ int xc_rrobin_global_set(int xc_handle, u64 slice);
 
 int xc_rrobin_global_get(int xc_handle, u64 *slice);
 
-#define DOMID_SELF              (0x7FF0U)
-#define DOMID_IO                (0x7FF1U)
-#define DOMID_XEN               (0x7FF2U)
-
-typedef struct {
-#define EVTCHNSTAT_closed       0  /* Chennel is not in use.                 */
-#define EVTCHNSTAT_unbound      1  /* Channel is not bound to a source.      */
-#define EVTCHNSTAT_interdomain  2  /* Channel is connected to remote domain. */
-#define EVTCHNSTAT_pirq         3  /* Channel is bound to a phys IRQ line.   */
-#define EVTCHNSTAT_virq         4  /* Channel is bound to a virtual IRQ line */
-    int status;
-    union {
-        struct {
-            u32 dom;
-            int port;
-        } interdomain;
-        int pirq;
-        int virq;
-    } u;
-} xc_evtchn_status_t;
-
+typedef evtchn_status_t xc_evtchn_status_t;
 int xc_evtchn_alloc_unbound(int xc_handle,
                             u32 dom,
                             int *port);
@@ -179,14 +166,7 @@ int xc_readconsolering(int xc_handle,
                        unsigned int max_chars, 
                        int clear);
 
-typedef struct {
-    int ht_per_core;
-    int cores;
-    unsigned long total_pages;
-    unsigned long free_pages;
-    unsigned long cpu_khz;
-} xc_physinfo_t;
-
+typedef dom0_physinfo_t xc_physinfo_t;
 int xc_physinfo(int xc_handle,
                 xc_physinfo_t *info);
 

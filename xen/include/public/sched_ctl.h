@@ -4,8 +4,8 @@
  * Mark Williamson, (C) 2004 Intel Research Cambridge
  */
 
-#ifndef __SCHED_CTL_H__
-#define __SCHED_CTL_H__
+#ifndef __XEN_PUBLIC_SCHED_CTL_H__
+#define __XEN_PUBLIC_SCHED_CTL_H__
 
 /* Scheduler types */
 #define SCHED_BVT      0
@@ -67,4 +67,4 @@ struct sched_adjdom_cmd
     } PACKED u;
 } PACKED; /* 40 bytes */
 
-#endif /* __SCHED_CTL_H__ */
+#endif /* __XEN_PUBLIC_SCHED_CTL_H__ */

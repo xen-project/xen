@@ -1,13 +1,13 @@
 /******************************************************************************
- * hypervisor-if.h
+ * xen.h
  * 
  * Guest OS interface to Xen.
  * 
  * Copyright (c) 2004, K A Fraser
  */
 
-#ifndef __HYPERVISOR_IF_H__
-#define __HYPERVISOR_IF_H__
+#ifndef __XEN_PUBLIC_XEN_H__
+#define __XEN_PUBLIC_XEN_H__
 
 /* GCC-specific way to pack structure definitions (no implicit padding). */
 #define PACKED __attribute__ ((packed))
@@ -21,7 +21,7 @@
 #endif
 
 /*
- * HYPERVISOR "SYSTEM CALLS"
+ * XEN "SYSTEM CALLS" (a.k.a. HYPERCALLS).
  */
 
 /* EAX = vector; EBX, ECX, EDX, ESI, EDI = args 1, 2, 3, 4, 5. */
@@ -62,7 +62,7 @@
 /* 
  * VIRTUAL INTERRUPTS
  * 
- * Virtual interrupts that a guest OS may receive from the hypervisor.
+ * Virtual interrupts that a guest OS may receive from Xen.
  */
 #define VIRQ_MISDIRECT  0  /* Catch-all interrupt for unbound VIRQs.      */
 #define VIRQ_TIMER      1  /* Timebase update, and/or requested timeout.  */
@@ -422,4 +422,4 @@ extern shared_info_t *HYPERVISOR_shared_info;
 
 #endif /* !__ASSEMBLY__ */
 
-#endif /* __HYPERVISOR_IF_H__ */
+#endif /* __XEN_PUBLIC_XEN_H__ */

@@ -7,8 +7,7 @@ XEN_ROOT = "../.."
 extra_compile_args  = [ "-fno-strict-aliasing", "-Wall", "-Werror" ]
 
 
-include_dirs = [ XEN_ROOT + "/xen/include/hypervisor-ifs",
-                 XEN_ROOT + "/linux-xen-sparse/include",
+include_dirs = [ XEN_ROOT + "/linux-xen-sparse/include",
                  XEN_ROOT + "/tools/python/xen/lowlevel/xu",
                  XEN_ROOT + "/tools/libxc",
                  XEN_ROOT + "/tools/libxutil",

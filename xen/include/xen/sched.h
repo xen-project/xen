@@ -10,8 +10,8 @@
 #include <xen/smp.h>
 #include <asm/page.h>
 #include <asm/processor.h>
-#include <hypervisor-ifs/hypervisor-if.h>
-#include <hypervisor-ifs/dom0_ops.h>
+#include <public/xen.h>
+#include <public/dom0_ops.h>
 #include <xen/list.h>
 #include <xen/time.h>
 #include <xen/ac_timer.h>

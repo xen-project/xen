@@ -22,9 +22,7 @@
 #include <signal.h>
 
 #include "xc_private.h"
-
-/* from xen/include/hypervisor-ifs */
-#include <trace.h>
+#include <xen/trace.h>
 
 extern FILE *stderr;
 

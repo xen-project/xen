@@ -13,7 +13,7 @@
  * it's possible to reconstruct a chronological record of trace events.
  *
  * See also include/xen/trace.h and the dom0 op in
- * include/hypervisor-ifs/dom0_ops.h
+ * include/public/dom0_ops.h
  */
 
 #include <xen/config.h>
@@ -26,7 +26,7 @@
 #include <xen/trace.h>
 #include <xen/errno.h>
 #include <asm/atomic.h>
-#include <hypervisor-ifs/dom0_ops.h>
+#include <public/dom0_ops.h>
 
 /* Pointers to the meta-data objects for all system trace buffers */
 struct t_buf *t_bufs[NR_CPUS];

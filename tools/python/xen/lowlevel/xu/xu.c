@@ -23,8 +23,8 @@
 #include <signal.h>
 #include <xc.h>
 
-#include <hypervisor-if.h>
-#include <io/domain_controller.h>
+#include <xen/xen.h>
+#include <xen/io/domain_controller.h>
 
 #include <asm-xen/proc_cmd.h>
 

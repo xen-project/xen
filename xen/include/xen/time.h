@@ -28,7 +28,7 @@
 #define __XEN_TIME_H__
 
 #include <xen/types.h>
-#include <hypervisor-ifs/hypervisor-if.h>
+#include <public/xen.h>
 
 extern int init_xen_time();
 

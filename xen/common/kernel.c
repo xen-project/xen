@@ -24,7 +24,7 @@
 #include <asm/io.h>
 #include <asm/uaccess.h>
 #include <asm/domain_page.h>
-#include <hypervisor-ifs/dom0_ops.h>
+#include <public/dom0_ops.h>
 
 unsigned long xenheap_phys_end;
 

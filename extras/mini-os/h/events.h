@@ -20,7 +20,7 @@
 #ifndef _EVENTS_H_
 #define _EVENTS_H_
 
-/* _EVENT_* are defined in hypervisor-if.h  */
+/* _EVENT_* are defined in xen-public/xen.h  */
 #define EV_BLKDEV _EVENT_BLKDEV
 #define EV_TIMER  _EVENT_TIMER
 #define EV_DIE    _EVENT_DIE

@@ -85,7 +85,7 @@ void vprintk(const char *, va_list);
 
 
 /*
- * these are also defined in hypervisor-if.h but can't be pulled in as
+ * these are also defined in xen-public/xen.h but can't be pulled in as
  * they are used in start of day assembly. Need to clean up the .h files
  * a bit more...
  */

@@ -6,8 +6,8 @@
  * Description: Interface for domains to access physical devices on the PCI bus
  */
 
-#ifndef __HYPERVISOR_IFS_PHYSDEV_H__
-#define __HYPERVISOR_IFS_PHYSDEV_H__
+#ifndef __XEN_PUBLIC_PHYSDEV_H__
+#define __XEN_PUBLIC_PHYSDEV_H__
 
 /* Commands to HYPERVISOR_physdev_op() */
 #define PHYSDEVOP_PCI_CFGREG_READ       0
@@ -77,4 +77,4 @@ typedef struct _physdev_op_st
     } PACKED u;
 } PACKED physdev_op_t; /* 40 bytes */
 
-#endif /* __HYPERVISOR_IFS_PHYSDEV_H__ */
+#endif /* __XEN_PUBLIC_PHYSDEV_H__ */

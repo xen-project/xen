@@ -1,5 +1,5 @@
 #include <xen/config.h>
-#include <hypervisor-ifs/hypervisor-if.h>
+#include <public/xen.h>
 #include <asm/page.h>
 
 #define  SECONDARY_CPU_FLAG 0xA5A5A5A5

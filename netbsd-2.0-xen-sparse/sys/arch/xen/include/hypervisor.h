@@ -54,12 +54,12 @@ struct xen_npx_attach_args {
 
 /* include the hypervisor interface */
 #include <sys/systm.h>
-#include <machine/hypervisor-ifs/hypervisor-if.h>
-#include <machine/hypervisor-ifs/dom0_ops.h>
-#include <machine/hypervisor-ifs/event_channel.h>
-#include <machine/hypervisor-ifs/io/domain_controller.h>
-#include <machine/hypervisor-ifs/io/netif.h>
-#include <machine/hypervisor-ifs/io/blkif.h>
+#include <machine/xen-public/xen.h>
+#include <machine/xen-public/dom0_ops.h>
+#include <machine/xen-public/event_channel.h>
+#include <machine/xen-public/io/domain_controller.h>
+#include <machine/xen-public/io/netif.h>
+#include <machine/xen-public/io/blkif.h>
 
 #undef u8
 #undef u16

@@ -4,7 +4,7 @@
 #ifndef __ASSEMBLY__
 #include <linux/types.h>
 #endif
-#include <asm/hypervisor-ifs/hypervisor-if.h>
+#include <asm/xen-public/xen.h>
 
 #define __KERNEL_CS	FLAT_RING1_CS
 #define __KERNEL_DS	FLAT_RING1_DS

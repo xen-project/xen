@@ -14,7 +14,7 @@
 #include <asm/flushtlb.h>
 #include <asm/io.h>
 
-#include <hypervisor-ifs/hypervisor-if.h>
+#include <public/xen.h>
 
 /*
  * Per-page-frame information.

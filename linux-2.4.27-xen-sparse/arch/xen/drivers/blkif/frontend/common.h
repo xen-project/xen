@@ -18,11 +18,11 @@
 #include <linux/hdreg.h>
 #include <linux/blkdev.h>
 #include <linux/major.h>
-#include <asm/hypervisor-ifs/hypervisor-if.h>
+#include <asm/xen-public/xen.h>
 #include <asm/io.h>
 #include <asm/atomic.h>
 #include <asm/uaccess.h>
-#include <asm-xen/hypervisor-ifs/io/blkif.h>
+#include <asm/xen-public/io/blkif.h>
 
 #if 0
 #define DPRINTK(_f, _a...) printk ( KERN_ALERT _f , ## _a )
