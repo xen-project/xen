@@ -4,6 +4,9 @@
 #include <xen/config.h>
 #include <xen/types.h>
 #include <xen/spinlock.h>
+#ifdef LINUX_2_6
+#include <linux/thread_info.h>
+#endif
 #include <asm/ptrace.h>
 #include <xen/smp.h>
 #include <asm/page.h>
@@ -148,17 +151,6 @@ struct domain
 };
 
 #include <asm/uaccess.h> /* for KERNEL_DS */
-
-#define IDLE0_TASK(_t)           \
-{                                \
-    processor:   0,              \
-    domain:      IDLE_DOMAIN_ID, \
-    mm:          IDLE0_MM,       \
-    addr_limit:  KERNEL_DS,      \
-    thread:      INIT_THREAD,    \
-    flags:       1<<DF_IDLETASK, \
-    refcnt:      ATOMIC_INIT(1)  \
-}
 
 extern struct domain idle0_task;
 
