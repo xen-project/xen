@@ -2320,8 +2320,9 @@ void audit_domain(struct domain *d)
 
 
     /* PHASE 1 */
-
-    adjust(&frame_table[pagetable_val(d->exec_domain[0]->arch.pagetable)>>PAGE_SHIFT], -1, 1);
+    if ( pagetable_val(d->exec_domain[0]->arch.pagetable) )
+        adjust(&frame_table[pagetable_val(d->exec_domain[0]->arch.pagetable)
+                           >>PAGE_SHIFT], -1, 1);
 
     list_ent = d->page_list.next;
     for ( i = 0; (list_ent != &d->page_list); i++ )
@@ -2574,10 +2575,11 @@ void audit_domain(struct domain *d)
 
     spin_unlock(&d->page_alloc_lock);
 
-    adjust(&frame_table[pagetable_val(
-        d->exec_domain[0]->arch.pagetable)>>PAGE_SHIFT], 1, 1);
+    if ( pagetable_val(d->exec_domain[0]->arch.pagetable) )
+        adjust(&frame_table[pagetable_val(
+            d->exec_domain[0]->arch.pagetable)>>PAGE_SHIFT], 1, 1);
 
-    printk("Audit %d: Done. ctot=%d ttot=%d\n", d->id, ctot, ttot );
+    printk("Audit %d: Done. pages=%d ctot=%d ttot=%d\n", d->id, i, ctot, ttot );
 
     if ( d != current->domain )
         domain_unpause(d);
