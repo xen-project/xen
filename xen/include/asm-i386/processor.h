@@ -427,6 +427,7 @@ struct mm_struct {
     struct shadow_status *shadow_ht_free;
     struct shadow_status *shadow_ht_extras; // extra allocation units
     unsigned int *shadow_dirty_bitmap;
+    unsigned int shadow_dirty_bitmap_size;  // in pages, bit per page
     unsigned int shadow_page_count;
     unsigned int shadow_max_page_count;
     unsigned int shadow_extras_count;
