@@ -14,6 +14,7 @@
 #include <xen/event.h>
 #include <xen/time.h>
 #include <xen/console.h>
+#include <xen/softirq.h>
 #include <asm/shadow.h>
 #include <public/dom0_ops.h>
 #include <asm/domain_page.h>
