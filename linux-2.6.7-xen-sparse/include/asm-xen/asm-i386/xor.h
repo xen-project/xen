@@ -535,7 +535,7 @@ static struct xor_block_template xor_block_p5_mmx = {
 
 #define XMMS_SAVE do {				\
 	preempt_disable();			\
-	if (!(current->flags & PF_USEDFPU))	\
+	if (!(current_thread_info()->status & TS_USEDFPU))	\
 		clts();				\
 	__asm__ __volatile__ ( 			\
 		"movups %%xmm0,(%1)	;\n\t"	\
@@ -557,7 +557,7 @@ static struct xor_block_template xor_block_p5_mmx = {
 		:				\
 		: "r" (cr0), "r" (xmm_save)	\
 		: "memory");			\
-	if (!(current->flags & PF_USEDFPU))	\
+	if (!(current_thread_info()->status & TS_USEDFPU))	\
 		stts();				\
 	preempt_enable();			\
 } while(0)
