@@ -386,6 +386,25 @@ typedef struct {
     u32      __pad1;
 } PACKED dom0_read_memtype_t; /* 32 bytes */
 
+/* Interface for controlling Xen software performance counters. */
+#define DOM0_PERFCCONTROL        34
+/* Sub-operations: */
+#define DOM0_PERFCCONTROL_OP_RESET 1   /* Reset all counters to zero. */
+#define DOM0_PERFCCONTROL_OP_QUERY 2   /* Get perfctr information. */
+typedef struct {
+    u8      name[80];               /*  0: name of perf counter */
+    u32     nr_vals;                /* 80: number of values for this counter */
+    u32     vals[64];               /* 84: array of values */
+} PACKED dom0_perfc_desc_t; /* 340 bytes */
+typedef struct {
+    /* IN variables. */
+    u32            op;                /*  0: DOM0_PERFCCONTROL_OP_??? */
+    /* OUT variables. */
+    u32            nr_counters;       /*  4: number of counters */
+    dom0_perfc_desc_t *desc;          /*  8: counter information (or NULL) */
+    MEMORY_PADDING;
+} PACKED dom0_perfccontrol_t; /* 16 bytes */
+
 typedef struct {
     u32 cmd;                          /* 0 */
     u32 interface_version;            /* 4 */ /* DOM0_INTERFACE_VERSION */
@@ -419,6 +438,7 @@ typedef struct {
         dom0_add_memtype_t       add_memtype;
         dom0_del_memtype_t       del_memtype;
         dom0_read_memtype_t      read_memtype;
+        dom0_perfccontrol_t      perfccontrol;
     } PACKED u;
 } PACKED dom0_op_t; /* 80 bytes */
 
