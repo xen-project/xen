@@ -643,10 +643,10 @@ config X86_VISWS_APIC
 	depends on X86_VISWS
 	default y
 
-config X86_IO_APIC
-	bool
-	depends on SMP && !(X86_VISWS || X86_VOYAGER)
-	default y
+#config X86_IO_APIC
+#	bool
+#	depends on SMP && !(X86_VISWS || X86_VOYAGER)
+#	default y
 
 config PCI
 	bool "PCI support" if !X86_VISWS
