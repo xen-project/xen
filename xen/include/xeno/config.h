@@ -145,10 +145,10 @@
 
 #define capable(_c) 0
 
-#define STACK_GUARD
 #ifndef NDEBUG
 #define DPRINTK(_f, _a...) printk("(file=%s, line=%d) " _f, \
                            __FILE__, __LINE__, ## _a)
+#define STACK_GUARD
 #else
 #define DPRINTK(_f, _a...) ((void)0)
 #endif
