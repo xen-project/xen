@@ -39,6 +39,7 @@
 #ifndef __GFP_NOWARN
 #define __GFP_NOWARN 0
 #endif
+#define alloc_skb_page() __dev_alloc_skb(PAGE_SIZE, GFP_ATOMIC|__GFP_NOWARN)
 
 /*
  * If the backend driver is pipelining transmit requests then we can be very
@@ -193,35 +194,24 @@ static int netctrl_connected_count(void)
  * @param dev device
  * @return 0 on success, error code otherwise
  */
-static int vif_wake(struct net_device *dev){
-    int err = 0;
+static int vif_wake(struct net_device *dev)
+{
     struct sk_buff *skb;
-    u32 src_ip;
-    u32 dst_ip = INADDR_BROADCAST;
-    unsigned char dst_hw[ETH_ALEN] = { 0xff, 0xff, 0xff, 0xff, 0xff, 0xff };
+    u32             src_ip, dst_ip;
+    unsigned char   dst_hw[ETH_ALEN];
 
+    memset(dst_hw, 0xff, ETH_ALEN);
+
+    dst_ip = INADDR_BROADCAST;
     src_ip = inet_select_addr(dev, dst_ip, RT_SCOPE_LINK);
+
     skb = arp_create(ARPOP_REQUEST, ETH_P_ARP,
                      dst_ip, dev, src_ip,
                      dst_hw, dev->dev_addr, NULL);
-    if(skb == NULL){
-        err = -ENOMEM;
-        goto exit;
-    }
-    err = dev_queue_xmit(skb);
-  exit:
-    return err;
-}
+    if ( skb == NULL )
+        return -ENOMEM;
 
-static inline struct sk_buff *alloc_skb_page(void)
-{
-    struct sk_buff *skb;
-    skb = __dev_alloc_skb((PAGE_SIZE/2)+1, GFP_ATOMIC|__GFP_NOWARN);
-#if 0
-    if ( skb && unlikely(((unsigned long)skb->head & (PAGE_SIZE-1)) != 0) )
-        panic("alloc_skb needs to provide us page-aligned buffers.");
-#endif
-    return skb;
+    return dev_queue_xmit(skb);
 }
 
 static int network_open(struct net_device *dev)

@@ -419,6 +419,18 @@ class Daemon:
         self.cleanup_xend(kill=kill)
         self.cleanup_xfrd(kill=kill)
             
+    def status(self):
+        """Returns the status of the xend and xfrd daemons.
+        The return value is defined by the LSB:
+        0  Running
+        3  Not running
+        """
+        if (self.cleanup_process(XEND_PID_FILE, "xend", False) == 0 or
+            self.cleanup_process(XFRD_PID_FILE, "xfrd", False) == 0):
+            return 3
+        else:
+            return 0
+
     def install_child_reaper(self):
         #signal.signal(signal.SIGCHLD, self.onSIGCHLD)
         # Ensure that zombie children are automatically reaped.
@@ -451,22 +463,46 @@ class Daemon:
             pass
         else:
             # Child
-            self.set_user()
             os.execl("/usr/sbin/xfrd", "xfrd")
             
     def start(self, trace=0):
+        """Attempts to start the daemons.
+        The return value is defined by the LSB:
+        0  Success
+        4  Insufficient privileges
+        """
         xend_pid = self.cleanup_xend()
         xfrd_pid = self.cleanup_xfrd()
+
+        # Detach from TTY.
+        os.setsid()
+
+        # Detach from standard file descriptors.
+        # I do this at the file-descriptor level: the overlying Python file
+        # objects also use fd's 0, 1 and 2.
+        os.close(0)
+        os.close(1)
+        os.close(2)
+        if DEBUG:
+            os.open('/dev/null', os.O_RDONLY)
+            # XXX KAF: Why doesn't this capture output from C extensions that
+            # fprintf(stdout) or fprintf(stderr) ??
+            os.open('/var/log/xend-debug.log', os.O_WRONLY|os.O_CREAT)
+        else:
+            os.open('/dev/null', os.O_RDWR)
+            os.dup(0)
+        os.dup(1)
+
+        if self.set_user():
+            return 4
+        os.chdir("/")
+
         if xfrd_pid == 0:
             self.start_xfrd()
         if xend_pid > 0:
-            return 1
+            # Trying to run an already-running service is a success.
+            return 0
 
-        # Detach from TTY.
-        if not DEBUG:
-            os.setsid()
-        if self.set_user():
-            return 1
         self.install_child_reaper()
 
         if self.fork_pid(XEND_PID_FILE):

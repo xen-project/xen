@@ -8,11 +8,12 @@
    Provides console server and HTTP management api.
 
    Run:
-
    xend start
 
-   The daemon is stopped with:
+   Restart:
+   xend restart
 
+   The daemon is stopped with:
    xend stop
 
    The daemon should reconnect to device control interfaces
@@ -107,6 +108,8 @@ def main():
         return daemon.stop()
     elif sys.argv[1] == 'restart':
         return daemon.stop() or daemon.start()
+    elif sys.argv[1] == 'status':
+        return daemon.status()
     else:
         print 'not an option:', sys.argv[1]
     return 1

@@ -10,15 +10,15 @@
 case "$1" in
   start)
 	xend start
-	exit $?
 	;;
   stop)
 	xend stop
-	exit $?
 	;;
   status)
+	xend status
 	;;
   restart|reload)
+	xend restart
 	;;
   *)
 	# do not advertise unreasonable commands that there is no reason
@@ -27,5 +27,5 @@ case "$1" in
 	exit 1
 esac
 
-exit 0
+exit $?
 

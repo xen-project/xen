@@ -1027,19 +1027,18 @@ static inline void __skb_queue_purge(struct sk_buff_head *list)
  *
  *	%NULL is returned in there is no free memory.
  */
- 
+#ifndef CONFIG_XEN 
 static inline struct sk_buff *__dev_alloc_skb(unsigned int length,
 					      int gfp_mask)
 {
-	struct sk_buff *skb;
-#if defined(CONFIG_XEN)
-	length = (PAGE_SIZE/2)+1; /* force slab allocater to give us a page */
-#endif
-	skb = alloc_skb(length+16, gfp_mask);
+	struct sk_buff *skb = alloc_skb(length+16, gfp_mask);
 	if (skb)
 		skb_reserve(skb,16);
 	return skb;
 }
+#else
+extern struct sk_buff *__dev_alloc_skb(unsigned int length, int gfp_mask);
+#endif
 
 /**
  *	dev_alloc_skb - allocate an skbuff for sending

@@ -17,13 +17,13 @@ struct t_rec {
  * field, indexes into an array of struct t_rec's.
  */
 struct t_buf {
-    struct t_rec *data;     /* pointer to data area.  physical address
-                             * for convenience in user space code            */
+    unsigned long data;      /* pointer to data area.  machine address
+                              * for convenience in user space code           */
 
     unsigned long size;      /* size of the data area, in t_recs             */
     unsigned long head;      /* array index of the most recent record        */
 
-    /* Kernel-private elements follow... */
+    /* Xen-private elements follow... */
     struct t_rec *head_ptr; /* pointer to the head record                    */
     struct t_rec *vdata;    /* virtual address pointer to data               */
 };

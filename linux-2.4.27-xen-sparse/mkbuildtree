@@ -228,6 +228,7 @@ ln -sf ../../../${LINUX_26}/arch/xen/kernel/evtchn.c
 ln -sf ../../../${LINUX_26}/arch/xen/kernel/fixup.c
 ln -sf ../../../${LINUX_26}/arch/xen/kernel/gnttab.c
 ln -sf ../../../${LINUX_26}/arch/xen/kernel/reboot.c
+ln -sf ../../../${LINUX_26}/arch/xen/kernel/skbuff.c
 ln -sf ../../../${LINUX_26}/arch/xen/i386/kernel/ioport.c
 ln -sf ../../../${LINUX_26}/arch/xen/i386/kernel/pci-dma.c
 

@@ -936,18 +936,18 @@ static inline void __skb_queue_purge(struct sk_buff_head *list)
  *
  *	%NULL is returned in there is no free memory.
  */
+#ifndef CONFIG_HAVE_ARCH_DEV_ALLOC_SKB
 static inline struct sk_buff *__dev_alloc_skb(unsigned int length,
 					      int gfp_mask)
 {
-	struct sk_buff *skb;
-#ifdef CONFIG_PAGESIZED_SKBS
-	length = max(length, (unsigned int)(PAGE_SIZE - 16));
-#endif
-	skb = alloc_skb(length + 16, gfp_mask);
+	struct sk_buff *skb = alloc_skb(length + 16, gfp_mask);
 	if (likely(skb))
 		skb_reserve(skb, 16);
 	return skb;
 }
+#else
+extern struct sk_buff *__dev_alloc_skb(unsigned int length, int gfp_mask);
+#endif
 
 /**
  *	dev_alloc_skb - allocate an skbuff for sending

@@ -108,6 +108,21 @@ static inline void maybe_schedule_tx_action(void)
         tasklet_schedule(&net_tx_tasklet);
 }
 
+/*
+ * A gross way of confirming the origin of an skb data page. The slab
+ * allocator abuses a field in the page struct to cache the kmem_cache_t ptr.
+ */
+static inline int is_xen_skb(struct sk_buff *skb)
+{
+    extern kmem_cache_t *skbuff_cachep;
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,0)
+    kmem_cache_t *cp = (kmem_cache_t *)virt_to_page(skb->head)->lru.next;
+#else
+    kmem_cache_t *cp = (kmem_cache_t *)virt_to_page(skb->head)->list.next;
+#endif
+    return (cp == skbuff_cachep);
+}
+
 int netif_be_start_xmit(struct sk_buff *skb, struct net_device *dev)
 {
     netif_t *netif = (netif_t *)dev->priv;
@@ -122,17 +137,14 @@ int netif_be_start_xmit(struct sk_buff *skb, struct net_device *dev)
     /*
      * We do not copy the packet unless:
      *  1. The data is shared; or
-     *  2. It spans a page boundary; or
-     *  3. We cannot be sure the whole data page is allocated.
+     *  2. The data is not allocated from our special cache.
      * The copying method is taken from skb_copy().
      * NB. We also couldn't cope with fragmented packets, but we won't get
      *     any because we not advertise the NETIF_F_SG feature.
      */
-    if ( skb_shared(skb) || skb_cloned(skb) || 
-         (((unsigned long)skb->end ^ (unsigned long)skb->head) & PAGE_MASK) ||
-         ((skb->end - skb->head) < (PAGE_SIZE/2)) )
+    if ( skb_shared(skb) || skb_cloned(skb) || !is_xen_skb(skb) )
     {
-        struct sk_buff *nskb = alloc_skb(PAGE_SIZE-1024, GFP_ATOMIC);
+        struct sk_buff *nskb = dev_alloc_skb(PAGE_SIZE);
         int hlen = skb->data - skb->head;
         if ( unlikely(nskb == NULL) )
             goto drop;

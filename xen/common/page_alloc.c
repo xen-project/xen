@@ -28,6 +28,7 @@
 #include <xen/spinlock.h>
 #include <xen/slab.h>
 #include <xen/irq.h>
+#include <asm/domain_page.h>
 
 extern char opt_badpage[];
 
@@ -427,6 +428,7 @@ void free_domheap_pages(struct pfn_info *pg, int order)
 {
     int            i, drop_dom_ref;
     struct domain *d = pg->u.inuse.domain;
+    void          *p;
 
     if ( unlikely(IS_XEN_HEAP_FRAME(pg)) )
     {
@@ -448,14 +450,22 @@ void free_domheap_pages(struct pfn_info *pg, int order)
 
         for ( i = 0; i < (1 << order); i++ )
         {
-#ifndef NDEBUG
-	    if ( pg[i].u.inuse.type_info & PGT_count_mask )
-		printk("ERROR: type count not zero on free %x\n",
-		       pg[i].u.inuse.type_info );
-#endif
+            ASSERT((pg[i].u.inuse.type_info & PGT_count_mask) == 0);
             pg[i].tlbflush_timestamp  = tlbflush_clock;
             pg[i].u.free.cpu_mask     = 1 << d->processor;
             list_del(&pg[i].list);
+
+            /*
+             * Normally we expect a domain to clear pages before freeing them,
+             * if it cares about the secrecy of their contents. However, after
+             * a domain has died we assume responsibility for erasure.
+             */
+            if ( unlikely(test_bit(DF_DYING, &d->flags)) )
+            {
+                p = map_domain_mem(page_to_phys(&pg[i]));
+                clear_page(p);
+                unmap_domain_mem(p);
+            }
         }
 
         d->tot_pages -= 1 << order;

@@ -1438,4 +1438,8 @@ PyMODINIT_FUNC initxu(void)
     d = PyModule_GetDict(m);
     port_error = PyErr_NewException(XENPKG ".PortError", NULL, NULL);
     PyDict_SetItemString(d, "PortError", port_error);
+
+    /* KAF: This ensures that we get debug output in a timely manner. */
+    setbuf(stdout, NULL);
+    setbuf(stderr, NULL);
 }
