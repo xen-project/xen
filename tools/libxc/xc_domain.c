@@ -69,6 +69,7 @@ int xc_domain_pincpu(int xc_handle,
     dom0_op_t op;
     op.cmd = DOM0_PINCPUDOMAIN;
     op.u.pincpudomain.domain = (domid_t)domid;
+    op.u.pincpudomain.exec_domain = 0; 
     op.u.pincpudomain.cpu  = cpu;
     return do_dom0_op(xc_handle, &op);
 }
