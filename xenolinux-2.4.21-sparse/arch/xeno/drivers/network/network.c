@@ -216,8 +216,10 @@ static void network_alloc_rx_buffers(struct net_device *dev)
     struct sk_buff *skb;
     unsigned int end = RX_RING_ADD(np->rx_resp_cons, RX_MAX_ENTRIES);    
 
-    for ( i = np->net_idx->rx_req_prod; i != end; i = RX_RING_INC(i) )
-    {
+    if ( (i = np->net_idx->rx_req_prod) == end )
+        return;
+
+    do {
         skb = dev_alloc_skb(RX_BUF_SIZE);
         if ( skb == NULL ) break;
         skb->dev = dev;
@@ -231,21 +233,21 @@ static void network_alloc_rx_buffers(struct net_device *dev)
 
         np->rx_bufs_to_notify++;
     }
+    while ( (i = RX_RING_INC(i)) != end );
 
+    /*
+     * We may have allocated buffers which have entries outstanding in the page
+     * update queue -- make sure we flush those first!
+     */
+    flush_page_update_queue();
+
+    np->net_idx->rx_req_prod = i;
+    np->net_idx->rx_event    = RX_RING_INC(np->rx_resp_cons);
+        
+    /* Batch Xen notifications. */
     if ( np->rx_bufs_to_notify > (RX_MAX_ENTRIES/4) )
     {
-        /*
-         * We may have allocated buffers which have entries outstanding in the 
-         * page update queue -- make sure we flush those first!
-         */
-        flush_page_update_queue();
-
-        np->net_idx->rx_req_prod = i;
-        
-        np->net_idx->rx_event = RX_RING_INC(np->rx_resp_cons);
-        
         HYPERVISOR_net_update();
-
         np->rx_bufs_to_notify = 0;
     }
 }
