@@ -9,6 +9,8 @@ Author: Mike Wray <mike.wray@hpl.hp.com>
 
 """
 
+import string
+import re
 import sys
 import os
 
@@ -17,7 +19,6 @@ from twisted.internet import defer
 import Xc; xc = Xc.new()
 
 import xenctl.ip
-import xenctl.vdisk
 
 import sxp
 
@@ -26,6 +27,24 @@ xendConsole = XendConsole.instance()
 
 import server.SrvConsoleServer
 xend = server.SrvConsoleServer.instance()
+
+def readlines(fd):
+    """Version of readlines safe against EINTR.
+    """
+    import errno
+    
+    lines = []
+    while 1:
+        try:
+            line = fd.readline()
+        except IOError, ex:
+            if ex.errno == errno.EINTR:
+                continue
+            else:
+                raise
+        if line == '': break
+        lines.append(line)
+    return lines
 
 class VmError(ValueError):
     """Vm construction error."""
@@ -60,6 +79,7 @@ class XendDomainInfo:
         self.devices = {}
         self.configs = []
         self.info = None
+        self.ipaddrs = []
 
         #todo: state: running, suspended
         self.state = 'running'
@@ -127,6 +147,12 @@ class XendDomainInfo:
         return sxp.child_with_id(self.get_devices(type), id)
 
     def get_device_by_index(self, type, idx):
+        """Get the device with the given index.
+
+        idx       device index
+
+        returns  device or None
+        """
         dl = self.get_devices(type)
         if 0 <= idx < len(dl):
             return dl[idx]
@@ -163,48 +189,81 @@ class XendDomainInfo:
             print
         print "]"
 
-def safety_level(sharing):
-    if sharing == 'rw':
-        return xenctl.vdisk.VBD_SAFETY_RW
-    if sharing == 'ww':
-        return xenctl.vdisk.VBD_SAFETY_WW
-    return xenctl.vdisk.VBD_SAFETY_RR
+def blkdev_name_to_number(name):
+    """Take the given textual block-device name (e.g., '/dev/sda1',
+    'hda') and return the device number used by the OS. """
 
+    if not re.match( '/dev/', name ):
+        name = '/dev/' + name
+        
+    return os.stat(name).st_rdev
 
-def make_disk_old(dom, uname, dev, mode, sharing):
-    writeable = ('w' in mode)
-    safety = safety_level(sharing)
-    vbd = xenctl.vdisk.blkdev_name_to_number(dev)
-    extents = xenctl.vdisk.lookup_disk_uname(uname)
-    if not extents:
-        raise VmError("vbd: Extents not found: uname=%s" % uname)
+def lookup_raw_partn(partition):
+    """Take the given block-device name (e.g., '/dev/sda1', 'hda')
+    and return a dictionary { device, start_sector,
+    nr_sectors, type }
+        device:       Device number of the given partition
+        start_sector: Index of first sector of the partition
+        nr_sectors:   Number of sectors comprising this partition
+        type:         'Disk' or identifying name for partition type
+    """
 
-    # check that setting up this VBD won't violate the sharing
-    # allowed by the current VBD expertise level
-    if xenctl.vdisk.vd_extents_validate(extents, writeable, safety=safety) < 0:
-        raise VmError("vbd: Extents invalid: uname=%s" % uname)
-            
-    if xc.vbd_create(dom=dom, vbd=vbd, writeable=writeable):
-        raise VmError("vbd: Creating device failed: dom=%d uname=%s vbd=%d mode=%s"
-                      % (dom, uname, vbdmode))
+    if not re.match( '/dev/', partition ):
+        partition = '/dev/' + partition
 
-    if xc.vbd_setextents(dom=dom, vbd=vbd, extents=extents):
-        raise VMError("vbd: Setting extents failed: dom=%d uname=%s vbd=%d"
-                      % (dom, uname, vbd))
-    return vbd
+    drive = re.split( '[0-9]', partition )[0]
+
+    if drive == partition:
+        fd = os.popen( '/sbin/sfdisk -s ' + drive + ' 2>/dev/null' )
+        line = readline(fd)
+        if line:
+            return [ { 'device' : blkdev_name_to_number(drive),
+                       'start_sector' : long(0),
+                       'nr_sectors' : long(line) * 2,
+                       'type' : 'Disk' } ]
+        return None
+
+    # determine position on disk
+    fd = os.popen( '/sbin/sfdisk -d ' + drive + ' 2>/dev/null' )
+
+    #['/dev/sda3 : start= 16948575, size=16836120, Id=83, bootable\012']
+    lines = readlines(fd)
+    for line in lines:
+        m = re.search( '^' + partition + '\s*: start=\s*([0-9]+), ' +
+                       'size=\s*([0-9]+), Id=\s*(\S+).*$', line)
+        if m:
+            return [ { 'device' : blkdev_name_to_number(drive),
+                       'start_sector' : long(m.group(1)),
+                       'nr_sectors' : long(m.group(2)),
+                       'type' : m.group(3) } ]
+    
+    return None
+
+def lookup_disk_uname( uname ):
+    """Lookup a list of segments for a physical device.
+    uname [string]:  name of the device in the format \'phy:dev\' for a physical device
+    returns [list of dicts]: list of extents that make up the named device
+    """
+    ( type, d_name ) = string.split( uname, ':' )
+
+    if type == "phy":
+        segments = lookup_raw_partn( d_name )
+    else:
+        segments = None
+    return segments
 
 def make_disk(dom, uname, dev, mode, sharing):
     """Create a virtual disk device for a domain.
 
     @returns Deferred
     """
-    segments = xenctl.vdisk.lookup_disk_uname(uname)
+    segments = lookup_disk_uname(uname)
     if not segments:
         raise VmError("vbd: Segments not found: uname=%s" % uname)
     if len(segments) > 1:
         raise VmError("vbd: Multi-segment vdisk: uname=%s" % uname)
     segment = segments[0]
-    vdev = xenctl.vdisk.blkdev_name_to_number(dev)
+    vdev = blkdev_name_to_number(dev)
     ctrl = xend.blkif_create(dom)
     
     def fn(ctrl):
@@ -212,13 +271,6 @@ def make_disk(dom, uname, dev, mode, sharing):
     ctrl.addCallback(fn)
     return ctrl
         
-def make_vif_old(dom, vif, vmac, vnet):
-    return # todo: Not supported yet.
-    err = xc.vif_setinfo(dom=dom, vif=vif, vmac=vmac, vnet=vnet)
-    if err < 0:
-        raise VmError('vnet: Error %d setting vif mac dom=%d vif=%d vmac=%s vnet=%d' %
-                        (err, dom, vif, vmac, vnet))
-
 def make_vif(dom, vif, vmac):
     """Create a virtual network device for a domain.
 
@@ -230,8 +282,10 @@ def make_vif(dom, vif, vmac):
     return d
 
 def vif_up(iplist):
-    #todo: Need a better way.
-    # send an unsolicited ARP reply for all non link-local IPs
+    """send an unsolicited ARP reply for all non link-local IP addresses.
+
+    iplist IP addresses
+    """
 
     IP_NONLOCAL_BIND = '/proc/sys/net/ipv4/ip_nonlocal_bind'
     
@@ -260,6 +314,18 @@ def vif_up(iplist):
         if not nlb: set_ip_nonlocal_bind(0)
 
 def xen_domain_create(config, ostype, name, memory, kernel, ramdisk, cmdline, vifs_n):
+    """Create a domain. Builds the image but does not configure it.
+
+    config  configuration
+    ostype  OS type
+    name    domain name
+    memory  domain memory (MB)
+    kernel  kernel image
+    ramdisk kernel ramdisk
+    cmdline kernel commandline
+    vifs_n  number of network interfaces
+    returns vm
+    """
     if not os.path.isfile(kernel):
         raise VmError('Kernel image does not exist: %s' % kernel)
     if ramdisk and not os.path.isfile(ramdisk):
@@ -380,11 +446,22 @@ def vm_create(config):
     return deferred
 
 def vm_restore(src, config, progress=0):
+    """Restore a VM.
+
+    src      saved state to restore
+    config   configuration
+    progress progress reporting flag
+    returns  deferred
+    raises   VmError for invalid configuration
+    """
     ostype = "linux" #todo set from config
     restorefn = getattr(xc, "%s_restore" % ostype)
     dom = restorefn(state_file=src, progress=progress)
     if dom < 0: return dom
     deferred = dom_configure(dom, config)
+    def vifs_cb(val, vm):
+        vif_up(vm.ipaddrs)
+    deferred.addCallback(vifs_cb, vm)
     return deferred
     
 def dom_get(dom):
@@ -394,6 +471,12 @@ def dom_get(dom):
     return None
     
 def dom_configure(dom, config):
+    """Configure a domain.
+
+    dom    domain id
+    config configuration
+    returns deferred
+    """
     d = dom_get(dom)
     if not d:
         raise VMError("Domain not found: %d" % dom)
@@ -628,6 +711,7 @@ def vm_field_vfr(vm, config, val, index):
     # Get the rules and add them.
     # (vfr (vif (id foo) (ip x.x.x.x)) ... ) 
     list = sxp.children(val, 'vif')
+    ipaddrs = []
     for v in list:
         id = sxp.child_value(v, 'id')
         if id is None:
@@ -640,9 +724,11 @@ def vm_field_vfr(vm, config, val, index):
         ip = sxp.child_value(v, 'ip')
         if not ip:
             raise VmError('vfr: missing ip address')
+        ipaddrs.append(ip);
         #Don't do this in new i/o model.
         #print 'vm_field_vfr> add rule', 'dom=', vm.dom, 'vif=', vif, 'ip=', ip
         #xenctl.ip.setup_vfr_rules_for_vif(vm.dom, vif, ip)
+    vm.ipaddrs = ipaddrs
 
 def vnet_bridge(vnet, vmac, dom, idx):
     """Add the device for the vif to the bridge for its vnet.

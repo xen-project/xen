@@ -164,10 +164,8 @@
 401d7e16NpnVrFSsR7lKKKfTwCYvWA tools/examples/xc_dom_control.py
 401d7e16RJj-lbtsVEjua6HYAIiKiA tools/examples/xc_dom_create.py
 403b7cf7J7FsSSoEPGhx6gXR4pIdZg tools/examples/xc_physinfo.py
-401d7e16X4iojyKopo_j63AyzYZd2A tools/examples/xc_vd_tool.py
 40c9c4684Wfg8VgMKtRFa_ULi2e_tQ tools/examples/xm_dom_control.py
 40c9c468pXANclL7slGaoD0kSrIwoQ tools/examples/xm_dom_create.py
-40c9c468QKoqBHjb5Qwrm60pNVcVng tools/examples/xm_vd_tool.py
 40cf2937oKlROYOJTN8GWwWM5AmjBg tools/examples/xmdefaults
 3f776bd2Xd-dUcPKlPN2vG89VGtfvQ tools/misc/Makefile
 40ab2cfawIw8tsYo0dQKtp83h4qfTQ tools/misc/fakei386xen
@@ -214,7 +212,6 @@
 40c9c468IienauFHQ_xJIcqnPJ8giQ tools/xenctl/lib/ip.py
 4059c6a0pnxhG8hwSOivXybbGOwuXw tools/xenctl/lib/tempfile.py
 3fbd4bd6GtGwZGxYUJPOheYIR7bPaA tools/xenctl/lib/utils.py
-40c9c468F36e06WH38kpYrD3JfXC0Q tools/xenctl/lib/vdisk.py
 4055ee44Bu6oP7U0WxxXypbUt4dNPQ tools/xenctl/setup.py
 40431ac64Hj4ixUnKmlugZKhXPFE_Q tools/xend/Makefile
 4055ad95Se-FqttgxollqOAAHB94zA tools/xend/lib/__init__.py
@@ -241,7 +238,6 @@
 40c9c46854nsHmuxHQHncKk5rAs5NA tools/xenmgr/lib/XendMigrate.py
 40c9c468M96gA1EYDvNa5w5kQNYLFA tools/xenmgr/lib/XendNode.py
 40c9c4686jruMyZIqiaZRMiMoqMJtg tools/xenmgr/lib/XendRoot.py
-40c9c468P75aHqyIE156JXwc-5W92A tools/xenmgr/lib/XendVdisk.py
 40c9c468xzANp6o2D_MeCYwNmOIUsQ tools/xenmgr/lib/XendVnet.py
 40c9c468x191zetrVlMnExfsQWHxIQ tools/xenmgr/lib/__init__.py
 40c9c468S2YnCEKmk4ey8XQIST7INg tools/xenmgr/lib/encode.py
@@ -257,8 +253,6 @@
 40c9c4694eu5759Dehr4Uhakei0EMg tools/xenmgr/lib/server/SrvNode.py
 40c9c469TaZ83ypsrktmPSHLEZiP5w tools/xenmgr/lib/server/SrvRoot.py
 40c9c469W3sgDMbBJYQdz5wbQweL0Q tools/xenmgr/lib/server/SrvServer.py
-40c9c469JlUVPkwGWZyVnqIsU8U6Bw tools/xenmgr/lib/server/SrvVdisk.py
-40c9c469sG8iuyxjVH3zKw8XOAyxtQ tools/xenmgr/lib/server/SrvVdiskDir.py
 40c9c469aq7oXrE1Ngqf3_lBqL0RoQ tools/xenmgr/lib/server/SrvVnetDir.py
 40c9c469Y_aimoOFfUZoS-4eV8gEKg tools/xenmgr/lib/server/__init__.py
 40c9c4692hckPol_EK0EGB16ZyDsyQ tools/xenmgr/lib/server/blkif.py

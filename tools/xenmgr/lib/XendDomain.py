@@ -49,18 +49,28 @@ class XendDomain:
     def initial_refresh(self):
         """Refresh initial domain info from domain_db.
         """
+        print "initial_refresh> db=", self.domain_db.values()
         domlist = xc.domain_getinfo()
+        print "doms=", domlist
         doms = {}
         for d in domlist:
             domid = str(d['dom'])
             doms[domid] = d
         for config in self.domain_db.values():
             domid = int(sxp.child_value(config, 'id'))
+            print "dom=", domid, "config=", config
             if domid in doms:
+                print "dom=", domid, "new"
                 self._new_domain(config)
             else:
+                print "dom=", domid, "del"
                 self._delete_domain(domid)
+        print "doms:"
+        for d in self.domain.values(): print d
+        print "refresh..."
         self.refresh()
+        print "doms:"
+        for d in self.domain.values(): print d
 
     def sync(self):
         """Sync domain db to disk.
@@ -132,7 +142,7 @@ class XendDomain:
                 image = None
                 newinfo = XendDomainInfo.XendDomainInfo(
                     config, d['dom'], d['name'], d['mem_kb']/1024, image)
-                self._add_domain(id, newinfo)
+                self._add_domain(newinfo.id, newinfo)
         # Remove entries for domains that no longer exist.
         for d in self.domain.values():
             dominfo = doms.get(d.id)
@@ -319,18 +329,18 @@ class XendDomain:
                 return v
         return None
 
-    def domain_vbd_add(self, dom, uname, dev, mode):
-        dom = int(dom)
-        vbd = vm.make_disk(dom, uname, dev, mode)
-        return vbd
+##     def domain_vbd_add(self, dom, uname, dev, mode):
+##         dom = int(dom)
+##         vbd = vm.make_disk(dom, uname, dev, mode)
+##         return vbd
 
-    def domain_vbd_remove(self, dom, dev):
-        dom = int(dom)
-        vbd = xenctl.vdisk.blkdev_name_to_number(dev)
-        if vbd < 0: return vbd
-        err = xc.vbd_destroy(dom, vbd)
-        if err < 0: return err
-        return vbd
+##     def domain_vbd_remove(self, dom, dev):
+##         dom = int(dom)
+##         vbd = xenctl.vdisk.blkdev_name_to_number(dev)
+##         if vbd < 0: return vbd
+##         err = xc.vbd_destroy(dom, vbd)
+##         if err < 0: return err
+##         return vbd
 
     def domain_shadow_control(self, dom, op):
         dom = int(dom)
