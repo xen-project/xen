@@ -9,7 +9,12 @@
 #ifndef __ASM_XEN__CTRL_IF_H__
 #define __ASM_XEN__CTRL_IF_H__
 
-#include <asm/hypervisor.h>
+#include <asm-xen/hypervisor.h>
+
+#if LINUX_VERSION_CODE < KERNEL_VERSION(2,6,0)
+#include <linux/tqueue.h>
+#define work_struct tq_struct
+#endif
 
 typedef control_msg_t ctrl_msg_t;
 

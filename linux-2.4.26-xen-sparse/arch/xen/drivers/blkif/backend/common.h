@@ -13,7 +13,7 @@
 #include <linux/blkdev.h>
 #include <asm/ctrl_if.h>
 #include <asm/io.h>
-#include "../blkif.h"
+#include <asm-xen/hypervisor-ifs/io/blkif.h>
 
 #if 0
 #define ASSERT(_p) \
@@ -25,6 +25,9 @@
 #define ASSERT(_p) ((void)0)
 #define DPRINTK(_f, _a...) ((void)0)
 #endif
+
+#define PRINTK(_f, _a...) printk(KERN_ALERT "(file=%s, line=%d) " _f, \
+                           __FILE__ , __LINE__ , ## _a )
 
 typedef struct blkif_st {
     /* Unique identifier for this interface. */

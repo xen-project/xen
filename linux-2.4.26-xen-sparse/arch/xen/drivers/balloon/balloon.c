@@ -109,7 +109,7 @@ static unsigned long inflate_balloon(unsigned long num_pages)
     XEN_flush_page_update_queue();
 
     ret = HYPERVISOR_dom_mem_op(MEMOP_decrease_reservation, 
-                                parray, num_pages);
+                                parray, num_pages, 0);
     if ( unlikely(ret != num_pages) )
     {
         printk("Unable to inflate balloon, error %lx\n", ret);
@@ -199,7 +199,7 @@ unsigned long deflate_balloon(unsigned long num_pages)
     XEN_flush_page_update_queue();
 
     ret = HYPERVISOR_dom_mem_op(MEMOP_increase_reservation, 
-                                parray, num_pages);
+                                parray, num_pages, 0);
     if ( unlikely(ret != num_pages) )
     {
         printk("Unable to deflate balloon, error %lx\n", ret);

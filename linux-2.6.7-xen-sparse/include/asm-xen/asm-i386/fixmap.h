@@ -75,6 +75,11 @@ enum fixed_addresses {
 	FIX_PCIE_MCFG,
 #endif
 	FIX_SHARED_INFO,
+#ifdef CONFIG_XEN_PRIVILEGED_GUEST
+#define NR_FIX_ISAMAPS	256
+	FIX_ISAMAP_END,
+	FIX_ISAMAP_BEGIN = FIX_ISAMAP_END + NR_FIX_ISAMAPS - 1,
+#endif
 	__end_of_permanent_fixed_addresses,
 	/* temporary boot-time mappings, used before ioremap() is functional */
 #define NR_FIX_BTMAPS	16

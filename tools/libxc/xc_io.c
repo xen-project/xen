@@ -4,7 +4,7 @@ void xcio_error(XcIOContext *ctxt, const char *msg, ...){
   va_list args;
 
   va_start(args, msg);
-  vfprintf(stdout, msg, args); fprintf(stdout, "\n");
+  vfprintf(stdout, msg, args); fprintf(stdout, "\n"); fflush(stdout);
   IOStream_vprint(ctxt->info, msg, args);
   IOStream_print(ctxt->info, "\n");
   va_end(args);

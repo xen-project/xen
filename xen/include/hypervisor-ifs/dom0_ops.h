@@ -55,8 +55,10 @@ typedef struct {
     u8           name[MAX_DOMAIN_NAME]; /*  8 */
     u32          cpu;                 /* 24 */
     u32          __pad;               /* 28 */
-    /* OUT parameters. */
+    /* IN/OUT parameters. */
+    /* If 0, domain is allocated. If non-zero use it unless in use. */
     domid_t      domain;              /* 32 */
+    /* OUT parameters. */
 } PACKED dom0_createdomain_t; /* 36 bytes */
 
 #define DOM0_DESTROYDOMAIN     9

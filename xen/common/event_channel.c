@@ -48,7 +48,7 @@ static int get_free_port(struct domain *d)
         
         max *= 2;
         
-        chn = kmalloc(max * sizeof(event_channel_t));
+        chn = xmalloc(max * sizeof(event_channel_t));
         if ( unlikely(chn == NULL) )
             return -ENOMEM;
 
@@ -57,7 +57,7 @@ static int get_free_port(struct domain *d)
         if ( d->event_channel != NULL )
         {
             memcpy(chn, d->event_channel, (max/2) * sizeof(event_channel_t));
-            kfree(d->event_channel);
+            xfree(d->event_channel);
         }
 
         d->event_channel     = chn;
@@ -197,7 +197,6 @@ static long evtchn_bind_pirq(evtchn_bind_pirq_t *bind)
     if ( rc != 0 )
     {
         d->pirq_to_evtchn[pirq] = 0;
-        DPRINTK("Couldn't bind to PIRQ %d (error=%d)\n", pirq, rc);
         goto out;
     }
 
@@ -477,7 +476,7 @@ long do_event_channel_op(evtchn_op_t *uop)
 int init_event_channels(struct domain *d)
 {
     spin_lock_init(&d->event_channel_lock);
-    d->event_channel = kmalloc(INIT_EVENT_CHANNELS * sizeof(event_channel_t));
+    d->event_channel = xmalloc(INIT_EVENT_CHANNELS * sizeof(event_channel_t));
     if ( unlikely(d->event_channel == NULL) )
         return -ENOMEM;
     d->max_event_channel = INIT_EVENT_CHANNELS;
@@ -495,6 +494,6 @@ void destroy_event_channels(struct domain *d)
     {
         for ( i = 0; i < d->max_event_channel; i++ )
             (void)__evtchn_close(d, i);
-        kfree(d->event_channel);
+        xfree(d->event_channel);
     }
 }

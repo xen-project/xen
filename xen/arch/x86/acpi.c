@@ -578,7 +578,7 @@ static void acpi_create_identity_pmd (void)
 	pgd_t *pgd;
 	int i;
 
-	ptep = (pte_t*)__get_free_page();
+	ptep = (pte_t*)alloc_xenheap_page();
 
 	/* fill page with low mapping */
 	for (i = 0; i < PTRS_PER_PTE; i++)
@@ -607,7 +607,7 @@ static void acpi_restore_pmd (void)
 {
 	set_pmd(pmd, saved_pmd);
 	local_flush_tlb();
-	free_page((unsigned long)ptep);
+	free_xenheap_page((unsigned long)ptep);
 }
 
 /**

@@ -100,14 +100,13 @@ struct domain
     unsigned int     xenheap_pages;   /* # pages allocated from Xen heap    */
 
     /* Scheduling. */
-    struct list_head run_list;
     int              shutdown_code; /* code value from OS (if DF_SHUTDOWN). */
+    spinlock_t       sleep_lock;    /* wake/sleep lock                      */
     s_time_t         lastschd;      /* time this domain was last scheduled */
     s_time_t         lastdeschd;    /* time this domain was last descheduled */
     s_time_t         cpu_time;      /* total CPU time received till now */
     s_time_t         wokenup;       /* time domain got woken up */
     struct ac_timer  timer;         /* one-shot timer for timeout values */
-    s_time_t         min_slice;     /* minimum time before reschedule */
     void            *sched_priv;    /* scheduler-specific data */
 
     struct mm_struct mm;
@@ -195,8 +194,6 @@ void new_thread(struct domain *d,
 extern unsigned long wait_init_idle;
 #define init_idle() clear_bit(smp_processor_id(), &wait_init_idle);
 
-extern spinlock_t schedule_lock[NR_CPUS] __cacheline_aligned;
-
 #define set_current_state(_s) do { current->state = (_s); } while (0)
 void scheduler_init(void);
 void schedulers_start(void);
@@ -246,6 +243,7 @@ extern struct domain *task_list;
 #define DF_DYING       11 /* Death rattle.                                  */
 #define DF_RUNNING     12 /* Currently running on a CPU.                    */
 #define DF_CPUPINNED   13 /* Disables auto-migration.                       */
+#define DF_MIGRATED    14 /* Domain migrated between CPUs.                  */ 
 
 static inline int domain_runnable(struct domain *d)
 {

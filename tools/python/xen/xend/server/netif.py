@@ -6,9 +6,10 @@ from twisted.internet import defer
 #defer.Deferred.debug = 1
 
 from xen.xend import sxp
-from xen.xend import PrettyPrint
 from xen.xend import Vifctl
 from xen.xend.XendError import XendError
+from xen.xend.XendLogging import log
+from xen.xend import XendVnet
 
 import channel
 import controller
@@ -93,7 +94,7 @@ class NetifControllerFactory(controller.ControllerFactory):
         if netif:
             netif.send_interface_connected(vif)
         else:
-            print "respond_be_connect> unknown vif=", vif
+            log.warning("respond_be_connect> unknown dom=%d vif=%d", dom, vif)
             pass
 
     def recv_be_driver_status_changed(self, msg, req):
@@ -111,7 +112,7 @@ class NetDev(controller.Dev):
     """
 
     def __init__(self, ctrl, vif, config):
-        controller.Dev.__init__(self, ctrl)
+        controller.Dev.__init__(self, vif, ctrl)
         self.vif = vif
         self.evtchn = None
         self.configure(config)
@@ -121,7 +122,7 @@ class NetDev(controller.Dev):
         self.mac = None
         self.bridge = None
         self.script = None
-        self.ipaddr = None
+        self.ipaddr = []
         
         vmac = sxp.child_value(config, 'mac')
         if not vmac: raise XendError("invalid mac")
@@ -139,7 +140,10 @@ class NetDev(controller.Dev):
     def sxpr(self):
         vif = str(self.vif)
         mac = self.get_mac()
-        val = ['vif', ['idx', vif], ['mac', mac]]
+        val = ['vif',
+               ['idx', self.idx],
+               ['vif', vif],
+               ['mac', mac]]
         if self.bridge:
             val.append(['bridge', self.bridge])
         if self.script:
@@ -160,7 +164,7 @@ class NetDev(controller.Dev):
     def get_mac(self):
         """Get the MAC address as a string.
         """
-        return ':'.join(map(lambda x: "%x" % x, self.mac))
+        return ':'.join(map(lambda x: "%02x" % x, self.mac))
 
     def vifctl_params(self, vmname=None):
         dom = self.controller.dom
@@ -176,6 +180,9 @@ class NetDev(controller.Dev):
         """Bring the device up or down.
         """
         Vifctl.vifctl(op, **self.vifctl_params(vmname=vmname))
+        vnet = XendVnet.instance().vnet_of_bridge(self.bridge)
+        if vnet:
+            vnet.vifctl(op, self.get_vifname(), self.get_mac())
 
     def destroy(self):
         """Destroy the device's resources and disconnect from the back-end
@@ -183,6 +190,7 @@ class NetDev(controller.Dev):
         """
         def cb_destroy(val):
             self.controller.send_be_destroy(self.vif)
+        log.debug("Destroying vif domain=%d vif=%d", self.controller.dom, self.vif)
         self.vifctl('down')
         d = defer.Deferred()
         d.addCallback(cb_destroy)
@@ -328,7 +336,6 @@ class NetifController(controller.Controller):
         self.factory.writeRequest(msg, response=response)
 
     def send_be_destroy(self, vif, response=None):
-        PrettyPrint.prettyprint(self.sxpr())
         dev = self.devices[vif]
         del self.devices[vif]
         msg = packMsg('netif_be_destroy_t',

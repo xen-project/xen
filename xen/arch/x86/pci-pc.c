@@ -1003,7 +1003,7 @@ struct irq_routing_table * __devinit pcibios_get_irq_routing_table(void)
 
 	if (!pci_bios_present)
 		return NULL;
-	page = __get_free_page();
+	page = alloc_xenheap_page();
 	if (!page)
 		return NULL;
 	opt.table = (struct irq_info *) page;
@@ -1030,7 +1030,7 @@ struct irq_routing_table * __devinit pcibios_get_irq_routing_table(void)
 	if (ret & 0xff00)
 		printk(KERN_ERR "PCI: Error %02x when fetching IRQ routing table.\n", (ret >> 8) & 0xff);
 	else if (opt.size) {
-		rt = kmalloc(sizeof(struct irq_routing_table) + opt.size);
+		rt = xmalloc(sizeof(struct irq_routing_table) + opt.size);
 		if (rt) {
 			memset(rt, 0, sizeof(struct irq_routing_table));
 			rt->size = opt.size + sizeof(struct irq_routing_table);
@@ -1039,7 +1039,7 @@ struct irq_routing_table * __devinit pcibios_get_irq_routing_table(void)
 			printk(KERN_INFO "PCI: Using BIOS Interrupt Routing Table\n");
 		}
 	}
-	free_page(page);
+	free_xenheap_page(page);
 	return rt;
 }
 
@@ -1109,7 +1109,7 @@ static void __devinit pcibios_fixup_ghosts(struct pci_bus *b)
 		if (d->devfn >= mirror) {
 			list_del(&d->global_list);
 			list_del(&d->bus_list);
-			kfree(d);
+			xfree(d);
 		} else
 			ln = ln->next;
 	}

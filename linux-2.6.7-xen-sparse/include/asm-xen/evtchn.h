@@ -11,7 +11,7 @@
 #define __ASM_EVTCHN_H__
 
 #include <linux/config.h>
-#include <asm/hypervisor.h>
+#include <asm-xen/hypervisor.h>
 #include <asm/ptrace.h>
 #include <asm/synch_bitops.h>
 #include <asm/hypervisor-ifs/event_channel.h>

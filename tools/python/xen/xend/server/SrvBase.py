@@ -161,8 +161,7 @@ class SrvBase(resource.Resource):
             sxp.show(['xend.err', str(err)], out=req)
         else:
             req.setHeader("Content-Type", "text/plain")
-            req.write('Error in ')
-            req.write(op)
+            req.write('Error ')
             req.write(': ')
             req.write(str(err))
         if dfr:

@@ -12,7 +12,7 @@
  *
  *  The returned physical address is the physical (CPU) mapping for
  *  the memory address given. It is only valid to use this function on
- *  addresses directly mapped or allocated via kmalloc.
+ *  addresses directly mapped or allocated via xmalloc.
  *
  *  This function does not give bus mappings for DMA transfers. In
  *  almost all conceivable cases a device driver should not be using

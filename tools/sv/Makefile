@@ -28,12 +28,22 @@ install:
 	install -m0644 images/seperator.jpg $(sv_insdir)/images
 	install -m0644 images/seperator-left-highlight.jpg $(sv_insdir)/images
 	install -m0644 images/seperator-right-highlight.jpg $(sv_insdir)/images
-
+	
+	install -m0644 images/shutdown.png $(sv_insdir)/images
+	install -m0644 images/reboot.png $(sv_insdir)/images
+	install -m0644 images/pause.png $(sv_insdir)/images
+	install -m0644 images/unpause.png $(sv_insdir)/images
+        
+	install -m0644 images/next.png $(sv_insdir)/images
+	install -m0644 images/previous.png $(sv_insdir)/images        
+	install -m0644 images/finish.png $(sv_insdir)/images 
+        
 	# make include folder
 	mkdir -p $(sv_insdir)/inc
 	
 	# copy stylesheet
 	install -m0644 inc/style.css $(sv_insdir)/inc
+	install -m0644 inc/script.js $(sv_insdir)/inc
 
 clean:
 

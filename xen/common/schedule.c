@@ -85,8 +85,6 @@ static struct scheduler ops;
          (( ops.fn != NULL ) ? ops.fn( __VA_ARGS__ )      \
           : (typeof(ops.fn(__VA_ARGS__)))0 )
 
-spinlock_t schedule_lock[NR_CPUS] __cacheline_aligned;
-
 /* Per-CPU periodic timer sends an event to the currently-executing domain. */
 static struct ac_timer t_timer[NR_CPUS]; 
 
@@ -96,26 +94,26 @@ static struct ac_timer t_timer[NR_CPUS];
  */
 static struct ac_timer fallback_timer[NR_CPUS];
 
-extern kmem_cache_t *domain_struct_cachep;
+extern xmem_cache_t *domain_struct_cachep;
 
 void free_domain_struct(struct domain *d)
 {
     SCHED_OP(free_task, d);
-    kmem_cache_free(domain_struct_cachep, d);
+    xmem_cache_free(domain_struct_cachep, d);
 }
 
 struct domain *alloc_domain_struct(void)
 {
     struct domain *d;
 
-    if ( (d = kmem_cache_alloc(domain_struct_cachep)) == NULL )
+    if ( (d = xmem_cache_alloc(domain_struct_cachep)) == NULL )
         return NULL;
     
     memset(d, 0, sizeof(*d));
 
     if ( SCHED_OP(alloc_task, d) < 0 )
     {
-        kmem_cache_free(domain_struct_cachep, d);
+        xmem_cache_free(domain_struct_cachep, d);
         return NULL;
     }
 
@@ -157,30 +155,22 @@ void sched_rem_domain(struct domain *d)
 
 void init_idle_task(void)
 {
-    unsigned long flags;
     struct domain *d = current;
 
-    if ( SCHED_OP(alloc_task, d) < 0)
-        panic("Failed to allocate scheduler private data for idle task");
-    SCHED_OP(add_task, d);
-
-    spin_lock_irqsave(&schedule_lock[d->processor], flags);
-    set_bit(DF_RUNNING, &d->flags);
-    if ( !__task_on_runqueue(d) )
-        __add_to_runqueue_head(d);
-    spin_unlock_irqrestore(&schedule_lock[d->processor], flags);
+    if ( SCHED_OP(init_idle_task, d) < 0)
+        panic("Failed to initialise idle task for processor %d",d->processor);
 }
 
 void domain_sleep(struct domain *d)
 {
     unsigned long flags;
-    int           cpu = d->processor;
 
-    spin_lock_irqsave(&schedule_lock[cpu], flags);
+    /* sleep and wake protected by domain's sleep_lock */
+    spin_lock_irqsave(&d->sleep_lock, flags);
     if ( likely(!domain_runnable(d)) )
         SCHED_OP(sleep, d);
-    spin_unlock_irqrestore(&schedule_lock[cpu], flags);
-
+    spin_unlock_irqrestore(&d->sleep_lock, flags);
+ 
     /* Synchronous. */
     while ( test_bit(DF_RUNNING, &d->flags) && !domain_runnable(d) )
     {
@@ -192,9 +182,9 @@ void domain_sleep(struct domain *d)
 void domain_wake(struct domain *d)
 {
     unsigned long       flags;
-    int                 cpu = d->processor;
 
-    spin_lock_irqsave(&schedule_lock[cpu], flags);
+    spin_lock_irqsave(&d->sleep_lock, flags);
+    
     if ( likely(domain_runnable(d)) )
     {
         TRACE_2D(TRC_SCHED_WAKE, d->domain, d);
@@ -203,7 +193,10 @@ void domain_wake(struct domain *d)
         d->wokenup = NOW();
 #endif
     }
-    spin_unlock_irqrestore(&schedule_lock[cpu], flags);
+    
+    clear_bit(DF_MIGRATED, &d->flags);
+    
+    spin_unlock_irqrestore(&d->sleep_lock, flags);
 }
 
 /* Block the currently-executing domain until a pertinent event occurs. */
@@ -334,15 +327,15 @@ void __enter_scheduler(void)
     s32                 r_time;     /* time for new dom to run */
 
     perfc_incrc(sched_run);
-
-    spin_lock_irq(&schedule_lock[cpu]);
-
+    
+    spin_lock_irq(&schedule_data[cpu].schedule_lock);
+ 
     now = NOW();
 
     rem_ac_timer(&schedule_data[cpu].s_timer);
     
     ASSERT(!in_irq());
-    ASSERT(__task_on_runqueue(prev));
+    // TODO - move to specific scheduler ASSERT(__task_on_runqueue(prev));
 
     if ( test_bit(DF_BLOCKED, &prev->flags) )
     {
@@ -360,16 +353,16 @@ void __enter_scheduler(void)
 
     r_time = next_slice.time;
     next = next_slice.task;
-
+    
     schedule_data[cpu].curr = next;
-
+    
     next->lastschd = now;
 
     /* reprogramm the timer */
     schedule_data[cpu].s_timer.expires  = now + r_time;
     add_ac_timer(&schedule_data[cpu].s_timer);
 
-    spin_unlock_irq(&schedule_lock[cpu]);
+    spin_unlock_irq(&schedule_data[cpu].schedule_lock);
 
     /* Ensure that the domain has an up-to-date time base. */
     if ( !is_idle_task(next) )
@@ -466,8 +459,10 @@ static void t_timer_fn(unsigned long unused)
 
     TRACE_0D(TRC_SCHED_T_TIMER_FN);
 
-    if ( !is_idle_task(p) )
+    if ( !is_idle_task(p) ) {
+        update_dom_time(p->shared_info);
         send_guest_virq(p, VIRQ_TIMER);
+    }
 
     t_timer[p->processor].expires = NOW() + MILLISECS(10);
     add_ac_timer(&t_timer[p->processor]);
@@ -478,6 +473,7 @@ static void dom_timer_fn(unsigned long data)
 {
     struct domain *p = (struct domain *)data;
     TRACE_0D(TRC_SCHED_DOM_TIMER_FN);
+    update_dom_time(p->shared_info);
     send_guest_virq(p, VIRQ_TIMER);
 }
 
@@ -505,8 +501,7 @@ void __init scheduler_init(void)
 
     for ( i = 0; i < NR_CPUS; i++ )
     {
-        INIT_LIST_HEAD(&schedule_data[i].runqueue);
-        spin_lock_init(&schedule_lock[i]);
+        spin_lock_init(&schedule_data[i].schedule_lock);
         schedule_data[i].curr = &idle0_task;
         
         init_ac_timer(&schedule_data[i].s_timer);
@@ -562,31 +557,8 @@ void schedulers_start(void)
 }
 
 
-static void dump_rqueue(struct list_head *queue, char *name)
-{
-    struct list_head *list;
-    int loop = 0;
-    struct domain *d;
-
-    printk("QUEUE %s %lx   n: %lx, p: %lx\n", name,  (unsigned long)queue,
-           (unsigned long) queue->next, (unsigned long) queue->prev);
-
-    list_for_each ( list, queue )
-    {
-        d = list_entry(list, struct domain, run_list);
-        printk("%3d: %u has=%c ", loop++, d->domain, 
-               test_bit(DF_RUNNING, &d->flags) ? 'T':'F');
-        SCHED_OP(dump_runq_el, d);
-        printk("c=0x%X%08X\n", (u32)(d->cpu_time>>32), (u32)d->cpu_time);
-        printk("         l: %lx n: %lx  p: %lx\n",
-               (unsigned long)list, (unsigned long)list->next,
-               (unsigned long)list->prev);
-    }
-}
-
 void dump_runq(u_char key, void *dev_id, struct pt_regs *regs)
 {
-    unsigned long flags; 
     s_time_t      now = NOW();
     int           i;
 
@@ -595,11 +567,8 @@ void dump_runq(u_char key, void *dev_id, struct pt_regs *regs)
     printk("NOW=0x%08X%08X\n",  (u32)(now>>32), (u32)now); 
     for ( i = 0; i < smp_num_cpus; i++ )
     {
-        spin_lock_irqsave(&schedule_lock[i], flags);
         printk("CPU[%02d] ", i);
         SCHED_OP(dump_cpu_state,i);
-        dump_rqueue(&schedule_data[i].runqueue, "rq"); 
-        spin_unlock_irqrestore(&schedule_lock[i], flags);
     }
 }
 

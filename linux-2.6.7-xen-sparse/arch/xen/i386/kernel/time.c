@@ -88,6 +88,7 @@ EXPORT_SYMBOL(i8253_lock);
 struct timer_opts *cur_timer = &timer_none;
 
 extern u64 shadow_system_time;
+extern u32 shadow_time_delta_usecs;
 extern void __get_time_values_from_xen(void);
 
 /* Keep track of last time we did processing/updating of jiffies and xtime. */
@@ -300,7 +301,9 @@ irqreturn_t timer_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 
 	__get_time_values_from_xen();
 
-	delta = (s64)(shadow_system_time - processed_system_time);
+	shadow_time_delta_usecs = cur_timer->get_offset() * NSEC_PER_USEC;
+	delta = (s64)(shadow_system_time + shadow_time_delta_usecs -
+		      processed_system_time);
 	if (delta < 0) {
 		printk("Timer ISR: Time went backwards: %lld\n", delta);
 		goto out;

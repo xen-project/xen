@@ -85,6 +85,7 @@ static u32 shadow_tsc_stamp;
 u64 shadow_system_time;
 static u32 shadow_time_version;
 static struct timeval shadow_tv;
+u32 shadow_time_delta_usecs;
 static unsigned int rdtsc_bitshift;
 extern u64 processed_system_time;
 
@@ -192,7 +193,8 @@ static void mark_offset_tsc(void)
 
 	write_seqlock(&monotonic_lock);
 
-	delta = (s64)(shadow_system_time - processed_system_time);
+	delta = (s64)(shadow_system_time + shadow_time_delta_usecs -
+		      processed_system_time);
 
 	/* Process elapsed jiffies since last call. */
 	while (delta >= NS_PER_TICK) {

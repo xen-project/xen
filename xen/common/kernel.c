@@ -28,7 +28,7 @@
 
 unsigned long xenheap_phys_end;
 
-kmem_cache_t *domain_struct_cachep;
+xmem_cache_t *domain_struct_cachep;
 
 struct e820entry {
     unsigned long addr_lo, addr_hi;        /* start of memory segment */
@@ -80,6 +80,17 @@ char opt_leveltrigger[30] = "", opt_edgetrigger[30] = "";
  * pfn_info table and allocation bitmap.
  */
 unsigned int opt_xenheap_megabytes = XENHEAP_DEFAULT_MB;
+/*
+ * opt_nmi: one of 'ignore', 'dom0', or 'fatal'.
+ *  fatal:  Xen prints diagnostic message and then hangs.
+ *  dom0:   The NMI is virtualised to DOM0.
+ *  ignore: The NMI error is cleared and ignored.
+ */
+#ifdef NDEBUG
+char opt_nmi[10] = "dom0";
+#else
+char opt_nmi[10] = "fatal";
+#endif
 
 static struct {
     unsigned char *name;
@@ -104,6 +115,7 @@ static struct {
     { "leveltrigger",      OPT_STR,  &opt_leveltrigger },
     { "edgetrigger",       OPT_STR,  &opt_edgetrigger },
     { "xenheap_megabytes", OPT_UINT, &opt_xenheap_megabytes },
+    { "nmi",               OPT_STR,  &opt_nmi },
     { NULL,               0,        NULL     }
 };
 
@@ -220,7 +232,7 @@ void cmain(multiboot_info_t *mbi)
         for ( ; ; ) ;
     }
 
-    ASSERT((sizeof(struct pfn_info) << 20) >
+    ASSERT((sizeof(struct pfn_info) << 20) <=
            (FRAMETABLE_VIRT_END - FRAMETABLE_VIRT_START));
 
     init_frametable((void *)FRAMETABLE_VIRT_START, max_page);
@@ -258,20 +270,20 @@ void cmain(multiboot_info_t *mbi)
            max_page >> (20-PAGE_SHIFT), max_page,
 	   max_mem  >> (20-PAGE_SHIFT));
 
-    add_to_domain_alloc_list(dom0_memory_end, max_page << PAGE_SHIFT);
-
     heap_start = memguard_init(&_end);
-
+    heap_start = __va(init_heap_allocator(__pa(heap_start), max_page));
+ 
+    init_xenheap_pages(__pa(heap_start), xenheap_phys_end);
     printk("Xen heap size is %luKB\n", 
 	   (xenheap_phys_end-__pa(heap_start))/1024 );
 
-    init_page_allocator(__pa(heap_start), xenheap_phys_end);
- 
-    /* Initialise the slab allocator. */
-    kmem_cache_init();
-    kmem_cache_sizes_init(max_page);
+    init_domheap_pages(dom0_memory_end, max_page << PAGE_SHIFT);
 
-    domain_struct_cachep = kmem_cache_create(
+    /* Initialise the slab allocator. */
+    xmem_cache_init();
+    xmem_cache_sizes_init(max_page);
+
+    domain_struct_cachep = xmem_cache_create(
         "domain_cache", sizeof(struct domain),
         0, SLAB_HWCACHE_ALIGN, NULL, NULL);
     if ( domain_struct_cachep == NULL )
@@ -307,8 +319,8 @@ void cmain(multiboot_info_t *mbi)
         panic("Could not set up DOM0 guest OS\n");
 
     /* The stash space for the initial kernel image can now be freed up. */
-    add_to_domain_alloc_list(__pa(frame_table) + frame_table_size,
-                             dom0_memory_start);
+    init_domheap_pages(__pa(frame_table) + frame_table_size,
+                       dom0_memory_start);
 
     init_trace_bufs();
 

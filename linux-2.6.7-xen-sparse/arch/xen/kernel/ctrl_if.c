@@ -47,12 +47,6 @@ static ctrl_msg_handler_t ctrl_if_rxmsg_handler[256];
 static unsigned long ctrl_if_rxmsg_blocking_context[256/sizeof(unsigned long)];
     /* Is it late enough during bootstrap to use schedule_task()? */
 static int safe_to_schedule_task;
-#if 0                           /* XXXcl tq */
-    /* Passed to schedule_task(). */
-static struct tq_struct ctrl_if_rxmsg_deferred_tq;
-#else
-static struct work_struct ctrl_if_rxmsg_deferred_work;
-#endif
     /* Queue up messages to be handled in process context. */
 static ctrl_msg_t ctrl_if_rxmsg_deferred[CONTROL_RING_SIZE];
 static CONTROL_RING_IDX ctrl_if_rxmsg_deferred_prod;
@@ -64,11 +58,14 @@ static struct {
     unsigned long      id;
 } ctrl_if_txmsg_id_mapping[CONTROL_RING_SIZE];
 
-#if 0                           /* XXXcl tq */
+#if LINUX_VERSION_CODE < KERNEL_VERSION(2,6,0)
+static struct tq_struct ctrl_if_rxmsg_deferred_tq;
 static DECLARE_TASK_QUEUE(ctrl_if_tx_tq);
 #else
+static struct work_struct ctrl_if_rxmsg_deferred_work;
 static struct workqueue_struct *ctrl_if_tx_wq = NULL;
 #endif
+
 static DECLARE_WAIT_QUEUE_HEAD(ctrl_if_tx_wait);
 static void __ctrl_if_tx_tasklet(unsigned long data);
 static DECLARE_TASKLET(ctrl_if_tx_tasklet, __ctrl_if_tx_tasklet, 0);
@@ -126,7 +123,7 @@ static void __ctrl_if_tx_tasklet(unsigned long data)
     if ( was_full && !TX_FULL(ctrl_if) )
     {
         wake_up(&ctrl_if_tx_wait);
-#if 0                           /* XXXcl tq */
+#if LINUX_VERSION_CODE < KERNEL_VERSION(2,6,0)
         run_task_queue(&ctrl_if_tx_tq);
 #endif
     }
@@ -162,12 +159,13 @@ static void __ctrl_if_rx_tasklet(unsigned long data)
         if ( msg.length != 0 )
             memcpy(msg.msg, pmsg->msg, msg.length);
 
-        if ( test_bit(msg.type, (unsigned long *)&ctrl_if_rxmsg_blocking_context) )
+        if ( test_bit(msg.type, 
+                      (unsigned long *)&ctrl_if_rxmsg_blocking_context) )
         {
             pmsg = &ctrl_if_rxmsg_deferred[MASK_CONTROL_IDX(
                 ctrl_if_rxmsg_deferred_prod++)];
             memcpy(pmsg, &msg, offsetof(ctrl_msg_t, msg) + msg.length);
-#if 0                           /* XXXcl tq */
+#if LINUX_VERSION_CODE < KERNEL_VERSION(2,6,0)
             schedule_task(&ctrl_if_rxmsg_deferred_tq);
 #else
             schedule_work(&ctrl_if_rxmsg_deferred_work);
@@ -180,7 +178,8 @@ static void __ctrl_if_rx_tasklet(unsigned long data)
     }
 }
 
-static irqreturn_t ctrl_if_interrupt(int irq, void *dev_id, struct pt_regs *regs)
+static irqreturn_t ctrl_if_interrupt(int irq, void *dev_id,
+                                     struct pt_regs *regs)
 {
     control_if_t *ctrl_if = get_ctrl_if();
 
@@ -280,10 +279,10 @@ int ctrl_if_enqueue_space_callback(struct work_struct *work)
     if ( !TX_FULL(ctrl_if) )
         return 0;
 
-#if 0                           /* XXXcl tq */
-    (void)queue_task(task, &ctrl_if_tx_tq);
+#if LINUX_VERSION_CODE < KERNEL_VERSION(2,6,0)
+    (void)queue_task(work, &ctrl_if_tx_tq);
 #else
-    if (ctrl_if_tx_wq)
+    if ( ctrl_if_tx_wq )
         (void)queue_work(ctrl_if_tx_wq, work);
     else
         return 1;
@@ -435,10 +434,11 @@ void __init ctrl_if_init(void)
 
     for ( i = 0; i < 256; i++ )
         ctrl_if_rxmsg_handler[i] = ctrl_if_rxmsg_default_handler;
-#if 0                           /* XXXcl tq */
+#if LINUX_VERSION_CODE < KERNEL_VERSION(2,6,0)
     ctrl_if_rxmsg_deferred_tq.routine = __ctrl_if_rxmsg_deferred;
 #else
-    INIT_WORK(&ctrl_if_rxmsg_deferred_work, (void *)__ctrl_if_rxmsg_deferred,
+    INIT_WORK(&ctrl_if_rxmsg_deferred_work,
+              (void *)__ctrl_if_rxmsg_deferred,
               NULL);
 #endif
 
@@ -453,9 +453,11 @@ void __init ctrl_if_init(void)
 static int __init ctrl_if_late_setup(void)
 {
     safe_to_schedule_task = 1;
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,0)
     ctrl_if_tx_wq = create_workqueue("ctrl_if_tx");
     if (ctrl_if_tx_wq == NULL)
         return 1;                 /* XXX */
+#endif
     return 0;
 }
 __initcall(ctrl_if_late_setup);

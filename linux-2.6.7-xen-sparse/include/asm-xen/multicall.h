@@ -5,7 +5,7 @@
 #ifndef __MULTICALL_H__
 #define __MULTICALL_H__
 
-#include <asm/hypervisor.h>
+#include <asm-xen/hypervisor.h>
 
 extern multicall_entry_t multicall_list[];
 extern int nr_multicall_ents;

@@ -1,16 +1,18 @@
 /******************************************************************************
- * xen/i386/mm/hypervisor.c
+ * mm/hypervisor.c
  * 
  * Update page tables via the hypervisor.
  * 
- * Copyright (c) 2002, K A Fraser
+ * Copyright (c) 2002-2004, K A Fraser
  */
 
 #include <linux/config.h>
 #include <linux/sched.h>
-#include <asm/hypervisor.h>
+#include <linux/mm.h>
+#include <linux/vmalloc.h>
 #include <asm/page.h>
 #include <asm/pgtable.h>
+#include <asm-xen/hypervisor.h>
 #include <asm-xen/multicall.h>
 
 /*
@@ -21,11 +23,14 @@
  */
 static spinlock_t update_lock = SPIN_LOCK_UNLOCKED;
 
-#if 0
+/* Linux 2.6 isn't using the traditional batched interface. */
+#if LINUX_VERSION_CODE < KERNEL_VERSION(2,6,0)
 #define QUEUE_SIZE 2048
+#define pte_offset_kernel pte_offset
 #else
 #define QUEUE_SIZE 1
 #endif
+
 static mmu_update_t update_queue[QUEUE_SIZE];
 unsigned int mmu_update_queue_idx = 0;
 #define idx mmu_update_queue_idx
@@ -126,8 +131,11 @@ static inline void __flush_page_update_queue(void)
 #endif
     idx = 0;
     wmb(); /* Make sure index is cleared first to avoid double updates. */
-    if (unlikely(HYPERVISOR_mmu_update(update_queue, _idx, NULL) < 0))
-	panic("Failed to execute MMU updates");
+    if ( unlikely(HYPERVISOR_mmu_update(update_queue, _idx, NULL) < 0) )
+    {
+        printk(KERN_ALERT "Failed to execute MMU updates.\n");
+        BUG();
+    }
 }
 
 void _flush_page_update_queue(void)
@@ -262,3 +270,91 @@ void queue_machphys_update(unsigned long mfn, unsigned long pfn)
     increment_index();
     spin_unlock_irqrestore(&update_lock, flags);
 }
+
+#ifdef CONFIG_XEN_PHYSDEV_ACCESS
+
+unsigned long allocate_empty_lowmem_region(unsigned long pages)
+{
+    pgd_t         *pgd; 
+    pmd_t         *pmd;
+    pte_t         *pte;
+    unsigned long *pfn_array;
+    unsigned long  vstart;
+    unsigned long  i;
+    int            ret;
+    unsigned int   order = get_order(pages*PAGE_SIZE);
+
+    vstart = __get_free_pages(GFP_KERNEL, order);
+    if ( vstart == 0 )
+        return 0UL;
+
+    pfn_array = vmalloc((1<<order) * sizeof(*pfn_array));
+    if ( pfn_array == NULL )
+        BUG();
+
+    for ( i = 0; i < (1<<order); i++ )
+    {
+        pgd = pgd_offset_k(   (vstart + (i*PAGE_SIZE)));
+        pmd = pmd_offset(pgd, (vstart + (i*PAGE_SIZE)));
+        pte = pte_offset_kernel(pmd, (vstart + (i*PAGE_SIZE))); 
+        pfn_array[i] = pte->pte_low >> PAGE_SHIFT;
+        queue_l1_entry_update(pte, 0);
+        phys_to_machine_mapping[__pa(vstart)>>PAGE_SHIFT] = 0xdeadbeef;
+    }
+
+    flush_page_update_queue();
+
+    ret = HYPERVISOR_dom_mem_op(MEMOP_decrease_reservation, 
+                                pfn_array, 1<<order, 0);
+    if ( unlikely(ret != (1<<order)) )
+    {
+        printk(KERN_WARNING "Unable to reduce memory reservation (%d)\n", ret);
+        BUG();
+    }
+
+    vfree(pfn_array);
+
+    return vstart;
+}
+
+void deallocate_lowmem_region(unsigned long vstart, unsigned long pages)
+{
+    pgd_t         *pgd; 
+    pmd_t         *pmd;
+    pte_t         *pte;
+    unsigned long *pfn_array;
+    unsigned long  i;
+    int            ret;
+    unsigned int   order = get_order(pages*PAGE_SIZE);
+
+    pfn_array = vmalloc((1<<order) * sizeof(*pfn_array));
+    if ( pfn_array == NULL )
+        BUG();
+
+    ret = HYPERVISOR_dom_mem_op(MEMOP_increase_reservation,
+                                pfn_array, 1<<order, 0);
+    if ( unlikely(ret != (1<<order)) )
+    {
+        printk(KERN_WARNING "Unable to increase memory reservation (%d)\n",
+               ret);
+        BUG();
+    }
+
+    for ( i = 0; i < (1<<order); i++ )
+    {
+        pgd = pgd_offset_k(   (vstart + (i*PAGE_SIZE)));
+        pmd = pmd_offset(pgd, (vstart + (i*PAGE_SIZE)));
+        pte = pte_offset_kernel(pmd, (vstart + (i*PAGE_SIZE)));
+        queue_l1_entry_update(pte, (pfn_array[i]<<PAGE_SHIFT)|__PAGE_KERNEL);
+        queue_machphys_update(pfn_array[i], __pa(vstart)>>PAGE_SHIFT);
+        phys_to_machine_mapping[__pa(vstart)>>PAGE_SHIFT] = pfn_array[i];
+    }
+
+    flush_page_update_queue();
+
+    vfree(pfn_array);
+
+    free_pages(vstart, order);
+}
+
+#endif /* CONFIG_XEN_PHYSDEV_ACCESS */

@@ -40,7 +40,7 @@
 #include <asm/tlb.h>
 #include <asm/tlbflush.h>
 #include <asm/sections.h>
-#include <asm/hypervisor.h>
+#include <asm-xen/hypervisor.h>
 
 DEFINE_PER_CPU(struct mmu_gather, mmu_gathers);
 unsigned long highstart_pfn, highend_pfn;
@@ -458,6 +458,10 @@ extern void zone_sizes_init(void);
  */
 void __init paging_init(void)
 {
+#ifdef CONFIG_XEN_PHYSDEV_ACCESS
+	int i;
+#endif
+
 	pagetable_init();
 
 	wrprotect_bootpt((pgd_t *)start_info.pt_base, swapper_pg_dir, 1);
@@ -494,6 +498,12 @@ void __init paging_init(void)
 	set_fixmap_ma(FIX_SHARED_INFO, start_info.shared_info);
 	HYPERVISOR_shared_info = (shared_info_t *)fix_to_virt(FIX_SHARED_INFO);
 	memset(empty_zero_page, 0, sizeof(empty_zero_page));
+
+#ifdef CONFIG_XEN_PRIVILEGED_GUEST
+	/* Setup mapping of lower 1st MB */
+	for (i = 0; i < NR_FIX_ISAMAPS; i++)
+		set_fixmap_ma(FIX_ISAMAP_BEGIN - i, i * PAGE_SIZE);
+#endif
 }
 
 /*

@@ -8,6 +8,8 @@ SOURCEFORGE_MIRROR := http://heanet.dl.sourceforge.net/sourceforge
 #http://voxel.dl.sourceforge.net/sourceforge/
 #http://easynews.dl.sourceforge.net/sourceforge
 
+.PHONY: docs delete-symlinks clean
+
 # a not partcularly useful but safe default target
 all: make-symlinks
 	$(MAKE) prefix=$(INSTALL_DIR) dist=yes -C xen install
@@ -27,6 +29,8 @@ dist: all
 
 LINUX_RELEASE    ?= 2.4
 LINUX_VER        ?= $(shell ( /bin/ls -ld linux-$(LINUX_RELEASE).*-xen-sparse ) 2>/dev/null | \
+		      sed -e 's!^.*linux-\(.\+\)-xen-sparse!\1!' )
+LINUX26_VER      ?= $(shell ( /bin/ls -ld linux-2.6.*-xen-sparse ) 2>/dev/null | \
 		      sed -e 's!^.*linux-\(.\+\)-xen-sparse!\1!' )
 LINUX_CONFIG_DIR ?= $(INSTALL_DIR)/boot
 LINUX_SRC_PATH   ?= .:..
@@ -65,9 +69,10 @@ mk-linux-trees: pristine-linux-src
 	$(RM) -rf $(LINUX_TREES)
 	echo $(LINUX_SRC) | grep -q bz2 && \
 	    tar -jxf $(LINUX_SRC) || tar -zxf $(LINUX_SRC)
-	mv linux-$(LINUX_VER) linux-$(LINUX_VER)-xenU
+	mv linux-$(LINUX_VER) linux-$(LINUX_VER)-xen0
 	( cd linux-$(LINUX_VER)-xen-sparse ; \
-          ./mkbuildtree ../linux-$(LINUX_VER)-xenU )
+          ./mkbuildtree ../linux-$(LINUX_VER)-xen0 )
+	cp -al linux-$(LINUX_VER)-xen0 linux-$(LINUX_VER)-xenU
 endif
 
 # configure the specified linux tree
@@ -108,23 +113,27 @@ world:
 	$(MAKE) linux-xenU
 	$(MAKE) config-xen0
 	$(MAKE) linux-xen0
+	$(MAKE) docs
 
 linux26:
 	$(MAKE) LINUX_RELEASE=2.6 mk-linux-trees
 	$(MAKE) LINUX_RELEASE=2.6 config-xenU
 	$(MAKE) LINUX_RELEASE=2.6 linux-xenU
+	$(MAKE) LINUX_RELEASE=2.6 config-xen0
+	$(MAKE) LINUX_RELEASE=2.6 linux-xen0
 
 
 clean: delete-symlinks
 	$(MAKE) -C xen clean
 	$(MAKE) -C tools clean
+	$(MAKE) -C docs clean
 
 # clean, but blow away linux build tree plus src tar ball
 mrproper: clean
 	rm -rf install/* patches $(LINUX_TREES) linux-$(LINUX_VER).tar.*
 
 make-symlinks: delete-symlinks
-	ln -sf linux-$(LINUX_VER)-xen-sparse linux-xen-sparse
+	ln -sf linux-$(LINUX26_VER)-xen-sparse linux-xen-sparse
 
 delete-symlinks:
 	$(RM) linux-xen-sparse
@@ -134,6 +143,12 @@ install-twisted:
 	wget http://www.twistedmatrix.com/products/get-current.epy
 	tar -zxf Twisted-*.tar.gz
 	( cd Twisted-* ; python setup.py install )
+
+install-logging: LOGGING=logging-0.4.9.2
+install-logging:
+	[ -f $(LOGGING).tar.gz ] || wget http://www.red-dove.com/$(LOGGING).tar.gz
+	tar -zxf $(LOGGING).tar.gz
+	( cd $(LOGGING) && python setup.py install )
 
 # handy target to upgrade iptables (use rpm or apt-get in preference)
 install-iptables:
@@ -145,3 +160,6 @@ install-iptables:
 uninstall:
 	cp -a /etc/xen /etc/xen.old && rm -rf /etc/xen 
 	rm -rf "/usr/lib/python2.2/site-packages/xen* /usr/lib/libxc* /usr/lib/python2.2/site-packages/Xc*"
+
+docs:
+	$(MAKE) -C docs all || true

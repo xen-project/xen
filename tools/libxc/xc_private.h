@@ -21,11 +21,10 @@
 #include <dom0_ops.h>
 #include <event_channel.h>
 #include <sched_ctl.h>
+#include <io/domain_controller.h>
 
 #include <asm-xen/proc_cmd.h>
 
-/* from xend/lib */
-#include <domain_controller.h>
 
 #define _PAGE_PRESENT   0x001
 #define _PAGE_RW        0x002

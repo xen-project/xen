@@ -22,9 +22,9 @@ class SrvDomain(SrvDir):
 
     def op_configure(self, op, req):
         fn = FormFn(self.xd.domain_configure,
-                    [['dom', 'int'],
+                    [['dom', 'str'],
                      ['config', 'sxpr']])
-        deferred = fn(req.args, {'dom': self.dom.id})
+        deferred = fn(req.args, {'dom': self.dom.name})
         deferred.addErrback(self._op_configure_err, req)
         return deferred
 
@@ -33,35 +33,35 @@ class SrvDomain(SrvDir):
         return str(err)
         
     def op_unpause(self, op, req):
-        val = self.xd.domain_unpause(self.dom.id)
+        val = self.xd.domain_unpause(self.dom.name)
         return val
         
     def op_pause(self, op, req):
-        val = self.xd.domain_pause(self.dom.id)
+        val = self.xd.domain_pause(self.dom.name)
         return val
 
     def op_shutdown(self, op, req):
         fn = FormFn(self.xd.domain_shutdown,
-                    [['dom', 'int'],
+                    [['dom', 'str'],
                      ['reason', 'str']])
-        val = fn(req.args, {'dom': self.dom.id})
+        val = fn(req.args, {'dom': self.dom.name})
         req.setResponseCode(http.ACCEPTED)
         req.setHeader("Location", "%s/.." % req.prePathURL())
         return val
 
     def op_destroy(self, op, req):
         fn = FormFn(self.xd.domain_destroy,
-                    [['dom', 'int'],
+                    [['dom', 'str'],
                      ['reason', 'str']])
-        val = fn(req.args, {'dom': self.dom.id})
+        val = fn(req.args, {'dom': self.dom.name})
         req.setHeader("Location", "%s/.." % req.prePathURL())
         return val
 
     def op_save(self, op, req):
         fn = FormFn(self.xd.domain_save,
-                    [['dom', 'int'],
+                    [['dom', 'str'],
                      ['file', 'str']])
-        deferred = fn(req.args, {'dom': self.dom.id})
+        deferred = fn(req.args, {'dom': self.dom.name})
         deferred.addCallback(self._op_save_cb, req)
         deferred.addErrback(self._op_save_err, req)
         return deferred
@@ -75,9 +75,9 @@ class SrvDomain(SrvDir):
         
     def op_migrate(self, op, req):
         fn = FormFn(self.xd.domain_migrate,
-                    [['dom', 'int'],
+                    [['dom', 'str'],
                      ['destination', 'str']])
-        deferred = fn(req.args, {'dom': self.dom.id})
+        deferred = fn(req.args, {'dom': self.dom.name})
         print 'op_migrate>', deferred
         deferred.addCallback(self._op_migrate_cb, req)
         deferred.addErrback(self._op_migrate_err, req)
@@ -99,92 +99,85 @@ class SrvDomain(SrvDir):
         req.setResponseCode(http.BAD_REQUEST, "Error: "+ str(err))
         return str(err)
 
-    def op_device_create(self, op, req):
-        fn = FormFn(self.xd.domain_device_create,
-                    [['dom', 'int'],
-                     ['config', 'sxpr']])
-        d = fn(req.args, {'dom': self.dom.id})
-        return d
-
-    def op_device_destroy(self, op, req):
-        fn = FormFn(self.xd.domain_device_destroy,
-                    [['dom', 'int'],
-                     ['type', 'str'],
-                     ['index', 'int']])
-        val = fn(req.args, {'dom': self.dom.id})
-        return val
-                
     def op_pincpu(self, op, req):
         fn = FormFn(self.xd.domain_pincpu,
-                    [['dom', 'int'],
+                    [['dom', 'str'],
                      ['cpu', 'int']])
-        val = fn(req.args, {'dom': self.dom.id})
+        val = fn(req.args, {'dom': self.dom.name})
         return val
 
     def op_cpu_bvt_set(self, op, req):
         fn = FormFn(self.xd.domain_cpu_bvt_set,
-                    [['dom', 'int'],
+                    [['dom', 'str'],
                      ['mcuadv', 'int'],
                      ['warp', 'int'],
                      ['warpl', 'int'],
                      ['warpu', 'int']])
-        val = fn(req.args, {'dom': self.dom.id})
+        val = fn(req.args, {'dom': self.dom.name})
         return val
     
     def op_cpu_fbvt_set(self, op, req):
         fn = FormFn(self.xd.domain_cpu_fbvt_set,
-                    [['dom', 'int'],
+                    [['dom', 'str'],
                      ['mcuadv', 'int'],
                      ['warp', 'int'],
                      ['warpl', 'int'],
                      ['warpu', 'int']])
-        val = fn(req.args, {'dom': self.dom.id})
+        val = fn(req.args, {'dom': self.dom.name})
         return val
 
     def op_cpu_atropos_set(self, op, req):
         fn = FormFn(self.xd.domain_cpu_atropos_set,
-                    [['dom', 'int'],
+                    [['dom', 'str'],
                      ['period', 'int'],
                      ['slice', 'int'],
                      ['latency', 'int'],
                      ['xtratime', 'int']])
-        val = fn(req.args, {'dom': self.dom.id})
+        val = fn(req.args, {'dom': self.dom.name})
         return val
 
+    def op_maxmem_set(self, op, req):
+        fn = FormFn(self.xd.domain_maxmem_set,
+                    [['dom', 'str'],
+                     ['memory', 'int']])
+        val = fn(req.args, {'dom': self.dom.name})
+        return val
+
+    def op_device_create(self, op, req):
+        fn = FormFn(self.xd.domain_device_create,
+                    [['dom', 'str'],
+                     ['config', 'sxpr']])
+        d = fn(req.args, {'dom': self.dom.name})
+        return d
+
+    def op_device_destroy(self, op, req):
+        fn = FormFn(self.xd.domain_device_destroy,
+                    [['dom', 'str'],
+                     ['type', 'str'],
+                     ['idx', 'str']])
+        val = fn(req.args, {'dom': self.dom.name})
+        return val
+                
     def op_vifs(self, op, req):
-        return self.xd.domain_vif_ls(self.dom.id)
+        devs = self.xd.domain_vif_ls(self.dom.name)
+        return [ dev.sxpr() for dev in devs ]
 
     def op_vif(self, op, req):
         fn = FormFn(self.xd.domain_vif_get,
-                    [['dom', 'int'],
-                     ['vif', 'int']])
-        val = fn(req.args, {'dom': self.dom.id})
+                    [['dom', 'str'],
+                     ['vif', 'str']])
+        val = fn(req.args, {'dom': self.dom.name})
         return val
 
     def op_vbds(self, op, req):
-        return self.xd.domain_vbd_ls(self.dom.id)
+        devs = self.xd.domain_vbd_ls(self.dom.name)
+        return [ dev.sxpr() for dev in devs ]
 
     def op_vbd(self, op, req):
         fn = FormFn(self.xd.domain_vbd_get,
-                    [['dom', 'int'],
-                     ['vbd', 'int']])
-        val = fn(req.args, {'dom': self.dom.id})
-        return val
-
-    def op_vbd_add(self, op, req):
-        fn = FormFn(self.xd.domain_vbd_add,
-                    [['dom', 'int'],
-                     ['uname', 'str'],
-                     ['dev', 'str'],
-                     ['mode', 'str']])
-        val = fn(req.args, {'dom': self.dom.id})
-        return val
-
-    def op_vbd_remove(self, op, req):
-        fn = FormFn(self.xd.domain_vbd_remove,
-                    [['dom', 'int'],
-                     ['dev', 'str']])
-        val = fn(req.args, {'dom': self.dom.id})
+                    [['dom', 'str'],
+                     ['vbd', 'str']])
+        val = fn(req.args, {'dom': self.dom.name})
         return val
 
     def render_POST(self, req):
@@ -204,7 +197,7 @@ class SrvDomain(SrvDir):
             req.write('<p>%s</p>' % self.dom)
             if self.dom.console:
                 cinfo = self.dom.console
-                cid = cinfo.id
+                cid = str(cinfo.console_port)
                 #todo: Local xref: need to know server prefix.
                 req.write('<p><a href="/xend/console/%s">Console %s</a></p>'
                           % (cid, cid))

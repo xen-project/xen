@@ -11,10 +11,14 @@ class DomList( HTMLBase ):
     def __init__( self, urlWriter ):
         HTMLBase.__init__(self)
         self.urlWriter = urlWriter
+        
+    def write_MENU( self, request ):
+    	return self.write_BODY( request, head=True, long=False ) 
 
     def write_BODY( self, request, head=True, long=True ):
-    
-        domains = server.xend_domains()
+        
+        domains = map(int, server.xend_domains())
+        domains.sort()
     
         request.write( "\n<table style='border:0px solid white' cellspacing='0' cellpadding='0' border='0' width='100%'>\n" )
         
@@ -40,15 +44,13 @@ class DomList( HTMLBase ):
     def write_DOMAIN( self, request, domInfoHash, long=True ):   
         request.write( "<td class='domainInfo' align='center'>%(dom)-4d</td>\n" % domInfoHash )
 
-        url = self.urlWriter( "mod=info&dom=%(dom)-4d" % domInfoHash )
+        url = self.urlWriter( "&mod=info&dom=%(dom)-4d" % domInfoHash )
 
         request.write( "<td class='domainInfo' align='center'><a href='%s'>%s</a></td>\n" % ( url, domInfoHash['name'] ) )
         if long: 
-            request.write( "<td class='domainInfo' align='center'>%(mem)7d</td>\n" % domInfoHash )
-            request.write( "<td class='domainInfo' align='center'>%(cpu)3d</td>\n" % domInfoHash )
+            request.write( "<td class='domainInfo' align='center'>%(memory)5s</td>\n" % domInfoHash )
+            request.write( "<td class='domainInfo' align='center'>%(cpu)2s</td>\n" % domInfoHash )
         request.write( "<td class='domainInfo' align='center'>%(state)5s</td>\n" % domInfoHash )
-        if long:
-            request.write( "<td class='domainInfo' align='center'>%(cpu_time)7.1f</td>\n" % domInfoHash )
 
     def write_DOMAIN_HEAD( self, request, long=True ):
         request.write( "<td class='domainInfoHead' align='center'>Domain</td>\n" )      
@@ -57,6 +59,4 @@ class DomList( HTMLBase ):
             request.write( "<td class='domainInfoHead' align='center'>Memory / Mb</td>\n" )      
             request.write( "<td class='domainInfoHead' align='center'>CPU</td>\n" )      
         request.write( "<td class='domainInfoHead' align='center'>State</td>\n" )      
-        if long:
-            request.write( "<td class='domainInfoHead' align='center'>CPU time / s</td>\n" )
             

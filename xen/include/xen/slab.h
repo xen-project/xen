@@ -6,12 +6,12 @@
 #ifndef __SLAB_H__
 #define __SLAB_H__
 
-typedef struct kmem_cache_s kmem_cache_t;
+typedef struct xmem_cache_s xmem_cache_t;
 
 #include <xen/mm.h>
 #include <xen/cache.h>
 
-/* Flags to pass to kmem_cache_create(). */
+/* Flags to pass to xmem_cache_create(). */
 /* NB. The first 3 are only valid when built with SLAB_DEBUG_SUPPORT. */
 #define SLAB_DEBUG_INITIAL      0x00000200UL    /* Call constructor */
 #define SLAB_RED_ZONE           0x00000400UL    /* Red zone objs in a cache */
@@ -24,23 +24,23 @@ typedef struct kmem_cache_s kmem_cache_t;
 #define SLAB_CTOR_ATOMIC        0x002UL /* tell cons. it can't sleep */
 #define SLAB_CTOR_VERIFY        0x004UL /* tell cons. it's a verify call */
 
-extern void kmem_cache_init(void);
-extern void kmem_cache_sizes_init(unsigned long);
+extern void xmem_cache_init(void);
+extern void xmem_cache_sizes_init(unsigned long);
 
-extern kmem_cache_t *kmem_find_general_cachep(size_t);
-extern kmem_cache_t *kmem_cache_create(
+extern xmem_cache_t *xmem_find_general_cachep(size_t);
+extern xmem_cache_t *xmem_cache_create(
     const char *, size_t, size_t, unsigned long,
-    void (*)(void *, kmem_cache_t *, unsigned long),
-    void (*)(void *, kmem_cache_t *, unsigned long));
-extern int kmem_cache_destroy(kmem_cache_t *);
-extern int kmem_cache_shrink(kmem_cache_t *);
-extern void *kmem_cache_alloc(kmem_cache_t *);
-extern void kmem_cache_free(kmem_cache_t *, void *);
+    void (*)(void *, xmem_cache_t *, unsigned long),
+    void (*)(void *, xmem_cache_t *, unsigned long));
+extern int xmem_cache_destroy(xmem_cache_t *);
+extern int xmem_cache_shrink(xmem_cache_t *);
+extern void *xmem_cache_alloc(xmem_cache_t *);
+extern void xmem_cache_free(xmem_cache_t *, void *);
 
-extern void *kmalloc(size_t);
-extern void kfree(const void *);
+extern void *xmalloc(size_t);
+extern void xfree(const void *);
 
-extern int kmem_cache_reap(void);
+extern int xmem_cache_reap(void);
 
 extern void dump_slabinfo();
 

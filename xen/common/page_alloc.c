@@ -3,7 +3,7 @@
  * 
  * Simple buddy heap allocator for Xen.
  * 
- * Copyright (c) 2002 K A Fraser
+ * Copyright (c) 2002-2004 K A Fraser
  * 
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -27,8 +27,7 @@
 #include <asm/page.h>
 #include <xen/spinlock.h>
 #include <xen/slab.h>
-
-static spinlock_t alloc_lock = SPIN_LOCK_UNLOCKED;
+#include <xen/irq.h>
 
 
 /*********************
@@ -115,283 +114,337 @@ static void map_free(unsigned long first_page, unsigned long nr_pages)
  * BINARY BUDDY ALLOCATOR
  */
 
-typedef struct chunk_head_st chunk_head_t;
+#define MEMZONE_XEN 0
+#define MEMZONE_DOM 1
+#define NR_ZONES    2
 
-struct chunk_head_st {
-    chunk_head_t  *next;
-    chunk_head_t **pprev;
-    int            level;
-};
+/* Up to 2^10 pages can be allocated at once. */
+#define MIN_ORDER  0
+#define MAX_ORDER 10
+#define NR_ORDERS (MAX_ORDER - MIN_ORDER + 1)
+static struct list_head heap[NR_ZONES][NR_ORDERS];
 
-/* Linked lists of free chunks of different powers-of-two in size. */
-#define FREELIST_SIZE ((sizeof(void*)<<3)-PAGE_SHIFT)
-static chunk_head_t *free_head[FREELIST_SIZE];
-static chunk_head_t  free_tail[FREELIST_SIZE];
-#define FREELIST_EMPTY(_i) (free_head[_i] == &free_tail[i])
+static unsigned long avail[NR_ZONES];
 
 #define round_pgdown(_p)  ((_p)&PAGE_MASK)
 #define round_pgup(_p)    (((_p)+(PAGE_SIZE-1))&PAGE_MASK)
 
-#ifdef MEMORY_GUARD
+static spinlock_t heap_lock = SPIN_LOCK_UNLOCKED;
 
-/*
- * Debug build: free memory chunks are made inaccessible.
- */
 
-/* Make order-'o' pages inaccessible, from address 'p'. */
-static inline void GUARD(void *p, int o)
+/* Initialise allocator to handle up to @max_pages. */
+unsigned long init_heap_allocator(
+    unsigned long bitmap_start, unsigned long max_pages)
 {
-    p = (void *)((unsigned long)p&PAGE_MASK);
-    if ( p > (void *)&_end ) /* careful not to protect the 'free_tail' array */
-        memguard_guard_range(p, (1<<(o+PAGE_SHIFT)));
-}
+    int i, j;
+    unsigned long bitmap_size;
 
-/* Make order-'o' pages accessible, from address 'p'. */
-static inline void UNGUARD(void *p, int o)
-{
-    p = (void *)((unsigned long)p&PAGE_MASK);
-    if ( p > (void *)&_end ) /* careful not to protect the 'free_tail' array */
-        memguard_unguard_range(p, (1<<(o+PAGE_SHIFT)));
-}
+    memset(avail, 0, sizeof(avail));
 
-/* Safe form of 'ch->level'. */
-static inline int HEAD_LEVEL(chunk_head_t *ch)
-{
-    int l;
-    ASSERT(memguard_is_guarded(ch));
-    UNGUARD(ch, 0);
-    l = ch->level;
-    GUARD(ch, 0);
-    return l;
-}
+    for ( i = 0; i < NR_ZONES; i++ )
+        for ( j = 0; j < NR_ORDERS; j++ )
+            INIT_LIST_HEAD(&heap[i][j]);
 
-/* Safe form of '*ch->pprev = l'. */
-static inline void UPDATE_PREV_FORWARDLINK(chunk_head_t *ch, chunk_head_t *l)
-{
-    ASSERT(((void *)ch->pprev < (void *)&_end) || 
-           memguard_is_guarded(ch->pprev));
-    UNGUARD(ch->pprev, 0);
-    *ch->pprev = l;
-    GUARD(ch->pprev, 0);
-}
-
-/* Safe form of 'ch->next->pprev = l'. */
-static inline void UPDATE_NEXT_BACKLINK(chunk_head_t *ch, chunk_head_t **l)
-{
-    ASSERT(((void *)ch->next < (void *)&_end) || 
-           memguard_is_guarded(ch->next));
-    UNGUARD(ch->next, 0);
-    ch->next->pprev = l;
-    GUARD(ch->next, 0);
-}
-
-#else
-
-/*
- * Non-debug build: free memory chunks are not made inaccessible.
- */
-
-#define GUARD(_p,_o) ((void)0)
-#define UNGUARD(_p,_o) ((void)0)
-#define HEAD_LEVEL(_ch) ((_ch)->level)
-#define UPDATE_PREV_FORWARDLINK(_ch,_link) (*(_ch)->pprev = (_link))
-#define UPDATE_NEXT_BACKLINK(_ch,_link) ((_ch)->next->pprev = (_link))
-
-#endif
-
-
-/*
- * Initialise allocator, placing addresses [@min,@max] in free pool.
- * @min and @max are PHYSICAL addresses.
- */
-void __init init_page_allocator(unsigned long min, unsigned long max)
-{
-    int i;
-    unsigned long range, bitmap_size, p, remaining;
-    chunk_head_t *ch;
-
-    for ( i = 0; i < FREELIST_SIZE; i++ )
-    {
-        free_head[i]       = &free_tail[i];
-        free_tail[i].pprev = &free_head[i];
-        free_tail[i].next  = NULL;
-    }
-
-    min = round_pgup  (min);
-    max = round_pgdown(max);
+    bitmap_start = round_pgup(bitmap_start);
 
     /* Allocate space for the allocation bitmap. */
-    bitmap_size  = (max+1) >> (PAGE_SHIFT+3);
+    bitmap_size  = max_pages / 8;
     bitmap_size  = round_pgup(bitmap_size);
-    alloc_bitmap = (unsigned long *)phys_to_virt(min);
-    min         += bitmap_size;
-    range        = max - min;
+    alloc_bitmap = (unsigned long *)phys_to_virt(bitmap_start);
 
     /* All allocated by default. */
     memset(alloc_bitmap, ~0, bitmap_size);
-    /* Free up the memory we've been given to play with. */
-    map_free(min>>PAGE_SHIFT, range>>PAGE_SHIFT);
-    
-    /* The buddy lists are addressed in high memory. */
-    min += PAGE_OFFSET;
-    max += PAGE_OFFSET;
 
-    p         = min;
-    remaining = range;
-    while ( remaining != 0 )
+    return bitmap_start + bitmap_size;
+}
+
+/* Hand the specified arbitrary page range to the specified heap zone. */
+void init_heap_pages(int zone, struct pfn_info *pg, unsigned long nr_pages)
+{
+    int i;
+    unsigned long flags;
+
+    spin_lock_irqsave(&heap_lock, flags);
+
+    /* Free up the memory we've been given to play with. */
+    map_free(page_to_pfn(pg), nr_pages);
+    avail[zone] += nr_pages;
+    
+    while ( nr_pages != 0 )
     {
         /*
-         * Next chunk is limited by alignment of p, but also must not be bigger
-         * than remaining bytes.
+         * Next chunk is limited by alignment of pg, but also must not be
+         * bigger than remaining bytes.
          */
-        for ( i = PAGE_SHIFT; (1<<(i+1)) <= remaining; i++ )
-            if ( p & (1<<i) ) break;
+        for ( i = 0; i < MAX_ORDER; i++ )
+            if ( ((page_to_pfn(pg) & (1 << i)) != 0) ||
+                 ((1 << (i + 1)) > nr_pages) )
+                break;
 
-        ch = (chunk_head_t *)p;
-        p         += (1<<i);
-        remaining -= (1<<i);
-        i -= PAGE_SHIFT;
-        ch->level       = i;
-        ch->next        = free_head[i];
-        ch->pprev       = &free_head[i];
-        ch->next->pprev = &ch->next;
-        free_head[i]    = ch;
+        PFN_ORDER(pg) = i;
+        list_add_tail(&pg->list, &heap[zone][i]);
+
+        pg       += 1 << i;
+        nr_pages -= 1 << i;
     }
 
-    memguard_guard_range((void *)min, range);
+    spin_unlock_irqrestore(&heap_lock, flags);
 }
 
 
-/* Allocate 2^@order contiguous pages. Returns a VIRTUAL address. */
-unsigned long __get_free_pages(int order)
+/* Allocate 2^@order contiguous pages. */
+struct pfn_info *alloc_heap_pages(int zone, int order)
 {
-    int i, attempts = 0;
-    chunk_head_t *alloc_ch, *spare_ch;
-    unsigned long           flags;
+    int i;
+    struct pfn_info *pg;
+    unsigned long flags;
 
-retry:
-    spin_lock_irqsave(&alloc_lock, flags);
+    if ( unlikely(order < MIN_ORDER) || unlikely(order > MAX_ORDER) )
+        return NULL;
+
+    spin_lock_irqsave(&heap_lock, flags);
 
     /* Find smallest order which can satisfy the request. */
-    for ( i = order; i < FREELIST_SIZE; i++ )
-	if ( !FREELIST_EMPTY(i) ) 
+    for ( i = order; i < NR_ORDERS; i++ )
+	if ( !list_empty(&heap[zone][i]) )
 	    break;
 
-    if ( i == FREELIST_SIZE ) 
+    if ( i == NR_ORDERS ) 
         goto no_memory;
  
-    /* Unlink a chunk. */
-    alloc_ch = free_head[i];
-    UNGUARD(alloc_ch, i);
-    free_head[i] = alloc_ch->next;
-    /* alloc_ch->next->pprev = alloc_ch->pprev */
-    UPDATE_NEXT_BACKLINK(alloc_ch, alloc_ch->pprev);
+    pg = list_entry(heap[zone][i].next, struct pfn_info, list);
+    list_del(&pg->list);
 
-    /* We may have to break the chunk a number of times. */
+    /* We may have to halve the chunk a number of times. */
     while ( i != order )
     {
-        /* Split into two equal parts. */
-        i--;
-        spare_ch = (chunk_head_t *)((char *)alloc_ch + (1<<(i+PAGE_SHIFT)));
-
-        /* Create new header for spare chunk. */
-        spare_ch->level = i;
-        spare_ch->next  = free_head[i];
-        spare_ch->pprev = &free_head[i];
-
-        /* Link in the spare chunk. */
-        /* spare_ch->next->pprev = &spare_ch->next */
-        UPDATE_NEXT_BACKLINK(spare_ch, &spare_ch->next);
-        free_head[i] = spare_ch;
-        GUARD(spare_ch, i);
+        PFN_ORDER(pg) = --i;
+        list_add_tail(&pg->list, &heap[zone][i]);
+        pg += 1 << i;
     }
     
-    map_alloc(virt_to_phys(alloc_ch)>>PAGE_SHIFT, 1<<order);
+    map_alloc(page_to_pfn(pg), 1 << order);
+    avail[zone] -= 1 << order;
 
-    spin_unlock_irqrestore(&alloc_lock, flags);
+    spin_unlock_irqrestore(&heap_lock, flags);
 
-#ifdef MEMORY_GUARD
-    memset(alloc_ch, 0x55, 1 << (order + PAGE_SHIFT));
-#endif
-
-    return((unsigned long)alloc_ch);
+    return pg;
 
  no_memory:
-    spin_unlock_irqrestore(&alloc_lock, flags);
+    spin_unlock_irqrestore(&heap_lock, flags);
+    return NULL;
+}
+
+
+/* Free 2^@order set of pages. */
+void free_heap_pages(int zone, struct pfn_info *pg, int order)
+{
+    unsigned long mask;
+    unsigned long flags;
+
+    spin_lock_irqsave(&heap_lock, flags);
+
+    map_free(page_to_pfn(pg), 1 << order);
+    avail[zone] += 1 << order;
+    
+    /* Merge chunks as far as possible. */
+    while ( order < MAX_ORDER )
+    {
+        mask = 1 << order;
+
+        if ( (page_to_pfn(pg) & mask) )
+        {
+            /* Merge with predecessor block? */
+            if ( allocated_in_map(page_to_pfn(pg)-mask) ||
+                 (PFN_ORDER(pg-mask) != order) )
+                break;
+            list_del(&(pg-mask)->list);
+            pg -= mask;
+        }
+        else
+        {
+            /* Merge with successor block? */
+            if ( allocated_in_map(page_to_pfn(pg)+mask) ||
+                 (PFN_ORDER(pg+mask) != order) )
+                break;
+            list_del(&(pg+mask)->list);
+        }
         
+        order++;
+    }
+
+    PFN_ORDER(pg) = order;
+    list_add_tail(&pg->list, &heap[zone][order]);
+
+    spin_unlock_irqrestore(&heap_lock, flags);
+}
+
+
+
+/*************************
+ * XEN-HEAP SUB-ALLOCATOR
+ */
+
+void init_xenheap_pages(unsigned long ps, unsigned long pe)
+{
+    ps = round_pgup(ps);
+    pe = round_pgdown(pe);
+    memguard_guard_range(__va(ps), pe - ps);
+    init_heap_pages(MEMZONE_XEN, phys_to_page(ps), (pe - ps) >> PAGE_SHIFT);
+}
+
+unsigned long alloc_xenheap_pages(int order)
+{
+    struct pfn_info *pg;
+    int attempts = 0;
+
+ retry:
+    if ( unlikely((pg = alloc_heap_pages(MEMZONE_XEN, order)) == NULL) )
+        goto no_memory;
+    memguard_unguard_range(page_to_virt(pg), 1 << (order + PAGE_SHIFT));
+    return (unsigned long)page_to_virt(pg);
+
+ no_memory:
     if ( attempts++ < 8 )
     {
-        kmem_cache_reap();
+        xmem_cache_reap();
         goto retry;
     }
 
     printk("Cannot handle page request order %d!\n", order);
     dump_slabinfo();
-
     return 0;
 }
 
-
-/* Free 2^@order pages at VIRTUAL address @p. */
-void __free_pages(unsigned long p, int order)
+void free_xenheap_pages(unsigned long p, int order)
 {
-    unsigned long size = 1 << (order + PAGE_SHIFT);
-    chunk_head_t *ch;
-    unsigned long flags;
-    unsigned long pfn = virt_to_phys((void *)p) >> PAGE_SHIFT;
+    memguard_guard_range((void *)p, 1 << (order + PAGE_SHIFT));    
+    free_heap_pages(MEMZONE_XEN, virt_to_page(p), order);
+}
 
-    spin_lock_irqsave(&alloc_lock, flags);
 
-#ifdef MEMORY_GUARD
-    memset((void *)p, 0xaa, size);
-#endif
 
-    map_free(pfn, 1<<order);
-    
-    /* Merge chunks as far as possible. */
-    for ( ; ; )
+/*************************
+ * DOMAIN-HEAP SUB-ALLOCATOR
+ */
+
+void init_domheap_pages(unsigned long ps, unsigned long pe)
+{
+    ps = round_pgup(ps);
+    pe = round_pgdown(pe);
+    init_heap_pages(MEMZONE_DOM, phys_to_page(ps), (pe - ps) >> PAGE_SHIFT);
+}
+
+struct pfn_info *alloc_domheap_pages(struct domain *d, int order)
+{
+    struct pfn_info *pg;
+    unsigned long mask, flushed_mask, pfn_stamp, cpu_stamp;
+    int i;
+
+    ASSERT(!in_irq());
+
+    if ( unlikely((pg = alloc_heap_pages(MEMZONE_DOM, order)) == NULL) )
+        return NULL;
+
+    flushed_mask = 0;
+    for ( i = 0; i < (1 << order); i++ )
     {
-        if ( (p & size) )
-        {
-            /* Merge with predecessor block? */
-            if ( allocated_in_map(pfn-(1<<order)) )
-                break;
-            ch = (chunk_head_t *)(p - size);
-            if ( HEAD_LEVEL(ch) != order )
-                break;
-            p   -= size;
-            pfn -= 1<<order;
-        }
-        else
-        {
-            /* Merge with successor block? */
-            if ( allocated_in_map(pfn+(1<<order)) )
-                break;
-            ch = (chunk_head_t *)(p + size);
-            if ( HEAD_LEVEL(ch) != order )
-                break;
-        }
-        
-        /* Okay, unlink the neighbour. */
-        UNGUARD(ch, order);
-        /* *ch->pprev = ch->next */
-        UPDATE_PREV_FORWARDLINK(ch, ch->next);
-        /* ch->next->pprev = ch->pprev */
-        UPDATE_NEXT_BACKLINK(ch, ch->pprev);
+        pg[i].u.inuse.domain    = NULL;
+        pg[i].u.inuse.type_info = 0;
 
-        order++;
-        size <<= 1;
+        if ( (mask = (pg[i].u.free.cpu_mask & ~flushed_mask)) != 0 )
+        {
+            pfn_stamp = pg[i].tlbflush_timestamp;
+            for ( i = 0; (mask != 0) && (i < smp_num_cpus); i++ )
+            {
+                if ( mask & (1<<i) )
+                {
+                    cpu_stamp = tlbflush_time[i];
+                    if ( !NEED_FLUSH(cpu_stamp, pfn_stamp) )
+                        mask &= ~(1<<i);
+                }
+            }
+            
+            if ( unlikely(mask != 0) )
+            {
+                flush_tlb_mask(mask);
+                perfc_incrc(need_flush_tlb_flush);
+                flushed_mask |= mask;
+            }
+        }
     }
 
-    /* Okay, add the final chunk to the appropriate free list. */
-    ch = (chunk_head_t *)p;
-    ch->level = order;
-    ch->pprev = &free_head[order];
-    ch->next  = free_head[order];
-    /* ch->next->pprev = &ch->next */
-    UPDATE_NEXT_BACKLINK(ch, &ch->next);
-    free_head[order] = ch;
-    GUARD(ch, order);
+    if ( d == NULL )
+        return pg;
 
-    spin_unlock_irqrestore(&alloc_lock, flags);
+    spin_lock(&d->page_alloc_lock);
+
+    if ( unlikely((d->tot_pages + (1 << order)) > d->max_pages) )
+    {
+        DPRINTK("Over-allocation for domain %u: %u > %u\n",
+                d->domain, d->tot_pages + (1 << order), d->max_pages);
+        spin_unlock(&d->page_alloc_lock);
+        free_heap_pages(MEMZONE_DOM, pg, order);
+        return NULL;
+    }
+
+    if ( unlikely(d->tot_pages == 0) )
+        get_domain(d);
+
+    d->tot_pages += 1 << order;
+
+    for ( i = 0; i < (1 << order); i++ )
+    {
+        pg[i].u.inuse.domain = d;
+        wmb(); /* Domain pointer must be visible before updating refcnt. */
+        pg[i].u.inuse.count_info = PGC_allocated | 1;
+        list_add_tail(&pg[i].list, &d->page_list);
+    }
+
+    spin_unlock(&d->page_alloc_lock);
+    
+    return pg;
 }
+
+void free_domheap_pages(struct pfn_info *pg, int order)
+{
+    int            i, drop_dom_ref;
+    struct domain *d = pg->u.inuse.domain;
+
+    if ( unlikely(IS_XEN_HEAP_FRAME(pg)) )
+    {
+        spin_lock_recursive(&d->page_alloc_lock);
+        d->xenheap_pages -= 1 << order;
+        drop_dom_ref = (d->xenheap_pages == 0);
+        spin_unlock_recursive(&d->page_alloc_lock);
+    }
+    else
+    {
+        /* NB. May recursively lock from domain_relinquish_memory(). */
+        spin_lock_recursive(&d->page_alloc_lock);
+
+        for ( i = 0; i < (1 << order); i++ )
+        {
+            pg[i].tlbflush_timestamp = tlbflush_clock;
+            pg[i].u.inuse.count_info = 0;
+            pg[i].u.free.cpu_mask    = 1 << d->processor;
+            list_del(&pg[i].list);
+        }
+
+        d->tot_pages -= 1 << order;
+        drop_dom_ref = (d->tot_pages == 0);
+
+        spin_unlock_recursive(&d->page_alloc_lock);
+
+        free_heap_pages(MEMZONE_DOM, pg, order);
+    }
+
+    if ( drop_dom_ref )
+        put_domain(d);
+}
+
+unsigned long avail_domheap_pages(void)
+{
+    return avail[MEMZONE_DOM];
+}
+

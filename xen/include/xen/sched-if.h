@@ -11,9 +11,10 @@
 
 typedef struct schedule_data_st
 {
-    struct list_head    runqueue;       /* runqueue */
-    struct domain *curr;           /* current task */
-    struct domain *idle;           /* idle task for this cpu */
+    spinlock_t          schedule_lock;  /* spinlock protecting curr pointer
+                                            TODO check this */
+    struct domain       *curr;          /* current task */
+    struct domain       *idle;          /* idle task for this cpu */
     void *              sched_priv;
     struct ac_timer     s_timer;        /* scheduling timer  */
 #ifdef BUCKETS
@@ -35,6 +36,7 @@ struct scheduler
     unsigned int sched_id;  /* ID for this scheduler             */
 
     int          (*init_scheduler) ();
+    int          (*init_idle_task) (struct domain *);
     int          (*alloc_task)     (struct domain *);
     void         (*add_task)       (struct domain *);
     void         (*free_task)      (struct domain *);
@@ -48,43 +50,10 @@ struct scheduler
                                     struct sched_adjdom_cmd *);
     void         (*dump_settings)  (void);
     void         (*dump_cpu_state) (int);
-    void         (*dump_runq_el)   (struct domain *);
     int          (*prn_state)      (int);
 };
 
 /* per CPU scheduler information */
 extern schedule_data_t schedule_data[];
 
-/*
- * Wrappers for run-queue management. Must be called with the schedule_lock
- * held.
- */
-static inline void __add_to_runqueue_head(struct domain * p)
-{    
-    list_add(&p->run_list, &schedule_data[p->processor].runqueue);
-}
 
-static inline void __add_to_runqueue_tail(struct domain * p)
-{
-    list_add_tail(&p->run_list, &schedule_data[p->processor].runqueue);
-}
-
-static inline void __del_from_runqueue(struct domain * p)
-{
-    list_del(&p->run_list);
-    p->run_list.next = NULL;
-}
-
-static inline int __task_on_runqueue(struct domain *p)
-{
-    return p->run_list.next != NULL;
-}
-
-#define next_domain(p) \\
-        list_entry((p)->run_list.next, struct domain, run_list)
-
-
-static inline int __runqueue_empty(int cpu)
-{
-    return list_empty(&schedule_data[cpu].runqueue);
-}

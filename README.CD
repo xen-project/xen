@@ -277,10 +277,6 @@ that may be able to help diagnose problems:
 
  noht		  Disable Hyperthreading.
 
- ifname=ethXX	  Select which Ethernet interface to use.
-
- ifname=dummy	  Don't use any network interface.
-
  com1=<baud>,DPS[,<io_base>,<irq>]
  com2=<baud>,DPS[,<io_base>,<irq>]
                   Xen supports up to two 16550-compatible serial ports.
@@ -316,6 +312,13 @@ that may be able to help diagnose problems:
                   then auto-switching is disabled. Any other value, or
                   omitting the character, enables auto-switching.
  [NB. Default for this option is 'a']
+
+ nmi=<nmi-error-behaviour>
+                  Specify what to do with an NMI parity or I/O error.
+                  'nmi=fatal':  Xen prints a diagnostic and then hangs.
+                  'nmi=dom0':   Inform DOM0 of the NMI.
+                  'nmi=ignore': Ignore the NMI.
+ [NB. Default is 'dom0' ('fatal' for debug builds).]
 
  dom0_mem=xxx 	  Set the initial amount of memory for domain0.
 

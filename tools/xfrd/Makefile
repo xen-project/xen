@@ -15,9 +15,6 @@ INCLUDES += -I $(XEN_HYPERVISOR_IFS)
 vpath %h       $(XEN_LINUX_INCLUDE)
 INCLUDES += -I $(XEN_LINUX_INCLUDE)
 
-vpath %.h      $(XEN_XU)
-INCLUDES += -I $(XEN_XU)
-
 vpath %.h      $(XEN_LIBXC)
 INCLUDES += -I $(XEN_LIBXC)
 
@@ -69,7 +66,7 @@ XFRD_LIBS += $(CURL_LIBS)
 all: xfrd
 
 xfrd: $(XFRD_PROG_OBJ)
-	$(CC) -shared -o $@ $^ $(XFRD_LIBS)
+	$(CC) -o $@ $^ $(XFRD_LIBS)
 
 .PHONY: install
 install: xfrd

@@ -1,6 +1,6 @@
 
 #include <linux/module.h>
-#include <asm/hypervisor.h>
+#include <asm-xen/hypervisor.h>
 
 int reboot_thru_bios = 0;	/* for dmi_scan.c */
 

@@ -64,11 +64,10 @@ interrupts enabled. Nothing can go wrong ;-)
 
 **/
 
-static inline void free_shadow_page( struct mm_struct *m, 
-                                     struct pfn_info *pfn_info )
+static inline void free_shadow_page(struct mm_struct *m, 
+                                    struct pfn_info *page)
 {
-    unsigned long flags;
-    unsigned long type = pfn_info->type_and_flags & PGT_type_mask;
+    unsigned long type = page->u.inuse.type_info & PGT_type_mask;
 
     m->shadow_page_count--;
 
@@ -77,14 +76,9 @@ static inline void free_shadow_page( struct mm_struct *m,
     else if (type == PGT_l2_page_table)
         perfc_decr(shadow_l2_pages);
     else printk("Free shadow weird page type pfn=%08x type=%08x\n",
-                frame_table-pfn_info, pfn_info->type_and_flags);
+                frame_table-page, page->u.inuse.type_info);
     
-    pfn_info->type_and_flags = 0;
-
-    spin_lock_irqsave(&free_list_lock, flags);
-    list_add(&pfn_info->list, &free_list);
-    free_pfns++;
-    spin_unlock_irqrestore(&free_list_lock, flags);
+    free_domheap_page(page);
 }
 
 static void __free_shadow_table( struct mm_struct *m )
@@ -147,7 +141,7 @@ static inline int shadow_page_op( struct mm_struct *m, unsigned int op,
     {
 	case TABLE_OP_ZERO_L2:
 	{
-		if ( (spfn_info->type_and_flags & PGT_type_mask) == 
+		if ( (spfn_info->u.inuse.type_info & PGT_type_mask) == 
              PGT_l2_page_table )
 		{
 			unsigned long * spl1e = map_domain_mem( spfn<<PAGE_SHIFT );
@@ -161,7 +155,7 @@ static inline int shadow_page_op( struct mm_struct *m, unsigned int op,
 	
 	case TABLE_OP_ZERO_L1:
 	{
-		if ( (spfn_info->type_and_flags & PGT_type_mask) == 
+		if ( (spfn_info->u.inuse.type_info & PGT_type_mask) == 
              PGT_l1_page_table )
 		{
 			unsigned long * spl1e = map_domain_mem( spfn<<PAGE_SHIFT );
@@ -173,7 +167,7 @@ static inline int shadow_page_op( struct mm_struct *m, unsigned int op,
 
 	case TABLE_OP_FREE_L1:
 	{
-		if ( (spfn_info->type_and_flags & PGT_type_mask) == 
+		if ( (spfn_info->u.inuse.type_info & PGT_type_mask) == 
              PGT_l1_page_table )
 		{
 			// lock is already held
@@ -244,7 +238,7 @@ int shadow_mode_enable( struct domain *p, unsigned int mode )
     m->shadow_mode = mode;
  
     // allocate hashtable
-    m->shadow_ht = kmalloc(shadow_ht_buckets * 
+    m->shadow_ht = xmalloc(shadow_ht_buckets * 
                            sizeof(struct shadow_status));
     if( m->shadow_ht == NULL )
         goto nomem;
@@ -252,7 +246,7 @@ int shadow_mode_enable( struct domain *p, unsigned int mode )
     memset(m->shadow_ht, 0, shadow_ht_buckets * sizeof(struct shadow_status));
 
     // allocate space for first lot of extra nodes
-    m->shadow_ht_extras = kmalloc(sizeof(void*) + 
+    m->shadow_ht_extras = xmalloc(sizeof(void*) + 
                                   (shadow_ht_extra_size * 
                                    sizeof(struct shadow_status)));
     if( m->shadow_ht_extras == NULL )
@@ -278,7 +272,7 @@ int shadow_mode_enable( struct domain *p, unsigned int mode )
     {
         m->shadow_dirty_bitmap_size = (p->max_pages+63)&(~63);
         m->shadow_dirty_bitmap = 
-            kmalloc( m->shadow_dirty_bitmap_size/8);
+            xmalloc( m->shadow_dirty_bitmap_size/8);
         if( m->shadow_dirty_bitmap == NULL )
         {
             m->shadow_dirty_bitmap_size = 0;
@@ -313,20 +307,20 @@ void __shadow_mode_disable(struct domain *d)
         struct shadow_status * this = next;
         m->shadow_extras_count--;
         next = *((struct shadow_status **)(&next[shadow_ht_extra_size]));
-        kfree(this);
+        xfree(this);
     }
 
     SH_LOG("freed extras, now %d", m->shadow_extras_count);
 
     if ( m->shadow_dirty_bitmap  )
     {
-        kfree( m->shadow_dirty_bitmap );
+        xfree( m->shadow_dirty_bitmap );
         m->shadow_dirty_bitmap = 0;
         m->shadow_dirty_bitmap_size = 0;
     }
 
     // free the hashtable itself
-    kfree( &m->shadow_ht[0] );
+    xfree( &m->shadow_ht[0] );
 }
 
 static int shadow_mode_table_op(struct domain *d, 
@@ -518,7 +512,7 @@ int shadow_mode_control(struct domain *d, dom0_shadow_control_t *sc)
 static inline struct pfn_info *alloc_shadow_page(struct mm_struct *m)
 {
     m->shadow_page_count++;
-    return alloc_domain_page(NULL);
+    return alloc_domheap_page(NULL);
 }
 
 void unshadow_table( unsigned long gpfn, unsigned int type )
@@ -564,7 +558,7 @@ unsigned long shadow_l2_table(
 
     ASSERT( spfn_info ); // XXX deal with failure later e.g. blow cache
 
-    spfn_info->type_and_flags = PGT_l2_page_table;
+    spfn_info->u.inuse.type_info = PGT_l2_page_table;
     perfc_incr(shadow_l2_pages);
 
     spfn = (unsigned long) (spfn_info - frame_table);
@@ -585,7 +579,7 @@ unsigned long shadow_l2_table(
     spl2e[SH_LINEAR_PT_VIRT_START >> L2_PAGETABLE_SHIFT] =
         mk_l2_pgentry((spfn << PAGE_SHIFT) | __PAGE_HYPERVISOR);
     spl2e[PERDOMAIN_VIRT_START >> L2_PAGETABLE_SHIFT] =
-        mk_l2_pgentry(__pa(frame_table[gpfn].u.domain->mm.perdomain_pt) | 
+        mk_l2_pgentry(__pa(frame_table[gpfn].u.inuse.domain->mm.perdomain_pt) | 
                       __PAGE_HYPERVISOR);
 #endif
 
@@ -728,7 +722,7 @@ int shadow_fault( unsigned long va, long error_code )
             unsigned long *gpl1e, *spl1e;
             int i;
             sl1pfn_info = alloc_shadow_page( &current->mm ); 
-            sl1pfn_info->type_and_flags = PGT_l1_page_table;
+            sl1pfn_info->u.inuse.type_info = PGT_l1_page_table;
 			
             sl1pfn = sl1pfn_info - frame_table;
 
@@ -1017,7 +1011,7 @@ int check_pagetable( struct mm_struct *m, pagetable_t pt, char *s )
             );
 
     if ( (l2_pgentry_val(spl2e[PERDOMAIN_VIRT_START >> L2_PAGETABLE_SHIFT]) !=
-          ((__pa(frame_table[gpfn].u.domain->mm.perdomain_pt) | __PAGE_HYPERVISOR))) )
+          ((__pa(frame_table[gpfn].u.inuse.domain->mm.perdomain_pt) | __PAGE_HYPERVISOR))) )
         FAILPT("hypervisor per-domain map inconsistent");
 
 

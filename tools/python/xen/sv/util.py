@@ -2,25 +2,51 @@ from xen.xend.XendClient import server
 from xen.xend import sxp
 from xen.xend import PrettyPrint
 
-def getDomInfoHash( domain ):
-    domInfo = server.xend_domain( int( domain ) )
-    d = {}
-    d['dom']    = int( domain )
-    d['name']   = sxp.child_value( domInfo, 'name' )
-    d['mem']    = int( sxp.child_value( domInfo, 'memory' ) )
-    d['cpu']    = int( sxp.child_value( domInfo, 'cpu' ) )
-    d['state']  = sxp.child_value( domInfo, 'state' )
-    d['cpu_time'] = float( sxp.child_value( domInfo, 'cpu_time' ) )
-    if( sxp.child_value( domInfo, 'up_time' ) ):
-        d['up_time'] =  float( sxp.child_value( domInfo, 'up_time' ) )
-    if( sxp.child_value( domInfo, 'start_time' ) ):
-        d['start_time'] = float( sxp.child_value( domInfo, 'start_time' ) )
-    return d
+import types
 
-def sxp2hash( sxp ):
-    pass
+def getDomInfoHash( domain ):
+    domInfoHash = sxp2hash( server.xend_domain( int( domain ) ) )
+    domInfoHash['dom'] = int( domain )
+    return domInfoHash
+
+def sxp2hash( s ):
+    sxphash = {}
+        
+    for child in sxp.children( s ):
+    	if isinstance( child, types.ListType ) and len( child ) > 1:
+            if isinstance( child[1], types.ListType ) and len( child ) > 1:
+                sxphash[ child[0] ] = sxp2hash( child[1] )
+            else:
+                sxphash[ child[0] ] = child[1]
+        
+    return sxphash  
     
-def sxp2string( sxp ):
+def ssxp2hash( s ):
+    sxphash = {}
+    
+    for i in s:
+       if isinstance( i, types.ListType ) and len( i ) > 1:
+          sxphash[ i[0] ] = i[1]
+    
+    return sxphash 
+    
+def hash2sxp( h ):
+    hashsxp = []
+    
+    for (key, item) in h.items():
+    	hashsxp.append( [key, item] )
+        
+    return hashsxp    
+    
+def string2sxp( string ):
+    pin = sxp.Parser()
+    pin.input( string )
+    return pin.get_val()    
+
+def sxp2string( sexp ):
+    return sxp.to_string( sexp )    
+    
+def sxp2prettystring( sxp ):
     class tmp:
         def __init__( self ):
                 self.str = ""
@@ -28,9 +54,19 @@ def sxp2string( sxp ):
                 self.str = self.str + str
     temp = tmp()
     PrettyPrint.prettyprint( sxp, out=temp )
-    return temp.str    
+    return temp.str
+
+def getVar( var, request, default=None ):
+   
+    arg = request.args.get( var )
+
+    if arg is None:
+        return default
+    else:
+        return arg[ len( arg )-1 ]
 
 def bigTimeFormatter( time ):
+    time = float( time )
     weeks = time // 604800
     remainder = time % 604800
     days = remainder // 86400
@@ -42,6 +78,7 @@ def bigTimeFormatter( time ):
     return "%d weeks, %d days, %s" % ( weeks, days, hms )
 
 def smallTimeFormatter( time ):
+    time = float( time )
     hours = time // 3600
     remainder = time % 3600
     mins = remainder // 60
@@ -51,16 +88,24 @@ def smallTimeFormatter( time ):
 def stateFormatter( state ):
     states = [ 'Running', 'Blocked', 'Paused', 'Shutdown', 'Crashed' ]
     
+    stateStr = ""
+    
     for i in range( len( state ) ):
         if state[i] != "-":
-            return states[ i ] + " (%s)" % state
-    
-    return state
-    
+            stateStr += "%s, " % states[ i ] 
+           
+    return stateStr + " (%s)" % state
+
 def memoryFormatter( mem ):
-    return "%7dMb" % mem
+    mem = int( mem )
+    if mem >= 1024:
+        mem = float( mem ) / 1024
+        return "%3.2fGb" % mem
+    else:    
+        return "%7dMb" % mem
 
 def cpuFormatter( mhz ):
+    mhz = int( mhz )
     if mhz > 1000:
         ghz = float( mhz ) / 1000.0
         return "%4.2fGHz" % ghz

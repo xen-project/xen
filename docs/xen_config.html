@@ -1,15 +1,15 @@
 <!DOCTYPE html PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
 <html>
 <head>
-  <meta http-equiv="content-type"
- content="text/html; charset=ISO-8859-1">
+  <meta http-equiv="content-type" content="text/html; charset=ISO-8859-1">
   <title>Xen Configuration Syntax</title>
 </head>
 <body>
 <center>
 <h1>Xen Configuration Syntax</h1>
 <br>
-Version 0.1<br>2004 June 21<br>
+<!-- Version 0.1<br>2004 June 21<br> -->
+Version 0.2<br>2004 July 19<br>
 </center>
 
 <h1>Xen Configuration</h1>
@@ -20,7 +20,7 @@ called SXP.
 
 The SXP syntax is s-expressions (sxprs), a simple bracketed abstract syntax.
 Python lists are used to represent its parsed form, with a support
-api providing  access to fields and values (class xenmgr.sxp).
+api providing  access to fields and values (class xen.xend.sxp).
 
 <h1>SXP syntax</h1>
 <p>A general s-expression has the syntax:
@@ -59,11 +59,17 @@ The top-level element, a virtual machine configuration.
 <ul>
     <li>name: string, required. Domain name.
     <li>id: int, optional, default generated. Domain unique id.
-    <li>memory: int, optional, default 128. Domain memory in MB.
+    <li>memory: int, required. Domain memory in MB.
+    <li>cpu: int, optional. Cpu to run on.
     <li>image: linux | netbsd | ..., required. Domain image (OS-specific element).
     <li>controller: any device controller type, optional, default none.
     <li>device: any device type, optional, repeats. Device.
-    <li>auto-restart: bool, optional, default false. Auto-restart flag.
+    <li>restart: string, optional, default onreboot. Restart mode, one of
+        <ul><li>onreboot: restart the domain when it exits with code reboot.
+            <li>always: always restart the domain when it exits.
+            <li>never:  never restart the domain.
+        </ul>
+    <li>console: int, optional, default 9600 + domain id. Console port.
 </ul>
 
 <h2>(image (linux)) element</h2>
@@ -98,13 +104,13 @@ The domain may not have virtual network interfaces (vifs) configured.
 <h2>(device (vif)) element</h2>
 Defines a virtual network interface.
 <ul>
-    <li>mac: string, optional, default generated. Interface MAC address.
-    <li>quota info: optional. Subelements bytes and usecs.
+    <li>mac: string, required. Interface MAC address.
     <li>bridge: string, optional, default system-dependent. Bridge to connect to.
+    <li>script: string, optional, default system-dependent. Vif script to use
+        when bringing the interface up or down.
+    <li>ip: IP address, optional, no default. May be repeated. An IP address
+    or CIDR-format subnet the vif may use.
 </ul>
-A random MAC is assined is not specified.
-The interface is connected to the system default bridge if no bridge
-is specified.
 
 <h2>(device (vbd)) element</h2>
 Defines a virtual block device.
@@ -133,14 +139,6 @@ Contains a list of vif elements:
 <ul>
   <li>id: id of the vif being configured.
   <li>vnet: id of vnet the vif is assigned to.
-</ul>
-
-<h2>(vfr) element</h2>
-Defines the ip addresses for vifs (may go away soon).
-Contains a list of vif elements:
-<ul>
-  <li>id: vif index
-  <li>ip: vif ip address
 </ul>
 
 <h1>Examples</h1>

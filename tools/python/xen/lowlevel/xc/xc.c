@@ -44,13 +44,13 @@ static PyObject *pyxc_domain_create(PyObject *self,
     unsigned int mem_kb = 0;
     char        *name   = "(anon)";
     int          cpu = -1;
-    u32          dom;
+    u32          dom = 0;
     int          ret;
 
-    static char *kwd_list[] = { "mem_kb", "name", "cpu", NULL };
+    static char *kwd_list[] = { "dom", "mem_kb", "name", "cpu", NULL };
 
-    if ( !PyArg_ParseTupleAndKeywords(args, kwds, "|isi", kwd_list, 
-                                      &mem_kb, &name, &cpu) )
+    if ( !PyArg_ParseTupleAndKeywords(args, kwds, "|iisi", kwd_list, 
+                                      &dom, &mem_kb, &name, &cpu) )
         return NULL;
 
     if ( (ret = xc_domain_create(xc->xc_handle, mem_kb, name, cpu, &dom)) < 0 )
@@ -906,15 +906,15 @@ static PyObject *pyxc_domain_setmaxmem(PyObject *self,
     XcObject *xc = (XcObject *)self;
 
     u32 dom;
-    unsigned long max_memkb;
+    unsigned long maxmem_kb;
 
-    static char *kwd_list[] = { "dom", "max_memkb", NULL };
+    static char *kwd_list[] = { "dom", "maxmem_kb", NULL };
 
     if ( !PyArg_ParseTupleAndKeywords(args, kwds, "ii", kwd_list, 
-                                      &dom, &max_memkb) )
+                                      &dom, &maxmem_kb) )
         return NULL;
 
-    if ( xc_domain_setmaxmem(xc->xc_handle, dom, max_memkb) != 0 )
+    if ( xc_domain_setmaxmem(xc->xc_handle, dom, maxmem_kb) != 0 )
         return PyErr_SetFromErrno(xc_error);
     
     Py_INCREF(zero);
@@ -927,6 +927,7 @@ static PyMethodDef pyxc_methods[] = {
       (PyCFunction)pyxc_domain_create, 
       METH_VARARGS | METH_KEYWORDS, "\n"
       "Create a new domain.\n"
+      " dom    [int, 0]:        Domain identifier to use (allocated if zero).\n"
       " mem_kb [int, 0]:        Memory allocation, in kilobytes.\n"
       " name   [str, '(anon)']: Informative textual name.\n\n"
       "Returns: [int] new domain identifier; -1 on error.\n" },
@@ -979,6 +980,7 @@ static PyMethodDef pyxc_methods[] = {
       " blocked  [int]:  Bool - is the domain blocked waiting for an event?\n"
       " running  [int]:  Bool - is the domain currently running?\n"
       " mem_kb   [int]:  Memory reservation, in kilobytes\n"
+      " maxmem_kb [int]: Maximum memory limit, in kilobytes\n"
       " cpu_time [long]: CPU time consumed, in nanoseconds\n"
       " name     [str]:  Identifying name\n"
       " shutdown_reason [int]: Numeric code from guest OS, explaining "
@@ -1227,7 +1229,7 @@ static PyMethodDef pyxc_methods[] = {
       METH_VARARGS | METH_KEYWORDS, "\n"
       "Set a domain's memory limit\n"
       " dom [int]: Identifier of domain.\n"
-      " max_memkb [long]: .\n"
+      " maxmem_kb [long]: .\n"
       "Returns: [int] 0 on success; -1 on error.\n" },
 
     { NULL, NULL, 0, NULL }

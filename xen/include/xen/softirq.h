@@ -1,22 +1,20 @@
 #ifndef __XEN_SOFTIRQ_H__
 #define __XEN_SOFTIRQ_H__
 
+#define AC_TIMER_SOFTIRQ                  0
+#define NEW_TLBFLUSH_CLOCK_PERIOD_SOFTIRQ 1
+#define DEBUGGER_SOFTIRQ                  2
+#define NMI_SOFTIRQ                       3
+#define SCHEDULE_SOFTIRQ                  4
+#define NR_SOFTIRQS                       5
+
+#ifndef __ASSEMBLY__
+
 #include <xen/config.h>
 #include <xen/lib.h>
 #include <xen/smp.h>
 #include <asm/bitops.h>
 #include <asm/hardirq.h>
-
-enum
-{
-    AC_TIMER_SOFTIRQ=0,
-    NEW_TLBFLUSH_CLOCK_PERIOD_SOFTIRQ,
-#ifdef XEN_DEBUGGER
-    DEBUGGER_SOFTIRQ,
-#endif
-    SCHEDULE_SOFTIRQ, /* NB. This must come last or do_softirq() will break! */
-    NR_SOFTIRQS
-};
 
 typedef void (*softirq_handler)(void);
 
@@ -33,5 +31,7 @@ static inline void raise_softirq(unsigned int nr)
 {
     set_bit(nr, &softirq_pending(smp_processor_id()));
 }
+
+#endif /* __ASSEMBLY__ */
 
 #endif /* __XEN_SOFTIRQ_H__ */

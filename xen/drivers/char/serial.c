@@ -459,3 +459,10 @@ unsigned char serial_getc(int handle)
     spin_unlock_irqrestore(&uart->lock, flags);
     return c;
 }
+
+void serial_force_unlock(int handle)
+{
+    uart_t *uart = &com[handle & SERHND_IDX];
+    if ( handle != -1 )
+        uart->lock = SPIN_LOCK_UNLOCKED;
+}

@@ -8,7 +8,6 @@ CFLAGS     = -Wall -O3
 INCLUDES += -I $(XEN_HYPERVISOR_IFS)
 INCLUDES += -I $(XEN_LINUX_INCLUDE)
 INCLUDES += -I $(XEN_XC)
-INCLUDES += -I $(XEN_XU)
 INCLUDES += -I $(XEN_LIBXC)
 INCLUDES += -I $(XEN_LIBXUTIL)
 
@@ -21,7 +20,7 @@ OBJS     = $(patsubst %.c,%.o,$(SRCS))
 TARGETS  = xen_cpuperf
 
 INSTALL_BIN  = $(TARGETS) xencons
-INSTALL_SBIN = netfix xm xend
+INSTALL_SBIN = netfix xm xend xensv
 
 all: $(TARGETS)
 	$(MAKE) -C miniterm

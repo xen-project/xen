@@ -56,4 +56,17 @@ static inline void pte_free(struct page *pte)
 
 #define check_pgt_cache()	do { } while (0)
 
+#ifdef CONFIG_XEN_PRIVILEGED_GUEST
+int direct_remap_area_pages(struct mm_struct *mm,
+                            unsigned long address, 
+                            unsigned long machine_addr,
+                            unsigned long size, 
+                            pgprot_t prot,
+                            domid_t  domid);
+int __direct_remap_area_pages(struct mm_struct *mm,
+			      unsigned long address, 
+			      unsigned long size, 
+			      mmu_update_t *v);
+#endif /* CONFIG_XEN_PRIVILEGED_GUEST */
+
 #endif /* _I386_PGALLOC_H */

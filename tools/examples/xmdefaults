@@ -1,28 +1,14 @@
 #  -*- mode: python; -*-
 #============================================================================
 # Python defaults setup for 'xm create'.
-# Edit this file to reflect the configuration of your system.
+# This script sets the parameters used when a domain is created using 'xm create'.
+# You use a separate script for each domain you want to create, or 
+# you can set the parameters for the domain on the xm command line.
 #============================================================================
-
-# Define script variables here.
-# xm_vars is defined automatically, use xm_vars.var() to define a variable.
-
-def vmid_check(var, val):
-    val = int(val)
-    if val <= 0:
-        raise ValueError
-    return val
-    
-xm_vars.var('vmid',
-            use="Virtual machine id. Integer greater than 0.",
-            check=vmid_check)
-
-# This checks the script variables.
-xm_vars.check()
 
 #----------------------------------------------------------------------------
 # Kernel image file.
-kernel = "../../../install/boot/vmlinuz-2.4.26-xenU"
+kernel = "/boot/vmlinuz-2.4.26-xenU"
 
 # Optional ramdisk.
 #ramdisk = "/boot/initrd.gz"
@@ -34,12 +20,11 @@ kernel = "../../../install/boot/vmlinuz-2.4.26-xenU"
 # Initial memory allocation (in megabytes) for the new domain.
 memory = 64
 
-# A handy name for your new domain.
-name = "This is VM %d" % vmid
+# A name for your domain. All domains must have different names.
+name = "ExampleDomain"
 
 # Which CPU to start domain on? 
 #cpu = -1   # leave to Xen to pick
-cpu = vmid  # set based on vmid (mod number of CPUs)
 
 #----------------------------------------------------------------------------
 # Define network interfaces.
@@ -54,12 +39,11 @@ cpu = vmid  # set based on vmid (mod number of CPUs)
 #----------------------------------------------------------------------------
 # Define the disk devices you want the domain to have access to, and
 # what you want them accessible as.
-# Each disk entry is of the form phy:DEV,VDEV,MODE
-# where DEV is the device, VDEV is the device name the domain will see,
+# Each disk entry is of the form phy:UNAME,DEV,MODE
+# where UNAME is the device, DEV is the device name the domain will see,
 # and MODE is r for read-only, w for read-write.
 
-disk = [ 'phy:sda%d,sda1,w' % (7+vmid),
-         'phy:sda6,sda6,r' ]
+disk = [ 'phy:hda1,xda1,r' ]
 
 #----------------------------------------------------------------------------
 # Set the kernel command line for the new domain.
@@ -78,7 +62,7 @@ disk = [ 'phy:sda%d,sda1,w' % (7+vmid),
 #hostname= "vm%d" % vmid
 
 # Set root device.
-root = "/dev/sda1 ro"
+root = "/dev/xda1 ro"
 
 # Root device for nfs.
 #root = "/dev/nfs"
@@ -87,8 +71,8 @@ root = "/dev/sda1 ro"
 # Root directory on the nfs server.
 #nfs_root   = '/full/path/to/root/directory'
 
-# Sets runlevel 4 and the device for /usr.
-extra = "4 VMID=%d usr=/dev/sda6" % vmid
+# Sets runlevel 4.
+extra = "4"
 
 #----------------------------------------------------------------------------
 # Set according to whether you want the domain restarted when it exits.

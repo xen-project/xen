@@ -56,6 +56,6 @@ typedef unsigned long size_t;
 typedef unsigned long dma_addr_t;
 typedef u64 dma64_addr_t;
 
-typedef unsigned short kmem_bufctl_t;
+typedef unsigned short xmem_bufctl_t;
 
 #endif

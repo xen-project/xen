@@ -1,6 +1,11 @@
 
 include $(BASEDIR)/Rules.mk
 
+ifeq ($(TARGET_ARCH),ia64) 
+OBJS := $(subst page_alloc.o,,$(OBJS))
+OBJS := $(subst slab.o,,$(OBJS))
+endif
+
 ifneq ($(debugger),y)
 OBJS := $(subst debug.o,,$(OBJS))
 OBJS := $(subst debug-linux.o,,$(OBJS))

@@ -13,6 +13,39 @@ from xen.xend.XendClient import XendError, server
 from xen.xend.XendClient import main as xend_client_main
 from xen.xm import create, destroy, shutdown
 
+class Group:
+
+    name = ""
+    info = ""
+    
+    def __init__(self, xm):
+        self.xm = xm
+        self.progs = {}
+
+    def addprog(self, prog):
+        self.progs[prog.name] = prog
+
+    def getprog(self, name):
+        return self.progs.get(name)
+
+    def proglist(self):
+        kl = self.progs.keys()
+        kl.sort()
+        return [ self.getprog(k) for k in kl ]
+
+    def help(self, args):
+        if self.info:
+            print 
+            print self.info
+            print
+        else:
+            print
+        
+    def shortHelp(self, args):
+        self.help(args)
+        for p in self.proglist():
+            p.shortHelp(args)
+
 class Prog:
     """Base class for sub-programs.
     """
@@ -61,6 +94,7 @@ class Xm:
         self.name = 'xm'
         self.unknown = ProgUnknown(self)
         self.progs = {}
+        self.groups = {}
 
     def err(self, msg):
         print >>sys.stderr, "Error:", msg
@@ -101,6 +135,7 @@ class Xm:
         """
         p = pklass(self)
         self.progs[p.name] = p
+        self.getgroup(p.group).addprog(p)
         return p
 
     def getprog(self, name, val=None):
@@ -123,25 +158,70 @@ class Xm:
 
         return self.progs.get(match, val)
 
-    def proglist(self):
-        """Get a list of sub-programs, ordered by group.
-        """
-        groups = {}
-        for p in self.progs.values():
-            l = groups.get(p.group, [])
-            l.append(p)
-            groups[p.group] = l
-        kl = groups.keys()
+    def group(self, klass):
+        g = klass(self)
+        self.groups[g.name] = g
+        return g
+
+    def getgroup(self, name):
+        return self.groups[name]
+
+    def grouplist(self):
+        kl = self.groups.keys()
         kl.sort()
-        pl = []
-        for k in kl:
-            l = groups[k]
-            l.sort()
-            pl += l
-        return pl
+        return [ self.getgroup(k) for k in kl ]
         
 # Create the application object, then add the sub-program classes.
 xm = Xm()
+
+class GroupAll(Group):
+
+    name = "all"
+    info = ""
+
+xm.group(GroupAll)
+
+class GroupDomain(Group):
+
+    name = "domain"
+    info = "Commands on domains:"
+    
+xm.group(GroupDomain)
+
+class GroupScheduler(Group):
+
+    name = "scheduler"
+    info = "Comands controlling scheduling:"
+
+xm.group(GroupScheduler)
+
+class GroupHost(Group):
+
+    name = "host"
+    info = "Commands related to the xen host (node):"
+
+xm.group(GroupHost)
+
+class GroupConsole(Group):
+
+    name = "console"
+    info = "Commands related to consoles:"
+
+xm.group(GroupConsole)
+
+class GroupVbd(Group):
+
+    name = "vbd"
+    info = "Commands related to virtual block devices:"
+
+xm.group(GroupVbd)
+
+class GroupVif(Group):
+
+    name = "vif"
+    info = "Commands related to virtual network interfaces:"
+
+xm.group(GroupVif)
 
 class ProgHelp(Prog):
 
@@ -157,8 +237,8 @@ class ProgHelp(Prog):
             else:
                 print '%s: Unknown command: %s' % (self.name, name)
         else:
-            for p in self.xm.proglist():
-                p.shortHelp(args)
+            for g in self.xm.grouplist():
+                g.shortHelp(args)
             print "\nTry '%s help CMD' for help on CMD" % self.xm.name
 
     main = help
@@ -220,7 +300,7 @@ xm.prog(ProgRestore)
 class ProgList(Prog):
     group = 'domain'
     name = "list"
-    info = """List info about domains."""
+    info = """List information about domains."""
 
     short_options = 'l'
     long_options = ['long']
@@ -246,10 +326,10 @@ class ProgList(Prog):
                 use_long = 1
                 
         if n == 0:
-            doms = map(int, server.xend_domains())
+            doms = server.xend_domains()
             doms.sort()
         else:
-            doms = map(int, params)
+            doms = params
             
         if use_long:
             self.long_list(doms)
@@ -257,22 +337,27 @@ class ProgList(Prog):
             self.brief_list(doms)
 
     def brief_list(self, doms):
-        print 'Dom  Name             Mem(MB)  CPU  State  Time(s)'
+        print 'Name              Id  Mem(MB)  CPU  State  Time(s)  Console'
         for dom in doms:
             info = server.xend_domain(dom)
             d = {}
-            d['dom'] = int(dom)
+            d['dom'] = int(sxp.child_value(info, 'id', '-1'))
             d['name'] = sxp.child_value(info, 'name', '??')
             d['mem'] = int(sxp.child_value(info, 'memory', '0'))
             d['cpu'] = int(sxp.child_value(info, 'cpu', '0'))
             d['state'] = sxp.child_value(info, 'state', '??')
             d['cpu_time'] = float(sxp.child_value(info, 'cpu_time', '0'))
-            print ("%(dom)-4d %(name)-16s %(mem)7d  %(cpu)3d  %(state)5s  %(cpu_time)7.1f" % d)
+            console = sxp.child(info, 'console')
+            if console:
+                d['port'] = sxp.child_value(console, 'console_port')
+            else:
+                d['port'] = ''
+            print ("%(name)-16s %(dom)3d  %(mem)7d  %(cpu)3d  %(state)5s  %(cpu_time)7.1f    %(port)4s"
+                   % d)
 
     def long_list(self, doms):
         for dom in doms:
             info = server.xend_domain(dom)
-            print '\nDomain %d' % dom
             PrettyPrint.prettyprint(info)
 
 xm.prog(ProgList)
@@ -351,6 +436,56 @@ class ProgPincpu(Prog):
 
 xm.prog(ProgPincpu)
 
+class ProgMaxmem(Prog):
+    group = 'domain'
+    name = 'maxmem'
+    info = """Set domain memory limit."""
+
+    def help(self, args):
+        print args[0], "DOM MEMORY"
+        print "\nSet the memory limit for domain DOM to MEMORY megabytes."
+
+    def main(self, args):
+        if len(args) != 3: self.err("%s: Invalid argument(s)" % args[0])
+        v = map(int, args[1:3])
+        server.xend_domain_maxmem_set(*v)
+
+xm.prog(ProgMaxmem)
+
+class ProgDomid(Prog):
+    group = 'domain'
+    name = 'domid'
+    info = 'Convert a domain name to a domain id.'
+
+    def help(self, args):
+        print args[0], "DOM"
+        print '\nGet the domain id for the domain with name DOM.'
+        
+    def main (self, args):
+        if len(args) != 2: self.err("%s: Invalid argument(s)" % args[0])
+        name = args[1]
+        dom = server.xend_domain(name)
+        print sxp.child_value(dom, 'id')
+
+xm.prog(ProgDomid)
+
+class ProgDomname(Prog):
+    group = 'domain'
+    name = 'domname'
+    info = 'Convert a domain id to a domain name.'
+
+    def help(self, args):
+        print args[0], "DOM"
+        print '\nGet the name for the domain with id DOM.'
+        
+    def main (self, args):
+        if len(args) != 2: self.err("%s: Invalid argument(s)" % args[0])
+        name = args[1]
+        dom = server.xend_domain(name)
+        print sxp.child_value(dom, 'name')
+
+xm.prog(ProgDomname)
+
 class ProgBvt(Prog):
     group = 'scheduler'
     name = "bvt"
@@ -379,6 +514,7 @@ class ProgBvtslice(Prog):
     def main(self, args):
         if len(args) < 2: self.err('%s: Missing context switch allowance'
                                                             % args[0])
+        slice = int(args[1])
         server.xend_node_cpu_bvt_slice_set(slice)
 
 xm.prog(ProgBvtslice)
@@ -411,7 +547,8 @@ class ProgFbvtslice(Prog):
     def main(self, args):
         if len(args) < 2: self.err('%s: Missing context switch allowance.' 
                                                                 % args[0])
-        server.xend_node_cpu_fbvt_slice_set(slice)
+        ctx_allow = int(args[1])
+        server.xend_node_cpu_fbvt_slice_set(ctx_allow)
 
 xm.prog(ProgFbvtslice)
 
@@ -467,14 +604,19 @@ class ProgConsoles(Prog):
 
     def main(self, args):
         l = server.xend_consoles()
-        print "Dom Port  Id"
+        print "Dom Port  Id Connection"
         for x in l:
             info = server.xend_console(x)
             d = {}
-            d['dom'] = sxp.child(info, 'dst', ['dst', '?', '?'])[1]
-            d['port'] = sxp.child_value(info, 'port', '?')
+            d['dom'] = sxp.child(info, 'domain', '?')[1]
+            d['port'] = sxp.child_value(info, 'console_port', '?')
             d['id'] = sxp.child_value(info, 'id', '?')
-            print "%(dom)3s %(port)4s %(id)3s" % d
+            connected = sxp.child(info, 'connected')
+            if connected:
+                d['conn'] = '%s:%s' % (connected[1], connected[2])
+            else:
+                d['conn'] = ''
+            print "%(dom)3s %(port)4s %(id)3s %(conn)s" % d
 
 xm.prog(ProgConsoles)
 
@@ -484,7 +626,7 @@ class ProgConsole(Prog):
     info = """Open a console to a domain."""
     
     def help(self, args):
-        print "console DOM"
+        print args[0], "DOM"
         print "\nOpen a console to domain DOM."
 
     def main(self, args):
@@ -494,7 +636,7 @@ class ProgConsole(Prog):
         console = sxp.child(info, "console")
         if not console:
             self.err("No console information")
-        port = sxp.child_value(console, "port")
+        port = sxp.child_value(console, "console_port")
         from xen.util import console_client
         console_client.connect("localhost", int(port))
 
@@ -505,7 +647,7 @@ class ProgCall(Prog):
     info = "Call xend api functions."
 
     def help (self, args):
-        print "call fn argss..."
+        print args[0], "function args..."
         print """
         Call a xend HTTP API function. The leading 'xend_' on the function
 can be omitted. See xen.xend.XendClient for the API functions.
@@ -522,9 +664,100 @@ class ProgDmesg(Prog):
     info  = """Print Xen boot output."""
 
     def main(self, args):
-        print server.xend_dmesg()[1]
+        print server.xend_node_dmesg()
 
 xm.prog(ProgDmesg)
+
+class ProgLog(Prog):
+    group = 'host'
+    name  =  "log"
+    info  = """Print the xend log."""
+
+    def main(self, args):
+        print server.xend_node_log()
+
+xm.prog(ProgLog)
+
+class ProgVifList(Prog):
+    group = 'vif'
+    name  = 'vif-list'
+    info  = """List virtual network interfaces for a domain."""
+
+    def help(self, args):
+        print args[0], "DOM"
+        print "\nList virtual network interfaces for domain DOM"
+
+    def main(self, args):
+        if len(args) != 2: self.err("%s: Invalid argument(s)" % args[0])
+        dom = args[1]
+        for x in server.xend_domain_vifs(dom):
+            sxp.show(x)
+            print
+
+xm.prog(ProgVifList)
+
+class ProgVbdList(Prog):
+    group = 'vbd'
+    name  = 'vbd-list'
+    info  = """List virtual block devices for a domain."""
+
+    def help(self, args):
+        print args[0], "DOM"
+        print "\nList virtual block devices for domain DOM"
+
+    def main(self, args):
+        if len(args) != 2: self.err("%s: Invalid argument(s)" % args[0])
+        dom = args[1]
+        for x in server.xend_domain_vbds(dom):
+            sxp.show(x)
+            print
+
+xm.prog(ProgVbdList)
+
+class ProgVbdCreate(Prog):
+    group = 'vbd'
+    name  = 'vbd-create'
+    info = """Create a new virtual block device for a domain"""
+
+    def help(self, args):
+        print args[0], "DOM UNAME DEV MODE"
+        print """
+Create a virtual block device for a domain.
+
+  UNAME - device to export, e.g. phys:hda2
+  DEV   - device name in the domain, e.g. xda1
+  MODE  - access mode: r for read, w for read-write
+"""
+
+    def main(self, args):
+        if len(args) != 5: self.err("%s: Invalid argument(s)" % args[0])
+        dom = args[1]
+        vbd = ['vbd',
+               ['uname', args[2]],
+               ['dev',   args[3]],
+               ['mode',  args[4]]]
+        server.xend_domain_device_create(dom, vbd)
+
+xm.prog(ProgVbdCreate)
+
+class ProgVbdDestroy(Prog):
+    group = 'vbd'
+    name = 'vbd-destroy'
+    info = """Destroy a domain's virtual block device"""
+
+    def help(self, args):
+        print args[0], "DOM DEV"
+        print """
+Destroy vbd DEV attached to domain DOM. Detaches the device
+from the domain, but does not destroy the device contents."""
+
+    def main(self, args):
+        if len(args!=3): self.err("%s: Invalid argument(s)" % args[0])
+        dom = args[1]
+        dev = args[2]
+        sever.xend_domain_device_destroy(dom, "vbd", dev)
+
+xm.prog(ProgVbdDestroy)
 
 def main(args):
     xm.main(args)

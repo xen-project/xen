@@ -15,7 +15,6 @@
 #include <xen/console.h>
 #include <asm/shadow.h>
 #include <hypervisor-ifs/dom0_ops.h>
-#include <asm/hardirq.h>
 #include <asm/domain_page.h>
 
 /* Both these structures are protected by the tasklist_lock. */
@@ -40,7 +39,9 @@ struct domain *do_createdomain(domid_t dom_id, unsigned int cpu)
     d->domain    = dom_id;
     d->processor = cpu;
     d->create_time = NOW();
-
+    /* Initialise the sleep_lock */
+    spin_lock_init(&d->sleep_lock);
+ 
     memcpy(&d->thread, &idle0_task.thread, sizeof(d->thread));
 
     if ( d->domain != IDLE_DOMAIN_ID )
@@ -194,111 +195,6 @@ void domain_shutdown(u8 reason)
     __enter_scheduler();
 }
 
-struct pfn_info *alloc_domain_page(struct domain *d)
-{
-    struct pfn_info *page = NULL;
-    unsigned long flags, mask, pfn_stamp, cpu_stamp;
-    int i;
-
-    ASSERT(!in_irq());
-
-    spin_lock_irqsave(&free_list_lock, flags);
-    if ( likely(!list_empty(&free_list)) )
-    {
-        page = list_entry(free_list.next, struct pfn_info, list);
-        list_del(&page->list);
-        free_pfns--;
-    }
-    spin_unlock_irqrestore(&free_list_lock, flags);
-
-    if ( unlikely(page == NULL) )
-        return NULL;
-
-    if ( (mask = page->u.cpu_mask) != 0 )
-    {
-        pfn_stamp = page->tlbflush_timestamp;
-        for ( i = 0; (mask != 0) && (i < smp_num_cpus); i++ )
-        {
-            if ( mask & (1<<i) )
-            {
-                cpu_stamp = tlbflush_time[i];
-                if ( !NEED_FLUSH(cpu_stamp, pfn_stamp) )
-                    mask &= ~(1<<i);
-            }
-        }
-
-        if ( unlikely(mask != 0) )
-        {
-            flush_tlb_mask(mask);
-            perfc_incrc(need_flush_tlb_flush);
-        }
-    }
-
-    page->u.domain = d;
-    page->type_and_flags = 0;
-    if ( d != NULL )
-    {
-        wmb(); /* Domain pointer must be visible before updating refcnt. */
-        spin_lock(&d->page_alloc_lock);
-        if ( unlikely(d->tot_pages >= d->max_pages) )
-        {
-            DPRINTK("Over-allocation for domain %u: %u >= %u\n",
-                    d->domain, d->tot_pages, d->max_pages);
-            spin_unlock(&d->page_alloc_lock);
-            goto free_and_exit;
-        }
-        list_add_tail(&page->list, &d->page_list);
-        page->count_and_flags = PGC_allocated | 1;
-        if ( unlikely(d->tot_pages++ == 0) )
-            get_domain(d);
-        spin_unlock(&d->page_alloc_lock);
-    }
-
-    return page;
-
- free_and_exit:
-    spin_lock_irqsave(&free_list_lock, flags);
-    list_add(&page->list, &free_list);
-    free_pfns++;
-    spin_unlock_irqrestore(&free_list_lock, flags);
-    return NULL;
-}
-
-void free_domain_page(struct pfn_info *page)
-{
-    unsigned long  flags;
-    int            drop_dom_ref;
-    struct domain *d = page->u.domain;
-
-    if ( unlikely(IS_XEN_HEAP_FRAME(page)) )
-    {
-        spin_lock_recursive(&d->page_alloc_lock);
-        drop_dom_ref = (--d->xenheap_pages == 0);
-        spin_unlock_recursive(&d->page_alloc_lock);
-    }
-    else
-    {
-        page->tlbflush_timestamp = tlbflush_clock;
-        page->u.cpu_mask = 1 << d->processor;
-        
-        /* NB. May recursively lock from domain_relinquish_memory(). */
-        spin_lock_recursive(&d->page_alloc_lock);
-        list_del(&page->list);
-        drop_dom_ref = (--d->tot_pages == 0);
-        spin_unlock_recursive(&d->page_alloc_lock);
-
-        page->count_and_flags = 0;
-        
-        spin_lock_irqsave(&free_list_lock, flags);
-        list_add(&page->list, &free_list);
-        free_pfns++;
-        spin_unlock_irqrestore(&free_list_lock, flags);
-    }
-
-    if ( drop_dom_ref )
-        put_domain(d);
-}
-
 unsigned int alloc_new_dom_mem(struct domain *d, unsigned int kbytes)
 {
     unsigned int alloc_pfns, nr_pages;
@@ -310,9 +206,7 @@ unsigned int alloc_new_dom_mem(struct domain *d, unsigned int kbytes)
     /* Grow the allocation if necessary. */
     for ( alloc_pfns = d->tot_pages; alloc_pfns < nr_pages; alloc_pfns++ )
     {
-        if ( unlikely((page=alloc_domain_page(d)) == NULL) ||
-             unlikely(free_pfns < (SLACK_DOMAIN_MEM_KILOBYTES >> 
-                                   (PAGE_SHIFT-10))) )
+        if ( unlikely((page = alloc_domheap_page(d)) == NULL) )
         {
             domain_relinquish_memory(d);
             return -ENOMEM;
@@ -365,7 +259,7 @@ void domain_destruct(struct domain *d)
     destroy_event_channels(d);
 
     free_perdomain_pt(d);
-    free_page((unsigned long)d->shared_info);
+    free_xenheap_page((unsigned long)d->shared_info);
 
     free_domain_struct(d);
 }
@@ -381,7 +275,7 @@ int final_setup_guestos(struct domain *p, dom0_builddomain_t *builddomain)
     int rc = 0;
     full_execution_context_t *c;
 
-    if ( (c = kmalloc(sizeof(*c))) == NULL )
+    if ( (c = xmalloc(sizeof(*c))) == NULL )
         return -ENOMEM;
 
     if ( test_bit(DF_CONSTRUCTED, &p->flags) )
@@ -405,6 +299,6 @@ int final_setup_guestos(struct domain *p, dom0_builddomain_t *builddomain)
 
  out:    
     if ( c != NULL )
-        kfree(c);
+        xfree(c);
     return rc;
 }

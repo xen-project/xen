@@ -14,7 +14,7 @@ class SrvConsole(SrvDir):
         self.xc = XendConsole.instance()
 
     def op_disconnect(self, op, req):
-        val = self.xc.console_disconnect(self.info.id)
+        val = self.xc.console_disconnect(self.info.console_port)
         return val
 
     def render_POST(self, req):
@@ -31,7 +31,7 @@ class SrvConsole(SrvDir):
                 #self.ls()
                 req.write('<p>%s</p>' % self.info)
                 req.write('<p><a href="%s">Connect to domain %d</a></p>'
-                          % (self.info.uri(), self.info.dom2))
+                          % (self.info.uri(), self.info.dom))
                 self.form(req)
                 req.write('</body></html>')
             return ''
@@ -40,6 +40,6 @@ class SrvConsole(SrvDir):
 
     def form(self, req):
         req.write('<form method="post" action="%s">' % req.prePathURL())
-        if self.info.connection():
+        if self.info.connected():
             req.write('<input type="submit" name="op" value="disconnect">')
         req.write('</form>')

@@ -354,18 +354,17 @@ def preprocess_vifs(opts, vals):
     vals.vif = vifs
 
 def preprocess_ip(opts, vals):
-    setip = (vals.hostname or vals.netmask
-             or vals.nfs_server
-             or vals.gateway or vals.dhcp or vals.interface)
-    if not setip: return
-    dummy_nfs_server = '1.2.3.4'
-    ip = (vals.ip
+    if vals.ip or vals.dhcp != 'off':
+        dummy_nfs_server = '1.2.3.4'
+        ip = (vals.ip
           + ':' + (vals.nfs_server or dummy_nfs_server)
           + ':' + vals.gateway
           + ':' + vals.netmask
           + ':' + vals.hostname
           + ':' + vals.interface
           + ':' + vals.dhcp)
+    else:
+        ip = ''
     vals.cmdline_ip = ip
 
 def preprocess_nfs(opts, vals):
@@ -402,17 +401,17 @@ def make_domain(opts, config):
     except XendError, ex:
         opts.err(str(ex))
 
-    dom = int(sxp.child_value(dominfo, 'id'))
+    dom = sxp.child_value(dominfo, 'name')
     console_info = sxp.child(dominfo, 'console')
     if console_info:
-        console_port = int(sxp.child_value(console_info, 'port'))
+        console_port = int(sxp.child_value(console_info, 'console_port'))
     else:
         console_port = None
     
     if server.xend_domain_unpause(dom) < 0:
         server.xend_domain_destroy(dom)
-        opts.err("Failed to unpause domain %d" % dom)
-    opts.info("Started domain %d, console on port %d"
+        opts.err("Failed to unpause domain %s" % dom)
+    opts.info("Started domain %s, console on port %d"
               % (dom, console_port))
     return (dom, console_port)
 
@@ -431,11 +430,11 @@ def main(argv):
             (var, val) = arg.strip().split('=', 1)
             gopts.setvar(var.strip(), val.strip())
     if opts.vals.config:
-        pass
+        config = opts.vals.config
     else:
         opts.load_defaults()
-    preprocess(opts, opts.vals)
-    config = make_config(opts.vals)
+        preprocess(opts, opts.vals)
+        config = make_config(opts.vals)
     if opts.vals.dryrun:
         PrettyPrint.prettyprint(config)
     else:

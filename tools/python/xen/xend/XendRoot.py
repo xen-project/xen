@@ -7,7 +7,9 @@ Creates the event server and handles configuration.
 import os
 import os.path
 import sys
+
 import EventServer
+from XendLogging import XendLogging
 
 # Initial create of the event server.
 eserver = EventServer.instance()
@@ -43,6 +45,10 @@ class XendRoot:
 
     """Where network control scripts live."""
     network_script_dir = "/etc/xen"
+
+    logfile_default = "/var/log/xend.log"
+
+    loglevel_default = 'DEBUG'
 
     def __init__(self):
         self.rebooted = 0
@@ -104,8 +110,20 @@ class XendRoot:
     def configure(self):
         print 'XendRoot>configure>'
         self.set_config()
+        self.configure_logger()
         self.dbroot = self.get_config_value("dbroot", self.dbroot_default)
         self.lastboot = self.get_config_value("lastboot", self.lastboot_default)
+
+    def configure_logger(self):
+        logfile = self.get_config_value("logfile", self.logfile_default)
+        loglevel = self.get_config_value("loglevel", self.loglevel_default)
+        self.logging = XendLogging(logfile, level=loglevel)
+
+    def get_logging(self):
+        return self.logging
+
+    def get_logger(self):
+        return self.logging.getLogger()
 
     def get_dbroot(self):
         """Get the path to the database root.
@@ -181,3 +199,6 @@ def instance():
     except:
         inst = XendRoot()
     return inst
+
+def logger():
+    return instance().get_logger()

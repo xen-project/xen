@@ -3,7 +3,7 @@
  *
  * Code to handle memory related requests from domains eg. balloon driver.
  *
- * Copyright (c) 2003, B Dragovic & K A Fraser.
+ * Copyright (c) 2003-2004, B Dragovic & K A Fraser.
  */
 
 #include <xen/config.h>
@@ -16,87 +16,89 @@
 #include <asm/domain_page.h>
 
 static long alloc_dom_mem(struct domain *d, 
-                          unsigned long *pages, 
-                          unsigned long  nr_pages)
+                          unsigned long *extent_list, 
+                          unsigned long  nr_extents,
+                          unsigned int   extent_order)
 {
     struct pfn_info *page;
     unsigned long    i;
 
-    /* Leave some slack pages; e.g., for the network. */
-    if ( unlikely(free_pfns < (nr_pages + (SLACK_DOMAIN_MEM_KILOBYTES >> 
-                                           (PAGE_SHIFT-10)))) )
+    if ( (extent_order != 0) && !IS_CAPABLE_PHYSDEV(current) )
     {
-        DPRINTK("Not enough slack: %u %u\n",
-                free_pfns,
-                SLACK_DOMAIN_MEM_KILOBYTES >> (PAGE_SHIFT-10));
+        DPRINTK("Only I/O-capable domains may allocate > order-0 memory.\n");
         return 0;
     }
 
-    for ( i = 0; i < nr_pages; i++ )
+    for ( i = 0; i < nr_extents; i++ )
     {
-        /* NB. 'alloc_domain_page' does limit-checking on pages per domain. */
-        if ( unlikely((page = alloc_domain_page(d)) == NULL) )
+        if ( unlikely((page = alloc_domheap_pages(d, extent_order)) == NULL) )
         {
             DPRINTK("Could not allocate a frame\n");
-            break;
+            return i;
         }
 
         /* Inform the domain of the new page's machine address. */ 
-        if ( unlikely(put_user(page_to_pfn(page), &pages[i]) != 0) )
-            break;
+        if ( unlikely(put_user(page_to_pfn(page), &extent_list[i]) != 0) )
+            return i;
     }
 
     return i;
 }
     
-static long free_dom_mem(struct domain *d, 
-                         unsigned long *pages, 
-                         unsigned long  nr_pages)
+static long free_dom_mem(struct domain *d,
+                         unsigned long *extent_list, 
+                         unsigned long  nr_extents,
+                         unsigned int   extent_order)
 {
     struct pfn_info *page;
-    unsigned long    i, mpfn;
-    long             rc = 0;
+    unsigned long    i, j, mpfn;
 
-    for ( i = 0; i < nr_pages; i++ )
+    for ( i = 0; i < nr_extents; i++ )
     {
-        if ( unlikely(get_user(mpfn, &pages[i]) != 0) )
-            break;
+        if ( unlikely(get_user(mpfn, &extent_list[i]) != 0) )
+            return i;
 
-        if ( unlikely(mpfn >= max_page) )
+        for ( j = 0; j < (1 << extent_order); j++ )
         {
-            DPRINTK("Domain %u page number out of range (%08lx>=%08lx)\n", 
-                    d->domain, mpfn, max_page);
-            rc = -EINVAL;
-            break;
-        }
+            if ( unlikely((mpfn + j) >= max_page) )
+            {
+                DPRINTK("Domain %u page number out of range (%08lx>=%08lx)\n", 
+                        d->domain, mpfn + j, max_page);
+                return i;
+            }
+            
+            page = &frame_table[mpfn + j];
+            if ( unlikely(!get_page(page, d)) )
+            {
+                DPRINTK("Bad page free for domain %u\n", d->domain);
+                return i;
+            }
 
-        page = &frame_table[mpfn];
-        if ( unlikely(!get_page(page, d)) )
-        {
-            DPRINTK("Bad page free for domain %u\n", d->domain);
-            rc = -EINVAL;
-            break;
-        }
+            if ( test_and_clear_bit(_PGC_guest_pinned, 
+                                    &page->u.inuse.count_info) )
+                put_page_and_type(page);
+            
+            if ( test_and_clear_bit(_PGC_allocated,
+                                    &page->u.inuse.count_info) )
+                put_page(page);
 
-        if ( test_and_clear_bit(_PGC_guest_pinned, &page->count_and_flags) )
-            put_page_and_type(page);
-
-        if ( test_and_clear_bit(_PGC_allocated, &page->count_and_flags) )
             put_page(page);
-
-        put_page(page);
+        }
     }
 
-    return rc ? rc : nr_pages;
+    return i;
 }
     
-long do_dom_mem_op(unsigned int op, void *pages, unsigned long nr_pages)
+long do_dom_mem_op(unsigned int   op, 
+                   unsigned long *extent_list, 
+                   unsigned long  nr_extents,
+                   unsigned int   extent_order)
 {
     if ( op == MEMOP_increase_reservation )
-        return alloc_dom_mem(current, pages, nr_pages);
+        return alloc_dom_mem(current, extent_list, nr_extents, extent_order);
 
     if ( op == MEMOP_decrease_reservation )
-        return free_dom_mem(current, pages, nr_pages);
+        return free_dom_mem(current, extent_list, nr_extents, extent_order);
 
     return -ENOSYS;
 }

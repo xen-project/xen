@@ -509,7 +509,7 @@ static int __init smp_read_mpc(struct mp_config_table *mpc)
 	
 	count = (max_mp_busses * sizeof(int)) * 4;
 	count += (max_irq_sources * sizeof(struct mpc_config_intsrc));
-	bus_data = (void *)__get_free_pages(get_order(count));
+	bus_data = (void *)alloc_xenheap_pages(get_order(count));
 	if (!bus_data) {
 		printk(KERN_ERR "SMP mptable: out of memory!\n");
 		return 0;
@@ -694,7 +694,7 @@ static inline void __init construct_default_ISA_mptable(int mpc_default_type)
 		struct mpc_config_intsrc mp_irqs[MAX_IRQ_SOURCES];
 	} *bus_data;
 
-	bus_data = (void *)__get_free_pages(get_order(sizeof(*bus_data)));
+	bus_data = (void *)alloc_xenheap_pages(get_order(sizeof(*bus_data)));
 	if (!bus_data)
 		panic("SMP mptable: out of memory!\n");
 	mp_bus_id_to_type = bus_data->mp_bus_id_to_type;
@@ -1171,7 +1171,7 @@ void __init mp_config_acpi_legacy_irqs (void)
 
 	count = (MAX_MP_BUSSES * sizeof(int)) * 4;
 	count += (MAX_IRQ_SOURCES * sizeof(int)) * 4;
-	bus_data = (void *)__get_free_pages(get_order(count));
+	bus_data = (void *)alloc_xenheap_pages(get_order(count));
 	if (!bus_data) {
 		panic("Fatal: can't allocate bus memory for ACPI legacy IRQ!");
 	}

@@ -23,7 +23,7 @@
 #include <xc.h>
 
 #include <hypervisor-if.h>
-#include "domain_controller.h"
+#include <io/domain_controller.h>
 
 #include <asm-xen/proc_cmd.h>
 

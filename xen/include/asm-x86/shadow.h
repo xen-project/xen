@@ -120,9 +120,9 @@ static inline int __mark_dirty( struct mm_struct *m, unsigned int mfn )
         SH_LOG("mark_dirty OOR! mfn=%x pfn=%x max=%x (mm %p)",
                mfn, pfn, m->shadow_dirty_bitmap_size, m );
         SH_LOG("dom=%u caf=%08x taf=%08x\n", 
-               frame_table[mfn].u.domain->domain,
-               frame_table[mfn].count_and_flags, 
-               frame_table[mfn].type_and_flags );
+               frame_table[mfn].u.inuse.domain->domain,
+               frame_table[mfn].u.inuse.count_info, 
+               frame_table[mfn].u.inuse.type_info );
     }
 
     return rc;
@@ -524,7 +524,7 @@ static inline void set_shadow_status( struct mm_struct *m,
         SH_LOG("allocate more shadow hashtable blocks");
 
         // we need to allocate more space
-        extra = kmalloc(sizeof(void*) + (shadow_ht_extra_size * 
+        extra = xmalloc(sizeof(void*) + (shadow_ht_extra_size * 
                                          sizeof(struct shadow_status)));
 
         if( ! extra ) BUG(); // should be more graceful here....
