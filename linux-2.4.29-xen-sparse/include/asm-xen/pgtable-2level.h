@@ -36,7 +36,7 @@ static inline int pgd_present(pgd_t pgd)	{ return 1; }
 
 #define set_pte(pteptr, pteval) queue_l1_entry_update(pteptr, (pteval).pte_low)
 #define set_pte_atomic(pteptr, pteval) queue_l1_entry_update(pteptr, (pteval).pte_low)
-#define set_pmd(pmdptr, pmdval) queue_l2_entry_update((pmdptr), (pmdval).pmd)
+#define set_pmd(pmdptr, pmdval) queue_l2_entry_update((pmdptr), (pmdval))
 #define set_pgd(pgdptr, pgdval) ((void)0)
 
 #define pgd_page(pgd) \
