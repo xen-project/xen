@@ -60,9 +60,11 @@ Error: expiry time not specified.<br>
       {
         expiry *= 24 * 60 * 60 * 1000 * 365;
       }
+      
+      expiry += System.currentTimeMillis();
 %>
 output =<br>
-<%= root.doCreateVirtualDisk( hsrw.getParameter("name"), size, expiry) %>
+<%= new CommandVdCreate( hsrw.getParameter("name"), Library.parseSize(size), new Date(expiry)).execute() %>
 <br>
 <%
     }

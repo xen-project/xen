@@ -8,6 +8,7 @@
 <%@ page import="org.xenoserver.web.*" %>
 <%@ page import="org.xenoserver.control.*" %>
 <%@ page import="java.util.Iterator" %>
+<%@ page import="java.util.Date" %>
 <%@ page import="javax.servlet.http.HttpServletRequestWrapper" %>
 
 <html lang="en">

@@ -51,10 +51,12 @@ Error: expiry time not specified.<br>
       expiry *= 24 * 60 * 60 * 1000 * 365;
     }
 
+	expiry += System.currentTimeMillis();
+	
     for (int i = 0; i < vds.length; i++)
     {
 %>
-vd = <%= root.doRefreshVirtualDisk(vds[i], expiry) %> <br>
+vd = <%= new CommandVdRefresh(vds[i], new Date(expiry)).execute() %> <br>
 <%
     }
   }

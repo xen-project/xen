@@ -46,11 +46,18 @@ Error: No virtual block device number specified.<br>
     {
       domain = Integer.decode(hsrw.getParameter("domain")).intValue();
       vbd = Integer.decode(hsrw.getParameter("vbd")).intValue();
+      Mode mode;
+      if (hsrw.getParameter("mode").equals("rw")) {
+        mode = Mode.READ_WRITE;
+      } else {
+        mode = Mode.READ_ONLY;
+      }
+      
 %>
 output =<br>
-<%= root.doCreateVirtualBlockDevice(hsrw.getParameter("vd"),
+<%= new CommandVbdCreate(hsrw.getParameter("vd"),
                                     domain, vbd,
-                                     hsrw.getParameter("mode"))  %>
+                                     mode).execute()  %>
 <%
     }
     catch (NumberFormatException e)

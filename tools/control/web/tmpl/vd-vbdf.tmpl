@@ -20,14 +20,15 @@ INCLUDE&vdmenu.tmpl
   <tr class="vdh"><td>vd key</td><td>dom</td><td>vbd</td><td>mode</td></tr>
 
   <%
-    for (Enumeration e = root.getVirtualBlockDevices(); e.hasMoreElements();)
+    for (Iterator i = root.vdm().getVirtualBlockDevices(); i.hasNext();)
     {
-      VirtualBlockDevice vbd = (VirtualBlockDevice) e.nextElement();
+      VirtualBlockDevice vbd = (VirtualBlockDevice) i.next();
+      VirtualDisk vd = vbd.getVirtualDisk(); 
   %>
     <tr class="vdt">
-      <td><%= vbd.getKey() %></td>
+      <td><%= vd.getKey() %></td>
       <td><%= vbd.getDomain() %></td>
-      <td><%= vbd.getVBDNum() %></td>
+      <td><%= vbd.getVbdNum() %></td>
       <td><%= vbd.getMode().toString() %></td>
     </tr>
   <%
