@@ -615,6 +615,10 @@ static inline int IO_APIC_irq_trigger(int irq)
 
 int irq_vector[NR_IRQS] = { FIRST_DEVICE_VECTOR , 0 };
 
+#ifdef CONFIG_VMX
+int vector_irq[256];
+#endif
+
 static int __init assign_irq_vector(int irq)
 {
 	static int current_vector = FIRST_DEVICE_VECTOR, offset = 0;
@@ -637,6 +641,10 @@ next:
 		panic("ran out of interrupt sources!");
 
 	IO_APIC_VECTOR(irq) = current_vector;
+#ifdef CONFIG_VMX
+        vector_irq[current_vector] = irq;
+        printk("vector_irq[%x] = %d\n", current_vector, irq);
+#endif
 	return current_vector;
 }
 

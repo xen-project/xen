@@ -15,6 +15,7 @@
 4187c1c7IWmBinGdI19kL4MuZ6RLbQ docs/check_pkgs
 3f9e7d60PWZJeVh5xdnk0nLUdxlqEA docs/figs/xenlogo.eps
 418a3248xjIqmNKo0v_XQSfAvlBGFw docs/html.sty
+41c0c4116itF389v0CEWcmzue6zJkA docs/misc/VMX_changes.txt
 4022a73cgxX1ryj1HgS-IwwB6NUi2A docs/misc/XenDebugger-HOWTO
 412f4bd9sm5mCQ8BkrgKcAKZGadq7Q docs/misc/blkif-drivers-explained.txt
 40d6ccbfKKBq8jE0ula4eHEzBiQuDA docs/misc/xen_config.html
@@ -698,6 +699,9 @@
 3ddb79bc-Udq7ol-NX4q9XsYnN7A2Q xen/arch/x86/time.c
 3ddb79bccYVzXZJyVaxuv5T42Z1Fsw xen/arch/x86/trampoline.S
 3ddb79bcOftONV9h4QCxXOfiT0h91w xen/arch/x86/traps.c
+41c0c411tD3C7TpfDMiFTf7BaNd_Dg xen/arch/x86/vmx.c
+41c0c411ODt8uEmV-yUxpQLpqimE5Q xen/arch/x86/vmx_io.c
+41c0c4128URE0dxcO15JME_MuKBPfg xen/arch/x86/vmx_vmcs.c
 419cbedeQDg8IrO3izo3o5rQNlo0kQ xen/arch/x86/x86_32/asm-offsets.c
 3e32af9aRnYGl4GMOaDKp7JdfhOGhg xen/arch/x86/x86_32/domain_page.c
 3ddb79bcecupHj56ZbTa3B0FxDowMg xen/arch/x86/x86_32/entry.S
@@ -808,6 +812,7 @@
 3ddb79c34BFiXjBJ_cCKB0aCsV1IDw xen/include/asm-x86/desc.h
 40715b2dTokMLYGSuD58BnxOqyWVew xen/include/asm-x86/div64.h
 3e20b82fl1jmQiKdLy7fxMcutfpjWA xen/include/asm-x86/domain_page.h
+41c0c412Ufq5sAvri3dMHC1BXiO6Gw xen/include/asm-x86/e820.h
 3ddb79c3NU8Zy40OTrq3D-i30Y3t4A xen/include/asm-x86/fixmap.h
 3e2d29944GI24gf7vOP_7x8EyuqxeA xen/include/asm-x86/flushtlb.h
 3ddb79c39o75zPP0T1aQQ4mNrCAN2w xen/include/asm-x86/hardirq.h
@@ -837,6 +842,10 @@
 3ddb79c3ezddh34MdelJpa5tNR00Dw xen/include/asm-x86/system.h
 3ddb79c4HugMq7IYGxcQKFBpKwKhzA xen/include/asm-x86/types.h
 40cf1596saFaHD5DC5zvrSn7CDCWGQ xen/include/asm-x86/uaccess.h
+41c0c412k6GHYF3cJtDdw37ee3TVaw xen/include/asm-x86/vmx.h
+41c0c412hck3QX-6_MaXaISGkngQuA xen/include/asm-x86/vmx_cpu.h
+41c0c41243jC1mcArZx_t3YkBL4lTA xen/include/asm-x86/vmx_platform.h
+41c0c412lQ0NVVN9PsOSznQ-qhOiPA xen/include/asm-x86/vmx_vmcs.h
 418fbcfe_WliJPToeVM-9VStvym-hw xen/include/asm-x86/x86_32/asm_defns.h
 3ddb79c2ADvRmdexd9y3AYK9_NTx-Q xen/include/asm-x86/x86_32/current.h
 3ddb79c3mbqEM7QQr3zVq7NiBNhouA xen/include/asm-x86/x86_32/regs.h
@@ -857,6 +866,7 @@
 4121d149udGfSUGhn3k1ECz0bM31nQ xen/include/public/grant_table.h
 40f5623bqoi4GEoBiiUc6TZk1HjsMg xen/include/public/io/blkif.h
 40dc4076pVeE1kEEWzcUaNZin65kCA xen/include/public/io/domain_controller.h
+41c0c412FLc0gunlJl91qMYscFtXVA xen/include/public/io/ioreq.h
 40f5623cTZ80EwjWUBlh44A9F9i_Lg xen/include/public/io/netif.h
 4051db79512nOCGweabrFWO2M2h5ng xen/include/public/physdev.h
 40589968wmhPmV5-ENbBYmMjnedgKw xen/include/public/sched_ctl.h

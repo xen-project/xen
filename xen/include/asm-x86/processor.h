@@ -16,6 +16,7 @@
 #include <asm/pdb.h>
 #include <xen/config.h>
 #include <xen/spinlock.h>
+#include <asm/vmx_vmcs.h>
 #include <public/xen.h>
 #endif
 
@@ -84,6 +85,7 @@
 #define X86_CR4_PCE		0x0100	/* enable performance counters at ipl 3 */
 #define X86_CR4_OSFXSR		0x0200	/* enable fast FPU save and restore */
 #define X86_CR4_OSXMMEXCPT	0x0400	/* enable unmasked SSE exceptions */
+#define X86_CR4_VMXE		0x2000  /* enable VMX */
 
 /*
  * Trap/fault mnemonics.
@@ -429,6 +431,9 @@ struct thread_struct {
     struct desc_struct fast_trap_desc;
 #endif
     trap_info_t        traps[256];
+#ifdef CONFIG_VMX
+    struct arch_vmx_struct arch_vmx; /* Virtual Machine Extensions */
+#endif
 };
 
 #define IDT_ENTRIES 256
@@ -473,6 +478,18 @@ struct mm_struct {
     l1_pgentry_t *perdomain_ptes;
     pagetable_t  pagetable;
 
+#ifdef CONFIG_VMX
+
+#define SHM_full_32     (8) /* full virtualization for 32-bit */
+
+        pagetable_t  monitor_table;
+        l2_pgentry_t *vpagetable;	/* virtual address of pagetable */
+        l2_pgentry_t *shadow_vtable;	/* virtual address of shadow_table */
+        l2_pgentry_t *guest_pl2e_cache;	/* guest page directory cache */
+        unsigned long min_pfn;		/* min host physical */
+        unsigned long max_pfn;		/* max host physical */
+#endif
+
     /* shadow mode status and controls */
     unsigned int shadow_mode;  /* flags to control shadow table operation */
     pagetable_t  shadow_table;
@@ -502,14 +519,25 @@ struct mm_struct {
     char gdt[10]; /* NB. 10 bytes needed for x86_64. Use 6 bytes for x86_32. */
 };
 
+#define SHM_full_32     (8) /* full virtualization for 32-bit */
+
 static inline void write_ptbase(struct mm_struct *mm)
 {
     unsigned long pa;
 
+#ifdef CONFIG_VMX
+    if ( unlikely(mm->shadow_mode) ) {
+            if (mm->shadow_mode == SHM_full_32)
+                    pa = pagetable_val(mm->monitor_table);
+            else
+                    pa = pagetable_val(mm->shadow_table);   
+    }
+#else
     if ( unlikely(mm->shadow_mode) )
-        pa = pagetable_val(mm->shadow_table);
+            pa = pagetable_val(mm->shadow_table);    
+#endif
     else
-        pa = pagetable_val(mm->pagetable);
+            pa = pagetable_val(mm->pagetable);
 
     write_cr3(pa);
 }
@@ -533,18 +561,40 @@ long set_gdt(struct exec_domain *d,
 
 long set_debugreg(struct exec_domain *p, int reg, unsigned long value);
 
-struct microcode {
-    unsigned int hdrver;
-    unsigned int rev;
-    unsigned int date;
-    unsigned int sig;
-    unsigned int cksum;
-    unsigned int ldrver;
-    unsigned int pf;
-    unsigned int reserved[5];
-    unsigned int bits[500];
+struct microcode_header {
+        unsigned int hdrver;
+        unsigned int rev;
+        unsigned int date;
+        unsigned int sig;
+        unsigned int cksum;
+        unsigned int ldrver;
+        unsigned int pf;
+        unsigned int datasize;
+        unsigned int totalsize;
+        unsigned int reserved[3];
 };
 
+struct microcode {
+        struct microcode_header hdr;
+        unsigned int bits[0];
+};
+
+typedef struct microcode microcode_t;
+typedef struct microcode_header microcode_header_t;
+
+/* microcode format is extended from prescott processors */
+struct extended_signature {
+        unsigned int sig;
+        unsigned int pf;
+        unsigned int cksum;
+};
+
+struct extended_sigtable {
+        unsigned int count;
+        unsigned int cksum;
+        unsigned int reserved[3];
+        struct extended_signature sigs[0];
+};
 /* '6' because it used to be for P6 only (but now covers Pentium 4 as well) */
 #define MICROCODE_IOCFREE	_IO('6',0)
 

@@ -50,7 +50,7 @@ static s_time_t        stime_irq;       /* System time at last 'time update' */
 static unsigned long   wc_sec, wc_usec; /* UTC time at last 'time update'.   */
 static rwlock_t        time_lock = RW_LOCK_UNLOCKED;
 
-static void timer_interrupt(int irq, void *dev_id, struct xen_regs *regs)
+void timer_interrupt(int irq, void *dev_id, struct xen_regs *regs)
 {
     write_lock_irq(&time_lock);
 

@@ -7,6 +7,7 @@
 #ifndef __XEN_I386_CONFIG_H__
 #define __XEN_I386_CONFIG_H__
 
+#define CONFIG_VMX 1
 #define CONFIG_X86 1
 
 #define CONFIG_SMP 1

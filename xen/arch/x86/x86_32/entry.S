@@ -65,6 +65,104 @@
         andl $~3,reg;      \
         movl (reg),reg;
 
+#ifdef CONFIG_VMX
+/*
+ * At VMExit time the processor saves the guest selectors, esp, eip, 
+ * and eflags. Therefore we don't save them, but simply decrement 
+ * the kernel stack pointer to make it consistent with the stack frame 
+ * at usual interruption time. The eflags of the host is not saved by VMX, 
+ * and we set it to the fixed value.
+ *
+ * We also need the room, especially because orig_eax field is used 
+ * by do_IRQ(). Compared the xen_regs, we skip pushing for the following:
+ * (1/1)  u16 error_code;
+ * (2/1)  u16 entry_vector;
+ *   (2)  u32 eip;
+ *   (3)  u32 cs;
+ *   (4)  u32 eflags;
+ */
+#define VMX_MONITOR_EFLAGS	0x202 /* IF on */
+#define NR_SKIPPED_REGS	4	/* See the above explanation */
+#define VMX_SAVE_ALL_NOSEGREGS \
+        pushl $VMX_MONITOR_EFLAGS; \
+        popf; \
+        subl $(NR_SKIPPED_REGS*4), %esp; \
+        pushl %eax; \
+        pushl %ebp; \
+        pushl %edi; \
+        pushl %esi; \
+        pushl %edx; \
+        pushl %ecx; \
+        pushl %ebx;
+
+ENTRY(vmx_asm_vmexit_handler)
+        /* selectors are restored/saved by VMX */
+        VMX_SAVE_ALL_NOSEGREGS
+        call SYMBOL_NAME(vmx_vmexit_handler)
+        jmp vmx_asm_do_resume
+
+ENTRY(vmx_asm_do_launch)
+        popl %ebx
+        popl %ecx
+        popl %edx
+        popl %esi
+        popl %edi
+        popl %ebp
+        popl %eax
+        addl $(NR_SKIPPED_REGS*4), %esp
+        /* VMLUANCH */
+        .byte 0x0f,0x01,0xc2
+        pushf
+        call SYMBOL_NAME(vm_launch_fail)
+        hlt
+        
+        ALIGN
+        
+ENTRY(vmx_asm_do_resume)
+vmx_test_all_events:
+        GET_CURRENT(%ebx)
+/* test_all_events: */
+        xorl %ecx,%ecx
+        notl %ecx
+        cli                             # tests must not race interrupts
+/*test_softirqs:*/  
+        movl EDOMAIN_processor(%ebx),%eax
+        shl  $6,%eax                    # sizeof(irq_cpustat) == 64
+        test %ecx,SYMBOL_NAME(irq_stat)(%eax,1)
+        jnz  vmx_process_softirqs
+
+vmx_restore_all_guest:
+        call SYMBOL_NAME(load_cr2)
+        /* 
+         * Check if we are going back to VMX-based VM
+         * By this time, all the setups in the VMCS must be complete.
+         */
+        popl %ebx
+        popl %ecx
+        popl %edx
+        popl %esi
+        popl %edi
+        popl %ebp
+        popl %eax
+        addl $(NR_SKIPPED_REGS*4), %esp
+        /* VMRESUME */
+        .byte 0x0f,0x01,0xc3
+        pushf
+        call SYMBOL_NAME(vm_resume_fail)
+        /* Should never reach here */
+        hlt
+
+        ALIGN
+vmx_process_softirqs:
+        sti       
+        call SYMBOL_NAME(do_softirq)
+        jmp  vmx_test_all_events
+#endif
+        
+ENTRY(continue_nonidle_task)
+        GET_CURRENT(%ebx)
+        jmp test_all_events
+
         ALIGN
 restore_all_guest:
         testb $TF_failsafe_return,EDOMAIN_thread_flags(%ebx)

@@ -120,7 +120,10 @@ static inline int clear_shadow_page(
         /* We clear L2 pages by zeroing the guest entries. */
     case PGT_l2_page_table:
         p = map_domain_mem((spage - frame_table) << PAGE_SHIFT);
-        memset(p, 0, DOMAIN_ENTRIES_PER_L2_PAGETABLE * sizeof(*p));
+        if (m->shadow_mode == SHM_full_32)
+            memset(p, 0, ENTRIES_PER_L2_PAGETABLE * sizeof(*p));
+        else 
+            memset(p, 0, DOMAIN_ENTRIES_PER_L2_PAGETABLE * sizeof(*p));
         unmap_domain_mem(p);
         break;
 
@@ -433,12 +436,24 @@ void unshadow_table(unsigned long gpfn, unsigned int type)
     free_shadow_page(&d->exec_domain[0]->mm, &frame_table[spfn]);
 }
 
+#ifdef CONFIG_VMX
+void vmx_shadow_clear_state(struct mm_struct *m) 
+{
+    SH_VVLOG("vmx_clear_shadow_state: \n");
+    clear_shadow_state(m);
+}
+#endif
+
+
 unsigned long shadow_l2_table( 
     struct mm_struct *m, unsigned long gpfn)
 {
     struct pfn_info *spfn_info;
     unsigned long    spfn;
-    l2_pgentry_t    *spl2e;
+    l2_pgentry_t    *spl2e = 0, *gpl2e;
+    unsigned long guest_gpfn;
+
+    __get_machine_to_phys(m, guest_gpfn, gpfn);
 
     SH_VVLOG("shadow_l2_table( %08lx )", gpfn);
 
@@ -451,33 +466,41 @@ unsigned long shadow_l2_table(
     perfc_incr(shadow_l2_pages);
 
     spfn = spfn_info - frame_table;
-
-    /* Mark pfn as being shadowed; update field to point at shadow. */
-    set_shadow_status(m, gpfn, spfn | PSH_shadowed);
+  /* Mark pfn as being shadowed; update field to point at shadow. */
+    set_shadow_status(m, guest_gpfn, spfn | PSH_shadowed);
  
-    spl2e = (l2_pgentry_t *)map_domain_mem(spfn << PAGE_SHIFT);
-
-    /*
-     * We could proactively fill in PDEs for pages that are already shadowed.
-     * However, we tried it and it didn't help performance. This is simpler.
-     */
-    memset(spl2e, 0, DOMAIN_ENTRIES_PER_L2_PAGETABLE * sizeof(l2_pgentry_t));
-
 #ifdef __i386__
     /* Install hypervisor and 2x linear p.t. mapings. */
-    memcpy(&spl2e[DOMAIN_ENTRIES_PER_L2_PAGETABLE], 
-           &idle_pg_table[DOMAIN_ENTRIES_PER_L2_PAGETABLE],
-           HYPERVISOR_ENTRIES_PER_L2_PAGETABLE * sizeof(l2_pgentry_t));
-    spl2e[LINEAR_PT_VIRT_START >> L2_PAGETABLE_SHIFT] =
-        mk_l2_pgentry((gpfn << PAGE_SHIFT) | __PAGE_HYPERVISOR);
-    spl2e[SH_LINEAR_PT_VIRT_START >> L2_PAGETABLE_SHIFT] =
-        mk_l2_pgentry((spfn << PAGE_SHIFT) | __PAGE_HYPERVISOR);
-    spl2e[PERDOMAIN_VIRT_START >> L2_PAGETABLE_SHIFT] =
-        mk_l2_pgentry(__pa(frame_table[gpfn].u.inuse.domain->mm_perdomain_pt) |
-                      __PAGE_HYPERVISOR);
+    if (m->shadow_mode == SHM_full_32) 
+        vmx_update_shadow_state(m, gpfn, spfn);
+    else {
+        spl2e = (l2_pgentry_t *)map_domain_mem(spfn << PAGE_SHIFT);
+        // can't use the linear map as we may not be in the right PT
+        gpl2e = (l2_pgentry_t *) map_domain_mem(gpfn << PAGE_SHIFT);
+        /*
+         * We could proactively fill in PDEs for pages that are already shadowed.
+         * However, we tried it and it didn't help performance. This is simpler.
+         */
+        memset(spl2e, 0, DOMAIN_ENTRIES_PER_L2_PAGETABLE * sizeof(l2_pgentry_t));
+
+        /* Install hypervisor and 2x linear p.t. mapings. */
+        memcpy(&spl2e[DOMAIN_ENTRIES_PER_L2_PAGETABLE], 
+               &idle_pg_table[DOMAIN_ENTRIES_PER_L2_PAGETABLE],
+               HYPERVISOR_ENTRIES_PER_L2_PAGETABLE * sizeof(l2_pgentry_t));
+        spl2e[LINEAR_PT_VIRT_START >> L2_PAGETABLE_SHIFT] =
+            mk_l2_pgentry((gpfn << PAGE_SHIFT) | __PAGE_HYPERVISOR);
+        spl2e[SH_LINEAR_PT_VIRT_START >> L2_PAGETABLE_SHIFT] =
+            mk_l2_pgentry((spfn << PAGE_SHIFT) | __PAGE_HYPERVISOR);
+        spl2e[PERDOMAIN_VIRT_START >> L2_PAGETABLE_SHIFT] =
+            mk_l2_pgentry(__pa(frame_table[gpfn].u.inuse.domain->mm_perdomain_pt) |
+			  __PAGE_HYPERVISOR);
+    }
 #endif
 
-    unmap_domain_mem(spl2e);
+    if (m->shadow_mode != SHM_full_32) 
+    {                           
+        unmap_domain_mem(spl2e);
+    }
 
     SH_VLOG("shadow_l2_table( %08lx -> %08lx)", gpfn, spfn);
     return spfn;
@@ -486,13 +509,13 @@ unsigned long shadow_l2_table(
 static void shadow_map_l1_into_current_l2(unsigned long va)
 { 
     struct mm_struct *m = &current->mm;
-    unsigned long    *gpl1e, *spl1e, gpde, spde, gl1pfn, sl1pfn, sl1ss;
+    unsigned long    *gpl1e, *spl1e, gpl2e, spl2e, gl1pfn, sl1pfn=0, sl1ss;
     struct pfn_info  *sl1pfn_info;
     int               i;
 
-    gpde = l2_pgentry_val(linear_l2_table[va >> L2_PAGETABLE_SHIFT]);
+    __guest_get_pl2e(m, va, &gpl2e);
 
-    gl1pfn = gpde >> PAGE_SHIFT;
+    gl1pfn = gpl2e >> PAGE_SHIFT;
 
     sl1ss = __shadow_status(m, gl1pfn);
     if ( !(sl1ss & PSH_shadowed) )
@@ -510,11 +533,10 @@ static void shadow_map_l1_into_current_l2(unsigned long va)
 
         set_shadow_status(m, gl1pfn, PSH_shadowed | sl1pfn);
 
-        l2pde_general(m, &gpde, &spde, sl1pfn);
+        l2pde_general(m, &gpl2e, &spl2e, sl1pfn);
 
-        linear_l2_table[va>>L2_PAGETABLE_SHIFT] = mk_l2_pgentry(gpde);
-        shadow_linear_l2_table[va>>L2_PAGETABLE_SHIFT] =
-            mk_l2_pgentry(spde);
+        __guest_set_pl2e(m, va, gpl2e);
+        __shadow_set_pl2e(m, va, spl2e);
 
         gpl1e = (unsigned long *) &(linear_pg_table[
             (va>>PAGE_SHIFT) & ~(ENTRIES_PER_L1_PAGETABLE-1)]);
@@ -531,12 +553,37 @@ static void shadow_map_l1_into_current_l2(unsigned long va)
         SH_VVLOG("4b: was shadowed, l2 missing ( %08lx )", sl1pfn);
 
         sl1pfn = sl1ss & PSH_pfn_mask;
-        l2pde_general(m, &gpde, &spde, sl1pfn);
-
-        linear_l2_table[va >> L2_PAGETABLE_SHIFT] = mk_l2_pgentry(gpde);
-        shadow_linear_l2_table[va >> L2_PAGETABLE_SHIFT] = mk_l2_pgentry(spde);
+        l2pde_general(m, &gpl2e, &spl2e, sl1pfn);
+        __guest_set_pl2e(m, va, gpl2e);
+        __shadow_set_pl2e(m, va, spl2e);
     }              
 }
+
+#ifdef CONFIG_VMX
+void vmx_shadow_invlpg(struct mm_struct *m, unsigned long va)
+{
+    unsigned long gpte, spte, host_pfn;
+
+    if (__put_user(0L, (unsigned long *)
+                   &shadow_linear_pg_table[va >> PAGE_SHIFT])) {
+        vmx_shadow_clear_state(m);
+        return;
+    }
+
+    if (__get_user(gpte, (unsigned long *)
+                   &linear_pg_table[va >> PAGE_SHIFT])) {
+        return;
+    }
+
+    host_pfn = phys_to_machine_mapping[gpte >> PAGE_SHIFT];
+    spte = (host_pfn << PAGE_SHIFT) | (gpte & ~PAGE_MASK);
+
+    if (__put_user(spte, (unsigned long *)
+                   &shadow_linear_pg_table[va >> PAGE_SHIFT])) {
+        return;
+    }
+}
+#endif
 
 int shadow_fault(unsigned long va, long error_code)
 {
@@ -718,6 +765,9 @@ static int check_pte(
     int level, int i)
 {
     unsigned long mask, gpfn, spfn;
+#ifdef CONFIG_VMX
+    unsigned long guest_gpfn;
+#endif
 
     if ( (spte == 0) || (spte == 0xdeadface) || (spte == 0x00000E00) )
         return 1;  /* always safe */
@@ -761,8 +811,20 @@ static int check_pte(
         if ( level < 2 )
             FAIL("Shadow in L1 entry?");
 
-        if ( __shadow_status(m, gpfn) != (PSH_shadowed | spfn) )
-            FAIL("spfn problem g.sf=%08lx", __shadow_status(m, gpfn));
+        if (m->shadow_mode == SHM_full_32) {
+
+            guest_gpfn = phys_to_machine_mapping[gpfn];
+
+            if ( __shadow_status(m, guest_gpfn) != (PSH_shadowed | spfn) )
+                FAIL("spfn problem g.sf=%08lx", 
+                     __shadow_status(m, guest_gpfn) );
+            
+        } else {
+            if ( __shadow_status(m, gpfn) != (PSH_shadowed | spfn) )
+                FAIL("spfn problem g.sf=%08lx", 
+                     __shadow_status(m, gpfn) );
+        }
+
     }
 
     return 1;
@@ -800,6 +862,7 @@ int check_pagetable(struct mm_struct *m, pagetable_t pt, char *s)
     unsigned long gpfn, spfn;
     int           i;
     l2_pgentry_t *gpl2e, *spl2e;
+    unsigned long host_gpfn = 0;
 
     sh_check_name = s;
 
@@ -809,20 +872,29 @@ int check_pagetable(struct mm_struct *m, pagetable_t pt, char *s)
 
     gpfn = gptbase >> PAGE_SHIFT;
 
-    if ( !(__shadow_status(m, gpfn) & PSH_shadowed) )
+    __get_phys_to_machine(m, host_gpfn, gpfn);
+  
+    if ( ! (__shadow_status(m, gpfn) & PSH_shadowed) )
     {
         printk("%s-PT %08lx not shadowed\n", s, gptbase);
-        if ( __shadow_status(m, gpfn) != 0 )
-            BUG();
-        return 0;
-    }
+
+        if( __shadow_status(m, gpfn) != 0 ) BUG();
+            return 0;
+    }   
  
     spfn = __shadow_status(m, gpfn) & PSH_pfn_mask;
 
-    if ( __shadow_status(m, gpfn) != (PSH_shadowed | spfn) )
-        FAILPT("ptbase shadow inconsistent1");
+    if ( ! __shadow_status(m, gpfn) == (PSH_shadowed | spfn) )
+            FAILPT("ptbase shadow inconsistent1");
 
-    gpl2e = (l2_pgentry_t *) map_domain_mem( gpfn << PAGE_SHIFT );
+    if (m->shadow_mode == SHM_full_32) 
+    {
+        host_gpfn = phys_to_machine_mapping[gpfn];
+        gpl2e = (l2_pgentry_t *) map_domain_mem( host_gpfn << PAGE_SHIFT );
+
+    } else
+        gpl2e = (l2_pgentry_t *) map_domain_mem( gpfn << PAGE_SHIFT );
+
     spl2e = (l2_pgentry_t *) map_domain_mem( spfn << PAGE_SHIFT );
 
     if ( memcmp(&spl2e[DOMAIN_ENTRIES_PER_L2_PAGETABLE],
@@ -830,7 +902,6 @@ int check_pagetable(struct mm_struct *m, pagetable_t pt, char *s)
                 ((SH_LINEAR_PT_VIRT_START >> L2_PAGETABLE_SHIFT) -
                  DOMAIN_ENTRIES_PER_L2_PAGETABLE) * sizeof(l2_pgentry_t)) )
     {
-        printk("gpfn=%08lx spfn=%08lx\n", gpfn, spfn);
         for ( i = DOMAIN_ENTRIES_PER_L2_PAGETABLE; 
               i < (SH_LINEAR_PT_VIRT_START >> L2_PAGETABLE_SHIFT);
               i++ )
@@ -851,11 +922,12 @@ int check_pagetable(struct mm_struct *m, pagetable_t pt, char *s)
                                    L2_PAGETABLE_SHIFT]),
                (spfn << PAGE_SHIFT) | __PAGE_HYPERVISOR);
 
-    if ( (l2_pgentry_val(spl2e[PERDOMAIN_VIRT_START >> L2_PAGETABLE_SHIFT]) !=
-          ((__pa(frame_table[gpfn].u.inuse.domain->mm.perdomain_pt) | 
+    if (m->shadow_mode != SHM_full_32) {
+        if ( (l2_pgentry_val(spl2e[PERDOMAIN_VIRT_START >> L2_PAGETABLE_SHIFT]) !=
+              ((__pa(frame_table[gpfn].u.inuse.domain->mm.perdomain_pt) | 
             __PAGE_HYPERVISOR))) )
-        FAILPT("hypervisor per-domain map inconsistent");
-
+            FAILPT("hypervisor per-domain map inconsistent");
+    }
 
     /* Check the whole L2. */
     for ( i = 0; i < DOMAIN_ENTRIES_PER_L2_PAGETABLE; i++ )

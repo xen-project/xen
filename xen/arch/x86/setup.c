@@ -146,6 +146,11 @@ static void __init init_intel(struct cpuinfo_x86 *c)
         }
     }
 #endif
+
+#ifdef CONFIG_VMX
+    start_vmx();
+#endif
+
 }
 
 static void __init init_amd(struct cpuinfo_x86 *c)

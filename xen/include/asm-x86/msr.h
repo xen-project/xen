@@ -84,6 +84,10 @@
 #define MSR_MTRRcap		0x0fe
 #define MSR_IA32_BBL_CR_CTL        0x119
 
+#define MSR_IA32_SYSENTER_CS		0x174
+#define MSR_IA32_SYSENTER_ESP		0x175
+#define MSR_IA32_SYSENTER_EIP		0x176
+
 #define MSR_IA32_MCG_CAP       0x179
 #define MSR_IA32_MCG_STATUS        0x17a
 #define MSR_IA32_MCG_CTL       0x17b

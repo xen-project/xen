@@ -26,8 +26,6 @@
 extern unsigned long volatile jiffies;
 extern rwlock_t domlist_lock;
 
-struct domain;
-
 /* A global pointer to the initial domain (DOM0). */
 extern struct domain *dom0;
 

@@ -474,7 +474,7 @@ static long evtchn_close(evtchn_close_t *close)
 }
 
 
-static long evtchn_send(int lport)
+long evtchn_send(int lport)
 {
     struct domain *ld = current->domain;
     struct exec_domain *rd;

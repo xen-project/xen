@@ -32,6 +32,10 @@
 #include <asm/shadow.h>
 #include <xen/console.h>
 #include <xen/elf.h>
+#include <asm/vmx.h>
+#include <asm/vmx_vmcs.h>
+#include <xen/kernel.h>
+#include <public/io/ioreq.h>
 #include <xen/multicall.h>
 
 #if !defined(CONFIG_X86_64BITMODE)
@@ -158,6 +162,9 @@ void machine_restart(char * __unused)
     smp_send_stop();
     disable_IO_APIC();
 #endif
+#ifdef CONFIG_VMX
+    stop_vmx();
+#endif
 
     if(!reboot_thru_bios) {
         /* rebooting needs to touch the page at absolute addr 0 */
@@ -239,6 +246,97 @@ void arch_do_createdomain(struct exec_domain *ed)
     }
 }
 
+#ifdef CONFIG_VMX
+void arch_vmx_do_resume(struct exec_domain *d) 
+{
+    vmx_do_resume(d);
+    reset_stack_and_jump(vmx_asm_do_resume);
+}
+
+void arch_vmx_do_launch(struct exec_domain *d) 
+{
+    vmx_do_launch(d);
+    reset_stack_and_jump(vmx_asm_do_launch);
+}
+
+static void monitor_mk_pagetable(struct exec_domain *ed)
+{
+    unsigned long mpfn;
+    l2_pgentry_t *mpl2e;
+    struct pfn_info *mpfn_info;
+    struct mm_struct *m = &ed->mm;
+    struct domain *d = ed->domain;
+
+    mpfn_info = alloc_domheap_page(NULL);
+    ASSERT( mpfn_info ); 
+
+    mpfn = (unsigned long) (mpfn_info - frame_table);
+    mpl2e = (l2_pgentry_t *) map_domain_mem(mpfn << PAGE_SHIFT);
+    memset(mpl2e, 0, PAGE_SIZE);
+
+    memcpy(&mpl2e[DOMAIN_ENTRIES_PER_L2_PAGETABLE], 
+           &idle_pg_table[DOMAIN_ENTRIES_PER_L2_PAGETABLE],
+           HYPERVISOR_ENTRIES_PER_L2_PAGETABLE * sizeof(l2_pgentry_t));
+
+    m->monitor_table = mk_pagetable(mpfn << PAGE_SHIFT);
+    m->shadow_mode = SHM_full_32;
+
+    mpl2e[PERDOMAIN_VIRT_START >> L2_PAGETABLE_SHIFT] =
+        mk_l2_pgentry((__pa(d->mm_perdomain_pt) & PAGE_MASK) 
+                      | __PAGE_HYPERVISOR);
+
+    unmap_domain_mem(mpl2e);
+}
+
+static int vmx_final_setup_guestos(struct exec_domain *d,
+                                   full_execution_context_t *full_context)
+{
+    int error;
+    execution_context_t *context;
+    struct vmcs_struct *vmcs;
+    unsigned long guest_pa;
+
+    context = &full_context->cpu_ctxt;
+
+    /*
+     * Create a new VMCS
+     */
+    if (!(vmcs = alloc_vmcs())) {
+        printk("Failed to create a new VMCS\n");
+        return -ENOMEM;
+    }
+
+    memset(&d->thread.arch_vmx, 0, sizeof (struct arch_vmx_struct));
+
+    d->thread.arch_vmx.vmcs = vmcs;
+    error = construct_vmcs(&d->thread.arch_vmx, context, full_context, VMCS_USE_HOST_ENV);
+    if (error < 0) {
+        printk("Failed to construct a new VMCS\n");
+        goto out;
+    }
+
+    monitor_mk_pagetable(d);
+    guest_pa = pagetable_val(d->mm.pagetable);
+    clear_bit(VMX_CPU_STATE_PG_ENABLED, &d->thread.arch_vmx.cpu_state);
+
+    d->thread.arch_vmx.vmx_platform.real_mode_data = 
+        (unsigned long *) context->esi;
+
+    memset(&d->domain->shared_info->evtchn_mask[0], 0xff, 
+           sizeof(d->domain->shared_info->evtchn_mask));
+    clear_bit(IOPACKET_PORT, &d->domain->shared_info->evtchn_mask[0]);
+
+    d->thread.schedule_tail = arch_vmx_do_launch;
+
+    return 0;
+
+out:
+    free_vmcs(vmcs);
+    d->thread.arch_vmx.vmcs = 0;
+    return error;
+}
+#endif
+
 int arch_final_setup_guestos(struct exec_domain *d, full_execution_context_t *c)
 {
     unsigned long phys_basetab;
@@ -310,6 +408,11 @@ int arch_final_setup_guestos(struct exec_domain *d, full_execution_context_t *c)
         }
     }
 
+#ifdef CONFIG_VMX
+    if (c->flags & ECF_VMX_GUEST)
+        return vmx_final_setup_guestos(d, c);
+#endif
+
     return 0;
 }
 
@@ -356,7 +459,8 @@ void switch_to(struct exec_domain *prev_p, struct exec_domain *next_p)
     struct tss_struct *tss = init_tss + smp_processor_id();
     execution_context_t *stack_ec = get_execution_context();
     int i;
-    
+    unsigned long vmx_domain = next_p->thread.arch_vmx.flags; 
+
     __cli();
 
     /* Switch guest general-register state. */
@@ -375,12 +479,6 @@ void switch_to(struct exec_domain *prev_p, struct exec_domain *next_p)
                &next_p->thread.user_ctxt,
                sizeof(*stack_ec));
 
-        SET_FAST_TRAP(&next_p->thread);
-
-        /* Switch the guest OS ring-1 stack. */
-        tss->esp1 = next->guestos_sp;
-        tss->ss1  = next->guestos_ss;
-
         /* Maybe switch the debug registers. */
         if ( unlikely(next->debugreg[7]) )
         {
@@ -392,6 +490,24 @@ void switch_to(struct exec_domain *prev_p, struct exec_domain *next_p)
             loaddebug(next, 6);
             loaddebug(next, 7);
         }
+
+         if (vmx_domain) {
+            /* Switch page tables. */
+            write_ptbase(&next_p->mm);
+ 
+            set_current(next_p);
+            /* Switch GDT and LDT. */
+            __asm__ __volatile__ ("lgdt %0" : "=m" (*next_p->mm.gdt));
+
+            __sti();
+            return;
+         }
+ 
+        SET_FAST_TRAP(&next_p->thread);
+
+        /* Switch the guest OS ring-1 stack. */
+        tss->esp1 = next->guestos_sp;
+        tss->ss1  = next->guestos_ss;
 
         /* Switch page tables. */
         write_ptbase(&next_p->mm);

@@ -33,13 +33,13 @@ xmem_cache_t *exec_domain_struct_cachep;
 struct domain *dom0;
 
 vm_assist_info_t vm_assist_info[MAX_VMASST_TYPE + 1];
-
+#if 0
 struct e820entry {
     unsigned long addr_lo, addr_hi;        /* start of memory segment */
     unsigned long size_lo, size_hi;        /* size of memory segment */
     unsigned long type;                    /* type of memory segment */
 };
-
+#endif
 void start_of_day(void);
 
 /* opt_console: comma-separated list of console outputs. */

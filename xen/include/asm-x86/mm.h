@@ -215,10 +215,19 @@ void synchronise_pagetables(unsigned long cpu_mask);
  * contiguous (or near contiguous) physical memory.
  */
 #undef  machine_to_phys_mapping
+/*
+ * The phys_to_machine_mapping is the reversed mapping of MPT for full
+ * virtualization.
+ */
+#undef  phys_to_machine_mapping
+
 #ifdef __x86_64__
 extern unsigned long *machine_to_phys_mapping;
 #else
 #define machine_to_phys_mapping ((unsigned long *)RDWR_MPT_VIRT_START)
+#ifdef CONFIG_VMX
+#define phys_to_machine_mapping ((unsigned long *)PERDOMAIN_VIRT_START)
+#endif
 #endif
 
 #define DEFAULT_GDT_ENTRIES     (LAST_RESERVED_GDT_ENTRY+1)
