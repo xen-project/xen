@@ -697,37 +697,29 @@ int reprogram_ac_timer(s_time_t timeout)
  * the timer APIC on CPU does not go off every 10ms or so the linux 
  * timers loose accuracy, but that shouldn't be a problem.
  */
-//static s_time_t last_cpu0_tirq = 0;
+static s_time_t last_cpu0_tirq = 0;
 inline void smp_local_timer_interrupt(struct pt_regs * regs)
 {
 	int cpu = smp_processor_id();
-	//s_time_t diff, now;
+	s_time_t diff, now;
+
 
     /* if CPU 0 do old timer stuff  */
 	if (cpu == 0) {
 
-		/*
-         * XXX RN: the following code should be moved here or somewhere
-         * else. It's currently done using the 8255 timer interrupt, which
-         * I'd like to disable. But, APIC initialisation relies on it,
-         * e.g., timer interrupts coming in, jiffies going up, etc. Need to
-         * clean this up. Also see ./arch/i386/time.c
-         */
-#if 0
-		//update_time();/* XXX should use a timer for this */		
 		now = NOW();
 		diff = now - last_cpu0_tirq;
 
-		/* this uses three 64bit divisions which should be avoided!! */
-		if (diff >= MILLISECS(10)) {
-			/* update jiffies */
-			(*(unsigned long *)&jiffies) += diff / MILLISECS(10);
-
-			/* do traditional linux timers */
-			do_timer(regs);
-			last_cpu0_tirq = now;
+		if (diff <= 0) {
+			printk ("System Time went backwards: %lld\n", diff);
+			return;
 		}
-#endif
+
+		while (diff >= MILLISECS(10)) {
+			do_timer(regs);
+			diff           -= MILLISECS(10);
+			last_cpu0_tirq += MILLISECS(10);
+		}
 	}
 	/* call accurate timer function */
 	do_ac_timer();

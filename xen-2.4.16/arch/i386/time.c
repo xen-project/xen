@@ -31,6 +31,7 @@
 #include <xeno/init.h>
 #include <xeno/interrupt.h>
 #include <xeno/time.h>
+#include <xeno/ac_timer.h>
 
 #include <asm/io.h>
 #include <xeno/smp.h>
@@ -74,15 +75,12 @@ static inline void do_timer_interrupt(int irq,
         spin_unlock(&i8259A_lock);
     }
 #endif
-
-	/* XXX RN: Want to remove this but APIC-SMP code seems to rely on it */
     do_timer(regs);
 }
 
 /*
- * This is the same as the above, except we _also_ save the current
- * Time Stamp Counter value at the time of the timer interrupt, so that
- * we later on can estimate the time of day more exactly.
+ * This is only temporarily. Once the APIC s up and running this 
+ * timer interrupt is turned off.
  */
 static void timer_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 {
@@ -303,8 +301,34 @@ void do_settimeofday(struct timeval *tv)
 /***************************************************************************
  * Update times
  ***************************************************************************/
-/* update hypervisors notion of time */
-void update_time(void) {
+
+/* update a domains notion of time */
+void update_dom_time(shared_info_t *si)
+{
+	unsigned long flags;
+
+	spin_lock_irqsave(&stime_lock, flags);
+	si->system_time  = stime_now;
+	si->st_timestamp = stime_pcc;
+	spin_unlock_irqrestore(&stime_lock, flags);
+
+	spin_lock_irqsave(&wctime_lock, flags);
+	si->tv_sec       = wall_clock_time.tv_sec;
+	si->tv_usec      = wall_clock_time.tv_usec;
+	si->wc_timestamp = wctime_st;
+	si->wc_version++;
+	spin_unlock_irqrestore(&wctime_lock, flags);	
+
+	TRC(printk(" 0x%08X%08X\n", (u32)(wctime_st>>32), (u32)wctime_st));
+}
+
+/*
+ * Update hypervisors notion of time
+ * This is done periodically of it's own timer
+ */
+static struct ac_timer update_timer;
+static void update_time(unsigned long foo)
+{
 	unsigned long  flags;
 	u32		       new_pcc;
 	s_time_t       new_st;
@@ -336,26 +360,12 @@ void update_time(void) {
 	TRC(printk("TIME[%02d] update time: stime_now=%lld now=%lld,wct=%ld:%ld\n",
 			   smp_processor_id(), stime_now, new_st, wall_clock_time.tv_sec,
 			   wall_clock_time.tv_usec));
-}
-
-/* update a domains notion of time */
-void update_dom_time(shared_info_t *si)
-{
-	unsigned long flags;
-
-	spin_lock_irqsave(&stime_lock, flags);
-	si->system_time  = stime_now;
-	si->st_timestamp = stime_pcc;
-	spin_unlock_irqrestore(&stime_lock, flags);
-
-	spin_lock_irqsave(&wctime_lock, flags);
-	si->tv_sec       = wall_clock_time.tv_sec;
-	si->tv_usec      = wall_clock_time.tv_usec;
-	si->wc_timestamp = wctime_st;
-	si->wc_version++;
-	spin_unlock_irqrestore(&wctime_lock, flags);	
-
-	TRC(printk(" 0x%08X%08X\n", (u32)(wctime_st>>32), (u32)wctime_st));
+	/* reload timer */
+ again:
+	update_timer.expires  = new_st + MILLISECS(200);
+	if(add_ac_timer(&update_timer) == 1) {
+		goto again;
+	}
 }
 
 /***************************************************************************
@@ -364,12 +374,14 @@ void update_dom_time(shared_info_t *si)
  ***************************************************************************/
 int __init init_xeno_time()
 {
-	int cpu = smp_processor_id();
-	u32	cpu_cycle;	 /* time of one cpu cyle in pico-seconds */
-	u64 scale;
+	int      cpu = smp_processor_id();
+	u32	     cpu_cycle;  /* time of one cpu cyle in pico-seconds */
+	u64      scale;      /* scale factor  */
 
 	spin_lock_init(&stime_lock);
 	spin_lock_init(&wctime_lock);
+
+	printk("Init Time[%02d]:\n", cpu);
 
 	/* System Time */
 	cpu_cycle   = (u32) (1000000000LL/cpu_khz); /* in pico seconds */
@@ -378,24 +390,30 @@ int __init init_xeno_time()
 	st_scale_f = scale & 0xffffffff;
 	st_scale_i = scale >> 32;
 
-	stime_now = (s_time_t)0;
-	rdtscl(stime_pcc);
-	
-	printk("Init Time[%02d]:\n", cpu);
-	printk(".... System Time: %lldns\n", NOW());
-	printk(".....cpu_cycle:   %u ps\n", cpu_cycle);
-	printk(".... st_scale_f:  %X\n",   st_scale_f);
-	printk(".... st_scale_i:  %X\n",   st_scale_i);
-	printk(".... stime_pcc:   %u\n",   stime_pcc);
-
 	/* Wall Clock time */
 	wall_clock_time.tv_sec  = get_cmos_time();
 	wall_clock_time.tv_usec = 0;
+
+	/* set starting times */
+	stime_now = (s_time_t)0;
+	rdtscl(stime_pcc);
 	wctime_st = NOW();
+
+	/* start timer to update time periodically */
+	init_ac_timer(&update_timer);
+	update_timer.function = &update_time;
+	update_time(0);
+
+	printk(".... System Time: %lldns\n", NOW());
+	printk(".....cpu_cycle:   %u ps\n",  cpu_cycle);
+	printk(".... st_scale_f:  %X\n",     st_scale_f);
+	printk(".... st_scale_i:  %X\n",     st_scale_i);
+	printk(".... stime_pcc:   %u\n",     stime_pcc);
 
 	printk(".... Wall Clock:  %lds %ldus\n", wall_clock_time.tv_sec,
 		   wall_clock_time.tv_usec);
 	printk(".... wctime_st:   %lld\n", wctime_st);
+
 	return 0;
 }
 

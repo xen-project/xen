@@ -29,6 +29,7 @@
 
 #include <xeno/time.h>
 #include <xeno/ac_timer.h>
+#include <xeno/keyhandler.h>
 
 #include <asm/system.h>
 #include <asm/desc.h>
@@ -80,8 +81,6 @@ int add_ac_timer(struct ac_timer *timer)
 {
 	int 			 cpu = smp_processor_id();
 	unsigned long 	 flags;
-	struct list_head *tmp, *prev;
-	struct ac_timer	 *t;
 	s_time_t		 now;
 
 	/* sanity checks */
@@ -96,42 +95,54 @@ int add_ac_timer(struct ac_timer *timer)
 			   (u32)(timer->expires>>32), (u32)timer->expires);
 		return 1;
 	}
-
-	local_irq_save(flags);
-
-	/* check if timer would be inserted at start of list */
-	if ((list_empty(&ac_timers[cpu].timers)) ||
-		(timer->expires <
-		(list_entry(&ac_timers[cpu].timers,
-					struct ac_timer, timer_list))->expires)) {
-
-		TRC(printk("ACT  [%02d] add(): add at head\n", cpu));
+	spin_lock_irqsave(&ac_timers[cpu].lock, flags);
+	/*
+     * Add timer to the list. If it gets added to the front we have to
+     * reprogramm the timer
+     */
+	if (list_empty(&ac_timers[cpu].timers)) {
 		/* Reprogramm and add to head of list */
 		if (!reprogram_ac_timer(timer->expires)) {
 			/* failed */
-			TRC(printk("ACT  [%02d] add(): add at head failed\n", cpu));
-			local_irq_restore(flags);
+			printk("ACT  [%02d] add(): add at head failed\n", cpu);
+			spin_unlock_irqrestore(&ac_timers[cpu].lock, flags);
 			return 1;
 		}
 		list_add(&timer->timer_list, &ac_timers[cpu].timers);
-		
+		TRC(printk("ACT  [%02d] add(0x%08X%08X): added at head\n", cpu,
+				   (u32)(timer->expires>>32), (u32)timer->expires));
 	} else {
-		/* find correct entry and add timer */
-		prev = &ac_timers[cpu].timers;
-		list_for_each(tmp, &ac_timers[cpu].timers) {
-			t = list_entry(tmp, struct ac_timer, timer_list);
-			if (t->expires < timer->expires) {
-				list_add(&timer->timer_list, prev);
-				TRC(printk("ACT  [%02d] add(): added between %lld and %lld\n",
-					   cpu,
-					   list_entry(prev,struct ac_timer,timer_list)->expires,
-					   list_entry(tmp,struct ac_timer,timer_list)->expires));
+		struct list_head *pos;
+		struct ac_timer	 *t;
+		for (pos = ac_timers[cpu].timers.next;
+			 pos != &ac_timers[cpu].timers;
+			 pos = pos->next) {
+			t = list_entry(pos, struct ac_timer, timer_list);
+			if (t->expires > timer->expires)
 				break;
-			}
-			prev = tmp;
 		}
+
+		if (pos->prev == &ac_timers[cpu].timers) {
+			/* added to head, reprogramm timer */
+			if (!reprogram_ac_timer(timer->expires)) {
+				/* failed */
+				TRC(printk("ACT  [%02d] add(): add at head failed\n", cpu));
+				spin_unlock_irqrestore(&ac_timers[cpu].lock, flags);
+				return 1;
+			}
+			list_add (&(timer->timer_list), pos->prev);
+			TRC(printk("ACT  [%02d] add(0x%08X%08X): added at head\n", cpu,
+					   (u32)(timer->expires>>32), (u32)timer->expires));
+		} else {
+			list_add (&(timer->timer_list), pos->prev);
+			TRC(printk("ACT  [%02d] add(0x%08X%08X): add < exp=0x%08X%08X\n",
+					   cpu,
+					   (u32)(timer->expires>>32), (u32)timer->expires,
+					   (u32)(t->expires>>32), (u32)t->expires));
+		}
+
 	}
-	local_irq_restore(flags);
+	spin_unlock_irqrestore(&ac_timers[cpu].lock, flags);
 	return 0;
 }
 
@@ -158,16 +169,17 @@ static int detach_ac_timer(struct ac_timer *timer)
  */
 int rem_ac_timer(struct ac_timer *timer)
 {
-	int res;
+	int 		  cpu = smp_processor_id();
+	int           res;
 	unsigned long flags;
-	TRC(int cpu = smp_processor_id());
 
 	TRC(printk("ACT  [%02d] remove(): timo=%lld \n", cpu, timer->expires));
 	/* sanity checks */
 
-	local_irq_save(flags);
+	spin_lock_irqsave(&ac_timers[cpu].lock, flags);
 	res = detach_ac_timer(timer);	
-	local_irq_restore(flags);
+	spin_unlock_irqrestore(&ac_timers[cpu].lock, flags);
+
 	return res;
 }
 
@@ -199,7 +211,7 @@ void do_ac_timer(void)
 	struct ac_timer	 *t;
 	struct list_head *tmp;
 
-	local_irq_save(flags);
+	spin_lock_irqsave(&ac_timers[cpu].lock, flags);
 
  do_timer_again:
 
@@ -210,7 +222,7 @@ void do_ac_timer(void)
     /* empty time list  */
 	if (list_empty(&ac_timers[cpu].timers)) {
 		printk("ACT[%02d] do_ac_timer(): timer irq without timer\n", cpu);
-		local_irq_restore(flags);
+		spin_unlock_irqrestore(&ac_timers[cpu].lock, flags);
 		return;
 	}
 
@@ -218,6 +230,8 @@ void do_ac_timer(void)
 	/* execute the head of timer queue */
 	t = list_entry(ac_timers[cpu].timers.next, struct ac_timer, timer_list);
 	detach_ac_timer(t);
+
+	spin_unlock_irqrestore(&ac_timers[cpu].lock, flags);
 
 
 #ifdef AC_TIMER_STATS
@@ -258,6 +272,9 @@ void do_ac_timer(void)
 
 	/* check if there are other timer functions on the list */
 	now = NOW();
+
+	spin_lock_irqsave(&ac_timers[cpu].lock, flags);
+
 	if (!list_empty(&ac_timers[cpu].timers)) {
 		list_for_each(tmp, &ac_timers[cpu].timers) {
 			t = list_entry(tmp, struct ac_timer, timer_list);
@@ -265,8 +282,10 @@ void do_ac_timer(void)
 					   cpu, now, t->expires));
 			if (t->expires <= now) {
 				detach_ac_timer(t);
+				spin_unlock_irqrestore(&ac_timers[cpu].lock, flags);
 				if (t->function != NULL)
 					t->function(t->data);
+				spin_lock_irqsave(&ac_timers[cpu].lock, flags);
 				now = NOW();
 			} else {
 				TRC(printk("ACT  [%02d] do(): break1\n", cpu));
@@ -286,7 +305,47 @@ void do_ac_timer(void)
 			}
 		}
 	}
-	local_irq_restore(flags);
+	spin_unlock_irqrestore(&ac_timers[cpu].lock, flags);
+	TRC(printk("ACT  [%02d] do(): end\n", cpu));
+}
+
+/*
+ * debug dump_queue
+ * arguments: queue head, name of queue
+ */
+static void dump_tqueue(struct list_head *queue, char *name)
+{
+    struct list_head *list;
+    int loop = 0;
+	struct ac_timer	 *t;
+
+    printk ("QUEUE %s %lx   n: %lx, p: %lx\n", name,  (unsigned long)queue,
+            (unsigned long) queue->next, (unsigned long) queue->prev);
+    list_for_each (list, queue) {
+		t = list_entry(list, struct ac_timer, timer_list);
+        printk ("  %s %d : %lx ex=0x%08X%08X %lu  n: %lx, p: %lx\n",
+				name, loop++, 
+                (unsigned long)list,
+				(u32)(t->expires>>32), (u32)t->expires, t->data,
+                (unsigned long)list->next, (unsigned long)list->prev);
+    }
+    return; 
+}
+
+
+static void dump_timerq(u_char key, void *dev_id, struct pt_regs *regs)
+{
+    u_long   flags; 
+	s_time_t now = NOW();
+
+    printk("Dumping ac_timer queues for cpu 0: NOW=0x%08X%08X\n",
+		   (u32)(now>>32), (u32)now); 
+	
+    spin_lock_irqsave(&ac_timers[0].lock, flags);
+    dump_tqueue(&ac_timers[0].timers, "ac_time"); 
+    spin_unlock_irqrestore(&ac_timers[0].lock, flags);
+	printk("\n");
+    return; 
 }
 
 /*
@@ -303,5 +362,6 @@ void __init ac_timer_init(void)
 		INIT_LIST_HEAD(&ac_timers[i].timers);
 		spin_lock_init(&ac_timers[i].lock);
     }
-	/* ac_timer_debug(0); */
+
+	add_key_handler('a', dump_timerq, "dump ac_timer queues");
 }
