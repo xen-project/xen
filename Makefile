@@ -4,7 +4,7 @@
 # Builds everything except Xenolinux:
 #  cd xenolinux-<version>-sparse
 #  ./mkbuildtree <build dir>
-#  cd <build dir> && make oldconfig && make dep && make bzImage
+#  cd <build dir> && make ARCH=xeno oldconfig dep bzImage
 #  (<build dir> should be a vanilla linux tree with matching version)
 
 all:	
