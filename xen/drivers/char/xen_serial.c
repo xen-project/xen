@@ -41,31 +41,114 @@
 #define NS16550_MCR_OUT2        0x08    /* OUT2: interrupt mask */
 #define NS16550_MCR_LOOP	0x10	/* Loop			*/
 
-#define SERIAL_BASE 0x3f8  /* XXX SMH: horrible hardwired COM1   */
+#define LSR_DR   0x01  /* Data ready */
+#define LSR_OE   0x02  /* Overrun */
+#define LSR_PE   0x04  /* Parity error */
+#define LSR_FE   0x08  /* Framing error */
+#define LSR_BI   0x10  /* Break */
+#define LSR_THRE 0x20  /* Xmit holding register empty */
+#define LSR_TEMT 0x40  /* Xmitter empty */
+#define LSR_ERR  0x80  /* Error */
 
-static int serial_echo = 0;   /* default is not to echo; change with 'e' */
+#define SERIAL_COM1 0x3f8
+#define SERIAL_COM2 0x2f8
 
+int serial_com_base = SERIAL_COM1;
+int debug_com_base  = SERIAL_COM1;
+
+
+static int serial_echo = 0;       /* default is not to echo; change with '~' */
 
 void toggle_echo(u_char key, void *dev_id, struct pt_regs *regs) 
 {
     serial_echo = !serial_echo; 
 }
 
+void debug_set_com_port(int port)
+{
+    debug_com_base = port == 1 ? SERIAL_COM1 : SERIAL_COM2;
+}
+
+int debug_testchar()                                /* character available? */
+{
+    return (inb(debug_com_base + NS16550_LSR) & LSR_DR);
+}
+
+u_char debug_getchar()
+{
+    while (! (inb(debug_com_base + NS16550_LSR) & LSR_DR));/* wait for char */
+    return inb(debug_com_base + NS16550_RBR);
+}
+
+void debug_putch(u_char c)
+{
+    while (! (inb(debug_com_base + NS16550_LSR) & LSR_THRE));
+                                                            /* wait for idle */
+    outb(c, debug_com_base + NS16550_RBR);
+}
+
+void debug_putchar(u_char c)
+{
+    debug_putch(c);
+    if (c == '\n') debug_putch('\r');
+}
+
+
+
+int serial_testchar()                                /* character available? */
+{
+    return (inb(serial_com_base + NS16550_LSR) & LSR_DR);
+}
+
+u_char serial_getchar()
+{
+    while (! (inb(serial_com_base + NS16550_LSR) & LSR_DR));/* wait for char */
+    return inb(serial_com_base + NS16550_RBR);
+}
+
+void serial_putch(u_char c)
+{
+    while (! (inb(serial_com_base + NS16550_LSR) & LSR_THRE));
+                                                            /* wait for idle */
+    outb(c, serial_com_base + NS16550_RBR);
+}
+
+void serial_putchar(u_char c)
+{
+    serial_putch(c);
+    if (c == '\n') serial_putch('\r');
+}
+
+static spinlock_t serial_lock;
+
 static void serial_rx_int(int irq, void *dev_id, struct pt_regs *regs)
 {
     u_char c; 
     key_handler *handler; 
+    unsigned long flags;
 
-    while ( (inb(SERIAL_BASE + NS16550_LSR) & 1) == 1 )
+    spin_lock_irqsave(&serial_lock, flags);
+
+    while (serial_testchar())
     {
-        c = inb(SERIAL_BASE + NS16550_RBR);
+        c = serial_getchar();
 
-        if( (handler = get_key_handler(c)) != NULL ) 
-            (*handler)(c, dev_id, regs); 
+	if (c & 0x80)
+	{
+	    extern int pdb_serial_input(u_char, struct pt_regs *);
+	    pdb_serial_input(c & 0x7f, regs);
+	}
+	else
+	{
+	    if ( (handler = get_key_handler(c)) != NULL ) 
+  	        (*handler)(c, dev_id, regs); 
 
-        if ( serial_echo ) 
-            printk("%c", c);
-    } 
+	    if ( serial_echo ) 
+	        serial_putch(c);
+	}
+    }
+
+    spin_unlock_irqrestore(&serial_lock, flags);
 }
 
 void initialize_serial() 
@@ -74,6 +157,8 @@ void initialize_serial()
 
     if ( !SERIAL_ENABLED )
         return;
+
+    spin_lock_init(&serial_lock);
     
     /* setup key handler */
     add_key_handler('~', toggle_echo, "toggle serial echo");
@@ -82,13 +167,13 @@ void initialize_serial()
     /* Clear FIFOs, enable, trigger at 1 byte */
     outb(NS16550_FCR_TRG1 | NS16550_FCR_ENABLE |
          NS16550_FCR_CLRX  | NS16550_FCR_CLTX, 
-         SERIAL_BASE+NS16550_FCR);
+         serial_com_base + NS16550_FCR);
 
     /* Enable receive interrupts. Also remember to keep DTR/RTS asserted. */
     outb(NS16550_MCR_OUT2|NS16550_MCR_DTR|NS16550_MCR_RTS, 
-         SERIAL_BASE + NS16550_MCR);
+         serial_com_base + NS16550_MCR);
     outb(NS16550_IER_ERDAI, 
-         SERIAL_BASE + NS16550_IER );
+         serial_com_base + NS16550_IER );
 
     if( (rc = request_irq(4, serial_rx_int, SA_NOPROFILE, "serial", 0)) )
 	printk("initialize_serial: failed to get IRQ4, rc=%d\n", rc); 

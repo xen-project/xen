@@ -1,0 +1,215 @@
+Pervasive Debugging 
+===================
+
+040205 Alex Ho (alex.ho@cl.cam.ac.uk)
+
+Introduction
+------------
+
+The pervasive debugging project is leveraging Xen to 
+debug distributed systems.  We have added a gdb stub
+to Xen to allow for remote debugging of both Xen and
+guest operating systems.  More information about the
+pervasive debugger is available at: http://www.cl.cam.ac.uk/netos/pdb
+
+
+Implementation
+--------------
+
+The gdb stub communicates with gdb running over a serial line.
+The main entry point is pdb_handle_exception() which is invoked
+from:    pdb_key_pressed()    ('D' on the console)
+         do_int3_exception()  (interrupt 3: breakpoint exception)
+         do_debug()           (interrupt 1: debug exception)
+
+This accepts characters from the serial port and passes gdb
+commands to pdb_process_command() which implements the gdb stub
+interface.  This file draws heavily from the kgdb project and
+sample gdbstub provided with gdb.
+
+The stub can examine registers, single step and continue, and
+read and write memory (in Xen, a domain, or a Linux process'
+address space).  The debugger does not currently trace the 
+current process, so all bets are off if context switch occurs
+in the domain.
+
+
+Setup
+-----
+
+ +-------+ telnet +-----------+ serial +-------+ 
+ |  GDB  |--------|  nsplitd  |--------|  Xen  |
+ +-------+        +-----------+        +-------+ 
+
+To run pdb, Xen must be appropriately configured and 
+a suitable serial interface attached to the target machine.
+GDB and nsplitd can run on the same machine.
+
+Xen Configuration
+
+  Add the "pdb=xxx" option to your Xen boot command line
+  where xxx is one of the following values:
+     com1    gdb stub should communicate on com1
+     com1H   gdb stub should communicate on com1 (with high bit set)
+     com2    gdb stub should communicate on com2
+     com2H   gdb stub should communicate on com2 (with high bit set)
+
+  Symbolic debugging infomration is quite helpful too:
+  xeno.bk/xen/arch/i386/Rules.mk
+    add -g to CFLAGS to compile Xen with symbols
+  xeno.bk/xenolinux-2.4.24-sparse/arch/xeno/Makefile
+    add -g to CFLAGS to compile XenoLinux with symbols
+
+  You may also want to consider dedicating a register to the
+  frame pointer (disable the -fomit-frame-pointer compile flag).
+
+  When booting Xen and domain 0, look for the console text 
+  "Initializing pervasive debugger (PDB)" just before DOM0 starts up.
+
+Serial Port Configuration
+
+  pdb expects to communicate with gdb using the serial port.  Since 
+  this port is often shared with the machine's console output, pdb can
+  discriminate its communication by setting the high bit of each char.
+
+  A new tool has been added to the source tree which splits 
+  the serial output from a remote machine into two streams: 
+  one stream (without the high bit) is the console and 
+  one stream (with the high bit stripped) is the pdb communication.
+
+  See:  xeno.bk/tools/nsplitd
+
+  Note: nsplitd was originally written for the Nemesis project
+  at Cambridge.
+
+  Usage:
+    %telnet <hostname> <port>
+    This is the console of the remote machine.  You will probably
+    want to set telnet in char mode (or create a .telnetrc file).
+    <hostname> and <port> are for your instance of nsplitd.
+    You should be able to press 'h' to display a list of keyboard
+    handlers.  In particular, you should see:
+       key 'D' (ascii '44') => enter pervasive debugger
+
+  After nsplitd accepts a connection on <port>, it starts listening
+  on port <port + 1>.  Characters sent to the <port + 1> will have the
+  high bit set and vice versa for characters received.
+
+  Note: if you are not using a serial console and can dedicate your
+  serial line to pdb messages, then edit pdb_put_char and pdb_get_char 
+  in pdb-stub.c to remove the high bit tests.
+
+GDB 6.0
+  pdb has been tested with gdb 6.0.  It should also work with
+  earlier versions.
+
+
+Usage
+-----
+
+1. Boot Xen and XenoLinux
+2. Interrupt Xen by pressing 'D' at the console
+   You should see the console message: 
+   pdb_handle_exception [0x88][0xfc5c9d88]
+   At this point Xen is waiting for gdb commands on the serial line.
+3. Attach with gdb
+   (gdb) file xeno.bk/xen/xen
+   Reading symbols from xeno.bk/xen/xen...done.
+   (gdb) target remote <hostname>:<port + 1>              /* contact nsplitd */
+   Remote debugging using serial.srg:12131
+   continue_cpu_idle_loop () at current.h:10
+   warning: shared library handler failed to enable breakpoint
+   (gdb) break __enter_scheduler
+   Breakpoint 1 at 0xfc510a94: file schedule.c, line 330.
+   (gdb) cont
+   Continuing.
+
+   Program received signal SIGTRAP, Trace/breakpoint trap.
+   __enter_scheduler () at schedule.c:330
+   (gdb) step
+   (gdb) step
+   (gdb) print next            /* the variable prev has been optimized away! */
+   $1 = (struct task_struct *) 0x0
+   (gdb) delete
+   Delete all breakpoints? (y or n) y
+4. You can add additional symbols to gdb
+   (gdb) add-sym xenolinux-2.4.24/vmlinux
+   add symbol table from file "xenolinux-2.4.24/vmlinux" at
+   (y or n) y
+   Reading symbols from xenolinux-2.4.24/vmlinux...done.
+   (gdb) x/s cpu_vendor_names[0]
+   0xc01530d2 <cpdext+62898>:	 "Intel"
+   (gdb) break free_uid
+   Breakpoint 2 at 0xc0012250
+   (gdb) cont
+   Continuing.                                  /* run a command in domain 0 */
+
+   Program received signal SIGTRAP, Trace/breakpoint trap.
+   free_uid (up=0xbffff738) at user.c:77
+
+   (gdb) print *up
+   $2 = {__count = {counter = 0}, processes = {counter = 135190120}, files = {
+       counter = 0}, next = 0x395, pprev = 0xbffff878, uid = 134701041}
+   (gdb) finish
+   Run till exit from #0  free_uid (up=0xbffff738) at user.c:77
+
+   Program received signal SIGTRAP, Trace/breakpoint trap.
+   release_task (p=0xc2da0000) at exit.c:51
+   (gdb) print *p
+$3 = {state = 4, flags = 4, sigpending = 0, addr_limit = {seg = 3221225472}, 
+  exec_domain = 0xc016a040, need_resched = 0, ptrace = 0, lock_depth = -1, 
+  counter = 1, nice = 0, policy = 0, mm = 0x0, processor = 0, 
+  cpus_runnable = 1, cpus_allowed = 4294967295, run_list = {next = 0x0, 
+    prev = 0x0}, sleep_time = 18995, next_task = 0xc017c000, 
+  prev_task = 0xc2f94000, active_mm = 0x0, local_pages = {next = 0xc2da0054, 
+    prev = 0xc2da0054}, allocation_order = 0, nr_local_pages = 0, 
+  binfmt = 0xc016c6a0, exit_code = 0, exit_signal = 17, pdeath_signal = 0, 
+  personality = 0, did_exec = -1, task_dumpable = 1, pid = 917, pgrp = 914, 
+  tty_old_pgrp = 0, session = 914, tgid = 917, leader = 0, 
+  p_opptr = 0xc2f94000, p_pptr = 0xc2f94000, p_cptr = 0x0, p_ysptr = 0x0, 
+  p_osptr = 0x0, thread_group = {next = 0xc2da00a8, prev = 0xc2da00a8}, 
+  pidhash_next = 0x0, pidhash_pprev = 0xc01900b8, wait_chldexit = {
+    lock = <incomplete type>, task_list = {next = 0xc2da00b8, 
+      prev = 0xc2da00b8}}, vfork_done = 0x0, rt_priority = 0, 
+  it_real_value = 0, it_prof_value = 0, it_virt_value = 0, it_real_incr = 0, 
+  it_prof_incr = 0, it_virt_incr = 0, real_timer = {list = {next = 0x0, 
+      prev = 0x0}, expires = 18950, data = 3269066752, 
+    function = 0xc000ce30 <it_real_fn>}, times = {tms_utime = 0, 
+    tms_stime = 0, tms_cutime = 0, tms_cstime = 0}, start_time = 18989, 
+  per_cpu_utime = {1}, per_cpu_stime = {310}, min_flt = 13, maj_flt = 104, 
+  nswap = 0, cmin_flt = 0, cmaj_flt = 0, cnswap = 0, swappable = -1, uid = 0, 
+  euid = 0, suid = 0, fsuid = 0, gid = 0, egid = 0, sgid = 0, fsgid = 0, 
+  ngroups = 7, groups = {0, 1, 2, 3, 4, 6, 10, 0 <repeats 25 times>}, 
+  cap_effective = 4294967039, cap_inheritable = 0, cap_permitted = 4294967039, 
+  keep_capabilities = 0, user = 0xc016b18c, rlim = {{rlim_cur = 4294967295, 
+      rlim_max = 4294967295}, {rlim_cur = 4294967295, rlim_max = 4294967295}, {
+      rlim_cur = 4294967295, rlim_max = 4294967295}, {rlim_cur = 8388608, 
+      rlim_max = 4294967295}, {rlim_cur = 0, rlim_max = 4294967295}, {
+      rlim_cur = 4294967295, rlim_max = 4294967295}, {rlim_cur = 512, 
+      rlim_max = 512}, {rlim_cur = 1024, rlim_max = 1024}, {
+      rlim_cur = 4294967295, rlim_max = 4294967295}, {rlim_cur = 4294967295, 
+      rlim_max = 4294967295}, {rlim_cur = 4294967295, rlim_max = 4294967295}}, 
+  used_math = 0, comm = "id\000h\000og\000\000\000\000\000\000\000\000", 
+  link_count = 0, total_link_count = 1, tty = 0xc3ed1000, locks = 0, 
+  semundo = 0x0, semsleeping = 0x0, thread = {esp0 = 3269074944, 
+    eip = 3221249046, esp = 3269074792, fs = 0, gs = 0, io_pl = 3, debugreg = {
+      0, 0, 0, 0, 0, 0, 0, 0}, cr2 = 0, trap_no = 0, error_code = 0, i387 = {
+      fsave = {cwd = 2098047, swd = 125632512, twd = 1073944696, fip = 2091, 
+        fcs = -1073745032, foo = 2099, fos = 8064, st_space = {
+          0 <repeats 20 times>}, status = 0}, fxsave = {cwd = 895, swd = 32, 
+        twd = 0, fop = 1917, fip = 1073944696, fcs = 2091, foo = -1073745032, 
+        fos = 2099, mxcsr = 8064, reserved = 0, st_space = {
+          0 <repeats 24 times>, 1449431204, -1774489361, 16383, 0, 1, 
+          -1891252224, 16404, 0}, xmm_space = {0 <repeats 32 times>}, 
+        padding = {0 <repeats 56 times>}}, soft = {cwd = 2098047, 
+        swd = 125632512, twd = 1073944696, fip = 2091, fcs = -1073745032, 
+        foo = 2099, fos = 8064, st_space = {0 <repeats 20 times>}, 
+        ftop = 0 '\0', changed = 0 '\0', lookahead = 0 '\0', 
+        no_update = 0 '\0', rm = 0 '\0', alimit = 0 '\0', info = 0x0, 
+        entry_eip = 0}}, vm86_info = 0x0, screen_bitmap = 0, v86flags = 0, 
+    v86mask = 0, saved_esp0 = 0}, fs = 0x0, files = 0x0, namespace = 0x0, 
+  sigmask_lock = <incomplete type>, sig = 0x0, blocked = {sig = {0, 0}}, 
+  pending = {head = 0x0, tail = 0xc2da04f8, signal = {sig = {0, 0}}}, 
+  sas_ss_sp = 0, sas_ss_size = 0, notifier = 0, notifier_data = 0x0, 
+  notifier_mask = 0x0, parent_exec_id = 7, self_exec_id = 8, 
+  alloc_lock = <incomplete type>, journal_info = 0x0}
