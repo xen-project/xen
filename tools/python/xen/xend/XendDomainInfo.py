@@ -132,8 +132,11 @@ def lookup_raw_partn(name):
 
 def lookup_disk_uname(uname):
     """Lookup a list of segments for a physical device.
-    uname [string]:  name of the device in the format \'phy:dev\' for a physical device
-    returns [list of dicts]: list of extents that make up the named device
+    
+    @param uname: name of the device in the format \'phy:dev\' for a physical device
+    @type  uname: string
+    @return: list of extents that make up the named device
+    @rtype: [dict]
     """
     ( type, d_name ) = string.split( uname, ':' )
 
@@ -159,14 +162,17 @@ def make_disk(vm, config, uname, dev, mode, recreate=0):
     if len(segments) > 1:
         raise VmError("vbd: Multi-segment vdisk: uname=%s" % uname)
     segment = segments[0]
+    # todo: The 'dev' should be looked up in the context of the domain.
     vdev = blkdev_name_to_number(dev)
+    if not vdev:
+        raise VmError("vbd: Device not found: uname=%s dev=%s" % (uname, dev))
     ctrl = xend.blkif_create(vm.dom, recreate=recreate)
     return ctrl.attachDevice(config, vdev, mode, segment, recreate=recreate)
         
 def vif_up(iplist):
     """send an unsolicited ARP reply for all non link-local IP addresses.
 
-    iplist IP addresses
+    @param iplist: IP addresses
     """
 
     IP_NONLOCAL_BIND = '/proc/sys/net/ipv4/ip_nonlocal_bind'
