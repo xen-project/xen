@@ -52,6 +52,8 @@ SRCS     += xc_misc.c
 SRCS     += xc_netbsd_build.c
 SRCS     += xc_physdev.c
 SRCS     += xc_private.c
+SRCS     += xc_rrobin.c
+
 SRCS     += $(LIB_SRCS)
 
 #CFLAGS  += -I../../../xen/include/hypervisor-ifs
