@@ -380,8 +380,6 @@ static void receive_usb_io(usbif_response_t *resp)
         struct urb *urb = urbp->urb;
 
         urb->actual_length = resp->length;
-	urb->status = resp->status;
-	urbp->status = resp->status;
         urbp->in_progress = 0;
 
         if( usb_pipetype(urb->pipe) == 0 ) /* ISO */
@@ -398,6 +396,12 @@ static void receive_usb_io(usbif_response_t *resp)
                 }
                 free_page((unsigned long)urbp->schedule);
         }
+
+        /* Only set status if it's not been changed since submission.  It might
+         * have been changed if the URB has been unlinked asynchronously, for
+         * instance. */
+	if ( urb->status == -EINPROGRESS )
+                urbp->status = urb->status = resp->status;
 }
 
 /**
@@ -567,7 +571,7 @@ static void xhci_destroy_urb_priv(struct urb *urb)
         return;
 
     if (!list_empty(&urb->urb_list))
-        warn("xhci_destroy_urb_priv: urb %p still on xhci->urb_list or xhci->remove_list", urb);
+        warn("xhci_destroy_urb_priv: urb %p still on xhci->urb_list", urb);
     
     if (!list_empty(&urbp->complete_list))
         warn("xhci_destroy_urb_priv: urb %p still on xhci->complete_list", urb);
@@ -849,8 +853,6 @@ static int xhci_unlink_urb(struct urb *urb)
 
 	list_del_init(&urb->urb_list);
 
-	xhci_delete_urb(urb);
-
 	/* Short circuit the virtual root hub */
 	if (urb->dev == xhci->rh.dev) {
 		rh_unlink_urb(urb);
@@ -861,17 +863,12 @@ static int xhci_unlink_urb(struct urb *urb)
 		xhci_call_completion(urb);
 	} else {
 		if (urb->transfer_flags & USB_ASYNC_UNLINK) {
+                        /* We currently don't currently attempt to cancel URBs
+                         * that have been queued in the ring.  We handle async
+                         * unlinked URBs when they complete. */
 			urbp->status = urb->status = -ECONNABORTED;
-
-			spin_lock(&xhci->urb_remove_list_lock);
-
-			list_add(&urb->urb_list, &xhci->urb_remove_list);
-
-			spin_unlock(&xhci->urb_remove_list_lock);
-
 			spin_unlock(&urb->lock);
 			spin_unlock_irqrestore(&xhci->urb_list_lock, flags);
-
 		} else {
 			urb->status = -ENOENT;
 
@@ -886,6 +883,8 @@ static int xhci_unlink_urb(struct urb *urb)
 				udelay(1000);
 			} else
 				schedule_timeout(1+1*HZ/1000); 
+
+                        xhci_delete_urb(urb);
 
 			xhci_call_completion(urb);
 		}
@@ -1418,9 +1417,6 @@ static int alloc_xhci(void)
 	}
 
 	xhci->state = USBIF_STATE_CLOSED;
-
-	spin_lock_init(&xhci->urb_remove_list_lock);
-	INIT_LIST_HEAD(&xhci->urb_remove_list);
 
 	spin_lock_init(&xhci->urb_list_lock);
 	INIT_LIST_HEAD(&xhci->urb_list);

@@ -68,10 +68,6 @@ struct xhci {
 	spinlock_t urb_list_lock;
 	struct list_head urb_list;		/* P: xhci->urb_list_lock */
 
-	/* List of asynchronously unlinked URB's */
-	spinlock_t urb_remove_list_lock;
-	struct list_head urb_remove_list;	/* P: xhci->urb_remove_list_lock */
-
 	/* List of URB's awaiting completion callback */
 	spinlock_t complete_list_lock;
 	struct list_head complete_list;		/* P: xhci->complete_list_lock */
