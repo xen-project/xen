@@ -16,6 +16,7 @@
 #include <asm/domain_page.h>
 #include <asm/pdb.h>
 
+extern void arch_init_memory(void);
 extern void init_IRQ(void);
 extern void trap_init(void);
 extern void time_init(void);
@@ -359,6 +360,8 @@ void __init start_of_day(void)
     trap_init();
     time_init(); /* installs software handler for HZ clock. */
     init_apic_mappings(); /* make APICs addressable in our pagetables. */
+
+    arch_init_memory();
 
 #ifndef CONFIG_SMP    
     APIC_init_uniprocessor();

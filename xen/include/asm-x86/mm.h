@@ -108,7 +108,7 @@ struct pfn_info
         /* _dom holds an allocation reference */                            \
         (_pfn)->u.inuse.count_info = PGC_allocated | 1;                     \
         if ( unlikely((_dom)->xenheap_pages++ == 0) )                       \
-            get_domain(_dom);                                               \
+            get_knownalive_domain(_dom);                                    \
         spin_unlock(&(_dom)->page_alloc_lock);                              \
     } while ( 0 )
 
