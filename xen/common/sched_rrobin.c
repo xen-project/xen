@@ -199,7 +199,7 @@ void rr_wake(struct domain *d)
 {
     unsigned long       flags;
     struct domain       *curr;
-    s_time_t            now, min_time;
+    s_time_t            now;
     int                 cpu = d->processor;
 
     spin_lock_irqsave(&run_locks[cpu], flags);
@@ -222,8 +222,6 @@ void rr_wake(struct domain *d)
  
     if ( is_idle_task(curr) )
         cpu_raise_softirq(cpu, SCHEDULE_SOFTIRQ);
-    else if ( schedule_data[cpu].s_timer.expires > (min_time + TIME_SLOP) )
-        mod_ac_timer(&schedule_data[cpu].s_timer, min_time);
 }
 
 
