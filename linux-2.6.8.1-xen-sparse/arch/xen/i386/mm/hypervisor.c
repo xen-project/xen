@@ -430,7 +430,8 @@ unsigned long allocate_empty_lowmem_region(unsigned long pages)
         phys_to_machine_mapping[__pa(vstart)>>PAGE_SHIFT] = INVALID_P2M_ENTRY;
     }
 
-    flush_page_update_queue();
+    /* Flush updates through and flush the TLB. */
+    xen_tlb_flush();
 
     ret = HYPERVISOR_dom_mem_op(MEMOP_decrease_reservation, 
                                 pfn_array, 1<<order, 0);

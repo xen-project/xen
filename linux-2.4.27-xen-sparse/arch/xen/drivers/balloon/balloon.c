@@ -81,8 +81,8 @@ static unsigned long inflate_balloon(unsigned long num_pages)
 
     for ( i = 0; i < num_pages; i++, currp++ )
     {
-	struct page *page = alloc_page(GFP_HIGHUSER);
-	unsigned long pfn = page - mem_map;
+        struct page *page = alloc_page(GFP_HIGHUSER);
+        unsigned long pfn = page - mem_map;
 
         /* If allocation fails then free all reserved pages. */
         if ( page == NULL )
@@ -92,7 +92,7 @@ static unsigned long inflate_balloon(unsigned long num_pages)
             currp = parray;
             for ( j = 0; j < i; j++, currp++ )
                 __free_page((struct page *) (mem_map + *currp));
-	    ret = -EFAULT;
+            ret = -EFAULT;
             goto cleanup;
         }
 
@@ -102,10 +102,10 @@ static unsigned long inflate_balloon(unsigned long num_pages)
 
     for ( i = 0, currp = parray; i < num_pages; i++, currp++ )
     {
-	unsigned long mfn = phys_to_machine_mapping[*currp];
+        unsigned long mfn = phys_to_machine_mapping[*currp];
         curraddr = (unsigned long)page_address(mem_map + *currp);
         /* Blow away page contents for security, and also p.t. ref if any. */
-	if ( curraddr != 0 )
+        if ( curraddr != 0 )
         {
             scrub_pages(curraddr, 1);
             queue_l1_entry_update(get_ptep(curraddr), 0);
@@ -122,7 +122,8 @@ static unsigned long inflate_balloon(unsigned long num_pages)
         *currp = mfn;
     }
 
-    XEN_flush_page_update_queue();
+    /* Flush updates through and flush the TLB. */
+    xen_tlb_flush();
 
     ret = HYPERVISOR_dom_mem_op(MEMOP_decrease_reservation, 
                                 parray, num_pages, 0);
@@ -168,7 +169,7 @@ static unsigned long process_returned_pages(unsigned long * parray,
         {
             phys_to_machine_mapping[i] = *curr;
             queue_machphys_update(*curr, i);
-	    if (i<max_low_pfn)
+            if (i<max_low_pfn)
               queue_l1_entry_update(
                 get_ptep((unsigned long)__va(i << PAGE_SHIFT)),
                 ((*curr) << PAGE_SHIFT) | pgprot_val(PAGE_KERNEL));
@@ -191,7 +192,7 @@ unsigned long deflate_balloon(unsigned long num_pages)
     if ( num_pages > credit )
     {
         printk(KERN_ERR "deflate_balloon: %lu pages > %lu credit.\n",
-			num_pages, credit);
+               num_pages, credit);
         return -EAGAIN;
     }
 
@@ -202,21 +203,19 @@ unsigned long deflate_balloon(unsigned long num_pages)
         return 0;
     }
 
-    XEN_flush_page_update_queue();
-
     ret = HYPERVISOR_dom_mem_op(MEMOP_increase_reservation, 
                                 parray, num_pages, 0);
     if ( unlikely(ret != num_pages) )
     {
         printk(KERN_ERR "deflate_balloon: xen increase_reservation err %lx\n",
-			ret);
+               ret);
         goto cleanup;
     }
 
     if ( (ret = process_returned_pages(parray, num_pages)) < num_pages )
     {
         printk(KERN_WARNING
-	   "deflate_balloon: restored only %lx of %lx pages.\n",
+               "deflate_balloon: restored only %lx of %lx pages.\n",
            ret, num_pages);
         goto cleanup;
     }
@@ -323,7 +322,6 @@ claim_new_pages(unsigned long num_pages)
         return 0;
     }
 
-    XEN_flush_page_update_queue();
     new_page_cnt = HYPERVISOR_dom_mem_op(MEMOP_increase_reservation, 
                                 parray, num_pages, 0);
     if ( new_page_cnt != num_pages )
@@ -332,48 +330,50 @@ claim_new_pages(unsigned long num_pages)
             "claim_new_pages: xen granted only %lu of %lu requested pages\n",
             new_page_cnt, num_pages);
 
-	/* 
-	 * Avoid xen lockup when user forgot to setdomainmaxmem. Xen
-	 * usually can dribble out a few pages and then hangs.
-	 */
-	if ( new_page_cnt < 1000 )
+        /* 
+         * Avoid xen lockup when user forgot to setdomainmaxmem. Xen
+         * usually can dribble out a few pages and then hangs.
+         */
+        if ( new_page_cnt < 1000 )
         {
             printk(KERN_WARNING "Remember to use setdomainmaxmem\n");
-	    HYPERVISOR_dom_mem_op(MEMOP_decrease_reservation, 
+            HYPERVISOR_dom_mem_op(MEMOP_decrease_reservation, 
                                 parray, new_page_cnt, 0);
             return -EFAULT;
-	}
+        }
     }
     memcpy(phys_to_machine_mapping+most_seen_pages, parray,
            new_page_cnt * sizeof(unsigned long));
 
     pagetable_extend(most_seen_pages,new_page_cnt);
 
-    for (pfn = most_seen_pages, curr = parray;
-	    pfn < most_seen_pages+new_page_cnt;
-            pfn++, curr++ )
+    for ( pfn = most_seen_pages, curr = parray;
+          pfn < most_seen_pages+new_page_cnt;
+          pfn++, curr++ )
     {
         struct page *page = mem_map + pfn;
 
 #ifndef CONFIG_HIGHMEM
-	if (pfn>=max_low_pfn) {
+        if ( pfn>=max_low_pfn )
+        {
             printk(KERN_WARNING "Warning only %ldMB will be used.\n",
                pfn>>PAGE_TO_MB_SHIFT);
             printk(KERN_WARNING "Use a HIGHMEM enabled kernel.\n");
-	    break;
-	}
+            break;
+        }
 #endif
-	queue_machphys_update(*curr, pfn);
-	XEN_flush_page_update_queue();
-	if (pfn<max_low_pfn)  {
-		queue_l1_entry_update(get_ptep((unsigned long)__va(pfn << PAGE_SHIFT)),
-			((*curr) << PAGE_SHIFT) | pgprot_val(PAGE_KERNEL));
-		XEN_flush_page_update_queue();
-		}
-
+        queue_machphys_update(*curr, pfn);
+        if ( pfn < max_low_pfn )
+            queue_l1_entry_update(
+                get_ptep((unsigned long)__va(pfn << PAGE_SHIFT)),
+                ((*curr) << PAGE_SHIFT) | pgprot_val(PAGE_KERNEL));
+        
+        XEN_flush_page_update_queue();
+        
         /* this next bit mimics arch/xen/mm/init.c:one_highpage_init() */
         ClearPageReserved(page);
-        if (pfn>=max_low_pfn) set_bit(PG_highmem, &page->flags);
+        if ( pfn >= max_low_pfn )
+            set_bit(PG_highmem, &page->flags);
         set_page_count(page, 1);
         __free_page(page);
     }
@@ -395,9 +395,8 @@ static int balloon_write(struct file *file, const char *buffer,
     if ( !capable(CAP_SYS_ADMIN) )
         return -EPERM;
 
-    if (count>sizeof memstring) {
+    if ( count > sizeof(memstring) )
         return -EFBIG;
-    }
 
     len = strnlen_user(buffer, count);
     if ( len == 0 ) return -EBADMSG;
@@ -406,39 +405,47 @@ static int balloon_write(struct file *file, const char *buffer,
         return -EFAULT;
 
     endchar = memstring;
-    for(i=0; i<len; ++i,++endchar) {
-        if ('0'>memstring[i] || memstring[i]>'9') break;
-    }
-    if (i==0) return -EBADMSG;
+    for ( i = 0; i < len; ++i, ++endchar )
+        if ( (memstring[i] < '0') || (memstring[i] > '9') )
+            break;
+    if ( i == 0 )
+        return -EBADMSG;
 
     targetbytes = memparse(memstring,&endchar);
     target = targetbytes >> PAGE_SHIFT;
 
-    if (target < current_pages) {
+    if ( target < current_pages )
+    {
         int change = inflate_balloon(current_pages-target);
-        if (change<=0) return change;
+        if ( change <= 0 )
+            return change;
 
         current_pages -= change;
         printk(KERN_INFO "Relinquish %dMB to xen. Domain now has %luMB\n",
             change>>PAGE_TO_MB_SHIFT, current_pages>>PAGE_TO_MB_SHIFT);
     }
-    else if (target > current_pages) {
+    else if ( target > current_pages )
+    {
         int change, reclaim = min(target,most_seen_pages) - current_pages;
 
-        if (reclaim) {
+        if ( reclaim )
+        {
             change = deflate_balloon( reclaim);
-            if (change<=0) return change;
+            if ( change <= 0 )
+                return change;
             current_pages += change;
             printk(KERN_INFO "Reclaim %dMB from xen. Domain now has %luMB\n",
                 change>>PAGE_TO_MB_SHIFT, current_pages>>PAGE_TO_MB_SHIFT);
         }
 
-        if (most_seen_pages<target) {
+        if ( most_seen_pages < target )
+        {
             int growth = claim_new_pages(target-most_seen_pages);
-	    if (growth<=0) return growth;
+            if ( growth <= 0 )
+                return growth;
             most_seen_pages += growth;
             current_pages += growth;
-            printk(KERN_INFO "Granted %dMB new mem by xen. Domain now has %luMB\n",
+            printk(KERN_INFO "Granted %dMB new mem. Dom now has %luMB\n",
                 growth>>PAGE_TO_MB_SHIFT, current_pages>>PAGE_TO_MB_SHIFT);
         }
     }
