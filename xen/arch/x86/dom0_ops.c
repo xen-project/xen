@@ -15,7 +15,6 @@
 #include <xen/event.h>
 #include <asm/domain_page.h>
 #include <asm/msr.h>
-#include <asm/pdb.h>
 #include <xen/trace.h>
 #include <xen/console.h>
 #include <asm/shadow.h>

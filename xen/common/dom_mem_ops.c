@@ -1,3 +1,4 @@
+/* -*-  Mode:C; c-basic-offset:4; tab-width:4; indent-tabs-mode:nil -*- */
 /******************************************************************************
  * dom_mem_ops.c
  *
@@ -141,7 +142,7 @@ do_dom_mem_op(unsigned long  op,
     else if ( unlikely(!IS_PRIV(current->domain)) )
         return -EPERM;
     else if ( unlikely((d = find_domain_by_id(domid)) == NULL) )
-	return -ESRCH;
+        return -ESRCH;
 
     LOCK_BIGLOCK(d);
 
@@ -150,18 +151,18 @@ do_dom_mem_op(unsigned long  op,
     case MEMOP_increase_reservation:
         rc = alloc_dom_mem(
             d, extent_list, start_extent, nr_extents, extent_order);
-	break;
+        break;
     case MEMOP_decrease_reservation:
         rc = free_dom_mem(
             d, extent_list, start_extent, nr_extents, extent_order);
-	break;
+        break;
     default:
         rc = -ENOSYS;
         break;
     }
 
     if ( unlikely(domid != DOMID_SELF) )
-	put_domain(d);
+        put_domain(d);
 
     UNLOCK_BIGLOCK(d);
 

@@ -9,11 +9,6 @@ OBJS := $(subst physdev.o,,$(OBJS))
 OBJS := $(subst xmalloc.o,,$(OBJS))
 endif
 
-ifneq ($(debugger),y)
-OBJS := $(subst debug.o,,$(OBJS))
-OBJS := $(subst debug-linux.o,,$(OBJS))
-endif
-
 ifneq ($(perfc),y)
 OBJS := $(subst perfc.o,,$(OBJS))
 endif

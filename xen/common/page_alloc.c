@@ -1,3 +1,4 @@
+/* -*-  Mode:C; c-basic-offset:4; tab-width:4; indent-tabs-mode:nil -*- */
 /******************************************************************************
  * page_alloc.c
  * 
@@ -262,8 +263,8 @@ struct pfn_info *alloc_heap_pages(unsigned int zone, unsigned int order)
 
     /* Find smallest order which can satisfy the request. */
     for ( i = order; i <= MAX_ORDER; i++ )
-	if ( !list_empty(&heap[zone][i]) )
-	    goto found;
+        if ( !list_empty(&heap[zone][i]) )
+            goto found;
 
     /* No suitable memory blocks. Fail the request. */
     spin_unlock(&heap_lock);

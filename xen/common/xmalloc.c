@@ -1,4 +1,6 @@
-/* Simple allocator for Xen.  If larger than a page, simply use the
+/* -*-  Mode:C; c-basic-offset:8; tab-width:8; indent-tabs-mode:t -*- */
+/******************************************************************************
+ * Simple allocator for Xen.  If larger than a page, simply use the
  * page-order allocator.
  *
  * Copyright (C) 2005 Rusty Russell IBM Corporation
@@ -17,6 +19,7 @@
  *  along with this program; if not, write to the Free Software
  *  Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
+
 #include <xen/mm.h>
 #include <xen/spinlock.h>
 #include <xen/ac_timer.h>

@@ -1,4 +1,4 @@
-/* -*-  Mode:C; c-basic-offset:4; tab-width:4 -*-
+/* -*-  Mode:C; c-basic-offset:4; tab-width:4; indent-tabs-mode:nil -*-
  ****************************************************************************
  * (c) 2004 - Rolf Neugebauer - Intel Research Cambridge
  * (c) 2004 - Keir Fraser - University of Cambridge
@@ -150,9 +150,9 @@ int physdev_pci_access_modify(
 
     /* Make the domain privileged. */
     set_bit(DF_PHYSDEV, &p->d_flags);
-	/* FIXME: MAW for now make the domain REALLY privileged so that it
-	 * can run a backend driver (hw access should work OK otherwise) */
-	set_bit(DF_PRIVILEGED, &p->d_flags);
+    /* FIXME: MAW for now make the domain REALLY privileged so that it
+     * can run a backend driver (hw access should work OK otherwise) */
+    set_bit(DF_PRIVILEGED, &p->d_flags);
 
     /* Grant write access to the specified device. */
     if ( (pdev = pci_find_slot(bus, PCI_DEVFN(dev, func))) == NULL )

@@ -1,3 +1,4 @@
+/* -*-  Mode:C; c-basic-offset:4; tab-width:4; indent-tabs-mode:nil -*- */
 /******************************************************************************
  * dom0_ops.c
  * 
@@ -14,7 +15,6 @@
 #include <xen/sched.h>
 #include <xen/event.h>
 #include <asm/domain_page.h>
-#include <asm/pdb.h>
 #include <xen/trace.h>
 #include <xen/console.h>
 #include <asm/shadow.h>
@@ -373,16 +373,6 @@ long do_dom0_op(dom0_op_t *u_dom0_op)
         put_domain(d);
     }
     break;
-
-#ifdef XEN_DEBUGGER
-    case DOM0_DEBUG:
-    {
-        pdb_do_debug(op);
-        copy_to_user(u_dom0_op, op, sizeof(*op));
-        ret = 0;
-    }
-    break;
-#endif
 
     case DOM0_SETTIME:
     {

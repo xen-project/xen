@@ -1,11 +1,6 @@
 
 include $(BASEDIR)/Rules.mk
 
-ifneq ($(debugger),y)
-OBJS := $(subst pdb-linux.o,,$(OBJS))
-OBJS := $(subst pdb-stub.o,,$(OBJS))
-endif
-
 OBJS += $(patsubst %.S,%.o,$(wildcard $(TARGET_SUBARCH)/*.S))
 OBJS += $(patsubst %.c,%.o,$(wildcard $(TARGET_SUBARCH)/*.c))
 OBJS += $(patsubst %.c,%.o,$(wildcard mtrr/*.c))

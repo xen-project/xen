@@ -54,9 +54,9 @@ else
 CFLAGS += -DVERBOSE
 endif
 
-ifeq ($(debugger),y)
-CFLAGS += -DXEN_DEBUGGER
-endif
+#ifeq ($(debugger),y)
+#CFLAGS += -DXEN_DEBUGGER
+#endif
 
 ifeq ($(perfc),y)
 CFLAGS += -DPERF_COUNTERS

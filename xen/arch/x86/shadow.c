@@ -1,4 +1,4 @@
-/* -*-  Mode:C++; c-file-style:BSD; c-basic-offset:4; tab-width:4 -*- */
+/* -*-  Mode:C; c-basic-offset:4; tab-width:4; indent-tabs-mode:nil -*- */
 
 #include <xen/config.h>
 #include <xen/types.h>
@@ -495,7 +495,7 @@ unsigned long shadow_l2_table(
             mk_l2_pgentry((spfn << PAGE_SHIFT) | __PAGE_HYPERVISOR);
         spl2e[PERDOMAIN_VIRT_START >> L2_PAGETABLE_SHIFT] =
             mk_l2_pgentry(__pa(page_get_owner(&frame_table[gpfn])->mm_perdomain_pt) |
-			  __PAGE_HYPERVISOR);
+                          __PAGE_HYPERVISOR);
     }
 #endif
 

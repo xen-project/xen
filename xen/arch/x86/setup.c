@@ -17,7 +17,6 @@
 #include <asm/apic.h>
 #include <asm/desc.h>
 #include <asm/domain_page.h>
-#include <asm/pdb.h>
 #include <asm/shadow.h>
 #include <asm/e820.h>
 
@@ -426,10 +425,6 @@ static void __init start_of_day(void)
     initialize_keytable(); /* call back handling for key codes */
 
     serial_init_stage2();
-
-#ifdef XEN_DEBUGGER
-    initialize_pdb();      /* pervasive debugger */
-#endif
 
     if ( !cpu_has_apic )
     {

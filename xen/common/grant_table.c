@@ -1,3 +1,4 @@
+/* -*-  Mode:C; c-basic-offset:4; tab-width:4; indent-tabs-mode:nil -*- */
 /******************************************************************************
  * common/grant_table.c
  * 
@@ -574,7 +575,7 @@ grant_table_create(
 
     /* Active grant table. */
     if ( (t->active = xmalloc_array(active_grant_entry_t, NR_GRANT_ENTRIES))
-	 == NULL )
+         == NULL )
         goto no_mem;
     memset(t->active, 0, sizeof(active_grant_entry_t) * NR_GRANT_ENTRIES);
 
