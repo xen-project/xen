@@ -65,7 +65,7 @@ void pdb_do_debug (dom0_op_t *op)
         case 'r' :
         {
             int loop;
-            u_char x;
+            u_char x = 0;
 	    unsigned long cr3;
 	    struct domain *d;
 
@@ -81,8 +81,8 @@ void pdb_do_debug (dom0_op_t *op)
                 {
                     printk ("\n%08x ", op->u.debug.in1 + loop);
                 }
-                x = pdb_linux_get_value(op->u.debug.in3,
-					cr3, op->u.debug.in1 + loop);
+		/* x = pdb_linux_get_value(op->u.debug.in3,
+		   cr3, op->u.debug.in1 + loop); */
                 printk (" %02x", x);
             }
             printk ("\n");
