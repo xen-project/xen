@@ -560,7 +560,7 @@ static int alloc_l1_table(struct pfn_info *page)
 
     pl1e = map_domain_mem(page_nr << PAGE_SHIFT);
 
-    for ( i = 0; i < ENTRIES_PER_L1_PAGETABLE; i++ )
+    for ( i = 0; i < L1_PAGETABLE_ENTRIES; i++ )
         if ( unlikely(!get_page_from_l1e(pl1e[i], d)) )
             goto fail;
 
@@ -600,7 +600,7 @@ static void free_l1_table(struct pfn_info *page)
 
     pl1e = map_domain_mem(page_nr << PAGE_SHIFT);
 
-    for ( i = 0; i < ENTRIES_PER_L1_PAGETABLE; i++ )
+    for ( i = 0; i < L1_PAGETABLE_ENTRIES; i++ )
         put_page_from_l1e(pl1e[i], d);
 
     unmap_domain_mem(pl1e);
@@ -1917,7 +1917,7 @@ void ptwr_flush(const int which)
      */
 
     pl1e = ptwr_info[cpu].ptinfo[which].pl1e;
-    for ( i = 0; i < ENTRIES_PER_L1_PAGETABLE; i++ )
+    for ( i = 0; i < L1_PAGETABLE_ENTRIES; i++ )
     {
         ol1e = ptwr_info[cpu].ptinfo[which].page[i];
         nl1e = pl1e[i];
@@ -1950,7 +1950,7 @@ void ptwr_flush(const int which)
              * reference counts are correct.
              */
             memcpy(&pl1e[i], &ptwr_info[cpu].ptinfo[which].page[i],
-                   (ENTRIES_PER_L1_PAGETABLE - i) * sizeof(l1_pgentry_t));
+                   (L1_PAGETABLE_ENTRIES - i) * sizeof(l1_pgentry_t));
             unmap_domain_mem(pl1e);
             ptwr_info[cpu].ptinfo[which].l1va = 0;
             UNLOCK_BIGLOCK(d);
@@ -2092,7 +2092,7 @@ int ptwr_do_page_fault(unsigned long addr)
     ptwr_info[cpu].ptinfo[which].pl1e = map_domain_mem(pfn << PAGE_SHIFT);
     memcpy(ptwr_info[cpu].ptinfo[which].page,
            ptwr_info[cpu].ptinfo[which].pl1e,
-           ENTRIES_PER_L1_PAGETABLE * sizeof(l1_pgentry_t));
+           L1_PAGETABLE_ENTRIES * sizeof(l1_pgentry_t));
     
     /* Finally, make the p.t. page writable by the guest OS. */
     pte |= _PAGE_RW;
@@ -2238,7 +2238,7 @@ void audit_domain(struct domain *d)
             case PGT_l1_page_table:
             case PGT_l2_page_table:
                 pt = map_domain_mem(pfn<<PAGE_SHIFT);
-                for ( i = 0; i < ENTRIES_PER_L1_PAGETABLE; i++ )
+                for ( i = 0; i < L1_PAGETABLE_ENTRIES; i++ )
                     if ( (pt[i] & _PAGE_PRESENT) &&
                          ((pt[i] >> PAGE_SHIFT) == xpfn) )
                         printk("     found dom=%d i=%x pfn=%lx t=%x c=%x\n",
@@ -2399,7 +2399,7 @@ void audit_domain(struct domain *d)
 #endif
             pt = map_domain_mem( pfn<<PAGE_SHIFT );
 
-            for ( i = 0; i < ENTRIES_PER_L1_PAGETABLE; i++ )
+            for ( i = 0; i < L1_PAGETABLE_ENTRIES; i++ )
             {
                 if ( pt[i] & _PAGE_PRESENT )
                 {
@@ -2540,7 +2540,7 @@ void audit_domain(struct domain *d)
 
             pt = map_domain_mem( pfn<<PAGE_SHIFT );
 
-            for ( i = 0; i < ENTRIES_PER_L1_PAGETABLE; i++ )
+            for ( i = 0; i < L1_PAGETABLE_ENTRIES; i++ )
             {
                 if ( pt[i] & _PAGE_PRESENT )
                 {

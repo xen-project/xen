@@ -329,7 +329,7 @@ static void monitor_mk_pagetable(struct exec_domain *ed)
     phys_table = (l2_pgentry_t *) map_domain_mem(pagetable_val(
                                         ed->arch.phys_table));
     memcpy(d->arch.mm_perdomain_pt, phys_table,
-           ENTRIES_PER_L1_PAGETABLE * sizeof(l1_pgentry_t));
+           L1_PAGETABLE_ENTRIES * sizeof(l1_pgentry_t));
 
     unmap_domain_mem(phys_table);
     unmap_domain_mem(mpl2e);

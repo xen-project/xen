@@ -3,18 +3,20 @@
 #ifndef __X86_64_PAGE_H__
 #define __X86_64_PAGE_H__
 
-#define L1_PAGETABLE_SHIFT       12
-#define L2_PAGETABLE_SHIFT       21
-#define L3_PAGETABLE_SHIFT       30
-#define L4_PAGETABLE_SHIFT       39
-#define PAGE_SHIFT               L1_PAGETABLE_SHIFT
+#define L1_PAGETABLE_SHIFT      12
+#define L2_PAGETABLE_SHIFT      21
+#define L3_PAGETABLE_SHIFT      30
+#define L4_PAGETABLE_SHIFT      39
+#define PAGE_SHIFT              L1_PAGETABLE_SHIFT
+#define ROOT_PAGETABLE_SHIFT    L4_PAGETABLE_SHIFT
 
-#define ENTRIES_PER_L1_PAGETABLE 512
-#define ENTRIES_PER_L2_PAGETABLE 512
-#define ENTRIES_PER_L3_PAGETABLE 512
-#define ENTRIES_PER_L4_PAGETABLE 512
+#define L1_PAGETABLE_ENTRIES    512
+#define L2_PAGETABLE_ENTRIES    512
+#define L3_PAGETABLE_ENTRIES    512
+#define L4_PAGETABLE_ENTRIES    512
+#define ROOT_PAGETABLE_ENTRIES  L4_PAGETABLE_ENTRIES
 
-#define __PAGE_OFFSET		(0xFFFF830000000000)
+#define __PAGE_OFFSET           (0xFFFF830000000000)
 
 /* These may increase in future (phys. bits in particular). */
 #define PADDR_BITS              40
@@ -28,6 +30,7 @@ typedef struct { unsigned long l1_lo; } l1_pgentry_t;
 typedef struct { unsigned long l2_lo; } l2_pgentry_t;
 typedef struct { unsigned long l3_lo; } l3_pgentry_t;
 typedef struct { unsigned long l4_lo; } l4_pgentry_t;
+typedef l4_pgentry_t root_pgentry_t;
 #endif /* !__ASSEMBLY__ */
 
 /* Strip type from a table entry. */
@@ -64,21 +67,15 @@ typedef struct { unsigned long l4_lo; } l4_pgentry_t;
 
 /* Given a virtual address, get an entry offset into a page table. */
 #define l1_table_offset(_a) \
-  (((_a) >> L1_PAGETABLE_SHIFT) & (ENTRIES_PER_L1_PAGETABLE - 1))
+  (((_a) >> L1_PAGETABLE_SHIFT) & (L1_PAGETABLE_ENTRIES - 1))
 #define l2_table_offset(_a) \
-  (((_a) >> L2_PAGETABLE_SHIFT) & (ENTRIES_PER_L2_PAGETABLE - 1))
+  (((_a) >> L2_PAGETABLE_SHIFT) & (L2_PAGETABLE_ENTRIES - 1))
 #define l3_table_offset(_a) \
-  (((_a) >> L3_PAGETABLE_SHIFT) & (ENTRIES_PER_L3_PAGETABLE - 1))
+  (((_a) >> L3_PAGETABLE_SHIFT) & (L3_PAGETABLE_ENTRIES - 1))
 #define l4_table_offset(_a) \
-  (((_a) >> L4_PAGETABLE_SHIFT) & (ENTRIES_PER_L4_PAGETABLE - 1))
+  (((_a) >> L4_PAGETABLE_SHIFT) & (L4_PAGETABLE_ENTRIES - 1))
 
 /* Given a virtual address, get an entry offset into a linear page table. */
 #define l1_linear_offset(_a) (((_a) & VADDR_MASK) >> PAGE_SHIFT)
-
-/* Root page-table definitions. */
-#define pagetable_t l4_pgentry_t
-#define pagetable_val(_x)  ((_x).l4_lo)
-#define mk_pagetable(_x)   ( (l4_pgentry_t) { (_x) } )
-#define ENTRIES_PER_PAGETABLE ENTRIES_PER_L4_PAGETABLE
 
 #endif /* __X86_64_PAGE_H__ */

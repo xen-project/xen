@@ -38,7 +38,7 @@ void *safe_page_alloc(void)
 
 /* Map physical byte range (@p, @p+@s) at virt address @v in pagetable @pt. */
 int map_pages(
-    pagetable_t *pt,
+    root_pgentry_t *pt,
     unsigned long v,
     unsigned long p,
     unsigned long s,
@@ -119,8 +119,8 @@ void __init paging_init(void)
     unsigned long i, p, max;
 
     /* Map all of physical memory. */
-    max = ((max_page + ENTRIES_PER_L1_PAGETABLE - 1) & 
-           ~(ENTRIES_PER_L1_PAGETABLE - 1)) << PAGE_SHIFT;
+    max = ((max_page + L1_PAGETABLE_ENTRIES - 1) & 
+           ~(L1_PAGETABLE_ENTRIES - 1)) << PAGE_SHIFT;
     map_pages(idle_pg_table, PAGE_OFFSET, 0, max, PAGE_HYPERVISOR);
 
     /*
@@ -201,7 +201,7 @@ void subarch_init_memory(struct domain *dom_xen)
             continue;
         m2p_start_mfn = l2_pgentry_to_pfn(l2e);
 
-        for ( i = 0; i < ENTRIES_PER_L1_PAGETABLE; i++ )
+        for ( i = 0; i < L1_PAGETABLE_ENTRIES; i++ )
         {
             frame_table[m2p_start_mfn+i].count_info = PGC_allocated | 1;
             /* gdt to make sure it's only mapped read-only by non-privileged
@@ -303,7 +303,7 @@ void *memguard_init(void *heap_start)
     for ( i = 0; i < (xenheap_phys_end >> L2_PAGETABLE_SHIFT); i++ )
     {
         ALLOC_PT(l1);
-        for ( j = 0; j < ENTRIES_PER_L1_PAGETABLE; j++ )
+        for ( j = 0; j < L1_PAGETABLE_ENTRIES; j++ )
             l1[j] = mk_l1_pgentry((i << L2_PAGETABLE_SHIFT) |
                                    (j << L1_PAGETABLE_SHIFT) | 
                                   __PAGE_HYPERVISOR);

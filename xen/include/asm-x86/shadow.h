@@ -677,7 +677,7 @@ static inline void vmx_update_shadow_state(
 
     spl2e = (l2_pgentry_t *)map_domain_mem(smfn << PAGE_SHIFT);
     gpl2e = (l2_pgentry_t *)map_domain_mem(gpfn << PAGE_SHIFT);
-    memset(spl2e, 0, ENTRIES_PER_L2_PAGETABLE * sizeof(l2_pgentry_t));
+    memset(spl2e, 0, L2_PAGETABLE_ENTRIES * sizeof(l2_pgentry_t));
 
     ed->arch.shadow_vtable = spl2e;
     ed->arch.vpagetable = gpl2e; /* expect the guest did clean this up */

@@ -30,7 +30,7 @@
 
 /* Map physical byte range (@p, @p+@s) at virt address @v in pagetable @pt. */
 int map_pages(
-    pagetable_t *pt,
+    root_pgentry_t *pt,
     unsigned long v,
     unsigned long p,
     unsigned long s,
@@ -327,7 +327,7 @@ void *memguard_init(void *heap_start)
     {
         l1 = (l1_pgentry_t *)heap_start;
         heap_start = (void *)((unsigned long)heap_start + PAGE_SIZE);
-        for ( j = 0; j < ENTRIES_PER_L1_PAGETABLE; j++ )
+        for ( j = 0; j < L1_PAGETABLE_ENTRIES; j++ )
             l1[j] = mk_l1_pgentry((i << L2_PAGETABLE_SHIFT) |
                                    (j << L1_PAGETABLE_SHIFT) | 
                                   __PAGE_HYPERVISOR);

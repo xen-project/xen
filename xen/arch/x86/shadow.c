@@ -121,7 +121,7 @@ static inline int clear_shadow_page(
     case PGT_l2_page_table:
         p = map_domain_mem((spage - frame_table) << PAGE_SHIFT);
         if ( shadow_mode(d) == SHM_full_32 )
-            memset(p, 0, ENTRIES_PER_L2_PAGETABLE * sizeof(*p));
+            memset(p, 0, L2_PAGETABLE_ENTRIES * sizeof(*p));
         else 
             memset(p, 0, DOMAIN_ENTRIES_PER_L2_PAGETABLE * sizeof(*p));
         unmap_domain_mem(p);
@@ -544,12 +544,12 @@ static void shadow_map_l1_into_current_l2(unsigned long va)
         __shadow_set_l2e(ed, va, sl2e);
 
         gpl1e = (unsigned long *) &(linear_pg_table[
-            (va>>L1_PAGETABLE_SHIFT) & ~(ENTRIES_PER_L1_PAGETABLE-1)]);
+            (va>>L1_PAGETABLE_SHIFT) & ~(L1_PAGETABLE_ENTRIES-1)]);
 
         spl1e = (unsigned long *) &(shadow_linear_pg_table[
-            (va>>L1_PAGETABLE_SHIFT) & ~(ENTRIES_PER_L1_PAGETABLE-1)]);
+            (va>>L1_PAGETABLE_SHIFT) & ~(L1_PAGETABLE_ENTRIES-1)]);
 
-        for ( i = 0; i < ENTRIES_PER_L1_PAGETABLE; i++ )
+        for ( i = 0; i < L1_PAGETABLE_ENTRIES; i++ )
             l1pte_propagate_from_guest(d, &gpl1e[i], &spl1e[i]);
     }
     else
@@ -847,7 +847,7 @@ static int check_l1_table(
     gpl1e = map_domain_mem(g2mfn << PAGE_SHIFT);
     spl1e = map_domain_mem(s2mfn << PAGE_SHIFT);
 
-    for ( i = 0; i < ENTRIES_PER_L1_PAGETABLE; i++ )
+    for ( i = 0; i < L1_PAGETABLE_ENTRIES; i++ )
         check_pte(d, &gpl1e[i], &spl1e[i], 1, i);
  
     unmap_domain_mem(spl1e);

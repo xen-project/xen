@@ -9,6 +9,13 @@
 #include <asm/x86_64/page.h>
 #endif
 
+/* Page-table type. */
+#ifndef __ASSEMBLY__
+typedef struct { unsigned long pt_lo; } pagetable_t;
+#define pagetable_val(_x)  ((_x).pt_lo)
+#define mk_pagetable(_x)   ( (pagetable_t) { (_x) } )
+#endif
+
 #ifndef __ASSEMBLY__
 #define PAGE_SIZE	         (1UL << PAGE_SHIFT)
 #else
@@ -38,7 +45,7 @@
 #define DOMAIN_ENTRIES_PER_L2_PAGETABLE	    \
   (HYPERVISOR_VIRT_START >> L2_PAGETABLE_SHIFT)
 #define HYPERVISOR_ENTRIES_PER_L2_PAGETABLE \
-  (ENTRIES_PER_L2_PAGETABLE - DOMAIN_ENTRIES_PER_L2_PAGETABLE)
+  (L2_PAGETABLE_ENTRIES - DOMAIN_ENTRIES_PER_L2_PAGETABLE)
 
 #ifndef __ASSEMBLY__
 #include <asm/processor.h>
@@ -51,7 +58,7 @@
 
 #define va_to_l1mfn(_va) (l2_pgentry_val(linear_l2_table[_va>>L2_PAGETABLE_SHIFT]) >> PAGE_SHIFT)
 
-extern pagetable_t idle_pg_table[ENTRIES_PER_PAGETABLE];
+extern root_pgentry_t idle_pg_table[ROOT_PAGETABLE_ENTRIES];
 
 extern void paging_init(void);
 
@@ -126,7 +133,7 @@ extern void zap_low_mappings(void);
 /* Map physical byte range (@p, @p+@s) at virt address @v in pagetable @pt. */
 extern int
 map_pages(
-    pagetable_t *pt,
+    root_pgentry_t *pt,
     unsigned long v,
     unsigned long p,
     unsigned long s,
