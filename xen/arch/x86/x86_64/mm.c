@@ -495,18 +495,19 @@ long do_update_descriptor(
 
 #ifdef MEMORY_GUARD
 
-#if 1
-
-void *memguard_init(void *heap_start) { return heap_start; }
-void memguard_guard_range(void *p, unsigned long l) {}
-void memguard_unguard_range(void *p, unsigned long l) {}
-
-#else
-
+#define ALLOC_PT(_level) \
+do { \
+    (_level) = (_level ## _pgentry_t *)heap_start; \
+    heap_start = (void *)((unsigned long)heap_start + PAGE_SIZE); \
+    clear_page(_level); \
+} while ( 0 )
 void *memguard_init(void *heap_start)
 {
-    l1_pgentry_t *l1;
-    int i, j;
+    l1_pgentry_t *l1 = NULL;
+    l2_pgentry_t *l2 = NULL;
+    l3_pgentry_t *l3 = NULL;
+    l4_pgentry_t *l4 = &idle_pg_table[l4_table_offset(PAGE_OFFSET)];
+    unsigned long i, j;
 
     /* Round the allocation pointer up to a page boundary. */
     heap_start = (void *)(((unsigned long)heap_start + (PAGE_SIZE-1)) & 
@@ -515,14 +516,22 @@ void *memguard_init(void *heap_start)
     /* Memory guarding is incompatible with super pages. */
     for ( i = 0; i < (xenheap_phys_end >> L2_PAGETABLE_SHIFT); i++ )
     {
-        l1 = (l1_pgentry_t *)heap_start;
-        heap_start = (void *)((unsigned long)heap_start + PAGE_SIZE);
+        ALLOC_PT(l1);
         for ( j = 0; j < ENTRIES_PER_L1_PAGETABLE; j++ )
             l1[j] = mk_l1_pgentry((i << L2_PAGETABLE_SHIFT) |
                                    (j << L1_PAGETABLE_SHIFT) | 
                                   __PAGE_HYPERVISOR);
-        idle_pg_table[i] = idle_pg_table[i + l2_table_offset(PAGE_OFFSET)] =
-            mk_l2_pgentry(virt_to_phys(l1) | __PAGE_HYPERVISOR);
+        if ( !((unsigned long)l2 & (PAGE_SIZE-1)) )
+        {
+            ALLOC_PT(l2);
+            if ( !((unsigned long)l3 & (PAGE_SIZE-1)) )
+            {
+                ALLOC_PT(l3);
+                *l4++ = mk_l4_pgentry(virt_to_phys(l3) | __PAGE_HYPERVISOR);
+            }
+            *l3++ = mk_l3_pgentry(virt_to_phys(l2) | __PAGE_HYPERVISOR);
+        }
+        *l2++ = mk_l2_pgentry(virt_to_phys(l1) | __PAGE_HYPERVISOR);
     }
 
     return heap_start;
@@ -532,6 +541,8 @@ static void __memguard_change_range(void *p, unsigned long l, int guard)
 {
     l1_pgentry_t *l1;
     l2_pgentry_t *l2;
+    l3_pgentry_t *l3;
+    l4_pgentry_t *l4;
     unsigned long _p = (unsigned long)p;
     unsigned long _l = (unsigned long)l;
 
@@ -543,8 +554,10 @@ static void __memguard_change_range(void *p, unsigned long l, int guard)
 
     while ( _l != 0 )
     {
-        l2  = &idle_pg_table[l2_table_offset(_p)];
-        l1  = l2_pgentry_to_l1(*l2) + l1_table_offset(_p);
+        l4 = &idle_pg_table[l4_table_offset(_p)];
+        l3 = l4_pgentry_to_l3(*l4) + l3_table_offset(_p);
+        l2 = l3_pgentry_to_l2(*l3) + l2_table_offset(_p);
+        l1 = l2_pgentry_to_l1(*l2) + l1_table_offset(_p);
         if ( guard )
             *l1 = mk_l1_pgentry(l1_pgentry_val(*l1) & ~_PAGE_PRESENT);
         else
@@ -552,6 +565,12 @@ static void __memguard_change_range(void *p, unsigned long l, int guard)
         _p += PAGE_SIZE;
         _l -= PAGE_SIZE;
     }
+}
+
+void memguard_guard_stack(void *p)
+{
+    p = (void *)((unsigned long)p + PAGE_SIZE);
+    memguard_guard_range(p, 2 * PAGE_SIZE);
 }
 
 void memguard_guard_range(void *p, unsigned long l)
@@ -564,7 +583,5 @@ void memguard_unguard_range(void *p, unsigned long l)
 {
     __memguard_change_range(p, l, 0);
 }
-
-#endif
 
 #endif

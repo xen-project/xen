@@ -169,7 +169,7 @@ ignore_int:
 /*** STACK LOCATION ***/
         
 ENTRY(stack_start)
-        .long SYMBOL_NAME(cpu0_stack) + 8100 - __PAGE_OFFSET
+        .long SYMBOL_NAME(cpu0_stack) + STACK_SIZE - 200 - __PAGE_OFFSET
         .long __HYPERVISOR_DS
         
 /*** DESCRIPTOR TABLES ***/

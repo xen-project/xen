@@ -83,7 +83,15 @@
 
 #ifndef NDEBUG
 #define MEMORY_GUARD
+#ifdef __x86_64__
+#define STACK_ORDER 2
 #endif
+#endif
+
+#ifndef STACK_ORDER
+#define STACK_ORDER 1
+#endif
+#define STACK_SIZE  (PAGE_SIZE << STACK_ORDER)
 
 #ifndef __ASSEMBLY__
 extern unsigned long _end; /* standard ELF symbol */

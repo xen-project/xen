@@ -360,7 +360,7 @@ static void __init start_of_day(void)
 #ifdef MEMORY_GUARD
     /* Unmap the first page of CPU0's stack. */
     extern unsigned long cpu0_stack[];
-    memguard_guard_range(cpu0_stack, PAGE_SIZE);
+    memguard_guard_stack(cpu0_stack);
 #endif
 
     open_softirq(NEW_TLBFLUSH_CLOCK_PERIOD_SOFTIRQ, new_tlbflush_clock_period);

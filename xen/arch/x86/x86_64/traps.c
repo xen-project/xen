@@ -138,6 +138,8 @@ asmlinkage void do_double_fault(struct xen_regs *regs)
     /* Disable the NMI watchdog. It's useless now. */
     watchdog_on = 0;
 
+    console_force_unlock();
+
     /* Find information saved during fault and dump it to the console. */
     printk("************************************\n");
     printk("EIP:    %04lx:[<%p>]      \nEFLAGS: %p\n",

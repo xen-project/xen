@@ -532,6 +532,11 @@ static void __memguard_change_range(void *p, unsigned long l, int guard)
     }
 }
 
+void memguard_guard_stack(void *p)
+{
+    memguard_guard_range(p, PAGE_SIZE);
+}
+
 void memguard_guard_range(void *p, unsigned long l)
 {
     __memguard_change_range(p, l, 1);

@@ -211,7 +211,7 @@ SYMBOL_NAME(idt):
         .quad   SYMBOL_NAME(idt_table)
 
 ENTRY(stack_start)
-        .quad   SYMBOL_NAME(cpu0_stack) + 8000
+        .quad   SYMBOL_NAME(cpu0_stack) + STACK_SIZE - 200
 
 high_start:
         .quad   __high_start

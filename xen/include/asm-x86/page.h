@@ -34,7 +34,11 @@
 #endif
 
 #define PAGE_SHIFT               L1_PAGETABLE_SHIFT
+#ifndef __ASSEMBLY__
 #define PAGE_SIZE	         (1UL << PAGE_SHIFT)
+#else
+#define PAGE_SIZE	         (1 << PAGE_SHIFT)
+#endif
 #define PAGE_MASK	         (~(PAGE_SIZE-1))
 
 #define clear_page(_p)           memset((void *)(_p), 0, PAGE_SIZE)

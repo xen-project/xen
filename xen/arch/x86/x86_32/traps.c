@@ -149,6 +149,8 @@ asmlinkage void do_double_fault(void)
     /* Disable the NMI watchdog. It's useless now. */
     watchdog_on = 0;
 
+    console_force_unlock();
+
     /* Find information saved during fault and dump it to the console. */
     tss = &init_tss[cpu];
     printk("CPU:    %d\nEIP:    %04x:[<%08x>]      \nEFLAGS: %08x\n",

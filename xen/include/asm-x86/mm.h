@@ -250,10 +250,12 @@ void synchronise_pagetables(unsigned long cpu_mask);
 
 #ifdef MEMORY_GUARD
 void *memguard_init(void *heap_start);
+void memguard_guard_stack(void *p);
 void memguard_guard_range(void *p, unsigned long l);
 void memguard_unguard_range(void *p, unsigned long l);
 #else
 #define memguard_init(_s)              (_s)
+#define memguard_guard_stack(_p)       ((void)0)
 #define memguard_guard_range(_p,_l)    ((void)0)
 #define memguard_unguard_range(_p,_l)  ((void)0)
 #endif

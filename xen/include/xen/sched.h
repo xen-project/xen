@@ -3,8 +3,6 @@
 #ifndef __SCHED_H__
 #define __SCHED_H__
 
-#define STACK_SIZE (2*PAGE_SIZE)
-
 #include <xen/config.h>
 #include <xen/types.h>
 #include <xen/spinlock.h>

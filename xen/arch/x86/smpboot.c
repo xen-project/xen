@@ -675,7 +675,7 @@ static void __init do_boot_cpu (int apicid)
     /* So we see what's up. */
     printk("Booting processor %d/%d eip %lx\n", cpu, apicid, start_eip);
 
-    stack = (void *)alloc_xenheap_pages(1);
+    stack = (void *)alloc_xenheap_pages(STACK_ORDER);
 #if defined(__i386__)
     stack_start.esp = __pa(stack) + STACK_SIZE - STACK_RESERVED;
 #elif defined(__x86_64__)
@@ -683,7 +683,7 @@ static void __init do_boot_cpu (int apicid)
 #endif
 
     /* Debug build: detect stack overflow by setting up a guard page. */
-    memguard_guard_range(stack, PAGE_SIZE);
+    memguard_guard_stack(stack);
 
     /*
      * This grunge runs the startup process for
