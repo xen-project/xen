@@ -134,21 +134,7 @@ int xc_evtchn_status(int xc_handle,
     op.u.status.port = port;
    
     if ( (rc = do_evtchn_op(xc_handle, &op)) == 0 )
-    {
-        switch ( status->status = op.u.status.status )
-        {
-        case EVTCHNSTAT_interdomain:
-            status->u.interdomain.dom  = (u16)op.u.status.u.interdomain.dom;
-            status->u.interdomain.port = op.u.status.u.interdomain.port;
-            break;
-        case EVTCHNSTAT_pirq:
-            status->u.pirq = op.u.status.u.pirq;
-            break;
-        case EVTCHNSTAT_virq:
-            status->u.virq = op.u.status.u.virq;
-            break;
-        }
-    }
+        memcpy(status, &op.u.status, sizeof(*status));
     
     return rc;
 }

@@ -16,13 +16,6 @@
 
 #include "xc.h"
 
-/* from xen/include/hypervisor-ifs */
-#include <hypervisor-if.h>
-#include <dom0_ops.h>
-#include <event_channel.h>
-#include <sched_ctl.h>
-#include <io/domain_controller.h>
-
 #include <asm-xen/proc_cmd.h>
 
 
@@ -193,14 +186,7 @@ typedef struct mfn_mapper {
     
 } mfn_mapper_t;
 
-long long  xc_domain_get_cpu_usage( int xc_handle, domid_t domid );
-
 #include "xc_io.h"
-
-int xc_domain_getfullinfo(int xc_handle,
-                          u32 domid,
-                          dom0_op_t *op,
-                          full_execution_context_t *ctxt );
 
 unsigned long xc_get_m2p_start_mfn ( int xc_handle );
 

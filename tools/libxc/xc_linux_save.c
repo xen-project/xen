@@ -319,9 +319,9 @@ static int analysis_phase( int xc_handle, u32 domid,
 }
 
 
-int suspend_and_state( int xc_handle, XcIOContext *ioctxt,		      
-		       dom0_op_t *op,
-		       full_execution_context_t *ctxt )
+int suspend_and_state(int xc_handle, XcIOContext *ioctxt,		      
+                      xc_domaininfo_t *info,
+                      full_execution_context_t *ctxt)
 {
     int i=0;
     
@@ -329,26 +329,26 @@ int suspend_and_state( int xc_handle, XcIOContext *ioctxt,
 
 retry:
 
-    if ( xc_domain_getfullinfo( xc_handle, ioctxt->domain, op, ctxt) )
+    if ( xc_domain_getfullinfo(xc_handle, ioctxt->domain, info, ctxt) )
     {
 	xcio_error(ioctxt, "Could not get full domain info");
 	return -1;
     }
 
-    if ( (op->u.getdomaininfo.flags & 
-	  ( DOMFLAGS_SHUTDOWN | (SHUTDOWN_suspend<<DOMFLAGS_SHUTDOWNSHIFT) ))
-	 == ( DOMFLAGS_SHUTDOWN | (SHUTDOWN_suspend<<DOMFLAGS_SHUTDOWNSHIFT) ))
+    if ( (info->flags & 
+          (DOMFLAGS_SHUTDOWN | (SHUTDOWN_suspend<<DOMFLAGS_SHUTDOWNSHIFT))) ==
+         (DOMFLAGS_SHUTDOWN | (SHUTDOWN_suspend<<DOMFLAGS_SHUTDOWNSHIFT)) )
     {
 	return 0; // success
     }
 
-    if ( op->u.getdomaininfo.flags & DOMFLAGS_PAUSED )
+    if ( info->flags & DOMFLAGS_PAUSED )
     {
 	// try unpausing domain, wait, and retest	
 	xc_domain_unpause( xc_handle, ioctxt->domain );
 
 	xcio_error(ioctxt, "Domain was paused. Wait and re-test. (%lx)",
-		   op->u.getdomaininfo.flags);
+		   info->flags);
 	usleep(10000);  // 10ms
 
 	goto retry;
@@ -358,20 +358,21 @@ retry:
     if( ++i < 100 )
     {
 	xcio_error(ioctxt, "Retry suspend domain (%lx)",
-		   op->u.getdomaininfo.flags);
+		   info->flags);
 	usleep(10000);  // 10ms	
 	goto retry;
     }
 
     xcio_error(ioctxt, "Unable to suspend domain. (%lx)",
-	       op->u.getdomaininfo.flags);
+	       info->flags);
 
     return -1;
 }
 
 int xc_linux_save(int xc_handle, XcIOContext *ioctxt)
 {
-    dom0_op_t op;
+    xc_domaininfo_t info;
+
     int rc = 1, i, j, k, last_iter, iter = 0;
     unsigned long mfn;
     u32 domid = ioctxt->domain;
@@ -441,12 +442,12 @@ int xc_linux_save(int xc_handle, XcIOContext *ioctxt)
         return 1;
     }
 
-    if ( xc_domain_getfullinfo( xc_handle, domid, &op, &ctxt) )
+    if ( xc_domain_getfullinfo( xc_handle, domid, &info, &ctxt) )
     {
         xcio_error(ioctxt, "Could not get full domain info");
         goto out;
     }
-    shared_info_frame = op.u.getdomaininfo.shared_info_frame;
+    shared_info_frame = info.shared_info_frame;
 
     /* A cheesy test to see whether the domain contains valid state. */
     if ( ctxt.pt_base == 0 ){
@@ -454,7 +455,7 @@ int xc_linux_save(int xc_handle, XcIOContext *ioctxt)
         goto out;
     }
     
-    nr_pfns = op.u.getdomaininfo.max_pages; 
+    nr_pfns = info.max_pages; 
 
     /* cheesy sanity check */
     if ( nr_pfns > 1024*1024 ){
@@ -536,10 +537,10 @@ int xc_linux_save(int xc_handle, XcIOContext *ioctxt)
 
         last_iter = 1;
 
-	if ( suspend_and_state( xc_handle, ioctxt, &op, &ctxt) )
+	if ( suspend_and_state( xc_handle, ioctxt, &info, &ctxt) )
 	{
 	    xcio_error(ioctxt, "Domain appears not to have suspended: %lx",
-		       op.u.getdomaininfo.flags);
+		       info.flags);
 	    goto out;
 	}
 
@@ -900,17 +901,17 @@ int xc_linux_save(int xc_handle, XcIOContext *ioctxt)
                 DPRINTF("Start last iteration\n");
                 last_iter = 1;
 
-		if ( suspend_and_state( xc_handle, ioctxt, &op, &ctxt) )
+		if ( suspend_and_state( xc_handle, ioctxt, &info, &ctxt) )
 		{
 		    xcio_error(ioctxt, "Domain appears not to have suspended: %lx",
-			       op.u.getdomaininfo.flags);
+			       info.flags);
 		    goto out;
 		}
 
 		xcio_info(ioctxt,
                           "SUSPEND flags %08lx shinfo %08lx eip %08lx "
-                          "esi %08lx\n", op.u.getdomaininfo.flags,
-                          op.u.getdomaininfo.shared_info_frame,
+                          "esi %08lx\n",info.flags,
+                          info.shared_info_frame,
                           ctxt.cpu_ctxt.eip, ctxt.cpu_ctxt.esi );
             } 
 

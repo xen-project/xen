@@ -120,16 +120,21 @@ int xc_domain_getinfo(int xc_handle,
 
 int xc_domain_getfullinfo(int xc_handle,
                           u32 domid,
-                          dom0_op_t *op,
-                          full_execution_context_t *ctxt )
+                          xc_domaininfo_t *info,
+                          full_execution_context_t *ctxt)
 {
     int rc;
-    op->cmd = DOM0_GETDOMAININFO;
-    op->u.getdomaininfo.domain = (domid_t)domid;
-    op->u.getdomaininfo.ctxt = ctxt;
+    dom0_op_t op;
 
-    rc = do_dom0_op(xc_handle, op);
-    if ( ((u16)op->u.getdomaininfo.domain != domid) && rc > 0 )
+    op.cmd = DOM0_GETDOMAININFO;
+    op.u.getdomaininfo.domain = (domid_t)domid;
+    op.u.getdomaininfo.ctxt = ctxt;
+
+    rc = do_dom0_op(xc_handle, &op);
+
+    memcpy(info, &op.u.getdomaininfo, sizeof(*info));
+
+    if ( ((u16)op.u.getdomaininfo.domain != domid) && rc > 0 )
         return -ESRCH;
     else
         return rc;

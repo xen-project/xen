@@ -5,7 +5,6 @@ include $(XEN_ROOT)/tools/Make.defs
 CC       = gcc
 CFLAGS   = -Wall -Werror -O3
 
-CFLAGS  += -I $(XEN_HYPERVISOR_IFS)
 CFLAGS  += -I $(XEN_LINUX_INCLUDE)
 CFLAGS  += -I $(XEN_XC)
 CFLAGS  += -I $(XEN_LIBXC)

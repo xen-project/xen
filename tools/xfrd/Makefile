@@ -9,9 +9,6 @@ include $(XEN_ROOT)/tools/Make.defs
 
 XFRD_INSTALL_DIR = /usr/sbin
 
-vpath %.h      $(XEN_HYPERVISOR_IFS)
-INCLUDES += -I $(XEN_HYPERVISOR_IFS)
-
 vpath %h       $(XEN_LINUX_INCLUDE)
 INCLUDES += -I $(XEN_LINUX_INCLUDE)
 
