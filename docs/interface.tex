@@ -1,0 +1,62 @@
+\documentclass[11pt,twoside,final,openright]{xenstyle}
+\usepackage{a4,graphicx,setspace}
+\setstretch{1.15}
+\input{style.tex}
+
+\begin{document}
+
+% TITLE PAGE
+\pagestyle{empty}
+\begin{center}
+\vspace*{\fill}
+\includegraphics{eps/xenlogo.eps}
+\vfill
+\vfill
+\vfill
+\begin{tabular}{l}
+{\Huge \bf Interface manual} \\[4mm]
+{\huge Xen v1.1 for x86} \\[80mm]
+{\Large Copyright (c) 2003, The Xen Team} \\[3mm]
+{\Large University of Cambridge, UK} \\[20mm]
+{\large Last updated on 28th October, 2003}
+\end{tabular}
+\vfill
+\end{center}
+\cleardoublepage
+
+% TABLE OF CONTENTS
+\pagestyle{plain}
+\pagenumbering{roman}
+{ \parskip 0pt plus 1pt
+  \tableofcontents }
+\cleardoublepage
+
+% PREPARE FOR MAIN TEXT
+\pagenumbering{arabic}
+\raggedbottom
+\widowpenalty=10000
+\clubpenalty=10000
+\parindent=0pt
+\renewcommand{\topfraction}{.8}
+\renewcommand{\bottomfraction}{.8}
+\renewcommand{\textfraction}{.2}
+\renewcommand{\floatpagefraction}{.8}
+\setstretch{1.15}
+
+\chapter{Introduction}
+
+\chapter{CPU state}
+
+\chapter{Exceptions}
+
+\chapter{Interrupts and events}
+
+\chapter{Time}
+
+\chapter{Memory}
+
+\chapter{I/O}
+
+\chapter{Privileged operations}
+
+\end{document}
