@@ -42,7 +42,12 @@ class XendDomain:
         if xroot.get_rebooted():
             print 'XendDomain> rebooted: removing all domain info'
             self.rm_all()
+        eserver.subscribe('xend.virq', self.onVirq)
         self.initial_refresh()
+
+    def onVirq(self, event, val):
+        print 'XendDomain> virq', val
+        self.reap()
 
     def rm_all(self):
         """Remove all domain info. Used after reboot.
@@ -136,12 +141,32 @@ class XendDomain:
 
     def _delete_domain(self, id, notify=1):
         if id in self.domain:
-            self.domain[id].died()
             if notify: eserver.inject('xend.domain.died', id)
             del self.domain[id]
         if id in self.domain_db:
             del self.domain_db[id]
             self.db.delete(id)
+
+    def reap(self):
+        print 'reap>'
+        domlist = xc.domain_getinfo()
+        casualties = []
+        for d in domlist:
+            print 'dom', d
+            dead = 0
+            dead = dead or (d['crashed'] or d['shutdown'])
+            dead = dead or (d['dying'] and
+                            not(d['running'] or d['paused'] or d['blocked']))
+            if dead:
+                casualties.append(d)
+        for d in casualties:
+            id = str(d['dom'])
+            print 'died> id=', id, d
+            dominfo = self.domain.get(id)
+            if not dominfo: continue
+            dominfo.died()
+            self.domain_destroy(id, refresh=0)
+        print 'reap<'
 
     def refresh(self):
         """Refresh domain list from Xen.
@@ -169,6 +194,7 @@ class XendDomain:
                 d.update(dominfo)
             else:
                 self._delete_domain(d.id)
+        self.reap()
 
     def refresh_domain(self, id):
         dom = int(id)
@@ -232,7 +258,7 @@ class XendDomain:
         self.refresh()
         return val
     
-    def domain_destroy(self, id):
+    def domain_destroy(self, id, refresh=1):
         """Terminate domain immediately.
         """
         dom = int(id)
@@ -240,7 +266,7 @@ class XendDomain:
             return 0
         eserver.inject('xend.domain.destroy', id)
         val = xc.domain_destroy(dom=dom)
-        self.refresh()
+        if refresh: self.refresh()
         return val       
 
     def domain_migrate(self, id, dst):

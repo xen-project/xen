@@ -40,14 +40,14 @@ class SrvDomain(SrvDir):
     def op_save(self, op, req):
         fn = FormFn(self.xd.domain_save,
                     [['dom', 'int'],
-                     ['dst', 'str']])
+                     ['file', 'str']])
         val = fn(req.args, {'dom': self.dom.id})
         return val
 
     def op_restore(self, op, req):
         fn = FormFn(self.xd.domain_restore,
                     [['dom', 'int'],
-                     ['src', 'str']])
+                     ['file', 'str']])
         val = fn(req.args, {'dom': self.dom.id})
         return val
         
