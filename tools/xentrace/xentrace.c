@@ -131,19 +131,16 @@ struct t_buf *map_tbufs(unsigned long tbufs_phys, unsigned int num,
 {
     int dm_fd;                               /* file descriptor for /dev/mem */
     struct t_buf *tbufs_mapped;
-    unsigned int page_size = getpagesize();
-    unsigned int off_in_pg = (tbufs_phys % page_size);
-
-    tbufs_phys -= off_in_pg; /* correct tbufs_phys if not page-aligned */
 
     dm_fd = open("/dev/mem", O_RDONLY);
+
     if ( dm_fd < 0 ) 
     {
         PERROR("Open /dev/mem when mapping trace buffers\n");
         exit(EXIT_FAILURE);
     }
 
-    tbufs_mapped = (struct t_buf *)mmap(NULL, size * num + off_in_pg,
+    tbufs_mapped = (struct t_buf *)mmap(NULL, size * num,
                                         PROT_READ, MAP_SHARED,
                                         dm_fd, (off_t)tbufs_phys);
 
@@ -155,8 +152,7 @@ struct t_buf *map_tbufs(unsigned long tbufs_phys, unsigned int num,
         exit(EXIT_FAILURE);
     }
 
-    /* add offset to get buffers in case original address wasn't pg aligned */
-    return (struct t_buf *)((unsigned long)tbufs_mapped + off_in_pg);
+    return (struct t_buf *)tbufs_mapped;
 }
 
 
