@@ -80,8 +80,13 @@ VM_MASK		= 0x00020000
 #define evtchn_upcall_pending		/* 0 */
 #define evtchn_upcall_mask		1
 
+#define XEN_GET_VCPU_INFO(reg)	movl HYPERVISOR_shared_info,reg
 #define XEN_BLOCK_EVENTS(reg)	movb $1,evtchn_upcall_mask(reg)
 #define XEN_UNBLOCK_EVENTS(reg)	movb $0,evtchn_upcall_mask(reg)
+#define XEN_SAVE_UPCALL_MASK(reg,tmp,off) \
+	movb evtchn_upcall_mask(reg), tmp; \
+	movb tmp, off(%esp)
+
 #define XEN_TEST_PENDING(reg)	testb $0xFF,evtchn_upcall_pending(reg)
 
 #ifdef CONFIG_PREEMPT
@@ -108,9 +113,8 @@ VM_MASK		= 0x00020000
 
 #define SAVE_ALL \
 	SAVE_ALL_NO_EVENTMASK; \
-	movl HYPERVISOR_shared_info, %esi; \
-	movb evtchn_upcall_mask(%esi), %dl; \
-	movb %dl, EVENT_MASK(%esp)
+	XEN_GET_VCPU_INFO(%esi); \
+	XEN_SAVE_UPCALL_MASK(%esi,%dl,EVENT_MASK)
 
 #define RESTORE_INT_REGS \
 	popl %ebx;	\
@@ -194,7 +198,7 @@ ENTRY(ret_from_fork)
 	call schedule_tail
 	GET_THREAD_INFO(%ebp)
 	popl %eax
-	movl HYPERVISOR_shared_info, %esi
+	XEN_GET_VCPU_INFO(%esi)
 	jmp syscall_exit
 
 /*
@@ -215,7 +219,7 @@ ret_from_intr:
 	testl $(VM_MASK | 2), %eax
 	jz resume_kernel		# returning to kernel or vm86-space
 ENTRY(resume_userspace)
-	movl HYPERVISOR_shared_info, %esi
+	XEN_GET_VCPU_INFO(%esi)
 	XEN_BLOCK_EVENTS(%esi)		# make sure we don't miss an interrupt
 					# setting need_resched or sigpending
 					# between sampling and the iret
@@ -227,7 +231,7 @@ ENTRY(resume_userspace)
 
 #ifdef CONFIG_PREEMPT
 ENTRY(resume_kernel)
-	movl HYPERVISOR_shared_info, %esi
+	XEN_GET_VCPU_INFO(%esi)
 	cmpl $0,TI_preempt_count(%ebp)	# non-zero preempt_count ?
 	jnz restore_all
 need_resched:
@@ -468,9 +472,8 @@ error_code:
 	movl $(__USER_DS), %edx
 	movl %edx, %ds
 	movl %edx, %es
-	movl HYPERVISOR_shared_info, %esi
-	movb evtchn_upcall_mask(%esi), %dl
-	movb %dl, EVENT_MASK+8(%esp)
+	XEN_GET_VCPU_INFO(%esi)
+	XEN_SAVE_UPCALL_MASK(%esi,%dl,EVENT_MASK+8)
 	call *%edi
 	addl $8, %esp
 	jmp ret_from_exception
@@ -494,7 +497,7 @@ ENTRY(hypervisor_callback)
 	jb   11f
 	cmpl $ecrit,%eax
 	jb   critical_region_fixup
-11:	movl HYPERVISOR_shared_info, %esi
+11:	XEN_GET_VCPU_INFO(%esi)
 	movb $0, EVENT_MASK(%esp)
 	push %esp
 	call evtchn_do_upcall
@@ -537,7 +540,7 @@ critical_region_fixup:
 	jmp  11b
 
 critical_fixup_table:
-	.byte 0x00,0x00,0x00		# testb $0xff,(%esi)
+	.byte 0x00,0x00,0x00		# testb $0xff,(%esi) = XEN_TEST_PENDING
 	.byte 0x00,0x00			# jnz  14f
 	.byte 0x00			# pop  %ebx
 	.byte 0x04			# pop  %ecx
@@ -748,7 +751,6 @@ ENTRY(page_fault)
 	decl %eax			/* eax = -1 */
 	pushl %ecx
 	pushl %ebx
-	GET_THREAD_INFO(%ebp)
 	cld
 	movl %es,%ecx
 	movl ORIG_EAX(%esp), %esi	/* get the error code */
@@ -762,9 +764,8 @@ ENTRY(page_fault)
 	movl $(__KERNEL_DS),%edx
 	movl %edx,%ds
 	movl %edx,%es
-	movl HYPERVISOR_shared_info, %esi
-	movb evtchn_upcall_mask(%esi), %dl
-	movb %dl, EVENT_MASK+12(%esp)
+	XEN_GET_VCPU_INFO(%esi)
+	XEN_SAVE_UPCALL_MASK(%esi,%dl,EVENT_MASK+12)
 	call do_page_fault
 	addl $12,%esp
 	jmp ret_from_exception
