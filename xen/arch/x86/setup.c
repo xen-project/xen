@@ -1,11 +1,11 @@
 
 #include <xen/config.h>
 #include <xen/init.h>
-#include <xen/interrupt.h>
 #include <xen/lib.h>
 #include <xen/sched.h>
 #include <xen/pci.h>
 #include <xen/serial.h>
+#include <xen/softirq.h>
 #include <xen/acpi.h>
 #include <asm/bitops.h>
 #include <asm/smp.h>

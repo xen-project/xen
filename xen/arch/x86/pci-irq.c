@@ -10,13 +10,10 @@
 #include <xen/pci.h>
 #include <xen/init.h>
 #include <xen/slab.h>
-#include <xen/interrupt.h>
 #include <xen/irq.h>
-
 #include <asm/io.h>
 #include <asm/smp.h>
 #include <asm/io_apic.h>
-
 #include "pci-x86.h"
 
 #define PIRQ_SIGNATURE	(('$' << 0) + ('P' << 8) + ('I' << 16) + ('R' << 24))

@@ -89,7 +89,7 @@ long do_dom0_op(dom0_op_t *u_dom0_op)
             ret = -EINVAL;
             if ( test_bit(DF_CONSTRUCTED, &d->flags) )
             {
-                domain_controller_unpause(d);
+                domain_start(d);
                 ret = 0;
             }
             put_domain(d);
@@ -103,7 +103,7 @@ long do_dom0_op(dom0_op_t *u_dom0_op)
         ret = -ESRCH;
         if ( d != NULL )
         {
-            domain_controller_pause(d);
+            domain_stop(d);
             put_domain(d);
             ret = 0;
         }
@@ -196,14 +196,14 @@ long do_dom0_op(dom0_op_t *u_dom0_op)
             {
                 if ( cpu == -1 )
                 {
-                    p->cpupinned = 0;
+                    clear_bit(DF_CPUPINNED, &p->flags);
                 }
                 else
                 {
                     domain_pause(p);
+                    set_bit(DF_CPUPINNED, &p->flags);
                     cpu = cpu % smp_num_cpus;
                     p->processor = cpu;
-                    p->cpupinned = 1;                    
                     domain_unpause(p);
                 }
                 put_domain(p);
@@ -295,14 +295,18 @@ long do_dom0_op(dom0_op_t *u_dom0_op)
                 op->u.getdomaininfo.flags = DOMSTATE_CRASHED;
             else if ( test_bit(DF_SUSPENDED, &p->flags) )
                 op->u.getdomaininfo.flags = DOMSTATE_SUSPENDED;
-            else if ( test_bit(DF_CONTROLPAUSE, &p->flags) )
+            else if ( test_bit(DF_STOPPED, &p->flags) )
                 op->u.getdomaininfo.flags = DOMSTATE_PAUSED;
             else if ( test_bit(DF_BLOCKED, &p->flags) )
                 op->u.getdomaininfo.flags = DOMSTATE_BLOCKED;
+            else if ( test_bit(DF_RUNNING, &p->flags) )
+            {
+                op->u.getdomaininfo.flags = DOMSTATE_RUNNING;
+                dump_state = 1;
+            }
             else
             {
-                op->u.getdomaininfo.flags = 
-                    p->has_cpu ? DOMSTATE_RUNNING : DOMSTATE_RUNNABLE;
+                op->u.getdomaininfo.flags = DOMSTATE_RUNNABLE;
                 dump_state = 1;
             }
 

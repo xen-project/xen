@@ -19,13 +19,12 @@
 #include <xen/lib.h>
 #include <xen/config.h>
 #include <xen/init.h>
-#include <xen/interrupt.h>
 #include <xen/time.h>
 #include <xen/ac_timer.h>
-
-#include <asm/io.h>
 #include <xen/smp.h>
 #include <xen/irq.h>
+#include <xen/softirq.h>
+#include <asm/io.h>
 #include <asm/msr.h>
 #include <asm/mpspec.h>
 #include <asm/processor.h>
@@ -93,7 +92,7 @@ static void timer_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 
     /* Rough hack to allow accurate timers to sort-of-work with no APIC. */
     if ( do_timer_lists_from_pit )
-        __cpu_raise_softirq(smp_processor_id(), AC_TIMER_SOFTIRQ);
+        raise_softirq(AC_TIMER_SOFTIRQ);
 }
 
 static struct irqaction irq0 = { timer_interrupt, "timer", NULL};

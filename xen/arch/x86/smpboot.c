@@ -34,7 +34,6 @@
 
 #include <xen/config.h>
 #include <xen/init.h>
-#include <xen/interrupt.h>
 #include <xen/irq.h>
 #include <xen/mm.h>
 #include <xen/slab.h>

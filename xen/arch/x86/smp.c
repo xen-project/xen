@@ -305,7 +305,9 @@ void flush_tlb_all_pge(void)
 
 void smp_send_event_check_mask(unsigned long cpu_mask)
 {
-    send_IPI_mask(cpu_mask, EVENT_CHECK_VECTOR);
+    cpu_mask &= ~(1<<smp_processor_id());
+    if ( cpu_mask != 0 )
+        send_IPI_mask(cpu_mask, EVENT_CHECK_VECTOR);
 }
 
 /*

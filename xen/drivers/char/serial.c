@@ -8,14 +8,14 @@
  * Copyright (c) 2003-2004, K A Fraser
  */
 
-#include <asm/io.h>
-#include <xen/sched.h>
-#include <xen/keyhandler.h> 
-#include <xen/reboot.h>
-#include <xen/interrupt.h>
+#include <xen/config.h>
 #include <xen/irq.h>
-#include <xen/serial.h>
+#include <xen/keyhandler.h> 
 #include <asm/pdb.h>
+#include <xen/reboot.h>
+#include <xen/sched.h>
+#include <xen/serial.h>
+#include <asm/io.h>
 
 /* Register offsets */
 #define RBR             0x00    /* receive buffer       */

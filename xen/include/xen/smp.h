@@ -25,7 +25,6 @@ extern void smp_send_stop(void);
 extern void FASTCALL(smp_send_event_check_mask(unsigned long cpu_mask));
 #define smp_send_event_check_cpu(_cpu) smp_send_event_check_mask(1<<(_cpu))
 
-
 /*
  * Boot processor call to load the other CPU's
  */

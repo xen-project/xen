@@ -84,7 +84,8 @@ void do_task_queues(u_char key, void *dev_id, struct pt_regs *regs)
     for_each_domain ( p )
     {
         printk("Xen: DOM %u, CPU %d [has=%c]\n",
-               p->domain, p->processor, p->has_cpu ? 'T':'F'); 
+               p->domain, p->processor, 
+               test_bit(DF_RUNNING, &p->flags) ? 'T':'F'); 
         s = p->shared_info; 
         printk("Guest: upcall_pend = %02x, upcall_mask = %02x\n", 
                s->vcpu_data[0].evtchn_upcall_pending, 

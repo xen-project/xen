@@ -132,7 +132,7 @@
 #include <xen/sched.h>
 #include <xen/errno.h>
 #include <xen/perfc.h>
-#include <xen/interrupt.h>
+#include <xen/irq.h>
 #include <xen/shadow.h>
 #include <asm/page.h>
 #include <asm/flushtlb.h>

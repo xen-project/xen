@@ -18,10 +18,8 @@
 #include <xen/mm.h>
 #include <xen/irq.h>
 #include <xen/delay.h>
-#include <xen/interrupt.h>
 #include <xen/time.h>
 #include <xen/sched.h>
-
 #include <asm/mc146818rtc.h>
 #include <asm/smp.h>
 #include <asm/msr.h>

@@ -5,19 +5,18 @@
 #include <xen/errno.h>
 #include <xen/sched.h>
 #include <xen/mm.h>
-#include <xen/interrupt.h>
 #include <xen/delay.h>
 #include <xen/event.h>
 #include <xen/time.h>
 #include <xen/shadow.h>
-#include <hypervisor-ifs/dom0_ops.h>
+#include <xen/console.h>
+#include <xen/shadow.h>
 #include <asm/io.h>
 #include <asm/domain_page.h>
 #include <asm/flushtlb.h>
 #include <asm/msr.h>
-#include <xen/console.h>
 #include <asm/i387.h>
-#include <xen/shadow.h>
+#include <hypervisor-ifs/dom0_ops.h>
 
 #if defined(__x86_64__)
 #define ELFSIZE 64
@@ -185,7 +184,7 @@ void domain_crash(void)
     struct domain *d;
 
     set_bit(DF_CRASHED, &current->flags);
-    
+
     d = find_domain_by_id(0);
     send_guest_virq(d, VIRQ_DOM_EXC);
     put_domain(d);

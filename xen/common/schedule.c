@@ -22,16 +22,16 @@
 #include <xen/event.h>
 #include <xen/time.h>
 #include <xen/ac_timer.h>
-#include <xen/interrupt.h>
 #include <xen/perfc.h>
 #include <xen/sched-if.h>
-#include <hypervisor-ifs/sched_ctl.h>
+#include <xen/softirq.h>
 #include <xen/trace.h>
+#include <hypervisor-ifs/sched_ctl.h>
 
-/*#define WAKEUP_HISTO*/
+/*#define WAKE_HISTO*/
 /*#define BLOCKTIME_HISTO*/
 
-#if defined(WAKEUP_HISTO)
+#if defined(WAKE_HISTO)
 #define BUCKETS 31
 #elif defined(BLOCKTIME_HISTO)
 #define BUCKETS 200
@@ -100,83 +100,104 @@ static struct ac_timer fallback_timer[NR_CPUS];
 
 extern kmem_cache_t *domain_struct_cachep;
 
-void free_domain_struct(struct domain *p)
+void free_domain_struct(struct domain *d)
 {
-    SCHED_OP(free_task, p);
-    kmem_cache_free(domain_struct_cachep, p);
+    SCHED_OP(free_task, d);
+    kmem_cache_free(domain_struct_cachep, d);
 }
 
 struct domain *alloc_domain_struct(void)
 {
-    struct domain *p;
+    struct domain *d;
 
-    if ( (p = kmem_cache_alloc(domain_struct_cachep,GFP_KERNEL)) == NULL )
+    if ( (d = kmem_cache_alloc(domain_struct_cachep,GFP_KERNEL)) == NULL )
         return NULL;
     
-    memset(p, 0, sizeof(*p));
+    memset(d, 0, sizeof(*d));
 
-    if ( SCHED_OP(alloc_task, p) < 0 )
+    if ( SCHED_OP(alloc_task, d) < 0 )
     {
-        kmem_cache_free(domain_struct_cachep,p);
+        kmem_cache_free(domain_struct_cachep, d);
         return NULL;
     }
 
-    return p;
+    return d;
 }
 
 /*
  * Add and remove a domain
  */
-void sched_add_domain(struct domain *p) 
+void sched_add_domain(struct domain *d) 
 {
-    domain_controller_pause(p);
+    set_bit(DF_STOPPED, &d->flags);
 
-    if ( p->domain != IDLE_DOMAIN_ID )
+    if ( d->domain != IDLE_DOMAIN_ID )
     {
         /* Initialise the per-domain timer. */
-        init_ac_timer(&p->timer);
-        p->timer.cpu      =  p->processor;
-        p->timer.data     = (unsigned long)p;
-        p->timer.function = &dom_timer_fn;
+        init_ac_timer(&d->timer);
+        d->timer.cpu      = d->processor;
+        d->timer.data     = (unsigned long)d;
+        d->timer.function = &dom_timer_fn;
     }
     else
     {
-        schedule_data[p->processor].idle = p;
+        schedule_data[d->processor].idle = d;
     }
 
-    SCHED_OP(add_task, p);
+    SCHED_OP(add_task, d);
 
-    TRACE_3D(TRC_SCHED_DOM_ADD, _HIGH32(p->domain), _LOW32(p->domain), p);
+    TRACE_3D(TRC_SCHED_DOM_ADD, _HIGH32(d->domain), _LOW32(d->domain), d);
 }
 
-void sched_rem_domain(struct domain *p) 
+void sched_rem_domain(struct domain *d) 
 {
-    rem_ac_timer(&p->timer);
-    SCHED_OP(rem_task, p);
-    TRACE_3D(TRC_SCHED_DOM_REM, _HIGH32(p->domain), _LOW32(p->domain), p);
+    rem_ac_timer(&d->timer);
+    SCHED_OP(rem_task, d);
+    TRACE_3D(TRC_SCHED_DOM_REM, _HIGH32(d->domain), _LOW32(d->domain), d);
 }
 
 void init_idle_task(void)
 {
     unsigned long flags;
-    struct domain *p = current;
+    struct domain *d = current;
 
-    if ( SCHED_OP(alloc_task, p) < 0)
+    if ( SCHED_OP(alloc_task, d) < 0)
         panic("Failed to allocate scheduler private data for idle task");
-    SCHED_OP(add_task, p);
+    SCHED_OP(add_task, d);
 
-    spin_lock_irqsave(&schedule_lock[p->processor], flags);
-    p->has_cpu = 1;
-    if ( !__task_on_runqueue(p) )
-        __add_to_runqueue_head(p);
-    spin_unlock_irqrestore(&schedule_lock[p->processor], flags);
+    spin_lock_irqsave(&schedule_lock[d->processor], flags);
+    set_bit(DF_RUNNING, &d->flags);
+    if ( !__task_on_runqueue(d) )
+        __add_to_runqueue_head(d);
+    spin_unlock_irqrestore(&schedule_lock[d->processor], flags);
 }
 
-/* Returns TRUE if the domain was actually woken up. */
-int domain_wakeup(struct domain *d)
+void domain_sleep(struct domain *d)
+{
+    unsigned long flags;
+    int           cpu = d->processor;
+
+    spin_lock_irqsave(&schedule_lock[cpu], flags);
+
+    if ( test_bit(DF_RUNNING, &d->flags) )
+        cpu_raise_softirq(cpu, SCHEDULE_SOFTIRQ);
+    else if ( __task_on_runqueue(d) )
+        __del_from_runqueue(d);
+
+    spin_unlock_irqrestore(&schedule_lock[cpu], flags);
+
+    /* Synchronous. */
+    while ( test_bit(DF_RUNNING, &d->flags) )
+    {
+        smp_mb();
+        cpu_relax();
+    }
+}
+
+void domain_wake(struct domain *d)
 {
     unsigned long       flags;
-    int                 cpu = d->processor, woken_up = 0;
+    int                 cpu = d->processor;
     struct domain      *curr;
     s_time_t            now, min_time;
 
@@ -184,16 +205,11 @@ int domain_wakeup(struct domain *d)
 
     if ( likely(domain_runnable(d)) && likely(!__task_on_runqueue(d)) )
     {
-        woken_up = 1;
-
         TRACE_3D(TRC_SCHED_WAKE, _HIGH32(d->domain), _LOW32(d->domain), d);
         SCHED_OP(wake_up, d);
-#ifdef WAKEUP_HISTO
+#ifdef WAKE_HISTO
         p->wokenup = NOW();
 #endif
-
-        ASSERT(__task_on_runqueue(d));
-        ASSERT(!d->has_cpu);
 
         now = NOW();
         curr = schedule_data[cpu].curr;
@@ -208,33 +224,7 @@ int domain_wakeup(struct domain *d)
     }
 
     spin_unlock_irqrestore(&schedule_lock[cpu], flags);
-
-    return woken_up;
 }
-
-
-void __domain_pause(struct domain *d)
-{
-    unsigned long flags;
-    int           cpu = d->processor;
-
-    spin_lock_irqsave(&schedule_lock[cpu], flags);
-
-    if ( d->has_cpu )
-        cpu_raise_softirq(cpu, SCHEDULE_SOFTIRQ);
-    else if ( __task_on_runqueue(d) )
-        __del_from_runqueue(d);
-
-    spin_unlock_irqrestore(&schedule_lock[cpu], flags);
-
-    /* Synchronous. */
-    while ( d->has_cpu )
-    {
-        smp_mb();
-        cpu_relax();
-    }
-}
-
 
 /* Block the currently-executing domain until a pertinent event occurs. */
 long do_block(void)
@@ -247,9 +237,7 @@ long do_block(void)
     return 0;
 }
 
-/*
- * Voluntarily yield the processor for this allocation.
- */
+/* Voluntarily yield the processor for this allocation. */
 static long do_yield(void)
 {
     TRACE_2D(TRC_SCHED_YIELD, current->domain, current);
@@ -394,9 +382,6 @@ void __enter_scheduler(void)
     r_time = next_slice.time;
     next = next_slice.task;
 
-    prev->has_cpu = 0;
-    next->has_cpu = 1;
-
     schedule_data[cpu].curr = next;
 
     next->lastschd = now;
@@ -416,7 +401,7 @@ void __enter_scheduler(void)
     
     perfc_incrc(sched_ctx);
 
-#if defined(WAKEUP_HISTO)
+#if defined(WAKE_HISTO)
     if ( !is_idle_task(next) && next->wokenup ) {
         ulong diff = (ulong)(now - next->wokenup);
         diff /= (ulong)MILLISECS(1);
@@ -437,7 +422,16 @@ void __enter_scheduler(void)
     TRACE_2D(TRC_SCHED_SWITCH, next->domain, next);
 
     switch_to(prev, next);
-    
+
+    /*
+     * We do this late on because it doesn't need to be protected by the
+     * schedule_lock, and because we want this to be the very last use of
+     * 'prev' (after this point, a dying domain's info structure may be freed
+     * without warning). 
+     */
+    clear_bit(DF_RUNNING, &prev->flags);
+    set_bit(DF_RUNNING, &next->flags);
+
     /* Mark a timer event for the newly-scheduled domain. */
     if ( !is_idle_task(next) )
         send_guest_virq(next, VIRQ_TIMER);
@@ -578,56 +572,61 @@ static void dump_rqueue(struct list_head *queue, char *name)
 {
     struct list_head *list;
     int loop = 0;
-    struct domain  *p;
+    struct domain *d;
 
-    printk ("QUEUE %s %lx   n: %lx, p: %lx\n", name,  (unsigned long)queue,
-            (unsigned long) queue->next, (unsigned long) queue->prev);
-    list_for_each (list, queue) {
-        p = list_entry(list, struct domain, run_list);
-        printk("%3d: %u has=%c ", loop++, p->domain, p->has_cpu ? 'T':'F');
-        SCHED_OP(dump_runq_el, p);
-        printk("c=0x%X%08X\n", (u32)(p->cpu_time>>32), (u32)p->cpu_time);
+    printk("QUEUE %s %lx   n: %lx, p: %lx\n", name,  (unsigned long)queue,
+           (unsigned long) queue->next, (unsigned long) queue->prev);
+
+    list_for_each ( list, queue )
+    {
+        d = list_entry(list, struct domain, run_list);
+        printk("%3d: %u has=%c ", loop++, d->domain, 
+               test_bit(DF_RUNNING, &d->flags) ? 'T':'F');
+        SCHED_OP(dump_runq_el, d);
+        printk("c=0x%X%08X\n", (u32)(d->cpu_time>>32), (u32)d->cpu_time);
         printk("         l: %lx n: %lx  p: %lx\n",
                (unsigned long)list, (unsigned long)list->next,
                (unsigned long)list->prev);
     }
-    return; 
 }
 
 void dump_runq(u_char key, void *dev_id, struct pt_regs *regs)
 {
-    u_long   flags; 
-    s_time_t now = NOW();
-    int i;
+    unsigned long flags; 
+    s_time_t      now = NOW();
+    int           i;
 
     printk("Scheduler: %s (%s)\n", ops.name, ops.opt_name);
     SCHED_OP(dump_settings);
     printk("NOW=0x%08X%08X\n",  (u32)(now>>32), (u32)now); 
-    for (i = 0; i < smp_num_cpus; i++) {
+    for ( i = 0; i < smp_num_cpus; i++ )
+    {
         spin_lock_irqsave(&schedule_lock[i], flags);
         printk("CPU[%02d] ", i);
         SCHED_OP(dump_cpu_state,i);
         dump_rqueue(&schedule_data[i].runqueue, "rq"); 
         spin_unlock_irqrestore(&schedule_lock[i], flags);
     }
-    return; 
 }
 
-#if defined(WAKEUP_HISTO) || defined(BLOCKTIME_HISTO)
+#if defined(WAKE_HISTO) || defined(BLOCKTIME_HISTO)
 void print_sched_histo(u_char key, void *dev_id, struct pt_regs *regs)
 {
-    int loop, i, j;
-    for (loop = 0; loop < smp_num_cpus; loop++) {
+    int i, j, k;
+    for ( k = 0; k < smp_num_cpus; k++ )
+    {
         j = 0;
-        printf ("CPU[%02d]: scheduler latency histogram (ms:[count])\n", loop);
-        for (i=0; i<BUCKETS; i++) {
-            if (schedule_data[loop].hist[i]) {
-                if (i < BUCKETS-1)
-                    printk("%2d:[%7u]    ", i, schedule_data[loop].hist[i]);
+        printf ("CPU[%02d]: scheduler latency histogram (ms:[count])\n", k);
+        for ( i = 0; i < BUCKETS; i++ )
+        {
+            if ( schedule_data[k].hist[i] != 0 )
+            {
+                if ( i < BUCKETS-1 )
+                    printk("%2d:[%7u]    ", i, schedule_data[k].hist[i]);
                 else
-                    printk(" >:[%7u]    ", schedule_data[loop].hist[i]);
-                j++;
-                if (!(j % 5)) printk("\n");
+                    printk(" >:[%7u]    ", schedule_data[k].hist[i]);
+                if ( !(++j % 5) )
+                    printk("\n");
             }
         }
         printk("\n");
@@ -636,10 +635,10 @@ void print_sched_histo(u_char key, void *dev_id, struct pt_regs *regs)
 }
 void reset_sched_histo(u_char key, void *dev_id, struct pt_regs *regs)
 {
-    int loop, i;
-    for (loop = 0; loop < smp_num_cpus; loop++)
-        for (i=0; i<BUCKETS; i++) 
-            schedule_data[loop].hist[i]=0;
+    int i, j;
+    for ( j = 0; j < smp_num_cpus; j++ )
+        for ( i=0; i < BUCKETS; i++ ) 
+            schedule_data[j].hist[i] = 0;
 }
 #else
 void print_sched_histo(u_char key, void *dev_id, struct pt_regs *regs)

@@ -16,7 +16,6 @@
 #include <xen/sched.h>
 #include <xen/mm.h>
 #include <xen/delay.h>
-#include <xen/interrupt.h>
 #include <xen/compile.h>
 #include <xen/console.h>
 #include <xen/serial.h>
@@ -287,8 +286,8 @@ void cmain(unsigned long magic, multiboot_info_t *mbi)
 
     init_trace_bufs();
 
-    domain_controller_unpause(current);
-    domain_controller_unpause(new_dom);
+    domain_start(current);
+    domain_start(new_dom);
     startup_cpu_idle_loop();
 }
 

@@ -29,7 +29,6 @@
 
 #include <xen/config.h>
 #include <xen/init.h>
-#include <xen/interrupt.h>
 #include <xen/sched.h>
 #include <xen/lib.h>
 #include <xen/errno.h>

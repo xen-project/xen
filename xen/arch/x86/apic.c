@@ -14,24 +14,24 @@
 
 
 #include <xen/config.h>
+#include <xen/ac_timer.h>
+#include <xen/perfc.h>
+#include <xen/errno.h>
 #include <xen/init.h>
+#include <xen/mm.h>
 #include <xen/sched.h>
 #include <xen/irq.h>
 #include <xen/delay.h>
+#include <xen/smp.h>
+#include <xen/softirq.h>
 #include <asm/mc146818rtc.h>
 #include <asm/msr.h>
-#include <xen/errno.h>
 #include <asm/atomic.h>
-#include <xen/smp.h>
-#include <xen/interrupt.h>
 #include <asm/mpspec.h>
 #include <asm/flushtlb.h>
 #include <asm/hardirq.h>
 #include <asm/apic.h>
-#include <xen/mm.h>
 #include <asm/io_apic.h>
-#include <xen/ac_timer.h>
-#include <xen/perfc.h>
 
 
 /* Using APIC to generate smp_local_timer_interrupt? */
@@ -726,14 +726,12 @@ unsigned int apic_timer_irqs [NR_CPUS];
 
 void smp_apic_timer_interrupt(struct pt_regs * regs)
 {
-    int cpu = smp_processor_id();
-
     ack_APIC_irq();
 
-    apic_timer_irqs[cpu]++;
+    apic_timer_irqs[smp_processor_id()]++;
     perfc_incrc(apic_timer);
 
-    __cpu_raise_softirq(cpu, AC_TIMER_SOFTIRQ);
+    raise_softirq(AC_TIMER_SOFTIRQ);
 }
 
 /*

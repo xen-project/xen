@@ -49,11 +49,11 @@ void pdb_do_debug (dom0_op_t *op)
     {
         case 'c' :
 	{
-	    struct domain *p = find_domain_by_id(op->u.debug.domain);
-	    if ( p != NULL )
+	    struct domain *d = find_domain_by_id(op->u.debug.domain);
+	    if ( d != NULL )
 	    {
-                domain_controller_unpause(p);
-		put_domain(p);
+                domain_start(d);
+		put_domain(d);
 	    }
 	    else
 	    {
@@ -66,13 +66,13 @@ void pdb_do_debug (dom0_op_t *op)
             int loop;
             u_char x;
 	    unsigned long cr3;
-	    struct domain *p;
+	    struct domain *d;
 
-	    p = find_domain_by_id(op->u.debug.domain);
-	    if (p->mm.shadow_mode)
-	      cr3 = pagetable_val(p->mm.shadow_table);
+	    d = find_domain_by_id(op->u.debug.domain);
+	    if ( d->mm.shadow_mode )
+	      cr3 = pagetable_val(d->mm.shadow_table);
 	    else
-	      cr3 = pagetable_val(p->mm.pagetable);
+	      cr3 = pagetable_val(d->mm.pagetable);
 
             for (loop = 0; loop < op->u.debug.in2; loop++)         /* length */
             { 
@@ -85,17 +85,17 @@ void pdb_do_debug (dom0_op_t *op)
                 printk (" %02x", x);
             }
             printk ("\n");
-	    put_domain(p);
+	    put_domain(d);
             break;
         }
         case 's' :
 	{
-	    struct domain * p = find_domain_by_id(op->u.debug.domain);
+	    struct domain *d = find_domain_by_id(op->u.debug.domain);
 
-	    if (p != NULL)
+	    if ( d != NULL )
 	    {
-                domain_controller_pause(p);
-		put_domain(p);
+                domain_stop(d);
+		put_domain(d);
 	    }
 	    else
 	    {
@@ -109,5 +109,4 @@ void pdb_do_debug (dom0_op_t *op)
 		   op->u.debug.opcode, op->u.debug.opcode);
 	}
     }
-    return;
 }

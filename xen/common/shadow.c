@@ -331,18 +331,18 @@ void shadow_mode_disable( struct domain *p )
     kfree( &m->shadow_ht[0] );
 }
 
-static int shadow_mode_table_op( struct domain *p, 
-								 dom0_shadow_control_t *sc )
+static int shadow_mode_table_op(struct domain *d, 
+							    dom0_shadow_control_t *sc)
 {
     unsigned int op = sc->op;
-    struct mm_struct *m = &p->mm;
+    struct mm_struct *m = &d->mm;
     int rc = 0;
 
     // since Dom0 did the hypercall, we should be running with it's page
     // tables right now. Calling flush on yourself would be really
     // stupid.
 
-    ASSERT(spin_is_locked(&p->mm.shadow_lock));
+    ASSERT(spin_is_locked(&d->mm.shadow_lock));
 
     if ( m == &current->mm )
     {
@@ -380,44 +380,44 @@ static int shadow_mode_table_op( struct domain *p,
 		
 	send_bitmap:
 
-		if( p->tot_pages > sc->pages || 
-			!sc->dirty_bitmap || !p->mm.shadow_dirty_bitmap )
+		if( d->tot_pages > sc->pages || 
+			!sc->dirty_bitmap || !d->mm.shadow_dirty_bitmap )
 		{
 			rc = -EINVAL;
 			goto out;
 		}
 
-		sc->fault_count = p->mm.shadow_fault_count;
-		sc->dirty_count = p->mm.shadow_dirty_count;
-		p->mm.shadow_fault_count = 0;
-		p->mm.shadow_dirty_count = 0;
+		sc->fault_count = d->mm.shadow_fault_count;
+		sc->dirty_count = d->mm.shadow_dirty_count;
+		d->mm.shadow_fault_count = 0;
+		d->mm.shadow_dirty_count = 0;
 	
-		sc->pages = p->tot_pages;
+		sc->pages = d->tot_pages;
 	
 #define chunk (8*1024) // do this in 1KB chunks for L1 cache
 	
-		for(i=0;i<p->tot_pages;i+=chunk)
+		for(i=0;i<d->tot_pages;i+=chunk)
 		{
-			int bytes = ((  ((p->tot_pages-i) > (chunk))?
-							(chunk):(p->tot_pages-i) ) + 7) / 8;
+			int bytes = ((  ((d->tot_pages-i) > (chunk))?
+							(chunk):(d->tot_pages-i) ) + 7) / 8;
 	    
 			copy_to_user( sc->dirty_bitmap + (i/(8*sizeof(unsigned long))),
-						  p->mm.shadow_dirty_bitmap +(i/(8*sizeof(unsigned long))),
+						  d->mm.shadow_dirty_bitmap +(i/(8*sizeof(unsigned long))),
 						  bytes );
 	    
 			for(j=0; zero && j<bytes/sizeof(unsigned long);j++)
 			{
-				if( p->mm.shadow_dirty_bitmap[j] != 0 )
+				if( d->mm.shadow_dirty_bitmap[j] != 0 )
 					zero = 0;
 			}
 
-			memset( p->mm.shadow_dirty_bitmap +(i/(8*sizeof(unsigned long))),
+			memset( d->mm.shadow_dirty_bitmap +(i/(8*sizeof(unsigned long))),
 					0, bytes);
 		}
 
         /* Might as well stop the domain as an optimization. */
 		if ( zero )
-            domain_controller_pause(p);
+            domain_stop(d);
 
 		break;
     }
@@ -426,24 +426,24 @@ static int shadow_mode_table_op( struct domain *p,
     {
 		int i;
 	
-		if( p->tot_pages > sc->pages || 
-			!sc->dirty_bitmap || !p->mm.shadow_dirty_bitmap )
+		if( d->tot_pages > sc->pages || 
+			!sc->dirty_bitmap || !d->mm.shadow_dirty_bitmap )
 		{
 			rc = -EINVAL;
 			goto out;
 		}
 	
-		sc->pages = p->tot_pages;
+		sc->pages = d->tot_pages;
 	
 #define chunk (8*1024) // do this in 1KB chunks for L1 cache
 	
-		for(i=0;i<p->tot_pages;i+=chunk)
+		for(i=0;i<d->tot_pages;i+=chunk)
 		{
-			int bytes = ((  ((p->tot_pages-i) > (chunk))?
-							(chunk):(p->tot_pages-i) ) + 7) / 8;
+			int bytes = ((  ((d->tot_pages-i) > (chunk))?
+							(chunk):(d->tot_pages-i) ) + 7) / 8;
 	    
 			copy_to_user( sc->dirty_bitmap + (i/(8*sizeof(unsigned long))),
-						  p->mm.shadow_dirty_bitmap +(i/(8*sizeof(unsigned long))),
+						  d->mm.shadow_dirty_bitmap +(i/(8*sizeof(unsigned long))),
 						  bytes );	    
 		}
 

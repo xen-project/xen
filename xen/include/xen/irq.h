@@ -4,6 +4,14 @@
 #include <xen/config.h>
 #include <xen/spinlock.h>
 #include <asm/ptrace.h>
+#include <asm/hardirq.h>
+
+struct irqaction
+{
+    void (*handler)(int, void *, struct pt_regs *);
+    const char *name;
+    void *dev_id;
+};
 
 /*
  * IRQ line status.

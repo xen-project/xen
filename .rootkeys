@@ -465,7 +465,6 @@
 3ddb79c0HIghfBF8zFUdmXhOU8i6hA xen/include/xen/errno.h
 3ddb79c1W0lQca8gRV7sN6j3iY4Luw xen/include/xen/event.h
 3ddb79c0GurNF9tDWqQbAwJFH8ugfA xen/include/xen/init.h
-3ddb79c1Vi5VleJAOKHAlY0G2zAsgw xen/include/xen/interrupt.h
 3ddb79c1nzaWu8NoF4xCCMSFJR4MlA xen/include/xen/ioport.h
 3ddb79c2qAxCOABlkKtD8Txohe-qEw xen/include/xen/irq.h
 3ddb79c2b3qe-6Ann09FqZBF4IrJaQ xen/include/xen/irq_cpustat.h
@@ -487,6 +486,7 @@
 405b8599BsDsDwKEJLS0XipaiQW3TA xen/include/xen/shadow.h
 3ddb79c14dXIhP7C2ahnoD08K90G_w xen/include/xen/slab.h
 3ddb79c09xbS-xxfKxuV3JETIhBzmg xen/include/xen/smp.h
+3ddb79c1Vi5VleJAOKHAlY0G2zAsgw xen/include/xen/softirq.h
 3ddb79c2iIcESrDAB8samy_yAh6olQ xen/include/xen/spinlock.h
 3e7f358aMtFMUVvN_Zjg5qvEJIqEBA xen/include/xen/string.h
 3ddb79c0BnA20PbgmuMPSGIBljNRQw xen/include/xen/time.h

@@ -17,11 +17,10 @@
 #include <xen/errno.h>
 #include <xen/sched.h>
 #include <xen/smp.h>
-#include <asm/ptrace.h>
 #include <xen/delay.h>
-#include <xen/interrupt.h>
+#include <xen/softirq.h>
+#include <asm/ptrace.h>
 #include <asm/mc146818rtc.h>
-
 #include <asm/system.h>
 #include <asm/io.h>
 #include <asm/processor.h>
@@ -77,7 +76,7 @@ void startup_cpu_idle_loop(void)
 {
     /* Just some sanity to ensure that the scheduler is set up okay. */
     ASSERT(current->domain == IDLE_DOMAIN_ID);
-    domain_controller_unpause(current);
+    domain_start(current);
     __enter_scheduler();
 
     /*

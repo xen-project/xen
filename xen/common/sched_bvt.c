@@ -22,7 +22,6 @@
 #include <xen/event.h>
 #include <xen/time.h>
 #include <xen/ac_timer.h>
-#include <xen/interrupt.h>
 #include <xen/perfc.h>
 #include <xen/sched-if.h>
 #include <xen/slab.h>

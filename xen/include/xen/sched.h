@@ -1,5 +1,5 @@
-#ifndef _LINUX_SCHED_H
-#define _LINUX_SCHED_H
+#ifndef __SCHED_H__
+#define __SCHED_H__
 
 #include <xen/config.h>
 #include <xen/types.h>
@@ -46,8 +46,8 @@ typedef struct event_channel_st
     } u;
 } event_channel_t;
 
-int  init_event_channels(struct domain *p);
-void destroy_event_channels(struct domain *p);
+int  init_event_channels(struct domain *d);
+void destroy_event_channels(struct domain *d);
 
 struct domain 
 {
@@ -85,7 +85,9 @@ struct domain
      * From here on things can be added and shuffled without special attention
      */
 
-    domid_t domain;
+    domid_t  domain;
+    char     name[MAX_DOMAIN_NAME];
+    s_time_t create_time;
 
     spinlock_t       page_list_lock;
     struct list_head page_list;
@@ -94,25 +96,18 @@ struct domain
 
     /* Scheduling. */
     struct list_head run_list;
-    int              has_cpu;
     int              stop_code;     /* stop code from OS (if DF_STOPPED). */
-    int              cpupinned;     /* true if pinned to curent CPU */
     s_time_t         lastschd;      /* time this domain was last scheduled */
     s_time_t         lastdeschd;    /* time this domain was last descheduled */
     s_time_t         cpu_time;      /* total CPU time received till now */
     s_time_t         wokenup;       /* time domain got woken up */
     struct ac_timer  timer;         /* one-shot timer for timeout values */
-
     s_time_t         min_slice;     /* minimum time before reschedule */
-
-    void *sched_priv;               /* scheduler-specific data */
+    void            *sched_priv;    /* scheduler-specific data */
 
     struct mm_struct mm;
 
     mm_segment_t addr_limit;
-
-    char name[MAX_DOMAIN_NAME];
-    s_time_t create_time;
 
     struct thread_struct thread;
     struct domain *next_list, *next_hash;
@@ -156,7 +151,6 @@ struct domain
 {                                \
     processor:   0,              \
     domain:      IDLE_DOMAIN_ID, \
-    has_cpu:     0,              \
     mm:          IDLE0_MM,       \
     addr_limit:  KERNEL_DS,      \
     thread:      INIT_THREAD,    \
@@ -172,7 +166,7 @@ extern struct domain *idle_task[NR_CPUS];
 
 #include <xen/slab.h>
 
-void free_domain_struct(struct domain *p);
+void free_domain_struct(struct domain *d);
 struct domain *alloc_domain_struct();
 
 #define DOMAIN_DESTRUCTED (1<<31) /* assumes atomic_t is >= 32 bits */
@@ -186,13 +180,13 @@ static inline int get_domain(struct domain *d)
   
 extern struct domain *do_createdomain(
     domid_t dom_id, unsigned int cpu);
-extern int construct_dom0(struct domain *p, 
+extern int construct_dom0(struct domain *d, 
                           unsigned long alloc_start,
                           unsigned long alloc_end,
                           char *image_start, unsigned long image_len, 
                           char *initrd_start, unsigned long initrd_len,
                           char *cmdline);
-extern int final_setup_guestos(struct domain *p, dom0_builddomain_t *);
+extern int final_setup_guestos(struct domain *d, dom0_builddomain_t *);
 
 struct domain *find_domain_by_id(domid_t dom);
 struct domain *find_last_domain(void);
@@ -202,7 +196,7 @@ extern void domain_crash(void);
 extern void domain_suspend(u8 reason);
 
 /* arch/process.c */
-void new_thread(struct domain *p,
+void new_thread(struct domain *d,
                 unsigned long start_pc,
                 unsigned long start_stack,
                 unsigned long start_info);
@@ -218,14 +212,14 @@ extern spinlock_t schedule_lock[NR_CPUS] __cacheline_aligned;
 #define set_current_state(_s) do { current->state = (_s); } while (0)
 void scheduler_init(void);
 void schedulers_start(void);
-void sched_add_domain(struct domain *p);
-void sched_rem_domain(struct domain *p);
+void sched_add_domain(struct domain *d);
+void sched_rem_domain(struct domain *d);
 long sched_ctl(struct sched_ctl_cmd *);
 long sched_adjdom(struct sched_adjdom_cmd *);
 int  sched_id();
 void init_idle_task(void);
-int domain_wakeup(struct domain *p);
-void __domain_pause(struct domain *p);
+void domain_wake(struct domain *d);
+void domain_sleep(struct domain *d);
 
 void __enter_scheduler(void);
 
@@ -259,61 +253,65 @@ extern struct domain *task_list;
 #define DF_PRIVILEGED   5 /* Is this domain privileged?                     */
 #define DF_CONSOLEWRITEBUG 6 /* Has this domain used the obsolete console?  */
 #define DF_PHYSDEV      7 /* May this domain do IO to physical devices?     */
-
 #define DF_BLOCKED      8 /* Domain is blocked waiting for an event.        */
-#define DF_CONTROLPAUSE 9 /* Domain is paused by control software.          */
+#define DF_STOPPED      9 /* Domain is stopped by control software.          */
 #define DF_SUSPENDED   10 /* Guest suspended its execution for some reason. */
 #define DF_CRASHED     11 /* Domain crashed inside Xen, cannot continue.    */
 #define DF_DYING       12 /* Death rattle.                                  */
+#define DF_RUNNING     13 /* Currently running on a CPU.                    */
+#define DF_CPUPINNED   14 /* Disables auto-migration.                       */
 
-static inline int domain_runnable(struct domain *p)
+static inline int domain_runnable(struct domain *d)
 {
-    return ( (atomic_read(&p->pausecnt) == 0) &&
-             !(p->flags & ((1<<DF_BLOCKED)|(1<<DF_CONTROLPAUSE)|
-                           (1<<DF_SUSPENDED)|(1<<DF_CRASHED)|(1<<DF_DYING))) );
-}
-
-/* Returns TRUE if the domain was actually unblocked and woken. */
-static inline int domain_unblock(struct domain *d)
-{
-    if ( test_and_clear_bit(DF_BLOCKED, &d->flags) )
-        return domain_wakeup(d);
-    return 0;
-}
-
-static inline void domain_unsuspend(struct domain *d)
-{
-    if ( test_and_clear_bit(DF_SUSPENDED, &d->flags) )
-        (void)domain_wakeup(d);
-}
-
-static inline void domain_controller_pause(struct domain *d)
-{
-    if ( !test_and_set_bit(DF_CONTROLPAUSE, &d->flags) )
-        __domain_pause(d);
-}
-
-static inline void domain_controller_unpause(struct domain *d)
-{
-    if ( test_and_clear_bit(DF_CONTROLPAUSE, &d->flags) )
-        (void)domain_wakeup(d);
+    return ( (atomic_read(&d->pausecnt) == 0) &&
+             !(d->flags & ((1<<DF_BLOCKED)|(1<<DF_STOPPED)|
+                           (1<<DF_SUSPENDED)|(1<<DF_CRASHED))) );
 }
 
 static inline void domain_pause(struct domain *d)
 {
-    if ( d == current ) BUG();
+    ASSERT(d != current);
     atomic_inc(&d->pausecnt);
-    __domain_pause(d);
+    domain_sleep(d);
 }
 
 static inline void domain_unpause(struct domain *d)
 {
+    ASSERT(d != current);
     if ( atomic_dec_and_test(&d->pausecnt) )
-        (void)domain_wakeup(d);
+        domain_wake(d);
+}
+
+static inline void domain_unblock(struct domain *d)
+{
+    ASSERT(d != current);
+    if ( test_and_clear_bit(DF_BLOCKED, &d->flags) )
+        domain_wake(d);
+}
+
+static inline void domain_unsuspend(struct domain *d)
+{
+    ASSERT(d != current);
+    if ( test_and_clear_bit(DF_SUSPENDED, &d->flags) )
+        domain_wake(d);
+}
+
+static inline void domain_stop(struct domain *d)
+{
+    ASSERT(d != current);
+    if ( !test_and_set_bit(DF_STOPPED, &d->flags) )
+        domain_sleep(d);
+}
+
+static inline void domain_start(struct domain *d)
+{
+    ASSERT(d != current);
+    if ( test_and_clear_bit(DF_STOPPED, &d->flags) )
+        domain_wake(d);
 }
 
 
-#define IS_PRIV(_p) (test_bit(DF_PRIVILEGED, &(_p)->flags))
-#define IS_CAPABLE_PHYSDEV(_p) (test_bit(DF_PHYSDEV, &(_p)->flags))
+#define IS_PRIV(_d) (test_bit(DF_PRIVILEGED, &(_d)->flags))
+#define IS_CAPABLE_PHYSDEV(_d) (test_bit(DF_PHYSDEV, &(_d)->flags))
 
-#endif /*_LINUX_SCHED_H */
+#endif /* __SCHED_H__ */

@@ -10,10 +10,10 @@
  */
 
 #include <xen/config.h>
+#include <xen/init.h>
 #include <xen/mm.h>
 #include <xen/sched.h>
-#include <xen/interrupt.h>
-#include <xen/init.h>
+#include <xen/softirq.h>
 
 irq_cpustat_t irq_stat[NR_CPUS];
 
@@ -35,20 +35,6 @@ asmlinkage void do_softirq()
             pending >>= 1;
         }
     }
-}
-
-inline void cpu_raise_softirq(unsigned int cpu, unsigned int nr)
-{
-    __cpu_raise_softirq(cpu, nr);
-#ifdef CONFIG_SMP
-    if ( cpu != smp_processor_id() )
-        smp_send_event_check_cpu(cpu);
-#endif
-}
-
-void raise_softirq(unsigned int nr)
-{
-    __cpu_raise_softirq(smp_processor_id(), nr);
 }
 
 void open_softirq(int nr, softirq_handler handler)

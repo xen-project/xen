@@ -21,7 +21,7 @@
 #include <xen/smp.h>
 #include <xen/perfc.h>
 #include <xen/time.h>
-#include <xen/interrupt.h>
+#include <xen/softirq.h>
 #include <xen/ac_timer.h>
 #include <xen/keyhandler.h>
 #include <asm/system.h>
@@ -154,84 +154,58 @@ static int add_entry(struct ac_timer **heap, struct ac_timer *t)
  * TIMER OPERATIONS.
  */
 
-static inline unsigned long __add_ac_timer(struct ac_timer *timer)
+static inline void __add_ac_timer(struct ac_timer *timer)
 {
     int cpu = timer->cpu;
-    unsigned long cpu_mask = 0;
-
     if ( add_entry(ac_timers[cpu].heap, timer) )
-    {
-        __cpu_raise_softirq(cpu, AC_TIMER_SOFTIRQ);
-        cpu_mask = (cpu != smp_processor_id()) ? 1<<cpu : 0;
-    }
-
-    return cpu_mask;
+        cpu_raise_softirq(cpu, AC_TIMER_SOFTIRQ);
 }
 
 void add_ac_timer(struct ac_timer *timer) 
 {
     int           cpu = timer->cpu;
-    unsigned long flags, cpu_mask;
+    unsigned long flags;
 
     spin_lock_irqsave(&ac_timers[cpu].lock, flags);
     ASSERT(timer != NULL);
     ASSERT(!active_ac_timer(timer));
-    cpu_mask = __add_ac_timer(timer);
+    __add_ac_timer(timer);
     spin_unlock_irqrestore(&ac_timers[cpu].lock, flags);
-
-    if ( cpu_mask ) 
-        smp_send_event_check_mask(cpu_mask);
 }
 
 
-static inline unsigned long __rem_ac_timer(struct ac_timer *timer)
+static inline void __rem_ac_timer(struct ac_timer *timer)
 {
     int cpu = timer->cpu;
-    unsigned long cpu_mask = 0;
-
     if ( remove_entry(ac_timers[cpu].heap, timer) )
-    {
-        __cpu_raise_softirq(cpu, AC_TIMER_SOFTIRQ);
-        cpu_mask = (cpu != smp_processor_id()) ? 1<<cpu : 0;
-    }
-
-    return cpu_mask;
+        cpu_raise_softirq(cpu, AC_TIMER_SOFTIRQ);
 }
 
 void rem_ac_timer(struct ac_timer *timer)
 {
     int           cpu = timer->cpu;
-    unsigned long flags, cpu_mask = 0;
+    unsigned long flags;
 
     spin_lock_irqsave(&ac_timers[cpu].lock, flags);
     ASSERT(timer != NULL);
     if ( active_ac_timer(timer) )
-        cpu_mask = __rem_ac_timer(timer);
+        __rem_ac_timer(timer);
     spin_unlock_irqrestore(&ac_timers[cpu].lock, flags);
-
-    if ( cpu_mask ) 
-        smp_send_event_check_mask(cpu_mask);
 }
 
 
 void mod_ac_timer(struct ac_timer *timer, s_time_t new_time)
 {
     int           cpu = timer->cpu;
-    unsigned long flags, cpu_mask = 0;
+    unsigned long flags;
 
     spin_lock_irqsave(&ac_timers[cpu].lock, flags);
-
     ASSERT(timer != NULL);
-
     if ( active_ac_timer(timer) )
-        cpu_mask = __rem_ac_timer(timer);
+        __rem_ac_timer(timer);
     timer->expires = new_time;
-    cpu_mask |= __add_ac_timer(timer);
-
+    __add_ac_timer(timer);
     spin_unlock_irqrestore(&ac_timers[cpu].lock, flags);
-
-    if ( cpu_mask ) 
-        smp_send_event_check_mask(cpu_mask);
 }
 
 
