@@ -194,6 +194,8 @@
 3e4540ccvQ9Dtoh9tV-L3ULUwN9X7g xen/drivers/net/e1000/e1000_main.c
 3e4540cc3t7_y-YLeyMG2pX9xtdXPA xen/drivers/net/e1000/e1000_osdep.h
 3e4540cct_8Ig-Y1W_vM2gS_u7mC0A xen/drivers/net/e1000/e1000_param.c
+3fd76772aP8tdbOsmFpbsSr90TP0YA xen/drivers/net/e1000/kcompat.c
+3fd76773I15-QqRK-uQAdEd-cBFVZw xen/drivers/net/e1000/kcompat.h
 3ddb79bfKvn9mt0kofpkw0QaWjxO6A xen/drivers/net/net_init.c
 3f0c428exbF4as5zi8GyGyDSUITmxg xen/drivers/net/pcnet32.c
 3ddb79bf_CBcu3QWYwq4bNAOnM2RqQ xen/drivers/net/setup.c

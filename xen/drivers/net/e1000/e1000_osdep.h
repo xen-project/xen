@@ -1,7 +1,7 @@
 /*******************************************************************************
 
   
-  Copyright(c) 1999 - 2002 Intel Corporation. All rights reserved.
+  Copyright(c) 1999 - 2003 Intel Corporation. All rights reserved.
   
   This program is free software; you can redistribute it and/or modify it 
   under the terms of the GNU General Public License as published by the Free 
@@ -27,7 +27,7 @@
 *******************************************************************************/
 
 
-/* glue for the OS independant part of e1000
+/* glue for the OS independent part of e1000
  * includes register access macros
  */
 
@@ -40,15 +40,11 @@
 #include <asm/io.h>
 #include <linux/interrupt.h>
 #include <linux/sched.h>
+#include "kcompat.h"
 
+#define usec_delay(x) udelay(x)
 #ifndef msec_delay
-#define msec_delay(x) {\
- 	int s=jiffies+1+((x*HZ)/1000); \
-	while(jiffies<s); }
-
-#if 0
-/********************  NOT in XEN ! *******/
-#define XXXXmsec_delay(x)	do { if(in_interrupt()) { \
+#define msec_delay(x)	do { if(in_interrupt()) { \
 				/* Don't mdelay in interrupt context! */ \
 	                	BUG(); \
 			} else { \
@@ -57,21 +53,19 @@
 			} } while(0)
 #endif
 
-#else
-#error "msec already defined!"
-#endif
-
 #define PCI_COMMAND_REGISTER   PCI_COMMAND
 #define CMD_MEM_WRT_INVALIDATE PCI_COMMAND_INVALIDATE
 
 typedef enum {
+#undef FALSE
     FALSE = 0,
+#undef TRUE
     TRUE = 1
 } boolean_t;
 
+#undef ASSERT
+#define ASSERT(x)	if(!(x)) BUG()
 #define MSGOUT(S, A, B)	printk(KERN_DEBUG S "\n", A, B)
-
-//#define DBG 1
 
 #if DBG
 #define DEBUGOUT(S)		printk(KERN_DEBUG S "\n")
@@ -88,24 +82,22 @@ typedef enum {
 
 
 #define E1000_WRITE_REG(a, reg, value) ( \
-    ((a)->mac_type >= e1000_82543) ? \
-        (writel((value), ((a)->hw_addr + E1000_##reg))) : \
-        (writel((value), ((a)->hw_addr + E1000_82542_##reg))))
+    writel((value), ((a)->hw_addr + \
+        (((a)->mac_type >= e1000_82543) ? E1000_##reg : E1000_82542_##reg))))
 
 #define E1000_READ_REG(a, reg) ( \
-    ((a)->mac_type >= e1000_82543) ? \
-        readl((a)->hw_addr + E1000_##reg) : \
-        readl((a)->hw_addr + E1000_82542_##reg))
+    readl((a)->hw_addr + \
+        (((a)->mac_type >= e1000_82543) ? E1000_##reg : E1000_82542_##reg)))
 
 #define E1000_WRITE_REG_ARRAY(a, reg, offset, value) ( \
-    ((a)->mac_type >= e1000_82543) ? \
-        writel((value), ((a)->hw_addr + E1000_##reg + ((offset) << 2))) : \
-        writel((value), ((a)->hw_addr + E1000_82542_##reg + ((offset) << 2))))
+    writel((value), ((a)->hw_addr + \
+        (((a)->mac_type >= e1000_82543) ? E1000_##reg : E1000_82542_##reg) + \
+        ((offset) << 2))))
 
 #define E1000_READ_REG_ARRAY(a, reg, offset) ( \
-    ((a)->mac_type >= e1000_82543) ? \
-        readl((a)->hw_addr + E1000_##reg + ((offset) << 2)) : \
-        readl((a)->hw_addr + E1000_82542_##reg + ((offset) << 2)))
+    readl((a)->hw_addr + \
+        (((a)->mac_type >= e1000_82543) ? E1000_##reg : E1000_82542_##reg) + \
+        ((offset) << 2)))
 
 #define E1000_WRITE_FLUSH(a) E1000_READ_REG(a, STATUS)
 
