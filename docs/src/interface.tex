@@ -111,12 +111,16 @@ direct access to CR3 and is not permitted to update privileged bits in
 EFLAGS. Guest OSes use \emph{hypercalls} to invoke operations in Xen; 
 these are analagous to system calls but occur from ring 1 to ring 0. 
 
+A list of all hypercalls is given in Appendix~\ref{a:hypercalls}. 
+
+
 
 \section{Exceptions}
 
-The IDT is virtualised by submitting to Xen a table of trap handlers.
-Most trap handlers are identical to native x86 handlers, although the
-page-fault handler is somewhat different.
+A virtual IDT is provided --- a domain can submit a table of trap
+handlers to Xen via the {\tt set\_trap\_table()} hypercall.  Most trap
+handlers are identical to native x86 handlers, although the page-fault
+handler is somewhat different.
 
 
 \section{Interrupts and events}
@@ -186,7 +190,8 @@ currently executing domain every 10ms.  The Xen scheduler also sends a
 timer event whenever a domain is scheduled; this allows the guest OS
 to adjust for the time that has passed while it has been inactive.  In
 addition, Xen allows each domain to request that they receive a timer
-event sent at a specified system time.  Guest OSes may use this timer to
+event sent at a specified system time by using the {\tt
+set\_timer\_op()} hypercall.  Guest OSes may use this timer to
 implement timeout values when they block.
 
 
@@ -199,7 +204,8 @@ hardware.
 
 \section{Memory Allocation}
 
-Xen resides within a small fixed portion of physical memory and
+
+Xen resides within a small fixed portion of physical memory; it also
 reserves the top 64MB of every virtual address space. The remaining
 physical memory is available for allocation to domains at a page
 granularity.  Xen tracks the ownership and use of each page, which
@@ -209,6 +215,52 @@ Each domain has a maximum and current physical memory allocation.
 A guest OS may run a `balloon driver' to dynamically adjust its 
 current memory allocation up to its limit. 
 
+
+%% XXX SMH: I use machine and physical in the next section (which 
+%% is kinda required for consistency with code); wonder if this 
+%% section should use same terms? 
+%%
+%% Probably. 
+%%
+%% Merging this and below section at some point prob makes sense. 
+
+\section{Pseudo-Physical Memory}
+
+Since physical memory is allocated and freed on a page granularity,
+there is no gaurantee that a domain will receive a contiguous stretch
+of physical memory. However most operating systems do not have good
+support for operating in a fragmented physical address space. To aid
+porting such operating systems to run on top of Xen, we make a
+distinction between \emph{machine memory} and \emph{pseduo-physical
+memory}.
+
+Put simply, machine memory refers to the entire amount of memory
+installed in the machine, including that reserved by Xen, in use by
+various domains, or currently unallocated. We consider machine memory
+to comprise a set of 4K \emph{machine page frames} numbered
+consecutively starting from 0. Machine frame numbers mean the same
+within Xen or any domain.
+
+Pseudo-physical memory, on the other hand, is a per-domain
+abstraction. It allows a guest operating system to consider its memory
+allocation to consist of a contiguous range of physical page frames
+starting at physical frame 0, despite the fact that the underlying
+machine page frames may be sparsely allocated and in any order.
+
+To achieve this, Xen maintains a globally readable {\it
+machine-to-physical} table which records the mapping from machine page
+frames to pseudo-physical ones. In addition, each domain is supplied
+with a {\it physical-to-machine} table which performs the inverse
+mapping. Clearly the machine-to-physical table has size proportional
+to the amount of RAM installed in the machine, while each
+physical-to-machine table has size proportional to the memory
+allocation of the given domain.
+
+Architecture dependent code in guest operating systems can then use
+the two tables to provide the abstraction of pseudo-physical
+memory. In general, only certain specialized parts of the operating
+system (such as page table management) needs to understand the
+difference between machine and pseudo-physical addresses.
 
 \section{Page Table Updates}
 
@@ -280,43 +332,21 @@ Note also that, after registering the GDT, slots {\em FIRST\_} through
 may be overwritten by Xen.
 \end{quote}
 
+The LDT is updated via the generic MMU update mechanism (i.e., via 
+the {\tt mmu\_update()} hypercall. 
 
-XXX SMH: HERE 
+\section{Start of Day} 
 
+The start-of-day environment for guest operating systems is rather
+different to that provided by the underlying hardware. In particular,
+the processor is already executing in protected mode with paging
+enabled.
 
-\section{Pseudo-Physical Memory}
-
-The usual problem of external fragmentation means that a domain is
-unlikely to receive a contiguous stretch of physical memory.  However,
-most guest operating systems do not have built-in support for
-operating in a fragmented physical address space e.g. Linux has to
-have a one-to-one mapping for its physical memory.  There a notion of
-{\it pseudo physical memory} is introdouced.  Xen maintains a {\it
-real physical} to {\it pseudo physical} mapping which can be consulted
-by every domain.  Additionally, at its start of day, a domain is
-supplied a {\it pseudo physical} to {\it real physical} mapping which
-it needs to keep updated itself.  From that moment onwards {\it pseudo
-physical} addresses are used instead of discontiguous {\it real
-physical} addresses.  Thus, the rest of the guest OS code has an
-impression of operating in a contiguous address space.  Guest OS page
-tables contain real physical addresses.  Mapping {\it pseudo physical}
-to {\it real physical} addresses is needed on page table updates and
-also on remapping memory regions with the guest OS.
-
-\section{start of day xxx}
-
-
-Start-of-day issues such as building initial page tables
-for a domain, loading its kernel image and so on are done by the {\it
-domain builder} running in user-space in {\it domain0}.  Paging to
-disk and swapping is handled by the guest operating systems
-themselves, if they need it.
-
-The amount of memory required by the domain is passed to the hypervisor
-as one of the parameters for new domain initialization by the domain builder.
-
-
-
+{\it Domain-0} is created and booted by Xen itself. For all subsequent
+donains, the analogue of the boot-loader is the {\it domain builder},
+user-space software running in {\it domain-0}. The domain builder 
+is responsible for building the initial page tables for a domain  
+and loading its kernel image at the appropriate virtual address. 
 
 
 
@@ -458,11 +488,265 @@ of the CPU for each domain.  Round-robin is provided as an example of
 Xen's internal scheduler API.
 
 More information on the characteristics and use of these schedulers is
-available in { \tt Sched-HOWTO.txt }.
+available in {\tt Sched-HOWTO.txt}.
+
+
+
+
+\appendix
+
+%\newcommand{\hypercall}[1]{\vspace{5mm}{\large\sf #1}}
+
+
+
+
+
+\newcommand{\hypercall}[1]{\vspace{2mm}{\sf #1}}
+
+
+
+\hypercall{physdev\_op(void *physdev\_op)}
+
+
+\hypercall{vm\_assist(unsigned int cmd, unsigned int type)}
+
+
+
+
+\chapter{Xen Hypercalls}
+\label{a:hypercalls}
+
+Hypercalls represent the procedural interface to Xen; this appendix 
+categorizes and describes the current set of hypercalls. 
+
+\section{Invoking Hypercalls} 
+
+\hypercall{multicall(void *call\_list, int nr\_calls)}
+
+Execute a series of hypervisor calls
+
+
+
+
+\section{Virtual CPU Setup} 
+
+\hypercall{set\_callbacks(unsigned long event\_selector, unsigned long
+  event\_address, unsigned long failsafe\_selector, unsigned long
+  failsafe\_address) }
+
+Register OS event processing routine.  In
+Linux both the event\_selector and failsafe\_selector are the
+kernel's CS.  The value event\_address specifies the address for an
+interrupt handler dispatch routine and failsafe\_address specifies a
+handler for application faults.
+
+\hypercall{set\_trap\_table(trap\_info\_t *table)} 
+
+Install trap handler table.
+
+
+\hypercall{set\_fast\_trap(int idx)}
+
+ install traps to allow guest OS to bypass hypervisor
+
+
+
+
+\section{Scheduling} 
+
+
+\hypercall{stack\_switch(unsigned long ss, unsigned long esp)} 
+
+Request context switch from hypervisor.
+
+
+\hypercall{fpu\_taskswitch(void)} 
+
+Notify hypervisor that fpu registers needed to be save on context switch.
+
+
+\hypercall{sched\_op(unsigned long op)} 
+
+Request scheduling operation from hypervisor. The options are: {\it
+yield}, {\it block}, and {\it shutdown}.  {\it yield} keeps the
+calling domain run-able but may cause a reschedule if other domains
+are run-able.  {\it block} removes the calling domain from the run
+queue and the domains sleeps until an event is delivered to it.  {\it
+shutdown} is used to end the domain's execution and allows to specify
+whether the domain should reboot, halt or suspend..
+
+\hypercall{set\_timer\_op(uint64\_t timeout)} 
+
+Request a timer event to be sent at the specified system time.
+
+
+\section{Page Table Management} 
+
+\hypercall{mmu\_update(mmu\_update\_t *req, int count, int *success\_count)} 
+
+Update the page table for the domain. Updates can be batched.
+success\_count will be updated to report the number of successfull
+updates.  The update types are:
+
+{\it MMU\_NORMAL\_PT\_UPDATE}:
+
+{\it MMU\_MACHPHYS\_UPDATE}:
+
+{\it MMU\_EXTENDED\_COMMAND}:
+
+
+\hypercall{update\_va\_mapping(unsigned long page\_nr, unsigned long val, unsigned long flags)}
+
+
+\hypercall{update\_va\_mapping\_otherdomain(unsigned long page\_nr,
+unsigned long val, unsigned long flags, uint16\_t domid)}
+
+
+\section{Segmentation Support}
+
+
+\hypercall{set\_gdt(unsigned long *frame\_list, int entries)} 
+
+Set the global descriptor table - virtualization for lgdt.
+
+
+
+\hypercall{update\_descriptor(unsigned long ma, unsigned long word1, unsigned long word2)} 
+
+
+
+
+\section{Inter-Domain Communication}
+
+
+\hypercall{event\_channel\_op(void *op)} 
+
+Inter-domain event-channel management.
+
+
+\hypercall{grant\_table\_op(unsigned int cmd, void *uop, unsigned int count)}
+
+
+
+\section{Physical Memory Management}
+
+\hypercall{dom\_mem\_op(unsigned int op, unsigned long *extent\_list,
+unsigned long nr\_extents, unsigned int extent\_order)}
+
+Increase or decrease memory reservations for guest OS
+
+
+
+
+
+
+\section{Administrative Operations}
+
+
+\hypercall{dom0\_op(dom0\_op\_t *op)} 
+
+Administrative domain operations for domain management. The options are:
+
+{\it DOM0\_CREATEDOMAIN}: create new domain, specifying the name and memory usage
+in kilobytes.
+
+{\it DOM0\_CREATEDOMAIN}: create domain
+
+{\it DOM0\_PAUSEDOMAIN}: mark domain as unschedulable
+
+{\it DOM0\_UNPAUSEDOMAIN}: mark domain as schedulable
+
+{\it DOM0\_DESTROYDOMAIN}: deallocate resources associated with the domain
+
+{\it DOM0\_GETMEMLIST}: get list of pages used by the domain
+
+{\it DOM0\_SCHEDCTL}:
+
+{\it DOM0\_ADJUSTDOM}: adjust scheduling priorities for domain
+
+{\it DOM0\_BUILDDOMAIN}: do final guest OS setup for domain
+
+{\it DOM0\_GETDOMAINFO}: get statistics about the domain
+
+{\it DOM0\_GETPAGEFRAMEINFO}:
+
+{\it DOM0\_IOPL}: set IO privilege level
+
+{\it DOM0\_MSR}:
+
+{\it DOM0\_DEBUG}: interactively call pervasive debugger
+
+{\it DOM0\_SETTIME}: set system time
+
+{\it DOM0\_READCONSOLE}: read console content from hypervisor buffer ring
+
+{\it DOM0\_PINCPUDOMAIN}: pin domain to a particular CPU
+
+{\it DOM0\_GETTBUFS}: get information about the size and location of
+                      the trace buffers (only on trace-buffer enabled builds)
+
+{\it DOM0\_PHYSINFO}: get information about the host machine
+
+{\it DOM0\_PCIDEV\_ACCESS}: modify PCI device access permissions
+
+{\it DOM0\_SCHED\_ID}: get the ID of the current Xen scheduler
+
+{\it DOM0\_SHADOW\_CONTROL}:
+
+{\it DOM0\_SETDOMAINNAME}: set the name of a domain
+
+{\it DOM0\_SETDOMAININITIALMEM}: set initial memory allocation of a domain
+
+{\it DOM0\_SETDOMAINMAXMEM}: set maximum memory allocation of a domain
+
+{\it DOM0\_GETPAGEFRAMEINFO2}:
+
+{\it DOM0\_SETDOMAINVMASSIST}: set domain VM assist options
+
+
+
+
+\section{Miscellaneous Hypercalls} 
+
+
+\hypercall{console\_io(int cmd, int count, char *str)}
+
+Interact with the console, operations are:
+
+{\it CONSOLEIO\_write}: Output count characters from buffer str.
+
+{\it CONSOLEIO\_read}: Input at most count characters into buffer str.
+
+
+
+\hypercall{set\_debugreg(int reg, unsigned long value)}
+
+set debug register reg to value
+
+
+\hypercall{get\_debugreg(int reg)}
+
+ get the debug register reg
+
+
+\hypercall{xen\_version(int cmd)}
+
+Request Xen version number.
+
+
+
+
+
+
+%% 
+%% XXX SMH: not really sure how useful below is -- if it's still 
+%% actually true, might be useful for someone wanting to write a 
+%% new scheduler... not clear how many of them there are...
+%%
 
 \begin{comment}
 
-\section{Scheduling API}
+\chapter{Scheduling API}  
 
 The scheduling API is used by both the schedulers described above and should
 also be used by any new schedulers.  It provides a generic interface and also
@@ -731,6 +1015,20 @@ This method should dump any private settings for the specified task.
 This function is called with interrupts disabled and the {\tt schedule\_lock}
 for the task's CPU held.
 
+\end{comment} 
+
+
+
+
+%%
+%% XXX SMH: we probably should have something in here on debugging 
+%% etc; this is a kinda developers manual and many devs seem to 
+%% like debugging support :^) 
+%% Possibly sanitize below, else wait until new xendbg stuff is in 
+%% (and/or kip's stuff?) and write about that instead? 
+%%
+
+\begin{comment} 
 
 \chapter{Debugging}
 
@@ -795,196 +1093,9 @@ trace points, there is an example format file in {\tt tools/xentrace/formats }.
 For more information, see the manual pages for {\tt xentrace}, {\tt
 xentrace\_format} and {\tt xentrace\_cpusplit}.
 
+\end{comment} 
 
-\appendix
 
-\newcommand{\hypercall}[1]{\vspace{5mm}{\large\sf #1}}
 
-\chapter{Xen Hypercalls}
-
-\hypercall{ set\_trap\_table(trap\_info\_t *table)} 
-
-Install trap handler table.
-
-
-\hypercall{ mmu\_update(mmu\_update\_t *req, int count, int *success\_count)} 
-
-Update the page table for the domain. Updates can be batched.
-success\_count will be updated to report the number of successfull
-updates.  The update types are:
-
-{\it MMU\_NORMAL\_PT\_UPDATE}:
-
-{\it MMU\_MACHPHYS\_UPDATE}:
-
-{\it MMU\_EXTENDED\_COMMAND}:
-
-
-\hypercall{ set\_gdt(unsigned long *frame\_list, int entries)} 
-
-Set the global descriptor table - virtualization for lgdt.
-
-
-\hypercall{ stack\_switch(unsigned long ss, unsigned long esp)} 
-
-Request context switch from hypervisor.
-
-
-\hypercall{ set\_callbacks(unsigned long event\_selector, unsigned long event\_address,
-                        unsigned long failsafe\_selector, unsigned
- long failsafe\_address) }
-
-Register OS event processing routine.  In
-Linux both the event\_selector and failsafe\_selector are the
-kernel's CS.  The value event\_address specifies the address for an
-interrupt handler dispatch routine and failsafe\_address specifies a
-handler for application faults.
-
-
-\hypercall{ fpu\_taskswitch(void)} 
-
-Notify hypervisor that fpu registers needed to be save on context switch.
-
-
-\hypercall{ sched\_op(unsigned long op)} 
-
-Request scheduling operation from hypervisor. The options are: {\it
-yield}, {\it block}, and {\it shutdown}.  {\it yield} keeps the
-calling domain run-able but may cause a reschedule if other domains
-are run-able.  {\it block} removes the calling domain from the run
-queue and the domains sleeps until an event is delivered to it.  {\it
-shutdown} is used to end the domain's execution and allows to specify
-whether the domain should reboot, halt or suspend..
-
-
-\hypercall{ dom0\_op(dom0\_op\_t *op)} 
-
-Administrative domain operations for domain management. The options are:
-
-{\it DOM0\_CREATEDOMAIN}: create new domain, specifying the name and memory usage
-in kilobytes.
-
-{\it DOM0\_CREATEDOMAIN}: create domain
-
-{\it DOM0\_PAUSEDOMAIN}: mark domain as unschedulable
-
-{\it DOM0\_UNPAUSEDOMAIN}: mark domain as schedulable
-
-{\it DOM0\_DESTROYDOMAIN}: deallocate resources associated with the domain
-
-{\it DOM0\_GETMEMLIST}: get list of pages used by the domain
-
-{\it DOM0\_SCHEDCTL}:
-
-{\it DOM0\_ADJUSTDOM}: adjust scheduling priorities for domain
-
-{\it DOM0\_BUILDDOMAIN}: do final guest OS setup for domain
-
-{\it DOM0\_GETDOMAINFO}: get statistics about the domain
-
-{\it DOM0\_GETPAGEFRAMEINFO}:
-
-{\it DOM0\_IOPL}: set IO privilege level
-
-{\it DOM0\_MSR}:
-
-{\it DOM0\_DEBUG}: interactively call pervasive debugger
-
-{\it DOM0\_SETTIME}: set system time
-
-{\it DOM0\_READCONSOLE}: read console content from hypervisor buffer ring
-
-{\it DOM0\_PINCPUDOMAIN}: pin domain to a particular CPU
-
-{\it DOM0\_GETTBUFS}: get information about the size and location of
-                      the trace buffers (only on trace-buffer enabled builds)
-
-{\it DOM0\_PHYSINFO}: get information about the host machine
-
-{\it DOM0\_PCIDEV\_ACCESS}: modify PCI device access permissions
-
-{\it DOM0\_SCHED\_ID}: get the ID of the current Xen scheduler
-
-{\it DOM0\_SHADOW\_CONTROL}:
-
-{\it DOM0\_SETDOMAINNAME}: set the name of a domain
-
-{\it DOM0\_SETDOMAININITIALMEM}: set initial memory allocation of a domain
-
-{\it DOM0\_SETDOMAINMAXMEM}: set maximum memory allocation of a domain
-
-{\it DOM0\_GETPAGEFRAMEINFO2}:
-
-{\it DOM0\_SETDOMAINVMASSIST}: set domain VM assist options
-
-
-\hypercall{ set\_debugreg(int reg, unsigned long value)}
-
-set debug register reg to value
-
-
-\hypercall{ get\_debugreg(int reg)}
-
- get the debug register reg
-
-
-\hypercall{ update\_descriptor(unsigned long ma, unsigned long word1, unsigned long word2)} 
-
-
-\hypercall{ set\_fast\_trap(int idx)}
-
- install traps to allow guest OS to bypass hypervisor
-
-
-\hypercall{ dom\_mem\_op(unsigned int op, unsigned long *extent\_list, unsigned long nr\_extents, unsigned int extent\_order)}
-
-Increase or decrease memory reservations for guest OS
-
-
-\hypercall{ multicall(void *call\_list, int nr\_calls)}
-
-Execute a series of hypervisor calls
-
-
-\hypercall{ update\_va\_mapping(unsigned long page\_nr, unsigned long val, unsigned long flags)}
-
-
-\hypercall{ set\_timer\_op(uint64\_t timeout)} 
-
-Request a timer event to be sent at the specified system time.
-
-
-\hypercall{ event\_channel\_op(void *op)} 
-
-Inter-domain event-channel management.
-
-
-\hypercall{ xen\_version(int cmd)}
-
-Request Xen version number.
-
-
-\hypercall{ console\_io(int cmd, int count, char *str)}
-
-Interact with the console, operations are:
-
-{\it CONSOLEIO\_write}: Output count characters from buffer str.
-
-{\it CONSOLEIO\_read}: Input at most count characters into buffer str.
-
-
-\hypercall{ physdev\_op(void *physdev\_op)}
-
-
-\hypercall{ grant\_table\_op(unsigned int cmd, void *uop, unsigned int count)}
-
-
-\hypercall{ vm\_assist(unsigned int cmd, unsigned int type)}
-
-
-\hypercall{ update\_va\_mapping\_otherdomain(unsigned long page\_nr, unsigned long val, unsigned long flags, uint16\_t domid)}
-
-
-\end{comment}
 
 \end{document}
