@@ -35,8 +35,8 @@ dist:	xen tools kernels docs
 install: 
 	$(MAKE) -C xen install
 	$(MAKE) -C tools install
-	$(shell cp -a install/boot/* /boot/)
-	$(shell cp -a install/lib/modules/* /lib/modules/)
+	$(shell cp -a $(INSTALL_DIR)/boot/* /boot/)
+	$(shell cp -a $(INSTALL_DIR)/lib/modules/* /lib/modules/)
 	sh ./docs/check_pkgs && $(MAKE) -C docs install || true
 	$(shell cp -dR $(INSTALL_DIR)/boot/*$(LINUX_VER)* $(prefix)/boot/)
 	$(shell cp -dR $(INSTALL_DIR)/lib/modules/* $(prefix)/lib/modules/)
