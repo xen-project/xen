@@ -29,7 +29,7 @@ dist: $(TARGET)
 	$(MAKE) prefix=`pwd`/../dist/install dist=yes install
 
 clean:
-	$(MAKE) -C figlet clean
+	$(MAKE) -C tools clean
 	$(MAKE) -C common clean
 	$(MAKE) -C drivers clean
 	$(MAKE) -C arch/$(TARGET_ARCH) clean
@@ -38,6 +38,7 @@ clean:
 
 $(TARGET): delete-unfresh-files
 	[ -e include/asm ] || ln -sf asm-$(TARGET_ARCH) include/asm
+	$(MAKE) -C tools
 	$(MAKE) include/xen/compile.h
 	$(MAKE) -C arch/$(TARGET_ARCH) asm-offsets.s
 	$(MAKE) include/asm-$(TARGET_ARCH)/asm-offsets.h
@@ -67,7 +68,7 @@ include/xen/compile.h:
 	@LANG=C echo \#define XEN_CHANGESET \"`bk changes -nd':D: :T: :REV: :MD5KEY:' -r+ 2>/dev/null || echo "information unavailable"`\" >> $@
 	@LANG=C echo >> $@
 	@LANG=C echo \#define XEN_BANNER \\ >> $@
-	cd ./figlet && make && ./figlet Xen $(XEN_VERSION).$(XEN_SUBVERSION)$(XEN_EXTRAVERSION) 1>>../$@ && cd ..
+	( cd ./tools/figlet && ./figlet Xen $(XEN_VERSION).$(XEN_SUBVERSION)$(XEN_EXTRAVERSION) 1>>../../$@ )
 	@LANG=C echo >> $@
 
 include/asm-$(TARGET_ARCH)/asm-offsets.h: arch/$(TARGET_ARCH)/asm-offsets.s

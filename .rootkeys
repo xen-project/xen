@@ -741,11 +741,6 @@
 3ddb79bf2AS7YBGwooE_Kbv7XgUqNQ xen/drivers/pci/pci.ids
 3ddb79bf7sTn85WtP_8Nc2YEmmVExQ xen/drivers/pci/quirks.c
 3ddb79bfJaf0bkE1Y67bnll8-kjEPg xen/drivers/pci/setup-res.c
-3eb3c87fc79FXLA6R9TvdBJNTvQDwA xen/figlet/LICENSE
-3eb3c87fPL2T_zBb0bHlbZY-ACEKRw xen/figlet/Makefile
-3eb3c87fmKYTC5GCh_rydFakZp9ayw xen/figlet/README
-3eb3c87fdQKQ5OBGbM-KjZfi9Us4ng xen/figlet/figlet.c
-3eb3c87fS7DNbg0i6yhFs28UIqAK5g xen/figlet/xen.flf
 40715b2cFpte_UNWnBZW0Du7z9AhTQ xen/include/acpi/acconfig.h
 40715b2cEQWX-PaxEH30qI48K1krnQ xen/include/acpi/acdebug.h
 40715b2c_7j-oy3ZNAuqE3IFNPzArg xen/include/acpi/acdisasm.h
@@ -891,3 +886,9 @@
 3ddb79c0BnA20PbgmuMPSGIBljNRQw xen/include/xen/time.h
 403a3edbG9K5uZjuY19_LORbQGmFbA xen/include/xen/trace.h
 3ddb79c1-kVvF8cVa0k3ZHDdBMj01Q xen/include/xen/types.h
+41d291f5u3J3HYViXLs3cNuFGTvzNg xen/tools/Makefile
+3eb3c87fc79FXLA6R9TvdBJNTvQDwA xen/tools/figlet/LICENSE
+3eb3c87fPL2T_zBb0bHlbZY-ACEKRw xen/tools/figlet/Makefile
+3eb3c87fmKYTC5GCh_rydFakZp9ayw xen/tools/figlet/README
+3eb3c87fdQKQ5OBGbM-KjZfi9Us4ng xen/tools/figlet/figlet.c
+3eb3c87fS7DNbg0i6yhFs28UIqAK5g xen/tools/figlet/xen.flf
