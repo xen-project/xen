@@ -143,6 +143,7 @@ static void __init parse_mem_cmdline (char ** cmdline_p)
 
 void __init setup_arch(char **cmdline_p)
 {
+    struct pt_regs *regs = ((struct pt_regs *)current->thread.esp0) - 1;
     unsigned long start_pfn, max_pfn, max_low_pfn;
     unsigned long bootmap_size;
     unsigned long i;
@@ -301,10 +302,15 @@ void __init setup_arch(char **cmdline_p)
 
     paging_init();
 
-    if ( start_info.flags & SIF_PRIVILEGED ) 
+    /* Set privilege level gubbins. */
+    regs->eflags &= ~(3<<12);
+    if ( start_info.flags & SIF_PRIVILEGED ) {
         /* We are privileged guest os - should have IO privileges. */
         if( HYPERVISOR_set_priv_levels(1, 1) )
             panic("Unable to obtain IOPL, despite being SIF_PRIVILEGED");
+        regs->eflags |= 1<<12;
+    }
+    current->thread.hypercall_pl = 1;
 
     if(start_info.flags & SIF_CONSOLE)
     {

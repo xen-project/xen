@@ -50,8 +50,11 @@ startup_32:
                 
         jmp SYMBOL_NAME(start_kernel)
 
+# Stack is 8kB. We leave 100 bytes trailer for fake 'pt_regs'.
+# This is needed so that iopl checks of the saved eflags register
+# work correctly, for example.
 ENTRY(stack_start)
-	.long SYMBOL_NAME(init_task_union)+8192, __KERNEL_DS
+	.long SYMBOL_NAME(init_task_union)+8192-100, __KERNEL_DS
 
 .org 0x1000
 ENTRY(empty_zero_page)
