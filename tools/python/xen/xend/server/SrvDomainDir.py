@@ -98,6 +98,7 @@ class SrvDomainDir(SrvDir):
         if isinstance(err, Failure):
             err = err.getErrorMessage()
         print 'op_create> Deferred Exception creating domain:', err
+        traceback.print_exc()
         req.setResponseCode(http.BAD_REQUEST, "Error creating domain: " + str(err))
         return str(err)
 
