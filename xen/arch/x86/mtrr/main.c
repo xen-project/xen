@@ -166,10 +166,8 @@ static void ipi_handler(void *info)
 	local_irq_save(flags);
 
 	atomic_dec(&data->count);
-	while(!atomic_read(&data->gate)) {
+	while(!atomic_read(&data->gate))
 		cpu_relax();
-		barrier();
-	}
 
 	/*  The master has cleared me to execute  */
 	if (data->smp_reg != ~0U) 
@@ -179,10 +177,9 @@ static void ipi_handler(void *info)
 		mtrr_if->set_all();
 
 	atomic_dec(&data->count);
-	while(atomic_read(&data->gate)) {
+	while(atomic_read(&data->gate))
 		cpu_relax();
-		barrier();
-	}
+
 	atomic_dec(&data->count);
 	local_irq_restore(flags);
 }
@@ -247,10 +244,9 @@ static void set_mtrr(unsigned int reg, unsigned long base,
 
 	local_irq_save(flags);
 
-	while(atomic_read(&data.count)) {
+	while(atomic_read(&data.count))
 		cpu_relax();
-		barrier();
-	}
+
 	/* ok, reset count and toggle gate */
 	atomic_set(&data.count, num_booting_cpus() - 1);
 	atomic_set(&data.gate,1);
@@ -267,10 +263,9 @@ static void set_mtrr(unsigned int reg, unsigned long base,
 		mtrr_if->set(reg,base,size,type);
 
 	/* wait for the others */
-	while(atomic_read(&data.count)) {
+	while(atomic_read(&data.count))
 		cpu_relax();
-		barrier();
-	}
+
 	atomic_set(&data.count, num_booting_cpus() - 1);
 	atomic_set(&data.gate,0);
 
@@ -278,10 +273,9 @@ static void set_mtrr(unsigned int reg, unsigned long base,
 	 * Wait here for everyone to have seen the gate change
 	 * So we're the last ones to touch 'data'
 	 */
-	while(atomic_read(&data.count)) {
+	while(atomic_read(&data.count))
 		cpu_relax();
-		barrier();
-	}
+
 	local_irq_restore(flags);
 }
 
