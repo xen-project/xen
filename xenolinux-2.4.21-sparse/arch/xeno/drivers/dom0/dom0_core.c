@@ -55,24 +55,6 @@ unsigned long direct_mmap(unsigned long, unsigned long, pgprot_t, int, int);
 int direct_unmap(unsigned long, unsigned long);
 int direct_disc_unmap(unsigned long, unsigned long, int);
 
-static unsigned char readbuf[1204];
-
-static int dom0_cmd_read(struct file *fp, char *buf, size_t count, loff_t *off)
-{
-    int copied, maxlen;
-    if (count > 1024)
-        count = 1024;
-    maxlen = strlen(readbuf);
-    if (count > maxlen)
-      count = maxlen;
-    copied = count - copy_to_user(buf, readbuf, count);
-    *readbuf = '\0';
-    if (copied != count)
-      return -EFAULT;
-    else
-      return copied;
-}
-
 static ssize_t dom_usage_read(struct file * file, char * buff, size_t size, loff_t * off)
 {
     char str[256];
@@ -458,7 +440,6 @@ static int dom0_cmd_ioctl(struct inode *inode, struct file *file,
 
 
 static struct file_operations dom0_cmd_file_ops = {
-  read : dom0_cmd_read,
   write : dom0_cmd_write,
   ioctl : dom0_cmd_ioctl
 };
@@ -469,7 +450,6 @@ static int __init init_module(void)
     xeno_base = proc_mkdir("xeno", &proc_root); 
 
     /* xeno control interface */
-    *readbuf = '\0';
     dom0_cmd_intf = create_proc_entry("dom0_cmd", 0600, xeno_base);
 
     if ( dom0_cmd_intf != NULL )
