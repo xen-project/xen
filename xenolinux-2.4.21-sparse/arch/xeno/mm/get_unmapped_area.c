@@ -14,8 +14,7 @@
 #include <asm/uaccess.h>
 #include <asm/pgalloc.h>
 
-extern int direct_unmap(unsigned long, unsigned long);
-
+extern int direct_unmap(struct mm_struct *, unsigned long, unsigned long);
 
 int init_direct_list(struct mm_struct *mm)
 {
@@ -30,7 +29,7 @@ void destroy_direct_list(struct mm_struct *mm)
     while ( (curr = direct_list->next) != direct_list )
     {
         direct_mmap_node_t *node = list_entry(curr, direct_mmap_node_t, list);
-        if ( direct_unmap(node->vm_start, node->vm_end - node->vm_start) != 0 )
+        if ( direct_unmap(mm, node->vm_start, node->vm_end - node->vm_start) )
             BUG();
     }
 }
