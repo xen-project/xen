@@ -203,7 +203,7 @@ static void pit_timer_fn(unsigned long data)
 
 
 /* Only some PIT operations such as load init counter need a hypervisor hook.
- * leave many other operations in user space DM
+ * leave all other operations in user space DM
  */
 void vmx_hooks_assist(struct exec_domain *d)
 {
@@ -213,11 +213,20 @@ void vmx_hooks_assist(struct exec_domain *d)
     struct vmx_virpit_t *vpit = &(d->arch.arch_vmx.vmx_platform.vmx_pit);
     int rw_mode;
 
-    if (p->state == STATE_IORESP_HOOK) { /*load init count*/
-        vpit->init_val = (p->u.data & 0xFFFF) ; /* frequency(ms) of pit */
-        vpit->period = (vpit->init_val) * 1000 / PIT_FREQ; /* frequency(ms) of pit */
+    /* load init count*/
+    if (p->state == STATE_IORESP_HOOK) { 
+        /* init count for this channel */
+        vpit->init_val = (p->u.data & 0xFFFF) ; 
+        /* frequency(ms) of pit */
+        vpit->period = DIV_ROUND(((vpit->init_val) * 1000), PIT_FREQ); 
+        if (vpit->period < 1) {
+            printk("VMX_PIT: guest programmed too small an init_val: %lx\n",
+                   vpit->init_val);
+            vpit->period = 1;
+        }
         vpit->vector = ((p->u.data >> 16) & 0xFF);
         vpit->channel = ((p->u.data >> 24) & 0x3);
+        vpit->first_injected = 0;
 
 	vpit->count_LSB_latched = 0;
 	vpit->count_MSB_latched = 0;

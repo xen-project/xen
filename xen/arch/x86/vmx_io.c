@@ -367,6 +367,12 @@ void vmx_intr_assist(struct exec_domain *d)
     else
         clear_highest_bit(d, highest_vector); 
 
+    /* close the window between guest PIT initialization and sti */
+    if (highest_vector == vpit->vector && !vpit->first_injected){
+        vpit->first_injected = 1;
+        vpit->pending_intr_nr = 0;
+    }
+
     intr_fields = (INTR_INFO_VALID_MASK | INTR_TYPE_EXT_INTR | highest_vector);
     __vmwrite(VM_ENTRY_INTR_INFO_FIELD, intr_fields);
 
