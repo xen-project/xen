@@ -5,8 +5,10 @@
  Needs to be persistent for one uptime.
 """
 import sys
+import traceback
 
 from twisted.internet import defer
+from twisted.internet import reactor
 
 import xen.lowlevel.xc; xc = xen.lowlevel.xc.new()
 
@@ -28,9 +30,18 @@ __all__ = [ "XendDomain" ]
 class XendDomain:
     """Index of all domains. Singleton.
     """
-    
+
+    """Path to domain database."""
     dbpath = "domain"
+
+    """Table of domain info indexed by domain id."""
     domain = {}
+    
+    """Table of configs for domain restart, indexed by domain id."""
+    restarts = {}
+
+    """Table of delayed calls."""
+    schedule = {}
     
     def __init__(self):
         self.xconsole = XendConsole.instance()
@@ -48,6 +59,53 @@ class XendDomain:
         """
         print 'XendDomain> virq', val
         self.reap()
+
+    def schedule_later(self, _delay, _name, _fn, *args):
+        """Schedule a function to be called later (if not already scheduled).
+
+        _delay delay in seconds
+        _name  schedule name
+        _fn    function
+        args   arguments
+        """
+        if self.schedule.get(_name): return
+        self.schedule[_name] = reactor.callLater(_delay, _fn, *args)
+        
+    def schedule_cancel(self, name):
+        """Cancel a scheduled function call.
+        
+        name schedule name to cancel
+        """
+        callid = self.schedule.get(name)
+        if not callid:
+            return
+        if callid.active():
+            callid.cancel()
+        del self.schedule[name]
+
+    def reap_schedule(self, delay=0):
+        """Schedule reap to be called later.
+
+        delay delay in seconds
+        """
+        self.schedule_later(delay, 'reap', self.reap)
+
+    def reap_cancel(self):
+        """Cancel any scheduled reap.
+        """
+        self.schedule_cancel('reap')
+
+    def refresh_schedule(self, delay=0):
+        """Schedule refresh to be called later.
+        
+        delay delay in seconds
+        """
+        self.schedule_later(delay, 'refresh', self.refresh)
+
+    def refresh_cancel(self):
+        """Cancel any scheduled refresh.
+        """
+        self.schedule_cancel('refresh')
 
     def rm_all(self):
         """Remove all domain info. Used after reboot.
@@ -145,6 +203,7 @@ class XendDomain:
         """Look for domains that have crashed or stopped.
         Tidy them up.
         """
+        self.reap_cancel()
         print 'XendDomain>reap>'
         domlist = xc.domain_getinfo()
         casualties = []
@@ -158,12 +217,14 @@ class XendDomain:
         for d in casualties:
             id = str(d['dom'])
             print 'XendDomain>reap> died id=', id, d
-            self.domain_destroy(id, refresh=0)
+            self.final_domain_destroy(id)
         print 'XendDomain>reap<'
 
     def refresh(self):
         """Refresh domain list from Xen.
         """
+        self.refresh_cancel()
+        print 'XendDomain>refresh>'
         domlist = xc.domain_getinfo()
         # Index the domlist by id.
         # Add entries for any domains we don't know about.
@@ -184,7 +245,7 @@ class XendDomain:
                 d.update(dominfo)
             else:
                 self._delete_domain(d.id)
-        self.reap()
+        self.reap_schedule(1)
 
     def refresh_domain(self, id):
         """Refresh information for a single domain.
@@ -267,21 +328,70 @@ class XendDomain:
         """Shutdown domain (nicely).
 
         id     domain id
-        reason shutdown type: poweroff, reboot, halt
+        reason shutdown type: poweroff, reboot, suspend, halt
         """
         dom = int(id)
         if dom <= 0:
             return 0
+        self.domain_restart_schedule(id, reason)
         eserver.inject('xend.domain.shutdown', [id, reason])
+        if reason == 'halt':
+            reason = 'poweroff'
         val = xend.domain_shutdown(dom, reason)
-        self.refresh()
+        self.refresh_schedule()
         return val
-    
-    def domain_destroy(self, id, refresh=1):
-        """Terminate domain immediately.
+
+    def domain_restart_schedule(self, id, reason):
+        """Schedule a restart for a domain if it needs one.
+
+        id     domain id
+        reason shutdown reason
+        """
+        if id in self.restarts:
+            # Don't schedule if already there.
+            return
+        restart = 0
+        if reason in ['poweroff', 'reboot']:
+            dominfo = self.domain.get(id)
+            if dominfo and (dominfo.autorestart or reason == 'reboot'):
+                restart = 1
+                # Clear autorestart flag to avoid multiple restarts.
+                dominfo.autorestart = 0
+            
+        if restart:
+            self.restarts[id] = dominfo.config
+            
+    def domain_restart_cancel(self, id):
+        """Cancel any restart scheduled for a domain.
 
         id domain id
-        refresh send a domain destroy event if true
+        """
+        dominfo = self.domain.get(id)
+        if dominfo:
+            dominfo.autorestart = 0
+        if id in self.restarts:
+            del self.restarts[id]
+
+    def domain_restarts(self):
+        """Execute any scheduled domain restarts for domains that have gone.
+        """
+        for id in self.restarts.keys():
+            if id in self.domain:
+                # Don't execute restart for domains still running.
+                continue
+            config = self.restarts[id]
+            # Remove it from the restarts.
+            del self.restarts[id]
+            try:
+                self.domain_create(config)
+            except:
+                print >>sys.stderr, "XendDomain> Exception restarting domain"
+                traceback.print_exc(sys.stderr)
+        
+    def final_domain_destroy(self, id):
+        """Final destruction of a domain..
+
+        id domain id
         """
         dom = int(id)
         if dom <= 0:
@@ -292,8 +402,18 @@ class XendDomain:
             val = dominfo.destroy()
         else:
             val = xc.domain_destroy(dom=dom)
-        if refresh: self.refresh()
         return val       
+
+    def domain_destroy(self, id):
+        """Terminate domain immediately.
+        Camcels any restart for the domain.
+
+        id domain id
+        """
+        self.domain_restart_cancel(id)
+        val = self.final_domain_destroy(id)
+        self.refresh_schedule()
+        return val
 
     def domain_migrate(self, id, dst):
         """Start domain migration.
@@ -301,6 +421,7 @@ class XendDomain:
         id domain id
         """
         # Need a cancel too?
+        # Don't forget to cancel restart for it.
         pass
 
     def domain_save(self, id, dst, progress=0):

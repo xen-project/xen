@@ -225,9 +225,10 @@ class Xend:
         return xend_call(self.domainurl(id),
                          {'op'      : 'pause'})
 
-    def xend_domain_shutdown(self, id):
+    def xend_domain_shutdown(self, id, reason):
         return xend_call(self.domainurl(id),
-                         {'op'      : 'shutdown'})
+                         {'op'      : 'shutdown',
+                          'reason'  : reason })
 
     def xend_domain_destroy(self, id):
         return xend_call(self.domainurl(id),

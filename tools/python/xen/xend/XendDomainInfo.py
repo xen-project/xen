@@ -362,6 +362,8 @@ class XendDomainInfo:
         self.state = self.STATE_OK
         #todo: set to migrate info if migrating
         self.migrate = None
+        #Whether to auto-restart
+        self.autorestart = 0
 
     def setdom(self, dom):
         self.dom = int(dom)
@@ -418,6 +420,8 @@ class XendDomainInfo:
         try:
             self.name = sxp.child_value(config, 'name')
             self.memory = int(sxp.child_value(config, 'memory', '128'))
+            if sxp.child(config, 'autorestart', None):
+                self.autorestart = 1
             self.configure_backends()
             image = sxp.child_value(config, 'image')
             image_name = sxp.name(image)

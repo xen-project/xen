@@ -101,6 +101,10 @@ gopts.opt('memory', short='m', val='MEMORY',
          fn=set_value, default=128,
          use="Domain memory in MB.")
 
+gopts.opt('autorestart',
+         fn=set_true, default=0,
+         use="Whether to restart the domain on exit.")
+
 gopts.opt('blkif',
           fn=set_true, default=0,
           use="Make the domain a block device backend.")
@@ -271,6 +275,8 @@ def make_config(opts):
         config.append(['backend', ['blkif']])
     if opts.netif:
         config.append(['backend', ['netif']])
+    if opts.autorestart:
+        config.append(['autorestart'])
     
     configure_image(config, opts)
     config_devs = []

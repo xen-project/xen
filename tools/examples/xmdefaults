@@ -2,7 +2,6 @@
 #============================================================================
 # Python defaults setup for 'xm create'.
 # Edit this file to reflect the configuration of your system.
-
 #============================================================================
 
 # Define script variables here.
@@ -94,6 +93,6 @@ extra = "4 VMID=%d usr=/dev/sda6" % vmid
 #----------------------------------------------------------------------------
 # Set according to whether you want the domain  restarted when it exits.
 # The default is False.
-#restart = True
+#autorestart = True
 
 #============================================================================
