@@ -1,7 +1,7 @@
 /******************************************************************************
  * xl_segment.c
  * 
- * Xenolinux virtual block-device driver (vhd).
+ * Xenolinux virtual block-device driver (xvd).
  * 
  */
 
@@ -52,11 +52,11 @@ int __init xlseg_init(void)
     memset(xdi, 0, sizeof(*xdi));
     xenolinux_control_msg(XEN_BLOCK_PROBE_SEG, (char *)xdi, sizeof(*xdi));
 
-    DPRINTK("vhd block device probe:\n");
+    DPRINTK("xvd block device probe:\n");
     for ( i = 0; i < xdi->count; i++ )
     { 
-	DPRINTK("  %2d: type: %d, capacity: %ld\n",
-		i, xdi->disks[i].type, xdi->disks[i].capacity);
+	DPRINTK("  %2d: device: %d, capacity: %ld\n",
+		i, xdi->disks[i].device, xdi->disks[i].capacity);
     }
 
     result = register_blkdev(XLVIRT_MAJOR, XLVIRT_MAJOR_NAME,

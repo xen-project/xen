@@ -123,7 +123,7 @@ static int proc_write_vhd(struct file *file, const char *buffer,
         return count;
     }
 
-    string = get_string(NULL);                             /* look for Segment */
+    string = get_string(NULL);                           /* look for Segment */
     if (string == NULL || (*string != 's' && *string != 'S'))
     {
         printk (KERN_ALERT 
@@ -132,7 +132,7 @@ static int proc_write_vhd(struct file *file, const char *buffer,
         return count;
     }
 
-    string = get_string(NULL);                               /* segment number */
+    string = get_string(NULL);                             /* segment number */
     if (string == NULL)
     {
         printk (KERN_ALERT "error: segment number missing\n");
@@ -140,7 +140,7 @@ static int proc_write_vhd(struct file *file, const char *buffer,
     }
     xvd.segment = (int) to_number(string);
 
-    string = get_string(NULL);                             /* look for Extents */
+    string = get_string(NULL);                           /* look for Extents */
     if (string == NULL || (*string != 'e' && *string != 'E'))
     {
         printk (KERN_ALERT 
@@ -149,7 +149,7 @@ static int proc_write_vhd(struct file *file, const char *buffer,
         return count;
     }
 
-    string = get_string(NULL);                            /* number of extents */
+    string = get_string(NULL);                          /* number of extents */
     if (string == NULL)
     {
         printk (KERN_ALERT "error: number of extents missing\n");
@@ -161,7 +161,7 @@ static int proc_write_vhd(struct file *file, const char *buffer,
 
     for (loop = 0; loop < xvd.ext_count; loop++)
     {
-        string = get_string(NULL);                              /* look for Disk */
+        string = get_string(NULL);                          /* look for Disk */
         if (string == NULL || (*string != 'd' && *string != 'D'))
         {
             printk (KERN_ALERT 
@@ -169,15 +169,15 @@ static int proc_write_vhd(struct file *file, const char *buffer,
                     string);
             return count;
         }
-        string = get_string(NULL);                                /* disk number */
+        string = get_string(NULL);                            /* disk number */
         if (string == NULL)
         {
             printk (KERN_ALERT "error: disk number missing\n");
             return count;
         }
-        xvd.extents[loop].disk = (int) to_number(string);
+        xvd.extents[loop].disk = xldev_to_physdev((int) to_number(string));
 
-        string = get_string(NULL);                            /* look for Offset */
+        string = get_string(NULL);                        /* look for Offset */
         if (string == NULL || (*string != 'o' && *string != 'O'))
         {
             printk (KERN_ALERT 
@@ -185,7 +185,7 @@ static int proc_write_vhd(struct file *file, const char *buffer,
                     string);
             return count;
         }
-        string = get_string(NULL);                                     /* offset */
+        string = get_string(NULL);                                 /* offset */
         if (string == NULL)
         {
             printk (KERN_ALERT "error: offset missing\n");
@@ -193,7 +193,7 @@ static int proc_write_vhd(struct file *file, const char *buffer,
         }
         xvd.extents[loop].offset =  to_number(string);
 
-        string = get_string(NULL);                              /* look for Size */
+        string = get_string(NULL);                          /* look for Size */
         if (string == NULL || (*string != 's' && *string != 'S'))
         {
             printk (KERN_ALERT 
@@ -201,7 +201,7 @@ static int proc_write_vhd(struct file *file, const char *buffer,
                     string);
             return count;
         }
-        string = get_string(NULL);                                       /* size */
+        string = get_string(NULL);                                   /* size */
         if (string == NULL)
         {
             printk (KERN_ALERT "error: extent size missing\n");
