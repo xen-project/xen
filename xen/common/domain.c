@@ -357,6 +357,9 @@ int final_setup_guestos(struct task_struct * p, dom_meminfo_t * meminfo)
     virt_startinfo_addr->mod_start = meminfo->virt_mod_addr;
     virt_startinfo_addr->mod_len   = meminfo->virt_mod_len;
 
+    virt_startinfo_addr->dom_id = p->domain;
+    virt_startinfo_addr->flags  = IS_PRIV(p) ? SIF_PRIVILEGED : 0;
+
     if( virt_startinfo_addr->mod_len )
 	printk("Initrd module present %08lx (%08lx)\n",
                virt_startinfo_addr->mod_start, 
@@ -617,6 +620,9 @@ int setup_guestos(struct task_struct *p, dom0_newdomain_t *params,
         (shared_info_t *)virt_shinfo_address;
     virt_startinfo_address->pt_base = virt_load_address + 
         ((p->tot_pages - 1) << PAGE_SHIFT); 
+
+    virt_startinfo_address->dom_id = p->domain;
+    virt_startinfo_address->flags  = IS_PRIV(p) ? SIF_PRIVILEGED : 0;
 
     if ( initrd_len )
     {
