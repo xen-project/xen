@@ -216,3 +216,15 @@ physdev_pci_access_modify(domid_t id, int bus, int dev, int func, int enable)
 {
 	return -EINVAL;
 }
+
+// accomodate linux extable.c
+//const struct exception_table_entry *
+void *search_module_extables(unsigned long addr)
+{
+	return NULL;
+}
+
+void *module_text_address(unsigned long addr)
+{
+	return NULL;
+}

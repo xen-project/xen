@@ -261,6 +261,8 @@ GLOBAL_ENTRY(ia64_prepare_handle_reflection)
 	br.cond.sptk.many rp			// goes to ia64_leave_kernel
 END(ia64_prepare_handle_reflection)
 
+#ifndef USER_ACCESS
+// REMOVE: replaced with get_user
 // NOTE: instruction spacing must be explicit for recovery on miss
 GLOBAL_ENTRY(__get_domain_bundle)
 	ld8 r8=[r32],8
@@ -276,6 +278,23 @@ GLOBAL_ENTRY(__get_domain_bundle)
 	nop 0
 	;;
 END(__get_domain_bundle)
+#else
+GLOBAL_ENTRY(__get_domain_bundle)
+	EX(.failure_in_get_bundle,ld8 r8=[r32],8)
+	;;
+	EX(.failure_in_get_bundle,ld8 r9=[r32])
+	;;
+	br.ret.sptk.many rp
+	;;
+.failure_in_get_bundle:
+	mov r8=0
+	;;
+	mov r9=0
+	;;
+	br.ret.sptk.many rp
+	;;
+END(__get_domain_bundle)
+#endif
 
 GLOBAL_ENTRY(dorfirfi)
 #define SI_CR_IIP_OFFSET 0x10
