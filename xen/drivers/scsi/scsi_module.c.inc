@@ -32,40 +32,24 @@
 #include <xeno/module.h>
 #include <linux/init.h>
 
+extern int scsi_register_module(int, void *);
+extern int scsi_unregister_module(int, void *);
+
 static int __init init_this_scsi_driver(void)
 {
-	driver_template.module = THIS_MODULE;
-	scsi_register_module(MODULE_SCSI_HA, &driver_template);
-	if (driver_template.present)
-		return 0;
-
-	scsi_unregister_module(MODULE_SCSI_HA, &driver_template);
-	return -ENODEV;
+    driver_template.module = THIS_MODULE;
+    scsi_register_module(MODULE_SCSI_HA, &driver_template);
+    if (driver_template.present)
+        return 0;
+    
+    scsi_unregister_module(MODULE_SCSI_HA, &driver_template);
+    return -ENODEV;
 }
 
 static void __exit exit_this_scsi_driver(void)
 {
-	scsi_unregister_module(MODULE_SCSI_HA, &driver_template);
+    scsi_unregister_module(MODULE_SCSI_HA, &driver_template);
 }
 
 module_init(init_this_scsi_driver);
 module_exit(exit_this_scsi_driver);
-
-/*
- * Overrides for Emacs so that we almost follow Linus's tabbing style.
- * Emacs will notice this stuff at the end of the file and automatically
- * adjust the settings for this buffer only.  This must remain at the end
- * of the file.
- * ---------------------------------------------------------------------------
- * Local variables:
- * c-indent-level: 4
- * c-brace-imaginary-offset: 0
- * c-brace-offset: -4
- * c-argdecl-indent: 4
- * c-label-offset: -4
- * c-continued-statement-offset: 4
- * c-continued-brace-offset: 0
- * indent-tabs-mode: nil
- * tab-width: 8
- * End:
- */

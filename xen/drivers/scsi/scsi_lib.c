@@ -431,9 +431,9 @@ static Scsi_Cmnd *__scsi_end_request(Scsi_Cmnd * SCpnt,
     }
 #else 
     /* XXX SMH: we're done -- flip the flag for the spinner :-| */
-    if(req->waiting && (*(int *)(req->waiting) != NULL)) {
+    if(req->waiting && (*(int *)(req->waiting) != 0)) {
 		printk("__scsi_end_request: flipping wait status on req %p\n", req); 
-		*(int *)(req->waiting) = NULL; 
+		*(int *)(req->waiting) = 0; 
     } // else printk("__scsi_end_request: no-one to notify!!\n"); 
 #endif
     req_finished_io(req);

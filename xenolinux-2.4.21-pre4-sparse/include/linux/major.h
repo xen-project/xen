@@ -145,8 +145,15 @@
 
 #define	UMEM_MAJOR	116	/* http://www.umem.com/ Battery Backed RAM */
 
+/*
+ * Each of these majors supports up to 16 devices of <= 16 partitions each.
+ * eg. xhda == (123, 0), xhdb == (123, 16), ...
+ *     xsda == (124, 0), xsdb == (124, 16), ...
+ *     xvda == (125, 0), xvdb == (125, 16), ...
+ */
 #define XLIDE_MAJOR	123	/* XenoLinux IDE Device */
-#define XLSCSI_MAJOR	133	/* XenoLinux SCSI Device */
+#define XLSCSI_MAJOR	124	/* XenoLinux SCSI Device */
+#define XLVIRT_MAJOR    125     /* XenoLinux Virtual Device */
 
 #define RTF_MAJOR	150
 #define RAW_MAJOR	162

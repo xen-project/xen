@@ -144,9 +144,6 @@
 
 #define	UMEM_MAJOR	116	/* http://www.umem.com/ Battery Backed RAM */
 
-/* note: 123, 124, 125, 126 and 234, 235, 236, 237 are defined in xeno_major */
-#include <hypervisor-ifs/xeno-major.h>
-
 #define RTF_MAJOR	150
 #define RAW_MAJOR	162
 

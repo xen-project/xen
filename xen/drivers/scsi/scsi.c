@@ -819,6 +819,7 @@ void scsi_wait_req (Scsi_Request * SRpnt, const void *cmnd ,
     DECLARE_COMPLETION(wait);
 #else 
     int wait = 1; 
+    int usecs = 0;
 #endif
 
 
@@ -846,9 +847,6 @@ void scsi_wait_req (Scsi_Request * SRpnt, const void *cmnd ,
        we've waited on &wait -- hence we deallocate the command structure
        if it hasn't been done already. This is not the correct behaviour 
        in xen ... hmm .. how to fix? */
-    int usecs = 0; 
-//    printk("scsi_wait_req: about to poll-wait, request is at %p\n", 
-//           SRpnt->sr_request); 
     while(*(int *)(SRpnt->sr_request.waiting)) {
         udelay(500); 
         usecs += 500; 

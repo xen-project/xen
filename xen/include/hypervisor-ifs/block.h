@@ -8,7 +8,23 @@
 #ifndef __BLOCK_H__
 #define __BLOCK_H__
 
-#include <linux/kdev_t.h>
+/*
+ * Device numbers
+ */
+
+#define XENDEV_TYPE_MASK      0xf000
+#define XENDEV_IDX_MASK       0x0fff
+#define XENDEV_TYPE_SHIFT     12
+#define XENDEV_IDX_SHIFT      0
+
+#define XENDEV_IDE            (1 << XENDEV_TYPE_SHIFT)
+#define XENDEV_SCSI           (2 << XENDEV_TYPE_SHIFT)
+#define XENDEV_VIRTUAL        (3 << XENDEV_TYPE_SHIFT)
+
+#define MK_IDE_XENDEV(_i)     ((_i) | XENDEV_IDE)
+#define MK_SCSI_XENDEV(_i)    ((_i) | XENDEV_SCSI)
+#define MK_VIRTUAL_XENDEV(_i) ((_i) | XENDEV_VIRTUAL)
+
 
 /*
  *
@@ -40,7 +56,7 @@ typedef struct blk_ring_req_entry
     char *          buffer;
     unsigned long   block_number;      /* block number */
     unsigned short  block_size;        /* block size */
-    kdev_t          device;
+    unsigned short  device;
     unsigned long   sector_number;     /* real buffer location on disk */
 } blk_ring_req_entry_t;
 
@@ -77,11 +93,6 @@ typedef struct xen_disk                                     /* physical disk */
 {
   int           type;                                           /* disk type */
   unsigned long capacity;
-  unsigned char heads;                               /* hdreg.h::hd_geometry */
-  unsigned char sectors;                             /* hdreg.h::hd_geometry */
-  unsigned int  cylinders;                       /* hdreg.h::hd_big_geometry */
-  unsigned long start;                               /* hdreg.h::hd_geometry */
-  void *        gendisk;                               /* struct gendisk ptr */
 } xen_disk_t;
 
 typedef struct xen_disk_info

@@ -38,6 +38,33 @@
 static kmem_cache_t *buffer_head_cachep;
 static atomic_t nr_pending;
 
+#define NR_IDE_DEVS  20
+#define NR_SCSI_DEVS 16
+
+static kdev_t ide_devs[NR_IDE_DEVS] = { 
+    MKDEV(IDE0_MAJOR, 0), MKDEV(IDE0_MAJOR, 64),                /* hda, hdb */
+    MKDEV(IDE1_MAJOR, 0), MKDEV(IDE1_MAJOR, 64),                /* hdc, hdd */
+    MKDEV(IDE2_MAJOR, 0), MKDEV(IDE2_MAJOR, 64),                /* hde, hdf */
+    MKDEV(IDE3_MAJOR, 0), MKDEV(IDE3_MAJOR, 64),                /* hdg, hdh */
+    MKDEV(IDE4_MAJOR, 0), MKDEV(IDE4_MAJOR, 64),                /* hdi, hdj */
+    MKDEV(IDE5_MAJOR, 0), MKDEV(IDE5_MAJOR, 64),                /* hdk, hdl */
+    MKDEV(IDE6_MAJOR, 0), MKDEV(IDE6_MAJOR, 64),                /* hdm, hdn */
+    MKDEV(IDE7_MAJOR, 0), MKDEV(IDE7_MAJOR, 64),                /* hdo, hdp */
+    MKDEV(IDE8_MAJOR, 0), MKDEV(IDE8_MAJOR, 64),                /* hdq, hdr */
+    MKDEV(IDE9_MAJOR, 0), MKDEV(IDE9_MAJOR, 64)                 /* hds, hdt */
+};
+
+static kdev_t scsi_devs[NR_SCSI_DEVS] = { 
+    MKDEV(SCSI_DISK0_MAJOR,   0), MKDEV(SCSI_DISK0_MAJOR,  16), /* sda, sdb */
+    MKDEV(SCSI_DISK0_MAJOR,  32), MKDEV(SCSI_DISK0_MAJOR,  48), /* sdc, sdd */
+    MKDEV(SCSI_DISK0_MAJOR,  64), MKDEV(SCSI_DISK0_MAJOR,  80), /* sde, sdf */
+    MKDEV(SCSI_DISK0_MAJOR,  96), MKDEV(SCSI_DISK0_MAJOR, 112), /* sdg, sdh */
+    MKDEV(SCSI_DISK0_MAJOR, 128), MKDEV(SCSI_DISK0_MAJOR, 144), /* sdi, sdj */
+    MKDEV(SCSI_DISK0_MAJOR, 160), MKDEV(SCSI_DISK0_MAJOR, 176), /* sdk, sdl */
+    MKDEV(SCSI_DISK0_MAJOR, 192), MKDEV(SCSI_DISK0_MAJOR, 208), /* sdm, sdn */
+    MKDEV(SCSI_DISK0_MAJOR, 224), MKDEV(SCSI_DISK0_MAJOR, 240), /* sdo, sdp */
+};
+
 static void io_schedule(unsigned long unused);
 static int do_block_io_op_domain(struct task_struct *p, int max_to_do);
 static void dispatch_rw_block_io(struct task_struct *p, int index);
@@ -247,7 +274,8 @@ static void dispatch_create_segment(struct task_struct *p, int index)
     if (p->domain != 0)
     {
         DPRINTK("dispatch_create_segment called by dom%d\n", p->domain);
-        make_response(p, blk_ring->ring[index].req.id, XEN_BLOCK_SEG_CREATE, 1); 
+        make_response(p, blk_ring->ring[index].req.id, 
+                      XEN_BLOCK_SEG_CREATE, 1); 
         return;
     }
 
@@ -266,30 +294,28 @@ static void dispatch_delete_segment(struct task_struct *p, int index)
 
 static void dispatch_probe_blk(struct task_struct *p, int index)
 {
-    extern void ide_probe_devices(xen_disk_info_t *xdi, int *count, 
-				  drive_t xdrives[]);
-    extern void scsi_probe_devices(xen_disk_info_t *xdi, int *count,
-                                   drive_t xdrives[]);
+    extern void ide_probe_devices(xen_disk_info_t *xdi);
+    extern void scsi_probe_devices(xen_disk_info_t *xdi);
 
     blk_ring_t *blk_ring = p->blk_ring_base;
     xen_disk_info_t *xdi;
 
     xdi = phys_to_virt((unsigned long)blk_ring->ring[index].req.buffer);    
 
-    ide_probe_devices(xdi, &num_xdrives, xdrives);
-    scsi_probe_devices(xdi, &num_xdrives, xdrives);
+    ide_probe_devices(xdi);
+    scsi_probe_devices(xdi);
 
     make_response(p, blk_ring->ring[index].req.id, XEN_BLOCK_PROBE_BLK, 0);
 }
 
 static void dispatch_probe_seg(struct task_struct *p, int index)
 {
-    extern void xen_segment_probe(xen_disk_info_t *xdi, int *count);
+    extern void xen_segment_probe(xen_disk_info_t *xdi);
     blk_ring_t *blk_ring = p->blk_ring_base;
     xen_disk_info_t *xdi;
 
     xdi = phys_to_virt((unsigned long)blk_ring->ring[index].req.buffer);    
-    xen_segment_probe(xdi, &num_xdrives);
+    xen_segment_probe(xdi);
 
     make_response(p, blk_ring->ring[index].req.id, XEN_BLOCK_PROBE_SEG, 0);
 }
@@ -305,7 +331,7 @@ static void dispatch_rw_block_io(struct task_struct *p, int index)
     unsigned long  sector_number = 0L;
     unsigned long buffer, pfn;
     struct pfn_info *page;
-    int xen_device, phys_device = 0;
+    int s, xen_device, phys_device = 0;
 
     operation = (blk_ring->ring[index].req.operation == XEN_BLOCK_WRITE) ? 
         WRITE : READ;
@@ -336,7 +362,7 @@ static void dispatch_rw_block_io(struct task_struct *p, int index)
         if ( pfn >= max_page )
         {
             DPRINTK("pfn out of range: %08lx\n", pfn);
-            goto bad_descriptor;
+            goto bad_descriptor_free_frames;
         }
 
         page = frame_table + pfn;
@@ -346,7 +372,7 @@ static void dispatch_rw_block_io(struct task_struct *p, int index)
         {
             DPRINTK("bad domain: expected %d, got %ld\n", 
                     p->domain, page->flags & PG_domain_mask);
-            goto bad_descriptor;
+            goto bad_descriptor_free_frames;
         }
 
         /* If reading into the frame, the frame must be writeable. */
@@ -355,7 +381,7 @@ static void dispatch_rw_block_io(struct task_struct *p, int index)
             if ( (page->flags & PG_type_mask) != PGT_writeable_page )
             {
                 DPRINTK("non-writeable page passed for block read\n");
-                goto bad_descriptor;
+                goto bad_descriptor_free_frames;
             }
             get_page_type(page);
         }
@@ -371,42 +397,52 @@ static void dispatch_rw_block_io(struct task_struct *p, int index)
     /* set just the important bits of the buffer header */
     memset (bh, 0, sizeof (struct buffer_head));
 
-    /* map from virtual xeno devices to physical ide & scsi devices */
     xen_device = blk_ring->ring[index].req.device;
-    if (IS_XHD_MAJOR(xen_device))
-    {
-        if (xen_device == XHDA_MAJOR)    	 phys_device = MKDEV(IDE0_MAJOR, 0);
-        else if (xen_device == XHDB_MAJOR) phys_device = MKDEV(IDE1_MAJOR, 0);
-        else if (xen_device == XHDC_MAJOR) phys_device = MKDEV(IDE2_MAJOR, 0);
-        else if (xen_device == XHDD_MAJOR) phys_device = MKDEV(IDE3_MAJOR, 0);
-        else
-        {
-            printk(KERN_ALERT "dispatch_rw_block_io: unknown device %d\n",
-                   xen_device);
-            BUG();
-        }
 
-        block_number = blk_ring->ring[index].req.block_number;
-        sector_number = blk_ring->ring[index].req.sector_number;
-    }
-    else if (IS_VHD_MAJOR(xen_device))
+ again:
+    switch ( (xen_device & XENDEV_TYPE_MASK) )
     {
-        int s;
-        if (s = xen_segment_map_request(&phys_device, &block_number, 
-                                        &sector_number,
-                                        p, operation, xen_device,
-                                        blk_ring->ring[index].req.block_number,
-                                        blk_ring->ring[index].req.sector_number))
+    case XENDEV_IDE:
+        xen_device &= XENDEV_IDX_MASK;
+        if ( xen_device >= NR_IDE_DEVS )
         {
-            DPRINTK("dispatch_rw_block_io: xen_seg_map_request status: %d\n", s);
-            goto bad_descriptor;
+            DPRINTK("IDE device number out of range %d\n", xen_device);
+            goto bad_descriptor_free_frames;
         }
-    }
-    else
-    {
-        printk (KERN_ALERT "dispatch_rw_block_io: unknown device %d\n",
-                xen_device);
-        BUG();
+        phys_device   = ide_devs[xen_device];
+        block_number  = blk_ring->ring[index].req.block_number;
+        sector_number = blk_ring->ring[index].req.sector_number;
+        break;
+
+    case XENDEV_SCSI:
+        xen_device &= XENDEV_IDX_MASK;
+        if ( xen_device >= NR_SCSI_DEVS )
+        {
+            DPRINTK("SCSI device number out of range %d\n", xen_device);
+            goto bad_descriptor_free_frames;
+        }
+        phys_device   = scsi_devs[xen_device];
+        block_number  = blk_ring->ring[index].req.block_number;
+        sector_number = blk_ring->ring[index].req.sector_number;
+        break;
+
+    case XENDEV_VIRTUAL:
+        xen_device &= XENDEV_IDX_MASK;
+        s = xen_segment_map_request(
+            &xen_device, &block_number, &sector_number,
+            p, operation, xen_device,
+            blk_ring->ring[index].req.block_number,
+            blk_ring->ring[index].req.sector_number);
+        if ( s != 0 )
+        {
+            DPRINTK("xen_seg_map_request status: %d\n", s);
+            goto bad_descriptor_free_frames;
+        }
+        goto again; /* Loop round to convert the virt IDE/SCSI identifier. */
+
+    default:
+        DPRINTK("dispatch_rw_block_io: unknown device %d\n", xen_device);
+        goto bad_descriptor_free_frames;
     }
     
     bh->b_blocknr       = block_number;
@@ -435,7 +471,15 @@ static void dispatch_rw_block_io(struct task_struct *p, int index)
     ll_rw_block(operation, 1, &bh);
     return;
 
- bad_descriptor:
+ bad_descriptor_free_frames:
+    while ( pfn > (buffer >> PAGE_SHIFT) )
+    {
+        page = frame_table + --pfn;
+        put_page_tot(page);
+        if ( operation == READ ) put_page_type(page);
+    }
+
+ bad_descriptor: 
     DPRINTK("dispatch rw blockio bad descriptor\n");
     make_response(p, blk_ring->ring[index].req.id, XEN_BLOCK_READ, 1);
 } 

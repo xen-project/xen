@@ -1318,49 +1318,22 @@ static void sd_finish()
 void scsi_probe_devices(xen_disk_info_t *xdi)
 {
     Scsi_Disk *sd; 
-    int i, base, diskinfo[4];
-    xen_disk_info_t *xen_xdi = 
-	(xen_disk_info_t *)map_domain_mem(virt_to_phys(xdi));
+    int i;
+    xen_disk_info_t *xen_xdi = map_domain_mem(virt_to_phys(xdi));
 
-    /* We've already had IDE probe => we need to append our info */
-    base = xen_xdi->count; 
+    for ( sd = rscsi_disks, i = 0; i < sd_template.dev_max; i++, sd++ )
+    {
+        if ( sd->device == NULL ) continue;
 
-    for (sd = rscsi_disks, i = 0; i < sd_template.dev_max; i++, sd++) {
-
-        if (sd->device !=NULL) { 
-
-	    xen_xdi->disks[xen_xdi->count].type = XEN_DISK_SCSI; 
-	    xen_xdi->disks[xen_xdi->count].capacity = sd->capacity; 
-	    xen_xdi->count++; 
-
-	    /* default bios params to most commonly used values */
-	    diskinfo[0] = 0x40;
-	    diskinfo[1] = 0x20;
-	    diskinfo[2] = (sd->capacity) >> 11;
-	    
-	    /* override with calculated, extended default,
-	       or driver values */
-	    /* XXX SMH: gross in-line literal major number. XXX FIXME. */
-	    if(sd->device->host->hostt->bios_param != NULL)
-		sd->device->host->hostt->bios_param(
-		    sd, MKDEV(SCSI_DISK0_MAJOR, 0), &diskinfo[0]);
-	    else scsicam_bios_param(sd, MKDEV(SCSI_DISK0_MAJOR, 0), 
-				    &diskinfo[0]);
-
-	    
-	    printk (KERN_ALERT "SCSI-XENO %d\n", xen_xdi->count - base);
-	    printk (KERN_ALERT "  capacity 0x%x\n", sd->capacity);
-	    printk (KERN_ALERT "  head     0x%x\n", diskinfo[0]);
-	    printk (KERN_ALERT "  sector   0x%x\n", diskinfo[1]);
-	    printk (KERN_ALERT "  cylinder 0x%x\n", diskinfo[2]);
-
-
-	}
+        xen_xdi->disks[xen_xdi->count].type = XEN_DISK_SCSI; 
+        xen_xdi->disks[xen_xdi->count].capacity = sd->capacity; 
+        xen_xdi->count++; 
+                
+        printk("Disk %d: SCSI-XENO capacity %dkB (%dMB)\n",
+               xen_xdi->count, sd->capacity>>1, sd->capacity>>11);
     }
 
     unmap_domain_mem(xen_xdi);
-
-    return; 
 }	
 
 

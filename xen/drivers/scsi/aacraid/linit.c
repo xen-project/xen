@@ -457,7 +457,7 @@ struct aac_driver_ident* aac_get_driver_ident(int devtype)
 static int aac_biosparm(Scsi_Disk *disk, kdev_t dev, int *geom)
 {
     struct diskparm *param = (struct diskparm *)geom;
-    struct buffer_head * buf;
+    /*struct buffer_head * buf;*/
     
     dprintk((KERN_DEBUG "aac_biosparm.\n"));
 

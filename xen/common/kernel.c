@@ -42,6 +42,7 @@ void start_of_day(void);
 
 /* Command line options and variables. */
 unsigned long opt_dom0_ip = 0;
+unsigned int opt_ser_baud = 9600;  /* default baud for COM1 */
 unsigned int opt_dom0_mem = 16000; /* default kbytes for DOM0 */
 unsigned int opt_ne_base = 0; /* NE2k NICs cannot be probed */
 unsigned char opt_ifname[10] = "eth0";
@@ -52,6 +53,7 @@ static struct {
     int type;
     void *var;
 } opts[] = {
+    { "ser_baud", OPT_UINT, &opt_ser_baud },
     { "dom0_ip",  OPT_IP,   &opt_dom0_ip },
     { "dom0_mem", OPT_UINT, &opt_dom0_mem }, 
     { "ne_base",  OPT_UINT, &opt_ne_base },
@@ -69,12 +71,17 @@ void cmain (unsigned long magic, multiboot_info_t *mbi)
     unsigned char *cmdline;
     int i;
 
-    init_serial();
+    /*
+     * Clear the screen. Note that serial output cannot be done properly until 
+     * after command-line arguments have been parsed, and the required baud 
+     * rate is known. Any messages before that will be output using the
+     * seetings of the bootloader, for example. Maybe okay for error msgs...
+     */
     cls();
 
     if ( magic != MULTIBOOT_BOOTLOADER_MAGIC )
     {
-        printf("Invalid magic number: 0x%x\n", (unsigned)magic);
+        printk("Invalid magic number: 0x%x\n", (unsigned)magic);
         return;
     }
 
@@ -84,13 +91,13 @@ void cmain (unsigned long magic, multiboot_info_t *mbi)
      */
     if ( (mbi->flags & 9) != 9 )
     {
-        printf("Bad flags passed by bootloader: 0x%x\n", (unsigned)mbi->flags);
+        printk("Bad flags passed by bootloader: 0x%x\n", (unsigned)mbi->flags);
         return;
     }
 
     if ( mbi->mods_count == 0 )
     {
-        printf("Require at least one module!\n");
+        printk("Require at least one module!\n");
         return;
     }
 
@@ -160,6 +167,9 @@ void cmain (unsigned long magic, multiboot_info_t *mbi)
         }
     }
 
+    /* INITIALISE SERIAL LINE (printk will work okay from here on). */
+    init_serial();
+
     memcpy(&idle0_task_union, &first_task_struct, sizeof(first_task_struct));
 
     max_page = (mbi->mem_upper+1024) >> (PAGE_SHIFT - 10);
@@ -213,9 +223,9 @@ void cmain (unsigned long magic, multiboot_info_t *mbi)
 
 void init_serial(void)
 {
-    /* 9600 baud, no parity, 1 stop bit, 8 data bits. */
+    /* 'opt_ser_baud' baud, no parity, 1 stop bit, 8 data bits. */
     outb(0x83, SERIAL_BASE+DATA_FORMAT);
-    outb(12, SERIAL_BASE+DIVISOR_LO);
+    outb(115200/opt_ser_baud, SERIAL_BASE+DIVISOR_LO);
     outb(0, SERIAL_BASE+DIVISOR_HI);
     outb(0x03, SERIAL_BASE+DATA_FORMAT);
 

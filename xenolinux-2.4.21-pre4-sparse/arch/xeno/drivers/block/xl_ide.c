@@ -5,49 +5,20 @@
  * 
  */
 
-#include <linux/config.h>
-#include <linux/module.h>
+#include "xl_block.h"
 
-#include <linux/kernel.h>
-#include <linux/sched.h>
-#include <linux/slab.h>
-#include <linux/string.h>
-#include <linux/errno.h>
-
-#include <linux/fs.h>
-#include <linux/hdreg.h>
-#include <linux/blkdev.h>
-#include <linux/major.h>
-
-#define MAJOR_NR XLIDE_MAJOR   /* force defns in blk.h, must precede include */
-static int xlide_major = XLIDE_MAJOR;
+#define MAJOR_NR XLIDE_MAJOR 
 #include <linux/blk.h>
 
-void xlide_ide_register_disk(int, unsigned long);
-
-#define XLIDE_MAX 32 /* Maximum minor devices we support */
+/* We support up to 16 devices of up to 16 partitions each. */
+#define XLIDE_MAX         256
 #define XLIDE_MAJOR_NAME "xhd"
-#define IDE_PARTN_BITS 6                           /* from ide.h::PARTN_BITS */
-#define IDE_PARTN_MASK ((1<<IDE_PARTN_BITS)-1)     /* from ide.h::PARTN_MASK */
-static int xlide_blk_size[XLIDE_MAX];
+#define IDE_PARTN_BITS    4
 static int xlide_blksize_size[XLIDE_MAX];
-static int xlide_read_ahead; 
 static int xlide_hardsect_size[XLIDE_MAX];
 static int xlide_max_sectors[XLIDE_MAX];
 
-extern xen_disk_info_t xen_disk_info;
-
-
-extern int xenolinux_block_open(struct inode *inode, struct file *filep);
-extern int xenolinux_block_release(struct inode *inode, struct file *filep);
-extern int xenolinux_block_ioctl(struct inode *inode, struct file *filep,
-				 unsigned command, unsigned long argument);
-extern int xenolinux_block_check(kdev_t dev);
-extern int xenolinux_block_revalidate(kdev_t dev);
-
-
-extern void do_xlblk_request (request_queue_t *rq); 
-
+struct gendisk *xlide_gendisk;
 
 static struct block_device_operations xlide_block_fops = 
 {
@@ -59,109 +30,92 @@ static struct block_device_operations xlide_block_fops =
 };
 
 
-/* tiny inteface fn */
 int xlide_hwsect(int minor) 
 {
     return xlide_hardsect_size[minor]; 
 } 
 
 
-void xlide_register_disk(int xidx, int idx)
+int xlide_init(xen_disk_info_t *xdi) 
 {
-    int units;
-    int minors;
+    int i, result, units, minors, disk;
     struct gendisk *gd;
 
-    /* plagarized from ide-probe.c::init_gendisk */
-    units = 2; /* from ide.h::MAX_DRIVES */
+    SET_MODULE_OWNER(&xlide_block_fops);
 
+    result = register_blkdev(XLIDE_MAJOR, XLIDE_MAJOR_NAME, 
+                             &xlide_block_fops);
+    if ( result < 0 )
+    {
+	printk (KERN_ALERT "XL IDE: can't get major %d\n", XLIDE_MAJOR);
+	return result;
+    }
+
+    /* Initialize global arrays. */
+    for ( i = 0; i < XLIDE_MAX; i++ )
+    {
+	xlide_blksize_size[i]  = 512;
+	xlide_hardsect_size[i] = 512;
+	xlide_max_sectors[i]   = 128;
+    }
+
+    blk_size[XLIDE_MAJOR]      = NULL;
+    blksize_size[XLIDE_MAJOR]  = xlide_blksize_size;
+    hardsect_size[XLIDE_MAJOR] = xlide_hardsect_size;
+    max_sectors[XLIDE_MAJOR]   = xlide_max_sectors;
+    read_ahead[XLIDE_MAJOR]    = 8;
+
+    blk_init_queue(BLK_DEFAULT_QUEUE(XLIDE_MAJOR), do_xlblk_request);
+
+    /*
+     * Turn off barking 'headactive' mode. We dequeue buffer heads as
+     * soon as we pass them down to Xen.
+     */
+    blk_queue_headactive(BLK_DEFAULT_QUEUE(XLIDE_MAJOR), 0);
+
+    /* Count number of IDE devices installed in the system. */
+    units = 0;
+    for ( i = 0; i < xdi->count; i++ )
+        if ( xdi->disks[i].type == XEN_DISK_IDE ) units++;
+
+    /* Construct an appropriate gendisk structure. */
     minors    = units * (1<<IDE_PARTN_BITS);
-    gd        = kmalloc (sizeof(struct gendisk), GFP_KERNEL);
-    gd->sizes = kmalloc (minors * sizeof(int), GFP_KERNEL);
-    gd->part  = kmalloc (minors * sizeof(struct hd_struct), GFP_KERNEL);
-    memset(gd->part, 0, minors * sizeof(struct hd_struct));
-    
-    gd->major        = xlide_major;         /* XXX should be idx-specific */
-    gd->major_name   = XLIDE_MAJOR_NAME;    /* XXX should be idx-specific */
+    gd        = kmalloc(sizeof(struct gendisk), GFP_KERNEL);
+    gd->sizes = kmalloc(minors * sizeof(int), GFP_KERNEL);
+    gd->part  = kmalloc(minors * sizeof(struct hd_struct), GFP_KERNEL);
+    gd->major        = XLIDE_MAJOR;
+    gd->major_name   = XLIDE_MAJOR_NAME;
     gd->minor_shift  = IDE_PARTN_BITS; 
     gd->max_p	     = 1<<IDE_PARTN_BITS;
     gd->nr_real	     = units;           
     gd->real_devices = NULL;          
     gd->next	     = NULL;            
     gd->fops         = &xlide_block_fops;
-    gd->de_arr       = kmalloc (sizeof *gd->de_arr * units, GFP_KERNEL);
-    gd->flags	     = kmalloc (sizeof *gd->flags * units, GFP_KERNEL);
-
-    if (gd->de_arr)  
-	memset (gd->de_arr, 0, sizeof *gd->de_arr * units);
-
-    if (gd->flags) 
-	memset (gd->flags, 0, sizeof *gd->flags * units);
-
+    gd->de_arr       = kmalloc(sizeof(*gd->de_arr) * units, GFP_KERNEL);
+    gd->flags	     = kmalloc(sizeof(*gd->flags) * units, GFP_KERNEL);
+    memset(gd->sizes, 0, minors * sizeof(int));
+    memset(gd->part,  0, minors * sizeof(struct hd_struct));
+    memset(gd->de_arr, 0, sizeof(*gd->de_arr) * units);
+    memset(gd->flags, 0, sizeof(*gd->flags) * units);
+    xlide_gendisk = gd;
     add_gendisk(gd);
 
-    xen_disk_info.disks[xidx].gendisk = gd;
-
-    /* XXX major should be idx-specific */
-    register_disk(gd, MKDEV(xlide_major, 0), 1<<IDE_PARTN_BITS, 
-		  &xlide_block_fops, xen_disk_info.disks[xidx].capacity);
-
-    return;
-}
-
-
-
-/*
-** Initialize a XenoLinux IDE disk; the 'xidx' is the index into the 
-** xen_disk_info array so we can grab interesting values; the 'idx' is 
-** a count of the number of XLSCSI disks we've seen so far, starting at 0
-** XXX SMH: this is all so ugly because the xen_disk_info() structure and 
-** array doesn't really give us what we want. Ho hum. To be tidied someday. 
-*/
-int xlide_init(int xidx, int idx) 
-{
-    int i, major, result;
-
-    SET_MODULE_OWNER(&xlide_block_fops);
-
-    major  = xlide_major + idx;  /* XXX assume we have a linear major space */
-
-    /* XXX SMH: name below should vary with major */
-    result = register_blkdev(major, XLIDE_MAJOR_NAME, &xlide_block_fops);
-    if (result < 0) {
-	printk (KERN_ALERT "XL IDE: can't get major %d\n",
-		major);
-	return result;
+    /* Now register each disk in turn. */
+    disk = 0;
+    for ( i = 0; i < xdi->count; i++ )
+    {
+        if ( xdi->disks[i].type != XEN_DISK_IDE ) continue;
+        register_disk(gd, 
+                      MKDEV(XLIDE_MAJOR, disk<<IDE_PARTN_BITS), 
+                      1<<IDE_PARTN_BITS, 
+                      &xlide_block_fops, 
+                      xdi->disks[i].capacity);
+        disk++;
     }
-
-    /* initialize global arrays in drivers/block/ll_rw_block.c */
-    for (i = 0; i < XLIDE_MAX; i++) {
-	xlide_blk_size[i]      = xen_disk_info.disks[0].capacity;
-	xlide_blksize_size[i]  = 512;
-	xlide_hardsect_size[i] = 512;
-	xlide_max_sectors[i]   = 128;
-    }
-    xlide_read_ahead  = 8; 
-
-    blk_size[major]      = xlide_blk_size;
-    blksize_size[major]  = xlide_blksize_size;
-    hardsect_size[major] = xlide_hardsect_size;
-    read_ahead[major]    = xlide_read_ahead; 
-    max_sectors[major]   = xlide_max_sectors;
-
-    blk_init_queue(BLK_DEFAULT_QUEUE(major), do_xlblk_request);
-
-    /*
-     * Turn off barking 'headactive' mode. We dequeue buffer heads as
-     * soon as we pass them down to Xen.
-     */
-    blk_queue_headactive(BLK_DEFAULT_QUEUE(major), 0);
-
-    xlide_register_disk(xidx, idx); 
-
+   
     printk(KERN_ALERT 
 	   "XenoLinux Virtual IDE Device Driver installed [device: %d]\n",
-	   major);
+	   XLIDE_MAJOR);
 
     return 0;
 }
@@ -169,32 +123,34 @@ int xlide_init(int xidx, int idx)
 
 void xlide_cleanup(void)
 {
-    /* CHANGE FOR MULTIQUEUE */
-    blk_cleanup_queue(BLK_DEFAULT_QUEUE(xlide_major));
+    blk_cleanup_queue(BLK_DEFAULT_QUEUE(XLIDE_MAJOR));
 
-    /* clean up global arrays */
-    read_ahead[xlide_major] = 0;
+    xlide_gendisk = NULL;
 
-    if (blk_size[xlide_major]) 
-	kfree(blk_size[xlide_major]);
-    blk_size[xlide_major] = NULL;
+    read_ahead[XLIDE_MAJOR] = 0;
 
-    if (blksize_size[xlide_major]) 
-	kfree(blksize_size[xlide_major]);
-    blksize_size[xlide_major] = NULL;
+    if ( blksize_size[XLIDE_MAJOR] != NULL )
+    { 
+	kfree(blksize_size[XLIDE_MAJOR]);
+        blksize_size[XLIDE_MAJOR] = NULL;
+    }
 
-    if (hardsect_size[xlide_major]) 
-	kfree(hardsect_size[xlide_major]);
-    hardsect_size[xlide_major] = NULL;
+    if ( hardsect_size[XLIDE_MAJOR] != NULL )
+    { 
+	kfree(hardsect_size[XLIDE_MAJOR]);
+        hardsect_size[XLIDE_MAJOR] = NULL;
+    }
     
-    /* XXX: free each gendisk */
-    if (unregister_blkdev(xlide_major, XLIDE_MAJOR_NAME))
+    if ( max_sectors[XLIDE_MAJOR] != NULL )
+    { 
+	kfree(max_sectors[XLIDE_MAJOR]);
+        max_sectors[XLIDE_MAJOR] = NULL;
+    }
+    
+    if ( unregister_blkdev(XLIDE_MAJOR, XLIDE_MAJOR_NAME) != 0 )
+    {
 	printk(KERN_ALERT
 	       "XenoLinux Virtual IDE Device Driver uninstalled w/ errs\n");
-    else
-	printk(KERN_ALERT 
-	       "XenoLinux Virtual IDE Device Driver uninstalled\n");
-
-    return;
+    }
 }
 

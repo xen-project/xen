@@ -5,58 +5,20 @@
  * 
  */
 
-#include <linux/config.h>
-#include <linux/module.h>
+#include "xl_block.h"
 
-#include <linux/kernel.h>
-#include <linux/sched.h>
-#include <linux/slab.h>
-#include <linux/string.h>
-#include <linux/errno.h>
-
-#include <linux/fs.h>
-#include <linux/hdreg.h>
-#include <linux/blkdev.h>
-#include <linux/major.h>
-
-#define MAJOR_NR XLSCSI_MAJOR   /* force defns in blk.h, must precede include */
-static int xlscsi_major = XLSCSI_MAJOR;
+#define MAJOR_NR XLSCSI_MAJOR
 #include <linux/blk.h>
 
-/* Copied from linux/ide.h */
-typedef unsigned char	byte; 
-
-void xlscsi_ide_register_disk(int, unsigned long);
-
-#define SCSI_DISKS_PER_MAJOR 16    /* max number of devices per scsi major */
-#define XLSCSI_MAX 32              /* maximum minor devices we support */
+/* We support up to 16 devices of up to 16 partitions each. */
+#define XLSCSI_MAX        256
 #define XLSCSI_MAJOR_NAME "xsd"
-
-static int xlscsi_blk_size[XLSCSI_MAX];
+#define SCSI_PARTN_BITS   4
 static int xlscsi_blksize_size[XLSCSI_MAX];
-static int xlscsi_read_ahead; 
 static int xlscsi_hardsect_size[XLSCSI_MAX];
 static int xlscsi_max_sectors[XLSCSI_MAX];
 
-#if 0
-#define DPRINTK(_f, _a...) printk ( KERN_ALERT _f , ## _a )
-#define DPRINTK_IOCTL(_f, _a...) printk ( KERN_ALERT _f , ## _a )
-#else
-#define DPRINTK(_f, _a...) ((void)0)
-#define DPRINTK_IOCTL(_f, _a...) ((void)0)
-#endif
-
-extern xen_disk_info_t xen_disk_info;
-
-extern int xenolinux_block_open(struct inode *inode, struct file *filep);
-extern int xenolinux_block_release(struct inode *inode, struct file *filep);
-extern int xenolinux_block_ioctl(struct inode *inode, struct file *filep,
-				 unsigned command, unsigned long argument);
-extern int xenolinux_block_check(kdev_t dev);
-extern int xenolinux_block_revalidate(kdev_t dev);
-
-
-extern void do_xlblk_request (request_queue_t *rq); 
+struct gendisk *xlscsi_gendisk = NULL;
 
 static struct block_device_operations xlscsi_block_fops = 
 {
@@ -75,137 +37,121 @@ int xlscsi_hwsect(int minor)
 } 
 
 
-void xlscsi_register_disk(int xidx, int idx)
+int xlscsi_init(xen_disk_info_t *xdi) 
 {
-    int minors;
+    int i, result, units, minors, disk;
     struct gendisk *gd;
-    unsigned long capacity; 
-
-    minors    = XLSCSI_MAX; 
-    gd        = kmalloc (sizeof(struct gendisk), GFP_KERNEL);
-    gd->sizes = kmalloc (minors * sizeof(int), GFP_KERNEL);
-    gd->part  = kmalloc (minors * sizeof(struct hd_struct), GFP_KERNEL);
-    memset(gd->part, 0, minors * sizeof(struct hd_struct));
-    
-    if(idx > 0) 
-	printk("xlscsi_register_disk: need fix to handle "
-	       "multiple SCSI majors!\n"); 
-    
-    gd->major        = xlscsi_major;       /* XXX should be idx-specific */
-    gd->major_name   = XLSCSI_MAJOR_NAME;  /* XXX should be idx-specific */
-    gd->minor_shift  = 4; 
-    gd->max_p	     = 1<<4; 
-    gd->nr_real	     = SCSI_DISKS_PER_MAJOR; 
-    gd->real_devices = NULL;          
-    gd->next	     = NULL;            
-    gd->fops         = &xlscsi_block_fops;
-    gd->de_arr       = kmalloc (sizeof *gd->de_arr * SCSI_DISKS_PER_MAJOR, 
-				GFP_KERNEL);
-    gd->flags	     = kmalloc (sizeof *gd->flags * SCSI_DISKS_PER_MAJOR, 
-				GFP_KERNEL);
-
-    if (gd->de_arr)  
-	memset (gd->de_arr, 0, sizeof *gd->de_arr * SCSI_DISKS_PER_MAJOR);
-
-    if (gd->flags) 
-	memset (gd->flags, 0, sizeof *gd->flags * SCSI_DISKS_PER_MAJOR);
-
-    add_gendisk(gd);
-
-    xen_disk_info.disks[xidx].gendisk = gd;
-
-    /* XXX major below should be idx-specific */
-    register_disk(gd, MKDEV(xlscsi_major, 0), 1<<4, &xlscsi_block_fops, 
-		  xen_disk_info.disks[xidx].capacity);
-
-    return;
-}
-
-
-/*
-** Initialize a XenoLinux SCSI disk; the 'xidx' is the index into the 
-** xen_disk_info array so we can grab interesting values; the 'idx' is 
-** a count of the number of XLSCSI disks we've seen so far, starting at 0
-** XXX SMH: this is all so ugly because the xen_disk_info() structure and 
-** array doesn't really give us what we want. Ho hum. To be tidied someday. 
-*/
-int xlscsi_init(int xidx, int idx)
-{
-    int i, major, result;
 
     SET_MODULE_OWNER(&xlscsi_block_fops);
 
-    major  = xlscsi_major + idx;   /* XXX asume we have linear major space */
-    
-    /* XXX SMH: 'name' below should vary for different major values */
-    result = register_blkdev(major, XLSCSI_MAJOR_NAME, &xlscsi_block_fops);
-
-    if (result < 0) {
-	printk (KERN_ALERT "XL SCSI: can't get major %d\n", major);
+    result = register_blkdev(XLSCSI_MAJOR, XLSCSI_MAJOR_NAME, 
+                             &xlscsi_block_fops);
+    if ( result < 0 )
+    {
+	printk (KERN_ALERT "XL SCSI: can't get major %d\n", XLSCSI_MAJOR);
 	return result;
     }
 
-    /* initialize global arrays in drivers/block/ll_rw_block.c */
-    for (i = 0; i < XLSCSI_MAX; i++) {
-	xlscsi_blk_size[i]      = xen_disk_info.disks[xidx].capacity;
+    /* Initialize global arrays. */
+    for ( i = 0; i < XLSCSI_MAX; i++ )
+    {
 	xlscsi_blksize_size[i]  = 512;
 	xlscsi_hardsect_size[i] = 512;
 	xlscsi_max_sectors[i]   = 128;
     }
-    xlscsi_read_ahead  = 8; 
 
-    blk_size[major]      = xlscsi_blk_size;
-    blksize_size[major]  = xlscsi_blksize_size;
-    hardsect_size[major] = xlscsi_hardsect_size;
-    read_ahead[major]    = xlscsi_read_ahead; 
-    max_sectors[major]   = xlscsi_max_sectors;
+    blk_size[XLSCSI_MAJOR]      = NULL;
+    blksize_size[XLSCSI_MAJOR]  = xlscsi_blksize_size;
+    hardsect_size[XLSCSI_MAJOR] = xlscsi_hardsect_size;
+    max_sectors[XLSCSI_MAJOR]   = xlscsi_max_sectors;
+    read_ahead[XLSCSI_MAJOR]    = 8;
 
-    blk_init_queue(BLK_DEFAULT_QUEUE(major), do_xlblk_request);
+    blk_init_queue(BLK_DEFAULT_QUEUE(XLSCSI_MAJOR), do_xlblk_request);
 
     /*
      * Turn off barking 'headactive' mode. We dequeue buffer heads as
      * soon as we pass them down to Xen.
      */
-    blk_queue_headactive(BLK_DEFAULT_QUEUE(major), 0);
-    
-    xlscsi_register_disk(xidx, idx);
+    blk_queue_headactive(BLK_DEFAULT_QUEUE(XLSCSI_MAJOR), 0);
 
+    /* Count number of SCSI devices installed in the system. */
+    units = 0;
+    for ( i = 0; i < xdi->count; i++ )
+        if ( xdi->disks[i].type == XEN_DISK_SCSI ) units++;
+
+    /* Construct an appropriate gendisk structure. */
+    minors    = units * (1<<SCSI_PARTN_BITS);
+    gd        = kmalloc(sizeof(struct gendisk), GFP_KERNEL);
+    gd->sizes = kmalloc(minors * sizeof(int), GFP_KERNEL);
+    gd->part  = kmalloc(minors * sizeof(struct hd_struct), GFP_KERNEL);
+    gd->major        = XLSCSI_MAJOR;
+    gd->major_name   = XLSCSI_MAJOR_NAME;
+    gd->minor_shift  = SCSI_PARTN_BITS; 
+    gd->max_p	     = 1<<SCSI_PARTN_BITS;
+    gd->nr_real	     = units;           
+    gd->real_devices = NULL;          
+    gd->next	     = NULL;            
+    gd->fops         = &xlscsi_block_fops;
+    gd->de_arr       = kmalloc(sizeof(*gd->de_arr) * units, GFP_KERNEL);
+    gd->flags	     = kmalloc(sizeof(*gd->flags) * units, GFP_KERNEL);
+    memset(gd->sizes, 0, minors * sizeof(int));
+    memset(gd->part,  0, minors * sizeof(struct hd_struct));
+    memset(gd->de_arr, 0, sizeof(*gd->de_arr) * units);
+    memset(gd->flags, 0, sizeof(*gd->flags) * units);
+    xlscsi_gendisk = gd;
+    add_gendisk(gd);
+
+    /* Now register each disk in turn. */
+    disk = 0;
+    for ( i = 0; i < xdi->count; i++ )
+    {
+        if ( xdi->disks[i].type != XEN_DISK_SCSI ) continue;
+        register_disk(gd,
+                      MKDEV(XLSCSI_MAJOR, disk<<SCSI_PARTN_BITS), 
+                      1<<SCSI_PARTN_BITS, 
+                      &xlscsi_block_fops, 
+                      xdi->disks[i].capacity);
+        disk++;
+    }
+   
     printk(KERN_ALERT 
 	   "XenoLinux Virtual SCSI Device Driver installed [device: %d]\n",
-	   major);
+	   XLSCSI_MAJOR);
+
     return 0;
 }
 
 
-
 void xlscsi_cleanup(void)
 {
-    /* CHANGE FOR MULTIQUEUE */
-    blk_cleanup_queue(BLK_DEFAULT_QUEUE(xlscsi_major));
+    blk_cleanup_queue(BLK_DEFAULT_QUEUE(XLSCSI_MAJOR));
 
-    /* clean up global arrays */
-    read_ahead[xlscsi_major] = 0;
+    xlscsi_gendisk = NULL;
 
-    if (blk_size[xlscsi_major]) 
-	kfree(blk_size[xlscsi_major]);
-    blk_size[xlscsi_major] = NULL;
+    read_ahead[XLSCSI_MAJOR] = 0;
 
-    if (blksize_size[xlscsi_major]) 
-	kfree(blksize_size[xlscsi_major]);
-    blksize_size[xlscsi_major] = NULL;
+    if ( blksize_size[XLSCSI_MAJOR] != NULL )
+    { 
+	kfree(blksize_size[XLSCSI_MAJOR]);
+        blksize_size[XLSCSI_MAJOR] = NULL;
+    }
 
-    if (hardsect_size[xlscsi_major]) 
-	kfree(hardsect_size[xlscsi_major]);
-    hardsect_size[xlscsi_major] = NULL;
+    if ( hardsect_size[XLSCSI_MAJOR] != NULL )
+    { 
+	kfree(hardsect_size[XLSCSI_MAJOR]);
+        hardsect_size[XLSCSI_MAJOR] = NULL;
+    }
     
-    /* XXX: free each gendisk */
-    if (unregister_blkdev(xlscsi_major, XLSCSI_MAJOR_NAME))
+    if ( max_sectors[XLSCSI_MAJOR] != NULL )
+    { 
+	kfree(max_sectors[XLSCSI_MAJOR]);
+        max_sectors[XLSCSI_MAJOR] = NULL;
+    }
+    
+    if ( unregister_blkdev(XLSCSI_MAJOR, XLSCSI_MAJOR_NAME) != 0 )
+    {
 	printk(KERN_ALERT
 	       "XenoLinux Virtual SCSI Device Driver uninstalled w/ errs\n");
-    else
-	printk(KERN_ALERT 
-	       "XenoLinux Virtual SCSI Device Driver uninstalled\n");
-
-    return;
+    }
 }
 
