@@ -422,7 +422,7 @@ void free_domheap_pages(struct pfn_info *pg, int order)
         drop_dom_ref = (d->xenheap_pages == 0);
         spin_unlock_recursive(&d->page_alloc_lock);
     }
-    else
+    else if ( likely(d != NULL) )
     {
         /* NB. May recursively lock from domain_relinquish_memory(). */
         spin_lock_recursive(&d->page_alloc_lock);
@@ -441,6 +441,12 @@ void free_domheap_pages(struct pfn_info *pg, int order)
         spin_unlock_recursive(&d->page_alloc_lock);
 
         free_heap_pages(MEMZONE_DOM, pg, order);
+    }
+    else
+    {
+        /* Freeing an anonymous domain-heap page. */
+        free_heap_pages(MEMZONE_DOM, pg, order);
+        drop_dom_ref = 0;
     }
 
     if ( drop_dom_ref )
