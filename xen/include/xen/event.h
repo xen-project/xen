@@ -29,7 +29,7 @@ static inline void evtchn_set_pending(struct exec_domain *ed, int port)
     /* These three operations must happen in strict order. */
     if ( !test_and_set_bit(port,    &s->evtchn_pending[0]) &&
          !test_bit        (port,    &s->evtchn_mask[0])    &&
-         !test_and_set_bit(port>>5, &s->evtchn_pending_sel) )
+         !test_and_set_bit(port>>5, &ed->vcpu_info->evtchn_pending_sel) )
     {
         /* The VCPU pending flag must be set /after/ update to evtchn-pend. */
         set_bit(0, &ed->vcpu_info->evtchn_upcall_pending);

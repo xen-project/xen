@@ -51,16 +51,17 @@
 #include <asm/desc.h>
 #include <asm/arch_hooks.h>
 
-#if 0
+#if 1
+#define Dprintk(args...)
+#define xxprint(msg) HYPERVISOR_console_io(CONSOLEIO_write, strlen(msg), msg)
+#else
 #include <mach_apic.h>
 #endif
 #include <mach_wakecpu.h>
 #include <smpboot_hooks.h>
 
-#if 0
 /* Set if we find a B stepping CPU */
 static int __initdata smp_b_stepping;
-#endif
 
 /* Number of siblings per CPU package */
 int smp_num_siblings = 1;
@@ -113,7 +114,14 @@ static unsigned long __init setup_trampoline(void)
 void __init smp_alloc_memory(void)
 {
 #if 1
-	printk("smp_alloc_memory\n");
+	int cpu;
+
+	xxprint("smp_alloc_memory\n");
+	for (cpu = 1; cpu < NR_CPUS; cpu++) {
+		cpu_gdt_descr[cpu].address = (unsigned long)
+			alloc_bootmem_low_pages(PAGE_SIZE);
+		/* XXX free unused pages later */
+	}
 #else
 	trampoline_base = (void *) alloc_bootmem_low_pages(PAGE_SIZE);
 	/*
@@ -134,7 +142,6 @@ void __init smp_alloc_memory(void)
  * a given CPU
  */
 
-#if 0
 static void __init smp_store_cpu_info(int id)
 {
 	struct cpuinfo_x86 *c = cpu_data + id;
@@ -187,7 +194,6 @@ static void __init smp_store_cpu_info(int id)
 valid_k7:
 	;
 }
-#endif
 
 #if 0
 /*
@@ -328,18 +334,16 @@ static void __init synchronize_tsc_ap (void)
 #undef NR_LOOPS
 
 extern void calibrate_delay(void);
+#endif
 
 static atomic_t init_deasserted;
-#endif
 
 void __init smp_callin(void)
 {
-#if 1
-	printk("smp_callin\n");
-#else
 	int cpuid, phys_id;
 	unsigned long timeout;
 
+#if 0
 	/*
 	 * If waken up by an INIT in an 82489DX configuration
 	 * we may get here before an INIT-deassert IPI reaches
@@ -347,11 +351,12 @@ void __init smp_callin(void)
 	 * lock up on an APIC access.
 	 */
 	wait_for_init_deassert(&init_deasserted);
+#endif
 
 	/*
 	 * (This works even if the APIC is not enabled.)
 	 */
-	phys_id = GET_APIC_ID(apic_read(APIC_ID));
+	phys_id = smp_processor_id();
 	cpuid = smp_processor_id();
 	if (cpu_isset(cpuid, cpu_callin_map)) {
 		printk("huh, phys CPU#%d, CPU#%d already present??\n",
@@ -387,6 +392,7 @@ void __init smp_callin(void)
 		BUG();
 	}
 
+#if 0
 	/*
 	 * the boot CPU has finished the init stage and is spinning
 	 * on callin_map until we finish. We are free to set up this
@@ -405,6 +411,7 @@ void __init smp_callin(void)
 	 * Get our bogomips.
 	 */
 	calibrate_delay();
+#endif
 	Dprintk("Stack at about %p\n",&cpuid);
 
 	/*
@@ -412,13 +419,16 @@ void __init smp_callin(void)
 	 */
  	smp_store_cpu_info(cpuid);
 
+#if 0
 	disable_APIC_timer();
 	local_irq_disable();
+#endif
 	/*
 	 * Allow the master to continue.
 	 */
 	cpu_set(cpuid, cpu_callin_map);
 
+#if 0
 	/*
 	 *      Synchronize the TSC with the BP
 	 */
@@ -436,8 +446,48 @@ extern int cpu_idle(void);
  */
 int __init start_secondary(void *unused)
 {
+	/*
+	 * Dont put anything before smp_callin(), SMP
+	 * booting is too fragile that we want to limit the
+	 * things done here to the most necessary things.
+	 */
+	cpu_init();
+	smp_callin();
+	while (!cpu_isset(smp_processor_id(), smp_commenced_mask))
+		rep_nop();
 #if 1
-	printk("start_secondary\n");
+	if (0) {
+		char *msg = "start_secondary\n";
+		char *msg2 = "delay2\n";
+		int timeout;
+		(void)HYPERVISOR_console_io(CONSOLEIO_write, strlen(msg), msg);
+		for (timeout = 0; timeout < 50000; timeout++) {
+			udelay(100);
+			if (timeout == 20000) {
+				(void)HYPERVISOR_console_io(CONSOLEIO_write, strlen(msg2), msg2);
+				timeout = 0;
+			}
+		}
+	}
+	// enable_APIC_timer();
+	/*
+	 * low-memory mappings have been cleared, flush them from
+	 * the local TLBs too.
+	 */
+	// local_flush_tlb();
+	cpu_set(smp_processor_id(), cpu_online_map);
+	wmb();
+	if (10) {
+		char *msg2 = "delay2\n";
+		int timeout;
+		for (timeout = 0; timeout < 50000; timeout++) {
+			udelay(1000);
+			if (timeout == 2000) {
+				(void)HYPERVISOR_console_io(CONSOLEIO_write, strlen(msg2), msg2);
+				timeout = 0;
+			}
+		}
+	}
 	return cpu_idle();
 #else
 	/*
@@ -531,7 +581,7 @@ u8 cpu_2_logical_apicid[NR_CPUS] = { [0 ... NR_CPUS-1] = BAD_APICID };
 void map_cpu_to_logical_apicid(void)
 {
 #if 1
-	printk("map_cpu_to_logical_apicid\n");
+	xxprint("map_cpu_to_logical_apicid\n");
 #else
 	int cpu = smp_processor_id();
 	int apicid = logical_smp_processor_id();
@@ -642,7 +692,7 @@ static int __init
 wakeup_secondary_cpu(int phys_apicid, unsigned long start_eip)
 {
 #if 1
-	printk("wakeup_secondary_cpu\n");
+	xxprint("wakeup_secondary_cpu\n");
 	return 0;
 #else
 	unsigned long send_status = 0, accept_status = 0;
@@ -780,7 +830,6 @@ wakeup_secondary_cpu(int phys_apicid, unsigned long start_eip)
 
 extern cpumask_t cpu_initialized;
 
-#if 0
 static int __init do_boot_cpu(int apicid)
 /*
  * NOTE - on most systems this is a PHYSICAL apic ID, but on multiquad
@@ -792,7 +841,14 @@ static int __init do_boot_cpu(int apicid)
 	unsigned long boot_error;
 	int timeout, cpu;
 	unsigned long start_eip;
+#if 0
 	unsigned short nmi_high = 0, nmi_low = 0;
+#endif
+	full_execution_context_t ctxt;
+	extern void startup_32_smp(void);
+	extern void hypervisor_callback(void);
+	extern void failsafe_callback(void);
+	int i;
 
 	cpu = ++cpucount;
 	/*
@@ -804,7 +860,7 @@ static int __init do_boot_cpu(int apicid)
 		panic("failed fork for CPU %d", cpu);
 	idle->thread.eip = (unsigned long) start_secondary;
 	/* start_eip had better be page-aligned! */
-	start_eip = setup_trampoline();
+	start_eip = (unsigned long)startup_32_smp;
 
 	/* So we see what's up   */
 	printk("Booting processor %d/%d eip %lx\n", cpu, apicid, start_eip);
@@ -820,6 +876,107 @@ static int __init do_boot_cpu(int apicid)
 
 	atomic_set(&init_deasserted, 0);
 
+#if 1
+	if (cpu_gdt_descr[0].size > PAGE_SIZE)
+		BUG();
+	cpu_gdt_descr[cpu].size = cpu_gdt_descr[0].size;
+	memcpy((void *)cpu_gdt_descr[cpu].address,
+	       (void *)cpu_gdt_descr[0].address, cpu_gdt_descr[0].size);
+		memset((char *)cpu_gdt_descr[cpu].address +
+		       FIRST_RESERVED_GDT_ENTRY * 8, 0,
+		       NR_RESERVED_GDT_ENTRIES * 8);
+
+	memset(&ctxt, 0, sizeof(ctxt));
+
+	ctxt.cpu_ctxt.ds = __USER_DS;
+	ctxt.cpu_ctxt.es = __USER_DS;
+	ctxt.cpu_ctxt.fs = 0;
+	ctxt.cpu_ctxt.gs = 0;
+	ctxt.cpu_ctxt.ss = __KERNEL_DS;
+	ctxt.cpu_ctxt.cs = __KERNEL_CS;
+	ctxt.cpu_ctxt.eip = start_eip;
+	ctxt.cpu_ctxt.esp = idle->thread.esp;
+	ctxt.cpu_ctxt.eflags = (1<<9) | (1<<2);
+
+	/* FPU is set up to default initial state. */
+	memset(ctxt.fpu_ctxt, 0, sizeof(ctxt.fpu_ctxt));
+
+	/* Virtual IDT is empty at start-of-day. */
+	for ( i = 0; i < 256; i++ )
+	{
+		ctxt.trap_ctxt[i].vector = i;
+		ctxt.trap_ctxt[i].cs     = FLAT_GUESTOS_CS;
+	}
+	ctxt.fast_trap_idx = 0;
+
+	/* No LDT. */
+	ctxt.ldt_ents = 0;
+
+	{
+		unsigned long va;
+		int f;
+
+		for (va = cpu_gdt_descr[cpu].address, f = 0;
+		     va < cpu_gdt_descr[cpu].address + cpu_gdt_descr[cpu].size;
+		     va += PAGE_SIZE, f++) {
+			ctxt.gdt_frames[f] = virt_to_machine(va) >> PAGE_SHIFT;
+			protect_page(swapper_pg_dir, (void *)va, PROT_ON);
+		}
+		ctxt.gdt_ents = cpu_gdt_descr[cpu].size / 8;
+		flush_page_update_queue();
+	}
+
+	/* Ring 1 stack is the initial stack. */
+	ctxt.guestos_ss  = __KERNEL_DS;
+	ctxt.guestos_esp = idle->thread.esp;
+
+	/* Callback handlers. */
+	ctxt.event_callback_cs     = __KERNEL_CS;
+	ctxt.event_callback_eip    = (unsigned long)hypervisor_callback;
+	ctxt.failsafe_callback_cs  = __KERNEL_CS;
+	ctxt.failsafe_callback_eip = (unsigned long)failsafe_callback;
+
+	ctxt.pt_base = (unsigned long)virt_to_machine(swapper_pg_dir);
+
+	boot_error = HYPERVISOR_boot_vcpu(cpu, &ctxt);
+
+	if (!boot_error) {
+		/*
+		 * allow APs to start initializing.
+		 */
+		Dprintk("Before Callout %d.\n", cpu);
+		cpu_set(cpu, cpu_callout_map);
+		Dprintk("After Callout %d.\n", cpu);
+
+		/*
+		 * Wait 5s total for a response
+		 */
+		for (timeout = 0; timeout < 50000; timeout++) {
+			if (cpu_isset(cpu, cpu_callin_map))
+				break;	/* It has booted */
+			udelay(100);
+		}
+
+		if (cpu_isset(cpu, cpu_callin_map)) {
+			/* number CPUs logically, starting from 1 (BSP is 0) */
+			Dprintk("OK.\n");
+			printk("CPU%d: ", cpu);
+			print_cpu_info(&cpu_data[cpu]);
+			Dprintk("CPU has booted.\n");
+		} else {
+			boot_error= 1;
+		}
+	}
+	x86_cpu_to_apicid[cpu] = apicid;
+	if (boot_error) {
+		/* Try to put things back the way they were before ... */
+		// unmap_cpu_to_logical_apicid(cpu);
+		cpu_clear(cpu, cpu_callout_map); /* was set here (do_boot_cpu()) */
+		cpu_clear(cpu, cpu_initialized); /* was set by cpu_init() */
+		cpucount--;
+	}
+
+#else
 	Dprintk("Setting warm reset code and vector.\n");
 
 	store_NMI_vector(&nmi_high, &nmi_low);
@@ -877,14 +1034,13 @@ static int __init do_boot_cpu(int apicid)
 
 	/* mark "stuck" area as not stuck */
 	*((volatile unsigned long *)trampoline_base) = 0;
+#endif
 
 	return boot_error;
 }
 
 cycles_t cacheflush_time;
-#endif
 unsigned long cache_decay_ticks;
-#if 0
 
 static void smp_tune_scheduling (void)
 {
@@ -931,6 +1087,7 @@ static void smp_tune_scheduling (void)
  * Cycle through the processors sending APIC IPIs to boot each.
  */
 
+#if 0
 static int boot_cpu_logical_apicid;
 #endif
 /* Where the IO area was mapped on multiquad, always 0 otherwise */
@@ -940,11 +1097,11 @@ cpumask_t cpu_sibling_map[NR_CPUS] __cacheline_aligned;
 
 static void __init smp_boot_cpus(unsigned int max_cpus)
 {
-#if 1
-	printk("smp_boot_cpus %d\n", max_cpus);
-#else
-	int apicid, cpu, bit, kicked;
+	int cpu, kicked;
 	unsigned long bogosum = 0;
+#if 0
+	int apicid, bit;
+#endif
 
 	/*
 	 * Setup boot CPU information
@@ -953,9 +1110,15 @@ static void __init smp_boot_cpus(unsigned int max_cpus)
 	printk("CPU%d: ", 0);
 	print_cpu_info(&cpu_data[0]);
 
+#if 0
 	boot_cpu_physical_apicid = GET_APIC_ID(apic_read(APIC_ID));
 	boot_cpu_logical_apicid = logical_smp_processor_id();
 	x86_cpu_to_apicid[0] = boot_cpu_physical_apicid;
+#else
+	// boot_cpu_physical_apicid = 0;
+	// boot_cpu_logical_apicid = 0;
+	x86_cpu_to_apicid[0] = 0;
+#endif
 
 	current_thread_info()->cpu = 0;
 	smp_tune_scheduling();
@@ -966,17 +1129,20 @@ static void __init smp_boot_cpus(unsigned int max_cpus)
 	 * If we couldn't find an SMP configuration at boot time,
 	 * get out of here now!
 	 */
-	if (!smp_found_config && !acpi_lapic) {
+	if (!smp_found_config /* && !acpi_lapic) */) {
 		printk(KERN_NOTICE "SMP motherboard not detected.\n");
 		smpboot_clear_io_apic_irqs();
+#if 0
 		phys_cpu_present_map = physid_mask_of_physid(0);
 		if (APIC_init_uniprocessor())
 			printk(KERN_NOTICE "Local APIC not detected."
 					   " Using dummy APIC emulation.\n");
+#endif
 		map_cpu_to_logical_apicid();
 		return;
 	}
 
+#if 0
 	/*
 	 * Should not be necessary because the MP table should list the boot
 	 * CPU too, but we do it for the sake of robustness anyway.
@@ -1001,18 +1167,22 @@ static void __init smp_boot_cpus(unsigned int max_cpus)
 	}
 
 	verify_local_APIC();
+#endif
 
 	/*
 	 * If SMP should be disabled, then really disable it!
 	 */
 	if (!max_cpus) {
-		smp_found_config = 0;
+		HYPERVISOR_shared_info->n_vcpu = 1;
 		printk(KERN_INFO "SMP mode deactivated, forcing use of dummy APIC emulation.\n");
 		smpboot_clear_io_apic_irqs();
+#if 0
 		phys_cpu_present_map = physid_mask_of_physid(0);
+#endif
 		return;
 	}
 
+#if 0
 	connect_bsp_APIC();
 	setup_local_APIC();
 	map_cpu_to_logical_apicid();
@@ -1028,32 +1198,29 @@ static void __init smp_boot_cpus(unsigned int max_cpus)
 	 * clustered apic ID.
 	 */
 	Dprintk("CPU present map: %lx\n", physids_coerce(phys_cpu_present_map));
+#endif
+	Dprintk("CPU present map: %lx\n",
+		(1UL << HYPERVISOR_shared_info->n_vcpu) - 1);
 
 	kicked = 1;
-	for (bit = 0; kicked < NR_CPUS && bit < MAX_APICS; bit++) {
-		apicid = cpu_present_to_apicid(bit);
-		/*
-		 * Don't even attempt to start the boot CPU!
-		 */
-		if ((apicid == boot_cpu_apicid) || (apicid == BAD_APICID))
-			continue;
-
-		if (!check_apicid_present(bit))
-			continue;
+	for (cpu = 1; kicked < NR_CPUS &&
+		     cpu < HYPERVISOR_shared_info->n_vcpu; cpu++) {
 		if (max_cpus <= cpucount+1)
 			continue;
 
-		if (do_boot_cpu(apicid))
+		if (do_boot_cpu(cpu))
 			printk("CPU #%d not responding - cannot use it.\n",
-								apicid);
+								cpu);
 		else
 			++kicked;
 	}
 
+#if 0
 	/*
 	 * Cleanup possible dangling ends...
 	 */
 	smpboot_restore_warm_reset_vector();
+#endif
 
 	/*
 	 * Allow the user to impress friends.
@@ -1117,6 +1284,7 @@ static void __init smp_boot_cpus(unsigned int max_cpus)
 			printk(KERN_WARNING "WARNING: %d siblings found for CPU%d, should be %d\n", siblings, cpu, smp_num_siblings);
 	}
 
+#if 0
 	if (nmi_watchdog == NMI_LOCAL_APIC)
 		check_nmi_watchdog();
 
@@ -1130,6 +1298,7 @@ static void __init smp_boot_cpus(unsigned int max_cpus)
 	if (cpu_has_tsc && cpucount && cpu_khz)
 		synchronize_tsc_bp();
 #endif
+	xxprint("smp_boot_cpus done\n");
 }
 
 /* These are wrappers to interface to the new boot process.  Someone
@@ -1147,6 +1316,7 @@ void __devinit smp_prepare_boot_cpu(void)
 
 int __devinit __cpu_up(unsigned int cpu)
 {
+	xxprint("__cpu_up\n");
 	/* This only works at boot for x86.  See "rewrite" above. */
 	if (cpu_isset(cpu, smp_commenced_mask)) {
 		local_irq_enable();
@@ -1164,13 +1334,13 @@ int __devinit __cpu_up(unsigned int cpu)
 	cpu_set(cpu, smp_commenced_mask);
 	while (!cpu_isset(cpu, cpu_online_map))
 		mb();
+	xxprint("__cpu_up ok\n");
 	return 0;
 }
 
 void __init smp_cpus_done(unsigned int max_cpus)
 {
 #if 1
-	printk("smp_cpus_done %d\n", max_cpus);
 #else
 #ifdef CONFIG_X86_IO_APIC
 	setup_ioapic_dest();
@@ -1186,7 +1356,7 @@ void __init smp_cpus_done(unsigned int max_cpus)
 void __init smp_intr_init(void)
 {
 #if 1
-	printk("smp_intr_init\n");
+	xxprint("smp_intr_init\n");
 #else
 	/*
 	 * IRQ0 must be given a fixed assignment and initialized,

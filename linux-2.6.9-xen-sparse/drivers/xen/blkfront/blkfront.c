@@ -44,6 +44,7 @@
 #include <linux/interrupt.h>
 #include <scsi/scsi.h>
 #include <asm-xen/ctrl_if.h>
+#include <asm-xen/evtchn.h>
 
 typedef unsigned char byte; /* from linux/ide.h */
 

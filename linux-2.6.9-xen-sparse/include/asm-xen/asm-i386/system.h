@@ -8,7 +8,6 @@
 #include <asm/segment.h>
 #include <asm/cpufeature.h>
 #include <asm-xen/hypervisor.h>
-#include <asm-xen/evtchn.h>
 
 #ifdef __KERNEL__
 

@@ -179,6 +179,7 @@ int bvt_alloc_task(struct exec_domain *ed)
     }
     ed->ed_sched_priv = &BVT_INFO(d)->ed_inf[ed->eid];
     BVT_INFO(d)->ed_inf[ed->eid].inf = BVT_INFO(d);
+    BVT_INFO(d)->ed_inf[ed->eid].exec_domain = ed;
     return 0;
 }
 
@@ -192,25 +193,28 @@ void bvt_add_task(struct exec_domain *d)
     ASSERT(inf != NULL);
     ASSERT(d   != NULL);
 
-    inf->mcu_advance = MCU_ADVANCE;
-    inf->domain      = d->domain;
+    if (d->eid == 0) {
+        inf->mcu_advance = MCU_ADVANCE;
+        inf->domain      = d->domain;
+        inf->warpback    = 0;
+        /* Set some default values here. */
+        inf->warp        = 0;
+        inf->warp_value  = 0;
+        inf->warpl       = MILLISECS(2000);
+        inf->warpu       = MILLISECS(1000);
+        /* initialise the timers */
+        init_ac_timer(&inf->warp_timer);
+        inf->warp_timer.cpu = d->processor;
+        inf->warp_timer.data = (unsigned long)inf;
+        inf->warp_timer.function = &warp_timer_fn;
+        init_ac_timer(&inf->unwarp_timer);
+        inf->unwarp_timer.cpu = d->processor;
+        inf->unwarp_timer.data = (unsigned long)inf;
+        inf->unwarp_timer.function = &unwarp_timer_fn;
+    }
+
     einf->exec_domain = d;
-    inf->warpback    = 0;
-    /* Set some default values here. */
-    inf->warp        = 0;
-    inf->warp_value  = 0;
-    inf->warpl       = MILLISECS(2000);
-    inf->warpu       = MILLISECS(1000);
-    /* initialise the timers */
-    init_ac_timer(&inf->warp_timer);
-    inf->warp_timer.cpu = d->processor;
-    inf->warp_timer.data = (unsigned long)inf;
-    inf->warp_timer.function = &warp_timer_fn;
-    init_ac_timer(&inf->unwarp_timer);
-    inf->unwarp_timer.cpu = d->processor;
-    inf->unwarp_timer.data = (unsigned long)inf;
-    inf->unwarp_timer.function = &unwarp_timer_fn;
-    
+
     if ( d->domain->id == IDLE_DOMAIN_ID )
     {
         einf->avt = einf->evt = ~0U;

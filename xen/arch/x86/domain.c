@@ -550,7 +550,8 @@ void domain_relinquish_memory(struct domain *d)
      * Relinquish GDT mappings. No need for explicit unmapping of the LDT as 
      * it automatically gets squashed when the guest's mappings go away.
      */
-    destroy_gdt(d);
+    for_each_exec_domain(d, ed)
+        destroy_gdt(ed);
 
     /* Relinquish every page of memory. */
     relinquish_list(d, &d->xenpage_list);

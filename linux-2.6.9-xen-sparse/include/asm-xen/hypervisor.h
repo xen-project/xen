@@ -48,6 +48,10 @@ union xen_start_info_union
 extern union xen_start_info_union xen_start_info_union;
 #define xen_start_info (xen_start_info_union.xen_start_info)
 
+/* arch/xen/kernel/evtchn.c */
+/* Force a proper event-channel callback from Xen. */
+void force_evtchn_callback(void);
+
 /* arch/xen/kernel/process.c */
 void xen_cpu_idle (void);
 
@@ -643,6 +647,22 @@ HYPERVISOR_vm_assist(
         : "=a" (ret), "=b" (ign1), "=c" (ign2)
 	: "0" (__HYPERVISOR_vm_assist), "1" (cmd), "2" (type)
 	: "memory" );
+
+    return ret;
+}
+
+static inline int
+HYPERVISOR_boot_vcpu(
+    unsigned long vcpu, full_execution_context_t *ctxt)
+{
+    int ret;
+    unsigned long ign1, ign2;
+
+    __asm__ __volatile__ (
+        TRAP_INSTR
+        : "=a" (ret), "=b" (ign1), "=c" (ign2)
+	: "0" (__HYPERVISOR_boot_vcpu), "1" (vcpu), "2" (ctxt)
+	: "memory");
 
     return ret;
 }

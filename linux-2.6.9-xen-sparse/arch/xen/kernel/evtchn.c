@@ -42,6 +42,8 @@
 #include <asm-xen/xen-public/physdev.h>
 #include <asm-xen/ctrl_if.h>
 #include <asm-xen/hypervisor.h>
+#define XEN_EVTCHN_MASK_OPS
+#include <asm-xen/evtchn.h>
 
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,0)
 EXPORT_SYMBOL(force_evtchn_callback);
@@ -89,14 +91,15 @@ void evtchn_do_upcall(struct pt_regs *regs)
     int            irq;
     unsigned long  flags;
     shared_info_t *s = HYPERVISOR_shared_info;
+    vcpu_info_t   *vcpu_info = &s->vcpu_data[smp_processor_id()];
 
     local_irq_save(flags);
     
-    while ( s->vcpu_data[0].evtchn_upcall_pending )
+    while ( vcpu_info->evtchn_upcall_pending )
     {
-        s->vcpu_data[0].evtchn_upcall_pending = 0;
+        vcpu_info->evtchn_upcall_pending = 0;
         /* NB. No need for a barrier here -- XCHG is a barrier on x86. */
-        l1 = xchg(&s->evtchn_pending_sel, 0);
+        l1 = xchg(&vcpu_info->evtchn_pending_sel, 0);
         while ( (l1i = ffs(l1)) != 0 )
         {
             l1i--;
@@ -411,6 +414,22 @@ static struct irqaction misdirect_action = {
     NULL
 };
 
+static irqreturn_t xen_dbg(int irq, void *dev_id, struct pt_regs *regs)
+{
+     char *msg = "debug\n";
+     (void)HYPERVISOR_console_io(CONSOLEIO_write, strlen(msg), msg);
+     return IRQ_HANDLED;
+}
+
+static struct irqaction xen_action = {
+    xen_dbg, 
+    SA_INTERRUPT, 
+    CPU_MASK_CPU0, 
+    "xen-dbg", 
+    NULL, 
+    NULL
+};
+
 void irq_suspend(void)
 {
     int pirq, virq, irq, evtchn;
@@ -507,6 +526,9 @@ void __init init_IRQ(void)
     }
 
     (void)setup_irq(bind_virq_to_irq(VIRQ_MISDIRECT), &misdirect_action);
+
+    printk("debug_int\n");
+	(void)setup_irq(bind_virq_to_irq(VIRQ_DEBUG), &xen_action);
 
     /* This needs to be done early, but after the IRQ subsystem is alive. */
     ctrl_if_init();

@@ -54,3 +54,6 @@ static inline void smpboot_setup_io_apic(void)
 		setup_IO_APIC();
 #endif
 }
+
+
+#define	smp_found_config	(HYPERVISOR_shared_info->n_vcpu > 1)

@@ -100,15 +100,21 @@ void do_task_queues(unsigned char key)
                page->u.inuse.type_info);
                
         for_each_exec_domain ( d, ed ) {
-            printk("Guest: CPU %d [has=%c] flags=%lx "
-                   "upcall_pend = %02x, upcall_mask = %02x\n",
+            printk("Guest: %p CPU %d [has=%c] flags=%lx "
+                   "upcall_pend = %02x, upcall_mask = %02x\n", ed,
                    ed->processor,
                    test_bit(EDF_RUNNING, &ed->ed_flags) ? 'T':'F',
                    ed->ed_flags,
                    ed->vcpu_info->evtchn_upcall_pending, 
                    ed->vcpu_info->evtchn_upcall_mask);
         }
-        printk("Notifying guest...\n"); 
+        ed = d->exec_domain[0];
+        printk("Notifying guest... %d/%d\n", d->id, ed->eid); 
+        printk("port %d/%d stat %d %d %d\n",
+               VIRQ_DEBUG, d->virq_to_evtchn[VIRQ_DEBUG],
+               test_bit(d->virq_to_evtchn[VIRQ_DEBUG], &d->shared_info->evtchn_pending[0]),
+               test_bit(d->virq_to_evtchn[VIRQ_DEBUG], &d->shared_info->evtchn_mask[0]),
+               test_bit(d->virq_to_evtchn[VIRQ_DEBUG]>>5, &ed->vcpu_info->evtchn_pending_sel));
         send_guest_virq(d->exec_domain[0], VIRQ_DEBUG);
     }
 

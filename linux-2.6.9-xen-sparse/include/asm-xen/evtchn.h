@@ -36,19 +36,19 @@
 #include <asm/ptrace.h>
 #include <asm/synch_bitops.h>
 #include <asm-xen/xen-public/event_channel.h>
+#include <linux/smp.h>
 
 /*
  * LOW-LEVEL DEFINITIONS
  */
-
-/* Force a proper event-channel callback from Xen. */
-void force_evtchn_callback(void);
 
 /* Entry point for notifications into Linux subsystems. */
 void evtchn_do_upcall(struct pt_regs *regs);
 
 /* Entry point for notifications into the userland character device. */
 void evtchn_device_upcall(int port);
+
+#ifdef XEN_EVTCHN_MASK_OPS
 
 static inline void mask_evtchn(int port)
 {
@@ -59,6 +59,7 @@ static inline void mask_evtchn(int port)
 static inline void unmask_evtchn(int port)
 {
     shared_info_t *s = HYPERVISOR_shared_info;
+    vcpu_info_t *vcpu_info = &s->vcpu_data[smp_processor_id()];
 
     synch_clear_bit(port, &s->evtchn_mask[0]);
 
@@ -67,13 +68,15 @@ static inline void unmask_evtchn(int port)
      * a real IO-APIC we 'lose the interrupt edge' if the channel is masked.
      */
     if (  synch_test_bit        (port,    &s->evtchn_pending[0]) && 
-         !synch_test_and_set_bit(port>>5, &s->evtchn_pending_sel) )
+         !synch_test_and_set_bit(port>>5, &vcpu_info->evtchn_pending_sel) )
     {
-        s->vcpu_data[0].evtchn_upcall_pending = 1;
-        if ( !s->vcpu_data[0].evtchn_upcall_mask )
+        vcpu_info->evtchn_upcall_pending = 1;
+        if ( !vcpu_info->evtchn_upcall_mask )
             force_evtchn_callback();
     }
 }
+
+#endif /* XEN_EVTCHN_MASK_OPS */
 
 static inline void clear_evtchn(int port)
 {

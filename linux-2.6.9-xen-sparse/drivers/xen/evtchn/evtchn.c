@@ -43,6 +43,7 @@
 #include <linux/poll.h>
 #include <linux/irq.h>
 #include <linux/init.h>
+#define XEN_EVTCHN_MASK_OPS
 #include <asm-xen/evtchn.h>
 
 #if LINUX_VERSION_CODE < KERNEL_VERSION(2,6,0)

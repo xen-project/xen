@@ -240,19 +240,16 @@ int check_descriptor(unsigned long *d)
 }
 
 
-void destroy_gdt(struct domain *d)
+void destroy_gdt(struct exec_domain *ed)
 {
-    struct exec_domain *ed;
     int i;
     unsigned long pfn;
 
-    for_each_exec_domain(d, ed) {
-        for ( i = 0; i < 16; i++ )
-        {
-            if ( (pfn = l1_pgentry_to_pagenr(ed->mm.perdomain_pt[i])) != 0 )
-                put_page_and_type(&frame_table[pfn]);
-            ed->mm.perdomain_pt[i] = mk_l1_pgentry(0);
-        }
+    for ( i = 0; i < 16; i++ )
+    {
+        if ( (pfn = l1_pgentry_to_pagenr(ed->mm.perdomain_pt[i])) != 0 )
+            put_page_and_type(&frame_table[pfn]);
+        ed->mm.perdomain_pt[i] = mk_l1_pgentry(0);
     }
 }
 
@@ -302,7 +299,7 @@ long set_gdt(struct exec_domain *ed,
     unmap_domain_mem(vgdt);
 
     /* Tear down the old GDT. */
-    destroy_gdt(d);
+    destroy_gdt(ed);
 
     /* Install the new GDT. */
     for ( i = 0; i < nr_pages; i++ )

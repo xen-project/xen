@@ -106,32 +106,67 @@ void free_domain_struct(struct domain *d)
     xmem_cache_free(domain_struct_cachep, d);
 }
 
+struct exec_domain *alloc_exec_domain_struct(struct domain *d,
+                                             unsigned long vcpu)
+{
+    struct exec_domain *ed, *edc;
+
+    ASSERT( d->exec_domain[vcpu] == NULL );
+
+    if ( (ed = xmem_cache_alloc(exec_domain_struct_cachep)) == NULL )
+        return NULL;
+
+    memset(ed, 0, sizeof(*ed));
+
+    d->exec_domain[vcpu] = ed;
+    ed->domain = d;
+    ed->eid = vcpu;
+
+    if ( SCHED_OP(alloc_task, ed) < 0 )
+        goto out;
+
+    if (vcpu != 0) {
+        ed->vcpu_info = &d->shared_info->vcpu_data[ed->eid];
+
+        for_each_exec_domain(d, edc) {
+            if (edc->ed_next_list == NULL || edc->ed_next_list->eid > vcpu)
+                break;
+        }
+        ed->ed_next_list = edc->ed_next_list;
+        edc->ed_next_list = ed;
+
+        if (test_bit(EDF_CPUPINNED, &edc->ed_flags)) {
+            ed->processor = (edc->processor + 1) % smp_num_cpus;
+            set_bit(EDF_CPUPINNED, &ed->ed_flags);
+        } else {
+            ed->processor = (edc->processor + 1) % smp_num_cpus;  /* XXX */
+        }
+    }
+
+    return ed;
+
+ out:
+    d->exec_domain[vcpu] = NULL;
+    xmem_cache_free(exec_domain_struct_cachep, ed);
+
+    return NULL;
+}
+
 struct domain *alloc_domain_struct(void)
 {
     struct domain *d;
-    struct exec_domain *ed = NULL;
 
     if ( (d = xmem_cache_alloc(domain_struct_cachep)) == NULL )
         return NULL;
     
     memset(d, 0, sizeof(*d));
 
-    if ( (ed = xmem_cache_alloc(exec_domain_struct_cachep)) == NULL )
-        goto out;
-
-    memset(ed, 0, sizeof(*ed));
-
-    d->exec_domain[0] = ed;
-    ed->domain = d;
-
-    if ( SCHED_OP(alloc_task, ed) < 0 )
+    if ( alloc_exec_domain_struct(d, 0) == NULL )
         goto out;
 
     return d;
 
  out:
-    if ( ed )
-        xmem_cache_free(exec_domain_struct_cachep, ed);
     xmem_cache_free(domain_struct_cachep, d);
     return NULL;
 }
@@ -139,31 +174,32 @@ struct domain *alloc_domain_struct(void)
 /*
  * Add and remove a domain
  */
-void sched_add_domain(struct domain *d) 
+void sched_add_domain(struct exec_domain *ed) 
 {
-    struct exec_domain *ed;
+    struct domain *d = ed->domain;
 
-    for_each_exec_domain(d, ed) {
-        /* Must be unpaused by control software to start execution. */
-        set_bit(EDF_CTRLPAUSE, &ed->ed_flags);
-    }
+    /* Must be unpaused by control software to start execution. */
+    set_bit(EDF_CTRLPAUSE, &ed->ed_flags);
 
-    if ( d->id != IDLE_DOMAIN_ID )
+    if (ed->eid == 0)
     {
-        /* Initialise the per-domain timer. */
-        init_ac_timer(&d->timer);
-        d->timer.cpu      = d->exec_domain[0]->processor;
-        d->timer.data     = (unsigned long)d;
-        d->timer.function = &dom_timer_fn;
-    }
-    else
-    {
-        schedule_data[d->exec_domain[0]->processor].idle = d->exec_domain[0];
+        if ( d->id != IDLE_DOMAIN_ID )
+        {
+            /* Initialise the per-domain timer. */
+            init_ac_timer(&d->timer);
+            d->timer.cpu      = ed->processor;
+            d->timer.data     = (unsigned long)d;
+            d->timer.function = &dom_timer_fn;
+        }
+        else
+        {
+            schedule_data[ed->processor].idle = ed;
+        }
     }
 
-    SCHED_OP(add_task, d->exec_domain[0]);
+    SCHED_OP(add_task, ed);
 
-    TRACE_2D(TRC_SCHED_DOM_ADD, d->id, d);
+    TRACE_2D(TRC_SCHED_DOM_ADD, d->id, ed);
 }
 
 void sched_rem_domain(struct domain *d) 

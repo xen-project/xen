@@ -94,7 +94,8 @@ int xc_linux_restore(int xc_handle, XcIOContext *ioctxt)
 
     /* The new domain's shared-info frame number. */
     unsigned long shared_info_frame;
-    unsigned char shared_info[PAGE_SIZE]; /* saved contents from file */
+    unsigned char shared_info_page[PAGE_SIZE]; /* saved contents from file */
+    shared_info_t *shared_info = (shared_info_t *)shared_info_page;
     
     /* A copy of the CPU context of the guest. */
     full_execution_context_t ctxt;
@@ -525,8 +526,8 @@ int xc_linux_restore(int xc_handle, XcIOContext *ioctxt)
 	}	
     }
 
-    if ( xcio_read(ioctxt, &ctxt,       sizeof(ctxt)) ||
-         xcio_read(ioctxt, shared_info, PAGE_SIZE) )
+    if ( xcio_read(ioctxt, &ctxt,            sizeof(ctxt)) ||
+         xcio_read(ioctxt, shared_info_page, PAGE_SIZE) )
     {
         xcio_error(ioctxt, "Error when reading from state file");
         goto out;
@@ -577,9 +578,10 @@ int xc_linux_restore(int xc_handle, XcIOContext *ioctxt)
     ctxt.pt_base = pfn_to_mfn_table[pfn] << PAGE_SHIFT;
 
     /* clear any pending events and the selector */
-    memset(&(((shared_info_t *)shared_info)->evtchn_pending[0]),
-           0, sizeof (((shared_info_t *)shared_info)->evtchn_pending)+
-           sizeof(((shared_info_t *)shared_info)->evtchn_pending_sel));
+    memset(&(shared_info->evtchn_pending[0]), 0,
+	   sizeof (shared_info->evtchn_pending));
+    for ( i = 0; i < MAX_VIRT_CPUS; i++ )
+        shared_info->vcpu_data[i].evtchn_pending_sel = 0;
 
     /* Copy saved contents of shared-info page. No checking needed. */
     ppage = xc_map_foreign_range(

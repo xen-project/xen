@@ -48,6 +48,7 @@
 #define __HYPERVISOR_grant_table_op       20
 #define __HYPERVISOR_vm_assist            21
 #define __HYPERVISOR_update_va_mapping_otherdomain 22
+#define __HYPERVISOR_boot_vcpu            23
 
 /*
  * MULTICALLS
@@ -287,6 +288,7 @@ typedef struct vcpu_info_st
     u8 evtchn_upcall_pending;
     u8 evtchn_upcall_mask;
     u8 pad0, pad1;
+    u32 evtchn_pending_sel;             /* 132 */
 } PACKED vcpu_info_t;
 
 /*
@@ -331,7 +333,6 @@ typedef struct shared_info_st
      * word in the PENDING bitfield array.
      */
     u32 evtchn_pending[32];             /*   4 */
-    u32 evtchn_pending_sel;             /* 132 */
     u32 evtchn_mask[32];                /* 136 */
 
     /*

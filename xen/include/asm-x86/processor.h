@@ -420,7 +420,7 @@ static inline void write_ptbase(struct mm_struct *mm)
 #define GET_GDT_ENTRIES(_p)     (((*(u16 *)((_p)->mm.gdt + 0))+1)>>3)
 #define GET_GDT_ADDRESS(_p)     (*(unsigned long *)((_p)->mm.gdt + 2))
 
-void destroy_gdt(struct domain *d);
+void destroy_gdt(struct exec_domain *d);
 long set_gdt(struct exec_domain *d, 
              unsigned long *frames, 
              unsigned int entries);

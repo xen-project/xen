@@ -26,6 +26,8 @@
 #include <mach_apic.h>
 #endif
 
+#define xxprint(msg) HYPERVISOR_console_io(CONSOLEIO_write, strlen(msg), msg)
+
 /*
  *	Some notes on x86 processor bugs affecting SMP operation:
  *
@@ -126,7 +128,7 @@ static inline int __prepare_ICR2 (unsigned int mask)
 void __send_IPI_shortcut(unsigned int shortcut, int vector)
 {
 #if 1
-	printk("__send_IPI_shortcut\n");
+	xxprint("__send_IPI_shortcut\n");
 #else
 	/*
 	 * Subtle. In the case of the 'never do double writes' workaround
@@ -165,7 +167,8 @@ void fastcall send_IPI_self(int vector)
 void send_IPI_mask_bitmask(cpumask_t cpumask, int vector)
 {
 #if 1
-	printk("send_IPI_mask_bitmask\n");
+	xxprint("send_IPI_mask_bitmask\n");
+	dump_stack();
 #else
 	unsigned long mask = cpus_addr(cpumask)[0];
 	unsigned long cfg;
@@ -201,7 +204,7 @@ void send_IPI_mask_bitmask(cpumask_t cpumask, int vector)
 inline void send_IPI_mask_sequence(cpumask_t mask, int vector)
 {
 #if 1
-	printk("send_IPI_mask_sequence\n");
+	xxprint("send_IPI_mask_sequence\n");
 #else
 	unsigned long cfg, flags;
 	unsigned int query_cpu;
@@ -349,7 +352,7 @@ asmlinkage void smp_invalidate_interrupt (void)
 			leave_mm(cpu);
 	}
 #if 1
-	printk("smp_invalidate_interrupt ack_APIC_irq\n");
+	xxprint("smp_invalidate_interrupt ack_APIC_irq\n");
 #else
 	ack_APIC_irq();
 #endif
@@ -405,6 +408,7 @@ static void flush_tlb_others(cpumask_t cpumask, struct mm_struct *mm,
 	 */
 	send_IPI_mask(cpumask, INVALIDATE_TLB_VECTOR);
 
+	xxprint("flush_tlb_others lockup");
 	while (!cpus_empty(flush_cpumask))
 		/* nothing. lockup detection does not belong here */
 		mb();
@@ -574,7 +578,7 @@ static void stop_this_cpu (void * dummy)
 	cpu_clear(smp_processor_id(), cpu_online_map);
 	local_irq_disable();
 #if 1
-	printk("stop_this_cpu disable_local_APIC\n");
+	xxprint("stop_this_cpu disable_local_APIC\n");
 #else
 	disable_local_APIC();
 #endif
@@ -593,7 +597,7 @@ void smp_send_stop(void)
 
 	local_irq_disable();
 #if 1
-	printk("smp_send_stop disable_local_APIC\n");
+	xxprint("smp_send_stop disable_local_APIC\n");
 #else
 	disable_local_APIC();
 #endif
@@ -608,7 +612,7 @@ void smp_send_stop(void)
 asmlinkage void smp_reschedule_interrupt(void)
 {
 #if 1
-	printk("smp_reschedule_interrupt: ack_APIC_irq\n");
+	xxprint("smp_reschedule_interrupt: ack_APIC_irq\n");
 #else
 	ack_APIC_irq();
 #endif
@@ -621,7 +625,7 @@ asmlinkage void smp_call_function_interrupt(void)
 	int wait = call_data->wait;
 
 #if 1
-	printk("smp_call_function_interrupt: ack_APIC_irq\n");
+	xxprint("smp_call_function_interrupt: ack_APIC_irq\n");
 #else
 	ack_APIC_irq();
 #endif

@@ -7,6 +7,7 @@
 #include <xen/config.h>
 #include <xen/init.h>
 #include <xen/lib.h>
+#include <xen/sched.h>
 #include <xen/errno.h>
 #include <xen/sched.h>
 #include <xen/mm.h>
@@ -62,7 +63,7 @@ struct domain *do_createdomain(domid_t dom_id, unsigned int cpu)
 
         arch_do_createdomain(ed);
 
-        sched_add_domain(d);
+        sched_add_domain(ed);
 
         write_lock(&domlist_lock);
         pd = &domain_list; /* NB. domain_list maintained in order of dom_id. */
@@ -77,7 +78,7 @@ struct domain *do_createdomain(domid_t dom_id, unsigned int cpu)
     }
     else
     {
-        sched_add_domain(d);
+        sched_add_domain(ed);
     }
 
     return d;
@@ -285,6 +286,76 @@ int final_setup_guestos(struct domain *p, dom0_builddomain_t *builddomain)
  out:    
     if ( c != NULL )
         xfree(c);
+    return rc;
+}
+
+extern xmem_cache_t *exec_domain_struct_cachep;
+
+/*
+ * final_setup_guestos is used for final setup and launching of domains other
+ * than domain 0. ie. the domains that are being built by the userspace dom0
+ * domain builder.
+ */
+long do_boot_vcpu(unsigned long vcpu, full_execution_context_t *ctxt) 
+{
+    struct domain *d = current->domain;
+    struct exec_domain *ed;
+    int rc = 0;
+    full_execution_context_t *c;
+
+    if ( d->exec_domain[vcpu] != NULL )
+        return EINVAL;
+
+    if ( alloc_exec_domain_struct(d, vcpu) == NULL )
+        return -ENOMEM;
+
+    if ( (c = xmalloc(sizeof(*c))) == NULL )
+    {
+        rc = -ENOMEM;
+        goto out;
+    }
+
+    if ( copy_from_user(c, ctxt, sizeof(*c)) )
+    {
+        rc = -EFAULT;
+        goto out;
+    }
+
+    printk("do_boot_vcpu for dom %d vcpu %d\n", d->id, vcpu);
+
+    ed = d->exec_domain[vcpu];
+
+    atomic_set(&ed->pausecnt, 0);
+    shadow_lock_init(ed);
+
+    memcpy(&ed->thread, &idle0_exec_domain.thread, sizeof(ed->thread));
+
+    /* arch_do_createdomain */
+    ed->mm.perdomain_pt = (l1_pgentry_t *)alloc_xenheap_page();
+    memset(ed->mm.perdomain_pt, 0, PAGE_SIZE);
+    machine_to_phys_mapping[virt_to_phys(ed->mm.perdomain_pt) >> 
+                           PAGE_SHIFT] = INVALID_P2M_ENTRY;
+
+    sched_add_domain(ed);
+
+    if ( (rc = arch_final_setup_guestos(ed, c)) != 0 )
+        goto out;
+
+    /* Set up the shared info structure. */
+    update_dom_time(d);
+
+    /* domain_unpause_by_systemcontroller */
+    if ( test_and_clear_bit(EDF_CTRLPAUSE, &ed->ed_flags) )
+        domain_wake(ed);
+
+    xfree(c);
+    return 0;
+
+ out:
+    if ( c != NULL )
+        xfree(c);
+    xmem_cache_free(exec_domain_struct_cachep, d->exec_domain[vcpu]);
+    d->exec_domain[vcpu] = NULL;
     return rc;
 }
 

@@ -178,6 +178,9 @@ extern struct exec_domain *idle_task[NR_CPUS];
 #define IDLE_DOMAIN_ID   (0x7FFFU)
 #define is_idle_task(_p) (test_bit(DF_IDLETASK, &(_p)->d_flags))
 
+struct exec_domain *alloc_exec_domain_struct(struct domain *d,
+                                             unsigned long vcpu);
+
 void free_domain_struct(struct domain *d);
 struct domain *alloc_domain_struct();
 
@@ -242,7 +245,7 @@ extern unsigned long wait_init_idle;
 #define set_current_state(_s) do { current->state = (_s); } while (0)
 void scheduler_init(void);
 void schedulers_start(void);
-void sched_add_domain(struct domain *d);
+void sched_add_domain(struct exec_domain *d);
 void sched_rem_domain(struct domain *d);
 long sched_ctl(struct sched_ctl_cmd *);
 long sched_adjdom(struct sched_adjdom_cmd *);

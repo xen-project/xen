@@ -11,6 +11,7 @@
  */
 
 #include "common.h"
+#include <asm-xen/evtchn.h>
 
 /*
  * These are rather arbitrary. They are fairly large because adjacent requests
