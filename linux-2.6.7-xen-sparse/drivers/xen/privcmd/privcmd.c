@@ -181,6 +181,18 @@ static int privcmd_ioctl(struct inode *inode, struct file *file,
     break;
 #endif
 
+    case IOCTL_PRIVCMD_GET_MACH2PHYS_START_MFN:
+    {
+	unsigned long m2p_start_mfn = 
+	    HYPERVISOR_shared_info->arch.mfn_to_pfn_start;
+
+	if( put_user( m2p_start_mfn, (unsigned long *) data ) )
+	    ret = -EFAULT;
+	else
+	    ret = 0;
+    }
+    break;
+
     default:
         ret = -EINVAL;
         break;

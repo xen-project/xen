@@ -317,3 +317,18 @@ unsigned long csum_page (void * page)
 
     return sum ^ (sum>>32);
 }
+
+unsigned long xc_get_m2p_start_mfn ( int xc_handle )
+{
+    unsigned long mfn;
+
+    if ( ioctl( xc_handle, IOCTL_PRIVCMD_GET_MACH2PHYS_START_MFN, &mfn ) < 0 )
+    {
+	perror("xc_get_m2p_start_mfn:");
+	return 0;
+    }
+    return mfn;
+}
+
+
+

@@ -256,6 +256,10 @@ static void network_alloc_rx_buffers(struct net_device *dev)
         
         rx_pfn_array[nr_pfns] = virt_to_machine(skb->head) >> PAGE_SHIFT;
 
+	/* remove this page from pseudo phys map (migration optimization) */
+	phys_to_machine_mapping[virt_to_phys(skb->head) >> PAGE_SHIFT] 
+	    = 0x80000001;
+
         rx_mcl[nr_pfns].op = __HYPERVISOR_update_va_mapping;
         rx_mcl[nr_pfns].args[0] = (unsigned long)skb->head >> PAGE_SHIFT;
         rx_mcl[nr_pfns].args[1] = 0;
