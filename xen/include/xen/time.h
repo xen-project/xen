@@ -52,7 +52,8 @@ s_time_t get_s_time(void);
 #define MILLISECS(_ms)  (((s_time_t)(_ms)) * 1000000ULL )
 #define MICROSECS(_us)  (((s_time_t)(_us)) * 1000ULL )
 
-extern void update_dom_time(shared_info_t *si);
+struct domain;
+extern void update_dom_time(struct domain *d);
 extern void do_settime(unsigned long secs, unsigned long usecs, 
                        u64 system_time_base);
 

@@ -358,10 +358,6 @@ void __enter_scheduler(void)
 
     spin_unlock_irq(&schedule_data[cpu].schedule_lock);
 
-    /* Ensure that the domain has an up-to-date time base. */
-    if ( !is_idle_task(next) )
-        update_dom_time(next->shared_info);
-
     if ( unlikely(prev == next) )
         return;
     
@@ -399,10 +395,10 @@ void __enter_scheduler(void)
      */
     clear_bit(DF_RUNNING, &prev->flags);
 
-    /* Mark a timer event for the newly-scheduled domain. */
+    /* Ensure that the domain has an up-to-date time base. */
     if ( !is_idle_task(next) )
-        send_guest_virq(next, VIRQ_TIMER);
-    
+        update_dom_time(next);
+
     schedule_tail(next);
 
     BUG();
@@ -439,10 +435,7 @@ static void t_timer_fn(unsigned long unused)
     TRACE_0D(TRC_SCHED_T_TIMER_FN);
 
     if ( !is_idle_task(d) )
-    {
-        update_dom_time(d->shared_info);
-        send_guest_virq(d, VIRQ_TIMER);
-    }
+        update_dom_time(d);
 
     t_timer[d->processor].expires = NOW() + MILLISECS(10);
     add_ac_timer(&t_timer[d->processor]);
@@ -453,8 +446,7 @@ static void dom_timer_fn(unsigned long data)
 {
     struct domain *d = (struct domain *)data;
     TRACE_0D(TRC_SCHED_DOM_TIMER_FN);
-    update_dom_time(d->shared_info);
-    send_guest_virq(d, VIRQ_TIMER);
+    update_dom_time(d);
 }
 
 /* Initialise the data structures. */

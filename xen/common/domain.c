@@ -267,9 +267,6 @@ int final_setup_guestos(struct domain *p, dom0_builddomain_t *builddomain)
     if ( (rc = arch_final_setup_guestos(p,c)) != 0 )
         goto out;
 
-    /* Set up the shared info structure. */
-    update_dom_time(p->shared_info);
-
     set_bit(DF_CONSTRUCTED, &p->flags);
 
  out:    
