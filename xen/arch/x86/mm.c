@@ -2974,4 +2974,4 @@ void audit_domains_key(unsigned char key)
     audit_domains();
 }
 
-#endif
+#endif /* NDEBUG */

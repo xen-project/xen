@@ -113,7 +113,7 @@ int vmx_setup_platform(struct exec_domain *d, execution_context_t *context)
 
     n = context->ecx;
     if (n > 32) {
-        VMX_DBG_LOG(DBG_LEVEL_1, "Too many e820 entries: %d\n", n);
+        VMX_DBG_LOG(DBG_LEVEL_1, "Too many e820 entries: %d", n);
         return -1;
     }
 

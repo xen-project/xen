@@ -260,7 +260,7 @@ static int shadow_mode_table_op(
     ASSERT(spin_is_locked(&d->arch.shadow_lock));
 
     SH_VLOG("shadow mode table op %p %p count %d",
-            pagetable_val(d->exec_domain[0]->arch.pagetable),    /* XXX SMP */
+            pagetable_val(d->exec_domain[0]->arch.guest_table),  /* XXX SMP */
             pagetable_val(d->exec_domain[0]->arch.shadow_table), /* XXX SMP */
             d->arch.shadow_page_count);
 
@@ -546,7 +546,7 @@ static void shadow_map_l1_into_current_l2(unsigned long va)
     if ( !(sl1ss & PSH_shadowed) )
     {
         /* This L1 is NOT already shadowed so we need to shadow it. */
-        SH_VVLOG("4a: l1 not shadowed ( %p )", sl1pfn);
+        SH_VVLOG("4a: l1 not shadowed ( %p )", sl1ss);
 
         sl1mfn_info = alloc_shadow_page(d);
         sl1mfn_info->u.inuse.type_info = PGT_l1_page_table;
@@ -618,7 +618,7 @@ int shadow_fault(unsigned long va, long error_code)
 
     SH_VVLOG("shadow_fault( va=%p, code=%ld )", va, error_code );
 
-    check_pagetable(d, ed->arch.pagetable, "pre-sf");
+    check_pagetable(d, ed->arch.guest_table, "pre-sf");
 
     /*
      * STEP 1. A fast-reject set of checks with no locking.
@@ -708,7 +708,7 @@ int shadow_fault(unsigned long va, long error_code)
 
     shadow_unlock(d);
 
-    check_pagetable(d, ed->arch.pagetable, "post-sf");
+    check_pagetable(d, ed->arch.guest_table, "post-sf");
     return EXCRET_fault_fixed;
 }
 
