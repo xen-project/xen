@@ -339,9 +339,10 @@ int final_setup_guestos(struct task_struct * p, dom_meminfo_t * meminfo)
     virt_startinfo_addr->mod_start = meminfo->virt_mod_addr;
     virt_startinfo_addr->mod_len   = meminfo->virt_mod_len;
 
-	
     if( virt_startinfo_addr->mod_len )
-	printk("Initrd module present %08x (%08x)\n",virt_startinfo_addr->mod_start, virt_startinfo_addr->mod_len);	
+	printk("Initrd module present %08lx (%08lx)\n",
+               virt_startinfo_addr->mod_start, 
+               virt_startinfo_addr->mod_len);	
  
     /* Add virtual network interfaces and point to them in startinfo. */
     while (meminfo->num_vifs-- > 0) {
