@@ -5,7 +5,8 @@ INSTALL_DIR	= $(INSTALL) -d -m0755
 
 MAJOR    = 3.0
 MINOR    = 0
-SONAME   = libxc.so.$(MAJOR)
+LIB_NAME = libxc
+SONAME   = $(LIB_NAME).so.$(MAJOR)
 
 CC       = gcc
 
@@ -40,9 +41,10 @@ CFLAGS   += $(INCLUDES) -I.
 CFLAGS   += -Wp,-MD,.$(@F).d
 DEPS     = .*.d
 
-OBJS     = $(patsubst %.c,%.o,$(SRCS))
+OBJS     := $(patsubst %.c,%.o,$(SRCS))
+PIC_OBJS := $(patsubst %.c,%.opic,$(SRCS))
 
-LIB      = libxc.so libxc.so.$(MAJOR) libxc.so.$(MAJOR).$(MINOR)
+LIB		:= $(LIB_NAME).a $(LIB_NAME).so $(LIB_NAME).so.$(MAJOR) $(LIB_NAME).so.$(MAJOR).$(MINOR)
 
 all: check-for-zlib mk-symlinks
 	$(MAKE) $(LIB)
@@ -69,13 +71,14 @@ mk-symlinks:
 install: all
 	[ -d $(DESTDIR)/usr/lib ] || $(INSTALL_DIR) $(DESTDIR)/usr/lib
 	[ -d $(DESTDIR)/usr/include ] || $(INSTALL_DIR) $(DESTDIR)/usr/include
-	$(INSTALL_PROG) libxc.so.$(MAJOR).$(MINOR) $(DESTDIR)/usr/lib
-	ln -sf libxc.so.$(MAJOR).$(MINOR) $(DESTDIR)/usr/lib/libxc.so.$(MAJOR)
-	ln -sf libxc.so.$(MAJOR) $(DESTDIR)/usr/lib/libxc.so
+	$(INSTALL_PROG) $(LIB_NAME).so.$(MAJOR).$(MINOR) $(DESTDIR)/usr/lib
+	$(INSTALL_DATA) $(LIB_NAME).a $(DESTDIR)/usr/lib
+	ln -sf $(LIB_NAME).so.$(MAJOR).$(MINOR) $(DESTDIR)/usr/lib/$(LIB_NAME).so.$(MAJOR)
+	ln -sf $(LIB_NAME).so.$(MAJOR) $(DESTDIR)/usr/lib/$(LIB_NAME).so
 	$(INSTALL_DATA) xc.h $(DESTDIR)/usr/include
 
 clean:
-	rm -rf *.a *.so *.o *.rpm $(LIB) *~ $(DEPS) xen
+	rm -rf *.a *.so *.o *.opic *.rpm $(LIB) *~ $(DEPS) xen
 
 rpm: all
 	rm -rf staging
@@ -86,11 +89,17 @@ rpm: all
 	mv staging/i386/*.rpm .
 	rm -rf staging
 
-libxc.so:
-	ln -sf libxc.so.$(MAJOR) $@
-libxc.so.$(MAJOR):
-	ln -sf libxc.so.$(MAJOR).$(MINOR) $@
-libxc.so.$(MAJOR).$(MINOR): $(OBJS)
+$(PIC_OBJS): %.opic: %.c
+	$(CC) $(CPPFLAGS) -DPIC $(CFLAGS) -fPIC -c -o $@ $<
+	
+$(LIB_NAME).a: $(OBJS)
+	$(AR) rc $@ $^
+
+$(LIB_NAME).so: $(LIB_NAME).so.$(MAJOR)
+	ln -sf $< $@
+$(LIB_NAME).so.$(MAJOR): $(LIB_NAME).so.$(MAJOR).$(MINOR)
+	ln -sf $< $@
+$(LIB_NAME).so.$(MAJOR).$(MINOR): $(PIC_OBJS)
 	$(CC) -Wl,-soname -Wl,$(SONAME) -shared -o $@ $^ -L../libxutil -lxutil -lz
 
 -include $(DEPS)
