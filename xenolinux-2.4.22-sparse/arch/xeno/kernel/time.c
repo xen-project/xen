@@ -1,23 +1,13 @@
 /* -*-  Mode:C; c-basic-offset:4; tab-width:4 -*-
  ****************************************************************************
- * (C) 2002 - Rolf Neugebauer - Intel Research Cambridge
+ * (C) 2002-2003 - Rolf Neugebauer - Intel Research Cambridge
+ * (C) 2002-2003 - Keir Fraser - University of Cambridge
  ****************************************************************************
  *
- *        File: arch.xeno/time.c
- *      Author: Rolf Neugebauer
- *     Changes: 
- *              
- *        Date: Nov 2002
+ *        File: arch/xeno/kernel/time.c
+ *      Author: Rolf Neugebauer and Keir Fraser
  * 
- * Environment: XenoLinux
- * Description: Interface with Hypervisor to get correct notion of time
- *              Currently supports Systemtime and WallClock time.
- *
- * (This has hardly any resemblence with the Linux code but left the
- *  copyright notice anyway. Ignore the comments in the copyright notice.)
- ****************************************************************************
- * $Id: c-insert.c,v 1.7 2002/11/08 16:04:34 rn Exp $
- ****************************************************************************
+ * Description: Interface with Xen to get correct notion of time
  */
 
 /*
@@ -62,7 +52,9 @@
 
 #include <asm/div64.h>
 #include <asm/hypervisor.h>
+#include <asm/hypervisor-ifs/dom0_ops.h>
 
+#include <linux/mc146818rtc.h>
 #include <linux/kernel.h>
 #include <linux/interrupt.h>
 #include <linux/time.h>
@@ -70,214 +62,334 @@
 #include <linux/smp.h>
 #include <linux/irq.h>
 
-#undef XENO_TIME_DEBUG	/* adds sanity checks and periodic printouts */
-
 spinlock_t rtc_lock = SPIN_LOCK_UNLOCKED;
 extern rwlock_t xtime_lock;
+extern unsigned long wall_jiffies;
 
 unsigned long cpu_khz;	/* get this from Xen, used elsewhere */
-static spinlock_t hyp_time_lock = SPIN_LOCK_UNLOCKED;
 
 static unsigned int rdtsc_bitshift;
-static u32 st_scale_f;
-static u32 st_scale_i;
-static u32 shadow_st_pcc;
-static s64 shadow_st;
+static u32 st_scale_f; /* convert ticks -> usecs */
+static u32 st_scale_i; /* convert ticks -> usecs */
 
+/* These are peridically updated in shared_info, and then copied here. */
+static u32 shadow_tsc_stamp;
+static s64 shadow_system_time;
+static u32 shadow_time_version;
+static struct timeval shadow_tv;
+
+#ifdef CONFIG_XENO_PRIV
+/* Periodically propagate synchronised time to the RTC and to Xen. */
+static long last_rtc_update, last_xen_update;
+#endif
+
+static u64 processed_system_time;
+
+#define HANDLE_USEC_UNDERFLOW(_tv)         \
+    do {                                   \
+        while ( (_tv).tv_usec < 0 )        \
+        {                                  \
+            (_tv).tv_usec += 1000000;      \
+            (_tv).tv_sec--;                \
+        }                                  \
+    } while ( 0 )
+#define HANDLE_USEC_OVERFLOW(_tv)          \
+    do {                                   \
+        while ( (_tv).tv_usec >= 1000000 ) \
+        {                                  \
+            (_tv).tv_usec -= 1000000;      \
+            (_tv).tv_sec++;                \
+        }                                  \
+    } while ( 0 )
+
+
+#ifdef CONFIG_XENO_PRIV
 /*
- * System time.
- * Although the rest of the Linux kernel doesn't know about this, we
- * we use it to extrapolate passage of wallclock time.
- * We need to read the values from the shared info page "atomically" 
- * and use the cycle counter value as the "version" number. Clashes
- * should be very rare.
+ * In order to set the CMOS clock precisely, set_rtc_mmss has to be
+ * called 500 ms after the second nowtime has started, because when
+ * nowtime is written into the registers of the CMOS clock, it will
+ * jump to the next second precisely 500 ms later. Check the Motorola
+ * MC146818A or Dallas DS12887 data sheet for details.
+ *
+ * BUG: This routine does not handle hour overflow properly; it just
+ *      sets the minutes. Usually you'll only notice that after reboot!
  */
-static inline s64 __get_s_time(void)
+static int set_rtc_mmss(unsigned long nowtime)
 {
-    s32 delta_tsc;
-    u32 low;
-    u64 delta, tsc;
+    int retval = 0;
+    int real_seconds, real_minutes, cmos_minutes;
+    unsigned char save_control, save_freq_select;
+
+    /* gets recalled with irq locally disabled */
+    spin_lock(&rtc_lock);
+    save_control = CMOS_READ(RTC_CONTROL);
+    CMOS_WRITE((save_control|RTC_SET), RTC_CONTROL);
+
+    save_freq_select = CMOS_READ(RTC_FREQ_SELECT);
+    CMOS_WRITE((save_freq_select|RTC_DIV_RESET2), RTC_FREQ_SELECT);
+
+    cmos_minutes = CMOS_READ(RTC_MINUTES);
+    if ( !(save_control & RTC_DM_BINARY) || RTC_ALWAYS_BCD )
+        BCD_TO_BIN(cmos_minutes);
+
+    /*
+     * since we're only adjusting minutes and seconds, don't interfere with
+     * hour overflow. This avoids messing with unknown time zones but requires
+     * your RTC not to be off by more than 15 minutes
+     */
+    real_seconds = nowtime % 60;
+    real_minutes = nowtime / 60;
+    if ( ((abs(real_minutes - cmos_minutes) + 15)/30) & 1 )
+        real_minutes += 30;		/* correct for half hour time zone */
+    real_minutes %= 60;
+
+    if ( abs(real_minutes - cmos_minutes) < 30 )
+    {
+        if ( !(save_control & RTC_DM_BINARY) || RTC_ALWAYS_BCD )
+        {
+            BIN_TO_BCD(real_seconds);
+            BIN_TO_BCD(real_minutes);
+        }
+        CMOS_WRITE(real_seconds,RTC_SECONDS);
+        CMOS_WRITE(real_minutes,RTC_MINUTES);
+    }
+    else 
+    {
+        printk(KERN_WARNING
+               "set_rtc_mmss: can't update from %d to %d\n",
+               cmos_minutes, real_minutes);
+        retval = -1;
+    }
+
+    /* The following flags have to be released exactly in this order,
+     * otherwise the DS12887 (popular MC146818A clone with integrated
+     * battery and quartz) will not reset the oscillator and will not
+     * update precisely 500 ms later. You won't find this mentioned in
+     * the Dallas Semiconductor data sheets, but who believes data
+     * sheets anyway ...                           -- Markus Kuhn
+     */
+    CMOS_WRITE(save_control, RTC_CONTROL);
+    CMOS_WRITE(save_freq_select, RTC_FREQ_SELECT);
+    spin_unlock(&rtc_lock);
+
+    return retval;
+}
+#endif
+
+
+/* Must be called with the xtime_lock held for writing. */
+static void get_time_values_from_xen(void)
+{
+    do {
+        shadow_time_version = HYPERVISOR_shared_info->time_version2;
+        rmb();
+        shadow_tv.tv_sec    = HYPERVISOR_shared_info->wc_sec;
+        shadow_tv.tv_usec   = HYPERVISOR_shared_info->wc_usec;
+        shadow_tsc_stamp    = HYPERVISOR_shared_info->tsc_timestamp;
+        shadow_system_time  = HYPERVISOR_shared_info->system_time;
+        rmb();
+    }
+    while ( shadow_time_version != HYPERVISOR_shared_info->time_version1 );
+}
+
+#define TIME_VALUES_UP_TO_DATE \
+    (shadow_time_version == HYPERVISOR_shared_info->time_version2)
+
+
+static inline unsigned long get_time_delta_usecs(void)
+{
+    s32      delta_tsc;
+    u32      low;
+    u64      delta, tsc;
 
     rdtscll(tsc);
     low = (u32)(tsc >> rdtsc_bitshift);
-    delta_tsc = (s32)(low - shadow_st_pcc);
+    delta_tsc = (s32)(low - shadow_tsc_stamp);
     if ( unlikely(delta_tsc < 0) ) delta_tsc = 0;
     delta = ((u64)delta_tsc * st_scale_f);
     delta >>= 32;
     delta += ((u64)delta_tsc * st_scale_i);
 
-    return shadow_st + delta;
+    return (unsigned long)delta;
 }
 
-/*
- * Wallclock time.
- * Based on what the hypervisor tells us, extrapolated using system time.
- * Again need to read a number of values from the shared page "atomically".
- * this time using a version number.
- */
-static u32        shadow_wc_version=0;
-static long       shadow_tv_sec;
-static long       shadow_tv_usec;
-static long long  shadow_wc_timestamp;
+
 void do_gettimeofday(struct timeval *tv)
 {
-    unsigned long flags;
-    long          usec, sec;
-    u32	          version;
-    u64           now, cpu_freq, scale;
+	unsigned long flags, lost;
+    struct timeval _tv;
 
-    spin_lock_irqsave(&hyp_time_lock, flags);
-
-    while ( (version = HYPERVISOR_shared_info->wc_version) != 
-            shadow_wc_version )
+ again:
+    read_lock_irqsave(&xtime_lock, flags);
+    _tv.tv_usec = get_time_delta_usecs();
+    if ( (lost = (jiffies - wall_jiffies)) != 0 )
+        _tv.tv_usec += lost * (1000000 / HZ);
+    _tv.tv_sec   = xtime.tv_sec;
+    _tv.tv_usec += xtime.tv_usec;
+    if ( unlikely(!TIME_VALUES_UP_TO_DATE) )
     {
-        barrier();
-
-        shadow_wc_version   = version;
-        shadow_tv_sec       = HYPERVISOR_shared_info->tv_sec;
-        shadow_tv_usec      = HYPERVISOR_shared_info->tv_usec;
-        shadow_wc_timestamp = HYPERVISOR_shared_info->wc_timestamp;
-        shadow_st_pcc       = HYPERVISOR_shared_info->st_timestamp;
-        shadow_st           = HYPERVISOR_shared_info->system_time;
-
-        rdtsc_bitshift      = HYPERVISOR_shared_info->rdtsc_bitshift;
-        cpu_freq            = HYPERVISOR_shared_info->cpu_freq;
-
-        /* XXX cpu_freq as u32 limits it to 4.29 GHz. Get a better do_div! */
-        scale = 1000000000LL << (32 + rdtsc_bitshift);
-        do_div(scale,(u32)cpu_freq);
-        st_scale_f = scale & 0xffffffff;
-        st_scale_i = scale >> 32;
-
-        barrier();
-	}
-
-    now   = __get_s_time();
-    usec  = ((unsigned long)(now-shadow_wc_timestamp))/1000;
-    sec   = shadow_tv_sec;
-    usec += shadow_tv_usec;
-
-    while ( usec >= 1000000 ) 
-    {
-        usec -= 1000000;
-        sec++;
+        /*
+         * We may have blocked for a long time, rendering our calculations
+         * invalid (e.g. the time delta may have overflowed). Detect that
+         * and recalculate with fresh values.
+         */
+        read_unlock_irqrestore(&xtime_lock, flags);
+        write_lock_irqsave(&xtime_lock, flags);
+        get_time_values_from_xen();
+        write_unlock_irqrestore(&xtime_lock, flags);
+        goto again;
     }
+    read_unlock_irqrestore(&xtime_lock, flags);
 
-    tv->tv_sec = sec;
-    tv->tv_usec = usec;
+    HANDLE_USEC_OVERFLOW(_tv);
 
-    spin_unlock_irqrestore(&hyp_time_lock, flags);
-
-#ifdef XENO_TIME_DEBUG
-    {
-        static long long old_now=0;
-        static long long wct=0, old_wct=0;
-
-        /* This debug code checks if time increase over two subsequent calls */
-        wct=(((long long)sec) * 1000000) + usec;
-        /* wall clock time going backwards */
-        if ((wct < old_wct) ) {	
-            printk("Urgh1: wc diff=%6ld, usec = %ld (0x%lX)\n",
-                   (long)(wct-old_wct), usec, usec);		
-            printk("       st diff=%lld cur st=0x%016llX old st=0x%016llX\n",
-                   now-old_now, now, old_now);
-        }
-
-        /* system time going backwards */
-        if (now<=old_now) {
-            printk("Urgh2: st diff=%lld cur st=0x%016llX old st=0x%016llX\n",
-                   now-old_now, now, old_now);
-        }
-        old_wct  = wct;
-        old_now  = now;
-    }
-#endif
+    *tv = _tv;
 }
 
 void do_settimeofday(struct timeval *tv)
 {
-/* XXX RN: should do something special here for dom0 */
-#if 0
+#ifdef CONFIG_XENO_PRIV
+    struct timeval newtv;
+    dom0_op_t op;
+    
+    if ( start_info.dom_id != 0 )
+        return;
+    
     write_lock_irq(&xtime_lock);
+    
     /*
-     * This is revolting. We need to set "xtime" correctly. However, the
-     * value in this location is the value at the most recent update of
-     * wall time.  Discover what correction gettimeofday() would have
-     * made, and then undo it!
+     * Ensure we don't get blocked for a long time so that our time delta
+     * overflows. If that were to happen then our shadow time values would
+     * be stale, so we can retry with fresh ones.
      */
-    tv->tv_usec -= do_gettimeoffset();
-    tv->tv_usec -= (jiffies - wall_jiffies) * (1000000 / HZ);
-
-    while ( tv->tv_usec < 0 )
+ again:
+    tv->tv_usec -= get_time_delta_usecs();
+    if ( unlikely(!TIME_VALUES_UP_TO_DATE) )
     {
-        tv->tv_usec += 1000000;
-        tv->tv_sec--;
+        get_time_values_from_xen();
+        goto again;
     }
+    
+    HANDLE_USEC_UNDERFLOW(*tv);
+    
+    newtv = *tv;
+    
+    tv->tv_usec -= (jiffies - wall_jiffies) * (1000000 / HZ);
+    HANDLE_USEC_UNDERFLOW(*tv);
 
     xtime = *tv;
     time_adjust = 0;		/* stop active adjtime() */
     time_status |= STA_UNSYNC;
     time_maxerror = NTP_PHASE_LIMIT;
     time_esterror = NTP_PHASE_LIMIT;
+
+    last_rtc_update = last_xen_update = 0;
+
+    op.cmd = DOM0_SETTIME;
+    op.u.settime.secs        = newtv.tv_sec;
+    op.u.settime.usecs       = newtv.tv_usec;
+    op.u.settime.system_time = shadow_system_time;
+
     write_unlock_irq(&xtime_lock);
+
+    HYPERVISOR_dom0_op(&op);
 #endif
 }
 
+asmlinkage long sys_stime(int *tptr)
+{
+	int value;
+    struct timeval tv;
 
-/*
- * Timer ISR. 
- * Unlike normal Linux these don't come in at a fixed rate of HZ. 
- * In here we wrok out how often it should have been called and then call
- * the architecture independent part (do_timer()) the appropriate number of
- * times. A bit of a nasty hack, to keep the "other" notion of wallclock time
- * happy.
- */
-static long long us_per_tick=1000000/HZ;
-static long long last_irq;
+	if ( !capable(CAP_SYS_TIME) )
+		return -EPERM;
+
+	if ( get_user(value, tptr) )
+		return -EFAULT;
+
+    tv.tv_sec  = value;
+    tv.tv_usec = 0;
+
+    do_settimeofday(&tv);
+
+	return 0;
+}
+
+#define NS_PER_TICK (1000000000ULL/HZ)
 static inline void do_timer_interrupt(int irq, void *dev_id,
                                       struct pt_regs *regs)
 {
-    struct timeval tv;
-    long long time, delta;
+    s64 delta;
 
-    /*
-     * The next bit really sucks:
-     * Linux not only uses do_gettimeofday() to keep a notion of
-     * wallclock time, but also maintains the xtime struct and jiffies.
-     * (Even worse some userland code accesses this via the sys_time()
-     * system call)
-     * Unfortunately, xtime is maintain in the architecture independent
-     * part of the timer ISR (./kernel/timer.c sic!). So, although we have
-     * perfectly valid notion of wallclock time from the hypervisor we here
-     * fake missed timer interrupts so that the arch independent part of
-     * the Timer ISR updates jiffies for us *and* once the bh gets run
-     * updates xtime accordingly. Yuck!
-     */
+    get_time_values_from_xen();
 
-    /* Work out the number of jiffy intervals passed and update them. */
-    do_gettimeofday(&tv);
-    time = (((long long)tv.tv_sec) * 1000000) + tv.tv_usec;
-    delta = time - last_irq;
-    if (delta <= 0) {
-        printk ("Timer ISR: Time went backwards: %lld\n", delta);
+    if ( (delta = (s64)(shadow_system_time - processed_system_time)) < 0 )
+    {
+        printk("Timer ISR: Time went backwards: %lld\n", delta);
         return;
     }
-    while (delta >= us_per_tick) {
+
+    while ( delta >= NS_PER_TICK )
+    {
         do_timer(regs);
-        delta    -= us_per_tick;
-        last_irq += us_per_tick;
+        delta -= NS_PER_TICK;
+        processed_system_time += NS_PER_TICK;
+    }
+    
+    if ( (time_status & STA_UNSYNC) != 0 )
+    {
+        /* Adjust shadow timeval for jiffies that haven't updated xtime yet. */
+        shadow_tv.tv_usec -= (jiffies - wall_jiffies) * (1000000/HZ);
+        HANDLE_USEC_UNDERFLOW(shadow_tv);
+
+        /* Update our unsynchronised xtime appropriately. */
+        xtime = shadow_tv;
     }
 
-#if 0
-    if (!user_mode(regs))
-        x86_do_profile(regs->eip);
+#ifdef CONFIG_XENO_PRIV
+	if ( (start_info.dom_id == 0) && ((time_status & STA_UNSYNC) == 0) )
+    {
+        /* Send synchronised time to Xen approximately every minute. */
+        if ( xtime.tv_sec > (last_xen_update + 60) )
+        {
+            dom0_op_t op;
+            struct timeval tv = xtime;
+
+            tv.tv_usec += (jiffies - wall_jiffies) * (1000000/HZ);
+            HANDLE_USEC_OVERFLOW(tv);
+
+            op.cmd = DOM0_SETTIME;
+            op.u.settime.secs        = tv.tv_sec;
+            op.u.settime.usecs       = tv.tv_usec;
+            op.u.settime.system_time = shadow_system_time;
+            HYPERVISOR_dom0_op(&op);
+
+            last_xen_update = xtime.tv_sec;
+        }
+
+        /*
+         * If we have an externally synchronized Linux clock, then update CMOS
+         * clock accordingly every ~11 minutes. Set_rtc_mmss() has to be called
+         * as close as possible to 500 ms before the new second starts.
+         */
+        if ( (xtime.tv_sec > (last_rtc_update + 660)) &&
+             (xtime.tv_usec >= (500000 - ((unsigned) tick) / 2)) &&
+             (xtime.tv_usec <= (500000 + ((unsigned) tick) / 2)) )
+        {
+            if ( set_rtc_mmss(xtime.tv_sec) == 0 )
+                last_rtc_update = xtime.tv_sec;
+            else
+                last_rtc_update = xtime.tv_sec - 600;
+        }
+    }
 #endif
 }
 
 static void timer_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 {
     write_lock(&xtime_lock);
-    do_timer_interrupt(irq, NULL, regs);
+    while ( !TIME_VALUES_UP_TO_DATE )
+        do_timer_interrupt(irq, NULL, regs);
     write_unlock(&xtime_lock);
 }
 
@@ -293,7 +405,7 @@ static struct irqaction irq_timer = {
 void __init time_init(void)
 {
     unsigned long long alarm;
-    u64 __cpu_khz;
+    u64 __cpu_khz, cpu_freq, scale, scale2;
 
     __cpu_khz = HYPERVISOR_shared_info->cpu_freq;
     do_div(__cpu_khz, 1000);
@@ -301,23 +413,29 @@ void __init time_init(void)
     printk("Xen reported: %lu.%03lu MHz processor.\n", 
            cpu_khz / 1000, cpu_khz % 1000);
 
-    do_gettimeofday(&xtime);
-    last_irq = (((long long)xtime.tv_sec) * 1000000) + xtime.tv_usec;
+    xtime.tv_sec = HYPERVISOR_shared_info->wc_sec;
+    xtime.tv_usec = HYPERVISOR_shared_info->wc_usec;
+    processed_system_time = shadow_system_time;
+
+    rdtsc_bitshift      = HYPERVISOR_shared_info->rdtsc_bitshift;
+    cpu_freq            = HYPERVISOR_shared_info->cpu_freq;
+
+    scale = 1000000LL << (32 + rdtsc_bitshift);
+    do_div(scale, (u32)cpu_freq);
+
+    if ( (cpu_freq >> 32) != 0 )
+    {
+        scale2 = 1000000LL << rdtsc_bitshift;
+        do_div(scale2, (u32)(cpu_freq>>32));
+        scale += scale2;
+    }
+
+    st_scale_f = scale & 0xffffffff;
+    st_scale_i = scale >> 32;
 
     setup_irq(TIMER_IRQ, &irq_timer);
 
-    /*
-     * Start ticker. Note that timing runs of wall clock, not virtual 'domain' 
-     * time. This means that clock sshould run at the correct rate. For things 
-     * like scheduling, it's not clear whether it matters which sort of time 
-     * we use. XXX RN: unimplemented.
-     */
-
     rdtscll(alarm);
-#if 0
-    alarm += (1000/HZ)*HYPERVISOR_shared_info->ticks_per_ms;
-    HYPERVISOR_shared_info->wall_timeout   = alarm;
-    HYPERVISOR_shared_info->domain_timeout = ~0ULL;
-#endif
+
     clear_bit(_EVENT_TIMER, &HYPERVISOR_shared_info->events);
 }

@@ -50,44 +50,21 @@ extern int init_xeno_time();
 s_time_t get_s_time(void);
 
 #define NOW()				((s_time_t)get_s_time())
-#define SECONDS(_s)			(((s_time_t)(_s))  * 1000000000UL )
-#define TENTHS(_ts)			(((s_time_t)(_ts)) * 100000000UL )
-#define HUNDREDTHS(_hs)		(((s_time_t)(_hs)) * 10000000UL )
-#define MILLISECS(_ms)		(((s_time_t)(_ms)) * 1000000UL )
-#define MICROSECS(_us)		(((s_time_t)(_us)) * 1000UL )
+#define SECONDS(_s)			(((s_time_t)(_s))  * 1000000000ULL )
+#define MILLISECS(_ms)		(((s_time_t)(_ms)) * 1000000ULL )
+#define MICROSECS(_us)		(((s_time_t)(_us)) * 1000ULL )
 #define Time_Max			((s_time_t) 0x7fffffffffffffffLL)
 #define FOREVER				Time_Max
 
-/*
- * Wall Clock Time
- */
+/* Wall Clock Time */
 struct timeval {
     long            tv_sec;         /* seconds */
     long            tv_usec;        /* microseconds */
 };
   
-struct timezone {
-    int     tz_minuteswest; /* minutes west of Greenwich */
-    int     tz_dsttime;     /* type of dst correction */
-};
-
-#ifdef __KERNEL__
-extern void do_gettimeofday(struct timeval *tv);
-extern void do_settimeofday(struct timeval *tv);
-extern void get_fast_time(struct timeval *tv);
-extern void (*do_get_fast_time)(struct timeval *);
-#endif
-
-/*
- * Domain Virtual Time (defined in asm/time.h) 
- */
-/* XXX Interface for getting and setting still missing */
-
-
-/* update the per domain time information */
 extern void update_dom_time(shared_info_t *si);
-
-/* XXX move this  */
+extern void do_settime(unsigned long secs, unsigned long usecs, 
+                       u64 system_time_base);
 extern void do_timer(struct pt_regs *regs);
 
 #endif /* __XENO_TIME_H__ */

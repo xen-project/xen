@@ -232,32 +232,35 @@ typedef struct shared_info_st {
     /*
      * Time: The following abstractions are exposed: System Time, Clock Time,
      * Domain Virtual Time. Domains can access Cycle counter time directly.
-     * 
-     * The following values are updated periodically (and atomically, from the
-     * p.o.v. of the guest OS). Th eguest OS detects this because the wc_version
-     * is incremented.
      */
-    u32		       wc_version;      /* a version number for info below */
-    unsigned int       rdtsc_bitshift;  /* use bits N:N+31 of TSC          */
-    u64		       cpu_freq;        /* to calculate ticks -> real time */
-    /* System Time */
-    long long	       system_time;     /* in ns */
-    unsigned long      st_timestamp;    /* cyclecounter at last update */
-    /* Wall Clock Time */
-    long	       tv_sec;          /* essentially a struct timeval */
-    long	       tv_usec;
-    long long	       wc_timestamp;    /* system time at last update */
+
+    unsigned int       rdtsc_bitshift;  /* tsc_timestamp uses N:N+31 of TSC. */
+    u64                cpu_freq;        /* CPU frequency (Hz).               */
+
+    /*
+     * The following values are updated periodically (and not necessarily
+     * atomically!). The guest OS detects this because 'time_version1' is
+     * incremented just before updating these values, and 'time_version2' is
+     * incremented immediately after. See Xenolinux code for an example of how 
+     * to read these values safely (arch/xeno/kernel/time.c).
+     */
+    unsigned long      time_version1;   /* A version number for info below.  */
+    unsigned long      time_version2;   /* A version number for info below.  */
+    unsigned long      tsc_timestamp;   /* TSC at last update of time vals.  */
+    u64                system_time;     /* Time, in nanosecs, since boot.    */
+    unsigned long      wc_sec;          /* Secs  00:00:00 UTC, Jan 1, 1970.  */
+    unsigned long      wc_usec;         /* Usecs 00:00:00 UTC, Jan 1, 1970.  */
     
     /* Domain Virtual Time */
-    unsigned long long domain_time;
+    u64                domain_time;
 	
     /*
      * Timeout values:
      * Allow a domain to specify a timeout value in system time and 
      * domain virtual time.
      */
-    unsigned long long wall_timeout;
-    unsigned long long domain_timeout;
+    u64                wall_timeout;
+    u64                domain_timeout;
 
     /*
      * The index structures are all stored here for convenience. The rings 

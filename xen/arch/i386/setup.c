@@ -310,10 +310,7 @@ void __init start_of_day(void)
     extern void time_init(void);
     extern void softirq_init(void);
     extern void timer_bh(void);
-    extern void tqueue_bh(void);
-    extern void immediate_bh(void);
     extern void init_timervecs(void);
-    extern void disable_pit(void);
     extern void ac_timer_init(void);
     extern int  setup_network_devices(void);
     extern void net_init(void);
@@ -366,8 +363,6 @@ void __init start_of_day(void)
     softirq_init();
     init_timervecs();
     init_bh(TIMER_BH, timer_bh);
-    init_bh(TQUEUE_BH, tqueue_bh);
-    init_bh(IMMEDIATE_BH, immediate_bh);
     init_apic_mappings(); /* make APICs addressable in our pagetables. */
 
 #ifndef CONFIG_SMP    
@@ -384,14 +379,15 @@ void __init start_of_day(void)
                       * fall thru to 8259A if we have to (but slower).
                       */
 #endif
+
     initialize_keytable(); /* call back handling for key codes      */
 
-    if ( cpu_has_apic )
-        disable_pit();
-    else if ( smp_num_cpus != 1 )
-        panic("We really need local APICs on SMP machines!");
-    else
+    if ( !cpu_has_apic )
+    {
         do_timer_lists_from_pit = 1;
+        if ( smp_num_cpus != 1 )
+            panic("We need local APICs on SMP machines!");
+    }
 
     ac_timer_init();    /* init accurate timers */
     init_xeno_time();	/* initialise the time */

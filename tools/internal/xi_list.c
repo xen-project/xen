@@ -21,7 +21,6 @@
  */
 #define SILENT_ERRORS_FROM_XEN
 
-#include "hypervisor-ifs/dom0_ops.h"
 #include "dom0_defs.h"
 #include "mem_defs.h"
 

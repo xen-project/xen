@@ -468,14 +468,3 @@ void __init init_IRQ(void)
     setup_irq(2, &irq2);
 }
 
-/*
- * we only need the timer interrupt for callibrating the tsc<->time<->bus cycle
- * mappings. After this all timeing related functions should be run of the 
- * APIC timers. This function allows us to disable the 
- */
-void __init disable_pit(void)
-{
-        printk("Disable PIT. Not needed anymore\n");
-        /* This is not the most elegant way, but hey. */
-        disable_irq(0);
-}

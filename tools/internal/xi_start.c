@@ -1,5 +1,4 @@
 
-#include "hypervisor-ifs/dom0_ops.h"
 #include "dom0_defs.h"
 #include "mem_defs.h"
 

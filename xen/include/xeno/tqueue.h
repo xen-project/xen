@@ -66,7 +66,7 @@ typedef struct list_head task_queue;
 #define DECLARE_TASK_QUEUE(q)	LIST_HEAD(q)
 #define TQ_ACTIVE(q)		(!list_empty(&q))
 
-extern task_queue tq_timer, tq_immediate, tq_disk;
+extern task_queue tq_disk;
 
 /*
  * To implement your own list of active bottom halfs, use the following

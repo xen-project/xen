@@ -713,36 +713,10 @@ int reprogram_ac_timer(s_time_t timeout)
 
 /*
  * Local timer interrupt handler.
- * here the programmable, accurate timers are executed.
- * If we are on CPU0 and we should have updated jiffies, we do this 
- * as well and and deal with traditional linux timers. Note, that of 
- * the timer APIC on CPU does not go off every 10ms or so the linux 
- * timers loose accuracy, but that shouldn't be a problem.
+ * Here the programmable, accurate timers are executed.
  */
-static s_time_t last_cpu0_tirq = 0;
-inline void smp_local_timer_interrupt(struct pt_regs * regs)
+inline void smp_local_timer_interrupt(struct pt_regs *regs)
 {
-    int cpu = smp_processor_id();
-    s_time_t diff, now;
-
-    /* if CPU 0 do old timer stuff  */
-    if (cpu == 0)
-    {
-        now = NOW();
-        diff = now - last_cpu0_tirq;
-
-        if (diff <= 0) {
-            printk ("System Time went backwards: %lld\n", diff);
-            return;
-        }
-
-        while (diff >= MILLISECS(10)) {
-            do_timer(regs);
-            diff           -= MILLISECS(10);
-            last_cpu0_tirq += MILLISECS(10);
-        }
-    }
-    /* call accurate timer function */
     do_ac_timer();
 }
 

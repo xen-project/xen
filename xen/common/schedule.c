@@ -535,6 +535,8 @@ static void virt_timer(unsigned long foo)
     do {
         if ( is_idle_task(p) ) continue;
         cpu_mask |= mark_guest_event(p, _EVENT_TIMER);
+        if ( p->has_cpu ) 
+            update_dom_time(p->shared_info);
     }
     while ( (p = p->next_task) != &idle0_task );
     read_unlock(&tasklist_lock);

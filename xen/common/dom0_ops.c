@@ -284,39 +284,47 @@ long do_dom0_op(dom0_op_t *u_dom0_op)
 
     case DOM0_MSR:
     {
-      if (op.u.msr.write)
+        if (op.u.msr.write)
 	{
-	  msr_cpu_mask = op.u.msr.cpu_mask;
-	  msr_addr = op.u.msr.msr;
-	  msr_lo = op.u.msr.in1;
-	  msr_hi = op.u.msr.in2;
-	  smp_call_function(write_msr_for, NULL, 1, 1);
-	  write_msr_for(NULL);
+            msr_cpu_mask = op.u.msr.cpu_mask;
+            msr_addr = op.u.msr.msr;
+            msr_lo = op.u.msr.in1;
+            msr_hi = op.u.msr.in2;
+            smp_call_function(write_msr_for, NULL, 1, 1);
+            write_msr_for(NULL);
 	}
-      else
+        else
 	{
-          msr_cpu_mask = op.u.msr.cpu_mask;
-          msr_addr = op.u.msr.msr;
-	  smp_call_function(read_msr_for, NULL, 1, 1);
-	  read_msr_for(NULL);
+            msr_cpu_mask = op.u.msr.cpu_mask;
+            msr_addr = op.u.msr.msr;
+            smp_call_function(read_msr_for, NULL, 1, 1);
+            read_msr_for(NULL);
 
-          op.u.msr.out1 = msr_lo;
-          op.u.msr.out2 = msr_hi;
-	  copy_to_user(u_dom0_op, &op, sizeof(op));
+            op.u.msr.out1 = msr_lo;
+            op.u.msr.out2 = msr_hi;
+            copy_to_user(u_dom0_op, &op, sizeof(op));
 	}
-      ret = 0;
+        ret = 0;
     }
     break;
 
     case DOM0_DEBUG:
     {
-      op.u.debug.out1 = op.u.debug.in2 + 1;
-      op.u.debug.out2 = op.u.debug.in1 + 1;
-      copy_to_user(u_dom0_op, &op, sizeof(op));
-      ret = 0;
+        op.u.debug.out1 = op.u.debug.in2 + 1;
+        op.u.debug.out2 = op.u.debug.in1 + 1;
+        copy_to_user(u_dom0_op, &op, sizeof(op));
+        ret = 0;
     }
     break;
 
+    case DOM0_SETTIME:
+    {
+        do_settime(op.u.settime.secs, 
+                   op.u.settime.usecs, 
+                   op.u.settime.system_time);
+        ret = 0;
+    }
+    break;
 
     default:
         ret = -ENOSYS;

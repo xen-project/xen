@@ -23,6 +23,8 @@
 extern unsigned long volatile jiffies;
 extern rwlock_t tasklist_lock;
 
+extern struct timeval xtime;
+
 #include <xeno/spinlock.h>
 
 struct mm_struct {
