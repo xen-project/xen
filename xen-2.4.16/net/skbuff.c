@@ -149,6 +149,102 @@ static __inline__ void skb_head_to_pool(struct sk_buff *skb)
 	kmem_cache_free(skbuff_head_cache, skb);
 }
 
+static inline u8 *alloc_skb_data_page(struct sk_buff *skb)
+{
+        struct list_head *list_ptr;
+        struct pfn_info  *pf;
+        unsigned long flags;
+        
+        spin_lock_irqsave(&free_list_lock, flags);
+
+        if (!free_pfns) return NULL;
+
+        list_ptr = free_list.next;
+        pf = list_entry(list_ptr, struct pfn_info, list);
+        pf->flags = 0; // owned by dom0
+        list_del(&pf->list);
+        pf->next = pf->prev = (pf - frame_table);
+        free_pfns--;
+
+        spin_unlock_irqrestore(&free_list_lock, flags);
+
+        skb->pf = pf;
+        return (u8 *)((pf - frame_table) << PAGE_SHIFT);
+}
+
+static inline void dealloc_skb_data_page(struct sk_buff *skb)
+{
+        struct pfn_info  *pf;
+        unsigned long flags;
+
+        pf = skb->pf;
+
+        spin_lock_irqsave(&free_list_lock, flags);
+
+        list_add_tail(&pf->list, &free_list);
+        free_pfns++;
+
+        spin_unlock_irqrestore(&free_list_lock, flags);
+}
+
+struct sk_buff *alloc_zc_skb(unsigned int size,int gfp_mask)
+{
+        struct sk_buff *skb;
+        u8 *data;
+
+        if (in_interrupt() && (gfp_mask & __GFP_WAIT)) {
+                static int count = 0;
+                if (++count < 5) {
+                        printk(KERN_ERR "alloc_skb called nonatomically "
+                               "from interrupt %p\n", NET_CALLER(size));
+                        BUG();
+                }
+                gfp_mask &= ~__GFP_WAIT;
+        }
+
+        /* Get the HEAD */
+        skb = skb_head_from_pool();
+        if (skb == NULL) {
+                skb = kmem_cache_alloc(skbuff_head_cache, gfp_mask & ~__GFP_DMA);
+                if (skb == NULL)
+                        goto nohead;
+        }
+
+        /* Get the DATA. Size must match skb_add_mtu(). */
+        size = SKB_DATA_ALIGN(size);
+        data = alloc_skb_data_page(skb);
+        if (data == NULL)
+                goto nodata;
+
+        /* XXX: does not include slab overhead */
+        skb->truesize = size + sizeof(struct sk_buff);
+
+        /* Load the data pointers. */
+        skb->head = data;
+        skb->data = data;
+        skb->tail = data;
+        skb->end = data + size;
+
+        /* Set up other state */
+        skb->len = 0;
+        skb->cloned = 0;
+        skb->data_len = 0;
+        skb->src_vif = VIF_UNKNOWN_INTERFACE;
+        skb->dst_vif = VIF_UNKNOWN_INTERFACE;
+        skb->skb_type = SKB_ZERO_COPY;
+
+        atomic_set(&skb->users, 1);
+        atomic_set(&(skb_shinfo(skb)->dataref), 1);
+        skb_shinfo(skb)->nr_frags = 0;
+        skb_shinfo(skb)->frag_list = NULL;
+        return skb;
+
+nodata:
+        skb_head_to_pool(skb);
+nohead:
+        return NULL;
+}
+
 
 /* 	Allocate a new skbuff. We do this ourselves so we can fill in a few
  *	'private' fields and also do memory statistics to find all the
@@ -213,6 +309,7 @@ struct sk_buff *alloc_skb(unsigned int size,int gfp_mask)
 	skb->data_len = 0;
         skb->src_vif = VIF_UNKNOWN_INTERFACE;
         skb->dst_vif = VIF_UNKNOWN_INTERFACE;
+        skb->skb_type = SKB_NORMAL;
 
 	atomic_set(&skb->users, 1); 
 	atomic_set(&(skb_shinfo(skb)->dataref), 1);
@@ -295,7 +392,13 @@ static void skb_release_data(struct sk_buff *skb)
 		if (skb_shinfo(skb)->frag_list)
 			skb_drop_fraglist(skb);
 
-		kfree(skb->head);
+                if (skb->skb_type == SKB_NORMAL) {
+		    kfree(skb->head);
+                } else if (skb->skb_type == SKB_ZERO_COPY) {
+                    dealloc_skb_data_page(skb);
+                } else {
+                    printk("skb_release_data called with unknown skb type!\n");
+                }
 	}
 }
 

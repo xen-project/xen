@@ -34,6 +34,10 @@
 #define VIF_DROP                -3
 #define VIF_ANY_INTERFACE       -4
 
+//skb_type values:
+#define SKB_NORMAL               0
+#define SKB_ZERO_COPY            1
+
 #define HAVE_ALLOC_SKB		/* For the drivers to know */
 #define HAVE_ALIGNABLE_SKB	/* Ditto 8)		   */
 #define SLAB_SKB 		/* Slabified skbuffs 	   */
@@ -187,7 +191,7 @@ struct sk_buff {
  	unsigned int 	data_len;
 	unsigned int	csum;			/* Checksum 					*/
 	unsigned char 	__unused,		/* Dead field, may be reused			*/
-			cloned, 		/* head may be cloned (check refcnt to be sure). */
+			cloned, 		/* head may be cloned (check refcnt to be sure) */
   			pkt_type,		/* Packet class					*/
   			ip_summed;		/* Driver fed us an IP checksum			*/
 	__u32		priority;		/* Packet queueing priority			*/
@@ -203,8 +207,12 @@ struct sk_buff {
 
 	void 		(*destructor)(struct sk_buff *);	/* Destruct function		*/
 
-        int src_vif;                            /* vif we came from */
-        int dst_vif;                            /* vif we are bound for */
+        unsigned int    skb_type;               /* SKB_NORMAL or SKB_ZERO_COPY                  */
+        struct pfn_info *pf;                    /* record of physical pf address for freeing    */
+        int src_vif;                            /* vif we came from                             */
+        int dst_vif;                            /* vif we are bound for                         */
+        struct skb_shared_info shinfo;          /* shared info is no longer shared in Xen.      */
+        
 
                 
         
@@ -244,6 +252,7 @@ struct sk_buff {
 
 extern void			__kfree_skb(struct sk_buff *skb);
 extern struct sk_buff *		alloc_skb(unsigned int size, int priority);
+extern struct sk_buff *         alloc_zc_skb(unsigned int size, int priority);
 extern void			kfree_skbmem(struct sk_buff *skb);
 extern struct sk_buff *		skb_clone(struct sk_buff *skb, int priority);
 extern struct sk_buff *		skb_copy(const struct sk_buff *skb, int priority);
@@ -259,7 +268,8 @@ extern void	skb_over_panic(struct sk_buff *skb, int len, void *here);
 extern void	skb_under_panic(struct sk_buff *skb, int len, void *here);
 
 /* Internal */
-#define skb_shinfo(SKB)		((struct skb_shared_info *)((SKB)->end))
+//#define skb_shinfo(SKB)		((struct skb_shared_info *)((SKB)->end))
+#define skb_shinfo(SKB)     ((struct skb_shared_info *)(&(SKB)->shinfo))
 
 /**
  *	skb_queue_empty - check if a queue is empty
@@ -1045,7 +1055,8 @@ static inline struct sk_buff *__dev_alloc_skb(unsigned int length,
 {
 	struct sk_buff *skb;
 
-	skb = alloc_skb(length+16, gfp_mask);
+	//skb = alloc_skb(length+16, gfp_mask);
+        skb = alloc_zc_skb(length+16, gfp_mask);
 	if (skb)
 		skb_reserve(skb,16);
 	return skb;

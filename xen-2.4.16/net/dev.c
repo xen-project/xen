@@ -30,6 +30,7 @@
 #include <linux/pkt_sched.h>
 
 #include <linux/event.h>
+#include <asm/domain_page.h>
 
 #define BUG_TRAP ASSERT
 #define notifier_call_chain(_a,_b,_c) ((void)0)
@@ -695,6 +696,21 @@ int netif_rx(struct sk_buff *skb)
 	if (skb->stamp.tv_sec == 0)
 		get_fast_time(&skb->stamp);
 
+        /* Attempt to handle zero-copy packets here: */
+        if (skb->skb_type == SKB_ZERO_COPY)
+        {
+                skb->head = (u8 *)map_domain_mem(((skb->pf - frame_table) << PAGE_SHIFT));
+
+                /* remapping this address really screws up all the skb pointers.  We need 
+                 * to map them all here sufficiently to get the packet demultiplexed.
+                 */
+                
+                skb->data = skb->head;
+                skb_reserve(skb,16); // need to ensure that all the drivers and not just tulip do this.
+                skb->mac.raw = skb->data;
+                skb->data += ETH_HLEN;
+        }
+        
 	/* The code is rearranged so that the path is the most
 	   short when CPU is congested, but is still operating.
 	 */
@@ -747,10 +763,18 @@ drop:
 	netdev_rx_stat[this_cpu].dropped++;
 	local_irq_restore(flags);
 
+        if (skb->skb_type == SKB_ZERO_COPY)
+                unmap_domain_mem(skb->head);
+        
 	kfree_skb(skb);
 	return NET_RX_DROP;
 
 found:
+        if (skb->skb_type == SKB_ZERO_COPY) {
+                unmap_domain_mem(skb->head);
+                //skb->head = (u8 *)((skb->pf - frame_table) << PAGE_SHIFT);
+                skb->head = skb->data = skb->tail = (void *)0xdeadbeef;
+        }
         hyp_event_notify(cpu_mask);
         local_irq_restore(flags);
         return 0;
@@ -930,8 +954,28 @@ void flush_rx_queue(void)
                     rx = shadow_ring->rx_ring+i;
                     if ( (skb->len + ETH_HLEN) < rx->size )
                         rx->size = skb->len + ETH_HLEN;
+
+                    /* remap the packet again.  This is very temporary and will shortly be
+                     * replaced with a page swizzle.
+                     */
+
+                    if (skb->skb_type == SKB_ZERO_COPY)
+                    {
+                        skb->head = (u8 *)map_domain_mem(((skb->pf - frame_table) << PAGE_SHIFT));
+                        skb->data = skb->head;
+                        skb_reserve(skb,16); 
+                        skb->mac.raw = skb->data;
+                        skb->data += ETH_HLEN;
+                    }
+                                                                        
                     copy_to_user((void *)rx->addr, skb->mac.raw, rx->size);
                     copy_to_user(net_ring->rx_ring+i, rx, sizeof(rx));
+                    
+                    if (skb->skb_type == SKB_ZERO_COPY)
+                    {
+                        unmap_domain_mem(skb->head);
+                        skb->head = skb->data = skb->tail = (void *)0xdeadbeef;
+                    }
                 }
                 net_ring->rx_cons = (i+1) & (RX_RING_SIZE-1);
                 if ( net_ring->rx_cons == net_ring->rx_event )
