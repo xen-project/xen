@@ -48,6 +48,8 @@
 
 #include <xeno/ac_timer.h>
 
+#include <xeno/perfc.h>
+
 #undef APIC_TIME_TRACE
 #ifdef APIC_TIME_TRACE
 #define TRC(_x) _x
@@ -748,6 +750,7 @@ void smp_apic_timer_interrupt(struct pt_regs * regs)
 
 	/* call the local handler */
     irq_enter(cpu, 0);
+	perfc_incrc(apic_timer);
     smp_local_timer_interrupt(regs);
     irq_exit(cpu, 0);
 
