@@ -634,6 +634,11 @@
 3f72f1bdJPsV3JCnBqs9ddL9tr6D2g xen/COPYING
 3ddb79bcbOVHh38VJzc97-JEGD4dJQ xen/Makefile
 3ddb79bcWnTwYsQRWl_PaneJfa6p0w xen/Rules.mk
+41a26ebcqaSGVQ8qTMwpPwOJSJ7qSw xen/arch/ia64/privop.c
+41a26ebc4BOHDUsT0TSnryPeV2xfRA xen/arch/ia64/process.c
+41a26ebcJ30TFl1v2kR8rqpEBvOtVw xen/arch/ia64/regionreg.c
+41a26ebc--sjlYZQxmIxyCx3jw70qA xen/arch/ia64/vcpu.c
+41a26ebc4jSBGQOuyNIPDST58mNbBw xen/arch/ia64/xenasm.S
 3ddb79bcZbRBzT3elFWSX7u6NtMagQ xen/arch/x86/Makefile
 3ddb79bcBQF85CfLS4i1WGZ4oLLaCA xen/arch/x86/Rules.mk
 3e5636e5FAYZ5_vQnmgwFJfSdmO5Mw xen/arch/x86/acpi.c
