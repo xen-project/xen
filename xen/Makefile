@@ -99,7 +99,8 @@ include/asm-$(TARGET_ARCH)/asm-offsets.h: arch/$(TARGET_ARCH)/asm-offsets.s
 	  echo ""; \
 	  sed -ne "/^->/{s:^->\([^ ]*\) [\$$#]*\([^ ]*\) \(.*\):#define \1 \2 /* \3 */:; s:->::; p;}"; \
 	  echo ""; \
-	  echo "#endif") <$< >$@
+	  echo "#endif") <$< >$@.tmp
+	@if cmp -s $@.tmp $@; then rm $@.tmp; else rm $@; mv $@.tmp $@; fi
 
 .PHONY: default debug install dist clean delete-unfresh-files TAGS
 
