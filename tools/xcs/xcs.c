@@ -75,6 +75,7 @@
 #include <errno.h>
 #include <malloc.h>
 #include <fcntl.h>
+#include <ctype.h>
 #include "xcs.h"
 
 #undef fd_max
@@ -250,7 +251,7 @@ static int listen_socket (char *listen_path)
         close (s);
         return -1;
     }
-    printf ("accepting connections on path %s\n", listen_path);
+    DPRINTF ("accepting connections on path %s\n", listen_path);
     listen (s, 10);
     return s;
 }
@@ -628,13 +629,66 @@ void gc_ufd_list( unbound_fd_t **ufd )
     }
 }
 
+void daemonize_xcs(void)
+{
+    
+    /* detach from our controlling tty so that a shell does hang waiting for
+       stopped jobs. */
+    
+    pid_t pid = fork();
+    int fd;
+
+    if (pid == -1) {
+	    perror("fork()");
+    } else if (pid) {
+	    exit(0);
+    }
+
+    fd = open("/var/log/xcs.log", O_WRONLY | O_APPEND | O_CREAT);
+    if ( fd == -1 ) {
+        fprintf(stderr, "xcs couldn't open logfile.  Directing all output to "
+                "/dev/null instead.\n");
+        fd = open("/dev/null", O_WRONLY);
+    }
+    
+    setsid();
+    close(2);
+    close(1);
+    close(0);
+    dup(fd);
+    dup(fd);
+}
+
+
+static char *pidfilename = NULL;
+void cleanup(int sig)
+{
+    /* throw away our pidfile if we created one. */
+    if ( pidfilename != NULL ) 
+        unlink(pidfilename);
+    exit(0);
+}
+
 int main (int argc, char *argv[])
 {
     int listen_fd, evtchn_fd;
     unbound_fd_t *unbound_fd_list = NULL, **ufd;
     struct timeval timeout = { XCS_GC_INTERVAL, 0 };
     connection_t **con;
+    int c, daemonize;
+    FILE *pidfile;
+    struct stat s;
+    
+    daemonize = 1;
+    pidfile = NULL;
 
+    signal(SIGHUP, cleanup);
+    signal(SIGTERM, cleanup);
+    signal(SIGINT, cleanup);
+    
+    /* Do a bunch of stuff before potentially daemonizing so we can 
+     * print error messages sanely before redirecting output. */
+    
     /* Initialize xc and event connections. */
     if (ctrl_chan_init() != 0)
     {
@@ -648,35 +702,61 @@ int main (int argc, char *argv[])
         exit(-1);
     }
    
+    /* Bind listen_fd to the client socket. */
+    listen_fd = listen_socket(XCS_SUN_PATH);
+     
+    while ((c = getopt (argc, argv, "ip:")) != -1)
+    {
+        switch (c)
+        {
+        case 'i': /* interactive */
+            daemonize = 0;
+            break;
+        case 'p': /* pid file */
+            pidfilename = optarg;
+            break;          
+        case '?':
+            if (isprint (optopt))
+                fprintf (stderr, "Unknown option `-%c'.\n", optopt);
+            else
+                fprintf (stderr,
+                    "Bad option character `\\x%x'.\n", optopt);
+            break;
+        }    
+    }
+    
+    if ( pidfilename != NULL )
+    {
+        if ( stat(pidfilename, &s) == 0 )
+        {
+            fprintf(stderr, "Thre specified pid file (%s) already exists.\n"
+                    "Is another instance of xcs running?\n", pidfilename);
+            exit(-1);
+        }
+
+        pidfile = fopen(pidfilename, "w");
+        if (pidfile == NULL)
+        {
+            fprintf(stderr, "Error openning pidfile (%s).\n", pidfilename);
+            exit(-1);
+        }
+    }
+        
+    if (daemonize == 1) 
+        daemonize_xcs();
+    
+    if (pidfile != NULL)
+    {
+        fprintf(pidfile, "%d", getpid());
+        fclose(pidfile); 
+    }
+    
+    
     /* Initialize control interfaces, bindings. */
     init_interfaces();
     init_bindings();
     
-    listen_fd = listen_socket(XCS_SUN_PATH);
    
-    /* detach from our controlling tty so that a shell does hang waiting for
-       stopped jobs. */
-    /* we should use getopt() here */
-
-    if (!(argc == 2 && !strcmp(argv[1], "-i"))) {
-	pid_t pid = fork();
-	int fd;
-
-	if (pid == -1) {
-		perror("fork()");
-	} else if (pid) {
-		exit(0);
-	}
-
-    	setsid();
-	close(2);
-	close(1);
-	close(0);
-	fd = open("/dev/null", O_RDWR);
-	dup(fd);
-	dup(fd);
-    }
- 
     for (;;)
     {
         int n = 0, ret;

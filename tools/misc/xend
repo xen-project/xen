@@ -22,11 +22,13 @@
 import os
 import sys
 import socket
+import signal
 import time
 
-XCS_PATH = "/var/lib/xen/xcs_socket"
-XCS_EXEC = "/usr/sbin/xcs"
-XCS_LOGFILE = "/var/log/xcs.log"
+XCS_PATH    = "/var/lib/xen/xcs_socket"
+XCS_EXEC    = "/usr/sbin/xcs"
+XCS_PIDFILE = "/var/run/xcs.pid"
+XCS_ARGS    = (XCS_EXEC, "-p", XCS_PIDFILE)
 
 # Default install path for Xen binary packages.
 sys.path = [ '/usr/lib/python' ] + sys.path
@@ -98,37 +100,21 @@ def check_user():
 
 def xcs_running():
     """ See if the control switch is running.
-    """
-    ret = 1
-    s = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+    """	
     try:
-        s.connect( (XCS_PATH) )
-    except:
-        ret = 0
-    s.close()
-    return (ret)
+	xcs_pidfile = open(XCS_PIDFILE)
+    except IOError:
+	return(0)
+    xcs_pidfile.close()
+    return 1
     
-def main():
-    try:
-        check_logging()
-        check_twisted_version()
-        check_user()
-    except CheckError:
-        sys.exit(1)
-    
+def start_xcs():
     if (not xcs_running()):
         if os.fork():
-            time.sleep(0.5) # let xcs start
+            time.sleep(0.1) # let xcs start
         else:
             try:
-                logfile = os.open(XCS_LOGFILE, 
-                                  os.O_WRONLY|os.O_APPEND|os.O_CREAT)
-                os.close(1)
-                os.dup(logfile)
-                os.close(2)
-                os.dup(logfile)
-                os.close(logfile)
-                os.execlp(XCS_EXEC, XCS_EXEC)
+                os.execvp(XCS_EXEC, XCS_ARGS)
             except:
                 hline()
                 msg("Tried to start xcs, but failed. Is it installed?")
@@ -139,7 +125,25 @@ def main():
             msg("Failed to start the control interface switch.")
             hline()
             raise CheckError("xcs not running")
-        
+            
+def stop_xcs():
+    try:
+	xcs_pidfile = open(XCS_PIDFILE)
+    except IOError:
+	return
+    xcs_pid = int(xcs_pidfile.read().strip())
+    os.kill(xcs_pid, signal.SIGTERM)
+    xcs_pidfile.close()
+    
+            
+def main():
+    try:
+        check_logging()
+        check_twisted_version()
+        check_user()
+    except CheckError:
+        sys.exit(1)
+    
     daemon = SrvDaemon.instance()
     if not sys.argv[1:]:
         print 'usage: %s {start|stop|restart}' % sys.argv[0]
@@ -147,12 +151,17 @@ def main():
         pid, status = os.wait()
         return status >> 8
     elif sys.argv[1] == 'start':
+        start_xcs()
         return daemon.start()
     elif sys.argv[1] == 'trace_start':
+        start_xcs()
         return daemon.start(trace=1)
     elif sys.argv[1] == 'stop':
+        stop_xcs()
         return daemon.stop()
     elif sys.argv[1] == 'restart':
+        stop_xcs()
+        start_xcs()
         return daemon.stop() or daemon.start()
     elif sys.argv[1] == 'status':
         return daemon.status()
