@@ -224,7 +224,7 @@ static int mmap_mem(struct file * file, struct vm_area_struct * vma)
 #else
 	unsigned long offset = vma->vm_pgoff << PAGE_SHIFT;
 
-	if (!(start_info.flags & SIF_PRIVILEGED))
+	if (!(xen_start_info.flags & SIF_PRIVILEGED))
 		return -ENXIO;
 
 	/* Currently we're not smart about setting PTE cacheability. */

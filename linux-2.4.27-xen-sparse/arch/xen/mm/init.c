@@ -221,9 +221,9 @@ static void __init pagetable_init (void)
 
     /* create tables only for boot_pfn frames.  max_low_pfn may be sized for
      * pages yet to be allocated from the hypervisor, or it may be set
-     * to override the start_info amount of memory
+     * to override the xen_start_info amount of memory
      */
-    int boot_pfn = min(start_info.nr_pages,max_low_pfn);
+    int boot_pfn = min(xen_start_info.nr_pages,max_low_pfn);
 
     /*
      * This can be zero as well - no problem, in that case we exit
@@ -315,7 +315,7 @@ void __init paging_init(void)
 
     zone_sizes_init();
     /* Switch to the real shared_info page, and clear the dummy page. */
-    set_fixmap(FIX_SHARED_INFO, start_info.shared_info);
+    set_fixmap(FIX_SHARED_INFO, xen_start_info.shared_info);
     HYPERVISOR_shared_info = (shared_info_t *)fix_to_virt(FIX_SHARED_INFO);
     memset(empty_zero_page, 0, sizeof(empty_zero_page));
 
@@ -376,9 +376,9 @@ static int __init free_pages_init(void)
     /* add only boot_pfn pages of low memory to free list.
      * max_low_pfn may be sized for
      * pages yet to be allocated from the hypervisor, or it may be set
-     * to override the start_info amount of memory
+     * to override the xen_start_info amount of memory
      */
-    int boot_pfn = min(start_info.nr_pages,max_low_pfn);
+    int boot_pfn = min(xen_start_info.nr_pages,max_low_pfn);
 
     /* this will put all low memory onto the freelists */
     totalram_pages += free_all_bootmem();
@@ -392,7 +392,7 @@ static int __init free_pages_init(void)
             reservedpages++;
     }
 #ifdef CONFIG_HIGHMEM
-    for (pfn = start_info.nr_pages-1; pfn >= highstart_pfn; pfn--)
+    for (pfn = xen_start_info.nr_pages-1; pfn >= highstart_pfn; pfn--)
         one_highpage_init((struct page *) (mem_map + pfn), pfn, bad_ppro);
     totalram_pages += totalhigh_pages;
 #endif

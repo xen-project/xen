@@ -147,7 +147,7 @@ static int __init __independent_wallclock(char *str)
 }
 __setup("independent_wallclock", __independent_wallclock);
 #define INDEPENDENT_WALLCLOCK() \
-    (independent_wallclock || (start_info.flags & SIF_INITDOMAIN))
+    (independent_wallclock || (xen_start_info.flags & SIF_INITDOMAIN))
 
 /*
  * Reads a consistent set of time-base values from Xen, into a shadow data
@@ -309,7 +309,7 @@ int do_settimeofday(struct timespec *tv)
 	last_update_from_xen = 0;
 
 #ifdef CONFIG_XEN_PRIVILEGED_GUEST
-	if (start_info.flags & SIF_INITDOMAIN) {
+	if (xen_start_info.flags & SIF_INITDOMAIN) {
 		dom0_op_t op;
 		last_rtc_update = last_update_to_xen = 0;
 		op.cmd = DOM0_SETTIME;
@@ -427,7 +427,7 @@ static inline void do_timer_interrupt(int irq, void *dev_id,
 	}
 
 #ifdef CONFIG_XEN_PRIVILEGED_GUEST
-	if (!(start_info.flags & SIF_INITDOMAIN))
+	if (!(xen_start_info.flags & SIF_INITDOMAIN))
 		return;
 
 	/* Send synchronised time to Xen approximately every minute. */

@@ -473,7 +473,7 @@ static int __init init_module(void)
 {
     printk(KERN_ALERT "Starting Xen Balloon driver\n");
 
-    most_seen_pages = current_pages = min(start_info.nr_pages,max_pfn);
+    most_seen_pages = current_pages = min(xen_start_info.nr_pages,max_pfn);
     if ( (balloon_pde = create_xen_proc_entry("memory_target", 0644)) == NULL )
     {
         printk(KERN_ALERT "Unable to create balloon driver proc entry!");
@@ -486,14 +486,14 @@ static int __init init_module(void)
     /* 
      * make a new phys map if mem= says xen can give us memory  to grow
      */
-    if ( max_pfn > start_info.nr_pages )
+    if ( max_pfn > xen_start_info.nr_pages )
     {
         extern unsigned long *phys_to_machine_mapping;
         unsigned long *newmap;
         newmap = (unsigned long *)vmalloc(max_pfn * sizeof(unsigned long));
         memset(newmap, ~0, max_pfn * sizeof(unsigned long));
         memcpy(newmap, phys_to_machine_mapping,
-               start_info.nr_pages * sizeof(unsigned long));
+               xen_start_info.nr_pages * sizeof(unsigned long));
         phys_to_machine_mapping = newmap;
     }
 

@@ -22,7 +22,7 @@ asmlinkage long sys_iopl(unsigned int new_io_pl)
 	if ((new_io_pl > old_io_pl) && !capable(CAP_SYS_RAWIO))
 		return -EPERM;
 
-	if (!(start_info.flags & SIF_PRIVILEGED))
+	if (!(xen_start_info.flags & SIF_PRIVILEGED))
 		return -EPERM;
 
 	/* Maintain OS privileges even if user attempts to relinquish them. */

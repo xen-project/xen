@@ -449,7 +449,7 @@ void ctrl_if_resume(void)
 {
     control_if_t *ctrl_if = get_ctrl_if();
 
-    if ( start_info.flags & SIF_INITDOMAIN )
+    if ( xen_start_info.flags & SIF_INITDOMAIN )
     {
         /*
          * The initial domain must create its own domain-controller link.
@@ -462,7 +462,7 @@ void ctrl_if_resume(void)
         op.u.bind_interdomain.dom2 = DOMID_SELF;
         if ( HYPERVISOR_event_channel_op(&op) != 0 )
             BUG();
-        start_info.domain_controller_evtchn = op.u.bind_interdomain.port1;
+        xen_start_info.domain_controller_evtchn = op.u.bind_interdomain.port1;
         initdom_ctrlif_domcontroller_port   = op.u.bind_interdomain.port2;
     }
 
@@ -470,7 +470,7 @@ void ctrl_if_resume(void)
     ctrl_if_tx_resp_cons = ctrl_if->tx_resp_prod;
     ctrl_if_rx_req_cons  = ctrl_if->rx_resp_prod;
 
-    ctrl_if_evtchn = start_info.domain_controller_evtchn;
+    ctrl_if_evtchn = xen_start_info.domain_controller_evtchn;
     ctrl_if_irq    = bind_evtchn_to_irq(ctrl_if_evtchn);
 
 #define SA_STATIC_ACTION 0x01000000 /* so that free_irq() doesn't do kfree() */

@@ -568,7 +568,7 @@ struct task_struct fastcall * __switch_to(struct task_struct *prev_p, struct tas
 	C(0); C(1); C(2);
 #undef C
 
-	if (start_info.flags & SIF_PRIVILEGED) {
+	if (xen_start_info.flags & SIF_PRIVILEGED) {
 		op.cmd           = DOM0_IOPL;
 		op.u.iopl.domain = DOMID_SELF;
 		op.u.iopl.iopl   = next->io_pl;

@@ -342,7 +342,7 @@ multicall_entry_t multicall_list[8];
 int nr_multicall_ents = 0;
 
 /* Raw start-of-day parameters from the hypervisor. */
-union start_info_union start_info_union;
+union xen_start_info_union xen_start_info_union;
 
 extern void (*pm_idle)(void);
 
@@ -682,7 +682,7 @@ static void __init parse_cmdline_early (char ** cmdline_p)
 	int len = 0;
 	int userdef = 0;
 
-        memcpy(saved_command_line, start_info.cmd_line, MAX_CMDLINE);
+        memcpy(saved_command_line, xen_start_info.cmd_line, MAX_CMDLINE);
 	/* Save unparsed command line copy for /proc/cmdline */
 	saved_command_line[COMMAND_LINE_SIZE-1] = '\0';
 
@@ -1020,7 +1020,7 @@ static unsigned long __init setup_memory(void)
 	 * partially used pages are not usable - thus
 	 * we are rounding upwards:
 	 */
-	start_pfn = PFN_UP(__pa(start_info.pt_base)) + start_info.nr_pt_frames;
+	start_pfn = PFN_UP(__pa(xen_start_info.pt_base)) + xen_start_info.nr_pt_frames;
 
 	find_max_pfn();
 
@@ -1081,7 +1081,7 @@ static unsigned long __init setup_memory(void)
 #endif
 
 #ifdef CONFIG_BLK_DEV_INITRD
-	if (start_info.mod_start) {
+	if (xen_start_info.mod_start) {
 		if (INITRD_START + INITRD_SIZE <= (max_low_pfn << PAGE_SHIFT)) {
 			/*reserve_bootmem(INITRD_START, INITRD_SIZE);*/
 			initrd_start = INITRD_START + PAGE_OFFSET;
@@ -1098,7 +1098,7 @@ static unsigned long __init setup_memory(void)
 	}
 #endif
 
-	phys_to_machine_mapping = (unsigned long *)start_info.mfn_list;
+	phys_to_machine_mapping = (unsigned long *)xen_start_info.mfn_list;
 
 	return max_low_pfn;
 }
@@ -1358,7 +1358,7 @@ void __init setup_arch(char **cmdline_p)
 	init_mm.start_code = (unsigned long) _text;
 	init_mm.end_code = (unsigned long) _etext;
 	init_mm.end_data = (unsigned long) _edata;
-	init_mm.brk = (PFN_UP(__pa(start_info.pt_base)) + start_info.nr_pt_frames) << PAGE_SHIFT;
+	init_mm.brk = (PFN_UP(__pa(xen_start_info.pt_base)) + xen_start_info.nr_pt_frames) << PAGE_SHIFT;
 
 	code_resource.start = virt_to_phys(_text);
 	code_resource.end = virt_to_phys(_etext)-1;
@@ -1423,7 +1423,7 @@ void __init setup_arch(char **cmdline_p)
 	register_memory(max_low_pfn);
 
 	/* If we are a privileged guest OS then we should request IO privs. */
-	if (start_info.flags & SIF_PRIVILEGED) {
+	if (xen_start_info.flags & SIF_PRIVILEGED) {
 		dom0_op_t op;
 		op.cmd           = DOM0_IOPL;
 		op.u.iopl.domain = DOMID_SELF;
@@ -1433,8 +1433,8 @@ void __init setup_arch(char **cmdline_p)
 		current->thread.io_pl = 1;
 	}
 
-	if (start_info.flags & SIF_INITDOMAIN) {
-		if (!(start_info.flags & SIF_PRIVILEGED))
+	if (xen_start_info.flags & SIF_INITDOMAIN) {
+		if (!(xen_start_info.flags & SIF_PRIVILEGED))
 			panic("Xen granted us console access "
 			      "but not privileged status");
 

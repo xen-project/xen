@@ -36,8 +36,8 @@ ENTRY(startup_32)
 	/* Set up the stack pointer */
 	lss stack_start,%esp
 
-	/* Copy the necessary stuff from start_info structure. */
-	mov  $start_info_union,%edi
+	/* Copy the necessary stuff from xen_start_info structure. */
+	mov  $xen_start_info_union,%edi
 	mov  $128,%ecx
 	rep movsl
 

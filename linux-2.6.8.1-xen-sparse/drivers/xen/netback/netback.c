@@ -776,8 +776,8 @@ static int __init netback_init(void)
     int i;
     struct page *page;
 
-    if ( !(start_info.flags & SIF_NET_BE_DOMAIN) &&
-	 !(start_info.flags & SIF_INITDOMAIN) )
+    if ( !(xen_start_info.flags & SIF_NET_BE_DOMAIN) &&
+	 !(xen_start_info.flags & SIF_INITDOMAIN) )
         return 0;
 
     printk("Initialising Xen netif backend\n");

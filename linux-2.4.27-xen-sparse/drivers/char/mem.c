@@ -234,7 +234,7 @@ static int mmap_mem(struct file * file, struct vm_area_struct * vma)
 {
 	unsigned long offset = vma->vm_pgoff << PAGE_SHIFT;
 
-	if (!(start_info.flags & SIF_PRIVILEGED))
+	if (!(xen_start_info.flags & SIF_PRIVILEGED))
 		return -ENXIO;
 
 	/* DONTCOPY is essential for Xen as copy_page_range is broken. */

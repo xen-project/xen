@@ -338,7 +338,7 @@ void __switch_to(struct task_struct *prev_p, struct task_struct *next_p)
     }
 
     queue_multicall2(__HYPERVISOR_stack_switch, __KERNEL_DS, next->esp0);
-    if ( start_info.flags & SIF_PRIVILEGED ) 
+    if ( xen_start_info.flags & SIF_PRIVILEGED ) 
     {
         dom0_op_t op;
         op.cmd           = DOM0_IOPL;

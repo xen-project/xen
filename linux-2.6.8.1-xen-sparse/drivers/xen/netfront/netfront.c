@@ -1244,8 +1244,8 @@ static int __init netif_init(void)
 {
     int err = 0;
 
-    if ( (start_info.flags & SIF_INITDOMAIN) ||
-         (start_info.flags & SIF_NET_BE_DOMAIN) )
+    if ( (xen_start_info.flags & SIF_INITDOMAIN) ||
+         (xen_start_info.flags & SIF_NET_BE_DOMAIN) )
         return 0;
 
     IPRINTK("Initialising virtual ethernet driver.\n");

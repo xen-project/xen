@@ -536,7 +536,7 @@ out:
  */
 void __init paging_init(void)
 {
-	pgd_t *old_pgd = (pgd_t *)start_info.pt_base;
+	pgd_t *old_pgd = (pgd_t *)xen_start_info.pt_base;
 	pgd_t *new_pgd = swapper_pg_dir;
 #ifdef CONFIG_XEN_PHYSDEV_ACCESS
 	int i;
@@ -567,7 +567,7 @@ void __init paging_init(void)
 	flush_page_update_queue();
 
 	/* Completely detached from old tables, so free them. */
-	free_bootmem(__pa(old_pgd), start_info.nr_pt_frames << PAGE_SHIFT);
+	free_bootmem(__pa(old_pgd), xen_start_info.nr_pt_frames << PAGE_SHIFT);
 
 #ifdef CONFIG_X86_PAE
 	/*
@@ -584,14 +584,14 @@ void __init paging_init(void)
 
 	/* Switch to the real shared_info page, and clear the dummy page. */
 	flush_page_update_queue();
-	set_fixmap_ma(FIX_SHARED_INFO, start_info.shared_info);
+	set_fixmap_ma(FIX_SHARED_INFO, xen_start_info.shared_info);
 	HYPERVISOR_shared_info = (shared_info_t *)fix_to_virt(FIX_SHARED_INFO);
 	memset(empty_zero_page, 0, sizeof(empty_zero_page));
 
 #ifdef CONFIG_XEN_PRIVILEGED_GUEST
 	/* Setup mapping of lower 1st MB */
 	for (i = 0; i < NR_FIX_ISAMAPS; i++)
-		if (start_info.flags & SIF_PRIVILEGED)
+		if (xen_start_info.flags & SIF_PRIVILEGED)
 			set_fixmap_ma(FIX_ISAMAP_BEGIN - i, i * PAGE_SIZE);
 		else
 			set_fixmap_ma_ro(FIX_ISAMAP_BEGIN - i,
