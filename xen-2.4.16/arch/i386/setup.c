@@ -103,6 +103,7 @@ static void __init init_amd(struct cpuinfo_x86 *c)
  */
 void __init identify_cpu(struct cpuinfo_x86 *c)
 {
+    extern int opt_noht, opt_noacpi;
     int junk, i;
     u32 xlvl, tfms;
 
@@ -163,6 +164,12 @@ void __init identify_cpu(struct cpuinfo_x86 *c)
         panic("Only support Intel processors (P6+)\n");
     }
 	
+    if ( opt_noht )
+    {
+        opt_noacpi = 1; /* Virtual CPUs only appear in ACPI tables. */
+        clear_bit(X86_FEATURE_HT, &c->x86_capability[0]);
+    }
+
     printk("CPU caps: %08x %08x %08x %08x\n",
            c->x86_capability[0],
            c->x86_capability[1],

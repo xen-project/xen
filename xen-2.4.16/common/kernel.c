@@ -45,7 +45,8 @@ unsigned long opt_dom0_ip = 0;
 unsigned int opt_dom0_mem = 16000; /* default kbytes for DOM0 */
 unsigned int opt_ne_base = 0; /* NE2k NICs cannot be probed */
 unsigned char opt_ifname[10] = "eth0";
-enum { OPT_IP, OPT_STR, OPT_UINT };
+int opt_noht=0, opt_noacpi=0;
+enum { OPT_IP, OPT_STR, OPT_UINT, OPT_BOOL };
 static struct {
     unsigned char *name;
     int type;
@@ -55,6 +56,8 @@ static struct {
     { "dom0_mem", OPT_UINT, &opt_dom0_mem }, 
     { "ne_base",  OPT_UINT, &opt_ne_base },
     { "ifname",   OPT_STR,  &opt_ifname },
+    { "noht",     OPT_BOOL, &opt_noht },
+    { "noacpi",   OPT_BOOL, &opt_noacpi },
     { NULL,       0,        NULL     }
 };
 
@@ -125,27 +128,31 @@ void cmain (unsigned long magic, multiboot_info_t *mbi)
         while ( cmdline != NULL )
         {
             while ( *cmdline == ' ' ) cmdline++;
-            if ( (opt = strchr(cmdline, '=')) == NULL ) break;
-            *opt++ = '\0';
-            opt_end = strchr(opt, ' ');
+            if ( *cmdline == '\0' ) break;
+            opt_end = strchr(cmdline, ' ');
             if ( opt_end != NULL ) *opt_end++ = '\0';
+            opt = strchr(cmdline, '=');
+            if ( opt != NULL ) *opt++ = '\0';
             for ( i = 0; opts[i].name != NULL; i++ )
             {
-                if ( strcmp(opts[i].name, cmdline ) == 0 )
+                if ( strcmp(opts[i].name, cmdline ) != 0 ) continue;
+                switch ( opts[i].type )
                 {
-                    if ( opts[i].type == OPT_IP )
-                    {
+                case OPT_IP:
+                    if ( opt != NULL )
                         *(unsigned long *)opts[i].var = str_to_quad(opt);
-                    }
-                    else if(opts[i].type == OPT_STR)
-                    {
+                    break;
+                case OPT_STR:
+                    if ( opt != NULL )
                         strcpy(opts[i].var, opt);
-                    }
-                    else /* opts[i].type == OPT_UINT */
-                    {
+                    break;
+                case OPT_UINT:
+                    if ( opt != NULL )
                         *(unsigned int *)opts[i].var =
                             simple_strtol(opt, (char **)&opt, 0);
-                    }
+                    break;
+                case OPT_BOOL:
+                    *(int *)opts[i].var = 1;
                     break;
                 }
             }

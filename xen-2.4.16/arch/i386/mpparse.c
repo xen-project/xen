@@ -781,7 +781,7 @@ void __init get_smp_config (void)
 	 * processor(s) that are provided by the MPS. We attempt to 
 	 * check only if the user provided a commandline override
 	 */
-	//XXX Xen config_acpi_tables();
+        config_acpi_tables();
 #endif
 	
 	printk("Intel MultiProcessor Specification v1.%d\n", mpf->mpf_specification);
