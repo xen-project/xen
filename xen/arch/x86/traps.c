@@ -223,7 +223,7 @@ asmlinkage int do_int3(struct xen_regs *regs)
         show_registers(regs);
         panic("CPU%d FATAL TRAP: vector = 3 (Int3)\n", smp_processor_id());
     } 
-#ifdef XEN_UDB
+#ifdef DOMU_DEBUG
     else if ( KERNEL_MODE(ed, regs) && ed->domain->id != 0 ) 
     {
         if ( !test_and_set_bit(EDF_CTRLPAUSE, &ed->ed_flags) ) {
@@ -234,7 +234,7 @@ asmlinkage int do_int3(struct xen_regs *regs)
         
         return 0;
     }
-#endif /* XEN_UDB */
+#endif /* DOMU_DEBUG */
     ti = current->arch.traps + 3;
     tb->flags = TBF_EXCEPTION;
     tb->cs    = ti->cs;
@@ -924,7 +924,7 @@ asmlinkage int do_debug(struct xen_regs *regs)
          */
         goto out;
     } 
-#ifdef XEN_UDB
+#ifdef DOMU_DEBUG
     else if ( KERNEL_MODE(ed, regs) && ed->domain->id != 0 ) 
     {
         regs->eflags &= ~EF_TF;
@@ -936,7 +936,7 @@ asmlinkage int do_debug(struct xen_regs *regs)
 
         goto out;
     }    
-#endif /* XEN_UDB */
+#endif /* DOMU_DEBUG */
     /* Save debug status register where guest OS can peek at it */
     ed->arch.debugreg[6] = condition;
 

@@ -1,10 +1,10 @@
 
 verbose     ?= n
 debug       ?= n
-debugger    ?= n
 perfc       ?= n
 trace       ?= n
 optimize    ?= y
+domu_debug  ?= n
 crash_debug ?= n
 
 # Currently supported architectures: x86_32, x86_64
@@ -55,8 +55,8 @@ else
 CFLAGS += -DVERBOSE
 endif
 
-ifeq ($(debugger),y)
-CFLAGS += -DXEN_UDB
+ifeq ($(domu_debug),y)
+CFLAGS += -DDOMU_DEBUG
 endif
 
 ifeq ($(crash_debug),y)

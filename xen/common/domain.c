@@ -267,7 +267,7 @@ int set_info_guest(struct domain *p, dom0_setdomaininfo_t *setdomaininfo)
     unsigned long vcpu = setdomaininfo->exec_domain;
     struct exec_domain *ed; 
 
-    if ( (vcpu >= MAX_VIRT_CPUS) || ((ed = p->exec_domain[vcpu]) != NULL) )
+    if ( (vcpu >= MAX_VIRT_CPUS) || ((ed = p->exec_domain[vcpu]) == NULL) )
         return -EINVAL;
     
     if (test_bit(DF_CONSTRUCTED, &p->d_flags) && 
