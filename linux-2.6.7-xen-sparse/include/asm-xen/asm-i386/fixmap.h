@@ -44,8 +44,6 @@
 enum fixed_addresses {
 	FIX_HOLE,
 	FIX_VSYSCALL,
-	FIX_4GB_SEGMENT_FIXUP_RO,
-	FIX_4GB_SEGMENT_FIXUP_RW,
 #ifdef CONFIG_X86_LOCAL_APIC
 	FIX_APIC_BASE,	/* local (CPU) APIC) -- required for SMP or not */
 #endif
@@ -128,8 +126,8 @@ extern void __set_fixmap_ma (enum fixed_addresses idx,
  * This is the range that is readable by user mode, and things
  * acting like user mode such as get_user_pages.
  */
-#define FIXADDR_USER_START	(__fix_to_virt(FIX_4GB_SEGMENT_FIXUP_RO))
-#define FIXADDR_USER_END	(FIXADDR_USER_START + (2*PAGE_SIZE))
+#define FIXADDR_USER_START	(__fix_to_virt(FIX_VSYSCALL))
+#define FIXADDR_USER_END	(FIXADDR_USER_START + PAGE_SIZE)
 
 
 extern void __this_fixmap_does_not_exist(void);
