@@ -364,7 +364,6 @@ void new_thread(struct task_struct *p,
 /* NB. prev_p passed in %eax, next_p passed in %edx */
 void __switch_to(struct task_struct *prev_p, struct task_struct *next_p)
 {
-    extern struct desc_struct idt_table[];
     struct thread_struct *prev = &prev_p->thread,
         *next = &next_p->thread;
     struct tss_struct *tss = init_tss + smp_processor_id();
