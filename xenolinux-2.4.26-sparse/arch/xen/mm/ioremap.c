@@ -183,10 +183,6 @@ void * __ioremap(unsigned long machine_addr,
     unsigned long offset, last_addr;
     pgprot_t prot;
 
-    /* Only privileged Xenolinux can make unchecked pagetable updates. */
-    if ( !(start_info.flags & SIF_PRIVILEGED) )
-        return NULL;
-
     /* Don't allow wraparound or zero size */
     last_addr = machine_addr + size - 1;
     if (!size || last_addr < machine_addr)

@@ -410,6 +410,7 @@ static int get_page_from_l1e(l1_pgentry_t l1e)
 {
     unsigned long l1v = l1_pgentry_val(l1e);
     unsigned long pfn = l1_pgentry_to_pagenr(l1e);
+    extern int domain_iomem_in_pfn(struct task_struct *p, unsigned long pfn);
 
     if ( !(l1v & _PAGE_PRESENT) )
         return 1;
@@ -423,7 +424,11 @@ static int get_page_from_l1e(l1_pgentry_t l1e)
     if ( unlikely(!pfn_is_ram(pfn)) )
     {
         if ( IS_PRIV(current) )
-            return 1;
+            return 1;	
+
+	if ( IS_CAPABLE_PHYSDEV(current) )
+            return domain_iomem_in_pfn(current, pfn);
+
         MEM_LOG("Non-privileged attempt to map I/O space %08lx", pfn);
         return 0;
     }
