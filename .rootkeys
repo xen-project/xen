@@ -901,11 +901,13 @@
 3ddb79bcecupHj56ZbTa3B0FxDowMg xen/arch/x86/x86_32/entry.S
 3ddb79bcHwuCQDjBICDTSis52hWguw xen/arch/x86/x86_32/mm.c
 40f92331jfOlE7MfKwpdkEb1CEf23g xen/arch/x86/x86_32/seg_fixup.c
+42000d3ckiFc1qxa4AWqsd0t3lxuyw xen/arch/x86/x86_32/traps.c
 3ddb79bc4nTpGQOe6_-MbyZzkhlhFQ xen/arch/x86/x86_32/usercopy.c
 3ddb79bcOMCu9-5mKpjIh5d0qqBDPg xen/arch/x86/x86_32/xen.lds
 41bf1717Ty3hwN3E9swdu8QfnvGqww xen/arch/x86/x86_64/asm-offsets.c
 40e96d3aLDI-nViMuYneD7VKYlZrVg xen/arch/x86/x86_64/entry.S
 41bf1717XhPz_dNT5OKSjgmbFuWBuA xen/arch/x86/x86_64/mm.c
+42000d3cMb8o1WuFBXC07c8i3lPZBw xen/arch/x86/x86_64/traps.c
 40e96d3ahBTZqbTViInnq0lM03vs7A xen/arch/x86/x86_64/usercopy.c
 40e96d3akN3Hu_J5Bk-WXD8OGscrYQ xen/arch/x86/x86_64/xen.lds
 3ddb79bdff-gj-jFGKjOejeHLqL8Lg xen/common/Makefile

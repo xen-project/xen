@@ -241,26 +241,17 @@ ENTRY(cpu0_stack)    # Initial stack is 8kB
 ENTRY(stext)
 ENTRY(_stext)
 
-.globl ret_from_intr, copy_to_user, set_intr_gate, die
-ret_from_intr:
-copy_to_user:
-set_intr_gate:
-die:
-.globl copy_from_user, show_registers, do_iopl
-copy_from_user: 
-show_registers: 
-do_iopl: 
-.globl idt_table, copy_user_generic, idt_tables, new_thread
-idt_table:
-copy_user_generic:
-idt_tables:
-new_thread:
-.globl switch_to, __get_user_1, __get_user_4, __get_user_8, trap_init
+.globl switch_to, ret_from_intr, do_iopl
 switch_to:
+ret_from_intr:
+do_iopl: 
+.globl copy_from_user, copy_to_user, copy_user_generic, new_thread
+copy_from_user: 
+copy_to_user:
+copy_user_generic:
+new_thread:
+.globl __get_user_1, __get_user_4, __get_user_8
 __get_user_1:
 __get_user_4:
 __get_user_8:
-trap_init: 
-.globl set_debugreg
-set_debugreg:
         

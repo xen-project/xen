@@ -31,4 +31,6 @@ enum EFLAGS {
     EF_ID   = 0x00200000,   /* id */
 };
 
+#define GUEST_FAULT(_r) (likely(VM86_MODE(_r) || !RING_0(_r)))
+
 #endif /* __X86_REGS_H__ */
