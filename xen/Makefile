@@ -51,12 +51,12 @@ $(TARGET): delete-unfresh-files include/xen/compile.h
 
 # Blow away kernel.o because build info is stored statically within it.
 delete-unfresh-files:
-	rm -f include/xen/compile.h common/kernel.o
+	rm -f include/xen/banner.h include/xen/compile.h common/kernel.o
 
 # compile.h contains dynamic build info. Rebuilt on every 'make' invocation.
 include/xen/compile.h: LANG=C
 include/xen/compile.h: include/xen/compile.h.in include/xen/banner.h
-	sed -e 's/@@date@@/$(shell date)/g' \
+	@sed -e 's/@@date@@/$(shell date)/g' \
 	    -e 's/@@time@@/$(shell date +%T)/g' \
 	    -e 's/@@whoami@@/$(shell whoami)/g' \
 	    -e 's/@@domain@@/$(shell ([ -x /bin/dnsdomainname ] && /bin/dnsdomainname) || ([ -x /bin/domainname ] && /bin/domainname || echo [unknown]))/g' \
@@ -67,8 +67,8 @@ include/xen/compile.h: include/xen/compile.h.in include/xen/banner.h
 	    -e 's/@@extraversion@@/$(XEN_EXTRAVERSION)/g' \
 	    -e 's!@@changeset@@!$(shell bk changes -nd':D: :T: :REV: :MD5KEY:' -r+ 2>/dev/null || echo information unavailable)!g' \
 	    < include/xen/compile.h.in > $@.new
-	cat include/xen/banner.h >> $@.new
-	mv -f $@.new $@
+	@cat include/xen/banner.h >> $@.new
+	@mv -f $@.new $@
 
 tools/figlet/figlet: tools/figlet/figlet.o
 	$(CC) -o $@ $<
@@ -77,7 +77,7 @@ tools/figlet/figlet.o: tools/figlet/figlet.c
 
 include/xen/banner.h: tools/figlet/figlet tools/figlet/xen.flf
 	tools/figlet/figlet -d tools/figlet Xen $(XEN_VERSION).$(XEN_SUBVERSION)$(XEN_EXTRAVERSION) > $@.new
-	mv -f $@.new $@
+	@mv -f $@.new $@
 
 include/asm-$(TARGET_ARCH)/asm-offsets.h: arch/$(TARGET_ARCH)/asm-offsets.s
 	@(set -e; \
