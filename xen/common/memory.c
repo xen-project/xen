@@ -915,7 +915,8 @@ static int do_extended_command(unsigned long ptr, unsigned long val)
         break;
 
     case MMUEXT_SET_SUBJECTDOM_H:
-        percpu_info[cpu].subject_id |= ((domid_t)((ptr&~0xFFFF)|(val>>16)))<<32;
+        percpu_info[cpu].subject_id |= 
+            ((domid_t)((ptr&~0xFFFF)|(val>>16)))<<32;
 
         if ( !IS_PRIV(current) )
         {
@@ -937,6 +938,25 @@ static int do_extended_command(unsigned long ptr, unsigned long val)
                 okay = 0;
             }
         }
+        break;
+
+    case MMUEXT_REASSIGN_PAGE:
+        if ( !IS_PRIV(current) )
+        {
+            MEM_LOG("Dom %llu has no privilege to reassign page ownership",
+                    current->domain);
+            okay = 0;
+        }
+        else if ( percpu_info[cpu].gps != NULL )
+        {
+            page->u.domain = percpu_info[cpu].gps;
+        }
+        break;
+
+    case MMUEXT_RESET_SUBJECTDOM:
+        if ( percpu_info[cpu].gps != NULL )
+            put_task_struct(percpu_info[cpu].gps);
+        percpu_info[cpu].gps = percpu_info[cpu].pts = NULL;
         break;
 
     default:

@@ -11,7 +11,10 @@
  */
 
 #include "common.h"
+#include <asm/hypervisor-ifs/dom_mem_ops.h>
 
+static void net_tx_action(unsigned long unused);
+static void tx_skb_release(struct sk_buff *skb);
 static void make_tx_response(netif_t *netif, 
                              u16      id,
                              s8       st);
@@ -21,38 +24,125 @@ static void make_rx_response(netif_t     *netif,
                              netif_addr_t addr,
                              u16          size);
 
+static DECLARE_TASKLET(net_tx_tasklet, net_tx_action, 0);
+
 /* Don't currently gate addition of an interface to the tx scheduling list. */
 #define tx_work_exists(_if) (1)
 
 #define MAX_PENDING_REQS 256
-static struct vm_struct *mmap_vma;
-#define MMAP_VADDR(_req) ((unsigned long)mmap_vma->addr + ((_req) * PAGE_SIZE))
+unsigned long mmap_vstart;
+#define MMAP_VADDR(_req) (mmap_vstart + ((_req) * PAGE_SIZE))
+
+#define PKT_PROT_LEN (ETH_HLEN + 20)
 
 /*static pending_req_t pending_reqs[MAX_PENDING_REQS];*/
+static u16 pending_id[MAX_PENDING_REQS];
 static u16 pending_ring[MAX_PENDING_REQS];
 static spinlock_t pend_prod_lock = SPIN_LOCK_UNLOCKED;
-/* NB. We use a different index type to differentiate from shared blk rings. */
 typedef unsigned int PEND_RING_IDX;
 #define MASK_PEND_IDX(_i) ((_i)&(MAX_PENDING_REQS-1))
 static PEND_RING_IDX pending_prod, pending_cons;
 #define NR_PENDING_REQS (MAX_PENDING_REQS - pending_prod + pending_cons)
 
+static struct list_head net_schedule_list;
+static spinlock_t net_schedule_list_lock;
+
+#define MAX_MFN_ALLOC 64
+static unsigned long mfn_list[MAX_MFN_ALLOC];
+static unsigned int alloc_index = 0;
+static spinlock_t mfn_lock = SPIN_LOCK_UNLOCKED;
+static void __refresh_mfn_list(void)
+{
+    int ret;
+    dom_mem_op_t op;
+    op.op = MEMOP_RESERVATION_INCREASE;
+    op.u.increase.size  = MAX_MFN_ALLOC;
+    op.u.increase.pages = mfn_list;
+    if ( (ret = HYPERVISOR_dom_mem_op(&op)) != MAX_MFN_ALLOC )
+    {
+        printk(KERN_WARNING "Unable to increase memory reservation (%d)\n",
+               ret);
+        BUG();
+    }
+    alloc_index = MAX_MFN_ALLOC;
+}
+static unsigned long get_new_mfn(void)
+{
+    unsigned long mfn, flags;
+    spin_lock_irqsave(&mfn_lock, flags);
+    if ( alloc_index == 0 )
+        __refresh_mfn_list();
+    mfn = mfn_list[--alloc_index];
+    spin_unlock_irqrestore(&mfn_lock, flags);
+    return mfn;
+}
+static void dealloc_mfn(unsigned long mfn)
+{
+    unsigned long flags;
+    spin_lock_irqsave(&mfn_lock, flags);
+    mfn_list[alloc_index++] = mfn;
+    spin_unlock_irqrestore(&mfn_lock, flags);
+}
+
+static inline void maybe_schedule_tx_action(void)
+{
+    smp_mb();
+    if ( (NR_PENDING_REQS < (MAX_PENDING_REQS/2)) &&
+         !list_empty(&net_schedule_list) )
+        tasklet_schedule(&net_tx_tasklet);
+}
+
 /*
  * This is the primary RECEIVE function for a network interface.
  * Note that, from the p.o.v. of /this/ OS it looks like a transmit.
  */
-static void netif_start_xmit(struct sk_buff *skb, struct net_device *dev)
+int netif_be_start_xmit(struct sk_buff *skb, struct net_device *dev)
 {
     netif_t *netif = (netif_t *)dev->priv;
-    s8 status = BLKIF_RSP_OKAY;
-    u16 size;
-    mmu_update_t mmu[4];
+    s8 status = NETIF_RSP_OKAY;
+    u16 size, id;
+    mmu_update_t mmu[6];
+    pgd_t *pgd; pmd_t *pmd; pte_t *pte;
+    unsigned long vdata, new_mfn;
 
-    memcpy(skb->mac.ethernet->h_dest, netif->vmac, ETH_ALEN);
-    if ( ntohs(skb->mac.ethernet->h_proto) == ETH_P_ARP )
-        memcpy(skb->nh.raw + 18, netif->vmac, ETH_ALEN);
+    /* Drop the packet if the target domain has no receive buffers. */
+    if ( (netif->rx_req_cons == netif->rx->req_prod) ||
+         ((netif->rx_req_cons-netif->rx_resp_prod) == NETIF_RX_RING_SIZE) )
+    {
+        dev_kfree_skb(skb);
+        return 0;
+    }
 
-    spin_lock(&netif->rx_lock);
+    id = netif->rx->ring[MASK_NETIF_RX_IDX(netif->rx_req_cons++)].req.id;
+ 
+    /*
+     * We do not copy the packet unless:
+     *  1. It is fragmented; or
+     *  2. It spans a page boundary; or
+     *  3. We cannot be sure the whole data page is allocated.
+     * The copying method is taken from skb_copy().
+     */
+    if ( (skb_shinfo(skb)->nr_frags != 0) ||
+         (((unsigned long)skb->end ^ (unsigned long)skb->head) & PAGE_MASK) ||
+         ((skb->end - skb->head) < (PAGE_SIZE/2)) )
+    {
+        struct sk_buff *nskb = dev_alloc_skb(PAGE_SIZE-1024);
+        int hlen = skb->data - skb->head;
+        skb_reserve(nskb, hlen);
+        skb_put(nskb, skb->len);
+        (void)skb_copy_bits(skb, -hlen, nskb->head, hlen + skb->len);
+        dev_kfree_skb(skb);
+        skb = nskb;
+    }
+
+    vdata = (unsigned long)skb->data;
+    size  = skb->tail - skb->data;
+
+    new_mfn = get_new_mfn();
+
+    pgd = pgd_offset_k(   (vdata & PAGE_MASK));
+    pmd = pmd_offset(pgd, (vdata & PAGE_MASK));
+    pte = pte_offset(pmd, (vdata & PAGE_MASK));
 
     mmu[0].val  = (unsigned long)(netif->domid<<16) & ~0xFFFFUL;
     mmu[0].ptr  = (unsigned long)(netif->domid<< 0) & ~0xFFFFUL;
@@ -63,49 +153,43 @@ static void netif_start_xmit(struct sk_buff *skb, struct net_device *dev)
     mmu[1].ptr |= MMU_EXTENDED_COMMAND;
     mmu[1].val |= MMUEXT_SET_SUBJECTDOM_H;
 
-    mmu[2].ptr  = ptr | MMU_EXTENDED_COMMAND;
+    mmu[2].ptr  = virt_to_machine(vdata & PAGE_MASK) | MMU_EXTENDED_COMMAND;
     mmu[2].val  = MMUEXT_REASSIGN_PAGE;
 
-    mmu[3].ptr  = ppte;
-    mmu[3].val  = newpage;
+    mmu[3].ptr  = MMU_EXTENDED_COMMAND;
+    mmu[3].val  = MMUEXT_RESET_SUBJECTDOM;
 
-    if ( unlikely(HYPERVISOR_mmu_update(mmu, 4) < 0) )
+    mmu[4].ptr  = virt_to_machine(pte);
+    mmu[4].val  = (new_mfn << PAGE_SHIFT) | __PAGE_KERNEL;
+
+    mmu[5].ptr  = (new_mfn << PAGE_SHIFT) | MMU_MACHPHYS_UPDATE;
+    mmu[5].val  = __pa(vdata) >> PAGE_SHIFT;
+
+    if ( unlikely(HYPERVISOR_mmu_update(mmu, 6) < 0) )
     {
-        status = BLKIF_RSP_ERROR;
+        dealloc_mfn(new_mfn);
+        status = NETIF_RSP_ERROR;
         goto out;
     }
 
-    /* Record this so they can be billed. */
-    netif->total_packets_received++;
-    netif->total_bytes_received += size;
+    phys_to_machine_mapping[__pa(vdata) >> PAGE_SHIFT] = new_mfn;
+
+    netif->stats.tx_bytes += size;
+    netif->stats.tx_packets++;
 
  out:
-    make_rx_response(netif, rx->id, status, addr, size);
+    spin_lock(&netif->rx_lock);
+    make_rx_response(netif, id, status, virt_to_machine(vdata), size);
     spin_unlock(&netif->rx_lock);    
     dev_kfree_skb(skb);
+    return 0;
 }
 
-
-/*************************************************************
- * NEW TRANSMIT SCHEDULER
- * 
- * NB. We ought also to only send a limited number of bytes to the NIC
- * for transmission at any one time (to avoid head-of-line blocking).
- * However, driver rings are small enough that they provide a reasonable
- * limit.
- * 
- * eg. 3c905 has 16 descriptors == 8 packets, at 100Mbps
- *     e1000 has 256 descriptors == 128 packets, at 1000Mbps
- *     tg3 has 512 descriptors == 256 packets, at 1000Mbps
- * 
- * So, worst case is tg3 with 256 1500-bytes packets == 375kB.
- * This would take 3ms, and represents our worst-case HoL blocking cost.
- * 
- * We think this is reasonable.
- */
-
-struct list_head net_schedule_list;
-spinlock_t net_schedule_list_lock;
+struct net_device_stats *netif_be_get_stats(struct net_device *dev)
+{
+    netif_t *netif = dev->priv;
+    return &netif->stats;
+}
 
 static int __on_net_schedule_list(netif_t *netif)
 {
@@ -128,7 +212,7 @@ static void add_to_net_schedule_list_tail(netif_t *netif)
         return;
 
     spin_lock(&net_schedule_list_lock);
-    if ( likely(!__on_net_schedule_list(netif)) )
+    if ( !__on_net_schedule_list(netif) && (netif->status == CONNECTED) )
     {
         list_add_tail(&netif->list, &net_schedule_list);
         netif_get(netif);
@@ -136,34 +220,12 @@ static void add_to_net_schedule_list_tail(netif_t *netif)
     spin_unlock(&net_schedule_list_lock);
 }
 
-
-static void tx_skb_release(struct sk_buff *skb);
-    
-static inline int init_tx_header(netif_t *netif, u8 *data, 
-                                 unsigned int len, struct net_device *dev)
+void netif_deschedule(netif_t *netif)
 {
-    int proto = ntohs(*(unsigned short *)(data + 12));
-
-    memcpy(data + ETH_ALEN, dev->dev_addr, ETH_ALEN);
-        
-    switch ( proto )
-    {
-    case ETH_P_ARP:
-        if ( len < 42 ) break;
-        memcpy(data + 22, dev->dev_addr, ETH_ALEN);
-        break;
-    case ETH_P_IP:
-        break;
-    default:
-        /* Unsupported protocols are onyl allowed to/from NETIF0/0. */
-        if ( (netif->domain->domain != 0) || (netif->idx != 0) )
-            proto = 0;
-        break;
-    }
-    return proto;
+    remove_from_net_schedule_list(netif);
 }
 
-
+#if 0
 static void tx_credit_callback(unsigned long data)
 {
     netif_t *netif = (netif_t *)data;
@@ -176,6 +238,7 @@ static void tx_credit_callback(unsigned long data)
         maybe_schedule_tx_action();
     }    
 }
+#endif
 
 static void net_tx_action(unsigned long unused)
 {
@@ -184,6 +247,7 @@ static void net_tx_action(unsigned long unused)
     netif_t *netif;
     netif_tx_request_t txreq;
     u16 pending_idx;
+    NETIF_RING_IDX i;
     pgprot_t prot = __pgprot(_PAGE_PRESENT|_PAGE_DIRTY|_PAGE_ACCESSED);
 
     while ( (NR_PENDING_REQS < MAX_PENDING_REQS) &&
@@ -197,7 +261,7 @@ static void net_tx_action(unsigned long unused)
 
         /* Work to do? */
         i = netif->tx_req_cons;
-        if ( (i == shared_idxs->tx_req_prod) && 
+        if ( (i == netif->tx->req_prod) && 
              ((i-netif->tx_resp_prod) == NETIF_TX_RING_SIZE) )
         {
             netif_put(netif);
@@ -246,7 +310,7 @@ static void net_tx_action(unsigned long unused)
         /* No crossing a page boundary as the payload mustn't fragment. */
         if ( unlikely(((txreq.addr & ~PAGE_MASK) + txreq.size) >= PAGE_SIZE) ) 
         {
-            DPRINTK("tx.addr: %lx, size: %u, end: %lu\n", 
+            DPRINTK("txreq.addr: %lx, size: %u, end: %lu\n", 
                     txreq.addr, txreq.size, 
                     (txreq.addr &~PAGE_MASK) + txreq.size);
             make_tx_response(netif, txreq.id, NETIF_RSP_ERROR);
@@ -262,42 +326,38 @@ static void net_tx_action(unsigned long unused)
                                      PAGE_SIZE, prot, netif->domid) != 0 )
         {
             DPRINTK("Bad page frame\n");
-            make_tx_response(netif, tx.id, NETIF_RSP_ERROR);
+            make_tx_response(netif, txreq.id, NETIF_RSP_ERROR);
             netif_put(netif);
             continue;
         }
-            
+        phys_to_machine_mapping[__pa(MMAP_VADDR(pending_idx)) >> PAGE_SHIFT] =
+            txreq.addr >> PAGE_SHIFT;
+
         if ( unlikely((skb = alloc_skb(PKT_PROT_LEN, GFP_ATOMIC)) == NULL) )
         {
-            make_tx_response(netif, tx.id, BLKIF_RSP_ERROR);
+            make_tx_response(netif, txreq.id, NETIF_RSP_ERROR);
             netif_put(netif);
             vmfree_area_pages(MMAP_VADDR(pending_idx), PAGE_SIZE);
             break;
         }
         
-        __skb_put(PKT_PROT_LEN);
-        memcpy(skb->data, src, PKT_PROT_LEN);
-        protocol = __constant_htons(
-            init_tx_header(netif, g_data, tx.size, the_dev));
-        if ( protocol == 0 )
-        {
-            make_tx_response(netif, tx.id, NETIF_RSP_ERROR);
-            netif_put(netif);
-            dev_kfree_skb(skb);
-            goto cleanup_and_continue;
-        }
+        __skb_put(skb, PKT_PROT_LEN);
+        memcpy(skb->data, 
+               (void *)(MMAP_VADDR(pending_idx)|(txreq.addr&~PAGE_MASK)),
+               PKT_PROT_LEN);
 
         skb->dev        = netif->dev;
         skb->protocol   = eth_type_trans(skb, skb->dev);
         
         /* Append the packet payload as a fragment. */
         skb_shinfo(skb)->frags[0].page        = 
-          &mem_map[txreq.addr >> PAGE_SHIFT];
-        skb_shinfo(skb)->frags[0].size        = txreq.size - PKT_PROT_LEN;
+            virt_to_page(MMAP_VADDR(pending_idx));
+        skb_shinfo(skb)->frags[0].size        =
+            txreq.size - PKT_PROT_LEN;
         skb_shinfo(skb)->frags[0].page_offset = 
             (txreq.addr + PKT_PROT_LEN) & ~PAGE_MASK;
         skb_shinfo(skb)->nr_frags = 1;
-        skb->data_len  = tx->size - PKT_PROT_LEN;
+        skb->data_len  = txreq.size - PKT_PROT_LEN;
         skb->len      += skb->data_len;
 
         /* Destructor information. */
@@ -305,33 +365,22 @@ static void net_tx_action(unsigned long unused)
         skb_shinfo(skb)->frags[MAX_SKB_FRAGS-1].page = (struct page *)netif;
         skb_shinfo(skb)->frags[MAX_SKB_FRAGS-1].size = pending_idx;
 
-        /* Record the transmission so they can be billed. */
-        netif->total_packets_sent++;
-        netif->total_bytes_sent += tx->size;
+        netif->stats.rx_bytes += txreq.size;
+        netif->stats.rx_packets++;
 
+        pending_id[pending_idx] = txreq.id;
         pending_cons++;
+
         netif_rx(skb);
         netif->dev->last_rx = jiffies;
     }
 }
 
-DECLARE_TASKLET(net_tx_tasklet, net_tx_action, 0);
-
-
-static inline void maybe_schedule_tx_action(void)
-{
-    smp_mb();
-    if ( !netif_queue_stopped(the_dev) &&
-         !list_empty(&net_schedule_list) )
-        tasklet_schedule(&net_tx_tasklet);
-}
-
-
 /* Destructor function for tx skbs. */
 static void tx_skb_release(struct sk_buff *skb)
 {
-    int i;
-    netif_t *netif = (netif_t)skb_shinfo(skb)->frags[MAX_SKB_FRAGS-1].page;
+    unsigned long flags;
+    netif_t *netif = (netif_t *)skb_shinfo(skb)->frags[MAX_SKB_FRAGS-1].page;
     u16 pending_idx = skb_shinfo(skb)->frags[MAX_SKB_FRAGS-1].size;
 
     vmfree_area_pages(MMAP_VADDR(pending_idx), PAGE_SIZE);
@@ -339,25 +388,19 @@ static void tx_skb_release(struct sk_buff *skb)
     skb_shinfo(skb)->nr_frags = 0; 
     
     spin_lock(&netif->tx_lock);
-    make_tx_response(netif, skb->guest_id, NETIF_RSP_OKAY);
+    make_tx_response(netif, pending_id[pending_idx], NETIF_RSP_OKAY);
     spin_unlock(&netif->tx_lock);
     
-    /*
-     * Checks below must happen after the above response is posted. This avoids
-     * a possible race with a guest OS on another CPU.
-     */
-    mb();
-    
-    if ( tx_work_exists(netif) )
-    {
-        add_to_net_schedule_list_tail(netif);
-        maybe_schedule_tx_action();        
-    }
-    
     netif_put(netif);
+ 
+    spin_lock_irqsave(&pend_prod_lock, flags);
+    pending_ring[MASK_PEND_IDX(pending_prod++)] = pending_idx;
+    spin_unlock_irqrestore(&pend_prod_lock, flags);
+ 
+    maybe_schedule_tx_action();        
 }
 
-
+#if 0
 long flush_bufs_for_netif(netif_t *netif)
 {
     NET_RING_IDX i;
@@ -395,6 +438,7 @@ long flush_bufs_for_netif(netif_t *netif)
 
     return 0;
 }
+#endif
 
 void netif_be_int(int irq, void *dev_id, struct pt_regs *regs)
 {
@@ -424,7 +468,6 @@ static void make_tx_response(netif_t *netif,
         notify_via_evtchn(netif->evtchn);
 }
 
-
 static void make_rx_response(netif_t     *netif, 
                              u16          id, 
                              s8           st,
@@ -448,28 +491,18 @@ static void make_rx_response(netif_t     *netif,
         notify_via_evtchn(netif->evtchn);
 }
 
-
 static int __init init_module(void)
 {
     netif_interface_init();
-
-    if ( (mmap_vma = get_vm_area(MAX_PENDING_REQS * PAGE_SIZE, 
-                                 VM_IOREMAP)) == NULL )
-    {
-        printk(KERN_WARNING "Could not allocate VMA for netif backend.\n");
-        return -ENOMEM;
-    }
-
+    mmap_vstart = allocate_empty_lowmem_region(MAX_PENDING_REQS);
     netif_ctrlif_init();
-
     return 0;
 }
 
-
 static void cleanup_module(void)
 {
+    BUG();
 }
-
 
 module_init(init_module);
 module_exit(cleanup_module);
