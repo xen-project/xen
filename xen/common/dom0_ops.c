@@ -15,6 +15,7 @@
 #include <xeno/event.h>
 #include <asm/domain_page.h>
 #include <asm/msr.h>
+#include <asm/pdb.h>
 
 extern unsigned int alloc_new_dom_mem(struct task_struct *, unsigned int);
 
@@ -427,7 +428,6 @@ long do_dom0_op(dom0_op_t *u_dom0_op)
 
     case DOM0_DEBUG:
     {
-        extern void pdb_do_debug(dom0_op_t *);
         pdb_do_debug(op);
         copy_to_user(u_dom0_op, op, sizeof(*op));
         ret = 0;

@@ -126,7 +126,6 @@
 3ddb79bdrqnW93GR9gZk1OJe1qK-iQ xen/common/brlock.c
 3fb10d07GscSWPKxBqpvNfU-dYfa0g xen/common/console.c
 4022a73c_BbDFd2YJ_NQYVvKX5Oz7w xen/common/debug-linux.c
-4022a73c_KPZ1VEbYOrpAhQffd01kA xen/common/debug-linux.h
 3fa152581E5KhrAtqZef2Sr5NKTz4w xen/common/debug.c
 3ddb79bdLX_P6iB7ILiblRLWvebapg xen/common/dom0_ops.c
 3e6377e4i0c9GtKN65e99OtRbw3AZw xen/common/dom_mem_ops.c

@@ -5,20 +5,13 @@
 #include <asm/pdb.h>
 #include <xeno/list.h>
 
-#undef DEBUG_TRACE
-#ifdef DEBUG_TRACE
-#define TRC(_x) _x
-#else
-#define TRC(_x)
-#endif
-
 #define BUFMAX 400
 
 #define PDB_DOMAIN_OFFSET 2              /* all domains are positive numbers */
 
 static const char hexchars[]="0123456789abcdef";
 
-int remote_debug;
+static int remote_debug;
 
 int pdb_foobar = 0x123456;                                        /* testing */
 char *pdb_foobaz = "cambridge";                                   /* testing */
@@ -31,14 +24,9 @@ static int  pdb_in_buffer_ptr;
 static unsigned char  pdb_in_checksum;
 static unsigned char  pdb_xmit_checksum;
 
-int pdb_ctrl_thread = -1;
-int pdb_info_thread = -1;
-int pdb_stepping = 0;
-
-int   hex (char);
-char *mem2hex (char *, char *, int);
-char *hex2mem (char *, char *, int);
-int   hexToInt (char **ptr, int *intValue);
+static int pdb_ctrl_thread = -1;
+static int pdb_info_thread = -1;
+static int pdb_stepping = 0;
 
 void pdb_put_packet (unsigned char *buffer, int ack);
 void pdb_put_char (u_char c);
@@ -47,7 +35,7 @@ u_char pdb_get_char ();
 static volatile int mem_err = 0;
 void set_mem_err (void)                                   /* NOT USED YET... */
 {
-  mem_err = 1;
+    mem_err = 1;
 }
 
 /* These are separate functions so that they are so short and sweet
@@ -89,8 +77,8 @@ pdb_process_query (char *ptr)
 	    if (count > 0)
 	        pdb_out_buffer[buf_idx++] = ',';
 	    /*
-	    if (domain < 0)
-	    {   pdb_out_buffer[buf_idx++] = '-'; domain = domain * -1; }
+              if (domain < 0)
+              {   pdb_out_buffer[buf_idx++] = '-'; domain = domain * -1; }
 	    */
 	    if (domain > 15)
 	    {
@@ -115,7 +103,7 @@ pdb_process_query (char *ptr)
 	ptr += 16;
         if (hexToInt (&ptr, &thread))
 	{
-	  mem2hex ((char *)message, pdb_out_buffer, strlen(message) + 1);
+            mem2hex ((char *)message, pdb_out_buffer, strlen(message) + 1);
 	}
     }
     else if (strcmp(ptr, "Offsets") == 0)
@@ -141,223 +129,222 @@ pdb_process_command (char *ptr, struct pt_regs *regs)
     int ack = 1;                           /* wait for ack in pdb_put_packet */
     int go = 0;
 
-    TRC(printk("pdb: [%s]\n", ptr));
+    DPRINTK("pdb: [%s]\n", ptr);
+
+    pdb_out_buffer[0] = 0;
+
+    switch (*ptr++)
     {
-        pdb_out_buffer[0] = 0;
+    case '?':
+        pdb_out_buffer[0] = 'S';
+        pdb_out_buffer[1] = hexchars[sigval >> 4];
+        pdb_out_buffer[2] = hexchars[sigval % 16];
+        pdb_out_buffer[3] = 0;
+        break;
+    case 'S':                                        /* step with signal */
+    case 's':                                                    /* step */
+        regs->eflags |= 0x100;
+        pdb_stepping = 1;
+        return 1;                                        
+        /* not reached */
+    case 'C':                                    /* continue with signal */
+    case 'c':                                                /* continue */
+        regs->eflags &= ~0x100;
+        /* jump out before replying to gdb */
+        return 1;
+        /* not reached */
+    case 'd':
+        remote_debug = !(remote_debug);               /* toggle debug flag */
+        break;
+    case 'D':                                                  /* detach */
+        return go;
+        /* not reached */
+    case 'g':                   /* return the value of the CPU registers */
+    {
+        int idx = 0;
+        mem2hex ((char *)&regs->eax, &pdb_out_buffer[idx], sizeof(regs->eax));
+        idx += sizeof(regs->eax) * 2;
+        mem2hex ((char *)&regs->ecx, &pdb_out_buffer[idx], sizeof(regs->ecx));
+        idx += sizeof(regs->ecx) * 2;
+        mem2hex ((char *)&regs->edx, &pdb_out_buffer[idx], sizeof(regs->edx));
+        idx += sizeof(regs->edx) * 2;
+        mem2hex ((char *)&regs->ebx, &pdb_out_buffer[idx], sizeof(regs->ebx));
+        idx += sizeof(regs->ebx) * 2;
+        mem2hex ((char *)&regs->esp, &pdb_out_buffer[idx], sizeof(regs->esp));
+        idx += sizeof(regs->esp) * 2;
+        mem2hex ((char *)&regs->ebp, &pdb_out_buffer[idx], sizeof(regs->ebp));
+        idx += sizeof(regs->ebp) * 2;
+        mem2hex ((char *)&regs->esi, &pdb_out_buffer[idx], sizeof(regs->esi));
+        idx += sizeof(regs->esi) * 2;
+        mem2hex ((char *)&regs->edi, &pdb_out_buffer[idx], sizeof(regs->edi));
+        idx += sizeof(regs->edi) * 2;
+        mem2hex ((char *)&regs->eip, &pdb_out_buffer[idx], sizeof(regs->eip));
+        idx += sizeof(regs->eip) * 2;
+        mem2hex ((char *)&regs->eflags, &pdb_out_buffer[idx], sizeof(regs->eflags));
+        idx += sizeof(regs->eflags) * 2;
+        mem2hex ((char *)&regs->xcs, &pdb_out_buffer[idx], sizeof(regs->xcs));
+        idx += sizeof(regs->xcs) * 2;
+        mem2hex ((char *)&regs->xss, &pdb_out_buffer[idx], sizeof(regs->xss));
+        idx += sizeof(regs->xss) * 2;
+        mem2hex ((char *)&regs->xds, &pdb_out_buffer[idx], sizeof(regs->xds));
+        idx += sizeof(regs->xds) * 2;
+        mem2hex ((char *)&regs->xes, &pdb_out_buffer[idx], sizeof(regs->xes));
+        idx += sizeof(regs->xes) * 2;
+        mem2hex ((char *)&regs->xfs, &pdb_out_buffer[idx], sizeof(regs->xfs));
+        idx += sizeof(regs->xfs) * 2;
+        mem2hex ((char *)&regs->xgs, &pdb_out_buffer[idx], sizeof(regs->xgs));
 
-	switch (*ptr++)
-	{
-	case '?':
-          pdb_out_buffer[0] = 'S';
-          pdb_out_buffer[1] = hexchars[sigval >> 4];
-          pdb_out_buffer[2] = hexchars[sigval % 16];
-          pdb_out_buffer[3] = 0;
-	  break;
-        case 'S':                                        /* step with signal */
-        case 's':                                                    /* step */
-	  regs->eflags |= 0x100;
-	  pdb_stepping = 1;
-	  return 1;                                        
-	  /* not reached */
-        case 'C':                                    /* continue with signal */
-        case 'c':                                                /* continue */
-	  regs->eflags &= ~0x100;
-	  /* jump out before replying to gdb */
-	  return 1;
-	  /* not reached */
-	case 'd':
-	  remote_debug = !(remote_debug);               /* toggle debug flag */
-	  break;
-	case 'D':                                                  /* detach */
-	  return go;
-	  /* not reached */
-	case 'g':                   /* return the value of the CPU registers */
-	{
-	    int idx = 0;
-	    mem2hex ((char *)&regs->eax, &pdb_out_buffer[idx], sizeof(regs->eax));
-	    idx += sizeof(regs->eax) * 2;
-	    mem2hex ((char *)&regs->ecx, &pdb_out_buffer[idx], sizeof(regs->ecx));
-	    idx += sizeof(regs->ecx) * 2;
-	    mem2hex ((char *)&regs->edx, &pdb_out_buffer[idx], sizeof(regs->edx));
-	    idx += sizeof(regs->edx) * 2;
-	    mem2hex ((char *)&regs->ebx, &pdb_out_buffer[idx], sizeof(regs->ebx));
-	    idx += sizeof(regs->ebx) * 2;
-	    mem2hex ((char *)&regs->esp, &pdb_out_buffer[idx], sizeof(regs->esp));
-	    idx += sizeof(regs->esp) * 2;
-	    mem2hex ((char *)&regs->ebp, &pdb_out_buffer[idx], sizeof(regs->ebp));
-	    idx += sizeof(regs->ebp) * 2;
-	    mem2hex ((char *)&regs->esi, &pdb_out_buffer[idx], sizeof(regs->esi));
-	    idx += sizeof(regs->esi) * 2;
-	    mem2hex ((char *)&regs->edi, &pdb_out_buffer[idx], sizeof(regs->edi));
-	    idx += sizeof(regs->edi) * 2;
-	    mem2hex ((char *)&regs->eip, &pdb_out_buffer[idx], sizeof(regs->eip));
-	    idx += sizeof(regs->eip) * 2;
-	    mem2hex ((char *)&regs->eflags, &pdb_out_buffer[idx], sizeof(regs->eflags));
-	    idx += sizeof(regs->eflags) * 2;
-	    mem2hex ((char *)&regs->xcs, &pdb_out_buffer[idx], sizeof(regs->xcs));
-	    idx += sizeof(regs->xcs) * 2;
-	    mem2hex ((char *)&regs->xss, &pdb_out_buffer[idx], sizeof(regs->xss));
-	    idx += sizeof(regs->xss) * 2;
-	    mem2hex ((char *)&regs->xds, &pdb_out_buffer[idx], sizeof(regs->xds));
-	    idx += sizeof(regs->xds) * 2;
-	    mem2hex ((char *)&regs->xes, &pdb_out_buffer[idx], sizeof(regs->xes));
-	    idx += sizeof(regs->xes) * 2;
-	    mem2hex ((char *)&regs->xfs, &pdb_out_buffer[idx], sizeof(regs->xfs));
-	    idx += sizeof(regs->xfs) * 2;
-	    mem2hex ((char *)&regs->xgs, &pdb_out_buffer[idx], sizeof(regs->xgs));
+        /*
+          TRC(printk ("  reg: %s \n", pdb_out_buffer));
+          TRC(printk ("  ebx: 0x%08lx\n", regs->ebx));
+          TRC(printk ("  ecx: 0x%08lx\n", regs->ecx));
+          TRC(printk ("  edx: 0x%08lx\n", regs->edx));
+          TRC(printk ("  esi: 0x%08lx\n", regs->esi));
+          TRC(printk ("  edi: 0x%08lx\n", regs->edi));
+          TRC(printk ("  ebp: 0x%08lx\n", regs->ebp));
+          TRC(printk ("  eax: 0x%08lx\n", regs->eax));
+          TRC(printk ("  xds: 0x%08x\n", regs->xds));
+          TRC(printk ("  xes: 0x%08x\n", regs->xes));
+          TRC(printk ("  xfs: 0x%08x\n", regs->xfs));
+          TRC(printk ("  xgs: 0x%08x\n", regs->xgs));
+          TRC(printk ("  eip: 0x%08lx\n", regs->eip));
+          TRC(printk ("  xcs: 0x%08x\n", regs->xcs));
+          TRC(printk ("  efl: 0x%08lx\n", regs->eflags));
+          TRC(printk ("  esp: 0x%08lx\n", regs->esp));
+          TRC(printk ("  xss: 0x%08x\n", regs->xss));
+        */
 
-	    /*
-	    TRC(printk ("  reg: %s \n", pdb_out_buffer));
-	    TRC(printk ("  ebx: 0x%08lx\n", regs->ebx));
-	    TRC(printk ("  ecx: 0x%08lx\n", regs->ecx));
-	    TRC(printk ("  edx: 0x%08lx\n", regs->edx));
-	    TRC(printk ("  esi: 0x%08lx\n", regs->esi));
-	    TRC(printk ("  edi: 0x%08lx\n", regs->edi));
-	    TRC(printk ("  ebp: 0x%08lx\n", regs->ebp));
-	    TRC(printk ("  eax: 0x%08lx\n", regs->eax));
-	    TRC(printk ("  xds: 0x%08x\n", regs->xds));
-	    TRC(printk ("  xes: 0x%08x\n", regs->xes));
-	    TRC(printk ("  xfs: 0x%08x\n", regs->xfs));
-	    TRC(printk ("  xgs: 0x%08x\n", regs->xgs));
-	    TRC(printk ("  eip: 0x%08lx\n", regs->eip));
-	    TRC(printk ("  xcs: 0x%08x\n", regs->xcs));
-	    TRC(printk ("  efl: 0x%08lx\n", regs->eflags));
-	    TRC(printk ("  esp: 0x%08lx\n", regs->esp));
-	    TRC(printk ("  xss: 0x%08x\n", regs->xss));
-	    */
-
-	    break;
-	}
-	case 'G':          /* set the value of the CPU registers - return OK */
-	    break;
-
-	case 'H':
-	{
-	    int thread;
-	    char *next = &ptr[1];
-	    if (hexToInt (&next, &thread))
-	    {
-	        if (thread > 0)
-		{
-		    thread = thread - PDB_DOMAIN_OFFSET;
-		}
-		if (*ptr == 'c')
-		{
-		    pdb_ctrl_thread = thread;
-		}
-		else if (*ptr == 'g')
-		{
-		    pdb_info_thread = thread;
-		}
-		else
-		{
-		    printk ("ack, unknown command %c (thread: %d)\n", 
-			    *ptr, thread);
-		}
-	    }
-	    strcpy (pdb_out_buffer, "OK");
-	    break;
-	}
-	case 'k':                                            /* kill request */
-	{
-	    strcpy (pdb_out_buffer, "OK");                    /* ack for fun */
-	    printk ("don't kill bill...\n");
-	    ack = 0;
-	    break;
-	}
-
-	case 'q':
-	{
-	    pdb_process_query(ptr);
-	    break;
-	}
-
-	/* mAA..AA,LLLL  Read LLLL bytes at address AA..AA */
-	case 'm':
-	{
-	    /* TRY TO READ %x,%x.  IF SUCCEED, SET PTR = 0 */
-	    if (hexToInt (&ptr, (int *)&addr))
-	        if (*(ptr++) == ',')
-		    if (hexToInt (&ptr, &length))
-		    {
-		        ptr = 0;
-			mem_err = 0;
-
-			if (pdb_info_thread >= 0)
-			{
-			    pdb_get_values(pdb_info_thread, pdb_buffer, addr, length);
-			    mem2hex (pdb_buffer, pdb_out_buffer, length);
-			}
-			else
-			    mem2hex ((char *) addr, pdb_out_buffer, length); 
-			if (mem_err)
-			{
-			    strcpy (pdb_out_buffer, "E03");
-			}
-		    }
-	    
-	    if (ptr)
-	    {
-	      strcpy (pdb_out_buffer, "E01");
-	    }
-	    break;
-	}
-
-	/* MAA..AA,LLLL: Write LLLL bytes at address AA.AA return OK */
-	case 'M':
-	{
-	    /* TRY TO READ '%x,%x:'.  IF SUCCEED, SET PTR = 0 */
-	    if (hexToInt (&ptr, (int *)&addr))
-	        if (*(ptr++) == ',')
-		    if (hexToInt (&ptr, &length))
-		        if (*(ptr++) == ':')
-			{
-			    mem_err = 0;
-
-			    pdb_set_values(pdb_info_thread, 
-					   ptr, addr, length);
-
-			    if (mem_err)
-			    {
-			        strcpy (pdb_out_buffer, "E03");
-			    }
-			    else
-			    {
-			        strcpy (pdb_out_buffer, "OK");
-			    }
-
-			    ptr = 0;
-			}
-	    if (ptr)
-	    {
-	        strcpy (pdb_out_buffer, "E02");
-	    }
-	    break;
-	}
-	case 'T':
-	{
-	    int thread;
-	    if (hexToInt (&ptr, &thread))
-	    {
-	        thread -= PDB_DOMAIN_OFFSET;
-	        struct task_struct *p = find_domain_by_id(thread);
-		if (p == NULL)
-		{
-		    strcpy (pdb_out_buffer, "E00");
-		}
-		else
-		{
-		    strcpy (pdb_out_buffer, "OK");
-		}
-		put_task_struct(p);
-	    }
-	    break;
-	}
-	}                                                          /* switch */
-
-	/* reply to the request */
-	pdb_put_packet (pdb_out_buffer, ack);
+        break;
     }
+    case 'G':          /* set the value of the CPU registers - return OK */
+        break;
+
+    case 'H':
+    {
+        int thread;
+        char *next = &ptr[1];
+        if (hexToInt (&next, &thread))
+        {
+            if (thread > 0)
+            {
+                thread = thread - PDB_DOMAIN_OFFSET;
+            }
+            if (*ptr == 'c')
+            {
+                pdb_ctrl_thread = thread;
+            }
+            else if (*ptr == 'g')
+            {
+                pdb_info_thread = thread;
+            }
+            else
+            {
+                printk ("ack, unknown command %c (thread: %d)\n", 
+                        *ptr, thread);
+            }
+        }
+        strcpy (pdb_out_buffer, "OK");
+        break;
+    }
+    case 'k':                                            /* kill request */
+    {
+        strcpy (pdb_out_buffer, "OK");                    /* ack for fun */
+        printk ("don't kill bill...\n");
+        ack = 0;
+        break;
+    }
+
+    case 'q':
+    {
+        pdb_process_query(ptr);
+        break;
+    }
+
+    /* mAA..AA,LLLL  Read LLLL bytes at address AA..AA */
+    case 'm':
+    {
+        /* TRY TO READ %x,%x.  IF SUCCEED, SET PTR = 0 */
+        if (hexToInt (&ptr, (int *)&addr))
+            if (*(ptr++) == ',')
+                if (hexToInt (&ptr, &length))
+                {
+                    ptr = 0;
+                    mem_err = 0;
+
+                    if (pdb_info_thread >= 0)
+                    {
+                        pdb_get_values(pdb_info_thread, pdb_buffer, addr, length);
+                        mem2hex (pdb_buffer, pdb_out_buffer, length);
+                    }
+                    else
+                        mem2hex ((char *) addr, pdb_out_buffer, length); 
+                    if (mem_err)
+                    {
+                        strcpy (pdb_out_buffer, "E03");
+                    }
+                }
+	    
+        if (ptr)
+        {
+            strcpy (pdb_out_buffer, "E01");
+        }
+        break;
+    }
+
+    /* MAA..AA,LLLL: Write LLLL bytes at address AA.AA return OK */
+    case 'M':
+    {
+        /* TRY TO READ '%x,%x:'.  IF SUCCEED, SET PTR = 0 */
+        if (hexToInt (&ptr, (int *)&addr))
+            if (*(ptr++) == ',')
+                if (hexToInt (&ptr, &length))
+                    if (*(ptr++) == ':')
+                    {
+                        mem_err = 0;
+
+                        pdb_set_values(pdb_info_thread, 
+                                       ptr, addr, length);
+
+                        if (mem_err)
+                        {
+                            strcpy (pdb_out_buffer, "E03");
+                        }
+                        else
+                        {
+                            strcpy (pdb_out_buffer, "OK");
+                        }
+
+                        ptr = 0;
+                    }
+        if (ptr)
+        {
+            strcpy (pdb_out_buffer, "E02");
+        }
+        break;
+    }
+    case 'T':
+    {
+        int thread;
+        if (hexToInt (&ptr, &thread))
+        {
+            thread -= PDB_DOMAIN_OFFSET;
+            struct task_struct *p = find_domain_by_id(thread);
+            if (p == NULL)
+            {
+                strcpy (pdb_out_buffer, "E00");
+            }
+            else
+            {
+                strcpy (pdb_out_buffer, "OK");
+            }
+            put_task_struct(p);
+        }
+        break;
+    }
+    }                                                          /* switch */
+
+    /* reply to the request */
+    pdb_put_packet (pdb_out_buffer, ack);
 
     return go;
 }
@@ -439,87 +426,87 @@ int pdb_serial_input(u_char c, struct pt_regs *regs)
 
 int hex(char ch)
 {
-  if ((ch >= 'a') && (ch <= 'f')) return (ch-'a'+10);
-  if ((ch >= '0') && (ch <= '9')) return (ch-'0');
-  if ((ch >= 'A') && (ch <= 'F')) return (ch-'A'+10);
-  return (-1);
+    if ((ch >= 'a') && (ch <= 'f')) return (ch-'a'+10);
+    if ((ch >= '0') && (ch <= '9')) return (ch-'0');
+    if ((ch >= 'A') && (ch <= 'F')) return (ch-'A'+10);
+    return (-1);
 }
 
 /* convert the memory pointed to by mem into hex, placing result in buf */
 /* return a pointer to the last char put in buf (null) */
 char *
 mem2hex (mem, buf, count)
-     char *mem;
-     char *buf;
-     int count;
+    char *mem;
+    char *buf;
+    int count;
 {
-  int i;
-  unsigned char ch;
+    int i;
+    unsigned char ch;
 
-  for (i = 0; i < count; i++)
+    for (i = 0; i < count; i++)
     {
-      ch = get_char (mem++);
-      *buf++ = hexchars[ch >> 4];
-      *buf++ = hexchars[ch % 16];
+        ch = get_char (mem++);
+        *buf++ = hexchars[ch >> 4];
+        *buf++ = hexchars[ch % 16];
     }
-  *buf = 0;
-  return (buf);
+    *buf = 0;
+    return (buf);
 }
 
 /* convert the hex array pointed to by buf into binary to be placed in mem */
 /* return a pointer to the character AFTER the last byte written */
 char *
 hex2mem (buf, mem, count)
-     char *buf;
-     char *mem;
-     int count;
+    char *buf;
+    char *mem;
+    int count;
 {
-  int i;
-  unsigned char ch;
+    int i;
+    unsigned char ch;
 
-  for (i = 0; i < count; i++)
+    for (i = 0; i < count; i++)
     {
-      ch = hex (*buf++) << 4;
-      ch = ch + hex (*buf++);
-      set_char (mem++, ch);
+        ch = hex (*buf++) << 4;
+        ch = ch + hex (*buf++);
+        set_char (mem++, ch);
     }
-  return (mem);
+    return (mem);
 }
 
 int
 hexToInt (char **ptr, int *intValue)
 {
-  int numChars = 0;
-  int hexValue;
-  int negative = 0;
+    int numChars = 0;
+    int hexValue;
+    int negative = 0;
 
-  *intValue = 0;
+    *intValue = 0;
 
-  if (**ptr == '-')
-  {
-    negative = 1;
-    numChars++;
-    (*ptr)++;
-  }
-  while (**ptr)
-  {
-      hexValue = hex (**ptr);
-      if (hexValue >= 0)
-      {
-          *intValue = (*intValue << 4) | hexValue;
-          numChars++;
-      }
-      else
-        break;
+    if (**ptr == '-')
+    {
+        negative = 1;
+        numChars++;
+        (*ptr)++;
+    }
 
-      (*ptr)++;
-  }
-  if (negative)
-  {
-      *intValue *= -1;
-  }
+    while (**ptr)
+    {
+        hexValue = hex (**ptr);
+        if (hexValue >= 0)
+        {
+            *intValue = (*intValue << 4) | hexValue;
+            numChars++;
+        }
+        else
+            break;
+
+        (*ptr)++;
+    }
+
+    if ( negative )
+        *intValue *= -1;
   
-  return (numChars);
+    return (numChars);
 }
 
 /***********************************************************************/
@@ -533,79 +520,53 @@ hexToInt (char **ptr, int *intValue)
  */
 struct pdb_breakpoint breakpoints;
 
-
 void pdb_bkpt_add (unsigned long address)
 {
-    struct pdb_breakpoint *bkpt;
-
-    bkpt = kmalloc(sizeof(struct pdb_breakpoint), GFP_KERNEL);
-    INIT_LIST_HEAD(&bkpt->list);
-
+    struct pdb_breakpoint *bkpt = kmalloc(sizeof(*bkpt), GFP_KERNEL);
     bkpt->address = address;
-
     list_add(&bkpt->list, &breakpoints.list);
-
-    return;
 }
 
 /*
  * Check to see of the breakpoint is in the list of known breakpoints 
- *
- * return 1 if it has been set, 0 otherwise
+ * Return 1 if it has been set, 0 otherwise.
  */
-
 struct pdb_breakpoint* pdb_bkpt_search (unsigned long address)
 {
-    struct pdb_breakpoint *found = NULL;
     struct list_head *list_entry;
     struct pdb_breakpoint *bkpt;
 
     list_for_each(list_entry, &breakpoints.list)
     {
         bkpt = list_entry(list_entry, struct pdb_breakpoint, list);
-
-	if (bkpt->address == address)
-	{
-	    found = bkpt;
-	    break;
-	}
+	if ( bkpt->address == address )
+            return bkpt;
     }
 
-    return found;
+    return NULL;
 }
 
 /*
  * Remove a breakpoint to the list of known breakpoints.
- *
  * Return 1 if the element was not found, otherwise 0.
  */
-
-void pdb_bkpt_remove_ptr (struct pdb_breakpoint *bkpt)
-{
-    struct list_head *list_entry = &bkpt->list;
-    list_del(list_entry);
-    kfree(bkpt);
-}
-
 int pdb_bkpt_remove (unsigned long address)
 {
     struct list_head *list_entry;
     struct pdb_breakpoint *bkpt;
-    int found = 1;
 
     list_for_each(list_entry, &breakpoints.list)
     {
         bkpt = list_entry(list_entry, struct pdb_breakpoint, list);
-
-	if (bkpt->address == address)
+	if ( bkpt->address == address )
 	{
-	    pdb_bkpt_remove_ptr (bkpt);
-	    found = 0;
-	    break;
+            list_del(&bkpt->list);
+            kfree(bkpt);
+            return 0;
 	}
     }
 
-    return found;
+    return 1;
 }
 
 /***********************************************************************/
@@ -617,16 +578,16 @@ int pdb_high_bit = 1;
 
 void pdb_put_char (u_char c)
 {
-  extern void   debug_putchar(u_char);
-  u_char cc = pdb_high_bit ? c | 0x80 : c;
-  debug_putchar(cc);
+    extern void   debug_putchar(u_char);
+    u_char cc = pdb_high_bit ? c | 0x80 : c;
+    debug_putchar(cc);
 }
 
 u_char pdb_get_char ()
 {
-  extern u_char debug_getchar();
-  u_char cc = debug_getchar();
-  return cc & 0x7f;
+    extern u_char debug_getchar();
+    u_char cc = debug_getchar();
+    return cc & 0x7f;
 }
 
 /* send the packet in buffer.  */
@@ -713,51 +674,57 @@ void pdb_get_packet(char *buffer)
 
 /*
  * process a machine interrupt or exception
- * return 1 if pdb is not interested in the exception; it should
+ * Return 1 if pdb is not interested in the exception; it should
  * be propagated to the guest os.
  */
-
+#define DEBUG_EXCEPTION      1
+#define BREAKPT_EXCEPTION    3
+#define KEYPRESS_EXCEPTION 136
 int pdb_handle_exception(int exceptionVector,
 			 struct pt_regs *xen_regs)
 {
     int signal = 0;
 
-    printk ("pdb_handle_exception [0x%x][0x%lx]\n",
-	    exceptionVector, xen_regs->eip);
-
-    /* if  pdb didn't set the breakpoint, and 
-           pdb is not single stepping, and
-	   the user didn't press the magic debug key on the console,
-       then pass the exception up to the guest os */
-    if (pdb_bkpt_search(xen_regs->eip - 1) == NULL &&
-	pdb_stepping == 0 &&
-	exceptionVector != 0x88)
+    /*
+     * If PDB didn't set the breakpoint, is not single stepping, and the user
+     * didn't press the magic debug key, then we don't handle the exception.
+     */
+    if ( (pdb_bkpt_search(xen_regs->eip - 1) == NULL) &&
+         !pdb_stepping && (exceptionVector != KEYPRESS_EXCEPTION) )
     {
-        TRC(printk("pdb: external breakpoint at 0x%lx\n", xen_regs->eip));
+        DPRINTK("pdb: external breakpoint at 0x%lx\n", xen_regs->eip);
 	return 1;
     }
 
-    if (pdb_stepping == 1)
+    printk("pdb_handle_exception [0x%x][0x%lx]\n",
+           exceptionVector, xen_regs->eip);
+
+    if ( pdb_stepping )
     {
+        /* Stepped one instruction; now return to normal execution. */
         xen_regs->eflags &= ~0x100;
         pdb_stepping = 0;
     }
 
-    if (exceptionVector == 0x03)
+    if ( exceptionVector == BREAKPT_EXCEPTION )
     {
-        xen_regs->eip --;
+        /* Executed Int3: replace breakpoint byte with real program byte. */
+        xen_regs->eip--;
     }
 
-    /* generate a signal for gdb */
-    switch (exceptionVector)
+    /* Generate a signal for GDB. */
+    switch ( exceptionVector )
     {
-    case 136 : signal = 2; break;                                  /* SIGINT */
-    case 1   : signal = 5; break;                                 /* SIGTRAP */
-    case 3   : signal = 5; break;                                 /* SIGTRAP */
-    default  :
-      printk ("can't generate signal for unknown exception vector %d\n",
-	      exceptionVector);
-      break;
+    case KEYPRESS_EXCEPTION:
+        signal = 2; break;                                  /* SIGINT */
+    case DEBUG_EXCEPTION:
+        signal = 5; break;                                 /* SIGTRAP */
+    case BREAKPT_EXCEPTION: 
+        signal = 5; break;                                 /* SIGTRAP */
+    default:
+        printk("can't generate signal for unknown exception vector %d\n",
+               exceptionVector);
+        break;
     }
 
     pdb_out_buffer[0] = 'S';
@@ -766,15 +733,11 @@ int pdb_handle_exception(int exceptionVector,
     pdb_out_buffer[3] = 0;
     pdb_put_packet(pdb_out_buffer, 1);
 
-    while (1)
-    {
+    do {
         pdb_out_buffer[0] = 0;
 	pdb_get_packet(pdb_in_buffer);
-	if (pdb_process_command(pdb_in_buffer, xen_regs))
-	{
-	    return 0;
-	}
     }
+    while ( pdb_process_command(pdb_in_buffer, xen_regs) == 0 );
 
     return 0;
 }
@@ -790,7 +753,12 @@ void initialize_pdb()
     extern char opt_pdb[];
     int pdb_com_port;
 
-    if (strncmp(opt_pdb, "com", 3) == 0)
+    /* Certain state must be initialised even when PDB will not be used. */
+    breakpoints.address = 0;
+    INIT_LIST_HEAD(&breakpoints.list);
+    pdb_stepping = 0;
+
+    if ( strncmp(opt_pdb, "com", 3) == 0 )
     {
         extern void debug_set_com_port(int port);
 
@@ -800,20 +768,13 @@ void initialize_pdb()
     }
     else
     {
-        if (strcmp(opt_pdb, "none") != 0)
-	{
+        if ( strcmp(opt_pdb, "none") != 0 )
 	    printk ("pdb: unknown option\n");
-	}
         return;
     }
 
-    printk ("Initializing pervasive debugger (PDB) [%s] port %d, high %d\n",
-	    opt_pdb, pdb_com_port, pdb_high_bit);
-
-    breakpoints.address = 0;
-    INIT_LIST_HEAD(&breakpoints.list);
-
-    pdb_stepping = 0;
+    printk("Initializing pervasive debugger (PDB) [%s] port %d, high %d\n",
+           opt_pdb, pdb_com_port, pdb_high_bit);
 
     /* ack any spurrious gdb packets */
     pdb_put_char ('+');
@@ -826,6 +787,6 @@ void initialize_pdb()
 
 void breakpoint(void)
 {
-    if (pdb_initialized)
+    if ( pdb_initialized )
         asm("int $3");
 }
