@@ -22,6 +22,7 @@
 #include <xen/grant_table.h>
 #include <asm/hardirq.h>
 #include <asm/domain.h>
+#include <asm/bitops.h>
 
 extern unsigned long volatile jiffies;
 extern rwlock_t domlist_lock;
