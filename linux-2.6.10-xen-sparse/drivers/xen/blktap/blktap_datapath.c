@@ -142,7 +142,7 @@ inline void kick_be_domain(void)
     
     wmb(); /* Ensure that the frontend can see the requests. */
     RING_PUSH_REQUESTS(BLKIF_RING, &blktap_be_ring);
-    notify_via_evtchn(blkif_ptbe_evtchn);
+    notify_via_evtchn(blktap_be_evtchn);
     DPRINTK("notified BE\n");
 }
 
