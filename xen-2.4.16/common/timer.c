@@ -586,26 +586,11 @@ void timer_bh(void)
 
 void do_timer(struct pt_regs *regs)
 {
-    struct task_struct *p;
-    shared_info_t *s;
-    unsigned long cpu_mask = 0;
 
     (*(unsigned long *)&jiffies)++;
 
     if ( !using_apic_timer )
         update_process_times(user_mode(regs));
-
-	/* XXX RN: Move this for virtual domain time timer interrupts */
-    read_lock(&tasklist_lock);
-    p = &idle0_task;
-    do {
-        s = p->shared_info;
-        cpu_mask |= mark_guest_event(p, _EVENT_TIMER);
-    }
-    while ( (p = p->next_task) != &idle0_task );
-    read_unlock(&tasklist_lock);
-
-    guest_event_notify(cpu_mask);
 
     mark_bh(TIMER_BH);
     if (TQ_ACTIVE(tq_timer))
