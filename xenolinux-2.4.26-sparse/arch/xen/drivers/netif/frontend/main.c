@@ -27,7 +27,6 @@
 
 #include <asm/evtchn.h>
 #include <asm/ctrl_if.h>
-#include <asm/hypervisor-ifs/dom_mem_ops.h>
 
 #include "../netif.h"
 
@@ -181,7 +180,6 @@ static void network_alloc_rx_buffers(struct net_device *dev)
     struct net_private *np = dev->priv;
     struct sk_buff *skb;
     NETIF_RING_IDX i = np->rx->req_prod;
-    dom_mem_op_t op;
     int nr_pfns = 0;
 
     /* Make sure the batch is large enough to be worthwhile (1/2 ring). */
@@ -225,11 +223,10 @@ static void network_alloc_rx_buffers(struct net_device *dev)
     rx_mcl[nr_pfns-1].args[2] = UVMF_FLUSH_TLB;
 
     /* Give away a batch of pages. */
-    op.op = MEMOP_RESERVATION_DECREASE;
-    op.u.decrease.size  = nr_pfns;
-    op.u.decrease.pages = rx_pfn_array;
     rx_mcl[nr_pfns].op = __HYPERVISOR_dom_mem_op;
-    rx_mcl[nr_pfns].args[0] = (unsigned long)&op;
+    rx_mcl[nr_pfns].args[0] = MEMOP_decrease_reservation;
+    rx_mcl[nr_pfns].args[1] = (unsigned long)rx_pfn_array;
+    rx_mcl[nr_pfns].args[2] = (unsigned long)nr_pfns;
 
     /* Zap PTEs and give away pages in one big multicall. */
     (void)HYPERVISOR_multicall(rx_mcl, nr_pfns+1);

@@ -24,8 +24,6 @@
 #include <asm/uaccess.h>
 #include <asm/tlb.h>
 
-#include <asm/hypervisor-ifs/dom_mem_ops.h>
-
 /* USER DEFINES -- THESE SHOULD BE COPIED TO USER-SPACE TOOLS */
 #define USER_INFLATE_BALLOON  1   /* return mem to hypervisor */
 #define USER_DEFLATE_BALLOON  2   /* claim mem from hypervisor */
@@ -59,7 +57,6 @@ static inline pte_t *get_ptep(unsigned long addr)
 /* main function for relinquishing bit of memory */
 static unsigned long inflate_balloon(unsigned long num_pages)
 {
-    dom_mem_op_t dom_mem_op;
     unsigned long *parray;
     unsigned long *currp;
     unsigned long curraddr;
@@ -67,19 +64,18 @@ static unsigned long inflate_balloon(unsigned long num_pages)
     unsigned long vaddr;
     unsigned long i, j;
 
-    parray = (unsigned long *)kmalloc(num_pages *
-                                      sizeof(unsigned long), GFP_KERNEL);
+    parray = (unsigned long *)kmalloc(num_pages * sizeof(unsigned long),
+                                      GFP_KERNEL);
     currp = parray;
 
     for ( i = 0; i < num_pages; i++ )
     {
-        /* try to obtain a free page, has to be done with GFP_ATOMIC
-         * as we do not want to sleep indefinately.
-         */
+        /* Try to obtain a free page (has to be done with GFP_ATOMIC). */
         vaddr = __get_free_page(GFP_ATOMIC);
 
-        /* if allocation fails, free all reserved pages */
-        if(!vaddr){
+        /* If allocation fails then free all reserved pages. */
+        if ( vaddr == 0 )
+        {
             printk("Unable to inflate balloon by %ld, only %ld pages free.",
                    num_pages, i);
             currp = parray;
@@ -105,10 +101,9 @@ static unsigned long inflate_balloon(unsigned long num_pages)
 
     XEN_flush_page_update_queue();
 
-    dom_mem_op.op = MEMOP_RESERVATION_DECREASE;
-    dom_mem_op.u.decrease.size  = num_pages;
-    dom_mem_op.u.decrease.pages = parray;
-    if ( (ret = HYPERVISOR_dom_mem_op(&dom_mem_op)) != num_pages )
+    ret = HYPERVISOR_dom_mem_op(MEMOP_decrease_reservation, 
+                                parray, num_pages);
+    if ( unlikely(ret != num_pages) )
     {
         printk("Unable to inflate balloon, error %lx\n", ret);
         goto cleanup;
@@ -177,11 +172,8 @@ static unsigned long process_new_pages(unsigned long * parray,
 
 unsigned long deflate_balloon(unsigned long num_pages)
 {
-    dom_mem_op_t dom_mem_op;
     unsigned long ret;
     unsigned long * parray;
-
-    printk(KERN_ALERT "bd240 debug: deflate balloon called for %lx pages\n", num_pages);
 
     if ( num_pages > credit )
     {
@@ -192,15 +184,16 @@ unsigned long deflate_balloon(unsigned long num_pages)
     parray = (unsigned long *)kmalloc(num_pages * sizeof(unsigned long), 
                                       GFP_KERNEL);
 
-    dom_mem_op.op = MEMOP_RESERVATION_INCREASE;
-    dom_mem_op.u.increase.size = num_pages;
-    dom_mem_op.u.increase.pages = parray;
-    if((ret = HYPERVISOR_dom_mem_op(&dom_mem_op)) != num_pages){
+    ret = HYPERVISOR_dom_mem_op(MEMOP_increase_reservation, 
+                                parray, num_pages);
+    if ( unlikely(ret != num_pages) )
+    {
         printk("Unable to deflate balloon, error %lx\n", ret);
         goto cleanup;
     }
 
-    if((ret = process_new_pages(parray, num_pages)) < num_pages){
+    if ( (ret = process_new_pages(parray, num_pages)) < num_pages )
+    {
         printk("Unable to deflate balloon by specified %lx pages, only %lx.\n",
                num_pages, ret);
         goto cleanup;
@@ -255,8 +248,7 @@ static int __init init_module(void)
 
     credit = 0;
 
-    balloon_pde = create_xen_proc_entry("balloon", 0600);
-    if ( balloon_pde == NULL )
+    if ( (balloon_pde = create_xen_proc_entry("balloon", 0600)) == NULL )
     {
         printk(KERN_ALERT "Unable to create balloon driver proc entry!");
         return -1;

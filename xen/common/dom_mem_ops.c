@@ -10,20 +10,21 @@
 #include <xen/types.h>
 #include <xen/lib.h>
 #include <xen/mm.h>
-#include <hypervisor-ifs/dom_mem_ops.h>
 #include <xen/perfc.h>
 #include <xen/sched.h>
 #include <xen/event.h>
 #include <asm/domain_page.h>
 
-static long alloc_dom_mem(struct task_struct *p, reservation_increase_t op)
+static long alloc_dom_mem(struct task_struct *p, 
+                          unsigned long      *pages, 
+                          unsigned long       nr_pages)
 {
     struct pfn_info *page;
     unsigned long    i;
 
     /* Leave some slack pages; e.g., for the network. */
-    if ( unlikely(free_pfns < (op.size + (SLACK_DOMAIN_MEM_KILOBYTES >> 
-                                          (PAGE_SHIFT-10)))) )
+    if ( unlikely(free_pfns < (nr_pages + (SLACK_DOMAIN_MEM_KILOBYTES >> 
+                                           (PAGE_SHIFT-10)))) )
     {
         DPRINTK("Not enough slack: %u %u\n",
                 free_pfns,
@@ -31,7 +32,7 @@ static long alloc_dom_mem(struct task_struct *p, reservation_increase_t op)
         return 0;
     }
 
-    for ( i = 0; i < op.size; i++ )
+    for ( i = 0; i < nr_pages; i++ )
     {
         /* NB. 'alloc_domain_page' does limit-checking on pages per domain. */
         if ( unlikely((page = alloc_domain_page(p)) == NULL) )
@@ -41,22 +42,24 @@ static long alloc_dom_mem(struct task_struct *p, reservation_increase_t op)
         }
 
         /* Inform the domain of the new page's machine address. */ 
-        if ( unlikely(put_user(page_to_pfn(page), &op.pages[i]) != 0) )
+        if ( unlikely(put_user(page_to_pfn(page), &pages[i]) != 0) )
             break;
     }
 
     return i;
 }
     
-static long free_dom_mem(struct task_struct *p, reservation_decrease_t op)
+static long free_dom_mem(struct task_struct *p, 
+                         unsigned long      *pages, 
+                         unsigned long       nr_pages)
 {
     struct pfn_info *page;
     unsigned long    i, mpfn;
     long             rc = 0;
 
-    for ( i = 0; i < op.size; i++ )
+    for ( i = 0; i < nr_pages; i++ )
     {
-        if ( unlikely(get_user(mpfn, &op.pages[i]) != 0) )
+        if ( unlikely(get_user(mpfn, &pages[i]) != 0) )
             break;
 
         if ( unlikely(mpfn >= max_page) )
@@ -84,31 +87,16 @@ static long free_dom_mem(struct task_struct *p, reservation_decrease_t op)
         put_page(page);
     }
 
-    return rc ? rc : op.size;
+    return rc ? rc : nr_pages;
 }
     
-long do_dom_mem_op(dom_mem_op_t *mem_op)
+long do_dom_mem_op(unsigned int op, void *pages, unsigned long nr_pages)
 {
-    dom_mem_op_t dmop;
-    unsigned long ret;
+    if ( op == MEMOP_increase_reservation )
+        return alloc_dom_mem(current, pages, nr_pages);
 
-    if ( copy_from_user(&dmop, mem_op, sizeof(dom_mem_op_t)) )
-        return -EFAULT;
+    if ( op == MEMOP_decrease_reservation )
+        return free_dom_mem(current, pages, nr_pages);
 
-    switch ( dmop.op )
-    {
-    case MEMOP_RESERVATION_INCREASE:
-        ret = alloc_dom_mem(current, dmop.u.increase);
-        break;
-
-    case MEMOP_RESERVATION_DECREASE:
-        ret = free_dom_mem(current, dmop.u.decrease);
-        break;
-
-    default:
-        ret = -ENOSYS;
-        break;
-    }
-
-    return ret;    
+    return -ENOSYS;
 }

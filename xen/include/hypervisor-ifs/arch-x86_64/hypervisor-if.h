@@ -31,9 +31,9 @@
  * installing their own GDT.
  */
 
-#define FLAT_RING3_CS32 0x0823	/* GDT index 260 */
-#define FLAT_RING3_CS64 0x082b	/* GDT index 261 */
-#define FLAT_RING3_DS 0x0833	/* GDT index 262 */
+#define FLAT_RING3_CS32 0x0823  /* GDT index 260 */
+#define FLAT_RING3_CS64 0x082b  /* GDT index 261 */
+#define FLAT_RING3_DS   0x0833  /* GDT index 262 */
 
 #define FLAT_GUESTOS_DS   FLAT_RING3_DS
 #define FLAT_GUESTOS_CS   FLAT_RING3_CS64
@@ -46,7 +46,7 @@
 /* And the trap vector is... */
 #define TRAP_INSTR "syscall"
 
-
+/* The machine->physical mapping table starts at this address, read-only. */
 #ifndef machine_to_phys_mapping
 #define machine_to_phys_mapping ((unsigned long *)0xffff810000000000ULL)
 #endif
@@ -64,7 +64,7 @@ typedef struct trap_info_st
 {
     unsigned char  vector;  /* exception vector                              */
     unsigned char  flags;   /* 0-3: privilege level; 4: clear event enable?  */
-    unsigned short cs;	    /* code selector                                 */
+    unsigned short cs;      /* code selector                                 */
     unsigned long  address; /* code address                                  */
 } trap_info_t;
 

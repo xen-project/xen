@@ -56,7 +56,6 @@
  * 
  * Virtual interrupts that a guest OS may receive from the hypervisor.
  */
-
 #define VIRQ_BLKDEV     0  /* A block device response has been queued. */
 #define VIRQ_TIMER      1  /* A timeout has been updated. */
 #define VIRQ_DIE        2  /* OS is about to be killed. Clean up please! */
@@ -169,7 +168,7 @@
 
 
 /*
- * SCHEDOP_* - Scheduler hypercall operations.
+ * Commands to HYPERVISOR_sched_op().
  */
 #define SCHEDOP_yield           0   /* Give up the CPU voluntarily.      */
 #define SCHEDOP_block           1   /* Block until an event is received. */
@@ -181,6 +180,12 @@
  */
 #define CONSOLEIO_write         0
 #define CONSOLEIO_read          1
+
+/*
+ * Commands to HYPERVISOR_dom_mem_op().
+ */
+#define MEMOP_increase_reservation 0
+#define MEMOP_decrease_reservation 1
 
 #ifndef __ASSEMBLY__
 

@@ -66,7 +66,7 @@ typedef struct trap_info_st
 {
     unsigned char  vector;  /* exception vector                              */
     unsigned char  flags;   /* 0-3: privilege level; 4: clear event enable?  */
-    unsigned short cs;	    /* code selector                                 */
+    unsigned short cs;      /* code selector                                 */
     unsigned long  address; /* code address                                  */
 } trap_info_t;
 

@@ -11,7 +11,6 @@
  */
 
 #include "common.h"
-#include <asm/hypervisor-ifs/dom_mem_ops.h>
 
 static void netif_page_release(struct page *page);
 static void make_tx_response(netif_t *netif, 
@@ -80,12 +79,9 @@ static spinlock_t mfn_lock = SPIN_LOCK_UNLOCKED;
 
 static void __refresh_mfn_list(void)
 {
-    int ret;
-    dom_mem_op_t op;
-    op.op = MEMOP_RESERVATION_INCREASE;
-    op.u.increase.size  = MAX_MFN_ALLOC;
-    op.u.increase.pages = mfn_list;
-    if ( (ret = HYPERVISOR_dom_mem_op(&op)) != MAX_MFN_ALLOC )
+    int ret = HYPERVISOR_dom_mem_op(MEMOP_increase_reservation,
+                                    mfn_list, MAX_MFN_ALLOC);
+    if ( unlikely(ret != MAX_MFN_ALLOC) )
     {
         printk(KERN_ALERT "Unable to increase memory reservation (%d)\n", ret);
         BUG();
@@ -107,21 +103,11 @@ static unsigned long get_new_mfn(void)
 static void dealloc_mfn(unsigned long mfn)
 {
     unsigned long flags;
-    dom_mem_op_t  op;
-
     spin_lock_irqsave(&mfn_lock, flags);
     if ( alloc_index != MAX_MFN_ALLOC )
-    {
-        /* Usually we can put the MFN back on the quicklist. */
         mfn_list[alloc_index++] = mfn;
-    }
     else
-    {
-        op.op = MEMOP_RESERVATION_INCREASE;
-        op.u.decrease.size  = 1;
-        op.u.decrease.pages = &mfn;
-        (void)HYPERVISOR_dom_mem_op(&op);
-    }
+        (void)HYPERVISOR_dom_mem_op(MEMOP_decrease_reservation, &mfn, 1);
     spin_unlock_irqrestore(&mfn_lock, flags);
 }
 

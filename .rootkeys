@@ -543,7 +543,6 @@
 404f1bc7IwU-qnH8mJeVu0YsNGMrcw xen/include/hypervisor-ifs/arch-x86_64/hypervisor-if.h
 3ddb79c2YTaZwOqWin9-QNgHge5RVw xen/include/hypervisor-ifs/block.h
 3ddb79c2PMeWTK86y4C3F4MzHw4A1g xen/include/hypervisor-ifs/dom0_ops.h
-3e6377eaioRoNm0m_HSDEAd4Vqrq_w xen/include/hypervisor-ifs/dom_mem_ops.h
 403cd194j2pyLqXD8FJ-ukvZzkPenw xen/include/hypervisor-ifs/event_channel.h
 3ddb79c25UE59iu4JJcbRalx95mvcg xen/include/hypervisor-ifs/hypervisor-if.h
 3ead095dE_VF-QA88rl_5cWYRWtRVQ xen/include/hypervisor-ifs/kbd.h

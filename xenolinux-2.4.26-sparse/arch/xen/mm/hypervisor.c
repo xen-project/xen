@@ -11,7 +11,6 @@
 #include <linux/mm.h>
 #include <linux/vmalloc.h>
 #include <asm/hypervisor.h>
-#include <asm/hypervisor-ifs/dom_mem_ops.h>
 #include <asm/page.h>
 #include <asm/pgtable.h>
 #include <asm/multicall.h>
@@ -269,7 +268,6 @@ unsigned long allocate_empty_lowmem_region(unsigned long pages)
     unsigned long  i;
     int            ret;
     unsigned int   order = get_order(pages*PAGE_SIZE);
-    dom_mem_op_t   dom_mem_op;
 
     vstart = __get_free_pages(GFP_KERNEL, order);
     if ( vstart == 0 )
@@ -291,10 +289,9 @@ unsigned long allocate_empty_lowmem_region(unsigned long pages)
 
     flush_page_update_queue();
 
-    dom_mem_op.op = MEMOP_RESERVATION_DECREASE;
-    dom_mem_op.u.decrease.size  = 1<<order;
-    dom_mem_op.u.decrease.pages = pfn_array;
-    if ( (ret = HYPERVISOR_dom_mem_op(&dom_mem_op)) != (1<<order) )
+    ret = HYPERVISOR_dom_mem_op(MEMOP_decrease_reservation, 
+                                pfn_array, 1<<order);
+    if ( unlikely(ret != (1<<order)) )
     {
         printk(KERN_WARNING "Unable to reduce memory reservation (%d)\n", ret);
         BUG();
@@ -314,16 +311,14 @@ void deallocate_lowmem_region(unsigned long vstart, unsigned long pages)
     unsigned long  i;
     int            ret;
     unsigned int   order = get_order(pages*PAGE_SIZE);
-    dom_mem_op_t   dom_mem_op;
 
     pfn_array = vmalloc((1<<order) * sizeof(*pfn_array));
     if ( pfn_array == NULL )
         BUG();
 
-    dom_mem_op.op = MEMOP_RESERVATION_INCREASE;
-    dom_mem_op.u.increase.size  = 1<<order;
-    dom_mem_op.u.increase.pages = pfn_array;
-    if ( (ret = HYPERVISOR_dom_mem_op(&dom_mem_op)) != (1<<order) )
+    ret = HYPERVISOR_dom_mem_op(MEMOP_increase_reservation,
+                                pfn_array, 1<<order);
+    if ( unlikely(ret != (1<<order)) )
     {
         printk(KERN_WARNING "Unable to increase memory reservation (%d)\n",
                ret);
