@@ -6,6 +6,7 @@
 #include <asm/domain_page.h>
 #include <asm/io.h>
 #include <xeno/segment.h>
+#include <xeno/physdisk.h>
 
 #define MAX(a,b) ((a) > (b) ? (a) : (b))
 
@@ -84,7 +85,7 @@ static void xen_physdisk_revoke_access(unsigned short dev,
 	ace_end <= start_sect)
       continue;
     
-    DPRINTK("Killing ace [%x, %x) against kill zone [%x, %x)\n",
+    DPRINTK("Killing ace [%lx, %lx) against kill zone [%lx, %lx)\n",
 	    cur_ace->start_sect, ace_end, start_sect, kill_zone_end);
 
     if (cur_ace->start_sect >= start_sect &&
@@ -234,7 +235,7 @@ int xen_physdisk_access_okay(phys_seg_t *pseg, struct task_struct *p,
   struct physdisk_ace *cur_ace;
   unsigned long sect;
 
-  DPRINTK("Checking access for domain %d, start sect %d, length %d.\n",
+  DPRINTK("Checking access for domain %d, start sect 0x%lx, length 0x%x.\n",
 	  p->domain, pseg->sector_number, pseg->nr_sects);
 
   for (sect = pseg->sector_number;

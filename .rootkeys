@@ -468,6 +468,7 @@
 3ddb79c0MOVXq8qZDQRGb6z64_xAwg xen/include/xeno/pci_ids.h
 3e54c38dlSCVdyVM4PKcrSfzLLxWUQ xen/include/xeno/perfc.h
 3e54c38de9SUSYSAwxDf_DwkpAnQFA xen/include/xeno/perfc_defn.h
+3f055a3dwldYR102YcSuBaxIf9t3Jw xen/include/xeno/physdisk.h
 3ddb79c04nQVR3EYM5L4zxDV_MCo1g xen/include/xeno/prefetch.h
 3e4540ccU1sgCx8seIMGlahmMfv7yQ xen/include/xeno/reboot.h
 3ddb79c0LzqqS0LhAQ50ekgj4oGl7Q xen/include/xeno/sched.h
