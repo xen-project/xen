@@ -449,7 +449,7 @@
 3e5a4e668yELUdtr3HiJZBIqxqUyuA xenolinux-2.4.21-pre4-sparse/drivers/block/Config.in
 3ea53c6em6uzVHSiGqrbbAVofyRY_g xenolinux-2.4.21-pre4-sparse/drivers/block/genhd.c
 3e5a4e66mrtlmV75L1tjKDg8RaM5gA xenolinux-2.4.21-pre4-sparse/drivers/block/ll_rw_blk.c
-3ead095dEkj9JJWYYBnbvW3OYbKFxg xenolinux-2.4.21-pre4-sparse/drivers/char/Config.in
+3eb7cc90LCRDzdNiLIt20dkBbAwVKQ xenolinux-2.4.21-pre4-sparse/drivers/char/Makefile
 3ead095dPseRoFELVf_xcnVXjq02hw xenolinux-2.4.21-pre4-sparse/drivers/char/dummy_console.c
 3e5a4e66rw65CxyolW9PKz4GG42RcA xenolinux-2.4.21-pre4-sparse/drivers/char/tty_io.c
 3e5a4e669uzIE54VwucPYtGwXLAbzA xenolinux-2.4.21-pre4-sparse/fs/exec.c

@@ -301,23 +301,21 @@ void __init setup_arch(char **cmdline_p)
 
     paging_init();
 
-    if(start_info.flags & SIF_PRIVILEGED) {
-      // we are privileged guest os - should be able to set IOPL
-      if(HYPERVISOR_iopl(1)) {
-	panic("Unable to obtain IOPL, despite being SIF_PRIVILEGED");
-      }
+    if ( start_info.flags & SIF_PRIVILEGED ) 
+        /* We are privileged guest os - should have IO privileges. */
+        if( HYPERVISOR_set_priv_levels(1, 1) )
+            panic("Unable to obtain IOPL, despite being SIF_PRIVILEGED");
 
-    }
+    if(start_info.flags & SIF_CONSOLE)
+    {
+        if( !(start_info.flags & SIF_PRIVILEGED) )
+            panic("Xen granted us console access but not privileged status");
 
-    if(start_info.flags & SIF_CONSOLE) {
-      if(!(start_info.flags & SIF_PRIVILEGED)) {
-	panic("Xen granted us console access but not privileged status");
-      }
 #ifdef CONFIG_VT
 #if defined(CONFIG_VGA_CONSOLE)
-      conswitchp = &vga_con;
+        conswitchp = &vga_con;
 #elif defined(CONFIG_DUMMY_CONSOLE)
-      conswitchp = &dummy_con;
+        conswitchp = &dummy_con;
 #endif
 #endif
     }

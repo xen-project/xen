@@ -210,8 +210,8 @@ ENTRY(ret_from_newdomain)
  */
 do_multicall:
         popl  %eax
-        cmpl  $SYMBOL_NAME(ret_from_hypervisor_call),%eax
-        jne   multicall_exit /* bail if called recursively */
+        cmpl  $SYMBOL_NAME(multicall_return_from_call),%eax
+        je    multicall_return_from_call
         pushl %ebx
         movl  4(%esp),%ebx   /* EBX == call_list */
         movl  8(%esp),%ecx   /* ECX == nr_calls  */
@@ -231,12 +231,12 @@ multicall_fault6:
         movl  (%ebx),%eax
         andl  $255,%eax
         call  *SYMBOL_NAME(hypervisor_call_table)(,%eax,4)
+multicall_return_from_call:
         addl  $20,%esp
         popl  %ecx
         addl  $BYTES_PER_MULTICALL_ENTRY,%ebx
         loop  multicall_loop
         popl  %ebx
-multicall_exit:
         xorl  %eax,%eax
         jmp   ret_from_hypervisor_call
 
@@ -647,7 +647,7 @@ ENTRY(hypervisor_call_table)
         .long SYMBOL_NAME(do_dom_mem_op)
         .long SYMBOL_NAME(do_multicall)
         .long SYMBOL_NAME(do_kbd_op)
-        .long SYMBOL_NAME(do_iopl)
+        .long SYMBOL_NAME(do_set_priv_levels)
         .rept NR_syscalls-((.-hypervisor_call_table)/4)
         .long SYMBOL_NAME(sys_ni_syscall)
 	.endr

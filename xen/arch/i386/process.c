@@ -348,10 +348,19 @@ void __switch_to(struct task_struct *prev_p, struct task_struct *next_p)
 }
 
 
-long do_iopl(unsigned int new_iopl)
+long do_set_priv_levels(unsigned int new_io_pl, unsigned int new_hypercall_pl)
 {
     struct pt_regs *regs = GET_SYSCALL_REGS(current);
-    if ( !IS_PRIV(current) ) return -EPERM;
-    regs->eflags = (regs->eflags & 0xffffcfff) | ((new_iopl&3) << 12);
+
+    /*
+     * Any domain can reduce privilege required for hypercall access.
+     * Note that access from ring 1 cannot be relinquished.
+     */
+    current->thread.hypercall_pl = new_hypercall_pl & 3;
+
+    /* Only privileged domains can acquire access to I/O ports. */
+    if ( IS_PRIV(current) )
+        regs->eflags = (regs->eflags & 0xffffcfff) | ((new_io_pl&3) << 12);
+
     return 0;
 }

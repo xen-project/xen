@@ -269,6 +269,9 @@ int copy_thread(int nr, unsigned long clone_flags, unsigned long esp,
     unlazy_fpu(current);
     struct_cpy(&p->thread.i387, &current->thread.i387);
 
+    /* We're careful with hypercall privileges. Don't allow inheritance. */
+    p->thread.hypercall_pl = 1;
+
     return 0;
 }
 
@@ -366,8 +369,9 @@ void __switch_to(struct task_struct *prev_p, struct task_struct *next_p)
     {
         queue_multicall2(__HYPERVISOR_stack_switch, __KERNEL_DS, next->esp0);
         /* Next call will silently fail if we are a non-privileged guest OS. */
-        queue_multicall1(__HYPERVISOR_iopl, 
-                         ((((struct pt_regs *)next->esp0)-1)->eflags>>12)&3);
+        queue_multicall2(__HYPERVISOR_set_priv_levels,
+                         ((((struct pt_regs *)next->esp0)-1)->eflags>>12)&3,
+                         next->hypercall_pl);
     }
 
     /* EXECUTE ALL TASK SWITCH XEN SYSCALLS AT THIS POINT. */

@@ -401,6 +401,23 @@ asmlinkage void do_general_protection(struct pt_regs *regs, long error_code)
      */
     if ( (error_code & 3) == 2 )
     {
+        /*
+         * Hypercalls from rings 2 or 3 fall through to here. If permitted, we 
+         * will transfer control to the requested hypercall.
+         */
+        if ( ((error_code>>3) == HYPERVISOR_CALL_VECTOR) &&
+             (current->thread.hypercall_pl >= (regs->xcs & 3)) )
+        {
+            __asm__ __volatile__ (
+                "movl %0,%%esp                                         \n"
+                "sti                                                   \n"
+                "andl $255,%%eax                                       \n"
+                "call *hypervisor_call_table(,%%eax,4)                 \n"
+                "movl %%eax,0x18(%%esp)                                \n"
+                "jmp  ret_from_intr                                    \n"
+                : : "r" (regs) );
+        }
+
         /* This fault must be due to <INT n> instruction. */
         ti = current->thread.traps + (error_code>>3);
         if ( ti->dpl >= (regs->xcs & 3) )
