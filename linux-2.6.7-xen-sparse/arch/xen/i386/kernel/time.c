@@ -87,6 +87,17 @@ EXPORT_SYMBOL(i8253_lock);
 
 struct timer_opts *cur_timer = &timer_none;
 
+/* These are peridically updated in shared_info, and then copied here. */
+static u32 shadow_tsc_stamp;
+static u64 shadow_system_time;
+static u32 shadow_time_version;
+static struct timeval shadow_tv;
+
+/* Keep track of last time we did processing/updating of jiffies and xtime. */
+static u64 processed_system_time;   /* System time (ns) at last processing. */
+
+#define NS_PER_TICK (1000000000ULL/HZ)
+
 /*
  * This version of gettimeofday has microsecond resolution
  * and better than microsecond precision on fast x86 machines with TSC.
@@ -204,12 +215,33 @@ EXPORT_SYMBOL(monotonic_clock);
 
 
 /*
+ * Reads a consistent set of time-base values from Xen, into a shadow data
+ * area. Must be called with the xtime_lock held for writing.
+ */
+static void __get_time_values_from_xen(void)
+{
+    do {
+        shadow_time_version = HYPERVISOR_shared_info->time_version2;
+        rmb();
+        shadow_tv.tv_sec    = HYPERVISOR_shared_info->wc_sec;
+        shadow_tv.tv_usec   = HYPERVISOR_shared_info->wc_usec;
+        shadow_tsc_stamp    = HYPERVISOR_shared_info->tsc_timestamp.tsc_bits;
+        shadow_system_time  = HYPERVISOR_shared_info->system_time;
+        rmb();
+    }
+    while ( shadow_time_version != HYPERVISOR_shared_info->time_version1 );
+}
+
+/*
  * timer_interrupt() needs to keep up the real-time clock,
  * as well as call the "do_timer()" routine every clocktick
  */
 static inline void do_timer_interrupt(int irq, void *dev_id,
 					struct pt_regs *regs)
 {
+	s64 delta;
+	unsigned long ticks = 0;
+
 #ifdef CONFIG_X86_IO_APIC
 	if (timer_ack) {
 		/*
@@ -226,7 +258,23 @@ static inline void do_timer_interrupt(int irq, void *dev_id,
 	}
 #endif
 
-	do_timer_interrupt_hook(regs);
+	__get_time_values_from_xen();
+
+	delta = (s64)(shadow_system_time - processed_system_time);
+	if (delta < 0) {
+		printk("Timer ISR: Time went backwards: %lld\n", delta);
+		return;
+	}
+
+	/* Process elapsed jiffies since last call. */
+	while (delta >= NS_PER_TICK) {
+		ticks++;
+		delta -= NS_PER_TICK;
+		processed_system_time += NS_PER_TICK;
+
+		if (regs)
+			do_timer_interrupt_hook(regs);
+	}
 
 #if 0				/* XEN PRIV */
 	/*
@@ -288,8 +336,7 @@ irqreturn_t timer_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 
 	cur_timer->mark_offset();
  
-	if (regs)		/* XXXcl check regs in do_timer_interrupt */
-		do_timer_interrupt(irq, NULL, regs);
+	do_timer_interrupt(irq, NULL, regs);
 
 	write_sequnlock(&xtime_lock);
 	return IRQ_HANDLED;
@@ -409,4 +456,52 @@ void __init time_init(void)
 	time_irq  = bind_virq_to_irq(VIRQ_TIMER);
 
 	(void)setup_irq(time_irq, &irq_timer);
+}
+
+/* Convert jiffies to system time. Call with xtime_lock held for reading. */
+static inline u64 __jiffies_to_st(unsigned long j) 
+{
+	return processed_system_time + ((j - jiffies) * NS_PER_TICK);
+}
+
+/*
+ * This function works out when the the next timer function has to be
+ * executed (by looking at the timer list) and sets the Xen one-shot
+ * domain timer to the appropriate value. This is typically called in
+ * cpu_idle() before the domain blocks.
+ * 
+ * The function returns a non-0 value on error conditions.
+ * 
+ * It must be called with interrupts disabled.
+ */
+extern spinlock_t timerlist_lock;
+int set_timeout_timer(void)
+{
+    struct timer_list *timer;
+    u64 alarm = 0;
+    int ret = 0;
+
+    spin_lock(&timerlist_lock);
+
+    /*
+     * This is safe against long blocking (since calculations are not based on 
+     * TSC deltas). It is also safe against warped system time since
+     * suspend-resume is cooperative and we would first get locked out. It is 
+     * safe against normal updates of jiffies since interrupts are off.
+     */
+    alarm = __jiffies_to_st(next_timer_interrupt());
+
+#if 0
+    /* Tasks on the timer task queue expect to be executed on the next tick. */
+    if ( TQ_ACTIVE(tq_timer) )
+        alarm = __jiffies_to_st(jiffies + 1);
+#endif
+
+    /* Failure is pretty bad, but we'd best soldier on. */
+    if ( HYPERVISOR_set_timer_op(alarm) != 0 )
+        ret = -1;
+    
+    spin_unlock(&timerlist_lock);
+
+    return ret;
 }
