@@ -257,3 +257,17 @@ void
 setstatclockrate(int arg)
 {
 }
+
+void
+idle_block(void)
+{
+
+	/*
+	 * We set the timer to when we expect the next timer
+	 * interrupt.  We could set the timer to later if we could
+	 * easily find out when we will have more work (callouts) to
+	 * process from hardclock.
+	 */
+	if (HYPERVISOR_set_timer_op(processed_system_time + NS_PER_TICK) == 0)
+		HYPERVISOR_block();
+}

@@ -54,6 +54,8 @@ void	xenmachmem_init(void);
 void	xenprivcmd_init(void);
 void	xenvfr_init(void);
 
+void	idle_block(void);
+
 #ifdef XENDEBUG
 void printk(const char *, ...);
 void vprintk(const char *, va_list);
