@@ -220,7 +220,7 @@ static void network_free_rx_buffers(struct net_device *dev)
     for ( i = np->rx_idx; i != np->net_ring->rx_prod; i = RX_RING_INC(i) )
     {
         skb = np->rx_skb_ring[i];
-        dev_kfree_skb(skb);
+        dev_kfree_skb_any(skb);
     }
 }
 
@@ -228,10 +228,10 @@ static int network_start_xmit(struct sk_buff *skb, struct net_device *dev)
 {
     unsigned int i;
     struct net_private *np = (struct net_private *)dev->priv;
-    
+
     if ( np->tx_full )
     {
-        printk(KERN_WARNING "%s: full queue wasn't stopped!\n", dev->name);
+        printk(KERN_ALERT "%s: full queue wasn't stopped!\n", dev->name);
         netif_stop_queue(dev);
         return -ENOBUFS;
     }
@@ -239,10 +239,11 @@ static int network_start_xmit(struct sk_buff *skb, struct net_device *dev)
 
     if ( (((unsigned long)skb->data & ~PAGE_MASK) + skb->len) >= PAGE_SIZE )
     {
-        struct sk_buff *new_skb = alloc_skb(RX_BUF_SIZE, GFP_KERNEL);
+        struct sk_buff *new_skb = dev_alloc_skb(RX_BUF_SIZE);
+        if ( new_skb == NULL ) return 1;
         skb_put(new_skb, skb->len);
         memcpy(new_skb->data, skb->data, skb->len);
-        kfree_skb(skb);
+        dev_kfree_skb(skb);
         skb = new_skb;
     }   
     

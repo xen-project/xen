@@ -38,7 +38,7 @@
 #define rtnl_lock() ((void)0)
 #define rtnl_unlock() ((void)0)
 
-#if 1
+#if 0
 #define DPRINTK(_f, _a...) printk(_f , ## _a)
 #else 
 #define DPRINTK(_f, _a...) ((void)0)
@@ -742,8 +742,8 @@ static void net_tx_action(unsigned long unused)
 
         if ( (skb = alloc_skb_nodata(GFP_ATOMIC)) == NULL )
         {
-            add_to_net_schedule_list_tail(vif);
             printk("Out of memory in net_tx_action()!\n");
+            tx->status = RING_STATUS_BAD_PAGE;
             break;
         }
         
@@ -769,8 +769,8 @@ static void net_tx_action(unsigned long unused)
         /* Transmit should always work, or the queue would be stopped. */
         if ( dev->hard_start_xmit(skb, dev) != 0 )
         {
-            add_to_net_schedule_list_tail(vif);
             printk("Weird failure in hard_start_xmit!\n");
+            kfree_skb(skb);
             break;
         }
     }
