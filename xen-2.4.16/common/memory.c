@@ -175,7 +175,7 @@
 #include <asm/uaccess.h>
 #include <asm/domain_page.h>
 
-#if 0
+#if 1
 #define MEM_LOG(_f, _a...) printk("DOM%d: (file=memory.c, line=%d) " _f "\n", current->domain, __LINE__, ## _a )
 #else
 #define MEM_LOG(_f, _a...) ((void)0)
@@ -760,6 +760,11 @@ int do_process_page_updates_bh(page_update_request_t * cur, int count)
                     break;
                 }
             }
+            else
+            {
+                MEM_LOG("Bad domain normal update (dom %d, pfn %ld)",
+                        current->domain, pfn);
+            }
             break;
 
         case PGREQ_MPT_UPDATE:
@@ -767,6 +772,12 @@ int do_process_page_updates_bh(page_update_request_t * cur, int count)
             if ( DOMAIN_OKAY(page->flags) )
             {
                 machine_to_phys_mapping[pfn] = cur->val;
+                err = 0;
+            }
+            else
+            {
+                MEM_LOG("Bad domain MPT update (dom %d, pfn %ld)",
+                        current->domain, pfn);
             }
             break;
 

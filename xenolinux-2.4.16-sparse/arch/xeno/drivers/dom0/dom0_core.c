@@ -43,8 +43,6 @@
 
 #define MAP_DISCONT     1
 
-frame_table_t * frame_table;
-
 static struct proc_dir_entry *xeno_base;
 static struct proc_dir_entry *dom0_cmd_intf;
 static struct proc_dir_entry *proc_ft;
@@ -238,8 +236,6 @@ out:
 
 static int __init init_module(void)
 {
-    frame_table = (frame_table_t *)start_info.frame_table;
-    
     /* xeno proc root setup */
     xeno_base = proc_mkdir(XENO_BASE, &proc_root); 
 

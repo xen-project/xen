@@ -564,12 +564,10 @@ int setup_guestos(struct task_struct *p, dom0_newdomain_t *params)
     unsigned long phys_l1tab, phys_l2tab;
     unsigned long cur_address, alloc_address;
     unsigned long virt_load_address, virt_stack_address, virt_shinfo_address;
-    unsigned long virt_ftable_start, virt_ftable_end, ft_mapping;
     start_info_t  *virt_startinfo_address;
     unsigned long long time;
     unsigned long count;
     unsigned long alloc_index;
-    unsigned long ft_pages;
     l2_pgentry_t *l2tab, *l2start;
     l1_pgentry_t *l1tab = NULL, *l1start = NULL;
     struct pfn_info *page = NULL;
@@ -626,17 +624,13 @@ int setup_guestos(struct task_struct *p, dom0_newdomain_t *params)
     p->mm.pagetable = mk_pagetable(phys_l2tab);
 
     /*
-     * NB. The upper limit on this loop does one extra page + pages for frame
-     * table. This is to make sure a pte exists when we want to map the
-     * shared_info struct and frame table struct.
+     * NB. The upper limit on this loop does one extra page. This is to make 
+     * sure a pte exists when we want to map the shared_info struct.
      */
 
-    ft_pages = frame_table_size >> PAGE_SHIFT;
     l2tab += l2_table_offset(virt_load_address);
     cur_address = p->pg_head << PAGE_SHIFT;
-    for ( count  = 0;
-          count < p->tot_pages + 1 + ft_pages;
-          count++)
+    for ( count = 0; count < p->tot_pages + 1; count++ )
     {
         if ( !((unsigned long)l1tab & (PAGE_SIZE-1)) )
         {
@@ -650,11 +644,13 @@ int setup_guestos(struct task_struct *p, dom0_newdomain_t *params)
         }
         *l1tab++ = mk_l1_pgentry(cur_address|L1_PROT);
         
-        if(count < p->tot_pages)
+        if ( count < p->tot_pages )
         {
             page = frame_table + (cur_address >> PAGE_SHIFT);
             page->flags = dom | PGT_writeable_page;
             page->type_count = page->tot_count = 1;
+            /* Set up the MPT entry. */
+            machine_to_phys_mapping[cur_address >> PAGE_SHIFT] = count;
         }
 
         cur_address = ((frame_table + (cur_address >> PAGE_SHIFT))->next) << PAGE_SHIFT;
@@ -663,9 +659,8 @@ int setup_guestos(struct task_struct *p, dom0_newdomain_t *params)
 
     /* pages that are part of page tables must be read only */
     cur_address = p->pg_head << PAGE_SHIFT;
-    for(count = 0;
-        count < alloc_index;
-        count++){
+    for ( count = 0; count < alloc_index; count++ ) 
+    {
         cur_address = ((frame_table + (cur_address >> PAGE_SHIFT))->next) << PAGE_SHIFT;
     }
 
@@ -674,11 +669,11 @@ int setup_guestos(struct task_struct *p, dom0_newdomain_t *params)
     l1start = l1tab = map_domain_mem(l2_pgentry_to_phys(*l2tab));
     l1tab += l1_table_offset(virt_load_address + (alloc_index << PAGE_SHIFT));
     l2tab++;
-    for(count = alloc_index;
-        count < p->tot_pages;
-        count++){
+    for ( count = alloc_index; count < p->tot_pages; count++ ) 
+    {
         *l1tab++ = mk_l1_pgentry(l1_pgentry_val(*l1tab) & ~_PAGE_RW);
-        if(!((unsigned long)l1tab & (PAGE_SIZE - 1))){
+        if( !((unsigned long)l1tab & (PAGE_SIZE - 1)) )
+        {
             unmap_domain_mem(l1start);
             l1start = l1tab = map_domain_mem(l2_pgentry_to_phys(*l2tab));
             l2tab++;
@@ -709,21 +704,6 @@ int setup_guestos(struct task_struct *p, dom0_newdomain_t *params)
     virt_startinfo_address = (start_info_t *)
         (virt_load_address + ((alloc_index - 1) << PAGE_SHIFT));
     virt_stack_address  = (unsigned long)virt_startinfo_address;
-
-    /* set up frame_table mapping */
-    ft_mapping = (unsigned long)frame_table;
-    virt_ftable_start = virt_shinfo_address + PAGE_SIZE; 
-    virt_ftable_end = virt_ftable_start + frame_table_size;
-    for(cur_address = virt_ftable_start;
-        cur_address < virt_ftable_end;
-        cur_address += PAGE_SIZE){
-        l2tab = l2start + l2_table_offset(cur_address);
-        l1start = l1tab = map_domain_mem(l2_pgentry_to_phys(*l2tab));
-        l1tab += l1_table_offset(cur_address);
-        *l1tab = mk_l1_pgentry(__pa(ft_mapping)|L1_PROT);
-        unmap_domain_mem(l1start);
-        ft_mapping += PAGE_SIZE;
-    }
     
     unmap_domain_mem(l2start);
 
@@ -745,7 +725,6 @@ int setup_guestos(struct task_struct *p, dom0_newdomain_t *params)
     virt_startinfo_address->pt_base = virt_load_address + 
         ((p->tot_pages - 1) << PAGE_SHIFT); 
     virt_startinfo_address->phys_base = p->pg_head << PAGE_SHIFT;
-    virt_startinfo_address->frame_table = virt_ftable_start;
 
     /* Add virtual network interfaces and point to them in startinfo. */
     while (params->num_vifs-- > 0) {

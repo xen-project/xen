@@ -1,4 +1,3 @@
-
 /******************************************************************************
  * dom0_ops.c
  * 
@@ -143,13 +142,18 @@ long do_dom0_op(dom0_op_t *u_dom0_op)
     }
     break;
 
-    case DOM0_MAPTASK:
+    case DOM0_GETMEMLIST:
     {
-        unsigned int dom = op.u.mapdomts.domain;
-        
-        op.u.mapdomts.ts_phy_addr = __pa(find_domain_by_id(dom));
-        copy_to_user(u_dom0_op, &op, sizeof(op));
+        int i;
+        unsigned long pfn = op.u.getmemlist.start_pfn;
+        unsigned long *buffer = op.u.getmemlist.buffer;
 
+        for ( i = 0; i < op.u.getmemlist.num_pfns; i++ )
+        {
+            /* XXX We trust DOM0 to give us a safe buffer. XXX */
+            *buffer++ = pfn;
+            pfn = (frame_table + pfn)->next;
+        }
     }
     break;
 

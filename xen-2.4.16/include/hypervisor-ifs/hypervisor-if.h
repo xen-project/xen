@@ -205,7 +205,6 @@ typedef struct start_info_st {
     net_ring_t *net_rings;
     int num_net_rings;
     blk_ring_t *blk_ring;         /* block io communication rings */
-    unsigned long frame_table;
     unsigned char cmd_line[1];    /* variable-length */
 } start_info_t;
 

@@ -1,4 +1,3 @@
-
 #include <linux/slab.h>
 #include <linux/mm.h>
 #include <linux/mman.h>
@@ -16,6 +15,7 @@
 #include <asm/mmu.h>
 
 #include "hypervisor_defs.h"
+#include "dom0_ops.h"
 
 #define MAP_CONT    0
 #define MAP_DISCONT 1
@@ -126,26 +126,36 @@ int direct_remap_page_range(unsigned long from, unsigned long phys_addr, unsigne
 int direct_remap_disc_page_range(unsigned long from, 
                 unsigned long first_pg, int tot_pages, pgprot_t prot)
 {
-    frame_table_t * current_ft;
-    unsigned long current_pfn;
+    dom0_op_t dom0_op;
+    unsigned long *pfns = get_free_page(GFP_KERNEL);
     unsigned long start = from;
-    int count = 0;
+    int pages, i;
 
-    current_ft = frame_table + first_pg;
-    current_pfn = first_pg; 
-    while(count < tot_pages){
-            if(direct_remap_page_range(start, current_pfn << PAGE_SHIFT, 
-                PAGE_SIZE, prot))
+    while ( tot_pages != 0 )
+    {
+        dom0_op.cmd = DOM0_GETMEMLIST;
+        dom0_op.u.getmemlist.start_pfn = first_pg;
+        pages = 1023;
+        dom0_op.u.getmemlist.num_pfns = 1024;
+        if ( tot_pages < 1024 )
+            dom0_op.u.getmemlist.num_pfns = pages = tot_pages;
+        dom0_op.u.getmemlist.buffer = pfns;
+        (void)HYPERVISOR_dom0_op(&dom0_op);
+        first_pg = pfns[1023]; 
+
+        for ( i = 0; i < pages; i++ )
+        {
+            if(direct_remap_page_range(start, pfns[i] << PAGE_SHIFT, 
+                                       PAGE_SIZE, prot))
                 goto out;
             start += PAGE_SIZE;
-            current_pfn = current_ft->next;
-            current_ft = (frame_table_t *)(frame_table + current_pfn);
-            count++;
+            tot_pages--;
+        }
     }
 
 out:
-
-    return tot_pages - count;
+    free_page(pfns);
+    return tot_pages;
 } 
            
 /* below functions replace standard sys_mmap and sys_munmap which are absolutely useless
@@ -175,8 +185,8 @@ unsigned long direct_mmap(unsigned long phys_addr, unsigned long size,
     }
 
     /* add node on the list of directly mapped areas, make sure the
-	 * list remains sorted.
-	 */ 
+     * list remains sorted.
+     */ 
     dmmap = (direct_mmap_node_t *)kmalloc(sizeof(direct_mmap_node_t), GFP_KERNEL);
     dmmap->vm_start = addr;
     dmmap->vm_end = addr + size;

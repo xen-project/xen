@@ -8,7 +8,7 @@
 
 #define DOM0_NEWDOMAIN   0
 #define DOM0_KILLDOMAIN  1
-#define DOM0_MAPTASK     2
+#define DOM0_GETMEMLIST  2
 #define MAP_DOM_MEM      3
 #define DOM0_STARTDOM    4
 #define MAX_CMD          4
@@ -28,11 +28,12 @@ typedef struct dom0_killdomain_st
     unsigned int domain;
 } dom0_killdomain_t;
 
-typedef struct dom0_map_ts
+typedef struct dom0_getmemlist_st
 {
-    unsigned int domain;
-    unsigned long ts_phy_addr;
-} dom0_tsmap_t;
+    unsigned long start_pfn;
+    unsigned long num_pfns;
+    void *buffer;
+} dom0_getmemlist_t;
 
 typedef struct dom_mem 
 {
@@ -62,7 +63,7 @@ typedef struct dom0_op_st
     {
         dom0_newdomain_t newdomain;
         dom0_killdomain_t killdomain;
-        dom0_tsmap_t mapdomts;
+        dom0_getmemlist_t getmemlist;
         dom_mem_t dommem;
         dom_meminfo_t meminfo;
     }
