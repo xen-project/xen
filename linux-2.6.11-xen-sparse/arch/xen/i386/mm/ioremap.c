@@ -369,7 +369,7 @@ int __direct_remap_area_pages(struct mm_struct *mm,
 		pud = pud_alloc(mm, dir, address);
 		if (!pud)
 			break;
-		pmd = pmd_alloc(mm, dir, address);
+		pmd = pmd_alloc(mm, pud, address);
 		if (!pmd)
 			break;
 		error = 0;
