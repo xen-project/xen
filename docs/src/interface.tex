@@ -16,12 +16,19 @@
 {\Huge \bf Interface manual} \\[4mm]
 {\huge Xen v2.0 for x86} \\[80mm]
 
-{\Large Xen is Copyright (c) 2004, The Xen Team} \\[3mm]
+{\Large Xen is Copyright (c) 2002-2004, The Xen Team} \\[3mm]
 {\Large University of Cambridge, UK} \\[20mm]
-{\large Last updated on 11th March, 2004}
 \end{tabular}
-\vfill
 \end{center}
+
+{\bf
+DISCLAIMER: This documentation is currently under active development
+and as such there may be mistakes and omissions --- watch out for
+these and please report any you find to the developer's mailing list.
+Contributions of material, suggestions and corrections are welcome.
+}
+
+\vfill
 \cleardoublepage
 
 % TABLE OF CONTENTS
@@ -45,42 +52,39 @@
 \setstretch{1.15}
 
 \chapter{Introduction}
-Xen allows the hardware resouces of a machine to be virtualized and
-dynamically partitioned such as to allow multiple different 'guest'
-operating system images to be run simultaneously.
 
-Virtualizing the machine in this manner provides flexibility allowing
-different users to choose their preferred operating system (Windows,
-Linux, NetBSD, or a custom operating system).  Furthermore, Xen provides
-secure partitioning between these 'domains', and enables better resource
+Xen allows the hardware resources of a machine to be virtualized and
+dynamically partitioned, allowing multiple different {\em guest}
+operating system images to be run simultaneously.  Virtualizing the
+machine in this manner provides considerable flexibility, for example
+allowing different users to choose their preferred operating system
+(e.g., Linux, NetBSD, or a custom operating system).  Furthermore, Xen
+provides secure partitioning between virtual machines (known as
+{\em domains} in Xen terminology), and enables better resource
 accounting and QoS isolation than can be achieved with a conventional
-operating system.
+operating system. 
 
-The hypervisor runs directly on server hardware and dynamically partitions
-it between a number of {\it domains}, each of which hosts an instance
-of a {\it guest operating system}.  The hypervisor provides just enough
-abstraction of the machine to allow effective isolation and resource 
-management between these domains.
+Xen essentially takes a `wholemachine' virtualization approach as
+pioneered by IBM VM/370.  However, unlike VM/370 or more recent
+efforts such as VMWare and Virtual PC, Xen doesn not attempt to
+completely virtualize the underlying hardware.  Instead parts of the
+hosted guest operating systems are modified to work with the
+VMM; the operating system is effectively ported to a new target
+architecture, typically requiring changes in just the
+machine-dependent code.  The user-level API is unchanged, thus
+existing binaries and operating system distributions work without
+modification. 
 
-Xen essentially takes a virtual machine approach as pioneered by IBM
-VM/370.  However, unlike VM/370 or more recent efforts such as VMWare
-and Virtual PC, Xen doesn not attempt to completely virtualize the
-underlying hardware.  Instead parts of the hosted guest operating
-systems are modified to work with the hypervisor; the operating system
-is effectively ported to a new target architecture, typically
-requiring changes in just the machine-dependent code.  The user-level
-API is unchanged, thus existing binaries and operating system
-distributions can work unmodified.
-
-In addition to exporting virtualized instances of CPU, memory, network and
-block devicees, Xen exposes a control interface to set how these resources
-are shared between the running domains.  The control interface is privileged
-and may only be accessed by one particular virtual machine: {\it domain0}.
-This domain is a required part of any Xen-base server and runs the application
-software that manages the control-plane aspects of the platform.  Running the
-control software in {\it domain0}, distinct from the hypervisor itself, allows
-the Xen framework to separate the notions of {\it mechanism} and {\it policy}
-within the system.
+In addition to exporting virtualized instances of CPU, memory, network
+and block devices, Xen exposes a control interface to manage how these
+resources are shared between the running domains. Access to the
+control interface is restricted: it may only be used by one
+specially-privileged VM, known as {\em Domain-0}.  This domain is a
+required part of any Xen-base server and runs the application software
+that manages the control-plane aspects of the platform.  Running the
+control software in {\it domain-0}, distinct from the hypervisor
+itself, allows the Xen framework to separate the notions of {\it
+mechanism} and {\it policy} within the system.
 
 
 \chapter{CPU state}
@@ -89,12 +93,16 @@ All privileged state must be handled by Xen.  The guest OS has no
 direct access to CR3 and is not permitted to update privileged bits in
 EFLAGS.
 
+
 \chapter{Exceptions}
-The IDT is virtualised by submitting a virtual 'trap
-table' to Xen.  Most trap handlers are identical to native x86
-handlers.  The page-fault handler is a noteable exception.
+
+The IDT is virtualised by submitting to Xen a table of trap handlers.
+Most trap handlers are identical to native x86 handlers, although the
+page-fault handler is a noteable exception.
+
 
 \chapter{Interrupts and events}
+
 Interrupts are virtualized by mapping them to events, which are delivered 
 asynchronously to the target domain.  A guest OS can map these events onto
 its standard interrupt dispatch mechanisms, such as a simple vectoring 
@@ -109,16 +117,19 @@ to it, {\it t} nanoseconds after the first packet arrived (which ever is true
 first).  This allows latency and throughput requirements to be addressed on a
 domain-specific basis.
 
+
 \chapter{Time}
-Guest operating systems need to be aware of the passage of real time and their
-own ``virtual time'', i.e. the time they have been executing.  Furthermore, a
-notion of time is required in the hypervisor itself for scheduling and the
-activities that relate to it.  To this end the hypervisor provides for notions
-of time:  cycle counter time, system time, wall clock time, domain virtual 
+
+Guest operating systems need to be aware of the passage of both real
+(or wallclock) time and their own `virtual time' (i.e., the time for
+which they have been executing) Furthermore, a notion of time is
+required in the hypervisor itself for scheduling and the activities
+that relate to it.  To this end the hypervisor provides for notions of
+time: cycle counter time, system time, wall clock time, domain virtual
 time.
 
-
 \section{Cycle counter time}
+
 This provides the finest-grained, free-running time reference, with the
 approximate frequency being publicly accessible.  The cycle counter time is
 used to accurately extrapolate the other time references.  On SMP machines
@@ -127,6 +138,7 @@ CPUs.  The current x86-based implementation achieves this within inter-CPU
 communication latencies.
 
 \section{System time}
+
 This is a 64-bit value containing the nanoseconds elapsed since boot
 time.  Unlike cycle counter time, system time accurately reflects the
 passage of real time, i.e.  it is adjusted several times a second for timer
@@ -135,6 +147,7 @@ the machine, feeding updates to the hypervisor.  Intermediate values can be
 extrapolated using the cycle counter.
 
 \section{Wall clock time}
+
 This is the actual ``time of day'' Unix style struct timeval (i.e. seconds and
 microseconds since 1 January 1970, adjusted by leap seconds etc.).  Again, an 
 NTP client hosted by {\it domain0} can help maintain this value.  To guest 
@@ -142,8 +155,8 @@ operating systems this value will be reported instead of the hardware RTC
 clock value and they can use the system time and cycle counter times to start
 and remain perfectly in time.
 
-
 \section{Domain virtual time}
+
 This progresses at the same pace as cycle counter time, but only while a
 domain is executing.  It stops while a domain is de-scheduled.  Therefore the
 share of the CPU that a domain receives is indicated by the rate at which
@@ -151,6 +164,7 @@ its domain virtual time increases, relative to the rate at which cycle
 counter time does so.
 
 \section{Time interface}
+
 Xen exports some timestamps to guest operating systems through their shared
 info page.  Timestamps are provided for system time and wall-clock time.  Xen
 also provides the cycle counter values at the time of the last update
@@ -178,6 +192,7 @@ them to request a timer event sent to them at the specified system
 time.  Guest OSes may use this timer to implement timeout values when they
 block.
 
+
 \chapter{Memory}
 
 The hypervisor is responsible for providing memory to each of the
@@ -203,6 +218,7 @@ own operation and place applications (if they support such a notion)
 in ring 3.
 
 \section{Physical Memory Allocation}
+
 The hypervisor reserves a small fixed portion of physical memory at
 system boot time.  This special memory region is located at the
 beginning of physical memory and is mapped at the very top of every
@@ -220,21 +236,31 @@ requested for them on initialization.  However, a domain can return
 pages to the hypervisor if it discovers that its memory requirements
 have diminished.
 
-% put reasons for why pages might be returned here.
 \section{Page Table Updates}
+
 In addition to managing physical memory allocation, the hypervisor is also in
 charge of performing page table updates on behalf of the domains.  This is 
-neccessary to prevent domains from adding arbitrary mappings to their page
+necessary to prevent domains from adding arbitrary mappings to their page
 tables or introducing mappings to other's page tables.
 
-\section{Writabel Page Tables}
-A domain can also request write access to its page tables.  In this
-mode, Xen notes write attempts to page table pages and makes the page
-temporarily writable.  In-use page table pages are also disconnect
-from the page directory.  The domain can now update entries in these
-page table pages without the assistance of Xen.  As soon as the
-writabel page table pages get used as page table pages, Xen makes the
-pages read-only again and revalidates the entries in the pages.
+\section{Writable Page Tables}
+
+Rather than using the explicit page-update interface that Xen
+provides, guests may also be provided with the illusion that their
+page tables are directly writable. Of course this is not really the
+case, since Xen must validate modifications to ensure secure
+partitioning of domains. Instead, Xen detects any write attempt to a
+memory page that is currently part of a page table. If such an access
+occurs, Xen temporarily allows write access to that page while at the
+same time {\em disconnecting} it from the page table that is currently
+in use. This allows the guest to safely make updates to the page
+because the newly-updated entries cannot be used by the MMU until Xen
+revalidates and {\em reconnects} the page.
+
+Reconnection occurs automatically in a number of situations: for
+example, when the guest modifies a different page-table page, when the
+domain is preempted, or whenever the guest uses Xen's explicit
+page-table update interfaces.
 
 \section{Segment Descriptor Tables}
 
@@ -752,13 +778,19 @@ For more information, see the manual pages for {\tt xentrace}, {\tt
 xentrace\_format} and {\tt xentrace\_cpusplit}.
 
 
-\chapter{Hypervisor calls}
+\appendix
 
-\section{ set\_trap\_table(trap\_info\_t *table)} 
+\newcommand{\hypercall}[1]{\vspace{5mm}{\large\sf #1}}
+
+\chapter{Xen Hypercalls}
+
+\hypercall{ set\_trap\_table(trap\_info\_t *table)} 
 
 Install trap handler table.
 
-\section{ mmu\_update(mmu\_update\_t *req, int count, int *success\_count)} 
+
+\hypercall{ mmu\_update(mmu\_update\_t *req, int count, int *success\_count)} 
+
 Update the page table for the domain. Updates can be batched.
 success\_count will be updated to report the number of successfull
 updates.  The update types are:
@@ -769,24 +801,35 @@ updates.  The update types are:
 
 {\it MMU\_EXTENDED\_COMMAND}:
 
-\section{ set\_gdt(unsigned long *frame\_list, int entries)} 
+
+\hypercall{ set\_gdt(unsigned long *frame\_list, int entries)} 
+
 Set the global descriptor table - virtualization for lgdt.
 
-\section{ stack\_switch(unsigned long ss, unsigned long esp)} 
+
+\hypercall{ stack\_switch(unsigned long ss, unsigned long esp)} 
+
 Request context switch from hypervisor.
 
-\section{ set\_callbacks(unsigned long event\_selector, unsigned long event\_address,
-                        unsigned long failsafe\_selector, unsigned
- long failsafe\_address) } Register OS event processing routine.  In
- Linux both the event\_selector and failsafe\_selector are the
- kernel's CS.  The value event\_address specifies the address for an
- interrupt handler dispatch routine and failsafe\_address specifies a
- handler for application faults.
 
-\section{ fpu\_taskswitch(void)} 
+\hypercall{ set\_callbacks(unsigned long event\_selector, unsigned long event\_address,
+                        unsigned long failsafe\_selector, unsigned
+ long failsafe\_address) }
+
+Register OS event processing routine.  In
+Linux both the event\_selector and failsafe\_selector are the
+kernel's CS.  The value event\_address specifies the address for an
+interrupt handler dispatch routine and failsafe\_address specifies a
+handler for application faults.
+
+
+\hypercall{ fpu\_taskswitch(void)} 
+
 Notify hypervisor that fpu registers needed to be save on context switch.
 
-\section{ sched\_op(unsigned long op)} 
+
+\hypercall{ sched\_op(unsigned long op)} 
+
 Request scheduling operation from hypervisor. The options are: {\it
 yield}, {\it block}, and {\it shutdown}.  {\it yield} keeps the
 calling domain run-able but may cause a reschedule if other domains
@@ -795,7 +838,9 @@ queue and the domains sleeps until an event is delivered to it.  {\it
 shutdown} is used to end the domain's execution and allows to specify
 whether the domain should reboot, halt or suspend..
 
-\section{ dom0\_op(dom0\_op\_t *op)} 
+
+\hypercall{ dom0\_op(dom0\_op\_t *op)} 
+
 Administrative domain operations for domain management. The options are:
 
 {\it DOM0\_CREATEDOMAIN}: create new domain, specifying the name and memory usage
@@ -855,47 +900,71 @@ in kilobytes.
 {\it DOM0\_SETDOMAINVMASSIST}: set domain VM assist options
 
 
-\section{ set\_debugreg(int reg, unsigned long value)}
+\hypercall{ set\_debugreg(int reg, unsigned long value)}
+
 set debug register reg to value
 
-\section{ get\_debugreg(int reg)}
+
+\hypercall{ get\_debugreg(int reg)}
+
  get the debug register reg
 
-\section{ update\_descriptor(unsigned long ma, unsigned long word1, unsigned long word2)} 
 
-\section{ set\_fast\_trap(int idx)}
+\hypercall{ update\_descriptor(unsigned long ma, unsigned long word1, unsigned long word2)} 
+
+
+\hypercall{ set\_fast\_trap(int idx)}
+
  install traps to allow guest OS to bypass hypervisor
 
-\section{ dom\_mem\_op(unsigned int op, unsigned long *extent\_list, unsigned long nr\_extents, unsigned int extent\_order)}
+
+\hypercall{ dom\_mem\_op(unsigned int op, unsigned long *extent\_list, unsigned long nr\_extents, unsigned int extent\_order)}
+
 Increase or decrease memory reservations for guest OS
 
-\section{ multicall(void *call\_list, int nr\_calls)}
+
+\hypercall{ multicall(void *call\_list, int nr\_calls)}
+
 Execute a series of hypervisor calls
 
-\section{ update\_va\_mapping(unsigned long page\_nr, unsigned long val, unsigned long flags)}
 
-\section{ set\_timer\_op(uint64\_t timeout)} 
+\hypercall{ update\_va\_mapping(unsigned long page\_nr, unsigned long val, unsigned long flags)}
+
+
+\hypercall{ set\_timer\_op(uint64\_t timeout)} 
+
 Request a timer event to be sent at the specified system time.
 
-\section{ event\_channel\_op(void *op)} 
-Iinter-domain event-channel management.
 
-\section{ xen\_version(int cmd)}
+\hypercall{ event\_channel\_op(void *op)} 
+
+Inter-domain event-channel management.
+
+
+\hypercall{ xen\_version(int cmd)}
+
 Request Xen version number.
 
-\section{ console\_io(int cmd, int count, char *str)}
+
+\hypercall{ console\_io(int cmd, int count, char *str)}
+
 Interact with the console, operations are:
 
 {\it CONSOLEIO\_write}: Output count characters from buffer str.
 
 {\it CONSOLEIO\_read}: Input at most count characters into buffer str.
 
-\section{ physdev\_op(void *physdev\_op)}
 
-\section{ grant\_table\_op(unsigned int cmd, void *uop, unsigned int count)}
+\hypercall{ physdev\_op(void *physdev\_op)}
 
-\section{ vm\_assist(unsigned int cmd, unsigned int type)}
 
-\section{ update\_va\_mapping\_otherdomain(unsigned long page\_nr, unsigned long val, unsigned long flags, uint16\_t domid)}
+\hypercall{ grant\_table\_op(unsigned int cmd, void *uop, unsigned int count)}
+
+
+\hypercall{ vm\_assist(unsigned int cmd, unsigned int type)}
+
+
+\hypercall{ update\_va\_mapping\_otherdomain(unsigned long page\_nr, unsigned long val, unsigned long flags, uint16\_t domid)}
+
 
 \end{document}
