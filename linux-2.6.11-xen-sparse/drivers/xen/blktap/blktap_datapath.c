@@ -77,7 +77,7 @@ void active_reqs_init(void)
 
 static inline unsigned long MAKE_ID(domid_t fe_dom, ACTIVE_RING_IDX idx)
 {
-    return ( (fe_dom << 16) | idx );
+    return ( (fe_dom << 16) | MASK_ACTIVE_IDX(idx) );
 }
 
 /*-----[ Ring helpers ]---------------------------------------------------*/

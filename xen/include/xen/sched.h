@@ -22,6 +22,7 @@
 #include <xen/grant_table.h>
 #include <asm/hardirq.h>
 #include <asm/domain.h>
+#include <asm/bitops.h>
 
 extern unsigned long volatile jiffies;
 extern rwlock_t domlist_lock;
@@ -88,19 +89,9 @@ struct exec_domain
     struct arch_exec_domain arch;
 };
 
-/*
-** SMH: do_mmu_update() grabs big_lock and subsequently can fault 
-** on map_ldt_shadow_page(), enter do_page_fault() and then deadlock 
-** trying to reacquire big_lock. A temporary fix is to make big_lock
-** recursive; overall probably needs more thought. 
-*/
-#if 0
-#define LOCK_BIGLOCK(_d) spin_lock(&(_d)->big_lock)
-#define UNLOCK_BIGLOCK(_d) spin_unlock(&(_d)->big_lock)
-#else
+/* Per-domain lock can be recursively acquired in fault handlers. */
 #define LOCK_BIGLOCK(_d) spin_lock_recursive(&(_d)->big_lock)
 #define UNLOCK_BIGLOCK(_d) spin_unlock_recursive(&(_d)->big_lock)
-#endif
 
 struct domain
 {
@@ -220,7 +211,7 @@ extern int construct_dom0(
     unsigned long image_start, unsigned long image_len, 
     unsigned long initrd_start, unsigned long initrd_len,
     char *cmdline);
-extern int final_setup_guest(struct domain *d, dom0_builddomain_t *);
+extern int set_info_guest(struct domain *d, dom0_setdomaininfo_t *);
 
 struct domain *find_domain_by_id(domid_t dom);
 struct domain *find_last_domain(void);
@@ -317,6 +308,7 @@ extern struct domain *domain_list;
 #define EDF_RUNNING     12 /* Currently running on a CPU.                    */
 #define EDF_CPUPINNED   13 /* Disables auto-migration.                       */
 #define EDF_MIGRATED    14 /* Domain migrated between CPUs.                  */
+#define EDF_DONEINIT    15 /* Initialization completed    .                  */
 
 static inline int domain_runnable(struct exec_domain *d)
 {

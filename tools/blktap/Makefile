@@ -141,6 +141,10 @@ vdi_fill: $(LIB) vdi_fill.c $(VDI_SRCS)
 vdi_validate: $(LIB) vdi_validate.c $(VDI_SRCS)
 	$(CC) $(CFLAGS) -g3 -o vdi_validate vdi_validate.c $(VDI_SRCS)
 
+blockstored: blockstored.c
+	$(CC) $(CFLAGS) -g3 -o blockstored blockstored.c
+bstest: bstest.c blockstore.c
+	$(CC) $(CFLAGS) -g3 -o bstest bstest.c blockstore.c
 
 rdx_cmp: $(LIB) rdx_cmp.c $(VDI_SRCS)
 	$(CC) $(CFLAGS) -g3 -o rdx_cmp rdx_cmp.c $(VDI_SRCS)

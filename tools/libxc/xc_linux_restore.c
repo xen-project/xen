@@ -638,9 +638,10 @@ int xc_linux_restore(int xc_handle, XcIOContext *ioctxt)
 
     xcio_info(ioctxt, "Domain ready to be built.\n");
 
-    op.cmd = DOM0_BUILDDOMAIN;
-    op.u.builddomain.domain   = (domid_t)dom;
-    op.u.builddomain.ctxt = &ctxt;
+    op.cmd = DOM0_SETDOMAININFO;
+    op.u.setdomaininfo.domain   = (domid_t)dom;
+    op.u.setdomaininfo.exec_domain   = 0;
+    op.u.setdomaininfo.ctxt = &ctxt;
     rc = do_dom0_op(xc_handle, &op);
 
     if ( rc != 0 )

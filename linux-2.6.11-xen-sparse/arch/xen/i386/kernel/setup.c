@@ -41,6 +41,7 @@
 #include <linux/init.h>
 #include <linux/edd.h>
 #include <linux/percpu.h>
+#include <linux/notifier.h>
 #include <video/edid.h>
 #include <asm/e820.h>
 #include <asm/mpspec.h>
@@ -56,6 +57,15 @@
 
 /* Allows setting of maximum possible memory size  */
 static unsigned long xen_override_max_pfn;
+
+extern struct notifier_block *panic_notifier_list;
+static int xen_panic_event(struct notifier_block *, unsigned long, void *);
+static struct notifier_block xen_panic_block = {
+	xen_panic_event,
+        NULL,
+        0 /* try to go last */
+};
+
 
 int disable_pse __initdata = 0;
 
@@ -1398,6 +1408,9 @@ void __init setup_arch(char **cmdline_p)
 	if ( panic_timeout == 0 )
 		panic_timeout = 1;
 
+	/* Register a call for panic conditions. */
+	notifier_chain_register(&panic_notifier_list, &xen_panic_block);
+
 	HYPERVISOR_vm_assist(VMASST_CMD_enable,
 			     VMASST_TYPE_4gb_segments);
 
@@ -1492,15 +1505,26 @@ void __init setup_arch(char **cmdline_p)
 #endif
 	paging_init();
 
-	/* Make sure we have a large enough P->M table. */
-	if (max_pfn > xen_start_info.nr_pages) {
+	/* Make sure we have a correctly sized P->M table. */
+	if (max_pfn != xen_start_info.nr_pages) {
 		phys_to_machine_mapping = alloc_bootmem_low_pages(
 			max_pfn * sizeof(unsigned long));
-		memset(phys_to_machine_mapping, ~0,
-			max_pfn * sizeof(unsigned long));
-		memcpy(phys_to_machine_mapping,
-			(unsigned long *)xen_start_info.mfn_list,
-			xen_start_info.nr_pages * sizeof(unsigned long));
+		if (max_pfn > xen_start_info.nr_pages) {
+			memset(phys_to_machine_mapping, ~0,
+				max_pfn * sizeof(unsigned long));
+			memcpy(phys_to_machine_mapping,
+				(unsigned long *)xen_start_info.mfn_list,
+				xen_start_info.nr_pages * sizeof(unsigned long));
+		} else {
+			memcpy(phys_to_machine_mapping,
+				(unsigned long *)xen_start_info.mfn_list,
+				max_pfn * sizeof(unsigned long));
+			if (HYPERVISOR_dom_mem_op(
+				MEMOP_decrease_reservation,
+				(unsigned long *)xen_start_info.mfn_list + max_pfn,
+				xen_start_info.nr_pages - max_pfn, 0) !=
+			    (xen_start_info.nr_pages - max_pfn)) BUG();
+		}
 		free_bootmem(
 			__pa(xen_start_info.mfn_list), 
 			PFN_PHYS(PFN_UP(xen_start_info.nr_pages *
@@ -1597,6 +1621,16 @@ void __init setup_arch(char **cmdline_p)
 #endif
 	}
 }
+
+
+static int
+xen_panic_event(struct notifier_block *this, unsigned long event, void *ptr)
+{
+     HYPERVISOR_crash();    
+     /* we're never actually going to get here... */
+     return NOTIFY_DONE;
+}
+
 
 #include "setup_arch_post.h"
 /*

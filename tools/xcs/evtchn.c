@@ -95,8 +95,6 @@ int evtchn_open(void)
             goto reopen;
         return -errno;
     }
-    /*set_cloexec(evtchn_fd); -- no longer required*/
-printf("Eventchan_fd is %d\n", evtchn_fd);
     return evtchn_fd;
 }
 

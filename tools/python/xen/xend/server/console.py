@@ -11,6 +11,8 @@ from xen.xend.XendError import XendError
 from xen.xend import EventServer
 eserver = EventServer.instance()
 from xen.xend.XendLogging import log
+from xen.xend import XendRoot
+xroot = XendRoot.instance()
 
 import controller
 from messages import *
@@ -82,7 +84,7 @@ class ConsoleControllerFactory(controller.ControllerFactory):
 
     def createController(self, dom, console_port=None):
         if console_port is None:
-            console_port = CONSOLE_PORT_BASE + dom
+            console_port = xroot.get_console_port_base() + dom
         for c in self.getControllers():
             if c.console_port == console_port:
                 raise XendError('console port in use: ' + str(console_port))
@@ -191,7 +193,8 @@ class ConsoleController(controller.Controller):
             pass
         else:
             f = ConsoleFactory(self, self.idx)
-            self.listener = reactor.listenTCP(self.console_port, f)
+            interface = xroot.get_console_address()
+            self.listener = reactor.listenTCP(self.console_port, f, interface=interface)
 
     def connect(self, addr, conn):
         """Connect a TCP connection to the console.

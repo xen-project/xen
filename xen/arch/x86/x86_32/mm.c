@@ -202,8 +202,7 @@ long do_stack_switch(unsigned long ss, unsigned long esp)
     int nr = smp_processor_id();
     struct tss_struct *t = &init_tss[nr];
 
-    /* We need to do this check as we load and use SS on guest's behalf. */
-    if ( (ss & 3) == 0 )
+    if ( (ss & 3) != 1 )
         return -EPERM;
 
     current->arch.kernel_ss = ss;
@@ -278,6 +277,7 @@ int check_descriptor(struct desc_struct *d)
     if ( (b & (_SEGMENT_CODE | _SEGMENT_EC)) == _SEGMENT_EC )
     {
         /*
+         * DATA, GROWS-DOWN.
          * Grows-down limit check. 
          * NB. limit == 0xFFFFF provides no access      (if G=1).
          *     limit == 0x00000 provides 4GB-4kB access (if G=1).
@@ -291,6 +291,8 @@ int check_descriptor(struct desc_struct *d)
     else
     {
         /*
+         * DATA, GROWS-UP. 
+         * CODE (CONFORMING AND NON-CONFORMING).
          * Grows-up limit check.
          * NB. limit == 0xFFFFF provides 4GB access (if G=1).
          *     limit == 0x00000 provides 4kB access (if G=1).

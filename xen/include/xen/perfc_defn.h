@@ -20,6 +20,7 @@ PERFCOUNTER_CPU( calls_to_update_va, "calls_to_update_va_map" )
 PERFCOUNTER_CPU( page_faults, "page faults" )
 PERFCOUNTER_CPU( copy_user_faults, "copy_user faults" )
 PERFCOUNTER_CPU( map_domain_mem_count, "map_domain_mem count" )
+PERFCOUNTER_CPU( ptwr_emulations, "writable pt emulations" )
 
 PERFCOUNTER_CPU( shadow_l2_table_count, "shadow_l2_table count" )
 PERFCOUNTER_CPU( shadow_l1_table_count, "shadow_l1_table count" )

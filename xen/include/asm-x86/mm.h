@@ -4,18 +4,7 @@
 
 #include <xen/config.h>
 #include <xen/list.h>
-#include <xen/spinlock.h>
-#include <xen/perfc.h>
-#include <xen/sched.h>
-
-#include <asm/processor.h>
-#include <asm/atomic.h>
-#include <asm/desc.h>
-#include <asm/flushtlb.h>
 #include <asm/io.h>
-#include <asm/uaccess.h>
-
-#include <public/xen.h>
 
 /*
  * Per-page-frame information.
@@ -241,19 +230,11 @@ void synchronise_pagetables(unsigned long cpu_mask);
  */
 #define __phys_to_machine_mapping ((unsigned long *)RO_MPT_VIRT_START)
 
-/* Returns the machine physical */
-static inline unsigned long phys_to_machine_mapping(unsigned long pfn) 
-{
-    unsigned long mfn;
-    l1_pgentry_t pte;
-
-   if (__get_user(l1_pgentry_val(pte), (__phys_to_machine_mapping + pfn)))
-       mfn = 0;
-   else
-       mfn = l1_pgentry_to_phys(pte) >> PAGE_SHIFT;
-
-   return mfn; 
-}
+#define phys_to_machine_mapping(_pfn)                                      \
+({ l1_pgentry_t l1e; unsigned long mfn;                                    \
+   mfn = __get_user(l1_pgentry_val(l1e), &__phys_to_machine_mapping[_pfn]) \
+       ? 0 : l1_pgentry_to_pfn(l1e);                                       \
+   mfn; })
 #define set_machinetophys(_mfn, _pfn) machine_to_phys_mapping[(_mfn)] = (_pfn)
 
 #define DEFAULT_GDT_ENTRIES     (LAST_RESERVED_GDT_ENTRY+1)
@@ -289,6 +270,9 @@ typedef struct {
     l1_pgentry_t *pl1e;
     /* Index in L2 page table where this L1 p.t. is always hooked. */
     unsigned int l2_idx; /* NB. Only used for PTWR_PT_ACTIVE. */
+    /* Info about last ptwr update batch. */
+    struct exec_domain *prev_exec_domain; /* domain making the update */
+    unsigned int        prev_nr_updates;  /* size of update batch */
 } ptwr_ptinfo_t;
 
 typedef struct {
@@ -336,9 +320,10 @@ void audit_domains(void);
 
 void propagate_page_fault(unsigned long addr, u16 error_code);
 
-/* update_grant_va_mapping
- * Caller must own d's BIGLOCK, is responsible for flushing the TLB,
- * and have already get_page'd */
+/*
+ * Caller must own d's BIGLOCK, is responsible for flushing the TLB, and must 
+ * hold a reference to the page.
+ */
 int update_grant_va_mapping(unsigned long va,
                             unsigned long val,
                             struct domain *d,

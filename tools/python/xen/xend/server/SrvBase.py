@@ -106,7 +106,8 @@ class SrvBase(resource.Resource):
         try:
             val = op_method(op, req)
         except Exception, err:
-            return self._perform_err(err, op, req)
+            self._perform_err(err, op, req)
+            return ''
             
         if isinstance(val, defer.Deferred):
             val.addCallback(self._perform_cb, op, req, dfr=1)

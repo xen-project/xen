@@ -4,6 +4,7 @@ debug       ?= n
 perfc       ?= n
 trace       ?= n
 optimize    ?= y
+domu_debug  ?= n
 crash_debug ?= n
 
 # Currently supported architectures: x86_32, x86_64
@@ -52,6 +53,10 @@ CFLAGS += -DVERBOSE
 endif
 else
 CFLAGS += -DVERBOSE
+endif
+
+ifeq ($(domu_debug),y)
+CFLAGS += -DDOMU_DEBUG
 endif
 
 ifeq ($(crash_debug),y)

@@ -32,9 +32,17 @@
  *  2. If the access fails (cannot emulate, or a standard access faults) then
  *     it is up to the memop to propagate the fault to the guest VM via
  *     some out-of-band mechanism, unknown to the emulator. The memop signals
- *     failure by returning a non-zero value to the emulator, which will then
- *     immediately bail.
+ *     failure by returning X86EMUL_PROPAGATE_FAULT to the emulator, which will
+ *     then immediately bail.
  */
+/* Access completed successfully: continue emulation as normal. */
+#define X86EMUL_CONTINUE        0
+/* Access is unhandleable: bail from emulation and return error to caller. */
+#define X86EMUL_UNHANDLEABLE    1
+/* Terminate emulation but return success to the caller. */
+#define X86EMUL_PROPAGATE_FAULT 2 /* propagate a generated fault to guest */
+#define X86EMUL_RETRY_INSTR     2 /* retry the instruction for some reason */
+#define X86EMUL_CMPXCHG_FAILED  2 /* cmpxchg did not see expected value */
 struct x86_mem_emulator
 {
     /*
@@ -89,17 +97,26 @@ struct x86_mem_emulator
      *  @addr:  [IN ] Linear address to access.
      *  @old:   [IN ] Value expected to be current at @addr.
      *  @new:   [IN ] Value to write to @addr.
-     *  @seen:  [OUT] Value actually seen at @addr, zero-extended to 'u_long'.
      *  @bytes: [IN ] Number of bytes to access using CMPXCHG.
      */
     int (*cmpxchg_emulated)(
         unsigned long addr,
-        unsigned long old, 
+        unsigned long old,
         unsigned long new,
-        unsigned long *seen,
         unsigned int bytes);
 };
 
+/* Standard reader/writer functions that callers may wish to use. */
+extern int
+x86_emulate_read_std(
+    unsigned long addr,
+    unsigned long *val,
+    unsigned int bytes);
+extern int
+x86_emulate_write_std(
+    unsigned long addr,
+    unsigned long val,
+    unsigned int bytes);
 
 struct xen_regs;
 

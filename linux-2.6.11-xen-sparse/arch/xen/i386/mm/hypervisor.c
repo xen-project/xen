@@ -60,8 +60,8 @@ static spinlock_t update_lock = SPIN_LOCK_UNLOCKED;
 #define QUEUE_SIZE 1
 #else
 #define QUEUE_SIZE 128
-#define pmd_val_ma(v) (v).pud.pgd.pgd;
 #endif
+#define pmd_val_ma(v) (v).pud.pgd.pgd;
 #endif
 
 DEFINE_PER_CPU(mmu_update_t, update_queue[QUEUE_SIZE]);

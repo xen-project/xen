@@ -5,6 +5,7 @@
  */
 
 #include <xen/config.h>
+#include <xen/perfc.h>
 #include <xen/sched.h>
 
 #define DEFINE(_sym, _val) \
