@@ -795,7 +795,7 @@ int xfr_recv(Args *args, XfrState *state, Conn *peer){
     // before we configure the new one.
     err = Conn_sxpr(peer, &sxpr);
     if(err) goto exit;
-    sleep(2);
+    //sleep(2);
     err = xen_domain_configure(state->vmid_new, state->vmconfig, state->vmconfig_n);
     if(err) goto exit;
     err = xen_domain_unpause(state->vmid_new);
