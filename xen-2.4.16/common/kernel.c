@@ -45,6 +45,7 @@ unsigned long opt_ipbase=0, opt_nfsserv=0, opt_gateway=0, opt_netmask=0;
 unsigned char opt_nfsroot[50]="";
 unsigned int opt_dom0_mem = 16000; /* default kbytes for DOM0 */
 unsigned int opt_ne_base = 0; /* NE2k NICs cannot be probed */
+unsigned char opt_ifname[10] = "eth0";
 enum { OPT_IP, OPT_STR, OPT_UINT };
 static struct {
     unsigned char *name;
@@ -58,6 +59,7 @@ static struct {
     { "nfsroot",  OPT_STR,  &opt_nfsroot },
     { "dom0_mem", OPT_UINT, &opt_dom0_mem }, 
     { "ne_base",  OPT_UINT, &opt_ne_base },
+    { "ifname",   OPT_STR,  &opt_ifname },
     { NULL,       0,        NULL     }
 };
 

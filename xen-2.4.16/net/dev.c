@@ -2221,17 +2221,13 @@ long do_net_update(void)
             if ( copy_from_user(&tx, net_ring->tx_ring+i, sizeof(tx)) )
                 continue;
 
-            if ( tx.size < PKT_PROT_LEN ) continue; // This should be reasonable.
-            
-            // Packets must not cross page boundaries.  For now, this is a 
-            // kernel panic, later it may become a continue -- silent fail.
+            if ( tx.size < PKT_PROT_LEN ) continue; 
             
             if ( ((tx.addr & ~PAGE_MASK) + tx.size) >= PAGE_SIZE ) 
             {
                 DPRINTK("tx.addr: %lx, size: %lu, end: %lu\n", tx.addr, tx.size,
                     (tx.addr &~PAGE_MASK) + tx.size);
                 continue;
-                //BUG();
             }
             
             if ( TX_RING_INC(i) == net_ring->tx_event )
@@ -2244,7 +2240,6 @@ long do_net_update(void)
             
             g_data = map_domain_mem(tx.addr);
 
-//print_range2(g_data, PKT_PROT_LEN);                
             protocol = __constant_htons(init_tx_header(g_data, tx.size, the_dev));
             if ( protocol == 0 )
             {
@@ -2253,13 +2248,14 @@ long do_net_update(void)
             }
 
             target = __net_get_target_vif(g_data, tx.size, current_vif->id);
-//printk("Send to target: %d\n", target); 
+
             if (target > VIF_PHYSICAL_INTERFACE )
             {
                 // Local delivery: Allocate an skb off the domain free list
                 // fil it, and pass it to netif_rx as if it came off the NIC.
-//printk("LOCAL! (%d) \n", target);
+
                 skb = dev_alloc_skb(tx.size);
+
                 if (skb == NULL) 
                 {
                     unmap_domain_mem(g_data);
@@ -2269,7 +2265,7 @@ long do_net_update(void)
                 skb->src_vif = current_vif->id;
                 skb->dst_vif = target;
                 skb->protocol = protocol;
-
+                
                 skb->head = (u8 *)map_domain_mem(((skb->pf - frame_table) << PAGE_SHIFT));
                 skb->data = skb->head + 16;
                 skb_reserve(skb,2);
@@ -2289,38 +2285,26 @@ long do_net_update(void)
                 // Set a frag link to the remaining data, and we will scatter-gather
                 // in the device driver to send the two bits later.
                 
-                /*unmap_domain_mem(g_data);*/
-                    
                 skb = alloc_skb(PKT_PROT_LEN, GFP_KERNEL); // Eth header + two IP addrs.
                 if (skb == NULL) 
-                {
-printk("Alloc skb failed!\n");
                     continue;
-                }
             
                 skb_put(skb, PKT_PROT_LEN);
-                /*if ( copy_from_user(skb->data, (void *)tx.addr, PKT_PROT_LEN) )
-                {
-printk("Copy from user failed!\n");
-                    kfree_skb(skb);
-                    continue;
-                }
-                */
                 memcpy(skb->data, g_data, PKT_PROT_LEN);
                 unmap_domain_mem(g_data);
-//print_range2(g_data, PKT_PROT_LEN);                
+
                 skb->dev = the_dev;
                 skb->src_vif = current_vif->id;
                 skb->dst_vif = target;
-                skb->protocol = protocol; // These next two lines abbreviate the call 
-                                          // to eth_type_trans as we already have our
-                                          // protocol.
-                //skb_pull(skb, skb->dev->hard_header_len);
+                skb->protocol = protocol; 
                 skb->mac.raw=skb->data; 
 
                 // set tot_count++ in the guest data pfn.
                 page = (tx.addr >> PAGE_SHIFT) + frame_table;
                 page->tot_count++;
+                
+                // assign a destructor to the skb that will unlink and dec the tot_count
+                skb->destructor = &tx_skb_release;
 
                 // place the remainder of the packet (which is in guest memory) into an
                 // skb frag.
@@ -2332,10 +2316,6 @@ printk("Copy from user failed!\n");
                 skb->data_len = tx.size - skb->len;
                 skb->len = tx.size;
                 
-                // assign a destructor to the skb that will unlink and dec the tot_count
-                skb->destructor = &tx_skb_release;
-                //skb_push(skb, skb->dev->hard_header_len);
-//printk("calling dev_queue_xmit!\n");
                 dev_queue_xmit(skb);
             }
             else
@@ -2370,7 +2350,6 @@ printk("Copy from user failed!\n");
 
                 if  ( page->flags != (PGT_l1_page_table | current->domain) ) 
                 {
-BUG();
                        continue;
                 }
 
@@ -2379,7 +2358,6 @@ BUG();
 
                 if (!(*g_pte & _PAGE_PRESENT))
                 {
-BUG();
                         unmap_domain_mem(g_pte);
                         continue;
                 }
@@ -2388,7 +2366,6 @@ BUG();
                 
                 if (page->tot_count != 1) 
                 {
-printk("!\n");
                         unmap_domain_mem(g_pte);
                         continue;
                 }
@@ -2411,21 +2388,22 @@ printk("!\n");
 int setup_network_devices(void)
 {
     int ret;
-    struct net_device *dev = dev_get_by_name("eth0");
-
+    extern char opt_ifname[];
+    struct net_device *dev = dev_get_by_name(opt_ifname);
+    
     if ( dev == NULL ) 
     {
-        printk("Could not find device eth0\n");
+        printk("Could not find device %s\n", opt_ifname);
         return 0;
     }
 
     ret = dev_open(dev);
     if ( ret != 0 )
     {
-        printk("Error opening device eth0 for use (%d)\n", ret);
+        printk("Error opening device %s for use (%d)\n", opt_ifname, ret);
         return 0;
     }
-    printk("Device eth0 opened and ready for use\n");
+    printk("Device %s opened and ready for use.\n", opt_ifname);
     the_dev = dev;
 
     return 1;

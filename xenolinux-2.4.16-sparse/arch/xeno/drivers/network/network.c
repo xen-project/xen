@@ -353,6 +353,16 @@ static void network_rx_int(int irq, void *dev_id, struct pt_regs *ptregs)
 
         skb_put(skb, np->net_ring->rx_ring[i].size);
         skb->protocol = eth_type_trans(skb, dev);
+
+        /* Set up shinfo -- from alloc_skb */
+        /* This was particularily nasty:  the shared info is hidden at the back of the data area
+         * (presumably so it can be shared), but on page flip it gets very spunked.
+         */
+
+        atomic_set(&(skb_shinfo(skb)->dataref), 1);
+        skb_shinfo(skb)->nr_frags = 0;
+        skb_shinfo(skb)->frag_list = NULL;
+                                
         np->stats.rx_packets++;
 
         np->stats.rx_bytes += np->net_ring->rx_ring[i].size;
