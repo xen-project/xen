@@ -4,8 +4,8 @@
  * A Linux-style configuration list.
  */
 
-#ifndef __XENO_CONFIG_H__
-#define __XENO_CONFIG_H__
+#ifndef __XENO_I386_CONFIG_H__
+#define __XENO_I386_CONFIG_H__
 
 #define CONFIG_X86 1
 
@@ -167,4 +167,4 @@ extern unsigned int opt_ser_baud;
 
 #endif /* __ASSEMBLY__ */
 
-#endif /* __XENO_CONFIG_H__ */
+#endif /* __XENO_I386_CONFIG_H__ */

@@ -1,5 +1,5 @@
-#ifndef _I386_SCATTERLIST_H
-#define _I386_SCATTERLIST_H
+#ifndef _X8664_SCATTERLIST_H
+#define _X8664_SCATTERLIST_H
 
 struct scatterlist {
     char *  address;    /* Location data is to be transferred to, NULL for

@@ -4,8 +4,8 @@
  * A Linux-style configuration list.
  */
 
-#ifndef __XENO_CONFIG_H__
-#define __XENO_CONFIG_H__
+#ifndef __XENO_X86_64_CONFIG_H__
+#define __XENO_X86_64_CONFIG_H__
 
 #define CONFIG_X86 1
 
@@ -53,9 +53,18 @@
 #define __cacheline_aligned __attribute__((__aligned__(SMP_CACHE_BYTES)))
 #define ____cacheline_aligned __cacheline_aligned
 
-/*** Hypervisor owns top 64MB of virtual address space. ***/
-#define HYPERVISOR_VIRT_START (0xFC000000UL)
-
+/*
+ * Virtual addresses beyond this are not modifiable by guest OSes. The
+ * machine->physical mapping table starts at this address, read-only.
+ */
+#define HYPERVISOR_VIRT_START (0xFFFF800000000000ULL)
+                                                                                                
+/*
+ * Xen exists in the highest 2GB of address space for RIP-relative
+ * addressing
+ */
+#define XEN_VIRT_START        (0xFFFFFFFF80000000ULL)
+                                                                                                
 /*
  * First 4MB are mapped read-only for all. It's for the machine->physical
  * mapping table (MPT table). The following are virtual addresses.
@@ -130,8 +139,12 @@
 
 #define barrier() __asm__ __volatile__("": : :"memory")
 
-#define __HYPERVISOR_CS 0x0808
-#define __HYPERVISOR_DS 0x0810
+/*
+ * Hypervisor segment selectors
+ */
+#define __HYPERVISOR_CS64 0x0810
+#define __HYPERVISOR_CS32 0x0808
+#define __HYPERVISOR_DS 0x0818
 
 #define NR_syscalls 256
 
@@ -167,4 +180,4 @@ extern unsigned int opt_ser_baud;
 
 #endif /* __ASSEMBLY__ */
 
-#endif /* __XENO_CONFIG_H__ */
+#endif /* __XENO_X86_64_CONFIG_H__ */

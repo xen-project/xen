@@ -22,9 +22,14 @@ extern void enable_irq(unsigned int);
  * IDT vectors usable for external interrupt sources start
  * at 0x20:
  */
+#define NR_VECTORS 256
 #define FIRST_EXTERNAL_VECTOR	0x30
 
-#define NR_IRQS (256 - FIRST_EXTERNAL_VECTOR)
+#ifdef CONFIG_X86_IO_APIC
+#define NR_IRQS 224
+#else
+#define NR_IRQS 16
+#endif
 
 #define HYPERVISOR_CALL_VECTOR	0x82
 
@@ -47,6 +52,7 @@ extern void enable_irq(unsigned int);
 #define EVENT_CHECK_VECTOR	0xfc
 #define CALL_FUNCTION_VECTOR	0xfb
 #define KDB_VECTOR		0xfa
+#define TASK_MIGRATION_VECTOR	0xf9
 
 /*
  * Local APIC timer IRQ vector is on a different priority level,
@@ -100,89 +106,15 @@ extern char _stext, _etext;
 #define __STR(x) #x
 #define STR(x) __STR(x)
 
-#define SAVE_ALL \
-	"cld\n\t" \
-	"pushl %gs\n\t" \
-	"pushl %fs\n\t" \
-	"pushl %es\n\t" \
-	"pushl %ds\n\t" \
-	"pushl %eax\n\t" \
-	"pushl %ebp\n\t" \
-	"pushl %edi\n\t" \
-	"pushl %esi\n\t" \
-	"pushl %edx\n\t" \
-	"pushl %ecx\n\t" \
-	"pushl %ebx\n\t" \
-	"movl $" STR(__HYPERVISOR_DS) ",%edx\n\t" \
-	"movl %edx,%ds\n\t" \
-	"movl %edx,%es\n\t" \
-	"movl %edx,%fs\n\t" \
-	"movl %edx,%gs\n\t"
-
 #define IRQ_NAME2(nr) nr##_interrupt(void)
 #define IRQ_NAME(nr) IRQ_NAME2(IRQ##nr)
-
-/*
- *	SMP has a few special interrupts for IPI messages
- */
-
-	/* there is a second layer of macro just to get the symbolic
-	   name for the vector evaluated. This change is for RTLinux */
-#define BUILD_SMP_INTERRUPT(x,v) XBUILD_SMP_INTERRUPT(x,v)
-#define XBUILD_SMP_INTERRUPT(x,v)\
-asmlinkage void x(void); \
-asmlinkage void call_##x(void); \
-__asm__( \
-"\n"__ALIGN_STR"\n" \
-SYMBOL_NAME_STR(x) ":\n\t" \
-	"pushl $"#v"-256\n\t" \
-	SAVE_ALL \
-	SYMBOL_NAME_STR(call_##x)":\n\t" \
-	"call "SYMBOL_NAME_STR(smp_##x)"\n\t" \
-	"jmp ret_from_intr\n");
-
-#define BUILD_SMP_TIMER_INTERRUPT(x,v) XBUILD_SMP_TIMER_INTERRUPT(x,v)
-#define XBUILD_SMP_TIMER_INTERRUPT(x,v) \
-asmlinkage void x(struct pt_regs * regs); \
-asmlinkage void call_##x(void); \
-__asm__( \
-"\n"__ALIGN_STR"\n" \
-SYMBOL_NAME_STR(x) ":\n\t" \
-	"pushl $"#v"-256\n\t" \
-	SAVE_ALL \
-	"movl %esp,%eax\n\t" \
-	"pushl %eax\n\t" \
-	SYMBOL_NAME_STR(call_##x)":\n\t" \
-	"call "SYMBOL_NAME_STR(smp_##x)"\n\t" \
-	"addl $4,%esp\n\t" \
-	"jmp ret_from_intr\n");
-
-#define BUILD_COMMON_IRQ() \
-asmlinkage void call_do_IRQ(void); \
-__asm__( \
-	"\n" __ALIGN_STR"\n" \
-	"common_interrupt:\n\t" \
-	SAVE_ALL \
-	SYMBOL_NAME_STR(call_do_IRQ)":\n\t" \
-	"call " SYMBOL_NAME_STR(do_IRQ) "\n\t" \
-	"jmp ret_from_intr\n");
-
-/* 
- * subtle. orig_eax is used by the signal code to distinct between
- * system calls and interrupted 'random user-space'. Thus we have
- * to put a negative value into orig_eax here. (the problem is that
- * both system calls and IRQs want to have small integer numbers in
- * orig_eax, and the syscall code has won the optimization conflict ;)
- *
- * Subtle as a pigs ear.  VY
- */
 
 #define BUILD_IRQ(nr) \
 asmlinkage void IRQ_NAME(nr); \
 __asm__( \
-"\n"__ALIGN_STR"\n" \
+"\n.p2align\n" \
 SYMBOL_NAME_STR(IRQ) #nr "_interrupt:\n\t" \
-	"pushl $"#nr"-256\n\t" \
+	"push $"#nr"-256\n\t" \
 	"jmp common_interrupt");
 
 extern unsigned long prof_cpu_mask;

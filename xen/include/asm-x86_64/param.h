@@ -1,5 +1,5 @@
-#ifndef _ASMi386_PARAM_H
-#define _ASMi386_PARAM_H
+#ifndef _ASMx86_64_PARAM_H
+#define _ASMx86_64_PARAM_H
 
 #ifndef HZ
 #define HZ 100

@@ -1,5 +1,5 @@
-#ifndef _I386_DEBUGREG_H
-#define _I386_DEBUGREG_H
+#ifndef _X86_64_DEBUGREG_H
+#define _X86_64_DEBUGREG_H
 
 
 /* Indicate the register numbers for a number of the specific
@@ -38,6 +38,7 @@
 #define DR_LEN_1 (0x0) /* Settings for data length to trap on */
 #define DR_LEN_2 (0x4)
 #define DR_LEN_4 (0xC)
+#define DR_LEN_8 (0x8)
 
 /* The low byte to the control register determine which registers are
    enabled.  There are 4 fields of two bits.  One bit is "local", meaning
@@ -57,7 +58,7 @@
    We can slow the instruction pipeline for instructions coming via the
    gdt or the ldt if we want to.  I am not sure why this is an advantage */
 
-#define DR_CONTROL_RESERVED (0xFC00) /* Reserved by Intel */
+#define DR_CONTROL_RESERVED (0xFFFFFFFF0000FC00UL) /* Reserved */
 #define DR_LOCAL_SLOWDOWN (0x100)   /* Local slow the pipeline */
 #define DR_GLOBAL_SLOWDOWN (0x200)  /* Global slow the pipeline */
 

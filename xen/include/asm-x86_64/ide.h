@@ -1,15 +1,15 @@
 /*
- *  linux/include/asm-i386/ide.h
+ *  linux/include/asm-x86_64/ide.h
  *
  *  Copyright (C) 1994-1996  Linus Torvalds & authors
  */
 
 /*
- *  This file contains the i386 architecture specific IDE code.
+ *  This file contains the x86_64 architecture specific IDE code.
  */
 
-#ifndef __ASMi386_IDE_H
-#define __ASMi386_IDE_H
+#ifndef __ASMx86_64_IDE_H
+#define __ASMx86_64_IDE_H
 
 #ifdef __KERNEL__
 
@@ -22,8 +22,6 @@
 #define MAX_HWIFS	6
 # endif
 #endif
-
-#define ide__sti()	__sti()
 
 static __inline__ int ide_default_irq(ide_ioreg_t base)
 {
@@ -79,6 +77,7 @@ static __inline__ void ide_init_default_hwifs(void)
 	int index;
 
 	for(index = 0; index < MAX_HWIFS; index++) {
+		memset(&hw, 0, sizeof hw);
 		ide_init_hwif_ports(&hw, ide_default_io_base(index), 0, NULL);
 		hw.irq = ide_default_irq(ide_default_io_base(index));
 		ide_register_hw(&hw, NULL);
@@ -125,4 +124,4 @@ typedef union {
 
 #endif /* __KERNEL__ */
 
-#endif /* __ASMi386_IDE_H */
+#endif /* __ASMx86_64_IDE_H */

@@ -1,4 +1,4 @@
-/* include/asm-i386/rwlock.h
+/* include/asm-x86_64/rwlock.h
  *
  *	Helpers used by both rw spinlocks and rw semaphores.
  *
@@ -6,6 +6,7 @@
  *	spinlock.h Copyright 1996 Linus Torvalds.
  *
  *	Copyright 1999 Red Hat, Inc.
+ *	Copyright 2001,2002 SuSE labs 
  *
  *	Written by Benjamin LaHaise.
  *
@@ -14,8 +15,8 @@
  *	as published by the Free Software Foundation; either version
  *	2 of the License, or (at your option) any later version.
  */
-#ifndef _ASM_I386_RWLOCK_H
-#define _ASM_I386_RWLOCK_H
+#ifndef _ASM_X86_64_RWLOCK_H
+#define _ASM_X86_64_RWLOCK_H
 
 #define RW_LOCK_BIAS		 0x01000000
 #define RW_LOCK_BIAS_STR	"0x01000000"
@@ -35,10 +36,10 @@
 		     "js 2f\n" \
 		     "1:\n" \
 		     ".section .text.lock,\"ax\"\n" \
-		     "2:\tpushl %%eax\n\t" \
-		     "leal %0,%%eax\n\t" \
+		     "2:\tpushq %%rax\n\t" \
+		     "leaq %0,%%rax\n\t" \
 		     "call " helper "\n\t" \
-		     "popl %%eax\n\t" \
+		     "popq %%rax\n\t" \
 		     "jmp 1b\n" \
 		     ".previous" \
 		     :"=m" (*(volatile int *)rw) : : "memory")
@@ -65,10 +66,10 @@
 		     "jnz 2f\n" \
 		     "1:\n" \
 		     ".section .text.lock,\"ax\"\n" \
-		     "2:\tpushl %%eax\n\t" \
-		     "leal %0,%%eax\n\t" \
+		     "2:\tpushq %%rax\n\t" \
+		     "leaq %0,%%rax\n\t" \
 		     "call " helper "\n\t" \
-		     "popl %%eax\n\t" \
+		     "popq %%rax\n\t" \
 		     "jmp 1b\n" \
 		     ".previous" \
 		     :"=m" (*(volatile int *)rw) : : "memory")

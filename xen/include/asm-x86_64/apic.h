@@ -20,19 +20,20 @@
  * Basic functions accessing APICs.
  */
 
-static __inline void apic_write(unsigned long reg, unsigned long v)
+static __inline void apic_write(unsigned long reg, unsigned int v)
 {
-	*((volatile unsigned long *)(APIC_BASE+reg)) = v;
+	*((volatile unsigned int *)(APIC_BASE+reg)) = v;
+	barrier();
 }
 
-static __inline void apic_write_atomic(unsigned long reg, unsigned long v)
+static __inline void apic_write_atomic(unsigned long reg, unsigned int v)
 {
-	xchg((volatile unsigned long *)(APIC_BASE+reg), v);
+	xchg((volatile unsigned int *)(APIC_BASE+reg), v);
 }
 
-static __inline unsigned long apic_read(unsigned long reg)
+static __inline unsigned int apic_read(unsigned long reg)
 {
-	return *((volatile unsigned long *)(APIC_BASE+reg));
+	return *((volatile unsigned int *)(APIC_BASE+reg));
 }
 
 static __inline__ void apic_wait_icr_idle(void)
@@ -94,5 +95,8 @@ extern unsigned int nmi_watchdog;
 #define NMI_INVALID	3
 
 #endif /* CONFIG_X86_LOCAL_APIC */
+
+#define clustered_apic_mode 0
+#define esr_disable 0
 
 #endif /* __ASM_APIC_H */

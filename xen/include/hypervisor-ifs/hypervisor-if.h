@@ -7,33 +7,7 @@
 #ifndef __HYPERVISOR_IF_H__
 #define __HYPERVISOR_IF_H__
 
-/*
- * SEGMENT DESCRIPTOR TABLES
- */
-/*
- * A number of GDT entries are reserved by Xen. These are not situated at the
- * start of the GDT because some stupid OSes export hard-coded selector values
- * in their ABI. These hard-coded values are always near the start of the GDT,
- * so Xen places itself out of the way.
- * 
- * NB. The reserved range is inclusive (that is, both FIRST_RESERVED_GDT_ENTRY
- * and LAST_RESERVED_GDT_ENTRY are reserved).
- */
-#define NR_RESERVED_GDT_ENTRIES    40
-#define FIRST_RESERVED_GDT_ENTRY   256
-#define LAST_RESERVED_GDT_ENTRY    \
-  (FIRST_RESERVED_GDT_ENTRY + NR_RESERVED_GDT_ENTRIES - 1)
-
-/*
- * These flat segments are in the Xen-private section of every GDT. Since these
- * are also present in the initial GDT, many OSes will be able to avoid
- * installing their own GDT.
- */
-#define FLAT_RING1_CS 0x0819    /* GDT index 259 */
-#define FLAT_RING1_DS 0x0821    /* GDT index 260 */
-#define FLAT_RING3_CS 0x082b    /* GDT index 261 */
-#define FLAT_RING3_DS 0x0833    /* GDT index 262 */
-
+#include "if-arch/hypervisor-if-arch.h"
 
 /*
  * HYPERVISOR "SYSTEM CALLS"
@@ -65,10 +39,6 @@
 #define __HYPERVISOR_xen_version          22
 #define __HYPERVISOR_serial_io            23
 
-/* And the trap vector is... */
-#define TRAP_INSTR "int $0x82"
-
-
 /*
  * MULTICALLS
  * 
@@ -76,7 +46,7 @@
  * (BYTES_PER_MULTICALL_ENTRY). Each is of the form (op, arg1, ..., argN)
  * where each element of the tuple is a machine word. 
  */
-#define BYTES_PER_MULTICALL_ENTRY 32
+#define ARGS_PER_MULTICALL_ENTRY 8
 
 
 /* EVENT MESSAGES
@@ -109,15 +79,6 @@
 #define _EVENT_EVTCHN   7
 #define _EVENT_VBD_UPD  8
 #define _EVENT_CONSOLE  9 /* This is only for domain-0 initial console. */
-
-/*
- * Virtual addresses beyond this are not modifiable by guest OSes. The 
- * machine->physical mapping table starts at this address, read-only.
- */
-#define HYPERVISOR_VIRT_START (0xFC000000UL)
-#ifndef machine_to_phys_mapping
-#define machine_to_phys_mapping ((unsigned long *)HYPERVISOR_VIRT_START)
-#endif
 
 
 /*
@@ -187,21 +148,6 @@ typedef u64 domid_t;
 #include "block.h"
 
 /*
- * Send an array of these to HYPERVISOR_set_trap_table()
- */
-#define TI_GET_DPL(_ti)      ((_ti)->flags & 3)
-#define TI_GET_IF(_ti)       ((_ti)->flags & 4)
-#define TI_SET_DPL(_ti,_dpl) ((_ti)->flags |= (_dpl))
-#define TI_SET_IF(_ti,_if)   ((_ti)->flags |= ((!!(_if))<<2))
-typedef struct trap_info_st
-{
-    unsigned char  vector;  /* exception vector                              */
-    unsigned char  flags;   /* 0-3: privilege level; 4: clear event enable?  */
-    unsigned short cs;	    /* code selector                                 */
-    unsigned long  address; /* code address                                  */
-} trap_info_t;
-
-/*
  * Send an array of these to HYPERVISOR_mmu_update()
  */
 typedef struct
@@ -217,27 +163,6 @@ typedef struct
     unsigned long op;
     unsigned long args[7];
 } multicall_entry_t;
-
-typedef struct
-{
-    unsigned long ebx;
-    unsigned long ecx;
-    unsigned long edx;
-    unsigned long esi;
-    unsigned long edi;
-    unsigned long ebp;
-    unsigned long eax;
-    unsigned long ds;
-    unsigned long es;
-    unsigned long fs;
-    unsigned long gs;
-    unsigned long _unused;
-    unsigned long eip;
-    unsigned long cs;
-    unsigned long eflags;
-    unsigned long esp;
-    unsigned long ss;
-} execution_context_t;
 
 /*
  * Xen/guestos shared data -- pointer provided in start_info.
@@ -285,7 +210,6 @@ typedef struct shared_info_st {
      * Domain Virtual Time. Domains can access Cycle counter time directly.
      */
 
-    unsigned int       rdtsc_bitshift;  /* tsc_timestamp uses N:N+31 of TSC. */
     u64                cpu_freq;        /* CPU frequency (Hz).               */
 
     /*
@@ -310,6 +234,7 @@ typedef struct shared_info_st {
      * Allow a domain to specify a timeout value in system time and 
      * domain virtual time.
      */
+
     u64                wall_timeout;
     u64                domain_timeout;
 
@@ -322,6 +247,7 @@ typedef struct shared_info_st {
     net_idx_t net_idx[MAX_DOMAIN_VIFS];
 
     execution_context_t execution_context;
+    arch_shared_info_t arch;
 
 } shared_info_t;
 

@@ -4,8 +4,8 @@
  * Defines x86 CPU feature bits
  */
 
-#ifndef __ASM_I386_CPUFEATURE_H
-#define __ASM_I386_CPUFEATURE_H
+#ifndef __ASM_X8664_CPUFEATURE_H
+#define __ASM_X8664_CPUFEATURE_H
 
 /* Sample usage: CPU_FEATURE_P(cpu.x86_capability, FPU) */
 #define CPU_FEATURE_P(CAP, FEATURE) test_bit(CAP, X86_FEATURE_##FEATURE ##_BIT)
@@ -40,7 +40,6 @@
 #define X86_FEATURE_XMM		(0*32+25) /* Streaming SIMD Extensions */
 #define X86_FEATURE_XMM2	(0*32+26) /* Streaming SIMD Extensions-2 */
 #define X86_FEATURE_SELFSNOOP	(0*32+27) /* CPU self snoop */
-#define X86_FEATURE_HT		(0*32+28) /* Hyper-Threading */
 #define X86_FEATURE_ACC		(0*32+29) /* Automatic clock control */
 #define X86_FEATURE_IA64	(0*32+30) /* IA-64 processor */
 
@@ -64,9 +63,7 @@
 #define X86_FEATURE_CYRIX_ARR	(3*32+ 2) /* Cyrix ARRs (= MTRRs) */
 #define X86_FEATURE_CENTAUR_MCR	(3*32+ 3) /* Centaur MCRs (= MTRRs) */
 
-#define cpu_has(c, bit)		test_bit(bit, (c)->x86_capability)
-
-#endif /* __ASM_I386_CPUFEATURE_H */
+#endif /* __ASM_X8664_CPUFEATURE_H */
 
 /* 
  * Local Variables:

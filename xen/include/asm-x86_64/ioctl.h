@@ -1,10 +1,10 @@
-/* $Id: ioctl.h,v 1.5 1993/07/19 21:53:50 root Exp root $
+/* $Id: ioctl.h,v 1.2 2001/07/04 09:08:13 ak Exp $
  *
  * linux/ioctl.h for Linux by H.H. Bergman.
  */
 
-#ifndef _ASMI386_IOCTL_H
-#define _ASMI386_IOCTL_H
+#ifndef _ASMX8664_IOCTL_H
+#define _ASMX8664_IOCTL_H
 
 /* ioctl command encoding: 32 bits total, command in lower 16 bits,
  * size of the parameter structure in the lower 14 bits of the
@@ -72,4 +72,4 @@
 #define IOCSIZE_MASK	(_IOC_SIZEMASK << _IOC_SIZESHIFT)
 #define IOCSIZE_SHIFT	(_IOC_SIZESHIFT)
 
-#endif /* _ASMI386_IOCTL_H */
+#endif /* _ASMX8664_IOCTL_H */

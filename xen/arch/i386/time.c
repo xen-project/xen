@@ -282,7 +282,7 @@ void update_dom_time(shared_info_t *si)
 
     /* NB. These two values don't actually ever change. */
     si->cpu_freq       = cpu_freq;
-    si->rdtsc_bitshift = rdtsc_bitshift;
+    si->arch.rdtsc_bitshift = rdtsc_bitshift;
 
     si->system_time    = stime_irq;
     si->tsc_timestamp  = tsc_irq;

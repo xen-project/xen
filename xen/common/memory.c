@@ -138,6 +138,7 @@
 #include <asm/io.h>
 #include <asm/uaccess.h>
 #include <asm/domain_page.h>
+#include <asm/ldt.h>
 
 #ifndef NDEBUG
 #define MEM_LOG(_f, _a...)                             \

@@ -23,9 +23,14 @@ static inline unsigned long get_limit(unsigned long segment)
 
 #define xchg(ptr,v) ((__typeof__(*(ptr)))__xchg((unsigned long)(v),(ptr),sizeof(*(ptr))))
 
-struct __xchg_dummy { unsigned long a[100]; };
-#define __xg(x) ((struct __xchg_dummy *)(x))
+#define __xg(x) ((volatile long *)(x))
 
+extern inline void set_64bit(volatile unsigned long *ptr, unsigned long val)
+{
+	*ptr = val;
+}
+
+#define _set_64bit set_64bit
 
 /*
  * Note: no "lock" prefix even on SMP: xchg always implies lock anyway
@@ -48,7 +53,13 @@ static inline unsigned long __xchg(unsigned long x, volatile void * ptr, int siz
 				:"memory");
 			break;
 		case 4:
-			__asm__ __volatile__("xchgl %0,%1"
+			__asm__ __volatile__("xchgl %k0,%1"
+				:"=r" (x)
+				:"m" (*__xg(ptr)), "0" (x)
+				:"memory");
+			break;
+		case 8:
+			__asm__ __volatile__("xchgq %0,%1"
 				:"=r" (x)
 				:"m" (*__xg(ptr)), "0" (x)
 				:"memory");
@@ -62,6 +73,8 @@ static inline unsigned long __xchg(unsigned long x, volatile void * ptr, int siz
  * store NEW in MEM.  Return the initial value in MEM.  Success is
  * indicated by comparing RETURN with OLD.
  */
+
+#define __HAVE_ARCH_CMPXCHG 1
 
 static inline unsigned long __cmpxchg(volatile void *ptr, unsigned long old,
 				      unsigned long new, int size)
@@ -81,7 +94,13 @@ static inline unsigned long __cmpxchg(volatile void *ptr, unsigned long old,
 				     : "memory");
 		return prev;
 	case 4:
-		__asm__ __volatile__(LOCK_PREFIX "cmpxchgl %1,%2"
+		__asm__ __volatile__(LOCK_PREFIX "cmpxchgl %k1,%2"
+				     : "=a"(prev)
+				     : "q"(new), "m"(*__xg(ptr)), "0"(old)
+				     : "memory");
+		return prev;
+	case 8:
+		__asm__ __volatile__(LOCK_PREFIX "cmpxchgq %1,%2"
 				     : "=a"(prev)
 				     : "q"(new), "m"(*__xg(ptr)), "0"(old)
 				     : "memory");
@@ -105,7 +124,7 @@ static inline unsigned long __cmpxchg(volatile void *ptr, unsigned long old,
 ({                                                                      \
     int _rc;                                                            \
     __asm__ __volatile__ (                                              \
-        "1: " LOCK_PREFIX "cmpxchgl %2,%3\n"                            \
+        "1: " LOCK_PREFIX "cmpxchgq %2,%3\n"                            \
         "2:\n"                                                          \
         ".section .fixup,\"ax\"\n"                                      \
         "3:     movl $1,%1\n"                                           \
@@ -121,6 +140,16 @@ static inline unsigned long __cmpxchg(volatile void *ptr, unsigned long old,
     _rc;                                                                \
 })
 
+#ifdef CONFIG_SMP
+#define smp_mb()	mb()
+#define smp_rmb()	rmb()
+#define smp_wmb()	wmb()
+#else
+#define smp_mb()	barrier()
+#define smp_rmb()	barrier()
+#define smp_wmb()	barrier()
+#endif
+
 /*
  * Force strict CPU ordering.
  * And yes, this is required on UP too when we're talking
@@ -134,44 +163,27 @@ static inline unsigned long __cmpxchg(volatile void *ptr, unsigned long old,
  * I expect future Intel CPU's to have a weaker ordering,
  * but I'd also expect them to finally get their act together
  * and add some real memory barriers if so.
- *
- * Some non intel clones support out of order store. wmb() ceases to be a
- * nop for these.
  */
- 
-#define mb() 	__asm__ __volatile__ ("lock; addl $0,0(%%esp)": : :"memory")
-#define rmb()	mb()
-
-#ifdef CONFIG_X86_OOSTORE
-#define wmb() 	__asm__ __volatile__ ("lock; addl $0,0(%%esp)": : :"memory")
-#else
-#define wmb()	__asm__ __volatile__ ("": : :"memory")
-#endif
-
-#ifdef CONFIG_SMP
-#define smp_mb()	mb()
-#define smp_rmb()	rmb()
-#define smp_wmb()	wmb()
-#else
-#define smp_mb()	barrier()
-#define smp_rmb()	barrier()
-#define smp_wmb()	barrier()
-#endif
-
+#define mb() 	asm volatile("mfence":::"memory")
+#define rmb()	asm volatile("lfence":::"memory")
+#define wmb()	asm volatile("sfence":::"memory")
 #define set_mb(var, value) do { xchg(&var, value); } while (0)
 #define set_wmb(var, value) do { var = value; wmb(); } while (0)
 
+#define warn_if_not_ulong(x) do { unsigned long foo; (void) (&(x) == &foo); } while (0)
+
 /* interrupt control.. */
-#define __save_flags(x)		__asm__ __volatile__("pushfl ; popl %0":"=g" (x): /* no input */)
-#define __restore_flags(x) 	__asm__ __volatile__("pushl %0 ; popfl": /* no output */ :"g" (x):"memory", "cc")
+#define __save_flags(x)		do { warn_if_not_ulong(x); __asm__ __volatile__("# save_flags \n\t pushfq ; popq %q0":"=g" (x): /* no input */ :"memory"); } while (0)
+#define __restore_flags(x) 	__asm__ __volatile__("# restore_flags \n\t pushq %0 ; popfq": /* no output */ :"g" (x):"memory", "cc")
 #define __cli() 		__asm__ __volatile__("cli": : :"memory")
 #define __sti()			__asm__ __volatile__("sti": : :"memory")
 /* used in the idle loop; sti takes one instruction cycle to complete */
 #define safe_halt()		__asm__ __volatile__("sti; hlt": : :"memory")
 
 /* For spinlocks etc */
-#define local_irq_save(x)	__asm__ __volatile__("pushfl ; popl %0 ; cli":"=g" (x): /* no input */ :"memory")
-#define local_irq_restore(x)	__restore_flags(x)
+#define local_irq_save(x) 	do { warn_if_not_ulong(x); __asm__ __volatile__("# local_irq_save \n\t pushfq ; popq %0 ; cli":"=g" (x): /* no input */ :"memory"); } while (0)
+#define local_irq_set(x) 	do { warn_if_not_ulong(x); __asm__ __volatile__("# local_irq_set \n\t pushfq ; popq %0 ; sti":"=g" (x): /* no input */ :"memory"); } while (0)
+#define local_irq_restore(x)	__asm__ __volatile__("# local_irq_restore \n\t pushq %0 ; popfq": /* no output */ :"g" (x):"memory")
 #define local_irq_disable()	__cli()
 #define local_irq_enable()	__sti()
 
@@ -195,14 +207,14 @@ extern void __global_restore_flags(unsigned long);
 
 #endif
 
+/* Default simics "magic" breakpoint */
+#define icebp() asm volatile("xchg %%bx,%%bx" ::: "ebx")
+
 /*
  * disable hlt during certain critical i/o operations
  */
 #define HAVE_DISABLE_HLT
 void disable_hlt(void);
 void enable_hlt(void);
-
-#define BROKEN_ACPI_Sx		0x0001
-#define BROKEN_INIT_AFTER_S1	0x0002
 
 #endif

@@ -1,47 +1,32 @@
-#ifndef _I386_BYTEORDER_H
-#define _I386_BYTEORDER_H
+#ifndef _X86_64_BYTEORDER_H
+#define _X86_64_BYTEORDER_H
 
 #include <asm/types.h>
 
 #ifdef __GNUC__
 
-/* For avoiding bswap on i386 */
-#ifdef __KERNEL__
-#include <linux/config.h>
-#endif
-
-static __inline__ __const__ __u32 ___arch__swab32(__u32 x)
+static __inline__ __const__ __u64 ___arch__swab64(__u64 x)
 {
-#ifdef CONFIG_X86_BSWAP
-	__asm__("bswap %0" : "=r" (x) : "0" (x));
-#else
-	__asm__("xchgb %b0,%h0\n\t"	/* swap lower bytes	*/
-		"rorl $16,%0\n\t"	/* swap words		*/
-		"xchgb %b0,%h0"		/* swap higher bytes	*/
-		:"=q" (x)
-		: "0" (x));
-#endif
+	__asm__("bswapq %0" : "=r" (x) : "0" (x));
 	return x;
 }
 
-static __inline__ __const__ __u16 ___arch__swab16(__u16 x)
+static __inline__ __const__ __u32 ___arch__swab32(__u32 x)
 {
-	__asm__("xchgb %b0,%h0"		/* swap bytes		*/ \
-		: "=q" (x) \
-		:  "0" (x)); \
-		return x;
+	__asm__("bswapl %0" : "=r" (x) : "0" (x));
+	return x;
 }
 
-#define __arch__swab32(x) ___arch__swab32(x)
-#define __arch__swab16(x) ___arch__swab16(x)
+/* Do not define swab16.  Gcc is smart enought to recognize "C" version and
+   convert it into rotation or exhange.  */
 
-#if !defined(__STRICT_ANSI__) || defined(__KERNEL__)
-#  define __BYTEORDER_HAS_U64__
-#  define __SWAB_64_THRU_32__
-#endif
+#define __arch__swab32(x) ___arch__swab32(x)
+#define __arch__swab64(x) ___arch__swab64(x)
 
 #endif /* __GNUC__ */
 
+#define __BYTEORDER_HAS_U64__
+
 #include <linux/byteorder/little_endian.h>
 
-#endif /* _I386_BYTEORDER_H */
+#endif /* _X86_64_BYTEORDER_H */

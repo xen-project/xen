@@ -9,21 +9,19 @@
 
 #include <xeno/config.h>
 #include <xeno/sched.h>
-
-extern unsigned long *mapcache;
-#define MAPCACHE_ENTRIES        1024
+#include <asm/page.h>
 
 /*
  * Maps a given physical address, returning corresponding virtual address.
  * The entire page containing that VA is now accessible until a 
  * corresponding call to unmap_domain_mem().
  */
-extern void *map_domain_mem(unsigned long pa);
+#define map_domain_mem(pa) __va(pa)
 
 /*
  * Pass a VA within a page previously mapped with map_domain_mem().
  * That page will then be removed from the mapping lists.
  */
-extern void unmap_domain_mem(void *va);
+#define unmap_domain_mem(va) {}
 
 #endif /* __ASM_DOMAIN_PAGE_H__ */

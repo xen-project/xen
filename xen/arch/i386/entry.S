@@ -202,7 +202,7 @@ multicall_fault6:
 multicall_return_from_call:
         addl  $20,%esp
         popl  %ecx
-        addl  $BYTES_PER_MULTICALL_ENTRY,%ebx
+        addl  $(ARGS_PER_MULTICALL_ENTRY*4),%ebx
         loop  multicall_loop
         popl  %ebx
         xorl  %eax,%eax

@@ -97,7 +97,7 @@ extern struct mpc_config_ioapic mp_ioapics[MAX_IO_APICS];
 extern int mp_irq_entries;
 
 /* MP IRQ source entries */
-extern struct mpc_config_intsrc *mp_irqs;
+extern struct mpc_config_intsrc mp_irqs[MAX_IRQ_SOURCES];
 
 /* non-0 if default (table-less) MP configuration */
 extern int mpc_default_type;

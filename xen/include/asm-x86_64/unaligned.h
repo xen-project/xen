@@ -1,8 +1,8 @@
-#ifndef __I386_UNALIGNED_H
-#define __I386_UNALIGNED_H
+#ifndef __X8664_UNALIGNED_H
+#define __X8664_UNALIGNED_H
 
 /*
- * The i386 can do unaligned accesses itself. 
+ * The x86-64 can do unaligned accesses itself. 
  *
  * The strange macros are there to make sure these can't
  * be misused in a way that makes them not work on other

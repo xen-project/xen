@@ -5,12 +5,9 @@
 #include <asm/ptrace.h>
 
 #ifdef CONFIG_SMP
-#define TARGET_CPUS cpu_online_map
-#else
-#define TARGET_CPUS 0x01
-#endif
+#ifndef ASSEMBLY
+#include <asm/pda.h>
 
-#ifdef CONFIG_SMP
 /*
  * Private routines/data
  */
@@ -62,7 +59,7 @@ extern void smp_store_cpu_info(int id);		/* Store per CPU info (like the initial
  * so this is correct in the x86 case.
  */
 
-#define smp_processor_id() (current->processor)
+#define smp_processor_id() read_pda(cpunumber) 
 
 #include <asm/fixmap.h>
 #include <asm/apic.h>
@@ -70,14 +67,37 @@ extern void smp_store_cpu_info(int id);		/* Store per CPU info (like the initial
 static __inline int hard_smp_processor_id(void)
 {
 	/* we don't want to mark this access volatile - bad code generation */
-	return GET_APIC_ID(*(unsigned long *)(APIC_BASE+APIC_ID));
+	return GET_APIC_ID(*(unsigned *)(APIC_BASE+APIC_ID));
 }
 
-static __inline int logical_smp_processor_id(void)
-{
-	/* we don't want to mark this access volatile - bad code generation */
-	return GET_APIC_LOGICAL_ID(*(unsigned long *)(APIC_BASE+APIC_LDR));
-}
+extern int apic_disabled;
+extern int slow_smp_processor_id(void);
+#define safe_smp_processor_id() \
+	(!apic_disabled ? hard_smp_processor_id() : slow_smp_processor_id())
 
+#endif /* !ASSEMBLY */
+
+#define NO_PROC_ID		0xFF		/* No processor magic marker */
+
+/*
+ *	This magic constant controls our willingness to transfer
+ *	a process across CPUs. Such a transfer incurs misses on the L1
+ *	cache, and on a P6 or P5 with multiple L2 caches L2 hits. My
+ *	gut feeling is this will vary by board in value. For a board
+ *	with separate L2 cache it probably depends also on the RSS, and
+ *	for a board with shared L2 cache it ought to decay fast as other
+ *	processes are run.
+ */
+ 
+#define PROC_CHANGE_PENALTY	15		/* Schedule penalty */
+
+
+
+#endif
+#define INT_DELIVERY_MODE 1     /* logical delivery */
+#define TARGET_CPUS 1
+
+#ifndef CONFIG_SMP
+#define safe_smp_processor_id() 0
 #endif
 #endif

@@ -186,6 +186,16 @@ static __inline__ int atomic_add_negative(int i, atomic_t *v)
 	return c;
 }
 
+
+/* These are x86-specific, used by some header files */
+#define atomic_clear_mask(mask, addr) \
+__asm__ __volatile__(LOCK "andl %0,%1" \
+: : "r" (~(mask)),"m" (*addr) : "memory")
+
+#define atomic_set_mask(mask, addr) \
+__asm__ __volatile__(LOCK "orl %0,%1" \
+: : "r" ((unsigned)mask),"m" (*addr) : "memory")
+
 /* Atomic operations are already serializing on x86 */
 #define smp_mb__before_atomic_dec()	barrier()
 #define smp_mb__after_atomic_dec()	barrier()

@@ -28,6 +28,7 @@
 #include <asm/desc.h>
 #include <asm/i387.h>
 #include <asm/mpspec.h>
+#include <asm/ldt.h>
 
 #include <xeno/irq.h>
 #include <xeno/event.h>

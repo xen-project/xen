@@ -1,27 +1,92 @@
-#ifndef _I386_PTRACE_H
-#define _I386_PTRACE_H
+#ifndef _X86_64_PTRACE_H
+#define _X86_64_PTRACE_H
+
+#if defined(__ASSEMBLY__) || defined(__FRAME_OFFSETS) 
+#define R15 0
+#define R14 8
+#define R13 16
+#define R12 24
+#define RBP 36
+#define RBX 40
+/* arguments: interrupts/non tracing syscalls only save upto here*/
+#define R11 48
+#define R10 56	
+#define R9 64
+#define R8 72
+#define RAX 80
+#define RCX 88
+#define RDX 96
+#define RSI 104
+#define RDI 112
+#define ORIG_RAX 120       /* = ERROR */ 
+/* end of arguments */ 	
+/* cpu exception frame or undefined in case of fast syscall. */
+#define RIP 128
+#define CS 136
+#define EFLAGS 144
+#define RSP 152
+#define SS 160
+#define ARGOFFSET R11
+#endif /* __ASSEMBLY__ */
+
+/* top of stack page */ 
+#define FRAME_SIZE 168
+
+#define PTRACE_SETOPTIONS         21
+
+/* options set using PTRACE_SETOPTIONS */
+#define PTRACE_O_TRACESYSGOOD     0x00000001
+
+/* Dummy values for ptrace */ 
+#define FS 1000 
+#define GS 1008
+
+#ifndef __ASSEMBLY__ 
 
 struct pt_regs {
-	long ebx;
-	long ecx;
-	long edx;
-	long esi;
-	long edi;
-	long ebp;
-	long eax;
-	int  xds;
-	int  xes;
-	int  xfs;
-	int  xgs;
-	long orig_eax;
-	long eip;
-	int  xcs;
-	long eflags;
-	long esp;
-	int  xss;
+	unsigned long r15;
+	unsigned long r14;
+	unsigned long r13;
+	unsigned long r12;
+	unsigned long rbp;
+	unsigned long rbx;
+/* arguments: non interrupts/non tracing syscalls only save upto here*/
+ 	unsigned long r11;
+	unsigned long r10;	
+	unsigned long r9;
+	unsigned long r8;
+	unsigned long rax;
+	unsigned long rcx;
+	unsigned long rdx;
+	unsigned long rsi;
+	unsigned long rdi;
+	unsigned long orig_rax;
+/* end of arguments */ 	
+/* cpu exception frame or undefined */
+	unsigned long rip;
+	unsigned long cs;
+	unsigned long eflags; 
+	unsigned long rsp; 
+	unsigned long ss;
+/* top of stack page */ 
 };
 
-enum EFLAGS {
+#endif
+
+/* Arbitrarily choose the same ptrace numbers as used by the Sparc code. */
+#define PTRACE_GETREGS            12
+#define PTRACE_SETREGS            13
+#define PTRACE_GETFPREGS          14
+#define PTRACE_SETFPREGS          15
+#define PTRACE_GETFPXREGS         18
+#define PTRACE_SETFPXREGS         19
+
+#if defined(__KERNEL__) && !defined(__ASSEMBLY__) 
+#define user_mode(regs) (!!((regs)->cs & 3))
+#define instruction_pointer(regs) ((regs)->rip)
+extern void show_regs(struct pt_regs *);
+
+enum {
         EF_CF   = 0x00000001,
         EF_PF   = 0x00000004,
         EF_AF   = 0x00000010,
@@ -44,8 +109,6 @@ enum EFLAGS {
         EF_ID   = 0x00200000,   /* id */
 };
 
-#ifdef __KERNEL__
-#define user_mode(regs) ((3 & (regs)->xcs))
 #endif
 
 #endif

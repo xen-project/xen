@@ -1,8 +1,8 @@
 /*
- * include/asm-i386/cache.h
+ * include/asm-x8664/cache.h
  */
-#ifndef __ARCH_I386_CACHE_H
-#define __ARCH_I386_CACHE_H
+#ifndef __ARCH_X8664_CACHE_H
+#define __ARCH_X8664_CACHE_H
 
 #include <xeno/config.h>
 

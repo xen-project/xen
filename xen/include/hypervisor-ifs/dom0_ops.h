@@ -19,29 +19,6 @@
  */
 #define DOM0_INTERFACE_VERSION   0xAAAA0008
 
-/*
- * The following is all CPU context. Note that the i387_ctxt block is filled 
- * in by FXSAVE if the CPU has feature FXSR; otherwise FSAVE is used.
- */
-typedef struct full_execution_context_st
-{
-#define ECF_I387_VALID (1<<0)
-    unsigned long flags;
-    execution_context_t i386_ctxt;          /* User-level CPU registers     */
-    char          i387_ctxt[256];           /* User-level FPU registers     */
-    trap_info_t   trap_ctxt[256];           /* Virtual IDT                  */
-    unsigned int  fast_trap_idx;            /* "Fast trap" vector offset    */
-    unsigned long ldt_base, ldt_ents;       /* LDT (linear address, # ents) */
-    unsigned long gdt_frames[16], gdt_ents; /* GDT (machine frames, # ents) */
-    unsigned long ring1_ss, ring1_esp;      /* Virtual TSS (only SS1/ESP1)  */
-    unsigned long pt_base;                  /* CR3 (pagetable base)         */
-    unsigned long debugreg[8];              /* DB0-DB7 (debug registers)    */
-    unsigned long event_callback_cs;        /* CS:EIP of event callback     */
-    unsigned long event_callback_eip;
-    unsigned long failsafe_callback_cs;     /* CS:EIP of failsafe callback  */
-    unsigned long failsafe_callback_eip;
-} full_execution_context_t;
-
 #define MAX_CMD_LEN       256
 #define MAX_DOMAIN_NAME    16
 

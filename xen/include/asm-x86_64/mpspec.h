@@ -29,7 +29,7 @@
 struct intel_mp_floating
 {
 	char mpf_signature[4];		/* "_MP_" 			*/
-	unsigned long mpf_physptr;	/* Configuration table address	*/
+	unsigned int mpf_physptr;	/* Configuration table address	*/
 	unsigned char mpf_length;	/* Our length (paragraphs)	*/
 	unsigned char mpf_specification;/* Specification version	*/
 	unsigned char mpf_checksum;	/* Checksum (makes sum 0)	*/
@@ -49,11 +49,11 @@ struct mp_config_table
 	char  mpc_checksum;
 	char  mpc_oem[8];
 	char  mpc_productid[12];
-	unsigned long mpc_oemptr;	/* 0 if not present */
+	unsigned int mpc_oemptr;	/* 0 if not present */
 	unsigned short mpc_oemsize;	/* 0 if not present */
 	unsigned short mpc_oemcount;
-	unsigned long mpc_lapic;	/* APIC address */
-	unsigned long reserved;
+	unsigned int mpc_lapic;	/* APIC address */
+	unsigned int reserved;
 };
 
 /* Followed by entries */
@@ -73,12 +73,12 @@ struct mpc_config_processor
 	unsigned char mpc_cpuflag;
 #define CPU_ENABLED		1	/* Processor is available */
 #define CPU_BOOTPROCESSOR	2	/* Processor is the BP */
-	unsigned long mpc_cpufeature;		
+	unsigned int mpc_cpufeature;		
 #define CPU_STEPPING_MASK 0x0F
 #define CPU_MODEL_MASK	0xF0
 #define CPU_FAMILY_MASK	0xF00
-	unsigned long mpc_featureflag;	/* CPUID feature value */
-	unsigned long mpc_reserved[2];
+	unsigned int mpc_featureflag;	/* CPUID feature value */
+	unsigned int mpc_reserved[2];
 };
 
 struct mpc_config_bus
@@ -115,7 +115,7 @@ struct mpc_config_ioapic
 	unsigned char mpc_apicver;
 	unsigned char mpc_flags;
 #define MPC_APIC_USABLE		0x01
-	unsigned long mpc_apicaddr;
+	unsigned int mpc_apicaddr;
 };
 
 struct mpc_config_intsrc
@@ -186,23 +186,18 @@ struct mpc_config_translation
  *	7	2 CPU MCA+PCI
  */
 
-#ifdef CONFIG_MULTIQUAD
-#define MAX_IRQ_SOURCES 512
-#else /* !CONFIG_MULTIQUAD */
-#define MAX_IRQ_SOURCES 256
-#endif /* CONFIG_MULTIQUAD */
-
-#define MAX_MP_BUSSES 32
+#define MAX_MP_BUSSES 257
+#define MAX_IRQ_SOURCES (MAX_MP_BUSSES*4)
 enum mp_bustype {
 	MP_BUS_ISA = 1,
 	MP_BUS_EISA,
 	MP_BUS_PCI,
 	MP_BUS_MCA
 };
-extern int *mp_bus_id_to_type;
-extern int *mp_bus_id_to_node;
-extern int *mp_bus_id_to_local;
-extern int *mp_bus_id_to_pci_bus;
+extern int mp_bus_id_to_type [MAX_MP_BUSSES];
+extern int mp_bus_id_to_node [MAX_MP_BUSSES];
+extern int mp_bus_id_to_local [MAX_MP_BUSSES];
+extern int mp_bus_id_to_pci_bus [MAX_MP_BUSSES];
 extern int quad_local_to_mp_bus_id [NR_CPUS/4][4];
 
 extern unsigned int boot_cpu_physical_apicid;
