@@ -245,10 +245,20 @@ typedef struct dom0_sched_id_st
 #define DOM0_SHADOW_CONTROL_OP_OFF         0
 #define DOM0_SHADOW_CONTROL_OP_ENABLE_TEST 1
 #define DOM0_SHADOW_CONTROL_OP_ENABLE_LOGDIRTY 2
+#define DOM0_SHADOW_CONTROL_OP_ENABLE_TRANSLATE 3
 #define DOM0_SHADOW_CONTROL_OP_FLUSH       10     /* table ops */
 #define DOM0_SHADOW_CONTROL_OP_CLEAN       11
 #define DOM0_SHADOW_CONTROL_OP_PEEK        12
 #define DOM0_SHADOW_CONTROL_OP_CLEAN2      13
+
+typedef struct dom0_shadow_control_stats_st
+{
+    unsigned long fault_count;
+    unsigned long dirty_count;
+    unsigned long dirty_net_count;     
+    unsigned long dirty_block_count;     
+} dom0_shadow_control_stats_t;
+
 typedef struct dom0_shadow_control_st
 {
     /* IN variables. */
@@ -258,8 +268,7 @@ typedef struct dom0_shadow_control_st
     /* IN/OUT variables */
     unsigned long  pages;  // size of buffer, updated with actual size
     /* OUT varaibles */
-    unsigned long fault_count;
-    unsigned long dirty_count;
+    dom0_shadow_control_stats_t stats;
 } dom0_shadow_control_t;
 
 #define DOM0_SETDOMAINNAME     26

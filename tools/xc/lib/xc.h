@@ -35,6 +35,14 @@ typedef struct {
     unsigned long max_memkb;
 } xc_dominfo_t;
 
+typedef struct xc_shadow_control_stats_st
+{
+    unsigned long fault_count;
+    unsigned long dirty_count;
+    unsigned long dirty_net_count;     
+    unsigned long dirty_block_count;     
+} xc_shadow_control_stats_t;
+
 int xc_domain_create(int xc_handle, 
                      unsigned int mem_kb, 
                      const char *name,
@@ -60,8 +68,7 @@ int xc_shadow_control(int xc_handle,
                       unsigned int sop,
 		      unsigned long *dirty_bitmap,
 		      unsigned long pages,
-		      unsigned long *fault_count,
-		      unsigned long *dirty_count);
+		      xc_shadow_control_stats_t *stats);
 
 
 #define XCFLAGS_VERBOSE 1

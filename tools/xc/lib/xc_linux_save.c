@@ -144,14 +144,22 @@ static long long tv_to_us( struct timeval *new )
     return (new->tv_sec * 1000000) + new->tv_usec;
 }
 
-static long long tvdelta( struct timeval *new, struct timeval *old )
+static long long llgettimeofday()
+{
+    struct timeval now;
+    gettimeofday(&now, NULL);
+    return tv_to_us(&now);
+}
+
+static long long tv_delta( struct timeval *new, struct timeval *old )
 {
     return ((new->tv_sec - old->tv_sec)*1000000 ) + 
 	(new->tv_usec - old->tv_usec);
 }
 
-static int track_cpu_usage( int xc_handle, u64 domid, int faults,
-			    int pages_sent, int pages_dirtied, int print )
+static int print_stats( int xc_handle, u64 domid, 
+			int pages_sent, xc_shadow_control_stats_t *stats,
+			int print )
 {
     static struct timeval wall_last;
     static long long      d0_cpu_last;
@@ -161,7 +169,6 @@ static int track_cpu_usage( int xc_handle, u64 domid, int faults,
     long long             wall_delta;
     long long             d0_cpu_now, d0_cpu_delta;
     long long             d1_cpu_now, d1_cpu_delta;
-
 
     gettimeofday(&wall_now, NULL);
 
@@ -173,7 +180,7 @@ static int track_cpu_usage( int xc_handle, u64 domid, int faults,
 	printf("ARRHHH!!\n");
     }
 
-    wall_delta = tvdelta(&wall_now,&wall_last)/1000;
+    wall_delta = tv_delta(&wall_now,&wall_last)/1000;
 
     if ( wall_delta == 0 ) wall_delta = 1;
 
@@ -186,7 +193,7 @@ static int track_cpu_usage( int xc_handle, u64 domid, int faults,
 	       (int)((d0_cpu_delta*100)/wall_delta),
 	       (int)((d1_cpu_delta*100)/wall_delta),
 	       (int)((pages_sent*PAGE_SIZE*8)/(wall_delta*1000)),
-	       (int)((pages_dirtied*PAGE_SIZE*8)/(wall_delta*1000))
+	       (int)((stats->dirty_count*PAGE_SIZE*8)/(wall_delta*1000))
 	    );
 
     d0_cpu_last  = d0_cpu_now;
@@ -196,6 +203,44 @@ static int track_cpu_usage( int xc_handle, u64 domid, int faults,
     return 0;
 }
 
+
+static int analysis_phase( int xc_handle, u64 domid, 
+			   int nr_pfns, unsigned long *arr )
+{
+    long long start, now;
+    xc_shadow_control_stats_t stats;
+
+    start = llgettimeofday();
+
+    while(0)
+    {
+	int i;
+
+	xc_shadow_control( xc_handle, domid, 
+			   DOM0_SHADOW_CONTROL_OP_CLEAN2,
+			   arr, nr_pfns, NULL);
+	printf("#Flush\n");
+	for(i=0;i<100;i++)
+	{	    
+	    usleep(10000);	    
+	    now = llgettimeofday();
+	    xc_shadow_control( xc_handle, domid, 
+			       DOM0_SHADOW_CONTROL_OP_PEEK,
+			       NULL, 0, &stats);
+
+	    printf("now= %lld faults= %ld dirty= %ld dirty_net= %ld dirty_block= %ld\n", 
+		   ((now-start)+500)/1000, 
+		   stats.fault_count, stats.dirty_count,
+		   stats.dirty_net_count, stats.dirty_block_count );
+
+	}
+
+
+    }
+    
+
+    return -1;
+}
 
 int xc_linux_save(int xc_handle,
                   u64 domid, 
@@ -210,7 +255,6 @@ int xc_linux_save(int xc_handle,
     int live = flags & XCFLAGS_LIVE;
     int debug = flags & XCFLAGS_DEBUG;
     int sent_last_iter, sent_this_iter, skip_this_iter;
-    unsigned long dirtied_this_iter, faults_this_iter;
 
     /* Important tuning parameters */
     int max_iters  = 29; // limit us to 30 times round loop
@@ -261,6 +305,8 @@ int xc_linux_save(int xc_handle,
        - to skip this iteration because already dirty;
        - to fixup by sending at the end if not already resent; */
     unsigned long *to_send, *to_skip, *to_fix;
+    
+    xc_shadow_control_stats_t stats;
 
     int needed_to_fix = 0;
     int total_sent    = 0;
@@ -374,7 +420,7 @@ int xc_linux_save(int xc_handle,
     { 
 	if ( xc_shadow_control( xc_handle, domid, 
 			   DOM0_SHADOW_CONTROL_OP_ENABLE_LOGDIRTY,
-			   NULL, 0, NULL, NULL ) < 0 )
+			   NULL, 0, NULL ) < 0 )
 	{
 	    ERROR("Couldn't enable shadow mode");
 	    goto out;
@@ -392,6 +438,9 @@ int xc_linux_save(int xc_handle,
     else
 	last_iter = 1;
 
+    /* calculate the power of 2 order of nr_pfns, e.g.
+     15->4 16->4 17->5 */
+    for( i=nr_pfns-1, order_nr=0; i ; i>>=1, order_nr++ );
 
     /* Setup to_send bitmap */
     {
@@ -425,11 +474,7 @@ int xc_linux_save(int xc_handle,
 
     }
 
-    /* calculate the power of 2 order of nr_pfns, e.g.
-     15->4 16->4 17->5 */
-    for( i=nr_pfns-1, order_nr=0; i ; i>>=1, order_nr++ );
-
-printf("nr_pfns=%d order_nr=%d\n",nr_pfns, order_nr);
+    analysis_phase( xc_handle, domid, nr_pfns, to_skip );
 
     /* We want zeroed memory so use calloc rather than malloc. */
     pfn_type = calloc(BATCH_SIZE, sizeof(unsigned long));
@@ -484,7 +529,7 @@ printf("nr_pfns=%d order_nr=%d\n",nr_pfns, order_nr);
         goto out;
     }
 
-    track_cpu_usage( xc_handle, domid, 0, 0, 0, 0 );
+    print_stats( xc_handle, domid, 0, &stats, 0 );
 
     /* Now write out each data page, canonicalising page tables as we go... */
     
@@ -516,7 +561,7 @@ printf("nr_pfns=%d order_nr=%d\n",nr_pfns, order_nr);
 	    if ( !last_iter && 
 		 xc_shadow_control(xc_handle, domid, 
 				   DOM0_SHADOW_CONTROL_OP_PEEK,
-				   to_skip, nr_pfns, NULL, NULL) != nr_pfns ) 
+				   to_skip, nr_pfns, NULL) != nr_pfns ) 
 	    {
 		ERROR("Error peeking shadow bitmap");
 		goto out;
@@ -722,7 +767,7 @@ printf("nr_pfns=%d order_nr=%d\n",nr_pfns, order_nr);
 
 	if ( last_iter )
 	{
-	    track_cpu_usage( xc_handle, domid, 0, sent_this_iter, 0, 1);
+	    print_stats( xc_handle, domid, sent_this_iter, &stats, 1);
 
 	    verbose_printf("Total pages sent= %d (%.2fx)\n", 
 			   total_sent, ((float)total_sent)/nr_pfns );
@@ -732,7 +777,7 @@ printf("nr_pfns=%d order_nr=%d\n",nr_pfns, order_nr);
 	if ( debug && last_iter )
 	{
 	    int minusone = -1;
-	    memset( to_send, 0xff, nr_pfns/8 );
+	    memset( to_send, 0xff, (nr_pfns+8)/8 );
 	    debug = 0;
 	    printf("Entering debug resend-all mode\n");
     
@@ -766,8 +811,7 @@ printf("nr_pfns=%d order_nr=%d\n",nr_pfns, order_nr);
 
 	    if ( xc_shadow_control( xc_handle, domid, 
 				    DOM0_SHADOW_CONTROL_OP_CLEAN2,
-				    to_send, nr_pfns, &faults_this_iter,
-				    &dirtied_this_iter) != nr_pfns ) 
+				    to_send, nr_pfns, &stats ) != nr_pfns ) 
 	    {
 		ERROR("Error flushing shadow PT");
 		goto out;
@@ -775,9 +819,7 @@ printf("nr_pfns=%d order_nr=%d\n",nr_pfns, order_nr);
 
 	    sent_last_iter = sent_this_iter;
 
-	    //dirtied_this_iter = count_bits( nr_pfns, to_send ); 
-	    track_cpu_usage( xc_handle, domid, faults_this_iter,
-			     sent_this_iter, dirtied_this_iter, 1);
+	    print_stats( xc_handle, domid, sent_this_iter, &stats, 1);
 	    
 	}
 

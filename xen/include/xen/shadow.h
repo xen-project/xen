@@ -17,8 +17,9 @@
 /* Shadow PT operation mode : shadowmode variable in mm_struct */
 #define SHM_test        (1) /* just run domain on shadow PTs */
 #define SHM_logdirty    (2) /* log pages that are dirtied */
-#define SHM_cow         (3) /* copy on write all dirtied pages */
-#define SHM_translate   (4) /* lookup machine pages in translation table */
+#define SHM_translate   (3) /* lookup machine pages in translation table */
+//#define SHM_cow       (4) /* copy on write all dirtied pages */
+
 
 #define shadow_linear_pg_table ((l1_pgentry_t *)SH_LINEAR_PT_VIRT_START)
 #define shadow_linear_l2_table ((l2_pgentry_t *)(SH_LINEAR_PT_VIRT_START+(SH_LINEAR_PT_VIRT_START>>(L2_PAGETABLE_SHIFT-L1_PAGETABLE_SHIFT))))
@@ -76,9 +77,10 @@ printk("DOM%lld: (file=shadow.c, line=%d) " _f "\n", \
 
 /************************************************************************/
 
-    static inline void __mark_dirty( struct mm_struct *m, unsigned int mfn )
+static inline int __mark_dirty( struct mm_struct *m, unsigned int mfn )
 {
     unsigned int pfn;
+    int rc = 0;
 
     ASSERT(spin_is_locked(&m->shadow_lock));
 	
@@ -90,17 +92,19 @@ printk("DOM%lld: (file=shadow.c, line=%d) " _f "\n", \
        really part of the domain's psuedo-physical memory map e.g.
        the shared info frame. Nothing to do here...
        */
-    if ( unlikely(pfn & 0x80000000U) ) return; 
+    if ( unlikely(pfn & 0x80000000U) ) return rc; 
 
     ASSERT(m->shadow_dirty_bitmap);
     if( likely(pfn<m->shadow_dirty_bitmap_size) )
     {
-		/* These updates occur with mm.shadow_lock held, so use 
-		   (__) version of test_and_set */
-		if( ! __test_and_set_bit( pfn, m->shadow_dirty_bitmap ) )
-		{
-			m->shadow_dirty_count++;
-		}
+	/* These updates occur with mm.shadow_lock held, so use 
+	   (__) version of test_and_set */
+	if( __test_and_set_bit( pfn, m->shadow_dirty_bitmap ) == 0 )
+	{
+	    // if we set it
+	    m->shadow_dirty_count++;
+	    rc = 1;
+	}
     }
     else
     {
@@ -113,17 +117,20 @@ printk("DOM%lld: (file=shadow.c, line=%d) " _f "\n", \
 	       frame_table[mfn].type_and_flags );
 	//show_traceX();
     }
-
+	
+    return rc;
 }
 
 
-static inline void mark_dirty( struct mm_struct *m, unsigned int mfn )
+static inline int mark_dirty( struct mm_struct *m, unsigned int mfn )
 {	
+	int rc;
     ASSERT(local_irq_is_enabled());
     //if(spin_is_locked(&m->shadow_lock)) printk("+");
     spin_lock(&m->shadow_lock);
-    __mark_dirty( m, mfn );
+    rc = __mark_dirty( m, mfn );
     spin_unlock(&m->shadow_lock);
+	return rc;
 }
 
 

@@ -567,7 +567,10 @@ void deliver_packet(struct sk_buff *skb, net_vif_t *vif)
 
     /* if in shadow mode, mark the buffer as dirty */
     if( p->mm.shadow_mode == SHM_logdirty )
-	mark_dirty( &p->mm, (new_page-frame_table) );
+    {
+	if( mark_dirty( &p->mm, (new_page-frame_table) ) )
+	    p->mm.shadow_dirty_net_count++;
+    }
 
     /* Updates must happen before releasing the descriptor. */
     smp_wmb();
@@ -2269,16 +2272,6 @@ long flush_bufs_for_vif(net_vif_t *vif)
 	if( p->mm.shadow_mode == SHM_logdirty )
 	{
 	    mark_dirty( &p->mm, rx->pte_ptr>>PAGE_SHIFT );
-#if 0
-	    mark_dirty( &p->mm, rx->buf_pfn ); // XXXXXXX debug
-
-	    {
-		unsigned long * p = map_domain_mem( rx->buf_pfn<<PAGE_SHIFT );
-		p[2] = 0xdeadc001;
-		unmap_domain_mem(p);
-	    }
-#endif
-
 	}
 	/* assume the shadow page table is about to be blown away,
 	   and that its not worth marking the buffer as dirty */

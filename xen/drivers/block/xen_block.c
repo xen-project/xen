@@ -364,7 +364,8 @@ static void unlock_buffer(unsigned long buffer,
 	struct task_struct *p = frame_table[pfn].u.domain;
 
 	if( p->mm.shadow_mode == SHM_logdirty )
-	    mark_dirty( &p->mm, pfn );	
+	    if( mark_dirty( &p->mm, pfn ) )
+		p->mm.shadow_dirty_block_count++;
 
 
         if ( writeable_buffer )

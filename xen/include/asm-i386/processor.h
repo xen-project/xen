@@ -465,6 +465,8 @@ struct mm_struct {
     unsigned int shadow_page_count;     
     unsigned int shadow_fault_count;     
     unsigned int shadow_dirty_count;     
+    unsigned int shadow_dirty_net_count;     
+    unsigned int shadow_dirty_block_count;     
 
 
     /* Current LDT details. */
