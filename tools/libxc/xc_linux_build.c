@@ -433,7 +433,10 @@ int xc_linux_build(int xc_handle,
         ctxt->trap_ctxt[i].vector = i;
         ctxt->trap_ctxt[i].cs     = FLAT_KERNEL_CS;
     }
+
+#if defined(__i386__)
     ctxt->fast_trap_idx = 0;
+#endif
 
     /* No LDT. */
     ctxt->ldt_ents = 0;
