@@ -54,32 +54,8 @@ void __set_fixmap(enum fixed_addresses idx,
 }
 
 
-static void __init fixrange_init(unsigned long start, 
-                                 unsigned long end, 
-                                 l2_pgentry_t *pg_base)
-{
-    l2_pgentry_t *l2e;
-    int i;
-    unsigned long vaddr, page;
-
-    vaddr = start;
-    i = l2_table_offset(vaddr);
-    l2e = pg_base + i;
-
-    for ( ; (i < ENTRIES_PER_L2_PAGETABLE) && (vaddr != end); l2e++, i++ ) 
-    {
-        if ( l2_pgentry_val(*l2e) != 0 )
-            continue;
-        page = (unsigned long)alloc_xenheap_page();
-        clear_page(page);
-        *l2e = mk_l2_pgentry(__pa(page) | __PAGE_HYPERVISOR);
-        vaddr += 1 << L2_PAGETABLE_SHIFT;
-    }
-}
-
 void __init paging_init(void)
 {
-    unsigned long addr;
     void *ioremap_pt;
     int i;
 
@@ -88,13 +64,6 @@ void __init paging_init(void)
         idle_pg_table[i] = 
             mk_l2_pgentry((i << L2_PAGETABLE_SHIFT) | 
                           __PAGE_HYPERVISOR | _PAGE_PSE);
-
-    /*
-     * Fixed mappings, only the page table structure has to be
-     * created - mappings will be set by set_fixmap():
-     */
-    addr = FIXADDR_START & ~((1<<L2_PAGETABLE_SHIFT)-1);
-    fixrange_init(addr, 0, idle_pg_table);
 
     /* Create page table for ioremap(). */
     ioremap_pt = (void *)alloc_xenheap_page();

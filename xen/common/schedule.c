@@ -56,13 +56,11 @@
 #define TRC_SCHED_S_TIMER_FN          0x0001000A
 #define TRC_SCHED_T_TIMER_FN          0x0001000B
 #define TRC_SCHED_DOM_TIMER_FN        0x0001000C
-#define TRC_SCHED_FALLBACK_TIMER_FN   0x0001000D
 
 /* Various timer handlers. */
 static void s_timer_fn(unsigned long unused);
 static void t_timer_fn(unsigned long unused);
 static void dom_timer_fn(unsigned long data);
-static void fallback_timer_fn(unsigned long unused);
 
 /* This is global for now so that private implementations can reach it */
 schedule_data_t schedule_data[NR_CPUS];
@@ -86,12 +84,6 @@ static struct scheduler ops;
 
 /* Per-CPU periodic timer sends an event to the currently-executing domain. */
 static struct ac_timer t_timer[NR_CPUS]; 
-
-/*
- * Per-CPU timer which ensures that even guests with very long quantums get
- * their time-of-day state updated often enough to avoid wrapping.
- */
-static struct ac_timer fallback_timer[NR_CPUS];
 
 extern xmem_cache_t *domain_struct_cachep;
 
@@ -428,7 +420,6 @@ int idle_cpu(int cpu)
  * - s_timer: per CPU timer for preemption and scheduling decisions
  * - t_timer: per CPU periodic timer to send timer interrupt to current dom
  * - dom_timer: per domain timer to specifiy timeout values
- * - fallback_timer: safeguard to ensure time is up to date
  ****************************************************************************/
 
 /* The scheduler timer: force a run through the scheduler*/
@@ -442,41 +433,27 @@ static void s_timer_fn(unsigned long unused)
 /* Periodic tick timer: send timer event to current domain*/
 static void t_timer_fn(unsigned long unused)
 {
-    struct domain *p = current;
+    struct domain *d = current;
 
     TRACE_0D(TRC_SCHED_T_TIMER_FN);
 
-    if ( !is_idle_task(p) ) {
-        update_dom_time(p->shared_info);
-        send_guest_virq(p, VIRQ_TIMER);
+    if ( !is_idle_task(d) )
+    {
+        update_dom_time(d->shared_info);
+        send_guest_virq(d, VIRQ_TIMER);
     }
 
-    t_timer[p->processor].expires = NOW() + MILLISECS(10);
-    add_ac_timer(&t_timer[p->processor]);
+    t_timer[d->processor].expires = NOW() + MILLISECS(10);
+    add_ac_timer(&t_timer[d->processor]);
 }
 
 /* Domain timer function, sends a virtual timer interrupt to domain */
 static void dom_timer_fn(unsigned long data)
 {
-    struct domain *p = (struct domain *)data;
+    struct domain *d = (struct domain *)data;
     TRACE_0D(TRC_SCHED_DOM_TIMER_FN);
-    update_dom_time(p->shared_info);
-    send_guest_virq(p, VIRQ_TIMER);
-}
-
-
-/* Fallback timer to ensure guests get time updated 'often enough'. */
-static void fallback_timer_fn(unsigned long unused)
-{
-    struct domain *p = current;
-
-    TRACE_0D(TRC_SCHED_FALLBACK_TIMER_FN);
-
-    if ( !is_idle_task(p) )
-        update_dom_time(p->shared_info);
-
-    fallback_timer[p->processor].expires = NOW() + MILLISECS(500);
-    add_ac_timer(&fallback_timer[p->processor]);
+    update_dom_time(d->shared_info);
+    send_guest_virq(d, VIRQ_TIMER);
 }
 
 /* Initialise the data structures. */
@@ -500,11 +477,6 @@ void __init scheduler_init(void)
         t_timer[i].cpu      = i;
         t_timer[i].data     = 3;
         t_timer[i].function = &t_timer_fn;
-
-        init_ac_timer(&fallback_timer[i]);
-        fallback_timer[i].cpu      = i;
-        fallback_timer[i].data     = 4;
-        fallback_timer[i].function = &fallback_timer_fn;
     }
 
     schedule_data[0].idle = &idle0_task;
@@ -538,9 +510,6 @@ void schedulers_start(void)
 
     t_timer_fn(0);
     smp_call_function((void *)t_timer_fn, NULL, 1, 1);
-
-    fallback_timer_fn(0);
-    smp_call_function((void *)fallback_timer_fn, NULL, 1, 1);
 }
 
 
