@@ -27,11 +27,8 @@
 
 extern FILE *stdout;
 
-/***** Compile time configuration of defaults ********************************/
 
-#define NUM_CPUS 1 /* XXX this ought to be removed and replaced with something
-                    * cleverer to dynamically query the machine - I'll use a
-                    * dom0 op once I've implemented it! :-) */
+/***** Compile time configuration of defaults ********************************/
 
 /* when we've got more records than this waiting, we log it to the output */
 #define NEW_DATA_THRESH 1
@@ -39,11 +36,11 @@ extern FILE *stdout;
 /* sleep for this long (milliseconds) between checking the trace buffers */
 #define POLL_SLEEP_MILLIS 100
 
+
 /***** The code **************************************************************/
 
 typedef struct settings_st {
     char *outfile;
-    unsigned int num_cpus;
     struct timespec poll_sleep;
     unsigned long new_data_thresh;
 } settings_t;
@@ -90,13 +87,14 @@ void print_rec(unsigned int cpu, struct t_rec *rec, FILE *out)
 
 
 /**
- * get_tbuf_ptrs - get pointer to trace buffers
+ * get_tbufs - get pointer to and size of the trace buffers
+ * @phys_addr: location to store physical address if the trace buffers to
+ * @size:      location to store the size of a trace buffer to
  *
- * Does a dom0 op to fetch a "pointer" to the trace buffers.  The pointer can't
- * be dereferenced immediately, since it is a physical address of memory in Xen
- * space - they are used in this program to mmap the right area from /dev/mem.
+ * Gets the physical address of the trace pointer area and the size of the
+ * per CPU buffers.
  */
-unsigned long get_tbuf_ptrs(void)
+void get_tbufs(unsigned long *phys_addr, unsigned long *size)
 {
     int ret;
     dom0_op_t op;                        /* dom0 op we'll build             */
@@ -114,22 +112,29 @@ unsigned long get_tbuf_ptrs(void)
         PERROR("Failure to get trace buffer pointer from Xen");
         exit(EXIT_FAILURE);
     }
-    
-    return op.u.gettbufs.phys_addr;
+
+    *phys_addr = op.u.gettbufs.phys_addr;
+    *size      = op.u.gettbufs.size;
 }
 
 /**
  * map_tbufs - memory map Xen trace buffers into user space
  * @tbufs:     physical address of the trace buffers
+ * @num:       number of trace buffers to map
+ * @size:      size of each trace buffer
  *
- * Given the physical address of the Xen trace buffers, maps them into process
- * address space by memory mapping /dev/mem.  Returns a pointer to the location
- * the buffers have been mapped to.
+ * Maps the Xen trace buffers them into process address space by memory mapping
+ * /dev/mem.  Returns the location the buffers have been mapped to.
  */
-struct t_buf *map_tbufs(unsigned long tbufs_phys)
+struct t_buf *map_tbufs(unsigned long tbufs_phys, unsigned int num,
+                        unsigned long size)
 {
-    int dm_fd;                    /* file descriptor for /dev/mem */
+    int dm_fd;                               /* file descriptor for /dev/mem */
     struct t_buf *tbufs_mapped;
+    unsigned int page_size = getpagesize();
+    unsigned int off_in_pg = (tbufs_phys % page_size);
+
+    tbufs_phys -= off_in_pg; /* correct tbufs_phys if not page-aligned */
 
     dm_fd = open("/dev/mem", O_RDONLY);
     if ( dm_fd < 0 ) 
@@ -137,8 +142,8 @@ struct t_buf *map_tbufs(unsigned long tbufs_phys)
         PERROR("Open /dev/mem when mapping trace buffers\n");
         exit(EXIT_FAILURE);
     }
-    
-    tbufs_mapped = (struct t_buf *)mmap(NULL, opts.num_cpus * TB_SIZE,
+
+    tbufs_mapped = (struct t_buf *)mmap(NULL, size * num + off_in_pg,
                                         PROT_READ, MAP_SHARED,
                                         dm_fd, (off_t)tbufs_phys);
 
@@ -149,24 +154,28 @@ struct t_buf *map_tbufs(unsigned long tbufs_phys)
         PERROR("Failed to mmap trace buffers");
         exit(EXIT_FAILURE);
     }
-    
-    return tbufs_mapped;
+
+    /* add offset to get buffers in case original address wasn't pg aligned */
+    return (struct t_buf *)((unsigned long)tbufs_mapped + off_in_pg);
 }
 
 
 /**
  * init_bufs_ptrs - initialises an array of pointers to the trace buffers
  * @bufs_mapped:    the userspace address where the trace buffers are mapped
+ * @num:            number of trace buffers
+ * @size:           trace buffer size
  *
  * Initialises an array of pointers to individual trace buffers within the
  * mapped region containing all trace buffers.
  */
-struct t_buf **init_bufs_ptrs(void *bufs_mapped)
+struct t_buf **init_bufs_ptrs(void *bufs_mapped, unsigned int num,
+                              unsigned long size)
 {
     int i;
     struct t_buf **user_ptrs;
 
-    user_ptrs = (struct t_buf **)calloc(opts.num_cpus, sizeof(struct t_buf *));
+    user_ptrs = (struct t_buf **)calloc(num, sizeof(struct t_buf *));
     if ( user_ptrs == NULL )
     {
         PERROR( "Failed to allocate memory for buffer pointers\n");
@@ -175,9 +184,9 @@ struct t_buf **init_bufs_ptrs(void *bufs_mapped)
     
     /* initialise pointers to the trace buffers - given the size of a trace
      * buffer and the value of bufs_maped, we can easily calculate these */
-    for ( i = 0; i<opts.num_cpus; i++ )
+    for ( i = 0; i<num; i++ )
         user_ptrs[i] = (struct t_buf *)(
-            (unsigned long)bufs_mapped + TB_SIZE * i);
+            (unsigned long)bufs_mapped + size * i);
 
     return user_ptrs;
 }
@@ -188,6 +197,7 @@ struct t_buf **init_bufs_ptrs(void *bufs_mapped)
  * @tbufs_phys:    physical base address of the trace buffer area
  * @tbufs_mapped:  user virtual address of base of trace buffer area
  * @meta:          array of user-space pointers to struct t_buf's of metadata
+ * @num:           number of trace buffers
  *
  * Initialises data area pointers to the locations that data areas have been
  * mapped in user space.  Note that the trace buffer metadata contains physical
@@ -195,19 +205,20 @@ struct t_buf **init_bufs_ptrs(void *bufs_mapped)
  */
 struct t_rec **init_rec_ptrs(unsigned long tbufs_phys,
                              struct t_buf *tbufs_mapped,
-                             struct t_buf **meta)
+                             struct t_buf **meta,
+                             unsigned int num)
 {
     int i;
     struct t_rec **data;
     
-    data = calloc(opts.num_cpus, sizeof(struct t_rec *));
+    data = calloc(num, sizeof(struct t_rec *));
     if ( data == NULL )
     {
         PERROR("Failed to allocate memory for data pointers\n");
         exit(EXIT_FAILURE);
     }
 
-    for ( i = 0; i<opts.num_cpus; i++ )
+    for ( i = 0; i<num; i++ )
         data[i] = (struct t_rec *)((unsigned long)meta[i]->data -
                                    tbufs_phys + (unsigned long)tbufs_mapped);
 
@@ -216,16 +227,17 @@ struct t_rec **init_rec_ptrs(unsigned long tbufs_phys,
 
 /**
  * init_tail_idxs - initialise an array of tail indexes
- * @bufs:           array of pointers to trace buffer metadata in struct t_buf's
+ * @bufs:           array of pointers to trace buffer metadata
+ * @num:            number of trace buffers
  *
  * The tail indexes indicate where we're read to so far in the data array of a
  * trace buffer.  Each entry in this table corresponds to the tail index for a
  * particular trace buffer.
  */
-int *init_tail_idxs(struct t_buf **bufs)
+int *init_tail_idxs(struct t_buf **bufs, unsigned int num)
 {
     int i;
-    int *tails = calloc(opts.num_cpus, sizeof(unsigned int));
+    int *tails = calloc(num, sizeof(unsigned int));
  
     if ( tails == NULL )
     {
@@ -233,10 +245,35 @@ int *init_tail_idxs(struct t_buf **bufs)
         exit(EXIT_FAILURE);
     }
     
-    for ( i = 0; i<opts.num_cpus; i++ )
+    for ( i = 0; i<num; i++ )
         tails[i] = bufs[i]->head;
 
     return tails;
+}
+
+/**
+ * get_num_cpus - get the number of logical CPUs
+ */
+unsigned int get_num_cpus()
+{
+    dom0_op_t op;
+    int xc_handle = xc_interface_open();
+    int ret;
+    
+    op.cmd = DOM0_PHYSINFO;
+    op.interface_version = DOM0_INTERFACE_VERSION;
+
+    ret = do_dom0_op(xc_handle, &op);
+    
+    if ( ret != 0 )
+    {
+        PERROR("Failure to get logical CPU count from Xen");
+        exit(EXIT_FAILURE);
+    }
+
+    xc_interface_close(xc_handle);
+
+    return op.u.physinfo.ht_per_core * op.u.physinfo.cores;
 }
 
 
@@ -253,20 +290,25 @@ int monitor_tbufs(FILE *logfile)
                                   * where they are mapped into user space.   */
     int *tails;                  /* store tail indexes for the trace buffers */
     unsigned long tbufs_phys;    /* physical address of the tbufs            */
-    
+    unsigned int  num;           /* number of trace buffers / logical CPUS   */
+    unsigned long size;          /* size of a single trace buffer            */
+
+    /* get number of logical CPUs (and therefore number of trace buffers) */
+    num = get_num_cpus();
+
     /* setup access to trace buffers */
-    tbufs_phys   = get_tbuf_ptrs();
-    tbufs_mapped = map_tbufs(tbufs_phys);
+    get_tbufs(&tbufs_phys, &size);
+    tbufs_mapped = map_tbufs(tbufs_phys, num, size);
 
     /* build arrays of convenience ptrs */
-    meta  = init_bufs_ptrs (tbufs_mapped);
-    data  = init_rec_ptrs  (tbufs_phys, tbufs_mapped, meta);
-    tails = init_tail_idxs (meta);
+    meta  = init_bufs_ptrs (tbufs_mapped, num, size);
+    data  = init_rec_ptrs  (tbufs_phys, tbufs_mapped, meta, num);
+    tails = init_tail_idxs (meta, num);
 
     /* now, scan buffers for events */
     while ( !interrupted )
     {
-        for ( i = 0; i < opts.num_cpus; i++ )
+        for ( i = 0; ( i < num ) && !interrupted; i++ )
         {
             signed long newdata = meta[i]->head - tails[i];
             signed long prewrap = newdata;
@@ -335,15 +377,6 @@ error_t cmd_parser(int key, char *arg, struct argp_state *state)
             argp_usage(state);
     }
     break;
-
-    case 'n': /* set number of CPU trace buffers to map */
-    {
-        char *inval;
-        setup->num_cpus = strtol(arg, &inval, 0);
-        if (inval == arg )
-            argp_usage(state);
-    }
-    break;
     
     case ARGP_KEY_ARG:
     {
@@ -376,11 +409,6 @@ const struct argp_option cmd_opts[] =
       "Set sleep time, p, in milliseconds between polling the trace buffer "
       "for new data (default " xstr(POLL_SLEEP_MILLIS) ")." },
 
-    { .name = "num-cpus", .key = 'n', .arg="i",
-      .doc = 
-      "Set number, i, of CPU trace buffers to map.  This should not exceed "
-      "the number of CPUs in the system (default " xstr(NUM_CPUS) ")." },
-
     {0}
 };
 
@@ -399,7 +427,7 @@ const struct argp parser_def =
 };
 
 
-const char *argp_program_version     = "xentrace v1.0";
+const char *argp_program_version     = "xentrace v1.1";
 const char *argp_program_bug_address = "<mark.a.williamson@intel.com>";
         
     
@@ -411,7 +439,6 @@ int main(int argc, char **argv)
     const struct sigaction act = { .sa_handler = close_handler };
 
     opts.outfile = 0;
-    opts.num_cpus = 1;
     opts.poll_sleep = millis_to_timespec(POLL_SLEEP_MILLIS);
     opts.new_data_thresh = NEW_DATA_THRESH;
 

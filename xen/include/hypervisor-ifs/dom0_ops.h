@@ -17,7 +17,7 @@
  * This makes sure that old versions of dom0 tools will stop working in a
  * well-defined way (rather than crashing the machine, for instance).
  */
-#define DOM0_INTERFACE_VERSION   0xAAAA0007
+#define DOM0_INTERFACE_VERSION   0xAAAA0008
 
 /*
  * The following is all CPU context. Note that the i387_ctxt block is filled 
@@ -213,8 +213,9 @@ typedef struct dom0_pincpudomain_st
 #define DOM0_GETTBUFS         21
 typedef struct dom0_gettbufs_st
 {
-  /* OUT variable - location of the trace buffers */
-  unsigned long phys_addr;
+  /* OUT variables */
+  unsigned long phys_addr; /* location of the trace buffers       */
+  unsigned long size;      /* size of each trace buffer, in bytes */
 } dom0_gettbufs_t;
 
 /*

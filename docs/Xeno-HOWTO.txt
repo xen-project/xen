@@ -225,6 +225,10 @@ The following is a list of command line arguments to pass to Xen:
 
  dom0_mem=xxx     Set the maximum amount of memory for domain0.
 
+ tbuf_size=xxx    Set the size of the per-cpu trace buffers, in pages
+                  (default 1).  Note that the trace buffers are only
+                  enabled in debug builds.  Most users can ignore
+                  this feature completely.
 
 Boot into Domain 0
 ==============================
