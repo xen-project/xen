@@ -276,13 +276,13 @@ s_time_t get_s_time(void)
 }
 
 
-void update_dom_time(struct domain *d)
+int update_dom_time(struct domain *d)
 {
     shared_info_t *si = d->shared_info;
     unsigned long flags;
 
     if ( d->last_propagated_timestamp == full_tsc_irq )
-        return;
+        return 0;
 
     read_lock_irqsave(&time_lock, flags);
 
@@ -302,7 +302,7 @@ void update_dom_time(struct domain *d)
 
     read_unlock_irqrestore(&time_lock, flags);
 
-    send_guest_virq(d, VIRQ_TIMER);
+    return 1;
 }
 
 
@@ -330,7 +330,8 @@ void do_settime(unsigned long secs, unsigned long usecs, u64 system_time_base)
 
     /* Others will pick up the change at the next tick. */
     current->last_propagated_timestamp = 0; /* force propagation */
-    update_dom_time(current);
+    (void)update_dom_time(current);
+    send_guest_virq(current, VIRQ_TIMER);
 }
 
 

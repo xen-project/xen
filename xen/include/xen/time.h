@@ -53,7 +53,7 @@ s_time_t get_s_time(void);
 #define MICROSECS(_us)  (((s_time_t)(_us)) * 1000ULL )
 
 struct domain;
-extern void update_dom_time(struct domain *d);
+extern int update_dom_time(struct domain *d);
 extern void do_settime(unsigned long secs, unsigned long usecs, 
                        u64 system_time_base);
 
