@@ -1,6 +1,6 @@
 
 .section __xen_guest
-	.asciz "GUEST_OS=linux,GUEST_VER=2.6,XEN_VER=1.3"
+	.asciz "GUEST_OS=linux,GUEST_VER=2.6,XEN_VER=2.0"
 
 .text
 #include <linux/config.h>
