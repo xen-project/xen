@@ -22,6 +22,7 @@
 #include <xen/mm.h>
 #include <xen/lib.h>
 #include <xen/errno.h>
+#include <xen/trace.h>
 
 #include <asm/cpufeature.h>
 #include <asm/processor.h>
@@ -372,6 +373,7 @@ void vmx_intr_assist(struct exec_domain *d)
 
     __vmwrite(GUEST_INTERRUPTIBILITY_INFO, 0);
 
+    TRACE_2D(TRC_VMX_INT, d, highest_vector);
     if (highest_vector == vpit->vector)
         vpit->inject_point = NOW();
 

@@ -706,9 +706,6 @@ void restore_xen_regs(struct xen_regs *regs)
 }
 #endif
 
-#define TRC_VMX_VMEXIT 0x00040001
-#define TRC_VMX_VECTOR 0x00040002
-
 asmlinkage void vmx_vmexit_handler(struct xen_regs regs)
 {
     unsigned int exit_reason, idtv_info_field;
@@ -813,6 +810,7 @@ asmlinkage void vmx_vmexit_handler(struct xen_regs regs)
                 __vmwrite(VM_ENTRY_INTR_INFO_FIELD, intr_fields);
                 __vmwrite(VM_ENTRY_EXCEPTION_ERROR_CODE, regs.error_code);
                 ed->arch.arch_vmx.cpu_cr2 = va;
+                TRACE_3D(TRC_VMX_INT, ed->domain->id, TRAP_page_fault, va);
             }
             break;
         }
