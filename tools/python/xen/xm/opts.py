@@ -242,7 +242,7 @@ class Opts:
         """Get an option value.
         An option value can also be got using 'opts.vals.name'.
         """
-        getattr(self.vals, name)
+        return getattr(self.vals, name)
 
     def specified(self, name):
         """Test if an option has been specified.
