@@ -230,6 +230,11 @@ int xc_domain_setmaxmem(int xc_handle,
                             u32 domid, 
                             unsigned int max_memkb);
 
+int xc_domain_setvmassist(int xc_handle,
+                          u32 domid, 
+                          unsigned int cmd,
+                          unsigned int type);
+
 
 void *xc_map_foreign_range(int xc_handle, u32 dom,
                             int size, int prot,

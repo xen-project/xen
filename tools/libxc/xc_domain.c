@@ -256,3 +256,15 @@ int xc_domain_setmaxmem(int xc_handle,
     return do_dom0_op(xc_handle, &op);
 }
 
+int xc_domain_setvmassist(int xc_handle,
+                          u32 domid, 
+                          unsigned int cmd,
+                          unsigned int type)
+{
+    dom0_op_t op;
+    op.cmd = DOM0_SETDOMAINVMASSIST;
+    op.u.setdomainvmassist.domain = (domid_t)domid;
+    op.u.setdomainvmassist.cmd = cmd;
+    op.u.setdomainvmassist.type = type;
+    return do_dom0_op(xc_handle, &op);
+}

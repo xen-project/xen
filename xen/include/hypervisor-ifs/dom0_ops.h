@@ -341,6 +341,15 @@ typedef struct {
     MEMORY_PADDING;
 } PACKED dom0_getpageframeinfo2_t; /* 24 bytes */
 
+#define DOM0_SETDOMAINVMASSIST   30
+typedef struct {
+    /* IN variables. */
+    domid_t      domain;              /*  0 */
+    u16          __pad0;
+    u32          cmd;                 /*  4: vm_assist cmd */
+    u32          type;                /*  8: vm_assist cmd */
+} PACKED dom0_setdomainvmassist_t; /* 12 bytes */
+
 typedef struct {
     u32 cmd;                          /* 0 */
     u32 interface_version;            /* 4 */ /* DOM0_INTERFACE_VERSION */
@@ -371,6 +380,7 @@ typedef struct {
 	dom0_setdomaininitialmem_t setdomaininitialmem;
 	dom0_setdomainmaxmem_t   setdomainmaxmem;
 	dom0_getpageframeinfo2_t getpageframeinfo2;
+	dom0_setdomainvmassist_t setdomainvmassist;
     } PACKED u;
 } PACKED dom0_op_t; /* 80 bytes */
 

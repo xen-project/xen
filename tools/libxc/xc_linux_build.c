@@ -14,12 +14,19 @@
 #define round_pgup(_p)    (((_p)+(PAGE_SIZE-1))&PAGE_MASK)
 #define round_pgdown(_p)  ((_p)&PAGE_MASK)
 
+struct domain_setup_info
+{
+    unsigned long v_start;
+    unsigned long v_kernstart;
+    unsigned long v_kernend;
+    unsigned long v_kernentry;
+
+    unsigned int use_writable_pagetables;
+};
+
 static int parseelfimage(char *elfbase, 
                          unsigned long elfsize,
-                         unsigned long *pvirtstart,
-                         unsigned long *pkernstart,
-                         unsigned long *pkernend,
-                         unsigned long *pkernentry);
+                         struct domain_setup_info *dsi);
 static int loadelfimage(char *elfbase, void *pmh, unsigned long *parray,
                         unsigned long vstart);
 
@@ -77,7 +84,7 @@ static int setup_guestos(int xc_handle,
                          const char *cmdline,
                          unsigned long shared_info_frame,
                          unsigned int control_evtchn,
-			 unsigned long flags)
+                         unsigned long flags)
 {
     l1_pgentry_t *vl1tab=NULL, *vl1e=NULL;
     l2_pgentry_t *vl2tab=NULL, *vl2e=NULL;
@@ -95,10 +102,7 @@ static int setup_guestos(int xc_handle,
     unsigned long ppt_alloc;
     unsigned long *physmap, *physmap_e, physmap_pfn;
 
-    unsigned long v_start;
-    unsigned long vkern_start;
-    unsigned long vkern_entry;
-    unsigned long vkern_end;
+    struct domain_setup_info dsi;
     unsigned long vinitrd_start;
     unsigned long vinitrd_end;
     unsigned long vphysmap_start;
@@ -111,12 +115,17 @@ static int setup_guestos(int xc_handle,
     unsigned long vpt_end;
     unsigned long v_end;
 
-    rc = parseelfimage(image, image_size, &v_start,
-                       &vkern_start, &vkern_end, &vkern_entry);
+    memset(&dsi, 0, sizeof(struct domain_setup_info));
+
+    rc = parseelfimage(image, image_size, &dsi);
     if ( rc != 0 )
         goto error_out;
-    
-    if ( (v_start & (PAGE_SIZE-1)) != 0 )
+
+    if (dsi.use_writable_pagetables)
+        xc_domain_setvmassist(xc_handle, dom, VMASST_CMD_enable,
+                              VMASST_TYPE_writable_pagetables);
+
+    if ( (dsi.v_start & (PAGE_SIZE-1)) != 0 )
     {
         PERROR("Guest OS must load to a page boundary.\n");
         goto error_out;
@@ -131,7 +140,7 @@ static int setup_guestos(int xc_handle,
      */
     for ( nr_pt_pages = 2; ; nr_pt_pages++ )
     {
-        vinitrd_start    = round_pgup(vkern_end);
+        vinitrd_start    = round_pgup(dsi.v_kernend);
         vinitrd_end      = vinitrd_start + initrd_len;
         vphysmap_start   = round_pgup(vinitrd_end);
         vphysmap_end     = vphysmap_start + (nr_pages * sizeof(unsigned long));
@@ -144,7 +153,7 @@ static int setup_guestos(int xc_handle,
         v_end            = (vstack_end + (1<<22)-1) & ~((1<<22)-1);
         if ( (v_end - vstack_end) < (512 << 10) )
             v_end += 1 << 22; /* Add extra 4MB to get >= 512kB padding. */
-        if ( (((v_end - v_start + ((1<<L2_PAGETABLE_SHIFT)-1)) >> 
+        if ( (((v_end - dsi.v_start + ((1<<L2_PAGETABLE_SHIFT)-1)) >> 
                L2_PAGETABLE_SHIFT) + 1) <= nr_pt_pages )
             break;
     }
@@ -157,20 +166,20 @@ static int setup_guestos(int xc_handle,
            " Start info:    %08lx->%08lx\n"
            " Boot stack:    %08lx->%08lx\n"
            " TOTAL:         %08lx->%08lx\n",
-           vkern_start, vkern_end, 
+           dsi.v_kernstart, dsi.v_kernend, 
            vinitrd_start, vinitrd_end,
            vphysmap_start, vphysmap_end,
            vpt_start, vpt_end,
            vstartinfo_start, vstartinfo_end,
            vstack_start, vstack_end,
-           v_start, v_end);
-    printf(" ENTRY ADDRESS: %08lx\n", vkern_entry);
+           dsi.v_start, v_end);
+    printf(" ENTRY ADDRESS: %08lx\n", dsi.v_kernentry);
 
-    if ( (v_end - v_start) > (nr_pages * PAGE_SIZE) )
+    if ( (v_end - dsi.v_start) > (nr_pages * PAGE_SIZE) )
     {
         printf("Initial guest OS requires too much space\n"
                "(%luMB is greater than %luMB limit)\n",
-               (v_end-v_start)>>20, (nr_pages<<PAGE_SHIFT)>>20);
+               (v_end-dsi.v_start)>>20, (nr_pages<<PAGE_SHIFT)>>20);
         goto error_out;
     }
 
@@ -189,13 +198,13 @@ static int setup_guestos(int xc_handle,
         goto error_out;
     }
 
-    loadelfimage(image, pm_handle, page_array, v_start);
+    loadelfimage(image, pm_handle, page_array, dsi.v_start);
 
     /* Load the initial ramdisk image. */
     if ( initrd_len != 0 )
     {
-        for ( i = (vinitrd_start - v_start); 
-              i < (vinitrd_end - v_start); i += PAGE_SIZE )
+        for ( i = (vinitrd_start - dsi.v_start); 
+              i < (vinitrd_end - dsi.v_start); i += PAGE_SIZE )
         {
             char page[PAGE_SIZE];
             if ( gzread(initrd_gfd, page, PAGE_SIZE) == -1 )
@@ -212,7 +221,7 @@ static int setup_guestos(int xc_handle,
         goto error_out;
 
     /* First allocate page for page dir. */
-    ppt_alloc = (vpt_start - v_start) >> PAGE_SHIFT;
+    ppt_alloc = (vpt_start - dsi.v_start) >> PAGE_SHIFT;
     l2tab = page_array[ppt_alloc++] << PAGE_SHIFT;
     ctxt->pt_base = l2tab;
 
@@ -220,8 +229,8 @@ static int setup_guestos(int xc_handle,
     if ( (vl2tab = map_pfn_writeable(pm_handle, l2tab >> PAGE_SHIFT)) == NULL )
         goto error_out;
     memset(vl2tab, 0, PAGE_SIZE);
-    vl2e = &vl2tab[l2_table_offset(v_start)];
-    for ( count = 0; count < ((v_end-v_start)>>PAGE_SHIFT); count++ )
+    vl2e = &vl2tab[l2_table_offset(dsi.v_start)];
+    for ( count = 0; count < ((v_end-dsi.v_start)>>PAGE_SHIFT); count++ )
     {    
         if ( ((unsigned long)vl1e & (PAGE_SIZE-1)) == 0 )
         {
@@ -232,13 +241,13 @@ static int setup_guestos(int xc_handle,
                                              l1tab >> PAGE_SHIFT)) == NULL )
                 goto error_out;
             memset(vl1tab, 0, PAGE_SIZE);
-            vl1e = &vl1tab[l1_table_offset(v_start + (count<<PAGE_SHIFT))];
+            vl1e = &vl1tab[l1_table_offset(dsi.v_start + (count<<PAGE_SHIFT))];
             *vl2e++ = l1tab | L2_PROT;
         }
 
         *vl1e = (page_array[count] << PAGE_SHIFT) | L1_PROT;
-        if ( (count >= ((vpt_start-v_start)>>PAGE_SHIFT)) && 
-             (count <  ((vpt_end  -v_start)>>PAGE_SHIFT)) )
+        if ( (count >= ((vpt_start-dsi.v_start)>>PAGE_SHIFT)) && 
+             (count <  ((vpt_end  -dsi.v_start)>>PAGE_SHIFT)) )
             *vl1e &= ~_PAGE_RW;
         vl1e++;
     }
@@ -246,7 +255,7 @@ static int setup_guestos(int xc_handle,
     unmap_pfn(pm_handle, vl2tab);
 
     /* Write the phys->machine and machine->phys table entries. */
-    physmap_pfn = (vphysmap_start - v_start) >> PAGE_SHIFT;
+    physmap_pfn = (vphysmap_start - dsi.v_start) >> PAGE_SHIFT;
     physmap = physmap_e = 
         map_pfn_writeable(pm_handle, page_array[physmap_pfn++]);
     for ( count = 0; count < nr_pages; count++ )
@@ -274,7 +283,7 @@ static int setup_guestos(int xc_handle,
         goto error_out;
 
     start_info = map_pfn_writeable(
-        pm_handle, page_array[(vstartinfo_start-v_start)>>PAGE_SHIFT]);
+        pm_handle, page_array[(vstartinfo_start-dsi.v_start)>>PAGE_SHIFT]);
     memset(start_info, 0, sizeof(*start_info));
     start_info->nr_pages     = nr_pages;
     start_info->shared_info  = shared_info_frame << PAGE_SHIFT;
@@ -309,7 +318,7 @@ static int setup_guestos(int xc_handle,
     free(page_array);
 
     *pvsi = vstartinfo_start;
-    *pvke = vkern_entry;
+    *pvke = dsi.v_kernentry;
 
     return 0;
 
@@ -551,10 +560,7 @@ static inline int is_loadable_phdr(Elf_Phdr *phdr)
 
 static int parseelfimage(char *elfbase, 
                          unsigned long elfsize,
-                         unsigned long *pvirtstart,
-                         unsigned long *pkernstart,
-                         unsigned long *pkernend,
-                         unsigned long *pkernentry)
+                         struct domain_setup_info *dsi)
 {
     Elf_Ehdr *ehdr = (Elf_Ehdr *)elfbase;
     Elf_Phdr *phdr;
@@ -643,13 +649,16 @@ static int parseelfimage(char *elfbase,
         return -EINVAL;
     }
 
-    *pvirtstart = kernstart;
+    dsi->v_start = kernstart;
     if ( (p = strstr(guestinfo, "VIRT_BASE=")) != NULL )
-        *pvirtstart = strtoul(p+10, &p, 0);
+        dsi->v_start = strtoul(p+10, &p, 0);
 
-    *pkernstart = kernstart;
-    *pkernend   = kernend;
-    *pkernentry = ehdr->e_entry;
+    if ( (p = strstr(guestinfo, "PT_MODE_WRITABLE")) != NULL )
+        dsi->use_writable_pagetables = 1;
+
+    dsi->v_kernstart = kernstart;
+    dsi->v_kernend   = kernend;
+    dsi->v_kernentry = ehdr->e_entry;
 
     return 0;
 }

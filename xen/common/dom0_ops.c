@@ -654,6 +654,21 @@ long do_dom0_op(dom0_op_t *u_dom0_op)
     }
     break;
 
+    case DOM0_SETDOMAINVMASSIST:
+    {
+        struct domain *d; 
+        ret = -ESRCH;
+        d = find_domain_by_id( op->u.setdomainmaxmem.domain );
+        if ( d != NULL )
+        {
+	    vm_assist(d, op->u.setdomainvmassist.cmd,
+                      op->u.setdomainvmassist.type);
+            put_domain(d);
+            ret = 0;
+        }
+    }
+    break;
+
     default:
         ret = arch_do_dom0_op(op,u_dom0_op);
 

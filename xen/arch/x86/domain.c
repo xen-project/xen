@@ -601,6 +601,10 @@ int construct_dom0(struct domain *p,
     if ( rc != 0 )
         return rc;
 
+    /* Set up domain options */
+    if ( dsi.use_writable_pagetables )
+        vm_assist(p, VMASST_CMD_enable, VMASST_TYPE_writable_pagetables);
+
     if ( (dsi.v_start & (PAGE_SIZE-1)) != 0 )
     {
         printk("Initial guest OS must load to a page boundary.\n");
@@ -768,10 +772,6 @@ int construct_dom0(struct domain *p,
         if( !((unsigned long)l1tab & (PAGE_SIZE - 1)) )
             l1start = l1tab = (l1_pgentry_t *)l2_pgentry_to_phys(*l2tab);
     }
-
-    /* Set up domain options */
-    if (dsi.use_writable_pagetables)
-        vm_assist(p, VMASST_CMD_enable, VMASST_TYPE_writable_pagetables);
 
     /* Set up shared-info area. */
     update_dom_time(p->shared_info);
