@@ -458,25 +458,12 @@ asmlinkage long sys_ni_syscall(void)
 
 unsigned short compute_cksum(unsigned short *buf, int count)
 {
-	/* Function written by ek247
-	 * Computes IP and UDP checksum.
-	 * To be used for the fake console packets
-	 * created in console_export
-	 */
-
-    unsigned long sum=0;
-
-    while (count--)
-    {
-        sum+=*buf++;
-        if (sum & 0xFFFF0000)
-        {
-            //carry occured, so wrap around
-            sum &=0xFFFF;
-            sum++;
-        }
-    }
-    return ~(sum & 0xFFFF);
+    unsigned long sum = 0;
+    while ( count-- )
+        sum += *buf++;
+    sum += sum >> 16;
+    sum += sum >> 16;
+    return (unsigned short)~sum;
 }
 
 

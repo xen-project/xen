@@ -4,7 +4,7 @@
  * Usage: elf-reloc <old base> <new base> <image>
  * 
  * Relocates <image> from <old base> address to <new base> address by
- * frobbing the Elf headers. Segment contents are unmodified!
+ * frobbing the Elf headers. Segment contents are unmodified.
  */
 
 #include <stdio.h>

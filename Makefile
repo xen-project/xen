@@ -13,7 +13,7 @@
 # the latest Java 2 SDK on your execution path: <http://java.sun.com>
 # Also, you will need Apache's 'ant' build tool: <http://ant.apache.org>
 #
-# If you received this sourec as part of a Xen release, you should find
+# If you received this source as part of a Xen release, you should find
 # that appropriate versions of the build tools are already installed in
 # the initial system setup.
 

@@ -171,7 +171,6 @@ int wake_up(struct task_struct *p)
 
     p->state = TASK_RUNNING;
     __add_to_runqueue_head(p);
-    //__add_to_runqueue_tail(p);
 
     /* set the BVT parameters */
     if (p->avt < schedule_data[p->processor].svt)

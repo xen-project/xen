@@ -5,9 +5,9 @@
  * This is a HACKED figlet source file for Xen.
  * 
  * Hacked to output C octal strings for inclusion in a header file.
- * Support for opening zippe files is removed.
+ * Support for opening zipped files is removed.
  * 
- * Go to www.figlet.org for teh unhacked Figlet sources!
+ * Go to www.figlet.org for the unhacked Figlet sources.
  */
 
 /****************************************************************************

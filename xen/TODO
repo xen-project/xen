@@ -1,19 +1,15 @@
 
-This is stuff we probably want to implement in the near future. I
-think I have them in a sensible priority order -- the first few would
-be nice to fix before a code release. The later ones can be
-longer-term goals.
+This is stuff we probably want to implement in the near future.
 
  -- Keir (16/3/03)
 
 
-1. ACCURATE TIMERS AND WALL-CLOCK TIME
---------------------------------------
-Currently our long-term timebase free runs on CPU0, with no external
-calibration. We should run ntpd on domain 0 and allow this to warp
-Xen's timebase. Once this is done, we can have a timebase per CPU and
-not worry about relative drift (since they'll all get sync'ed
-periodically by ntp).
+1. DOMAIN-0 MANAGEMENT DAEMON
+-----------------------------
+A better control daemon is required for domain 0, which keeps proper
+track of machine resources and can make sensible policy choices. This
+may require support in Xen; for example, notifications (eg. DOMn is
+killed), and requests (eg. can DOMn allocate x frames of memory?).
 
 2. ASSIGNING DOMAINS TO PROCESSORS
 ----------------------------------
@@ -27,41 +23,10 @@ relationships between processors in the system (eg. which ones are
 siblings in the same package). We then use this to balance domains
 across packages, and across virtual processors within a package.
 
-3. DOMAIN 0 MANAGEMENT DAEMON
------------------------------
-A better control daemon is required for domain 0, which keeps proper
-track of machine resources and can make sensible policy choices. This
-may require support in Xen; for example, notifications (eg. DOMn is
-killed), and requests (eg. can DOMn allocate x frames of memory?).
-
-4. SANE NETWORK ROUTING
+3. SANE NETWORK ROUTING
 -----------------------
 The current virtual firewall/router is completely broken. Needs a new
 design and implementation!
-
-5. NETWORK CHECKSUM OFFLOAD 
---------------------------- 
-All the NICs that we support can checksum packets on behalf of guest
-OSes. We need to add appropriate flags to and from each domain to
-indicate, on transmit, which packets need the checksum added and, on
-receive, which packets have been checked out as okay. We can steal
-Linux's interface, which is entirely sane given NIC limitations.
-
-6. MODULE SUPPORT FOR XEN
--------------------------
-Network and blkdev drivers are bloating Xen. At some point we want to
-build drivers as modules, stick them in a cheesy ramfs, then relocate
-them one by one at boot time. If a driver duccessfully probes hardware
-we keep it, otherwise we blow it away. Alternative is to have a
-central PCI ID to driver name repository. We then use that to decide
-which drivers to load.
-
-Most of the hard stuff (relocating and the like) is done for us by
-Linux's module system.
-
-7. NEW DESIGN FEATURES
-----------------------
-This includes the last-chance page cache, and the unified buffer cache.
 
 
 

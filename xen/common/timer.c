@@ -280,7 +280,7 @@ static inline void cascade_timers(struct timer_vec *tv)
 
 		tmp = list_entry(curr, struct timer_list, list);
 		next = curr->next;
-		list_del(curr); // not needed
+		list_del(curr); /* not needed */
 		internal_add_timer(tmp);
 		curr = next;
 	}
@@ -509,18 +509,12 @@ static void update_wall_time(unsigned long ticks)
 static inline void do_process_times(struct task_struct *p,
 	unsigned long user, unsigned long system)
 {
-    //unsigned long psecs;
-
-//	psecs = (p->times.tms_utime += user);
-	//psecs += (p->times.tms_stime += system);
 }
 
 
 void update_one_process(struct task_struct *p, unsigned long user,
 			unsigned long system, int cpu)
 {
-//	p->per_cpu_utime[cpu] += user;
-//	p->per_cpu_stime[cpu] += system;
 	do_process_times(p, user, system);
 }	
 
