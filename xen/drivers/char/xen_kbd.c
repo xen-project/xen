@@ -200,6 +200,7 @@ static void keyboard_interrupt(int irq, void *dev_id, struct pt_regs *regs)
             if ( (scancode & ~KBD_SCANCODE_KEYUP_MASK) == XEN_ATTENTION_KEY )
             {
                 xen_attention_key_down = !(scancode & KBD_SCANCODE_KEYUP_MASK);
+		continue;
             } 
             else if ( xen_attention_key_down )
             {
