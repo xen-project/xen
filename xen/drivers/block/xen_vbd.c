@@ -288,7 +288,7 @@ long vbd_setextents(vbd_setextents_t *setextents)
 
     /* Construct the new extent list. */
     new_extents = NULL;
-    for ( i = setextents->nr_extents; i >= 0; i++ )
+    for ( i = setextents->nr_extents; i > 0; i-- )
     {
         if ( unlikely(copy_from_user(&e, 
                                      &setextents->extents[i], 

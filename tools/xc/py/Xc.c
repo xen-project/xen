@@ -445,7 +445,7 @@ static PyObject *pyxc_vbd_setextents(PyObject *self,
 
     static char *kwd_list[] = { "dom", "vbd", "extents", NULL };
 
-    if ( !PyArg_ParseTupleAndKeywords(args, kwds, "iio", kwd_list, 
+    if ( !PyArg_ParseTupleAndKeywords(args, kwds, "iiO", kwd_list, 
                                       &dom, &vbd, &list) )
         goto fail;
 
