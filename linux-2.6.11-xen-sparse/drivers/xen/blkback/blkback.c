@@ -627,8 +627,7 @@ static void dispatch_rw_block_io(blkif_t *blkif, blkif_request_t *req)
                 (bio_add_page(bio,
                               virt_to_page(MMAP_VADDR(pending_idx, i)),
                               seg[i].nsec << 9,
-                              seg[i].buf & ~PAGE_MASK) <
-                 (seg[i].nsec << 9)) )
+                              seg[i].buf & ~PAGE_MASK) == 0) )
         {
             bio = biolist[nbio++] = bio_alloc(GFP_KERNEL, nseg-i);
             if ( unlikely(bio == NULL) )
