@@ -150,7 +150,7 @@ start_paging:
         je      start_secondary
 
         /* Call into main C routine. This should never return.*/
-       	call	cmain
+       	call	__start_xen
         ud2     /* Force a panic (invalid opcode). */
 
 /* This is the default interrupt handler. */

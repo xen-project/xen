@@ -19,7 +19,8 @@ printk("Memory Reservation 0x%lx, %lu bytes\n", (_p), (_l))
 
 struct domain;
 
-/* kernel.c */
+void cmdline_parse(char *cmdline);
+
 #define printk printf
 void printf(const char *format, ...);
 void panic(const char *format, ...);

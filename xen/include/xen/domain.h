@@ -2,7 +2,7 @@
 #ifndef __XEN_DOMAIN_H__
 #define __XEN_DOMAIN_H__
 
-
+extern void domain_startofday(void);
 
 /*
  * Arch-specifics.
