@@ -50,7 +50,7 @@ unsigned long initrd_start = 0, initrd_end = 0;
 
 #define IS_XEN_ADDRESS(d,a) ((a >= d->xen_vastart) && (a <= d->xen_vaend))
 
-extern int loadelfimage(char *);
+//extern int loadelfimage(char *);
 extern int readelfimage_base_and_size(char *, unsigned long,
 	              unsigned long *, unsigned long *, unsigned long *);
 
@@ -627,7 +627,9 @@ int construct_dom0(struct domain *d,
 //printk("First word of image: %lx\n",*(unsigned long *)image_start);
 
 //printf("construct_dom0: about to call parseelfimage\n");
-	rc = parseelfimage(image_start, image_len, &dsi);
+	dsi.image_addr = (unsigned long)image_start;
+	dsi.image_len  = image_len;
+	rc = parseelfimage(&dsi);
 	if ( rc != 0 )
 	    return rc;
 
