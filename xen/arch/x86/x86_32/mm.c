@@ -274,10 +274,25 @@ int check_descriptor(struct desc_struct *d)
     if ( (b & _SEGMENT_G) )
         limit <<= 12;
 
-    switch ( b & (_SEGMENT_CODE | _SEGMENT_EC) )
+    if ( (b & (_SEGMENT_CODE | _SEGMENT_EC)) == _SEGMENT_EC )
     {
-    case 0: /* Data segment, grows-up */
         /*
+         * DATA, GROWS-DOWN.
+         * Grows-down limit check. 
+         * NB. limit == 0xFFFFF provides no access      (if G=1).
+         *     limit == 0x00000 provides 4GB-4kB access (if G=1).
+         */
+        if ( (base + limit) > base )
+        {
+            limit = -(base & PAGE_MASK);
+            goto truncate;
+        }
+    }
+    else
+    {
+        /*
+         * DATA, GROWS-UP. 
+         * CODE (CONFORMING AND NON-CONFORMING).
          * Grows-up limit check.
          * NB. limit == 0xFFFFF provides 4GB access (if G=1).
          *     limit == 0x00000 provides 4kB access (if G=1).
@@ -293,23 +308,6 @@ int check_descriptor(struct desc_struct *d)
             d->a &= ~0x0ffff; d->a |= limit & 0x0ffff;
             d->b &= ~0xf0000; d->b |= limit & 0xf0000;
         }
-        goto good;
-    case _SEGMENT_EC: /* Data segment, grows-down */
-        /*
-         * Grows-down limit check. 
-         * NB. limit == 0xFFFFF provides no access      (if G=1).
-         *     limit == 0x00000 provides 4GB-4kB access (if G=1).
-         */
-        if ( (base + limit) > base )
-        {
-            limit = -(base & PAGE_MASK);
-            goto truncate;
-        }
-        goto good;
-    case _SEGMENT_CODE: /* Code segment, non-conforming */
-        goto good;
-    case _SEGMENT_CODE|_SEGMENT_EC: /* Code segment, conforming */
-        goto bad;
     }
 
  good:
