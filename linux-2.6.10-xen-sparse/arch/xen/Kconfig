@@ -32,8 +32,7 @@ config XEN_PRIVILEGED_GUEST
 
 config XEN_PHYSDEV_ACCESS
 	bool "Physical device access"
-	default y if XEN_PRIVILEGED_GUEST
-	default n if !XEN_PRIVILEGED_GUEST
+	default XEN_PRIVILEGED_GUEST
 	help
 	  Assume access is available to physical hardware devices
           (e.g., hard drives, network cards). This allows you to configure
@@ -42,8 +41,8 @@ config XEN_PHYSDEV_ACCESS
 
 config XEN_BLKDEV_BACKEND
         bool "Block-device backend driver"
-        default y if XEN_PHYSDEV_ACCESS
-        default n if !XEN_PHYSDEV_ACCESS
+      depends on XEN_PHYSDEV_ACCESS
+        default y
         help
           The block-device backend driver allows the kernel to export its
           block devices to other guests via a high-performance shared-memory
@@ -51,8 +50,8 @@ config XEN_BLKDEV_BACKEND
 
 config XEN_NETDEV_BACKEND
         bool "Network-device backend driver"
-        default y if XEN_PHYSDEV_ACCESS
-        default n if !XEN_PHYSDEV_ACCESS
+      depends on XEN_PHYSDEV_ACCESS
+        default y
         help
           The network-device backend driver allows the kernel to export its
           network devices to other guests via a high-performance shared-memory
@@ -76,9 +75,9 @@ config XEN_NETDEV_FRONTEND
           dedicated device-driver domain, or your master control domain
           (domain 0), then you almost certainly want to say Y here.
 
-if XEN_NETDEV_FRONTEND
 config XEN_NETDEV_FRONTEND_PIPELINED_TRANSMITTER
         bool "Pipelined transmitter (DANGEROUS)"
+	depends on XEN_NETDEV_FRONTEND
         default n
         help
           The driver will assume that the backend is pipelining packets for
@@ -92,7 +91,6 @@ config XEN_NETDEV_FRONTEND_PIPELINED_TRANSMITTER
           like reassembling packets to perform firewall filtering; or if you
           are unsure; or if you experience network hangs when this option is
           enabled; then you must say N here.
-endif
 
 config XEN_WRITABLE_PAGETABLES
 	bool
@@ -109,39 +107,27 @@ config XEN_SCRUB_PAGES
           If security is not a concern then you may increase performance by
           saying N.
 
+choice
+        prompt "Processor Type"
+        default X86
+
+config X86
+        bool "X86"
+        help
+          Choose this option if your computer is a X86 architecture.
+
+config X86_64
+        bool "X86_64"
+        help
+          Choose this option if your computer is a X86 architecture.
+
+endchoice
+
 endmenu
 
 config HAVE_ARCH_DEV_ALLOC_SKB
 	bool
 	default y
-
-#config VT
-#	bool
-#	default y
-
-#config VT_CONSOLE
-#	bool
-#	default y
-
-#config HW_CONSOLE
-#	bool
-#	default y
-
-choice
-	prompt "Processor Type"
-	default X86
-
-config X86
-	bool "X86"
-	help
-	  Choose this option if your computer is a X86 architecture.
-
-config X86_64
-	bool "X86_64"
-	help
-	  Choose this option if your computer is a X86 architecture.
-
-endchoice
 
 source "init/Kconfig"
 
