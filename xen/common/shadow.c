@@ -387,7 +387,7 @@ pa,gpte,prev_spfn, prev_spl1e);
 	spl1e[(pa & ~PAGE_MASK) / sizeof(l1_pgentry_t) ] = 
 		mk_l1_pgentry( spte );
 
-	unmap_domain_mem( (void *) spl1e );
+	//unmap_domain_mem( (void *) spl1e );
 }
 
 void shadow_l2_normal_pt_update( unsigned long pa, unsigned long gpte )
