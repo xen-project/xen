@@ -123,8 +123,8 @@ extern void paging_init(void);
 			: "memory");					\
 	} while (0)
 
-#define __flush_tlb_one(addr) \
-__asm__ __volatile__("invlpg %0": :"m" (*(char *) addr))
+#define __flush_tlb_one(__addr) \
+__asm__ __volatile__("invlpg %0": :"m" (*(char *) (__addr)))
 
 #endif /* !__ASSEMBLY__ */
 

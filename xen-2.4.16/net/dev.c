@@ -690,6 +690,7 @@ int netif_rx(struct sk_buff *skb)
 	int this_cpu = smp_processor_id();
 	struct softnet_data *queue;
 	unsigned long flags;
+        net_vif_t *vif;
 
 	if (skb->stamp.tv_sec == 0)
 		get_fast_time(&skb->stamp);
@@ -703,13 +704,13 @@ int netif_rx(struct sk_buff *skb)
         
 	netdev_rx_stat[this_cpu].total++;
 
-        if (skb->src_vif == VIF_UNKNOWN_INTERFACE)
+        if ( skb->src_vif == VIF_UNKNOWN_INTERFACE )
             skb->src_vif = VIF_PHYSICAL_INTERFACE;
 
-        if (skb->dst_vif == VIF_UNKNOWN_INTERFACE)
+        if ( skb->dst_vif == VIF_UNKNOWN_INTERFACE )
             net_get_target_vif(skb);
         
-        if (sys_vif_list[skb->dst_vif] == NULL)
+        if ( (vif = sys_vif_list[skb->dst_vif]) == NULL )
         {
             // the target vif does not exist.
             goto drop;
@@ -730,8 +731,9 @@ int netif_rx(struct sk_buff *skb)
             read_lock(&tasklist_lock);
             p = &idle0_task;
             do {
-                if ( p->domain != sys_vif_list[skb->dst_vif]->domain ) continue;
-                skb_queue_tail(&sys_vif_list[skb->dst_vif]->skb_list, skb);
+                if ( p->domain != vif->domain ) continue;
+                if ( vif->skb_list.qlen > 100 ) break;
+                skb_queue_tail(&vif->skb_list, skb);
                 cpu_mask = mark_hyp_event(p, _HYP_EVENT_NET_RX);
                 read_unlock(&tasklist_lock);
                 goto found;
@@ -1975,21 +1977,17 @@ long do_net_update(void)
 
             if ( skb != NULL )
             {
-                skb_get(skb); /* get a reference for non-local delivery */
                 skb->protocol = eth_type_trans(skb, skb->dev);
                 skb->src_vif = current_vif->id; 
                 net_get_target_vif(skb);
                 if ( skb->dst_vif > VIF_PHYSICAL_INTERFACE )
                 {
-                    if (netif_rx(skb) == 0)
-                        /* Give up non-local reference. Packet delivered locally. */
-                        kfree_skb(skb);
+                    (void)netif_rx(skb);
                 }
                 else if ( skb->dst_vif == VIF_PHYSICAL_INTERFACE )
                 {
-
-                        skb_push(skb, skb->dev->hard_header_len);
-                        dev_queue_xmit(skb);
+                    skb_push(skb, skb->dev->hard_header_len);
+                    dev_queue_xmit(skb);
                 } 
                 else
                 {

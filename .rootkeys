@@ -39,6 +39,7 @@
 3ddb79bdrqnW93GR9gZk1OJe1qK-iQ xen-2.4.16/common/brlock.c
 3ddb79bdLX_P6iB7ILiblRLWvebapg xen-2.4.16/common/dom0_ops.c
 3ddb79bdYO5D8Av12NHqPeSviav7cg xen-2.4.16/common/domain.c
+3e32af9aRnYGl4GMOaDKp7JdfhOGhg xen-2.4.16/common/domain_page.c
 3ddb79bdeyutmaXEfpQvvxj7eQ0fCw xen-2.4.16/common/event.c
 3ddb79bd9drcFPVxd4w2GPOIjLlXpA xen-2.4.16/common/kernel.c
 3ddb79bduhSEZI8xa7IbGQCpap5y2A xen-2.4.16/common/lib.c
