@@ -37,7 +37,6 @@ struct perfcounter_t
 };
 
 extern struct perfcounter_t perfcounters;
-extern char *perfc_name[];
 
 #define perfc_value(x)    perfcounters.x[0]
 #define perfc_valuec(x)   perfcounters.x[smp_processor_id()]
@@ -51,8 +50,4 @@ extern char *perfc_name[];
 #define perfc_add(x,y)    perfcounters.x[0]+=(y)
 #define perfc_addc(x,y)   perfcounters.x[smp_processor_id()]+=(y)
 #define perfc_adda(x,y,z) perfcounters.x[y]+=(z)
-
-#define perf_print(x) \
-  __perfc_print(perfcounters.x, \
-	        &perfcounters.x[0] - ((unsigned long *)&perfcounters))
 
