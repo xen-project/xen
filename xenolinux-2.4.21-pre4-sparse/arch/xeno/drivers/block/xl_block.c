@@ -440,13 +440,15 @@ static void xlblk_response_int(int irq, void *dev_id, struct pt_regs *ptregs)
 	{
         case XEN_BLOCK_READ:
         case XEN_BLOCK_WRITE:
+            if ( bret->status )
+                printk(KERN_ALERT "Bad return from blkdev data request\n");
             for ( bh = (struct buffer_head *)bret->id; 
                   bh != NULL; 
                   bh = next_bh )
             {
                 next_bh = bh->b_reqnext;
                 bh->b_reqnext = NULL;
-                bh->b_end_io(bh, 1);
+                bh->b_end_io(bh, !bret->status);
             }
 	    break;
 	    
@@ -454,6 +456,8 @@ static void xlblk_response_int(int irq, void *dev_id, struct pt_regs *ptregs)
         case XEN_BLOCK_SEG_DELETE:
         case XEN_BLOCK_PROBE_SEG:
         case XEN_BLOCK_PROBE_BLK:
+            if ( bret->status )
+                printk(KERN_ALERT "Bad return from blkdev control request\n");
             xlblk_control_msg_pending = 0;
             break;
 	  
@@ -488,7 +492,7 @@ int xenolinux_control_msg(int operation, char *buffer, int size)
     char *aligned_buf;
 
     /* We copy from an aligned buffer, as interface needs sector alignment. */
-    aligned_buf = get_free_page(GFP_KERNEL);
+    aligned_buf = (char *)get_free_page(GFP_KERNEL);
     if ( aligned_buf == NULL ) BUG();
 
     xlblk_control_msg_pending = 1;
@@ -501,7 +505,7 @@ int xenolinux_control_msg(int operation, char *buffer, int size)
     while ( xlblk_control_msg_pending ) barrier();
 
     memcpy(buffer, aligned_buf, size);
-    free_page(aligned_buf);
+    free_page((unsigned long)aligned_buf);
     
     return 0;
 }

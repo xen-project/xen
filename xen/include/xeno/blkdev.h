@@ -20,6 +20,7 @@ typedef struct {
     unsigned long       id;
     atomic_t            pendcnt;
     unsigned short      operation;
+    unsigned short      status;
 } pending_req_t;
 
 extern kdev_t xendev_to_physdev(unsigned short xendev);

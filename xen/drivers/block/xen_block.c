@@ -17,8 +17,10 @@
 #include <xeno/keyhandler.h>
 #include <xeno/interrupt.h>
 #include <xeno/segment.h>
+#include <asm/domain_page.h> /* TEST_READ_VALIDITY */
 
 #if 1
+#define TEST_READ_VALIDITY
 #define DPRINTK(_f, _a...) printk( _f , ## _a )
 #else
 #define DPRINTK(_f, _a...) ((void)0)
@@ -198,6 +200,23 @@ static void end_block_io_op(struct buffer_head *bh, int uptodate)
     unsigned long flags;
     pending_req_t *pending_req = bh->pending_req;
 
+    /* An error fails the entire request. */
+    if ( !uptodate )
+    {
+        DPRINTK("Buffer not up-to-date at end of operation\n");
+        pending_req->status = 1;
+    }
+#ifdef TEST_READ_VALIDITY
+    else
+    {
+        unsigned long *buff = map_domain_mem(virt_to_phys(bh->b_data));
+        if ( (buff[  0] == 0xdeadbeef) &&
+             (buff[127] == 0xdeadbeef) )
+            printk("A really fucked buffer at %ld\n", bh->b_rsector);
+        unmap_domain_mem(buff);
+    }
+#endif
+
     unlock_buffer(pending_req->domain, 
                   virt_to_phys(bh->b_data), 
                   bh->b_size, 
@@ -206,7 +225,7 @@ static void end_block_io_op(struct buffer_head *bh, int uptodate)
     if ( atomic_dec_and_test(&pending_req->pendcnt) )
     {
         make_response(pending_req->domain, pending_req->id,
-                      pending_req->operation, uptodate ? 0 : 1);
+                      pending_req->operation, pending_req->status);
         spin_lock_irqsave(&pend_prod_lock, flags);
         pending_ring[pending_prod] = pending_req - pending_reqs;
         PENDREQ_IDX_INC(pending_prod);
@@ -572,6 +591,7 @@ static void dispatch_rw_block_io(struct task_struct *p, int index)
     pending_req->domain    = p;
     pending_req->id        = req->id;
     pending_req->operation = operation;
+    pending_req->status    = 0;
     atomic_set(&pending_req->pendcnt, nr_psegs);
 
     /* Now we pass each segment down to the real blkdev layer. */
@@ -595,6 +615,12 @@ static void dispatch_rw_block_io(struct task_struct *p, int index)
         } 
         else
         {
+#ifdef TEST_READ_VALIDITY
+            unsigned long *buff = map_domain_mem(phys_seg[i].buffer);
+            buff[  0] = 0xdeadbeef;
+            buff[127] = 0xdeadbeef;
+            unmap_domain_mem(buff);
+#endif
             bh->b_state = (1 << BH_Mapped) | (1 << BH_Read);
         }
 
