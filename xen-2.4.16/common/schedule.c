@@ -26,6 +26,7 @@
 #include <xeno/event.h>
 #include <xeno/time.h>
 #include <xeno/ac_timer.h>
+#include <xeno/interrupt.h>
 
 #undef SCHEDULER_TRACE
 #ifdef SCHEDULER_TRACE
@@ -224,7 +225,7 @@ asmlinkage void schedule(void)
 
     spin_lock_irq(&schedule_data[this_cpu].lock);
 
-    /*ASSERT(!in_interrupt());*/
+    ASSERT(!in_interrupt());
     ASSERT(__task_on_runqueue(prev));
 
 	__move_last_runqueue(prev);
@@ -247,7 +248,7 @@ asmlinkage void schedule(void)
     list_for_each(tmp, &schedule_data[smp_processor_id()].runqueue) {
         p = list_entry(tmp, struct task_struct, run_list);
         next = p;
-        break;
+        if ( !is_idle_task(next) ) break;
     }
 
     prev->has_cpu = 0;
