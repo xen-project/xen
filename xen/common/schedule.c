@@ -191,14 +191,12 @@ void sched_add_domain(struct exec_domain *ed)
     TRACE_2D(TRC_SCHED_DOM_ADD, d->id, ed);
 }
 
-void sched_rem_domain(struct domain *d) 
+void sched_rem_domain(struct exec_domain *ed) 
 {
-    struct exec_domain *ed;
 
-    for_each_exec_domain(d, ed)
-        rem_ac_timer(&ed->timer);
-    SCHED_OP(rem_task, d);
-    TRACE_2D(TRC_SCHED_DOM_REM, d->id, d);
+    rem_ac_timer(&ed->timer);
+    SCHED_OP(rem_task, ed);
+    TRACE_3D(TRC_SCHED_DOM_REM, ed->domain->id, ed->eid, ed);
 }
 
 void init_idle_task(void)

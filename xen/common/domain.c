@@ -135,10 +135,13 @@ struct domain *find_last_domain(void)
 
 void domain_kill(struct domain *d)
 {
+    struct exec_domain *ed;
+
     domain_pause(d);
     if ( !test_and_set_bit(DF_DYING, &d->d_flags) )
     {
-        sched_rem_domain(d);
+        for_each_exec_domain(d, ed)
+            sched_rem_domain(ed);
         domain_relinquish_memory(d);
         put_domain(d);
     }
@@ -330,6 +333,9 @@ long do_boot_vcpu(unsigned long vcpu, full_execution_context_t *ctxt)
     atomic_set(&ed->pausecnt, 0);
     shadow_lock_init(ed);
 
+    if ( (rc = init_exec_domain_event_channels(ed)) != 0 )
+        goto out;
+
     memcpy(&ed->thread, &idle0_exec_domain.thread, sizeof(ed->thread));
 
     /* arch_do_createdomain */
@@ -337,8 +343,10 @@ long do_boot_vcpu(unsigned long vcpu, full_execution_context_t *ctxt)
 
     sched_add_domain(ed);
 
-    if ( (rc = arch_final_setup_guestos(ed, c)) != 0 )
+    if ( (rc = arch_final_setup_guestos(ed, c)) != 0 ) {
+        sched_rem_domain(ed);
         goto out;
+    }
 
     /* Set up the shared info structure. */
     update_dom_time(d);

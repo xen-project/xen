@@ -40,7 +40,7 @@ struct scheduler
     int          (*alloc_task)     (struct exec_domain *);
     void         (*add_task)       (struct exec_domain *);
     void         (*free_task)      (struct domain *);
-    void         (*rem_task)       (struct domain *);
+    void         (*rem_task)       (struct exec_domain *);
     void         (*sleep)          (struct exec_domain *);
     void         (*wake)           (struct exec_domain *);
     void         (*do_block)       (struct exec_domain *);

@@ -48,8 +48,11 @@ static int get_free_port(struct exec_domain *ed)
     {
         if ( max == MAX_EVENT_CHANNELS )
             return -ENOSPC;
-        
-        max = port + EVENT_CHANNELS_SPREAD;
+
+        if ( port == 0 )
+            max = INIT_EVENT_CHANNELS;
+        else
+            max = port + EVENT_CHANNELS_SPREAD;
         
         chn = xmalloc(max * sizeof(event_channel_t));
         if ( unlikely(chn == NULL) )
@@ -256,7 +259,8 @@ static long evtchn_bind_virq(evtchn_bind_virq_t *bind)
      * bound yet. The exception is the 'misdirect VIRQ', which is permanently 
      * bound to port 0.
      */
-    if ( ((port = ed->virq_to_evtchn[virq]) != 0) ||
+    if ( ((port = ed->virq_to_evtchn[virq]) !=
+          (ed->eid * EVENT_CHANNELS_SPREAD)) ||
          (virq == VIRQ_MISDIRECT) ||
          ((port = get_free_port(ed)) < 0) )
         goto out;
@@ -357,7 +361,8 @@ static long __evtchn_close(struct domain *d1, int port1)
     chn1 = d1->event_channel;
 
     /* NB. Port 0 is special (VIRQ_MISDIRECT). Never let it be closed. */
-    if ( (port1 <= 0) || (port1 >= d1->max_event_channel) )
+    if ( (port1 <= 0) || (port1 >= d1->max_event_channel) ||
+         ((port1 & (EVENT_CHANNELS_SPREAD - 1)) == 0) )
     {
         rc = -EINVAL;
         goto out;
@@ -642,17 +647,31 @@ long do_event_channel_op(evtchn_op_t *uop)
 }
 
 
+int init_exec_domain_event_channels(struct exec_domain *ed)
+{
+    struct domain *d = ed->domain;
+    int port, ret = -EINVAL, virq;
+
+    spin_lock(&d->event_channel_lock);
+    port = ed->eid * EVENT_CHANNELS_SPREAD;
+    if ( ((port < d->max_event_channel &&
+           d->event_channel[port].state != ECS_FREE)) ||
+         (get_free_port(ed) != port) )
+        goto out;
+    d->event_channel[port].state  = ECS_VIRQ;
+    d->event_channel[port].u.virq = VIRQ_MISDIRECT;
+    for ( virq = 0; virq < NR_VIRQS; virq++ )
+        ed->virq_to_evtchn[virq] = port;
+    ret = 0;
+ out:
+    spin_unlock(&d->event_channel_lock);
+    return ret;
+}
+
 int init_event_channels(struct domain *d)
 {
     spin_lock_init(&d->event_channel_lock);
-    d->event_channel = xmalloc(INIT_EVENT_CHANNELS * sizeof(event_channel_t));
-    if ( unlikely(d->event_channel == NULL) )
-        return -ENOMEM;
-    d->max_event_channel = INIT_EVENT_CHANNELS;
-    memset(d->event_channel, 0, INIT_EVENT_CHANNELS * sizeof(event_channel_t));
-    d->event_channel[0].state  = ECS_VIRQ;
-    d->event_channel[0].u.virq = VIRQ_MISDIRECT;
-    return 0;
+    return init_exec_domain_event_channels(d->exec_domain[0]);
 }
 
 

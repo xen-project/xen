@@ -56,6 +56,7 @@ typedef struct event_channel_st
 
 int  init_event_channels(struct domain *d);
 void destroy_event_channels(struct domain *d);
+int  init_exec_domain_event_channels(struct exec_domain *ed);
 
 struct exec_domain 
 {
@@ -233,8 +234,8 @@ extern unsigned long wait_init_idle;
 #define set_current_state(_s) do { current->state = (_s); } while (0)
 void scheduler_init(void);
 void schedulers_start(void);
-void sched_add_domain(struct exec_domain *d);
-void sched_rem_domain(struct domain *d);
+void sched_add_domain(struct exec_domain *);
+void sched_rem_domain(struct exec_domain *);
 long sched_ctl(struct sched_ctl_cmd *);
 long sched_adjdom(struct sched_adjdom_cmd *);
 int  sched_id();
