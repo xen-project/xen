@@ -288,6 +288,8 @@ printk("About to call ac_timer_init()\n");
 // init_xen_time(); ???
 // schedulers_start(); ???
 // do_initcalls(); ???
+printk("About to call sort_main_extable()\n");
+    sort_main_extable();
 #else
     start_of_day();
 
