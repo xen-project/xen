@@ -35,7 +35,7 @@
 #define XENO_BASE       "xeno"          // proc file name defs should be in separate .h
 #define DOM0_CMD_INTF   "dom0_cmd"
 #define DOM0_FT         "frame_table"
-#define DOM0_NEWDOM     "new_dom_id"
+#define DOM0_NEWDOM     "new_dom_data"
 
 #define MAX_LEN         16
 #define DOM_DIR         "dom"
@@ -148,13 +148,13 @@ static void create_proc_dom_entries(int dom)
 static ssize_t dom_mem_write(struct file * file, const char * buff, 
 	size_t size , loff_t * off)
 {
-    unsigned long addr;
-    proc_memdata_t * mem_data = (proc_memdata_t *)((struct proc_dir_entry *)file->f_dentry->d_inode->u.generic_ip)->data;
+    dom_mem_t mem_data;
     
-    copy_from_user(&addr, (unsigned long *)buff, sizeof(addr));
+    copy_from_user(&mem_data, (dom_mem_t *)buff, sizeof(dom_mem_t));
     
-    if(direct_disc_unmap(addr, mem_data->pfn, mem_data->tot_pages) == 0){
-        return sizeof(addr);
+    if(direct_disc_unmap(mem_data.vaddr, mem_data.start_pfn, 
+        mem_data.tot_pages) == 0){
+        return sizeof(sizeof(dom_mem_t));
     } else {
         return -1;
     }
@@ -172,14 +172,10 @@ static ssize_t dom_mem_read(struct file * file, char * buff, size_t size, loff_t
     /* remap the range using xen specific routines */
 
     addr = direct_mmap(mem_data->pfn << PAGE_SHIFT, mem_data->tot_pages << PAGE_SHIFT, prot, 0, 0);
-	printk(KERN_ALERT "bd240 debug: dom_mem_read: %lx, %lx @ %lx\n", mem_data->pfn << PAGE_SHIFT, mem_data->tot_pages << PAGE_SHIFT, addr);
 
     copy_to_user((unsigned long *)buff, &addr, sizeof(addr));
 
-	printk(KERN_ALERT "bd240 debug: exiting dom_mem_read\n");
-
     return sizeof(addr);
-     
 }
 
 struct file_operations dom_mem_ops = {
@@ -218,8 +214,6 @@ static int dom_map_mem(unsigned int dom, unsigned long pfn, int tot_pages)
                 memdata->tot_pages = tot_pages;
                 file->data = memdata;
 
-				printk(KERN_ALERT "bd240 debug: cmd setup dom mem: %lx, %d\n", memdata->pfn, memdata->tot_pages);
-
                 ret = 0;
                 break;
             }
@@ -232,16 +226,24 @@ static int dom_map_mem(unsigned int dom, unsigned long pfn, int tot_pages)
     return ret;
 }
 
-/* return dom id stored as data pointer to userspace */
-static int dom_id_read_proc(char *page, char **start, off_t off,
-                          int count, int *eof, void *data)
+/* function used to retrieve data associated with new domain */
+static ssize_t dom_data_read(struct file * file, char * buff, size_t size, loff_t * off)
 {
-    char arg[16];
-    sprintf(arg, "%d", (int)data);
-    strcpy(page, arg);
+    dom0_newdomain_t * dom_data = (dom0_newdomain_t *)
+        ((struct proc_dir_entry *)file->f_dentry->d_inode->u.generic_ip)->data;
+
+    copy_to_user((dom0_newdomain_t *)buff, dom_data, sizeof(dom0_newdomain_t));
+
     remove_proc_entry(DOM0_NEWDOM, xeno_base);
-    return sizeof(unsigned int);
+
+    kfree(dom_data);
+
+    return sizeof(dom0_newdomain_t);
 }
+
+struct file_operations newdom_data_fops = {
+    read:    dom_data_read,
+};
 
 static int cmd_write_proc(struct file *file, const char *buffer, 
                            u_long count, void *data)
@@ -249,6 +251,8 @@ static int cmd_write_proc(struct file *file, const char *buffer,
     dom0_op_t op;
     int ret = 0;
     struct proc_dir_entry * new_dom_id;
+    dom0_newdomain_t * params;
+
     
     copy_from_user(&op, buffer, sizeof(dom0_op_t));
 
@@ -260,11 +264,21 @@ static int cmd_write_proc(struct file *file, const char *buffer,
 
     /* is the request intended for hypervisor? */
     if(op.cmd != MAP_DOM_MEM){
+
         ret = HYPERVISOR_dom0_op(&op);
 
         /* if new domain created, create proc entries */
         if(op.cmd == DOM0_NEWDOMAIN){
             create_proc_dom_entries(ret);
+
+            params = (dom0_newdomain_t *)kmalloc(sizeof(dom0_newdomain_t),
+                GFP_KERNEL);
+            params->memory_kb = op.u.newdomain.memory_kb;
+            params->pg_head = op.u.newdomain.pg_head;
+            params->num_vifs = op.u.newdomain.num_vifs;
+            params->domain = op.u.newdomain.domain;
+
+            printk(KERN_ALERT "bd240 debug: cmd_write: %lx, %d, %d\n", params->pg_head, params->memory_kb, params->domain); 
 
             /* now notify user space of the new domain's id */
             new_dom_id = create_proc_entry(DOM0_NEWDOM, 0600, xeno_base);
@@ -272,16 +286,16 @@ static int cmd_write_proc(struct file *file, const char *buffer,
             {
                 new_dom_id->owner      = THIS_MODULE;
                 new_dom_id->nlink      = 1;
-                new_dom_id->read_proc  = dom_id_read_proc; 
-                new_dom_id->data       = (void *)ret; 
+                new_dom_id->proc_fops  = &newdom_data_fops; 
+                new_dom_id->data       = (void *)params; 
             }
 
         }
 
     } else {
 
-        ret = dom_map_mem(op.u.reqdommem.domain, op.u.reqdommem.start_pfn, 
-                        op.u.reqdommem.tot_pages); 
+        ret = dom_map_mem(op.u.dommem.domain, op.u.dommem.start_pfn, 
+                        op.u.dommem.tot_pages); 
     }
     
 out:
@@ -324,7 +338,6 @@ struct file_operations ft_ops = {
 
 static int __init init_module(void)
 {
-    
     frame_table = (frame_table_t *)start_info.frame_table;
     frame_table_len = start_info.frame_table_len;
     frame_table_pa = start_info.frame_table_pa;

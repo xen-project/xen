@@ -757,6 +757,11 @@ int do_process_page_updates(page_update_request_t *updates, int count)
 
         if ( err )
         {
+            page = frame_table + (cur.ptr >> PAGE_SHIFT);
+            printk(KERN_ALERT "bd240 debug: Update request %d\n", cur.ptr & (sizeof(l1_pgentry_t) - 1)); 
+            printk(KERN_ALERT "bd240 debug: Update request %lx, %lx\n", cur.ptr, cur.val);
+            printk(KERN_ALERT "bd240 debug: Page flags %lx\n", page->flags);
+
             kill_domain_with_errmsg("Illegal page update request");
         }
 
@@ -774,3 +779,116 @@ int do_process_page_updates(page_update_request_t *updates, int count)
     return(0);
 }
 
+/* Apply updates to page table @pagetable_id within the current domain. */
+int new_do_process_page_updates(page_update_request_t * cur, int count)
+{
+    unsigned long flags, pfn;
+    struct pfn_info *page;
+    int err = 0, i;
+
+    for ( i = 0; i < count; i++ )
+    {
+        pfn = cur->ptr >> PAGE_SHIFT;
+        if ( pfn >= max_page )
+        {
+            MEM_LOG("Page out of range (%08lx > %08lx)", pfn, max_page);
+            kill_domain_with_errmsg("Page update request out of range");
+        }
+
+        err = 1;
+
+        /* Least significant bits of 'ptr' demux the operation type. */
+        switch ( cur->ptr & (sizeof(l1_pgentry_t)-1) )
+        {
+
+            /*
+             * PGREQ_NORMAL: Normal update to any level of page table.
+             */
+        case PGREQ_NORMAL:
+            page = frame_table + pfn;
+            flags = page->flags;
+            
+            printk(KERN_ALERT "bd240 debug: normal update\n");
+            
+            if ( (flags & PG_domain_mask) == current->domain )
+            {
+                printk(KERN_ALERT "bd240 debug: normal update inside\n");
+                switch ( (flags & PG_type_mask) )
+                {
+                case PGT_l1_page_table: 
+                    err = mod_l1_entry(cur->ptr, mk_l1_pgentry(cur->val)); 
+                    break;
+                case PGT_l2_page_table: 
+                    err = mod_l2_entry(cur->ptr, mk_l2_pgentry(cur->val)); 
+                    break;
+                default:
+                    MEM_LOG("Update to non-pt page %08lx", cur->ptr);
+                    break;
+                }
+            }
+
+            printk(KERN_ALERT "bd240 debug: normal update finish\n");
+
+            break;
+
+            /*
+             * PGREQ_UNCHECKED_UPDATE: Make an unchecked update to a
+             * bottom-level page-table entry.
+             * Restrictions apply:
+             *  1. Update only allowed by domain 0.
+             *  2. Update must be to a level-1 pte belonging to dom0.
+             */
+        case PGREQ_UNCHECKED_UPDATE:
+            cur->ptr &= ~(sizeof(l1_pgentry_t) - 1);
+            page = frame_table + pfn;
+            flags = page->flags;
+            if ( (flags | current->domain) == PGT_l1_page_table )
+            {
+                
+                *(unsigned long *)map_domain_mem(cur->ptr) = cur->val;
+                err = 0;
+            }
+            else
+            {
+                MEM_LOG("UNCHECKED_UPDATE: Bad domain %d, or"
+                        " bad pte type %08lx", current->domain, flags);
+            }
+            break;
+
+            /*
+             * PGREQ_EXTENDED_COMMAND: Extended command is specified
+             * in the least-siginificant bits of the 'value' field.
+             */
+        case PGREQ_EXTENDED_COMMAND:
+            cur->ptr &= ~(sizeof(l1_pgentry_t) - 1);
+            err = do_extended_command(cur->ptr, cur->val);
+            break;
+
+        default:
+            MEM_LOG("Invalid page update command %08lx", cur->ptr);
+            break;
+        }
+
+        if ( err )
+        {
+            page = frame_table + (cur->ptr >> PAGE_SHIFT);
+            printk(KERN_ALERT "bd240 debug: Update request %lx\n", cur->ptr & (sizeof(l1_pgentry_t) - 1)); 
+            printk(KERN_ALERT "bd240 debug: Update request %lx, %lx\n", cur->ptr, cur->val);
+            printk(KERN_ALERT "bd240 debug: Page flags %lx\n", page->flags);
+
+            kill_domain_with_errmsg("Illegal page update request");
+        }
+
+        cur++;
+    }
+
+    if ( tlb_flush[smp_processor_id()] )
+    {
+        tlb_flush[smp_processor_id()] = 0;
+        __asm__ __volatile__ (
+            "movl %%eax,%%cr3" : : 
+            "a" (pagetable_val(current->mm.pagetable)));
+    }
+
+    return(0);
+}

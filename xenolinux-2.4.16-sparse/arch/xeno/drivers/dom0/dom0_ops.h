@@ -1,4 +1,3 @@
-
 /******************************************************************************
  * dom0_ops.h
  * 
@@ -18,9 +17,10 @@
 
 typedef struct dom0_newdomain_st
 {
+    unsigned int domain;
     unsigned int memory_kb;
     unsigned int num_vifs;  // temporary
-    unsigned int domain;    // return parameter
+    unsigned long pg_head;  // return parameter
 } dom0_newdomain_t;
 
 typedef struct dom0_killdomain_st
@@ -34,12 +34,13 @@ typedef struct dom0_map_ts
     unsigned long ts_phy_addr;
 } dom0_tsmap_t;
 
-typedef struct dom_mem_req 
+typedef struct dom_mem 
 {
     unsigned int domain;
+    unsigned long vaddr;
     unsigned long start_pfn;
     int tot_pages;
-} dom_mem_req_t;
+} dom_mem_t;
 
 typedef struct domain_launch
 {
@@ -48,6 +49,9 @@ typedef struct domain_launch
     unsigned long virt_load_addr;
     unsigned long virt_shinfo_addr;
     unsigned long virt_startinfo_addr;
+    unsigned long pgt_update_arr;
+    unsigned long num_pgt_updates;
+    unsigned int num_vifs;
     char cmd_line[MAX_CMD_LEN];
 } dom_meminfo_t;
 
@@ -59,7 +63,8 @@ typedef struct dom0_op_st
         dom0_newdomain_t newdomain;
         dom0_killdomain_t killdomain;
         dom0_tsmap_t mapdomts;
-        dom_mem_req_t reqdommem;
+        dom_mem_t dommem;
+        dom_meminfo_t meminfo;
     }
     u;
 } dom0_op_t;

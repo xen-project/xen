@@ -55,9 +55,6 @@ static inline void direct_remappte_range(pte_t * pte, unsigned long address, uns
 	do {
 		pte_t oldpage;
 		oldpage = ptep_get_and_clear(pte);
-    /*    
-		printk(KERN_ALERT "bd240 debug: %lx - %lx\n", pte, phys_addr);
-	*/
  		direct_set_pte(pte, direct_mk_pte_phys(phys_addr, prot));
 
 		forget_pte(oldpage);
@@ -184,10 +181,8 @@ unsigned long direct_mmap(unsigned long phys_addr, unsigned long size,
 	entry = find_direct(&current->mm->context.direct_list, addr);
 	if(entry != &current->mm->context.direct_list){
 		list_add_tail(&dmmap->list, entry);
-		printk(KERN_ALERT "bd240 debug: added node %lx, size %lx in the middle\n", dmmap->vm_start, size);
 	} else {
     	list_add_tail(&dmmap->list, &current->mm->context.direct_list);
-		printk(KERN_ALERT "bd240 debug: added node %lx, size %lx at tail\n", dmmap->vm_start, size);
 	}
 
     /* and perform the mapping */
@@ -321,7 +316,6 @@ int direct_unmap(unsigned long addr, unsigned long size)
         return -1;
 
     list_del(&node->list);
-	printk(KERN_ALERT "bd240 debug: delisted %lx from dlist\n", node->vm_start);
     kfree(node);
 
     direct_zap_page_range(current->mm, addr, size);
@@ -336,8 +330,6 @@ int direct_disc_unmap(unsigned long from, unsigned long first_pg, int tot_pages)
     struct list_head * curr;
     struct list_head * direct_list = &current->mm->context.direct_list;    
 
-	printk(KERN_ALERT "bd240 debug: direct_disc_unmap\n");
-
     curr = direct_list->next;
     while(curr != direct_list){
         node = list_entry(curr, direct_mmap_node_t, list);
@@ -350,12 +342,8 @@ int direct_disc_unmap(unsigned long from, unsigned long first_pg, int tot_pages)
     if(curr == direct_list)
         return -1;
 
-	printk(KERN_ALERT "bd240 debug: direct_disc_unmap, deleted from direct_list\n");
-
     list_del(&node->list);
     kfree(node);
-
-	printk(KERN_ALERT "bd240 debug: direct_disc_unmap, from %lx, tot_pages %lx\n", from, tot_pages);
 
     while(count < tot_pages){
             direct_zap_page_range(current->mm, from, PAGE_SIZE);

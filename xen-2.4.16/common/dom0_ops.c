@@ -13,6 +13,7 @@
 #include <xeno/dom0_ops.h>
 #include <xeno/sched.h>
 #include <xeno/event.h>
+#include <asm/domain_page.h>
 
 extern unsigned int alloc_new_dom_mem(struct task_struct *, unsigned int);
 
@@ -30,6 +31,28 @@ static unsigned int get_domnr(void)
     return (dom_mask == ~0UL) ? 0 : ffz(dom_mask);
 }
 
+static void build_page_list(struct task_struct *p)
+{
+    unsigned long * list;
+    unsigned long curr;
+    unsigned long page;
+
+    list = (unsigned long *)map_domain_mem(p->pg_head << PAGE_SHIFT);
+    curr = p->pg_head;
+    *list++ = p->pg_head;
+    page = (frame_table + p->pg_head)->next;
+    printk(KERN_ALERT "bd240 debug: list %lx, page num %lx\n", list, page);
+    while(page != p->pg_head){
+        if(!((unsigned long)list & (PAGE_SIZE-1))){
+            printk(KERN_ALERT "bd240 debug: list %lx, page num %lx\n", list, page);
+            curr = (frame_table + curr)->next;
+            list = (unsigned long *)map_domain_mem(curr << PAGE_SHIFT);
+        }
+        *list++ = page;
+        page = (frame_table + page)->next;
+    }
+}
+    
 long do_dom0_op(dom0_op_t *u_dom0_op)
 {
     long ret = 0;
@@ -80,7 +103,14 @@ long do_dom0_op(dom0_op_t *u_dom0_op)
                 ret = -1;
                 break;
             }
+            build_page_list(p);
             ret = p->domain;
+
+            op.u.newdomain.domain = ret;
+            op.u.newdomain.pg_head = p->pg_head;
+            copy_to_user(u_dom0_op, &op, sizeof(op));
+            printk(KERN_ALERT "bd240 debug: hyp dom0_ops: %lx, %d\n", op.u.newdomain.pg_head, op.u.newdomain.memory_kb);
+
             break;
         }
 

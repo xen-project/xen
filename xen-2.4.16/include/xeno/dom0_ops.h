@@ -19,9 +19,10 @@
 
 typedef struct dom0_newdomain_st 
 {
-    unsigned int memory_kb;
+    unsigned int domain;    // return parameter
+    unsigned int memory_kb; 
     unsigned int num_vifs;  // temporary
-    unsigned int domain; 
+    unsigned long pg_head;  // return parameter
 } dom0_newdomain_t;
 
 typedef struct dom0_killdomain_st
@@ -37,11 +38,13 @@ typedef struct dom0_map_ts
 
 typedef struct domain_launch
 {
-    unsigned long domain;
+    unsigned int domain;
     unsigned long l2_pgt_addr;
     unsigned long virt_load_addr;
     unsigned long virt_shinfo_addr;
     unsigned long virt_startinfo_addr;
+    unsigned long pgt_update_arr;
+    unsigned long num_pgt_updates;
     unsigned int num_vifs;
     char cmd_line[MAX_CMD_LEN];
 } dom_meminfo_t;

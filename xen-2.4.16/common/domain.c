@@ -17,6 +17,8 @@
 #define L2_PROT (_PAGE_PRESENT|_PAGE_RW|_PAGE_USER|_PAGE_ACCESSED)
 #define L1_PROT (_PAGE_PRESENT|_PAGE_RW|_PAGE_USER|_PAGE_ACCESSED|_PAGE_DIRTY)
 
+extern int new_do_process_page_updates(page_update_request_t *, int);
+
 extern int nr_mods;
 extern module_t *mod;
 extern unsigned char *cmdline;
@@ -336,7 +338,7 @@ asmlinkage void schedule(void)
 }
 
 
-static unsigned int alloc_new_dom_mem(struct task_struct *p, unsigned int kbytes)
+unsigned int alloc_new_dom_mem(struct task_struct *p, unsigned int kbytes)
 {
     struct list_head *temp;
     struct pfn_info *pf, *pf_head;
@@ -352,7 +354,6 @@ static unsigned int alloc_new_dom_mem(struct task_struct *p, unsigned int kbytes
     
     /* allocate pages and build a thread through frame_table */
     temp = free_list.next;
-    printk("bd240 debug: DOM%d requesting %d pages\n", p->domain, req_pages);
 
     /* allocate first page */
     pf = list_entry(temp, struct pfn_info, list);
@@ -390,22 +391,51 @@ int final_setup_guestos(struct task_struct * p, dom_meminfo_t * meminfo)
     start_info_t * virt_startinfo_addr;
     unsigned long virt_stack_addr;
     unsigned long long time;
+    unsigned long phys_l1tab, phys_l2tab;
+    page_update_request_t * pgt_updates;
+    unsigned long count;
     net_ring_t *net_ring;
+    net_vif_t *net_vif;
     char *dst;    // temporary
     int i;        // temporary
+
+    /* first of all, set up domain pagetables */
+    pgt_updates = (page_update_request_t *)
+        map_domain_mem(meminfo->pgt_update_arr);
+    printk(KERN_ALERT "bd240 debug: update request starting virt %lx, phys %lx\n", pgt_updates, meminfo->pgt_update_arr);
+    for(count = 0; count < meminfo->num_pgt_updates; count++){
+        printk(KERN_ALERT "bd240 debug: update pair %lx, %lx\n", pgt_updates->ptr, pgt_updates->val); 
+        new_do_process_page_updates(pgt_updates, 1);
+        pgt_updates++;
+        if(!((unsigned long)pgt_updates & (PAGE_SIZE-1))){
+            pgt_updates--;
+            pgt_updates = (page_update_request_t *)map_domain_mem(
+                ((frame_table + ((unsigned long)pgt_updates >> 
+                PAGE_SHIFT))->next) << PAGE_SHIFT);   
+        }
+    }
 
     /* entries 0xe0000000 onwards in page table must contain hypervisor
      * mem mappings - set them up.
      */
-    l2tab = (l2_pgentry_t *)__va(meminfo->l2_pgt_addr);
+    phys_l2tab = meminfo->l2_pgt_addr;
+    l2tab = map_domain_mem(phys_l2tab); 
     memcpy(l2tab + DOMAIN_ENTRIES_PER_L2_PAGETABLE, 
-        ((l2_pgentry_t *)idle0_pg_table) + DOMAIN_ENTRIES_PER_L2_PAGETABLE, 
-        (ENTRIES_PER_L2_PAGETABLE - DOMAIN_ENTRIES_PER_L2_PAGETABLE) * sizeof(l2_pgentry_t));
-    p->mm.pagetable = mk_pagetable((unsigned long)l2tab);
+        ((l2_pgentry_t *)idle_pg_table[p->processor]) + 
+        DOMAIN_ENTRIES_PER_L2_PAGETABLE, 
+        (ENTRIES_PER_L2_PAGETABLE - DOMAIN_ENTRIES_PER_L2_PAGETABLE) 
+        * sizeof(l2_pgentry_t));
+    l2tab[PERDOMAIN_VIRT_START >> L2_PAGETABLE_SHIFT] = 
+        mk_l2_pgentry(__pa(p->mm.perdomain_pt) | PAGE_HYPERVISOR);
+    p->mm.pagetable = mk_pagetable(phys_l2tab);
 
     /* map in the shared info structure */
-    l2tab = pagetable_ptr(p->mm.pagetable) + l2_table_offset(meminfo->virt_shinfo_addr);
-    l1tab = l2_pgentry_to_l1(*l2tab) + l1_table_offset(meminfo->virt_shinfo_addr);
+    phys_l2tab = pagetable_val(p->mm.pagetable) + 
+        (l2_table_offset(meminfo->virt_shinfo_addr) * sizeof(l2_pgentry_t));
+    l2tab = map_domain_mem(phys_l2tab);
+    phys_l1tab = l2_pgentry_to_phys(*l2tab) + 
+        (l1_table_offset(meminfo->virt_shinfo_addr) * sizeof(l1_pgentry_t));
+    l1tab = map_domain_mem(phys_l1tab);
     *l1tab = mk_l1_pgentry(__pa(p->shared_info) | L1_PROT);
 
     /* set up the shared info structure */
@@ -422,9 +452,8 @@ int final_setup_guestos(struct task_struct * p, dom_meminfo_t * meminfo)
      * new domain. thus, temporarely install its pagetables.
      */
     __cli();
-    __asm__ __volatile__ (
-        "mov %%eax, %%cr3"
-        : : "a" (__pa(pagetable_ptr(p->mm.pagetable))));
+    __asm__ __volatile__ ( 
+        "mov %%eax,%%cr3" : : "a" (pagetable_val(p->mm.pagetable)));
 
     memset(virt_startinfo_addr, 0, sizeof(virt_startinfo_addr));
     virt_startinfo_addr->nr_pages = p->tot_pages;
@@ -439,26 +468,20 @@ int final_setup_guestos(struct task_struct * p, dom_meminfo_t * meminfo)
     
     /* Add virtual network interfaces and point to them in startinfo. */
     while (meminfo->num_vifs-- > 0) {
-        net_ring = create_net_vif(p->domain);
+        net_vif = create_net_vif(p->domain);
+        net_ring = net_vif->net_ring;
         if (!net_ring) panic("no network ring!\n");
     }
-    virt_startinfo_addr->net_rings = p->net_ring_base;
+
+/* XXX SMH: horrible hack to convert hypervisor VAs in SHIP to guest VAs  */
+#define SH2G(_x) (meminfo->virt_shinfo_addr | (((unsigned long)(_x)) & 0xFFF))
+
+    virt_startinfo_addr->net_rings = (net_ring_t *)SH2G(p->net_ring_base); 
     virt_startinfo_addr->num_net_rings = p->num_net_vifs;
 
     /* Add block io interface */
-    virt_startinfo_addr->blk_ring = p->blk_ring_base;
+    virt_startinfo_addr->blk_ring = (blk_ring_t *)SH2G(p->blk_ring_base);
 
-    /* i do not think this has to be done any more, temporary */
-    /* We tell OS about any modules we were given. */
-    if ( nr_mods > 1 )
-    {
-        virt_startinfo_addr->mod_start = 
-            (mod[1].mod_start-mod[0].mod_start-12) + meminfo->virt_load_addr;
-        virt_startinfo_addr->mod_len = 
-            mod[nr_mods-1].mod_end - mod[1].mod_start;
-    }
-
-    /* temporary, meminfo->cmd_line just needs to be copied info start info */
     dst = virt_startinfo_addr->cmd_line;
     if ( mod[0].string )
     {
@@ -489,9 +512,9 @@ int final_setup_guestos(struct task_struct * p, dom_meminfo_t * meminfo)
 
     /* Reinstate the caller's page tables. */
     __asm__ __volatile__ (
-        "mov %%eax,%%cr3"
-        : : "a" (__pa(pagetable_ptr(current->mm.pagetable))));    
+        "mov %%eax,%%cr3" : : "a" (pagetable_val(current->mm.pagetable)));    
     __sti();
+
 
     new_thread(p, 
                (unsigned long)meminfo->virt_load_addr, 
