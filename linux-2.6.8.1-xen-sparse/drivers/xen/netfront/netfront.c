@@ -393,11 +393,12 @@ static int network_start_xmit(struct sk_buff *skb, struct net_device *dev)
     tx->size = skb->len;
 
     wmb(); /* Ensure that backend will see the request. */
-    np->tx->req_prod = i + 1;
+    i++;
+    np->tx->req_prod = i;
 
     network_tx_buf_gc(dev);
 
-    if ( (i - np->tx_resp_cons) == (NETIF_TX_RING_SIZE - 1) )
+    if ( (i - np->tx_resp_cons) == NETIF_TX_RING_SIZE )
     {
         np->tx_full = 1;
         netif_stop_queue(dev);
@@ -410,7 +411,7 @@ static int network_start_xmit(struct sk_buff *skb, struct net_device *dev)
 
     /* Only notify Xen if there are no outstanding responses. */
     mb();
-    if ( np->tx->resp_prod == i )
+    if ( np->tx->resp_prod != i )
         notify_via_evtchn(np->evtchn);
 
     return 0;
