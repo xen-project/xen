@@ -422,11 +422,11 @@ void __enter_scheduler(void)
     
     perfc_incrc(sched_ctx);
 
-    if ( !is_idle_task(current->domain) )
+    if ( !is_idle_task(prev->domain) )
     {
-        LOCK_BIGLOCK(current->domain);
+        LOCK_BIGLOCK(prev->domain);
         cleanup_writable_pagetable(prev->domain);
-        UNLOCK_BIGLOCK(current->domain);
+        UNLOCK_BIGLOCK(prev->domain);
     }
 
 #if defined(WAKE_HISTO)
