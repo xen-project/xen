@@ -112,7 +112,6 @@ static struct {
 
 
 void initialize_xendbg(void);
-void trap_to_xendbg(void);
 
 void cmain(multiboot_info_t *mbi)
 {
@@ -298,10 +297,6 @@ void cmain(multiboot_info_t *mbi)
     set_bit(DF_PRIVILEGED, &new_dom->flags);
 
     shadow_mode_init();
-
-    printk("Trapping to debugger.\n");
-    trap_to_xendbg();
-    printk("Trapped to debugger and came back.\n");
 
     /*
      * We're going to setup domain0 using the module(s) that we stashed safely

@@ -40,17 +40,7 @@ hex_char_val(unsigned char c)
 		return c - 'A' + 10;
 	else
 		BUG();
-}
-
-static unsigned char
-val_to_hex_char(unsigned val)
-{
-	if (val < 10)
-		return val + '0';
-	else if (val < 16)
-		return val - 10 + 'a';
-	else
-		BUG();
+	return -1;
 }
 
 /* Receive a command.  Returns -1 on csum error, 0 otherwise. */
@@ -344,11 +334,11 @@ __trap_to_xendbg(struct pt_regs *regs)
 		return;
 	}
 	xendbg_running = 1;
-	/* trap_to_xendbg gets esp slightly wrong.  Correct for this. */
-	regs->esp += 8;
 
-	dbg_printk("Waiting for GDB to attach to XenDBG\n");
-	/* Urgg... hope this is right... */
+	/* Shouldn't really do this, but otherwise we stop for no
+	   obvious reason, which is Bad */
+	printk("Waiting for GDB to attach to XenDBG\n");
+
 	while (resume == 0) {
 		r = receive_command(recv_buf);
 		if (r < 0) {
