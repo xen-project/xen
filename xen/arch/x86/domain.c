@@ -765,7 +765,7 @@ void context_switch(struct exec_domain *prev_p, struct exec_domain *next_p)
             __asm__ __volatile__ ("lgdt %0" : "=m" (*next_p->arch.gdt));
 
             __sti();
-            return;
+            goto done;
         }
 #endif
  
@@ -810,6 +810,7 @@ void context_switch(struct exec_domain *prev_p, struct exec_domain *next_p)
 
     switch_segments(stack_ec, prev_p, next_p);
 
+ done:
     /*
      * We do this late on because it doesn't need to be protected by the
      * schedule_lock, and because we want this to be the very last use of
