@@ -69,6 +69,8 @@ static inline void direct_remappte_range(pte_t * pte, unsigned long address, uns
 		phys_addr += PAGE_SIZE;
 		pte++;
 	} while (address && (address < end));
+
+	printk("bd240 debug: exit from direct_remappte_range\n");
 }
 
 static inline int direct_remappmd_range(struct mm_struct *mm, pmd_t * pmd, unsigned long address, unsigned long size,
