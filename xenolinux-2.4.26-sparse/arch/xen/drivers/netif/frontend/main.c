@@ -37,6 +37,10 @@ static void network_tx_buf_gc(struct net_device *dev);
 static void network_alloc_rx_buffers(struct net_device *dev);
 static void cleanup_module(void);
 
+static unsigned long rx_pfn_array[NETIF_RX_RING_SIZE];
+static multicall_entry_t rx_mcl[NETIF_RX_RING_SIZE+1];
+static mmu_update_t rx_mmu[NETIF_RX_RING_SIZE];
+
 static struct list_head dev_list;
 
 struct net_private
@@ -178,8 +182,7 @@ static void network_alloc_rx_buffers(struct net_device *dev)
     struct sk_buff *skb;
     NETIF_RING_IDX i = np->rx->req_prod;
     dom_mem_op_t op;
-    unsigned long pfn_array[NETIF_RX_RING_SIZE];
-    int ret, nr_pfns = 0;
+    int nr_pfns = 0;
 
     /* Make sure the batch is large enough to be worthwhile (1/2 ring). */
     if ( unlikely((i - np->rx_resp_cons) > (NETIF_RX_RING_SIZE/2)) || 
@@ -201,9 +204,14 @@ static void network_alloc_rx_buffers(struct net_device *dev)
 
         np->rx->ring[MASK_NET_RX_IDX(i)].req.id = id;
         
-        pfn_array[nr_pfns++] = virt_to_machine(skb->head) >> PAGE_SHIFT;
-        HYPERVISOR_update_va_mapping((unsigned long)skb->head >> PAGE_SHIFT,
-                                     (pte_t) { 0 }, UVMF_INVLPG);
+        rx_pfn_array[nr_pfns] = virt_to_machine(skb->head) >> PAGE_SHIFT;
+
+        rx_mcl[nr_pfns].op = __HYPERVISOR_update_va_mapping;
+        rx_mcl[nr_pfns].args[0] = (unsigned long)skb->head >> PAGE_SHIFT;
+        rx_mcl[nr_pfns].args[1] = 0;
+        rx_mcl[nr_pfns].args[2] = 0;
+
+        nr_pfns++;
     }
     while ( (++i - np->rx_resp_cons) != NETIF_RX_RING_SIZE );
 
@@ -213,14 +221,22 @@ static void network_alloc_rx_buffers(struct net_device *dev)
      */
     flush_page_update_queue();
 
+    /* After all PTEs have been zapped we blow away stale TLB entries. */
+    rx_mcl[nr_pfns-1].args[2] = UVMF_FLUSH_TLB;
+
+    /* Give away a batch of pages. */
     op.op = MEMOP_RESERVATION_DECREASE;
     op.u.decrease.size  = nr_pfns;
-    op.u.decrease.pages = pfn_array;
-    if ( (ret = HYPERVISOR_dom_mem_op(&op)) != nr_pfns )
-    {
-        printk(KERN_WARNING "Unable to reduce memory reservation (%d)\n", ret);
-        BUG();
-    }
+    op.u.decrease.pages = rx_pfn_array;
+    rx_mcl[nr_pfns].op = __HYPERVISOR_dom_mem_op;
+    rx_mcl[nr_pfns].args[0] = (unsigned long)&op;
+
+    /* Zap PTEs and give away pages in one big multicall. */
+    (void)HYPERVISOR_multicall(rx_mcl, nr_pfns+1);
+
+    /* Check return status of HYPERVISOR_dom_mem_op(). */
+    if ( rx_mcl[nr_pfns].args[5] != nr_pfns )
+        panic("Unable to reduce memory reservation\n");
 
     np->rx->req_prod = i;
 }
@@ -295,17 +311,36 @@ static void netif_int(int irq, void *dev_id, struct pt_regs *ptregs)
     struct net_device *dev = dev_id;
     struct net_private *np = dev->priv;
     unsigned long flags;
-    struct sk_buff *skb;
-    netif_rx_response_t *rx;
-    NETIF_RING_IDX i;
-    mmu_update_t mmu;
 
     spin_lock_irqsave(&np->tx_lock, flags);
     network_tx_buf_gc(dev);
     spin_unlock_irqrestore(&np->tx_lock, flags);
 
- again:
-    for ( i = np->rx_resp_cons; i != np->rx->resp_prod; i++ )
+    if ( np->rx_resp_cons != np->rx->resp_prod )
+        netif_rx_schedule(dev);
+}
+
+
+static int netif_poll(struct net_device *dev, int *pbudget)
+{
+    struct net_private *np = dev->priv;
+    struct sk_buff *skb;
+    netif_rx_response_t *rx;
+    NETIF_RING_IDX i;
+    mmu_update_t *mmu = rx_mmu;
+    multicall_entry_t *mcl = rx_mcl;
+    int work_done, budget, more_to_do = 1;
+    struct sk_buff_head rxq;
+    unsigned long flags;
+
+    skb_queue_head_init(&rxq);
+
+    if ( (budget = *pbudget) > dev->quota )
+        budget = dev->quota;
+
+    for ( i = np->rx_resp_cons, work_done = 0; 
+          (i != np->rx->resp_prod) && (work_done < budget); 
+          i++, work_done++ )
     {
         rx = &np->rx->ring[MASK_NET_RX_IDX(i)].resp;
 
@@ -317,38 +352,53 @@ static void netif_int(int irq, void *dev_id, struct pt_regs *ptregs)
             /* Gate this error. We get a (valid) slew of them on suspend. */
             if ( np->state == NETIF_STATE_ACTIVE )
                 printk(KERN_ALERT "bad buffer on RX ring!(%d)\n", rx->status);
-            dev_kfree_skb_any(skb);
+            dev_kfree_skb(skb);
             continue;
         }
 
+        skb->data = skb->tail = skb->head + (rx->addr & ~PAGE_MASK);
+        skb_put(skb, rx->status);
+
+        np->stats.rx_packets++;
+        np->stats.rx_bytes += rx->status;
+
         /* Remap the page. */
-        mmu.ptr  = (rx->addr & PAGE_MASK) | MMU_MACHPHYS_UPDATE;
-        mmu.val  = __pa(skb->head) >> PAGE_SHIFT;
-        if ( HYPERVISOR_mmu_update(&mmu, 1) != 0 )
-            BUG();
-        HYPERVISOR_update_va_mapping((unsigned long)skb->head >> PAGE_SHIFT,
-                                     (pte_t) { (rx->addr & PAGE_MASK) | 
-                                                   __PAGE_KERNEL },
-                                     0);
+        mmu->ptr  = (rx->addr & PAGE_MASK) | MMU_MACHPHYS_UPDATE;
+        mmu->val  = __pa(skb->head) >> PAGE_SHIFT;
+        mmu++;
+        mcl->op = __HYPERVISOR_update_va_mapping;
+        mcl->args[0] = (unsigned long)skb->head >> PAGE_SHIFT;
+        mcl->args[1] = (rx->addr & PAGE_MASK) | __PAGE_KERNEL;
+        mcl->args[2] = 0;
+        mcl++;
+
         phys_to_machine_mapping[__pa(skb->head) >> PAGE_SHIFT] = 
             rx->addr >> PAGE_SHIFT;
 
-        /*
-         * Set up shinfo -- from alloc_skb This was particularily nasty:  the
-         * shared info is hidden at the back of the data area (presumably so it
-         * can be shared), but on page flip it gets very spunked.
-         */
+        __skb_queue_tail(&rxq, skb);
+    }
+
+    /* Do all the remapping work, and M->P updates, in one big hypercall. */
+    if ( likely((mcl - rx_mcl) != 0) )
+    {
+        mcl->op = __HYPERVISOR_mmu_update;
+        mcl->args[0] = (unsigned long)rx_mmu;
+        mcl->args[1] = mmu - rx_mmu;
+        mcl++;
+        (void)HYPERVISOR_multicall(rx_mcl, mcl - rx_mcl);
+    }
+
+    while ( (skb = __skb_dequeue(&rxq)) != NULL )
+    {
+        /* Set the shared-info area, which is hidden behind the real data. */
         atomic_set(&(skb_shinfo(skb)->dataref), 1);
         skb_shinfo(skb)->nr_frags = 0;
         skb_shinfo(skb)->frag_list = NULL;
 
-        skb->data = skb->tail = skb->head + (rx->addr & ~PAGE_MASK);
-        skb_put(skb, rx->status);
+        /* Ethernet-specific work. Delayed to here as it peeks the header. */
         skb->protocol = eth_type_trans(skb, dev);
 
-        np->stats.rx_packets++;
-
-        np->stats.rx_bytes += rx->status;
+        /* Pass it up. */
         netif_rx(skb);
         dev->last_rx = jiffies;
     }
@@ -356,12 +406,28 @@ static void netif_int(int irq, void *dev_id, struct pt_regs *ptregs)
     np->rx_resp_cons = i;
 
     network_alloc_rx_buffers(dev);
-    np->rx->event = np->rx_resp_cons + 1;
+
+    *pbudget   -= work_done;
+    dev->quota -= work_done;
+
+    if ( work_done < budget )
+    {
+        local_irq_save(flags);
+
+        np->rx->event = i + 1;
     
-    /* Deal with hypervisor racing our resetting of rx_event. */
-    mb();
-    if ( np->rx->resp_prod != i )
-        goto again;
+        /* Deal with hypervisor racing our resetting of rx_event. */
+        mb();
+        if ( np->rx->resp_prod == i )
+        {
+            __netif_rx_complete(dev);
+            more_to_do = 0;
+        }
+
+        local_irq_restore(flags);
+    }
+
+    return more_to_do;
 }
 
 
@@ -524,6 +590,8 @@ static int __init init_module(void)
     dev->hard_start_xmit = network_start_xmit;
     dev->stop            = network_close;
     dev->get_stats       = network_get_stats;
+    dev->poll            = netif_poll;
+    dev->weight          = 64;
     
     if ( (err = register_netdev(dev)) != 0 )
     {
