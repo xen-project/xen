@@ -503,7 +503,7 @@ loadelfimage(gzFile kernel_gfd, int pm_handle, unsigned long *page_array,
     }
     curpos += ehdr.e_phnum * sizeof(Elf_Phdr);
 
-
+    /* Copy kernel .text .data .bss segments into physical memory */
     for (h = 0; h < ehdr.e_phnum; h++) {
         if (phdr[h].p_type != PT_LOAD ||
             (phdr[h].p_flags & (PF_W|PF_X)) == 0)
@@ -585,6 +585,7 @@ loadelfimage(gzFile kernel_gfd, int pm_handle, unsigned long *page_array,
     maxva += sizeof(Elf_Ehdr) + ehdr.e_shnum * sizeof(Elf_Shdr);
     maxva = (maxva + ELFROUND - 1) & ~(ELFROUND - 1);
 
+    /* Copy kernel string / symbol tables into physical memory */
     for (h = 0; h < ehdr.e_shnum; h++) {
         if (shdr[h].sh_type == SHT_STRTAB) {
             for (i = 0; i < ehdr.e_shnum; i++)
@@ -593,7 +594,7 @@ loadelfimage(gzFile kernel_gfd, int pm_handle, unsigned long *page_array,
                     break;
             if (i == ehdr.e_shnum) {
                 shdr[h].sh_offset = 0;
-                continue;
+                continue;  /* Skip string tables which are not for symbol tables */
             }
         }
 
@@ -606,7 +607,7 @@ loadelfimage(gzFile kernel_gfd, int pm_handle, unsigned long *page_array,
             }
             curpos = shdr[h].sh_offset;
 
-            shdr[h].sh_offset = maxva - *symtab_addr;
+            shdr[h].sh_offset = maxva - *symtab_addr;  /* Mangled to be based on ELF header location */
 
             DPRINTF(("copy section %d, size 0x%x\n", h, shdr[h].sh_size));
             for (i = 0; i < shdr[h].sh_size; i += c, maxva += c) {
@@ -635,7 +636,7 @@ loadelfimage(gzFile kernel_gfd, int pm_handle, unsigned long *page_array,
             maxva = (maxva + ELFROUND - 1) & ~(ELFROUND - 1);
 
         }
-        shdr[h].sh_name = 0;
+        shdr[h].sh_name = 0;  /* Name is NULL */
     }
 
     if (*symtab_len == 0) {
@@ -656,6 +657,7 @@ loadelfimage(gzFile kernel_gfd, int pm_handle, unsigned long *page_array,
     memcpy(p + sizeof(int), &ehdr, sizeof(Elf_Ehdr));
     *(int *)p = maxva - *symtab_addr;
 
+    /* Copy total length, crafted ELF header and section header table */
     s = sizeof(int) + sizeof(Elf_Ehdr) + ehdr.e_shnum * sizeof(Elf_Shdr);
     for (i = 0; i < s; i += c, symva += c) {
         c = PAGE_SIZE - (symva & (PAGE_SIZE - 1));

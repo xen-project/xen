@@ -29,10 +29,10 @@
  * are also present in the initial GDT, many OSes will be able to avoid
  * installing their own GDT.
  */
-#define FLAT_RING1_CS 0x0819
-#define FLAT_RING1_DS 0x0821
-#define FLAT_RING3_CS 0x082b
-#define FLAT_RING3_DS 0x0833
+#define FLAT_RING1_CS 0x0819    /* GDT index 259 */
+#define FLAT_RING1_DS 0x0821    /* GDT index 260 */
+#define FLAT_RING3_CS 0x082b    /* GDT index 261 */
+#define FLAT_RING3_DS 0x0833    /* GDT index 262 */
 
 
 /*
