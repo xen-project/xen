@@ -1288,7 +1288,6 @@
 421098b7Z6OwjZnrTZkh34DoDfcjrA xen/include/asm-ia64/regionreg.h
 421098b707cY5YluUcWK5Pc-71ETVw xen/include/asm-ia64/regs.h
 4214e2f3fbO_n9Z1kIcBR83d7W4OJw xen/include/asm-ia64/serial.h
-421098b7czhvyPGFa5nskL0N4vNvFw xen/include/asm-ia64/shadow.h
 421098b7GkWOnlzSmPvNAhByOSZ1Dw xen/include/asm-ia64/time.h
 421098b7FK3xgShpnH0I0Ou3O4fJ2Q xen/include/asm-ia64/tlb.h
 421098b78IGdFOGUlPmpS7h_QBmoFg xen/include/asm-ia64/vcpu.h
@@ -1416,6 +1415,7 @@
 40589969nPq3DMzv24RDb5LXE9brHw xen/include/xen/sched-if.h
 3ddb79c0LzqqS0LhAQ50ekgj4oGl7Q xen/include/xen/sched.h
 403a06a7H0hpHcKpAiDe5BPnaXWTlA xen/include/xen/serial.h
+4252c315hw0xXYMKIfFzhomi1M1yNA xen/include/xen/shadow.h
 3ddb79c14dXIhP7C2ahnoD08K90G_w xen/include/xen/slab.h
 3ddb79c09xbS-xxfKxuV3JETIhBzmg xen/include/xen/smp.h
 3ddb79c1Vi5VleJAOKHAlY0G2zAsgw xen/include/xen/softirq.h

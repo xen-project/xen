@@ -17,7 +17,6 @@
 #include <xen/trace.h>
 #include <xen/console.h>
 #include <xen/physdev.h>
-#include <asm/shadow.h>
 #include <public/sched_ctl.h>
 
 #define TRC_DOM0OP_ENTER_BASE  0x00020000
