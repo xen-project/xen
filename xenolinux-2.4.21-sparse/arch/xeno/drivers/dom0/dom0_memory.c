@@ -32,88 +32,43 @@ extern struct list_head * find_direct(struct list_head *, unsigned long);
 #define __direct_mk_pte(page_nr,pgprot) __direct_pte(((page_nr) << PAGE_SHIFT) | pgprot_val(pgprot))
 #define direct_mk_pte_phys(physpage, pgprot)   __direct_mk_pte((physpage) >> PAGE_SHIFT, pgprot)
 
-static inline void forget_pte(pte_t page)
+/*  Note: this is only safe if the mm semaphore is held when called. */
+
+static int direct_remap_page(unsigned long from, unsigned long phys_addr, pgprot_t prot)
 {
-    if (!pte_none(page)) {
-        printk("forget_pte: old mapping existed!\n");
+    struct mm_struct *mm = current->mm;
+    pgd_t * dir;
+    pmd_t *pmd;
+    pte_t *pte;
+
+    pte_t oldpage;
+
+    dir = pgd_offset(mm, from);
+    flush_cache_range(mm, from, from + PAGE_SIZE);
+    
+    spin_lock(&mm->page_table_lock);
+    pmd = pmd_alloc(mm, dir, from);
+    if (!pmd)
+	return -ENOMEM;
+    pte = pte_alloc(mm, pmd, address);
+    if (!pte) {
+	/* XXX free pmd? */
+	return -ENOMEM;
+    }
+
+    /* Sanity check */
+    oldpage = ptep_get_and_clear(pte);
+    if (!pte_none(oldpage)) {
+        printk("Page already in use!\n");
         BUG();
     }
-}
+    direct_set_pte(pte, direct_mk_pte_phys(phys_addr, prot));
 
-static inline void direct_remappte_range(pte_t * pte, unsigned long address, unsigned long size,
-                                         unsigned long phys_addr, pgprot_t prot)
-{
-    unsigned long end;
-
-    address &= ~PMD_MASK;
-    end = address + size;
-    if (end > PMD_SIZE)
-        end = PMD_SIZE;
-    do {
-        pte_t oldpage;
-        oldpage = ptep_get_and_clear(pte);
-
-        direct_set_pte(pte, direct_mk_pte_phys(phys_addr, prot));
-
-        forget_pte(oldpage);
-        address += PAGE_SIZE;
-        phys_addr += PAGE_SIZE;
-        pte++;
-    } while (address && (address < end));
-
-}
-
-static inline int direct_remappmd_range(struct mm_struct *mm, pmd_t * pmd, unsigned long address, unsigned long size,
-                                        unsigned long phys_addr, pgprot_t prot)
-{
-    unsigned long end;
-
-    address &= ~PGDIR_MASK;
-    end = address + size;
-    if (end > PGDIR_SIZE)
-        end = PGDIR_SIZE;
-    phys_addr -= address;
-    do {
-        pte_t * pte = pte_alloc(mm, pmd, address);
-        if (!pte)
-            return -ENOMEM;
-        direct_remappte_range(pte, address, end - address, address + phys_addr, prot);
-        address = (address + PMD_SIZE) & PMD_MASK;
-        pmd++;
-    } while (address && (address < end));
-    return 0;
-}
-
-/*  Note: this is only safe if the mm semaphore is held when called. */
-static int direct_remap_page_range(unsigned long from, unsigned long phys_addr, unsigned long size, pgprot_t prot)
-{
-    int error = 0;
-    pgd_t * dir;
-    unsigned long beg = from;
-    unsigned long end = from + size;
-    struct mm_struct *mm = current->mm;
-
-    phys_addr -= from;
-    dir = pgd_offset(mm, from);
-    flush_cache_range(mm, beg, end);
-    if (from >= end)
-        BUG();
-
-    spin_lock(&mm->page_table_lock);
-    do {
-        pmd_t *pmd = pmd_alloc(mm, dir, from);
-        error = -ENOMEM;
-        if (!pmd)
-            break;
-        error = direct_remappmd_range(mm, pmd, from, end - from, phys_addr + from, prot);
-        if (error)
-            break;
-        from = (from + PGDIR_SIZE) & PGDIR_MASK;
-        dir++;
-    } while (from && (from < end));
     spin_unlock(&mm->page_table_lock);
-    flush_tlb_range(mm, beg, end);
-    return error;
+
+    flush_tlb_range(mm, from, from + PAGE_SIZE);
+
+    return 0;
 }
 
 /* 
@@ -142,8 +97,8 @@ static int direct_remap_disc_page_range(unsigned long from,
 
         for ( i = 0; i < pages; i++ )
         {
-            if(direct_remap_page_range(start, pfns[i] << PAGE_SHIFT, 
-                                       PAGE_SIZE, prot))
+            if(direct_remap_page(start, pfns[i] << PAGE_SHIFT, 
+				 prot))
                 goto out;
             start += PAGE_SIZE;
             tot_pages--;
@@ -155,10 +110,10 @@ static int direct_remap_disc_page_range(unsigned long from,
     return tot_pages;
 } 
            
-/* below functions replace standard sys_mmap and sys_munmap which are absolutely useless
- * for direct memory mapping. direct_zap* functions are minor ammendments to the 
- * original versions in mm/memory.c. the changes are to enable unmapping of real physical
- * addresses.
+/* below functions replace standard sys_mmap and sys_munmap which are
+ * absolutely useless for direct memory mapping. direct_zap* functions
+ * are minor ammendments to the original versions in mm/memory.c. the
+ * changes are to enable unmapping of real physical addresses.
  */
 
 unsigned long direct_mmap(unsigned long phys_addr, unsigned long size, 
@@ -169,6 +124,9 @@ unsigned long direct_mmap(unsigned long phys_addr, unsigned long size,
     unsigned long addr;
     int ret = 0;
     
+    if(!(size & ~PAGE_MASK))
+	return -EINVAL;
+
     if(!capable(CAP_SYS_ADMIN))
         return -EPERM;
 
@@ -185,16 +143,16 @@ unsigned long direct_mmap(unsigned long phys_addr, unsigned long size,
     dmmap->vm_end = addr + size;
     entry = find_direct(&current->mm->context.direct_list, addr);
     if(entry != &current->mm->context.direct_list){
-      list_add_tail(&dmmap->list, entry);
+	list_add_tail(&dmmap->list, entry);
     } else {
-      list_add_tail(&dmmap->list, &current->mm->context.direct_list);
+	list_add_tail(&dmmap->list, &current->mm->context.direct_list);
     }
 
-    /* XXX kfree(dmmap)? */
-
+    /* Acquire mm sem? */
     /* and perform the mapping */
     ret = direct_remap_disc_page_range(addr, phys_addr >> PAGE_SHIFT, 
 				       tot_pages, prot);
+    /* Drop mm sem? */
 
     if(ret == 0)
         return addr;
@@ -202,75 +160,19 @@ unsigned long direct_mmap(unsigned long phys_addr, unsigned long size,
         return ret;
 }
 
-/* most of the checks, refcnt updates, cache stuff have been thrown out as they are not
- * needed
- */
-static inline int direct_zap_pte_range(mmu_gather_t *tlb, pmd_t * pmd, unsigned long address, 
-                                       unsigned long size)
-{
-    unsigned long offset;
-    pte_t * ptep;
-    int freed = 0;
-
-    if (pmd_none(*pmd))
-        return 0;
-    if (pmd_bad(*pmd)) {
-        pmd_ERROR(*pmd);
-        pmd_clear(pmd);
-        return 0;
-    }
-    ptep = pte_offset(pmd, address);
-    offset = address & ~PMD_MASK;
-    if (offset + size > PMD_SIZE)
-        size = PMD_SIZE - offset;
-    size &= PAGE_MASK;
-    for (offset=0; offset < size; ptep++, offset += PAGE_SIZE) {
-        pte_t pte = *ptep;
-        if (pte_none(pte))
-            continue;
-        freed ++;
-        direct_pte_clear(ptep);
-    }
-
-    return freed;
-}
-
-static inline int direct_zap_pmd_range(mmu_gather_t *tlb, pgd_t * dir, 
-                                       unsigned long address, unsigned long size)
-{
-    pmd_t * pmd;
-    unsigned long end;
-    int freed;
-
-    if (pgd_none(*dir))
-        return 0;
-    if (pgd_bad(*dir)) {
-        pgd_ERROR(*dir);
-        pgd_clear(dir);
-        return 0;
-    }
-    pmd = pmd_offset(dir, address);
-    end = address + size;
-    if (end > ((address + PGDIR_SIZE) & PGDIR_MASK))
-        end = ((address + PGDIR_SIZE) & PGDIR_MASK);
-    freed = 0;
-    do {
-        freed += direct_zap_pte_range(tlb, pmd, address, end - address);
-        address = (address + PMD_SIZE) & PMD_MASK; 
-        pmd++;
-    } while (address < end);
-    return freed;
-}
-
 /*
- * remove user pages in a given range.
+ * remove a user page
+ *
+ * There used to be a function here which could remove a whole range
+ * of pages, but it was only ever called with that range equal to a
+ * single page, so I simplified it a bit -- sos22.
  */
-static void direct_zap_page_range(struct mm_struct *mm, unsigned long address, unsigned long size)
+static void direct_zap_page(struct mm_struct *mm, unsigned long address)
 {
     mmu_gather_t *tlb;
     pgd_t * dir;
-    unsigned long start = address, end = address + size;
-    int freed = 0;
+    pmd_t * pmd;
+    pte_t * pte;
 
     dir = pgd_offset(mm, address);
 
@@ -281,20 +183,14 @@ static void direct_zap_page_range(struct mm_struct *mm, unsigned long address, u
      * even if kswapd happened to be looking at this
      * process we _want_ it to get stuck.
      */
-    if (address >= end)
-        BUG();
     spin_lock(&mm->page_table_lock);
-    flush_cache_range(mm, address, end);
+    flush_cache_range(mm, address, address + PAGE_SIZE);
+    
     tlb = tlb_gather_mmu(mm);
-
-    do {
-        freed += direct_zap_pmd_range(tlb, dir, address, end - address);
-        address = (address + PGDIR_SIZE) & PGDIR_MASK;
-        dir++;
-    } while (address && (address < end));
-
-    /* this will flush any remaining tlb entries */
-    tlb_finish_mmu(tlb, start, end);
+    pmd = pmd_offset(dir, address);
+    pte = pte_offset(pmd, address);
+    direct_pte_clear(pte);
+    tlb_finish_mmu(tlb, address, address + PAGE_SIZE);
 
     /* decrementing rss removed */
     spin_unlock(&mm->page_table_lock);
@@ -303,16 +199,16 @@ static void direct_zap_page_range(struct mm_struct *mm, unsigned long address, u
 
 int direct_unmap(struct mm_struct *mm, unsigned long addr, unsigned long size)
 {
-    int count = 0, tot_pages = (size+PAGE_SIZE-1) >> PAGE_SHIFT;
     direct_mmap_node_t * node;
     struct list_head * curr;
     struct list_head * direct_list = &mm->context.direct_list;    
+    unsigned long end;
 
     curr = direct_list->next;
     while ( curr != direct_list )
     {
         node = list_entry(curr, direct_mmap_node_t, list);
-        if ( node->vm_start == addr )
+        if ( node->vm_start == addr && node->vm_end == addr + size)
             break;
         curr = curr->next;
     }
@@ -323,11 +219,17 @@ int direct_unmap(struct mm_struct *mm, unsigned long addr, unsigned long size)
     list_del(&node->list);
     kfree(node);
 
-    while ( count < tot_pages )
+    if (size & ~PAGE_MASK) {
+	printk("Managed to map something which isn\'t a multiple of a page size...\n");
+	BUG();
+	return -EINVAL;
+    }
+
+    end = addr + size;
+    while ( addr < end )
     {
-        direct_zap_page_range(mm, addr, PAGE_SIZE);
+        direct_zap_page(mm, addr);
         addr += PAGE_SIZE;
-        count++;
     }
 
     return 0;

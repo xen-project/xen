@@ -162,8 +162,8 @@ static int dom0_cmd_write(struct file *file, const char *buffer, size_t size,
     }
     else if ( op.cmd == DO_PGUPDATES )
     {
-        ret = HYPERVISOR_pt_update((void *)op.u.pgupdate.pgt_update_arr,
-                                   op.u.pgupdate.num_pgt_updates);
+        /* Now an ioctl. */
+        ret = -EOPNOTSUPP;
     }
     else if (op.cmd == DOM0_CREATEDOMAIN)
     {
@@ -274,6 +274,8 @@ static struct file_operations proc_xeno_domains_operations = {
     release:        seq_release,
 };
 
+/* END OF /proc/xeno/domains */
+
 static int handle_dom0_cmd_createdomain(unsigned long data)
 {
   struct dom0_createdomain_args argbuf;
@@ -344,6 +346,18 @@ static int handle_dom0_cmd_unmapdommem(unsigned long data)
 		      argbuf.tot_pages << PAGE_SHIFT);
 }
 
+static int handle_dom0_cmd_dopgupdates(unsigned long data)
+{
+  struct dom0_dopgupdates_args argbuf;
+
+  if (copy_from_user(&argbuf, (void *)data, sizeof(argbuf)))
+    return -EFAULT;
+
+  /* argbuf.pgt_update_arr had better be direct mapped... */
+  return HYPERVISOR_pt_update(argbuf.pgt_update_arr,
+			      argbuf.num_pgt_updates);
+}
+
 static int dom0_cmd_ioctl(struct inode *inode, struct file *file,
 			  unsigned int cmd, unsigned long data)
 {
@@ -355,6 +369,8 @@ static int dom0_cmd_ioctl(struct inode *inode, struct file *file,
     return handle_dom0_cmd_mapdommem(data);
   case IOCTL_DOM0_UNMAPDOMMEM:
     return handle_dom0_cmd_unmapdommem(data);
+  case IOCTL_DOM0_DOPGUPDATES:
+    return handle_dom0_cmd_dopgupdates(data);
   default:
     printk("Unknown dom0_cmd ioctl!\n");
     return -EINVAL;

@@ -42,4 +42,4 @@ typedef struct { unsigned long l2_lo; } l2_pgentry_t;
 
 /* local definitions */
 
-#define nr_2_page(x) (x << PAGE_SHIFT)
+#define nr_2_page(x) ((x) << PAGE_SHIFT)

@@ -8,13 +8,11 @@
 #include <stdio.h>
 #include <errno.h>
 #include <fcntl.h>
-#include <sys/mman.h>
-#include <sys/types.h>
 #include <sys/stat.h>
-#include <stdlib.h>
 #include <sys/ioctl.h>
+#include <string.h>
+#include <stdlib.h>
 
-#include "asm-i386/types.h"
 #include "hypervisor-ifs/hypervisor-if.h"
 #include "dom0_ops.h"
 #include "dom0_defs.h"
@@ -51,7 +49,7 @@ static void dom_mem_cleanup(dom_mem_t * dom_mem)
 {
     int fd;
     struct dom0_unmapdommem_args argbuf;
-
+	    
     fd = open("/proc/xeno/dom0_cmd", O_WRONLY);
     if(fd < 0){
         perror(PERR_STRING);
@@ -68,85 +66,33 @@ static void dom_mem_cleanup(dom_mem_t * dom_mem)
     close(fd);
 }
 
-/* ask dom0 to export domains memory through /proc */
-static int setup_dom_memmap(unsigned long pfn, int pages, int dom)
-{
-    char cmd_path[MAX_PATH];
-    dom0_op_t dop;
-    int cmd_fd;
-
-    dop.cmd = MAP_DOM_MEM;
-    dop.u.dommem.start_pfn = pfn;
-    dop.u.dommem.tot_pages = pages;
-    dop.u.dommem.domain = dom;
-
-    /* open the /proc command interface */
-    sprintf(cmd_path, "%s%s%s%s", "/proc/", PROC_XENO_ROOT, "/", PROC_CMD);
-    cmd_fd = open(cmd_path, O_WRONLY);
-    if ( cmd_fd < 0 )
-    {
-        perror(PERR_STRING);
-        return -1;
-    }
-
-    write(cmd_fd, &dop, sizeof(dom0_op_t));
-    close(cmd_fd);
-
-    return 0;
-}
-      
-/* request the actual mapping from dom0 */
-static unsigned long get_vaddr(unsigned int dom)
-{
-    char mem_path[MAX_PATH];
-    unsigned long addr;
-    int mem_fd;
-
-    /* open the domain's /proc mem interface */
-    sprintf(mem_path, "%s%s%s%s%d%s%s", "/proc/", PROC_XENO_ROOT, "/", 
-            PROC_DOM_PREFIX, dom, "/", PROC_DOM_MEM);
-
-    mem_fd = open(mem_path, O_RDONLY);
-    if(mem_fd < 0){
-        perror(PERR_STRING);
-        return 0;
-    }
-
-    /* get virtual address of mapped region */
-    read(mem_fd, &addr, sizeof(addr));
-	
-    close(mem_fd);
-
-    return addr;
-}
-
 static int map_dom_mem(unsigned long pfn, int pages, int dom, 
                        dom_mem_t * dom_mem)
 {
-  struct dom0_mapdommem_args argbuf;
-  int fd;
+    struct dom0_mapdommem_args argbuf;
+    int fd;
 
-  argbuf.domain = dom;
-  argbuf.start_pfn = pfn;
-  argbuf.tot_pages = pages;
+    argbuf.domain = dom;
+    argbuf.start_pfn = pfn;
+    argbuf.tot_pages = pages;
   
-  fd = open("/proc/xeno/dom0_cmd", O_RDWR);
-  if (fd < 0) {
-    perror("openning /proc/xeno/dom0_cmd");
-    return -1;
-  }
+    fd = open("/proc/xeno/dom0_cmd", O_RDWR);
+    if (fd < 0) {
+        perror("openning /proc/xeno/dom0_cmd");
+        return -1;
+    }
   
-  dom_mem->domain = dom;
-  dom_mem->start_pfn = pfn;
-  dom_mem->tot_pages = pages;
-  dom_mem->vaddr = ioctl(fd, IOCTL_DOM0_MAPDOMMEM, &argbuf);
+    dom_mem->domain = dom;
+    dom_mem->start_pfn = pfn;
+    dom_mem->tot_pages = pages;
+    dom_mem->vaddr = ioctl(fd, IOCTL_DOM0_MAPDOMMEM, &argbuf);
+    
+    if (dom_mem->vaddr == -1) {
+        perror("mapping domain memory");
+	return -1;
+    }
 
-  if (dom_mem->vaddr == -1) {
-    perror("mapping domain memory");
-    return -1;
-  }
-
-  return 0;
+    return 0;
 }
 
 /* open kernel image and do some sanity checks */
@@ -215,14 +161,13 @@ static dom_meminfo_t *setup_guestos(int dom, int kernel_fd, int initrd_fd,
     dom_meminfo_t *meminfo;
     unsigned long *page_array;
     page_update_request_t *pgt_updates;
-    dom_mem_t mem_map;
     dom_meminfo_t *ret = NULL;
     int alloc_index, num_pt_pages;
     unsigned long l2tab;
     unsigned long l1tab = 0;
     unsigned long num_pgt_updates = 0;
     unsigned long count, pt_start;
-    dom0_op_t pgupdate_req;
+    struct dom0_dopgupdates_args pgupdate_req;
     char cmd_path[MAX_PATH];
     int cmd_fd;
 
@@ -324,10 +269,9 @@ static dom_meminfo_t *setup_guestos(int dom, int kernel_fd, int initrd_fd,
      */
     sprintf(cmd_path, "%s%s%s%s", "/proc/", PROC_XENO_ROOT, "/", PROC_CMD);
     if ( (cmd_fd = open(cmd_path, O_WRONLY)) < 0 ) goto out;
-    pgupdate_req.cmd = DO_PGUPDATES;
-    pgupdate_req.u.pgupdate.pgt_update_arr  = (unsigned long)dom_mem->vaddr;
-    pgupdate_req.u.pgupdate.num_pgt_updates = num_pgt_updates;
-    write(cmd_fd, &pgupdate_req, sizeof(dom0_op_t));
+    pgupdate_req.pgt_update_arr  = (unsigned long)dom_mem->vaddr;
+    pgupdate_req.num_pgt_updates = num_pgt_updates;
+    if (ioctl(cmd_fd, IOCTL_DOM0_DOPGUPDATES, &pgupdate_req) < 0) goto out;
     close(cmd_fd);
 
     /* Load the guest OS image. */
@@ -435,11 +379,9 @@ int main(int argc, char **argv)
 {
 
     dom_mem_t dom_os_image;
-    dom_mem_t dom_pgt; 
     dom_meminfo_t * meminfo;
     size_t ksize;
     unsigned long load_addr;
-    char status[1024];
     int kernel_fd, initrd_fd = 0;
     int count;
     int cmd_len;
@@ -449,8 +391,6 @@ int main(int argc, char **argv)
     int domain_id;
     int pg_head;
     int tot_pages;
-
-    unsigned long addr;
 
     /**** this argument parsing code is really _gross_. rewrite me! ****/
 
