@@ -251,8 +251,8 @@ typedef struct
 /* Event channel endpoints per domain. */
 #define NR_EVENT_CHANNELS 1024
 
-/* No support for multi-processor guests. */
-#define MAX_VIRT_CPUS 4
+/* Support for multi-processor guests. */
+#define MAX_VIRT_CPUS 32
 
 /*
  * Per-VCPU information goes here. This will be cleaned up more when Xen 
