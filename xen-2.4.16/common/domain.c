@@ -253,7 +253,7 @@ void release_task(struct task_struct *p)
 
 asmlinkage void schedule(void)
 {
-    struct task_struct *prev, *next, *p;
+    struct task_struct *prev, *next;
     struct list_head *tmp;
     int this_cpu;
 
@@ -286,11 +286,11 @@ asmlinkage void schedule(void)
     }
     clear_bit(_HYP_EVENT_NEED_RESCHED, &prev->hyp_events);
 
+    /* Round-robin, skipping idle where possible. */
     next = NULL;
     list_for_each(tmp, &schedule_data[smp_processor_id()].runqueue) {
-        p = list_entry(tmp, struct task_struct, run_list);
-        next = p;
-        break;
+        next = list_entry(tmp, struct task_struct, run_list);
+        if ( next->domain != IDLE_DOMAIN_ID ) break;
     }
 
     prev->has_cpu = 0;
@@ -402,7 +402,7 @@ int setup_guestos(struct task_struct *p, dom0_newdomain_t *params)
     unsigned long cur_address, end_address, alloc_address, vaddr;
     unsigned long virt_load_address, virt_stack_address, virt_shinfo_address;
     unsigned long virt_ftable_start_addr = 0, virt_ftable_end_addr;
-    unsigned long ft_mapping = frame_table;
+    unsigned long ft_mapping = (unsigned long)frame_table;
     unsigned int ft_size = 0;
     start_info_t  *virt_startinfo_address;
     unsigned long long time;
@@ -410,7 +410,6 @@ int setup_guestos(struct task_struct *p, dom0_newdomain_t *params)
     l1_pgentry_t *l1tab = NULL;
     struct pfn_info *page = NULL;
     net_ring_t *net_ring;
-    blk_ring_t *blk_ring;
 
     if ( strncmp(__va(mod[0].mod_start), "XenoGues", 8) )
     {
