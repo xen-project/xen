@@ -33,7 +33,6 @@ def vif_bridge_add(params):
     """Add the network interface for vif on dom to a bridge.
     """
     cmd(CMD_BRCTL, 'addif %(bridge)s %(vif)s' % params)
-    return bridge
 
 def vif_bridge_rem(params):
     """Remove the network interface for vif on dom from a bridge.
@@ -122,11 +121,11 @@ def reconfigure(interface, bridge):
     global opts
     intf_info = ifconfig(interface)
     if not intf_info:
-        print 'Interface not found:', interface
+        print >>sys.stderr, 'Interface not found:', interface
         return
     #bridge_info = ifconfig(bridge)
     #if not bridge_info:
-    #    print 'Bridge not found:', bridge
+    #    print >>sys.stderr, 'Bridge not found:', bridge
     #    return
     route_info = routes()
     intf_info['bridge'] = bridge
@@ -137,7 +136,7 @@ def reconfigure(interface, bridge):
             r['interface'] == interface):
             intf_info['gateway'] = r['gateway']
     if not intf_info['gateway']:
-        print 'Gateway not found: ', interface
+        print >>sys.stderr, 'Gateway not found: ', interface
         return
     cmd(CMD_IFCONFIG,
         '%(bridge)s %(address)s netmask %(mask)s broadcast %(broadcast)s up'

@@ -40,6 +40,7 @@ class VifControl:
         self.name = 'vifctl'
     
     def main(self, args):
+        #print self.name, args
         if len(args) < 2:
             usage(args)
         self.name = args[0]
@@ -85,7 +86,7 @@ class VifControl:
         for x in req:
             if not d[x]:
                 print >>sys.stderr, 'Missing parameter:', x
-            sys.exit(1)
+                sys.exit(1)
         return d
             
     def vifctl_help(self, args):

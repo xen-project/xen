@@ -52,3 +52,4 @@ xen/tools/figlet/figlet
 xen/xen
 xen/xen-syms
 xen/xen.*
+tools/xc/lib/.xc_rrobin.o.d
