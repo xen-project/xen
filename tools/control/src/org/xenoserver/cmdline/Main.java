@@ -36,6 +36,8 @@ public class Main {
     };
   private static final CommandParser vbdcommands[] =
     { new ParseVbdCreate(),
+      new ParseVbdDelete(),
+      new ParseVbdFlush(),
       new ParseVbdShow()
     };
   private static final CommandParser commands[] =

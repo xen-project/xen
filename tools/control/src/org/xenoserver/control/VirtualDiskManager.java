@@ -125,10 +125,11 @@ public class VirtualDiskManager {
      * Delete a virtual block device.
      * @param domain Domain owning the device.
      * @param vbdNum The vbd number within the domain.
+     * @return true if the VBD was deleted, false if it does not exist.
      */
-    void deleteVirtualBlockDevice(int domain, int vbdNum) {
+    boolean deleteVirtualBlockDevice(int domain, int vbdNum) {
         Object hash = hashVBD(domain, vbdNum);
-        virtualBlockDevices.remove(hash);
+        return virtualBlockDevices.remove(hash) != null;
     }
 
     /**
