@@ -151,7 +151,7 @@ gopts.var('ipaddr', val="IPADDR",
           fn=append_value, default=[],
           use="Add an IP address to the domain.")
 
-gopts.var('vif', val="mac=MAC,bridge=BRIDGE,script=SCRIPT,backend=DOM",
+gopts.var('vif', val="mac=MAC,bridge=BRIDGE,script=SCRIPT,backend=DOM,vifname=NAME",
           fn=append_value, default=[],
           use="""Add a network interface with the given MAC address and bridge.
           The vif is configured by calling the given configuration script.
@@ -159,6 +159,8 @@ gopts.var('vif', val="mac=MAC,bridge=BRIDGE,script=SCRIPT,backend=DOM",
           If bridge is not specified the default bridge is used.
           If script is not specified the default script is used.
           If backend is not specified the default backend driver domain is used.
+          If vifname is not specified the backend virtual interface will have name vifD.N
+          where D is the domain id and N is the interface id.
           This option may be repeated to add more than one vif.
           Specifying vifs will increase the number of interfaces as needed.""")
 
@@ -289,14 +291,18 @@ def configure_vifs(config_devs, vals):
             script = d.get('script')
             backend = d.get('backend')
             ip = d.get('ip')
+            vifname = d.get('vifname')
         else:
             mac = randomMAC()
             bridge = None
             script = None
             backend = None
             ip = None
+            vifname = None
         config_vif = ['vif']
         config_vif.append(['mac', mac])
+        if vifname:
+            config_vif.append(['vifname', vifname])
         if bridge:
             config_vif.append(['bridge', bridge])
         if script:
@@ -383,7 +389,7 @@ def preprocess_vifs(opts, vals):
             (k, v) = b.strip().split('=', 1)
             k = k.strip()
             v = v.strip()
-            if k not in ['mac', 'bridge', 'script', 'backend', 'ip']:
+            if k not in ['mac', 'bridge', 'script', 'backend', 'ip', 'vifname']:
                 opts.err('Invalid vif specifier: ' + vif)
             d[k] = v
         vifs.append(d)
