@@ -4,6 +4,10 @@
 
 DIST_DIR    ?= $(shell pwd)/dist
 INSTALL_DIR ?= $(DIST_DIR)/install
+INSTALL		:= install
+INSTALL_DIR	:= $(INSTALL) -d -m0755
+INSTALL_DATA	:= $(INSTALL) -m0644
+INSTALL_PROG	:= $(INSTALL) -m0755
 
 KERNELS ?= linux-2.6-xen0 linux-2.6-xenU
 # linux-2.4-xen0 linux-2.4-xenU netbsd-2.0-xenU
@@ -35,21 +39,21 @@ install-tools:
 	$(MAKE) -C tools install
 
 install-kernels:
-	$(shell cp -a $(INSTALL_DIR)/boot/* /boot/)
-	$(shell cp -a $(INSTALL_DIR)/lib/modules/* /lib/modules/)
-	$(shell cp -dR $(INSTALL_DIR)/boot/*$(LINUX_VER)* $(prefix)/boot/)
-	$(shell cp -dR $(INSTALL_DIR)/lib/modules/* $(prefix)/lib/modules/)
+	cp -a $(INSTALL_DIR)/boot/* /boot/
+	cp -a $(INSTALL_DIR)/lib/modules/* /lib/modules/
+	cp -dR $(INSTALL_DIR)/boot/*$(LINUX_VER)* $(prefix)/boot/
+	cp -dR $(INSTALL_DIR)/lib/modules/* $(prefix)/lib/modules/
 
 install-docs:
 	sh ./docs/check_pkgs && $(MAKE) -C docs install || true
 
 # build and install everything into local dist directory
 dist: xen tools kernels docs
-	install -m0644 ./COPYING $(DIST_DIR)
-	install -m0644 ./README $(DIST_DIR)
-	install -m0755 ./install.sh $(DIST_DIR)
-	mkdir -p $(DIST_DIR)/check
-	install -m0755 tools/check/chk tools/check/check_* $(DIST_DIR)/check
+	$(INSTALL_DIR) $(DIST_DIR)/check
+	$(INSTALL_DATA) ./COPYING $(DIST_DIR)
+	$(INSTALL_DATA) ./README $(DIST_DIR)
+	$(INSTALL_PROG) ./install.sh $(DIST_DIR)
+	$(INSTALL_PROG) tools/check/chk tools/check/check_* $(DIST_DIR)/check
 
 xen:
 	$(MAKE) prefix=$(INSTALL_DIR) dist=yes -C xen install

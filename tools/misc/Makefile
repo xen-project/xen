@@ -1,3 +1,6 @@
+INSTALL		= install
+INSTALL_PROG	= $(INSTALL) -m0755
+INSTALL_DIR	= $(INSTALL) -d -m0755
 
 XEN_ROOT=../..
 include $(XEN_ROOT)/tools/Make.defs
@@ -20,10 +23,10 @@ all: $(TARGETS)
 	$(MAKE) -C miniterm
 
 install: all
-	mkdir -p $(prefix)/usr/bin
-	mkdir -p $(prefix)/usr/sbin
-	install -m0755 $(INSTALL_BIN) $(prefix)/usr/bin
-	install -m0755 $(INSTALL_SBIN) $(prefix)/usr/sbin
+	$(INSTALL_DIR) $(prefix)/usr/bin
+	$(INSTALL_DIR) $(prefix)/usr/sbin
+	$(INSTALL_PROG) $(INSTALL_BIN) $(prefix)/usr/bin
+	$(INSTALL_PROG) $(INSTALL_SBIN) $(prefix)/usr/sbin
 	$(MAKE) -C miniterm install
 
 clean:

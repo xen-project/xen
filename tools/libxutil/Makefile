@@ -1,4 +1,9 @@
 XEN_ROOT = ../..
+INSTALL		= install
+INSTALL_DATA	= $(INSTALL) -m0644
+INSTALL_PROG	= $(INSTALL) -m0755
+INSTALL_DIR	= $(INSTALL) -d -m0755
+
 include $(XEN_ROOT)/tools/Make.defs
 
 CC = gcc
@@ -67,8 +72,8 @@ check-for-zlib:
 	fi
 
 install: all
-	mkdir -p $(prefix)/usr/lib
-	install -m0755 $(LIB) $(prefix)/usr/lib
+	$(INSTALL_DIR) -p $(prefix)/usr/lib
+	$(INSTALL_PROG) $(LIB) $(prefix)/usr/lib
 	ln -sf $(LIB_NAME).so.$(MAJOR).$(MINOR) $(prefix)/usr/lib/$(LIB_NAME).so.$(MAJOR)
 	ln -sf $(LIB_NAME).so.$(MAJOR) $(prefix)/usr/lib/$(LIB_NAME).so
 

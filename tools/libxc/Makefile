@@ -1,3 +1,7 @@
+INSTALL		= install
+INSTALL_PROG	= $(INSTALL) -m0755
+INSTALL_DATA	= $(INSTALL) -m0644
+INSTALL_DIR	= $(INSTALL) -d -m0755
 
 MAJOR		:= 2.0
 MINOR		:= 0
@@ -64,12 +68,12 @@ mk-symlinks:
 	  ln -sf ../../$(LINUX_ROOT)/include/asm-xen/linux-public/*.h . )
 
 install: all
-	mkdir -p $(prefix)/usr/lib
-	mkdir -p $(prefix)/usr/include
-	install -m0755 $(LIB) $(prefix)/usr/lib
+	$(INSTALL_DIR) $(prefix)/usr/lib
+	$(INSTALL_DIR) $(prefix)/usr/include
+	$(INSTALL_PROG) $(LIB) $(prefix)/usr/lib
 	ln -sf $(LIB_NAME).so.$(MAJOR).$(MINOR) $(prefix)/usr/lib/$(LIB_NAME).so.$(MAJOR)
 	ln -sf $(LIB_NAME).so.$(MAJOR) $(prefix)/usr/lib/$(LIB_NAME).so
-	install -m0644 xc.h $(prefix)/usr/include
+	$(INSTALL_DATA) xc.h $(prefix)/usr/include
 
 clean:
 	rm -rf *.a *.so *.o *.opic *.rpm $(LIB) *~ $(DEPS) xen
