@@ -100,7 +100,7 @@ BUILD_SMP_INTERRUPT(spurious_interrupt,SPURIOUS_APIC_VECTOR)
 	IRQ(x,8), IRQ(x,9), IRQ(x,a), IRQ(x,b), \
 	IRQ(x,c), IRQ(x,d), IRQ(x,e), IRQ(x,f)
 
-    void (*interrupt[NR_IRQS])(void) = {
+    void *interrupt[NR_IRQS] = {
 	IRQLIST_16(0x0),
 
 #ifdef CONFIG_X86_IO_APIC
