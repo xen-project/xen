@@ -53,9 +53,17 @@ typedef struct schedule_data_st
     u32                 hist[BUCKETS];  /* for scheduler latency histogram */
 #endif
 } __cacheline_aligned schedule_data_t;
-schedule_data_t schedule_data[NR_CPUS];
+static schedule_data_t schedule_data[NR_CPUS];
 
-struct ac_timer v_timer;        /* scheduling timer  */
+/* Skanky periodic event to all guests. This must die in the next release! */
+static struct ac_timer v_timer; 
+
+/*
+ * Per-CPU timer to ensure that even guests with very long quantums get
+ * their time-of-day state updated often enough to avoid wrapping.
+ */
+static struct ac_timer fallback_timer[NR_CPUS];
+
 static void virt_timer(unsigned long foo);
 static void dump_rqueue(struct list_head *queue, char *name);
 
@@ -544,10 +552,8 @@ int idle_cpu(int cpu)
 }
 
 
-/*
- * The scheduler timer.
- */
-static void sched_timer(unsigned long foo)
+/* The scheduler timer. */
+static void sched_timer(unsigned long unused)
 {
     int                 cpu  = smp_processor_id();
     struct task_struct *curr = schedule_data[cpu].curr;
@@ -556,31 +562,40 @@ static void sched_timer(unsigned long foo)
     perfc_incrc(sched_irq);
 }
 
-/*
- * The Domain virtual time timer
- */
-static void virt_timer(unsigned long foo)
+/* The Domain virtual time timer */
+static void virt_timer(unsigned long unused)
 {
-    unsigned long cpu_mask = 0;
+    unsigned long flags, cpu_mask = 0;
     struct task_struct *p;
     s_time_t now;
 
     /* send virtual timer interrupt */
-    read_lock(&tasklist_lock);
+    read_lock_irqsave(&tasklist_lock, flags);
     p = &idle0_task;
     do {
         if ( is_idle_task(p) ) continue;
         cpu_mask |= mark_guest_event(p, _EVENT_TIMER);
-        if ( p->has_cpu ) 
-            update_dom_time(p->shared_info);
     }
     while ( (p = p->next_task) != &idle0_task );
-    read_unlock(&tasklist_lock);
+    read_unlock_irqrestore(&tasklist_lock, flags);
     guest_event_notify(cpu_mask);
 
     now = NOW();
-    v_timer.expires  = now + MILLISECS(20);
+    v_timer.expires = now + MILLISECS(20);
     add_ac_timer(&v_timer);
+}
+
+/* Fallback timer to ensure guests get time updated 'often enough'. */
+static void fallback_timer_fn(unsigned long unused)
+{
+    struct task_struct *p = current;
+    unsigned int cpu = p->processor;
+
+    if ( !is_idle_task(p) )
+        update_dom_time(p->shared_info);
+
+    fallback_timer[cpu].expires = NOW() + MILLISECS(500);
+    add_ac_timer(&fallback_timer[cpu]);
 }
 
 /*
@@ -598,15 +613,19 @@ void __init scheduler_init(void)
         spin_lock_init(&schedule_data[i].lock);
         schedule_data[i].curr = &idle0_task;
         
-        /* a timer for each CPU  */
         init_ac_timer(&schedule_data[i].s_timer, i);
-        schedule_data[i].s_timer.data = 2;
+        schedule_data[i].s_timer.data     = 2;
         schedule_data[i].s_timer.function = &sched_timer;
 
+        init_ac_timer(&fallback_timer[i], i);
+        fallback_timer[i].data     = 0;
+        fallback_timer[i].function = &fallback_timer_fn;
     }
-    schedule_data[0].idle = &idle0_task; /* idle on CPU 0 is special */
+
+    schedule_data[0].idle = &idle0_task;
+
     init_ac_timer(&v_timer, 0);
-    v_timer.data = 3;
+    v_timer.data     = 0;
     v_timer.function = &virt_timer;
 }
 
@@ -617,9 +636,14 @@ void __init scheduler_init(void)
 void schedulers_start(void) 
 {   
     printk("Start schedulers\n");
-    sched_timer(0);
+
     virt_timer(0);
+
+    sched_timer(0);
     smp_call_function((void *)sched_timer, NULL, 1, 1);
+
+    fallback_timer_fn(0);
+    smp_call_function((void *)fallback_timer_fn, NULL, 1, 1);
 }
 
 
