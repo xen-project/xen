@@ -347,20 +347,20 @@ int __net_get_target_vif(u8 *data, unsigned int len, int src_vif)
     int target = VIF_DROP;
     u8 *h_raw, *nh_raw;
     
-    if ( len < 2 ) goto drop;
+    if ( len < ETH_HLEN ) goto drop;
 
     nh_raw = data + ETH_HLEN;
     switch ( ntohs(*(unsigned short *)(data + 12)) )
     {
     case ETH_P_ARP:
-        if ( len < 28 ) goto drop;
+        if ( len < (ETH_HLEN + 28) ) goto drop;
         target = net_find_rule((u8)ETH_P_ARP, 0, ntohl(*(u32 *)(nh_raw + 14)),
                                ntohl(*(u32 *)(nh_raw + 24)), 0, 0, 
                                src_vif);
         break;
 
     case ETH_P_IP:
-        if ( len < 20 ) goto drop;
+        if ( len < (ETH_HLEN + 20) ) goto drop;
         h_raw =  data + ((*(unsigned char *)(nh_raw)) & 0x0f) * 4;
         
         /* XXX For now, we ignore ports. */

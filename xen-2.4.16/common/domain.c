@@ -321,7 +321,7 @@ int final_setup_guestos(struct task_struct * p, dom_meminfo_t * meminfo)
     __asm__ __volatile__ ( 
         "mov %%eax,%%cr3" : : "a" (pagetable_val(p->mm.pagetable)));
 
-    memset(virt_startinfo_addr, 0, sizeof(virt_startinfo_addr));
+    memset(virt_startinfo_addr, 0, sizeof(*virt_startinfo_addr));
     virt_startinfo_addr->nr_pages = p->tot_pages;
     virt_startinfo_addr->shared_info = (shared_info_t *)meminfo->virt_shinfo_addr;
     virt_startinfo_addr->pt_base = meminfo->virt_load_addr + 

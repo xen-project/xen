@@ -297,12 +297,6 @@ asmlinkage void do_general_protection(struct pt_regs * regs, long error_code)
         ti = current->thread.traps + (error_code>>3);
         if ( ti->dpl >= (regs->xcs & 3) )
         {
-            /* XXX Kill next conditional soon :-) XXX */
-            if ( (error_code>>3)==0x80 ) 
-            { 
-                printk("DIDN'T USE FAST-TRAP HANDLER FOR 0x80!!! :-(\n");
-                BUG(); 
-            }
             gtb->flags = GTBF_TRAP_NOCODE;
             gtb->cs    = ti->cs;
             gtb->eip   = ti->address;
