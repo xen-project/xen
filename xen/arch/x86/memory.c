@@ -1288,6 +1288,9 @@ void ptwr_reconnect_disconnected(unsigned long addr)
                          _PAGE_PRESENT);
     pl1e = map_domain_mem(l2_pgentry_to_pagenr(nl2e) << PAGE_SHIFT);
     for ( i = 0; i < ENTRIES_PER_L1_PAGETABLE; i++ ) {
+        if (likely(l1_pgentry_val(pl1e[i]) ==
+                   l1_pgentry_val(ptwr_disconnected_page[cpu][i])))
+            continue;
         if (likely((l1_pgentry_val(pl1e[i]) ^
                     l1_pgentry_val(ptwr_disconnected_page[cpu][i])) ==
                    _PAGE_RW)) {
@@ -1301,18 +1304,16 @@ void ptwr_reconnect_disconnected(unsigned long addr)
             if (likely(readonly_page_from_l1e(pl1e[i])))
                 continue;
         }
-        if (l1_pgentry_val(pl1e[i]) != l1_pgentry_val(ptwr_disconnected_page[cpu][i])) {
 #if 0
-            printk("%03x: %08lx != %08lx\n", i,
-                   l1_pgentry_val(ptwr_disconnected_page[cpu][i]),
-                   l1_pgentry_val(pl1e[i]));
+        printk("%03x: %08lx != %08lx\n", i,
+               l1_pgentry_val(ptwr_disconnected_page[cpu][i]),
+               l1_pgentry_val(pl1e[i]));
 #endif
-            if (unlikely(l1_pgentry_val(ptwr_disconnected_page[cpu][i]) &
-                         _PAGE_PRESENT))
-                put_page_from_l1e(ptwr_disconnected_page[cpu][i]);
-            if (unlikely(!get_page_from_l1e(pl1e[i])))
-                BUG();
-        }
+        if (unlikely(l1_pgentry_val(ptwr_disconnected_page[cpu][i]) &
+                     _PAGE_PRESENT))
+            put_page_from_l1e(ptwr_disconnected_page[cpu][i]);
+        if (unlikely(!get_page_from_l1e(pl1e[i])))
+            BUG();
     }
     unmap_domain_mem(pl1e);
     update_l2e(pl2e, *pl2e, nl2e);
@@ -1367,6 +1368,9 @@ void ptwr_flush_inactive(void)
 
         pl1e = map_domain_mem(pfn << PAGE_SHIFT);
         for ( i = 0; i < ENTRIES_PER_L1_PAGETABLE; i++ ) {
+            if (likely(l1_pgentry_val(pl1e[i]) ==
+                       l1_pgentry_val(ptwr_writable_page[cpu][idx][i])))
+                continue;
 #if 0
             if ((l1_pgentry_val(pl1e[i]) ^
                  l1_pgentry_val(ptwr_writable_page[cpu][idx][i])) == _PAGE_RW) {
@@ -1381,19 +1385,16 @@ void ptwr_flush_inactive(void)
                     continue;
             }
 #endif
-            if (l1_pgentry_val(pl1e[i]) !=
-                l1_pgentry_val(ptwr_writable_page[cpu][idx][i])) {
 #if 0
-                printk("%03x: %08lx != %08lx\n", i,
-                       l1_pgentry_val(ptwr_writable_page[cpu][idx][i]),
-                       l1_pgentry_val(pl1e[i]));
+            printk("%03x: %08lx != %08lx\n", i,
+                   l1_pgentry_val(ptwr_writable_page[cpu][idx][i]),
+                   l1_pgentry_val(pl1e[i]));
 #endif
-                if (unlikely(l1_pgentry_val(ptwr_writable_page[cpu][idx][i]) &
-                             _PAGE_PRESENT))
-                    put_page_from_l1e(ptwr_writable_page[cpu][idx][i]);
-                if (unlikely(!get_page_from_l1e(pl1e[i])))
-                    BUG();
-            }
+            if (unlikely(l1_pgentry_val(ptwr_writable_page[cpu][idx][i]) &
+                         _PAGE_PRESENT))
+                put_page_from_l1e(ptwr_writable_page[cpu][idx][i]);
+            if (unlikely(!get_page_from_l1e(pl1e[i])))
+                BUG();
         }
         unmap_domain_mem(pl1e);
 
