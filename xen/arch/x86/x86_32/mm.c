@@ -190,16 +190,38 @@ int check_descriptor(unsigned long *d)
     limit++; /* We add one because limit is inclusive. */
     if ( (b & _SEGMENT_G) )
         limit <<= 12;
-    if ( ((base + limit) <= base) || 
-         ((base + limit) > PAGE_OFFSET) )
+
+    if ( (b & (3<<10)) == 1 )
     {
-        /* Need to truncate. Calculate and poke a best-effort limit. */
-        limit = PAGE_OFFSET - base;
-        if ( (b & _SEGMENT_G) )
-            limit >>= 12;
-        limit--;
-        d[0] &= ~0x0ffff; d[0] |= limit & 0x0ffff;
-        d[1] &= ~0xf0000; d[1] |= limit & 0xf0000;
+        /*
+         * Grows-down limit check. 
+         * NB. limit == 0xFFFFF provides no access      (if G=1).
+         *     limit == 0x00000 provides 4GB-4kB access (if G=1).
+         */
+        if ( (base + limit) > base )
+        {
+            limit = -(base & PAGE_MASK);
+            goto truncate;
+        }
+    }
+    else
+    {
+        /*
+         * Grows-up limit check.
+         * NB. limit == 0xFFFFF provides 4GB access (if G=1).
+         *     limit == 0x00000 provides 4kB access (if G=1).
+         */
+        if ( ((base + limit) <= base) || 
+             ((base + limit) > PAGE_OFFSET) )
+        {
+            limit = PAGE_OFFSET - base;
+        truncate:
+            if ( !(b & _SEGMENT_G) )
+                goto bad; /* too dangerous; too hard to work out... */
+            limit = (limit >> 12) - 1;
+            d[0] &= ~0x0ffff; d[0] |= limit & 0x0ffff;
+            d[1] &= ~0xf0000; d[1] |= limit & 0xf0000;
+        }
     }
 
  good:
