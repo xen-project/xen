@@ -21,10 +21,11 @@ debug:
 	objdump -D -S $(TARGET)-syms > $(TARGET).s
 
 install: $(TARGET).gz
-	$(INSTALL_DIR) $(DESTDIR)/boot
+	[ -d $(DESTDIR)/boot ] || $(INSTALL_DIR) $(DESTDIR)/boot
 	$(INSTALL_DATA) $(TARGET).gz $(DESTDIR)/boot
 	$(INSTALL_DATA) $(TARGET)-syms $(DESTDIR)/boot
-	$(INSTALL_DIR) $(DESTDIR)/usr/include/xen/io
+	[ -d $(DESTDIR)/usr/include/xen/io ] || \
+		$(INSTALL_DIR) $(DESTDIR)/usr/include/xen/io
 	$(INSTALL_DATA) include/public/*.h $(DESTDIR)/usr/include/xen
 	$(INSTALL_DATA) include/public/io/*.h $(DESTDIR)/usr/include/xen/io
 	$(INSTALL_DATA) include/public/COPYING $(DESTDIR)/usr/include/xen

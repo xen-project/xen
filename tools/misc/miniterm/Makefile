@@ -9,7 +9,7 @@ TARGET = miniterm
 all: $(TARGET)
 
 install: all
-	$(INSTALL_DIR) $(DESTDIR)/usr/bin
+	[ -d $(DESTDIR)/usr/bin ] || $(INSTALL_DIR) $(DESTDIR)/usr/bin
 	$(INSTALL_PROG) $(TARGET) $(DESTDIR)/usr/bin
 
 clean:

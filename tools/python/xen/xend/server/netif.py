@@ -140,7 +140,8 @@ class NetDev(controller.SplitDev):
         self.ipaddr = self._get_config_ipaddr(config) or []
         
         try:
-            self.backendDomain = int(sxp.child_value(config, 'backend', '0'))
+            xd = get_component('xen.xend.XendDomain')
+            self.backendDomain = int(xd.domain_lookup(sxp.child_value(config, 'backend', '0')).id)
         except:
             raise XendError('invalid backend domain')
 
@@ -161,7 +162,8 @@ class NetDev(controller.SplitDev):
         bridge = sxp.child_value(config, 'bridge')
         script = sxp.child_value(config, 'script')
         ipaddr = self._get_config_ipaddr(config)
-        backendDomain = sxp.child_value(config, 'backend', '0')
+        xd = get_component('xen.xend.XendDomain')
+        backendDomain = str(xd.domain_lookup(sxp.child_value(config, 'backend', '0')).id)
         if (mac is not None) and (mac != self.mac):
             raise XendError("cannot change mac")
         if (backendDomain is not None) and (backendDomain != str(self.backendDomain)):
