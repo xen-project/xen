@@ -334,6 +334,10 @@ static int handle_dom0_cmd_dopgupdates(unsigned long data)
 	return -EFAULT;
 
     /* argbuf.pgt_update_arr had better be direct mapped... */
+    /* Actually, we only *really* need to make sure that all of it's
+       pages are in memory and aren't going to get swapped out in the
+       mean time, but this is slightly easier than checking all of
+       that and is sufficient for the current userspace tools. */
     entry = find_direct(&current->mm->context.direct_list,
 			argbuf.pgt_update_arr);
     if (entry == &current->mm->context.direct_list)
