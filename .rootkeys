@@ -246,6 +246,7 @@
 40f5623cndVUFlkxpf7Lfx7xu8madQ linux-2.6.7-xen-sparse/include/asm-xen/multicall.h
 40f5623cTZ80EwjWUBlh44A9F9i_Lg linux-2.6.7-xen-sparse/include/asm-xen/netif.h
 40f5623cBiQhPHILVLrl3xa6bDBaRg linux-2.6.7-xen-sparse/include/asm-xen/xen.h
+40f56a0ddHCSs3501MY4hRf22tctOw linux-2.6.7-xen-sparse/mkbuildtree
 40e1b09db5mN69Ijj0X_Eol-S7dXiw tools/Make.defs
 3f776bd1Hy9rn69ntXBhPReUFw9IEA tools/Makefile
 401d7e160vaxMBAUSLSicuZ7AQjJ3w tools/examples/Makefile
