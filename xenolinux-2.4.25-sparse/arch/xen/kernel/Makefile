@@ -13,7 +13,7 @@ obj-y	:= process.o semaphore.o signal.o entry.o traps.o irq.o  \
 		i386_ksyms.o i387.o evtchn.o pci-dma.o
 
 ifdef CONFIG_PCI
-obj-y	+= pci-i386.o pci-pc.o pci-irq.o
+obj-y	+= pci-i386.o pci-pc.o
 endif
 
 include $(TOPDIR)/Rules.make

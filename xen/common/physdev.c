@@ -1,11 +1,8 @@
 /* -*-  Mode:C; c-basic-offset:4; tab-width:4 -*-
  ****************************************************************************
- * (C) 2004 - Rolf Neugebauer - Intel Research Cambridge
+ * (c) 2004 - Rolf Neugebauer - Intel Research Cambridge
+ * (c) 2004 - Keir Fraser - University of Cambridge
  ****************************************************************************
- *
- *        File: phys_dev.c
- *      Author: Rolf Neugebauer (rolf.neugebauer@intel.com)
- *        Date: Feb 2004
  * 
  * Description: allows a domain to access devices on the PCI bus
  *
@@ -46,6 +43,9 @@
 #include <asm/pci.h>
 #include <hypervisor-ifs/hypervisor-if.h>
 #include <hypervisor-ifs/physdev.h>
+
+/* Called by PHYSDEV_PCI_INITIALISE_DEVICE to finalise IRQ routing. */
+extern void pcibios_enable_irq(struct pci_dev *dev);
 
 #if 1
 #define DBG(_x...)
@@ -267,7 +267,7 @@ inline static int check_dev_acc (struct task_struct *p,
  * error is flagged.
  */
 static int do_base_address_access(phys_dev_t *pdev, int acc,
-                                  int seg, int bus, int dev, int func, 
+                                  int bus, int dev, int func, 
                                   int reg, int len, u32 *val)
 {
     int idx, st_bit, ret = -EINVAL;
@@ -293,7 +293,7 @@ static int do_base_address_access(phys_dev_t *pdev, int acc,
             clear_bit(st_bit, &pdev->state);
 
             /* check if guest tries to restore orig value */
-            ret = pci_config_read(seg, bus, dev, func, reg, len, &orig_val);
+            ret = pci_config_read(0, bus, dev, func, reg, len, &orig_val);
             if ( *val != orig_val ) 
             {
                 printk("caution: guest tried to change base address range.\n");
@@ -311,12 +311,12 @@ static int do_base_address_access(phys_dev_t *pdev, int acc,
         if ( !test_bit(st_bit, &pdev->state) )
         {
             /* just read and return */
-            ret = pci_config_read(seg, bus, dev, func, reg, len, val);
+            ret = pci_config_read(0, bus, dev, func, reg, len, val);
         }
         else
         {
             /* fake value */
-            ret = pci_config_read(seg, bus, dev, func, reg, len, &orig_val);
+            ret = pci_config_read(0, bus, dev, func, reg, len, &orig_val);
 
             sz  = res->end - res->start;
 
@@ -358,8 +358,8 @@ static int do_base_address_access(phys_dev_t *pdev, int acc,
  * pretty much the same as a above
  */
 static int do_rom_address_access(phys_dev_t *pdev, int acc,
-                                  int seg, int bus, int dev, int func, 
-                                  int reg, int len, u32 *val)
+                                 int bus, int dev, int func, 
+                                 int reg, int len, u32 *val)
 {
     int st_bit, ret = -EINVAL;
     u32 orig_val, sz;
@@ -383,7 +383,7 @@ static int do_rom_address_access(phys_dev_t *pdev, int acc,
             clear_bit(st_bit, &pdev->state);
             
             /* check if guest tries to restore orig value */
-            ret = pci_config_read(seg, bus, dev, func, reg, len, &orig_val);
+            ret = pci_config_read(0, bus, dev, func, reg, len, &orig_val);
             if ( (*val != orig_val) ) 
             {
                 if (*val != 0x00000000 )
@@ -409,12 +409,12 @@ static int do_rom_address_access(phys_dev_t *pdev, int acc,
        if ( !test_bit(st_bit, &pdev->state) )
         {
             /* just read and return */
-            ret = pci_config_read(seg, bus, dev, func, reg, len, val);
+            ret = pci_config_read(0, bus, dev, func, reg, len, val);
         }
         else
         {
             /* fake value */
-            ret = pci_config_read(seg, bus, dev, func, reg, len, &orig_val);
+            ret = pci_config_read(0, bus, dev, func, reg, len, &orig_val);
             sz  = res->end - res->start;
             *val = 0xffffffff;
             /* leave bit 0 untouched */
@@ -438,18 +438,17 @@ static int do_rom_address_access(phys_dev_t *pdev, int acc,
  * For some registers for read-only devices (e.g. address base registers)
  * we need to maintain a state machine.
  */
-static long pci_cfgreg_read(int seg, int bus, int dev, int func, int reg,
+static long pci_cfgreg_read(int bus, int dev, int func, int reg,
                             int len, u32 *val)
 {
-    int ret = 0;
+    int ret;
     phys_dev_t *pdev;
 
-    ret = check_dev_acc(current, bus, dev, func, &pdev);
-    if ( ret != 0 )
+    if ( (ret = check_dev_acc(current, bus, dev, func, &pdev)) != 0 )
         return ret;
 
-    /* fake out read requests for some registers */
-    switch (reg)
+    /* Fake out read requests for some registers. */
+    switch ( reg )
     {
     case PCI_BASE_ADDRESS_0:
     case PCI_BASE_ADDRESS_1:
@@ -457,23 +456,26 @@ static long pci_cfgreg_read(int seg, int bus, int dev, int func, int reg,
     case PCI_BASE_ADDRESS_3:
     case PCI_BASE_ADDRESS_4:
     case PCI_BASE_ADDRESS_5:
-        ret = do_base_address_access (pdev, ACC_READ, seg, bus, dev, 
-                                      func, reg, len, val);
-        return ret;
+        ret = do_base_address_access(pdev, ACC_READ, bus, dev, 
+                                     func, reg, len, val);
         break;
+
     case PCI_ROM_ADDRESS:
-        ret = do_rom_address_access (pdev, ACC_READ, seg, bus, dev, 
-                                      func, reg, len, val);
-        return ret;
+        ret = do_rom_address_access(pdev, ACC_READ, bus, dev, 
+                                    func, reg, len, val);
         break;        
+
+    case PCI_INTERRUPT_LINE:
+        ret = pdev->dev->irq;
+        break;
+
     default:
+        ret = pci_config_read(0, bus, dev, func, reg, len, val);        
+        DBG("pci read : %02x:%02x:%02x reg=0x%02x len=0x%02x val=0x%08x\n",
+            bus, dev, func, reg, len, *val);
         break;
     }
 
-    ret = pci_config_read(seg, bus, dev, func, reg, len, val);
-
-    DBG("pci read : %02x:%02x:%02x reg=0x%02x len=0x%02x val=0x%08x\n",
-        bus, dev, func, reg, len, *val);
     return ret;
 }
 
@@ -483,14 +485,13 @@ static long pci_cfgreg_read(int seg, int bus, int dev, int func, int reg,
  * for some registers a state machine is maintained to fake out r/w access.
  * By default no write access is allowed but we may change that in the future.
  */
-static long pci_cfgreg_write(int seg, int bus, int dev, int func, int reg,
+static long pci_cfgreg_write(int bus, int dev, int func, int reg,
                              int len, u32 val)
 {
-    int ret = 0;
+    int ret;
     phys_dev_t *pdev;
 
-    ret = check_dev_acc(current, bus, dev, func, &pdev);
-    if ( ret != 0 )
+    if ( (ret = check_dev_acc(current, bus, dev, func, &pdev)) != 0 )
         return ret;
 
     /* special treatment for some registers */
@@ -502,73 +503,61 @@ static long pci_cfgreg_write(int seg, int bus, int dev, int func, int reg,
     case PCI_BASE_ADDRESS_3:
     case PCI_BASE_ADDRESS_4:
     case PCI_BASE_ADDRESS_5:
-        ret = do_base_address_access (pdev, ACC_WRITE, seg, bus, dev, 
+        ret = do_base_address_access (pdev, ACC_WRITE, bus, dev, 
                                       func, reg, len, &val);
         return ret;
         break;
+
     case PCI_ROM_ADDRESS:
-        ret = do_rom_address_access (pdev, ACC_WRITE, seg, bus, dev, 
+        ret = do_rom_address_access (pdev, ACC_WRITE, bus, dev, 
                                       func, reg, len, &val);
         return ret;
         break;        
-#if 0
-    case 0xe0: /* XXX some device drivers seem to write to this.... */
-        printk("pci write hack allowed %02x:%02x:%02x: "
-                   "reg=0x%02x len=0x%02x val=0x%08x\n",
-                   bus, dev, func, reg, len, val);
-        break;        
-#endif
+
     default:
-        //if ( pdev->flags != ACC_WRITE ) 
-        /* XXX for debug we disallow all write access */
+        if ( pdev->flags != ACC_WRITE ) 
         {
             printk("pci write not allowed %02x:%02x:%02x: "
                    "reg=0x%02x len=0x%02x val=0x%08x\n",
                    bus, dev, func, reg, len, val);
-            return -EPERM;
+            ret = -EPERM;
+        }
+        else
+        {
+            ret = pci_config_write(0, bus, dev, func, reg, len, val);
+            DBG("pci write: %02x:%02x:%02x reg=0x%02x len=0x%02x val=0x%08x\n",
+                bus, dev, func, reg, len, val);
         }
         break;
     }
 
-    ret = pci_config_write(seg, bus, dev, func, reg, len, val);
-
-    DBG("pci write: %02x:%02x:%02x reg=0x%02x len=0x%02x val=0x%08x\n",
-        bus, dev, func, reg, len, val);
     return ret;
 }
 
-/*
- * 
- * Interrupt handling
- * 
- */
 
-
-/*
- * return the IRQ xen assigned to the device.
- * This may be different to what is in the PCI confic space!
- * XXX RN: I'm not sure we need this. we could just intercept PCI config
- * reads on PCI_INTERRUPT_LINE and return the correct value.
- */
-static long pci_find_irq(int seg, int bus, int dev, int func, u32 *val)
+static long pci_probe_root_buses(u32 *busmask)
 {
-    int ret = 0;
     phys_dev_t *pdev;
+    struct list_head *tmp;
 
-    ret = check_dev_acc(current, bus, dev, func, &pdev);
-    if ( ret != 0 )
-        return ret;
+    memset(busmask, 0, 256/8);
 
-    *val = pdev->dev->irq;
+    list_for_each ( tmp, &current->pcidev_list )
+    {
+        pdev = list_entry(tmp, phys_dev_t, node);
+        set_bit(pdev->dev->bus->number, busmask);
+    }
+
     return 0;
 }
 
 
 /*
- * demux hypervisor call.
+ * Demuxing hypercall.
  */
 long do_physdev_op(physdev_op_t *uop)
 {
+    phys_dev_t *pdev;
     physdev_op_t op;
     long ret;
 
@@ -577,24 +566,35 @@ long do_physdev_op(physdev_op_t *uop)
 
     switch ( op.cmd )
     {
-    case PHYSDEVOP_CFGREG_READ:
-        ret = pci_cfgreg_read(op.u.cfg_read.seg, op.u.cfg_read.bus,
-                              op.u.cfg_read.dev, op.u.cfg_read.func,
-                              op.u.cfg_read.reg, op.u.cfg_read.len,
-                              &op.u.cfg_read.value);
+    case PHYSDEVOP_PCI_CFGREG_READ:
+        ret = pci_cfgreg_read(op.u.pci_cfgreg_read.bus,
+                              op.u.pci_cfgreg_read.dev, 
+                              op.u.pci_cfgreg_read.func,
+                              op.u.pci_cfgreg_read.reg, 
+                              op.u.pci_cfgreg_read.len,
+                              &op.u.pci_cfgreg_read.value);
         break;
 
-    case PHYSDEVOP_CFGREG_WRITE:
-        ret = pci_cfgreg_write(op.u.cfg_write.seg, op.u.cfg_write.bus,
-                               op.u.cfg_write.dev, op.u.cfg_write.func,
-                               op.u.cfg_write.reg, op.u.cfg_write.len,
-                               op.u.cfg_write.value);
+    case PHYSDEVOP_PCI_CFGREG_WRITE:
+        ret = pci_cfgreg_write(op.u.pci_cfgreg_write.bus,
+                               op.u.pci_cfgreg_write.dev, 
+                               op.u.pci_cfgreg_write.func,
+                               op.u.pci_cfgreg_write.reg, 
+                               op.u.pci_cfgreg_write.len,
+                               op.u.pci_cfgreg_write.value);
         break;
 
-    case PHYSDEVOP_FIND_IRQ:
-        ret = pci_find_irq(op.u.find_irq.seg, op.u.find_irq.bus,
-                           op.u.find_irq.dev, op.u.find_irq.func,
-                           &op.u.find_irq.irq);
+    case PHYSDEVOP_PCI_INITIALISE_DEVICE:
+        if ( (ret = check_dev_acc(current, 
+                                  op.u.pci_initialise_device.bus, 
+                                  op.u.pci_initialise_device.dev, 
+                                  op.u.pci_initialise_device.func, 
+                                  &pdev)) == 0 )
+            pcibios_enable_irq(pdev->dev);
+        break;
+
+    case PHYSDEVOP_PCI_PROBE_ROOT_BUSES:
+        ret = pci_probe_root_buses(op.u.pci_probe_root_buses.busmask);
         break;
 
     case PHYSDEVOP_UNMASK_IRQ:
@@ -611,10 +611,7 @@ long do_physdev_op(physdev_op_t *uop)
 }
 
 
-/*
- * Domain 0 has read access to all devices.
- * XXX this is a bit of a hack
- */
+/* Domain 0 has read access to all devices. */
 void physdev_init_dom0(struct task_struct *p)
 {
     struct pci_dev *dev;
@@ -627,7 +624,7 @@ void physdev_init_dom0(struct task_struct *p)
         /* add device */
         pdev = kmalloc(sizeof(phys_dev_t), GFP_KERNEL);
         pdev->dev = dev;
-        pdev->flags = ACC_READ;
+        pdev->flags = ACC_WRITE;
         pdev->state = 0;
         pdev->owner = p;
         list_add(&pdev->node, &p->pcidev_list);
