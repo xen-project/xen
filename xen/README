@@ -1,109 +1,16 @@
 
 *****************************************************
-   Xeno Hypervisor (18/7/02)
+   Xeno Hypervisor (16/3/03)
 
-1) Tree layout
-Looks rather like a simplified Linux :-)
-Headers are in include/xeno and include asm-<arch>.
-At build time we create symlinks:
- include/linux -> include/xeno
- include/asm   -> include/asm-<arch>
-In this way, Linux device drivers should need less tweaking of
-their #include lines.
-
-For source files, mapping between hypervisor and Linux is:
- Linux                 Hypervisor
- -----                 ----------
- kernel/init/mm/lib -> common
- net/*              -> net/*
- drivers/*          -> drivers/*
- arch/*             -> arch/*
-
-Note that the use of #include <asm/...> and #include <linux/...> can
-lead to confusion, as such files will often exist on the system include
-path, even if a version doesn't exist within the hypervisor tree.
-Unfortunately '-nostdinc' cannot be specified to the compiler, as that
-prevents us using stdarg.h in the compiler's own header directory.
-
-We try to not modify things in driver/* as much as possible, so we can
-easily take updates from Linux. arch/* is basically straight from
-Linux, with fingers in Linux-specific pies hacked off. common/* has
-a lot of Linux code in it, but certain subsystems (task maintenance,
-low-level memory handling) have been replaced. net/* contains enough
-Linux-like gloop to get network drivers to work with little/no
-modification.
-
-2) Building
 'make': Builds ELF executable called 'image' in base directory
-'make install': gzip-compresses 'image' and copies it to TFTP server
 'make clean': removes *all* build and target files
 
-
-*****************************************************
-Random thoughts and stuff from here down...
-
-Todo list
----------
-* Hypervisor need only directly map its own memory pool
-  (maybe 128MB, tops). That would need 0x08000000....
-  This would allow 512MB Linux with plenty room for vmalloc'ed areas.
-* Network device -- port drivers to hypervisor, implement virtual
-  driver for xeno-linux. Looks like Ethernet.
-  -- Hypervisor needs to do (at a minimum):
-       - packet filtering on tx (unicast IP only)
-       - packet demux on rx     (unicast IP only)
-       - provide DHCP [maybedo something simpler?]
-         and ARP [at least for hypervisor IP address]
-
-
-Segment descriptor tables
--------------------------
-We want to allow guest OSes to specify GDT and LDT tables using their
-own pages of memory (just like with page tables). So allow the following:
- * new_table_entry(ptr, val)
-   [Allows insertion of a code, data, or LDT descriptor into given
-    location. Can simply be checked then poked, with no need to look at
-    page type.]
- * new_GDT() -- relevent virtual pages are resolved to frames. Either
-    (i) page not present; or (ii) page is only mapped read-only and checks
-    out okay (then marked as special page). Old table is resolved first,
-    and the pages are unmarked (no longer special type).
- * new_LDT() -- same as for new_GDT(), with same special page type.
-
-Page table updates must be hooked, so we look for updates to virtual page
-addresses in the GDT/LDT range. If map to not present, then old physpage
-has type_count decremented. If map to present, ensure read-only, check the
-page, and set special type.
-
-Merge set_{LDT,GDT} into update_baseptr, by passing four args:
- update_baseptrs(mask, ptab, gdttab, ldttab);
-Update of ptab requires update of gtab (or set to internal default).
-Update of gtab requires update of ltab (or set to internal default).
-
-
-The hypervisor page cache
--------------------------
-This will allow guest OSes to make use of spare pages in the system, but
-allow them to be immediately used for any new domains or memory requests.
-The idea is that, when a page is laundered and falls off Linux's clean_LRU
-list, rather than freeing it it becomes a candidate for passing down into
-the hypervisor. In return, xeno-linux may ask for one of its previously-
-cached pages back:
- (page, new_id) = cache_query(page, old_id);
-If the requested page couldn't be kept, a blank page is returned.
-When would Linux make the query? Whenever it wants a page back without
-the delay or going to disc. Also, whenever a page would otherwise be
-flushed to disc.
-
-To try and add to the cache: (blank_page, new_id) = cache_query(page, NULL);
- [NULL means "give me a blank page"].
-To try and retrieve from the cache: (page, new_id) = cache_query(x_page, id)
- [we may request that x_page just be discarded, and therefore not impinge
-  on this domain's cache quota].
 
 
 Booting secondary processors
 ----------------------------
+
+It's twisty and turny, so this is (roughly) the code path:
 
 start_of_day (i386/setup.c)
 smp_boot_cpus (i386/smpboot.c)
@@ -128,18 +35,3 @@ On other processor:
        * barrier, then write bitmasks to signal back to boot cpu
        * then barrel into...
          cpu_idle (i386/process.c)
-         [THIS IS PROBABLY REASONABLE -- BOOT CPU SHOULD KICK
-          SECONDARIES TO GET WORK DONE]
-
-
-SMP capabilities
-----------------
-
-Current intention is to allow hypervisor to schedule on all processors in
-SMP boxen, but to tie each domain to a single processor. This simplifies
-many SMP intricacies both in terms of correctness and efficiency (eg.
-TLB flushing, network packet delivery, ...).
-
-Clients can still make use of SMP by installing multiple domains on a single
-machine, and treating it as a fast cluster (at the very least, the
-hypervisor will have fast routing of locally-destined packets).
