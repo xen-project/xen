@@ -60,19 +60,21 @@ typedef struct blkif_st {
     struct list_head blkdev_list;
     spinlock_t       blk_ring_lock;
     atomic_t         refcnt;
+
+    struct work_struct work;
 } blkif_t;
 
 void blkif_create(blkif_be_create_t *create);
 void blkif_destroy(blkif_be_destroy_t *destroy);
 void blkif_connect(blkif_be_connect_t *connect);
 int  blkif_disconnect(blkif_be_disconnect_t *disconnect, u8 rsp_id);
-void __blkif_disconnect_complete(blkif_t *blkif);
+void blkif_disconnect_complete(blkif_t *blkif);
 blkif_t *blkif_find_by_handle(domid_t domid, unsigned int handle);
 #define blkif_get(_b) (atomic_inc(&(_b)->refcnt))
 #define blkif_put(_b)                             \
     do {                                          \
         if ( atomic_dec_and_test(&(_b)->refcnt) ) \
-            __blkif_disconnect_complete(_b);      \
+            blkif_disconnect_complete(_b);        \
     } while (0)
 
 /* An entry in a list of xen_extents. */

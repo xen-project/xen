@@ -27,13 +27,14 @@ netif_t *netif_find_by_handle(domid_t domid, unsigned int handle)
     return netif;
 }
 
-void __netif_disconnect_complete(netif_t *netif)
+static void __netif_disconnect_complete(void *arg)
 {
+    netif_t              *netif = (netif_t *)arg;
     ctrl_msg_t            cmsg;
     netif_be_disconnect_t disc;
 
     /*
-     * These can't be done in __netif_disconnect() because at that point there
+     * These can't be done in netif_disconnect() because at that point there
      * may be outstanding requests at the disc whose asynchronous responses
      * must still be notified to the remote driver.
      */
@@ -68,6 +69,12 @@ void __netif_disconnect_complete(netif_t *netif)
 
     /* Send the successful response. */
     ctrl_if_send_response(&cmsg);
+}
+
+void netif_disconnect_complete(netif_t *netif)
+{
+    INIT_WORK(&netif->work, __netif_disconnect_complete, (void *)netif);
+    schedule_work(&netif->work);
 }
 
 void netif_create(netif_be_create_t *create)

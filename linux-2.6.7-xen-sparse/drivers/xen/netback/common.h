@@ -70,19 +70,21 @@ typedef struct netif_st {
     spinlock_t       rx_lock, tx_lock;
     struct net_device *dev;
     struct net_device_stats stats;
+
+    struct work_struct work;
 } netif_t;
 
 void netif_create(netif_be_create_t *create);
 void netif_destroy(netif_be_destroy_t *destroy);
 void netif_connect(netif_be_connect_t *connect);
 int  netif_disconnect(netif_be_disconnect_t *disconnect, u8 rsp_id);
-void __netif_disconnect_complete(netif_t *netif);
+void netif_disconnect_complete(netif_t *netif);
 netif_t *netif_find_by_handle(domid_t domid, unsigned int handle);
 #define netif_get(_b) (atomic_inc(&(_b)->refcnt))
 #define netif_put(_b)                             \
     do {                                          \
         if ( atomic_dec_and_test(&(_b)->refcnt) ) \
-            __netif_disconnect_complete(_b);      \
+            netif_disconnect_complete(_b);        \
     } while (0)
 
 void netif_interface_init(void);

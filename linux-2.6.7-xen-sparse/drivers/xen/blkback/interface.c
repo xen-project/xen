@@ -27,13 +27,14 @@ blkif_t *blkif_find_by_handle(domid_t domid, unsigned int handle)
     return blkif;
 }
 
-void __blkif_disconnect_complete(blkif_t *blkif)
+static void __blkif_disconnect_complete(void *arg)
 {
+    blkif_t              *blkif = (blkif_t *)arg;
     ctrl_msg_t            cmsg;
     blkif_be_disconnect_t disc;
 
     /*
-     * These can't be done in __blkif_disconnect() because at that point there
+     * These can't be done in blkif_disconnect() because at that point there
      * may be outstanding requests at the disc whose asynchronous responses
      * must still be notified to the remote driver.
      */
@@ -65,6 +66,12 @@ void __blkif_disconnect_complete(blkif_t *blkif)
 
     /* Send the successful response. */
     ctrl_if_send_response(&cmsg);
+}
+
+void blkif_disconnect_complete(blkif_t *blkif)
+{
+    INIT_WORK(&blkif->work, __blkif_disconnect_complete, (void *)blkif);
+    schedule_work(&blkif->work);
 }
 
 void blkif_create(blkif_be_create_t *create)
