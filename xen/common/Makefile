@@ -15,7 +15,7 @@ OBJS := $(subst trace.o,,$(OBJS))
 endif
 
 default: $(OBJS)
-	$(LD) $(LDARCHFLAGS) -r -o common.o $(OBJS)
+	$(LD) $(LDFLAGS) -r -o common.o $(OBJS)
 
 clean:
 	rm -f *.o *~ core

@@ -29,7 +29,7 @@ OBJS := pci.o quirks.o compat.o names.o setup-res.o
 #endif
 
 default: $(OBJS)
-	$(LD) -r -o driver.o $(OBJS)
+	$(LD) $(LDFLAGS) -r -o driver.o $(OBJS)
 
 clean:
 	rm -f *.o *~ core gen-devlist classlist.h devlist.h

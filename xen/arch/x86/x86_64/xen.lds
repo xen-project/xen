@@ -4,7 +4,7 @@ OUTPUT_ARCH(i386:x86-64)
 ENTRY(start)
 SECTIONS
 {
-  . = 0xFFFF840000100000;
+  . = 0xFFFF830000100000;
   _text = .;			/* Text and read-only data */
   .text : {
 	*(.text)
