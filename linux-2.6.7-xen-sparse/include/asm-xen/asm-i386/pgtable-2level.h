@@ -40,8 +40,13 @@ static inline int pgd_present(pgd_t pgd)	{ return 1; }
  * within a page table are directly modified.  Thus, the following
  * hook is made available.
  */
+#ifdef CONFIG_XEN_WRITABLE_PAGETABLES
+#define set_pte(pteptr, pteval) (*(pteptr) = pteval)
+#define set_pte_atomic(pteptr, pteval) (*(pteptr) = pteval)
+#else
 #define set_pte(pteptr, pteval) queue_l1_entry_update(pteptr, (pteval).pte_low)
 #define set_pte_atomic(pteptr, pteval) queue_l1_entry_update(pteptr, (pteval).pte_low)
+#endif
 /*
  * (pmds are folded into pgds so this doesn't get actually called,
  * but the define is needed for a generic inline function.)
@@ -70,7 +75,7 @@ static inline pte_t ptep_get_and_clear(pte_t *xp)
 {
 	pte_t pte = *xp;
 	if (pte.pte_low)
-		queue_l1_entry_update(xp, 0);
+		set_pte(xp, __pte_ma(0));
 	return pte;
 }
 

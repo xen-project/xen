@@ -191,7 +191,7 @@ extern unsigned long pg0[];
 #define pmd_none(x)	(!pmd_val(x))
 #define pmd_present(x)	(pmd_val(x) & _PAGE_PRESENT)
 /* pmd_clear below */
-#define	pmd_bad(x)	((pmd_val(x) & (~PAGE_MASK & ~_PAGE_USER)) != _KERNPG_TABLE)
+#define	pmd_bad(x)	((pmd_val(x) & (~PAGE_MASK & ~_PAGE_USER & ~_PAGE_PRESENT)) != (_KERNPG_TABLE & ~_PAGE_PRESENT))
 
 
 #define pages_to_mb(x) ((x) >> (20-PAGE_SHIFT))
@@ -241,9 +241,9 @@ static inline  int ptep_test_and_clear_young(pte_t *ptep)
 }
 static inline void ptep_set_wrprotect(pte_t *ptep)
 {
-	unsigned long pteval = *(unsigned long *)ptep;
-	if ((pteval & _PAGE_RW))
-		queue_l1_entry_update(ptep, pteval & ~_PAGE_RW);
+	pte_t pte = *ptep;
+	if (pte_write(pte))
+		set_pte(ptep, pte_wrprotect(pte));
 }
 static inline void ptep_mkdirty(pte_t *ptep)
 {
@@ -283,6 +283,7 @@ static inline pte_t pte_modify(pte_t pte, pgprot_t newprot)
 	pmd_t p = *(xp);					\
 	set_pmd(xp, __pmd(0));					\
 	__make_page_writeable((void *)pmd_page_kernel(p));	\
+	/* XXXcl queue */ \
 } while (0)
 
 #ifndef CONFIG_DISCONTIGMEM
@@ -401,6 +402,7 @@ static inline void make_page_readonly(void *va)
 	if ( (unsigned long)va >= VMALLOC_START )
 		__make_page_readonly(machine_to_virt(
 			*(unsigned long *)pte&PAGE_MASK));
+	/* XXXcl queue */
 }
 
 static inline void make_page_writeable(void *va)
@@ -412,6 +414,7 @@ static inline void make_page_writeable(void *va)
 	if ( (unsigned long)va >= VMALLOC_START )
 		__make_page_writeable(machine_to_virt(
 			*(unsigned long *)pte&PAGE_MASK));
+	/* XXXcl queue */
 }
 
 static inline void make_pages_readonly(void *va, unsigned int nr)
@@ -421,6 +424,7 @@ static inline void make_pages_readonly(void *va, unsigned int nr)
 		make_page_readonly(va);
 		va = (void *)((unsigned long)va + PAGE_SIZE);
 	}
+	/* XXXcl queue */
 }
 
 static inline void make_pages_writeable(void *va, unsigned int nr)
@@ -430,6 +434,7 @@ static inline void make_pages_writeable(void *va, unsigned int nr)
 		make_page_writeable(va);
 		va = (void *)((unsigned long)va + PAGE_SIZE);
 	}
+	/* XXXcl queue */
 }
 
 static inline unsigned long arbitrary_virt_to_phys(void *va)

@@ -6,6 +6,7 @@
 #include <asm/fixmap.h>
 #include <linux/threads.h>
 #include <linux/mm.h>		/* for struct page */
+#include <asm/io.h>		/* for phys_to_virt and page_to_pseudophys */
 
 #define pmd_populate_kernel(mm, pmd, pte) \
 		set_pmd(pmd, __pmd(_PAGE_TABLE + __pa(pte)))
@@ -15,7 +16,8 @@ static inline void pmd_populate(struct mm_struct *mm, pmd_t *pmd, struct page *p
 	set_pmd(pmd, __pmd(_PAGE_TABLE +
 		((unsigned long long)page_to_pfn(pte) <<
 			(unsigned long long) PAGE_SHIFT)));
-	flush_page_update_queue(); /* XXXcl flush */
+	flush_page_update_queue();
+	/* XXXcl queue */
 }
 /*
  * Allocate and free page tables.
@@ -30,17 +32,25 @@ extern struct page *pte_alloc_one(struct mm_struct *, unsigned long);
 static inline void pte_free_kernel(pte_t *pte)
 {
 	free_page((unsigned long)pte);
+	__make_page_writeable(pte);
 }
 
 static inline void pte_free(struct page *pte)
 {
-	__free_page(pte);
+#ifdef CONFIG_HIGHPTE
+	if (pte < highmem_start_page)
+#endif
+	{
+		__make_page_writeable(phys_to_virt(page_to_pseudophys(pte)));
+		__free_page(pte);
+	}
 }
 
 
 #define __pte_free_tlb(tlb,pte) do {			\
 	tlb_remove_page((tlb),(pte));			\
-	flush_page_update_queue(); /* XXXcl flush */	\
+	flush_page_update_queue();			\
+	/* XXXcl queue */ \
 } while (0)
 
 /*
