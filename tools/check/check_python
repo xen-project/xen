@@ -1,0 +1,10 @@
+#!/bin/bash
+# CHECK-BUILD CHECK-INSTALL
+
+function error {
+    echo "Check for Python version 2.2 or higher failed."
+    exit 1
+}
+
+python -V
+python -V 2>&1 | cut -d ' ' -f 2 | grep -q -E '^2.2|^2.3|^2.4' || error

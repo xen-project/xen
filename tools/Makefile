@@ -1,5 +1,6 @@
 
 all:	
+	$(MAKE) -C check
 	$(MAKE) -C libxutil
 	$(MAKE) -C libxc
 	$(MAKE) -C misc
