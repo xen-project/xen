@@ -215,7 +215,7 @@ def packMsg(ty, params):
         else:
             args[k] = v
     msg = xu.message(major, minor, msgid, args)
-    if DEBUG: print '<packMsg', msg.get_header()['id'], ty, params
+    if DEBUG: print '<packMsg', msg.get_header()['id'], ty, args
     return msg
 
 def unpackMsg(ty, msg):
@@ -231,8 +231,9 @@ def unpackMsg(ty, msg):
     @rtype: dict
     """
     args = msg.get_payload()
+    if DEBUG: print '>unpackMsg', args
     if isinstance(args, types.StringType):
-        args = { 'value': args }
+        args = {'value': args}
     else:
         mac = [0, 0, 0, 0, 0, 0]
         macs = []
@@ -284,5 +285,5 @@ def printMsg(msg, out=sys.stdout, all=0):
     ty = msgTypeName(major, minor)
     print >>out, 'message:', 'type=', ty, '%d:%d' % (major, minor), 'id=%d' % msgid
     if all:
-        print >>out, 'payload=', unpackMsg(ty, msg)
+        print >>out, 'payload=', msg.get_payload()
 

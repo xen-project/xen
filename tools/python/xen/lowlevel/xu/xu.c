@@ -426,6 +426,12 @@ static PyObject *xu_message_get_payload(PyObject *self, PyObject *args)
         C2P(netif_fe_interface_status_changed_t, handle, Int, Long);
         C2P(netif_fe_interface_status_changed_t, status, Int, Long);
         C2P(netif_fe_interface_status_changed_t, evtchn, Int, Long);
+        C2P(netif_fe_interface_status_changed_t, mac[0], Int, Long);
+        C2P(netif_fe_interface_status_changed_t, mac[1], Int, Long);
+        C2P(netif_fe_interface_status_changed_t, mac[2], Int, Long);
+        C2P(netif_fe_interface_status_changed_t, mac[3], Int, Long);
+        C2P(netif_fe_interface_status_changed_t, mac[4], Int, Long);
+        C2P(netif_fe_interface_status_changed_t, mac[5], Int, Long);
         return dict;
     case TYPE(CMSG_NETIF_FE, CMSG_NETIF_FE_DRIVER_STATUS_CHANGED):
         C2P(netif_fe_driver_status_changed_t, status,        Int, Long);

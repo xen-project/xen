@@ -125,12 +125,14 @@ class CtrlMsgRcvr:
         if DEBUG:
             print 'requestReceived>',
             printMsg(msg, all=1)
+        responded = 0
         method = self.getMethod(type, subtype)
         if method:
-            method(msg, 1)
+            responded = method(msg, 1)
         elif DEBUG:
             print ('requestReceived> No handler: Message type %s %d:%d'
                    % (msgTypeName(type, subtype), type, subtype)), self
+        return responded
         
     def responseReceived(self, msg, type, subtype):
         """Dispatch a response to handlers.

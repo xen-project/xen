@@ -333,13 +333,15 @@ class Channel(BaseChannel):
         (ty, subty) = self.getMessageType(msg)
         #todo:  Must respond before writing any more messages.
         #todo:  Should automate this (respond on write)
-        self.port.write_response(msg)
+        responded = 0
         dev = self.getDevice(ty)
         if dev:
-            dev.requestReceived(msg, ty, subty)
+            responded = dev.requestReceived(msg, ty, subty)
         else:
             print ("requestReceived> No device: Message type %s %d:%d"
                    % (msgTypeName(ty, subty), ty, subty)), self
+        if not responded:
+            self.port.write_response(msg)
 
     def handleResponses(self):
         work = 0

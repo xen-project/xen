@@ -1074,8 +1074,8 @@ def vm_dev_vif(vm, val, index):
     @param index:     vif index
     @return: deferred
     """
-    if vm.netif_backend:
-        raise VmError('vif: vif in netif backend domain')
+    #if vm.netif_backend:
+    #    raise VmError('vif: vif in netif backend domain')
     vif = vm.next_device_index('vif')
     vmac = sxp.child_value(val, "mac")
     backend = vm.get_device_backend('vif')
@@ -1098,8 +1098,8 @@ def vm_dev_vbd(vm, val, index):
     @param index:     vbd index
     @return: deferred
     """
-    if vm.blkif_backend:
-        raise VmError('vbd: vbd in blkif backend domain')
+    #if vm.blkif_backend:
+    #    raise VmError('vbd: vbd in blkif backend domain')
     uname = sxp.child_value(val, 'uname')
     if not uname:
         raise VmError('vbd: Missing uname')
