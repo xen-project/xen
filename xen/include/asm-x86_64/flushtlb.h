@@ -43,9 +43,7 @@ static inline int NEED_FLUSH(u32 cpu_stamp, u32 lastuse_stamp)
 extern u32 tlbflush_clock;
 extern u32 tlbflush_time[NR_CPUS];
 
+extern void tlb_clocktick(void);
 extern void new_tlbflush_clock_period(void);
-
-extern void write_cr3_counted(unsigned long pa);
-extern void flush_tlb_counted(void);
 
 #endif /* __FLUSHTLB_H__ */

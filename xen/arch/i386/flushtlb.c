@@ -14,7 +14,7 @@
 u32 tlbflush_clock;
 u32 tlbflush_time[NR_CPUS];
 
-static inline void tlb_clocktick(unsigned int cpu)
+void tlb_clocktick(void)
 {
     u32 y, ny;
 
@@ -34,23 +34,6 @@ static inline void tlb_clocktick(unsigned int cpu)
     }
     while ( unlikely((ny = cmpxchg(&tlbflush_clock, y-1, y)) != y-1) );
 
-    /* Update cpu's timestamp to new time. */
-    tlbflush_time[cpu] = y;
+    /* Update this CPU's timestamp to new time. */
+    tlbflush_time[smp_processor_id()] = y;
 }
-
-void write_cr3_counted(unsigned long pa)
-{
-    __asm__ __volatile__ ( 
-        "movl %0, %%cr3"
-        : : "r" (pa) : "memory" );
-    tlb_clocktick(smp_processor_id());
-}
-
-void flush_tlb_counted(void)
-{
-    __asm__ __volatile__ ( 
-        "movl %%cr3, %%eax; movl %%eax, %%cr3"
-        : : : "memory", "eax" );
-    tlb_clocktick(smp_processor_id());
-}
-

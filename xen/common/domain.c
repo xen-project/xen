@@ -929,7 +929,7 @@ int construct_dom0(struct task_struct *p,
 
     /* Install the new page tables. */
     __cli();
-    write_cr3_counted(pagetable_val(p->mm.pagetable));
+    write_ptbase(&p->mm);
 
     /* Copy the OS image. */
     (void)loadelfimage(image_start);
@@ -977,7 +977,7 @@ int construct_dom0(struct task_struct *p,
     *dst = '\0';
 
     /* Reinstate the caller's page tables. */
-    write_cr3_counted(pagetable_val(current->mm.pagetable));
+    write_ptbase(&current->mm);
     __sti();
 
     /* Destroy low mappings - they were only for our convenience. */

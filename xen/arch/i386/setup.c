@@ -282,8 +282,7 @@ void __init cpu_init(void)
 #undef CD
 
     /* Install correct page table. */
-    __asm__ __volatile__ ("movl %%eax,%%cr3"
-                          : : "a" (pagetable_val(current->mm.pagetable)));
+    write_ptbase(&current->mm);
 
     init_idle_task();
 }

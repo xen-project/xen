@@ -280,8 +280,9 @@ void switch_to(struct task_struct *prev_p, struct task_struct *next_p)
         }
     }
 
-    /* Switch page tables.  */
-    write_ptbase( &next_p->mm );
+    /* Switch page tables. */
+    write_ptbase(&next_p->mm);
+    tlb_clocktick();
 
     set_current(next_p);
 

@@ -871,6 +871,13 @@ static int do_extended_command(unsigned long ptr, unsigned long val)
             write_ptbase(&current->mm);
 
             put_page_and_type(&frame_table[old_base_pfn]);    
+
+            /*
+             * Note that we tick the clock /after/ dropping the old base's
+             * reference count. If the page tables got freed then this will
+             * avoid unnecessary TLB flushes when the pages are reused.
+             */
+            tlb_clocktick();
         }
         else
         {
@@ -1096,9 +1103,7 @@ int do_mmu_update(mmu_update_t *ureqs, int count)
     percpu_info[cpu].deferred_ops = 0;
 
     if ( deferred_ops & DOP_FLUSH_TLB )
-    {
-        write_ptbase(&current->mm);
-    }
+        local_flush_tlb();
 
     if ( deferred_ops & DOP_RELOAD_LDT )
         (void)map_ldt_shadow_page(0);
@@ -1168,9 +1173,7 @@ int do_update_va_mapping(unsigned long page_nr,
 
     if ( unlikely(deferred_ops & DOP_FLUSH_TLB) || 
          unlikely(flags & UVMF_FLUSH_TLB) )
-    {
-        write_ptbase(&p->mm);
-    }
+        local_flush_tlb();
     else if ( unlikely(flags & UVMF_INVLPG) )
         __flush_tlb_one(page_nr << PAGE_SHIFT);
 

@@ -209,9 +209,6 @@ static inline unsigned int cpuid_edx(unsigned int op)
 #define X86_CR4_OSFXSR		0x0200	/* enable fast FPU save and restore */
 #define X86_CR4_OSXMMEXCPT	0x0400	/* enable unmasked SSE exceptions */
 
-#define load_cr3(pgdir) \
-       asm volatile("movl %0,%%cr3": :"r" (__pa(pgdir)));
-
 /*
  * Save the cr4 feature set we're using (ie
  * Pentium 4MB enable and PPro Global page
@@ -461,12 +458,16 @@ struct mm_struct {
     char gdt[6];
 };
 
-static inline void write_ptbase( struct mm_struct *m )
+static inline void write_ptbase(struct mm_struct *mm)
 {
-    if ( unlikely(m->shadow_mode) )
-        write_cr3_counted(pagetable_val(m->shadow_table));
+    unsigned long pa;
+
+    if ( unlikely(mm->shadow_mode) )
+        pa = pagetable_val(mm->shadow_table);
     else
-        write_cr3_counted(pagetable_val(m->pagetable));
+        pa = pagetable_val(mm->pagetable);
+
+    __asm__ __volatile__ ( "movl %0, %%cr3" : : "r" (pa) : "memory" );
 }
 
 #define IDLE0_MM                                                    \

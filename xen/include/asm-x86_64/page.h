@@ -162,7 +162,13 @@ extern unsigned long vm_force_exec32;
 extern l2_pgentry_t idle_pg_table[ENTRIES_PER_L2_PAGETABLE];
 extern void paging_init(void);
 
-#define __flush_tlb() flush_tlb_counted()
+#define __flush_tlb()                                    \
+    do {                                                 \
+        __asm__ __volatile__ (                           \
+            "movl %%cr3, %%eax; movl %%eax, %%cr3"       \
+            : : : "memory", "eax" );                     \
+        tlb_clocktick();                                 \
+    } while ( 0 )
 
 /* Flush global pages as well. */
 
@@ -184,7 +190,7 @@ extern void paging_init(void);
 #define __flush_tlb_pge()						\
 	do {								\
                 __pge_off();                                            \
-		flush_tlb_counted();					\
+		__flush_tlb();						\
                 __pge_on();                                             \
 	} while (0)
 
