@@ -19,9 +19,6 @@
 #include <xen/physdev.h>
 #include <public/sched_ctl.h>
 
-#define TRC_DOM0OP_ENTER_BASE  0x00020000
-#define TRC_DOM0OP_LEAVE_BASE  0x00030000
-
 extern unsigned int alloc_new_dom_mem(struct domain *, unsigned int);
 extern long arch_do_dom0_op(dom0_op_t *op, dom0_op_t *u_dom0_op);
 extern void arch_getdomaininfo_ctxt(
@@ -385,9 +382,9 @@ long do_dom0_op(dom0_op_t *u_dom0_op)
     break;
 
 #ifdef TRACE_BUFFER
-    case DOM0_GETTBUFS:
+    case DOM0_TBUFCONTROL:
     {
-        ret = get_tb_info(&op->u.gettbufs);
+        ret = tb_control(&op->u.tbufcontrol);
         copy_to_user(u_dom0_op, op, sizeof(*op));
     }
     break;

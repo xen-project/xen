@@ -249,8 +249,4 @@ static inline int __vmxon (u64 addr)
     return 0;
 }
 
-#define TRC_VMX_VMEXIT 0x00040001
-#define TRC_VMX_VECTOR 0x00040002
-#define TRC_VMX_INT    0x00040003
-
 #endif /* __ASM_X86_VMX_H__ */

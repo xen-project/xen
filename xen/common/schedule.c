@@ -42,24 +42,6 @@ string_param("sched", opt_sched);
 
 #define TIME_SLOP      (s32)MICROSECS(50)     /* allow time to slip a bit */
 
-/*
- * TODO MAW pull trace-related #defines out of here and into an auto-generated
- * header file later on!
- */
-#define TRC_SCHED_DOM_ADD             0x00010000
-#define TRC_SCHED_DOM_REM             0x00010001
-#define TRC_SCHED_SLEEP               0x00010002
-#define TRC_SCHED_WAKE                0x00010003
-#define TRC_SCHED_YIELD               0x00010004
-#define TRC_SCHED_BLOCK               0x00010005
-#define TRC_SCHED_SHUTDOWN            0x00010006
-#define TRC_SCHED_CTL                 0x00010007
-#define TRC_SCHED_ADJDOM              0x00010008
-#define TRC_SCHED_SWITCH              0x00010009
-#define TRC_SCHED_S_TIMER_FN          0x0001000A
-#define TRC_SCHED_T_TIMER_FN          0x0001000B
-#define TRC_SCHED_DOM_TIMER_FN        0x0001000C
-
 /* Various timer handlers. */
 static void s_timer_fn(unsigned long unused);
 static void t_timer_fn(unsigned long unused);

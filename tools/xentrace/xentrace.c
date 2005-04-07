@@ -11,10 +11,10 @@
 
 #include <time.h>
 #include <stdlib.h>
-#include <sys/mman.h>
 #include <stdio.h>
-#include <sys/types.h>
+#include <sys/mman.h>
 #include <sys/stat.h>
+#include <sys/types.h>
 #include <fcntl.h>
 #include <unistd.h>
 #include <errno.h>
@@ -101,8 +101,9 @@ void get_tbufs(unsigned long *mach_addr, unsigned long *size)
     dom0_op_t op;                        /* dom0 op we'll build             */
     int xc_handle = xc_interface_open(); /* for accessing control interface */
 
-    op.cmd = DOM0_GETTBUFS;
+    op.cmd = DOM0_TBUFCONTROL;
     op.interface_version = DOM0_INTERFACE_VERSION;
+    op.u.tbufcontrol.op  = DOM0_TBUF_GET_INFO;
 
     ret = do_dom0_op(xc_handle, &op);
 
@@ -114,8 +115,8 @@ void get_tbufs(unsigned long *mach_addr, unsigned long *size)
         exit(EXIT_FAILURE);
     }
 
-    *mach_addr = op.u.gettbufs.mach_addr;
-    *size      = op.u.gettbufs.size;
+    *mach_addr = op.u.tbufcontrol.mach_addr;
+    *size      = op.u.tbufcontrol.size;
 }
 
 /**
@@ -141,8 +142,8 @@ struct t_buf *map_tbufs(unsigned long tbufs_mach, unsigned int num,
     }
 
     tbufs_mapped = xc_map_foreign_range(xc_handle, 0 /* Dom 0 ID */,
-					size * num, PROT_READ,
-					tbufs_mach >> PAGE_SHIFT);
+                                        size * num, PROT_READ,
+                                        tbufs_mach >> PAGE_SHIFT);
 
     xc_interface_close(xc_handle);
 
@@ -152,7 +153,7 @@ struct t_buf *map_tbufs(unsigned long tbufs_mach, unsigned int num,
         exit(EXIT_FAILURE);
     }
 
-    return (struct t_buf *)tbufs_mapped;
+    return tbufs_mapped;
 }
 
 
@@ -181,8 +182,7 @@ struct t_buf **init_bufs_ptrs(void *bufs_mapped, unsigned int num,
     /* initialise pointers to the trace buffers - given the size of a trace
      * buffer and the value of bufs_maped, we can easily calculate these */
     for ( i = 0; i<num; i++ )
-        user_ptrs[i] = (struct t_buf *)(
-            (unsigned long)bufs_mapped + size * i);
+        user_ptrs[i] = (struct t_buf *)((unsigned long)bufs_mapped + size * i);
 
     return user_ptrs;
 }
@@ -214,9 +214,9 @@ struct t_rec **init_rec_ptrs(unsigned long tbufs_mach,
         exit(EXIT_FAILURE);
     }
 
-    for ( i = 0; i<num; i++ )
-        data[i] = (struct t_rec *)(meta[i]->data - tbufs_mach
-				   + (unsigned long)tbufs_mapped);
+    for ( i = 0; i < num; i++ )
+        data[i] = (struct t_rec *)(meta[i]->rec_addr - tbufs_mach
+                                   + (unsigned long)tbufs_mapped);
 
     return data;
 }
@@ -242,7 +242,7 @@ unsigned long *init_tail_idxs(struct t_buf **bufs, unsigned int num)
     }
     
     for ( i = 0; i<num; i++ )
-        tails[i] = bufs[i]->head;
+        tails[i] = atomic_read(&bufs[i]->rec_idx);
 
     return tails;
 }
@@ -299,7 +299,7 @@ int monitor_tbufs(FILE *logfile)
     get_tbufs(&tbufs_mach, &size);
     tbufs_mapped = map_tbufs(tbufs_mach, num, size);
 
-    size_in_recs = (size / sizeof(struct t_rec) )-1;
+    size_in_recs = (size - sizeof(struct t_buf)) / sizeof(struct t_rec);
 
     /* build arrays of convenience ptrs */
     meta  = init_bufs_ptrs (tbufs_mapped, num, size);
@@ -310,11 +310,11 @@ int monitor_tbufs(FILE *logfile)
     while ( !interrupted )
     {
         for ( i = 0; ( i < num ) && !interrupted; i++ )
-	    while( cons[i] != meta[i]->head )
-	    {
-		write_rec(i, data[i] + (cons[i] % size_in_recs), logfile);
-		cons[i]++;
-	    }
+            while( cons[i] != atomic_read(&meta[i]->rec_idx) )
+            {
+                write_rec(i, data[i] + cons[i], logfile);
+                cons[i] = (cons[i] + 1) % size_in_recs;
+            }
 
         nanosleep(&opts.poll_sleep, NULL);
     }
@@ -445,9 +445,11 @@ int main(int argc, char **argv)
     
     /* ensure that if we get a signal, we'll do cleanup, then exit */
     act.sa_handler = close_handler;
-    sigaction(SIGHUP,  &act, 0);
-    sigaction(SIGTERM, &act, 0);
-    sigaction(SIGINT,  &act, 0);
+    act.sa_flags = 0;
+    sigemptyset(&act.sa_mask);
+    sigaction(SIGHUP,  &act, NULL);
+    sigaction(SIGTERM, &act, NULL);
+    sigaction(SIGINT,  &act, NULL);
 
     ret = monitor_tbufs(logfile);
 
