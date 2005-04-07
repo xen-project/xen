@@ -585,22 +585,21 @@ static void load_segments(struct exec_domain *p, struct exec_domain *n)
               n->arch.user_ctxt.fs_base,
               n->arch.user_ctxt.fs_base>>32);
 
+    /* Most kernels have non-zero GS base, so don't bother testing. */
+    /* (This is also a serialising instruction, avoiding AMD erratum #88.) */
+    wrmsr(MSR_SHADOW_GS_BASE,
+          n->arch.user_ctxt.gs_base_kernel,
+          n->arch.user_ctxt.gs_base_kernel>>32);
+
     /* This can only be non-zero if selector is NULL. */
     if ( n->arch.user_ctxt.gs_base_user )
         wrmsr(MSR_GS_BASE,
               n->arch.user_ctxt.gs_base_user,
               n->arch.user_ctxt.gs_base_user>>32);
 
-    /* This can only be non-zero if selector is NULL. */
-    if ( p->arch.user_ctxt.gs_base_kernel |
-         n->arch.user_ctxt.gs_base_kernel )
-        wrmsr(MSR_SHADOW_GS_BASE,
-              n->arch.user_ctxt.gs_base_kernel,
-              n->arch.user_ctxt.gs_base_kernel>>32);
-
     /* If in kernel mode then switch the GS bases around. */
     if ( n->arch.flags & TF_kernel_mode )
-        __asm__ __volatile__ ( safe_swapgs );
+        __asm__ __volatile__ ( "swapgs" );
 
     if ( unlikely(!all_segs_okay) )
     {
