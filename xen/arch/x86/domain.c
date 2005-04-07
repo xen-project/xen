@@ -516,7 +516,7 @@ void new_thread(struct exec_domain *d,
 void toggle_guest_mode(struct exec_domain *ed)
 {
     ed->arch.flags ^= TF_kernel_mode;
-    __asm__ __volatile__ ( "mfence; swapgs" ); /* AMD erratum #88 */
+    __asm__ __volatile__ ( "swapgs" );
     update_pagetables(ed);
     write_ptbase(ed);
 }
@@ -600,7 +600,7 @@ static void load_segments(struct exec_domain *p, struct exec_domain *n)
 
     /* If in kernel mode then switch the GS bases around. */
     if ( n->arch.flags & TF_kernel_mode )
-        __asm__ __volatile__ ( "mfence; swapgs" ); /* AMD erratum #88 */
+        __asm__ __volatile__ ( safe_swapgs );
 
     if ( unlikely(!all_segs_okay) )
     {
@@ -651,12 +651,12 @@ static void save_segments(struct exec_domain *p)
 static void clear_segments(void)
 {
     __asm__ __volatile__ (
-        "movl %0,%%ds; "
-        "movl %0,%%es; "
-        "movl %0,%%fs; "
-        "movl %0,%%gs; "
-        "mfence; swapgs; " /* AMD erratum #88 */
-        "movl %0,%%gs"
+        " movl %0,%%ds; "
+        " movl %0,%%es; "
+        " movl %0,%%fs; "
+        " movl %0,%%gs; "
+        ""safe_swapgs"  "
+        " movl %0,%%gs"
         : : "r" (0) );
 }
 

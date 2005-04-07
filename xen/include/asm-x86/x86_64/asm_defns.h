@@ -39,6 +39,10 @@
         "popq  %rsi;" \
         "popq  %rdi;"
 
+/* Work around AMD erratum #88 */
+#define safe_swapgs \
+        "mfence; swapgs;"
+
 #else
 
 #define SAVE_ALL \

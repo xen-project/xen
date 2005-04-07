@@ -4,7 +4,7 @@
 
 #include <xen/config.h>
 
-#ifdef CONFIG_X86
+#ifdef CONFIG_SHADOW
 
 #include <asm/shadow.h>
 

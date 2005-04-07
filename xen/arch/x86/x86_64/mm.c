@@ -23,6 +23,7 @@
 #include <xen/init.h>
 #include <xen/mm.h>
 #include <xen/sched.h>
+#include <asm/asm_defns.h>
 #include <asm/page.h>
 #include <asm/flushtlb.h>
 #include <asm/fixmap.h>
@@ -248,31 +249,33 @@ long do_stack_switch(unsigned long ss, unsigned long esp)
 long do_set_segment_base(unsigned int which, unsigned long base)
 {
     struct exec_domain *ed = current;
-
-    base = canonicalise_virt_address(base);
+    long ret = 0;
 
     switch ( which )
     {
     case SEGBASE_FS:
         ed->arch.user_ctxt.fs_base = base;
-        wrmsr(MSR_FS_BASE, base, base>>32);
+        if ( wrmsr_user(MSR_FS_BASE, base, base>>32) )
+            ret = -EFAULT;
         break;
 
     case SEGBASE_GS_USER:
         ed->arch.user_ctxt.gs_base_user = base;
-        wrmsr(MSR_SHADOW_GS_BASE, base, base>>32);
+        if ( wrmsr_user(MSR_SHADOW_GS_BASE, base, base>>32) )
+            ret = -EFAULT;
         break;
 
     case SEGBASE_GS_KERNEL:
         ed->arch.user_ctxt.gs_base_kernel = base;
-        wrmsr(MSR_GS_BASE, base, base>>32);
+        if ( wrmsr_user(MSR_GS_BASE, base, base>>32) )
+            ret = -EFAULT;
         break;
 
     case SEGBASE_GS_USER_SEL:
         __asm__ __volatile__ (
             "     swapgs              \n"
             "1:   movl %k0,%%gs       \n"
-            "     mfence; swapgs      \n" /* AMD erratum #88 */
+            "    "safe_swapgs"        \n"
             ".section .fixup,\"ax\"   \n"
             "2:   xorl %k0,%k0        \n"
             "     jmp  1b             \n"
@@ -285,10 +288,11 @@ long do_set_segment_base(unsigned int which, unsigned long base)
         break;
 
     default:
-        return -EINVAL;
+        ret = -EINVAL;
+        break;
     }
 
-    return 0;
+    return ret;
 }
 
 
