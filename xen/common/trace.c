@@ -8,6 +8,8 @@
  * Author: Mark Williamson, mark.a.williamson@intel.com
  * Date:   January 2004
  *
+ * Copyright (C) 2005 Bin Ren
+ *
  * The trace buffer code is designed to allow debugging traces of Xen to be
  * generated on UP / SMP machines.  Each trace entry is timestamped so that
  * it's possible to reconstruct a chronological record of trace events.
@@ -39,6 +41,11 @@ struct t_buf *t_bufs[NR_CPUS];
 /* a flag recording whether initialisation has been done */
 int tb_init_done = 0;
 
+/* which CPUs tracing is enabled on */
+unsigned long tb_cpu_mask = (~0UL);
+
+/* which tracing events are enabled */
+u32 tb_event_mask = TRC_ALL;
 /**
  * init_trace_bufs - performs initialisation of the per-cpu trace buffers.
  *
@@ -69,25 +76,18 @@ void init_trace_bufs(void)
     }
 
     /* Share pages so that xentrace can map them. */
-
     for ( i = 0; i < nr_pages; i++ )
-        SHARE_PFN_WITH_DOMAIN(virt_to_page(rawbuf+(i*PAGE_SIZE)), dom0);
+        SHARE_PFN_WITH_DOMAIN(virt_to_page(rawbuf + i * PAGE_SIZE), dom0);
     
     for ( i = 0; i < smp_num_cpus; i++ )
     {
         buf = t_bufs[i] = (struct t_buf *)&rawbuf[i*opt_tbuf_size*PAGE_SIZE];
         
-        /* For use in Xen. */
-        buf->vdata    = (struct t_rec *)(buf+1);
-        buf->head_ptr = buf->vdata;
-        
-        /* For use in user space. */
-        buf->data = __pa(buf->vdata);
-        buf->head = 0;
-
-        /* For use in both. */
-        buf->size = (opt_tbuf_size * PAGE_SIZE - sizeof(struct t_buf))
-            / sizeof(struct t_rec);
+        _atomic_set(buf->rec_idx, 0);
+        buf->rec_num  = (opt_tbuf_size * PAGE_SIZE - sizeof(struct t_buf))
+                        / sizeof(struct t_rec);
+        buf->rec      = (struct t_rec *)(buf + 1);
+        buf->rec_addr = __pa(buf->rec);
     }
 
     printk("Xen trace buffers: initialised\n");
@@ -98,27 +98,40 @@ void init_trace_bufs(void)
 }
 
 /**
- * get_tb_info - get trace buffer details
- * @st: a pointer to a dom0_gettbufs_t to be filled out
- *
- * Called by the %DOM0_GETTBUFS dom0 op to fetch the machine address of the
- * trace buffers.
+ * tb_control - DOM0 operations on trace buffers.
+ * @tbc: a pointer to a dom0_tbufcontrol_t to be filled out
  */
-int get_tb_info(dom0_gettbufs_t *st)
+int tb_control(dom0_tbufcontrol_t *tbc)
 {
-    if ( tb_init_done )
+    static spinlock_t lock = SPIN_LOCK_UNLOCKED;
+    int rc = 0;
+
+    if ( !tb_init_done )
+        return -EINVAL;
+
+    spin_lock(&lock);
+
+    switch ( tbc->op)
     {
-        st->mach_addr = __pa(t_bufs[0]);
-        st->size      = opt_tbuf_size * PAGE_SIZE;
-        
-        return 0;
+    case DOM0_TBUF_GET_INFO:
+        tbc->cpu_mask  = tb_cpu_mask;
+        tbc->evt_mask  = tb_event_mask;
+        tbc->mach_addr = __pa(t_bufs[0]);
+        tbc->size      = opt_tbuf_size * PAGE_SIZE;
+        break;
+    case DOM0_TBUF_SET_CPU_MASK:
+        tb_cpu_mask = tbc->cpu_mask;
+        break;
+    case DOM0_TBUF_SET_EVT_MASK:
+        tb_event_mask = tbc->evt_mask;
+        break;
+    default:
+        rc = -EINVAL;
     }
-    else
-    {
-        st->mach_addr = 0;
-        st->size      = 0;
-        return -ENODATA;
-    }
+
+    spin_unlock(&lock);
+
+    return rc;
 }
 
 /*

@@ -8,6 +8,8 @@
  * Author: Mark Williamson, mark.a.williamson@intel.com
  * Date:   January 2004
  *
+ * Copyright (C) 2005 Bin Ren
+ *
  * The trace buffer code is designed to allow debugging traces of Xen to be
  * generated on UP / SMP machines.  Each trace entry is timestamped so that
  * it's possible to reconstruct a chronological record of trace events.
@@ -25,7 +27,6 @@
 
 #ifdef TRACE_BUFFER
 
-#include <xen/spinlock.h>
 #include <asm/page.h>
 #include <xen/types.h>
 #include <xen/sched.h>
@@ -34,11 +35,16 @@
 #include <asm/msr.h>
 #include <public/dom0_ops.h>
 
+extern struct t_buf *t_bufs[];
+extern int tb_init_done;
+extern unsigned long tb_cpu_mask;
+extern u32 tb_event_mask;
+
 /* Used to initialise trace buffer functionality */
 void init_trace_bufs(void);
 
 /* used to retrieve the physical address of the trace buffers */
-int get_tb_info(dom0_gettbufs_t *st);
+int tb_control(dom0_tbufcontrol_t *tbc);
 
 /**
  * trace - Enters a trace tuple into the trace buffer for the current CPU.
@@ -49,42 +55,43 @@ int get_tb_info(dom0_gettbufs_t *st);
  * failure, otherwise 0.  Failure occurs only if the trace buffers are not yet
  * initialised.
  */
-static inline int trace(u32 event, u32 d1, u32 d2, u32 d3, u32 d4, u32 d5)
+static inline int trace(u32 event, unsigned long d1, unsigned long d2,
+                        unsigned long d3, unsigned long d4, unsigned long d5)
 {
-    extern struct t_buf *t_bufs[];      /* global array of pointers to bufs */
-    extern int tb_init_done;            /* set when buffers are initialised */
-    unsigned long flags;                /* for saving interrupt flags       */
-    struct t_buf *buf;                  /* the buffer we're working on      */
-    struct t_rec *rec;                  /* next record to fill out          */
-
+    atomic_t old, new, seen;
+    struct t_buf *buf;
+    struct t_rec *rec;
 
     if ( !tb_init_done )
         return -1;
 
+    if ( (tb_event_mask & event) == 0 )
+        return 0;
+
+    if ( (tb_cpu_mask & (1UL << smp_processor_id())) == 0 )
+        return 0;
 
     buf = t_bufs[smp_processor_id()];
 
-    local_irq_save(flags);
+    do
+    {
+        old = buf->rec_idx;
+        _atomic_set(new, (_atomic_read(old) + 1) % buf->rec_num);
+        seen = atomic_compareandswap(old, new, &buf->rec_idx);
+    }
+    while ( unlikely(_atomic_read(seen) != _atomic_read(old)) );
 
-    rec = buf->head_ptr;
+    wmb();
 
+    rec = &buf->rec[_atomic_read(old)];
     rdtscll(rec->cycles);
-    rec->event = event;
-    rec->d1 = d1;
-    rec->d2 = d2;
-    rec->d3 = d3;
-    rec->d4 = d4;
-    rec->d5 = d5;
+    rec->event   = event;
+    rec->data[0] = d1;
+    rec->data[1] = d2;
+    rec->data[2] = d3;
+    rec->data[3] = d4;
+    rec->data[4] = d5;
 
-    wmb(); /* above must be visible before reader sees index updated */
-
-    buf->head_ptr++;
-    buf->head++;
-    if ( buf->head_ptr == (buf->vdata + buf->size) )
-        buf->head_ptr = buf->vdata;
-
-    local_irq_restore(flags);
-    
     return 0;
 }
 
