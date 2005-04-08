@@ -14,6 +14,7 @@
 #include <linux/config.h>
 #include <linux/kernel.h>
 #include <asm/apicdef.h>
+#include <asm-xen/gnttab.h>
 #include <asm/page.h>
 #include <asm/vsyscall.h>
 #include <asm/vsyscall32.h>
@@ -46,7 +47,8 @@ enum fixed_addresses {
 	FIX_IO_APIC_BASE_END = FIX_IO_APIC_BASE_0 + MAX_IO_APICS-1,
 #endif
 	FIX_SHARED_INFO,
-	FIX_GNTTAB,
+	FIX_GNTTAB_BEGIN,
+	FIX_GNTTAB_END = FIX_GNTTAB_BEGIN + NR_GRANT_FRAMES - 1,
 #ifdef CONFIG_XEN_PHYSDEV_ACCESS
 #define NR_FIX_ISAMAPS	256
 	FIX_ISAMAP_END,

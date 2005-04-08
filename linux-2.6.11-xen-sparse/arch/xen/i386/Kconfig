@@ -9,6 +9,10 @@ config XENARCH
 	string
 	default i386
 
+config X86
+	bool
+	default y
+
 config MMU
 	bool
 	default y

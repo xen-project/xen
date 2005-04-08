@@ -54,9 +54,6 @@
 
 extern void load_gs_index(unsigned);
 
-#define __load_gs_index(index) \
-	HYPERVISOR_set_segment_base(SEGBASE_GS_USER_SEL, index)
-
 /*
  * Load a segment. Fall back on loading the zero
  * segment if something goes wrong..
@@ -176,13 +173,8 @@ static inline void write_cr4(unsigned long val)
 
 #define stts() write_cr0(8 | read_cr0())
 
-static inline void wbinvd(void)
-{
-	mmu_update_t u;
-	u.ptr = MMU_EXTENDED_COMMAND;
-	u.val = MMUEXT_FLUSH_CACHE;
-	(void)HYPERVISOR_mmu_update(&u, 1, NULL);
-}
+#define wbinvd() \
+	__asm__ __volatile__ ("wbinvd": : :"memory");
 
 #endif	/* __KERNEL__ */
 

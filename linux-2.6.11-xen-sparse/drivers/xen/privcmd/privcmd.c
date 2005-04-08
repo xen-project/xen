@@ -49,6 +49,7 @@ static int privcmd_ioctl(struct inode *inode, struct file *file,
         if ( copy_from_user(&hypercall, (void *)data, sizeof(hypercall)) )
             return -EFAULT;
 
+#if defined(__i386__)
         __asm__ __volatile__ (
             "pushl %%ebx; pushl %%ecx; pushl %%edx; pushl %%esi; pushl %%edi; "
             "movl  4(%%eax),%%ebx ;"
@@ -60,7 +61,18 @@ static int privcmd_ioctl(struct inode *inode, struct file *file,
             TRAP_INSTR "; "
             "popl %%edi; popl %%esi; popl %%edx; popl %%ecx; popl %%ebx"
             : "=a" (ret) : "0" (&hypercall) : "memory" );
-
+#elif defined (__x86_64__)
+	__asm__ __volatile__ (
+	    "movq   %5,%%r10; movq %6,%%r8;" TRAP_INSTR
+	    : "=a" (ret)
+	    : "a" ((unsigned long)hypercall.op), 
+	      "D" ((unsigned long)hypercall.arg[0]), 
+	      "S" ((unsigned long)hypercall.arg[1]),
+	      "d" ((unsigned long)hypercall.arg[2]), 
+	      "g" ((unsigned long)hypercall.arg[3]),
+	      "g" ((unsigned long)hypercall.arg[4])
+	    : "r11","rcx","r8","r10","memory");
+#endif
     }
     break;
 

@@ -16,7 +16,7 @@
 #include <linux/stddef.h>
 #include <linux/slab.h>
 #include <linux/thread_info.h>
-#include <asm-xen/xen-public/dom0_ops.h>
+#include <asm-xen/xen-public/physdev.h>
 
 /*
  * sys_iopl has to be used when you want to access the IO ports
@@ -29,19 +29,15 @@
 asmlinkage long sys_iopl(unsigned int new_io_pl)
 {
         unsigned int old_io_pl = current->thread.io_pl;
-        dom0_op_t op;
+        physdev_op_t op;
 
 
 	if (new_io_pl > 3)
 		return -EINVAL;
-	/* Trying to gain more privileges? */
-	if (new_io_pl > old_io_pl) {
-		if (!capable(CAP_SYS_RAWIO))
-			return -EPERM;
-	}
-        
-        if (!(xen_start_info.flags & SIF_PRIVILEGED))
-                return -EPERM;
+
+	/* Need "raw I/O" privileges for direct port access. */
+	if ((new_io_pl > old_io_pl) && !capable(CAP_SYS_RAWIO))
+		return -EPERM;
 
 	/* Maintain OS privileges even if user attempts to relinquish them. */
 	if (new_io_pl == 0)
@@ -51,13 +47,11 @@ asmlinkage long sys_iopl(unsigned int new_io_pl)
 	current->thread.io_pl = new_io_pl;
 
 	/* Force the change at ring 0. */
-	op.cmd           = DOM0_IOPL;
-	op.u.iopl.domain = DOMID_SELF;
-	op.u.iopl.iopl   = new_io_pl;
-	HYPERVISOR_dom0_op(&op);
+	op.cmd             = PHYSDEVOP_SET_IOPL;
+	op.u.set_iopl.iopl = new_io_pl;
+	HYPERVISOR_physdev_op(&op);
 
 	return 0;
-        
 }
 
 /*

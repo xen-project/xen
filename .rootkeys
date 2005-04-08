@@ -262,7 +262,6 @@
 3f68905c5eiA-lBMQSvXLMWS1ikDEA linux-2.6.11-xen-sparse/arch/xen/kernel/xen_proc.c
 424efaa6xahU2q85_dT-SjUJEaivfg linux-2.6.11-xen-sparse/arch/xen/x86_64/Kconfig
 424efaa6kKleWe45IrqsG8gkejgEQA linux-2.6.11-xen-sparse/arch/xen/x86_64/Makefile
-424efaa7hjpGexXRf5TYBwgP7uT5Wg linux-2.6.11-xen-sparse/arch/xen/x86_64/defconfig
 424efaa6HSyuVodl6SxFGj39vlp6MA linux-2.6.11-xen-sparse/arch/xen/x86_64/kernel/Makefile
 424efaa7bVAw3Z_q0SdFivfNVavyIg linux-2.6.11-xen-sparse/arch/xen/x86_64/kernel/asm-offsets.c
 424efaa7ddTVabh547Opf0u9vKmUXw linux-2.6.11-xen-sparse/arch/xen/x86_64/kernel/e820.c
@@ -343,6 +342,7 @@
 40f5623akIoBsQ3KxSB2kufkbgONXQ linux-2.6.11-xen-sparse/include/asm-xen/asm-i386/fixmap.h
 41979925z1MsKU1SfuuheM1IFDQ_bA linux-2.6.11-xen-sparse/include/asm-xen/asm-i386/floppy.h
 4118b6a418gnL6AZsTdglC92YGqYTg linux-2.6.11-xen-sparse/include/asm-xen/asm-i386/highmem.h
+42539fb5A9hsS3NFQ-2VY4y1TONZZQ linux-2.6.11-xen-sparse/include/asm-xen/asm-i386/hypercall.h
 40f5623aJVXQwpJMOLE99XgvGsfQ8Q linux-2.6.11-xen-sparse/include/asm-xen/asm-i386/io.h
 40f5623aKXkBBxgpLx2NcvkncQ1Yyw linux-2.6.11-xen-sparse/include/asm-xen/asm-i386/mach-xen/irq_vectors.h
 40f5623aDMCsWOFO0jktZ4e8sjwvEg linux-2.6.11-xen-sparse/include/asm-xen/asm-i386/mach-xen/setup_arch_post.h

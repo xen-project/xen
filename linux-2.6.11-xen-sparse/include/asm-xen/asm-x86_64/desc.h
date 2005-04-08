@@ -71,7 +71,19 @@ extern struct desc_ptr cpu_gdt_table[NR_CPUS][GDT_ENTRIES];
 
 #define load_TR_desc() asm volatile("ltr %w0"::"r" (GDT_ENTRY_TSS*8))
 #define load_LDT_desc() asm volatile("lldt %w0"::"r" (GDT_ENTRY_LDT*8))
-#define clear_LDT()  asm volatile("lldt %w0"::"r" (0))
+
+static inline void clear_LDT(void)
+{
+	int cpu = get_cpu();
+
+	/*
+	 * NB. We load the default_ldt for lcall7/27 handling on demand, as
+	 * it slows down context switching. Noone uses it anyway.
+	 */
+	cpu = cpu;              /* XXX avoid compiler warning */
+	xen_set_ldt(0UL, 0);
+	put_cpu();
+}
 
 /*
  * This is the ldt that every process will get unless we need
@@ -211,7 +223,7 @@ extern inline void load_LDT_nolock (mm_context_t *pc, int cpu)
         if (likely(!count))
                 segments = NULL;
 
-        queue_set_ldt((unsigned long)segments, count);
+        xen_set_ldt((unsigned long)segments, count);
 }
 
 static inline void load_LDT(mm_context_t *pc)

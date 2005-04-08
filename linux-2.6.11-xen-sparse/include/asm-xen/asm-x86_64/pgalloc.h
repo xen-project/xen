@@ -18,19 +18,16 @@ void make_pages_writable(void *va, unsigned int nr);
 static inline void pmd_populate_kernel(struct mm_struct *mm, pmd_t *pmd, pte_t *pte)
 {
 	set_pmd(pmd, __pmd(_PAGE_TABLE | __pa(pte)));
-        flush_page_update_queue();
 }
 
 static inline void pmd_populate(struct mm_struct *mm, pmd_t *pmd, struct page *pte)
 {
 	set_pmd(pmd, __pmd(_PAGE_TABLE | (page_to_pfn(pte) << PAGE_SHIFT)));
-        flush_page_update_queue();
 }
 
 static inline void pud_populate(struct mm_struct *mm, pud_t *pud, pmd_t *pmd)
 {
 	set_pud(pud, __pud(_PAGE_TABLE | __pa(pmd)));
-        flush_page_update_queue();
 }
 
 /*
@@ -41,7 +38,6 @@ static inline void pgd_populate(struct mm_struct *mm, pgd_t *pgd, pud_t *pud)
 {
         set_pgd(pgd, __pgd(_PAGE_TABLE | __pa(pud)));
         set_pgd(__user_pgd(pgd), __pgd(_PAGE_TABLE | __pa(pud)));
-        flush_page_update_queue();
 }
 
 extern __inline__ pmd_t *get_pmd(void)
@@ -51,7 +47,6 @@ extern __inline__ pmd_t *get_pmd(void)
 		return NULL;
         make_page_readonly(pmd);
         xen_pmd_pin(__pa(pmd));
-        flush_page_update_queue();        
 	return pmd;
 }
 
@@ -60,7 +55,6 @@ extern __inline__ void pmd_free(pmd_t *pmd)
 	BUG_ON((unsigned long)pmd & (PAGE_SIZE-1));
         xen_pmd_unpin(__pa(pmd));
         make_page_writable(pmd);
-        flush_page_update_queue();
 	free_page((unsigned long)pmd);
 }
 
@@ -71,7 +65,6 @@ static inline pmd_t *pmd_alloc_one(struct mm_struct *mm, unsigned long addr)
 		return NULL;
         make_page_readonly(pmd);
         xen_pmd_pin(__pa(pmd)); 
-        flush_page_update_queue(); 
         return pmd;
 }
 
@@ -82,7 +75,6 @@ static inline pud_t *pud_alloc_one(struct mm_struct *mm, unsigned long addr)
 		return NULL;
         make_page_readonly(pud);
         xen_pud_pin(__pa(pud)); 
-        flush_page_update_queue(); 
         return pud;
 }
 
@@ -91,7 +83,6 @@ static inline void pud_free(pud_t *pud)
 	BUG_ON((unsigned long)pud & (PAGE_SIZE-1));
         xen_pud_unpin(__pa(pud));
         make_page_writable(pud);
-	flush_page_update_queue(); 
 	free_page((unsigned long)pud);
 }
 
@@ -126,7 +117,6 @@ static inline pgd_t *pgd_alloc(struct mm_struct *mm)
          */
 	set_pgd(__user_pgd(pgd) + pgd_index(VSYSCALL_START), 
                 mk_kernel_pgd(__pa_symbol(level3_user_pgt)));
-        flush_page_update_queue();
 	return pgd;
 }
 
@@ -136,7 +126,6 @@ static inline void pgd_free(pgd_t *pgd)
         xen_pgd_unpin(__pa(pgd));
         xen_pgd_unpin(__pa(__user_pgd(pgd)));
         make_pages_writable(pgd, 2);
-	flush_page_update_queue(); 
 	free_pages((unsigned long)pgd, 1);
 }
 
@@ -147,7 +136,6 @@ static inline pte_t *pte_alloc_one_kernel(struct mm_struct *mm, unsigned long ad
 		return NULL;
         make_page_readonly(pte);
         xen_pte_pin(__pa(pte));
-	flush_page_update_queue(); 
 	return pte;
 }
 
@@ -158,7 +146,6 @@ static inline struct page *pte_alloc_one(struct mm_struct *mm, unsigned long add
 		return NULL;
         make_page_readonly(pte);
         xen_pte_pin(__pa(pte));
-	flush_page_update_queue(); 
 	return virt_to_page((unsigned long)pte);
 }
 
@@ -170,7 +157,6 @@ extern __inline__ void pte_free_kernel(pte_t *pte)
 	BUG_ON((unsigned long)pte & (PAGE_SIZE-1));
         xen_pte_unpin(__pa(pte));
         make_page_writable(pte);
-	flush_page_update_queue(); 
 	free_page((unsigned long)pte); 
 }
 
