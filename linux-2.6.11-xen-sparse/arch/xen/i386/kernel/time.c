@@ -86,7 +86,11 @@ struct timespec __xtime __section_xtime;
 struct timezone __sys_tz __section_sys_tz;
 #endif
 
+#if defined(__x86_64__)
+unsigned int cpu_khz;	/* Detected as we calibrate the TSC */
+#else
 unsigned long cpu_khz;	/* Detected as we calibrate the TSC */
+#endif
 
 extern unsigned long wall_jiffies;
 

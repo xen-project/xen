@@ -14,7 +14,7 @@ obj-y	:= process.o signal.o entry.o traps.o  \
 c-obj-y	:= semaphore.o i387.o sys_x86_64.o \
 		ptrace.o quirks.o syscall.o
 
-obj-y				+= ../../i386/time.o
+i386-obj-y			:= time.o
 obj-y				+= ../../i386/kernel/timers/
 
 s-obj-y	:=
@@ -57,7 +57,10 @@ s-link	:= vsyscall.o
 $(patsubst %.o,$(obj)/%.c,$(c-obj-y) $(c-link)) $(patsubst %.o,$(obj)/%.S,$(s-obj-y) $(s-link)):
 	ln -fsn $(srctree)/arch/x86_64/kernel/$(notdir $@) $@
 
-obj-y	+= $(c-obj-y) $(s-obj-y)
+$(patsubst %.o,$(obj)/%.c,$(i386-obj-y)):
+	ln -fsn $(srctree)/arch/xen/i386/kernel/$(notdir $@) $@
 
-clean-files += $(patsubst %.o,%.c,$(c-obj-y) $(c-obj-) $(c-link))
+obj-y	+= $(c-obj-y) $(s-obj-y) $(i386-obj-y)
+
+clean-files += $(patsubst %.o,%.c,$(c-obj-y) $(c-obj-) $(c-link) $(i386-obj-y))
 clean-files += $(patsubst %.o,%.S,$(s-obj-y) $(s-obj-) $(s-link))
