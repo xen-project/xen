@@ -289,6 +289,7 @@ struct page * map_new_domain_page(struct domain *d, unsigned long mpaddr)
 	struct mm_struct *mm = d->arch.mm;
 	struct page *p = (struct page *)0;
 	pgd_t *pgd;
+	pud_t *pud;
 	pmd_t *pmd;
 	pte_t *pte;
 extern unsigned long vhpt_paddr, vhpt_pend;
@@ -299,9 +300,13 @@ extern unsigned long vhpt_paddr, vhpt_pend;
 	}
 	pgd = pgd_offset(mm,mpaddr);
 	if (pgd_none(*pgd))
-		pgd_populate(mm, pgd, pmd_alloc_one(mm,mpaddr));
+		pgd_populate(mm, pgd, pud_alloc_one(mm,mpaddr));
 
-	pmd = pmd_offset(pgd, mpaddr);
+	pud = pud_offset(pgd, mpaddr);
+	if (pud_none(*pud))
+		pud_populate(mm, pud, pmd_alloc_one(mm,mpaddr));
+
+	pmd = pmd_offset(pud, mpaddr);
 	if (pmd_none(*pmd))
 		pmd_populate_kernel(mm, pmd, pte_alloc_one_kernel(mm,mpaddr));
 //		pmd_populate(mm, pmd, pte_alloc_one(mm,mpaddr));
@@ -338,6 +343,7 @@ unsigned long lookup_domain_mpa(struct domain *d, unsigned long mpaddr)
 {
 	struct mm_struct *mm = d->arch.mm;
 	pgd_t *pgd = pgd_offset(mm, mpaddr);
+	pud_t *pud;
 	pmd_t *pmd;
 	pte_t *pte;
 
@@ -356,14 +362,17 @@ unsigned long lookup_domain_mpa(struct domain *d, unsigned long mpaddr)
 #endif
 tryagain:
 	if (pgd_present(*pgd)) {
-		pmd = pmd_offset(pgd,mpaddr);
-		if (pmd_present(*pmd)) {
-			pte = pte_offset_map(pmd,mpaddr);
-			if (pte_present(*pte)) {
+		pud = pud_offset(pgd,mpaddr);
+		if (pud_present(*pud)) {
+			pmd = pmd_offset(pud,mpaddr);
+			if (pmd_present(*pmd)) {
+				pte = pte_offset_map(pmd,mpaddr);
+				if (pte_present(*pte)) {
 //printk("lookup_domain_page: found mapping for %lx, pte=%lx\n",mpaddr,pte_val(*pte));
-				return *(unsigned long *)pte;
+					return *(unsigned long *)pte;
+				}
 			}
-		}	
+		}
 	}
 	/* if lookup fails and mpaddr is "legal", "create" the page */
 	if ((mpaddr >> PAGE_SHIFT) < d->max_pages) {
