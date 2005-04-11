@@ -23,8 +23,6 @@
 #ifndef __XEN_TRACE_H__
 #define __XEN_TRACE_H__
 
-#include <public/trace.h>
-
 #ifdef TRACE_BUFFER
 
 #include <asm/page.h>
@@ -34,6 +32,7 @@
 #include <asm/current.h>
 #include <asm/msr.h>
 #include <public/dom0_ops.h>
+#include <public/trace.h>
 
 extern struct t_buf *t_bufs[];
 extern int tb_init_done;

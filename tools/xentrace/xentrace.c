@@ -22,6 +22,10 @@
 #include <signal.h>
 
 #include "xc_private.h"
+
+typedef struct { int counter; } atomic_t;
+#define _atomic_read(v)		((v).counter)
+
 #include <xen/trace.h>
 
 extern FILE *stderr;
@@ -242,7 +246,7 @@ unsigned long *init_tail_idxs(struct t_buf **bufs, unsigned int num)
     }
     
     for ( i = 0; i<num; i++ )
-        tails[i] = atomic_read(&bufs[i]->rec_idx);
+        tails[i] = _atomic_read(bufs[i]->rec_idx);
 
     return tails;
 }
@@ -310,7 +314,7 @@ int monitor_tbufs(FILE *logfile)
     while ( !interrupted )
     {
         for ( i = 0; ( i < num ) && !interrupted; i++ )
-            while( cons[i] != atomic_read(&meta[i]->rec_idx) )
+            while( cons[i] != _atomic_read(meta[i]->rec_idx) )
             {
                 write_rec(i, data[i] + cons[i], logfile);
                 cons[i] = (cons[i] + 1) % size_in_recs;
