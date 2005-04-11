@@ -573,16 +573,11 @@ do_watchdog_tick:
         movl  %edx,%ds
         movl  %edx,%es
         movl  %esp,%edx
-	pushl %ebx   # reason
-	pushl %edx   # regs
+        pushl %ebx   # reason
+        pushl %edx   # regs
         call  SYMBOL_NAME(do_nmi)
-	addl  $8,%esp
-        movl  XREGS_eflags(%esp),%eax
-        movb  XREGS_cs(%esp),%al
-        testl $(3|X86_EFLAGS_VM),%eax
-	jz    restore_all_xen
-        GET_CURRENT(%ebx)
-        jmp   restore_all_guest
+        addl  $8,%esp
+        jmp   ret_from_intr
 
 defer_nmi:
         movl  $FIXMAP_apic_base,%eax
@@ -616,7 +611,7 @@ nmi_parity_err:
 nmi_out:movl  %ss:XREGS_eflags(%esp),%eax
         movb  %ss:XREGS_cs(%esp),%al
         testl $(3|X86_EFLAGS_VM),%eax
-	jz    restore_all_xen
+        jz    restore_all_xen
         movl  $(__HYPERVISOR_DS),%edx
         movl  %edx,%ds
         movl  %edx,%es
