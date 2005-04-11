@@ -1,8 +1,9 @@
 // control flags for turning on/off features under test
 #undef CLONE_DOMAIN0
-//#define CLONE_DOMAIN0 5
+//#define CLONE_DOMAIN0 1
 #define DOMU_BUILD_STAGING
 #define VHPT_GLOBAL
+#define DOMU_AUTO_RESTART
 
 // manufactured from component pieces
 

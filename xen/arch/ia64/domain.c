@@ -258,8 +258,8 @@ void new_thread(struct exec_domain *ed,
 	sw->ar_pfs = 0;
 	sw->ar_bspstore = new_rbs;
 	//regs->r13 = (unsigned long) ed;
-printf("new_thread: ed=%p, regs=%p, sw=%p, new_rbs=%p, IA64_STK_OFFSET=%p, &r8=%p\n",
-ed,regs,sw,new_rbs,IA64_STK_OFFSET,&regs->r8);
+printf("new_thread: ed=%p, start_pc=%p, regs=%p, sw=%p, new_rbs=%p, IA64_STK_OFFSET=%p, &r8=%p\n",
+ed,start_pc,regs,sw,new_rbs,IA64_STK_OFFSET,&regs->r8);
 	sw->b0 = (unsigned long) &ia64_ret_from_clone;
 	ed->thread.ksp = (unsigned long) sw - 16;
 	//ed->thread_info->flags = 0;
@@ -428,6 +428,7 @@ void loaddomainelfimage(struct domain *d, unsigned long image_start)
 	int h, filesz, memsz, paddr;
 	unsigned long elfaddr, dom_mpaddr, dom_imva;
 	struct page *p;
+	unsigned long pteval;
   
 	copy_memory(&ehdr,image_start,sizeof(Elf_Ehdr));
 	for ( h = 0; h < ehdr.e_phnum; h++ ) {
@@ -456,9 +457,15 @@ void loaddomainelfimage(struct domain *d, unsigned long image_start)
 	else
 #endif
 	while (memsz > 0) {
+#ifdef DOMU_AUTO_RESTART
+		pteval = lookup_domain_mpa(d,dom_mpaddr);
+		if (pteval) dom_imva = __va(pteval & _PFN_MASK);
+		else { printf("loaddomainelfimage: BAD!\n"); while(1); }
+#else
 		p = map_new_domain_page(d,dom_mpaddr);
 		if (unlikely(!p)) BUG();
 		dom_imva = __va(page_to_phys(p));
+#endif
 		if (filesz > 0) {
 			if (filesz >= PAGE_SIZE)
 				copy_memory(dom_imva,elfaddr,PAGE_SIZE);
@@ -774,7 +781,9 @@ int construct_domU(struct domain *d,
 	struct exec_domain *ed = d->exec_domain[0];
 	unsigned long pkern_entry;
 
+#ifndef DOMU_AUTO_RESTART
 	if ( test_bit(DF_CONSTRUCTED, &d->d_flags) ) BUG();
+#endif
 
 	printk("*** LOADING DOMAIN %d ***\n",d->id);
 
@@ -808,13 +817,29 @@ int construct_domU(struct domain *d,
 
 	set_bit(DF_CONSTRUCTED, &d->d_flags);
 
-	printk("calling new_thread\n");
+	printk("calling new_thread, entry=%p\n",pkern_entry);
+#ifdef DOMU_AUTO_RESTART
+	ed->domain->arch.image_start = image_start;
+	ed->domain->arch.image_len = image_len;
+	ed->domain->arch.entry = pkern_entry;
+#endif
 	new_thread(ed, pkern_entry, 0, 0);
 	printk("new_thread returns\n");
 	__set_bit(0x30,ed->vcpu_info->arch.delivery_mask);
 
 	return 0;
 }
+
+#ifdef DOMU_AUTO_RESTART
+void reconstruct_domU(struct exec_domain *ed)
+{
+	/* re-copy the OS image to reset data values to original */
+	printk("reconstruct_domU: restarting domain %d...\n",
+		ed->domain->id);
+	loaddomainelfimage(ed->domain,ed->domain->arch.image_start);
+	new_thread(ed, ed->domain->arch.entry, 0, 0);
+}
+#endif
 
 // FIXME: When dom0 can construct domains, this goes away (or is rewritten)
 int launch_domainU(unsigned long size)

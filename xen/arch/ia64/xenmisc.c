@@ -276,6 +276,7 @@ void panic_domain(struct pt_regs *regs, const char *fmt, ...)
 	extern spinlock_t console_lock;
 	unsigned long flags;
     
+loop:
 	printf("$$$$$ PANIC in domain %d (k6=%p): ",
 		ed->domain->id, ia64_get_kr(IA64_KR_CURRENT));
 	va_start(args, fmt);
@@ -285,5 +286,11 @@ void panic_domain(struct pt_regs *regs, const char *fmt, ...)
 	if (regs) show_registers(regs);
 	domain_pause_by_systemcontroller(current->domain);
 	set_bit(DF_CRASHED, ed->domain->d_flags);
-	//while(test);
+	if (ed->domain->id == 0) {
+		int i = 1000000000L;
+		// if domain0 crashes, just periodically print out panic
+		// message to make post-mortem easier
+		while(i--);
+		goto loop;
+	}
 }

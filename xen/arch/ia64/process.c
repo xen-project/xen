@@ -714,8 +714,8 @@ ia64_handle_break (unsigned long ifa, struct pt_regs *regs, unsigned long isr, u
 		else do_ssc(vcpu_get_gr(current,36), regs);
 	}
 	else if (iim == d->breakimm) {
-		ia64_hypercall(regs);
-		vcpu_increment_iip(current);
+		if (ia64_hypercall(regs))
+			vcpu_increment_iip(current);
 	}
 	else reflect_interruption(ifa,isr,iim,regs,IA64_BREAK_VECTOR);
 }
