@@ -93,6 +93,17 @@ int reprogram_ac_timer(s_time_t timeout)
 DEFINE_PER_CPU(struct page_state, page_states) = {0};
 unsigned long totalram_pages;
 
+void __mod_page_state(unsigned offset, unsigned long delta)
+{
+	unsigned long flags;
+	void* ptr;
+
+	local_irq_save(flags);
+	ptr = &__get_cpu_var(page_states);
+	*(unsigned long*)(ptr + offset) += delta;
+	local_irq_restore(flags);
+}
+
 ///////////////////////////////
 // from arch/x86/flushtlb.c
 ///////////////////////////////

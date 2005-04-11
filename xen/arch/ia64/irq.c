@@ -492,101 +492,101 @@ EXPORT_SYMBOL(enable_irq);
  * SMP cross-CPU interrupts have their own specific
  * handlers).
  */
-unsigned int do_IRQ(unsigned long irq, struct pt_regs *regs)
+fastcall unsigned int __do_IRQ(unsigned int irq, struct pt_regs *regs)
 {
-	/*
-	 * We ack quickly, we don't want the irq controller
-	 * thinking we're snobs just because some other CPU has
-	 * disabled global interrupts (we have already done the
-	 * INT_ACK cycles, it's too late to try to pretend to the
-	 * controller that we aren't taking the interrupt).
-	 *
-	 * 0 return value means that this irq is already being
-	 * handled by some other CPU. (or is disabled)
-	 */
-	irq_desc_t *desc = irq_descp(irq);
+	irq_desc_t *desc = irq_desc + irq;
 	struct irqaction * action;
-	irqreturn_t action_ret;
 	unsigned int status;
-	int cpu;
-
-	cpu = smp_processor_id(); /* for CONFIG_PREEMPT, this must come after irq_enter()! */
 
 #ifndef XEN
-	kstat_cpu(cpu).irqs[irq]++;
+	kstat_this_cpu.irqs[irq]++;
 #endif
-
 	if (desc->status & IRQ_PER_CPU) {
-		/* no locking required for CPU-local interrupts: */
+		irqreturn_t action_ret;
+
+		/*
+		 * No locking required for CPU-local interrupts:
+		 */
 		desc->handler->ack(irq);
 		action_ret = handle_IRQ_event(irq, regs, desc->action);
-		desc->handler->end(irq);
-	} else {
-		spin_lock(&desc->lock);
-		desc->handler->ack(irq);
-		/*
-		 * REPLAY is when Linux resends an IRQ that was dropped earlier
-		 * WAITING is used by probe to mark irqs that are being tested
-		 */
-#ifdef XEN
-		status = desc->status & ~IRQ_REPLAY;
-#else
-		status = desc->status & ~(IRQ_REPLAY | IRQ_WAITING);
-#endif
-		status |= IRQ_PENDING; /* we _want_ to handle it */
-
-		/*
-		 * If the IRQ is disabled for whatever reason, we cannot
-		 * use the action we have.
-		 */
-		action = NULL;
-		if (likely(!(status & (IRQ_DISABLED | IRQ_INPROGRESS)))) {
-			action = desc->action;
-			status &= ~IRQ_PENDING; /* we commit to handling */
-			status |= IRQ_INPROGRESS; /* we are handling it */
-		}
-		desc->status = status;
-
-		/*
-		 * If there is no IRQ handler or it was disabled, exit early.
-		 * Since we set PENDING, if another processor is handling
-		 * a different instance of this same irq, the other processor
-		 * will take care of it.
-		 */
-		if (unlikely(!action))
-			goto out;
-
-		/*
-		 * Edge triggered interrupts need to remember
-		 * pending events.
-		 * This applies to any hw interrupts that allow a second
-		 * instance of the same irq to arrive while we are in do_IRQ
-		 * or in the handler. But the code here only handles the _second_
-		 * instance of the irq, not the third or fourth. So it is mostly
-		 * useful for irq hardware that does not mask cleanly in an
-		 * SMP environment.
-		 */
-		for (;;) {
-			spin_unlock(&desc->lock);
-			action_ret = handle_IRQ_event(irq, regs, action);
-			spin_lock(&desc->lock);
 #ifndef XEN
-			if (!noirqdebug)
-				note_interrupt(irq, desc, action_ret);
+		if (!noirqdebug)
+			note_interrupt(irq, desc, action_ret);
 #endif
-			if (!(desc->status & IRQ_PENDING))
-				break;
-			desc->status &= ~IRQ_PENDING;
-		}
-		desc->status &= ~IRQ_INPROGRESS;
-	  out:
-		/*
-		 * The ->end() handler has to deal with interrupts which got
-		 * disabled while the handler was running.
-		 */
 		desc->handler->end(irq);
-		spin_unlock(&desc->lock);
+		return 1;
 	}
+
+	spin_lock(&desc->lock);
+	desc->handler->ack(irq);
+	/*
+	 * REPLAY is when Linux resends an IRQ that was dropped earlier
+	 * WAITING is used by probe to mark irqs that are being tested
+	 */
+#ifdef XEN
+	status = desc->status & ~IRQ_REPLAY;
+#else
+	status = desc->status & ~(IRQ_REPLAY | IRQ_WAITING);
+#endif
+	status |= IRQ_PENDING; /* we _want_ to handle it */
+
+	/*
+	 * If the IRQ is disabled for whatever reason, we cannot
+	 * use the action we have.
+	 */
+	action = NULL;
+	if (likely(!(status & (IRQ_DISABLED | IRQ_INPROGRESS)))) {
+		action = desc->action;
+		status &= ~IRQ_PENDING; /* we commit to handling */
+		status |= IRQ_INPROGRESS; /* we are handling it */
+	}
+	desc->status = status;
+
+	/*
+	 * If there is no IRQ handler or it was disabled, exit early.
+	 * Since we set PENDING, if another processor is handling
+	 * a different instance of this same irq, the other processor
+	 * will take care of it.
+	 */
+	if (unlikely(!action))
+		goto out;
+
+	/*
+	 * Edge triggered interrupts need to remember
+	 * pending events.
+	 * This applies to any hw interrupts that allow a second
+	 * instance of the same irq to arrive while we are in do_IRQ
+	 * or in the handler. But the code here only handles the _second_
+	 * instance of the irq, not the third or fourth. So it is mostly
+	 * useful for irq hardware that does not mask cleanly in an
+	 * SMP environment.
+	 */
+	for (;;) {
+		irqreturn_t action_ret;
+
+		spin_unlock(&desc->lock);
+
+		action_ret = handle_IRQ_event(irq, regs, action);
+
+		spin_lock(&desc->lock);
+#ifndef XEN
+		if (!noirqdebug)
+			note_interrupt(irq, desc, action_ret);
+#endif
+		if (likely(!(desc->status & IRQ_PENDING)))
+			break;
+		desc->status &= ~IRQ_PENDING;
+	}
+	desc->status &= ~IRQ_INPROGRESS;
+
+out:
+	/*
+	 * The ->end() handler has to deal with interrupts which got
+	 * disabled while the handler was running.
+	 */
+	desc->handler->end(irq);
+	spin_unlock(&desc->lock);
+
 	return 1;
 }
 
