@@ -388,7 +388,7 @@ __gnttab_map_grant_ref(
         handle = get_maptrack_handle(ld->grant_table);
     }
 
-#ifdef GRANT_DEBUG_VERBOSE
+#if GRANT_DEBUG_VERBOSE
     DPRINTK("Mapping grant ref (%hu) for domain (%hu) with flags (%x)\n",
             ref, dom, dev_hst_ro_flags);
 #endif
@@ -499,7 +499,7 @@ __gnttab_unmap_grant_ref(
         (void)__put_user(GNTST_bad_domain, &uop->status);
         return GNTST_bad_domain;
     }
-#ifdef GRANT_DEBUG_VERBOSE
+#if GRANT_DEBUG_VERBOSE
     DPRINTK("Unmapping grant ref (%hu) for domain (%hu) with handle (%hu)\n",
             ref, dom, handle);
 #endif
@@ -703,7 +703,7 @@ gnttab_setup_table(
     return 0;
 }
 
-#ifdef GRANT_DEBUG
+#if GRANT_DEBUG
 static int
 gnttab_dump_table(gnttab_dump_table_t *uop)
 {
@@ -821,7 +821,7 @@ do_grant_table_op(
     case GNTTABOP_setup_table:
         rc = gnttab_setup_table((gnttab_setup_table_t *)uop, count);
         break;
-#ifdef GRANT_DEBUG
+#if GRANT_DEBUG
     case GNTTABOP_dump_table:
         rc = gnttab_dump_table((gnttab_dump_table_t *)uop);
         break;
@@ -860,7 +860,7 @@ gnttab_check_unmap(
 
     lgt = ld->grant_table;
 
-#ifdef GRANT_DEBUG_VERBOSE
+#if GRANT_DEBUG_VERBOSE
     if ( ld->id != 0 )
     {
         DPRINTK("Foreign unref rd(%d) ld(%d) frm(%x) flgs(%x).\n",
