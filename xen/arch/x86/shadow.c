@@ -515,9 +515,9 @@ static void free_shadow_pages(struct domain *d)
      * e.g., You are expected to have paused the domain and synchronized CR3.
      */
 
-    shadow_audit(d, 1);
-
     if( !d->arch.shadow_ht ) return;
+
+    shadow_audit(d, 1);
 
     // first, remove any outstanding refs from out_of_sync entries...
     //
@@ -1663,7 +1663,7 @@ shadow_mark_mfn_out_of_sync(struct exec_domain *ed, unsigned long gpfn,
     ASSERT(pfn_is_ram(mfn));
     ASSERT((page->u.inuse.type_info & PGT_type_mask) == PGT_writable_page);
 
-    FSH_LOG("mark_mfn_out_of_sync(gpfn=%p, mfn=%p) c=%p t=%p",
+    FSH_LOG("%s(gpfn=%p, mfn=%p) c=%p t=%p", __func__,
             gpfn, mfn, page->count_info, page->u.inuse.type_info);
 
     // XXX this will require some more thought...  Cross-domain sharing and
@@ -2031,6 +2031,7 @@ u32 shadow_remove_all_access(struct domain *d, unsigned long forbidden_gmfn)
     u32 count = 0;
 
     ASSERT(spin_is_locked(&d->arch.shadow_lock));
+    perfc_incrc(remove_all_access);
 
     for (i = 0; i < shadow_ht_buckets; i++)
     {
@@ -2622,14 +2623,6 @@ static int check_l1_table(
     unsigned long *gpl1e, *spl1e;
     int errors = 0, oos_ptes = 0;
 
-    // First check to see if this guest page is currently the active
-    // PTWR page.  If so, then we compare the (old) cached copy of the
-    // guest page to the shadow, and not the currently writable (and
-    // thus potentially out-of-sync) guest page.
-    //
-    if ( VM_ASSIST(d, VMASST_TYPE_writable_pagetables) )
-        BUG();
-
     if ( page_out_of_sync(pfn_to_page(gmfn)) )
     {
         gmfn = __shadow_status(d, gpfn, PGT_snapshot);
@@ -2743,7 +2736,7 @@ int _check_pagetable(struct exec_domain *ed, char *s)
     unsigned long ptbase_mfn = 0;
     int errors = 0, limit, oos_pdes = 0;
 
-    _audit_domain(d, AUDIT_QUIET);
+    //_audit_domain(d, AUDIT_QUIET);
     shadow_lock(d);
 
     sh_check_name = s;

@@ -71,15 +71,26 @@ void lgdt_finish(void);
  * be MACHINE addresses.
  */
 
-void xen_l1_entry_update(pte_t *ptr, unsigned long val);
-void xen_l2_entry_update(pmd_t *ptr, pmd_t val);
 void xen_pt_switch(unsigned long ptr);
 void xen_tlb_flush(void);
 void xen_invlpg(unsigned long ptr);
+
+#ifndef CONFIG_XEN_SHADOW_MODE
+void xen_l1_entry_update(pte_t *ptr, unsigned long val);
+void xen_l2_entry_update(pmd_t *ptr, pmd_t val);
 void xen_pgd_pin(unsigned long ptr);
 void xen_pgd_unpin(unsigned long ptr);
 void xen_pte_pin(unsigned long ptr);
 void xen_pte_unpin(unsigned long ptr);
+#else
+#define xen_l1_entry_update(_p, _v) set_pte((_p), (pte_t){(_v)})
+#define xen_l2_entry_update(_p, _v) set_pgd((_p), (pgd_t){(_v)})
+#define xen_pgd_pin(_p)   ((void)0)
+#define xen_pgd_unpin(_p) ((void)0)
+#define xen_pte_pin(_p)   ((void)0)
+#define xen_pte_unpin(_p) ((void)0)
+#endif
+
 void xen_set_ldt(unsigned long ptr, unsigned long bytes);
 void xen_machphys_update(unsigned long mfn, unsigned long pfn);
 

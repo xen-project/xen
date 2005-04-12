@@ -99,6 +99,7 @@ PERFCOUNTER_CPU(validate_hl2e_calls,               "calls to validate_hl2e_chang
 PERFCOUNTER_CPU(validate_hl2e_changes,             "validate_hl2e makes changes")
 PERFCOUNTER_CPU(exception_fixed,                   "pre-exception fixed")
 PERFCOUNTER_CPU(gpfn_to_mfn_foreign,               "calls to gpfn_to_mfn_foreign")
+PERFCOUNTER_CPU(remove_all_access,                 "calls to remove_all_access")
 PERFCOUNTER_CPU(remove_write_access,               "calls to remove_write_access")
 PERFCOUNTER_CPU(remove_write_access_easy,          "easy outs of remove_write_access")
 PERFCOUNTER_CPU(remove_write_no_work,              "no work in remove_write_access")

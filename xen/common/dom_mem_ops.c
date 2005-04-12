@@ -121,15 +121,6 @@ free_dom_mem(struct domain *d,
                 if ( page_out_of_sync(page) )
                     __shadow_sync_mfn(d, mpfn + j);
                 shadow_remove_all_access(d, mpfn + j);
-
-                if (page->count_info != 1)
-                {
-                    printk("free_dom_mem in shadow mode didn't release page "
-                           "mfn=%p c=%p\n", mpfn+j, page->count_info);
-                    shadow_unlock(d);
-                    audit_domain(d);
-                    BUG();
-                }
                 shadow_unlock(d);
             }
 

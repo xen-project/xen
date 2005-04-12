@@ -48,6 +48,7 @@
 #define pmd_val_ma(v) (v).pud.pgd.pgd;
 #endif
 
+#ifndef CONFIG_XEN_SHADOW_MODE
 void xen_l1_entry_update(pte_t *ptr, unsigned long val)
 {
     mmu_update_t u;
@@ -63,6 +64,7 @@ void xen_l2_entry_update(pmd_t *ptr, pmd_t val)
     u.val = pmd_val_ma(val);
     BUG_ON(HYPERVISOR_mmu_update(&u, 1, NULL, DOMID_SELF) < 0);
 }
+#endif
 
 void xen_machphys_update(unsigned long mfn, unsigned long pfn)
 {
@@ -131,6 +133,7 @@ void xen_invlpg_mask(cpumask_t mask, unsigned long ptr)
 
 #endif /* CONFIG_SMP */
 
+#ifndef CONFIG_XEN_SHADOW_MODE
 void xen_pgd_pin(unsigned long ptr)
 {
     struct mmuext_op op;
@@ -162,6 +165,7 @@ void xen_pte_unpin(unsigned long ptr)
     op.mfn = pfn_to_mfn(ptr >> PAGE_SHIFT);
     BUG_ON(HYPERVISOR_mmuext_op(&op, 1, NULL, DOMID_SELF) < 0);
 }
+#endif
 
 void xen_set_ldt(unsigned long ptr, unsigned long len)
 {
