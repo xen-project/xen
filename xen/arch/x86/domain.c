@@ -440,9 +440,17 @@ int arch_set_info_guest(
     phys_basetab = c->pt_base;
     ed->arch.guest_table = mk_pagetable(phys_basetab);
 
-    if ( !get_page_and_type(&frame_table[phys_basetab>>PAGE_SHIFT], d, 
-                            PGT_base_page_table) )
-        return -EINVAL;
+    if ( shadow_mode_enabled(d) )
+    {
+        if ( !get_page(&frame_table[phys_basetab>>PAGE_SHIFT], d) )
+            return -EINVAL;
+    }
+    else
+    {
+        if ( !get_page_and_type(&frame_table[phys_basetab>>PAGE_SHIFT], d, 
+                                PGT_base_page_table) )
+            return -EINVAL;
+    }
 
     /* Failure to set GDT is harmless. */
     SET_GDT_ENTRIES(ed, DEFAULT_GDT_ENTRIES);

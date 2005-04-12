@@ -1897,8 +1897,11 @@ int do_mmu_update(
                         gpfn = __mfn_to_gpfn(d, mfn);
                         ASSERT(VALID_M2P(gpfn));
 
-                        if ( page_is_page_table(page) )
+                        if ( page_is_page_table(page) &&
+                             !page_out_of_sync(page) )
+                        {
                             shadow_mark_mfn_out_of_sync(ed, gpfn, mfn);
+                        }
                     }
 
                     *(unsigned long *)va = req.val;
@@ -2152,7 +2155,7 @@ int do_update_va_mapping(unsigned long va,
             local_flush_tlb();
             break;
         case UVMF_ALL:
-            BUG_ON(shadow_mode_enabled(d));
+            BUG_ON(shadow_mode_enabled(d) && (d->cpuset != (1<<cpu)));
             flush_tlb_mask(d->cpuset);
             break;
         default:
@@ -2173,7 +2176,7 @@ int do_update_va_mapping(unsigned long va,
             local_flush_tlb_one(va);
             break;
         case UVMF_ALL:
-            BUG_ON(shadow_mode_enabled(d));
+            BUG_ON(shadow_mode_enabled(d) && (d->cpuset != (1<<cpu)));
             flush_tlb_one_mask(d->cpuset, va);
             break;
         default:
@@ -2391,7 +2394,7 @@ long do_update_descriptor(unsigned long pa, u64 desc)
         if ( shadow_mode_log_dirty(dom) )
             __mark_dirty(dom, mfn);
 
-        if ( page_is_page_table(page) )
+        if ( page_is_page_table(page) && !page_out_of_sync(page) )
             shadow_mark_mfn_out_of_sync(current, gpfn, mfn);
     }
 

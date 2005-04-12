@@ -222,11 +222,11 @@ struct out_of_sync_entry {
 #define SHADOW_SNAPSHOT_ELSEWHERE (-1L)
 
 /************************************************************************/
-#define SHADOW_DEBUG 1
-#define SHADOW_VERBOSE_DEBUG 1
-#define SHADOW_VVERBOSE_DEBUG 1
-#define SHADOW_HASH_DEBUG 1
-#define FULLSHADOW_DEBUG 1
+#define SHADOW_DEBUG 0
+#define SHADOW_VERBOSE_DEBUG 0
+#define SHADOW_VVERBOSE_DEBUG 0
+#define SHADOW_HASH_DEBUG 0
+#define FULLSHADOW_DEBUG 0
 
 #if SHADOW_DEBUG
 extern int shadow_status_noswap;
@@ -1490,14 +1490,18 @@ extern void __update_pagetables(struct exec_domain *ed);
 static inline void update_pagetables(struct exec_domain *ed)
 {
     struct domain *d = ed->domain;
+    int paging_enabled;
 
 #ifdef CONFIG_VMX
-    int paging_enabled =
-        !VMX_DOMAIN(ed) ||
-        test_bit(VMX_CPU_STATE_PG_ENABLED, &ed->arch.arch_vmx.cpu_state);
-#else
-    const int paging_enabled = 1;
+    if ( VMX_DOMAIN(ed) )
+        paging_enabled =
+            test_bit(VMX_CPU_STATE_PG_ENABLED, &ed->arch.arch_vmx.cpu_state);
+    else
 #endif
+        // HACK ALERT: there's currently no easy way to figure out if a domU
+        // has set its arch.guest_table to zero, vs not yet initialized it.
+        //
+        paging_enabled = !!pagetable_val(ed->arch.guest_table);
 
     /*
      * We don't call __update_pagetables() when vmx guest paging is
