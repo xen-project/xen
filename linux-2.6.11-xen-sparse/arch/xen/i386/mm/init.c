@@ -326,8 +326,8 @@ extern void __init remap_numa_kva(void);
 static void __init pagetable_init (void)
 {
 	unsigned long vaddr;
+	pgd_t *pgd_base = swapper_pg_dir;
 	pgd_t *old_pgd = (pgd_t *)xen_start_info.pt_base;
-	pgd_t *new_pgd = swapper_pg_dir;
 
 #ifdef CONFIG_X86_PAE
 	int i;
@@ -353,16 +353,16 @@ static void __init pagetable_init (void)
 	 * page directory, write-protect the new page directory, then switch to
 	 * it. We clean up by write-enabling and then freeing the old page dir.
 	 */
-	memcpy(new_pgd, old_pgd, PTRS_PER_PGD_NO_HV*sizeof(pgd_t));
-	make_page_readonly(new_pgd);
-	xen_pgd_pin(__pa(new_pgd));
-	load_cr3(new_pgd);
+	memcpy(pgd_base, old_pgd, PTRS_PER_PGD_NO_HV*sizeof(pgd_t));
+	make_page_readonly(pgd_base);
+	xen_pgd_pin(__pa(pgd_base));
+	load_cr3(pgd_base);
 	xen_pgd_unpin(__pa(old_pgd));
 	make_page_writable(old_pgd);
 	__flush_tlb_all();
 	free_bootmem(__pa(old_pgd), PAGE_SIZE);
 
-	kernel_physical_mapping_init(new_pgd);
+	kernel_physical_mapping_init(pgd_base);
 	remap_numa_kva();
 
 	/*
@@ -370,9 +370,9 @@ static void __init pagetable_init (void)
 	 * created - mappings will be set by set_fixmap():
 	 */
 	vaddr = __fix_to_virt(__end_of_fixed_addresses - 1) & PMD_MASK;
-	page_table_range_init(vaddr, 0, new_pgd);
+	page_table_range_init(vaddr, 0, pgd_base);
 
-	permanent_kmaps_init(new_pgd);
+	permanent_kmaps_init(pgd_base);
 
 #ifdef CONFIG_X86_PAE
 	/*
@@ -382,7 +382,7 @@ static void __init pagetable_init (void)
 	 * All user-space mappings are explicitly cleared after
 	 * SMP startup.
 	 */
-	new_pgd[0] = new_pgd[USER_PTRS_PER_PGD];
+	pgd_base[0] = pgd_base[USER_PTRS_PER_PGD];
 #endif
 }
 
