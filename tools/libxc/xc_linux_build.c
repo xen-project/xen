@@ -210,11 +210,9 @@ static int setup_guest(int xc_handle,
         }
 
         *vl1e = (page_array[count] << PAGE_SHIFT) | L1_PROT;
-#if !(1 || defined(GROSS_HACK_TO_TEST_SHADOW_MODE_CLIENTS))
         if ( (count >= ((vpt_start-dsi.v_start)>>PAGE_SHIFT)) && 
              (count <  ((vpt_end  -dsi.v_start)>>PAGE_SHIFT)) )
             *vl1e &= ~_PAGE_RW;
-#endif
         vl1e++;
     }
     munmap(vl1tab, PAGE_SIZE);
@@ -245,25 +243,12 @@ static int setup_guest(int xc_handle,
     }
     munmap(physmap, PAGE_SIZE);
     
-#if 1 || defined(GROSS_HACK_TO_TEST_SHADOW_MODE_CLIENTS)
-    {
-        int ret;
-        ret = xc_shadow_control(xc_handle, dom,
-                                DOM0_SHADOW_CONTROL_OP_ENABLE_TEST,
-                                NULL, 0, NULL);
-        if ( !ret )
-            ERROR("enabling shadow test mode failed\n");
-    }
-#endif
-
     /*
      * Pin down l2tab addr as page dir page - causes hypervisor to provide
      * correct protection for the page
      */ 
-#if !(1 || defined(GROSS_HACK_TO_TEST_SHADOW_MODE_CLIENTS))
     if ( pin_table(xc_handle, MMUEXT_PIN_L2_TABLE, l2tab>>PAGE_SHIFT, dom) )
         goto error_out;
-#endif
 
     start_info = xc_map_foreign_range(
         xc_handle, dom, PAGE_SIZE, PROT_READ|PROT_WRITE,

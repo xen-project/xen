@@ -1228,6 +1228,11 @@ int shadow_mode_control(struct domain *d, dom0_shadow_control_t *sc)
         rc = __shadow_mode_enable(d, d->arch.shadow_mode|SHM_enable|SHM_log_dirty);
         break;
 
+    case DOM0_SHADOW_CONTROL_OP_ENABLE_TRANSLATE:
+        free_shadow_pages(d);
+        rc = __shadow_mode_enable(d, d->arch.shadow_mode|SHM_enable|SHM_translate);
+        break;
+
     default:
         rc = shadow_mode_enabled(d) ? shadow_mode_table_op(d, sc) : -EINVAL;
         break;
