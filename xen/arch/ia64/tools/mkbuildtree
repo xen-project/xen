@@ -34,7 +34,6 @@ null ()
 # ensure linux directory is set up
 if [ ! -d $LINUX ]; then
 	echo "ERROR: $LINUX directory doesn't exist"
-	echo "(don't forget to apply the -ia64 patch to it too)"
 	exit
 fi
 
