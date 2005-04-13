@@ -22,7 +22,7 @@
 #include <asm/e820.h>
 
 /* opt_dom0_mem: Kilobytes of memory allocated to domain 0. */
-static unsigned int opt_dom0_mem = 16000;
+static unsigned int opt_dom0_mem = 64000;
 integer_param("dom0_mem", opt_dom0_mem);
 
 /*
