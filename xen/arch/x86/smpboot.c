@@ -51,8 +51,10 @@
 
 #ifdef CONFIG_SMP
 
-/* Setup configured maximum number of CPUs to activate */
+/* Cconfigured maximum number of CPUs to activate. We name the parameter 
+"maxcpus" rather than max_cpus to be compatible with Linux */
 static int max_cpus = -1;
+integer_param("maxcpus", max_cpus); 
 
 /* Total count of live CPUs */
 int smp_num_cpus = 1;

@@ -45,14 +45,14 @@ static inline int xcio_read(XcIOContext *ctxt, void *buf, int n){
     int rc;
 
     rc = IOStream_read(ctxt->io, buf, n);
-    return (rc == n ? 0 : rc);
+    return (rc == n ? 0 : -1);
 }
 
 static inline int xcio_write(XcIOContext *ctxt, void *buf, int n){
     int rc;
 
     rc = IOStream_write(ctxt->io, buf, n);
-    return (rc == n ? 0 : rc);
+    return (rc == n ? 0 : -1);
 }
 
 static inline int xcio_flush(XcIOContext *ctxt){
