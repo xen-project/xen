@@ -212,6 +212,7 @@ ln -sf ../../${LINUX_26}/include/asm-xen/gnttab.h
 ln -sf ../../${LINUX_26}/include/asm-xen/hypervisor.h
 ln -sf ../../${LINUX_26}/include/asm-xen/xen_proc.h
 ln -sf ../../${LINUX_26}/include/asm-xen/asm-i386/synch_bitops.h
+ln -sf ../../${LINUX_26}/include/asm-xen/asm-i386/hypercall.h
 
 mkdir -p linux-public && cd linux-public
 ln -sf ../../../${LINUX_26}/include/asm-xen/linux-public/privcmd.h
