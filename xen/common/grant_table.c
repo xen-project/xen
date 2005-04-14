@@ -169,7 +169,7 @@ __gnttab_map_grant_ref(
 
         /* rmb(); */ /* not on x86 */
         frame = sha->frame;
-        if ( unlikely(!pfn_is_ram(frame)) || 
+        if ( unlikely(!pfn_valid(frame)) || 
              unlikely(!((flags & GNTMAP_readonly) ? 
                         get_page(&frame_table[frame], rd) : 
                         get_page_and_type(&frame_table[frame], rd, 
