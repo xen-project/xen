@@ -185,9 +185,10 @@ panic_domain(regs,"psr.ic off, delivering fault=%lx,iip=%p,ifa=%p,isr=%p,PSCB.ii
 
 	regs->cr_iip = ((unsigned long) PSCB(ed,iva) + vector) & ~0xffUL;
 	regs->cr_ipsr = (regs->cr_ipsr & ~DELIVER_PSR_CLR) | DELIVER_PSR_SET;
-// FIXME: NEED TO PASS PSCB, BUT **NOT** IN R31 WHICH IS BEING USED FOR ar.pr
-// IN ANY CASE, PASS PINNED ADDRESS, NOT THIS ONE
-	//regs->r31 = (unsigned long) &PSCB(ed);
+#ifdef CONFIG_SMP
+#error "sharedinfo doesn't handle smp yet"
+#endif
+	regs->r31 = &((shared_info_t *)SHAREDINFO_ADDR)->vcpu_data[0].arch;
 
 	PSCB(ed,interrupt_delivery_enabled) = 0;
 	PSCB(ed,interrupt_collection_enabled) = 0;

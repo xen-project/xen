@@ -190,7 +190,7 @@ GLOBAL_ENTRY(ia64_new_rr7)
 
 	movl r22=SHAREDINFO_ADDR
 	;;
-	movl r25=PAGE_KERNEL
+	movl r25=PAGE_SHARED
 	;;
 	mov r21=loc5			// saved sharedinfo physical address
 	;;
