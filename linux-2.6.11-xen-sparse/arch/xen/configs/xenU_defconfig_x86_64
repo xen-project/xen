@@ -1,7 +1,7 @@
 #
 # Automatically generated make config: don't edit
-# Linux kernel version: 2.6.10-xenU
-# Mon Dec 27 10:15:03 2004
+# Linux kernel version: 2.6.11-xenU
+# Thu Apr 14 22:19:48 2005
 #
 CONFIG_XEN=y
 CONFIG_ARCH_XEN=y
@@ -12,17 +12,16 @@ CONFIG_NO_IDLE_HZ=y
 #
 # CONFIG_XEN_PRIVILEGED_GUEST is not set
 # CONFIG_XEN_PHYSDEV_ACCESS is not set
-# CONFIG_XEN_BLKDEV_BACKEND is not set
-# CONFIG_XEN_NETDEV_BACKEND is not set
+CONFIG_XEN_BLKDEV_GRANT=y
 CONFIG_XEN_BLKDEV_FRONTEND=y
 CONFIG_XEN_NETDEV_FRONTEND=y
 # CONFIG_XEN_NETDEV_FRONTEND_PIPELINED_TRANSMITTER is not set
 # CONFIG_XEN_BLKDEV_TAP is not set
-CONFIG_XEN_WRITABLE_PAGETABLES=y
+# CONFIG_XEN_SHADOW_MODE is not set
 CONFIG_XEN_SCRUB_PAGES=y
+# CONFIG_XEN_X86 is not set
+CONFIG_XEN_X86_64=y
 CONFIG_HAVE_ARCH_DEV_ALLOC_SKB=y
-CONFIG_X86=y
-# CONFIG_X86_64 is not set
 
 #
 # Code maturity level options
@@ -48,7 +47,6 @@ CONFIG_KOBJECT_UEVENT=y
 # CONFIG_IKCONFIG is not set
 # CONFIG_EMBEDDED is not set
 CONFIG_KALLSYMS=y
-# CONFIG_KALLSYMS_ALL is not set
 # CONFIG_KALLSYMS_EXTRA_PASS is not set
 CONFIG_FUTEX=y
 CONFIG_EPOLL=y
@@ -70,80 +68,74 @@ CONFIG_OBSOLETE_MODPARM=y
 # CONFIG_MODVERSIONS is not set
 # CONFIG_MODULE_SRCVERSION_ALL is not set
 CONFIG_KMOD=y
-
-#
-# X86 Processor Configuration
-#
 CONFIG_XENARCH="x86_64"
+CONFIG_X86=y
 CONFIG_MMU=y
-CONFIG_UID16=y
 CONFIG_GENERIC_ISA_DMA=y
 CONFIG_GENERIC_IOMAP=y
-# CONFIG_M386 is not set
-# CONFIG_M486 is not set
-# CONFIG_M586 is not set
-# CONFIG_M586TSC is not set
-# CONFIG_M586MMX is not set
-# CONFIG_M686 is not set
-# CONFIG_MPENTIUMII is not set
-# CONFIG_MPENTIUMIII is not set
-# CONFIG_MPENTIUMM is not set
-CONFIG_MPENTIUM4=y
-# CONFIG_MK6 is not set
-# CONFIG_MK7 is not set
-# CONFIG_MK8 is not set
-# CONFIG_MCRUSOE is not set
-# CONFIG_MEFFICEON is not set
-# CONFIG_MWINCHIPC6 is not set
-# CONFIG_MWINCHIP2 is not set
-# CONFIG_MWINCHIP3D is not set
-# CONFIG_MCYRIXIII is not set
-# CONFIG_MVIAC3_2 is not set
-# CONFIG_X86_GENERIC is not set
 CONFIG_X86_CMPXCHG=y
-CONFIG_X86_XADD=y
 CONFIG_X86_L1_CACHE_SHIFT=7
-CONFIG_RWSEM_XCHGADD_ALGORITHM=y
-CONFIG_X86_WP_WORKS_OK=y
-CONFIG_X86_INVLPG=y
-CONFIG_X86_BSWAP=y
-CONFIG_X86_POPAD_OK=y
+CONFIG_RWSEM_GENERIC_SPINLOCK=y
+CONFIG_GENERIC_CALIBRATE_DELAY=y
 CONFIG_X86_GOOD_APIC=y
-CONFIG_X86_INTEL_USERCOPY=y
-CONFIG_X86_USE_PPRO_CHECKSUM=y
 # CONFIG_HPET_TIMER is not set
-# CONFIG_HPET_EMULATE_RTC is not set
 # CONFIG_SMP is not set
 CONFIG_PREEMPT=y
+# CONFIG_MICROCODE is not set
 CONFIG_X86_CPUID=y
-
-#
-# Firmware Drivers
-#
-# CONFIG_EDD is not set
-CONFIG_NOHIGHMEM=y
-# CONFIG_HIGHMEM4G is not set
-CONFIG_HAVE_DEC_LOCK=y
-# CONFIG_REGPARM is not set
-
-#
-# Kernel hacking
-#
-# CONFIG_DEBUG_KERNEL is not set
-CONFIG_EARLY_PRINTK=y
-# CONFIG_DEBUG_SPINLOCK_SLEEP is not set
-# CONFIG_FRAME_POINTER is not set
-# CONFIG_4KSTACKS is not set
+# CONFIG_NUMA is not set
+# CONFIG_MTRR is not set
+# CONFIG_PCI is not set
+# CONFIG_EARLY_PRINTK is not set
 CONFIG_GENERIC_HARDIRQS=y
 CONFIG_GENERIC_IRQ_PROBE=y
-CONFIG_X86_BIOS_REBOOT=y
-CONFIG_PC=y
+
+#
+# X86_64 processor configuration
+#
+CONFIG_X86_64=y
+CONFIG_64BIT=y
+
+#
+# Processor type and features
+#
+# CONFIG_MPSC is not set
+CONFIG_GENERIC_CPU=y
+CONFIG_X86_L1_CACHE_BYTES=128
+# CONFIG_X86_TSC is not set
+# CONFIG_X86_MSR is not set
+CONFIG_DUMMY_IOMMU=y
+# CONFIG_X86_MCE is not set
+
+#
+# Power management options
+#
+# CONFIG_PM is not set
+
+#
+# ACPI (Advanced Configuration and Power Interface) Support
+#
+# CONFIG_ACPI is not set
+
+#
+# CPU Frequency scaling
+#
+# CONFIG_CPU_FREQ is not set
+
+#
+# Bus options (PCI etc.)
+#
+# CONFIG_UNORDERED_IO is not set
+
+#
+# Executable file formats / Emulations
+#
+# CONFIG_IA32_EMULATION is not set
 
 #
 # Executable file formats
 #
 CONFIG_BINFMT_ELF=y
-# CONFIG_BINFMT_AOUT is not set
 # CONFIG_BINFMT_MISC is not set
 
 #
@@ -156,12 +148,12 @@ CONFIG_BINFMT_ELF=y
 CONFIG_STANDALONE=y
 CONFIG_PREVENT_FIRMWARE_BUILD=y
 # CONFIG_FW_LOADER is not set
-# CONFIG_DEBUG_DRIVER is not set
 
 #
 # Block devices
 #
 # CONFIG_BLK_DEV_FD is not set
+# CONFIG_BLK_DEV_COW_COMMON is not set
 CONFIG_BLK_DEV_LOOP=m
 # CONFIG_BLK_DEV_CRYPTOLOOP is not set
 CONFIG_BLK_DEV_NBD=m
@@ -180,6 +172,7 @@ CONFIG_IOSCHED_NOOP=y
 CONFIG_IOSCHED_AS=y
 CONFIG_IOSCHED_DEADLINE=y
 CONFIG_IOSCHED_CFQ=y
+# CONFIG_ATA_OVER_ETH is not set
 
 #
 # SCSI device support
@@ -208,6 +201,7 @@ CONFIG_BLK_DEV_SD=m
 #
 # CONFIG_SCSI_SPI_ATTRS is not set
 # CONFIG_SCSI_FC_ATTRS is not set
+# CONFIG_SCSI_ISCSI_ATTRS is not set
 
 #
 # SCSI low-level drivers
@@ -340,6 +334,10 @@ CONFIG_REISERFS_FS=y
 # CONFIG_REISERFS_PROC_INFO is not set
 # CONFIG_REISERFS_FS_XATTR is not set
 # CONFIG_JFS_FS is not set
+
+#
+# XFS support
+#
 # CONFIG_XFS_FS is not set
 # CONFIG_MINIX_FS is not set
 # CONFIG_ROMFS_FS is not set
@@ -410,7 +408,6 @@ CONFIG_NFS_V3=y
 CONFIG_ROOT_NFS=y
 CONFIG_LOCKD=y
 CONFIG_LOCKD_V4=y
-# CONFIG_EXPORTFS is not set
 CONFIG_SUNRPC=y
 # CONFIG_RPCSEC_GSS_KRB5 is not set
 # CONFIG_RPCSEC_GSS_SPKM3 is not set
@@ -492,7 +489,7 @@ CONFIG_CRYPTO_MD5=m
 # CONFIG_CRYPTO_BLOWFISH is not set
 # CONFIG_CRYPTO_TWOFISH is not set
 # CONFIG_CRYPTO_SERPENT is not set
-# CONFIG_CRYPTO_AES_586 is not set
+# CONFIG_CRYPTO_AES is not set
 # CONFIG_CRYPTO_CAST5 is not set
 # CONFIG_CRYPTO_CAST6 is not set
 # CONFIG_CRYPTO_TEA is not set
@@ -503,6 +500,10 @@ CONFIG_CRYPTO_MD5=m
 # CONFIG_CRYPTO_MICHAEL_MIC is not set
 CONFIG_CRYPTO_CRC32C=m
 # CONFIG_CRYPTO_TEST is not set
+
+#
+# Hardware crypto devices
+#
 
 #
 # Library routines
