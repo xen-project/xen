@@ -524,6 +524,7 @@ PPEFCN Mpriv_funcs[64] = {
 struct {
 	unsigned long mov_to_ar_imm;
 	unsigned long mov_to_ar_reg;
+	unsigned long mov_from_ar;
 	unsigned long ssm;
 	unsigned long rsm;
 	unsigned long rfi;
@@ -617,7 +618,9 @@ priv_handle_op(VCPU *vcpu, REGS *regs, int privlvl)
 		else if (inst.generic.major != 1) break;
 		x6 = inst.M29.x6;
 		if (x6 == 0x2a) {
-			privcnt.mov_to_ar_reg++;
+			if (inst.M29.r2 > 63 && inst.M29.ar3 < 8)
+				privcnt.mov_from_ar++; // privified mov from kr
+			else privcnt.mov_to_ar_reg++;
 			return priv_mov_to_ar_reg(vcpu,inst);
 		}
 		if (inst.M29.x3 != 0) break;
@@ -663,7 +666,9 @@ priv_handle_op(VCPU *vcpu, REGS *regs, int privlvl)
 #endif
 		if (inst.I26.x3 != 0) break;  // I26.x3 == I27.x3
 		if (inst.I26.x6 == 0x2a) {
-			privcnt.mov_to_ar_reg++;
+			if (inst.I26.r2 > 63 && inst.I26.ar3 < 8)
+				privcnt.mov_from_ar++; // privified mov from kr
+			else privcnt.mov_to_ar_reg++;
 			return priv_mov_to_ar_reg(vcpu,inst);
 		}
 		if (inst.I27.x6 == 0x0a) {
@@ -800,6 +805,9 @@ int dump_privop_counts(char *buf)
 	if (privcnt.mov_to_ar_reg)
 		s += sprintf(s,"%10d  %s [%d%%]\r\n", privcnt.mov_to_ar_reg,
 			"mov_to_ar_reg", (privcnt.mov_to_ar_reg*100L)/sum);
+	if (privcnt.mov_from_ar)
+		s += sprintf(s,"%10d  %s [%d%%]\r\n", privcnt.mov_from_ar,
+			"privified-mov_from_ar", (privcnt.mov_from_ar*100L)/sum);
 	if (privcnt.ssm)
 		s += sprintf(s,"%10d  %s [%d%%]\r\n", privcnt.ssm,
 			"ssm", (privcnt.ssm*100L)/sum);
@@ -852,6 +860,7 @@ int zero_privop_counts(char *buf)
 	// this is ugly and should probably produce sorted output
 	// but it will have to do for now
 	privcnt.mov_to_ar_imm = 0; privcnt.mov_to_ar_reg = 0;
+	privcnt.mov_from_ar = 0;
 	privcnt.ssm = 0; privcnt.rsm = 0;
 	privcnt.rfi = 0; privcnt.bsw0 = 0;
 	privcnt.bsw1 = 0; privcnt.cover = 0;
