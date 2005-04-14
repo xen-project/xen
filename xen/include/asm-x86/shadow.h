@@ -270,20 +270,21 @@ extern int shadow_status_noswap;
 static inline int
 shadow_get_page_from_l1e(l1_pgentry_t l1e, struct domain *d)
 {
-    int res = get_page_from_l1e(l1e, d);
+    l1_pgentry_t nl1e = mk_l1_pgentry(l1_pgentry_val(l1e) & ~_PAGE_GLOBAL);
+    int res = get_page_from_l1e(nl1e, d);
     unsigned long mfn;
     struct domain *owner;
 
-    ASSERT( l1_pgentry_val(l1e) & _PAGE_PRESENT );
+    ASSERT( l1_pgentry_val(nl1e) & _PAGE_PRESENT );
 
     if ( unlikely(!res) && IS_PRIV(d) && !shadow_mode_translate(d) &&
-         !(l1_pgentry_val(l1e) & L1_DISALLOW_MASK) &&
-         (mfn = l1_pgentry_to_pfn(l1e)) &&
+         !(l1_pgentry_val(nl1e) & L1_DISALLOW_MASK) &&
+         (mfn = l1_pgentry_to_pfn(nl1e)) &&
          pfn_is_ram(mfn) &&
-         (owner = page_get_owner(pfn_to_page(l1_pgentry_to_pfn(l1e)))) &&
+         (owner = page_get_owner(pfn_to_page(l1_pgentry_to_pfn(nl1e)))) &&
          (d != owner) )
     {
-        res = get_page_from_l1e(l1e, owner);
+        res = get_page_from_l1e(nl1e, owner);
         printk("tried to map mfn %p from domain %d into shadow page tables "
                "of domain %d; %s\n",
                mfn, owner->id, d->id, res ? "success" : "failed");
@@ -292,7 +293,7 @@ shadow_get_page_from_l1e(l1_pgentry_t l1e, struct domain *d)
     if ( unlikely(!res) )
     {
         perfc_incrc(shadow_get_page_fail);
-        FSH_LOG("%s failed to get ref l1e=%p\n", __func__, l1_pgentry_val(l1e));
+        FSH_LOG("%s failed to get ref l1e=%p", __func__, l1_pgentry_val(l1e));
     }
 
     return res;
@@ -417,36 +418,11 @@ static inline void shadow_sync_and_drop_references(
 
 /************************************************************************/
 
-//#define MFN3_TO_WATCH 0x8575
-#ifdef MFN3_TO_WATCH
-#define get_shadow_ref(__s) (                                                 \
-{                                                                             \
-    unsigned long _s = (__s);                                                 \
-    if ( _s == MFN3_TO_WATCH )                                                \
-        printk("get_shadow_ref(%x) oc=%d @ %s:%d in %s\n",                    \
-               MFN3_TO_WATCH, frame_table[_s].count_info,                     \
-               __FILE__, __LINE__, __func__);                                 \
-    _get_shadow_ref(_s);                                                      \
-})
-#define put_shadow_ref(__s) (                                                 \
-{                                                                             \
-    unsigned long _s = (__s);                                                 \
-    if ( _s == MFN3_TO_WATCH )                                                \
-        printk("put_shadow_ref(%x) oc=%d @ %s:%d in %s\n",                    \
-               MFN3_TO_WATCH, frame_table[_s].count_info,                     \
-               __FILE__, __LINE__, __func__);                                 \
-    _put_shadow_ref(_s);                                                      \
-})
-#else
-#define _get_shadow_ref get_shadow_ref
-#define _put_shadow_ref put_shadow_ref
-#endif
-
 /*
  * Add another shadow reference to smfn.
  */
 static inline int
-_get_shadow_ref(unsigned long smfn)
+get_shadow_ref(unsigned long smfn)
 {
     u32 x, nx;
 
@@ -475,7 +451,7 @@ extern void free_shadow_page(unsigned long smfn);
  * Drop a shadow reference to smfn.
  */
 static inline void
-_put_shadow_ref(unsigned long smfn)
+put_shadow_ref(unsigned long smfn)
 {
     u32 x, nx;
 
@@ -486,7 +462,8 @@ _put_shadow_ref(unsigned long smfn)
 
     if ( unlikely(x == 0) )
     {
-        printk("put_shadow_ref underflow, oc=%p t=%p\n",
+        printk("put_shadow_ref underflow, smfn=%p oc=%p t=%p\n",
+               smfn,
                frame_table[smfn].count_info,
                frame_table[smfn].u.inuse.type_info);
         BUG();
@@ -508,13 +485,15 @@ shadow_pin(unsigned long smfn)
     ASSERT( !(frame_table[smfn].u.inuse.type_info & PGT_pinned) );
 
     frame_table[smfn].u.inuse.type_info |= PGT_pinned;
-    if ( !get_shadow_ref(smfn) )
+    if ( unlikely(!get_shadow_ref(smfn)) )
         BUG();
 }
 
 static inline void
 shadow_unpin(unsigned long smfn)
 {
+    ASSERT( (frame_table[smfn].u.inuse.type_info & PGT_pinned) );
+
     frame_table[smfn].u.inuse.type_info &= ~PGT_pinned;
     put_shadow_ref(smfn);
 }
@@ -767,7 +746,7 @@ validate_pte_change(
     perfc_incrc(validate_pte_calls);
 
 #if 0
-    FSH_LOG("validate_pte(old=%p new=%p)\n", old_pte, new_pte);
+    FSH_LOG("validate_pte(old=%p new=%p)", old_pte, new_pte);
 #endif
 
     old_spte = *shadow_pte_p;
@@ -1457,7 +1436,7 @@ static inline unsigned long gva_to_gpte(unsigned long gva)
     if ( unlikely(__get_user(gpte, (unsigned long *)
                              &linear_pg_table[gva >> PAGE_SHIFT])) )
     {
-        FSH_LOG("gva_to_gpte got a fault on gva=%p\n", gva);
+        FSH_LOG("gva_to_gpte got a fault on gva=%p", gva);
         return 0;
     }
 

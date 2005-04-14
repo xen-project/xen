@@ -297,7 +297,8 @@ asmlinkage int do_page_fault(struct xen_regs *regs)
     }
 
     if ( unlikely(shadow_mode_enabled(d)) &&
-         ((addr < HYPERVISOR_VIRT_START) || shadow_mode_external(d)) &&
+         ((addr < HYPERVISOR_VIRT_START) ||
+          (shadow_mode_external(d) && GUEST_CONTEXT(ed, regs))) &&
          shadow_fault(addr, regs) )
     {
         return EXCRET_fault_fixed;

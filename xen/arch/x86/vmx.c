@@ -521,9 +521,8 @@ static int mov_to_cr(int gp, int cr, struct xen_regs *regs)
                 domain_crash_synchronous(); /* need to take a clean path */
             }
             mfn = phys_to_machine_mapping(value >> PAGE_SHIFT);
-            vmx_shadow_clear_state(d->domain);
             d->arch.guest_table  = mk_pagetable(mfn << PAGE_SHIFT);
-            update_pagetables(d); 
+            update_pagetables(d);
             /* 
              * arch.shadow_table should now hold the next CR3 for shadow
              */

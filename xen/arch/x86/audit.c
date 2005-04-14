@@ -35,7 +35,6 @@ static int ttot=0, ctot=0, io_mappings=0, lowmem_mappings=0;
 static int l1, l2, oos_count, page_count;
 
 #define FILE_AND_LINE 0
-//#define MFN2_TO_WATCH 0x1d8
 
 #if FILE_AND_LINE
 #define adjust(_p, _a) _adjust((_p), (_a), __FILE__, __LINE__)
@@ -55,13 +54,6 @@ int audit_adjust_pgtables(struct domain *d, int dir, int noisy)
 
     void _adjust(struct pfn_info *page, int adjtype ADJUST_EXTRA_ARGS)
     {
-#ifdef MFN2_TO_WATCH
-        if (page_to_pfn(page) == MFN2_TO_WATCH)
-        {
-            APRINTK("adjust(mfn=%p, dir=%d, adjtype=%d)",
-                    page_to_pfn(page), dir, adjtype);
-        }
-#endif
         if ( adjtype )
         {
             // adjust the type count
