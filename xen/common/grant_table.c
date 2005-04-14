@@ -804,18 +804,19 @@ do_grant_table_op(
 
     LOCK_BIGLOCK(current->domain);
 
+    rc = -EFAULT;
     switch ( cmd )
     {
     case GNTTABOP_map_grant_ref:
         if ( unlikely(!array_access_ok(
             VERIFY_WRITE, uop, count, sizeof(gnttab_map_grant_ref_t))) )
-            return -EFAULT;
+            goto out;
         rc = gnttab_map_grant_ref((gnttab_map_grant_ref_t *)uop, count);
         break;
     case GNTTABOP_unmap_grant_ref:
         if ( unlikely(!array_access_ok(
             VERIFY_WRITE, uop, count, sizeof(gnttab_unmap_grant_ref_t))) )
-            return -EFAULT;
+            goto out;
         rc = gnttab_unmap_grant_ref((gnttab_unmap_grant_ref_t *)uop, count);
         break;
     case GNTTABOP_setup_table:
@@ -831,6 +832,7 @@ do_grant_table_op(
         break;
     }
 
+out:
     UNLOCK_BIGLOCK(current->domain);
 
     return rc;
