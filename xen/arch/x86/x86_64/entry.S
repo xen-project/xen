@@ -19,6 +19,14 @@
         movq (reg),reg;
 
         ALIGN
+/* %rbx: struct exec_domain, interrupts disabled */
+switch_to_kernel:
+        leaq  EDOMAIN_trap_bounce(%rbx),%rdx
+        movq  EDOMAIN_syscall_addr(%rbx),%rax
+        movq  %rax,TRAPBOUNCE_eip(%rdx)
+        movw  $0,TRAPBOUNCE_flags(%rdx)
+        call  create_bounce_frame
+
 /* %rbx: struct exec_domain */
 restore_all_guest:
         RESTORE_ALL
@@ -104,20 +112,12 @@ ENTRY(syscall_enter)
         pushq $0
         movl  $TRAP_syscall,4(%rsp)
         SAVE_ALL
-        sti
         GET_CURRENT(%rbx)
         testb $TF_kernel_mode,EDOMAIN_thread_flags(%rbx)
-        jnz   hypercall
+        jz    switch_to_kernel
 
-        leaq  EDOMAIN_trap_bounce(%rbx),%rdx
-        movq  EDOMAIN_syscall_addr(%rbx),%rax
-        movq  %rax,TRAPBOUNCE_eip(%rdx)
-        movw  $0,TRAPBOUNCE_flags(%rdx)
-        call  create_bounce_frame
-        jmp   restore_all_guest
-
-/* %rbx: struct exec_domain */
-hypercall:
+/*hypercall:*/
+        sti
         movq  %r10,%rcx
         andq  $(NR_hypercalls-1),%rax
         leaq  SYMBOL_NAME(hypercall_table)(%rip),%r10
