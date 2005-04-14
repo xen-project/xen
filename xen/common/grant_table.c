@@ -161,7 +161,7 @@ __gnttab_activate_grant_ref(
 
         frame = __gpfn_to_mfn_foreign(granting_d, sha->frame);
 
-        if ( unlikely(!pfn_is_ram(frame)) ||
+        if ( unlikely(!pfn_valid(frame)) ||
              unlikely(!((dev_hst_ro_flags & GNTMAP_readonly) ?
                         get_page(&frame_table[frame], granting_d) :
                         get_page_and_type(&frame_table[frame], granting_d,

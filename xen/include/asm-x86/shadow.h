@@ -85,7 +85,7 @@ static inline int page_is_page_table(struct pfn_info *page)
 
 static inline int mfn_is_page_table(unsigned long mfn)
 {
-    if ( !pfn_is_ram(mfn) )
+    if ( !pfn_valid(mfn) )
         return 0;
 
     return frame_table[mfn].count_info & PGC_page_table;
@@ -98,7 +98,7 @@ static inline int page_out_of_sync(struct pfn_info *page)
 
 static inline int mfn_out_of_sync(unsigned long mfn)
 {
-    if ( !pfn_is_ram(mfn) )
+    if ( !pfn_valid(mfn) )
         return 0;
 
     return frame_table[mfn].count_info & PGC_out_of_sync;
@@ -280,7 +280,7 @@ shadow_get_page_from_l1e(l1_pgentry_t l1e, struct domain *d)
     if ( unlikely(!res) && IS_PRIV(d) && !shadow_mode_translate(d) &&
          !(l1_pgentry_val(nl1e) & L1_DISALLOW_MASK) &&
          (mfn = l1_pgentry_to_pfn(nl1e)) &&
-         pfn_is_ram(mfn) &&
+         pfn_valid(mfn) &&
          (owner = page_get_owner(pfn_to_page(l1_pgentry_to_pfn(nl1e)))) &&
          (d != owner) )
     {
@@ -426,7 +426,7 @@ get_shadow_ref(unsigned long smfn)
 {
     u32 x, nx;
 
-    ASSERT(pfn_is_ram(smfn));
+    ASSERT(pfn_valid(smfn));
 
     x = frame_table[smfn].count_info;
     nx = x + 1;
@@ -455,7 +455,7 @@ put_shadow_ref(unsigned long smfn)
 {
     u32 x, nx;
 
-    ASSERT(pfn_is_ram(smfn));
+    ASSERT(pfn_valid(smfn));
 
     x = frame_table[smfn].count_info;
     nx = x - 1;

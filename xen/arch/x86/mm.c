@@ -171,6 +171,9 @@ void arch_init_memory(void)
 {
     extern void subarch_init_memory(struct domain *);
 
+    unsigned long i, j, pfn, nr_pfns;
+    struct pfn_info *page;
+
     memset(percpu_info, 0, sizeof(percpu_info));
 
     /*
@@ -184,12 +187,41 @@ void arch_init_memory(void)
 
     /*
      * Initialise our DOMID_IO domain.
-     * This domain owns no pages but is considered a special case when
-     * mapping I/O pages, as the mappings occur at the priv of the caller.
+     * This domain owns I/O pages that are within the range of the pfn_info
+     * array. Mappings occur at the priv of the caller.
      */
     dom_io = alloc_domain_struct();
     atomic_set(&dom_io->refcnt, 1);
     dom_io->id = DOMID_IO;
+
+    /* First 1MB of RAM is historically marked as I/O. */
+    for ( i = 0; i < 0x100; i++ )
+    {
+        page = &frame_table[i];
+        page->count_info        = PGC_allocated | 1;
+        page->u.inuse.type_info = PGT_writable_page | PGT_validated | 1;
+        page_set_owner(page, dom_io);
+    }
+ 
+    /* Any non-RAM areas in the e820 map are considered to be for I/O. */
+    for ( i = 0; i < e820.nr_map; i++ )
+    {
+        if ( e820.map[i].type == E820_RAM )
+            continue;
+        pfn = e820.map[i].addr >> PAGE_SHIFT;
+        nr_pfns = (e820.map[i].size +
+                   (e820.map[i].addr & ~PAGE_MASK) +
+                   ~PAGE_MASK) >> PAGE_SHIFT;
+        for ( j = 0; j < nr_pfns; j++ )
+        {
+            if ( !pfn_valid(pfn+j) )
+                continue;
+            page = &frame_table[pfn+j];
+            page->count_info        = PGC_allocated | 1;
+            page->u.inuse.type_info = PGT_writable_page | PGT_validated | 1;
+            page_set_owner(page, dom_io);
+        }
+    }
 
     subarch_init_memory(dom_xen);
 }
@@ -306,13 +338,7 @@ static int get_page_from_pagenr(unsigned long page_nr, struct domain *d)
 {
     struct pfn_info *page = &frame_table[page_nr];
 
-    if ( unlikely(!pfn_is_ram(page_nr)) )
-    {
-        MEM_LOG("Pfn %p is not RAM", page_nr);
-        return 0;
-    }
-
-    if ( unlikely(!get_page(page, d)) )
+    if ( unlikely(!pfn_valid(page_nr)) || unlikely(!get_page(page, d)) )
     {
         MEM_LOG("Could not get page ref for pfn %p", page_nr);
         return 0;
@@ -419,20 +445,25 @@ get_page_from_l1e(
         return 0;
     }
 
-    if ( unlikely(!pfn_is_ram(mfn)) )
+    if ( unlikely(!pfn_valid(mfn)) ||
+         unlikely(page_get_owner(page) == dom_io) )
     {
-        /* Revert to caller privileges if FD == DOMID_IO. */
+        /* DOMID_IO reverts to caller for privilege checks. */
         if ( d == dom_io )
             d = current->domain;
 
-        if ( IS_PRIV(d) )
+        if ( (!IS_PRIV(d)) &&
+             (!IS_CAPABLE_PHYSDEV(d) || !domain_iomem_in_pfn(d, mfn)) )
+        {
+            MEM_LOG("Non-privileged attempt to map I/O space %08lx", mfn);
+            return 0;
+        }
+
+        /* No reference counting for out-of-range I/O pages. */
+        if ( !pfn_valid(mfn) )
             return 1;
 
-        if ( IS_CAPABLE_PHYSDEV(d) )
-            return domain_iomem_in_pfn(d, mfn);
-
-        MEM_LOG("Non-privileged attempt to map I/O space %p", mfn);
-        return 0;
+        d = dom_io;
     }
 
     return ((l1v & _PAGE_RW) ?
@@ -529,7 +560,7 @@ void put_page_from_l1e(l1_pgentry_t l1e, struct domain *d)
     struct pfn_info *page = &frame_table[pfn];
     struct domain   *e;
 
-    if ( !(l1v & _PAGE_PRESENT) || !pfn_is_ram(pfn) )
+    if ( !(l1v & _PAGE_PRESENT) || !pfn_valid(pfn) )
         return;
 
     e = page_get_owner(page);
@@ -2851,7 +2882,7 @@ void ptwr_destroy(struct domain *d)
         gntref = (grant_ref_t)((val & 0xFF00) | ((ptr >> 2) & 0x00FF));
         
         if ( unlikely(IS_XEN_HEAP_FRAME(page)) ||
-             unlikely(!pfn_is_ram(pfn)) ||
+             unlikely(!pfn_valid(pfn)) ||
              unlikely((e = find_domain_by_id(domid)) == NULL) )
         {
             MEM_LOG("Bad frame (%p) or bad domid (%d).\n", pfn, domid);

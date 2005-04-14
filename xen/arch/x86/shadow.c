@@ -1727,7 +1727,7 @@ shadow_mark_mfn_out_of_sync(struct exec_domain *ed, unsigned long gpfn,
     struct out_of_sync_entry *entry = shadow_alloc_oos_entry(d);
 
     ASSERT(spin_is_locked(&d->arch.shadow_lock));
-    ASSERT(pfn_is_ram(mfn));
+    ASSERT(pfn_valid(mfn));
     ASSERT((page->u.inuse.type_info & PGT_type_mask) == PGT_writable_page);
 
     FSH_LOG("%s(gpfn=%p, mfn=%p) c=%p t=%p", __func__,
