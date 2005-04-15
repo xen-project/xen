@@ -1323,8 +1323,10 @@
 4204e7acwXDo-5iAAiO2eQbtDeYZXA xen/include/asm-x86/init.h
 3ddb79c3fQ_O3o5NHK2N8AJdk0Ea4Q xen/include/asm-x86/io.h
 3ddb79c2TKeScYHQZreTdHqYNLbehQ xen/include/asm-x86/io_apic.h
+42605109qxLSrHVE2SRhGXmgk907iw xen/include/asm-x86/io_ports.h
 3ddb79c2L7rTlFzazOLW1XuSZefpFw xen/include/asm-x86/irq.h
 404f1b93OjLO4bFfBXYNaJdIqlNz-Q xen/include/asm-x86/ldt.h
+4260510aYPj2kr6rMbBfMxcvvmXndQ xen/include/asm-x86/mach_apic.h
 3ddb79c3I98vWcQR8xEo34JMJ4Ahyw xen/include/asm-x86/mc146818rtc.h
 40ec25fd7cSvbP7Biw91zaU_g0xsEQ xen/include/asm-x86/mm.h
 3ddb79c3n_UbPuxlkNxvvLycClIkxA xen/include/asm-x86/mpspec.h
