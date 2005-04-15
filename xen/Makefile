@@ -106,15 +106,18 @@ include/asm-$(TARGET_ARCH)/asm-offsets.h: arch/$(TARGET_ARCH)/asm-offsets.s
 .PHONY: default debug install dist clean delete-unfresh-files TAGS tags
 
 SUBDIRS = arch/$(TARGET_ARCH) common drivers 
+define all_sources
+    ( find include/asm-$(TARGET_ARCH) -name SCCS -prune -o -name '*.h' -print; \
+      find include -type d -name SCCS -prune -o \( -name "asm-*" -o \
+            -name config \) -prune -o -name '*.h' -print; \
+      find $(SUBDIRS) -name SCCS -prune -o -name '*.[chS]' -print )
+endef
 TAGS: 
-	( find include/asm-$(TARGET_ARCH) -name '*.h'; \
-	  find include -type d \( -name "asm-*" -o -name config \) -prune -o \
-		-name '*.h' -print; \
-	  find $(SUBDIRS) -name '*.[chS]' ) | grep -v /SCCS/ | etags -
+	$(all_sources) | etags -
 tags: 
-	( find include/asm-$(TARGET_ARCH) -name '*.h'; \
-	  find include -type d \( -name "asm-*" -o -name config \) -prune -o \
-		-name '*.h' -print; \
-	  find $(SUBDIRS) -name '*.[chS]' ) | grep -v /SCCS/ | xargs ctags
+	$(all_sources) | xargs ctags
+cscope: 
+	$(all_sources) > cscope.files
+	cscope -k -b -q
 MAP:
 	nm $(TARGET) | grep -v '\(compiled\)\|\(\.o$$\)\|\( [aUw] \)\|\(\.\.ng$$\)\|\(LASH[RL]DI\)' | sort > System.map
