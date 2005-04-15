@@ -89,6 +89,8 @@ tools/blktap/xen/*
 tools/check/.*
 tools/cmdline/*
 tools/cmdline/xen/*
+tools/gdb/gdb-6.2.1/*
+tools/gdb/gdb-6.2.1-linux-i386-xen/*
 tools/ioemu/iodev/device-model
 tools/libxc/xen/*
 tools/misc/cpuperf/cpuperf-perfcntr
