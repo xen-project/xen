@@ -163,7 +163,7 @@ uninstall: D=$(DESTDIR)
 uninstall:
 	[ ! -d $(D)/etc/xen ] || mv -f $(D)/etc/xen $(D)/etc/xen.old
 	rm -rf $(D)/etc/init.d/xend*
-	rm -rf $(D)/usr/lib/libxc* $(D)/usr/lib/libxutil*
+	rm -rf $(D)/usr/$(LIBDIR)/libxc* $(D)/usr/$(LIBDIR)/libxutil*
 	rm -rf $(D)/usr/lib/python/xen $(D)/usr/include/xen
 	rm -rf $(D)/usr/include/xcs_proto.h $(D)/usr/include/xc.h
 	rm -rf $(D)/usr/sbin/xcs $(D)/usr/sbin/xcsdump $(D)/usr/sbin/xen*

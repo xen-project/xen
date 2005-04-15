@@ -24,9 +24,15 @@ STRIP      = $(CROSS_COMPILE)strip
 OBJCOPY    = $(CROSS_COMPILE)objcopy
 OBJDUMP    = $(CROSS_COMPILE)objdump
 
+ifeq ($(XEN_TARGET_ARCH),x86_64)
+LIBDIR = lib64
+else
+LIBDIR = lib
+endif
+
 ifneq ($(EXTRA_PREFIX),)
 EXTRA_INCLUDES += $(EXTRA_PREFIX)/include
-EXTRA_LIB += $(EXTRA_PREFIX)/lib
+EXTRA_LIB += $(EXTRA_PREFIX)/$(LIBDIR)
 endif
 
 LDFLAGS += $(foreach i, $(EXTRA_LIB), -L$(i)) 

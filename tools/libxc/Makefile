@@ -69,12 +69,12 @@ mk-symlinks:
 	  ln -sf ../../$(LINUX_ROOT)/include/asm-xen/linux-public/*.h . )
 
 install: build
-	[ -d $(DESTDIR)/usr/lib ] || $(INSTALL_DIR) $(DESTDIR)/usr/lib
+	[ -d $(DESTDIR)/usr/$(LIBDIR) ] || $(INSTALL_DIR) $(DESTDIR)/usr/$(LIBDIR)
 	[ -d $(DESTDIR)/usr/include ] || $(INSTALL_DIR) $(DESTDIR)/usr/include
-	$(INSTALL_PROG) libxc.so.$(MAJOR).$(MINOR) $(DESTDIR)/usr/lib
-	$(INSTALL_DATA) libxc.a $(DESTDIR)/usr/lib
-	ln -sf libxc.so.$(MAJOR).$(MINOR) $(DESTDIR)/usr/lib/libxc.so.$(MAJOR)
-	ln -sf libxc.so.$(MAJOR) $(DESTDIR)/usr/lib/libxc.so
+	$(INSTALL_PROG) libxc.so.$(MAJOR).$(MINOR) $(DESTDIR)/usr/$(LIBDIR)
+	$(INSTALL_DATA) libxc.a $(DESTDIR)/usr/$(LIBDIR)
+	ln -sf libxc.so.$(MAJOR).$(MINOR) $(DESTDIR)/usr/$(LIBDIR)/libxc.so.$(MAJOR)
+	ln -sf libxc.so.$(MAJOR) $(DESTDIR)/usr/$(LIBDIR)/libxc.so
 	$(INSTALL_DATA) xc.h $(DESTDIR)/usr/include
 
 .PHONY: TAGS clean rpm install all

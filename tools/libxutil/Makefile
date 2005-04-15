@@ -63,11 +63,11 @@ check-for-zlib:
 	fi
 
 install: build
-	[ -d $(DESTDIR)/usr/lib ] || $(INSTALL_DIR) -p $(DESTDIR)/usr/lib
-	$(INSTALL_PROG) libxutil.so.$(MAJOR).$(MINOR) $(DESTDIR)/usr/lib
-	$(INSTALL_DATA) libxutil.a $(DESTDIR)/usr/lib
-	ln -sf libxutil.so.$(MAJOR).$(MINOR) $(DESTDIR)/usr/lib/libxutil.so.$(MAJOR)
-	ln -sf libxutil.so.$(MAJOR) $(DESTDIR)/usr/lib/libxutil.so
+	[ -d $(DESTDIR)/usr/$(LIBDIR) ] || $(INSTALL_DIR) -p $(DESTDIR)/usr/$(LIBDIR)
+	$(INSTALL_PROG) libxutil.so.$(MAJOR).$(MINOR) $(DESTDIR)/usr/$(LIBDIR)
+	$(INSTALL_DATA) libxutil.a $(DESTDIR)/usr/$(LIBDIR)
+	ln -sf libxutil.so.$(MAJOR).$(MINOR) $(DESTDIR)/usr/$(LIBDIR)/libxutil.so.$(MAJOR)
+	ln -sf libxutil.so.$(MAJOR) $(DESTDIR)/usr/$(LIBDIR)/libxutil.so
 
 clean:
 	$(RM) *.a *.so* *.o *.opic *.rpm 

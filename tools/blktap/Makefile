@@ -73,9 +73,9 @@ mk-symlinks:
 	  ln -sf ../../$(LINUX_ROOT)/include/asm-xen/linux-public/*.h . )
 
 install: all
-	$(INSTALL_DIR) -p $(DESTDIR)/usr/lib
+	$(INSTALL_DIR) -p $(DESTDIR)/usr/$(LIBDIR)
 	$(INSTALL_DIR) -p $(DESTDIR)/usr/include
-	$(INSTALL_PROG) $(LIB) $(DESTDIR)/usr/lib
+	$(INSTALL_PROG) $(LIB) $(DESTDIR)/usr/$(LIBDIR)
 	$(INSTALL_PROG) blktaplib.h $(DESTDIR)/usr/include
 	$(INSTALL_PROG) blkdump blkcow blkimg blkcowimg blkgnbd blkcowgnbd $(DESTDIR)/$(BLKTAP_INSTALL_DIR)
 
