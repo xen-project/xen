@@ -30,8 +30,8 @@ XCS_EXEC    = "/usr/sbin/xcs"
 XCS_PIDFILE = "/var/run/xcs.pid"
 XCS_ARGS    = (XCS_EXEC, "-p", XCS_PIDFILE)
 
-# Default install path for Xen binary packages.
-sys.path = [ '/usr/lib/python' ] + sys.path
+# add fallback path for non-native python path installs if needed
+sys.path.append('/usr/lib/python')
 from xen.xend.server import SrvDaemon
 
 class CheckError(ValueError):

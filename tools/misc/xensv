@@ -22,8 +22,8 @@ import os
 import sys
 import re
 
-# Default install path for Xen binary packages.
-sys.path = [ '/usr/lib/python' ] + sys.path
+# add fallback path for non-native python path installs if needed
+sys.path.append('/usr/lib/python')
 from xen.xend.server.params import XEND_PID_FILE
 
 class CheckError(ValueError):

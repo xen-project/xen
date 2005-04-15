@@ -80,12 +80,12 @@ static inline void clear_evtchn(int port)
     synch_clear_bit(port, &s->evtchn_pending[0]);
 }
 
-static inline void notify_via_evtchn(int port)
+static inline int notify_via_evtchn(int port)
 {
     evtchn_op_t op;
     op.cmd = EVTCHNOP_send;
     op.u.send.local_port = port;
-    (void)HYPERVISOR_event_channel_op(&op);
+    return HYPERVISOR_event_channel_op(&op);
 }
 
 /*

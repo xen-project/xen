@@ -27,7 +27,7 @@ debug:
 dist: install
 
 build: $(TARGET).gz
-	
+
 install: $(TARGET).gz
 	[ -d $(DESTDIR)/boot ] || $(INSTALL_DIR) $(DESTDIR)/boot
 	$(INSTALL_DATA) $(TARGET).gz $(DESTDIR)/boot
