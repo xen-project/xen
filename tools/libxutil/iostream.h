@@ -114,7 +114,7 @@ static inline int IOStream_read(IOStream *stream, void *buf, size_t n){
         result = -EINVAL;
         goto exit;
     }
-    result = stream->methods->read(stream, buf, n);
+    result = (stream->methods->read)(stream, buf, n);
     if(result > 0){
         stream->read += result;
     }
@@ -139,7 +139,7 @@ static inline int IOStream_write(IOStream *stream, const void *buf, size_t n){
         result = -EINVAL;
         goto exit;
     }
-    result = stream->methods->write(stream, buf, n);
+    result = (stream->methods->write)(stream, buf, n);
     if(result > 0){
         stream->written += result;
     }
@@ -157,7 +157,7 @@ static inline int IOStream_flush(IOStream *stream){
     if(stream->closed){
         result = IOSTREAM_EOF;
     } else if(stream->methods->flush){
-        result = stream->methods->flush(stream);
+        result = (stream->methods->flush)(stream);
         if(result < 0) result = IOSTREAM_EOF;
     }
     return result;
@@ -171,7 +171,7 @@ static inline int IOStream_flush(IOStream *stream){
 static inline int IOStream_error(IOStream *stream){
     int err = 0;
     if(stream->methods && stream->methods->error){
-       err = stream->methods->error(stream);
+       err = (stream->methods->error)(stream);
     }
     return err;
 }
@@ -184,7 +184,7 @@ static inline int IOStream_error(IOStream *stream){
 static inline int IOStream_close(IOStream *stream){
     int err = 1;
     if(stream->methods && stream->methods->close){
-        err = stream->methods->close(stream);
+        err = (stream->methods->close)(stream);
         stream->closed = 1;
     }
     return err;
@@ -205,10 +205,10 @@ static inline int IOStream_is_closed(IOStream *stream){
  */
 static inline void IOStream_free(IOStream *stream){
     if(!stream->closed && stream->methods && stream->methods->close){
-        stream->methods->close(stream);
+        (stream->methods->close)(stream);
     }
     if(stream->methods && stream->methods->free){
-        stream->methods->free(stream);
+        (stream->methods->free)(stream);
     }
     *stream = (IOStream){};
     deallocate(stream);
