@@ -49,18 +49,39 @@ static inline int HYPERVISOR_set_trap_table(trap_info_t *table)
     return ret;
 }
 
-static inline int HYPERVISOR_mmu_update(mmu_update_t *req, 
-					int count,
-					int *success_count)
+static inline int 
+HYPERVISOR_mmu_update(mmu_update_t *req, int count, 
+		      int *success_count, domid_t domid)
 {
     int ret;
+    unsigned long ign1, ign2, ign3, ign4;
     __asm__ __volatile__ (
         TRAP_INSTR
-        : "=a" (ret) : "0" (__HYPERVISOR_mmu_update), 
-        "b" (req), "c" (count), "d" (success_count) : "memory" );
+        : "=a" (ret), "=b" (ign1), "=c" (ign2), "=d" (ign3), "=S" (ign4)
+        : "0" (__HYPERVISOR_mmu_update), "1" (req), "2" (count),
+        "3" (success_count), "4" (domid)
+        : "memory" );
 
     return ret;
 }
+
+static inline int
+HYPERVISOR_mmuext_op(
+		     struct mmuext_op *op, int count, int *success_count, domid_t domid)
+{
+    int ret;
+    unsigned long ign1, ign2, ign3, ign4;
+    __asm__ __volatile__ (
+        TRAP_INSTR
+        : "=a" (ret), "=b" (ign1), "=c" (ign2), "=d" (ign3), "=S" (ign4)
+        : "0" (__HYPERVISOR_mmuext_op), "1" (op), "2" (count),
+        "3" (success_count), "4" (domid)
+        : "memory" );
+
+    return ret;
+}
+
+
 
 static inline int HYPERVISOR_set_gdt(unsigned long *frame_list, int entries)
 {
@@ -262,13 +283,13 @@ static inline int HYPERVISOR_multicall(void *call_list, int nr_calls)
 }
 
 static inline int HYPERVISOR_update_va_mapping(
-    unsigned long page_nr, pte_t new_val, unsigned long flags)
+    unsigned long page_nr, unsigned long new_val, unsigned long flags)
 {
     int ret;
     __asm__ __volatile__ (
         TRAP_INSTR
         : "=a" (ret) : "0" (__HYPERVISOR_update_va_mapping), 
-	"b" (page_nr), "c" ((new_val).pte_low), "d" (flags):
+	"b" (page_nr), "c" (new_val), "d" (flags):
 	"memory" );
     /* XXX */
 #if 0

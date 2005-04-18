@@ -224,7 +224,6 @@ cpu_startup(void *dummy)
 	/*
 	 * Good {morning,afternoon,evening,night}.
 	 */
-    /* XXX need to write clock driver */
 	startrtclock();
 
 	printcpuinfo();
@@ -1375,6 +1374,7 @@ extern unsigned long cpu0prvpage;
 extern unsigned long *SMPpt;
 pteinfo_t *pteinfo_list;
 unsigned long *xen_machine_phys = ((unsigned long *)VADDR(1008, 0));
+pt_entry_t *KPTphysv;
 int preemptable;
 int gdt_set;
 
@@ -1386,6 +1386,10 @@ void
 initvalues(start_info_t *startinfo)
 { 
     int i;
+#ifdef WRITABLE_PAGETABLES
+    HYPERVISOR_vm_assist(VMASST_CMD_enable, VMASST_TYPE_writable_pagetables);
+#endif
+
     xen_start_info = startinfo;
     xen_phys_machine = (unsigned long *)startinfo->mfn_list;
     unsigned long tmpindex = ((__pa(xen_start_info->pt_base) >> PAGE_SHIFT) + xen_start_info->nr_pt_frames) + 3 /* number of pages allocated after the pts + 1*/;
@@ -1393,6 +1397,7 @@ initvalues(start_info_t *startinfo)
     /* pre-zero unused mapped pages */
     bzero((char *)(KERNBASE + (tmpindex << PAGE_SHIFT)), (1024 - tmpindex)*PAGE_SIZE); 
     IdlePTD = (pd_entry_t *)xpmap_ptom(__pa(startinfo->pt_base));
+    KPTphysv = (pt_entry_t *)(startinfo->pt_base + PAGE_SIZE);
     XENPRINTF("IdlePTD %p\n", IdlePTD);
     XENPRINTF("nr_pages: %ld shared_info: 0x%lx flags: 0x%lx pt_base: 0x%lx "
 	      "mod_start: 0x%lx mod_len: 0x%lx\n",
@@ -1401,9 +1406,9 @@ initvalues(start_info_t *startinfo)
 	      xen_start_info->mod_start, xen_start_info->mod_len);
     
     /* setup self-referential mapping first so vtomach will work */
-    xpq_queue_pt_update(IdlePTD + PTDPTDI , (unsigned long)IdlePTD | 
+    xen_queue_pt_update(IdlePTD + PTDPTDI , (unsigned long)IdlePTD | 
 			PG_V | PG_A);
-    mcl_flush_queue();
+    xen_flush_queue();
     /* Map proc0's UPAGES */
     proc0uarea = (struct user *)(KERNBASE + (tmpindex << PAGE_SHIFT));
     tmpindex += UAREA_PAGES;
@@ -1431,10 +1436,10 @@ initvalues(start_info_t *startinfo)
     SMPpt[0] = vtomach(cpu0prvpage) | PG_RW | PG_M | PG_V | PG_A;
 
     /* map SMP page table RO */
-    PT_SET_MA(SMPpt, vtomach(SMPpt) & ~PG_RW, TRUE);
+    PT_SET_MA(SMPpt, vtomach(SMPpt) & ~PG_RW);
 
     /* put the page table into the pde */
-    xpq_queue_pt_update(IdlePTD + MPPTDI, xpmap_ptom((tmpindex << PAGE_SHIFT))| PG_M | PG_RW | PG_V | PG_A);
+    xen_queue_pt_update(IdlePTD + MPPTDI, xpmap_ptom((tmpindex << PAGE_SHIFT))| PG_M | PG_RW | PG_V | PG_A);
 
     tmpindex++;
 #endif
@@ -1448,20 +1453,16 @@ initvalues(start_info_t *startinfo)
 #endif
     /* unmap remaining pages from initial 4MB chunk */
     for (i = tmpindex; i%1024 != 0; i++) 
-	PT_CLEAR(KERNBASE + (i << PAGE_SHIFT), TRUE);
+	PT_CLEAR_VA(KPTphysv + i, TRUE);
 
     /* allocate remainder of NKPT pages */
     for (i = 0; i < NKPT-1; i++, tmpindex++)
-	xpq_queue_pt_update(IdlePTD + KPTDI + i + 1, xpmap_ptom((tmpindex << PAGE_SHIFT))| PG_M | PG_RW | PG_V | PG_A);
-    tmpindex += NKPT-1;
-
-
-
+	PT_SET_VA(((unsigned long *)startinfo->pt_base) + KPTDI + i + 1, (tmpindex << PAGE_SHIFT)| PG_M | PG_RW | PG_V | PG_A, TRUE);
     tmpindex += NKPT-1;
     PT_UPDATES_FLUSH();
 
     HYPERVISOR_shared_info = (shared_info_t *)(KERNBASE + (tmpindex << PAGE_SHIFT));
-    PT_SET_MA(HYPERVISOR_shared_info, xen_start_info->shared_info | PG_A | PG_V | PG_RW | PG_M, TRUE);
+    PT_SET_MA(HYPERVISOR_shared_info, xen_start_info->shared_info | PG_A | PG_V | PG_RW | PG_M);
     tmpindex++;
 
     HYPERVISOR_shared_info->arch.pfn_to_mfn_frame_list = (unsigned long)xen_phys_machine;
@@ -1568,7 +1569,7 @@ init386(void)
 	for (x = 0; x < NGDT; x++)
 	    ssdtosd(&gdt_segs[x], &gdt[x].sd);
 
-	PT_SET_MA(gdt, *vtopte((unsigned long)gdt) & ~PG_RW, TRUE); 
+	PT_SET_MA(gdt, *vtopte((unsigned long)gdt) & ~PG_RW);
 	gdtmachpfn = vtomach(gdt) >> PAGE_SHIFT;
 	if (HYPERVISOR_set_gdt(&gdtmachpfn, LAST_RESERVED_GDT_ENTRY + 1)) {
 	    XENPRINTF("set_gdt failed\n");
@@ -1617,7 +1618,7 @@ init386(void)
 	default_proc_ldt.ldt_len = 6;
 	_default_ldt = (int)&default_proc_ldt;
 	PCPU_SET(currentldt, _default_ldt)
-	PT_SET_MA(ldt, *vtopte((unsigned long)ldt) & ~PG_RW, TRUE);
+	PT_SET_MA(ldt, *vtopte((unsigned long)ldt) & ~PG_RW);
 	xen_set_ldt((unsigned long) ldt, (sizeof ldt_segs / sizeof ldt_segs[0]));
 
 

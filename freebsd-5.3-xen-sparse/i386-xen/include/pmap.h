@@ -253,8 +253,8 @@ pte_load_store(pt_entry_t *ptep, pt_entry_t v)
 	return (r);
 }
 
-#define	pte_store(ptep, pte)	PT_SET_VA_MA(ptep, pte, TRUE);
-#define pte_clear(pte)          PT_CLEAR_VA(pte, TRUE);
+#define	pte_store(ptep, pte)	PT_SET_VA(ptep, pte, TRUE)
+#define pte_clear(pte)          PT_CLEAR_VA(pte, TRUE)
 
 
 #endif /* _KERNEL */

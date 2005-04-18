@@ -1,8 +1,7 @@
-/*	$NetBSD:$	*/
-
 /*
  *
  * Copyright (c) 2004 Christian Limpach.
+ * Copyright (c) 2004,2005 Kip Macy
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -59,7 +58,6 @@ extern pteinfo_t *pteinfo_list;
 char *xen_setbootenv(char *cmd_line);
 int xen_boothowto(char *envp);
 void load_cr3(uint32_t val);
-void xen_set_ldt(vm_offset_t, uint32_t);
 void xen_machphys_update(unsigned long, unsigned long);
 void xen_update_descriptor(union descriptor *, union descriptor *);
 void lldt(u_short sel);
@@ -71,14 +69,14 @@ void lldt(u_short sel);
 static __inline void
 invlpg(u_int addr)
 {
-	xpq_queue_invlpg(addr);
+	xen_invlpg(addr);
 }
 
 static __inline void
 invltlb(void)
 {
-	xpq_queue_tlb_flush();
-	mcl_flush_queue();
+	xen_tlb_flush();
+	
 }
 
 

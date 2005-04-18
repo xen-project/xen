@@ -444,7 +444,7 @@ xn_alloc_rx_buffers(struct xn_softc *sc)
 
     /* Give away a batch of pages. */
     xn_rx_mcl[i].op = __HYPERVISOR_dom_mem_op;
-    xn_rx_mcl[i].args[0] = (unsigned long) MEMOP_decrease_reservation;
+    xn_rx_mcl[i].args[0] = MEMOP_decrease_reservation;
     xn_rx_mcl[i].args[1] = (unsigned long)xn_rx_pfns;
     xn_rx_mcl[i].args[2] = (unsigned long)i;
     xn_rx_mcl[i].args[3] = 0;
@@ -454,7 +454,7 @@ xn_alloc_rx_buffers(struct xn_softc *sc)
     (void)HYPERVISOR_multicall(xn_rx_mcl, i+1);
 
     /* Check return status of HYPERVISOR_dom_mem_op(). */
-    if ( xn_rx_mcl[i].args[5] != i )
+    if (unlikely(xn_rx_mcl[i].args[5] != i))
         panic("Unable to reduce memory reservation\n");
 
     /* Above is a suitable barrier to ensure backend will see requests. */
@@ -544,6 +544,7 @@ xn_rxeof(struct xn_softc *sc)
 	mcl->args[0] = (unsigned long)xn_rx_mmu;
 	mcl->args[1] = mmu - xn_rx_mmu;
 	mcl->args[2] = 0;
+	mcl->args[3] = DOMID_SELF;
 	mcl++;
 	(void)HYPERVISOR_multicall(xn_rx_mcl, mcl - xn_rx_mcl);
     }
