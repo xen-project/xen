@@ -82,7 +82,9 @@ void xen_invlpg(unsigned long ptr);
 #ifndef CONFIG_XEN_SHADOW_MODE
 void xen_l1_entry_update(pte_t *ptr, unsigned long val);
 void xen_l2_entry_update(pmd_t *ptr, pmd_t val);
+#ifdef __x86_64__
 void xen_l3_entry_update(pud_t *ptr, pud_t val); /* x86_64 only */
+#endif
 void xen_l4_entry_update(pgd_t *ptr, pgd_t val); /* x86_64 only */
 void xen_pgd_pin(unsigned long ptr);
 void xen_pgd_unpin(unsigned long ptr);
