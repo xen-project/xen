@@ -10,6 +10,7 @@
 #define PDRSHIFT        22
 #define	PSL_T		0x00000100	/* trace enable bit */
 
+#define VCPU            0               /* XXX */
 
 /*
  * long  
@@ -67,6 +68,17 @@ struct gdb_regs {
     long esp;    /* 60 */     
     int  xss;    /* 64 */
 };
+
+#define FETCH_REGS(cpu) \
+    if (!regs_valid[cpu]) \
+    {                \
+	int retval = xc_domain_getfullinfo(xc_handle, domid, cpu, NULL, &ctxt[cpu]); \
+	if (retval) \
+	    goto error_out; \
+	cr3[cpu] = ctxt[cpu].pt_base; \
+	regs_valid[cpu] = 1; \
+    } \
+
 #define printval(x) printf("%s = %lx\n", #x, (long)x);
 #define SET_PT_REGS(pt, xc) \
 { \
@@ -115,74 +127,70 @@ struct gdb_regs {
 /* XXX application state */
 
 
-static int xc_handle;
-static int regs_valid;
-static unsigned long cr3;
-static full_execution_context_t ctxt;
+static int                      xc_handle;
+static int                      regs_valid[MAX_VIRT_CPUS];
+static unsigned long            cr3[MAX_VIRT_CPUS];
+static full_execution_context_t ctxt[MAX_VIRT_CPUS];
+
 
 /* --------------------- */
 
 static void *
-map_domain_va(unsigned long domid, void * guest_va, int perm)
+map_domain_va(unsigned long domid, int cpu, void * guest_va, int perm)
 {
     unsigned long pde, page;
     unsigned long va = (unsigned long)guest_va;
 
-    static unsigned long cr3_phys;
-    static unsigned long *cr3_virt;
-    static unsigned long pde_phys;
-    static unsigned long *pde_virt;
-    static unsigned long page_phys;
-    static unsigned long *page_virt;
+    static unsigned long  cr3_phys[MAX_VIRT_CPUS];
+    static unsigned long *cr3_virt[MAX_VIRT_CPUS];
+    static unsigned long  pde_phys[MAX_VIRT_CPUS];
+    static unsigned long *pde_virt[MAX_VIRT_CPUS];
+    static unsigned long  page_phys[MAX_VIRT_CPUS];
+    static unsigned long *page_virt[MAX_VIRT_CPUS];
     
-    static int prev_perm;
-    if (!regs_valid) 
+    static int            prev_perm[MAX_VIRT_CPUS];
+
+    FETCH_REGS(cpu);
+
+    if (cr3[cpu] != cr3_phys[cpu]) 
     {
-	int retval = xc_domain_getfullinfo(xc_handle, domid, 0, NULL, &ctxt);
-	if (retval)
-	    goto error_out;
-	cr3 = ctxt.pt_base;
-	regs_valid = 1;
-    }
-    if (cr3 != cr3_phys) 
-    {
-	cr3_phys = cr3;
-	if (cr3_virt)
-	    munmap(cr3_virt, PAGE_SIZE);
-	if ((cr3_virt = xc_map_foreign_range(xc_handle, domid, PAGE_SIZE,
+	cr3_phys[cpu] = cr3[cpu];
+	if (cr3_virt[cpu])
+	    munmap(cr3_virt[cpu], PAGE_SIZE);
+	if ((cr3_virt[cpu] = xc_map_foreign_range(xc_handle, domid, PAGE_SIZE,
 					     PROT_READ,
-					     cr3_phys >> PAGE_SHIFT)) == NULL)
+					     cr3_phys[cpu] >> PAGE_SHIFT)) == NULL)
 	    goto error_out;
     } 
-    if ((pde = cr3_virt[vtopdi(va)]) == 0)
+    if ((pde = cr3_virt[cpu][vtopdi(va)]) == 0)
 	goto error_out;
-    if (pde != pde_phys) 
+    if (pde != pde_phys[cpu]) 
     {
-	pde_phys = pde;
-	if (pde_virt)
-	    munmap(pde_virt, PAGE_SIZE);
-	if ((pde_virt = xc_map_foreign_range(xc_handle, domid, PAGE_SIZE,
+	pde_phys[cpu] = pde;
+	if (pde_virt[cpu])
+	    munmap(pde_virt[cpu], PAGE_SIZE);
+	if ((pde_virt[cpu] = xc_map_foreign_range(xc_handle, domid, PAGE_SIZE,
 					     PROT_READ,
-					     pde_phys >> PAGE_SHIFT)) == NULL)
+					     pde_phys[cpu] >> PAGE_SHIFT)) == NULL)
 	    goto error_out;
     }
-    if ((page = pde_virt[vtopti(va)]) == 0)
+    if ((page = pde_virt[cpu][vtopti(va)]) == 0)
 	goto error_out;
-    if (page != page_phys || perm != prev_perm) 
+    if (page != page_phys[cpu] || perm != prev_perm[cpu]) 
     {
-	page_phys = page;
-	if (page_virt)
-	    munmap(page_virt, PAGE_SIZE);
-	if ((page_virt = xc_map_foreign_range(xc_handle, domid, PAGE_SIZE,
-					     perm,
-					      page_phys >> PAGE_SHIFT)) == NULL) {
-	    printf("cr3 %lx pde %lx page %lx pti %lx\n", cr3, pde, page, vtopti(va));
-	    page_phys = 0;
+	page_phys[cpu] = page;
+	if (page_virt[cpu])
+	    munmap(page_virt[cpu], PAGE_SIZE);
+	if ((page_virt[cpu] = xc_map_foreign_range(xc_handle, domid, PAGE_SIZE,
+					      perm,
+					      page_phys[cpu] >> PAGE_SHIFT)) == NULL) {
+	    printf("cr3 %lx pde %lx page %lx pti %lx\n", cr3[cpu], pde, page, vtopti(va));
+	    page_phys[cpu] = 0;
 	    goto error_out;
 	}
-	prev_perm = perm;
+	prev_perm[cpu] = perm;
     }	
-    return (void *)(((unsigned long)page_virt) | (va & BSD_PAGE_MASK));
+    return (void *)(((unsigned long)page_virt[cpu]) | (va & BSD_PAGE_MASK));
 
  error_out:
     return 0;
@@ -231,14 +239,14 @@ waitdomain(int domain, int *status, int options)
 }
 
 long
-xc_ptrace(enum __ptrace_request request, pid_t pid, void *addr, void *data)
+xc_ptrace(enum __ptrace_request request, pid_t domid, void *addr, void *data)
 {
-    dom0_op_t op;
-    int status = 0;
-    xc_domaininfo_t info;
+    dom0_op_t       op;
+    int             status = 0;
     struct gdb_regs pt;
-    long retval = 0;
-    unsigned long *guest_va;
+    long            retval = 0;
+    unsigned long  *guest_va;
+    int             cpu = VCPU;
 
     op.interface_version = DOM0_INTERFACE_VERSION;
     
@@ -246,23 +254,23 @@ xc_ptrace(enum __ptrace_request request, pid_t pid, void *addr, void *data)
 	if ((xc_handle = xc_interface_open()) < 0)
 	    return -1;
 #if 0
-    printf("%20s %d, %p, %p \n", ptrace_names[request], pid, addr, data);
+    printf("%20s %d, %p, %p \n", ptrace_names[request], domid, addr, data);
 #endif
     switch (request) {	
     case PTRACE_PEEKTEXT:
     case PTRACE_PEEKDATA:
-	if ((guest_va = (unsigned long *)map_domain_va(pid, addr, PROT_READ)) == NULL) {
+	if ((guest_va = (unsigned long *)map_domain_va(domid, cpu, addr, PROT_READ)) == NULL) {
 	    status = EFAULT;
-	    goto done;
+	    goto error_out;
 	}
 
 	retval = *guest_va;
 	break;
     case PTRACE_POKETEXT:
     case PTRACE_POKEDATA:
-	if ((guest_va = (unsigned long *)map_domain_va(pid, addr, PROT_READ|PROT_WRITE)) == NULL) {
+	if ((guest_va = (unsigned long *)map_domain_va(domid, cpu, addr, PROT_READ|PROT_WRITE)) == NULL) {
 	    status = EFAULT;
-	    goto done;
+	    goto error_out;
 	}
 
 	*guest_va = (unsigned long)data;
@@ -270,70 +278,79 @@ xc_ptrace(enum __ptrace_request request, pid_t pid, void *addr, void *data)
     case PTRACE_GETREGS:
     case PTRACE_GETFPREGS:
     case PTRACE_GETFPXREGS:
-	/* XXX hard-coding UP */
-	retval = xc_domain_getfullinfo(xc_handle, pid, 0, &info, &ctxt);
+	FETCH_REGS(cpu);
 
-	if (retval) {
-	    printf("getfullinfo failed\n");
-	    goto done;
-	}
 	if (request == PTRACE_GETREGS) {
-		SET_PT_REGS(pt, ctxt.cpu_ctxt); 
+		SET_PT_REGS(pt, ctxt[cpu].cpu_ctxt); 
 		memcpy(data, &pt, sizeof(elf_gregset_t));
 	} else if (request == PTRACE_GETFPREGS)
-	    memcpy(data, &ctxt.fpu_ctxt, sizeof(ctxt.fpu_ctxt));
+	    memcpy(data, &ctxt[cpu].fpu_ctxt, sizeof(ctxt[cpu].fpu_ctxt));
 	else /*if (request == PTRACE_GETFPXREGS)*/
-	    memcpy(data, &ctxt.fpu_ctxt, sizeof(ctxt.fpu_ctxt));
-	cr3 = ctxt.pt_base;
-	regs_valid = 1;
+	    memcpy(data, &ctxt[cpu].fpu_ctxt, sizeof(ctxt[cpu].fpu_ctxt));
 	break;
     case PTRACE_SETREGS:
 	op.cmd = DOM0_SETDOMAININFO;
-	SET_XC_REGS(((struct gdb_regs *)data), ctxt.cpu_ctxt);
-	op.u.setdomaininfo.domain = pid;
+	SET_XC_REGS(((struct gdb_regs *)data), ctxt[VCPU].cpu_ctxt);
+	op.u.setdomaininfo.domain = domid;
 	/* XXX need to understand multiple exec_domains */
-	op.u.setdomaininfo.exec_domain = 0;
-	op.u.setdomaininfo.ctxt = &ctxt;
+	op.u.setdomaininfo.exec_domain = cpu;
+	op.u.setdomaininfo.ctxt = &ctxt[cpu];
 	retval = do_dom0_op(xc_handle, &op);
 	if (retval)
-	    goto done;
+	    goto error_out;
 
 	break;
     case PTRACE_ATTACH:
 	op.cmd = DOM0_GETDOMAININFO;
-	op.u.getdomaininfo.domain = pid;
+	op.u.getdomaininfo.domain = domid;
 	op.u.getdomaininfo.exec_domain = 0;
-	op.u.getdomaininfo.ctxt = &ctxt;
+	op.u.getdomaininfo.ctxt = NULL;
 	retval = do_dom0_op(xc_handle, &op);
 	if (retval) {
 	    perror("dom0 op failed");
-	    goto done;
+	    goto error_out;
 	}
 	if (op.u.getdomaininfo.flags & DOMFLAGS_PAUSED) {
 	    printf("domain currently paused\n");
-	    goto done;
+	    goto error_out;
 	}
 	printf("domain not currently paused\n");
 	op.cmd = DOM0_PAUSEDOMAIN;
-	op.u.pausedomain.domain = pid;
+	op.u.pausedomain.domain = domid;
 	retval = do_dom0_op(xc_handle, &op);
 	break;
     case PTRACE_SINGLESTEP:
-	ctxt.cpu_ctxt.eflags |= PSL_T;
+	ctxt[VCPU].cpu_ctxt.eflags |= PSL_T;
 	op.cmd = DOM0_SETDOMAININFO;
-	op.u.setdomaininfo.domain = pid;
+	op.u.setdomaininfo.domain = domid;
 	op.u.setdomaininfo.exec_domain = 0;
-	op.u.setdomaininfo.ctxt = &ctxt;
+	op.u.setdomaininfo.ctxt = &ctxt[cpu];
 	retval = do_dom0_op(xc_handle, &op);	
 	if (retval) {
 	    perror("dom0 op failed");
-	    goto done;
+	    goto error_out;
 	}
     case PTRACE_CONT:
     case PTRACE_DETACH:
-	regs_valid = 0;
+	if (request != PTRACE_SINGLESTEP) {
+	    FETCH_REGS(cpu);
+	    /* Clear trace flag */
+	    if (ctxt[cpu].cpu_ctxt.eflags & PSL_T) {
+		ctxt[cpu].cpu_ctxt.eflags &= ~PSL_T;
+		op.cmd = DOM0_SETDOMAININFO;
+		op.u.setdomaininfo.domain = domid;
+		op.u.setdomaininfo.exec_domain = cpu;
+		op.u.setdomaininfo.ctxt = &ctxt[cpu];
+		retval = do_dom0_op(xc_handle, &op);	
+		if (retval) {
+		    perror("dom0 op failed");
+		    goto error_out;
+		}
+	    }
+	}
+	regs_valid[cpu] = 0;
 	op.cmd = DOM0_UNPAUSEDOMAIN;
-	op.u.unpausedomain.domain = pid > 0 ? pid : -pid;
+	op.u.unpausedomain.domain = domid > 0 ? domid : -domid;
 	retval = do_dom0_op(xc_handle, &op);
 	break;
     case PTRACE_SETFPREGS:
@@ -357,6 +374,6 @@ xc_ptrace(enum __ptrace_request request, pid_t pid, void *addr, void *data)
 	errno = status;
 	retval = -1;
     }
- done:
+ error_out:
     return retval;
 }
