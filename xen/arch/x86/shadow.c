@@ -1651,7 +1651,7 @@ static inline unsigned long
 shadow_make_snapshot(
     struct domain *d, unsigned long gpfn, unsigned long gmfn)
 {
-    unsigned long smfn, sl1mfn;
+    unsigned long smfn, sl1mfn = 0;
     void *original, *snapshot;
     u32 min_max = 0;
     int min, max, length;

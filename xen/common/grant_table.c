@@ -311,7 +311,7 @@ __gnttab_map_grant_ref(
     struct exec_domain   *led;
     u16                   dev_hst_ro_flags;
     int                   handle;
-    unsigned long         frame, host_virt_addr;
+    unsigned long         frame = 0, host_virt_addr;
     int                   rc;
 
     /* Returns 0 if TLB flush / invalidate required by caller.
