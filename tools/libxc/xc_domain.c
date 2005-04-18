@@ -136,7 +136,8 @@ int xc_domain_getfullinfo(int xc_handle,
 
     rc = do_dom0_op(xc_handle, &op);
 
-    memcpy(info, &op.u.getdomaininfo, sizeof(*info));
+    if ( info )
+        memcpy(info, &op.u.getdomaininfo, sizeof(*info));
 
     if ( ((u16)op.u.getdomaininfo.domain != domid) && rc > 0 )
         return -ESRCH;
