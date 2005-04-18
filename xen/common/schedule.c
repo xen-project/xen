@@ -364,7 +364,7 @@ static void __enter_scheduler(void)
     cleanup_writable_pagetable(prev);
 
 #if defined(WAKE_HISTO)
-    if ( !is_idle_task(next) && next->wokenup ) {
+    if ( !is_idle_task(next->domain) && next->wokenup ) {
         ulong diff = (ulong)(now - next->wokenup);
         diff /= (ulong)MILLISECS(1);
         if (diff <= BUCKETS-2)  schedule_data[cpu].hist[diff]++;
@@ -373,7 +373,7 @@ static void __enter_scheduler(void)
     next->wokenup = (s_time_t)0;
 #elif defined(BLOCKTIME_HISTO)
     prev->lastdeschd = now;
-    if ( !is_idle_task(next) )
+    if ( !is_idle_task(next->domain) )
     {
         ulong diff = (ulong)((now - next->lastdeschd) / MILLISECS(10));
         if (diff <= BUCKETS-2)  schedule_data[cpu].hist[diff]++;
