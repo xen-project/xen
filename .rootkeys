@@ -45,6 +45,7 @@
 3f815145xlKBAQmal9oces3G_Mvxqw extras/mini-os/traps.c
 423e7e86yUUeeOvTAmjIahrpk1ksaQ freebsd-5.3-xen-sparse/conf/Makefile.i386-xen
 423e7e86CSWbA9G8OftmMbfhStuQ6Q freebsd-5.3-xen-sparse/conf/files.i386-xen
+42642db9m5qcqIrsHX8QlcBGeKSAmw freebsd-5.3-xen-sparse/conf/kern.mk
 423e7e86m-vV5fQ_32CjcFMEr77Fyg freebsd-5.3-xen-sparse/conf/ldscript.i386-xen
 423e7e86Fo2PxRS_37IwkpH-x5t5xQ freebsd-5.3-xen-sparse/conf/options.i386-xen
 423e7e868Yt0iZuEeccnczyToPPvow freebsd-5.3-xen-sparse/fbsdxensetup
