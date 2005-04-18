@@ -1229,35 +1229,38 @@ int get_page_type(struct pfn_info *page, u32 type)
                     nx |= PGT_validated;
             }
         }
-        else if ( unlikely(!(x & PGT_validated)) )
+        else
         {
-            /* Someone else is updating validation of this page. Wait... */
-            while ( (y = page->u.inuse.type_info) == x )
-                cpu_relax();
-            goto again;
-        }
-        else if ( unlikely((x & (PGT_type_mask|PGT_va_mask)) != type) )
-        {
-            if ( unlikely((x & PGT_type_mask) != (type & PGT_type_mask) ) )
+            if ( unlikely((x & (PGT_type_mask|PGT_va_mask)) != type) )
             {
-                if ( ((x & PGT_type_mask) != PGT_l2_page_table) ||
-                     ((type & PGT_type_mask) != PGT_l1_page_table) )
-                    MEM_LOG("Bad type (saw %08x != exp %08x) for pfn %p",
-                            x, type, page_to_pfn(page));
-                return 0;
+                if ( unlikely((x & PGT_type_mask) != (type & PGT_type_mask) ) )
+                {
+                    if ( ((x & PGT_type_mask) != PGT_l2_page_table) ||
+                         ((type & PGT_type_mask) != PGT_l1_page_table) )
+                        MEM_LOG("Bad type (saw %08x != exp %08x) for pfn %p",
+                                x, type, page_to_pfn(page));
+                    return 0;
+                }
+                else if ( (x & PGT_va_mask) == PGT_va_mutable )
+                {
+                    /* The va backpointer is mutable, hence we update it. */
+                    nx &= ~PGT_va_mask;
+                    nx |= type; /* we know the actual type is correct */
+                }
+                else if ( ((type & PGT_va_mask) != PGT_va_mutable) &&
+                          ((type & PGT_va_mask) != (x & PGT_va_mask)) )
+                {
+                    /* This table is potentially mapped at multiple locations. */
+                    nx &= ~PGT_va_mask;
+                    nx |= PGT_va_unknown;
+                }
             }
-            else if ( (x & PGT_va_mask) == PGT_va_mutable )
+            if ( unlikely(!(x & PGT_validated)) )
             {
-                /* The va backpointer is mutable, hence we update it. */
-                nx &= ~PGT_va_mask;
-                nx |= type; /* we know the actual type is correct */
-            }
-            else if ( ((type & PGT_va_mask) != PGT_va_mutable) &&
-                      ((type & PGT_va_mask) != (x & PGT_va_mask)) )
-            {
-                /* This table is potentially mapped at multiple locations. */
-                nx &= ~PGT_va_mask;
-                nx |= PGT_va_unknown;
+                /* Someone else is updating validation of this page. Wait... */
+                while ( (y = page->u.inuse.type_info) == x )
+                    cpu_relax();
+                goto again;
             }
         }
     }
