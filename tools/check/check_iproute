@@ -1,0 +1,10 @@
+#!/bin/bash
+# CHECK-INSTALL
+
+function error {
+   echo 'Check for iproute (ip addr) failed.'
+   exit 1
+}
+
+ip addr list || error
+
