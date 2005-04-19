@@ -268,8 +268,6 @@ asmlinkage int do_page_fault(struct xen_regs *regs)
 
     DEBUGGER_trap_entry(TRAP_page_fault, regs);
 
-    //printk("do_page_fault(eip=%p, va=%p, code=%d)\n", regs->eip, addr, regs->error_code);
-
     perfc_incrc(page_faults);
 
     if ( likely(VM_ASSIST(d, VMASST_TYPE_writable_pagetables)) )
@@ -284,7 +282,7 @@ asmlinkage int do_page_fault(struct xen_regs *regs)
             return EXCRET_fault_fixed;
         }
 
-        if ( (addr < PAGE_OFFSET) &&
+        if ( (addr < HYPERVISOR_VIRT_START) &&
              ((regs->error_code & 3) == 3) && /* write-protection fault */
              ptwr_do_page_fault(d, addr) )
         {
@@ -1100,13 +1098,6 @@ long do_set_trap_table(trap_info_t *traps)
 }
 
 
-#if defined(__i386__)
-#define DB_VALID_ADDR(_a) \
-    ((_a) <= (PAGE_OFFSET - 4))
-#elif defined(__x86_64__)
-#define DB_VALID_ADDR(_a) \
-    ((_a) >= HYPERVISOR_VIRT_END) || ((_a) <= (HYPERVISOR_VIRT_START-8))
-#endif
 long set_debugreg(struct exec_domain *p, int reg, unsigned long value)
 {
     int i;
@@ -1114,22 +1105,26 @@ long set_debugreg(struct exec_domain *p, int reg, unsigned long value)
     switch ( reg )
     {
     case 0: 
-        if ( !DB_VALID_ADDR(value) ) return -EPERM;
+        if ( !access_ok(VERIFY_READ, value, sizeof(long)) )
+            return -EPERM;
         if ( p == current ) 
             __asm__ ( "mov %0, %%db0" : : "r" (value) );
         break;
     case 1: 
-        if ( !DB_VALID_ADDR(value) ) return -EPERM;
+        if ( !access_ok(VERIFY_READ, value, sizeof(long)) )
+            return -EPERM;
         if ( p == current ) 
             __asm__ ( "mov %0, %%db1" : : "r" (value) );
         break;
     case 2: 
-        if ( !DB_VALID_ADDR(value) ) return -EPERM;
+        if ( !access_ok(VERIFY_READ, value, sizeof(long)) )
+            return -EPERM;
         if ( p == current ) 
             __asm__ ( "mov %0, %%db2" : : "r" (value) );
         break;
     case 3:
-        if ( !DB_VALID_ADDR(value) ) return -EPERM;
+        if ( !access_ok(VERIFY_READ, value, sizeof(long)) )
+            return -EPERM;
         if ( p == current ) 
             __asm__ ( "mov %0, %%db3" : : "r" (value) );
         break;

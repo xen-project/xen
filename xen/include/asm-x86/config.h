@@ -216,12 +216,71 @@ extern void __out_of_line_bug(int line) __attribute__((noreturn));
 
 #define asmlinkage __attribute__((regparm(0)))
 
-#define XENHEAP_DEFAULT_MB (12)
-#define DIRECTMAP_PHYS_END (12*1024*1024)
+/*
+ * Memory layout (high to low):                          SIZE   PAE-SIZE
+ *                                                       ------ ------
+ *  I/O remapping area                                   ( 4MB)
+ *  Direct-map (1:1) area [Xen code/data/heap]           (12MB)
+ *  map_domain_mem cache                                 ( 4MB)
+ *  Per-domain mappings                                  ( 4MB)
+ *  Shadow linear pagetable                              ( 4MB) ( 8MB)
+ *  Guest linear pagetable                               ( 4MB) ( 8MB)
+ *  Machine-to-physical translation table [writable]     ( 4MB)
+ *  Frame-info table                                     (24MB) (96MB)
+ *   * Start of guest inaccessible area
+ *  Machine-to-physical translation table [read-only]    ( 4MB)
+ *   * Start of guest unmodifiable area
+ */
 
+#define IOREMAP_MBYTES           4
+#define DIRECTMAP_MBYTES        12
+#define MAPCACHE_MBYTES          4
+#define PERDOMAIN_MBYTES         4
+
+#ifdef CONFIG_X86_PAE
+# define LINEARPT_MBYTES         8
+# define MACHPHYS_MBYTES         4 /* KAF: This needs to be bigger */
+# define FRAMETABLE_MBYTES	96 /* 16 GB mem limit (total)      */
+#else
+# define LINEARPT_MBYTES         4
+# define MACHPHYS_MBYTES         4
+# define FRAMETABLE_MBYTES      24
+#endif
+
+#define IOREMAP_VIRT_END	0UL
+#define IOREMAP_VIRT_START	(IOREMAP_VIRT_END - (IOREMAP_MBYTES<<20))
+#define DIRECTMAP_VIRT_END	IOREMAP_VIRT_START
+#define DIRECTMAP_VIRT_START	(DIRECTMAP_VIRT_END - (DIRECTMAP_MBYTES<<20))
+#define MAPCACHE_VIRT_END	DIRECTMAP_VIRT_START
+#define MAPCACHE_VIRT_START	(MAPCACHE_VIRT_END - (MAPCACHE_MBYTES<<20))
+#define PERDOMAIN_VIRT_END	MAPCACHE_VIRT_START
+#define PERDOMAIN_VIRT_START	(PERDOMAIN_VIRT_END - (PERDOMAIN_MBYTES<<20))
+#define SH_LINEAR_PT_VIRT_END	PERDOMAIN_VIRT_START
+#define SH_LINEAR_PT_VIRT_START	(SH_LINEAR_PT_VIRT_END - (LINEARPT_MBYTES<<20))
+#define LINEAR_PT_VIRT_END	SH_LINEAR_PT_VIRT_START
+#define LINEAR_PT_VIRT_START	(LINEAR_PT_VIRT_END - (LINEARPT_MBYTES<<20))
+#define RDWR_MPT_VIRT_END	LINEAR_PT_VIRT_START
+#define RDWR_MPT_VIRT_START	(RDWR_MPT_VIRT_END - (MACHPHYS_MBYTES<<20))
+#define FRAMETABLE_VIRT_END	RDWR_MPT_VIRT_START
+#define FRAMETABLE_VIRT_START	(FRAMETABLE_VIRT_END - (FRAMETABLE_MBYTES<<20))
+#define RO_MPT_VIRT_END		FRAMETABLE_VIRT_START
+#define RO_MPT_VIRT_START	(RO_MPT_VIRT_END - (MACHPHYS_MBYTES<<20))
+
+#define XENHEAP_DEFAULT_MB	(DIRECTMAP_MBYTES)
+#define DIRECTMAP_PHYS_END	(DIRECTMAP_MBYTES<<20)
+
+/* Maximum linear address accessible via guest memory segments. */
+#define GUEST_SEGMENT_MAX_ADDR  RO_MPT_VIRT_END
+
+#ifdef CONFIG_X86_PAE
+/* Hypervisor owns top 144MB of virtual address space. */
+# define __HYPERVISOR_VIRT_START  0xF7000000
+# define HYPERVISOR_VIRT_START   (0xF7000000UL)
+#else
 /* Hypervisor owns top 64MB of virtual address space. */
-#define __HYPERVISOR_VIRT_START  0xFC000000
-#define HYPERVISOR_VIRT_START   (0xFC000000UL)
+# define __HYPERVISOR_VIRT_START  0xFC000000
+# define HYPERVISOR_VIRT_START   (0xFC000000UL)
+#endif
 
 #define ROOT_PAGETABLE_FIRST_XEN_SLOT \
     (HYPERVISOR_VIRT_START >> L2_PAGETABLE_SHIFT)
@@ -229,37 +288,6 @@ extern void __out_of_line_bug(int line) __attribute__((noreturn));
     (~0UL >> L2_PAGETABLE_SHIFT)
 #define ROOT_PAGETABLE_XEN_SLOTS \
     (ROOT_PAGETABLE_LAST_XEN_SLOT - ROOT_PAGETABLE_FIRST_XEN_SLOT + 1)
-
-/*
- * First 4MB are mapped read-only for all. It's for the machine->physical
- * mapping table (MPT table). The following are virtual addresses.
- */
-#define RO_MPT_VIRT_START     (HYPERVISOR_VIRT_START)
-#define RO_MPT_VIRT_END       (RO_MPT_VIRT_START + (4*1024*1024))
-/* Xen heap extends to end of 1:1 direct-mapped memory region. */
-#define DIRECTMAP_VIRT_START  (RO_MPT_VIRT_END)
-#define DIRECTMAP_VIRT_END    (DIRECTMAP_VIRT_START + DIRECTMAP_PHYS_END)
-/* Machine-to-phys conversion table. */
-#define RDWR_MPT_VIRT_START   (DIRECTMAP_VIRT_END)
-#define RDWR_MPT_VIRT_END     (RDWR_MPT_VIRT_START + (4*1024*1024))
-/* Variable-length page-frame information array. */
-#define FRAMETABLE_VIRT_START (RDWR_MPT_VIRT_END)
-#define FRAMETABLE_VIRT_END   (FRAMETABLE_VIRT_START + (24*1024*1024))
-/* Next 4MB of virtual address space is used as a linear p.t. mapping. */
-#define LINEAR_PT_VIRT_START  (FRAMETABLE_VIRT_END)
-#define LINEAR_PT_VIRT_END    (LINEAR_PT_VIRT_START + (4*1024*1024))
-/* Next 4MB of virtual address space is used as a shadow linear p.t. map. */
-#define SH_LINEAR_PT_VIRT_START (LINEAR_PT_VIRT_END)
-#define SH_LINEAR_PT_VIRT_END (SH_LINEAR_PT_VIRT_START + (4*1024*1024))
-/* Next 4MB of virtual address space used for per-domain mappings (eg. GDT). */
-#define PERDOMAIN_VIRT_START  (SH_LINEAR_PT_VIRT_END)
-#define PERDOMAIN_VIRT_END    (PERDOMAIN_VIRT_START + (4*1024*1024))
-/* Penultimate 4MB of virtual address space used for domain page mappings. */
-#define MAPCACHE_VIRT_START   (PERDOMAIN_VIRT_END)
-#define MAPCACHE_VIRT_END     (MAPCACHE_VIRT_START + (4*1024*1024))
-/* Final 4MB of virtual address space used for ioremap(). */
-#define IOREMAP_VIRT_START    (MAPCACHE_VIRT_END)
-#define IOREMAP_VIRT_END      (IOREMAP_VIRT_START + (4*1024*1024))
 
 #define PGT_base_page_table PGT_l2_page_table
 

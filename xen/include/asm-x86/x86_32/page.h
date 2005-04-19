@@ -12,7 +12,7 @@
 #define L2_PAGETABLE_ENTRIES    (1<<PAGETABLE_ORDER)
 #define ROOT_PAGETABLE_ENTRIES  L2_PAGETABLE_ENTRIES
 
-#define __PAGE_OFFSET           (0xFC400000)
+#define __PAGE_OFFSET           (0xFF000000)
 
 #define PADDR_BITS              32
 #define VADDR_BITS              32

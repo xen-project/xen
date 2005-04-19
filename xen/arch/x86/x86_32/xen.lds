@@ -11,7 +11,7 @@ PHDRS
 }
 SECTIONS
 {
-  . = 0xFC400000 + 0x100000;
+  . = 0xFF000000 + 0x100000;
   _text = .;			/* Text and read-only data */
   .text : {
 	*(.text)

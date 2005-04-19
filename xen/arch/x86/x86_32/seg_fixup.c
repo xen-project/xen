@@ -145,7 +145,7 @@ int get_baselimit(u16 seg, unsigned long *base, unsigned long *limit)
      * Anything that looks like a truncated segment we assume ought really
      * to be a 4GB segment. DANGER!
      */
-    if ( (PAGE_OFFSET - (*base + *limit)) < PAGE_SIZE )
+    if ( (GUEST_SEGMENT_MAX_ADDR - (*base + *limit)) < PAGE_SIZE )
         *limit = 0;
 
     return 1;
@@ -226,14 +226,14 @@ int fixup_seg(u16 seg, unsigned long offset)
         if ( ((base + limit) < PAGE_SIZE) && (offset <= limit)  )
         {
             /* Flip to expands-up. */
-            limit = PAGE_OFFSET - base;
+            limit = GUEST_SEGMENT_MAX_ADDR - base;
             goto flip;
         }
     }
     else
     {
         /* Expands-up: All the way to Xen space? Assume 4GB if so. */
-        if ( ((PAGE_OFFSET - (base + limit)) < PAGE_SIZE) &&
+        if ( ((GUEST_SEGMENT_MAX_ADDR - (base + limit)) < PAGE_SIZE) &&
              (offset > limit) )
         {
             /* Flip to expands-down. */

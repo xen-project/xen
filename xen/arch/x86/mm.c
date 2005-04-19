@@ -1634,7 +1634,6 @@ int do_mmuext_op(
         {
             if ( shadow_mode_external(d) )
             {
-                // ignore this request from an external domain...
                 MEM_LOG("ignoring SET_LDT hypercall from external "
                         "domain %u\n", d->id);
                 okay = 0;
@@ -1645,8 +1644,7 @@ int do_mmuext_op(
             unsigned long ents = op.nr_ents;
             if ( ((ptr & (PAGE_SIZE-1)) != 0) || 
                  (ents > 8192) ||
-                 ((ptr+ents*LDT_ENTRY_SIZE) < ptr) ||
-                 ((ptr+ents*LDT_ENTRY_SIZE) > PAGE_OFFSET) )
+                 !array_access_ok(VERIFY_READ, ptr, ents, LDT_ENTRY_SIZE) )
             {
                 okay = 0;
                 MEM_LOG("Bad args to SET_LDT: ptr=%p, ents=%p", ptr, ents);

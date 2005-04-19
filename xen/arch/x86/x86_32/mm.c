@@ -249,7 +249,7 @@ int check_descriptor(struct desc_struct *d)
     
     /* Check that base is at least a page away from Xen-private area. */
     base  = (b&(0xff<<24)) | ((b&0xff)<<16) | (a>>16);
-    if ( base >= (PAGE_OFFSET - PAGE_SIZE) )
+    if ( base >= (GUEST_SEGMENT_MAX_ADDR - PAGE_SIZE) )
         goto bad;
 
     /* Check and truncate the limit if necessary. */
@@ -282,9 +282,9 @@ int check_descriptor(struct desc_struct *d)
          *     limit == 0x00000 provides 4kB access (if G=1).
          */
         if ( ((base + limit) <= base) || 
-             ((base + limit) > PAGE_OFFSET) )
+             ((base + limit) > GUEST_SEGMENT_MAX_ADDR) )
         {
-            limit = PAGE_OFFSET - base;
+            limit = GUEST_SEGMENT_MAX_ADDR - base;
         truncate:
             if ( !(b & _SEGMENT_G) )
                 goto bad; /* too dangerous; too hard to work out... */
