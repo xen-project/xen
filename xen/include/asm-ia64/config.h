@@ -203,7 +203,7 @@ void sort_main_extable(void);
 #define find_first_set_bit(x)	(ffs(x)-1)	// FIXME: Is this right???
 
 // from include/asm-x86/*/uaccess.h
-#define array_access_ok(type,addr,count,size)                    \
+#define array_access_ok(addr,count,size)			\
     (likely(sizeof(count) <= 4) /* disallow 64-bit counts */ &&  \
      access_ok(type,addr,count*size))
 
