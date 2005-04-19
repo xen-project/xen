@@ -319,7 +319,8 @@ static int grant_write(struct file *file, const char __user *buffer,
     return -ENOSYS;
 }
 
-static int __init gnttab_init(void)
+
+int gnttab_resume(void)
 {
     gnttab_setup_table_t setup;
     unsigned long        frames[NR_GRANT_FRAMES];
@@ -341,6 +342,21 @@ static int __init gnttab_init(void)
 
     for ( i = 0; i < NR_GRANT_ENTRIES; i++ )
         gnttab_free_list[i] = i + 1;
+    
+    return 0;
+}
+
+int gnttab_suspend(void)
+{
+    int i;
+    for ( i = 0; i < NR_GRANT_FRAMES; i++ )
+	clear_fixmap(FIX_GNTTAB_END - i);
+    return 0;
+}
+
+static int __init gnttab_init(void)
+{
+    BUG_ON(gnttab_resume());
 
     /*
      *  /proc/xen/grant : used by libxc to access grant tables

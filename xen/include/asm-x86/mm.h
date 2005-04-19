@@ -332,7 +332,7 @@ int audit_adjust_pgtables(struct domain *d, int dir, int noisy);
 #define AUDIT_QUIET          ( 1u << 2 )
 
 void _audit_domain(struct domain *d, int flags);
-#define audit_domain(_d) _audit_domain((_d), 0)
+#define audit_domain(_d) _audit_domain((_d), AUDIT_ERRORS_OK)
 void audit_domains(void);
 
 #else

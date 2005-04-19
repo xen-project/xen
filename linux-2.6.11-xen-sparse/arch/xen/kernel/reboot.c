@@ -84,6 +84,9 @@ static void __do_suspend(void)
 #define usbif_resume() do{}while(0)
 #endif
 
+    extern int gnttab_suspend(void);
+    extern int gnttab_resume(void);
+
     extern void time_suspend(void);
     extern void time_resume(void);
     extern unsigned long max_pfn;
@@ -106,6 +109,8 @@ static void __do_suspend(void)
     ctrl_if_suspend();
 
     irq_suspend();
+
+    gnttab_suspend();
 
     HYPERVISOR_shared_info = (shared_info_t *)empty_zero_page;
     clear_fixmap(FIX_SHARED_INFO);
@@ -138,6 +143,7 @@ static void __do_suspend(void)
     HYPERVISOR_shared_info->arch.pfn_to_mfn_frame_list =
         virt_to_machine(pfn_to_mfn_frame_list) >> PAGE_SHIFT;
 
+    gnttab_resume();
 
     irq_resume();
 
