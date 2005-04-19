@@ -1,8 +1,9 @@
 // control flags for turning on/off features under test
 #undef CLONE_DOMAIN0
-//#define CLONE_DOMAIN0 5
+//#define CLONE_DOMAIN0 1
 #define DOMU_BUILD_STAGING
 #define VHPT_GLOBAL
+#define DOMU_AUTO_RESTART
 
 // manufactured from component pieces
 
@@ -39,9 +40,6 @@ typedef int pid_t;
 #define CLEAR_BITMAP(name,bits) \
 	memset(name, 0, BITS_TO_LONGS(bits)*sizeof(unsigned long))
 
-// from linux/include/linux/compiler.h
-#define __user
-
 // FIXME?: x86-ism used in xen/mm.h
 #define LOCK_PREFIX
 
@@ -57,6 +55,21 @@ extern char _end[]; /* standard ELF symbol */
 
 // linux/include/linux/compiler.h
 #define __attribute_const__
+#define __user
+//#define __kernel
+//#define __safe
+#define __force
+#define __iomem
+#define __chk_user_ptr(x) (void)0
+//#define __chk_io_ptr(x) (void)0
+//#define __builtin_warning(x, y...) (1)
+//#define __acquires(x)
+//#define __releases(x)
+//#define __acquire(x) (void)0
+//#define __release(x) (void)0
+//#define __cond_lock(x) (x)
+#define __must_check
+#define __deprecated
 
 // xen/include/asm/config.h
 #define HZ 100
@@ -65,6 +78,9 @@ extern char _end[]; /* standard ELF symbol */
 //#define NR_CPUS 16
 //#define CONFIG_NR_CPUS 16
 #define barrier() __asm__ __volatile__("": : :"memory")
+
+// linux/include/spinlock.h
+#define DEFINE_SPINLOCK(x) spinlock_t x = SPIN_LOCK_UNLOCKED
 
 ///////////////////////////////////////////////////////////////
 // xen/include/asm/config.h

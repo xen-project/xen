@@ -102,6 +102,39 @@ void insert_vm_struct(struct mm_struct * mm, struct vm_area_struct * vma)
 /////////////////////////////////////////////
 //following from linux/mm/memory.c
 
+#ifndef __ARCH_HAS_4LEVEL_HACK
+/*
+ * Allocate page upper directory.
+ *
+ * We've already handled the fast-path in-line, and we own the
+ * page table lock.
+ *
+ * On a two-level or three-level page table, this ends up actually being
+ * entirely optimized away.
+ */
+pud_t fastcall *__pud_alloc(struct mm_struct *mm, pgd_t *pgd, unsigned long address)
+{
+	pud_t *new;
+
+	spin_unlock(&mm->page_table_lock);
+	new = pud_alloc_one(mm, address);
+	spin_lock(&mm->page_table_lock);
+	if (!new)
+		return NULL;
+
+	/*
+	 * Because we dropped the lock, we should re-check the
+	 * entry, as somebody else could have populated it..
+	 */
+	if (pgd_present(*pgd)) {
+		pud_free(new);
+		goto out;
+	}
+	pgd_populate(mm, pgd, new);
+ out:
+	return pud_offset(pgd, address);
+}
+
 /*
  * Allocate page middle directory.
  *
@@ -111,7 +144,7 @@ void insert_vm_struct(struct mm_struct * mm, struct vm_area_struct * vma)
  * On a two-level page table, this ends up actually being entirely
  * optimized away.
  */
-pmd_t fastcall *__pmd_alloc(struct mm_struct *mm, pgd_t *pgd, unsigned long address)
+pmd_t fastcall *__pmd_alloc(struct mm_struct *mm, pud_t *pud, unsigned long address)
 {
 	pmd_t *new;
 
@@ -125,14 +158,15 @@ pmd_t fastcall *__pmd_alloc(struct mm_struct *mm, pgd_t *pgd, unsigned long addr
 	 * Because we dropped the lock, we should re-check the
 	 * entry, as somebody else could have populated it..
 	 */
-	if (pgd_present(*pgd)) {
+	if (pud_present(*pud)) {
 		pmd_free(new);
 		goto out;
 	}
-	pgd_populate(mm, pgd, new);
-out:
-	return pmd_offset(pgd, address);
+	pud_populate(mm, pud, new);
+ out:
+	return pmd_offset(pud, address);
 }
+#endif
 
 pte_t fastcall * pte_alloc_map(struct mm_struct *mm, pmd_t *pmd, unsigned long address)
 {
