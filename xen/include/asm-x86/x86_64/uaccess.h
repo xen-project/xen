@@ -12,9 +12,6 @@
 
 #define __user
 
-#define VERIFY_READ 0
-#define VERIFY_WRITE 1
-
 /*
  * Valid if in +ve half of 48-bit address space, or above Xen-reserved area.
  * This is also valid for range checks (addr, addr+size). As long as the
@@ -25,9 +22,9 @@
     (((unsigned long)(addr) < (1UL<<48)) || \
      ((unsigned long)(addr) >= HYPERVISOR_VIRT_END))
 
-#define access_ok(type, addr, size) (__addr_ok(addr))
+#define access_ok(addr, size) (__addr_ok(addr))
 
-#define array_access_ok(type,addr,count,size) (__addr_ok(addr))
+#define array_access_ok(addr, count, size) (__addr_ok(addr))
 
 extern long __get_user_bad(void);
 extern void __put_user_bad(void);

@@ -41,8 +41,8 @@ alloc_dom_mem(struct domain *d,
     struct pfn_info *page;
     unsigned long    i;
 
-    if ( unlikely(!array_access_ok(VERIFY_WRITE, extent_list, 
-                                   nr_extents, sizeof(*extent_list))) )
+    if ( unlikely(!array_access_ok(extent_list, nr_extents,
+                                   sizeof(*extent_list))) )
         return start_extent;
 
     if ( (extent_order != 0) && !IS_CAPABLE_PHYSDEV(current->domain) )
@@ -79,8 +79,8 @@ free_dom_mem(struct domain *d,
     struct pfn_info *page;
     unsigned long    i, j, mpfn;
 
-    if ( unlikely(!array_access_ok(VERIFY_READ, extent_list, 
-                                   nr_extents, sizeof(*extent_list))) )
+    if ( unlikely(!array_access_ok(extent_list, nr_extents,
+                                   sizeof(*extent_list))) )
         return start_extent;
 
     for ( i = start_extent; i < nr_extents; i++ )

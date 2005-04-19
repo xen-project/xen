@@ -712,7 +712,7 @@ long do_physdev_op(physdev_op_t *uop)
 
     case PHYSDEVOP_SET_IOBITMAP:
         ret = -EINVAL;
-        if ( !access_ok(VERIFY_READ, op.u.set_iobitmap.bitmap, IOBMP_BYTES) ||
+        if ( !access_ok(op.u.set_iobitmap.bitmap, IOBMP_BYTES) ||
              (op.u.set_iobitmap.nr_ports > 65536) )
             break;
         ret = 0;

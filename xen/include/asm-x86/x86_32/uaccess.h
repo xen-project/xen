@@ -11,9 +11,6 @@
 
 #define __user
 
-#define VERIFY_READ 0
-#define VERIFY_WRITE 1
-
 /*
  * movsl can be slow when source and dest are not both 8-byte aligned
  */
@@ -39,10 +36,10 @@ extern struct movsl_mask {
 		:"1" (addr),"g" ((int)(size)),"r" (HYPERVISOR_VIRT_START)); \
 	flag; })
 
-#define access_ok(type,addr,size) (likely(__range_not_ok(addr,size) == 0))
+#define access_ok(addr,size) (likely(__range_not_ok(addr,size) == 0))
 
-#define array_access_ok(type,addr,count,size) \
-    (likely(count < (~0UL/size)) && access_ok(type,addr,count*size))
+#define array_access_ok(addr,count,size) \
+    (likely(count < (~0UL/size)) && access_ok(addr,count*size))
 
 extern long __get_user_bad(void);
 extern void __put_user_bad(void);

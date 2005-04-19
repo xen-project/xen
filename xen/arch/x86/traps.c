@@ -1105,25 +1105,25 @@ long set_debugreg(struct exec_domain *p, int reg, unsigned long value)
     switch ( reg )
     {
     case 0: 
-        if ( !access_ok(VERIFY_READ, value, sizeof(long)) )
+        if ( !access_ok(value, sizeof(long)) )
             return -EPERM;
         if ( p == current ) 
             __asm__ ( "mov %0, %%db0" : : "r" (value) );
         break;
     case 1: 
-        if ( !access_ok(VERIFY_READ, value, sizeof(long)) )
+        if ( !access_ok(value, sizeof(long)) )
             return -EPERM;
         if ( p == current ) 
             __asm__ ( "mov %0, %%db1" : : "r" (value) );
         break;
     case 2: 
-        if ( !access_ok(VERIFY_READ, value, sizeof(long)) )
+        if ( !access_ok(value, sizeof(long)) )
             return -EPERM;
         if ( p == current ) 
             __asm__ ( "mov %0, %%db2" : : "r" (value) );
         break;
     case 3:
-        if ( !access_ok(VERIFY_READ, value, sizeof(long)) )
+        if ( !access_ok(value, sizeof(long)) )
             return -EPERM;
         if ( p == current ) 
             __asm__ ( "mov %0, %%db3" : : "r" (value) );

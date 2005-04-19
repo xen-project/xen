@@ -59,7 +59,7 @@ do {									\
 unsigned long
 clear_user(void __user *to, unsigned long n)
 {
-	if (access_ok(VERIFY_WRITE, to, n))
+	if (access_ok(to, n))
 		__do_clear_user(to, n);
 	return n;
 }
@@ -410,7 +410,7 @@ __copy_from_user_ll(void *to, const void __user *from, unsigned long n)
 unsigned long
 copy_to_user(void __user *to, const void *from, unsigned long n)
 {
-	if (access_ok(VERIFY_WRITE, to, n))
+	if (access_ok(to, n))
 		n = __copy_to_user(to, from, n);
 	return n;
 }
@@ -434,7 +434,7 @@ copy_to_user(void __user *to, const void *from, unsigned long n)
 unsigned long
 copy_from_user(void *to, const void __user *from, unsigned long n)
 {
-	if (access_ok(VERIFY_READ, from, n))
+	if (access_ok(from, n))
 		n = __copy_from_user(to, from, n);
 	else
 		memset(to, 0, n);

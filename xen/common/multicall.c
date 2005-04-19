@@ -24,8 +24,7 @@ long do_multicall(multicall_entry_t *call_list, unsigned int nr_calls)
         return -EINVAL;
     }
 
-    if ( unlikely(!array_access_ok(VERIFY_WRITE, call_list, 
-                                   nr_calls, sizeof(*call_list))) )
+    if ( unlikely(!array_access_ok(call_list, nr_calls, sizeof(*call_list))) )
     {
         DPRINTK("Bad memory range %p for %u*%u bytes.\n",
                 call_list, nr_calls, sizeof(*call_list));

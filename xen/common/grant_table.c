@@ -812,13 +812,13 @@ do_grant_table_op(
     {
     case GNTTABOP_map_grant_ref:
         if ( unlikely(!array_access_ok(
-            VERIFY_WRITE, uop, count, sizeof(gnttab_map_grant_ref_t))) )
+            uop, count, sizeof(gnttab_map_grant_ref_t))) )
             goto out;
         rc = gnttab_map_grant_ref((gnttab_map_grant_ref_t *)uop, count);
         break;
     case GNTTABOP_unmap_grant_ref:
         if ( unlikely(!array_access_ok(
-            VERIFY_WRITE, uop, count, sizeof(gnttab_unmap_grant_ref_t))) )
+            uop, count, sizeof(gnttab_unmap_grant_ref_t))) )
             goto out;
         rc = gnttab_unmap_grant_ref((gnttab_unmap_grant_ref_t *)uop, count);
         break;
