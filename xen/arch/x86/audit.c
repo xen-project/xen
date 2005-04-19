@@ -285,7 +285,7 @@ int audit_adjust_pgtables(struct domain *d, int dir, int noisy)
                                    d->id, l1mfn, i, gmfn);
                             errors++;
                         }
-                    }
+                    }		   
 
                     if ( page_get_owner(gpage) != d )
                     {
@@ -587,7 +587,7 @@ void _audit_domain(struct domain *d, int flags)
                              unsigned long mfn)
     {
         struct pfn_info *page = &frame_table[mfn];
-        unsigned long *pt = map_domain_mem(mfn);
+        unsigned long *pt = map_domain_mem(mfn<<PAGE_SHIFT);
         int i;
 
         for ( i = 0; i < L1_PAGETABLE_ENTRIES; i++ )
