@@ -397,7 +397,7 @@ static void dispatch_probe(blkif_t *blkif, blkif_request_t *req)
                         GNTTABOP_map_grant_ref, &op, 1)))
             BUG();
 
-        if ( op.u.map_grant_ref.dev_bus_addr == 0 )
+        if ( op.u.map_grant_ref.handle < 0 )
             goto out;
 
         pending_handle(pending_idx, 0) = op.u.map_grant_ref.handle;
@@ -500,7 +500,7 @@ static void dispatch_rw_block_io(blkif_t *blkif, blkif_request_t *req)
 
     for ( i = 0; i < nseg; i++ )
     {
-        if ( unlikely(aop[i].u.map_grant_ref.dev_bus_addr == 0) )
+        if ( unlikely(aop[i].u.map_grant_ref.handle < 0) )
         {
             DPRINTK("invalid buffer -- could not remap it\n");
             fast_flush_area(pending_idx, nseg);
