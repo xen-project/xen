@@ -194,7 +194,7 @@ static inline int __vmpclear (u64 addr)
     return 0;
 }
 
-static inline int __vmread (unsigned int field, void *value)
+static inline int __vmread (unsigned long field, void *value)
 {
     unsigned long eflags;
     unsigned long ecx = 0;
@@ -213,7 +213,7 @@ static inline int __vmread (unsigned int field, void *value)
     return 0;
 }
 
-static inline int __vmwrite (unsigned int field, unsigned int value)
+static inline int __vmwrite (unsigned long field, unsigned long value)
 {
     unsigned long eflags;
 
