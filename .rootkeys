@@ -71,6 +71,7 @@
 423e7e88B5vxFblc-MlhxKk9e4ieBw freebsd-5.3-xen-sparse/i386-xen/i386-xen/evtchn.c
 423e7e88z_BrFu1O71-Ya4pXJpjAPQ freebsd-5.3-xen-sparse/i386-xen/i386-xen/exception.s
 423e7e88uDvAZLmABMkqOpmemyVRyw freebsd-5.3-xen-sparse/i386-xen/i386-xen/genassym.c
+4266317eeOLpvRxIjmOYQVlL4WWQsg freebsd-5.3-xen-sparse/i386-xen/i386-xen/gnttab.c
 423e7e88yr5NFQudubMnkvdb_y-Gtg freebsd-5.3-xen-sparse/i386-xen/i386-xen/hypervisor.c
 423e7e88Y-e-4RRf9nrgkVn5PXUv3Q freebsd-5.3-xen-sparse/i386-xen/i386-xen/i686_mem.c
 423e7e88b8m2cuGtOxVvs4Sok4Vk7Q freebsd-5.3-xen-sparse/i386-xen/i386-xen/initcpu.c
@@ -95,6 +96,7 @@
 423e7e8avrrUxDugrwq_GJp499DkJw freebsd-5.3-xen-sparse/i386-xen/include/ctrl_if.h
 423e7e8apY1r9Td-S0eZITNZZbfNTQ freebsd-5.3-xen-sparse/i386-xen/include/evtchn.h
 423e7e8aL9DsObEegCwtILrF6SWcAQ freebsd-5.3-xen-sparse/i386-xen/include/frame.h
+4266317eOVvN00XdcqRfDRFIrbqgvg freebsd-5.3-xen-sparse/i386-xen/include/gnttab.h
 423e7e8btv8Gojq50ggnP5A1Dkc4kA freebsd-5.3-xen-sparse/i386-xen/include/hypervisor-ifs.h
 423e7e8buhTLVFLZ33-5s8-UdADSZg freebsd-5.3-xen-sparse/i386-xen/include/hypervisor.h
 423e7e8bnHT1kMD-FPC7zHZR7l3VXw freebsd-5.3-xen-sparse/i386-xen/include/md_var.h

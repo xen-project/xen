@@ -11,6 +11,7 @@
 #define u32 uint32_t
 #define u64 uint64_t
 
+#define CONFIG_XEN_BLKDEV_GRANT
 #include <machine/xen-public/xen.h>
 #include <machine/xen-public/io/domain_controller.h>
 #include <machine/xen-public/io/netif.h>
@@ -19,6 +20,7 @@
 #include <machine/xen-public/event_channel.h>
 #include <machine/xen-public/sched_ctl.h>
 #include <machine/xen-public/physdev.h>
+#include <machine/xen-public/grant_table.h>
 #undef  blkif_sector_t			/* XXX pre-processor didn't do the */
 #define blkif_sector_t uint64_t		/* right thing */
 

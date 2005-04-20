@@ -1387,6 +1387,7 @@ initvalues(start_info_t *startinfo)
 { 
     int i;
 #ifdef WRITABLE_PAGETABLES
+    XENPRINTF("using writable pagetables\n");
     HYPERVISOR_vm_assist(VMASST_CMD_enable, VMASST_TYPE_writable_pagetables);
 #endif
 
@@ -1457,7 +1458,7 @@ initvalues(start_info_t *startinfo)
 
     /* allocate remainder of NKPT pages */
     for (i = 0; i < NKPT-1; i++, tmpindex++)
-	PT_SET_VA(((unsigned long *)startinfo->pt_base) + KPTDI + i + 1, (tmpindex << PAGE_SHIFT)| PG_M | PG_RW | PG_V | PG_A, TRUE);
+	PD_SET_VA(((unsigned long *)startinfo->pt_base) + KPTDI + i + 1, (tmpindex << PAGE_SHIFT)| PG_M | PG_RW | PG_V | PG_A, TRUE);
     tmpindex += NKPT-1;
     PT_UPDATES_FLUSH();
 

@@ -381,9 +381,10 @@ pmap_bootstrap(firstaddr, loadaddr)
 	 * CMAP1/CMAP2 are used for zeroing and copying pages.
 	 * CMAP3 is used for the idle process page zeroing.
 	 */
-	SYSMAP(caddr_t, CMAP1, CADDR1, 1)
-	SYSMAP(caddr_t, CMAP2, CADDR2, 1)
-	SYSMAP(caddr_t, CMAP3, CADDR3, 1)
+	SYSMAP(caddr_t, CMAP1, CADDR1, 1);
+	SYSMAP(caddr_t, CMAP2, CADDR2, 1);
+	SYSMAP(caddr_t, CMAP3, CADDR3, 1);
+
 	PT_CLEAR_VA(CMAP3, TRUE);
 
 	mtx_init(&CMAPCADDR12_lock, "CMAPCADDR12", NULL, MTX_DEF);
@@ -416,7 +417,7 @@ pmap_bootstrap(firstaddr, loadaddr)
 	PT_CLEAR_VA(CMAP2, FALSE);
 
 	for (i = 0; i < NKPT; i++)
-		PT_CLEAR_VA(&PTD[i], FALSE);
+		PD_CLEAR_VA(&PTD[i], FALSE);
 	PT_UPDATES_FLUSH();
 #ifdef XEN_UNNEEDED
 	/* Turn on PG_G on kernel page(s) */
@@ -959,6 +960,19 @@ pmap_kenter(vm_offset_t va, vm_paddr_t pa)
 
 	pte = vtopte(va);
 	pte_store(pte, pa | PG_RW | PG_V | pgeflag);
+}
+
+/*
+ * Add a wired page to the kva.
+ * Note: not SMP coherent.
+ */
+PMAP_INLINE void 
+pmap_kenter_ma(vm_offset_t va, vm_paddr_t ma)
+{
+	pt_entry_t *pte;
+
+	pte = vtopte(va);
+	PT_SET_VA_MA(pte, ma | PG_RW | PG_V | pgeflag, TRUE);
 }
 
 /*

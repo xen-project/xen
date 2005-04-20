@@ -46,12 +46,19 @@
 #include <machine/ctrl_if.h>
 #include <machine/xenfunc.h>
 
+
+
+#ifdef CONFIG_XEN_BLKDEV_GRANT
+#include <machine/gnttab.h>
+#endif
+
 /* prototypes */
 struct xb_softc;
 static void xb_startio(struct xb_softc *sc);
 static void xb_vbdinit(void);
 static void blkif_control_send(blkif_request_t *req, blkif_response_t *rsp);
 static void blkif_ctrlif_rx(ctrl_msg_t *msg, unsigned long id);
+static void blkif_control_probe_send(blkif_request_t *req, blkif_response_t *rsp, unsigned long address);
 
 struct xb_softc {
     device_t		  xb_dev;
@@ -104,6 +111,14 @@ static blkif_front_ring_t   blk_ring;
 
 #define BLK_RING_SIZE __RING_SIZE((blkif_sring_t *)0, PAGE_SIZE)
 
+#ifdef CONFIG_XEN_BLKDEV_GRANT
+static domid_t rdomid = 0;
+static grant_ref_t gref_head, gref_terminal;
+#define MAXIMUM_OUTSTANDING_BLOCK_REQS \
+    (BLKIF_MAX_SEGMENTS_PER_REQUEST * BLKIF_RING_SIZE)
+#endif
+
+
 static unsigned long rec_ring_free;		
 blkif_request_t rec_ring[BLK_RING_SIZE];
 
@@ -151,8 +166,9 @@ ADD_ID_TO_FREELIST( unsigned long id )
     rec_ring_free = id;
 }
 
-static inline void translate_req_to_pfn(blkif_request_t *xreq,
-                                        blkif_request_t *req)
+static inline void 
+translate_req_to_pfn(blkif_request_t *xreq,
+		     blkif_request_t *req)
 {
     int i;
 
@@ -163,7 +179,11 @@ static inline void translate_req_to_pfn(blkif_request_t *xreq,
     xreq->sector_number = req->sector_number;
 
     for ( i = 0; i < req->nr_segments; i++ ){
+#ifdef CONFIG_XEN_BLKDEV_GRANT
+        xreq->frame_and_sects[i] = req->frame_and_sects[i];
+#else
         xreq->frame_and_sects[i] = xpmap_mtop(req->frame_and_sects[i]);
+#endif
     }
 }
 
@@ -179,7 +199,11 @@ static inline void translate_req_to_mfn(blkif_request_t *xreq,
     xreq->sector_number = req->sector_number;
 
     for ( i = 0; i < req->nr_segments; i++ ){
+#ifdef CONFIG_XEN_BLKDEV_GRANT
+        xreq->frame_and_sects[i] = req->frame_and_sects[i];
+#else
         xreq->frame_and_sects[i] = xpmap_ptom(req->frame_and_sects[i]);
+#endif
     }
 }
 
@@ -340,6 +364,9 @@ xb_startio(struct xb_softc *sc)
     int			s, queued = 0;
     unsigned long id;
     unsigned int fsect, lsect;
+#ifdef CONFIG_XEN_BLKDEV_GRANT
+    int ref;
+#endif
 
     
     if (unlikely(blkif_state != BLKIF_STATE_CONNECTED))
@@ -396,12 +423,26 @@ xb_startio(struct xb_softc *sc)
     	req->nr_segments  = 1;	/* not doing scatter/gather since buffer
     				 * chaining is not supported.
 				 */
+#ifdef CONFIG_XEN_BLKDEV_GRANT
+            /* install a grant reference. */
+            ref = gnttab_claim_grant_reference(&gref_head, gref_terminal);
+            KASSERT( ref != -ENOSPC, ("grant_reference failed") );
+
+            gnttab_grant_foreign_access_ref(
+                        ref,
+                        rdomid,
+                        buffer_ma >> PAGE_SHIFT,
+                        req->operation & 1 ); /* ??? */
+
+            req->frame_and_sects[0] =
+                (((uint32_t) ref) << 16) | (fsect << 3) | lsect;
+#else
 	/*
 	 * upper bits represent the machine address of the buffer and the
 	 * lower bits is the number of sectors to be read/written.
 	 */
 	req->frame_and_sects[0] = buffer_ma | (fsect << 3) | lsect; 
-
+#endif
 	/* Keep a private copy so we can reissue requests when recovering. */
 	translate_req_to_pfn( &rec_ring[id], req);
 
@@ -503,9 +544,14 @@ xb_vbdinit(void)
     memset(&req, 0, sizeof(req)); 
     req.operation = BLKIF_OP_PROBE;
     req.nr_segments = 1;
+#ifdef CONFIG_XEN_BLKDEV_GRANT
+    blkif_control_probe_send(&req, &rsp,
+                             (unsigned long)(vtomach(buf)));
+    
+#else
     req.frame_and_sects[0] = vtomach(buf) | 7;
     blkif_control_send(&req, &rsp);
-    
+#endif
     if ( rsp.status <= 0 ) {
         printk("xb_identify: Could not identify disks (%d)\n", rsp.status);
     	free(buf, M_DEVBUF);
@@ -525,6 +571,22 @@ xb_vbdinit(void)
 
 
 /*****************************  COMMON CODE  *******************************/
+
+#ifdef CONFIG_XEN_BLKDEV_GRANT
+static void 
+blkif_control_probe_send(blkif_request_t *req, blkif_response_t *rsp,
+                              unsigned long address)
+{
+    int ref = gnttab_claim_grant_reference(&gref_head, gref_terminal);
+    KASSERT( ref != -ENOSPC, ("couldn't get grant reference") );
+
+    gnttab_grant_foreign_access_ref( ref, rdomid, address >> PAGE_SHIFT, 0 );
+
+    req->frame_and_sects[0] = (((uint32_t) ref) << 16) | 7;
+
+    blkif_control_send(req, rsp);
+}
+#endif
 
 void 
 blkif_control_send(blkif_request_t *req, blkif_response_t *rsp)
@@ -713,6 +775,10 @@ blkif_connect(blkif_fe_interface_status_t *status)
 
     blkif_evtchn = status->evtchn;
     blkif_irq    = bind_evtchn_to_irq(blkif_evtchn);
+#ifdef CONFIG_XEN_BLKDEV_GRANT
+    rdomid       = status->domid;
+#endif
+
 
     err = intr_add_handler("xbd", blkif_irq, 
 			   (driver_intr_t *)xb_response_intr, NULL,
@@ -875,6 +941,14 @@ xb_init(void *unused)
 
     printk("[XEN] Initialising virtual block device driver\n");
 
+#ifdef CONFIG_XEN_BLKDEV_GRANT
+    if ( 0 > gnttab_alloc_grant_references( MAXIMUM_OUTSTANDING_BLOCK_REQS,
+                                            &gref_head, &gref_terminal ))
+        return;
+    printk("Blkif frontend is using grant tables.\n");
+#endif
+
+
     rec_ring_free = 0;
     for (i = 0; i < BLK_RING_SIZE; i++) {
 	rec_ring[i].id = i+1;
@@ -899,13 +973,21 @@ blkdev_resume(void)
 }
 #endif
 
-/* XXXXX THIS IS A TEMPORARY FUNCTION UNTIL WE GET GRANT TABLES */
-
 void 
 blkif_completion(blkif_request_t *req)
 {
     int i;
 
+#ifdef CONFIG_XEN_BLKDEV_GRANT
+    grant_ref_t gref;
+
+    for ( i = 0; i < req->nr_segments; i++ )
+    {
+        gref = blkif_gref_from_fas(req->frame_and_sects[i]);
+        gnttab_release_grant_reference(&gref_head, gref);
+    }
+#else
+    /* This is a hack to get the dirty logging bits set */
     switch ( req->operation )
     {
     case BLKIF_OP_READ:
@@ -917,7 +999,7 @@ blkif_completion(blkif_request_t *req)
 	}
 	break;
     }
-    
+#endif    
 }
 MTX_SYSINIT(ioreq, &blkif_io_lock, "BIO LOCK", MTX_SPIN | MTX_NOWITNESS); /* XXX how does one enroll a lock? */
 SYSINIT(xbdev, SI_SUB_PSEUDO, SI_ORDER_ANY, xb_init, NULL)
