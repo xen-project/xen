@@ -151,6 +151,139 @@ test_all_events:
         movb  $1,VCPUINFO_upcall_mask(%rax) # Upcalls masked during delivery
         jmp   test_all_events
 
+#ifdef CONFIG_VMX
+/*
+ * At VMExit time the processor saves the guest selectors, rsp, rip, 
+ * and rflags. Therefore we don't save them, but simply decrement 
+ * the kernel stack pointer to make it consistent with the stack frame 
+ * at usual interruption time. The rflags of the host is not saved by VMX, 
+ * and we set it to the fixed value.
+ *
+ * We also need the room, especially because orig_eax field is used 
+ * by do_IRQ(). Compared the xen_regs, we skip pushing for the following:
+ *   (13) u64 gs_base_user;                 
+ *   (12) u64 gs_base_kernel;                 
+ *   (11) u64 fs_base;                 
+ *   (10) u64 gs;                 
+ *   (9)  u64 fs;
+ *   (8)  u64 ds;
+ *   (7)  u64 es;
+ *               <- get_stack_bottom() (= HOST_ESP)
+ *   (6)  u64 ss;
+ *   (5)  u64 rsp;
+ *   (4)  u64 rflags;
+ *   (3)  u64 cs;
+ *   (2)  u64 rip;
+ * (2/1)  u32 entry_vector;
+ * (1/1)  u32 error_code;
+ * However, get_stack_bottom() actually returns 64 bytes before the real
+ * bottom of the stack to allow space for:
+ * domain pointer, DS, ES, FS, GS. Therefore, we effectively skip 6 registers.
+ */
+#define VMX_MONITOR_RFLAGS	0x202 /* IF on */
+#define NR_SKIPPED_REGS	6	/* See the above explanation */
+#define VMX_SAVE_ALL_NOSEGREGS \
+        pushq $VMX_MONITOR_RFLAGS; \
+        popfq; \
+        subq $(NR_SKIPPED_REGS*8), %rsp; \
+        pushq %rdi; \
+        pushq %rsi; \
+        pushq %rdx; \
+        pushq %rcx; \
+        pushq %rax; \
+        pushq %r8;  \
+        pushq %r9;  \
+        pushq %r10; \
+        pushq %r11; \
+        pushq %rbx; \
+        pushq %rbp; \
+        pushq %r12; \
+        pushq %r13; \
+        pushq %r14; \
+        pushq %r15; \
+
+ENTRY(vmx_asm_vmexit_handler)
+        /* selectors are restored/saved by VMX */
+        VMX_SAVE_ALL_NOSEGREGS
+        call SYMBOL_NAME(vmx_vmexit_handler)
+        jmp vmx_asm_do_resume
+
+ENTRY(vmx_asm_do_launch)
+        popq %r15
+        popq %r14
+        popq %r13
+        popq %r12
+        popq %rbp
+        popq %rbx
+        popq %r11
+        popq %r10
+        popq %r9
+        popq %r8
+        popq %rax
+        popq %rcx
+        popq %rdx
+        popq %rsi
+        popq %rdi
+        addq $(NR_SKIPPED_REGS*8), %rsp
+        /* VMLUANCH */
+        .byte 0x0f,0x01,0xc2
+        pushfq
+        call SYMBOL_NAME(vm_launch_fail)
+        hlt
+        
+        ALIGN
+        
+ENTRY(vmx_asm_do_resume)
+vmx_test_all_events:
+        GET_CURRENT(%rbx)
+/* test_all_events: */
+        xorq %rcx,%rcx
+        notq %rcx
+        cli                             # tests must not race interrupts
+/*test_softirqs:*/  
+        movq EDOMAIN_processor(%rbx),%rax
+#if 0
+        shl  $6,%rax                    # sizeof(irq_cpustat) == 64
+        test %rcx,SYMBOL_NAME(irq_stat)(%rax,1)
+#endif
+        jnz  vmx_process_softirqs
+
+vmx_restore_all_guest:
+        call SYMBOL_NAME(load_cr2)
+        /* 
+         * Check if we are going back to VMX-based VM
+         * By this time, all the setups in the VMCS must be complete.
+         */
+        popq %r15
+        popq %r14
+        popq %r13
+        popq %r12
+        popq %rbp
+        popq %rbx
+        popq %r11
+        popq %r10
+        popq %r9
+        popq %r8
+        popq %rax
+        popq %rcx
+        popq %rdx
+        popq %rsi
+        popq %rdi
+        addq $(NR_SKIPPED_REGS*8), %rsp
+        /* VMRESUME */
+        .byte 0x0f,0x01,0xc3
+        pushfq
+        call SYMBOL_NAME(vm_resume_fail)
+        /* Should never reach here */
+        hlt
+
+        ALIGN
+vmx_process_softirqs:
+        sti       
+        call SYMBOL_NAME(do_softirq)
+        jmp  vmx_test_all_events
+#endif
+
         ALIGN
 /* %rbx: struct exec_domain */
 process_softirqs:

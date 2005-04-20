@@ -7,9 +7,7 @@
 #ifndef __X86_CONFIG_H__
 #define __X86_CONFIG_H__
 
-#ifdef __i386__
 #define CONFIG_VMX 1
-#endif
 
 #define CONFIG_X86 1
 #define CONFIG_SHADOW 1

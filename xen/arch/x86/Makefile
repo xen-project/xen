@@ -7,10 +7,6 @@ OBJS += $(patsubst %.c,%.o,$(wildcard mtrr/*.c))
 
 OBJS := $(subst $(TARGET_SUBARCH)/asm-offsets.o,,$(OBJS))
 
-ifneq ($(TARGET_SUBARCH),x86_32)
-OBJS := $(patsubst vmx%.o,,$(OBJS))
-endif
-
 ifneq ($(crash_debug),y)
 OBJS := $(patsubst cdb%.o,,$(OBJS))
 endif

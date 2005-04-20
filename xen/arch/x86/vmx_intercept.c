@@ -37,7 +37,7 @@ int vmx_io_intercept(ioreq_t *p)
     struct exec_domain *d = current;
     struct vmx_handler_t *handler = &(d->arch.arch_vmx.vmx_platform.vmx_handler);
     int i;
-    unsigned addr, offset;
+    unsigned long addr, offset;
     for (i = 0; i < handler->num_slot; i++) {
         addr   = handler->hdl_list[i].addr;
         offset = handler->hdl_list[i].offset;

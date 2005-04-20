@@ -959,7 +959,12 @@ asmlinkage void load_cr2(void)
     struct exec_domain *d = current;
 
     local_irq_disable();        
+#ifdef __i386__
     asm volatile("movl %0,%%cr2": :"r" (d->arch.arch_vmx.cpu_cr2));
+#else
+    asm volatile("movq %0,%%cr2": :"r" (d->arch.arch_vmx.cpu_cr2));
+#endif
+
 }
 
 #endif /* CONFIG_VMX */

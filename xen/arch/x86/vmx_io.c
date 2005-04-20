@@ -169,6 +169,17 @@ static void set_reg_value (int size, int index, int seg, struct xen_regs *regs, 
         break;
     }
 }
+#else
+static void load_xen_regs(struct xen_regs *regs)
+{ 
+	/* XXX: TBD */
+	return;
+}
+static void set_reg_value (int size, int index, int seg, struct xen_regs *regs, long value)
+{
+	/* XXX: TBD */
+	return;
+}
 #endif
 
 void vmx_io_assist(struct exec_domain *ed) 
@@ -271,7 +282,8 @@ void vmx_io_assist(struct exec_domain *ed)
     }
 }
 
-static inline int __fls(unsigned long word)
+#ifdef __i386__
+static inline int __fls(u32 word)
 {
     int bit;
 
@@ -280,26 +292,57 @@ static inline int __fls(unsigned long word)
             :"rm" (word));
     return word ? bit : -1;
 }
+#else
+#define __fls(x) 	generic_fls(x)
+static __inline__ int generic_fls(u32 x)
+{
+	int r = 32;
+
+	if (!x)
+		return 0;
+	if (!(x & 0xffff0000u)) {
+		x <<= 16;
+		r -= 16;
+	}
+	if (!(x & 0xff000000u)) {
+		x <<= 8;
+		r -= 8;
+	}
+	if (!(x & 0xf0000000u)) {
+		x <<= 4;
+		r -= 4;
+	}
+	if (!(x & 0xc0000000u)) {
+		x <<= 2;
+		r -= 2;
+	}
+	if (!(x & 0x80000000u)) {
+                x <<= 1;
+                r -= 1;
+	}
+	return r;
+}
+#endif
 
 
 /* Simple minded Local APIC priority implementation. Fix later */
-static __inline__ int find_highest_irq(unsigned long *pintr)
+static __inline__ int find_highest_irq(u32 *pintr)
 {
     if (pintr[7])
-        return __fls(pintr[7]) + (256-32*1);
+        return __fls(pintr[7]) + (255-32*1);
     if (pintr[6])
-        return __fls(pintr[6]) + (256-32*2);
+        return __fls(pintr[6]) + (255-32*2);
     if (pintr[5])
-        return __fls(pintr[5]) + (256-32*3);
+        return __fls(pintr[5]) + (255-32*3);
     if (pintr[4])
-        return __fls(pintr[4]) + (256-32*4);
+        return __fls(pintr[4]) + (255-32*4);
     if (pintr[3])
-        return __fls(pintr[3]) + (256-32*5);
+        return __fls(pintr[3]) + (255-32*5);
     if (pintr[2])
-        return __fls(pintr[2]) + (256-32*6);
+        return __fls(pintr[2]) + (255-32*6);
     if (pintr[1])
-        return __fls(pintr[1]) + (256-32*7);
-    return __fls(pintr[0]);
+        return __fls(pintr[1]) + (255-32*7);
+    return (__fls(pintr[0])-1);
 }
 
 /*
@@ -317,7 +360,7 @@ static inline int find_highest_pending_irq(struct exec_domain *d)
         domain_crash_synchronous();
     }
         
-    return find_highest_irq(&vio->vp_intr[0]);
+    return find_highest_irq((unsigned int *)&vio->vp_intr[0]);
 }
 
 static inline void clear_highest_bit(struct exec_domain *d, int vector)
