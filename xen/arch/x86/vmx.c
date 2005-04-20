@@ -195,6 +195,7 @@ static void vmx_vmexit_do_cpuid(unsigned long input, struct xen_regs *regs)
     cpuid(input, &eax, &ebx, &ecx, &edx);
 
     if (input == 1) {
+        clear_bit(X86_FEATURE_PGE, &edx); /* temporarily disabled */
         clear_bit(X86_FEATURE_PSE, &edx);
         clear_bit(X86_FEATURE_PAE, &edx);
         clear_bit(X86_FEATURE_PSE36, &edx);
@@ -382,10 +383,261 @@ static void vmx_io_instruction(struct xen_regs *regs,
     do_block();
 }
 
-static int
-vm86assist(struct exec_domain *d)
+enum { COPY_IN = 0, COPY_OUT };
+
+static inline int
+vmx_copy(void *buf, unsigned long laddr, int size, int dir)
 {
-    /* stay tuned ... */
+    unsigned char *addr;
+    unsigned long mfn;
+
+    if ((size + (laddr & (PAGE_SIZE - 1))) >= PAGE_SIZE) {
+    	printf("vmx_copy exceeds page boundary\n");
+	return 0;
+    }
+
+    mfn = phys_to_machine_mapping(gva_to_gpte(laddr) >> PAGE_SHIFT);
+    addr = map_domain_mem((mfn << PAGE_SHIFT) | (laddr & ~PAGE_MASK));
+
+    if (dir == COPY_IN)
+	    memcpy(buf, addr, size);
+    else
+	    memcpy(addr, buf, size);
+
+    unmap_domain_mem(addr);
+    return 1;
+}
+
+int
+vmx_world_save(struct exec_domain *d, struct vmx_assist_context *c)
+{
+    unsigned long inst_len;
+    int error = 0;
+
+    error |= __vmread(INSTRUCTION_LEN, &inst_len);
+    error |= __vmread(GUEST_EIP, &c->eip);
+    c->eip += inst_len; /* skip transition instruction */
+    error |= __vmread(GUEST_ESP, &c->esp);
+    error |= __vmread(GUEST_EFLAGS, &c->eflags);
+
+    error |= __vmread(CR0_READ_SHADOW, &c->cr0);
+    c->cr3 = d->arch.arch_vmx.cpu_cr3;
+    error |= __vmread(CR4_READ_SHADOW, &c->cr4);
+
+    error |= __vmread(GUEST_IDTR_LIMIT, &c->idtr_limit);
+    error |= __vmread(GUEST_IDTR_BASE, &c->idtr_base);
+
+    error |= __vmread(GUEST_GDTR_LIMIT, &c->gdtr_limit);
+    error |= __vmread(GUEST_GDTR_BASE, &c->gdtr_base);
+
+    error |= __vmread(GUEST_CS_SELECTOR, &c->cs_sel);
+    error |= __vmread(GUEST_CS_LIMIT, &c->cs_limit);
+    error |= __vmread(GUEST_CS_BASE, &c->cs_base);
+    error |= __vmread(GUEST_CS_AR_BYTES, &c->cs_arbytes.bytes);
+
+    error |= __vmread(GUEST_DS_SELECTOR, &c->ds_sel);
+    error |= __vmread(GUEST_DS_LIMIT, &c->ds_limit);
+    error |= __vmread(GUEST_DS_BASE, &c->ds_base);
+    error |= __vmread(GUEST_DS_AR_BYTES, &c->ds_arbytes.bytes);
+
+    error |= __vmread(GUEST_ES_SELECTOR, &c->es_sel);
+    error |= __vmread(GUEST_ES_LIMIT, &c->es_limit);
+    error |= __vmread(GUEST_ES_BASE, &c->es_base);
+    error |= __vmread(GUEST_ES_AR_BYTES, &c->es_arbytes.bytes);
+
+    error |= __vmread(GUEST_SS_SELECTOR, &c->ss_sel);
+    error |= __vmread(GUEST_SS_LIMIT, &c->ss_limit);
+    error |= __vmread(GUEST_SS_BASE, &c->ss_base);
+    error |= __vmread(GUEST_SS_AR_BYTES, &c->ss_arbytes.bytes);
+
+    error |= __vmread(GUEST_FS_SELECTOR, &c->fs_sel);
+    error |= __vmread(GUEST_FS_LIMIT, &c->fs_limit);
+    error |= __vmread(GUEST_FS_BASE, &c->fs_base);
+    error |= __vmread(GUEST_FS_AR_BYTES, &c->fs_arbytes.bytes);
+
+    error |= __vmread(GUEST_GS_SELECTOR, &c->gs_sel);
+    error |= __vmread(GUEST_GS_LIMIT, &c->gs_limit);
+    error |= __vmread(GUEST_GS_BASE, &c->gs_base);
+    error |= __vmread(GUEST_GS_AR_BYTES, &c->gs_arbytes.bytes);
+
+    error |= __vmread(GUEST_TR_SELECTOR, &c->tr_sel);
+    error |= __vmread(GUEST_TR_LIMIT, &c->tr_limit);
+    error |= __vmread(GUEST_TR_BASE, &c->tr_base);
+    error |= __vmread(GUEST_TR_AR_BYTES, &c->tr_arbytes.bytes);
+
+    error |= __vmread(GUEST_LDTR_SELECTOR, &c->ldtr_sel);
+    error |= __vmread(GUEST_LDTR_LIMIT, &c->ldtr_limit);
+    error |= __vmread(GUEST_LDTR_BASE, &c->ldtr_base);
+    error |= __vmread(GUEST_LDTR_AR_BYTES, &c->ldtr_arbytes.bytes);
+
+    return !error;
+}
+
+int
+vmx_world_restore(struct exec_domain *d, struct vmx_assist_context *c)
+{
+    unsigned long mfn, old_cr4;
+    int error = 0;
+
+    error |= __vmwrite(GUEST_EIP, c->eip);
+    error |= __vmwrite(GUEST_ESP, c->esp);
+    error |= __vmwrite(GUEST_EFLAGS, c->eflags);
+
+    error |= __vmwrite(CR0_READ_SHADOW, c->cr0);
+
+    if (c->cr3 == d->arch.arch_vmx.cpu_cr3) {
+	/* 
+	 * This is simple TLB flush, implying the guest has 
+	 * removed some translation or changed page attributes.
+	 * We simply invalidate the shadow.
+	 */
+	mfn = phys_to_machine_mapping(c->cr3 >> PAGE_SHIFT);
+	if ((mfn << PAGE_SHIFT) != pagetable_val(d->arch.guest_table)) {
+	    VMX_DBG_LOG(DBG_LEVEL_VMMU, "Invalid CR3 value=%lx", c->cr3);
+	    domain_crash_synchronous();
+	    return 0;
+	}
+	shadow_sync_all(d->domain);
+    } else {
+	/*
+	 * If different, make a shadow. Check if the PDBR is valid
+	 * first.
+	 */
+	VMX_DBG_LOG(DBG_LEVEL_VMMU, "CR3 c->cr3 = %lx", c->cr3);
+	if ((c->cr3 >> PAGE_SHIFT) > d->domain->max_pages) {
+	    VMX_DBG_LOG(DBG_LEVEL_VMMU, "Invalid CR3 value=%lx", c->cr3);
+	    domain_crash_synchronous(); 
+	    return 0;
+	}
+	mfn = phys_to_machine_mapping(c->cr3 >> PAGE_SHIFT);
+	d->arch.guest_table = mk_pagetable(mfn << PAGE_SHIFT);
+	update_pagetables(d);
+	/* 
+	 * arch.shadow_table should now hold the next CR3 for shadow
+	 */
+	d->arch.arch_vmx.cpu_cr3 = c->cr3;
+	VMX_DBG_LOG(DBG_LEVEL_VMMU, "Update CR3 value = %lx", c->cr3);
+	__vmwrite(GUEST_CR3, pagetable_val(d->arch.shadow_table));
+    }
+
+    error |= __vmread(CR4_READ_SHADOW, &old_cr4);
+    error |= __vmwrite(GUEST_CR4, (c->cr4 | X86_CR4_VMXE));
+    error |= __vmwrite(CR4_READ_SHADOW, c->cr4);
+
+    error |= __vmwrite(GUEST_IDTR_LIMIT, c->idtr_limit);
+    error |= __vmwrite(GUEST_IDTR_BASE, c->idtr_base);
+
+    error |= __vmwrite(GUEST_GDTR_LIMIT, c->gdtr_limit);
+    error |= __vmwrite(GUEST_GDTR_BASE, c->gdtr_base);
+
+    error |= __vmwrite(GUEST_CS_SELECTOR, c->cs_sel);
+    error |= __vmwrite(GUEST_CS_LIMIT, c->cs_limit);
+    error |= __vmwrite(GUEST_CS_BASE, c->cs_base);
+    error |= __vmwrite(GUEST_CS_AR_BYTES, c->cs_arbytes.bytes);
+
+    error |= __vmwrite(GUEST_DS_SELECTOR, c->ds_sel);
+    error |= __vmwrite(GUEST_DS_LIMIT, c->ds_limit);
+    error |= __vmwrite(GUEST_DS_BASE, c->ds_base);
+    error |= __vmwrite(GUEST_DS_AR_BYTES, c->ds_arbytes.bytes);
+
+    error |= __vmwrite(GUEST_ES_SELECTOR, c->es_sel);
+    error |= __vmwrite(GUEST_ES_LIMIT, c->es_limit);
+    error |= __vmwrite(GUEST_ES_BASE, c->es_base);
+    error |= __vmwrite(GUEST_ES_AR_BYTES, c->es_arbytes.bytes);
+
+    error |= __vmwrite(GUEST_SS_SELECTOR, c->ss_sel);
+    error |= __vmwrite(GUEST_SS_LIMIT, c->ss_limit);
+    error |= __vmwrite(GUEST_SS_BASE, c->ss_base);
+    error |= __vmwrite(GUEST_SS_AR_BYTES, c->ss_arbytes.bytes);
+
+    error |= __vmwrite(GUEST_FS_SELECTOR, c->fs_sel);
+    error |= __vmwrite(GUEST_FS_LIMIT, c->fs_limit);
+    error |= __vmwrite(GUEST_FS_BASE, c->fs_base);
+    error |= __vmwrite(GUEST_FS_AR_BYTES, c->fs_arbytes.bytes);
+
+    error |= __vmwrite(GUEST_GS_SELECTOR, c->gs_sel);
+    error |= __vmwrite(GUEST_GS_LIMIT, c->gs_limit);
+    error |= __vmwrite(GUEST_GS_BASE, c->gs_base);
+    error |= __vmwrite(GUEST_GS_AR_BYTES, c->gs_arbytes.bytes);
+
+    error |= __vmwrite(GUEST_TR_SELECTOR, c->tr_sel);
+    error |= __vmwrite(GUEST_TR_LIMIT, c->tr_limit);
+    error |= __vmwrite(GUEST_TR_BASE, c->tr_base);
+    error |= __vmwrite(GUEST_TR_AR_BYTES, c->tr_arbytes.bytes);
+
+    error |= __vmwrite(GUEST_LDTR_SELECTOR, c->ldtr_sel);
+    error |= __vmwrite(GUEST_LDTR_LIMIT, c->ldtr_limit);
+    error |= __vmwrite(GUEST_LDTR_BASE, c->ldtr_base);
+    error |= __vmwrite(GUEST_LDTR_AR_BYTES, c->ldtr_arbytes.bytes);
+
+    return !error;
+}
+
+enum { VMX_ASSIST_INVOKE = 0, VMX_ASSIST_RESTORE };
+
+int
+vmx_assist(struct exec_domain *d, int mode)
+{
+    struct vmx_assist_context c;
+    unsigned long magic, cp;
+
+    /* make sure vmxassist exists (this is not an error) */
+    if (!vmx_copy(&magic, VMXASSIST_MAGIC_OFFSET, sizeof(magic), COPY_IN))
+    	return 0;
+    if (magic != VMXASSIST_MAGIC)
+    	return 0;
+
+    switch (mode) {
+    /*
+     * Transfer control to vmxassist.
+     * Store the current context in VMXASSIST_OLD_CONTEXT and load
+     * the new VMXASSIST_NEW_CONTEXT context. This context was created
+     * by vmxassist and will transfer control to it.
+     */
+    case VMX_ASSIST_INVOKE:
+	/* save the old context */
+	if (!vmx_copy(&cp, VMXASSIST_OLD_CONTEXT, sizeof(cp), COPY_IN))
+    	    goto error;
+	if (cp != 0) {
+    	    if (!vmx_world_save(d, &c))
+		goto error;
+	    if (!vmx_copy(&c, cp, sizeof(c), COPY_OUT))
+		goto error;
+	}
+
+	/* restore the new context, this should activate vmxassist */
+	if (!vmx_copy(&cp, VMXASSIST_NEW_CONTEXT, sizeof(cp), COPY_IN))
+	    goto error;
+	if (cp != 0) {
+            if (!vmx_copy(&c, cp, sizeof(c), COPY_IN))
+		goto error;
+    	    if (!vmx_world_restore(d, &c))
+		goto error;
+    	    return 1;
+	}
+	break;
+
+    /*
+     * Restore the VMXASSIST_OLD_CONTEXT that was saved by VMX_ASSIST_INVOKE
+     * above.
+     */
+    case VMX_ASSIST_RESTORE:
+	/* save the old context */
+	if (!vmx_copy(&cp, VMXASSIST_OLD_CONTEXT, sizeof(cp), COPY_IN))
+    	    goto error;
+	if (cp != 0) {
+            if (!vmx_copy(&c, cp, sizeof(c), COPY_IN))
+		goto error;
+    	    if (!vmx_world_restore(d, &c))
+		goto error;
+	    return 1;
+	}
+	break;
+    }
+
+error:
+    printf("Failed to transfer to vmxassist\n");
+    domain_crash_synchronous(); 
     return 0;
 }
 
@@ -399,6 +651,7 @@ static int mov_to_cr(int gp, int cr, struct xen_regs *regs)
 {
     unsigned long value;
     unsigned long old_cr;
+    unsigned long eip;
     struct exec_domain *d = current;
 
     switch (gp) {
@@ -469,15 +722,28 @@ static int mov_to_cr(int gp, int cr, struct xen_regs *regs)
             put_page_and_type(&frame_table[old_base_mfn]);
         } else {
             if ((value & X86_CR0_PE) == 0) {
-		unsigned long eip;
-
 	        __vmread(GUEST_EIP, &eip);
                 VMX_DBG_LOG(DBG_LEVEL_1,
 			"Disabling CR0.PE at %%eip 0x%lx", eip);
-		if (vm86assist(d)) {
+		if (vmx_assist(d, VMX_ASSIST_INVOKE)) {
+		    set_bit(VMX_CPU_STATE_ASSIST_ENABLED,
+						&d->arch.arch_vmx.cpu_state);
 	            __vmread(GUEST_EIP, &eip);
 		    VMX_DBG_LOG(DBG_LEVEL_1,
-			"Transfering control to vm86assist %%eip 0x%lx", eip);
+			"Transfering control to vmxassist %%eip 0x%lx", eip);
+		    return 0; /* do not update eip! */
+		}
+	    } else if (test_bit(VMX_CPU_STATE_ASSIST_ENABLED,
+					&d->arch.arch_vmx.cpu_state)) {
+		__vmread(GUEST_EIP, &eip);
+		VMX_DBG_LOG(DBG_LEVEL_1,
+			"Enabling CR0.PE at %%eip 0x%lx", eip);
+		if (vmx_assist(d, VMX_ASSIST_RESTORE)) {
+		    clear_bit(VMX_CPU_STATE_ASSIST_ENABLED,
+						&d->arch.arch_vmx.cpu_state);
+		    __vmread(GUEST_EIP, &eip);
+		    VMX_DBG_LOG(DBG_LEVEL_1,
+			"Restoring to %%eip 0x%lx", eip);
 		    return 0; /* do not update eip! */
 		}
 	    }
@@ -549,6 +815,7 @@ static int mov_to_cr(int gp, int cr, struct xen_regs *regs)
          */
         if ((old_cr ^ value) & (X86_CR4_PSE | X86_CR4_PGE | X86_CR4_PAE)) {
             vmx_shadow_clear_state(d->domain);
+            shadow_sync_all(d->domain);
         }
         break;
     default:

@@ -484,6 +484,11 @@ static void send_mmio_req(unsigned long gpa,
 
     vm86 = inst_decoder_regs->eflags & X86_EFLAGS_VM;
 
+    if (test_bit(ARCH_VMX_IO_WAIT, &d->arch.arch_vmx.flags)) {
+        printf("VMX I/O has not yet completed\n");
+        domain_crash_synchronous();
+    }
+
     set_bit(ARCH_VMX_IO_WAIT, &d->arch.arch_vmx.flags);
     p->dir = dir;
     p->pdata_valid = pvalid;
