@@ -171,6 +171,10 @@ panic_domain(regs,"psr.ic off, delivering fault=%lx,iip=%p,ifa=%p,isr=%p,PSCB.ii
 		else if (vector == IA64_INST_TLB_VECTOR)
 			vector = IA64_ALT_INST_TLB_VECTOR;
 //	}
+	if (vector == IA64_ALT_DATA_TLB_VECTOR ||
+	    vector == IA64_ALT_INST_TLB_VECTOR) {
+		vcpu_thash(ed,ifa,&PSCB(ed,iha));
+	}
 	PSCB(ed,unat) = regs->ar_unat;  // not sure if this is really needed?
 	PSCB(ed,precover_ifs) = regs->cr_ifs;
 	vcpu_bsw0(ed);
