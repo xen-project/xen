@@ -416,7 +416,7 @@ void __set_fixmap_user (enum fixed_addresses idx, unsigned long phys, pgprot_t p
 
 
 void __set_fixmap_ma (enum fixed_addresses idx, unsigned long phys, pgprot_t prot)
-{
+{ 
 	unsigned long address = __fix_to_virt(idx);
 
 	if (idx >= __end_of_fixed_addresses) {
@@ -464,21 +464,21 @@ unsigned long get_machine_pfn(unsigned long addr)
         pte_t *pte = pte_offset_kernel(pmd, addr);
         
         return (pte->pte >> PAGE_SHIFT);
-}
+} 
 
 
 /*
  * We start using from start_pfn
  */
 static __init void *alloc_low_page(unsigned long *phys)
-{
+{ 
         unsigned long pfn = table_end++;
     
         *phys = (pfn << PAGE_SHIFT);
         memset((void *) ((pfn << PAGE_SHIFT) + __START_KERNEL_map), 0, PAGE_SIZE);
 
         return (void *)((pfn << PAGE_SHIFT) + __START_KERNEL_map);
-}
+} 
 
 #define PTE_SIZE PAGE_SIZE
 
@@ -500,11 +500,11 @@ void __init phys_pud_init(pud_t *pud, unsigned long address, unsigned long end)
 		pmd_t *pmd;
 
 		paddr = address + i*PUD_SIZE;
-                if (paddr >= end) { 
+		if (paddr >= end) { 
 			for (; i < PTRS_PER_PUD; i++, pud++) 
 				set_pud(pud, __pud(0)); 
 			break;
-		}
+		} 
 
 		pmd = alloc_low_page(&pmd_phys);
                 make_page_readonly(pmd);
@@ -515,11 +515,11 @@ void __init phys_pud_init(pud_t *pud, unsigned long address, unsigned long end)
                         unsigned long pte_phys;
                         pte_t *pte, *pte_save;
 
-                        if (paddr >= end) { 
+			if (paddr >= end) { 
 				for (; j < PTRS_PER_PMD; j++, pmd++)
 					set_pmd(pmd,  __pmd(0)); 
 				break;
-                        }
+			}
                         pte = alloc_low_page(&pte_phys);
                         pte_save = pte;
                         for (k = 0; k < PTRS_PER_PTE; pte++, k++, paddr += PTE_SIZE) {
@@ -550,8 +550,8 @@ static void __init find_early_table_space(unsigned long end)
 {
         unsigned long puds, pmds, ptes; 
 
-        puds = (end + PUD_SIZE - 1) >> PUD_SHIFT;
-        pmds = (end + PMD_SIZE - 1) >> PMD_SHIFT;
+	puds = (end + PUD_SIZE - 1) >> PUD_SHIFT;
+	pmds = (end + PMD_SIZE - 1) >> PMD_SHIFT;
         ptes = (end + PTE_SIZE - 1) >> PAGE_SHIFT;
 
         tables_reserved = round_up(puds*8, PAGE_SIZE) + round_up(pmds * 8, PAGE_SIZE) 
@@ -570,12 +570,12 @@ void __init init_memory_mapping(unsigned long start, unsigned long end)
 
 	Dprintk("init_memory_mapping\n");
 
-        find_early_table_space(end);
+	find_early_table_space(end);
 
-        start = (unsigned long)__va(start);
-        end = (unsigned long)__va(end);
+	start = (unsigned long)__va(start);
+	end = (unsigned long)__va(end);
 
-        for (; start < end; start = next) {
+	for (; start < end; start = next) {
 		unsigned long pud_phys; 
                 pud_t *pud = alloc_low_page(&pud_phys);
                 make_page_readonly(pud);
@@ -583,9 +583,9 @@ void __init init_memory_mapping(unsigned long start, unsigned long end)
 		next = start + PGDIR_SIZE;
 		if (next > end) 
 			next = end; 
-		phys_pud_init(pud, __pa(start), __pa(next)); 
-                set_pgd(pgd_offset_k(start), mk_kernel_pgd(pud_phys));
-	}
+		phys_pud_init(pud, __pa(start), __pa(next));
+		set_pgd(pgd_offset_k(start), mk_kernel_pgd(pud_phys));
+	} 
 
 	early_printk("kernel direct mapping tables upto %lx @ %lx-%lx\n", end, 
 	       table_start<<PAGE_SHIFT, 
@@ -622,14 +622,14 @@ void __init paging_init(void)
                 /*	unsigned int max_dma; */
                 /* max_dma = virt_to_phys((char *)MAX_DMA_ADDRESS) >> PAGE_SHIFT; */
                 /* if (end_pfn < max_dma) */
-                zones_size[ZONE_DMA] = end_pfn;
+			zones_size[ZONE_DMA] = end_pfn;
 #if 0                
 		else {
 			zones_size[ZONE_DMA] = max_dma;
 			zones_size[ZONE_NORMAL] = end_pfn - max_dma;
-                } 
+		}
 #endif
-                free_area_init(zones_size);
+		free_area_init(zones_size);
 	}
 
         __set_fixmap_ma(FIX_SHARED_INFO, xen_start_info.shared_info, 
@@ -672,7 +672,7 @@ void __init clear_kernel_mapping(unsigned long address, unsigned long size)
 		pud = pud_offset(pgd, address);
 		if (pud_none(*pud))
 			continue; 
-                pmd = pmd_offset(pud, address);
+		pmd = pmd_offset(pud, address);
 		if (!pmd || pmd_none(*pmd))
 			continue; 
 		if (0 == (pmd_val(*pmd) & _PAGE_PSE)) { 
@@ -774,7 +774,7 @@ void __init mem_init(void)
 	 * the WP-bit has been tested.
 	 */
 #ifndef CONFIG_SMP
-        zap_low_mappings();
+	zap_low_mappings();
 #endif
 }
 
@@ -836,16 +836,16 @@ void __init reserve_bootmem_generic(unsigned long phys, unsigned len)
 
 int kern_addr_valid(unsigned long addr) 
 { 
-        unsigned long above = ((long)addr) >> __VIRTUAL_MASK_SHIFT;
-        pgd_t *pgd;
-        pud_t *pud;
-        pmd_t *pmd;
-        pte_t *pte;
+	unsigned long above = ((long)addr) >> __VIRTUAL_MASK_SHIFT;
+       pgd_t *pgd;
+       pud_t *pud;
+       pmd_t *pmd;
+       pte_t *pte;
 
 	if (above != 0 && above != -1UL)
 		return 0; 
 	
-        pgd = pgd_offset_k(addr);
+	pgd = pgd_offset_k(addr);
 	if (pgd_none(*pgd))
 		return 0;
 
@@ -853,13 +853,13 @@ int kern_addr_valid(unsigned long addr)
 	if (pud_none(*pud))
 		return 0; 
 
-        pmd = pmd_offset(pud, addr);
+	pmd = pmd_offset(pud, addr);
 	if (pmd_none(*pmd))
 		return 0;
 	if (pmd_large(*pmd))
 		return pfn_valid(pmd_pfn(*pmd));
 
-        pte = pte_offset_kernel(pmd, addr);
+	pte = pte_offset_kernel(pmd, addr);
 	if (pte_none(*pte))
 		return 0;
 	return pfn_valid(pte_pfn(*pte));

@@ -27,9 +27,8 @@
 #ifdef CONFIG_SMP /* avoids "defined but not used" warnig */
 static void flush_ldt(void *null)
 {
-        if (current->active_mm) {
-                load_LDT(&current->active_mm->context);
-        }
+	if (current->active_mm)
+               load_LDT(&current->active_mm->context);
 }
 #endif
 

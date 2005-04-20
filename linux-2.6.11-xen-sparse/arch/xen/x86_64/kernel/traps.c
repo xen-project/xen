@@ -948,7 +948,7 @@ void __init trap_init(void)
 #ifdef CONFIG_IA32_EMULATION
 	set_system_gate(IA32_SYSCALL_VECTOR, ia32_syscall);
 #endif
-
+       
 	/*
 	 * Should be a barrier for any external CPU state.
 	 */

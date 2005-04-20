@@ -108,7 +108,7 @@ ECF_IN_SYSCALL  = (1<<8)
 #define preempt_stop
 #define retint_kernel retint_restore_args
 #endif	
-
+	
 
 /*
  * C code is not supposed to know about undefined top of stack. Every time 
@@ -191,7 +191,7 @@ ECF_IN_SYSCALL  = (1<<8)
 1:
         .endm
 
-/*        
+/*
  * A newly forked process directly context switches into this.
  */ 	
 /* rdi:	prev */	
@@ -276,7 +276,7 @@ sysret_check:
         XEN_UNBLOCK_EVENTS(%r11)                
 	RESTORE_ARGS 0,8,0
         SWITCH_TO_USER ECF_IN_SYSCALL
-        
+
 	/* Handle reschedules */
 	/* edx:	work, edi: workmask */	
 sysret_careful:
@@ -491,11 +491,11 @@ ENTRY(stub_rt_sigreturn)
 #else		
 	SAVE_ARGS
 	leaq -ARGOFFSET(%rsp),%rdi	# arg1 for handler
-#endif
+#endif	
 #if 0 /* For Xen we don't need to do this */       
 	testl $3,CS(%rdi)
 	je 1f
-	swapgs
+	swapgs	
 #endif        
 1:	addl $1,%gs:pda_irqcount	# RED-PEN should check preempt count
 	movq %gs:pda_irqstackptr,%rax
@@ -508,16 +508,16 @@ retint_check:
 	movl threadinfo_flags(%rcx),%edx
 	andl %edi,%edx
 	jnz  retint_careful
-retint_restore_args:
-	RESTORE_ARGS 0,8,0
+retint_restore_args:				
+	RESTORE_ARGS 0,8,0						
         testb $3,8(%rsp)                # check CS
         jnz  user_mode
 kernel_mode:
         orb   $3,1*8(%rsp)
-        iretq
+	iretq
 user_mode:
         SWITCH_TO_USER 0                        
-                
+	
 	/* edi: workmask, edx: work */	
 retint_careful:
 	bt    $TIF_NEED_RESCHED,%edx
@@ -527,7 +527,7 @@ retint_careful:
 /*	sti */        
 	pushq %rdi
 	call  schedule
-	popq %rdi
+	popq %rdi		
         XEN_GET_VCPU_INFO(%r11)        
         XEN_BLOCK_EVENTS(%r11)		
 	GET_THREAD_INFO(%rcx)
@@ -661,7 +661,7 @@ ENTRY(error_entry)
 	CFI_REL_OFFSET	rsp,(RSP-RDI)
 	CFI_REL_OFFSET	rip,(RIP-RDI)
 	/* rdi slot contains rax, oldrax contains error code */
-	cld
+	cld	
 	subq  $14*8,%rsp
 	CFI_ADJUST_CFA_OFFSET	(14*8)
 	movq %rsi,13*8(%rsp)
@@ -717,7 +717,7 @@ error_check_event:
 	andb $1,%al			# %al == mask & ~saved_mask
 	jnz restore_all_enable_events	# != 0 => reenable event delivery      
         XEN_UNLOCK_VCPU_INFO_SMP(%rsi)
-error_exit:
+error_exit:		
 	RESTORE_REST
 /*	cli */
 	GET_THREAD_INFO(%rcx)	
@@ -727,7 +727,7 @@ error_exit:
 	movl  $_TIF_WORK_MASK,%edi
 	andl  %edi,%edx
 	jnz  retint_careful
-	RESTORE_ARGS 0,8,0
+	RESTORE_ARGS 0,8,0						
         SWITCH_TO_USER 0
 	CFI_ENDPROC
 
@@ -756,7 +756,7 @@ error_kernelspace:
         je   error_swapgs
 	jmp  error_sti
 #endif        
-  
+	
 ENTRY(hypervisor_callback)
 	zeroentry do_hypervisor_callback
         
@@ -896,7 +896,7 @@ ENTRY(failsafe_callback)
 	.long 3b,8b;	\
 	.long 4b,9b;	\
 .previous
-             
+       
         .section __ex_table,"a"
         .align 8
         .quad gs_change,bad_gs
@@ -1051,7 +1051,7 @@ ENTRY(debug)
 	CFI_ENDPROC
 
 #if 0
-       	/* runs on exception stack */	
+	/* runs on exception stack */	
 ENTRY(nmi)
 	CFI_STARTPROC
 	pushq $-1

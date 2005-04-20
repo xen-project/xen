@@ -85,7 +85,6 @@ unsigned long xen_override_max_pfn;
 
 struct cpuinfo_x86 boot_cpu_data;
 
-
 unsigned long mmu_cr4_features;
 EXPORT_SYMBOL_GPL(mmu_cr4_features);
 
@@ -385,7 +384,7 @@ static __init void parse_cmdline_early (char ** cmdline_p)
 			disable_apic = 1;
 
 		if (!memcmp(from, "noapic", 6)) 
-			skip_ioapic_setp = 1;
+			skip_ioapic_setup = 1;
 
 		if (!memcmp(from, "apic", 4)) { 
 			skip_ioapic_setup = 0;
@@ -428,7 +427,7 @@ static __init void parse_cmdline_early (char ** cmdline_p)
 #ifndef CONFIG_DISCONTIGMEM
 static void __init contig_initmem_init(void)
 {
-        unsigned long bootmap_size, bootmap;
+        unsigned long bootmap_size, bootmap; 
 
         /*
 	 * partially used pages are not usable - thus
@@ -606,7 +605,7 @@ void __init setup_arch(char **cmdline_p)
 	unsigned long low_mem_size;
 	int i, j;
 	physdev_op_t op;
- 
+
 #if 0
  	ROOT_DEV = old_decode_dev(ORIG_ROOT_DEV);
 #else
@@ -759,7 +758,7 @@ void __init setup_arch(char **cmdline_p)
                 }
         }
 #endif
-        paging_init();
+	paging_init();
 
 	/* Make sure we have a large enough P->M table. */
 	if (end_pfn > xen_start_info.nr_pages) {
@@ -785,7 +784,7 @@ void __init setup_arch(char **cmdline_p)
 	}
 
 #if 0
-        check_ioapic();
+	check_ioapic();
 #endif
 
 #ifdef CONFIG_ACPI_BOOT
@@ -803,7 +802,7 @@ void __init setup_arch(char **cmdline_p)
 		get_smp_config();
 	init_apic_mappings();
 #endif
-        
+
         /* XXX Disable irqdebug until we have a way to avoid interrupt
 	 * conflicts. */
 /*	noirqdebug_setup(""); */
@@ -835,7 +834,7 @@ void __init setup_arch(char **cmdline_p)
 		pci_mem_start = low_mem_size;
 
 #ifdef CONFIG_GART_IOMMU
-	iommu_hole_init();
+       iommu_hole_init();
 #endif
 
 	op.cmd             = PHYSDEVOP_SET_IOPL;

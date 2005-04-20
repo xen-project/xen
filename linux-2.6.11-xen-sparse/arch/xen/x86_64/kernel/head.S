@@ -41,7 +41,7 @@
 	.code64
 ENTRY(_start)
         cld                
-        movq init_rsp(%rip),%rsp    
+	movq init_rsp(%rip),%rsp
 	/* Copy the necessary stuff from xen_start_info structure. */
 	movq  $xen_start_info_union,%rdi
 	movq  $64,%rcx          /* sizeof (union xen_start_info_union) / sizeof (long) */
@@ -89,7 +89,7 @@ ENTRY(lgdt_finish)
         pushq %rax
         lretq
 #endif 
-                       
+
 ENTRY(stext)
 ENTRY(_stext)
 
@@ -113,7 +113,7 @@ ENTRY(init_level4_pgt)
 .org 0x2000
 ENTRY(init_level4_user_pgt)
 	.fill	512,8,0
-        
+
         /*
          * This is used for vsyscall area mapping as we have a different
          * level4 page table for user.
@@ -130,7 +130,7 @@ ENTRY(cpu_gdt_table)
 	.quad	0x008ffa000000ffff	/* __KERNEL_COMPAT32_CS */	
 	.quad	0x00affa000000ffff	/* __KERNEL_CS */
 	.quad	0x00cff2000000ffff	/* __KERNEL_DS */
-
+	
        	.quad	0x00cffa000000ffff	/* __USER32_CS */
 	.quad	0x00cff2000000ffff	/* __USER_DS, __USER32_DS  */		
 	.quad	0x00affa000000ffff	/* __USER_CS */
@@ -194,7 +194,7 @@ gdt32_end:
  * IRET will check the segment types  kkeil 2000/10/28
  * Also sysret mandates a special GDT layout 
  */
-
+		 		
 #if 0        		 		
 .align L1_CACHE_BYTES
 #endif

@@ -112,7 +112,7 @@ void __iomem * __ioremap(unsigned long phys_addr, unsigned long size, unsigned l
 	 */
 	if (is_local_lowmem(phys_addr)) {
 		char *t_addr, *t_end;
-		struct page *page;
+ 		struct page *page;
 
 		t_addr = bus_to_virt(phys_addr);
 		t_end = t_addr + (size - 1);

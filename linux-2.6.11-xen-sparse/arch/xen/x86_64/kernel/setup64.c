@@ -58,7 +58,7 @@ off	Disable
 */ 
 int __init nonx_setup(char *str)
 {
-	if (!strcmp(str, "on")) {
+	if (!strncmp(str, "on", 2)) {
                 __supported_pte_mask |= _PAGE_NX; 
  		do_not_nx = 0; 
 	} else if (!strncmp(str, "off", 3)) {
@@ -126,18 +126,18 @@ void pda_init(int cpu)
 { 
         pgd_t *old_level4 = (pgd_t *)xen_start_info.pt_base;
 	struct x8664_pda *pda = &cpu_pda[cpu];
-        
+
 	/* Setup up data that may be needed in __get_free_pages early */
 	asm volatile("movl %0,%%fs ; movl %0,%%gs" :: "r" (0)); 
         HYPERVISOR_set_segment_base(SEGBASE_GS_KERNEL, 
                                     (unsigned long)(cpu_pda + cpu));
-	
-        pda->me = pda;
-        pda->cpunumber = cpu; 
-        pda->irqcount = -1;
-        pda->kernelstack = 
-                (unsigned long)stack_thread_info() - PDA_STACKOFFSET + THREAD_SIZE; 
-        pda->active_mm = &init_mm;
+
+	pda->me = pda;
+	pda->cpunumber = cpu; 
+	pda->irqcount = -1;
+	pda->kernelstack = 
+		(unsigned long)stack_thread_info() - PDA_STACKOFFSET + THREAD_SIZE; 
+	pda->active_mm = &init_mm;
 	pda->mmu_state = 0;
         pda->kernel_mode = 1;
 
@@ -258,7 +258,7 @@ void __init cpu_init (void)
 	printk("Initializing CPU#%d\n", cpu);
 
 #if 0
-        clear_in_cr4(X86_CR4_VME|X86_CR4_PVI|X86_CR4_TSD|X86_CR4_DE);
+		clear_in_cr4(X86_CR4_VME|X86_CR4_PVI|X86_CR4_TSD|X86_CR4_DE);
 #endif
 	/*
 	 * Initialize the per-CPU GDT with the boot GDT,
@@ -278,12 +278,12 @@ void __init cpu_init (void)
 
 #if 0
 	memcpy(me->thread.tls_array, cpu_gdt_table[cpu], GDT_ENTRY_TLS_ENTRIES * 8);
-	
+
 #endif
  	memcpy(me->thread.tls_array, &get_cpu_gdt_table(cpu)[GDT_ENTRY_TLS_MIN],
 	    GDT_ENTRY_TLS_ENTRIES * 8);
        
-        /*
+	/*
 	 * Delete NT
 	 */
 
