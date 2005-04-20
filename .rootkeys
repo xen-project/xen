@@ -1224,6 +1224,7 @@
 405b8599xI_PoEr3zZoJ2on-jdn7iw xen/arch/x86/shadow.c
 3ddb79bcSx2e8JSR3pdSGa8x1ScYzA xen/arch/x86/smp.c
 3ddb79bcfUN3-UBCPzX26IU8bq-3aw xen/arch/x86/smpboot.c
+4266673dBje6CS6CwQ3lEdvWbf5Dcw xen/arch/x86/string.c
 3ddb79bc-Udq7ol-NX4q9XsYnN7A2Q xen/arch/x86/time.c
 3ddb79bccYVzXZJyVaxuv5T42Z1Fsw xen/arch/x86/trampoline.S
 3ddb79bcOftONV9h4QCxXOfiT0h91w xen/arch/x86/traps.c

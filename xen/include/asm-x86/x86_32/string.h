@@ -184,7 +184,7 @@ __asm__ __volatile__(
 return __res;
 }
 
-static inline void * __memcpy(void * to, const void * from, size_t n)
+static inline void * __variable_memcpy(void * to, const void * from, size_t n)
 {
 int d0, d1, d2;
 __asm__ __volatile__(
@@ -272,12 +272,13 @@ __asm__ __volatile__( \
 }
 
 #define __HAVE_ARCH_MEMCPY
-static always_inline __attribute_used__
-void memcpy(void *t, const void *f, size_t n)
+#define memcpy(t,f,n) (__memcpy((t),(f),(n)))
+static always_inline
+void *__memcpy(void *t, const void *f, size_t n)
 {
-	(__builtin_constant_p(n) ?
+	return (__builtin_constant_p(n) ?
 	 __constant_memcpy((t),(f),(n)) :
-	 __memcpy((t),(f),(n)));
+	 __variable_memcpy((t),(f),(n)));
 }
 
 /*
@@ -299,7 +300,8 @@ void memcpy(void *t, const void *f, size_t n)
 */
 
 #define __HAVE_ARCH_MEMMOVE
-static inline void * memmove(void * dest,const void * src, size_t n)
+#define memmove(dest,src,n) (__memmove((dest),(src),(n)))
+static inline void *__memmove(void * dest,const void * src, size_t n)
 {
 int d0, d1, d2;
 if (dest<src)
@@ -455,16 +457,17 @@ __asm__  __volatile__( \
  __constant_c_and_count_memset((s),(c),(count)) : \
  __constant_c_memset((s),(c),(count)))
 
-#define __memset(s, c, count) \
+#define __var_x_memset(s, c, count) \
 (__builtin_constant_p(count) ? \
  __constant_count_memset((s),(c),(count)) : \
  __memset_generic((s),(c),(count)))
 
 #define __HAVE_ARCH_MEMSET
-#define memset(s, c, count) \
+#define memset(s, c, count) (__memset((s),(c),(count)))
+#define __memset(s, c, count) \
 (__builtin_constant_p(c) ? \
  __constant_c_x_memset((s),(0x01010101UL*(unsigned char)(c)),(count)) : \
- __memset((s),(c),(count)))
+ __var_x_memset((s),(c),(count)))
 
 /*
  * find the first occurrence of byte 'c', or 1 past the area if none
