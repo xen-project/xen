@@ -55,7 +55,11 @@
 
 #define OPT_CONSOLE_STR "com1,vga"
 
-#define NR_CPUS 16
+/*
+ * If you increase this value, please update NR_RESERVED_GDT_ENTRIES
+ * in include/public/arch-x86_xx.h
+ */
+#define NR_CPUS 32
 
 /* Linkage for x86 */
 #define __ALIGN .align 16,0x90
