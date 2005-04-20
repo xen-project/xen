@@ -187,7 +187,7 @@ void vmx_do_launch(struct exec_domain *ed)
 
     vmx_setup_platform(ed, ec);
 
-    __asm__ __volatile__ ("sgdt  (%%eax) \n" :: "a"(&desc) : "memory");
+    __asm__ __volatile__ ("sgdt  (%0) \n" :: "a"(&desc) : "memory");
     host_env.gdtr_limit = desc.size;
     host_env.gdtr_base = desc.address;
 
@@ -197,7 +197,7 @@ void vmx_do_launch(struct exec_domain *ed)
     error |= __vmwrite(GUEST_LDTR_BASE, 0);
     error |= __vmwrite(GUEST_LDTR_LIMIT, 0);
         
-    __asm__ __volatile__ ("str  (%%eax) \n" :: "a"(&tr) : "memory");
+    __asm__ __volatile__ ("str  (%0) \n" :: "a"(&tr) : "memory");
     host_env.tr_selector = tr;
     host_env.tr_limit = sizeof(struct tss_struct);
     host_env.tr_base = (unsigned long) &init_tss[cpu];
@@ -358,7 +358,7 @@ static inline int construct_vmcs_host(struct host_execution_env *host_env)
     error |= __vmwrite(HOST_GS_BASE, host_env->ds_base);
 
 /* Debug */
-    __asm__ __volatile__ ("sidt  (%%eax) \n" :: "a"(&desc) : "memory");
+    __asm__ __volatile__ ("sidt  (%0) \n" :: "a"(&desc) : "memory");
     host_env->idtr_limit = desc.size;
     host_env->idtr_base = desc.address;
     error |= __vmwrite(HOST_IDTR_BASE, host_env->idtr_base);
