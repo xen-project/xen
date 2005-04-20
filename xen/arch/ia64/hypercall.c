@@ -21,7 +21,7 @@ extern struct ia64_sal_retval sal_emulator(UINT64,UINT64,UINT64,UINT64,UINT64,UI
 
 void fooefi(void) {}
 
-void
+int
 ia64_hypercall (struct pt_regs *regs)
 {
 	struct exec_domain *ed = (struct domain *) current;
@@ -50,8 +50,15 @@ ia64_hypercall (struct pt_regs *regs)
 			printf("(by dom0)\n ");
 			(*efi.reset_system)(EFI_RESET_WARM,0,0,NULL);
 		}
+#ifdef DOMU_AUTO_RESTART
+		else {
+			reconstruct_domU(current);
+			return 0;  // don't increment ip!
+		}
+#else	
 		printf("(not supported for non-0 domain)\n");
 		regs->r8 = EFI_UNSUPPORTED;
+#endif
 		break;
 	    case FW_HYPERCALL_EFI_GET_TIME:
 		fooefi();
@@ -105,4 +112,5 @@ ia64_hypercall (struct pt_regs *regs)
 		regs->r8 = domU_staging_read_8(vcpu_get_gr(ed,32));
 		break;
 	}
+	return 1;
 }

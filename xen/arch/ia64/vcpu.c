@@ -509,6 +509,7 @@ void vcpu_pend_interrupt(VCPU *vcpu, UINT64 vector)
 //printf("vcpu_pend_interrupt: overrun\n");
 	}
 	set_bit(vector,PSCB(vcpu,irr));
+	PSCB(vcpu,pending_interruption) = 1;
 }
 
 void early_tick(VCPU *vcpu)
@@ -637,7 +638,7 @@ IA64FAULT vcpu_get_ivr(VCPU *vcpu, UINT64 *pval)
 //printf("ZZZZZZ vcpu_get_ivr: setting insvc mask for vector %ld\n",vector);
 	PSCB(vcpu,insvc[i]) |= mask;
 	PSCB(vcpu,irr[i]) &= ~mask;
-	PSCB(vcpu,pending_interruption)--;
+	//PSCB(vcpu,pending_interruption)--;
 	*pval = vector;
 	// if delivering a timer interrupt, remember domain_itm
 	if (vector == (PSCB(vcpu,itv) & 0xff)) {
@@ -746,6 +747,7 @@ IA64FAULT vcpu_set_tpr(VCPU *vcpu, UINT64 val)
 {
 	if (val & 0xff00) return IA64_RSVDREG_FAULT;
 	PSCB(vcpu,tpr) = val;
+	//PSCB(vcpu,pending_interruption) = 1;
 	return (IA64_NO_FAULT);
 }
 

@@ -57,7 +57,7 @@ int acpi_ioapic = 0;
    -------------------------------------------------------------------------- */
 
 #ifdef CONFIG_ACPI_BOOT
-int acpi_noirq __initdata = 0;  /* skip ACPI IRQ initialization */
+//int acpi_noirq __initdata = 0;  /* skip ACPI IRQ initialization */
 int acpi_ht __initdata = 1;     /* enable HT */
 
 enum acpi_irq_model_id		acpi_irq_model;

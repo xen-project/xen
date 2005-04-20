@@ -25,25 +25,6 @@
 
 typedef unsigned long page_flags_t;
 
-// from linux/include/linux/mm.h
-
-extern pmd_t *FASTCALL(__pmd_alloc(struct mm_struct *mm, pgd_t *pgd, unsigned long address));
-extern pte_t *FASTCALL(pte_alloc_kernel(struct mm_struct *mm, pmd_t *pmd, unsigned long address));
-extern pte_t *FASTCALL(pte_alloc_map(struct mm_struct *mm, pmd_t *pmd, unsigned long address));
-
-/*
- * On a two-level page table, this ends up being trivial. Thus the
- * inlining and the symmetry break with pte_alloc_map() that does all
- * of this out-of-line.
- */
-static inline pmd_t *pmd_alloc(struct mm_struct *mm, pgd_t *pgd, unsigned long address)
-{
-	if (pgd_none(*pgd))
-		return __pmd_alloc(mm, pgd, address);
-	return pmd_offset(pgd, address);
-}
-
-
 /*
  * Per-page-frame information.
  */

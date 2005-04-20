@@ -132,9 +132,9 @@ GLOBAL_ENTRY(ia64_new_rr7)
 (p7)	br.cond.sptk	.stack_overlaps
 	;;
 	movl r25=PAGE_KERNEL
-	dep r20=0,r13,60,4		// physical address of "current"
+	dep r21=0,r13,60,4		// physical address of "current"
 	;;
-	or r23=r25,r20			// construct PA | page properties
+	or r23=r25,r21			// construct PA | page properties
 	mov r25=IA64_GRANULE_SHIFT<<2
 	;;
 	ptr.d	r13,r25
@@ -152,9 +152,9 @@ GLOBAL_ENTRY(ia64_new_rr7)
 	;;
 	movl r25=PAGE_KERNEL
 	;;
-	mov r20=loc2			// saved percpu physical address
+	mov r21=loc2			// saved percpu physical address
 	;;
-	or r23=r25,r20			// construct PA | page properties
+	or r23=r25,r21			// construct PA | page properties
 	mov r24=PERCPU_PAGE_SHIFT<<2
 	;;
 	ptr.d	r22,r24
@@ -172,9 +172,9 @@ GLOBAL_ENTRY(ia64_new_rr7)
 	;;
 	movl r25=PAGE_KERNEL
 	;;
-	mov r20=loc6			// saved vhpt physical address
+	mov r21=loc6			// saved vhpt physical address
 	;;
-	or r23=r25,r20			// construct PA | page properties
+	or r23=r25,r21			// construct PA | page properties
 	mov r24=VHPT_PAGE_SHIFT<<2
 	;;
 	ptr.d	r22,r24
@@ -190,11 +190,12 @@ GLOBAL_ENTRY(ia64_new_rr7)
 
 	movl r22=SHAREDINFO_ADDR
 	;;
-	movl r25=PAGE_KERNEL
+	movl r25=PAGE_SHARED
+	movl r25=__pgprot(__DIRTY_BITS | _PAGE_PL_2 | _PAGE_AR_RW)
 	;;
-	mov r20=loc5			// saved sharedinfo physical address
+	mov r21=loc5			// saved sharedinfo physical address
 	;;
-	or r23=r25,r20			// construct PA | page properties
+	or r23=r25,r21			// construct PA | page properties
 	mov r24=PAGE_SHIFT<<2
 	;;
 	ptr.d	r22,r24
