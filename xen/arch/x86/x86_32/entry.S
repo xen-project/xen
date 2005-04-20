@@ -140,7 +140,7 @@ vmx_test_all_events:
         cli                             # tests must not race interrupts
 /*test_softirqs:*/  
         movl EDOMAIN_processor(%ebx),%eax
-        shl  $6,%eax                    # sizeof(irq_cpustat) == 64
+        shl  $IRQSTAT_shift,%eax
         test %ecx,SYMBOL_NAME(irq_stat)(%eax,1)
         jnz  vmx_process_softirqs
 
@@ -270,7 +270,7 @@ test_all_events:
         cli                             # tests must not race interrupts
 /*test_softirqs:*/  
         movl EDOMAIN_processor(%ebx),%eax
-        shl  $6,%eax                    # sizeof(irq_cpustat) == 64
+        shl  $IRQSTAT_shift,%eax
         test %ecx,SYMBOL_NAME(irq_stat)(%eax,1)
         jnz  process_softirqs
 /*test_guest_events:*/

@@ -130,7 +130,7 @@ test_all_events:
         cli                             # tests must not race interrupts
 /*test_softirqs:*/  
         movl  EDOMAIN_processor(%rbx),%eax
-        shl   $6,%rax                    # sizeof(irq_cpustat) == 64
+        shl   $IRQSTAT_shift,%rax
         leaq  SYMBOL_NAME(irq_stat)(%rip),%rcx
         testl $~0,(%rcx,%rax,1)
         jnz   process_softirqs
@@ -237,16 +237,13 @@ ENTRY(vmx_asm_do_resume)
 vmx_test_all_events:
         GET_CURRENT(%rbx)
 /* test_all_events: */
-        xorq %rcx,%rcx
-        notq %rcx
         cli                             # tests must not race interrupts
 /*test_softirqs:*/  
-        movq EDOMAIN_processor(%rbx),%rax
-#if 0
-        shl  $6,%rax                    # sizeof(irq_cpustat) == 64
-        test %rcx,SYMBOL_NAME(irq_stat)(%rax,1)
-#endif
-        jnz  vmx_process_softirqs
+        movl  EDOMAIN_processor(%rbx),%eax
+        shl   $IRQSTAT_shift,%rax
+        leaq  SYMBOL_NAME(irq_stat)(%rip), %rdx
+        testl $~0,(%rdx,%rax,1)
+        jnz   vmx_process_softirqs
 
 vmx_restore_all_guest:
         call SYMBOL_NAME(load_cr2)
