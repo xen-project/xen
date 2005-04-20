@@ -3475,7 +3475,7 @@ USE_THREAD_DB=
 
 
 GDBSERVER_DEPFILES="$srv_regobj $srv_tgtobj $srv_thread_depfiles"
-GDBSERVER_LIBS="$srv_libs -lxc"
+GDBSERVER_LIBS="$srv_libs -L../../../../libxc/ -L../../../../libxutil/ -lxc -lxutil"
 
 
 

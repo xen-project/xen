@@ -1,9 +1,12 @@
-#!/bin/csh -f
-setenv XENROOT `bk root`
+#!/bin/sh
+
+XENROOT=`bk root`
+export XENROOT
 
 cd $XENROOT/tools/gdb
 rm -rf gdb-6.2.1  gdb-6.2.1-linux-i386-xen
-wget ftp://ftp.gnu.org/gnu/gdb/gdb-6.2.1.tar.bz2
+# FIXME:cw this should be smarter
+wget -c ftp://ftp.gnu.org/gnu/gdb/gdb-6.2.1.tar.bz2
 tar xjf gdb-6.2.1.tar.bz2
 
 cd $XENROOT/tools/gdb/gdb-6.2.1-xen-sparse
@@ -12,4 +15,9 @@ cd $XENROOT/tools/gdb/gdb-6.2.1-xen-sparse
 mkdir $XENROOT/tools/gdb/gdb-6.2.1-linux-i386-xen
 cd $XENROOT/tools/gdb/gdb-6.2.1-linux-i386-xen
 ../gdb-6.2.1/configure
-gmake -j4
+# some people don't have gmake
+if which gmake ; then
+    gmake -j4
+else
+    make -j4
+fi
