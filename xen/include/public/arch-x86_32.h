@@ -33,10 +33,13 @@
  * in their ABI. These hard-coded values are always near the start of the GDT,
  * so Xen places itself out of the way.
  * 
+ * NR_RESERVED_GDT_ENTRIES is (8 + 2 * NR_CPUS) Please update this value if 
+ * you increase NR_CPUS or add another GDT entry to gdt_table in x86_32.S
+ *
  * NB. The reserved range is inclusive (that is, both FIRST_RESERVED_GDT_ENTRY
  * and LAST_RESERVED_GDT_ENTRY are reserved).
  */
-#define NR_RESERVED_GDT_ENTRIES    40
+#define NR_RESERVED_GDT_ENTRIES    72
 #define FIRST_RESERVED_GDT_ENTRY   256
 #define LAST_RESERVED_GDT_ENTRY    \
   (FIRST_RESERVED_GDT_ENTRY + NR_RESERVED_GDT_ENTRIES - 1)
