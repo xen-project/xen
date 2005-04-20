@@ -19,36 +19,93 @@
 #define PADDR_MASK              (~0UL)
 #define VADDR_MASK              (~0UL)
 
+#define _PAGE_NX                0UL
+#define PAGE_FLAG_MASK          0xfff
+
 #ifndef __ASSEMBLY__
 #include <xen/config.h>
-typedef struct { unsigned long l1_lo; } l1_pgentry_t;
-typedef struct { unsigned long l2_lo; } l2_pgentry_t;
+#include <asm/types.h>
+typedef struct { u32 l1_lo; } l1_pgentry_t;
+typedef struct { u32 l2_lo; } l2_pgentry_t;
 typedef l2_pgentry_t root_pgentry_t;
+
+/* read access (depricated) */
+#define l1e_get_value(_x)         ((_x).l1_lo)
+#define l2e_get_value(_x)         ((_x).l2_lo)
+
+/* read access */
+#define l1e_get_pfn(_x)           ((_x).l1_lo >> PAGE_SHIFT)
+#define l1e_get_phys(_x)          ((_x).l1_lo &  PAGE_MASK)
+#define l1e_get_flags(_x)         ((_x).l1_lo &  PAGE_FLAG_MASK)
+
+#define l2e_get_pfn(_x)           ((_x).l2_lo >> PAGE_SHIFT)
+#define l2e_get_phys(_x)          ((_x).l2_lo &  PAGE_MASK)
+#define l2e_get_flags(_x)         ((_x).l2_lo &  PAGE_FLAG_MASK)
+
+/* write access */
+static inline l1_pgentry_t l1e_empty(void)
+{
+    l1_pgentry_t e = { .l1_lo = 0 };
+    return e;
+}
+static inline l1_pgentry_t l1e_create_pfn(u32 pfn, u32 flags)
+{
+    l1_pgentry_t e = { .l1_lo = (pfn << PAGE_SHIFT) | flags };
+    return e;
+}
+static inline l1_pgentry_t l1e_create_phys(u32 addr, u32 flags)
+{
+    l1_pgentry_t e = { .l1_lo = (addr & PAGE_MASK) | flags };
+    return e;
+}
+static inline void l1e_add_flags(l1_pgentry_t *e, u32 flags)
+{
+    e->l1_lo |= flags;
+}
+static inline void l1e_remove_flags(l1_pgentry_t *e, u32 flags)
+{
+    e->l1_lo &= ~flags;
+}
+
+static inline l2_pgentry_t l2e_empty(void)
+{
+    l2_pgentry_t e = { .l2_lo = 0 };
+    return e;
+}
+static inline l2_pgentry_t l2e_create_pfn(u32 pfn, u32 flags)
+{
+    l2_pgentry_t e = { .l2_lo = (pfn << PAGE_SHIFT) | flags };
+    return e;
+}
+static inline l2_pgentry_t l2e_create_phys(u32 addr, u32 flags)
+{
+    l2_pgentry_t e = { .l2_lo = (addr & PAGE_MASK) | flags };
+    return e;
+}
+static inline void l2e_add_flags(l2_pgentry_t *e, u32 flags)
+{
+    e->l2_lo |= flags;
+}
+static inline void l2e_remove_flags(l2_pgentry_t *e, u32 flags)
+{
+    e->l2_lo &= ~flags;
+}
+
+/* check entries */
+static inline int l1e_has_changed(l1_pgentry_t *e1, l1_pgentry_t *e2, u32 flags)
+{
+    return ((e1->l1_lo ^ e2->l1_lo) & (PAGE_MASK | flags)) != 0;
+}
+static inline int l2e_has_changed(l2_pgentry_t *e1, l2_pgentry_t *e2, u32 flags)
+{
+    return ((e1->l2_lo ^ e2->l2_lo) & (PAGE_MASK | flags)) != 0;
+}
+
 #endif /* !__ASSEMBLY__ */
 
-/* Strip type from a table entry. */
-#define l1_pgentry_val(_x)   ((_x).l1_lo)
-#define l2_pgentry_val(_x)   ((_x).l2_lo)
-#define root_pgentry_val(_x) (l2_pgentry_val(_x))
-
-/* Add type to a table entry. */
-#define mk_l1_pgentry(_x)   ( (l1_pgentry_t) { (_x) } )
-#define mk_l2_pgentry(_x)   ( (l2_pgentry_t) { (_x) } )
-#define mk_root_pgentry(_x) (mk_l2_pgentry(_x))
-
-/* Turn a typed table entry into a physical address. */
-#define l1_pgentry_to_phys(_x)   (l1_pgentry_val(_x) & PAGE_MASK)
-#define l2_pgentry_to_phys(_x)   (l2_pgentry_val(_x) & PAGE_MASK)
-#define root_pgentry_to_phys(_x) (l2_pgentry_to_phys(_x))
-
-/* Turn a typed table entry into a page index. */
-#define l1_pgentry_to_pfn(_x)   (l1_pgentry_val(_x) >> PAGE_SHIFT) 
-#define l2_pgentry_to_pfn(_x)   (l2_pgentry_val(_x) >> PAGE_SHIFT)
-#define root_pgentry_to_pfn(_x) (l2_pgentry_to_pfn(_x))
-
 /* Pagetable walking. */
-#define l2_pgentry_to_l1(_x) \
-  ((l1_pgentry_t *)__va(l2_pgentry_to_phys(_x)))
+#define l2e_to_l1e(_x) \
+  ((l1_pgentry_t *)__va(l2e_get_phys(_x)))
 
 /* Given a virtual address, get an entry offset into a page table. */
 #define l1_table_offset(_a) \
@@ -62,9 +119,12 @@ typedef l2_pgentry_t root_pgentry_t;
 #define is_guest_l1_slot(_s) (1)
 #define is_guest_l2_slot(_s) ((_s) < ROOT_PAGETABLE_FIRST_XEN_SLOT)
 
-#define PGT_root_page_table PGT_l2_page_table
-
-#define _PAGE_NX         0UL
+#define root_get_pfn              l2e_get_pfn
+#define root_get_flags            l2e_get_flags
+#define root_get_value            l2e_get_value
+#define root_empty                l2e_empty
+#define root_create_phys          l2e_create_phys
+#define PGT_root_page_table       PGT_l2_page_table
 
 #define L1_DISALLOW_MASK (3UL << 7)
 #define L2_DISALLOW_MASK (7UL << 7)

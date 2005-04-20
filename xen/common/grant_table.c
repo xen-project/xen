@@ -255,11 +255,11 @@ __gnttab_activate_grant_ref(
     if ( (host_virt_addr != 0) && (dev_hst_ro_flags & GNTMAP_host_map) )
     {
         /* Write update into the pagetable. */
-        rc = update_grant_va_mapping( host_virt_addr,
-                                (frame << PAGE_SHIFT) | _PAGE_PRESENT  |
-                                                        _PAGE_ACCESSED |
-                                                        _PAGE_DIRTY    |
-                       ((dev_hst_ro_flags & GNTMAP_readonly) ? 0 : _PAGE_RW),
+        l1_pgentry_t pte;
+        pte = l1e_create_pfn(frame, _PAGE_PRESENT | _PAGE_ACCESSED | _PAGE_DIRTY);
+        if ( !(dev_hst_ro_flags & GNTMAP_readonly) )
+            l1e_add_flags(&pte,_PAGE_RW);
+        rc = update_grant_va_mapping( host_virt_addr, pte, 
                        mapping_d, mapping_ed );
 
         /*

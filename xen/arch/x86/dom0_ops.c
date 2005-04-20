@@ -425,7 +425,7 @@ void arch_getdomaininfo_ctxt(
     {
         for ( i = 0; i < 16; i++ )
             c->gdt_frames[i] = 
-                l1_pgentry_to_pfn(ed->arch.perdomain_ptes[i]);
+                l1e_get_pfn(ed->arch.perdomain_ptes[i]);
         c->gdt_ents = GET_GDT_ENTRIES(ed);
     }
     c->kernel_ss  = ed->arch.kernel_ss;

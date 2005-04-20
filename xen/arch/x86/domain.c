@@ -268,11 +268,13 @@ void arch_do_createdomain(struct exec_domain *ed)
         d->arch.mm_perdomain_l2 = (l2_pgentry_t *)alloc_xenheap_page();
         memset(d->arch.mm_perdomain_l2, 0, PAGE_SIZE);
         d->arch.mm_perdomain_l2[l2_table_offset(PERDOMAIN_VIRT_START)] = 
-            mk_l2_pgentry(__pa(d->arch.mm_perdomain_pt) | __PAGE_HYPERVISOR);
+            l2e_create_phys(__pa(d->arch.mm_perdomain_pt),
+                            __PAGE_HYPERVISOR);
         d->arch.mm_perdomain_l3 = (l3_pgentry_t *)alloc_xenheap_page();
         memset(d->arch.mm_perdomain_l3, 0, PAGE_SIZE);
         d->arch.mm_perdomain_l3[l3_table_offset(PERDOMAIN_VIRT_START)] = 
-            mk_l3_pgentry(__pa(d->arch.mm_perdomain_l2) | __PAGE_HYPERVISOR);
+            l3e_create_phys(__pa(d->arch.mm_perdomain_l2),
+                            __PAGE_HYPERVISOR);
 #endif
 
         (void)ptwr_init(d);

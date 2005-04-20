@@ -109,7 +109,8 @@ static int vmx_do_page_fault(unsigned long va, struct xen_regs *regs)
 {
     struct exec_domain *ed = current;
     unsigned long eip;
-    unsigned long gpte, gpa;
+    l1_pgentry_t gpte;
+    unsigned long gpa; /* FIXME: PAE */
     int result;
 
 #if VMX_DEBUG
@@ -132,9 +133,9 @@ static int vmx_do_page_fault(unsigned long va, struct xen_regs *regs)
     }
 
     gpte = gva_to_gpte(va);
-    if (!(gpte & _PAGE_PRESENT) )
+    if (!(l1e_get_flags(gpte) & _PAGE_PRESENT) )
             return 0;
-    gpa = (gpte & PAGE_MASK) + (va & ~PAGE_MASK);
+    gpa = l1e_get_phys(gpte) + (va & ~PAGE_MASK);
 
     /* Use 1:1 page table to identify MMIO address space */
     if (mmio_space(gpa))
