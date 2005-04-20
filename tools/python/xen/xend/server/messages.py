@@ -4,7 +4,12 @@ import types
 
 from xen.lowlevel import xu
 
-DEBUG = 0
+DEBUG = False
+
+#PORT_WILDCARD = 0xefffffff
+
+"""Wildcard for the control message types."""
+TYPE_WILDCARD = 0xffff
 
 """ All message formats.
 Added to incrementally for the various message types.
@@ -94,7 +99,6 @@ blkif_formats = {
     (CMSG_BLKIF_FE, CMSG_BLKIF_FE_INTERFACE_STATUS),
     # Notify device status to fe.
     # Also used to notify 'any' device change with status BLKIF_INTERFACE_STATUS_CHANGED.
-    # Rename to blkif_fe_interface_status.
 
     'blkif_fe_driver_status_t':
     (CMSG_BLKIF_FE, CMSG_BLKIF_FE_DRIVER_STATUS),
@@ -102,7 +106,6 @@ blkif_formats = {
     # Xend sets be(s) to BLKIF_INTERFACE_STATUS_DISCONNECTED,
     # sends blkif_fe_interface_status_t to fe (from each be).
     #
-    # Rename to blkif_fe_driver_status.
     # Reply with i/f count.
     # The i/f sends probes (using -ve trick), we reply with the info.
 
@@ -227,24 +230,34 @@ USBIF_BE_STATUS_MAPPING_ERROR = 9
 usbif_formats = {
     'usbif_be_create_t':
     (CMSG_USBIF_BE, CMSG_USBIF_BE_CREATE),
+
     'usbif_be_destroy_t':
     (CMSG_USBIF_BE, CMSG_USBIF_BE_DESTROY),
+
     'usbif_be_connect_t':
     (CMSG_USBIF_BE, CMSG_USBIF_BE_CONNECT),
+
     'usbif_be_disconnect_t':
     (CMSG_USBIF_BE, CMSG_USBIF_BE_DISCONNECT),
+
     'usbif_be_claim_port_t':
     (CMSG_USBIF_BE, CMSG_USBIF_BE_CLAIM_PORT),
+
     'usbif_be_release_port_t':
     (CMSG_USBIF_BE, CMSG_USBIF_BE_RELEASE_PORT),
+
     'usbif_fe_interface_status_changed_t':
     (CMSG_USBIF_FE, CMSG_USBIF_FE_INTERFACE_STATUS_CHANGED),
+
     'usbif_fe_driver_status_changed_t':
     (CMSG_USBIF_FE, CMSG_USBIF_FE_DRIVER_STATUS_CHANGED),
+
     'usbif_fe_interface_connect_t':
     (CMSG_USBIF_FE, CMSG_USBIF_FE_INTERFACE_CONNECT),
+
     'usbif_fe_interface_disconnect_t':
-    (CMSG_USBIF_FE, CMSG_USBIF_FE_INTERFACE_DISCONNECT)
+    (CMSG_USBIF_FE, CMSG_USBIF_FE_INTERFACE_DISCONNECT),
+   
     }
     
 msg_formats.update(usbif_formats)
@@ -364,8 +377,8 @@ def unpackMsg(ty, msg):
                 pass
         if macs:
             args['mac'] = mac
-            print 'macs=', macs
-            print 'args=', args
+            #print 'macs=', macs
+            #print 'args=', args
             for k in macs:
                 del args[k]
     if DEBUG:
@@ -388,7 +401,7 @@ def msgTypeName(ty, subty):
             return name
     return None
 
-def printMsg(msg, out=sys.stdout, all=0):
+def printMsg(msg, out=sys.stdout, all=False):
     """Print a message.
 
     @param msg: message
@@ -407,3 +420,18 @@ def printMsg(msg, out=sys.stdout, all=0):
     if all:
         print >>out, 'payload=', msg.get_payload()
 
+
+def getMessageType(msg):
+    """Get a 2-tuple of the message type and subtype.
+
+    @param msg: message
+    @type  msg: xu message
+    @return: type info
+    @rtype:  (int, int)
+    """
+    hdr = msg.get_header()
+    return (hdr['type'], hdr.get('subtype'))
+
+def getMessageId(msg):
+    hdr = msg.get_header()
+    return hdr['id']

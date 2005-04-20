@@ -304,20 +304,6 @@ static PyObject *xu_notifier_read(PyObject *self, PyObject *args)
     return Py_None;
 }
 
-/* this is now a NOOP */
-static PyObject *xu_notifier_unmask(PyObject *self, PyObject *args)
-{
-    Py_INCREF(Py_None);
-    return Py_None;
-}
-
-/* this is now a NOOP */
-static PyObject *xu_notifier_bind(PyObject *self, PyObject *args)
-{
-    Py_INCREF(Py_None);
-    return Py_None;
-}
-
 static PyObject *xu_notifier_bind_virq(PyObject *self, 
             PyObject *args, PyObject *kwds)
 {
@@ -366,13 +352,6 @@ static PyObject *xu_notifier_virq_send(PyObject *self,
     return PyInt_FromLong(kmsg.u.virq.port);
 }
 
-/* this is now a NOOP */
-static PyObject *xu_notifier_unbind(PyObject *self, PyObject *args)
-{
-    Py_INCREF(Py_None);
-    return Py_None;
-}
-
 static PyObject *xu_notifier_fileno(PyObject *self, PyObject *args)
 {
     return PyInt_FromLong(xcs_data_fd);
@@ -384,21 +363,6 @@ static PyMethodDef xu_notifier_methods[] = {
       METH_VARARGS,
       "Read a @port with pending notifications.\n" },
 
-    { "unmask", 
-      (PyCFunction)xu_notifier_unmask,
-      METH_VARARGS,
-      "Unmask notifications for a @port.\n" },
-
-    { "bind", 
-      (PyCFunction)xu_notifier_bind,
-      METH_VARARGS,
-      "Get notifications for a @port.\n" },
-
-    { "unbind", 
-      (PyCFunction)xu_notifier_unbind,
-      METH_VARARGS,
-      "No longer get notifications for a @port.\n" },
-      
     { "bind_virq",
       (PyCFunction)xu_notifier_bind_virq,
       METH_VARARGS | METH_KEYWORDS,
@@ -1054,13 +1018,6 @@ typedef struct xu_port_object {
 
 static PyObject *port_error;
 
-/* now a NOOP */
-static PyObject *xu_port_notify(PyObject *self, PyObject *args)
-{
-    Py_INCREF(Py_None);
-    return Py_None;
-}
-
 static PyObject *xu_port_read_request(PyObject *self, PyObject *args)
 {
     xu_port_object    *xup = (xu_port_object *)self;
@@ -1212,14 +1169,6 @@ static PyObject *xu_port_request_to_read(PyObject *self, PyObject *args)
     return PyInt_FromLong(found);
 }
 
-static PyObject *xu_port_space_to_write_request(PyObject *self, PyObject *args)
-{
-    if ( !PyArg_ParseTuple(args, "") )
-        return NULL;
-
-    return PyInt_FromLong(1);
-}
-
 static PyObject *xu_port_response_to_read(PyObject *self, PyObject *args)
 {
     xu_port_object   *xup = (xu_port_object *)self;
@@ -1243,25 +1192,27 @@ static PyObject *xu_port_response_to_read(PyObject *self, PyObject *args)
     return PyInt_FromLong(found);
 }
 
-static PyObject *xu_port_space_to_write_response(
-    PyObject *self, PyObject *args)
+static void _xu_port_close(xu_port_object *xup )
 {
-    if ( !PyArg_ParseTuple(args, "") )
-        return NULL;
-
-    return PyInt_FromLong(1);
+    if ( xup->connected && xup->remote_dom != 0 )
+    {  
+        xcs_msg_t kmsg;
+        kmsg.type = XCS_CIF_FREE_CC;
+        kmsg.u.interface.dom         = xup->remote_dom;
+        kmsg.u.interface.local_port  = xup->local_port; 
+        kmsg.u.interface.remote_port = xup->remote_port;
+        xcs_ctrl_send(&kmsg);
+        xcs_ctrl_read(&kmsg);
+        xup->connected = 0;
+    }
 }
 
-/* NOOP */
-static PyObject *xu_port_connect(PyObject *self, PyObject *args)
+static PyObject *xu_port_close(PyObject *self, PyObject *args)
 {
-    Py_INCREF(Py_None);
-    return Py_None;
-}
+    xu_port_object *xup = (xu_port_object *)self;
 
-/* NOOP */
-static PyObject *xu_port_disconnect(PyObject *self, PyObject *args)
-{
+    _xu_port_close(xup);
+
     Py_INCREF(Py_None);
     return Py_None;
 }
@@ -1277,6 +1228,11 @@ static PyObject *xu_port_register(PyObject *self, PyObject *args,
     if ( !PyArg_ParseTupleAndKeywords(args, kwds, "i", kwd_list,
                                       &type) )
         return NULL;
+    
+    if (!xup->connected)
+    {
+        return PyInt_FromLong(0);
+    }
     
     msg.type = XCS_MSG_BIND;
     msg.u.bind.port = xup->local_port;
@@ -1303,6 +1259,11 @@ static PyObject *xu_port_deregister(PyObject *self, PyObject *args,
     if ( !PyArg_ParseTupleAndKeywords(args, kwds, "i", kwd_list,
                                       &type) )
         return NULL;
+
+    if (!xup->connected)
+    {
+        return PyInt_FromLong(0);
+    }
     
     msg.type = XCS_MSG_UNBIND;
     msg.u.bind.port = xup->local_port;
@@ -1319,10 +1280,6 @@ static PyObject *xu_port_deregister(PyObject *self, PyObject *args,
 }
 
 static PyMethodDef xu_port_methods[] = {
-    { "notify",
-      (PyCFunction)xu_port_notify,
-      METH_VARARGS,
-      "Send a notification to the remote end.\n" },
 
     { "read_request",
       (PyCFunction)xu_port_read_request,
@@ -1349,21 +1306,12 @@ static PyMethodDef xu_port_methods[] = {
       METH_VARARGS,
       "Returns TRUE if there is a request message to read.\n" },
 
-    { "space_to_write_request",
-      (PyCFunction)xu_port_space_to_write_request,
-      METH_VARARGS,
-      "Returns TRUE if there is space to write a request message.\n" },
 
     { "response_to_read",
       (PyCFunction)xu_port_response_to_read,
       METH_VARARGS,
       "Returns TRUE if there is a response message to read.\n" },
 
-    { "space_to_write_response",
-      (PyCFunction)xu_port_space_to_write_response,
-      METH_VARARGS,
-      "Returns TRUE if there is space to write a response message.\n" },
-      
     { "register",
       (PyCFunction)xu_port_register,
       METH_VARARGS | METH_KEYWORDS,
@@ -1374,15 +1322,10 @@ static PyMethodDef xu_port_methods[] = {
       METH_VARARGS | METH_KEYWORDS,
       "Stop receiving a type of message on this port.\n" },
 
-    { "connect",
-      (PyCFunction)xu_port_connect,
+    { "close",
+      (PyCFunction)xu_port_close,
       METH_VARARGS,
-      "Synchronously connect to remote domain.\n" },
-
-    { "disconnect",
-      (PyCFunction)xu_port_disconnect,
-      METH_VARARGS,
-      "Synchronously disconnect from remote domain.\n" },
+      "Close the port.\n" },
 
     { NULL, NULL, 0, NULL }
 };
@@ -1431,31 +1374,32 @@ static PyObject *xu_port_new(PyObject *self, PyObject *args, PyObject *kwds)
 static PyObject *xu_port_getattr(PyObject *obj, char *name)
 {
     xu_port_object *xup = (xu_port_object *)obj;
+
     if ( strcmp(name, "local_port") == 0 )
-        return PyInt_FromLong(xup->local_port);
+    {
+        return PyInt_FromLong(xup->connected ? xup->local_port : -1);
+    }
     if ( strcmp(name, "remote_port") == 0 )
-        return PyInt_FromLong(xup->remote_port);
+    {
+        return PyInt_FromLong(xup->connected ? xup->remote_port : -1);
+    }
     if ( strcmp(name, "remote_dom") == 0 )
+    {
         return PyInt_FromLong(xup->remote_dom);
+    }
+    if ( strcmp(name, "connected") == 0 )
+    {
+        return PyInt_FromLong(xup->connected);
+    }
     return Py_FindMethod(xu_port_methods, obj, name);
 }
 
 static void xu_port_dealloc(PyObject *self)
 {
-
     xu_port_object *xup = (xu_port_object *)self;
-    xcs_msg_t kmsg;
 
-    if ( xup->remote_dom != 0 )
-    {  
-        kmsg.type = XCS_CIF_FREE_CC;
-        kmsg.u.interface.dom         = xup->remote_dom;
-        kmsg.u.interface.local_port  = xup->local_port; 
-        kmsg.u.interface.remote_port = xup->remote_port;
-        xcs_ctrl_send(&kmsg);
-        xcs_ctrl_read(&kmsg);
-    }
-            
+    _xu_port_close(xup);
+
     PyObject_Del(self);
 }
 
@@ -1638,6 +1582,26 @@ static PyObject *xu_buffer_full(PyObject *self, PyObject *args)
     return PyInt_FromLong(0);
 }
 
+static PyObject *xu_buffer_size(PyObject *self, PyObject *args)
+{
+    xu_buffer_object *xub = (xu_buffer_object *)self;
+
+    if ( !PyArg_ParseTuple(args, "") )
+        return NULL;
+
+    return PyInt_FromLong(xub->prod - xub->cons);
+}
+
+static PyObject *xu_buffer_space(PyObject *self, PyObject *args)
+{
+    xu_buffer_object *xub = (xu_buffer_object *)self;
+
+    if ( !PyArg_ParseTuple(args, "") )
+        return NULL;
+
+    return PyInt_FromLong(BUFSZ - (xub->prod - xub->cons));
+}
+
 static PyMethodDef xu_buffer_methods[] = {
     { "peek", 
       (PyCFunction)xu_buffer_peek,
@@ -1668,6 +1632,16 @@ static PyMethodDef xu_buffer_methods[] = {
       (PyCFunction)xu_buffer_full,
       METH_VARARGS,
       "Return TRUE if the buffer is full.\n" },
+
+    { "size", 
+      (PyCFunction)xu_buffer_size,
+      METH_VARARGS,
+      "Return number of bytes in the buffer.\n" },
+
+    { "space", 
+      (PyCFunction)xu_buffer_space,
+      METH_VARARGS,
+      "Return space left in the buffer.\n" },
 
     { NULL, NULL, 0, NULL }
 };

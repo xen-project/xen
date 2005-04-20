@@ -62,9 +62,8 @@ class SrvDomainDir(SrvDir):
         if not ok:
             raise XendError(errmsg)
         try:
-            deferred = self.xd.domain_create(config)
-            deferred.addCallback(self._op_create_cb, configstring, req)
-            return deferred
+            dominfo = self.xd.domain_create(config)
+            return self._op_create_cb(dominfo, configstring, req)
         except Exception, ex:
             print 'op_create> Exception creating domain:'
             traceback.print_exc()
@@ -97,9 +96,8 @@ class SrvDomainDir(SrvDir):
         """
         fn = FormFn(self.xd.domain_restore,
                     [['file', 'str']])
-        deferred = fn(req.args)
-        deferred.addCallback(self._op_restore_cb, req)
-        return deferred
+        dominfo = fn(req.args)
+        return self._op_restore_cb(dominfo, req)
 
     def _op_restore_cb(self, dominfo, req):
         dom = dominfo.name

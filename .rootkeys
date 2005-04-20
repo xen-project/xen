@@ -902,6 +902,7 @@
 40c9c468xzANp6o2D_MeCYwNmOIUsQ tools/python/xen/xend/XendVnet.py
 40c9c468x191zetrVlMnExfsQWHxIQ tools/python/xen/xend/__init__.py
 40c9c468S2YnCEKmk4ey8XQIST7INg tools/python/xen/xend/encode.py
+4266169ezWIlXSfY50n6HSoVFbosmw tools/python/xen/xend/scheduler.py
 40c9c468DCpMe542varOolW1Xc68ew tools/python/xen/xend/server/SrvBase.py
 40c9c468IxQabrKJSWs0aEjl-27mRQ tools/python/xen/xend/server/SrvConsole.py
 40c9c4689Io5bxfbYIfRiUvsiLX0EQ tools/python/xen/xend/server/SrvConsoleDir.py
@@ -924,9 +925,11 @@
 40c9c469hJ_IlatRne-9QEa0-wlquw tools/python/xen/xend/server/console.py
 40c9c469UcNJh_NuLU0ytorM0Lk5Ow tools/python/xen/xend/server/controller.py
 40d83983OXjt-y3HjSCcuoPp9rzvmw tools/python/xen/xend/server/domain.py
+4266169exkN9o3hA8vxe8Er0BZv1Xw tools/python/xen/xend/server/event.py
 40c9c469yrm31i60pGKslTi2Zgpotg tools/python/xen/xend/server/messages.py
 40c9c46925x-Rjb0Cv2f1-l2jZrPYg tools/python/xen/xend/server/netif.py
 40c9c469ZqILEQ8x6yWy0_51jopiCg tools/python/xen/xend/server/params.py
+4266169eI_oX3YBjwaeC0V-THBRnjg tools/python/xen/xend/server/pciif.py
 41ee5e8dq9NtihbL4nWKjuSLOhXPUg tools/python/xen/xend/server/usbif.py
 40c9c469LNxLVizOUpOjEaTKKCm8Aw tools/python/xen/xend/sxp.py
 4189125cL90jKSOcBJ3Vx4nWGiXXvA tools/python/xen/xend/util.py

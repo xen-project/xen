@@ -1,14 +1,22 @@
 # Copyright (C) 2004 Mike Wray <mike.wray@hp.com>
 
+import threading
+import select
+
 import xen.lowlevel.xc; xc = xen.lowlevel.xc.new()
 from xen.lowlevel import xu
-from messages import msgTypeName, printMsg
+
+from messages import *
 
 VIRQ_MISDIRECT  = 0  # Catch-all interrupt for unbound VIRQs.
 VIRQ_TIMER      = 1  # Timebase update, and/or requested timeout.
 VIRQ_DEBUG      = 2  # Request guest to dump debug info.
 VIRQ_CONSOLE    = 3  # (DOM0) bytes received on emergency console.
 VIRQ_DOM_EXC    = 4  # (DOM0) Exceptional event for some domain.
+
+DEBUG = 0
+
+RESPONSE_TIMEOUT = 20.0
 
 def eventChannel(dom1, dom2):
     """Create an event channel between domains.
@@ -33,6 +41,7 @@ def eventChannelClose(evtchn):
             pass
         
     if not evtchn: return
+    print 'eventChannelClose>', evtchn
     evtchn_close(evtchn.get('dom1'), evtchn.get('port1'))
     evtchn_close(evtchn.get('dom2'), evtchn.get('port2'))
     
@@ -45,76 +54,135 @@ class ChannelFactory:
     """ Channels indexed by index. """
     channels = {}
 
+    thread = None
+
+    notifier = None
+
+    """Map of ports to the virq they signal."""
+    virqPorts = {}
+
     def __init__(self):
         """Constructor - do not use. Use the channelFactory function."""
         self.notifier = xu.notifier()
+        self.bind_virq(VIRQ_MISDIRECT)
+        self.bind_virq(VIRQ_TIMER)
+        self.bind_virq(VIRQ_DEBUG)
+        self.bind_virq(VIRQ_CONSOLE)
+        self.bind_virq(VIRQ_DOM_EXC)
+        self.virqHandler = None
+
+    def bind_virq(self, virq):
+        port = self.notifier.bind_virq(virq)
+        self.virqPorts[port] = virq
+
+    def virq(self):
+        self.notifier.virq_send(self.virqPort)
+
+    def start(self):
+        """Fork a thread to read messages.
+        """
+        if self.thread: return
+        self.thread = threading.Thread(name="ChannelFactory",
+                                       target=self.main)
+        self.thread.setDaemon(True)
+        self.thread.start()
+
+    def stop(self):
+        """Signal the thread to stop.
+        """
+        self.thread = None
+
+    def main(self):
+        """Main routine for the thread.
+        """
+        while True:
+            if self.thread == None: return
+            port = self.notifier.read()
+            if port:
+                virq = self.virqPorts.get(port)
+                if virq is not None:
+                    self.virqReceived(virq)
+                else:
+                    self.msgReceived(port)
+            else:
+                select.select([self.notifier], [], [], 1.0)
+
+    def msgReceived(self, port):
+        # We run the message handlers in their own threads.
+        # Note we use keyword args to lambda to save the values -
+        # otherwise lambda will use the variables, which will get
+        # assigned by the loop and the lambda will get the changed values.
+        for chan in self.channels.values():
+            if self.thread == None: return
+            msg = chan.readResponse()
+            if msg:
+                chan.responseReceived(msg)
+        for chan in self.channels.values():
+            if self.thread == None: return
+            msg = chan.readRequest()
+            if msg:
+                self.runInThread(lambda chan=chan, msg=msg: chan.requestReceived(msg))
+
+    def runInThread(self, thunk):
+        thread = threading.Thread(target = thunk)
+        thread.setDaemon(True)
+        thread.start()
+
+    def setVirqHandler(self, virqHandler):
+        self.virqHandler = virqHandler
+
+    def virqReceived(self, virq):
+        if 1 or DEBUG:
+            print 'virqReceived>', virq
+        if not self.virqHandler: return
+        self.runInThread(lambda virq=virq: self.virqHandler(virq))
+
+    def newChannel(self, dom, local_port, remote_port):
+        """Create a new channel.
+        """
+        return self.addChannel(Channel(self, dom, local_port, remote_port))
     
     def addChannel(self, channel):
-        """Add a channel. Registers with the notifier.
+        """Add a channel.
         """
-        idx = channel.idx
-        self.channels[idx] = channel
-        self.notifier.bind(idx)
+        self.channels[channel.getKey()] = channel
+        return channel
 
-    def getChannel(self, idx):
-        """Get the channel with the given index (if any).
+    def delChannel(self, channel):
+        """Remove the channel.
         """
-        return self.channels.get(idx)
+        key = channel.getKey()
+        if key in self.channels:
+            del self.channels[key]
 
-    def delChannel(self, idx):
-        """Remove the channel with the given index (if any).
-        Deregisters with the notifier.
+    def getChannel(self, dom, local_port, remote_port):
+        """Get the channel with the given domain and ports (if any).
         """
-        if idx in self.channels:
-            del self.channels[idx]
-            self.notifier.unbind(idx)
+        key = (dom, local_port, remote_port)
+        return self.channels.get(key)
 
-    def domChannel(self, dom, local_port=0, remote_port=0):
-        """Get the channel for the given domain.
-        Construct if necessary.
+    def findChannel(self, dom, local_port=0, remote_port=0):
+        """Find a channel. Ports given as zero are wildcards.
 
         dom domain
 
         returns channel
         """
-        chan = self.getDomChannel(dom)
-        if not chan:
-            chan = Channel(self, dom, local_port=local_port,
-                           remote_port=remote_port)
-            self.addChannel(chan)
-        return chan
-
-    def getDomChannel(self, dom):
-        """Get the channel for the given domain.
-
-        dom domain
-
-        returns channel (or None)
-        """
-        dom = int(dom)
-        for chan in self.channels.values():
-            if not isinstance(chan, Channel): continue
-            if chan.dom == dom:
-                return chan
+        chan = self.getChannel(dom, local_port, remote_port)
+        if chan: return chan
+        if local_port and remote_port:
+            return None
+        for c in self.channels.values():
+            if c.dom != dom: continue
+            if local_port and local_port != c.getLocalPort(): continue
+            if remote_port and remote_port != c.getRemotePort(): continue
+            return c
         return None
-        
 
-    def virqChannel(self, virq):
-        """Get the channel for the given virq.
-        Construct if necessary.
-        """
-        for chan in self.channels.values():
-            if not isinstance(chan, VirqChannel): continue
-            if chan.virq == virq:
-                return chan
-        chan = VirqChannel(self, virq)
-        self.addChannel(chan)
-        return chan
-
-    def channelClosed(self, channel):
-        """The given channel has been closed - remove it.
-        """
-        self.delChannel(channel.idx)
+    def openChannel(self, dom, local_port=0, remote_port=0):
+        return (self.findChannel(dom, local_port=local_port, remote_port=remote_port)
+                or
+                self.newChannel(dom, local_port, remote_port))
 
     def createPort(self, dom, local_port=0, remote_port=0):
         """Create a port for a channel to the given domain.
@@ -147,122 +215,54 @@ def channelFactory():
         inst = ChannelFactory()
     return inst
 
-class BaseChannel:
-    """Abstract superclass for channels.
+class Channel:
 
-    The subclass constructor must set idx to the port to use.
-    """
-
-    def __init__(self, factory):
+    def __init__(self, factory, dom, local_port, remote_port):
         self.factory = factory
-        self.idx = -1
-        self.closed = 0
-
-    def getIndex(self):
-        """Get the channel index.
-        """
-        return self.idx
-
-    def notificationReceived(self):
-        """Called when a notification is received.
-        Calls handleNotification(), which should be defined
-        in a subclass.
-        """
-        if self.closed: return
-        self.handleNotification()
-
-    def close(self):
-        """Close the channel. Calls channelClosed() on the factory.
-        Override in subclass.
-        """
-        self.factory.channelClosed(self)
-
-    def handleNotification(self):
-        """Handle notification.
-        Define in subclass.
-        """
-        pass
-        
-
-class VirqChannel(BaseChannel):
-    """A channel for handling a virq.
-    """
-    
-    def __init__(self, factory, virq):
-        """Create a channel for the given virq using the given factory.
-
-        Do not call directly, use virqChannel on the factory.
-        """
-        BaseChannel.__init__(self, factory)
-        self.virq = virq
-        self.factory = factory
-        # Notification port (int).
-        #self.port = xc.evtchn_bind_virq(virq)
-        self.port = factory.notifier.bind_virq(virq)
-        self.idx = self.port
-        # Clients to call when a virq arrives.
-        self.clients = []
-
-    def __repr__(self):
-        return ('<VirqChannel virq=%d port=%d>'
-                % (self.virq, self.port))
-
-    def getVirq(self):
-        """Get the channel's virq.
-        """
-        return self.virq
-
-    def close(self):
-        """Close the channel. Calls lostChannel(self) on all its clients and
-        channelClosed() on the factory.
-        """
-        for c in self.clients[:]:
-            c.lostChannel(self)
-        self.clients = []
-        BaseChannel.close(self)
-
-    def registerClient(self, client):
-        """Register a client. The client will be called with
-        client.virqReceived(virq) when a virq is received.
-        The client will be called with client.lostChannel(self) if the
-        channel is closed.
-        """
-        self.clients.append(client)
-
-    def handleNotification(self):
-        for c in self.clients:
-            c.virqReceived(self.virq)
-
-    def notify(self):
-        # xc.evtchn_send(self.port)
-        self.factory.notifier.virq_send(self.port)
-
-
-class Channel(BaseChannel):
-    """A control channel to a domain. Messages for the domain device controllers
-    are multiplexed over the channel (console, block devs, net devs).
-    """
-
-    def __init__(self, factory, dom, local_port=0, remote_port=0):
-        """Create a channel to the given domain using the given factory.
-
-        Do not call directly, use domChannel on the factory.
-        """
-        BaseChannel.__init__(self, factory)
-        # Domain.
         self.dom = int(dom)
-        # Domain port (object).
-        self.port = self.factory.createPort(dom, local_port=local_port,
-                                            remote_port=remote_port)
-        # Channel port (int).
-        self.idx = self.port.local_port
         # Registered devices.
         self.devs = []
         # Devices indexed by the message types they handle.
         self.devs_by_type = {}
-        # Output queue.
-        self.queue = []
-        self.closed = 0
+        self.port = self.factory.createPort(self.dom,
+                                            local_port=local_port,
+                                            remote_port=remote_port)
+        self.closed = False
+        self.queue = ResponseQueue(self)
+        # Make sure the port will deliver all the messages.
+        self.port.register(TYPE_WILDCARD)
+
+    def getKey(self):
+        """Get the channel key.
+        """
+        return (self.dom, self.getLocalPort(), self.getRemotePort())
+
+    def sxpr(self):
+        val = ['channel']
+        val.append(['domain', self.dom])
+        if self.port:
+            val.append(['local_port', self.port.local_port])
+            val.append(['remote_port', self.port.remote_port])
+        return val
+
+    def close(self):
+        """Close the channel.
+        """
+        if DEBUG:
+            print 'Channel>close>', self
+        if self.closed: return
+        self.closed = True
+        self.factory.delChannel(self)
+        for d in self.devs[:]:
+            d.lostChannel(self)
+        self.devs = []
+        self.devs_by_type = {}
+        if self.port:
+            self.port.close()
+            #self.port = None
+
+    def getDomain(self):
+        return self.dom
 
     def getLocalPort(self):
         """Get the local port.
@@ -282,18 +282,12 @@ class Channel(BaseChannel):
         if self.closed: return -1
         return self.port.remote_port
 
-    def close(self):
-        """Close the channel. Calls lostChannel() on all its devices and
-        channelClosed() on the factory.
-        """
-        if self.closed: return
-        self.closed = 1
-        for d in self.devs[:]:
-            d.lostChannel()
-        self.factory.channelClosed(self)
-        self.devs = []
-        self.devs_by_type = {}
-        self.port.disconnect()
+    def __repr__(self):
+        return ('<Channel dom=%d ports=%d:%d>'
+                % (self.dom,
+                   self.getLocalPort(),
+                   self.getRemotePort()))
+
 
     def registerDevice(self, types, dev):
         """Register a device controller.
@@ -306,7 +300,6 @@ class Channel(BaseChannel):
         self.devs.append(dev)
         for ty in types:
             self.devs_by_type[ty] = dev
-        self.port.register(ty)
 
     def deregisterDevice(self, dev):
         """Remove the registration for a device controller.
@@ -318,7 +311,6 @@ class Channel(BaseChannel):
         types = [ ty for (ty, d) in self.devs_by_type.items() if d == dev ]
         for ty in types:
             del self.devs_by_type[ty]
-            self.port.deregister(ty)
 
     def getDevice(self, type):
         """Get the device controller handling a message type.
@@ -330,130 +322,160 @@ class Channel(BaseChannel):
         """
         return self.devs_by_type.get(type)
 
-    def getMessageType(self, msg):
-        """Get a 2-tuple of the message type and subtype.
-
-        @param msg: message
-        @type  msg: xu message
-        @return: type info
-        @rtype:  (int, int)
-        """
-        hdr = msg.get_header()
-        return (hdr['type'], hdr.get('subtype'))
-
-    def __repr__(self):
-        return ('<Channel dom=%d ports=%d:%d>'
-                % (self.dom,
-                   self.getLocalPort(),
-                   self.getRemotePort()))
-
-    def handleNotification(self):
-        """Process outstanding messages in repsonse to notification on the port.
-        """
-        if self.closed:
-            print 'handleNotification> Notification on closed channel', self
-            return
-        work = 0
-        work += self.handleRequests()
-        work += self.handleResponses()
-        work += self.handleWrites()
-        if work:
-            self.notify()
-
-    def notify(self):
-        """Notify the other end of the port that messages have been processed.
-        """
-        if self.closed: return
-        self.port.notify()
-
-    def handleRequests(self):
-        work = 0
-        while 1:
-            msg = self.readRequest()
-            if not msg: break
-            self.requestReceived(msg)
-            work += 1
-        return work
-
     def requestReceived(self, msg):
-        (ty, subty) = self.getMessageType(msg)
-        #todo:  Must respond before writing any more messages.
-        #todo:  Should automate this (respond on write)
-        responded = 0
+        if DEBUG:
+            print 'Channel>requestReceived>', self,
+            printMsg(msg)
+        (ty, subty) = getMessageType(msg)
+        responded = False
         dev = self.getDevice(ty)
         if dev:
             responded = dev.requestReceived(msg, ty, subty)
+        elif DEBUG:
+            print "Channel>requestReceived> No device", self,
+            printMsg(msg)
         else:
-            print ("requestReceived> No device: Message type %s %d:%d"
-                   % (msgTypeName(ty, subty), ty, subty)), self
+            pass
         if not responded:
-            self.port.write_response(msg)
+            self.writeResponse(msg)
 
-    def handleResponses(self):
-        work = 0
-        while 1:
-            msg = self.readResponse()
-            if not msg: break
-            self.responseReceived(msg)
-            work += 1
-        return work
-
-    def responseReceived(self, msg):
-        (ty, subty) = self.getMessageType(msg)
-        dev = self.getDevice(ty)
-        if dev:
-            dev.responseReceived(msg, ty, subty)
-        else:
-            print ("responseReceived> No device: Message type %d:%d"
-                   % (msgTypeName(ty, subty), ty, subty)), self
-
-    def handleWrites(self):
-        work = 0
-        # Pull data from producers.
-        for dev in self.devs:
-            work += dev.produceRequests()
-        # Flush the queue.
-        while self.queue and self.port.space_to_write_request():
-            msg = self.queue.pop(0)
-            self.port.write_request(msg)
-            work += 1
-        return work
-
-    def writeRequest(self, msg, notify=1):
-        if self.closed:
-            val = -1
-        elif self.writeReady():
-            self.port.write_request(msg)
-            if notify: self.notify()
-            val = 1
-        else:
-            self.queue.append(msg)
-            val = 0
-        return val
-
-    def writeResponse(self, msg):
+    def writeRequest(self, msg):
+        if DEBUG:
+            print 'Channel>writeRequest>', self,
+            printMsg(msg, all=True)
         if self.closed: return -1
-        self.port.write_response(msg)
+        self.port.write_request(msg)
         return 1
 
-    def writeReady(self):
-        if self.closed or self.queue: return 0
-        return self.port.space_to_write_request()
+    def writeResponse(self, msg):
+        if DEBUG:
+            print 'Channel>writeResponse>', self,
+            printMsg(msg, all=True)
+        if self.port:
+            self.port.write_response(msg)
+        return 1
 
     def readRequest(self):
         if self.closed:
-            return None
-        if self.port.request_to_read():
-            val = self.port.read_request()
+            val =  None
         else:
-            val = None
+            val = self.port.read_request()
         return val
         
     def readResponse(self):
         if self.closed:
-            return None
-        if self.port.response_to_read():
-            val = self.port.read_response()
-        else:
             val = None
+        else:
+            val = self.port.read_response()
+        if DEBUG and val:
+            print 'Channel>readResponse>', self,
+            printMsg(val, all=True)
         return val
+
+    def requestResponse(self, msg, timeout=None):
+        """Write a request and wait for a response.
+        Raises IOError on timeout.
+
+        @param msg request message
+        @param timeout timeout (0 is forever)
+        @return response message
+        """
+        if self.closed:
+            raise IOError("closed")
+        if self.closed:
+            return None
+        if timeout is None:
+            timeout = RESPONSE_TIMEOUT
+        elif timeout <= 0:
+            timeout = None
+        return self.queue.call(msg, timeout)
+
+    def responseReceived(self, msg):
+        if DEBUG:
+            print 'Channel>responseReceived>', self,
+            printMsg(msg)
+        self.queue.response(getMessageId(msg), msg)
+
+    def virq(self):
+        self.factory.virq()
+
+
+class Response:
+    """Entry in the response queue.
+    Used to signal a response to a message.
+    """
+
+    def __init__(self, mid):
+        self.mid = mid
+        self.msg = None
+        self.ready = threading.Event()
+
+    def response(self, msg):
+        """Signal arrival of a response to a waiting thread.
+        Passing msg None cancels the wait with an IOError.
+        """
+        if msg:
+            self.msg = msg
+        else:
+            self.mid = -1
+        self.ready.set()
+
+    def wait(self, timeout):
+        """Wait up to 'timeout' seconds for a response.
+        Returns the response or raises an IOError.
+        """
+        self.ready.wait(timeout)
+        if self.mid < 0:
+            raise IOError("wait canceled")
+        if self.msg is None:
+            raise IOError("response timeout")
+        return self.msg
+
+class ResponseQueue:
+    """Response queue. Manages waiters for responses to messages.
+    """
+
+    def __init__(self, channel):
+        self.channel = channel
+        self.lock = threading.Lock()
+        self.responses = {}
+
+    def add(self, mid):
+        r = Response(mid)
+        self.responses[mid] = r
+        return r
+
+    def get(self, mid):
+        return self.responses.get(mid)
+
+    def remove(self, mid):
+        r = self.responses.get(mid)
+        if r:
+            del self.responses[mid]
+        return r
+
+    def response(self, mid, msg):
+        """Process a response.
+        """
+        try:
+            self.lock.acquire()
+            r = self.remove(mid)
+        finally:
+            self.lock.release()
+        if r:
+            r.response(msg)
+
+    def call(self, msg, timeout):
+        """Send the message and wait for 'timeout' seconds for a response.
+        Returns the response.
+        Raises IOError on timeout.
+        """
+        mid = getMessageId(msg)
+        try:
+            self.lock.acquire()
+            r = self.add(mid)
+        finally:
+            self.lock.release()
+        self.channel.writeRequest(msg)
+        return r.wait(timeout)
+                
