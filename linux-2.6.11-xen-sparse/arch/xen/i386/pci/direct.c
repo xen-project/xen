@@ -71,13 +71,11 @@ struct pci_raw_ops pci_direct_xen = {
 	.write =	pci_conf_write,
 };
 
-
 static int __init pci_direct_init(void)
 {
-
-        printk(KERN_INFO "PCI: Using configuration type Xen\n");
-        raw_pci_ops = &pci_direct_xen;
-        return 0;
+	printk(KERN_INFO "PCI: Using configuration type Xen\n");
+	raw_pci_ops = &pci_direct_xen;
+	return 0;
 }
 
 arch_initcall(pci_direct_init);

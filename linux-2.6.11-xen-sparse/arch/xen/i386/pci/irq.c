@@ -93,7 +93,7 @@ void pcibios_penalize_isa_irq(int irq)
 static int pirq_enable_irq(struct pci_dev *dev)
 {
 	int err;
-	u8  pin;
+	u8 pin;
 	physdev_op_t op;
 
 	/* Inform Xen that we are going to use this device. */

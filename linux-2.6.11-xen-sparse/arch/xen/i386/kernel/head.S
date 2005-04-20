@@ -67,10 +67,10 @@ checkCPUtype:
 
 	incb ready
 
-	xorl %eax,%eax		# Clear FS/GS and LDT
+	xorl %eax,%eax			# Clear FS/GS and LDT
 	movl %eax,%fs
 	movl %eax,%gs
-	cld		# gcc2 wants the direction flag cleared at all times
+	cld			# gcc2 wants the direction flag cleared at all times
 
 #ifdef CONFIG_SMP
 	movb ready, %cl	
