@@ -62,7 +62,7 @@ config XEN_BLKDEV_TAP_BE
           modified to use grant tables.
 
 config XEN_BLKDEV_GRANT
-        bool "Grant table substrate for block drivers (DANGEROUS)"
+        bool "Grant table substrate for block drivers"
         depends on !XEN_BLKDEV_TAP_BE
         default y
         help

@@ -120,7 +120,7 @@ is complete.
 
         for ( i = 0; i < BATCH_SIZE; i++ )
         {
-            if ( unlikely(aop[i].u.map_grant_ref.dev_bus_addr == 0) )
+            if ( unlikely(aop[i].u.map_grant_ref.handle < 0) )
             {
                 tidyup_all(aop, i);
                 goto panic;

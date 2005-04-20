@@ -516,11 +516,11 @@ static void dispatch_rw_block_io(blkif_t *blkif, blkif_request_t *req)
 
     for ( i = 0; i < nseg; i++ )
     {
+        fas         = req->frame_and_sects[i];
 #ifdef CONFIG_XEN_BLKDEV_GRANT
         seg[i].buf  = (aop[i].u.map_grant_ref.dev_bus_addr << PAGE_SHIFT) |
                       (blkif_first_sect(fas) << 9);
 #else
-        fas          = req->frame_and_sects[i];
         seg[i].buf  = (fas & PAGE_MASK) | (blkif_first_sect(fas) << 9);
         seg[i].nsec = blkif_last_sect(fas) - blkif_first_sect(fas) + 1;
         if ( seg[i].nsec <= 0 )
