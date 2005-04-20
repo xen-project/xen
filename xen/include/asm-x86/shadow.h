@@ -270,18 +270,22 @@ extern int shadow_status_noswap;
 static inline int
 shadow_get_page_from_l1e(l1_pgentry_t l1e, struct domain *d)
 {
-    l1_pgentry_t nl1e = mk_l1_pgentry(l1_pgentry_val(l1e) & ~_PAGE_GLOBAL);
-    int res = get_page_from_l1e(nl1e, d);
+    l1_pgentry_t nl1e;
+    int res;
     unsigned long mfn;
     struct domain *owner;
 
-    ASSERT( l1_pgentry_val(nl1e) & _PAGE_PRESENT );
+    ASSERT(l1e_get_flags(l1e) & _PAGE_PRESENT);
+
+    nl1e = l1e;
+    l1e_remove_flags(&nl1e, _PAGE_GLOBAL);
+    res = get_page_from_l1e(nl1e, d);
 
     if ( unlikely(!res) && IS_PRIV(d) && !shadow_mode_translate(d) &&
-         !(l1_pgentry_val(nl1e) & L1_DISALLOW_MASK) &&
-         (mfn = l1_pgentry_to_pfn(nl1e)) &&
+         !(l1e_get_flags(l1e) & L1_DISALLOW_MASK) &&
+         (mfn = l1e_get_pfn(l1e)) &&
          pfn_valid(mfn) &&
-         (owner = page_get_owner(pfn_to_page(l1_pgentry_to_pfn(nl1e)))) &&
+         (owner = page_get_owner(pfn_to_page(l1e_get_pfn(l1e)))) &&
          (d != owner) )
     {
         res = get_page_from_l1e(nl1e, owner);
@@ -293,7 +297,7 @@ shadow_get_page_from_l1e(l1_pgentry_t l1e, struct domain *d)
     if ( unlikely(!res) )
     {
         perfc_incrc(shadow_get_page_fail);
-        FSH_LOG("%s failed to get ref l1e=%p", __func__, l1_pgentry_val(l1e));
+        FSH_LOG("%s failed to get ref l1e=%p\n", __func__, l1e_get_value(l1e));
     }
 
     return res;
@@ -303,34 +307,34 @@ shadow_get_page_from_l1e(l1_pgentry_t l1e, struct domain *d)
 
 static inline void
 __shadow_get_l2e(
-    struct exec_domain *ed, unsigned long va, unsigned long *psl2e)
+    struct exec_domain *ed, unsigned long va, l2_pgentry_t *psl2e)
 {
     ASSERT(shadow_mode_enabled(ed->domain));
 
-    *psl2e = l2_pgentry_val( ed->arch.shadow_vtable[l2_table_offset(va)]);
+    *psl2e = ed->arch.shadow_vtable[l2_table_offset(va)];
 }
 
 static inline void
 __shadow_set_l2e(
-    struct exec_domain *ed, unsigned long va, unsigned long value)
+    struct exec_domain *ed, unsigned long va, l2_pgentry_t value)
 {
     ASSERT(shadow_mode_enabled(ed->domain));
 
-    ed->arch.shadow_vtable[l2_table_offset(va)] = mk_l2_pgentry(value);
+    ed->arch.shadow_vtable[l2_table_offset(va)] = value;
 }
 
 static inline void
 __guest_get_l2e(
-    struct exec_domain *ed, unsigned long va, unsigned long *pl2e)
+    struct exec_domain *ed, unsigned long va, l2_pgentry_t *pl2e)
 {
-    *pl2e = l2_pgentry_val(ed->arch.guest_vtable[l2_table_offset(va)]);
+    *pl2e = ed->arch.guest_vtable[l2_table_offset(va)];
 }
 
 static inline void
 __guest_set_l2e(
-    struct exec_domain *ed, unsigned long va, unsigned long value)
+    struct exec_domain *ed, unsigned long va, l2_pgentry_t value)
 {
-    ed->arch.guest_vtable[l2_table_offset(va)] = mk_l2_pgentry(value);
+    ed->arch.guest_vtable[l2_table_offset(va)] = value;
 
     if ( unlikely(shadow_mode_translate(ed->domain)) )
         update_hl2e(ed, va);
@@ -340,36 +344,36 @@ static inline void
 update_hl2e(struct exec_domain *ed, unsigned long va)
 {
     int index = l2_table_offset(va);
-    unsigned long gl2e = l2_pgentry_val(ed->arch.guest_vtable[index]);
     unsigned long mfn;
-    unsigned long old_hl2e, new_hl2e;
+    l2_pgentry_t gl2e = ed->arch.guest_vtable[index];
+    l1_pgentry_t old_hl2e, new_hl2e;
     int need_flush = 0;
 
     ASSERT(shadow_mode_translate(ed->domain));
 
-    old_hl2e = l1_pgentry_val(ed->arch.hl2_vtable[index]);
+    old_hl2e = ed->arch.hl2_vtable[index];
 
-    if ( (gl2e & _PAGE_PRESENT) &&
-         VALID_MFN(mfn = phys_to_machine_mapping(gl2e >> PAGE_SHIFT)) )
-        new_hl2e = (mfn << PAGE_SHIFT) | __PAGE_HYPERVISOR;
+    if ( (l2e_get_flags(gl2e) & _PAGE_PRESENT) &&
+         VALID_MFN(mfn = phys_to_machine_mapping(l2e_get_pfn(gl2e)) ))
+        new_hl2e = l1e_create_pfn(mfn, __PAGE_HYPERVISOR);
     else
-        new_hl2e = 0;
+        new_hl2e = l1e_empty();
 
     // only do the ref counting if something important changed.
     //
-    if ( (old_hl2e ^ new_hl2e) & (PAGE_MASK | _PAGE_PRESENT) )
+    if ( (l1e_has_changed(&old_hl2e, &new_hl2e, _PAGE_PRESENT)) )
     {
-        if ( (new_hl2e & _PAGE_PRESENT) &&
-             !get_page(pfn_to_page(new_hl2e >> PAGE_SHIFT), ed->domain) )
-            new_hl2e = 0;
-        if ( old_hl2e & _PAGE_PRESENT )
+        if ( (l1e_get_flags(new_hl2e) & _PAGE_PRESENT) &&
+             !get_page(pfn_to_page(l1e_get_pfn(new_hl2e)), ed->domain) )
+            new_hl2e = l1e_empty();
+        if ( l1e_get_flags(old_hl2e) & _PAGE_PRESENT )
         {
-            put_page(pfn_to_page(old_hl2e >> PAGE_SHIFT));
+            put_page(pfn_to_page(l1e_get_pfn(old_hl2e)));
             need_flush = 1;
         }
     }
 
-    ed->arch.hl2_vtable[l2_table_offset(va)] = mk_l1_pgentry(new_hl2e);
+    ed->arch.hl2_vtable[l2_table_offset(va)] = new_hl2e;
 
     if ( need_flush )
     {
@@ -564,13 +568,13 @@ extern void shadow_mark_va_out_of_sync(
     unsigned long va);
 
 static inline int l1pte_write_fault(
-    struct exec_domain *ed, unsigned long *gpte_p, unsigned long *spte_p,
+    struct exec_domain *ed, l1_pgentry_t *gpte_p, l1_pgentry_t *spte_p,
     unsigned long va)
 {
     struct domain *d = ed->domain;
-    unsigned long gpte = *gpte_p;
-    unsigned long spte;
-    unsigned long gpfn = gpte >> PAGE_SHIFT;
+    l1_pgentry_t gpte = *gpte_p;
+    l1_pgentry_t spte;
+    unsigned long gpfn = l1e_get_pfn(gpte);
     unsigned long gmfn = __gpfn_to_mfn(d, gpfn);
 
     //printk("l1pte_write_fault gmfn=%p\n", gmfn);
@@ -578,15 +582,16 @@ static inline int l1pte_write_fault(
     if ( unlikely(!VALID_MFN(gmfn)) )
     {
         SH_LOG("l1pte_write_fault: invalid gpfn=%p", gpfn);
-        *spte_p = 0;
+        *spte_p = l1e_empty();
         return 0;
     }
 
-    ASSERT(gpte & _PAGE_RW);
-    gpte |= _PAGE_DIRTY | _PAGE_ACCESSED;
-    spte = (gmfn << PAGE_SHIFT) | (gpte & ~PAGE_MASK);
+    ASSERT(l1e_get_flags(gpte) & _PAGE_RW);
+    l1e_add_flags(&gpte, _PAGE_DIRTY | _PAGE_ACCESSED);
+    spte = l1e_create_pfn(gmfn, l1e_get_flags(gpte));
 
-    SH_VVLOG("l1pte_write_fault: updating spte=0x%p gpte=0x%p", spte, gpte);
+    SH_VVLOG("l1pte_write_fault: updating spte=0x%p gpte=0x%p",
+             l1e_get_value(spte), l1e_get_value(gpte));
 
     if ( shadow_mode_log_dirty(d) )
         __mark_dirty(d, gmfn);
@@ -601,30 +606,31 @@ static inline int l1pte_write_fault(
 }
 
 static inline int l1pte_read_fault(
-    struct domain *d, unsigned long *gpte_p, unsigned long *spte_p)
+    struct domain *d, l1_pgentry_t *gpte_p, l1_pgentry_t *spte_p)
 { 
-    unsigned long gpte = *gpte_p;
-    unsigned long spte = *spte_p;
-    unsigned long pfn = gpte >> PAGE_SHIFT;
+    l1_pgentry_t gpte = *gpte_p;
+    l1_pgentry_t spte = *spte_p;
+    unsigned long pfn = l1e_get_pfn(gpte);
     unsigned long mfn = __gpfn_to_mfn(d, pfn);
 
     if ( unlikely(!VALID_MFN(mfn)) )
     {
         SH_LOG("l1pte_read_fault: invalid gpfn=%p", pfn);
-        *spte_p = 0;
+        *spte_p = l1e_empty();
         return 0;
     }
 
-    gpte |= _PAGE_ACCESSED;
-    spte = (mfn << PAGE_SHIFT) | (gpte & ~PAGE_MASK);
+    l1e_add_flags(&gpte, _PAGE_ACCESSED);
+    spte = l1e_create_pfn(mfn, l1e_get_flags(gpte));
 
-    if ( shadow_mode_log_dirty(d) || !(gpte & _PAGE_DIRTY) ||
+    if ( shadow_mode_log_dirty(d) || !(l1e_get_flags(gpte) & _PAGE_DIRTY) ||
          mfn_is_page_table(mfn) )
     {
-        spte &= ~_PAGE_RW;
+        l1e_remove_flags(&spte, _PAGE_RW);
     }
 
-    SH_VVLOG("l1pte_read_fault: updating spte=0x%p gpte=0x%p", spte, gpte);
+    SH_VVLOG("l1pte_read_fault: updating spte=0x%p gpte=0x%p",
+             l1e_get_value(spte), l1e_get_value(gpte));
     *gpte_p = gpte;
     *spte_p = spte;
 
@@ -632,23 +638,24 @@ static inline int l1pte_read_fault(
 }
 
 static inline void l1pte_propagate_from_guest(
-    struct domain *d, unsigned long gpte, unsigned long *spte_p)
+    struct domain *d, l1_pgentry_t gpte, l1_pgentry_t *spte_p)
 { 
-    unsigned long mfn, spte;
+    unsigned long mfn;
+    l1_pgentry_t spte;
 
-    spte = 0;
+    spte = l1e_empty();
 
-    if ( ((gpte & (_PAGE_PRESENT|_PAGE_ACCESSED) ) ==
+    if ( ((l1e_get_flags(gpte) & (_PAGE_PRESENT|_PAGE_ACCESSED) ) ==
           (_PAGE_PRESENT|_PAGE_ACCESSED)) &&
-         VALID_MFN(mfn = __gpfn_to_mfn(d, gpte >> PAGE_SHIFT)) )
+         VALID_MFN(mfn = __gpfn_to_mfn(d, l1e_get_pfn(gpte))) )
     {
-        spte = (mfn << PAGE_SHIFT) | (gpte & ~PAGE_MASK);
+        spte = l1e_create_pfn(mfn, l1e_get_flags(gpte));
         
         if ( shadow_mode_log_dirty(d) ||
-             !(gpte & _PAGE_DIRTY) ||
+             !(l1e_get_flags(gpte) & _PAGE_DIRTY) ||
              mfn_is_page_table(mfn) )
         {
-            spte &= ~_PAGE_RW;
+            l1e_remove_flags(&spte, _PAGE_RW);
         }
     }
 
@@ -661,14 +668,15 @@ static inline void l1pte_propagate_from_guest(
 }
 
 static inline void hl2e_propagate_from_guest(
-    struct domain *d, unsigned long gpde, unsigned long *hl2e_p)
+    struct domain *d, l2_pgentry_t gpde, l1_pgentry_t *hl2e_p)
 {
-    unsigned long pfn = gpde >> PAGE_SHIFT;
-    unsigned long mfn, hl2e;
+    unsigned long pfn = l2e_get_pfn(gpde);
+    unsigned long mfn;
+    l1_pgentry_t hl2e;
+    
+    hl2e = l1e_empty();
 
-    hl2e = 0;
-
-    if ( gpde & _PAGE_PRESENT )
+    if ( l2e_get_flags(gpde) & _PAGE_PRESENT )
     {
         if ( unlikely((current->domain != d) && !shadow_mode_external(d)) )
         {
@@ -683,30 +691,31 @@ static inline void hl2e_propagate_from_guest(
             mfn = __gpfn_to_mfn(d, pfn);
 
         if ( VALID_MFN(mfn) && (mfn < max_page) )
-            hl2e = (mfn << PAGE_SHIFT) | __PAGE_HYPERVISOR;
+            hl2e = l1e_create_pfn(mfn, __PAGE_HYPERVISOR);
     }
 
-    if ( hl2e || gpde )
-        SH_VVLOG("%s: gpde=%p hl2e=%p", __func__, gpde, hl2e);
+    if ( l1e_get_value(hl2e) || l2e_get_value(gpde) )
+        SH_VVLOG("%s: gpde=%p hl2e=%p", __func__,
+                 l2e_get_value(gpde), l1e_get_value(hl2e));
 
     *hl2e_p = hl2e;
 }
 
 static inline void l2pde_general(
     struct domain *d,
-    unsigned long *gpde_p,
-    unsigned long *spde_p,
+    l2_pgentry_t *gpde_p,
+    l2_pgentry_t *spde_p,
     unsigned long sl1mfn)
 {
-    unsigned long gpde = *gpde_p;
-    unsigned long spde;
+    l2_pgentry_t gpde = *gpde_p;
+    l2_pgentry_t spde;
 
-    spde = 0;
-    if ( (gpde & _PAGE_PRESENT) && (sl1mfn != 0) )
+    spde = l2e_empty();
+    if ( (l2e_get_flags(gpde) & _PAGE_PRESENT) && (sl1mfn != 0) )
     {
-        spde = (gpde & ~PAGE_MASK) | (sl1mfn << PAGE_SHIFT) | 
-            _PAGE_RW | _PAGE_ACCESSED;
-        gpde |= _PAGE_ACCESSED; /* N.B. PDEs do not have a dirty bit. */
+        spde = l2e_create_pfn(sl1mfn, 
+                              l2e_get_flags(gpde) | _PAGE_RW | _PAGE_ACCESSED);
+        l2e_add_flags(&gpde, _PAGE_ACCESSED); /* N.B. PDEs do not have a dirty bit. */
 
         // XXX mafetter: Hmm...
         //     Shouldn't the dirty log be checked/updated here?
@@ -715,19 +724,21 @@ static inline void l2pde_general(
         *gpde_p = gpde;
     }
 
-    if ( spde || gpde )
-        SH_VVLOG("%s: gpde=%p, new spde=%p", __func__, gpde, spde);
+    if ( l2e_get_value(spde) || l2e_get_value(gpde) )
+        SH_VVLOG("%s: gpde=%p, new spde=%p", __func__,
+                 l2e_get_value(gpde), l2e_get_value(spde));
 
     *spde_p = spde;
 }
 
 static inline void l2pde_propagate_from_guest(
-    struct domain *d, unsigned long *gpde_p, unsigned long *spde_p)
+    struct domain *d, l2_pgentry_t *gpde_p, l2_pgentry_t *spde_p)
 {
-    unsigned long gpde = *gpde_p, sl1mfn = 0;
+    l2_pgentry_t gpde = *gpde_p;
+    unsigned long sl1mfn = 0;
 
-    if ( gpde & _PAGE_PRESENT )
-        sl1mfn =  __shadow_status(d, gpde >> PAGE_SHIFT, PGT_l1_shadow);
+    if ( l2e_get_flags(gpde) & _PAGE_PRESENT )
+        sl1mfn =  __shadow_status(d, l2e_get_pfn(gpde), PGT_l1_shadow);
     l2pde_general(d, gpde_p, spde_p, sl1mfn);
 }
     
@@ -738,10 +749,10 @@ static inline void l2pde_propagate_from_guest(
 static int inline
 validate_pte_change(
     struct domain *d,
-    unsigned long new_pte,
-    unsigned long *shadow_pte_p)
+    l1_pgentry_t new_pte,
+    l1_pgentry_t *shadow_pte_p)
 {
-    unsigned long old_spte, new_spte;
+    l1_pgentry_t old_spte, new_spte;
 
     perfc_incrc(validate_pte_calls);
 
@@ -754,16 +765,16 @@ validate_pte_change(
 
     // only do the ref counting if something important changed.
     //
-    if ( ((old_spte | new_spte) & _PAGE_PRESENT ) &&
-         ((old_spte ^ new_spte) & (PAGE_MASK | _PAGE_RW | _PAGE_PRESENT)) )
+    if ( ((l1e_get_value(old_spte) | l1e_get_value(new_spte)) & _PAGE_PRESENT ) &&
+         l1e_has_changed(&old_spte, &new_spte, _PAGE_RW | _PAGE_PRESENT) )
     {
         perfc_incrc(validate_pte_changes);
 
-        if ( (new_spte & _PAGE_PRESENT) &&
-             !shadow_get_page_from_l1e(mk_l1_pgentry(new_spte), d) )
-            new_spte = 0;
-        if ( old_spte & _PAGE_PRESENT )
-            put_page_from_l1e(mk_l1_pgentry(old_spte), d);
+        if ( (l1e_get_flags(new_spte) & _PAGE_PRESENT) &&
+             !shadow_get_page_from_l1e(new_spte, d) )
+            new_spte = l1e_empty();
+        if ( l1e_get_flags(old_spte) & _PAGE_PRESENT )
+            put_page_from_l1e(old_spte, d);
     }
 
     *shadow_pte_p = new_spte;
@@ -777,10 +788,10 @@ validate_pte_change(
 static int inline
 validate_hl2e_change(
     struct domain *d,
-    unsigned long new_gpde,
-    unsigned long *shadow_hl2e_p)
+    l2_pgentry_t new_gpde,
+    l1_pgentry_t *shadow_hl2e_p)
 {
-    unsigned long old_hl2e, new_hl2e;
+    l1_pgentry_t old_hl2e, new_hl2e;
 
     perfc_incrc(validate_hl2e_calls);
 
@@ -789,16 +800,16 @@ validate_hl2e_change(
 
     // Only do the ref counting if something important changed.
     //
-    if ( ((old_hl2e | new_hl2e) & _PAGE_PRESENT) &&
-         ((old_hl2e ^ new_hl2e) & (PAGE_MASK | _PAGE_PRESENT)) )
+    if ( ((l1e_get_flags(old_hl2e) | l1e_get_flags(new_hl2e)) & _PAGE_PRESENT) &&
+         l1e_has_changed(&old_hl2e, &new_hl2e, _PAGE_PRESENT) )
     {
         perfc_incrc(validate_hl2e_changes);
 
-        if ( (new_hl2e & _PAGE_PRESENT) &&
-             !get_page(pfn_to_page(new_hl2e >> PAGE_SHIFT), d) )
-            new_hl2e = 0;
-        if ( old_hl2e & _PAGE_PRESENT )
-            put_page(pfn_to_page(old_hl2e >> PAGE_SHIFT));
+        if ( (l1e_get_flags(new_hl2e) & _PAGE_PRESENT) &&
+             !get_page(pfn_to_page(l1e_get_pfn(new_hl2e)), d) )
+            new_hl2e = l1e_empty();
+        if ( l1e_get_flags(old_hl2e) & _PAGE_PRESENT )
+            put_page(pfn_to_page(l1e_get_pfn(old_hl2e)));
     }
 
     *shadow_hl2e_p = new_hl2e;
@@ -813,10 +824,10 @@ validate_hl2e_change(
 static int inline
 validate_pde_change(
     struct domain *d,
-    unsigned long new_gpde,
-    unsigned long *shadow_pde_p)
+    l2_pgentry_t new_gpde,
+    l2_pgentry_t *shadow_pde_p)
 {
-    unsigned long old_spde, new_spde;
+    l2_pgentry_t old_spde, new_spde;
 
     perfc_incrc(validate_pde_calls);
 
@@ -828,16 +839,16 @@ validate_pde_change(
 
     // Only do the ref counting if something important changed.
     //
-    if ( ((old_spde | new_spde) & _PAGE_PRESENT) &&
-         ((old_spde ^ new_spde) & (PAGE_MASK | _PAGE_PRESENT)) )
+    if ( ((l2e_get_value(old_spde) | l2e_get_value(new_spde)) & _PAGE_PRESENT) &&
+         l2e_has_changed(&old_spde, &new_spde, _PAGE_PRESENT) )
     {
         perfc_incrc(validate_pde_changes);
 
-        if ( (new_spde & _PAGE_PRESENT) &&
-             !get_shadow_ref(new_spde >> PAGE_SHIFT) )
+        if ( (l2e_get_flags(new_spde) & _PAGE_PRESENT) &&
+             !get_shadow_ref(l2e_get_pfn(new_spde)) )
             BUG();
-        if ( old_spde & _PAGE_PRESENT )
-            put_shadow_ref(old_spde >> PAGE_SHIFT);
+        if ( l2e_get_flags(old_spde) & _PAGE_PRESENT )
+            put_shadow_ref(l2e_get_pfn(old_spde));
     }
 
     *shadow_pde_p = new_spde;
@@ -1347,19 +1358,20 @@ shadow_update_min_max(unsigned long smfn, int index)
 extern void shadow_map_l1_into_current_l2(unsigned long va);
 
 void static inline
-shadow_set_l1e(unsigned long va, unsigned long new_spte, int create_l1_shadow)
+shadow_set_l1e(unsigned long va, l1_pgentry_t new_spte, int create_l1_shadow)
 {
     struct exec_domain *ed = current;
     struct domain *d = ed->domain;
-    unsigned long sl2e, old_spte;
+    l2_pgentry_t sl2e;
+    l1_pgentry_t old_spte;
 
 #if 0
     printk("shadow_set_l1e(va=%p, new_spte=%p, create=%d)\n",
-           va, new_spte, create_l1_shadow);
+           va, l1e_get_value(new_spte), create_l1_shadow);
 #endif
 
     __shadow_get_l2e(ed, va, &sl2e);
-    if ( !(sl2e & _PAGE_PRESENT) )
+    if ( !(l2e_get_flags(sl2e) & _PAGE_PRESENT) )
     {
         /*
          * Either the L1 is not shadowed, or the shadow isn't linked into
@@ -1372,12 +1384,11 @@ shadow_set_l1e(unsigned long va, unsigned long new_spte, int create_l1_shadow)
         }
         else /* check to see if it exists; if so, link it in */
         {
-            unsigned long gpde =
-                l2_pgentry_val(linear_l2_table(ed)[l2_table_offset(va)]);
-            unsigned long gl1pfn = gpde >> PAGE_SHIFT;
+            l2_pgentry_t gpde = linear_l2_table(ed)[l2_table_offset(va)];
+            unsigned long gl1pfn = l2e_get_pfn(gpde);
             unsigned long sl1mfn = __shadow_status(d, gl1pfn, PGT_l1_shadow);
 
-            ASSERT( gpde & _PAGE_PRESENT );
+            ASSERT( l2e_get_flags(gpde) & _PAGE_PRESENT );
 
             if ( sl1mfn )
             {
@@ -1397,47 +1408,49 @@ shadow_set_l1e(unsigned long va, unsigned long new_spte, int create_l1_shadow)
         }
     }
 
-    old_spte = l1_pgentry_val(shadow_linear_pg_table[l1_linear_offset(va)]);
+    old_spte = shadow_linear_pg_table[l1_linear_offset(va)];
 
     // only do the ref counting if something important changed.
     //
-    if ( (old_spte ^ new_spte) & (PAGE_MASK | _PAGE_RW | _PAGE_PRESENT) )
+    if ( l1e_has_changed(&old_spte, &new_spte, _PAGE_RW | _PAGE_PRESENT) )
     {
-        if ( (new_spte & _PAGE_PRESENT) &&
-             !shadow_get_page_from_l1e(mk_l1_pgentry(new_spte), d) )
-            new_spte = 0;
-        if ( old_spte & _PAGE_PRESENT )
-            put_page_from_l1e(mk_l1_pgentry(old_spte), d);
+        if ( (l1e_get_flags(new_spte) & _PAGE_PRESENT) &&
+             !shadow_get_page_from_l1e(new_spte, d) )
+            new_spte = l1e_empty();
+        if ( l1e_get_flags(old_spte) & _PAGE_PRESENT )
+            put_page_from_l1e(old_spte, d);
     }
 
-    shadow_linear_pg_table[l1_linear_offset(va)] = mk_l1_pgentry(new_spte);
+    shadow_linear_pg_table[l1_linear_offset(va)] = new_spte;
 
-    shadow_update_min_max(sl2e >> PAGE_SHIFT, l1_table_offset(va));
+    shadow_update_min_max(l2e_get_pfn(sl2e), l1_table_offset(va));
 }
 
 /************************************************************************/
 
-static inline unsigned long gva_to_gpte(unsigned long gva)
+static inline l1_pgentry_t gva_to_gpte(unsigned long gva)
 {
-    unsigned long gpde, gpte;
+    l2_pgentry_t gpde;
+    l1_pgentry_t gpte;
     struct exec_domain *ed = current;
 
     ASSERT( shadow_mode_translate(current->domain) );
 
     __guest_get_l2e(ed, gva, &gpde);
-    if ( unlikely(!(gpde & _PAGE_PRESENT)) )
-        return 0;
+    if ( unlikely(!(l2e_get_flags(gpde) & _PAGE_PRESENT)) )
+        return l1e_empty();;
 
     // This is actually overkill - we only need to make sure the hl2
     // is in-sync.
     //
     shadow_sync_va(ed, gva);
 
-    if ( unlikely(__get_user(gpte, (unsigned long *)
-                             &linear_pg_table[gva >> PAGE_SHIFT])) )
+    if ( unlikely(__copy_from_user(&gpte,
+                                   &linear_pg_table[gva >> PAGE_SHIFT],
+                                   sizeof(gpte))) )
     {
         FSH_LOG("gva_to_gpte got a fault on gva=%p", gva);
-        return 0;
+        return l1e_empty();
     }
 
     return gpte;
@@ -1445,13 +1458,13 @@ static inline unsigned long gva_to_gpte(unsigned long gva)
 
 static inline unsigned long gva_to_gpa(unsigned long gva)
 {
-    unsigned long gpte;
+    l1_pgentry_t gpte;
 
     gpte = gva_to_gpte(gva);
-    if ( !(gpte & _PAGE_PRESENT) )
+    if ( !(l1e_get_flags(gpte) & _PAGE_PRESENT) )
         return 0;
 
-    return (gpte & PAGE_MASK) + (gva & ~PAGE_MASK); 
+    return l1e_get_phys(gpte) + (gva & ~PAGE_MASK); 
 }
 
 /************************************************************************/

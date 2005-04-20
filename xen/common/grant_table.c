@@ -253,12 +253,12 @@ __gnttab_activate_grant_ref(
     {
         /* Write update into the pagetable
          */
+        l1_pgentry_t pte;
 
-        rc = update_grant_va_mapping( host_virt_addr,
-                                (frame << PAGE_SHIFT) | _PAGE_PRESENT  |
-                                                        _PAGE_ACCESSED |
-                                                        _PAGE_DIRTY    |
-                       ((dev_hst_ro_flags & GNTMAP_readonly) ? 0 : _PAGE_RW),
+        pte = l1e_create_pfn(frame, _PAGE_PRESENT | _PAGE_ACCESSED | _PAGE_DIRTY);
+        if ( !(dev_hst_ro_flags & GNTMAP_readonly) )
+            l1e_add_flags(&pte,_PAGE_RW);
+        rc = update_grant_va_mapping( host_virt_addr, pte, 
                        mapping_d, mapping_ed );
 
         /* IMPORTANT: (rc == 0) => must flush / invalidate entry in TLB.

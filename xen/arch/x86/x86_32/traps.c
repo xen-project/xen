@@ -163,7 +163,7 @@ void show_page_walk(unsigned long addr)
 
     printk("Pagetable walk from %p:\n", addr);
     
-    page = l2_pgentry_val(idle_pg_table[l2_table_offset(addr)]);
+    page = l2e_get_value(idle_pg_table[l2_table_offset(addr)]);
     printk(" L2 = %p %s\n", page, (page & _PAGE_PSE) ? "(4MB)" : "");
     if ( !(page & _PAGE_PRESENT) || (page & _PAGE_PSE) )
         return;

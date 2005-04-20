@@ -2,6 +2,13 @@
 #ifndef __X86_PAGE_H__
 #define __X86_PAGE_H__
 
+#ifndef __ASSEMBLY__
+#define PAGE_SIZE           (1UL << PAGE_SHIFT)
+#else
+#define PAGE_SIZE           (1 << PAGE_SHIFT)
+#endif
+#define PAGE_MASK           (~(PAGE_SIZE-1))
+
 #if defined(__i386__)
 #include <asm/x86_32/page.h>
 #elif defined(__x86_64__)
@@ -18,13 +25,6 @@ typedef struct { unsigned long pt_lo; } pagetable_t;
 #define pagetable_val(_x)   ((_x).pt_lo)
 #define mk_pagetable(_x)    ( (pagetable_t) { (_x) } )
 #endif
-
-#ifndef __ASSEMBLY__
-#define PAGE_SIZE           (1UL << PAGE_SHIFT)
-#else
-#define PAGE_SIZE           (1 << PAGE_SHIFT)
-#endif
-#define PAGE_MASK           (~(PAGE_SIZE-1))
 
 #define clear_page(_p)      memset((void *)(_p), 0, PAGE_SIZE)
 #define copy_page(_t,_f)    memcpy((void *)(_t), (void *)(_f), PAGE_SIZE)
@@ -70,7 +70,7 @@ typedef struct { unsigned long pt_lo; } pagetable_t;
 #define linear_l4_table(_ed) ((_ed)->arch.guest_vl4table)
 
 #define va_to_l1mfn(_ed, _va) \
-    (l2_pgentry_val(linear_l2_table(_ed)[_va>>L2_PAGETABLE_SHIFT]) >> PAGE_SHIFT)
+    (l2e_get_pfn(linear_l2_table(_ed)[_va>>L2_PAGETABLE_SHIFT]))
 
 extern root_pgentry_t idle_pg_table[ROOT_PAGETABLE_ENTRIES];
 

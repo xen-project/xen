@@ -69,29 +69,29 @@ int map_pages(
     while ( s != 0 )
     {
         pl4e = &pt[l4_table_offset(v)];
-        if ( !(l4_pgentry_val(*pl4e) & _PAGE_PRESENT) )
+        if ( !(l4e_get_flags(*pl4e) & _PAGE_PRESENT) )
         {
             newpg = safe_page_alloc();
             clear_page(newpg);
-            *pl4e = mk_l4_pgentry(__pa(newpg) | (flags & __PTE_MASK));
+            *pl4e = l4e_create_phys(__pa(newpg), flags & __PTE_MASK);
         }
 
-        pl3e = l4_pgentry_to_l3(*pl4e) + l3_table_offset(v);
-        if ( !(l3_pgentry_val(*pl3e) & _PAGE_PRESENT) )
+        pl3e = l4e_to_l3e(*pl4e) + l3_table_offset(v);
+        if ( !(l3e_get_flags(*pl3e) & _PAGE_PRESENT) )
         {
             newpg = safe_page_alloc();
             clear_page(newpg);
-            *pl3e = mk_l3_pgentry(__pa(newpg) | (flags & __PTE_MASK));
+            *pl3e = l3e_create_phys(__pa(newpg), flags & __PTE_MASK);
         }
 
-        pl2e = l3_pgentry_to_l2(*pl3e) + l2_table_offset(v);
+        pl2e = l3e_to_l2e(*pl3e) + l2_table_offset(v);
 
         if ( ((s|v|p) & ((1<<L2_PAGETABLE_SHIFT)-1)) == 0 )
         {
             /* Super-page mapping. */
-            if ( (l2_pgentry_val(*pl2e) & _PAGE_PRESENT) )
+            if ( (l2e_get_flags(*pl2e) & _PAGE_PRESENT) )
                 local_flush_tlb_pge();
-            *pl2e = mk_l2_pgentry(p|flags|_PAGE_PSE);
+            *pl2e = l2e_create_phys(p, flags|_PAGE_PSE);
 
             v += 1 << L2_PAGETABLE_SHIFT;
             p += 1 << L2_PAGETABLE_SHIFT;
@@ -100,16 +100,16 @@ int map_pages(
         else
         {
             /* Normal page mapping. */
-            if ( !(l2_pgentry_val(*pl2e) & _PAGE_PRESENT) )
+            if ( !(l2e_get_flags(*pl2e) & _PAGE_PRESENT) )
             {
                 newpg = safe_page_alloc();
                 clear_page(newpg);
-                *pl2e = mk_l2_pgentry(__pa(newpg) | (flags & __PTE_MASK));
+                *pl2e = l2e_create_phys(__pa(newpg), flags & __PTE_MASK);
             }
-            pl1e = l2_pgentry_to_l1(*pl2e) + l1_table_offset(v);
-            if ( (l1_pgentry_val(*pl1e) & _PAGE_PRESENT) )
+            pl1e = l2e_to_l1e(*pl2e) + l1_table_offset(v);
+            if ( (l1e_get_flags(*pl1e) & _PAGE_PRESENT) )
                 local_flush_tlb_one(v);
-            *pl1e = mk_l1_pgentry(p|flags);
+            *pl1e = l1e_create_phys(p, flags);
 
             v += 1 << L1_PAGETABLE_SHIFT;
             p += 1 << L1_PAGETABLE_SHIFT;
@@ -161,19 +161,18 @@ void __init paging_init(void)
      * Above we mapped the M2P table as user-accessible and read-writable.
      * Fix security by denying user access at the top level of the page table.
      */
-    idle_pg_table[l4_table_offset(RDWR_MPT_VIRT_START)] =
-        mk_l4_pgentry(l4_pgentry_val(
-            idle_pg_table[l4_table_offset(RDWR_MPT_VIRT_START)]) & 
-                      ~_PAGE_USER);
+    l4e_remove_flags(&idle_pg_table[l4_table_offset(RDWR_MPT_VIRT_START)],
+                     _PAGE_USER);
 
     /* Create read-only mapping of MPT for guest-OS use. */
     l3ro = (l3_pgentry_t *)alloc_xenheap_page();
     clear_page(l3ro);
     idle_pg_table[l4_table_offset(RO_MPT_VIRT_START)] =
-        mk_l4_pgentry((__pa(l3ro) | __PAGE_HYPERVISOR | _PAGE_USER) &
-                      ~_PAGE_RW);
+        l4e_create_phys(__pa(l3ro),
+                        (__PAGE_HYPERVISOR | _PAGE_USER) & ~_PAGE_RW);
+
     /* Copy the L3 mappings from the RDWR_MPT area. */
-    l3rw = l4_pgentry_to_l3(
+    l3rw = l4e_to_l3e(
         idle_pg_table[l4_table_offset(RDWR_MPT_VIRT_START)]);
     l3rw += l3_table_offset(RDWR_MPT_VIRT_START);
     l3ro += l3_table_offset(RO_MPT_VIRT_START);
@@ -182,12 +181,12 @@ void __init paging_init(void)
 
     /* Set up linear page table mapping. */
     idle_pg_table[l4_table_offset(LINEAR_PT_VIRT_START)] =
-        mk_l4_pgentry(__pa(idle_pg_table) | __PAGE_HYPERVISOR);
+        l4e_create_phys(__pa(idle_pg_table), __PAGE_HYPERVISOR);
 }
 
 void __init zap_low_mappings(void)
 {
-    idle_pg_table[0] = mk_l4_pgentry(0);
+    idle_pg_table[0] = l4e_empty();
     flush_tlb_all_pge();
 }
 
@@ -217,14 +216,14 @@ void subarch_init_memory(struct domain *dom_xen)
           v != RDWR_MPT_VIRT_END;
           v += 1 << L2_PAGETABLE_SHIFT )
     {
-        l3e = l4_pgentry_to_l3(idle_pg_table[l4_table_offset(v)])[
+        l3e = l4e_to_l3e(idle_pg_table[l4_table_offset(v)])[
             l3_table_offset(v)];
-        if ( !(l3_pgentry_val(l3e) & _PAGE_PRESENT) )
+        if ( !(l3e_get_flags(l3e) & _PAGE_PRESENT) )
             continue;
-        l2e = l3_pgentry_to_l2(l3e)[l2_table_offset(v)];
-        if ( !(l2_pgentry_val(l2e) & _PAGE_PRESENT) )
+        l2e = l3e_to_l2e(l3e)[l2_table_offset(v)];
+        if ( !(l2e_get_flags(l2e) & _PAGE_PRESENT) )
             continue;
-        m2p_start_mfn = l2_pgentry_to_pfn(l2e);
+        m2p_start_mfn = l2e_get_pfn(l2e);
 
         for ( i = 0; i < L1_PAGETABLE_ENTRIES; i++ )
         {
@@ -361,20 +360,20 @@ void *memguard_init(void *heap_start)
     {
         ALLOC_PT(l1);
         for ( j = 0; j < L1_PAGETABLE_ENTRIES; j++ )
-            l1[j] = mk_l1_pgentry((i << L2_PAGETABLE_SHIFT) |
-                                   (j << L1_PAGETABLE_SHIFT) | 
-                                  __PAGE_HYPERVISOR);
+            l1[j] = l1e_create_phys((i << L2_PAGETABLE_SHIFT) |
+                                    (j << L1_PAGETABLE_SHIFT),
+                                    __PAGE_HYPERVISOR);
         if ( !((unsigned long)l2 & (PAGE_SIZE-1)) )
         {
             ALLOC_PT(l2);
             if ( !((unsigned long)l3 & (PAGE_SIZE-1)) )
             {
                 ALLOC_PT(l3);
-                *l4++ = mk_l4_pgentry(virt_to_phys(l3) | __PAGE_HYPERVISOR);
+                *l4++ = l4e_create_phys(virt_to_phys(l3), __PAGE_HYPERVISOR);
             }
-            *l3++ = mk_l3_pgentry(virt_to_phys(l2) | __PAGE_HYPERVISOR);
+            *l3++ = l3e_create_phys(virt_to_phys(l2), __PAGE_HYPERVISOR);
         }
-        *l2++ = mk_l2_pgentry(virt_to_phys(l1) | __PAGE_HYPERVISOR);
+        *l2++ = l2e_create_phys(virt_to_phys(l1), __PAGE_HYPERVISOR);
     }
 
     return heap_start;
@@ -398,13 +397,13 @@ static void __memguard_change_range(void *p, unsigned long l, int guard)
     while ( _l != 0 )
     {
         l4 = &idle_pg_table[l4_table_offset(_p)];
-        l3 = l4_pgentry_to_l3(*l4) + l3_table_offset(_p);
-        l2 = l3_pgentry_to_l2(*l3) + l2_table_offset(_p);
-        l1 = l2_pgentry_to_l1(*l2) + l1_table_offset(_p);
+        l3 = l4e_to_l3e(*l4) + l3_table_offset(_p);
+        l2 = l3e_to_l2e(*l3) + l2_table_offset(_p);
+        l1 = l2e_to_l1e(*l2) + l1_table_offset(_p);
         if ( guard )
-            *l1 = mk_l1_pgentry(l1_pgentry_val(*l1) & ~_PAGE_PRESENT);
+            l1e_remove_flags(l1, _PAGE_PRESENT);
         else
-            *l1 = mk_l1_pgentry(l1_pgentry_val(*l1) | _PAGE_PRESENT);
+            l1e_add_flags(l1, _PAGE_PRESENT);
         _p += PAGE_SIZE;
         _l -= PAGE_SIZE;
     }

@@ -10,7 +10,7 @@
 #include <xen/config.h>
 #include <xen/sched.h>
 
-extern unsigned long *mapcache;
+extern l1_pgentry_t *mapcache;
 #define MAPCACHE_ENTRIES        1024
 
 /*

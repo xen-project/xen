@@ -263,13 +263,14 @@ static inline unsigned long phys_to_machine_mapping(unsigned long pfn)
     unsigned long mfn;
     l1_pgentry_t pte;
 
-   if ( !__get_user(l1_pgentry_val(pte), (__phys_to_machine_mapping + pfn)) &&
-        (l1_pgentry_val(pte) & _PAGE_PRESENT) )
-       mfn = l1_pgentry_to_phys(pte) >> PAGE_SHIFT;
-   else
-       mfn = INVALID_MFN;
-
-   return mfn; 
+    if (!__copy_from_user(&pte, (__phys_to_machine_mapping + pfn),
+			  sizeof(pte))
+	&& (l1e_get_flags(pte) & _PAGE_PRESENT) )
+	mfn = l1e_get_pfn(pte);
+    else
+	mfn = INVALID_MFN;
+    
+    return mfn; 
 }
 #define set_machinetophys(_mfn, _pfn) machine_to_phys_mapping[(_mfn)] = (_pfn)
 
@@ -352,7 +353,7 @@ void propagate_page_fault(unsigned long addr, u16 error_code);
  * hold a reference to the page.
  */
 int update_grant_va_mapping(unsigned long va,
-                            unsigned long val,
+                            l1_pgentry_t _nl1e, 
                             struct domain *d,
                             struct exec_domain *ed);
 #endif /* __ASM_X86_MM_H__ */

@@ -47,9 +47,9 @@ int map_pages(
         if ( ((s|v|p) & ((1<<L2_PAGETABLE_SHIFT)-1)) == 0 )
         {
             /* Super-page mapping. */
-            if ( (l2_pgentry_val(*pl2e) & _PAGE_PRESENT) )
+            if ( (l2e_get_flags(*pl2e) & _PAGE_PRESENT) )
                 local_flush_tlb_pge();
-            *pl2e = mk_l2_pgentry(p|flags|_PAGE_PSE);
+            *pl2e = l2e_create_phys(p, flags|_PAGE_PSE);
 
             v += 1 << L2_PAGETABLE_SHIFT;
             p += 1 << L2_PAGETABLE_SHIFT;
@@ -58,16 +58,16 @@ int map_pages(
         else
         {
             /* Normal page mapping. */
-            if ( !(l2_pgentry_val(*pl2e) & _PAGE_PRESENT) )
+            if ( !(l2e_get_flags(*pl2e) & _PAGE_PRESENT) )
             {
                 newpg = (void *)alloc_xenheap_page();
                 clear_page(newpg);
-                *pl2e = mk_l2_pgentry(__pa(newpg) | (flags & __PTE_MASK));
+                *pl2e = l2e_create_phys(__pa(newpg), flags & __PTE_MASK);
             }
-            pl1e = l2_pgentry_to_l1(*pl2e) + l1_table_offset(v);
-            if ( (l1_pgentry_val(*pl1e) & _PAGE_PRESENT) )
+            pl1e = l2e_to_l1e(*pl2e) + l1_table_offset(v);
+            if ( (l1e_get_flags(*pl1e) & _PAGE_PRESENT) )
                 local_flush_tlb_one(v);
-            *pl1e = mk_l1_pgentry(p|flags);
+            *pl1e = l1e_create_phys(p, flags);
 
             v += 1 << L1_PAGETABLE_SHIFT;
             p += 1 << L1_PAGETABLE_SHIFT;
@@ -90,14 +90,14 @@ void __set_fixmap(
 void __init paging_init(void)
 {
     void *ioremap_pt;
-    unsigned long v, l2e;
+    unsigned long v;
     struct pfn_info *pg;
 
     /* Allocate and map the machine-to-phys table. */
     if ( (pg = alloc_domheap_pages(NULL, 10)) == NULL )
         panic("Not enough memory to bootstrap Xen.\n");
     idle_pg_table[l2_table_offset(RDWR_MPT_VIRT_START)] =
-        mk_l2_pgentry(page_to_phys(pg) | __PAGE_HYPERVISOR | _PAGE_PSE);
+        l2e_create_phys(page_to_phys(pg), __PAGE_HYPERVISOR | _PAGE_PSE);
     memset((void *)RDWR_MPT_VIRT_START, 0x55, 4UL << 20);
 
     /* Xen 4MB mappings can all be GLOBAL. */
@@ -105,10 +105,9 @@ void __init paging_init(void)
     {
         for ( v = HYPERVISOR_VIRT_START; v; v += (1 << L2_PAGETABLE_SHIFT) )
         {
-             l2e = l2_pgentry_val(idle_pg_table[l2_table_offset(v)]);
-             if ( l2e & _PAGE_PSE )
-                 l2e |= _PAGE_GLOBAL;
-             idle_pg_table[v >> L2_PAGETABLE_SHIFT] = mk_l2_pgentry(l2e);
+            if (l2e_get_flags(idle_pg_table[l2_table_offset(v)]) & _PAGE_PSE)
+                l2e_add_flags(&idle_pg_table[l2_table_offset(v)],
+                              _PAGE_GLOBAL);
         }
     }
 
@@ -116,33 +115,33 @@ void __init paging_init(void)
     ioremap_pt = (void *)alloc_xenheap_page();
     clear_page(ioremap_pt);
     idle_pg_table[l2_table_offset(IOREMAP_VIRT_START)] =
-        mk_l2_pgentry(__pa(ioremap_pt) | __PAGE_HYPERVISOR);
+        l2e_create_phys(__pa(ioremap_pt), __PAGE_HYPERVISOR);
 
     /* Create read-only mapping of MPT for guest-OS use.
      * NB. Remove the global bit so that shadow_mode_translate()==true domains
      *     can reused this address space for their phys-to-machine mapping.
      */
     idle_pg_table[l2_table_offset(RO_MPT_VIRT_START)] =
-        mk_l2_pgentry(l2_pgentry_val(
-                          idle_pg_table[l2_table_offset(RDWR_MPT_VIRT_START)]) &
-                      ~(_PAGE_RW | _PAGE_GLOBAL));
+        l2e_create_pfn(l2e_get_pfn(idle_pg_table[l2_table_offset(RDWR_MPT_VIRT_START)]),
+                       l2e_get_flags(idle_pg_table[l2_table_offset(RDWR_MPT_VIRT_START)])
+                       & ~(_PAGE_RW | _PAGE_GLOBAL));
 
     /* Set up mapping cache for domain pages. */
-    mapcache = (unsigned long *)alloc_xenheap_page();
+    mapcache = (l1_pgentry_t *)alloc_xenheap_page();
     clear_page(mapcache);
     idle_pg_table[l2_table_offset(MAPCACHE_VIRT_START)] =
-        mk_l2_pgentry(__pa(mapcache) | __PAGE_HYPERVISOR);
+        l2e_create_phys(__pa(mapcache), __PAGE_HYPERVISOR);
 
     /* Set up linear page table mapping. */
     idle_pg_table[l2_table_offset(LINEAR_PT_VIRT_START)] =
-        mk_l2_pgentry(__pa(idle_pg_table) | __PAGE_HYPERVISOR);
+        l2e_create_phys(__pa(idle_pg_table), __PAGE_HYPERVISOR);
 }
 
 void __init zap_low_mappings(void)
 {
     int i;
     for ( i = 0; i < DOMAIN_ENTRIES_PER_L2_PAGETABLE; i++ )
-        idle_pg_table[i] = mk_l2_pgentry(0);
+        idle_pg_table[i] = l2e_empty();
     flush_tlb_all_pge();
 }
 
@@ -168,7 +167,7 @@ void subarch_init_memory(struct domain *dom_xen)
     }
 
     /* M2P table is mappable read-only by privileged domains. */
-    m2p_start_mfn = l2_pgentry_to_pfn(
+    m2p_start_mfn = l2e_get_pfn(
         idle_pg_table[l2_table_offset(RDWR_MPT_VIRT_START)]);
     for ( i = 0; i < 1024; i++ )
     {
@@ -318,11 +317,11 @@ void *memguard_init(void *heap_start)
         l1 = (l1_pgentry_t *)heap_start;
         heap_start = (void *)((unsigned long)heap_start + PAGE_SIZE);
         for ( j = 0; j < L1_PAGETABLE_ENTRIES; j++ )
-            l1[j] = mk_l1_pgentry((i << L2_PAGETABLE_SHIFT) |
-                                   (j << L1_PAGETABLE_SHIFT) | 
-                                  __PAGE_HYPERVISOR);
+            l1[j] = l1e_create_phys((i << L2_PAGETABLE_SHIFT) |
+                                    (j << L1_PAGETABLE_SHIFT),
+                                    __PAGE_HYPERVISOR);
         idle_pg_table[i + l2_table_offset(PAGE_OFFSET)] =
-            mk_l2_pgentry(virt_to_phys(l1) | __PAGE_HYPERVISOR);
+            l2e_create_phys(virt_to_phys(l1), __PAGE_HYPERVISOR);
     }
 
     return heap_start;
@@ -344,11 +343,11 @@ static void __memguard_change_range(void *p, unsigned long l, int guard)
     while ( _l != 0 )
     {
         l2  = &idle_pg_table[l2_table_offset(_p)];
-        l1  = l2_pgentry_to_l1(*l2) + l1_table_offset(_p);
+        l1  = l2e_to_l1e(*l2) + l1_table_offset(_p);
         if ( guard )
-            *l1 = mk_l1_pgentry(l1_pgentry_val(*l1) & ~_PAGE_PRESENT);
+            l1e_remove_flags(l1, _PAGE_PRESENT);
         else
-            *l1 = mk_l1_pgentry(l1_pgentry_val(*l1) | _PAGE_PRESENT);
+            l1e_add_flags(l1, _PAGE_PRESENT);
         _p += PAGE_SIZE;
         _l -= PAGE_SIZE;
     }
