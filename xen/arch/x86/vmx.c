@@ -396,7 +396,7 @@ vmx_copy(void *buf, unsigned long laddr, int size, int dir)
 	return 0;
     }
 
-    mfn = phys_to_machine_mapping(gva_to_gpte(laddr) >> PAGE_SHIFT);
+    mfn = phys_to_machine_mapping(l1e_get_pfn(gva_to_gpte(laddr)));
     addr = map_domain_mem((mfn << PAGE_SHIFT) | (laddr & ~PAGE_MASK));
 
     if (dir == COPY_IN)
