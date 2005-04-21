@@ -152,6 +152,23 @@ static always_inline unsigned long __cmpxchg(volatile void *ptr, unsigned long o
     case 4:                                                             \
         __cmpxchg_user(_p,_o,_n,"l","","r");                            \
         break;                                                          \
+    case 8:                                                             \
+        __asm__ __volatile__ (                                          \
+            "1: " LOCK_PREFIX "cmpxchg8b %4\n"                          \
+            "2:\n"                                                      \
+            ".section .fixup,\"ax\"\n"                                  \
+            "3:     movl $1,%1\n"                                       \
+            "       jmp 2b\n"                                           \
+            ".previous\n"                                               \
+            ".section __ex_table,\"a\"\n"                               \
+            "       .align 4\n"                                         \
+            "       .long 1b,3b\n"                                      \
+            ".previous"                                                 \
+            : "=A" (_o), "=r" (_rc)                                     \
+            : "c" ((u32)((u64)(_n)>>32)), "b" ((u32)(_n)),              \
+              "m" (*__xg((volatile void *)(_p))), "0" (_o), "1" (0)     \
+            : "memory");                                                \
+        break;                                                          \
     }                                                                   \
     _rc;                                                                \
 })
