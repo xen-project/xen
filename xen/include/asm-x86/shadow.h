@@ -1152,7 +1152,7 @@ static inline void delete_shadow_status(
     unsigned long key = gpfn | stype;
 
     ASSERT(spin_is_locked(&d->arch.shadow_lock));
-    ASSERT(gpfn && !(gpfn & ~PGT_mfn_mask));
+    ASSERT(!(gpfn & ~PGT_mfn_mask));
     ASSERT(stype && !(stype & ~PGT_type_mask));
 
     head = hash_bucket(d, gpfn);
