@@ -115,7 +115,8 @@ void __init smp_alloc_memory(void)
 void __init smp_store_cpu_info(int id)
 {
     cpu_data[id] = boot_cpu_data;
-    identify_cpu(&cpu_data[id]);
+    if (id != 0)
+        identify_cpu(&cpu_data[id]);
 }
 
 /*
