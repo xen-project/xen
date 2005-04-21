@@ -77,15 +77,19 @@ static void __do_suspend(void)
 #define netif_resume()  do{}while(0)
 #endif
 
-
 #ifdef CONFIG_XEN_USB_FRONTEND
     extern void usbif_resume();
 #else
 #define usbif_resume() do{}while(0)
 #endif
 
+#ifdef CONFIG_XEN_BLKDEV_GRANT
     extern int gnttab_suspend(void);
     extern int gnttab_resume(void);
+#else
+#define gnttab_suspend() do{}while(0)
+#define gnttab_resume()  do{}while(0)
+#endif
 
     extern void time_suspend(void);
     extern void time_resume(void);
