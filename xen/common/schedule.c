@@ -40,6 +40,17 @@
 static char opt_sched[10] = "bvt";
 string_param("sched", opt_sched);
 
+/*#define WAKE_HISTO*/
+/*#define BLOCKTIME_HISTO*/
+/*#define ADV_SCHED_HISTO*/
+//#include <xen/adv_sched_hist.h>
+
+#if defined(WAKE_HISTO)
+#define BUCKETS 31
+#elif defined(BLOCKTIME_HISTO)
+#define BUCKETS 200
+#endif
+
 #define TIME_SLOP      (s32)MICROSECS(50)     /* allow time to slip a bit */
 
 /* Various timer handlers. */
@@ -51,8 +62,10 @@ static void dom_timer_fn(unsigned long data);
 struct schedule_data schedule_data[NR_CPUS];
 
 extern struct scheduler sched_bvt_def;
+extern struct scheduler sched_sedf_def;
 static struct scheduler *schedulers[] = { 
     &sched_bvt_def,
+    &sched_sedf_def,
     NULL
 };
 
@@ -223,6 +236,10 @@ long do_block(void)
 {
     struct exec_domain *ed = current;
 
+#ifdef ADV_SCHED_HISTO
+    adv_sched_hist_start(current->processor);
+#endif
+
     ed->vcpu_info->evtchn_upcall_mask = 0;
     set_bit(EDF_BLOCKED, &ed->ed_flags);
 
@@ -241,6 +258,10 @@ long do_block(void)
 /* Voluntarily yield the processor for this allocation. */
 static long do_yield(void)
 {
+#ifdef ADV_SCHED_HISTO
+    adv_sched_hist_start(current->processor);
+#endif
+    
     TRACE_2D(TRC_SCHED_YIELD, current->domain->id, current->eid);
     __enter_scheduler();
     return 0;
@@ -320,7 +341,7 @@ long sched_adjdom(struct sched_adjdom_cmd *cmd)
 
     if ( cmd->sched_id != ops.sched_id )
         return -EINVAL;
-
+    
     if ( cmd->direction != SCHED_INFO_PUT && cmd->direction != SCHED_INFO_GET )
         return -EINVAL;
 
@@ -353,8 +374,14 @@ static void __enter_scheduler(void)
     perfc_incrc(sched_run);
     
     spin_lock_irq(&schedule_data[cpu].schedule_lock);
- 
+
+#ifdef ADV_SCHED_HISTO
+    adv_sched_hist_from_stop(cpu);
+#endif
     now = NOW();
+#ifdef ADV_SCHED_HISTO
+    adv_sched_hist_start(cpu);
+#endif
 
     rem_ac_timer(&schedule_data[cpu].s_timer);
     
@@ -381,9 +408,12 @@ static void __enter_scheduler(void)
 
     spin_unlock_irq(&schedule_data[cpu].schedule_lock);
 
-    if ( unlikely(prev == next) )
+    if ( unlikely(prev == next) ) {
+#ifdef ADV_SCHED_HISTO
+        adv_sched_hist_to_stop(cpu);
+#endif
         return;
-    
+    }
     perfc_incrc(sched_ctx);
 
 #if defined(WAKE_HISTO)
@@ -418,6 +448,10 @@ static void __enter_scheduler(void)
              prev->domain->id, prev->eid,
              next->domain->id, next->eid);
 
+#ifdef ADV_SCHED_HISTO
+    adv_sched_hist_to_stop(cpu);
+#endif
+
     context_switch(prev, next);
 }
 
@@ -439,6 +473,10 @@ int idle_cpu(int cpu)
 /* The scheduler timer: force a run through the scheduler */
 static void s_timer_fn(unsigned long unused)
 {
+#ifdef ADV_SCHED_HISTO
+    adv_sched_hist_start(current->processor);
+#endif
+
     raise_softirq(SCHEDULE_SOFTIRQ);
     perfc_incrc(sched_irq);
 }
@@ -582,8 +620,65 @@ void reset_sched_histo(unsigned char key)
             schedule_data[j].hist[i] = 0;
 }
 #else
+#if defined(ADV_SCHED_HISTO)
+void print_sched_histo(unsigned char key)
+{
+    int i, j, k,t;
+    printf("Hello!\n");
+    for ( k = 0; k < smp_num_cpus; k++ )
+    {
+        j = 0;
+	t = 0;
+        printf ("CPU[%02d]: scheduler latency histogram FROM (ms:[count])\n", k);
+        for ( i = 0; i < BUCKETS; i++ )
+        {
+            //if ( schedule_data[k].hist[i] != 0 )
+            {
+	        t += schedule_data[k].from_hist[i];
+                if ( i < BUCKETS-1 )
+                    printk("%3d:[%7u]    ", i, schedule_data[k].from_hist[i]);
+                else
+                    printk(" >:[%7u]    ", schedule_data[k].from_hist[i]);
+                //if ( !(++j % 5) )
+                    printk("\n");
+            }
+        }
+        printk("\nTotal: %i\n",t);
+    }
+    for ( k = 0; k < smp_num_cpus; k++ )
+    {
+        j = 0; t = 0;
+        printf ("CPU[%02d]: scheduler latency histogram TO (ms:[count])\n", k);
+        for ( i = 0; i < BUCKETS; i++ )
+        {
+            //if ( schedule_data[k].hist[i] != 0 )
+            {
+	    	t += schedule_data[k].from_hist[i];
+                if ( i < BUCKETS-1 )
+                    printk("%3d:[%7u]    ", i, schedule_data[k].to_hist[i]);
+                else
+                    printk(" >:[%7u]    ", schedule_data[k].to_hist[i]);
+                //if ( !(++j % 5) )
+                    printk("\n");
+            }
+        }
+	printk("\nTotal: %i\n",t);
+    }
+      
+}
+void reset_sched_histo(unsigned char key)
+{
+    int i, j;
+    for ( j = 0; j < smp_num_cpus; j++ ) {
+        for ( i=0; i < BUCKETS; i++ ) 
+            schedule_data[j].to_hist[i] = schedule_data[j].from_hist[i] = 0;
+        schedule_data[j].save_tsc = 0;
+    }
+}
+#else
 void print_sched_histo(unsigned char key) { }
 void reset_sched_histo(unsigned char key) { }
+#endif
 #endif
 
 /*

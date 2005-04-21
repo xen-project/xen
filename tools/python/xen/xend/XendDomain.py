@@ -642,6 +642,24 @@ class XendDomain:
         except Exception, ex:
             raise XendError(str(ex))
     
+    
+    def domain_cpu_sedf_set(self, id, period, slice, latency, extratime, weight):
+        """Set Simple EDF scheduler parameters for a domain.
+        """
+	dominfo = self.domain_lookup(id)
+        try:
+            return xc.sedf_domain_set(dominfo.dom, period, slice, latency, extratime, weight)
+        except Exception, ex:
+            raise XendError(str(ex))
+
+    def domain_cpu_sedf_get(self, id):
+        """Get Atropos scheduler parameters for a domain.
+        """
+        dominfo = self.domain_lookup(id)
+        try:
+            return xc.sedf_domain_get(dominfo.dom)
+        except Exception, ex:
+            raise XendError(str(ex))
     def domain_device_create(self, id, devconfig):
         """Create a new device for a domain.
 

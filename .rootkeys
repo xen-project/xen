@@ -21,6 +21,7 @@
 412f4bd9sm5mCQ8BkrgKcAKZGadq7Q docs/misc/blkif-drivers-explained.txt
 420b949cy9ZGzED74Fz_DaWlK7tT4g docs/misc/crashdb.txt
 4251a1f82AexscYEiF4Iku8Gc_kWfQ docs/misc/grant-tables.txt
+424d462b5GuApQ_NyMsRFt9LbrsWow docs/misc/sedf_scheduler_mini-HOWTO.txt
 40d6ccbfKKBq8jE0ula4eHEzBiQuDA docs/misc/xen_config.html
 410a4c2bAO_m_l4RsiiPHnZ4ixHWbQ docs/misc/xend.tex
 3f9e7d564bWFB-Czjv1qdmE6o0GqNg docs/src/interface.tex
@@ -732,6 +733,7 @@
 3fbba6dctWRWlFJkYb6hdix2X4WMuw tools/libxc/xc_private.c
 3fbba6dcbVrG2hPzEzwdeV_UC8kydQ tools/libxc/xc_private.h
 42337174PxyzzPk62raDiYCIsfStDg tools/libxc/xc_ptrace.c
+41ebbfe9U0b0kI-HgjK7VEY4EvW7_w tools/libxc/xc_sedf.c
 41dde8b0pLfAKMs_L9Uri2hnzHiCRQ tools/libxc/xc_vmx_build.c
 40e1b09dMYB4ItGCqcMIzirdMd9I-w tools/libxutil/Makefile
 40e033325Sjqs-_4TuzeUEprP_gYFg tools/libxutil/allocate.c
@@ -1266,6 +1268,7 @@
 4051bcecFeq4DE70p4zGO5setf47CA xen/common/physdev.c
 3ddb79bdHqdQpATqC0rmUZNbsb6L6A xen/common/resource.c
 40589968dD2D1aejwSOvrROg7fOvGQ xen/common/sched_bvt.c
+41ebbfe9oF1BF3cH5v7yE3eOL9uPbA xen/common/sched_sedf.c
 3e397e6619PgAfBbw2XFbXkewvUWgw xen/common/schedule.c
 3ddb79bd0gVQYmL2zvuJnldvD0AGxQ xen/common/softirq.c
 3e7f358awXBC3Vw-wFRwPw18qL1khg xen/common/string.c
@@ -1434,6 +1437,7 @@
 3ddb79c25UE59iu4JJcbRalx95mvcg xen/include/public/xen.h
 3e397e66m2tO3s-J8Jnr7Ws_tGoPTg xen/include/xen/ac_timer.h
 40715b2epYl2jBbxzz9CI2rgIca7Zg xen/include/xen/acpi.h
+422f0995xCgnbsVhTjSncnqIABs64g xen/include/xen/adv_sched_hist.h
 3ddb79c0c0cX_DZE209-Bb-Rx1v-Aw xen/include/xen/cache.h
 41f2cea7Yna7xc0X9fyavIjoSFFeVg xen/include/xen/compile.h.in
 3f840f12CkbYSlwMrY2S11Mpyxg7Nw xen/include/xen/compiler.h
