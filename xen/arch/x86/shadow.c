@@ -325,7 +325,7 @@ free_shadow_hl2_table(struct domain *d, unsigned long smfn)
     l1_pgentry_t *hl2 = map_domain_mem(smfn << PAGE_SHIFT);
     int i, limit;
 
-    SH_VVLOG("%s: smfn=%p freed\n", __func__, smfn);
+    SH_VVLOG("%s: smfn=%p freed", __func__, smfn);
 
 #ifdef __i386__
     if ( shadow_mode_external(d) )
@@ -2435,7 +2435,7 @@ int shadow_fault(unsigned long va, struct xen_regs *regs)
 
     spte = l1e_empty();
 
-    SH_VVLOG("shadow_fault( va=%p, code=%lu )", va, regs->error_code );
+    SH_VVLOG("shadow_fault( va=%p, code=%lu )", va, regs->error_code);
     perfc_incrc(shadow_fault_calls);
     
     check_pagetable(ed, "pre-sf");
@@ -2458,7 +2458,7 @@ int shadow_fault(unsigned long va, struct xen_regs *regs)
     __guest_get_l2e(ed, va, &gpde);
     if ( unlikely(!(l2e_get_flags(gpde) & _PAGE_PRESENT)) )
     {
-        SH_VVLOG("shadow_fault - EXIT: L1 not present" );
+        SH_VVLOG("shadow_fault - EXIT: L1 not present");
         perfc_incrc(shadow_fault_bail_pde_not_present);
         goto fail;
     }
@@ -2470,7 +2470,7 @@ int shadow_fault(unsigned long va, struct xen_regs *regs)
     orig_gpte = gpte = linear_pg_table[l1_linear_offset(va)];
     if ( unlikely(!(l1e_get_flags(gpte) & _PAGE_PRESENT)) )
     {
-        SH_VVLOG("shadow_fault - EXIT: gpte not present (%lx)",gpte );
+        SH_VVLOG("shadow_fault - EXIT: gpte not present (%lx)", gpte);
         perfc_incrc(shadow_fault_bail_pte_not_present);
         goto fail;
     }

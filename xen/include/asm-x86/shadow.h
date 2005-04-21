@@ -240,7 +240,7 @@ extern int shadow_status_noswap;
     printk("DOM%uP%u: SH_LOG(%d): " _f "\n",                            \
        current->domain->id , current->processor, __LINE__ , ## _a )
 #else
-#define SH_LOG(_f, _a...) 
+#define SH_LOG(_f, _a...) ((void)0)
 #endif
 
 #if SHADOW_VERBOSE_DEBUG
@@ -248,7 +248,7 @@ extern int shadow_status_noswap;
     printk("DOM%uP%u: SH_VLOG(%d): " _f "\n",                           \
            current->domain->id, current->processor, __LINE__ , ## _a )
 #else
-#define SH_VLOG(_f, _a...) 
+#define SH_VLOG(_f, _a...) ((void)0)
 #endif
 
 #if SHADOW_VVERBOSE_DEBUG
@@ -256,7 +256,7 @@ extern int shadow_status_noswap;
     printk("DOM%uP%u: SH_VVLOG(%d): " _f "\n",                          \
            current->domain->id, current->processor, __LINE__ , ## _a )
 #else
-#define SH_VVLOG(_f, _a...)
+#define SH_VVLOG(_f, _a...) ((void)0)
 #endif
 
 #if SHADOW_VVVERBOSE_DEBUG
@@ -264,7 +264,7 @@ extern int shadow_status_noswap;
     printk("DOM%uP%u: SH_VVVLOG(%d): " _f "\n",                         \
            current->domain->id, current->processor, __LINE__ , ## _a )
 #else
-#define SH_VVVLOG(_f, _a...)
+#define SH_VVVLOG(_f, _a...) ((void)0)
 #endif
 
 #if FULLSHADOW_DEBUG
@@ -272,7 +272,7 @@ extern int shadow_status_noswap;
     printk("DOM%uP%u: FSH_LOG(%d): " _f "\n",                           \
            current->domain->id, current->processor, __LINE__ , ## _a )
 #else
-#define FSH_LOG(_f, _a...) 
+#define FSH_LOG(_f, _a...) ((void)0)
 #endif
 
 
