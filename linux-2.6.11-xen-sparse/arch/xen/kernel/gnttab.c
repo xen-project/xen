@@ -330,34 +330,36 @@ int gnttab_resume(void)
     setup.nr_frames  = NR_GRANT_FRAMES;
     setup.frame_list = frames;
 
-    if ( HYPERVISOR_grant_table_op(GNTTABOP_setup_table, &setup, 1) != 0 )
-        BUG();
-    if ( setup.status != 0 )
-        BUG();
+    BUG_ON(HYPERVISOR_grant_table_op(GNTTABOP_setup_table, &setup, 1) != 0);
+    BUG_ON(setup.status != 0);
 
     for ( i = 0; i < NR_GRANT_FRAMES; i++ )
         set_fixmap_ma(FIX_GNTTAB_END - i, frames[i] << PAGE_SHIFT);
 
-    shared = (grant_entry_t *)fix_to_virt(FIX_GNTTAB_END);
-
-    for ( i = 0; i < NR_GRANT_ENTRIES; i++ )
-        gnttab_free_list[i] = i + 1;
-    
     return 0;
 }
 
 int gnttab_suspend(void)
 {
     int i;
+
     for ( i = 0; i < NR_GRANT_FRAMES; i++ )
 	clear_fixmap(FIX_GNTTAB_END - i);
+
     return 0;
 }
 
 static int __init gnttab_init(void)
 {
+    int i;
+
     BUG_ON(gnttab_resume());
 
+    shared = (grant_entry_t *)fix_to_virt(FIX_GNTTAB_END);
+
+    for ( i = 0; i < NR_GRANT_ENTRIES; i++ )
+        gnttab_free_list[i] = i + 1;
+    
     /*
      *  /proc/xen/grant : used by libxc to access grant tables
      */
