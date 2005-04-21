@@ -83,16 +83,6 @@ void clear_local_APIC(void)
         apic_write_around(APIC_LVTPC, v | APIC_LVT_MASKED);
     }
 
-#if 0
-/* lets not touch this if we didn't frob it */
-#ifdef CONFIG_X86_MCE_P4THERMAL
-    if (maxlvt >= 5) {
-        v = apic_read(APIC_LVTTHMR);
-        apic_write_around(APIC_LVTTHMR, v | APIC_LVT_MASKED);
-    }
-#endif
-#endif
-
     /*
      * Clean APIC state for other OSs:
      */
@@ -103,13 +93,6 @@ void clear_local_APIC(void)
         apic_write_around(APIC_LVTERR, APIC_LVT_MASKED);
     if (maxlvt >= 4)
         apic_write_around(APIC_LVTPC, APIC_LVT_MASKED);
-
-#if 0
-#ifdef CONFIG_X86_MCE_P4THERMAL
-    if (maxlvt >= 5)
-        apic_write_around(APIC_LVTTHMR, APIC_LVT_MASKED);
-#endif
-#endif 
 
     v = GET_APIC_VERSION(apic_read(APIC_LVR));
     if (APIC_INTEGRATED(v)) {	/* !82489DX */
@@ -134,9 +117,6 @@ void __init connect_bsp_APIC(void)
         outb(0x70, 0x22);
         outb(0x01, 0x23);
     }
-#if 0
-    enable_apic_mode();
-#endif
 }
 
 void disconnect_bsp_APIC(void)
@@ -406,9 +386,6 @@ void __init setup_local_APIC (void)
 
     if (nmi_watchdog == NMI_LOCAL_APIC)
         setup_apic_nmi_watchdog();
-#if 0
-    apic_pm_activate();
-#endif
 }
 
 /*
@@ -420,12 +397,6 @@ static int __init detect_init_APIC (void)
 {
     u32 h, l, features;
     extern void get_cpu_vendor(struct cpuinfo_x86*);
-
-#if 0
-    /* Disabled by kernel option? */
-    if (enable_local_apic < 0)
-        return -1;
-#endif
 
     /* Workaround for us being called before identify_cpu(). */
     get_cpu_vendor(&boot_cpu_data);
@@ -447,17 +418,6 @@ static int __init detect_init_APIC (void)
 
     if (!cpu_has_apic) {
         /*
-         * Over-ride BIOS and try to enable the local
-         * APIC only if "lapic" specified.
-         */
-#if 0
-        if (enable_local_apic <= 0) {
-            printk("Local APIC disabled by BIOS -- "
-                   "you can enable it with \"lapic\"\n");
-            return -1;
-        }
-#endif
-        /*
          * Some BIOSes disable the local APIC in the
          * APIC_BASE MSR. This can only be done in
          * software for Intel P6 or later and AMD K7
@@ -472,15 +432,14 @@ static int __init detect_init_APIC (void)
             enabled_via_apicbase = 1;
         }
     }
-    /*
-     * The APIC feature bit should now be enabled
-     * in `cpuid'
-     */
+
+    /* The APIC feature bit should now be enabled in `cpuid' */
     features = cpuid_edx(1);
     if (!(features & (1 << X86_FEATURE_APIC))) {
         printk("Could not enable APIC!\n");
         return -1;
     }
+
     set_bit(X86_FEATURE_APIC, boot_cpu_data.x86_capability);
     mp_lapic_addr = APIC_DEFAULT_PHYS_BASE;
 
@@ -489,14 +448,10 @@ static int __init detect_init_APIC (void)
     if (l & MSR_IA32_APICBASE_ENABLE)
         mp_lapic_addr = l & MSR_IA32_APICBASE_BASE;
 
-	if (nmi_watchdog != NMI_NONE)
-		nmi_watchdog = NMI_LOCAL_APIC;
+    if (nmi_watchdog != NMI_NONE)
+        nmi_watchdog = NMI_LOCAL_APIC;
 
     printk("Found and enabled local APIC!\n");
-
-#if 0
-    apic_pm_activate();
-#endif
 
     return 0;
 
@@ -616,11 +571,10 @@ static void __init wait_8254_wraparound(void)
         delta = curr_count-prev_count;
 
         /*
-     * This limit for delta seems arbitrary, but it isn't, it's
-     * slightly above the level of error a buggy Mercury/Neptune
-     * chipset timer can cause.
+         * This limit for delta seems arbitrary, but it isn't, it's slightly
+         * above the level of error a buggy Mercury/Neptune chipset timer can
+         * cause.
          */
-
     } while (delta < 300);
 }
 
@@ -649,20 +603,11 @@ static void __setup_APIC_LVTT(unsigned int clocks)
     unsigned int lvtt_value, tmp_value, ver;
 
     ver = GET_APIC_VERSION(apic_read(APIC_LVR));
-    lvtt_value = APIC_LVT_TIMER_PERIODIC | LOCAL_TIMER_VECTOR;
+    /* NB. Xen uses local APIC timer in one-shot mode. */
+    lvtt_value = /*APIC_LVT_TIMER_PERIODIC |*/ LOCAL_TIMER_VECTOR;
     if (!APIC_INTEGRATED(ver))
         lvtt_value |= SET_APIC_TIMER_BASE(APIC_TIMER_BASE_DIV);
     apic_write_around(APIC_LVTT, lvtt_value);
-
-#if 0
-    /*
-     * Divide PICLK by 16
-     */
-    tmp_value = apic_read(APIC_TDCR);
-    apic_write_around(APIC_TDCR, (tmp_value
-                & ~(APIC_TDR_DIV_1 | APIC_TDR_DIV_TMBASE))
-                | APIC_TDR_DIV_16);
-#endif
 
     tmp_value = apic_read(APIC_TDCR);
     apic_write_around(APIC_TDCR, (tmp_value | APIC_TDR_DIV_1));
@@ -704,9 +649,6 @@ int __init calibrate_APIC_clock(void)
     int i;
     const int LOOPS = HZ/10;
 
-#if 0
-    apic_printk(APIC_VERBOSE, "calibrating APIC timer ...\n");
-#endif
     printk("Calibrating APIC timer for CPU%d...\n",  smp_processor_id());
 
     /*
@@ -721,14 +663,13 @@ int __init calibrate_APIC_clock(void)
      * for a wraparound to start exact measurement:
      * (the current tick might have been already half done)
      */
-
     wait_timer_tick();
 
     /*
      * We wrapped around just now. Let's start:
      */
     if (cpu_has_tsc)
-    rdtscll(t1);
+        rdtscll(t1);
     tt1 = apic_read(APIC_TMCCT);
 
     /*
@@ -739,14 +680,13 @@ int __init calibrate_APIC_clock(void)
 
     tt2 = apic_read(APIC_TMCCT);
     if (cpu_has_tsc)
-    rdtscll(t2);
+        rdtscll(t2);
 
     /*
      * The APIC bus clock counter is 32 bits only, it
      * might have overflown, but note that we use signed
      * longs, thus no extra care needed.
-     *
-     * underflown to be exact, as the timer counts down ;)
+     * [underflown to be exact, as the timer counts down ;)]
      */
 
     result = (tt1-tt2)*APIC_DIVISOR/LOOPS;
@@ -861,7 +801,6 @@ void smp_apic_timer_interrupt(struct xen_regs * regs)
     raise_softirq(AC_TIMER_SOFTIRQ);
 }
 
-
 /*
  * This interrupt should _never_ happen with our APIC/SMP architecture
  */
@@ -869,9 +808,6 @@ asmlinkage void smp_spurious_interrupt(struct xen_regs *regs)
 {
     unsigned long v;
 
-#if 0
-    irq_enter();
-#endif
     /*
      * Check if this really is a spurious interrupt and ACK it
      * if it is a vectored one.  Just in case...
@@ -884,9 +820,6 @@ asmlinkage void smp_spurious_interrupt(struct xen_regs *regs)
     /* see sw-dev-man vol 3, chapter 7.4.13.5 */
     printk("spurious APIC interrupt on CPU#%d, should never happen.\n",
            smp_processor_id());
-#if 0
-    irq_exit();
-#endif
 }
 
 /*
@@ -897,9 +830,6 @@ asmlinkage void smp_error_interrupt(struct xen_regs *regs)
 {
     unsigned long v, v1;
 
-#if 0
-    irq_enter();
-#endif
     /* First tickle the hardware, only then report what went on. -- REW */
     v = apic_read(APIC_ESR);
     apic_write(APIC_ESR, 0);
@@ -917,11 +847,8 @@ asmlinkage void smp_error_interrupt(struct xen_regs *regs)
        6: Received illegal vector
        7: Illegal register address
     */
-    Dprintk("APIC error on CPU%d: %02lx(%02lx)\n",
-            smp_processor_id(), v , v1);
-#if 0
-    irq_exit();
-#endif
+    printk("APIC error on CPU%d: %02lx(%02lx)\n",
+            smp_processor_id(), v, v1);
 }
 
 /*
@@ -930,11 +857,6 @@ asmlinkage void smp_error_interrupt(struct xen_regs *regs)
  */
 int __init APIC_init_uniprocessor (void)
 {
-#if 0
-    if (enable_local_apic < 0)
-        clear_bit(X86_FEATURE_APIC, boot_cpu_data.x86_capability);
-#endif
-
     if (!smp_found_config && !cpu_has_apic)
         return -1;
 
@@ -954,25 +876,15 @@ int __init APIC_init_uniprocessor (void)
 #ifdef CONFIG_SMP
     cpu_online_map = 1;
 #endif
-#if 0
-    phys_cpu_present_map = physid_mask_of_physid(boot_cpu_physical_apicid);
-#endif
     phys_cpu_present_map = 1;
     apic_write_around(APIC_ID, boot_cpu_physical_apicid);
 
     setup_local_APIC();
 
-#if 0
-    if (nmi_watchdog == NMI_LOCAL_APIC)
-        check_nmi_watchdog();
-#endif
 #ifdef CONFIG_X86_IO_APIC
     if (smp_found_config)
         if (!skip_ioapic_setup && nr_ioapics)
-        setup_IO_APIC();
-#endif
-#if 0
-    setup_boot_APIC_clock();
+            setup_IO_APIC();
 #endif
     setup_APIC_clocks();
 
