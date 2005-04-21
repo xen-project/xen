@@ -249,16 +249,13 @@ class BlkDev(Dev):
         self.configure(self.config, recreate=recreate)
 
     def init(self, recreate=False, reboot=False):
-        print 'BlkDev>init>'
         self.frontendDomain = self.getDomain()
         self.frontendChannel = self.getChannel()
         backend = self.getBackend()
         self.backendChannel = backend.backendChannel
         self.backendId = backend.id
-        print 'BlkDev>init<'
 
     def configure(self, config, change=False, recreate=False):
-        print 'BlkDev>configure>'
         if change:
             raise XendError("cannot reconfigure vbd")
         self.config = config
@@ -282,15 +279,12 @@ class BlkDev(Dev):
         except:
             raise XendError('invalid backend domain')
 
-        print 'BlkDev>configure<'
         return self.config
 
     def attach(self, recreate=False, change=False):
-        print 'BlkDev>attach>', self
         if recreate:
-            print 'attach>', 'recreate=', recreate
             node = sxp.child_value(recreate, 'node')
-            print 'attach>', 'node=', node
+            print 'BlkDev>attach>', 'recreate=', recreate, 'node=', node
             self.setNode(node)
         else:
             node = Blkctl.block('bind', self.type, self.params)
@@ -298,7 +292,6 @@ class BlkDev(Dev):
             self.attachBackend()
         if change:
             self.interfaceChanged()
-        print 'BlkDev>attach<', self
 
     def unbind(self):
         if self.node is None: return
@@ -401,13 +394,10 @@ class BlkDev(Dev):
         """Attach the device to its controller.
 
         """
-        print 'BlkDev>attachBackend>'
         self.getBackend().connect()
         self.send_be_vbd_create()
-        print 'BlkDev>attachBackend<'
         
     def send_be_vbd_create(self):
-        print 'BlkDev>send_be_vbd_create>'
         msg = packMsg('blkif_be_vbd_create_t',
                       { 'domid'        : self.frontendDomain,
                         'blkif_handle' : self.backendId,
@@ -443,7 +433,6 @@ class BlkifController(DevController):
         self.rcvr = None
 
     def initController(self, recreate=False, reboot=False):
-        print 'BlkifController>initController>'
         self.destroyed = False
         # Add our handlers for incoming requests.
         self.rcvr = CtrlMsgRcvr(self.getChannel())
@@ -457,7 +446,6 @@ class BlkifController(DevController):
         if reboot:
             self.rebootBackends()
             self.rebootDevices()
-        print 'BlkifController>initController<'
 
     def sxpr(self):
         val = ['blkif', ['dom', self.getDomain()]]

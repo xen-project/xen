@@ -83,7 +83,8 @@ class CtrlMsgRcvr:
     def lostChannel(self):
         """Called when the channel to the domain is lost.
         """
-        print 'CtrlMsgRcvr>lostChannel>',
+        if DEBUG:
+            print 'CtrlMsgRcvr>lostChannel>',
         self.channel = None
     
     def registerChannel(self):
@@ -234,14 +235,12 @@ class DevController:
         raise NotImplementedError()
 
     def createDevice(self, config, recreate=False, change=False):
-        print 'DevController>createDevice>', 'config=', config, 'recreate=', recreate, 'change=', change
         dev = self.newDevice(self.nextDeviceId(), config, recreate=recreate)
         dev.init(recreate=recreate)
         self.addDevice(dev)
         idx = self.getDeviceIndex(dev)
         recreate = self.vm.get_device_recreate(self.getType(), idx)
         dev.attach(recreate=recreate, change=change)
-        print 'DevController>createDevice<'
 
     def configureDevice(self, id, config, change=False):
         """Reconfigure an existing device.
@@ -290,6 +289,9 @@ class DevController:
     def getDeviceIds(self):
         return [ dev.getId() for dev in self.device_order ]
 
+    def getDeviceIndexes(self):
+        return range(0, len(self.device_order))
+    
     def getDevices(self):
         return self.device_order
 
@@ -314,7 +316,6 @@ class DevController:
             self.device_order.remove(dev)
 
     def rebootDevices(self):
-        print 'DevController>rebootDevices>', self
         for dev in self.getDevices():
             dev.reboot()
 
@@ -405,7 +406,6 @@ class Dev:
     def reboot(self):
         """Reconnect device when the domain is rebooted.
         """
-        print 'Dev>reboot>', self
         self.init(reboot=True)
         self.attach()
 

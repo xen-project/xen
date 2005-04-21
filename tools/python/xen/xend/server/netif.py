@@ -4,8 +4,6 @@
 
 import random
 
-from twisted.internet import defer
-
 from xen.xend import sxp
 from xen.xend import Vifctl
 from xen.xend.XendError import XendError, VmError
@@ -420,7 +418,6 @@ class NetifController(DevController):
         @param id: interface id
         @param config: device configuration
         @param recreate: recreate flag (true after xend restart)
-        @return: deferred
         """
         return NetDev(self, id, config, recreate=recreate)
 

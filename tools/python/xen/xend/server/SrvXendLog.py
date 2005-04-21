@@ -1,6 +1,6 @@
 # Copyright (C) 2004 Mike Wray <mike.wray@hp.com>
 
-from twisted.web import static
+from xen.web import static
 
 from xen.xend import XendRoot
 
@@ -21,4 +21,4 @@ class SrvXendLog(SrvDir):
         try:
             return self.logfile.render(req)
         except Exception, ex:
-            self._perform_err(ex, req)
+            self._perform_err(ex, 'log', req)

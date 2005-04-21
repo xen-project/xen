@@ -17,7 +17,6 @@ class SrvRoot(SrvDir):
         ('domain',  'SrvDomainDir'  ),
         ('console', 'SrvConsoleDir' ),
         ('event',   'SrvEventDir'   ),
-        ('device',  'SrvDeviceDir'  ),
         ('vnet',    'SrvVnetDir'    ),
         ]
 
@@ -28,3 +27,7 @@ class SrvRoot(SrvDir):
         for (name, klass) in self.subdirs:
             self.get(name)
         xroot.start()
+        
+    def __repr__(self):
+        return "<SrvRoot %x %s>" %(id(self), self.table.keys())
+

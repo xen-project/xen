@@ -201,6 +201,7 @@ class XendDomain:
             if domid in doms:
                 try:
                     self._new_domain(config, doms[domid])
+                    self.update_domain(domid)
                 except Exception, ex:
                     log.exception("Error recreating domain info: id=%s", domid)
                     self._delete_domain(domid)
@@ -301,11 +302,11 @@ class XendDomain:
         destroyed = 0
         for d in casualties:
             id = str(d['dom'])
-            print 'reap>', id
+            #print 'reap>', id
             dominfo = self.domain_by_id.get(id)
             name = (dominfo and dominfo.name) or '??'
             if dominfo and dominfo.is_terminated():
-                print 'reap> already terminated:', id
+                #print 'reap> already terminated:', id
                 continue
             log.debug('XendDomain>reap> domain died name=%s id=%s', name, id)
             if d['shutdown']:
@@ -725,9 +726,9 @@ class XendDomain:
         @param devconfig: device configuration
         """
         dominfo = self.domain_lookup(id)
-        self.refresh_schedule()
         val = dominfo.device_create(devconfig)
         self.update_domain(dominfo.id)
+        self.refresh_schedule()
         return val
 
     def domain_device_configure(self, id, devconfig, idx):
@@ -739,9 +740,9 @@ class XendDomain:
         @return: updated device configuration
         """
         dominfo = self.domain_lookup(id)
-        self.refresh_schedule()
         val = dominfo.device_configure(devconfig, idx)
         self.update_domain(dominfo.id)
+        self.refresh_schedule()
         return val
     
     def domain_device_refresh(self, id, type, idx):
@@ -752,9 +753,9 @@ class XendDomain:
         @param type: device type
         """
         dominfo = self.domain_lookup(id)
-        self.refresh_schedule()
         val = dominfo.device_refresh(type, idx)
         self.update_domain(dominfo.id)
+        self.refresh_schedule()
         return val
 
     def domain_device_destroy(self, id, type, idx):
@@ -765,9 +766,9 @@ class XendDomain:
         @param type: device type
         """
         dominfo = self.domain_lookup(id)
-        self.refresh_schedule()
         val = dominfo.device_destroy(type, idx)
         self.update_domain(dominfo.id)
+        self.refresh_schedule()
         return val
 
     def domain_devtype_ls(self, id, type):
@@ -778,7 +779,7 @@ class XendDomain:
         @return: device indexes
         """
         dominfo = self.domain_lookup(id)
-        return dominfo.get_devices(type)
+        return dominfo.getDeviceIndexes(type)
 
     def domain_devtype_get(self, id, type, idx):
         """Get a device from a domain.
@@ -789,16 +790,16 @@ class XendDomain:
         @return: device object (or None)
         """
         dominfo = self.domain_lookup(id)
-        return dominfo.get_device_by_index(type, idx)
+        return dominfo.getDeviceByIndex(type, idx)
 
     def domain_vif_credit_limit(self, id, vif, credit, period):
         """Limit the vif's transmission rate
         """
         dominfo = self.domain_lookup(id)
-        try:
-            return dominfo.limit_vif(vif, credit, period)
-        except Exception, ex:
-            raise XendError(str(ex))
+        dev = dominfo.getDeviceById('vif', vif)
+        if not dev:
+            raise XendError("invalid vif")
+        return dev.setCreditLimit(credit, period)
         
     def domain_vif_ls(self, id):
         """Get list of virtual network interface (vif) indexes for a domain.

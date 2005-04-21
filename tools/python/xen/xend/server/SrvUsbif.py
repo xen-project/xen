@@ -1,6 +1,6 @@
 # Copyright (C) 2004 Mike Wray <mike.wray@hp.com>
 
-from twisted.protocols import http
+from xen.web import http
 
 from xen.xend import sxp
 from xen.xend import XendDomain

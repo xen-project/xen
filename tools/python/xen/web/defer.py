@@ -1,0 +1,3 @@
+
+class Deferred:
+    pass

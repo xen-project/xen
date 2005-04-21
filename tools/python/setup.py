@@ -43,6 +43,7 @@ setup(name            = 'xen',
                          'xen.xend.server',
                          'xen.sv',
                          'xen.xm',
+                         'xen.web',
                          ],
       ext_package = "xen.lowlevel",
       ext_modules = [ xc, xu ]

@@ -2,7 +2,7 @@
 
 import socket
 
-from twisted.internet import reactor, protocol
+from xen.web import reactor, protocol
 
 from xen.lowlevel import xu
 
@@ -24,14 +24,13 @@ class ConsoleProtocol(protocol.Protocol):
         self.console = console
         self.id = id
         self.addr = None
-        self.binary = 0
 
-    def connectionMade(self):
+    def connectionMade(self, addr=None):
         peer = self.transport.getPeer()
-        self.addr = (peer.host, peer.port)
+        self.addr = addr
         if self.console.connect(self.addr, self):
             self.transport.write("Cannot connect to console %d on domain %d\n"
-                                 % (self.id, self.console.dom))
+                                 % (self.id, self.console.getDomain()))
             self.loseConnection()
             return
         else:
@@ -49,6 +48,7 @@ class ConsoleProtocol(protocol.Protocol):
         return len(data)
 
     def connectionLost(self, reason=None):
+        print 'ConsoleProtocol>connectionLost>', reason
         log.info("Console disconnected %s %s %s",
                  str(self.id), str(self.addr[0]), str(self.addr[1]))
         eserver.inject('xend.console.disconnect',
@@ -85,7 +85,6 @@ class ConsoleDev(Dev):
     STATUS_LISTENING = 'listening'
 
     def __init__(self, controller, id, config, recreate=False):
-        print 'Console>'
         Dev.__init__(self, controller, id, config)
         self.status = self.STATUS_NEW
         self.addr = None
@@ -108,7 +107,6 @@ class ConsoleDev(Dev):
                        [self.id, self.getDomain(), self.console_port])
 
     def init(self, recreate=False, reboot=False):
-        print 'Console>init>'
         self.destroyed = False
         self.channel = self.getChannel()
         self.listen()
@@ -165,6 +163,7 @@ class ConsoleDev(Dev):
     def destroy(self, change=False, reboot=False):
         """Close the console.
         """
+        print 'ConsoleDev>destroy>', self, reboot
         if reboot:
             return
         self.status = self.STATUS_CLOSED
@@ -175,7 +174,8 @@ class ConsoleDev(Dev):
     def listen(self):
         """Listen for TCP connections to the console port..
         """
-        if self.closed(): return
+        if self.closed():
+            return
         if self.listener:
             pass
         else:
@@ -193,8 +193,10 @@ class ConsoleDev(Dev):
 
         returns 0 if ok, negative otherwise
         """
-        if self.closed(): return -1
-        if self.connected(): return -1
+        if self.closed():
+            return -1
+        if self.connected():
+            return -1
         self.addr = addr
         self.conn = conn
         self.status = self.STATUS_CONNECTED
@@ -204,6 +206,7 @@ class ConsoleDev(Dev):
     def disconnect(self, conn=None):
         """Disconnect the TCP connection to the console.
         """
+        print 'ConsoleDev>disconnect>', conn
         if conn and conn != self.conn: return
         if self.conn:
             self.conn.loseConnection()
@@ -288,6 +291,7 @@ class ConsoleController(DevController):
             self.rebootDevices()
 
     def destroyController(self, reboot=False):
+        print 'ConsoleController>destroyController>', self, reboot
         self.destroyed = True
         self.destroyDevices(reboot=reboot)
         self.rcvr.deregisterChannel()
@@ -312,4 +316,6 @@ class ConsoleController(DevController):
         console = self.getDevice(0)
         if console:
             console.receiveOutput(msg)
+        else:
+            log.warning('no console: domain %d', self.getDomain())
 

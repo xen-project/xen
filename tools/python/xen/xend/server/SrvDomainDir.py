@@ -3,9 +3,7 @@
 import traceback
 from StringIO import StringIO
 
-from twisted.protocols import http
-from twisted.web import error
-from twisted.python.failure import Failure
+from xen.web import http
 
 from xen.xend import sxp
 from xen.xend import XendDomain

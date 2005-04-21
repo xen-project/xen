@@ -879,6 +879,19 @@
 40c9c468IienauFHQ_xJIcqnPJ8giQ tools/python/xen/util/ip.py
 41dde8b0yuJX-S79w4xJKxBQ-Mhp1A tools/python/xen/util/memmap.py
 4059c6a0pnxhG8hwSOivXybbGOwuXw tools/python/xen/util/tempfile.py
+4267a9b16u4IEPhjRryesk6A17sobA tools/python/xen/web/SrvBase.py
+4267a9b1FfCUjW7m9anLERcx9lwhJg tools/python/xen/web/SrvDir.py
+4267a9b1uMXIfzB6-81ZLqMCyTgJmw tools/python/xen/web/__init__.py
+4267a9b1i_zVq36tt2iQejVuR6DGFw tools/python/xen/web/connection.py
+4267a9b1Z2SpO9v-zEDApywETZPDwA tools/python/xen/web/defer.py
+4267a9b1KzSWZwWKYrGRc9bUhow_7Q tools/python/xen/web/http.py
+4267a9b1KWNZhhmZnySe_nLASwO47g tools/python/xen/web/httpserver.py
+4267a9b21miObgEJLAgtLTAKRBK8uQ tools/python/xen/web/protocol.py
+4267a9b2pA22-lF37dB7XfapMNroGw tools/python/xen/web/reactor.py
+4267a9b2AbH-azu7SXIUETXC39tu-A tools/python/xen/web/resource.py
+4267a9b21XhDCpkVXtgea3ko8uS16g tools/python/xen/web/static.py
+4267a9b2q7UA0cU5-KATCWX6O-TKsA tools/python/xen/web/tcp.py
+4267a9b2XqvzKDWxfAdV22c3mO6NHA tools/python/xen/web/unix.py
 40c9c468SNuObE_YWARyS0hzTPSzKg tools/python/xen/xend/Args.py
 41597996WNvJA-DVCBmc0xU9w_XmoA tools/python/xen/xend/Blkctl.py
 40c9c468Um_qc66OQeLEceIz1pgD5g tools/python/xen/xend/EventServer.py
@@ -907,7 +920,6 @@
 40c9c468IxQabrKJSWs0aEjl-27mRQ tools/python/xen/xend/server/SrvConsole.py
 40c9c4689Io5bxfbYIfRiUvsiLX0EQ tools/python/xen/xend/server/SrvConsoleDir.py
 40c9c468woSmBByfeXA4o_jGf2gCgA tools/python/xen/xend/server/SrvDaemon.py
-40c9c468kACsmkqjxBWKHRo071L26w tools/python/xen/xend/server/SrvDeviceDir.py
 40c9c468EQZJVkCLds-OhesJVVyZbQ tools/python/xen/xend/server/SrvDir.py
 40eee3a0m38EwYXfCSFIjWNwG6jx_A tools/python/xen/xend/server/SrvDmesg.py
 40c9c468TyHZUq8sk0FF_vxM6Sozrg tools/python/xen/xend/server/SrvDomain.py
@@ -924,7 +936,6 @@
 40c9c469N2-b3GqpLHHHPZykJPLVvA tools/python/xen/xend/server/channel.py
 40c9c469hJ_IlatRne-9QEa0-wlquw tools/python/xen/xend/server/console.py
 40c9c469UcNJh_NuLU0ytorM0Lk5Ow tools/python/xen/xend/server/controller.py
-40d83983OXjt-y3HjSCcuoPp9rzvmw tools/python/xen/xend/server/domain.py
 4266169exkN9o3hA8vxe8Er0BZv1Xw tools/python/xen/xend/server/event.py
 40c9c469yrm31i60pGKslTi2Zgpotg tools/python/xen/xend/server/messages.py
 40c9c46925x-Rjb0Cv2f1-l2jZrPYg tools/python/xen/xend/server/netif.py

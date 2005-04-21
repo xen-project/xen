@@ -17,20 +17,14 @@ import StringIO
 import traceback
 import time
 
-from twisted.internet import pollreactor
-pollreactor.install()
-
+#from twisted.internet import pollreactor; pollreactor.install()
 from twisted.internet import reactor
-from twisted.internet import protocol
-from twisted.internet import abstract
-from twisted.internet import defer
 
 from xen.lowlevel import xu
 
 from xen.xend import sxp
 from xen.xend import PrettyPrint
-from xen.xend import EventServer
-eserver = EventServer.instance()
+from xen.xend import EventServer; eserver = EventServer.instance()
 from xen.xend.XendError import XendError
 from xen.xend.server import SrvServer
 from xen.xend import XendRoot
@@ -331,16 +325,20 @@ class Daemon:
             log.info("Xend Daemon started")
             self.createFactories()
             self.listenEvent(xroot)
-            self.listenVirq()
             self.listenChannels()
-            SrvServer.create(bridge=1)
+            serverthread = SrvServer.create(bridge=1)
             self.daemonize()
+            print 'running serverthread...'
+            serverthread.start()
+            print 'running reactor...'
             reactor.run()
         except Exception, ex:
             print >>sys.stderr, 'Exception starting xend:', ex
+            if DEBUG:
+                traceback.print_exc()
+            log.exception("Exception starting xend")
             self.exit(1)
             
-
     def createFactories(self):
         self.channelF = channel.channelFactory()
 
@@ -350,18 +348,22 @@ class Daemon:
         return event.listenEvent(self, port, interface)
 
     def listenChannels(self):
-        self.channelF.start()
-
-    def listenVirq(self):
         def virqReceived(virq):
             print 'virqReceived>', virq
             eserver.inject('xend.virq', virq)
+
         self.channelF.setVirqHandler(virqReceived)
+        self.channelF.start()
 
     def exit(self, rc=0):
         reactor.disconnectAll()
         self.channelF.stop()
-        sys.exit(rc)
+        # Calling sys.exit() raises a SystemExit exception, which only
+        # kills the current thread. Calling os._exit() makes the whole
+        # Python process exit immediately. There doesn't seem to be another
+        # way to exit a Python with running threads.
+        #sys.exit(rc)
+        os._exit(rc)
 
 def instance():
     global inst

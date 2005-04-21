@@ -25,16 +25,15 @@
 # todo Support security settings etc. in the config file.
 # todo Support command-line args.
 
-from twisted.web import server, static
-from twisted.web import resource, script
-from twisted.internet import reactor
+from threading import Thread
+
+from xen.web.httpserver import HttpServer
 
 from xen.xend import XendRoot
 xroot = XendRoot.instance()
-
 from xen.xend import Vifctl
-
 from SrvRoot import SrvRoot
+from SrvDir import SrvDir
 
 def create(port=None, interface=None, bridge=0):
     if port is None:
@@ -43,16 +42,8 @@ def create(port=None, interface=None, bridge=0):
         interface = xroot.get_xend_address()
     if bridge:
         Vifctl.network('start')
-    root = resource.Resource()
-    xend = SrvRoot()
-    root.putChild('xend', xend)
-    site = server.Site(root)
-    reactor.listenTCP(port, site, interface=interface)
-
-def main(port=None, interface=None):
-    create(port, interface)
-    reactor.run()
-
-
-if __name__ == '__main__':
-    main()
+    root = SrvDir()
+    root.putChild('xend', SrvRoot())
+    server = HttpServer(root=root, interface=interface, port=port)
+    thread = Thread(name="XendHttpServer", target=server.run)
+    return thread

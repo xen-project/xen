@@ -1,4 +1,7 @@
-from twisted.internet import reactor, protocol, defer
+import sys
+import StringIO
+
+from xen.web import reactor, protocol
 
 from xen.lowlevel import xu
 
@@ -64,7 +67,10 @@ class EventProtocol(protocol.Protocol):
             sxp.show(sxpr, out=io)
         print >> io
         io.seek(0)
-        return self.transport.write(io.getvalue())
+        if self.transport:
+            return self.transport.write(io.getvalue())
+        else:
+            return 0
 
     def send_result(self, res):
         return self.send_reply(['ok', res])
@@ -135,10 +141,10 @@ class EventProtocol(protocol.Protocol):
 
     def op_info(self, name, req):
         val = ['info']
-        val += self.daemon.consoles()
-        val += self.daemon.blkifs()
-        val += self.daemon.netifs()
-        val += self.daemon.usbifs()
+        #val += self.daemon.consoles()
+        #val += self.daemon.blkifs()
+        #val += self.daemon.netifs()
+        #val += self.daemon.usbifs()
         return val
 
     def op_sys_subscribe(self, name, v):
@@ -175,7 +181,6 @@ class EventProtocol(protocol.Protocol):
         import controller
         controller.DEBUG = (mode == 'on')
 
-
 class EventFactory(protocol.Factory):
     """Asynchronous handler for the event server socket.
     """
@@ -191,8 +196,6 @@ class EventFactory(protocol.Factory):
         proto.factory = self
         return proto
 
-
 def listenEvent(daemon, port, interface):
-    protocol = EventFactory(daemon)
-    return reactor.listenTCP(port, protocol, interface=interface)
-    
+    factory = EventFactory(daemon)
+    return reactor.listenTCP(port, factory, interface=interface)

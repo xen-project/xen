@@ -4,7 +4,7 @@
 Includes support for domain construction, using
 open-ended configurations.
 
-Author: Mike Wray <mike.wray@hpl.hp.com>
+Author: Mike Wray <mike.wray@hp.com>
 
 """
 
@@ -25,15 +25,8 @@ import sxp
 from XendLogging import log
 from XendError import VmError
 from XendRoot import get_component
-#import XendConsole; xendConsole = XendConsole.instance()
 
 from PrettyPrint import prettyprint
-
-"""The length of domain names that Xen can handle.
-The names stored in Xen itself are not used for much, and
-xend can handle domain names of any length.
-"""
-MAX_DOMAIN_NAME = 15
 
 """Flag for a block device backend domain."""
 SIF_BLK_BE_DOMAIN = (1<<4)
@@ -279,7 +272,6 @@ class XendDomainInfo:
 
         self.channel = None
         self.controllers = {}
-        self.devices = {}
         
         self.configs = []
         
@@ -386,10 +378,6 @@ class XendDomainInfo:
         ctrl = self.getDeviceController(type)
         return ctrl.getDeviceByIndex(idx)
 
-    def getDeviceIndex(self, type, dev):
-        ctrl = self.getDeviceController(type)
-        return ctrl.getDeviceIndex(dev)
-    
     def getDeviceConfig(self, type, id):
         ctrl = self.getDeviceController(type)
         return ctrl.getDeviceConfig(id)
@@ -397,6 +385,10 @@ class XendDomainInfo:
     def getDeviceIds(self, type):
         ctrl = self.getDeviceController(type)
         return ctrl.getDeviceIds()
+    
+    def getDeviceIndexes(self, type):
+        ctrl = self.getDeviceController(type)
+        return ctrl.getDeviceIndexes()
     
     def getDeviceConfigs(self, type):
         ctrl = self.getDeviceController(type)
@@ -451,16 +443,19 @@ class XendDomainInfo:
         return sxpr
 
     def sxpr_devices(self):
-        sxpr = ['devices']
+        sxpr = []
         for ty in self.getDeviceTypes():
-            devs = [ ty ]
-            devs += self.getDeviceSxprs(ty)
-            sxpr.append(devs)
+            devs = self.getDeviceSxprs(ty)
+            sxpr += devs
+        if sxpr:
+            sxpr.insert(0, 'devices')
+        else:
+            sxpr = None
         return sxpr
 
     def check_name(self, name):
-        """Check if a vm name is valid. Valid names start with a non-digit
-        and contain alphabetic characters, digits, or characters in '_-.:/+'.
+        """Check if a vm name is valid. Valid names contain alphabetic characters,
+        digits, or characters in '_-.:/+'.
         The same name cannot be used for more than one vm at the same time.
 
         @param name: name
@@ -469,8 +464,6 @@ class XendDomainInfo:
         if self.recreate: return
         if name is None or name == '':
             raise VmError('missing vm name')
-        if name[0] in string.digits:
-            raise VmError('invalid vm name')
         for c in name:
             if c in string.digits: continue
             if c in '_-.:/+': continue
@@ -585,14 +578,11 @@ class XendDomainInfo:
         val = None
         if self.savedinfo is None:
             return val
-        devinfo = sxp.child(self.savedinfo, 'devices')
-        if devinfo is None:
-            return val
-        devs = sxp.child(devinfo, type)
-        if devs is None:
+        devices = sxp.child(self.savedinfo, 'devices')
+        if devices is None:
             return val
         index = str(index)
-        for d in sxp.children(devs):
+        for d in sxp.children(devices, type):
             dindex = sxp.child_value(d, 'index')
             if dindex is None: continue
             if str(dindex) == index:
@@ -603,19 +593,6 @@ class XendDomainInfo:
     def get_device_recreate(self, type, index):
         return self.get_device_savedinfo(type, index) or self.recreate
 
-    def limit_vif(self, vif, credit, period):
-        """Limit the rate of a virtual interface
-        @param vif:       vif
-        @param credit:    vif credit in bytes
-        @param period:    vif period in uSec
-        @return: 0 on success
-        """
-        #todo: all wrong
-        #ctrl = xend.netif_create(self.dom, recreate=self.recreate)
-        #d = ctrl.limitDevice(vif, credit, period)
-        #return d
-        pass
-    
     def add_config(self, val):
         """Add configuration data to a virtual machine.
 
@@ -662,8 +639,6 @@ class XendDomainInfo:
             if ctrl.isDestroyed(): continue
             ctrl.destroyController(reboot=reboot)
         if not reboot:
-            self.devices = {}
-            self.device_index = {}
             self.configs = []
             self.ipaddrs = []
 
@@ -674,11 +649,6 @@ class XendDomainInfo:
         print "image:"
         sxp.show(self.image)
         print
-        for dl in self.devices:
-            for dev in dl:
-                print "device:"
-                sxp.show(dev)
-                print
         for val in self.configs:
             print "config:"
             sxp.show(val)
@@ -1011,9 +981,9 @@ class XendDomainInfo:
         at creation time, for example when it uses NFS root.
 
         """
-        blkif = self.getDeviceController("blkif", error=False)
+        blkif = self.getDeviceController("vbd", error=False)
         if not blkif:
-            blkif = self.createDeviceController("blkif")
+            blkif = self.createDeviceController("vbd")
             backend = blkif.getBackend(0)
             backend.connect(recreate=self.recreate)
 
@@ -1210,19 +1180,19 @@ from server import console
 controller.addDevControllerClass("console", console.ConsoleController)
 
 from server import blkif
-controller.addDevControllerClass("blkif", blkif.BlkifController)
-add_device_handler("vbd", "blkif")
+controller.addDevControllerClass("vbd", blkif.BlkifController)
+add_device_handler("vbd", "vbd")
 
 from server import netif
-controller.addDevControllerClass("netif", netif.NetifController)
-add_device_handler("vif", "netif")
+controller.addDevControllerClass("vif", netif.NetifController)
+add_device_handler("vif", "vif")
 
 from server import pciif
-controller.addDevControllerClass("pciif", pciif.PciController)
-add_device_handler("pci", "pciif")
+controller.addDevControllerClass("pci", pciif.PciController)
+add_device_handler("pci", "pci")
 
 from xen.xend.server import usbif
-controller.addDevControllerClass("usbif", usbif.UsbifController)
-add_device_handler("usb", "usbif")
+controller.addDevControllerClass("usb", usbif.UsbifController)
+add_device_handler("usb", "usb")
 
 #============================================================================
