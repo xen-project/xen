@@ -895,7 +895,6 @@
 40c9c468SNuObE_YWARyS0hzTPSzKg tools/python/xen/xend/Args.py
 41597996WNvJA-DVCBmc0xU9w_XmoA tools/python/xen/xend/Blkctl.py
 40c9c468Um_qc66OQeLEceIz1pgD5g tools/python/xen/xend/EventServer.py
-40c9c468U8EVl0d3G--8YXVg6VJD3g tools/python/xen/xend/EventTypes.py
 40c9c468QJTEuk9g4qHxGpmIi70PEQ tools/python/xen/xend/PrettyPrint.py
 40e15b7eeQxWE_hUPB2YTgM9fsZ1PQ tools/python/xen/xend/Vifctl.py
 4151594bBq8h-bwTfEt8dbBuojMtcA tools/python/xen/xend/XendAsynchProtocol.py
