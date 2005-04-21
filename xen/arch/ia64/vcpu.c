@@ -750,7 +750,8 @@ IA64FAULT vcpu_set_tpr(VCPU *vcpu, UINT64 val)
 {
 	if (val & 0xff00) return IA64_RSVDREG_FAULT;
 	PSCB(vcpu,tpr) = val;
-	//PSCB(vcpu,pending_interruption) = 1;
+	if (vcpu_check_pending_interrupts(vcpu) != SPURIOUS_VECTOR)
+		PSCB(vcpu,pending_interruption) = 1;
 	return (IA64_NO_FAULT);
 }
 
@@ -776,6 +777,8 @@ IA64FAULT vcpu_set_eoi(VCPU *vcpu, UINT64 val)
 		// with interrupts disabled
 		printf("Trying to EOI interrupt with interrupts enabled\r\n");
 	}
+	if (vcpu_check_pending_interrupts(vcpu) != SPURIOUS_VECTOR)
+		PSCB(vcpu,pending_interruption) = 1;
 //printf("YYYYY vcpu_set_eoi: Successful\n");
 	return (IA64_NO_FAULT);
 }
