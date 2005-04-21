@@ -177,6 +177,8 @@ static inline void shadow_mode_disable(struct domain *d)
         __shadow_mode_disable(d);
 }
 
+extern void shadow_mode_destroy(struct domain *d);
+
 /************************************************************************/
 
 #define __mfn_to_gpfn(_d, mfn)                         \
@@ -660,8 +662,9 @@ static inline void l1pte_propagate_from_guest(
     }
 
 #if 0
-    if ( spte || gpte )
-        SH_VVLOG("%s: gpte=%p, new spte=%p", __func__, gpte, spte);
+    if ( l1e_get_value(spte) || l1e_get_value(gpte) )
+        SH_VVLOG("%s: gpte=%p, new spte=%p",
+                 __func__, l1e_get_value(gpte), l1e_get_value(spte));
 #endif
 
     *spte_p = spte;

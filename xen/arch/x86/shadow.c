@@ -33,6 +33,7 @@
 static void shadow_free_snapshot(struct domain *d,
                                  struct out_of_sync_entry *entry);
 static void remove_out_of_sync_entries(struct domain *d, unsigned long smfn);
+static void free_writable_pte_predictions(struct domain *d);
 
 /********
 
@@ -554,18 +555,22 @@ static void free_shadow_pages(struct domain *d)
         for_each_exec_domain(d, ed)
         {
             l2_pgentry_t *mpl2e = ed->arch.monitor_vtable;
-            l2_pgentry_t hl2e = mpl2e[l2_table_offset(LINEAR_PT_VIRT_START)];
-            l2_pgentry_t smfn = mpl2e[l2_table_offset(SH_LINEAR_PT_VIRT_START)];
 
-            if ( l2e_get_flags(hl2e) & _PAGE_PRESENT )
+            if ( mpl2e )
             {
-                put_shadow_ref(l2e_get_pfn(hl2e));
-                mpl2e[l2_table_offset(LINEAR_PT_VIRT_START)] = l2e_empty();
-            }
-            if ( l2e_get_flags(smfn) & _PAGE_PRESENT )
-            {
-                put_shadow_ref(l2e_get_pfn(smfn));
-                mpl2e[l2_table_offset(SH_LINEAR_PT_VIRT_START)] = l2e_empty();
+                l2_pgentry_t hl2e = mpl2e[l2_table_offset(LINEAR_PT_VIRT_START)];
+                l2_pgentry_t smfn = mpl2e[l2_table_offset(SH_LINEAR_PT_VIRT_START)];
+
+                if ( l2e_get_flags(hl2e) & _PAGE_PRESENT )
+                {
+                    put_shadow_ref(l2e_get_pfn(hl2e));
+                    mpl2e[l2_table_offset(LINEAR_PT_VIRT_START)] = l2e_empty();
+                }
+                if ( l2e_get_flags(smfn) & _PAGE_PRESENT )
+                {
+                    put_shadow_ref(l2e_get_pfn(smfn));
+                    mpl2e[l2_table_offset(SH_LINEAR_PT_VIRT_START)] = l2e_empty();
+                }
             }
         }
     }
@@ -586,12 +591,11 @@ static void free_shadow_pages(struct domain *d)
         unsigned long *mfn_list;
 
         /* Skip empty buckets. */
-        x = &d->arch.shadow_ht[i];
-        if ( x->gpfn_and_flags == 0 )
+        if ( d->arch.shadow_ht[i].gpfn_and_flags == 0 )
             continue;
 
         count = 0;
-        for ( ; x != NULL; x = x->next )
+        for ( x = &d->arch.shadow_ht[i]; x != NULL; x = x->next )
             if ( PINNED(x->smfn) )
                 count++;
         if ( !count )
@@ -675,14 +679,13 @@ void free_monitor_pagetable(struct exec_domain *ed)
     unsigned long mfn;
 
     ASSERT( pagetable_val(ed->arch.monitor_table) );
-    ASSERT( shadow_mode_external(ed->domain) );
     
     mpl2e = ed->arch.monitor_vtable;
 
     /*
      * First get the mfn for hl2_table by looking at monitor_table
      */
-    hl2e = mpl2e[LINEAR_PT_VIRT_START >> L2_PAGETABLE_SHIFT];
+    hl2e = mpl2e[l2_table_offset(LINEAR_PT_VIRT_START)];
     if ( l2e_get_flags(hl2e) & _PAGE_PRESENT )
     {
         mfn = l2e_get_pfn(hl2e);
@@ -690,7 +693,7 @@ void free_monitor_pagetable(struct exec_domain *ed)
         put_shadow_ref(mfn);
     }
 
-    sl2e = mpl2e[SH_LINEAR_PT_VIRT_START >> L2_PAGETABLE_SHIFT];
+    sl2e = mpl2e[l2_table_offset(SH_LINEAR_PT_VIRT_START)];
     if ( l2e_get_flags(sl2e) & _PAGE_PRESENT )
     {
         mfn = l2e_get_pfn(sl2e);
@@ -1107,6 +1110,34 @@ static void free_out_of_sync_entries(struct domain *d)
     FSH_LOG("freed extra out_of_sync entries, now %d",
             d->arch.out_of_sync_extras_count);
 }
+
+void shadow_mode_destroy(struct domain *d)
+{
+    shadow_lock(d);
+
+    free_shadow_pages(d);
+    free_writable_pte_predictions(d);
+
+#ifndef NDEBUG
+    int i;
+    for ( i = 0; i < shadow_ht_buckets; i++ )
+    {
+        if ( d->arch.shadow_ht[i].gpfn_and_flags != 0 )
+        {
+            printk("%s: d->arch.shadow_ht[%x].gpfn_and_flags=%p\n",
+                   i, d->arch.shadow_ht[i].gpfn_and_flags);
+            BUG();
+        }
+    }
+#endif
+    
+    d->arch.shadow_mode = 0;
+
+    free_shadow_ht_entries(d);
+    free_out_of_sync_entries(d);
+
+    shadow_unlock(d);
+}    
 
 void __shadow_mode_disable(struct domain *d)
 {
@@ -1914,6 +1945,42 @@ decrease_writable_pte_prediction(struct domain *d, unsigned long gpfn, unsigned 
     }
 }
 
+static void
+free_writable_pte_predictions(struct domain *d)
+{
+    int i;
+    struct shadow_status *x;
+
+    for ( i = 0; i < shadow_ht_buckets; i++ )
+    {
+        u32 count;
+        unsigned long *gpfn_list;
+
+        /* Skip empty buckets. */
+        if ( d->arch.shadow_ht[i].gpfn_and_flags == 0 )
+            continue;
+
+        count = 0;
+        for ( x = &d->arch.shadow_ht[i]; x != NULL; x = x->next )
+            if ( (x->gpfn_and_flags & PGT_type_mask) == PGT_writable_pred )
+                count++;
+
+        gpfn_list = xmalloc_array(unsigned long, count);
+        count = 0;
+        for ( x = &d->arch.shadow_ht[i]; x != NULL; x = x->next )
+            if ( (x->gpfn_and_flags & PGT_type_mask) == PGT_writable_pred )
+                gpfn_list[count++] = x->gpfn_and_flags & PGT_mfn_mask;
+
+        while ( count )
+        {
+            count--;
+            delete_shadow_status(d, gpfn_list[count], 0, PGT_writable_pred);
+        }
+
+        xfree(gpfn_list);
+    }
+}
+
 static u32 remove_all_write_access_in_ptpage(
     struct domain *d, unsigned long pt_pfn, unsigned long pt_mfn,
     unsigned long readonly_gpfn, unsigned long readonly_gmfn,
@@ -2606,30 +2673,39 @@ static int sh_l1_present;
 char * sh_check_name;
 int shadow_status_noswap;
 
-#define v2m(adr) ({                                                      \
-    unsigned long _a  = (unsigned long)(adr);                            \
-    l1_pgentry_t _pte = shadow_linear_pg_table[_a >> PAGE_SHIFT];        \
-    unsigned long _pa = l1e_get_phys(_pte);                              \
-    _pa | (_a & ~PAGE_MASK);                                             \
+#define v2m(_ed, _adr) ({                                                    \
+    unsigned long _a  = (unsigned long)(_adr);                               \
+    l2_pgentry_t _pde = shadow_linear_l2_table(_ed)[l2_table_offset(_a)];    \
+    unsigned long _pa = -1;                                                  \
+    if ( l2e_get_flags(_pde) & _PAGE_PRESENT )                               \
+    {                                                                        \
+        l1_pgentry_t _pte;                                                   \
+        _pte = shadow_linear_pg_table[l1_linear_offset(_a)];                 \
+        if ( l1e_get_flags(_pte) & _PAGE_PRESENT )                           \
+            _pa = l1e_get_phys(_pte);                                        \
+    }                                                                        \
+    _pa | (_a & ~PAGE_MASK);                                                 \
 })
 
 #define FAIL(_f, _a...)                                                      \
     do {                                                                     \
-        printk("XXX %s-FAIL (%d,%d,%d)" _f "\n"                              \
-               "g=%08lx s=%08lx &g=%08lx &s=%08lx"                           \
+        printk("XXX %s-FAIL (%d,%d,%d)" _f " at %s(%d)\n",                   \
+               sh_check_name, level, l2_idx, l1_idx, ## _a,                  \
+               __FILE__, __LINE__);                                          \
+        printk("g=%08lx s=%08lx &g=%08lx &s=%08lx"                           \
                " v2m(&g)=%08lx v2m(&s)=%08lx ea=%08lx\n",                    \
-               sh_check_name, level, l2_idx, l1_idx, ## _a ,                 \
                gpte, spte, pgpte, pspte,                                     \
-               v2m(pgpte), v2m(pspte),                                       \
+               v2m(ed, pgpte), v2m(ed, pspte),                               \
                (l2_idx << L2_PAGETABLE_SHIFT) |                              \
                (l1_idx << L1_PAGETABLE_SHIFT));                              \
         errors++;                                                            \
     } while ( 0 )
 
 static int check_pte(
-    struct domain *d, l1_pgentry_t *pgpte, l1_pgentry_t *pspte, 
+    struct exec_domain *ed, l1_pgentry_t *pgpte, l1_pgentry_t *pspte, 
     int level, int l2_idx, int l1_idx, int oos_ptes)
 {
+    struct domain *d = ed->domain;
     l1_pgentry_t gpte = *pgpte;
     l1_pgentry_t spte = *pspte;
     unsigned long mask, gpfn, smfn, gmfn;
@@ -2650,19 +2726,22 @@ static int check_pte(
     if ( !(l1e_get_flags(gpte) & _PAGE_PRESENT) )
         FAIL("Guest not present yet shadow is");
 
-    mask = ~(_PAGE_DIRTY|_PAGE_ACCESSED|_PAGE_RW);
+    mask = ~(_PAGE_GLOBAL|_PAGE_DIRTY|_PAGE_ACCESSED|_PAGE_RW|PAGE_MASK);
 
-    if ( l1e_has_changed(&spte, &gpte, mask) )
+    if ( (l1e_get_value(spte) & mask) != (l1e_get_value(gpte) & mask) )
         FAIL("Corrupt?");
 
     if ( (level == 1) &&
-         (l1e_get_flags(spte) & _PAGE_DIRTY ) &&
+         (l1e_get_flags(spte) & _PAGE_DIRTY) &&
          !(l1e_get_flags(gpte) & _PAGE_DIRTY) && !oos_ptes )
         FAIL("Dirty coherence");
 
-    if ( (l1e_get_flags(spte) & _PAGE_ACCESSED ) &&
+    if ( (l1e_get_flags(spte) & _PAGE_ACCESSED) &&
          !(l1e_get_flags(gpte) & _PAGE_ACCESSED) && !oos_ptes )
         FAIL("Accessed coherence");
+
+    if ( l1e_get_flags(spte) & _PAGE_GLOBAL )
+        FAIL("global bit set in shadow");
 
     smfn = l1e_get_pfn(spte);
     gpfn = l1e_get_pfn(gpte);
@@ -2721,11 +2800,14 @@ static int check_pte(
 
     return errors;
 }
+#undef FAIL
+#undef v2m
 
 static int check_l1_table(
-    struct domain *d, unsigned long gpfn,
+    struct exec_domain *ed, unsigned long gpfn,
     unsigned long gmfn, unsigned long smfn, unsigned l2_idx)
 {
+    struct domain *d = ed->domain;
     int i;
     l1_pgentry_t *gpl1e, *spl1e;
     int errors = 0, oos_ptes = 0;
@@ -2741,7 +2823,7 @@ static int check_l1_table(
     spl1e = map_domain_mem(smfn << PAGE_SHIFT);
 
     for ( i = 0; i < L1_PAGETABLE_ENTRIES; i++ )
-        errors += check_pte(d, &gpl1e[i], &spl1e[i], 1, l2_idx, i, oos_ptes);
+        errors += check_pte(ed, &gpl1e[i], &spl1e[i], 1, l2_idx, i, oos_ptes);
  
     unmap_domain_mem(spl1e);
     unmap_domain_mem(gpl1e);
@@ -2756,8 +2838,9 @@ static int check_l1_table(
     } while ( 0 )
 
 int check_l2_table(
-    struct domain *d, unsigned long gmfn, unsigned long smfn, int oos_pdes)
+    struct exec_domain *ed, unsigned long gmfn, unsigned long smfn, int oos_pdes)
 {
+    struct domain *d = ed->domain;
     l2_pgentry_t *gpl2e = (l2_pgentry_t *)map_domain_mem(gmfn << PAGE_SHIFT);
     l2_pgentry_t *spl2e = (l2_pgentry_t *)map_domain_mem(smfn << PAGE_SHIFT);
     l2_pgentry_t match;
@@ -2825,7 +2908,7 @@ int check_l2_table(
 
     /* Check the whole L2. */
     for ( i = 0; i < limit; i++ )
-        errors += check_pte(d,
+        errors += check_pte(ed,
                             (l1_pgentry_t*)(&gpl2e[i]), /* Hmm, dirty ... */
                             (l1_pgentry_t*)(&spl2e[i]),
                             2, i, 0, 0);
@@ -2840,6 +2923,7 @@ int check_l2_table(
 
     return errors;
 }
+#undef FAILPT
 
 int _check_pagetable(struct exec_domain *ed, char *s)
 {
@@ -2875,7 +2959,7 @@ int _check_pagetable(struct exec_domain *ed, char *s)
         ASSERT(ptbase_mfn);
     }
  
-    errors += check_l2_table(d, ptbase_mfn, smfn, oos_pdes);
+    errors += check_l2_table(ed, ptbase_mfn, smfn, oos_pdes);
 
     gpl2e = (l2_pgentry_t *) map_domain_mem( ptbase_mfn << PAGE_SHIFT );
     spl2e = (l2_pgentry_t *) map_domain_mem( smfn << PAGE_SHIFT );
@@ -2898,7 +2982,7 @@ int _check_pagetable(struct exec_domain *ed, char *s)
 
         if ( l2e_get_value(spl2e[i]) != 0 )  /* FIXME: check flags? */
         {
-            errors += check_l1_table(d, gl1pfn, gl1mfn, sl1mfn, i);
+            errors += check_l1_table(ed, gl1pfn, gl1mfn, sl1mfn, i);
         }
     }
 
@@ -2944,11 +3028,11 @@ int _check_all_pagetables(struct exec_domain *ed, char *s)
             switch ( a->gpfn_and_flags & PGT_type_mask )
             {
             case PGT_l1_shadow:
-                errors += check_l1_table(d, a->gpfn_and_flags & PGT_mfn_mask,
+                errors += check_l1_table(ed, a->gpfn_and_flags & PGT_mfn_mask,
                                          gmfn, a->smfn, 0);
                 break;
             case PGT_l2_shadow:
-                errors += check_l2_table(d, gmfn, a->smfn,
+                errors += check_l2_table(ed, gmfn, a->smfn,
                                          page_out_of_sync(pfn_to_page(gmfn)));
                 break;
             case PGT_l3_shadow:
