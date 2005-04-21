@@ -195,7 +195,6 @@ static void vmx_vmexit_do_cpuid(unsigned long input, struct xen_regs *regs)
     cpuid(input, &eax, &ebx, &ecx, &edx);
 
     if (input == 1) {
-        clear_bit(X86_FEATURE_PGE, &edx); /* temporarily disabled */
         clear_bit(X86_FEATURE_PSE, &edx);
         clear_bit(X86_FEATURE_PAE, &edx);
         clear_bit(X86_FEATURE_PSE36, &edx);
