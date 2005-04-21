@@ -2456,7 +2456,7 @@ int shadow_fault(unsigned long va, struct xen_regs *regs)
      * STEP 2. Check the guest PTE.
      */
     __guest_get_l2e(ed, va, &gpde);
-    if ( unlikely(!(l1e_get_flags(gpte) & _PAGE_PRESENT)) )
+    if ( unlikely(!(l2e_get_flags(gpde) & _PAGE_PRESENT)) )
     {
         SH_VVLOG("shadow_fault - EXIT: L1 not present" );
         perfc_incrc(shadow_fault_bail_pde_not_present);
