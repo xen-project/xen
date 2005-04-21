@@ -177,6 +177,8 @@ static inline void shadow_mode_disable(struct domain *d)
         __shadow_mode_disable(d);
 }
 
+extern void shadow_mode_destroy(struct domain *d);
+
 /************************************************************************/
 
 #define __mfn_to_gpfn(_d, mfn)                         \
@@ -588,7 +590,7 @@ static inline int l1pte_write_fault(
 
     ASSERT(l1e_get_flags(gpte) & _PAGE_RW);
     l1e_add_flags(&gpte, _PAGE_DIRTY | _PAGE_ACCESSED);
-    spte = l1e_create_pfn(gmfn, l1e_get_flags(gpte));
+    spte = l1e_create_pfn(gmfn, l1e_get_flags(gpte) & ~_PAGE_GLOBAL);
 
     SH_VVLOG("l1pte_write_fault: updating spte=0x%p gpte=0x%p",
              l1e_get_value(spte), l1e_get_value(gpte));
@@ -621,7 +623,7 @@ static inline int l1pte_read_fault(
     }
 
     l1e_add_flags(&gpte, _PAGE_ACCESSED);
-    spte = l1e_create_pfn(mfn, l1e_get_flags(gpte));
+    spte = l1e_create_pfn(mfn, l1e_get_flags(gpte) & ~_PAGE_GLOBAL);
 
     if ( shadow_mode_log_dirty(d) || !(l1e_get_flags(gpte) & _PAGE_DIRTY) ||
          mfn_is_page_table(mfn) )
@@ -649,7 +651,7 @@ static inline void l1pte_propagate_from_guest(
           (_PAGE_PRESENT|_PAGE_ACCESSED)) &&
          VALID_MFN(mfn = __gpfn_to_mfn(d, l1e_get_pfn(gpte))) )
     {
-        spte = l1e_create_pfn(mfn, l1e_get_flags(gpte));
+        spte = l1e_create_pfn(mfn, l1e_get_flags(gpte) & ~_PAGE_GLOBAL);
         
         if ( shadow_mode_log_dirty(d) ||
              !(l1e_get_flags(gpte) & _PAGE_DIRTY) ||
@@ -660,8 +662,9 @@ static inline void l1pte_propagate_from_guest(
     }
 
 #if 0
-    if ( spte || gpte )
-        SH_VVLOG("%s: gpte=%p, new spte=%p", __func__, gpte, spte);
+    if ( l1e_get_value(spte) || l1e_get_value(gpte) )
+        SH_VVLOG("%s: gpte=%p, new spte=%p",
+                 __func__, l1e_get_value(gpte), l1e_get_value(spte));
 #endif
 
     *spte_p = spte;

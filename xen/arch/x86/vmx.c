@@ -676,7 +676,7 @@ static int mov_to_cr(int gp, int cr, struct xen_regs *regs)
     switch(cr) {
     case 0: 
     {
-        unsigned long old_base_mfn = 0, mfn;
+        unsigned long old_base_mfn, mfn;
 
         /* 
          * CR0:
@@ -694,14 +694,17 @@ static int mov_to_cr(int gp, int cr, struct xen_regs *regs)
             /*
              * The guest CR3 must be pointing to the guest physical.
              */
-            if (!VALID_MFN(mfn = phys_to_machine_mapping(
-                               d->arch.arch_vmx.cpu_cr3 >> PAGE_SHIFT)))
+            if ( !VALID_MFN(mfn = phys_to_machine_mapping(
+                                d->arch.arch_vmx.cpu_cr3 >> PAGE_SHIFT)) ||
+                 !get_page(pfn_to_page(mfn), d->domain) )
             {
-                VMX_DBG_LOG(DBG_LEVEL_VMMU, "Invalid CR3 value = %lx", 
-                        d->arch.arch_vmx.cpu_cr3);
+                VMX_DBG_LOG(DBG_LEVEL_VMMU, "Invalid CR3 value = %lx",
+                            d->arch.arch_vmx.cpu_cr3);
                 domain_crash_synchronous(); /* need to take a clean path */
             }
             old_base_mfn = pagetable_val(d->arch.guest_table) >> PAGE_SHIFT;
+            if ( old_base_mfn )
+                put_page(pfn_to_page(old_base_mfn));
 
             /*
              * Now arch.guest_table points to machine physical.
@@ -718,8 +721,6 @@ static int mov_to_cr(int gp, int cr, struct xen_regs *regs)
              */
             VMX_DBG_LOG(DBG_LEVEL_VMMU, "Update CR3 value = %lx, mfn = %lx", 
                     d->arch.arch_vmx.cpu_cr3, mfn);
-            /* undo the get_page done in the para virt case */
-            put_page_and_type(&frame_table[old_base_mfn]);
         } else {
             if ((value & X86_CR0_PE) == 0) {
 	        __vmread(GUEST_EIP, &eip);
@@ -752,7 +753,7 @@ static int mov_to_cr(int gp, int cr, struct xen_regs *regs)
     }
     case 3: 
     {
-        unsigned long mfn;
+        unsigned long old_base_mfn, mfn;
 
         /*
          * If paging is not enabled yet, simply copy the value to CR3.
@@ -781,14 +782,18 @@ static int mov_to_cr(int gp, int cr, struct xen_regs *regs)
              * first.
              */
             VMX_DBG_LOG(DBG_LEVEL_VMMU, "CR3 value = %lx", value);
-            if ((value >> PAGE_SHIFT) > d->domain->max_pages)
+            if ( ((value >> PAGE_SHIFT) > d->domain->max_pages ) ||
+                 !VALID_MFN(mfn = phys_to_machine_mapping(value >> PAGE_SHIFT)) ||
+                 !get_page(pfn_to_page(mfn), d->domain) )
             {
                 VMX_DBG_LOG(DBG_LEVEL_VMMU, 
                         "Invalid CR3 value=%lx", value);
                 domain_crash_synchronous(); /* need to take a clean path */
             }
-            mfn = phys_to_machine_mapping(value >> PAGE_SHIFT);
+            old_base_mfn = pagetable_val(d->arch.guest_table) >> PAGE_SHIFT;
             d->arch.guest_table  = mk_pagetable(mfn << PAGE_SHIFT);
+            if ( old_base_mfn )
+                put_page(pfn_to_page(old_base_mfn));
             update_pagetables(d);
             /* 
              * arch.shadow_table should now hold the next CR3 for shadow
