@@ -2387,7 +2387,7 @@ void __shadow_sync_all(struct domain *d)
         l1_pgentry_t *ppte = map_domain_mem(entry->writable_pl1e);
         l1_pgentry_t opte = *ppte;
         l1_pgentry_t npte = opte;
-        l1e_remove_flags(&opte, _PAGE_RW);
+        l1e_remove_flags(&npte, _PAGE_RW);
 
         if ( (l1e_get_flags(npte) & _PAGE_PRESENT) &&
              !shadow_get_page_from_l1e(npte, d) )
