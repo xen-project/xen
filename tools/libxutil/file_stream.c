@@ -151,7 +151,12 @@ static int file_error(IOStream *s){
  * @return result of the close
  */
 static int file_close(IOStream *s){
-    return fclose(get_file(s));
+    int result = 0;
+    if (s->data){
+        result = fclose(get_file(s));
+        s->data = (void*)0;
+    }
+    return result;
 }
 
 /** Free a file stream.
@@ -159,7 +164,7 @@ static int file_close(IOStream *s){
  * @param s file stream
  */
 static void file_free(IOStream *s){
-    // Do nothing - fclose does it all?
+    file_close(s);
 }
 
 /** Create an IOStream for a stream.
@@ -189,7 +194,6 @@ IOStream *file_stream_fopen(const char *file, const char *flags){
 	io = file_stream_new(fin);
 	if(!io){
 	    fclose(fin);
-	    //free(fin); // fclose frees ?
 	}
     }
     return io;
@@ -199,13 +203,16 @@ IOStream *file_stream_fopen(const char *file, const char *flags){
  *
  * @param fd file descriptor
  * @param flags giving the mode to open in (as for fdopen())
- * @return new stream for the open file, or 0 if failed
+ * @return new stream for the open file, or 0 if failed.  Always takes
+ *         ownership of fd.
  */
 IOStream *file_stream_fdopen(int fd, const char *flags){
     IOStream *io = 0;
     FILE *fin = fdopen(fd, flags);
     if(fin){
-	io = file_stream_new(fin);
+        io = file_stream_new(fin);
+        if(!io)
+            fclose(fin);
     }
     return io;
 }

@@ -172,7 +172,6 @@ static int xcio_ratewrite(XcIOContext *ioctxt, void *buf, int n){
     struct timeval now;
     struct timespec delay;
     long long delta;
-    int rc;
 
     if (START_MBIT_RATE == 0)
 	return xcio_write(ioctxt, buf, n);
@@ -212,8 +211,7 @@ static int xcio_ratewrite(XcIOContext *ioctxt, void *buf, int n){
 	    }
 	}
     }
-    rc = IOStream_write(ioctxt->io, buf, n);
-    return (rc == n ? 0 : rc);
+    return xcio_write(ioctxt, buf, n);
 }
 
 static int print_stats( int xc_handle, u32 domid, 

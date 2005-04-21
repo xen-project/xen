@@ -107,7 +107,12 @@ static int gzip_error(IOStream *s){
  * @return result of the close
  */
 static int gzip_close(IOStream *s){
-    return gzclose(get_gzfile(s));
+    int result = 0;
+    if (s->data){
+        result = gzclose(get_gzfile(s));
+        s->data = (void*)0;
+    }
+    return result;
 }
 
 /** Free a gzip stream.
@@ -115,7 +120,7 @@ static int gzip_close(IOStream *s){
  * @param s gzip stream
  */
 static void gzip_free(IOStream *s){
-    // Do nothing - fclose does it all?
+    gzip_close(s);
 }
 
 /** Create an IOStream for a gzip stream.
@@ -143,11 +148,10 @@ IOStream *gzip_stream_fopen(const char *file, const char *flags){
     gzFile *fgz;
     fgz = gzopen(file, flags);
     if(fgz){
-	io = gzip_stream_new(fgz);
-	if(!io){
-	    gzclose(fgz);
-	    //free(fgz); // gzclose frees ?
-	}
+        io = gzip_stream_new(fgz);
+        if(!io){
+            gzclose(fgz);
+        }
     }
     return io;
 }
@@ -156,14 +160,17 @@ IOStream *gzip_stream_fopen(const char *file, const char *flags){
  *
  * @param fd file descriptor
  * @param flags giving the mode to open in (as for fdopen())
- * @return new stream for the open file, or NULL if failed
+ * @return new stream for the open file, or NULL if failed.  Always takes
+ *         ownership of fd.
  */
 IOStream *gzip_stream_fdopen(int fd, const char *flags){
     IOStream *io = NULL;
     gzFile *fgz;
     fgz = gzdopen(fd, flags);
     if(fgz){
-	io = gzip_stream_new(fgz);
+        io = gzip_stream_new(fgz);
+        if(!io)
+            gzclose(fgz);
     }
     return io;
 }

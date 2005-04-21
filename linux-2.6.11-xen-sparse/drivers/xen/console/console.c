@@ -44,6 +44,7 @@
 #include <linux/slab.h>
 #include <linux/init.h>
 #include <linux/console.h>
+#include <linux/bootmem.h>
 #include <asm/io.h>
 #include <asm/irq.h>
 #include <asm/uaccess.h>
@@ -77,10 +78,20 @@ static int __init xencons_setup(char *str)
 __setup("xencons=", xencons_setup);
 
 /* The kernel and user-land drivers share a common transmit buffer. */
-#define WBUF_SIZE     4096
-#define WBUF_MASK(_i) ((_i)&(WBUF_SIZE-1))
-static char wbuf[WBUF_SIZE];
+static unsigned int wbuf_size = 4096;
+#define WBUF_MASK(_i) ((_i)&(wbuf_size-1))
+static char *wbuf;
 static unsigned int wc, wp; /* write_cons, write_prod */
+
+static int __init xencons_bufsz_setup(char *str)
+{
+    unsigned int goal;
+    goal = simple_strtoul(str, NULL, 0);
+    while ( wbuf_size < goal )
+        wbuf_size <<= 1;
+    return 1;
+}
+__setup("xencons_bufsz=", xencons_bufsz_setup);
 
 /* This lock protects accesses to the common transmit buffer. */
 static spinlock_t xencons_lock = SPIN_LOCK_UNLOCKED;
@@ -114,7 +125,7 @@ static void kcons_write(
     
     for ( i = 0; i < count; i++ )
     {
-        if ( (wp - wc) >= (WBUF_SIZE - 1) )
+        if ( (wp - wc) >= (wbuf_size - 1) )
             break;
         if ( (wbuf[WBUF_MASK(wp++)] = s[i]) == '\n' )
             wbuf[WBUF_MASK(wp++)] = '\r';
@@ -195,6 +206,8 @@ void xen_console_init(void)
     else
         strcpy(kcons_info.name, "tty");
 
+    wbuf = alloc_bootmem(wbuf_size);
+
     register_console(&kcons_info);
     return __RETCODE;
 }
@@ -246,8 +259,8 @@ void xencons_force_flush(void)
             continue;
         if ( sz > sizeof(msg.msg) )
             sz = sizeof(msg.msg);
-        if ( sz > (WBUF_SIZE - WBUF_MASK(wc)) )
-            sz = WBUF_SIZE - WBUF_MASK(wc);
+        if ( sz > (wbuf_size - WBUF_MASK(wc)) )
+            sz = wbuf_size - WBUF_MASK(wc);
 
         msg.type    = CMSG_CONSOLE;
         msg.subtype = CMSG_CONSOLE_DATA;
@@ -315,8 +328,8 @@ static void __xencons_tx_flush(void)
         while ( wc != wp )
         {
             sz = wp - wc;
-            if ( sz > (WBUF_SIZE - WBUF_MASK(wc)) )
-                sz = WBUF_SIZE - WBUF_MASK(wc);
+            if ( sz > (wbuf_size - WBUF_MASK(wc)) )
+                sz = wbuf_size - WBUF_MASK(wc);
             kcons_write_dom0(NULL, &wbuf[WBUF_MASK(wc)], sz);
             wc += sz;
             work_done = 1;
@@ -344,8 +357,8 @@ static void __xencons_tx_flush(void)
             sz = wp - wc;
             if ( sz > sizeof(msg.msg) )
                 sz = sizeof(msg.msg);
-            if ( sz > (WBUF_SIZE - WBUF_MASK(wc)) )
-                sz = WBUF_SIZE - WBUF_MASK(wc);
+            if ( sz > (wbuf_size - WBUF_MASK(wc)) )
+                sz = wbuf_size - WBUF_MASK(wc);
 
             msg.type    = CMSG_CONSOLE;
             msg.subtype = CMSG_CONSOLE_DATA;
@@ -409,7 +422,7 @@ static irqreturn_t xencons_priv_interrupt(int irq, void *dev_id,
 
 static int xencons_write_room(struct tty_struct *tty)
 {
-    return WBUF_SIZE - (wp - wc);
+    return wbuf_size - (wp - wc);
 }
 
 static int xencons_chars_in_buffer(struct tty_struct *tty)
@@ -468,7 +481,7 @@ static void xencons_flush_buffer(struct tty_struct *tty)
 static inline int __xencons_put_char(int ch)
 {
     char _ch = (char)ch;
-    if ( (wp - wc) == WBUF_SIZE )
+    if ( (wp - wc) == wbuf_size )
         return 0;
     wbuf[WBUF_MASK(wp++)] = _ch;
     return 1;

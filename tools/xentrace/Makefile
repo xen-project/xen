@@ -26,13 +26,13 @@ build: $(BIN)
 
 install: build
 	[ -d $(DESTDIR)/usr/bin ] || $(INSTALL_DIR) $(DESTDIR)/usr/bin
-	[ -d $(DESTDIR)/usr/man/man1 ] || \
-		$(INSTALL_DIR) $(DESTDIR)/usr/man/man1
-	[ -d $(DESTDIR)/usr/man/man8 ] || \
-		$(INSTALL_DIR) $(DESTDIR)/usr/man/man8
+	[ -d $(DESTDIR)/usr/share/man/man1 ] || \
+		$(INSTALL_DIR) $(DESTDIR)/usr/share/man/man1
+	[ -d $(DESTDIR)/usr/share/man/man8 ] || \
+		$(INSTALL_DIR) $(DESTDIR)/usr/share/man/man8
 	$(INSTALL_PROG) $(BIN) $(SCRIPTS) $(DESTDIR)/usr/bin
-	$(INSTALL_DATA) $(MAN1) $(DESTDIR)/usr/man/man1
-	$(INSTALL_DATA) $(MAN8) $(DESTDIR)/usr/man/man8
+	$(INSTALL_DATA) $(MAN1) $(DESTDIR)/usr/share/man/man1
+	$(INSTALL_DATA) $(MAN8) $(DESTDIR)/usr/share/man/man8
 
 clean:
 	$(RM) *.a *.so *.o *.rpm $(BIN)

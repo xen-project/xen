@@ -46,6 +46,7 @@
 3f815145xlKBAQmal9oces3G_Mvxqw extras/mini-os/traps.c
 423e7e86yUUeeOvTAmjIahrpk1ksaQ freebsd-5.3-xen-sparse/conf/Makefile.i386-xen
 423e7e86CSWbA9G8OftmMbfhStuQ6Q freebsd-5.3-xen-sparse/conf/files.i386-xen
+42642db9m5qcqIrsHX8QlcBGeKSAmw freebsd-5.3-xen-sparse/conf/kern.mk
 423e7e86m-vV5fQ_32CjcFMEr77Fyg freebsd-5.3-xen-sparse/conf/ldscript.i386-xen
 423e7e86Fo2PxRS_37IwkpH-x5t5xQ freebsd-5.3-xen-sparse/conf/options.i386-xen
 423e7e868Yt0iZuEeccnczyToPPvow freebsd-5.3-xen-sparse/fbsdxensetup
@@ -377,6 +378,7 @@
 4124b307jt7T3CHysgl9LijNHSe1tA tools/check/check_brctl
 4124b307HDX972-zihuZWXB7R8Vd0w tools/check/check_curl_devel
 4124b307P3bZBkTFm6r-3XTbf0phAA tools/check/check_curl_lib
+42642813SYRkwr07qVZ9eCI5QTZANg tools/check/check_iproute
 4124b307u-FeKvFP9kZnh0rLV0XjGg tools/check/check_logging
 4124b307tRTjLqzRy60QrUoqN2Fhuw tools/check/check_python
 4124b307XdznSNCv97lrT3RpOdMM1A tools/check/check_twisted

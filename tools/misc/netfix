@@ -9,8 +9,8 @@
 
 from getopt import getopt
 
-# Default install path for Xen binary packages.
-sys.path = [ '/usr/lib/python' ] + sys.path
+# add fallback path for non-native python path installs if needed
+sys.path.append('/usr/lib/python')
 from xen.util.Brctl import *
 
 short_options = 'hvqni:b:c'
