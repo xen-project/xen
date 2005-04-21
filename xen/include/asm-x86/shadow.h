@@ -227,6 +227,7 @@ struct out_of_sync_entry {
 #define SHADOW_DEBUG 0
 #define SHADOW_VERBOSE_DEBUG 0
 #define SHADOW_VVERBOSE_DEBUG 0
+#define SHADOW_VVVERBOSE_DEBUG 0
 #define SHADOW_HASH_DEBUG 0
 #define FULLSHADOW_DEBUG 0
 
@@ -256,6 +257,14 @@ extern int shadow_status_noswap;
            current->domain->id, current->processor, __LINE__ , ## _a )
 #else
 #define SH_VVLOG(_f, _a...)
+#endif
+
+#if SHADOW_VVVERBOSE_DEBUG
+#define SH_VVVLOG(_f, _a...)                                            \
+    printk("DOM%uP%u: SH_VVVLOG(%d): " _f "\n",                         \
+           current->domain->id, current->processor, __LINE__ , ## _a )
+#else
+#define SH_VVVLOG(_f, _a...)
 #endif
 
 #if FULLSHADOW_DEBUG
@@ -661,11 +670,9 @@ static inline void l1pte_propagate_from_guest(
         }
     }
 
-#if 0
     if ( l1e_get_value(spte) || l1e_get_value(gpte) )
-        SH_VVLOG("%s: gpte=%p, new spte=%p",
-                 __func__, l1e_get_value(gpte), l1e_get_value(spte));
-#endif
+        SH_VVVLOG("%s: gpte=%p, new spte=%p",
+                  __func__, l1e_get_value(gpte), l1e_get_value(spte));
 
     *spte_p = spte;
 }
