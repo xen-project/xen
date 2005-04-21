@@ -53,10 +53,6 @@ static grant_ref_t gnttab_free_head;
 
 static grant_entry_t *shared;
 
-/* /proc/xen/grant */
-static struct proc_dir_entry *grant_pde;
-
-
 /*
  * Lock-free grant-entry allocator
  */
@@ -243,6 +239,14 @@ gnttab_release_grant_reference( grant_ref_t *private_head,
     *private_head = release;
 }
 
+/*
+ * ProcFS operations
+ */
+
+#ifdef CONFIG_PROC_FS
+
+static struct proc_dir_entry *grant_pde;
+
 static int grant_ioctl(struct inode *inode, struct file *file,
                        unsigned int cmd, unsigned long data)
 {
@@ -319,6 +323,7 @@ static int grant_write(struct file *file, const char __user *buffer,
     return -ENOSYS;
 }
 
+#endif /* CONFIG_PROC_FS */
 
 int gnttab_resume(void)
 {
@@ -360,6 +365,7 @@ static int __init gnttab_init(void)
     for ( i = 0; i < NR_GRANT_ENTRIES; i++ )
         gnttab_free_list[i] = i + 1;
     
+#ifdef CONFIG_PROC_FS
     /*
      *  /proc/xen/grant : used by libxc to access grant tables
      */
@@ -376,6 +382,7 @@ static int __init gnttab_init(void)
 
     grant_pde->read_proc  = &grant_read;
     grant_pde->write_proc = &grant_write;
+#endif
 
     printk("Grant table initialized\n");
     return 0;
