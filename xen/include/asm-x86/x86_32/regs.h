@@ -15,4 +15,7 @@
 #define PERMIT_SOFTINT(_dpl, _e, _r) \
     ((_dpl) >= (VM86_MODE(_r) ? 3 : ((_r)->cs & 3)))
 
+/* Number of bytes of on-stack execution state to be context-switched. */
+#define CTXT_SWITCH_STACK_BYTES (sizeof(execution_context_t))
+
 #endif

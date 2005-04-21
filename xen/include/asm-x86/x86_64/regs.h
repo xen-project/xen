@@ -15,4 +15,8 @@
 #define PERMIT_SOFTINT(_dpl, _e, _r) \
     ((_dpl) >= (KERNEL_MODE(_e, _r) ? 1 : 3))
 
+/* Number of bytes of on-stack execution state to be context-switched. */
+/* NB. Segment registers and bases are not saved/restored on x86/64 stack. */
+#define CTXT_SWITCH_STACK_BYTES (offsetof(execution_context_t, es))
+
 #endif

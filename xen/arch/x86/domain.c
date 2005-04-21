@@ -632,17 +632,17 @@ static void load_segments(struct exec_domain *p, struct exec_domain *n)
         else
             regs->cs &= ~3;
 
-        if ( put_user(regs->ss,     rsp- 1) |
-             put_user(regs->rsp,    rsp- 2) |
-             put_user(regs->rflags, rsp- 3) |
-             put_user(regs->cs,     rsp- 4) |
-             put_user(regs->rip,    rsp- 5) |
-             put_user(regs->gs,     rsp- 6) |
-             put_user(regs->fs,     rsp- 7) |
-             put_user(regs->es,     rsp- 8) |
-             put_user(regs->ds,     rsp- 9) |
-             put_user(regs->r11,    rsp-10) |
-             put_user(regs->rcx,    rsp-11) )
+        if ( put_user(regs->ss,             rsp- 1) |
+             put_user(regs->rsp,            rsp- 2) |
+             put_user(regs->rflags,         rsp- 3) |
+             put_user(regs->cs,             rsp- 4) |
+             put_user(regs->rip,            rsp- 5) |
+             put_user(n->arch.user_ctxt.gs, rsp- 6) |
+             put_user(n->arch.user_ctxt.fs, rsp- 7) |
+             put_user(n->arch.user_ctxt.es, rsp- 8) |
+             put_user(n->arch.user_ctxt.ds, rsp- 9) |
+             put_user(regs->r11,            rsp-10) |
+             put_user(regs->rcx,            rsp-11) )
         {
             DPRINTK("Error while creating failsafe callback frame.\n");
             domain_crash();
@@ -737,7 +737,7 @@ static void __context_switch(void)
     {
         memcpy(&p->arch.user_ctxt,
                stack_ec, 
-               sizeof(*stack_ec));
+               CTXT_SWITCH_STACK_BYTES);
         unlazy_fpu(p);
         CLEAR_FAST_TRAP(&p->arch);
         save_segments(p);
@@ -747,7 +747,7 @@ static void __context_switch(void)
     {
         memcpy(stack_ec,
                &n->arch.user_ctxt,
-               sizeof(*stack_ec));
+               CTXT_SWITCH_STACK_BYTES);
 
         /* Maybe switch the debug registers. */
         if ( unlikely(n->arch.debugreg[7]) )
