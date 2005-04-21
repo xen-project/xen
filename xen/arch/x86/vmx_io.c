@@ -299,7 +299,7 @@ static __inline__ int generic_fls(u32 x)
     int r = 31;
 
     if (!x)
-        return 0;
+        return -1;
     if (!(x & 0xffff0000u)) {
         x <<= 16;
         r -= 16;
