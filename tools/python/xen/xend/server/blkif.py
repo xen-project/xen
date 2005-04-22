@@ -103,10 +103,11 @@ class BlkifBackend:
         self.destroyed = False
         self.connected = False
         self.evtchn = None
-        self.status = BLKIF_INTERFACE_STATUS_DISCONNECTED
+        self.status = None
 
     def init(self, recreate=False, reboot=False):
         self.destroyed = False
+        self.status = BLKIF_INTERFACE_STATUS_DISCONNECTED
         self.frontendDomain = self.controller.getDomain()
         self.frontendChannel = self.controller.getChannel()
         cf = channel.channelFactory()

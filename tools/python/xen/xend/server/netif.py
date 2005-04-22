@@ -23,7 +23,7 @@ class NetDev(Dev):
         Dev.__init__(self, controller, id, config, recreate=recreate)
         self.vif = int(self.id)
         self.evtchn = None
-        self.status = NETIF_INTERFACE_STATUS_DISCONNECTED
+        self.status = None
         self.frontendDomain = self.getDomain()
         self.frontendChannel = None
         self.backendDomain = None
@@ -40,6 +40,7 @@ class NetDev(Dev):
 
     def init(self, recreate=False, reboot=False):
         self.destroyed = False
+        self.status = NETIF_INTERFACE_STATUS_DISCONNECTED
         self.frontendDomain = self.getDomain()
         self.frontendChannel = self.getChannel()
         cf = channel.channelFactory()
