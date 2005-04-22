@@ -457,13 +457,14 @@ class NetifController(DevController):
         return resp
 
     def recv_fe_interface_status(self, msg):
+        val = unpackMsg('netif_fe_interface_status_t', msg)
         vif = val['handle']
         dev = self.findDevice(vif)
         if dev:
             dev.reportStatus(resp=True)
         else:
             log.error('Received netif_fe_interface_status for unknown vif: dom=%d vif=%d',
-                      self.dom, vif)
+                      self.getDomain(), vif)
             msg = packMsg('netif_fe_interface_status_t',
                           { 'handle' : -1,
                             'status' : NETIF_INTERFACE_STATUS_CLOSED,
@@ -479,5 +480,5 @@ class NetifController(DevController):
             dev.recv_fe_interface_connect(val)
         else:
             log.error('Received netif_fe_interface_connect for unknown vif: dom=%d vif=%d',
-                      self.dom, vif)
+                      self.getDomain(), vif)
 
