@@ -1686,11 +1686,19 @@ int do_mmuext_op(
                 spin_lock(&d->page_alloc_lock);
             }
             
-            /* A domain shouldn't have PGC_allocated pages when it is dying. */
+            /*
+             * Check that 'e' will accept the page and has reservation
+             * headroom. Also, a domain mustn't have PGC_allocated pages when
+             * it is dying. 
+             */
+            ASSERT(e->tot_pages <= e->max_pages);
             if ( unlikely(test_bit(DF_DYING, &e->d_flags)) ||
+                 unlikely(e->tot_pages == e->max_pages) ||
                  unlikely(IS_XEN_HEAP_FRAME(page)) )
             {
-                MEM_LOG("Reassign page is Xen heap, or dest dom is dying.");
+                MEM_LOG("Transferee has no reservation headroom (%d,%d), or "
+                        "page is in Xen heap (%p), or dom is dying (%d).\n",
+                        e->tot_pages, e->max_pages, op.mfn, e->d_flags);
                 okay = 0;
                 goto reassign_fail;
             }
