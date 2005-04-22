@@ -163,8 +163,6 @@ extern void __put_user_bad(void);
 		: "=r"(err)					\
 		: "A" (x), "r" (addr), "i"(-EFAULT), "0"(err))
 
-#ifdef CONFIG_X86_WP_WORKS_OK
-
 #define __put_user_size(x,ptr,size,retval,errret)			\
 do {									\
 	retval = 0;							\
@@ -177,18 +175,6 @@ do {									\
 	}								\
 } while (0)
 
-#else
-
-#define __put_user_size(x,ptr,size,retval,errret)			\
-do {									\
-	__typeof__(*(ptr)) __pus_tmp = x;				\
-	retval = 0;							\
-									\
-	if(unlikely(__copy_to_user_ll(ptr, &__pus_tmp, size) != 0))	\
-		retval = errret;					\
-} while (0)
-
-#endif
 struct __large_struct { unsigned long buf[100]; };
 #define __m(x) (*(struct __large_struct *)(x))
 
