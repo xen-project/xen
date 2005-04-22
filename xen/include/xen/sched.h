@@ -301,8 +301,11 @@ unsigned long __hypercall_create_continuation(
         (unsigned long)(_a1), (unsigned long)(_a2), (unsigned long)(_a3), \
         (unsigned long)(_a4), (unsigned long)(_a5), (unsigned long)(_a6))
 
-#define hypercall_preempt_check() \
-    (unlikely(softirq_pending(smp_processor_id())))
+#define hypercall_preempt_check() (unlikely(            \
+        softirq_pending(smp_processor_id()) |           \
+        (!!current->vcpu_info->evtchn_upcall_pending &  \
+          !current->vcpu_info->evtchn_upcall_mask)      \
+    ))
 
 /* This domain_hash and domain_list are protected by the domlist_lock. */
 #define DOMAIN_HASH_SIZE 256
@@ -310,11 +313,13 @@ unsigned long __hypercall_create_continuation(
 extern struct domain *domain_hash[DOMAIN_HASH_SIZE];
 extern struct domain *domain_list;
 
-#define for_each_domain(_p) \
- for ( (_p) = domain_list; (_p) != NULL; (_p) = (_p)->next_list )
+#define for_each_domain(_d) \
+ for ( (_d) = domain_list; (_d) != NULL; (_d) = (_d)->next_list )
 
 #define for_each_exec_domain(_d,_ed) \
- for ( (_ed) = _d->exec_domain[0]; (_ed) != NULL; (_ed) = (_ed)->ed_next_list )
+ for ( (_ed) = (_d)->exec_domain[0]; \
+       (_ed) != NULL;                \
+       (_ed) = (_ed)->ed_next_list )
 
 #define EDF_DONEFPUINIT  0 /* Has the FPU been initialised for this task?    */
 #define EDF_USEDFPU      1 /* Has this task used the FPU since last save?    */
