@@ -41,8 +41,8 @@ alloc_dom_mem(struct domain *d,
     struct pfn_info *page;
     unsigned long    i;
 
-    if ( unlikely(!array_access_ok(extent_list, nr_extents,
-                                   sizeof(*extent_list))) )
+    if ( (extent_list != NULL) && 
+         !array_access_ok(extent_list, nr_extents, sizeof(*extent_list)) )
         return start_extent;
 
     if ( (extent_order != 0) && !IS_CAPABLE_PHYSDEV(current->domain) )
@@ -62,7 +62,8 @@ alloc_dom_mem(struct domain *d,
         }
 
         /* Inform the domain of the new page's machine address. */ 
-        if ( unlikely(__put_user(page_to_pfn(page), &extent_list[i]) != 0) )
+        if ( (extent_list != NULL) && 
+             (__put_user(page_to_pfn(page), &extent_list[i]) != 0) )
             return i;
     }
 
@@ -79,8 +80,7 @@ free_dom_mem(struct domain *d,
     struct pfn_info *page;
     unsigned long    i, j, mpfn;
 
-    if ( unlikely(!array_access_ok(extent_list, nr_extents,
-                                   sizeof(*extent_list))) )
+    if ( !array_access_ok(extent_list, nr_extents, sizeof(*extent_list)) )
         return start_extent;
 
     for ( i = start_extent; i < nr_extents; i++ )

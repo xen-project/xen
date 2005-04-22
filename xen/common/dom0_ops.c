@@ -19,7 +19,6 @@
 #include <xen/physdev.h>
 #include <public/sched_ctl.h>
 
-extern unsigned int alloc_new_dom_mem(struct domain *, unsigned int);
 extern long arch_do_dom0_op(dom0_op_t *op, dom0_op_t *u_dom0_op);
 extern void arch_getdomaininfo_ctxt(
     struct exec_domain *, full_execution_context_t *);
@@ -153,9 +152,12 @@ long do_dom0_op(dom0_op_t *u_dom0_op)
 
     case DOM0_CREATEDOMAIN:
     {
-        struct domain *d;
-        unsigned int   pro;
-        domid_t        dom;
+        struct domain      *d;
+        unsigned int        pro;
+        domid_t             dom;
+        struct exec_domain *ed;
+        unsigned int        i, ht, cnt[NR_CPUS] = { 0 };
+
 
         dom = op->u.createdomain.domain;
         if ( (dom > 0) && (dom < DOMID_FIRST_RESERVED) )
@@ -165,45 +167,31 @@ long do_dom0_op(dom0_op_t *u_dom0_op)
                 break;
         }
         else if ( (ret = allocate_domid(&dom)) != 0 )
-            break;
-
-        if ( op->u.createdomain.cpu == -1 )
         {
-            /* Do an initial placement. Pick the least-populated CPU. */
-            struct domain *d;
-            struct exec_domain *ed;
-            unsigned int i, ht, cnt[NR_CPUS] = { 0 };
-
-            read_lock(&domlist_lock);
-            for_each_domain ( d ) {
-                for_each_exec_domain ( d, ed )
-                    cnt[ed->processor]++;
-            }
-            read_unlock(&domlist_lock);
-
-            /* If we're on a HT system, we only use the first HT for dom0,
-               other domains will all share the second HT of each CPU.
-	       Since dom0 is on CPU 0, we favour high numbered CPUs in
-	       the event of a tie */
-            ht = opt_noht ? 1 : ht_per_core;
-            pro = ht-1;
-            for ( i = pro; i < smp_num_cpus; i += ht )
-		if ( cnt[i] <= cnt[pro] )
-		    pro = i;
+            break;
         }
-        else
-            pro = op->u.createdomain.cpu % smp_num_cpus;
+
+        /* Do an initial CPU placement. Pick the least-populated CPU. */
+        read_lock(&domlist_lock);
+        for_each_domain ( d )
+            for_each_exec_domain ( d, ed )
+                cnt[ed->processor]++;
+        read_unlock(&domlist_lock);
+        
+        /*
+         * If we're on a HT system, we only use the first HT for dom0, other 
+         * domains will all share the second HT of each CPU. Since dom0 is on 
+	     * CPU 0, we favour high numbered CPUs in the event of a tie.
+         */
+        ht = opt_noht ? 1 : ht_per_core;
+        pro = ht-1;
+        for ( i = pro; i < smp_num_cpus; i += ht )
+            if ( cnt[i] <= cnt[pro] )
+                pro = i;
 
         ret = -ENOMEM;
         if ( (d = do_createdomain(dom, pro)) == NULL )
             break;
-
-        ret = alloc_new_dom_mem(d, op->u.createdomain.memory_kb);
-        if ( ret != 0 ) 
-        {
-            domain_kill(d);
-            break;
-        }
 
         ret = 0;
         
@@ -416,33 +404,14 @@ long do_dom0_op(dom0_op_t *u_dom0_op)
     }
     break;
 
-    case DOM0_SETDOMAININITIALMEM:
-    {
-        struct domain *d; 
-        ret = -ESRCH;
-        d = find_domain_by_id(op->u.setdomaininitialmem.domain);
-        if ( d != NULL )
-        { 
-            /* should only be used *before* domain is built. */
-            if ( !test_bit(DF_CONSTRUCTED, &d->d_flags) )
-                ret = alloc_new_dom_mem( 
-                    d, op->u.setdomaininitialmem.initial_memkb );
-            else
-                ret = -EINVAL;
-            put_domain(d);
-        }
-    }
-    break;
-
     case DOM0_SETDOMAINMAXMEM:
     {
         struct domain *d; 
         ret = -ESRCH;
-        d = find_domain_by_id( op->u.setdomainmaxmem.domain );
+        d = find_domain_by_id(op->u.setdomainmaxmem.domain);
         if ( d != NULL )
         {
-            d->max_pages = 
-                (op->u.setdomainmaxmem.max_memkb+PAGE_SIZE-1)>> PAGE_SHIFT;
+            d->max_pages = op->u.setdomainmaxmem.max_memkb >> (PAGE_SHIFT-10);
             put_domain(d);
             ret = 0;
         }

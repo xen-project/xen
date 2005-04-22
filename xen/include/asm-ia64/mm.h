@@ -161,7 +161,6 @@ static inline int get_page(struct pfn_info *page,
 	dummy();
 }
 
-// see alloc_new_dom_mem() in common/domain.c
 #define	set_machinetophys(_mfn, _pfn) do { } while(0);
 
 #ifdef MEMORY_GUARD

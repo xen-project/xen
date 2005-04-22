@@ -26,8 +26,6 @@
 #define TRC_DOM0OP_ENTER_BASE  0x00020000
 #define TRC_DOM0OP_LEAVE_BASE  0x00030000
 
-extern unsigned int alloc_new_dom_mem(struct domain *, unsigned int);
-
 static int msr_cpu_mask;
 static unsigned long msr_addr;
 static unsigned long msr_lo;

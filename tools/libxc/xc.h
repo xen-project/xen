@@ -353,10 +353,6 @@ int xc_physinfo(int xc_handle,
 int xc_sched_id(int xc_handle,
                 int *sched_id);
 
-int xc_domain_setinitialmem(int xc_handle,
-                            u32 domid, 
-                            unsigned int initial_memkb);
-
 int xc_domain_setmaxmem(int xc_handle,
                         u32 domid, 
                         unsigned int max_memkb);
