@@ -42,6 +42,8 @@
 #define shadow_mode_translate(_d) ((_d)->arch.shadow_mode & SHM_translate)
 #define shadow_mode_external(_d)  ((_d)->arch.shadow_mode & SHM_external)
 
+#define shadow_tainted_refcnts(_d) ((_d)->arch.shadow_tainted_refcnts)
+
 #define shadow_linear_pg_table ((l1_pgentry_t *)SH_LINEAR_PT_VIRT_START)
 #define __shadow_linear_l2_table ((l2_pgentry_t *)(SH_LINEAR_PT_VIRT_START + \
      (SH_LINEAR_PT_VIRT_START >> (L2_PAGETABLE_SHIFT - L1_PAGETABLE_SHIFT))))
@@ -173,11 +175,13 @@ shadow_sync_va(struct exec_domain *ed, unsigned long gva)
 extern void __shadow_mode_disable(struct domain *d);
 static inline void shadow_mode_disable(struct domain *d)
 {
-    if ( shadow_mode_enabled(d) )
+    if ( unlikely(shadow_mode_enabled(d)) )
+    {
+        shadow_lock(d);
         __shadow_mode_disable(d);
+        shadow_unlock(d);
+    }
 }
-
-extern void shadow_mode_destroy(struct domain *d);
 
 /************************************************************************/
 

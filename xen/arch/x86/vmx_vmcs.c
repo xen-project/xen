@@ -160,27 +160,11 @@ void vmx_do_launch(struct exec_domain *ed)
     unsigned int tr, cpu, error = 0;
     struct host_execution_env host_env;
     struct Xgt_desc_struct desc;
-    struct list_head *list_ent;
-    unsigned long i, pfn = 0;
+    unsigned long pfn = 0;
     struct pfn_info *page;
     execution_context_t *ec = get_execution_context();
-    struct domain *d = ed->domain;
 
-    cpu =  smp_processor_id();
-    d->arch.min_pfn = d->arch.max_pfn = 0;
-
-    spin_lock(&d->page_alloc_lock);
-    list_ent = d->page_list.next;
-
-    for ( i = 0; list_ent != &d->page_list; i++ )
-    {
-        pfn = list_entry(list_ent, struct pfn_info, list) - frame_table;
-        d->arch.min_pfn = min(d->arch.min_pfn, pfn);
-        d->arch.max_pfn = max(d->arch.max_pfn, pfn);
-        list_ent = frame_table[pfn].list.next;
-    }
-
-    spin_unlock(&d->page_alloc_lock);
+    cpu = smp_processor_id();
 
     page = (struct pfn_info *) alloc_domheap_page(NULL);
     pfn = (unsigned long) (page - frame_table);

@@ -1111,9 +1111,17 @@ static void free_out_of_sync_entries(struct domain *d)
             d->arch.out_of_sync_extras_count);
 }
 
-void shadow_mode_destroy(struct domain *d)
+void __shadow_mode_disable(struct domain *d)
 {
-    shadow_lock(d);
+    if ( unlikely(!shadow_mode_enabled(d)) )
+        return;
+
+    /*
+     * Currently this does not fix up page ref counts, so it is valid to call
+     * only when a domain is being destroyed.
+     */
+    BUG_ON(!test_bit(DF_DYING, &d->d_flags));
+    d->arch.shadow_tainted_refcnts = 1;
 
     free_shadow_pages(d);
     free_writable_pte_predictions(d);
@@ -1130,26 +1138,6 @@ void shadow_mode_destroy(struct domain *d)
         }
     }
 #endif
-    
-    d->arch.shadow_mode = 0;
-
-    free_shadow_ht_entries(d);
-    free_out_of_sync_entries(d);
-
-    shadow_unlock(d);
-}    
-
-void __shadow_mode_disable(struct domain *d)
-{
-    // This needs rethinking for the full shadow mode stuff.
-    //
-    // Among other things, ref counts need to be restored to a sensible
-    // state for a non-shadow-mode guest...
-    // This is probably easiest to do by stealing code from audit_domain().
-    //
-    BUG();
-
-    free_shadow_pages(d);
     
     d->arch.shadow_mode = 0;
 
@@ -1293,7 +1281,7 @@ int shadow_mode_control(struct domain *d, dom0_shadow_control_t *sc)
     switch ( op )
     {
     case DOM0_SHADOW_CONTROL_OP_OFF:
-        shadow_mode_disable(d);
+        __shadow_mode_disable(d);
         break;
 
     case DOM0_SHADOW_CONTROL_OP_ENABLE_TEST:
@@ -1303,12 +1291,14 @@ int shadow_mode_control(struct domain *d, dom0_shadow_control_t *sc)
 
     case DOM0_SHADOW_CONTROL_OP_ENABLE_LOGDIRTY:
         free_shadow_pages(d);
-        rc = __shadow_mode_enable(d, d->arch.shadow_mode|SHM_enable|SHM_log_dirty);
+        rc = __shadow_mode_enable(
+            d, d->arch.shadow_mode|SHM_enable|SHM_log_dirty);
         break;
 
     case DOM0_SHADOW_CONTROL_OP_ENABLE_TRANSLATE:
         free_shadow_pages(d);
-        rc = __shadow_mode_enable(d, d->arch.shadow_mode|SHM_enable|SHM_translate);
+        rc = __shadow_mode_enable(
+            d, d->arch.shadow_mode|SHM_enable|SHM_translate);
         break;
 
     default:
@@ -2165,6 +2155,9 @@ u32 shadow_remove_all_access(struct domain *d, unsigned long forbidden_gmfn)
     int i;
     struct shadow_status *a;
     u32 count = 0;
+
+    if ( unlikely(!shadow_mode_enabled(d)) )
+        return 0;
 
     ASSERT(spin_is_locked(&d->arch.shadow_lock));
     perfc_incrc(remove_all_access);

@@ -991,36 +991,24 @@ void domain_relinquish_resources(struct domain *d)
     {
         if ( pagetable_val(ed->arch.guest_table) != 0 )
         {
-            struct pfn_info *page =
-                &frame_table[pagetable_val(ed->arch.guest_table)>>PAGE_SHIFT];
-
-            if ( shadow_mode_enabled(d) )
-                put_page(page);
-            else
-                put_page_and_type(page);
-
+            (shadow_mode_enabled(d) ? put_page : put_page_and_type)
+                (&frame_table[pagetable_val(
+                    ed->arch.guest_table) >> PAGE_SHIFT]);
             ed->arch.guest_table = mk_pagetable(0);
         }
 
         if ( pagetable_val(ed->arch.guest_table_user) != 0 )
         {
-            struct pfn_info *page =
-                &frame_table[pagetable_val(ed->arch.guest_table_user)
-                             >> PAGE_SHIFT];
-
-            if ( shadow_mode_enabled(d) )
-                put_page(page);
-            else
-                put_page_and_type(page);
-
+            (shadow_mode_enabled(d) ? put_page : put_page_and_type)
+                (&frame_table[pagetable_val(
+                    ed->arch.guest_table_user) >> PAGE_SHIFT]);
             ed->arch.guest_table_user = mk_pagetable(0);
         }
 
         vmx_relinquish_resources(ed);
     }
 
-    /* Exit shadow mode before deconstructing final guest page table. */
-    shadow_mode_destroy(d);
+    shadow_mode_disable(d);
 
     /*
      * Relinquish GDT mappings. No need for explicit unmapping of the LDT as 

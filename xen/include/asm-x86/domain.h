@@ -26,11 +26,11 @@ struct arch_domain
     /* I/O-port access bitmap mask. */
     u8 *iobmp_mask;       /* Address of IO bitmap mask, or NULL.      */
 
-    /* shadow mode status and controls */
+    /* Shadow mode status and controls. */
     unsigned int shadow_mode;  /* flags to control shadow table operation */
     spinlock_t   shadow_lock;
-    unsigned long min_pfn;     /* min host physical */
-    unsigned long max_pfn;     /* max host physical */
+    /* Shadow mode has tainted page reference counts? */
+    unsigned int shadow_tainted_refcnts;
 
     /* shadow hashtable */
     struct shadow_status *shadow_ht;
