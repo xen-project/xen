@@ -197,8 +197,6 @@ class XfrdInfo:
         """Add an error to the error list.
         Returns the error added.
         """
-        #while isinstance(err, Failure):
-        #    err = err.value
         if err not in self.errors:
             self.errors.append(err)
         return err
@@ -386,8 +384,6 @@ class XendMigrateInfo(XfrdInfo):
         self.state = 'ok'
         self.dst_dom = dom
         self.xd.domain_destroy(self.src_dom)
-        #if not self.deferred.called:
-        #    self.deferred.callback(self)
 
     def connectionLost(self, reason=None):
         print 'XendMigrateInfo>connectionLost>', reason
@@ -437,8 +433,6 @@ class XendSaveInfo(XfrdInfo):
     def xfr_save_ok(self, xfrd, val):
         self.state = 'ok'
         self.xd.domain_destroy(self.src_dom)
-        #if not self.deferred.called:
-        #    self.deferred.callback(self)
 
     def connectionLost(self, reason=None):
         print 'XendSaveInfo>connectionLost>', reason
@@ -479,8 +473,6 @@ class XendRestoreInfo(XfrdInfo):
         dom = int(sxp.child0(val))
         dominfo = self.xd.domain_get(dom)
         self.state = 'ok'
-        if not self.deferred.called:
-            self.deferred.callback(dominfo)
          
     def connectionLost(self, reason=None):
         XfrdInfo.connectionLost(self, reason)
@@ -548,7 +540,6 @@ class XendMigrate:
         Remove the session from the table when it finishes.
 
         @param info: session
-        @return: deferred
         """
         self._add_session(info)
         try:
@@ -563,7 +554,6 @@ class XendMigrate:
         @param dominfo:  domain info
         @param host: destination host
         @param port: destination port
-        @return: deferred
         """
         xid = self.nextid()
         info = XendMigrateInfo(xid, dominfo, host, port, live, resource)
@@ -574,7 +564,6 @@ class XendMigrate:
 
         @param dominfo:  domain info
         @param file: destination file
-        @return: deferred
         """
         xid = self.nextid()
         info = XendSaveInfo(xid, dominfo, file)

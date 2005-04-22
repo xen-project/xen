@@ -132,7 +132,7 @@ class EventServer:
         if async:
             reactor.callLater(0, self.call_handlers, event, val)
         else:
-            self.notify_handlers(event, val)
+            self.call_handlers(event, val)
 
     def call_handlers(self, event, val):
         """Internal method to call event handlers.
