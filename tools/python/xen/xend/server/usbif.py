@@ -62,7 +62,6 @@ class UsbBackend:
         """Connect the controller to the usbif control interface.
 
         @param recreate: true if after xend restart
-        @return: deferred
         """
         log.debug("Connecting usbif %s", str(self))
         if recreate or self.connected or self.connecting:

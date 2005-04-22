@@ -72,6 +72,8 @@ class SocketServerConnection:
                 return True
 
     def dataReceived(self, data):
+        if not self.connected:
+            return True
         if not self.protocol:
             return True
         try:
@@ -79,7 +81,7 @@ class SocketServerConnection:
         except SystemExit:
             raise
         except Exception, ex:
-            self.disconnect(ex)
+            self.loseConnection(ex)
             return True
         return False
 
@@ -261,7 +263,7 @@ class SocketClientConnection:
         except SystemExit:
             raise
         except Exception, ex:
-            self.disconnect(ex)
+            self.loseConnection(ex)
 
     def mainLoop(self):
         # Something a protocol could call.
@@ -282,7 +284,7 @@ class SocketClientConnection:
             if ex.args[0] in (EWOULDBLOCK, EAGAIN, EINTR):
                 return False
             else:
-                self.disconnect(ex)
+                self.loseConnection(ex)
                 return True
 
     def read(self):
@@ -293,7 +295,7 @@ class SocketClientConnection:
             if ex.args[0] in (EWOULDBLOCK, EAGAIN, EINTR):
                 return None
             else:
-                self.disconnect(ex)
+                self.loseConnection(ex)
                 return True
         
     def dataReceived(self, data):
@@ -304,11 +306,11 @@ class SocketClientConnection:
         except SystemExit:
             raise
         except Exception, ex:
-            self.disconnect(ex)
+            self.loseConnection(ex)
             return True
         return False
 
-    def disconnect(self, reason=None):
+    def loseConnection(self, reason=None):
         self.thread = None
         self.closeSocket(reason)
         self.closeProtocol(reason)
@@ -350,6 +352,8 @@ class SocketConnector:
 
     def __init__(self, factory):
         self.factoryStarted = False
+        self.clientLost = False
+        self.clientFailed = False
         self.factory = factory
         self.state = "disconnected"
         self.transport = None
@@ -364,11 +368,14 @@ class SocketConnector:
         if self.state != "disconnected":
             raise socket.error(EINVAL, "cannot connect in state " + self.state)
         self.state = "connecting"
+        self.clientLost = False
+        self.clientFailed = False
         if not self.factoryStarted:
             self.factoryStarted = True
             self.factory.doStart()
-        self.factory.startedConnecting()
+        self.factory.startedConnecting(self)
         self.connectTransport()
+        self.state = "connected"
 
     def stopConnecting(self):
         if self.state != "connecting":
@@ -380,8 +387,12 @@ class SocketConnector:
         return self.factory.buildProtocol(addr)
 
     def connectionLost(self, reason=None):
-        self.factory.doStop()
+        if not self.clientLost:
+            self.clientLost = True
+            self.factory.clientConnectionLost(self, reason)
 
     def connectionFailed(self, reason=None):
-        self.factory.doStop()
+        if not self.clientFailed:
+            self.clientFailed = True
+            self.factory.clientConnectionFailed(self, reason)
         

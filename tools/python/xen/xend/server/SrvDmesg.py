@@ -19,19 +19,15 @@ class SrvDmesg(SrvDir):
         self.perform(req)
 
     def render_GET(self, req):
-        try:
-            if self.use_sxp(req):
-                req.setHeader("Content-Type", "text/plain")
-                req.write(self.info())
-            else:
-                req.write('<html><head></head><body>')
-                self.print_path(req)
-                req.write('<pre>')
-                req.write(self.info())
-                req.write('</pre></body></html>')
-            return ''
-        except Exception, ex:
-            self._perform_err(ex, req)
+        if self.use_sxp(req):
+            req.setHeader("Content-Type", "text/plain")
+            req.write(self.info())
+        else:
+            req.write('<html><head></head><body>')
+            self.print_path(req)
+            req.write('<pre>')
+            req.write(self.info())
+            req.write('</pre></body></html>')
             
     def info(self):
         return self.xd.info()

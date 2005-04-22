@@ -18,7 +18,4 @@ class SrvXendLog(SrvDir):
         self.logfile.encoding = None
 
     def render_GET(self, req):
-        try:
-            return self.logfile.render(req)
-        except Exception, ex:
-            self._perform_err(ex, 'log', req)
+        return self.logfile.render(req)

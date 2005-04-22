@@ -68,7 +68,7 @@ class SrvDomainDir(SrvDir):
             raise XendError("Error creating domain: " + str(ex))
 
     def _op_create_cb(self, dominfo, configstring, req):
-        """Callback to handle deferred domain creation.
+        """Callback to handle domain creation.
         """
         dom = dominfo.name
         domurl = "%s/%s" % (req.prePathURL(), dom)
@@ -90,14 +90,13 @@ class SrvDomainDir(SrvDir):
     def op_restore(self, op, req):
         """Restore a domain from file.
 
-        @return: deferred
         """
+        return req.threadRequest(self.do_restore, op, req)
+
+    def do_restore(self, op, req):
         fn = FormFn(self.xd.domain_restore,
                     [['file', 'str']])
         dominfo = fn(req.args)
-        return self._op_restore_cb(dominfo, req)
-
-    def _op_restore_cb(self, dominfo, req):
         dom = dominfo.name
         domurl = "%s/%s" % (req.prePathURL(), dom)
         req.setResponseCode(http.CREATED)
@@ -116,20 +115,16 @@ class SrvDomainDir(SrvDir):
         return self.perform(req)
 
     def render_GET(self, req):
-        try:
-            if self.use_sxp(req):
-                req.setHeader("Content-Type", sxp.mime_type)
-                self.ls_domain(req, 1)
-            else:
-                req.write("<html><head></head><body>")
-                self.print_path(req)
-                self.ls(req)
-                self.ls_domain(req)
-                self.form(req)
-                req.write("</body></html>")
-            return ''
-        except Exception, ex:
-            self._perform_err(ex, req)
+        if self.use_sxp(req):
+            req.setHeader("Content-Type", sxp.mime_type)
+            self.ls_domain(req, 1)
+        else:
+            req.write("<html><head></head><body>")
+            self.print_path(req)
+            self.ls(req)
+            self.ls_domain(req)
+            self.form(req)
+            req.write("</body></html>")
 
     def ls_domain(self, req, use_sxp=0):
         url = req.prePathURL()

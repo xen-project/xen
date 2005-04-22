@@ -75,20 +75,16 @@ class SrvVnetDir(SrvDir):
         return self.perform(req)
 
     def render_GET(self, req):
-        try:
-            if self.use_sxp(req):
-                req.setHeader("Content-Type", sxp.mime_type)
-                self.ls_vnet(req, 1)
-            else:
-                req.write("<html><head></head><body>")
-                self.print_path(req)
-                self.ls(req)
-                self.ls_vnet(req)
-                self.form(req)
-                req.write("</body></html>")
-            return ''
-        except Exception, ex:
-            self._perform_err(ex, req)
+        if self.use_sxp(req):
+            req.setHeader("Content-Type", sxp.mime_type)
+            self.ls_vnet(req, 1)
+        else:
+            req.write("<html><head></head><body>")
+            self.print_path(req)
+            self.ls(req)
+            self.ls_vnet(req)
+            self.form(req)
+            req.write("</body></html>")
 
     def ls_vnet(self, req, use_sxp=0):
         url = req.prePathURL()

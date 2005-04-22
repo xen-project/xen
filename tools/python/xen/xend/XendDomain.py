@@ -369,7 +369,7 @@ class XendDomain:
 
         @param id: domain id
         """
-        dominfo = xen_domain(id)
+        dominfo = self.xen_domain(id)
         if dominfo:
             d = self.domain_by_id.get(id)
             if d:
@@ -454,7 +454,6 @@ class XendDomain:
 
         @param src:      source file
         @param progress: output progress if true
-        @return: deferred
         """
         xmigrate = XendMigrate.instance()
         return xmigrate.restore_begin(src)
@@ -667,7 +666,6 @@ class XendDomain:
         """Start domain migration.
 
         @param id: domain id
-        @return: deferred
         """
         # Need a cancel too?
         # Don't forget to cancel restart for it.
@@ -681,7 +679,6 @@ class XendDomain:
         @param id:       domain id
         @param dst:      destination file
         @param progress: output progress if true
-        @return: deferred
         """
         dominfo = self.domain_lookup(id)
         xmigrate = XendMigrate.instance()

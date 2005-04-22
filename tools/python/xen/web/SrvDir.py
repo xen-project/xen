@@ -47,9 +47,6 @@ class SrvDir(SrvBase):
         self.table = {}
         self.order = []
 
-    def __repr__(self):
-        return "<SrvDir %x %s>" %(id(self), self.table.keys())
-
     def noChild(self, msg):
         return resource.ErrorPage(http.NOT_FOUND, msg=msg)
 

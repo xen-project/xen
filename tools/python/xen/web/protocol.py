@@ -1,29 +1,52 @@
 class Factory:
+    """Generic protocol factory.
+    """
+
+    starts = 0
 
     def __init__(self):
         pass
 
-    def startedConnecting(self):
-        print 'ServerProtocolFactory>startedConnecting>'
-        pass
-
     def doStart(self):
-        print 'ServerProtocolFactory>doStart>'
-        pass
+        if self.starts == 0:
+            self.startFactory()
+        self.starts += 1
 
     def doStop(self):
-        print 'ServerProtocolFactory>doStop>'
-        pass
+        if self.starts > 0:
+            self.starts -= 1
+        else:
+            return
+        if self.starts == 0:
+            self.stopFactory()
 
     def buildProtocol(self, addr):
-        print 'ServerProtocolFactory>buildProtocol>', addr
         return Protocol(self)
 
+    def startFactory(self):
+        pass
+
+    def stopFactory(self):
+        pass
+
 class ServerFactory(Factory):
+    """Factory for server protocols.
+    """
     pass
     
 class ClientFactory(Factory):
-    pass
+    """Factory for client protocols.
+    """
+    
+    def startedConnecting(self, connector):
+        pass
+
+    def clientConnectionLost(self, connector, reason):
+        pass
+
+    def clientConnectionFailed(self, connector, reason):
+        pass
+
 
 class Protocol:
 
@@ -65,23 +88,32 @@ class Protocol:
         else:
             return None
 
-class TestClientFactory(Factory):
+class TestClientFactory(ClientFactory):
 
     def buildProtocol(self, addr):
-        print 'TestClientProtocolFactory>buildProtocol>', addr
+        print 'TestClientFactory>buildProtocol>', addr
         return TestClientProtocol(self)
     
+    def startedConnecting(self, connector):
+        print 'TestClientFactory>startedConnecting>', connector
+
+    def clientConnectionLost(self, connector, reason):
+        print 'TestClientFactory>clientConnectionLost>', connector, reason
+
+    def clientConnectionFailed(self, connector, reason):
+        print 'TestClientFactory>clientConnectionFailed>', connector, reason
+
 class TestClientProtocol(Protocol):
 
     def connectionMade(self, addr):
-        print 'TestProtocol>connectionMade>', addr
+        print 'TestClientProtocol>connectionMade>', addr
         self.write("hello")
         self.write("there")
 
 class TestServerFactory(Factory):
 
     def buildProtocol(self, addr):
-        print 'TestServerProtocolFactory>buildProtocol>', addr
+        print 'TestServerFactory>buildProtocol>', addr
         return TestServerProtocol(self)
     
 class TestServerProtocol(Protocol):

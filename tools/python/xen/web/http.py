@@ -282,7 +282,6 @@ class HttpRequest:
             header_count += 1
             if line == '\r\n' or line == '\n' or line == '':
                 break
-        #print 'parseRequestHeaders>', header_bytes
         header_input = StringIO(header_bytes)
         self.request_headers = Message(header_input)
 
@@ -329,7 +328,6 @@ class HttpRequest:
         self.content.seek(0,0)
 
     def parseRequest(self):
-        #print 'parseRequest>'
         self.request_line = self.rin.readline()
         self.parseRequestLine()
         self.parseRequestHeaders()
@@ -338,7 +336,6 @@ class HttpRequest:
         self.setCloseConnection(connection_mode)
         self.readContent()
         self.parseRequestArgs()
-        #print 'parseRequest<'
 
     def setCloseConnection(self, mode):
         if not mode: return
@@ -347,8 +344,10 @@ class HttpRequest:
             self.close_connection = True
         elif (mode == 'keep-alive') and (self.http_version >= (1, 1)):
             self.close_connection = False
-        #print 'setCloseConnection>', mode, self.close_connection
         
+    def getCloseConnection(self):
+        return self.close_connection
+
     def getHeader(self, k, v=None):
         return self.request_headers.get(k, v)
 
@@ -365,7 +364,6 @@ class HttpRequest:
         self.response_status = status
 
     def setResponseHeader(self, k, v):
-        #print 'setResponseHeader>', k, v
         k = k.lower()
         self.response_headers[k] = v
         if k == 'connection':
@@ -432,7 +430,6 @@ class HttpRequest:
         self.send("\r\n")
         
     def sendResponse(self):
-        #print 'sendResponse>'
         if self.response_sent:
             return
         self.response_sent = True
@@ -443,7 +440,6 @@ class HttpRequest:
             self.output.seek(0, 0)
             body = self.output.getvalue()
             body_length = len(body)
-            #print 'sendResponse> body=', body_length, body
             self.setResponseHeader("Content-Length", body_length)
         if self.http_version > (0, 9):
             self.send("%s %d %s\r\n" % (self.http_version_string,
@@ -451,16 +447,18 @@ class HttpRequest:
                                          self.response_status))
             self.sendResponseHeaders()
         if send_body:
-            #print 'sendResponse> writing body'
             self.send(body)
+        self.flush()
 
     def write(self, data):
-        #print 'write>', data
         self.output.write(data)
 
     def send(self, data):
-        #print 'send>', len(data), '|%s|' % data
+        #print 'send>', data
         self.out.write(data)
+
+    def flush(self):
+        self.out.flush()
 
     def hasNoBody(self):
         return ((self.request_method == "HEAD") or

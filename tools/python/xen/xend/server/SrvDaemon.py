@@ -17,9 +17,6 @@ import StringIO
 import traceback
 import time
 
-#from twisted.internet import pollreactor; pollreactor.install()
-from twisted.internet import reactor
-
 from xen.lowlevel import xu
 
 from xen.xend import sxp
@@ -330,8 +327,6 @@ class Daemon:
             self.daemonize()
             print 'running serverthread...'
             serverthread.start()
-            print 'running reactor...'
-            reactor.run()
         except Exception, ex:
             print >>sys.stderr, 'Exception starting xend:', ex
             if DEBUG:
@@ -356,7 +351,7 @@ class Daemon:
         self.channelF.start()
 
     def exit(self, rc=0):
-        reactor.disconnectAll()
+        #reactor.disconnectAll()
         self.channelF.stop()
         # Calling sys.exit() raises a SystemExit exception, which only
         # kills the current thread. Calling os._exit() makes the whole
