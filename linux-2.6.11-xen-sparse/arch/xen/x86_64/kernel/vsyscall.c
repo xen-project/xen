@@ -182,7 +182,7 @@ static int __init vsyscall_init(void)
 	BUG_ON((VSYSCALL_ADDR(0) != __fix_to_virt(VSYSCALL_FIRST_PAGE)));
 	map_vsyscall();
         map_vsyscall_user();    /* establish tranlation for user address space */
-	sysctl_vsyscall = 1; 
+	sysctl_vsyscall = 0;    /* TBD */
 
 	return 0;
 }

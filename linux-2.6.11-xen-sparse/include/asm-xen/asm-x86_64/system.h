@@ -144,8 +144,7 @@ struct alt_instr {
 /*
  * Clear and set 'TS' bit respectively
  */
-#define clts() __asm__ __volatile__ ("clts")
-
+#define clts() (HYPERVISOR_fpu_taskswitch(0))
 static inline unsigned long read_cr0(void)
 { 
         BUG();
@@ -170,8 +169,7 @@ static inline void write_cr4(unsigned long val)
 { 
         BUG();
 } 
-
-#define stts() write_cr0(8 | read_cr0())
+#define stts() (HYPERVISOR_fpu_taskswitch(1))
 
 #define wbinvd() \
 	__asm__ __volatile__ ("wbinvd": : :"memory");

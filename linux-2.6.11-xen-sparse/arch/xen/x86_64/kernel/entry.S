@@ -204,7 +204,7 @@ ENTRY(ret_from_fork)
 	jnz rff_trace
 rff_action:	
 	RESTORE_REST
-	cmpl $__KERNEL_CS,CS-ARGOFFSET(%rsp)	# from kernel_thread?
+	testl $3,CS-ARGOFFSET(%rsp)	# from kernel_thread?
 	je   int_ret_from_sys_call
 	testl $_TIF_IA32,threadinfo_flags(%rcx)
 	jnz  int_ret_from_sys_call
@@ -268,12 +268,12 @@ ret_from_sys_call:
 	/* edi:	flagmask */
 sysret_check:		
 	GET_THREAD_INFO(%rcx)
-        XEN_GET_VCPU_INFO(%r11)
-        XEN_BLOCK_EVENTS(%r11)        
+        XEN_GET_VCPU_INFO(%rsi)
+        XEN_BLOCK_EVENTS(%rsi)        
 	movl threadinfo_flags(%rcx),%edx
 	andl %edi,%edx
 	jnz  sysret_careful 
-        XEN_UNBLOCK_EVENTS(%r11)                
+        XEN_UNBLOCK_EVENTS(%rsi)                
 	RESTORE_ARGS 0,8,0
         SWITCH_TO_USER ECF_IN_SYSCALL
 
@@ -282,8 +282,8 @@ sysret_check:
 sysret_careful:
 	bt $TIF_NEED_RESCHED,%edx
 	jnc sysret_signal
-        XEN_GET_VCPU_INFO(%r11)
-        XEN_BLOCK_EVENTS(%r11)        
+        XEN_GET_VCPU_INFO(%rsi)
+        XEN_BLOCK_EVENTS(%rsi)        
 	pushq %rdi
 	call schedule
 	popq  %rdi
@@ -292,8 +292,8 @@ sysret_careful:
 	/* Handle a signal */ 
 sysret_signal:
 /*	sti */
-        XEN_GET_VCPU_INFO(%r11)
-        XEN_UNBLOCK_EVENTS(%r11)        
+        XEN_GET_VCPU_INFO(%rsi)
+        XEN_UNBLOCK_EVENTS(%rsi)        
 	testl $(_TIF_SIGPENDING|_TIF_NOTIFY_RESUME|_TIF_SINGLESTEP),%edx
 	jz    1f
 
@@ -334,8 +334,8 @@ badsys:
  * Has correct top of stack, but partial stack frame.
  */ 	
 ENTRY(int_ret_from_sys_call)	
-        XEN_GET_VCPU_INFO(%r11)
-        XEN_BLOCK_EVENTS(%r11)
+        XEN_GET_VCPU_INFO(%rsi)
+        XEN_BLOCK_EVENTS(%rsi)
 	testb $3,CS-ARGOFFSET(%rsp)
         jnz 1f
         /* Need to set the proper %ss (not NULL) for ring 3 iretq */
@@ -358,8 +358,8 @@ int_careful:
 	bt $TIF_NEED_RESCHED,%edx
 	jnc  int_very_careful
 /*	sti */
-        XEN_GET_VCPU_INFO(%r11)
-        XEN_UNBLOCK_EVENTS(%r11)
+        XEN_GET_VCPU_INFO(%rsi)
+        XEN_UNBLOCK_EVENTS(%rsi)
 	pushq %rdi
 	call schedule
 	popq %rdi
@@ -368,6 +368,8 @@ int_careful:
 	/* handle signals and tracing -- both require a full stack frame */
 int_very_careful:
 /*	sti */
+        XEN_GET_VCPU_INFO(%rsi)
+        XEN_UNBLOCK_EVENTS(%rsi)
 	SAVE_REST
 	/* Check for syscall exit trace */	
 	testl $(_TIF_SYSCALL_TRACE|_TIF_SYSCALL_AUDIT|_TIF_SINGLESTEP),%edx
@@ -510,26 +512,26 @@ retint_check:
 	jnz  retint_careful
 retint_restore_args:				
 	RESTORE_ARGS 0,8,0						
-        testb $3,8(%rsp)                # check CS
-        jnz  user_mode
+	testb $3,8(%rsp)                # check CS
+	jnz  user_mode
 kernel_mode:
         orb   $3,1*8(%rsp)
 	iretq
 user_mode:
-        SWITCH_TO_USER 0                        
+	SWITCH_TO_USER 0                        
 	
 	/* edi: workmask, edx: work */	
 retint_careful:
 	bt    $TIF_NEED_RESCHED,%edx
 	jnc   retint_signal
-        XEN_GET_VCPU_INFO(%r11)
-        XEN_UNBLOCK_EVENTS(%r11)
+	XEN_GET_VCPU_INFO(%rsi)
+	XEN_UNBLOCK_EVENTS(%rsi)
 /*	sti */        
 	pushq %rdi
 	call  schedule
 	popq %rdi		
-        XEN_GET_VCPU_INFO(%r11)        
-        XEN_BLOCK_EVENTS(%r11)		
+	XEN_GET_VCPU_INFO(%rsi)        
+	XEN_BLOCK_EVENTS(%rsi)		
 	GET_THREAD_INFO(%rcx)
 /*	cli */
 	jmp retint_check
@@ -537,16 +539,16 @@ retint_careful:
 retint_signal:
 	testl $(_TIF_SIGPENDING|_TIF_NOTIFY_RESUME|_TIF_SINGLESTEP),%edx
 	jz    retint_restore_args
-        XEN_GET_VCPU_INFO(%r11)
-        XEN_UNBLOCK_EVENTS(%r11)
+        XEN_GET_VCPU_INFO(%rsi)
+        XEN_UNBLOCK_EVENTS(%rsi)
 	SAVE_REST
 	movq $-1,ORIG_RAX(%rsp) 			
 	xorq %rsi,%rsi		# oldset
 	movq %rsp,%rdi		# &pt_regs
 	call do_notify_resume
 	RESTORE_REST
-        XEN_GET_VCPU_INFO(%r11)        
-        XEN_BLOCK_EVENTS(%r11)		
+        XEN_GET_VCPU_INFO(%rsi)        
+        XEN_BLOCK_EVENTS(%rsi)		
 	movl $_TIF_NEED_RESCHED,%edi
 	GET_THREAD_INFO(%rcx)	
 	jmp retint_check
@@ -564,11 +566,11 @@ retint_kernel:
 	jc   retint_restore_args
 	movl $PREEMPT_ACTIVE,threadinfo_preempt_count(%rcx)
 /*	sti */
-        XEN_GET_VCPU_INFO(%r11)
-        XEN_BLOCK_EVENTS(%r11)
+	XEN_GET_VCPU_INFO(%rsi)
+	XEN_UNBLOCK_EVENTS(%rsi)
 	call schedule
-        XEN_GET_VCPU_INFO(%r11) /* %esi can be different */
-        XEN_UNBLOCK_EVENTS(%r11)
+	XEN_GET_VCPU_INFO(%rsi) /* %esi can be different */
+	XEN_BLOCK_EVENTS(%rsi)
 /*	cli */
 	GET_THREAD_INFO(%rcx)
 	movl $0,threadinfo_preempt_count(%rcx) 
@@ -796,7 +798,13 @@ scrit:	/**** START OF CRITICAL REGION ****/
 	jnz  14f			# process more events if necessary...
 	XEN_UNLOCK_VCPU_INFO_SMP(%rsi)
         RESTORE_REST
-        jmp retint_restore_args
+        RESTORE_ARGS 0,8,0
+        testb $3,8(%rsp)                # check CS
+        jnz  crit_user_mode
+        orb   $3,1*8(%rsp)
+        iretq
+crit_user_mode:
+        SWITCH_TO_USER 0 
         
 14:	XEN_LOCKED_BLOCK_EVENTS(%rsi)
 	XEN_UNLOCK_VCPU_INFO_SMP(%rsi)
@@ -842,32 +850,47 @@ critical_region_fixup:
 	jmp   11b
 
 critical_fixup_table:
-	.word 0x0000,0x0000,0x0000,0x0000         # testb  $0xff,0x0(%rsi)
-	.word 0x0000,0x0000                       # jne    ffffffff8010daa0 14f
-	.word 0x0000,0x0000,0x0000,0x0000         # mov    (%rsp),%r15
-	.word 0x0808,0x0808,0x0808,0x0808,0x0808  # mov    0x8(%rsp),%r14
-	.word 0x1010,0x1010,0x1010,0x1010,0x1010  # mov    0x10(%rsp),%r13
-	.word 0x1818,0x1818,0x1818,0x1818,0x1818  # mov    0x18(%rsp),%r12
-	.word 0x2020,0x2020,0x2020,0x2020,0x2020  # mov    0x20(%rsp),%rbp
-	.word 0x2828,0x2828,0x2828,0x2828,0x2828  # mov    0x28(%rsp),%rbx
-	.word 0x3030,0x3030,0x3030,0x3030         # add    $0x30,%rsp
-	.word 0x0030,0x0030,0x0030,0x0030,0x0030  # testb  $0x1,0x74(%rsp)
-	.word 0x0030,0x0030,0x0030,0x0030,0x0030,0x0030 # jne    ffffffff8010d740 <user_mode>
-	.word 0x0030,0x0030,0x0030,0x0030         # mov    (%rsp),%r11
-	.word 0x0838,0x0838,0x0838,0x0838,0x0838  # mov    0x8(%rsp),%r10
-	.word 0x1040,0x1040,0x1040,0x1040,0x1040  # mov    0x10(%rsp),%r9
-	.word 0x1848,0x1848,0x1848,0x1848,0x1848  # mov    0x18(%rsp),%r8
-	.word 0x2060,0x2060,0x2060,0x2060,0x2060  # mov    0x20(%rsp),%rax
-	.word 0x2868,0x2868,0x2868,0x2868,0x2868  # mov    0x28(%rsp),%rcx
-	.word 0x3070,0x3070,0x3070,0x3070,0x3070  # mov    0x30(%rsp),%rdx
-	.word 0x3878,0x3878,0x3878,0x3878,0x3878  # mov    0x38(%rsp),%rsi
-	.word 0x4080,0x4080,0x4080,0x4080,0x4080  # mov    0x40(%rsp),%rdi
-	.word 0x4888,0x4888,0x4888,0x4888         # add    $0x50,%rsp
-	.word 0x0000,0x0000                       # iretq
-	.word 0x0000,0x0000,0x0000,0x0000         # movb   $0x1,0x1(%rsi)
-	.word 0x0000,0x0000,0x0000                # mov    %rsp,%rdi
-	.word 0x0000,0x0000,0x0000,0x0000,0x0000  # jmpq   11b
- 
+        .byte 0x00,0x00,0x00,0x00                 # testb  $0xff,0x0(%rsi)
+        .byte 0x00,0x00,0x00,0x00,0x00,0x00       # jne    <crit_user_mode+0x42>
+        .byte 0x00,0x00,0x00,0x00                 # mov    (%rsp),%r15
+        .byte 0x00,0x00,0x00,0x00,0x00            # mov    0x8(%rsp),%r14
+        .byte 0x00,0x00,0x00,0x00,0x00            # mov    0x10(%rsp),%r13
+        .byte 0x00,0x00,0x00,0x00,0x00            # mov    0x18(%rsp),%r12
+        .byte 0x00,0x00,0x00,0x00,0x00            # mov    0x20(%rsp),%rbp
+        .byte 0x00,0x00,0x00,0x00,0x00            # mov    0x28(%rsp),%rbx
+        .byte 0x00,0x00,0x00,0x00                 # add    $0x30,%rsp
+        .byte 0x30,0x30,0x30,0x30                 # mov    (%rsp),%r11
+        .byte 0x30,0x30,0x30,0x30,0x30            # mov    0x8(%rsp),%r10
+        .byte 0x30,0x30,0x30,0x30,0x30            # mov    0x10(%rsp),%r9
+        .byte 0x30,0x30,0x30,0x30,0x30            # mov    0x18(%rsp),%r8
+        .byte 0x30,0x30,0x30,0x30,0x30            # mov    0x20(%rsp),%rax
+        .byte 0x30,0x30,0x30,0x30,0x30            # mov    0x28(%rsp),%rcx
+        .byte 0x30,0x30,0x30,0x30,0x30            # mov    0x30(%rsp),%rdx
+        .byte 0x30,0x30,0x30,0x30,0x30            # mov    0x38(%rsp),%rsi
+        .byte 0x30,0x30,0x30,0x30,0x30            # mov    0x40(%rsp),%rdi
+        .byte 0x30,0x30,0x30,0x30                 # add    $0x50,%rsp
+        .byte 0x80,0x80,0x80,0x80,0x80            # testb  $0x3,0x8(%rsp)
+        .byte 0x80,0x80                           # jne    ffffffff8010dc25 <crit_user_mode>
+        .byte 0x80,0x80,0x80,0x80                 # orb    $0x3,0x8(%rsp)
+        .byte 0x80,0x80                           # iretq
+                                                  # <crit_user_mode>:
+        .byte 0x80,0x80,0x80,0x80,0x80,0x80,0x80  # movq   $0x0,%gs:0x60
+        .byte 0x80,0x80,0x80,0x80,0x80
+        .byte 0x80,0x80,0x80,0x80                 # sub    $0x20,%rsp
+        .byte 0x60,0x60,0x60,0x60                 # mov    %rax,(%rsp)
+        .byte 0x60,0x60,0x60,0x60,0x60            # mov    %r11,0x8(%rsp)
+        .byte 0x60,0x60,0x60,0x60,0x60            # mov    %rcx,0x10(%rsp)
+        .byte 0x60,0x60,0x60,0x60,0x60,0x60,0x60  # movq   $0x0,0x18(%rsp)
+        .byte 0x60,0x60
+        .byte 0x60,0x60,0x60,0x60,0x60,0x60,0x60  # movq   $0x33,0x28(%rsp)
+        .byte 0x60,0x60
+        .byte 0x60,0x60,0x60,0x60,0x60,0x60,0x60  # movq   $0x2b,0x40(%rsp)
+        .byte 0x60,0x60        
+        .byte 0x60,0x60,0x60,0x60,0x60,0x60,0x60  # mov    $0x17,%rax
+        .byte 0x60,0x60                           # syscall
+        .byte 0x60,0x60,0x60,0x60,0x60            # movb   $0x1,0x1(%rsi)
+        .byte 0x60,0x60,0x60                      # mov    %rsp,%rdi
+        .byte 0x60,0x60,0x60,0x60,0x60            # jmpq   <do_hypervisor_callback+0x20>
 # Hypervisor uses this for application faults while it executes.
 ENTRY(failsafe_callback)
         hlt         

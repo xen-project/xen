@@ -87,7 +87,9 @@ EXPORT_SYMBOL(enable_hlt);
 extern int set_timeout_timer(void);
 void xen_idle(void)
 {
-	int cpu;
+	int cpu;	
+
+	local_irq_disable();
 
 	cpu = smp_processor_id();
 	if (rcu_pending(cpu))
@@ -102,7 +104,6 @@ void xen_idle(void)
 		local_irq_enable();
 		HYPERVISOR_yield();
 	}
-        set_need_resched();
 }
 
 /*
