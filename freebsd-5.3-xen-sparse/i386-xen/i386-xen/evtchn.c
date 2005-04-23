@@ -54,7 +54,7 @@ evtchn_do_upcall(struct intrframe *frame)
 {
     unsigned long  l1, l2;
     unsigned int   l1i, l2i, port;
-    int            irq;
+    int            irq, owned;
     unsigned long  flags;
     shared_info_t *s = HYPERVISOR_shared_info;
     vcpu_info_t   *vcpu_info = &s->vcpu_data[smp_processor_id()];
@@ -78,12 +78,16 @@ evtchn_do_upcall(struct intrframe *frame)
                 l2 &= ~(1 << l2i);
             
                 port = (l1i << 5) + l2i;
+                if ( (owned = mtx_owned(&sched_lock)) != 0 )
+                    mtx_unlock_spin_flags(&sched_lock, MTX_QUIET);
                 if ( (irq = evtchn_to_irq[port]) != -1 ) {
 		    struct intsrc *isrc = intr_lookup_source(irq);
 		    intr_execute_handlers(isrc, frame);
 		} else {
                     evtchn_device_upcall(port);
 		}
+                if ( owned )
+                    mtx_lock_spin_flags(&sched_lock, MTX_QUIET);                    
             }
         }
     }
