@@ -146,7 +146,7 @@ int xc_domain_getfullinfo(int xc_handle,
                           xc_domaininfo_t *info,
                           full_execution_context_t *ctxt)
 {
-    int rc;
+    int rc, errno_saved;
     dom0_op_t op;
 
     op.cmd = DOM0_GETDOMAININFO;
@@ -154,12 +154,23 @@ int xc_domain_getfullinfo(int xc_handle,
     op.u.getdomaininfo.exec_domain = (u16)vcpu;
     op.u.getdomaininfo.ctxt = ctxt;
 
+    if ( (ctxt != NULL) &&
+         ((rc = mlock(ctxt, sizeof(*ctxt))) != 0) )
+        return rc;
+
     rc = do_dom0_op(xc_handle, &op);
 
-    if ( info )
+    if ( ctxt != NULL )
+    {
+        errno_saved = errno;
+        (void)munlock(ctxt, sizeof(*ctxt));
+        errno = errno_saved;
+    }
+
+    if ( info != NULL )
         memcpy(info, &op.u.getdomaininfo, sizeof(*info));
 
-    if ( ((u16)op.u.getdomaininfo.domain != domid) && rc > 0 )
+    if ( ((u16)op.u.getdomaininfo.domain != domid) && (rc > 0) )
         return -ESRCH;
     else
         return rc;
