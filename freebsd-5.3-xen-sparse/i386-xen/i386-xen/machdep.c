@@ -1374,7 +1374,6 @@ extern unsigned long cpu0prvpage;
 extern unsigned long *SMPpt;
 pteinfo_t *pteinfo_list;
 unsigned long *xen_machine_phys = ((unsigned long *)VADDR(1008, 0));
-pt_entry_t *KPTphysv;
 int preemptable;
 int gdt_set;
 
@@ -1386,8 +1385,9 @@ void
 initvalues(start_info_t *startinfo)
 { 
     int i;
+    vm_paddr_t pdir_shadow_ma, KPTphys;
 #ifdef WRITABLE_PAGETABLES
-    XENPRINTF("using writable pagetables\n");
+    printk("using writable pagetables\n");
     HYPERVISOR_vm_assist(VMASST_CMD_enable, VMASST_TYPE_writable_pagetables);
 #endif
 
@@ -1398,18 +1398,17 @@ initvalues(start_info_t *startinfo)
     /* pre-zero unused mapped pages */
     bzero((char *)(KERNBASE + (tmpindex << PAGE_SHIFT)), (1024 - tmpindex)*PAGE_SIZE); 
     IdlePTD = (pd_entry_t *)xpmap_ptom(__pa(startinfo->pt_base));
-    KPTphysv = (pt_entry_t *)(startinfo->pt_base + PAGE_SIZE);
+    KPTphys = xpmap_ptom(__pa(startinfo->pt_base + PAGE_SIZE));
     XENPRINTF("IdlePTD %p\n", IdlePTD);
     XENPRINTF("nr_pages: %ld shared_info: 0x%lx flags: 0x%lx pt_base: 0x%lx "
 	      "mod_start: 0x%lx mod_len: 0x%lx\n",
 	      xen_start_info->nr_pages, xen_start_info->shared_info, 
 	      xen_start_info->flags, xen_start_info->pt_base, 
 	      xen_start_info->mod_start, xen_start_info->mod_len);
-    
-    /* setup self-referential mapping first so vtomach will work */
-    xen_queue_pt_update(IdlePTD + PTDPTDI , (unsigned long)IdlePTD | 
-			PG_V | PG_A);
-    xen_flush_queue();
+
+
+
+
     /* Map proc0's UPAGES */
     proc0uarea = (struct user *)(KERNBASE + (tmpindex << PAGE_SHIFT));
     tmpindex += UAREA_PAGES;
@@ -1439,9 +1438,11 @@ initvalues(start_info_t *startinfo)
     /* map SMP page table RO */
     PT_SET_MA(SMPpt, vtomach(SMPpt) & ~PG_RW);
 
-    /* put the page table into the pde */
-    xen_queue_pt_update(IdlePTD + MPPTDI, xpmap_ptom((tmpindex << PAGE_SHIFT))| PG_M | PG_RW | PG_V | PG_A);
-
+    /* put the page table into the page directory */
+    xen_queue_pt_update((vm_paddr_t)(IdlePTD + MPPTDI), 
+			xpmap_ptom((tmpindex << PAGE_SHIFT))| PG_M | PG_RW | PG_V | PG_A);
+    xen_queue_pt_update(pdir_shadow_ma + MPPTDI*sizeof(vm_paddr_t), 
+			xpmap_ptom((tmpindex << PAGE_SHIFT))| PG_V | PG_A);
     tmpindex++;
 #endif
 
@@ -1454,16 +1455,34 @@ initvalues(start_info_t *startinfo)
 #endif
     /* unmap remaining pages from initial 4MB chunk */
     for (i = tmpindex; i%1024 != 0; i++) 
-	PT_CLEAR_VA(KPTphysv + i, TRUE);
+	xen_queue_pt_update(KPTphys + i*sizeof(vm_paddr_t), 0);
+    xen_flush_queue();
+    
+    pdir_shadow_ma = xpmap_ptom(tmpindex << PAGE_SHIFT);
+    tmpindex++;
+
+    /* setup shadow mapping first so vtomach will work */
+    xen_pt_pin((vm_paddr_t)pdir_shadow_ma);
+    xen_queue_pt_update((vm_paddr_t)(IdlePTD + PTDPTDI), 
+			pdir_shadow_ma | PG_V | PG_A | PG_RW | PG_M);
+    xen_queue_pt_update(pdir_shadow_ma + PTDPTDI*sizeof(vm_paddr_t), 
+			((vm_paddr_t)IdlePTD) | PG_V | PG_A);
+    xen_queue_pt_update(pdir_shadow_ma + KPTDI*sizeof(vm_paddr_t), 
+			KPTphys | PG_V | PG_A);
 
     /* allocate remainder of NKPT pages */
-    for (i = 0; i < NKPT-1; i++, tmpindex++)
-	PD_SET_VA(((unsigned long *)startinfo->pt_base) + KPTDI + i + 1, (tmpindex << PAGE_SHIFT)| PG_M | PG_RW | PG_V | PG_A, TRUE);
+    for (i = 0; i < NKPT-1; i++, tmpindex++) {
+	xen_queue_pt_update((vm_paddr_t)(IdlePTD + KPTDI + i + 1), 
+			    xpmap_ptom((tmpindex << PAGE_SHIFT)| PG_M | PG_RW | PG_V | PG_A));
+	xen_queue_pt_update(pdir_shadow_ma + (KPTDI + i + 1)*sizeof(vm_paddr_t), 
+			    xpmap_ptom((tmpindex << PAGE_SHIFT)| PG_V | PG_A));
+    }
     tmpindex += NKPT-1;
     PT_UPDATES_FLUSH();
 
     HYPERVISOR_shared_info = (shared_info_t *)(KERNBASE + (tmpindex << PAGE_SHIFT));
-    PT_SET_MA(HYPERVISOR_shared_info, xen_start_info->shared_info | PG_A | PG_V | PG_RW | PG_M);
+    PT_SET_MA(HYPERVISOR_shared_info, 
+	      xen_start_info->shared_info | PG_A | PG_V | PG_RW | PG_M);
     tmpindex++;
 
     HYPERVISOR_shared_info->arch.pfn_to_mfn_frame_list = (unsigned long)xen_phys_machine;
@@ -1572,10 +1591,9 @@ init386(void)
 
 	PT_SET_MA(gdt, *vtopte((unsigned long)gdt) & ~PG_RW);
 	gdtmachpfn = vtomach(gdt) >> PAGE_SHIFT;
-	if (HYPERVISOR_set_gdt(&gdtmachpfn, LAST_RESERVED_GDT_ENTRY + 1)) {
-	    XENPRINTF("set_gdt failed\n");
-
-	}
+	if ((error = HYPERVISOR_set_gdt(&gdtmachpfn, LAST_RESERVED_GDT_ENTRY + 1))) 
+	    panic("set_gdt failed");
+	
 	lgdt_finish();
 	gdt_set = 1;
 

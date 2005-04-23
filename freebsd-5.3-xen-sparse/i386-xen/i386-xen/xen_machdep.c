@@ -474,7 +474,7 @@ xen_machphys_update(unsigned long mfn, unsigned long pfn)
 }
 
 void
-xen_queue_pt_update(pt_entry_t *ptr, pt_entry_t val)
+xen_queue_pt_update(vm_paddr_t ptr, vm_paddr_t val)
 {
     SET_VCPU();
     

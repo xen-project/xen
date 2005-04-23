@@ -88,11 +88,13 @@ static inline int
 HYPERVISOR_set_gdt(unsigned long *frame_list, int entries)
 {
     int ret;
+    unsigned long ign1, ign2;
+
     __asm__ __volatile__ (
         TRAP_INSTR
-        : "=a" (ret) : "0" (__HYPERVISOR_set_gdt), 
-        "b" (frame_list), "c" (entries) : "memory" );
-
+        : "=a" (ret), "=b" (ign1), "=c" (ign2)
+        : "0" (__HYPERVISOR_set_gdt), "1" (frame_list), "2" (entries)
+        : "memory" );
 
     return ret;
 }
