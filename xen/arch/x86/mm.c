@@ -2802,7 +2802,11 @@ int ptwr_do_page_fault(struct domain *d, unsigned long addr)
      * update to ensure we make progress.
      */
     if ( d->arch.ptwr[which].prev_nr_updates == 0 )
+    {
+        /* Ensure that we don't get stuck in an emulation-only rut. */
+        d->arch.ptwr[which].prev_nr_updates = 1;
         goto emulate;
+    }
 
     d->arch.ptwr[which].l1va   = addr | 1;
     d->arch.ptwr[which].l2_idx = l2_idx;
