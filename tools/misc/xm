@@ -4,6 +4,7 @@ import sys
 
 # add fallback path for non-native python path installs if needed
 sys.path.append('/usr/lib/python')
+sys.path.append('/usr/lib64/python')
 from xen.xm import main
 
 main.main(sys.argv)

@@ -24,6 +24,7 @@ import re
 
 # add fallback path for non-native python path installs if needed
 sys.path.append('/usr/lib/python')
+sys.path.append('/usr/lib64/python')
 from xen.xend.server.params import XEND_PID_FILE
 
 class CheckError(ValueError):

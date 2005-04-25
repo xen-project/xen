@@ -32,6 +32,7 @@ XCS_ARGS    = (XCS_EXEC, "-p", XCS_PIDFILE)
 
 # add fallback path for non-native python path installs if needed
 sys.path.append('/usr/lib/python')
+sys.path.append('/usr/lib64/python')
 from xen.xend.server import SrvDaemon
 
 class CheckError(ValueError):

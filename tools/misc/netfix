@@ -11,6 +11,7 @@ from getopt import getopt
 
 # add fallback path for non-native python path installs if needed
 sys.path.append('/usr/lib/python')
+sys.path.append('/usr/lib64/python')
 from xen.util.Brctl import *
 
 short_options = 'hvqni:b:c'
