@@ -89,6 +89,7 @@ extern unsigned int cpu_rev;
 #define TYPE_MOV_TO_CR                  (0 << 4) 
 #define TYPE_MOV_FROM_CR                (1 << 4)
 #define TYPE_CLTS                       (2 << 4)
+#define	TYPE_LMSW			(3 << 4)
 #define CONTROL_REG_ACCESS_REG          0x700   /* 10:8, general purpose register */
 #define REG_EAX                         (0 << 8) 
 #define REG_ECX                         (1 << 8) 
@@ -98,6 +99,7 @@ extern unsigned int cpu_rev;
 #define REG_EBP                         (5 << 8) 
 #define REG_ESI                         (6 << 8) 
 #define REG_EDI                         (7 << 8) 
+#define	LMSW_SOURCE_DATA		(0xFFFF << 16) /* 16:31 lmsw source */
 
 /*
  * Exit Qualifications for MOV for Debug Register Access

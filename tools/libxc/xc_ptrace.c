@@ -75,7 +75,7 @@ struct gdb_regs {
 	int retval = xc_domain_getfullinfo(xc_handle, domid, cpu, NULL, &ctxt[cpu]); \
 	if (retval) \
 	    goto error_out; \
-	cr3[cpu] = ctxt[cpu].pt_base; \
+	cr3[cpu] = ctxt[cpu].pt_base; /* physical address */ \
 	regs_valid[cpu] = 1; \
     } \
 
@@ -128,10 +128,11 @@ struct gdb_regs {
 
 
 static int                      xc_handle;
+static long			nr_pages = 0;
+unsigned long			*page_array = NULL;
 static int                      regs_valid[MAX_VIRT_CPUS];
 static unsigned long            cr3[MAX_VIRT_CPUS];
 static full_execution_context_t ctxt[MAX_VIRT_CPUS];
-
 
 /* --------------------- */
 
@@ -140,6 +141,7 @@ map_domain_va(unsigned long domid, int cpu, void * guest_va, int perm)
 {
     unsigned long pde, page;
     unsigned long va = (unsigned long)guest_va;
+    long npgs = xc_get_tot_pages(xc_handle, domid);
 
     static unsigned long  cr3_phys[MAX_VIRT_CPUS];
     static unsigned long *cr3_virt[MAX_VIRT_CPUS];
@@ -149,6 +151,21 @@ map_domain_va(unsigned long domid, int cpu, void * guest_va, int perm)
     static unsigned long *page_virt[MAX_VIRT_CPUS];
     
     static int            prev_perm[MAX_VIRT_CPUS];
+
+    if (nr_pages != npgs) {
+	if (nr_pages > 0)
+	    free(page_array);
+	nr_pages = npgs;
+	if ((page_array = malloc(nr_pages * sizeof(unsigned long))) == NULL) {
+	    printf("Could not allocate memory\n");
+	    goto error_out;
+	}
+
+	if (xc_get_pfn_list(xc_handle, domid, page_array, nr_pages) != nr_pages) {
+		printf("Could not get the page frame list\n");
+		goto error_out;
+	}
+    }
 
     FETCH_REGS(cpu);
 
@@ -162,8 +179,9 @@ map_domain_va(unsigned long domid, int cpu, void * guest_va, int perm)
 					     cr3_phys[cpu] >> PAGE_SHIFT)) == NULL)
 	    goto error_out;
     } 
-    if ((pde = cr3_virt[cpu][vtopdi(va)]) == 0)
+    if ((pde = cr3_virt[cpu][vtopdi(va)]) == 0) /* logical address */
 	goto error_out;
+    pde = page_array[pde >> PAGE_SHIFT] << PAGE_SHIFT;
     if (pde != pde_phys[cpu]) 
     {
 	pde_phys[cpu] = pde;
@@ -174,8 +192,9 @@ map_domain_va(unsigned long domid, int cpu, void * guest_va, int perm)
 					     pde_phys[cpu] >> PAGE_SHIFT)) == NULL)
 	    goto error_out;
     }
-    if ((page = pde_virt[cpu][vtopti(va)]) == 0)
+    if ((page = pde_virt[cpu][vtopti(va)]) == 0) /* logical address */
 	goto error_out;
+    page = page_array[page >> PAGE_SHIFT] << PAGE_SHIFT;
     if (page != page_phys[cpu] || perm != prev_perm[cpu]) 
     {
 	page_phys[cpu] = page;
@@ -330,6 +349,7 @@ xc_ptrace(enum __ptrace_request request, pid_t domid, void *addr, void *data)
 	    perror("dom0 op failed");
 	    goto error_out;
 	}
+    	/* FALLTHROUGH */
     case PTRACE_CONT:
     case PTRACE_DETACH:
 	if (request != PTRACE_SINGLESTEP) {

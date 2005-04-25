@@ -128,15 +128,13 @@ void bx_cpu_c::dispatch_ioreq(ioreq_t *req)
 		if (!req->pdata_valid) {
 			if(req->dir == IOREQ_READ){//read
 				//BX_INFO(("mmio[value]: <READ> addr:%llx, value:%llx, size: %llx, count: %llx\n", req->addr, req->u.data, req->size, req->count));
-
 				for (i = 0; i < req->count; i++) {
-					BX_MEM_READ_PHYSICAL(req->addr, req->size, &req->u.data);
+					BX_MEM_READ_PHYSICAL(req->addr + (sign * i * req->size), req->size, &req->u.data);
 				}
 			} else if(req->dir == IOREQ_WRITE) {//write
 				//BX_INFO(("mmio[value]: <WRITE> addr:%llx, value:%llx, size: %llx, count: %llx\n", req->addr, req->u.data, req->size, req->count));
-
 				for (i = 0; i < req->count; i++) {
-					BX_MEM_WRITE_PHYSICAL(req->addr, req->size, &req->u.data);
+					BX_MEM_WRITE_PHYSICAL(req->addr + (sign * i * req->size), req->size, &req->u.data);
 				}
 			}
 		} else {

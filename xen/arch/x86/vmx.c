@@ -640,6 +640,84 @@ error:
     return 0;
 }
 
+static int vmx_set_cr0(unsigned long value)
+{
+    struct exec_domain *d = current;
+    unsigned long old_base_mfn, mfn;
+    unsigned long eip;
+
+    /* 
+     * CR0: We don't want to lose PE and PG.
+     */
+    __vmwrite(GUEST_CR0, (value | X86_CR0_PE | X86_CR0_PG));
+
+    if (value & (X86_CR0_PE | X86_CR0_PG) &&
+        !test_bit(VMX_CPU_STATE_PG_ENABLED, &d->arch.arch_vmx.cpu_state)) {
+        /*
+         * Enable paging
+         */
+        set_bit(VMX_CPU_STATE_PG_ENABLED, &d->arch.arch_vmx.cpu_state);
+        /*
+         * The guest CR3 must be pointing to the guest physical.
+         */
+        if ( !VALID_MFN(mfn = phys_to_machine_mapping(
+                            d->arch.arch_vmx.cpu_cr3 >> PAGE_SHIFT)) ||
+             !get_page(pfn_to_page(mfn), d->domain) )
+        {
+            VMX_DBG_LOG(DBG_LEVEL_VMMU, "Invalid CR3 value = %lx",
+                        d->arch.arch_vmx.cpu_cr3);
+            domain_crash_synchronous(); /* need to take a clean path */
+        }
+        old_base_mfn = pagetable_val(d->arch.guest_table) >> PAGE_SHIFT;
+        if (old_base_mfn)
+            put_page(pfn_to_page(old_base_mfn));
+
+        /*
+         * Now arch.guest_table points to machine physical.
+         */
+        d->arch.guest_table = mk_pagetable(mfn << PAGE_SHIFT);
+        update_pagetables(d);
+
+        VMX_DBG_LOG(DBG_LEVEL_VMMU, "New arch.guest_table = %lx", 
+                (unsigned long) (mfn << PAGE_SHIFT));
+
+        __vmwrite(GUEST_CR3, pagetable_val(d->arch.shadow_table));
+        /* 
+         * arch->shadow_table should hold the next CR3 for shadow
+         */
+        VMX_DBG_LOG(DBG_LEVEL_VMMU, "Update CR3 value = %lx, mfn = %lx", 
+                d->arch.arch_vmx.cpu_cr3, mfn);
+    } else {
+        if ((value & X86_CR0_PE) == 0) {
+            __vmread(GUEST_EIP, &eip);
+            VMX_DBG_LOG(DBG_LEVEL_1,
+		"Disabling CR0.PE at %%eip 0x%lx", eip);
+	    if (vmx_assist(d, VMX_ASSIST_INVOKE)) {
+		set_bit(VMX_CPU_STATE_ASSIST_ENABLED,
+					&d->arch.arch_vmx.cpu_state);
+		__vmread(GUEST_EIP, &eip);
+		VMX_DBG_LOG(DBG_LEVEL_1,
+		    "Transfering control to vmxassist %%eip 0x%lx", eip);
+		return 0; /* do not update eip! */
+	    }
+	} else if (test_bit(VMX_CPU_STATE_ASSIST_ENABLED,
+					&d->arch.arch_vmx.cpu_state)) {
+	    __vmread(GUEST_EIP, &eip);
+	    VMX_DBG_LOG(DBG_LEVEL_1,
+		"Enabling CR0.PE at %%eip 0x%lx", eip);
+	    if (vmx_assist(d, VMX_ASSIST_RESTORE)) {
+		clear_bit(VMX_CPU_STATE_ASSIST_ENABLED,
+					&d->arch.arch_vmx.cpu_state);
+		__vmread(GUEST_EIP, &eip);
+		VMX_DBG_LOG(DBG_LEVEL_1,
+		    "Restoring to %%eip 0x%lx", eip);
+		return 0; /* do not update eip! */
+	    }
+	}
+    }
+    return 1;
+}
+
 #define CASE_GET_REG(REG, reg)  \
     case REG_ ## REG: value = regs->reg; break
 
@@ -650,7 +728,6 @@ static int mov_to_cr(int gp, int cr, struct xen_regs *regs)
 {
     unsigned long value;
     unsigned long old_cr;
-    unsigned long eip;
     struct exec_domain *d = current;
 
     switch (gp) {
@@ -675,80 +752,8 @@ static int mov_to_cr(int gp, int cr, struct xen_regs *regs)
     switch(cr) {
     case 0: 
     {
-        unsigned long old_base_mfn, mfn;
-
-        /* 
-         * CR0:
-         * We don't want to lose PE and PG.
-         */
-        __vmwrite(GUEST_CR0, (value | X86_CR0_PE | X86_CR0_PG));
-        __vmwrite(CR0_READ_SHADOW, value);
-
-        if (value & (X86_CR0_PE | X86_CR0_PG) &&
-            !test_bit(VMX_CPU_STATE_PG_ENABLED, &d->arch.arch_vmx.cpu_state)) {
-            /*
-             * Enable paging
-             */
-            set_bit(VMX_CPU_STATE_PG_ENABLED, &d->arch.arch_vmx.cpu_state);
-            /*
-             * The guest CR3 must be pointing to the guest physical.
-             */
-            if ( !VALID_MFN(mfn = phys_to_machine_mapping(
-                                d->arch.arch_vmx.cpu_cr3 >> PAGE_SHIFT)) ||
-                 !get_page(pfn_to_page(mfn), d->domain) )
-            {
-                VMX_DBG_LOG(DBG_LEVEL_VMMU, "Invalid CR3 value = %lx",
-                            d->arch.arch_vmx.cpu_cr3);
-                domain_crash_synchronous(); /* need to take a clean path */
-            }
-            old_base_mfn = pagetable_val(d->arch.guest_table) >> PAGE_SHIFT;
-            if ( old_base_mfn )
-                put_page(pfn_to_page(old_base_mfn));
-
-            /*
-             * Now arch.guest_table points to machine physical.
-             */
-            d->arch.guest_table = mk_pagetable(mfn << PAGE_SHIFT);
-            update_pagetables(d);
-
-            VMX_DBG_LOG(DBG_LEVEL_VMMU, "New arch.guest_table = %lx", 
-                    (unsigned long) (mfn << PAGE_SHIFT));
-
-            __vmwrite(GUEST_CR3, pagetable_val(d->arch.shadow_table));
-            /* 
-             * arch->shadow_table should hold the next CR3 for shadow
-             */
-            VMX_DBG_LOG(DBG_LEVEL_VMMU, "Update CR3 value = %lx, mfn = %lx", 
-                    d->arch.arch_vmx.cpu_cr3, mfn);
-        } else {
-            if ((value & X86_CR0_PE) == 0) {
-	        __vmread(GUEST_EIP, &eip);
-                VMX_DBG_LOG(DBG_LEVEL_1,
-			"Disabling CR0.PE at %%eip 0x%lx", eip);
-		if (vmx_assist(d, VMX_ASSIST_INVOKE)) {
-		    set_bit(VMX_CPU_STATE_ASSIST_ENABLED,
-						&d->arch.arch_vmx.cpu_state);
-	            __vmread(GUEST_EIP, &eip);
-		    VMX_DBG_LOG(DBG_LEVEL_1,
-			"Transfering control to vmxassist %%eip 0x%lx", eip);
-		    return 0; /* do not update eip! */
-		}
-	    } else if (test_bit(VMX_CPU_STATE_ASSIST_ENABLED,
-					&d->arch.arch_vmx.cpu_state)) {
-		__vmread(GUEST_EIP, &eip);
-		VMX_DBG_LOG(DBG_LEVEL_1,
-			"Enabling CR0.PE at %%eip 0x%lx", eip);
-		if (vmx_assist(d, VMX_ASSIST_RESTORE)) {
-		    clear_bit(VMX_CPU_STATE_ASSIST_ENABLED,
-						&d->arch.arch_vmx.cpu_state);
-		    __vmread(GUEST_EIP, &eip);
-		    VMX_DBG_LOG(DBG_LEVEL_1,
-			"Restoring to %%eip 0x%lx", eip);
-		    return 0; /* do not update eip! */
-		}
-	    }
-	}
-        break;
+	__vmwrite(CR0_READ_SHADOW, value);
+	return vmx_set_cr0(value);
     }
     case 3: 
     {
@@ -790,8 +795,8 @@ static int mov_to_cr(int gp, int cr, struct xen_regs *regs)
                 domain_crash_synchronous(); /* need to take a clean path */
             }
             old_base_mfn = pagetable_val(d->arch.guest_table) >> PAGE_SHIFT;
-            d->arch.guest_table  = mk_pagetable(mfn << PAGE_SHIFT);
-            if ( old_base_mfn )
+            d->arch.guest_table = mk_pagetable(mfn << PAGE_SHIFT);
+            if (old_base_mfn)
                 put_page(pfn_to_page(old_base_mfn));
             update_pagetables(d);
             /* 
@@ -892,6 +897,13 @@ static int vmx_cr_access(unsigned long exit_qualification, struct xen_regs *regs
         __vmread(CR0_READ_SHADOW, &value);
         value &= ~X86_CR0_TS; /* clear TS */
         __vmwrite(CR0_READ_SHADOW, value);
+        break;
+    case TYPE_LMSW:
+        __vmwrite(CR0_READ_SHADOW, value);
+	value = (value & ~0xF) |
+		(((exit_qualification & LMSW_SOURCE_DATA) >> 16) & 0xF) |
+		1 /* CR0.PE == 1 */;
+	return vmx_set_cr0(value);
         break;
     default:
         __vmx_bug(regs);

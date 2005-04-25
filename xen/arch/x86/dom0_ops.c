@@ -402,6 +402,10 @@ void arch_getdomaininfo_ctxt(
         c->flags |= ECF_I387_VALID;
     if ( KERNEL_MODE(ed, &ed->arch.user_ctxt) )
         c->flags |= ECF_IN_KERNEL;
+#ifdef CONFIG_VMX
+    if (VMX_DOMAIN(ed))
+        c->flags |= ECF_VMX_GUEST;
+#endif
     memcpy(&c->fpu_ctxt,
            &ed->arch.i387,
            sizeof(ed->arch.i387));
