@@ -102,16 +102,16 @@ static struct block_device_operations xlvbd_block_fops =
 
 spinlock_t blkif_io_lock = SPIN_LOCK_UNLOCKED;
 
-static struct lvdisk * xlvbd_device_alloc(void)
+static struct lvdisk *xlvbd_device_alloc(void)
 {
-    struct lvdisk *ret;
+    struct lvdisk *disk;
 
-    ret = kmalloc(sizeof(struct lvdisk), GFP_KERNEL);
-    if ( ret ) {
-        memset(ret, '\0', 0);
-        INIT_LIST_HEAD(&ret->list);
+    disk = kmalloc(sizeof(*disk), GFP_KERNEL);
+    if (disk) {
+        memset(disk, 0, sizeof(*disk));
+        INIT_LIST_HEAD(&disk->list);
     }
-    return ret;
+    return disk;
 }
 
 static void xlvbd_device_free(struct lvdisk *disk)
