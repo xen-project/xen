@@ -6,6 +6,8 @@ import select
 import xen.lowlevel.xc; xc = xen.lowlevel.xc.new()
 from xen.lowlevel import xu
 
+from xen.xend.XendLogging import log
+
 from messages import *
 
 VIRQ_MISDIRECT  = 0  # Catch-all interrupt for unbound VIRQs.
@@ -74,6 +76,7 @@ class ChannelFactory:
     def bind_virq(self, virq):
         port = self.notifier.bind_virq(virq)
         self.virqPorts[port] = virq
+        log.info("Virq %s on port %s", virq, port)
 
     def virq(self):
         self.notifier.virq_send(self.virqPort)
@@ -112,16 +115,21 @@ class ChannelFactory:
         # Note we use keyword args to lambda to save the values -
         # otherwise lambda will use the variables, which will get
         # assigned by the loop and the lambda will get the changed values.
+        received = 0
         for chan in self.channels.values():
             if self.thread == None: return
             msg = chan.readResponse()
             if msg:
+                received += 1
                 chan.responseReceived(msg)
         for chan in self.channels.values():
             if self.thread == None: return
             msg = chan.readRequest()
             if msg:
+                received += 1
                 self.runInThread(lambda chan=chan, msg=msg: chan.requestReceived(msg))
+        if port and received == 0:
+            log.warning("Port %s notified, but no messages found", port)
 
     def runInThread(self, thunk):
         thread = threading.Thread(target = thunk)

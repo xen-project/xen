@@ -109,7 +109,7 @@ class XendDomain:
         """Event handler for virq.
         """
         print 'onVirq>', val
-        self.reap()
+        self.refresh_schedule(delay=0)
 
     def schedule_later(self, _delay, _name, _fn, *args):
         """Schedule a function to be called later (if not already scheduled).
@@ -127,18 +127,6 @@ class XendDomain:
         @param name: schedule name to cancel
         """
         self.scheduler.cancel(name)
-
-    def reap_schedule(self, delay=1):
-        """Schedule reap to be called later.
-
-        @param delay: delay in seconds
-        """
-        self.schedule_later(delay, 'reap', self.reap)
-
-    def reap_cancel(self):
-        """Cancel any scheduled reap.
-        """
-        self.schedule_cancel('reap')
 
     def refresh_schedule(self, delay=1):
         """Schedule refresh to be called later.
@@ -289,7 +277,6 @@ class XendDomain:
         """Look for domains that have crashed or stopped.
         Tidy them up.
         """
-        self.reap_cancel()
         casualties = []
         doms = self.xen_domains()
         for d in doms.values():
@@ -311,7 +298,7 @@ class XendDomain:
             log.debug('XendDomain>reap> domain died name=%s id=%s', name, id)
             if d['shutdown']:
                 reason = XendDomainInfo.shutdown_reason(d['shutdown_reason'])
-                log.debug('XendDomain>reap> shutdown id=%s reason=%s', id, reason)
+                log.debug('XendDomain>reap> shutdown name=%s id=%s reason=%s', name, id, reason)
                 if reason in ['suspend']:
                     if dominfo and dominfo.is_terminated():
                         log.debug('XendDomain>reap> Suspended domain died id=%s', id)
@@ -327,21 +314,24 @@ class XendDomain:
             self.final_domain_destroy(id)
         if self.domain_restarts_exist():
             self.domain_restarts_schedule()
-        if destroyed:
-            self.refresh_schedule(delay=5)
 
     def refresh(self):
         """Refresh domain list from Xen.
         """
         self.refresh_cancel()
+        self.refresh_schedule(delay=10)
+        self.reap()
         doms = self.xen_domains()
         # Add entries for any domains we don't know about.
         for (id, d) in doms.items():
             if id not in self.domain_by_id:
-                log.warning("Created entry for unknown domain: %s", id)
+                log.info("Creating entry for unknown domain: id=%s", id)
                 savedinfo = None
-                dominfo = XendDomainInfo.vm_recreate(savedinfo, d)
-                self._add_domain(dominfo)
+                try:
+                    dominfo = XendDomainInfo.vm_recreate(savedinfo, d)
+                    self._add_domain(dominfo)
+                except Exception, ex:
+                    log.exception("Error creating domain info: id=%s", id)
         # Remove entries for domains that no longer exist.
         # Update entries for existing domains.
         for d in self.domain_by_id.values():
@@ -352,7 +342,6 @@ class XendDomain:
                 pass
             else:
                 self._delete_domain(d.id)
-        self.reap_schedule(delay=1)
 
     def update_domain(self, id):
         """Update the saved info for a domain.
@@ -416,7 +405,7 @@ class XendDomain:
 
         @param dominfo: domain object
         """
-        log.info("Restarting domain: id=%s name=%s", dominfo.id, dominfo.name)
+        log.info("Restarting domain: name=%s id=%s", dominfo.name, dominfo.id)
         eserver.inject("xend.domain.restart",
                        [dominfo.name, dominfo.id, "begin"])
         try:

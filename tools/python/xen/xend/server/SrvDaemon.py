@@ -41,8 +41,11 @@ class Daemon:
     """The xend daemon.
     """
     def __init__(self):
+        self.channelF = None
         self.shutdown = 0
         self.traceon = 0
+        self.tracefile = None
+        self.traceindent = 0
 
     def daemon_pids(self):
         pids = []
@@ -352,7 +355,8 @@ class Daemon:
 
     def exit(self, rc=0):
         #reactor.disconnectAll()
-        self.channelF.stop()
+        if self.channelF:
+            self.channelF.stop()
         # Calling sys.exit() raises a SystemExit exception, which only
         # kills the current thread. Calling os._exit() makes the whole
         # Python process exit immediately. There doesn't seem to be another
