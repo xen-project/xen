@@ -106,11 +106,13 @@ void xen_tlb_flush_all(void)
     BUG_ON(HYPERVISOR_mmuext_op(&op, 1, NULL, DOMID_SELF) < 0);
 }
 
-void xen_tlb_flush_mask(cpumask_t mask)
+void xen_tlb_flush_mask(cpumask_t *mask)
 {
     struct mmuext_op op;
+    if ( cpus_empty(*mask) )
+        return;
     op.cmd = MMUEXT_TLB_FLUSH_MULTI;
-    op.cpuset = mask.bits;
+    op.cpuset = mask->bits;
     BUG_ON(HYPERVISOR_mmuext_op(&op, 1, NULL, DOMID_SELF) < 0);
 }
 
@@ -122,11 +124,13 @@ void xen_invlpg_all(unsigned long ptr)
     BUG_ON(HYPERVISOR_mmuext_op(&op, 1, NULL, DOMID_SELF) < 0);
 }
 
-void xen_invlpg_mask(cpumask_t mask, unsigned long ptr)
+void xen_invlpg_mask(cpumask_t *mask, unsigned long ptr)
 {
     struct mmuext_op op;
+    if ( cpus_empty(*mask) )
+        return;
     op.cmd = MMUEXT_INVLPG_MULTI;
-    op.cpuset = mask.bits;
+    op.cpuset = mask->bits;
     op.linear_addr = ptr & PAGE_MASK;
     BUG_ON(HYPERVISOR_mmuext_op(&op, 1, NULL, DOMID_SELF) < 0);
 }

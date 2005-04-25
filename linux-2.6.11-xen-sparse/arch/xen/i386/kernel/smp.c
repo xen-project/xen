@@ -448,11 +448,11 @@ irqreturn_t smp_invalidate_interrupt(int irq, void *dev_id,
 				     struct pt_regs *regs)
 { return 0; }
 void flush_tlb_current_task(void)
-{ xen_tlb_flush_mask(current->mm->cpu_vm_mask); }
+{ xen_tlb_flush_mask(&current->mm->cpu_vm_mask); }
 void flush_tlb_mm(struct mm_struct * mm)
-{ xen_tlb_flush_mask(mm->cpu_vm_mask); }
+{ xen_tlb_flush_mask(&mm->cpu_vm_mask); }
 void flush_tlb_page(struct vm_area_struct *vma, unsigned long va)
-{ xen_invlpg_mask(vma->vm_mm->cpu_vm_mask, va); }
+{ xen_invlpg_mask(&vma->vm_mm->cpu_vm_mask, va); }
 void flush_tlb_all(void)
 { xen_tlb_flush_all(); }
 

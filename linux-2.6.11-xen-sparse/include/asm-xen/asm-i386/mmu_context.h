@@ -16,7 +16,7 @@ void destroy_context(struct mm_struct *mm);
 
 static inline void enter_lazy_tlb(struct mm_struct *mm, struct task_struct *tsk)
 {
-#if 0 /* XEN */
+#if 0 /* XEN: no lazy tlb */
 	unsigned cpu = smp_processor_id();
 	if (per_cpu(cpu_tlbstate, cpu).state == TLBSTATE_OK)
 		per_cpu(cpu_tlbstate, cpu).state = TLBSTATE_LAZY;
@@ -51,7 +51,7 @@ static inline void switch_mm(struct mm_struct *prev,
 	if (likely(prev != next)) {
 		/* stop flush ipis for the previous mm */
 		cpu_clear(cpu, prev->cpu_vm_mask);
-#if 0 /* XEN */
+#if 0 /* XEN: no lazy tlb */
 		per_cpu(cpu_tlbstate, cpu).state = TLBSTATE_OK;
 		per_cpu(cpu_tlbstate, cpu).active_mm = next;
 #endif
@@ -76,7 +76,7 @@ static inline void switch_mm(struct mm_struct *prev,
 
 		BUG_ON(HYPERVISOR_mmuext_op(_op, op-_op, NULL, DOMID_SELF));
 	}
-#if 0 /* XEN */
+#if 0 /* XEN: no lazy tlb */
 	else {
 		per_cpu(cpu_tlbstate, cpu).state = TLBSTATE_OK;
 		BUG_ON(per_cpu(cpu_tlbstate, cpu).active_mm != next);
@@ -92,8 +92,17 @@ static inline void switch_mm(struct mm_struct *prev,
 #endif
 }
 
-#define deactivate_mm(tsk, mm) \
-	asm("movl %0,%%fs ; movl %0,%%gs": :"r" (0))
+/*
+ * XEN: We aggressively remove defunct pgd from cr3. We execute unmap_vmas()
+ * *much* faster this way, as no tlb flushes means much bigger wrpt batches.
+ */
+#define deactivate_mm(tsk, mm) do {					\
+	asm("movl %0,%%fs ; movl %0,%%gs": :"r" (0));			\
+	if ((mm) && cpu_isset(smp_processor_id(), (mm)->cpu_vm_mask)) {	\
+		cpu_clear(smp_processor_id(), (mm)->cpu_vm_mask);	\
+		load_cr3(swapper_pg_dir);				\
+	}								\
+} while (0)
 
 #define activate_mm(prev, next) do {		\
 	switch_mm((prev),(next),NULL);		\

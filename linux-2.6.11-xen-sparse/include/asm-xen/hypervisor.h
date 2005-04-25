@@ -110,8 +110,8 @@ void xen_machphys_update(unsigned long mfn, unsigned long pfn);
 #include <linux/cpumask.h>
 void xen_tlb_flush_all(void);
 void xen_invlpg_all(unsigned long ptr);
-void xen_tlb_flush_mask(cpumask_t mask);
-void xen_invlpg_mask(cpumask_t mask, unsigned long ptr);
+void xen_tlb_flush_mask(cpumask_t *mask);
+void xen_invlpg_mask(cpumask_t *mask, unsigned long ptr);
 #endif
 
 #if LINUX_VERSION_CODE < KERNEL_VERSION(2,6,0)
