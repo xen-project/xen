@@ -222,7 +222,7 @@ void vmx_hooks_assist(struct exec_domain *d)
         /* frequency(ms) of pit */
         vpit->period = DIV_ROUND(((vpit->init_val) * 1000), PIT_FREQ); 
         if (vpit->period < 1) {
-            printk("VMX_PIT: guest programmed too small an init_val: %lx\n",
+            printk("VMX_PIT: guest programmed too small an init_val: %x\n",
                    vpit->init_val);
             vpit->period = 1;
         }

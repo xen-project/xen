@@ -40,17 +40,20 @@ extern void debugtrace_printk(const char *fmt, ...);
 #define debugtrace_printk(_f, ...) ((void)0)
 #endif
 
-#define printk printf
-void printf(const char *format, ...);
-void panic(const char *format, ...);
-long vm_assist(struct domain *, unsigned int, unsigned int);
+/* Allows us to use '%p' as general-purpose machine-word format char. */
+#define _p(_x) ((void *)(unsigned long)(_x))
+#define printk(_f , _a...) printf( _f , ## _a )
+extern void printf(const char *format, ...)
+    __attribute__ ((format (printf, 1, 2)));
+extern void panic(const char *format, ...);
+extern long vm_assist(struct domain *, unsigned int, unsigned int);
 
 /* vsprintf.c */
 extern int sprintf(char * buf, const char * fmt, ...)
-	__attribute__ ((format (printf, 2, 3)));
+    __attribute__ ((format (printf, 2, 3)));
 extern int vsprintf(char *buf, const char *, va_list);
 extern int snprintf(char * buf, size_t size, const char * fmt, ...)
-	__attribute__ ((format (printf, 3, 4)));
+    __attribute__ ((format (printf, 3, 4)));
 extern int vsnprintf(char *buf, size_t size, const char *fmt, va_list args);
 
 long simple_strtol(const char *cp,char **endp,unsigned int base);

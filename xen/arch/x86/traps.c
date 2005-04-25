@@ -115,7 +115,7 @@ asmlinkage void fatal_trap(int trapnr, struct xen_regs *regs)
     if ( trapnr == TRAP_page_fault )
     {
         __asm__ __volatile__ ("mov %%cr2,%0" : "=r" (cr2) : );
-        printk("Faulting linear address might be %p\n", cr2);
+        printk("Faulting linear address might be %p\n", _p(cr2));
     }
 
     printk("************************************\n");
@@ -171,7 +171,7 @@ static inline int do_trap(int trapnr, char *str,
 
     if ( likely((fixup = search_exception_table(regs->eip)) != 0) )
     {
-        DPRINTK("Trap %d: %p -> %p\n", trapnr, regs->eip, fixup);
+        DPRINTK("Trap %d: %p -> %p\n", trapnr, _p(regs->eip), _p(fixup));
         regs->eip = fixup;
         return 0;
     }
@@ -336,7 +336,7 @@ asmlinkage int do_page_fault(struct xen_regs *regs)
     {
         perfc_incrc(copy_user_faults);
         if ( !shadow_mode_enabled(d) )
-            DPRINTK("Page fault: %p -> %p\n", regs->eip, fixup);
+            DPRINTK("Page fault: %p -> %p\n", _p(regs->eip), _p(fixup));
         regs->eip = fixup;
         return 0;
     }
@@ -709,7 +709,7 @@ static int emulate_privileged_op(struct xen_regs *regs)
         /* Ignore the instruction if unprivileged. */
         if ( !IS_PRIV(ed->domain) )
             DPRINTK("Non-priv domain attempted WRMSR(%p,%08lx,%08lx).\n",
-                    regs->ecx, (long)regs->eax, (long)regs->edx);
+                    _p(regs->ecx), (long)regs->eax, (long)regs->edx);
         else if ( wrmsr_user(regs->ecx, regs->eax, regs->edx) )
             goto fail;
         break;
@@ -717,7 +717,7 @@ static int emulate_privileged_op(struct xen_regs *regs)
     case 0x32: /* RDMSR */
         if ( !IS_PRIV(ed->domain) )
             DPRINTK("Non-priv domain attempted RDMSR(%p,%08lx,%08lx).\n",
-                    regs->ecx, (long)regs->eax, (long)regs->edx);
+                    _p(regs->ecx), (long)regs->eax, (long)regs->edx);
         /* Everyone can read the MSR space. */
         if ( rdmsr_user(regs->ecx, regs->eax, regs->edx) )
             goto fail;
@@ -824,7 +824,7 @@ asmlinkage int do_general_protection(struct xen_regs *regs)
     if ( likely((fixup = search_exception_table(regs->eip)) != 0) )
     {
         DPRINTK("GPF (%04x): %p -> %p\n",
-                regs->error_code, regs->eip, fixup);
+                regs->error_code, _p(regs->eip), _p(fixup));
         regs->eip = fixup;
         return 0;
     }

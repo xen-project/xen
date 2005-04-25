@@ -118,7 +118,7 @@ static int vmx_do_page_fault(unsigned long va, struct xen_regs *regs)
         __vmread(GUEST_EIP, &eip);
         VMX_DBG_LOG(DBG_LEVEL_VMMU, 
                 "vmx_do_page_fault = 0x%lx, eip = %lx, error_code = %lx",
-                va, eip, regs->error_code);
+                va, eip, (unsigned long)regs->error_code);
     }
 #endif
 
@@ -163,12 +163,14 @@ static void vmx_do_general_protection_fault(struct xen_regs *regs)
     __vmread(VM_EXIT_INTR_ERROR_CODE, &error_code);
 
     VMX_DBG_LOG(DBG_LEVEL_1,
-            "vmx_general_protection_fault: eip = %lx, erro_code = %lx",
-            eip, error_code);
+                "vmx_general_protection_fault: eip = %lx, erro_code = %lx",
+                eip, error_code);
 
     VMX_DBG_LOG(DBG_LEVEL_1,
-            "eax=%lx, ebx=%lx, ecx=%lx, edx=%lx, esi=%lx, edi=%lx",
-            regs->eax, regs->ebx, regs->ecx, regs->edx, regs->esi, regs->edi);
+                "eax=%lx, ebx=%lx, ecx=%lx, edx=%lx, esi=%lx, edi=%lx",
+                (unsigned long)regs->eax, (unsigned long)regs->ebx,
+                (unsigned long)regs->ecx, (unsigned long)regs->edx,
+                (unsigned long)regs->esi, (unsigned long)regs->edi);
 
     /* Reflect it back into the guest */
     intr_fields = (INTR_INFO_VALID_MASK | 
@@ -189,8 +191,9 @@ static void vmx_vmexit_do_cpuid(unsigned long input, struct xen_regs *regs)
     VMX_DBG_LOG(DBG_LEVEL_1, 
                 "do_cpuid: (eax) %lx, (ebx) %lx, (ecx) %lx, (edx) %lx,"
                 " (esi) %lx, (edi) %lx",
-                regs->eax, regs->ebx, regs->ecx, regs->edx,
-                regs->esi, regs->edi);
+                (unsigned long)regs->eax, (unsigned long)regs->ebx,
+                (unsigned long)regs->ecx, (unsigned long)regs->edx,
+                (unsigned long)regs->esi, (unsigned long)regs->edi);
 
     cpuid(input, &eax, &ebx, &ecx, &edx);
 
@@ -275,7 +278,7 @@ static void vmx_vmexit_do_invlpg(unsigned long va)
 
     __vmread(GUEST_EIP, &eip);
 
-    VMX_DBG_LOG(DBG_LEVEL_VMMU, "vmx_vmexit_do_invlpg: eip=%p, va=%p",
+    VMX_DBG_LOG(DBG_LEVEL_VMMU, "vmx_vmexit_do_invlpg: eip=%lx, va=%lx",
                 eip, va);
 
     /*
@@ -301,8 +304,9 @@ static void vmx_io_instruction(struct xen_regs *regs,
     vm86 = eflags & X86_EFLAGS_VM ? 1 : 0;
 
     VMX_DBG_LOG(DBG_LEVEL_1, 
-            "vmx_io_instruction: vm86 %d, eip=%p:%p, exit_qualification = %lx",
-            vm86, cs, eip, exit_qualification);
+                "vmx_io_instruction: vm86 %d, eip=%lx:%lx, "
+                "exit_qualification = %lx",
+                vm86, cs, eip, exit_qualification);
 
     if (test_bit(6, &exit_qualification))
         addr = (exit_qualification >> 16) & (0xffff);
@@ -915,13 +919,15 @@ static int vmx_cr_access(unsigned long exit_qualification, struct xen_regs *regs
 static inline void vmx_do_msr_read(struct xen_regs *regs)
 {
     VMX_DBG_LOG(DBG_LEVEL_1, "vmx_do_msr_read: ecx=%lx, eax=%lx, edx=%lx",
-            regs->ecx, regs->eax, regs->edx);
+                (unsigned long)regs->ecx, (unsigned long)regs->eax, 
+                (unsigned long)regs->edx);
 
     rdmsr(regs->ecx, regs->eax, regs->edx);
 
     VMX_DBG_LOG(DBG_LEVEL_1, "vmx_do_msr_read returns: "
                 "ecx=%lx, eax=%lx, edx=%lx",
-                regs->ecx, regs->eax, regs->edx);
+                (unsigned long)regs->ecx, (unsigned long)regs->eax,
+                (unsigned long)regs->edx);
 }
 
 /*
@@ -933,7 +939,7 @@ static inline void vmx_vmexit_do_hlt(void)
     unsigned long eip;
     __vmread(GUEST_EIP, &eip);
 #endif
-    VMX_DBG_LOG(DBG_LEVEL_1, "vmx_vmexit_do_hlt:eip=%p", eip);
+    VMX_DBG_LOG(DBG_LEVEL_1, "vmx_vmexit_do_hlt:eip=%lx", eip);
     raise_softirq(SCHEDULE_SOFTIRQ);
 }
 
@@ -943,7 +949,7 @@ static inline void vmx_vmexit_do_mwait(void)
     unsigned long eip;
     __vmread(GUEST_EIP, &eip);
 #endif
-    VMX_DBG_LOG(DBG_LEVEL_1, "vmx_vmexit_do_mwait:eip=%p", eip);
+    VMX_DBG_LOG(DBG_LEVEL_1, "vmx_vmexit_do_mwait:eip=%lx", eip);
     raise_softirq(SCHEDULE_SOFTIRQ);
 }
 
@@ -1097,9 +1103,10 @@ asmlinkage void vmx_vmexit_handler(struct xen_regs regs)
             __vmread(EXIT_QUALIFICATION, &va);
             __vmread(VM_EXIT_INTR_ERROR_CODE, &regs.error_code);
             VMX_DBG_LOG(DBG_LEVEL_VMMU, 
-                    "eax=%lx, ebx=%lx, ecx=%lx, edx=%lx, esi=%lx, edi=%lx",
-                        regs.eax, regs.ebx, regs.ecx, regs.edx, regs.esi,
-                        regs.edi);
+                        "eax=%lx, ebx=%lx, ecx=%lx, edx=%lx, esi=%lx, edi=%lx",
+                        (unsigned long)regs.eax, (unsigned long)regs.ebx,
+                        (unsigned long)regs.ecx, (unsigned long)regs.edx,
+                        (unsigned long)regs.esi, (unsigned long)regs.edi);
             ed->arch.arch_vmx.vmx_platform.mpci.inst_decoder_regs = &regs;
 
             if (!(error = vmx_do_page_fault(va, &regs))) {
@@ -1219,8 +1226,8 @@ asmlinkage void vmx_vmexit_handler(struct xen_regs regs)
         break;
     case EXIT_REASON_MSR_WRITE:
         __vmread(GUEST_EIP, &eip);
-        VMX_DBG_LOG(DBG_LEVEL_1, "MSR_WRITE: eip=%p, eax=%p, edx=%p",
-                eip, regs.eax, regs.edx);
+        VMX_DBG_LOG(DBG_LEVEL_1, "MSR_WRITE: eip=%lx, eax=%lx, edx=%lx",
+                eip, (unsigned long)regs.eax, (unsigned long)regs.edx);
         /* just ignore this point */
         __get_instruction_length(inst_len);
         __update_guest_eip(inst_len);

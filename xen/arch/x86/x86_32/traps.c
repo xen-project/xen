@@ -31,7 +31,7 @@ void show_guest_stack(void)
     int i;
     execution_context_t *ec = get_execution_context();
     unsigned long *stack = (unsigned long *)ec->esp;
-    printk("Guest EIP is %lx\n   ",ec->eip);
+    printk("Guest EIP is %08x\n   ", ec->eip);
 
     for ( i = 0; i < kstack_depth_to_print; i++ )
     {
@@ -39,7 +39,7 @@ void show_guest_stack(void)
             break;
         if ( i && ((i % 8) == 0) )
             printk("\n   ");
-            printk("%p ", *stack++);            
+        printk("%08lx ", *stack++);
     }
     printk("\n");
     
@@ -58,7 +58,7 @@ void show_trace(unsigned long *esp)
         if (kernel_text_address(addr)) {
             if (i && ((i % 6) == 0))
                 printk("\n   ");
-            printk("[<%p>] ", addr);
+            printk("[<%08lx>] ", addr);
             i++;
         }
     }
@@ -80,9 +80,9 @@ void show_stack(unsigned long *esp)
         if ( i && ((i % 8) == 0) )
             printk("\n   ");
         if ( kernel_text_address(*stack) )
-            printk("[%p] ", *stack++);
+            printk("[%08lx] ", *stack++);
         else
-            printk("%p ", *stack++);            
+            printk("%08lx ", *stack++);
     }
     printk("\n");
 
@@ -140,13 +140,16 @@ void show_registers(struct xen_regs *regs)
         }
     }
 
-    printk("CPU:    %d\nEIP:    %04lx:[<%p>]      \nEFLAGS: %p   CONTEXT: %s\n",
-           smp_processor_id(), 0xffff & regs->cs, eip, eflags, context);
-    printk("eax: %p   ebx: %p   ecx: %p   edx: %p\n",
+    printk("CPU:    %d\nEIP:    %04lx:[<%08lx>]      \nEFLAGS: %08lx   "
+           "CONTEXT: %s\n",
+           smp_processor_id(), (unsigned long)0xffff & regs->cs,
+           eip, eflags, context);
+    printk("eax: %08x   ebx: %08x   ecx: %08x   edx: %08x\n",
            regs->eax, regs->ebx, regs->ecx, regs->edx);
-    printk("esi: %p   edi: %p   ebp: %p   esp: %p\n",
+    printk("esi: %08x   edi: %08x   ebp: %08x   esp: %08lx\n",
            regs->esi, regs->edi, regs->ebp, esp);
-    printk("ds: %04x   es: %04x   fs: %04x   gs: %04x   ss: %04x   cs: %04x\n",
+    printk("ds: %04lx   es: %04lx   fs: %04lx   gs: %04lx   "
+           "ss: %04lx   cs: %04lx\n",
            ds, es, fs, gs, ss, cs);
 
     show_stack((unsigned long *)&regs->esp);
@@ -161,16 +164,16 @@ void show_page_walk(unsigned long addr)
     if ( addr < PAGE_OFFSET )
         return;
 
-    printk("Pagetable walk from %p:\n", addr);
+    printk("Pagetable walk from %08lx:\n", addr);
     
     page = l2e_get_value(idle_pg_table[l2_table_offset(addr)]);
-    printk(" L2 = %p %s\n", page, (page & _PAGE_PSE) ? "(4MB)" : "");
+    printk(" L2 = %08lx %s\n", page, (page & _PAGE_PSE) ? "(4MB)" : "");
     if ( !(page & _PAGE_PRESENT) || (page & _PAGE_PSE) )
         return;
 
     page &= PAGE_MASK;
     page = ((unsigned long *) __va(page))[l1_table_offset(addr)];
-    printk("  L1 = %p\n", page);
+    printk("  L1 = %08lx\n", page);
 }
 
 #define DOUBLEFAULT_STACK_SIZE 1024

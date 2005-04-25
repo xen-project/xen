@@ -304,7 +304,7 @@ shadow_get_page_from_l1e(l1_pgentry_t l1e, struct domain *d)
          (d != owner) )
     {
         res = get_page_from_l1e(nl1e, owner);
-        printk("tried to map mfn %p from domain %d into shadow page tables "
+        printk("tried to map mfn %lx from domain %d into shadow page tables "
                "of domain %d; %s\n",
                mfn, owner->id, d->id, res ? "success" : "failed");
     }
@@ -312,7 +312,8 @@ shadow_get_page_from_l1e(l1_pgentry_t l1e, struct domain *d)
     if ( unlikely(!res) )
     {
         perfc_incrc(shadow_get_page_fail);
-        FSH_LOG("%s failed to get ref l1e=%p\n", __func__, l1e_get_value(l1e));
+        FSH_LOG("%s failed to get ref l1e=%lx\n",
+                __func__, l1e_get_value(l1e));
     }
 
     return res;
@@ -369,7 +370,7 @@ update_hl2e(struct exec_domain *ed, unsigned long va)
     old_hl2e = ed->arch.hl2_vtable[index];
 
     if ( (l2e_get_flags(gl2e) & _PAGE_PRESENT) &&
-         VALID_MFN(mfn = phys_to_machine_mapping(l2e_get_pfn(gl2e)) ))
+         VALID_MFN(mfn = phys_to_machine_mapping(l2e_get_pfn(gl2e))) )
         new_hl2e = l1e_create_pfn(mfn, __PAGE_HYPERVISOR);
     else
         new_hl2e = l1e_empty();
@@ -405,16 +406,16 @@ static inline void shadow_drop_references(
         return;
 
     /* XXX This needs more thought... */
-    printk("%s: needing to call shadow_remove_all_access for mfn=%p\n",
+    printk("%s: needing to call shadow_remove_all_access for mfn=%lx\n",
            __func__, page_to_pfn(page));
-    printk("Before: mfn=%p c=%p t=%p\n", page_to_pfn(page),
+    printk("Before: mfn=%lx c=%08x t=%08x\n", page_to_pfn(page),
            page->count_info, page->u.inuse.type_info);
 
     shadow_lock(d);
     shadow_remove_all_access(d, page_to_pfn(page));
     shadow_unlock(d);
 
-    printk("After:  mfn=%p c=%p t=%p\n", page_to_pfn(page),
+    printk("After:  mfn=%lx c=%08x t=%08x\n", page_to_pfn(page),
            page->count_info, page->u.inuse.type_info);
 }
 
@@ -452,8 +453,9 @@ get_shadow_ref(unsigned long smfn)
 
     if ( unlikely(nx == 0) )
     {
-        printk("get_shadow_ref overflow, gmfn=%p smfn=%p\n",
-               frame_table[smfn].u.inuse.type_info & PGT_mfn_mask, smfn);
+        printk("get_shadow_ref overflow, gmfn=%x smfn=%lx\n",
+               frame_table[smfn].u.inuse.type_info & PGT_mfn_mask,
+               smfn);
         BUG();
     }
     
@@ -481,7 +483,7 @@ put_shadow_ref(unsigned long smfn)
 
     if ( unlikely(x == 0) )
     {
-        printk("put_shadow_ref underflow, smfn=%p oc=%p t=%p\n",
+        printk("put_shadow_ref underflow, smfn=%lx oc=%08x t=%08x\n",
                smfn,
                frame_table[smfn].count_info,
                frame_table[smfn].u.inuse.type_info);
@@ -592,11 +594,11 @@ static inline int l1pte_write_fault(
     unsigned long gpfn = l1e_get_pfn(gpte);
     unsigned long gmfn = __gpfn_to_mfn(d, gpfn);
 
-    //printk("l1pte_write_fault gmfn=%p\n", gmfn);
+    //printk("l1pte_write_fault gmfn=%lx\n", gmfn);
 
     if ( unlikely(!VALID_MFN(gmfn)) )
     {
-        SH_LOG("l1pte_write_fault: invalid gpfn=%p", gpfn);
+        SH_LOG("l1pte_write_fault: invalid gpfn=%lx", gpfn);
         *spte_p = l1e_empty();
         return 0;
     }
@@ -605,7 +607,7 @@ static inline int l1pte_write_fault(
     l1e_add_flags(&gpte, _PAGE_DIRTY | _PAGE_ACCESSED);
     spte = l1e_create_pfn(gmfn, l1e_get_flags(gpte) & ~_PAGE_GLOBAL);
 
-    SH_VVLOG("l1pte_write_fault: updating spte=0x%p gpte=0x%p",
+    SH_VVLOG("l1pte_write_fault: updating spte=0x%lx gpte=0x%lx",
              l1e_get_value(spte), l1e_get_value(gpte));
 
     if ( shadow_mode_log_dirty(d) )
@@ -630,7 +632,7 @@ static inline int l1pte_read_fault(
 
     if ( unlikely(!VALID_MFN(mfn)) )
     {
-        SH_LOG("l1pte_read_fault: invalid gpfn=%p", pfn);
+        SH_LOG("l1pte_read_fault: invalid gpfn=%lx", pfn);
         *spte_p = l1e_empty();
         return 0;
     }
@@ -644,7 +646,7 @@ static inline int l1pte_read_fault(
         l1e_remove_flags(&spte, _PAGE_RW);
     }
 
-    SH_VVLOG("l1pte_read_fault: updating spte=0x%p gpte=0x%p",
+    SH_VVLOG("l1pte_read_fault: updating spte=0x%lx gpte=0x%lx",
              l1e_get_value(spte), l1e_get_value(gpte));
     *gpte_p = gpte;
     *spte_p = spte;
@@ -675,7 +677,7 @@ static inline void l1pte_propagate_from_guest(
     }
 
     if ( l1e_get_value(spte) || l1e_get_value(gpte) )
-        SH_VVVLOG("%s: gpte=%p, new spte=%p",
+        SH_VVVLOG("%s: gpte=%lx, new spte=%lx",
                   __func__, l1e_get_value(gpte), l1e_get_value(spte));
 
     *spte_p = spte;
@@ -709,7 +711,7 @@ static inline void hl2e_propagate_from_guest(
     }
 
     if ( l1e_get_value(hl2e) || l2e_get_value(gpde) )
-        SH_VVLOG("%s: gpde=%p hl2e=%p", __func__,
+        SH_VVLOG("%s: gpde=%lx hl2e=%lx", __func__,
                  l2e_get_value(gpde), l1e_get_value(hl2e));
 
     *hl2e_p = hl2e;
@@ -739,7 +741,7 @@ static inline void l2pde_general(
     }
 
     if ( l2e_get_value(spde) || l2e_get_value(gpde) )
-        SH_VVLOG("%s: gpde=%p, new spde=%p", __func__,
+        SH_VVLOG("%s: gpde=%lx, new spde=%lx", __func__,
                  l2e_get_value(gpde), l2e_get_value(spde));
 
     *spde_p = spde;
@@ -771,7 +773,7 @@ validate_pte_change(
     perfc_incrc(validate_pte_calls);
 
 #if 0
-    FSH_LOG("validate_pte(old=%p new=%p)", old_pte, new_pte);
+    FSH_LOG("validate_pte(old=%lx new=%lx)", old_pte, new_pte);
 #endif
 
     old_spte = *shadow_pte_p;
@@ -897,7 +899,7 @@ static void shadow_audit(struct domain *d, int print)
             live++; 
             if ( (a->gpfn_and_flags == 0) || (a->smfn == 0) )
             {
-                printk("XXX live=%d gpfn+flags=%p sp=%p next=%p\n",
+                printk("XXX live=%d gpfn+flags=%lx sp=%lx next=%p\n",
                        live, a->gpfn_and_flags, a->smfn, a->next);
                 BUG();
             }
@@ -1161,7 +1163,7 @@ static inline void delete_shadow_status(
 
     head = hash_bucket(d, gpfn);
 
-    SH_VLOG("delete gpfn=%p t=%p bucket=%p", gpfn, stype, head);
+    SH_VLOG("delete gpfn=%lx t=%08x bucket=%p", gpfn, stype, head);
     shadow_audit(d, 0);
 
     /* Match on head item? */
@@ -1235,7 +1237,7 @@ static inline void set_shadow_status(
     int i;
     unsigned long key = gpfn | stype;
 
-    SH_VVLOG("set gpfn=%p gmfn=%p smfn=%p t=%p", gpfn, gmfn, smfn, stype);
+    SH_VVLOG("set gpfn=%lx gmfn=%lx smfn=%lx t=%lx", gpfn, gmfn, smfn, stype);
 
     ASSERT(spin_is_locked(&d->arch.shadow_lock));
 
@@ -1249,7 +1251,7 @@ static inline void set_shadow_status(
 
     x = head = hash_bucket(d, gpfn);
    
-    SH_VLOG("set gpfn=%p smfn=%p t=%p bucket=%p(%p)",
+    SH_VLOG("set gpfn=%lx smfn=%lx t=%lx bucket=%p(%p)",
              gpfn, smfn, stype, x, x->next);
     shadow_audit(d, 0);
 
@@ -1463,7 +1465,7 @@ static inline l1_pgentry_t gva_to_gpte(unsigned long gva)
                                    &linear_pg_table[gva >> PAGE_SHIFT],
                                    sizeof(gpte))) )
     {
-        FSH_LOG("gva_to_gpte got a fault on gva=%p", gva);
+        FSH_LOG("gva_to_gpte got a fault on gva=%lx", gva);
         return l1e_empty();
     }
 

@@ -27,7 +27,7 @@ long do_multicall(multicall_entry_t *call_list, unsigned int nr_calls)
     if ( unlikely(!array_access_ok(call_list, nr_calls, sizeof(*call_list))) )
     {
         DPRINTK("Bad memory range %p for %u*%u bytes.\n",
-                call_list, nr_calls, sizeof(*call_list));
+                call_list, nr_calls, (unsigned int)sizeof(*call_list));
         goto fault;
     }
 
@@ -37,7 +37,7 @@ long do_multicall(multicall_entry_t *call_list, unsigned int nr_calls)
                                        sizeof(*call_list))) )
         {
             DPRINTK("Error copying from user range %p for %u bytes.\n",
-                    &call_list[i], sizeof(*call_list));
+                    &call_list[i], (unsigned int)sizeof(*call_list));
             goto fault;
         }
 

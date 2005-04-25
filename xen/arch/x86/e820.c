@@ -40,8 +40,8 @@ print_e820_memory_map(struct e820entry *map, int entries)
 
     for (i = 0; i < entries; i++) {
         printk(" %016Lx - %016Lx ",
-               map[i].addr,
-               map[i].addr + map[i].size);
+               (unsigned long long)(map[i].addr),
+               (unsigned long long)(map[i].addr + map[i].size));
         switch (map[i].type) {
         case E820_RAM:	printk("(usable)\n");
             break;

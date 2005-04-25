@@ -64,23 +64,25 @@ int audit_adjust_pgtables(struct domain *d, int dir, int noisy)
 
             if ( page_get_owner(page) == NULL )
             {
-                APRINTK("adjust(mfn=%p, dir=%d, adjtype=%d) owner=NULL",
+                APRINTK("adjust(mfn=%lx, dir=%d, adjtype=%d) owner=NULL",
                         page_to_pfn(page), dir, adjtype);
                 errors++;
             }
 
             if ( tcount < 0 )
             {
-                APRINTK("Audit %d: type count went below zero mfn=%x t=%x ot=%x",
-                        d->id, page-frame_table,
+                APRINTK("Audit %d: type count went below zero "
+                        "mfn=%lx t=%x ot=%x",
+                        d->id, page_to_pfn(page),
                         page->u.inuse.type_info,
                         page->tlbflush_timestamp);
                 errors++;
             }
             else if ( (tcount & ~PGT_count_mask) != 0 )
             {
-                APRINTK("Audit %d: type count overflowed mfn=%x t=%x ot=%x",
-                        d->id, page-frame_table,
+                APRINTK("Audit %d: type count overflowed "
+                        "mfn=%lx t=%x ot=%x",
+                        d->id, page_to_pfn(page),
                         page->u.inuse.type_info,
                         page->tlbflush_timestamp);
                 errors++;
@@ -97,16 +99,18 @@ int audit_adjust_pgtables(struct domain *d, int dir, int noisy)
 
         if ( count < 0 )
         {
-            APRINTK("Audit %d: general count went below zero mfn=%x t=%x ot=%x",
-                    d->id, page-frame_table,
+            APRINTK("Audit %d: general count went below zero "
+                    "mfn=%lx t=%x ot=%x",
+                    d->id, page_to_pfn(page),
                     page->u.inuse.type_info,
                     page->tlbflush_timestamp);
             errors++;
         }
         else if ( (count & ~PGT_count_mask) != 0 )
         {
-            APRINTK("Audit %d: general count overflowed mfn=%x t=%x ot=%x",
-                    d->id, page-frame_table,
+            APRINTK("Audit %d: general count overflowed "
+                    "mfn=%lx t=%x ot=%x",
+                    d->id, page_to_pfn(page),
                     page->u.inuse.type_info,
                     page->tlbflush_timestamp);
             errors++;
@@ -133,7 +137,7 @@ int audit_adjust_pgtables(struct domain *d, int dir, int noisy)
                     {
                         if ( page_get_owner(l1page) != NULL )
                         {
-                            printk("L2: Bizarre shadow L1 page mfn=%p "
+                            printk("L2: Bizarre shadow L1 page mfn=%lx "
                                    "belonging to a domain %p (id=%d)\n",
                                    l1mfn,
                                    page_get_owner(l1page),
@@ -146,7 +150,7 @@ int audit_adjust_pgtables(struct domain *d, int dir, int noisy)
                     {
                         if ( page_get_owner(l1page) != d )
                         {
-                            printk("L2: Skip bizarre L1 page mfn=%p "
+                            printk("L2: Skip bizarre L1 page mfn=%lx "
                                    "belonging to other dom %p (id=%d)\n",
                                    l1mfn,
                                    page_get_owner(l1page),
@@ -160,14 +164,14 @@ int audit_adjust_pgtables(struct domain *d, int dir, int noisy)
                         if ( page_type == PGT_l2_page_table )
                         {
                             printk("Audit %d: [%x] Found %s Linear PT "
-                                   "t=%x mfn=%p\n",
+                                   "t=%x mfn=%lx\n",
                                    d->id, i, (l1mfn==mfn) ? "Self" : "Other",
                                    l1page->u.inuse.type_info, l1mfn);
                         }
                         else if ( page_type != PGT_l1_page_table )
                         {
-                            printk("Audit %d: [L2 mfn=%p i=%x] "
-                                   "Expected L1 t=%x mfn=%p\n",
+                            printk("Audit %d: [L2 mfn=%lx i=%x] "
+                                   "Expected L1 t=%x mfn=%lx\n",
                                    d->id, mfn, i,
                                    l1page->u.inuse.type_info, l1mfn);
                             errors++;
@@ -218,8 +222,8 @@ int audit_adjust_pgtables(struct domain *d, int dir, int noisy)
                 {
                     if ( page_get_owner(gpage) != d )
                     {
-                        printk("Audit %d: [hl2mfn=%p,i=%x] Skip foreign page "
-                               "dom=%p (id=%d) mfn=%p c=%08x t=%08x\n",
+                        printk("Audit %d: [hl2mfn=%lx,i=%x] Skip foreign page "
+                               "dom=%p (id=%d) mfn=%lx c=%08x t=%08x\n",
                                d->id, hl2mfn, i,
                                page_get_owner(gpage),
                                page_get_owner(gpage)->id,
@@ -269,8 +273,8 @@ int audit_adjust_pgtables(struct domain *d, int dir, int noisy)
                         if ( !((gpage->u.inuse.type_info & PGT_type_mask) ==
                                PGT_writable_page) )
                         {
-                            printk("Audit %d: [l1mfn=%p, i=%x] Illegal RW "
-                                   "t=%x mfn=%p\n",
+                            printk("Audit %d: [l1mfn=%lx, i=%x] Illegal RW "
+                                   "t=%x mfn=%lx\n",
                                    d->id, l1mfn, i,
                                    gpage->u.inuse.type_info, gmfn);
                             errors++;
@@ -280,8 +284,8 @@ int audit_adjust_pgtables(struct domain *d, int dir, int noisy)
                              page_is_page_table(gpage) &&
                              ! page_out_of_sync(gpage) )
                         {
-                            printk("Audit %d: [l1mfn=%p, i=%x] Illegal RW of "
-                                   "page table gmfn=%p\n",
+                            printk("Audit %d: [l1mfn=%lx, i=%x] Illegal RW of "
+                                   "page table gmfn=%lx\n",
                                    d->id, l1mfn, i, gmfn);
                             errors++;
                         }
@@ -289,8 +293,8 @@ int audit_adjust_pgtables(struct domain *d, int dir, int noisy)
 
                     if ( page_get_owner(gpage) != d )
                     {
-                        printk("Audit %d: [l1mfn=%p,i=%x] Skip foreign page "
-                               "dom=%p (id=%d) mfn=%p c=%08x t=%08x\n",
+                        printk("Audit %d: [l1mfn=%lx,i=%x] Skip foreign page "
+                               "dom=%p (id=%d) mfn=%lx c=%08x t=%08x\n",
                                d->id, l1mfn, i,
                                page_get_owner(gpage),
                                page_get_owner(gpage)->id,
@@ -436,22 +440,23 @@ int audit_adjust_pgtables(struct domain *d, int dir, int noisy)
                     if ( shadow_enabled )
                     {
                         printk("Audit %d: found an L2 guest page "
-                               "mfn=%p t=%08x c=%08x while in shadow mode\n",
-                               mfn, page->u.inuse.type_info, page->count_info);
+                               "mfn=%lx t=%08x c=%08x while in shadow mode\n",
+                               d->id, mfn, page->u.inuse.type_info,
+                               page->count_info);
                         errors++;
                     }
 
                     if ( (page->u.inuse.type_info & PGT_validated) !=
                          PGT_validated )
                     {
-                        printk("Audit %d: L2 mfn=%p not validated %p\n",
+                        printk("Audit %d: L2 mfn=%lx not validated %08x\n",
                                d->id, mfn, page->u.inuse.type_info);
                         errors++;
                     }
 
                     if ( (page->u.inuse.type_info & PGT_pinned) != PGT_pinned )
                     {
-                        printk("Audit %d: L2 mfn=%p not pinned t=%p\n",
+                        printk("Audit %d: L2 mfn=%lx not pinned t=%08x\n",
                                d->id, mfn, page->u.inuse.type_info);
                         errors++;
                     }
@@ -472,14 +477,15 @@ int audit_adjust_pgtables(struct domain *d, int dir, int noisy)
                 {
                     if ( shadow_enabled )
                     {
-                        printk("found an L1 guest page mfn=%p t=%08x c=%08x while in shadow mode\n",
+                        printk("found an L1 guest page mfn=%lx t=%08x c=%08x "
+                               "while in shadow mode\n",
                                mfn, page->u.inuse.type_info, page->count_info);
                         errors++;
                     }
 
                     if ( (page->u.inuse.type_info & PGT_validated) != PGT_validated )
                     {
-                        printk("Audit %d: L1 not validated mfn=%p t=%p\n",
+                        printk("Audit %d: L1 not validated mfn=%lx t=%08x\n",
                                d->id, mfn, page->u.inuse.type_info);
                         errors++;
                     }
@@ -488,7 +494,7 @@ int audit_adjust_pgtables(struct domain *d, int dir, int noisy)
                     {
                         if ( !VM_ASSIST(d, VMASST_TYPE_writable_pagetables) )
                         {
-                            printk("Audit %d: L1 mfn=%p not pinned t=%p\n",
+                            printk("Audit %d: L1 mfn=%lx not pinned t=%08x\n",
                                    d->id, mfn, page->u.inuse.type_info);
                             errors++;
                         }
@@ -575,7 +581,7 @@ void audit_pagelist(struct domain *d)
     if ( xenpages != d->xenheap_pages ||
          totpages != d->tot_pages )
     {
-        printk("ARGH! dom %d: xen=%d %d, pages=%d %d\n",
+        printk("ARGH! dom %d: xen=%d %d, pages=%d %d\n", d->id,
                xenpages, d->xenheap_pages, 
                totpages, d->tot_pages );
     }
@@ -593,7 +599,8 @@ void _audit_domain(struct domain *d, int flags)
         for ( i = 0; i < L1_PAGETABLE_ENTRIES; i++ )
         {
             if ( (pt[i] & _PAGE_PRESENT) && ((pt[i] >> PAGE_SHIFT) == xmfn) )
-                printk("     found dom=%d mfn=%p t=%x c=%x pt[i=%x]=%p\n",
+                printk("     found dom=%d mfn=%lx t=%08x c=%08x "
+                       "pt[i=%x]=%lx\n",
                        d->id, mfn, page->u.inuse.type_info,
                        page->count_info, i, pt[i]);
         }
@@ -704,7 +711,7 @@ void _audit_domain(struct domain *d, int flags)
         if ( (page->u.inuse.type_info & PGT_count_mask) >
              (page->count_info & PGC_count_mask) )
         {
-            printk("taf(%08x) > caf(%08x) mfn=%p\n",
+            printk("taf(%08x) > caf(%08x) mfn=%lx\n",
                    page->u.inuse.type_info, page->count_info, mfn);
             errors++;
         }
@@ -713,7 +720,8 @@ void _audit_domain(struct domain *d, int flags)
              (page_type == PGT_writable_page) &&
              !(page->u.inuse.type_info & PGT_validated) )
         {
-            printk("shadow mode writable page not validated mfn=%p t=%08x c=%08x\n",
+            printk("shadow mode writable page not validated mfn=%lx "
+                   "t=%08x c=%08x\n",
                    mfn, page->u.inuse.type_info, page->count_info);
             errors++;
         }
@@ -722,7 +730,8 @@ void _audit_domain(struct domain *d, int flags)
         if ( page_type == PGT_writable_page && 
              (page->u.inuse.type_info & PGT_count_mask) > 1 )
         {
-            printk("writeable page with type count >1: mfn=%lx t=%x c=%x\n",
+            printk("writeable page with type count >1: "
+                   "mfn=%lx t=%08x c=%08x\n",
                   mfn,
                   page->u.inuse.type_info,
                   page->count_info );
@@ -734,7 +743,7 @@ void _audit_domain(struct domain *d, int flags)
         if ( page_type == PGT_none && 
              (page->u.inuse.type_info & PGT_count_mask) > 0 )
         {
-            printk("normal page with type count >0: mfn=%lx t=%x c=%x\n",
+            printk("normal page with type count >0: mfn=%lx t=%08x c=%08x\n",
                   mfn,
                   page->u.inuse.type_info,
                   page->count_info );
@@ -745,18 +754,20 @@ void _audit_domain(struct domain *d, int flags)
         {
             if ( !page_is_page_table(page) )
             {
-                printk("out of sync page mfn=%p is not a page table\n", mfn);
+                printk("out of sync page mfn=%lx is not a page table\n", mfn);
                 errors++;
             }
             unsigned long pfn = __mfn_to_gpfn(d, mfn);
             if ( !__shadow_status(d, pfn, PGT_snapshot) )
             {
-                printk("out of sync page mfn=%p doesn't have a snapshot\n");
+                printk("out of sync page mfn=%lx doesn't have a snapshot\n",
+                       mfn);
                 errors++;
             }
             if ( page_type != PGT_writable_page )
             {
-                printk("out of sync page mfn=%p has strange type t=%08x c=%08x\n",
+                printk("out of sync page mfn=%lx has strange type "
+                       "t=%08x c=%08x\n",
                        mfn, page->u.inuse.type_info, page->count_info);
                 errors++;
             }
@@ -854,7 +865,8 @@ void _audit_domain(struct domain *d, int flags)
                     if ( ((page->u.inuse.type_info & PGT_type_mask) != page_type ) ||
                          (page->count_info != 0) )
                     {
-                        printk("Audit %d: shadow page counts wrong mfn=%p t=%x c=%x\n",
+                        printk("Audit %d: shadow page counts wrong "
+                               "mfn=%lx t=%08x c=%08x\n",
                                d->id, page_to_pfn(page),
                                page->u.inuse.type_info,
                                page->count_info);

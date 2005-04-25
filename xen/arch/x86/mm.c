@@ -342,7 +342,7 @@ static int get_page_from_pagenr(unsigned long page_nr, struct domain *d)
 
     if ( unlikely(!pfn_valid(page_nr)) || unlikely(!get_page(page, d)) )
     {
-        MEM_LOG("Could not get page ref for pfn %p", page_nr);
+        MEM_LOG("Could not get page ref for pfn %lx", page_nr);
         return 0;
     }
 
@@ -362,7 +362,7 @@ static int get_page_and_type_from_pagenr(unsigned long page_nr,
     if ( unlikely(!get_page_type(page, type)) )
     {
         if ( (type & PGT_type_mask) != PGT_l1_page_table )
-            MEM_LOG("Bad page type for pfn %p (%08x)", 
+            MEM_LOG("Bad page type for pfn %lx (%08x)", 
                     page_nr, page->u.inuse.type_info);
         put_page(page);
         return 0;
@@ -442,7 +442,7 @@ get_page_from_l1e(
 
     if ( unlikely(l1e_get_flags(l1e) & L1_DISALLOW_MASK) )
     {
-        MEM_LOG("Bad L1 type settings %p %p", l1e_get_value(l1e),
+        MEM_LOG("Bad L1 type settings %lx %lx", l1e_get_value(l1e),
                 l1e_get_value(l1e) & L1_DISALLOW_MASK);
         return 0;
     }
@@ -489,7 +489,7 @@ get_page_from_l2e(
 
     if ( unlikely((l2e_get_flags(l2e) & L2_DISALLOW_MASK)) )
     {
-        MEM_LOG("Bad L2 page type settings %p",
+        MEM_LOG("Bad L2 page type settings %lx",
                 l2e_get_value(l2e) & L2_DISALLOW_MASK);
         return 0;
     }
@@ -517,7 +517,7 @@ get_page_from_l3e(
 
     if ( unlikely((l3e_get_flags(l3e) & L3_DISALLOW_MASK)) )
     {
-        MEM_LOG("Bad L3 page type settings %p",
+        MEM_LOG("Bad L3 page type settings %lx",
                 l3e_get_value(l3e) & L3_DISALLOW_MASK);
         return 0;
     }
@@ -538,7 +538,7 @@ get_page_from_l4e(
 
     if ( unlikely((l4e_get_flags(l4e) & L4_DISALLOW_MASK)) )
     {
-        MEM_LOG("Bad L4 page type settings %p",
+        MEM_LOG("Bad L4 page type settings %lx",
                 l4e_get_value(l4e) & L4_DISALLOW_MASK);
         return 0;
     }
@@ -846,7 +846,7 @@ static inline int update_l1e(l1_pgentry_t *pl1e,
     if ( unlikely(cmpxchg_user(pl1e, o, n) != 0) ||
          unlikely(o != l1e_get_value(ol1e)) )
     {
-        MEM_LOG("Failed to update %p -> %p: saw %p",
+        MEM_LOG("Failed to update %lx -> %lx: saw %lx",
                 l1e_get_value(ol1e), l1e_get_value(nl1e), o);
         return 0;
     }
@@ -870,7 +870,7 @@ static int mod_l1_entry(l1_pgentry_t *pl1e, l1_pgentry_t nl1e)
     {
         if ( unlikely(l1e_get_flags(nl1e) & L1_DISALLOW_MASK) )
         {
-            MEM_LOG("Bad L1 type settings %p", 
+            MEM_LOG("Bad L1 type settings %lx", 
                     l1e_get_value(nl1e) & L1_DISALLOW_MASK);
             return 0;
         }
@@ -904,7 +904,7 @@ static int mod_l1_entry(l1_pgentry_t *pl1e, l1_pgentry_t nl1e)
                                 _t ## e_get_value(_o),                  \
                                 _t ## e_get_value(_n));                 \
     if ( __o != _t ## e_get_value(_o) )                                 \
-        MEM_LOG("Failed to update %p -> %p: saw %p",                    \
+        MEM_LOG("Failed to update %lx -> %lx: saw %lx",                 \
                 _t ## e_get_value(_o), _t ## e_get_value(_n), __o);     \
     (__o == _t ## e_get_value(_o)); })
 
@@ -929,7 +929,7 @@ static int mod_l2_entry(l2_pgentry_t *pl2e,
     {
         if ( unlikely(l2e_get_flags(nl2e) & L2_DISALLOW_MASK) )
         {
-            MEM_LOG("Bad L2 type settings %p", 
+            MEM_LOG("Bad L2 type settings %lx", 
                     l2e_get_value(nl2e) & L2_DISALLOW_MASK);
             return 0;
         }
@@ -982,7 +982,7 @@ static int mod_l3_entry(l3_pgentry_t *pl3e,
     {
         if ( unlikely(l3e_get_flags(nl3e) & L3_DISALLOW_MASK) )
         {
-            MEM_LOG("Bad L3 type settings %p", 
+            MEM_LOG("Bad L3 type settings %lx", 
                     l3e_get_value(nl3e) & L3_DISALLOW_MASK);
             return 0;
         }
@@ -1032,7 +1032,7 @@ static int mod_l4_entry(l4_pgentry_t *pl4e,
     {
         if ( unlikely(l4e_get_flags(nl4e) & L4_DISALLOW_MASK) )
         {
-            MEM_LOG("Bad L4 type settings %p", 
+            MEM_LOG("Bad L4 type settings %lx", 
                     l4e_get_value(nl4e) & L4_DISALLOW_MASK);
             return 0;
         }
@@ -1189,7 +1189,7 @@ int get_page_type(struct pfn_info *page, u32 type)
         nx = x + 1;
         if ( unlikely((nx & PGT_count_mask) == 0) )
         {
-            MEM_LOG("Type count overflow on pfn %p", page_to_pfn(page));
+            MEM_LOG("Type count overflow on pfn %lx", page_to_pfn(page));
             return 0;
         }
         else if ( unlikely((x & PGT_count_mask) == 0) )
@@ -1228,7 +1228,7 @@ int get_page_type(struct pfn_info *page, u32 type)
                 {
                     if ( ((x & PGT_type_mask) != PGT_l2_page_table) ||
                          ((type & PGT_type_mask) != PGT_l1_page_table) )
-                        MEM_LOG("Bad type (saw %08x != exp %08x) for pfn %p",
+                        MEM_LOG("Bad type (saw %08x != exp %08x) for pfn %lx",
                                 x, type, page_to_pfn(page));
                     return 0;
                 }
@@ -1241,7 +1241,7 @@ int get_page_type(struct pfn_info *page, u32 type)
                 else if ( ((type & PGT_va_mask) != PGT_va_mutable) &&
                           ((type & PGT_va_mask) != (x & PGT_va_mask)) )
                 {
-                    /* This table is potentially mapped at multiple locations. */
+                    /* This table is may be mapped at multiple locations. */
                     nx &= ~PGT_va_mask;
                     nx |= PGT_va_unknown;
                 }
@@ -1262,7 +1262,7 @@ int get_page_type(struct pfn_info *page, u32 type)
         /* Try to validate page type; drop the new reference on failure. */
         if ( unlikely(!alloc_page_type(page, type & PGT_type_mask)) )
         {
-            MEM_LOG("Error while validating pfn %p for type %08x."
+            MEM_LOG("Error while validating pfn %lx for type %08x."
                     " caf=%08x taf=%08x",
                     page_to_pfn(page), type,
                     page->count_info,
@@ -1307,21 +1307,20 @@ int new_guest_cr3(unsigned long mfn)
         else
             put_page_and_type(&frame_table[old_base_mfn]);
 
-        // CR3 holds its own ref to its shadow...
-        //
+        /* CR3 holds its own ref to its shadow. */
         if ( shadow_mode_enabled(d) )
         {
             if ( ed->arch.monitor_shadow_ref )
                 put_shadow_ref(ed->arch.monitor_shadow_ref);
             ed->arch.monitor_shadow_ref =
                 pagetable_val(ed->arch.monitor_table) >> PAGE_SHIFT;
-            ASSERT(page_get_owner(&frame_table[ed->arch.monitor_shadow_ref]) == NULL);
+            ASSERT(!page_get_owner(&frame_table[ed->arch.monitor_shadow_ref]));
             get_shadow_ref(ed->arch.monitor_shadow_ref);
         }
     }
     else
     {
-        MEM_LOG("Error while installing new baseptr %p", mfn);
+        MEM_LOG("Error while installing new baseptr %lx", mfn);
     }
 
     return okay;
@@ -1493,14 +1492,14 @@ int do_mmuext_op(
             okay = get_page_and_type_from_pagenr(op.mfn, type, FOREIGNDOM);
             if ( unlikely(!okay) )
             {
-                MEM_LOG("Error while pinning MFN %p", op.mfn);
+                MEM_LOG("Error while pinning mfn %lx", op.mfn);
                 break;
             }
             
             if ( unlikely(test_and_set_bit(_PGT_pinned,
                                            &page->u.inuse.type_info)) )
             {
-                MEM_LOG("MFN %p already pinned", op.mfn);
+                MEM_LOG("Mfn %lx already pinned", op.mfn);
                 put_page_and_type(page);
                 okay = 0;
                 break;
@@ -1525,7 +1524,7 @@ int do_mmuext_op(
         case MMUEXT_UNPIN_TABLE:
             if ( unlikely(!(okay = get_page_from_pagenr(op.mfn, FOREIGNDOM))) )
             {
-                MEM_LOG("MFN %p bad domain (dom=%p)",
+                MEM_LOG("Mfn %lx bad domain (dom=%p)",
                         op.mfn, page_get_owner(page));
             }
             else if ( likely(test_and_clear_bit(_PGT_pinned, 
@@ -1538,7 +1537,7 @@ int do_mmuext_op(
             {
                 okay = 0;
                 put_page(page);
-                MEM_LOG("MFN %p not pinned", op.mfn);
+                MEM_LOG("Mfn %lx not pinned", op.mfn);
             }
             break;
 
@@ -1553,7 +1552,7 @@ int do_mmuext_op(
                 op.mfn, PGT_root_page_table, d);
             if ( unlikely(!okay) )
             {
-                MEM_LOG("Error while installing new MFN %p", op.mfn);
+                MEM_LOG("Error while installing new mfn %lx", op.mfn);
             }
             else
             {
@@ -1638,7 +1637,7 @@ int do_mmuext_op(
                  !array_access_ok(ptr, ents, LDT_ENTRY_SIZE) )
             {
                 okay = 0;
-                MEM_LOG("Bad args to SET_LDT: ptr=%p, ents=%p", ptr, ents);
+                MEM_LOG("Bad args to SET_LDT: ptr=%lx, ents=%lx", ptr, ents);
             }
             else if ( (ed->arch.ldt_ents != ents) || 
                       (ed->arch.ldt_base != ptr) )
@@ -1665,7 +1664,7 @@ int do_mmuext_op(
             e = percpu_info[cpu].foreign;
             if ( unlikely(e == NULL) )
             {
-                MEM_LOG("No FOREIGNDOM to reassign MFN %p to", op.mfn);
+                MEM_LOG("No FOREIGNDOM to reassign mfn %lx to", op.mfn);
                 okay = 0;
                 break;
             }
@@ -1697,7 +1696,7 @@ int do_mmuext_op(
                  unlikely(IS_XEN_HEAP_FRAME(page)) )
             {
                 MEM_LOG("Transferee has no reservation headroom (%d,%d), or "
-                        "page is in Xen heap (%p), or dom is dying (%d).\n",
+                        "page is in Xen heap (%lx), or dom is dying (%ld).\n",
                         e->tot_pages, e->max_pages, op.mfn, e->d_flags);
                 okay = 0;
                 goto reassign_fail;
@@ -1717,7 +1716,7 @@ int do_mmuext_op(
                               (1|PGC_allocated)) ||
                      unlikely(_nd != _d) )
                 {
-                    MEM_LOG("Bad page values %p: ed=%p(%u), sd=%p,"
+                    MEM_LOG("Bad page values %lx: ed=%p(%u), sd=%p,"
                             " caf=%08x, taf=%08x\n", page_to_pfn(page),
                             d, d->id, unpickle_domptr(_nd), x,
                             page->u.inuse.type_info);
@@ -1754,7 +1753,7 @@ int do_mmuext_op(
             break;
             
         default:
-            MEM_LOG("Invalid extended pt command 0x%p", op.cmd);
+            MEM_LOG("Invalid extended pt command 0x%x", op.cmd);
             okay = 0;
             break;
         }
@@ -1959,12 +1958,12 @@ int do_mmu_update(
 
         case MMU_MACHPHYS_UPDATE:
 
-            // HACK ALERT...  Need to think about this some more...
-            //
+            /* HACK ALERT...  Need to think about this some more... */
             if ( unlikely(shadow_mode_translate(FOREIGNDOM) && IS_PRIV(d)) )
             {
                 rc = FOREIGNDOM->next_io_page++;
-                printk("privileged guest dom%d requests mfn=%p for dom%d, gets pfn=%p\n",
+                printk("privileged guest dom%d requests mfn=%lx for dom%d, "
+                       "gets pfn=%x\n",
                        d->id, mfn, FOREIGNDOM->id, rc);
                 set_machinetophys(mfn, rc);
                 set_p2m_entry(FOREIGNDOM, rc, mfn);
@@ -1999,7 +1998,7 @@ int do_mmu_update(
             break;
 
         default:
-            MEM_LOG("Invalid page update command %p", req.ptr);
+            MEM_LOG("Invalid page update command %lx", req.ptr);
             break;
         }
 
@@ -2497,7 +2496,7 @@ void ptwr_flush(struct domain *d, const int which)
          */
         BUG();
     }
-    PTWR_PRINTK("[%c] disconnected_l1va at %p is %p\n",
+    PTWR_PRINTK("[%c] disconnected_l1va at %p is %lx\n",
                 PTWR_PRINT_WHICH, ptep, pte);
     pte &= ~_PAGE_RW;
 
@@ -2515,7 +2514,7 @@ void ptwr_flush(struct domain *d, const int which)
     /* Ensure that there are no stale writable mappings in any TLB. */
     /* NB. INVLPG is a serialising instruction: flushes pending updates. */
     local_flush_tlb_one(l1va); /* XXX Multi-CPU guests? */
-    PTWR_PRINTK("[%c] disconnected_l1va at %p now %p\n",
+    PTWR_PRINTK("[%c] disconnected_l1va at %p now %lx\n",
                 PTWR_PRINT_WHICH, ptep, pte);
 
     /*
@@ -2597,7 +2596,7 @@ static int ptwr_emulated_update(
     /* Aligned access only, thank you. */
     if ( !access_ok(addr, bytes) || ((addr & (bytes-1)) != 0) )
     {
-        MEM_LOG("ptwr_emulate: Unaligned or bad size ptwr access (%d, %p)\n",
+        MEM_LOG("ptwr_emulate: Unaligned or bad size ptwr access (%d, %lx)\n",
                 bytes, addr);
         return X86EMUL_UNHANDLEABLE;
     }
@@ -2633,12 +2632,12 @@ static int ptwr_emulated_update(
     page = &frame_table[pfn];
 
     /* We are looking only for read-only mappings of p.t. pages. */
-    if ( ((l1e_get_flags(pte) & (_PAGE_RW | _PAGE_PRESENT)) != _PAGE_PRESENT) ||
+    if ( ((l1e_get_flags(pte) & (_PAGE_RW|_PAGE_PRESENT)) != _PAGE_PRESENT) ||
          ((page->u.inuse.type_info & PGT_type_mask) != PGT_l1_page_table) ||
          (page_get_owner(page) != d) )
     {
-        MEM_LOG("ptwr_emulate: Page is mistyped or bad pte (%p, %x)\n",
-                pte, page->u.inuse.type_info);
+        MEM_LOG("ptwr_emulate: Page is mistyped or bad pte (%lx, %08x)\n",
+                l1e_get_pfn(pte), page->u.inuse.type_info);
         return X86EMUL_UNHANDLEABLE;
     }
 
@@ -2787,8 +2786,8 @@ int ptwr_do_page_fault(struct domain *d, unsigned long addr)
             which = PTWR_PT_ACTIVE;
     }
     
-    PTWR_PRINTK("[%c] page_fault on l1 pt at va %p, pt for %08x, "
-                "pfn %p\n", PTWR_PRINT_WHICH,
+    PTWR_PRINTK("[%c] page_fault on l1 pt at va %lx, pt for %08x, "
+                "pfn %lx\n", PTWR_PRINT_WHICH,
                 addr, l2_idx << L2_PAGETABLE_SHIFT, pfn);
     
     /*
@@ -2823,8 +2822,6 @@ int ptwr_do_page_fault(struct domain *d, unsigned long addr)
     
     /* Finally, make the p.t. page writable by the guest OS. */
     l1e_add_flags(&pte, _PAGE_RW);
-    PTWR_PRINTK("[%c] update %p pte to %p\n", PTWR_PRINT_WHICH,
-                &linear_pg_table[addr>>PAGE_SHIFT], pte);
     if ( unlikely(__copy_to_user(&linear_pg_table[addr>>PAGE_SHIFT],
                                  &pte, sizeof(pte))) )
     {

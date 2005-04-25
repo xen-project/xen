@@ -171,7 +171,7 @@ void init_boot_pages(unsigned long ps, unsigned long pe)
 
         if ( (bad_pfn < (bitmap_size*8)) && !allocated_in_map(bad_pfn) )
         {
-            printk("Marking page %p as bad\n", bad_pfn);
+            printk("Marking page %lx as bad\n", bad_pfn);
             map_alloc(bad_pfn, 1);
         }
     }

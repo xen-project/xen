@@ -183,7 +183,7 @@ static inline int get_page(struct pfn_info *page,
              unlikely(d != _domain) )                /* Wrong owner? */
         {
             if ( !_shadow_mode_enabled(domain) )
-                DPRINTK("Error pfn %p: rd=%p, od=%p, caf=%08x, taf=%08x\n",
+                DPRINTK("Error pfn %lx: rd=%p, od=%p, caf=%08x, taf=%08x\n",
                         page_to_pfn(page), domain, unpickle_domptr(d),
                         x, page->u.inuse.type_info);
             return 0;
@@ -263,9 +263,9 @@ static inline unsigned long phys_to_machine_mapping(unsigned long pfn)
     unsigned long mfn;
     l1_pgentry_t pte;
 
-    if (!__copy_from_user(&pte, (__phys_to_machine_mapping + pfn),
-			  sizeof(pte))
-	&& (l1e_get_flags(pte) & _PAGE_PRESENT) )
+    if ( (__copy_from_user(&pte, &__phys_to_machine_mapping[pfn],
+                           sizeof(pte)) == 0) &&
+         (l1e_get_flags(pte) & _PAGE_PRESENT) )
 	mfn = l1e_get_pfn(pte);
     else
 	mfn = INVALID_MFN;

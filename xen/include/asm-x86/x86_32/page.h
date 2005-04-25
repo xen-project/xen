@@ -29,18 +29,18 @@ typedef struct { u32 l1_lo; } l1_pgentry_t;
 typedef struct { u32 l2_lo; } l2_pgentry_t;
 typedef l2_pgentry_t root_pgentry_t;
 
-/* read access (depricated) */
-#define l1e_get_value(_x)         ((_x).l1_lo)
-#define l2e_get_value(_x)         ((_x).l2_lo)
+/* read access (deprecated) */
+#define l1e_get_value(_x)      ((unsigned long)((_x).l1_lo))
+#define l2e_get_value(_x)      ((unsigned long)((_x).l2_lo))
 
 /* read access */
-#define l1e_get_pfn(_x)           ((_x).l1_lo >> PAGE_SHIFT)
-#define l1e_get_phys(_x)          ((_x).l1_lo &  PAGE_MASK)
-#define l1e_get_flags(_x)         ((_x).l1_lo &  PAGE_FLAG_MASK)
+#define l1e_get_pfn(_x)        ((unsigned long)((_x).l1_lo >> PAGE_SHIFT))
+#define l1e_get_phys(_x)       ((unsigned long)((_x).l1_lo &  PAGE_MASK))
+#define l1e_get_flags(_x)      ((unsigned long)((_x).l1_lo &  PAGE_FLAG_MASK))
 
-#define l2e_get_pfn(_x)           ((_x).l2_lo >> PAGE_SHIFT)
-#define l2e_get_phys(_x)          ((_x).l2_lo &  PAGE_MASK)
-#define l2e_get_flags(_x)         ((_x).l2_lo &  PAGE_FLAG_MASK)
+#define l2e_get_pfn(_x)        ((unsigned long)((_x).l2_lo >> PAGE_SHIFT))
+#define l2e_get_phys(_x)       ((unsigned long)((_x).l2_lo &  PAGE_MASK))
+#define l2e_get_flags(_x)      ((unsigned long)((_x).l2_lo &  PAGE_FLAG_MASK))
 
 /* write access */
 static inline l1_pgentry_t l1e_empty(void)

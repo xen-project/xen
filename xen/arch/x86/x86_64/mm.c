@@ -204,7 +204,7 @@ void subarch_init_memory(struct domain *dom_xen)
     if ( (offsetof(struct pfn_info, u.inuse._domain) != 
           (offsetof(struct pfn_info, count_info) + sizeof(u32))) )
     {
-        printk("Weird pfn_info layout (%ld,%ld,%d)\n",
+        printk("Weird pfn_info layout (%ld,%ld,%ld)\n",
                offsetof(struct pfn_info, count_info),
                offsetof(struct pfn_info, u.inuse._domain),
                sizeof(struct pfn_info));

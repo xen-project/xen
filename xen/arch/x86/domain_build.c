@@ -184,9 +184,9 @@ int construct_dom0(struct domain *d,
 
     printk("PHYSICAL MEMORY ARRANGEMENT:\n"
            " Dom0 alloc.:   %p->%p",
-           alloc_start, alloc_end);
+           _p(alloc_start), _p(alloc_end));
     if ( d->tot_pages < nr_pages )
-        printk(" (%d pages to be allocated)",
+        printk(" (%lu pages to be allocated)",
                nr_pages - d->tot_pages);
     printk("\nVIRTUAL MEMORY ARRANGEMENT:\n"
            " Loaded kernel: %p->%p\n"
@@ -196,14 +196,14 @@ int construct_dom0(struct domain *d,
            " Start info:    %p->%p\n"
            " Boot stack:    %p->%p\n"
            " TOTAL:         %p->%p\n",
-           dsi.v_kernstart, dsi.v_kernend, 
-           vinitrd_start, vinitrd_end,
-           vphysmap_start, vphysmap_end,
-           vpt_start, vpt_end,
-           vstartinfo_start, vstartinfo_end,
-           vstack_start, vstack_end,
-           dsi.v_start, v_end);
-    printk(" ENTRY ADDRESS: %p\n", dsi.v_kernentry);
+           _p(dsi.v_kernstart), _p(dsi.v_kernend), 
+           _p(vinitrd_start), _p(vinitrd_end),
+           _p(vphysmap_start), _p(vphysmap_end),
+           _p(vpt_start), _p(vpt_end),
+           _p(vstartinfo_start), _p(vstartinfo_end),
+           _p(vstack_start), _p(vstack_end),
+           _p(dsi.v_start), _p(v_end));
+    printk(" ENTRY ADDRESS: %p\n", _p(dsi.v_kernentry));
 
     if ( (v_end - dsi.v_start) > (nr_pages * PAGE_SIZE) )
     {
@@ -508,7 +508,7 @@ int construct_dom0(struct domain *d,
     {
         si->mod_start = vinitrd_start;
         si->mod_len   = initrd_len;
-        printk("Initrd len 0x%lx, start at 0x%p\n",
+        printk("Initrd len 0x%lx, start at 0x%lx\n",
                si->mod_len, si->mod_start);
     }
 
