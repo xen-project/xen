@@ -170,13 +170,13 @@ int xc_linux_restore(int xc_handle, XcIOContext *ioctxt)
     if ( xc_domain_create(xc_handle, nr_pfns * (PAGE_SIZE / 1024),
                           -1, 1, &dom) )
     {
-	xcio_error(ioctxt, "Could not create domain. pfns=%d, %dKB",
-		   nr_pfns,nr_pfns * (PAGE_SIZE / 1024));
+	xcio_error(ioctxt, "Could not create domain. pfns=%ld, %ldKB",
+		   nr_pfns, nr_pfns * (PAGE_SIZE / 1024));
         goto out;
     }
     
     ioctxt->domain = dom;
-    xcio_info(ioctxt, "Created domain %ld\n",dom);
+    xcio_info(ioctxt, "Created domain %u\n", dom);
 
     /* Get the domain's shared-info frame. */
     op.cmd = DOM0_GETDOMAININFO;
@@ -200,7 +200,8 @@ int xc_linux_restore(int xc_handle, XcIOContext *ioctxt)
     }
 
     /* Build the pfn-to-mfn table. We choose MFN ordering returned by Xen. */
-    if ( xc_get_pfn_list(xc_handle, dom, pfn_to_mfn_table, nr_pfns) != nr_pfns )
+    if ( xc_get_pfn_list(xc_handle, dom, 
+                         pfn_to_mfn_table, nr_pfns) != nr_pfns )
     {
         xcio_error(ioctxt, "Did not read correct number of frame "
                    "numbers for new dom");
@@ -657,7 +658,7 @@ int xc_linux_restore(int xc_handle, XcIOContext *ioctxt)
     if ( rc == 0 )
     {
         /* Success: print the domain id. */
-        xcio_info(ioctxt, "DOM=%lu\n", dom);
+        xcio_info(ioctxt, "DOM=%u\n", dom);
         return 0;
     }
 

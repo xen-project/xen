@@ -140,3 +140,6 @@ xen/tools/figlet/figlet
 xen/xen
 xen/xen-syms
 xen/xen.*
+linux-2.6.11-xen-sparse/include/asm-xen/multicall.h
+tools/libxc/xc_linux_restore.c.SMH
+tools/libxc/xc_linux_save.c.SMH
