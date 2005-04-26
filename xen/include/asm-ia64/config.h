@@ -251,6 +251,8 @@ extern unsigned int watchdog_on;
 
 #undef CONFIG_X86
 
+#define CONFIG_MCKINLEY
+
 //#define CONFIG_SMP 1
 //#define CONFIG_NR_CPUS 2
 //leave SMP for a later time

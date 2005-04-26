@@ -32,6 +32,14 @@ ia64_hypercall (struct pt_regs *regs)
 	    case FW_HYPERCALL_PAL_CALL:
 		//printf("*** PAL hypercall: index=%d\n",regs->r28);
 		//FIXME: This should call a C routine
+#if 1
+		// This is very conservative, but avoids a possible
+		// (and deadly) freeze in paravirtualized domains due
+		// to a yet-to-be-found bug where pending_interruption
+		// is zero when it shouldn't be. Since PAL is called
+		// in the idle loop, this should resolve it
+		ed->vcpu_info->arch.pending_interruption = 1;
+#endif
 		x = pal_emulator_static(regs->r28);
 		regs->r8 = x.status; regs->r9 = x.v0;
 		regs->r10 = x.v1; regs->r11 = x.v2;
@@ -61,7 +69,6 @@ ia64_hypercall (struct pt_regs *regs)
 #endif
 		break;
 	    case FW_HYPERCALL_EFI_GET_TIME:
-		fooefi();
 		tv = vcpu_get_gr(ed,32);
 		tc = vcpu_get_gr(ed,33);
 		//printf("efi_get_time(%p,%p) called...",tv,tc);
