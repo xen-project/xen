@@ -1122,8 +1122,7 @@ grant_table_create(
  no_mem:
     if ( t != NULL )
     {
-        if ( t->active != NULL )
-            xfree(t->active);
+        xfree(t->active);
         if ( t->maptrack != NULL )
             free_xenheap_page((unsigned long)t->maptrack);
         xfree(t);

@@ -146,11 +146,8 @@ void physdev_destroy_state(struct domain *d)
 {
     struct list_head *ent;
 
-    if ( d->arch.iobmp_mask != NULL )
-    {
-        xfree(d->arch.iobmp_mask);
-        d->arch.iobmp_mask = NULL;
-    }
+    xfree(d->arch.iobmp_mask);
+    d->arch.iobmp_mask = NULL;
 
     while ( (ent = d->pcidev_list.next) != &d->pcidev_list )
     {

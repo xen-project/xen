@@ -257,8 +257,7 @@ int set_info_guest(struct domain *p, dom0_setdomaininfo_t *setdomaininfo)
     set_bit(DF_CONSTRUCTED, &p->d_flags);
 
  out:    
-    if ( c != NULL )
-        xfree(c);
+    xfree(c);
     return rc;
 }
 
@@ -313,8 +312,7 @@ long do_boot_vcpu(unsigned long vcpu, full_execution_context_t *ctxt)
     return 0;
 
  out:
-    if ( c != NULL )
-        xfree(c);
+    xfree(c);
     arch_free_exec_domain_struct(d->exec_domain[vcpu]);
     d->exec_domain[vcpu] = NULL;
     return rc;

@@ -349,8 +349,7 @@ long do_dom0_op(dom0_op_t *u_dom0_op)
             if ( copy_to_user(op->u.getdomaininfo.ctxt, c, sizeof(*c)) )
                 ret = -EINVAL;
 
-            if ( c != NULL )
-                xfree(c);
+            xfree(c);
         }
 
         if ( copy_to_user(u_dom0_op, op, sizeof(*op)) )     
