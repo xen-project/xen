@@ -35,7 +35,7 @@ int xc_domain_create(int xc_handle,
         goto fail;
 
     if ( (err = do_dom_mem_op(xc_handle, MEMOP_increase_reservation,
-                              NULL, mem_kb/4, 0, *pdomid)) != (mem_kb/4) )
+                              NULL, mem_kb/4 + 1, 0, *pdomid)) != (mem_kb/4) )
     {
         if ( err > 0 )
             errno = ENOMEM;

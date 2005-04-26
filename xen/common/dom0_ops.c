@@ -411,7 +411,8 @@ long do_dom0_op(dom0_op_t *u_dom0_op)
         d = find_domain_by_id(op->u.setdomainmaxmem.domain);
         if ( d != NULL )
         {
-            d->max_pages = op->u.setdomainmaxmem.max_memkb >> (PAGE_SHIFT-10);
+            d->max_pages = (op->u.setdomainmaxmem.max_memkb +
+                            ((PAGE_SIZE-1)>>10)) >> (PAGE_SHIFT-10);
             put_domain(d);
             ret = 0;
         }
