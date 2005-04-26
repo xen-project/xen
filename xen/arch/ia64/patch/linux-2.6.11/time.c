@@ -1,10 +1,5 @@
- time.c |  158 +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
- 1 files changed, 158 insertions(+)
-
-Index: linux-2.6.11-xendiffs/arch/ia64/kernel/time.c
-===================================================================
---- linux-2.6.11-xendiffs.orig/arch/ia64/kernel/time.c	2005-04-07 17:02:39.634985144 -0500
-+++ linux-2.6.11-xendiffs/arch/ia64/kernel/time.c	2005-04-07 17:23:52.777723222 -0500
+--- ../../linux-2.6.11/arch/ia64/kernel/time.c	2005-03-02 00:37:50.000000000 -0700
++++ arch/ia64/time.c	2005-04-26 15:43:01.000000000 -0600
 @@ -10,16 +10,22 @@
   */
  #include <linux/config.h>
@@ -48,7 +43,7 @@ Index: linux-2.6.11-xendiffs/arch/ia64/kernel/time.c
  
  EXPORT_SYMBOL(jiffies_64);
  
-@@ -45,33 +60,154 @@ EXPORT_SYMBOL(last_cli_ip);
+@@ -45,33 +60,155 @@
  
  #endif
  
@@ -158,6 +153,7 @@ Index: linux-2.6.11-xendiffs/arch/ia64/kernel/time.c
 +		// We have to ensure that domain0 is launched before we
 +		// call vcpu_timer_expired on it
 +		//domain0_ready = 1; // moved to xensetup.c
++		current->vcpu_info->arch.pending_interruption = 1;
 +	}
 +	if (domain0_ready && vcpu_timer_expired(dom0->exec_domain[0])) {
 +		vcpu_pend_timer(dom0->exec_domain[0]);
@@ -203,7 +199,7 @@ Index: linux-2.6.11-xendiffs/arch/ia64/kernel/time.c
  
  		new_itm += local_cpu_data->itm_delta;
  
-@@ -82,10 +218,16 @@ timer_interrupt (int irq, void *dev_id, 
+@@ -82,10 +219,16 @@
  			 * another CPU. We need to avoid to SMP race by acquiring the
  			 * xtime_lock.
  			 */
@@ -220,7 +216,7 @@ Index: linux-2.6.11-xendiffs/arch/ia64/kernel/time.c
  		} else
  			local_cpu_data->itm_next = new_itm;
  
-@@ -105,7 +247,12 @@ timer_interrupt (int irq, void *dev_id, 
+@@ -105,7 +248,12 @@
  		 */
  		while (!time_after(new_itm, ia64_get_itc() + local_cpu_data->itm_delta/2))
  			new_itm += local_cpu_data->itm_delta;
@@ -233,7 +229,7 @@ Index: linux-2.6.11-xendiffs/arch/ia64/kernel/time.c
  		/* double check, in case we got hit by a (slow) PMI: */
  	} while (time_after_eq(ia64_get_itc(), new_itm));
  	return IRQ_HANDLED;
-@@ -120,6 +267,7 @@ ia64_cpu_local_tick (void)
+@@ -120,6 +268,7 @@
  	int cpu = smp_processor_id();
  	unsigned long shift = 0, delta;
  
@@ -241,7 +237,7 @@ Index: linux-2.6.11-xendiffs/arch/ia64/kernel/time.c
  	/* arrange for the cycle counter to generate a timer interrupt: */
  	ia64_set_itv(IA64_TIMER_VECTOR);
  
-@@ -133,6 +281,7 @@ ia64_cpu_local_tick (void)
+@@ -133,6 +282,7 @@
  		shift = (2*(cpu - hi) + 1) * delta/hi/2;
  	}
  	local_cpu_data->itm_next = ia64_get_itc() + delta + shift;
@@ -249,7 +245,7 @@ Index: linux-2.6.11-xendiffs/arch/ia64/kernel/time.c
  	ia64_set_itm(local_cpu_data->itm_next);
  }
  
-@@ -160,6 +309,7 @@ ia64_init_itm (void)
+@@ -160,6 +310,7 @@
  	 * frequency and then a PAL call to determine the frequency ratio between the ITC
  	 * and the base frequency.
  	 */
@@ -257,7 +253,7 @@ Index: linux-2.6.11-xendiffs/arch/ia64/kernel/time.c
  	status = ia64_sal_freq_base(SAL_FREQ_BASE_PLATFORM,
  				    &platform_base_freq, &platform_base_drift);
  	if (status != 0) {
-@@ -212,6 +362,7 @@ ia64_init_itm (void)
+@@ -212,6 +363,7 @@
  					+ itc_freq/2)/itc_freq;
  
  	if (!(sal_platform_features & IA64_SAL_PLATFORM_FEATURE_ITC_DRIFT)) {
@@ -265,7 +261,7 @@ Index: linux-2.6.11-xendiffs/arch/ia64/kernel/time.c
  		itc_interpolator.frequency = local_cpu_data->itc_freq;
  		itc_interpolator.drift = itc_drift;
  #ifdef CONFIG_SMP
-@@ -228,6 +379,7 @@ ia64_init_itm (void)
+@@ -228,6 +380,7 @@
  		if (!nojitter) itc_interpolator.jitter = 1;
  #endif
  		register_time_interpolator(&itc_interpolator);
@@ -273,7 +269,7 @@ Index: linux-2.6.11-xendiffs/arch/ia64/kernel/time.c
  	}
  
  	/* Setup the CPU local timer tick */
-@@ -236,7 +388,9 @@ ia64_init_itm (void)
+@@ -236,7 +389,9 @@
  
  static struct irqaction timer_irqaction = {
  	.handler =	timer_interrupt,
@@ -283,7 +279,7 @@ Index: linux-2.6.11-xendiffs/arch/ia64/kernel/time.c
  	.name =		"timer"
  };
  
-@@ -244,12 +398,16 @@ void __init
+@@ -244,12 +399,16 @@
  time_init (void)
  {
  	register_percpu_irq(IA64_TIMER_VECTOR, &timer_irqaction);
