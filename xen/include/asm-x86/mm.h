@@ -301,6 +301,8 @@ struct ptwr_info {
     unsigned int l2_idx; /* NB. Only used for PTWR_PT_ACTIVE. */
     /* Info about last ptwr update batch. */
     unsigned int prev_nr_updates;
+    /* Exec domain which created writable mapping. */
+    struct exec_domain *ed;
 };
 
 #define PTWR_PT_ACTIVE 0

@@ -2477,9 +2477,11 @@ void ptwr_flush(struct domain *d, const int which)
     int            i;
     unsigned int   modified = 0;
 
-    // not supported in combination with various shadow modes!
-    ASSERT( !shadow_mode_enabled(d) );
-    
+    ASSERT(!shadow_mode_enabled(d));
+
+    if ( unlikely(d->arch.ptwr[which].ed != current) )
+        write_ptbase(d->arch.ptwr[which].ed);
+
     l1va = d->arch.ptwr[which].l1va;
     ptep = (unsigned long *)&linear_pg_table[l1_linear_offset(l1va)];
 
@@ -2513,7 +2515,7 @@ void ptwr_flush(struct domain *d, const int which)
 
     /* Ensure that there are no stale writable mappings in any TLB. */
     /* NB. INVLPG is a serialising instruction: flushes pending updates. */
-    local_flush_tlb_one(l1va); /* XXX Multi-CPU guests? */
+    flush_tlb_one_mask(d->cpuset, l1va);
     PTWR_PRINTK("[%c] disconnected_l1va at %p now %lx\n",
                 PTWR_PRINT_WHICH, ptep, pte);
 
@@ -2579,6 +2581,9 @@ void ptwr_flush(struct domain *d, const int which)
      */
 
     d->arch.ptwr[which].l1va = 0;
+
+    if ( unlikely(d->arch.ptwr[which].ed != current) )
+        write_ptbase(current);
 }
 
 static int ptwr_emulated_update(
@@ -2741,7 +2746,7 @@ int ptwr_do_page_fault(struct domain *d, unsigned long addr)
     page = &frame_table[pfn];
 
     /* We are looking only for read-only mappings of p.t. pages. */
-    if ( ((l1e_get_flags(pte) & (_PAGE_RW | _PAGE_PRESENT)) != _PAGE_PRESENT) ||
+    if ( ((l1e_get_flags(pte) & (_PAGE_RW|_PAGE_PRESENT)) != _PAGE_PRESENT) ||
          ((page->u.inuse.type_info & PGT_type_mask) != PGT_l1_page_table) ||
          (page_get_owner(page) != d) )
     {
@@ -2752,10 +2757,6 @@ int ptwr_do_page_fault(struct domain *d, unsigned long addr)
 #if defined(__x86_64__)
     goto emulate;
 #endif
-
-    /* Writable pagetables are not yet SMP safe. Use emulator for now. */
-    if ( d->exec_domain[0]->ed_next_list != NULL )
-        goto emulate;
 
     /* Get the L2 index at which this L1 p.t. is always mapped. */
     l2_idx = page->u.inuse.type_info & PGT_va_mask;
@@ -2785,7 +2786,21 @@ int ptwr_do_page_fault(struct domain *d, unsigned long addr)
               (l2_idx == d->arch.ptwr[PTWR_PT_ACTIVE].l2_idx)) )
             which = PTWR_PT_ACTIVE;
     }
-    
+
+    /*
+     * If this is a multi-processor guest then ensure that the page is hooked
+     * into at most one L2 table, which must be the one running on this VCPU.
+     */
+    if ( (d->exec_domain[0]->ed_next_list != NULL) &&
+         ((page->u.inuse.type_info & PGT_count_mask) != 
+          (!!(page->u.inuse.type_info & PGT_pinned) +
+           (which == PTWR_PT_ACTIVE))) )
+    {
+        /* Could be conflicting writable mappings from other VCPUs. */
+        cleanup_writable_pagetable(d);
+        goto emulate;
+    }
+
     PTWR_PRINTK("[%c] page_fault on l1 pt at va %lx, pt for %08x, "
                 "pfn %lx\n", PTWR_PRINT_WHICH,
                 addr, l2_idx << L2_PAGETABLE_SHIFT, pfn);
@@ -2810,12 +2825,13 @@ int ptwr_do_page_fault(struct domain *d, unsigned long addr)
 
     d->arch.ptwr[which].l1va   = addr | 1;
     d->arch.ptwr[which].l2_idx = l2_idx;
+    d->arch.ptwr[which].ed     = current;
     
     /* For safety, disconnect the L1 p.t. page from current space. */
     if ( which == PTWR_PT_ACTIVE )
     {
         l2e_remove_flags(pl2e, _PAGE_PRESENT);
-        local_flush_tlb(); /* XXX Multi-CPU guests? */
+        flush_tlb_mask(d->cpuset);
     }
     
     /* Temporarily map the L1 page, and make a copy of it. */
