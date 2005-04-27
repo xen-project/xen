@@ -211,7 +211,8 @@ unsigned long allocate_empty_lowmem_region(unsigned long pages)
         pte = pte_offset_kernel(pmd, (vstart + (i*PAGE_SIZE))); 
         pfn_array[i] = pte->pte_low >> PAGE_SHIFT;
         HYPERVISOR_update_va_mapping(vstart + (i*PAGE_SIZE), __pte_ma(0), 0);
-        phys_to_machine_mapping[__pa(vstart)>>PAGE_SHIFT] = INVALID_P2M_ENTRY;
+        phys_to_machine_mapping[(__pa(vstart)>>PAGE_SHIFT)+i] =
+            INVALID_P2M_ENTRY;
     }
 
     flush_tlb_all();

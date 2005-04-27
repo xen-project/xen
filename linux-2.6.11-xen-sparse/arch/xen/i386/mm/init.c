@@ -710,18 +710,9 @@ void __init mem_init(void)
 
 kmem_cache_t *pgd_cache;
 kmem_cache_t *pmd_cache;
-kmem_cache_t *pte_cache;
 
 void __init pgtable_cache_init(void)
 {
-	pte_cache = kmem_cache_create("pte",
-				PTRS_PER_PTE*sizeof(pte_t),
-				PTRS_PER_PTE*sizeof(pte_t),
-				0,
-				pte_ctor,
-				pte_dtor);
-	if (!pte_cache)
-		panic("pgtable_cache_init(): Cannot create pte cache");
 	if (PTRS_PER_PMD > 1) {
 		pmd_cache = kmem_cache_create("pmd",
 					PTRS_PER_PMD*sizeof(pmd_t),

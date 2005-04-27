@@ -44,24 +44,21 @@ extern unsigned long pgkern_mask;
 
 static inline void flush_tlb_mm(struct mm_struct *mm)
 {
-	/* XEN: cpu_vm_mask is more accurate than active_mm. */
-	if (cpu_isset(smp_processor_id(), mm->cpu_vm_mask))
+	if (mm == current->active_mm)
 		__flush_tlb();
 }
 
 static inline void flush_tlb_page(struct vm_area_struct *vma,
 	unsigned long addr)
 {
-	/* XEN: cpu_vm_mask is more accurate than active_mm. */
-	if (cpu_isset(smp_processor_id(), vma->vm_mm->cpu_vm_mask))
+	if (vma->vm_mm == current->active_mm)
 		__flush_tlb_one(addr);
 }
 
 static inline void flush_tlb_range(struct vm_area_struct *vma,
 	unsigned long start, unsigned long end)
 {
-	/* XEN: cpu_vm_mask is more accurate than active_mm. */
-	if (cpu_isset(smp_processor_id(), vma->vm_mm->cpu_vm_mask))
+	if (vma->vm_mm == current->active_mm)
 		__flush_tlb();
 }
 
