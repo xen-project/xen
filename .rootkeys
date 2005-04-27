@@ -351,6 +351,7 @@
 40f5623aDMCsWOFO0jktZ4e8sjwvEg linux-2.6.11-xen-sparse/include/asm-xen/asm-i386/mach-xen/setup_arch_post.h
 40f5623arsFXkGdPvIqvFi3yFXGR0Q linux-2.6.11-xen-sparse/include/asm-xen/asm-i386/mach-xen/setup_arch_pre.h
 41811f07Iri9hrvs97t-baxmhOwWDQ linux-2.6.11-xen-sparse/include/asm-xen/asm-i386/mach-xen/smpboot_hooks.h
+426fa4d7RzvcFMqff_M76HrvRQZHSg linux-2.6.11-xen-sparse/include/asm-xen/asm-i386/mmu.h
 4120f807GCO0uqsLqdZj9csxR1Wthw linux-2.6.11-xen-sparse/include/asm-xen/asm-i386/mmu_context.h
 40f5623adgjZq9nAgCt0IXdWl7udSA linux-2.6.11-xen-sparse/include/asm-xen/asm-i386/page.h
 40f5623a54NuG-7qHihGYmw4wWQnMA linux-2.6.11-xen-sparse/include/asm-xen/asm-i386/param.h
@@ -418,6 +419,7 @@
 40f56a0ddHCSs3501MY4hRf22tctOw linux-2.6.11-xen-sparse/mkbuildtree
 42305f54Q6xJ1bXcQJlCQq1m-e2C8g linux-2.6.11-xen-sparse/mm/highmem.c
 412f46c0LJuKAgSPGoC0Z1DEkLfuLA linux-2.6.11-xen-sparse/mm/memory.c
+426fa4d7ooLYmFcFjJMF_ut4GFVh2Q linux-2.6.11-xen-sparse/mm/mmap.c
 410a94a4KT6I6X0LVc7djB39tRDp4g linux-2.6.11-xen-sparse/mm/page_alloc.c
 413cb1e4zst25MDYjg63Y-NGC5_pLg netbsd-2.0-xen-sparse/Makefile
 413cb1e5c_Mkxf_X0zimEhTKI_l4DA netbsd-2.0-xen-sparse/mkbuildtree

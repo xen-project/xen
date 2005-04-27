@@ -11,10 +11,23 @@
 #define pmd_populate_kernel(mm, pmd, pte) \
 		set_pmd(pmd, __pmd(_PAGE_TABLE + __pa(pte)))
 
-#define pmd_populate(mm, pmd, pte) 				\
-	set_pmd(pmd, __pmd(_PAGE_TABLE +			\
-		((unsigned long long)page_to_pfn(pte) <<	\
-			(unsigned long long) PAGE_SHIFT)))
+#define pmd_populate(mm, pmd, pte) 					\
+do {									\
+	if (unlikely((mm)->context.pinned)) {				\
+		if (!PageHighMem(pte))					\
+			HYPERVISOR_update_va_mapping(			\
+			  (unsigned long)__va(page_to_pfn(pte)<<PAGE_SHIFT),\
+			  pfn_pte(page_to_pfn(pte), PAGE_KERNEL_RO), 0);\
+		set_pmd(pmd, __pmd(_PAGE_TABLE +			\
+			((unsigned long long)page_to_pfn(pte) <<	\
+				(unsigned long long) PAGE_SHIFT)));	\
+	} else {							\
+		*(pmd) = __pmd(_PAGE_TABLE +				\
+			((unsigned long long)page_to_pfn(pte) <<	\
+				(unsigned long long) PAGE_SHIFT));	\
+	}								\
+} while (0)
+
 /*
  * Allocate and free page tables.
  */

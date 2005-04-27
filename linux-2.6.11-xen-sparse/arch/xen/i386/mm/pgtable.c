@@ -198,59 +198,35 @@ pte_t *pte_alloc_one_kernel(struct mm_struct *mm, unsigned long address)
 	return pte;
 }
 
-void pte_ctor(void *pte, kmem_cache_t *cache, unsigned long unused)
-{
-	struct page *page = virt_to_page(pte);
-	SetPageForeign(page, pte_free);
-	set_page_count(page, 1);
-
-	clear_page(pte);
-	make_page_readonly(pte);
-	xen_pte_pin(__pa(pte));
-}
-
-void pte_dtor(void *pte, kmem_cache_t *cache, unsigned long unused)
-{
-	struct page *page = virt_to_page(pte);
-	ClearPageForeign(page);
-
-	xen_pte_unpin(__pa(pte));
-	make_page_writable(pte);
-}
-
 struct page *pte_alloc_one(struct mm_struct *mm, unsigned long address)
 {
-	pte_t *ptep;
-
-#ifdef CONFIG_HIGHPTE
 	struct page *pte;
 
+#ifdef CONFIG_HIGHPTE
 	pte = alloc_pages(GFP_KERNEL|__GFP_HIGHMEM|__GFP_REPEAT|__GFP_ZERO, 0);
-	if (pte == NULL)
-		return pte;
-	if (PageHighMem(pte))
-		return pte;
-	/* not a highmem page -- free page and grab one from the cache */
-	__free_page(pte);
+#else
+	pte = alloc_pages(GFP_KERNEL|__GFP_REPEAT|__GFP_ZERO, 0);
+	if (pte) {
+		SetPageForeign(pte, pte_free);
+		set_page_count(pte, 1);
+	}
 #endif
-	ptep = kmem_cache_alloc(pte_cache, GFP_KERNEL);
-	if (ptep)
-		return virt_to_page(ptep);
-	return NULL;
+
+	return pte;
 }
 
 void pte_free(struct page *pte)
 {
+	unsigned long va = (unsigned long)__va(page_to_pfn(pte)<<PAGE_SHIFT);
+
+	if (!pte_write(*virt_to_ptep(va)))
+		HYPERVISOR_update_va_mapping(
+			va, pfn_pte(page_to_pfn(pte), PAGE_KERNEL), 0);
+
+	ClearPageForeign(pte);
 	set_page_count(pte, 1);
-#ifdef CONFIG_HIGHPTE
-	if (!PageHighMem(pte))
-#endif
-		kmem_cache_free(pte_cache,
-				phys_to_virt(page_to_pseudophys(pte)));
-#ifdef CONFIG_HIGHPTE
-	else
-		__free_page(pte);
-#endif
+
+	__free_page(pte);
 }
 
 void pmd_ctor(void *pmd, kmem_cache_t *cache, unsigned long flags)
@@ -305,23 +281,17 @@ void pgd_ctor(void *pgd, kmem_cache_t *cache, unsigned long unused)
 			(PTRS_PER_PGD - USER_PTRS_PER_PGD) * sizeof(pgd_t));
 
 	if (PTRS_PER_PMD > 1)
-		goto out;
+		return;
 
 	pgd_list_add(pgd);
 	spin_unlock_irqrestore(&pgd_lock, flags);
 	memset(pgd, 0, USER_PTRS_PER_PGD*sizeof(pgd_t));
- out:
-	make_page_readonly(pgd);
-	xen_pgd_pin(__pa(pgd));
 }
 
 /* never called when PTRS_PER_PMD > 1 */
 void pgd_dtor(void *pgd, kmem_cache_t *cache, unsigned long unused)
 {
 	unsigned long flags; /* can be called from interrupt context */
-
-	xen_pgd_unpin(__pa(pgd));
-	make_page_writable(pgd);
 
 	if (PTRS_PER_PMD > 1)
 		return;
@@ -357,6 +327,15 @@ out_oom:
 void pgd_free(pgd_t *pgd)
 {
 	int i;
+	pte_t *ptep = virt_to_ptep(pgd);
+
+	if (!pte_write(*ptep)) {
+		xen_pgd_unpin(__pa(pgd));
+		HYPERVISOR_update_va_mapping(
+			(unsigned long)pgd,
+			pfn_pte(virt_to_phys(pgd)>>PAGE_SHIFT, PAGE_KERNEL),
+			0);
+	}
 
 	/* in the PAE case user pgd entries are overwritten before usage */
 	if (PTRS_PER_PMD > 1)
@@ -369,28 +348,19 @@ void pgd_free(pgd_t *pgd)
 #ifndef CONFIG_XEN_SHADOW_MODE
 void make_lowmem_page_readonly(void *va)
 {
-	pgd_t *pgd = pgd_offset_k((unsigned long)va);
-	pud_t *pud = pud_offset(pgd, (unsigned long)va);
-	pmd_t *pmd = pmd_offset(pud, (unsigned long)va);
-	pte_t *pte = pte_offset_kernel(pmd, (unsigned long)va);
+	pte_t *pte = virt_to_ptep(va);
 	set_pte(pte, pte_wrprotect(*pte));
 }
 
 void make_lowmem_page_writable(void *va)
 {
-	pgd_t *pgd = pgd_offset_k((unsigned long)va);
-	pud_t *pud = pud_offset(pgd, (unsigned long)va);
-	pmd_t *pmd = pmd_offset(pud, (unsigned long)va);
-	pte_t *pte = pte_offset_kernel(pmd, (unsigned long)va);
+	pte_t *pte = virt_to_ptep(va);
 	set_pte(pte, pte_mkwrite(*pte));
 }
 
 void make_page_readonly(void *va)
 {
-	pgd_t *pgd = pgd_offset_k((unsigned long)va);
-	pud_t *pud = pud_offset(pgd, (unsigned long)va);
-	pmd_t *pmd = pmd_offset(pud, (unsigned long)va);
-	pte_t *pte = pte_offset_kernel(pmd, (unsigned long)va);
+	pte_t *pte = virt_to_ptep(va);
 	set_pte(pte, pte_wrprotect(*pte));
 	if ( (unsigned long)va >= (unsigned long)high_memory )
 	{
@@ -405,10 +375,7 @@ void make_page_readonly(void *va)
 
 void make_page_writable(void *va)
 {
-	pgd_t *pgd = pgd_offset_k((unsigned long)va);
-	pud_t *pud = pud_offset(pgd, (unsigned long)va);
-	pmd_t *pmd = pmd_offset(pud, (unsigned long)va);
-	pte_t *pte = pte_offset_kernel(pmd, (unsigned long)va);
+	pte_t *pte = virt_to_ptep(va);
 	set_pte(pte, pte_mkwrite(*pte));
 	if ( (unsigned long)va >= (unsigned long)high_memory )
 	{
@@ -439,3 +406,91 @@ void make_pages_writable(void *va, unsigned int nr)
 	}
 }
 #endif /* CONFIG_XEN_SHADOW_MODE */
+
+void mm_pin(struct mm_struct *mm)
+{
+    pgd_t       *pgd;
+    struct page *page;
+    int          i;
+
+    spin_lock(&mm->page_table_lock);
+
+    for ( i = 0, pgd = mm->pgd; i < USER_PTRS_PER_PGD; i++, pgd++ )
+    {
+        if ( *(unsigned long *)pgd == 0 )
+            continue;
+        page = pmd_page(*(pmd_t *)pgd);
+        if ( !PageHighMem(page) )
+            HYPERVISOR_update_va_mapping(
+                (unsigned long)__va(page_to_pfn(page)<<PAGE_SHIFT),
+                pfn_pte(page_to_pfn(page), PAGE_KERNEL_RO), 0);
+    }
+
+    HYPERVISOR_update_va_mapping(
+        (unsigned long)mm->pgd,
+        pfn_pte(virt_to_phys(mm->pgd)>>PAGE_SHIFT, PAGE_KERNEL_RO), 0);
+    xen_pgd_pin(__pa(mm->pgd));
+
+    mm->context.pinned = 1;
+
+    spin_unlock(&mm->page_table_lock);
+}
+
+void mm_unpin(struct mm_struct *mm)
+{
+    pgd_t       *pgd;
+    struct page *page;
+    int          i;
+
+    spin_lock(&mm->page_table_lock);
+
+    xen_pgd_unpin(__pa(mm->pgd));
+    HYPERVISOR_update_va_mapping(
+        (unsigned long)mm->pgd,
+        pfn_pte(virt_to_phys(mm->pgd)>>PAGE_SHIFT, PAGE_KERNEL), 0);
+
+    for ( i = 0, pgd = mm->pgd; i < USER_PTRS_PER_PGD; i++, pgd++ )
+    {
+        if ( *(unsigned long *)pgd == 0 )
+            continue;
+        page = pmd_page(*(pmd_t *)pgd);
+        if ( !PageHighMem(page) )
+            HYPERVISOR_update_va_mapping(
+                (unsigned long)__va(page_to_pfn(page)<<PAGE_SHIFT),
+                pfn_pte(page_to_pfn(page), PAGE_KERNEL), 0);
+    }
+
+    mm->context.pinned = 0;
+
+    spin_unlock(&mm->page_table_lock);
+}
+
+void _arch_exit_mmap(struct mm_struct *mm)
+{
+    unsigned int cpu = smp_processor_id();
+    struct task_struct *tsk = current;
+
+    task_lock(tsk);
+
+    /*
+     * We aggressively remove defunct pgd from cr3. We execute unmap_vmas()
+     * *much* faster this way, as no tlb flushes means bigger wrpt batches.
+     */
+    if ( tsk->active_mm == mm )
+    {
+        tsk->active_mm = &init_mm;
+        atomic_inc(&init_mm.mm_count);
+
+        cpu_set(cpu, init_mm.cpu_vm_mask);
+        load_cr3(swapper_pg_dir);
+        cpu_clear(cpu, mm->cpu_vm_mask);
+
+        atomic_dec(&mm->mm_count);
+        BUG_ON(atomic_read(&mm->mm_count) == 0);
+    }
+
+    task_unlock(tsk);
+
+    if ( mm->context.pinned && (atomic_read(&mm->mm_count) == 1) )
+        mm_unpin(mm);
+}

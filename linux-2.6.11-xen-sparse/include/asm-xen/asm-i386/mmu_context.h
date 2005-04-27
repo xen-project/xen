@@ -41,6 +41,9 @@ static inline void __prepare_arch_switch(void)
 		: : "r" (0) );
 }
 
+extern void mm_pin(struct mm_struct *mm);
+extern void mm_unpin(struct mm_struct *mm);
+
 static inline void switch_mm(struct mm_struct *prev,
 			     struct mm_struct *next,
 			     struct task_struct *tsk)
@@ -49,6 +52,9 @@ static inline void switch_mm(struct mm_struct *prev,
 	struct mmuext_op _op[2], *op = _op;
 
 	if (likely(prev != next)) {
+		if (!next->context.pinned)
+			mm_pin(next);
+
 		/* stop flush ipis for the previous mm */
 		cpu_clear(cpu, prev->cpu_vm_mask);
 #if 0 /* XEN: no lazy tlb */
@@ -92,20 +98,10 @@ static inline void switch_mm(struct mm_struct *prev,
 #endif
 }
 
-/*
- * XEN: We aggressively remove defunct pgd from cr3. We execute unmap_vmas()
- * *much* faster this way, as no tlb flushes means much bigger wrpt batches.
- */
-#define deactivate_mm(tsk, mm) do {					\
-	asm("movl %0,%%fs ; movl %0,%%gs": :"r" (0));			\
-	if ((mm) && cpu_isset(smp_processor_id(), (mm)->cpu_vm_mask)) {	\
-		cpu_clear(smp_processor_id(), (mm)->cpu_vm_mask);	\
-		load_cr3(swapper_pg_dir);				\
-	}								\
-} while (0)
+#define deactivate_mm(tsk, mm) \
+	asm("movl %0,%%fs ; movl %0,%%gs": :"r" (0))
 
-#define activate_mm(prev, next) do {		\
-	switch_mm((prev),(next),NULL);		\
-} while (0)
+#define activate_mm(prev, next) \
+	switch_mm((prev),(next),NULL)
 
 #endif

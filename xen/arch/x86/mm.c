@@ -482,7 +482,7 @@ get_page_from_l2e(
 {
     int rc;
 
-    ASSERT( !shadow_mode_enabled(d) );
+    ASSERT(!shadow_mode_enabled(d));
 
     if ( !(l2e_get_flags(l2e) & _PAGE_PRESENT) )
         return 1;
@@ -641,7 +641,7 @@ static int alloc_l1_table(struct pfn_info *page)
     l1_pgentry_t  *pl1e;
     int            i;
 
-    ASSERT( !shadow_mode_enabled(d) );
+    ASSERT(!shadow_mode_enabled(d));
 
     pl1e = map_domain_mem(pfn << PAGE_SHIFT);
 
@@ -2670,22 +2670,6 @@ static int ptwr_emulated_update(
     }
     unmap_domain_mem(pl1e);
 
-    /* Propagate update to shadow cache. */
-    if ( unlikely(shadow_mode_enabled(d)) )
-    {
-        BUG(); // XXX fix me...
-#if 0
-        sstat = get_shadow_status(d, page_to_pfn(page));
-        if ( sstat & PSH_shadowed )
-        {
-            sl1e = map_domain_mem(
-                ((sstat & PSH_pfn_mask) << PAGE_SHIFT) + (addr & ~PAGE_MASK));
-            l1pte_propagate_from_guest(d, &nl1e, sl1e);
-            unmap_domain_mem(sl1e);
-        }
-#endif
-    }
-
     /* Finally, drop the old PTE. */
     put_page_from_l1e(ol1e, d);
 
@@ -2748,6 +2732,7 @@ int ptwr_do_page_fault(struct domain *d, unsigned long addr)
     /* We are looking only for read-only mappings of p.t. pages. */
     if ( ((l1e_get_flags(pte) & (_PAGE_RW|_PAGE_PRESENT)) != _PAGE_PRESENT) ||
          ((page->u.inuse.type_info & PGT_type_mask) != PGT_l1_page_table) ||
+         ((page->u.inuse.type_info & PGT_count_mask) == 0) ||
          (page_get_owner(page) != d) )
     {
         return 0;

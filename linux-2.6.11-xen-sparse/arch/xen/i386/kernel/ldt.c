@@ -100,8 +100,8 @@ int init_new_context(struct task_struct *tsk, struct mm_struct *mm)
 	struct mm_struct * old_mm;
 	int retval = 0;
 
+	memset(&mm->context, 0, sizeof(mm->context));
 	init_MUTEX(&mm->context.sem);
-	mm->context.size = 0;
 	old_mm = current->mm;
 	if (old_mm && old_mm->context.size > 0) {
 		down(&old_mm->context.sem);
