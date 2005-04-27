@@ -61,9 +61,6 @@ alloc_dom_mem(struct domain *d,
             return i;
         }
 
-        /* Initialise the machine-to-phys mapping for this page. */
-        set_machinetophys(page_to_pfn(page), d->tot_pages - 1);
-
         /* Inform the domain of the new page's machine address. */ 
         if ( (extent_list != NULL) && 
              (__put_user(page_to_pfn(page), &extent_list[i]) != 0) )
