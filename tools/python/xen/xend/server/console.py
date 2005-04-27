@@ -2,7 +2,8 @@
 
 import socket
 import threading
-
+from errno import EAGAIN, EINTR, EWOULDBLOCK
+    
 from xen.web import reactor, protocol
 
 from xen.lowlevel import xu
@@ -278,15 +279,20 @@ class ConsoleDev(Dev):
             self.lock.acquire()
             if self.closed():
                 return -1
-            if not self.conn:
-                return 0
-            while not self.obuf.empty():
+            writes = 0
+            while self.conn and (writes < 100) and (not self.obuf.empty()):
                 try:
+                    writes += 1
                     bytes = self.conn.write(self.obuf.peek())
                     if bytes > 0:
                         self.obuf.discard(bytes)
-                except socket.error:
-                    pass
+                except socket.error, err:
+                    if err.args[0] in (EWOULDBLOCK, EAGAIN, EINTR):
+                        pass
+                    else:
+                        self.disconnect()
+                        break
+                        
         finally:
             self.lock.release()
         return 0
