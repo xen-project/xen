@@ -4,6 +4,8 @@ import string
 import socket
 import types
 from urllib import quote, unquote
+import os
+import os.path
 
 from xen.xend import sxp
 from xen.xend.Args import ArgError
@@ -184,7 +186,9 @@ class HttpServerRequest(http.HttpRequest):
 
         @param val: the value
         """
-        if isinstance(val, ThreadRequest):
+        if val is None:
+            return val
+        elif isinstance(val, ThreadRequest):
             return val
         elif self.useSxp():
             self.setHeader("Content-Type", sxp.mime_type)
@@ -316,18 +320,23 @@ class HttpServer:
     def getResource(self, req):
         return self.root.getRequestResource(req)
 
+class UnixHttpServer(HttpServer):
 
-def main():
-    root = SrvDir()
-    a = root.add("a", SrvDir())
-    b = root.add("b", SrvDir())
-    server = HttpServer(root=root)
-    server.run()
-
-if __name__ == "__main__":
-    main()
+    def __init__(self, path=None, root=None):
+        HttpServer.__init__(self, interface='localhost', root=root)
+        self.path = path
         
-        
-        
-            
-
+    def bind(self):
+        pathdir = os.path.dirname(self.path)
+        if not os.path.exists(pathdir):
+            os.makedirs(pathdir)
+        else:
+            try:
+                os.unlink(self.path)
+            except SystemExit:
+                raise
+            except Exception, ex:
+                pass
+        self.socket = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+        #self.socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+        self.socket.bind(self.path)

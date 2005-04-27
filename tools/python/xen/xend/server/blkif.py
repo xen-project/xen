@@ -425,10 +425,10 @@ class BlkifController(DevController):
     for a domain.
     """
     
-    def __init__(self, dctype, vm, recreate=False):
+    def __init__(self, vm, recreate=False):
         """Create a block device controller.
         """
-        DevController.__init__(self, dctype, vm, recreate=recreate)
+        DevController.__init__(self, vm, recreate=recreate)
         self.backends = {}
         self.backendId = 0
         self.rcvr = None

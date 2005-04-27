@@ -5,7 +5,7 @@ import os
 from xen.xend import sxp
 from xen.xend import XendDmesg
 
-from SrvDir import SrvDir
+from xen.web.SrvDir import SrvDir
 
 class SrvDmesg(SrvDir):
     """Xen Dmesg output.

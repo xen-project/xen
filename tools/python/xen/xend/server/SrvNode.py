@@ -2,7 +2,7 @@
 
 import os
 
-from SrvDir import SrvDir
+from xen.web.SrvDir import SrvDir
 from xen.xend import sxp
 from xen.xend import XendNode
 from xen.xend.Args import FormFn

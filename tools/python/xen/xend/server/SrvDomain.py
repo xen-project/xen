@@ -8,7 +8,7 @@ from xen.xend import XendConsole
 from xen.xend import PrettyPrint
 from xen.xend.Args import FormFn
 
-from SrvDir import SrvDir
+from xen.web.SrvDir import SrvDir
 
 class SrvDomain(SrvDir):
     """Service managing a single domain.
@@ -35,10 +35,6 @@ class SrvDomain(SrvDir):
         return val
         
     def op_pause(self, op, req):
-        # Pause doesn't need a thread, but request one for testing.
-        return req.threadRequest(self.do_pause, op, req)
-
-    def do_pause(self, op, req):
         val = self.xd.domain_pause(self.dom.name)
         return val
 
@@ -113,6 +109,31 @@ class SrvDomain(SrvDir):
                      ['memory', 'int']])
         val = fn(req.args, {'dom': self.dom.id})
         return val
+    
+    def op_mem_target_set(self, op, req):
+        fn = FormFn(self.xd.domain_mem_target_set,
+                    [['dom',    'str'],
+                     ['target', 'int']])
+        val = fn(req.args, {'dom': self.dom.id})
+        return val
+
+    def op_devices(self, op, req):
+        fn = FormFn(self.xd.domain_devtype_ls,
+                    [['dom',    'str'],
+                     ['type',   'str']])
+        val = fn(req.args, {'dom': self.dom.id})
+        return val
+
+    def op_device(self, op, req):
+        fn = FormFn(self.xd.domain_devtype_get,
+                    [['dom',    'str'],
+                     ['type',   'str'],
+                     ['idx',    'int']])
+        val = fn(req.args, {'dom': self.dom.id})
+        if val:
+            return val.sxpr()
+        else:
+            raise XendError("invalid device")
 
     def op_device_create(self, op, req):
         fn = FormFn(self.xd.domain_device_create,
@@ -145,41 +166,12 @@ class SrvDomain(SrvDir):
         val = fn(req.args, {'dom': self.dom.id})
         return val
 
-    def op_vif_credit_limit(self, op, req):
-        fn = FormFn(self.xd.domain_vif_credit_limit,
+    def op_vif_limit_set(self, op, req):
+        fn = FormFn(self.xd.domain_vif_limit_set,
                     [['dom',    'str'],
                      ['vif',    'int'],
                      ['credit', 'int'],
                      ['period', 'int']])
-        val = fn(req.args, {'dom': self.dom.id})
-        return val
-
-    def op_vifs(self, op, req):
-        devs = self.xd.domain_vif_ls(self.dom.id)
-        return [ dev.sxpr() for dev in devs ]
-
-    def op_vif(self, op, req):
-        fn = FormFn(self.xd.domain_vif_get,
-                    [['dom', 'str'],
-                     ['vif', 'str']])
-        val = fn(req.args, {'dom': self.dom.id})
-        return val
-
-    def op_vbds(self, op, req):
-        devs = self.xd.domain_vbd_ls(self.dom.id)
-        return [ dev.sxpr() for dev in devs ]
-
-    def op_vbd(self, op, req):
-        fn = FormFn(self.xd.domain_vbd_get,
-                    [['dom', 'str'],
-                     ['vbd', 'str']])
-        val = fn(req.args, {'dom': self.dom.id})
-        return val
-
-    def op_mem_target_set(self, op, req):
-        fn = FormFn(self.xd.domain_mem_target_set,
-                    [['dom',    'str'],
-                     ['target', 'int']])
         val = fn(req.args, {'dom': self.dom.id})
         return val
 

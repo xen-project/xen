@@ -20,7 +20,7 @@ class SrvConstructor:
 
     def __init__(self, klass):
         """Create a constructor. It is assumed that the class
-        should be imported as 'import klass from klass'.
+        should be imported as 'from xen.xend.server.klass import klass'.
 
         klass	name of its class
         """

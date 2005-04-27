@@ -24,7 +24,7 @@ class File(Resource):
         if self.type:
             req.setHeader('Content-Type', self.type)
         if self.encoding:
-            rew.setHeader('Content-Encoding', self.encoding)
+            req.setHeader('Content-Encoding', self.encoding)
         req.setHeader('Content-Length', self.getFileSize())
         try:
             io = file(self.filename, "r")
@@ -40,7 +40,6 @@ class File(Resource):
                 io.close()
         except:
             pass
-        return ''
         
 
         

@@ -376,8 +376,8 @@ class NetifController(DevController):
     """Network interface controller. Handles all network devices for a domain.
     """
     
-    def __init__(self, dctype, vm, recreate=False):
-        DevController.__init__(self, dctype, vm, recreate=recreate)
+    def __init__(self, vm, recreate=False):
+        DevController.__init__(self, vm, recreate=recreate)
         self.channel = None
         self.rcvr = None
         self.channel = None

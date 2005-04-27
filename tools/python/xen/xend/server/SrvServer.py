@@ -27,23 +27,38 @@
 
 from threading import Thread
 
-from xen.web.httpserver import HttpServer
+from xen.web.httpserver import HttpServer, UnixHttpServer
 
-from xen.xend import XendRoot
-xroot = XendRoot.instance()
+from xen.xend import XendRoot; xroot = XendRoot.instance()
 from xen.xend import Vifctl
-from SrvRoot import SrvRoot
-from SrvDir import SrvDir
+from xen.web.SrvDir import SrvDir
 
-def create(port=None, interface=None, bridge=0):
-    if port is None:
-        port = xroot.get_xend_port()
-    if interface is None:
-        interface = xroot.get_xend_address()
-    if bridge:
+from SrvRoot import SrvRoot
+
+class XendServers:
+
+    def __init__(self):
+        self.servers = []
+
+    def add(self, server):
+        self.servers.append(server)
+
+    def start(self):
         Vifctl.network('start')
+        for server in self.servers:
+            thread = Thread(target=server.run)
+            thread.start()
+
+def create():
     root = SrvDir()
     root.putChild('xend', SrvRoot())
-    server = HttpServer(root=root, interface=interface, port=port)
-    thread = Thread(name="XendHttpServer", target=server.run)
-    return thread
+    servers = XendServers()
+    if xroot.get_xend_http_server():
+        port = xroot.get_xend_port()
+        interface = xroot.get_xend_address()
+        servers.add(HttpServer(root=root, interface=interface, port=port))
+    if xroot.get_xend_unix_server():
+        path = xroot.get_xend_unix_path()
+        print 'unix path=', path
+        servers.add(UnixHttpServer(path=path, root=root))
+    return servers

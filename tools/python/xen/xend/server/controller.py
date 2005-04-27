@@ -9,7 +9,7 @@ from messages import msgTypeName, printMsg, getMessageType
 DEBUG = 0
 
 class CtrlMsgRcvr:
-    """Dispatcher class for messages on a control channel.
+    """Utility class to dispatch messages on a control channel.
     Once I{registerChannel} has been called, our message types are registered
     with the channel. The channel will call I{requestReceived}
     when a request arrives if it has one of our message types.
@@ -105,65 +105,32 @@ class CtrlMsgRcvr:
         if self.channel:
             self.channel.deregisterDevice(self)
 
-class DevControllerType:
-    """Abstract class for device controller types.
-    """
-
-    def __init__(self, type):
-        self.type = type
-
-    def getType(self):
-        """Get the device controller type name.
-        """
-        return self.type
-
-    def createDevController(self, vm, recreate=False):
-        """Create a device controller for a domain.
-           Must be implemented in subclass.
-        """
-        raise NotImplementedError()
-
-class SimpleDevControllerType(DevControllerType):
-    """Device controller type that simply wraps a controller
-    class and uses its constructor to create instances.
-    """
-    
-    def __init__(self, type, devControllerClass):
-        DevControllerType.__init__(self, type)
-        self.devControllerClass = devControllerClass
-
-    def createDevController(self, vm, recreate=False):
-        """Create a device controller for a domain.
-        """
-        ctrl = self.devControllerClass(self, vm, recreate=recreate)
-        ctrl.initController(recreate=recreate)
-        return ctrl
-
 class DevControllerTable:
-    """Table of device controller types, indexed by type name.
+    """Table of device controller classes, indexed by type name.
     """
 
     def __init__(self):
-        self.controllerTypes = {}
+        self.controllerClasses = {}
 
-    def getDevControllerType(self, type):
-        return self.controllerTypes.get(type)
+    def getDevControllerClass(self, type):
+        return self.controllerClasses.get(type)
 
-    def addDevControllerType(self, dctype):
-        self.controllerTypes[dctype.getType()] = dctype
-        return dctype
+    def addDevControllerClass(self, klass):
+        self.controllerClasses[klass.getType()] = klass
 
-    def delDevControllerType(self, type):
-        if type in self.controllerTypes:
-            del self.controllerTypes[type]
+    def delDevControllerClass(self, type):
+        if type in self.controllerClasses:
+            del self.controllerClasses[type]
 
     def createDevController(self, type, vm, recreate=False):
-        dctype = self.getDevControllerType(type)
-        if not dctype:
+        klass = self.getDevControllerClass(type)
+        if not klass:
             raise XendError("unknown device type: " + type)
-        return dctype.createDevController(vm, recreate=recreate)
+        return klass.createDevController(vm, recreate=recreate)
 
 def getDevControllerTable():
+    """Singleton constructor for the controller table.
+    """
     global devControllerTable
     try:
         devControllerTable
@@ -171,12 +138,11 @@ def getDevControllerTable():
         devControllerTable = DevControllerTable()
     return devControllerTable
 
-def addDevControllerType(dctype):
-    return getDevControllerTable().addDevControllerType(dctype)
-    
 def addDevControllerClass(name, klass):
-    ty = SimpleDevControllerType(name, klass)
-    return addDevControllerType(ty)
+    """Add a device controller class to the controller table.
+    """
+    klass.name = name
+    getDevControllerTable().addDevControllerClass(klass)
 
 def createDevController(name, vm, recreate=False):
     return getDevControllerTable().createDevController(name, vm, recreate=recreate)
@@ -189,16 +155,28 @@ class DevController:
 
     """
 
-    def __init__(self, dctype, vm, recreate=False):
-        self.dctype = dctype
+    name = None
+
+    def createDevController(klass, vm, recreate=False):
+        """Class method to create a dev controller.
+        """
+        ctrl = klass(vm, recreate=recreate)
+        ctrl.initController(recreate=recreate)
+        return ctrl
+
+    createDevController = classmethod(createDevController)
+
+    def getType(klass):
+        return klass.name
+
+    getType = classmethod(getType)
+
+    def __init__(self, vm, recreate=False):
         self.destroyed = False
         self.vm = vm
         self.deviceId = 0
         self.devices = {}
         self.device_order = []
-
-    def getType(self):
-        return self.dctype.getType()
 
     def getDevControllerType(self):
         return self.dctype
@@ -222,6 +200,14 @@ class DevController:
     # Redefinitions must have the same arguments.
 
     def initController(self, recreate=False, reboot=False):
+        """Initialise the controller. Called when the controller is
+        first created, and again after the domain is rebooted (with reboot True).
+        If called with recreate True (and reboot False) the controller is being
+        recreated after a xend restart.
+
+        As this can be a re-init (after reboot) any controller state should
+        be reset. For example the destroyed flag.
+        """
         self.destroyed = False
         if reboot:
             self.rebootDevices()
@@ -229,12 +215,19 @@ class DevController:
     def newDevice(self, id, config, recreate=False):
         """Create a device with the given config.
         Must be defined in subclass.
+        Called with recreate True when the device is being recreated after a
+        xend restart.
 
         @return device
         """
         raise NotImplementedError()
 
     def createDevice(self, config, recreate=False, change=False):
+        """Create a device and attach to its front- and back-ends.
+        If recreate is true the device is being recreated after a xend restart.
+        If change is true the device is a change to an existing domain,
+        i.e. it is being added at runtime rather than when the domain is created.
+        """
         dev = self.newDevice(self.nextDeviceId(), config, recreate=recreate)
         dev.init(recreate=recreate)
         self.addDevice(dev)
@@ -252,7 +245,12 @@ class DevController:
 
     def destroyDevice(self, id, change=False, reboot=False):
         """Destroy a device.
-        May be defined in subclass."""
+        May be defined in subclass.
+
+        If reboot is true the device is being destroyed for a domain reboot.
+
+        The device is not deleted, since it may be recreated later.
+        """
         dev = self.getDevice(id)
         if not dev:
             raise XendError("invalid device id: " + id)
@@ -260,12 +258,18 @@ class DevController:
         return dev
 
     def deleteDevice(self, id, change=True):
+        """Destroy a device and delete it.
+        Normally called to remove a device from a domain at runtime.
+        """
         dev = self.destroyDevice(id, change=change)
         self.removeDevice(dev)
 
     def destroyController(self, reboot=False):
         """Destroy all devices and clean up.
-        May be defined in subclass."""
+        May be defined in subclass.
+        If reboot is true the controller is being destroyed for a domain reboot.
+        Called at domain shutdown.
+        """
         self.destroyed = True
         self.destroyDevices(reboot=reboot)
 
@@ -394,6 +398,13 @@ class Dev:
         """Initialization. Called on initial create (when reboot is False)
         and on reboot (when reboot is True). When xend is restarting is
         called with recreate True. Define in subclass if needed.
+
+        Device instance variables must be defined in the class constructor,
+        but given null or default values. The real values should be initialised
+        in this method. This allows devices to be re-initialised.
+
+        Since this can be called to re-initialise a device any state flags
+        should be reset.
         """
         self.destroyed = False
 
@@ -404,7 +415,7 @@ class Dev:
         pass
 
     def reboot(self):
-        """Reconnect device when the domain is rebooted.
+        """Reconnect the device when the domain is rebooted.
         """
         self.init(reboot=True)
         self.attach()
@@ -435,6 +446,9 @@ class Dev:
         If change is True notify destruction (runtime change).
         If reboot is True the device is being destroyed for a reboot.
         Redefine in subclass if needed.
+
+        Called at domain shutdown and when a device is deleted from
+        a running domain (with change True).
         """
         self.destroyed = True
         pass

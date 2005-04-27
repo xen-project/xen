@@ -5,7 +5,7 @@ from xen.xend.Args import FormFn
 from xen.xend import PrettyPrint
 from xen.xend import XendVnet
 
-from SrvDir import SrvDir
+from xen.web.SrvDir import SrvDir
 
 class SrvVnet(SrvDir):
 

@@ -12,7 +12,6 @@ from xen.xend.XendLogging import log
 import resource
 import http
 import httpserver
-import defer
 
 def uri_pathlist(p):
     """Split a path into a list.

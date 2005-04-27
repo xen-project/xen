@@ -11,7 +11,7 @@ from xen.xend.Args import FormFn
 from xen.xend.XendError import XendError
 from xen.xend.XendLogging import log
 
-from SrvDir import SrvDir
+from xen.web.SrvDir import SrvDir
 from SrvDomain import SrvDomain
 
 class SrvDomainDir(SrvDir):

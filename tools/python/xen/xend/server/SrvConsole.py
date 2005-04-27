@@ -2,7 +2,7 @@
 
 from xen.xend import sxp
 from xen.xend import XendConsole
-from SrvDir import SrvDir
+from xen.web.SrvDir import SrvDir
 
 class SrvConsole(SrvDir):
     """An individual console.

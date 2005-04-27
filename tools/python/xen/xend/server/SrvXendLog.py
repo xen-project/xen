@@ -4,7 +4,7 @@ from xen.web import static
 
 from xen.xend import XendRoot
 
-from SrvDir import SrvDir
+from xen.web.SrvDir import SrvDir
 
 class SrvXendLog(SrvDir):
     """Xend log.

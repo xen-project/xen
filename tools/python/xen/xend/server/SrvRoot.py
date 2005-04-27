@@ -2,7 +2,7 @@
 
 from xen.xend import XendRoot
 xroot = XendRoot.instance()
-from SrvDir import SrvDir
+from xen.web.SrvDir import SrvDir
 
 class SrvRoot(SrvDir):
     """The root of the xend server.
@@ -16,7 +16,6 @@ class SrvRoot(SrvDir):
         ('node',    'SrvNode'       ),
         ('domain',  'SrvDomainDir'  ),
         ('console', 'SrvConsoleDir' ),
-        ('event',   'SrvEventDir'   ),
         ('vnet',    'SrvVnetDir'    ),
         ]
 

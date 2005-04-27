@@ -778,7 +778,7 @@ class XendDomain:
         dominfo = self.domain_lookup(id)
         return dominfo.getDeviceByIndex(type, idx)
 
-    def domain_vif_credit_limit(self, id, vif, credit, period):
+    def domain_vif_limit_set(self, id, vif, credit, period):
         """Limit the vif's transmission rate
         """
         dominfo = self.domain_lookup(id)
@@ -787,40 +787,6 @@ class XendDomain:
             raise XendError("invalid vif")
         return dev.setCreditLimit(credit, period)
         
-    def domain_vif_ls(self, id):
-        """Get list of virtual network interface (vif) indexes for a domain.
-
-        @param id: domain
-        @return: vif indexes
-        """
-        return self.domain_devtype_ls(id, 'vif')
-
-    def domain_vif_get(self, id, vif):
-        """Get a virtual network interface (vif) from a domain.
-
-        @param id: domain
-        @param vif: vif index
-        @return: vif device object (or None)
-        """
-        return self.domain_devtype_get(id, 'vif', vif)
-
-    def domain_vbd_ls(self, id):
-        """Get list of virtual block device (vbd) indexes for a domain.
-
-        @param id: domain
-        @return: vbd indexes
-        """
-        return self.domain_devtype_ls(id, 'vbd')
-
-    def domain_vbd_get(self, id, vbd):
-        """Get a virtual block device (vbd) from a domain.
-
-        @param id: domain
-        @param vbd: vbd index
-        @return: vbd device (or None)
-        """
-        return self.domain_devtype_get(id, 'vbd', vbd)
-
     def domain_shadow_control(self, id, op):
         """Shadow page control.
 

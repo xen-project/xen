@@ -66,6 +66,8 @@ class ChannelFactory:
     def __init__(self):
         """Constructor - do not use. Use the channelFactory function."""
         self.notifier = xu.notifier()
+        # Register interest in all virqs.
+        # Unfortunately virqs do not seem to be delivered.
         self.bind_virq(VIRQ_MISDIRECT)
         self.bind_virq(VIRQ_TIMER)
         self.bind_virq(VIRQ_DEBUG)
@@ -97,6 +99,7 @@ class ChannelFactory:
 
     def main(self):
         """Main routine for the thread.
+        Reads the notifier and dispatches to channels.
         """
         while True:
             if self.thread == None: return
@@ -224,18 +227,23 @@ def channelFactory():
     return inst
 
 class Channel:
+    """Chanel to a domain.
+    Maintains a list of device handlers to dispatch requests to, based
+    on the request type.
+    """
 
     def __init__(self, factory, dom, local_port, remote_port):
         self.factory = factory
         self.dom = int(dom)
-        # Registered devices.
+        # Registered device handlers.
         self.devs = []
-        # Devices indexed by the message types they handle.
+        # Handlers indexed by the message types they handle.
         self.devs_by_type = {}
         self.port = self.factory.createPort(self.dom,
                                             local_port=local_port,
                                             remote_port=remote_port)
         self.closed = False
+        # Queue of waiters for responses to requests.
         self.queue = ResponseQueue(self)
         # Make sure the port will deliver all the messages.
         self.port.register(TYPE_WILDCARD)
@@ -298,11 +306,11 @@ class Channel:
 
 
     def registerDevice(self, types, dev):
-        """Register a device controller.
+        """Register a device message handler.
 
-        @param types: message types the controller handles
+        @param types: message types handled
         @type  types: array of ints
-        @param dev:   device controller
+        @param dev:   device handler
         """
         if self.closed: return
         self.devs.append(dev)
@@ -310,9 +318,9 @@ class Channel:
             self.devs_by_type[ty] = dev
 
     def deregisterDevice(self, dev):
-        """Remove the registration for a device controller.
+        """Remove the registration for a device handler.
 
-        @param dev: device controller
+        @param dev: device handler
         """
         if dev in self.devs:
             self.devs.remove(dev)
@@ -321,16 +329,20 @@ class Channel:
             del self.devs_by_type[ty]
 
     def getDevice(self, type):
-        """Get the device controller handling a message type.
+        """Get the handler for a message type.
 
         @param type: message type
         @type  type: int
         @return: controller or None
-        @rtype:  device controller
+        @rtype:  device handler
         """
         return self.devs_by_type.get(type)
 
     def requestReceived(self, msg):
+        """A request has been received on the channel.
+        Disptach it to the device handlers.
+        Called from the channel factory thread.
+        """
         if DEBUG:
             print 'Channel>requestReceived>', self,
             printMsg(msg)
@@ -340,7 +352,7 @@ class Channel:
         if dev:
             responded = dev.requestReceived(msg, ty, subty)
         elif DEBUG:
-            print "Channel>requestReceived> No device", self,
+            print "Channel>requestReceived> No device handler", self,
             printMsg(msg)
         else:
             pass
@@ -348,6 +360,8 @@ class Channel:
             self.writeResponse(msg)
 
     def writeRequest(self, msg):
+        """Write a request to the channel.
+        """
         if DEBUG:
             print 'Channel>writeRequest>', self,
             printMsg(msg, all=True)
@@ -356,6 +370,8 @@ class Channel:
         return 1
 
     def writeResponse(self, msg):
+        """Write a response to the channel.
+        """
         if DEBUG:
             print 'Channel>writeResponse>', self,
             printMsg(msg, all=True)
@@ -364,6 +380,9 @@ class Channel:
         return 1
 
     def readRequest(self):
+        """Read a request from the channel.
+        Called internally.
+        """
         if self.closed:
             val =  None
         else:
@@ -371,6 +390,9 @@ class Channel:
         return val
         
     def readResponse(self):
+        """Read a response from the channel.
+        Called internally.
+        """
         if self.closed:
             val = None
         else:
@@ -399,6 +421,10 @@ class Channel:
         return self.queue.call(msg, timeout)
 
     def responseReceived(self, msg):
+        """A response has been received, look for a waiter to
+        give it to.
+        Called internally.
+        """
         if DEBUG:
             print 'Channel>responseReceived>', self,
             printMsg(msg)
@@ -406,7 +432,6 @@ class Channel:
 
     def virq(self):
         self.factory.virq()
-
 
 class Response:
     """Entry in the response queue.
@@ -463,7 +488,8 @@ class ResponseQueue:
         return r
 
     def response(self, mid, msg):
-        """Process a response.
+        """Process a response - signals any waiter that a response
+        has arrived.
         """
         try:
             self.lock.acquire()

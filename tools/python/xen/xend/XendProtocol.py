@@ -1,5 +1,6 @@
 # Copyright (C) 2004 Mike Wray <mike.wray@hp.com>
 
+import socket
 import httplib
 import types
 
@@ -122,12 +123,19 @@ class XendClientProtocol:
         """
         raise NotImplementedError()
 
-class SynchXendClientProtocol(XendClientProtocol):
+class HttpXendClientProtocol(XendClientProtocol):
     """A synchronous xend client. This will make a request, wait for
     the reply and return the result.
     """
 
     resp = None
+    request = None
+
+    def makeConnection(self, url):
+        return httplib.HTTPConnection(url.location())
+
+    def makeRequest(self, url, method, args):
+        return XendRequest(url, method, args)
 
     def xendRequest(self, url, method, args=None):
         """Make a request to xend.
@@ -136,8 +144,8 @@ class SynchXendClientProtocol(XendClientProtocol):
         @param method: http method: POST or GET
         @param args:   request arguments (dict)
         """
-        self.request = XendRequest(url, method, args)
-        conn = httplib.HTTPConnection(url.location())
+        self.request = self.makeRequest(url, method, args)
+        conn = self.makeConnection(url)
         if DEBUG: conn.set_debuglevel(1)
         conn.request(method, url.fullpath(), self.request.data, self.request.headers)
         resp = conn.getresponse()
@@ -154,3 +162,29 @@ class SynchXendClientProtocol(XendClientProtocol):
     def getHeader(self, key):
         return self.resp.getheader(key)
 
+class UnixConnection(httplib.HTTPConnection):
+    """Subclass of Python library HTTPConnection that uses a unix-domain socket.
+    """
+
+    def __init__(self, path):
+        httplib.HTTPConnection.__init__(self, 'localhost')
+        self.path = path
+
+    def connect(self):
+        sock = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+        sock.connect(self.path)
+        self.sock = sock
+
+class UnixXendClientProtocol(HttpXendClientProtocol):
+    """A synchronous xend client using a unix-domain socket.
+    """
+
+    XEND_PATH_DEFAULT = '/var/lib/xend/xend-socket'
+    
+    def __init__(self, path=None):
+        if path is None:
+            path = self.XEND_PATH_DEFAULT
+        self.path = path
+
+    def makeConnection(self, url):
+        return UnixConnection(self.path)

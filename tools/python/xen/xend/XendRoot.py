@@ -15,6 +15,7 @@ import sys
 
 import EventServer
 from XendLogging import XendLogging
+from XendError import XendError
 
 # Initial create of the event server.
 eserver = EventServer.instance()
@@ -44,6 +45,9 @@ class XendRoot:
 
     loglevel_default = 'DEBUG'
 
+    """Default for the flag indicating whether xend should run an http server."""
+    xend_http_server_default = 'no'
+
     """Default interface address xend listens at. """
     xend_address_default      = ''
 
@@ -53,7 +57,13 @@ class XendRoot:
     """Default port xend serves events at. """
     xend_event_port_default   = '8001'
 
-    """Default inteface address xend listens at for consoles."""
+    """Default for the flag indicating whether xend should run a unix-domain server."""
+    xend_unix_server_default = 'yes'
+
+    """Default path the unix-domain server listens at."""
+    xend_unix_path_default = '/var/lib/xend/xend-socket'
+
+    """Default interface address xend listens at for consoles."""
     console_address_default   = ''
 
     """Default port xend serves consoles at. """
@@ -157,6 +167,7 @@ class XendRoot:
         logfile = self.get_config_value("logfile", self.logfile_default)
         loglevel = self.get_config_value("loglevel", self.loglevel_default)
         self.logging = XendLogging(logfile, level=loglevel)
+        self.logging.addLogStderr()
 
     def get_logging(self):
         """Get the XendLogging instance.
@@ -218,15 +229,35 @@ class XendRoot:
         """
         return sxp.child_value(self.config, name, val=val)
 
+    def get_config_bool(self, name, val=None):
+        v = self.get_config_value(name, val)
+        if v in ['yes', '1', 'on', 1, True]:
+            return True
+        if v in ['no', '0', 'off', 0, False]:
+            return False
+        raise XendError("invalid xend config %s: expected bool: %s" % (name, v))
+
+    def get_config_int(self, name, val=None):
+        v = self.get_config_value(name, val)
+        try:
+            return int(v)
+        except Exception, ex:
+            raise XendError("invalid xend config %s: expected int: %s" % (name, v))
+
+    def get_xend_http_server(self):
+        """Get the flag indicating whether xend should run an http server.
+        """
+        return self.get_config_bool("xend-http-server", self.xend_http_server_default)
+
     def get_xend_port(self):
         """Get the port xend listens at for its HTTP interface.
         """
-        return int(self.get_config_value('xend-port', self.xend_port_default))
+        return self.get_config_int('xend-port', self.xend_port_default)
 
     def get_xend_event_port(self):
         """Get the port xend listens at for connection to its event server.
         """
-        return int(self.get_config_value('xend-event-port', self.xend_event_port_default))
+        return self.get_config_int('xend-event-port', self.xend_event_port_default)
 
     def get_xend_address(self):
         """Get the address xend listens at for its HTTP and event ports.
@@ -235,6 +266,16 @@ class XendRoot:
         to the HTTP and event ports.
         """
         return self.get_config_value('xend-address', self.xend_address_default)
+
+    def get_xend_unix_server(self):
+        """Get the flag indicating whether xend should run a unix-domain server.
+        """
+        return self.get_config_bool("xend-unix-server", self.xend_unix_server_default)
+
+    def get_xend_unix_path(self):
+        """Get the path the xend unix-domain server listens at.
+        """
+        return self.get_config_value("xend-unix-path", self.xend_unix_path_default)
 
     def get_console_address(self):
         """Get the address xend listens at for its console ports.
@@ -247,7 +288,7 @@ class XendRoot:
     def get_console_port_base(self):
         """Get the base port number used to generate console ports for domains.
         """
-        return int(self.get_config_value('console-port-base', self.console_port_base_default))
+        return self.get_config_int('console-port-base', self.console_port_base_default)
 
     def get_block_script(self, type):
         return self.get_config_value('block-%s' % type, '')
@@ -262,8 +303,7 @@ class XendRoot:
         return self.get_config_value('vif-script', 'vif-bridge')
 
     def get_vif_antispoof(self):
-        v = self.get_config_value('vif-antispoof', 'yes')
-        return v in ['yes', '1', 'on']
+        return self.get_config_bool('vif-antispoof', 'yes')
 
 def instance():
     """Get an instance of XendRoot.

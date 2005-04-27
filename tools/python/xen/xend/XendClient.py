@@ -2,7 +2,7 @@
 # Copyright (C) 2004 Mike Wray <mike.wray@hp.com>
 """Client API for the HTTP interface on xend.
 Callable as a script - see main().
-Supports synchronous or asynchronous connection to xend.
+Supports inet or unix connection to xend.
 
 This API is the 'control-plane' for xend.
 The 'data-plane' is done separately. For example, consoles
@@ -15,7 +15,9 @@ import types
 
 import sxp
 import PrettyPrint
-from XendProtocol import XendClientProtocol, SynchXendClientProtocol, XendError
+from XendProtocol import HttpXendClientProtocol, \
+                         UnixXendClientProtocol, \
+                         XendError
 
 DEBUG = 0
 
@@ -31,15 +33,6 @@ def fileof(val):
     if hasattr(val, 'readlines'):
         return val
     raise XendError('cannot convert value')
-
-# todo: need to sort of what urls/paths are using for objects.
-# e.g. for domains at the moment return '0'.
-# should probably return abs path w.r.t. server, e.g. /xend/domain/0.
-# As an arg, assume abs path is obj uri, otherwise just id.
-
-# Function to convert to full url: Xend.uri(path), e.g.
-# maps /xend/domain/0 to http://wray-m-3.hpl.hp.com:8000/xend/domain/0
-# And should accept urls for ids?
 
 class URL:
     """A URL.
@@ -115,7 +108,7 @@ class Xend:
         @param root:    xend root path on the server
         """
         if client is None:
-            client = SynchXendClientProtocol()
+            client = HttpXendClientProtocol()
         self.client = client
         self.bind(srv, root)
 
@@ -161,9 +154,6 @@ class Xend:
 
     def vneturl(self, id=''):
         return self.url.relative('vnet/' + str(id))
-
-    def eventurl(self, id=''):
-        return self.url.relative('event/' + str(id))
 
     def xend(self):
         return self.xendGet(self.url)
@@ -262,34 +252,33 @@ class Xend:
 
     def xend_domain_maxmem_set(self, id, memory):
         return self.xendPost(self.domainurl(id),
-                             { 'op'     : 'maxmem_set',
-                               'memory' : memory })
+                             { 'op'      : 'maxmem_set',
+                               'memory'  : memory })
+
+    def xend_domain_mem_target_set(self, id, mem_target):
+        val = self.xendPost(self.domainurl(id),
+                            {'op'        : 'mem_target_set',
+                             'target'    : mem_target })
+        return val
 
     def xend_domain_vif_limit(self, id, vif, credit, period):
         return self.xendPost(self.domainurl(id),
-                            { 'op'      : 'vif_credit_limit',
+                            { 'op'      : 'vif_limit_set',
                               'vif'     : vif,
                               'credit'  : credit,
                               'period'  : period })
 
-    def xend_domain_vifs(self, id):
+    def xend_domain_devices(self, id, type):
         return self.xendGet(self.domainurl(id),
-                            { 'op'      : 'vifs' })
+                             {'op'      : 'devices',
+                              'type'    : type })
 
-    def xend_domain_vif(self, id, vif):
+    def xend_domain_device(self, id, type, idx):
         return self.xendGet(self.domainurl(id),
-                            { 'op'      : 'vif',
-                              'vif'     : vif })
-
-    def xend_domain_vbds(self, id):
-        return self.xendGet(self.domainurl(id),
-                            {'op'       : 'vbds'})
-
-    def xend_domain_vbd(self, id, vbd):
-        return self.xendGet(self.domainurl(id),
-                            {'op'       : 'vbd',
-                             'vbd'      : vbd })
-
+                             {'op'      : 'device',
+                              'type'    : type,
+                              'idx'     : idx })
+    
     def xend_domain_device_create(self, id, config):
         return self.xendPost(self.domainurl(id),
                              {'op'      : 'device_create',
@@ -338,63 +327,29 @@ class Xend:
         return self.xendPost(self.vneturl(id),
                               {'op'     : 'delete' })
 
-    def xend_event_inject(self, sxpr):
-        val = self.xendPost(self.eventurl(),
-                             {'op'      : 'inject',
-                              'event'   : fileof(sxpr) })
-
-    def xend_domain_mem_target_set(self, id, mem_target):
-        val = self.xendPost(self.domainurl(id),
-                            {'op'         : 'mem_target_set',
-                             'target'     : mem_target })
-        return val
-
-def getAsynchXendClientProtocol():
-    """Load AsynchXendClientProtocol on demand to avoid the cost.
+def getHttpServer(srv=None):
+    """Create and return a xend client.
     """
-    global AsynchXendClientProtocol
-    try:
-       AsynchXendClientProtocol
-    except:
-        from XendAsynchProtocol import AsynchXendClientProtocol
-    return AsynchXendClientProtocol
+    return Xend(srv=srv, client=XendClientProtocol())
 
-def getAsynchServer():
-    """Load AsynchXendClientProtocol and create an asynch xend client.
-
-    @return asynch Xend
+def getUnixServer(srv=None):
+    """Create and return a unix-domain xend client.
     """
-    getAsynchXendClientProtocol()
-    return Xend(AsynchXendClientProtocol())
+    return Xend(client=UnixXendClientProtocol(srv))
 
-def xendmain(srv, asynch, fn, args):
-    if asynch:
-        getAsynchXendClientProtocol()
-        client = AsynchXendClientProtocol() 
+def xendmain(srv, fn, args, unix=False):
+    if unix:
+        xend = getUnixServer(srv)
     else:
-        client = None
-    xend = Xend(srv=srv, client=client)
+        xend = getHttpServer(srv)
     xend.rc = 0
     try:
         v = getattr(xend, fn)(*args)
+        PrettyPrint.prettyprint(v)
+        return 0
     except XendError, err:
         print 'ERROR:', err
         return 1
-    if asynch:
-        def cbok(val):
-            PrettyPrint.prettyprint(val)
-            reactor.stop()
-        def cberr(err):
-            print 'ERROR:', err
-            xend.rc = 1
-            reactor.stop()
-        v.addCallback(cbok)
-        v.addErrback(cberr)
-        reactor.run()
-        return xend.rc
-    else:
-        PrettyPrint.prettyprint(v)
-        return 0
 
 def main(argv):
     """Call an API function:
@@ -411,16 +366,16 @@ python XendClient.py domain 0
     """
     global DEBUG
     from getopt import getopt
-    short_options = 'x:ad'
-    long_options = ['xend=', 'asynch', 'debug']
+    short_options = 'x:au:d'
+    long_options = ['xend=', 'unix=', 'debug']
     (options, args) = getopt(argv[1:], short_options, long_options)
     srv = None
-    asynch = 0
+    unix = 1
     for k, v in options:
         if k in ['-x', '--xend']:
             srv = v
-        elif k in ['-a', '--asynch']:
-            asynch = 1
+        elif k in ['-u', '--unix']:
+            unix = int(v)
         elif k in ['-d', '--debug']:
             DEBUG = 1
     if len(args):
@@ -431,9 +386,9 @@ python XendClient.py domain 0
         args = []
     if not fn.startswith('xend'):
         fn = 'xend_' + fn
-    sys.exit(xendmain(srv, asynch, fn, args))
+    sys.exit(xendmain(srv, fn, args, unix=unix))
 
 if __name__ == "__main__":
     main(sys.argv)
 else:    
-    server = Xend()
+    server = getUnixServer()

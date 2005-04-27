@@ -326,8 +326,8 @@ class ConsoleController(DevController):
     """Device controller for all the consoles for a domain.
     """
 
-    def __init__(self, dctype, vm, recreate=False):
-        DevController.__init__(self, dctype, vm, recreate=recreate)
+    def __init__(self, vm, recreate=False):
+        DevController.__init__(self, vm, recreate=recreate)
         self.rcvr = None
 
     def initController(self, recreate=False, reboot=False):

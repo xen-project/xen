@@ -326,10 +326,10 @@ class Daemon:
             self.createFactories()
             self.listenEvent(xroot)
             self.listenChannels()
-            serverthread = SrvServer.create(bridge=1)
+            servers = SrvServer.create()
             self.daemonize()
             print 'running serverthread...'
-            serverthread.start()
+            servers.start()
         except Exception, ex:
             print >>sys.stderr, 'Exception starting xend:', ex
             if DEBUG:
