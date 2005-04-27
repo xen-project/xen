@@ -19,7 +19,7 @@ from messages import *
 from params import *
 
 class ConsoleProtocol(protocol.Protocol):
-    """Asynchronous handler for a console TCP socket.
+    """Asynchronous handler for a console socket.
     """
 
     def __init__(self, console, id):
@@ -36,10 +36,16 @@ class ConsoleProtocol(protocol.Protocol):
             self.loseConnection()
             return
         else:
+            if len(self.addr) == 2:
+                host = str(self.addr[0])
+                port = str(self.addr[1])
+            else:
+                host = 'localhost'
+                port = str(addr)
             log.info("Console connected %s %s %s",
-                     self.id, str(self.addr[0]), str(self.addr[1]))
+                     self.id, host, port)
             eserver.inject('xend.console.connect',
-                           [self.id, self.addr[0], self.addr[1]])
+                           [self.id, host, port])
 
     def dataReceived(self, data):
         if self.console.receiveInput(self, data):
@@ -50,7 +56,6 @@ class ConsoleProtocol(protocol.Protocol):
         return len(data)
 
     def connectionLost(self, reason=None):
-        print 'ConsoleProtocol>connectionLost>', reason
         log.info("Console disconnected %s %s %s",
                  str(self.id), str(self.addr[0]), str(self.addr[1]))
         eserver.inject('xend.console.disconnect',
@@ -60,22 +65,7 @@ class ConsoleProtocol(protocol.Protocol):
     def loseConnection(self):
         self.transport.loseConnection()
 
-class ConsoleFactory(protocol.ServerFactory):
-    """Asynchronous handler for a console server socket.
-    """
-    protocol = ConsoleProtocol
-    
-    def __init__(self, console, id):
-        #protocol.ServerFactory.__init__(self)
-        self.console = console
-        self.id = id
-
-    def buildProtocol(self, addr):
-        proto = self.protocol(self.console, self.id)
-        proto.factory = self
-        return proto
-
-class ConsoleDev(Dev):
+class ConsoleDev(Dev, protocol.ServerFactory):
     """Console device for a domain.
     Does not poll for i/o itself, but relies on the domain to post console
     output and the connected TCP sockets to post console input.
@@ -96,7 +86,9 @@ class ConsoleDev(Dev):
         self.obuf = xu.buffer()
         self.ibuf = xu.buffer()
         self.channel = None
-        self.listener = None
+        self.listening = False
+        self.unix_listener = None
+        self.tcp_listener = None
         
         console_port = sxp.child_value(self.config, "console_port")
         if console_port is None:
@@ -188,9 +180,15 @@ class ConsoleDev(Dev):
         try:
             self.lock.acquire()
             self.status = self.STATUS_CLOSED
+            self.listening = False
             if self.conn:
                 self.conn.loseConnection()
-            self.listener.stopListening()
+            if self.tcp_listener:
+                self.tcp_listener.stopListening()
+                self.tcp_listener = None
+            if self.unix_listener:
+                self.unix_listener.stopListening()
+                self.unix_listener = None
         finally:
             self.lock.release()
 
@@ -201,15 +199,27 @@ class ConsoleDev(Dev):
             self.lock.acquire()
             if self.closed():
                 return
-            if self.listener:
+            if self.listening:
                 pass
             else:
+                self.listening = True
                 self.status = self.STATUS_LISTENING
-                cf = ConsoleFactory(self, self.id)
-                interface = xroot.get_console_address()
-                self.listener = reactor.listenTCP(self.console_port, cf, interface=interface)
+                if xroot.get_xend_unix_server():
+                    path = '/var/lib/xend/console-%s' % self.console_port
+                    self.unix_listener = reactor.listenUNIX(path, self)
+                if xroot.get_xend_http_server():
+                    interface = xroot.get_console_address()
+                    self.tcp_listener = reactor.listenTCP(self.console_port, self, interface=interface)
         finally:
             self.lock.release()
+
+    def buildProtocol(self, addr):
+        """Factory function called to create the protocol when a connection is accepted
+        by listenTCP.
+        """
+        proto = ConsoleProtocol(self, self.id)
+        proto.factory = self
+        return proto
 
     def connect(self, addr, conn):
         """Connect a TCP connection to the console.

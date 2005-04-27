@@ -593,7 +593,8 @@ def main(argv):
     else:
         (dom, console) = make_domain(opts, config)
         if opts.vals.console_autoconnect:
-            console_client.connect('localhost', console)
+            path = "/var/lib/xend/console-%s" % console
+            console_client.connect('localhost', console, path=path)
         
 if __name__ == '__main__':
     main(sys.argv)

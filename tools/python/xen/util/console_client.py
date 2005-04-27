@@ -57,9 +57,18 @@ def __send_to_sock(sock):
                     raise
     sys.exit(0)
 
-def connect(host,port):
-    sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM, 0)
-    sock.connect((host,port))
+def connect(host, port, path=None):
+    # Try inet first. If 'path' is given and the error
+    # was connection refused, try unix-domain on 'path'.
+    try:
+        sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        sock.connect((host, port))
+    except socket.error, err:
+        if (path is None) or (err[0] != errno.ECONNREFUSED):
+            raise
+        # Try unix-domain.
+        sock = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+        sock.connect(path)
 
     oattrs = tcgetattr(0)
     nattrs = tcgetattr(0)
@@ -86,7 +95,14 @@ def connect(host,port):
         __send_to_sock(sock)
 
 if __name__ == '__main__':
-    if len(sys.argv) != 3:
-        print sys.argv[0] + " <host> <port>"
+    argc = len(sys.argv)
+    if argc < 3 or argc > 4:
+        print >>sys.stderr, sys.argv[0], "<host> <port> [<path>]"
         sys.exit(1)
-    connect(str(sys.argv[1]),int(sys.argv[2]))
+    host = sys.argv[1]
+    port = int(sys.argv[2])
+    if argc > 3:
+        path = sys.argv[3]
+    else:
+        path = None
+    connect(host, port, path=path)

@@ -324,7 +324,7 @@ class Daemon:
             xroot = XendRoot.instance()
             log.info("Xend Daemon started")
             self.createFactories()
-            self.listenEvent(xroot)
+            event.listenEvent(self)
             self.listenChannels()
             servers = SrvServer.create()
             self.daemonize()
@@ -339,11 +339,6 @@ class Daemon:
             
     def createFactories(self):
         self.channelF = channel.channelFactory()
-
-    def listenEvent(self, xroot):
-        port = xroot.get_xend_event_port()
-        interface = xroot.get_xend_address()
-        return event.listenEvent(self, port, interface)
 
     def listenChannels(self):
         def virqReceived(virq):

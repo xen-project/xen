@@ -1,6 +1,7 @@
 import sys
 import socket
 import os
+import os.path
 
 from connection import *
 from protocol import *
@@ -15,18 +16,22 @@ class UnixListener(SocketListener):
         self.path = path
         
     def createSocket(self):
-        try:
-            os.unlink(self.path)
-        except SystemExit:
-            raise
-        except Exception, ex:
-            pass
+        pathdir = os.path.dirname(self.path)
+        if not os.path.exists(pathdir):
+            os.makedirs(pathdir)
+        else:
+            try:
+                os.unlink(self.path)
+            except SystemExit:
+                raise
+            except Exception, ex:
+                pass
         sock = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
         sock.bind(self.path)
         return sock
 
     def acceptConnection(self, sock, protocol, addr):
-        return UnixServerConnection(sock, protocol, addr, self)
+        return UnixServerConnection(sock, protocol, self.path, self)
 
 class UnixClientConnection(SocketClientConnection):
 

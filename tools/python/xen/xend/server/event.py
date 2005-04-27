@@ -11,7 +11,7 @@ from xen.xend import EventServer
 eserver = EventServer.instance()
 from xen.xend.XendError import XendError
 
-from xen.xend import XendRoot
+from xen.xend import XendRoot; xroot = XendRoot.instance()
 
 DEBUG = 1
 
@@ -165,7 +165,7 @@ class EventProtocol(protocol.Protocol):
 
     def op_log_stderr(self, name, v):
         mode = v[1]
-        logging = XendRoot.instance().get_logging()
+        logging = xroot.get_logging()
         if mode == 'on':
             logging.addLogStderr()
         else:
@@ -181,21 +181,23 @@ class EventProtocol(protocol.Protocol):
         import controller
         controller.DEBUG = (mode == 'on')
 
-class EventFactory(protocol.Factory):
+class EventFactory(protocol.ServerFactory):
     """Asynchronous handler for the event server socket.
     """
-    protocol = EventProtocol
-    service = None
 
     def __init__(self, daemon):
-        #protocol.Factory.__init__(self)
+        #protocol.ServerFactory.__init__(self)
         self.daemon = daemon
 
     def buildProtocol(self, addr):
-        proto = self.protocol(self.daemon)
-        proto.factory = self
-        return proto
+        return EventProtocol(self.daemon)
 
-def listenEvent(daemon, port, interface):
+def listenEvent(daemon):
     factory = EventFactory(daemon)
-    return reactor.listenTCP(port, factory, interface=interface)
+    if xroot.get_xend_unix_server():
+        path = '/var/lib/xend/event-socket'
+        reactor.listenUNIX(path, factory)
+    if xroot.get_xend_http_server():
+        port = xroot.get_xend_event_port()
+        interface = xroot.get_xend_address()
+        reactor.listenTCP(port, factory, interface=interface)
