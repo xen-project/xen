@@ -258,7 +258,8 @@ unsigned long allocate_empty_lowmem_region(unsigned long pages)
         pte = pte_offset_kernel(pmd, (vstart + (i*PAGE_SIZE))); 
         pfn_array[i] = pte->pte >> PAGE_SHIFT;
         xen_l1_entry_update(pte, 0);
-        phys_to_machine_mapping[__pa(vstart)>>PAGE_SHIFT] = (u32)INVALID_P2M_ENTRY;
+        phys_to_machine_mapping[(__pa(vstart)>>PAGE_SHIFT)+i] =
+            (u32)INVALID_P2M_ENTRY;
     }
 
     /* Flush updates through and flush the TLB. */
