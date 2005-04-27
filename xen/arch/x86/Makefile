@@ -13,7 +13,7 @@ endif
 
 default: $(TARGET)
 
-$(TARGET): $(TARGET)-syms boot/mkelf32
+$(TARGET): $(TARGET)-syms boot/mkelf32 ../../include/xen/compile.h
 	./boot/mkelf32 $(TARGET)-syms $(TARGET) 0x100000
 
 $(CURDIR)/arch.o: $(OBJS)
