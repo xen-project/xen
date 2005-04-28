@@ -90,7 +90,8 @@ cp_patch arch/ia64/kernel/ivt.S arch/ia64/ivt.S ivt.S
 cp_patch arch/ia64/kernel/setup.c arch/ia64/setup.c setup.c
 cp_patch arch/ia64/kernel/time.c arch/ia64/time.c time.c
 cp_patch arch/ia64/kernel/unaligned.c arch/ia64/unaligned.c unaligned.c
-cp_patch arch/ia64/kernel/vmlinux.lds.S arch/ia64/xen.lds.S lds.S
+#cp_patch arch/ia64/kernel/vmlinux.lds.S arch/ia64/xen.lds.S lds.S
+softlink arch/ia64/kernel/vmlinux.lds.S arch/ia64/xen.lds.S
 
 #cp_patch mm/bootmem.c arch/ia64/mm_bootmem.c mm_bootmem.c
 #cp_patch mm/page_alloc.c arch/ia64/page_alloc.c page_alloc.c
@@ -304,7 +305,6 @@ softlink include/linux/thread_info.h include/asm-ia64/linux/thread_info.h
 softlink include/linux/threads.h include/asm-ia64/linux/threads.h
 softlink include/linux/timex.h include/asm-ia64/linux/timex.h
 softlink include/linux/topology.h include/asm-ia64/linux/topology.h
-softlink include/linux/tty.h include/asm-ia64/linux/tty.h
 softlink include/linux/seqlock.h include/asm-ia64/linux/seqlock.h
 
 null include/asm-ia64/linux/file.h
@@ -315,6 +315,8 @@ null include/asm-ia64/linux/proc_fs.h
 null include/asm-ia64/linux/rtc.h
 null include/asm-ia64/linux/profile.h
 null include/asm-ia64/linux/seqlock.h
+null include/asm-ia64/linux/smp_lock.h
+null include/asm-ia64/linux/tty.h
 
 softlink include/linux/byteorder/generic.h include/asm-ia64/linux/byteorder/generic.h
 softlink include/linux/byteorder/little_endian.h include/asm-ia64/linux/byteorder/little_endian.h

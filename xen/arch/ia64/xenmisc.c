@@ -258,6 +258,40 @@ void sys_exit(void)
 	dummy();
 }
 
+////////////////////////////////////
+// called from unaligned.c
+////////////////////////////////////
+
+void die_if_kernel(char *str, struct pt_regs *regs, long err) /* __attribute__ ((noreturn)) */
+{
+	printk("die_if_kernel: called, not implemented\n");
+}
+
+long
+ia64_peek (struct task_struct *child, struct switch_stack *child_stack,
+	   unsigned long user_rbs_end, unsigned long addr, long *val)
+{
+	printk("ia64_peek: called, not implemented\n");
+}
+
+long
+ia64_poke (struct task_struct *child, struct switch_stack *child_stack,
+	   unsigned long user_rbs_end, unsigned long addr, long val)
+{
+	printk("ia64_poke: called, not implemented\n");
+}
+
+void
+ia64_sync_fph (struct task_struct *task)
+{
+	printk("ia64_sync_fph: called, not implemented\n");
+}
+
+void
+ia64_flush_fph (struct task_struct *task)
+{
+	printk("ia64_flush_fph: called, not implemented\n");
+}
 
 ////////////////////////////////////
 // called from irq_ia64.c:init_IRQ()

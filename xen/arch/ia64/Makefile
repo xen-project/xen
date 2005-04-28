@@ -6,7 +6,7 @@ OBJS = xensetup.o setup.o time.o irq.o ia64_ksyms.o process.o smp.o \
 	xenmisc.o pdb-stub.o acpi.o hypercall.o \
 	machvec.o dom0_ops.o domain.o \
 	idle0_task.o pal.o hpsim.o efi.o efi_stub.o ivt.o mm_contig.o \
-	sal.o cmdline.o mm_init.o tlb.o smpboot.o \
+	xenmem.o sal.o cmdline.o mm_init.o tlb.o smpboot.o \
 	extable.o linuxextable.o \
 	regionreg.o entry.o unaligned.o privop.o vcpu.o \
 	irq_ia64.o irq_lsapic.o vhpt.o xenasm.o dom_fw.o
