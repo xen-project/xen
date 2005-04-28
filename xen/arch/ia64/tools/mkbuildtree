@@ -268,7 +268,7 @@ softlink include/linux/dma-mapping.h include/asm-ia64/linux/dma-mapping.h
 #cp_patch include/linux/efi.h include/asm-ia64/linux/efi.h efi.h
 softlink include/linux/efi.h include/asm-ia64/linux/efi.h
 #cp_patch include/linux/hardirq.h include/asm-ia64/linux/hardirq.h linuxhardirq.h
-softlink include/linux/hardirq.h include/asm-ia64/linux/linuxhardirq.h
+softlink include/linux/hardirq.h include/asm-ia64/linux/hardirq.h
 #cp_patch include/linux/init_task.h include/asm-ia64/linux/init_task.h init_task.h
 cp_patch include/linux/interrupt.h include/asm-ia64/linux/interrupt.h interrupt.h
 #cp_patch include/linux/mmzone.h include/asm-ia64/linux/mmzone.h mmzone.h
