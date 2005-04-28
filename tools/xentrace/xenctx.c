@@ -24,27 +24,26 @@
 #include "xc.h"
 
 #ifdef __i386__
-void
-print_ctx(full_execution_context_t *ctx1)
+void print_ctx(vcpu_guest_context_t *ctx1)
 {
-    execution_context_t *ctx = &ctx1->cpu_ctxt;
+    struct cpu_user_regs *regs = &ctx1->user_regs;
 
-    printf("eip: %08lx\t", ctx->eip);
-    printf("esp: %08lx\n", ctx->esp);
+    printf("eip: %08lx\t", regs->eip);
+    printf("esp: %08lx\n", regs->esp);
 
-    printf("eax: %08lx\t", ctx->eax);
-    printf("ebx: %08lx\t", ctx->ebx);
-    printf("ecx: %08lx\t", ctx->ecx);
-    printf("edx: %08lx\n", ctx->edx);
+    printf("eax: %08lx\t", regs->eax);
+    printf("ebx: %08lx\t", regs->ebx);
+    printf("ecx: %08lx\t", regs->ecx);
+    printf("edx: %08lx\n", regs->edx);
 
-    printf("esi: %08lx\t", ctx->esi);
-    printf("edi: %08lx\t", ctx->edi);
-    printf("ebp: %08lx\n", ctx->ebp);
+    printf("esi: %08lx\t", regs->esi);
+    printf("edi: %08lx\t", regs->edi);
+    printf("ebp: %08lx\n", regs->ebp);
 
-    printf(" cs: %08lx\t", ctx->cs);
-    printf(" ds: %08lx\t", ctx->ds);
-    printf(" fs: %08lx\t", ctx->fs);
-    printf(" gs: %08lx\n", ctx->gs);
+    printf(" cs: %08lx\t", regs->cs);
+    printf(" ds: %08lx\t", regs->ds);
+    printf(" fs: %08lx\t", regs->fs);
+    printf(" gs: %08lx\n", regs->gs);
 
 }
 #endif
@@ -53,7 +52,7 @@ void dump_ctx(u32 domid, u32 vcpu)
 {
     int ret;
     xc_domaininfo_t info;
-    full_execution_context_t ctx;
+    vcpu_guest_context_t ctx;
 
     int xc_handle = xc_interface_open(); /* for accessing control interface */
 

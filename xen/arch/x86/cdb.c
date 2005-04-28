@@ -214,7 +214,7 @@ xendbg_send_reply(const char *buf, struct xendbg_context *ctx)
 }
 
 static int
-handle_register_read_command(struct xen_regs *regs, struct xendbg_context *ctx)
+handle_register_read_command(struct cpu_user_regs *regs, struct xendbg_context *ctx)
 {
 	char buf[121];
 
@@ -240,7 +240,7 @@ handle_register_read_command(struct xen_regs *regs, struct xendbg_context *ctx)
 }
 
 static int
-process_command(char *received_packet, struct xen_regs *regs,
+process_command(char *received_packet, struct cpu_user_regs *regs,
 		struct xendbg_context *ctx)
 {
 	char *ptr;
@@ -318,7 +318,7 @@ xdb_ctx = {
 };
 
 int
-__trap_to_cdb(struct xen_regs *regs)
+__trap_to_cdb(struct cpu_user_regs *regs)
 {
 	int resume = 0;
 	int r;

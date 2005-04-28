@@ -374,33 +374,33 @@ long arch_do_dom0_op(dom0_op_t *op, dom0_op_t *u_dom0_op)
 }
 
 void arch_getdomaininfo_ctxt(
-    struct exec_domain *ed, full_execution_context_t *c)
+    struct exec_domain *ed, struct vcpu_guest_context *c)
 { 
     int i;
 #ifdef __i386__  /* Remove when x86_64 VMX is implemented */
 #ifdef CONFIG_VMX
-    extern void save_vmx_execution_context(execution_context_t *);
+    extern void save_vmx_cpu_user_regs(struct cpu_user_regs *);
 #endif
 #endif
 
     c->flags = 0;
-    memcpy(&c->cpu_ctxt, 
-           &ed->arch.user_ctxt,
-           sizeof(ed->arch.user_ctxt));
+    memcpy(&c->user_regs, 
+           &ed->arch.user_regs,
+           sizeof(ed->arch.user_regs));
     /* IOPL privileges are virtualised -- merge back into returned eflags. */
-    BUG_ON((c->cpu_ctxt.eflags & EF_IOPL) != 0);
-    c->cpu_ctxt.eflags |= ed->arch.iopl << 12;
+    BUG_ON((c->user_regs.eflags & EF_IOPL) != 0);
+    c->user_regs.eflags |= ed->arch.iopl << 12;
 
 #ifdef __i386__
 #ifdef CONFIG_VMX
     if ( VMX_DOMAIN(ed) )
-        save_vmx_execution_context(&c->cpu_ctxt);
+        save_vmx_cpu_user_regs(&c->user_regs);
 #endif
 #endif
 
     if ( test_bit(EDF_DONEFPUINIT, &ed->ed_flags) )
         c->flags |= ECF_I387_VALID;
-    if ( KERNEL_MODE(ed, &ed->arch.user_ctxt) )
+    if ( KERNEL_MODE(ed, &ed->arch.user_regs) )
         c->flags |= ECF_IN_KERNEL;
 #ifdef CONFIG_VMX
     if (VMX_DOMAIN(ed))

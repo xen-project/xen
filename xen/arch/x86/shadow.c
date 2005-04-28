@@ -2421,7 +2421,7 @@ void __shadow_sync_all(struct domain *d)
     free_out_of_sync_state(d);
 }
 
-int shadow_fault(unsigned long va, struct xen_regs *regs)
+int shadow_fault(unsigned long va, struct cpu_user_regs *regs)
 {
     l1_pgentry_t gpte, spte, orig_gpte;
     struct exec_domain *ed = current;

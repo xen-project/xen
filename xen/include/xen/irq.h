@@ -8,7 +8,7 @@
 
 struct irqaction
 {
-    void (*handler)(int, void *, struct xen_regs *);
+    void (*handler)(int, void *, struct cpu_user_regs *);
     const char *name;
     void *dev_id;
 };
@@ -63,7 +63,7 @@ extern int setup_irq(unsigned int, struct irqaction *);
 extern void free_irq(unsigned int);
 
 extern hw_irq_controller no_irq_type;
-extern void no_action(int cpl, void *dev_id, struct xen_regs *regs);
+extern void no_action(int cpl, void *dev_id, struct cpu_user_regs *regs);
 
 struct domain;
 struct exec_domain;

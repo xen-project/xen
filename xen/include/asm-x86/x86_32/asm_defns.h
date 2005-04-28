@@ -13,16 +13,16 @@
         "pushl %edx;" \
         "pushl %ecx;" \
         "pushl %ebx;" \
-        "testl $"STR(X86_EFLAGS_VM)","STR(XREGS_eflags)"(%esp);" \
+        "testl $"STR(X86_EFLAGS_VM)","STR(UREGS_eflags)"(%esp);" \
         "jz 2f;" \
         "call setup_vm86_frame;" \
         "jmp 3f;" \
-        "2:testb $3,"STR(XREGS_cs)"(%esp);" \
+        "2:testb $3,"STR(UREGS_cs)"(%esp);" \
         "jz 1f;" \
-        "movl %ds,"STR(XREGS_ds)"(%esp);" \
-        "movl %es,"STR(XREGS_es)"(%esp);" \
-        "movl %fs,"STR(XREGS_fs)"(%esp);" \
-        "movl %gs,"STR(XREGS_gs)"(%esp);" \
+        "movl %ds,"STR(UREGS_ds)"(%esp);" \
+        "movl %es,"STR(UREGS_es)"(%esp);" \
+        "movl %fs,"STR(UREGS_fs)"(%esp);" \
+        "movl %gs,"STR(UREGS_gs)"(%esp);" \
         "3:"
 
 #define SAVE_ALL_NOSEGREGS(_reg) \
@@ -50,16 +50,16 @@
         pushl %edx; \
         pushl %ecx; \
         pushl %ebx; \
-        testl $X86_EFLAGS_VM,XREGS_eflags(%esp); \
+        testl $X86_EFLAGS_VM,UREGS_eflags(%esp); \
         jz 2f; \
         call setup_vm86_frame; \
         jmp 3f; \
-        2:testb $3,XREGS_cs(%esp); \
+        2:testb $3,UREGS_cs(%esp); \
         jz 1f; \
-        movl %ds,XREGS_ds(%esp); \
-        movl %es,XREGS_es(%esp); \
-        movl %fs,XREGS_fs(%esp); \
-        movl %gs,XREGS_gs(%esp); \
+        movl %ds,UREGS_ds(%esp); \
+        movl %es,UREGS_es(%esp); \
+        movl %fs,UREGS_fs(%esp); \
+        movl %gs,UREGS_gs(%esp); \
         3:
 
 #define SAVE_ALL_NOSEGREGS(_reg) \
@@ -98,7 +98,7 @@ __asm__( \
 
 #define BUILD_SMP_TIMER_INTERRUPT(x,v) XBUILD_SMP_TIMER_INTERRUPT(x,v)
 #define XBUILD_SMP_TIMER_INTERRUPT(x,v) \
-asmlinkage void x(struct xen_regs * regs); \
+asmlinkage void x(struct cpu_user_regs * regs); \
 __asm__( \
 "\n"__ALIGN_STR"\n" \
 SYMBOL_NAME_STR(x) ":\n\t" \

@@ -36,7 +36,7 @@ static void keypress_softirq(void)
         (*h)(key);
 }
 
-void handle_keypress(unsigned char key, struct xen_regs *regs)
+void handle_keypress(unsigned char key, struct cpu_user_regs *regs)
 {
     irq_keyhandler_t *h;
 
@@ -83,13 +83,13 @@ static void show_handlers(unsigned char key)
                    key_table[i].desc);
 }
 
-static void dump_registers(unsigned char key, struct xen_regs *regs)
+static void dump_registers(unsigned char key, struct cpu_user_regs *regs)
 {
     printk("'%c' pressed -> dumping registers\n", key); 
     show_registers(regs); 
 }
 
-static void halt_machine(unsigned char key, struct xen_regs *regs)
+static void halt_machine(unsigned char key, struct cpu_user_regs *regs)
 {
     printk("'%c' pressed -> rebooting machine\n", key); 
     machine_restart(NULL); 
@@ -125,9 +125,12 @@ static void do_task_queues(unsigned char key)
             printk("Notifying guest... %d/%d\n", d->id, ed->eid); 
             printk("port %d/%d stat %d %d %d\n",
                    VIRQ_DEBUG, ed->virq_to_evtchn[VIRQ_DEBUG],
-                   test_bit(ed->virq_to_evtchn[VIRQ_DEBUG], &d->shared_info->evtchn_pending[0]),
-                   test_bit(ed->virq_to_evtchn[VIRQ_DEBUG], &d->shared_info->evtchn_mask[0]),
-                   test_bit(ed->virq_to_evtchn[VIRQ_DEBUG]>>5, &ed->vcpu_info->evtchn_pending_sel));
+                   test_bit(ed->virq_to_evtchn[VIRQ_DEBUG], 
+                            &d->shared_info->evtchn_pending[0]),
+                   test_bit(ed->virq_to_evtchn[VIRQ_DEBUG], 
+                            &d->shared_info->evtchn_mask[0]),
+                   test_bit(ed->virq_to_evtchn[VIRQ_DEBUG]>>5, 
+                            &ed->vcpu_info->evtchn_pending_sel));
             send_guest_virq(ed, VIRQ_DEBUG);
         }
     }
@@ -147,7 +150,7 @@ extern void perfc_printall(unsigned char key);
 extern void perfc_reset(unsigned char key);
 #endif
 
-void do_debug_key(unsigned char key, struct xen_regs *regs)
+void do_debug_key(unsigned char key, struct cpu_user_regs *regs)
 {
     (void)debugger_trap_fatal(0xf001, regs);
     nop(); /* Prevent the compiler doing tail call

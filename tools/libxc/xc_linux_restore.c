@@ -73,7 +73,7 @@ int xc_linux_restore(int xc_handle, XcIOContext *ioctxt)
     shared_info_t *shared_info = (shared_info_t *)shared_info_page;
     
     /* A copy of the CPU context of the guest. */
-    full_execution_context_t ctxt;
+    vcpu_guest_context_t ctxt;
 
     /* First 16 bytes of the state file must contain 'LinuxGuestRecord'. */
     char signature[16];
@@ -505,13 +505,13 @@ int xc_linux_restore(int xc_handle, XcIOContext *ioctxt)
     }
 
     /* Uncanonicalise the suspend-record frame number and poke resume rec. */
-    pfn = ctxt.cpu_ctxt.esi;
+    pfn = ctxt.user_regs.esi;
     if ( (pfn >= nr_pfns) || (pfn_type[pfn] != NOTAB) )
     {
         xcio_error(ioctxt, "Suspend record frame number is bad");
         goto out;
     }
-    ctxt.cpu_ctxt.esi = mfn = pfn_to_mfn_table[pfn];
+    ctxt.user_regs.esi = mfn = pfn_to_mfn_table[pfn];
     p_srec = xc_map_foreign_range(
         xc_handle, dom, PAGE_SIZE, PROT_WRITE, mfn);
     p_srec->resume_info.nr_pages    = nr_pfns;
@@ -599,7 +599,7 @@ int xc_linux_restore(int xc_handle, XcIOContext *ioctxt)
 
     /*
      * Safety checking of saved context:
-     *  1. cpu_ctxt is fine, as Xen checks that on context switch.
+     *  1. user_regs is fine, as Xen checks that on context switch.
      *  2. fpu_ctxt is fine, as it can't hurt Xen.
      *  3. trap_ctxt needs the code selectors checked.
      *  4. fast_trap_idx is checked by Xen.

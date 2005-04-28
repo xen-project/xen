@@ -489,7 +489,7 @@ HYPERVISOR_switch_to_user(void)
 
 static inline int
 HYPERVISOR_boot_vcpu(
-    unsigned long vcpu, full_execution_context_t *ctxt)
+    unsigned long vcpu, vcpu_guest_context_t *ctxt)
 {
     int ret;
 

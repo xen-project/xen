@@ -106,7 +106,7 @@ __asm__( \
 
 #define BUILD_SMP_TIMER_INTERRUPT(x,v) XBUILD_SMP_TIMER_INTERRUPT(x,v)
 #define XBUILD_SMP_TIMER_INTERRUPT(x,v) \
-asmlinkage void x(struct xen_regs * regs); \
+asmlinkage void x(struct cpu_user_regs * regs); \
 __asm__( \
 "\n"__ALIGN_STR"\n" \
 SYMBOL_NAME_STR(x) ":\n\t" \

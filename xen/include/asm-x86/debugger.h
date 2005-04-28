@@ -38,11 +38,11 @@
 #define DEBUGGER_trap_fatal(_v, _r) \
     if ( debugger_trap_fatal(_v, _r) ) return EXCRET_fault_fixed;
 
-int call_with_registers(int (*f)(struct xen_regs *r));
+int call_with_registers(int (*f)(struct cpu_user_regs *r));
 
 #if defined(CRASH_DEBUG)
 
-extern int __trap_to_cdb(struct xen_regs *r);
+extern int __trap_to_cdb(struct cpu_user_regs *r);
 #define debugger_trap_entry(_v, _r) (0)
 #define debugger_trap_fatal(_v, _r) __trap_to_cdb(_r)
 #define debugger_trap_immediate() call_with_registers(__trap_to_cdb)
@@ -52,7 +52,7 @@ extern int __trap_to_cdb(struct xen_regs *r);
 #include <xen/softirq.h>
 
 static inline int debugger_trap_entry(
-    unsigned int vector, struct xen_regs *regs)
+    unsigned int vector, struct cpu_user_regs *regs)
 {
     struct exec_domain *ed = current;
 
@@ -77,16 +77,16 @@ static inline int debugger_trap_entry(
 
 #elif 0
 
-extern int kdb_trap(int, int, struct xen_regs *);
+extern int kdb_trap(int, int, struct cpu_user_regs *);
 
 static inline int debugger_trap_entry(
-    unsigned int vector, struct xen_regs *regs)
+    unsigned int vector, struct cpu_user_regs *regs)
 {
     return 0;
 }
 
 static inline int debugger_trap_fatal(
-    unsigned int vector, struct xen_regs *regs)
+    unsigned int vector, struct cpu_user_regs *regs)
 {
     return kdb_trap(vector, 0, regs);
 }

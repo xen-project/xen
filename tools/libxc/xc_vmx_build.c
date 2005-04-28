@@ -149,7 +149,7 @@ static int setup_guest(int xc_handle,
                          char *image, unsigned long image_size,
                          gzFile initrd_gfd, unsigned long initrd_len,
                          unsigned long nr_pages,
-                         full_execution_context_t *ctxt,
+                         vcpu_guest_context_t *ctxt,
                          const char *cmdline,
                          unsigned long shared_info_frame,
                          unsigned int control_evtchn,
@@ -422,22 +422,22 @@ static int setup_guest(int xc_handle,
     /*
      * Initial register values:
      */
-    ctxt->cpu_ctxt.ds = 0x68;
-    ctxt->cpu_ctxt.es = 0x0;
-    ctxt->cpu_ctxt.fs = 0x0;
-    ctxt->cpu_ctxt.gs = 0x0;
-    ctxt->cpu_ctxt.ss = 0x68;
-    ctxt->cpu_ctxt.cs = 0x60;
-    ctxt->cpu_ctxt.eip = dsi.v_kernentry;
-    ctxt->cpu_ctxt.edx = vboot_gdt_start;
-    ctxt->cpu_ctxt.eax = 0x800;
-    ctxt->cpu_ctxt.esp = vboot_gdt_end;
-    ctxt->cpu_ctxt.ebx = 0;	/* startup_32 expects this to be 0 to signal boot cpu */
-    ctxt->cpu_ctxt.ecx = mem_mapp->nr_map;
-    ctxt->cpu_ctxt.esi = vboot_params_start;
-    ctxt->cpu_ctxt.edi = vboot_params_start + 0x2d0;
+    ctxt->user_regs.ds = 0x68;
+    ctxt->user_regs.es = 0x0;
+    ctxt->user_regs.fs = 0x0;
+    ctxt->user_regs.gs = 0x0;
+    ctxt->user_regs.ss = 0x68;
+    ctxt->user_regs.cs = 0x60;
+    ctxt->user_regs.eip = dsi.v_kernentry;
+    ctxt->user_regs.edx = vboot_gdt_start;
+    ctxt->user_regs.eax = 0x800;
+    ctxt->user_regs.esp = vboot_gdt_end;
+    ctxt->user_regs.ebx = 0;	/* startup_32 expects this to be 0 to signal boot cpu */
+    ctxt->user_regs.ecx = mem_mapp->nr_map;
+    ctxt->user_regs.esi = vboot_params_start;
+    ctxt->user_regs.edi = vboot_params_start + 0x2d0;
 
-    ctxt->cpu_ctxt.eflags = (1<<2);
+    ctxt->user_regs.eflags = (1<<2);
 
     return 0;
 
@@ -488,7 +488,7 @@ int xc_vmx_build(int xc_handle,
     int initrd_fd = -1;
     gzFile initrd_gfd = NULL;
     int rc, i;
-    full_execution_context_t st_ctxt, *ctxt = &st_ctxt;
+    vcpu_guest_context_t st_ctxt, *ctxt = &st_ctxt;
     unsigned long nr_pages;
     char         *image = NULL;
     unsigned long image_size, initrd_size=0;

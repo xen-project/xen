@@ -68,7 +68,7 @@ search_exception_table(unsigned long addr)
 }
 
 unsigned long
-search_pre_exception_table(struct xen_regs *regs)
+search_pre_exception_table(struct cpu_user_regs *regs)
 {
     unsigned long addr = (unsigned long)regs->eip;
     unsigned long fixup = search_one_table(

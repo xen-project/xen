@@ -16,6 +16,6 @@
     ((_dpl) >= (VM86_MODE(_r) ? 3 : ((_r)->cs & 3)))
 
 /* Number of bytes of on-stack execution state to be context-switched. */
-#define CTXT_SWITCH_STACK_BYTES (sizeof(execution_context_t))
+#define CTXT_SWITCH_STACK_BYTES (sizeof(struct cpu_user_regs))
 
 #endif

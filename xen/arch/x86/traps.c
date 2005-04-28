@@ -95,7 +95,7 @@ asmlinkage void machine_check(void);
  * are disabled). In such situations we can't do much that is safe. We try to
  * print out some tracing and then we just spin.
  */
-asmlinkage void fatal_trap(int trapnr, struct xen_regs *regs)
+asmlinkage void fatal_trap(int trapnr, struct cpu_user_regs *regs)
 {
     int cpu = smp_processor_id();
     unsigned long cr2;
@@ -136,7 +136,7 @@ asmlinkage void fatal_trap(int trapnr, struct xen_regs *regs)
 }
 
 static inline int do_trap(int trapnr, char *str,
-                          struct xen_regs *regs, 
+                          struct cpu_user_regs *regs, 
                           int use_error_code)
 {
     struct exec_domain *ed = current;
@@ -186,13 +186,13 @@ static inline int do_trap(int trapnr, char *str,
 }
 
 #define DO_ERROR_NOCODE(trapnr, str, name) \
-asmlinkage int do_##name(struct xen_regs *regs) \
+asmlinkage int do_##name(struct cpu_user_regs *regs) \
 { \
     return do_trap(trapnr, str, regs, 0); \
 }
 
 #define DO_ERROR(trapnr, str, name) \
-asmlinkage int do_##name(struct xen_regs *regs) \
+asmlinkage int do_##name(struct cpu_user_regs *regs) \
 { \
     return do_trap(trapnr, str, regs, 1); \
 }
@@ -209,7 +209,7 @@ DO_ERROR_NOCODE(16, "fpu error", coprocessor_error)
 DO_ERROR(17, "alignment check", alignment_check)
 DO_ERROR_NOCODE(19, "simd error", simd_coprocessor_error)
 
-asmlinkage int do_int3(struct xen_regs *regs)
+asmlinkage int do_int3(struct cpu_user_regs *regs)
 {
     struct exec_domain *ed = current;
     struct trap_bounce *tb = &ed->arch.trap_bounce;
@@ -234,7 +234,7 @@ asmlinkage int do_int3(struct xen_regs *regs)
     return 0;
 }
 
-asmlinkage void do_machine_check(struct xen_regs *regs)
+asmlinkage void do_machine_check(struct cpu_user_regs *regs)
 {
     fatal_trap(TRAP_machine_check, regs);
 }
@@ -257,7 +257,7 @@ void propagate_page_fault(unsigned long addr, u16 error_code)
     ed->arch.guest_cr2 = addr;
 }
 
-asmlinkage int do_page_fault(struct xen_regs *regs)
+asmlinkage int do_page_fault(struct cpu_user_regs *regs)
 {
     unsigned long off, addr, fixup;
     struct exec_domain *ed = current;
@@ -374,7 +374,7 @@ long do_fpu_taskswitch(int set)
 /* Has the guest requested sufficient permission for this I/O access? */
 static inline int guest_io_okay(
     unsigned int port, unsigned int bytes,
-    struct exec_domain *ed, struct xen_regs *regs)
+    struct exec_domain *ed, struct cpu_user_regs *regs)
 {
     u16 x;
 #if defined(__x86_64__)
@@ -404,7 +404,7 @@ static inline int guest_io_okay(
 /* Has the administrator granted sufficient permission for this I/O access? */
 static inline int admin_io_okay(
     unsigned int port, unsigned int bytes,
-    struct exec_domain *ed, struct xen_regs *regs)
+    struct exec_domain *ed, struct cpu_user_regs *regs)
 {
     struct domain *d = ed->domain;
     u16 x;
@@ -436,7 +436,7 @@ static inline int admin_io_okay(
         goto read_fault;                        \
     eip += _size; (_type)_x; })
 
-static int emulate_privileged_op(struct xen_regs *regs)
+static int emulate_privileged_op(struct cpu_user_regs *regs)
 {
     struct exec_domain *ed = current;
     unsigned long *reg, eip = regs->eip;
@@ -743,7 +743,7 @@ static int emulate_privileged_op(struct xen_regs *regs)
     return EXCRET_fault_fixed;
 }
 
-asmlinkage int do_general_protection(struct xen_regs *regs)
+asmlinkage int do_general_protection(struct cpu_user_regs *regs)
 {
     struct exec_domain *ed = current;
     struct trap_bounce *tb = &ed->arch.trap_bounce;
@@ -851,7 +851,7 @@ static void nmi_softirq(void)
         send_guest_virq(dom0->exec_domain[0], VIRQ_IO_ERR);
 }
 
-asmlinkage void mem_parity_error(struct xen_regs *regs)
+asmlinkage void mem_parity_error(struct cpu_user_regs *regs)
 {
     /* Clear and disable the parity-error line. */
     outb((inb(0x61)&15)|4,0x61);
@@ -870,7 +870,7 @@ asmlinkage void mem_parity_error(struct xen_regs *regs)
     }
 }
 
-asmlinkage void io_check_error(struct xen_regs *regs)
+asmlinkage void io_check_error(struct cpu_user_regs *regs)
 {
     /* Clear and disable the I/O-error line. */
     outb((inb(0x61)&15)|8,0x61);
@@ -896,7 +896,7 @@ static void unknown_nmi_error(unsigned char reason)
     printk("Do you have a strange power saving mode enabled?\n");
 }
 
-asmlinkage void do_nmi(struct xen_regs *regs, unsigned long reason)
+asmlinkage void do_nmi(struct cpu_user_regs *regs, unsigned long reason)
 {
     ++nmi_count(smp_processor_id());
 
@@ -911,7 +911,7 @@ asmlinkage void do_nmi(struct xen_regs *regs, unsigned long reason)
         unknown_nmi_error((unsigned char)(reason&0xff));
 }
 
-asmlinkage int math_state_restore(struct xen_regs *regs)
+asmlinkage int math_state_restore(struct cpu_user_regs *regs)
 {
     /* Prevent recursion. */
     clts();
@@ -936,7 +936,7 @@ asmlinkage int math_state_restore(struct xen_regs *regs)
     return EXCRET_fault_fixed;
 }
 
-asmlinkage int do_debug(struct xen_regs *regs)
+asmlinkage int do_debug(struct cpu_user_regs *regs)
 {
     unsigned long condition;
     struct exec_domain *ed = current;
@@ -978,7 +978,7 @@ asmlinkage int do_debug(struct xen_regs *regs)
     return EXCRET_not_a_fault;
 }
 
-asmlinkage int do_spurious_interrupt_bug(struct xen_regs *regs)
+asmlinkage int do_spurious_interrupt_bug(struct cpu_user_regs *regs)
 {
     return EXCRET_not_a_fault;
 }

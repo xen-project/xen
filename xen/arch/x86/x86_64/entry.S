@@ -123,7 +123,7 @@ ENTRY(syscall_enter)
         leaq  SYMBOL_NAME(hypercall_table)(%rip),%r10
         PERFC_INCR(PERFC_hypercalls, %rax)
         callq *(%r10,%rax,8)
-        movq %rax,XREGS_rax(%rsp)       # save the return value
+        movq %rax,UREGS_rax(%rsp)       # save the return value
 
 /* %rbx: struct exec_domain */
 test_all_events:
@@ -160,7 +160,7 @@ test_all_events:
  * and we set it to the fixed value.
  *
  * We also need the room, especially because orig_eax field is used 
- * by do_IRQ(). Compared the xen_regs, we skip pushing for the following:
+ * by do_IRQ(). Compared the cpu_user_regs, we skip pushing for the following:
  *   (13) u64 gs_base_user;                 
  *   (12) u64 gs_base_kernel;                 
  *   (11) u64 fs_base;                 
@@ -303,8 +303,8 @@ create_bounce_frame:
         movq  EDOMAIN_kernel_sp(%rbx),%rsi
         jmp   2f
 1:      /* In kernel context already: push new frame at existing %rsp. */
-        movq  XREGS_rsp+8(%rsp),%rsi
-        andb  $0xfc,XREGS_cs+8(%rsp)    # Indicate kernel context to guest.
+        movq  UREGS_rsp+8(%rsp),%rsi
+        andb  $0xfc,UREGS_cs+8(%rsp)    # Indicate kernel context to guest.
 2:      movq  $HYPERVISOR_VIRT_START,%rax
         cmpq  %rax,%rsi
         jb    1f                        # In +ve address space? Then okay.
@@ -312,15 +312,15 @@ create_bounce_frame:
         cmpq  %rax,%rsi
         jb    domain_crash_synchronous  # Above Xen private area? Then okay.
 1:      subq  $40,%rsi
-        movq  XREGS_ss+8(%rsp),%rax
+        movq  UREGS_ss+8(%rsp),%rax
 FLT2:   movq  %rax,32(%rsi)             # SS
-        movq  XREGS_rsp+8(%rsp),%rax
+        movq  UREGS_rsp+8(%rsp),%rax
 FLT3:   movq  %rax,24(%rsi)             # RSP
-        movq  XREGS_eflags+8(%rsp),%rax
+        movq  UREGS_eflags+8(%rsp),%rax
 FLT4:   movq  %rax,16(%rsi)             # RFLAGS
-        movq  XREGS_cs+8(%rsp),%rax
+        movq  UREGS_cs+8(%rsp),%rax
 FLT5:   movq  %rax,8(%rsi)              # CS
-        movq  XREGS_rip+8(%rsp),%rax
+        movq  UREGS_rip+8(%rsp),%rax
 FLT6:   movq  %rax,(%rsi)               # RIP
         movb  TRAPBOUNCE_flags(%rdx),%cl
         testb $TBF_EXCEPTION_ERRCODE,%cl
@@ -345,19 +345,19 @@ FLT11:  movq  %rax,8(%rsi)              # ES
         movl  %ds,%eax
 FLT12:  movq  %rax,(%rsi)               # DS
 2:      subq  $16,%rsi
-        movq  XREGS_r11+8(%rsp),%rax
+        movq  UREGS_r11+8(%rsp),%rax
 FLT13:  movq  %rax,8(%rsi)              # R11
-        movq  XREGS_rcx+8(%rsp),%rax
+        movq  UREGS_rcx+8(%rsp),%rax
 FLT14:  movq  %rax,(%rsi)               # RCX
         /* Rewrite our stack frame and return to guest-OS mode. */
         /* IA32 Ref. Vol. 3: TF, VM, RF and NT flags are cleared on trap. */
-        movq  $TRAP_syscall,XREGS_entry_vector+8(%rsp)
-        andl  $0xfffcbeff,XREGS_eflags+8(%rsp)
-        movq  $__GUEST_SS,XREGS_ss+8(%rsp)
-        movq  %rsi,XREGS_rsp+8(%rsp)
-        movq  $__GUEST_CS,XREGS_cs+8(%rsp)
+        movq  $TRAP_syscall,UREGS_entry_vector+8(%rsp)
+        andl  $0xfffcbeff,UREGS_eflags+8(%rsp)
+        movq  $__GUEST_SS,UREGS_ss+8(%rsp)
+        movq  %rsi,UREGS_rsp+8(%rsp)
+        movq  $__GUEST_CS,UREGS_cs+8(%rsp)
         movq  TRAPBOUNCE_eip(%rdx),%rax
-        movq  %rax,XREGS_rip+8(%rsp)
+        movq  %rax,UREGS_rip+8(%rsp)
         movb  $0,TRAPBOUNCE_flags(%rdx)
         ret
 .section __ex_table,"a"
@@ -383,7 +383,7 @@ process_guest_exception_and_events:
 /* No special register assumptions. */
 ENTRY(ret_from_intr)
         GET_CURRENT(%rbx)
-        testb $3,XREGS_cs(%rsp)
+        testb $3,UREGS_cs(%rsp)
         jnz   test_all_events
         jmp   restore_all_xen
 
@@ -391,43 +391,43 @@ ENTRY(ret_from_intr)
 /* No special register assumptions. */
 error_code:
         SAVE_ALL
-        testb $X86_EFLAGS_IF>>8,XREGS_eflags+1(%rsp)
+        testb $X86_EFLAGS_IF>>8,UREGS_eflags+1(%rsp)
         jz    exception_with_ints_disabled
         sti
         movq  %rsp,%rdi
-        movl  XREGS_entry_vector(%rsp),%eax
+        movl  UREGS_entry_vector(%rsp),%eax
         leaq  SYMBOL_NAME(exception_table)(%rip),%rdx
         GET_CURRENT(%rbx)
         PERFC_INCR(PERFC_exceptions, %rax)
         callq *(%rdx,%rax,8)
-        testb $3,XREGS_cs(%rsp)
+        testb $3,UREGS_cs(%rsp)
         jz    restore_all_xen
         jmp   process_guest_exception_and_events
 
 /* No special register assumptions. */
 exception_with_ints_disabled:
-        testb $3,XREGS_cs(%rsp)         # interrupts disabled outside Xen?
+        testb $3,UREGS_cs(%rsp)         # interrupts disabled outside Xen?
         jnz   FATAL_exception_with_ints_disabled
         movq  %rsp,%rdi
         call  search_pre_exception_table
         testq %rax,%rax                 # no fixup code for faulting EIP?
         jz    FATAL_exception_with_ints_disabled
-        movq  %rax,XREGS_rip(%rsp)
-        subq  $8,XREGS_rsp(%rsp)        # add ec/ev to previous stack frame
-        testb $15,XREGS_rsp(%rsp)       # return %rsp is now aligned?
+        movq  %rax,UREGS_rip(%rsp)
+        subq  $8,UREGS_rsp(%rsp)        # add ec/ev to previous stack frame
+        testb $15,UREGS_rsp(%rsp)       # return %rsp is now aligned?
         jz    1f                        # then there is a pad quadword already
         movq  %rsp,%rsi
         subq  $8,%rsp
         movq  %rsp,%rdi
-        movq  $XREGS_kernel_sizeof/8,%rcx
+        movq  $UREGS_kernel_sizeof/8,%rcx
         rep;  movsq                     # make room for ec/ev
-1:      movq  XREGS_error_code(%rsp),%rax # ec/ev
-        movq  %rax,XREGS_kernel_sizeof(%rsp)
+1:      movq  UREGS_error_code(%rsp),%rax # ec/ev
+        movq  %rax,UREGS_kernel_sizeof(%rsp)
         jmp   restore_all_xen           # return to fixup code
 
 /* No special register assumptions. */
 FATAL_exception_with_ints_disabled:
-        movl  XREGS_entry_vector(%rsp),%edi
+        movl  UREGS_entry_vector(%rsp),%edi
         movq  %rsp,%rsi
         call  SYMBOL_NAME(fatal_trap)
         ud2

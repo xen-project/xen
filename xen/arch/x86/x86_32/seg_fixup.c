@@ -263,7 +263,7 @@ int fixup_seg(u16 seg, unsigned long offset)
  * Called from the general-protection fault handler to attempt to decode
  * and emulate an instruction that depends on 4GB segments.
  */
-int gpf_emulate_4gb(struct xen_regs *regs)
+int gpf_emulate_4gb(struct cpu_user_regs *regs)
 {
     struct exec_domain *d = current;
     trap_info_t   *ti;

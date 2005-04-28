@@ -63,7 +63,7 @@
 
 extern void shadow_mode_init(void);
 extern int shadow_mode_control(struct domain *p, dom0_shadow_control_t *sc);
-extern int shadow_fault(unsigned long va, struct xen_regs *regs);
+extern int shadow_fault(unsigned long va, struct cpu_user_regs *regs);
 extern int shadow_mode_enable(struct domain *p, unsigned int mode);
 extern void shadow_invlpg(struct exec_domain *, unsigned long);
 extern struct out_of_sync_entry *shadow_mark_mfn_out_of_sync(

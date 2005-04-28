@@ -1,2 +1,2 @@
 #include <asm/ptrace.h>
-#define xen_regs pt_regs
+#define cpu_user_regs pt_regs

@@ -97,8 +97,7 @@ typedef struct {
     memory_t address; /* 4: code address                                  */
 } PACKED trap_info_t; /* 8 bytes */
 
-typedef struct xen_regs
-{
+typedef struct cpu_user_regs {
     u32 ebx;
     u32 ecx;
     u32 edx;
@@ -117,7 +116,7 @@ typedef struct xen_regs
     u32 ds;
     u32 fs;
     u32 gs;
-} PACKED execution_context_t;
+} cpu_user_regs_t;
 
 typedef u64 tsc_timestamp_t; /* RDTSC timestamp */
 
@@ -125,12 +124,12 @@ typedef u64 tsc_timestamp_t; /* RDTSC timestamp */
  * The following is all CPU context. Note that the i387_ctxt block is filled 
  * in by FXSAVE if the CPU has feature FXSR; otherwise FSAVE is used.
  */
-typedef struct {
+typedef struct vcpu_guest_context {
 #define ECF_I387_VALID (1<<0)
 #define ECF_VMX_GUEST  (1<<1)
-#define ECF_IN_KERNEL (1<<2)
+#define ECF_IN_KERNEL  (1<<2)
     unsigned long flags;
-    execution_context_t cpu_ctxt;           /* User-level CPU registers     */
+    cpu_user_regs_t user_regs;              /* User-level CPU registers     */
     char          fpu_ctxt[256];            /* User-level FPU registers     */
     trap_info_t   trap_ctxt[256];           /* Virtual IDT                  */
     unsigned int  fast_trap_idx;            /* "Fast trap" vector offset    */
@@ -144,7 +143,7 @@ typedef struct {
     unsigned long failsafe_callback_cs;     /* CS:EIP of failsafe callback  */
     unsigned long failsafe_callback_eip;
     unsigned long vm_assist;                /* VMASST_TYPE_* bitmap */
-} PACKED full_execution_context_t;
+} PACKED vcpu_guest_context_t;
 
 typedef struct {
     /* MFN of a table of MFNs that make up p2m table */

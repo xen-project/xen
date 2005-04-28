@@ -47,7 +47,7 @@ long arch_do_dom0_op(dom0_op_t *op, dom0_op_t *u_dom0_op)
     return ret;
 }
 
-void arch_getdomaininfo_ctxt(struct domain *d, full_execution_context_t *c)
+void arch_getdomaininfo_ctxt(struct domain *d, struct vcpu_guest_context *c)
 { 
     int i;
 

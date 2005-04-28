@@ -2,35 +2,35 @@
 
 #include <asm/asm-offsets.h>
 
-	// int call_with_registers(void (*f)(struct xen_regs *r)) ->
-	// build a xen_regs structure, and then call f with that.
+	// int call_with_registers(void (*f)(struct cpu_user_regs *r)) ->
+	// build a cpu_user_regs structure, and then call f with that.
 call_with_registers:
 	pushf
-	subl $XREGS_user_sizeof, %esp
-	movl %ebx, XREGS_ebx(%esp)
-	movl %ecx, XREGS_ecx(%esp)
-	movl %edx, XREGS_edx(%esp)
-	movl %esi, XREGS_esi(%esp)
-	movl %edi, XREGS_edi(%esp)
-	movl %ebp, XREGS_ebp(%esp)
-	movl %eax, XREGS_eax(%esp)
-	movw $0, XREGS_error_code(%esp)
-	movw $0, XREGS_entry_vector(%esp)
-	movl XREGS_user_sizeof+4(%esp), %eax
-	movl %eax, XREGS_eip(%esp)
-	movl %cs, XREGS_cs(%esp)
-	movl XREGS_user_sizeof(%esp), %eax
-	movl %eax, XREGS_eflags(%esp)
-	movl %esp, XREGS_esp(%esp)
-	addl $XREGS_user_sizeof+4, XREGS_esp(%esp)
-	movl %ss, XREGS_ss(%esp)
-	movl %es, XREGS_es(%esp)
-	movl %ds, XREGS_ds(%esp)
-	movl %fs, XREGS_fs(%esp)
-	movl %gs, XREGS_gs(%esp)
+	subl $UREGS_user_sizeof, %esp
+	movl %ebx, UREGS_ebx(%esp)
+	movl %ecx, UREGS_ecx(%esp)
+	movl %edx, UREGS_edx(%esp)
+	movl %esi, UREGS_esi(%esp)
+	movl %edi, UREGS_edi(%esp)
+	movl %ebp, UREGS_ebp(%esp)
+	movl %eax, UREGS_eax(%esp)
+	movw $0, UREGS_error_code(%esp)
+	movw $0, UREGS_entry_vector(%esp)
+	movl UREGS_user_sizeof+4(%esp), %eax
+	movl %eax, UREGS_eip(%esp)
+	movl %cs, UREGS_cs(%esp)
+	movl UREGS_user_sizeof(%esp), %eax
+	movl %eax, UREGS_eflags(%esp)
+	movl %esp, UREGS_esp(%esp)
+	addl $UREGS_user_sizeof+4, UREGS_esp(%esp)
+	movl %ss, UREGS_ss(%esp)
+	movl %es, UREGS_es(%esp)
+	movl %ds, UREGS_ds(%esp)
+	movl %fs, UREGS_fs(%esp)
+	movl %gs, UREGS_gs(%esp)
 
-	movl XREGS_user_sizeof+8(%esp), %eax
+	movl UREGS_user_sizeof+8(%esp), %eax
 	pushl %esp
 	call *%eax
-	add $XREGS_user_sizeof + 8, %esp
+	add $UREGS_user_sizeof + 8, %esp
 	ret

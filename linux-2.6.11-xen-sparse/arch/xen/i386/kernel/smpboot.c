@@ -820,7 +820,7 @@ static int __init do_boot_cpu(int apicid)
 #if 0
 	unsigned short nmi_high = 0, nmi_low = 0;
 #endif
-	full_execution_context_t ctxt;
+	vcpu_guest_context_t ctxt;
 	extern void startup_32_smp(void);
 	extern void hypervisor_callback(void);
 	extern void failsafe_callback(void);
@@ -865,15 +865,15 @@ static int __init do_boot_cpu(int apicid)
 
 	memset(&ctxt, 0, sizeof(ctxt));
 
-	ctxt.cpu_ctxt.ds = __USER_DS;
-	ctxt.cpu_ctxt.es = __USER_DS;
-	ctxt.cpu_ctxt.fs = 0;
-	ctxt.cpu_ctxt.gs = 0;
-	ctxt.cpu_ctxt.ss = __KERNEL_DS;
-	ctxt.cpu_ctxt.cs = __KERNEL_CS;
-	ctxt.cpu_ctxt.eip = start_eip;
-	ctxt.cpu_ctxt.esp = idle->thread.esp;
-	ctxt.cpu_ctxt.eflags = (1<<9) | (1<<2) | (idle->thread.io_pl<<12);
+	ctxt.user_regs.ds = __USER_DS;
+	ctxt.user_regs.es = __USER_DS;
+	ctxt.user_regs.fs = 0;
+	ctxt.user_regs.gs = 0;
+	ctxt.user_regs.ss = __KERNEL_DS;
+	ctxt.user_regs.cs = __KERNEL_CS;
+	ctxt.user_regs.eip = start_eip;
+	ctxt.user_regs.esp = idle->thread.esp;
+	ctxt.user_regs.eflags = (1<<9) | (1<<2) | (idle->thread.io_pl<<12);
 
 	/* FPU is set up to default initial state. */
 	memset(ctxt.fpu_ctxt, 0, sizeof(ctxt.fpu_ctxt));

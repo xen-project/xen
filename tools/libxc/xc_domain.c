@@ -144,7 +144,7 @@ int xc_domain_getfullinfo(int xc_handle,
                           u32 domid,
                           u32 vcpu,
                           xc_domaininfo_t *info,
-                          full_execution_context_t *ctxt)
+                          vcpu_guest_context_t *ctxt)
 {
     int rc, errno_saved;
     dom0_op_t op;

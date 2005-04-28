@@ -825,7 +825,7 @@ int reprogram_ac_timer(s_time_t timeout)
     return 1;
 }
 
-void smp_apic_timer_interrupt(struct xen_regs * regs)
+void smp_apic_timer_interrupt(struct cpu_user_regs * regs)
 {
     ack_APIC_irq();
     perfc_incrc(apic_timer);
@@ -835,7 +835,7 @@ void smp_apic_timer_interrupt(struct xen_regs * regs)
 /*
  * This interrupt should _never_ happen with our APIC/SMP architecture
  */
-asmlinkage void smp_spurious_interrupt(struct xen_regs *regs)
+asmlinkage void smp_spurious_interrupt(struct cpu_user_regs *regs)
 {
     unsigned long v;
 
@@ -857,7 +857,7 @@ asmlinkage void smp_spurious_interrupt(struct xen_regs *regs)
  * This interrupt should never happen with our APIC/SMP architecture
  */
 
-asmlinkage void smp_error_interrupt(struct xen_regs *regs)
+asmlinkage void smp_error_interrupt(struct cpu_user_regs *regs)
 {
     unsigned long v, v1;
 

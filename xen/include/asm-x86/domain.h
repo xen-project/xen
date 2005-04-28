@@ -78,7 +78,7 @@ struct arch_exec_domain
     struct i387_state  i387;
 
     /* general user-visible register state */
-    execution_context_t user_ctxt;
+    struct cpu_user_regs user_regs;
 
     void (*schedule_tail) (struct exec_domain *);
 

@@ -46,7 +46,7 @@ unsigned int opt_vmx_debug_level = 0;
 
 extern long evtchn_send(int lport);
 extern long do_block(void);
-void do_nmi(struct xen_regs *, unsigned long);
+void do_nmi(struct cpu_user_regs *, unsigned long);
 
 int start_vmx()
 {
@@ -105,7 +105,7 @@ static void inline __update_guest_eip(unsigned long inst_len)
 
 #include <asm/domain_page.h>
 
-static int vmx_do_page_fault(unsigned long va, struct xen_regs *regs) 
+static int vmx_do_page_fault(unsigned long va, struct cpu_user_regs *regs) 
 {
     struct exec_domain *ed = current;
     unsigned long eip;
@@ -154,7 +154,7 @@ static int vmx_do_page_fault(unsigned long va, struct xen_regs *regs)
     return result;
 }
 
-static void vmx_do_general_protection_fault(struct xen_regs *regs) 
+static void vmx_do_general_protection_fault(struct cpu_user_regs *regs) 
 {
     unsigned long eip, error_code;
     unsigned long intr_fields;
@@ -181,7 +181,7 @@ static void vmx_do_general_protection_fault(struct xen_regs *regs)
     __vmwrite(VM_ENTRY_EXCEPTION_ERROR_CODE, error_code);
 }
 
-static void vmx_vmexit_do_cpuid(unsigned long input, struct xen_regs *regs) 
+static void vmx_vmexit_do_cpuid(unsigned long input, struct cpu_user_regs *regs) 
 {
     unsigned int eax, ebx, ecx, edx;
     unsigned long eip;
@@ -217,7 +217,7 @@ static void vmx_vmexit_do_cpuid(unsigned long input, struct xen_regs *regs)
 #define CASE_GET_REG_P(REG, reg)    \
     case REG_ ## REG: reg_p = (unsigned long *)&(regs->reg); break
 
-static void vmx_dr_access (unsigned long exit_qualification, struct xen_regs *regs)
+static void vmx_dr_access (unsigned long exit_qualification, struct cpu_user_regs *regs)
 {
     unsigned int reg;
     unsigned long *reg_p = 0;
@@ -288,7 +288,7 @@ static void vmx_vmexit_do_invlpg(unsigned long va)
     shadow_invlpg(ed, va);
 }
 
-static void vmx_io_instruction(struct xen_regs *regs, 
+static void vmx_io_instruction(struct cpu_user_regs *regs, 
                    unsigned long exit_qualification, unsigned long inst_len) 
 {
     struct exec_domain *d = current;
@@ -728,7 +728,7 @@ static int vmx_set_cr0(unsigned long value)
 /*
  * Write to control registers
  */
-static int mov_to_cr(int gp, int cr, struct xen_regs *regs)
+static int mov_to_cr(int gp, int cr, struct cpu_user_regs *regs)
 {
     unsigned long value;
     unsigned long old_cr;
@@ -847,7 +847,7 @@ static int mov_to_cr(int gp, int cr, struct xen_regs *regs)
 /*
  * Read from control registers. CR0 and CR4 are read from the shadow.
  */
-static void mov_from_cr(int cr, int gp, struct xen_regs *regs)
+static void mov_from_cr(int cr, int gp, struct cpu_user_regs *regs)
 {
     unsigned long value;
     struct exec_domain *d = current;
@@ -878,7 +878,7 @@ static void mov_from_cr(int cr, int gp, struct xen_regs *regs)
     VMX_DBG_LOG(DBG_LEVEL_VMMU, "mov_from_cr: CR%d, value = %lx,", cr, value);
 }
 
-static int vmx_cr_access(unsigned long exit_qualification, struct xen_regs *regs)
+static int vmx_cr_access(unsigned long exit_qualification, struct cpu_user_regs *regs)
 {
     unsigned int gp, cr;
     unsigned long value;
@@ -916,7 +916,7 @@ static int vmx_cr_access(unsigned long exit_qualification, struct xen_regs *regs
     return 1;
 }
 
-static inline void vmx_do_msr_read(struct xen_regs *regs)
+static inline void vmx_do_msr_read(struct cpu_user_regs *regs)
 {
     VMX_DBG_LOG(DBG_LEVEL_1, "vmx_do_msr_read: ecx=%lx, eax=%lx, edx=%lx",
                 (unsigned long)regs->ecx, (unsigned long)regs->eax, 
@@ -973,7 +973,7 @@ static void vmx_print_line(const char c, struct exec_domain *d)
         print_buf[index++] = c;
 }
 
-void save_vmx_execution_context(execution_context_t *ctxt)
+void save_vmx_cpu_user_regs(struct cpu_user_regs *ctxt)
 {
     __vmread(GUEST_SS_SELECTOR, &ctxt->ss);
     __vmread(GUEST_ESP, &ctxt->esp);
@@ -988,7 +988,7 @@ void save_vmx_execution_context(execution_context_t *ctxt)
 }
 
 #ifdef XEN_DEBUGGER
-void save_xen_regs(struct xen_regs *regs)
+void save_cpu_user_regs(struct cpu_user_regs *regs)
 {
     __vmread(GUEST_SS_SELECTOR, &regs->xss);
     __vmread(GUEST_ESP, &regs->esp);
@@ -1002,7 +1002,7 @@ void save_xen_regs(struct xen_regs *regs)
     __vmread(GUEST_DS_SELECTOR, &regs->xds);
 }
 
-void restore_xen_regs(struct xen_regs *regs)
+void restore_cpu_user_regs(struct cpu_user_regs *regs)
 {
     __vmwrite(GUEST_SS_SELECTOR, regs->xss);
     __vmwrite(GUEST_ESP, regs->esp);
@@ -1017,7 +1017,7 @@ void restore_xen_regs(struct xen_regs *regs)
 }
 #endif
 
-asmlinkage void vmx_vmexit_handler(struct xen_regs regs)
+asmlinkage void vmx_vmexit_handler(struct cpu_user_regs regs)
 {
     unsigned int exit_reason, idtv_info_field;
     unsigned long exit_qualification, eip, inst_len = 0;
@@ -1080,16 +1080,16 @@ asmlinkage void vmx_vmexit_handler(struct xen_regs regs)
 #ifdef XEN_DEBUGGER
         case TRAP_debug:
         {
-            save_xen_regs(&regs);
+            save_cpu_user_regs(&regs);
             pdb_handle_exception(1, &regs, 1);
-            restore_xen_regs(&regs);
+            restore_cpu_user_regs(&regs);
             break;
         }
         case TRAP_int3:
         {
-            save_xen_regs(&regs);
+            save_cpu_user_regs(&regs);
             pdb_handle_exception(3, &regs, 1);
-            restore_xen_regs(&regs);
+            restore_cpu_user_regs(&regs);
             break;
         }
 #endif
@@ -1139,9 +1139,9 @@ asmlinkage void vmx_vmexit_handler(struct xen_regs regs)
     case EXIT_REASON_EXTERNAL_INTERRUPT: 
     {
         extern int vector_irq[];
-        extern asmlinkage void do_IRQ(struct xen_regs *);
-        extern void smp_apic_timer_interrupt(struct xen_regs *);
-        extern void timer_interrupt(int, void *, struct xen_regs *);
+        extern asmlinkage void do_IRQ(struct cpu_user_regs *);
+        extern void smp_apic_timer_interrupt(struct cpu_user_regs *);
+        extern void timer_interrupt(int, void *, struct cpu_user_regs *);
         unsigned int    vector;
 
         if ((error = __vmread(VM_EXIT_INTR_INFO, &vector))

@@ -140,19 +140,19 @@ static int pit_read_io(struct vmx_virpit_t *vpit)
 /* vmx_io_assist light-weight version, specific to PIT DM */ 
 static void resume_pit_io(ioreq_t *p)
 {
-    execution_context_t *ec = get_execution_context();
-    unsigned long old_eax = ec->eax;
+    struct cpu_user_regs *regs = get_cpu_user_regs();
+    unsigned long old_eax = regs->eax;
     p->state = STATE_INVALID;
 
     switch(p->size) {
     case 1:
-        ec->eax = (old_eax & 0xffffff00) | (p->u.data & 0xff);
+        regs->eax = (old_eax & 0xffffff00) | (p->u.data & 0xff);
         break;
     case 2:
-        ec->eax = (old_eax & 0xffff0000) | (p->u.data & 0xffff);
+        regs->eax = (old_eax & 0xffff0000) | (p->u.data & 0xffff);
         break;
     case 4:
-        ec->eax = (p->u.data & 0xffffffff);
+        regs->eax = (p->u.data & 0xffffffff);
         break;
     default:
         BUG();

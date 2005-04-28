@@ -24,9 +24,10 @@ static inline int kernel_text_address(unsigned long addr)
 void show_guest_stack(void)
 {
     int i;
-    execution_context_t *ec = get_execution_context();
-    unsigned long *stack = (unsigned long *)ec->rsp;
-    printk("Guest RIP is %016lx\n   ", ec->rip);
+    struct cpu_user_regs *regs = get_cpu_user_regs();
+    unsigned long *stack = (unsigned long *)regs->rsp;
+
+    printk("Guest RIP is %016lx\n   ", regs->rip);
 
     for ( i = 0; i < kstack_depth_to_print; i++ )
     {
@@ -84,7 +85,7 @@ void show_stack(unsigned long *rsp)
     show_trace(rsp);
 }
 
-void show_registers(struct xen_regs *regs)
+void show_registers(struct cpu_user_regs *regs)
 {
     printk("CPU:    %d\nEIP:    %04lx:[<%016lx>]      \nEFLAGS: %016lx\n",
            smp_processor_id(), 0xffff & regs->cs, regs->rip, regs->eflags);
@@ -130,7 +131,7 @@ void show_page_walk(unsigned long addr)
 }
 
 asmlinkage void double_fault(void);
-asmlinkage void do_double_fault(struct xen_regs *regs)
+asmlinkage void do_double_fault(struct cpu_user_regs *regs)
 {
     /* Disable the NMI watchdog. It's useless now. */
     watchdog_on = 0;

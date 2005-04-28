@@ -65,8 +65,8 @@ void free_vmcs(struct vmcs_struct *);
 int  load_vmcs(struct arch_vmx_struct *, u64);
 int  store_vmcs(struct arch_vmx_struct *, u64);
 void dump_vmcs(void);
-int  construct_vmcs(struct arch_vmx_struct *, execution_context_t *, 
-                    full_execution_context_t *, int);
+int  construct_vmcs(struct arch_vmx_struct *, struct cpu_user_regs *, 
+                    struct vcpu_guest_context *, int);
 
 #define VMCS_USE_HOST_ENV       1
 #define VMCS_USE_SEPARATE_ENV   0

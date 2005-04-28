@@ -24,30 +24,30 @@
 
 void __dummy__(void)
 {
-    OFFSET(XREGS_r15, struct xen_regs, r15);
-    OFFSET(XREGS_r14, struct xen_regs, r14);
-    OFFSET(XREGS_r13, struct xen_regs, r13);
-    OFFSET(XREGS_r12, struct xen_regs, r12);
-    OFFSET(XREGS_rbp, struct xen_regs, rbp);
-    OFFSET(XREGS_rbx, struct xen_regs, rbx);
-    OFFSET(XREGS_r11, struct xen_regs, r11);
-    OFFSET(XREGS_r10, struct xen_regs, r10);
-    OFFSET(XREGS_r9, struct xen_regs, r9);
-    OFFSET(XREGS_r8, struct xen_regs, r8);
-    OFFSET(XREGS_rax, struct xen_regs, rax);
-    OFFSET(XREGS_rcx, struct xen_regs, rcx);
-    OFFSET(XREGS_rdx, struct xen_regs, rdx);
-    OFFSET(XREGS_rsi, struct xen_regs, rsi);
-    OFFSET(XREGS_rdi, struct xen_regs, rdi);
-    OFFSET(XREGS_error_code, struct xen_regs, error_code);
-    OFFSET(XREGS_entry_vector, struct xen_regs, entry_vector);
-    OFFSET(XREGS_rip, struct xen_regs, rip);
-    OFFSET(XREGS_cs, struct xen_regs, cs);
-    OFFSET(XREGS_eflags, struct xen_regs, eflags);
-    OFFSET(XREGS_rsp, struct xen_regs, rsp);
-    OFFSET(XREGS_ss, struct xen_regs, ss);
-    OFFSET(XREGS_kernel_sizeof, struct xen_regs, es);
-    DEFINE(XREGS_user_sizeof, sizeof(struct xen_regs));
+    OFFSET(UREGS_r15, struct cpu_user_regs, r15);
+    OFFSET(UREGS_r14, struct cpu_user_regs, r14);
+    OFFSET(UREGS_r13, struct cpu_user_regs, r13);
+    OFFSET(UREGS_r12, struct cpu_user_regs, r12);
+    OFFSET(UREGS_rbp, struct cpu_user_regs, rbp);
+    OFFSET(UREGS_rbx, struct cpu_user_regs, rbx);
+    OFFSET(UREGS_r11, struct cpu_user_regs, r11);
+    OFFSET(UREGS_r10, struct cpu_user_regs, r10);
+    OFFSET(UREGS_r9, struct cpu_user_regs, r9);
+    OFFSET(UREGS_r8, struct cpu_user_regs, r8);
+    OFFSET(UREGS_rax, struct cpu_user_regs, rax);
+    OFFSET(UREGS_rcx, struct cpu_user_regs, rcx);
+    OFFSET(UREGS_rdx, struct cpu_user_regs, rdx);
+    OFFSET(UREGS_rsi, struct cpu_user_regs, rsi);
+    OFFSET(UREGS_rdi, struct cpu_user_regs, rdi);
+    OFFSET(UREGS_error_code, struct cpu_user_regs, error_code);
+    OFFSET(UREGS_entry_vector, struct cpu_user_regs, entry_vector);
+    OFFSET(UREGS_rip, struct cpu_user_regs, rip);
+    OFFSET(UREGS_cs, struct cpu_user_regs, cs);
+    OFFSET(UREGS_eflags, struct cpu_user_regs, eflags);
+    OFFSET(UREGS_rsp, struct cpu_user_regs, rsp);
+    OFFSET(UREGS_ss, struct cpu_user_regs, ss);
+    OFFSET(UREGS_kernel_sizeof, struct cpu_user_regs, es);
+    DEFINE(UREGS_user_sizeof, sizeof(struct cpu_user_regs));
     BLANK();
 
     OFFSET(EDOMAIN_processor, struct exec_domain, processor);

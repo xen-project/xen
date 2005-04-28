@@ -15,7 +15,7 @@ extern void arch_do_createdomain(struct exec_domain *ed);
 extern void arch_do_boot_vcpu(struct exec_domain *ed);
 
 extern int  arch_set_info_guest(
-    struct exec_domain *d, full_execution_context_t *c);
+    struct exec_domain *d, struct vcpu_guest_context *c);
 
 extern void free_perdomain_pt(struct domain *d);
 

@@ -29,9 +29,10 @@ static inline int kernel_text_address(unsigned long addr)
 void show_guest_stack(void)
 {
     int i;
-    execution_context_t *ec = get_execution_context();
-    unsigned long *stack = (unsigned long *)ec->esp;
-    printk("Guest EIP is %08x\n   ", ec->eip);
+    struct cpu_user_regs *regs = get_cpu_user_regs();
+    unsigned long *stack = (unsigned long *)regs->esp;
+
+    printk("Guest EIP is %08x\n   ", regs->eip);
 
     for ( i = 0; i < kstack_depth_to_print; i++ )
     {
@@ -89,7 +90,7 @@ void show_stack(unsigned long *esp)
     show_trace( esp );
 }
 
-void show_registers(struct xen_regs *regs)
+void show_registers(struct cpu_user_regs *regs)
 {
     unsigned long ss, ds, es, fs, gs, cs;
     unsigned long eip, esp, eflags;
@@ -215,9 +216,9 @@ asmlinkage void do_double_fault(void)
 }
 
 BUILD_SMP_INTERRUPT(deferred_nmi, TRAP_deferred_nmi)
-asmlinkage void smp_deferred_nmi(struct xen_regs regs)
+asmlinkage void smp_deferred_nmi(struct cpu_user_regs regs)
 {
-    asmlinkage void do_nmi(struct xen_regs *, unsigned long);
+    asmlinkage void do_nmi(struct cpu_user_regs *, unsigned long);
     ack_APIC_irq();
     do_nmi(&regs, 0);
 }

@@ -267,7 +267,7 @@ void touch_nmi_watchdog (void)
         alert_counter[i] = 0;
 }
 
-void nmi_watchdog_tick (struct xen_regs * regs)
+void nmi_watchdog_tick (struct cpu_user_regs * regs)
 {
     int sum, cpu = smp_processor_id();
 

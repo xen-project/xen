@@ -519,7 +519,7 @@ HYPERVISOR_vm_assist(
 
 static inline int
 HYPERVISOR_boot_vcpu(
-    unsigned long vcpu, full_execution_context_t *ctxt)
+    unsigned long vcpu, vcpu_guest_context_t *ctxt)
 {
     int ret;
     unsigned long ign1, ign2;

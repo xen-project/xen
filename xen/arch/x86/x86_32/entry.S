@@ -76,7 +76,7 @@
  * and we set it to the fixed value.
  *
  * We also need the room, especially because orig_eax field is used 
- * by do_IRQ(). Compared the xen_regs, we skip pushing for the following:
+ * by do_IRQ(). Compared the cpu_user_regs, we skip pushing for the following:
  *   (10) u32 gs;                 
  *   (9)  u32 fs;
  *   (8)  u32 ds;
@@ -99,7 +99,7 @@
         pushl $VMX_MONITOR_EFLAGS; \
         popf; \
         subl $(NR_SKIPPED_REGS*4), %esp; \
-        movl $0, 0xc(%esp); /* eflags==0 identifies xen_regs as VMX guest */ \
+        movl $0, 0xc(%esp); /* eflags==0 identifies cpu_user_regs as VMX guest */ \
         pushl %eax; \
         pushl %ebp; \
         pushl %edi; \
@@ -174,12 +174,12 @@ vmx_process_softirqs:
 
         ALIGN
 restore_all_guest:
-        testl $X86_EFLAGS_VM,XREGS_eflags(%esp)
+        testl $X86_EFLAGS_VM,UREGS_eflags(%esp)
         jnz  restore_all_vm86
-FLT1:   movl XREGS_ds(%esp),%ds
-FLT2:   movl XREGS_es(%esp),%es
-FLT3:   movl XREGS_fs(%esp),%fs
-FLT4:   movl XREGS_gs(%esp),%gs
+FLT1:   movl UREGS_ds(%esp),%ds
+FLT2:   movl UREGS_es(%esp),%es
+FLT3:   movl UREGS_fs(%esp),%fs
+FLT4:   movl UREGS_gs(%esp),%gs
 restore_all_vm86:
         popl %ebx
         popl %ecx
@@ -193,13 +193,13 @@ FLT5:   iret
 .section .fixup,"ax"
 FIX5:   subl  $28,%esp
         pushl 28(%esp)                 # error_code/entry_vector
-        movl  %eax,XREGS_eax+4(%esp)
-        movl  %ebp,XREGS_ebp+4(%esp)
-        movl  %edi,XREGS_edi+4(%esp)
-        movl  %esi,XREGS_esi+4(%esp)
-        movl  %edx,XREGS_edx+4(%esp)
-        movl  %ecx,XREGS_ecx+4(%esp)
-        movl  %ebx,XREGS_ebx+4(%esp)
+        movl  %eax,UREGS_eax+4(%esp)
+        movl  %ebp,UREGS_ebp+4(%esp)
+        movl  %edi,UREGS_edi+4(%esp)
+        movl  %esi,UREGS_esi+4(%esp)
+        movl  %edx,UREGS_edx+4(%esp)
+        movl  %ecx,UREGS_ecx+4(%esp)
+        movl  %ebx,UREGS_ebx+4(%esp)
 FIX1:   SET_XEN_SEGMENTS(a)
         movl  %eax,%fs
         movl  %eax,%gs
@@ -224,10 +224,10 @@ failsafe_callback:
         movw  $TBF_FAILSAFE,TRAPBOUNCE_flags(%edx)
         call  create_bounce_frame
         xorl  %eax,%eax
-        movl  %eax,XREGS_ds(%esp)
-        movl  %eax,XREGS_es(%esp)
-        movl  %eax,XREGS_fs(%esp)
-        movl  %eax,XREGS_gs(%esp)
+        movl  %eax,UREGS_ds(%esp)
+        movl  %eax,UREGS_es(%esp)
+        movl  %eax,UREGS_fs(%esp)
+        movl  %eax,UREGS_gs(%esp)
         jmp   test_all_events
 .previous
 .section __pre_ex_table,"a"
@@ -262,7 +262,7 @@ ENTRY(hypercall)
         andl $(NR_hypercalls-1),%eax
         PERFC_INCR(PERFC_hypercalls, %eax)
         call *SYMBOL_NAME(hypercall_table)(,%eax,4)
-        movl %eax,XREGS_eax(%esp)       # save the return value
+        movl %eax,UREGS_eax(%esp)       # save the return value
 
 test_all_events:
         xorl %ecx,%ecx
@@ -301,41 +301,41 @@ process_softirqs:
 /* CREATE A BASIC EXCEPTION FRAME ON GUEST OS (RING-1) STACK:            */
 /*   {EIP, CS, EFLAGS, [ESP, SS]}                                        */
 /* %edx == trap_bounce, %ebx == struct exec_domain                       */
-/* %eax,%ecx are clobbered. %gs:%esi contain new XREGS_ss/XREGS_esp. */
+/* %eax,%ecx are clobbered. %gs:%esi contain new UREGS_ss/UREGS_esp. */
 create_bounce_frame:
-        movl XREGS_eflags+4(%esp),%ecx
-        movb XREGS_cs+4(%esp),%cl
+        movl UREGS_eflags+4(%esp),%ecx
+        movb UREGS_cs+4(%esp),%cl
         testl $(2|X86_EFLAGS_VM),%ecx
         jz   ring1 /* jump if returning to an existing ring-1 activation */
         movl EDOMAIN_kernel_sp(%ebx),%esi
 FLT6:   movl EDOMAIN_kernel_ss(%ebx),%gs
-        testl $X86_EFLAGS_VM,XREGS_eflags+4(%esp)
+        testl $X86_EFLAGS_VM,UREGS_eflags+4(%esp)
         jz   nvm86_1
         subl $16,%esi       /* push ES/DS/FS/GS (VM86 stack frame) */
-        movl XREGS_es+4(%esp),%eax
+        movl UREGS_es+4(%esp),%eax
 FLT7:   movl %eax,%gs:(%esi)
-        movl XREGS_ds+4(%esp),%eax
+        movl UREGS_ds+4(%esp),%eax
 FLT8:   movl %eax,%gs:4(%esi)
-        movl XREGS_fs+4(%esp),%eax
+        movl UREGS_fs+4(%esp),%eax
 FLT9:   movl %eax,%gs:8(%esi)
-        movl XREGS_gs+4(%esp),%eax
+        movl UREGS_gs+4(%esp),%eax
 FLT10:  movl %eax,%gs:12(%esi)
 nvm86_1:subl $8,%esi        /* push SS/ESP (inter-priv iret) */
-        movl XREGS_esp+4(%esp),%eax
+        movl UREGS_esp+4(%esp),%eax
 FLT11:  movl %eax,%gs:(%esi) 
-        movl XREGS_ss+4(%esp),%eax
+        movl UREGS_ss+4(%esp),%eax
 FLT12:  movl %eax,%gs:4(%esi) 
         jmp 1f
 ring1:  /* obtain ss/esp from oldss/oldesp -- a ring-1 activation exists */
-        movl XREGS_esp+4(%esp),%esi
-FLT13:  movl XREGS_ss+4(%esp),%gs 
+        movl UREGS_esp+4(%esp),%esi
+FLT13:  movl UREGS_ss+4(%esp),%gs 
 1:      /* Construct a stack frame: EFLAGS, CS/EIP */
         subl $12,%esi
-        movl XREGS_eip+4(%esp),%eax
+        movl UREGS_eip+4(%esp),%eax
 FLT14:  movl %eax,%gs:(%esi) 
-        movl XREGS_cs+4(%esp),%eax
+        movl UREGS_cs+4(%esp),%eax
 FLT15:  movl %eax,%gs:4(%esi) 
-        movl XREGS_eflags+4(%esp),%eax
+        movl UREGS_eflags+4(%esp),%eax
 FLT16:  movl %eax,%gs:8(%esi)
         movb TRAPBOUNCE_flags(%edx),%cl
         test $TBF_EXCEPTION_ERRCODE,%cl
@@ -351,7 +351,7 @@ FLT18:  movl %eax,%gs:(%esi)
 1:      testb $TBF_FAILSAFE,%cl
         jz   2f
         subl $16,%esi                # add DS/ES/FS/GS to failsafe stack frame
-        testl $X86_EFLAGS_VM,XREGS_eflags+4(%esp)
+        testl $X86_EFLAGS_VM,UREGS_eflags+4(%esp)
         jz   nvm86_2
         xorl %eax,%eax               # VM86: we write zero selector values
 FLT19:  movl %eax,%gs:(%esi) 
@@ -359,30 +359,30 @@ FLT20:  movl %eax,%gs:4(%esi)
 FLT21:  movl %eax,%gs:8(%esi) 
 FLT22:  movl %eax,%gs:12(%esi)
         jmp  2f
-nvm86_2:movl XREGS_ds+4(%esp),%eax   # non-VM86: write real selector values
+nvm86_2:movl UREGS_ds+4(%esp),%eax   # non-VM86: write real selector values
 FLT23:  movl %eax,%gs:(%esi) 
-        movl XREGS_es+4(%esp),%eax
+        movl UREGS_es+4(%esp),%eax
 FLT24:  movl %eax,%gs:4(%esi)
-        movl XREGS_fs+4(%esp),%eax
+        movl UREGS_fs+4(%esp),%eax
 FLT25:  movl %eax,%gs:8(%esi) 
-        movl XREGS_gs+4(%esp),%eax
+        movl UREGS_gs+4(%esp),%eax
 FLT26:  movl %eax,%gs:12(%esi)
-2:      testl $X86_EFLAGS_VM,XREGS_eflags+4(%esp)
+2:      testl $X86_EFLAGS_VM,UREGS_eflags+4(%esp)
         jz   nvm86_3
         xorl %eax,%eax      /* zero DS-GS, just as a real CPU would */
-        movl %eax,XREGS_ds+4(%esp)
-        movl %eax,XREGS_es+4(%esp)
-        movl %eax,XREGS_fs+4(%esp)
-        movl %eax,XREGS_gs+4(%esp)
+        movl %eax,UREGS_ds+4(%esp)
+        movl %eax,UREGS_es+4(%esp)
+        movl %eax,UREGS_fs+4(%esp)
+        movl %eax,UREGS_gs+4(%esp)
 nvm86_3:/* Rewrite our stack frame and return to ring 1. */
         /* IA32 Ref. Vol. 3: TF, VM, RF and NT flags are cleared on trap. */
-        andl $0xfffcbeff,XREGS_eflags+4(%esp)
-        movl %gs,XREGS_ss+4(%esp)
-        movl %esi,XREGS_esp+4(%esp)
+        andl $0xfffcbeff,UREGS_eflags+4(%esp)
+        movl %gs,UREGS_ss+4(%esp)
+        movl %esi,UREGS_esp+4(%esp)
         movzwl TRAPBOUNCE_cs(%edx),%eax
-        movl %eax,XREGS_cs+4(%esp)
+        movl %eax,UREGS_cs+4(%esp)
         movl TRAPBOUNCE_eip(%edx),%eax
-        movl %eax,XREGS_eip+4(%esp)
+        movl %eax,UREGS_eip+4(%esp)
         movb $0,TRAPBOUNCE_flags(%edx)
         ret
 .section __ex_table,"a"
@@ -410,8 +410,8 @@ process_guest_exception_and_events:
         ALIGN
 ENTRY(ret_from_intr)
         GET_CURRENT(%ebx)
-        movl  XREGS_eflags(%esp),%eax
-        movb  XREGS_cs(%esp),%al
+        movl  UREGS_eflags(%esp),%eax
+        movb  UREGS_cs(%esp),%al
         testl $(3|X86_EFLAGS_VM),%eax
         jnz   test_all_events
         jmp   restore_all_xen
@@ -422,26 +422,26 @@ ENTRY(divide_error)
 error_code:
         SAVE_ALL_NOSEGREGS(a)
         SET_XEN_SEGMENTS(a)
-        testb $X86_EFLAGS_IF>>8,XREGS_eflags+1(%esp)
+        testb $X86_EFLAGS_IF>>8,UREGS_eflags+1(%esp)
         jz    exception_with_ints_disabled
         sti                             # re-enable interrupts
         xorl  %eax,%eax
-        movw  XREGS_entry_vector(%esp),%ax
+        movw  UREGS_entry_vector(%esp),%ax
         movl  %esp,%edx
-	pushl %edx			# push the xen_regs pointer
+	pushl %edx			# push the cpu_user_regs pointer
 	GET_CURRENT(%ebx)
         PERFC_INCR(PERFC_exceptions, %eax)
 	call  *SYMBOL_NAME(exception_table)(,%eax,4)
         addl  $4,%esp
-        movl  XREGS_eflags(%esp),%eax
-        movb  XREGS_cs(%esp),%al
+        movl  UREGS_eflags(%esp),%eax
+        movb  UREGS_cs(%esp),%al
         testl $(3|X86_EFLAGS_VM),%eax
 	jz    restore_all_xen
         jmp   process_guest_exception_and_events
 
 exception_with_ints_disabled:
-        movl  XREGS_eflags(%esp),%eax
-        movb  XREGS_cs(%esp),%al
+        movl  UREGS_eflags(%esp),%eax
+        movb  UREGS_cs(%esp),%al
         testl $(3|X86_EFLAGS_VM),%eax   # interrupts disabled outside Xen?
         jnz   FATAL_exception_with_ints_disabled
         pushl %esp
@@ -449,21 +449,21 @@ exception_with_ints_disabled:
         addl  $4,%esp
         testl %eax,%eax                 # no fixup code for faulting EIP?
         jz    FATAL_exception_with_ints_disabled
-        movl  %eax,XREGS_eip(%esp)
+        movl  %eax,UREGS_eip(%esp)
         movl  %esp,%esi
         subl  $4,%esp
         movl  %esp,%edi
-        movl  $XREGS_kernel_sizeof/4,%ecx
+        movl  $UREGS_kernel_sizeof/4,%ecx
         rep;  movsl                     # make room for error_code/entry_vector
-        movl  XREGS_error_code(%esp),%eax # error_code/entry_vector
-        movl  %eax,XREGS_kernel_sizeof(%esp)
+        movl  UREGS_error_code(%esp),%eax # error_code/entry_vector
+        movl  %eax,UREGS_kernel_sizeof(%esp)
         jmp   restore_all_xen           # return to fixup code
 
 FATAL_exception_with_ints_disabled:
         xorl  %esi,%esi
-        movw  XREGS_entry_vector(%esp),%si
+        movw  UREGS_entry_vector(%esp),%si
         movl  %esp,%edx
-	pushl %edx			# push the xen_regs pointer
+	pushl %edx			# push the cpu_user_regs pointer
         pushl %esi                      # push the trapnr (entry vector)
         call  SYMBOL_NAME(fatal_trap)
         ud2
@@ -557,8 +557,8 @@ ENTRY(nmi)
         # In all other cases we bail without touching DS-GS, as we have
         # interrupted an enclosing Xen activation in tricky prologue or
         # epilogue code.
-        movl  XREGS_eflags(%esp),%eax
-        movb  XREGS_cs(%esp),%al
+        movl  UREGS_eflags(%esp),%eax
+        movb  UREGS_cs(%esp),%al
         testl $(3|X86_EFLAGS_VM),%eax
         jnz   do_watchdog_tick
         movl  %ds,%eax
@@ -608,8 +608,8 @@ nmi_parity_err:
         push %edx
         call SYMBOL_NAME(mem_parity_error)
         addl $4,%esp
-nmi_out:movl  %ss:XREGS_eflags(%esp),%eax
-        movb  %ss:XREGS_cs(%esp),%al
+nmi_out:movl  %ss:UREGS_eflags(%esp),%eax
+        movb  %ss:UREGS_cs(%esp),%al
         testl $(3|X86_EFLAGS_VM),%eax
         jz    restore_all_xen
         movl  $(__HYPERVISOR_DS),%edx
@@ -657,27 +657,27 @@ do_switch_vm86:
         addl $4,%esp
 
         # GS:ESI == Ring-1 stack activation
-        movl XREGS_esp(%esp),%esi
-VFLT1:  movl XREGS_ss(%esp),%gs
+        movl UREGS_esp(%esp),%esi
+VFLT1:  movl UREGS_ss(%esp),%gs
 
         # ES:EDI == Ring-0 stack activation
-        leal XREGS_eip(%esp),%edi
+        leal UREGS_eip(%esp),%edi
 
         # Restore the hypercall-number-clobbered EAX on our stack frame
 VFLT2:  movl %gs:(%esi),%eax
-        movl %eax,XREGS_eax(%esp)
+        movl %eax,UREGS_eax(%esp)
         addl $4,%esi
         	
       	# Copy the VM86 activation from the ring-1 stack to the ring-0 stack
-        movl $(XREGS_user_sizeof-XREGS_eip)/4,%ecx
+        movl $(UREGS_user_sizeof-UREGS_eip)/4,%ecx
 VFLT3:  movl %gs:(%esi),%eax
         stosl
         addl $4,%esi
         loop VFLT3
 
         # Fix up EFLAGS: IOPL=0, IF=1, VM=1
-        andl $~X86_EFLAGS_IOPL,XREGS_eflags(%esp)
-        orl  $X86_EFLAGS_IF|X86_EFLAGS_VM,XREGS_eflags(%esp)
+        andl $~X86_EFLAGS_IOPL,UREGS_eflags(%esp)
+        orl  $X86_EFLAGS_IF|X86_EFLAGS_VM,UREGS_eflags(%esp)
         
         jmp test_all_events
 

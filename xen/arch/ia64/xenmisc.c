@@ -66,7 +66,7 @@ void grant_table_destroy(struct domain *d)
 	return;
 }
 
-struct pt_regs *get_execution_context(void) { return ia64_task_regs(current); }
+struct pt_regs *get_cpu_user_regs(void) { return ia64_task_regs(current); }
 
 void raise_actimer_softirq(void)
 {

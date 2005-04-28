@@ -191,7 +191,9 @@ extern void dodgy_tsc(void);
 /*
  * Generic CPUID function
  */
-static inline void cpuid(int op, unsigned int *eax, unsigned int *ebx, unsigned int *ecx, unsigned int *edx)
+static inline void cpuid(
+    int op, unsigned int *eax, unsigned int *ebx,
+    unsigned int *ecx, unsigned int *edx)
 {
     __asm__("cpuid"
             : "=a" (*eax),
@@ -405,7 +407,7 @@ long set_fast_trap(struct exec_domain *p, int idx);
 
 #endif
 
-extern int gpf_emulate_4gb(struct xen_regs *regs);
+extern int gpf_emulate_4gb(struct cpu_user_regs *regs);
 
 extern void write_ptbase(struct exec_domain *ed);
 
@@ -499,9 +501,9 @@ extern inline void prefetchw(const void *x)
 void show_guest_stack();
 void show_trace(unsigned long *esp);
 void show_stack(unsigned long *esp);
-void show_registers(struct xen_regs *regs);
+void show_registers(struct cpu_user_regs *regs);
 void show_page_walk(unsigned long addr);
-asmlinkage void fatal_trap(int trapnr, struct xen_regs *regs);
+asmlinkage void fatal_trap(int trapnr, struct cpu_user_regs *regs);
 
 #endif /* !__ASSEMBLY__ */
 

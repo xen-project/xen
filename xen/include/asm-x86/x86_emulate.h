@@ -139,7 +139,7 @@ x86_emulate_write_std(
     unsigned long val,
     unsigned int bytes);
 
-struct xen_regs;
+struct cpu_user_regs;
 
 /*
  * x86_emulate_memop: Emulate an instruction that faulted attempting to
@@ -152,7 +152,7 @@ struct xen_regs;
  */
 extern int
 x86_emulate_memop(
-    struct xen_regs *regs,
+    struct cpu_user_regs *regs,
     unsigned long cr2,
     struct x86_mem_emulator *ops,
     int mode);
@@ -164,6 +164,6 @@ x86_emulate_memop(
  */
 extern void *
 decode_register(
-    u8 modrm_reg, struct xen_regs *regs, int highbyte_regs);
+    u8 modrm_reg, struct cpu_user_regs *regs, int highbyte_regs);
 
 #endif /* __X86_EMULATE_H__ */
