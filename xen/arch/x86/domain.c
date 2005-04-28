@@ -50,6 +50,16 @@ struct percpu_ctxt {
 } __cacheline_aligned;
 static struct percpu_ctxt percpu_ctxt[NR_CPUS];
 
+static void continue_idle_task(struct exec_domain *ed)
+{
+    reset_stack_and_jump(idle_loop);
+}
+
+static void continue_nonidle_task(struct exec_domain *ed)
+{
+    reset_stack_and_jump(ret_from_intr);
+}
+
 static void default_idle(void)
 {
     local_irq_disable();
@@ -74,24 +84,32 @@ static __attribute_used__ void idle_loop(void)
     }
 }
 
+static void __startup_cpu_idle_loop(struct exec_domain *ed)
+{
+    /* Signal to boot CPU that we are done. */
+    init_idle();
+
+    /* Start normal idle loop. */
+    ed->arch.schedule_tail = continue_idle_task;
+    reset_stack_and_jump(idle_loop);
+}
+
 void startup_cpu_idle_loop(void)
 {
+    struct exec_domain *ed = current;
+
     /* Just some sanity to ensure that the scheduler is set up okay. */
-    ASSERT(current->domain->id == IDLE_DOMAIN_ID);
-    percpu_ctxt[smp_processor_id()].curr_ed = current;
-    set_bit(smp_processor_id(), &current->domain->cpuset);
-    domain_unpause_by_systemcontroller(current->domain);
+    ASSERT(ed->domain->id == IDLE_DOMAIN_ID);
+    percpu_ctxt[smp_processor_id()].curr_ed = ed;
+    set_bit(smp_processor_id(), &ed->domain->cpuset);
+    domain_unpause_by_systemcontroller(ed->domain);
+
+    ed->arch.schedule_tail = __startup_cpu_idle_loop;
     raise_softirq(SCHEDULE_SOFTIRQ);
     do_softirq();
 
-    /*
-     * Declares CPU setup done to the boot processor.
-     * Therefore memory barrier to ensure state is visible.
-     */
-    smp_mb();
-    init_idle();
-
-    idle_loop();
+    /* End up in __startup_cpu_idle_loop, not here. */
+    BUG();
 }
 
 static long no_idt[2];
@@ -219,16 +237,6 @@ void free_perdomain_pt(struct domain *d)
 #endif
 }
 
-static void continue_idle_task(struct exec_domain *ed)
-{
-    reset_stack_and_jump(idle_loop);
-}
-
-static void continue_nonidle_task(struct exec_domain *ed)
-{
-    reset_stack_and_jump(ret_from_intr);
-}
-
 void arch_do_createdomain(struct exec_domain *ed)
 {
     struct domain *d = ed->domain;
@@ -237,11 +245,7 @@ void arch_do_createdomain(struct exec_domain *ed)
 
     ed->arch.flags = TF_kernel_mode;
 
-    if ( d->id == IDLE_DOMAIN_ID )
-    {
-        ed->arch.schedule_tail = continue_idle_task;
-    }
-    else
+    if ( d->id != IDLE_DOMAIN_ID )
     {
         ed->arch.schedule_tail = continue_nonidle_task;
 
@@ -657,7 +661,7 @@ static void clear_segments(void)
 
 long do_switch_to_user(void)
 {
-    struct cpu_user_regs       *regs = get_cpu_user_regs();
+    struct cpu_user_regs  *regs = get_cpu_user_regs();
     struct switch_to_user  stu;
     struct exec_domain    *ed = current;
 
