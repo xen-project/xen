@@ -600,7 +600,7 @@ void __init cpu_init (void)
 	 * Set up the per-thread TLS descriptor cache:
 	 */
 	memcpy(thread->tls_array, &get_cpu_gdt_table(cpu)[GDT_ENTRY_TLS_MIN],
-		GDT_ENTRY_TLS_ENTRIES * 8);
+	       GDT_ENTRY_TLS_ENTRIES * 8);
 
 	cpu_gdt_init(&cpu_gdt_descr[cpu]);
 

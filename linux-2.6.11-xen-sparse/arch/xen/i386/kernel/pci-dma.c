@@ -44,13 +44,13 @@ xen_contig_memory(unsigned long vstart, unsigned int order)
 
 	/* 1. Zap current PTEs, giving away the underlying pages. */
 	for (i = 0; i < (1<<order); i++) {
-		pgd = pgd_offset_k(   (vstart + (i*PAGE_SIZE)));
-		pud = pud_offset(pgd, (vstart + (i*PAGE_SIZE)));
-		pmd = pmd_offset(pud, (vstart + (i*PAGE_SIZE)));
-		pte = pte_offset_kernel(pmd, (vstart + (i*PAGE_SIZE)));
-		pfn = pte->pte_low >> PAGE_SHIFT;
-		HYPERVISOR_update_va_mapping(
-			vstart + (i*PAGE_SIZE), __pte_ma(0), 0);
+		pgd = pgd_offset_k(vstart + (i*PAGE_SIZE));
+		pud = pud_offset(pgd, vstart + (i*PAGE_SIZE));
+		pmd = pmd_offset(pud, vstart + (i*PAGE_SIZE));
+		pte = pte_offset_kernel(pmd, vstart + (i*PAGE_SIZE));
+		pfn = pte_val_ma(*pte) >> PAGE_SHIFT;
+		HYPERVISOR_update_va_mapping(vstart + (i*PAGE_SIZE),
+					     __pte_ma(0), 0);
 		phys_to_machine_mapping[(__pa(vstart)>>PAGE_SHIFT)+i] =
 			INVALID_P2M_ENTRY;
 		if (HYPERVISOR_dom_mem_op(MEMOP_decrease_reservation, 
@@ -61,17 +61,10 @@ xen_contig_memory(unsigned long vstart, unsigned int order)
 				  &pfn, 1, order) != 1) BUG();
 	/* 3. Map the new extent in place of old pages. */
 	for (i = 0; i < (1<<order); i++) {
-		pgd = pgd_offset_k(   (vstart + (i*PAGE_SIZE)));
-		pud = pud_offset(pgd, (vstart + (i*PAGE_SIZE)));
-		pmd = pmd_offset(pud, (vstart + (i*PAGE_SIZE)));
-		pte = pte_offset_kernel(pmd, (vstart + (i*PAGE_SIZE)));
-		HYPERVISOR_update_va_mapping(
-			vstart + (i*PAGE_SIZE),
+		HYPERVISOR_update_va_mapping(vstart + (i*PAGE_SIZE),
 			__pte_ma(((pfn+i)<<PAGE_SHIFT)|__PAGE_KERNEL), 0);
-		xen_machphys_update(
-			pfn+i, (__pa(vstart)>>PAGE_SHIFT)+i);
-		phys_to_machine_mapping[(__pa(vstart)>>PAGE_SHIFT)+i] =
-			pfn+i;
+		xen_machphys_update(pfn+i, (__pa(vstart)>>PAGE_SHIFT)+i);
+		phys_to_machine_mapping[(__pa(vstart)>>PAGE_SHIFT)+i] = pfn+i;
 	}
 	flush_tlb_all();
 
@@ -82,11 +75,9 @@ void *dma_alloc_coherent(struct device *dev, size_t size,
 			   dma_addr_t *dma_handle, int gfp)
 {
 	void *ret;
+	struct dma_coherent_mem *mem = dev ? dev->dma_mem : NULL;
 	unsigned int order = get_order(size);
 	unsigned long vstart;
-
-	struct dma_coherent_mem *mem = dev ? dev->dma_mem : NULL;
-
 	/* ignore region specifiers */
 	gfp &= ~(__GFP_DMA | __GFP_HIGHMEM);
 
@@ -108,14 +99,13 @@ void *dma_alloc_coherent(struct device *dev, size_t size,
 
 	vstart = __get_free_pages(gfp, order);
 	ret = (void *)vstart;
-	if (ret == NULL)
-		return ret;
 
-	xen_contig_memory(vstart, order);
+	if (ret != NULL) {
+		xen_contig_memory(vstart, order);
 
-	memset(ret, 0, size);
-	*dma_handle = virt_to_bus(ret);
-
+		memset(ret, 0, size);
+		*dma_handle = virt_to_bus(ret);
+	}
 	return ret;
 }
 

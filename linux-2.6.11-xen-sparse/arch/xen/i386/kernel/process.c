@@ -329,7 +329,7 @@ int copy_thread(int nr, unsigned long clone_flags, unsigned long esp,
 		desc->b = LDT_entry_b(&info);
 	}
 
-        p->thread.io_pl = current->thread.io_pl;
+	p->thread.io_pl = current->thread.io_pl;
 
 	err = 0;
  out:
@@ -445,7 +445,7 @@ struct task_struct fastcall * __switch_to(struct task_struct *prev_p, struct tas
 	physdev_op_t iopl_op, iobmp_op;
 	multicall_entry_t _mcl[8], *mcl = _mcl;
 
-        /* XEN NOTE: FS/GS saved in switch_mm(), not here. */
+	/* XEN NOTE: FS/GS saved in switch_mm(), not here. */
 
 	/*
 	 * This is basically '__unlazy_fpu', except that we queue a
