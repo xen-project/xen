@@ -90,7 +90,8 @@ cp_patch arch/ia64/kernel/ivt.S arch/ia64/ivt.S ivt.S
 cp_patch arch/ia64/kernel/setup.c arch/ia64/setup.c setup.c
 cp_patch arch/ia64/kernel/time.c arch/ia64/time.c time.c
 cp_patch arch/ia64/kernel/unaligned.c arch/ia64/unaligned.c unaligned.c
-cp_patch arch/ia64/kernel/vmlinux.lds.S arch/ia64/xen.lds.S lds.S
+#cp_patch arch/ia64/kernel/vmlinux.lds.S arch/ia64/xen.lds.S lds.S
+softlink arch/ia64/kernel/vmlinux.lds.S arch/ia64/xen.lds.S
 
 #cp_patch mm/bootmem.c arch/ia64/mm_bootmem.c mm_bootmem.c
 #cp_patch mm/page_alloc.c arch/ia64/page_alloc.c page_alloc.c
