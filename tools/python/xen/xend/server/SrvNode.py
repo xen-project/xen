@@ -2,7 +2,7 @@
 
 import os
 
-from SrvDir import SrvDir
+from xen.web.SrvDir import SrvDir
 from xen.xend import sxp
 from xen.xend import XendNode
 from xen.xend.Args import FormFn
@@ -35,26 +35,22 @@ class SrvNode(SrvDir):
         return self.perform(req)
 
     def render_GET(self, req):
-        try:
-            if self.use_sxp(req):
-                req.setHeader("Content-Type", sxp.mime_type)
-                sxp.show(['node'] + self.info(), out=req)
-            else:
-                url = req.prePathURL()
-                if not url.endswith('/'):
-                    url += '/'
-                req.write('<html><head></head><body>')
-                self.print_path(req)
-                req.write('<ul>')
-                for d in self.info():
-                    req.write('<li> %10s: %s' % (d[0], str(d[1])))
-                req.write('<li><a href="%sdmesg">Xen dmesg output</a>' % url)
-                req.write('<li><a href="%slog>Xend log</a>' % url)
-                req.write('</ul>')
-                req.write('</body></html>')
-            return ''
-        except Exception, ex:
-            self._perform_err(ex, req)
+        if self.use_sxp(req):
+            req.setHeader("Content-Type", sxp.mime_type)
+            sxp.show(['node'] + self.info(), out=req)
+        else:
+            url = req.prePathURL()
+            if not url.endswith('/'):
+                url += '/'
+            req.write('<html><head></head><body>')
+            self.print_path(req)
+            req.write('<ul>')
+            for d in self.info():
+                req.write('<li> %10s: %s' % (d[0], str(d[1])))
+            req.write('<li><a href="%sdmesg">Xen dmesg output</a>' % url)
+            req.write('<li><a href="%slog>Xend log</a>' % url)
+            req.write('</ul>')
+            req.write('</body></html>')
             
     def info(self):
         return self.xn.info()

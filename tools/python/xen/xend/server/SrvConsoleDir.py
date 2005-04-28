@@ -31,20 +31,16 @@ class SrvConsoleDir(SrvDir):
         return v
 
     def render_GET(self, req):
-        try:
-            if self.use_sxp(req):
-                req.setHeader("Content-Type", sxp.mime_type)
-                self.ls_console(req, 1)
-            else:
-                req.write("<html><head></head><body>")
-                self.print_path(req)
-                self.ls(req)
-                self.ls_console(req)
-                #self.form(req.wfile)
-                req.write("</body></html>")
-            return ''
-        except Exception, ex:
-            self._perform_err(ex, req)
+        if self.use_sxp(req):
+            req.setHeader("Content-Type", sxp.mime_type)
+            self.ls_console(req, 1)
+        else:
+            req.write("<html><head></head><body>")
+            self.print_path(req)
+            self.ls(req)
+            self.ls_console(req)
+            #self.form(req.wfile)
+            req.write("</body></html>")
 
     def ls_console(self, req, use_sxp=0):
         url = req.prePathURL()

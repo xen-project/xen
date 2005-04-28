@@ -1,6 +1,7 @@
 # Copyright (C) 2004 Mike Wray <mike.wray@hp.com>
 
 import traceback
+import threading
 
 import errno
 import sys
@@ -8,12 +9,8 @@ import socket
 import time
 import types
 
-from twisted.internet import reactor
-from twisted.internet import defer
-#defer.Deferred.debug = 1
-from twisted.internet.protocol import Protocol
-from twisted.internet.protocol import ClientFactory
-from twisted.python.failure import Failure
+from xen.web import reactor
+from xen.web.protocol import Protocol, ClientFactory
 
 import sxp
 import XendDB
@@ -37,11 +34,13 @@ class Xfrd(Protocol):
         self.parser = sxp.Parser()
         self.xinfo = xinfo
 
-    def connectionMade(self):
+    def connectionMade(self, addr=None):
         # Send hello.
         self.request(['xfr.hello', XFR_PROTO_MAJOR, XFR_PROTO_MINOR])
         # Send request.
         self.xinfo.request(self)
+        # Run the transport mainLoop which reads from the peer.
+        self.transport.mainLoop()
 
     def request(self, req):
         sxp.show(req, out=self.transport)
@@ -60,7 +59,6 @@ class Xfrd(Protocol):
         if self.parser.at_eof():
             self.loseConnection()
             
-
 class XfrdClientFactory(ClientFactory):
     """Factory for clients of the migration/save daemon xfrd.
     """
@@ -68,7 +66,33 @@ class XfrdClientFactory(ClientFactory):
     def __init__(self, xinfo):
         #ClientFactory.__init__(self)
         self.xinfo = xinfo
+        self.readyCond = threading.Condition()
+        self.ready = False
+        self.err = None
 
+    def start(self):
+        print 'XfrdClientFactory>start>'
+        reactor.connectTCP('localhost', XFRD_PORT, self)
+        try:
+            self.readyCond.acquire()
+            while not self.ready:
+                self.readyCond.wait()
+        finally:
+            self.readyCond.release()
+        print 'XfrdClientFactory>start>', 'err=', self.err
+        if self.err:
+            raise self.err
+        return 0
+
+    def notifyReady(self):
+        try:
+            self.readyCond.acquire()
+            self.ready = True
+            self.err = self.xinfo.error_summary()
+            self.readyCond.notify()
+        finally:
+            self.readyCond.release()
+            
     def startedConnecting(self, connector):
         pass
 
@@ -76,10 +100,72 @@ class XfrdClientFactory(ClientFactory):
         return Xfrd(self.xinfo)
 
     def clientConnectionLost(self, connector, reason):
-        pass
+        print "XfrdClientFactory>clientConnectionLost>", reason
+        self.notifyReady()
 
     def clientConnectionFailed(self, connector, reason):
+        print "XfrdClientFactory>clientConnectionFailed>", reason
         self.xinfo.error(reason)
+        self.notifyReady()
+
+class SuspendHandler:
+
+    def __init__(self, xinfo, vmid, timeout):
+        self.xinfo = xinfo
+        self.vmid = vmid
+        self.timeout = timeout
+        self.readyCond = threading.Condition()
+        self.ready = False
+        self.err = None
+
+    def start(self):
+        self.subscribe(on=True)
+        timer = reactor.callLater(self.timeout, self.onTimeout)
+        try:
+            self.readyCond.acquire()
+            while not self.ready:
+                self.readyCond.wait()
+        finally:
+            self.readyCond.release()
+            self.subscribe(on=False)
+            timer.cancel()
+        if self.err:
+            raise XendError(self.err)
+
+    def notifyReady(self, err=None):
+        try:
+            self.readyCond.acquire()
+            if not self.ready:
+                self.ready = True
+                self.err = err
+                self.readyCond.notify()
+        finally:
+            self.readyCond.release()
+
+    def subscribe(self, on=True):
+        # Subscribe to 'suspended' events so we can tell when the
+        # suspend completes. Subscribe to 'died' events so we can tell if
+        # the domain died.
+        if on:
+            action = eserver.subscribe
+        else:
+            action = eserver.unsubscribe
+        action('xend.domain.suspended', self.onSuspended)
+        action('xend.domain.died', self.onDied)
+
+    def onSuspended(self, e, v):
+        if v[1] != self.vmid: return
+        print 'SuspendHandler>onSuspended>', e, v
+        self.notifyReady()
+                
+    def onDied(self, e, v):
+        if v[1] != self.vmid: return
+        print 'SuspendHandler>onDied>', e, v
+        self.notifyReady('Domain %s died while suspending' % self.vmid)
+
+    def onTimeout(self):
+         print 'SuspendHandler>onTimeout>'
+         self.notifyReady('Domain %s suspend timed out' % self.vmid)
 
 class XfrdInfo:
     """Abstract class for info about a session with xfrd.
@@ -88,18 +174,17 @@ class XfrdInfo:
 
     """Suspend timeout (seconds).
     We set a timeout because suspending a domain can hang."""
-    timeout = 10
+    timeout = 30
 
     def __init__(self):
         from xen.xend import XendDomain
         self.xd = XendDomain.instance()
-        self.deferred = defer.Deferred()
         self.suspended = {}
         self.paused = {}
         self.state = 'init'
         # List of errors encountered.
         self.errors = []
-        
+            
     def vmconfig(self):
         dominfo = self.xd.domain_get(self.src_dom)
         if dominfo:
@@ -110,11 +195,8 @@ class XfrdInfo:
 
     def add_error(self, err):
         """Add an error to the error list.
-        Returns the error added (which may have been unwrapped if it
-        was a Twisted Failure).
+        Returns the error added.
         """
-        while isinstance(err, Failure):
-            err = err.value
         if err not in self.errors:
             self.errors.append(err)
         return err
@@ -122,6 +204,8 @@ class XfrdInfo:
     def error_summary(self, msg=None):
         """Get a XendError summarising the errors (if any).
         """
+        if not self.errors:
+            return None
         if msg is None:
             msg = "errors"
         if self.errors:
@@ -136,34 +220,27 @@ class XfrdInfo:
         return self.errors
 
     def error(self, err):
+        print 'XfrdInfo>error>', err
         self.state = 'error'
         self.add_error(err)
-        if not self.deferred.called:
-            self.deferred.errback(self.error_summary())
 
     def dispatch(self, xfrd, val):
-        
-        def cbok(v):
-            if v is None: return
-            sxp.show(v, out=xfrd.transport)
-
-        def cberr(err):
-            v = ['xfr.err', errno.EINVAL]
-            sxp.show(v, out=xfrd.transport)
-            self.error(err)
-
+        print 'XfrdInfo>dispatch>', val
         op = sxp.name(val)
         op = op.replace('.', '_')
         if op.startswith('xfr_'):
             fn = getattr(self, op, self.unknown)
         else:
             fn = self.unknown
-        val = fn(xfrd, val)
-        if isinstance(val, defer.Deferred):
-            val.addCallback(cbok)
-            val.addErrback(cberr)
-        else:
-            cbok(val)
+        try:
+            val = fn(xfrd, val)
+            if val:
+                sxp.show(val, out=xfrd.transport)
+        except Exception, err:
+            print 'XfrdInfo>dispatch> error:', err
+            val = ['xfr.err', errno.EINVAL]
+            sxp.show(val, out=xfrd.transport)
+            self.error(err)
 
     def unknown(self, xfrd, val):
         xfrd.loseConnection()
@@ -172,6 +249,7 @@ class XfrdInfo:
     def xfr_err(self, xfrd, val):
         # If we get an error with non-zero code the operation failed.
         # An error with code zero indicates hello success.
+        print 'XfrdInfo>xfr_err>', val
         v = sxp.child0(val)
         err = int(sxp.child0(val))
         if not err: return
@@ -220,50 +298,19 @@ class XfrdInfo:
         return ['xfr.err', val]
 
     def xfr_vm_suspend(self, xfrd, val):
-        """Suspend a domain. Suspending takes time, so we return
-        a Deferred that is called when the suspend completes.
+        """Suspend a domain.
         Suspending can hang, so we set a timeout and fail if it
         takes too long.
         """
         try:
             vmid = sxp.child0(val)
-            d = defer.Deferred()
-            # Subscribe to 'suspended' events so we can tell when the
-            # suspend completes. Subscribe to 'died' events so we can tell if
-            # the domain died. Set a timeout and error handler so the subscriptions
-            # will be cleaned up if suspending hangs or there is an error.
-            def onSuspended(e, v):
-                if v[1] != vmid: return
-                subscribe(on=0)
-                if not d.called:
-                    d.callback(v)
-                
-            def onDied(e, v):
-                if v[1] != vmid: return
-                if not d.called:
-                    d.errback(XendError('Domain %s died while suspending' % vmid))
-                
-            def subscribe(on=1):
-                if on:
-                    action = eserver.subscribe
-                else:
-                    action = eserver.unsubscribe
-                action('xend.domain.suspended', onSuspended)
-                action('xend.domain.died', onDied)
-
-            def cberr(err):
-                subscribe(on=0)
-                self.add_error("suspend failed")
-                self.add_error(err)
-                return err
-
-            d.addErrback(cberr)
-            d.setTimeout(self.timeout)
-            subscribe()
+            h = SuspendHandler(self, vmid, self.timeout)
             val = self.xd.domain_shutdown(vmid, reason='suspend')
             self.suspended[vmid] = 1
-            return d
+            h.start()
+            print 'xfr_vm_suspend> suspended', vmid
         except Exception, err:
+            print 'xfr_vm_suspend> err', err
             self.add_error("suspend failed")
             self.add_error(err)
             traceback.print_exc()
@@ -271,6 +318,7 @@ class XfrdInfo:
         return ['xfr.err', val]
 
     def connectionLost(self, reason=None):
+        print 'XfrdInfo>connectionLost>', reason
         for vmid in self.suspended:
             try:
                 self.xd.domain_destroy(vmid)
@@ -336,10 +384,9 @@ class XendMigrateInfo(XfrdInfo):
         self.state = 'ok'
         self.dst_dom = dom
         self.xd.domain_destroy(self.src_dom)
-        if not self.deferred.called:
-            self.deferred.callback(self)
 
     def connectionLost(self, reason=None):
+        print 'XendMigrateInfo>connectionLost>', reason
         XfrdInfo.connectionLost(self, reason)
         if self.state =='ok':
             log.info('Migrate OK: ' + str(self.sxpr()))
@@ -386,10 +433,9 @@ class XendSaveInfo(XfrdInfo):
     def xfr_save_ok(self, xfrd, val):
         self.state = 'ok'
         self.xd.domain_destroy(self.src_dom)
-        if not self.deferred.called:
-            self.deferred.callback(self)
 
     def connectionLost(self, reason=None):
+        print 'XendSaveInfo>connectionLost>', reason
         XfrdInfo.connectionLost(self, reason)
         if self.state =='ok':
             log.info('Save OK: ' + str(self.sxpr()))
@@ -427,8 +473,6 @@ class XendRestoreInfo(XfrdInfo):
         dom = int(sxp.child0(val))
         dominfo = self.xd.domain_get(dom)
         self.state = 'ok'
-        if not self.deferred.called:
-            self.deferred.callback(dominfo)
          
     def connectionLost(self, reason=None):
         XfrdInfo.connectionLost(self, reason)
@@ -493,29 +537,16 @@ class XendMigrate:
 
     def session_begin(self, info):
         """Add the session to the table and start it.
-        Set up callbacks to remove the session from the table
-        when it finishes.
+        Remove the session from the table when it finishes.
 
         @param info: session
-        @return: deferred
         """
-        dfr = defer.Deferred()
-        def cbok(val):
-            self._delete_session(info.xid)
-            if not dfr.called:
-                dfr.callback(val)
-            return val
-        def cberr(err):
-            self._delete_session(info.xid)
-            if not dfr.called:
-                dfr.errback(err)
-            return err
         self._add_session(info)
-        info.deferred.addCallback(cbok)
-        info.deferred.addErrback(cberr)
-        xcf = XfrdClientFactory(info)
-        reactor.connectTCP('localhost', XFRD_PORT, xcf)
-        return dfr
+        try:
+            xcf = XfrdClientFactory(info)
+            return xcf.start()
+        finally:
+            self._delete_session(info.xid)
     
     def migrate_begin(self, dominfo, host, port=XFRD_PORT, live=0, resource=0):
         """Begin to migrate a domain to another host.
@@ -523,7 +554,6 @@ class XendMigrate:
         @param dominfo:  domain info
         @param host: destination host
         @param port: destination port
-        @return: deferred
         """
         xid = self.nextid()
         info = XendMigrateInfo(xid, dominfo, host, port, live, resource)
@@ -534,7 +564,6 @@ class XendMigrate:
 
         @param dominfo:  domain info
         @param file: destination file
-        @return: deferred
         """
         xid = self.nextid()
         info = XendSaveInfo(xid, dominfo, file)

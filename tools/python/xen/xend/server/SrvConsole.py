@@ -2,7 +2,7 @@
 
 from xen.xend import sxp
 from xen.xend import XendConsole
-from SrvDir import SrvDir
+from xen.web.SrvDir import SrvDir
 
 class SrvConsole(SrvDir):
     """An individual console.
@@ -21,22 +21,18 @@ class SrvConsole(SrvDir):
         return self.perform(req)
         
     def render_GET(self, req):
-        try:
-            if self.use_sxp(req):
-                req.setHeader("Content-Type", sxp.mime_type)
-                sxp.show(self.info.sxpr(), out=req)
-            else:
-                req.write('<html><head></head><body>')
-                self.print_path(req)
-                #self.ls()
-                req.write('<p>%s</p>' % self.info)
-                req.write('<p><a href="%s">Connect to domain %d</a></p>'
-                          % (self.info.uri(), self.info.dom))
-                self.form(req)
-                req.write('</body></html>')
-            return ''
-        except Exception, ex:
-            self._perform_err(ex, req)
+        if self.use_sxp(req):
+            req.setHeader("Content-Type", sxp.mime_type)
+            sxp.show(self.info.sxpr(), out=req)
+        else:
+            req.write('<html><head></head><body>')
+            self.print_path(req)
+            #self.ls()
+            req.write('<p>%s</p>' % self.info)
+            req.write('<p><a href="%s">Connect to domain %d</a></p>'
+                      % (self.info.uri(), self.info.dom))
+            self.form(req)
+            req.write('</body></html>')
 
     def form(self, req):
         req.write('<form method="post" action="%s">' % req.prePathURL())

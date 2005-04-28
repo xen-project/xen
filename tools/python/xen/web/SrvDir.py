@@ -1,28 +1,26 @@
 # Copyright (C) 2004 Mike Wray <mike.wray@hp.com>
 
-from twisted.protocols import http
-from twisted.web import error
+import types
 
 from xen.xend import sxp
+from xen.xend import PrettyPrint
+from xen.xend.Args import ArgError
 from xen.xend.XendError import XendError
+#from xen.xend.XendLogging import log
 
-from SrvBase import SrvBase
+import resource
+import http
 
-class SrvError(error.ErrorPage):
-
-    def render(self, request):
-        val = error.ErrorPage.render(self, request)
-        request.setResponseCode(self.code, self.brief)
-        return val
+from xen.web.SrvBase import SrvBase
 
 class SrvConstructor:
     """Delayed constructor for sub-servers.
     Does not import the sub-server class or create the object until needed.
     """
-    
+
     def __init__(self, klass):
         """Create a constructor. It is assumed that the class
-        should be imported as 'import klass from klass'.
+        should be imported as 'from xen.xend.server.klass import klass'.
 
         klass	name of its class
         """
@@ -34,7 +32,7 @@ class SrvConstructor:
         necessary.
         """
         if not self.obj:
-            exec 'from %s import %s' % (self.klass, self.klass)
+            exec 'from xen.xend.server.%s import %s' % (self.klass, self.klass)
             klassobj = eval(self.klass)
             self.obj = klassobj()
         return self.obj
@@ -50,7 +48,7 @@ class SrvDir(SrvBase):
         self.order = []
 
     def noChild(self, msg):
-        return SrvError(http.NOT_FOUND, msg, msg)
+        return resource.ErrorPage(http.NOT_FOUND, msg=msg)
 
     def getChild(self, x, req):
         if x == '': return self
@@ -59,21 +57,24 @@ class SrvDir(SrvBase):
         except XendError, ex:
             return self.noChild(str(ex))
         if val is None:
-            return self.noChild('Not found ' + str(x))
+            return self.noChild('Not found: ' + str(x))
         else:
             return val
 
     def get(self, x):
         val = self.table.get(x)
-        if val is not None:
+        if isinstance(val, SrvConstructor):
             val = val.getobj()
         return val
 
-    def add(self, x, xclass = None):
-        if xclass is None:
-            xclass = 'SrvDir'
-        self.table[x] = SrvConstructor(xclass)
+    def add(self, x, v=None):
+        if v is None:
+            v = 'SrvDir'
+        if isinstance(v, types.StringType):
+            v = SrvConstructor(v)
+        self.table[x] = v
         self.order.append(x)
+        return v
 
     def render_GET(self, req):
         try:

@@ -25,34 +25,40 @@
 # todo Support security settings etc. in the config file.
 # todo Support command-line args.
 
-from twisted.web import server, static
-from twisted.web import resource, script
-from twisted.internet import reactor
+from threading import Thread
 
-from xen.xend import XendRoot
-xroot = XendRoot.instance()
+from xen.web.httpserver import HttpServer, UnixHttpServer
 
+from xen.xend import XendRoot; xroot = XendRoot.instance()
 from xen.xend import Vifctl
+from xen.web.SrvDir import SrvDir
 
 from SrvRoot import SrvRoot
 
-def create(port=None, interface=None, bridge=0):
-    if port is None:
-        port = xroot.get_xend_port()
-    if interface is None:
-        interface = xroot.get_xend_address()
-    if bridge:
+class XendServers:
+
+    def __init__(self):
+        self.servers = []
+
+    def add(self, server):
+        self.servers.append(server)
+
+    def start(self):
         Vifctl.network('start')
-    root = resource.Resource()
-    xend = SrvRoot()
-    root.putChild('xend', xend)
-    site = server.Site(root)
-    reactor.listenTCP(port, site, interface=interface)
+        for server in self.servers:
+            thread = Thread(target=server.run)
+            thread.start()
 
-def main(port=None, interface=None):
-    create(port, interface)
-    reactor.run()
-
-
-if __name__ == '__main__':
-    main()
+def create():
+    root = SrvDir()
+    root.putChild('xend', SrvRoot())
+    servers = XendServers()
+    if xroot.get_xend_http_server():
+        port = xroot.get_xend_port()
+        interface = xroot.get_xend_address()
+        servers.add(HttpServer(root=root, interface=interface, port=port))
+    if xroot.get_xend_unix_server():
+        path = xroot.get_xend_unix_path()
+        print 'unix path=', path
+        servers.add(UnixHttpServer(path=path, root=root))
+    return servers

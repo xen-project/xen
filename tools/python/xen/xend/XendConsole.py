@@ -1,40 +1,29 @@
 # Copyright (C) 2004 Mike Wray <mike.wray@hp.com>
 
-import socket
 import xen.lowlevel.xc
 xc = xen.lowlevel.xc.new()
 
-import sxp
-import XendRoot
-xroot = XendRoot.instance()
-import XendDB
+import XendRoot; xroot = XendRoot.instance()
 from XendError import XendError
-
-import EventServer
-eserver = EventServer.instance()
-
-from xen.xend.server import SrvDaemon
-daemon = SrvDaemon.instance()
 
 class XendConsole:
 
     def  __init__(self):
-        pass
-        eserver.subscribe('xend.domain.died', self.onDomainDied)
-        eserver.subscribe('xend.domain.destroy', self.onDomainDied)
-
-    def onDomainDied(self, event, val):
         pass
 
     def console_ls(self):
         return [ c.console_port for c in self.consoles() ]
 
     def consoles(self):
-        return daemon.get_consoles()
-    
-    def console_create(self, dom, console_port=None):
-        consinfo = daemon.console_create(dom, console_port=console_port)
-        return consinfo
+        l = []
+        xd = XendRoot.get_component('xen.xend.XendDomain')
+        for vm in xd.domains():
+            ctrl = vm.getDeviceController("console", error=False)
+            if (not ctrl): continue
+            console = ctrl.getDevice(0)
+            if (not console): continue
+            l.append(console)
+        return l
     
     def console_get(self, id):
         id = int(id)

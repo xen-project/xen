@@ -3,9 +3,7 @@
 import traceback
 from StringIO import StringIO
 
-from twisted.protocols import http
-from twisted.web import error
-from twisted.python.failure import Failure
+from xen.web import http
 
 from xen.xend import sxp
 from xen.xend import XendDomain
@@ -13,7 +11,7 @@ from xen.xend.Args import FormFn
 from xen.xend.XendError import XendError
 from xen.xend.XendLogging import log
 
-from SrvDir import SrvDir
+from xen.web.SrvDir import SrvDir
 from SrvDomain import SrvDomain
 
 class SrvDomainDir(SrvDir):
@@ -62,16 +60,15 @@ class SrvDomainDir(SrvDir):
         if not ok:
             raise XendError(errmsg)
         try:
-            deferred = self.xd.domain_create(config)
-            deferred.addCallback(self._op_create_cb, configstring, req)
-            return deferred
+            dominfo = self.xd.domain_create(config)
+            return self._op_create_cb(dominfo, configstring, req)
         except Exception, ex:
             print 'op_create> Exception creating domain:'
             traceback.print_exc()
             raise XendError("Error creating domain: " + str(ex))
 
     def _op_create_cb(self, dominfo, configstring, req):
-        """Callback to handle deferred domain creation.
+        """Callback to handle domain creation.
         """
         dom = dominfo.name
         domurl = "%s/%s" % (req.prePathURL(), dom)
@@ -93,15 +90,13 @@ class SrvDomainDir(SrvDir):
     def op_restore(self, op, req):
         """Restore a domain from file.
 
-        @return: deferred
         """
+        return req.threadRequest(self.do_restore, op, req)
+
+    def do_restore(self, op, req):
         fn = FormFn(self.xd.domain_restore,
                     [['file', 'str']])
-        deferred = fn(req.args)
-        deferred.addCallback(self._op_restore_cb, req)
-        return deferred
-
-    def _op_restore_cb(self, dominfo, req):
+        dominfo = fn(req.args)
         dom = dominfo.name
         domurl = "%s/%s" % (req.prePathURL(), dom)
         req.setResponseCode(http.CREATED)
@@ -120,20 +115,16 @@ class SrvDomainDir(SrvDir):
         return self.perform(req)
 
     def render_GET(self, req):
-        try:
-            if self.use_sxp(req):
-                req.setHeader("Content-Type", sxp.mime_type)
-                self.ls_domain(req, 1)
-            else:
-                req.write("<html><head></head><body>")
-                self.print_path(req)
-                self.ls(req)
-                self.ls_domain(req)
-                self.form(req)
-                req.write("</body></html>")
-            return ''
-        except Exception, ex:
-            self._perform_err(ex, req)
+        if self.use_sxp(req):
+            req.setHeader("Content-Type", sxp.mime_type)
+            self.ls_domain(req, 1)
+        else:
+            req.write("<html><head></head><body>")
+            self.print_path(req)
+            self.ls(req)
+            self.ls_domain(req)
+            self.form(req)
+            req.write("</body></html>")
 
     def ls_domain(self, req, use_sxp=0):
         url = req.prePathURL()

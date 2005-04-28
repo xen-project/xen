@@ -3,8 +3,10 @@
 
 """
 import string
+from threading import Lock
 
-from twisted.internet import reactor
+#from twisted.internet import reactor
+from xen.web import reactor
 
 # subscribe a.b.c h: map a.b.c -> h
 # subscribe a.b.* h: map a.b.* -> h
@@ -38,20 +40,30 @@ class EventServer:
         self.handlers = {}
         self.run = run
         self.queue = []
+        self.lock = Lock()
 
     def start(self):
         """Enable event handling. Sends any queued events.
         """
-        self.run = 1
-        for (e,v) in self.queue:
+        try:
+            self.lock.acquire()
+            self.run = 1
+            queue = self.queue
+            self.queue = []
+        finally:
+            self.lock.release()
+        for (e,v) in queue:
             self.inject(e, v)
-        self.queue = []
 
     def stop(self):
         """Suspend event handling. Events injected while suspended
         are queued until we are started again.
         """
-        self.run = 0
+        try:
+            self.lock.acquire()
+            self.run = 0
+        finally:
+            self.lock.release()
 
     def subscribe(self, event, handler):
         """Subscribe to an event. For example 'a.b.c.d'.
@@ -62,21 +74,29 @@ class EventServer:
         event	event name
         handler event handler fn(event, val)
         """
-        hl = self.handlers.get(event)
-        if hl is None:
-            self.handlers[event] = [handler]
-        else:
-            hl.append(handler)
+        try:
+            self.lock.acquire()
+            hl = self.handlers.get(event)
+            if hl is None:
+                self.handlers[event] = [handler]
+            else:
+                hl.append(handler)
+        finally:
+            self.lock.release()
 
     def unsubscribe_all(self, event=None):
         """Unsubscribe all handlers for a given event, or all handlers.
 
         event	event (optional)
         """
-        if event == None:
-            self.handlers.clear()
-        elif event in self.handlers:
-            del self.handlers[event]
+        try:
+            self.lock.acquire()
+            if event == None:
+                self.handlers.clear()
+            elif event in self.handlers:
+                del self.handlers[event]
+        finally:
+            self.lock.release()
         
     def unsubscribe(self, event, handler):
         """Unsubscribe a given event and handler.
@@ -84,11 +104,15 @@ class EventServer:
         event	event
         handler handler
         """
-        hl = self.handlers.get(event)
-        if hl is None:
-            return
-        if handler in hl:
-            hl.remove(handler)
+        try:
+            self.lock.acquire()
+            hl = self.handlers.get(event)
+            if hl is None:
+                return
+            if handler in hl:
+                hl.remove(handler)
+        finally:
+            self.lock.release()
 
     def inject(self, event, val, async=1):
         """Inject an event. Handlers for it are called if running, otherwise
@@ -97,13 +121,18 @@ class EventServer:
         event	event type
         val	event value
         """
-        if self.run:
-            if async:
-                reactor.callLater(0, self.call_handlers, event, val)
-            else:
-                self.notify_handlers(event, val)
+        try:
+            self.lock.acquire()
+            if not self.run:
+                self.queue.append( (event, val) )
+                return
+        finally:
+            self.lock.release()
+            
+        if async:
+            reactor.callLater(0, self.call_handlers, event, val)
         else:
-            self.queue.append( (event, val) )
+            self.call_handlers(event, val)
 
     def call_handlers(self, event, val):
         """Internal method to call event handlers.
@@ -121,13 +150,19 @@ class EventServer:
         event	event type
         val	event value
         """
-        hl = self.handlers.get(key)
-        if hl is None:
-            return
-        # Copy the handler list so that handlers can call
-        # subscribe/unsubscribe safely - python list iteration
-        # is not safe against list modification.
-        for h in hl[:]:
+        try:
+            self.lock.acquire()
+            hl = self.handlers.get(key)
+            if hl is None:
+                return
+            # Copy the handler list so that handlers can call
+            # subscribe/unsubscribe safely - python list iteration
+            # is not safe against list modification.
+            hl = hl[:]
+        finally:
+            self.lock.release()
+        # Must not hold the lock while calling the handlers.
+        for h in hl:
             try:
                 h(event, val)
             except:
