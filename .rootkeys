@@ -1084,6 +1084,7 @@
 425ae516maKAsHBJVSzs19cdRgt3Nw xen/arch/ia64/patch/linux-2.6.11/cpumask.h
 425ae516cGqvMzGtihTEsQXAXsuOhQ xen/arch/ia64/patch/linux-2.6.11/efi.c
 425ae516Y1A4q4_Kfre3qnDj7lbHJg xen/arch/ia64/patch/linux-2.6.11/entry.S
+425ae516txAP-owjzpTJ7ThfzWR8nw xen/arch/ia64/patch/linux-2.6.11/hardirq.h
 425ae516PDO1ESDHXHVeDNvlqUfmdQ xen/arch/ia64/patch/linux-2.6.11/head.S
 425ae516JR7HWvt1zxJ-wLvEWmJGgg xen/arch/ia64/patch/linux-2.6.11/hpsim_ssc.h
 425ae516AHRNmaVuZjJY-9YjmKRDqg xen/arch/ia64/patch/linux-2.6.11/interrupt.h
@@ -1092,7 +1093,6 @@
 425ae516qQA5dHuIybqfN3nEzM_Zvg xen/arch/ia64/patch/linux-2.6.11/ivt.S
 425ae516atiECmpn_6nZDw4kkmbJ6g xen/arch/ia64/patch/linux-2.6.11/kregs.h
 425ae516lwlYwHG1Jv93kC3tfU5caw xen/arch/ia64/patch/linux-2.6.11/lds.S
-425ae516txAP-owjzpTJ7ThfzWR8nw xen/arch/ia64/patch/linux-2.6.11/linuxhardirq.h
 425ae516Je2zI-Iw30_uGhvUYdlCZQ xen/arch/ia64/patch/linux-2.6.11/mca_asm.h
 425ae5160-9wHxh0tOnIjavEjt6W0A xen/arch/ia64/patch/linux-2.6.11/minstate.h
 425ae516N7SaORdbodDr90tmtCzYXw xen/arch/ia64/patch/linux-2.6.11/mm_contig.c
