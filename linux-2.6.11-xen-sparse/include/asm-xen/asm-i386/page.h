@@ -111,7 +111,7 @@ typedef struct { unsigned long pgprot; } pgprot_t;
 static inline unsigned long pgd_val(pgd_t x)
 {
 	unsigned long ret = x.pgd;
-	if (ret) ret = machine_to_phys(ret) | 1;
+	if (ret) ret = machine_to_phys(ret);
 	return ret;
 }
 #define pgprot_val(x)	((x).pgprot)
