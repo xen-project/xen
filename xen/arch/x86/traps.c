@@ -150,11 +150,12 @@ static inline int do_trap(int trapnr, char *str,
         goto xen_fault;
 
 #ifndef NDEBUG
-    if ( (ed->arch.traps[trapnr].address == 0) && (ed->domain->id == 0) )
+    if ( (ed->arch.guest_context.trap_ctxt[trapnr].address == 0) &&
+         (ed->domain->id == 0) )
         goto xen_fault;
 #endif
 
-    ti = current->arch.traps + trapnr;
+    ti = &current->arch.guest_context.trap_ctxt[trapnr];
     tb->flags = TBF_EXCEPTION;
     tb->cs    = ti->cs;
     tb->eip   = ti->address;
@@ -224,7 +225,7 @@ asmlinkage int do_int3(struct cpu_user_regs *regs)
         panic("CPU%d FATAL TRAP: vector = 3 (Int3)\n", smp_processor_id());
     } 
 
-    ti = current->arch.traps + 3;
+    ti = &current->arch.guest_context.trap_ctxt[TRAP_int3];
     tb->flags = TBF_EXCEPTION;
     tb->cs    = ti->cs;
     tb->eip   = ti->address;
@@ -245,7 +246,7 @@ void propagate_page_fault(unsigned long addr, u16 error_code)
     struct exec_domain *ed = current;
     struct trap_bounce *tb = &ed->arch.trap_bounce;
 
-    ti = ed->arch.traps + 14;
+    ti = &ed->arch.guest_context.trap_ctxt[TRAP_page_fault];
     tb->flags = TBF_EXCEPTION | TBF_EXCEPTION_ERRCODE | TBF_EXCEPTION_CR2;
     tb->cr2        = addr;
     tb->error_code = error_code;
@@ -303,7 +304,8 @@ asmlinkage int do_page_fault(struct cpu_user_regs *regs)
     }
 
     if ( unlikely(addr >= LDT_VIRT_START(ed)) && 
-         (addr < (LDT_VIRT_START(ed) + (ed->arch.ldt_ents*LDT_ENTRY_SIZE))) )
+         (addr < (LDT_VIRT_START(ed) + 
+                  (ed->arch.guest_context.ldt_ents*LDT_ENTRY_SIZE))) )
     {
         /*
          * Copy a mapping from the guest's LDT, if it is valid. Otherwise we
@@ -312,7 +314,7 @@ asmlinkage int do_page_fault(struct cpu_user_regs *regs)
         extern int map_ldt_shadow_page(unsigned int);
         LOCK_BIGLOCK(d);
         off  = addr - LDT_VIRT_START(ed);
-        addr = ed->arch.ldt_base + off;
+        addr = ed->arch.guest_context.ldt_base + off;
         ret = map_ldt_shadow_page(off >> PAGE_SHIFT);
         UNLOCK_BIGLOCK(d);
         if ( likely(ret) )
@@ -323,7 +325,8 @@ asmlinkage int do_page_fault(struct cpu_user_regs *regs)
         goto xen_fault;
 
 #ifndef NDEBUG
-    if ( (ed->arch.traps[TRAP_page_fault].address == 0) && (d->id == 0) )
+    if ( (ed->arch.guest_context.trap_ctxt[TRAP_page_fault].address == 0) &&
+         (d->id == 0) )
         goto xen_fault;
 #endif
 
@@ -781,7 +784,7 @@ asmlinkage int do_general_protection(struct cpu_user_regs *regs)
     if ( (regs->error_code & 3) == 2 )
     {
         /* This fault must be due to <INT n> instruction. */
-        ti = current->arch.traps + (regs->error_code>>3);
+        ti = &current->arch.guest_context.trap_ctxt[regs->error_code>>3];
         if ( PERMIT_SOFTINT(TI_GET_DPL(ti), ed, regs) )
         {
             tb->flags = TBF_EXCEPTION;
@@ -803,13 +806,13 @@ asmlinkage int do_general_protection(struct cpu_user_regs *regs)
 #endif
 
 #ifndef NDEBUG
-    if ( (ed->arch.traps[TRAP_gp_fault].address == 0) &&
+    if ( (ed->arch.guest_context.trap_ctxt[TRAP_gp_fault].address == 0) &&
          (ed->domain->id == 0) )
         goto gp_in_kernel;
 #endif
 
     /* Pass on GPF as is. */
-    ti = current->arch.traps + 13;
+    ti = &current->arch.guest_context.trap_ctxt[TRAP_gp_fault];
     tb->flags      = TBF_EXCEPTION | TBF_EXCEPTION_ERRCODE;
     tb->error_code = regs->error_code;
  finish_propagation:
@@ -916,21 +919,20 @@ asmlinkage int math_state_restore(struct cpu_user_regs *regs)
     /* Prevent recursion. */
     clts();
 
-    if ( !test_bit(EDF_USEDFPU, &current->ed_flags) )
+    if ( !test_and_set_bit(EDF_USEDFPU, &current->ed_flags) )
     {
         if ( test_bit(EDF_DONEFPUINIT, &current->ed_flags) )
             restore_fpu(current);
         else
             init_fpu();
-        set_bit(EDF_USEDFPU, &current->ed_flags); /* so we fnsave on switch_to() */
     }
 
     if ( test_and_clear_bit(EDF_GUEST_STTS, &current->ed_flags) )
     {
         struct trap_bounce *tb = &current->arch.trap_bounce;
-        tb->flags      = TBF_EXCEPTION;
-        tb->cs         = current->arch.traps[7].cs;
-        tb->eip        = current->arch.traps[7].address;
+        tb->flags = TBF_EXCEPTION;
+        tb->cs    = current->arch.guest_context.trap_ctxt[7].cs;
+        tb->eip   = current->arch.guest_context.trap_ctxt[7].address;
     }
 
     return EXCRET_fault_fixed;
@@ -946,7 +948,7 @@ asmlinkage int do_debug(struct cpu_user_regs *regs)
 
     /* Mask out spurious debug traps due to lazy DR7 setting */
     if ( (condition & (DR_TRAP0|DR_TRAP1|DR_TRAP2|DR_TRAP3)) &&
-         (ed->arch.debugreg[7] == 0) )
+         (ed->arch.guest_context.debugreg[7] == 0) )
     {
         __asm__("mov %0,%%db7" : : "r" (0UL));
         goto out;
@@ -968,11 +970,11 @@ asmlinkage int do_debug(struct cpu_user_regs *regs)
     } 
 
     /* Save debug status register where guest OS can peek at it */
-    ed->arch.debugreg[6] = condition;
+    ed->arch.guest_context.debugreg[6] = condition;
 
     tb->flags = TBF_EXCEPTION;
-    tb->cs    = ed->arch.traps[1].cs;
-    tb->eip   = ed->arch.traps[1].address;
+    tb->cs    = ed->arch.guest_context.trap_ctxt[TRAP_debug].cs;
+    tb->eip   = ed->arch.guest_context.trap_ctxt[TRAP_debug].address;
 
  out:
     return EXCRET_not_a_fault;
@@ -1059,7 +1061,7 @@ void __init trap_init(void)
 long do_set_trap_table(trap_info_t *traps)
 {
     trap_info_t cur;
-    trap_info_t *dst = current->arch.traps;
+    trap_info_t *dst = current->arch.guest_context.trap_ctxt;
     long rc = 0;
 
     LOCK_BIGLOCK(current->domain);
@@ -1163,7 +1165,7 @@ long set_debugreg(struct exec_domain *p, int reg, unsigned long value)
         return -EINVAL;
     }
 
-    p->arch.debugreg[reg] = value;
+    p->arch.guest_context.debugreg[reg] = value;
     return 0;
 }
 
@@ -1175,7 +1177,7 @@ long do_set_debugreg(int reg, unsigned long value)
 unsigned long do_get_debugreg(int reg)
 {
     if ( (reg < 0) || (reg > 7) ) return -EINVAL;
-    return current->arch.debugreg[reg];
+    return current->arch.guest_context.debugreg[reg];
 }
 
 /*

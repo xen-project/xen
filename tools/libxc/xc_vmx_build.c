@@ -565,9 +565,9 @@ int xc_vmx_build(int xc_handle,
     if ( image != NULL )
         free(image);
 
-    ctxt->flags = ECF_VMX_GUEST;
+    ctxt->flags = VGCF_VMX_GUEST;
     /* FPU is set up to default initial state. */
-    memset(ctxt->fpu_ctxt, 0, sizeof(ctxt->fpu_ctxt));
+    memset(&ctxt->fpu_ctxt, 0, sizeof(ctxt->fpu_ctxt));
 
     /* Virtual IDT is empty at start-of-day. */
     for ( i = 0; i < 256; i++ )
@@ -588,8 +588,8 @@ int xc_vmx_build(int xc_handle,
 
     /* Ring 1 stack is the initial stack. */
 /*
-    ctxt->kernel_ss  = FLAT_KERNEL_DS;
-    ctxt->kernel_esp = vstartinfo_start;
+    ctxt->kernel_ss = FLAT_KERNEL_DS;
+    ctxt->kernel_sp = vstartinfo_start;
 */
     /* No debugging. */
     memset(ctxt->debugreg, 0, sizeof(ctxt->debugreg));

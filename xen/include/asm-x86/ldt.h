@@ -10,7 +10,7 @@ static inline void load_LDT(struct exec_domain *ed)
     struct desc_struct *desc;
     unsigned long ents;
 
-    if ( (ents = ed->arch.ldt_ents) == 0 )
+    if ( (ents = ed->arch.guest_context.ldt_ents) == 0 )
     {
         __asm__ __volatile__ ( "lldt %%ax" : : "a" (0) );
     }

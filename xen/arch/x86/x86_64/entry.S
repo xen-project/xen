@@ -161,9 +161,6 @@ test_all_events:
  *
  * We also need the room, especially because orig_eax field is used 
  * by do_IRQ(). Compared the cpu_user_regs, we skip pushing for the following:
- *   (13) u64 gs_base_user;                 
- *   (12) u64 gs_base_kernel;                 
- *   (11) u64 fs_base;                 
  *   (10) u64 gs;                 
  *   (9)  u64 fs;
  *   (8)  u64 ds;
@@ -176,9 +173,6 @@ test_all_events:
  *   (2)  u64 rip;
  * (2/1)  u32 entry_vector;
  * (1/1)  u32 error_code;
- * However, get_stack_bottom() actually returns 64 bytes before the real
- * bottom of the stack to allow space for:
- * domain pointer, DS, ES, FS, GS. Therefore, we effectively skip 6 registers.
  */
 #define VMX_MONITOR_RFLAGS	0x202 /* IF on */
 #define NR_SKIPPED_REGS	6	/* See the above explanation */

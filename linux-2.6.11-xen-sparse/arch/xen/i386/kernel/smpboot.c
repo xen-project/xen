@@ -876,7 +876,7 @@ static int __init do_boot_cpu(int apicid)
 	ctxt.user_regs.eflags = (1<<9) | (1<<2) | (idle->thread.io_pl<<12);
 
 	/* FPU is set up to default initial state. */
-	memset(ctxt.fpu_ctxt, 0, sizeof(ctxt.fpu_ctxt));
+	memset(&ctxt.fpu_ctxt, 0, sizeof(ctxt.fpu_ctxt));
 
 	/* Virtual IDT is empty at start-of-day. */
 	for ( i = 0; i < 256; i++ )
@@ -903,8 +903,8 @@ static int __init do_boot_cpu(int apicid)
 	}
 
 	/* Ring 1 stack is the initial stack. */
-	ctxt.kernel_ss  = __KERNEL_DS;
-	ctxt.kernel_esp = idle->thread.esp;
+	ctxt.kernel_ss = __KERNEL_DS;
+	ctxt.kernel_sp = idle->thread.esp;
 
 	/* Callback handlers. */
 	ctxt.event_callback_cs     = __KERNEL_CS;

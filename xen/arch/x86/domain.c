@@ -385,64 +385,41 @@ int arch_set_info_guest(
      * #GP. If DS, ES, FS, GS are DPL 0 then they'll be cleared automatically.
      * If SS RPL or DPL differs from CS RPL then we'll #GP.
      */
-    if (!(c->flags & ECF_VMX_GUEST)) 
+    if ( !(c->flags & VGCF_VMX_GUEST) )
+    {
         if ( ((c->user_regs.cs & 3) == 0) ||
              ((c->user_regs.ss & 3) == 0) )
                 return -EINVAL;
+    }
 
     clear_bit(EDF_DONEFPUINIT, &ed->ed_flags);
-    if ( c->flags & ECF_I387_VALID )
+    if ( c->flags & VGCF_I387_VALID )
         set_bit(EDF_DONEFPUINIT, &ed->ed_flags);
 
     ed->arch.flags &= ~TF_kernel_mode;
-    if ( c->flags & ECF_IN_KERNEL )
+    if ( c->flags & VGCF_IN_KERNEL )
         ed->arch.flags |= TF_kernel_mode;
 
-    memcpy(&ed->arch.user_regs,
-           &c->user_regs,
-           sizeof(ed->arch.user_regs));
-
-    memcpy(&ed->arch.i387,
-           &c->fpu_ctxt,
-           sizeof(ed->arch.i387));
+    memcpy(&ed->arch.guest_context, c, sizeof(*c));
 
     /* IOPL privileges are virtualised. */
-    ed->arch.iopl = (ed->arch.user_regs.eflags >> 12) & 3;
-    ed->arch.user_regs.eflags &= ~EF_IOPL;
+    ed->arch.iopl = (ed->arch.guest_context.user_regs.eflags >> 12) & 3;
+    ed->arch.guest_context.user_regs.eflags &= ~EF_IOPL;
 
     /* Clear IOPL for unprivileged domains. */
-    if (!IS_PRIV(d))
-        ed->arch.user_regs.eflags &= 0xffffcfff;
+    if ( !IS_PRIV(d) )
+        ed->arch.guest_context.user_regs.eflags &= 0xffffcfff;
 
-    if (test_bit(EDF_DONEINIT, &ed->ed_flags))
+    if ( test_bit(EDF_DONEINIT, &ed->ed_flags) )
         return 0;
-
-    memcpy(ed->arch.traps,
-           &c->trap_ctxt,
-           sizeof(ed->arch.traps));
 
     if ( (rc = (int)set_fast_trap(ed, c->fast_trap_idx)) != 0 )
         return rc;
 
-    ed->arch.ldt_base = c->ldt_base;
-    ed->arch.ldt_ents = c->ldt_ents;
-
-    ed->arch.kernel_ss = c->kernel_ss;
-    ed->arch.kernel_sp = c->kernel_esp;
-
+    memset(ed->arch.guest_context.debugreg, 0,
+           sizeof(ed->arch.guest_context.debugreg));
     for ( i = 0; i < 8; i++ )
         (void)set_debugreg(ed, i, c->debugreg[i]);
-
-#if defined(__i386__)
-    ed->arch.event_selector    = c->event_callback_cs;
-    ed->arch.event_address     = c->event_callback_eip;
-    ed->arch.failsafe_selector = c->failsafe_callback_cs;
-    ed->arch.failsafe_address  = c->failsafe_callback_eip;
-#elif defined(__x86_64__)
-    ed->arch.event_address     = c->event_callback_eip;
-    ed->arch.failsafe_address  = c->failsafe_callback_eip;
-    ed->arch.syscall_address   = c->syscall_callback_eip;
-#endif
 
     if ( ed->eid == 0 )
         d->vm_assist = c->vm_assist;
@@ -475,7 +452,7 @@ int arch_set_info_guest(
     }
 
 #ifdef CONFIG_VMX
-    if ( c->flags & ECF_VMX_GUEST )
+    if ( c->flags & VGCF_VMX_GUEST )
     {
         int error;
 
@@ -507,7 +484,7 @@ void new_thread(struct exec_domain *d,
                 unsigned long start_stack,
                 unsigned long start_info)
 {
-    struct cpu_user_regs *regs = &d->arch.user_regs;
+    struct cpu_user_regs *regs = &d->arch.guest_context.user_regs;
 
     /*
      * Initial register values:
@@ -557,63 +534,63 @@ void toggle_guest_mode(struct exec_domain *ed)
 
 static void load_segments(struct exec_domain *p, struct exec_domain *n)
 {
+    struct vcpu_guest_context *pctxt = &p->arch.guest_context;
+    struct vcpu_guest_context *nctxt = &n->arch.guest_context;
     int all_segs_okay = 1;
 
     /* Either selector != 0 ==> reload. */
-    if ( unlikely(p->arch.user_regs.ds |
-                  n->arch.user_regs.ds) )
-        all_segs_okay &= loadsegment(ds, n->arch.user_regs.ds);
+    if ( unlikely(pctxt->user_regs.ds | nctxt->user_regs.ds) )
+        all_segs_okay &= loadsegment(ds, nctxt->user_regs.ds);
 
     /* Either selector != 0 ==> reload. */
-    if ( unlikely(p->arch.user_regs.es |
-                  n->arch.user_regs.es) )
-        all_segs_okay &= loadsegment(es, n->arch.user_regs.es);
+    if ( unlikely(pctxt->user_regs.es | nctxt->user_regs.es) )
+        all_segs_okay &= loadsegment(es, nctxt->user_regs.es);
 
     /*
      * Either selector != 0 ==> reload.
      * Also reload to reset FS_BASE if it was non-zero.
      */
-    if ( unlikely(p->arch.user_regs.fs |
-                  p->arch.user_regs.fs_base |
-                  n->arch.user_regs.fs) )
+    if ( unlikely(pctxt->user_regs.fs |
+                  pctxt->fs_base |
+                  nctxt->user_regs.fs) )
     {
-        all_segs_okay &= loadsegment(fs, n->arch.user_regs.fs);
-        if ( p->arch.user_regs.fs ) /* != 0 selector kills fs_base */
-            p->arch.user_regs.fs_base = 0;
+        all_segs_okay &= loadsegment(fs, nctxt->user_regs.fs);
+        if ( pctxt->user_regs.fs ) /* != 0 selector kills fs_base */
+            pctxt->fs_base = 0;
     }
 
     /*
      * Either selector != 0 ==> reload.
      * Also reload to reset GS_BASE if it was non-zero.
      */
-    if ( unlikely(p->arch.user_regs.gs |
-                  p->arch.user_regs.gs_base_user |
-                  n->arch.user_regs.gs) )
+    if ( unlikely(pctxt->user_regs.gs |
+                  pctxt->gs_base_user |
+                  nctxt->user_regs.gs) )
     {
         /* Reset GS_BASE with user %gs? */
-        if ( p->arch.user_regs.gs || !n->arch.user_regs.gs_base_user )
-            all_segs_okay &= loadsegment(gs, n->arch.user_regs.gs);
-        if ( p->arch.user_regs.gs ) /* != 0 selector kills gs_base_user */
-            p->arch.user_regs.gs_base_user = 0;
+        if ( pctxt->user_regs.gs || !nctxt->gs_base_user )
+            all_segs_okay &= loadsegment(gs, nctxt->user_regs.gs);
+        if ( pctxt->user_regs.gs ) /* != 0 selector kills gs_base_user */
+            pctxt->gs_base_user = 0;
     }
 
     /* This can only be non-zero if selector is NULL. */
-    if ( n->arch.user_regs.fs_base )
+    if ( nctxt->fs_base )
         wrmsr(MSR_FS_BASE,
-              n->arch.user_regs.fs_base,
-              n->arch.user_regs.fs_base>>32);
+              nctxt->fs_base,
+              nctxt->fs_base>>32);
 
     /* Most kernels have non-zero GS base, so don't bother testing. */
     /* (This is also a serialising instruction, avoiding AMD erratum #88.) */
     wrmsr(MSR_SHADOW_GS_BASE,
-          n->arch.user_regs.gs_base_kernel,
-          n->arch.user_regs.gs_base_kernel>>32);
+          nctxt->gs_base_kernel,
+          nctxt->gs_base_kernel>>32);
 
     /* This can only be non-zero if selector is NULL. */
-    if ( n->arch.user_regs.gs_base_user )
+    if ( nctxt->gs_base_user )
         wrmsr(MSR_GS_BASE,
-              n->arch.user_regs.gs_base_user,
-              n->arch.user_regs.gs_base_user>>32);
+              nctxt->gs_base_user,
+              nctxt->gs_base_user>>32);
 
     /* If in kernel mode then switch the GS bases around. */
     if ( n->arch.flags & TF_kernel_mode )
@@ -625,24 +602,24 @@ static void load_segments(struct exec_domain *p, struct exec_domain *n)
         unsigned long   *rsp =
             (n->arch.flags & TF_kernel_mode) ?
             (unsigned long *)regs->rsp : 
-            (unsigned long *)n->arch.kernel_sp;
+            (unsigned long *)nctxt->kernel_sp;
 
         if ( !(n->arch.flags & TF_kernel_mode) )
             toggle_guest_mode(n);
         else
             regs->cs &= ~3;
 
-        if ( put_user(regs->ss,             rsp- 1) |
-             put_user(regs->rsp,            rsp- 2) |
-             put_user(regs->rflags,         rsp- 3) |
-             put_user(regs->cs,             rsp- 4) |
-             put_user(regs->rip,            rsp- 5) |
-             put_user(n->arch.user_regs.gs, rsp- 6) |
-             put_user(n->arch.user_regs.fs, rsp- 7) |
-             put_user(n->arch.user_regs.es, rsp- 8) |
-             put_user(n->arch.user_regs.ds, rsp- 9) |
-             put_user(regs->r11,            rsp-10) |
-             put_user(regs->rcx,            rsp-11) )
+        if ( put_user(regs->ss,            rsp- 1) |
+             put_user(regs->rsp,           rsp- 2) |
+             put_user(regs->rflags,        rsp- 3) |
+             put_user(regs->cs,            rsp- 4) |
+             put_user(regs->rip,           rsp- 5) |
+             put_user(nctxt->user_regs.gs, rsp- 6) |
+             put_user(nctxt->user_regs.fs, rsp- 7) |
+             put_user(nctxt->user_regs.es, rsp- 8) |
+             put_user(nctxt->user_regs.ds, rsp- 9) |
+             put_user(regs->r11,           rsp-10) |
+             put_user(regs->rcx,           rsp-11) )
         {
             DPRINTK("Error while creating failsafe callback frame.\n");
             domain_crash();
@@ -653,16 +630,17 @@ static void load_segments(struct exec_domain *p, struct exec_domain *n)
         regs->ss            = __GUEST_SS;
         regs->rsp           = (unsigned long)(rsp-11);
         regs->cs            = __GUEST_CS;
-        regs->rip           = n->arch.failsafe_address;
+        regs->rip           = nctxt->failsafe_callback_eip;
     }
 }
 
-static void save_segments(struct exec_domain *p)
+static void save_segments(struct exec_domain *ed)
 {
-    __asm__ __volatile__ ( "movl %%ds,%0" : "=m" (p->arch.user_regs.ds) );
-    __asm__ __volatile__ ( "movl %%es,%0" : "=m" (p->arch.user_regs.es) );
-    __asm__ __volatile__ ( "movl %%fs,%0" : "=m" (p->arch.user_regs.fs) );
-    __asm__ __volatile__ ( "movl %%gs,%0" : "=m" (p->arch.user_regs.gs) );
+    struct cpu_user_regs *regs = &ed->arch.guest_context.user_regs;
+    __asm__ __volatile__ ( "movl %%ds,%0" : "=m" (regs->ds) );
+    __asm__ __volatile__ ( "movl %%es,%0" : "=m" (regs->es) );
+    __asm__ __volatile__ ( "movl %%fs,%0" : "=m" (regs->fs) );
+    __asm__ __volatile__ ( "movl %%gs,%0" : "=m" (regs->gs) );
 }
 
 static void clear_segments(void)
@@ -695,7 +673,7 @@ long do_switch_to_user(void)
     regs->rsp    = stu.rsp;
     regs->ss     = stu.ss | 3; /* force guest privilege */
 
-    if ( !(stu.flags & ECF_IN_SYSCALL) )
+    if ( !(stu.flags & VGCF_IN_SYSCALL) )
     {
         regs->entry_vector = 0;
         regs->r11 = stu.r11;
@@ -717,8 +695,8 @@ long do_switch_to_user(void)
 static inline void switch_kernel_stack(struct exec_domain *n, unsigned int cpu)
 {
     struct tss_struct *tss = &init_tss[cpu];
-    tss->esp1 = n->arch.kernel_sp;
-    tss->ss1  = n->arch.kernel_ss;
+    tss->esp1 = n->arch.guest_context.kernel_sp;
+    tss->ss1  = n->arch.guest_context.kernel_ss;
 }
 
 #endif
@@ -728,15 +706,15 @@ static inline void switch_kernel_stack(struct exec_domain *n, unsigned int cpu)
 
 static void __context_switch(void)
 {
-    struct cpu_user_regs *stack_ec = get_cpu_user_regs();
+    struct cpu_user_regs *stack_regs = get_cpu_user_regs();
     unsigned int         cpu = smp_processor_id();
     struct exec_domain  *p = percpu_ctxt[cpu].curr_ed;
     struct exec_domain  *n = current;
 
     if ( !is_idle_task(p->domain) )
     {
-        memcpy(&p->arch.user_regs,
-               stack_ec, 
+        memcpy(&p->arch.guest_context.user_regs,
+               stack_regs, 
                CTXT_SWITCH_STACK_BYTES);
         unlazy_fpu(p);
         CLEAR_FAST_TRAP(&p->arch);
@@ -745,20 +723,20 @@ static void __context_switch(void)
 
     if ( !is_idle_task(n->domain) )
     {
-        memcpy(stack_ec,
-               &n->arch.user_regs,
+        memcpy(stack_regs,
+               &n->arch.guest_context.user_regs,
                CTXT_SWITCH_STACK_BYTES);
 
         /* Maybe switch the debug registers. */
-        if ( unlikely(n->arch.debugreg[7]) )
+        if ( unlikely(n->arch.guest_context.debugreg[7]) )
         {
-            loaddebug(&n->arch, 0);
-            loaddebug(&n->arch, 1);
-            loaddebug(&n->arch, 2);
-            loaddebug(&n->arch, 3);
+            loaddebug(&n->arch.guest_context, 0);
+            loaddebug(&n->arch.guest_context, 1);
+            loaddebug(&n->arch.guest_context, 2);
+            loaddebug(&n->arch.guest_context, 3);
             /* no 4 and 5 */
-            loaddebug(&n->arch, 6);
-            loaddebug(&n->arch, 7);
+            loaddebug(&n->arch.guest_context, 6);
+            loaddebug(&n->arch.guest_context, 7);
         }
 
         if ( !VMX_DOMAIN(n) )

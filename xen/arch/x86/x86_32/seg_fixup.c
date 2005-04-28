@@ -115,7 +115,7 @@ int get_baselimit(u16 seg, unsigned long *base, unsigned long *limit)
     if ( ldt )
     {
         table = (unsigned long *)LDT_VIRT_START(d);
-        if ( idx >= d->arch.ldt_ents )
+        if ( idx >= d->arch.guest_context.ldt_ents )
             goto fail;
     }
     else /* gdt */
@@ -181,7 +181,7 @@ int fixup_seg(u16 seg, unsigned long offset)
     if ( ldt )
     {
         table = (unsigned long *)LDT_VIRT_START(d);
-        if ( idx >= d->arch.ldt_ents )
+        if ( idx >= d->arch.guest_context.ldt_ents )
         {
             DPRINTK("Segment %04x out of LDT range (%ld)\n",
                     seg, d->arch.ldt_ents);
@@ -449,7 +449,7 @@ int gpf_emulate_4gb(struct cpu_user_regs *regs)
     /* If requested, give a callback on otherwise unused vector 15. */
     if ( VM_ASSIST(d->domain, VMASST_TYPE_4gb_segments_notify) )
     {
-        ti  = &d->arch.traps[15];
+        ti  = &d->arch.guest_context.trap_ctxt[15];
         tb  = &d->arch.trap_bounce;
         tb->flags      = TBF_EXCEPTION | TBF_EXCEPTION_ERRCODE;
         tb->error_code = pb - eip;

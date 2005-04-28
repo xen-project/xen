@@ -34,15 +34,15 @@ static inline struct cpu_user_regs *get_cpu_user_regs(void)
 
 /*
  * Get the bottom-of-stack, as stored in the per-CPU TSS. This is actually
- * 64 bytes before the real bottom of the stack to allow space for:
- *  domain pointer, DS, ES, FS, GS, FS_BASE, GS_BASE_OS, GS_BASE_APP
+ * 40 bytes before the real bottom of the stack to allow space for:
+ *  domain pointer, DS, ES, FS, GS
  */
 static inline unsigned long get_stack_bottom(void)
 {
     unsigned long p;
     __asm__( "andq %%rsp,%0; addq %2,%0"
 	    : "=r" (p)
-	    : "0" (~(STACK_SIZE-1)), "i" (STACK_SIZE-64) );
+	    : "0" (~(STACK_SIZE-1)), "i" (STACK_SIZE-40) );
     return p;
 }
 

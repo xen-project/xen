@@ -121,21 +121,22 @@ typedef struct cpu_user_regs {
 typedef u64 tsc_timestamp_t; /* RDTSC timestamp */
 
 /*
- * The following is all CPU context. Note that the i387_ctxt block is filled 
+ * The following is all CPU context. Note that the fpu_ctxt block is filled 
  * in by FXSAVE if the CPU has feature FXSR; otherwise FSAVE is used.
  */
 typedef struct vcpu_guest_context {
-#define ECF_I387_VALID (1<<0)
-#define ECF_VMX_GUEST  (1<<1)
-#define ECF_IN_KERNEL  (1<<2)
-    unsigned long flags;
+#define VGCF_I387_VALID (1<<0)
+#define VGCF_VMX_GUEST  (1<<1)
+#define VGCF_IN_KERNEL  (1<<2)
+    unsigned long flags;                    /* VGCF_* flags                 */
     cpu_user_regs_t user_regs;              /* User-level CPU registers     */
-    char          fpu_ctxt[256];            /* User-level FPU registers     */
+    struct { char x[512]; } fpu_ctxt        /* User-level FPU registers     */
+    __attribute__((__aligned__(16)));       /* (needs 16-byte alignment)    */
     trap_info_t   trap_ctxt[256];           /* Virtual IDT                  */
     unsigned int  fast_trap_idx;            /* "Fast trap" vector offset    */
     unsigned long ldt_base, ldt_ents;       /* LDT (linear address, # ents) */
     unsigned long gdt_frames[16], gdt_ents; /* GDT (machine frames, # ents) */
-    unsigned long kernel_ss, kernel_esp;  /* Virtual TSS (only SS1/ESP1)  */
+    unsigned long kernel_ss, kernel_sp;     /* Virtual TSS (only SS1/SP1)   */
     unsigned long pt_base;                  /* CR3 (pagetable base)         */
     unsigned long debugreg[8];              /* DB0-DB7 (debug registers)    */
     unsigned long event_callback_cs;        /* CS:EIP of event callback     */
@@ -143,15 +144,15 @@ typedef struct vcpu_guest_context {
     unsigned long failsafe_callback_cs;     /* CS:EIP of failsafe callback  */
     unsigned long failsafe_callback_eip;
     unsigned long vm_assist;                /* VMASST_TYPE_* bitmap */
-} PACKED vcpu_guest_context_t;
+} vcpu_guest_context_t;
 
 typedef struct {
     /* MFN of a table of MFNs that make up p2m table */
     u64 pfn_to_mfn_frame_list;
-} PACKED arch_shared_info_t;
+} arch_shared_info_t;
 
 typedef struct {
-} PACKED arch_vcpu_info_t;
+} arch_vcpu_info_t;
 
 #define ARCH_HAS_FAST_TRAP
 

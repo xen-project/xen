@@ -412,7 +412,7 @@ int xc_linux_build(int xc_handle,
     ctxt->user_regs.eflags = (1<<9) | (1<<2);
 
     /* FPU is set up to default initial state. */
-    memset(ctxt->fpu_ctxt, 0, sizeof(ctxt->fpu_ctxt));
+    memset(&ctxt->fpu_ctxt, 0, sizeof(ctxt->fpu_ctxt));
 
     /* Virtual IDT is empty at start-of-day. */
     for ( i = 0; i < 256; i++ )
@@ -432,8 +432,8 @@ int xc_linux_build(int xc_handle,
     ctxt->gdt_ents = 0;
 
     /* Ring 1 stack is the initial stack. */
-    ctxt->kernel_ss  = FLAT_KERNEL_DS;
-    ctxt->kernel_esp = vstartinfo_start + 2*PAGE_SIZE;
+    ctxt->kernel_ss = FLAT_KERNEL_DS;
+    ctxt->kernel_sp = vstartinfo_start + 2*PAGE_SIZE;
 
     /* No debugging. */
     memset(ctxt->debugreg, 0, sizeof(ctxt->debugreg));

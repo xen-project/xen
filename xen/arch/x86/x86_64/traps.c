@@ -255,9 +255,9 @@ long do_set_callbacks(unsigned long event_address,
 {
     struct exec_domain *d = current;
 
-    d->arch.event_address    = event_address;
-    d->arch.failsafe_address = failsafe_address;
-    d->arch.syscall_address  = syscall_address;
+    d->arch.guest_context.event_callback_eip    = event_address;
+    d->arch.guest_context.failsafe_callback_eip = failsafe_address;
+    d->arch.guest_context.syscall_callback_eip  = syscall_address;
 
     return 0;
 }

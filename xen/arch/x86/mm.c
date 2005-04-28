@@ -285,7 +285,7 @@ int map_ldt_shadow_page(unsigned int off)
     struct domain *d = ed->domain;
     unsigned long gpfn, gmfn;
     l1_pgentry_t l1e, nl1e;
-    unsigned gva = ed->arch.ldt_base + (off << PAGE_SHIFT);
+    unsigned gva = ed->arch.guest_context.ldt_base + (off << PAGE_SHIFT);
     int res;
 
 #if defined(__x86_64__)
@@ -1639,12 +1639,12 @@ int do_mmuext_op(
                 okay = 0;
                 MEM_LOG("Bad args to SET_LDT: ptr=%lx, ents=%lx", ptr, ents);
             }
-            else if ( (ed->arch.ldt_ents != ents) || 
-                      (ed->arch.ldt_base != ptr) )
+            else if ( (ed->arch.guest_context.ldt_ents != ents) || 
+                      (ed->arch.guest_context.ldt_base != ptr) )
             {
                 invalidate_shadow_ldt(ed);
-                ed->arch.ldt_base = ptr;
-                ed->arch.ldt_ents = ents;
+                ed->arch.guest_context.ldt_base = ptr;
+                ed->arch.guest_context.ldt_ents = ents;
                 load_LDT(ed);
                 percpu_info[cpu].deferred_ops &= ~DOP_RELOAD_LDT;
                 if ( ents != 0 )

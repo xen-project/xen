@@ -240,8 +240,8 @@ long do_stack_switch(unsigned long ss, unsigned long esp)
 {
     if ( (ss & 3) != 3 )
         return -EPERM;
-    current->arch.kernel_ss = ss;
-    current->arch.kernel_sp = esp;
+    current->arch.guest_context.kernel_ss = ss;
+    current->arch.guest_context.kernel_sp = esp;
     return 0;
 }
 
@@ -253,21 +253,24 @@ long do_set_segment_base(unsigned int which, unsigned long base)
     switch ( which )
     {
     case SEGBASE_FS:
-        ed->arch.user_regs.fs_base = base;
         if ( wrmsr_user(MSR_FS_BASE, base, base>>32) )
             ret = -EFAULT;
+        else
+            ed->arch.guest_context.fs_base = base;
         break;
 
     case SEGBASE_GS_USER:
-        ed->arch.user_regs.gs_base_user = base;
         if ( wrmsr_user(MSR_SHADOW_GS_BASE, base, base>>32) )
             ret = -EFAULT;
+        else
+            ed->arch.guest_context.gs_base_user = base;
         break;
 
     case SEGBASE_GS_KERNEL:
-        ed->arch.user_regs.gs_base_kernel = base;
         if ( wrmsr_user(MSR_GS_BASE, base, base>>32) )
             ret = -EFAULT;
+        else
+            ed->arch.guest_context.gs_base_kernel = base;
         break;
 
     case SEGBASE_GS_USER_SEL:

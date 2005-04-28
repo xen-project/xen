@@ -110,7 +110,7 @@
 #define TRAP_deferred_nmi     31
 
 /* Set for entry via SYSCALL. Informs return code to use SYSRETQ not IRETQ. */
-/* NB. Same as ECF_IN_SYSCALL. No bits in common with any other TRAP_* defn. */
+/* NB. Same as VGCF_IN_SYSCALL. No bits in common with any other TRAP_ defn. */
 #define TRAP_syscall         256
 
 /*
@@ -332,10 +332,6 @@ static inline void clear_in_cr4 (unsigned long mask)
 #define IOBMP_BYTES             8192
 #define IOBMP_INVALID_OFFSET    0x8000
 
-struct i387_state {
-    u8 state[512]; /* big enough for FXSAVE */
-} __attribute__ ((aligned (16)));
-
 struct tss_struct {
     unsigned short	back_link,__blh;
 #ifdef __x86_64__
@@ -384,16 +380,18 @@ extern struct tss_struct init_tss[NR_CPUS];
 #ifdef ARCH_HAS_FAST_TRAP
 
 #define SET_DEFAULT_FAST_TRAP(_p) \
-    (_p)->fast_trap_idx = 0x20;   \
+    (_p)->guest_context.fast_trap_idx = 0x20;   \
     (_p)->fast_trap_desc.a = 0;   \
     (_p)->fast_trap_desc.b = 0;
 
 #define CLEAR_FAST_TRAP(_p) \
-    (memset(idt_tables[smp_processor_id()] + (_p)->fast_trap_idx, \
-     0, 8))
+    (memset(idt_tables[smp_processor_id()] + \
+            (_p)->guest_context.fast_trap_idx, \
+            0, 8))
 
 #define SET_FAST_TRAP(_p)   \
-    (memcpy(idt_tables[smp_processor_id()] + (_p)->fast_trap_idx, \
+    (memcpy(idt_tables[smp_processor_id()] + \
+            (_p)->guest_context.fast_trap_idx, \
             &((_p)->fast_trap_desc), 8))
 
 long set_fast_trap(struct exec_domain *p, int idx);

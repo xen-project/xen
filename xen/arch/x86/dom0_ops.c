@@ -383,10 +383,8 @@ void arch_getdomaininfo_ctxt(
 #endif
 #endif
 
-    c->flags = 0;
-    memcpy(&c->user_regs, 
-           &ed->arch.user_regs,
-           sizeof(ed->arch.user_regs));
+    memcpy(c, &ed->arch.guest_context, sizeof(*c));
+
     /* IOPL privileges are virtualised -- merge back into returned eflags. */
     BUG_ON((c->user_regs.eflags & EF_IOPL) != 0);
     c->user_regs.eflags |= ed->arch.iopl << 12;
@@ -398,30 +396,22 @@ void arch_getdomaininfo_ctxt(
 #endif
 #endif
 
+    c->flags = 0;
     if ( test_bit(EDF_DONEFPUINIT, &ed->ed_flags) )
-        c->flags |= ECF_I387_VALID;
-    if ( KERNEL_MODE(ed, &ed->arch.user_regs) )
-        c->flags |= ECF_IN_KERNEL;
+        c->flags |= VGCF_I387_VALID;
+    if ( KERNEL_MODE(ed, &ed->arch.guest_context.user_regs) )
+        c->flags |= VGCF_IN_KERNEL;
 #ifdef CONFIG_VMX
     if (VMX_DOMAIN(ed))
-        c->flags |= ECF_VMX_GUEST;
+        c->flags |= VGCF_VMX_GUEST;
 #endif
-    memcpy(&c->fpu_ctxt,
-           &ed->arch.i387,
-           sizeof(ed->arch.i387));
-    memcpy(&c->trap_ctxt,
-           ed->arch.traps,
-           sizeof(ed->arch.traps));
+
 #ifdef ARCH_HAS_FAST_TRAP
     if ( (ed->arch.fast_trap_desc.a == 0) &&
          (ed->arch.fast_trap_desc.b == 0) )
         c->fast_trap_idx = 0;
-    else
-        c->fast_trap_idx = 
-            ed->arch.fast_trap_idx;
 #endif
-    c->ldt_base = ed->arch.ldt_base;
-    c->ldt_ents = ed->arch.ldt_ents;
+
     c->gdt_ents = 0;
     if ( GET_GDT_ADDRESS(ed) == GDT_VIRT_START(ed) )
     {
@@ -430,22 +420,8 @@ void arch_getdomaininfo_ctxt(
                 l1e_get_pfn(ed->arch.perdomain_ptes[i]);
         c->gdt_ents = GET_GDT_ENTRIES(ed);
     }
-    c->kernel_ss  = ed->arch.kernel_ss;
-    c->kernel_esp = ed->arch.kernel_sp;
-    c->pt_base   = 
-        pagetable_val(ed->arch.guest_table);
-    memcpy(c->debugreg, 
-           ed->arch.debugreg, 
-           sizeof(ed->arch.debugreg));
-#if defined(__i386__)
-    c->event_callback_cs     = ed->arch.event_selector;
-    c->event_callback_eip    = ed->arch.event_address;
-    c->failsafe_callback_cs  = ed->arch.failsafe_selector;
-    c->failsafe_callback_eip = ed->arch.failsafe_address;
-#elif defined(__x86_64__)
-    c->event_callback_eip    = ed->arch.event_address;
-    c->failsafe_callback_eip = ed->arch.failsafe_address;
-    c->syscall_callback_eip  = ed->arch.syscall_address;
-#endif
+
+    c->pt_base = pagetable_val(ed->arch.guest_table);
+
     c->vm_assist = ed->domain->vm_assist;
 }

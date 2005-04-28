@@ -66,37 +66,11 @@ struct arch_domain
 
 struct arch_exec_domain
 {
-    unsigned long      kernel_sp;
-    unsigned long      kernel_ss;
+    struct vcpu_guest_context guest_context;
 
     unsigned long      flags; /* TF_ */
 
-    /* Hardware debugging registers */
-    unsigned long      debugreg[8];  /* %%db0-7 debug registers */
-
-    /* floating point info */
-    struct i387_state  i387;
-
-    /* general user-visible register state */
-    struct cpu_user_regs user_regs;
-
     void (*schedule_tail) (struct exec_domain *);
-
-    /*
-     * Return vectors pushed to us by guest OS.
-     * The stack frame for events is exactly that of an x86 hardware interrupt.
-     * The stack frame for a failsafe callback is augmented with saved values
-     * for segment registers %ds, %es, %fs and %gs:
-     *  %ds, %es, %fs, %gs, %eip, %cs, %eflags [, %oldesp, %oldss]
-     */
-
-    unsigned long event_selector;    /* entry CS  (x86/32 only) */
-    unsigned long event_address;     /* entry EIP */
-
-    unsigned long failsafe_selector; /* entry CS  (x86/32 only) */
-    unsigned long failsafe_address;  /* entry EIP */
-
-    unsigned long syscall_address;   /* entry EIP (x86/64 only) */
 
     /* Bounce information for propagating an exception to guest OS. */
     struct trap_bounce trap_bounce;
@@ -108,10 +82,8 @@ struct arch_exec_domain
 
     /* Trap info. */
 #ifdef ARCH_HAS_FAST_TRAP
-    int                fast_trap_idx;
     struct desc_struct fast_trap_desc;
 #endif
-    trap_info_t        traps[256];
 
     /* Virtual Machine Extensions */
     struct arch_vmx_struct arch_vmx;
@@ -143,7 +115,7 @@ struct arch_exec_domain
     unsigned long guest_cr2;
 
     /* Current LDT details. */
-    unsigned long ldt_base, ldt_ents, shadow_ldt_mapcnt;
+    unsigned long shadow_ldt_mapcnt;
     /* Next entry is passed to LGDT on domain switch. */
     char gdt[10]; /* NB. 10 bytes needed for x86_64. Use 6 bytes for x86_32. */
 } __cacheline_aligned;

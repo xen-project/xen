@@ -52,12 +52,16 @@ void __dummy__(void)
 
     OFFSET(EDOMAIN_processor, struct exec_domain, processor);
     OFFSET(EDOMAIN_vcpu_info, struct exec_domain, vcpu_info);
-    OFFSET(EDOMAIN_event_addr, struct exec_domain, arch.event_address);
-    OFFSET(EDOMAIN_failsafe_addr, struct exec_domain, arch.failsafe_address);
-    OFFSET(EDOMAIN_syscall_addr, struct exec_domain, arch.syscall_address);
     OFFSET(EDOMAIN_trap_bounce, struct exec_domain, arch.trap_bounce);
     OFFSET(EDOMAIN_thread_flags, struct exec_domain, arch.flags);
-    OFFSET(EDOMAIN_kernel_sp, struct exec_domain, arch.kernel_sp);
+    OFFSET(EDOMAIN_event_addr, struct exec_domain,
+           arch.guest_context.event_callback_eip);
+    OFFSET(EDOMAIN_failsafe_addr, struct exec_domain,
+           arch.guest_context.failsafe_callback_eip);
+    OFFSET(EDOMAIN_syscall_addr, struct exec_domain,
+           arch.guest_context.syscall_callback_eip);
+    OFFSET(EDOMAIN_kernel_sp, struct exec_domain,
+           arch.guest_context.kernel_sp);
     BLANK();
 
     OFFSET(VCPUINFO_upcall_pending, vcpu_info_t, evtchn_upcall_pending);

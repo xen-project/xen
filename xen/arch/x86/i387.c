@@ -34,11 +34,11 @@ void save_init_fpu(struct exec_domain *tsk)
     if ( cpu_has_fxsr )
         __asm__ __volatile__ (
             "fxsave %0 ; fnclex"
-            : "=m" (tsk->arch.i387) );
+            : "=m" (tsk->arch.guest_context.fpu_ctxt) );
     else
         __asm__ __volatile__ (
             "fnsave %0 ; fwait"
-            : "=m" (tsk->arch.i387) );
+            : "=m" (tsk->arch.guest_context.fpu_ctxt) );
 
     clear_bit(EDF_USEDFPU, &tsk->ed_flags);
     stts();
@@ -49,11 +49,11 @@ void restore_fpu(struct exec_domain *tsk)
     if ( cpu_has_fxsr )
         __asm__ __volatile__ (
             "fxrstor %0"
-            : : "m" (tsk->arch.i387) );
+            : : "m" (tsk->arch.guest_context.fpu_ctxt) );
     else
         __asm__ __volatile__ (
             "frstor %0"
-            : : "m" (tsk->arch.i387) );
+            : : "m" (tsk->arch.guest_context.fpu_ctxt) );
 }
 
 /*

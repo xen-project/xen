@@ -250,18 +250,18 @@ static void vmx_dr_access (unsigned long exit_qualification, struct cpu_user_reg
     case TYPE_MOV_TO_DR: 
         /* don't need to check the range */
         if (reg != REG_ESP)
-            ed->arch.debugreg[reg] = *reg_p; 
+            ed->arch.guest_context.debugreg[reg] = *reg_p; 
         else {
             unsigned long value;
             __vmread(GUEST_ESP, &value);
-            ed->arch.debugreg[reg] = value;
+            ed->arch.guest_context.debugreg[reg] = value;
         }
         break;
     case TYPE_MOV_FROM_DR:
         if (reg != REG_ESP)
-            *reg_p = ed->arch.debugreg[reg];
+            *reg_p = ed->arch.guest_context.debugreg[reg];
         else {
-            __vmwrite(GUEST_ESP, ed->arch.debugreg[reg]);
+            __vmwrite(GUEST_ESP, ed->arch.guest_context.debugreg[reg]);
         }
         break;
     }

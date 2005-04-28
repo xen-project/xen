@@ -222,13 +222,14 @@ int construct_dom0(struct domain *d,
      * We're basically forcing default RPLs to 1, so that our "what privilege
      * level are we returning to?" logic works.
      */
-    ed->arch.failsafe_selector = FLAT_KERNEL_CS;
-    ed->arch.event_selector    = FLAT_KERNEL_CS;
-    ed->arch.kernel_ss = FLAT_KERNEL_SS;
+    ed->arch.guest_context.kernel_ss = FLAT_KERNEL_SS;
     for ( i = 0; i < 256; i++ ) 
-        ed->arch.traps[i].cs = FLAT_KERNEL_CS;
+        ed->arch.guest_context.trap_ctxt[i].cs = FLAT_KERNEL_CS;
 
 #if defined(__i386__)
+
+    ed->arch.guest_context.failsafe_callback_cs = FLAT_KERNEL_CS;
+    ed->arch.guest_context.event_callback_cs    = FLAT_KERNEL_CS;
 
     /*
      * Protect the lowest 1GB of memory. We use a temporary mapping there
