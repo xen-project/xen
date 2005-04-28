@@ -276,6 +276,7 @@ static inline void ptep_set_wrprotect(pte_t *ptep)
 	if (pte_write(pte))
 		set_pte(ptep, pte_wrprotect(pte));
 }
+
 static inline void ptep_mkdirty(pte_t *ptep)
 {
 	pte_t pte = *ptep;
@@ -455,12 +456,17 @@ void make_page_writable(void *va);
 void make_pages_readonly(void *va, unsigned int nr);
 void make_pages_writable(void *va, unsigned int nr);
 
-#define arbitrary_virt_to_machine(__va)					\
+#define virt_to_ptep(__va)						\
 ({									\
 	pgd_t *__pgd = pgd_offset_k((unsigned long)(__va));		\
 	pud_t *__pud = pud_offset(__pgd, (unsigned long)(__va));	\
 	pmd_t *__pmd = pmd_offset(__pud, (unsigned long)(__va));	\
-	pte_t *__pte = pte_offset_kernel(__pmd, (unsigned long)(__va));	\
+	pte_offset_kernel(__pmd, (unsigned long)(__va));		\
+})
+
+#define arbitrary_virt_to_machine(__va)					\
+({									\
+	pte_t *__pte = virt_to_ptep(__va);				\
 	unsigned long __pa = (*(unsigned long *)__pte) & PAGE_MASK;	\
 	__pa | ((unsigned long)(__va) & (PAGE_SIZE-1));			\
 })

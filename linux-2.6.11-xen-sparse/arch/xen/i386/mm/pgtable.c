@@ -374,28 +374,19 @@ void pgd_free(pgd_t *pgd)
 
 void make_lowmem_page_readonly(void *va)
 {
-	pgd_t *pgd = pgd_offset_k((unsigned long)va);
-	pud_t *pud = pud_offset(pgd, (unsigned long)va);
-	pmd_t *pmd = pmd_offset(pud, (unsigned long)va);
-	pte_t *pte = pte_offset_kernel(pmd, (unsigned long)va);
+	pte_t *pte = virt_to_ptep(va);
 	queue_l1_entry_update(pte, (*(unsigned long *)pte)&~_PAGE_RW);
 }
 
 void make_lowmem_page_writable(void *va)
 {
-	pgd_t *pgd = pgd_offset_k((unsigned long)va);
-	pud_t *pud = pud_offset(pgd, (unsigned long)va);
-	pmd_t *pmd = pmd_offset(pud, (unsigned long)va);
-	pte_t *pte = pte_offset_kernel(pmd, (unsigned long)va);
+	pte_t *pte = virt_to_ptep(va);
 	queue_l1_entry_update(pte, (*(unsigned long *)pte)|_PAGE_RW);
 }
 
 void make_page_readonly(void *va)
 {
-	pgd_t *pgd = pgd_offset_k((unsigned long)va);
-	pud_t *pud = pud_offset(pgd, (unsigned long)va);
-	pmd_t *pmd = pmd_offset(pud, (unsigned long)va);
-	pte_t *pte = pte_offset_kernel(pmd, (unsigned long)va);
+	pte_t *pte = virt_to_ptep(va);
 	queue_l1_entry_update(pte, (*(unsigned long *)pte)&~_PAGE_RW);
 	if ( (unsigned long)va >= (unsigned long)high_memory )
 	{
@@ -410,10 +401,7 @@ void make_page_readonly(void *va)
 
 void make_page_writable(void *va)
 {
-	pgd_t *pgd = pgd_offset_k((unsigned long)va);
-	pud_t *pud = pud_offset(pgd, (unsigned long)va);
-	pmd_t *pmd = pmd_offset(pud, (unsigned long)va);
-	pte_t *pte = pte_offset_kernel(pmd, (unsigned long)va);
+	pte_t *pte = virt_to_ptep(va);
 	queue_l1_entry_update(pte, (*(unsigned long *)pte)|_PAGE_RW);
 	if ( (unsigned long)va >= (unsigned long)high_memory )
 	{
