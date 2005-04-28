@@ -11,7 +11,7 @@ from xen.xend import sxp
 from xen.xend import PrettyPrint
 from xen.xend.XendClient import server, XendError
 from xen.xend.XendBootloader import bootloader
-from xen.xend.server import blkif
+from xen.util import blkif
 
 from xen.util import console_client
 

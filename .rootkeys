@@ -885,6 +885,7 @@
 40fcefb4rnaZNjqsBu7A5V2rlLyqRw tools/python/xen/sv/util.py
 40d8915cyoVA0hJxiBFNymL7YvDaRg tools/python/xen/util/Brctl.py
 40dfd40aGqGkiopOOgJxSF4iCbHM0Q tools/python/xen/util/__init__.py
+4270e4efFg3wHCCxXpA0h6yoMTkeSQ tools/python/xen/util/blkif.py
 4055ee4dwy4l0MghZosxoiu6zmhc9Q tools/python/xen/util/console_client.py
 40c9c468IienauFHQ_xJIcqnPJ8giQ tools/python/xen/util/ip.py
 41dde8b0yuJX-S79w4xJKxBQ-Mhp1A tools/python/xen/util/memmap.py

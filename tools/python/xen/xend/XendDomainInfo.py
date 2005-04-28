@@ -16,7 +16,7 @@ import xen.lowlevel.xc; xc = xen.lowlevel.xc.new()
 import xen.util.ip
 from xen.util.ip import _readline, _readlines
 from xen.xend.server import channel, controller
-from xen.xend.server.blkif import blkdev_uname_to_file
+from xen.util.blkif import blkdev_uname_to_file
 
 from server.channel import channelFactory
 import server.SrvDaemon; xend = server.SrvDaemon.instance()
