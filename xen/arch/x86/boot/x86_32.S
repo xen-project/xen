@@ -24,10 +24,10 @@ bad_cpu_msg:
 not_multiboot_msg:
         .asciz "ERR: Not a Multiboot bootloader!"
 bad_cpu:
-        mov     $SYMBOL_NAME(bad_cpu_msg)-__PAGE_OFFSET,%esi
+        mov     $bad_cpu_msg-__PAGE_OFFSET,%esi
         jmp     print_err
 not_multiboot:
-        mov     $SYMBOL_NAME(not_multiboot_msg)-__PAGE_OFFSET,%esi
+        mov     $not_multiboot_msg-__PAGE_OFFSET,%esi
 print_err:
         mov     $0xB8000,%edi  # VGA framebuffer
 1:      mov     (%esi),%bl
@@ -118,7 +118,7 @@ __start:
         mov     $(__HYPERVISOR_CS << 16),%eax
         mov     %dx,%ax            /* selector = 0x0010 = cs */
         mov     $0x8E00,%dx        /* interrupt gate - dpl=0, present */
-        lea     SYMBOL_NAME(idt_table)-__PAGE_OFFSET,%edi
+        lea     idt_table-__PAGE_OFFSET,%edi
         mov     $256,%ecx
 1:      mov     %eax,(%edi)
         mov     %edx,4(%edi)
@@ -163,38 +163,38 @@ ignore_int:
         mov     %eax,%ds
         mov     %eax,%es
         pushl   $int_msg
-        call    SYMBOL_NAME(printf)
+        call    printf
 1:      jmp     1b
 
 /*** STACK LOCATION ***/
         
 ENTRY(stack_start)
-        .long SYMBOL_NAME(cpu0_stack) + STACK_SIZE - 200 - __PAGE_OFFSET
+        .long cpu0_stack + STACK_SIZE - 200 - __PAGE_OFFSET
         .long __HYPERVISOR_DS
         
 /*** DESCRIPTOR TABLES ***/
 
-.globl SYMBOL_NAME(idt)
-.globl SYMBOL_NAME(gdt)        
+.globl idt
+.globl gdt        
 
         ALIGN
         
         .word   0    
 idt_descr:
 	.word	256*8-1
-SYMBOL_NAME(idt):
-        .long	SYMBOL_NAME(idt_table)
+idt:
+        .long	idt_table
 
         .word   0
 gdt_descr:
 	.word	(LAST_RESERVED_GDT_ENTRY*8)+7
-SYMBOL_NAME(gdt):       
-        .long   SYMBOL_NAME(gdt_table)	/* gdt base */
+gdt:       
+        .long   gdt_table	/* gdt base */
 
         .word   0
 nopaging_gdt_descr:
         .word   (LAST_RESERVED_GDT_ENTRY*8)+7
-        .long   SYMBOL_NAME(gdt_table)-__PAGE_OFFSET
+        .long   gdt_table-__PAGE_OFFSET
         
         ALIGN
 /* NB. Rings != 0 get access up to 0xFC400000. This allows access to the */

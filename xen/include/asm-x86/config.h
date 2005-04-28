@@ -64,16 +64,13 @@
 /* Linkage for x86 */
 #define __ALIGN .align 16,0x90
 #define __ALIGN_STR ".align 16,0x90"
-#define SYMBOL_NAME_STR(X) #X
-#define SYMBOL_NAME(X) X
-#define SYMBOL_NAME_LABEL(X) X##:
 #ifdef __ASSEMBLY__
 #define ALIGN __ALIGN
 #define ALIGN_STR __ALIGN_STR
-#define ENTRY(name) \
-  .globl SYMBOL_NAME(name); \
-  ALIGN; \
-  SYMBOL_NAME_LABEL(name)
+#define ENTRY(name)                             \
+  .globl name;                                  \
+  ALIGN;                                        \
+  name:
 #endif
 
 #define barrier() __asm__ __volatile__("": : :"memory")

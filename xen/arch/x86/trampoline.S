@@ -60,8 +60,7 @@ gdt_48:
 #else
 	.long   0x100200 # gdt_table
 #endif
-        
-.globl SYMBOL_NAME(trampoline_end)
-SYMBOL_NAME_LABEL(trampoline_end)
+
+ENTRY(trampoline_end)
 
 #endif /* CONFIG_SMP */

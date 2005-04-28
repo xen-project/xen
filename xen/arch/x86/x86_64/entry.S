@@ -120,7 +120,7 @@ ENTRY(syscall_enter)
         sti
         movq  %r10,%rcx
         andq  $(NR_hypercalls-1),%rax
-        leaq  SYMBOL_NAME(hypercall_table)(%rip),%r10
+        leaq  hypercall_table(%rip),%r10
         PERFC_INCR(PERFC_hypercalls, %rax)
         callq *(%r10,%rax,8)
         movq %rax,UREGS_rax(%rsp)       # save the return value
@@ -131,7 +131,7 @@ test_all_events:
 /*test_softirqs:*/  
         movl  EDOMAIN_processor(%rbx),%eax
         shl   $IRQSTAT_shift,%rax
-        leaq  SYMBOL_NAME(irq_stat)(%rip),%rcx
+        leaq  irq_stat(%rip),%rcx
         testl $~0,(%rcx,%rax,1)
         jnz   process_softirqs
 /*test_guest_events:*/
@@ -199,7 +199,7 @@ test_all_events:
 ENTRY(vmx_asm_vmexit_handler)
         /* selectors are restored/saved by VMX */
         VMX_SAVE_ALL_NOSEGREGS
-        call SYMBOL_NAME(vmx_vmexit_handler)
+        call vmx_vmexit_handler
         jmp vmx_asm_do_resume
 
 ENTRY(vmx_asm_do_launch)
@@ -222,7 +222,7 @@ ENTRY(vmx_asm_do_launch)
         /* VMLUANCH */
         .byte 0x0f,0x01,0xc2
         pushfq
-        call SYMBOL_NAME(vm_launch_fail)
+        call vm_launch_fail
         hlt
         
         ALIGN
@@ -235,12 +235,12 @@ vmx_test_all_events:
 /*test_softirqs:*/  
         movl  EDOMAIN_processor(%rbx),%eax
         shl   $IRQSTAT_shift,%rax
-        leaq  SYMBOL_NAME(irq_stat)(%rip), %rdx
+        leaq  irq_stat(%rip), %rdx
         testl $~0,(%rdx,%rax,1)
         jnz   vmx_process_softirqs
 
 vmx_restore_all_guest:
-        call SYMBOL_NAME(load_cr2)
+        call load_cr2
         /* 
          * Check if we are going back to VMX-based VM
          * By this time, all the setups in the VMCS must be complete.
@@ -264,14 +264,14 @@ vmx_restore_all_guest:
         /* VMRESUME */
         .byte 0x0f,0x01,0xc3
         pushfq
-        call SYMBOL_NAME(vm_resume_fail)
+        call vm_resume_fail
         /* Should never reach here */
         hlt
 
         ALIGN
 vmx_process_softirqs:
         sti       
-        call SYMBOL_NAME(do_softirq)
+        call do_softirq
         jmp  vmx_test_all_events
 #endif
 
@@ -279,7 +279,7 @@ vmx_process_softirqs:
 /* %rbx: struct exec_domain */
 process_softirqs:
         sti       
-        call SYMBOL_NAME(do_softirq)
+        call do_softirq
         jmp  test_all_events
 
 /* CREATE A BASIC EXCEPTION FRAME ON GUEST OS STACK:                     */
@@ -292,7 +292,7 @@ create_bounce_frame:
         /* Push new frame at registered guest-OS stack base. */
         pushq %rdx
         movq  %rbx,%rdi
-        call  SYMBOL_NAME(toggle_guest_mode)
+        call  toggle_guest_mode
         popq  %rdx
         movq  EDOMAIN_kernel_sp(%rbx),%rsi
         jmp   2f
@@ -390,7 +390,7 @@ error_code:
         sti
         movq  %rsp,%rdi
         movl  UREGS_entry_vector(%rsp),%eax
-        leaq  SYMBOL_NAME(exception_table)(%rip),%rdx
+        leaq  exception_table(%rip),%rdx
         GET_CURRENT(%rbx)
         PERFC_INCR(PERFC_exceptions, %rax)
         callq *(%rdx,%rax,8)
@@ -423,7 +423,7 @@ exception_with_ints_disabled:
 FATAL_exception_with_ints_disabled:
         movl  UREGS_entry_vector(%rsp),%edi
         movq  %rsp,%rsi
-        call  SYMBOL_NAME(fatal_trap)
+        call  fatal_trap
         ud2
 
 ENTRY(divide_error)
@@ -520,67 +520,67 @@ ENTRY(nmi)
         inb   $0x61,%al
         movl  %eax,%esi # reason
         movq  %rsp,%rdi # regs
-        call  SYMBOL_NAME(do_nmi)
+        call  do_nmi
 	jmp   restore_all_xen
 
 do_arch_sched_op:
         # Ensure we return success even if we return via schedule_tail()
         xorl  %eax,%eax
         movq  %rax,UREGS_rax+8(%rsp)
-        jmp   SYMBOL_NAME(do_sched_op)
+        jmp   do_sched_op
 
 .data
 
 ENTRY(exception_table)
-        .quad SYMBOL_NAME(do_divide_error)
-        .quad SYMBOL_NAME(do_debug)
+        .quad do_divide_error
+        .quad do_debug
         .quad 0 # nmi
-        .quad SYMBOL_NAME(do_int3)
-        .quad SYMBOL_NAME(do_overflow)
-        .quad SYMBOL_NAME(do_bounds)
-        .quad SYMBOL_NAME(do_invalid_op)
-        .quad SYMBOL_NAME(math_state_restore)
-        .quad SYMBOL_NAME(do_double_fault)
-        .quad SYMBOL_NAME(do_coprocessor_segment_overrun)
-        .quad SYMBOL_NAME(do_invalid_TSS)
-        .quad SYMBOL_NAME(do_segment_not_present)
-        .quad SYMBOL_NAME(do_stack_segment)
-        .quad SYMBOL_NAME(do_general_protection)
-        .quad SYMBOL_NAME(do_page_fault)
-        .quad SYMBOL_NAME(do_spurious_interrupt_bug)
-        .quad SYMBOL_NAME(do_coprocessor_error)
-        .quad SYMBOL_NAME(do_alignment_check)
-        .quad SYMBOL_NAME(do_machine_check)
-        .quad SYMBOL_NAME(do_simd_coprocessor_error)
+        .quad do_int3
+        .quad do_overflow
+        .quad do_bounds
+        .quad do_invalid_op
+        .quad math_state_restore
+        .quad do_double_fault
+        .quad do_coprocessor_segment_overrun
+        .quad do_invalid_TSS
+        .quad do_segment_not_present
+        .quad do_stack_segment
+        .quad do_general_protection
+        .quad do_page_fault
+        .quad do_spurious_interrupt_bug
+        .quad do_coprocessor_error
+        .quad do_alignment_check
+        .quad do_machine_check
+        .quad do_simd_coprocessor_error
 
 ENTRY(hypercall_table)
-        .quad SYMBOL_NAME(do_set_trap_table)     /*  0 */
-        .quad SYMBOL_NAME(do_mmu_update)
-        .quad SYMBOL_NAME(do_set_gdt)
-        .quad SYMBOL_NAME(do_stack_switch)
-        .quad SYMBOL_NAME(do_set_callbacks)
-        .quad SYMBOL_NAME(do_fpu_taskswitch)     /*  5 */
-        .quad SYMBOL_NAME(do_arch_sched_op)
-        .quad SYMBOL_NAME(do_dom0_op)
-        .quad SYMBOL_NAME(do_set_debugreg)
-        .quad SYMBOL_NAME(do_get_debugreg)
-        .quad SYMBOL_NAME(do_update_descriptor)  /* 10 */
-        .quad SYMBOL_NAME(do_ni_hypercall)
-        .quad SYMBOL_NAME(do_dom_mem_op)
-        .quad SYMBOL_NAME(do_multicall)
-        .quad SYMBOL_NAME(do_update_va_mapping)
-        .quad SYMBOL_NAME(do_set_timer_op)       /* 15 */
-        .quad SYMBOL_NAME(do_event_channel_op)
-        .quad SYMBOL_NAME(do_xen_version)
-        .quad SYMBOL_NAME(do_console_io)
-        .quad SYMBOL_NAME(do_physdev_op)
-        .quad SYMBOL_NAME(do_grant_table_op)     /* 20 */
-        .quad SYMBOL_NAME(do_vm_assist)
-        .quad SYMBOL_NAME(do_update_va_mapping_otherdomain)
-        .quad SYMBOL_NAME(do_switch_to_user)
-        .quad SYMBOL_NAME(do_boot_vcpu)
-        .quad SYMBOL_NAME(do_set_segment_base)   /* 25 */
-        .quad SYMBOL_NAME(do_mmuext_op)
+        .quad do_set_trap_table     /*  0 */
+        .quad do_mmu_update
+        .quad do_set_gdt
+        .quad do_stack_switch
+        .quad do_set_callbacks
+        .quad do_fpu_taskswitch     /*  5 */
+        .quad do_arch_sched_op
+        .quad do_dom0_op
+        .quad do_set_debugreg
+        .quad do_get_debugreg
+        .quad do_update_descriptor  /* 10 */
+        .quad do_ni_hypercall
+        .quad do_dom_mem_op
+        .quad do_multicall
+        .quad do_update_va_mapping
+        .quad do_set_timer_op       /* 15 */
+        .quad do_event_channel_op
+        .quad do_xen_version
+        .quad do_console_io
+        .quad do_physdev_op
+        .quad do_grant_table_op     /* 20 */
+        .quad do_vm_assist
+        .quad do_update_va_mapping_otherdomain
+        .quad do_switch_to_user
+        .quad do_boot_vcpu
+        .quad do_set_segment_base   /* 25 */
+        .quad do_mmuext_op
         .rept NR_hypercalls-((.-hypercall_table)/4)
-        .quad SYMBOL_NAME(do_ni_hypercall)
+        .quad do_ni_hypercall
         .endr

@@ -7,10 +7,10 @@
                 
         .text
         .code32
-        
+
 ENTRY(start)
         jmp __start
-        
+
         .org    0x004
 /*** MULTIBOOT HEADER ****/
         /* Magic number indicating a Multiboot header. */
@@ -180,8 +180,8 @@ __high_start:
                         
 /*** DESCRIPTOR TABLES ***/
 
-.globl SYMBOL_NAME(idt)
-.globl SYMBOL_NAME(gdt)        
+.globl idt
+.globl gdt        
 
         .org    0x1f0
         .word   (LAST_RESERVED_GDT_ENTRY*8)+7
@@ -203,17 +203,17 @@ ENTRY(gdt_table)
         .word   0
 gdt_descr:
         .word   (LAST_RESERVED_GDT_ENTRY*8)+7
-SYMBOL_NAME(gdt):       
-        .quad   SYMBOL_NAME(gdt_table)
+gdt:       
+        .quad   gdt_table
 
         .word   0    
 idt_descr:
         .word   256*16-1
-SYMBOL_NAME(idt):
-        .quad   SYMBOL_NAME(idt_table)
+idt:
+        .quad   idt_table
 
 ENTRY(stack_start)
-        .quad   SYMBOL_NAME(cpu0_stack) + STACK_SIZE - 200
+        .quad   cpu0_stack + STACK_SIZE - 200
 
 high_start:
         .quad   __high_start
@@ -258,6 +258,6 @@ int_msg:
 ignore_int:
         cld
         leaq    int_msg(%rip),%rdi
-        call    SYMBOL_NAME(printf)
+        call    printf
 1:      jmp     1b
 

@@ -111,7 +111,7 @@
 ENTRY(vmx_asm_vmexit_handler)
         /* selectors are restored/saved by VMX */
         VMX_SAVE_ALL_NOSEGREGS
-        call SYMBOL_NAME(vmx_vmexit_handler)
+        call vmx_vmexit_handler
         jmp vmx_asm_do_resume
 
 ENTRY(vmx_asm_do_launch)
@@ -126,7 +126,7 @@ ENTRY(vmx_asm_do_launch)
         /* VMLUANCH */
         .byte 0x0f,0x01,0xc2
         pushf
-        call SYMBOL_NAME(vm_launch_fail)
+        call vm_launch_fail
         hlt
         
         ALIGN
@@ -141,11 +141,11 @@ vmx_test_all_events:
 /*test_softirqs:*/  
         movl EDOMAIN_processor(%ebx),%eax
         shl  $IRQSTAT_shift,%eax
-        test %ecx,SYMBOL_NAME(irq_stat)(%eax,1)
+        test %ecx,irq_stat(%eax,1)
         jnz  vmx_process_softirqs
 
 vmx_restore_all_guest:
-        call SYMBOL_NAME(load_cr2)
+        call load_cr2
         /* 
          * Check if we are going back to VMX-based VM
          * By this time, all the setups in the VMCS must be complete.
@@ -161,14 +161,14 @@ vmx_restore_all_guest:
         /* VMRESUME */
         .byte 0x0f,0x01,0xc3
         pushf
-        call SYMBOL_NAME(vm_resume_fail)
+        call vm_resume_fail
         /* Should never reach here */
         hlt
 
         ALIGN
 vmx_process_softirqs:
         sti       
-        call SYMBOL_NAME(do_softirq)
+        call do_softirq
         jmp  vmx_test_all_events
 #endif
 
@@ -261,7 +261,7 @@ ENTRY(hypercall)
         GET_CURRENT(%ebx)
         andl $(NR_hypercalls-1),%eax
         PERFC_INCR(PERFC_hypercalls, %eax)
-        call *SYMBOL_NAME(hypercall_table)(,%eax,4)
+        call *hypercall_table(,%eax,4)
         movl %eax,UREGS_eax(%esp)       # save the return value
 
 test_all_events:
@@ -271,7 +271,7 @@ test_all_events:
 /*test_softirqs:*/  
         movl EDOMAIN_processor(%ebx),%eax
         shl  $IRQSTAT_shift,%eax
-        test %ecx,SYMBOL_NAME(irq_stat)(%eax,1)
+        test %ecx,irq_stat(%eax,1)
         jnz  process_softirqs
 /*test_guest_events:*/
         movl EDOMAIN_vcpu_info(%ebx),%eax
@@ -295,7 +295,7 @@ test_all_events:
         ALIGN
 process_softirqs:
         sti       
-        call SYMBOL_NAME(do_softirq)
+        call do_softirq
         jmp  test_all_events
                 
 /* CREATE A BASIC EXCEPTION FRAME ON GUEST OS (RING-1) STACK:            */
@@ -431,7 +431,7 @@ error_code:
 	pushl %edx			# push the cpu_user_regs pointer
 	GET_CURRENT(%ebx)
         PERFC_INCR(PERFC_exceptions, %eax)
-	call  *SYMBOL_NAME(exception_table)(,%eax,4)
+	call  *exception_table(,%eax,4)
         addl  $4,%esp
         movl  UREGS_eflags(%esp),%eax
         movb  UREGS_cs(%esp),%al
@@ -465,7 +465,7 @@ FATAL_exception_with_ints_disabled:
         movl  %esp,%edx
 	pushl %edx			# push the cpu_user_regs pointer
         pushl %esi                      # push the trapnr (entry vector)
-        call  SYMBOL_NAME(fatal_trap)
+        call  fatal_trap
         ud2
                                         
 ENTRY(coprocessor_error)
@@ -575,7 +575,7 @@ do_watchdog_tick:
         movl  %esp,%edx
         pushl %ebx   # reason
         pushl %edx   # regs
-        call  SYMBOL_NAME(do_nmi)
+        call  do_nmi
         addl  $8,%esp
         jmp   ret_from_intr
 
@@ -595,18 +595,18 @@ nmi_parity_err:
         andb $0xf,%al
         orb  $0x4,%al
         outb %al,$0x61
-        cmpb $'i',%ss:SYMBOL_NAME(opt_nmi) # nmi=ignore
+        cmpb $'i',%ss:opt_nmi # nmi=ignore
         je   nmi_out
-        bts  $0,%ss:SYMBOL_NAME(nmi_softirq_reason)
-        bts  $NMI_SOFTIRQ,%ss:SYMBOL_NAME(irq_stat)
-        cmpb $'d',%ss:SYMBOL_NAME(opt_nmi) # nmi=dom0
+        bts  $0,%ss:nmi_softirq_reason
+        bts  $NMI_SOFTIRQ,%ss:irq_stat
+        cmpb $'d',%ss:opt_nmi # nmi=dom0
         je   nmi_out
         movl $(__HYPERVISOR_DS),%edx       # nmi=fatal
         movl %edx,%ds
         movl %edx,%es
         movl %esp,%edx
         push %edx
-        call SYMBOL_NAME(mem_parity_error)
+        call mem_parity_error
         addl $4,%esp
 nmi_out:movl  %ss:UREGS_eflags(%esp),%eax
         movb  %ss:UREGS_cs(%esp),%al
@@ -623,18 +623,18 @@ nmi_io_err:
         andb $0xf,%al
         orb  $0x8,%al
         outb %al,$0x61
-        cmpb $'i',%ss:SYMBOL_NAME(opt_nmi) # nmi=ignore
+        cmpb $'i',%ss:opt_nmi # nmi=ignore
         je   nmi_out
-        bts  $1,%ss:SYMBOL_NAME(nmi_softirq_reason)
-        bts  $NMI_SOFTIRQ,%ss:SYMBOL_NAME(irq_stat)
-        cmpb $'d',%ss:SYMBOL_NAME(opt_nmi) # nmi=dom0
+        bts  $1,%ss:nmi_softirq_reason
+        bts  $NMI_SOFTIRQ,%ss:irq_stat
+        cmpb $'d',%ss:opt_nmi # nmi=dom0
         je   nmi_out
         movl $(__HYPERVISOR_DS),%edx       # nmi=fatal
         movl %edx,%ds
         movl %edx,%es
         movl %esp,%edx
         push %edx
-        call SYMBOL_NAME(io_check_error)                        
+        call io_check_error                        
         addl $4,%esp
         jmp  nmi_out
 
@@ -656,7 +656,7 @@ do_arch_sched_op:
         # Ensure we return success even if we return via schedule_tail()
         xorl %eax,%eax
         movl %eax,UREGS_eax+4(%esp)
-        jmp  SYMBOL_NAME(do_sched_op)
+        jmp  do_sched_op
 
 do_switch_vm86:
         # Discard the return address
@@ -696,55 +696,55 @@ VFLT3:  movl %gs:(%esi),%eax
 .data
 
 ENTRY(exception_table)
-        .long SYMBOL_NAME(do_divide_error)
-        .long SYMBOL_NAME(do_debug)
+        .long do_divide_error
+        .long do_debug
         .long 0 # nmi
-        .long SYMBOL_NAME(do_int3)
-        .long SYMBOL_NAME(do_overflow)
-        .long SYMBOL_NAME(do_bounds)
-        .long SYMBOL_NAME(do_invalid_op)
-        .long SYMBOL_NAME(math_state_restore)
+        .long do_int3
+        .long do_overflow
+        .long do_bounds
+        .long do_invalid_op
+        .long math_state_restore
         .long 0 # double fault
-        .long SYMBOL_NAME(do_coprocessor_segment_overrun)
-        .long SYMBOL_NAME(do_invalid_TSS)
-        .long SYMBOL_NAME(do_segment_not_present)
-        .long SYMBOL_NAME(do_stack_segment)
-        .long SYMBOL_NAME(do_general_protection)
-        .long SYMBOL_NAME(do_page_fault)
-        .long SYMBOL_NAME(do_spurious_interrupt_bug)
-        .long SYMBOL_NAME(do_coprocessor_error)
-        .long SYMBOL_NAME(do_alignment_check)
-        .long SYMBOL_NAME(do_machine_check)
-        .long SYMBOL_NAME(do_simd_coprocessor_error)
+        .long do_coprocessor_segment_overrun
+        .long do_invalid_TSS
+        .long do_segment_not_present
+        .long do_stack_segment
+        .long do_general_protection
+        .long do_page_fault
+        .long do_spurious_interrupt_bug
+        .long do_coprocessor_error
+        .long do_alignment_check
+        .long do_machine_check
+        .long do_simd_coprocessor_error
 
 ENTRY(hypercall_table)
-        .long SYMBOL_NAME(do_set_trap_table)     /*  0 */
-        .long SYMBOL_NAME(do_mmu_update)
-        .long SYMBOL_NAME(do_set_gdt)
-        .long SYMBOL_NAME(do_stack_switch)
-        .long SYMBOL_NAME(do_set_callbacks)
-        .long SYMBOL_NAME(do_fpu_taskswitch)     /*  5 */
-        .long SYMBOL_NAME(do_arch_sched_op)
-        .long SYMBOL_NAME(do_dom0_op)
-        .long SYMBOL_NAME(do_set_debugreg)
-        .long SYMBOL_NAME(do_get_debugreg)
-        .long SYMBOL_NAME(do_update_descriptor)  /* 10 */
-        .long SYMBOL_NAME(do_set_fast_trap)
-        .long SYMBOL_NAME(do_dom_mem_op)
-        .long SYMBOL_NAME(do_multicall)
-        .long SYMBOL_NAME(do_update_va_mapping)
-        .long SYMBOL_NAME(do_set_timer_op)       /* 15 */
-        .long SYMBOL_NAME(do_event_channel_op)
-        .long SYMBOL_NAME(do_xen_version)
-        .long SYMBOL_NAME(do_console_io)
-        .long SYMBOL_NAME(do_physdev_op)
-        .long SYMBOL_NAME(do_grant_table_op)     /* 20 */
-        .long SYMBOL_NAME(do_vm_assist)
-        .long SYMBOL_NAME(do_update_va_mapping_otherdomain)
-        .long SYMBOL_NAME(do_switch_vm86)
-        .long SYMBOL_NAME(do_boot_vcpu)
-        .long SYMBOL_NAME(do_ni_hypercall)       /* 25 */
-        .long SYMBOL_NAME(do_mmuext_op)
+        .long do_set_trap_table     /*  0 */
+        .long do_mmu_update
+        .long do_set_gdt
+        .long do_stack_switch
+        .long do_set_callbacks
+        .long do_fpu_taskswitch     /*  5 */
+        .long do_arch_sched_op
+        .long do_dom0_op
+        .long do_set_debugreg
+        .long do_get_debugreg
+        .long do_update_descriptor  /* 10 */
+        .long do_set_fast_trap
+        .long do_dom_mem_op
+        .long do_multicall
+        .long do_update_va_mapping
+        .long do_set_timer_op       /* 15 */
+        .long do_event_channel_op
+        .long do_xen_version
+        .long do_console_io
+        .long do_physdev_op
+        .long do_grant_table_op     /* 20 */
+        .long do_vm_assist
+        .long do_update_va_mapping_otherdomain
+        .long do_switch_vm86
+        .long do_boot_vcpu
+        .long do_ni_hypercall       /* 25 */
+        .long do_mmuext_op
         .rept NR_hypercalls-((.-hypercall_table)/4)
-        .long SYMBOL_NAME(do_ni_hypercall)
+        .long do_ni_hypercall
         .endr
