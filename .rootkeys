@@ -800,6 +800,7 @@
 4056f5155QYZdsk-1fLdjsZPFTnlhg tools/misc/xensymoops
 40cf2937dqM1jWW87O5OoOYND8leuA tools/misc/xm
 4270cc81g3nSNYCZ1ryCMDEbLtMtbQ tools/pygrub/Makefile
+4270deeccyRsJn6jLnRh9odRtMW9SA tools/pygrub/README
 4270cc81EIl7NyaS3Av6IPRk2c2a6Q tools/pygrub/setup.py
 4270cc81t7eNCDp4Bhbh58p1CNxaCQ tools/pygrub/src/GrubConf.py
 4270d6c2fWF4r5-zF1pSuAFwUZS0aA tools/pygrub/src/__init__.py
