@@ -97,7 +97,8 @@ cp_patch arch/ia64/kernel/vmlinux.lds.S arch/ia64/xen.lds.S lds.S
 #cp_patch mm/slab.c arch/ia64/slab.c slab.c
 
 # following renamed to avoid conflict
-cp_patch kernel/extable.c arch/ia64/linuxextable.c linuxextable.c
+#cp_patch kernel/extable.c arch/ia64/linuxextable.c linuxextable.c
+softlink kernel/extable.c arch/ia64/linuxextable.c
 
 cp_patch arch/ia64/mm/contig.c arch/ia64/mm_contig.c mm_contig.c
 cp_patch arch/ia64/mm/tlb.c arch/ia64/tlb.c tlb.c
@@ -168,7 +169,8 @@ softlink include/asm-generic/vmlinux.lds.h include/asm-generic/vmlinux.lds.h vml
 
 cp_patch arch/ia64/hp/sim/hpsim_ssc.h include/asm-ia64/hpsim_ssc.h hpsim_ssc.h
 
-cp_patch include/asm-ia64/current.h include/asm-ia64/current.h current.h
+#cp_patch include/asm-ia64/current.h include/asm-ia64/current.h current.h
+softlink include/asm-ia64/current.h include/asm-ia64/current.h
 #cp_patch include/asm-ia64/gcc_intrin.h include/asm-ia64/gcc_intrin.h gcc_intrin.h
 softlink include/asm-ia64/gcc_intrin.h include/asm-ia64/gcc_intrin.h
 cp_patch include/asm-ia64/hardirq.h include/asm-ia64/hardirq.h hardirq.h
@@ -180,7 +182,8 @@ cp_patch include/asm-ia64/irq.h include/asm-ia64/irq.h irq.h
 cp_patch include/asm-ia64/kregs.h include/asm-ia64/kregs.h kregs.h
 cp_patch include/asm-ia64/page.h include/asm-ia64/page.h page.h
 cp_patch include/asm-ia64/processor.h include/asm-ia64/processor.h processor.h
-cp_patch include/asm-ia64/sal.h include/asm-ia64/sal.h sal.h
+#cp_patch include/asm-ia64/sal.h include/asm-ia64/sal.h sal.h
+softlink include/asm-ia64/sal.h include/asm-ia64/sal.h
 cp_patch include/asm-ia64/system.h include/asm-ia64/system.h system.h
 cp_patch include/asm-ia64/types.h include/asm-ia64/types.h types.h
 
@@ -268,9 +271,10 @@ cp_patch include/linux/hardirq.h include/asm-ia64/linux/hardirq.h linuxhardirq.h
 cp_patch include/linux/interrupt.h include/asm-ia64/linux/interrupt.h interrupt.h
 cp_patch include/linux/mmzone.h include/asm-ia64/linux/mmzone.h mmzone.h
 
-cp_patch include/linux/wait.h include/asm-ia64/linux/wait.h wait.h
+#cp_patch include/linux/wait.h include/asm-ia64/linux/wait.h wait.h
+softlink include/linux/wait.h include/asm-ia64/linux/wait.h
 
-cp_patch include/linux/slab.h include/asm-ia64/slab.h slab.h
+#cp_patch include/linux/slab.h include/asm-ia64/slab.h slab.h
 
 # following renamed to avoid conflict
 cp_patch include/linux/time.h include/xen/linuxtime.h linuxtime.h

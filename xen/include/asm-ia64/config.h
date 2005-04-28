@@ -116,6 +116,9 @@ struct page;
 // avoid redefining task_t in asm/thread_info.h
 #define task_t	struct domain
 
+// avoid redefining task_struct in asm/current.h
+#define task_struct exec_domain
+
 // linux/include/asm-ia64/machvec.h (linux/arch/ia64/lib/io.c)
 #define platform_inb	__ia64_inb
 #define platform_inw	__ia64_inw
@@ -177,8 +180,6 @@ struct pci_bus_region {
 	unsigned long end;
 };
 
-// from linux/include/linux/module.h
-
 // warning: unless search_extable is declared, the return value gets
 // truncated to 32-bits, causing a very strange error in privop handling
 struct exception_table_entry;
@@ -232,7 +233,9 @@ void sort_main_extable(void);
 
 #define ARCH_HAS_EXEC_DOMAIN_MM_PTR
 
-// see arch/x86/nmi.c !?!?
+// from include/linux/preempt.h (needs including from interrupt.h or smp.h)
+#define preempt_enable()	do { } while (0)
+#define preempt_disable()	do { } while (0)
 
 // these declarations got moved at some point, find a better place for them
 extern int opt_noht;

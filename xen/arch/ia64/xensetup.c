@@ -1,13 +1,9 @@
 /******************************************************************************
- * kernel.c
- * 
- * This file should contain architecture-independent bootstrap and low-level
- * help routines. It's a bit x86/PC specific right now!
- * 
- * Copyright (c) 2002-2003 K A Fraser
+ * xensetup.c
+ * Copyright (c) 2004-2005  Hewlett-Packard Co
+ *         Dan Magenheimer <dan.magenheimer@hp.com>
  */
 
-//#include <stdarg.h>
 #include <xen/config.h>
 #include <xen/lib.h>
 #include <xen/errno.h>
@@ -20,11 +16,6 @@
 //#include <xen/console.h>
 //#include <xen/serial.h>
 #include <xen/trace.h>
-//#include <asm/shadow.h>
-//#include <asm/io.h>
-//#include <asm/uaccess.h>
-//#include <asm/domain_page.h>
-//#include <public/dom0_ops.h>
 #include <asm/meminit.h>
 #include <asm/page.h>
 
@@ -84,7 +75,7 @@ char opt_physdev_dom0_hide[200] = "";
 char opt_leveltrigger[30] = "", opt_edgetrigger[30] = "";
 /*
  * opt_xenheap_megabytes: Size of Xen heap in megabytes, including:
- * 	xen image
+ *	xen image
  *	bootmap bits
  *	xen heap
  * Note: To allow xenheap size configurable, the prerequisite is
@@ -147,10 +138,9 @@ static void __init do_initcalls(void)
         (*call)();
 }
 
-void cmain(multiboot_info_t *mbi)
+void start_kernel(void)
 {
     unsigned char *cmdline;
-    module_t *mod = (module_t *)__va(mbi->mods_addr);
     void *heap_start;
     int i;
     unsigned long max_mem, nr_pages, firsthole_start;
@@ -162,7 +152,8 @@ void cmain(multiboot_info_t *mbi)
     xen_pstart = ia64_tpa(KERNEL_START);
 
     /* Must do this early -- e.g., spinlocks rely on get_current(). */
-    set_current(&idle0_exec_domain);
+    //set_current(&idle0_exec_domain);
+    ia64_r13 = (void *)&idle0_exec_domain;
     idle0_exec_domain.domain = &idle0_domain;
 
     early_setup_arch(&cmdline);
@@ -170,7 +161,7 @@ void cmain(multiboot_info_t *mbi)
     /* We initialise the serial devices very early so we can get debugging. */
     serial_init_stage1();
 
-    init_console(); 
+    init_console();
     set_printk_prefix("(XEN) ");
 
     /* xenheap should be in same TR-covered range with xen image */
@@ -201,7 +192,7 @@ void cmain(multiboot_info_t *mbi)
 	   ia64_boot_param->initrd_size);
     ia64_boot_param->initrd_start = initial_images_start;
     printk("Done\n");
-    
+
     /* first find highest page frame number */
     max_page = 0;
     efi_memmap_walk(find_max_pfn, &max_page);
@@ -217,7 +208,7 @@ void cmain(multiboot_info_t *mbi)
     efi_memmap_walk(filter_rsvd_memory, init_boot_pages);
     efi_memmap_walk(xen_count_pages, &nr_pages);
 
-    printk("System RAM: %luMB (%lukB)\n", 
+    printk("System RAM: %luMB (%lukB)\n",
 	nr_pages >> (20 - PAGE_SHIFT),
 	nr_pages << (PAGE_SHIFT - 10));
 
@@ -267,7 +258,7 @@ printk("About to call init_idle_task()\n");
     {
     int i;
     for (i = 0; i < CLONE_DOMAIN0; i++) {
-    	clones[i] = do_createdomain(i+1, 0);
+	clones[i] = do_createdomain(i+1, 0);
         if ( clones[i] == NULL )
             panic("Error creating domain0 clone %d\n",i);
     }
@@ -277,9 +268,6 @@ printk("About to call init_idle_task()\n");
         panic("Error creating domain 0\n");
 
     set_bit(DF_PRIVILEGED, &dom0->d_flags);
-
-//printk("About to call shadow_mode_init()\n");
-//    shadow_mode_init();
 
     /*
      * We're going to setup domain0 using the module(s) that we stashed safely

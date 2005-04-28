@@ -237,17 +237,34 @@ void physdev_destroy_state(struct domain *d)
 	dummy();
 }
 
-// accomodate linux extable.c
-//const struct exception_table_entry *
-void *search_module_extables(unsigned long addr)
+///////////////////////////////
+// called from arch/ia64/head.S
+///////////////////////////////
+
+void console_print(char *msg)
 {
-	return NULL;
+	printk("console_print called, how did start_kernel return???\n");
 }
 
-void *module_text_address(unsigned long addr)
+void kernel_thread_helper(void)
 {
-	return NULL;
+	printk("kernel_thread_helper not implemented\n");
+	dummy();
 }
+
+void sys_exit(void)
+{
+	printk("sys_exit not implemented\n");
+	dummy();
+}
+
+
+
+// accomodate linux extable.c
+//const struct exception_table_entry *
+void *search_module_extables(unsigned long addr) { return NULL; }
+void *__module_text_address(unsigned long addr) { return NULL; }
+void *module_text_address(unsigned long addr) { return NULL; }
 
 void cs10foo(void) {}
 void cs01foo(void) {}
