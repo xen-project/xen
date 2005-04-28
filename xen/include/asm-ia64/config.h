@@ -136,6 +136,7 @@ struct page;
 #define __cacheline_aligned
 #define ____cacheline_aligned
 #define ____cacheline_aligned_in_smp
+#define ____cacheline_maxaligned_in_smp
 
 #include "asm/types.h"	// for u64
 struct device {
@@ -222,20 +223,26 @@ void sort_main_extable(void);
 // FIXME following needs work
 #define atomic_compareandswap(old, new, v) old
 
-// x86 typedef still used in sched.h, may go away later
-//typedef unsigned long l1_pgentry_t;
-
 // see include/asm-ia64/mm.h, handle remaining pfn_info uses until gone
 #define pfn_info page
 
 // see common/keyhandler.c
 #define	nop()	asm volatile ("nop 0")
 
-#define ARCH_HAS_EXEC_DOMAIN_MM_PTR
-
 // from include/linux/preempt.h (needs including from interrupt.h or smp.h)
 #define preempt_enable()	do { } while (0)
 #define preempt_disable()	do { } while (0)
+
+// needed for include/xen/linuxtime.h
+typedef s64 time_t;
+typedef s64 suseconds_t;
+
+// used in common code
+#define softirq_pending(cpu)	(cpu_data(cpu)->softirq_pending)
+
+// dup'ed from signal.h to avoid changes to includes
+#define	SA_SHIRQ	0x04000000
+#define	SA_INTERRUPT	0x20000000
 
 // these declarations got moved at some point, find a better place for them
 extern int opt_noht;

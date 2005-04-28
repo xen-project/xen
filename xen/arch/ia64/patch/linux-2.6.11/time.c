@@ -1,5 +1,5 @@
 --- ../../linux-2.6.11/arch/ia64/kernel/time.c	2005-03-02 00:37:50.000000000 -0700
-+++ arch/ia64/time.c	2005-04-26 15:43:01.000000000 -0600
++++ arch/ia64/time.c	2005-04-28 14:29:58.000000000 -0600
 @@ -10,16 +10,22 @@
   */
  #include <linux/config.h>
@@ -49,7 +49,7 @@
  
 +#ifdef XEN
 +volatile unsigned long last_nsec_offset;
-+extern rwlock_t xtime_lock;
++extern seqlock_t xtime_lock;
 +unsigned long cpu_khz;  /* Detected as we calibrate the TSC */
 +static s_time_t        stime_irq;       /* System time at last 'time update' */
 +

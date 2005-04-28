@@ -259,6 +259,12 @@ void sys_exit(void)
 }
 
 
+////////////////////////////////////
+// called from irq_ia64.c:init_IRQ()
+//   (because CONFIG_IA64_HP_SIM is specified)
+////////////////////////////////////
+void hpsim_irq_init(void) { }
+
 
 // accomodate linux extable.c
 //const struct exception_table_entry *

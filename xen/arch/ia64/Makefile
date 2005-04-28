@@ -9,7 +9,7 @@ OBJS = xensetup.o setup.o time.o irq.o ia64_ksyms.o process.o smp.o \
 	sal.o cmdline.o mm_init.o tlb.o smpboot.o \
 	extable.o linuxextable.o \
 	regionreg.o entry.o unaligned.o privop.o vcpu.o \
-	irq_ia64.o irq_lsapic.o hpsim_irq.o vhpt.o xenasm.o dom_fw.o
+	irq_ia64.o irq_lsapic.o vhpt.o xenasm.o dom_fw.o
 # perfmon.o
 # unwind.o needed for kernel unwinding (rare)
 
