@@ -278,6 +278,11 @@ if (!i--) { printk("+",id); cnt[id] = 100; }
 	if (vcpu_timer_expired(current)) vcpu_pend_timer(current);
 }
 
+void continue_running(struct exec_domain *same)
+{
+    /* nothing to do */
+}
+
 void panic_domain(struct pt_regs *regs, const char *fmt, ...)
 {
 	va_list args;

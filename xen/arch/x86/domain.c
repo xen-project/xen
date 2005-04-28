@@ -794,7 +794,12 @@ void context_switch(struct exec_domain *prev, struct exec_domain *next)
     clear_bit(EDF_RUNNING, &prev->ed_flags);
 
     schedule_tail(next);
+    BUG();
+}
 
+void continue_running(struct exec_domain *same)
+{
+    schedule_tail(same);
     BUG();
 }
 

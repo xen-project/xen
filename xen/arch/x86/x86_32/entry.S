@@ -652,6 +652,12 @@ ENTRY(setup_vm86_frame)
         addl $16,%esp
         ret
 
+do_arch_sched_op:
+        # Ensure we return success even if we return via schedule_tail()
+        xorl %eax,%eax
+        movl %eax,UREGS_eax+4(%esp)
+        jmp  SYMBOL_NAME(do_sched_op)
+
 do_switch_vm86:
         # Discard the return address
         addl $4,%esp
@@ -718,7 +724,7 @@ ENTRY(hypercall_table)
         .long SYMBOL_NAME(do_stack_switch)
         .long SYMBOL_NAME(do_set_callbacks)
         .long SYMBOL_NAME(do_fpu_taskswitch)     /*  5 */
-        .long SYMBOL_NAME(do_sched_op)
+        .long SYMBOL_NAME(do_arch_sched_op)
         .long SYMBOL_NAME(do_dom0_op)
         .long SYMBOL_NAME(do_set_debugreg)
         .long SYMBOL_NAME(do_get_debugreg)
