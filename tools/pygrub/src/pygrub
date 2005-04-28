@@ -19,6 +19,8 @@ import logging
 import curses, _curses, curses.wrapper
 import getopt
 
+sys.path = [ '/usr/lib/python' ] + sys.path
+
 import grub.GrubConf
 import grub.fsys
 
@@ -78,7 +80,6 @@ def is_disk_image(file):
     if len(buf) >= 512 and struct.unpack("H", buf[0x1fe: 0x200]) == (0xaaff):
         return True
     return False
-    
 
 def get_config(fn):
     if not os.access(fn, os.R_OK):
@@ -97,7 +98,14 @@ def get_config(fn):
             break
 
     if fs is not None:
-        f = fs.open_file("/boot/grub/grub.conf")
+        if fs.file_exist("/boot/grub/menu.lst"):
+            grubfile = "/boot/grub/menu.lst"
+        elif fs.file_exist("/boot/grub/grub.conf"):
+            grubfile = "/boot/grub/grub.conf"
+        else:
+            raise RuntimeError, "we couldn't find /boot/grub{menu.lst,grub.conf} " + \
+                                "in the image provided. halt!"
+        f = fs.open_file(grubfile)
         buf = f.read()
         f.close()
         fs.close()

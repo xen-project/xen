@@ -49,7 +49,10 @@ class FileSystem(object):
         should look similar to a native file object."""
         raise RuntimeError, "open_file not implemented"
     
-
+    def file_exist(self, file):
+        """Check to see if the give file is existed.
+        Return true if file existed, return false otherwise."""
+        raise RuntimeError, "file_exist not implemented"
 
 mydir = sys.modules['grub.fsys'].__path__[0]
 for f in os.listdir(mydir):

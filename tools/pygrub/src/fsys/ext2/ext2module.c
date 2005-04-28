@@ -174,6 +174,25 @@ ext2_file_open (Ext2Fs *fs, char * name, int flags)
     return (PyObject *) file;
 }
 
+static PyObject *
+ext2_file_exist (Ext2Fs *fs, char * name)
+{
+    int err;
+    ext2_ino_t ino;
+    Ext2File * file;
+
+    file = (Ext2File *) PyObject_NEW(Ext2File, &Ext2FileType);
+    file->file = NULL;
+
+    err = ext2fs_namei_follow(fs->fs, EXT2_ROOT_INO, EXT2_ROOT_INO, name, &ino);
+    if (err) {
+        Py_INCREF(Py_False);
+        return Py_False;
+    }
+    Py_INCREF(Py_True);
+    return Py_True;
+}
+
 /* ext2fs object */
 
 static PyObject *
@@ -231,6 +250,18 @@ ext2_fs_open_file (Ext2Fs *fs, PyObject *args, PyObject *kwargs)
     return ext2_file_open(fs, name, flags);
 }
 
+static PyObject *
+ext2_fs_file_exist (Ext2Fs *fs, PyObject *args, PyObject *kwargs)
+{
+    static char *kwlist[] = { "name", NULL };
+    char * name;
+
+    if (!PyArg_ParseTupleAndKeywords(args, kwargs, "s", kwlist, &name))
+                                     return NULL;
+
+    return ext2_file_exist(fs, name);
+}
+
 static void
 ext2_fs_dealloc (Ext2Fs * fs)
 {
@@ -248,6 +279,9 @@ static struct PyMethodDef Ext2FsMethods[] = {
           METH_VARARGS|METH_KEYWORDS, NULL },
         { "open_file",
           (PyCFunction) ext2_fs_open_file,
+          METH_VARARGS|METH_KEYWORDS, NULL },
+        { "file_exist",
+          (PyCFunction) ext2_fs_file_exist,
           METH_VARARGS|METH_KEYWORDS, NULL },
 	{ NULL, NULL, 0, NULL }	
 };
@@ -312,21 +346,20 @@ ext2_fs_new(PyObject *o, PyObject *args, PyObject *kwargs)
     return (PyObject *)pfs;
 }
 
-
 static struct PyMethodDef Ext2ModuleMethods[] = {
     { "Ext2Fs", (PyCFunction) ext2_fs_new, METH_VARARGS|METH_KEYWORDS, NULL },
     { NULL, NULL, 0, NULL }
 };
 
-
 void init_pyext2(void) {
-    PyObject *m, *d;
+    PyObject *m;
 
     m = Py_InitModule("_pyext2", Ext2ModuleMethods);
-    d = PyModule_GetDict(m);
-
-    /*    o = PyObject_NEW(PyObject, yExt2FsConstructorType);
-    PyDict_SetItemString(d, "PyExt2Fs", o);
-    Py_DECREF(o);*/
-                      
+    /*
+     * PyObject *d;
+     * d = PyModule_GetDict(m);
+     * o = PyObject_NEW(PyObject, yExt2FsConstructorType);
+     * PyDict_SetItemString(d, "PyExt2Fs", o);
+     * Py_DECREF(o);
+     */
 }
