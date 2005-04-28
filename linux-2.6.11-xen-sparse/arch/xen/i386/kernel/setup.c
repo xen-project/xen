@@ -40,6 +40,8 @@
 #include <linux/efi.h>
 #include <linux/init.h>
 #include <linux/edd.h>
+#include <linux/kernel.h>
+#include <linux/notifier.h>
 #include <video/edid.h>
 #include <asm/e820.h>
 #include <asm/mpspec.h>
@@ -55,6 +57,11 @@
 
 /* Allows setting of maximum possible memory size  */
 static unsigned long xen_override_max_pfn;
+
+static int xen_panic_event(struct notifier_block *, unsigned long, void *);
+static struct notifier_block xen_panic_block = {
+	xen_panic_event, NULL, 0 /* try to go last */
+};
 
 int disable_pse __initdata = 0;
 
@@ -347,7 +354,7 @@ static void __init probe_roms(void)
 shared_info_t *HYPERVISOR_shared_info = (shared_info_t *)empty_zero_page;
 EXPORT_SYMBOL(HYPERVISOR_shared_info);
 
-unsigned long *phys_to_machine_mapping, *pfn_to_mfn_frame_list;
+unsigned int *phys_to_machine_mapping, *pfn_to_mfn_frame_list;
 EXPORT_SYMBOL(phys_to_machine_mapping);
 
 multicall_entry_t multicall_list[8];
@@ -892,6 +899,7 @@ efi_find_max_pfn(unsigned long start, unsigned long end, void *arg)
 	return 0;
 }
 
+
 /*
  * Find the highest page frame number we have available
  */
@@ -1151,7 +1159,7 @@ static unsigned long __init setup_memory(void)
 	}
 #endif
 
-	phys_to_machine_mapping = (unsigned long *)xen_start_info.mfn_list;
+	phys_to_machine_mapping = (unsigned int *)xen_start_info.mfn_list;
 
 	return max_low_pfn;
 }
@@ -1388,17 +1396,18 @@ static void set_mca_bus(int x) { }
  */
 void __init setup_arch(char **cmdline_p)
 {
-        int i,j;
-
-        unsigned long max_low_pfn;
+	int i, j;
+	unsigned long max_low_pfn;
 
 	/* Force a quick death if the kernel panics. */
 	extern int panic_timeout;
-	if ( panic_timeout == 0 )
+	if (panic_timeout == 0)
 		panic_timeout = 1;
 
-	HYPERVISOR_vm_assist(VMASST_CMD_enable,
-			     VMASST_TYPE_4gb_segments);
+	/* Register a call for panic conditions. */
+	notifier_chain_register(&panic_notifier_list, &xen_panic_block);
+
+	HYPERVISOR_vm_assist(VMASST_CMD_enable, VMASST_TYPE_4gb_segments);
 
 	memcpy(&boot_cpu_data, &new_cpu_data, sizeof(new_cpu_data));
 	early_cpu_init();
@@ -1464,7 +1473,8 @@ void __init setup_arch(char **cmdline_p)
 	init_mm.start_code = (unsigned long) _text;
 	init_mm.end_code = (unsigned long) _etext;
 	init_mm.end_data = (unsigned long) _edata;
-	init_mm.brk = (PFN_UP(__pa(xen_start_info.pt_base)) + xen_start_info.nr_pt_frames) << PAGE_SHIFT;
+	init_mm.brk = (PFN_UP(__pa(xen_start_info.pt_base)) +
+		       xen_start_info.nr_pt_frames) << PAGE_SHIFT;
 
 	/* XEN: This is nonsense: kernel may not even be contiguous in RAM. */
 	/*code_resource.start = virt_to_phys(_text);*/
@@ -1497,7 +1507,7 @@ void __init setup_arch(char **cmdline_p)
 			max_pfn * sizeof(unsigned long));
 
 		if (max_pfn > xen_start_info.nr_pages) {
-			/* set to INVALID_P2M_ENTRY */                        
+			/* set to INVALID_P2M_ENTRY */
 			memset(phys_to_machine_mapping, ~0,
 				max_pfn * sizeof(unsigned long));
 			memcpy(phys_to_machine_mapping,
@@ -1608,6 +1618,14 @@ void __init setup_arch(char **cmdline_p)
 		console_use_vt = 0;
 #endif
 	}
+}
+
+static int
+xen_panic_event(struct notifier_block *this, unsigned long event, void *ptr)
+{
+	HYPERVISOR_crash();    
+	/* we're never actually going to get here... */
+	return NOTIFY_DONE;
 }
 
 #include "setup_arch_post.h"

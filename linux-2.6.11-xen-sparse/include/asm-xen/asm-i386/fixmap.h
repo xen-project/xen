@@ -84,7 +84,6 @@ enum fixed_addresses {
 	FIX_PCIE_MCFG,
 #endif
 	FIX_SHARED_INFO,
-	FIX_GNTTAB,
 #ifdef CONFIG_XEN_PHYSDEV_ACCESS
 #define NR_FIX_ISAMAPS	256
 	FIX_ISAMAP_END,

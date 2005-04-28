@@ -125,6 +125,7 @@ static inline void load_LDT(mm_context_t *pc)
 {
 	int cpu = get_cpu();
 	load_LDT_nolock(pc, cpu);
+	flush_page_update_queue();
 	put_cpu();
 }
 

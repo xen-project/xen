@@ -41,9 +41,6 @@
  * LOW-LEVEL DEFINITIONS
  */
 
-/* Force a proper event-channel callback from Xen. */
-void force_evtchn_callback(void);
-
 /* Entry point for notifications into Linux subsystems. */
 asmlinkage void evtchn_do_upcall(struct pt_regs *regs);
 

@@ -2,7 +2,9 @@
 #include <linux/config.h>
 
 .section __xen_guest
-	.ascii	"GUEST_OS=linux,GUEST_VER=2.6,XEN_VER=2.0,VIRT_BASE=0xC0000000"
+	.ascii	"GUEST_OS=linux,GUEST_VER=2.6"
+	.ascii	",XEN_VER=2.0"
+	.ascii	",VIRT_BASE=0xC0000000"
 	.ascii	",LOADER=generic"
 	.ascii	",PT_MODE_WRITABLE"
 	.byte	0
@@ -31,13 +33,18 @@
 ENTRY(startup_32)
 	cld
 
-	/* Set up the stack pointer */
-	lss stack_start,%esp
-
 	/* Copy the necessary stuff from xen_start_info structure. */
 	mov  $xen_start_info_union,%edi
 	mov  $128,%ecx
 	rep movsl
+
+#ifdef CONFIG_SMP
+ENTRY(startup_32_smp)
+	cld
+#endif /* CONFIG_SMP */
+
+	/* Set up the stack pointer */
+	lss stack_start,%esp
 
 checkCPUtype:
 
@@ -61,11 +68,22 @@ checkCPUtype:
 	movb %cl,X86_MASK
 	movl %edx,X86_CAPABILITY
 
-	xorl %eax,%eax		# Clear FS/GS and LDT
+	incb ready
+
+	xorl %eax,%eax			# Clear FS/GS and LDT
 	movl %eax,%fs
 	movl %eax,%gs
-	cld		# gcc2 wants the direction flag cleared at all times
+	cld			# gcc2 wants the direction flag cleared at all times
 
+#ifdef CONFIG_SMP
+	movb ready, %cl	
+	cmpb $1,%cl
+	je 1f			# the first CPU calls start_kernel
+				# all other CPUs call initialize_secondary
+	call initialize_secondary
+	jmp L6
+1:
+#endif /* CONFIG_SMP */
 	call start_kernel
 L6:
 	jmp L6			# main should never return here, but
@@ -87,6 +105,8 @@ ENTRY(lgdt_finish)
 ENTRY(stack_start)
 	.long init_thread_union+THREAD_SIZE
 	.long __BOOT_DS
+
+ready:	.byte 0
 
 .globl idt_descr
 .globl cpu_gdt_descr

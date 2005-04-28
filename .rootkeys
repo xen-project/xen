@@ -246,7 +246,6 @@
 41ab6fa06JdF7jxUsuDcjN3UhuIAxg linux-2.6.11-xen-sparse/arch/xen/kernel/devmem.c
 40f56238xFQe9T7M_U_FItM-bZIpLw linux-2.6.11-xen-sparse/arch/xen/kernel/evtchn.c
 4110f478aeQWllIN7J4kouAHiAqrPw linux-2.6.11-xen-sparse/arch/xen/kernel/fixup.c
-412dfae9eA3_6e6bCGUtg1mj8b56fQ linux-2.6.11-xen-sparse/arch/xen/kernel/gnttab.c
 40f562392LBhwmOxVPsYdkYXMxI_ZQ linux-2.6.11-xen-sparse/arch/xen/kernel/reboot.c
 414c113396tK1HTVeUalm3u-1DF16g linux-2.6.11-xen-sparse/arch/xen/kernel/skbuff.c
 3f68905c5eiA-lBMQSvXLMWS1ikDEA linux-2.6.11-xen-sparse/arch/xen/kernel/xen_proc.c
@@ -314,7 +313,6 @@
 40f5623bYNP7tHE2zX6YQxp9Zq2utQ linux-2.6.11-xen-sparse/include/asm-xen/ctrl_if.h
 40f5623b3Eqs8pAc5WpPX8_jTzV2qw linux-2.6.11-xen-sparse/include/asm-xen/evtchn.h
 419b4e9367PjTEvdjwavWN12BeBBXg linux-2.6.11-xen-sparse/include/asm-xen/foreign_page.h
-412dfaeazclyNDM0cpnp60Yo4xulpQ linux-2.6.11-xen-sparse/include/asm-xen/gnttab.h
 40f5623aGPlsm0u1LTO-NVZ6AGzNRQ linux-2.6.11-xen-sparse/include/asm-xen/hypervisor.h
 3f108af1ylCIm82H052FVTfXACBHrw linux-2.6.11-xen-sparse/include/asm-xen/linux-public/privcmd.h
 3fa8e3f0kBLeE4To2vpdi3cpJbIkbQ linux-2.6.11-xen-sparse/include/asm-xen/linux-public/suspend.h

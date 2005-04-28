@@ -39,8 +39,10 @@
 #include <asm-xen/xen-public/io/domain_controller.h>
 #include <asm/ptrace.h>
 #include <asm/page.h>
+#if defined(__i386__)
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,0)
 #include <asm-generic/pgtable-nopmd.h>
+#endif
 #endif
 
 /* arch/xen/i386/kernel/setup.c */
@@ -51,6 +53,10 @@ union xen_start_info_union
 };
 extern union xen_start_info_union xen_start_info_union;
 #define xen_start_info (xen_start_info_union.xen_start_info)
+
+/* arch/xen/kernel/evtchn.c */
+/* Force a proper event-channel callback from Xen. */
+void force_evtchn_callback(void);
 
 /* arch/xen/kernel/process.c */
 void xen_cpu_idle (void);

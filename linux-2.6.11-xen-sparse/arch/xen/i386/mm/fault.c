@@ -228,10 +228,10 @@ fastcall void do_page_fault(struct pt_regs *regs, unsigned long error_code,
 	error_code |= (regs->xcs & 2) << 1;
 	if (regs->eflags & X86_EFLAGS_VM)
 		error_code |= 4;
-		
- 	if (notify_die(DIE_PAGE_FAULT, "page fault", regs, error_code, 14,
- 					SIGSEGV) == NOTIFY_STOP)
- 		return;
+
+	if (notify_die(DIE_PAGE_FAULT, "page fault", regs, error_code, 14,
+					SIGSEGV) == NOTIFY_STOP)
+		return;
 #if 0
 	/* It's safe to allow irq's after cr2 has been saved */
 	if (regs->eflags & (X86_EFLAGS_IF|VM_MASK))

@@ -444,7 +444,7 @@ struct alt_instr {
 /* 
  * The use of 'barrier' in the following reflects their use as local-lock
  * operations. Reentrancy must be prevented (e.g., __cli()) /before/ following
- * critical operations are executed. All critical operatiosn must complete
+ * critical operations are executed. All critical operations must complete
  * /before/ reentrancy is permitted (e.g., __sti()). Alpha architecture also
  * includes these barriers, for example.
  */

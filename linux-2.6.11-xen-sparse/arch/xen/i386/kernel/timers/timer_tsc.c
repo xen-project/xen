@@ -266,7 +266,7 @@ static unsigned long cpu_khz_ref = 0;
 
 static int
 time_cpufreq_notifier(struct notifier_block *nb, unsigned long val,
-		      void *data)
+		       void *data)
 {
 	struct cpufreq_freqs *freq = data;
 
@@ -338,7 +338,7 @@ static int init_tsc(char* override)
 
 	/* (10^6 * 2^32) / cpu_hz = (10^3 * 2^32) / cpu_khz =
 	   (2^32 * 1 / (clocks/us)) */
-	{	
+	{
 		unsigned long eax=0, edx=1000;
 		__asm__("divl %2"
 		    :"=a" (fast_gettimeoffset_quotient), "=d" (edx)

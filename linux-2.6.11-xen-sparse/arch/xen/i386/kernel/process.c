@@ -94,10 +94,11 @@ EXPORT_SYMBOL(enable_hlt);
 extern int set_timeout_timer(void);
 void xen_idle(void)
 {
-	int cpu = smp_processor_id();
+	int cpu;
 
 	local_irq_disable();
 
+	cpu = smp_processor_id();
 	if (rcu_pending(cpu))
 		rcu_check_callbacks(cpu, 0);
 
@@ -167,7 +168,7 @@ void show_regs(struct pt_regs * regs)
 	if (regs->xcs & 2)
 		printk(" ESP: %04x:%08lx",0xffff & regs->xss,regs->esp);
 	printk(" EFLAGS: %08lx    %s  (%s)\n",
-	       regs->eflags, print_tainted(),UTS_RELEASE);
+	       regs->eflags, print_tainted(), system_utsname.release);
 	printk("EAX: %08lx EBX: %08lx ECX: %08lx EDX: %08lx\n",
 		regs->eax,regs->ebx,regs->ecx,regs->edx);
 	printk("ESI: %08lx EDI: %08lx EBP: %08lx",

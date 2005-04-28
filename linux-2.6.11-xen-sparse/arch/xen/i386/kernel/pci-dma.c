@@ -49,11 +49,11 @@ xen_contig_memory(unsigned long vstart, unsigned int order)
 
 	/* 1. Zap current PTEs, giving away the underlying pages. */
 	for (i = 0; i < (1<<order); i++) {
-		pgd = pgd_offset_k(   (vstart + (i*PAGE_SIZE)));
-		pud = pud_offset(pgd, (vstart + (i*PAGE_SIZE)));
-		pmd = pmd_offset(pud, (vstart + (i*PAGE_SIZE)));
-		pte = pte_offset_kernel(pmd, (vstart + (i*PAGE_SIZE)));
-		pfn = pte->pte_low >> PAGE_SHIFT;
+		pgd = pgd_offset_k(vstart + (i*PAGE_SIZE));
+		pud = pud_offset(pgd, vstart + (i*PAGE_SIZE));
+		pmd = pmd_offset(pud, vstart + (i*PAGE_SIZE));
+		pte = pte_offset_kernel(pmd, vstart + (i*PAGE_SIZE));
+		pfn = pte_val_ma(*pte) >> PAGE_SHIFT;
 		queue_l1_entry_update(pte, 0);
 		phys_to_machine_mapping[(__pa(vstart)>>PAGE_SHIFT)+i] =
 			INVALID_P2M_ENTRY;
@@ -66,21 +66,19 @@ xen_contig_memory(unsigned long vstart, unsigned int order)
 				  &pfn, 1, order) != 1) BUG();
 	/* 3. Map the new extent in place of old pages. */
 	for (i = 0; i < (1<<order); i++) {
-		pgd = pgd_offset_k(   (vstart + (i*PAGE_SIZE)));
-		pud = pud_offset(pgd, (vstart + (i*PAGE_SIZE)));
-		pmd = pmd_offset(pud, (vstart + (i*PAGE_SIZE)));
-		pte = pte_offset_kernel(pmd, (vstart + (i*PAGE_SIZE)));
-		queue_l1_entry_update(
-			pte, ((pfn+i)<<PAGE_SHIFT)|__PAGE_KERNEL);
-		queue_machphys_update(
-			pfn+i, (__pa(vstart)>>PAGE_SHIFT)+i);
-		phys_to_machine_mapping[(__pa(vstart)>>PAGE_SHIFT)+i] =
-			pfn+i;
+		pgd = pgd_offset_k(vstart + (i*PAGE_SIZE));
+		pud = pud_offset(pgd, vstart + (i*PAGE_SIZE));
+		pmd = pmd_offset(pud, vstart + (i*PAGE_SIZE));
+		pte = pte_offset_kernel(pmd, vstart + (i*PAGE_SIZE));
+		queue_l1_entry_update(pte,
+				      ((pfn+i)<<PAGE_SHIFT)|__PAGE_KERNEL);
+		queue_machphys_update(pfn+i, (__pa(vstart)>>PAGE_SHIFT)+i);
+		phys_to_machine_mapping[(__pa(vstart)>>PAGE_SHIFT)+i] = pfn+i;
 	}
 	/* Flush updates through and flush the TLB. */
 	xen_tlb_flush();
 
-        balloon_unlock(flags);
+	balloon_unlock(flags);
 }
 
 #if LINUX_VERSION_CODE < KERNEL_VERSION(2,6,0)
@@ -125,14 +123,13 @@ void *dma_alloc_coherent(struct device *dev, size_t size,
 
 	vstart = __get_free_pages(gfp, order);
 	ret = (void *)vstart;
-	if (ret == NULL)
-		return ret;
 
-	xen_contig_memory(vstart, order);
+	if (ret != NULL) {
+		xen_contig_memory(vstart, order);
 
-	memset(ret, 0, size);
-	*dma_handle = virt_to_bus(ret);
-
+		memset(ret, 0, size);
+		*dma_handle = virt_to_bus(ret);
+	}
 	return ret;
 }
 

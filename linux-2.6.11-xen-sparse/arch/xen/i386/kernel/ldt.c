@@ -22,10 +22,8 @@
 #ifdef CONFIG_SMP /* avoids "defined but not used" warnig */
 static void flush_ldt(void *null)
 {
-	if (current->active_mm) {
+	if (current->active_mm)
 		load_LDT(&current->active_mm->context);
-		flush_page_update_queue();
-	}
 }
 #endif
 
@@ -64,7 +62,6 @@ static int alloc_ldt(mm_context_t *pc, int mincount, int reload)
 		make_pages_readonly(pc->ldt, (pc->size * LDT_ENTRY_SIZE) /
 				    PAGE_SIZE);
 		load_LDT(pc);
-		flush_page_update_queue();
 #ifdef CONFIG_SMP
 		mask = cpumask_of_cpu(smp_processor_id());
 		if (!cpus_equal(current->mm->cpu_vm_mask, mask))

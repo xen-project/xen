@@ -80,7 +80,7 @@ static void __do_suspend(void)
     extern void time_suspend(void);
     extern void time_resume(void);
     extern unsigned long max_pfn;
-    extern unsigned long *pfn_to_mfn_frame_list;
+    extern unsigned int *pfn_to_mfn_frame_list;
 
     suspend_record = (suspend_record_t *)__get_free_page(GFP_KERNEL);
     if ( suspend_record == NULL )
@@ -103,7 +103,8 @@ static void __do_suspend(void)
     HYPERVISOR_shared_info = (shared_info_t *)empty_zero_page;
     clear_fixmap(FIX_SHARED_INFO);
 
-    memcpy(&suspend_record->resume_info, &xen_start_info, sizeof(xen_start_info));
+    memcpy(&suspend_record->resume_info, &xen_start_info,
+	   sizeof(xen_start_info));
 
     HYPERVISOR_suspend(virt_to_machine(suspend_record) >> PAGE_SHIFT);
 
@@ -116,7 +117,8 @@ static void __do_suspend(void)
 
     shutting_down = -1; 
 
-    memcpy(&xen_start_info, &suspend_record->resume_info, sizeof(xen_start_info));
+    memcpy(&xen_start_info, &suspend_record->resume_info,
+	   sizeof(xen_start_info));
 
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,0)
     set_fixmap_ma(FIX_SHARED_INFO, xen_start_info.shared_info);
