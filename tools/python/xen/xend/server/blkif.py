@@ -71,6 +71,15 @@ def blkdev_segment(name):
                 'type'         : 'Disk' }
     return val
 
+def blkdev_uname_to_file(uname):
+    """Take a blkdev uname and return the corresponding filename."""
+    fn = None
+    if uname.find(":") != -1:
+        (typ, fn) = uname.split(":")
+        if typ == "phy" and not fn.startswith("/dev/"):
+            fn = "/dev/%s" %(fn,)
+    return fn
+
 def mount_mode(name):
     mode = None
     name = expand_dev_name(name)

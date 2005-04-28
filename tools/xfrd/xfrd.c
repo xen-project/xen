@@ -49,7 +49,7 @@
 #include "select.h"
 
 #define MODULE_NAME "XFRD"
-
+#define DEBUG 1
 #include "debug.h"
 
 /*
@@ -1226,7 +1226,9 @@ int main(int argc, char *argv[]){
     int err = 0;
     int key = 0;
     int long_index = 0;
+#ifndef DEBUG
     static const char * LOGFILE = "/var/log/xfrd.log";
+#endif
 
 #ifndef DEBUG
     freopen(LOGFILE, "w+", stdout);

@@ -799,6 +799,15 @@
 4107986eMWVdBoz4tXYoOscpN_BCYg tools/misc/xensv
 4056f5155QYZdsk-1fLdjsZPFTnlhg tools/misc/xensymoops
 40cf2937dqM1jWW87O5OoOYND8leuA tools/misc/xm
+4270cc81g3nSNYCZ1ryCMDEbLtMtbQ tools/pygrub/Makefile
+4270cc81EIl7NyaS3Av6IPRk2c2a6Q tools/pygrub/setup.py
+4270cc81t7eNCDp4Bhbh58p1CNxaCQ tools/pygrub/src/GrubConf.py
+4270d6c2fWF4r5-zF1pSuAFwUZS0aA tools/pygrub/src/__init__.py
+4270cc81CzKMiujDPWcaYhu709vGXw tools/pygrub/src/fsys/__init__.py
+4270cc81RTIiq9si0dI4YRTRE4KRMw tools/pygrub/src/fsys/ext2/__init__.py
+4270cc81YCYa4pexivBD2NdLE2F_Pg tools/pygrub/src/fsys/ext2/ext2module.c
+4270cc81o4BL5e8Cs87aSi8EXA5NtQ tools/pygrub/src/fsys/ext2/test.py
+4270cc81TS6L_tEO6wSp5wcURcpldQ tools/pygrub/src/pygrub
 40c9c468icGyC5RAF1bRKsCXPDCvsA tools/python/Makefile
 40ffc44dOwe1CcYXGCkYHdG_NxcccA tools/python/logging/logging-0.4.9.2/PKG-INFO
 40ffc44dpqpgqgrnLfR70PsiBc3liA tools/python/logging/logging-0.4.9.2/README.txt
@@ -896,6 +905,7 @@
 40c9c468Um_qc66OQeLEceIz1pgD5g tools/python/xen/xend/EventServer.py
 40c9c468QJTEuk9g4qHxGpmIi70PEQ tools/python/xen/xend/PrettyPrint.py
 40e15b7eeQxWE_hUPB2YTgM9fsZ1PQ tools/python/xen/xend/Vifctl.py
+4270cc81xbweGYhsM4326N3dX1bGHQ tools/python/xen/xend/XendBootloader.py
 40c9c4688m3eqnC8fhLu1APm36VOVA tools/python/xen/xend/XendClient.py
 40c9c468t6iIKTjwuYoe-UMCikDcOQ tools/python/xen/xend/XendConsole.py
 40c9c468WnXs6eOUSff23IIGI4kMfQ tools/python/xen/xend/XendDB.py

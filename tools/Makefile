@@ -11,6 +11,7 @@ SUBDIRS += python
 SUBDIRS += xfrd
 SUBDIRS += xcs
 SUBDIRS += ioemu
+SUBDIRS += pygrub
 
 .PHONY: all install clean check check_clean
 

@@ -10,6 +10,8 @@ import socket
 from xen.xend import sxp
 from xen.xend import PrettyPrint
 from xen.xend.XendClient import server, XendError
+from xen.xend.XendBootloader import bootloader
+from xen.xend.server import blkif
 
 from xen.util import console_client
 
@@ -93,6 +95,14 @@ gopts.var('vnc', val='no|yes',
 gopts.var('name', val='NAME',
           fn=set_value, default=None,
           use="Domain name. Must be unique.")
+
+gopts.var('bootloader', val='FILE',
+          fn=set_value, default=None,
+          use="Path to bootloader.")
+
+gopts.var('bootentry', val='NAME',
+          fn=set_value, default=None,
+          use="Entry to boot via boot loader")
 
 gopts.var('kernel', val='FILE',
           fn=set_value, default=None,
@@ -252,7 +262,7 @@ def strip(pre, s):
     else:
         return s
 
-def configure_image(config, vals):
+def configure_image(opts, config, vals):
     """Create the image config.
     """
     config_image = [ vals.builder ]
@@ -272,7 +282,7 @@ def configure_image(config, vals):
     config.append(['image', config_image ])
 
     
-def configure_disks(config_devs, vals):
+def configure_disks(opts, config_devs, vals):
     """Create the config for disks (virtual block devices).
     """
     for (uname, dev, mode, backend) in vals.disk:
@@ -284,14 +294,14 @@ def configure_disks(config_devs, vals):
             config_vbd.append(['backend', backend])
         config_devs.append(['device', config_vbd])
 
-def configure_pci(config_devs, vals):
+def configure_pci(opts, config_devs, vals):
     """Create the config for pci devices.
     """
     for (bus, dev, func) in vals.pci:
         config_pci = ['pci', ['bus', bus], ['dev', dev], ['func', func]]
         config_devs.append(['device', config_pci])
 
-def configure_usb(config_devs, vals):
+def configure_usb(opts, config_devs, vals):
     for path in vals.usb:
         config_usb = ['usb', ['path', path]]
         config_devs.append(['device', config_usb])
@@ -315,7 +325,7 @@ def randomMAC():
             random.randint(0x00, 0xff) ]
     return ':'.join(map(lambda x: "%02x" % x, mac))
 
-def configure_vifs(config_devs, vals):
+def configure_vifs(opts, config_devs, vals):
     """Create the config for virtual network interfaces.
     """
     vifs = vals.vif
@@ -357,7 +367,7 @@ def configure_vifs(config_devs, vals):
             config_vif.append(['ip', ip])
         config_devs.append(['device', config_vif])
 
-def configure_vfr(config, vals):
+def configure_vfr(opts, config, vals):
      if not vals.ipaddr: return
      config_vfr = ['vfr']
      idx = 0 # No way of saying which IP is for which vif?
@@ -365,7 +375,7 @@ def configure_vfr(config, vals):
          config_vfr.append(['vif', ['id', idx], ['ip', ip]])
      config.append(config_vfr)
 
-def configure_vmx(config_devs, vals):
+def configure_vmx(opts, config_devs, vals):
     """Create the config for VMX devices.
     """
     memmap = vals.memmap
@@ -375,7 +385,21 @@ def configure_vmx(config_devs, vals):
     config_devs.append(['device_model', device_model])
     config_devs.append(['device_config', device_config])
 
-def make_config(vals):
+def run_bootloader(opts, config, vals):
+    if not os.access(vals.bootloader, os.X_OK):
+        opts.err("Bootloader isn't executable")
+    if len(vals.disk) < 1:
+        opts.err("No disks configured and boot loader requested")
+    (uname, dev, mode, backend) = vals.disk[0]
+    file = blkif.blkdev_uname_to_file(uname)
+
+    blcfg = bootloader(vals.bootloader, file, not vals.console_autoconnect,
+                       vals.vcpus, vals.blentry)
+
+    config.append(['bootloader', vals.bootloader])
+    config.append(blcfg)
+
+def make_config(opts, vals):
     """Create the domain configuration.
     """
     
@@ -396,15 +420,19 @@ def make_config(vals):
         config.append(['restart', vals.restart])
     if vals.console:
         config.append(['console', vals.console])
-    
-    configure_image(config, vals)
+
+    if vals.bootloader:
+        run_bootloader(opts, config, vals)
+    else:
+        configure_image(opts, config, vals)
     config_devs = []
-    configure_disks(config_devs, vals)
-    configure_pci(config_devs, vals)
-    configure_vifs(config_devs, vals)
-    configure_usb(config_devs, vals)
-    configure_vmx(config_devs, vals)
+    configure_disks(opts, config_devs, vals)
+    configure_pci(opts, config_devs, vals)
+    configure_vifs(opts, config_devs, vals)
+    configure_usb(opts, config_devs, vals)
+    configure_vmx(opts, config_devs, vals)
     config += config_devs
+
     return config
 
 def preprocess_disk(opts, vals):
@@ -587,7 +615,8 @@ def main(argv):
         preprocess(opts, opts.vals)
         if not opts.getopt('name') and opts.getopt('defconfig'):
             opts.setopt('name', os.path.basename(opts.getopt('defconfig')))
-        config = make_config(opts.vals)
+        config = make_config(opts, opts.vals)
+
     if opts.vals.dryrun:
         PrettyPrint.prettyprint(config)
     else:
