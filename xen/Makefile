@@ -47,7 +47,8 @@ clean: delete-unfresh-files
 	rm -f include/asm-*/asm-offsets.h
 	rm -f tools/figlet/*.o tools/figlet/figlet
 
-$(TARGET): delete-unfresh-files include/xen/compile.h
+$(TARGET): delete-unfresh-files
+	$(MAKE) include/xen/compile.h
 	[ -e include/asm ] || ln -sf asm-$(TARGET_ARCH) include/asm
 	$(MAKE) -C arch/$(TARGET_ARCH) asm-offsets.s
 	$(MAKE) include/asm-$(TARGET_ARCH)/asm-offsets.h
@@ -55,8 +56,9 @@ $(TARGET): delete-unfresh-files include/xen/compile.h
 	$(MAKE) -C drivers
 	$(MAKE) -C arch/$(TARGET_ARCH)
 
+# drivers/char/console.o may contain static banner/compile info. Blow it away.
 delete-unfresh-files:
-	rm -f include/xen/compile.h
+	rm -f include/xen/banner.h include/xen/compile.h drivers/char/console.o
 	$(MAKE) -C arch/$(TARGET_ARCH) delete-unfresh-files
 
 # compile.h contains dynamic build info. Rebuilt on every 'make' invocation.
@@ -81,10 +83,9 @@ tools/figlet/figlet: tools/figlet/figlet.o
 tools/figlet/figlet.o: tools/figlet/figlet.c
 	$(HOSTCC) -o $@ -c $<
 
-.PHONY: include/xen/banner.h
 include/xen/banner.h: tools/figlet/figlet tools/figlet/xen.flf
 	tools/figlet/figlet -d tools/figlet Xen $(XEN_VERSION).$(XEN_SUBVERSION)$(XEN_EXTRAVERSION) > $@.new
-	@cmp $@.new $@ && rm -f $@.new || mv -f $@.new $@
+	@mv -f $@.new $@
 
 include/asm-$(TARGET_ARCH)/asm-offsets.h: arch/$(TARGET_ARCH)/asm-offsets.s
 	@(set -e; \
