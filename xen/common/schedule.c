@@ -228,7 +228,9 @@ long do_block(void)
 
     /* Check for events /after/ blocking: avoids wakeup waiting race. */
     if ( event_pending(ed) )
+    {
         clear_bit(EDF_BLOCKED, &ed->ed_flags);
+    }
     else
     {
         TRACE_2D(TRC_SCHED_BLOCK, ed->domain->id, ed->eid);
@@ -382,7 +384,7 @@ static void __enter_scheduler(void)
     spin_unlock_irq(&schedule_data[cpu].schedule_lock);
 
     if ( unlikely(prev == next) )
-        return;
+        return continue_running(prev);
     
     perfc_incrc(sched_ctx);
 

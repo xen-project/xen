@@ -523,6 +523,12 @@ ENTRY(nmi)
         call  SYMBOL_NAME(do_nmi)
 	jmp   restore_all_xen
 
+do_arch_sched_op:
+        # Ensure we return success even if we return via schedule_tail()
+        xorl  %eax,%eax
+        movq  %rax,UREGS_rax+8(%rsp)
+        jmp   SYMBOL_NAME(do_sched_op)
+
 .data
 
 ENTRY(exception_table)
@@ -554,7 +560,7 @@ ENTRY(hypercall_table)
         .quad SYMBOL_NAME(do_stack_switch)
         .quad SYMBOL_NAME(do_set_callbacks)
         .quad SYMBOL_NAME(do_fpu_taskswitch)     /*  5 */
-        .quad SYMBOL_NAME(do_sched_op)
+        .quad SYMBOL_NAME(do_arch_sched_op)
         .quad SYMBOL_NAME(do_dom0_op)
         .quad SYMBOL_NAME(do_set_debugreg)
         .quad SYMBOL_NAME(do_get_debugreg)
