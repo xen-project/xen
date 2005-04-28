@@ -20,6 +20,12 @@ class XendDB:
             self.dbpath = os.path.join(self.dbpath, path)
         pass
 
+    def listdir(self, dpath):
+        try:
+            return dircache.listdir(dpath)
+        except:
+            return []
+
     def filepath(self, path):
         return os.path.join(self.dbpath, path)
         
@@ -52,21 +58,37 @@ class XendDB:
         return self.savefile(fpath, sxpr)
     
     def savefile(self, fpath, sxpr):
+        backup = False
         fdir = os.path.dirname(fpath)
         if not os.path.isdir(fdir):
             os.makedirs(fdir)
+        if os.path.exists(fpath):
+            backup = True
+            real_fpath = fpath
+            fpath += ".new."
+            
         fout = file(fpath, "wb+")
         try:
-            t = time.strftime("%Y-%m-%d %H:%M:%S", time.localtime())
-            fout.write("# %s %s\n" % (fpath, t))
-            sxp.show(sxpr, out=fout)
-        finally:
-            fout.close()
+            try:
+                t = time.strftime("%Y-%m-%d %H:%M:%S", time.localtime())
+                fout.write("# %s %s\n" % (fpath, t))
+                sxp.show(sxpr, out=fout)
+            finally:
+                fout.close()
+        except:
+            if backup:
+                try:
+                    os.unlink(fpath)
+                except:
+                    pass
+                raise
+        if backup:
+            os.rename(fpath, real_fpath)
 
     def fetchall(self, path):
         dpath = self.filepath(path)
         d = {}
-        for k in dircache.listdir(dpath):
+        for k in self.listdir(dpath):
             try:
                 v = self.fetchfile(os.path.join(dpath, k))
                 d[k] = v
@@ -84,8 +106,7 @@ class XendDB:
 
     def ls(self, path):
         dpath = self.filepath(path)
-        return dircache.listdir(dpath)
-            
+        return self.listdir(dpath)
         
 
         
