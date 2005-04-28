@@ -16,11 +16,13 @@ import xen.lowlevel.xc; xc = xen.lowlevel.xc.new()
 import xen.util.ip
 from xen.util.ip import _readline, _readlines
 from xen.xend.server import channel, controller
+from xen.util.blkif import blkdev_uname_to_file
 
 from server.channel import channelFactory
 import server.SrvDaemon; xend = server.SrvDaemon.instance()
 from server import messages
 
+from xen.xend.XendBootloader import bootloader
 import sxp
 from XendLogging import log
 from XendError import VmError
@@ -294,6 +296,7 @@ class XendDomainInfo:
         self.image_handler = None
         self.is_vmx = False
         self.vcpus = 1
+        self.bootloader = None
 
     def setdom(self, dom):
         """Set the domain id.
@@ -496,6 +499,7 @@ class XendDomainInfo:
             self.find_image_handler()
             self.init_domain()
             self.register_domain()
+            self.configure_bootloader()
 
             # Create domain devices.
             self.configure_backends()
@@ -674,6 +678,13 @@ class XendDomainInfo:
         memory = memory * 1024 + self.pgtable_size(memory)
         dom = xc.domain_create(dom= dom, mem_kb= memory,
                                cpu= cpu, cpu_weight= cpu_weight)
+        if self.bootloader:
+            try:
+                if kernel: os.unlink(kernel)
+                if ramdisk: os.unlink(ramdisk)
+            except OSError, e:
+                log.warning('unable to unlink kernel/ramdisk: %s' %(e,))
+
         if dom <= 0:
             raise VmError('Creating domain failed: name=%s memory=%d'
                           % (self.name, memory))
@@ -854,6 +865,13 @@ class XendDomainInfo:
             self.config.remove(['device', dev_config])
         self.deleteDevice(type, dev.getId())
 
+    def configure_bootloader(self):
+        """Configure boot loader.
+        """
+        bl = sxp.child_value(self.config, "bootloader")
+        if bl is not None:
+            self.bootloader = bl
+
     def configure_console(self):
         """Configure the vm console port.
         """
@@ -931,9 +949,29 @@ class XendDomainInfo:
             self.state = STATE_VM_OK
             self.restart_check()
             self.restart_state = STATE_RESTART_BOOTING
+            if self.bootloader:
+                self.config = self.bootloader_config()
             self.construct(self.config)
         finally:
             self.restart_state = None
+
+    def bootloader_config(self):
+        # if we're restarting with a bootloader, we need to run it
+        # FIXME: this assumes the disk is the first device and
+        # that we're booting from the first disk
+        blcfg = None
+        # FIXME: this assumes that we want to use the first disk
+        dev = sxp.child_value(self.config, "device")
+        if dev:
+            disk = sxp.child_value(dev, "uname")
+            fn = blkdev_uname_to_file(disk)
+            blcfg = bootloader(self.bootloader, fn, 1, self.vcpus)
+        if blcfg is None:
+            msg = "Had a bootloader specified, but can't find disk"
+            log.error(msg)
+            raise VmError(msg)
+        config = sxp.merge(['vm', blconfig ], self.config)
+        return config
 
     def configure_backends(self):
         """Set configuration flags if the vm is a backend for netif or blkif.
@@ -1071,6 +1109,7 @@ def vm_image_linux(vm, image):
     if args:
         cmdline += " " + args
     ramdisk = sxp.child_value(image, "ramdisk", '')
+    log.debug("creating linux domain with cmdline: %s" %(cmdline,))
     vm.create_domain("linux", kernel, ramdisk, cmdline)
     return vm
 
@@ -1169,6 +1208,7 @@ add_config_handler('image',      vm_field_ignore)
 add_config_handler('device',     vm_field_ignore)
 add_config_handler('backend',    vm_field_ignore)
 add_config_handler('vcpus',      vm_field_ignore)
+add_config_handler('bootloader', vm_field_ignore)
 
 # Register other config handlers.
 add_config_handler('maxmem',     vm_field_maxmem)

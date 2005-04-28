@@ -1,0 +1,270 @@
+#!/usr/bin/python
+#
+# pygrub - simple python-based bootloader for Xen
+#
+# Copyright 2005 Red Hat, Inc.
+# Jeremy Katz <katzj@redhat.com>
+#
+# This software may be freely redistributed under the terms of the GNU
+# general public license.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program; if not, write to the Free Software
+# Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
+#
+
+import os, sys, string, struct, tempfile
+import logging
+
+import curses, _curses, curses.wrapper
+import getopt
+
+import grub.GrubConf
+import grub.fsys
+
+PYGRUB_VER = 0.02
+
+
+def draw_window():
+    stdscr = curses.initscr()
+    curses.use_default_colors()
+    try:
+        curses.curs_set(0)
+    except _curses.error:
+        pass
+
+    stdscr.addstr(1, 4, "pyGRUB  version %s" %(PYGRUB_VER,))
+
+    win = curses.newwin(10, 74, 2, 1)
+    win.box()
+    win.refresh()
+
+    stdscr.addstr(12, 5, "Use the U and D keys to select which entry is highlighted.")
+    stdscr.addstr(13, 5, "Press enter to boot the selected OS. 'e' to edit the")
+    stdscr.addstr(14, 5, "commands before booting, 'a' to modify the kernel arguments ")
+    stdscr.addstr(15, 5, "before booting, or 'c' for a command line.")
+    stdscr.addch(12, 13, curses.ACS_UARROW)
+    stdscr.addch(12, 19, curses.ACS_DARROW)
+    (y, x) = stdscr.getmaxyx()
+    stdscr.move(y - 1, x - 1)
+
+    stdscr.refresh()
+    return (stdscr, win)
+
+def fill_entries(win, cfg, selected):
+    y = 0
+
+    for i in cfg.images:
+        if (0, y) > win.getmaxyx():
+            break
+        if y == selected:
+            attr = curses.A_REVERSE
+        else:
+            attr = 0
+        win.addstr(y + 1, 2, i.title.ljust(70), attr)
+        y += 1
+    win.refresh()
+
+def select(win, line):
+    win.attron(curses.A_REVERSE)
+    win.redrawln(line + 1, 1)
+    win.refresh()
+
+def is_disk_image(file):
+    fd = os.open(file, os.O_RDONLY)
+    buf = os.read(fd, 512)
+    os.close(fd)
+
+    if len(buf) >= 512 and struct.unpack("H", buf[0x1fe: 0x200]) == (0xaaff):
+        return True
+    return False
+    
+
+def get_config(fn):
+    if not os.access(fn, os.R_OK):
+        raise RuntimeError, "Unable to access %s" %(fn,)
+
+    cf = grub.GrubConf.GrubConfigFile()
+
+    if is_disk_image(fn):
+        raise RuntimeError, "appears to be a full disk image... unable to handle this yet"
+
+    # open the image and read the grub config
+    fs = None
+    for fstype in grub.fsys.fstypes.values():
+        if fstype.sniff_magic(fn):
+            fs = fstype.open_fs(fn)
+            break
+
+    if fs is not None:
+        f = fs.open_file("/boot/grub/grub.conf")
+        buf = f.read()
+        f.close()
+        fs.close()
+        # then parse the grub config
+        cf.parse(buf)
+    else:
+        # set the config file and parse it
+        cf.filename = fn
+        cf.parse()
+    
+    return cf
+
+def get_entry_idx(cf, entry):
+    # first, see if the given entry is numeric
+    try:
+        idx = string.atoi(entry)
+        return idx
+    except ValueError:
+        pass
+
+    # it's not, now check the labels for a match
+    for i in range(len(cf.images)):
+        if entry == cf.images[i].title:
+            return i
+
+    return None
+
+def main(cf = None):
+    mytime = 0
+
+    (stdscr, win) = draw_window()
+    stdscr.timeout(1000)
+    selected = cf.default
+    
+    while (mytime < int(cf.timeout)):
+        if cf.timeout != -1 and mytime != -1: 
+            stdscr.addstr(20, 5, "Will boot selected entry in %2d seconds"
+                          %(int(cf.timeout) - mytime))
+        else:
+            stdscr.addstr(20, 5, " " * 80)
+            
+        fill_entries(win, cf, selected)
+        c = stdscr.getch()
+        if mytime != -1:
+            mytime += 1
+#        if c == ord('q'):
+#            selected = -1
+#            break
+        elif c == ord('c'):
+            # FIXME: needs to go to command line mode
+            continue
+        elif c == ord('a'):
+            # FIXME: needs to go to append mode
+            continue
+        elif c == ord('e'):
+            # FIXME: needs to go to edit mode
+            continue
+        elif c in (curses.KEY_ENTER, ord('\n'), ord('\r')):
+            break
+        elif c == curses.KEY_UP:
+            mytime = -1
+            selected -= 1
+        elif c == curses.KEY_DOWN:
+            mytime = -1
+            selected += 1
+        else:
+            pass
+
+        # bound at the top and bottom
+        if selected < 0:
+            selected = 0
+        elif selected >= len(cf.images):
+            selected = len(cf.images) - 1
+
+    if selected >= 0:
+        return selected
+
+if __name__ == "__main__":
+    sel = None
+    
+    def run_main(scr, *args):
+        global sel
+        sel = main(cf)
+
+    def usage():
+        print >> sys.stderr, "Usage: %s [-q|--quiet] [--output=] [--entry=] <image>" %(sys.argv[0],)
+
+    try:
+        opts, args = getopt.gnu_getopt(sys.argv[1:], 'qh::',
+                                   ["quiet", "help", "output=", "entry="])
+    except getopt.GetoptError:
+        usage()
+        sys.exit(1)
+
+    if len(args) < 1:
+        usage()
+        sys.exit(1)
+    file = args[0]
+        
+    output = None
+    entry = None
+    interactive = True
+    for o, a in opts:
+        if o in ("-q", "--quiet"):
+            interactive = False
+        elif o in ("-h", "--help"):
+            usage()
+            sys.exit()
+        elif o in ("--output",):
+            output = a
+        elif o in ("--entry",):
+            entry = a
+            # specifying the entry to boot implies non-interactive
+            interactive = False
+
+    if output is None or output == "-":
+        fd = sys.stdout.fileno()
+    else:
+        fd = os.open(output, os.O_WRONLY)
+
+    cf = get_config(file)
+    if interactive:
+        curses.wrapper(run_main)
+    else:
+        sel = cf.default
+
+    # set the entry to boot as requested
+    if entry is not None:
+        idx = get_entry_idx(cf, entry)
+        if idx is not None and idx > 0 and idx < len(cf.images):
+            sel = idx
+
+    img = cf.images[sel]
+    print "Going to boot %s" %(img.title)
+    print "  kernel: %s" %(img.kernel[1],)
+    if img.initrd:
+        print "  initrd: %s" %(img.initrd[1],)
+
+    if is_disk_image(file):
+        raise RuntimeError, "unable to handle full disk images yet"
+
+    # read the kernel and initrd onto the hostfs
+    fs = None
+    for fstype in grub.fsys.fstypes.values():
+        if fstype.sniff_magic(file):
+            fs = fstype.open_fs(file)
+            break
+
+    if fs is None:
+        raise RuntimeError, "Unable to open filesystem"
+
+    kernel = fs.open_file(img.kernel[1],).read()
+    (tfd, fn) = tempfile.mkstemp(prefix="vmlinuz.")
+    os.write(tfd, kernel)
+    os.close(tfd)
+    sxp = "linux (kernel %s)" %(fn,)
+
+    if img.initrd:
+        initrd = fs.open_file(img.initrd[1],).read()
+        (tfd, fn) = tempfile.mkstemp(prefix="initrd.")
+        os.write(tfd, initrd)
+        os.close(tfd)
+        sxp += "(ramdisk %s)" %(fn,)
+    else:
+        initrd = None
+    sxp += "(args '%s')" %(img.args,)
+
+    sys.stdout.flush()
+    os.write(fd, sxp)
+    
