@@ -1086,6 +1086,7 @@
 425ae516Y1A4q4_Kfre3qnDj7lbHJg xen/arch/ia64/patch/linux-2.6.11/entry.S
 425ae516txAP-owjzpTJ7ThfzWR8nw xen/arch/ia64/patch/linux-2.6.11/hardirq.h
 425ae516PDO1ESDHXHVeDNvlqUfmdQ xen/arch/ia64/patch/linux-2.6.11/head.S
+425ae516JR7HWvt1zxJ-wLvEWmJGgg xen/arch/ia64/patch/linux-2.6.11/hpsim_ssc.h
 425ae516AHRNmaVuZjJY-9YjmKRDqg xen/arch/ia64/patch/linux-2.6.11/interrupt.h
 425ae516U2wFUzrUJQUpy3z38jZHsQ xen/arch/ia64/patch/linux-2.6.11/io.h
 425ae516GGRmXijPBLC5ii6yWOn0rg xen/arch/ia64/patch/linux-2.6.11/irq_ia64.c
