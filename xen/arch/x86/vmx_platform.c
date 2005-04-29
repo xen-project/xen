@@ -39,17 +39,17 @@
 #define DECODE_failure  0
 
 #if defined (__x86_64__)
-static void store_xen_regs(struct xen_regs *regs)
+static void store_cpu_user_regs(struct cpu_user_regs *regs)
 {
 
 }
 
-static long get_reg_value(int size, int index, int seg, struct xen_regs *regs) 
+static long get_reg_value(int size, int index, int seg, struct cpu_user_regs *regs) 
 {
     return 0;
 }
 #elif defined (__i386__)
-static void store_xen_regs(struct xen_regs *regs)
+static void store_cpu_user_regs(struct cpu_user_regs *regs)
 {
     __vmread(GUEST_SS_SELECTOR, &regs->ss);
     __vmread(GUEST_ESP, &regs->esp);
@@ -60,7 +60,7 @@ static void store_xen_regs(struct xen_regs *regs)
     __vmread(GUEST_EIP, &regs->eip);
 }
 
-static long get_reg_value(int size, int index, int seg, struct xen_regs *regs)
+static long get_reg_value(int size, int index, int seg, struct cpu_user_regs *regs)
 {                    
     /*               
      * Reference the db_reg[] table
@@ -468,7 +468,7 @@ static void send_mmio_req(unsigned long gpa,
     ioreq_t *p;
     int vm86;
     struct mi_per_cpu_info *mpci_p;
-    struct xen_regs *inst_decoder_regs;
+    struct cpu_user_regs *inst_decoder_regs;
     extern long evtchn_send(int lport);
     extern long do_block(void);
 
@@ -528,7 +528,7 @@ void handle_mmio(unsigned long va, unsigned long gpa)
     unsigned long eip, eflags, cs;
     unsigned long inst_len, inst_addr;
     struct mi_per_cpu_info *mpci_p;
-    struct xen_regs *inst_decoder_regs;
+    struct cpu_user_regs *inst_decoder_regs;
     struct instruction mmio_inst;
     unsigned char inst[MAX_INST_LEN];
     int vm86, ret;
@@ -569,7 +569,7 @@ void handle_mmio(unsigned long va, unsigned long gpa)
         domain_crash_synchronous();
 
     __vmwrite(GUEST_EIP, eip + inst_len);
-    store_xen_regs(inst_decoder_regs);
+    store_cpu_user_regs(inst_decoder_regs);
 
     // Only handle "mov" and "movs" instructions!
     if (!strncmp((char *)mmio_inst.i_name, "movz", 4)) {

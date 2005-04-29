@@ -22,7 +22,7 @@ typedef unsigned long cpureg_t;   /* Full-sized register.                    */
 
 typedef struct
 {
-} PACKED execution_context_t;
+} PACKED struct cpu_user_regs;
 
 /*
  * NB. This may become a 64-bit count with no shift. If this happens then the 
@@ -91,9 +91,9 @@ typedef struct {
  * The following is all CPU context. Note that the i387_ctxt block is filled 
  * in by FXSAVE if the CPU has feature FXSR; otherwise FSAVE is used.
  */
-typedef struct {
+typedef struct vcpu_guest_context {
     //unsigned long flags;
-} PACKED full_execution_context_t;
+} PACKED vcpu_guest_context_t;
 
 #endif /* !__ASSEMBLY__ */
 

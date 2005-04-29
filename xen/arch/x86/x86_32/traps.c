@@ -29,9 +29,10 @@ static inline int kernel_text_address(unsigned long addr)
 void show_guest_stack(void)
 {
     int i;
-    execution_context_t *ec = get_execution_context();
-    unsigned long *stack = (unsigned long *)ec->esp;
-    printk("Guest EIP is %08x\n   ", ec->eip);
+    struct cpu_user_regs *regs = get_cpu_user_regs();
+    unsigned long *stack = (unsigned long *)regs->esp;
+
+    printk("Guest EIP is %08x\n   ", regs->eip);
 
     for ( i = 0; i < kstack_depth_to_print; i++ )
     {
@@ -89,7 +90,7 @@ void show_stack(unsigned long *esp)
     show_trace( esp );
 }
 
-void show_registers(struct xen_regs *regs)
+void show_registers(struct cpu_user_regs *regs)
 {
     unsigned long ss, ds, es, fs, gs, cs;
     unsigned long eip, esp, eflags;
@@ -215,9 +216,9 @@ asmlinkage void do_double_fault(void)
 }
 
 BUILD_SMP_INTERRUPT(deferred_nmi, TRAP_deferred_nmi)
-asmlinkage void smp_deferred_nmi(struct xen_regs regs)
+asmlinkage void smp_deferred_nmi(struct cpu_user_regs regs)
 {
-    asmlinkage void do_nmi(struct xen_regs *, unsigned long);
+    asmlinkage void do_nmi(struct cpu_user_regs *, unsigned long);
     ack_APIC_irq();
     do_nmi(&regs, 0);
 }
@@ -280,7 +281,7 @@ long set_fast_trap(struct exec_domain *p, int idx)
     if ( (idx != 0x80) && ((idx < 0x20) || (idx > 0x2f)) ) 
         return -1;
 
-    ti = p->arch.traps + idx;
+    ti = &p->arch.guest_context.trap_ctxt[idx];
 
     /*
      * We can't virtualise interrupt gates, as there's no way to get
@@ -292,7 +293,7 @@ long set_fast_trap(struct exec_domain *p, int idx)
     if ( p == current )
         CLEAR_FAST_TRAP(&p->arch);
 
-    p->arch.fast_trap_idx    = idx;
+    p->arch.guest_context.fast_trap_idx = idx;
     p->arch.fast_trap_desc.a = (ti->cs << 16) | (ti->address & 0xffff);
     p->arch.fast_trap_desc.b = 
         (ti->address & 0xffff0000) | 0x8f00 | (TI_GET_DPL(ti)&3)<<13;
@@ -319,10 +320,10 @@ long do_set_callbacks(unsigned long event_selector,
     if ( !VALID_CODESEL(event_selector) || !VALID_CODESEL(failsafe_selector) )
         return -EPERM;
 
-    d->arch.event_selector    = event_selector;
-    d->arch.event_address     = event_address;
-    d->arch.failsafe_selector = failsafe_selector;
-    d->arch.failsafe_address  = failsafe_address;
+    d->arch.guest_context.event_callback_cs     = event_selector;
+    d->arch.guest_context.event_callback_eip    = event_address;
+    d->arch.guest_context.failsafe_callback_cs  = failsafe_selector;
+    d->arch.guest_context.failsafe_callback_eip = failsafe_address;
 
     return 0;
 }

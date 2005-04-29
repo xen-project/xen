@@ -26,13 +26,13 @@
 
 /* The main trap handlers use these helper macros which include early bail. */
 static inline int debugger_trap_entry(
-    unsigned int vector, struct xen_regs *regs)
+    unsigned int vector, struct cpu_user_regs *regs)
 {
     return 0;
 }
 
 static inline int debugger_trap_fatal(
-    unsigned int vector, struct xen_regs *regs)
+    unsigned int vector, struct cpu_user_regs *regs)
 {
     return 0;
 }

@@ -120,10 +120,10 @@ ENTRY(syscall_enter)
         sti
         movq  %r10,%rcx
         andq  $(NR_hypercalls-1),%rax
-        leaq  SYMBOL_NAME(hypercall_table)(%rip),%r10
+        leaq  hypercall_table(%rip),%r10
         PERFC_INCR(PERFC_hypercalls, %rax)
         callq *(%r10,%rax,8)
-        movq %rax,XREGS_rax(%rsp)       # save the return value
+        movq %rax,UREGS_rax(%rsp)       # save the return value
 
 /* %rbx: struct exec_domain */
 test_all_events:
@@ -131,7 +131,7 @@ test_all_events:
 /*test_softirqs:*/  
         movl  EDOMAIN_processor(%rbx),%eax
         shl   $IRQSTAT_shift,%rax
-        leaq  SYMBOL_NAME(irq_stat)(%rip),%rcx
+        leaq  irq_stat(%rip),%rcx
         testl $~0,(%rcx,%rax,1)
         jnz   process_softirqs
 /*test_guest_events:*/
@@ -160,10 +160,7 @@ test_all_events:
  * and we set it to the fixed value.
  *
  * We also need the room, especially because orig_eax field is used 
- * by do_IRQ(). Compared the xen_regs, we skip pushing for the following:
- *   (13) u64 gs_base_user;                 
- *   (12) u64 gs_base_kernel;                 
- *   (11) u64 fs_base;                 
+ * by do_IRQ(). Compared the cpu_user_regs, we skip pushing for the following:
  *   (10) u64 gs;                 
  *   (9)  u64 fs;
  *   (8)  u64 ds;
@@ -176,9 +173,6 @@ test_all_events:
  *   (2)  u64 rip;
  * (2/1)  u32 entry_vector;
  * (1/1)  u32 error_code;
- * However, get_stack_bottom() actually returns 64 bytes before the real
- * bottom of the stack to allow space for:
- * domain pointer, DS, ES, FS, GS. Therefore, we effectively skip 6 registers.
  */
 #define VMX_MONITOR_RFLAGS	0x202 /* IF on */
 #define NR_SKIPPED_REGS	6	/* See the above explanation */
@@ -205,7 +199,7 @@ test_all_events:
 ENTRY(vmx_asm_vmexit_handler)
         /* selectors are restored/saved by VMX */
         VMX_SAVE_ALL_NOSEGREGS
-        call SYMBOL_NAME(vmx_vmexit_handler)
+        call vmx_vmexit_handler
         jmp vmx_asm_do_resume
 
 ENTRY(vmx_asm_do_launch)
@@ -228,7 +222,7 @@ ENTRY(vmx_asm_do_launch)
         /* VMLUANCH */
         .byte 0x0f,0x01,0xc2
         pushfq
-        call SYMBOL_NAME(vm_launch_fail)
+        call vm_launch_fail
         hlt
         
         ALIGN
@@ -241,12 +235,12 @@ vmx_test_all_events:
 /*test_softirqs:*/  
         movl  EDOMAIN_processor(%rbx),%eax
         shl   $IRQSTAT_shift,%rax
-        leaq  SYMBOL_NAME(irq_stat)(%rip), %rdx
+        leaq  irq_stat(%rip), %rdx
         testl $~0,(%rdx,%rax,1)
         jnz   vmx_process_softirqs
 
 vmx_restore_all_guest:
-        call SYMBOL_NAME(load_cr2)
+        call load_cr2
         /* 
          * Check if we are going back to VMX-based VM
          * By this time, all the setups in the VMCS must be complete.
@@ -270,14 +264,14 @@ vmx_restore_all_guest:
         /* VMRESUME */
         .byte 0x0f,0x01,0xc3
         pushfq
-        call SYMBOL_NAME(vm_resume_fail)
+        call vm_resume_fail
         /* Should never reach here */
         hlt
 
         ALIGN
 vmx_process_softirqs:
         sti       
-        call SYMBOL_NAME(do_softirq)
+        call do_softirq
         jmp  vmx_test_all_events
 #endif
 
@@ -285,7 +279,7 @@ vmx_process_softirqs:
 /* %rbx: struct exec_domain */
 process_softirqs:
         sti       
-        call SYMBOL_NAME(do_softirq)
+        call do_softirq
         jmp  test_all_events
 
 /* CREATE A BASIC EXCEPTION FRAME ON GUEST OS STACK:                     */
@@ -298,13 +292,13 @@ create_bounce_frame:
         /* Push new frame at registered guest-OS stack base. */
         pushq %rdx
         movq  %rbx,%rdi
-        call  SYMBOL_NAME(toggle_guest_mode)
+        call  toggle_guest_mode
         popq  %rdx
         movq  EDOMAIN_kernel_sp(%rbx),%rsi
         jmp   2f
 1:      /* In kernel context already: push new frame at existing %rsp. */
-        movq  XREGS_rsp+8(%rsp),%rsi
-        andb  $0xfc,XREGS_cs+8(%rsp)    # Indicate kernel context to guest.
+        movq  UREGS_rsp+8(%rsp),%rsi
+        andb  $0xfc,UREGS_cs+8(%rsp)    # Indicate kernel context to guest.
 2:      movq  $HYPERVISOR_VIRT_START,%rax
         cmpq  %rax,%rsi
         jb    1f                        # In +ve address space? Then okay.
@@ -312,15 +306,15 @@ create_bounce_frame:
         cmpq  %rax,%rsi
         jb    domain_crash_synchronous  # Above Xen private area? Then okay.
 1:      subq  $40,%rsi
-        movq  XREGS_ss+8(%rsp),%rax
+        movq  UREGS_ss+8(%rsp),%rax
 FLT2:   movq  %rax,32(%rsi)             # SS
-        movq  XREGS_rsp+8(%rsp),%rax
+        movq  UREGS_rsp+8(%rsp),%rax
 FLT3:   movq  %rax,24(%rsi)             # RSP
-        movq  XREGS_eflags+8(%rsp),%rax
+        movq  UREGS_eflags+8(%rsp),%rax
 FLT4:   movq  %rax,16(%rsi)             # RFLAGS
-        movq  XREGS_cs+8(%rsp),%rax
+        movq  UREGS_cs+8(%rsp),%rax
 FLT5:   movq  %rax,8(%rsi)              # CS
-        movq  XREGS_rip+8(%rsp),%rax
+        movq  UREGS_rip+8(%rsp),%rax
 FLT6:   movq  %rax,(%rsi)               # RIP
         movb  TRAPBOUNCE_flags(%rdx),%cl
         testb $TBF_EXCEPTION_ERRCODE,%cl
@@ -345,19 +339,19 @@ FLT11:  movq  %rax,8(%rsi)              # ES
         movl  %ds,%eax
 FLT12:  movq  %rax,(%rsi)               # DS
 2:      subq  $16,%rsi
-        movq  XREGS_r11+8(%rsp),%rax
+        movq  UREGS_r11+8(%rsp),%rax
 FLT13:  movq  %rax,8(%rsi)              # R11
-        movq  XREGS_rcx+8(%rsp),%rax
+        movq  UREGS_rcx+8(%rsp),%rax
 FLT14:  movq  %rax,(%rsi)               # RCX
         /* Rewrite our stack frame and return to guest-OS mode. */
         /* IA32 Ref. Vol. 3: TF, VM, RF and NT flags are cleared on trap. */
-        movq  $TRAP_syscall,XREGS_entry_vector+8(%rsp)
-        andl  $0xfffcbeff,XREGS_eflags+8(%rsp)
-        movq  $__GUEST_SS,XREGS_ss+8(%rsp)
-        movq  %rsi,XREGS_rsp+8(%rsp)
-        movq  $__GUEST_CS,XREGS_cs+8(%rsp)
+        movq  $TRAP_syscall,UREGS_entry_vector+8(%rsp)
+        andl  $0xfffcbeff,UREGS_eflags+8(%rsp)
+        movq  $__GUEST_SS,UREGS_ss+8(%rsp)
+        movq  %rsi,UREGS_rsp+8(%rsp)
+        movq  $__GUEST_CS,UREGS_cs+8(%rsp)
         movq  TRAPBOUNCE_eip(%rdx),%rax
-        movq  %rax,XREGS_rip+8(%rsp)
+        movq  %rax,UREGS_rip+8(%rsp)
         movb  $0,TRAPBOUNCE_flags(%rdx)
         ret
 .section __ex_table,"a"
@@ -383,7 +377,7 @@ process_guest_exception_and_events:
 /* No special register assumptions. */
 ENTRY(ret_from_intr)
         GET_CURRENT(%rbx)
-        testb $3,XREGS_cs(%rsp)
+        testb $3,UREGS_cs(%rsp)
         jnz   test_all_events
         jmp   restore_all_xen
 
@@ -391,45 +385,45 @@ ENTRY(ret_from_intr)
 /* No special register assumptions. */
 error_code:
         SAVE_ALL
-        testb $X86_EFLAGS_IF>>8,XREGS_eflags+1(%rsp)
+        testb $X86_EFLAGS_IF>>8,UREGS_eflags+1(%rsp)
         jz    exception_with_ints_disabled
         sti
         movq  %rsp,%rdi
-        movl  XREGS_entry_vector(%rsp),%eax
-        leaq  SYMBOL_NAME(exception_table)(%rip),%rdx
+        movl  UREGS_entry_vector(%rsp),%eax
+        leaq  exception_table(%rip),%rdx
         GET_CURRENT(%rbx)
         PERFC_INCR(PERFC_exceptions, %rax)
         callq *(%rdx,%rax,8)
-        testb $3,XREGS_cs(%rsp)
+        testb $3,UREGS_cs(%rsp)
         jz    restore_all_xen
         jmp   process_guest_exception_and_events
 
 /* No special register assumptions. */
 exception_with_ints_disabled:
-        testb $3,XREGS_cs(%rsp)         # interrupts disabled outside Xen?
+        testb $3,UREGS_cs(%rsp)         # interrupts disabled outside Xen?
         jnz   FATAL_exception_with_ints_disabled
         movq  %rsp,%rdi
         call  search_pre_exception_table
         testq %rax,%rax                 # no fixup code for faulting EIP?
         jz    FATAL_exception_with_ints_disabled
-        movq  %rax,XREGS_rip(%rsp)
-        subq  $8,XREGS_rsp(%rsp)        # add ec/ev to previous stack frame
-        testb $15,XREGS_rsp(%rsp)       # return %rsp is now aligned?
+        movq  %rax,UREGS_rip(%rsp)
+        subq  $8,UREGS_rsp(%rsp)        # add ec/ev to previous stack frame
+        testb $15,UREGS_rsp(%rsp)       # return %rsp is now aligned?
         jz    1f                        # then there is a pad quadword already
         movq  %rsp,%rsi
         subq  $8,%rsp
         movq  %rsp,%rdi
-        movq  $XREGS_kernel_sizeof/8,%rcx
+        movq  $UREGS_kernel_sizeof/8,%rcx
         rep;  movsq                     # make room for ec/ev
-1:      movq  XREGS_error_code(%rsp),%rax # ec/ev
-        movq  %rax,XREGS_kernel_sizeof(%rsp)
+1:      movq  UREGS_error_code(%rsp),%rax # ec/ev
+        movq  %rax,UREGS_kernel_sizeof(%rsp)
         jmp   restore_all_xen           # return to fixup code
 
 /* No special register assumptions. */
 FATAL_exception_with_ints_disabled:
-        movl  XREGS_entry_vector(%rsp),%edi
+        movl  UREGS_entry_vector(%rsp),%edi
         movq  %rsp,%rsi
-        call  SYMBOL_NAME(fatal_trap)
+        call  fatal_trap
         ud2
 
 ENTRY(divide_error)
@@ -526,61 +520,67 @@ ENTRY(nmi)
         inb   $0x61,%al
         movl  %eax,%esi # reason
         movq  %rsp,%rdi # regs
-        call  SYMBOL_NAME(do_nmi)
+        call  do_nmi
 	jmp   restore_all_xen
+
+do_arch_sched_op:
+        # Ensure we return success even if we return via schedule_tail()
+        xorl  %eax,%eax
+        movq  %rax,UREGS_rax+8(%rsp)
+        jmp   do_sched_op
 
 .data
 
 ENTRY(exception_table)
-        .quad SYMBOL_NAME(do_divide_error)
-        .quad SYMBOL_NAME(do_debug)
+        .quad do_divide_error
+        .quad do_debug
         .quad 0 # nmi
-        .quad SYMBOL_NAME(do_int3)
-        .quad SYMBOL_NAME(do_overflow)
-        .quad SYMBOL_NAME(do_bounds)
-        .quad SYMBOL_NAME(do_invalid_op)
-        .quad SYMBOL_NAME(math_state_restore)
-        .quad SYMBOL_NAME(do_double_fault)
-        .quad SYMBOL_NAME(do_coprocessor_segment_overrun)
-        .quad SYMBOL_NAME(do_invalid_TSS)
-        .quad SYMBOL_NAME(do_segment_not_present)
-        .quad SYMBOL_NAME(do_stack_segment)
-        .quad SYMBOL_NAME(do_general_protection)
-        .quad SYMBOL_NAME(do_page_fault)
-        .quad SYMBOL_NAME(do_spurious_interrupt_bug)
-        .quad SYMBOL_NAME(do_coprocessor_error)
-        .quad SYMBOL_NAME(do_alignment_check)
-        .quad SYMBOL_NAME(do_machine_check)
-        .quad SYMBOL_NAME(do_simd_coprocessor_error)
+        .quad do_int3
+        .quad do_overflow
+        .quad do_bounds
+        .quad do_invalid_op
+        .quad math_state_restore
+        .quad do_double_fault
+        .quad do_coprocessor_segment_overrun
+        .quad do_invalid_TSS
+        .quad do_segment_not_present
+        .quad do_stack_segment
+        .quad do_general_protection
+        .quad do_page_fault
+        .quad do_spurious_interrupt_bug
+        .quad do_coprocessor_error
+        .quad do_alignment_check
+        .quad do_machine_check
+        .quad do_simd_coprocessor_error
 
 ENTRY(hypercall_table)
-        .quad SYMBOL_NAME(do_set_trap_table)     /*  0 */
-        .quad SYMBOL_NAME(do_mmu_update)
-        .quad SYMBOL_NAME(do_set_gdt)
-        .quad SYMBOL_NAME(do_stack_switch)
-        .quad SYMBOL_NAME(do_set_callbacks)
-        .quad SYMBOL_NAME(do_fpu_taskswitch)     /*  5 */
-        .quad SYMBOL_NAME(do_sched_op)
-        .quad SYMBOL_NAME(do_dom0_op)
-        .quad SYMBOL_NAME(do_set_debugreg)
-        .quad SYMBOL_NAME(do_get_debugreg)
-        .quad SYMBOL_NAME(do_update_descriptor)  /* 10 */
-        .quad SYMBOL_NAME(do_ni_hypercall)
-        .quad SYMBOL_NAME(do_dom_mem_op)
-        .quad SYMBOL_NAME(do_multicall)
-        .quad SYMBOL_NAME(do_update_va_mapping)
-        .quad SYMBOL_NAME(do_set_timer_op)       /* 15 */
-        .quad SYMBOL_NAME(do_event_channel_op)
-        .quad SYMBOL_NAME(do_xen_version)
-        .quad SYMBOL_NAME(do_console_io)
-        .quad SYMBOL_NAME(do_physdev_op)
-        .quad SYMBOL_NAME(do_grant_table_op)     /* 20 */
-        .quad SYMBOL_NAME(do_vm_assist)
-        .quad SYMBOL_NAME(do_update_va_mapping_otherdomain)
-        .quad SYMBOL_NAME(do_switch_to_user)
-        .quad SYMBOL_NAME(do_boot_vcpu)
-        .quad SYMBOL_NAME(do_set_segment_base)   /* 25 */
-        .quad SYMBOL_NAME(do_mmuext_op)
+        .quad do_set_trap_table     /*  0 */
+        .quad do_mmu_update
+        .quad do_set_gdt
+        .quad do_stack_switch
+        .quad do_set_callbacks
+        .quad do_fpu_taskswitch     /*  5 */
+        .quad do_arch_sched_op
+        .quad do_dom0_op
+        .quad do_set_debugreg
+        .quad do_get_debugreg
+        .quad do_update_descriptor  /* 10 */
+        .quad do_ni_hypercall
+        .quad do_dom_mem_op
+        .quad do_multicall
+        .quad do_update_va_mapping
+        .quad do_set_timer_op       /* 15 */
+        .quad do_event_channel_op
+        .quad do_xen_version
+        .quad do_console_io
+        .quad do_physdev_op
+        .quad do_grant_table_op     /* 20 */
+        .quad do_vm_assist
+        .quad do_update_va_mapping_otherdomain
+        .quad do_switch_to_user
+        .quad do_boot_vcpu
+        .quad do_set_segment_base   /* 25 */
+        .quad do_mmuext_op
         .rept NR_hypercalls-((.-hypercall_table)/4)
-        .quad SYMBOL_NAME(do_ni_hypercall)
+        .quad do_ni_hypercall
         .endr

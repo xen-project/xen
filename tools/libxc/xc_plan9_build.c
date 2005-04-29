@@ -113,7 +113,7 @@ setup_guest(int xc_handle,
 	      unsigned long tot_pages,
 	      unsigned long *virt_startinfo_addr,
 	      unsigned long *virt_load_addr,
-	      full_execution_context_t * ctxt,
+	      vcpu_guest_context_t * ctxt,
 	      const char *cmdline,
 	      unsigned long shared_info_frame, 
 	      unsigned int control_evtchn,
@@ -411,7 +411,7 @@ xc_plan9_build(int xc_handle,
 	int kernel_fd = -1;
 	gzFile kernel_gfd = NULL;
 	int rc, i;
-	full_execution_context_t st_ctxt, *ctxt = &st_ctxt;
+	vcpu_guest_context_t st_ctxt, *ctxt = &st_ctxt;
 	unsigned long virt_startinfo_addr;
 
 	if ((tot_pages = xc_get_tot_pages(xc_handle, domid)) < 0) {
@@ -482,23 +482,23 @@ xc_plan9_build(int xc_handle,
 	 *  [EAX,EBX,ECX,EDX,EDI,EBP are zero]
 	 *       EFLAGS = IF | 2 (bit 1 is reserved and should always be 1)
 	 */
-	ctxt->cpu_ctxt.ds = FLAT_KERNEL_DS;
-	ctxt->cpu_ctxt.es = FLAT_KERNEL_DS;
-	ctxt->cpu_ctxt.fs = FLAT_KERNEL_DS;
-	ctxt->cpu_ctxt.gs = FLAT_KERNEL_DS;
-	ctxt->cpu_ctxt.ss = FLAT_KERNEL_DS;
-	ctxt->cpu_ctxt.cs = FLAT_KERNEL_CS;
-	ctxt->cpu_ctxt.eip = load_addr;
-	ctxt->cpu_ctxt.eip = 0x80100020;
+	ctxt->user_regs.ds = FLAT_KERNEL_DS;
+	ctxt->user_regs.es = FLAT_KERNEL_DS;
+	ctxt->user_regs.fs = FLAT_KERNEL_DS;
+	ctxt->user_regs.gs = FLAT_KERNEL_DS;
+	ctxt->user_regs.ss = FLAT_KERNEL_DS;
+	ctxt->user_regs.cs = FLAT_KERNEL_CS;
+	ctxt->user_regs.eip = load_addr;
+	ctxt->user_regs.eip = 0x80100020;
 	/* put stack at top of second page */
-	ctxt->cpu_ctxt.esp = 0x80000000 + (STACKPAGE << PAGE_SHIFT);
+	ctxt->user_regs.esp = 0x80000000 + (STACKPAGE << PAGE_SHIFT);
 
 	/* why is this set? */
-	ctxt->cpu_ctxt.esi = ctxt->cpu_ctxt.esp;
-	ctxt->cpu_ctxt.eflags = (1 << 9) | (1 << 2);
+	ctxt->user_regs.esi = ctxt->user_regs.esp;
+	ctxt->user_regs.eflags = (1 << 9) | (1 << 2);
 
 	/* FPU is set up to default initial state. */
-	memset(ctxt->fpu_ctxt, 0, sizeof (ctxt->fpu_ctxt));
+	memset(&ctxt->fpu_ctxt, 0, sizeof(ctxt->fpu_ctxt));
 
 	/* Virtual IDT is empty at start-of-day. */
 	for (i = 0; i < 256; i++) {
@@ -519,7 +519,7 @@ xc_plan9_build(int xc_handle,
 	/* Ring 1 stack is the initial stack. */
 	/* put stack at top of second page */
 	ctxt->kernel_ss = FLAT_KERNEL_DS;
-	ctxt->kernel_esp = ctxt->cpu_ctxt.esp;
+	ctxt->kernel_sp = ctxt->user_regs.esp;
 
 	/* No debugging. */
 	memset(ctxt->debugreg, 0, sizeof (ctxt->debugreg));

@@ -66,7 +66,7 @@ void grant_table_destroy(struct domain *d)
 	return;
 }
 
-struct pt_regs *get_execution_context(void) { return ia64_task_regs(current); }
+struct pt_regs *get_cpu_user_regs(void) { return ia64_task_regs(current); }
 
 void raise_actimer_softirq(void)
 {
@@ -276,6 +276,11 @@ if (!i--) { printk("+",id); cnt[id] = 100; }
 		//send_guest_virq(next, VIRQ_TIMER);
 	load_region_regs(current);
 	if (vcpu_timer_expired(current)) vcpu_pend_timer(current);
+}
+
+void continue_running(struct exec_domain *same)
+{
+    /* nothing to do */
 }
 
 void panic_domain(struct pt_regs *regs, const char *fmt, ...)

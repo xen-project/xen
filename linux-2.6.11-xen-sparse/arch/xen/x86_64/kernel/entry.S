@@ -50,7 +50,7 @@
 
 
 EVENT_MASK      = (CS+4)
-ECF_IN_SYSCALL  = (1<<8)
+VGCF_IN_SYSCALL = (1<<8)
         
 /*
  * Copied from arch/xen/i386/kernel/entry.S
@@ -169,7 +169,7 @@ ECF_IN_SYSCALL  = (1<<8)
          *     struct switch_to_user {
          *        u64 rax, r11, rcx, flags, rip, cs, rflags, rsp, ss;
          *     } PACKED;
-         * #define ECF_IN_SYSCALL (1<<8) 
+         * #define VGCF_IN_SYSCALL (1<<8) 
          */
         .macro SWITCH_TO_USER flag
         movl $0,%gs:pda_kernel_mode     # change to user mode
@@ -275,7 +275,7 @@ sysret_check:
 	jnz  sysret_careful 
         XEN_UNBLOCK_EVENTS(%rsi)                
 	RESTORE_ARGS 0,8,0
-        SWITCH_TO_USER ECF_IN_SYSCALL
+        SWITCH_TO_USER VGCF_IN_SYSCALL
 
 	/* Handle reschedules */
 	/* edx:	work, edi: workmask */	

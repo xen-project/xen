@@ -24,38 +24,44 @@
 
 void __dummy__(void)
 {
-    OFFSET(XREGS_eax, struct xen_regs, eax);
-    OFFSET(XREGS_ebx, struct xen_regs, ebx);
-    OFFSET(XREGS_ecx, struct xen_regs, ecx);
-    OFFSET(XREGS_edx, struct xen_regs, edx);
-    OFFSET(XREGS_esi, struct xen_regs, esi);
-    OFFSET(XREGS_edi, struct xen_regs, edi);
-    OFFSET(XREGS_esp, struct xen_regs, esp);
-    OFFSET(XREGS_ebp, struct xen_regs, ebp);
-    OFFSET(XREGS_eip, struct xen_regs, eip);
-    OFFSET(XREGS_cs, struct xen_regs, cs);
-    OFFSET(XREGS_ds, struct xen_regs, ds);
-    OFFSET(XREGS_es, struct xen_regs, es);
-    OFFSET(XREGS_fs, struct xen_regs, fs);
-    OFFSET(XREGS_gs, struct xen_regs, gs);
-    OFFSET(XREGS_ss, struct xen_regs, ss);
-    OFFSET(XREGS_eflags, struct xen_regs, eflags);
-    OFFSET(XREGS_error_code, struct xen_regs, error_code);
-    OFFSET(XREGS_entry_vector, struct xen_regs, entry_vector);
-    OFFSET(XREGS_kernel_sizeof, struct xen_regs, esp);
-    DEFINE(XREGS_user_sizeof, sizeof(struct xen_regs));
+    OFFSET(UREGS_eax, struct cpu_user_regs, eax);
+    OFFSET(UREGS_ebx, struct cpu_user_regs, ebx);
+    OFFSET(UREGS_ecx, struct cpu_user_regs, ecx);
+    OFFSET(UREGS_edx, struct cpu_user_regs, edx);
+    OFFSET(UREGS_esi, struct cpu_user_regs, esi);
+    OFFSET(UREGS_edi, struct cpu_user_regs, edi);
+    OFFSET(UREGS_esp, struct cpu_user_regs, esp);
+    OFFSET(UREGS_ebp, struct cpu_user_regs, ebp);
+    OFFSET(UREGS_eip, struct cpu_user_regs, eip);
+    OFFSET(UREGS_cs, struct cpu_user_regs, cs);
+    OFFSET(UREGS_ds, struct cpu_user_regs, ds);
+    OFFSET(UREGS_es, struct cpu_user_regs, es);
+    OFFSET(UREGS_fs, struct cpu_user_regs, fs);
+    OFFSET(UREGS_gs, struct cpu_user_regs, gs);
+    OFFSET(UREGS_ss, struct cpu_user_regs, ss);
+    OFFSET(UREGS_eflags, struct cpu_user_regs, eflags);
+    OFFSET(UREGS_error_code, struct cpu_user_regs, error_code);
+    OFFSET(UREGS_entry_vector, struct cpu_user_regs, entry_vector);
+    OFFSET(UREGS_kernel_sizeof, struct cpu_user_regs, esp);
+    DEFINE(UREGS_user_sizeof, sizeof(struct cpu_user_regs));
     BLANK();
 
     OFFSET(EDOMAIN_processor, struct exec_domain, processor);
     OFFSET(EDOMAIN_vcpu_info, struct exec_domain, vcpu_info);
-    OFFSET(EDOMAIN_event_sel, struct exec_domain, arch.event_selector);
-    OFFSET(EDOMAIN_event_addr, struct exec_domain, arch.event_address);
-    OFFSET(EDOMAIN_failsafe_sel, struct exec_domain, arch.failsafe_selector);
-    OFFSET(EDOMAIN_failsafe_addr, struct exec_domain, arch.failsafe_address);
     OFFSET(EDOMAIN_trap_bounce, struct exec_domain, arch.trap_bounce);
     OFFSET(EDOMAIN_thread_flags, struct exec_domain, arch.flags);
-    OFFSET(EDOMAIN_kernel_ss, struct exec_domain, arch.kernel_ss);
-    OFFSET(EDOMAIN_kernel_sp, struct exec_domain, arch.kernel_sp);
+    OFFSET(EDOMAIN_event_sel, struct exec_domain,
+           arch.guest_context.event_callback_cs);
+    OFFSET(EDOMAIN_event_addr, struct exec_domain, 
+           arch.guest_context.event_callback_eip);
+    OFFSET(EDOMAIN_failsafe_sel, struct exec_domain,
+           arch.guest_context.failsafe_callback_cs);
+    OFFSET(EDOMAIN_failsafe_addr, struct exec_domain,
+           arch.guest_context.failsafe_callback_eip);
+    OFFSET(EDOMAIN_kernel_ss, struct exec_domain,
+           arch.guest_context.kernel_ss);
+    OFFSET(EDOMAIN_kernel_sp, struct exec_domain,
+           arch.guest_context.kernel_sp);
     BLANK();
 
     OFFSET(VCPUINFO_upcall_pending, vcpu_info_t, evtchn_upcall_pending);

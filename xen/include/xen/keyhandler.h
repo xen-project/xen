@@ -23,11 +23,11 @@ extern void register_keyhandler(
  * synchronously in hard-IRQ context with interrupts disabled. The @regs
  * callback parameter points at the interrupted register context.
  */
-typedef void irq_keyhandler_t(unsigned char key, struct xen_regs *regs);
+typedef void irq_keyhandler_t(unsigned char key, struct cpu_user_regs *regs);
 extern void register_irq_keyhandler(
     unsigned char key, irq_keyhandler_t *handler, char *desc); 
 
 /* Inject a keypress into the key-handling subsystem. */
-extern void handle_keypress(unsigned char key, struct xen_regs *regs);
+extern void handle_keypress(unsigned char key, struct cpu_user_regs *regs);
 
 #endif /* __XEN_KEYHANDLER_H__ */

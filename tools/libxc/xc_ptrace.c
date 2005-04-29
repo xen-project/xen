@@ -132,7 +132,7 @@ static long			nr_pages = 0;
 unsigned long			*page_array = NULL;
 static int                      regs_valid[MAX_VIRT_CPUS];
 static unsigned long            cr3[MAX_VIRT_CPUS];
-static full_execution_context_t ctxt[MAX_VIRT_CPUS];
+static vcpu_guest_context_t ctxt[MAX_VIRT_CPUS];
 
 /* --------------------- */
 
@@ -220,7 +220,7 @@ waitdomain(int domain, int *status, int options)
 {
     dom0_op_t op;
     int retval;
-    full_execution_context_t ctxt;
+    vcpu_guest_context_t ctxt;
     struct timespec ts;
     ts.tv_sec = 0;
     ts.tv_nsec = 10*1000*1000;
@@ -300,7 +300,7 @@ xc_ptrace(enum __ptrace_request request, pid_t domid, void *addr, void *data)
 	FETCH_REGS(cpu);
 
 	if (request == PTRACE_GETREGS) {
-		SET_PT_REGS(pt, ctxt[cpu].cpu_ctxt); 
+		SET_PT_REGS(pt, ctxt[cpu].user_regs); 
 		memcpy(data, &pt, sizeof(elf_gregset_t));
 	} else if (request == PTRACE_GETFPREGS)
 	    memcpy(data, &ctxt[cpu].fpu_ctxt, sizeof(ctxt[cpu].fpu_ctxt));
@@ -309,7 +309,7 @@ xc_ptrace(enum __ptrace_request request, pid_t domid, void *addr, void *data)
 	break;
     case PTRACE_SETREGS:
 	op.cmd = DOM0_SETDOMAININFO;
-	SET_XC_REGS(((struct gdb_regs *)data), ctxt[VCPU].cpu_ctxt);
+	SET_XC_REGS(((struct gdb_regs *)data), ctxt[VCPU].user_regs);
 	op.u.setdomaininfo.domain = domid;
 	/* XXX need to understand multiple exec_domains */
 	op.u.setdomaininfo.exec_domain = cpu;
@@ -339,7 +339,7 @@ xc_ptrace(enum __ptrace_request request, pid_t domid, void *addr, void *data)
 	retval = do_dom0_op(xc_handle, &op);
 	break;
     case PTRACE_SINGLESTEP:
-	ctxt[VCPU].cpu_ctxt.eflags |= PSL_T;
+	ctxt[VCPU].user_regs.eflags |= PSL_T;
 	op.cmd = DOM0_SETDOMAININFO;
 	op.u.setdomaininfo.domain = domid;
 	op.u.setdomaininfo.exec_domain = 0;
@@ -355,8 +355,8 @@ xc_ptrace(enum __ptrace_request request, pid_t domid, void *addr, void *data)
 	if (request != PTRACE_SINGLESTEP) {
 	    FETCH_REGS(cpu);
 	    /* Clear trace flag */
-	    if (ctxt[cpu].cpu_ctxt.eflags & PSL_T) {
-		ctxt[cpu].cpu_ctxt.eflags &= ~PSL_T;
+	    if (ctxt[cpu].user_regs.eflags & PSL_T) {
+		ctxt[cpu].user_regs.eflags &= ~PSL_T;
 		op.cmd = DOM0_SETDOMAININFO;
 		op.u.setdomaininfo.domain = domid;
 		op.u.setdomaininfo.exec_domain = cpu;

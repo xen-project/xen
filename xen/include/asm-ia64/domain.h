@@ -6,7 +6,7 @@
 extern void arch_do_createdomain(struct exec_domain *);
 
 extern int arch_final_setup_guestos(
-    struct exec_domain *, full_execution_context_t *);
+    struct exec_domain *, struct vcpu_guest_context *);
 
 extern void domain_relinquish_resources(struct domain *);
 

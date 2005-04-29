@@ -374,54 +374,44 @@ long arch_do_dom0_op(dom0_op_t *op, dom0_op_t *u_dom0_op)
 }
 
 void arch_getdomaininfo_ctxt(
-    struct exec_domain *ed, full_execution_context_t *c)
+    struct exec_domain *ed, struct vcpu_guest_context *c)
 { 
     int i;
 #ifdef __i386__  /* Remove when x86_64 VMX is implemented */
 #ifdef CONFIG_VMX
-    extern void save_vmx_execution_context(execution_context_t *);
+    extern void save_vmx_cpu_user_regs(struct cpu_user_regs *);
 #endif
 #endif
 
-    c->flags = 0;
-    memcpy(&c->cpu_ctxt, 
-           &ed->arch.user_ctxt,
-           sizeof(ed->arch.user_ctxt));
+    memcpy(c, &ed->arch.guest_context, sizeof(*c));
+
     /* IOPL privileges are virtualised -- merge back into returned eflags. */
-    BUG_ON((c->cpu_ctxt.eflags & EF_IOPL) != 0);
-    c->cpu_ctxt.eflags |= ed->arch.iopl << 12;
+    BUG_ON((c->user_regs.eflags & EF_IOPL) != 0);
+    c->user_regs.eflags |= ed->arch.iopl << 12;
 
 #ifdef __i386__
 #ifdef CONFIG_VMX
     if ( VMX_DOMAIN(ed) )
-        save_vmx_execution_context(&c->cpu_ctxt);
+        save_vmx_cpu_user_regs(&c->user_regs);
 #endif
 #endif
 
+    c->flags = 0;
     if ( test_bit(EDF_DONEFPUINIT, &ed->ed_flags) )
-        c->flags |= ECF_I387_VALID;
-    if ( KERNEL_MODE(ed, &ed->arch.user_ctxt) )
-        c->flags |= ECF_IN_KERNEL;
+        c->flags |= VGCF_I387_VALID;
+    if ( KERNEL_MODE(ed, &ed->arch.guest_context.user_regs) )
+        c->flags |= VGCF_IN_KERNEL;
 #ifdef CONFIG_VMX
     if (VMX_DOMAIN(ed))
-        c->flags |= ECF_VMX_GUEST;
+        c->flags |= VGCF_VMX_GUEST;
 #endif
-    memcpy(&c->fpu_ctxt,
-           &ed->arch.i387,
-           sizeof(ed->arch.i387));
-    memcpy(&c->trap_ctxt,
-           ed->arch.traps,
-           sizeof(ed->arch.traps));
+
 #ifdef ARCH_HAS_FAST_TRAP
     if ( (ed->arch.fast_trap_desc.a == 0) &&
          (ed->arch.fast_trap_desc.b == 0) )
         c->fast_trap_idx = 0;
-    else
-        c->fast_trap_idx = 
-            ed->arch.fast_trap_idx;
 #endif
-    c->ldt_base = ed->arch.ldt_base;
-    c->ldt_ents = ed->arch.ldt_ents;
+
     c->gdt_ents = 0;
     if ( GET_GDT_ADDRESS(ed) == GDT_VIRT_START(ed) )
     {
@@ -430,22 +420,8 @@ void arch_getdomaininfo_ctxt(
                 l1e_get_pfn(ed->arch.perdomain_ptes[i]);
         c->gdt_ents = GET_GDT_ENTRIES(ed);
     }
-    c->kernel_ss  = ed->arch.kernel_ss;
-    c->kernel_esp = ed->arch.kernel_sp;
-    c->pt_base   = 
-        pagetable_val(ed->arch.guest_table);
-    memcpy(c->debugreg, 
-           ed->arch.debugreg, 
-           sizeof(ed->arch.debugreg));
-#if defined(__i386__)
-    c->event_callback_cs     = ed->arch.event_selector;
-    c->event_callback_eip    = ed->arch.event_address;
-    c->failsafe_callback_cs  = ed->arch.failsafe_selector;
-    c->failsafe_callback_eip = ed->arch.failsafe_address;
-#elif defined(__x86_64__)
-    c->event_callback_eip    = ed->arch.event_address;
-    c->failsafe_callback_eip = ed->arch.failsafe_address;
-    c->syscall_callback_eip  = ed->arch.syscall_address;
-#endif
+
+    c->pt_base = pagetable_val(ed->arch.guest_table);
+
     c->vm_assist = ed->domain->vm_assist;
 }

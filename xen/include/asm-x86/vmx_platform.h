@@ -73,7 +73,7 @@ struct instruction {
 struct mi_per_cpu_info
 {
     unsigned long          mmio_target;
-    struct xen_regs        *inst_decoder_regs;
+    struct cpu_user_regs        *inst_decoder_regs;
 };
 
 struct virutal_platform_def {
@@ -85,7 +85,7 @@ struct virutal_platform_def {
 };
 
 extern void handle_mmio(unsigned long, unsigned long);
-extern int vmx_setup_platform(struct exec_domain *, execution_context_t *);
+extern int vmx_setup_platform(struct exec_domain *, struct cpu_user_regs *);
 
 // XXX - think about this -- maybe use bit 30 of the mfn to signify an MMIO frame.
 #define mmio_space(gpa) (!VALID_MFN(phys_to_machine_mapping((gpa) >> PAGE_SHIFT)))

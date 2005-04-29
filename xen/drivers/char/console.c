@@ -260,7 +260,7 @@ static void switch_serial_input(void)
     }
 }
 
-static void __serial_rx(unsigned char c, struct xen_regs *regs)
+static void __serial_rx(unsigned char c, struct cpu_user_regs *regs)
 {
     if ( xen_rx )
     {
@@ -274,7 +274,7 @@ static void __serial_rx(unsigned char c, struct xen_regs *regs)
     }
 }
 
-static void serial_rx(unsigned char c, struct xen_regs *regs)
+static void serial_rx(unsigned char c, struct cpu_user_regs *regs)
 {
     static int switch_code_count = 0;
 

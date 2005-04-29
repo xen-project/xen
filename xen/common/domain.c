@@ -231,7 +231,7 @@ void domain_destruct(struct domain *d)
 int set_info_guest(struct domain *p, dom0_setdomaininfo_t *setdomaininfo)
 {
     int rc = 0;
-    full_execution_context_t *c = NULL;
+    struct vcpu_guest_context *c = NULL;
     unsigned long vcpu = setdomaininfo->exec_domain;
     struct exec_domain *ed; 
 
@@ -242,7 +242,7 @@ int set_info_guest(struct domain *p, dom0_setdomaininfo_t *setdomaininfo)
         !test_bit(EDF_CTRLPAUSE, &ed->ed_flags))
         return -EINVAL;
 
-    if ( (c = xmalloc(full_execution_context_t)) == NULL )
+    if ( (c = xmalloc(struct vcpu_guest_context)) == NULL )
         return -ENOMEM;
 
     if ( copy_from_user(c, setdomaininfo->ctxt, sizeof(*c)) )
@@ -266,12 +266,12 @@ int set_info_guest(struct domain *p, dom0_setdomaininfo_t *setdomaininfo)
  * than domain 0. ie. the domains that are being built by the userspace dom0
  * domain builder.
  */
-long do_boot_vcpu(unsigned long vcpu, full_execution_context_t *ctxt) 
+long do_boot_vcpu(unsigned long vcpu, struct vcpu_guest_context *ctxt) 
 {
     struct domain *d = current->domain;
     struct exec_domain *ed;
     int rc = 0;
-    full_execution_context_t *c;
+    struct vcpu_guest_context *c;
 
     if ( (vcpu >= MAX_VIRT_CPUS) || (d->exec_domain[vcpu] != NULL) )
         return -EINVAL;
@@ -279,7 +279,7 @@ long do_boot_vcpu(unsigned long vcpu, full_execution_context_t *ctxt)
     if ( alloc_exec_domain_struct(d, vcpu) == NULL )
         return -ENOMEM;
 
-    if ( (c = xmalloc(full_execution_context_t)) == NULL )
+    if ( (c = xmalloc(struct vcpu_guest_context)) == NULL )
     {
         rc = -ENOMEM;
         goto out;

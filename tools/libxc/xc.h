@@ -160,7 +160,7 @@ int xc_domain_getfullinfo(int xc_handle,
                           u32 domid,
                           u32 vcpu,
                           xc_domaininfo_t *info,
-                          full_execution_context_t *ctxt);
+                          vcpu_guest_context_t *ctxt);
 int xc_domain_setcpuweight(int xc_handle,
                            u32 domid,
                            float weight);

@@ -377,7 +377,7 @@ do{ __asm__ __volatile__ (                                              \
 
 void *
 decode_register(
-    u8 modrm_reg, struct xen_regs *regs, int highbyte_regs)
+    u8 modrm_reg, struct cpu_user_regs *regs, int highbyte_regs)
 {
     void *p;
 
@@ -417,7 +417,7 @@ decode_register(
 
 int 
 x86_emulate_memop(
-    struct xen_regs *regs,
+    struct cpu_user_regs *regs,
     unsigned long cr2,
     struct x86_mem_emulator *ops,
     int mode)
@@ -430,7 +430,7 @@ x86_emulate_memop(
     struct operand src, dst;
 
     /* Shadow copy of register state. Committed on successful emulation. */
-    struct xen_regs _regs = *regs;
+    struct cpu_user_regs _regs = *regs;
 
     /* Legacy prefixes. */
     for ( i = 0; i < 8; i++ )

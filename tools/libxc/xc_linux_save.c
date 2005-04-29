@@ -325,7 +325,7 @@ static int analysis_phase( int xc_handle, u32 domid,
 
 int suspend_and_state(int xc_handle, XcIOContext *ioctxt,		      
                       xc_domaininfo_t *info,
-                      full_execution_context_t *ctxt)
+                      vcpu_guest_context_t *ctxt)
 {
     int i=0;
     
@@ -391,7 +391,7 @@ int xc_linux_save(int xc_handle, XcIOContext *ioctxt)
     unsigned long shared_info_frame;
     
     /* A copy of the CPU context of the guest. */
-    full_execution_context_t ctxt;
+    vcpu_guest_context_t ctxt;
 
     /* A table containg the type of each PFN (/not/ MFN!). */
     unsigned long *pfn_type = NULL;
@@ -922,7 +922,7 @@ int xc_linux_save(int xc_handle, XcIOContext *ioctxt)
                           "SUSPEND flags %08u shinfo %08lx eip %08u "
                           "esi %08u\n",info.flags,
                           info.shared_info_frame,
-                          ctxt.cpu_ctxt.eip, ctxt.cpu_ctxt.esi );
+                          ctxt.user_regs.eip, ctxt.user_regs.esi );
             } 
 
             if ( xc_shadow_control( xc_handle, domid, 
@@ -995,7 +995,7 @@ int xc_linux_save(int xc_handle, XcIOContext *ioctxt)
        domid for this to succeed. */
     p_srec = xc_map_foreign_range(xc_handle, domid,
                                    sizeof(*p_srec), PROT_READ, 
-                                   ctxt.cpu_ctxt.esi);
+                                   ctxt.user_regs.esi);
     if (!p_srec){
         xcio_error(ioctxt, "Couldn't map suspend record");
         goto out;
@@ -1009,7 +1009,7 @@ int xc_linux_save(int xc_handle, XcIOContext *ioctxt)
     }
 
     /* Canonicalise the suspend-record frame number. */
-    if ( !translate_mfn_to_pfn(&ctxt.cpu_ctxt.esi) ){
+    if ( !translate_mfn_to_pfn(&ctxt.user_regs.esi) ){
         xcio_error(ioctxt, "Suspend record is not in range of pseudophys map");
         goto out;
     }

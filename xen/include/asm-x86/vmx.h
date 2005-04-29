@@ -25,7 +25,7 @@
 #include <asm/processor.h>
 #include <asm/vmx_vmcs.h>
 
-extern void vmx_asm_vmexit_handler(struct xen_regs);
+extern void vmx_asm_vmexit_handler(struct cpu_user_regs);
 extern void vmx_asm_do_resume(void);
 extern void vmx_asm_do_launch(void);
 extern void vmx_intr_assist(struct exec_domain *d);

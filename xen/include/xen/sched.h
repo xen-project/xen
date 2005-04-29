@@ -210,7 +210,7 @@ static inline void get_knownalive_domain(struct domain *d)
     atomic_inc(&d->refcnt);
     ASSERT(!(atomic_read(&d->refcnt) & DOMAIN_DESTRUCTED));
 }
-  
+
 extern struct domain *do_createdomain(
     domid_t dom_id, unsigned int cpu);
 extern int construct_dom0(
@@ -265,9 +265,14 @@ extern void sync_lazy_execstate_cpuset(unsigned long cpuset);
 extern void sync_lazy_execstate_all(void);
 extern int __sync_lazy_execstate(void);
 
+/* Called by the scheduler to switch to another exec_domain. */
 extern void context_switch(
     struct exec_domain *prev, 
     struct exec_domain *next);
+
+/* Called by the scheduler to continue running the current exec_domain. */
+extern void continue_running(
+    struct exec_domain *same);
 
 void domain_init(void);
 

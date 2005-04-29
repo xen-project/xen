@@ -45,7 +45,7 @@ static int setup_guest(int xc_handle,
                          gzFile initrd_gfd, unsigned long initrd_len,
                          unsigned long nr_pages,
                          unsigned long *pvsi, unsigned long *pvke,
-                         full_execution_context_t *ctxt,
+                         vcpu_guest_context_t *ctxt,
                          const char *cmdline,
                          unsigned long shared_info_frame,
                          unsigned int control_evtchn,
@@ -316,7 +316,7 @@ int xc_linux_build(int xc_handle,
     int initrd_fd = -1;
     gzFile initrd_gfd = NULL;
     int rc, i;
-    full_execution_context_t st_ctxt, *ctxt = &st_ctxt;
+    vcpu_guest_context_t st_ctxt, *ctxt = &st_ctxt;
     unsigned long nr_pages;
     char         *image = NULL;
     unsigned long image_size, initrd_size=0;
@@ -400,19 +400,19 @@ int xc_linux_build(int xc_handle,
      *  [EAX,EBX,ECX,EDX,EDI,EBP are zero]
      *       EFLAGS = IF | 2 (bit 1 is reserved and should always be 1)
      */
-    ctxt->cpu_ctxt.ds = FLAT_KERNEL_DS;
-    ctxt->cpu_ctxt.es = FLAT_KERNEL_DS;
-    ctxt->cpu_ctxt.fs = FLAT_KERNEL_DS;
-    ctxt->cpu_ctxt.gs = FLAT_KERNEL_DS;
-    ctxt->cpu_ctxt.ss = FLAT_KERNEL_DS;
-    ctxt->cpu_ctxt.cs = FLAT_KERNEL_CS;
-    ctxt->cpu_ctxt.eip = vkern_entry;
-    ctxt->cpu_ctxt.esp = vstartinfo_start + 2*PAGE_SIZE;
-    ctxt->cpu_ctxt.esi = vstartinfo_start;
-    ctxt->cpu_ctxt.eflags = (1<<9) | (1<<2);
+    ctxt->user_regs.ds = FLAT_KERNEL_DS;
+    ctxt->user_regs.es = FLAT_KERNEL_DS;
+    ctxt->user_regs.fs = FLAT_KERNEL_DS;
+    ctxt->user_regs.gs = FLAT_KERNEL_DS;
+    ctxt->user_regs.ss = FLAT_KERNEL_DS;
+    ctxt->user_regs.cs = FLAT_KERNEL_CS;
+    ctxt->user_regs.eip = vkern_entry;
+    ctxt->user_regs.esp = vstartinfo_start + 2*PAGE_SIZE;
+    ctxt->user_regs.esi = vstartinfo_start;
+    ctxt->user_regs.eflags = (1<<9) | (1<<2);
 
     /* FPU is set up to default initial state. */
-    memset(ctxt->fpu_ctxt, 0, sizeof(ctxt->fpu_ctxt));
+    memset(&ctxt->fpu_ctxt, 0, sizeof(ctxt->fpu_ctxt));
 
     /* Virtual IDT is empty at start-of-day. */
     for ( i = 0; i < 256; i++ )
@@ -432,8 +432,8 @@ int xc_linux_build(int xc_handle,
     ctxt->gdt_ents = 0;
 
     /* Ring 1 stack is the initial stack. */
-    ctxt->kernel_ss  = FLAT_KERNEL_DS;
-    ctxt->kernel_esp = vstartinfo_start + 2*PAGE_SIZE;
+    ctxt->kernel_ss = FLAT_KERNEL_DS;
+    ctxt->kernel_sp = vstartinfo_start + 2*PAGE_SIZE;
 
     /* No debugging. */
     memset(ctxt->debugreg, 0, sizeof(ctxt->debugreg));

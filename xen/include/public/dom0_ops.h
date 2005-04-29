@@ -83,7 +83,7 @@ typedef struct {
 #define DOMFLAGS_SHUTDOWNMASK 255 /* DOMFLAGS_SHUTDOWN guest-supplied code.  */
 #define DOMFLAGS_SHUTDOWNSHIFT 16
     u32      flags;
-    full_execution_context_t *ctxt;   /* NB. IN/OUT variable. */
+    vcpu_guest_context_t *ctxt;   /* NB. IN/OUT variable. */
     memory_t tot_pages;
     memory_t max_pages;
     memory_t shared_info_frame;       /* MFN of shared_info struct */
@@ -96,7 +96,7 @@ typedef struct {
     domid_t                   domain;
     u16                       exec_domain;
     /* IN/OUT parameters */
-    full_execution_context_t *ctxt;
+    vcpu_guest_context_t *ctxt;
 } dom0_setdomaininfo_t;
 
 #define DOM0_MSR              15

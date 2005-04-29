@@ -17,7 +17,7 @@ irq_desc_t irq_desc[NR_IRQS];
 
 static void __do_IRQ_guest(int irq);
 
-void no_action(int cpl, void *dev_id, struct xen_regs *regs) { }
+void no_action(int cpl, void *dev_id, struct cpu_user_regs *regs) { }
 
 static void enable_none(unsigned int irq) { }
 static unsigned int startup_none(unsigned int irq) { return 0; }
@@ -87,7 +87,7 @@ void enable_irq(unsigned int irq)
     spin_unlock_irqrestore(&desc->lock, flags);
 }
 
-asmlinkage void do_IRQ(struct xen_regs *regs)
+asmlinkage void do_IRQ(struct cpu_user_regs *regs)
 {       
     unsigned int      irq = regs->entry_vector;
     irq_desc_t       *desc = &irq_desc[irq];

@@ -28,7 +28,7 @@ void serial_init_stage2(void);
 int parse_serial_handle(char *conf);
 
 /* Register a character-receive hook on the specified COM port. */
-typedef void (*serial_rx_fn)(unsigned char, struct xen_regs *);
+typedef void (*serial_rx_fn)(unsigned char, struct cpu_user_regs *);
 void serial_set_rx_handler(int handle, serial_rx_fn fn);
 
 /* Transmit a single character via the specified COM port. */

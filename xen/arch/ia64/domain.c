@@ -199,13 +199,13 @@ void arch_do_boot_vcpu(struct exec_domain *p)
 	return;
 }
 
-int arch_set_info_guest(struct exec_domain *p, full_execution_context_t *c)
+int arch_set_info_guest(struct exec_domain *p, struct vcpu_guest_context *c)
 {
 	dummy();
 	return 1;
 }
 
-int arch_final_setup_guest(struct exec_domain *p, full_execution_context_t *c)
+int arch_final_setup_guest(struct exec_domain *p, struct vcpu_guest_context *c)
 {
 	dummy();
 	return 1;
