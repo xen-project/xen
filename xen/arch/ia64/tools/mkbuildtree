@@ -169,6 +169,7 @@ softlink include/asm-generic/vmlinux.lds.h include/asm-generic/vmlinux.lds.h vml
 # xen/include/asm-ia64 files
 
 #cp_patch arch/ia64/hp/sim/hpsim_ssc.h include/asm-ia64/hpsim_ssc.h hpsim_ssc.h
+softlink arch/ia64/hp/sim/hpsim_ssc.h include/asm-ia64/hpsim_ssc.h
 
 #cp_patch include/asm-ia64/current.h include/asm-ia64/current.h current.h
 softlink include/asm-ia64/current.h include/asm-ia64/current.h
@@ -264,7 +265,6 @@ softlink include/asm-ia64/ustack.h include/asm-ia64/ustack.h
 # xen/include/asm-ia64/linux/*.h (== linux/include/linux/*.h)
 
 #cp_patch include/linux/bootmem.h include/asm-ia64/linux/bootmem.h bootmem.h
-softlink include/linux/bootmem.h include/asm-ia64/linux/bootmem.h
 cp_patch include/linux/cpumask.h include/asm-ia64/linux/cpumask.h cpumask.h
 #cp_patch include/linux/dma-mapping.h include/asm-ia64/linux/dma-mapping.h dma-mapping.h
 softlink include/linux/dma-mapping.h include/asm-ia64/linux/dma-mapping.h
@@ -323,6 +323,7 @@ null include/asm-ia64/linux/kernel_stat.h
 null include/asm-ia64/linux/ptrace.h
 null include/asm-ia64/linux/random.h
 null include/asm-ia64/linux/signal.h
+null include/asm-ia64/linux/bootmem.h
 
 softlink include/linux/byteorder/generic.h include/asm-ia64/linux/byteorder/generic.h
 softlink include/linux/byteorder/little_endian.h include/asm-ia64/linux/byteorder/little_endian.h
