@@ -38,14 +38,13 @@
 #define DEBUGGER_trap_fatal(_v, _r) \
     if ( debugger_trap_fatal(_v, _r) ) return EXCRET_fault_fixed;
 
-int call_with_registers(int (*f)(struct cpu_user_regs *r));
-
 #if defined(CRASH_DEBUG)
 
 extern int __trap_to_cdb(struct cpu_user_regs *r);
 #define debugger_trap_entry(_v, _r) (0)
 #define debugger_trap_fatal(_v, _r) __trap_to_cdb(_r)
-#define debugger_trap_immediate() call_with_registers(__trap_to_cdb)
+/* Int3 is a trivial way to gather cpu_user_regs context. */
+#define debugger_trap_immediate() __asm__ __volatile__ ( "int3" );
 
 #elif defined(DOMU_DEBUG)
 

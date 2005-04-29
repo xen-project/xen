@@ -69,7 +69,7 @@ static void default_idle(void)
         local_irq_enable();
 }
 
-static __attribute_used__ void idle_loop(void)
+void idle_loop(void)
 {
     int cpu = smp_processor_id();
     for ( ; ; )
@@ -91,7 +91,7 @@ static void __startup_cpu_idle_loop(struct exec_domain *ed)
 
     /* Start normal idle loop. */
     ed->arch.schedule_tail = continue_idle_task;
-    reset_stack_and_jump(idle_loop);
+    continue_idle_task(ed);
 }
 
 void startup_cpu_idle_loop(void)
