@@ -407,30 +407,58 @@ void make_pages_writable(void *va, unsigned int nr)
 }
 #endif /* CONFIG_XEN_SHADOW_MODE */
 
+static inline void mm_walk_set_prot(void *pt, pgprot_t flags)
+{
+	struct page *page = virt_to_page(pt);
+	unsigned long pfn = page_to_pfn(page);
+
+	if (PageHighMem(page))
+		return;
+	HYPERVISOR_update_va_mapping(
+		(unsigned long)__va(pfn << PAGE_SHIFT),
+		pfn_pte(pfn, flags), 0);
+}
+
+static void mm_walk(struct mm_struct *mm, pgprot_t flags)
+{
+	pgd_t       *pgd;
+	pud_t       *pud;
+	pmd_t       *pmd;
+	pte_t       *pte;
+	int          g,u,m;
+
+	pgd = mm->pgd;
+	for (g = 0; g < USER_PTRS_PER_PGD; g++, pgd++) {
+		if (pgd_none(*pgd))
+			continue;
+		pud = pud_offset(pgd, 0);
+		if (PTRS_PER_PUD > 1) /* not folded */
+			mm_walk_set_prot(pud,flags);
+		for (u = 0; u < PTRS_PER_PUD; u++, pud++) {
+			if (pud_none(*pud))
+				continue;
+			pmd = pmd_offset(pud, 0);
+			if (PTRS_PER_PMD > 1) /* not folded */
+				mm_walk_set_prot(pmd,flags);
+			for (m = 0; m < PTRS_PER_PMD; m++, pmd++) {
+				if (pmd_none(*pmd))
+					continue;
+				pte = pte_offset_kernel(pmd,0);
+				mm_walk_set_prot(pte,flags);
+			}
+		}
+	}
+}
+
 void mm_pin(struct mm_struct *mm)
 {
-    pgd_t       *pgd;
-    struct page *page;
-    int          i;
-
     spin_lock(&mm->page_table_lock);
 
-    for ( i = 0, pgd = mm->pgd; i < USER_PTRS_PER_PGD; i++, pgd++ )
-    {
-        if ( *(unsigned long *)pgd == 0 )
-            continue;
-        page = pmd_page(*(pmd_t *)pgd);
-        if ( !PageHighMem(page) )
-            HYPERVISOR_update_va_mapping(
-                (unsigned long)__va(page_to_pfn(page)<<PAGE_SHIFT),
-                pfn_pte(page_to_pfn(page), PAGE_KERNEL_RO), 0);
-    }
-
+    mm_walk(mm, PAGE_KERNEL_RO);
     HYPERVISOR_update_va_mapping(
         (unsigned long)mm->pgd,
         pfn_pte(virt_to_phys(mm->pgd)>>PAGE_SHIFT, PAGE_KERNEL_RO), 0);
     xen_pgd_pin(__pa(mm->pgd));
-
     mm->context.pinned = 1;
 
     spin_unlock(&mm->page_table_lock);
@@ -438,28 +466,13 @@ void mm_pin(struct mm_struct *mm)
 
 void mm_unpin(struct mm_struct *mm)
 {
-    pgd_t       *pgd;
-    struct page *page;
-    int          i;
-
     spin_lock(&mm->page_table_lock);
 
     xen_pgd_unpin(__pa(mm->pgd));
     HYPERVISOR_update_va_mapping(
         (unsigned long)mm->pgd,
         pfn_pte(virt_to_phys(mm->pgd)>>PAGE_SHIFT, PAGE_KERNEL), 0);
-
-    for ( i = 0, pgd = mm->pgd; i < USER_PTRS_PER_PGD; i++, pgd++ )
-    {
-        if ( *(unsigned long *)pgd == 0 )
-            continue;
-        page = pmd_page(*(pmd_t *)pgd);
-        if ( !PageHighMem(page) )
-            HYPERVISOR_update_va_mapping(
-                (unsigned long)__va(page_to_pfn(page)<<PAGE_SHIFT),
-                pfn_pte(page_to_pfn(page), PAGE_KERNEL), 0);
-    }
-
+    mm_walk(mm, PAGE_KERNEL);
     mm->context.pinned = 0;
 
     spin_unlock(&mm->page_table_lock);
