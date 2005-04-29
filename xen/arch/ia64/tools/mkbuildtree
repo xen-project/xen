@@ -168,8 +168,7 @@ softlink include/asm-generic/vmlinux.lds.h include/asm-generic/vmlinux.lds.h vml
 
 # xen/include/asm-ia64 files
 
-#cp_patch arch/ia64/hp/sim/hpsim_ssc.h include/asm-ia64/hpsim_ssc.h hpsim_ssc.h
-softlink arch/ia64/hp/sim/hpsim_ssc.h include/asm-ia64/hpsim_ssc.h
+cp_patch arch/ia64/hp/sim/hpsim_ssc.h include/asm-ia64/hpsim_ssc.h hpsim_ssc.h
 
 #cp_patch include/asm-ia64/current.h include/asm-ia64/current.h current.h
 softlink include/asm-ia64/current.h include/asm-ia64/current.h
