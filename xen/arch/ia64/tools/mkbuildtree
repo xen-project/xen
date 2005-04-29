@@ -85,7 +85,7 @@ cp_patch arch/ia64/kernel/entry.S arch/ia64/entry.S entry.S
 cp_patch arch/ia64/kernel/head.S arch/ia64/head.S head.S
 #cp_patch arch/ia64/kernel/init_task.c arch/ia64/init_task.c init_task.c
 cp_patch arch/ia64/kernel/irq_ia64.c arch/ia64/irq_ia64.c irq_ia64.c
-cp_patch arch/ia64/kernel/ivt.S arch/ia64/ivt.S ivt.S
+#cp_patch arch/ia64/kernel/ivt.S arch/ia64/ivt.S ivt.S
 #cp_patch arch/ia64/kernel/minstate.h arch/ia64/minstate.h minstate.h
 cp_patch arch/ia64/kernel/setup.c arch/ia64/setup.c setup.c
 cp_patch arch/ia64/kernel/time.c arch/ia64/time.c time.c
@@ -317,6 +317,11 @@ null include/asm-ia64/linux/profile.h
 null include/asm-ia64/linux/seqlock.h
 null include/asm-ia64/linux/smp_lock.h
 null include/asm-ia64/linux/tty.h
+null include/asm-ia64/linux/jiffies.h
+null include/asm-ia64/linux/kernel_stat.h
+null include/asm-ia64/linux/ptrace.h
+null include/asm-ia64/linux/random.h
+null include/asm-ia64/linux/signal.h
 
 softlink include/linux/byteorder/generic.h include/asm-ia64/linux/byteorder/generic.h
 softlink include/linux/byteorder/little_endian.h include/asm-ia64/linux/byteorder/little_endian.h
