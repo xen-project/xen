@@ -313,6 +313,16 @@ static int setup_guest(int xc_handle,
     munmap(vl1tab, PAGE_SIZE);
     munmap(vl2tab, PAGE_SIZE);
 
+    /* Write the machine->phys table entries. */
+    for ( count = 0; count < nr_pages; count++ )
+    {
+        if ( add_mmu_update(xc_handle, mmu,
+                            (page_array[count] << PAGE_SHIFT) | 
+                            MMU_MACHPHYS_UPDATE, count) )
+	    goto error_out;
+    }
+    
+
     if ((boot_paramsp = xc_map_foreign_range(
 		xc_handle, dom, PAGE_SIZE, PROT_READ|PROT_WRITE,
 		page_array[(vboot_params_start-dsi.v_start)>>PAGE_SHIFT])) == 0)
