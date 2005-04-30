@@ -550,6 +550,7 @@
 423d3a7b2vJq86I8FbYm6up5BsCwfA tools/gdb/gdb-6.2.1-xen-sparse/gdb/gdbserver/configure.in
 423d3a7bQPownmVb63qOoyq89ebBVA tools/gdb/gdb-6.2.1-xen-sparse/gdb/gdbserver/configure.srv
 423d3a7bHtqhyOgiRWhjWt-S-6wbYg tools/gdb/gdb-6.2.1-xen-sparse/gdb/gdbserver/linux-xen-low.c
+4273458dYPghQKVnj_xu5-fC38CcOg tools/gdb/gdb-6.2.1-xen-sparse/gdb/gdbserver/server.c
 423d3a7b2ENk2IskDZYZ98pe5NsvIA tools/gdb/gdb-6.2.1-xen-sparse/mkbuildtree
 423d3a7buANO_q-kgxIRffUu7lMnUw tools/gdb/gdbbuild
 41e2ff6dNPgvIrdIF6dC1azdex1U3A tools/ioemu/Makefile
@@ -720,6 +721,7 @@
 3fbba6dc1uU7U3IFeF6A-XEOYF2MkQ tools/libxc/rpm.spec
 3fbba6dcrNxtygEcgJYAJJ1gCQqfsA tools/libxc/xc.h
 3fbba6dbEVkVMX0JuDFzap9jeaucGA tools/libxc/xc_bvtsched.c
+4273458dyF2_sKA6CFkNJQYb8eY2dA tools/libxc/xc_core.c
 3fbba6dbasJQV-MVElDC0DGSHMiL5w tools/libxc/xc_domain.c
 40278d99BLsfUv3qxv0I8C1sClZ0ow tools/libxc/xc_elf.h
 403e0977Bjsm_e82pwvl9VvaJxh8Gg tools/libxc/xc_evtchn.c
@@ -735,6 +737,7 @@
 3fbba6dctWRWlFJkYb6hdix2X4WMuw tools/libxc/xc_private.c
 3fbba6dcbVrG2hPzEzwdeV_UC8kydQ tools/libxc/xc_private.h
 42337174PxyzzPk62raDiYCIsfStDg tools/libxc/xc_ptrace.c
+4273458duzL--nsTfT6e_q6Kfij48g tools/libxc/xc_ptrace_core.c
 41dde8b0pLfAKMs_L9Uri2hnzHiCRQ tools/libxc/xc_vmx_build.c
 40e1b09dMYB4ItGCqcMIzirdMd9I-w tools/libxutil/Makefile
 40e033325Sjqs-_4TuzeUEprP_gYFg tools/libxutil/allocate.c

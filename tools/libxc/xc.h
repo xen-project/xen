@@ -20,6 +20,7 @@ typedef int16_t            s16;
 typedef int32_t            s32;
 typedef int64_t            s64;
 
+#include <sys/ptrace.h>
 #include <xen/xen.h>
 #include <xen/dom0_ops.h>
 #include <xen/event_channel.h>
@@ -72,6 +73,38 @@ int xc_interface_open(void);
 int xc_interface_close(int xc_handle);
 
 /*
+ * DOMAIN DEBUGGING FUNCTIONS
+ */
+
+typedef struct xc_core_header {
+    unsigned int xch_magic;
+    unsigned int xch_nr_vcpus;
+    unsigned int xch_nr_pages;
+    unsigned int xch_ctxt_offset;
+    unsigned int xch_index_offset;
+    unsigned int xch_pages_offset;
+} xc_core_header_t;
+
+
+long xc_ptrace(enum __ptrace_request request, 
+	       pid_t pid, 
+	       long addr, 
+	       long data);
+
+long xc_ptrace_core(enum __ptrace_request request, 
+		    pid_t pid, 
+		    long addr, 
+		    long data);
+
+int xc_waitdomain(int domain, 
+		  int *status, 
+		  int options);
+
+int xc_waitdomain_core(int domain, 
+		       int *status, 
+		       int options);
+
+/*
  * DOMAIN MANAGEMENT FUNCTIONS
  */
 
@@ -93,6 +126,12 @@ int xc_domain_create(int xc_handle,
                      int cpu,
                      float cpu_weight,
                      u32 *pdomid);
+
+
+int xc_domain_dumpcore(int xc_handle, 
+		       u32 domid,
+		       const char *corename);
+
 
 /**
  * This function pauses a domain. A paused domain still exists in memory

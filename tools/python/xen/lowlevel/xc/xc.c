@@ -36,6 +36,33 @@ typedef struct {
  * Definitions for the 'xc' object type.
  */
 
+static PyObject *pyxc_domain_dumpcore(PyObject *self,
+				      PyObject *args,
+				      PyObject *kwds)
+{
+    XcObject *xc = (XcObject *)self;
+
+    u32 dom;
+    char *corefile;
+
+    static char *kwd_list[] = { "dom", "corefile", NULL };
+
+    if ( !PyArg_ParseTupleAndKeywords(args, kwds, "is", kwd_list, &dom, &corefile) )
+        goto exit;
+
+    if ( (corefile == NULL) || (corefile[0] == '\0') )
+        goto exit;
+
+    if ( xc_domain_dumpcore(xc->xc_handle, dom, corefile) != 0 )
+        return PyErr_SetFromErrno(xc_error);
+    
+    Py_INCREF(zero);
+    return zero;
+
+ exit:
+    return NULL;
+}
+
 static PyObject *pyxc_domain_create(PyObject *self,
                                     PyObject *args,
                                     PyObject *kwds)
@@ -853,6 +880,14 @@ static PyMethodDef pyxc_methods[] = {
       " dom    [int, 0]:        Domain identifier to use (allocated if zero).\n"
       " mem_kb [int, 0]:        Memory allocation, in kilobytes.\n"
       "Returns: [int] new domain identifier; -1 on error.\n" },
+
+    { "domain_dumpcore", 
+      (PyCFunction)pyxc_domain_dumpcore, 
+      METH_VARARGS | METH_KEYWORDS, "\n"
+      "dump core of a domain.\n"
+      " dom [int]: Identifier of domain to be paused.\n\n"
+      " corefile [string]: Name of corefile to be created.\n\n"
+      "Returns: [int] 0 on success; -1 on error.\n" },
 
     { "domain_pause", 
       (PyCFunction)pyxc_domain_pause, 

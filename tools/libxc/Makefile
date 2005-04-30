@@ -17,6 +17,7 @@ INCLUDES += -I $(XEN_LIBXUTIL)
 
 SRCS     :=
 SRCS     += xc_bvtsched.c
+SRCS     += xc_core.c
 SRCS     += xc_domain.c
 SRCS     += xc_evtchn.c
 SRCS     += xc_gnttab.c
@@ -29,6 +30,7 @@ SRCS     += xc_misc.c
 SRCS     += xc_physdev.c
 SRCS     += xc_private.c
 SRCS     += xc_ptrace.c
+SRCS     += xc_ptrace_core.c
 SRCS     += xc_vmx_build.c
 
 CFLAGS   += -Wall

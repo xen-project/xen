@@ -35,12 +35,11 @@
 #include <stdlib.h>
 #include <unistd.h>
 #include <errno.h>
-
+#include <xc.h>
 #define TRACE_ENTER /* printf("enter %s\n", __FUNCTION__) */
-#define ptrace xc_ptrace
-long xc_ptrace(enum __ptrace_request request, ...);
+long (*myptrace)(enum __ptrace_request, pid_t, long, long);
+int (*myxcwait)(int domain, int *status, int options) ;
 
-int waitdomain(int domain, int *status, int options);
 
 #define DOMFLAGS_DYING     (1<<0) /* Domain is scheduled to die.             */
 #define DOMFLAGS_CRASHED   (1<<1) /* Crashed domain; frozen for postmortem.  */
@@ -61,6 +60,8 @@ static void linux_resume (struct thread_resume *resume_info);
 
 int debug_threads;
 int using_threads;
+extern int isfile;
+
 struct pending_signals
 {
   int signal;
@@ -150,7 +151,7 @@ linux_attach (int domain)
 {
     struct process_info *new_process;
     current_domain = domain;
-    if (ptrace (PTRACE_ATTACH, domain, 0, 0) != 0) {
+    if (myptrace (PTRACE_ATTACH, domain, 0, 0) != 0) {
 	fprintf (stderr, "Cannot attach to domain %d: %s (%d)\n", domain,
 		 strerror (errno), errno);
 	fflush (stderr);
@@ -173,7 +174,7 @@ linux_kill_one_process (struct inferior_list_entry *entry)
 {
   struct thread_info *thread = (struct thread_info *) entry;
   struct process_info *process = get_thread_process (thread);
-  ptrace (PTRACE_KILL, pid_of (process), 0, 0);
+  myptrace (PTRACE_KILL, pid_of (process), 0, 0);
 
 }
 
@@ -190,7 +191,7 @@ linux_detach_one_process (struct inferior_list_entry *entry)
   struct thread_info *thread = (struct thread_info *) entry;
   struct process_info *process = get_thread_process (thread);
 
-  ptrace (PTRACE_DETACH, pid_of (process), 0, 0);
+  myptrace (PTRACE_DETACH, pid_of (process), 0, 0);
 }
 
 
@@ -216,8 +217,7 @@ static unsigned char
 linux_wait (char *status)
 {
   int w;
-  TRACE_ENTER;
-  if (waitdomain(current_domain, &w, 0))
+  if (myxcwait(current_domain, &w, 0))
       return -1;
   
   if (w & (DOMFLAGS_CRASHED|DOMFLAGS_DYING)) {
@@ -242,7 +242,7 @@ linux_resume (struct thread_resume *resume_info)
   expect_signal = resume_info->sig;
   for_each_inferior(&all_threads, regcache_invalidate_one);
 
-  ptrace (step ? PTRACE_SINGLESTEP : PTRACE_CONT, current_domain, 0, 0);
+  myptrace (step ? PTRACE_SINGLESTEP : PTRACE_CONT, current_domain, 0, 0);
 
 }
 
@@ -266,7 +266,7 @@ regsets_fetch_inferior_registers ()
 	}
 
       buf = malloc (regset->size);
-      res = ptrace (regset->get_request, inferior_pid, 0, buf);
+      res = myptrace (regset->get_request, inferior_pid, 0, (PTRACE_XFER_TYPE)buf);
       if (res < 0)
 	{
 	  if (errno == EIO)
@@ -318,7 +318,7 @@ regsets_store_inferior_registers ()
 
       buf = malloc (regset->size);
       regset->fill_function (buf);
-      res = ptrace (regset->set_request, inferior_pid, 0, buf);
+      res = myptrace (regset->set_request, inferior_pid, 0, (PTRACE_XFER_TYPE)buf);
       if (res < 0)
 	{
 	  if (errno == EIO)
@@ -395,7 +395,7 @@ linux_read_memory (CORE_ADDR memaddr, char *myaddr, int len)
   for (i = 0; i < count; i++, addr += sizeof (PTRACE_XFER_TYPE))
     {
       errno = 0;
-      buffer[i] = ptrace (PTRACE_PEEKTEXT, inferior_pid, (PTRACE_ARG3_TYPE) addr, 0);
+      buffer[i] = myptrace (PTRACE_PEEKTEXT, inferior_pid, (PTRACE_ARG3_TYPE) addr, 0);
       if (errno)
 	return errno;
     }
@@ -428,13 +428,13 @@ linux_write_memory (CORE_ADDR memaddr, const char *myaddr, int len)
 
   /* Fill start and end extra bytes of buffer with existing memory data.  */
 
-  buffer[0] = ptrace (PTRACE_PEEKTEXT, inferior_pid,
+  buffer[0] = myptrace (PTRACE_PEEKTEXT, inferior_pid,
 		      (PTRACE_ARG3_TYPE) addr, 0);
 
   if (count > 1)
     {
       buffer[count - 1]
-	= ptrace (PTRACE_PEEKTEXT, inferior_pid,
+	= myptrace (PTRACE_PEEKTEXT, inferior_pid,
 		  (PTRACE_ARG3_TYPE) (addr + (count - 1)
 				      * sizeof (PTRACE_XFER_TYPE)),
 		  0);
@@ -448,7 +448,7 @@ linux_write_memory (CORE_ADDR memaddr, const char *myaddr, int len)
   for (i = 0; i < count; i++, addr += sizeof (PTRACE_XFER_TYPE))
     {
       errno = 0;
-      ptrace (PTRACE_POKETEXT, inferior_pid, (PTRACE_ARG3_TYPE) addr, buffer[i]);
+      myptrace (PTRACE_POKETEXT, inferior_pid, (PTRACE_ARG3_TYPE) addr, buffer[i]);
       if (errno)
 	return errno;
     }
@@ -545,4 +545,12 @@ initialize_low (void)
 		       the_low_target.breakpoint_len);
   init_registers ();
   linux_init_signals ();
+  if (isfile) {
+      myptrace = xc_ptrace_core;
+      myxcwait = xc_waitdomain_core;
+  } else {
+      myptrace = xc_ptrace;
+      myxcwait = xc_waitdomain;
+  }
+
 }

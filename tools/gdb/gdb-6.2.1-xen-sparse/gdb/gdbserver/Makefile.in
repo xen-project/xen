@@ -83,7 +83,7 @@ READLINE_DEP = $$(READLINE_DIR)
 # -I. for config files.
 # -I${srcdir} for our headers.
 # -I$(srcdir)/../regformats for regdef.h.
-INCLUDE_CFLAGS = -I. -I${srcdir} -I$(srcdir)/../regformats -I$(INCLUDE_DIR)
+INCLUDE_CFLAGS = -I. -I${srcdir} -I$(srcdir)/../regformats -I$(INCLUDE_DIR)  -I../../../../libxc/ -I../../../../libxutil/
 
 # M{H,T}_CFLAGS, if defined, has host- and target-dependent CFLAGS
 # from the config/ directory.
