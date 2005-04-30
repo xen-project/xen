@@ -59,7 +59,9 @@ void pmap_ref(pt_entry_t *pte, unsigned long ma);
 #define PMAP_DEC_REF_PAGE(a)
 #endif
 
+#if 0
 #define WRITABLE_PAGETABLES
+#endif
 #define ALWAYS_SYNC 0
 
 #ifdef PT_DEBUG
@@ -118,18 +120,18 @@ void pd_set(struct pmap *pmap, vm_paddr_t *ptr, vm_paddr_t val, int type);
 
 #define PT_SET_VA(_ptp,_npte,sync) do {				\
         PMAP_REF((_ptp), xpmap_ptom(_npte));                    \
-	xen_queue_pt_update((pt_entry_t *)vtomach(_ptp), 	\
+	xen_queue_pt_update(vtomach(_ptp), 	                \
 			    xpmap_ptom(_npte)); 		\
 	if (sync || ALWAYS_SYNC) xen_flush_queue();		\
 } while (/*CONSTCOND*/0)
 #define PT_SET_VA_MA(_ptp,_npte,sync) do {		        \
         PMAP_REF((_ptp), (_npte));                              \
-	xen_queue_pt_update((pt_entry_t *)vtomach(_ptp), _npte);\
+	xen_queue_pt_update(vtomach(_ptp), _npte);              \
 	if (sync || ALWAYS_SYNC) xen_flush_queue();		\
 } while (/*CONSTCOND*/0)
 #define PT_CLEAR_VA(_ptp, sync) do {				\
         PMAP_REF((pt_entry_t *)(_ptp), 0);                      \
-	xen_queue_pt_update((pt_entry_t *)vtomach(_ptp), 0);	\
+	xen_queue_pt_update(vtomach(_ptp), 0);	                \
 	if (sync || ALWAYS_SYNC)				\
 		xen_flush_queue();				\
 } while (/*CONSTCOND*/0)
