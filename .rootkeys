@@ -1100,6 +1100,7 @@
 425ae516EWaNOBEnc1xnphTbRmNZsw xen/arch/ia64/patch/linux-2.6.11/processor.h
 425ae516LecDyXlwh3NLBtHZKXmMcA xen/arch/ia64/patch/linux-2.6.11/series
 425ae516RFiPn2CGkpJ21LM-1lJcQg xen/arch/ia64/patch/linux-2.6.11/setup.c
+425ae516FX_10YaKGMU8Ysf7kkdm_A xen/arch/ia64/patch/linux-2.6.11/swiotlb.c
 425ae516p4ICTkjqNYEfYFxqULj4dw xen/arch/ia64/patch/linux-2.6.11/system.h
 425ae516juUB257qrwUdsL9AsswrqQ xen/arch/ia64/patch/linux-2.6.11/time.c
 425ae5167zQn7zYcgKtDUDX2v-e8mw xen/arch/ia64/patch/linux-2.6.11/tlb.c

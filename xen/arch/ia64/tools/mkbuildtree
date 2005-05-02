@@ -142,7 +142,7 @@ softlink arch/ia64/lib/strlen_user.S arch/ia64/lib/strlen_user.S
 softlink arch/ia64/lib/strncpy_from_user.S arch/ia64/lib/strncpy_from_user.S
 softlink arch/ia64/lib/strnlen_user.S arch/ia64/lib/strnlen_user.S
 #softlink arch/ia64/lib/swiotlb.c arch/ia64/lib/swiotlb.c
-#cp_patch arch/ia64/lib/swiotlb.c arch/ia64/lib/swiotlb.c swiotlb.c
+cp_patch arch/ia64/lib/swiotlb.c arch/ia64/lib/swiotlb.c swiotlb.c
 softlink arch/ia64/lib/xor.S arch/ia64/lib/xor.S
 
 softlink lib/cmdline.c arch/ia64/cmdline.c
@@ -151,19 +151,19 @@ softlink arch/ia64/hp/sim/hpsim.S arch/ia64/hpsim.S
 
 # xen/include/asm-generic files
 
-softlink include/asm-generic/bug.h include/asm-generic/bug.h bug.h
-softlink include/asm-generic/div64.h include/asm-generic/div64.h div64.h
+softlink include/asm-generic/bug.h include/asm-generic/bug.h
+softlink include/asm-generic/div64.h include/asm-generic/div64.h
 softlink include/asm-generic/errno.h include/asm-generic/errno.h
 softlink include/asm-generic/errno-base.h include/asm-generic/errno-base.h
-softlink include/asm-generic/ide_iops.h include/asm-generic/ide_iops.h ide_iops.h
-softlink include/asm-generic/iomap.h include/asm-generic/iomap.h iomap.h
-softlink include/asm-generic/pci-dma-compat.h include/asm-generic/pci-dma-compat.h pci-dma-compat.h
-softlink include/asm-generic/pci.h include/asm-generic/pci.h pci.h
-softlink include/asm-generic/pgtable.h include/asm-generic/pgtable.h pgtable.h
-softlink include/asm-generic/pgtable-nopud.h include/asm-generic/pgtable-nopud.h pgtable-nopud.h
-softlink include/asm-generic/sections.h include/asm-generic/sections.h sections.h
-softlink include/asm-generic/topology.h include/asm-generic/topology.h topology.h
-softlink include/asm-generic/vmlinux.lds.h include/asm-generic/vmlinux.lds.h vmlinux.lds.h
+softlink include/asm-generic/ide_iops.h include/asm-generic/ide_iops.h
+softlink include/asm-generic/iomap.h include/asm-generic/iomap.h
+softlink include/asm-generic/pci-dma-compat.h include/asm-generic/pci-dma-compat.h
+softlink include/asm-generic/pci.h include/asm-generic/pci.h
+softlink include/asm-generic/pgtable.h include/asm-generic/pgtable.h
+softlink include/asm-generic/pgtable-nopud.h include/asm-generic/pgtable-nopud.h
+softlink include/asm-generic/sections.h include/asm-generic/sections.h
+softlink include/asm-generic/topology.h include/asm-generic/topology.h
+softlink include/asm-generic/vmlinux.lds.h include/asm-generic/vmlinux.lds.h
 
 
 # xen/include/asm-ia64 files

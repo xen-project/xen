@@ -33,7 +33,7 @@ void ia64_patch_vtop(unsigned long a, unsigned long b) { }
 void hpsim_setup(char **x) { }
 
 // called from mem_init... don't think s/w I/O tlb is needed in Xen
-void swiotlb_init(void) { }
+//void swiotlb_init(void) { }  ...looks like it IS needed
 
 long
 is_platform_hp_ski(void)
