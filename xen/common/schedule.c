@@ -338,7 +338,19 @@ long sched_ctl(struct sched_ctl_cmd *cmd)
 long sched_adjdom(struct sched_adjdom_cmd *cmd)
 {
     struct domain *d;
+    struct exec_domain *ed;
+    int cpu;
+#if NR_CPUS <=32
+    unsigned long have_lock;
+ #else
+    unsigned long long have_lock;
+#endif
+    int succ;
 
+    #define __set_cpu_bit(cpu, data) data |= ((typeof(data))1)<<cpu
+    #define __get_cpu_bit(cpu, data) (data & ((typeof(data))1)<<cpu)
+    #define __clear_cpu_bits(data) data = ((typeof(data))0)
+    
     if ( cmd->sched_id != ops.sched_id )
         return -EINVAL;
     
@@ -349,9 +361,38 @@ long sched_adjdom(struct sched_adjdom_cmd *cmd)
     if ( d == NULL )
         return -ESRCH;
 
-    spin_lock_irq(&schedule_data[d->exec_domain[0]->processor].schedule_lock);
+    /* acquire locks on all CPUs on which exec_domains of this domain run */
+    do {
+        succ = 0;
+        __clear_cpu_bits(have_lock);
+        for_each_exec_domain(d, ed) {
+            cpu = ed->processor;
+            if (!__get_cpu_bit(cpu, have_lock)) {
+                /* if we don't have a lock on this CPU: acquire it*/
+                if (!spin_trylock(&schedule_data[cpu].schedule_lock)) {
+                    /*we have this lock!*/
+                    __set_cpu_bit(cpu, have_lock);
+                    succ = 1;
+                } else {
+                    /*we didn,t get this lock -> free all other locks too!*/
+                    for (cpu = 0; cpu < NR_CPUS; cpu++)
+                        if (__get_cpu_bit(cpu, have_lock))
+                            spin_unlock(&schedule_data[cpu].schedule_lock);
+                    /* and start from the beginning! */
+                    succ = 0;
+                    /* leave the "for_each_domain_loop" */
+                    break;
+                }
+            }
+        }
+    } while (!succ);
+    //spin_lock_irq(&schedule_data[d->exec_domain[0]->processor].schedule_lock);
     SCHED_OP(adjdom, d, cmd);
-    spin_unlock_irq(&schedule_data[d->exec_domain[0]->processor].schedule_lock);
+    //spin_unlock_irq(&schedule_data[d->exec_domain[0]->processor].schedule_lock);
+    for (cpu = 0; cpu < NR_CPUS; cpu++)
+        if (__get_cpu_bit(cpu, have_lock))
+            spin_unlock(&schedule_data[cpu].schedule_lock);
+    __clear_cpu_bits(have_lock);
 
     TRACE_1D(TRC_SCHED_ADJDOM, d->id);
     put_domain(d);
