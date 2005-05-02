@@ -31,8 +31,9 @@ static struct mtx irq_mapping_update_lock;
 static int evtchn_to_irq[NR_EVENT_CHANNELS];
 static int irq_to_evtchn[NR_IRQS];
 
-/* IRQ <-> VIRQ mapping. */
-static int virq_to_irq[NR_VIRQS];
+static int virq_to_irq[MAX_VIRT_CPUS][NR_VIRQS];
+static int ipi_to_evtchn[MAX_VIRT_CPUS][NR_VIRQS];
+
 
 /* Reference counts for bindings to IRQs. */
 static int irq_bindcount[NR_IRQS];
@@ -120,7 +121,7 @@ bind_virq_to_irq(int virq)
 
     mtx_lock(&irq_mapping_update_lock);
 
-    if ( (irq = virq_to_irq[virq]) == -1 )
+    if ( (irq = PCPU_GET(virq_to_irq)[virq]) == -1 )
     {
         op.cmd              = EVTCHNOP_bind_virq;
         op.u.bind_virq.virq = virq;
@@ -132,7 +133,7 @@ bind_virq_to_irq(int virq)
         evtchn_to_irq[evtchn] = irq;
         irq_to_evtchn[irq]    = evtchn;
 
-        virq_to_irq[virq] = irq;
+        PCPU_GET(virq_to_irq)[virq] = irq;
     }
 
     irq_bindcount[irq]++;
@@ -146,7 +147,7 @@ void
 unbind_virq_from_irq(int virq)
 {
     evtchn_op_t op;
-    int irq    = virq_to_irq[virq];
+    int irq    = PCPU_GET(virq_to_irq)[virq];
     int evtchn = irq_to_evtchn[irq];
 
     mtx_lock(&irq_mapping_update_lock);
@@ -161,7 +162,64 @@ unbind_virq_from_irq(int virq)
 
         evtchn_to_irq[evtchn] = -1;
         irq_to_evtchn[irq]    = -1;
-        virq_to_irq[virq]     = -1;
+        PCPU_GET(virq_to_irq)[virq]     = -1;
+    }
+
+    mtx_unlock(&irq_mapping_update_lock);
+}
+
+
+int 
+bind_ipi_on_cpu_to_irq(int cpu, int ipi)
+{
+    evtchn_op_t op;
+    int evtchn, irq;
+
+    mtx_lock(&irq_mapping_update_lock);
+
+    if ( (evtchn = PCPU_GET(ipi_to_evtchn)[ipi]) == 0 )
+    {
+        op.cmd                 = EVTCHNOP_bind_ipi;
+        op.u.bind_ipi.ipi_edom = cpu;
+        if ( HYPERVISOR_event_channel_op(&op) != 0 )
+            panic("Failed to bind virtual IPI %d on cpu %d\n", ipi, cpu);
+        evtchn = op.u.bind_ipi.port;
+
+        irq = find_unbound_irq();
+        evtchn_to_irq[evtchn] = irq;
+        irq_to_evtchn[irq]    = evtchn;
+
+        PCPU_GET(ipi_to_evtchn)[ipi] = evtchn;
+    } else
+	irq = evtchn_to_irq[evtchn];
+
+    irq_bindcount[irq]++;
+
+    mtx_unlock(&irq_mapping_update_lock);
+
+    return irq;
+}
+
+void 
+unbind_ipi_on_cpu_from_irq(int cpu, int ipi)
+{
+    evtchn_op_t op;
+    int evtchn = PCPU_GET(ipi_to_evtchn)[ipi];
+    int irq    = irq_to_evtchn[evtchn];
+
+    mtx_lock(&irq_mapping_update_lock);
+
+    if ( --irq_bindcount[irq] == 0 )
+    {
+	op.cmd          = EVTCHNOP_close;
+	op.u.close.dom  = DOMID_SELF;
+	op.u.close.port = evtchn;
+	if ( HYPERVISOR_event_channel_op(&op) != 0 )
+	    panic("Failed to unbind virtual IPI %d on cpu %d\n", ipi, cpu);
+
+        evtchn_to_irq[evtchn] = -1;
+        irq_to_evtchn[irq]    = -1;
+	PCPU_GET(ipi_to_evtchn)[ipi] = 0;
     }
 
     mtx_unlock(&irq_mapping_update_lock);
@@ -464,7 +522,7 @@ void irq_suspend(void)
     /* Unbind VIRQs from event channels. */
     for ( virq = 0; virq < NR_VIRQS; virq++ )
     {
-        if ( (irq = virq_to_irq[virq]) == -1 )
+        if ( (irq = PCPU_GET(virq_to_irq)[virq]) == -1 )
             continue;
         evtchn = irq_to_evtchn[irq];
 
@@ -493,7 +551,7 @@ void irq_resume(void)
 
     for ( virq = 0; virq < NR_VIRQS; virq++ )
     {
-        if ( (irq = virq_to_irq[virq]) == -1 )
+        if ( (irq = PCPU_GET(virq_to_irq)[virq]) == -1 )
             continue;
 
         /* Get a new binding from Xen. */
@@ -512,6 +570,20 @@ void irq_resume(void)
     }
 }
 
+void
+ap_evtchn_init(int cpu)
+{
+    int i;
+
+    /* XXX -- expedience hack */
+    PCPU_SET(virq_to_irq, (int  *)&virq_to_irq[cpu]);
+    PCPU_SET(ipi_to_evtchn, (int *)&ipi_to_evtchn[cpu]);
+
+    /* No VIRQ -> IRQ mappings. */
+    for ( i = 0; i < NR_VIRQS; i++ )
+        PCPU_GET(virq_to_irq)[i] = -1;
+}
+
 static void 
 evtchn_init(void *dummy __unused)
 {
@@ -527,9 +599,13 @@ evtchn_init(void *dummy __unused)
      */
     mtx_init(&irq_mapping_update_lock, "xp", NULL, MTX_DEF);
 
+    /* XXX -- expedience hack */
+    PCPU_SET(virq_to_irq, (int *)&virq_to_irq[0]);
+    PCPU_SET(ipi_to_evtchn, (int *)&ipi_to_evtchn[0]);
+
     /* No VIRQ -> IRQ mappings. */
     for ( i = 0; i < NR_VIRQS; i++ )
-        virq_to_irq[i] = -1;
+        PCPU_GET(virq_to_irq)[i] = -1;
 
     /* No event-channel -> IRQ mappings. */
     for ( i = 0; i < NR_EVENT_CHANNELS; i++ )

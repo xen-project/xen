@@ -31,6 +31,9 @@ extern int  bind_virq_to_irq(int virq);
 extern void unbind_virq_from_irq(int virq);
 extern int  bind_evtchn_to_irq(int evtchn);
 extern void unbind_evtchn_from_irq(int evtchn);
+extern int bind_ipi_on_cpu_to_irq(int cpu, int ipi);
+extern void unbind_ipi_on_cpu_from_irq(int cpu, int ipi);
+extern void ap_evtchn_init(int cpu);
 
 static __inline__ int irq_cannonicalize(int irq)
 {
