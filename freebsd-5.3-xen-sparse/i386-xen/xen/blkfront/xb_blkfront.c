@@ -68,6 +68,7 @@ struct xb_softc {
     void		 *xb_resp_handler;
     int			  xb_unit;
     int			  xb_flags;
+    struct xb_softc      *xb_next_blocked;
 #define XB_OPEN	(1<<0)		/* drive is open (can't shut down) */
 };
 
@@ -118,6 +119,9 @@ static grant_ref_t gref_head, gref_terminal;
     (BLKIF_MAX_SEGMENTS_PER_REQUEST * BLKIF_RING_SIZE)
 #endif
 
+static struct xb_softc *xb_kick_pending_head = NULL;
+static struct xb_softc *xb_kick_pending_tail = NULL;
+static struct mtx blkif_io_block_lock;
 
 static unsigned long rec_ring_free;		
 blkif_request_t rec_ring[BLK_RING_SIZE];
@@ -246,6 +250,7 @@ xb_response_intr(void *xsc)
     /* sometimes we seem to lose i/o.  stay in the interrupt handler while
      * there is stuff to process: continually recheck the response producer.
      */
+ process_rcvd:
     for ( i = blk_ring.rsp_cons; i != (rp = blk_ring.sring->rsp_prod); i++ ) {
 	unsigned long id;
         bret = RING_GET_RESPONSE(&blk_ring, i);
@@ -298,9 +303,28 @@ xb_response_intr(void *xsc)
     
     blk_ring.rsp_cons = i;
 
-    if (sc && xb_kick_pending) {
-    	xb_kick_pending = FALSE;
-	xb_startio(sc);
+    if (xb_kick_pending) {
+	unsigned long flags;
+	mtx_lock_irqsave(&blkif_io_block_lock, flags);
+   	xb_kick_pending = FALSE;
+	/* Run as long as there are blocked devs or queue fills again */
+	while ((NULL != xb_kick_pending_head) && (FALSE == xb_kick_pending)) {
+	    struct xb_softc *xb_cur = xb_kick_pending_head;
+	    xb_kick_pending_head = xb_cur->xb_next_blocked;
+	    if(NULL == xb_kick_pending_head) {
+		xb_kick_pending_tail = NULL;
+	    }
+	    xb_cur->xb_next_blocked = NULL;
+	    mtx_unlock_irqrestore(&blkif_io_block_lock, flags);
+	    xb_startio(xb_cur);
+	    mtx_lock_irqsave(&blkif_io_block_lock, flags);
+	}
+	mtx_unlock_irqrestore(&blkif_io_block_lock, flags);
+
+	if(blk_ring.rsp_cons != blk_ring.sring->rsp_prod) {
+	    /* Consume those, too */
+	    goto process_rcvd;
+	}
     }
 
     mtx_unlock_irqrestore(&blkif_io_lock, flags);
@@ -448,8 +472,22 @@ xb_startio(struct xb_softc *sc)
 
     }
 
-    if (RING_FULL(&blk_ring))
+    if (RING_FULL(&blk_ring)) {
+	unsigned long flags;
+	mtx_lock_irqsave(&blkif_io_block_lock, flags);
 	xb_kick_pending = TRUE;
+        /* If we are not already on blocked list, add us */
+        if((NULL == sc->xb_next_blocked) && (xb_kick_pending_tail != sc)) {
+
+            if(NULL == xb_kick_pending_head) {
+                xb_kick_pending_head = xb_kick_pending_tail = sc;
+            } else {
+                xb_kick_pending_tail->xb_next_blocked = sc;
+                xb_kick_pending_tail = sc;
+            }
+        }
+        mtx_unlock_irqrestore(&blkif_io_block_lock, flags);
+    }
     
     if (queued != 0) 
 	flush_requests();
@@ -501,6 +539,7 @@ xb_create(int unit)
     
     sc = (struct xb_softc *)malloc(sizeof(*sc), M_DEVBUF, M_WAITOK);
     sc->xb_unit = unit;
+    sc->xb_next_blocked = NULL;
 
     memset(&sc->xb_disk, 0, sizeof(sc->xb_disk)); 
     sc->xb_disk.d_unit = unit;
@@ -947,7 +986,10 @@ xb_init(void *unused)
         return;
     printk("Blkif frontend is using grant tables.\n");
 #endif
-
+ 
+    xb_kick_pending = FALSE;
+    xb_kick_pending_head = NULL;
+    xb_kick_pending_tail = NULL;
 
     rec_ring_free = 0;
     for (i = 0; i < BLK_RING_SIZE; i++) {
@@ -1002,4 +1044,5 @@ blkif_completion(blkif_request_t *req)
 #endif    
 }
 MTX_SYSINIT(ioreq, &blkif_io_lock, "BIO LOCK", MTX_SPIN | MTX_NOWITNESS); /* XXX how does one enroll a lock? */
+ MTX_SYSINIT(ioreq_block, &blkif_io_block_lock, "BIO BLOCK LOCK", MTX_SPIN | MTX_NOWITNESS);
 SYSINIT(xbdev, SI_SUB_PSEUDO, SI_ORDER_ANY, xb_init, NULL)
