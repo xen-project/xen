@@ -42,7 +42,7 @@ ifeq ($(verbose),y)
 CFLAGS += -DVERBOSE
 endif
 else
-CFLAGS += -DVERBOSE
+CFLAGS += -g -DVERBOSE
 endif
 
 ifeq ($(domu_debug),y)
