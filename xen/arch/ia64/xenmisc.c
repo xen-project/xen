@@ -27,7 +27,13 @@ unsigned int watchdog_on = 0;	// from arch/x86/nmi.c ?!?
 
 void unw_init(void) { printf("unw_init() skipped (NEED FOR KERNEL UNWIND)\n"); }
 void ia64_mca_init(void) { printf("ia64_mca_init() skipped (Machine check abort handling)\n"); }
-void hpsim_setup(char **x) { printf("hpsim_setup() skipped (MAY NEED FOR CONSOLE INPUT!!!)\n"); }	
+void ia64_mca_cpu_init(void *x) { }
+void ia64_patch_mckinley_e9(unsigned long a, unsigned long b) { }
+void ia64_patch_vtop(unsigned long a, unsigned long b) { }
+void hpsim_setup(char **x) { }
+
+// called from mem_init... don't think s/w I/O tlb is needed in Xen
+void swiotlb_init(void) { }
 
 long
 is_platform_hp_ski(void)

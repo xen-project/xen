@@ -18,8 +18,11 @@
 #include <xen/trace.h>
 #include <asm/meminit.h>
 #include <asm/page.h>
+#include <asm/setup.h>
 
 unsigned long xenheap_phys_end;
+
+char saved_command_line[COMMAND_LINE_SIZE];
 
 struct exec_domain *idle_task[NR_CPUS] = { &idle0_exec_domain };
 
@@ -226,15 +229,15 @@ void start_kernel(void)
 	(xenheap_phys_end-__pa(heap_start)) >> 20,
 	(xenheap_phys_end-__pa(heap_start)) >> 10);
 
-    setup_arch();
+    late_setup_arch(&cmdline);
     setup_per_cpu_areas();
     mem_init();
 
 printk("About to call scheduler_init()\n");
     scheduler_init();
     local_irq_disable();
-printk("About to call time_init()\n");
-    time_init();
+printk("About to call xen_time_init()\n");
+    xen_time_init();
 printk("About to call ac_timer_init()\n");
     ac_timer_init();
 // init_xen_time(); ???

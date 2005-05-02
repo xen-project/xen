@@ -1,78 +1,72 @@
- pgalloc.h |   17 +++++++++++------
- 1 files changed, 11 insertions(+), 6 deletions(-)
-
-Index: linux-2.6.11-xendiffs/include/asm-ia64/pgalloc.h
-===================================================================
---- linux-2.6.11-xendiffs.orig/include/asm-ia64/pgalloc.h	2005-04-08 11:57:30.909774800 -0500
-+++ linux-2.6.11-xendiffs/include/asm-ia64/pgalloc.h	2005-04-08 11:58:08.102711219 -0500
-@@ -18,6 +18,7 @@
- #include <linux/compiler.h>
- #include <linux/mm.h>
- #include <linux/page-flags.h>
-+#include <linux/preempt.h>
- #include <linux/threads.h>
- 
- #include <asm/mmu_context.h>
-@@ -34,6 +35,10 @@
- #define pmd_quicklist		(local_cpu_data->pmd_quick)
- #define pgtable_cache_size	(local_cpu_data->pgtable_cache_sz)
- 
-+/* FIXME: Later 3 level page table should be over, to create 
-+ * new interface upon xen memory allocator. To simplify first
-+ * effort moving to xen allocator, use xenheap pages temporarily. 
-+ */
- static inline pgd_t*
- pgd_alloc_one_fast (struct mm_struct *mm)
- {
-@@ -61,7 +66,7 @@ pgd_alloc (struct mm_struct *mm)
+--- ../../linux-2.6.11/include/asm-ia64/pgalloc.h	2005-03-02 00:37:31.000000000 -0700
++++ include/asm-ia64/pgalloc.h	2005-04-29 17:09:20.000000000 -0600
+@@ -61,7 +61,11 @@
  	pgd_t *pgd = pgd_alloc_one_fast(mm);
  
  	if (unlikely(pgd == NULL)) {
--		pgd = (pgd_t *)__get_free_page(GFP_KERNEL|__GFP_ZERO);
++#ifdef XEN
 +		pgd = (pgd_t *)alloc_xenheap_page();
++#else
+ 		pgd = (pgd_t *)__get_free_page(GFP_KERNEL|__GFP_ZERO);
++#endif
  	}
  	return pgd;
  }
-@@ -104,7 +109,7 @@ pmd_alloc_one_fast (struct mm_struct *mm
+@@ -104,7 +108,11 @@
  static inline pmd_t*
  pmd_alloc_one (struct mm_struct *mm, unsigned long addr)
  {
--	pmd_t *pmd = (pmd_t *)__get_free_page(GFP_KERNEL|__GFP_REPEAT|__GFP_ZERO);
++#ifdef XEN
 +	pmd_t *pmd = (pmd_t *)alloc_xenheap_page();
++#else
+ 	pmd_t *pmd = (pmd_t *)__get_free_page(GFP_KERNEL|__GFP_REPEAT|__GFP_ZERO);
++#endif
  
  	return pmd;
  }
-@@ -136,7 +141,7 @@ pmd_populate_kernel (struct mm_struct *m
+@@ -136,7 +144,11 @@
  static inline struct page *
  pte_alloc_one (struct mm_struct *mm, unsigned long addr)
  {
--	struct page *pte = alloc_pages(GFP_KERNEL|__GFP_REPEAT|__GFP_ZERO, 0);
++#ifdef XEN
 +	struct page *pte = alloc_xenheap_page();
++#else
+ 	struct page *pte = alloc_pages(GFP_KERNEL|__GFP_REPEAT|__GFP_ZERO, 0);
++#endif
  
  	return pte;
  }
-@@ -144,7 +149,7 @@ pte_alloc_one (struct mm_struct *mm, uns
+@@ -144,7 +156,11 @@
  static inline pte_t *
  pte_alloc_one_kernel (struct mm_struct *mm, unsigned long addr)
  {
--	pte_t *pte = (pte_t *)__get_free_page(GFP_KERNEL|__GFP_REPEAT|__GFP_ZERO);
++#ifdef XEN
 +	pte_t *pte = (pte_t *)alloc_xenheap_page();
++#else
+ 	pte_t *pte = (pte_t *)__get_free_page(GFP_KERNEL|__GFP_REPEAT|__GFP_ZERO);
++#endif
  
  	return pte;
  }
-@@ -152,13 +157,13 @@ pte_alloc_one_kernel (struct mm_struct *
+@@ -152,13 +168,21 @@
  static inline void
  pte_free (struct page *pte)
  {
--	__free_page(pte);
++#ifdef XEN
 +	free_xenheap_page(pte);
++#else
+ 	__free_page(pte);
++#endif
  }
  
  static inline void
  pte_free_kernel (pte_t *pte)
  {
--	free_page((unsigned long) pte);
++#ifdef XEN
 +	free_xenheap_page((unsigned long) pte);
++#else
+ 	free_page((unsigned long) pte);
++#endif
  }
  
  #define __pte_free_tlb(tlb, pte)	tlb_remove_page((tlb), (pte))

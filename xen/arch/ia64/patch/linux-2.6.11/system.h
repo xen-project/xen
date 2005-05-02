@@ -1,16 +1,10 @@
- system.h |   15 +++++++++++++++
- 1 files changed, 15 insertions(+)
-
-Index: linux-2.6.11-xendiffs/include/asm-ia64/system.h
-===================================================================
---- linux-2.6.11-xendiffs.orig/include/asm-ia64/system.h	2005-04-07 10:39:11.066701457 -0500
-+++ linux-2.6.11-xendiffs/include/asm-ia64/system.h	2005-04-07 10:40:19.540544127 -0500
-@@ -24,8 +24,16 @@
+--- ../../linux-2.6.11/include/asm-ia64/system.h	2005-03-02 00:38:07.000000000 -0700
++++ include/asm-ia64/system.h	2005-05-02 10:18:30.000000000 -0600
+@@ -24,8 +24,15 @@
   * 0xa000000000000000+2*PERCPU_PAGE_SIZE
   * - 0xa000000000000000+3*PERCPU_PAGE_SIZE remain unmapped (guard page)
   */
 +#ifdef XEN
-+//#define KERNEL_START		 0xf000000100000000
 +#define KERNEL_START		 0xf000000004000000
 +#define PERCPU_ADDR		 0xf100000000000000-PERCPU_PAGE_SIZE
 +#define SHAREDINFO_ADDR		 0xf100000000000000
@@ -22,7 +16,7 @@ Index: linux-2.6.11-xendiffs/include/asm-ia64/system.h
  
  #ifndef __ASSEMBLY__
  
-@@ -218,9 +226,13 @@ extern void ia64_load_extra (struct task
+@@ -218,9 +225,13 @@
  # define PERFMON_IS_SYSWIDE() (0)
  #endif
  
@@ -36,13 +30,3 @@ Index: linux-2.6.11-xendiffs/include/asm-ia64/system.h
  
  #define __switch_to(prev,next,last) do {							 \
  	if (IA64_HAS_EXTRA_STATE(prev))								 \
-@@ -249,6 +261,9 @@ extern void ia64_load_extra (struct task
- #else
- # define switch_to(prev,next,last)	__switch_to(prev, next, last)
- #endif
-+//#ifdef XEN
-+//#undef switch_to
-+//#endif
- 
- /*
-  * On IA-64, we don't want to hold the runqueue's lock during the low-level context-switch,
