@@ -1,21 +1,6 @@
- tlb.c |   10 ++++++++++
- 1 files changed, 10 insertions(+)
-
-Index: linux-2.6.11/arch/ia64/mm/tlb.c
-===================================================================
---- linux-2.6.11.orig/arch/ia64/mm/tlb.c	2005-03-02 01:38:38.000000000 -0600
-+++ linux-2.6.11/arch/ia64/mm/tlb.c	2005-03-19 14:58:43.978400822 -0600
-@@ -21,7 +21,9 @@
- #include <asm/mmu_context.h>
- #include <asm/pgalloc.h>
- #include <asm/pal.h>
-+#ifndef XEN
- #include <asm/tlbflush.h>
-+#endif
- 
- static struct {
- 	unsigned long mask;	/* mask of supported purge page-sizes */
-@@ -43,6 +45,9 @@ DEFINE_PER_CPU(u8, ia64_need_tlb_flush);
+--- ../../linux-2.6.11/arch/ia64/mm/tlb.c	2005-03-02 00:38:38.000000000 -0700
++++ arch/ia64/tlb.c	2005-05-02 10:23:09.000000000 -0600
+@@ -43,6 +43,9 @@
  void
  wrap_mmu_context (struct mm_struct *mm)
  {
@@ -25,7 +10,7 @@ Index: linux-2.6.11/arch/ia64/mm/tlb.c
  	unsigned long tsk_context, max_ctx = ia64_ctx.max_ctx;
  	struct task_struct *tsk;
  	int i;
-@@ -83,6 +88,7 @@ wrap_mmu_context (struct mm_struct *mm)
+@@ -83,6 +86,7 @@
  		put_cpu();
  	}
  	local_flush_tlb_all();
@@ -33,7 +18,7 @@ Index: linux-2.6.11/arch/ia64/mm/tlb.c
  }
  
  void
-@@ -132,6 +138,9 @@ EXPORT_SYMBOL(local_flush_tlb_all);
+@@ -132,6 +136,9 @@
  void
  flush_tlb_range (struct vm_area_struct *vma, unsigned long start, unsigned long end)
  {
@@ -43,7 +28,7 @@ Index: linux-2.6.11/arch/ia64/mm/tlb.c
  	struct mm_struct *mm = vma->vm_mm;
  	unsigned long size = end - start;
  	unsigned long nbits;
-@@ -163,6 +172,7 @@ flush_tlb_range (struct vm_area_struct *
+@@ -163,6 +170,7 @@
  # endif
  
  	ia64_srlz_i();			/* srlz.i implies srlz.d */

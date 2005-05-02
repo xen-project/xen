@@ -21,7 +21,20 @@ void vhpt_flush(void)
 {
 	struct vhpt_lf_entry *v = (void *)VHPT_ADDR;
 	int i, cnt = 0;
+#if 0
+static int firsttime = 2;
 
+if (firsttime) firsttime--;
+else {
+printf("vhpt_flush: *********************************************\n");
+printf("vhpt_flush: *********************************************\n");
+printf("vhpt_flush: *********************************************\n");
+printf("vhpt_flush: flushing vhpt (seems to crash at rid wrap?)...\n");
+printf("vhpt_flush: *********************************************\n");
+printf("vhpt_flush: *********************************************\n");
+printf("vhpt_flush: *********************************************\n");
+}
+#endif
 	for (i = 0; i < VHPT_NUM_ENTRIES; i++, v++) {
 		v->itir = 0;
 		v->CChain = 0;

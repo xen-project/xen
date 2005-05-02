@@ -1,86 +1,34 @@
- entry.S |   86 +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++-
- 1 files changed, 85 insertions(+), 1 deletion(-)
-
-Index: linux-2.6.11-xendiffs/arch/ia64/kernel/entry.S
-===================================================================
---- linux-2.6.11-xendiffs.orig/arch/ia64/kernel/entry.S	2005-04-08 13:32:07.636308237 -0500
-+++ linux-2.6.11-xendiffs/arch/ia64/kernel/entry.S	2005-04-08 13:37:04.612542509 -0500
-@@ -35,7 +35,9 @@
- 
- #include <asm/asmmacro.h>
- #include <asm/cache.h>
-+#ifndef XEN
- #include <asm/errno.h>
-+#endif
- #include <asm/kregs.h>
- #include <asm/offsets.h>
- #include <asm/pgtable.h>
-@@ -46,6 +48,25 @@
+--- ../../linux-2.6.11/arch/ia64/kernel/entry.S	2005-03-02 00:37:50.000000000 -0700
++++ arch/ia64/entry.S	2005-04-29 14:54:13.000000000 -0600
+@@ -46,6 +46,7 @@
  
  #include "minstate.h"
  
-+#ifdef XEN
-+#define	sys_execve 0
-+#define do_fork 0
-+#define	syscall_trace_enter 0
-+#define	syscall_trace_leave 0
-+#define schedule 0
-+#define do_notify_resume_user 0
-+#define ia64_rt_sigsuspend 0
-+#define ia64_rt_sigreturn 0
-+#define	ia64_handle_unaligned 0
-+#define	errno 0
-+#define	sys_ni_syscall 0
-+#define unw_init_frame_info 0
-+#define sys_call_table 0
-+#define do_sigdelayed 0
-+#endif
-+
-+	/*
-+
++#ifndef XEN
  	/*
  	 * execve() is special because in case of success, we need to
  	 * setup a null register window frame.
-@@ -187,11 +208,14 @@ GLOBAL_ENTRY(ia64_switch_to)
- 	DO_SAVE_SWITCH_STACK
- 	.body
+@@ -174,6 +175,7 @@
+ 	mov rp=loc0
+ 	br.ret.sptk.many rp
+ END(sys_clone)
++#endif /* !XEN */
  
-+#ifdef XEN
-+//#undef IA64_TASK_THREAD_KSP_OFFSET
-+//#define	IA64_TASK_THREAD_KSP_OFFSET	0x38
- 	adds r22=IA64_TASK_THREAD_KSP_OFFSET,r13
+ /*
+  * prev_task <- ia64_switch_to(struct task_struct *next)
+@@ -191,7 +193,11 @@
  	movl r25=init_task
  	mov r27=IA64_KR(CURRENT_STACK)
  	adds r21=IA64_TASK_THREAD_KSP_OFFSET,in0
--	dep r20=0,in0,61,3		// physical address of "next"
++#ifdef XEN
 +	dep r20=0,in0,60,4		// physical address of "next"
++#else
+ 	dep r20=0,in0,61,3		// physical address of "next"
++#endif
  	;;
  	st8 [r22]=sp			// save kernel stack pointer of old task
  	shr.u r26=r20,IA64_GRANULE_SHIFT
-@@ -203,6 +227,22 @@ GLOBAL_ENTRY(ia64_switch_to)
- (p6)	cmp.eq p7,p6=r26,r27
- (p6)	br.cond.dpnt .map
- 	;;
-+#else
-+	adds r22=IA64_TASK_THREAD_KSP_OFFSET,r13
-+	mov r27=IA64_KR(CURRENT_STACK)
-+	dep r20=0,in0,61,3		// physical address of "current"
-+	;;
-+	st8 [r22]=sp			// save kernel stack pointer of old task
-+	shr.u r26=r20,IA64_GRANULE_SHIFT
-+	adds r21=IA64_TASK_THREAD_KSP_OFFSET,in0
-+	;;
-+	/*
-+	 * If we've already mapped this task's page, we can skip doing it again.
-+	 */
-+	cmp.eq p7,p6=r26,r27
-+(p6)	br.cond.dpnt .map
-+	;;
-+#endif
- .done:
- (p6)	ssm psr.ic			// if we had to map, reenable the psr.ic bit FIRST!!!
- 	;;
-@@ -220,6 +260,16 @@ GLOBAL_ENTRY(ia64_switch_to)
+@@ -220,6 +226,16 @@
  	br.ret.sptk.many rp		// boogie on out in new context
  
  .map:
@@ -97,7 +45,7 @@ Index: linux-2.6.11-xendiffs/arch/ia64/kernel/entry.S
  	rsm psr.ic			// interrupts (psr.i) are already disabled here
  	movl r25=PAGE_KERNEL
  	;;
-@@ -376,7 +426,11 @@ END(save_switch_stack)
+@@ -376,7 +392,11 @@
   *	- b7 holds address to return to
   *	- must not touch r8-r11
   */
@@ -109,7 +57,23 @@ Index: linux-2.6.11-xendiffs/arch/ia64/kernel/entry.S
  	.prologue
  	.altrp b7
  
-@@ -604,6 +658,11 @@ GLOBAL_ENTRY(ia64_ret_from_clone)
+@@ -470,6 +490,7 @@
+ 	br.cond.sptk.many b7
+ END(load_switch_stack)
+ 
++#ifndef XEN
+ GLOBAL_ENTRY(__ia64_syscall)
+ 	.regstk 6,0,0,0
+ 	mov r15=in5				// put syscall number in place
+@@ -588,6 +609,7 @@
+ }
+ .ret4:	br.cond.sptk ia64_leave_kernel
+ END(ia64_strace_leave_kernel)
++#endif
+ 
+ GLOBAL_ENTRY(ia64_ret_from_clone)
+ 	PT_REGS_UNWIND_INFO(0)
+@@ -604,6 +626,11 @@
  	 */
  	br.call.sptk.many rp=ia64_invoke_schedule_tail
  }
@@ -121,7 +85,7 @@ Index: linux-2.6.11-xendiffs/arch/ia64/kernel/entry.S
  .ret8:
  	adds r2=TI_FLAGS+IA64_TASK_SIZE,r13
  	;;
-@@ -614,6 +673,7 @@ GLOBAL_ENTRY(ia64_ret_from_clone)
+@@ -614,6 +641,7 @@
  	;;
  	cmp.ne p6,p0=r2,r0
  (p6)	br.cond.spnt .strace_check_retval
@@ -129,14 +93,11 @@ Index: linux-2.6.11-xendiffs/arch/ia64/kernel/entry.S
  	;;					// added stop bits to prevent r8 dependency
  END(ia64_ret_from_clone)
  	// fall through
-@@ -700,9 +760,14 @@ ENTRY(ia64_leave_syscall)
+@@ -700,19 +728,25 @@
  .work_processed_syscall:
  	adds r2=PT(LOADRS)+16,r12
  	adds r3=PT(AR_BSPSTORE)+16,r12
-+#ifdef XEN
-+	mov r31=r0
-+	;;
-+#else
++#ifndef XEN
  	adds r18=TI_FLAGS+IA64_TASK_SIZE,r13
  	;;
  (p6)	ld4 r31=[r18]				// load current_thread_info()->flags
@@ -144,7 +105,21 @@ Index: linux-2.6.11-xendiffs/arch/ia64/kernel/entry.S
  	ld8 r19=[r2],PT(B6)-PT(LOADRS)		// load ar.rsc value for "loadrs"
  	mov b7=r0		// clear b7
  	;;
-@@ -757,7 +822,11 @@ ENTRY(ia64_leave_syscall)
+ 	ld8 r23=[r3],PT(R11)-PT(AR_BSPSTORE)	// load ar.bspstore (may be garbage)
+ 	ld8 r18=[r2],PT(R9)-PT(B6)		// load b6
++#ifndef XEN
+ (p6)	and r15=TIF_WORK_MASK,r31		// any work other than TIF_SYSCALL_TRACE?
++#endif
+ 	;;
+ 	mov r16=ar.bsp				// M2  get existing backing store pointer
++#ifndef XEN
+ (p6)	cmp4.ne.unc p6,p0=r15, r0		// any special work pending?
+ (p6)	br.cond.spnt .work_pending_syscall
++#endif
+ 	;;
+ 	// start restoring the state saved on the kernel stack (struct pt_regs):
+ 	ld8 r9=[r2],PT(CR_IPSR)-PT(R9)
+@@ -757,7 +791,11 @@
  	;;
  	ld8.fill r12=[r2]	// restore r12 (sp)
  	ld8.fill r15=[r3]	// restore r15
@@ -156,7 +131,7 @@ Index: linux-2.6.11-xendiffs/arch/ia64/kernel/entry.S
  	;;
  (pUStk)	ld4 r3=[r3]		// r3 = cpu_data->phys_stacked_size_p8
  (pUStk) st1 [r14]=r17
-@@ -814,9 +883,18 @@ GLOBAL_ENTRY(ia64_leave_kernel)
+@@ -814,9 +852,18 @@
  (pUStk)	cmp.eq.unc p6,p0=r0,r0		// p6 <- pUStk
  #endif
  .work_processed_kernel:
@@ -175,7 +150,17 @@ Index: linux-2.6.11-xendiffs/arch/ia64/kernel/entry.S
  	adds r21=PT(PR)+16,r12
  	;;
  
-@@ -934,7 +1012,11 @@ GLOBAL_ENTRY(ia64_leave_kernel)
+@@ -838,7 +885,9 @@
+ 	;;
+ 	ld8 r29=[r2],16		// load b7
+ 	ld8 r30=[r3],16		// load ar.csd
++#ifndef XEN
+ (p6)	br.cond.spnt .work_pending
++#endif
+ 	;;
+ 	ld8 r31=[r2],16		// load ar.ssd
+ 	ld8.fill r8=[r3],16
+@@ -934,7 +983,11 @@
  	shr.u r18=r19,16	// get byte size of existing "dirty" partition
  	;;
  	mov r16=ar.bsp		// get existing backing store pointer
@@ -187,15 +172,47 @@ Index: linux-2.6.11-xendiffs/arch/ia64/kernel/entry.S
  	;;
  	ld4 r17=[r17]		// r17 = cpu_data->phys_stacked_size_p8
  (pKStk)	br.cond.dpnt skip_rbs_switch
-@@ -1323,6 +1405,7 @@ GLOBAL_ENTRY(unw_init_running)
- 	br.ret.sptk.many rp
- END(unw_init_running)
+@@ -1069,6 +1122,7 @@
+ 	mov pr=r31,-1		// I0
+ 	rfi			// B
  
 +#ifndef XEN
- 	.rodata
- 	.align 8
- 	.globl sys_call_table
-@@ -1585,3 +1668,4 @@ sys_call_table:
+ 	/*
+ 	 * On entry:
+ 	 *	r20 = &current->thread_info->pre_count (if CONFIG_PREEMPT)
+@@ -1130,6 +1184,7 @@
+ 	ld8 r8=[r2]
+ 	ld8 r10=[r3]
+ 	br.cond.sptk.many .work_processed_syscall	// re-check
++#endif
+ 
+ END(ia64_leave_kernel)
+ 
+@@ -1166,6 +1221,7 @@
+ 	br.ret.sptk.many rp
+ END(ia64_invoke_schedule_tail)
+ 
++#ifndef XEN
+ 	/*
+ 	 * Setup stack and call do_notify_resume_user().  Note that pSys and pNonSys need to
+ 	 * be set up by the caller.  We declare 8 input registers so the system call
+@@ -1264,6 +1320,7 @@
+ 	mov ar.unat=r9
+ 	br.many b7
+ END(sys_rt_sigreturn)
++#endif
+ 
+ GLOBAL_ENTRY(ia64_prepare_handle_unaligned)
+ 	.prologue
+@@ -1278,6 +1335,7 @@
+ 	br.cond.sptk.many rp				// goes to ia64_leave_kernel
+ END(ia64_prepare_handle_unaligned)
+ 
++#ifndef XEN
+ 	//
+ 	// unw_init_running(void (*callback)(info, arg), void *arg)
+ 	//
+@@ -1585,3 +1643,4 @@
  	data8 sys_ni_syscall
  
  	.org sys_call_table + 8*NR_syscalls	// guard against failures to increase NR_syscalls
