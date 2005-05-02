@@ -4,8 +4,7 @@ include $(XEN_ROOT)/tools/Rules.mk
 TOPDIR= ..
 CXXFLAGS=-I. -I../include -I..
 
-ARCH=$(shell uname -i)
-ifeq ($(ARCH), i386)
+ifeq ($(XEN_TARGET_ARCH), x86_32)
 CXXFLAGS+=-D_FILE_OFFSET_BITS=64
 endif
 
