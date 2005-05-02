@@ -1169,6 +1169,7 @@
 427162263zDUiPmTj-lP4eGyXs5eIg xen/arch/ia64/xenmem.c
 421098b6mWyFPtkhPz9h1LCmKpoCLg xen/arch/ia64/xenmisc.c
 421098b6lY2JzrV1oFDbrt7XQhtElg xen/arch/ia64/xensetup.c
+427664f5eygrc3nEhI3RKf0Y37PzyA xen/arch/ia64/xentime.c
 3ddb79bcZbRBzT3elFWSX7u6NtMagQ xen/arch/x86/Makefile
 3ddb79bcBQF85CfLS4i1WGZ4oLLaCA xen/arch/x86/Rules.mk
 3e5636e5FAYZ5_vQnmgwFJfSdmO5Mw xen/arch/x86/acpi.c
