@@ -213,7 +213,7 @@ xc_waitdomain_core(int domfd, int *status, int options)
 }
 
 long
-xc_ptrace_core(enum __ptrace_request request, int domfd, long eaddr, long edata)
+xc_ptrace_core(enum __ptrace_request request, u32 domfd, long eaddr, long edata)
 {
     int             status = 0;
     struct gdb_regs pt;

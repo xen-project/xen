@@ -87,12 +87,12 @@ typedef struct xc_core_header {
 
 
 long xc_ptrace(enum __ptrace_request request, 
-	       pid_t pid, 
+	       u32  domid,
 	       long addr, 
 	       long data);
 
 long xc_ptrace_core(enum __ptrace_request request, 
-		    pid_t pid, 
+		    u32 domid, 
 		    long addr, 
 		    long data);
 

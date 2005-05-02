@@ -259,7 +259,7 @@ xc_waitdomain(int domain, int *status, int options)
 }
 
 long
-xc_ptrace(enum __ptrace_request request, pid_t domid, long eaddr, long edata)
+xc_ptrace(enum __ptrace_request request, u32 domid, long eaddr, long edata)
 {
     dom0_op_t       op;
     int             status = 0;
