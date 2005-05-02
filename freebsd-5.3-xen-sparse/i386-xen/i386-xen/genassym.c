@@ -200,8 +200,7 @@ ASSYM(PC_TSS_GDT, offsetof(struct pcpu, pc_tss_gdt));
 ASSYM(PC_CURRENTLDT, offsetof(struct pcpu, pc_currentldt));
 ASSYM(PC_CPUID, offsetof(struct pcpu, pc_cpuid));
 ASSYM(PC_CURPMAP, offsetof(struct pcpu, pc_curpmap));
-ASSYM(PC_TRAP_NESTING, offsetof(struct pcpu, pc_trap_nesting));
-
+ASSYM(PC_CR2, offsetof(struct pcpu, pc_cr2));
 ASSYM(PC_CR3, offsetof(struct pcpu, pc_pdir));
 
 #ifdef DEV_APIC
