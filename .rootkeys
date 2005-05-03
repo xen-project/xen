@@ -248,6 +248,7 @@
 40f562389xNa78YBZciUibQjyRU_Lg linux-2.6.11-xen-sparse/arch/xen/i386/kernel/traps.c
 40f56238JypKAUG01ZojFwH7qnZ5uA linux-2.6.11-xen-sparse/arch/xen/i386/kernel/vsyscall.S
 40f56238wi6AdNQjm0RT57bSkwb6hg linux-2.6.11-xen-sparse/arch/xen/i386/kernel/vsyscall.lds
+427245dboQBkhq841wIPqlRD-AG9Jw linux-2.6.11-xen-sparse/arch/xen/i386/mach-default/Makefile
 40f56238a3w6-byOzexIlMgni76Lcg linux-2.6.11-xen-sparse/arch/xen/i386/mm/Makefile
 40f56238ILx8xlbywNbzTdv5Zr4xXQ linux-2.6.11-xen-sparse/arch/xen/i386/mm/fault.c
 4118cc35CbY8rfGVspF5O-7EkXBEAA linux-2.6.11-xen-sparse/arch/xen/i386/mm/highmem.c
@@ -466,6 +467,7 @@
 422e4430-gOD358H8nGGnNWes08Nng netbsd-2.0-xen-sparse/sys/miscfs/kernfs/kernfs_vnops.c
 413cb3b53nyOv1OIeDSsCXhBFDXvJA netbsd-2.0-xen-sparse/sys/nfs/files.nfs
 413aa1d0oNP8HXLvfPuMe6cSroUfSA patches/linux-2.6.11/agpgart.patch
+427261074Iy1MkbbqIV6zdZDWWx_Jg patches/linux-2.6.11/i386-cpu-hotplug-updated-for-mm.patch
 42372652KCUP-IOH9RN19YQmGhs4aA patches/linux-2.6.11/iomap.patch
 424f001e_M1Tnxc52rDrmCLelnDWMQ patches/linux-2.6.11/x86_64-linux.patch
 3f776bd1Hy9rn69ntXBhPReUFw9IEA tools/Makefile

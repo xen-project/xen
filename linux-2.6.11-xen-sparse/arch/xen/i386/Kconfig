@@ -672,6 +672,16 @@ config X86_IO_APIC
 	depends on !SMP && X86_UP_IOAPIC
 	default y
 
+config HOTPLUG_CPU
+	bool "Support for hot-pluggable CPUs (EXPERIMENTAL)"
+	depends on SMP && HOTPLUG && EXPERIMENTAL
+	---help---
+	  Say Y here to experiment with turning CPUs off and on.  CPUs
+	  can be controlled through /sys/devices/system/cpu.
+
+	  Say N.
+
+
 if XEN_PHYSDEV_ACCESS
 
 menu "Bus options (PCI, PCMCIA, EISA, MCA, ISA)"
