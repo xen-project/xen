@@ -11,7 +11,7 @@ c-obj-$(CONFIG_PCI_DIRECT)	+= direct.o
 c-pci-y				:= fixup.o
 c-pci-$(CONFIG_ACPI_PCI)	+= acpi.o
 c-pci-y				+= legacy.o
-c-pci-y				+= irq.o
+pci-y				+= irq.o
 
 c-pci-$(CONFIG_X86_VISWS)	:= visws.o fixup.o
 pci-$(CONFIG_X86_VISWS)		:=
