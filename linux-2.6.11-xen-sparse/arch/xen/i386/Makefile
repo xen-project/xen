@@ -72,6 +72,7 @@ head-y := arch/xen/i386/kernel/head.o arch/xen/i386/kernel/init_task.o
 libs-y 					+= arch/i386/lib/
 core-y					+= arch/xen/i386/kernel/ \
 					   arch/xen/i386/mm/ \
+					   arch/xen/i386/mach-default/ \
 					   arch/i386/crypto/
 # \
 #					   arch/xen/$(mcore-y)/
