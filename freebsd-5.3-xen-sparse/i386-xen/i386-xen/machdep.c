@@ -1386,6 +1386,7 @@ initvalues(start_info_t *startinfo)
 { 
     int i;
     vm_paddr_t pdir_shadow_ma, KPTphys;
+    vm_offset_t *pdir_shadow;
 #ifdef WRITABLE_PAGETABLES
     printk("using writable pagetables\n");
     HYPERVISOR_vm_assist(VMASST_CMD_enable, VMASST_TYPE_writable_pagetables);
@@ -1424,6 +1425,27 @@ initvalues(start_info_t *startinfo)
     /* allocate page for ldt */
     ldt = (union descriptor *)(KERNBASE + (tmpindex << PAGE_SHIFT));
     tmpindex++; 
+
+    /* initialize page directory shadow page */
+    pdir_shadow = (vm_offset_t *)(KERNBASE + (tmpindex << PAGE_SHIFT));
+    i686_pagezero(pdir_shadow);
+    pdir_shadow_ma = xpmap_ptom(tmpindex << PAGE_SHIFT);
+    PT_SET_MA(pdir_shadow, pdir_shadow_ma | PG_V | PG_A);
+    tmpindex++;
+
+    /* setup shadow mapping first so vtomach will work */
+    xen_pt_pin((vm_paddr_t)pdir_shadow_ma);
+    xen_queue_pt_update((vm_paddr_t)(IdlePTD + PTDPTDI), 
+			pdir_shadow_ma | PG_V | PG_A | PG_RW | PG_M);
+    xen_queue_pt_update(pdir_shadow_ma + PTDPTDI*sizeof(vm_paddr_t), 
+			((vm_paddr_t)IdlePTD) | PG_V | PG_A);
+    xen_queue_pt_update(pdir_shadow_ma + KPTDI*sizeof(vm_paddr_t), 
+			KPTphys | PG_V | PG_A);
+
+    xen_flush_queue();
+    /* allocate remainder of NKPT pages */
+
+
 #ifdef SMP
     /* allocate cpu0 private page */
     cpu0prvpage = (KERNBASE + (tmpindex << PAGE_SHIFT));
@@ -1458,18 +1480,6 @@ initvalues(start_info_t *startinfo)
 	xen_queue_pt_update(KPTphys + i*sizeof(vm_paddr_t), 0);
     xen_flush_queue();
     
-    pdir_shadow_ma = xpmap_ptom(tmpindex << PAGE_SHIFT);
-    tmpindex++;
-
-    /* setup shadow mapping first so vtomach will work */
-    xen_pt_pin((vm_paddr_t)pdir_shadow_ma);
-    xen_queue_pt_update((vm_paddr_t)(IdlePTD + PTDPTDI), 
-			pdir_shadow_ma | PG_V | PG_A | PG_RW | PG_M);
-    xen_queue_pt_update(pdir_shadow_ma + PTDPTDI*sizeof(vm_paddr_t), 
-			((vm_paddr_t)IdlePTD) | PG_V | PG_A);
-    xen_queue_pt_update(pdir_shadow_ma + KPTDI*sizeof(vm_paddr_t), 
-			KPTphys | PG_V | PG_A);
-
     /* allocate remainder of NKPT pages */
     for (i = 0; i < NKPT-1; i++, tmpindex++) {
 	xen_queue_pt_update((vm_paddr_t)(IdlePTD + KPTDI + i + 1), 

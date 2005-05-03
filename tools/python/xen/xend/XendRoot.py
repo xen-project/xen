@@ -296,6 +296,9 @@ class XendRoot:
     def get_network_script(self):
         return self.get_config_value('network-script', 'network')
 
+    def get_enable_dump(self):
+        return self.get_config_value('enable-dump', 'false')
+
     def get_vif_bridge(self):
         return self.get_config_value('vif-bridge', 'xen-br0')
 

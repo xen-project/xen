@@ -17,8 +17,7 @@
  * ptrace(enum __ptrace_request request, pid_t pid, void *addr, void *data);
  */
 
-long xc_ptrace(enum __ptrace_request request, 
-	       pid_t pid, void *addr, void *data);
+
 int waitdomain(int domain, int *status, int options);
 
 char * ptrace_names[] = {
@@ -181,7 +180,8 @@ map_domain_va(unsigned long domid, int cpu, void * guest_va, int perm)
     } 
     if ((pde = cr3_virt[cpu][vtopdi(va)]) == 0) /* logical address */
 	goto error_out;
-    pde = page_array[pde >> PAGE_SHIFT] << PAGE_SHIFT;
+    if (ctxt[cpu].flags & VGCF_VMX_GUEST)
+        pde = page_array[pde >> PAGE_SHIFT] << PAGE_SHIFT;
     if (pde != pde_phys[cpu]) 
     {
 	pde_phys[cpu] = pde;
@@ -194,7 +194,8 @@ map_domain_va(unsigned long domid, int cpu, void * guest_va, int perm)
     }
     if ((page = pde_virt[cpu][vtopti(va)]) == 0) /* logical address */
 	goto error_out;
-    page = page_array[page >> PAGE_SHIFT] << PAGE_SHIFT;
+    if (ctxt[cpu].flags & VGCF_VMX_GUEST)
+        page = page_array[page >> PAGE_SHIFT] << PAGE_SHIFT;
     if (page != page_phys[cpu] || perm != prev_perm[cpu]) 
     {
 	page_phys[cpu] = page;
@@ -216,7 +217,7 @@ map_domain_va(unsigned long domid, int cpu, void * guest_va, int perm)
 }
 
 int 
-waitdomain(int domain, int *status, int options)
+xc_waitdomain(int domain, int *status, int options)
 {
     dom0_op_t op;
     int retval;
@@ -258,7 +259,7 @@ waitdomain(int domain, int *status, int options)
 }
 
 long
-xc_ptrace(enum __ptrace_request request, pid_t domid, void *addr, void *data)
+xc_ptrace(enum __ptrace_request request, u32 domid, long eaddr, long edata)
 {
     dom0_op_t       op;
     int             status = 0;
@@ -266,6 +267,8 @@ xc_ptrace(enum __ptrace_request request, pid_t domid, void *addr, void *data)
     long            retval = 0;
     unsigned long  *guest_va;
     int             cpu = VCPU;
+    void           *addr = (char *)eaddr;
+    void           *data = (char *)edata;
 
     op.interface_version = DOM0_INTERFACE_VERSION;
     

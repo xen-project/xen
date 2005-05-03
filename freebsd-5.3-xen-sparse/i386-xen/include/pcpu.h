@@ -50,8 +50,9 @@
 	int	pc_currentldt;						\
 	u_int	pc_acpi_id;						\
 	u_int	pc_apic_id;                                             \
-        u_int   pc_faultaddr;                                           \
-        u_int   pc_trap_nesting;                                        \
+        int     *pc_ipi_to_evtchn;                                      \
+        int     *pc_virq_to_irq;                                        \
+        u_int   pc_cr2;                                                 \
         u_int   pc_pdir                                        
 
 #if defined(lint)

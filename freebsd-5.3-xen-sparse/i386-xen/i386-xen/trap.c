@@ -181,11 +181,6 @@ trap(struct trapframe frame)
 	u_int sticks = 0;
 	int i = 0, ucode = 0, type, code;
 	vm_offset_t eva;
-#ifdef STACK_DEBUGGING
-	int nesting, current_sp;
-	static int prev_csp = 0, prev_ssp = 0;
-	nesting = PCPU_GET(trap_nesting);
-#endif
 
 #ifdef POWERFAIL_NMI
 	static int lastalert = 0;
@@ -227,7 +222,7 @@ trap(struct trapframe frame)
 		 * kernel can print out a useful trap message and even get
 		 * to the debugger.
 		 */
-	        eva = frame.tf_cr2;
+	        eva = PCPU_GET(cr2);
 
 		if (td->td_critnest != 0)			
 		    trap_fatal(&frame, eva);
@@ -613,9 +608,6 @@ user:
 	mtx_assert(&Giant, MA_NOTOWNED);
 userout:
 out:
-#ifdef STACK_DEBUGGING 
-	PCPU_SET(trap_nesting, nesting);
-#endif
 	return;
 }
 

@@ -309,7 +309,9 @@ class XendDomain:
                     eserver.inject('xend.domain.exit', [name, id, reason])
                     self.domain_restart_schedule(id, reason)
             else:
-               eserver.inject('xend.domain.exit', [name, id, 'crash'])
+               if xroot.get_enable_dump() == 'true':
+                   xc.domain_dumpcore(dom = int(id), corefile = "/var/xen/dump/%s.%s.core"%(name,id))
+               eserver.inject('xend.domain.exit', [name, id, 'crash']) 
             destroyed += 1
             self.final_domain_destroy(id)
         if self.domain_restarts_exist():

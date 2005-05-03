@@ -14,8 +14,6 @@
 // needed by include/asm-ia64/page.h
 #define	CONFIG_IA64_PAGE_SIZE_16KB	// 4KB doesn't work?!?
 #define	CONFIG_IA64_GRANULE_16MB
-// needed in arch/ia64/setup.c to reserve memory for domain0
-#define CONFIG_BLK_DEV_INITRD
 
 #ifndef __ASSEMBLY__
 
@@ -116,6 +114,9 @@ struct page;
 // avoid redefining task_t in asm/thread_info.h
 #define task_t	struct domain
 
+// avoid redefining task_struct in asm/current.h
+#define task_struct exec_domain
+
 // linux/include/asm-ia64/machvec.h (linux/arch/ia64/lib/io.c)
 #define platform_inb	__ia64_inb
 #define platform_inw	__ia64_inw
@@ -131,8 +132,10 @@ struct page;
 #undef ____cacheline_aligned
 #undef ____cacheline_aligned_in_smp
 #define __cacheline_aligned
+#define __cacheline_aligned_in_smp
 #define ____cacheline_aligned
 #define ____cacheline_aligned_in_smp
+#define ____cacheline_maxaligned_in_smp
 
 #include "asm/types.h"	// for u64
 struct device {
@@ -177,8 +180,6 @@ struct pci_bus_region {
 	unsigned long end;
 };
 
-// from linux/include/linux/module.h
-
 // warning: unless search_extable is declared, the return value gets
 // truncated to 32-bits, causing a very strange error in privop handling
 struct exception_table_entry;
@@ -221,18 +222,47 @@ void sort_main_extable(void);
 // FIXME following needs work
 #define atomic_compareandswap(old, new, v) old
 
-// x86 typedef still used in sched.h, may go away later
-//typedef unsigned long l1_pgentry_t;
-
 // see include/asm-ia64/mm.h, handle remaining pfn_info uses until gone
 #define pfn_info page
 
 // see common/keyhandler.c
 #define	nop()	asm volatile ("nop 0")
 
-#define ARCH_HAS_EXEC_DOMAIN_MM_PTR
+// from include/linux/preempt.h (needs including from interrupt.h or smp.h)
+#define preempt_enable()	do { } while (0)
+#define preempt_disable()	do { } while (0)
 
-// see arch/x86/nmi.c !?!?
+// needed for include/xen/linuxtime.h
+typedef s64 time_t;
+typedef s64 suseconds_t;
+
+// needed for include/linux/jiffies.h
+typedef long clock_t;
+
+// from include/linux/kernel.h, needed by jiffies.h
+#define typecheck(type,x) \
+({	type __dummy; \
+	typeof(x) __dummy2; \
+	(void)(&__dummy == &__dummy2); \
+	1; \
+})
+
+// from include/linux/timex.h, needed by arch/ia64/time.c
+#define	TIME_SOURCE_CPU 0
+
+// used in common code
+#define softirq_pending(cpu)	(cpu_data(cpu)->softirq_pending)
+
+// dup'ed from signal.h to avoid changes to includes
+#define	SA_SHIRQ	0x04000000
+#define	SA_INTERRUPT	0x20000000
+
+// needed for setup.c
+extern unsigned long loops_per_jiffy;
+extern char saved_command_line[];
+struct screen_info { };
+#define seq_printf(a,b...) printf(b)
+#define CONFIG_BLK_DEV_INITRD // needed to reserve memory for domain0
 
 // these declarations got moved at some point, find a better place for them
 extern int opt_noht;
@@ -250,6 +280,8 @@ extern unsigned int watchdog_on;
 #define __XEN_IA64_CONFIG_H__
 
 #undef CONFIG_X86
+
+#define CONFIG_MCKINLEY
 
 //#define CONFIG_SMP 1
 //#define CONFIG_NR_CPUS 2

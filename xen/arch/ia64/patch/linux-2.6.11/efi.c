@@ -1,29 +1,6 @@
- efi.c |   32 ++++++++++++++++++++++++++++++++
- 1 files changed, 32 insertions(+)
-
-Index: linux-2.6.11-xendiffs/arch/ia64/kernel/efi.c
-===================================================================
---- linux-2.6.11-xendiffs.orig/arch/ia64/kernel/efi.c	2005-04-07 12:22:08.230781400 -0500
-+++ linux-2.6.11-xendiffs/arch/ia64/kernel/efi.c	2005-04-07 12:25:11.875195997 -0500
-@@ -25,6 +25,9 @@
- #include <linux/types.h>
- #include <linux/time.h>
- #include <linux/efi.h>
-+#ifdef XEN
-+#include <xen/sched.h>
-+#endif
- 
- #include <asm/io.h>
- #include <asm/kregs.h>
-@@ -218,6 +221,7 @@ efi_gettimeofday (struct timespec *ts)
- 	if ((*efi.get_time)(&tm, NULL) != EFI_SUCCESS)
- 		return;
- 
-+	dummy();
- 	ts->tv_sec = mktime(tm.year, tm.month, tm.day, tm.hour, tm.minute, tm.second);
- 	ts->tv_nsec = tm.nanosecond;
- }
-@@ -320,6 +324,10 @@ efi_memmap_walk (efi_freemem_callback_t 
+--- ../../linux-2.6.11/arch/ia64/kernel/efi.c	2005-03-02 00:37:47.000000000 -0700
++++ arch/ia64/efi.c	2005-04-29 14:09:24.000000000 -0600
+@@ -320,6 +320,10 @@
  		if (!(md->attribute & EFI_MEMORY_WB))
  			continue;
  
@@ -34,7 +11,7 @@ Index: linux-2.6.11-xendiffs/arch/ia64/kernel/efi.c
  		/*
  		 * granule_addr is the base of md's first granule.
  		 * [granule_addr - first_non_wb_addr) is guaranteed to
-@@ -719,6 +727,30 @@ efi_get_iobase (void)
+@@ -719,6 +723,30 @@
  	return 0;
  }
  

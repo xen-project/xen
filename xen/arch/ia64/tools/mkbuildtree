@@ -85,24 +85,26 @@ cp_patch arch/ia64/kernel/entry.S arch/ia64/entry.S entry.S
 cp_patch arch/ia64/kernel/head.S arch/ia64/head.S head.S
 #cp_patch arch/ia64/kernel/init_task.c arch/ia64/init_task.c init_task.c
 cp_patch arch/ia64/kernel/irq_ia64.c arch/ia64/irq_ia64.c irq_ia64.c
-cp_patch arch/ia64/kernel/ivt.S arch/ia64/ivt.S ivt.S
+#cp_patch arch/ia64/kernel/ivt.S arch/ia64/ivt.S ivt.S
 #cp_patch arch/ia64/kernel/minstate.h arch/ia64/minstate.h minstate.h
 cp_patch arch/ia64/kernel/setup.c arch/ia64/setup.c setup.c
 cp_patch arch/ia64/kernel/time.c arch/ia64/time.c time.c
 cp_patch arch/ia64/kernel/unaligned.c arch/ia64/unaligned.c unaligned.c
-cp_patch arch/ia64/kernel/vmlinux.lds.S arch/ia64/xen.lds.S lds.S
+#cp_patch arch/ia64/kernel/vmlinux.lds.S arch/ia64/xen.lds.S lds.S
+softlink arch/ia64/kernel/vmlinux.lds.S arch/ia64/xen.lds.S
 
 #cp_patch mm/bootmem.c arch/ia64/mm_bootmem.c mm_bootmem.c
 #cp_patch mm/page_alloc.c arch/ia64/page_alloc.c page_alloc.c
 #cp_patch mm/slab.c arch/ia64/slab.c slab.c
 
 # following renamed to avoid conflict
-cp_patch kernel/extable.c arch/ia64/linuxextable.c linuxextable.c
+#cp_patch kernel/extable.c arch/ia64/linuxextable.c linuxextable.c
+softlink kernel/extable.c arch/ia64/linuxextable.c
 
 cp_patch arch/ia64/mm/contig.c arch/ia64/mm_contig.c mm_contig.c
 cp_patch arch/ia64/mm/tlb.c arch/ia64/tlb.c tlb.c
 
-cp_patch arch/ia64/hp/sim/hpsim_irq.c arch/ia64/hpsim_irq.c hpsim_irq.c
+#cp_patch arch/ia64/hp/sim/hpsim_irq.c arch/ia64/hpsim_irq.c hpsim_irq.c
 
 softlink arch/ia64/kernel/efi_stub.S arch/ia64/efi_stub.S
 softlink arch/ia64/kernel/entry.h arch/ia64/entry.h
@@ -149,38 +151,42 @@ softlink arch/ia64/hp/sim/hpsim.S arch/ia64/hpsim.S
 
 # xen/include/asm-generic files
 
-softlink include/asm-generic/bug.h include/asm-generic/bug.h bug.h
-softlink include/asm-generic/div64.h include/asm-generic/div64.h div64.h
+softlink include/asm-generic/bug.h include/asm-generic/bug.h
+softlink include/asm-generic/div64.h include/asm-generic/div64.h
 softlink include/asm-generic/errno.h include/asm-generic/errno.h
 softlink include/asm-generic/errno-base.h include/asm-generic/errno-base.h
-softlink include/asm-generic/ide_iops.h include/asm-generic/ide_iops.h ide_iops.h
-softlink include/asm-generic/iomap.h include/asm-generic/iomap.h iomap.h
-softlink include/asm-generic/pci-dma-compat.h include/asm-generic/pci-dma-compat.h pci-dma-compat.h
-softlink include/asm-generic/pci.h include/asm-generic/pci.h pci.h
-softlink include/asm-generic/pgtable.h include/asm-generic/pgtable.h pgtable.h
-softlink include/asm-generic/pgtable-nopud.h include/asm-generic/pgtable-nopud.h pgtable-nopud.h
-softlink include/asm-generic/sections.h include/asm-generic/sections.h sections.h
-softlink include/asm-generic/topology.h include/asm-generic/topology.h topology.h
-softlink include/asm-generic/vmlinux.lds.h include/asm-generic/vmlinux.lds.h vmlinux.lds.h
+softlink include/asm-generic/ide_iops.h include/asm-generic/ide_iops.h
+softlink include/asm-generic/iomap.h include/asm-generic/iomap.h
+softlink include/asm-generic/pci-dma-compat.h include/asm-generic/pci-dma-compat.h
+softlink include/asm-generic/pci.h include/asm-generic/pci.h
+softlink include/asm-generic/pgtable.h include/asm-generic/pgtable.h
+softlink include/asm-generic/pgtable-nopud.h include/asm-generic/pgtable-nopud.h
+softlink include/asm-generic/sections.h include/asm-generic/sections.h
+softlink include/asm-generic/topology.h include/asm-generic/topology.h
+softlink include/asm-generic/vmlinux.lds.h include/asm-generic/vmlinux.lds.h
 
 
 # xen/include/asm-ia64 files
 
 cp_patch arch/ia64/hp/sim/hpsim_ssc.h include/asm-ia64/hpsim_ssc.h hpsim_ssc.h
 
-cp_patch include/asm-ia64/current.h include/asm-ia64/current.h current.h
+#cp_patch include/asm-ia64/current.h include/asm-ia64/current.h current.h
+softlink include/asm-ia64/current.h include/asm-ia64/current.h
 #cp_patch include/asm-ia64/gcc_intrin.h include/asm-ia64/gcc_intrin.h gcc_intrin.h
 softlink include/asm-ia64/gcc_intrin.h include/asm-ia64/gcc_intrin.h
-cp_patch include/asm-ia64/hardirq.h include/asm-ia64/hardirq.h hardirq.h
+#cp_patch include/asm-ia64/hardirq.h include/asm-ia64/hardirq.h hardirq.h
+softlink include/asm-ia64/hardirq.h include/asm-ia64/hardirq.h
 #cp_patch include/asm-ia64/hw_irq.h include/asm-ia64/hw_irq.h hw_irq.h
 softlink include/asm-ia64/hw_irq.h include/asm-ia64/hw_irq.h
 #cp_patch include/asm-ia64/ide.h include/asm-ia64/ide.h ide.h
 cp_patch include/asm-ia64/io.h include/asm-ia64/io.h io.h
-cp_patch include/asm-ia64/irq.h include/asm-ia64/irq.h irq.h
+#cp_patch include/asm-ia64/irq.h include/asm-ia64/irq.h irq.h
+softlink include/asm-ia64/irq.h include/asm-ia64/irq.h
 cp_patch include/asm-ia64/kregs.h include/asm-ia64/kregs.h kregs.h
 cp_patch include/asm-ia64/page.h include/asm-ia64/page.h page.h
 cp_patch include/asm-ia64/processor.h include/asm-ia64/processor.h processor.h
-cp_patch include/asm-ia64/sal.h include/asm-ia64/sal.h sal.h
+#cp_patch include/asm-ia64/sal.h include/asm-ia64/sal.h sal.h
+softlink include/asm-ia64/sal.h include/asm-ia64/sal.h
 cp_patch include/asm-ia64/system.h include/asm-ia64/system.h system.h
 cp_patch include/asm-ia64/types.h include/asm-ia64/types.h types.h
 
@@ -190,6 +196,8 @@ null include/asm-ia64/desc.h
 null include/asm-ia64/io_apic.h
 null include/asm-ia64/pdb.h
 null include/asm-ia64/module.h
+null include/asm-ia64/ia32.h
+null include/asm-ia64/tlbflush.h
 
 softlink include/asm-ia64/acpi.h include/asm-ia64/acpi.h
 softlink include/asm-ia64/asmmacro.h include/asm-ia64/asmmacro.h
@@ -208,7 +216,7 @@ softlink include/asm-ia64/dma-mapping.h include/asm-ia64/dma-mapping.h
 softlink include/asm-ia64/errno.h include/asm-ia64/errno.h
 softlink include/asm-ia64/fpu.h include/asm-ia64/fpu.h
 softlink include/asm-ia64/hdreg.h include/asm-ia64/hdreg.h
-softlink include/asm-ia64/ia32.h include/asm-ia64/ia32.h
+#softlink include/asm-ia64/ia32.h include/asm-ia64/ia32.h
 softlink include/asm-ia64/ia64regs.h include/asm-ia64/ia64regs.h
 softlink include/asm-ia64/intrinsics.h include/asm-ia64/intrinsics.h
 softlink include/asm-ia64/ioctl.h include/asm-ia64/ioctl.h
@@ -257,23 +265,26 @@ softlink include/asm-ia64/ustack.h include/asm-ia64/ustack.h
 
 # xen/include/asm-ia64/linux/*.h (== linux/include/linux/*.h)
 
-cp_patch include/linux/bootmem.h include/asm-ia64/linux/bootmem.h bootmem.h
+#cp_patch include/linux/bootmem.h include/asm-ia64/linux/bootmem.h bootmem.h
 cp_patch include/linux/cpumask.h include/asm-ia64/linux/cpumask.h cpumask.h
 #cp_patch include/linux/dma-mapping.h include/asm-ia64/linux/dma-mapping.h dma-mapping.h
 softlink include/linux/dma-mapping.h include/asm-ia64/linux/dma-mapping.h
 #cp_patch include/linux/efi.h include/asm-ia64/linux/efi.h efi.h
 softlink include/linux/efi.h include/asm-ia64/linux/efi.h
-cp_patch include/linux/hardirq.h include/asm-ia64/linux/hardirq.h linuxhardirq.h
+cp_patch include/linux/hardirq.h include/asm-ia64/linux/hardirq.h hardirq.h
 #cp_patch include/linux/init_task.h include/asm-ia64/linux/init_task.h init_task.h
 cp_patch include/linux/interrupt.h include/asm-ia64/linux/interrupt.h interrupt.h
-cp_patch include/linux/mmzone.h include/asm-ia64/linux/mmzone.h mmzone.h
+#cp_patch include/linux/mmzone.h include/asm-ia64/linux/mmzone.h mmzone.h
+softlink include/linux/mmzone.h include/asm-ia64/linux/mmzone.h
 
-cp_patch include/linux/wait.h include/asm-ia64/linux/wait.h wait.h
+#cp_patch include/linux/wait.h include/asm-ia64/linux/wait.h wait.h
+softlink include/linux/wait.h include/asm-ia64/linux/wait.h
 
-cp_patch include/linux/slab.h include/asm-ia64/slab.h slab.h
+#cp_patch include/linux/slab.h include/asm-ia64/slab.h slab.h
 
 # following renamed to avoid conflict
-cp_patch include/linux/time.h include/xen/linuxtime.h linuxtime.h
+#cp_patch include/linux/time.h include/xen/linuxtime.h linuxtime.h
+softlink include/linux/time.h include/asm-ia64/linux/linuxtime.h
 
 softlink include/linux/bcd.h include/asm-ia64/linux/bcd.h
 softlink include/linux/bitmap.h include/asm-ia64/linux/bitmap.h
@@ -289,14 +300,15 @@ softlink include/linux/percpu.h include/asm-ia64/linux/percpu.h
 softlink include/linux/preempt.h include/asm-ia64/linux/preempt.h
 softlink include/linux/rbtree.h include/asm-ia64/linux/rbtree.h
 softlink include/linux/rwsem.h include/asm-ia64/linux/rwsem.h
-softlink include/linux/seq_file.h include/asm-ia64/linux/seq_file.h
-softlink include/linux/serial_core.h include/asm-ia64/linux/serial_core.h
+#softlink include/linux/seq_file.h include/asm-ia64/linux/seq_file.h
+#softlink include/linux/serial_core.h include/asm-ia64/linux/serial_core.h
 softlink include/linux/stddef.h include/asm-ia64/linux/stddef.h
 softlink include/linux/thread_info.h include/asm-ia64/linux/thread_info.h
 softlink include/linux/threads.h include/asm-ia64/linux/threads.h
 softlink include/linux/timex.h include/asm-ia64/linux/timex.h
 softlink include/linux/topology.h include/asm-ia64/linux/topology.h
-softlink include/linux/tty.h include/asm-ia64/linux/tty.h
+softlink include/linux/seqlock.h include/asm-ia64/linux/seqlock.h
+softlink include/linux/jiffies.h include/asm-ia64/linux/jiffies.h
 
 null include/asm-ia64/linux/file.h
 null include/asm-ia64/linux/module.h
@@ -305,6 +317,18 @@ null include/asm-ia64/linux/device.h
 null include/asm-ia64/linux/proc_fs.h
 null include/asm-ia64/linux/rtc.h
 null include/asm-ia64/linux/profile.h
+null include/asm-ia64/linux/seqlock.h
+null include/asm-ia64/linux/smp_lock.h
+null include/asm-ia64/linux/tty.h
+null include/asm-ia64/linux/kernel_stat.h
+null include/asm-ia64/linux/ptrace.h
+null include/asm-ia64/linux/random.h
+null include/asm-ia64/linux/signal.h
+null include/asm-ia64/linux/bootmem.h
+null include/asm-ia64/linux/serial.h
+null include/asm-ia64/linux/serial_core.h
+null include/asm-ia64/linux/seq_file.h
+null include/asm-ia64/linux/cpu.h
 
 softlink include/linux/byteorder/generic.h include/asm-ia64/linux/byteorder/generic.h
 softlink include/linux/byteorder/little_endian.h include/asm-ia64/linux/byteorder/little_endian.h

@@ -1,20 +1,6 @@
- head.S |   34 ++++++++++++++++++++++++++++++++++
- 1 files changed, 34 insertions(+)
-
-Index: linux-2.6.11-xendiffs/arch/ia64/kernel/head.S
-===================================================================
---- linux-2.6.11-xendiffs.orig/arch/ia64/kernel/head.S	2005-04-07 10:56:19.225128582 -0500
-+++ linux-2.6.11-xendiffs/arch/ia64/kernel/head.S	2005-04-07 11:00:21.718513399 -0500
-@@ -1,3 +1,8 @@
-+#ifdef XEN
-+#define	console_print	printf
-+#define kernel_thread_helper 0
-+#define sys_exit 0
-+#endif
- /*
-  * Here is where the ball gets rolling as far as the kernel is concerned.
-  * When control is transferred to _start, the bootload has already
-@@ -187,7 +192,11 @@ start_ap:
+--- ../../linux-2.6.11/arch/ia64/kernel/head.S	2005-03-02 00:38:13.000000000 -0700
++++ arch/ia64/head.S	2005-04-28 10:51:19.000000000 -0600
+@@ -187,7 +187,11 @@
  	dep r18=0,r3,0,12
  	;;
  	or r18=r17,r18
@@ -26,7 +12,7 @@ Index: linux-2.6.11-xendiffs/arch/ia64/kernel/head.S
  	;;
  	mov r17=rr[r2]
  	shr.u r16=r3,IA64_GRANULE_SHIFT
-@@ -227,7 +236,11 @@ start_ap:
+@@ -227,7 +231,11 @@
  	;;
  	mov ar.rsc=0x3		// place RSE in eager mode
  
@@ -38,29 +24,7 @@ Index: linux-2.6.11-xendiffs/arch/ia64/kernel/head.S
  (isBP)	movl r2=ia64_boot_param
  	;;
  (isBP)	st8 [r2]=r28		// save the address of the boot param area passed by the bootloader
-@@ -245,7 +258,21 @@ start_ap:
- 	br.call.sptk.many rp=sys_fw_init
- .ret1:
- #endif
-+#ifdef XEN
-+	alloc r2=ar.pfs,8,0,2,0
-+	;;
-+#define fake_mbi_magic 0
-+#define MULTIBOOT_INFO_SIZE	1024
-+	.rodata
-+fake_mbi:
-+	.skip MULTIBOOT_INFO_SIZE
-+	.previous
-+	movl out0=fake_mbi
-+	;;
-+	br.call.sptk.many rp=cmain
-+#else
- 	br.call.sptk.many rp=start_kernel
-+#endif
- .ret2:	addl r3=@ltoff(halt_msg),gp
- 	;;
- 	alloc r2=ar.pfs,8,0,2,0
-@@ -254,7 +281,9 @@ start_ap:
+@@ -254,7 +262,9 @@
  	br.call.sptk.many b0=console_print
  
  self:	hint @pause
@@ -70,13 +34,12 @@ Index: linux-2.6.11-xendiffs/arch/ia64/kernel/head.S
  END(_start)
  
  GLOBAL_ENTRY(ia64_save_debug_regs)
-@@ -850,7 +879,12 @@ END(ia64_delay_loop)
+@@ -850,7 +860,11 @@
   * intermediate precision so that we can produce a full 64-bit result.
   */
  GLOBAL_ENTRY(sched_clock)
 +#ifdef XEN
-+	break 0;;	// FIX IA64_CPUINFO_NSEC_PER_CYC_OFFSET
-+	//movl r8=THIS_CPU(cpu_info) + IA64_CPUINFO_NSEC_PER_CYC_OFFSET
++	movl r8=THIS_CPU(cpu_info) + IA64_CPUINFO_NSEC_PER_CYC_OFFSET
 +#else
  	addl r8=THIS_CPU(cpu_info) + IA64_CPUINFO_NSEC_PER_CYC_OFFSET,r0
 +#endif

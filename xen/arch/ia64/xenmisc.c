@@ -27,7 +27,13 @@ unsigned int watchdog_on = 0;	// from arch/x86/nmi.c ?!?
 
 void unw_init(void) { printf("unw_init() skipped (NEED FOR KERNEL UNWIND)\n"); }
 void ia64_mca_init(void) { printf("ia64_mca_init() skipped (Machine check abort handling)\n"); }
-void hpsim_setup(char **x) { printf("hpsim_setup() skipped (MAY NEED FOR CONSOLE INPUT!!!)\n"); }	
+void ia64_mca_cpu_init(void *x) { }
+void ia64_patch_mckinley_e9(unsigned long a, unsigned long b) { }
+void ia64_patch_vtop(unsigned long a, unsigned long b) { }
+void hpsim_setup(char **x) { }
+
+// called from mem_init... don't think s/w I/O tlb is needed in Xen
+//void swiotlb_init(void) { }  ...looks like it IS needed
 
 long
 is_platform_hp_ski(void)
@@ -237,17 +243,74 @@ void physdev_destroy_state(struct domain *d)
 	dummy();
 }
 
-// accomodate linux extable.c
-//const struct exception_table_entry *
-void *search_module_extables(unsigned long addr)
+///////////////////////////////
+// called from arch/ia64/head.S
+///////////////////////////////
+
+void console_print(char *msg)
 {
-	return NULL;
+	printk("console_print called, how did start_kernel return???\n");
 }
 
-void *module_text_address(unsigned long addr)
+void kernel_thread_helper(void)
 {
-	return NULL;
+	printk("kernel_thread_helper not implemented\n");
+	dummy();
 }
+
+void sys_exit(void)
+{
+	printk("sys_exit not implemented\n");
+	dummy();
+}
+
+////////////////////////////////////
+// called from unaligned.c
+////////////////////////////////////
+
+void die_if_kernel(char *str, struct pt_regs *regs, long err) /* __attribute__ ((noreturn)) */
+{
+	printk("die_if_kernel: called, not implemented\n");
+}
+
+long
+ia64_peek (struct task_struct *child, struct switch_stack *child_stack,
+	   unsigned long user_rbs_end, unsigned long addr, long *val)
+{
+	printk("ia64_peek: called, not implemented\n");
+}
+
+long
+ia64_poke (struct task_struct *child, struct switch_stack *child_stack,
+	   unsigned long user_rbs_end, unsigned long addr, long val)
+{
+	printk("ia64_poke: called, not implemented\n");
+}
+
+void
+ia64_sync_fph (struct task_struct *task)
+{
+	printk("ia64_sync_fph: called, not implemented\n");
+}
+
+void
+ia64_flush_fph (struct task_struct *task)
+{
+	printk("ia64_flush_fph: called, not implemented\n");
+}
+
+////////////////////////////////////
+// called from irq_ia64.c:init_IRQ()
+//   (because CONFIG_IA64_HP_SIM is specified)
+////////////////////////////////////
+void hpsim_irq_init(void) { }
+
+
+// accomodate linux extable.c
+//const struct exception_table_entry *
+void *search_module_extables(unsigned long addr) { return NULL; }
+void *__module_text_address(unsigned long addr) { return NULL; }
+void *module_text_address(unsigned long addr) { return NULL; }
 
 void cs10foo(void) {}
 void cs01foo(void) {}

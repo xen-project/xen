@@ -91,47 +91,52 @@ MCOUNT_LABEL(user)
 MCOUNT_LABEL(btrap)
 
 IDTVEC(div)
-	pushl $0; pushl $0; TRAP(T_DIVIDE)
+	pushl $0; TRAP(T_DIVIDE)
 IDTVEC(dbg)
-	pushl $0; pushl $0; TRAP(T_TRCTRAP)
+	pushl $0; TRAP(T_TRCTRAP)
 IDTVEC(nmi)
-	pushl $0; pushl $0; TRAP(T_NMI)
+	pushl $0; TRAP(T_NMI)
 IDTVEC(bpt)
-	pushl $0; pushl $0; TRAP(T_BPTFLT)
+	pushl $0; TRAP(T_BPTFLT)
 IDTVEC(ofl)
-	pushl $0; pushl $0; TRAP(T_OFLOW)
+	pushl $0; TRAP(T_OFLOW)
 IDTVEC(bnd)
-	pushl $0; pushl $0; TRAP(T_BOUND)
+	pushl $0; TRAP(T_BOUND)
 IDTVEC(ill)
-	pushl $0; pushl $0; TRAP(T_PRIVINFLT)
+	pushl $0; TRAP(T_PRIVINFLT)
 IDTVEC(dna)
-	pushl $0; pushl $0; TRAP(T_DNA)
+	pushl $0; TRAP(T_DNA)
 IDTVEC(fpusegm)
-	pushl $0; pushl $0; TRAP(T_FPOPFLT)
+	pushl $0; TRAP(T_FPOPFLT)
 IDTVEC(tss)
-	pushl $0; TRAP(T_TSSFLT)
+	TRAP(T_TSSFLT)
 IDTVEC(missing)
-	pushl $0; TRAP(T_SEGNPFLT)
+	TRAP(T_SEGNPFLT)
 IDTVEC(stk)
-	pushl $0; TRAP(T_STKFLT)
+	TRAP(T_STKFLT)
 IDTVEC(prot)
-	pushl $0; TRAP(T_PROTFLT)
+	TRAP(T_PROTFLT)
 IDTVEC(page)
+	pushl %eax 
+	movl  4(%esp),%eax
+	movl  %eax,-44(%esp)	# move cr2 after trap frame
+	popl %eax
+	addl $4,%esp
 	TRAP(T_PAGEFLT)
 IDTVEC(mchk)
-	pushl $0; pushl $0; TRAP(T_MCHK)
+	pushl $0; TRAP(T_MCHK)
 IDTVEC(rsvd)
-	pushl $0; pushl $0; TRAP(T_RESERVED)
+	pushl $0; TRAP(T_RESERVED)
 IDTVEC(fpu)
-	pushl $0; pushl $0; TRAP(T_ARITHTRAP)
+	pushl $0; TRAP(T_ARITHTRAP)
 IDTVEC(align)
-	pushl $0; TRAP(T_ALIGNFLT)
+	TRAP(T_ALIGNFLT)
 
 IDTVEC(xmm)
-	pushl $0; pushl $0; TRAP(T_XMMFLT)
+	pushl $0; TRAP(T_XMMFLT)
 
 IDTVEC(hypervisor_callback)
-	 pushl $T_HYPCALLBACK;  pushl %eax; TRAP(T_HYPCALLBACK)
+	pushl %eax; TRAP(T_HYPCALLBACK)
 
 hypervisor_callback_pending:
 	movl	$T_HYPCALLBACK,TF_TRAPNO(%esp)
@@ -161,6 +166,12 @@ alltraps_with_regs_pushed:
 	movl	$KPSEL,%eax
 	movl	%eax,%fs
 	FAKE_MCOUNT(TF_EIP(%esp))
+save_cr2:
+	movl	TF_TRAPNO(%esp),%eax
+	cmpl	$T_PAGEFLT,%eax
+	jne	calltrap
+	movl	-4(%esp),%eax
+	movl	%eax,PCPU(CR2)
 calltrap:
 	movl	TF_EIP(%esp),%eax
 	cmpl	$scrit,%eax
@@ -217,8 +228,7 @@ IDTVEC(lcall_syscall)
 	SUPERALIGN_TEXT
 IDTVEC(int0x80_syscall)
 	pushl	$2			/* sizeof "int 0x80" */
-	pushl	$0xCAFE
-	pushl	$0xDEAD
+	pushl	$0xBEEF
 	pushal
 	pushl	%ds
 	pushl	%es
@@ -324,7 +334,7 @@ doreti_popl_es:
 doreti_popl_ds:
 	popl	%ds
 	POPA
-	addl	$12,%esp
+	addl	$8,%esp
 	.globl	doreti_iret
 doreti_iret:
 	iret
@@ -341,7 +351,7 @@ ecrit:
 	ALIGN_TEXT
 	.globl	doreti_iret_fault
 doreti_iret_fault:
-	subl	$12,%esp
+	subl	$8,%esp
 	pushal
 	pushl	%ds
 	.globl	doreti_popl_ds_fault
@@ -376,7 +386,7 @@ critical_region_fixup:
         movl  %esp,%esi
         add  %eax,%esi        # %esi points at end of src region
         movl  %esp,%edi
-        add  $0x44,%edi       # %edi points at end of dst region
+        add  $0x40,%edi       # %edi points at end of dst region
         movl  %eax,%ecx
         shr  $2,%ecx          # convert bytes to words
         je   16f              # skip loop if nothing to copy
@@ -403,8 +413,8 @@ critical_fixup_table:
 .byte   0x20	                        #pop    %edx
 .byte   0x24	                        #pop    %ecx
 .byte   0x28	                        #pop    %eax
-.byte   0x2c,0x2c,0x2c                  #add    $0xc,%esp
-.byte   0x38	                        #iret   
+.byte   0x2c,0x2c,0x2c                  #add    $0x8,%esp
+.byte   0x34	                        #iret   
 
 	
 /* # Hypervisor uses this for application faults while it executes.*/
@@ -412,17 +422,17 @@ ENTRY(failsafe_callback)
 	pushal
 	call xen_failsafe_handler
 /*#	call install_safe_pf_handler */
-        movl 32(%esp),%ebx
+        movl 28(%esp),%ebx
 1:      movl %ebx,%ds
-        movl 36(%esp),%ebx
+        movl 32(%esp),%ebx
 2:      movl %ebx,%es
-        movl 40(%esp),%ebx
+        movl 36(%esp),%ebx
 3:      movl %ebx,%fs
-        movl 44(%esp),%ebx
+        movl 40(%esp),%ebx
 4:      movl %ebx,%gs
 /*#        call install_normal_pf_handler */
 	popal
-	addl $16,%esp
+	addl $12,%esp
 	iret
 
 

@@ -42,7 +42,14 @@
 
 extern int __trap_to_cdb(struct cpu_user_regs *r);
 #define debugger_trap_entry(_v, _r) (0)
-#define debugger_trap_fatal(_v, _r) __trap_to_cdb(_r)
+
+static inline int debugger_trap_fatal(
+    unsigned int vector, struct cpu_user_regs *regs)
+{
+    (void)__trap_to_cdb(regs);
+    return (vector == TRAP_int3); /* int3 is harmless */
+}
+
 /* Int3 is a trivial way to gather cpu_user_regs context. */
 #define debugger_trap_immediate() __asm__ __volatile__ ( "int3" );
 

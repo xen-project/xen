@@ -22,6 +22,7 @@ extern start_info_t *xen_start_info;
  * be MACHINE addresses.
  */
 
+static inline void HYPERVISOR_crash(void) __dead2;
 
 void MULTICALL_flush_page_update_queue(void);
 
@@ -199,6 +200,23 @@ HYPERVISOR_suspend(unsigned long srec)
         "S" (srec) : "memory" );
 
     return ret;
+}
+
+
+static inline void
+HYPERVISOR_crash(void) 
+{
+    int ret;
+    unsigned long ign1;
+    __asm__ __volatile__ (
+        TRAP_INSTR
+        : "=a" (ret), "=b" (ign1)
+        : "0" (__HYPERVISOR_sched_op),
+	"1" (SCHEDOP_shutdown | (SHUTDOWN_crash << SCHEDOP_reasonshift))
+        : "memory" );
+
+	for (;;) ; /* eliminate noreturn error */ 
+
 }
 
 static inline long 

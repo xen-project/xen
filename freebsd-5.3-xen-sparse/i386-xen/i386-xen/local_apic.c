@@ -545,7 +545,6 @@ apic_register_enumerator(struct apic_enumerator *enumerator)
 static void
 apic_init(void *dummy __unused)
 {
-	struct apic_enumerator *enumerator;
 	uint64_t apic_base;
 	int retval, best;
 
@@ -560,6 +559,7 @@ apic_init(void *dummy __unused)
 	/* First, probe all the enumerators to find the best match. */
 	best_enum = NULL;
 	best = 0;
+#ifndef XEN
 	SLIST_FOREACH(enumerator, &enumerators, apic_next) {
 		retval = enumerator->apic_probe();
 		if (retval > 0)
@@ -569,6 +569,7 @@ apic_init(void *dummy __unused)
 			best = retval;
 		}
 	}
+#endif
 	if (best_enum == NULL) {
 		if (bootverbose)
 			printf("APIC: Could not find any APICs.\n");

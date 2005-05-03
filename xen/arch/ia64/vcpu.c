@@ -394,7 +394,10 @@ IA64FAULT vcpu_get_iim(VCPU *vcpu, UINT64 *pval)
 
 IA64FAULT vcpu_get_iha(VCPU *vcpu, UINT64 *pval)
 {
-	return vcpu_thash(vcpu,PSCB(vcpu,ifa),pval);
+	//return vcpu_thash(vcpu,PSCB(vcpu,ifa),pval);
+	UINT64 val = PSCB(vcpu,iha);
+	*pval = val;
+	return (IA64_NO_FAULT);
 }
 
 IA64FAULT vcpu_set_dcr(VCPU *vcpu, UINT64 val)
@@ -747,7 +750,8 @@ IA64FAULT vcpu_set_tpr(VCPU *vcpu, UINT64 val)
 {
 	if (val & 0xff00) return IA64_RSVDREG_FAULT;
 	PSCB(vcpu,tpr) = val;
-	//PSCB(vcpu,pending_interruption) = 1;
+	if (vcpu_check_pending_interrupts(vcpu) != SPURIOUS_VECTOR)
+		PSCB(vcpu,pending_interruption) = 1;
 	return (IA64_NO_FAULT);
 }
 
@@ -773,6 +777,8 @@ IA64FAULT vcpu_set_eoi(VCPU *vcpu, UINT64 val)
 		// with interrupts disabled
 		printf("Trying to EOI interrupt with interrupts enabled\r\n");
 	}
+	if (vcpu_check_pending_interrupts(vcpu) != SPURIOUS_VECTOR)
+		PSCB(vcpu,pending_interruption) = 1;
 //printf("YYYYY vcpu_set_eoi: Successful\n");
 	return (IA64_NO_FAULT);
 }
@@ -1138,11 +1144,13 @@ IA64FAULT vcpu_thash(VCPU *vcpu, UINT64 vadr, UINT64 *pval)
 	UINT64 VHPT_addr = VHPT_addr1 | ((VHPT_addr2a | VHPT_addr2b) << 15) |
 			VHPT_addr3;
 
+#if 0
 	if (VHPT_addr1 == 0xe000000000000000L) {
 	    printf("vcpu_thash: thash unsupported with rr7 @%lx\n",
 		PSCB(vcpu,iip));
 	    return (IA64_ILLOP_FAULT);
 	}
+#endif
 //verbose("vcpu_thash: vadr=%p, VHPT_addr=%p\n",vadr,VHPT_addr);
 	*pval = VHPT_addr;
 	return (IA64_NO_FAULT);
