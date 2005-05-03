@@ -491,6 +491,7 @@ static int do_rom_address_access(phys_dev_t *pdev, int acc, int len, u32 *val)
 }
 #endif /* SLOPPY_CHECKING */
 
+#ifdef CONFIG_PCI
 /*
  * Handle a PCI config space read access if the domain has access privileges.
  */
@@ -635,23 +636,24 @@ static long pci_probe_root_buses(u32 *busmask)
 
     return 0;
 }
-
+#endif
 
 /*
  * Demuxing hypercall.
  */
 long do_physdev_op(physdev_op_t *uop)
 {
-    phys_dev_t  *pdev;
     physdev_op_t op;
     long         ret;
-    int          irq;
+    u32          apic, irq;
+    u32          address, val;
 
     if ( unlikely(copy_from_user(&op, uop, sizeof(op)) != 0) )
         return -EFAULT;
 
     switch ( op.cmd )
     {
+#ifdef CONFIG_PCI
     case PHYSDEVOP_PCI_CFGREG_READ:
         ret = pci_cfgreg_read(op.u.pci_cfgreg_read.bus,
                               op.u.pci_cfgreg_read.dev, 
@@ -682,7 +684,7 @@ long do_physdev_op(physdev_op_t *uop)
     case PHYSDEVOP_PCI_PROBE_ROOT_BUSES:
         ret = pci_probe_root_buses(op.u.pci_probe_root_buses.busmask);
         break;
-
+#endif
     case PHYSDEVOP_IRQ_UNMASK_NOTIFY:
         ret = pirq_guest_unmask(current->domain);
         break;
@@ -698,7 +700,45 @@ long do_physdev_op(physdev_op_t *uop)
             op.u.irq_status_query.flags |= PHYSDEVOP_IRQ_NEEDS_UNMASK_NOTIFY;
         ret = 0;
         break;
+#ifdef __ARCH_HAS_IOAPIC
+    case PHYSDEVOP_APIC_READ:
+        if ( !IS_PRIV(current->domain) )
+                return -EPERM;
 
+        apic = op.u.apic_op.apic;
+        address = op.u.apic_op.offset;
+        ret = -EINVAL;
+        if (apic >= nr_ioapics)
+            break;
+        val = io_apic_read(apic, address);
+        DPRINTK("ioapic read: %x = %x\n", address, val);
+        op.u.apic_op.value = val;
+        ret = 0;
+        break;
+    case PHYSDEVOP_APIC_WRITE:
+        if ( !IS_PRIV(current->domain) )
+                return -EPERM;
+
+        apic = op.u.apic_op.apic;
+        address = op.u.apic_op.offset;
+        val = op.u.apic_op.value;
+        ret = -EINVAL;
+        if (apic >= nr_ioapics)
+            break;
+
+        DPRINTK("ioapic write: %x = %x\n", address, val);
+        io_apic_write(apic, address, val);
+        ret = 0;
+        break;
+    case PHYSDEVOP_ASSIGN_VECTOR:
+        if ( !IS_PRIV(current->domain) )
+                return -EPERM;
+        
+        irq = op.u.irq_op.irq;
+        op.u.irq_op.vector = assign_irq_vector(irq);
+        ret = 0;
+        break;
+#endif
     case PHYSDEVOP_SET_IOPL:
         ret = -EINVAL;
         if ( op.u.set_iopl.iopl > 3 )
@@ -716,7 +756,6 @@ long do_physdev_op(physdev_op_t *uop)
         current->arch.iobmp       = (u8 *)op.u.set_iobitmap.bitmap;
         current->arch.iobmp_limit = op.u.set_iobitmap.nr_ports;
         break;
-
     default:
         ret = -EINVAL;
         break;

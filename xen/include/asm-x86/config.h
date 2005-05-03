@@ -23,10 +23,10 @@
 #define CONFIG_ACPI 1
 #define CONFIG_ACPI_BOOT 1
 
-#define CONFIG_PCI 1
-#define CONFIG_PCI_DIRECT 1
+//#define CONFIG_PCI 0
+//#define CONFIG_PCI_DIRECT 0
 #if defined(__i386__)
-#define CONFIG_PCI_BIOS 1
+//#define CONFIG_PCI_BIOS 0
 #endif
 
 #define CONFIG_IDE 1
@@ -314,5 +314,7 @@ extern unsigned long xenheap_phys_end; /* user-configurable */
 #else
 #define ELFSIZE 32
 #endif
+
+#define __ARCH_HAS_IOAPIC
 
 #endif /* __X86_CONFIG_H__ */

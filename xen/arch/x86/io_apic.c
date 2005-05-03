@@ -619,7 +619,7 @@ int irq_vector[NR_IRQS] = { FIRST_DEVICE_VECTOR , 0 };
 int vector_irq[256];
 #endif
 
-static int __init assign_irq_vector(int irq)
+int assign_irq_vector(int irq)
 {
 	static int current_vector = FIRST_DEVICE_VECTOR, offset = 0;
 	if (IO_APIC_VECTOR(irq) > 0)

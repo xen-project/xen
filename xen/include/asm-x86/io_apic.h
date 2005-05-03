@@ -157,6 +157,8 @@ static inline int ioapic_setup_disabled(void)
 	return skip_ioapic_setup;
 }
 
+extern int assign_irq_vector(int irq);
+
 #else	/* !CONFIG_X86_IO_APIC */
 #define io_apic_assign_pci_irqs 0
 

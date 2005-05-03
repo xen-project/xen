@@ -662,11 +662,15 @@ config REGPARM
 	generate incorrect output with certain kernel constructs when
 	-mregparm=3 is used.
 
-
 config X86_LOCAL_APIC
 	bool
-	depends on (X86_VISWS || SMP) && !X86_VOYAGER
-	default n
+	depends on !SMP && X86_UP_APIC
+	default y
+
+config X86_IO_APIC
+	bool
+	depends on !SMP && X86_UP_IOAPIC
+	default y
 
 if XEN_PHYSDEV_ACCESS
 
@@ -677,10 +681,45 @@ config X86_VISWS_APIC
 	depends on X86_VISWS
 	default y
 
-#config X86_IO_APIC
-#	bool
-#	depends on SMP && !(X86_VISWS || X86_VOYAGER)
-#	default y
+config X86_LOCAL_APIC
+	bool
+	depends on (X86_VISWS || SMP) && !X86_VOYAGER
+	default y
+
+config X86_UP_APIC
+	bool "Local APIC support on uniprocessors" if !SMP
+	depends on !(X86_VISWS || X86_VOYAGER)
+	---help---
+	  A local APIC (Advanced Programmable Interrupt Controller) is an
+	  integrated interrupt controller in the CPU. If you have a single-CPU
+	  system which has a processor with a local APIC, you can say Y here to
+	  enable and use it. If you say Y here even though your machine doesn't
+	  have a local APIC, then the kernel will still run with no slowdown at
+	  all. The local APIC supports CPU-generated self-interrupts (timer,
+	  performance counters), and the NMI watchdog which detects hard
+	  lockups.
+
+	  If you have a system with several CPUs, you do not need to say Y
+	  here: the local APIC will be used automatically.
+
+config X86_UP_IOAPIC
+	bool "IO-APIC support on uniprocessors"
+	depends on !SMP && X86_UP_APIC
+	help
+	  An IO-APIC (I/O Advanced Programmable Interrupt Controller) is an
+	  SMP-capable replacement for PC-style interrupt controllers. Most
+	  SMP systems and a small number of uniprocessor systems have one.
+	  If you have a single-CPU system with an IO-APIC, you can say Y here
+	  to use it. If you say Y here even though your machine doesn't have
+	  an IO-APIC, then the kernel will still run with no slowdown at all.
+
+	  If you have a system with several CPUs, you do not need to say Y
+	  here: the IO-APIC will be used automatically.
+
+config X86_IO_APIC
+	bool
+	depends on SMP && !(X86_VISWS || X86_VOYAGER)
+	default y
 
 config PCI
 	bool "PCI support" if !X86_VISWS
@@ -697,52 +736,47 @@ config PCI
 	  information about which PCI hardware does work under Linux and which
 	  doesn't.
 
-#choice
-#	prompt "PCI access mode"
-#	depends on PCI && !X86_VISWS
-#	default PCI_GOANY
-#	---help---
-#	  On PCI systems, the BIOS can be used to detect the PCI devices and
-#	  determine their configuration. However, some old PCI motherboards
-#	  have BIOS bugs and may crash if this is done. Also, some embedded
-#	  PCI-based systems don't have any BIOS at all. Linux can also try to
-#	  detect the PCI hardware directly without using the BIOS.
-#
-#	  With this option, you can specify how Linux should detect the
-#	  PCI devices. If you choose "BIOS", the BIOS will be used,
-#	  if you choose "Direct", the BIOS won't be used, and if you
-#	  choose "MMConfig", then PCI Express MMCONFIG will be used.
-#	  If you choose "Any", the kernel will try MMCONFIG, then the
-#	  direct access method and falls back to the BIOS if that doesn't
-#	  work. If unsure, go with the default, which is "Any".
-#
-#config PCI_GOBIOS
-#	bool "BIOS"
-#
-#config PCI_GOMMCONFIG
-#	bool "MMConfig"
-#
-#config PCI_GODIRECT
-#	bool "Direct"
-#
-#config PCI_GOANY
-#	bool "Any"
-#
-#endchoice
-#
-#config PCI_BIOS
-#	bool
-#	depends on !X86_VISWS && PCI && (PCI_GOBIOS || PCI_GOANY)
-#	default y
-#
-#config PCI_DIRECT
-#	bool
-# 	depends on PCI && ((PCI_GODIRECT || PCI_GOANY) || X86_VISWS)
-#	default y
+choice
+	prompt "PCI access mode"
+	depends on PCI && !X86_VISWS
+	default PCI_GOANY
+	---help---
+	  On PCI systems, the BIOS can be used to detect the PCI devices and
+	  determine their configuration. However, some old PCI motherboards
+	  have BIOS bugs and may crash if this is done. Also, some embedded
+	  PCI-based systems don't have any BIOS at all. Linux can also try to
+	  detect the PCI hardware directly without using the BIOS.
+
+	  With this option, you can specify how Linux should detect the
+	  PCI devices. If you choose "BIOS", the BIOS will be used,
+	  if you choose "Direct", the BIOS won't be used, and if you
+	  choose "MMConfig", then PCI Express MMCONFIG will be used.
+	  If you choose "Any", the kernel will try MMCONFIG, then the
+	  direct access method and falls back to the BIOS if that doesn't
+	  work. If unsure, go with the default, which is "Any".
+
+config PCI_GOBIOS
+	bool "BIOS"
+
+config PCI_GOMMCONFIG
+	bool "MMConfig"
+
+config PCI_GODIRECT
+	bool "Direct"
+
+config PCI_GOANY
+	bool "Any"
+
+endchoice
+
+config PCI_BIOS
+	bool
+	depends on !X86_VISWS && PCI && (PCI_GOBIOS || PCI_GOANY)
+	default n
 
 config PCI_DIRECT
 	bool
- 	depends on PCI
+ 	depends on PCI && ((PCI_GODIRECT || PCI_GOANY) || X86_VISWS)
 	default y
 
 source "drivers/pci/pcie/Kconfig"
@@ -927,7 +961,7 @@ config 4KSTACKS
 config X86_FIND_SMP_CONFIG
 	bool
 	depends on X86_LOCAL_APIC || X86_VOYAGER
-	default y
+	default n
 
 config X86_MPPARSE
 	bool
