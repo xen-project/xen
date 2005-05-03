@@ -20,7 +20,7 @@ s-obj-y	:=
 
 obj-y				+= cpu/
 obj-y				+= timers/
-c-obj-$(CONFIG_ACPI_BOOT)	+= acpi/
+obj-$(CONFIG_ACPI_BOOT)		+= acpi/
 #c-obj-$(CONFIG_X86_BIOS_REBOOT)	+= reboot.o
 c-obj-$(CONFIG_MCA)		+= mca.o
 c-obj-$(CONFIG_X86_MSR)		+= msr.o
