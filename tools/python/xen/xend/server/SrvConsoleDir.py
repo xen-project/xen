@@ -1,6 +1,6 @@
 # Copyright (C) 2004 Mike Wray <mike.wray@hp.com>
 
-from SrvDir import SrvDir
+from xen.web.SrvDir import SrvDir
 from SrvConsole import SrvConsole
 from xen.xend import XendConsole
 from xen.xend import sxp
