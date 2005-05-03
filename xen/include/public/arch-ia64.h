@@ -22,7 +22,7 @@ typedef unsigned long cpureg_t;   /* Full-sized register.                    */
 
 typedef struct
 {
-} PACKED struct cpu_user_regs;
+} PACKED cpu_user_regs;
 
 /*
  * NB. This may become a 64-bit count with no shift. If this happens then the 
