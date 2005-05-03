@@ -39,6 +39,7 @@
 #include <linux/skbuff.h>
 #include <linux/init.h>
 #include <linux/bitops.h>
+#include <linux/proc_fs.h>
 #include <net/sock.h>
 #include <net/pkt_sched.h>
 #include <net/arp.h>
@@ -85,6 +86,16 @@ static unsigned long rx_pfn_array[NETIF_RX_RING_SIZE];
 static multicall_entry_t rx_mcl[NETIF_RX_RING_SIZE+1];
 static mmu_update_t rx_mmu[NETIF_RX_RING_SIZE];
 
+#ifdef CONFIG_PROC_FS
+static int xennet_proc_init(void);
+static int xennet_proc_addif(struct net_device *dev);
+static void xennet_proc_delif(struct net_device *dev);
+#else
+#define xennet_proc_init()   (0)
+#define xennet_proc_addif(d) (0)
+#define xennet_proc_delif(d) ((void)0)
+#endif
+
 static struct list_head dev_list;
 
 struct net_private
@@ -120,7 +131,7 @@ struct net_private
     /* Receive-ring batched refills. */
 #define RX_MIN_TARGET 8
 #define RX_MAX_TARGET NETIF_RX_RING_SIZE
-    int rx_target;
+    int rx_min_target, rx_max_target, rx_target;
     struct sk_buff_head rx_batch;
 
     /*
@@ -419,8 +430,8 @@ static void network_alloc_rx_buffers(struct net_device *dev)
 
     /* Adjust our floating fill target if we risked running out of buffers. */
     if (((req_prod - np->rx->resp_prod) < (np->rx_target / 4)) &&
-         ((np->rx_target *= 2) > RX_MAX_TARGET))
-        np->rx_target = RX_MAX_TARGET;
+         ((np->rx_target *= 2) > np->rx_max_target))
+        np->rx_target = np->rx_max_target;
 }
 
 
@@ -651,8 +662,8 @@ static int netif_poll(struct net_device *dev, int *pbudget)
     /* If we get a callback with very few responses, reduce fill target. */
     /* NB. Note exponential increase, linear decrease. */
     if (((np->rx->req_prod - np->rx->resp_prod) > ((3*np->rx_target) / 4)) &&
-         (--np->rx_target < RX_MIN_TARGET))
-        np->rx_target = RX_MIN_TARGET;
+         (--np->rx_target < np->rx_min_target))
+        np->rx_target = np->rx_min_target;
 
     network_alloc_rx_buffers(dev);
 
@@ -943,7 +954,9 @@ static int create_netdev(int handle, struct net_device **val)
     spin_lock_init(&np->rx_lock);
 
     skb_queue_head_init(&np->rx_batch);
-    np->rx_target = RX_MIN_TARGET;
+    np->rx_target     = RX_MIN_TARGET;
+    np->rx_min_target = RX_MIN_TARGET;
+    np->rx_max_target = RX_MAX_TARGET;
 
     /* Initialise {tx,rx}_skbs to be a free chain containing every entry. */
     for (i = 0; i <= NETIF_TX_RING_SIZE; i++)
@@ -962,11 +975,17 @@ static int create_netdev(int handle, struct net_device **val)
         printk(KERN_WARNING "%s> register_netdev err=%d\n", __FUNCTION__, err);
         goto exit;
     }
+
+    if ((err = xennet_proc_addif(dev)) != 0) {
+        unregister_netdev(dev);
+        goto exit;
+    }
+
     np->dev = dev;
     list_add(&np->list, &dev_list);
 
   exit:
-    if ((err != 0) && (dev != NULL ))
+    if ((err != 0) && (dev != NULL))
         kfree(dev);
     else if (val != NULL)
         *val = dev;
@@ -1248,6 +1267,9 @@ static int __init netif_init(void)
     if (xen_start_info.flags & SIF_INITDOMAIN)
         return 0;
 
+    if ((err = xennet_proc_init()) != 0)
+        return err;
+
     IPRINTK("Initialising virtual ethernet driver.\n");
     INIT_LIST_HEAD(&dev_list);
     (void)register_inetaddr_notifier(&notifier_inetdev);
@@ -1305,6 +1327,153 @@ void netif_resume(void)
     }
 }
 
+#ifdef CONFIG_PROC_FS
+
+#define TARGET_MIN 0UL
+#define TARGET_MAX 1UL
+#define TARGET_CUR 2UL
+
+static int xennet_proc_read(
+    char *page, char **start, off_t off, int count, int *eof, void *data)
+{
+    struct net_device *dev = (struct net_device *)((unsigned long)data & ~3UL);
+    struct net_private *np = netdev_priv(dev);
+    int len = 0, which_target = (int)data & 3;
+    
+    switch (which_target)
+    {
+    case TARGET_MIN:
+        len = sprintf(page, "%d\n", np->rx_min_target);
+        break;
+    case TARGET_MAX:
+        len = sprintf(page, "%d\n", np->rx_max_target);
+        break;
+    case TARGET_CUR:
+        len = sprintf(page, "%d\n", np->rx_target);
+        break;
+    }
+
+    *eof = 1;
+    return len;
+}
+
+static int xennet_proc_write(
+    struct file *file, const char __user *buffer,
+    unsigned long count, void *data)
+{
+    struct net_device *dev = (struct net_device *)((unsigned long)data & ~3UL);
+    struct net_private *np = netdev_priv(dev);
+    int which_target = (int)data & 3;
+    char string[64];
+    long target;
+
+    if (!capable(CAP_SYS_ADMIN))
+        return -EPERM;
+
+    if (count <= 1)
+        return -EBADMSG; /* runt */
+    if (count > sizeof(string))
+        return -EFBIG;   /* too long */
+
+    if (copy_from_user(string, buffer, count))
+        return -EFAULT;
+    string[sizeof(string)-1] = '\0';
+
+    target = simple_strtol(string, NULL, 10);
+    if (target < RX_MIN_TARGET)
+        target = RX_MIN_TARGET;
+    if (target > RX_MAX_TARGET)
+        target = RX_MAX_TARGET;
+
+    spin_lock(&np->rx_lock);
+
+    switch (which_target)
+    {
+    case TARGET_MIN:
+        if (target > np->rx_max_target)
+            np->rx_max_target = target;
+        np->rx_min_target = target;
+        if (target > np->rx_target)
+            np->rx_target = target;
+        break;
+    case TARGET_MAX:
+        if (target < np->rx_min_target)
+            np->rx_min_target = target;
+        np->rx_max_target = target;
+        if (target < np->rx_target)
+            np->rx_target = target;
+        break;
+    case TARGET_CUR:
+        break;
+    }
+
+    network_alloc_rx_buffers(dev);
+
+    spin_unlock(&np->rx_lock);
+
+    return count;
+}
+
+static int xennet_proc_init(void)
+{
+    if (proc_mkdir("xen/net", NULL) == NULL)
+        return -ENOMEM;
+    return 0;
+}
+
+static int xennet_proc_addif(struct net_device *dev)
+{
+    struct proc_dir_entry *dir, *min, *max, *cur;
+    char name[30];
+
+    sprintf(name, "xen/net/%s", dev->name);
+
+    dir = proc_mkdir(name, NULL);
+    if (!dir)
+        goto nomem;
+
+    min = create_proc_entry("rxbuf_min", 0644, dir);
+    max = create_proc_entry("rxbuf_max", 0644, dir);
+    cur = create_proc_entry("rxbuf_cur", 0444, dir);
+    if (!min || !max || !cur)
+        goto nomem;
+
+    min->read_proc  = xennet_proc_read;
+    min->write_proc = xennet_proc_write;
+    min->data       = (void *)((unsigned long)dev | TARGET_MIN);
+
+    max->read_proc  = xennet_proc_read;
+    max->write_proc = xennet_proc_write;
+    max->data       = (void *)((unsigned long)dev | TARGET_MAX);
+
+    cur->read_proc  = xennet_proc_read;
+    cur->write_proc = xennet_proc_write;
+    cur->data       = (void *)((unsigned long)dev | TARGET_CUR);
+
+    return 0;
+
+ nomem:
+    xennet_proc_delif(dev);
+    return -ENOMEM;
+}
+
+static void xennet_proc_delif(struct net_device *dev)
+{
+    char name[30];
+
+    sprintf(name, "xen/net/%s/rxbuf_min", dev->name);
+    remove_proc_entry(name, NULL);
+
+    sprintf(name, "xen/net/%s/rxbuf_max", dev->name);
+    remove_proc_entry(name, NULL);
+
+    sprintf(name, "xen/net/%s/rxbuf_cur", dev->name);
+    remove_proc_entry(name, NULL);
+
+    sprintf(name, "xen/net/%s", dev->name);
+    remove_proc_entry(name, NULL);
+}
+
+#endif
 
 module_init(netif_init);
-
