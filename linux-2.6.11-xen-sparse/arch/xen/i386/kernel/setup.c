@@ -67,8 +67,6 @@ static struct notifier_block xen_panic_block = {
 
 int disable_pse __initdata = 0;
 
-unsigned int __initdata maxcpus = NR_CPUS;
-
 /*
  * Machine setup..
  */
@@ -781,12 +779,14 @@ static void __init parse_cmdline_early (char ** cmdline_p)
 			noexec_setup(from + 7);
 
 
-#ifdef  CONFIG_X86_SMP
+#ifdef  CONFIG_X86_MPPARSE
 		/*
 		 * If the BIOS enumerates physical processors before logical,
 		 * maxcpus=N at enumeration-time can be used to disable HT.
 		 */
 		else if (!memcmp(from, "maxcpus=", 8)) {
+			extern unsigned int maxcpus;
+
 			maxcpus = simple_strtoul(from + 8, NULL, 0);
 		}
 #endif

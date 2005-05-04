@@ -37,7 +37,7 @@
 
 /* Have we found an MP table */
 int smp_found_config;
-extern unsigned int maxcpus;
+unsigned int __initdata maxcpus = NR_CPUS;
 
 /*
  * Various Linux-internal data structures created from the
