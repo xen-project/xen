@@ -165,28 +165,27 @@ extern int mpc_default_type;
 
 static inline unsigned int io_apic_read(unsigned int apic, unsigned int reg)
 {
-        physdev_op_t op;
-        int ret;
+	physdev_op_t op;
+	int ret;
 
-        op.cmd = PHYSDEVOP_APIC_READ;
-        op.u.apic_op.apic = apic;
-        op.u.apic_op.offset = reg;
-        ret = HYPERVISOR_physdev_op(&op);
-        if (ret)
-                return ret;
-        return op.u.apic_op.value;
+	op.cmd = PHYSDEVOP_APIC_READ;
+	op.u.apic_op.apic = apic;
+	op.u.apic_op.offset = reg;
+	ret = HYPERVISOR_physdev_op(&op);
+	if (ret)
+		return ret;
+	return op.u.apic_op.value;
 }
 
 static inline void io_apic_write(unsigned int apic, unsigned int reg, unsigned int value)
 {
-        physdev_op_t op;
-        int ret;
+	physdev_op_t op;
 
-        op.cmd = PHYSDEVOP_APIC_WRITE;
-        op.u.apic_op.apic = apic;
-        op.u.apic_op.offset = reg;
-        op.u.apic_op.value = value;
-        ret = HYPERVISOR_physdev_op(&op);
+	op.cmd = PHYSDEVOP_APIC_WRITE;
+	op.u.apic_op.apic = apic;
+	op.u.apic_op.offset = reg;
+	op.u.apic_op.value = value;
+	HYPERVISOR_physdev_op(&op);
 }
 
 /*
