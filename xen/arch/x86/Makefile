@@ -11,8 +11,6 @@ ifneq ($(crash_debug),y)
 OBJS := $(patsubst cdb%.o,,$(OBJS))
 endif
 
-OBJS := $(filter-out pci%,$(OBJS))
-
 default: $(TARGET)
 
 $(TARGET): $(TARGET)-syms boot/mkelf32
