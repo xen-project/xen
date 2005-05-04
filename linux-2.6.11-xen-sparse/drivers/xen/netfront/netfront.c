@@ -50,6 +50,7 @@
 #include <asm-xen/xen-public/io/netif.h>
 #include <asm-xen/balloon.h>
 #include <asm/page.h>
+#include <asm/uaccess.h>
 
 #ifndef __GFP_NOWARN
 #define __GFP_NOWARN 0
