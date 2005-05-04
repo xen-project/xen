@@ -524,7 +524,7 @@ acpi_scan_rsdp (
 {
 	unsigned long		offset = 0;
 	unsigned long		sig_len = sizeof("RSD PTR ") - 1;
-	unsigned long		vstart = isa_bus_to_virt(start);
+	unsigned long		vstart = (unsigned long)isa_bus_to_virt(start);
 
 	/*
 	 * Scan all 16-byte boundaries of the physical memory region for the
