@@ -656,7 +656,7 @@ acpi_find_rsdp (void)
 	 */
 	rsdp_phys = acpi_scan_rsdp (0, 0x400);
 	if (!rsdp_phys)
-		rsdp_phys = acpi_scan_rsdp (0xE0000, 0xFFFFF);
+		rsdp_phys = acpi_scan_rsdp (0xE0000, 0x20000);
 
         __set_fixmap_ma(FIX_ACPI_RSDP_PAGE, rsdp_phys, PAGE_KERNEL);
 
