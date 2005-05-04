@@ -1133,12 +1133,6 @@ static unsigned long __init setup_memory(void)
 	 */
 	acpi_reserve_bootmem();
 #endif
-#ifdef CONFIG_X86_FIND_SMP_CONFIG
-	/*
-	 * Find and reserve possible boot-time SMP configuration:
-	 */
-	find_smp_config();
-#endif
 
 #ifdef CONFIG_BLK_DEV_INITRD
 	if (xen_start_info.mod_start) {
@@ -1502,6 +1496,13 @@ void __init setup_arch(char **cmdline_p)
 	smp_alloc_memory(); /* AP processor realmode stacks in low memory*/
 #endif
 	paging_init();
+
+#ifdef CONFIG_X86_FIND_SMP_CONFIG
+	/*
+	 * Find and reserve possible boot-time SMP configuration:
+	 */
+	find_smp_config();
+#endif
 
 	/* Make sure we have a correctly sized P->M table. */
 	if (max_pfn != xen_start_info.nr_pages) {
