@@ -615,9 +615,7 @@ static inline int IO_APIC_irq_trigger(int irq)
 
 int irq_vector[NR_IRQS] = { FIRST_DEVICE_VECTOR , 0 };
 
-#ifdef CONFIG_VMX
 int vector_irq[256];
-#endif
 
 int assign_irq_vector(int irq)
 {
@@ -641,10 +639,10 @@ next:
 		panic("ran out of interrupt sources!");
 
 	IO_APIC_VECTOR(irq) = current_vector;
-#ifdef CONFIG_VMX
+
         vector_irq[current_vector] = irq;
-        printk("vector_irq[%x] = %d\n", current_vector, irq);
-#endif
+        DPRINTK("vector_irq[%x] = %d\n", current_vector, irq);
+
 	return current_vector;
 }
 
@@ -1627,6 +1625,16 @@ static inline void check_timer(void)
 	panic("IO-APIC + timer doesn't work! pester mingo@redhat.com");
 }
 
+#define NR_IOAPIC_BIOSIDS 256
+static u8 ioapic_biosid_to_apic_enum[NR_IOAPIC_BIOSIDS];
+static void store_ioapic_biosid_mapping(void)
+{
+    u8 apic;
+    memset(ioapic_biosid_to_apic_enum, ~0, NR_IOAPIC_BIOSIDS);
+    for ( apic = 0; apic < nr_ioapics; apic++ )
+        ioapic_biosid_to_apic_enum[mp_ioapics[apic].mpc_apicid] = apic;
+}
+
 /*
  *
  * IRQ's that are handled by the old PIC in all cases:
@@ -1646,6 +1654,8 @@ static inline void check_timer(void)
 
 void __init setup_IO_APIC(void)
 {
+	store_ioapic_biosid_mapping();
+
 	enable_IO_APIC();
 
 	io_apic_irqs = ~PIC_IRQS;
@@ -1949,3 +1959,67 @@ static int __init ioapic_trigger_setup(void)
 }
 
 __initcall(ioapic_trigger_setup);
+
+int ioapic_guest_read(int apicid, int address, u32 *pval)
+{
+    u32 val;
+    int apicenum;
+    struct IO_APIC_reg_00 reg_00;
+    unsigned long flags;
+
+    if ( (apicid >= NR_IOAPIC_BIOSIDS) ||
+         ((apicenum = ioapic_biosid_to_apic_enum[apicid]) >= nr_ioapics) )
+            return -EINVAL;
+
+    spin_lock_irqsave(&ioapic_lock, flags);
+    val = io_apic_read(apicenum, address);
+    spin_unlock_irqrestore(&ioapic_lock, flags);
+
+    /* Rewrite APIC ID to what the BIOS originally specified. */
+    if ( address == 0 )
+    {
+        *(int *)&reg_00 = val;
+        reg_00.ID = apicid;
+        val = *(u32 *)&reg_00;
+    }
+
+    *pval = val;
+    return 0;
+}
+
+int ioapic_guest_write(int apicid, int address, u32 val)
+{
+    int apicenum, pin, irq;
+    struct IO_APIC_route_entry rte = { 0 };
+    unsigned long flags;
+
+    if ( (apicid >= NR_IOAPIC_BIOSIDS) ||
+         ((apicenum = ioapic_biosid_to_apic_enum[apicid]) >= nr_ioapics) )
+            return -EINVAL;
+
+    /* Only write to the first half of a route entry. */
+    if ( (address < 0x10) || (address & 1) )
+        return 0;
+    
+    pin = (address - 0x10) >> 1;
+
+    rte.dest.logical.logical_dest = target_cpus();
+    *(int *)&rte = val;
+
+    /* Make sure we handle edge/level triggering correctly. */
+    if ( !rte.mask )
+    {
+        irq = vector_irq[rte.vector];
+        if ( !IO_APIC_IRQ(irq) )
+            return 0;
+        irq_desc[irq].handler = rte.trigger ? 
+            &ioapic_level_irq_type: &ioapic_edge_irq_type;
+    }
+    
+    spin_lock_irqsave(&ioapic_lock, flags);
+    io_apic_write(apicenum, 0x10 + 2 * pin, *(((int *)&rte) + 0));
+    io_apic_write(apicenum, 0x11 + 2 * pin, *(((int *)&rte) + 1));
+    spin_unlock_irqrestore(&ioapic_lock, flags);
+
+    return 0;
+}

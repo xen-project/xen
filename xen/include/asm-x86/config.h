@@ -315,6 +315,4 @@ extern unsigned long xenheap_phys_end; /* user-configurable */
 #define ELFSIZE 32
 #endif
 
-#define __ARCH_HAS_IOAPIC
-
 #endif /* __X86_CONFIG_H__ */

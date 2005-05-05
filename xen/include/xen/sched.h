@@ -129,10 +129,6 @@ struct domain
     u16 pirq_to_evtchn[NR_PIRQS];
     u32 pirq_mask[NR_PIRQS/32];
 
-    /* Physical I/O */
-    spinlock_t       pcidev_lock;
-    struct list_head pcidev_list;
-
     unsigned long d_flags;
     unsigned long vm_assist;
 

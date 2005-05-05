@@ -69,9 +69,6 @@ unsigned char opt_pdb[10] = "none";
 unsigned int opt_tbuf_size = 10;
 /* opt_sched: scheduler - default to Borrowed Virtual Time */
 char opt_sched[10] = "bvt";
-/* opt_physdev_dom0_hide: list of PCI slots to hide from domain 0. */
-/* Format is '(%02x:%02x.%1x)(%02x:%02x.%1x)' and so on. */
-char opt_physdev_dom0_hide[200] = "";
 /* opt_leveltrigger, opt_edgetrigger: Force an IO-APIC-routed IRQ to be */
 /*                                    level- or edge-triggered.         */
 /* Example: 'leveltrigger=4,5,6,20 edgetrigger=21'. */

@@ -15,8 +15,11 @@
 #include <xen/reboot.h>
 #include <xen/sched.h>
 #include <xen/serial.h>
-#include <xen/physdev.h>
 #include <asm/io.h>
+
+#ifdef CONFIG_X86
+#include <asm/physdev.h>
+#endif
 
 /* Config serial port with a string <baud>,DPS,<io-base>,<irq>. */
 static char opt_com1[30] = OPT_COM1_STR, opt_com2[30] = OPT_COM2_STR;
@@ -482,10 +485,12 @@ void serial_force_unlock(int handle)
 
 void serial_endboot(void)
 {
+#ifdef CONFIG_X86
     int i;
     for ( i = 0; i < ARRAY_SIZE(com); i++ )
         if ( UART_ENABLED(&com[i]) )
             physdev_modify_ioport_access_range(dom0, 0, com[i].io_base, 8);
+#endif
 }
 
 /*

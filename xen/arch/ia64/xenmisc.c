@@ -150,33 +150,6 @@ void dump_pageframe_info(struct domain *d)
 }
 
 ///////////////////////////////
-// from common/physdev.c
-///////////////////////////////
-void
-physdev_init_dom0(struct domain *d)
-{
-}
-
-int
-physdev_pci_access_modify(domid_t id, int bus, int dev, int func, int enable)
-{
-	return -EINVAL;
-}
-
-void physdev_modify_ioport_access_range(struct domain *d, int enable,
-	int port, int num)
-{
-	printk("physdev_modify_ioport_access_range not implemented\n");
-	dummy();
-}
-
-void physdev_destroy_state(struct domain *d)
-{
-	printk("physdev_destroy_state not implemented\n");
-	dummy();
-}
-
-///////////////////////////////
 // called from arch/ia64/head.S
 ///////////////////////////////
 

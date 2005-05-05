@@ -621,8 +621,6 @@ int construct_dom0(struct domain *d,
 	unsigned long pkern_entry;
 	unsigned long pkern_end;
 
-	extern void physdev_init_dom0(struct domain *);
-
 //printf("construct_dom0: starting\n");
 	/* Sanity! */
 #ifndef CLONE_DOMAIN0
@@ -754,12 +752,6 @@ int construct_dom0(struct domain *d,
 	if (cmdline != NULL)
 #endif
 	console_endboot(strstr(cmdline, "tty0") != NULL);
-
-	/* DOM0 gets access to everything. */
-#ifdef CLONE_DOMAIN0
-if (d == dom0)
-#endif
-	physdev_init_dom0(d);
 
 	set_bit(DF_CONSTRUCTED, &d->d_flags);
 
