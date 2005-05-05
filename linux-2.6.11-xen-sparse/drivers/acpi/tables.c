@@ -581,8 +581,8 @@ acpi_table_init (void)
 		return -ENODEV;
 	}
 
-        rsdp = (struct acpi_table_rsdp *) (__fix_to_virt(FIX_ACPI_RSDP_PAGE)
-                                           + (rsdp_phys & ~PAGE_MASK));
+	rsdp = (struct acpi_table_rsdp *) (__fix_to_virt(FIX_ACPI_RSDP_PAGE) +
+					   (rsdp_phys & ~PAGE_MASK));
 	if (!rsdp) {
 		printk(KERN_WARNING PREFIX "Unable to map RSDP\n");
 		return -ENODEV;

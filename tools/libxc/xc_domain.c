@@ -43,7 +43,7 @@ int xc_domain_create(int xc_handle,
         goto fail;
     }
 
-    return err;
+    return 0;
 
  fail:
     errno_saved = errno;
