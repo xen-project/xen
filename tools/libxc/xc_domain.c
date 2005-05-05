@@ -103,6 +103,7 @@ int xc_domain_getinfo(int xc_handle,
     unsigned int nr_doms;
     u32 next_domid = first_domid;
     dom0_op_t op;
+    int rc = 0; 
 
     for ( nr_doms = 0; nr_doms < max_doms; nr_doms++ )
     {
@@ -110,7 +111,7 @@ int xc_domain_getinfo(int xc_handle,
         op.u.getdomaininfo.domain = (domid_t)next_domid;
         op.u.getdomaininfo.exec_domain = 0; // FIX ME?!?
         op.u.getdomaininfo.ctxt = NULL; /* no exec context info, thanks. */
-        if ( do_dom0_op(xc_handle, &op) < 0 )
+        if ( (rc = do_dom0_op(xc_handle, &op)) < 0 )
             break;
         info->domid   = (u16)op.u.getdomaininfo.domain;
 
@@ -136,6 +137,8 @@ int xc_domain_getinfo(int xc_handle,
         next_domid = (u16)op.u.getdomaininfo.domain + 1;
         info++;
     }
+
+    if(!nr_doms) return rc; 
 
     return nr_doms;
 }

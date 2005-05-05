@@ -140,3 +140,8 @@ xen/tools/figlet/figlet
 xen/xen
 xen/xen-syms
 xen/xen.*
+CRASH.txt
+linux-2.4.29-xen-sparse/arch/xen/kernel/foo.ps
+skiing-defaults2
+tools/libxc/xc_linux_restore.c.SMH
+tools/libxc/xc_linux_save.c.SMH
