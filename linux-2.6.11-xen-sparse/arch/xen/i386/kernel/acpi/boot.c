@@ -113,9 +113,8 @@ char *__acpi_map_table(unsigned long phys_addr, unsigned long size)
 
 	j = PAGE_ALIGN(size) >> PAGE_SHIFT;
 	for (i = 0; (i < FIX_ACPI_PAGES) && j ; i++, j--) {
-		__set_fixmap_ma(FIX_ACPI_END - i,
-				(phys_addr & PAGE_MASK) + (i << PAGE_SHIFT),
-				PAGE_KERNEL);
+		set_fixmap(FIX_ACPI_END - i,
+			   (phys_addr & PAGE_MASK) + (i << PAGE_SHIFT));
 	}
 
 	return (char *) __fix_to_virt(FIX_ACPI_END) + (phys_addr & ~PAGE_MASK);
@@ -658,7 +657,7 @@ acpi_find_rsdp (void)
 	if (!rsdp_phys)
 		rsdp_phys = acpi_scan_rsdp (0xE0000, 0x20000);
 
-	__set_fixmap_ma(FIX_ACPI_RSDP_PAGE, rsdp_phys, PAGE_KERNEL);
+	set_fixmap(FIX_ACPI_RSDP_PAGE, rsdp_phys);
 
 	return rsdp_phys;
 }

@@ -176,18 +176,18 @@ void __set_fixmap (enum fixed_addresses idx, unsigned long phys, pgprot_t flags)
 		BUG();
 		return;
 	}
-	set_pte_pfn(address, phys >> PAGE_SHIFT, flags);
-}
-
-void __set_fixmap_ma (enum fixed_addresses idx, unsigned long phys, pgprot_t flags)
-{
-	unsigned long address = __fix_to_virt(idx);
-
-	if (idx >= __end_of_fixed_addresses) {
-		BUG();
-		return;
+	switch (idx) {
+	case FIX_WP_TEST:
+	case FIX_VSYSCALL:
+#ifdef CONFIG_X86_F00F_BUG
+	case FIX_F00F_IDT:
+#endif
+		set_pte_pfn(address, phys >> PAGE_SHIFT, flags);
+		break;
+	default:
+		set_pte_pfn_ma(address, phys >> PAGE_SHIFT, flags);
+		break;
 	}
-	set_pte_pfn_ma(address, phys >> PAGE_SHIFT, flags);
 }
 
 pte_t *pte_alloc_one_kernel(struct mm_struct *mm, unsigned long address)
