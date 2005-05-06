@@ -363,8 +363,6 @@ menu "Power management options"
 
 source kernel/power/Kconfig
 
-source "drivers/acpi/Kconfig"
-
 source "arch/x86_64/kernel/cpufreq/Kconfig"
 
 endmenu

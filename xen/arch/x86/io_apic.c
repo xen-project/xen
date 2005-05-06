@@ -313,46 +313,6 @@ static int __init find_isa_irq_pin(int irq, int type)
  */
 static int pin_2_irq(int idx, int apic, int pin);
 
-int IO_APIC_get_PCI_irq_vector(int bus, int slot, int pin)
-{
-	int apic, i, best_guess = -1;
-
-	Dprintk("querying PCI -> IRQ mapping bus:%d, slot:%d, pin:%d.\n",
-		bus, slot, pin);
-	if ((mp_bus_id_to_pci_bus==NULL) || (mp_bus_id_to_pci_bus[bus] == -1)) {
-		printk(KERN_WARNING "PCI BIOS passed nonexistent PCI bus %d!\n", bus);
-		return -1;
-	}
-	for (i = 0; i < mp_irq_entries; i++) {
-		int lbus = mp_irqs[i].mpc_srcbus;
-
-		for (apic = 0; apic < nr_ioapics; apic++)
-			if (mp_ioapics[apic].mpc_apicid == mp_irqs[i].mpc_dstapic ||
-			    mp_irqs[i].mpc_dstapic == MP_APIC_ALL)
-				break;
-
-		if ((mp_bus_id_to_type[lbus] == MP_BUS_PCI) &&
-		    !mp_irqs[i].mpc_irqtype &&
-		    (bus == lbus) &&
-		    (slot == ((mp_irqs[i].mpc_srcbusirq >> 2) & 0x1f))) {
-			int irq = pin_2_irq(i,apic,mp_irqs[i].mpc_dstirq);
-
-			if (!(apic || IO_APIC_IRQ(irq)))
-				continue;
-
-			if (pin == (mp_irqs[i].mpc_srcbusirq & 3))
-				return irq;
-			/*
-			 * Use the first all-but-pin matching entry as a
-			 * best-guess fuzzy result for broken mptables.
-			 */
-			if (best_guess < 0)
-				best_guess = irq;
-		}
-	}
-	return best_guess;
-}
-
 /*
  * EISA Edge/Level control register, ELCR
  */
@@ -615,11 +575,9 @@ static inline int IO_APIC_irq_trigger(int irq)
 
 int irq_vector[NR_IRQS] = { FIRST_DEVICE_VECTOR , 0 };
 
-#ifdef CONFIG_VMX
 int vector_irq[256];
-#endif
 
-static int __init assign_irq_vector(int irq)
+int assign_irq_vector(int irq)
 {
 	static int current_vector = FIRST_DEVICE_VECTOR, offset = 0;
 	if (IO_APIC_VECTOR(irq) > 0)
@@ -641,10 +599,9 @@ next:
 		panic("ran out of interrupt sources!");
 
 	IO_APIC_VECTOR(irq) = current_vector;
-#ifdef CONFIG_VMX
+
         vector_irq[current_vector] = irq;
-        printk("vector_irq[%x] = %d\n", current_vector, irq);
-#endif
+
 	return current_vector;
 }
 
@@ -1627,6 +1584,16 @@ static inline void check_timer(void)
 	panic("IO-APIC + timer doesn't work! pester mingo@redhat.com");
 }
 
+#define NR_IOAPIC_BIOSIDS 256
+static u8 ioapic_biosid_to_apic_enum[NR_IOAPIC_BIOSIDS];
+static void store_ioapic_biosid_mapping(void)
+{
+    u8 apic;
+    memset(ioapic_biosid_to_apic_enum, ~0, NR_IOAPIC_BIOSIDS);
+    for ( apic = 0; apic < nr_ioapics; apic++ )
+        ioapic_biosid_to_apic_enum[mp_ioapics[apic].mpc_apicid] = apic;
+}
+
 /*
  *
  * IRQ's that are handled by the old PIC in all cases:
@@ -1646,6 +1613,8 @@ static inline void check_timer(void)
 
 void __init setup_IO_APIC(void)
 {
+	store_ioapic_biosid_mapping();
+
 	enable_IO_APIC();
 
 	io_apic_irqs = ~PIC_IRQS;
@@ -1660,8 +1629,7 @@ void __init setup_IO_APIC(void)
 	setup_IO_APIC_irqs();
 	init_IO_APIC_traps();
 	check_timer();
-	if (!acpi_ioapic)
-		print_IO_APIC();
+	print_IO_APIC();
 }
 
 #endif /* CONFIG_X86_IO_APIC */
@@ -1949,3 +1917,82 @@ static int __init ioapic_trigger_setup(void)
 }
 
 __initcall(ioapic_trigger_setup);
+
+int ioapic_guest_read(int apicid, int address, u32 *pval)
+{
+    u32 val;
+    int apicenum;
+    struct IO_APIC_reg_00 reg_00;
+    unsigned long flags;
+
+    if ( (apicid >= NR_IOAPIC_BIOSIDS) ||
+         ((apicenum = ioapic_biosid_to_apic_enum[apicid]) >= nr_ioapics) )
+            return -EINVAL;
+
+    spin_lock_irqsave(&ioapic_lock, flags);
+    val = io_apic_read(apicenum, address);
+    spin_unlock_irqrestore(&ioapic_lock, flags);
+
+    /* Rewrite APIC ID to what the BIOS originally specified. */
+    if ( address == 0 )
+    {
+        *(int *)&reg_00 = val;
+        reg_00.ID = apicid;
+        val = *(u32 *)&reg_00;
+    }
+
+    *pval = val;
+    return 0;
+}
+
+int ioapic_guest_write(int apicid, int address, u32 val)
+{
+    int apicenum, pin, irq;
+    struct IO_APIC_route_entry rte = { 0 };
+    struct irq_pin_list *entry;
+    unsigned long flags;
+
+    if ( (apicid >= NR_IOAPIC_BIOSIDS) ||
+         ((apicenum = ioapic_biosid_to_apic_enum[apicid]) >= nr_ioapics) )
+            return -EINVAL;
+
+    /* Only write to the first half of a route entry. */
+    if ( (address < 0x10) || (address & 1) )
+        return 0;
+    
+    pin = (address - 0x10) >> 1;
+
+    rte.dest.logical.logical_dest = target_cpus();
+    *(int *)&rte = val;
+
+    if ( rte.vector >= FIRST_DEVICE_VECTOR )
+    {
+        /* Is there a valid irq mapped to this vector? */
+        irq = vector_irq[rte.vector];
+        if ( !IO_APIC_IRQ(irq) )
+            return 0;
+
+        /* Set the correct irq-handling type. */
+        irq_desc[irq].handler = rte.trigger ? 
+            &ioapic_level_irq_type: &ioapic_edge_irq_type;
+
+        /* Record the pin<->irq mapping. */
+        for ( entry = &irq_2_pin[irq]; ; entry = &irq_2_pin[entry->next] )
+        {
+            if ( (entry->apic == apicenum) && (entry->pin == pin) )
+                break;
+            if ( !entry->next )
+            {
+                add_pin_to_irq(irq, apicenum, pin);
+                break;
+            }
+        }
+    }
+
+    spin_lock_irqsave(&ioapic_lock, flags);
+    io_apic_write(apicenum, 0x10 + 2 * pin, *(((int *)&rte) + 0));
+    io_apic_write(apicenum, 0x11 + 2 * pin, *(((int *)&rte) + 1));
+    spin_unlock_irqrestore(&ioapic_lock, flags);
+
+    return 0;
+}

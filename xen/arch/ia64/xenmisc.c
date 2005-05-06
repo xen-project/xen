@@ -133,73 +133,6 @@ void free_page_type(struct pfn_info *page, unsigned int type)
 }
 
 ///////////////////////////////
-// from arch/x86/pci.c
-///////////////////////////////
-
-int
-pcibios_prep_mwi (struct pci_dev *dev)
-{
-	dummy();
-}
-
-///////////////////////////////
-// from arch/x86/pci-irq.c
-///////////////////////////////
-
-void pcibios_enable_irq(struct pci_dev *dev)
-{
-	dummy();
-}
-
-///////////////////////////////
-// from arch/ia64/pci-pc.c
-///////////////////////////////
-
-#include <xen/pci.h>
-
-int pcibios_enable_device(struct pci_dev *dev, int mask)
-{
-	dummy();
-	return 0;
-}
-
-int (*pci_config_read)(int seg, int bus, int dev, int fn, int reg, int len, u32 *value) = NULL;
-int (*pci_config_write)(int seg, int bus, int dev, int fn, int reg, int len, u32 value) = NULL;
-
-//struct pci_fixup pcibios_fixups[] = { { 0 } };
-struct pci_fixup pcibios_fixups[] = { { 0 } };
-
-void
-pcibios_align_resource(void *data, struct resource *res,
-		       unsigned long size, unsigned long align)
-{
-	dummy();
-}
-
-void
-pcibios_update_resource(struct pci_dev *dev, struct resource *root,
-			struct resource *res, int resource)
-{
-	dummy();
-}
-
-void __devinit  pcibios_fixup_bus(struct pci_bus *b)
-{
-	dummy();
-}
-
-void __init pcibios_init(void)
-{
-	dummy();
-}
-
-char * __devinit  pcibios_setup(char *str)
-{
-	dummy();
-	return 0;
-}
-
-///////////////////////////////
 // from arch/ia64/traps.c
 ///////////////////////////////
 
@@ -214,33 +147,6 @@ void show_registers(struct pt_regs *regs)
 void dump_pageframe_info(struct domain *d)
 {
 	printk("dump_pageframe_info not implemented\n");
-}
-
-///////////////////////////////
-// from common/physdev.c
-///////////////////////////////
-void
-physdev_init_dom0(struct domain *d)
-{
-}
-
-int
-physdev_pci_access_modify(domid_t id, int bus, int dev, int func, int enable)
-{
-	return -EINVAL;
-}
-
-void physdev_modify_ioport_access_range(struct domain *d, int enable,
-	int port, int num)
-{
-	printk("physdev_modify_ioport_access_range not implemented\n");
-	dummy();
-}
-
-void physdev_destroy_state(struct domain *d)
-{
-	printk("physdev_destroy_state not implemented\n");
-	dummy();
 }
 
 ///////////////////////////////

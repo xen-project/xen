@@ -66,7 +66,7 @@ relative_lndir ()
     (
     cd $i
     pref=`echo $i | sed -e 's#/[^/]*#../#g' -e 's#^\.##'`
-    for j in `find . -type f -o -type l -maxdepth 1`; do
+    for j in `find . -maxdepth 1 -type f -o -type l`; do
       ln -sf ${pref}${REAL_DIR}/$i/$j ${SYMLINK_DIR}/$i/$j
     done
     )
@@ -232,7 +232,6 @@ ln -sf ../../../${LINUX_26}/arch/xen/kernel/fixup.c
 ln -sf ../../../${LINUX_26}/arch/xen/kernel/gnttab.c
 ln -sf ../../../${LINUX_26}/arch/xen/kernel/reboot.c
 ln -sf ../../../${LINUX_26}/arch/xen/kernel/skbuff.c
-ln -sf ../../../${LINUX_26}/arch/xen/i386/kernel/pci-dma.c
 
 cd ${AD}/arch/xen/lib
 ln -sf ../../i386/lib/checksum.S 

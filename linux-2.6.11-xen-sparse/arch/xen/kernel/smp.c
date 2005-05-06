@@ -4,9 +4,6 @@
 #include <linux/kernel.h>
 #include <linux/threads.h>
 
-unsigned int __initdata maxcpus = NR_CPUS;
-
-
 /*
  * the frequency of the profiling timer can be changed
  * by writing a multiplier value into /proc/profile.

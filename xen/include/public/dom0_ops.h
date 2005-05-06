@@ -208,19 +208,6 @@ typedef struct {
     memory_t free_pages;
 } dom0_physinfo_t;
 
-/* 
- * Allow a domain access to a physical PCI device
- */
-#define DOM0_PCIDEV_ACCESS    23
-typedef struct {
-    /* IN variables. */
-    domid_t      domain;
-    u32          bus;
-    u32          dev;
-    u32          func;
-    u32          enable;
-} dom0_pcidev_access_t;
-
 /*
  * Get the ID of the current scheduler.
  */
@@ -376,7 +363,6 @@ typedef struct {
         dom0_pincpudomain_t      pincpudomain;
         dom0_tbufcontrol_t       tbufcontrol;
         dom0_physinfo_t          physinfo;
-        dom0_pcidev_access_t     pcidev_access;
         dom0_sched_id_t          sched_id;
         dom0_shadow_control_t    shadow_control;
         dom0_setdomainmaxmem_t   setdomainmaxmem;

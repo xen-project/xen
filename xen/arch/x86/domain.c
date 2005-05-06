@@ -37,6 +37,7 @@
 #include <asm/vmx.h>
 #include <asm/vmx_vmcs.h>
 #include <asm/msr.h>
+#include <asm/physdev.h>
 #include <xen/kernel.h>
 #include <public/io/ioreq.h>
 #include <xen/multicall.h>
@@ -967,6 +968,8 @@ void domain_relinquish_resources(struct domain *d)
     struct exec_domain *ed;
 
     BUG_ON(d->cpuset != 0);
+
+    physdev_destroy_state(d);
 
     ptwr_destroy(d);
 

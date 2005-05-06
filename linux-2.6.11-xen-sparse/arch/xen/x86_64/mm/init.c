@@ -361,7 +361,14 @@ void __set_fixmap (enum fixed_addresses idx, unsigned long phys, pgprot_t prot)
 		printk("Invalid __set_fixmap\n");
 		return;
 	}
-	set_pte_phys(address, phys, prot, SET_FIXMAP_KERNEL);
+	switch (idx) {
+	case VSYSCALL_FIRST_PAGE:
+		set_pte_phys(address, phys, prot, SET_FIXMAP_KERNEL);
+		break;
+	default:
+		set_pte_phys_ma(address, phys, prot);
+		break;
+	}
 }
 
 
@@ -412,18 +419,6 @@ void __set_fixmap_user (enum fixed_addresses idx, unsigned long phys, pgprot_t p
         set_pmd(pmd, __pmd(__pa(pte) | _KERNPG_TABLE | _PAGE_USER));
 #endif
 
-}
-
-
-void __set_fixmap_ma (enum fixed_addresses idx, unsigned long phys, pgprot_t prot)
-{ 
-	unsigned long address = __fix_to_virt(idx);
-
-	if (idx >= __end_of_fixed_addresses) {
-		printk("Invalid __set_fixmap\n");
-		return;
-	}
-	set_pte_phys_ma(address, phys, prot);
 }
 
 unsigned long __initdata table_start, table_end, tables_reserved; 
@@ -632,8 +627,7 @@ void __init paging_init(void)
 		free_area_init(zones_size);
 	}
 
-        __set_fixmap_ma(FIX_SHARED_INFO, xen_start_info.shared_info, 
-                        __pgprot(_KERNPG_TABLE));
+        set_fixmap(FIX_SHARED_INFO, xen_start_info.shared_info);
         HYPERVISOR_shared_info = (shared_info_t *)fix_to_virt(FIX_SHARED_INFO);
 
         memset(empty_zero_page, 0, sizeof(empty_zero_page));
@@ -642,11 +636,11 @@ void __init paging_init(void)
         /* Setup mapping of lower 1st MB */
         for (i = 0; i < NR_FIX_ISAMAPS; i++)
                 if (xen_start_info.flags & SIF_PRIVILEGED)
-                        __set_fixmap_ma(FIX_ISAMAP_BEGIN - i, i * PAGE_SIZE,
-                                __pgprot(_KERNPG_TABLE));
+                        set_fixmap(FIX_ISAMAP_BEGIN - i, i * PAGE_SIZE);
                 else
-                        set_fixmap_ma_ro(FIX_ISAMAP_BEGIN - i,
-                                         virt_to_machine(empty_zero_page));
+                        __set_fixmap(FIX_ISAMAP_BEGIN - i,
+				     virt_to_machine(empty_zero_page),
+				     PAGE_KERNEL_RO);
 #endif
 
 }

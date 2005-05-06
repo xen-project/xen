@@ -16,7 +16,6 @@
 #include <asm/domain_page.h>
 #include <xen/trace.h>
 #include <xen/console.h>
-#include <xen/physdev.h>
 #include <public/sched_ctl.h>
 
 extern long arch_do_dom0_op(dom0_op_t *op, dom0_op_t *u_dom0_op);
@@ -382,16 +381,6 @@ long do_dom0_op(dom0_op_t *u_dom0_op)
         ret = read_console_ring(op->u.readconsole.str, 
                                 op->u.readconsole.count,
                                 op->u.readconsole.cmd); 
-    }
-    break;
-
-    case DOM0_PCIDEV_ACCESS:
-    {
-        ret = physdev_pci_access_modify(op->u.pcidev_access.domain, 
-                                        op->u.pcidev_access.bus,
-                                        op->u.pcidev_access.dev,
-                                        op->u.pcidev_access.func,
-                                        op->u.pcidev_access.enable);
     }
     break;
 

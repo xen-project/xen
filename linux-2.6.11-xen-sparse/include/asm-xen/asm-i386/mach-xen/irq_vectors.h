@@ -59,6 +59,9 @@
 #define LOCAL_TIMER_VECTOR	0xef
 #endif
 
+#define SPURIOUS_APIC_VECTOR	0xff
+#define ERROR_APIC_VECTOR	0xfe
+
 /*
  * First APIC vector available to drivers: (vectors 0x30-0xee)
  * we start at 0x31 to spread out vectors evenly between priority

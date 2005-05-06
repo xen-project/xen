@@ -562,7 +562,7 @@ void __init paging_init(void)
 	zone_sizes_init();
 
 	/* Switch to the real shared_info page, and clear the dummy page. */
-	set_fixmap_ma(FIX_SHARED_INFO, xen_start_info.shared_info);
+	set_fixmap(FIX_SHARED_INFO, xen_start_info.shared_info);
 	HYPERVISOR_shared_info = (shared_info_t *)fix_to_virt(FIX_SHARED_INFO);
 	memset(empty_zero_page, 0, sizeof(empty_zero_page));
 
@@ -570,10 +570,11 @@ void __init paging_init(void)
 	/* Setup mapping of lower 1st MB */
 	for (i = 0; i < NR_FIX_ISAMAPS; i++)
 		if (xen_start_info.flags & SIF_PRIVILEGED)
-			set_fixmap_ma(FIX_ISAMAP_BEGIN - i, i * PAGE_SIZE);
+			set_fixmap(FIX_ISAMAP_BEGIN - i, i * PAGE_SIZE);
 		else
-			set_fixmap_ma_ro(FIX_ISAMAP_BEGIN - i,
-					 virt_to_machine(empty_zero_page));
+			__set_fixmap(FIX_ISAMAP_BEGIN - i,
+				     virt_to_machine(empty_zero_page),
+				     PAGE_KERNEL_RO);
 #endif
 }
 

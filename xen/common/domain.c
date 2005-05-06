@@ -50,10 +50,6 @@ struct domain *do_createdomain(domid_t dom_id, unsigned int cpu)
     INIT_LIST_HEAD(&d->page_list);
     INIT_LIST_HEAD(&d->xenpage_list);
 
-    /* Per-domain PCI-device list. */
-    spin_lock_init(&d->pcidev_lock);
-    INIT_LIST_HEAD(&d->pcidev_list);
-    
     if ( (d->id != IDLE_DOMAIN_ID) &&
          ((init_event_channels(d) != 0) || (grant_table_create(d) != 0)) )
     {
@@ -106,12 +102,6 @@ struct domain *find_domain_by_id(domid_t dom)
 }
 
 
-#ifndef CONFIG_IA64
-extern void physdev_destroy_state(struct domain *d);
-#else
-#define physdev_destroy_state(_d) ((void)0)
-#endif
-
 void domain_kill(struct domain *d)
 {
     struct exec_domain *ed;
@@ -122,7 +112,6 @@ void domain_kill(struct domain *d)
         for_each_exec_domain(d, ed)
             sched_rem_domain(ed);
         domain_relinquish_resources(d);
-        physdev_destroy_state(d);
         put_domain(d);
     }
 }

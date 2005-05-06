@@ -181,6 +181,12 @@ endmenu
 
 source "arch/xen/Kconfig.drivers"
 
+if XEN_PRIVILEGED_GUEST
+menu "Power management options"
+source "drivers/acpi/Kconfig"
+endmenu
+endif
+
 source "fs/Kconfig"
 
 source "security/Kconfig"

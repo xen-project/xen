@@ -779,7 +779,7 @@ static void __init parse_cmdline_early (char ** cmdline_p)
 			noexec_setup(from + 7);
 
 
-#ifdef  CONFIG_X86_SMP
+#ifdef  CONFIG_X86_MPPARSE
 		/*
 		 * If the BIOS enumerates physical processors before logical,
 		 * maxcpus=N at enumeration-time can be used to disable HT.
@@ -1132,12 +1132,6 @@ static unsigned long __init setup_memory(void)
 	 * Reserve low memory region for sleep support.
 	 */
 	acpi_reserve_bootmem();
-#endif
-#ifdef CONFIG_X86_FIND_SMP_CONFIG
-	/*
-	 * Find and reserve possible boot-time SMP configuration:
-	 */
-	find_smp_config();
 #endif
 
 #ifdef CONFIG_BLK_DEV_INITRD
@@ -1503,6 +1497,13 @@ void __init setup_arch(char **cmdline_p)
 #endif
 	paging_init();
 
+#ifdef CONFIG_X86_FIND_SMP_CONFIG
+	/*
+	 * Find and reserve possible boot-time SMP configuration:
+	 */
+	find_smp_config();
+#endif
+
 	/* Make sure we have a correctly sized P->M table. */
 	if (max_pfn != xen_start_info.nr_pages) {
 		phys_to_machine_mapping = alloc_bootmem_low_pages(
@@ -1566,6 +1567,10 @@ void __init setup_arch(char **cmdline_p)
 	if (efi_enabled)
 		efi_map_memmap();
 
+	op.cmd             = PHYSDEVOP_SET_IOPL;
+	op.u.set_iopl.iopl = current->thread.io_pl = 1;
+	HYPERVISOR_physdev_op(&op);
+
 	/*
 	 * Parse the ACPI tables for possible boot-time SMP configuration.
 	 */
@@ -1582,10 +1587,6 @@ void __init setup_arch(char **cmdline_p)
 	noirqdebug_setup("");
 
 	register_memory();
-
-	op.cmd             = PHYSDEVOP_SET_IOPL;
-	op.u.set_iopl.iopl = current->thread.io_pl = 1;
-	HYPERVISOR_physdev_op(&op);
 
 	if (xen_start_info.flags & SIF_INITDOMAIN) {
 		if (!(xen_start_info.flags & SIF_PRIVILEGED))
