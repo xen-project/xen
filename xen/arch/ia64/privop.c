@@ -758,6 +758,38 @@ priv_emulate(VCPU *vcpu, REGS *regs, UINT64 isr)
 }
 
 
+// FIXME: Move these to include/public/arch-ia64?
+#define HYPERPRIVOP_RFI			1
+#define HYPERPRIVOP_RSM_DT		2
+#define HYPERPRIVOP_SSM_DT		3
+#define HYPERPRIVOP_COVER		4
+
+/* hyperprivops are generally executed in assembly (with physical psr.ic off)
+ * so this code is primarily used for debugging them */
+int
+ia64_hyperprivop(unsigned long iim)
+{
+	struct exec_domain *ed = (struct domain *) current;
+
+// FIXME: Add instrumentation for these
+	switch(iim) {
+	    case HYPERPRIVOP_RFI:
+		(void)vcpu_rfi(ed);
+		return 0;	// don't update iip
+	    case HYPERPRIVOP_RSM_DT:
+		(void)vcpu_reset_psr_dt(ed);
+		return 1;
+	    case HYPERPRIVOP_SSM_DT:
+		(void)vcpu_set_psr_dt(ed);
+		return 1;
+	    case HYPERPRIVOP_COVER:
+		(void)vcpu_cover(ed);
+		return 1;
+	}
+	return 0;
+}
+
+
 /**************************************************************************
 Privileged operation instrumentation routines
 **************************************************************************/

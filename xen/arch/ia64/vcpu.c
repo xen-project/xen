@@ -120,6 +120,12 @@ void vcpu_set_metaphysical_mode(VCPU *vcpu, BOOLEAN newmode)
 	}
 }
 
+IA64FAULT vcpu_reset_psr_dt(VCPU *vcpu)
+{
+	vcpu_set_metaphysical_mode(vcpu,TRUE);
+	return IA64_NO_FAULT;
+}
+
 IA64FAULT vcpu_reset_psr_sm(VCPU *vcpu, UINT64 imm24)
 {
 	struct ia64_psr psr, imm, *ipsr;
@@ -153,6 +159,12 @@ IA64FAULT vcpu_reset_psr_sm(VCPU *vcpu, UINT64 imm24)
 
 extern UINT64 vcpu_check_pending_interrupts(VCPU *vcpu);
 #define SPURIOUS_VECTOR 0xf
+
+IA64FAULT vcpu_set_psr_dt(VCPU *vcpu)
+{
+	vcpu_set_metaphysical_mode(vcpu,FALSE);
+	return IA64_NO_FAULT;
+}
 
 IA64FAULT vcpu_set_psr_sm(VCPU *vcpu, UINT64 imm24)
 {
