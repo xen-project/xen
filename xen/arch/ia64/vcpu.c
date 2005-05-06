@@ -37,6 +37,17 @@ typedef	union {
 
 #define STATIC
 
+#ifdef PRIVOP_ADDR_COUNT
+struct privop_addr_count privop_addr_counter[PRIVOP_COUNT_NINSTS] = {
+	{ "rsm", { 0 }, { 0 }, 0 },
+	{ "ssm", { 0 }, { 0 }, 0 }
+};
+extern void privop_count_addr(unsigned long addr, int inst);
+#define	PRIVOP_COUNT_ADDR(regs,inst) privop_count_addr(regs->cr_iip,inst)
+#else
+#define	PRIVOP_COUNT_ADDR(x,y) do {} while (0)
+#endif
+
 unsigned long vcpu_verbose = 0;
 #define verbose(a...) do {if (vcpu_verbose) printf(a);} while(0)
 
@@ -77,30 +88,20 @@ vcpu_set_gr(VCPU *vcpu, unsigned reg, UINT64 value)
 IA64FAULT vcpu_set_ar(VCPU *vcpu, UINT64 reg, UINT64 val)
 {
 	if (reg == 44) return (vcpu_set_itc(vcpu,val));
-	if (reg == 27) return (IA64_ILLOP_FAULT);
-	if (reg > 7) return (IA64_ILLOP_FAULT);
-	PSCB(vcpu,krs[reg]) = val;
-#if 0
-// for now, privify kr read's so all kr accesses are privileged
-	switch (reg) {
-	      case 0: asm volatile ("mov ar.k0=%0" :: "r"(val)); break;
-	      case 1: asm volatile ("mov ar.k1=%0" :: "r"(val)); break;
-	      case 2: asm volatile ("mov ar.k2=%0" :: "r"(val)); break;
-	      case 3: asm volatile ("mov ar.k3=%0" :: "r"(val)); break;
-	      case 4: asm volatile ("mov ar.k4=%0" :: "r"(val)); break;
-	      case 5: asm volatile ("mov ar.k5=%0" :: "r"(val)); break;
-	      case 6: asm volatile ("mov ar.k6=%0" :: "r"(val)); break;
-	      case 7: asm volatile ("mov ar.k7=%0" :: "r"(val)); break;
-	      case 27: asm volatile ("mov ar.cflg=%0" :: "r"(val)); break;
-	}
-#endif
+	else if (reg == 27) return (IA64_ILLOP_FAULT);
+	else if (reg == 24)
+	    printf("warning: setting ar.eflg is a no-op; no IA-32 support\n");
+	else if (reg > 7) return (IA64_ILLOP_FAULT);
+	else PSCB(vcpu,krs[reg]) = val;
 	return IA64_NO_FAULT;
 }
 
 IA64FAULT vcpu_get_ar(VCPU *vcpu, UINT64 reg, UINT64 *val)
 {
-	if (reg > 7) return (IA64_ILLOP_FAULT);
-	*val = PSCB(vcpu,krs[reg]);
+	if (reg == 24)
+	    printf("warning: getting ar.eflg is a no-op; no IA-32 support\n");
+	else if (reg > 7) return (IA64_ILLOP_FAULT);
+	else *val = PSCB(vcpu,krs[reg]);
 	return IA64_NO_FAULT;
 }
 
@@ -124,6 +125,7 @@ IA64FAULT vcpu_reset_psr_sm(VCPU *vcpu, UINT64 imm24)
 	struct ia64_psr psr, imm, *ipsr;
 	REGS *regs = vcpu_regs(vcpu);
 
+	PRIVOP_COUNT_ADDR(regs,_RSM);
 	// TODO: All of these bits need to be virtualized
 	// TODO: Only allowed for current vcpu
 	__asm__ __volatile ("mov %0=psr;;" : "=r"(psr) :: "memory");
@@ -158,6 +160,7 @@ IA64FAULT vcpu_set_psr_sm(VCPU *vcpu, UINT64 imm24)
 	REGS *regs = vcpu_regs(vcpu);
 	UINT64 mask, enabling_interrupts = 0;
 
+	PRIVOP_COUNT_ADDR(regs,_SSM);
 	// TODO: All of these bits need to be virtualized
 	__asm__ __volatile ("mov %0=psr;;" : "=r"(psr) :: "memory");
 	imm = *(struct ia64_psr *)&imm24;

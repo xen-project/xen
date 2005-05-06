@@ -174,12 +174,6 @@ struct device {
 #endif
 };
 
-// from linux/include/linux/pci.h
-struct pci_bus_region {
-	unsigned long start;
-	unsigned long end;
-};
-
 // warning: unless search_extable is declared, the return value gets
 // truncated to 32-bits, causing a very strange error in privop handling
 struct exception_table_entry;

@@ -417,10 +417,17 @@ IA64FAULT priv_mov_from_pmc(VCPU *vcpu, INST64 inst)
 	UINT64 val;
 	IA64FAULT fault;
 	
-	fault = vcpu_get_pmc(vcpu,vcpu_get_gr(vcpu,inst.M43.r3),&val);
-	if (fault == IA64_NO_FAULT)
-		return vcpu_set_gr(vcpu, inst.M43.r1, val);
-	else return fault;
+	if (inst.M43.r1 > 63) { // privified mov from pmd
+		fault = vcpu_get_pmd(vcpu,vcpu_get_gr(vcpu,inst.M43.r3),&val);
+		if (fault == IA64_NO_FAULT)
+			return vcpu_set_gr(vcpu, inst.M43.r1-64, val);
+	}
+	else {
+		fault = vcpu_get_pmc(vcpu,vcpu_get_gr(vcpu,inst.M43.r3),&val);
+		if (fault == IA64_NO_FAULT)
+			return vcpu_set_gr(vcpu, inst.M43.r1, val);
+	}
+	return fault;
 }
 
 unsigned long from_cr_cnt[128] = { 0 };
@@ -531,6 +538,8 @@ struct {
 	unsigned long bsw0;
 	unsigned long bsw1;
 	unsigned long cover;
+	unsigned long fc;
+	unsigned long cpuid;
 	unsigned long Mpriv_cnt[64];
 } privcnt = { 0 };
 
@@ -631,7 +640,11 @@ priv_handle_op(VCPU *vcpu, REGS *regs, int privlvl)
 				else x6 = 0x1a;
 			}
 		}
-		privcnt.Mpriv_cnt[x6]++;
+		if (x6 == 52 && inst.M28.r3 > 63)
+			privcnt.fc++;
+		else if (x6 == 16 && inst.M43.r3 > 63)
+			privcnt.cpuid++;
+		else privcnt.Mpriv_cnt[x6]++;
 		return (*pfunc)(vcpu,inst);
 		break;
 	    case B:
@@ -826,6 +839,12 @@ int dump_privop_counts(char *buf)
 	if (privcnt.cover)
 		s += sprintf(s,"%10d  %s [%d%%]\r\n", privcnt.cover,
 			"cover", (privcnt.cover*100L)/sum);
+	if (privcnt.fc)
+		s += sprintf(s,"%10d  %s [%d%%]\r\n", privcnt.fc,
+			"privified-fc", (privcnt.fc*100L)/sum);
+	if (privcnt.cpuid)
+		s += sprintf(s,"%10d  %s [%d%%]\r\n", privcnt.cpuid,
+			"privified-getcpuid", (privcnt.cpuid*100L)/sum);
 	for (i=0; i < 64; i++) if (privcnt.Mpriv_cnt[i]) {
 		if (!Mpriv_str[i]) s += sprintf(s,"PRIVSTRING NULL!!\r\n");
 		else s += sprintf(s,"%10d  %s [%d%%]\r\n", privcnt.Mpriv_cnt[i],
@@ -864,6 +883,7 @@ int zero_privop_counts(char *buf)
 	privcnt.ssm = 0; privcnt.rsm = 0;
 	privcnt.rfi = 0; privcnt.bsw0 = 0;
 	privcnt.bsw1 = 0; privcnt.cover = 0;
+	privcnt.fc = 0; privcnt.cpuid = 0;
 	for (i=0; i < 64; i++) privcnt.Mpriv_cnt[i] = 0;
 	for (j=0; j < 128; j++) from_cr_cnt[j] = 0;
 	for (j=0; j < 128; j++) to_cr_cnt[j] = 0;
@@ -871,12 +891,61 @@ int zero_privop_counts(char *buf)
 	return s - buf;
 }
 
+#ifdef PRIVOP_ADDR_COUNT
+
+extern struct privop_addr_count privop_addr_counter[];
+
+void privop_count_addr(unsigned long iip, int inst)
+{
+	struct privop_addr_count *v = &privop_addr_counter[inst];
+	int i;
+
+	for (i = 0; i < PRIVOP_COUNT_NADDRS; i++) {
+		if (!v->addr[i]) { v->addr[i] = iip; v->count[i]++; return; }
+		else if (v->addr[i] == iip)  { v->count[i]++; return; }
+	}
+	v->overflow++;;
+}
+
+int dump_privop_addrs(char *buf)
+{
+	int i,j;
+	char *s = buf;
+	s += sprintf(s,"Privop addresses:\r\n");
+	for (i = 0; i < PRIVOP_COUNT_NINSTS; i++) {
+		struct privop_addr_count *v = &privop_addr_counter[i];
+		s += sprintf(s,"%s:\n",v->instname);
+		for (j = 0; j < PRIVOP_COUNT_NADDRS; j++) {
+			if (!v->addr[j]) break;
+			s += sprintf(s," @%p #%ld\n",v->addr[j],v->count[j]);
+		}
+		if (v->overflow) 
+			s += sprintf(s," other #%ld\n",v->overflow);
+	}
+	return s - buf;
+}
+
+void zero_privop_addrs(void)
+{
+	int i,j;
+	for (i = 0; i < PRIVOP_COUNT_NINSTS; i++) {
+		struct privop_addr_count *v = &privop_addr_counter[i];
+		for (j = 0; j < PRIVOP_COUNT_NADDRS; j++)
+			v->addr[j] = v->count[j] = 0;
+		v->overflow = 0;
+	}
+}
+#endif
+
 #define TMPBUFLEN 8*1024
 int dump_privop_counts_to_user(char __user *ubuf, int len)
 {
 	char buf[TMPBUFLEN];
 	int n = dump_privop_counts(buf);
 
+#ifdef PRIVOP_ADDR_COUNT
+	n += dump_privop_addrs(buf + n);
+#endif
 	if (len < TMPBUFLEN) return -1;
 	if (__copy_to_user(ubuf,buf,n)) return -1;
 	return n;
@@ -887,6 +956,9 @@ int zero_privop_counts_to_user(char __user *ubuf, int len)
 	char buf[TMPBUFLEN];
 	int n = zero_privop_counts(buf);
 
+#ifdef PRIVOP_ADDR_COUNT
+	zero_privop_addrs();
+#endif
 	if (len < TMPBUFLEN) return -1;
 	if (__copy_to_user(ubuf,buf,n)) return -1;
 	return n;

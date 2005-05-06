@@ -84,6 +84,17 @@ xen_timer_interrupt (int irq, void *dev_id, struct pt_regs *regs)
 {
 	unsigned long new_itm;
 
+#define HEARTBEAT_FREQ 16	// period in seconds
+#ifdef HEARTBEAT_FREQ
+	static long count = 0;
+	if (!(++count & ((HEARTBEAT_FREQ*1024)-1))) {
+		printf("Heartbeat... iip=%p,psr.i=%d,pend=%d\n",
+			regs->cr_iip,
+			current->vcpu_info->arch.interrupt_delivery_enabled,
+			current->vcpu_info->arch.pending_interruption);
+		count = 0;
+	}
+#endif
 #ifndef XEN
 	if (unlikely(cpu_is_offline(smp_processor_id()))) {
 		return IRQ_HANDLED;

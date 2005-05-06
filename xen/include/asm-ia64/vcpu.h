@@ -21,6 +21,21 @@ typedef struct pt_regs REGS;
 //#define vcpu_regs(vcpu)		&((struct spk_thread_t *)vcpu)->thread_regs
 //#define vcpu_thread(vcpu)	((struct spk_thread_t *)vcpu)
 
+#define PRIVOP_ADDR_COUNT
+#ifdef PRIVOP_ADDR_COUNT
+#define _RSM 0
+#define _SSM 1
+#define PRIVOP_COUNT_NINSTS 2
+#define PRIVOP_COUNT_NADDRS 30
+
+struct privop_addr_count {
+	char *instname;
+	unsigned long addr[PRIVOP_COUNT_NADDRS];
+	unsigned long count[PRIVOP_COUNT_NADDRS];
+	unsigned long overflow;
+};
+#endif
+
 /* general registers */
 extern UINT64 vcpu_get_gr(VCPU *vcpu, unsigned reg);
 extern IA64FAULT vcpu_set_gr(VCPU *vcpu, unsigned reg, UINT64 value);
