@@ -189,7 +189,7 @@ acpi_parse_lapic_nmi (
 
 #endif /*CONFIG_X86_LOCAL_APIC*/
 
-#if defined(CONFIG_X86_IO_APIC) && defined(CONFIG_ACPI_INTERPRETER)
+#if defined(CONFIG_X86_IO_APIC) /*&& defined(CONFIG_ACPI_INTERPRETER)*/
 
 static int __init
 acpi_parse_ioapic (
@@ -211,6 +211,7 @@ acpi_parse_ioapic (
 	return 0;
 }
 
+#ifdef CONFIG_ACPI_INTERPRETER
 /*
  * Parse Interrupt Source Override for the ACPI SCI
  */
@@ -244,6 +245,7 @@ acpi_sci_ioapic_setup(u32 gsi, u16 polarity, u16 trigger)
 	acpi_sci_override_gsi = gsi;
 	return;
 }
+#endif
 
 static int __init
 acpi_parse_fadt(unsigned long phys, unsigned long size)
@@ -277,11 +279,13 @@ acpi_parse_int_src_ovr (
 
 	acpi_table_print_madt_entry(header);
 
+#ifdef CONFIG_ACPI_INTERPRETER
 	if (intsrc->bus_irq == acpi_fadt.sci_int) {
 		acpi_sci_ioapic_setup(intsrc->global_irq,
 			intsrc->flags.polarity, intsrc->flags.trigger);
 		return 0;
 	}
+#endif
 
 	mp_override_legacy_irq (
 		intsrc->bus_irq,
@@ -460,13 +464,14 @@ acpi_boot_init (void)
 
 #endif /*CONFIG_X86_LOCAL_APIC*/
 
-#if defined(CONFIG_X86_IO_APIC) && defined(CONFIG_ACPI_INTERPRETER)
+#if defined(CONFIG_X86_IO_APIC) /*&& defined(CONFIG_ACPI_INTERPRETER)*/
 
 	/* 
 	 * I/O APIC 
 	 * --------
 	 */
 
+#if 0
 	/*
 	 * ACPI interpreter is required to complete interrupt setup,
 	 * so if it is off, don't enumerate the io-apics with ACPI.
@@ -476,6 +481,7 @@ acpi_boot_init (void)
 	if (acpi_disabled || acpi_noirq) {
 		return 1;
 	}
+#endif
 
 	/*
 	 * if "noapic" boot option, don't look for IO-APICs
@@ -510,12 +516,14 @@ acpi_boot_init (void)
 		return result;
 	}
 
+#ifdef CONFIG_ACPI_INTERPRETER
 	/*
 	 * If BIOS did not supply an INT_SRC_OVR for the SCI
 	 * pretend we got one so we can set the SCI flags.
 	 */
 	if (!acpi_sci_override_gsi)
 		acpi_sci_ioapic_setup(acpi_fadt.sci_int, 0, 0);
+#endif
 
 	result = acpi_table_parse_madt(ACPI_MADT_NMI_SRC, acpi_parse_nmi_src);
 	if (result < 0) {
