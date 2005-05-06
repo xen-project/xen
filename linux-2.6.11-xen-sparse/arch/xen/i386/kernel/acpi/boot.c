@@ -672,10 +672,6 @@ acpi_parse_madt_lapic_entries(void)
 {
 	int count;
 
-#ifdef CONFIG_XEN
-	return 0;
-#endif
-
 	/* 
 	 * Note that the LAPIC address is obtained from the MADT (32-bit value)
 	 * and (optionally) overriden by a LAPIC_ADDR_OVR entry (64-bit value).
@@ -871,9 +867,7 @@ acpi_boot_table_init(void)
 	}
 
 #ifdef __i386__
-#ifndef CONFIG_XEN
 	check_acpi_pci();
-#endif
 #endif
 
 	acpi_table_parse(ACPI_BOOT, acpi_parse_sbf);

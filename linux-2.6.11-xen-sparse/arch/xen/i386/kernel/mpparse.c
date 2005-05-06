@@ -109,7 +109,7 @@ static int MP_valid_apicid(int apicid, int version)
 {
 	return hweight_long(apicid & 0xf) == 1 && (apicid >> 4) != 0xf;
 }
-#else
+#elif !defined(CONFIG_XEN)
 static int MP_valid_apicid(int apicid, int version)
 {
 	if (version >= 0x14)
@@ -119,6 +119,7 @@ static int MP_valid_apicid(int apicid, int version)
 }
 #endif
 
+#ifndef CONFIG_XEN
 void __init MP_processor_info (struct mpc_config_processor *m)
 {
  	int ver, apicid;
@@ -217,6 +218,12 @@ void __init MP_processor_info (struct mpc_config_processor *m)
 	apic_version[m->mpc_apicid] = ver;
 	bios_cpu_apicid[num_processors - 1] = m->mpc_apicid;
 }
+#else
+void __init MP_processor_info (struct mpc_config_processor *m)
+{
+	num_processors++;
+}
+#endif /* CONFIG_XEN */
 
 static void __init MP_bus_info (struct mpc_config_bus *m)
 {
@@ -816,12 +823,14 @@ void __init find_smp_config (void)
 void __init mp_register_lapic_address (
 	u64			address)
 {
+#ifndef CONFIG_XEN
 	mp_lapic_addr = (unsigned long) address;
 
 	if (boot_cpu_physical_apicid == -1U)
 		boot_cpu_physical_apicid = GET_APIC_ID(apic_read(APIC_ID));
 
 	Dprintk("Boot CPU = %d\n", boot_cpu_physical_apicid);
+#endif
 }
 
 
@@ -841,6 +850,7 @@ void __init mp_register_lapic (
 	if (id == boot_cpu_physical_apicid)
 		boot_cpu = 1;
 
+#ifndef CONFIG_XEN
 	processor.mpc_type = MP_PROCESSOR;
 	processor.mpc_apicid = id;
 	processor.mpc_apicver = GET_APIC_VERSION(apic_read(APIC_LVR));
@@ -851,6 +861,7 @@ void __init mp_register_lapic (
 	processor.mpc_featureflag = boot_cpu_data.x86_capability[0];
 	processor.mpc_reserved[0] = 0;
 	processor.mpc_reserved[1] = 0;
+#endif
 
 	MP_processor_info(&processor);
 }

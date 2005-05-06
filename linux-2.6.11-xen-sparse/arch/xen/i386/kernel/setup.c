@@ -1567,6 +1567,10 @@ void __init setup_arch(char **cmdline_p)
 	if (efi_enabled)
 		efi_map_memmap();
 
+	op.cmd             = PHYSDEVOP_SET_IOPL;
+	op.u.set_iopl.iopl = current->thread.io_pl = 1;
+	HYPERVISOR_physdev_op(&op);
+
 	/*
 	 * Parse the ACPI tables for possible boot-time SMP configuration.
 	 */
@@ -1583,10 +1587,6 @@ void __init setup_arch(char **cmdline_p)
 	noirqdebug_setup("");
 
 	register_memory();
-
-	op.cmd             = PHYSDEVOP_SET_IOPL;
-	op.u.set_iopl.iopl = current->thread.io_pl = 1;
-	HYPERVISOR_physdev_op(&op);
 
 	if (xen_start_info.flags & SIF_INITDOMAIN) {
 		if (!(xen_start_info.flags & SIF_PRIVILEGED))
