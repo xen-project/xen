@@ -313,46 +313,6 @@ static int __init find_isa_irq_pin(int irq, int type)
  */
 static int pin_2_irq(int idx, int apic, int pin);
 
-int IO_APIC_get_PCI_irq_vector(int bus, int slot, int pin)
-{
-	int apic, i, best_guess = -1;
-
-	Dprintk("querying PCI -> IRQ mapping bus:%d, slot:%d, pin:%d.\n",
-		bus, slot, pin);
-	if ((mp_bus_id_to_pci_bus==NULL) || (mp_bus_id_to_pci_bus[bus] == -1)) {
-		printk(KERN_WARNING "PCI BIOS passed nonexistent PCI bus %d!\n", bus);
-		return -1;
-	}
-	for (i = 0; i < mp_irq_entries; i++) {
-		int lbus = mp_irqs[i].mpc_srcbus;
-
-		for (apic = 0; apic < nr_ioapics; apic++)
-			if (mp_ioapics[apic].mpc_apicid == mp_irqs[i].mpc_dstapic ||
-			    mp_irqs[i].mpc_dstapic == MP_APIC_ALL)
-				break;
-
-		if ((mp_bus_id_to_type[lbus] == MP_BUS_PCI) &&
-		    !mp_irqs[i].mpc_irqtype &&
-		    (bus == lbus) &&
-		    (slot == ((mp_irqs[i].mpc_srcbusirq >> 2) & 0x1f))) {
-			int irq = pin_2_irq(i,apic,mp_irqs[i].mpc_dstirq);
-
-			if (!(apic || IO_APIC_IRQ(irq)))
-				continue;
-
-			if (pin == (mp_irqs[i].mpc_srcbusirq & 3))
-				return irq;
-			/*
-			 * Use the first all-but-pin matching entry as a
-			 * best-guess fuzzy result for broken mptables.
-			 */
-			if (best_guess < 0)
-				best_guess = irq;
-		}
-	}
-	return best_guess;
-}
-
 /*
  * EISA Edge/Level control register, ELCR
  */
@@ -641,7 +601,6 @@ next:
 	IO_APIC_VECTOR(irq) = current_vector;
 
         vector_irq[current_vector] = irq;
-        DPRINTK("vector_irq[%x] = %d\n", current_vector, irq);
 
 	return current_vector;
 }
@@ -1670,8 +1629,7 @@ void __init setup_IO_APIC(void)
 	setup_IO_APIC_irqs();
 	init_IO_APIC_traps();
 	check_timer();
-	if (!acpi_ioapic)
-		print_IO_APIC();
+	print_IO_APIC();
 }
 
 #endif /* CONFIG_X86_IO_APIC */
@@ -1991,6 +1949,7 @@ int ioapic_guest_write(int apicid, int address, u32 val)
 {
     int apicenum, pin, irq;
     struct IO_APIC_route_entry rte = { 0 };
+    struct irq_pin_list *entry;
     unsigned long flags;
 
     if ( (apicid >= NR_IOAPIC_BIOSIDS) ||
@@ -2006,16 +1965,30 @@ int ioapic_guest_write(int apicid, int address, u32 val)
     rte.dest.logical.logical_dest = target_cpus();
     *(int *)&rte = val;
 
-    /* Make sure we handle edge/level triggering correctly. */
-    if ( !rte.mask )
+    if ( rte.vector >= FIRST_DEVICE_VECTOR )
     {
+        /* Is there a valid irq mapped to this vector? */
         irq = vector_irq[rte.vector];
         if ( !IO_APIC_IRQ(irq) )
             return 0;
+
+        /* Set the correct irq-handling type. */
         irq_desc[irq].handler = rte.trigger ? 
             &ioapic_level_irq_type: &ioapic_edge_irq_type;
+
+        /* Record the pin<->irq mapping. */
+        for ( entry = &irq_2_pin[irq]; ; entry = &irq_2_pin[entry->next] )
+        {
+            if ( (entry->apic == apicenum) && (entry->pin == pin) )
+                break;
+            if ( !entry->next )
+            {
+                add_pin_to_irq(irq, apicenum, pin);
+                break;
+            }
+        }
     }
-    
+
     spin_lock_irqsave(&ioapic_lock, flags);
     io_apic_write(apicenum, 0x10 + 2 * pin, *(((int *)&rte) + 0));
     io_apic_write(apicenum, 0x11 + 2 * pin, *(((int *)&rte) + 1));
