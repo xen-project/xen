@@ -23,34 +23,6 @@
 #define CONFIG_ACPI 1
 #define CONFIG_ACPI_BOOT 1
 
-//#define CONFIG_PCI 0
-//#define CONFIG_PCI_DIRECT 0
-#if defined(__i386__)
-//#define CONFIG_PCI_BIOS 0
-#endif
-
-#define CONFIG_IDE 1
-#define CONFIG_BLK_DEV_IDE 1
-#define CONFIG_BLK_DEV_IDEDMA 1
-#define CONFIG_BLK_DEV_IDEPCI 1
-#define CONFIG_IDEDISK_MULTI_MODE 1
-#define CONFIG_IDEDISK_STROKE 1
-#define CONFIG_IDEPCI_SHARE_IRQ 1
-#define CONFIG_BLK_DEV_IDEDMA_PCI 1
-#define CONFIG_IDEDMA_PCI_AUTO 1
-#define CONFIG_IDEDMA_AUTO 1
-#define CONFIG_IDEDMA_ONLYDISK 1
-#define CONFIG_BLK_DEV_IDE_MODES 1
-#define CONFIG_BLK_DEV_PIIX 1
-
-#define CONFIG_SCSI 1
-#define CONFIG_SCSI_LOGGING 1
-#define CONFIG_BLK_DEV_SD 1
-#define CONFIG_SD_EXTRA_DEVS 40
-#define CONFIG_SCSI_MULTI_LUN 1
-
-#define CONFIG_XEN_ATTENTION_KEY 1
-
 #define HZ 100
 
 #define OPT_CONSOLE_STR "com1,vga"
@@ -91,8 +63,6 @@
 
 #ifndef __ASSEMBLY__
 extern unsigned long _end; /* standard ELF symbol */
-extern void __out_of_line_bug(int line) __attribute__((noreturn));
-#define out_of_line_bug() __out_of_line_bug(__LINE__)
 #endif /* __ASSEMBLY__ */
 
 #define FORCE_CRASH() __asm__ __volatile__ ( "ud2" )
