@@ -12,7 +12,7 @@ c-obj-y		:= i386.o
 c-obj-y		+= fixup.o
 c-obj-$(CONFIG_ACPI_PCI)	+= acpi.o
 c-obj-y			+= legacy.o common.o
-c-xen-obj-$(CONFIG_PCI_DIRECT)+= direct.o
+c-obj-$(CONFIG_PCI_DIRECT)+= direct.o
 c-xen-obj-y		+= irq.o
 # mmconfig has a 64bit special
 c-obj-$(CONFIG_PCI_MMCONFIG) += mmconfig.o
