@@ -8,25 +8,6 @@
 #include <xen/config.h>
 #include <xen/lib.h>
 
-#undef memmove
-void *memmove(void *dest, const void *src, size_t n)
-{
-    int d0, d1, d2;
- 
-    if ( dest < src )
-        return memcpy(dest, src, n);
-
-    __asm__ __volatile__ (
-        "   std         ; "
-        "   rep ; movsb ; "
-        "   cld           "
-        : "=&c" (d0), "=&S" (d1), "=&D" (d2)
-        : "0" (n), "1" (n-1+(const char *)src), "2" (n-1+(char *)dest)
-        : "memory");
-
-    return dest;
-}
-
 #undef memcpy
 void *memcpy(void *dest, const void *src, size_t n)
 {
@@ -60,4 +41,23 @@ void *memset(void *s, int c, size_t n)
         : "memory");
 
     return s;
+}
+
+#undef memmove
+void *memmove(void *dest, const void *src, size_t n)
+{
+    int d0, d1, d2;
+ 
+    if ( dest < src )
+        return memcpy(dest, src, n);
+
+    __asm__ __volatile__ (
+        "   std         ; "
+        "   rep ; movsb ; "
+        "   cld           "
+        : "=&c" (d0), "=&S" (d1), "=&D" (d2)
+        : "0" (n), "1" (n-1+(const char *)src), "2" (n-1+(char *)dest)
+        : "memory");
+
+    return dest;
 }
