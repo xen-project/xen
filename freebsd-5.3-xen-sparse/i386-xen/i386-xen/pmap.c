@@ -1374,7 +1374,6 @@ static u_int *lazymask;
 static u_int lazyptd;
 static volatile u_int lazywait;
 
-void pmap_lazyfix_action(void);
 
 void
 pmap_lazyfix_action(void)

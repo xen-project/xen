@@ -380,8 +380,6 @@ printk(const char *fmt, ...)
         (void)HYPERVISOR_console_write(buf, ret);
 }
 
-#define PANIC_IF(exp) if (unlikely(exp)) {printk("%s failed\n",#exp); panic("%s: %s:%d", #exp, __FILE__, __LINE__);} 
-
 
 #define XPQUEUE_SIZE 128
 #ifdef SMP
