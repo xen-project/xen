@@ -361,6 +361,7 @@ static void __init pagetable_init (void)
 	make_page_writable(old_pgd);
 	__flush_tlb_all();
 	free_bootmem(__pa(old_pgd), PAGE_SIZE);
+	init_mm.context.pinned = 1;
 
 	kernel_physical_mapping_init(pgd_base);
 	remap_numa_kva();
