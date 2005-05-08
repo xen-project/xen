@@ -1120,7 +1120,7 @@ void __shadow_mode_disable(struct domain *d)
      * Currently this does not fix up page ref counts, so it is valid to call
      * only when a domain is being destroyed.
      */
-    BUG_ON(!test_bit(DF_DYING, &d->d_flags));
+    BUG_ON(!test_bit(DF_DYING, &d->flags));
     d->arch.shadow_tainted_refcnts = 1;
 
     free_shadow_pages(d);

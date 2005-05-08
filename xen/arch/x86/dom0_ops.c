@@ -397,7 +397,7 @@ void arch_getdomaininfo_ctxt(
 #endif
 
     c->flags = 0;
-    if ( test_bit(EDF_DONEFPUINIT, &ed->ed_flags) )
+    if ( test_bit(EDF_DONEFPUINIT, &ed->flags) )
         c->flags |= VGCF_I387_VALID;
     if ( KERNEL_MODE(ed, &ed->arch.guest_context.user_regs) )
         c->flags |= VGCF_IN_KERNEL;

@@ -114,7 +114,7 @@ int construct_dom0(struct domain *d,
     /* Sanity! */
     if ( d->id != 0 ) 
         BUG();
-    if ( test_bit(DF_CONSTRUCTED, &d->d_flags) ) 
+    if ( test_bit(DF_CONSTRUCTED, &d->flags) ) 
         BUG();
 
     memset(&dsi, 0, sizeof(struct domain_setup_info));
@@ -540,7 +540,7 @@ int construct_dom0(struct domain *d,
     /* DOM0 gets access to everything. */
     physdev_init_dom0(d);
 
-    set_bit(DF_CONSTRUCTED, &d->d_flags);
+    set_bit(DF_CONSTRUCTED, &d->flags);
 
     new_thread(ed, dsi.v_kernentry, vstack_end, vstartinfo_start);
 

@@ -240,7 +240,7 @@ int id = ((struct exec_domain *)current)->domain->id & 0xf;
 if (!cnt[id]--) { printk("%x",id); cnt[id] = 50; }
 if (!i--) { printk("+",id); cnt[id] = 100; }
 }
-	clear_bit(EDF_RUNNING, &prev->ed_flags);
+	clear_bit(EDF_RUNNING, &prev->flags);
 	//if (!is_idle_task(next->domain) )
 		//send_guest_virq(next, VIRQ_TIMER);
 	load_region_regs(current);
@@ -270,7 +270,7 @@ loop:
 	printf(buf);
 	if (regs) show_registers(regs);
 	domain_pause_by_systemcontroller(current->domain);
-	set_bit(DF_CRASHED, ed->domain->d_flags);
+	set_bit(DF_CRASHED, ed->domain->flags);
 	if (ed->domain->id == 0) {
 		int i = 1000000000L;
 		// if domain0 crashes, just periodically print out panic

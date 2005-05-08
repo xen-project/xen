@@ -1142,7 +1142,7 @@ void put_page_type(struct pfn_info *page)
          * See domain.c:relinquish_list().
          */
         ASSERT((x & PGT_validated) || 
-               test_bit(DF_DYING, &page_get_owner(page)->d_flags));
+               test_bit(DF_DYING, &page_get_owner(page)->flags));
 
         if ( unlikely((nx & PGT_count_mask) == 0) )
         {
@@ -1691,13 +1691,13 @@ int do_mmuext_op(
              * it is dying. 
              */
             ASSERT(e->tot_pages <= e->max_pages);
-            if ( unlikely(test_bit(DF_DYING, &e->d_flags)) ||
+            if ( unlikely(test_bit(DF_DYING, &e->flags)) ||
                  unlikely(e->tot_pages == e->max_pages) ||
                  unlikely(IS_XEN_HEAP_FRAME(page)) )
             {
                 MEM_LOG("Transferee has no reservation headroom (%d,%d), or "
                         "page is in Xen heap (%lx), or dom is dying (%ld).\n",
-                        e->tot_pages, e->max_pages, op.mfn, e->d_flags);
+                        e->tot_pages, e->max_pages, op.mfn, e->flags);
                 okay = 0;
                 goto reassign_fail;
             }
@@ -2776,7 +2776,7 @@ int ptwr_do_page_fault(struct domain *d, unsigned long addr)
      * If this is a multi-processor guest then ensure that the page is hooked
      * into at most one L2 table, which must be the one running on this VCPU.
      */
-    if ( (d->exec_domain[0]->ed_next_list != NULL) &&
+    if ( (d->exec_domain[0]->next_in_list != NULL) &&
          ((page->u.inuse.type_info & PGT_count_mask) != 
           (!!(page->u.inuse.type_info & PGT_pinned) +
            (which == PTWR_PT_ACTIVE))) )
@@ -2945,13 +2945,13 @@ void ptwr_destroy(struct domain *d)
          * Also, a domain mustn't have PGC_allocated pages when it is dying.
          */
         ASSERT(e->tot_pages <= e->max_pages);
-        if ( unlikely(test_bit(DF_DYING, &e->d_flags)) ||
+        if ( unlikely(test_bit(DF_DYING, &e->flags)) ||
              unlikely(e->tot_pages == e->max_pages) ||
              unlikely(!gnttab_prepare_for_transfer(e, d, gntref)) )
         {
             MEM_LOG("Transferee has no reservation headroom (%d,%d), or "
                     "provided a bad grant ref, or is dying (%p).\n",
-                    e->tot_pages, e->max_pages, e->d_flags);
+                    e->tot_pages, e->max_pages, e->flags);
             spin_unlock(&e->page_alloc_lock);
             put_domain(e);
             okay = 0;

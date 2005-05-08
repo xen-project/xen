@@ -626,7 +626,7 @@ int construct_dom0(struct domain *d,
 #ifndef CLONE_DOMAIN0
 	if ( d != dom0 ) 
 	    BUG();
-	if ( test_bit(DF_CONSTRUCTED, &d->d_flags) ) 
+	if ( test_bit(DF_CONSTRUCTED, &d->flags) ) 
 	    BUG();
 #endif
 
@@ -753,7 +753,7 @@ int construct_dom0(struct domain *d,
 #endif
 	console_endboot(strstr(cmdline, "tty0") != NULL);
 
-	set_bit(DF_CONSTRUCTED, &d->d_flags);
+	set_bit(DF_CONSTRUCTED, &d->flags);
 
 	new_thread(ed, pkern_entry, 0, 0);
 	// FIXME: Hack for keyboard input
@@ -783,7 +783,7 @@ int construct_domU(struct domain *d,
 	unsigned long pkern_entry;
 
 #ifndef DOMU_AUTO_RESTART
-	if ( test_bit(DF_CONSTRUCTED, &d->d_flags) ) BUG();
+	if ( test_bit(DF_CONSTRUCTED, &d->flags) ) BUG();
 #endif
 
 	printk("*** LOADING DOMAIN %d ***\n",d->id);
@@ -816,7 +816,7 @@ int construct_domU(struct domain *d,
 	loaddomainelfimage(d,image_start);
 	printk("loaddomainelfimage returns\n");
 
-	set_bit(DF_CONSTRUCTED, &d->d_flags);
+	set_bit(DF_CONSTRUCTED, &d->flags);
 
 	printk("calling new_thread, entry=%p\n",pkern_entry);
 #ifdef DOMU_AUTO_RESTART

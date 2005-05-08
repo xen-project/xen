@@ -252,7 +252,7 @@ void arch_do_createdomain(struct exec_domain *ed)
 
         d->shared_info = (void *)alloc_xenheap_page();
         memset(d->shared_info, 0, PAGE_SIZE);
-        ed->vcpu_info = &d->shared_info->vcpu_data[ed->eid];
+        ed->vcpu_info = &d->shared_info->vcpu_data[ed->id];
         SHARE_PFN_WITH_DOMAIN(virt_to_page(d->shared_info), d);
         machine_to_phys_mapping[virt_to_phys(d->shared_info) >> 
                                PAGE_SHIFT] = INVALID_M2P_ENTRY;
@@ -294,7 +294,7 @@ void arch_do_boot_vcpu(struct exec_domain *ed)
     struct domain *d = ed->domain;
     ed->arch.schedule_tail = d->exec_domain[0]->arch.schedule_tail;
     ed->arch.perdomain_ptes = 
-        d->arch.mm_perdomain_pt + (ed->eid << PDPT_VCPU_SHIFT);
+        d->arch.mm_perdomain_pt + (ed->id << PDPT_VCPU_SHIFT);
     ed->arch.flags = TF_kernel_mode;
 }
 
@@ -397,9 +397,9 @@ int arch_set_info_guest(
                 return -EINVAL;
     }
 
-    clear_bit(EDF_DONEFPUINIT, &ed->ed_flags);
+    clear_bit(EDF_DONEFPUINIT, &ed->flags);
     if ( c->flags & VGCF_I387_VALID )
-        set_bit(EDF_DONEFPUINIT, &ed->ed_flags);
+        set_bit(EDF_DONEFPUINIT, &ed->flags);
 
     ed->arch.flags &= ~TF_kernel_mode;
     if ( c->flags & VGCF_IN_KERNEL )
@@ -415,7 +415,7 @@ int arch_set_info_guest(
     if ( !IS_PRIV(d) )
         ed->arch.guest_context.user_regs.eflags &= 0xffffcfff;
 
-    if ( test_bit(EDF_DONEINIT, &ed->ed_flags) )
+    if ( test_bit(EDF_DONEINIT, &ed->flags) )
         return 0;
 
     if ( (rc = (int)set_fast_trap(ed, c->fast_trap_idx)) != 0 )
@@ -426,7 +426,7 @@ int arch_set_info_guest(
     for ( i = 0; i < 8; i++ )
         (void)set_debugreg(ed, i, c->debugreg[i]);
 
-    if ( ed->eid == 0 )
+    if ( ed->id == 0 )
         d->vm_assist = c->vm_assist;
 
     phys_basetab = c->pt_base;
@@ -478,7 +478,7 @@ int arch_set_info_guest(
     update_pagetables(ed);
     
     /* Don't redo final setup */
-    set_bit(EDF_DONEINIT, &ed->ed_flags);
+    set_bit(EDF_DONEINIT, &ed->flags);
 
     return 0;
 }
@@ -796,7 +796,7 @@ void context_switch(struct exec_domain *prev, struct exec_domain *next)
      * 'prev' (after this point, a dying domain's info structure may be freed
      * without warning). 
      */
-    clear_bit(EDF_RUNNING, &prev->ed_flags);
+    clear_bit(EDF_RUNNING, &prev->flags);
 
     schedule_tail(next);
     BUG();

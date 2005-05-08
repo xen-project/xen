@@ -93,24 +93,27 @@ struct exec_domain *alloc_exec_domain_struct(struct domain *d,
 
     d->exec_domain[vcpu] = ed;
     ed->domain = d;
-    ed->eid = vcpu;
+    ed->id = vcpu;
 
     if ( SCHED_OP(alloc_task, ed) < 0 )
         goto out;
 
-    if (vcpu != 0) {
-        ed->vcpu_info = &d->shared_info->vcpu_data[ed->eid];
+    if ( vcpu != 0 )
+    {
+        ed->vcpu_info = &d->shared_info->vcpu_data[ed->id];
 
-        for_each_exec_domain(d, edc) {
-            if (edc->ed_next_list == NULL || edc->ed_next_list->eid > vcpu)
+        for_each_exec_domain( d, edc )
+        {
+            if ( (edc->next_in_list == NULL) ||
+                 (edc->next_in_list->id > vcpu) )
                 break;
         }
-        ed->ed_next_list = edc->ed_next_list;
-        edc->ed_next_list = ed;
+        ed->next_in_list  = edc->next_in_list;
+        edc->next_in_list = ed;
 
-        if (test_bit(EDF_CPUPINNED, &edc->ed_flags)) {
+        if (test_bit(EDF_CPUPINNED, &edc->flags)) {
             ed->processor = (edc->processor + 1) % smp_num_cpus;
-            set_bit(EDF_CPUPINNED, &ed->ed_flags);
+            set_bit(EDF_CPUPINNED, &ed->flags);
         } else {
             ed->processor = (edc->processor + 1) % smp_num_cpus;  /* XXX */
         }
@@ -152,7 +155,7 @@ void sched_add_domain(struct exec_domain *ed)
     struct domain *d = ed->domain;
 
     /* Must be unpaused by control software to start execution. */
-    set_bit(EDF_CTRLPAUSE, &ed->ed_flags);
+    set_bit(EDF_CTRLPAUSE, &ed->flags);
 
     if ( d->id != IDLE_DOMAIN_ID )
     {
@@ -168,14 +171,14 @@ void sched_add_domain(struct exec_domain *ed)
     }
 
     SCHED_OP(add_task, ed);
-    TRACE_2D(TRC_SCHED_DOM_ADD, d->id, ed->eid);
+    TRACE_2D(TRC_SCHED_DOM_ADD, d->id, ed->id);
 }
 
 void sched_rem_domain(struct exec_domain *ed) 
 {
     rem_ac_timer(&ed->timer);
     SCHED_OP(rem_task, ed);
-    TRACE_2D(TRC_SCHED_DOM_REM, ed->domain->id, ed->eid);
+    TRACE_2D(TRC_SCHED_DOM_REM, ed->domain->id, ed->id);
 }
 
 void init_idle_task(void)
@@ -193,10 +196,10 @@ void domain_sleep(struct exec_domain *ed)
         SCHED_OP(sleep, ed);
     spin_unlock_irqrestore(&schedule_data[ed->processor].schedule_lock, flags);
 
-    TRACE_2D(TRC_SCHED_SLEEP, ed->domain->id, ed->eid);
+    TRACE_2D(TRC_SCHED_SLEEP, ed->domain->id, ed->id);
  
     /* Synchronous. */
-    while ( test_bit(EDF_RUNNING, &ed->ed_flags) && !domain_runnable(ed) )
+    while ( test_bit(EDF_RUNNING, &ed->flags) && !domain_runnable(ed) )
         cpu_relax();
 }
 
@@ -212,10 +215,10 @@ void domain_wake(struct exec_domain *ed)
         ed->wokenup = NOW();
 #endif
     }
-    clear_bit(EDF_MIGRATED, &ed->ed_flags);
+    clear_bit(EDF_MIGRATED, &ed->flags);
     spin_unlock_irqrestore(&schedule_data[ed->processor].schedule_lock, flags);
 
-    TRACE_2D(TRC_SCHED_WAKE, ed->domain->id, ed->eid);
+    TRACE_2D(TRC_SCHED_WAKE, ed->domain->id, ed->id);
 }
 
 /* Block the currently-executing domain until a pertinent event occurs. */
@@ -224,16 +227,16 @@ long do_block(void)
     struct exec_domain *ed = current;
 
     ed->vcpu_info->evtchn_upcall_mask = 0;
-    set_bit(EDF_BLOCKED, &ed->ed_flags);
+    set_bit(EDF_BLOCKED, &ed->flags);
 
     /* Check for events /after/ blocking: avoids wakeup waiting race. */
     if ( event_pending(ed) )
     {
-        clear_bit(EDF_BLOCKED, &ed->ed_flags);
+        clear_bit(EDF_BLOCKED, &ed->flags);
     }
     else
     {
-        TRACE_2D(TRC_SCHED_BLOCK, ed->domain->id, ed->eid);
+        TRACE_2D(TRC_SCHED_BLOCK, ed->domain->id, ed->id);
         __enter_scheduler();
     }
 
@@ -243,7 +246,7 @@ long do_block(void)
 /* Voluntarily yield the processor for this allocation. */
 static long do_yield(void)
 {
-    TRACE_2D(TRC_SCHED_YIELD, current->domain->id, current->eid);
+    TRACE_2D(TRC_SCHED_YIELD, current->domain->id, current->id);
     __enter_scheduler();
     return 0;
 }
@@ -272,7 +275,7 @@ long do_sched_op(unsigned long op)
 
     case SCHEDOP_shutdown:
     {
-        TRACE_3D(TRC_SCHED_SHUTDOWN, current->domain->id, current->eid,
+        TRACE_3D(TRC_SCHED_SHUTDOWN, current->domain->id, current->id,
                  (op >> SCHEDOP_reasonshift));
         domain_shutdown((u8)(op >> SCHEDOP_reasonshift));
         break;
@@ -379,7 +382,7 @@ static void __enter_scheduler(void)
     add_ac_timer(&schedule_data[cpu].s_timer);
 
     /* Must be protected by the schedule_lock! */
-    set_bit(EDF_RUNNING, &next->ed_flags);
+    set_bit(EDF_RUNNING, &next->flags);
 
     spin_unlock_irq(&schedule_data[cpu].schedule_lock);
 
@@ -417,8 +420,8 @@ static void __enter_scheduler(void)
     }
 
     TRACE_4D(TRC_SCHED_SWITCH,
-             prev->domain->id, prev->eid,
-             next->domain->id, next->eid);
+             prev->domain->id, prev->id,
+             next->domain->id, next->id);
 
     context_switch(prev, next);
 }

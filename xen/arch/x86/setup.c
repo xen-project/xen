@@ -581,7 +581,7 @@ void __init __start_xen(multiboot_info_t *mbi)
     if ( dom0 == NULL )
         panic("Error creating domain 0\n");
 
-    set_bit(DF_PRIVILEGED, &dom0->d_flags);
+    set_bit(DF_PRIVILEGED, &dom0->flags);
 
     /* Grab the DOM0 command line. Skip past the image name. */
     cmdline = (char *)(mod[0].string ? __va(mod[0].string) : NULL);

@@ -19,7 +19,7 @@ extern void save_init_fpu(struct exec_domain *tsk);
 extern void restore_fpu(struct exec_domain *tsk);
 
 #define unlazy_fpu(_tsk) do { \
-    if ( test_bit(EDF_USEDFPU, &(_tsk)->ed_flags) ) \
+    if ( test_bit(EDF_USEDFPU, &(_tsk)->flags) ) \
         save_init_fpu(_tsk); \
 } while ( 0 )
 
