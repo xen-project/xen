@@ -28,7 +28,7 @@
 /** Size of a parser input buffer.
  * Tokens read must fit into this size (including trailing null).
  */
-#define PARSER_BUF_SIZE 1024
+#define PARSER_BUF_SIZE 4096
 
 struct Parser;
 typedef int ParserStateFn(struct Parser *, char c);
