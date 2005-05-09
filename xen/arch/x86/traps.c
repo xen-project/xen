@@ -270,7 +270,8 @@ asmlinkage int do_page_fault(struct xen_regs *regs)
 
     perfc_incrc(page_faults);
 
-    if ( likely(VM_ASSIST(d, VMASST_TYPE_writable_pagetables)) )
+    if ( likely(VM_ASSIST(d, VMASST_TYPE_writable_pagetables) &&
+                !shadow_mode_enabled(d)) )
     {
         LOCK_BIGLOCK(d);
         if ( unlikely(d->arch.ptwr[PTWR_PT_ACTIVE].l1va) &&
@@ -286,8 +287,6 @@ asmlinkage int do_page_fault(struct xen_regs *regs)
              ((regs->error_code & 3) == 3) && /* write-protection fault */
              ptwr_do_page_fault(d, addr) )
         {
-            if ( unlikely(shadow_mode_enabled(d)) )
-                (void)shadow_fault(addr, regs);
             UNLOCK_BIGLOCK(d);
             return EXCRET_fault_fixed;
         }

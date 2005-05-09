@@ -672,7 +672,7 @@ static int vmx_set_cr0(unsigned long value)
                         d->arch.arch_vmx.cpu_cr3);
             domain_crash_synchronous(); /* need to take a clean path */
         }
-        old_base_mfn = pagetable_val(d->arch.guest_table) >> PAGE_SHIFT;
+        old_base_mfn = pagetable_get_pfn(d->arch.guest_table);
         if (old_base_mfn)
             put_page(pfn_to_page(old_base_mfn));
 
@@ -798,7 +798,7 @@ static int mov_to_cr(int gp, int cr, struct xen_regs *regs)
                         "Invalid CR3 value=%lx", value);
                 domain_crash_synchronous(); /* need to take a clean path */
             }
-            old_base_mfn = pagetable_val(d->arch.guest_table) >> PAGE_SHIFT;
+            old_base_mfn = pagetable_get_pfn(d->arch.guest_table);
             d->arch.guest_table = mk_pagetable(mfn << PAGE_SHIFT);
             if (old_base_mfn)
                 put_page(pfn_to_page(old_base_mfn));

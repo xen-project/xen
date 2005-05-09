@@ -15,7 +15,7 @@
 #define BUG_ON(_p) do { if (_p) BUG(); } while ( 0 )
 
 #ifndef NDEBUG
-#define ASSERT(_p) if ( !(_p) ) { printk("Assertion '%s' failed, line %d, file %s\n", #_p , __LINE__, __FILE__); BUG(); }
+#define ASSERT(_p) { if ( !(_p) ) { printk("Assertion '%s' failed, line %d, file %s\n", #_p , __LINE__, __FILE__); BUG(); } }
 #else
 #define ASSERT(_p) ((void)0)
 #endif
