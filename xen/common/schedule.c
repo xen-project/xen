@@ -297,7 +297,6 @@ long do_sched_op(unsigned long op)
     case SCHEDOP_shutdown:
     {
         TRACE_3D(TRC_SCHED_SHUTDOWN, current->domain->id, current->id,
-        TRACE_3D(TRC_SCHED_SHUTDOWN, current->domain->id, current->id,
                  (op >> SCHEDOP_reasonshift));
         domain_shutdown((u8)(op >> SCHEDOP_reasonshift));
         break;
