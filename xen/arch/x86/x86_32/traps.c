@@ -273,12 +273,8 @@ long set_fast_trap(struct exec_domain *p, int idx)
         return 0;
     }
 
-    /*
-     * We only fast-trap vectors 0x20-0x2f, and vector 0x80.
-     * The former range is used by Windows and MS-DOS.
-     * Vector 0x80 is used by Linux and the BSD variants.
-     */
-    if ( (idx != 0x80) && ((idx < 0x20) || (idx > 0x2f)) ) 
+    /* We only fast-trap vector 0x80 (used by Linux and the BSD variants). */
+    if ( idx != 0x80 )
         return -1;
 
     ti = &p->arch.guest_context.trap_ctxt[idx];

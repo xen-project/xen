@@ -6,7 +6,7 @@
  *****************************************************************************/
 
 /*
- * Copyright (C) 2000 - 2004, R. Byron Moore
+ * Copyright (C) 2000 - 2005, R. Byron Moore
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -70,9 +70,11 @@ acpi_status
 acpi_terminate (
 	void);
 
+#ifdef ACPI_FUTURE_USAGE
 acpi_status
 acpi_subsystem_status (
 	void);
+#endif
 
 acpi_status
 acpi_enable (
@@ -82,9 +84,11 @@ acpi_status
 acpi_disable (
 	void);
 
+#ifdef ACPI_FUTURE_USAGE
 acpi_status
 acpi_get_system_info (
 	struct acpi_buffer              *ret_buffer);
+#endif
 
 const char *
 acpi_format_exception (
@@ -94,10 +98,12 @@ acpi_status
 acpi_purge_cached_objects (
 	void);
 
+#ifdef ACPI_FUTURE_USAGE
 acpi_status
 acpi_install_initialization_handler (
 	acpi_init_handler               handler,
 	u32                             function);
+#endif
 
 /*
  * ACPI Memory manager
@@ -129,6 +135,7 @@ acpi_status
 acpi_load_tables (
 	void);
 
+#ifdef ACPI_FUTURE_USAGE
 acpi_status
 acpi_load_table (
 	struct acpi_table_header        *table_ptr);
@@ -142,6 +149,7 @@ acpi_get_table_header (
 	acpi_table_type                 table_type,
 	u32                             instance,
 	struct acpi_table_header        *out_table_header);
+#endif  /*  ACPI_FUTURE_USAGE  */
 
 acpi_status
 acpi_get_table (
@@ -218,6 +226,7 @@ acpi_evaluate_object (
 	struct acpi_object_list         *parameter_objects,
 	struct acpi_buffer              *return_object_buffer);
 
+#ifdef ACPI_FUTURE_USAGE
 acpi_status
 acpi_evaluate_object_typed (
 	acpi_handle                     object,
@@ -225,6 +234,7 @@ acpi_evaluate_object_typed (
 	struct acpi_object_list         *external_params,
 	struct acpi_buffer              *return_buffer,
 	acpi_object_type                return_type);
+#endif
 
 acpi_status
 acpi_get_object_info (
@@ -296,8 +306,19 @@ acpi_install_gpe_handler (
 	acpi_handle                     gpe_device,
 	u32                             gpe_number,
 	u32                             type,
-	acpi_gpe_handler                handler,
+	acpi_event_handler              address,
 	void                            *context);
+
+#ifdef ACPI_FUTURE_USAGE
+acpi_status
+acpi_install_exception_handler (
+	acpi_exception_handler          handler);
+#endif
+
+
+/*
+ * Event interfaces
+ */
 
 acpi_status
 acpi_acquire_global_lock (
@@ -312,7 +333,7 @@ acpi_status
 acpi_remove_gpe_handler (
 	acpi_handle                     gpe_device,
 	u32                             gpe_number,
-	acpi_gpe_handler                handler);
+	acpi_event_handler              address);
 
 acpi_status
 acpi_enable_event (
@@ -328,10 +349,18 @@ acpi_status
 acpi_clear_event (
 	u32                             event);
 
+#ifdef ACPI_FUTURE_USAGE
 acpi_status
 acpi_get_event_status (
 	u32                             event,
 	acpi_event_status               *event_status);
+#endif  /*  ACPI_FUTURE_USAGE  */
+
+acpi_status
+acpi_set_gpe_type (
+	acpi_handle                     gpe_device,
+	u32                             gpe_number,
+	u8                              type);
 
 acpi_status
 acpi_enable_gpe (
@@ -351,12 +380,14 @@ acpi_clear_gpe (
 	u32                             gpe_number,
 	u32                             flags);
 
+#ifdef ACPI_FUTURE_USAGE
 acpi_status
 acpi_get_gpe_status (
 	acpi_handle                     gpe_device,
 	u32                             gpe_number,
 	u32                             flags,
 	acpi_event_status               *event_status);
+#endif  /*  ACPI_FUTURE_USAGE  */
 
 acpi_status
 acpi_install_gpe_block (
@@ -385,10 +416,12 @@ acpi_get_current_resources(
 	acpi_handle                     device_handle,
 	struct acpi_buffer              *ret_buffer);
 
+#ifdef ACPI_FUTURE_USAGE
 acpi_status
 acpi_get_possible_resources(
 	acpi_handle                     device_handle,
 	struct acpi_buffer              *ret_buffer);
+#endif
 
 acpi_status
 acpi_walk_resources (
@@ -432,9 +465,11 @@ acpi_status
 acpi_set_firmware_waking_vector (
 	acpi_physical_address           physical_address);
 
+#ifdef ACPI_FUTURE_USAGE
 acpi_status
 acpi_get_firmware_waking_vector (
 	acpi_physical_address           *physical_address);
+#endif
 
 acpi_status
 acpi_get_sleep_type_data (
@@ -446,11 +481,11 @@ acpi_status
 acpi_enter_sleep_state_prep (
 	u8                              sleep_state);
 
-acpi_status
+acpi_status asmlinkage
 acpi_enter_sleep_state (
 	u8                              sleep_state);
 
-acpi_status
+acpi_status asmlinkage
 acpi_enter_sleep_state_s4bios (
 	void);
 

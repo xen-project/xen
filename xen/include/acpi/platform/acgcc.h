@@ -5,7 +5,7 @@
  *****************************************************************************/
 
 /*
- * Copyright (C) 2000 - 2004, R. Byron Moore
+ * Copyright (C) 2000 - 2005, R. Byron Moore
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -54,6 +54,6 @@
  * to to tell the compiler warning in a per-variable manner that a variable
  * is unused.
  */
-#define ACPI_UNUSED_VAR __attribute_used__
+#define ACPI_UNUSED_VAR __attribute__ ((unused))
 
 #endif /* __ACGCC_H__ */

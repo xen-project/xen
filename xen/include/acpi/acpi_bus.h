@@ -26,15 +26,9 @@
 #ifndef __ACPI_BUS_H__
 #define __ACPI_BUS_H__
 
-#if 0
-#include <xen/version.h>
-#if (LINUX_VERSION_CODE >= KERNEL_VERSION(2,5,4))
-#include <xen/device.h>
-#define CONFIG_LDM
-#endif
-#endif /* 0 */
-
 #include <acpi/acpi.h>
+
+#define PREFIX			"ACPI: "
 
 /* TBD: Make dynamic */
 #define ACPI_MAX_HANDLES	10
@@ -66,10 +60,10 @@ acpi_evaluate_reference (
 
 #ifdef CONFIG_ACPI_BUS
 
-/*#include <xen/proc_fs.h>*/
+#include <linux/proc_fs.h>
 
 #define ACPI_BUS_FILE_ROOT	"acpi"
-/*extern struct proc_dir_entry	*acpi_root_dir;*/
+extern struct proc_dir_entry	*acpi_root_dir;
 extern FADT_DESCRIPTOR		acpi_fadt;
 
 enum acpi_bus_removal_type {
@@ -108,6 +102,9 @@ typedef int (*acpi_op_suspend)	(struct acpi_device *device, int state);
 typedef int (*acpi_op_resume)	(struct acpi_device *device, int state);
 typedef int (*acpi_op_scan)	(struct acpi_device *device);
 typedef int (*acpi_op_bind)	(struct acpi_device *device);
+typedef int (*acpi_op_unbind)	(struct acpi_device *device);
+typedef int (*acpi_op_match)	(struct acpi_device *device,
+				 struct acpi_driver *driver);
 
 struct acpi_device_ops {
 	acpi_op_add		add;
@@ -119,13 +116,15 @@ struct acpi_device_ops {
 	acpi_op_resume		resume;
 	acpi_op_scan		scan;
 	acpi_op_bind		bind;
+	acpi_op_unbind		unbind;
+	acpi_op_match		match;
 };
 
 struct acpi_driver {
 	struct list_head	node;
 	char			name[80];
 	char			class[80];
-	int			references;
+	atomic_t		references;
 	char			*ids;		/* Supported Hardware IDs */
 	struct acpi_device_ops	ops;
 };
@@ -161,7 +160,8 @@ struct acpi_device_flags {
 	u32			suprise_removal_ok:1;
 	u32			power_manageable:1;
 	u32			performance_manageable:1;
-	u32			reserved:21;
+	u32			wake_capable:1; /* Wakeup(_PRW) supported? */
+	u32			reserved:20;
 };
 
 
@@ -207,10 +207,8 @@ struct acpi_device_power_flags {
 	u32			explicit_get:1;		     /* _PSC present? */
 	u32			power_resources:1;	   /* Power resources */
 	u32			inrush_current:1;	  /* Serialize Dx->D0 */
-	u32			wake_capable:1;		 /* Wakeup supported? */
-	u32			wake_enabled:1;		/* Enabled for wakeup */
 	u32			power_removed:1;	   /* Optimize Dx->D0 */
-	u32			reserved:26;
+	u32			reserved:28;
 };
 
 struct acpi_device_power_state {
@@ -254,6 +252,25 @@ struct acpi_device_perf {
 	struct acpi_device_perf_state *states;
 };
 
+/* Wakeup Management */
+struct acpi_device_wakeup_flags {
+	u8	valid:1; /* Can successfully enable wakeup? */
+	u8	run_wake:1; /* Run-Wake GPE devices */
+};
+
+struct acpi_device_wakeup_state {
+	u8	enabled:1;
+	u8	active:1;
+};
+
+struct acpi_device_wakeup {
+	acpi_handle		gpe_device;
+	acpi_integer		gpe_number;;
+	acpi_integer		sleep_state;
+	struct acpi_handle_list	resources;
+	struct acpi_device_wakeup_state	state;
+	struct acpi_device_wakeup_flags	flags;
+};
 
 /* Device */
 
@@ -262,18 +279,19 @@ struct acpi_device {
 	struct acpi_device	*parent;
 	struct list_head	children;
 	struct list_head	node;
+	struct list_head	wakeup_list;
+	struct list_head	g_list;
 	struct acpi_device_status status;
 	struct acpi_device_flags flags;
 	struct acpi_device_pnp	pnp;
 	struct acpi_device_power power;
+	struct acpi_device_wakeup wakeup;
 	struct acpi_device_perf	performance;
 	struct acpi_device_dir	dir;
 	struct acpi_device_ops	ops;
 	struct acpi_driver	*driver;
 	void			*driver_data;
-#ifdef CONFIG_LDM
-	struct device		dev;
-#endif
+	struct kobject		kobj;
 };
 
 #define acpi_driver_data(d)	((d)->driver_data)
@@ -292,12 +310,14 @@ struct acpi_bus_event {
 	u32			data;
 };
 
+extern struct subsystem acpi_subsys;
 
 /*
  * External Functions
  */
 
-int acpi_bus_get_device(acpi_handle, struct acpi_device **device);
+int acpi_bus_get_device(acpi_handle handle, struct acpi_device **device);
+void acpi_bus_data_handler(acpi_handle handle, u32 function, void *context);
 int acpi_bus_get_status (struct acpi_device *device);
 int acpi_bus_get_power (acpi_handle handle, int *state);
 int acpi_bus_set_power (acpi_handle handle, int state);
@@ -305,10 +325,15 @@ int acpi_bus_generate_event (struct acpi_device *device, u8 type, int data);
 int acpi_bus_receive_event (struct acpi_bus_event *event);
 int acpi_bus_register_driver (struct acpi_driver *driver);
 int acpi_bus_unregister_driver (struct acpi_driver *driver);
-int acpi_bus_scan (struct acpi_device *device);
-int acpi_init (void);
-void acpi_exit (void);
+int acpi_bus_scan (struct acpi_device *start);
+int acpi_bus_trim(struct acpi_device *start, int rmdevice);
+int acpi_bus_add (struct acpi_device **child, struct acpi_device *parent,
+		acpi_handle handle, int type);
 
+
+int acpi_match_ids (struct acpi_device	*device, char	*ids);
+int acpi_create_dir(struct acpi_device *);
+void acpi_remove_dir(struct acpi_device *);
 
 #endif /*CONFIG_ACPI_BUS*/
 

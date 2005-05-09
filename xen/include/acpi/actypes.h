@@ -5,7 +5,7 @@
  *****************************************************************************/
 
 /*
- * Copyright (C) 2000 - 2004, R. Byron Moore
+ * Copyright (C) 2000 - 2005, R. Byron Moore
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -303,7 +303,7 @@ struct uint32_struct
 typedef u32                                     acpi_integer;
 #define ACPI_INTEGER_MAX                ACPI_UINT32_MAX
 #define ACPI_INTEGER_BIT_SIZE           32
-#define ACPI_MAX_DECIMAL_DIGITS         10
+#define ACPI_MAX_DECIMAL_DIGITS         10  /* 2^32 = 4,294,967,296 */
 
 #define ACPI_USE_NATIVE_DIVIDE          /* Use compiler native 32-bit divide */
 
@@ -315,13 +315,18 @@ typedef u32                                     acpi_integer;
 typedef u64                                     acpi_integer;
 #define ACPI_INTEGER_MAX                ACPI_UINT64_MAX
 #define ACPI_INTEGER_BIT_SIZE           64
-#define ACPI_MAX_DECIMAL_DIGITS         19
+#define ACPI_MAX_DECIMAL_DIGITS         20  /* 2^64 = 18,446,744,073,709,551,616 */
+
 
 #if ACPI_MACHINE_WIDTH == 64
 #define ACPI_USE_NATIVE_DIVIDE          /* Use compiler native 64-bit divide */
 #endif
 #endif
 
+#define ACPI_MAX64_DECIMAL_DIGITS       20
+#define ACPI_MAX32_DECIMAL_DIGITS       10
+#define ACPI_MAX16_DECIMAL_DIGITS        5
+#define ACPI_MAX8_DECIMAL_DIGITS         3
 
 /*
  * Constants with special meanings
@@ -349,7 +354,6 @@ typedef u64                                     acpi_integer;
 /*
  * Power state values
  */
-
 #define ACPI_STATE_UNKNOWN              (u8) 0xFF
 
 #define ACPI_STATE_S0                   (u8) 0
@@ -393,7 +397,6 @@ typedef u64                                     acpi_integer;
 #define ACPI_NOTIFY_BUS_MODE_MISMATCH   (u8) 6
 #define ACPI_NOTIFY_POWER_FAULT         (u8) 7
 
-
 /*
  *  Table types.  These values are passed to the table related APIs
  */
@@ -409,14 +412,13 @@ typedef u32                                     acpi_table_type;
 #define ACPI_TABLE_MAX                  6
 #define NUM_ACPI_TABLE_TYPES            (ACPI_TABLE_MAX+1)
 
-
 /*
  * Types associated with ACPI names and objects.  The first group of
  * values (up to ACPI_TYPE_EXTERNAL_MAX) correspond to the definition
  * of the ACPI object_type() operator (See the ACPI Spec). Therefore,
  * only add to the first group if the spec changes.
  *
- * Types must be kept in sync with the global acpi_ns_properties
+ * NOTE: Types must be kept in sync with the global acpi_ns_properties
  * and acpi_ns_type_names arrays.
  */
 typedef u32                                     acpi_object_type;
@@ -453,26 +455,27 @@ typedef u32                                     acpi_object_type;
 #define ACPI_TYPE_LOCAL_INDEX_FIELD     0x13
 #define ACPI_TYPE_LOCAL_REFERENCE       0x14  /* Arg#, Local#, Name, Debug, ref_of, Index */
 #define ACPI_TYPE_LOCAL_ALIAS           0x15
-#define ACPI_TYPE_LOCAL_NOTIFY          0x16
-#define ACPI_TYPE_LOCAL_ADDRESS_HANDLER 0x17
-#define ACPI_TYPE_LOCAL_RESOURCE        0x18
-#define ACPI_TYPE_LOCAL_RESOURCE_FIELD  0x19
-#define ACPI_TYPE_LOCAL_SCOPE           0x1A  /* 1 Name, multiple object_list Nodes */
+#define ACPI_TYPE_LOCAL_METHOD_ALIAS    0x16
+#define ACPI_TYPE_LOCAL_NOTIFY          0x17
+#define ACPI_TYPE_LOCAL_ADDRESS_HANDLER 0x18
+#define ACPI_TYPE_LOCAL_RESOURCE        0x19
+#define ACPI_TYPE_LOCAL_RESOURCE_FIELD  0x1A
+#define ACPI_TYPE_LOCAL_SCOPE           0x1B  /* 1 Name, multiple object_list Nodes */
 
-#define ACPI_TYPE_NS_NODE_MAX           0x1A  /* Last typecode used within a NS Node */
+#define ACPI_TYPE_NS_NODE_MAX           0x1B  /* Last typecode used within a NS Node */
 
 /*
  * These are special object types that never appear in
  * a Namespace node, only in an union acpi_operand_object
  */
-#define ACPI_TYPE_LOCAL_EXTRA           0x1B
-#define ACPI_TYPE_LOCAL_DATA            0x1C
+#define ACPI_TYPE_LOCAL_EXTRA           0x1C
+#define ACPI_TYPE_LOCAL_DATA            0x1D
 
-#define ACPI_TYPE_LOCAL_MAX             0x1C
+#define ACPI_TYPE_LOCAL_MAX             0x1D
 
 /* All types above here are invalid */
 
-#define ACPI_TYPE_INVALID               0x1D
+#define ACPI_TYPE_INVALID               0x1E
 #define ACPI_TYPE_NOT_FOUND             0xFF
 
 
@@ -514,9 +517,8 @@ typedef u32                                     acpi_object_type;
 #define ACPI_WRITE                      1
 #define ACPI_IO_MASK                    1
 
-
 /*
- * Acpi Event Types: Fixed & General Purpose
+ * Event Types: Fixed & General Purpose
  */
 typedef u32                                     acpi_event_type;
 
@@ -531,25 +533,8 @@ typedef u32                                     acpi_event_type;
 #define ACPI_EVENT_MAX                  4
 #define ACPI_NUM_FIXED_EVENTS           ACPI_EVENT_MAX + 1
 
-#define ACPI_GPE_INVALID                0xFF
-#define ACPI_GPE_MAX                    0xFF
-#define ACPI_NUM_GPE                    256
-
-#define ACPI_EVENT_LEVEL_TRIGGERED      1
-#define ACPI_EVENT_EDGE_TRIGGERED       2
-
 /*
- * Flags for GPE and Lock interfaces
- */
-#define ACPI_EVENT_WAKE_ENABLE          0x2
-#define ACPI_EVENT_WAKE_DISABLE         0x2
-
-#define ACPI_NOT_ISR                    0x1
-#define ACPI_ISR                        0x0
-
-
-/*
- * acpi_event Status:
+ * Event Status - Per event
  * -------------
  * The encoding of acpi_event_status is illustrated below.
  * Note that a set bit (1) indicates the property is TRUE
@@ -570,12 +555,74 @@ typedef u32                                     acpi_event_status;
 #define ACPI_EVENT_FLAG_WAKE_ENABLED    (acpi_event_status) 0x02
 #define ACPI_EVENT_FLAG_SET             (acpi_event_status) 0x04
 
+/*
+ * General Purpose Events (GPE)
+ */
+#define ACPI_GPE_INVALID                0xFF
+#define ACPI_GPE_MAX                    0xFF
+#define ACPI_NUM_GPE                    256
+
+#define ACPI_GPE_ENABLE                 0
+#define ACPI_GPE_DISABLE                1
+
+
+/*
+ * GPE info flags - Per GPE
+ * +-+-+-+---+---+-+
+ * |7|6|5|4:3|2:1|0|
+ * +-+-+-+---+---+-+
+ *  | | |  |   |  |
+ *  | | |  |   |  +--- Interrupt type: Edge or Level Triggered
+ *  | | |  |   +--- Type: Wake-only, Runtime-only, or wake/runtime
+ *  | | |  +--- Type of dispatch -- to method, handler, or none
+ *  | | +--- Enabled for runtime?
+ *  | +--- Enabled for wake?
+ *  +--- System state when GPE ocurred (running/waking)
+ */
+#define ACPI_GPE_XRUPT_TYPE_MASK        (u8) 0x01
+#define ACPI_GPE_LEVEL_TRIGGERED        (u8) 0x01
+#define ACPI_GPE_EDGE_TRIGGERED         (u8) 0x00
+
+#define ACPI_GPE_TYPE_MASK              (u8) 0x06
+#define ACPI_GPE_TYPE_WAKE_RUN          (u8) 0x06
+#define ACPI_GPE_TYPE_WAKE              (u8) 0x02
+#define ACPI_GPE_TYPE_RUNTIME           (u8) 0x04    /* Default */
+
+#define ACPI_GPE_DISPATCH_MASK          (u8) 0x18
+#define ACPI_GPE_DISPATCH_HANDLER       (u8) 0x08
+#define ACPI_GPE_DISPATCH_METHOD        (u8) 0x10
+#define ACPI_GPE_DISPATCH_NOT_USED      (u8) 0x00    /* Default */
+
+#define ACPI_GPE_RUN_ENABLE_MASK        (u8) 0x20
+#define ACPI_GPE_RUN_ENABLED            (u8) 0x20
+#define ACPI_GPE_RUN_DISABLED           (u8) 0x00    /* Default */
+
+#define ACPI_GPE_WAKE_ENABLE_MASK       (u8) 0x40
+#define ACPI_GPE_WAKE_ENABLED           (u8) 0x40
+#define ACPI_GPE_WAKE_DISABLED          (u8) 0x00    /* Default */
+
+#define ACPI_GPE_ENABLE_MASK            (u8) 0x60    /* Both run/wake */
+
+#define ACPI_GPE_SYSTEM_MASK            (u8) 0x80
+#define ACPI_GPE_SYSTEM_RUNNING         (u8) 0x80
+#define ACPI_GPE_SYSTEM_WAKING          (u8) 0x00
+
+/*
+ * Flags for GPE and Lock interfaces
+ */
+#define ACPI_EVENT_WAKE_ENABLE          0x2             /* acpi_gpe_enable */
+#define ACPI_EVENT_WAKE_DISABLE         0x2             /* acpi_gpe_disable */
+
+#define ACPI_NOT_ISR                    0x1
+#define ACPI_ISR                        0x0
+
 
 /* Notify types */
 
-#define ACPI_SYSTEM_NOTIFY              0
-#define ACPI_DEVICE_NOTIFY              1
-#define ACPI_MAX_NOTIFY_HANDLER_TYPE    1
+#define ACPI_SYSTEM_NOTIFY              0x1
+#define ACPI_DEVICE_NOTIFY              0x2
+#define ACPI_ALL_NOTIFY                 0x3
+#define ACPI_MAX_NOTIFY_HANDLER_TYPE    0x3
 
 #define ACPI_MAX_SYS_NOTIFY             0x7f
 
@@ -756,11 +803,11 @@ struct acpi_system_info
  */
 
 typedef u32
-(ACPI_SYSTEM_XFACE *OSD_HANDLER) (
+(ACPI_SYSTEM_XFACE *acpi_osd_handler) (
 	void                            *context);
 
 typedef void
-(ACPI_SYSTEM_XFACE *OSD_EXECUTION_CALLBACK) (
+(ACPI_SYSTEM_XFACE *acpi_osd_exec_callback) (
 	void                            *context);
 
 /*
@@ -768,10 +815,6 @@ typedef void
  */
 typedef
 u32 (*acpi_event_handler) (
-	void                                *context);
-
-typedef
-void (*acpi_gpe_handler) (
 	void                                *context);
 
 typedef
@@ -793,8 +836,16 @@ acpi_status (*acpi_init_handler) (
 
 #define ACPI_INIT_DEVICE_INI        1
 
+typedef
+acpi_status (*acpi_exception_handler) (
+	acpi_status                     aml_status,
+	acpi_name                       name,
+	u16                             opcode,
+	u32                             aml_offset,
+	void                            *context);
 
-/* Address Spaces (Operation Regions */
+
+/* Address Spaces (For Operation Regions) */
 
 typedef
 acpi_status (*acpi_adr_space_handler) (
@@ -861,6 +912,7 @@ struct acpi_compatible_id_list
 #define ACPI_VALID_HID                  0x0004
 #define ACPI_VALID_UID                  0x0008
 #define ACPI_VALID_CID                  0x0010
+#define ACPI_VALID_SXDS                 0x0020
 
 
 #define ACPI_COMMON_OBJ_INFO \
@@ -880,11 +932,12 @@ struct acpi_device_info
 {
 	ACPI_COMMON_OBJ_INFO;
 
-	u32                                 valid;              /* Indicates which fields are valid */
+	u32                                 valid;              /* Indicates which fields below are valid */
 	u32                                 current_status;     /* _STA value */
 	acpi_integer                        address;            /* _ADR value if any */
 	struct acpi_device_id               hardware_id;        /* _HID value if any */
 	struct acpi_device_id               unique_id;          /* _UID value if any */
+	u8                                  highest_dstates[4]; /* _sx_d values: 0xFF indicates not valid */
 	struct acpi_compatible_id_list      compatibility_id;   /* List of _CIDs if any */
 };
 

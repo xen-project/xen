@@ -1,7 +1,13 @@
 #ifndef __TYPES_H__
 #define __TYPES_H__
 
+#include <xen/config.h>
 #include <asm/types.h>
+
+#define BITS_TO_LONGS(bits) \
+    (((bits)+BITS_PER_LONG-1)/BITS_PER_LONG)
+#define DECLARE_BITMAP(name,bits) \
+    unsigned long name[BITS_TO_LONGS(bits)]
 
 #ifndef NULL
 #define NULL ((void*)0)

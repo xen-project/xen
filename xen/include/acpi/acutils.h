@@ -5,7 +5,7 @@
  *****************************************************************************/
 
 /*
- * Copyright (C) 2000 - 2004, R. Byron Moore
+ * Copyright (C) 2000 - 2005, R. Byron Moore
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -52,14 +52,12 @@ acpi_status (*acpi_pkg_callback) (
 	union acpi_generic_state        *state,
 	void                            *context);
 
-
 acpi_status
 acpi_ut_walk_package_tree (
 	union acpi_operand_object       *source_object,
 	void                            *target_object,
 	acpi_pkg_callback               walk_callback,
 	void                            *context);
-
 
 struct acpi_pkg_info
 {
@@ -177,6 +175,12 @@ char *
 acpi_ut_strncpy (
 	char                            *dst_string,
 	const char                      *src_string,
+	acpi_size                       count);
+
+int
+acpi_ut_memcmp (
+	const char                      *buffer1,
+	const char                      *buffer2,
 	acpi_size                       count);
 
 int
@@ -473,7 +477,12 @@ acpi_ut_delete_internal_object_list (
 #define METHOD_NAME__PRT        "_PRT"
 #define METHOD_NAME__CRS        "_CRS"
 #define METHOD_NAME__PRS        "_PRS"
+#define METHOD_NAME__PRW        "_PRW"
 
+
+acpi_status
+acpi_ut_osi_implementation (
+	struct acpi_walk_state          *walk_state);
 
 acpi_status
 acpi_ut_evaluate_object (
@@ -508,6 +517,10 @@ acpi_ut_execute_UID (
 	struct acpi_namespace_node      *device_node,
 	struct acpi_device_id           *uid);
 
+acpi_status
+acpi_ut_execute_sxds (
+	struct acpi_namespace_node      *device_node,
+	u8                              *highest);
 
 /*
  * ut_mutex - mutual exclusion interfaces
@@ -569,6 +582,10 @@ acpi_ut_valid_internal_object (
 union acpi_operand_object *
 acpi_ut_create_buffer_object (
 	acpi_size                       buffer_size);
+
+union acpi_operand_object *
+acpi_ut_create_string_object (
+	acpi_size                       string_size);
 
 
 /*
@@ -649,12 +666,14 @@ acpi_ut_create_update_state_and_push (
 	u16                             action,
 	union acpi_generic_state        **state_list);
 
+#ifdef ACPI_FUTURE_USAGE
 acpi_status
 acpi_ut_create_pkg_state_and_push (
 	void                            *internal_object,
 	void                            *external_object,
 	u16                             index,
 	union acpi_generic_state        **state_list);
+#endif
 
 union acpi_generic_state *
 acpi_ut_create_control_state (
@@ -664,6 +683,7 @@ void
 acpi_ut_delete_generic_state (
 	union acpi_generic_state        *state);
 
+#ifdef ACPI_ENABLE_OBJECT_CACHE
 void
 acpi_ut_delete_generic_state_cache (
 	void);
@@ -671,6 +691,7 @@ acpi_ut_delete_generic_state_cache (
 void
 acpi_ut_delete_object_cache (
 	void);
+#endif
 
 /*
  * utmisc
@@ -683,14 +704,14 @@ acpi_ut_print_string (
 
 acpi_status
 acpi_ut_divide (
-	acpi_integer                    *in_dividend,
-	acpi_integer                    *in_divisor,
+	acpi_integer                    in_dividend,
+	acpi_integer                    in_divisor,
 	acpi_integer                    *out_quotient,
 	acpi_integer                    *out_remainder);
 
 acpi_status
 acpi_ut_short_divide (
-	acpi_integer                    *in_dividend,
+	acpi_integer                    in_dividend,
 	u32                             divisor,
 	acpi_integer                    *out_quotient,
 	u32                             *out_remainder);
@@ -709,9 +730,15 @@ acpi_ut_strtoul64 (
 	u32                             base,
 	acpi_integer                    *ret_integer);
 
+/* Values for Base above (16=Hex, 10=Decimal) */
+
+#define ACPI_ANY_BASE        0
+
+#ifdef ACPI_FUTURE_USAGE
 char *
 acpi_ut_strupr (
 	char                            *src_string);
+#endif
 
 u8 *
 acpi_ut_get_resource_end_tag (
@@ -753,9 +780,11 @@ acpi_ut_release_to_cache (
 	u32                             list_id,
 	void                            *object);
 
+#ifdef ACPI_ENABLE_OBJECT_CACHE
 void
 acpi_ut_delete_generic_cache (
 	u32                             list_id);
+#endif
 
 acpi_status
 acpi_ut_validate_buffer (
@@ -830,9 +859,11 @@ acpi_ut_remove_allocation (
 	char                            *module,
 	u32                             line);
 
+#ifdef ACPI_FUTURE_USAGE
 void
 acpi_ut_dump_allocation_info (
 	void);
+#endif
 
 void
 acpi_ut_dump_allocations (

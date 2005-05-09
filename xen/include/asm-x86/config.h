@@ -69,6 +69,8 @@ extern unsigned long _end; /* standard ELF symbol */
 
 #if defined(__x86_64__)
 
+#define CONFIG_X86_64 1
+
 #define asmlinkage
 
 #define XENHEAP_DEFAULT_MB (16)
@@ -178,6 +180,8 @@ extern unsigned long _end; /* standard ELF symbol */
 #define __FIXUP_WORD  ".quad"
 
 #elif defined(__i386__)
+
+#define CONFIG_X86_32 1
 
 #define asmlinkage __attribute__((regparm(0)))
 

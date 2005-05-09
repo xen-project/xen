@@ -86,24 +86,20 @@ extern int logical_proc_id[];
 int __init check_nmi_watchdog (void)
 {
     unsigned int prev_nmi_count[NR_CPUS];
-    int j, cpu;
+    int cpu;
     
     if ( !nmi_watchdog )
         return 0;
 
     printk("Testing NMI watchdog --- ");
 
-    for ( j = 0; j < smp_num_cpus; j++ ) 
-    {
-        cpu = cpu_logical_map(j);
+    for ( cpu = 0; cpu < smp_num_cpus; cpu++ ) 
         prev_nmi_count[cpu] = nmi_count(cpu);
-    }
     __sti();
     mdelay((10*1000)/nmi_hz); /* wait 10 ticks */
 
-    for ( j = 0; j < smp_num_cpus; j++ ) 
+    for ( cpu = 0; cpu < smp_num_cpus; cpu++ ) 
     {
-        cpu = cpu_logical_map(j);
         if ( nmi_count(cpu) - prev_nmi_count[cpu] <= 5 )
             printk("CPU#%d stuck. ", cpu);
         else

@@ -131,8 +131,6 @@ static __inline__ int get_order(unsigned long size)
     return order;
 }
 
-extern void zap_low_mappings(void);
-
 /* Map physical byte range (@p, @p+@s) at virt address @v in pagetable @pt. */
 extern int
 map_pages(
