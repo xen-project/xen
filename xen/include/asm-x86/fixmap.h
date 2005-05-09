@@ -13,6 +13,7 @@
 #define _ASM_FIXMAP_H
 
 #include <xen/config.h>
+#include <xen/lib.h>
 #include <asm/acpi.h>
 #include <asm/apicdef.h>
 #include <asm/page.h>
@@ -52,6 +53,36 @@ extern void __set_fixmap(
 #define set_fixmap_nocache(idx, phys) \
     __set_fixmap(idx, phys, PAGE_HYPERVISOR_NOCACHE)
 
-#define fix_to_virt(x) (FIXADDR_TOP - ((x) << PAGE_SHIFT))
+#define __fix_to_virt(x) (FIXADDR_TOP - ((x) << PAGE_SHIFT))
+#define __virt_to_fix(x) ((FIXADDR_TOP - ((x)&PAGE_MASK)) >> PAGE_SHIFT)
+
+extern void __this_fixmap_does_not_exist(void);
+
+/*
+ * 'index to address' translation. If anyone tries to use the idx
+ * directly without translation, we catch the bug with a NULL-deference
+ * kernel oops. Illegal ranges of incoming indices are caught too.
+ */
+static always_inline unsigned long fix_to_virt(const unsigned int idx)
+{
+    /*
+     * This branch gets completely eliminated after inlining, except when 
+     * someone tries to use fixaddr indices in an illegal way (such as mixing 
+     * up address types or using out-of-range indices).
+     *
+     * If it doesn't get removed, the linker will complain loudly with a 
+     * reasonably clear error message.
+     */
+    if (idx >= __end_of_fixed_addresses)
+        __this_fixmap_does_not_exist();
+
+    return __fix_to_virt(idx);
+}
+
+static inline unsigned long virt_to_fix(const unsigned long vaddr)
+{
+    BUG_ON(vaddr >= FIXADDR_TOP || vaddr < FIXADDR_START);
+    return __virt_to_fix(vaddr);
+}
 
 #endif

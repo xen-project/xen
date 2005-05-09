@@ -2,7 +2,9 @@
 #ifndef __ASM_DOMAIN_H__
 #define __ASM_DOMAIN_H__
 
+#include <xen/config.h>
 #include <xen/mm.h>
+#include <asm/vmx_vmcs.h>
 
 struct trap_bounce {
     unsigned long  error_code;

@@ -6,7 +6,7 @@
  *****************************************************************************/
 
 /*
- * Copyright (C) 2000 - 2004, R. Byron Moore
+ * Copyright (C) 2000 - 2005, R. Byron Moore
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -94,9 +94,7 @@
 	u32                                     bit_length;         /* Length of field in bits */\
 	u32                                     base_byte_offset;   /* Byte offset within containing object */\
 	u8                                      start_field_bit_offset;/* Bit offset within first field datum (0-63) */\
-	u8                                      datum_valid_bits;   /* Valid bit in first "Field datum" */\
-	u8                                      end_field_valid_bits; /* Valid bits in the last "field datum" */\
-	u8                                      end_buffer_valid_bits; /* Valid bits in the last "buffer datum" */\
+	u8                                      access_bit_width;   /* Read/Write size in bits (8-64) */\
 	u32                                     value;              /* Value to store into the Bank or Index register */\
 	struct acpi_namespace_node              *node;              /* Link back to parent node */
 
@@ -135,7 +133,10 @@ struct acpi_object_integer
 	acpi_integer                            value;
 };
 
-
+/*
+ * Note: The String and Buffer object must be identical through the Pointer
+ * element.  There is code that depends on this.
+ */
 struct acpi_object_string           /* Null terminated, ASCII characters only */
 {
 	ACPI_OBJECT_COMMON_HEADER
@@ -180,7 +181,11 @@ struct acpi_object_event
 };
 
 
-#define INFINITE_CONCURRENCY        0xFF
+#define ACPI_INFINITE_CONCURRENCY   0xFF
+
+typedef
+acpi_status (*ACPI_INTERNAL_METHOD) (
+	struct acpi_walk_state          *walk_state);
 
 struct acpi_object_method
 {
@@ -190,6 +195,7 @@ struct acpi_object_method
 	u32                                     aml_length;
 	void                                    *semaphore;
 	u8                                      *aml_start;
+	ACPI_INTERNAL_METHOD            implementation;
 	u8                                      concurrency;
 	u8                                      thread_count;
 	acpi_owner_id                           owning_id;
@@ -199,13 +205,14 @@ struct acpi_object_method
 struct acpi_object_mutex
 {
 	ACPI_OBJECT_COMMON_HEADER
-	u16                                     sync_level;
-	u16                                     acquisition_depth;
-	struct acpi_thread_state                *owner_thread;
-	void                                    *semaphore;
+	u8                                      sync_level;         /* 0-15, specified in Mutex() call */
+	u16                                     acquisition_depth;  /* Allow multiple Acquires, same thread */
+	struct acpi_thread_state                *owner_thread;      /* Current owner of the mutex */
+	void                                    *semaphore;         /* Actual OS synchronization object */
 	union acpi_operand_object               *prev;              /* Link for list of acquired mutexes */
 	union acpi_operand_object               *next;              /* Link for list of acquired mutexes */
-	struct acpi_namespace_node              *node;              /* containing object */
+	struct acpi_namespace_node              *node;              /* Containing namespace node */
+	u8                                      original_sync_level; /* Owner's original sync level (0-15) */
 };
 
 
@@ -215,7 +222,7 @@ struct acpi_object_region
 
 	u8                                      space_id;
 	union acpi_operand_object               *handler;           /* Handler for region access */
-	struct acpi_namespace_node              *node;              /* containing object */
+	struct acpi_namespace_node              *node;              /* Containing namespace node */
 	union acpi_operand_object               *next;
 	u32                                     length;
 	acpi_physical_address                   address;

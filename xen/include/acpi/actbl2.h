@@ -5,7 +5,7 @@
  *****************************************************************************/
 
 /*
- * Copyright (C) 2000 - 2004, R. Byron Moore
+ * Copyright (C) 2000 - 2005, R. Byron Moore
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -62,6 +62,7 @@
 #define BAF_8042_KEYBOARD_CONTROLLER    0x0002
 
 #define FADT2_REVISION_ID               3
+#define FADT2_MINUS_REVISION_ID         2
 
 
 #pragma pack(1)
@@ -114,10 +115,48 @@ struct acpi_generic_address
 	u8                              address_space_id;       /* Address space where struct or register exists. */
 	u8                              register_bit_width;     /* Size in bits of given register */
 	u8                              register_bit_offset;    /* Bit offset within the register */
-	u8                              reserved;               /* Must be 0 */
+	u8                              access_width;           /* Minimum Access size (ACPI 3.0) */
 	u64                             address;                /* 64-bit address of struct or register */
 };
 
+
+#define FADT_REV2_COMMON \
+	u32                             V1_firmware_ctrl;   /* 32-bit physical address of FACS */ \
+	u32                             V1_dsdt;            /* 32-bit physical address of DSDT */ \
+	u8                              reserved1;          /* System Interrupt Model isn't used in ACPI 2.0*/ \
+	u8                              prefer_PM_profile;  /* Conveys preferred power management profile to OSPM. */ \
+	u16                             sci_int;            /* System vector of SCI interrupt */ \
+	u32                             smi_cmd;            /* Port address of SMI command port */ \
+	u8                              acpi_enable;        /* Value to write to smi_cmd to enable ACPI */ \
+	u8                              acpi_disable;       /* Value to write to smi_cmd to disable ACPI */ \
+	u8                              S4bios_req;         /* Value to write to SMI CMD to enter S4BIOS state */ \
+	u8                              pstate_cnt;         /* Processor performance state control*/ \
+	u32                             V1_pm1a_evt_blk;    /* Port address of Power Mgt 1a acpi_event Reg Blk */ \
+	u32                             V1_pm1b_evt_blk;    /* Port address of Power Mgt 1b acpi_event Reg Blk */ \
+	u32                             V1_pm1a_cnt_blk;    /* Port address of Power Mgt 1a Control Reg Blk */ \
+	u32                             V1_pm1b_cnt_blk;    /* Port address of Power Mgt 1b Control Reg Blk */ \
+	u32                             V1_pm2_cnt_blk;     /* Port address of Power Mgt 2 Control Reg Blk */ \
+	u32                             V1_pm_tmr_blk;      /* Port address of Power Mgt Timer Ctrl Reg Blk */ \
+	u32                             V1_gpe0_blk;        /* Port addr of General Purpose acpi_event 0 Reg Blk */ \
+	u32                             V1_gpe1_blk;        /* Port addr of General Purpose acpi_event 1 Reg Blk */ \
+	u8                              pm1_evt_len;        /* Byte length of ports at pm1_x_evt_blk */ \
+	u8                              pm1_cnt_len;        /* Byte length of ports at pm1_x_cnt_blk */ \
+	u8                              pm2_cnt_len;        /* Byte Length of ports at pm2_cnt_blk */ \
+	u8                              pm_tm_len;          /* Byte Length of ports at pm_tm_blk */ \
+	u8                              gpe0_blk_len;       /* Byte Length of ports at gpe0_blk */ \
+	u8                              gpe1_blk_len;       /* Byte Length of ports at gpe1_blk */ \
+	u8                              gpe1_base;          /* Offset in gpe model where gpe1 events start */ \
+	u8                              cst_cnt;            /* Support for the _CST object and C States change notification.*/ \
+	u16                             plvl2_lat;          /* Worst case HW latency to enter/exit C2 state */ \
+	u16                             plvl3_lat;          /* Worst case HW latency to enter/exit C3 state */ \
+	u16                             flush_size;         /* Number of flush strides that need to be read */ \
+	u16                             flush_stride;       /* Processor's memory cache line width, in bytes */ \
+	u8                              duty_offset;        /* Processor's duty cycle index in processor's P_CNT reg*/ \
+	u8                              duty_width;         /* Processor's duty cycle value bit width in P_CNT register.*/ \
+	u8                              day_alrm;           /* Index to day-of-month alarm in RTC CMOS RAM */ \
+	u8                              mon_alrm;           /* Index to month-of-year alarm in RTC CMOS RAM */ \
+	u8                              century;            /* Index to century in RTC CMOS RAM */ \
+	u16                             iapc_boot_arch;     /* IA-PC Boot Architecture Flags. See Table 5-10 for description*/
 
 /*
  * ACPI 2.0 Fixed ACPI Description Table (FADT)
@@ -125,42 +164,7 @@ struct acpi_generic_address
 struct fadt_descriptor_rev2
 {
 	ACPI_TABLE_HEADER_DEF                       /* ACPI common table header */
-	u32                             V1_firmware_ctrl;   /* 32-bit physical address of FACS */
-	u32                             V1_dsdt;            /* 32-bit physical address of DSDT */
-	u8                              reserved1;          /* System Interrupt Model isn't used in ACPI 2.0*/
-	u8                              prefer_PM_profile;  /* Conveys preferred power management profile to OSPM. */
-	u16                             sci_int;            /* System vector of SCI interrupt */
-	u32                             smi_cmd;            /* Port address of SMI command port */
-	u8                              acpi_enable;        /* Value to write to smi_cmd to enable ACPI */
-	u8                              acpi_disable;       /* Value to write to smi_cmd to disable ACPI */
-	u8                              S4bios_req;         /* Value to write to SMI CMD to enter S4BIOS state */
-	u8                              pstate_cnt;         /* Processor performance state control*/
-	u32                             V1_pm1a_evt_blk;    /* Port address of Power Mgt 1a acpi_event Reg Blk */
-	u32                             V1_pm1b_evt_blk;    /* Port address of Power Mgt 1b acpi_event Reg Blk */
-	u32                             V1_pm1a_cnt_blk;    /* Port address of Power Mgt 1a Control Reg Blk */
-	u32                             V1_pm1b_cnt_blk;    /* Port address of Power Mgt 1b Control Reg Blk */
-	u32                             V1_pm2_cnt_blk;     /* Port address of Power Mgt 2 Control Reg Blk */
-	u32                             V1_pm_tmr_blk;      /* Port address of Power Mgt Timer Ctrl Reg Blk */
-	u32                             V1_gpe0_blk;        /* Port addr of General Purpose acpi_event 0 Reg Blk */
-	u32                             V1_gpe1_blk;        /* Port addr of General Purpose acpi_event 1 Reg Blk */
-	u8                              pm1_evt_len;        /* Byte length of ports at pm1_x_evt_blk */
-	u8                              pm1_cnt_len;        /* Byte length of ports at pm1_x_cnt_blk */
-	u8                              pm2_cnt_len;        /* Byte Length of ports at pm2_cnt_blk */
-	u8                              pm_tm_len;          /* Byte Length of ports at pm_tm_blk */
-	u8                              gpe0_blk_len;       /* Byte Length of ports at gpe0_blk */
-	u8                              gpe1_blk_len;       /* Byte Length of ports at gpe1_blk */
-	u8                              gpe1_base;          /* Offset in gpe model where gpe1 events start */
-	u8                              cst_cnt;            /* Support for the _CST object and C States change notification.*/
-	u16                             plvl2_lat;          /* Worst case HW latency to enter/exit C2 state */
-	u16                             plvl3_lat;          /* Worst case HW latency to enter/exit C3 state */
-	u16                             flush_size;         /* Number of flush strides that need to be read */
-	u16                             flush_stride;       /* Processor's memory cache line width, in bytes */
-	u8                              duty_offset;        /* Processor's duty cycle index in processor's P_CNT reg*/
-	u8                              duty_width;         /* Processor's duty cycle value bit width in P_CNT register.*/
-	u8                              day_alrm;           /* Index to day-of-month alarm in RTC CMOS RAM */
-	u8                              mon_alrm;           /* Index to month-of-year alarm in RTC CMOS RAM */
-	u8                              century;            /* Index to century in RTC CMOS RAM */
-	u16                             iapc_boot_arch;     /* IA-PC Boot Architecture Flags. See Table 5-10 for description*/
+	FADT_REV2_COMMON
 	u8                              reserved2;          /* Reserved */
 	u32                             wb_invd     : 1;    /* The wbinvd instruction works properly */
 	u32                             wb_invd_flush : 1;  /* The wbinvd flushes but does not invalidate */
@@ -192,6 +196,20 @@ struct fadt_descriptor_rev2
 	struct acpi_generic_address     xpm_tmr_blk;        /* Extended Power Mgt Timer Ctrl Reg Blk address */
 	struct acpi_generic_address     xgpe0_blk;          /* Extended General Purpose acpi_event 0 Reg Blk address */
 	struct acpi_generic_address     xgpe1_blk;          /* Extended General Purpose acpi_event 1 Reg Blk address */
+};
+
+
+/* "Downrevved" ACPI 2.0 FADT descriptor */
+
+struct fadt_descriptor_rev2_minus
+{
+	ACPI_TABLE_HEADER_DEF                       /* ACPI common table header */
+	FADT_REV2_COMMON
+	u8                              reserved2;          /* Reserved */
+	u32                             flags;
+	struct acpi_generic_address     reset_register;     /* Reset register address in GAS format */
+	u8                              reset_value;        /* Value to write to the reset_register port to reset the system. */
+	u8                              reserved7[3];       /* These three bytes must be zero */
 };
 
 

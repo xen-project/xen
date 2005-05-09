@@ -90,7 +90,7 @@ void __dummy__(void)
     OFFSET(MULTICALL_result, multicall_entry_t, args[5]);
     BLANK();
 
-    DEFINE(FIXMAP_apic_base, fix_to_virt(FIX_APIC_BASE));
+    DEFINE(FIXMAP_apic_base, __fix_to_virt(FIX_APIC_BASE));
     BLANK();
 
     DEFINE(IRQSTAT_shift, LOG_2(sizeof(irq_cpustat_t)));

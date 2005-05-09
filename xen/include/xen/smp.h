@@ -47,6 +47,17 @@ extern int smp_call_function(
     void (*func) (void *info), void *info, int retry, int wait);
 
 /*
+ * Call a function on all processors
+ */
+static inline int on_each_cpu(void (*func) (void *info), void *info,
+                              int retry, int wait)
+{
+    int ret = smp_call_function(func, info, retry, wait);
+    func(info);
+    return ret;
+}
+
+/*
  * True once the per process idle is forked
  */
 extern int smp_threads_ready;
@@ -85,7 +96,15 @@ extern volatile int smp_msg_id;
 #define cpu_logical_map(cpu)			0
 #define cpu_number_map(cpu)			0
 #define smp_call_function(func,info,retry,wait)	0
+#define on_each_cpu(func,info,retry,wait)	({ func(info); 0; })
 #define cpu_online_map				1
 
 #endif
+
+#ifdef __smp_processor_id
+#define smp_processor_id() __smp_processor_id()
+#else
+extern unsigned int smp_processor_id(void);
+#endif
+
 #endif

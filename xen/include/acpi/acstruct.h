@@ -5,7 +5,7 @@
  *****************************************************************************/
 
 /*
- * Copyright (C) 2000 - 2004, R. Byron Moore
+ * Copyright (C) 2000 - 2005, R. Byron Moore
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -69,13 +69,14 @@
 struct acpi_walk_state
 {
 	u8                                  data_type;                          /* To differentiate various internal objs MUST BE FIRST!*/\
+	u8                                  walk_type;
 	acpi_owner_id                       owner_id;                           /* Owner of objects created during the walk */
 	u8                                  last_predicate;                     /* Result of last predicate */
+	u8                                  reserved;                           /* For alignment */
 	u8                                  current_result;                     /* */
 	u8                                  next_op_info;                       /* Info about next_op */
 	u8                                  num_operands;                       /* Stack pointer for Operands[] array */
 	u8                                  return_used;
-	u8                                  walk_type;
 	u16                                 opcode;                             /* Current AML opcode */
 	u8                                  scope_depth;
 	u8                                  reserved1;
@@ -91,7 +92,8 @@ struct acpi_walk_state
 	struct acpi_namespace_node          arguments[ACPI_METHOD_NUM_ARGS];    /* Control method arguments */
 	union acpi_operand_object           **caller_return_desc;
 	union acpi_generic_state            *control_state;                     /* List of control states (nested IFs) */
-	struct acpi_namespace_node          *deferred_node;                      /* Used when executing deferred opcodes */
+	struct acpi_namespace_node          *deferred_node;                     /* Used when executing deferred opcodes */
+	struct acpi_gpe_event_info          *gpe_event_info;                    /* Info for GPE (_Lxx/_Exx methods only */
 	struct acpi_namespace_node          local_variables[ACPI_METHOD_NUM_LOCALS];    /* Control method locals */
 	struct acpi_namespace_node          *method_call_node;                  /* Called method Node*/
 	union acpi_parse_object             *method_call_op;                    /* method_call Op if running a method */
@@ -112,7 +114,7 @@ struct acpi_walk_state
 	union acpi_parse_object             *next_op;                           /* next op to be processed */
 	acpi_parse_downwards                descending_callback;
 	acpi_parse_upwards                  ascending_callback;
-	struct acpi_thread_state            *acpi_thread;
+	struct acpi_thread_state            *thread;
 	struct acpi_walk_state              *next;                              /* Next walk_state in list */
 };
 
@@ -198,6 +200,23 @@ union acpi_aml_operands
 
 	} mid;
 };
+
+
+/* Internal method parameter list */
+
+struct acpi_parameter_info
+{
+	struct acpi_namespace_node      *node;
+	union acpi_operand_object       **parameters;
+	union acpi_operand_object       *return_object;
+	u8                              parameter_type;
+	u8                              return_object_type;
+};
+
+/* Types for parameter_type above */
+
+#define ACPI_PARAM_ARGS                 0
+#define ACPI_PARAM_GPE                  1
 
 
 #endif

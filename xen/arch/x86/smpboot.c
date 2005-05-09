@@ -48,8 +48,8 @@
 #include <xen/sched.h>
 #include <xen/delay.h>
 #include <xen/lib.h>
-
-#ifdef CONFIG_SMP
+#include <mach_apic.h>
+#include <mach_wakecpu.h>
 
 /* Cconfigured maximum number of CPUs to activate. We name the parameter 
 "maxcpus" rather than max_cpus to be compatible with Linux */
@@ -63,10 +63,10 @@ int smp_num_cpus = 1;
 int ht_per_core = 1;
 
 /* Bitmask of currently online CPUs */
-unsigned long cpu_online_map;
+cpumask_t cpu_online_map;
 
-static volatile unsigned long cpu_callin_map;
-static volatile unsigned long cpu_callout_map;
+cpumask_t cpu_callin_map;
+cpumask_t cpu_callout_map;
 
 /* Per CPU bogomips and other parameters */
 struct cpuinfo_x86 cpu_data[NR_CPUS];
@@ -800,7 +800,8 @@ void __init smp_boot_cpus(void)
     if (!smp_found_config) {
         printk("SMP motherboard not detected.\n");
         io_apic_irqs = 0;
-        cpu_online_map = phys_cpu_present_map = 1;
+        phys_cpu_present_map = physid_mask_of_physid(0);
+        cpu_online_map = 1;
         smp_num_cpus = 1;
         if (APIC_init_uniprocessor())
             printk("Local APIC not detected."
@@ -815,7 +816,7 @@ void __init smp_boot_cpus(void)
     if (!test_bit(boot_cpu_physical_apicid, &phys_cpu_present_map)) {
         printk("weird, boot CPU (#%d) not listed by the BIOS.\n",
                boot_cpu_physical_apicid);
-        phys_cpu_present_map |= (1 << hard_smp_processor_id());
+        physid_set(hard_smp_processor_id(), phys_cpu_present_map);
     }
 
     /*
@@ -827,7 +828,8 @@ void __init smp_boot_cpus(void)
                boot_cpu_physical_apicid);
         printk("... forcing use of dummy APIC emulation. (tell your hw vendor)\n");
         io_apic_irqs = 0;
-        cpu_online_map = phys_cpu_present_map = 1;
+        phys_cpu_present_map = physid_mask_of_physid(0);
+        cpu_online_map = 1;
         smp_num_cpus = 1;
         goto smp_done;
     }
@@ -841,7 +843,8 @@ void __init smp_boot_cpus(void)
         smp_found_config = 0;
         printk("SMP mode deactivated, forcing use of dummy APIC emulation.\n");
         io_apic_irqs = 0;
-        cpu_online_map = phys_cpu_present_map = 1;
+        phys_cpu_present_map = physid_mask_of_physid(0);
+        cpu_online_map = 1;
         smp_num_cpus = 1;
         goto smp_done;
     }
@@ -875,7 +878,7 @@ void __init smp_boot_cpus(void)
         if (opt_noht && (apicid & (ht_per_core - 1)))
             continue;
 
-        if (!(phys_cpu_present_map & (1 << bit)))
+        if (!check_apicid_present(bit))
             continue;
         if ((max_cpus >= 0) && (max_cpus <= cpucount+1))
             continue;
@@ -886,7 +889,7 @@ void __init smp_boot_cpus(void)
          * Make sure we unmap all failed CPUs
          */
         if ((boot_apicid_to_cpu(apicid) == -1) &&
-            (phys_cpu_present_map & (1 << bit)))
+            (!check_apicid_present(bit)))
             printk("CPU #%d not responding - cannot use it.\n",
                    apicid);
     }
@@ -923,7 +926,10 @@ void __init smp_boot_cpus(void)
     if ( nr_ioapics ) setup_IO_APIC();
 
     /* Set up all local APIC timers in the system. */
-    setup_APIC_clocks();
+    {
+        extern void setup_APIC_clocks(void);
+        setup_APIC_clocks();
+    }
 
     /* Synchronize the TSC with the AP(s). */
     if ( cpucount ) synchronize_tsc_bp();
@@ -931,8 +937,6 @@ void __init smp_boot_cpus(void)
  smp_done:
     ;
 }
-
-#endif /* CONFIG_SMP */
 
 /*
  * Local variables:

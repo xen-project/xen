@@ -34,13 +34,26 @@
 #include <asm/hardirq.h>
 #include <asm/apic.h>
 #include <asm/io_apic.h>
-#include <asm/mach_apic.h>
-#include <asm/io_ports.h>
+#include <mach_apic.h>
+#include <io_ports.h>
 
 /* Using APIC to generate smp_local_timer_interrupt? */
 int using_apic_timer = 0;
 
+int apic_verbosity;
+
 static int enabled_via_apicbase;
+
+int get_physical_broadcast(void)
+{
+    unsigned int lvr, version;
+    lvr = apic_read(APIC_LVR);
+    version = GET_APIC_VERSION(lvr);
+    if (!APIC_INTEGRATED(version) || version >= 0x14)
+        return 0xff;
+    else
+        return 0xf;
+}
 
 int get_maxlvt(void)
 {
@@ -907,7 +920,7 @@ int __init APIC_init_uniprocessor (void)
 #ifdef CONFIG_SMP
     cpu_online_map = 1;
 #endif
-    phys_cpu_present_map = 1;
+    phys_cpu_present_map = physid_mask_of_physid(boot_cpu_physical_apicid);
     apic_write_around(APIC_ID, boot_cpu_physical_apicid);
 
     setup_local_APIC();

@@ -10,8 +10,6 @@
 #include <public/xen.h>
 #include <public/physdev.h>
 
-extern void (*interrupt[])(void);
-
 extern int ioapic_guest_read(int apicid, int address, u32 *pval);
 extern int ioapic_guest_write(int apicid, int address, u32 pval);
 

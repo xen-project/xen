@@ -5,7 +5,7 @@
  *****************************************************************************/
 
 /*
- * Copyright (C) 2000 - 2004, R. Byron Moore
+ * Copyright (C) 2000 - 2005, R. Byron Moore
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -114,25 +114,13 @@ acpi_hw_clear_acpi_status (
 /* GPE support */
 
 acpi_status
-acpi_hw_enable_gpe (
-	struct acpi_gpe_event_info      *gpe_event_info);
-
-void
-acpi_hw_enable_gpe_for_wakeup (
-	struct acpi_gpe_event_info      *gpe_event_info);
-
-acpi_status
-acpi_hw_disable_gpe (
+acpi_hw_write_gpe_enable_reg (
 	struct acpi_gpe_event_info      *gpe_event_info);
 
 acpi_status
 acpi_hw_disable_gpe_block (
 	struct acpi_gpe_xrupt_info      *gpe_xrupt_info,
 	struct acpi_gpe_block_info      *gpe_block);
-
-void
-acpi_hw_disable_gpe_for_wakeup (
-	struct acpi_gpe_event_info      *gpe_event_info);
 
 acpi_status
 acpi_hw_clear_gpe (
@@ -143,22 +131,39 @@ acpi_hw_clear_gpe_block (
 	struct acpi_gpe_xrupt_info      *gpe_xrupt_info,
 	struct acpi_gpe_block_info      *gpe_block);
 
+#ifdef ACPI_FUTURE_USAGE
 acpi_status
 acpi_hw_get_gpe_status (
 	struct acpi_gpe_event_info      *gpe_event_info,
 	acpi_event_status               *event_status);
+#endif
 
 acpi_status
-acpi_hw_disable_non_wakeup_gpes (
-	void);
+acpi_hw_disable_all_gpes (
+	u32                             flags);
 
 acpi_status
-acpi_hw_enable_non_wakeup_gpes (
-	void);
+acpi_hw_enable_all_runtime_gpes (
+	u32                             flags);
+
+acpi_status
+acpi_hw_enable_all_wakeup_gpes (
+	u32                             flags);
+
+acpi_status
+acpi_hw_enable_runtime_gpe_block (
+	struct acpi_gpe_xrupt_info      *gpe_xrupt_info,
+	struct acpi_gpe_block_info      *gpe_block);
+
+acpi_status
+acpi_hw_enable_wakeup_gpe_block (
+	struct acpi_gpe_xrupt_info      *gpe_xrupt_info,
+	struct acpi_gpe_block_info      *gpe_block);
 
 
 /* ACPI Timer prototypes */
 
+#ifdef ACPI_FUTURE_USAGE
 acpi_status
 acpi_get_timer_resolution (
 	u32                             *resolution);
@@ -172,6 +177,6 @@ acpi_get_timer_duration (
 	u32                             start_ticks,
 	u32                             end_ticks,
 	u32                             *time_elapsed);
-
+#endif  /*  ACPI_FUTURE_USAGE  */
 
 #endif /* __ACHWARE_H__ */

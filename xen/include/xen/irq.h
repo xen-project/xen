@@ -2,6 +2,7 @@
 #define __XEN_IRQ_H__
 
 #include <xen/config.h>
+#include <xen/cpumask.h>
 #include <xen/spinlock.h>
 #include <asm/regs.h>
 #include <asm/hardirq.h>
@@ -35,7 +36,7 @@ struct hw_interrupt_type {
     void (*disable)(unsigned int irq);
     void (*ack)(unsigned int irq);
     void (*end)(unsigned int irq);
-    void (*set_affinity)(unsigned int irq, unsigned long mask);
+    void (*set_affinity)(unsigned int irq, cpumask_t mask);
 };
 
 typedef struct hw_interrupt_type hw_irq_controller;

@@ -15,7 +15,7 @@
 
 #define always_inline __inline__ __attribute__ ((always_inline))
 
-/* syslog levels ==> nothing! */
+/* Linux syslog levels. */
 #define KERN_NOTICE  ""
 #define KERN_WARNING ""
 #define KERN_DEBUG   ""
@@ -24,6 +24,10 @@
 #define KERN_CRIT    ""
 #define KERN_EMERG   ""
 #define KERN_ALERT   ""
+
+/* Linux 'checker' project. */
+#define __iomem
+#define __user
 
 #ifdef VERBOSE
 #define DPRINTK(_f, _a...) printk("(file=%s, line=%d) " _f, \

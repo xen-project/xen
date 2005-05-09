@@ -3,6 +3,7 @@ include $(BASEDIR)/Rules.mk
 
 OBJS += $(patsubst %.S,%.o,$(wildcard $(TARGET_SUBARCH)/*.S))
 OBJS += $(patsubst %.c,%.o,$(wildcard $(TARGET_SUBARCH)/*.c))
+OBJS += $(patsubst %.c,%.o,$(wildcard acpi/*.c))
 OBJS += $(patsubst %.c,%.o,$(wildcard mtrr/*.c))
 
 OBJS := $(subst $(TARGET_SUBARCH)/asm-offsets.o,,$(OBJS))
