@@ -1,6 +1,6 @@
 /*
  * Virtualized CPU functions
- * 
+ *
  * Copyright (C) 2004 Hewlett-Packard Co.
  *	Dan Magenheimer (dan.magenheimer@hp.com)
  *
@@ -26,6 +26,7 @@ typedef	union {
 // this def for vcpu_regs won't work if kernel stack is present
 #define	vcpu_regs(vcpu) ((struct pt_regs *) vcpu->arch.regs)
 #define	PSCB(x,y)	x->vcpu_info->arch.y
+#define	PSCBX(x,y)	x->arch.y
 
 #define	TRUE	1
 #define	FALSE	0
@@ -289,9 +290,9 @@ BOOLEAN vcpu_get_psr_i(VCPU *vcpu)
 
 UINT64 vcpu_get_ipsr_int_state(VCPU *vcpu,UINT64 prevpsr)
 {
-	UINT64 dcr = PSCB(vcpu,dcr);
+	UINT64 dcr = PSCBX(vcpu,dcr);
 	PSR psr = {0};
-	
+
 	//printf("*** vcpu_get_ipsr_int_state (0x%016lx)...",prevpsr);
 	psr.i64 = prevpsr;
 	psr.ia64_psr.be = 0; if (dcr & IA64_DCR_BE) psr.ia64_psr.be = 1;
@@ -317,13 +318,13 @@ extern unsigned long privop_trace;
 //verbose("vcpu_get_dcr: called @%p\n",PSCB(vcpu,iip));
 	// Reads of cr.dcr on Xen always have the sign bit set, so
 	// a domain can differentiate whether it is running on SP or not
-	*pval = PSCB(vcpu,dcr) | 0x8000000000000000L;
+	*pval = PSCBX(vcpu,dcr) | 0x8000000000000000L;
 	return (IA64_NO_FAULT);
 }
 
 IA64FAULT vcpu_get_iva(VCPU *vcpu, UINT64 *pval)
 {
-	*pval = PSCB(vcpu,iva) & ~0x7fffL;
+	*pval = PSCBX(vcpu,iva) & ~0x7fffL;
 	return (IA64_NO_FAULT);
 }
 
@@ -423,13 +424,13 @@ extern unsigned long privop_trace;
 	// a domain can differentiate whether it is running on SP or not
 	// Thus, writes of DCR should ignore the sign bit
 //verbose("vcpu_set_dcr: called\n");
-	PSCB(vcpu,dcr) = val & ~0x8000000000000000L;
+	PSCBX(vcpu,dcr) = val & ~0x8000000000000000L;
 	return (IA64_NO_FAULT);
 }
 
 IA64FAULT vcpu_set_iva(VCPU *vcpu, UINT64 val)
 {
-	PSCB(vcpu,iva) = val & ~0x7fffL;
+	PSCBX(vcpu,iva) = val & ~0x7fffL;
 	return (IA64_NO_FAULT);
 }
 
@@ -523,16 +524,16 @@ void vcpu_pend_interrupt(VCPU *vcpu, UINT64 vector)
 		return;
 	}
 	if (!test_bit(vector,PSCB(vcpu,delivery_mask))) return;
-	if (test_bit(vector,PSCB(vcpu,irr))) {
+	if (test_bit(vector,PSCBX(vcpu,irr))) {
 //printf("vcpu_pend_interrupt: overrun\n");
 	}
-	set_bit(vector,PSCB(vcpu,irr));
+	set_bit(vector,PSCBX(vcpu,irr));
 	PSCB(vcpu,pending_interruption) = 1;
 }
 
 void early_tick(VCPU *vcpu)
 {
-	UINT64 *p = &PSCB(vcpu,irr[3]);
+	UINT64 *p = &PSCBX(vcpu,irr[3]);
 	printf("vcpu_check_pending: about to deliver early tick\n");
 	printf("&irr[0]=%p, irr[0]=0x%lx\n",p,*p);
 }
@@ -550,9 +551,9 @@ UINT64 vcpu_check_pending_interrupts(VCPU *vcpu)
 {
 	UINT64 *p, *q, *r, bits, bitnum, mask, i, vector;
 
-	p = &PSCB(vcpu,irr[3]);
+	p = &PSCBX(vcpu,irr[3]);
 	q = &PSCB(vcpu,delivery_mask[3]);
-	r = &PSCB(vcpu,insvc[3]);
+	r = &PSCBX(vcpu,insvc[3]);
 	for (i = 3; ; p--, q--, r--, i--) {
 		bits = *p & *q;
 		if (bits) break; // got a potential interrupt
@@ -592,9 +593,9 @@ UINT64 vcpu_check_pending_interrupts(VCPU *vcpu)
 #if 0
 if (vector == (PSCB(vcpu,itv) & 0xff)) {
 	UINT64 now = ia64_get_itc();
-	UINT64 itm = PSCB(vcpu,domain_itm);
+	UINT64 itm = PSCBX(vcpu,domain_itm);
 	if (now < itm) early_tick(vcpu);
-	
+
 }
 #endif
 	return vector;
@@ -654,13 +655,13 @@ IA64FAULT vcpu_get_ivr(VCPU *vcpu, UINT64 *pval)
 	i = vector >> 6;
 	mask = 1L << (vector & 0x3f);
 //printf("ZZZZZZ vcpu_get_ivr: setting insvc mask for vector %ld\n",vector);
-	PSCB(vcpu,insvc[i]) |= mask;
-	PSCB(vcpu,irr[i]) &= ~mask;
+	PSCBX(vcpu,insvc[i]) |= mask;
+	PSCBX(vcpu,irr[i]) &= ~mask;
 	//PSCB(vcpu,pending_interruption)--;
 	*pval = vector;
 	// if delivering a timer interrupt, remember domain_itm
 	if (vector == (PSCB(vcpu,itv) & 0xff)) {
-		PSCB(vcpu,domain_itm_last) = PSCB(vcpu,domain_itm);
+		PSCBX(vcpu,domain_itm_last) = PSCBX(vcpu,domain_itm);
 	}
 	return IA64_NO_FAULT;
 }
@@ -775,7 +776,7 @@ IA64FAULT vcpu_set_eoi(VCPU *vcpu, UINT64 val)
 	UINT64 *p, bits, vec, bitnum;
 	int i;
 
-	p = &PSCB(vcpu,insvc[3]);
+	p = &PSCBX(vcpu,insvc[3]);
 	for (i = 3; (i >= 0) && !(bits = *p); i--, p--);
 	if (i < 0) {
 		printf("Trying to EOI interrupt when none are in-service.\r\n");
@@ -826,8 +827,8 @@ extern unsigned long privop_trace;
 	if (val & 0xef00) return (IA64_ILLOP_FAULT);
 	PSCB(vcpu,itv) = val;
 	if (val & 0x10000) {
-printf("**** vcpu_set_itv(%d): vitm=%lx, setting to 0\n",val,PSCB(vcpu,domain_itm));
-		PSCB(vcpu,domain_itm) = 0;
+printf("**** vcpu_set_itv(%d): vitm=%lx, setting to 0\n",val,PSCBX(vcpu,domain_itm));
+		PSCBX(vcpu,domain_itm) = 0;
 	}
 	else vcpu_enable_timer(vcpu,1000000L);
 	return (IA64_NO_FAULT);
@@ -860,14 +861,14 @@ BOOLEAN vcpu_timer_disabled(VCPU *vcpu)
 BOOLEAN vcpu_timer_inservice(VCPU *vcpu)
 {
 	UINT64 itv = PSCB(vcpu,itv);
-	return (test_bit(itv, PSCB(vcpu,insvc)));
+	return (test_bit(itv, PSCBX(vcpu,insvc)));
 }
 
 BOOLEAN vcpu_timer_expired(VCPU *vcpu)
 {
-	unsigned long domain_itm = PSCB(vcpu,domain_itm);
+	unsigned long domain_itm = PSCBX(vcpu,domain_itm);
 	unsigned long now = ia64_get_itc();
- 
+
 	if (!domain_itm) return FALSE;
 	if (now < domain_itm) return FALSE;
 	if (vcpu_timer_disabled(vcpu)) return FALSE;
@@ -892,36 +893,36 @@ void vcpu_safe_set_itm(unsigned long val)
 
 void vcpu_set_next_timer(VCPU *vcpu)
 {
-	UINT64 d = PSCB(vcpu,domain_itm);
-	//UINT64 s = PSCB(vcpu,xen_itm);
+	UINT64 d = PSCBX(vcpu,domain_itm);
+	//UINT64 s = PSCBX(vcpu,xen_itm);
 	UINT64 s = local_cpu_data->itm_next;
 	UINT64 now = ia64_get_itc();
-	//UINT64 interval = PSCB(vcpu,xen_timer_interval);
+	//UINT64 interval = PSCBX(vcpu,xen_timer_interval);
 
 	/* gloss over the wraparound problem for now... we know it exists
 	 * but it doesn't matter right now */
 
 #if 0
 	/* ensure at least next SP tick is in the future */
-	if (!interval) PSCB(vcpu,xen_itm) = now +
+	if (!interval) PSCBX(vcpu,xen_itm) = now +
 #if 0
 		(running_on_sim() ? SIM_DEFAULT_CLOCK_RATE :
-		 			DEFAULT_CLOCK_RATE);
+					DEFAULT_CLOCK_RATE);
 #else
 	3000000;
 //printf("vcpu_set_next_timer: HACK!\n");
 #endif
 #if 0
-	if (PSCB(vcpu,xen_itm) < now)
-		while (PSCB(vcpu,xen_itm) < now + (interval>>1))
-			PSCB(vcpu,xen_itm) += interval;
+	if (PSCBX(vcpu,xen_itm) < now)
+		while (PSCBX(vcpu,xen_itm) < now + (interval>>1))
+			PSCBX(vcpu,xen_itm) += interval;
 #endif
 #endif
 
 	if (is_idle_task(vcpu->domain)) {
 		printf("****** vcpu_set_next_timer called during idle!!\n");
 	}
-	//s = PSCB(vcpu,xen_itm);
+	//s = PSCBX(vcpu,xen_itm);
 	if (d && (d > now) && (d < s)) {
 		vcpu_safe_set_itm(d);
 		//using_domain_as_itm++;
@@ -935,10 +936,10 @@ void vcpu_set_next_timer(VCPU *vcpu)
 // parameter is a time interval specified in cycles
 void vcpu_enable_timer(VCPU *vcpu,UINT64 cycles)
 {
-    PSCB(vcpu,xen_timer_interval) = cycles;
+    PSCBX(vcpu,xen_timer_interval) = cycles;
     vcpu_set_next_timer(vcpu);
     printf("vcpu_enable_timer(%d): interval set to %d cycles\n",
-             PSCB(vcpu,xen_timer_interval));
+             PSCBX(vcpu,xen_timer_interval));
     __set_bit(PSCB(vcpu,itv), PSCB(vcpu,delivery_mask));
 }
 
@@ -948,30 +949,30 @@ IA64FAULT vcpu_set_itm(VCPU *vcpu, UINT64 val)
 
 	//if (val < now) val = now + 1000;
 //printf("*** vcpu_set_itm: called with %lx\n",val);
-	PSCB(vcpu,domain_itm) = val;
+	PSCBX(vcpu,domain_itm) = val;
 	vcpu_set_next_timer(vcpu);
 	return (IA64_NO_FAULT);
 }
 
 IA64FAULT vcpu_set_itc(VCPU *vcpu, UINT64 val)
 {
-	
+
 	UINT64 oldnow = ia64_get_itc();
-	UINT64 olditm = PSCB(vcpu,domain_itm);
+	UINT64 olditm = PSCBX(vcpu,domain_itm);
 	unsigned long d = olditm - oldnow;
 	unsigned long x = local_cpu_data->itm_next - oldnow;
-	
+
 	UINT64 newnow = val, min_delta;
 
 	local_irq_disable();
 	if (olditm) {
 printf("**** vcpu_set_itc(%lx): vitm changed to %lx\n",val,newnow+d);
-		PSCB(vcpu,domain_itm) = newnow + d;
+		PSCBX(vcpu,domain_itm) = newnow + d;
 	}
 	local_cpu_data->itm_next = newnow + x;
-	d = PSCB(vcpu,domain_itm);
+	d = PSCBX(vcpu,domain_itm);
 	x = local_cpu_data->itm_next;
-	
+
 	ia64_set_itc(newnow);
 	if (d && (d > newnow) && (d < x)) {
 		vcpu_safe_set_itm(d);
@@ -1006,7 +1007,7 @@ void vcpu_pend_timer(VCPU *vcpu)
 
 	if (vcpu_timer_disabled(vcpu)) return;
 	//if (vcpu_timer_inservice(vcpu)) return;
-	if (PSCB(vcpu,domain_itm_last) == PSCB(vcpu,domain_itm)) {
+	if (PSCBX(vcpu,domain_itm_last) == PSCBX(vcpu,domain_itm)) {
 		// already delivered an interrupt for this so
 		// don't deliver another
 		return;
@@ -1014,7 +1015,7 @@ void vcpu_pend_timer(VCPU *vcpu)
 #if 0
 	// attempt to flag "timer tick before its due" source
 	{
-	UINT64 itm = PSCB(vcpu,domain_itm);
+	UINT64 itm = PSCBX(vcpu,domain_itm);
 	UINT64 now = ia64_get_itc();
 	if (now < itm) printf("******* vcpu_pend_timer: pending before due!\n");
 	}
@@ -1026,7 +1027,7 @@ void vcpu_pend_timer(VCPU *vcpu)
 UINT64 vcpu_timer_pending_early(VCPU *vcpu)
 {
 	UINT64 now = ia64_get_itc();
-	UINT64 itm = PSCB(vcpu,domain_itm);
+	UINT64 itm = PSCBX(vcpu,domain_itm);
 
 	if (vcpu_timer_disabled(vcpu)) return 0;
 	if (!itm) return 0;
@@ -1038,7 +1039,7 @@ void vcpu_poke_timer(VCPU *vcpu)
 {
 	UINT64 itv = PSCB(vcpu,itv) & 0xff;
 	UINT64 now = ia64_get_itc();
-	UINT64 itm = PSCB(vcpu,domain_itm);
+	UINT64 itm = PSCBX(vcpu,domain_itm);
 	UINT64 irr;
 
 	if (vcpu_timer_disabled(vcpu)) return;
@@ -1048,8 +1049,8 @@ void vcpu_poke_timer(VCPU *vcpu)
 		while(1);
 	}
 	// using 0xef instead of itv so can get real irr
-	if (now > itm && !test_bit(0xefL, PSCB(vcpu,insvc))) {
-		if (!test_bit(0xefL,PSCB(vcpu,irr))) {
+	if (now > itm && !test_bit(0xefL, PSCBX(vcpu,insvc))) {
+		if (!test_bit(0xefL,PSCBX(vcpu,irr))) {
 			irr = ia64_getreg(_IA64_REG_CR_IRR3);
 			if (irr & (1L<<(0xef-0xc0))) return;
 if (now-itm>0x800000)
@@ -1106,7 +1107,7 @@ printf("SI_CR_IIP/IPSR/IFS_OFFSET CHANGED, SEE dorfirfi\n");
 printf("SI_CR_IIP=0x%x,IPSR=0x%x,IFS_OFFSET=0x%x\n",SI_OFS(iip),SI_OFS(ipsr),SI_OFS(ifs));
 while(1);
 }
-		// TODO: validate PSCB(vcpu,iip) 
+		// TODO: validate PSCB(vcpu,iip)
 		// TODO: PSCB(vcpu,ipsr) = psr;
 		PSCB(vcpu,ipsr) = psr.i64;
 		// now set up the trampoline
@@ -1353,7 +1354,6 @@ IA64FAULT vcpu_get_cpuid(VCPU *vcpu, UINT64 reg, UINT64 *pval)
 
 unsigned long vcpu_get_rr_ve(VCPU *vcpu,UINT64 vadr)
 {
-	
 	ia64_rr rr;
 
 	rr.rrval = PSCB(vcpu,rrs)[vadr>>61];
@@ -1363,7 +1363,6 @@ unsigned long vcpu_get_rr_ve(VCPU *vcpu,UINT64 vadr)
 
 unsigned long vcpu_get_rr_ps(VCPU *vcpu,UINT64 vadr)
 {
-	
 	ia64_rr rr;
 
 	rr.rrval = PSCB(vcpu,rrs)[vadr>>61];
@@ -1373,7 +1372,6 @@ unsigned long vcpu_get_rr_ps(VCPU *vcpu,UINT64 vadr)
 
 unsigned long vcpu_get_rr_rid(VCPU *vcpu,UINT64 vadr)
 {
-	
 	ia64_rr rr;
 
 	rr.rrval = PSCB(vcpu,rrs)[vadr>>61];
@@ -1460,8 +1458,8 @@ TR_ENTRY *vcpu_match_tr_entry(VCPU *vcpu, TR_ENTRY *trp, UINT64 ifa, int count)
 	for (i = 0; i < count; i++, trp++) {
 		if (!trp->p) continue;
 		if (physicalize_rid(vcpu,trp->rid) != rid) continue;
-        	if (ifa < trp->vadr) continue;
-        	if (ifa >= (trp->vadr + (1L << trp->ps)) - 1) continue;
+		if (ifa < trp->vadr) continue;
+		if (ifa >= (trp->vadr + (1L << trp->ps)) - 1) continue;
 		//if (trp->key && !match_pkr(vcpu,trp->key)) continue;
 		return trp;
 	}
@@ -1472,9 +1470,9 @@ TR_ENTRY *match_tr(VCPU *vcpu, unsigned long ifa)
 {
 	TR_ENTRY *trp;
 
-	trp = vcpu_match_tr_entry(vcpu,vcpu->vcpu_info->arch.dtrs,ifa,NDTRS);
+	trp = vcpu_match_tr_entry(vcpu,vcpu->arch.dtrs,ifa,NDTRS);
 	if (trp) return trp;
-	trp = vcpu_match_tr_entry(vcpu,vcpu->vcpu_info->arch.itrs,ifa,NITRS);
+	trp = vcpu_match_tr_entry(vcpu,vcpu->arch.itrs,ifa,NITRS);
 	if (trp) return trp;
 	return 0;
 }
@@ -1485,7 +1483,8 @@ IA64FAULT vcpu_itr_d(VCPU *vcpu, UINT64 slot, UINT64 pte,
 	TR_ENTRY *trp;
 
 	if (slot >= NDTRS) return IA64_RSVDREG_FAULT;
-	trp = &PSCB(vcpu,dtrs[slot]);
+	trp = &PSCBX(vcpu,dtrs[slot]);
+//printf("***** itr.d: setting slot %d: ifa=%p\n",slot,ifa);
 	vcpu_set_tr_entry(trp,pte,itir,ifa);
 	return IA64_NO_FAULT;
 }
@@ -1496,7 +1495,8 @@ IA64FAULT vcpu_itr_i(VCPU *vcpu, UINT64 slot, UINT64 pte,
 	TR_ENTRY *trp;
 
 	if (slot >= NITRS) return IA64_RSVDREG_FAULT;
-	trp = &PSCB(vcpu,itrs[slot]);
+	trp = &PSCBX(vcpu,itrs[slot]);
+//printf("***** itr.i: setting slot %d: ifa=%p\n",slot,ifa);
 	vcpu_set_tr_entry(trp,pte,itir,ifa);
 	return IA64_NO_FAULT;
 }
@@ -1539,12 +1539,12 @@ void vcpu_itc_no_srlz(VCPU *vcpu, UINT64 IorD, UINT64 vaddr, UINT64 pte, UINT64 
 #endif
 	if (IorD & 0x4) return;  // don't place in 1-entry TLB
 	if (IorD & 0x1) {
-		vcpu_set_tr_entry(&PSCB(vcpu,itlb),pte,ps<<2,vaddr);
-		PSCB(vcpu,itlb_pte) = mp_pte;
+		vcpu_set_tr_entry(&PSCBX(vcpu,itlb),pte,ps<<2,vaddr);
+		PSCBX(vcpu,itlb_pte) = mp_pte;
 	}
 	if (IorD & 0x2) {
-		vcpu_set_tr_entry(&PSCB(vcpu,dtlb),pte,ps<<2,vaddr);
-		PSCB(vcpu,dtlb_pte) = mp_pte;
+		vcpu_set_tr_entry(&PSCBX(vcpu,dtlb),pte,ps<<2,vaddr);
+		PSCBX(vcpu,dtlb_pte) = mp_pte;
 	}
 }
 
@@ -1554,9 +1554,9 @@ unsigned long match_dtlb(VCPU *vcpu, unsigned long ifa, unsigned long *ps, unsig
 {
 	TR_ENTRY *trp;
 
-	if (trp = vcpu_match_tr_entry(vcpu,&vcpu->vcpu_info->arch.dtlb,ifa,1)) {
+	if (trp = vcpu_match_tr_entry(vcpu,&vcpu->arch.dtlb,ifa,1)) {
 		if (ps) *ps = trp->ps;
-		if (mp_pte) *mp_pte = vcpu->vcpu_info->arch.dtlb_pte;
+		if (mp_pte) *mp_pte = vcpu->arch.dtlb_pte;
 		return (trp->page_flags);
 	}
 	return 0UL;
@@ -1660,8 +1660,8 @@ IA64FAULT vcpu_ptc_e(VCPU *vcpu, UINT64 vadr)
 #endif
 	local_flush_tlb_all();
 	// just invalidate the "whole" tlb
-	vcpu_purge_tr_entry(&PSCB(vcpu,dtlb));
-	vcpu_purge_tr_entry(&PSCB(vcpu,itlb));
+	vcpu_purge_tr_entry(&PSCBX(vcpu,dtlb));
+	vcpu_purge_tr_entry(&PSCBX(vcpu,itlb));
 	return IA64_NO_FAULT;
 }
 
@@ -1681,8 +1681,8 @@ IA64FAULT vcpu_ptc_ga(VCPU *vcpu,UINT64 vadr,UINT64 addr_range)
 	vhpt_flush_address(vadr,addr_range);
 #endif
 	ia64_global_tlb_purge(vadr,vadr+addr_range,PAGE_SHIFT);
-	vcpu_purge_tr_entry(&PSCB(vcpu,dtlb));
-	vcpu_purge_tr_entry(&PSCB(vcpu,itlb));
+	vcpu_purge_tr_entry(&PSCBX(vcpu,dtlb));
+	vcpu_purge_tr_entry(&PSCBX(vcpu,itlb));
 	return IA64_NO_FAULT;
 }
 

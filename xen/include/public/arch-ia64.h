@@ -63,24 +63,8 @@ typedef struct {
 	unsigned long bank1_regs[16]; // bank1 regs (r16-r31) when bank0 active
 	unsigned long rrs[8];	// region registers
 	unsigned long krs[8];	// kernel registers
-	unsigned long pkrs[8]; // protection key registers
-	// FIXME:  These shouldn't be here as they can be overwritten by guests
-	// and validation at TLB miss time would be too expensive.
-	TR_ENTRY itrs[NITRS];
-	TR_ENTRY dtrs[NDTRS];
-	TR_ENTRY itlb;
-	TR_ENTRY dtlb;
-	unsigned long itlb_pte;
-	unsigned long dtlb_pte;
-	unsigned long irr[4];
-	unsigned long insvc[4];
-	unsigned long iva;
-	unsigned long dcr;
-	unsigned long itc;
-	unsigned long domain_itm;
-	unsigned long domain_itm_last;
-	unsigned long xen_itm;
-	unsigned long xen_timer_interval;
+	unsigned long pkrs[8];	// protection key registers
+	unsigned long tmp[8];	// temp registers (e.g. for hyperprivops)
 //} PACKED arch_shared_info_t;
 } arch_vcpu_info_t;		// DON'T PACK 
 

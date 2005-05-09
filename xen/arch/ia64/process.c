@@ -51,6 +51,7 @@ extern unsigned long dom0_start, dom0_size;
 			IA64_PSR_SS | IA64_PSR_RI | IA64_PSR_ED | IA64_PSR_IA)
 
 #define PSCB(x,y)	x->vcpu_info->arch.y
+#define PSCBX(x,y)	x->arch.y
 
 extern unsigned long vcpu_verbose;
 
@@ -154,7 +155,7 @@ panic_domain(regs,"psr.ic off, delivering fault=%lx,iip=%p,ifa=%p,isr=%p,PSCB.ii
 		}
 //printf("Delivering NESTED DATA TLB fault\n");
 		vector = IA64_DATA_NESTED_TLB_VECTOR;
-		regs->cr_iip = ((unsigned long) PSCB(ed,iva) + vector) & ~0xffUL;
+		regs->cr_iip = ((unsigned long) PSCBX(ed,iva) + vector) & ~0xffUL;
 		regs->cr_ipsr = (regs->cr_ipsr & ~DELIVER_PSR_CLR) | DELIVER_PSR_SET;
 // NOTE: nested trap must NOT pass PSCB address
 		//regs->r31 = (unsigned long) &PSCB(ed);
@@ -187,7 +188,7 @@ panic_domain(regs,"psr.ic off, delivering fault=%lx,iip=%p,ifa=%p,isr=%p,PSCB.ii
 	PSCB(ed,ifs) = 0;
 	PSCB(ed,incomplete_regframe) = 0;
 
-	regs->cr_iip = ((unsigned long) PSCB(ed,iva) + vector) & ~0xffUL;
+	regs->cr_iip = ((unsigned long) PSCBX(ed,iva) + vector) & ~0xffUL;
 	regs->cr_ipsr = (regs->cr_ipsr & ~DELIVER_PSR_CLR) | DELIVER_PSR_SET;
 #ifdef CONFIG_SMP
 #error "sharedinfo doesn't handle smp yet"

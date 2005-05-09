@@ -37,10 +37,28 @@ struct arch_domain {
 #define shared_info_va arch.shared_info_va
 
 struct arch_exec_domain {
+#if 1
+	TR_ENTRY itrs[NITRS];
+	TR_ENTRY dtrs[NDTRS];
+	TR_ENTRY itlb;
+	TR_ENTRY dtlb;
+	unsigned long itlb_pte;
+	unsigned long dtlb_pte;
+	unsigned long irr[4];
+	unsigned long insvc[4];
+	unsigned long iva;
+	unsigned long dcr;
+	unsigned long itc;
+	unsigned long domain_itm;
+	unsigned long domain_itm_last;
+	unsigned long xen_itm;
+	unsigned long xen_timer_interval;
+#endif
     void *regs;	/* temporary until find a better way to do privops */
-    struct thread_struct _thread;
     struct mm_struct *active_mm;
+    struct thread_struct _thread;	// this must be last
 };
+
 #define active_mm arch.active_mm
 #define thread arch._thread
 
