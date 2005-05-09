@@ -369,7 +369,7 @@ long sched_adjdom(struct sched_adjdom_cmd *cmd)
             cpu = ed->processor;
             if (!__get_cpu_bit(cpu, have_lock)) {
                 /* if we don't have a lock on this CPU: acquire it*/
-                if (!spin_trylock(&schedule_data[cpu].schedule_lock)) {
+                if (spin_trylock(&schedule_data[cpu].schedule_lock)) {
                     /*we have this lock!*/
                     __set_cpu_bit(cpu, have_lock);
                     succ = 1;
