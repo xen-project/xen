@@ -364,7 +364,8 @@ static int vmx_final_setup_guest(
 
         /* Put the domain in shadow mode even though we're going to be using
          * the shared 1:1 page table initially. It shouldn't hurt */
-        shadow_mode_enable(ed->domain, SHM_enable|SHM_translate|SHM_external);
+        shadow_mode_enable(ed->domain,
+                           SHM_enable|SHM_refcounts|SHM_translate|SHM_external);
     }
 
     return 0;
@@ -432,7 +433,7 @@ int arch_set_info_guest(
     phys_basetab = c->pt_base;
     ed->arch.guest_table = mk_pagetable(phys_basetab);
 
-    if ( shadow_mode_enabled(d) )
+    if ( shadow_mode_refcounts(d) )
     {
         if ( !get_page(&frame_table[phys_basetab>>PAGE_SHIFT], d) )
             return -EINVAL;
@@ -981,17 +982,21 @@ void domain_relinquish_resources(struct domain *d)
     {
         if ( pagetable_val(ed->arch.guest_table) != 0 )
         {
-            (shadow_mode_enabled(d) ? put_page : put_page_and_type)
-                (&frame_table[pagetable_val(
-                    ed->arch.guest_table) >> PAGE_SHIFT]);
+            if ( shadow_mode_refcounts(d) )
+                put_page(&frame_table[pagetable_get_pfn(ed->arch.guest_table)]);
+            else
+                put_page_and_type(&frame_table[pagetable_get_pfn(ed->arch.guest_table)]);
+
             ed->arch.guest_table = mk_pagetable(0);
         }
 
         if ( pagetable_val(ed->arch.guest_table_user) != 0 )
         {
-            (shadow_mode_enabled(d) ? put_page : put_page_and_type)
-                (&frame_table[pagetable_val(
-                    ed->arch.guest_table_user) >> PAGE_SHIFT]);
+            if ( shadow_mode_refcounts(d) )
+                put_page(&frame_table[pagetable_get_pfn(ed->arch.guest_table_user)]);
+            else
+                put_page_and_type(&frame_table[pagetable_get_pfn(ed->arch.guest_table_user)]);
+
             ed->arch.guest_table_user = mk_pagetable(0);
         }
 
