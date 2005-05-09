@@ -849,6 +849,20 @@ IA64FAULT vcpu_set_cmcv(VCPU *vcpu, UINT64 val)
 }
 
 /**************************************************************************
+ VCPU temporary register access routines
+**************************************************************************/
+UINT64 vcpu_get_tmp(VCPU *vcpu, UINT64 index)
+{
+	if (index > 7) return 0;
+	return PSCB(vcpu,tmp[index]);
+}
+
+void vcpu_set_tmp(VCPU *vcpu, UINT64 index, UINT64 val)
+{
+	if (index <= 7) PSCB(vcpu,tmp[index]) = val;
+}
+
+/**************************************************************************
 Interval timer routines
 **************************************************************************/
 

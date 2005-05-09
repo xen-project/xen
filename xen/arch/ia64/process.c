@@ -724,7 +724,7 @@ ia64_handle_break (unsigned long ifa, struct pt_regs *regs, unsigned long isr, u
 			vcpu_increment_iip(current);
 	}
 	else if (!PSCB(ed,interrupt_collection_enabled)) {
-		if (ia64_hyperprivop(iim))
+		if (ia64_hyperprivop(iim,regs))
 			vcpu_increment_iip(current);
 	}
 	else reflect_interruption(ifa,isr,iim,regs,IA64_BREAK_VECTOR);
