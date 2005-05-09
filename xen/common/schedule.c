@@ -40,6 +40,17 @@
 static char opt_sched[10] = "bvt";
 string_param("sched", opt_sched);
 
+/*#define WAKE_HISTO*/
+/*#define BLOCKTIME_HISTO*/
+/*#define ADV_SCHED_HISTO*/
+//#include <xen/adv_sched_hist.h>
+
+#if defined(WAKE_HISTO)
+#define BUCKETS 31
+#elif defined(BLOCKTIME_HISTO)
+#define BUCKETS 200
+#endif
+
 #define TIME_SLOP      (s32)MICROSECS(50)     /* allow time to slip a bit */
 
 /* Various timer handlers. */
@@ -51,8 +62,10 @@ static void dom_timer_fn(unsigned long data);
 struct schedule_data schedule_data[NR_CPUS];
 
 extern struct scheduler sched_bvt_def;
+extern struct scheduler sched_sedf_def;
 static struct scheduler *schedulers[] = { 
     &sched_bvt_def,
+    &sched_sedf_def,
     NULL
 };
 
@@ -226,6 +239,10 @@ long do_block(void)
 {
     struct exec_domain *ed = current;
 
+#ifdef ADV_SCHED_HISTO
+    adv_sched_hist_start(current->processor);
+#endif
+
     ed->vcpu_info->evtchn_upcall_mask = 0;
     set_bit(EDF_BLOCKED, &ed->flags);
 
@@ -246,6 +263,10 @@ long do_block(void)
 /* Voluntarily yield the processor for this allocation. */
 static long do_yield(void)
 {
+#ifdef ADV_SCHED_HISTO
+    adv_sched_hist_start(current->processor);
+#endif
+    
     TRACE_2D(TRC_SCHED_YIELD, current->domain->id, current->id);
     __enter_scheduler();
     return 0;
@@ -275,6 +296,7 @@ long do_sched_op(unsigned long op)
 
     case SCHEDOP_shutdown:
     {
+        TRACE_3D(TRC_SCHED_SHUTDOWN, current->domain->id, current->id,
         TRACE_3D(TRC_SCHED_SHUTDOWN, current->domain->id, current->id,
                  (op >> SCHEDOP_reasonshift));
         domain_shutdown((u8)(op >> SCHEDOP_reasonshift));
@@ -322,10 +344,22 @@ long sched_ctl(struct sched_ctl_cmd *cmd)
 long sched_adjdom(struct sched_adjdom_cmd *cmd)
 {
     struct domain *d;
+    struct exec_domain *ed;
+    int cpu;
+#if NR_CPUS <=32
+    unsigned long have_lock;
+ #else
+    unsigned long long have_lock;
+#endif
+    int succ;
 
+    #define __set_cpu_bit(cpu, data) data |= ((typeof(data))1)<<cpu
+    #define __get_cpu_bit(cpu, data) (data & ((typeof(data))1)<<cpu)
+    #define __clear_cpu_bits(data) data = ((typeof(data))0)
+    
     if ( cmd->sched_id != ops.sched_id )
         return -EINVAL;
-
+    
     if ( cmd->direction != SCHED_INFO_PUT && cmd->direction != SCHED_INFO_GET )
         return -EINVAL;
 
@@ -333,9 +367,38 @@ long sched_adjdom(struct sched_adjdom_cmd *cmd)
     if ( d == NULL )
         return -ESRCH;
 
-    spin_lock_irq(&schedule_data[d->exec_domain[0]->processor].schedule_lock);
+    /* acquire locks on all CPUs on which exec_domains of this domain run */
+    do {
+        succ = 0;
+        __clear_cpu_bits(have_lock);
+        for_each_exec_domain(d, ed) {
+            cpu = ed->processor;
+            if (!__get_cpu_bit(cpu, have_lock)) {
+                /* if we don't have a lock on this CPU: acquire it*/
+                if (spin_trylock(&schedule_data[cpu].schedule_lock)) {
+                    /*we have this lock!*/
+                    __set_cpu_bit(cpu, have_lock);
+                    succ = 1;
+                } else {
+                    /*we didn,t get this lock -> free all other locks too!*/
+                    for (cpu = 0; cpu < NR_CPUS; cpu++)
+                        if (__get_cpu_bit(cpu, have_lock))
+                            spin_unlock(&schedule_data[cpu].schedule_lock);
+                    /* and start from the beginning! */
+                    succ = 0;
+                    /* leave the "for_each_domain_loop" */
+                    break;
+                }
+            }
+        }
+    } while (!succ);
+    //spin_lock_irq(&schedule_data[d->exec_domain[0]->processor].schedule_lock);
     SCHED_OP(adjdom, d, cmd);
-    spin_unlock_irq(&schedule_data[d->exec_domain[0]->processor].schedule_lock);
+    //spin_unlock_irq(&schedule_data[d->exec_domain[0]->processor].schedule_lock);
+    for (cpu = 0; cpu < NR_CPUS; cpu++)
+        if (__get_cpu_bit(cpu, have_lock))
+            spin_unlock(&schedule_data[cpu].schedule_lock);
+    __clear_cpu_bits(have_lock);
 
     TRACE_1D(TRC_SCHED_ADJDOM, d->id);
     put_domain(d);
@@ -358,8 +421,14 @@ static void __enter_scheduler(void)
     perfc_incrc(sched_run);
     
     spin_lock_irq(&schedule_data[cpu].schedule_lock);
- 
+
+#ifdef ADV_SCHED_HISTO
+    adv_sched_hist_from_stop(cpu);
+#endif
     now = NOW();
+#ifdef ADV_SCHED_HISTO
+    adv_sched_hist_start(cpu);
+#endif
 
     rem_ac_timer(&schedule_data[cpu].s_timer);
     
@@ -386,9 +455,12 @@ static void __enter_scheduler(void)
 
     spin_unlock_irq(&schedule_data[cpu].schedule_lock);
 
-    if ( unlikely(prev == next) )
+    if ( unlikely(prev == next) ) {
+#ifdef ADV_SCHED_HISTO
+        adv_sched_hist_to_stop(cpu);
+#endif
         return continue_running(prev);
-    
+    }
     perfc_incrc(sched_ctx);
 
 #if defined(WAKE_HISTO)
@@ -423,6 +495,10 @@ static void __enter_scheduler(void)
              prev->domain->id, prev->id,
              next->domain->id, next->id);
 
+#ifdef ADV_SCHED_HISTO
+    adv_sched_hist_to_stop(cpu);
+#endif
+
     context_switch(prev, next);
 }
 
@@ -444,6 +520,10 @@ int idle_cpu(int cpu)
 /* The scheduler timer: force a run through the scheduler */
 static void s_timer_fn(unsigned long unused)
 {
+#ifdef ADV_SCHED_HISTO
+    adv_sched_hist_start(current->processor);
+#endif
+
     raise_softirq(SCHEDULE_SOFTIRQ);
     perfc_incrc(sched_irq);
 }
@@ -587,8 +667,65 @@ void reset_sched_histo(unsigned char key)
             schedule_data[j].hist[i] = 0;
 }
 #else
+#if defined(ADV_SCHED_HISTO)
+void print_sched_histo(unsigned char key)
+{
+    int i, j, k,t;
+    printf("Hello!\n");
+    for ( k = 0; k < smp_num_cpus; k++ )
+    {
+        j = 0;
+	t = 0;
+        printf ("CPU[%02d]: scheduler latency histogram FROM (ms:[count])\n", k);
+        for ( i = 0; i < BUCKETS; i++ )
+        {
+            //if ( schedule_data[k].hist[i] != 0 )
+            {
+	        t += schedule_data[k].from_hist[i];
+                if ( i < BUCKETS-1 )
+                    printk("%3d:[%7u]    ", i, schedule_data[k].from_hist[i]);
+                else
+                    printk(" >:[%7u]    ", schedule_data[k].from_hist[i]);
+                //if ( !(++j % 5) )
+                    printk("\n");
+            }
+        }
+        printk("\nTotal: %i\n",t);
+    }
+    for ( k = 0; k < smp_num_cpus; k++ )
+    {
+        j = 0; t = 0;
+        printf ("CPU[%02d]: scheduler latency histogram TO (ms:[count])\n", k);
+        for ( i = 0; i < BUCKETS; i++ )
+        {
+            //if ( schedule_data[k].hist[i] != 0 )
+            {
+	    	t += schedule_data[k].from_hist[i];
+                if ( i < BUCKETS-1 )
+                    printk("%3d:[%7u]    ", i, schedule_data[k].to_hist[i]);
+                else
+                    printk(" >:[%7u]    ", schedule_data[k].to_hist[i]);
+                //if ( !(++j % 5) )
+                    printk("\n");
+            }
+        }
+	printk("\nTotal: %i\n",t);
+    }
+      
+}
+void reset_sched_histo(unsigned char key)
+{
+    int i, j;
+    for ( j = 0; j < smp_num_cpus; j++ ) {
+        for ( i=0; i < BUCKETS; i++ ) 
+            schedule_data[j].to_hist[i] = schedule_data[j].from_hist[i] = 0;
+        schedule_data[j].save_tsc = 0;
+    }
+}
+#else
 void print_sched_histo(unsigned char key) { }
 void reset_sched_histo(unsigned char key) { }
+#endif
 #endif
 
 /*
