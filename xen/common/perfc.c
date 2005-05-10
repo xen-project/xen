@@ -4,6 +4,7 @@
 #include <xen/time.h>
 #include <xen/perfc.h>
 #include <xen/keyhandler.h> 
+#include <xen/spinlock.h>
 #include <public/dom0_ops.h>
 #include <asm/uaccess.h>
 

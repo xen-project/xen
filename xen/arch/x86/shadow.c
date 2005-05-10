@@ -1898,37 +1898,34 @@ void shadow_mark_va_out_of_sync(
  * Returns 0 otherwise.
  */
 static int snapshot_entry_matches(
-    struct exec_domain *ed, unsigned long gmfn, unsigned index)
+    struct domain *d, l1_pgentry_t *guest_pt,
+    unsigned long gpfn, unsigned index)
 {
-    unsigned long gpfn = __mfn_to_gpfn(ed->domain, gmfn);
-    unsigned long smfn = __shadow_status(ed->domain, gpfn, PGT_snapshot);
-    unsigned long *guest, *snapshot;
-    int compare;
-
-    ASSERT( ! IS_INVALID_M2P_ENTRY(gpfn) );
+    unsigned long smfn = __shadow_status(d, gpfn, PGT_snapshot);
+    l1_pgentry_t *snapshot; // could be L1s or L2s or ...
+    int entries_match;
 
     perfc_incrc(snapshot_entry_matches_calls);
 
     if ( !smfn )
         return 0;
 
-    guest    = map_domain_mem(gmfn << PAGE_SHIFT);
     snapshot = map_domain_mem(smfn << PAGE_SHIFT);
 
     // This could probably be smarter, but this is sufficent for
     // our current needs.
     //
-    compare = (guest[index] == snapshot[index]);
+    entries_match = !l1e_has_changed(&guest_pt[index], &snapshot[index],
+                                     PAGE_FLAG_MASK);
 
-    unmap_domain_mem(guest);
     unmap_domain_mem(snapshot);
 
 #ifdef PERF_COUNTERS
-    if ( compare )
+    if ( entries_match )
         perfc_incrc(snapshot_entry_matches_true);
 #endif
 
-    return compare;
+    return entries_match;
 }
 
 /*
@@ -1939,37 +1936,35 @@ int __shadow_out_of_sync(struct exec_domain *ed, unsigned long va)
 {
     struct domain *d = ed->domain;
     unsigned long l2mfn = pagetable_get_pfn(ed->arch.guest_table);
+    unsigned long l2pfn = __mfn_to_gpfn(d, l2mfn);
     l2_pgentry_t l2e;
-    unsigned long l1mfn;
+    unsigned long l1pfn, l1mfn;
 
     ASSERT(spin_is_locked(&d->arch.shadow_lock));
+    ASSERT(VALID_M2P(l2pfn));
 
     perfc_incrc(shadow_out_of_sync_calls);
 
-    // PERF BUG: snapshot_entry_matches will call map_domain_mem() on the l2
-    // page, but it's already available at ed->arch.guest_vtable...
-    // Ditto for the sl2 page and ed->arch.shadow_vtable.
-    //
     if ( page_out_of_sync(&frame_table[l2mfn]) &&
-         !snapshot_entry_matches(ed, l2mfn, l2_table_offset(va)) )
+         !snapshot_entry_matches(d, (l1_pgentry_t *)ed->arch.guest_vtable,
+                                 l2pfn, l2_table_offset(va)) )
         return 1;
 
     __guest_get_l2e(ed, va, &l2e);
     if ( !(l2e_get_flags(l2e) & _PAGE_PRESENT) )
         return 0;
 
-    l1mfn = __gpfn_to_mfn(d, l2e_get_pfn(l2e));
+    l1pfn = l2e_get_pfn(l2e);
+    l1mfn = __gpfn_to_mfn(d, l1pfn);
 
     // If the l1 pfn is invalid, it can't be out of sync...
     if ( !VALID_MFN(l1mfn) )
         return 0;
 
-    // PERF BUG: snapshot_entry_matches will call map_domain_mem() on the l1
-    // page, but it's already available at linear_pg_table[l1_linear_offset()].
-    // Ditto for the sl1 page and shadow_linear_pg_table[]...
-    //
     if ( page_out_of_sync(&frame_table[l1mfn]) &&
-         !snapshot_entry_matches(ed, l1mfn, l1_table_offset(va)) )
+         !snapshot_entry_matches(
+             d, &linear_pg_table[l1_linear_offset(va) & ~(L1_PAGETABLE_ENTRIES-1)],
+             l1pfn, l1_table_offset(va)) )
         return 1;
 
     return 0;
