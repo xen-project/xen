@@ -17,7 +17,6 @@
 #ifdef CONFIG_PCI_MSI
 static inline int use_pci_vector(void)	{return 1;}
 static inline void disable_edge_ioapic_vector(unsigned int vector) { }
-static inline void mask_and_ack_level_ioapic_vector(unsigned int vector) { }
 static inline void end_edge_ioapic_vector (unsigned int vector) { }
 #define startup_level_ioapic	startup_level_ioapic_vector
 #define shutdown_level_ioapic	mask_IO_APIC_vector
@@ -36,7 +35,6 @@ static inline void end_edge_ioapic_vector (unsigned int vector) { }
 #else
 static inline int use_pci_vector(void)	{return 0;}
 static inline void disable_edge_ioapic_irq(unsigned int irq) { }
-static inline void mask_and_ack_level_ioapic_irq(unsigned int irq) { }
 static inline void end_edge_ioapic_irq (unsigned int irq) { }
 #define startup_level_ioapic	startup_level_ioapic_irq
 #define shutdown_level_ioapic	mask_IO_APIC_irq
