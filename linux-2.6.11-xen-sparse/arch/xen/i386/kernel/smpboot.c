@@ -1267,9 +1267,11 @@ static void __init smp_boot_cpus(unsigned int max_cpus)
 #if 0
 	if (nmi_watchdog == NMI_LOCAL_APIC)
 		check_nmi_watchdog();
+#endif
 
 	smpboot_setup_io_apic();
 
+#if 0
 	setup_boot_APIC_clock();
 
 	/*
