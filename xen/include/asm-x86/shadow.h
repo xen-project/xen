@@ -518,9 +518,9 @@ update_hl2e(struct exec_domain *ed, unsigned long va)
     else
         new_hl2e = l1e_empty();
 
-    // only do the ref counting if something important changed.
+    // only do the ref counting if something has changed.
     //
-    if ( (l1e_has_changed(&old_hl2e, &new_hl2e, _PAGE_PRESENT)) )
+    if ( (l1e_has_changed(&old_hl2e, &new_hl2e, PAGE_FLAG_MASK)) )
     {
         if ( (l1e_get_flags(new_hl2e) & _PAGE_PRESENT) &&
              !shadow_get_page(ed->domain, pfn_to_page(l1e_get_pfn(new_hl2e)),
@@ -531,14 +531,15 @@ update_hl2e(struct exec_domain *ed, unsigned long va)
             shadow_put_page(ed->domain, pfn_to_page(l1e_get_pfn(old_hl2e)));
             need_flush = 1;
         }
-    }
 
-    ed->arch.hl2_vtable[l2_table_offset(va)] = new_hl2e;
+        ed->arch.hl2_vtable[l2_table_offset(va)] = new_hl2e;
 
-    if ( need_flush )
-    {
-        perfc_incrc(update_hl2e_invlpg);
-        local_flush_tlb_one(&linear_pg_table[l1_linear_offset(va)]);
+        if ( need_flush )
+        {
+            perfc_incrc(update_hl2e_invlpg);
+            // SMP BUG???
+            local_flush_tlb_one(&linear_pg_table[l1_linear_offset(va)]);
+        }
     }
 }
 
@@ -1500,11 +1501,6 @@ shadow_set_l1e(unsigned long va, l1_pgentry_t new_spte, int create_l1_shadow)
     struct exec_domain *ed = current;
     struct domain *d = ed->domain;
     l2_pgentry_t sl2e;
-
-#if 0
-    printk("shadow_set_l1e(va=%p, new_spte=%p, create=%d)\n",
-           va, l1e_get_value(new_spte), create_l1_shadow);
-#endif
 
     __shadow_get_l2e(ed, va, &sl2e);
     if ( !(l2e_get_flags(sl2e) & _PAGE_PRESENT) )

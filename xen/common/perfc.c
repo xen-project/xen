@@ -4,6 +4,7 @@
 #include <xen/time.h>
 #include <xen/perfc.h>
 #include <xen/keyhandler.h> 
+#include <xen/spinlock.h>
 #include <public/dom0_ops.h>
 #include <asm/uaccess.h>
 
@@ -66,6 +67,14 @@ void perfc_printall(unsigned char key)
             for ( j = sum = 0; j < perfc_info[i].nr_elements; j++ )
                 sum += atomic_read(&counters[j]);
             printk("TOTAL[%10d]  ", sum);
+#ifdef PERF_ARRAYS
+            for ( j = 0; j < perfc_info[i].nr_elements; j++ )
+            {
+                if ( (j != 0) && ((j % 4) == 0) )
+                    printk("\n                   ");
+                printk("ARR%02d[%10d]  ", j, atomic_read(&counters[j]));
+            }
+#endif
             counters += j;
             break;
         }

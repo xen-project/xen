@@ -87,6 +87,7 @@ extern struct perfcounter perfcounters;
  * Histogram: special treatment for 0 and 1 count. After that equally spaced 
  * with last bucket taking the rest.
  */
+#ifdef PERFC_ARRAYS
 #define perfc_incr_histo(_x,_v,_n)                                          \
     do {                                                                    \
         if ( (_v) == 0 )                                                    \
@@ -99,6 +100,9 @@ extern struct perfcounter perfcounters;
         else                                                                \
             perfc_incra(_x, PERFC_MAX_ ## _n - 1);                          \
     } while ( 0 )
+#else
+#define perfc_incr_histo(_x,_v,_n) ((void)0)
+#endif
     
 #else /* PERF_COUNTERS */
 

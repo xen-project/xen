@@ -54,11 +54,6 @@
 #include <asm/desc.h>
 #include <asm/arch_hooks.h>
 
-#if 1
-#define Dprintk(args...)
-#else
-#include <mach_apic.h>
-#endif
 #include <mach_wakecpu.h>
 #include <smpboot_hooks.h>
 
@@ -472,7 +467,7 @@ extern void local_setup_timer(void);
 /*
  * Activate a secondary processor.
  */
-static int __init start_secondary(void *unused)
+static void __init start_secondary(void *unused)
 {
 	/*
 	 * Dont put anything before smp_callin(), SMP
@@ -1278,9 +1273,11 @@ static void __init smp_boot_cpus(unsigned int max_cpus)
 #if 0
 	if (nmi_watchdog == NMI_LOCAL_APIC)
 		check_nmi_watchdog();
+#endif
 
 	smpboot_setup_io_apic();
 
+#if 0
 	setup_boot_APIC_clock();
 
 	/*
