@@ -1004,8 +1004,9 @@ int dump_hyperprivop_counts(char *buf)
 	s += sprintf(s,"Hyperprivops:\n");
 	for (i = 1; i <= HYPERPRIVOP_MAX; i++)
 		if (hyperpriv_cnt[i])
-			s += sprintf("%10d %s\n",
+			s += sprintf(s,"%10d %s\n",
 				hyperpriv_cnt[i], hyperpriv_str[i]);
+	return s - buf;
 }
 
 void zero_hyperprivop_counts(void)
