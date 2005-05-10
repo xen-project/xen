@@ -3,11 +3,7 @@
 
 static inline void smpboot_clear_io_apic_irqs(void)
 {
-#if 1
-	printk("smpboot_clear_io_apic_irqs\n");
-#else
 	io_apic_irqs = 0;
-#endif
 }
 
 static inline void smpboot_setup_warm_reset_vector(unsigned long start_eip)
