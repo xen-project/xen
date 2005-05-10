@@ -1376,7 +1376,6 @@
 41aaf567Mi3OishhvrCtET1y-mxQBg xen/include/asm-x86/mtrr.h
 41a61536MFhNalgbVmYGXAhQsPTZNw xen/include/asm-x86/multicall.h
 3ddb79c3xjYnrv5t3VqYlR4tNEOl4Q xen/include/asm-x86/page.h
-3ddb79c3ysKUbxZuwKBRK3WXU2TlEg xen/include/asm-x86/pci.h
 42422fb0FVX-TJkSvAXnbfwMf19XFA xen/include/asm-x86/physdev.h
 3ddb79c2QF5-pZGzuX4QukPCDAl59A xen/include/asm-x86/processor.h
 40cf1596bim9F9DNdV75klgRSZ6Y2A xen/include/asm-x86/regs.h
