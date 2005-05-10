@@ -2,6 +2,7 @@
 verbose     ?= n
 debug       ?= n
 perfc       ?= n
+perfc_arrays?= n
 trace       ?= n
 optimize    ?= y
 domu_debug  ?= n
@@ -54,6 +55,9 @@ endif
 
 ifeq ($(perfc),y)
 CFLAGS += -DPERF_COUNTERS
+ifeq ($(perfc_arrays),y)
+CFLAGS += -DPERF_ARRAYS
+endif
 endif
 
 ifeq ($(trace),y)
