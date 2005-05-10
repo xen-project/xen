@@ -79,6 +79,14 @@ void raise_actimer_softirq(void)
 	raise_softirq(AC_TIMER_SOFTIRQ);
 }
 
+unsigned long __hypercall_create_continuation(
+	unsigned int op, unsigned int nr_args, ...)
+{
+	printf("__hypercall_create_continuation: not implemented!!!\n");
+}
+
+///////////////////////////////
+
 ///////////////////////////////
 // from arch/x86/apic.c
 ///////////////////////////////
@@ -139,7 +147,7 @@ void free_page_type(struct pfn_info *page, unsigned int type)
 void show_registers(struct pt_regs *regs)
 {
 	printf("*** ADD REGISTER DUMP HERE FOR DEBUGGING\n");
-}	
+}
 
 ///////////////////////////////
 // from common/keyhandler.c

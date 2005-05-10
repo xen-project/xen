@@ -1406,9 +1406,11 @@ int pirq_guest_bind(struct exec_domain *d, int irq, int will_share)
         desc->handler->startup(irq);
 
         /* Attempt to bind the interrupt target to the correct CPU. */
+#if 0 /* FIXME CONFIG_SMP ??? */
         if ( desc->handler->set_affinity != NULL )
             desc->handler->set_affinity(
                 irq, apicid_to_phys_cpu_present(d->processor));
+#endif
     }
     else if ( !will_share || !action->shareable )
     {

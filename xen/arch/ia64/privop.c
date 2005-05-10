@@ -205,7 +205,8 @@ IA64FAULT priv_itc_d(VCPU *vcpu, INST64 inst)
 		return(IA64_ILLOP_FAULT);
 	if ((fault = vcpu_get_ifa(vcpu,&ifa)) != IA64_NO_FAULT)
 		return(IA64_ILLOP_FAULT);
-	pte = vcpu_get_gr(vcpu,inst.M41.r2);
+	if (!inst.inst) pte = vcpu_get_tmp(vcpu,0);
+	else pte = vcpu_get_gr(vcpu,inst.M41.r2);
 
 	return (vcpu_itc_d(vcpu,pte,itir,ifa));
 }
@@ -219,7 +220,8 @@ IA64FAULT priv_itc_i(VCPU *vcpu, INST64 inst)
 		return(IA64_ILLOP_FAULT);
 	if ((fault = vcpu_get_ifa(vcpu,&ifa)) != IA64_NO_FAULT)
 		return(IA64_ILLOP_FAULT);
-	pte = vcpu_get_gr(vcpu,inst.M41.r2);
+	if (!inst.inst) pte = vcpu_get_tmp(vcpu,0);
+	else pte = vcpu_get_gr(vcpu,inst.M41.r2);
 
 	return (vcpu_itc_i(vcpu,pte,itir,ifa));
 }
@@ -417,10 +419,17 @@ IA64FAULT priv_mov_from_pmc(VCPU *vcpu, INST64 inst)
 	UINT64 val;
 	IA64FAULT fault;
 	
-	fault = vcpu_get_pmc(vcpu,vcpu_get_gr(vcpu,inst.M43.r3),&val);
-	if (fault == IA64_NO_FAULT)
-		return vcpu_set_gr(vcpu, inst.M43.r1, val);
-	else return fault;
+	if (inst.M43.r1 > 63) { // privified mov from pmd
+		fault = vcpu_get_pmd(vcpu,vcpu_get_gr(vcpu,inst.M43.r3),&val);
+		if (fault == IA64_NO_FAULT)
+			return vcpu_set_gr(vcpu, inst.M43.r1-64, val);
+	}
+	else {
+		fault = vcpu_get_pmc(vcpu,vcpu_get_gr(vcpu,inst.M43.r3),&val);
+		if (fault == IA64_NO_FAULT)
+			return vcpu_set_gr(vcpu, inst.M43.r1, val);
+	}
+	return fault;
 }
 
 unsigned long from_cr_cnt[128] = { 0 };
@@ -531,6 +540,8 @@ struct {
 	unsigned long bsw0;
 	unsigned long bsw1;
 	unsigned long cover;
+	unsigned long fc;
+	unsigned long cpuid;
 	unsigned long Mpriv_cnt[64];
 } privcnt = { 0 };
 
@@ -631,7 +642,11 @@ priv_handle_op(VCPU *vcpu, REGS *regs, int privlvl)
 				else x6 = 0x1a;
 			}
 		}
-		privcnt.Mpriv_cnt[x6]++;
+		if (x6 == 52 && inst.M28.r3 > 63)
+			privcnt.fc++;
+		else if (x6 == 16 && inst.M43.r3 > 63)
+			privcnt.cpuid++;
+		else privcnt.Mpriv_cnt[x6]++;
 		return (*pfunc)(vcpu,inst);
 		break;
 	    case B:
@@ -682,7 +697,7 @@ priv_handle_op(VCPU *vcpu, REGS *regs, int privlvl)
         //printf("We who are about do die salute you\n");
 	printf("handle_op: can't handle privop at 0x%lx (op=0x%016lx) slot %d (type=%d)\n",
 		 iip, (UINT64)inst.inst, slot, slot_type);
-        //printf("vtop(0x%lx)==0x%lx\r\n", iip, tr_vtop(iip));
+        //printf("vtop(0x%lx)==0x%lx\n", iip, tr_vtop(iip));
         //thread_mozambique("privop fault\n");
 	return (IA64_ILLOP_FAULT);
 }
@@ -745,6 +760,64 @@ priv_emulate(VCPU *vcpu, REGS *regs, UINT64 isr)
 }
 
 
+// FIXME: Move these to include/public/arch-ia64?
+#define HYPERPRIVOP_RFI			0x1
+#define HYPERPRIVOP_RSM_DT		0x2
+#define HYPERPRIVOP_SSM_DT		0x3
+#define HYPERPRIVOP_COVER		0x4
+#define HYPERPRIVOP_ITC_D		0x5
+#define HYPERPRIVOP_ITC_I		0x6
+#define HYPERPRIVOP_MAX			0x6
+
+char *hyperpriv_str[HYPERPRIVOP_MAX+1] = {
+	0, "rfi", "rsm.dt", "ssm.dt", "cover", "itc.d", "itc.i",
+	0
+};
+
+unsigned long hyperpriv_cnt[HYPERPRIVOP_MAX+1] = { 0 };
+
+/* hyperprivops are generally executed in assembly (with physical psr.ic off)
+ * so this code is primarily used for debugging them */
+int
+ia64_hyperprivop(unsigned long iim, REGS *regs)
+{
+	struct exec_domain *ed = (struct domain *) current;
+	INST64 inst;
+	UINT64 val;
+
+// FIXME: Add instrumentation for these
+// FIXME: Handle faults appropriately for these
+	if (!iim || iim > HYPERPRIVOP_MAX) {
+		printf("bad hyperprivop; ignored\n");
+		return 1;
+	}
+	hyperpriv_cnt[iim]++;
+	switch(iim) {
+	    case HYPERPRIVOP_RFI:
+		(void)vcpu_rfi(ed);
+		return 0;	// don't update iip
+	    case HYPERPRIVOP_RSM_DT:
+		(void)vcpu_reset_psr_dt(ed);
+		return 1;
+	    case HYPERPRIVOP_SSM_DT:
+		(void)vcpu_set_psr_dt(ed);
+		return 1;
+	    case HYPERPRIVOP_COVER:
+		(void)vcpu_cover(ed);
+		return 1;
+	    case HYPERPRIVOP_ITC_D:
+		inst.inst = 0;
+		(void)priv_itc_d(ed,inst);
+		return 1;
+	    case HYPERPRIVOP_ITC_I:
+		inst.inst = 0;
+		(void)priv_itc_i(ed,inst);
+		return 1;
+	}
+	return 0;
+}
+
+
 /**************************************************************************
 Privileged operation instrumentation routines
 **************************************************************************/
@@ -798,55 +871,61 @@ int dump_privop_counts(char *buf)
 	sum += privcnt.rfi; sum += privcnt.bsw0;
 	sum += privcnt.bsw1; sum += privcnt.cover;
 	for (i=0; i < 64; i++) sum += privcnt.Mpriv_cnt[i];
-	s += sprintf(s,"Privop statistics: (Total privops: %ld)\r\n",sum);
+	s += sprintf(s,"Privop statistics: (Total privops: %ld)\n",sum);
 	if (privcnt.mov_to_ar_imm)
-		s += sprintf(s,"%10d  %s [%d%%]\r\n", privcnt.mov_to_ar_imm,
+		s += sprintf(s,"%10d  %s [%d%%]\n", privcnt.mov_to_ar_imm,
 			"mov_to_ar_imm", (privcnt.mov_to_ar_imm*100L)/sum);
 	if (privcnt.mov_to_ar_reg)
-		s += sprintf(s,"%10d  %s [%d%%]\r\n", privcnt.mov_to_ar_reg,
+		s += sprintf(s,"%10d  %s [%d%%]\n", privcnt.mov_to_ar_reg,
 			"mov_to_ar_reg", (privcnt.mov_to_ar_reg*100L)/sum);
 	if (privcnt.mov_from_ar)
-		s += sprintf(s,"%10d  %s [%d%%]\r\n", privcnt.mov_from_ar,
+		s += sprintf(s,"%10d  %s [%d%%]\n", privcnt.mov_from_ar,
 			"privified-mov_from_ar", (privcnt.mov_from_ar*100L)/sum);
 	if (privcnt.ssm)
-		s += sprintf(s,"%10d  %s [%d%%]\r\n", privcnt.ssm,
+		s += sprintf(s,"%10d  %s [%d%%]\n", privcnt.ssm,
 			"ssm", (privcnt.ssm*100L)/sum);
 	if (privcnt.rsm)
-		s += sprintf(s,"%10d  %s [%d%%]\r\n", privcnt.rsm,
+		s += sprintf(s,"%10d  %s [%d%%]\n", privcnt.rsm,
 			"rsm", (privcnt.rsm*100L)/sum);
 	if (privcnt.rfi)
-		s += sprintf(s,"%10d  %s [%d%%]\r\n", privcnt.rfi,
+		s += sprintf(s,"%10d  %s [%d%%]\n", privcnt.rfi,
 			"rfi", (privcnt.rfi*100L)/sum);
 	if (privcnt.bsw0)
-		s += sprintf(s,"%10d  %s [%d%%]\r\n", privcnt.bsw0,
+		s += sprintf(s,"%10d  %s [%d%%]\n", privcnt.bsw0,
 			"bsw0", (privcnt.bsw0*100L)/sum);
 	if (privcnt.bsw1)
-		s += sprintf(s,"%10d  %s [%d%%]\r\n", privcnt.bsw1,
+		s += sprintf(s,"%10d  %s [%d%%]\n", privcnt.bsw1,
 			"bsw1", (privcnt.bsw1*100L)/sum);
 	if (privcnt.cover)
-		s += sprintf(s,"%10d  %s [%d%%]\r\n", privcnt.cover,
+		s += sprintf(s,"%10d  %s [%d%%]\n", privcnt.cover,
 			"cover", (privcnt.cover*100L)/sum);
+	if (privcnt.fc)
+		s += sprintf(s,"%10d  %s [%d%%]\n", privcnt.fc,
+			"privified-fc", (privcnt.fc*100L)/sum);
+	if (privcnt.cpuid)
+		s += sprintf(s,"%10d  %s [%d%%]\n", privcnt.cpuid,
+			"privified-getcpuid", (privcnt.cpuid*100L)/sum);
 	for (i=0; i < 64; i++) if (privcnt.Mpriv_cnt[i]) {
-		if (!Mpriv_str[i]) s += sprintf(s,"PRIVSTRING NULL!!\r\n");
-		else s += sprintf(s,"%10d  %s [%d%%]\r\n", privcnt.Mpriv_cnt[i],
+		if (!Mpriv_str[i]) s += sprintf(s,"PRIVSTRING NULL!!\n");
+		else s += sprintf(s,"%10d  %s [%d%%]\n", privcnt.Mpriv_cnt[i],
 			Mpriv_str[i], (privcnt.Mpriv_cnt[i]*100L)/sum);
 		if (i == 0x24) { // mov from CR
 			s += sprintf(s,"            [");
 			for (j=0; j < 128; j++) if (from_cr_cnt[j]) {
 				if (!cr_str[j])
-					s += sprintf(s,"PRIVSTRING NULL!!\r\n");
+					s += sprintf(s,"PRIVSTRING NULL!!\n");
 				s += sprintf(s,"%s(%d),",cr_str[j],from_cr_cnt[j]);
 			}
-			s += sprintf(s,"]\r\n");
+			s += sprintf(s,"]\n");
 		}
 		else if (i == 0x2c) { // mov to CR
 			s += sprintf(s,"            [");
 			for (j=0; j < 128; j++) if (to_cr_cnt[j]) {
 				if (!cr_str[j])
-					s += sprintf(s,"PRIVSTRING NULL!!\r\n");
+					s += sprintf(s,"PRIVSTRING NULL!!\n");
 				s += sprintf(s,"%s(%d),",cr_str[j],to_cr_cnt[j]);
 			}
-			s += sprintf(s,"]\r\n");
+			s += sprintf(s,"]\n");
 		}
 	}
 	return s - buf;
@@ -864,11 +943,76 @@ int zero_privop_counts(char *buf)
 	privcnt.ssm = 0; privcnt.rsm = 0;
 	privcnt.rfi = 0; privcnt.bsw0 = 0;
 	privcnt.bsw1 = 0; privcnt.cover = 0;
+	privcnt.fc = 0; privcnt.cpuid = 0;
 	for (i=0; i < 64; i++) privcnt.Mpriv_cnt[i] = 0;
 	for (j=0; j < 128; j++) from_cr_cnt[j] = 0;
 	for (j=0; j < 128; j++) to_cr_cnt[j] = 0;
-	s += sprintf(s,"All privop statistics zeroed\r\n");
+	s += sprintf(s,"All privop statistics zeroed\n");
 	return s - buf;
+}
+
+#ifdef PRIVOP_ADDR_COUNT
+
+extern struct privop_addr_count privop_addr_counter[];
+
+void privop_count_addr(unsigned long iip, int inst)
+{
+	struct privop_addr_count *v = &privop_addr_counter[inst];
+	int i;
+
+	for (i = 0; i < PRIVOP_COUNT_NADDRS; i++) {
+		if (!v->addr[i]) { v->addr[i] = iip; v->count[i]++; return; }
+		else if (v->addr[i] == iip)  { v->count[i]++; return; }
+	}
+	v->overflow++;;
+}
+
+int dump_privop_addrs(char *buf)
+{
+	int i,j;
+	char *s = buf;
+	s += sprintf(s,"Privop addresses:\n");
+	for (i = 0; i < PRIVOP_COUNT_NINSTS; i++) {
+		struct privop_addr_count *v = &privop_addr_counter[i];
+		s += sprintf(s,"%s:\n",v->instname);
+		for (j = 0; j < PRIVOP_COUNT_NADDRS; j++) {
+			if (!v->addr[j]) break;
+			s += sprintf(s," @%p #%ld\n",v->addr[j],v->count[j]);
+		}
+		if (v->overflow) 
+			s += sprintf(s," other #%ld\n",v->overflow);
+	}
+	return s - buf;
+}
+
+void zero_privop_addrs(void)
+{
+	int i,j;
+	for (i = 0; i < PRIVOP_COUNT_NINSTS; i++) {
+		struct privop_addr_count *v = &privop_addr_counter[i];
+		for (j = 0; j < PRIVOP_COUNT_NADDRS; j++)
+			v->addr[j] = v->count[j] = 0;
+		v->overflow = 0;
+	}
+}
+#endif
+
+int dump_hyperprivop_counts(char *buf)
+{
+	int i;
+	char *s = buf;
+	s += sprintf(s,"Hyperprivops:\n");
+	for (i = 1; i <= HYPERPRIVOP_MAX; i++)
+		if (hyperpriv_cnt[i])
+			s += sprintf(s,"%10d %s\n",
+				hyperpriv_cnt[i], hyperpriv_str[i]);
+	return s - buf;
+}
+
+void zero_hyperprivop_counts(void)
+{
+	int i;
+	for (i = 0; i <= HYPERPRIVOP_MAX; i++) hyperpriv_cnt[i] = 0;
 }
 
 #define TMPBUFLEN 8*1024
@@ -877,6 +1021,10 @@ int dump_privop_counts_to_user(char __user *ubuf, int len)
 	char buf[TMPBUFLEN];
 	int n = dump_privop_counts(buf);
 
+	n += dump_hyperprivop_counts(buf + n);
+#ifdef PRIVOP_ADDR_COUNT
+	n += dump_privop_addrs(buf + n);
+#endif
 	if (len < TMPBUFLEN) return -1;
 	if (__copy_to_user(ubuf,buf,n)) return -1;
 	return n;
@@ -887,6 +1035,10 @@ int zero_privop_counts_to_user(char __user *ubuf, int len)
 	char buf[TMPBUFLEN];
 	int n = zero_privop_counts(buf);
 
+	zero_hyperprivop_counts();
+#ifdef PRIVOP_ADDR_COUNT
+	zero_privop_addrs();
+#endif
 	if (len < TMPBUFLEN) return -1;
 	if (__copy_to_user(ubuf,buf,n)) return -1;
 	return n;

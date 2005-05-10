@@ -227,7 +227,7 @@ ia64_set_rbs_bot (void)
 
 	if (stack_size > MAX_USER_STACK_SIZE)
 		stack_size = MAX_USER_STACK_SIZE;
-	current->thread.rbs_bot = STACK_TOP - stack_size;
+	current->arch._thread.rbs_bot = STACK_TOP - stack_size;
 }
 
 /*
@@ -255,7 +255,7 @@ printf("ia64_init_addr_space: called, not implemented\n");
 	if (vma) {
 		memset(vma, 0, sizeof(*vma));
 		vma->vm_mm = current->mm;
-		vma->vm_start = current->thread.rbs_bot & PAGE_MASK;
+		vma->vm_start = current->arch._thread.rbs_bot & PAGE_MASK;
 		vma->vm_end = vma->vm_start + PAGE_SIZE;
 		vma->vm_page_prot = protection_map[VM_DATA_DEFAULT_FLAGS & 0x7];
 		vma->vm_flags = VM_READ|VM_WRITE|VM_MAYREAD|VM_MAYWRITE|VM_GROWSUP;
