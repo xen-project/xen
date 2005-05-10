@@ -678,10 +678,6 @@ void pci_pool_free (struct pci_pool *pool, void *vaddr, dma_addr_t addr);
 
 #endif /* CONFIG_PCI */
 
-/* Include architecture-dependent settings and functions */
-
-#include <asm/pci.h>
-
 /*
  *  If the system does not have PCI, clearly these return errors.  Define
  *  these as simple inline functions to avoid hair in drivers.

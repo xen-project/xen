@@ -77,12 +77,7 @@ unsigned long wait_init_idle;
 
 struct exec_domain *idle_task[NR_CPUS] = { &idle0_exec_domain };
 
-#ifdef CONFIG_ACPI_INTERPRETER
-int acpi_disabled = 0;
-#else
-int acpi_disabled = 1;
-#endif
-EXPORT_SYMBOL(acpi_disabled);
+int acpi_disabled;
 
 int phys_proc_id[NR_CPUS];
 int logical_proc_id[NR_CPUS];
@@ -341,12 +336,8 @@ static void __init do_initcalls(void)
         (*call)();
 }
 
-unsigned long pci_mem_start = 0x10000000;
-
 static void __init start_of_day(void)
 {
-    unsigned long low_mem_size;
-    
 #ifdef MEMORY_GUARD
     /* Unmap the first page of CPU0's stack. */
     extern unsigned long cpu0_stack[];
@@ -362,10 +353,6 @@ static void __init start_of_day(void)
 
     arch_do_createdomain(current);
 
-    /* Tell the PCI layer not to allocate too close to the RAM area.. */
-    low_mem_size = ((max_page << PAGE_SHIFT) + 0xfffff) & ~0xfffff;
-    if ( low_mem_size > pci_mem_start ) pci_mem_start = low_mem_size;
-    
     identify_cpu(&boot_cpu_data); /* get CPU type info */
     if ( cpu_has_fxsr ) set_in_cr4(X86_CR4_OSFXSR);
     if ( cpu_has_xmm )  set_in_cr4(X86_CR4_OSXMMEXCPT);
@@ -383,7 +370,10 @@ static void __init start_of_day(void)
 #endif
     paging_init();                /* not much here now, but sets up fixmap */
     if ( !opt_noacpi )
+    {
+        acpi_boot_table_init();
         acpi_boot_init();
+    }
 #ifdef CONFIG_SMP
     if ( smp_found_config ) 
         get_smp_config();

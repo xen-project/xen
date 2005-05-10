@@ -34,6 +34,7 @@
 #include <xen/config.h>
 #include <xen/init.h>
 #include <xen/pci.h>
+#include <xen/slab.h>
 #include <xen/smp.h>
 #include <xen/spinlock.h>
 #include <asm/mtrr.h>

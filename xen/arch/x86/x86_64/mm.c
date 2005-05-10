@@ -125,7 +125,7 @@ void __set_fixmap(
 {
     if ( unlikely(idx >= __end_of_fixed_addresses) )
         BUG();
-    map_pages(idle_pg_table, __fix_to_virt(idx), p, PAGE_SIZE, flags);
+    map_pages(idle_pg_table, fix_to_virt(idx), p, PAGE_SIZE, flags);
 }
 
 

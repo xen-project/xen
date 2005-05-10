@@ -115,7 +115,8 @@ asmlinkage void fatal_trap(int trapnr, struct cpu_user_regs *regs)
     if ( trapnr == TRAP_page_fault )
     {
         __asm__ __volatile__ ("mov %%cr2,%0" : "=r" (cr2) : );
-        printk("Faulting linear address might be %p\n", _p(cr2));
+        printk("Faulting linear address: %p\n", _p(cr2));
+        show_page_walk(cr2);
     }
 
     printk("************************************\n");
@@ -349,7 +350,7 @@ asmlinkage int do_page_fault(struct cpu_user_regs *regs)
     show_page_walk(addr);
     panic("CPU%d FATAL PAGE FAULT\n"
           "[error_code=%04x]\n"
-          "Faulting linear address might be %p\n",
+          "Faulting linear address: %p\n",
           smp_processor_id(), regs->error_code, addr);
     return 0;
 }
