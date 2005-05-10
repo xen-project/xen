@@ -186,26 +186,30 @@ typedef struct {
     struct exec_domain *guest[IRQ_MAX_GUESTS];
 } irq_guest_action_t;
 
+extern int vector_irq[];
+
 static void __do_IRQ_guest(int irq)
 {
     irq_desc_t         *desc = &irq_desc[irq];
     irq_guest_action_t *action = (irq_guest_action_t *)desc->action;
     struct exec_domain *ed;
-    int                 i;
+    int                 i, pirq;
+
+    pirq = platform_legacy_irq(irq) ? irq : vector_irq[irq];
 
     for ( i = 0; i < action->nr_guests; i++ )
     {
         ed = action->guest[i];
-        if ( !test_and_set_bit(irq, &ed->domain->pirq_mask) )
+        if ( !test_and_set_bit(pirq, &ed->domain->pirq_mask) )
             action->in_flight++;
-        send_guest_pirq(ed, irq);
+        send_guest_pirq(ed, pirq);
     }
 }
 
 int pirq_guest_unmask(struct domain *d)
 {
     irq_desc_t    *desc;
-    unsigned int   i, j, pirq;
+    unsigned int   i, j, pirq, vector;
     u32            m;
     shared_info_t *s = d->shared_info;
 
@@ -217,12 +221,13 @@ int pirq_guest_unmask(struct domain *d)
             j = find_first_set_bit(m);
             m &= ~(1 << j);
             pirq = (i << 5) + j;
-            desc = &irq_desc[pirq];
+            vector = platform_legacy_irq(pirq) ? pirq : IO_APIC_VECTOR(pirq);
+            desc = &irq_desc[vector];
             spin_lock_irq(&desc->lock);
             if ( !test_bit(d->pirq_to_evtchn[pirq], &s->evtchn_mask[0]) &&
                  test_and_clear_bit(pirq, &d->pirq_mask) &&
                  (--((irq_guest_action_t *)desc->action)->in_flight == 0) )
-                desc->handler->end(pirq);
+                desc->handler->end(vector);
             spin_unlock_irq(&desc->lock);
         }
     }
@@ -233,13 +238,16 @@ int pirq_guest_unmask(struct domain *d)
 int pirq_guest_bind(struct exec_domain *ed, int irq, int will_share)
 {
     struct domain      *d = ed->domain;
-    irq_desc_t         *desc = &irq_desc[irq];
+    irq_desc_t         *desc;
     irq_guest_action_t *action;
     unsigned long       flags;
-    int                 rc = 0;
+    int                 rc = 0, vector;
 
     if ( !IS_CAPABLE_PHYSDEV(d) )
         return -EPERM;
+
+    vector = platform_legacy_irq(irq) ? irq : IO_APIC_VECTOR(irq);
+    desc = &irq_desc[vector];
 
     spin_lock_irqsave(&desc->lock, flags);
 
@@ -270,12 +278,12 @@ int pirq_guest_bind(struct exec_domain *ed, int irq, int will_share)
         desc->depth = 0;
         desc->status |= IRQ_GUEST;
         desc->status &= ~IRQ_DISABLED;
-        desc->handler->startup(irq);
+        desc->handler->startup(vector);
 
         /* Attempt to bind the interrupt target to the correct CPU. */
         if ( desc->handler->set_affinity != NULL )
             desc->handler->set_affinity(
-                irq, apicid_to_phys_cpu_present(ed->processor));
+                vector, apicid_to_phys_cpu_present(ed->processor));
     }
     else if ( !will_share || !action->shareable )
     {
@@ -301,10 +309,13 @@ int pirq_guest_bind(struct exec_domain *ed, int irq, int will_share)
 
 int pirq_guest_unbind(struct domain *d, int irq)
 {
-    irq_desc_t         *desc = &irq_desc[irq];
+    irq_desc_t         *desc;
     irq_guest_action_t *action;
     unsigned long       flags;
-    int                 i;
+    int                 i, vector;
+
+    vector = platform_legacy_irq(irq) ? irq : IO_APIC_VECTOR(irq);
+    desc = &irq_desc[vector];
 
     spin_lock_irqsave(&desc->lock, flags);
 
@@ -312,7 +323,7 @@ int pirq_guest_unbind(struct domain *d, int irq)
 
     if ( test_and_clear_bit(irq, &d->pirq_mask) &&
          (--action->in_flight == 0) )
-        desc->handler->end(irq);
+        desc->handler->end(vector);
 
     if ( action->nr_guests == 1 )
     {
@@ -321,7 +332,7 @@ int pirq_guest_unbind(struct domain *d, int irq)
         desc->depth   = 1;
         desc->status |= IRQ_DISABLED;
         desc->status &= ~IRQ_GUEST;
-        desc->handler->shutdown(irq);
+        desc->handler->shutdown(vector);
     }
     else
     {
@@ -334,27 +345,4 @@ int pirq_guest_unbind(struct domain *d, int irq)
 
     spin_unlock_irqrestore(&desc->lock, flags);    
     return 0;
-}
-
-int pirq_guest_bindable(int irq, int will_share)
-{
-    irq_desc_t         *desc = &irq_desc[irq];
-    irq_guest_action_t *action;
-    unsigned long       flags;
-    int                 okay;
-
-    spin_lock_irqsave(&desc->lock, flags);
-
-    action = (irq_guest_action_t *)desc->action;
-
-    /*
-     * To be bindable the IRQ must either be not currently bound (1), or
-     * it must be shareable (2) and not at its share limit (3).
-     */
-    okay = ((!(desc->status & IRQ_GUEST) && (action == NULL)) || /* 1 */
-            (action->shareable && will_share &&                  /* 2 */
-             (action->nr_guests != IRQ_MAX_GUESTS)));            /* 3 */
-
-    spin_unlock_irqrestore(&desc->lock, flags);
-    return okay;
 }
