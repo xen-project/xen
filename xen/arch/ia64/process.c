@@ -517,7 +517,7 @@ printf("ia64_fault, vector=0x%p, ifa=%p, iip=%p, ipsr=%p, isr=%p\n",
 	      case 32: /* fp fault */
 	      case 33: /* fp trap */
 		//result = handle_fpu_swa((vector == 32) ? 1 : 0, regs, isr);
-		if ((result < 0) || (current->thread.flags & IA64_THREAD_FPEMU_SIGFPE)) {
+		//if ((result < 0) || (current->thread.flags & IA64_THREAD_FPEMU_SIGFPE)) {
 			//siginfo.si_signo = SIGFPE;
 			//siginfo.si_errno = 0;
 			//siginfo.si_code = FPE_FLTINV;
@@ -526,7 +526,7 @@ printf("ia64_fault, vector=0x%p, ifa=%p, iip=%p, ipsr=%p, isr=%p\n",
 			//siginfo.si_isr = isr;
 			//siginfo.si_imm = 0;
 			//force_sig_info(SIGFPE, &siginfo, current);
-		}
+		//}
 		//return;
 		sprintf(buf, "FP fault/trap");
 		break;

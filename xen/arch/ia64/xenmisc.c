@@ -79,6 +79,14 @@ void raise_actimer_softirq(void)
 	raise_softirq(AC_TIMER_SOFTIRQ);
 }
 
+unsigned long __hypercall_create_continuation(
+	unsigned int op, unsigned int nr_args, ...)
+{
+	printf("__hypercall_create_continuation: not implemented!!!\n");
+}
+
+///////////////////////////////
+
 ///////////////////////////////
 // from arch/x86/apic.c
 ///////////////////////////////

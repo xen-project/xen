@@ -60,7 +60,7 @@ struct arch_exec_domain {
 };
 
 #define active_mm arch.active_mm
-#define thread arch._thread
+//#define thread arch._thread
 
 // FOLLOWING FROM linux-2.6.7/include/sched.h
 

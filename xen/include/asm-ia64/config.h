@@ -258,6 +258,14 @@ struct screen_info { };
 #define seq_printf(a,b...) printf(b)
 #define CONFIG_BLK_DEV_INITRD // needed to reserve memory for domain0
 
+//
+#define __smp_processor_id() (current->processor)
+
+// needed for newer ACPI code
+#define asmlinkage
+
+#define FORCE_CRASH()	asm("break 0;;");
+
 // these declarations got moved at some point, find a better place for them
 extern int opt_noht;
 extern int ht_per_core;
