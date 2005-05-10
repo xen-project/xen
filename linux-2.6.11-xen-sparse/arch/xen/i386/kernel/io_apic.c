@@ -726,6 +726,7 @@ void fastcall send_IPI_self(int vector)
 }
 #endif /* !CONFIG_SMP */
 
+
 /*
  * support for broken MP BIOSs, enables hand-redirection of PIRQ0-7 to
  * specific CPU-side IRQs.
