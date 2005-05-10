@@ -69,7 +69,7 @@ static inline int debugger_trap_entry(
     {
     case TRAP_int3:
     case TRAP_debug:
-        set_bit(EDF_CTRLPAUSE, &ed->ed_flags);
+        set_bit(EDF_CTRLPAUSE, &ed->flags);
         raise_softirq(SCHEDULE_SOFTIRQ);
         return 1;
     }
@@ -96,6 +96,9 @@ static inline int debugger_trap_fatal(
 {
     return kdb_trap(vector, 0, regs);
 }
+
+/* Int3 is a trivial way to gather cpu_user_regs context. */
+#define debugger_trap_immediate() __asm__ __volatile__ ( "int3" );
 
 #else
 

@@ -109,17 +109,17 @@ enum acpi_irq_model_id		acpi_irq_model = ACPI_IRQ_MODEL_PIC;
 
 char *__acpi_map_table(unsigned long phys_addr, unsigned long size)
 {
-        unsigned int i,j;
+	unsigned int i,j;
 
-        j = PAGE_ALIGN(size) >> PAGE_SHIFT;
-        for (i = 0; (i < FIX_ACPI_PAGES) && j ; i++, j--) {
-                __set_fixmap_ma(FIX_ACPI_END - i,
-                                (phys_addr & PAGE_MASK) + (i << PAGE_SHIFT),
-                                PAGE_KERNEL);
-        }
+	j = PAGE_ALIGN(size) >> PAGE_SHIFT;
+	for (i = 0; (i < FIX_ACPI_PAGES) && j ; i++, j--) {
+		set_fixmap(FIX_ACPI_END - i,
+			   (phys_addr & PAGE_MASK) + (i << PAGE_SHIFT));
+	}
 
-        return (char *) __fix_to_virt(FIX_ACPI_END) + (phys_addr & ~PAGE_MASK);
+	return (char *) __fix_to_virt(FIX_ACPI_END) + (phys_addr & ~PAGE_MASK);
 }
+
 #else
 #ifdef	CONFIG_X86_64
 
@@ -523,7 +523,7 @@ acpi_scan_rsdp (
 {
 	unsigned long		offset = 0;
 	unsigned long		sig_len = sizeof("RSD PTR ") - 1;
-        unsigned long           vstart = isa_bus_to_virt(start);
+	unsigned long		vstart = (unsigned long)isa_bus_to_virt(start);
 
 	/*
 	 * Scan all 16-byte boundaries of the physical memory region for the
@@ -649,16 +649,15 @@ acpi_find_rsdp (void)
 		else if (efi.acpi)
 			return __pa(efi.acpi);
 	}
-
 	/*
 	 * Scan memory looking for the RSDP signature. First search EBDA (low
 	 * memory) paragraphs and then search upper memory (E0000-FFFFF).
 	 */
 	rsdp_phys = acpi_scan_rsdp (0, 0x400);
 	if (!rsdp_phys)
-		rsdp_phys = acpi_scan_rsdp (0xE0000, 0xFFFFF);
+		rsdp_phys = acpi_scan_rsdp (0xE0000, 0x20000);
 
-        __set_fixmap_ma(FIX_ACPI_RSDP_PAGE, rsdp_phys, PAGE_KERNEL);
+	set_fixmap(FIX_ACPI_RSDP_PAGE, rsdp_phys);
 
 	return rsdp_phys;
 }
@@ -672,10 +671,6 @@ static int __init
 acpi_parse_madt_lapic_entries(void)
 {
 	int count;
-
-#ifdef CONFIG_XEN
-        return 0;
-#endif
 
 	/* 
 	 * Note that the LAPIC address is obtained from the MADT (32-bit value)
@@ -872,7 +867,7 @@ acpi_boot_table_init(void)
 	}
 
 #ifdef __i386__
-	//check_acpi_pci();
+	check_acpi_pci();
 #endif
 
 	acpi_table_parse(ACPI_BOOT, acpi_parse_sbf);

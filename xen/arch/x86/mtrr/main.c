@@ -35,6 +35,7 @@
 #include <xen/init.h>
 #include <xen/pci.h>
 #include <xen/smp.h>
+#include <xen/spinlock.h>
 #include <asm/mtrr.h>
 #include <asm/uaccess.h>
 #include <asm/processor.h>

@@ -60,17 +60,8 @@ enum fixed_addresses {
 extern void __set_fixmap (enum fixed_addresses idx,
 					unsigned long phys, pgprot_t flags);
 
-extern void __set_fixmap_ma (enum fixed_addresses idx,
-					unsigned long mach, pgprot_t flags);
-
 #define set_fixmap(idx, phys) \
 		__set_fixmap(idx, phys, PAGE_KERNEL)
-
-#define set_fixmap_ma(idx, phys) \
-		__set_fixmap_ma(idx, phys, PAGE_KERNEL)
-#define set_fixmap_ma_ro(idx, phys) \
-		__set_fixmap_ma(idx, phys, PAGE_KERNEL_RO)
-
 /*
  * Some hardware wants to get fixmapped without caching.
  */

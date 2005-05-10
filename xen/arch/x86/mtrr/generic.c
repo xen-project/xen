@@ -1,8 +1,8 @@
 /* This only handles 32bit MTRR on 32bit hosts. This is strictly wrong
    because MTRRs can span upto 40 bits (36bits on most modern x86) */ 
 #include <xen/init.h>
-#include <xen/slab.h>
 #include <xen/mm.h>
+#include <xen/slab.h>
 #include <asm/io.h>
 #include <asm/mtrr.h>
 #include <asm/msr.h>

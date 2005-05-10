@@ -273,7 +273,7 @@ void __init *bt_ioremap(unsigned long phys_addr, unsigned long size)
 	 */
 	idx = FIX_BTMAP_BEGIN;
 	while (nrpages > 0) {
-		set_fixmap_ma(idx, phys_addr);
+		set_fixmap(idx, phys_addr);
 		phys_addr += PAGE_SIZE;
 		--idx;
 		--nrpages;

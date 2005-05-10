@@ -4,7 +4,6 @@ include $(BASEDIR)/Rules.mk
 ifeq ($(TARGET_ARCH),ia64) 
 OBJS := $(subst dom_mem_ops.o,,$(OBJS))
 OBJS := $(subst grant_table.o,,$(OBJS))
-OBJS := $(subst physdev.o,,$(OBJS))
 endif
 
 ifneq ($(perfc),y)

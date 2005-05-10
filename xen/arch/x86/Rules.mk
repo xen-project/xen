@@ -2,8 +2,8 @@
 # x86-specific definitions
 
 CFLAGS  += -nostdinc -fno-builtin -fno-common -fno-strict-aliasing
-CFLAGS  += -iwithprefix include -Wall -Werror -pipe
-CFLAGS  += -I$(BASEDIR)/include -Wno-pointer-arith -Wredundant-decls
+CFLAGS  += -iwithprefix include -Wall -Werror -Wno-pointer-arith -pipe
+CFLAGS  += -I$(BASEDIR)/include -I$(BASEDIR)/include/asm-x86/mach-default
 
 ifeq ($(optimize),y)
 CFLAGS  += -O3 -fomit-frame-pointer

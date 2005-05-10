@@ -6,59 +6,19 @@
 #include <xen/config.h>
 #include <asm/atomic.h>
 #include <asm/asm_defns.h>
+#include <irq_vectors.h>
 
 extern void disable_irq(unsigned int);
 extern void disable_irq_nosync(unsigned int);
 extern void enable_irq(unsigned int);
 
-/*
- * IDT vectors usable for external interrupt sources start
- * at 0x20:
- */
-#define FIRST_EXTERNAL_VECTOR   0x30
-
-#define NR_IRQS (256 - FIRST_EXTERNAL_VECTOR)
-
-#define HYPERCALL_VECTOR        0x82
-
-/*
- * Vectors 0x30-0x3f are used for ISA interrupts.
- */
-
-/*
- * Special IRQ vectors used by the SMP architecture, 0xf0-0xff
- */
-#define SPURIOUS_APIC_VECTOR    0xff
-#define ERROR_APIC_VECTOR       0xfe
-#define INVALIDATE_TLB_VECTOR   0xfd
-#define EVENT_CHECK_VECTOR      0xfc
-#define CALL_FUNCTION_VECTOR    0xfb
-#define KDB_VECTOR              0xfa
-
-/*
- * Local APIC timer IRQ vector is on a different priority level,
- * to work around the 'lost local interrupt if more than 2 IRQ
- * sources per level' errata.
- */
-#define LOCAL_TIMER_VECTOR      0xef
-
-/*
- * First APIC vector available to drivers: (vectors 0x40-0xee)
- * we start at 0x41 to spread out vectors evenly between priority
- * levels. (0x82 is the hypercall vector)
- */
-#define FIRST_DEVICE_VECTOR     0x41
-#define FIRST_SYSTEM_VECTOR     0xef
-
-extern int irq_vector[NR_IRQS];
+extern u8 irq_vector[NR_IRQ_VECTORS];
 #define IO_APIC_VECTOR(irq)     irq_vector[irq]
+#define AUTO_ASSIGN             -1
 
-/*
- * Various low-level irq details needed by irq.c, process.c,
- * time.c, io_apic.c and smp.c
- *
- * Interrupt entry/exit code at both C and assembly level
- */
+extern void (*interrupt[NR_IRQS])(void);
+
+#define platform_legacy_irq(irq)	((irq) < 16)
 
 extern void mask_irq(unsigned int irq);
 extern void unmask_irq(unsigned int irq);

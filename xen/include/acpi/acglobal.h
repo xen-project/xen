@@ -5,7 +5,7 @@
  *****************************************************************************/
 
 /*
- * Copyright (C) 2000 - 2004, R. Byron Moore
+ * Copyright (C) 2000 - 2005, R. Byron Moore
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -46,16 +46,25 @@
 
 
 /*
- * Ensure that the globals are actually defined only once.
+ * Ensure that the globals are actually defined and initialized only once.
  *
- * The use of these defines allows a single list of globals (here) in order
+ * The use of these macros allows a single list of globals (here) in order
  * to simplify maintenance of the code.
  */
 #ifdef DEFINE_ACPI_GLOBALS
 #define ACPI_EXTERN
+#define ACPI_INIT_GLOBAL(a,b) a=b
 #else
 #define ACPI_EXTERN extern
+#define ACPI_INIT_GLOBAL(a,b) a
 #endif
+
+/*
+ * Keep local copies of these FADT-based registers.  NOTE: These globals
+ * are first in this file for alignment reasons on 64-bit systems.
+ */
+ACPI_EXTERN struct acpi_generic_address         acpi_gbl_xpm1a_enable;
+ACPI_EXTERN struct acpi_generic_address         acpi_gbl_xpm1b_enable;
 
 
 /*****************************************************************************
@@ -76,6 +85,46 @@ extern      u32                                 acpi_gbl_nesting_level;
 
 /*****************************************************************************
  *
+ * Runtime configuration (static defaults that can be overriden at runtime)
+ *
+ ****************************************************************************/
+
+/*
+ * Enable "slack" in the AML interpreter?  Default is FALSE, and the
+ * interpreter strictly follows the ACPI specification.  Setting to TRUE
+ * allows the interpreter to forgive certain bad AML constructs.  Currently:
+ * 1) Allow "implicit return" of last value in a control method
+ * 2) Allow access beyond end of operation region
+ * 3) Allow access to uninitialized locals/args (auto-init to integer 0)
+ * 4) Allow ANY object type to be a source operand for the Store() operator
+ */
+ACPI_EXTERN u8       ACPI_INIT_GLOBAL (acpi_gbl_enable_interpreter_slack, FALSE);
+
+/*
+ * Automatically serialize ALL control methods? Default is FALSE, meaning
+ * to use the Serialized/not_serialized method flags on a per method basis.
+ * Only change this if the ASL code is poorly written and cannot handle
+ * reentrancy even though methods are marked "not_serialized".
+ */
+ACPI_EXTERN u8       ACPI_INIT_GLOBAL (acpi_gbl_all_methods_serialized, FALSE);
+
+/*
+ * Create the predefined _OSI method in the namespace? Default is TRUE
+ * because ACPI CA is fully compatible with other ACPI implementations.
+ * Changing this will revert ACPI CA (and machine ASL) to pre-OSI behavior.
+ */
+ACPI_EXTERN u8       ACPI_INIT_GLOBAL (acpi_gbl_create_osi_method, TRUE);
+
+/*
+ * Disable wakeup GPEs during runtime? Default is TRUE because WAKE and
+ * RUNTIME GPEs should never be shared, and WAKE GPEs should typically only
+ * be enabled just before going to sleep.
+ */
+ACPI_EXTERN u8       ACPI_INIT_GLOBAL (acpi_gbl_leave_wake_gpes_disabled, TRUE);
+
+
+/*****************************************************************************
+ *
  * ACPI Table globals
  *
  ****************************************************************************/
@@ -87,7 +136,6 @@ extern      u32                                 acpi_gbl_nesting_level;
  *
  * These tables are single-table only; meaning that there can be at most one
  * of each in the system.  Each global points to the actual table.
- *
  */
 ACPI_EXTERN u32                                 acpi_gbl_table_flags;
 ACPI_EXTERN u32                                 acpi_gbl_rsdt_table_count;
@@ -97,6 +145,11 @@ ACPI_EXTERN FADT_DESCRIPTOR            *acpi_gbl_FADT;
 ACPI_EXTERN struct acpi_table_header           *acpi_gbl_DSDT;
 ACPI_EXTERN FACS_DESCRIPTOR            *acpi_gbl_FACS;
 ACPI_EXTERN struct acpi_common_facs             acpi_gbl_common_fACS;
+/*
+ * Since there may be multiple SSDTs and PSDTS, a single pointer is not
+ * sufficient; Therefore, there isn't one!
+ */
+
 
 /*
  * Handle both ACPI 1.0 and ACPI 2.0 Integer widths
@@ -106,17 +159,6 @@ ACPI_EXTERN struct acpi_common_facs             acpi_gbl_common_fACS;
 ACPI_EXTERN u8                                  acpi_gbl_integer_bit_width;
 ACPI_EXTERN u8                                  acpi_gbl_integer_byte_width;
 ACPI_EXTERN u8                                  acpi_gbl_integer_nybble_width;
-
-/* Keep local copies of these FADT-based registers */
-
-ACPI_EXTERN struct acpi_generic_address         acpi_gbl_xpm1a_enable;
-ACPI_EXTERN struct acpi_generic_address         acpi_gbl_xpm1b_enable;
-
-/*
- * Since there may be multiple SSDTs and PSDTS, a single pointer is not
- * sufficient; Therefore, there isn't one!
- */
-
 
 /*
  * ACPI Table info arrays
@@ -142,6 +184,7 @@ ACPI_EXTERN struct acpi_mutex_info              acpi_gbl_mutex_info[NUM_MUTEX];
 ACPI_EXTERN struct acpi_memory_list             acpi_gbl_memory_lists[ACPI_NUM_MEM_LISTS];
 ACPI_EXTERN struct acpi_object_notify_handler   acpi_gbl_device_notify;
 ACPI_EXTERN struct acpi_object_notify_handler   acpi_gbl_system_notify;
+ACPI_EXTERN acpi_exception_handler              acpi_gbl_exception_handler;
 ACPI_EXTERN acpi_init_handler                   acpi_gbl_init_handler;
 ACPI_EXTERN struct acpi_walk_state             *acpi_gbl_breakpoint_walk;
 ACPI_EXTERN acpi_handle                         acpi_gbl_global_lock_semaphore;
@@ -161,13 +204,16 @@ ACPI_EXTERN u8                                  acpi_gbl_step_to_next_call;
 ACPI_EXTERN u8                                  acpi_gbl_acpi_hardware_present;
 ACPI_EXTERN u8                                  acpi_gbl_global_lock_present;
 ACPI_EXTERN u8                                  acpi_gbl_events_initialized;
+ACPI_EXTERN u8                                  acpi_gbl_system_awake_and_running;
 
 extern u8                                       acpi_gbl_shutdown;
 extern u32                                      acpi_gbl_startup_flags;
 extern const u8                                 acpi_gbl_decode_to8bit[8];
-extern const char                              *acpi_gbl_db_sleep_states[ACPI_S_STATE_COUNT];
+extern const char                              *acpi_gbl_sleep_state_names[ACPI_S_STATE_COUNT];
+extern const char                              *acpi_gbl_highest_dstate_names[4];
 extern const struct acpi_opcode_info            acpi_gbl_aml_op_info[AML_NUM_OPCODES];
 extern const char                              *acpi_gbl_region_types[ACPI_NUM_PREDEFINED_REGIONS];
+extern const char                              *acpi_gbl_valid_osi_strings[ACPI_NUM_OSI_STRINGS];
 
 
 /*****************************************************************************
@@ -178,7 +224,7 @@ extern const char                              *acpi_gbl_region_types[ACPI_NUM_P
 
 #define NUM_NS_TYPES                    ACPI_TYPE_INVALID+1
 
-#if defined (ACPI_NO_METHOD_EXECUTION) || defined (ACPI_CONSTANT_EVAL_ONLY)
+#if !defined (ACPI_NO_METHOD_EXECUTION) || defined (ACPI_CONSTANT_EVAL_ONLY)
 #define NUM_PREDEFINED_NAMES            10
 #else
 #define NUM_PREDEFINED_NAMES            9
@@ -186,6 +232,7 @@ extern const char                              *acpi_gbl_region_types[ACPI_NUM_P
 
 ACPI_EXTERN struct acpi_namespace_node          acpi_gbl_root_node_struct;
 ACPI_EXTERN struct acpi_namespace_node         *acpi_gbl_root_node;
+ACPI_EXTERN struct acpi_namespace_node         *acpi_gbl_fadt_gpe_device;
 
 extern const u8                                 acpi_gbl_ns_properties[NUM_NS_TYPES];
 extern const struct acpi_predefined_names       acpi_gbl_pre_defined_names [NUM_PREDEFINED_NAMES];

@@ -20,10 +20,6 @@
 #include <asm-xen/linux-public/privcmd.h>
 #include <asm-xen/gnttab.h>
 
-#ifndef set_fixmap_ma
-#define set_fixmap_ma set_fixmap
-#endif
-
 #if 1
 #define ASSERT(_p) \
     if ( !(_p) ) { printk(KERN_ALERT"Assertion '%s': line %d, file %s\n", \
@@ -339,7 +335,7 @@ int gnttab_resume(void)
     BUG_ON(setup.status != 0);
 
     for ( i = 0; i < NR_GRANT_FRAMES; i++ )
-        set_fixmap_ma(FIX_GNTTAB_END - i, frames[i] << PAGE_SHIFT);
+        set_fixmap(FIX_GNTTAB_END - i, frames[i] << PAGE_SHIFT);
 
     return 0;
 }

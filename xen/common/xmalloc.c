@@ -42,7 +42,7 @@ struct xmalloc_hdr
     /* Total including this hdr. */
     size_t size;
     struct list_head freelist;
-} __attribute__((__aligned__(SMP_CACHE_BYTES)));
+} __cacheline_aligned;
 
 static void maybe_split(struct xmalloc_hdr *hdr, size_t size, size_t block)
 {

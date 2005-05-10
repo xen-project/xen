@@ -18,7 +18,7 @@ void init_fpu(void)
     __asm__ __volatile__ ( "fninit" );
     if ( cpu_has_xmm )
         load_mxcsr(0x1f80);
-    set_bit(EDF_DONEFPUINIT, &current->ed_flags);
+    set_bit(EDF_DONEFPUINIT, &current->flags);
 }
 
 void save_init_fpu(struct exec_domain *tsk)
@@ -28,7 +28,7 @@ void save_init_fpu(struct exec_domain *tsk)
      * This causes us to set the real flag, so we'll need
      * to temporarily clear it while saving f-p state.
      */
-    if ( test_bit(EDF_GUEST_STTS, &tsk->ed_flags) )
+    if ( test_bit(EDF_GUEST_STTS, &tsk->flags) )
         clts();
 
     if ( cpu_has_fxsr )
@@ -40,7 +40,7 @@ void save_init_fpu(struct exec_domain *tsk)
             "fnsave %0 ; fwait"
             : "=m" (tsk->arch.guest_context.fpu_ctxt) );
 
-    clear_bit(EDF_USEDFPU, &tsk->ed_flags);
+    clear_bit(EDF_USEDFPU, &tsk->flags);
     stts();
 }
 

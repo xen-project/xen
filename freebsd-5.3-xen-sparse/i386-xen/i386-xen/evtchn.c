@@ -79,9 +79,14 @@ evtchn_do_upcall(struct intrframe *frame)
                 l2 &= ~(1 << l2i);
             
                 port = (l1i << 5) + l2i;
+		irq = evtchn_to_irq[port];
+#ifdef SMP		
+		if (irq == PCPU_GET(cpuast)) 
+			continue;
+#endif
                 if ( (owned = mtx_owned(&sched_lock)) != 0 )
                     mtx_unlock_spin_flags(&sched_lock, MTX_QUIET);
-                if ( (irq = evtchn_to_irq[port]) != -1 ) {
+                if ( irq != -1 ) {
 		    struct intsrc *isrc = intr_lookup_source(irq);
 		    intr_execute_handlers(isrc, frame);
 		} else {
@@ -584,6 +589,7 @@ ap_evtchn_init(int cpu)
         PCPU_GET(virq_to_irq)[i] = -1;
 }
 
+
 static void 
 evtchn_init(void *dummy __unused)
 {
@@ -591,13 +597,6 @@ evtchn_init(void *dummy __unused)
     struct xenpic *xp;
     struct xenpic_intsrc *pin;
 
-    /*
-     * xenpic_lock: in order to allow an interrupt to occur in a critical
-     * 	        section, to set pcpu->ipending (etc...) properly, we
-     *	        must be able to get the icu lock, so it can't be
-     *	        under witness.
-     */
-    mtx_init(&irq_mapping_update_lock, "xp", NULL, MTX_DEF);
 
     /* XXX -- expedience hack */
     PCPU_SET(virq_to_irq, (int *)&virq_to_irq[0]);
@@ -657,3 +656,11 @@ evtchn_init(void *dummy __unused)
 }
 
 SYSINIT(evtchn_init, SI_SUB_INTR, SI_ORDER_ANY, evtchn_init, NULL);
+    /*
+     * xenpic_lock: in order to allow an interrupt to occur in a critical
+     * 	        section, to set pcpu->ipending (etc...) properly, we
+     *	        must be able to get the icu lock, so it can't be
+     *	        under witness.
+     */
+
+MTX_SYSINIT(irq_mapping_update_lock, &irq_mapping_update_lock, "xp", MTX_DEF|MTX_NOWITNESS);

@@ -16,14 +16,6 @@ int xc_physdev_pci_access_modify(int xc_handle,
                                  int func,
                                  int enable)
 {
-    dom0_op_t op;
-
-    op.cmd = DOM0_PCIDEV_ACCESS;
-    op.u.pcidev_access.domain = (domid_t)domid;
-    op.u.pcidev_access.bus    = bus;
-    op.u.pcidev_access.dev    = dev;
-    op.u.pcidev_access.func   = func;
-    op.u.pcidev_access.enable = enable;
-
-    return do_dom0_op(xc_handle, &op);
+    errno = ENOSYS;
+    return -1;
 }

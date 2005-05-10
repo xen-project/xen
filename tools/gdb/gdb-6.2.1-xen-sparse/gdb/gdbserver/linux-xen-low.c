@@ -338,7 +338,9 @@ regsets_store_inferior_registers ()
 	    }
 	  else
 	    {
+#ifdef DEBUG
 	      perror ("Warning: ptrace(regsets_store_inferior_registers)");
+#endif
 	    }
 	}
       regset ++;
@@ -364,7 +366,6 @@ linux_fetch_registers (int regno)
 void
 linux_store_registers (int regno)
 {
-    printf("store %d\n", regno);
   if (use_regsets_p)
     {
       if (regsets_store_inferior_registers () == 0)

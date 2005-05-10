@@ -16,7 +16,6 @@
 #include <asm/domain_page.h>
 #include <xen/trace.h>
 #include <xen/console.h>
-#include <xen/physdev.h>
 #include <public/sched_ctl.h>
 
 extern long arch_do_dom0_op(dom0_op_t *op, dom0_op_t *u_dom0_op);
@@ -140,7 +139,7 @@ long do_dom0_op(dom0_op_t *u_dom0_op)
         {
             ret = -EINVAL;
             if ( (d != current->domain) && 
-                 test_bit(DF_CONSTRUCTED, &d->d_flags) )
+                 test_bit(DF_CONSTRUCTED, &d->flags) )
             {
                 domain_unpause_by_systemcontroller(d);
                 ret = 0;
@@ -247,14 +246,14 @@ long do_dom0_op(dom0_op_t *u_dom0_op)
 
         if ( cpu == -1 )
         {
-            clear_bit(EDF_CPUPINNED, &ed->ed_flags);
+            clear_bit(EDF_CPUPINNED, &ed->flags);
         }
         else
         {
             exec_domain_pause(ed);
             if ( ed->processor != (cpu % smp_num_cpus) )
-                set_bit(EDF_MIGRATED, &ed->ed_flags);
-            set_bit(EDF_CPUPINNED, &ed->ed_flags);
+                set_bit(EDF_MIGRATED, &ed->flags);
+            set_bit(EDF_CPUPINNED, &ed->flags);
             ed->processor = cpu % smp_num_cpus;
             exec_domain_unpause(ed);
         }
@@ -312,12 +311,12 @@ long do_dom0_op(dom0_op_t *u_dom0_op)
         ed = d->exec_domain[op->u.getdomaininfo.exec_domain];
 
         op->u.getdomaininfo.flags =
-            (test_bit( DF_DYING,      &d->d_flags)  ? DOMFLAGS_DYING    : 0) |
-            (test_bit( DF_CRASHED,    &d->d_flags)  ? DOMFLAGS_CRASHED  : 0) |
-            (test_bit( DF_SHUTDOWN,   &d->d_flags)  ? DOMFLAGS_SHUTDOWN : 0) |
-            (test_bit(EDF_CTRLPAUSE, &ed->ed_flags) ? DOMFLAGS_PAUSED   : 0) |
-            (test_bit(EDF_BLOCKED,   &ed->ed_flags) ? DOMFLAGS_BLOCKED  : 0) |
-            (test_bit(EDF_RUNNING,   &ed->ed_flags) ? DOMFLAGS_RUNNING  : 0);
+            (test_bit( DF_DYING,      &d->flags)  ? DOMFLAGS_DYING    : 0) |
+            (test_bit( DF_CRASHED,    &d->flags)  ? DOMFLAGS_CRASHED  : 0) |
+            (test_bit( DF_SHUTDOWN,   &d->flags)  ? DOMFLAGS_SHUTDOWN : 0) |
+            (test_bit(EDF_CTRLPAUSE, &ed->flags) ? DOMFLAGS_PAUSED   : 0) |
+            (test_bit(EDF_BLOCKED,   &ed->flags) ? DOMFLAGS_BLOCKED  : 0) |
+            (test_bit(EDF_RUNNING,   &ed->flags) ? DOMFLAGS_RUNNING  : 0);
 
         op->u.getdomaininfo.flags |= ed->processor << DOMFLAGS_CPUSHIFT;
         op->u.getdomaininfo.flags |= 
@@ -382,16 +381,6 @@ long do_dom0_op(dom0_op_t *u_dom0_op)
         ret = read_console_ring(op->u.readconsole.str, 
                                 op->u.readconsole.count,
                                 op->u.readconsole.cmd); 
-    }
-    break;
-
-    case DOM0_PCIDEV_ACCESS:
-    {
-        ret = physdev_pci_access_modify(op->u.pcidev_access.domain, 
-                                        op->u.pcidev_access.bus,
-                                        op->u.pcidev_access.dev,
-                                        op->u.pcidev_access.func,
-                                        op->u.pcidev_access.enable);
     }
     break;
 

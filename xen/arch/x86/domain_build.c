@@ -114,7 +114,7 @@ int construct_dom0(struct domain *d,
     /* Sanity! */
     if ( d->id != 0 ) 
         BUG();
-    if ( test_bit(DF_CONSTRUCTED, &d->d_flags) ) 
+    if ( test_bit(DF_CONSTRUCTED, &d->flags) ) 
         BUG();
 
     memset(&dsi, 0, sizeof(struct domain_setup_info));
@@ -540,14 +540,14 @@ int construct_dom0(struct domain *d,
     /* DOM0 gets access to everything. */
     physdev_init_dom0(d);
 
-    set_bit(DF_CONSTRUCTED, &d->d_flags);
+    set_bit(DF_CONSTRUCTED, &d->flags);
 
     new_thread(ed, dsi.v_kernentry, vstack_end, vstartinfo_start);
 
     if ( opt_dom0_shadow || opt_dom0_translate )
     {
         shadow_mode_enable(d, (opt_dom0_translate
-                               ? SHM_enable | SHM_translate
+                               ? SHM_enable | SHM_refcounts | SHM_translate
                                : SHM_enable));
         if ( opt_dom0_translate )
         {
@@ -570,7 +570,7 @@ int construct_dom0(struct domain *d,
             idle_pg_table[1] = root_create_phys(pagetable_val(d->arch.phys_table),
                                                 __PAGE_HYPERVISOR);
             translate_l2pgtable(d, (l1_pgentry_t *)(1u << L2_PAGETABLE_SHIFT),
-                                pagetable_val(ed->arch.guest_table) >> PAGE_SHIFT);
+                                pagetable_get_pfn(ed->arch.guest_table));
             idle_pg_table[1] = root_empty();
             local_flush_tlb();
         }

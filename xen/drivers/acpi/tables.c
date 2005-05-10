@@ -58,6 +58,7 @@ static char *acpi_table_signatures[ACPI_TABLE_COUNT] = {
 	[ACPI_SSDT]		= "SSDT",
 	[ACPI_SPMI]		= "SPMI",
 	[ACPI_HPET]		= "HPET",
+	[ACPI_MCFG]		= "MCFG",
 };
 
 static char *mps_inti_flags_polarity[] = { "dfl", "high", "res", "low" };
@@ -100,7 +101,7 @@ acpi_table_print (
 	else
 		name = header->signature;
 
-	printk(KERN_INFO PREFIX "%.4s (v%3.3d %6.6s %8.8s 0x%08x %.4s 0x%08x) @ 0x%p\n",
+	printk(KERN_DEBUG PREFIX "%.4s (v%3.3d %6.6s %8.8s 0x%08x %.4s 0x%08x) @ 0x%p\n",
 		name, header->revision, header->oem_id,
 		header->oem_table_id, header->oem_revision,
 		header->asl_compiler_id, header->asl_compiler_revision,
@@ -130,7 +131,7 @@ acpi_table_print_madt_entry (
 	{
 		struct acpi_table_ioapic *p =
 			(struct acpi_table_ioapic*) header;
-		printk(KERN_INFO PREFIX "IOAPIC (id[0x%02x] address[0x%08x] global_irq_base[0x%x])\n",
+		printk(KERN_INFO PREFIX "IOAPIC (id[0x%02x] address[0x%08x] gsi_base[%d])\n",
 			p->id, p->address, p->global_irq_base);
 	}
 		break;
@@ -184,8 +185,8 @@ acpi_table_print_madt_entry (
 	{
 		struct acpi_table_iosapic *p =
 			(struct acpi_table_iosapic*) header;
-		printk(KERN_INFO PREFIX "IOSAPIC (id[0x%x] global_irq_base[0x%x] address[%p])\n",
-			p->id, p->global_irq_base, (void *) (unsigned long) p->address);
+		printk(KERN_INFO PREFIX "IOSAPIC (id[0x%x] address[%p] gsi_base[%d])\n",
+			p->id, (void *) (unsigned long) p->address, p->global_irq_base);
 	}
 		break;
 
@@ -285,7 +286,7 @@ acpi_get_table_header_early (
 			*header = (void *) __acpi_map_table(fadt->V1_dsdt,
 					sizeof(struct acpi_table_header));
 		} else
-			*header = 0;
+			*header = NULL;
 
 		if (!*header) {
 			printk(KERN_WARNING PREFIX "Unable to map DSDT\n");
@@ -302,13 +303,14 @@ acpi_table_parse_madt_family (
 	enum acpi_table_id	id,
 	unsigned long		madt_size,
 	int			entry_id,
-	acpi_madt_entry_handler	handler)
+	acpi_madt_entry_handler	handler,
+	unsigned int		max_entries)
 {
 	void			*madt = NULL;
-	acpi_table_entry_header	*entry = NULL;
-	unsigned long		count = 0;
-	unsigned long		madt_end = 0;
-	unsigned int			i = 0;
+	acpi_table_entry_header	*entry;
+	unsigned int		count = 0;
+	unsigned long		madt_end;
+	unsigned int		i;
 
 	if (!handler)
 		return -EINVAL;
@@ -341,13 +343,19 @@ acpi_table_parse_madt_family (
 	entry = (acpi_table_entry_header *)
 		((unsigned long) madt + madt_size);
 
-	while (((unsigned long) entry) < madt_end) {
-		if (entry->type == entry_id) {
-			count++;
-			handler(entry);
-		}
+	while (((unsigned long) entry) + sizeof(acpi_table_entry_header) < madt_end) {
+		if (entry->type == entry_id &&
+		    (!max_entries || count++ < max_entries))
+			if (handler(entry, madt_end))
+				return -EINVAL;
+
 		entry = (acpi_table_entry_header *)
 			((unsigned long) entry + entry->length);
+	}
+	if (max_entries && count > max_entries) {
+		printk(KERN_WARNING PREFIX "[%s:0x%02x] ignored %i entries of "
+		       "%i found\n", acpi_table_signatures[id], entry_id,
+		       count - max_entries, count);
 	}
 
 	return count;
@@ -357,10 +365,11 @@ acpi_table_parse_madt_family (
 int __init
 acpi_table_parse_madt (
 	enum acpi_madt_entry_id	id,
-	acpi_madt_entry_handler	handler)
+	acpi_madt_entry_handler	handler,
+	unsigned int max_entries)
 {
 	return acpi_table_parse_madt_family(ACPI_APIC, sizeof(struct acpi_table_madt),
-					    id, handler);
+					    id, handler, max_entries);
 }
 
 
@@ -378,8 +387,13 @@ acpi_table_parse (
 	for (i = 0; i < sdt_count; i++) {
 		if (sdt_entry[i].id != id)
 			continue;
-		handler(sdt_entry[i].pa, sdt_entry[i].size);
 		count++;
+		if (count == 1)
+			handler(sdt_entry[i].pa, sdt_entry[i].size);
+
+		else
+			printk(KERN_WARNING PREFIX "%d duplicate %s table ignored.\n",
+				count, acpi_table_signatures[id]);
 	}
 
 	return count;
@@ -543,6 +557,14 @@ acpi_table_get_sdt (
 	return 0;
 }
 
+/*
+ * acpi_table_init()
+ *
+ * find RSDP, find and checksum SDT/XSDT.
+ * checksum all tables, print SDT/XSDT
+ * 
+ * result: sdt_entry[] is initialized
+ */
 
 int __init
 acpi_table_init (void)
@@ -565,7 +587,7 @@ acpi_table_init (void)
 		return -ENODEV;
 	}
 
-	printk(KERN_INFO PREFIX "RSDP (v%3.3d %6.6s                                    ) @ 0x%p\n",
+	printk(KERN_DEBUG PREFIX "RSDP (v%3.3d %6.6s                                ) @ 0x%p\n",
 		rsdp->revision, rsdp->oem_id, (void *) rsdp_phys);
 
 	if (rsdp->revision < 2)
@@ -585,4 +607,3 @@ acpi_table_init (void)
 
 	return 0;
 }
-

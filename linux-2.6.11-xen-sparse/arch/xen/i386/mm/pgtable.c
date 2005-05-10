@@ -22,6 +22,7 @@
 #include <asm/tlb.h>
 #include <asm/tlbflush.h>
 #include <asm/io.h>
+#include <asm/mmu_context.h>
 
 #include <asm-xen/foreign_page.h>
 
@@ -176,18 +177,18 @@ void __set_fixmap (enum fixed_addresses idx, unsigned long phys, pgprot_t flags)
 		BUG();
 		return;
 	}
-	set_pte_pfn(address, phys >> PAGE_SHIFT, flags);
-}
-
-void __set_fixmap_ma (enum fixed_addresses idx, unsigned long phys, pgprot_t flags)
-{
-	unsigned long address = __fix_to_virt(idx);
-
-	if (idx >= __end_of_fixed_addresses) {
-		BUG();
-		return;
+	switch (idx) {
+	case FIX_WP_TEST:
+	case FIX_VSYSCALL:
+#ifdef CONFIG_X86_F00F_BUG
+	case FIX_F00F_IDT:
+#endif
+		set_pte_pfn(address, phys >> PAGE_SHIFT, flags);
+		break;
+	default:
+		set_pte_pfn_ma(address, phys >> PAGE_SHIFT, flags);
+		break;
 	}
-	set_pte_pfn_ma(address, phys >> PAGE_SHIFT, flags);
 }
 
 pte_t *pte_alloc_one_kernel(struct mm_struct *mm, unsigned long address)
@@ -480,7 +481,6 @@ void mm_unpin(struct mm_struct *mm)
 
 void _arch_exit_mmap(struct mm_struct *mm)
 {
-    unsigned int cpu = smp_processor_id();
     struct task_struct *tsk = current;
 
     task_lock(tsk);
@@ -494,9 +494,7 @@ void _arch_exit_mmap(struct mm_struct *mm)
         tsk->active_mm = &init_mm;
         atomic_inc(&init_mm.mm_count);
 
-        cpu_set(cpu, init_mm.cpu_vm_mask);
-        load_cr3(swapper_pg_dir);
-        cpu_clear(cpu, mm->cpu_vm_mask);
+        switch_mm(mm, &init_mm, tsk);
 
         atomic_dec(&mm->mm_count);
         BUG_ON(atomic_read(&mm->mm_count) == 0);

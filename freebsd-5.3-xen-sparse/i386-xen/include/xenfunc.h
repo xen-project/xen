@@ -61,6 +61,9 @@ void load_cr3(uint32_t val);
 void xen_machphys_update(unsigned long, unsigned long);
 void xen_update_descriptor(union descriptor *, union descriptor *);
 void lldt(u_short sel);
+void ap_cpu_initclocks(void);
+
+
 /*
  * Invalidate a patricular VA on all cpus
  *
@@ -79,5 +82,6 @@ invltlb(void)
 	
 }
 
+#define PANIC_IF(exp) if (unlikely(exp)) {printk("%s failed\n",#exp); panic("%s: %s:%d", #exp, __FILE__, __LINE__);} 
 
 #endif /* _XEN_XENFUNC_H_ */

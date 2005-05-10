@@ -16,8 +16,32 @@
 
 #include <linux/config.h>
 #include <linux/init.h>
-#include <asm/apic.h>
 
+#include <linux/mm.h>
+#include <linux/irq.h>
+#include <linux/delay.h>
+#include <linux/bootmem.h>
+#include <linux/smp_lock.h>
+#include <linux/interrupt.h>
+#include <linux/mc146818rtc.h>
+#include <linux/kernel_stat.h>
+#include <linux/sysdev.h>
+
+#include <asm/atomic.h>
+#include <asm/smp.h>
+#include <asm/mtrr.h>
+#include <asm/mpspec.h>
+#include <asm/desc.h>
+#include <asm/arch_hooks.h>
+#include <asm/hpet.h>
+
+#include <mach_apic.h>
+
+#include "io_ports.h"
+
+/*
+ * Debug level
+ */
 int apic_verbosity;
 
 int get_physical_broadcast(void)
@@ -49,5 +73,11 @@ void ack_bad_irq(unsigned int irq)
  */
 int __init APIC_init_uniprocessor (void)
 {
+#ifdef CONFIG_X86_IO_APIC
+	if (smp_found_config)
+		if (!skip_ioapic_setup && nr_ioapics)
+			setup_IO_APIC();
+#endif
+
 	return 0;
 }

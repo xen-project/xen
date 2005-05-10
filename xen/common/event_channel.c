@@ -40,7 +40,7 @@ static int get_free_port(struct exec_domain *ed)
     max = d->max_event_channel;
     chn = d->event_channel;
 
-    for ( port = ed->eid * EVENT_CHANNELS_SPREAD; port < max; port++ )
+    for ( port = ed->id * EVENT_CHANNELS_SPREAD; port < max; port++ )
         if ( chn[port].state == ECS_FREE )
             break;
 

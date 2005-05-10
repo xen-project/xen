@@ -10,10 +10,6 @@
 
 #else
 
-#include <xen/mm.h>
-#include <xen/cache.h>
-#include <xen/types.h>
-
 /* Allocate space for typed object. */
 #define xmalloc(_type) ((_type *)_xmalloc(sizeof(_type), __alignof__(_type)))
 
