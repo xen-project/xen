@@ -31,13 +31,11 @@ struct map_dom_mem_cache {
     void *va;
 };
 
-#define MAP_DOM_MEM_CACHE_INIT { .pa = 0 }
-
 static inline void
 init_map_domain_mem_cache(struct map_dom_mem_cache *cache)
 {
     ASSERT(cache != NULL);
-    *cache = MAP_DOM_MEM_CACHE_INIT;
+    cache->pa = 0;
 }
 
 static inline void *
