@@ -341,12 +341,8 @@ static void __init do_initcalls(void)
         (*call)();
 }
 
-unsigned long pci_mem_start = 0x10000000;
-
 static void __init start_of_day(void)
 {
-    unsigned long low_mem_size;
-    
 #ifdef MEMORY_GUARD
     /* Unmap the first page of CPU0's stack. */
     extern unsigned long cpu0_stack[];
@@ -362,10 +358,6 @@ static void __init start_of_day(void)
 
     arch_do_createdomain(current);
 
-    /* Tell the PCI layer not to allocate too close to the RAM area.. */
-    low_mem_size = ((max_page << PAGE_SHIFT) + 0xfffff) & ~0xfffff;
-    if ( low_mem_size > pci_mem_start ) pci_mem_start = low_mem_size;
-    
     identify_cpu(&boot_cpu_data); /* get CPU type info */
     if ( cpu_has_fxsr ) set_in_cr4(X86_CR4_OSFXSR);
     if ( cpu_has_xmm )  set_in_cr4(X86_CR4_OSXMMEXCPT);
