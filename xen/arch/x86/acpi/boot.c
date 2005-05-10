@@ -447,6 +447,44 @@ acpi_pic_sci_set_trigger(unsigned int irq, u16 trigger)
 
 #endif /* CONFIG_ACPI_BUS */
 
+int acpi_gsi_to_irq(u32 gsi, unsigned int *irq)
+{
+#ifdef CONFIG_X86_IO_APIC
+	if (use_pci_vector() && !platform_legacy_irq(gsi))
+ 		*irq = IO_APIC_VECTOR(gsi);
+	else
+#endif
+		*irq = gsi;
+	return 0;
+}
+
+unsigned int acpi_register_gsi(u32 gsi, int edge_level, int active_high_low)
+{
+	unsigned int irq;
+	unsigned int plat_gsi = gsi;
+
+#ifdef CONFIG_PCI
+	/*
+	 * Make sure all (legacy) PCI IRQs are set as level-triggered.
+	 */
+	if (acpi_irq_model == ACPI_IRQ_MODEL_PIC) {
+		extern void eisa_set_level_irq(unsigned int irq);
+
+		if (edge_level == ACPI_LEVEL_SENSITIVE)
+				eisa_set_level_irq(gsi);
+	}
+#endif
+
+#ifdef CONFIG_X86_IO_APIC
+	if (acpi_irq_model == ACPI_IRQ_MODEL_IOAPIC) {
+		plat_gsi = mp_register_gsi(gsi, edge_level, active_high_low);
+	}
+#endif
+	acpi_gsi_to_irq(plat_gsi, &irq);
+	return irq;
+}
+EXPORT_SYMBOL(acpi_register_gsi);
+
 /*
  *  ACPI based hotplug support for CPU
  */
@@ -817,6 +855,10 @@ acpi_boot_table_init(void)
 		disable_acpi();
 		return error;
 	}
+
+#if 0 /*def __i386__*/
+	check_acpi_pci();
+#endif
 
 	acpi_table_parse(ACPI_BOOT, acpi_parse_sbf);
 

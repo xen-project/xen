@@ -41,7 +41,7 @@ long do_physdev_op(physdev_op_t *uop)
 {
     physdev_op_t op;
     long         ret;
-    int          irq, vector;
+    int          irq;
 
     if ( unlikely(copy_from_user(&op, uop, sizeof(op)) != 0) )
         return -EFAULT;
@@ -87,13 +87,8 @@ long do_physdev_op(physdev_op_t *uop)
         if ( (irq = op.u.irq_op.irq) >= NR_IRQS )
             return -EINVAL;
         
-        op.u.irq_op.vector = vector = assign_irq_vector(irq);
-
-        if ( use_pci_vector() && !platform_legacy_irq(irq) )
-            set_intr_gate(vector, interrupt[vector]);
-        else
-            set_intr_gate(vector, interrupt[irq]);
-
+        op.u.irq_op.vector = assign_irq_vector(irq);
+        set_intr_gate(op.u.irq_op.vector, interrupt[irq]);
         ret = 0;
         break;
 

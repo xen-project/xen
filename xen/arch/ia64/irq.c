@@ -1468,6 +1468,29 @@ int pirq_guest_unbind(struct domain *d, int irq)
     spin_unlock_irqrestore(&desc->lock, flags);    
     return 0;
 }
+
+int pirq_guest_bindable(int irq, int will_share)
+{
+    irq_desc_t         *desc = &irq_desc[irq];
+    irq_guest_action_t *action;
+    unsigned long       flags;
+    int                 okay;
+
+    spin_lock_irqsave(&desc->lock, flags);
+
+    action = (irq_guest_action_t *)desc->action;
+
+    /*
+     * To be bindable the IRQ must either be not currently bound (1), or
+     * it must be shareable (2) and not at its share limit (3).
+     */
+    okay = ((!(desc->status & IRQ_GUEST) && (action == NULL)) || /* 1 */
+            (action->shareable && will_share &&                  /* 2 */
+             (action->nr_guests != IRQ_MAX_GUESTS)));            /* 3 */
+
+    spin_unlock_irqrestore(&desc->lock, flags);
+    return okay;
+}
 #endif
 
 #ifdef XEN

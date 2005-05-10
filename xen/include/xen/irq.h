@@ -71,5 +71,6 @@ struct exec_domain;
 extern int pirq_guest_unmask(struct domain *p);
 extern int pirq_guest_bind(struct exec_domain *p, int irq, int will_share);
 extern int pirq_guest_unbind(struct domain *p, int irq);
+extern int pirq_guest_bindable(int irq, int will_share);
 
 #endif /* __XEN_IRQ_H__ */
