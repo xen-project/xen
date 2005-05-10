@@ -1450,6 +1450,7 @@
 3ddb79c1W0lQca8gRV7sN6j3iY4Luw xen/include/xen/event.h
 41262590CyJy4vd42dnqzsn8-eeGvw xen/include/xen/grant_table.h
 3ddb79c0GurNF9tDWqQbAwJFH8ugfA xen/include/xen/init.h
+428084e41zemtCAtYLcD9bUzwE35SA xen/include/xen/inttypes.h
 3ddb79c1nzaWu8NoF4xCCMSFJR4MlA xen/include/xen/ioport.h
 3ddb79c2qAxCOABlkKtD8Txohe-qEw xen/include/xen/irq.h
 3ddb79c2b3qe-6Ann09FqZBF4IrJaQ xen/include/xen/irq_cpustat.h

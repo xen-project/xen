@@ -33,40 +33,45 @@ struct map_dom_mem_cache {
 
 #define MAP_DOM_MEM_CACHE_INIT { .pa = 0 }
 
-static inline void *
-map_domain_mem_with_cache(unsigned long pa,
-                          struct map_dom_mem_cache *cache)
+static inline void
+init_map_domain_mem_cache(struct map_dom_mem_cache *cache)
 {
-    if ( likely(cache != NULL) )
+    ASSERT(cache != NULL);
+    *cache = MAP_DOM_MEM_CACHE_INIT;
+}
+
+static inline void *
+map_domain_mem_with_cache(unsigned long pa, struct map_dom_mem_cache *cache)
+{
+    ASSERT(cache != NULL);
+
+    if ( likely(cache->pa) )
     {
-        if ( likely(cache->pa) )
-        {
-            if ( likely((pa & PAGE_MASK) == (cache->pa & PAGE_MASK)) )
-                goto done;
-            unmap_domain_mem(cache->va);
-        }
-        cache->pa = (pa & PAGE_MASK) | 1;
-        cache->va = map_domain_mem(cache->pa);
-    done:
-        return (void *)(((unsigned long)cache->va & PAGE_MASK) |
-                        (pa & ~PAGE_MASK));
+        if ( likely((pa & PAGE_MASK) == (cache->pa & PAGE_MASK)) )
+            goto done;
+        unmap_domain_mem(cache->va);
     }
 
-    return map_domain_mem(pa);
+    cache->pa = (pa & PAGE_MASK) | 1;
+    cache->va = map_domain_mem(cache->pa);
+
+ done:
+    return (void *)(((unsigned long)cache->va & PAGE_MASK) |
+                    (pa & ~PAGE_MASK));
 }
 
 static inline void
-unmap_domain_mem_with_cache(void *va,
-                            struct map_dom_mem_cache *cache)
+unmap_domain_mem_with_cache(void *va, struct map_dom_mem_cache *cache)
 {
-    if ( unlikely(!cache) )
-        unmap_domain_mem(va);
+    ASSERT(cache != NULL);
+    unmap_domain_mem(va);
 }
 
 static inline void
-unmap_domain_mem_cache(struct map_dom_mem_cache *cache)
+destroy_map_domain_mem_cache(struct map_dom_mem_cache *cache)
 {
-    if ( likely(cache != NULL) && likely(cache->pa) )
+    ASSERT(cache != NULL);
+    if ( likely(cache->pa) )
     {
         unmap_domain_mem(cache->va);
         cache->pa = 0;

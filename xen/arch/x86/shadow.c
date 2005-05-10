@@ -808,12 +808,15 @@ alloc_p2m_table(struct domain *d)
     struct pfn_info *page, *l2page;
     l2_pgentry_t *l2;
     unsigned long mfn, pfn;
-    struct map_dom_mem_cache l2cache = MAP_DOM_MEM_CACHE_INIT;
-    struct map_dom_mem_cache l1cache = MAP_DOM_MEM_CACHE_INIT;
+    struct map_dom_mem_cache l1cache, l2cache;
 
     l2page = alloc_domheap_page(NULL);
-    if ( !l2page )
+    if ( l2page == NULL )
         return 0;
+
+    init_map_domain_mem_cache(&l1cache);
+    init_map_domain_mem_cache(&l2cache);
+
     d->arch.phys_table = mk_pagetable(page_to_phys(l2page));
     l2 = map_domain_mem_with_cache(page_to_phys(l2page), &l2cache);
     memset(l2, 0, PAGE_SIZE);
@@ -848,8 +851,8 @@ alloc_p2m_table(struct domain *d)
         list_ent = page->list.next;
     }
 
-    unmap_domain_mem_cache(&l2cache);
-    unmap_domain_mem_cache(&l1cache);
+    destroy_map_domain_mem_cache(&l2cache);
+    destroy_map_domain_mem_cache(&l1cache);
 
     return 1;
 }

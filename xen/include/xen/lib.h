@@ -1,6 +1,7 @@
 #ifndef __LIB_H__
 #define __LIB_H__
 
+#include <xen/inttypes.h>
 #include <stdarg.h>
 #include <xen/config.h>
 #include <xen/types.h>

@@ -44,7 +44,6 @@ int sbf_port; /* XXX XEN */
 static inline void  acpi_madt_oem_check(char *oem_id, char *oem_table_id) { }
 extern void __init clustered_apic_check(void);
 static inline int ioapic_setup_disabled(void) { return 0; }
-#include <asm/proto.h>
 
 #else	/* X86 */
 
@@ -110,7 +109,7 @@ char *__acpi_map_table(unsigned long phys_addr, unsigned long size)
 	if (!phys_addr || !size)
 	return NULL;
 
-	if (phys_addr < (end_pfn_map << PAGE_SHIFT))
+	if (phys_addr < (max_page << PAGE_SHIFT))
 		return __va(phys_addr);
 
 	return NULL;
@@ -155,7 +154,7 @@ char *__acpi_map_table(unsigned long phys, unsigned long size)
 		mapped_size += PAGE_SIZE;
 	}
 
-	return ((unsigned char *) base + offset);
+	return ((char *) base + offset);
 }
 #endif
 
