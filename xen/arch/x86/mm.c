@@ -1992,7 +1992,7 @@ int do_mmu_update(
                 printk("privileged guest dom%d requests pfn=%lx to map mfn=%lx for dom%d\n",
                        d->id, gpfn, mfn, FOREIGNDOM->id);
                 set_machinetophys(mfn, gpfn);
-                set_p2m_entry(FOREIGNDOM, gpfn, mfn, NULL, NULL);
+                set_p2m_entry(FOREIGNDOM, gpfn, mfn, &sh_mapcache, &mapcache);
                 okay = 1;
                 shadow_unlock(FOREIGNDOM);
                 break;
