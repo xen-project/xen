@@ -1233,7 +1233,6 @@ static inline void UNEXPECTED_IO_APIC(void)
 
 void __init print_IO_APIC(void)
 {
-#ifndef NDEBUG
 	int apic, i;
 	union IO_APIC_reg_00 reg_00;
 	union IO_APIC_reg_01 reg_01;
@@ -1377,7 +1376,7 @@ void __init print_IO_APIC(void)
 	}
 
 	printk(KERN_INFO ".................................... done.\n");
-#endif /* !NDEBUG */
+
 	return;
 }
 
@@ -1830,26 +1829,6 @@ static struct hw_interrupt_type lapic_irq_type = {
 	.end 		= end_lapic_irq
 };
 
-#if 0
-static void setup_nmi (void)
-{
-	/*
- 	 * Dirty trick to enable the NMI watchdog ...
-	 * We put the 8259A master into AEOI mode and
-	 * unmask on all local APICs LVT0 as NMI.
-	 *
-	 * The idea to use the 8259A in AEOI mode ('8259A Virtual Wire')
-	 * is from Maciej W. Rozycki - so we do not have to EOI from
-	 * the NMI handler or the timer interrupt.
-	 */ 
-	apic_printk(APIC_VERBOSE, KERN_INFO "activating NMI Watchdog ...");
-
-	on_each_cpu(enable_NMI_through_LVT0, NULL, 1, 1);
-
-	apic_printk(APIC_VERBOSE, " done.\n");
-}
-#endif
-
 /*
  * This looks a bit hackish but it's about the only one way of sending
  * a few INTA cycles to 8259As and any associated glue logic.  ICR does
@@ -1953,14 +1932,6 @@ static inline void check_timer(void)
 		 */
 		unmask_IO_APIC_irq(0);
 		if (timer_irq_works()) {
-#if 0
-			if (nmi_watchdog == NMI_IO_APIC) {
-				disable_8259A_irq(0);
-				setup_nmi();
-				enable_8259A_irq(0);
-				check_nmi_watchdog();
-			}
-#endif
 			return;
 		}
 		clear_IO_APIC_pin(0, pin1);
@@ -1980,12 +1951,6 @@ static inline void check_timer(void)
 				replace_pin_at_irq(0, 0, pin1, 0, pin2);
 			else
 				add_pin_to_irq(0, 0, pin2);
-#if 0
-			if (nmi_watchdog == NMI_IO_APIC) {
-				setup_nmi();
-				check_nmi_watchdog();
-			}
-#endif
 			return;
 		}
 		/*
