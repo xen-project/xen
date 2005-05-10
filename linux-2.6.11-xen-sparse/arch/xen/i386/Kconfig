@@ -636,7 +636,7 @@ config MTRR
 
 config IRQBALANCE
  	bool "Enable kernel irq balancing"
-	depends on SMP && X86_IO_APIC
+	depends on SMP && X86_IO_APIC && !XEN
 	default y
 	help
  	  The default yes will allow the kernel to do irq load balancing.

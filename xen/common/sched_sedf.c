@@ -1,4 +1,4 @@
-/*******************************************************************************
+/******************************************************************************
  * Simple EDF scheduler for xen
  *
  * by Stephan Diestelhorst (C)  2004 Cambridge University
@@ -180,9 +180,10 @@ static inline void extraq_add_sort_update(struct exec_domain *d, int i, int sub)
 	struct sedf_edom_info *curinf;
 	
 	ASSERT(!extraq_on(d,i));
-	PRINT(3, "Adding domain %i.%i (score= %i, short_pen= %lli) to L%i "\
-	         "extraq\n", d->domain->id, d->id, EDOM_INFO(d)->score[i],
-	         EDOM_INFO(d)->short_block_lost_tot, i);	
+	PRINT(3, "Adding domain %i.%i (score= %i, short_pen= %"PRIi64")"
+              " to L%i extraq\n",
+              d->domain->id, d->id, EDOM_INFO(d)->score[i],
+              EDOM_INFO(d)->short_block_lost_tot, i);	
 	/*iterate through all elements to find our "hole" and on our way
 	  update all the other scores*/
 	list_for_each(cur,EXTRAQ(d->processor,i)){
@@ -266,8 +267,8 @@ static inline void __del_from_queue(struct exec_domain *d)
 {
     struct list_head *list = LIST(d);
     ASSERT(__task_on_queue(d));
-    PRINT(3,"Removing domain %i.%i (bop= %llu) from runq/waitq\n", d->domain->id,
-          d->id, PERIOD_BEGIN(EDOM_INFO(d)));
+    PRINT(3,"Removing domain %i.%i (bop= %"PRIu64") from runq/waitq\n",
+          d->domain->id, d->id, PERIOD_BEGIN(EDOM_INFO(d)));
     list_del(list);
     list->next = NULL;
     ASSERT(!__task_on_queue(d));
@@ -307,8 +308,8 @@ int name##_comp(struct list_head* el1, struct list_head* el2) \
 DOMAIN_COMPARER(waitq, list, PERIOD_BEGIN(d1), PERIOD_BEGIN(d2))
 static inline void __add_to_waitqueue_sort(struct exec_domain *d) {
 	ASSERT(!__task_on_queue(d));
-	PRINT(3,"Adding domain %i.%i (bop= %llu) to waitq\n", d->domain->id,
-	      d->id, PERIOD_BEGIN(EDOM_INFO(d)));
+	PRINT(3,"Adding domain %i.%i (bop= %"PRIu64") to waitq\n",
+              d->domain->id, d->id, PERIOD_BEGIN(EDOM_INFO(d)));
 	list_insert_sort(WAITQ(d->processor), LIST(d), waitq_comp);
 	ASSERT(__task_on_queue(d));
 }
@@ -320,8 +321,8 @@ static inline void __add_to_waitqueue_sort(struct exec_domain *d) {
  */ 
 DOMAIN_COMPARER(runq, list, d1->deadl_abs, d2->deadl_abs)
 static inline void __add_to_runqueue_sort(struct exec_domain *d) {
-	PRINT(3,"Adding domain %i.%i (deadl= %llu) to runq\n", d->domain->id,
-	      d->id, EDOM_INFO(d)->deadl_abs);
+	PRINT(3,"Adding domain %i.%i (deadl= %"PRIu64") to runq\n",
+              d->domain->id, d->id, EDOM_INFO(d)->deadl_abs);
 	list_insert_sort(RUNQ(d->processor), LIST(d), runq_comp);
 }
 
@@ -530,9 +531,9 @@ struct list_head* waitq) {
 			/*we missed the deadline or the slice was
 				already finished... might hapen because
 				of dom_adj.*/
-			PRINT(4,"\tDomain %i.%i exceeded it's deadline/"\
-				"slice (%llu / %llu) now: %llu "\
-				"cputime: %llu\n",
+			PRINT(4,"\tDomain %i.%i exceeded it's deadline/"
+				"slice (%"PRIu64" / %"PRIu64") now: %"PRIu64
+				" cputime: %"PRIu64"\n",
 				curinf->exec_domain->domain->id,
 				curinf->exec_domain->id,
 				curinf->deadl_abs, curinf->slice, now,
@@ -599,7 +600,7 @@ static inline void desched_extra_dom(s_time_t now, struct exec_domain* d) {
 		/*reduce block lost, probably more sophistication here!*/
 		/*inf->short_block_lost_tot -= EXTRA_QUANTUM;*/
 		inf->short_block_lost_tot -= now - inf->sched_start_abs;
-		PRINT(3,"Domain %i.%i: Short_block_loss: %lli\n", 
+		PRINT(3,"Domain %i.%i: Short_block_loss: %"PRIi64"\n", 
 		      inf->exec_domain->domain->id, inf->exec_domain->id,
 		      inf->short_block_lost_tot);
 		if (inf->short_block_lost_tot <= 0) {
@@ -796,7 +797,7 @@ sched_done:
 	/*TODO: Do something USEFUL when this happens and find out, why it
 	still can happen!!!*/
 	if (ret.time<0) {
-		printk("Ouch! We are seriously BEHIND schedule! %lli\n",
+		printk("Ouch! We are seriously BEHIND schedule! %"PRIi64"\n",
 		       ret.time);
 		ret.time = EXTRA_QUANTUM;
 	}
@@ -1158,8 +1159,8 @@ void sedf_wake(struct exec_domain *d) {
 		/*initial setup of the deadline*/
 		inf->deadl_abs = now + inf->slice;
 		
-	PRINT(3,"waking up domain %i.%i (deadl= %llu period= %llu "\
-	        "now= %llu)\n", d->domain->id, d->id, inf->deadl_abs,
+	PRINT(3,"waking up domain %i.%i (deadl= %"PRIu64" period= %"PRIu64" "\
+	        "now= %"PRIu64")\n", d->domain->id, d->id, inf->deadl_abs,
 		 inf->period, now);
 #ifdef SEDF_STATS	
 	inf->block_tot++;
@@ -1220,8 +1221,8 @@ void sedf_wake(struct exec_domain *d) {
 			extraq_check_add_unblocked(d, 1);
 		}
 	}
-	PRINT(3,"woke up domain %i.%i (deadl= %llu period= %llu "\
-	        "now= %llu)\n", d->domain->id, d->id, inf->deadl_abs,
+	PRINT(3,"woke up domain %i.%i (deadl= %"PRIu64" period= %"PRIu64" "\
+	        "now= %"PRIu64")\n", d->domain->id, d->id, inf->deadl_abs,
 		inf->period, now);
 	if (PERIOD_BEGIN(inf) > now) {
 		__add_to_waitqueue_sort(d);
@@ -1258,21 +1259,21 @@ void sedf_wake(struct exec_domain *d) {
 static void sedf_dump_domain(struct exec_domain *d) {
 	printk("%i.%i has=%c ", d->domain->id, d->id,
 		test_bit(EDF_RUNNING, &d->flags) ? 'T':'F');
-	printk("p=%llu sl=%llu ddl=%llu w=%hu c=%llu sc=%i xtr(%s)=%llu ew=%hu",
+	printk("p=%"PRIu64" sl=%"PRIu64" ddl=%"PRIu64" w=%hu c=%"PRIu64" sc=%i xtr(%s)=%"PRIu64" ew=%hu",
 	  EDOM_INFO(d)->period, EDOM_INFO(d)->slice, EDOM_INFO(d)->deadl_abs,
 	  EDOM_INFO(d)->weight, d->cpu_time, EDOM_INFO(d)->score[EXTRA_UTIL_Q],
 	 (EDOM_INFO(d)->status & EXTRA_AWARE) ? "yes" : "no",
 	  EDOM_INFO(d)->extra_time_tot, EDOM_INFO(d)->extraweight);
 	if (d->cpu_time !=0)
-		printf(" (%llu%%)", (EDOM_INFO(d)->extra_time_tot * 100)
+		printf(" (%"PRIu64"%%)", (EDOM_INFO(d)->extra_time_tot * 100)
 		                 / d->cpu_time);
 #ifdef SEDF_STATS
 	if (EDOM_INFO(d)->block_time_tot!=0)
-		printf(" pen=%llu%%", (EDOM_INFO(d)->penalty_time_tot * 100) /
+		printf(" pen=%"PRIu64"%%", (EDOM_INFO(d)->penalty_time_tot * 100) /
 		                     EDOM_INFO(d)->block_time_tot);
 	if (EDOM_INFO(d)->block_tot!=0)
 		printf("\n   blks=%u sh=%u (%u%%) (shc=%u (%u%%) shex=%i "\
-		       "shexsl=%i) l=%u (%u%%) avg: b=%llu p=%llu",
+		       "shexsl=%i) l=%u (%u%%) avg: b=%"PRIu64" p=%"PRIu64"",
 		    EDOM_INFO(d)->block_tot, EDOM_INFO(d)->short_block_tot,
 		   (EDOM_INFO(d)->short_block_tot * 100) 
 		  / EDOM_INFO(d)->block_tot, EDOM_INFO(d)->short_cont,
@@ -1296,7 +1297,7 @@ static void sedf_dump_cpu_state(int i)
 	struct exec_domain    *ed;
 	int loop = 0;
 	
-	printk("now=%llu\n",NOW());
+	printk("now=%"PRIu64"\n",NOW());
 	queue = RUNQ(i);
 	printk("RUNQ rq %lx   n: %lx, p: %lx\n",  (unsigned long)queue,
 		(unsigned long) queue->next, (unsigned long) queue->prev);
@@ -1396,8 +1397,8 @@ static inline int sedf_adjust_weights(struct sched_adjdom_cmd *cmd) {
 static int sedf_adjdom(struct domain *p, struct sched_adjdom_cmd *cmd) {
 	struct exec_domain *ed;
 
-	PRINT(2,"sedf_adjdom was called, domain-id %i new period %llu "\
-	        "new slice %llu\nlatency %llu extra:%s\n",
+	PRINT(2,"sedf_adjdom was called, domain-id %i new period %"PRIu64" "\
+	        "new slice %"PRIu64"\nlatency %"PRIu64" extra:%s\n",
 		p->id, cmd->u.sedf.period, cmd->u.sedf.slice,
 		cmd->u.sedf.latency, (cmd->u.sedf.extratime)?"yes":"no");
 	if ( cmd->direction == SCHED_INFO_PUT )

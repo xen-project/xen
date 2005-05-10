@@ -1813,8 +1813,7 @@ int do_mmu_update(
     struct exec_domain *ed = current;
     struct domain *d = ed->domain;
     u32 type_info;
-    struct map_dom_mem_cache mapcache = MAP_DOM_MEM_CACHE_INIT;
-    struct map_dom_mem_cache sh_mapcache = MAP_DOM_MEM_CACHE_INIT;
+    struct map_dom_mem_cache mapcache, sh_mapcache;
 
     LOCK_BIGLOCK(d);
 
@@ -1829,6 +1828,9 @@ int do_mmu_update(
         if ( unlikely(pdone != NULL) )
             (void)get_user(done, pdone);
     }
+
+    init_map_domain_mem_cache(&mapcache);
+    init_map_domain_mem_cache(&sh_mapcache);
 
     if ( !set_foreigndom(cpu, foreigndom) )
     {
@@ -2037,8 +2039,8 @@ int do_mmu_update(
     }
 
  out:
-    unmap_domain_mem_cache(&mapcache);
-    unmap_domain_mem_cache(&sh_mapcache);
+    destroy_map_domain_mem_cache(&mapcache);
+    destroy_map_domain_mem_cache(&sh_mapcache);
 
     process_deferred_ops(cpu);
 

@@ -35,6 +35,7 @@ clean:
 	rm -f x86_32/*.o x86_32/*~ x86_32/core
 	rm -f x86_64/*.o x86_64/*~ x86_64/core
 	rm -f mtrr/*.o mtrr/*~ mtrr/core
+	rm -f acpi/*.o acpi/*~ acpi/core
 
 delete-unfresh-files:
 	# nothing
