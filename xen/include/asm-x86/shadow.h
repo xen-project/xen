@@ -26,6 +26,7 @@
 #include <xen/types.h>
 #include <xen/perfc.h>
 #include <xen/sched.h>
+#include <xen/mm.h>
 #include <asm/processor.h>
 #include <asm/domain_page.h>
 #include <public/dom0_ops.h>

@@ -9,7 +9,9 @@
 
 typedef u32 cpumask_t;
 
+#ifndef cpu_online_map
 extern cpumask_t cpu_online_map;
+#endif
 
 static inline int cpus_weight(cpumask_t w)
 {

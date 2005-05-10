@@ -3,12 +3,7 @@
 #define __SLAB_H__
 
 #include <xen/config.h>
-
-#ifdef __ARCH_HAS_SLAB_ALLOCATOR
-
-#include <asm/slab.h>
-
-#else
+#include <xen/mm.h>
 
 /* Allocate space for typed object. */
 #define xmalloc(_type) ((_type *)_xmalloc(sizeof(_type), __alignof__(_type)))
@@ -31,7 +26,5 @@ static inline void *_xmalloc_array(size_t size, size_t align, size_t num)
 		return NULL;
  	return _xmalloc(size * num, align);
 }
-
-#endif /* __ARCH_HAS_SLAB_ALLOCATOR */
 
 #endif /* __SLAB_H__ */

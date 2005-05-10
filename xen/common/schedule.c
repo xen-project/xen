@@ -34,6 +34,7 @@
 #include <xen/sched-if.h>
 #include <xen/softirq.h>
 #include <xen/trace.h>
+#include <xen/mm.h>
 #include <public/sched_ctl.h>
 
 /* opt_sched: scheduler - default to Borrowed Virtual Time */
