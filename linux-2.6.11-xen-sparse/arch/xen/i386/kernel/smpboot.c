@@ -54,6 +54,7 @@
 #include <asm/desc.h>
 #include <asm/arch_hooks.h>
 
+#include <mach_apic.h>
 #include <mach_wakecpu.h>
 #include <smpboot_hooks.h>
 
@@ -493,19 +494,7 @@ static void __init start_secondary(void *unused)
 	local_irq_enable();
 
 	wmb();
-	if (0) {
-		char *msg2 = "delay2\n";
-		int timeout;
-		for (timeout = 0; timeout < 50000; timeout++) {
-			udelay(1000);
-			if (timeout == 2000) {
-				(void)HYPERVISOR_console_io(CONSOLEIO_write, strlen(msg2), msg2);
-				timeout = 0;
-			}
-		}
-	}
 	cpu_idle();
-	return 0;
 }
 
 /*
@@ -1111,15 +1100,15 @@ static void __init smp_boot_cpus(unsigned int max_cpus)
 	 * If we couldn't find an SMP configuration at boot time,
 	 * get out of here now!
 	 */
-	if (!smp_found_config /* && !acpi_lapic) */) {
+	if (!smp_found_config && !acpi_lapic) {
 		printk(KERN_NOTICE "SMP motherboard not detected.\n");
 		smpboot_clear_io_apic_irqs();
 #if 0
 		phys_cpu_present_map = physid_mask_of_physid(0);
+#endif
 		if (APIC_init_uniprocessor())
 			printk(KERN_NOTICE "Local APIC not detected."
 					   " Using dummy APIC emulation.\n");
-#endif
 		map_cpu_to_logical_apicid();
 		return;
 	}
