@@ -409,13 +409,15 @@ int arch_set_info_guest(
 
     memcpy(&ed->arch.guest_context, c, sizeof(*c));
 
-    /* IOPL privileges are virtualised. */
-    ed->arch.iopl = (ed->arch.guest_context.user_regs.eflags >> 12) & 3;
-    ed->arch.guest_context.user_regs.eflags &= ~EF_IOPL;
+    if ( !(c->flags & VGCF_VMX_GUEST) )
+    {
+        /* IOPL privileges are virtualised. */
+        ed->arch.iopl = (ed->arch.guest_context.user_regs.eflags >> 12) & 3;
+        ed->arch.guest_context.user_regs.eflags &= ~EF_IOPL;
 
-    /* Clear IOPL for unprivileged domains. */
-    if ( !IS_PRIV(d) )
-        ed->arch.guest_context.user_regs.eflags &= 0xffffcfff;
+        /* Ensure real hardware interrupts are enabled. */
+        ed->arch.guest_context.user_regs.eflags |= EF_IE;
+    }
 
     if ( test_bit(EDF_DONEINIT, &ed->flags) )
         return 0;

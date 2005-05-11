@@ -447,7 +447,7 @@ static int setup_guest(int xc_handle,
     ctxt->user_regs.esi = vboot_params_start;
     ctxt->user_regs.edi = vboot_params_start + 0x2d0;
 
-    ctxt->user_regs.eflags = (1<<2);
+    ctxt->user_regs.eflags = 0;
 
     return 0;
 
