@@ -89,7 +89,7 @@ typedef struct {
     memory_t shared_info_frame;       /* MFN of shared_info struct */
     u64      cpu_time;
     u32      n_vcpu;
-    u32      vcpu_to_cpu[MAX_VIRT_CPUS];  /* current mapping   */
+    s32      vcpu_to_cpu[MAX_VIRT_CPUS];  /* current mapping   */
     cpumap_t cpumap[MAX_VIRT_CPUS];       /* allowable mapping */
 } dom0_getdomaininfo_t;
 

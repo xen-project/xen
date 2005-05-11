@@ -119,7 +119,7 @@ typedef struct {
     unsigned long shared_info_frame;
     u64           cpu_time;
     unsigned long max_memkb;
-    u32           vcpu_to_cpu[MAX_VIRT_CPUS];
+    s32           vcpu_to_cpu[MAX_VIRT_CPUS];
     cpumap_t      cpumap[MAX_VIRT_CPUS];
 } xc_dominfo_t;
 

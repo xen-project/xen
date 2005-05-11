@@ -17,7 +17,7 @@ int xc_domain_create(int xc_handle,
     int err, errno_saved;
     dom0_op_t op;
     u32 vcpu = 0; /* FIXME, hard coded initial pin to vcpu 0 */
-    cpumap_t cpumap = 1<<cpu;
+    cpumap_t cpumap = 1 << cpu;
 
     op.cmd = DOM0_CREATEDOMAIN;
     op.u.createdomain.domain = (domid_t)*pdomid;
@@ -137,10 +137,10 @@ int xc_domain_getinfo(int xc_handle,
         info->shared_info_frame = op.u.getdomaininfo.shared_info_frame;
         info->cpu_time = op.u.getdomaininfo.cpu_time;
         info->vcpus = op.u.getdomaininfo.n_vcpu;
-        memcpy(info->vcpu_to_cpu, &op.u.getdomaininfo.vcpu_to_cpu, 
-               MAX_VIRT_CPUS*sizeof(u32));
-        memcpy(info->cpumap, &op.u.getdomaininfo.cpumap, 
-               MAX_VIRT_CPUS*sizeof(cpumap_t));
+        memcpy(&info->vcpu_to_cpu, &op.u.getdomaininfo.vcpu_to_cpu, 
+               sizeof(info->vcpu_to_cpu));
+        memcpy(&info->cpumap, &op.u.getdomaininfo.cpumap, 
+               sizeof(info->cpumap));
 
         next_domid = (u16)op.u.getdomaininfo.domain + 1;
         info++;

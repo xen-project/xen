@@ -221,7 +221,7 @@ long do_dom0_op(dom0_op_t *u_dom0_op)
         domid_t dom = op->u.pincpudomain.domain;
         struct domain *d = find_domain_by_id(dom);
         struct exec_domain *ed;
-        cpumap_t curmap, *cpumap = &curmap;
+        cpumap_t cpumap;
 
 
         if ( d == NULL )
@@ -253,8 +253,8 @@ long do_dom0_op(dom0_op_t *u_dom0_op)
             break;
         }
 
-        if ( copy_from_user(cpumap, 
-                            op->u.pincpudomain.cpumap, sizeof(*cpumap)) )
+        if ( copy_from_user(&cpumap, op->u.pincpudomain.cpumap,
+                            sizeof(cpumap)) )
         {
             ret = -EFAULT;
             put_domain(d);
@@ -262,14 +262,14 @@ long do_dom0_op(dom0_op_t *u_dom0_op)
         }
 
         /* update cpumap for this ed */
-        ed->cpumap = *(cpumap);
+        ed->cpumap = cpumap;
 
-        if ( *(cpumap) == CPUMAP_RUNANYWHERE )
+        if ( cpumap == CPUMAP_RUNANYWHERE )
             clear_bit(EDF_CPUPINNED, &ed->flags);
         else
         {
             /* pick a new cpu from the usable map */
-            int new_cpu = (int)find_first_set_bit(*(cpumap)) % smp_num_cpus;
+            int new_cpu = (int)find_first_set_bit(cpumap) % smp_num_cpus;
 
             exec_domain_pause(ed);
             if ( ed->processor != new_cpu )
@@ -329,7 +329,10 @@ long do_dom0_op(dom0_op_t *u_dom0_op)
             break;
         }
         
-        memset(&op->u.getdomaininfo.vcpu_to_cpu,-1,MAX_VIRT_CPUS*sizeof(u8));
+        memset(&op->u.getdomaininfo.vcpu_to_cpu, -1,
+               sizeof(op->u.getdomaininfo.vcpu_to_cpu));
+        memset(&op->u.getdomaininfo.cpumap, 0,
+               sizeof(op->u.getdomaininfo.cpumap));
         for_each_exec_domain ( d, ed ) {
             op->u.getdomaininfo.vcpu_to_cpu[ed->id] = ed->processor;
             op->u.getdomaininfo.cpumap[ed->id]      = ed->cpumap;
