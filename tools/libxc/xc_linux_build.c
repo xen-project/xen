@@ -414,7 +414,7 @@ int xc_linux_build(int xc_handle,
     ctxt->user_regs.eip = vkern_entry;
     ctxt->user_regs.esp = vstartinfo_start + 2*PAGE_SIZE;
     ctxt->user_regs.esi = vstartinfo_start;
-    ctxt->user_regs.eflags = (1<<9) | (1<<2);
+    ctxt->user_regs.eflags = 1 << 9; /* Interrupt Enable */
 
     /* FPU is set up to default initial state. */
     memset(&ctxt->fpu_ctxt, 0, sizeof(ctxt->fpu_ctxt));

@@ -499,7 +499,7 @@ xc_plan9_build(int xc_handle,
 
 	/* why is this set? */
 	ctxt->user_regs.esi = ctxt->user_regs.esp;
-	ctxt->user_regs.eflags = (1 << 9) | (1 << 2);
+	ctxt->user_regs.eflags = 1 << 9; /* Interrupt Enable */
 
 	/* FPU is set up to default initial state. */
 	memset(&ctxt->fpu_ctxt, 0, sizeof(ctxt->fpu_ctxt));
