@@ -181,8 +181,6 @@ int xc_linux_restore(int xc_handle, XcIOContext *ioctxt)
     /* Get the domain's shared-info frame. */
     op.cmd = DOM0_GETDOMAININFO;
     op.u.getdomaininfo.domain = (domid_t)dom;
-    op.u.getdomaininfo.exec_domain = 0;
-    op.u.getdomaininfo.ctxt = NULL;
     if ( do_dom0_op(xc_handle, &op) < 0 )
     {
         xcio_error(ioctxt, "Could not get information on new domain");

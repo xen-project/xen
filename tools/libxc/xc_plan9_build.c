@@ -440,17 +440,21 @@ xc_plan9_build(int xc_handle,
 
 	op.cmd = DOM0_GETDOMAININFO;
 	op.u.getdomaininfo.domain = (domid_t) domid;
-        op.u.getdomaininfo.exec_domain = 0;
-	op.u.getdomaininfo.ctxt = ctxt;
 	if ((do_dom0_op(xc_handle, &op) < 0) ||
 	    ((u32) op.u.getdomaininfo.domain != domid)) {
 		PERROR("Could not get info on domain");
 		goto error_out;
 	}
 	DPRINTF(("xc_get_tot_pages returns %ld pages\n", tot_pages));
+	
+	if ( xc_domain_get_vcpu_context(xc_handle, domid, 0, ctxt) )
+	{
+	    PERROR("Could not get vcpu context");
+	    goto error_out;
+	}
 
 	if (!(op.u.getdomaininfo.flags & DOMFLAGS_PAUSED)
-	    || (op.u.getdomaininfo.ctxt->pt_base != 0)) {
+	    || (ctxt->pt_base != 0)) {
 		ERROR("Domain is already constructed");
 		goto error_out;
 	}

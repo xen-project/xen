@@ -110,8 +110,10 @@ int xc_waitdomain_core(int domain,
 
 typedef struct {
     u32           domid;
-    unsigned int  cpu;
+    unsigned int  flags;
+    unsigned int  processors;
     unsigned int  vcpus;
+    u16           n_vcpus;	
     unsigned int  dying:1, crashed:1, shutdown:1, 
                   paused:1, blocked:1, running:1;
     unsigned int  shutdown_reason; /* only meaningful if shutdown==1 */
@@ -199,11 +201,11 @@ int xc_domain_getinfo(int xc_handle,
  *            domain
  * @return 0 on success, -1 on failure
  */
-int xc_domain_getfullinfo(int xc_handle,
-                          u32 domid,
-                          u32 vcpu,
-                          xc_domaininfo_t *info,
-                          vcpu_guest_context_t *ctxt);
+int xc_domain_get_vcpu_context(int xc_handle,
+			      u32 domid,
+			      u32 vcpu,
+			      vcpu_guest_context_t *ctxt);
+
 int xc_domain_setcpuweight(int xc_handle,
                            u32 domid,
                            float weight);

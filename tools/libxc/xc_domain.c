@@ -112,14 +112,12 @@ int xc_domain_getinfo(int xc_handle,
     {
         op.cmd = DOM0_GETDOMAININFO;
         op.u.getdomaininfo.domain = (domid_t)next_domid;
-        op.u.getdomaininfo.exec_domain = 0; // FIX ME?!?
-        op.u.getdomaininfo.ctxt = NULL; /* no exec context info, thanks. */
         if ( (rc = do_dom0_op(xc_handle, &op)) < 0 )
             break;
-        info->domid   = (u16)op.u.getdomaininfo.domain;
-
-        info->cpu     =
-            (op.u.getdomaininfo.flags>>DOMFLAGS_CPUSHIFT) & DOMFLAGS_CPUMASK;
+        info->domid      = (u16)op.u.getdomaininfo.domain;
+        info->processors = op.u.getdomaininfo.processors;
+	info->n_vcpus    = op.u.getdomaininfo.n_active_vcpus;
+	info->flags      = op.u.getdomaininfo.flags;
 
         info->dying    = !!(op.u.getdomaininfo.flags & DOMFLAGS_DYING);
         info->crashed  = !!(op.u.getdomaininfo.flags & DOMFLAGS_CRASHED);
@@ -142,28 +140,27 @@ int xc_domain_getinfo(int xc_handle,
         memcpy(&info->cpumap, &op.u.getdomaininfo.cpumap, 
                sizeof(info->cpumap));
 
-        next_domid = (u16)op.u.getdomaininfo.domain + 1;
-        info++;
+       next_domid = (u16)op.u.getdomaininfo.domain + 1;
+       info++;
     }
 
-    if(!nr_doms) return rc; 
+    if( !nr_doms ) return rc; 
 
     return nr_doms;
 }
 
-int xc_domain_getfullinfo(int xc_handle,
-                          u32 domid,
-                          u32 vcpu,
-                          xc_domaininfo_t *info,
-                          vcpu_guest_context_t *ctxt)
+int xc_domain_get_vcpu_context(int xc_handle,
+			       u32 domid,
+			       u32 vcpu,
+			       vcpu_guest_context_t *ctxt)
 {
     int rc, errno_saved;
     dom0_op_t op;
 
-    op.cmd = DOM0_GETDOMAININFO;
-    op.u.getdomaininfo.domain = (domid_t)domid;
-    op.u.getdomaininfo.exec_domain = (u16)vcpu;
-    op.u.getdomaininfo.ctxt = ctxt;
+    op.cmd = DOM0_GETVCPUCONTEXT;
+    op.u.getvcpucontext.domain = (domid_t)domid;
+    op.u.getvcpucontext.exec_domain = (u16)vcpu;
+    op.u.getvcpucontext.ctxt = ctxt;
 
     if ( (ctxt != NULL) &&
          ((rc = mlock(ctxt, sizeof(*ctxt))) != 0) )
@@ -178,10 +175,7 @@ int xc_domain_getfullinfo(int xc_handle,
         errno = errno_saved;
     }
 
-    if ( info != NULL )
-        memcpy(info, &op.u.getdomaininfo, sizeof(*info));
-
-    if ( ((u16)op.u.getdomaininfo.domain != domid) && (rc > 0) )
+    if ( rc > 0 )
         return -ESRCH;
     else
         return rc;

@@ -70,7 +70,7 @@ typedef struct {
 typedef struct {
     /* IN variables. */
     domid_t  domain;                  /* NB. IN/OUT variable. */
-    u16      exec_domain;
+    u16      n_active_vcpus;          /* # of vcpus currently active */
     /* OUT variables. */
 #define DOMFLAGS_DYING     (1<<0) /* Domain is scheduled to die.             */
 #define DOMFLAGS_CRASHED   (1<<1) /* Crashed domain; frozen for postmortem.  */
@@ -83,7 +83,7 @@ typedef struct {
 #define DOMFLAGS_SHUTDOWNMASK 255 /* DOMFLAGS_SHUTDOWN guest-supplied code.  */
 #define DOMFLAGS_SHUTDOWNSHIFT 16
     u32      flags;
-    vcpu_guest_context_t *ctxt;   /* NB. IN/OUT variable. */
+    u32      processors;	
     memory_t tot_pages;
     memory_t max_pages;
     memory_t shared_info_frame;       /* MFN of shared_info struct */
@@ -345,6 +345,15 @@ typedef struct {
     u16     allow_access;             /* allow or deny access to range? */
 } dom0_ioport_permission_t;
 
+#define DOM0_GETVCPUCONTEXT      37
+typedef struct {
+    domid_t domain;                   /* domain to be affected */
+    u16     exec_domain;              /* NB. IN: nth active cpu / OUT: actual cpu # */
+    vcpu_guest_context_t *ctxt;       /* NB. IN/OUT variable. */
+    u64     cpu_time;                 
+} dom0_getvcpucontext_t;
+
+
 typedef struct {
     u32 cmd;
     u32 interface_version; /* DOM0_INTERFACE_VERSION */
@@ -376,6 +385,7 @@ typedef struct {
         dom0_perfccontrol_t      perfccontrol;
         dom0_microcode_t         microcode;
         dom0_ioport_permission_t ioport_permission;
+        dom0_getvcpucontext_t    getvcpucontext;
     } u;
 } dom0_op_t;
 

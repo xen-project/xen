@@ -324,7 +324,7 @@ static int analysis_phase( int xc_handle, u32 domid,
 
 
 int suspend_and_state(int xc_handle, XcIOContext *ioctxt,		      
-                      xc_domaininfo_t *info,
+                      xc_dominfo_t *info,
                       vcpu_guest_context_t *ctxt)
 {
     int i=0;
@@ -333,11 +333,16 @@ int suspend_and_state(int xc_handle, XcIOContext *ioctxt,
 
 retry:
 
-    if ( xc_domain_getfullinfo(xc_handle, ioctxt->domain, /* FIXME */ 0, 
-                               info, ctxt) )
+    if ( xc_domain_getinfo(xc_handle, ioctxt->domain, 1, info) )
     {
 	xcio_error(ioctxt, "Could not get full domain info");
 	return -1;
+    }
+
+    if ( xc_domain_get_vcpu_context(xc_handle, ioctxt->domain, 0 /* XXX */, 
+				    ctxt) )
+    {
+        xcio_error(ioctxt, "Could not get vcpu context");
     }
 
     if ( (info->flags & 
@@ -374,7 +379,7 @@ retry:
 
 int xc_linux_save(int xc_handle, XcIOContext *ioctxt)
 {
-    xc_domaininfo_t info;
+    xc_dominfo_t info;
 
     int rc = 1, i, j, k, last_iter, iter = 0;
     unsigned long mfn;
@@ -444,11 +449,16 @@ int xc_linux_save(int xc_handle, XcIOContext *ioctxt)
         xcio_perror(ioctxt, "Unable to mlock ctxt");
         return 1;
     }
-
-    if ( xc_domain_getfullinfo( xc_handle, domid, /* FIXME */ 0, 
-                                &info, &ctxt) )
+    
+    if ( xc_domain_getinfo(xc_handle, domid, 1, &info) )
     {
         xcio_error(ioctxt, "Could not get full domain info");
+        goto out;
+    }
+    if ( xc_domain_get_vcpu_context( xc_handle, domid, /* FIXME */ 0, 
+                                &ctxt) )
+    {
+        xcio_error(ioctxt, "Could not get vcpu context");
         goto out;
     }
     shared_info_frame = info.shared_info_frame;
@@ -459,7 +469,7 @@ int xc_linux_save(int xc_handle, XcIOContext *ioctxt)
         goto out;
     }
     
-    nr_pfns = info.max_pages; 
+    nr_pfns = info.nr_pages; 
 
     /* cheesy sanity check */
     if ( nr_pfns > 1024*1024 ){

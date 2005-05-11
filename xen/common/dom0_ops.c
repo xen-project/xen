@@ -299,9 +299,16 @@ long do_dom0_op(dom0_op_t *u_dom0_op)
 
     case DOM0_GETDOMAININFO:
     { 
-        struct vcpu_guest_context *c;
-        struct domain            *d;
-        struct exec_domain       *ed;
+        struct domain             *d;
+        struct exec_domain        *ed;
+        u64 cpu_time = 0;
+        int vcpu_count = 0;
+        u32 processors = 0;
+        int flags = DOMFLAGS_PAUSED | DOMFLAGS_BLOCKED;
+
+#if MAX_VIRT_CPUS > 32
+#error "update processors field in GETDOMAININFO"
+#endif
 
         read_lock(&domlist_lock);
 
@@ -322,13 +329,6 @@ long do_dom0_op(dom0_op_t *u_dom0_op)
 
         op->u.getdomaininfo.domain = d->id;
 
-        if ( (op->u.getdomaininfo.exec_domain >= MAX_VIRT_CPUS) ||
-             !d->exec_domain[op->u.getdomaininfo.exec_domain] )
-        {
-            ret = -EINVAL;
-            break;
-        }
-        
         memset(&op->u.getdomaininfo.vcpu_to_cpu, -1,
                sizeof(op->u.getdomaininfo.vcpu_to_cpu));
         memset(&op->u.getdomaininfo.cpumap, 0,
@@ -338,28 +338,86 @@ long do_dom0_op(dom0_op_t *u_dom0_op)
             op->u.getdomaininfo.cpumap[ed->id]      = ed->cpumap;
         }
 
-        ed = d->exec_domain[op->u.getdomaininfo.exec_domain];
+        /* 
+         * - domain is marked as paused or blocked only if all its vcpus 
+         *   are paused or blocked 
+         * - domain is marked as running if any of its vcpus is running
+         */
+        
+        for_each_exec_domain(d, ed)  
+        { 
+            if (!((flags & DOMFLAGS_PAUSED) && test_bit(EDF_CTRLPAUSE, &ed->flags)))
+                flags &=  ~DOMFLAGS_PAUSED;
+            if (!((flags & DOMFLAGS_BLOCKED) && test_bit(EDF_BLOCKED, &ed->flags)))
+                flags &=  ~DOMFLAGS_BLOCKED;                
+            flags |= (test_bit(EDF_RUNNING,   &ed->flags) ? DOMFLAGS_RUNNING  : 0);
+
+            set_bit(ed->processor, &processors);
+            if ( ed->cpu_time > cpu_time )
+                cpu_time += ed->cpu_time;
+            vcpu_count++;
+        }
+        op->u.getdomaininfo.n_active_vcpus = vcpu_count;
+        op->u.getdomaininfo.cpu_time = cpu_time;
 
         op->u.getdomaininfo.flags =
             (test_bit( DF_DYING,      &d->flags)  ? DOMFLAGS_DYING    : 0) |
             (test_bit( DF_CRASHED,    &d->flags)  ? DOMFLAGS_CRASHED  : 0) |
             (test_bit( DF_SHUTDOWN,   &d->flags)  ? DOMFLAGS_SHUTDOWN : 0) |
-            (test_bit(EDF_CTRLPAUSE, &ed->flags) ? DOMFLAGS_PAUSED   : 0) |
-            (test_bit(EDF_BLOCKED,   &ed->flags) ? DOMFLAGS_BLOCKED  : 0) |
-            (test_bit(EDF_RUNNING,   &ed->flags) ? DOMFLAGS_RUNNING  : 0);
+            flags;
 
-        op->u.getdomaininfo.flags |= ed->processor << DOMFLAGS_CPUSHIFT;
         op->u.getdomaininfo.flags |= 
             d->shutdown_code << DOMFLAGS_SHUTDOWNSHIFT;
 
+        op->u.getdomaininfo.processors  = processors;
         op->u.getdomaininfo.tot_pages   = d->tot_pages;
         op->u.getdomaininfo.max_pages   = d->max_pages;
-        op->u.getdomaininfo.cpu_time    = ed->cpu_time;
         op->u.getdomaininfo.n_vcpu      = d->shared_info->n_vcpu;
         op->u.getdomaininfo.shared_info_frame = 
             __pa(d->shared_info) >> PAGE_SHIFT;
 
-        if ( op->u.getdomaininfo.ctxt != NULL )
+        if ( copy_to_user(u_dom0_op, op, sizeof(*op)) )     
+            ret = -EINVAL;
+
+        put_domain(d);
+    }
+    break;
+
+    case DOM0_GETVCPUCONTEXT:
+    { 
+        struct vcpu_guest_context *c;
+        struct domain             *d;
+        struct exec_domain        *ed;
+        int active_index = 0; 
+        int exec_domain_index;
+
+        exec_domain_index = op->u.getvcpucontext.exec_domain;
+        d = find_domain_by_id(op->u.getvcpucontext.domain);
+
+        if ( d == NULL )
+        {
+            ret = -ESRCH;
+            break;
+        }
+
+        if ( (exec_domain_index >= MAX_VIRT_CPUS) )
+        {
+            ret = -EINVAL;
+            break;
+        }
+        
+        for_each_exec_domain(d, ed)
+        {
+            if ( exec_domain_index == active_index ) 
+            {
+                op->u.getvcpucontext.exec_domain = ed->id;
+                break;
+            }
+            active_index++;
+        }
+        op->u.getvcpucontext.cpu_time = ed->cpu_time;
+
+        if ( op->u.getvcpucontext.ctxt != NULL )
         {
             if ( (c = xmalloc(struct vcpu_guest_context)) == NULL )
             {
@@ -376,7 +434,7 @@ long do_dom0_op(dom0_op_t *u_dom0_op)
             if ( ed != current )
                 exec_domain_unpause(ed);
 
-            if ( copy_to_user(op->u.getdomaininfo.ctxt, c, sizeof(*c)) )
+            if ( copy_to_user(op->u.getvcpucontext.ctxt, c, sizeof(*c)) )
                 ret = -EINVAL;
 
             xfree(c);
