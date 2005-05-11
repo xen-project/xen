@@ -3,7 +3,9 @@
 
 static inline void smpboot_clear_io_apic_irqs(void)
 {
+#ifdef CONFIG_X86_IO_APIC
 	io_apic_irqs = 0;
+#endif
 }
 
 static inline void smpboot_setup_warm_reset_vector(unsigned long start_eip)
@@ -39,12 +41,14 @@ static inline void smpboot_restore_warm_reset_vector(void)
 
 static inline void smpboot_setup_io_apic(void)
 {
+#ifdef CONFIG_X86_IO_APIC
 	/*
 	 * Here we can be sure that there is an IO-APIC in the system. Let's
 	 * go and set it up:
 	 */
 	if (!skip_ioapic_setup && nr_ioapics)
 		setup_IO_APIC();
+#endif
 }
 
 
