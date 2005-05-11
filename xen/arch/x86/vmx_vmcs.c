@@ -164,6 +164,9 @@ void vmx_do_launch(struct exec_domain *ed)
     struct pfn_info *page;
     struct cpu_user_regs *regs = get_cpu_user_regs();
 
+    vmx_stts();
+    set_bit(EDF_GUEST_STTS, &ed->flags);
+
     cpu = smp_processor_id();
 
     page = (struct pfn_info *) alloc_domheap_page(NULL);

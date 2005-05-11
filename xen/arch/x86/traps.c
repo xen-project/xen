@@ -919,13 +919,7 @@ asmlinkage int math_state_restore(struct cpu_user_regs *regs)
     /* Prevent recursion. */
     clts();
 
-    if ( !test_and_set_bit(EDF_USEDFPU, &current->flags) )
-    {
-        if ( test_bit(EDF_DONEFPUINIT, &current->flags) )
-            restore_fpu(current);
-        else
-            init_fpu();
-    }
+    setup_fpu(current);
 
     if ( test_and_clear_bit(EDF_GUEST_STTS, &current->flags) )
     {
