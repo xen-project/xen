@@ -87,22 +87,22 @@ typedef struct xc_core_header {
 
 
 long xc_ptrace(enum __ptrace_request request, 
-	       u32  domid,
-	       long addr, 
-	       long data);
+               u32  domid,
+               long addr, 
+               long data);
 
 long xc_ptrace_core(enum __ptrace_request request, 
-		    u32 domid, 
-		    long addr, 
-		    long data);
+                    u32 domid, 
+                    long addr, 
+                    long data);
 
 int xc_waitdomain(int domain, 
-		  int *status, 
-		  int options);
+                  int *status, 
+                  int options);
 
 int xc_waitdomain_core(int domain, 
-		       int *status, 
-		       int options);
+                       int *status, 
+                       int options);
 
 /*
  * DOMAIN MANAGEMENT FUNCTIONS
@@ -110,10 +110,6 @@ int xc_waitdomain_core(int domain,
 
 typedef struct {
     u32           domid;
-    unsigned int  flags;
-    unsigned int  processors;
-    unsigned int  vcpus;
-    u16           n_vcpus;	
     unsigned int  dying:1, crashed:1, shutdown:1, 
                   paused:1, blocked:1, running:1;
     unsigned int  shutdown_reason; /* only meaningful if shutdown==1 */
@@ -121,6 +117,7 @@ typedef struct {
     unsigned long shared_info_frame;
     u64           cpu_time;
     unsigned long max_memkb;
+    unsigned int  vcpus;
     s32           vcpu_to_cpu[MAX_VIRT_CPUS];
     cpumap_t      cpumap[MAX_VIRT_CPUS];
 } xc_dominfo_t;
@@ -134,8 +131,8 @@ int xc_domain_create(int xc_handle,
 
 
 int xc_domain_dumpcore(int xc_handle, 
-		       u32 domid,
-		       const char *corename);
+                       u32 domid,
+                       const char *corename);
 
 
 /**
@@ -202,9 +199,9 @@ int xc_domain_getinfo(int xc_handle,
  * @return 0 on success, -1 on failure
  */
 int xc_domain_get_vcpu_context(int xc_handle,
-			      u32 domid,
-			      u32 vcpu,
-			      vcpu_guest_context_t *ctxt);
+                               u32 domid,
+                               u32 vcpu,
+                               vcpu_guest_context_t *ctxt);
 
 int xc_domain_setcpuweight(int xc_handle,
                            u32 domid,
@@ -266,8 +263,8 @@ xc_plan9_build (int xc_handle,
                 u32 domid, 
                 const char *image_name,
                 const char *cmdline, 
-		unsigned int control_evtchn, 
-		unsigned long flags);
+                unsigned int control_evtchn, 
+                unsigned long flags);
 
 struct mem_map;
 int xc_vmx_build(int xc_handle,
@@ -444,7 +441,7 @@ void *xc_map_foreign_batch(int xc_handle, u32 dom, int prot,
                            unsigned long *arr, int num );
 
 int xc_get_pfn_list(int xc_handle, u32 domid, unsigned long *pfn_buf, 
-		    unsigned long max_pfns);
+                    unsigned long max_pfns);
 
 /*\
  *  GRANT TABLE FUNCTIONS

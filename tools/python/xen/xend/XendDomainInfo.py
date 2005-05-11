@@ -370,7 +370,7 @@ class XendDomainInfo:
             if self.info['shutdown']:
                 reason = shutdown_reason(self.info['shutdown_reason'])
                 sxpr.append(['shutdown_reason', reason])
-            sxpr.append(['cpu', self.info['cpu']])
+            sxpr.append(['cpu', self.info['vcpu_to_cpu'][0]])
             sxpr.append(['cpu_time', self.info['cpu_time']/1e9])    
             sxpr.append(['vcpus', self.info['vcpus']])
             sxpr.append(['cpumap', self.info['cpumap']])

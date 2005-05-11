@@ -205,10 +205,9 @@ static PyObject *pyxc_domain_getinfo(PyObject *self,
                             Py_BuildValue("i", info[i].cpumap[j]));
         }
                  
-        info_dict = Py_BuildValue("{s:i,s:i,s:i,s:i,s:i,s:i,s:i,s:i,s:i"
+        info_dict = Py_BuildValue("{s:i,s:i,s:i,s:i,s:i,s:i,s:i,s:i"
                                   ",s:l,s:L,s:l,s:i}",
                                   "dom",       info[i].domid,
-                                  "cpu",       info[i].cpu,
                                   "vcpus",     info[i].vcpus,
                                   "dying",     info[i].dying,
                                   "crashed",   info[i].crashed,

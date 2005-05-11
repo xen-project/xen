@@ -53,7 +53,10 @@ xc_domain_dumpcore(int xc_handle,
 		goto error_out;
 	}
 	
-	for (i = 0; i < info.n_vcpus; i++) {
+	for (i = 0; i < sizeof(info.vcpu_to_cpu) / sizeof(info.vcpu_to_cpu[0]);
+	     i++) {
+		if (info.vcpu_to_cpu[i] == -1)
+			continue;
 		if (xc_domain_get_vcpu_context(xc_handle, domid, i, &ctxt[i])) {
 			PERROR("Could not get all vcpu contexts for domain");
 			goto error_out;
@@ -63,7 +66,7 @@ xc_domain_dumpcore(int xc_handle,
 	nr_pages = info.nr_pages;
 
 	header.xch_magic = 0xF00FEBED; 
-	header.xch_nr_vcpus = info.n_vcpus;
+	header.xch_nr_vcpus = info.vcpus;
 	header.xch_nr_pages = nr_pages;
 	header.xch_ctxt_offset = sizeof(struct xc_core_header);
 	header.xch_index_offset = sizeof(struct xc_core_header) +
@@ -72,7 +75,7 @@ xc_domain_dumpcore(int xc_handle,
 	    sizeof(vcpu_guest_context_t) + nr_pages * sizeof(unsigned long));
 
 	write(dump_fd, &header, sizeof(struct xc_core_header));
-	write(dump_fd, &ctxt, sizeof(ctxt[0]) * info.n_vcpus);
+	write(dump_fd, &ctxt, sizeof(ctxt[0]) * info.vcpus);
 
 	if ((page_array = malloc(nr_pages * sizeof(unsigned long))) == NULL) {
 	    printf("Could not allocate memory\n");

@@ -70,7 +70,6 @@ typedef struct {
 typedef struct {
     /* IN variables. */
     domid_t  domain;                  /* NB. IN/OUT variable. */
-    u16      n_active_vcpus;          /* # of vcpus currently active */
     /* OUT variables. */
 #define DOMFLAGS_DYING     (1<<0) /* Domain is scheduled to die.             */
 #define DOMFLAGS_CRASHED   (1<<1) /* Crashed domain; frozen for postmortem.  */
@@ -83,7 +82,6 @@ typedef struct {
 #define DOMFLAGS_SHUTDOWNMASK 255 /* DOMFLAGS_SHUTDOWN guest-supplied code.  */
 #define DOMFLAGS_SHUTDOWNSHIFT 16
     u32      flags;
-    u32      processors;	
     memory_t tot_pages;
     memory_t max_pages;
     memory_t shared_info_frame;       /* MFN of shared_info struct */
@@ -348,11 +346,10 @@ typedef struct {
 #define DOM0_GETVCPUCONTEXT      37
 typedef struct {
     domid_t domain;                   /* domain to be affected */
-    u16     exec_domain;              /* NB. IN: nth active cpu / OUT: actual cpu # */
+    u16     exec_domain;              /* vcpu # */
     vcpu_guest_context_t *ctxt;       /* NB. IN/OUT variable. */
     u64     cpu_time;                 
 } dom0_getvcpucontext_t;
-
 
 typedef struct {
     u32 cmd;

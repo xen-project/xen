@@ -303,12 +303,7 @@ long do_dom0_op(dom0_op_t *u_dom0_op)
         struct exec_domain        *ed;
         u64 cpu_time = 0;
         int vcpu_count = 0;
-        u32 processors = 0;
         int flags = DOMFLAGS_PAUSED | DOMFLAGS_BLOCKED;
-
-#if MAX_VIRT_CPUS > 32
-#error "update processors field in GETDOMAININFO"
-#endif
 
         read_lock(&domlist_lock);
 
@@ -333,46 +328,37 @@ long do_dom0_op(dom0_op_t *u_dom0_op)
                sizeof(op->u.getdomaininfo.vcpu_to_cpu));
         memset(&op->u.getdomaininfo.cpumap, 0,
                sizeof(op->u.getdomaininfo.cpumap));
-        for_each_exec_domain ( d, ed ) {
-            op->u.getdomaininfo.vcpu_to_cpu[ed->id] = ed->processor;
-            op->u.getdomaininfo.cpumap[ed->id]      = ed->cpumap;
-        }
 
         /* 
          * - domain is marked as paused or blocked only if all its vcpus 
          *   are paused or blocked 
          * - domain is marked as running if any of its vcpus is running
          */
-        
-        for_each_exec_domain(d, ed)  
-        { 
-            if (!((flags & DOMFLAGS_PAUSED) && test_bit(EDF_CTRLPAUSE, &ed->flags)))
-                flags &=  ~DOMFLAGS_PAUSED;
-            if (!((flags & DOMFLAGS_BLOCKED) && test_bit(EDF_BLOCKED, &ed->flags)))
-                flags &=  ~DOMFLAGS_BLOCKED;                
-            flags |= (test_bit(EDF_RUNNING,   &ed->flags) ? DOMFLAGS_RUNNING  : 0);
-
-            set_bit(ed->processor, &processors);
+        for_each_exec_domain ( d, ed ) {
+            op->u.getdomaininfo.vcpu_to_cpu[ed->id] = ed->processor;
+            op->u.getdomaininfo.cpumap[ed->id]      = ed->cpumap;
+            if (!test_bit(EDF_CTRLPAUSE, &ed->flags))
+                flags &= ~DOMFLAGS_PAUSED;
+            if (!test_bit(EDF_BLOCKED, &ed->flags))
+                flags &= ~DOMFLAGS_BLOCKED;
+            if (test_bit(EDF_RUNNING, &ed->flags))
+                flags |= DOMFLAGS_RUNNING;
             if ( ed->cpu_time > cpu_time )
                 cpu_time += ed->cpu_time;
             vcpu_count++;
         }
-        op->u.getdomaininfo.n_active_vcpus = vcpu_count;
-        op->u.getdomaininfo.cpu_time = cpu_time;
 
-        op->u.getdomaininfo.flags =
+        op->u.getdomaininfo.cpu_time = cpu_time;
+        op->u.getdomaininfo.n_vcpu = vcpu_count;
+
+        op->u.getdomaininfo.flags = flags |
             (test_bit( DF_DYING,      &d->flags)  ? DOMFLAGS_DYING    : 0) |
             (test_bit( DF_CRASHED,    &d->flags)  ? DOMFLAGS_CRASHED  : 0) |
             (test_bit( DF_SHUTDOWN,   &d->flags)  ? DOMFLAGS_SHUTDOWN : 0) |
-            flags;
-
-        op->u.getdomaininfo.flags |= 
             d->shutdown_code << DOMFLAGS_SHUTDOWNSHIFT;
 
-        op->u.getdomaininfo.processors  = processors;
         op->u.getdomaininfo.tot_pages   = d->tot_pages;
         op->u.getdomaininfo.max_pages   = d->max_pages;
-        op->u.getdomaininfo.n_vcpu      = d->shared_info->n_vcpu;
         op->u.getdomaininfo.shared_info_frame = 
             __pa(d->shared_info) >> PAGE_SHIFT;
 
@@ -388,33 +374,29 @@ long do_dom0_op(dom0_op_t *u_dom0_op)
         struct vcpu_guest_context *c;
         struct domain             *d;
         struct exec_domain        *ed;
-        int active_index = 0; 
-        int exec_domain_index;
 
-        exec_domain_index = op->u.getvcpucontext.exec_domain;
         d = find_domain_by_id(op->u.getvcpucontext.domain);
-
         if ( d == NULL )
         {
             ret = -ESRCH;
             break;
         }
 
-        if ( (exec_domain_index >= MAX_VIRT_CPUS) )
+        if ( op->u.getvcpucontext.exec_domain >= MAX_VIRT_CPUS )
         {
             ret = -EINVAL;
+            put_domain(d);
             break;
         }
         
-        for_each_exec_domain(d, ed)
+        ed = d->exec_domain[op->u.getvcpucontext.exec_domain];
+        if ( ed == NULL )
         {
-            if ( exec_domain_index == active_index ) 
-            {
-                op->u.getvcpucontext.exec_domain = ed->id;
-                break;
-            }
-            active_index++;
+            ret = -ESRCH;
+            put_domain(d);
+            break;
         }
+
         op->u.getvcpucontext.cpu_time = ed->cpu_time;
 
         if ( op->u.getvcpucontext.ctxt != NULL )

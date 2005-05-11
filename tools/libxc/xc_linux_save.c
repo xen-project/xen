@@ -345,20 +345,17 @@ retry:
         xcio_error(ioctxt, "Could not get vcpu context");
     }
 
-    if ( (info->flags & 
-          (DOMFLAGS_SHUTDOWN | (SHUTDOWN_suspend<<DOMFLAGS_SHUTDOWNSHIFT))) ==
-         (DOMFLAGS_SHUTDOWN | (SHUTDOWN_suspend<<DOMFLAGS_SHUTDOWNSHIFT)) )
+    if ( info->shutdown && info->shutdown_reason == SHUTDOWN_suspend )
     {
 	return 0; // success
     }
 
-    if ( info->flags & DOMFLAGS_PAUSED )
+    if ( info->paused )
     {
 	// try unpausing domain, wait, and retest	
 	xc_domain_unpause( xc_handle, ioctxt->domain );
 
-	xcio_error(ioctxt, "Domain was paused. Wait and re-test. (%u)",
-		   info->flags);
+	xcio_error(ioctxt, "Domain was paused. Wait and re-test.");
 	usleep(10000);  // 10ms
 
 	goto retry;
@@ -367,12 +364,12 @@ retry:
 
     if( ++i < 100 )
     {
-	xcio_error(ioctxt, "Retry suspend domain (%u)", info->flags);
+	xcio_error(ioctxt, "Retry suspend domain.");
 	usleep(10000);  // 10ms	
 	goto retry;
     }
 
-    xcio_error(ioctxt, "Unable to suspend domain. (%u)", info->flags);
+    xcio_error(ioctxt, "Unable to suspend domain.");
 
     return -1;
 }
@@ -469,7 +466,7 @@ int xc_linux_save(int xc_handle, XcIOContext *ioctxt)
         goto out;
     }
     
-    nr_pfns = info.nr_pages; 
+    nr_pfns = info.max_memkb >> PAGE_SHIFT; 
 
     /* cheesy sanity check */
     if ( nr_pfns > 1024*1024 ){
@@ -556,8 +553,7 @@ int xc_linux_save(int xc_handle, XcIOContext *ioctxt)
 
 	if ( suspend_and_state( xc_handle, ioctxt, &info, &ctxt) )
 	{
-	    xcio_error(ioctxt, "Domain appears not to have suspended: %u",
-		       info.flags);
+	    xcio_error(ioctxt, "Domain appears not to have suspended");
 	    goto out;
 	}
 
@@ -923,14 +919,12 @@ int xc_linux_save(int xc_handle, XcIOContext *ioctxt)
 		if ( suspend_and_state( xc_handle, ioctxt, &info, &ctxt) )
 		{
 		    xcio_error(ioctxt, 
-                               "Domain appears not to have suspended: %u",
-			       info.flags);
+                               "Domain appears not to have suspended");
 		    goto out;
 		}
 
 		xcio_info(ioctxt,
-                          "SUSPEND flags %08u shinfo %08lx eip %08u "
-                          "esi %08u\n",info.flags,
+                          "SUSPEND shinfo %08lx eip %08u esi %08u\n",
                           info.shared_info_frame,
                           ctxt.user_regs.eip, ctxt.user_regs.esi );
             } 
