@@ -33,22 +33,28 @@ integer_param("xenheap_megabytes", opt_xenheap_megabytes);
 int opt_noht = 0;
 boolean_param("noht", opt_noht);
 
-/* opt_noacpi: If true, ACPI tables are not parsed. */
-static int opt_noacpi = 0;
-boolean_param("noacpi", opt_noacpi);
-
-/* opt_nosmp: If true, secondary processors are ignored. */
-static int opt_nosmp = 0;
-boolean_param("nosmp", opt_nosmp);
-
-/* opt_ignorebiostables: If true, ACPI and MP tables are ignored. */
-/* NB. This flag implies 'nosmp' and 'noacpi'. */
-static int opt_ignorebiostables = 0;
-boolean_param("ignorebiostables", opt_ignorebiostables);
-
 /* opt_watchdog: If true, run a watchdog NMI on each processor. */
 static int opt_watchdog = 0;
 boolean_param("watchdog", opt_watchdog);
+
+/* **** Linux config option: propagated to domain0. */
+/* "acpi=off":    Sisables both ACPI table parsing and interpreter. */
+/* "acpi=force":  Override the disable blacklist.                   */
+/* "acpi=strict": Disables out-of-spec workarounds.                 */
+/* "acpi=ht":     Limit ACPI just to boot-time to enable HT.        */
+/* "acpi=noirq":  Disables ACPI interrupt routing.                  */
+static void parse_acpi_param(char *s);
+custom_param("acpi", parse_acpi_param);
+
+/* **** Linux config option: propagated to domain0. */
+/* acpi_skip_timer_override: Skip IRQ0 overrides. */
+extern int acpi_skip_timer_override;
+boolean_param("acpi_skip_timer_override", acpi_skip_timer_override);
+
+/* **** Linux config option: propagated to domain0. */
+/* noapic: Disable IOAPIC setup. */
+extern int skip_ioapic_setup;
+boolean_param("noapic", skip_ioapic_setup);
 
 int early_boot = 1;
 
@@ -62,7 +68,6 @@ extern void ac_timer_init(void);
 extern void initialize_keytable();
 extern int do_timer_lists_from_pit;
 
-char ignore_irq13; /* set if exception 16 works */
 struct cpuinfo_x86 boot_cpu_data = { 0, 0, 0, 0, -1 };
 
 #if defined(__x86_64__)
@@ -328,6 +333,41 @@ void __init cpu_init(void)
     init_idle_task();
 }
 
+int acpi_force;
+char acpi_param[10] = "";
+static void parse_acpi_param(char *s)
+{
+    /* Save the parameter so it can be propagated to domain0. */
+    strncpy(acpi_param, s, sizeof(acpi_param));
+    acpi_param[sizeof(acpi_param)-1] = '\0';
+
+    /* Interpret the parameter for use within Xen. */
+    if ( !strcmp(s, "off") )
+    {
+        disable_acpi();
+    }
+    else if ( !strcmp(s, "force") )
+    {
+        acpi_force = 1;
+        acpi_ht = 1;
+        acpi_disabled = 0;
+    }
+    else if ( !strcmp(s, "strict") )
+    {
+        acpi_strict = 1;
+    }
+    else if ( !strcmp(s, "ht") )
+    {
+        if ( !acpi_force )
+            disable_acpi();
+        acpi_ht = 1;
+    }
+    else if ( !strcmp(s, "noirq") )
+    {
+        acpi_noirq_set();
+    }
+}
+
 static void __init do_initcalls(void)
 {
     initcall_t *call;
@@ -355,54 +395,36 @@ static void __init start_of_day(void)
     identify_cpu(&boot_cpu_data); /* get CPU type info */
     if ( cpu_has_fxsr ) set_in_cr4(X86_CR4_OSFXSR);
     if ( cpu_has_xmm )  set_in_cr4(X86_CR4_OSXMMEXCPT);
-#ifdef CONFIG_SMP
-    if ( opt_ignorebiostables )
-    {
-        opt_nosmp  = 1;           /* No SMP without configuration          */
-        opt_noacpi = 1;           /* ACPI will just confuse matters also   */
-    }
-    else
-    {
-        find_smp_config();
-        smp_alloc_memory();       /* trampoline which other CPUs jump at   */
-    }
-#endif
-    paging_init();                /* not much here now, but sets up fixmap */
-    if ( !opt_noacpi )
-    {
-        acpi_boot_table_init();
-        acpi_boot_init();
-    }
-#ifdef CONFIG_SMP
+
+    find_smp_config();
+
+    smp_alloc_memory();
+
+    paging_init();
+
+    acpi_boot_table_init();
+    acpi_boot_init();
+
     if ( smp_found_config ) 
         get_smp_config();
-#endif
-    init_apic_mappings(); /* make APICs addressable in our pagetables. */
+
+    init_apic_mappings();
+
     scheduler_init();	
-    init_IRQ();  /* installs simple interrupt wrappers. Starts HZ clock. */
+
+    init_IRQ();
+
     trap_init();
-    time_init(); /* installs software handler for HZ clock. */
+
+    time_init();
 
     arch_init_memory();
 
-#ifndef CONFIG_SMP    
-    APIC_init_uniprocessor();
-#else
-    if ( opt_nosmp )
-        APIC_init_uniprocessor();
-    else
-    	smp_boot_cpus(); 
-    /*
-     * Does loads of stuff, including kicking the local
-     * APIC, and the IO APIC after other CPUs are booted.
-     * Each IRQ is preferably handled by IO-APIC, but
-     * fall thru to 8259A if we have to (but slower).
-     */
-#endif
+    smp_boot_cpus();
 
     __sti();
 
-    initialize_keytable(); /* call back handling for key codes */
+    initialize_keytable();
 
     serial_init_stage2();
 
@@ -419,19 +441,14 @@ static void __init start_of_day(void)
 
     check_nmi_watchdog();
 
-#ifdef CONFIG_PCI
-    pci_init();
-#endif
     do_initcalls();
 
-#ifdef CONFIG_SMP
     wait_init_idle = cpu_online_map;
     clear_bit(smp_processor_id(), &wait_init_idle);
     smp_threads_ready = 1;
     smp_commence(); /* Tell other CPUs that state of the world is stable. */
     while ( wait_init_idle != 0 )
         cpu_relax();
-#endif
 
     watchdog_on = 1;
 #ifdef __x86_64__ /* x86_32 uses low mappings when building DOM0. */
@@ -572,13 +589,32 @@ void __init __start_xen(multiboot_info_t *mbi)
 
     set_bit(DF_PRIVILEGED, &dom0->flags);
 
-    /* Grab the DOM0 command line. Skip past the image name. */
+    /* Grab the DOM0 command line. */
     cmdline = (char *)(mod[0].string ? __va(mod[0].string) : NULL);
     if ( cmdline != NULL )
     {
+        static char dom0_cmdline[256];
+
+        /* Skip past the image name. */
         while ( *cmdline == ' ' ) cmdline++;
         if ( (cmdline = strchr(cmdline, ' ')) != NULL )
             while ( *cmdline == ' ' ) cmdline++;
+
+        /* Copy the command line to a local buffer. */
+        strcpy(dom0_cmdline, cmdline);
+        cmdline = dom0_cmdline;
+
+        /* Append any extra parameters. */
+        if ( skip_ioapic_setup && !strstr(cmdline, "noapic") )
+            strcat(cmdline, " noapic");
+        if ( acpi_skip_timer_override &&
+             !strstr(cmdline, "acpi_skip_timer_override") )
+            strcat(cmdline, " acpi_skip_timer_override");
+        if ( (strlen(acpi_param) != 0) && !strstr(cmdline, "acpi=") )
+        {
+            strcat(cmdline, " acpi=");
+            strcat(cmdline, acpi_param);
+        }
     }
 
     /*

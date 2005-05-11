@@ -57,8 +57,15 @@ extern int snprintf(char * buf, size_t size, const char * fmt, ...)
     __attribute__ ((format (printf, 3, 4)));
 extern int vsnprintf(char *buf, size_t size, const char *fmt, va_list args);
 
-long simple_strtol(const char *cp,char **endp,unsigned int base);
-unsigned long simple_strtoul(const char *cp,char **endp,unsigned int base);
-long long simple_strtoll(const char *cp,char **endp,unsigned int base);
+long simple_strtol(
+    const char *cp,char **endp, unsigned int base);
+unsigned long simple_strtoul(
+    const char *cp,char **endp, unsigned int base);
+long long simple_strtoll(
+    const char *cp,char **endp, unsigned int base);
+unsigned long long simple_strtoull(
+    const char *cp,char **endp, unsigned int base);
+
+unsigned long long memparse(char *s);
 
 #endif /* __LIB_H__ */
