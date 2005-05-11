@@ -1571,12 +1571,19 @@ void __init setup_arch(char **cmdline_p)
 	op.u.set_iopl.iopl = current->thread.io_pl = 1;
 	HYPERVISOR_physdev_op(&op);
 
-	/*
-	 * Parse the ACPI tables for possible boot-time SMP configuration.
-	 */
-	acpi_boot_table_init();
-	acpi_boot_init();
+	if ( !(xen_start_info.flags & SIF_INITDOMAIN) )
+	{
+	     printk(KERN_INFO "Not running in dom0: Disabling ACPI\n");
+	     acpi_disabled = 1;
+             acpi_ht = 0;
+	}
 
+ 	/*
+ 	 * Parse the ACPI tables for possible boot-time SMP configuration.
+ 	 */	     
+        acpi_boot_table_init();
+        acpi_boot_init();
+	     
 #ifdef CONFIG_X86_LOCAL_APIC
 	if (smp_found_config)
 		get_smp_config();
