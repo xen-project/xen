@@ -59,7 +59,7 @@ struct bvt_cpu_info
 };
 
 #define BVT_INFO(p)   ((struct bvt_dom_info *)(p)->sched_priv)
-#define EBVT_INFO(p)  ((struct bvt_edom_info *)(p)->ed_sched_priv)
+#define EBVT_INFO(p)  ((struct bvt_edom_info *)(p)->sched_priv)
 #define CPU_INFO(cpu) ((struct bvt_cpu_info *)(schedule_data[cpu]).sched_priv)
 #define RUNLIST(p)    ((struct list_head *)&(EBVT_INFO(p)->run_list))
 #define RUNQUEUE(cpu) ((struct list_head *)&(CPU_INFO(cpu)->runqueue))
@@ -174,9 +174,9 @@ static int bvt_alloc_task(struct exec_domain *ed)
             return -1;
         memset(d->sched_priv, 0, sizeof(struct bvt_dom_info));
     }
-    ed->ed_sched_priv = &BVT_INFO(d)->ed_inf[ed->eid];
-    BVT_INFO(d)->ed_inf[ed->eid].inf = BVT_INFO(d);
-    BVT_INFO(d)->ed_inf[ed->eid].exec_domain = ed;
+    ed->sched_priv = &BVT_INFO(d)->ed_inf[ed->id];
+    BVT_INFO(d)->ed_inf[ed->id].inf = BVT_INFO(d);
+    BVT_INFO(d)->ed_inf[ed->id].exec_domain = ed;
     return 0;
 }
 
@@ -190,7 +190,7 @@ static void bvt_add_task(struct exec_domain *d)
     ASSERT(inf != NULL);
     ASSERT(d   != NULL);
 
-    if (d->eid == 0) {
+    if (d->id == 0) {
         inf->mcu_advance = MCU_ADVANCE;
         inf->domain      = d->domain;
         inf->warpback    = 0;
@@ -224,43 +224,43 @@ static void bvt_add_task(struct exec_domain *d)
     }
 }
 
-static int bvt_init_idle_task(struct exec_domain *p)
+static int bvt_init_idle_task(struct exec_domain *ed)
 {
-    if ( bvt_alloc_task(p) < 0 )
+    if ( bvt_alloc_task(ed) < 0 )
         return -1;
 
-    bvt_add_task(p);
+    bvt_add_task(ed);
 
-    set_bit(EDF_RUNNING, &p->ed_flags);
-    if ( !__task_on_runqueue(p) )
-        __add_to_runqueue_head(p);
-        
+    set_bit(EDF_RUNNING, &ed->flags);
+    if ( !__task_on_runqueue(ed) )
+        __add_to_runqueue_head(ed);
+
     return 0;
 }
 
-static void bvt_wake(struct exec_domain *d)
+static void bvt_wake(struct exec_domain *ed)
 {
-    struct bvt_edom_info *einf = EBVT_INFO(d);
+    struct bvt_edom_info *einf = EBVT_INFO(ed);
     struct exec_domain  *curr;
     s_time_t            now, r_time;
-    int                 cpu = d->processor;
+    int                 cpu = ed->processor;
     u32                 curr_evt;
 
-    if ( unlikely(__task_on_runqueue(d)) )
+    if ( unlikely(__task_on_runqueue(ed)) )
         return;
 
-    __add_to_runqueue_head(d);
+    __add_to_runqueue_head(ed);
 
     now = NOW();
 
     /* Set the BVT parameters. AVT should always be updated 
        if CPU migration ocurred.*/
     if ( einf->avt < CPU_SVT(cpu) || 
-         unlikely(test_bit(EDF_MIGRATED, &d->ed_flags)) )
+         unlikely(test_bit(EDF_MIGRATED, &ed->flags)) )
         einf->avt = CPU_SVT(cpu);
 
     /* Deal with warping here. */
-    einf->evt = calc_evt(d, einf->avt);
+    einf->evt = calc_evt(ed, einf->avt);
     
     curr = schedule_data[cpu].curr;
     curr_evt = calc_evt(curr, calc_avt(curr, now));
@@ -277,12 +277,12 @@ static void bvt_wake(struct exec_domain *d)
 }
 
 
-static void bvt_sleep(struct exec_domain *d)
+static void bvt_sleep(struct exec_domain *ed)
 {
-    if ( test_bit(EDF_RUNNING, &d->ed_flags) )
-        cpu_raise_softirq(d->processor, SCHEDULE_SOFTIRQ);
-    else  if ( __task_on_runqueue(d) )
-        __del_from_runqueue(d);
+    if ( test_bit(EDF_RUNNING, &ed->flags) )
+        cpu_raise_softirq(ed->processor, SCHEDULE_SOFTIRQ);
+    else  if ( __task_on_runqueue(ed) )
+        __del_from_runqueue(ed);
 }
 
 /**
@@ -377,7 +377,7 @@ static struct task_slice bvt_do_schedule(s_time_t now)
     struct bvt_edom_info *next_prime_einf = NULL;
     struct task_slice     ret;
 
-    ASSERT(prev->ed_sched_priv != NULL);
+    ASSERT(prev->sched_priv != NULL);
     ASSERT(prev_einf != NULL);
     ASSERT(__task_on_runqueue(prev));
 
@@ -526,8 +526,8 @@ static void bvt_dump_cpu_state(int i)
 {
     struct list_head *queue;
     int loop = 0;
-    struct bvt_edom_info *d_inf;
-    struct exec_domain *d;
+    struct bvt_edom_info *ed_inf;
+    struct exec_domain *ed;
     
     printk("svt=0x%08lX ", CPU_SVT(i));
 
@@ -535,15 +535,15 @@ static void bvt_dump_cpu_state(int i)
     printk("QUEUE rq %lx   n: %lx, p: %lx\n",  (unsigned long)queue,
            (unsigned long) queue->next, (unsigned long) queue->prev);
 
-    list_for_each_entry ( d_inf, queue, run_list )
+    list_for_each_entry ( ed_inf, queue, run_list )
     {
-        d = d_inf->exec_domain;
-        printk("%3d: %u has=%c ", loop++, d->domain->id,
-               test_bit(EDF_RUNNING, &d->ed_flags) ? 'T':'F');
-        bvt_dump_runq_el(d);
-        printk("c=0x%X%08X\n", (u32)(d->cpu_time>>32), (u32)d->cpu_time);
+        ed = ed_inf->exec_domain;
+        printk("%3d: %u has=%c ", loop++, ed->domain->id,
+               test_bit(EDF_RUNNING, &ed->flags) ? 'T':'F');
+        bvt_dump_runq_el(ed);
+        printk("c=0x%X%08X\n", (u32)(ed->cpu_time>>32), (u32)ed->cpu_time);
         printk("         l: %p n: %p  p: %p\n",
-               &d_inf->run_list, d_inf->run_list.next, d_inf->run_list.prev);
+               &ed_inf->run_list, ed_inf->run_list.next, ed_inf->run_list.prev);
     }
 }
 

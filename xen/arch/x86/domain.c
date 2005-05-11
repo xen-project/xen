@@ -252,7 +252,7 @@ void arch_do_createdomain(struct exec_domain *ed)
 
         d->shared_info = (void *)alloc_xenheap_page();
         memset(d->shared_info, 0, PAGE_SIZE);
-        ed->vcpu_info = &d->shared_info->vcpu_data[ed->eid];
+        ed->vcpu_info = &d->shared_info->vcpu_data[ed->id];
         SHARE_PFN_WITH_DOMAIN(virt_to_page(d->shared_info), d);
         machine_to_phys_mapping[virt_to_phys(d->shared_info) >> 
                                PAGE_SHIFT] = INVALID_M2P_ENTRY;
@@ -294,7 +294,7 @@ void arch_do_boot_vcpu(struct exec_domain *ed)
     struct domain *d = ed->domain;
     ed->arch.schedule_tail = d->exec_domain[0]->arch.schedule_tail;
     ed->arch.perdomain_ptes = 
-        d->arch.mm_perdomain_pt + (ed->eid << PDPT_VCPU_SHIFT);
+        d->arch.mm_perdomain_pt + (ed->id << PDPT_VCPU_SHIFT);
     ed->arch.flags = TF_kernel_mode;
 }
 
@@ -364,7 +364,8 @@ static int vmx_final_setup_guest(
 
         /* Put the domain in shadow mode even though we're going to be using
          * the shared 1:1 page table initially. It shouldn't hurt */
-        shadow_mode_enable(ed->domain, SHM_enable|SHM_translate|SHM_external);
+        shadow_mode_enable(ed->domain,
+                           SHM_enable|SHM_refcounts|SHM_translate|SHM_external);
     }
 
     return 0;
@@ -397,9 +398,9 @@ int arch_set_info_guest(
                 return -EINVAL;
     }
 
-    clear_bit(EDF_DONEFPUINIT, &ed->ed_flags);
+    clear_bit(EDF_DONEFPUINIT, &ed->flags);
     if ( c->flags & VGCF_I387_VALID )
-        set_bit(EDF_DONEFPUINIT, &ed->ed_flags);
+        set_bit(EDF_DONEFPUINIT, &ed->flags);
 
     ed->arch.flags &= ~TF_kernel_mode;
     if ( c->flags & VGCF_IN_KERNEL )
@@ -415,7 +416,7 @@ int arch_set_info_guest(
     if ( !IS_PRIV(d) )
         ed->arch.guest_context.user_regs.eflags &= 0xffffcfff;
 
-    if ( test_bit(EDF_DONEINIT, &ed->ed_flags) )
+    if ( test_bit(EDF_DONEINIT, &ed->flags) )
         return 0;
 
     if ( (rc = (int)set_fast_trap(ed, c->fast_trap_idx)) != 0 )
@@ -426,13 +427,13 @@ int arch_set_info_guest(
     for ( i = 0; i < 8; i++ )
         (void)set_debugreg(ed, i, c->debugreg[i]);
 
-    if ( ed->eid == 0 )
+    if ( ed->id == 0 )
         d->vm_assist = c->vm_assist;
 
     phys_basetab = c->pt_base;
     ed->arch.guest_table = mk_pagetable(phys_basetab);
 
-    if ( shadow_mode_enabled(d) )
+    if ( shadow_mode_refcounts(d) )
     {
         if ( !get_page(&frame_table[phys_basetab>>PAGE_SHIFT], d) )
             return -EINVAL;
@@ -478,7 +479,7 @@ int arch_set_info_guest(
     update_pagetables(ed);
     
     /* Don't redo final setup */
-    set_bit(EDF_DONEINIT, &ed->ed_flags);
+    set_bit(EDF_DONEINIT, &ed->flags);
 
     return 0;
 }
@@ -796,7 +797,7 @@ void context_switch(struct exec_domain *prev, struct exec_domain *next)
      * 'prev' (after this point, a dying domain's info structure may be freed
      * without warning). 
      */
-    clear_bit(EDF_RUNNING, &prev->ed_flags);
+    clear_bit(EDF_RUNNING, &prev->flags);
 
     schedule_tail(next);
     BUG();
@@ -981,17 +982,21 @@ void domain_relinquish_resources(struct domain *d)
     {
         if ( pagetable_val(ed->arch.guest_table) != 0 )
         {
-            (shadow_mode_enabled(d) ? put_page : put_page_and_type)
-                (&frame_table[pagetable_val(
-                    ed->arch.guest_table) >> PAGE_SHIFT]);
+            if ( shadow_mode_refcounts(d) )
+                put_page(&frame_table[pagetable_get_pfn(ed->arch.guest_table)]);
+            else
+                put_page_and_type(&frame_table[pagetable_get_pfn(ed->arch.guest_table)]);
+
             ed->arch.guest_table = mk_pagetable(0);
         }
 
         if ( pagetable_val(ed->arch.guest_table_user) != 0 )
         {
-            (shadow_mode_enabled(d) ? put_page : put_page_and_type)
-                (&frame_table[pagetable_val(
-                    ed->arch.guest_table_user) >> PAGE_SHIFT]);
+            if ( shadow_mode_refcounts(d) )
+                put_page(&frame_table[pagetable_get_pfn(ed->arch.guest_table_user)]);
+            else
+                put_page_and_type(&frame_table[pagetable_get_pfn(ed->arch.guest_table_user)]);
+
             ed->arch.guest_table_user = mk_pagetable(0);
         }
 

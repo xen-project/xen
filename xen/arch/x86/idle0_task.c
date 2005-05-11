@@ -5,7 +5,7 @@
 
 struct domain idle0_domain = {
     id:          IDLE_DOMAIN_ID,
-    d_flags:     1<<DF_IDLETASK,
+    flags:       1<<DF_IDLETASK,
     refcnt:      ATOMIC_INIT(1)
 };
 

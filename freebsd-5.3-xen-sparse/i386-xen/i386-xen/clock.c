@@ -87,6 +87,12 @@ __FBSDID("$FreeBSD: src/sys/i386/isa/clock.c,v 1.207 2003/11/13 10:02:12 phk Exp
 
 /* XEN specific defines */
 #include <machine/xen_intr.h>
+#include <vm/vm.h>   /* needed by machine/pmap.h */
+#include <vm/pmap.h> /* needed by machine/pmap.h */
+#include <machine/pmap.h> /* needed by xen-os.h */
+#include <machine/hypervisor-ifs.h>
+#include <machine/xen-os.h> /* needed by xenfunc.h */
+#include <machine/xenfunc.h>
 
 /*
  * 32-bit time_t's can't reach leap years before 1904 or after 2036, so we
@@ -129,7 +135,15 @@ static uint64_t shadow_system_time;
 static uint32_t shadow_time_version;
 static struct timeval shadow_tv;
 
+#define DEFINE_PER_CPU(type, name) \
+    __typeof__(type) per_cpu__##name
+
+#define per_cpu(var, cpu)           (*((void)cpu, &per_cpu__##var))
+
+
 static uint64_t processed_system_time;/* System time (ns) at last processing. */
+static DEFINE_PER_CPU(uint64_t, processed_system_time);
+
 
 #define NS_PER_TICK (1000000000ULL/hz)
 
@@ -202,18 +216,19 @@ static struct timecounter xen_timecounter = {
 static void 
 clkintr(struct clockframe *frame)
 {
-    int64_t delta;
+    int64_t cpu_delta, delta;
+    int cpu = smp_processor_id();
     long ticks = 0;
-
 
     do {
     	__get_time_values_from_xen();
-    	delta = (int64_t)(shadow_system_time + 
-			  xen_get_offset() * 1000 - 
-			  processed_system_time);
+    	delta = cpu_delta = (int64_t)shadow_system_time + 
+		(int64_t)xen_get_offset() * 1000;
+	delta -= processed_system_time;
+	cpu_delta -= per_cpu(processed_system_time, cpu);
     } while (!TIME_VALUES_UP_TO_DATE);
 
-    if (unlikely(delta < 0)) {
+    if (unlikely(delta < 0) || unlikely(cpu_delta < 0)) {
         printk("Timer ISR: Time went backwards: %lld\n", delta);
         return;
     }
@@ -225,15 +240,28 @@ clkintr(struct clockframe *frame)
         delta -= NS_PER_TICK;
         processed_system_time += NS_PER_TICK;
     }
-
-    if (ticks > 0) {
-	if (frame)
-		timer_func(frame);
-#ifdef SMP
-	if (timer_func == hardclock && frame)
-		forward_hardclock();
+    /* Local CPU jiffy work. */
+    while (cpu_delta >= NS_PER_TICK) {
+	    cpu_delta -= NS_PER_TICK;
+	    per_cpu(processed_system_time, cpu) += NS_PER_TICK;
+#if 0
+	    update_process_times(user_mode(regs));
+	    profile_tick(CPU_PROFILING, regs);
 #endif
     }
+    if (ticks > 0) {
+	if (frame) timer_func(frame);
+    }
+    
+    if (cpu != 0)
+	    return;
+    /*
+     * Take synchronised time from Xen once a minute if we're not
+     * synchronised ourselves, and we haven't chosen to keep an independent
+     * time base.
+     */
+    
+    /* XXX TODO */
 }
 
 #include "opt_ddb.h"
@@ -429,7 +457,7 @@ resettodr()
  * Start clocks running.
  */
 void
-cpu_initclocks()
+cpu_initclocks(void)
 {
 	int diag;
 	int time_irq = bind_virq_to_irq(VIRQ_TIMER);
@@ -445,7 +473,25 @@ cpu_initclocks()
 	/* initialize xen values */
 	__get_time_values_from_xen();
 	processed_system_time = shadow_system_time;
+	per_cpu(processed_system_time, 0) = processed_system_time;
+
 }
+
+#ifdef SMP 
+void
+ap_cpu_initclocks(void)
+{
+	int irq;
+	int cpu = smp_processor_id();
+
+	per_cpu(processed_system_time, cpu) = shadow_system_time;
+	
+	irq = bind_virq_to_irq(VIRQ_TIMER);
+	PCPU_SET(time_irq, irq);
+	PANIC_IF(intr_add_handler("clk", irq, (driver_intr_t *)clkintr, 
+				  NULL, INTR_TYPE_CLK | INTR_FAST, NULL));
+}
+#endif
 
 void
 cpu_startprofclock(void)

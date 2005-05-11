@@ -69,7 +69,7 @@ static inline int debugger_trap_entry(
     {
     case TRAP_int3:
     case TRAP_debug:
-        set_bit(EDF_CTRLPAUSE, &ed->ed_flags);
+        set_bit(EDF_CTRLPAUSE, &ed->flags);
         raise_softirq(SCHEDULE_SOFTIRQ);
         return 1;
     }

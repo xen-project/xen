@@ -60,13 +60,14 @@ int  init_exec_domain_event_channels(struct exec_domain *ed);
 
 struct exec_domain 
 {
-    u32 processor;
+    int              id;
 
-    vcpu_info_t *vcpu_info;
+    int              processor;
 
-    struct domain *domain;
-    struct exec_domain *ed_next_list;
-    int eid;
+    vcpu_info_t     *vcpu_info;
+
+    struct domain   *domain;
+    struct exec_domain *next_in_list;
 
     struct ac_timer  timer;         /* one-shot timer for timeout values */
     unsigned long    sleep_tick;    /* tick at which this vcpu started sleep */
@@ -75,13 +76,13 @@ struct exec_domain
     s_time_t         lastdeschd;    /* time this domain was last descheduled */
     s_time_t         cpu_time;      /* total CPU time received till now */
     s_time_t         wokenup;       /* time domain got woken up */
-    void            *ed_sched_priv;    /* scheduler-specific data */
+    void            *sched_priv;    /* scheduler-specific data */
 
-    unsigned long ed_flags;
+    unsigned long    flags;
 
-    u16 virq_to_evtchn[NR_VIRQS];
+    u16              virq_to_evtchn[NR_VIRQS];
 
-    atomic_t pausecnt;
+    atomic_t         pausecnt;
 
     struct arch_exec_domain arch;
 };
@@ -111,14 +112,15 @@ struct domain
     int              shutdown_code; /* code value from OS (if DF_SHUTDOWN). */
     void            *sched_priv;    /* scheduler-specific data */
 
-    struct domain *next_list, *next_hash;
+    struct domain   *next_in_list;
+    struct domain   *next_in_hashbucket;
 
     /* Event channel information. */
     event_channel_t *event_channel;
     unsigned int     max_event_channel;
     spinlock_t       event_channel_lock;
 
-    grant_table_t *grant_table;
+    grant_table_t   *grant_table;
 
     /*
      * Interrupt to event-channel mappings. Updates should be protected by the 
@@ -126,13 +128,13 @@ struct domain
      * the lock, but races don't usually matter.
      */
 #define NR_PIRQS 128 /* Put this somewhere sane! */
-    u16 pirq_to_evtchn[NR_PIRQS];
-    u32 pirq_mask[NR_PIRQS/32];
+    u16              pirq_to_evtchn[NR_PIRQS];
+    u32              pirq_mask[NR_PIRQS/32];
 
-    unsigned long d_flags;
-    unsigned long vm_assist;
+    unsigned long    flags;
+    unsigned long    vm_assist;
 
-    atomic_t refcnt;
+    atomic_t         refcnt;
 
     struct exec_domain *exec_domain[MAX_VIRT_CPUS];
 
@@ -166,7 +168,7 @@ extern struct exec_domain idle0_exec_domain;
 
 extern struct exec_domain *idle_task[NR_CPUS];
 #define IDLE_DOMAIN_ID   (0x7FFFU)
-#define is_idle_task(_p) (test_bit(DF_IDLETASK, &(_p)->d_flags))
+#define is_idle_task(_p) (test_bit(DF_IDLETASK, &(_p)->flags))
 
 struct exec_domain *alloc_exec_domain_struct(struct domain *d,
                                              unsigned long vcpu);
@@ -315,35 +317,36 @@ extern struct domain *domain_hash[DOMAIN_HASH_SIZE];
 extern struct domain *domain_list;
 
 #define for_each_domain(_d) \
- for ( (_d) = domain_list; (_d) != NULL; (_d) = (_d)->next_list )
+ for ( (_d) = domain_list; (_d) != NULL; (_d) = (_d)->next_in_list )
 
 #define for_each_exec_domain(_d,_ed) \
  for ( (_ed) = (_d)->exec_domain[0]; \
        (_ed) != NULL;                \
-       (_ed) = (_ed)->ed_next_list )
+       (_ed) = (_ed)->next_in_list )
 
 #define EDF_DONEFPUINIT  0 /* Has the FPU been initialised for this task?    */
 #define EDF_USEDFPU      1 /* Has this task used the FPU since last save?    */
 #define EDF_GUEST_STTS   2 /* Has the guest OS requested 'stts'?             */
-#define  DF_CONSTRUCTED  3 /* Has the guest OS been fully built yet?         */
-#define  DF_IDLETASK     4 /* Is this one of the per-CPU idle domains?       */
-#define  DF_PRIVILEGED   5 /* Is this domain privileged?                     */
-#define  DF_PHYSDEV      6 /* May this domain do IO to physical devices?     */
-#define EDF_BLOCKED      7 /* Domain is blocked waiting for an event.        */
-#define EDF_CTRLPAUSE    8 /* Domain is paused by controller software.       */
-#define  DF_SHUTDOWN     9 /* Guest shut itself down for some reason.        */
-#define  DF_CRASHED     10 /* Domain crashed inside Xen, cannot continue.    */
-#define  DF_DYING       11 /* Death rattle.                                  */
-#define EDF_RUNNING     12 /* Currently running on a CPU.                    */
-#define EDF_CPUPINNED   13 /* Disables auto-migration.                       */
-#define EDF_MIGRATED    14 /* Domain migrated between CPUs.                  */
-#define EDF_DONEINIT    15 /* Initialization completed    .                  */
+#define EDF_BLOCKED      3 /* Domain is blocked waiting for an event.        */
+#define EDF_CTRLPAUSE    4 /* Domain is paused by controller software.       */
+#define EDF_RUNNING      5 /* Currently running on a CPU.                    */
+#define EDF_CPUPINNED    6 /* Disables auto-migration.                       */
+#define EDF_MIGRATED     7 /* Domain migrated between CPUs.                  */
+#define EDF_DONEINIT     8 /* Initialization completed    .                  */
 
-static inline int domain_runnable(struct exec_domain *d)
+#define DF_CONSTRUCTED   0 /* Has the guest OS been fully built yet?         */
+#define DF_IDLETASK      1 /* Is this one of the per-CPU idle domains?       */
+#define DF_PRIVILEGED    2 /* Is this domain privileged?                     */
+#define DF_PHYSDEV       3 /* May this domain do IO to physical devices?     */
+#define DF_SHUTDOWN      4 /* Guest shut itself down for some reason.        */
+#define DF_CRASHED       5 /* Domain crashed inside Xen, cannot continue.    */
+#define DF_DYING         6 /* Death rattle.                                  */
+
+static inline int domain_runnable(struct exec_domain *ed)
 {
-    return ( (atomic_read(&d->pausecnt) == 0) &&
-             !(d->ed_flags & ((1<<EDF_BLOCKED)|(1<<EDF_CTRLPAUSE))) &&
-             !(d->domain->d_flags & ((1<<DF_SHUTDOWN)|(1<<DF_CRASHED))) );
+    return ( (atomic_read(&ed->pausecnt) == 0) &&
+             !(ed->flags & ((1<<EDF_BLOCKED)|(1<<EDF_CTRLPAUSE))) &&
+             !(ed->domain->flags & ((1<<DF_SHUTDOWN)|(1<<DF_CRASHED))) );
 }
 
 static inline void exec_domain_pause(struct exec_domain *ed)
@@ -385,7 +388,7 @@ static inline void domain_unpause(struct domain *d)
 
 static inline void exec_domain_unblock(struct exec_domain *ed)
 {
-    if ( test_and_clear_bit(EDF_BLOCKED, &ed->ed_flags) )
+    if ( test_and_clear_bit(EDF_BLOCKED, &ed->flags) )
         domain_wake(ed);
 }
 
@@ -396,7 +399,7 @@ static inline void domain_pause_by_systemcontroller(struct domain *d)
     for_each_exec_domain ( d, ed )
     {
         ASSERT(ed != current);
-        if ( !test_and_set_bit(EDF_CTRLPAUSE, &ed->ed_flags) )
+        if ( !test_and_set_bit(EDF_CTRLPAUSE, &ed->flags) )
             domain_sleep(ed);
     }
 
@@ -409,14 +412,14 @@ static inline void domain_unpause_by_systemcontroller(struct domain *d)
 
     for_each_exec_domain ( d, ed )
     {
-        if ( test_and_clear_bit(EDF_CTRLPAUSE, &ed->ed_flags) )
+        if ( test_and_clear_bit(EDF_CTRLPAUSE, &ed->flags) )
             domain_wake(ed);
     }
 }
 
 
-#define IS_PRIV(_d) (test_bit(DF_PRIVILEGED, &(_d)->d_flags))
-#define IS_CAPABLE_PHYSDEV(_d) (test_bit(DF_PHYSDEV, &(_d)->d_flags))
+#define IS_PRIV(_d) (test_bit(DF_PRIVILEGED, &(_d)->flags))
+#define IS_CAPABLE_PHYSDEV(_d) (test_bit(DF_PHYSDEV, &(_d)->flags))
 
 #define VM_ASSIST(_d,_t) (test_bit((_t), &(_d)->vm_assist))
 

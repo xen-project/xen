@@ -42,7 +42,6 @@ struct hw_interrupt_type no_irq_type = {
 };
 
 atomic_t irq_err_count;
-atomic_t irq_mis_count;
 
 inline void disable_irq_nosync(unsigned int irq)
 {

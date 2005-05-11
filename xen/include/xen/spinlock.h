@@ -82,4 +82,7 @@ typedef struct { int gcc_is_buggy; } rwlock_t;
 #define write_lock(_lock)            _raw_write_lock(_lock)
 #define write_unlock(_lock)          _raw_write_unlock(_lock)
 
+#define DEFINE_SPINLOCK(x) spinlock_t x = SPIN_LOCK_UNLOCKED
+#define DEFINE_RWLOCK(x) rwlock_t x = RW_LOCK_UNLOCKED
+
 #endif /* __SPINLOCK_H__ */

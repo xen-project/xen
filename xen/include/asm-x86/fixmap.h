@@ -13,6 +13,7 @@
 #define _ASM_FIXMAP_H
 
 #include <xen/config.h>
+#include <xen/lib.h>
 #include <asm/acpi.h>
 #include <asm/apicdef.h>
 #include <asm/page.h>
@@ -52,6 +53,15 @@ extern void __set_fixmap(
 #define set_fixmap_nocache(idx, phys) \
     __set_fixmap(idx, phys, PAGE_HYPERVISOR_NOCACHE)
 
-#define fix_to_virt(x) (FIXADDR_TOP - ((x) << PAGE_SHIFT))
+#define __fix_to_virt(x) (FIXADDR_TOP - ((x) << PAGE_SHIFT))
+#define __virt_to_fix(x) ((FIXADDR_TOP - ((x)&PAGE_MASK)) >> PAGE_SHIFT)
+
+#define fix_to_virt(x)   (__fix_to_virt(x))
+
+static inline unsigned long virt_to_fix(const unsigned long vaddr)
+{
+    BUG_ON(vaddr >= FIXADDR_TOP || vaddr < FIXADDR_START);
+    return __virt_to_fix(vaddr);
+}
 
 #endif

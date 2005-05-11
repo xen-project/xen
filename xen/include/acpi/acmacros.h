@@ -5,7 +5,7 @@
  *****************************************************************************/
 
 /*
- * Copyright (C) 2000 - 2004, R. Byron Moore
+ * Copyright (C) 2000 - 2005, R. Byron Moore
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -53,6 +53,10 @@
 #define ACPI_LOBYTE(l)                  ((u8)(u16)(l))
 #define ACPI_HIBYTE(l)                  ((u8)((((u16)(l)) >> 8) & 0xFF))
 
+#define ACPI_SET_BIT(target,bit)        ((target) |= (bit))
+#define ACPI_CLEAR_BIT(target,bit)      ((target) &= ~(bit))
+#define ACPI_MIN(a,b)                   (((a)<(b))?(a):(b))
+
 
 #if ACPI_MACHINE_WIDTH == 16
 
@@ -97,7 +101,7 @@
  * printf() format helpers
  */
 
-/* Split 64-bit integer into two 32-bit values. use with %8,8_x%8.8X */
+/* Split 64-bit integer into two 32-bit values. Use with %8.8X%8.8X */
 
 #define ACPI_FORMAT_UINT64(i)           ACPI_HIDWORD(i),ACPI_LODWORD(i)
 
@@ -361,24 +365,6 @@
 
 #define ACPI_IS_OCTAL_DIGIT(d)               (((char)(d) >= '0') && ((char)(d) <= '7'))
 
-/* Macros for GAS addressing */
-
-#if ACPI_MACHINE_WIDTH != 16
-
-#define ACPI_PCI_DEVICE(a)              (u16) ((ACPI_HIDWORD ((a))) & 0x0000FFFF)
-#define ACPI_PCI_FUNCTION(a)            (u16) ((ACPI_LODWORD ((a))) >> 16)
-#define ACPI_PCI_REGISTER(a)            (u16) ((ACPI_LODWORD ((a))) & 0x0000FFFF)
-
-#else
-
-/* No support for GAS and PCI IDs in 16-bit mode  */
-
-#define ACPI_PCI_FUNCTION(a)            (u16) ((a) & 0xFFFF0000)
-#define ACPI_PCI_DEVICE(a)              (u16) ((a) & 0x0000FFFF)
-#define ACPI_PCI_REGISTER(a)            (u16) ((a) & 0x0000FFFF)
-
-#endif
-
 
 /* Bitfields within ACPI registers */
 
@@ -502,19 +488,19 @@
  * The first parameter should be the procedure name as a quoted string.  This is declared
  * as a local string ("_proc_name) so that it can be also used by the function exit macros below.
  */
-#define ACPI_FUNCTION_NAME(a)               struct acpi_debug_print_info _dbg; \
-												_dbg.component_id = _COMPONENT; \
-												_dbg.proc_name   = a; \
-												_dbg.module_name = _THIS_MODULE;
+#define ACPI_FUNCTION_NAME(a)               struct acpi_debug_print_info _debug_info; \
+												_debug_info.component_id = _COMPONENT; \
+												_debug_info.proc_name  = a; \
+												_debug_info.module_name = _THIS_MODULE;
 
 #define ACPI_FUNCTION_TRACE(a)              ACPI_FUNCTION_NAME(a) \
-												acpi_ut_trace(__LINE__,&_dbg)
+												acpi_ut_trace(__LINE__,&_debug_info)
 #define ACPI_FUNCTION_TRACE_PTR(a,b)        ACPI_FUNCTION_NAME(a) \
-												acpi_ut_trace_ptr(__LINE__,&_dbg,(void *)b)
+												acpi_ut_trace_ptr(__LINE__,&_debug_info,(void *)b)
 #define ACPI_FUNCTION_TRACE_U32(a,b)        ACPI_FUNCTION_NAME(a) \
-												acpi_ut_trace_u32(__LINE__,&_dbg,(u32)b)
+												acpi_ut_trace_u32(__LINE__,&_debug_info,(u32)b)
 #define ACPI_FUNCTION_TRACE_STR(a,b)        ACPI_FUNCTION_NAME(a) \
-												acpi_ut_trace_str(__LINE__,&_dbg,(char *)b)
+												acpi_ut_trace_str(__LINE__,&_debug_info,(char *)b)
 
 #define ACPI_FUNCTION_ENTRY()               acpi_ut_track_stack_ptr()
 
@@ -531,10 +517,10 @@
 #define ACPI_DO_WHILE0(a)               a
 #endif
 
-#define return_VOID                     ACPI_DO_WHILE0 ({acpi_ut_exit(__LINE__,&_dbg);return;})
-#define return_ACPI_STATUS(s)           ACPI_DO_WHILE0 ({acpi_ut_status_exit(__LINE__,&_dbg,(s));return((s));})
-#define return_VALUE(s)                 ACPI_DO_WHILE0 ({acpi_ut_value_exit(__LINE__,&_dbg,(acpi_integer)(s));return((s));})
-#define return_PTR(s)                   ACPI_DO_WHILE0 ({acpi_ut_ptr_exit(__LINE__,&_dbg,(u8 *)(s));return((s));})
+#define return_VOID                     ACPI_DO_WHILE0 ({acpi_ut_exit(__LINE__,&_debug_info);return;})
+#define return_ACPI_STATUS(s)           ACPI_DO_WHILE0 ({acpi_ut_status_exit(__LINE__,&_debug_info,(s));return((s));})
+#define return_VALUE(s)                 ACPI_DO_WHILE0 ({acpi_ut_value_exit(__LINE__,&_debug_info,(acpi_integer)(s));return((s));})
+#define return_PTR(s)                   ACPI_DO_WHILE0 ({acpi_ut_ptr_exit(__LINE__,&_debug_info,(u8 *)(s));return((s));})
 
 /* Conditional execution */
 
@@ -548,12 +534,16 @@
 
 /* Stack and buffer dumping */
 
-#define ACPI_DUMP_STACK_ENTRY(a)        acpi_ex_dump_operand(a)
+#define ACPI_DUMP_STACK_ENTRY(a)        acpi_ex_dump_operand((a),0)
 #define ACPI_DUMP_OPERANDS(a,b,c,d,e)   acpi_ex_dump_operands(a,b,c,d,e,_THIS_MODULE,__LINE__)
 
 
 #define ACPI_DUMP_ENTRY(a,b)            acpi_ns_dump_entry (a,b)
+
+#ifdef ACPI_FUTURE_USAGE
 #define ACPI_DUMP_TABLES(a,b)           acpi_ns_dump_tables(a,b)
+#endif
+
 #define ACPI_DUMP_PATHNAME(a,b,c,d)     acpi_ns_dump_pathname(a,b,c,d)
 #define ACPI_DUMP_RESOURCE_LIST(a)      acpi_rs_dump_resource_list(a)
 #define ACPI_DUMP_BUFFER(a,b)           acpi_ut_dump_buffer((u8 *)a,b,DB_BYTE_DISPLAY,_COMPONENT)
@@ -606,7 +596,11 @@
 #define ACPI_DUMP_STACK_ENTRY(a)
 #define ACPI_DUMP_OPERANDS(a,b,c,d,e)
 #define ACPI_DUMP_ENTRY(a,b)
+
+#ifdef ACPI_FUTURE_USAGE
 #define ACPI_DUMP_TABLES(a,b)
+#endif
+
 #define ACPI_DUMP_PATHNAME(a,b,c,d)
 #define ACPI_DUMP_RESOURCE_LIST(a)
 #define ACPI_DUMP_BUFFER(a,b)
@@ -680,8 +674,5 @@
 #define ACPI_MEM_TRACKING(a)            a
 
 #endif /* ACPI_DBG_TRACK_ALLOCATIONS */
-
-
-#define ACPI_GET_STACK_POINTER          _asm {mov eax, ebx}
 
 #endif /* ACMACROS_H */

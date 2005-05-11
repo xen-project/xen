@@ -5,7 +5,7 @@
  *****************************************************************************/
 
 /*
- * Copyright (C) 2000 - 2004, R. Byron Moore
+ * Copyright (C) 2000 - 2005, R. Byron Moore
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -136,7 +136,7 @@
 /*
  * Debug level macros that are used in the DEBUG_PRINT macros
  */
-#define ACPI_DEBUG_LEVEL(dl)        (u32) dl,__LINE__,&_dbg
+#define ACPI_DEBUG_LEVEL(dl)        (u32) dl,__LINE__,&_debug_info
 
 /* Exception level -- used in the global "debug_level" */
 

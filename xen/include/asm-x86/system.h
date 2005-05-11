@@ -112,6 +112,7 @@ static always_inline unsigned long __cmpxchg(volatile void *ptr, unsigned long o
 	return old;
 }
 
+#define __HAVE_ARCH_CMPXCHG
 #define cmpxchg(ptr,o,n)\
 	((__typeof__(*(ptr)))__cmpxchg((ptr),(unsigned long)(o),\
 					(unsigned long)(n),sizeof(*(ptr))))

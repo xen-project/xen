@@ -5,16 +5,13 @@
 #define __ASM_X86_PROCESSOR_H
 
 #ifndef __ASSEMBLY__
-#include <asm/page.h>
+#include <xen/config.h>
+#include <xen/cache.h>
+#include <xen/types.h>
+#include <public/xen.h>
 #include <asm/types.h>
 #include <asm/cpufeature.h>
 #include <asm/desc.h>
-#include <asm/flushtlb.h>
-#include <xen/config.h>
-#include <xen/spinlock.h>
-#include <xen/cache.h>
-#include <asm/vmx_vmcs.h>
-#include <public/xen.h>
 #endif
 
 /*
@@ -166,7 +163,7 @@ struct cpuinfo_x86 {
     int     x86_cache_size;  /* in KB - for CPUS that support this call  */
     int	    x86_clflush_size;
     int	    x86_tlbsize;     /* number of 4K pages in DTLB/ITLB combined */
-} __attribute__((__aligned__(SMP_CACHE_BYTES)));
+} __cacheline_aligned;
 
 /*
  * capabilities of CPUs
@@ -369,7 +366,7 @@ struct tss_struct {
     u16 bitmap;
     /* Pads the TSS to be cacheline-aligned (total size is 0x80). */
     u8 __cacheline_filler[24];
-} __cacheline_aligned PACKED;
+} __cacheline_aligned __attribute__((packed));
 
 #define IDT_ENTRIES 256
 extern idt_entry_t idt_table[];

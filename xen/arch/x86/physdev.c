@@ -10,8 +10,6 @@
 #include <public/xen.h>
 #include <public/physdev.h>
 
-extern void (*interrupt[])(void);
-
 extern int ioapic_guest_read(int apicid, int address, u32 *pval);
 extern int ioapic_guest_write(int apicid, int address, u32 pval);
 
@@ -130,7 +128,7 @@ void physdev_init_dom0(struct domain *d)
     BUG_ON(d->arch.iobmp_mask == NULL);
     memset(d->arch.iobmp_mask, 0, IOBMP_BYTES);
 
-    set_bit(DF_PHYSDEV, &d->d_flags);
+    set_bit(DF_PHYSDEV, &d->flags);
 }
 
 

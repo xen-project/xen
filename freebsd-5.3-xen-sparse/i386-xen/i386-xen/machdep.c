@@ -78,6 +78,7 @@ __FBSDID("$FreeBSD: src/sys/i386/i386/machdep.c,v 1.584 2003/12/03 21:12:09 jhb 
 #include <sys/sched.h>
 #include <sys/sysent.h>
 #include <sys/sysctl.h>
+#include <sys/smp.h>
 #include <sys/ucontext.h>
 #include <sys/vmmeter.h>
 #include <sys/bus.h>
@@ -883,14 +884,6 @@ SYSCTL_INT(_machdep, OID_AUTO, cpu_idle_hlt, CTLFLAG_RW,
 static void
 cpu_idle_default(void)
 {
-#if 0
-	/*
-	 * we must absolutely guarentee that hlt is the
-	 * absolute next instruction after sti or we
-	 * introduce a timing window.
-	 */
-	__asm __volatile("sti; hlt");
-#endif
 	idle_block();
 	enable_intr();
 }
@@ -1376,6 +1369,7 @@ pteinfo_t *pteinfo_list;
 unsigned long *xen_machine_phys = ((unsigned long *)VADDR(1008, 0));
 int preemptable;
 int gdt_set;
+static int ncpus;
 
 /* Linux infection */
 #define PAGE_OFFSET  KERNBASE
@@ -1387,6 +1381,10 @@ initvalues(start_info_t *startinfo)
     int i;
     vm_paddr_t pdir_shadow_ma, KPTphys;
     vm_offset_t *pdir_shadow;
+#ifdef SMP
+    int j;
+#endif
+
 #ifdef WRITABLE_PAGETABLES
     printk("using writable pagetables\n");
     HYPERVISOR_vm_assist(VMASST_CMD_enable, VMASST_TYPE_writable_pagetables);
@@ -1447,18 +1445,19 @@ initvalues(start_info_t *startinfo)
 
 
 #ifdef SMP
+#if 0
     /* allocate cpu0 private page */
     cpu0prvpage = (KERNBASE + (tmpindex << PAGE_SHIFT));
     tmpindex++; 
-
+#endif
     /* allocate SMP page table */
     SMPpt = (unsigned long *)(KERNBASE + (tmpindex << PAGE_SHIFT));
-
+#if 0
     /* Map the private page into the SMP page table */
     SMPpt[0] = vtomach(cpu0prvpage) | PG_RW | PG_M | PG_V | PG_A;
-
+#endif
     /* map SMP page table RO */
-    PT_SET_MA(SMPpt, vtomach(SMPpt) & ~PG_RW);
+    PT_SET_MA(SMPpt, *vtopte((vm_offset_t)SMPpt) & ~PG_RW);
 
     /* put the page table into the page directory */
     xen_queue_pt_update((vm_paddr_t)(IdlePTD + MPPTDI), 
@@ -1496,10 +1495,51 @@ initvalues(start_info_t *startinfo)
     tmpindex++;
 
     HYPERVISOR_shared_info->arch.pfn_to_mfn_frame_list = (unsigned long)xen_phys_machine;
+    ncpus = HYPERVISOR_shared_info->n_vcpu; 
+#ifdef SMP
+    for (i = 0; i < ncpus; i++) {
+	    int npages = (sizeof(struct privatespace) + 1)/PAGE_SIZE;
+	    for (j = 0; j < npages; j++) {
+		    vm_paddr_t ma = xpmap_ptom(tmpindex << PAGE_SHIFT);
+		    tmpindex++;
+		    PT_SET_VA_MA(SMPpt + i*npages + j, ma | PG_A | PG_V | PG_RW | PG_M, FALSE);
+	    }
+    }
+    xen_flush_queue();
+#endif
     
     init_first = tmpindex;
     
 }
+
+
+trap_info_t trap_table[] = {
+	{ 0,   0, GSEL(GCODE_SEL, SEL_KPL), (unsigned long) &IDTVEC(div)},
+	{ 1,   0, GSEL(GCODE_SEL, SEL_KPL), (unsigned long) &IDTVEC(dbg)},
+	{ 3,   3, GSEL(GCODE_SEL, SEL_KPL), (unsigned long) &IDTVEC(bpt)},
+	{ 4,   3, GSEL(GCODE_SEL, SEL_KPL), (unsigned long) &IDTVEC(ofl)},
+	/* This is UPL on Linux and KPL on BSD */
+	{ 5,   3, GSEL(GCODE_SEL, SEL_KPL), (unsigned long) &IDTVEC(bnd)},
+	{ 6,   0, GSEL(GCODE_SEL, SEL_KPL), (unsigned long) &IDTVEC(ill)},
+	{ 7,   0, GSEL(GCODE_SEL, SEL_KPL), (unsigned long) &IDTVEC(dna)},
+	/*
+	 * { 8,   0, GSEL(GCODE_SEL, SEL_KPL), (unsigned long) &IDTVEC(XXX)},
+	 *   no handler for double fault
+	 */
+	{ 9,   0, GSEL(GCODE_SEL, SEL_KPL), (unsigned long) &IDTVEC(fpusegm)},
+	{10,   0, GSEL(GCODE_SEL, SEL_KPL), (unsigned long) &IDTVEC(tss)},
+	{11,   0, GSEL(GCODE_SEL, SEL_KPL), (unsigned long) &IDTVEC(missing)},
+	{12,   0, GSEL(GCODE_SEL, SEL_KPL), (unsigned long) &IDTVEC(stk)},
+	{13,   0, GSEL(GCODE_SEL, SEL_KPL), (unsigned long) &IDTVEC(prot)},
+	{14,   0, GSEL(GCODE_SEL, SEL_KPL), (unsigned long) &IDTVEC(page)},
+	{15,   0, GSEL(GCODE_SEL, SEL_KPL), (unsigned long) &IDTVEC(rsvd)},
+	{16,   0, GSEL(GCODE_SEL, SEL_KPL), (unsigned long) &IDTVEC(fpu)},
+	{17,   0, GSEL(GCODE_SEL, SEL_KPL), (unsigned long) &IDTVEC(align)},
+	{18,   0, GSEL(GCODE_SEL, SEL_KPL), (unsigned long) &IDTVEC(mchk)},
+	{19,   0, GSEL(GCODE_SEL, SEL_KPL), (unsigned long) &IDTVEC(xmm)},
+	{0x80, 3, GSEL(GCODE_SEL, SEL_KPL), (unsigned long) &IDTVEC(int0x80_syscall)},
+	{  0, 0,           0, 0 }
+};
 
 void
 init386(void)
@@ -1507,33 +1547,9 @@ init386(void)
 	int gsel_tss, metadata_missing, off, x, error;
 	struct pcpu *pc;
 	unsigned long gdtmachpfn;
-	trap_info_t trap_table[] = {
-	    { 0,   0, GSEL(GCODE_SEL, SEL_KPL), (unsigned long) &IDTVEC(div)},
-	    { 1,   0, GSEL(GCODE_SEL, SEL_KPL), (unsigned long) &IDTVEC(dbg)},
-	    { 3,   3, GSEL(GCODE_SEL, SEL_KPL), (unsigned long) &IDTVEC(bpt)},
-	    { 4,   3, GSEL(GCODE_SEL, SEL_KPL), (unsigned long) &IDTVEC(ofl)},
-	    /* This is UPL on Linux and KPL on BSD */
-	    { 5,   3, GSEL(GCODE_SEL, SEL_KPL), (unsigned long) &IDTVEC(bnd)},
-	    { 6,   0, GSEL(GCODE_SEL, SEL_KPL), (unsigned long) &IDTVEC(ill)},
-	    { 7,   0, GSEL(GCODE_SEL, SEL_KPL), (unsigned long) &IDTVEC(dna)},
-	    /*
-	     * { 8,   0, GSEL(GCODE_SEL, SEL_KPL), (unsigned long) &IDTVEC(XXX)},
-	     *   no handler for double fault
-	     */
-	    { 9,   0, GSEL(GCODE_SEL, SEL_KPL), (unsigned long) &IDTVEC(fpusegm)},
-	    {10,   0, GSEL(GCODE_SEL, SEL_KPL), (unsigned long) &IDTVEC(tss)},
-	    {11,   0, GSEL(GCODE_SEL, SEL_KPL), (unsigned long) &IDTVEC(missing)},
-	    {12,   0, GSEL(GCODE_SEL, SEL_KPL), (unsigned long) &IDTVEC(stk)},
-	    {13,   0, GSEL(GCODE_SEL, SEL_KPL), (unsigned long) &IDTVEC(prot)},
-	    {14,   0, GSEL(GCODE_SEL, SEL_KPL), (unsigned long) &IDTVEC(page)},
-	    {15,   0, GSEL(GCODE_SEL, SEL_KPL), (unsigned long) &IDTVEC(rsvd)},
-	    {16,   0, GSEL(GCODE_SEL, SEL_KPL), (unsigned long) &IDTVEC(fpu)},
-	    {17,   0, GSEL(GCODE_SEL, SEL_KPL), (unsigned long) &IDTVEC(align)},
-	    {18,   0, GSEL(GCODE_SEL, SEL_KPL), (unsigned long) &IDTVEC(mchk)},
-	    {19,   0, GSEL(GCODE_SEL, SEL_KPL), (unsigned long) &IDTVEC(xmm)},
-	    {0x80, 3, GSEL(GCODE_SEL, SEL_KPL), (unsigned long) &IDTVEC(int0x80_syscall)},
-	    {  0, 0,           0, 0 }
-        };
+#ifdef SMP
+	int i;
+#endif
 	proc0.p_uarea = proc0uarea;
 	thread0.td_kstack = proc0kstack;
 	thread0.td_pcb = (struct pcb *)
@@ -1583,26 +1599,42 @@ init386(void)
 	gdt_segs[GDATA_SEL].ssd_limit = atop(0 - ((1 << 26) - (1 << 22) + (1 << 16))); 
 #endif
 #ifdef SMP
-	/* this correspond to the cpu private page as mapped into the SMP page 
-	 * table in initvalues
+	/* XXX this will blow up if there are more than 512/NGDT vcpus - will never 
+	 * be an issue in the real world but should add an assert on general principles
+	 * we'll likely blow up when we hit LAST_RESERVED_GDT_ENTRY, at which point we
+	 * would need to start allocating more pages for the GDT
 	 */
 	pc = &SMP_prvspace[0].pcpu;
-	gdt_segs[GPRIV_SEL].ssd_limit =
-		atop(sizeof(struct privatespace) - 1);
+	for (i = 0; i < ncpus; i++) {
+		cpu_add(i, (i == 0));
+
+		gdt_segs[GPRIV_SEL].ssd_base = (int) &SMP_prvspace[i];
+		gdt_segs[GPRIV_SEL].ssd_limit =
+			atop(sizeof(struct privatespace) - 1);
+		gdt_segs[GPROC0_SEL].ssd_base =
+			(int) &SMP_prvspace[i].pcpu.pc_common_tss;
+		SMP_prvspace[i].pcpu.pc_prvspace =
+			&SMP_prvspace[i].pcpu;
+		
+		for (x = 0; x < NGDT; x++) {
+			ssdtosd(&gdt_segs[x], &gdt[i * NGDT + x].sd);
+		}
+	}
 #else
 	pc = &__pcpu;
 	gdt_segs[GPRIV_SEL].ssd_limit =
 		atop(sizeof(struct pcpu) - 1);
-#endif
 	gdt_segs[GPRIV_SEL].ssd_base = (int) pc;
 	gdt_segs[GPROC0_SEL].ssd_base = (int) &pc->pc_common_tss;
 	for (x = 0; x < NGDT; x++)
 	    ssdtosd(&gdt_segs[x], &gdt[x].sd);
+#endif
+
 
 	PT_SET_MA(gdt, *vtopte((unsigned long)gdt) & ~PG_RW);
 	gdtmachpfn = vtomach(gdt) >> PAGE_SHIFT;
-	if ((error = HYPERVISOR_set_gdt(&gdtmachpfn, LAST_RESERVED_GDT_ENTRY + 1))) 
-	    panic("set_gdt failed");
+	PANIC_IF(HYPERVISOR_set_gdt(&gdtmachpfn, LAST_RESERVED_GDT_ENTRY + 1) != 0);
+
 	
 	lgdt_finish();
 	gdt_set = 1;

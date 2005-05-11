@@ -43,7 +43,7 @@ static inline void evtchn_set_pending(struct exec_domain *ed, int port)
          * NB2. We save DF_RUNNING across the unblock to avoid a needless
          * IPI for domains that we IPI'd to unblock.
          */
-        running = test_bit(EDF_RUNNING, &ed->ed_flags);
+        running = test_bit(EDF_RUNNING, &ed->flags);
         exec_domain_unblock(ed);
         if ( running )
             smp_send_event_check_cpu(ed->processor);

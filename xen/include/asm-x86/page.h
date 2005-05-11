@@ -23,6 +23,7 @@
 #ifndef __ASSEMBLY__
 typedef struct { unsigned long pt_lo; } pagetable_t;
 #define pagetable_val(_x)   ((_x).pt_lo)
+#define pagetable_get_pfn(_x) ((_x).pt_lo >> PAGE_SHIFT)
 #define mk_pagetable(_x)    ( (pagetable_t) { (_x) } )
 #endif
 
@@ -103,6 +104,7 @@ extern void paging_init(void);
 #define _PAGE_PAT      0x080UL
 #define _PAGE_PSE      0x080UL
 #define _PAGE_GLOBAL   0x100UL
+#define _PAGE_AVAIL    0xe00UL
 
 #define __PAGE_HYPERVISOR \
     (_PAGE_PRESENT | _PAGE_RW | _PAGE_DIRTY | _PAGE_ACCESSED)
@@ -128,8 +130,6 @@ static __inline__ int get_order(unsigned long size)
     } while (size);
     return order;
 }
-
-extern void zap_low_mappings(void);
 
 /* Map physical byte range (@p, @p+@s) at virt address @v in pagetable @pt. */
 extern int

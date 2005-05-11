@@ -44,6 +44,9 @@
 #include <linux/smp_lock.h>
 #include <linux/irq.h>
 #include <linux/bootmem.h>
+#include <linux/notifier.h>
+#include <linux/cpu.h>
+#include <linux/percpu.h>
 
 #include <linux/delay.h>
 #include <linux/mc146818rtc.h>
@@ -51,11 +54,7 @@
 #include <asm/desc.h>
 #include <asm/arch_hooks.h>
 
-#if 1
-#define Dprintk(args...)
-#else
 #include <mach_apic.h>
-#endif
 #include <mach_wakecpu.h>
 #include <smpboot_hooks.h>
 
@@ -93,7 +92,14 @@ extern unsigned char trampoline_data [];
 extern unsigned char trampoline_end  [];
 static unsigned char *trampoline_base;
 static int trampoline_exec;
+#endif
 
+#ifdef CONFIG_HOTPLUG_CPU
+/* State of each CPU. */
+DEFINE_PER_CPU(int, cpu_state) = { 0 };
+#endif
+
+#if 0
 /*
  * Currently trivial. Write the real->protected mode
  * bootstrap into the page concerned. The caller
@@ -462,7 +468,7 @@ extern void local_setup_timer(void);
 /*
  * Activate a secondary processor.
  */
-static int __init start_secondary(void *unused)
+static void __init start_secondary(void *unused)
 {
 	/*
 	 * Dont put anything before smp_callin(), SMP
@@ -488,17 +494,6 @@ static int __init start_secondary(void *unused)
 	local_irq_enable();
 
 	wmb();
-	if (0) {
-		char *msg2 = "delay2\n";
-		int timeout;
-		for (timeout = 0; timeout < 50000; timeout++) {
-			udelay(1000);
-			if (timeout == 2000) {
-				(void)HYPERVISOR_console_io(CONSOLEIO_write, strlen(msg2), msg2);
-				timeout = 0;
-			}
-		}
-	}
 	cpu_idle();
 }
 
@@ -1105,15 +1100,15 @@ static void __init smp_boot_cpus(unsigned int max_cpus)
 	 * If we couldn't find an SMP configuration at boot time,
 	 * get out of here now!
 	 */
-	if (!smp_found_config /* && !acpi_lapic) */) {
+	if (!smp_found_config && !acpi_lapic) {
 		printk(KERN_NOTICE "SMP motherboard not detected.\n");
 		smpboot_clear_io_apic_irqs();
 #if 0
 		phys_cpu_present_map = physid_mask_of_physid(0);
+#endif
 		if (APIC_init_uniprocessor())
 			printk(KERN_NOTICE "Local APIC not detected."
 					   " Using dummy APIC emulation.\n");
-#endif
 		map_cpu_to_logical_apicid();
 		return;
 	}
@@ -1267,9 +1262,11 @@ static void __init smp_boot_cpus(unsigned int max_cpus)
 #if 0
 	if (nmi_watchdog == NMI_LOCAL_APIC)
 		check_nmi_watchdog();
+#endif
 
 	smpboot_setup_io_apic();
 
+#if 0
 	setup_boot_APIC_clock();
 
 	/*
@@ -1284,6 +1281,9 @@ static void __init smp_boot_cpus(unsigned int max_cpus)
    who understands all this stuff should rewrite it properly. --RR 15/Jul/02 */
 void __init smp_prepare_cpus(unsigned int max_cpus)
 {
+	smp_commenced_mask = cpumask_of_cpu(0);
+	cpu_callin_map = cpumask_of_cpu(0);
+	mb();
 	smp_boot_cpus(max_cpus);
 }
 
@@ -1293,19 +1293,96 @@ void __devinit smp_prepare_boot_cpu(void)
 	cpu_set(smp_processor_id(), cpu_callout_map);
 }
 
+#ifdef CONFIG_HOTPLUG_CPU
+
+/* must be called with the cpucontrol mutex held */
+static int __devinit cpu_enable(unsigned int cpu)
+{
+	/* get the target out of its holding state */
+	per_cpu(cpu_state, cpu) = CPU_UP_PREPARE;
+	wmb();
+
+	/* wait for the processor to ack it. timeout? */
+	while (!cpu_online(cpu))
+		cpu_relax();
+
+	fixup_irqs(cpu_online_map);
+	/* counter the disable in fixup_irqs() */
+	local_irq_enable();
+	return 0;
+}
+
+int __cpu_disable(void)
+{
+	cpumask_t map = cpu_online_map;
+	int cpu = smp_processor_id();
+
+	/*
+	 * Perhaps use cpufreq to drop frequency, but that could go
+	 * into generic code.
+ 	 *
+	 * We won't take down the boot processor on i386 due to some
+	 * interrupts only being able to be serviced by the BSP.
+	 * Especially so if we're not using an IOAPIC	-zwane
+	 */
+	if (cpu == 0)
+		return -EBUSY;
+
+	/* Allow any queued timer interrupts to get serviced */
+	local_irq_enable();
+	mdelay(1);
+	local_irq_disable();
+
+	cpu_clear(cpu, map);
+	fixup_irqs(map);
+	/* It's now safe to remove this processor from the online map */
+	cpu_clear(cpu, cpu_online_map);
+	return 0;
+}
+
+void __cpu_die(unsigned int cpu)
+{
+	/* We don't do anything here: idle task is faking death itself. */
+	unsigned int i;
+
+	for (i = 0; i < 10; i++) {
+		/* They ack this in play_dead by setting CPU_DEAD */
+		if (per_cpu(cpu_state, cpu) == CPU_DEAD)
+			return;
+		current->state = TASK_UNINTERRUPTIBLE;
+		schedule_timeout(HZ/10);
+	}
+ 	printk(KERN_ERR "CPU %u didn't die...\n", cpu);
+}
+#else /* ... !CONFIG_HOTPLUG_CPU */
+int __cpu_disable(void)
+{
+	return -ENOSYS;
+}
+
+void __cpu_die(unsigned int cpu)
+{
+	/* We said "no" in __cpu_disable */
+	BUG();
+}
+#endif /* CONFIG_HOTPLUG_CPU */
+
 int __devinit __cpu_up(unsigned int cpu)
 {
-	/* This only works at boot for x86.  See "rewrite" above. */
-	if (cpu_isset(cpu, smp_commenced_mask)) {
-		local_irq_enable();
-		return -ENOSYS;
-	}
-
 	/* In case one didn't come up */
 	if (!cpu_isset(cpu, cpu_callin_map)) {
+		printk(KERN_DEBUG "skipping cpu%d, didn't come online\n", cpu);
 		local_irq_enable();
 		return -EIO;
 	}
+
+#ifdef CONFIG_HOTPLUG_CPU
+	/* Already up, and in cpu_quiescent now? */
+	if (cpu_isset(cpu, smp_commenced_mask)) {
+		cpu_enable(cpu);
+		return 0;
+	}
+#endif
 
 	local_irq_enable();
 	/* Unleash the CPU! */

@@ -79,6 +79,14 @@ void raise_actimer_softirq(void)
 	raise_softirq(AC_TIMER_SOFTIRQ);
 }
 
+unsigned long __hypercall_create_continuation(
+	unsigned int op, unsigned int nr_args, ...)
+{
+	printf("__hypercall_create_continuation: not implemented!!!\n");
+}
+
+///////////////////////////////
+
 ///////////////////////////////
 // from arch/x86/apic.c
 ///////////////////////////////
@@ -139,7 +147,7 @@ void free_page_type(struct pfn_info *page, unsigned int type)
 void show_registers(struct pt_regs *regs)
 {
 	printf("*** ADD REGISTER DUMP HERE FOR DEBUGGING\n");
-}	
+}
 
 ///////////////////////////////
 // from common/keyhandler.c
@@ -240,7 +248,7 @@ int id = ((struct exec_domain *)current)->domain->id & 0xf;
 if (!cnt[id]--) { printk("%x",id); cnt[id] = 50; }
 if (!i--) { printk("+",id); cnt[id] = 100; }
 }
-	clear_bit(EDF_RUNNING, &prev->ed_flags);
+	clear_bit(EDF_RUNNING, &prev->flags);
 	//if (!is_idle_task(next->domain) )
 		//send_guest_virq(next, VIRQ_TIMER);
 	load_region_regs(current);
@@ -270,7 +278,7 @@ loop:
 	printf(buf);
 	if (regs) show_registers(regs);
 	domain_pause_by_systemcontroller(current->domain);
-	set_bit(DF_CRASHED, ed->domain->d_flags);
+	set_bit(DF_CRASHED, ed->domain->flags);
 	if (ed->domain->id == 0) {
 		int i = 1000000000L;
 		// if domain0 crashes, just periodically print out panic

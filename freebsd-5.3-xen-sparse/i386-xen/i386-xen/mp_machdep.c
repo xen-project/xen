@@ -83,7 +83,16 @@ __FBSDID("$FreeBSD: src/sys/i386/i386/mp_machdep.c,v 1.235.2.3 2004/09/24 15:02:
 #include <machine/specialreg.h>
 #include <machine/privatespace.h>
 
+
+/* XEN includes */
 #include <machine/xenfunc.h>
+#include <machine/xen_intr.h>
+
+void Xhypervisor_callback(void);
+void failsafe_callback(void);
+
+/***************/
+
 
 #define WARMBOOT_TARGET		0
 #define WARMBOOT_OFF		(KERNBASE + 0x0467)
@@ -93,6 +102,10 @@ __FBSDID("$FreeBSD: src/sys/i386/i386/mp_machdep.c,v 1.235.2.3 2004/09/24 15:02:
 #define CMOS_DATA		(0x71)
 #define BIOS_RESET		(0x0f)
 #define BIOS_WARM		(0x0a)
+
+
+#undef POSTCODE
+#define POSTCODE(x)
 
 /*
  * this code MUST be enabled here and in mpboot.s.
@@ -175,6 +188,8 @@ extern pt_entry_t *KPTphys;
 /* SMP page table page */
 extern pt_entry_t *SMPpt;
 
+extern trap_info_t trap_table[];
+
 struct pcb stoppcbs[MAXCPU];
 
 /* Variables needed for SMP tlb shootdown. */
@@ -208,7 +223,9 @@ static u_int boot_address;
 
 static void	set_logical_apic_ids(void);
 static int	start_all_aps(void);
+#if 0
 static void	install_ap_tramp(void);
+#endif
 static int	start_ap(int apic_id);
 static void	release_aps(void *dummy);
 
@@ -314,6 +331,7 @@ int
 cpu_mp_probe(void)
 {
 
+	mp_ncpus = HYPERVISOR_shared_info->n_vcpu;
 	/*
 	 * Always record BSP in CPU map so that the mbuf init code works
 	 * correctly.
@@ -342,20 +360,24 @@ cpu_mp_probe(void)
 	return (1);
 }
 
-/*
- * Initialize the IPI handlers and start up the AP's.
- */
-void
-cpu_mp_start(void)
+static void
+cpu_mp_ipi_init(void)
 {
-	int i;
-
-	POSTCODE(MP_START_POST);
-
-	/* Initialize the logical ID to APIC ID table. */
-	for (i = 0; i < MAXCPU; i++)
-		cpu_apic_ids[i] = -1;
-
+	int irq;
+	int cpu = smp_processor_id();
+	/* 
+	 * these are not needed by XenFreeBSD - from Keir:
+	 * For TLB-flush related IPIs, Xen has hypercalls 
+	 * you should use instead. You can pass a pointer 
+	 * to a vcpu bitmap to update_va_mapping(), and to
+	 * MMUEXT_flush_tlb_multi and MMEXT_invlpg_multi. 
+	 * Xen will then make sure that those vcpus get 
+	 * flushed appropriately before returning to the
+	 * caller.
+	 * There is also no indication that we need to forward
+	 * clock interrupts.
+	 */
+#if 0 
 	/* Install an inter-CPU IPI for TLB invalidation */
 	setidt(IPI_INVLTLB, IDTVEC(invltlb),
 	       SDT_SYS386IGT, SEL_KPL, GSEL(GCODE_SEL, SEL_KPL));
@@ -371,22 +393,69 @@ cpu_mp_start(void)
 	/* Install an inter-CPU IPI for forwarding statclock() */
 	setidt(IPI_STATCLOCK, IDTVEC(statclock),
 	       SDT_SYS386IGT, SEL_KPL, GSEL(GCODE_SEL, SEL_KPL));
-	
+#endif
+
+	/* 
+	 * These can all be consolidated. For now leaving 
+	 * as individual IPIs.
+	 *
+	 */
+#if 0
 	/* Install an inter-CPU IPI for lazy pmap release */
 	setidt(IPI_LAZYPMAP, IDTVEC(lazypmap),
 	       SDT_SYS386IGT, SEL_KPL, GSEL(GCODE_SEL, SEL_KPL));
+#else
+	irq = bind_ipi_on_cpu_to_irq(cpu, IPI_LAZYPMAP);
+	PCPU_SET(lazypmap, irq);
+	PANIC_IF(intr_add_handler("pmap_lazyfix", irq, 
+				  (driver_intr_t *)pmap_lazyfix_action, 
+				  NULL, INTR_TYPE_CLK | INTR_FAST, NULL));
+#endif
 
+#if 0
 	/* Install an inter-CPU IPI for all-CPU rendezvous */
 	setidt(IPI_RENDEZVOUS, IDTVEC(rendezvous),
 	       SDT_SYS386IGT, SEL_KPL, GSEL(GCODE_SEL, SEL_KPL));
+#else 
+	irq = bind_ipi_on_cpu_to_irq(cpu, IPI_RENDEZVOUS);
+	PCPU_SET(rendezvous, irq);
+	PANIC_IF(intr_add_handler("smp_rendezvous", irq, 
+				  (driver_intr_t *)smp_rendezvous_action, 
+				  NULL, INTR_TYPE_CLK | INTR_FAST, NULL));
+#endif
 
+#if 0
 	/* Install an inter-CPU IPI for forcing an additional software trap */
 	setidt(IPI_AST, IDTVEC(cpuast),
 	       SDT_SYS386IGT, SEL_KPL, GSEL(GCODE_SEL, SEL_KPL));
-
+#else
+	irq = bind_ipi_on_cpu_to_irq(cpu, IPI_AST);
+	PCPU_SET(cpuast, irq);
+#endif
+	/* XXX ignore for now */
+#if 0 
 	/* Install an inter-CPU IPI for CPU stop/restart */
 	setidt(IPI_STOP, IDTVEC(cpustop),
 	       SDT_SYS386IGT, SEL_KPL, GSEL(GCODE_SEL, SEL_KPL));
+#endif
+
+}
+
+SYSINIT(ipi_setup, SI_SUB_INTR, SI_ORDER_ANY, cpu_mp_ipi_init, NULL);
+
+/*
+ * Initialize the IPI handlers and start up the AP's.
+ */
+void
+cpu_mp_start(void) /* --- Start here --- */
+{
+	int i;
+
+	POSTCODE(MP_START_POST);
+
+	/* Initialize the logical ID to APIC ID table. */
+	for (i = 0; i < MAXCPU; i++)
+		cpu_apic_ids[i] = -1;
 
 
 	/* Set boot_cpu_id if needed. */
@@ -437,35 +506,44 @@ cpu_mp_announce(void)
 void
 init_secondary(void)
 {
-	int	gsel_tss;
-	int	x, myid;
+	int	myid;
+	unsigned long gdtmachpfn;
+	printk("MADE IT!!");
+
 #if 0
 	u_int	cr0;
 #endif
+	/* Steps to booting SMP on xen as gleaned from XenLinux:
+	 * - cpu_init() - processor specific initialization
+	 * - smp_callin() 
+	 *    - wait 2s for BP to finish its startup sequence
+	 *    - map_cpu_to_logical_apicid()
+	 *    - save cpuid info
+	 *    - set bit in callin map to let master (BP?) continue
+	 * - local setup timer() - per cpu timer initialization
+	 * - ldebug_setup() - bind debug IRQ to local CPU.
+	 * - smp_intr_init() - IPI setup that we do in cpu_mp_start
+	 * - local_irq_enable() - enable interrupts locally
+	 * - cpu_set(id, map) - announce that we're up
+	 * - cpu_idle() - make us schedulable
+	 */
+
+
 	/* bootAP is set in start_ap() to our ID. */
 	myid = bootAP;
-	gdt_segs[GPRIV_SEL].ssd_base = (int) &SMP_prvspace[myid];
-	gdt_segs[GPROC0_SEL].ssd_base =
-		(int) &SMP_prvspace[myid].pcpu.pc_common_tss;
-	SMP_prvspace[myid].pcpu.pc_prvspace =
-		&SMP_prvspace[myid].pcpu;
 
-	for (x = 0; x < NGDT; x++) {
-		ssdtosd(&gdt_segs[x], &gdt[myid * NGDT + x].sd);
-	}
+	gdtmachpfn = vtomach(gdt) >> PAGE_SHIFT;
+	PANIC_IF(HYPERVISOR_set_gdt(&gdtmachpfn, LAST_RESERVED_GDT_ENTRY + 1) != 0); 
 
-#if 0
-	r_gdt.rd_limit = NGDT * sizeof(gdt[0]) - 1;
-	r_gdt.rd_base = (int) &gdt[myid * NGDT];
-	lgdt(&r_gdt);			/* does magic intra-segment return */
+	
+	lgdt_finish();
 
-	lidt(&r_idt);
-	lldt(_default_ldt);
-#endif
+	PCPU_SET(cpuid, myid);
+
+
+	set_user_ldt((struct mdproc *)_default_ldt);
 	PCPU_SET(currentldt, _default_ldt);
 
-	gsel_tss = GSEL(GPROC0_SEL, SEL_KPL);
-	gdt[myid * NGDT + GPROC0_SEL].sd.sd_type = SDT_SYS386TSS;
 	PCPU_SET(common_tss.tss_esp0, 0); /* not used until after switch */
 	PCPU_SET(common_tss.tss_ss0, GSEL(GDATA_SEL, SEL_KPL));
 	PCPU_SET(common_tss.tss_ioopt, (sizeof (struct i386tss)) << 16);
@@ -557,6 +635,13 @@ init_secondary(void)
 	while (smp_started == 0)
 		ia32_pause();
 
+	/* need to wait until now to setup the IPIs as SI_SUB_CPU is
+	 * much earlier than SI_SUB_INTR
+	 */  
+	ap_evtchn_init(myid);
+	ap_cpu_initclocks();
+	cpu_mp_ipi_init();
+
 	/* ok, now grab sched_lock and enter the scheduler */
 	mtx_lock_spin(&sched_lock);
 
@@ -610,28 +695,35 @@ set_logical_apic_ids(void)
 static int
 start_all_aps(void)
 {
-#ifndef PC98
-	u_char mpbiosreason;
-#endif
-	u_long mpbioswarmvec;
 	struct pcpu *pc;
 	char *stack;
-	uintptr_t kptbase;
-	int i, pg, apic_id, cpu;
+	int i, apic_id, cpu;
+
+	/* 
+	 * This function corresponds most closely to 
+	 * smp_boot_cpus in XenLinux - the sequence there 
+	 * is:
+	 * - check if SMP config is found - if not:
+	 *     - clear the I/O APIC IRQs
+	 *     - map cpu to logical apicid
+	 *     - exit
+	 * - smp_intr_init - IPI initialization
+	 * - map cpu to logical apicid
+	 * - boot each of the vcpus
+	 * - clear and then construct the cpu sibling [logical CPUs] map.
+	 *
+	 */
 
 	POSTCODE(START_ALL_APS_POST);
 
 	mtx_init(&ap_boot_mtx, "ap boot", NULL, MTX_SPIN);
-
+#if 0
 	/* install the AP 1st level boot code */
 	install_ap_tramp();
 
 	/* save the current value of the warm-start vector */
 	mpbioswarmvec = *((u_long *) WARMBOOT_OFF);
-#ifndef PC98
-	outb(CMOS_REG, BIOS_RESET);
-	mpbiosreason = inb(CMOS_DATA);
-#endif
+
 
 	/* set up temporary P==V mapping for AP boot */
 	/* XXX this is a hack, we should boot the AP on its own stack/PTD */
@@ -640,7 +732,7 @@ start_all_aps(void)
 		PTD[i] = (pd_entry_t)(PG_V | PG_RW |
 		    ((kptbase + i * PAGE_SIZE) & PG_FRAME));
 	invltlb();
-
+#endif
 	/* start each AP */
 	for (cpu = 0, apic_id = 0; apic_id < MAXCPU; apic_id++) {
 		if (!cpu_info[apic_id].cpu_present ||
@@ -650,7 +742,7 @@ start_all_aps(void)
 
 		/* save APIC ID for this logical ID */
 		cpu_apic_ids[cpu] = apic_id;
-
+#if 0
 		/* first page of AP's private space */
 		pg = cpu * i386_btop(sizeof(struct privatespace));
 
@@ -665,11 +757,14 @@ start_all_aps(void)
 		for (i = 0; i < KSTACK_PAGES; i++)
 			SMPpt[pg + 1 + i] = (pt_entry_t)
 			    (PG_V | PG_RW | vtophys(PAGE_SIZE * i + stack));
+#endif
+		pc = &SMP_prvspace[cpu].pcpu;
 
 		/* prime data page for it to use */
 		pcpu_init(pc, cpu, sizeof(struct pcpu));
 		pc->pc_apic_id = apic_id;
 
+#if 0
 		/* setup a vector to our boot code */
 		*((volatile u_short *) WARMBOOT_OFF) = WARMBOOT_TARGET;
 		*((volatile u_short *) WARMBOOT_SEG) = (boot_address >> 4);
@@ -677,7 +772,7 @@ start_all_aps(void)
 		outb(CMOS_REG, BIOS_RESET);
 		outb(CMOS_DATA, BIOS_WARM);	/* 'warm-start' */
 #endif
-
+#endif
 		bootSTK = &SMP_prvspace[cpu].idlekstack[KSTACK_PAGES *
 		    PAGE_SIZE];
 		bootAP = cpu;
@@ -700,13 +795,10 @@ start_all_aps(void)
 	/* build our map of 'other' CPUs */
 	PCPU_SET(other_cpus, all_cpus & ~PCPU_GET(cpumask));
 
+#if 0
 	/* restore the warmstart vector */
 	*(u_long *) WARMBOOT_OFF = mpbioswarmvec;
-#ifndef PC98
-	outb(CMOS_REG, BIOS_RESET);
-	outb(CMOS_DATA, mpbiosreason);
 #endif
-
 	/*
 	 * Set up the idle context for the BSP.  Similar to above except
 	 * that some was done by locore, some by pmap.c and some is implicit
@@ -739,7 +831,7 @@ extern void bootDataSeg(void);
 extern void MPentry(void);
 extern u_int MP_GDT;
 extern u_int mp_gdtbase;
-
+#if 0
 static void
 install_ap_tramp(void)
 {
@@ -791,6 +883,21 @@ install_ap_tramp(void)
 	*dst16 = (u_int) boot_address & 0xffff;
 	*dst8 = ((u_int) boot_address >> 16) & 0xff;
 }
+#endif
+
+static int 
+cpu_mp_trap_init(trap_info_t *trap_ctxt)
+{
+
+        trap_info_t *t = trap_table;
+
+        for (t = trap_table; t->address; t++) {
+                trap_ctxt[t->vector].flags = t->flags;
+                trap_ctxt[t->vector].cs = t->cs;
+                trap_ctxt[t->vector].address = t->address;
+        }
+        return 0x80 /*SYSCALL_VECTOR*/;
+}
 
 /*
  * This function starts the AP (application processor) identified
@@ -802,8 +909,25 @@ install_ap_tramp(void)
 static int
 start_ap(int apic_id)
 {
-	int vector, ms;
-	int cpus;
+	int vector, ms, i;
+	int cpus, boot_error;
+	vcpu_guest_context_t ctxt;
+
+	/* 
+	 * This is the FreeBSD equivalent to do_boot_cpu(apicid) in
+	 * smpboot.c. 
+	 * its initialization sequence consists of:
+	 * - fork_idle(cpu) to create separate idle context
+	 * - initialization of idle's context to start_secondary
+	 * - initialization of cpu ctxt to start in startup_32_smp
+	 * - then we call HYPERVISOR_boot_vcpu with the cpu index and
+	 *   a pointer to the context.
+	 * - on boot success we:
+	 *   - set ourselves in the callout_map
+	 *   - wait up to 5 seconds for us to be set in the callin map
+	 * - set x86_cpu_to_apicid[cpu] = apicid;
+	 *
+	 */
 
 	POSTCODE(START_AP_POST);
 
@@ -813,6 +937,55 @@ start_ap(int apic_id)
 	/* used as a watchpoint to signal AP startup */
 	cpus = mp_naps;
 
+	memset(&ctxt, 0, sizeof(ctxt));
+
+	ctxt.user_regs.ds = GSEL(GDATA_SEL, SEL_KPL);
+	ctxt.user_regs.es = GSEL(GDATA_SEL, SEL_KPL);
+	ctxt.user_regs.fs = 0;
+	ctxt.user_regs.gs = 0;
+	ctxt.user_regs.ss = __KERNEL_DS;
+	ctxt.user_regs.cs = __KERNEL_CS;
+	ctxt.user_regs.eip = (unsigned long)init_secondary;
+	ctxt.user_regs.esp = (unsigned long)bootSTK;
+#ifdef notyet
+	ctxt.user_regs.eflags = (1<<9) | (1<<2) | (idle->thread.io_pl<<12);
+#else
+	ctxt.user_regs.eflags = (1<<9) | (1<<2);
+#endif
+	/* FPU is set up to default initial state. */
+	memset(&ctxt.fpu_ctxt, 0, sizeof(ctxt.fpu_ctxt));
+
+	/* Virtual IDT is empty at start-of-day. */
+	for ( i = 0; i < 256; i++ )
+	{
+		ctxt.trap_ctxt[i].vector = i;
+		ctxt.trap_ctxt[i].cs     = FLAT_KERNEL_CS;
+	}
+	ctxt.fast_trap_idx = cpu_mp_trap_init(ctxt.trap_ctxt);
+
+	/* No LDT. */
+	ctxt.ldt_ents = 0;
+
+	/* Ring 1 stack is the initial stack. */
+	ctxt.kernel_ss = __KERNEL_DS;
+	ctxt.kernel_sp = (unsigned long)bootSTK;
+
+	/* Callback handlers. */
+	ctxt.event_callback_cs     = __KERNEL_CS;
+	ctxt.event_callback_eip    = (unsigned long)Xhypervisor_callback;
+	ctxt.failsafe_callback_cs  = __KERNEL_CS;
+	ctxt.failsafe_callback_eip = (unsigned long)failsafe_callback;
+
+	ctxt.pt_base = (vm_paddr_t)IdlePTD;
+
+	boot_error = HYPERVISOR_boot_vcpu(bootAP, &ctxt);
+
+	
+	if (boot_error) 
+		printk("Houston we have a problem\n");
+	else
+		printk("boot_vcpu succeeded\n");
+#if 0
 	/*
 	 * first we do an INIT/RESET IPI this INIT IPI might be run, reseting
 	 * and running the target CPU. OR this INIT IPI might be latched (P5
@@ -862,6 +1035,7 @@ start_ap(int apic_id)
 	    APIC_LEVEL_DEASSERT | APIC_DESTMODE_PHY | APIC_DELMODE_STARTUP |
 	    vector, apic_id);
 	lapic_ipi_wait(-1);
+#endif
 	DELAY(200);		/* wait ~200uS */
 
 	/* Wait up to 5 seconds for it to start. */

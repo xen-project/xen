@@ -31,10 +31,6 @@ typedef int pid_t;
 
 #define touch_nmi_watchdog()
 // from linux/include/linux/types.h
-#define BITS_TO_LONGS(bits) \
-	(((bits)+BITS_PER_LONG-1)/BITS_PER_LONG)
-#define DECLARE_BITMAP(name,bits) \
-	unsigned long name[BITS_TO_LONGS(bits)]
 #define CLEAR_BITMAP(name,bits) \
 	memset(name, 0, BITS_TO_LONGS(bits)*sizeof(unsigned long))
 
@@ -57,7 +53,6 @@ extern char _end[]; /* standard ELF symbol */
 //#define __kernel
 //#define __safe
 #define __force
-#define __iomem
 #define __chk_user_ptr(x) (void)0
 //#define __chk_io_ptr(x) (void)0
 //#define __builtin_warning(x, y...) (1)
@@ -76,9 +71,6 @@ extern char _end[]; /* standard ELF symbol */
 //#define NR_CPUS 16
 //#define CONFIG_NR_CPUS 16
 #define barrier() __asm__ __volatile__("": : :"memory")
-
-// linux/include/spinlock.h
-#define DEFINE_SPINLOCK(x) spinlock_t x = SPIN_LOCK_UNLOCKED
 
 ///////////////////////////////////////////////////////////////
 // xen/include/asm/config.h
@@ -174,12 +166,6 @@ struct device {
 #endif
 };
 
-// from linux/include/linux/pci.h
-struct pci_bus_region {
-	unsigned long start;
-	unsigned long end;
-};
-
 // warning: unless search_extable is declared, the return value gets
 // truncated to 32-bits, causing a very strange error in privop handling
 struct exception_table_entry;
@@ -263,6 +249,14 @@ extern char saved_command_line[];
 struct screen_info { };
 #define seq_printf(a,b...) printf(b)
 #define CONFIG_BLK_DEV_INITRD // needed to reserve memory for domain0
+
+//
+#define __smp_processor_id() (current->processor)
+
+// needed for newer ACPI code
+#define asmlinkage
+
+#define FORCE_CRASH()	asm("break 0;;");
 
 // these declarations got moved at some point, find a better place for them
 extern int opt_noht;

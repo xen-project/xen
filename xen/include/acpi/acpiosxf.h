@@ -9,7 +9,7 @@
 
 
 /*
- * Copyright (C) 2000 - 2004, R. Byron Moore
+ * Copyright (C) 2000 - 2005, R. Byron Moore
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -169,17 +169,19 @@ acpi_status
 acpi_os_map_memory (
 	acpi_physical_address           physical_address,
 	acpi_size                       size,
-	void                            **logical_address);
+	void __iomem                  **logical_address);
 
 void
 acpi_os_unmap_memory (
-	void                            *logical_address,
+	void __iomem                  *logical_address,
 	acpi_size                       size);
 
+#ifdef ACPI_FUTURE_USAGE
 acpi_status
 acpi_os_get_physical_address (
 	void                            *logical_address,
 	acpi_physical_address           *physical_address);
+#endif
 
 
 /*
@@ -188,14 +190,14 @@ acpi_os_get_physical_address (
 
 acpi_status
 acpi_os_install_interrupt_handler (
-	u32                             interrupt_number,
-	OSD_HANDLER             service_routine,
+	u32                             gsi,
+	acpi_osd_handler                service_routine,
 	void                            *context);
 
 acpi_status
 acpi_os_remove_interrupt_handler (
-	u32                             interrupt_number,
-	OSD_HANDLER             service_routine);
+	u32                             gsi,
+	acpi_osd_handler                service_routine);
 
 
 /*
@@ -209,13 +211,16 @@ acpi_os_get_thread_id (
 acpi_status
 acpi_os_queue_for_execution (
 	u32                             priority,
-	OSD_EXECUTION_CALLBACK  function,
+	acpi_osd_exec_callback          function,
+	void                            *context);
+
+void
+acpi_os_wait_events_complete (
 	void                            *context);
 
 void
 acpi_os_sleep (
-	u32                             seconds,
-	u32                             milliseconds);
+	acpi_integer                    milliseconds);
 
 void
 acpi_os_stall (
@@ -258,25 +263,28 @@ acpi_os_write_memory (
 
 /*
  * Platform and hardware-independent PCI configuration space access
+ * Note: Can't use "Register" as a parameter, changed to "Reg" --
+ * certain compilers complain.
  */
 
 acpi_status
 acpi_os_read_pci_configuration (
 	struct acpi_pci_id              *pci_id,
-	u32                             register,
+	u32                             reg,
 	void                            *value,
 	u32                             width);
 
 acpi_status
 acpi_os_write_pci_configuration (
 	struct acpi_pci_id              *pci_id,
-	u32                             register,
+	u32                             reg,
 	acpi_integer                    value,
 	u32                             width);
 
 /*
  * Interim function needed for PCI IRQ routing
  */
+
 void
 acpi_os_derive_pci_id(
 	acpi_handle                     rhandle,
@@ -292,12 +300,14 @@ acpi_os_readable (
 	void                            *pointer,
 	acpi_size                       length);
 
+#ifdef ACPI_FUTURE_USAGE
 u8
 acpi_os_writable (
 	void                            *pointer,
 	acpi_size                       length);
+#endif
 
-u32
+u64
 acpi_os_get_timer (
 	void);
 
@@ -329,9 +339,11 @@ acpi_os_redirect_output (
  * Debug input
  */
 
+#ifdef ACPI_FUTURE_USAGE
 u32
 acpi_os_get_line (
 	char                            *buffer);
+#endif
 
 
 /*

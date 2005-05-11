@@ -17,8 +17,8 @@
 #include <xen/console.h>
 #include <xen/serial.h>
 #include <xen/keyhandler.h>
+#include <xen/mm.h>
 #include <asm/uaccess.h>
-#include <asm/mm.h>
 #include <asm/debugger.h>
 #include <asm/io.h>
 

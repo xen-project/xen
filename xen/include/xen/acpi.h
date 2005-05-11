@@ -80,7 +80,7 @@ typedef struct {
 
 struct acpi_table_rsdt {
 	struct acpi_table_header header;
-	u32			entry[1];
+	u32			entry[8];
 } __attribute__ ((packed));
 
 /* Extended System Description Table (XSDT) */
@@ -233,8 +233,27 @@ struct acpi_table_hpet {
 } __attribute__ ((packed));
 
 /*
+ * Simple Boot Flags
+ * http://www.microsoft.com/whdc/hwdev/resources/specs/simp_bios.mspx
+ */
+struct acpi_table_sbf
+{
+	u8 sbf_signature[4];
+	u32 sbf_len;
+	u8 sbf_revision;
+	u8 sbf_csum;
+	u8 sbf_oemid[6];
+	u8 sbf_oemtable[8];
+	u8 sbf_revdata[4];
+	u8 sbf_creator[4];
+	u8 sbf_crearev[4];
+	u8 sbf_cmos;
+	u8 sbf_spare[3];
+} __attribute__ ((packed));
+
+/*
  * System Resource Affinity Table (SRAT)
- *   see http://www.microsoft.com/hwdev/design/srat.htm
+ * http://www.microsoft.com/whdc/hwdev/platform/proc/SRAT.mspx
  */
 
 struct acpi_table_srat {
@@ -309,12 +328,21 @@ struct acpi_table_sbst {
 /* Embedded Controller Boot Resources Table (ECDT) */
 
 struct acpi_table_ecdt {
-	struct acpi_table_header	header;
+	struct acpi_table_header 	header;
 	struct acpi_generic_address	ec_control;
 	struct acpi_generic_address	ec_data;
 	u32				uid;
 	u8				gpe_bit;
 	char				ec_id[0];
+} __attribute__ ((packed));
+
+/* PCI MMCONFIG */
+
+struct acpi_table_mcfg {
+	struct acpi_table_header	header;
+	u8				reserved[8];
+	u32				base_address;
+	u32				base_reserved;
 } __attribute__ ((packed));
 
 /* Table Handlers */
@@ -338,6 +366,7 @@ enum acpi_table_id {
 	ACPI_SSDT,
 	ACPI_SPMI,
 	ACPI_HPET,
+	ACPI_MCFG,
 	ACPI_TABLE_COUNT
 };
 
@@ -345,18 +374,19 @@ typedef int (*acpi_table_handler) (unsigned long phys_addr, unsigned long size);
 
 extern acpi_table_handler acpi_table_ops[ACPI_TABLE_COUNT];
 
-typedef int (*acpi_madt_entry_handler) (acpi_table_entry_header *header);
+typedef int (*acpi_madt_entry_handler) (acpi_table_entry_header *header, const unsigned long end);
 
 char * __acpi_map_table (unsigned long phys_addr, unsigned long size);
 unsigned long acpi_find_rsdp (void);
 int acpi_boot_init (void);
+int acpi_boot_table_init (void);
 int acpi_numa_init (void);
 
 int acpi_table_init (void);
 int acpi_table_parse (enum acpi_table_id id, acpi_table_handler handler);
 int acpi_get_table_header_early (enum acpi_table_id id, struct acpi_table_header **header);
-int acpi_table_parse_madt (enum acpi_madt_entry_id id, acpi_madt_entry_handler handler);
-int acpi_table_parse_srat (enum acpi_srat_entry_id id, acpi_madt_entry_handler handler);
+int acpi_table_parse_madt (enum acpi_madt_entry_id id, acpi_madt_entry_handler handler, unsigned int max_entries);
+int acpi_table_parse_srat (enum acpi_srat_entry_id id, acpi_madt_entry_handler handler, unsigned int max_entries);
 void acpi_table_print (struct acpi_table_header *header, unsigned long phys_addr);
 void acpi_table_print_madt_entry (acpi_table_entry_header *madt);
 void acpi_table_print_srat_entry (acpi_table_entry_header *srat);
@@ -367,15 +397,45 @@ void acpi_numa_processor_affinity_init (struct acpi_table_processor_affinity *pa
 void acpi_numa_memory_affinity_init (struct acpi_table_memory_affinity *ma);
 void acpi_numa_arch_fixup(void);
 
-#else /*!CONFIG_ACPI_BOOT*/
+#ifdef CONFIG_ACPI_HOTPLUG_CPU
+/* Arch dependent functions for cpu hotplug support */
+int acpi_map_lsapic(acpi_handle handle, int *pcpu);
+int acpi_unmap_lsapic(int cpu);
+#endif /* CONFIG_ACPI_HOTPLUG_CPU */
+
+extern int acpi_mp_config;
+
+extern u32 pci_mmcfg_base_addr;
+
+extern int sbf_port ;
+
+#else	/*!CONFIG_ACPI_BOOT*/
+
+#define acpi_mp_config	0
 
 static inline int acpi_boot_init(void)
 {
 	return 0;
 }
 
-#endif /*!CONFIG_ACPI_BOOT*/
+static inline int acpi_boot_table_init(void)
+{
+	return 0;
+}
 
+#endif 	/*!CONFIG_ACPI_BOOT*/
+
+unsigned int acpi_register_gsi (u32 gsi, int edge_level, int active_high_low);
+int acpi_gsi_to_irq (u32 gsi, unsigned int *irq);
+
+/*
+ * This function undoes the effect of one call to acpi_register_gsi().
+ * If this matches the last registration, any IRQ resources for gsi
+ * are freed.
+ */
+#ifdef CONFIG_ACPI_DEALLOCATE_IRQ
+void acpi_unregister_gsi (u32 gsi);
+#endif
 
 #ifdef CONFIG_ACPI_PCI
 
@@ -400,7 +460,11 @@ extern struct acpi_prt_list	acpi_prt;
 struct pci_dev;
 
 int acpi_pci_irq_enable (struct pci_dev *dev);
-int acpi_pci_irq_init (void);
+void acpi_penalize_isa_irq(int irq);
+
+#ifdef CONFIG_ACPI_DEALLOCATE_IRQ
+void acpi_pci_irq_disable (struct pci_dev *dev);
+#endif
 
 struct acpi_pci_driver {
 	struct acpi_pci_driver *next;
@@ -415,14 +479,15 @@ void acpi_pci_unregister_driver(struct acpi_pci_driver *driver);
 
 #ifdef CONFIG_ACPI_EC
 
-int ec_read(u8 addr, u8 *val);
-int ec_write(u8 addr, u8 val);
+extern int ec_read(u8 addr, u8 *val);
+extern int ec_write(u8 addr, u8 val);
 
 #endif /*CONFIG_ACPI_EC*/
 
 #ifdef CONFIG_ACPI_INTERPRETER
 
-int acpi_blacklisted(void);
+extern int acpi_blacklisted(void);
+extern void acpi_bios_year(char *s);
 
 #else /*!CONFIG_ACPI_INTERPRETER*/
 
@@ -432,5 +497,42 @@ static inline int acpi_blacklisted(void)
 }
 
 #endif /*!CONFIG_ACPI_INTERPRETER*/
+
+#define	ACPI_CSTATE_LIMIT_DEFINED	/* for driver builds */
+#ifdef	CONFIG_ACPI
+
+/*
+ * Set highest legal C-state
+ * 0: C0 okay, but not C1
+ * 1: C1 okay, but not C2
+ * 2: C2 okay, but not C3 etc.
+ */
+
+extern unsigned int max_cstate;
+
+static inline unsigned int acpi_get_cstate_limit(void)
+{
+	return max_cstate;
+}
+static inline void acpi_set_cstate_limit(unsigned int new_limit)
+{
+	max_cstate = new_limit;
+	return;
+}
+#else
+static inline unsigned int acpi_get_cstate_limit(void) { return 0; }
+static inline void acpi_set_cstate_limit(unsigned int new_limit) { return; }
+#endif
+
+#ifdef CONFIG_ACPI_NUMA
+int acpi_get_pxm(acpi_handle handle);
+#else
+static inline int acpi_get_pxm(acpi_handle handle)
+{
+	return 0;
+}
+#endif
+
+extern int pnpacpi_disabled;
 
 #endif /*_LINUX_ACPI_H*/

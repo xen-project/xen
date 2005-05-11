@@ -441,4 +441,20 @@ HYPERVISOR_vm_assist(unsigned int cmd, unsigned int type)
     return ret;
 }
 
+static inline int
+HYPERVISOR_boot_vcpu(
+    unsigned long vcpu, vcpu_guest_context_t *ctxt)
+{
+    int ret;
+    unsigned long ign1, ign2;
+
+    __asm__ __volatile__ (
+        TRAP_INSTR
+        : "=a" (ret), "=b" (ign1), "=c" (ign2)
+	: "0" (__HYPERVISOR_boot_vcpu), "1" (vcpu), "2" (ctxt)
+	: "memory");
+
+    return ret;
+}
+
 #endif /* __HYPERVISOR_H__ */

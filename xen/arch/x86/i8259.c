@@ -45,7 +45,7 @@ BUILD_COMMON_IRQ()
 
 /*
  * ISA PIC or low IO-APIC triggered (INTA-cycle or APIC) interrupts:
- * (these are usually mapped to vectors 0x30-0x3f)
+ * (these are usually mapped to vectors 0x20-0x2f)
  */
 BUILD_16_IRQS(0x0)
 
@@ -58,7 +58,7 @@ BUILD_16_IRQS(0x0)
  * of these. Plus, more powerful systems might have more than 64
  * IO-APIC registers.
  *
- * (these are usually mapped into the 0x30-0xff vector range)
+ * (these are usually mapped into the 0x20-0xff vector range)
  */
 BUILD_16_IRQS(0x1) BUILD_16_IRQS(0x2) BUILD_16_IRQS(0x3)
 BUILD_16_IRQS(0x4) BUILD_16_IRQS(0x5) BUILD_16_IRQS(0x6) BUILD_16_IRQS(0x7)
@@ -101,7 +101,7 @@ BUILD_SMP_INTERRUPT(spurious_interrupt,SPURIOUS_APIC_VECTOR)
 	IRQ(x,8), IRQ(x,9), IRQ(x,a), IRQ(x,b), \
 	IRQ(x,c), IRQ(x,d), IRQ(x,e), IRQ(x,f)
 
-    void *interrupt[NR_IRQS] = {
+    void (*interrupt[NR_IRQS])(void) = {
 	IRQLIST_16(0x0),
 
 #ifdef CONFIG_X86_IO_APIC
@@ -341,7 +341,7 @@ void __init init_8259A(int auto_eoi)
      * outb_p - this has to work on a wide range of PC hardware.
      */
     outb_p(0x11, 0x20);	/* ICW1: select 8259A-1 init */
-    outb_p(0x30 + 0, 0x21);	/* ICW2: 8259A-1 IR0-7 mapped to 0x30-0x37 */
+    outb_p(0x20 + 0, 0x21);	/* ICW2: 8259A-1 IR0-7 mapped to 0x20-0x27 */
     outb_p(0x04, 0x21);	/* 8259A-1 (the master) has a slave on IR2 */
     if (auto_eoi)
         outb_p(0x03, 0x21);	/* master does Auto EOI */
@@ -349,7 +349,7 @@ void __init init_8259A(int auto_eoi)
         outb_p(0x01, 0x21);	/* master expects normal EOI */
 
     outb_p(0x11, 0xA0);	/* ICW1: select 8259A-2 init */
-    outb_p(0x30 + 8, 0xA1);	/* ICW2: 8259A-2 IR0-7 mapped to 0x38-0x3f */
+    outb_p(0x20 + 8, 0xA1);	/* ICW2: 8259A-2 IR0-7 mapped to 0x28-0x2f */
     outb_p(0x02, 0xA1);	/* 8259A-2 is a slave on master's IR2 */
     outb_p(0x01, 0xA1);	/* (slave's support for AEOI in flat mode
                            is to be investigated) */

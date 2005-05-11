@@ -115,7 +115,8 @@ asmlinkage void fatal_trap(int trapnr, struct cpu_user_regs *regs)
     if ( trapnr == TRAP_page_fault )
     {
         __asm__ __volatile__ ("mov %%cr2,%0" : "=r" (cr2) : );
-        printk("Faulting linear address might be %p\n", _p(cr2));
+        printk("Faulting linear address: %p\n", _p(cr2));
+        show_page_walk(cr2);
     }
 
     printk("************************************\n");
@@ -271,7 +272,8 @@ asmlinkage int do_page_fault(struct cpu_user_regs *regs)
 
     perfc_incrc(page_faults);
 
-    if ( likely(VM_ASSIST(d, VMASST_TYPE_writable_pagetables)) )
+    if ( likely(VM_ASSIST(d, VMASST_TYPE_writable_pagetables) &&
+                !shadow_mode_enabled(d)) )
     {
         LOCK_BIGLOCK(d);
         if ( unlikely(d->arch.ptwr[PTWR_PT_ACTIVE].l1va) &&
@@ -287,8 +289,6 @@ asmlinkage int do_page_fault(struct cpu_user_regs *regs)
              ((regs->error_code & 3) == 3) && /* write-protection fault */
              ptwr_do_page_fault(d, addr) )
         {
-            if ( unlikely(shadow_mode_enabled(d)) )
-                (void)shadow_fault(addr, regs);
             UNLOCK_BIGLOCK(d);
             return EXCRET_fault_fixed;
         }
@@ -350,7 +350,7 @@ asmlinkage int do_page_fault(struct cpu_user_regs *regs)
     show_page_walk(addr);
     panic("CPU%d FATAL PAGE FAULT\n"
           "[error_code=%04x]\n"
-          "Faulting linear address might be %p\n",
+          "Faulting linear address: %p\n",
           smp_processor_id(), regs->error_code, addr);
     return 0;
 }
@@ -361,13 +361,13 @@ long do_fpu_taskswitch(int set)
 
     if ( set )
     {
-        set_bit(EDF_GUEST_STTS, &ed->ed_flags);
+        set_bit(EDF_GUEST_STTS, &ed->flags);
         stts();
     }
     else
     {
-        clear_bit(EDF_GUEST_STTS, &ed->ed_flags);
-        if ( test_bit(EDF_USEDFPU, &ed->ed_flags) )
+        clear_bit(EDF_GUEST_STTS, &ed->flags);
+        if ( test_bit(EDF_USEDFPU, &ed->flags) )
             clts();
     }
 
@@ -665,7 +665,7 @@ static int emulate_privileged_op(struct cpu_user_regs *regs)
         case 0: /* Read CR0 */
             *reg = 
                 (read_cr0() & ~X86_CR0_TS) | 
-                (test_bit(EDF_GUEST_STTS, &ed->ed_flags) ? X86_CR0_TS : 0);
+                (test_bit(EDF_GUEST_STTS, &ed->flags) ? X86_CR0_TS : 0);
             break;
 
         case 2: /* Read CR2 */
@@ -919,15 +919,15 @@ asmlinkage int math_state_restore(struct cpu_user_regs *regs)
     /* Prevent recursion. */
     clts();
 
-    if ( !test_and_set_bit(EDF_USEDFPU, &current->ed_flags) )
+    if ( !test_and_set_bit(EDF_USEDFPU, &current->flags) )
     {
-        if ( test_bit(EDF_DONEFPUINIT, &current->ed_flags) )
+        if ( test_bit(EDF_DONEFPUINIT, &current->flags) )
             restore_fpu(current);
         else
             init_fpu();
     }
 
-    if ( test_and_clear_bit(EDF_GUEST_STTS, &current->ed_flags) )
+    if ( test_and_clear_bit(EDF_GUEST_STTS, &current->flags) )
     {
         struct trap_bounce *tb = &current->arch.trap_bounce;
         tb->flags = TBF_EXCEPTION;
