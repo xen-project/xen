@@ -111,6 +111,7 @@ int xc_waitdomain_core(int domain,
 typedef struct {
     u32           domid;
     unsigned int  cpu;
+    unsigned int  vcpus;
     unsigned int  dying:1, crashed:1, shutdown:1, 
                   paused:1, blocked:1, running:1;
     unsigned int  shutdown_reason; /* only meaningful if shutdown==1 */
@@ -118,6 +119,8 @@ typedef struct {
     unsigned long shared_info_frame;
     u64           cpu_time;
     unsigned long max_memkb;
+    u32           vcpu_to_cpu[MAX_VIRT_CPUS];
+    cpumap_t      cpumap[MAX_VIRT_CPUS];
 } xc_dominfo_t;
 
 typedef dom0_getdomaininfo_t xc_domaininfo_t;
@@ -167,7 +170,8 @@ int xc_domain_destroy(int xc_handle,
                       u32 domid);
 int xc_domain_pincpu(int xc_handle,
                      u32 domid,
-                     int cpu);
+                     int vcpu,
+                     cpumap_t *cpumap);
 /**
  * This function will return information about one or more domains.
  *

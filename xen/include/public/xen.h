@@ -473,6 +473,8 @@ typedef struct {
 /* For use in guest OSes. */
 extern shared_info_t *HYPERVISOR_shared_info;
 
+typedef u64 cpumap_t;
+
 #endif /* !__ASSEMBLY__ */
 
 #endif /* __XEN_PUBLIC_XEN_H__ */

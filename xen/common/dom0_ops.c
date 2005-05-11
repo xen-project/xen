@@ -221,7 +221,8 @@ long do_dom0_op(dom0_op_t *u_dom0_op)
         domid_t dom = op->u.pincpudomain.domain;
         struct domain *d = find_domain_by_id(dom);
         struct exec_domain *ed;
-        int cpu = op->u.pincpudomain.cpu;
+        cpumap_t curmap, *cpumap = &curmap;
+
 
         if ( d == NULL )
         {
@@ -229,6 +230,14 @@ long do_dom0_op(dom0_op_t *u_dom0_op)
             break;
         }
         
+        if ( (op->u.pincpudomain.exec_domain >= MAX_VIRT_CPUS) ||
+             !d->exec_domain[op->u.pincpudomain.exec_domain] )
+        {
+            ret = -EINVAL;
+            put_domain(d);
+            break;
+        }
+
         ed = d->exec_domain[op->u.pincpudomain.exec_domain];
         if ( ed == NULL )
         {
@@ -244,17 +253,29 @@ long do_dom0_op(dom0_op_t *u_dom0_op)
             break;
         }
 
-        if ( cpu == -1 )
+        if ( copy_from_user(cpumap, 
+                            op->u.pincpudomain.cpumap, sizeof(*cpumap)) )
         {
-            clear_bit(EDF_CPUPINNED, &ed->flags);
+            ret = -EFAULT;
+            put_domain(d);
+            break;
         }
+
+        /* update cpumap for this ed */
+        ed->cpumap = *(cpumap);
+
+        if ( *(cpumap) == CPUMAP_RUNANYWHERE )
+            clear_bit(EDF_CPUPINNED, &ed->flags);
         else
         {
+            /* pick a new cpu from the usable map */
+            int new_cpu = (int)find_first_set_bit(*(cpumap)) % smp_num_cpus;
+
             exec_domain_pause(ed);
-            if ( ed->processor != (cpu % smp_num_cpus) )
+            if ( ed->processor != new_cpu )
                 set_bit(EDF_MIGRATED, &ed->flags);
             set_bit(EDF_CPUPINNED, &ed->flags);
-            ed->processor = cpu % smp_num_cpus;
+            ed->processor = new_cpu;
             exec_domain_unpause(ed);
         }
 
@@ -308,6 +329,12 @@ long do_dom0_op(dom0_op_t *u_dom0_op)
             break;
         }
         
+        memset(&op->u.getdomaininfo.vcpu_to_cpu,-1,MAX_VIRT_CPUS*sizeof(u8));
+        for_each_exec_domain ( d, ed ) {
+            op->u.getdomaininfo.vcpu_to_cpu[ed->id] = ed->processor;
+            op->u.getdomaininfo.cpumap[ed->id]      = ed->cpumap;
+        }
+
         ed = d->exec_domain[op->u.getdomaininfo.exec_domain];
 
         op->u.getdomaininfo.flags =
@@ -325,6 +352,7 @@ long do_dom0_op(dom0_op_t *u_dom0_op)
         op->u.getdomaininfo.tot_pages   = d->tot_pages;
         op->u.getdomaininfo.max_pages   = d->max_pages;
         op->u.getdomaininfo.cpu_time    = ed->cpu_time;
+        op->u.getdomaininfo.n_vcpu      = d->shared_info->n_vcpu;
         op->u.getdomaininfo.shared_info_frame = 
             __pa(d->shared_info) >> PAGE_SHIFT;
 

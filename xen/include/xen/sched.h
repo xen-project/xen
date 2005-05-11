@@ -58,6 +58,8 @@ int  init_event_channels(struct domain *d);
 void destroy_event_channels(struct domain *d);
 int  init_exec_domain_event_channels(struct exec_domain *ed);
 
+
+#define CPUMAP_RUNANYWHERE 0xFFFFFFFF
 struct exec_domain 
 {
     int              id;
@@ -83,6 +85,8 @@ struct exec_domain
     u16              virq_to_evtchn[NR_VIRQS];
 
     atomic_t         pausecnt;
+
+    cpumap_t  cpumap;               /* which cpus this domain can run on */
 
     struct arch_exec_domain arch;
 };

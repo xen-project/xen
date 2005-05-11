@@ -88,6 +88,9 @@ typedef struct {
     memory_t max_pages;
     memory_t shared_info_frame;       /* MFN of shared_info struct */
     u64      cpu_time;
+    u32      n_vcpu;
+    u32      vcpu_to_cpu[MAX_VIRT_CPUS];  /* current mapping   */
+    cpumap_t cpumap[MAX_VIRT_CPUS];       /* allowable mapping */
 } dom0_getdomaininfo_t;
 
 #define DOM0_SETDOMAININFO      13
@@ -170,14 +173,14 @@ typedef struct {
 } dom0_readconsole_t;
 
 /* 
- * Pin Domain to a particular CPU  (use -1 to unpin)
+ * Set which cpus an exec_domain can use
  */
 #define DOM0_PINCPUDOMAIN     20
 typedef struct {
     /* IN variables. */
     domid_t      domain;
     u16          exec_domain;
-    s32          cpu;                 /*  -1 implies unpin */
+    cpumap_t     *cpumap;
 } dom0_pincpudomain_t;
 
 /* Get trace buffers machine base address */

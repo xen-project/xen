@@ -155,15 +155,16 @@ static PyObject *pyxc_domain_pincpu(PyObject *self,
     XcObject *xc = (XcObject *)self;
 
     u32 dom;
-    int cpu = -1;
+    int vcpu = 0;
+    cpumap_t cpumap = 0xFFFFFFFF;
 
-    static char *kwd_list[] = { "dom", "cpu", NULL };
+    static char *kwd_list[] = { "dom", "vcpu", "cpumap", NULL };
 
-    if ( !PyArg_ParseTupleAndKeywords(args, kwds, "i|i", kwd_list, 
-                                      &dom, &cpu) )
+    if ( !PyArg_ParseTupleAndKeywords(args, kwds, "i|ii", kwd_list, 
+                                      &dom, &vcpu, &cpumap) )
         return NULL;
 
-    if ( xc_domain_pincpu(xc->xc_handle, dom, cpu) != 0 )
+    if ( xc_domain_pincpu(xc->xc_handle, dom, vcpu, &cpumap) != 0 )
         return PyErr_SetFromErrno(xc_error);
     
     Py_INCREF(zero);
@@ -175,10 +176,10 @@ static PyObject *pyxc_domain_getinfo(PyObject *self,
                                      PyObject *kwds)
 {
     XcObject *xc = (XcObject *)self;
-    PyObject *list;
+    PyObject *list, *vcpu_list, *cpumap_list, *info_dict;
 
     u32 first_dom = 0;
-    int max_doms = 1024, nr_doms, i;
+    int max_doms = 1024, nr_doms, i, j;
     xc_dominfo_t *info;
 
     static char *kwd_list[] = { "first_dom", "max_doms", NULL };
@@ -195,23 +196,34 @@ static PyObject *pyxc_domain_getinfo(PyObject *self,
     list = PyList_New(nr_doms);
     for ( i = 0 ; i < nr_doms; i++ )
     {
-        PyList_SetItem(
-            list, i, 
-            Py_BuildValue("{s:i,s:i,s:i,s:i,s:i,s:i,s:i,s:i"
-                          ",s:l,s:L,s:l,s:i}",
-                          "dom",       info[i].domid,
-                          "cpu",       info[i].cpu,
-                          "dying",     info[i].dying,
-                          "crashed",   info[i].crashed,
-                          "shutdown",  info[i].shutdown,
-                          "paused",    info[i].paused,
-                          "blocked",   info[i].blocked,
-                          "running",   info[i].running,
-                          "mem_kb",    info[i].nr_pages*4,
-                          "cpu_time",  info[i].cpu_time,
-                          "maxmem_kb", info[i].max_memkb,
-                          "shutdown_reason", info[i].shutdown_reason
-                ));
+        vcpu_list = PyList_New(MAX_VIRT_CPUS);
+        cpumap_list = PyList_New(MAX_VIRT_CPUS);
+        for ( j = 0; j < MAX_VIRT_CPUS; j++ ) {
+            PyList_SetItem( vcpu_list, j, 
+                            Py_BuildValue("i", info[i].vcpu_to_cpu[j]));
+            PyList_SetItem( cpumap_list, j, 
+                            Py_BuildValue("i", info[i].cpumap[j]));
+        }
+                 
+        info_dict = Py_BuildValue("{s:i,s:i,s:i,s:i,s:i,s:i,s:i,s:i,s:i"
+                                  ",s:l,s:L,s:l,s:i}",
+                                  "dom",       info[i].domid,
+                                  "cpu",       info[i].cpu,
+                                  "vcpus",     info[i].vcpus,
+                                  "dying",     info[i].dying,
+                                  "crashed",   info[i].crashed,
+                                  "shutdown",  info[i].shutdown,
+                                  "paused",    info[i].paused,
+                                  "blocked",   info[i].blocked,
+                                  "running",   info[i].running,
+                                  "mem_kb",    info[i].nr_pages*4,
+                                  "cpu_time",  info[i].cpu_time,
+                                  "maxmem_kb", info[i].max_memkb,
+                                  "shutdown_reason", info[i].shutdown_reason);
+        PyDict_SetItemString( info_dict, "vcpu_to_cpu", vcpu_list );
+        PyDict_SetItemString( info_dict, "cpumap", cpumap_list );
+        PyList_SetItem( list, i, info_dict);
+ 
     }
 
     free(info);
@@ -959,9 +971,10 @@ static PyMethodDef pyxc_methods[] = {
     { "domain_pincpu", 
       (PyCFunction)pyxc_domain_pincpu, 
       METH_VARARGS | METH_KEYWORDS, "\n"
-      "Pin a domain to a specified CPU.\n"
-      " dom [int]:     Identifier of domain to be pinned.\n"
-      " cpu [int, -1]: CPU to pin to, or -1 to unpin\n\n"
+      "Pin a VCPU to a specified set CPUs.\n"
+      " dom [int]:     Identifier of domain to which VCPU belongs.\n"
+      " vcpu [int, 0]: VCPU being pinned.\n"
+      " cpumap [int, -1]: Bitmap of usable CPUs.\n\n"
       "Returns: [int] 0 on success; -1 on error.\n" },
 
     { "domain_getinfo", 
@@ -976,6 +989,7 @@ static PyMethodDef pyxc_methods[] = {
       "         domain-id space was reached.\n"
       " dom      [int]: Identifier of domain to which this info pertains\n"
       " cpu      [int]:  CPU to which this domain is bound\n"
+      " vcpus    [int]:  Number of Virtual CPUS in this domain\n"
       " dying    [int]:  Bool - is the domain dying?\n"
       " crashed  [int]:  Bool - has the domain crashed?\n"
       " shutdown [int]:  Bool - has the domain shut itself down?\n"
@@ -986,7 +1000,8 @@ static PyMethodDef pyxc_methods[] = {
       " maxmem_kb [int]: Maximum memory limit, in kilobytes\n"
       " cpu_time [long]: CPU time consumed, in nanoseconds\n"
       " shutdown_reason [int]: Numeric code from guest OS, explaining "
-      "reason why it shut itself down.\n" },
+      "reason why it shut itself down.\n" 
+      " vcpu_to_cpu [[int]]: List that maps VCPUS to CPUS\n" },
 
     { "linux_save", 
       (PyCFunction)pyxc_linux_save, 

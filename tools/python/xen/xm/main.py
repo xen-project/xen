@@ -6,6 +6,8 @@ import os.path
 import sys
 from getopt import getopt
 import socket
+import warnings
+warnings.filterwarnings('ignore', category=FutureWarning)
 
 from xen.xend import PrettyPrint
 from xen.xend import sxp
@@ -340,8 +342,8 @@ class ProgList(Prog):
     name = "list"
     info = """List information about domains."""
 
-    short_options = 'l'
-    long_options = ['long']
+    short_options = 'lv'
+    long_options = ['long','vcpus']
 
     def help(self, args):
         if help:
@@ -350,11 +352,13 @@ class ProgList(Prog):
             Either all domains or the domains given.
 
             -l, --long   Get more detailed information.
+            -v, --vcpus  Show VCPU to CPU mapping.
             """
             return
         
     def main(self, args):
         use_long = 0
+        show_vcpus = 0
         (options, params) = getopt(args[1:],
                                    self.short_options,
                                    self.long_options)
@@ -362,6 +366,8 @@ class ProgList(Prog):
         for (k, v) in options:
             if k in ['-l', '--long']:
                 use_long = 1
+            if k in ['-v', '--vcpus']:
+                show_vcpus = 1
                 
         if n == 0:
             doms = server.xend_domains()
@@ -371,11 +377,13 @@ class ProgList(Prog):
             
         if use_long:
             self.long_list(doms)
+        elif show_vcpus:
+            self.show_vcpus(doms)
         else:
             self.brief_list(doms)
 
     def brief_list(self, doms):
-        print 'Name              Id  Mem(MB)  CPU  State  Time(s)  Console'
+        print 'Name              Id  Mem(MB)  CPU VCPU(s)  State  Time(s)  Console'
         for dom in doms:
             info = server.xend_domain(dom)
             d = {}
@@ -383,6 +391,7 @@ class ProgList(Prog):
             d['name'] = sxp.child_value(info, 'name', '??')
             d['mem'] = int(sxp.child_value(info, 'memory', '0'))
             d['cpu'] = int(sxp.child_value(info, 'cpu', '0'))
+            d['vcpus'] = int(sxp.child_value(info, 'vcpus', '0'))
             d['state'] = sxp.child_value(info, 'state', '??')
             d['cpu_time'] = float(sxp.child_value(info, 'cpu_time', '0'))
             console = sxp.child(info, 'console')
@@ -390,8 +399,26 @@ class ProgList(Prog):
                 d['port'] = sxp.child_value(console, 'console_port')
             else:
                 d['port'] = ''
-            print ("%(name)-16s %(dom)3d  %(mem)7d  %(cpu)3d  %(state)5s  %(cpu_time)7.1f    %(port)4s"
+            print ("%(name)-16s %(dom)3d  %(mem)7d  %(cpu)3d  %(vcpus)5d   %(state)5s  %(cpu_time)7.1f     %(port)4s"
                    % d)
+
+    def show_vcpus(self, doms):
+        print 'Name              Id  VCPU  CPU  CPUMAP'
+        for dom in doms:
+            info = server.xend_domain(dom)
+            vcpu_to_cpu = sxp.child_value(info, 'vcpu_to_cpu', '?').replace('-','')
+            cpumap = sxp.child_value(info, 'cpumap', [])
+            mask = ((int(sxp.child_value(info, 'vcpus', '0')))**2) - 1
+            count = 0
+            for cpu in vcpu_to_cpu:
+                d = {}
+                d['name']   = sxp.child_value(info, 'name', '??')
+                d['dom']    = int(sxp.child_value(info, 'id', '-1'))
+                d['vcpu']   = int(count)
+                d['cpu']    = int(cpu)
+                d['cpumap'] = int(cpumap[count])&mask
+                count = count + 1
+                print ("%(name)-16s %(dom)3d  %(vcpu)4d  %(cpu)3d  0x%(cpumap)x" % d)
 
     def long_list(self, doms):
         for dom in doms:
@@ -474,17 +501,35 @@ xm.prog(ProgUnpause)
 class ProgPincpu(Prog):
     group = 'domain'
     name = "pincpu"
-    info = """Pin a domain to a cpu. """
+    info = """Set which cpus a VCPU can use. """
 
     def help(self, args):
-        print args[0],'DOM CPU'
-        print '\nPin domain DOM to cpu CPU.'
+        print args[0],'DOM VCPU CPUS'
+        print '\nSet which cpus VCPU in domain DOM can use.'
+
+    # convert list of cpus to bitmap integer value
+    def make_map(self, cpulist):
+        cpus = []
+        cpumap = 0
+        for c in cpulist.split(','):
+            if len(c) > 1:
+                (x,y) = c.split('-')
+                for i in range(int(x),int(y)+1):
+                    cpus.append(int(i))
+            else:
+                cpus.append(int(c))
+        cpus.sort()
+        for c in cpus:
+            cpumap = cpumap | 1<<c
+
+        return cpumap
 
     def main(self, args):
-        if len(args) != 3: self.err("%s: Invalid argument(s)" % args[0])
-        dom = args[1]
-        cpu = int(args[2])
-        server.xend_domain_pincpu(dom, cpu)
+        if len(args) != 4: self.err("%s: Invalid argument(s)" % args[0])
+        dom  = args[1]
+        vcpu = int(args[2])
+        cpumap  = self.make_map(args[3]);
+        server.xend_domain_pincpu(dom, vcpu, cpumap)
 
 xm.prog(ProgPincpu)
 

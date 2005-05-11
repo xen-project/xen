@@ -283,6 +283,7 @@ long do_boot_vcpu(unsigned long vcpu, struct vcpu_guest_context *ctxt)
     ed = d->exec_domain[vcpu];
 
     atomic_set(&ed->pausecnt, 0);
+    ed->cpumap = CPUMAP_RUNANYWHERE;
 
     memcpy(&ed->arch, &idle0_exec_domain.arch, sizeof(ed->arch));
 

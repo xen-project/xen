@@ -16,6 +16,8 @@ int xc_domain_create(int xc_handle,
 {
     int err, errno_saved;
     dom0_op_t op;
+    u32 vcpu = 0; /* FIXME, hard coded initial pin to vcpu 0 */
+    cpumap_t cpumap = 1<<cpu;
 
     op.cmd = DOM0_CREATEDOMAIN;
     op.u.createdomain.domain = (domid_t)*pdomid;
@@ -25,7 +27,7 @@ int xc_domain_create(int xc_handle,
     *pdomid = (u16)op.u.createdomain.domain;
 
     if ( (cpu != -1) &&
-         ((err = xc_domain_pincpu(xc_handle, *pdomid, cpu)) != 0) )
+         ((err = xc_domain_pincpu(xc_handle, *pdomid, vcpu, &cpumap)) != 0) )
         goto fail;
 
     if ( (err = xc_domain_setcpuweight(xc_handle, *pdomid, cpu_weight)) != 0 )
@@ -84,13 +86,14 @@ int xc_domain_destroy(int xc_handle,
 
 int xc_domain_pincpu(int xc_handle,
                      u32 domid, 
-                     int cpu)
+                     int vcpu,
+                     cpumap_t *cpumap)
 {
     dom0_op_t op;
     op.cmd = DOM0_PINCPUDOMAIN;
     op.u.pincpudomain.domain = (domid_t)domid;
-    op.u.pincpudomain.exec_domain = 0;
-    op.u.pincpudomain.cpu  = cpu;
+    op.u.pincpudomain.exec_domain = vcpu;
+    op.u.pincpudomain.cpumap  = cpumap;
     return do_dom0_op(xc_handle, &op);
 }
 
@@ -133,6 +136,11 @@ int xc_domain_getinfo(int xc_handle,
         info->max_memkb = op.u.getdomaininfo.max_pages<<(PAGE_SHIFT);
         info->shared_info_frame = op.u.getdomaininfo.shared_info_frame;
         info->cpu_time = op.u.getdomaininfo.cpu_time;
+        info->vcpus = op.u.getdomaininfo.n_vcpu;
+        memcpy(info->vcpu_to_cpu, &op.u.getdomaininfo.vcpu_to_cpu, 
+               MAX_VIRT_CPUS*sizeof(u32));
+        memcpy(info->cpumap, &op.u.getdomaininfo.cpumap, 
+               MAX_VIRT_CPUS*sizeof(cpumap_t));
 
         next_domid = (u16)op.u.getdomaininfo.domain + 1;
         info++;
