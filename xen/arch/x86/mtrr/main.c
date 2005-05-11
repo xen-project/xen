@@ -33,7 +33,6 @@
 
 #include <xen/config.h>
 #include <xen/init.h>
-#include <xen/pci.h>
 #include <xen/slab.h>
 #include <xen/smp.h>
 #include <xen/spinlock.h>
@@ -97,25 +96,6 @@ void set_mtrr_ops(struct mtrr_ops * ops)
 /*  Returns non-zero if we have the write-combining memory type  */
 static int have_wrcomb(void)
 {
-	struct pci_dev *dev;
-	
-	if ((dev = pci_find_class(PCI_CLASS_BRIDGE_HOST << 8, NULL)) != NULL) {
-		/* ServerWorks LE chipsets have problems with write-combining 
-		   Don't allow it and leave room for other chipsets to be tagged */
-		if (dev->vendor == PCI_VENDOR_ID_SERVERWORKS &&
-		    dev->device == PCI_DEVICE_ID_SERVERWORKS_LE) {
-			printk(KERN_INFO "mtrr: Serverworks LE detected. Write-combining disabled.\n");
-			return 0;
-		}
-		/* Intel 450NX errata # 23. Non ascending cachline evictions to
-		   write combining memory may resulting in data corruption */
-		if (dev->vendor == PCI_VENDOR_ID_INTEL &&
-		    dev->device == PCI_DEVICE_ID_INTEL_82451NX)
-		{
-			printk(KERN_INFO "mtrr: Intel 450NX MMC detected. Write-combining disabled.\n");
-			return 0;
-		}
-	}		
 	return (mtrr_if->have_wrcomb ? mtrr_if->have_wrcomb() : 0);
 }
 
