@@ -24,9 +24,9 @@ patches/tmp/ebtables.diff:
 	wget http://www.cl.cam.ac.uk/netos/xen/downloads/ebtables-brnf-5_vs_2.4.27.diff.gz -O- | gunzip -c > $@
 
 $(LINUX_DIR)/include/linux/autoconf.h: patches/tmp/ebtables.diff
-$(LINUX_DIR)/include/linux/autoconf.h: ref-$(OS)-$(LINUX_VER)
+$(LINUX_DIR)/include/linux/autoconf.h: ref-$(OS)-$(LINUX_VER)/.valid-ref
 	rm -rf $(LINUX_DIR)
-	cp -al $< $(LINUX_DIR)
+	cp -al $(<D) $(LINUX_DIR)
 	# Apply arch-xen patches
 	( cd linux-$(LINUX_VER)-xen-sparse ; \
           ./mkbuildtree ../$(LINUX_DIR) )
@@ -45,7 +45,7 @@ $(LINUX_DIR)/include/linux/autoconf.h: ref-$(OS)-$(LINUX_VER)
 	make -C $(LINUX_DIR) ARCH=xen oldconfig
 	make -C $(LINUX_DIR) ARCH=xen dep
 
-clean:
+clean::
 	$(MAKE) -C $(LINUX_DIR) ARCH=xen clean
 
 delete: 

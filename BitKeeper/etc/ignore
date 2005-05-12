@@ -52,6 +52,7 @@ netbsd-*-tools/*
 netbsd-*-xen0/*
 netbsd-*-xenU/*
 netbsd-*.patch
+patches/*/.makedep
 patches/tmp/*
 pristine-*
 ref-*
@@ -90,8 +91,3 @@ xen/tools/figlet/figlet
 xen/xen
 xen/xen-syms
 xen/xen.*
-install/*
-patches/ebtables-brnf-5_vs_2.4.25.diff
-patches/ebtables.diff
-tools/x2d2/minixend
-BLOG
