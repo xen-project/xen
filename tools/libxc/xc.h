@@ -421,7 +421,7 @@ int xc_msr_write(int xc_handle, int cpu_mask, int msr, unsigned int low,
 /**
  * Memory maps a range within one domain to a local address range.  Mappings
  * should be unmapped with munmap and should follow the same rules as mmap
- * regarding page alignment.
+ * regarding page alignment.  Returns NULL on failure.
  *
  * In Linux, the ring queue for the control channel is accessible by mapping
  * the shared_info_frame (from xc_domain_getinfo()) + 2048.  The structure

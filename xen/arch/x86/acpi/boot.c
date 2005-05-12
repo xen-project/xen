@@ -36,25 +36,12 @@
 #include <asm/io.h>
 #include <asm/irq.h>
 #include <asm/mpspec.h>
+#include <mach_apic.h>
+#include <mach_mpparse.h>
 
 int sbf_port;
 #define end_pfn_map max_page
 #define CONFIG_ACPI_PCI
-
-#ifdef	CONFIG_X86_64
-
-static inline void  acpi_madt_oem_check(char *oem_id, char *oem_table_id) { }
-extern void __init clustered_apic_check(void);
-static inline int ioapic_setup_disabled(void) { return 0; }
-
-#else	/* X86 */
-
-#ifdef	CONFIG_X86_LOCAL_APIC
-#include <mach_apic.h>
-#include <mach_mpparse.h>
-#endif	/* CONFIG_X86_LOCAL_APIC */
-
-#endif	/* X86 */
 
 #define BAD_MADT_ENTRY(entry, end) (					    \
 		(!entry) || (unsigned long)entry + sizeof(*entry) > end ||  \

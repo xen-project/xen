@@ -1217,7 +1217,7 @@ static int shadow_mode_table_op(
     int               i, rc = 0;
     struct exec_domain *ed;
 
-    ASSERT(spin_is_locked(&d->arch.shadow_lock));
+    ASSERT(shadow_lock_is_acquired(d));
 
     SH_VLOG("shadow mode table op %lx %lx count %d",
             pagetable_val(d->exec_domain[0]->arch.guest_table),  /* XXX SMP */
@@ -1813,7 +1813,7 @@ shadow_mark_mfn_out_of_sync(struct exec_domain *ed, unsigned long gpfn,
     struct pfn_info *page = &frame_table[mfn];
     struct out_of_sync_entry *entry = shadow_alloc_oos_entry(d);
 
-    ASSERT(spin_is_locked(&d->arch.shadow_lock));
+    ASSERT(shadow_lock_is_acquired(d));
     ASSERT(pfn_valid(mfn));
 
 #ifndef NDEBUG
@@ -1943,7 +1943,7 @@ int __shadow_out_of_sync(struct exec_domain *ed, unsigned long va)
     l2_pgentry_t l2e;
     unsigned long l1pfn, l1mfn;
 
-    ASSERT(spin_is_locked(&d->arch.shadow_lock));
+    ASSERT(shadow_lock_is_acquired(d));
     ASSERT(VALID_M2P(l2pfn));
 
     perfc_incrc(shadow_out_of_sync_calls);
@@ -2127,7 +2127,7 @@ int shadow_remove_all_write_access(
     u32 found = 0, fixups, write_refs;
     unsigned long prediction, predicted_gpfn, predicted_smfn;
 
-    ASSERT(spin_is_locked(&d->arch.shadow_lock));
+    ASSERT(shadow_lock_is_acquired(d));
     ASSERT(VALID_MFN(readonly_gmfn));
 
     perfc_incrc(remove_write_access);
@@ -2245,7 +2245,7 @@ u32 shadow_remove_all_access(struct domain *d, unsigned long forbidden_gmfn)
     if ( unlikely(!shadow_mode_enabled(d)) )
         return 0;
 
-    ASSERT(spin_is_locked(&d->arch.shadow_lock));
+    ASSERT(shadow_lock_is_acquired(d));
     perfc_incrc(remove_all_access);
 
     for (i = 0; i < shadow_ht_buckets; i++)
@@ -2287,7 +2287,7 @@ static int resync_all(struct domain *d, u32 stype)
     int unshadow;
     int changed;
 
-    ASSERT(spin_is_locked(&d->arch.shadow_lock));
+    ASSERT(shadow_lock_is_acquired(d));
 
     for ( entry = d->arch.out_of_sync; entry; entry = entry->next)
     {
@@ -2485,7 +2485,7 @@ void __shadow_sync_all(struct domain *d)
 
     perfc_incrc(shadow_sync_all);
 
-    ASSERT(spin_is_locked(&d->arch.shadow_lock));
+    ASSERT(shadow_lock_is_acquired(d));
 
     // First, remove all write permissions to the page tables
     //

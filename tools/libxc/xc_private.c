@@ -13,18 +13,18 @@ void *xc_map_foreign_batch(int xc_handle, u32 dom, int prot,
     privcmd_mmapbatch_t ioctlx; 
     void *addr;
     addr = mmap(NULL, num*PAGE_SIZE, prot, MAP_SHARED, xc_handle, 0);
-    if ( addr != NULL )
+    if ( addr == MAP_FAILED )
+	return NULL;
+
+    ioctlx.num=num;
+    ioctlx.dom=dom;
+    ioctlx.addr=(unsigned long)addr;
+    ioctlx.arr=arr;
+    if ( ioctl( xc_handle, IOCTL_PRIVCMD_MMAPBATCH, &ioctlx ) < 0 )
     {
-        ioctlx.num=num;
-        ioctlx.dom=dom;
-        ioctlx.addr=(unsigned long)addr;
-        ioctlx.arr=arr;
-        if ( ioctl( xc_handle, IOCTL_PRIVCMD_MMAPBATCH, &ioctlx ) < 0 )
-        {
-            perror("XXXXXXXX");
-            munmap(addr, num*PAGE_SIZE);
-            return 0;
-        }
+	perror("XXXXXXXX");
+	munmap(addr, num*PAGE_SIZE);
+	return NULL;
     }
     return addr;
 
@@ -40,19 +40,19 @@ void *xc_map_foreign_range(int xc_handle, u32 dom,
     privcmd_mmap_entry_t entry; 
     void *addr;
     addr = mmap(NULL, size, prot, MAP_SHARED, xc_handle, 0);
-    if ( addr != NULL )
+    if ( addr == MAP_FAILED )
+	return NULL;
+
+    ioctlx.num=1;
+    ioctlx.dom=dom;
+    ioctlx.entry=&entry;
+    entry.va=(unsigned long) addr;
+    entry.mfn=mfn;
+    entry.npages=(size+PAGE_SIZE-1)>>PAGE_SHIFT;
+    if ( ioctl( xc_handle, IOCTL_PRIVCMD_MMAP, &ioctlx ) < 0 )
     {
-        ioctlx.num=1;
-        ioctlx.dom=dom;
-        ioctlx.entry=&entry;
-        entry.va=(unsigned long) addr;
-        entry.mfn=mfn;
-        entry.npages=(size+PAGE_SIZE-1)>>PAGE_SHIFT;
-        if ( ioctl( xc_handle, IOCTL_PRIVCMD_MMAP, &ioctlx ) < 0 )
-        {
-            munmap(addr, size);
-            return 0;
-        }
+	munmap(addr, size);
+	return NULL;
     }
     return addr;
 }
