@@ -367,6 +367,7 @@
 413cb3b53nyOv1OIeDSsCXhBFDXvJA netbsd-2.0-xen-sparse/sys/nfs/files.nfs
 413aa1d0oNP8HXLvfPuMe6cSroUfSA patches/linux-2.6.11/agpgart.patch
 42372652KCUP-IOH9RN19YQmGhs4aA patches/linux-2.6.11/iomap.patch
+428359d4b3fDYtazwXi4UUmSWaOUew patches/linux-2.6.11/linux-2.6.11.8.patch
 418abc69J3F638vPO9MYoDGeYilxoQ patches/linux-2.6.11/nettel.patch
 3f776bd1Hy9rn69ntXBhPReUFw9IEA tools/Makefile
 40e1b09db5mN69Ijj0X_Eol-S7dXiw tools/Rules.mk
