@@ -311,8 +311,8 @@ xc_ptrace(enum __ptrace_request request, u32 domid, long eaddr, long edata)
 	op.cmd = DOM0_SETDOMAININFO;
 	SET_XC_REGS(((struct gdb_regs *)data), ctxt[VCPU].user_regs);
 	op.u.setdomaininfo.domain = domid;
-	/* XXX need to understand multiple exec_domains */
-	op.u.setdomaininfo.exec_domain = cpu;
+	/* XXX need to understand multiple vcpus */
+	op.u.setdomaininfo.vcpu = cpu;
 	op.u.setdomaininfo.ctxt = &ctxt[cpu];
 	retval = do_dom0_op(xc_handle, &op);
 	if (retval)
@@ -340,7 +340,7 @@ xc_ptrace(enum __ptrace_request request, u32 domid, long eaddr, long edata)
 	ctxt[VCPU].user_regs.eflags |= PSL_T;
 	op.cmd = DOM0_SETDOMAININFO;
 	op.u.setdomaininfo.domain = domid;
-	op.u.setdomaininfo.exec_domain = 0;
+	op.u.setdomaininfo.vcpu = 0;
 	op.u.setdomaininfo.ctxt = &ctxt[cpu];
 	retval = do_dom0_op(xc_handle, &op);	
 	if (retval) {
@@ -357,7 +357,7 @@ xc_ptrace(enum __ptrace_request request, u32 domid, long eaddr, long edata)
 		ctxt[cpu].user_regs.eflags &= ~PSL_T;
 		op.cmd = DOM0_SETDOMAININFO;
 		op.u.setdomaininfo.domain = domid;
-		op.u.setdomaininfo.exec_domain = cpu;
+		op.u.setdomaininfo.vcpu = cpu;
 		op.u.setdomaininfo.ctxt = &ctxt[cpu];
 		retval = do_dom0_op(xc_handle, &op);	
 		if (retval) {

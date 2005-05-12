@@ -95,7 +95,7 @@ typedef struct {
 typedef struct {
     /* IN variables. */
     domid_t                   domain;
-    u16                       exec_domain;
+    u16                       vcpu;
     /* IN/OUT parameters */
     vcpu_guest_context_t *ctxt;
 } dom0_setdomaininfo_t;
@@ -171,13 +171,13 @@ typedef struct {
 } dom0_readconsole_t;
 
 /* 
- * Set which cpus an exec_domain can use
+ * Set which physical cpus a vcpu can execute on.
  */
 #define DOM0_PINCPUDOMAIN     20
 typedef struct {
     /* IN variables. */
     domid_t      domain;
-    u16          exec_domain;
+    u16          vcpu;
     cpumap_t     *cpumap;
 } dom0_pincpudomain_t;
 
@@ -346,7 +346,7 @@ typedef struct {
 #define DOM0_GETVCPUCONTEXT      37
 typedef struct {
     domid_t domain;                   /* domain to be affected */
-    u16     exec_domain;              /* vcpu # */
+    u16     vcpu;                     /* vcpu # */
     vcpu_guest_context_t *ctxt;       /* NB. IN/OUT variable. */
     u64     cpu_time;                 
 } dom0_getvcpucontext_t;

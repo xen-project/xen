@@ -91,8 +91,8 @@ int xc_domain_pincpu(int xc_handle,
 {
     dom0_op_t op;
     op.cmd = DOM0_PINCPUDOMAIN;
-    op.u.pincpudomain.domain = (domid_t)domid;
-    op.u.pincpudomain.exec_domain = vcpu;
+    op.u.pincpudomain.domain  = (domid_t)domid;
+    op.u.pincpudomain.vcpu    = vcpu;
     op.u.pincpudomain.cpumap  = cpumap;
     return do_dom0_op(xc_handle, &op);
 }
@@ -156,8 +156,8 @@ int xc_domain_get_vcpu_context(int xc_handle,
 
     op.cmd = DOM0_GETVCPUCONTEXT;
     op.u.getvcpucontext.domain = (domid_t)domid;
-    op.u.getvcpucontext.exec_domain = (u16)vcpu;
-    op.u.getvcpucontext.ctxt = ctxt;
+    op.u.getvcpucontext.vcpu   = (u16)vcpu;
+    op.u.getvcpucontext.ctxt   = ctxt;
 
     if ( (ctxt != NULL) &&
          ((rc = mlock(ctxt, sizeof(*ctxt))) != 0) )
