@@ -1,11 +1,13 @@
 
+OS           = linux
+
 LINUX_SERIES = 2.6
 
 EXTRAVERSION = xenU
 
 FULLVERSION  = $(LINUX_VER)-$(EXTRAVERSION)
 
-LINUX_DIR    = linux-$(FULLVERSION)
+LINUX_DIR    = $(OS)-$(FULLVERSION)
 
 include buildconfigs/Rules.mk
 
@@ -19,7 +21,7 @@ build: $(LINUX_DIR)/include/linux/autoconf.h
 	fi
 	$(MAKE) -C $(LINUX_DIR) ARCH=xen INSTALL_PATH=$(DESTDIR) install
 
-$(LINUX_DIR)/include/linux/autoconf.h: pristine-linux-$(LINUX_VER)
+$(LINUX_DIR)/include/linux/autoconf.h: ref-$(OS)-$(LINUX_VER)
 	rm -rf $(LINUX_DIR)
 	cp -al $< $(LINUX_DIR)
 	# Apply arch-xen patches
@@ -44,4 +46,4 @@ clean:
 	$(MAKE) -C $(LINUX_DIR) ARCH=xen clean
 
 delete: 
-	rm -rf tmp-linux-$(LINUX_VER) $(LINUX_DIR) 
+	rm -rf tmp-$(OS)-$(LINUX_VER) $(LINUX_DIR) 

@@ -62,6 +62,7 @@ patches/ebtables-brnf-5_vs_2.4.25.diff
 patches/ebtables.diff
 patches/tmp/*
 pristine-*
+ref-*
 tools/*/build/lib*/*.py
 tools/Makefile.smh
 tools/balloon/balloon
@@ -89,8 +90,8 @@ tools/blktap/xen/*
 tools/check/.*
 tools/cmdline/*
 tools/cmdline/xen/*
-tools/gdb/gdb-6.2.1/*
 tools/gdb/gdb-6.2.1-linux-i386-xen/*
+tools/gdb/gdb-6.2.1/*
 tools/ioemu/iodev/device-model
 tools/libxc/xen/*
 tools/misc/cpuperf/cpuperf-perfcntr
