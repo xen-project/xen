@@ -1,5 +1,5 @@
 /*
- *      based on linux-2.6.10/arch/i386/kernel/apic.c
+ *      based on linux-2.6.11/arch/i386/kernel/apic.c
  *
  *  Local APIC handling, local APIC timers
  *
@@ -37,10 +37,13 @@
 #include <mach_apic.h>
 #include <io_ports.h>
 
+/*
+ * Debug level
+ */
+int apic_verbosity;
+
 /* Using APIC to generate smp_local_timer_interrupt? */
 int using_apic_timer = 0;
-
-int apic_verbosity;
 
 static int enabled_via_apicbase;
 
@@ -126,7 +129,8 @@ void __init connect_bsp_APIC(void)
          * PIC mode, enable APIC mode in the IMCR, i.e.
          * connect BSP's local APIC to INT and NMI lines.
          */
-        printk("leaving PIC mode, enabling APIC mode.\n");
+        apic_printk(APIC_VERBOSE, "leaving PIC mode, "
+                    "enabling APIC mode.\n");
         outb(0x70, 0x22);
         outb(0x01, 0x23);
     }
@@ -141,7 +145,8 @@ void disconnect_bsp_APIC(void)
          * interrupts, including IPIs, won't work beyond
          * this point!  The only exception are INIT IPIs.
          */
-        printk("disabling APIC mode, entering PIC mode.\n");
+        apic_printk(APIC_VERBOSE, "disabling APIC mode, "
+                    "entering PIC mode.\n");
         outb(0x70, 0x22);
         outb(0x00, 0x23);
     }
@@ -182,10 +187,10 @@ int __init verify_local_APIC(void)
      * The version register is read-only in a real APIC.
      */
     reg0 = apic_read(APIC_LVR);
-    Dprintk("Getting VERSION: %x\n", reg0);
+    apic_printk(APIC_DEBUG, "Getting VERSION: %x\n", reg0);
     apic_write(APIC_LVR, reg0 ^ APIC_LVR_MASK);
     reg1 = apic_read(APIC_LVR);
-    Dprintk("Getting VERSION: %x\n", reg1);
+    apic_printk(APIC_DEBUG, "Getting VERSION: %x\n", reg1);
 
     /*
      * The two version reads above should print the same
@@ -209,7 +214,7 @@ int __init verify_local_APIC(void)
      * The ID register is read/write in a real APIC.
      */
     reg0 = apic_read(APIC_ID);
-    Dprintk("Getting ID: %x\n", reg0);
+    apic_printk(APIC_DEBUG, "Getting ID: %x\n", reg0);
 
     /*
      * The next two are just to see if we have sane values.
@@ -217,9 +222,9 @@ int __init verify_local_APIC(void)
      * compatibility mode, but most boxes are anymore.
      */
     reg0 = apic_read(APIC_LVT0);
-    Dprintk("Getting LVT0: %x\n", reg0);
+    apic_printk(APIC_DEBUG, "Getting LVT0: %x\n", reg0);
     reg1 = apic_read(APIC_LVT1);
-    Dprintk("Getting LVT1: %x\n", reg1);
+    apic_printk(APIC_DEBUG, "Getting LVT1: %x\n", reg1);
 
     return 1;
 }
@@ -235,20 +240,23 @@ void __init sync_Arb_IDs(void)
      */
     apic_wait_icr_idle();
 
-    Dprintk("Synchronizing Arb IDs.\n");
+    apic_printk(APIC_DEBUG, "Synchronizing Arb IDs.\n");
     apic_write_around(APIC_ICR, APIC_DEST_ALLINC | APIC_INT_LEVELTRIG
                       | APIC_DM_INIT);
 }
 
 extern void __error_in_apic_c (void);
 
+/*
+ * An initial setup of the virtual wire mode.
+ */
 void __init init_bsp_APIC(void)
 {
     unsigned long value, ver;
 
     /*
-     * Don't do the setup now if we have a SMP BIOS as the through-I/O-APIC 
-     * virtual wire mode might be active.
+     * Don't do the setup now if we have a SMP BIOS as the
+     * through-I/O-APIC virtual wire mode might be active.
      */
     if (smp_found_config || !cpu_has_apic)
         return;
@@ -380,10 +388,12 @@ void __init setup_local_APIC (void)
     value = apic_read(APIC_LVT0) & APIC_LVT_MASKED;
     if (!smp_processor_id() && (pic_mode || !value)) {
         value = APIC_DM_EXTINT;
-        printk("enabled ExtINT on CPU#%d\n", smp_processor_id());
+        apic_printk(APIC_VERBOSE, "enabled ExtINT on CPU#%d\n",
+                    smp_processor_id());
     } else {
         value = APIC_DM_EXTINT | APIC_LVT_MASKED;
-        printk("masked ExtINT on CPU#%d\n", smp_processor_id());
+        apic_printk(APIC_VERBOSE, "masked ExtINT on CPU#%d\n",
+                    smp_processor_id());
     }
     apic_write_around(APIC_LVT0, value);
 
@@ -413,8 +423,9 @@ void __init setup_local_APIC (void)
             apic_write(APIC_ESR, 0);
         value = apic_read(APIC_ESR);
         if (value != oldvalue)
-            printk("ESR value before enabling vector: 0x%08lx "
-                "after: 0x%08lx\n", oldvalue, value);
+            apic_printk(APIC_VERBOSE, "ESR value before enabling "
+                        "vector: 0x%08lx  after: 0x%08lx\n",
+                        oldvalue, value);
     } else {
         if (esr_disable)    
             /* 
@@ -424,8 +435,8 @@ void __init setup_local_APIC (void)
              * errors anyway - mbligh
              */
             printk("Leaving ESR disabled.\n");
-        else 
-        printk("No ESR for 82489DX.\n");
+        else
+            printk("No ESR for 82489DX.\n");
     }
 
     if (nmi_watchdog == NMI_LOCAL_APIC)
@@ -436,6 +447,18 @@ void __init setup_local_APIC (void)
  * Detect and enable local APICs on non-SMP boards.
  * Original code written by Keir Fraser.
  */
+
+static void __init apic_set_verbosity(char *str)
+{
+    if (strcmp("debug", str) == 0)
+        apic_verbosity = APIC_DEBUG;
+    else if (strcmp("verbose", str) == 0)
+        apic_verbosity = APIC_VERBOSE;
+    else
+        printk(KERN_WARNING "APIC Verbosity level %s not recognised"
+               " use apic=verbose or apic=debug", str);
+}
+custom_param("apic", apic_set_verbosity);
 
 static int __init detect_init_APIC (void)
 {
@@ -476,8 +499,10 @@ static int __init detect_init_APIC (void)
             enabled_via_apicbase = 1;
         }
     }
-
-    /* The APIC feature bit should now be enabled in `cpuid' */
+    /*
+     * The APIC feature bit should now be enabled
+     * in `cpuid'
+     */
     features = cpuid_edx(1);
     if (!(features & (1 << X86_FEATURE_APIC))) {
         printk("Could not enable APIC!\n");
@@ -520,7 +545,8 @@ void __init init_apic_mappings(void)
         apic_phys = mp_lapic_addr;
 
     set_fixmap_nocache(FIX_APIC_BASE, apic_phys);
-    Dprintk("mapped APIC to %08lx (%08lx)\n", APIC_BASE, apic_phys);
+    apic_printk(APIC_VERBOSE, "mapped APIC to %08lx (%08lx)\n", APIC_BASE,
+                apic_phys);
 
     /*
      * Fetch the APIC ID of the BSP in case we have a
@@ -552,8 +578,8 @@ fake_ioapic_page:
                 ioapic_phys = __pa(ioapic_phys);
             }
             set_fixmap_nocache(idx, ioapic_phys);
-            Dprintk("mapped IOAPIC to %08lx (%08lx)\n",
-                    fix_to_virt(idx), ioapic_phys);
+            apic_printk(APIC_VERBOSE, "mapped IOAPIC to %08lx (%08lx)\n",
+                        __fix_to_virt(idx), ioapic_phys);
             idx++;
         }
     }
@@ -604,37 +630,32 @@ static unsigned int __init get_8254_timer_count(void)
 /* next tick in 8254 can be caught by catching timer wraparound */
 static void __init wait_8254_wraparound(void)
 {
-    unsigned int curr_count, prev_count=~0;
-    int delta;
-
+    unsigned int curr_count, prev_count;
+    
     curr_count = get_8254_timer_count();
-
     do {
         prev_count = curr_count;
         curr_count = get_8254_timer_count();
-        delta = curr_count-prev_count;
 
-        /*
-         * This limit for delta seems arbitrary, but it isn't, it's slightly
-         * above the level of error a buggy Mercury/Neptune chipset timer can
-         * cause.
-         */
-    } while (delta < 300);
+        /* workaround for broken Mercury/Neptune */
+        if (prev_count >= curr_count + 0x100)
+            curr_count = get_8254_timer_count();
+        
+    } while (prev_count >= curr_count);
 }
 
 /*
  * Default initialization for 8254 timers. If we use other timers like HPET,
  * we override this later
  */
-void (*wait_timer_tick)(void) = wait_8254_wraparound;
+void (*wait_timer_tick)(void) __initdata = wait_8254_wraparound;
 
 /*
  * This function sets up the local APIC timer, with a timeout of
  * 'clocks' APIC bus clock. During calibration we actually call
- * this function with a very large value and read the current time after
- * a well defined period of time as expired.
- *
- * Calibration is only performed once, for CPU0!
+ * this function twice on the boot CPU, once with a bogus timeout
+ * value, second time for real. The other (noncalibrating) CPUs
+ * call this function only once, with the real, calibrated value.
  *
  * We do reads before writes even if unnecessary, to get around the
  * P5 APIC double write bug.
@@ -693,7 +714,7 @@ int __init calibrate_APIC_clock(void)
     int i;
     const int LOOPS = HZ/10;
 
-    printk("Calibrating APIC timer for CPU%d...\n",  smp_processor_id());
+    apic_printk(APIC_VERBOSE, "calibrating APIC timer ...\n");
 
     /*
      * Put whatever arbitrary (but long enough) timeout
@@ -730,26 +751,29 @@ int __init calibrate_APIC_clock(void)
      * The APIC bus clock counter is 32 bits only, it
      * might have overflown, but note that we use signed
      * longs, thus no extra care needed.
-     * [underflown to be exact, as the timer counts down ;)]
+     *
+     * underflown to be exact, as the timer counts down ;)
      */
 
     result = (tt1-tt2)*APIC_DIVISOR/LOOPS;
 
     if (cpu_has_tsc)
-        printk("..... CPU clock speed is %ld.%04ld MHz.\n",
-            ((long)(t2-t1)/LOOPS)/(1000000/HZ),
-            ((long)(t2-t1)/LOOPS)%(1000000/HZ));
+        apic_printk(APIC_VERBOSE, "..... CPU clock speed is "
+                    "%ld.%04ld MHz.\n",
+                    ((long)(t2-t1)/LOOPS)/(1000000/HZ),
+                    ((long)(t2-t1)/LOOPS)%(1000000/HZ));
 
-    printk("..... host bus clock speed is %ld.%04ld MHz.\n",
-        result/(1000000/HZ),
-        result%(1000000/HZ));
+    apic_printk(APIC_VERBOSE, "..... host bus clock speed is "
+		"%ld.%04ld MHz.\n",
+		result/(1000000/HZ),
+		result%(1000000/HZ));
 
     /* set up multipliers for accurate timer code */
     bus_freq   = result*HZ;
     bus_cycle  = (u32) (1000000000000LL/bus_freq); /* in pico seconds */
     bus_scale  = (1000*262144)/bus_cycle;
 
-    printk("..... bus_scale = 0x%08X\n", bus_scale);
+    apic_printk(APIC_VERBOSE, "..... bus_scale = 0x%08X\n", bus_scale);
     /* reset APIC to zero timeout value */
     __setup_APIC_LVTT(0);
 
@@ -762,7 +786,6 @@ int __init calibrate_APIC_clock(void)
  */
 void __init setup_APIC_clocks (void)
 {
-    printk("Using local APIC timer interrupts.\n");
     using_apic_timer = 1;
     __cli();
     /* calibrate CPU0 for CPU speed and BUS speed */
@@ -908,7 +931,7 @@ int __init APIC_init_uniprocessor (void)
      * Complain if the BIOS pretends there is one.
      */
     if (!cpu_has_apic && APIC_INTEGRATED(apic_version[boot_cpu_physical_apicid])) {
-        printk("BIOS bug, local APIC #%d not detected!...\n",
+        printk(KERN_ERR "BIOS bug, local APIC #%d not detected!...\n",
                boot_cpu_physical_apicid);
         return -1;
     }
