@@ -5,9 +5,7 @@ LINUX_SERIES = 2.6
 
 EXTRAVERSION = xenU
 
-FULLVERSION  = $(LINUX_VER)-$(EXTRAVERSION)
-
-LINUX_DIR    = $(OS)-$(FULLVERSION)
+LINUX_DIR    = $(OS)-$(LINUX_VER)-$(EXTRAVERSION)
 
 include buildconfigs/Rules.mk
 
@@ -32,8 +30,9 @@ $(LINUX_DIR)/include/linux/autoconf.h: ref-$(OS)-$(LINUX_VER)
 	  sed -e 's/^EXTRAVERSION.*/&-$(EXTRAVERSION)/' Makefile >Mk.tmp ; \
 	  rm -f Makefile ; mv Mk.tmp Makefile )
 	# Re-use config from install dir if one exits else use default config
-	[ -r $(DESTDIR)/boot/config-$(FULLVERSION) ] && \
-	  cp $(DESTDIR)/boot/config-$(FULLVERSION) $(LINUX_DIR)/.config \
+	CONFIG_VERSION=$$(sed -ne 's/^EXTRAVERSION = //p' $(LINUX_DIR)/Makefile); \
+	[ -r $(DESTDIR)/boot/config-$(LINUX_VER)$$CONFIG_VERSION ] && \
+	  cp $(DESTDIR)/boot/config-$(LINUX_VER)$$CONFIG_VERSION $(LINUX_DIR)/.config \
 	  || cp $(LINUX_DIR)/arch/xen/configs/$(EXTRAVERSION)_defconfig_$(TARGET_SUBARCH) \
 		$(LINUX_DIR)/.config
 	$(MAKE) -C $(LINUX_DIR) ARCH=xen oldconfig
