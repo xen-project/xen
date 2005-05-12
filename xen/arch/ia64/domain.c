@@ -626,7 +626,7 @@ int construct_dom0(struct domain *d,
 #ifndef CLONE_DOMAIN0
 	if ( d != dom0 ) 
 	    BUG();
-	if ( test_bit(DF_CONSTRUCTED, &d->flags) ) 
+	if ( test_bit(_DOMF_constructed, &d->domain_flags) ) 
 	    BUG();
 #endif
 
@@ -753,7 +753,7 @@ int construct_dom0(struct domain *d,
 #endif
 	console_endboot(strstr(cmdline, "tty0") != NULL);
 
-	set_bit(DF_CONSTRUCTED, &d->flags);
+	set_bit(_DOMF_constructed, &d->domain_flags);
 
 	new_thread(ed, pkern_entry, 0, 0);
 	// FIXME: Hack for keyboard input
@@ -783,10 +783,10 @@ int construct_domU(struct domain *d,
 	unsigned long pkern_entry;
 
 #ifndef DOMU_AUTO_RESTART
-	if ( test_bit(DF_CONSTRUCTED, &d->flags) ) BUG();
+	if ( test_bit(_DOMF_constructed, &d->domain_flags) ) BUG();
 #endif
 
-	printk("*** LOADING DOMAIN %d ***\n",d->id);
+	printk("*** LOADING DOMAIN %d ***\n",d->domain_id);
 
 	d->max_pages = dom0_size/PAGE_SIZE;	// FIXME: use dom0 size
 	// FIXME: use domain0 command line
@@ -796,13 +796,13 @@ int construct_domU(struct domain *d,
 
 	d->arch.mm = xmalloc(struct mm_struct);
 	if (unlikely(!d->arch.mm)) {
-	    	printk("Can't allocate mm_struct for domain %d\n",d->id);
+	    	printk("Can't allocate mm_struct for domain %d\n",d->domain_id);
 	    	return -ENOMEM;
 	}
 	memset(d->arch.mm, 0, sizeof(*d->arch.mm));
 	d->arch.mm->pgd = pgd_alloc(d->arch.mm);
 	if (unlikely(!d->arch.mm->pgd)) {
-	    	printk("Can't allocate pgd for domain %d\n",d->id);
+	    	printk("Can't allocate pgd for domain %d\n",d->domain_id);
 	    	return -ENOMEM;
 	}
 
@@ -816,7 +816,7 @@ int construct_domU(struct domain *d,
 	loaddomainelfimage(d,image_start);
 	printk("loaddomainelfimage returns\n");
 
-	set_bit(DF_CONSTRUCTED, &d->flags);
+	set_bit(_DOMF_constructed, &d->domain_flags);
 
 	printk("calling new_thread, entry=%p\n",pkern_entry);
 #ifdef DOMU_AUTO_RESTART
@@ -836,7 +836,7 @@ void reconstruct_domU(struct exec_domain *ed)
 {
 	/* re-copy the OS image to reset data values to original */
 	printk("reconstruct_domU: restarting domain %d...\n",
-		ed->domain->id);
+		ed->domain->domain_id);
 	loaddomainelfimage(ed->domain,ed->domain->arch.image_start);
 	new_thread(ed, ed->domain->arch.entry, 0, 0);
 }
@@ -859,7 +859,7 @@ int launch_domainU(unsigned long size)
 	else next++;
 	if (construct_domU(d, (unsigned long)domU_staging_area, size,0,0,0)) {
 		printf("launch_domainU: couldn't construct(id=%d,%lx,%lx)\n",
-			d->id,domU_staging_area,size);
+			d->domain_id,domU_staging_area,size);
 		return 2;
 	}
 	domain_unpause_by_systemcontroller(d);

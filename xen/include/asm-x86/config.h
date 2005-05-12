@@ -275,9 +275,9 @@ extern unsigned long _end; /* standard ELF symbol */
 extern unsigned long xenheap_phys_end; /* user-configurable */
 #endif
 
-#define GDT_VIRT_START(ed)    (PERDOMAIN_VIRT_START + ((ed)->id << PDPT_VCPU_VA_SHIFT))
+#define GDT_VIRT_START(ed)    (PERDOMAIN_VIRT_START + ((ed)->vcpu_id << PDPT_VCPU_VA_SHIFT))
 #define GDT_VIRT_END(ed)      (GDT_VIRT_START(ed) + (64*1024))
-#define LDT_VIRT_START(ed)    (PERDOMAIN_VIRT_START + (64*1024) + ((ed)->id << PDPT_VCPU_VA_SHIFT))
+#define LDT_VIRT_START(ed)    (PERDOMAIN_VIRT_START + (64*1024) + ((ed)->vcpu_id << PDPT_VCPU_VA_SHIFT))
 #define LDT_VIRT_END(ed)      (LDT_VIRT_START(ed) + (64*1024))
 
 #define PDPT_VCPU_SHIFT       5

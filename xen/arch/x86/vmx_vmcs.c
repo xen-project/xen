@@ -165,7 +165,7 @@ void vmx_do_launch(struct exec_domain *ed)
     struct cpu_user_regs *regs = get_cpu_user_regs();
 
     vmx_stts();
-    set_bit(EDF_GUEST_STTS, &ed->flags);
+    set_bit(_VCPUF_guest_stts, &ed->vcpu_flags);
 
     cpu = smp_processor_id();
 

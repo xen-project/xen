@@ -214,7 +214,7 @@ void deliver_pending_interrupt(struct pt_regs *regs)
 		if (vcpu_deliverable_interrupts(ed)) {
 			unsigned long isr = regs->cr_ipsr & IA64_PSR_RI;
 			if (vcpu_timer_pending_early(ed))
-printf("*#*#*#* about to deliver early timer to domain %d!!!\n",ed->domain->id);
+printf("*#*#*#* about to deliver early timer to domain %d!!!\n",ed->domain->domain_id);
 			reflect_interruption(0,isr,0,regs,IA64_EXTINT_VECTOR);
 		}
 	}

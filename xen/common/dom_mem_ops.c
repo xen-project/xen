@@ -29,7 +29,7 @@
             __HYPERVISOR_dom_mem_op,                \
             (_op) | (i << START_EXTENT_SHIFT),      \
             extent_list, nr_extents, extent_order,  \
-            (d == current->domain) ? DOMID_SELF : d->id);
+            (d == current->domain) ? DOMID_SELF : d->domain_id);
 
 static long
 alloc_dom_mem(struct domain *d, 
@@ -95,14 +95,14 @@ free_dom_mem(struct domain *d,
             if ( unlikely((mpfn + j) >= max_page) )
             {
                 DPRINTK("Domain %u page number out of range (%lx >= %lx)\n", 
-                        d->id, mpfn + j, max_page);
+                        d->domain_id, mpfn + j, max_page);
                 return i;
             }
             
             page = &frame_table[mpfn + j];
             if ( unlikely(!get_page(page, d)) )
             {
-                DPRINTK("Bad page free for domain %u\n", d->id);
+                DPRINTK("Bad page free for domain %u\n", d->domain_id);
                 return i;
             }
 

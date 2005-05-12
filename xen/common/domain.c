@@ -39,7 +39,7 @@ struct domain *do_createdomain(domid_t dom_id, unsigned int cpu)
     atomic_set(&d->refcnt, 1);
     atomic_set(&ed->pausecnt, 0);
 
-    d->id          = dom_id;
+    d->domain_id   = dom_id;
     ed->processor  = cpu;
  
     spin_lock_init(&d->time_lock);
@@ -50,7 +50,7 @@ struct domain *do_createdomain(domid_t dom_id, unsigned int cpu)
     INIT_LIST_HEAD(&d->page_list);
     INIT_LIST_HEAD(&d->xenpage_list);
 
-    if ( (d->id != IDLE_DOMAIN_ID) &&
+    if ( (d->domain_id != IDLE_DOMAIN_ID) &&
          ((init_event_channels(d) != 0) || (grant_table_create(d) != 0)) )
     {
         destroy_event_channels(d);
@@ -62,12 +62,12 @@ struct domain *do_createdomain(domid_t dom_id, unsigned int cpu)
     
     sched_add_domain(ed);
 
-    if ( d->id != IDLE_DOMAIN_ID )
+    if ( d->domain_id != IDLE_DOMAIN_ID )
     {
         write_lock(&domlist_lock);
         pd = &domain_list; /* NB. domain_list maintained in order of dom_id. */
         for ( pd = &domain_list; *pd != NULL; pd = &(*pd)->next_in_list )
-            if ( (*pd)->id > d->id )
+            if ( (*pd)->domain_id > d->domain_id )
                 break;
         d->next_in_list = *pd;
         *pd = d;
@@ -88,7 +88,7 @@ struct domain *find_domain_by_id(domid_t dom)
     d = domain_hash[DOMAIN_HASH(dom)];
     while ( d != NULL )
     {
-        if ( d->id == dom )
+        if ( d->domain_id == dom )
         {
             if ( unlikely(!get_domain(d)) )
                 d = NULL;
@@ -107,7 +107,7 @@ void domain_kill(struct domain *d)
     struct exec_domain *ed;
 
     domain_pause(d);
-    if ( !test_and_set_bit(DF_DYING, &d->flags) )
+    if ( !test_and_set_bit(_DOMF_dying, &d->domain_flags) )
     {
         for_each_exec_domain(d, ed)
             sched_rem_domain(ed);
@@ -121,10 +121,10 @@ void domain_crash(void)
 {
     struct domain *d = current->domain;
 
-    if ( d->id == 0 )
+    if ( d->domain_id == 0 )
         BUG();
 
-    set_bit(DF_CRASHED, &d->flags);
+    set_bit(_DOMF_crashed, &d->domain_flags);
 
     send_guest_virq(dom0->exec_domain[0], VIRQ_DOM_EXC);
 
@@ -144,7 +144,7 @@ void domain_shutdown(u8 reason)
 {
     struct domain *d = current->domain;
 
-    if ( d->id == 0 )
+    if ( d->domain_id == 0 )
     {
         extern void machine_restart(char *);
         extern void machine_halt(void);
@@ -164,9 +164,9 @@ void domain_shutdown(u8 reason)
     }
 
     if ( (d->shutdown_code = reason) == SHUTDOWN_crash )
-        set_bit(DF_CRASHED, &d->flags);
+        set_bit(_DOMF_crashed, &d->domain_flags);
     else
-        set_bit(DF_SHUTDOWN, &d->flags);
+        set_bit(_DOMF_shutdown, &d->domain_flags);
 
     send_guest_virq(dom0->exec_domain[0], VIRQ_DOM_EXC);
 
@@ -180,7 +180,7 @@ void domain_destruct(struct domain *d)
     struct domain **pd;
     atomic_t      old, new;
 
-    if ( !test_bit(DF_DYING, &d->flags) )
+    if ( !test_bit(_DOMF_dying, &d->domain_flags) )
         BUG();
 
     /* May be already destructed, or get_domain() can race us. */
@@ -196,7 +196,7 @@ void domain_destruct(struct domain *d)
     while ( *pd != d ) 
         pd = &(*pd)->next_in_list;
     *pd = d->next_in_list;
-    pd = &domain_hash[DOMAIN_HASH(d->id)];
+    pd = &domain_hash[DOMAIN_HASH(d->domain_id)];
     while ( *pd != d ) 
         pd = &(*pd)->next_in_hashbucket;
     *pd = d->next_in_hashbucket;
@@ -217,18 +217,18 @@ void domain_destruct(struct domain *d)
  * of domains other than domain 0. ie. the domains that are being built by 
  * the userspace dom0 domain builder.
  */
-int set_info_guest(struct domain *p, dom0_setdomaininfo_t *setdomaininfo)
+int set_info_guest(struct domain *d, dom0_setdomaininfo_t *setdomaininfo)
 {
     int rc = 0;
     struct vcpu_guest_context *c = NULL;
     unsigned long vcpu = setdomaininfo->exec_domain;
     struct exec_domain *ed; 
 
-    if ( (vcpu >= MAX_VIRT_CPUS) || ((ed = p->exec_domain[vcpu]) == NULL) )
+    if ( (vcpu >= MAX_VIRT_CPUS) || ((ed = d->exec_domain[vcpu]) == NULL) )
         return -EINVAL;
     
-    if (test_bit(DF_CONSTRUCTED, &p->flags) && 
-        !test_bit(EDF_CTRLPAUSE, &ed->flags))
+    if (test_bit(_DOMF_constructed, &d->domain_flags) && 
+        !test_bit(_VCPUF_ctrl_pause, &ed->vcpu_flags))
         return -EINVAL;
 
     if ( (c = xmalloc(struct vcpu_guest_context)) == NULL )
@@ -243,7 +243,7 @@ int set_info_guest(struct domain *p, dom0_setdomaininfo_t *setdomaininfo)
     if ( (rc = arch_set_info_guest(ed, c)) != 0 )
         goto out;
 
-    set_bit(DF_CONSTRUCTED, &p->flags);
+    set_bit(_DOMF_constructed, &d->domain_flags);
 
  out:    
     xfree(c);
@@ -295,7 +295,7 @@ long do_boot_vcpu(unsigned long vcpu, struct vcpu_guest_context *ctxt)
     sched_add_domain(ed);
 
     /* domain_unpause_by_systemcontroller */
-    if ( test_and_clear_bit(EDF_CTRLPAUSE, &ed->flags) )
+    if ( test_and_clear_bit(_VCPUF_ctrl_pause, &ed->vcpu_flags) )
         domain_wake(ed);
 
     xfree(c);

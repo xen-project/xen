@@ -152,7 +152,7 @@ static inline int do_trap(int trapnr, char *str,
 
 #ifndef NDEBUG
     if ( (ed->arch.guest_context.trap_ctxt[trapnr].address == 0) &&
-         (ed->domain->id == 0) )
+         (ed->domain->domain_id == 0) )
         goto xen_fault;
 #endif
 
@@ -326,7 +326,7 @@ asmlinkage int do_page_fault(struct cpu_user_regs *regs)
 
 #ifndef NDEBUG
     if ( (ed->arch.guest_context.trap_ctxt[TRAP_page_fault].address == 0) &&
-         (d->id == 0) )
+         (d->domain_id == 0) )
         goto xen_fault;
 #endif
 
@@ -361,13 +361,13 @@ long do_fpu_taskswitch(int set)
 
     if ( set )
     {
-        set_bit(EDF_GUEST_STTS, &ed->flags);
+        set_bit(_VCPUF_guest_stts, &ed->vcpu_flags);
         stts();
     }
     else
     {
-        clear_bit(EDF_GUEST_STTS, &ed->flags);
-        if ( test_bit(EDF_USEDFPU, &ed->flags) )
+        clear_bit(_VCPUF_guest_stts, &ed->vcpu_flags);
+        if ( test_bit(_VCPUF_fpu_dirtied, &ed->vcpu_flags) )
             clts();
     }
 
@@ -674,7 +674,7 @@ static int emulate_privileged_op(struct cpu_user_regs *regs)
         case 0: /* Read CR0 */
             *reg = 
                 (read_cr0() & ~X86_CR0_TS) | 
-                (test_bit(EDF_GUEST_STTS, &ed->flags) ? X86_CR0_TS : 0);
+                (test_bit(_VCPUF_guest_stts, &ed->vcpu_flags) ? X86_CR0_TS:0);
             break;
 
         case 2: /* Read CR2 */
@@ -808,7 +808,7 @@ asmlinkage int do_general_protection(struct cpu_user_regs *regs)
 
 #ifndef NDEBUG
     if ( (ed->arch.guest_context.trap_ctxt[TRAP_gp_fault].address == 0) &&
-         (ed->domain->id == 0) )
+         (ed->domain->domain_id == 0) )
         goto gp_in_kernel;
 #endif
 
@@ -922,7 +922,7 @@ asmlinkage int math_state_restore(struct cpu_user_regs *regs)
 
     setup_fpu(current);
 
-    if ( test_and_clear_bit(EDF_GUEST_STTS, &current->flags) )
+    if ( test_and_clear_bit(_VCPUF_guest_stts, &current->vcpu_flags) )
     {
         struct trap_bounce *tb = &current->arch.trap_bounce;
         tb->flags = TBF_EXCEPTION;

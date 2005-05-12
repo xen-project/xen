@@ -234,21 +234,21 @@ void context_switch(struct exec_domain *prev, struct exec_domain *next)
 {
 //printk("@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@\n");
 //printk("@@@@@@ context switch from domain %d (%x) to domain %d (%x)\n",
-//prev->domain->id,(long)prev&0xffffff,next->domain->id,(long)next&0xffffff);
-//if (prev->domain->id == 1 && next->domain->id == 0) cs10foo();
-//if (prev->domain->id == 0 && next->domain->id == 1) cs01foo();
-//printk("@@sw %d->%d\n",prev->domain->id,next->domain->id);
+//prev->domain->domain_id,(long)prev&0xffffff,next->domain->domain_id,(long)next&0xffffff);
+//if (prev->domain->domain_id == 1 && next->domain->domain_id == 0) cs10foo();
+//if (prev->domain->domain_id == 0 && next->domain->domain_id == 1) cs01foo();
+//printk("@@sw %d->%d\n",prev->domain->domain_id,next->domain->domain_id);
 	switch_to(prev,next,prev);
 // leave this debug for now: it acts as a heartbeat when more than
 // one domain is active
 {
 static long cnt[16] = { 50,50,50,50,50,50,50,50,50,50,50,50,50,50,50,50};
 static int i = 100;
-int id = ((struct exec_domain *)current)->domain->id & 0xf;
+int id = ((struct exec_domain *)current)->domain->domain_id & 0xf;
 if (!cnt[id]--) { printk("%x",id); cnt[id] = 50; }
 if (!i--) { printk("+",id); cnt[id] = 100; }
 }
-	clear_bit(EDF_RUNNING, &prev->flags);
+	clear_bit(_VCPUF_running, &prev->vcpu_flags);
 	//if (!is_idle_task(next->domain) )
 		//send_guest_virq(next, VIRQ_TIMER);
 	load_region_regs(current);
@@ -271,15 +271,15 @@ void panic_domain(struct pt_regs *regs, const char *fmt, ...)
     
 loop:
 	printf("$$$$$ PANIC in domain %d (k6=%p): ",
-		ed->domain->id, ia64_get_kr(IA64_KR_CURRENT));
+		ed->domain->domain_id, ia64_get_kr(IA64_KR_CURRENT));
 	va_start(args, fmt);
 	(void)vsnprintf(buf, sizeof(buf), fmt, args);
 	va_end(args);
 	printf(buf);
 	if (regs) show_registers(regs);
 	domain_pause_by_systemcontroller(current->domain);
-	set_bit(DF_CRASHED, ed->domain->flags);
-	if (ed->domain->id == 0) {
+	set_bit(_DOMF_crashed, ed->domain->domain_flags);
+	if (ed->domain->domain_id == 0) {
 		int i = 1000000000L;
 		// if domain0 crashes, just periodically print out panic
 		// message to make post-mortem easier

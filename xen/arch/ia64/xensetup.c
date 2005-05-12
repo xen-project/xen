@@ -262,7 +262,7 @@ printk("About to call init_idle_task()\n");
     if ( dom0 == NULL )
         panic("Error creating domain 0\n");
 
-    set_bit(DF_PRIVILEGED, &dom0->flags);
+    set_bit(_DOMF_privileged, &dom0->domain_flags);
 
     /*
      * We're going to setup domain0 using the module(s) that we stashed safely

@@ -122,9 +122,9 @@ int construct_dom0(struct domain *d,
     extern void translate_l2pgtable(struct domain *d, l1_pgentry_t *p2m, unsigned long l2mfn);
 
     /* Sanity! */
-    if ( d->id != 0 ) 
+    if ( d->domain_id != 0 ) 
         BUG();
-    if ( test_bit(DF_CONSTRUCTED, &d->flags) ) 
+    if ( test_bit(_DOMF_constructed, &d->domain_flags) ) 
         BUG();
 
     memset(&dsi, 0, sizeof(struct domain_setup_info));
@@ -550,7 +550,7 @@ int construct_dom0(struct domain *d,
     /* DOM0 gets access to everything. */
     physdev_init_dom0(d);
 
-    set_bit(DF_CONSTRUCTED, &d->flags);
+    set_bit(_DOMF_constructed, &d->domain_flags);
 
     new_thread(ed, dsi.v_kernentry, vstack_end, vstartinfo_start);
 

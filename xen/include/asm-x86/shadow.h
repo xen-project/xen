@@ -317,7 +317,7 @@ extern int shadow_status_noswap;
 #ifdef VERBOSE
 #define SH_LOG(_f, _a...)                                               \
     printk("DOM%uP%u: SH_LOG(%d): " _f "\n",                            \
-       current->domain->id , current->processor, __LINE__ , ## _a )
+       current->domain->domain_id , current->processor, __LINE__ , ## _a )
 #else
 #define SH_LOG(_f, _a...) ((void)0)
 #endif
@@ -325,7 +325,7 @@ extern int shadow_status_noswap;
 #if SHADOW_VERBOSE_DEBUG
 #define SH_VLOG(_f, _a...)                                              \
     printk("DOM%uP%u: SH_VLOG(%d): " _f "\n",                           \
-           current->domain->id, current->processor, __LINE__ , ## _a )
+           current->domain->domain_id, current->processor, __LINE__ , ## _a )
 #else
 #define SH_VLOG(_f, _a...) ((void)0)
 #endif
@@ -333,7 +333,7 @@ extern int shadow_status_noswap;
 #if SHADOW_VVERBOSE_DEBUG
 #define SH_VVLOG(_f, _a...)                                             \
     printk("DOM%uP%u: SH_VVLOG(%d): " _f "\n",                          \
-           current->domain->id, current->processor, __LINE__ , ## _a )
+           current->domain->domain_id, current->processor, __LINE__ , ## _a )
 #else
 #define SH_VVLOG(_f, _a...) ((void)0)
 #endif
@@ -341,7 +341,7 @@ extern int shadow_status_noswap;
 #if SHADOW_VVVERBOSE_DEBUG
 #define SH_VVVLOG(_f, _a...)                                            \
     printk("DOM%uP%u: SH_VVVLOG(%d): " _f "\n",                         \
-           current->domain->id, current->processor, __LINE__ , ## _a )
+           current->domain->domain_id, current->processor, __LINE__ , ## _a )
 #else
 #define SH_VVVLOG(_f, _a...) ((void)0)
 #endif
@@ -349,7 +349,7 @@ extern int shadow_status_noswap;
 #if FULLSHADOW_DEBUG
 #define FSH_LOG(_f, _a...)                                              \
     printk("DOM%uP%u: FSH_LOG(%d): " _f "\n",                           \
-           current->domain->id, current->processor, __LINE__ , ## _a )
+           current->domain->domain_id, current->processor, __LINE__ , ## _a )
 #else
 #define FSH_LOG(_f, _a...) ((void)0)
 #endif
@@ -384,7 +384,8 @@ shadow_get_page_from_l1e(l1_pgentry_t l1e, struct domain *d)
         res = get_page_from_l1e(nl1e, owner);
         printk("tried to map mfn %lx from domain %d into shadow page tables "
                "of domain %d; %s\n",
-               mfn, owner->id, d->id, res ? "success" : "failed");
+               mfn, owner->domain_id, d->domain_id,
+               res ? "success" : "failed");
     }
 
     if ( unlikely(!res) )
@@ -1189,7 +1190,7 @@ static inline unsigned long __shadow_status(
         {
             printk("d->id=%d gpfn=%lx gmfn=%lx stype=%lx c=%x t=%x "
                    "mfn_out_of_sync(gmfn)=%d mfn_is_page_table(gmfn)=%d\n",
-                   d->id, gpfn, gmfn, stype,
+                   d->domain_id, gpfn, gmfn, stype,
                    frame_table[gmfn].count_info,
                    frame_table[gmfn].u.inuse.type_info,
                    mfn_out_of_sync(gmfn), mfn_is_page_table(gmfn));

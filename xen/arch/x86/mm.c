@@ -106,7 +106,7 @@
 #ifdef VERBOSE
 #define MEM_LOG(_f, _a...)                           \
   printk("DOM%u: (file=mm.c, line=%d) " _f "\n", \
-         current->domain->id , __LINE__ , ## _a )
+         current->domain->domain_id , __LINE__ , ## _a )
 #else
 #define MEM_LOG(_f, _a...) ((void)0)
 #endif
@@ -183,7 +183,7 @@ void arch_init_memory(void)
      */
     dom_xen = alloc_domain_struct();
     atomic_set(&dom_xen->refcnt, 1);
-    dom_xen->id = DOMID_XEN;
+    dom_xen->domain_id = DOMID_XEN;
 
     /*
      * Initialise our DOMID_IO domain.
@@ -192,7 +192,7 @@ void arch_init_memory(void)
      */
     dom_io = alloc_domain_struct();
     atomic_set(&dom_io->refcnt, 1);
-    dom_io->id = DOMID_IO;
+    dom_io->domain_id = DOMID_IO;
 
     /* First 1MB of RAM is historically marked as I/O. */
     for ( i = 0; i < 0x100; i++ )
@@ -1162,7 +1162,7 @@ void put_page_type(struct pfn_info *page)
          * See domain.c:relinquish_list().
          */
         ASSERT((x & PGT_validated) || 
-               test_bit(DF_DYING, &page_get_owner(page)->flags));
+               test_bit(_DOMF_dying, &page_get_owner(page)->domain_flags));
 
         if ( unlikely((nx & PGT_count_mask) == 0) )
         {
@@ -1392,7 +1392,7 @@ static int set_foreigndom(unsigned int cpu, domid_t domid)
             percpu_info[cpu].foreign = dom_io;
             break;
         default:
-            MEM_LOG("Dom %u cannot set foreign dom\n", d->id);
+            MEM_LOG("Dom %u cannot set foreign dom\n", d->domain_id);
             okay = 0;
             break;
         }
@@ -1645,7 +1645,7 @@ int do_mmuext_op(
             if ( shadow_mode_external(d) )
             {
                 MEM_LOG("ignoring SET_LDT hypercall from external "
-                        "domain %u\n", d->id);
+                        "domain %u\n", d->domain_id);
                 okay = 0;
                 break;
             }
@@ -1676,7 +1676,7 @@ int do_mmuext_op(
         case MMUEXT_REASSIGN_PAGE:
             if ( unlikely(!IS_PRIV(d)) )
             {
-                MEM_LOG("Dom %u has no reassignment priv", d->id);
+                MEM_LOG("Dom %u has no reassignment priv", d->domain_id);
                 okay = 0;
                 break;
             }
@@ -1711,13 +1711,13 @@ int do_mmuext_op(
              * it is dying. 
              */
             ASSERT(e->tot_pages <= e->max_pages);
-            if ( unlikely(test_bit(DF_DYING, &e->flags)) ||
+            if ( unlikely(test_bit(_DOMF_dying, &e->domain_flags)) ||
                  unlikely(e->tot_pages == e->max_pages) ||
                  unlikely(IS_XEN_HEAP_FRAME(page)) )
             {
                 MEM_LOG("Transferee has no reservation headroom (%d,%d), or "
                         "page is in Xen heap (%lx), or dom is dying (%ld).\n",
-                        e->tot_pages, e->max_pages, op.mfn, e->flags);
+                        e->tot_pages, e->max_pages, op.mfn, e->domain_flags);
                 okay = 0;
                 goto reassign_fail;
             }
@@ -1738,7 +1738,7 @@ int do_mmuext_op(
                 {
                     MEM_LOG("Bad page values %lx: ed=%p(%u), sd=%p,"
                             " caf=%08x, taf=%08x\n", page_to_pfn(page),
-                            d, d->id, unpickle_domptr(_nd), x,
+                            d, d->domain_id, unpickle_domptr(_nd), x,
                             page->u.inuse.type_info);
                     okay = 0;
                     goto reassign_fail;
@@ -1990,7 +1990,7 @@ int do_mmu_update(
             {
                 shadow_lock(FOREIGNDOM);
                 printk("privileged guest dom%d requests pfn=%lx to map mfn=%lx for dom%d\n",
-                       d->id, gpfn, mfn, FOREIGNDOM->id);
+                       d->domain_id, gpfn, mfn, FOREIGNDOM->domain_id);
                 set_machinetophys(mfn, gpfn);
                 set_p2m_entry(FOREIGNDOM, gpfn, mfn, &sh_mapcache, &mapcache);
                 okay = 1;
@@ -2452,7 +2452,7 @@ int revalidate_l1(struct domain *d, l1_pgentry_t *l1page, l1_pgentry_t *snapshot
     int modified = 0, i;
 
 #if 0
-    if ( d->id )
+    if ( d->domain_id )
         printk("%s: l1page mfn=%lx snapshot mfn=%lx\n", __func__,
                l1e_get_pfn(linear_pg_table[l1_linear_offset((unsigned long)l1page)]),
                l1e_get_pfn(linear_pg_table[l1_linear_offset((unsigned long)snapshot)]));
@@ -2909,7 +2909,7 @@ void ptwr_destroy(struct domain *d)
             {
                 MEM_LOG("Bad page values %p: ed=%p(%u), sd=%p,"
                         " caf=%08x, taf=%08x\n", page_to_pfn(page),
-                        d, d->id, unpickle_domptr(_nd), x, 
+                        d, d->domain_id, unpickle_domptr(_nd), x, 
                         page->u.inuse.type_info);
                 spin_unlock(&d->page_alloc_lock);
                 put_domain(e);
@@ -2939,7 +2939,7 @@ void ptwr_destroy(struct domain *d)
          * Also, a domain mustn't have PGC_allocated pages when it is dying.
          */
         ASSERT(e->tot_pages <= e->max_pages);
-        if ( unlikely(test_bit(DF_DYING, &e->flags)) ||
+        if ( unlikely(test_bit(_DOMF_dying, &e->domain_flags)) ||
              unlikely(e->tot_pages == e->max_pages) ||
              unlikely(!gnttab_prepare_for_transfer(e, d, gntref)) )
         {

@@ -21,8 +21,8 @@
 
 #define IDLE0_DOMAIN(_t)             \
 {                                    \
-    id:          IDLE_DOMAIN_ID,     \
-    flags:     1<<DF_IDLETASK,       \
+    domain_id:   IDLE_DOMAIN_ID,     \
+    domain_flags:DOMF_idle_domain,   \
     refcnt:      ATOMIC_INIT(1)      \
 }
 
