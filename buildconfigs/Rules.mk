@@ -55,7 +55,9 @@ pristine-%: %.tar.bz2
 	touch $@ # update timestamp to avoid rebuild
 	@rm -rf tmp-$(@F)
 
-OS_PATCHES = $(shell echo patches/$(OS)-$(OS_VER)/*.patch)
+OS_PATCHES = $(shell if [[ -e patches/$(OS)-$(OS_VER) ]]; then \
+               echo patches/$(OS)-$(OS_VER)/*.patch; fi)
+
 
 ref-%: pristine-% $(OS_PATCHES)
 	rm -rf $@
