@@ -221,7 +221,7 @@ int set_info_guest(struct domain *d, dom0_setdomaininfo_t *setdomaininfo)
 {
     int rc = 0;
     struct vcpu_guest_context *c = NULL;
-    unsigned long vcpu = setdomaininfo->exec_domain;
+    unsigned long vcpu = setdomaininfo->vcpu;
     struct exec_domain *ed; 
 
     if ( (vcpu >= MAX_VIRT_CPUS) || ((ed = d->exec_domain[vcpu]) == NULL) )
