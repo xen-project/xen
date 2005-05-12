@@ -41,6 +41,12 @@ netbsd-%-xen-kernel-$(NETBSD_CVSSNAP).tar.bz2:
 netbsd-%.tar.bz2: netbsd-%-xen-kernel-$(NETBSD_CVSSNAP).tar.bz2
 	ln -fs $< $@
 
+ifeq ($(OS),linux)
+OS_VER = $(LINUX_VER)
+else
+OS_VER = $(NETBSD_VER)
+endif
+
 pristine-%: %.tar.bz2
 	rm -rf tmp-$(@F) $@
 	mkdir -p tmp-$(@F)
@@ -48,9 +54,17 @@ pristine-%: %.tar.bz2
 	mv tmp-$(@F)/* $@
 	touch $@ # update timestamp to avoid rebuild
 	@rm -rf tmp-$(@F)
+
+OS_PATCHES = $(shell echo patches/$(OS)-$(OS_VER)/*.patch)
+
+ref-%: pristine-% $(OS_PATCHES)
+	rm -rf $@
+	cp -al $< tmp-$(@F)
 	[ -d patches/$* ] && \
-	  for i in patches/$*/*.patch ; do ( cd $@ ; patch -p1 <../$$i ) ; done || \
+	  for i in patches/$*/*.patch ; do ( cd tmp-$(@F) ; patch -p1 <../$$i ) ; done || \
 	  true
+	mv tmp-$(@F) $@
+	touch $@ # update timestamp to avoid rebuild
 
 %-build:
 	$(MAKE) -f buildconfigs/mk.$* build
@@ -61,7 +75,7 @@ pristine-%: %.tar.bz2
 %-clean:
 	$(MAKE) -f buildconfigs/mk.$* clean
 
-%-xen.patch: pristine-%
+%-xen.patch: ref-%
 	rm -rf tmp-$@
 	cp -al $< tmp-$@
 	( cd $*-xen-sparse && ./mkbuildtree ../tmp-$@ )	
@@ -69,7 +83,7 @@ pristine-%: %.tar.bz2
 	rm -rf tmp-$@
 
 %-mrproper: %-mrproper-extra
-	rm -rf pristine-$* $*.tar.bz2
+	rm -rf pristine-$* ref-$* $*.tar.bz2
 	rm -rf $*-xen.patch
 
 netbsd-%-mrproper-extra:

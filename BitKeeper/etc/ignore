@@ -54,6 +54,7 @@ netbsd-*-xenU/*
 netbsd-*.patch
 patches/tmp/*
 pristine-*
+ref-*
 tools/*/build/lib*/*.py
 tools/balloon/balloon
 tools/check/.*
