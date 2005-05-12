@@ -24,9 +24,9 @@ netbsd-%-tools: netbsd-%-tools.tar.bz2
 	tar -jxf $<
 	touch $@ # update timestamp to avoid rebuild
 
-$(NETBSD_DIR)/.valid: ref-$(OS)-$(NETBSD_VER)
+$(NETBSD_DIR)/.valid: ref-$(OS)-$(NETBSD_VER)/.valid-ref
 	$(RM) -rf $(NETBSD_DIR)
-	cp -al $< $(NETBSD_DIR)
+	cp -al $(<D) $(NETBSD_DIR)
 	# Apply arch-xen patches
 	( cd netbsd-$(NETBSD_VER)-xen-sparse ; \
           ./mkbuildtree ../$(NETBSD_DIR) )
@@ -38,7 +38,7 @@ netbsd-xen%: $(NETBSD_DIR)/.valid netbsd-$(NETBSD_RELEASE)-tools
 	$(MAKE) -C netbsd-$(FULLVERSION) netbsd
 	$(MAKE) -C netbsd-$(FULLVERSION) INSTALL_PATH=$(DESTDIR) INSTALL_NAME=boot/netbsd-$(NETBSD_VER)-xen$* install
 
-clean:
+clean::
 	$(MAKE) -C netbsd-$(FULLVERSION) clean
 
 delete:

@@ -19,9 +19,9 @@ build: $(LINUX_DIR)/include/linux/autoconf.h
 	fi
 	$(MAKE) -C $(LINUX_DIR) ARCH=xen INSTALL_PATH=$(DESTDIR) install
 
-$(LINUX_DIR)/include/linux/autoconf.h: ref-$(OS)-$(LINUX_VER)
+$(LINUX_DIR)/include/linux/autoconf.h: ref-$(OS)-$(LINUX_VER)/.valid-ref
 	rm -rf $(LINUX_DIR)
-	cp -al $< $(LINUX_DIR)
+	cp -al $(<D) $(LINUX_DIR)
 	# Apply arch-xen patches
 	( cd linux-$(LINUX_VER)-xen-sparse ; \
           ./mkbuildtree ../$(LINUX_DIR) )
@@ -37,7 +37,7 @@ $(LINUX_DIR)/include/linux/autoconf.h: ref-$(OS)-$(LINUX_VER)
 		$(LINUX_DIR)/.config
 	$(MAKE) -C $(LINUX_DIR) ARCH=xen oldconfig
 
-clean:
+clean::
 	$(MAKE) -C $(LINUX_DIR) ARCH=xen clean
 
 delete: 
