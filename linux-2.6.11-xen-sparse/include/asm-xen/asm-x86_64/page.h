@@ -92,6 +92,7 @@ typedef struct { unsigned long pgprot; } pgprot_t;
 
 #define pte_val(x)	(((x).pte & 1) ? machine_to_phys((x).pte) : \
 			 (x).pte)
+#define pte_val_ma(x)	((x).pte)
 
 static inline unsigned long pmd_val(pmd_t x)
 {
