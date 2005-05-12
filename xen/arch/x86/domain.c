@@ -100,7 +100,7 @@ void startup_cpu_idle_loop(void)
     struct exec_domain *ed = current;
 
     /* Just some sanity to ensure that the scheduler is set up okay. */
-    ASSERT(ed->domain->id == IDLE_DOMAIN_ID);
+    ASSERT(ed->domain->domain_id == IDLE_DOMAIN_ID);
     percpu_ctxt[smp_processor_id()].curr_ed = ed;
     set_bit(smp_processor_id(), &ed->domain->cpuset);
     domain_unpause_by_systemcontroller(ed->domain);
@@ -246,13 +246,13 @@ void arch_do_createdomain(struct exec_domain *ed)
 
     ed->arch.flags = TF_kernel_mode;
 
-    if ( d->id != IDLE_DOMAIN_ID )
+    if ( d->domain_id != IDLE_DOMAIN_ID )
     {
         ed->arch.schedule_tail = continue_nonidle_task;
 
         d->shared_info = (void *)alloc_xenheap_page();
         memset(d->shared_info, 0, PAGE_SIZE);
-        ed->vcpu_info = &d->shared_info->vcpu_data[ed->id];
+        ed->vcpu_info = &d->shared_info->vcpu_data[ed->vcpu_id];
         ed->cpumap = CPUMAP_RUNANYWHERE;
         SHARE_PFN_WITH_DOMAIN(virt_to_page(d->shared_info), d);
         machine_to_phys_mapping[virt_to_phys(d->shared_info) >> 
@@ -295,7 +295,7 @@ void arch_do_boot_vcpu(struct exec_domain *ed)
     struct domain *d = ed->domain;
     ed->arch.schedule_tail = d->exec_domain[0]->arch.schedule_tail;
     ed->arch.perdomain_ptes = 
-        d->arch.mm_perdomain_pt + (ed->id << PDPT_VCPU_SHIFT);
+        d->arch.mm_perdomain_pt + (ed->vcpu_id << PDPT_VCPU_SHIFT);
     ed->arch.flags = TF_kernel_mode;
 }
 
@@ -399,9 +399,9 @@ int arch_set_info_guest(
                 return -EINVAL;
     }
 
-    clear_bit(EDF_DONEFPUINIT, &ed->flags);
+    clear_bit(_VCPUF_fpu_initialised, &ed->vcpu_flags);
     if ( c->flags & VGCF_I387_VALID )
-        set_bit(EDF_DONEFPUINIT, &ed->flags);
+        set_bit(_VCPUF_fpu_initialised, &ed->vcpu_flags);
 
     ed->arch.flags &= ~TF_kernel_mode;
     if ( c->flags & VGCF_IN_KERNEL )
@@ -419,7 +419,7 @@ int arch_set_info_guest(
         ed->arch.guest_context.user_regs.eflags |= EF_IE;
     }
 
-    if ( test_bit(EDF_DONEINIT, &ed->flags) )
+    if ( test_bit(_VCPUF_initialised, &ed->vcpu_flags) )
         return 0;
 
     if ( (rc = (int)set_fast_trap(ed, c->fast_trap_idx)) != 0 )
@@ -430,7 +430,7 @@ int arch_set_info_guest(
     for ( i = 0; i < 8; i++ )
         (void)set_debugreg(ed, i, c->debugreg[i]);
 
-    if ( ed->id == 0 )
+    if ( ed->vcpu_id == 0 )
         d->vm_assist = c->vm_assist;
 
     phys_basetab = c->pt_base;
@@ -482,7 +482,7 @@ int arch_set_info_guest(
     update_pagetables(ed);
     
     /* Don't redo final setup */
-    set_bit(EDF_DONEINIT, &ed->flags);
+    set_bit(_VCPUF_initialised, &ed->vcpu_flags);
 
     return 0;
 }
@@ -800,7 +800,7 @@ void context_switch(struct exec_domain *prev, struct exec_domain *next)
      * 'prev' (after this point, a dying domain's info structure may be freed
      * without warning). 
      */
-    clear_bit(EDF_RUNNING, &prev->flags);
+    clear_bit(_VCPUF_running, &prev->vcpu_flags);
 
     schedule_tail(next);
     BUG();

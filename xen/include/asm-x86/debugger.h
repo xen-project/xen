@@ -62,14 +62,14 @@ static inline int debugger_trap_entry(
 {
     struct exec_domain *ed = current;
 
-    if ( !KERNEL_MODE(ed, regs) || (ed->domain->id == 0) )
+    if ( !KERNEL_MODE(ed, regs) || (ed->domain->domain_id == 0) )
         return 0;
     
     switch ( vector )
     {
     case TRAP_int3:
     case TRAP_debug:
-        set_bit(EDF_CTRLPAUSE, &ed->flags);
+        set_bit(_VCPUF_ctrl_pause, &ed->vcpu_flags);
         raise_softirq(SCHEDULE_SOFTIRQ);
         return 1;
     }

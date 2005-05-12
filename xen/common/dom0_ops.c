@@ -139,7 +139,7 @@ long do_dom0_op(dom0_op_t *u_dom0_op)
         {
             ret = -EINVAL;
             if ( (d != current->domain) && 
-                 test_bit(DF_CONSTRUCTED, &d->flags) )
+                 test_bit(_DOMF_constructed, &d->domain_flags) )
             {
                 domain_unpause_by_systemcontroller(d);
                 ret = 0;
@@ -194,7 +194,7 @@ long do_dom0_op(dom0_op_t *u_dom0_op)
 
         ret = 0;
         
-        op->u.createdomain.domain = d->id;
+        op->u.createdomain.domain = d->domain_id;
         copy_to_user(u_dom0_op, op, sizeof(*op));
     }
     break;
@@ -265,7 +265,7 @@ long do_dom0_op(dom0_op_t *u_dom0_op)
         ed->cpumap = cpumap;
 
         if ( cpumap == CPUMAP_RUNANYWHERE )
-            clear_bit(EDF_CPUPINNED, &ed->flags);
+            clear_bit(_VCPUF_cpu_pinned, &ed->vcpu_flags);
         else
         {
             /* pick a new cpu from the usable map */
@@ -273,8 +273,8 @@ long do_dom0_op(dom0_op_t *u_dom0_op)
 
             exec_domain_pause(ed);
             if ( ed->processor != new_cpu )
-                set_bit(EDF_MIGRATED, &ed->flags);
-            set_bit(EDF_CPUPINNED, &ed->flags);
+                set_bit(_VCPUF_cpu_migrated, &ed->vcpu_flags);
+            set_bit(_VCPUF_cpu_pinned, &ed->vcpu_flags);
             ed->processor = new_cpu;
             exec_domain_unpause(ed);
         }
@@ -309,7 +309,7 @@ long do_dom0_op(dom0_op_t *u_dom0_op)
 
         for_each_domain ( d )
         {
-            if ( d->id >= op->u.getdomaininfo.domain )
+            if ( d->domain_id >= op->u.getdomaininfo.domain )
                 break;
         }
 
@@ -322,7 +322,7 @@ long do_dom0_op(dom0_op_t *u_dom0_op)
 
         read_unlock(&domlist_lock);
 
-        op->u.getdomaininfo.domain = d->id;
+        op->u.getdomaininfo.domain = d->domain_id;
 
         memset(&op->u.getdomaininfo.vcpu_to_cpu, -1,
                sizeof(op->u.getdomaininfo.vcpu_to_cpu));
@@ -335,13 +335,13 @@ long do_dom0_op(dom0_op_t *u_dom0_op)
          * - domain is marked as running if any of its vcpus is running
          */
         for_each_exec_domain ( d, ed ) {
-            op->u.getdomaininfo.vcpu_to_cpu[ed->id] = ed->processor;
-            op->u.getdomaininfo.cpumap[ed->id]      = ed->cpumap;
-            if (!test_bit(EDF_CTRLPAUSE, &ed->flags))
+            op->u.getdomaininfo.vcpu_to_cpu[ed->vcpu_id] = ed->processor;
+            op->u.getdomaininfo.cpumap[ed->vcpu_id]      = ed->cpumap;
+            if ( !(ed->vcpu_flags & VCPUF_ctrl_pause) )
                 flags &= ~DOMFLAGS_PAUSED;
-            if (!test_bit(EDF_BLOCKED, &ed->flags))
+            if ( !(ed->vcpu_flags & VCPUF_blocked) )
                 flags &= ~DOMFLAGS_BLOCKED;
-            if (test_bit(EDF_RUNNING, &ed->flags))
+            if ( ed->vcpu_flags & VCPUF_running )
                 flags |= DOMFLAGS_RUNNING;
             if ( ed->cpu_time > cpu_time )
                 cpu_time += ed->cpu_time;
@@ -352,9 +352,9 @@ long do_dom0_op(dom0_op_t *u_dom0_op)
         op->u.getdomaininfo.n_vcpu = vcpu_count;
 
         op->u.getdomaininfo.flags = flags |
-            (test_bit( DF_DYING,      &d->flags)  ? DOMFLAGS_DYING    : 0) |
-            (test_bit( DF_CRASHED,    &d->flags)  ? DOMFLAGS_CRASHED  : 0) |
-            (test_bit( DF_SHUTDOWN,   &d->flags)  ? DOMFLAGS_SHUTDOWN : 0) |
+            ((d->domain_flags & DOMF_dying)    ? DOMFLAGS_DYING    : 0) |
+            ((d->domain_flags & DOMF_crashed)  ? DOMFLAGS_CRASHED  : 0) |
+            ((d->domain_flags & DOMF_shutdown) ? DOMFLAGS_SHUTDOWN : 0) |
             d->shutdown_code << DOMFLAGS_SHUTDOWNSHIFT;
 
         op->u.getdomaininfo.tot_pages   = d->tot_pages;

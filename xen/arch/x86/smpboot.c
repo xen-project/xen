@@ -661,7 +661,7 @@ static void __init do_boot_cpu (int apicid)
 
     ed = idle->exec_domain[0];
 
-    set_bit(DF_IDLETASK, &idle->flags);
+    set_bit(_DOMF_idle_domain, &idle->domain_flags);
 
     ed->arch.monitor_table = mk_pagetable(__pa(idle_pg_table));
 

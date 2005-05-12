@@ -128,7 +128,7 @@ void physdev_init_dom0(struct domain *d)
     BUG_ON(d->arch.iobmp_mask == NULL);
     memset(d->arch.iobmp_mask, 0, IOBMP_BYTES);
 
-    set_bit(DF_PHYSDEV, &d->flags);
+    set_bit(_DOMF_physdev_access, &d->domain_flags);
 }
 
 

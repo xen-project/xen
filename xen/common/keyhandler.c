@@ -109,7 +109,7 @@ static void do_task_queues(unsigned char key)
     for_each_domain ( d )
     {
         printk("Xen: DOM %u, flags=%lx refcnt=%d nr_pages=%d "
-               "xenheap_pages=%d\n", d->id, d->flags,
+               "xenheap_pages=%d\n", d->domain_id, d->domain_flags,
                atomic_read(&d->refcnt), d->tot_pages, d->xenheap_pages);
 
         dump_pageframe_info(d);
@@ -118,11 +118,11 @@ static void do_task_queues(unsigned char key)
             printk("Guest: %p CPU %d [has=%c] flags=%lx "
                    "upcall_pend = %02x, upcall_mask = %02x\n", ed,
                    ed->processor,
-                   test_bit(EDF_RUNNING, &ed->flags) ? 'T':'F',
-                   ed->flags,
+                   test_bit(_VCPUF_running, &ed->vcpu_flags) ? 'T':'F',
+                   ed->vcpu_flags,
                    ed->vcpu_info->evtchn_upcall_pending, 
                    ed->vcpu_info->evtchn_upcall_mask);
-            printk("Notifying guest... %d/%d\n", d->id, ed->id); 
+            printk("Notifying guest... %d/%d\n", d->domain_id, ed->vcpu_id); 
             printk("port %d/%d stat %d %d %d\n",
                    VIRQ_DEBUG, ed->virq_to_evtchn[VIRQ_DEBUG],
                    test_bit(ed->virq_to_evtchn[VIRQ_DEBUG], 
