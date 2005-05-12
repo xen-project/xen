@@ -60,9 +60,45 @@
 #define __linear_hl2_table ((l1_pgentry_t *)(LINEAR_PT_VIRT_START + \
      (PERDOMAIN_VIRT_START >> (L2_PAGETABLE_SHIFT - L1_PAGETABLE_SHIFT))))
 
-#define shadow_lock_init(_d) spin_lock_init(&(_d)->arch.shadow_lock)
-#define shadow_lock(_d)      do { ASSERT(!spin_is_locked(&(_d)->arch.shadow_lock)); spin_lock(&(_d)->arch.shadow_lock); } while (0)
-#define shadow_unlock(_d)    spin_unlock(&(_d)->arch.shadow_lock)
+/*
+ * For now we use the per-domain BIGLOCK rather than a shadow-specific lock.
+ * We usually have the BIGLOCK already acquired anyway, so this is unlikely
+ * to cause much unnecessary extra serialisation. Also it's a recursive
+ * lock, and there are some code paths containing nested shadow_lock().
+ * The #if0'ed code below is therefore broken until such nesting is removed.
+ */
+#if 0
+#define shadow_lock_init(_d)                    \
+    spin_lock_init(&(_d)->arch.shadow_lock)
+#define shadow_lock_is_acquired(_d)             \
+    spin_is_locked(&(_d)->arch.shadow_lock)
+#define shadow_lock(_d)                         \
+do {                                            \
+    ASSERT(!shadow_lock_is_acquired(_d));       \
+    spin_lock(&(_d)->arch.shadow_lock);         \
+} while (0)
+#define shadow_unlock(_d)                       \
+do {                                            \
+    ASSERT(!shadow_lock_is_acquired(_d));       \
+    spin_unlock(&(_d)->arch.shadow_lock);       \
+} while (0)
+#else
+#define shadow_lock_init(_d)                    \
+    ((_d)->arch.shadow_nest = 0)
+#define shadow_lock_is_acquired(_d)             \
+    (spin_is_locked(&(_d)->big_lock) && ((_d)->arch.shadow_nest != 0))
+#define shadow_lock(_d)                         \
+do {                                            \
+    LOCK_BIGLOCK(_d);                           \
+    (_d)->arch.shadow_nest++;                   \
+} while (0)
+#define shadow_unlock(_d)                       \
+do {                                            \
+    ASSERT(shadow_lock_is_acquired(_d));        \
+    (_d)->arch.shadow_nest--;                   \
+    UNLOCK_BIGLOCK(_d);                         \
+} while (0)
+#endif
 
 #define SHADOW_ENCODE_MIN_MAX(_min, _max) ((((L1_PAGETABLE_ENTRIES - 1) - (_max)) << 16) | (_min))
 #define SHADOW_MIN(_encoded) ((_encoded) & ((1u<<16) - 1))
@@ -403,7 +439,7 @@ static inline int __mark_dirty(struct domain *d, unsigned int mfn)
     unsigned long pfn;
     int           rc = 0;
 
-    ASSERT(spin_is_locked(&d->arch.shadow_lock));
+    ASSERT(shadow_lock_is_acquired(d));
     ASSERT(d->arch.shadow_dirty_bitmap != NULL);
 
     if ( !VALID_MFN(mfn) )
@@ -1137,7 +1173,7 @@ static inline unsigned long __shadow_status(
                           ? __gpfn_to_mfn(d, gpfn)
                           : INVALID_MFN);
 
-    ASSERT(spin_is_locked(&d->arch.shadow_lock));
+    ASSERT(shadow_lock_is_acquired(d));
     ASSERT(gpfn == (gpfn & PGT_mfn_mask));
     ASSERT(stype && !(stype & ~PGT_type_mask));
 
@@ -1186,7 +1222,7 @@ shadow_max_pgtable_type(struct domain *d, unsigned long gpfn,
     struct shadow_status *x;
     u32 pttype = PGT_none, type;
 
-    ASSERT(spin_is_locked(&d->arch.shadow_lock));
+    ASSERT(shadow_lock_is_acquired(d));
     ASSERT(gpfn == (gpfn & PGT_mfn_mask));
 
     perfc_incrc(shadow_max_type);
@@ -1280,7 +1316,7 @@ static inline void delete_shadow_status(
     struct shadow_status *p, *x, *n, *head;
     unsigned long key = gpfn | stype;
 
-    ASSERT(spin_is_locked(&d->arch.shadow_lock));
+    ASSERT(shadow_lock_is_acquired(d));
     ASSERT(!(gpfn & ~PGT_mfn_mask));
     ASSERT(stype && !(stype & ~PGT_type_mask));
 
@@ -1362,7 +1398,7 @@ static inline void set_shadow_status(
 
     SH_VVLOG("set gpfn=%lx gmfn=%lx smfn=%lx t=%lx", gpfn, gmfn, smfn, stype);
 
-    ASSERT(spin_is_locked(&d->arch.shadow_lock));
+    ASSERT(shadow_lock_is_acquired(d));
 
     ASSERT(shadow_mode_translate(d) || gpfn);
     ASSERT(!(gpfn & ~PGT_mfn_mask));
