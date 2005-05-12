@@ -1578,7 +1578,7 @@ void __init setup_arch(char **cmdline_p)
 
 #ifdef CONFIG_ACPI_BOOT
 	if (!(xen_start_info.flags & SIF_INITDOMAIN)) {
-		printk(KERN_INFO "Not running in dom0: Disabling ACPI\n");
+		printk(KERN_INFO "ACPI in unprivileged domain disabled\n");
 		acpi_disabled = 1;
 		acpi_ht = 0;
 	}
