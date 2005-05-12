@@ -486,12 +486,11 @@ static void dispatch_rw_block_io(blkif_t *blkif, blkif_request_t *req)
         preq.nr_sects += seg[i].nsec;
 
         aop[i].u.map_grant_ref.host_virt_addr = MMAP_VADDR(pending_idx, i);
-
         aop[i].u.map_grant_ref.dom = blkif->domid;
         aop[i].u.map_grant_ref.ref = blkif_gref_from_fas(fas);
-        aop[i].u.map_grant_ref.flags = ( GNTMAP_host_map   |
-                                       ( ( operation == READ ) ?
-                                             0 : GNTMAP_readonly ) );
+        aop[i].u.map_grant_ref.flags = GNTMAP_host_map;
+        if ( operation == READ )
+            aop[i].u.map_grant_ref.flags |= GNTMAP_readonly;
     }
 
     if ( unlikely(HYPERVISOR_grant_table_op(
