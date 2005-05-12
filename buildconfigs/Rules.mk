@@ -55,7 +55,7 @@ endif
 $(patsubst %,pristine-%/.valid-pristine,$(ALLSPARSETREES)) : pristine-%/.valid-pristine: %.tar.bz2
 	rm -rf tmp-pristine-$* $(@D)
 	mkdir -p tmp-pristine-$*
-	touch $@/.bk_skip
+	touch tmp-pristine-$*/.bk_skip
 	tar -C tmp-pristine-$* -jxf $<
 	mv tmp-pristine-$*/* $(@D)
 	@rm -rf tmp-pristine-$*
