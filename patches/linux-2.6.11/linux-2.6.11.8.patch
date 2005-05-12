@@ -1,0 +1,1613 @@
+diff -Nru a/Makefile b/Makefile
+--- a/Makefile	2005-04-29 18:34:28 -07:00
++++ b/Makefile	2005-04-29 18:34:28 -07:00
+@@ -1,8 +1,8 @@
+ VERSION = 2
+ PATCHLEVEL = 6
+ SUBLEVEL = 11
+-EXTRAVERSION =
+-NAME=Woozy Numbat
++EXTRAVERSION = .8
++NAME=Woozy Beaver
+ 
+ # *DOCUMENTATION*
+ # To see a list of typical targets execute "make help"
+diff -Nru a/arch/ia64/kernel/fsys.S b/arch/ia64/kernel/fsys.S
+--- a/arch/ia64/kernel/fsys.S	2005-04-29 18:34:28 -07:00
++++ b/arch/ia64/kernel/fsys.S	2005-04-29 18:34:28 -07:00
+@@ -611,8 +611,10 @@
+ 	movl r2=ia64_ret_from_syscall
+ 	;;
+ 	mov rp=r2				// set the real return addr
+-	tbit.z p8,p0=r3,TIF_SYSCALL_TRACE
++	and r3=_TIF_SYSCALL_TRACEAUDIT,r3
+ 	;;
++	cmp.eq p8,p0=r3,r0
++
+ (p10)	br.cond.spnt.many ia64_ret_from_syscall	// p10==true means out registers are more than 8
+ (p8)	br.call.sptk.many b6=b6		// ignore this return addr
+ 	br.cond.sptk ia64_trace_syscall
+diff -Nru a/arch/ia64/kernel/signal.c b/arch/ia64/kernel/signal.c
+--- a/arch/ia64/kernel/signal.c	2005-04-29 18:34:28 -07:00
++++ b/arch/ia64/kernel/signal.c	2005-04-29 18:34:28 -07:00
+@@ -224,7 +224,8 @@
+ 	 * could be corrupted.
+ 	 */
+ 	retval = (long) &ia64_leave_kernel;
+-	if (test_thread_flag(TIF_SYSCALL_TRACE))
++	if (test_thread_flag(TIF_SYSCALL_TRACE)
++	    || test_thread_flag(TIF_SYSCALL_AUDIT))
+ 		/*
+ 		 * strace expects to be notified after sigreturn returns even though the
+ 		 * context to which we return may not be in the middle of a syscall.
+diff -Nru a/arch/ppc/oprofile/op_model_fsl_booke.c b/arch/ppc/oprofile/op_model_fsl_booke.c
+--- a/arch/ppc/oprofile/op_model_fsl_booke.c	2005-04-29 18:34:28 -07:00
++++ b/arch/ppc/oprofile/op_model_fsl_booke.c	2005-04-29 18:34:28 -07:00
+@@ -150,7 +150,6 @@
+ 	int is_kernel;
+ 	int val;
+ 	int i;
+-	unsigned int cpu = smp_processor_id();
+ 
+ 	/* set the PMM bit (see comment below) */
+ 	mtmsr(mfmsr() | MSR_PMM);
+@@ -162,7 +161,7 @@
+ 		val = ctr_read(i);
+ 		if (val < 0) {
+ 			if (oprofile_running && ctr[i].enabled) {
+-				oprofile_add_sample(pc, is_kernel, i, cpu);
++				oprofile_add_pc(pc, is_kernel, i);
+ 				ctr_write(i, reset_value[i]);
+ 			} else {
+ 				ctr_write(i, 0);
+diff -Nru a/arch/ppc/platforms/4xx/ebony.h b/arch/ppc/platforms/4xx/ebony.h
+--- a/arch/ppc/platforms/4xx/ebony.h	2005-04-29 18:34:28 -07:00
++++ b/arch/ppc/platforms/4xx/ebony.h	2005-04-29 18:34:28 -07:00
+@@ -61,8 +61,8 @@
+  */
+ 
+ /* OpenBIOS defined UART mappings, used before early_serial_setup */
+-#define UART0_IO_BASE	(u8 *) 0xE0000200
+-#define UART1_IO_BASE	(u8 *) 0xE0000300
++#define UART0_IO_BASE	0xE0000200
++#define UART1_IO_BASE	0xE0000300
+ 
+ /* external Epson SG-615P */
+ #define BASE_BAUD	691200
+diff -Nru a/arch/ppc/platforms/4xx/luan.h b/arch/ppc/platforms/4xx/luan.h
+--- a/arch/ppc/platforms/4xx/luan.h	2005-04-29 18:34:28 -07:00
++++ b/arch/ppc/platforms/4xx/luan.h	2005-04-29 18:34:28 -07:00
+@@ -47,9 +47,9 @@
+ #define RS_TABLE_SIZE	3
+ 
+ /* PIBS defined UART mappings, used before early_serial_setup */
+-#define UART0_IO_BASE	(u8 *) 0xa0000200
+-#define UART1_IO_BASE	(u8 *) 0xa0000300
+-#define UART2_IO_BASE	(u8 *) 0xa0000600
++#define UART0_IO_BASE	0xa0000200
++#define UART1_IO_BASE	0xa0000300
++#define UART2_IO_BASE	0xa0000600
+ 
+ #define BASE_BAUD	11059200
+ #define STD_UART_OP(num)					\
+diff -Nru a/arch/ppc/platforms/4xx/ocotea.h b/arch/ppc/platforms/4xx/ocotea.h
+--- a/arch/ppc/platforms/4xx/ocotea.h	2005-04-29 18:34:28 -07:00
++++ b/arch/ppc/platforms/4xx/ocotea.h	2005-04-29 18:34:28 -07:00
+@@ -56,8 +56,8 @@
+ #define RS_TABLE_SIZE	2
+ 
+ /* OpenBIOS defined UART mappings, used before early_serial_setup */
+-#define UART0_IO_BASE	(u8 *) 0xE0000200
+-#define UART1_IO_BASE	(u8 *) 0xE0000300
++#define UART0_IO_BASE	0xE0000200
++#define UART1_IO_BASE	0xE0000300
+ 
+ #define BASE_BAUD	11059200/16
+ #define STD_UART_OP(num)					\
+diff -Nru a/arch/sparc/kernel/ptrace.c b/arch/sparc/kernel/ptrace.c
+--- a/arch/sparc/kernel/ptrace.c	2005-04-29 18:34:28 -07:00
++++ b/arch/sparc/kernel/ptrace.c	2005-04-29 18:34:28 -07:00
+@@ -531,18 +531,6 @@
+ 			pt_error_return(regs, EIO);
+ 			goto out_tsk;
+ 		}
+-		if (addr != 1) {
+-			if (addr & 3) {
+-				pt_error_return(regs, EINVAL);
+-				goto out_tsk;
+-			}
+-#ifdef DEBUG_PTRACE
+-			printk ("Original: %08lx %08lx\n", child->thread.kregs->pc, child->thread.kregs->npc);
+-			printk ("Continuing with %08lx %08lx\n", addr, addr+4);
+-#endif
+-			child->thread.kregs->pc = addr;
+-			child->thread.kregs->npc = addr + 4;
+-		}
+ 
+ 		if (request == PTRACE_SYSCALL)
+ 			set_tsk_thread_flag(child, TIF_SYSCALL_TRACE);
+diff -Nru a/arch/sparc64/kernel/ptrace.c b/arch/sparc64/kernel/ptrace.c
+--- a/arch/sparc64/kernel/ptrace.c	2005-04-29 18:34:28 -07:00
++++ b/arch/sparc64/kernel/ptrace.c	2005-04-29 18:34:28 -07:00
+@@ -514,25 +514,6 @@
+ 			pt_error_return(regs, EIO);
+ 			goto out_tsk;
+ 		}
+-		if (addr != 1) {
+-			unsigned long pc_mask = ~0UL;
+-
+-			if ((child->thread_info->flags & _TIF_32BIT) != 0)
+-				pc_mask = 0xffffffff;
+-
+-			if (addr & 3) {
+-				pt_error_return(regs, EINVAL);
+-				goto out_tsk;
+-			}
+-#ifdef DEBUG_PTRACE
+-			printk ("Original: %016lx %016lx\n",
+-				child->thread_info->kregs->tpc,
+-				child->thread_info->kregs->tnpc);
+-			printk ("Continuing with %016lx %016lx\n", addr, addr+4);
+-#endif
+-			child->thread_info->kregs->tpc = (addr & pc_mask);
+-			child->thread_info->kregs->tnpc = ((addr + 4) & pc_mask);
+-		}
+ 
+ 		if (request == PTRACE_SYSCALL) {
+ 			set_tsk_thread_flag(child, TIF_SYSCALL_TRACE);
+diff -Nru a/arch/sparc64/kernel/signal32.c b/arch/sparc64/kernel/signal32.c
+--- a/arch/sparc64/kernel/signal32.c	2005-04-29 18:34:28 -07:00
++++ b/arch/sparc64/kernel/signal32.c	2005-04-29 18:34:28 -07:00
+@@ -192,9 +192,12 @@
+ 			err |= __put_user(from->si_uid, &to->si_uid);
+ 			break;
+ 		case __SI_FAULT >> 16:
+-		case __SI_POLL >> 16:
+ 			err |= __put_user(from->si_trapno, &to->si_trapno);
+ 			err |= __put_user((unsigned long)from->si_addr, &to->si_addr);
++			break;
++		case __SI_POLL >> 16:
++			err |= __put_user(from->si_band, &to->si_band);
++			err |= __put_user(from->si_fd, &to->si_fd);
+ 			break;
+ 		case __SI_RT >> 16: /* This is not generated by the kernel as of now.  */
+ 		case __SI_MESGQ >> 16:
+diff -Nru a/arch/sparc64/kernel/systbls.S b/arch/sparc64/kernel/systbls.S
+--- a/arch/sparc64/kernel/systbls.S	2005-04-29 18:34:27 -07:00
++++ b/arch/sparc64/kernel/systbls.S	2005-04-29 18:34:27 -07:00
+@@ -75,7 +75,7 @@
+ /*260*/	.word compat_sys_sched_getaffinity, compat_sys_sched_setaffinity, sys32_timer_settime, compat_sys_timer_gettime, sys_timer_getoverrun
+ 	.word sys_timer_delete, sys32_timer_create, sys_ni_syscall, compat_sys_io_setup, sys_io_destroy
+ /*270*/	.word sys32_io_submit, sys_io_cancel, compat_sys_io_getevents, sys32_mq_open, sys_mq_unlink
+-	.word sys_mq_timedsend, sys_mq_timedreceive, compat_sys_mq_notify, compat_sys_mq_getsetattr, compat_sys_waitid
++	.word compat_sys_mq_timedsend, compat_sys_mq_timedreceive, compat_sys_mq_notify, compat_sys_mq_getsetattr, compat_sys_waitid
+ /*280*/	.word sys_ni_syscall, sys_add_key, sys_request_key, sys_keyctl
+ 
+ #endif /* CONFIG_COMPAT */
+diff -Nru a/arch/um/include/sysdep-i386/syscalls.h b/arch/um/include/sysdep-i386/syscalls.h
+--- a/arch/um/include/sysdep-i386/syscalls.h	2005-04-29 18:34:27 -07:00
++++ b/arch/um/include/sysdep-i386/syscalls.h	2005-04-29 18:34:27 -07:00
+@@ -23,6 +23,9 @@
+ 		      unsigned long prot, unsigned long flags,
+ 		      unsigned long fd, unsigned long pgoff);
+ 
++/* On i386 they choose a meaningless naming.*/
++#define __NR_kexec_load __NR_sys_kexec_load
++
+ #define ARCH_SYSCALLS \
+ 	[ __NR_waitpid ] = (syscall_handler_t *) sys_waitpid, \
+ 	[ __NR_break ] = (syscall_handler_t *) sys_ni_syscall, \
+@@ -101,15 +104,12 @@
+ 	[ 223 ] = (syscall_handler_t *) sys_ni_syscall, \
+ 	[ __NR_set_thread_area ] = (syscall_handler_t *) sys_ni_syscall, \
+ 	[ __NR_get_thread_area ] = (syscall_handler_t *) sys_ni_syscall, \
+-	[ __NR_fadvise64 ] = (syscall_handler_t *) sys_fadvise64, \
+ 	[ 251 ] = (syscall_handler_t *) sys_ni_syscall, \
+-        [ __NR_remap_file_pages ] = (syscall_handler_t *) sys_remap_file_pages, \
+-	[ __NR_utimes ] = (syscall_handler_t *) sys_utimes, \
+-	[ __NR_vserver ] = (syscall_handler_t *) sys_ni_syscall,
+-        
++	[ 285 ] = (syscall_handler_t *) sys_ni_syscall,
++
+ /* 222 doesn't yet have a name in include/asm-i386/unistd.h */
+ 
+-#define LAST_ARCH_SYSCALL __NR_vserver
++#define LAST_ARCH_SYSCALL 285
+ 
+ /*
+  * Overrides for Emacs so that we follow Linus's tabbing style.
+diff -Nru a/arch/um/include/sysdep-x86_64/syscalls.h b/arch/um/include/sysdep-x86_64/syscalls.h
+--- a/arch/um/include/sysdep-x86_64/syscalls.h	2005-04-29 18:34:28 -07:00
++++ b/arch/um/include/sysdep-x86_64/syscalls.h	2005-04-29 18:34:28 -07:00
+@@ -71,12 +71,7 @@
+ 	[ __NR_iopl ] = (syscall_handler_t *) sys_ni_syscall, \
+ 	[ __NR_set_thread_area ] = (syscall_handler_t *) sys_ni_syscall, \
+ 	[ __NR_get_thread_area ] = (syscall_handler_t *) sys_ni_syscall, \
+-        [ __NR_remap_file_pages ] = (syscall_handler_t *) sys_remap_file_pages, \
+ 	[ __NR_semtimedop ] = (syscall_handler_t *) sys_semtimedop, \
+-	[ __NR_fadvise64 ] = (syscall_handler_t *) sys_fadvise64, \
+-	[ 223 ] = (syscall_handler_t *) sys_ni_syscall, \
+-	[ __NR_utimes ] = (syscall_handler_t *) sys_utimes, \
+-	[ __NR_vserver ] = (syscall_handler_t *) sys_ni_syscall, \
+ 	[ 251 ] = (syscall_handler_t *) sys_ni_syscall,
+ 
+ #define LAST_ARCH_SYSCALL 251
+diff -Nru a/arch/um/kernel/skas/uaccess.c b/arch/um/kernel/skas/uaccess.c
+--- a/arch/um/kernel/skas/uaccess.c	2005-04-29 18:34:28 -07:00
++++ b/arch/um/kernel/skas/uaccess.c	2005-04-29 18:34:28 -07:00
+@@ -61,7 +61,8 @@
+ 	void *arg;
+ 	int *res;
+ 
+-	va_copy(args, *(va_list *)arg_ptr);
++	/* Some old gccs recognize __va_copy, but not va_copy */
++	__va_copy(args, *(va_list *)arg_ptr);
+ 	addr = va_arg(args, unsigned long);
+ 	len = va_arg(args, int);
+ 	is_write = va_arg(args, int);
+diff -Nru a/arch/um/kernel/sys_call_table.c b/arch/um/kernel/sys_call_table.c
+--- a/arch/um/kernel/sys_call_table.c	2005-04-29 18:34:28 -07:00
++++ b/arch/um/kernel/sys_call_table.c	2005-04-29 18:34:28 -07:00
+@@ -48,7 +48,6 @@
+ extern syscall_handler_t old_select;
+ extern syscall_handler_t sys_modify_ldt;
+ extern syscall_handler_t sys_rt_sigsuspend;
+-extern syscall_handler_t sys_vserver;
+ extern syscall_handler_t sys_mbind;
+ extern syscall_handler_t sys_get_mempolicy;
+ extern syscall_handler_t sys_set_mempolicy;
+@@ -242,6 +241,7 @@
+ 	[ __NR_epoll_create ] = (syscall_handler_t *) sys_epoll_create,
+ 	[ __NR_epoll_ctl ] = (syscall_handler_t *) sys_epoll_ctl,
+ 	[ __NR_epoll_wait ] = (syscall_handler_t *) sys_epoll_wait,
++	[ __NR_remap_file_pages ] = (syscall_handler_t *) sys_remap_file_pages,
+         [ __NR_set_tid_address ] = (syscall_handler_t *) sys_set_tid_address,
+ 	[ __NR_timer_create ] = (syscall_handler_t *) sys_timer_create,
+ 	[ __NR_timer_settime ] = (syscall_handler_t *) sys_timer_settime,
+@@ -252,12 +252,10 @@
+ 	[ __NR_clock_gettime ] = (syscall_handler_t *) sys_clock_gettime,
+ 	[ __NR_clock_getres ] = (syscall_handler_t *) sys_clock_getres,
+ 	[ __NR_clock_nanosleep ] = (syscall_handler_t *) sys_clock_nanosleep,
+-	[ __NR_statfs64 ] = (syscall_handler_t *) sys_statfs64,
+-	[ __NR_fstatfs64 ] = (syscall_handler_t *) sys_fstatfs64,
+ 	[ __NR_tgkill ] = (syscall_handler_t *) sys_tgkill,
+ 	[ __NR_utimes ] = (syscall_handler_t *) sys_utimes,
+-	[ __NR_fadvise64_64 ] = (syscall_handler_t *) sys_fadvise64_64,
+-	[ __NR_vserver ] = (syscall_handler_t *) sys_vserver,
++	[ __NR_fadvise64 ] = (syscall_handler_t *) sys_fadvise64,
++	[ __NR_vserver ] = (syscall_handler_t *) sys_ni_syscall,
+ 	[ __NR_mbind ] = (syscall_handler_t *) sys_mbind,
+ 	[ __NR_get_mempolicy ] = (syscall_handler_t *) sys_get_mempolicy,
+ 	[ __NR_set_mempolicy ] = (syscall_handler_t *) sys_set_mempolicy,
+@@ -267,9 +265,8 @@
+ 	[ __NR_mq_timedreceive ] = (syscall_handler_t *) sys_mq_timedreceive,
+ 	[ __NR_mq_notify ] = (syscall_handler_t *) sys_mq_notify,
+ 	[ __NR_mq_getsetattr ] = (syscall_handler_t *) sys_mq_getsetattr,
+-	[ __NR_sys_kexec_load ] = (syscall_handler_t *) sys_ni_syscall,
++	[ __NR_kexec_load ] = (syscall_handler_t *) sys_ni_syscall,
+ 	[ __NR_waitid ] = (syscall_handler_t *) sys_waitid,
+-	[ 285 ] = (syscall_handler_t *) sys_ni_syscall,
+ 	[ __NR_add_key ] = (syscall_handler_t *) sys_add_key,
+ 	[ __NR_request_key ] = (syscall_handler_t *) sys_request_key,
+ 	[ __NR_keyctl ] = (syscall_handler_t *) sys_keyctl,
+diff -Nru a/drivers/char/drm/drm_ioctl.c b/drivers/char/drm/drm_ioctl.c
+--- a/drivers/char/drm/drm_ioctl.c	2005-04-29 18:34:27 -07:00
++++ b/drivers/char/drm/drm_ioctl.c	2005-04-29 18:34:27 -07:00
+@@ -326,6 +326,8 @@
+ 
+ 	DRM_COPY_FROM_USER_IOCTL(sv, argp, sizeof(sv));
+ 
++	memset(&version, 0, sizeof(version));
++
+ 	dev->driver->version(&version);
+ 	retv.drm_di_major = DRM_IF_MAJOR;
+ 	retv.drm_di_minor = DRM_IF_MINOR;
+diff -Nru a/drivers/i2c/chips/eeprom.c b/drivers/i2c/chips/eeprom.c
+--- a/drivers/i2c/chips/eeprom.c	2005-04-29 18:34:27 -07:00
++++ b/drivers/i2c/chips/eeprom.c	2005-04-29 18:34:27 -07:00
+@@ -130,7 +130,8 @@
+ 
+ 	/* Hide Vaio security settings to regular users (16 first bytes) */
+ 	if (data->nature == VAIO && off < 16 && !capable(CAP_SYS_ADMIN)) {
+-		int in_row1 = 16 - off;
++		size_t in_row1 = 16 - off;
++		in_row1 = min(in_row1, count);
+ 		memset(buf, 0, in_row1);
+ 		if (count - in_row1 > 0)
+ 			memcpy(buf + in_row1, &data->data[16], count - in_row1);
+diff -Nru a/drivers/i2c/chips/it87.c b/drivers/i2c/chips/it87.c
+--- a/drivers/i2c/chips/it87.c	2005-04-29 18:34:28 -07:00
++++ b/drivers/i2c/chips/it87.c	2005-04-29 18:34:28 -07:00
+@@ -631,7 +631,7 @@
+ 	struct it87_data *data = it87_update_device(dev);
+ 	return sprintf(buf,"%d\n", ALARMS_FROM_REG(data->alarms));
+ }
+-static DEVICE_ATTR(alarms, S_IRUGO | S_IWUSR, show_alarms, NULL);
++static DEVICE_ATTR(alarms, S_IRUGO, show_alarms, NULL);
+ 
+ static ssize_t
+ show_vrm_reg(struct device *dev, char *buf)
+diff -Nru a/drivers/i2c/chips/via686a.c b/drivers/i2c/chips/via686a.c
+--- a/drivers/i2c/chips/via686a.c	2005-04-29 18:34:27 -07:00
++++ b/drivers/i2c/chips/via686a.c	2005-04-29 18:34:27 -07:00
+@@ -554,7 +554,7 @@
+ 	struct via686a_data *data = via686a_update_device(dev);
+ 	return sprintf(buf,"%d\n", ALARMS_FROM_REG(data->alarms));
+ }
+-static DEVICE_ATTR(alarms, S_IRUGO | S_IWUSR, show_alarms, NULL);
++static DEVICE_ATTR(alarms, S_IRUGO, show_alarms, NULL);
+ 
+ /* The driver. I choose to use type i2c_driver, as at is identical to both
+    smbus_driver and isa_driver, and clients could be of either kind */
+diff -Nru a/drivers/input/serio/i8042-x86ia64io.h b/drivers/input/serio/i8042-x86ia64io.h
+--- a/drivers/input/serio/i8042-x86ia64io.h	2005-04-29 18:34:28 -07:00
++++ b/drivers/input/serio/i8042-x86ia64io.h	2005-04-29 18:34:28 -07:00
+@@ -88,7 +88,7 @@
+ };
+ #endif
+ 
+-#ifdef CONFIG_ACPI
++#if defined(__ia64__) && defined(CONFIG_ACPI)
+ #include <linux/acpi.h>
+ #include <acpi/acpi_bus.h>
+ 
+@@ -281,7 +281,7 @@
+ 	i8042_kbd_irq = I8042_MAP_IRQ(1);
+ 	i8042_aux_irq = I8042_MAP_IRQ(12);
+ 
+-#ifdef CONFIG_ACPI
++#if defined(__ia64__) && defined(CONFIG_ACPI)
+ 	if (i8042_acpi_init())
+ 		return -1;
+ #endif
+@@ -300,7 +300,7 @@
+ 
+ static inline void i8042_platform_exit(void)
+ {
+-#ifdef CONFIG_ACPI
++#if defined(__ia64__) && defined(CONFIG_ACPI)
+ 	i8042_acpi_exit();
+ #endif
+ }
+diff -Nru a/drivers/md/raid6altivec.uc b/drivers/md/raid6altivec.uc
+--- a/drivers/md/raid6altivec.uc	2005-04-29 18:34:28 -07:00
++++ b/drivers/md/raid6altivec.uc	2005-04-29 18:34:28 -07:00
+@@ -108,7 +108,11 @@
+ int raid6_have_altivec(void)
+ {
+ 	/* This assumes either all CPUs have Altivec or none does */
++#ifdef CONFIG_PPC64
+ 	return cur_cpu_spec->cpu_features & CPU_FTR_ALTIVEC;
++#else
++	return cur_cpu_spec[0]->cpu_features & CPU_FTR_ALTIVEC;
++#endif
+ }
+ #endif
+ 
+diff -Nru a/drivers/media/video/adv7170.c b/drivers/media/video/adv7170.c
+--- a/drivers/media/video/adv7170.c	2005-04-29 18:34:28 -07:00
++++ b/drivers/media/video/adv7170.c	2005-04-29 18:34:28 -07:00
+@@ -130,7 +130,7 @@
+ 		u8 block_data[32];
+ 
+ 		msg.addr = client->addr;
+-		msg.flags = client->flags;
++		msg.flags = 0;
+ 		while (len >= 2) {
+ 			msg.buf = (char *) block_data;
+ 			msg.len = 0;
+diff -Nru a/drivers/media/video/adv7175.c b/drivers/media/video/adv7175.c
+--- a/drivers/media/video/adv7175.c	2005-04-29 18:34:28 -07:00
++++ b/drivers/media/video/adv7175.c	2005-04-29 18:34:28 -07:00
+@@ -126,7 +126,7 @@
+ 		u8 block_data[32];
+ 
+ 		msg.addr = client->addr;
+-		msg.flags = client->flags;
++		msg.flags = 0;
+ 		while (len >= 2) {
+ 			msg.buf = (char *) block_data;
+ 			msg.len = 0;
+diff -Nru a/drivers/media/video/bt819.c b/drivers/media/video/bt819.c
+--- a/drivers/media/video/bt819.c	2005-04-29 18:34:27 -07:00
++++ b/drivers/media/video/bt819.c	2005-04-29 18:34:27 -07:00
+@@ -146,7 +146,7 @@
+ 		u8 block_data[32];
+ 
+ 		msg.addr = client->addr;
+-		msg.flags = client->flags;
++		msg.flags = 0;
+ 		while (len >= 2) {
+ 			msg.buf = (char *) block_data;
+ 			msg.len = 0;
+diff -Nru a/drivers/media/video/bttv-cards.c b/drivers/media/video/bttv-cards.c
+--- a/drivers/media/video/bttv-cards.c	2005-04-29 18:34:28 -07:00
++++ b/drivers/media/video/bttv-cards.c	2005-04-29 18:34:28 -07:00
+@@ -2718,8 +2718,6 @@
+         }
+ 	btv->pll.pll_current = -1;
+ 
+-	bttv_reset_audio(btv);
+-
+ 	/* tuner configuration (from card list / autodetect / insmod option) */
+  	if (UNSET != bttv_tvcards[btv->c.type].tuner_type)
+ 		if(UNSET == btv->tuner_type)
+diff -Nru a/drivers/media/video/saa7110.c b/drivers/media/video/saa7110.c
+--- a/drivers/media/video/saa7110.c	2005-04-29 18:34:27 -07:00
++++ b/drivers/media/video/saa7110.c	2005-04-29 18:34:27 -07:00
+@@ -60,8 +60,10 @@
+ 
+ #define	I2C_SAA7110		0x9C	/* or 0x9E */
+ 
++#define SAA7110_NR_REG		0x35
++
+ struct saa7110 {
+-	unsigned char reg[54];
++	u8 reg[SAA7110_NR_REG];
+ 
+ 	int norm;
+ 	int input;
+@@ -95,31 +97,28 @@
+ 		     unsigned int       len)
+ {
+ 	int ret = -1;
+-	u8 reg = *data++;
++	u8 reg = *data;		/* first register to write to */
+ 
+-	len--;
++	/* Sanity check */
++	if (reg + (len - 1) > SAA7110_NR_REG)
++		return ret;
+ 
+ 	/* the saa7110 has an autoincrement function, use it if
+ 	 * the adapter understands raw I2C */
+ 	if (i2c_check_functionality(client->adapter, I2C_FUNC_I2C)) {
+ 		struct saa7110 *decoder = i2c_get_clientdata(client);
+ 		struct i2c_msg msg;
+-		u8 block_data[54];
+ 
+-		msg.len = 0;
+-		msg.buf = (char *) block_data;
++		msg.len = len;
++		msg.buf = (char *) data;
+ 		msg.addr = client->addr;
+-		msg.flags = client->flags;
+-		while (len >= 1) {
+-			msg.len = 0;
+-			block_data[msg.len++] = reg;
+-			while (len-- >= 1 && msg.len < 54)
+-				block_data[msg.len++] =
+-				    decoder->reg[reg++] = *data++;
+-			ret = i2c_transfer(client->adapter, &msg, 1);
+-		}
++		msg.flags = 0;
++		ret = i2c_transfer(client->adapter, &msg, 1);
++
++		/* Cache the written data */
++		memcpy(decoder->reg + reg, data + 1, len - 1);
+ 	} else {
+-		while (len-- >= 1) {
++		for (++data, --len; len; len--) {
+ 			if ((ret = saa7110_write(client, reg++,
+ 						 *data++)) < 0)
+ 				break;
+@@ -192,7 +191,7 @@
+ 	return 0;
+ }
+ 
+-static const unsigned char initseq[] = {
++static const unsigned char initseq[1 + SAA7110_NR_REG] = {
+ 	0, 0x4C, 0x3C, 0x0D, 0xEF, 0xBD, 0xF2, 0x03, 0x00,
+ 	/* 0x08 */ 0xF8, 0xF8, 0x60, 0x60, 0x00, 0x86, 0x18, 0x90,
+ 	/* 0x10 */ 0x00, 0x59, 0x40, 0x46, 0x42, 0x1A, 0xFF, 0xDA,
+diff -Nru a/drivers/media/video/saa7114.c b/drivers/media/video/saa7114.c
+--- a/drivers/media/video/saa7114.c	2005-04-29 18:34:28 -07:00
++++ b/drivers/media/video/saa7114.c	2005-04-29 18:34:28 -07:00
+@@ -163,7 +163,7 @@
+ 		u8 block_data[32];
+ 
+ 		msg.addr = client->addr;
+-		msg.flags = client->flags;
++		msg.flags = 0;
+ 		while (len >= 2) {
+ 			msg.buf = (char *) block_data;
+ 			msg.len = 0;
+diff -Nru a/drivers/media/video/saa7185.c b/drivers/media/video/saa7185.c
+--- a/drivers/media/video/saa7185.c	2005-04-29 18:34:28 -07:00
++++ b/drivers/media/video/saa7185.c	2005-04-29 18:34:28 -07:00
+@@ -118,7 +118,7 @@
+ 		u8 block_data[32];
+ 
+ 		msg.addr = client->addr;
+-		msg.flags = client->flags;
++		msg.flags = 0;
+ 		while (len >= 2) {
+ 			msg.buf = (char *) block_data;
+ 			msg.len = 0;
+diff -Nru a/drivers/net/amd8111e.c b/drivers/net/amd8111e.c
+--- a/drivers/net/amd8111e.c	2005-04-29 18:34:28 -07:00
++++ b/drivers/net/amd8111e.c	2005-04-29 18:34:28 -07:00
+@@ -1381,6 +1381,8 @@
+ 
+ 	if(amd8111e_restart(dev)){
+ 		spin_unlock_irq(&lp->lock);
++		if (dev->irq)
++			free_irq(dev->irq, dev);
+ 		return -ENOMEM;
+ 	}
+ 	/* Start ipg timer */
+diff -Nru a/drivers/net/ppp_async.c b/drivers/net/ppp_async.c
+--- a/drivers/net/ppp_async.c	2005-04-29 18:34:28 -07:00
++++ b/drivers/net/ppp_async.c	2005-04-29 18:34:28 -07:00
+@@ -1000,7 +1000,7 @@
+ 	data += 4;
+ 	dlen -= 4;
+ 	/* data[0] is code, data[1] is length */
+-	while (dlen >= 2 && dlen >= data[1]) {
++	while (dlen >= 2 && dlen >= data[1] && data[1] >= 2) {
+ 		switch (data[0]) {
+ 		case LCP_MRU:
+ 			val = (data[2] << 8) + data[3];
+diff -Nru a/drivers/net/r8169.c b/drivers/net/r8169.c
+--- a/drivers/net/r8169.c	2005-04-29 18:34:28 -07:00
++++ b/drivers/net/r8169.c	2005-04-29 18:34:28 -07:00
+@@ -1683,16 +1683,19 @@
+ 	rtl8169_make_unusable_by_asic(desc);
+ }
+ 
+-static inline void rtl8169_return_to_asic(struct RxDesc *desc, int rx_buf_sz)
++static inline void rtl8169_mark_to_asic(struct RxDesc *desc, u32 rx_buf_sz)
+ {
+-	desc->opts1 |= cpu_to_le32(DescOwn + rx_buf_sz);
++	u32 eor = le32_to_cpu(desc->opts1) & RingEnd;
++
++	desc->opts1 = cpu_to_le32(DescOwn | eor | rx_buf_sz);
+ }
+ 
+-static inline void rtl8169_give_to_asic(struct RxDesc *desc, dma_addr_t mapping,
+-					int rx_buf_sz)
++static inline void rtl8169_map_to_asic(struct RxDesc *desc, dma_addr_t mapping,
++				       u32 rx_buf_sz)
+ {
+ 	desc->addr = cpu_to_le64(mapping);
+-	desc->opts1 |= cpu_to_le32(DescOwn + rx_buf_sz);
++	wmb();
++	rtl8169_mark_to_asic(desc, rx_buf_sz);
+ }
+ 
+ static int rtl8169_alloc_rx_skb(struct pci_dev *pdev, struct sk_buff **sk_buff,
+@@ -1712,7 +1715,7 @@
+ 	mapping = pci_map_single(pdev, skb->tail, rx_buf_sz,
+ 				 PCI_DMA_FROMDEVICE);
+ 
+-	rtl8169_give_to_asic(desc, mapping, rx_buf_sz);
++	rtl8169_map_to_asic(desc, mapping, rx_buf_sz);
+ 
+ out:
+ 	return ret;
+@@ -2150,7 +2153,7 @@
+ 			skb_reserve(skb, NET_IP_ALIGN);
+ 			eth_copy_and_sum(skb, sk_buff[0]->tail, pkt_size, 0);
+ 			*sk_buff = skb;
+-			rtl8169_return_to_asic(desc, rx_buf_sz);
++			rtl8169_mark_to_asic(desc, rx_buf_sz);
+ 			ret = 0;
+ 		}
+ 	}
+diff -Nru a/drivers/net/sis900.c b/drivers/net/sis900.c
+--- a/drivers/net/sis900.c	2005-04-29 18:34:27 -07:00
++++ b/drivers/net/sis900.c	2005-04-29 18:34:27 -07:00
+@@ -236,7 +236,7 @@
+ 	signature = (u16) read_eeprom(ioaddr, EEPROMSignature);    
+ 	if (signature == 0xffff || signature == 0x0000) {
+ 		printk (KERN_INFO "%s: Error EERPOM read %x\n", 
+-			net_dev->name, signature);
++			pci_name(pci_dev), signature);
+ 		return 0;
+ 	}
+ 
+@@ -268,7 +268,7 @@
+ 	if (!isa_bridge)
+ 		isa_bridge = pci_get_device(PCI_VENDOR_ID_SI, 0x0018, isa_bridge);
+ 	if (!isa_bridge) {
+-		printk("%s: Can not find ISA bridge\n", net_dev->name);
++		printk("%s: Can not find ISA bridge\n", pci_name(pci_dev));
+ 		return 0;
+ 	}
+ 	pci_read_config_byte(isa_bridge, 0x48, &reg);
+@@ -456,10 +456,6 @@
+ 	net_dev->tx_timeout = sis900_tx_timeout;
+ 	net_dev->watchdog_timeo = TX_TIMEOUT;
+ 	net_dev->ethtool_ops = &sis900_ethtool_ops;
+-	
+-	ret = register_netdev(net_dev);
+-	if (ret)
+-		goto err_unmap_rx;
+ 		
+ 	/* Get Mac address according to the chip revision */
+ 	pci_read_config_byte(pci_dev, PCI_CLASS_REVISION, &revision);
+@@ -476,7 +472,7 @@
+ 
+ 	if (ret == 0) {
+ 		ret = -ENODEV;
+-		goto err_out_unregister;
++		goto err_unmap_rx;
+ 	}
+ 	
+ 	/* 630ET : set the mii access mode as software-mode */
+@@ -486,7 +482,7 @@
+ 	/* probe for mii transceiver */
+ 	if (sis900_mii_probe(net_dev) == 0) {
+ 		ret = -ENODEV;
+-		goto err_out_unregister;
++		goto err_unmap_rx;
+ 	}
+ 
+ 	/* save our host bridge revision */
+@@ -496,6 +492,10 @@
+ 		pci_dev_put(dev);
+ 	}
+ 
++	ret = register_netdev(net_dev);
++	if (ret)
++		goto err_unmap_rx;
++
+ 	/* print some information about our NIC */
+ 	printk(KERN_INFO "%s: %s at %#lx, IRQ %d, ", net_dev->name,
+ 	       card_name, ioaddr, net_dev->irq);
+@@ -505,8 +505,6 @@
+ 
+ 	return 0;
+ 
+- err_out_unregister:
+- 	unregister_netdev(net_dev);
+  err_unmap_rx:
+ 	pci_free_consistent(pci_dev, RX_TOTAL_SIZE, sis_priv->rx_ring,
+ 		sis_priv->rx_ring_dma);
+@@ -533,6 +531,7 @@
+ static int __init sis900_mii_probe(struct net_device * net_dev)
+ {
+ 	struct sis900_private * sis_priv = net_dev->priv;
++	const char *dev_name = pci_name(sis_priv->pci_dev);
+ 	u16 poll_bit = MII_STAT_LINK, status = 0;
+ 	unsigned long timeout = jiffies + 5 * HZ;
+ 	int phy_addr;
+@@ -582,21 +581,20 @@
+ 					mii_phy->phy_types =
+ 					    (mii_status & (MII_STAT_CAN_TX_FDX | MII_STAT_CAN_TX)) ? LAN : HOME;
+ 				printk(KERN_INFO "%s: %s transceiver found at address %d.\n",
+-				       net_dev->name, mii_chip_table[i].name,
++				       dev_name, mii_chip_table[i].name,
+ 				       phy_addr);
+ 				break;
+ 			}
+ 			
+ 		if( !mii_chip_table[i].phy_id1 ) {
+ 			printk(KERN_INFO "%s: Unknown PHY transceiver found at address %d.\n",
+-			       net_dev->name, phy_addr);
++			       dev_name, phy_addr);
+ 			mii_phy->phy_types = UNKNOWN;
+ 		}
+ 	}
+ 	
+ 	if (sis_priv->mii == NULL) {
+-		printk(KERN_INFO "%s: No MII transceivers found!\n",
+-			net_dev->name);
++		printk(KERN_INFO "%s: No MII transceivers found!\n", dev_name);
+ 		return 0;
+ 	}
+ 
+@@ -621,7 +619,7 @@
+ 			poll_bit ^= (mdio_read(net_dev, sis_priv->cur_phy, MII_STATUS) & poll_bit);
+ 			if (time_after_eq(jiffies, timeout)) {
+ 				printk(KERN_WARNING "%s: reset phy and link down now\n",
+-					net_dev->name);
++				       dev_name);
+ 				return -ETIME;
+ 			}
+ 		}
+@@ -691,7 +689,7 @@
+ 		sis_priv->mii = default_phy;
+ 		sis_priv->cur_phy = default_phy->phy_addr;
+ 		printk(KERN_INFO "%s: Using transceiver found at address %d as default\n",
+-					net_dev->name,sis_priv->cur_phy);
++		       pci_name(sis_priv->pci_dev), sis_priv->cur_phy);
+ 	}
+ 	
+ 	status = mdio_read(net_dev, sis_priv->cur_phy, MII_CONTROL);
+diff -Nru a/drivers/net/tun.c b/drivers/net/tun.c
+--- a/drivers/net/tun.c	2005-04-29 18:34:27 -07:00
++++ b/drivers/net/tun.c	2005-04-29 18:34:27 -07:00
+@@ -229,7 +229,7 @@
+ 	size_t len = count;
+ 
+ 	if (!(tun->flags & TUN_NO_PI)) {
+-		if ((len -= sizeof(pi)) > len)
++		if ((len -= sizeof(pi)) > count)
+ 			return -EINVAL;
+ 
+ 		if(memcpy_fromiovec((void *)&pi, iv, sizeof(pi)))
+diff -Nru a/drivers/net/via-rhine.c b/drivers/net/via-rhine.c
+--- a/drivers/net/via-rhine.c	2005-04-29 18:34:28 -07:00
++++ b/drivers/net/via-rhine.c	2005-04-29 18:34:28 -07:00
+@@ -1197,8 +1197,10 @@
+ 		       dev->name, rp->pdev->irq);
+ 
+ 	rc = alloc_ring(dev);
+-	if (rc)
++	if (rc) {
++		free_irq(rp->pdev->irq, dev);
+ 		return rc;
++	}
+ 	alloc_rbufs(dev);
+ 	alloc_tbufs(dev);
+ 	rhine_chip_reset(dev);
+@@ -1898,6 +1900,9 @@
+ 	struct net_device *dev = pci_get_drvdata(pdev);
+ 	struct rhine_private *rp = netdev_priv(dev);
+ 	void __iomem *ioaddr = rp->base;
++
++	if (!(rp->quirks & rqWOL))
++		return; /* Nothing to do for non-WOL adapters */
+ 
+ 	rhine_power_init(dev);
+ 
+diff -Nru a/drivers/net/wan/hd6457x.c b/drivers/net/wan/hd6457x.c
+--- a/drivers/net/wan/hd6457x.c	2005-04-29 18:34:27 -07:00
++++ b/drivers/net/wan/hd6457x.c	2005-04-29 18:34:27 -07:00
+@@ -315,7 +315,7 @@
+ #endif
+ 	stats->rx_packets++;
+ 	stats->rx_bytes += skb->len;
+-	skb->dev->last_rx = jiffies;
++	dev->last_rx = jiffies;
+ 	skb->protocol = hdlc_type_trans(skb, dev);
+ 	netif_rx(skb);
+ }
+diff -Nru a/drivers/pci/hotplug/pciehp_ctrl.c b/drivers/pci/hotplug/pciehp_ctrl.c
+--- a/drivers/pci/hotplug/pciehp_ctrl.c	2005-04-29 18:34:27 -07:00
++++ b/drivers/pci/hotplug/pciehp_ctrl.c	2005-04-29 18:34:27 -07:00
+@@ -1354,10 +1354,11 @@
+ 				dbg("PCI Bridge Hot-Remove s:b:d:f(%02x:%02x:%02x:%02x)\n", 
+ 					ctrl->seg, func->bus, func->device, func->function);
+ 				bridge_slot_remove(func);
+-			} else
++			} else {
+ 				dbg("PCI Function Hot-Remove s:b:d:f(%02x:%02x:%02x:%02x)\n", 
+ 					ctrl->seg, func->bus, func->device, func->function);
+ 				slot_remove(func);
++			}
+ 
+ 			func = pciehp_slot_find(ctrl->slot_bus, device, 0);
+ 		}
+diff -Nru a/fs/binfmt_elf.c b/fs/binfmt_elf.c
+--- a/fs/binfmt_elf.c	2005-04-29 18:34:28 -07:00
++++ b/fs/binfmt_elf.c	2005-04-29 18:34:28 -07:00
+@@ -1008,6 +1008,7 @@
+ static int load_elf_library(struct file *file)
+ {
+ 	struct elf_phdr *elf_phdata;
++	struct elf_phdr *eppnt;
+ 	unsigned long elf_bss, bss, len;
+ 	int retval, error, i, j;
+ 	struct elfhdr elf_ex;
+@@ -1031,44 +1032,47 @@
+ 	/* j < ELF_MIN_ALIGN because elf_ex.e_phnum <= 2 */
+ 
+ 	error = -ENOMEM;
+-	elf_phdata = (struct elf_phdr *) kmalloc(j, GFP_KERNEL);
++	elf_phdata = kmalloc(j, GFP_KERNEL);
+ 	if (!elf_phdata)
+ 		goto out;
+ 
++	eppnt = elf_phdata;
+ 	error = -ENOEXEC;
+-	retval = kernel_read(file, elf_ex.e_phoff, (char *) elf_phdata, j);
++	retval = kernel_read(file, elf_ex.e_phoff, (char *)eppnt, j);
+ 	if (retval != j)
+ 		goto out_free_ph;
+ 
+ 	for (j = 0, i = 0; i<elf_ex.e_phnum; i++)
+-		if ((elf_phdata + i)->p_type == PT_LOAD) j++;
++		if ((eppnt + i)->p_type == PT_LOAD)
++			j++;
+ 	if (j != 1)
+ 		goto out_free_ph;
+ 
+-	while (elf_phdata->p_type != PT_LOAD) elf_phdata++;
++	while (eppnt->p_type != PT_LOAD)
++		eppnt++;
+ 
+ 	/* Now use mmap to map the library into memory. */
+ 	down_write(&current->mm->mmap_sem);
+ 	error = do_mmap(file,
+-			ELF_PAGESTART(elf_phdata->p_vaddr),
+-			(elf_phdata->p_filesz +
+-			 ELF_PAGEOFFSET(elf_phdata->p_vaddr)),
++			ELF_PAGESTART(eppnt->p_vaddr),
++			(eppnt->p_filesz +
++			 ELF_PAGEOFFSET(eppnt->p_vaddr)),
+ 			PROT_READ | PROT_WRITE | PROT_EXEC,
+ 			MAP_FIXED | MAP_PRIVATE | MAP_DENYWRITE,
+-			(elf_phdata->p_offset -
+-			 ELF_PAGEOFFSET(elf_phdata->p_vaddr)));
++			(eppnt->p_offset -
++			 ELF_PAGEOFFSET(eppnt->p_vaddr)));
+ 	up_write(&current->mm->mmap_sem);
+-	if (error != ELF_PAGESTART(elf_phdata->p_vaddr))
++	if (error != ELF_PAGESTART(eppnt->p_vaddr))
+ 		goto out_free_ph;
+ 
+-	elf_bss = elf_phdata->p_vaddr + elf_phdata->p_filesz;
++	elf_bss = eppnt->p_vaddr + eppnt->p_filesz;
+ 	if (padzero(elf_bss)) {
+ 		error = -EFAULT;
+ 		goto out_free_ph;
+ 	}
+ 
+-	len = ELF_PAGESTART(elf_phdata->p_filesz + elf_phdata->p_vaddr + ELF_MIN_ALIGN - 1);
+-	bss = elf_phdata->p_memsz + elf_phdata->p_vaddr;
++	len = ELF_PAGESTART(eppnt->p_filesz + eppnt->p_vaddr + ELF_MIN_ALIGN - 1);
++	bss = eppnt->p_memsz + eppnt->p_vaddr;
+ 	if (bss > len) {
+ 		down_write(&current->mm->mmap_sem);
+ 		do_brk(len, bss - len);
+diff -Nru a/fs/cramfs/inode.c b/fs/cramfs/inode.c
+--- a/fs/cramfs/inode.c	2005-04-29 18:34:27 -07:00
++++ b/fs/cramfs/inode.c	2005-04-29 18:34:27 -07:00
+@@ -70,6 +70,7 @@
+ 			inode->i_data.a_ops = &cramfs_aops;
+ 		} else {
+ 			inode->i_size = 0;
++			inode->i_blocks = 0;
+ 			init_special_inode(inode, inode->i_mode,
+ 				old_decode_dev(cramfs_inode->size));
+ 		}
+diff -Nru a/fs/eventpoll.c b/fs/eventpoll.c
+--- a/fs/eventpoll.c	2005-04-29 18:34:27 -07:00
++++ b/fs/eventpoll.c	2005-04-29 18:34:27 -07:00
+@@ -619,6 +619,7 @@
+ 	return error;
+ }
+ 
++#define MAX_EVENTS (INT_MAX / sizeof(struct epoll_event))
+ 
+ /*
+  * Implement the event wait interface for the eventpoll file. It is the kernel
+@@ -635,7 +636,7 @@
+ 		     current, epfd, events, maxevents, timeout));
+ 
+ 	/* The maximum number of event must be greater than zero */
+-	if (maxevents <= 0)
++	if (maxevents <= 0 || maxevents > MAX_EVENTS)
+ 		return -EINVAL;
+ 
+ 	/* Verify that the area passed by the user is writeable */
+diff -Nru a/fs/exec.c b/fs/exec.c
+--- a/fs/exec.c	2005-04-29 18:34:27 -07:00
++++ b/fs/exec.c	2005-04-29 18:34:27 -07:00
+@@ -814,7 +814,7 @@
+ {
+ 	/* buf must be at least sizeof(tsk->comm) in size */
+ 	task_lock(tsk);
+-	memcpy(buf, tsk->comm, sizeof(tsk->comm));
++	strncpy(buf, tsk->comm, sizeof(tsk->comm));
+ 	task_unlock(tsk);
+ }
+ 
+diff -Nru a/fs/ext2/dir.c b/fs/ext2/dir.c
+--- a/fs/ext2/dir.c	2005-04-29 18:34:28 -07:00
++++ b/fs/ext2/dir.c	2005-04-29 18:34:28 -07:00
+@@ -592,6 +592,7 @@
+ 		goto fail;
+ 	}
+ 	kaddr = kmap_atomic(page, KM_USER0);
++       memset(kaddr, 0, chunk_size);
+ 	de = (struct ext2_dir_entry_2 *)kaddr;
+ 	de->name_len = 1;
+ 	de->rec_len = cpu_to_le16(EXT2_DIR_REC_LEN(1));
+diff -Nru a/fs/isofs/inode.c b/fs/isofs/inode.c
+--- a/fs/isofs/inode.c	2005-04-29 18:34:28 -07:00
++++ b/fs/isofs/inode.c	2005-04-29 18:34:28 -07:00
+@@ -685,6 +685,8 @@
+ 	  sbi->s_log_zone_size = isonum_723 (h_pri->logical_block_size);
+ 	  sbi->s_max_size = isonum_733(h_pri->volume_space_size);
+ 	} else {
++	  if (!pri)
++	    goto out_freebh;
+ 	  rootp = (struct iso_directory_record *) pri->root_directory_record;
+ 	  sbi->s_nzones = isonum_733 (pri->volume_space_size);
+ 	  sbi->s_log_zone_size = isonum_723 (pri->logical_block_size);
+@@ -1394,6 +1396,9 @@
+ 	unsigned long hashval;
+ 	struct inode *inode;
+ 	struct isofs_iget5_callback_data data;
++
++	if (offset >= 1ul << sb->s_blocksize_bits)
++		return NULL;
+ 
+ 	data.block = block;
+ 	data.offset = offset;
+diff -Nru a/fs/isofs/rock.c b/fs/isofs/rock.c
+--- a/fs/isofs/rock.c	2005-04-29 18:34:28 -07:00
++++ b/fs/isofs/rock.c	2005-04-29 18:34:28 -07:00
+@@ -53,6 +53,7 @@
+   if(LEN & 1) LEN++;						\
+   CHR = ((unsigned char *) DE) + LEN;				\
+   LEN = *((unsigned char *) DE) - LEN;                          \
++  if (LEN<0) LEN=0;                                             \
+   if (ISOFS_SB(inode->i_sb)->s_rock_offset!=-1)                \
+   {                                                             \
+      LEN-=ISOFS_SB(inode->i_sb)->s_rock_offset;                \
+@@ -73,6 +74,10 @@
+     offset1 = 0; \
+     pbh = sb_bread(DEV->i_sb, block); \
+     if(pbh){       \
++      if (offset > pbh->b_size || offset + cont_size > pbh->b_size){	\
++	brelse(pbh); \
++	goto out; \
++      } \
+       memcpy(buffer + offset1, pbh->b_data + offset, cont_size - offset1); \
+       brelse(pbh); \
+       chr = (unsigned char *) buffer; \
+@@ -103,12 +108,13 @@
+     struct rock_ridge * rr;
+     int sig;
+     
+-    while (len > 1){ /* There may be one byte for padding somewhere */
++    while (len > 2){ /* There may be one byte for padding somewhere */
+       rr = (struct rock_ridge *) chr;
+-      if (rr->len == 0) goto out; /* Something got screwed up here */
++      if (rr->len < 3) goto out; /* Something got screwed up here */
+       sig = isonum_721(chr);
+       chr += rr->len; 
+       len -= rr->len;
++      if (len < 0) goto out;	/* corrupted isofs */
+ 
+       switch(sig){
+       case SIG('R','R'):
+@@ -122,6 +128,7 @@
+ 	break;
+       case SIG('N','M'):
+ 	if (truncate) break;
++	if (rr->len < 5) break;
+         /*
+ 	 * If the flags are 2 or 4, this indicates '.' or '..'.
+ 	 * We don't want to do anything with this, because it
+@@ -186,12 +193,13 @@
+     struct rock_ridge * rr;
+     int rootflag;
+     
+-    while (len > 1){ /* There may be one byte for padding somewhere */
++    while (len > 2){ /* There may be one byte for padding somewhere */
+       rr = (struct rock_ridge *) chr;
+-      if (rr->len == 0) goto out; /* Something got screwed up here */
++      if (rr->len < 3) goto out; /* Something got screwed up here */
+       sig = isonum_721(chr);
+       chr += rr->len; 
+       len -= rr->len;
++      if (len < 0) goto out;	/* corrupted isofs */
+       
+       switch(sig){
+ #ifndef CONFIG_ZISOFS		/* No flag for SF or ZF */
+@@ -462,7 +470,7 @@
+ 	struct rock_ridge *rr;
+ 
+ 	if (!ISOFS_SB(inode->i_sb)->s_rock)
+-		panic ("Cannot have symlink with high sierra variant of iso filesystem\n");
++		goto error;
+ 
+ 	block = ei->i_iget5_block;
+ 	lock_kernel();
+@@ -487,13 +495,15 @@
+ 	SETUP_ROCK_RIDGE(raw_inode, chr, len);
+ 
+       repeat:
+-	while (len > 1) { /* There may be one byte for padding somewhere */
++	while (len > 2) { /* There may be one byte for padding somewhere */
+ 		rr = (struct rock_ridge *) chr;
+-		if (rr->len == 0)
++		if (rr->len < 3)
+ 			goto out;	/* Something got screwed up here */
+ 		sig = isonum_721(chr);
+ 		chr += rr->len;
+ 		len -= rr->len;
++		if (len < 0)
++			goto out;	/* corrupted isofs */
+ 
+ 		switch (sig) {
+ 		case SIG('R', 'R'):
+@@ -543,6 +553,7 @@
+       fail:
+ 	brelse(bh);
+ 	unlock_kernel();
++      error:
+ 	SetPageError(page);
+ 	kunmap(page);
+ 	unlock_page(page);
+diff -Nru a/fs/jbd/transaction.c b/fs/jbd/transaction.c
+--- a/fs/jbd/transaction.c	2005-04-29 18:34:27 -07:00
++++ b/fs/jbd/transaction.c	2005-04-29 18:34:27 -07:00
+@@ -1775,10 +1775,10 @@
+ 			JBUFFER_TRACE(jh, "checkpointed: add to BJ_Forget");
+ 			ret = __dispose_buffer(jh,
+ 					journal->j_running_transaction);
++			journal_put_journal_head(jh);
+ 			spin_unlock(&journal->j_list_lock);
+ 			jbd_unlock_bh_state(bh);
+ 			spin_unlock(&journal->j_state_lock);
+-			journal_put_journal_head(jh);
+ 			return ret;
+ 		} else {
+ 			/* There is no currently-running transaction. So the
+@@ -1789,10 +1789,10 @@
+ 				JBUFFER_TRACE(jh, "give to committing trans");
+ 				ret = __dispose_buffer(jh,
+ 					journal->j_committing_transaction);
++				journal_put_journal_head(jh);
+ 				spin_unlock(&journal->j_list_lock);
+ 				jbd_unlock_bh_state(bh);
+ 				spin_unlock(&journal->j_state_lock);
+-				journal_put_journal_head(jh);
+ 				return ret;
+ 			} else {
+ 				/* The orphan record's transaction has
+@@ -1813,10 +1813,10 @@
+ 					journal->j_running_transaction);
+ 			jh->b_next_transaction = NULL;
+ 		}
++		journal_put_journal_head(jh);
+ 		spin_unlock(&journal->j_list_lock);
+ 		jbd_unlock_bh_state(bh);
+ 		spin_unlock(&journal->j_state_lock);
+-		journal_put_journal_head(jh);
+ 		return 0;
+ 	} else {
+ 		/* Good, the buffer belongs to the running transaction.
+diff -Nru a/fs/partitions/msdos.c b/fs/partitions/msdos.c
+--- a/fs/partitions/msdos.c	2005-04-29 18:34:28 -07:00
++++ b/fs/partitions/msdos.c	2005-04-29 18:34:28 -07:00
+@@ -114,6 +114,9 @@
+ 		 */
+ 		for (i=0; i<4; i++, p++) {
+ 			u32 offs, size, next;
++
++			if (SYS_IND(p) == 0)
++				continue;
+ 			if (!NR_SECTS(p) || is_extended_partition(p))
+ 				continue;
+ 
+@@ -430,6 +433,8 @@
+ 	for (slot = 1 ; slot <= 4 ; slot++, p++) {
+ 		u32 start = START_SECT(p)*sector_size;
+ 		u32 size = NR_SECTS(p)*sector_size;
++		if (SYS_IND(p) == 0)
++			continue;
+ 		if (!size)
+ 			continue;
+ 		if (is_extended_partition(p)) {
+diff -Nru a/kernel/signal.c b/kernel/signal.c
+--- a/kernel/signal.c	2005-04-29 18:34:27 -07:00
++++ b/kernel/signal.c	2005-04-29 18:34:27 -07:00
+@@ -1728,6 +1728,7 @@
+ 			 * with another processor delivering a stop signal,
+ 			 * then the SIGCONT that wakes us up should clear it.
+ 			 */
++			read_unlock(&tasklist_lock);
+ 			return 0;
+ 		}
+ 
+diff -Nru a/lib/rwsem-spinlock.c b/lib/rwsem-spinlock.c
+--- a/lib/rwsem-spinlock.c	2005-04-29 18:34:28 -07:00
++++ b/lib/rwsem-spinlock.c	2005-04-29 18:34:28 -07:00
+@@ -140,12 +140,12 @@
+ 
+ 	rwsemtrace(sem, "Entering __down_read");
+ 
+-	spin_lock(&sem->wait_lock);
++	spin_lock_irq(&sem->wait_lock);
+ 
+ 	if (sem->activity >= 0 && list_empty(&sem->wait_list)) {
+ 		/* granted */
+ 		sem->activity++;
+-		spin_unlock(&sem->wait_lock);
++		spin_unlock_irq(&sem->wait_lock);
+ 		goto out;
+ 	}
+ 
+@@ -160,7 +160,7 @@
+ 	list_add_tail(&waiter.list, &sem->wait_list);
+ 
+ 	/* we don't need to touch the semaphore struct anymore */
+-	spin_unlock(&sem->wait_lock);
++	spin_unlock_irq(&sem->wait_lock);
+ 
+ 	/* wait to be given the lock */
+ 	for (;;) {
+@@ -181,10 +181,12 @@
+  */
+ int fastcall __down_read_trylock(struct rw_semaphore *sem)
+ {
++	unsigned long flags;
+ 	int ret = 0;
++
+ 	rwsemtrace(sem, "Entering __down_read_trylock");
+ 
+-	spin_lock(&sem->wait_lock);
++	spin_lock_irqsave(&sem->wait_lock, flags);
+ 
+ 	if (sem->activity >= 0 && list_empty(&sem->wait_list)) {
+ 		/* granted */
+@@ -192,7 +194,7 @@
+ 		ret = 1;
+ 	}
+ 
+-	spin_unlock(&sem->wait_lock);
++	spin_unlock_irqrestore(&sem->wait_lock, flags);
+ 
+ 	rwsemtrace(sem, "Leaving __down_read_trylock");
+ 	return ret;
+@@ -209,12 +211,12 @@
+ 
+ 	rwsemtrace(sem, "Entering __down_write");
+ 
+-	spin_lock(&sem->wait_lock);
++	spin_lock_irq(&sem->wait_lock);
+ 
+ 	if (sem->activity == 0 && list_empty(&sem->wait_list)) {
+ 		/* granted */
+ 		sem->activity = -1;
+-		spin_unlock(&sem->wait_lock);
++		spin_unlock_irq(&sem->wait_lock);
+ 		goto out;
+ 	}
+ 
+@@ -229,7 +231,7 @@
+ 	list_add_tail(&waiter.list, &sem->wait_list);
+ 
+ 	/* we don't need to touch the semaphore struct anymore */
+-	spin_unlock(&sem->wait_lock);
++	spin_unlock_irq(&sem->wait_lock);
+ 
+ 	/* wait to be given the lock */
+ 	for (;;) {
+@@ -250,10 +252,12 @@
+  */
+ int fastcall __down_write_trylock(struct rw_semaphore *sem)
+ {
++	unsigned long flags;
+ 	int ret = 0;
++
+ 	rwsemtrace(sem, "Entering __down_write_trylock");
+ 
+-	spin_lock(&sem->wait_lock);
++	spin_lock_irqsave(&sem->wait_lock, flags);
+ 
+ 	if (sem->activity == 0 && list_empty(&sem->wait_list)) {
+ 		/* granted */
+@@ -261,7 +265,7 @@
+ 		ret = 1;
+ 	}
+ 
+-	spin_unlock(&sem->wait_lock);
++	spin_unlock_irqrestore(&sem->wait_lock, flags);
+ 
+ 	rwsemtrace(sem, "Leaving __down_write_trylock");
+ 	return ret;
+@@ -272,14 +276,16 @@
+  */
+ void fastcall __up_read(struct rw_semaphore *sem)
+ {
++	unsigned long flags;
++
+ 	rwsemtrace(sem, "Entering __up_read");
+ 
+-	spin_lock(&sem->wait_lock);
++	spin_lock_irqsave(&sem->wait_lock, flags);
+ 
+ 	if (--sem->activity == 0 && !list_empty(&sem->wait_list))
+ 		sem = __rwsem_wake_one_writer(sem);
+ 
+-	spin_unlock(&sem->wait_lock);
++	spin_unlock_irqrestore(&sem->wait_lock, flags);
+ 
+ 	rwsemtrace(sem, "Leaving __up_read");
+ }
+@@ -289,15 +295,17 @@
+  */
+ void fastcall __up_write(struct rw_semaphore *sem)
+ {
++	unsigned long flags;
++
+ 	rwsemtrace(sem, "Entering __up_write");
+ 
+-	spin_lock(&sem->wait_lock);
++	spin_lock_irqsave(&sem->wait_lock, flags);
+ 
+ 	sem->activity = 0;
+ 	if (!list_empty(&sem->wait_list))
+ 		sem = __rwsem_do_wake(sem, 1);
+ 
+-	spin_unlock(&sem->wait_lock);
++	spin_unlock_irqrestore(&sem->wait_lock, flags);
+ 
+ 	rwsemtrace(sem, "Leaving __up_write");
+ }
+@@ -308,15 +316,17 @@
+  */
+ void fastcall __downgrade_write(struct rw_semaphore *sem)
+ {
++	unsigned long flags;
++
+ 	rwsemtrace(sem, "Entering __downgrade_write");
+ 
+-	spin_lock(&sem->wait_lock);
++	spin_lock_irqsave(&sem->wait_lock, flags);
+ 
+ 	sem->activity = 1;
+ 	if (!list_empty(&sem->wait_list))
+ 		sem = __rwsem_do_wake(sem, 0);
+ 
+-	spin_unlock(&sem->wait_lock);
++	spin_unlock_irqrestore(&sem->wait_lock, flags);
+ 
+ 	rwsemtrace(sem, "Leaving __downgrade_write");
+ }
+diff -Nru a/lib/rwsem.c b/lib/rwsem.c
+--- a/lib/rwsem.c	2005-04-29 18:34:28 -07:00
++++ b/lib/rwsem.c	2005-04-29 18:34:28 -07:00
+@@ -150,7 +150,7 @@
+ 	set_task_state(tsk, TASK_UNINTERRUPTIBLE);
+ 
+ 	/* set up my own style of waitqueue */
+-	spin_lock(&sem->wait_lock);
++	spin_lock_irq(&sem->wait_lock);
+ 	waiter->task = tsk;
+ 	get_task_struct(tsk);
+ 
+@@ -163,7 +163,7 @@
+ 	if (!(count & RWSEM_ACTIVE_MASK))
+ 		sem = __rwsem_do_wake(sem, 0);
+ 
+-	spin_unlock(&sem->wait_lock);
++	spin_unlock_irq(&sem->wait_lock);
+ 
+ 	/* wait to be given the lock */
+ 	for (;;) {
+@@ -219,15 +219,17 @@
+  */
+ struct rw_semaphore fastcall *rwsem_wake(struct rw_semaphore *sem)
+ {
++	unsigned long flags;
++
+ 	rwsemtrace(sem, "Entering rwsem_wake");
+ 
+-	spin_lock(&sem->wait_lock);
++	spin_lock_irqsave(&sem->wait_lock, flags);
+ 
+ 	/* do nothing if list empty */
+ 	if (!list_empty(&sem->wait_list))
+ 		sem = __rwsem_do_wake(sem, 0);
+ 
+-	spin_unlock(&sem->wait_lock);
++	spin_unlock_irqrestore(&sem->wait_lock, flags);
+ 
+ 	rwsemtrace(sem, "Leaving rwsem_wake");
+ 
+@@ -241,15 +243,17 @@
+  */
+ struct rw_semaphore fastcall *rwsem_downgrade_wake(struct rw_semaphore *sem)
+ {
++	unsigned long flags;
++
+ 	rwsemtrace(sem, "Entering rwsem_downgrade_wake");
+ 
+-	spin_lock(&sem->wait_lock);
++	spin_lock_irqsave(&sem->wait_lock, flags);
+ 
+ 	/* do nothing if list empty */
+ 	if (!list_empty(&sem->wait_list))
+ 		sem = __rwsem_do_wake(sem, 1);
+ 
+-	spin_unlock(&sem->wait_lock);
++	spin_unlock_irqrestore(&sem->wait_lock, flags);
+ 
+ 	rwsemtrace(sem, "Leaving rwsem_downgrade_wake");
+ 	return sem;
+diff -Nru a/net/bluetooth/af_bluetooth.c b/net/bluetooth/af_bluetooth.c
+--- a/net/bluetooth/af_bluetooth.c	2005-04-29 18:34:27 -07:00
++++ b/net/bluetooth/af_bluetooth.c	2005-04-29 18:34:27 -07:00
+@@ -64,7 +64,7 @@
+ 
+ int bt_sock_register(int proto, struct net_proto_family *ops)
+ {
+-	if (proto >= BT_MAX_PROTO)
++	if (proto < 0 || proto >= BT_MAX_PROTO)
+ 		return -EINVAL;
+ 
+ 	if (bt_proto[proto])
+@@ -77,7 +77,7 @@
+ 
+ int bt_sock_unregister(int proto)
+ {
+-	if (proto >= BT_MAX_PROTO)
++	if (proto < 0 || proto >= BT_MAX_PROTO)
+ 		return -EINVAL;
+ 
+ 	if (!bt_proto[proto])
+@@ -92,7 +92,7 @@
+ {
+ 	int err = 0;
+ 
+-	if (proto >= BT_MAX_PROTO)
++	if (proto < 0 || proto >= BT_MAX_PROTO)
+ 		return -EINVAL;
+ 
+ #if defined(CONFIG_KMOD)
+diff -Nru a/net/ipv4/fib_hash.c b/net/ipv4/fib_hash.c
+--- a/net/ipv4/fib_hash.c	2005-04-29 18:34:28 -07:00
++++ b/net/ipv4/fib_hash.c	2005-04-29 18:34:28 -07:00
+@@ -919,13 +919,23 @@
+ 	return fa;
+ }
+ 
++static struct fib_alias *fib_get_idx(struct seq_file *seq, loff_t pos)
++{
++	struct fib_alias *fa = fib_get_first(seq);
++
++	if (fa)
++		while (pos && (fa = fib_get_next(seq)))
++			--pos;
++	return pos ? NULL : fa;
++}
++
+ static void *fib_seq_start(struct seq_file *seq, loff_t *pos)
+ {
+ 	void *v = NULL;
+ 
+ 	read_lock(&fib_hash_lock);
+ 	if (ip_fib_main_table)
+-		v = *pos ? fib_get_next(seq) : SEQ_START_TOKEN;
++		v = *pos ? fib_get_idx(seq, *pos - 1) : SEQ_START_TOKEN;
+ 	return v;
+ }
+ 
+diff -Nru a/net/ipv4/tcp_input.c b/net/ipv4/tcp_input.c
+--- a/net/ipv4/tcp_input.c	2005-04-29 18:34:28 -07:00
++++ b/net/ipv4/tcp_input.c	2005-04-29 18:34:28 -07:00
+@@ -1653,7 +1653,10 @@
+ static void tcp_undo_cwr(struct tcp_sock *tp, int undo)
+ {
+ 	if (tp->prior_ssthresh) {
+-		tp->snd_cwnd = max(tp->snd_cwnd, tp->snd_ssthresh<<1);
++		if (tcp_is_bic(tp))
++			tp->snd_cwnd = max(tp->snd_cwnd, tp->bictcp.last_max_cwnd);
++		else
++			tp->snd_cwnd = max(tp->snd_cwnd, tp->snd_ssthresh<<1);
+ 
+ 		if (undo && tp->prior_ssthresh > tp->snd_ssthresh) {
+ 			tp->snd_ssthresh = tp->prior_ssthresh;
+diff -Nru a/net/ipv4/tcp_timer.c b/net/ipv4/tcp_timer.c
+--- a/net/ipv4/tcp_timer.c	2005-04-29 18:34:28 -07:00
++++ b/net/ipv4/tcp_timer.c	2005-04-29 18:34:28 -07:00
+@@ -38,6 +38,7 @@
+ 
+ #ifdef TCP_DEBUG
+ const char tcp_timer_bug_msg[] = KERN_DEBUG "tcpbug: unknown timer value\n";
++EXPORT_SYMBOL(tcp_timer_bug_msg);
+ #endif
+ 
+ /*
+diff -Nru a/net/ipv4/xfrm4_output.c b/net/ipv4/xfrm4_output.c
+--- a/net/ipv4/xfrm4_output.c	2005-04-29 18:34:27 -07:00
++++ b/net/ipv4/xfrm4_output.c	2005-04-29 18:34:27 -07:00
+@@ -103,16 +103,16 @@
+ 			goto error_nolock;
+ 	}
+ 
+-	spin_lock_bh(&x->lock);
+-	err = xfrm_state_check(x, skb);
+-	if (err)
+-		goto error;
+-
+ 	if (x->props.mode) {
+ 		err = xfrm4_tunnel_check_size(skb);
+ 		if (err)
+-			goto error;
++			goto error_nolock;
+ 	}
++
++	spin_lock_bh(&x->lock);
++	err = xfrm_state_check(x, skb);
++	if (err)
++		goto error;
+ 
+ 	xfrm4_encap(skb);
+ 
+diff -Nru a/net/ipv6/xfrm6_output.c b/net/ipv6/xfrm6_output.c
+--- a/net/ipv6/xfrm6_output.c	2005-04-29 18:34:28 -07:00
++++ b/net/ipv6/xfrm6_output.c	2005-04-29 18:34:28 -07:00
+@@ -103,16 +103,16 @@
+ 			goto error_nolock;
+ 	}
+ 
+-	spin_lock_bh(&x->lock);
+-	err = xfrm_state_check(x, skb);
+-	if (err)
+-		goto error;
+-
+ 	if (x->props.mode) {
+ 		err = xfrm6_tunnel_check_size(skb);
+ 		if (err)
+-			goto error;
++			goto error_nolock;
+ 	}
++
++	spin_lock_bh(&x->lock);
++	err = xfrm_state_check(x, skb);
++	if (err)
++		goto error;
+ 
+ 	xfrm6_encap(skb);
+ 
+diff -Nru a/net/netrom/nr_in.c b/net/netrom/nr_in.c
+--- a/net/netrom/nr_in.c	2005-04-29 18:34:27 -07:00
++++ b/net/netrom/nr_in.c	2005-04-29 18:34:27 -07:00
+@@ -74,7 +74,6 @@
+ static int nr_state1_machine(struct sock *sk, struct sk_buff *skb,
+ 	int frametype)
+ {
+-	bh_lock_sock(sk);
+ 	switch (frametype) {
+ 	case NR_CONNACK: {
+ 		nr_cb *nr = nr_sk(sk);
+@@ -103,8 +102,6 @@
+ 	default:
+ 		break;
+ 	}
+-	bh_unlock_sock(sk);
+-
+ 	return 0;
+ }
+ 
+@@ -116,7 +113,6 @@
+ static int nr_state2_machine(struct sock *sk, struct sk_buff *skb,
+ 	int frametype)
+ {
+-	bh_lock_sock(sk);
+ 	switch (frametype) {
+ 	case NR_CONNACK | NR_CHOKE_FLAG:
+ 		nr_disconnect(sk, ECONNRESET);
+@@ -132,8 +128,6 @@
+ 	default:
+ 		break;
+ 	}
+-	bh_unlock_sock(sk);
+-
+ 	return 0;
+ }
+ 
+@@ -154,7 +148,6 @@
+ 	nr = skb->data[18];
+ 	ns = skb->data[17];
+ 
+-	bh_lock_sock(sk);
+ 	switch (frametype) {
+ 	case NR_CONNREQ:
+ 		nr_write_internal(sk, NR_CONNACK);
+@@ -265,8 +258,6 @@
+ 	default:
+ 		break;
+ 	}
+-	bh_unlock_sock(sk);
+-
+ 	return queued;
+ }
+ 
+diff -Nru a/net/xfrm/xfrm_state.c b/net/xfrm/xfrm_state.c
+--- a/net/xfrm/xfrm_state.c	2005-04-29 18:34:28 -07:00
++++ b/net/xfrm/xfrm_state.c	2005-04-29 18:34:28 -07:00
+@@ -609,7 +609,7 @@
+ 
+ 	for (i = 0; i < XFRM_DST_HSIZE; i++) {
+ 		list_for_each_entry(x, xfrm_state_bydst+i, bydst) {
+-			if (x->km.seq == seq) {
++			if (x->km.seq == seq && x->km.state == XFRM_STATE_ACQ) {
+ 				xfrm_state_hold(x);
+ 				return x;
+ 			}
+diff -Nru a/security/keys/key.c b/security/keys/key.c
+--- a/security/keys/key.c	2005-04-29 18:34:28 -07:00
++++ b/security/keys/key.c	2005-04-29 18:34:28 -07:00
+@@ -57,9 +57,10 @@
+ {
+ 	struct key_user *candidate = NULL, *user;
+ 	struct rb_node *parent = NULL;
+-	struct rb_node **p = &key_user_tree.rb_node;
++	struct rb_node **p;
+ 
+  try_again:
++	p = &key_user_tree.rb_node;
+ 	spin_lock(&key_user_lock);
+ 
+ 	/* search the tree for a user record with a matching UID */
+diff -Nru a/sound/core/timer.c b/sound/core/timer.c
+--- a/sound/core/timer.c	2005-04-29 18:34:28 -07:00
++++ b/sound/core/timer.c	2005-04-29 18:34:28 -07:00
+@@ -1117,7 +1117,8 @@
+ 	if (tu->qused >= tu->queue_size) {
+ 		tu->overrun++;
+ 	} else {
+-		memcpy(&tu->queue[tu->qtail++], tread, sizeof(*tread));
++		memcpy(&tu->tqueue[tu->qtail++], tread, sizeof(*tread));
++		tu->qtail %= tu->queue_size;
+ 		tu->qused++;
+ 	}
+ }
+@@ -1140,6 +1141,8 @@
+ 	spin_lock(&tu->qlock);
+ 	snd_timer_user_append_to_tqueue(tu, &r1);
+ 	spin_unlock(&tu->qlock);
++	kill_fasync(&tu->fasync, SIGIO, POLL_IN);
++	wake_up(&tu->qchange_sleep);
+ }
+ 
+ static void snd_timer_user_tinterrupt(snd_timer_instance_t *timeri,
+diff -Nru a/sound/pci/ac97/ac97_codec.c b/sound/pci/ac97/ac97_codec.c
+--- a/sound/pci/ac97/ac97_codec.c	2005-04-29 18:34:28 -07:00
++++ b/sound/pci/ac97/ac97_codec.c	2005-04-29 18:34:28 -07:00
+@@ -1185,7 +1185,7 @@
+ /*
+  * create mute switch(es) for normal stereo controls
+  */
+-static int snd_ac97_cmute_new(snd_card_t *card, char *name, int reg, ac97_t *ac97)
++static int snd_ac97_cmute_new_stereo(snd_card_t *card, char *name, int reg, int check_stereo, ac97_t *ac97)
+ {
+ 	snd_kcontrol_t *kctl;
+ 	int err;
+@@ -1196,7 +1196,7 @@
+ 
+ 	mute_mask = 0x8000;
+ 	val = snd_ac97_read(ac97, reg);
+-	if (ac97->flags & AC97_STEREO_MUTES) {
++	if (check_stereo || (ac97->flags & AC97_STEREO_MUTES)) {
+ 		/* check whether both mute bits work */
+ 		val1 = val | 0x8080;
+ 		snd_ac97_write(ac97, reg, val1);
+@@ -1254,7 +1254,7 @@
+ /*
+  * create a mute-switch and a volume for normal stereo/mono controls
+  */
+-static int snd_ac97_cmix_new(snd_card_t *card, const char *pfx, int reg, ac97_t *ac97)
++static int snd_ac97_cmix_new_stereo(snd_card_t *card, const char *pfx, int reg, int check_stereo, ac97_t *ac97)
+ {
+ 	int err;
+ 	char name[44];
+@@ -1265,7 +1265,7 @@
+ 
+ 	if (snd_ac97_try_bit(ac97, reg, 15)) {
+ 		sprintf(name, "%s Switch", pfx);
+-		if ((err = snd_ac97_cmute_new(card, name, reg, ac97)) < 0)
++		if ((err = snd_ac97_cmute_new_stereo(card, name, reg, check_stereo, ac97)) < 0)
+ 			return err;
+ 	}
+ 	check_volume_resolution(ac97, reg, &lo_max, &hi_max);
+@@ -1277,6 +1277,8 @@
+ 	return 0;
+ }
+ 
++#define snd_ac97_cmix_new(card, pfx, reg, ac97)	snd_ac97_cmix_new_stereo(card, pfx, reg, 0, ac97)
++#define snd_ac97_cmute_new(card, name, reg, ac97)	snd_ac97_cmute_new_stereo(card, name, reg, 0, ac97)
+ 
+ static unsigned int snd_ac97_determine_spdif_rates(ac97_t *ac97);
+ 
+@@ -1327,7 +1329,8 @@
+ 
+ 	/* build surround controls */
+ 	if (snd_ac97_try_volume_mix(ac97, AC97_SURROUND_MASTER)) {
+-		if ((err = snd_ac97_cmix_new(card, "Surround Playback", AC97_SURROUND_MASTER, ac97)) < 0)
++		/* Surround Master (0x38) is with stereo mutes */
++		if ((err = snd_ac97_cmix_new_stereo(card, "Surround Playback", AC97_SURROUND_MASTER, 1, ac97)) < 0)
+ 			return err;
+ 	}
+ 
