@@ -433,10 +433,19 @@ static inline int admin_io_okay(
 #define outl_user(_v, _p, _d, _r) \
     (admin_io_okay(_p, 4, _d, _r) ? outl(_v, _p) : ((void)0))
 
+/* Propagate a fault back to the guest kernel. */
+#define USER_READ_FAULT  4 /* user mode, read fault */
+#define USER_WRITE_FAULT 6 /* user mode, write fault */
+#define PAGE_FAULT(_faultaddr, _errcode)        \
+({  propagate_page_fault(_faultaddr, _errcode); \
+    return EXCRET_fault_fixed;                  \
+})
+
+/* Isntruction fetch with error handling. */
 #define insn_fetch(_type, _size, _ptr)          \
 ({  unsigned long _x;                           \
     if ( get_user(_x, (_type *)eip) )           \
-        goto read_fault;                        \
+        PAGE_FAULT(eip, USER_READ_FAULT);       \
     eip += _size; (_type)_x; })
 
 static int emulate_privileged_op(struct cpu_user_regs *regs)
@@ -502,17 +511,17 @@ static int emulate_privileged_op(struct cpu_user_regs *regs)
             case 1:
                 data = (u8)inb_user((u16)regs->edx, ed, regs);
                 if ( put_user((u8)data, (u8 *)regs->edi) )
-                    goto write_fault;
+                    PAGE_FAULT(regs->edi, USER_WRITE_FAULT);
                 break;
             case 2:
                 data = (u16)inw_user((u16)regs->edx, ed, regs);
                 if ( put_user((u16)data, (u16 *)regs->edi) )
-                    goto write_fault;
+                    PAGE_FAULT(regs->edi, USER_WRITE_FAULT);
                 break;
             case 4:
                 data = (u32)inl_user((u16)regs->edx, ed, regs);
                 if ( put_user((u32)data, (u32 *)regs->edi) )
-                    goto write_fault;
+                    PAGE_FAULT(regs->edi, USER_WRITE_FAULT);
                 break;
             }
             regs->edi += (regs->eflags & EF_DF) ? -op_bytes : op_bytes;
@@ -527,17 +536,17 @@ static int emulate_privileged_op(struct cpu_user_regs *regs)
             {
             case 1:
                 if ( get_user(data, (u8 *)regs->esi) )
-                    goto read_fault;
+                    PAGE_FAULT(regs->esi, USER_READ_FAULT);
                 outb_user((u8)data, (u16)regs->edx, ed, regs);
                 break;
             case 2:
                 if ( get_user(data, (u16 *)regs->esi) )
-                    goto read_fault;
+                    PAGE_FAULT(regs->esi, USER_READ_FAULT);
                 outw_user((u16)data, (u16)regs->edx, ed, regs);
                 break;
             case 4:
                 if ( get_user(data, (u32 *)regs->esi) )
-                    goto read_fault;
+                    PAGE_FAULT(regs->esi, USER_READ_FAULT);
                 outl_user((u32)data, (u16)regs->edx, ed, regs);
                 break;
             }
@@ -736,14 +745,6 @@ static int emulate_privileged_op(struct cpu_user_regs *regs)
 
  fail:
     return 0;
-
- read_fault:
-    propagate_page_fault(eip, 4); /* user mode, read fault */
-    return EXCRET_fault_fixed;
-
- write_fault:
-    propagate_page_fault(eip, 6); /* user mode, write fault */
-    return EXCRET_fault_fixed;
 }
 
 asmlinkage int do_general_protection(struct cpu_user_regs *regs)
