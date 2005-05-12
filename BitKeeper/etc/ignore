@@ -58,6 +58,7 @@ netbsd-*-tools/*
 netbsd-*-xen0/*
 netbsd-*-xenU/*
 netbsd-*.patch
+patches/*/.makedep
 patches/ebtables-brnf-5_vs_2.4.25.diff
 patches/ebtables.diff
 patches/tmp/*
