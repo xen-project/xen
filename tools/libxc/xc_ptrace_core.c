@@ -107,6 +107,7 @@ map_domain_va(unsigned long domfd, int cpu, void * guest_va)
 {
     unsigned long pde, page;
     unsigned long va = (unsigned long)guest_va;
+    void *v;
 
     static unsigned long  cr3_phys[MAX_VIRT_CPUS];
     static unsigned long *cr3_virt[MAX_VIRT_CPUS];
@@ -120,13 +121,15 @@ map_domain_va(unsigned long domfd, int cpu, void * guest_va)
 	cr3_phys[cpu] = cr3[cpu];
 	if (cr3_virt[cpu])
 	    munmap(cr3_virt[cpu], PAGE_SIZE);
-	if ((cr3_virt[cpu] = mmap(NULL, PAGE_SIZE, PROT_READ, 
-				  MAP_PRIVATE, domfd, map_mtop_offset(cr3_phys[cpu]))) == 
-	    (unsigned long*)0xffffffff)
+	v = mmap(
+            NULL, PAGE_SIZE, PROT_READ, MAP_PRIVATE, domfd,
+            map_mtop_offset(cr3_phys[cpu]));
+        if (v == MAP_FAILED)
 	{
 	    perror("mmap failed");
 	    goto error_out;
 	}
+        cr3_virt[cpu] = v;
     } 
     if ((pde = cr3_virt[cpu][vtopdi(va)]) == 0) /* logical address */
 	goto error_out;
@@ -137,9 +140,12 @@ map_domain_va(unsigned long domfd, int cpu, void * guest_va)
 	pde_phys[cpu] = pde;
 	if (pde_virt[cpu])
 	    munmap(pde_virt[cpu], PAGE_SIZE);
-	if ((pde_virt[cpu] =  mmap(NULL, PAGE_SIZE, PROT_READ, 
-				  MAP_PRIVATE, domfd, map_mtop_offset(pde_phys[cpu]))) == NULL)
+	v = mmap(
+            NULL, PAGE_SIZE, PROT_READ, MAP_PRIVATE, domfd,
+            map_mtop_offset(pde_phys[cpu]));
+        if (v == MAP_FAILED)
 	    goto error_out;
+        pde_virt[cpu] = v;
     }
     if ((page = pde_virt[cpu][vtopti(va)]) == 0) /* logical address */
 	goto error_out;
@@ -150,12 +156,15 @@ map_domain_va(unsigned long domfd, int cpu, void * guest_va)
 	page_phys[cpu] = page;
 	if (page_virt[cpu])
 	    munmap(page_virt[cpu], PAGE_SIZE);
-	if ((page_virt[cpu] = mmap(NULL, PAGE_SIZE, PROT_READ, 
-				  MAP_PRIVATE, domfd, map_mtop_offset(page_phys[cpu]))) == NULL) {
+	v = mmap(
+            NULL, PAGE_SIZE, PROT_READ, MAP_PRIVATE, domfd,
+            map_mtop_offset(page_phys[cpu]));
+        if (v == MAP_FAILED) {
 	    printf("cr3 %lx pde %lx page %lx pti %lx\n", cr3[cpu], pde, page, vtopti(va));
 	    page_phys[cpu] = 0;
 	    goto error_out;
 	}
+        page_virt[cpu] = v;
     }	
     return (void *)(((unsigned long)page_virt[cpu]) | (va & BSD_PAGE_MASK));
 
