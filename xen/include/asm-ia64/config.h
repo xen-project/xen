@@ -166,12 +166,6 @@ struct device {
 #endif
 };
 
-// from linux/include/linux/pci.h
-struct pci_bus_region {
-	unsigned long start;
-	unsigned long end;
-};
-
 // warning: unless search_extable is declared, the return value gets
 // truncated to 32-bits, causing a very strange error in privop handling
 struct exception_table_entry;
@@ -255,6 +249,14 @@ extern char saved_command_line[];
 struct screen_info { };
 #define seq_printf(a,b...) printf(b)
 #define CONFIG_BLK_DEV_INITRD // needed to reserve memory for domain0
+
+//
+#define __smp_processor_id() (current->processor)
+
+// needed for newer ACPI code
+#define asmlinkage
+
+#define FORCE_CRASH()	asm("break 0;;");
 
 // these declarations got moved at some point, find a better place for them
 extern int opt_noht;

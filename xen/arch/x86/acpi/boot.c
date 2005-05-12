@@ -36,23 +36,12 @@
 #include <asm/io.h>
 #include <asm/irq.h>
 #include <asm/mpspec.h>
-
-int sbf_port; /* XXX XEN */
-
-#ifdef	CONFIG_X86_64
-
-static inline void  acpi_madt_oem_check(char *oem_id, char *oem_table_id) { }
-extern void __init clustered_apic_check(void);
-static inline int ioapic_setup_disabled(void) { return 0; }
-
-#else	/* X86 */
-
-#ifdef	CONFIG_X86_LOCAL_APIC
 #include <mach_apic.h>
 #include <mach_mpparse.h>
-#endif	/* CONFIG_X86_LOCAL_APIC */
 
-#endif	/* X86 */
+int sbf_port;
+#define end_pfn_map max_page
+#define CONFIG_ACPI_PCI
 
 #define BAD_MADT_ENTRY(entry, end) (					    \
 		(!entry) || (unsigned long)entry + sizeof(*entry) > end ||  \
@@ -109,7 +98,7 @@ char *__acpi_map_table(unsigned long phys_addr, unsigned long size)
 	if (!phys_addr || !size)
 	return NULL;
 
-	if (phys_addr < (max_page << PAGE_SHIFT))
+	if (phys_addr < (end_pfn_map << PAGE_SHIFT))
 		return __va(phys_addr);
 
 	return NULL;
@@ -279,7 +268,7 @@ acpi_parse_lapic_nmi (
 
 #endif /*CONFIG_X86_LOCAL_APIC*/
 
-#if defined(CONFIG_X86_IO_APIC) && defined(CONFIG_ACPI_INTERPRETER)
+#if defined(CONFIG_X86_IO_APIC) /*&& defined(CONFIG_ACPI_INTERPRETER)*/
 
 static int __init
 acpi_parse_ioapic (
@@ -302,6 +291,7 @@ acpi_parse_ioapic (
 	return 0;
 }
 
+#ifdef CONFIG_ACPI_INTERPRETER
 /*
  * Parse Interrupt Source Override for the ACPI SCI
  */
@@ -335,6 +325,7 @@ acpi_sci_ioapic_setup(u32 gsi, u16 polarity, u16 trigger)
 	acpi_sci_override_gsi = gsi;
 	return;
 }
+#endif
 
 static int __init
 acpi_parse_int_src_ovr (
@@ -349,11 +340,13 @@ acpi_parse_int_src_ovr (
 
 	acpi_table_print_madt_entry(header);
 
+#ifdef CONFIG_ACPI_INTERPRETER
 	if (intsrc->bus_irq == acpi_fadt.sci_int) {
 		acpi_sci_ioapic_setup(intsrc->global_irq,
 			intsrc->flags.polarity, intsrc->flags.trigger);
 		return 0;
 	}
+#endif
 
 	if (acpi_skip_timer_override &&
 		intsrc->bus_irq == 0 && intsrc->global_irq == 2) {
@@ -698,7 +691,7 @@ acpi_parse_madt_lapic_entries(void)
 }
 #endif /* CONFIG_X86_LOCAL_APIC */
 
-#if defined(CONFIG_X86_IO_APIC) && defined(CONFIG_ACPI_INTERPRETER)
+#if defined(CONFIG_X86_IO_APIC) /*&& defined(CONFIG_ACPI_INTERPRETER)*/
 /*
  * Parse IOAPIC related entries in MADT
  * returns 0 on success, < 0 on error
@@ -744,12 +737,14 @@ acpi_parse_madt_ioapic_entries(void)
 		return count;
 	}
 
+#ifdef CONFIG_ACPI_INTERPRETER
 	/*
 	 * If BIOS did not supply an INT_SRC_OVR for the SCI
 	 * pretend we got one so we can set the SCI flags.
 	 */
 	if (!acpi_sci_override_gsi)
 		acpi_sci_ioapic_setup(acpi_fadt.sci_int, 0, 0);
+#endif
 
 	/* Fill in identity legacy mapings where no override */
 	mp_config_acpi_legacy_irqs();
@@ -855,10 +850,6 @@ acpi_boot_table_init(void)
 		disable_acpi();
 		return error;
 	}
-
-#if 0 /*def __i386__*/
-	check_acpi_pci();
-#endif
 
 	acpi_table_parse(ACPI_BOOT, acpi_parse_sbf);
 

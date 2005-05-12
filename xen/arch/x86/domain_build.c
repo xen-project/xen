@@ -7,6 +7,7 @@
 #include <xen/config.h>
 #include <xen/init.h>
 #include <xen/lib.h>
+#include <xen/ctype.h>
 #include <xen/sched.h>
 #include <xen/smp.h>
 #include <xen/delay.h>
@@ -21,9 +22,18 @@
 #include <asm/i387.h>
 #include <asm/shadow.h>
 
-/* opt_dom0_mem: Kilobytes of memory allocated to domain 0. */
-static unsigned int opt_dom0_mem = 0;
-integer_unit_param("dom0_mem", opt_dom0_mem);
+/* opt_dom0_mem: memory allocated to domain 0. */
+static unsigned int opt_dom0_mem;
+static void parse_dom0_mem(char *s)
+{
+    unsigned long long bytes = memparse(s);
+    /* If no unit is specified we default to kB units, not bytes. */
+    if ( isdigit(s[strlen(s)-1]) )
+        opt_dom0_mem = (unsigned int)bytes;
+    else
+        opt_dom0_mem = (unsigned int)(bytes >> 10);
+}
+custom_param("dom0_mem", parse_dom0_mem);
 
 static unsigned int opt_dom0_shadow = 0;
 boolean_param("dom0_shadow", opt_dom0_shadow);

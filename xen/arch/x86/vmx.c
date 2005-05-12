@@ -154,6 +154,21 @@ static int vmx_do_page_fault(unsigned long va, struct cpu_user_regs *regs)
     return result;
 }
 
+static void vmx_do_no_device_fault() 
+{
+    unsigned long cr0;
+        
+    clts();
+    setup_fpu(current);
+    __vmread(CR0_READ_SHADOW, &cr0);
+    if (!(cr0 & X86_CR0_TS)) {
+        __vmread(GUEST_CR0, &cr0);
+        cr0 &= ~X86_CR0_TS;
+        __vmwrite(GUEST_CR0, cr0);
+    }
+    __vmwrite(EXCEPTION_BITMAP, MONITOR_DEFAULT_EXCEPTION_BITMAP);
+}
+
 static void vmx_do_general_protection_fault(struct cpu_user_regs *regs) 
 {
     unsigned long eip, error_code;
@@ -894,6 +909,9 @@ static int vmx_cr_access(unsigned long exit_qualification, struct cpu_user_regs 
         mov_from_cr(cr, gp, regs);
         break;
     case TYPE_CLTS:
+        clts();
+        setup_fpu(current);
+
         __vmread(GUEST_CR0, &value);
         value &= ~X86_CR0_TS; /* clear TS */
         __vmwrite(GUEST_CR0, value);
@@ -1093,6 +1111,11 @@ asmlinkage void vmx_vmexit_handler(struct cpu_user_regs regs)
             break;
         }
 #endif
+        case TRAP_no_device:
+        {
+            vmx_do_no_device_fault();
+            break;  
+        }
         case TRAP_gp_fault:
         {
             vmx_do_general_protection_fault(&regs);

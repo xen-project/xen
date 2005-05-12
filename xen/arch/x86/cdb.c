@@ -12,7 +12,9 @@
 #include <asm/irq.h>
 #include <xen/spinlock.h>
 #include <asm/debugger.h>
-#include <asm/init.h>
+#include <xen/init.h>
+#include <xen/smp.h>
+#include <asm/apic.h>
 
 /* Printk isn't particularly safe just after we've trapped to the
    debugger. so avoid it. */

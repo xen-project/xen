@@ -8,6 +8,7 @@
 #include <xen/sched.h>
 #include <asm/processor.h>
 #include <asm/ptrace.h>
+#include <public/xen.h>
 
 #define task_struct exec_domain
 
@@ -37,6 +38,9 @@ void foo(void)
 
 	BLANK();
 
+	DEFINE(XSI_PSR_IC_OFS, offsetof(vcpu_info_t, arch.interrupt_collection_enabled));
+	DEFINE(XSI_PSR_IC, (SHAREDINFO_ADDR+offsetof(vcpu_info_t, arch.interrupt_collection_enabled)));
+	DEFINE(XSI_PSR_I_OFS, offsetof(vcpu_info_t, arch.interrupt_delivery_enabled));
 	//DEFINE(IA64_TASK_BLOCKED_OFFSET,offsetof (struct task_struct, blocked));
 	//DEFINE(IA64_TASK_CLEAR_CHILD_TID_OFFSET,offsetof (struct task_struct, clear_child_tid));
 	//DEFINE(IA64_TASK_GROUP_LEADER_OFFSET, offsetof (struct task_struct, group_leader));
@@ -46,8 +50,8 @@ void foo(void)
 	//DEFINE(IA64_TASK_SIGHAND_OFFSET,offsetof (struct task_struct, sighand));
 	//DEFINE(IA64_TASK_SIGNAL_OFFSET,offsetof (struct task_struct, signal));
 	//DEFINE(IA64_TASK_TGID_OFFSET, offsetof (struct task_struct, tgid));
-	DEFINE(IA64_TASK_THREAD_KSP_OFFSET, offsetof (struct task_struct, thread.ksp));
-	DEFINE(IA64_TASK_THREAD_ON_USTACK_OFFSET, offsetof (struct task_struct, thread.on_ustack));
+	DEFINE(IA64_TASK_THREAD_KSP_OFFSET, offsetof (struct exec_domain, arch._thread.ksp));
+	DEFINE(IA64_TASK_THREAD_ON_USTACK_OFFSET, offsetof (struct exec_domain, arch._thread.on_ustack));
 
 	BLANK();
 

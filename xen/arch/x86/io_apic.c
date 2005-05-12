@@ -145,16 +145,16 @@ static void __unmask_IO_APIC_irq (unsigned int irq)
 	__modify_IO_APIC_irq(irq, 0, 0x00010000);
 }
 
-/* mask = 1, trigger = 0 */
-static void __mask_and_edge_IO_APIC_irq (unsigned int irq)
+/* trigger = 0 */
+static void __edge_IO_APIC_irq (unsigned int irq)
 {
-	__modify_IO_APIC_irq(irq, 0x00010000, 0x00008000);
+	__modify_IO_APIC_irq(irq, 0, 0x00008000);
 }
 
-/* mask = 0, trigger = 1 */
-static void __unmask_and_level_IO_APIC_irq (unsigned int irq)
+/* trigger = 1 */
+static void __level_IO_APIC_irq (unsigned int irq)
 {
-	__modify_IO_APIC_irq(irq, 0x00008000, 0x00010000);
+	__modify_IO_APIC_irq(irq, 0x00008000, 0);
 }
 
 static void mask_IO_APIC_irq (unsigned int irq)
@@ -1637,12 +1637,14 @@ static unsigned int startup_level_ioapic_irq (unsigned int irq)
 	return 0; /* don't check for pending */
 }
 
-static void end_level_ioapic_irq (unsigned int irq)
+static void mask_and_ack_level_ioapic_irq (unsigned int irq)
 {
 	unsigned long v;
 	int i;
 
 	move_irq(irq);
+
+	mask_IO_APIC_irq(irq);
 /*
  * It appears there is an erratum which affects at least version 0x11
  * of I/O APIC (that's the 82093AA and cores integrated into various
@@ -1671,10 +1673,15 @@ static void end_level_ioapic_irq (unsigned int irq)
 	if (!(v & (1 << (i & 0x1f)))) {
 		atomic_inc(&irq_mis_count);
 		spin_lock(&ioapic_lock);
-		__mask_and_edge_IO_APIC_irq(irq);
-		__unmask_and_level_IO_APIC_irq(irq);
+		__edge_IO_APIC_irq(irq);
+		__level_IO_APIC_irq(irq);
 		spin_unlock(&ioapic_lock);
 	}
+}
+
+static void end_level_ioapic_irq (unsigned int irq)
+{
+	unmask_IO_APIC_irq(irq);
 }
 
 #ifdef CONFIG_PCI_MSI
@@ -1697,6 +1704,13 @@ static unsigned int startup_level_ioapic_vector (unsigned int vector)
 	int irq = vector_to_irq(vector);
 
 	return startup_level_ioapic_irq (irq);
+}
+
+static void mask_and_ack_level_ioapic_vector (unsigned int vector)
+{
+	int irq = vector_to_irq(vector);
+
+	mask_and_ack_level_ioapic_irq(irq);
 }
 
 static void end_level_ioapic_vector (unsigned int vector)

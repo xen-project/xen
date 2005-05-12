@@ -429,6 +429,7 @@ void vmx_intr_assist(struct exec_domain *d)
 
 void vmx_do_resume(struct exec_domain *d) 
 {
+    vmx_stts();
     if ( test_bit(VMX_CPU_STATE_PG_ENABLED, &d->arch.arch_vmx.cpu_state) )
         __vmwrite(GUEST_CR3, pagetable_val(d->arch.shadow_table));
     else

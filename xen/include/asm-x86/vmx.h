@@ -24,6 +24,7 @@
 #include <asm/regs.h>
 #include <asm/processor.h>
 #include <asm/vmx_vmcs.h>
+#include <asm/i387.h>
 
 extern void vmx_asm_vmexit_handler(struct cpu_user_regs);
 extern void vmx_asm_do_resume(void);
@@ -251,4 +252,19 @@ static inline int __vmxon (u64 addr)
     return 0;
 }
 
+/* Make sure that xen intercepts any FP accesses from current */
+static inline void vmx_stts()
+{
+    unsigned long cr0;
+
+    __vmread(GUEST_CR0, &cr0);
+    if (!(cr0 & X86_CR0_TS))
+        __vmwrite(GUEST_CR0, cr0 | X86_CR0_TS);
+
+    __vmread(CR0_READ_SHADOW, &cr0);
+    if (!(cr0 & X86_CR0_TS))
+       __vmwrite(EXCEPTION_BITMAP, MONITOR_DEFAULT_EXCEPTION_BITMAP | 
+                                   EXCEPTION_BITMAP_NM);
+}
+ 
 #endif /* __ASM_X86_VMX_H__ */

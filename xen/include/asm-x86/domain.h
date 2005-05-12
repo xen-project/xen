@@ -30,7 +30,7 @@ struct arch_domain
 
     /* Shadow mode status and controls. */
     unsigned int shadow_mode;  /* flags to control shadow table operation */
-    spinlock_t   shadow_lock;
+    unsigned int shadow_nest;  /* Recursive depth of shadow_lock() nesting */
     /* Shadow mode has tainted page reference counts? */
     unsigned int shadow_tainted_refcnts;
 

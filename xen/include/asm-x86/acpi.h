@@ -27,7 +27,7 @@
 #define _ASM_ACPI_H
 
 #include <xen/config.h>
-#include <asm/system.h>
+#include <asm/system.h>		/* defines cmpxchg */
 
 #define COMPILER_DEPENDENT_INT64   long long
 #define COMPILER_DEPENDENT_UINT64  unsigned long long
@@ -49,8 +49,8 @@
 
 #define ACPI_ASM_MACROS
 #define BREAKPOINT3
-#define ACPI_DISABLE_IRQS() __cli()
-#define ACPI_ENABLE_IRQS()  __sti()
+#define ACPI_DISABLE_IRQS() local_irq_disable()
+#define ACPI_ENABLE_IRQS()  local_irq_enable()
 #define ACPI_FLUSH_CPU_CACHE()	wbinvd()
 
 
@@ -100,6 +100,11 @@ __acpi_release_global_lock (unsigned int *lock)
         :"=r"(n_hi), "=r"(n_lo)     \
         :"0"(n_hi), "1"(n_lo))
 
+/*
+ * Refer Intel ACPI _PDC support document for bit definitions
+ */
+#define ACPI_PDC_EST_CAPABILITY_SMP 	0xa
+#define ACPI_PDC_EST_CAPABILITY_MSR	0x1
 
 #ifdef CONFIG_ACPI_BOOT 
 extern int acpi_lapic;
@@ -108,46 +113,52 @@ extern int acpi_noirq;
 extern int acpi_strict;
 extern int acpi_disabled;
 extern int acpi_ht;
-static inline void disable_acpi(void) { acpi_disabled = 1; acpi_ht = 0; }
+extern int acpi_pci_disabled;
+static inline void disable_acpi(void) 
+{ 
+	acpi_disabled = 1; 
+	acpi_ht = 0;
+	acpi_pci_disabled = 1;
+	acpi_noirq = 1;
+}
 
 /* Fixmap pages to reserve for ACPI boot-time tables (see fixmap.h) */
 #define FIX_ACPI_PAGES 4
 
-#else	/* !CONFIG_ACPI_BOOT */
+extern int acpi_gsi_to_irq(u32 gsi, unsigned int *irq);
+
+#ifdef CONFIG_X86_IO_APIC
+extern int skip_ioapic_setup;
+extern int acpi_skip_timer_override;
+
+extern void check_acpi_pci(void);
+
+static inline void disable_ioapic_setup(void)
+{
+	skip_ioapic_setup = 1;
+}
+
+static inline int ioapic_setup_disabled(void)
+{
+	return skip_ioapic_setup;
+}
+
+#else
+static inline void disable_ioapic_setup(void) { }
+static inline void check_acpi_pci(void) { }
+
+#endif
+
+#else	/* CONFIG_ACPI_BOOT */
 #  define acpi_lapic 0
 #  define acpi_ioapic 0
 
-#endif	/* !CONFIG_ACPI_BOOT */
-
-#ifdef CONFIG_ACPI_PCI
-static inline void acpi_noirq_set(void) { acpi_noirq = 1; }
-extern int acpi_irq_balance_set(char *str);
-#else
-static inline void acpi_noirq_set(void) { }
-static inline int acpi_irq_balance_set(char *str) { return 0; }
 #endif
 
+static inline void acpi_noirq_set(void) { acpi_noirq = 1; }
+static inline int acpi_irq_balance_set(char *str) { return 0; }
+
 #ifdef CONFIG_ACPI_SLEEP
-
-extern unsigned long saved_eip;
-extern unsigned long saved_esp;
-extern unsigned long saved_ebp;
-extern unsigned long saved_ebx;
-extern unsigned long saved_esi;
-extern unsigned long saved_edi;
-
-static inline void acpi_save_register_state(unsigned long return_point)
-{
-	saved_eip = return_point;
-	asm volatile ("movl %%esp,(%0)" : "=m" (saved_esp));
-	asm volatile ("movl %%ebp,(%0)" : "=m" (saved_ebp));
-	asm volatile ("movl %%ebx,(%0)" : "=m" (saved_ebx));
-	asm volatile ("movl %%edi,(%0)" : "=m" (saved_edi));
-	asm volatile ("movl %%esi,(%0)" : "=m" (saved_esi));
-}
-
-#define acpi_restore_register_state()   do {} while (0)
-
 
 /* routines for saving/restoring kernel state */
 extern int acpi_save_state_mem(void);
@@ -156,11 +167,11 @@ extern void acpi_restore_state_mem(void);
 
 extern unsigned long acpi_wakeup_address;
 
-extern void do_suspend_lowlevel_s4bios(int resume);
-
 /* early initialization routine */
 extern void acpi_reserve_bootmem(void);
 
 #endif /*CONFIG_ACPI_SLEEP*/
+
+extern u8 x86_acpiid_to_apicid[];
 
 #endif /*_ASM_ACPI_H*/

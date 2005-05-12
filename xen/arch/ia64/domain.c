@@ -191,7 +191,7 @@ void arch_do_createdomain(struct exec_domain *ed)
 	// stay on kernel stack because may get interrupts!
 	// ia64_ret_from_clone (which b0 gets in new_thread) switches
 	// to user stack
-	ed->thread.on_ustack = 0;
+	ed->arch._thread.on_ustack = 0;
 }
 
 void arch_do_boot_vcpu(struct exec_domain *p)
@@ -261,7 +261,7 @@ void new_thread(struct exec_domain *ed,
 printf("new_thread: ed=%p, start_pc=%p, regs=%p, sw=%p, new_rbs=%p, IA64_STK_OFFSET=%p, &r8=%p\n",
 ed,start_pc,regs,sw,new_rbs,IA64_STK_OFFSET,&regs->r8);
 	sw->b0 = (unsigned long) &ia64_ret_from_clone;
-	ed->thread.ksp = (unsigned long) sw - 16;
+	ed->arch._thread.ksp = (unsigned long) sw - 16;
 	//ed->thread_info->flags = 0;
 printk("new_thread, about to call init_all_rr\n");
 	init_all_rr(ed);

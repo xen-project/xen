@@ -28,4 +28,16 @@ extern void restore_fpu(struct exec_domain *tsk);
     __asm__ __volatile__ ( "ldmxcsr %0" : : "m" (__mxcsr) ); \
 } while ( 0 )
 
+/* Make domain the FPU owner */
+static inline void setup_fpu(struct exec_domain *ed)
+{
+    if ( !test_and_set_bit(EDF_USEDFPU, &ed->flags) )
+    {
+        if ( test_bit(EDF_DONEFPUINIT, &ed->flags) )
+            restore_fpu(ed);
+        else
+            init_fpu();
+    }
+}
+
 #endif /* __ASM_I386_I387_H */

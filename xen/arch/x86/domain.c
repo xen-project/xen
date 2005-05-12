@@ -253,6 +253,7 @@ void arch_do_createdomain(struct exec_domain *ed)
         d->shared_info = (void *)alloc_xenheap_page();
         memset(d->shared_info, 0, PAGE_SIZE);
         ed->vcpu_info = &d->shared_info->vcpu_data[ed->id];
+        ed->cpumap = CPUMAP_RUNANYWHERE;
         SHARE_PFN_WITH_DOMAIN(virt_to_page(d->shared_info), d);
         machine_to_phys_mapping[virt_to_phys(d->shared_info) >> 
                                PAGE_SHIFT] = INVALID_M2P_ENTRY;
@@ -408,13 +409,15 @@ int arch_set_info_guest(
 
     memcpy(&ed->arch.guest_context, c, sizeof(*c));
 
-    /* IOPL privileges are virtualised. */
-    ed->arch.iopl = (ed->arch.guest_context.user_regs.eflags >> 12) & 3;
-    ed->arch.guest_context.user_regs.eflags &= ~EF_IOPL;
+    if ( !(c->flags & VGCF_VMX_GUEST) )
+    {
+        /* IOPL privileges are virtualised. */
+        ed->arch.iopl = (ed->arch.guest_context.user_regs.eflags >> 12) & 3;
+        ed->arch.guest_context.user_regs.eflags &= ~EF_IOPL;
 
-    /* Clear IOPL for unprivileged domains. */
-    if ( !IS_PRIV(d) )
-        ed->arch.guest_context.user_regs.eflags &= 0xffffcfff;
+        /* Ensure real hardware interrupts are enabled. */
+        ed->arch.guest_context.user_regs.eflags |= EF_IE;
+    }
 
     if ( test_bit(EDF_DONEINIT, &ed->flags) )
         return 0;

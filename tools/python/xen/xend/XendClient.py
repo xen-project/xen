@@ -246,10 +246,11 @@ class Xend:
                               'live'       : live,
                               'resource'   : resource })
 
-    def xend_domain_pincpu(self, id, cpu):
+    def xend_domain_pincpu(self, id, vcpu, cpumap):
         return self.xendPost(self.domainurl(id),
                              {'op'      : 'pincpu',
-                              'cpu'     : cpu })
+                              'vcpu'    : vcpu,
+                              'cpumap'  : cpumap })
 
     def xend_domain_cpu_bvt_set(self, id, mcuadv, warpback, warpvalue, warpl, warpu):
         return self.xendPost(self.domainurl(id),

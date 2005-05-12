@@ -1264,7 +1264,6 @@
 41a61536SZbR6cj1ukWTb0DYU-vz9w xen/common/multicall.c
 3ddb79bdD4SLmmdMD7yLW5HcUWucXw xen/common/page_alloc.c
 3e54c38dkHAev597bPr71-hGzTdocg xen/common/perfc.c
-3ddb79bdHqdQpATqC0rmUZNbsb6L6A xen/common/resource.c
 40589968dD2D1aejwSOvrROg7fOvGQ xen/common/sched_bvt.c
 41ebbfe9oF1BF3cH5v7yE3eOL9uPbA xen/common/sched_sedf.c
 3e397e6619PgAfBbw2XFbXkewvUWgw xen/common/schedule.c
@@ -1452,7 +1451,6 @@
 41262590CyJy4vd42dnqzsn8-eeGvw xen/include/xen/grant_table.h
 3ddb79c0GurNF9tDWqQbAwJFH8ugfA xen/include/xen/init.h
 428084e41zemtCAtYLcD9bUzwE35SA xen/include/xen/inttypes.h
-3ddb79c1nzaWu8NoF4xCCMSFJR4MlA xen/include/xen/ioport.h
 3ddb79c2qAxCOABlkKtD8Txohe-qEw xen/include/xen/irq.h
 3ddb79c2b3qe-6Ann09FqZBF4IrJaQ xen/include/xen/irq_cpustat.h
 3e4540ccPHqIIv2pvnQ1gV8LUnoHIg xen/include/xen/kernel.h
@@ -1462,7 +1460,6 @@
 3ddb79c1gs2VbLbQlw0dcDUXYIepDA xen/include/xen/mm.h
 3ddb79c1ieLZfGSFwfvvSQ2NK1BMSg xen/include/xen/multiboot.h
 41a61536ii6j2lJ2rXwMOLaG1CHPvw xen/include/xen/multicall.h
-3ddb79c2Fg44_PBPVxHSC0gTOMq4Ow xen/include/xen/pci.h
 3ddb79c0MOVXq8qZDQRGb6z64_xAwg xen/include/xen/pci_ids.h
 3e54c38dlSCVdyVM4PKcrSfzLLxWUQ xen/include/xen/perfc.h
 3e54c38de9SUSYSAwxDf_DwkpAnQFA xen/include/xen/perfc_defn.h

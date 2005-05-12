@@ -3,6 +3,11 @@
 #include <xen/lib.h>
 #include <asm/e820.h>
 
+/* opt_mem: Limit of physical RAM. Any RAM beyond this point is ignored. */
+unsigned long long opt_mem;
+static void parse_mem(char *s) { opt_mem = memparse(s); }
+custom_param("mem", parse_mem);
+
 struct e820map e820;
 
 static void __init add_memory_region(unsigned long long start,
@@ -341,6 +346,31 @@ static void __init clip_4gb(void)
 #define clip_4gb() ((void)0)
 #endif
 
+static void __init clip_mem(void)
+{
+    int i;
+
+    if ( !opt_mem )
+        return;
+
+    for ( i = 0; i < e820.nr_map; i++ )
+    {
+        if ( (e820.map[i].addr + e820.map[i].size) <= opt_mem )
+            continue;
+        printk("Truncating memory map to %lukB\n",
+               (unsigned long)(opt_mem >> 10));
+        if ( e820.map[i].addr >= opt_mem )
+        {
+            e820.nr_map = i;
+        }
+        else
+        {
+            e820.map[i].size = opt_mem - e820.map[i].addr;
+            e820.nr_map = i + 1;          
+        }
+    }
+}
+
 static void __init machine_specific_memory_setup(
     struct e820entry *raw, int raw_nr)
 {
@@ -348,6 +378,7 @@ static void __init machine_specific_memory_setup(
     sanitize_e820_map(raw, &nr);
     (void)copy_e820_map(raw, nr);
     clip_4gb();
+    clip_mem();
 }
 
 unsigned long __init init_e820(struct e820entry *raw, int raw_nr)

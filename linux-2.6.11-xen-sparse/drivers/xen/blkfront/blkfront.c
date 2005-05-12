@@ -824,7 +824,7 @@ static int blkif_queue_request(unsigned long   id,
                         buffer_ma >> PAGE_SHIFT,
                         ( operation == BLKIF_OP_WRITE ? 1 : 0 ) );
 
-            blk_shadow[id].frame[req->nr_segments] =
+            blk_shadow[req->id].frame[req->nr_segments] =
                 buffer_ma >> PAGE_SHIFT;
 
             req->frame_and_sects[req->nr_segments] =
