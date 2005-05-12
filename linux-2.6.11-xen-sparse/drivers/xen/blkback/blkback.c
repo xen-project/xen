@@ -489,7 +489,7 @@ static void dispatch_rw_block_io(blkif_t *blkif, blkif_request_t *req)
         aop[i].u.map_grant_ref.dom = blkif->domid;
         aop[i].u.map_grant_ref.ref = blkif_gref_from_fas(fas);
         aop[i].u.map_grant_ref.flags = GNTMAP_host_map;
-        if ( operation == READ )
+        if ( operation == WRITE )
             aop[i].u.map_grant_ref.flags |= GNTMAP_readonly;
     }
 
