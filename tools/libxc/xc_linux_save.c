@@ -333,9 +333,9 @@ int suspend_and_state(int xc_handle, XcIOContext *ioctxt,
 
 retry:
 
-    if ( xc_domain_getinfo(xc_handle, ioctxt->domain, 1, info) )
+    if ( xc_domain_getinfo(xc_handle, ioctxt->domain, 1, info) != 1)
     {
-	xcio_error(ioctxt, "Could not get full domain info");
+	xcio_error(ioctxt, "Could not get domain info");
 	return -1;
     }
 
@@ -447,9 +447,9 @@ int xc_linux_save(int xc_handle, XcIOContext *ioctxt)
         return 1;
     }
     
-    if ( xc_domain_getinfo(xc_handle, domid, 1, &info) )
+    if ( xc_domain_getinfo(xc_handle, domid, 1, &info) != 1)
     {
-        xcio_error(ioctxt, "Could not get full domain info");
+        xcio_error(ioctxt, "Could not get domain info");
         goto out;
     }
     if ( xc_domain_get_vcpu_context( xc_handle, domid, /* FIXME */ 0, 
