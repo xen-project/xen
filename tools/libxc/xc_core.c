@@ -48,7 +48,7 @@ xc_domain_dumpcore(int xc_handle,
 		goto error_out;
 	}
 	
-	if (xc_domain_getinfo(xc_handle, domid, 1, &info)) {
+	if (xc_domain_getinfo(xc_handle, domid, 1, &info) != 1) {
 		PERROR("Could not get info for domain");
 		goto error_out;
 	}
