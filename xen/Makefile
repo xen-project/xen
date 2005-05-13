@@ -31,8 +31,11 @@ build: $(TARGET).gz
 
 install: $(TARGET).gz
 	[ -d $(DESTDIR)/boot ] || $(INSTALL_DIR) $(DESTDIR)/boot
-	$(INSTALL_DATA) $(TARGET).gz $(DESTDIR)/boot
-	$(INSTALL_DATA) $(TARGET)-syms $(DESTDIR)/boot
+	$(INSTALL_DATA) $(TARGET).gz $(DESTDIR)/boot/$(notdir $(TARGET))-$(XEN_VERSION).$(XEN_SUBVERSION)$(XEN_EXTRAVERSION).gz
+	ln -f -s $(notdir $(TARGET))-$(XEN_VERSION).$(XEN_SUBVERSION)$(XEN_EXTRAVERSION).gz $(DESTDIR)/boot/$(notdir $(TARGET))-$(XEN_VERSION).$(XEN_SUBVERSION).gz
+	ln -f -s $(notdir $(TARGET))-$(XEN_VERSION).$(XEN_SUBVERSION)$(XEN_EXTRAVERSION).gz $(DESTDIR)/boot/$(notdir $(TARGET))-$(XEN_VERSION).gz
+	ln -f -s $(notdir $(TARGET))-$(XEN_VERSION).$(XEN_SUBVERSION)$(XEN_EXTRAVERSION).gz $(DESTDIR)/boot/$(notdir $(TARGET)).gz
+	$(INSTALL_DATA) $(TARGET)-syms $(DESTDIR)/boot/$(notdir $(TARGET))-$(XEN_VERSION).$(XEN_SUBVERSION)$(XEN_EXTRAVERSION)-syms
 	[ -d $(DESTDIR)/usr/include/xen/io ] || \
 		$(INSTALL_DIR) $(DESTDIR)/usr/include/xen/io
 	$(INSTALL_DATA) include/public/*.h $(DESTDIR)/usr/include/xen
