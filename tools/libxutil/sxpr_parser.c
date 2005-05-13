@@ -56,6 +56,7 @@
 static int state_start(Parser *p, char c);
 static int begin_start(Parser *p, char c);
 
+#if 0
 /** Print a parse error.
  *
  * @param in parser
@@ -83,6 +84,8 @@ static void wprintf(Parser *in, char *msg, ...){
         va_end(args);
     }
 }
+#endif
+
 
 /*============================================================================*/
 
@@ -134,6 +137,7 @@ static char *get_message(ParseErrorId id){
     return "";
 }
 
+#if 0
 /** Get the line number.
  *
  * @param in parser
@@ -149,6 +153,7 @@ static int get_line(Parser *in){
 static int get_column(Parser *in){
     return in->char_no;
 }
+#endif
 
 /** Get the line number the current token started on.
  *
