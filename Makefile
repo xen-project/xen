@@ -15,8 +15,6 @@ KERNELS ?= linux-2.6-xen0 linux-2.6-xenU
 # linux-2.4-xen0 linux-2.4-xenU netbsd-2.0-xenU
 # You may use wildcards in the above e.g. KERNELS=*2.4*
 
-ALLKERNELS = $(patsubst buildconfigs/mk.%,%,$(wildcard buildconfigs/mk.*))
-ALLSPARSETREES = $(patsubst %-xen-sparse,%,$(wildcard *-xen-sparse))
 XKERNELS := $(foreach kernel, $(KERNELS), $(patsubst buildconfigs/mk.%,%,$(wildcard buildconfigs/mk.$(kernel))) )
 
 export DESTDIR
@@ -87,7 +85,7 @@ world:
 	$(MAKE) dist
 
 # clean doesn't do a kclean
-clean: 
+clean:: 
 	$(MAKE) -C xen clean
 	$(MAKE) -C tools clean
 	$(MAKE) -C docs clean

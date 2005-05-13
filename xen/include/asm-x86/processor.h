@@ -377,7 +377,7 @@ extern struct tss_struct init_tss[NR_CPUS];
 #ifdef ARCH_HAS_FAST_TRAP
 
 #define SET_DEFAULT_FAST_TRAP(_p) \
-    (_p)->guest_context.fast_trap_idx = 0x20;   \
+    (_p)->guest_context.fast_trap_idx = 0x30;   \
     (_p)->fast_trap_desc.a = 0;   \
     (_p)->fast_trap_desc.b = 0;
 

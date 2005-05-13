@@ -6,6 +6,9 @@ include Config.mk
 DISTDIR	?= $(CURDIR)/dist
 DESTDIR	?= $(DISTDIR)/install
 
+ALLKERNELS = $(patsubst buildconfigs/mk.%,%,$(wildcard buildconfigs/mk.*))
+ALLSPARSETREES = $(patsubst %-xen-sparse,%,$(wildcard *-xen-sparse))
+
 .PHONY:	mkpatches mrproper
 
 # Setup pristine search path
@@ -49,24 +52,30 @@ else
 OS_VER = $(NETBSD_VER)
 endif
 
-pristine-%: %.tar.bz2
-	rm -rf tmp-$(@F) $@
-	mkdir -p tmp-$(@F)
-	tar -C tmp-$(@F) -jxf $<
-	mv tmp-$(@F)/* $@
+$(patsubst %,pristine-%/.valid-pristine,$(ALLSPARSETREES)) : pristine-%/.valid-pristine: %.tar.bz2
+	rm -rf tmp-pristine-$* $(@D)
+	mkdir -p tmp-pristine-$*
+	touch tmp-pristine-$*/.bk_skip
+	tar -C tmp-pristine-$* -jxf $<
+	mv tmp-pristine-$*/* $(@D)
+	@rm -rf tmp-pristine-$*
 	touch $@ # update timestamp to avoid rebuild
-	touch $@/.bk_skip
-	@rm -rf tmp-$(@F)
 
-OS_PATCHES = $(shell echo patches/$(OS)-$(OS_VER)/*.patch)
+PATCHDIRS := $(wildcard patches/*-*)
 
-ref-%: pristine-% $(OS_PATCHES)
-	rm -rf $@
-	cp -al $< tmp-$(@F)
+-include $(patsubst %,%/.makedep,$(PATCHDIRS))
+
+$(patsubst patches/%,patches/%/.makedep,$(PATCHDIRS)): patches/%/.makedep: 
+	@echo 'ref-$*/.valid-ref: $$(wildcard patches/$*/*.patch)' >$@
+
+clean::
+	rm -f patches/*/.makedep
+
+ref-%/.valid-ref: pristine-%/.valid-pristine
+	rm -rf $(@D)
+	cp -al $(<D) $(@D)
 	[ -d patches/$* ] && \
-	  for i in patches/$*/*.patch ; do ( cd tmp-$(@F) ; patch -p1 <../$$i ) ; done || \
-	  true
-	mv tmp-$(@F) $@
+	  for i in patches/$*/*.patch ; do ( cd $(@D) ; patch -p1 <../$$i || exit 1 ) ; done
 	touch $@ # update timestamp to avoid rebuild
 
 %-build:
@@ -81,11 +90,11 @@ ref-%: pristine-% $(OS_PATCHES)
 %-config:
 	$(MAKE) -f buildconfigs/mk.$* config
 
-%-xen.patch: ref-%
+%-xen.patch: ref-%/.valid-ref
 	rm -rf tmp-$@
-	cp -al $< tmp-$@
+	cp -al $(<D) tmp-$@
 	( cd $*-xen-sparse && ./mkbuildtree ../tmp-$@ )	
-	diff -Nurp $< tmp-$@ > $@ || true
+	diff -Nurp $(<D) tmp-$@ > $@ || true
 	rm -rf tmp-$@
 
 %-mrproper: %-mrproper-extra

@@ -5,9 +5,7 @@ LINUX_SERIES = 2.4
 
 EXTRAVERSION = xenU
 
-FULLVERSION  = $(LINUX_VER)-$(EXTRAVERSION)
-
-LINUX_DIR    = $(OS)-$(FULLVERSION)
+LINUX_DIR    = $(OS)-$(LINUX_VER)-$(EXTRAVERSION)
 
 include buildconfigs/Rules.mk
 
@@ -21,9 +19,9 @@ build: $(LINUX_DIR)/include/linux/autoconf.h
 	fi
 	$(MAKE) -C $(LINUX_DIR) ARCH=xen INSTALL_PATH=$(DESTDIR) install
 
-$(LINUX_DIR)/include/linux/autoconf.h: ref-linux-$(LINUX_VER)
+$(LINUX_DIR)/include/linux/autoconf.h: ref-linux-$(LINUX_VER)/.valid-ref
 	rm -rf $(LINUX_DIR)
-	cp -al $< $(LINUX_DIR)
+	cp -al $(<D) $(LINUX_DIR)
 	# Apply arch-xen patches
 	( cd linux-$(LINUX_VER)-xen-sparse ; \
           ./mkbuildtree ../$(LINUX_DIR) )
@@ -32,8 +30,9 @@ $(LINUX_DIR)/include/linux/autoconf.h: ref-linux-$(LINUX_VER)
 	  sed -e 's/^EXTRAVERSION.*/&-$(EXTRAVERSION)/' Makefile >Mk.tmp ; \
 	  rm -f Makefile ; mv Mk.tmp Makefile )
 	# Re-use config from install dir if one exits else use default config
-	[ -r $(DESTDIR)/boot/config-$(FULLVERSION) ] && \
-	  cp $(DESTDIR)/boot/config-$(FULLVERSION) $(LINUX_DIR)/.config \
+	CONFIG_VERSION=$$(sed -ne 's/^EXTRAVERSION = //p' $(LINUX_DIR)/Makefile); \
+	[ -r $(DESTDIR)/boot/config-$(LINUX_VER)$$CONFIG_VERSION ] && \
+	  cp $(DESTDIR)/boot/config-$(LINUX_VER)$$CONFIG_VERSION $(LINUX_DIR)/.config \
 	  || cp $(LINUX_DIR)/arch/xen/defconfig-$(EXTRAVERSION) \
 		$(LINUX_DIR)/.config
 	make -C $(LINUX_DIR) ARCH=xen oldconfig
@@ -44,7 +43,7 @@ config: $(LINUX_DIR)/include/linux/autoconf.h
 	$(MAKE) -C $(LINUX_DIR) ARCH=xen $(CONFIGMODE)
 	$(MAKE) -C $(LINUX_DIR) ARCH=xen dep
 
-clean:
+clean::
 	$(MAKE) -C $(LINUX_DIR) ARCH=xen clean
 
 delete: 

@@ -230,15 +230,15 @@ long do_dom0_op(dom0_op_t *u_dom0_op)
             break;
         }
         
-        if ( (op->u.pincpudomain.exec_domain >= MAX_VIRT_CPUS) ||
-             !d->exec_domain[op->u.pincpudomain.exec_domain] )
+        if ( (op->u.pincpudomain.vcpu >= MAX_VIRT_CPUS) ||
+             !d->exec_domain[op->u.pincpudomain.vcpu] )
         {
             ret = -EINVAL;
             put_domain(d);
             break;
         }
 
-        ed = d->exec_domain[op->u.pincpudomain.exec_domain];
+        ed = d->exec_domain[op->u.pincpudomain.vcpu];
         if ( ed == NULL )
         {
             ret = -ESRCH;
@@ -382,14 +382,14 @@ long do_dom0_op(dom0_op_t *u_dom0_op)
             break;
         }
 
-        if ( op->u.getvcpucontext.exec_domain >= MAX_VIRT_CPUS )
+        if ( op->u.getvcpucontext.vcpu >= MAX_VIRT_CPUS )
         {
             ret = -EINVAL;
             put_domain(d);
             break;
         }
         
-        ed = d->exec_domain[op->u.getvcpucontext.exec_domain];
+        ed = d->exec_domain[op->u.getvcpucontext.vcpu];
         if ( ed == NULL )
         {
             ret = -ESRCH;

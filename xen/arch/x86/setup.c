@@ -615,6 +615,13 @@ void __init __start_xen(multiboot_info_t *mbi)
             strcat(cmdline, " acpi=");
             strcat(cmdline, acpi_param);
         }
+        if ( !strstr(cmdline, "apic=") )
+        {
+            if ( apic_verbosity == APIC_VERBOSE )
+                strcat(cmdline, " apic=verbose");
+            else if ( apic_verbosity == APIC_DEBUG )
+                strcat(cmdline, " apic=debug");
+        }
     }
 
     /*

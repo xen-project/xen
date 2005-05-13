@@ -5,9 +5,7 @@ LINUX_SERIES = 2.4
 
 EXTRAVERSION = xen0
 
-FULLVERSION  = $(LINUX_VER)-$(EXTRAVERSION)
-
-LINUX_DIR    = $(OS)-$(FULLVERSION)
+LINUX_DIR    = $(OS)-$(LINUX_VER)-$(EXTRAVERSION)
 
 include buildconfigs/Rules.mk
 
@@ -26,9 +24,9 @@ patches/tmp/ebtables.diff:
 	wget http://www.cl.cam.ac.uk/netos/xen/downloads/ebtables-brnf-5_vs_2.4.27.diff.gz -O- | gunzip -c > $@
 
 $(LINUX_DIR)/include/linux/autoconf.h: patches/tmp/ebtables.diff
-$(LINUX_DIR)/include/linux/autoconf.h: ref-$(OS)-$(LINUX_VER)
+$(LINUX_DIR)/include/linux/autoconf.h: ref-$(OS)-$(LINUX_VER)/.valid-ref
 	rm -rf $(LINUX_DIR)
-	cp -al $< $(LINUX_DIR)
+	cp -al $(<D) $(LINUX_DIR)
 	# Apply arch-xen patches
 	( cd linux-$(LINUX_VER)-xen-sparse ; \
           ./mkbuildtree ../$(LINUX_DIR) )
@@ -39,8 +37,9 @@ $(LINUX_DIR)/include/linux/autoconf.h: ref-$(OS)-$(LINUX_VER)
 	# add ebtables patch
 	( cd $(LINUX_DIR) ; patch -p1 -F3 < ../patches/tmp/ebtables.diff )
 	# Re-use config from install dir if one exits else use default config
-	[ -r $(DESTDIR)/boot/config-$(FULLVERSION) ] && \
-	  cp $(DESTDIR)/boot/config-$(FULLVERSION) $(LINUX_DIR)/.config \
+	CONFIG_VERSION=$$(sed -ne 's/^EXTRAVERSION = //p' $(LINUX_DIR)/Makefile); \
+	[ -r $(DESTDIR)/boot/config-$(LINUX_VER)$$CONFIG_VERSION ] && \
+	  cp $(DESTDIR)/boot/config-$(LINUX_VER)$$CONFIG_VERSION $(LINUX_DIR)/.config \
 	  || cp $(LINUX_DIR)/arch/xen/defconfig-$(EXTRAVERSION) \
 		$(LINUX_DIR)/.config
 	make -C $(LINUX_DIR) ARCH=xen oldconfig
@@ -51,7 +50,7 @@ config: $(LINUX_DIR)/include/linux/autoconf.h
 	$(MAKE) -C $(LINUX_DIR) ARCH=xen $(CONFIGMODE)
 	$(MAKE) -C $(LINUX_DIR) ARCH=xen dep
 
-clean:
+clean::
 	$(MAKE) -C $(LINUX_DIR) ARCH=xen clean
 
 delete: 
