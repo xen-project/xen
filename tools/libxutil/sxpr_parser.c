@@ -160,6 +160,8 @@ void Parser_free(Parser *z){
     if(!z) return;
     objfree(z->val);
     z->val = ONONE;
+    if (z->buf)
+        deallocate(z->buf);
     deallocate(z);
 }
 
@@ -171,6 +173,7 @@ Parser * Parser_new(void){
   
     if(!z) goto exit;
     err = 0;
+    z->buf = NULL;
     reset(z);
   exit:
     if(err){
@@ -201,8 +204,16 @@ static int inputchar(Parser *p, char c){
 static int savechar(Parser *p, char c){
     int err = 0;
     if(p->buf_i >= p->buf_n){
-        err = -ENOMEM;
-        goto exit;
+        char *nbuf;
+        nbuf = allocate(2 * (p->buf_n + 1));
+        if (nbuf == NULL) {
+            err = -ENOMEM;
+            goto exit;
+        }
+        memcpy(nbuf, p->buf, p->buf_i);
+        deallocate(p->buf);
+	p->buf = nbuf;
+	p->buf_n = 2 * (p->buf_n + 1) - 1;
     }
     p->buf[p->buf_i] = c;
     p->buf_i++;
@@ -687,8 +698,16 @@ int end_list(Parser *p){
 static void reset(Parser *z){
   IOStream *error_out = z->error_out;
   int flags = z->flags;
+  int buf_n = z->buf_n;
+  char *buf = z->buf;
   memzero(z, sizeof(Parser));
-  z->buf_n = sizeof(z->buf) - 1;
+  if (buf) {
+      z->buf = buf;
+      z->buf_n = buf_n;
+  } else {
+      z->buf = (char *)allocate(PARSER_BUF_SIZE);
+      z->buf_n = PARSER_BUF_SIZE - 1;
+  }
   z->buf_i = 0;
   z->line_no = 1;
   z->char_no = 0;
