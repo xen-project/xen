@@ -6,6 +6,7 @@ UTIL_LIB = libutil.a
 UTIL_LIB_SRC =
 UTIL_LIB_SRC += allocate.c
 UTIL_LIB_SRC += enum.c
+UTIL_LIB_SRC += fd_stream.c
 UTIL_LIB_SRC += file_stream.c
 UTIL_LIB_SRC += gzip_stream.c
 UTIL_LIB_SRC += hash_table.c
@@ -19,7 +20,7 @@ UTIL_LIB_SRC += sxpr_parser.c
 UTIL_LIB_SRC += sys_net.c
 UTIL_LIB_SRC += sys_string.c
 #UTIL_LIB_SRC += util.c
-UTIL_LIB_SRC += xdr.c
+#UTIL_LIB_SRC += xdr.c
 
 #----------------------------------------------------------------------------
 # Xfrd.

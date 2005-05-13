@@ -754,6 +754,8 @@
 41a216cav5JJbtDQnusfuMa_1x_Xpw tools/libxutil/debug.h
 40e9808eyjiahG5uF6AMelNVujBzCg tools/libxutil/enum.c
 40e9808eZpbdn9q2KSSMGCNvY_ZgpQ tools/libxutil/enum.h
+4284c2ecWyadIhHF1u_QSgWqIXkaLA tools/libxutil/fd_stream.c
+4284c2ecEOOcF6fZUf_NsZzYAoNo-w tools/libxutil/fd_stream.h
 40e03332p5Dc_owJQRuN72ymJZddFQ tools/libxutil/file_stream.c
 40e03332jWfB2viAhLSkq1WK0r_iDQ tools/libxutil/file_stream.h
 40e03332rUjNMGg11n2rN6V4DCrvOg tools/libxutil/gzip_stream.c

@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2001 - 2004 Mike Wray <mike.wray@hp.com>
+ * Copyright (C) 2001 - 2005 Mike Wray <mike.wray@hp.com>
  *
  * This library is free software; you can redistribute it and/or modify
  * it under the terms of the GNU Lesser General Public License as
@@ -25,10 +25,13 @@
  * Sxpr parsing definitions.
  */
 
-/** Size of a parser input buffer.
- * Tokens read must fit into this size (including trailing null).
+/** Initial size of a parser input buffer.
  */
-#define PARSER_BUF_SIZE 4096
+#define PARSER_BUF_SIZE 512
+
+/** Input buffer size increment (when it's full).
+ */
+#define PARSER_BUF_INCREMENT 512
 
 struct Parser;
 typedef int ParserStateFn(struct Parser *, char c);
@@ -43,13 +46,14 @@ typedef struct ParserState {
     char *name;
 } ParserState;
 
-/** Structure representing an input source for the parser.
- * Can read from any IOStream implementation.
- */
 typedef struct Parser {
+    /** Initial state function. */
+    ParserStateFn *begin;
+    /** Parse value. */
     Sxpr val;
     /** Error reporting stream (null for no reports). */
     IOStream *error_out;
+    /** End-of-file flag, */
     int eof;
     /** Error flag. Non-zero if there has been a read error. */
     int err;
@@ -57,13 +61,11 @@ typedef struct Parser {
     int line_no;
     /** Column number of input (reset on new line). */
     int char_no;
-    /** Lookahead character. */
-    char c;
     /** Buffer for reading tokens. */
-    char buf[PARSER_BUF_SIZE];
-    /** Size of token buffer. */
-    int buf_n;
-    int buf_i;
+    char *buf;
+    char *buf_end;
+    char *tok;
+    char *tok_end;
     /** Line the last token started on. */
     int tok_begin_line;
     /** Character number the last token started on. */
@@ -95,7 +97,7 @@ typedef enum {
  * @param in parser
  * @param flags flags mask
  */
-inline static void parser_flags_raise(Parser *in, int flags){
+inline static void Parser_flags_raise(Parser *in, int flags){
     in->flags |= flags;
 }
 
@@ -104,7 +106,7 @@ inline static void parser_flags_raise(Parser *in, int flags){
  * @param in parser
  * @param flags flags mask
  */
-inline static void parser_flags_lower(Parser *in, int flags){
+inline static void Parser_flags_lower(Parser *in, int flags){
     in->flags &= ~flags;
 }
 
@@ -112,7 +114,7 @@ inline static void parser_flags_lower(Parser *in, int flags){
  *
  * @param in parser
  */
-inline static void parser_flags_clear(Parser *in){
+inline static void Parser_flags_clear(Parser *in){
     in->flags = 0;
 }
 
@@ -121,14 +123,32 @@ extern Parser * Parser_new(void);
 extern int Parser_input(Parser *p, char *buf, int buf_n);
 extern int Parser_input_eof(Parser *p);
 extern int Parser_input_char(Parser *p, char c);
-extern void set_error_stream(Parser *z, IOStream *error_out);
+extern void Parser_set_error_stream(Parser *z, IOStream *error_out);
 
-extern int parse_error_message(Parser *in, char *buf, int n);
-extern int has_error(Parser *in);
-extern int at_eof(Parser *in);
+extern int Parser_error_message(Parser *in, char *buf, int n);
+extern int Parser_has_error(Parser *in);
+extern int Parser_at_eof(Parser *in);
 
-int Parser_ready(Parser *p);
-Sxpr Parser_get_val(Parser *p);
-Sxpr Parser_get_all(Parser *p);
+extern int Parser_ready(Parser *p);
+extern Sxpr Parser_get_val(Parser *p);
+extern Sxpr Parser_get_all(Parser *p);
+
+/* Internal parser api. */
+void Parser_pop(Parser *p);
+int Parser_push(Parser *p, ParserStateFn *fn, char *name);
+int Parser_return(Parser *p);
+int Parser_at_eof(Parser *p);
+int Parser_error(Parser *in);
+int Parser_set_value(Parser *p, Sxpr val);
+int Parser_intern(Parser *p);
+int Parser_string(Parser *p);
+int Parser_data(Parser *p);
+int Parser_uint(Parser *p);
+
+char *peek_token(Parser *p);
+char *copy_token(Parser *p);
+void new_token(Parser *p);
+int save_char(Parser *p, char c);
+int token_len(Parser *p);
 
 #endif /* ! _XUTIL_SXPR_PARSER_H_ */

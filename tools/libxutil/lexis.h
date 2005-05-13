@@ -34,7 +34,7 @@
 #define space_class ((char []){ '\n', '\r', '\t', ' ', '\f' , 0 })
 
 /** Class of separator characters. */
-#define sep_class "{}()<>[]@!;"
+#define sep_class "{}()<>[]!;\"'"
 
 #define comment_class "#"
 

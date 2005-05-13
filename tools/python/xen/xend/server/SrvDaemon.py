@@ -60,7 +60,6 @@ class Daemon:
             if not pm: continue
             xm = xendre.match(pm.group('cmd'))
             if not xm: continue
-            #print 'pid=', pm.group('pid'), 'cmd=', pm.group('cmd')
             pids.append(int(pm.group('pid')))
         return pids
 
@@ -313,7 +312,7 @@ class Daemon:
             os.setuid(pwd.getpwnam(XEND_USER)[2])
             return 0
         except KeyError, error:
-            print "Error: no such user '%s'" % XEND_USER
+            print >>sys.stderr, "Error: no such user '%s'" % XEND_USER
             return 1
 
     def stop(self):
@@ -328,7 +327,6 @@ class Daemon:
             self.listenChannels()
             servers = SrvServer.create()
             self.daemonize()
-            print 'running serverthread...'
             servers.start()
         except Exception, ex:
             print >>sys.stderr, 'Exception starting xend:', ex
@@ -342,14 +340,12 @@ class Daemon:
 
     def listenChannels(self):
         def virqReceived(virq):
-            print 'virqReceived>', virq
             eserver.inject('xend.virq', virq)
 
         self.channelF.setVirqHandler(virqReceived)
         self.channelF.start()
 
     def exit(self, rc=0):
-        #reactor.disconnectAll()
         if self.channelF:
             self.channelF.stop()
         # Calling sys.exit() raises a SystemExit exception, which only

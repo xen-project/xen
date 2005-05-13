@@ -188,7 +188,6 @@ enum {
     XFR_MAX
 };
 
-#ifndef SXPR_PARSER_MAIN
 /** Short options. Options followed by ':' take an argument. */
 static char *short_opts = (char[]){
     OPT_PORT,     ':',
@@ -213,7 +212,6 @@ static Args _args = {};
 
 /** Xfrd arguments. */
 static Args *args = &_args;
-#endif
 
 /** Initialize an array element for a constant to its string name. */
 #define VALDEF(val) { val, #val }
@@ -782,7 +780,6 @@ int xfr_save(Args *args, XfrState *state, Conn *xend, char *file){
   exit:
     if(io){
         IOStream_close(io);
-        IOStream_free(io);
     }
     if(err){
         unlink(file);
@@ -798,7 +795,7 @@ int xfr_save(Args *args, XfrState *state, Conn *xend, char *file){
 int xfr_restore(Args *args, XfrState *state, Conn *xend, char *file){
     int err = 0;
     IOStream *io = NULL;
-    int configured=0;
+    int configured = 0;
 
     dprintf("> file=%s\n", file);
     io = gzip_stream_fopen(file, "rb");
@@ -820,7 +817,6 @@ int xfr_restore(Args *args, XfrState *state, Conn *xend, char *file){
   exit:
     if(io){
         IOStream_close(io);
-        IOStream_free(io);
     }
     if(err){
         xfr_error(xend, err);
@@ -1215,7 +1211,6 @@ int xfrd_main(Args *args){
     return err;
 }
 
-#ifndef SXPR_PARSER_MAIN
 /** Parse command-line arguments and call the xfrd main program.
  *
  * @param arg argument count
@@ -1271,4 +1266,3 @@ int main(int argc, char *argv[]){
     }
     return (err ? 1 : 0);
 }
-#endif

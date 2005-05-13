@@ -49,6 +49,27 @@ inline static const char * convert_set_base(const char *s, int *base){
     return s;
 }
 
+/** Set the sign to use for converting a string to a number.
+ * Value is 1 for positive, -1 for negative.
+ *
+ * @param s input string
+ * @param sign where to put the sign
+ * @return rest of s to parse as a number
+ */
+inline static const char * convert_set_sign(const char *s, int *sign){
+    *sign = 1;
+    if(s){
+        if(*s == '+'){
+            *sign = 1;
+            s++;
+        } else if (*s == '-'){
+            *sign = -1;
+            s++;
+        }
+    }
+    return s;
+}
+
 /** Get the numerical value of a digit in the given base.
  *
  * @param c digit character
@@ -98,6 +119,40 @@ int convert_atoul(const char *str, unsigned long *val){
         v *= base;
         v += digit;
     } 
+  exit:
+    *val = (err ? 0 : v);
+    return err;
+}
+
+/** Convert a string to a long by parsing it as a number.
+ * Will accept hex or decimal in usual C syntax.
+ *
+ * @param str input string
+ * @param val where to put the result
+ * @return 0 if converted OK, negative otherwise
+ */
+int convert_atol(const char *str, long *val){
+    int err = 0;
+    unsigned long v = 0;
+    int base, sign = 1;
+    const char *s = str;
+
+    if(!s) {
+        err = -EINVAL;
+        goto exit;
+    }
+    s = convert_set_sign(s, &sign);
+    s = convert_set_base(s, &base);
+    for( ; !err && *s; s++){
+        int digit = convert_get_digit(*s, base);
+        if(digit<0){
+            err = -EINVAL;
+            goto exit;
+        }
+        v *= base;
+        v += digit;
+    } 
+    if(sign < 0) v = -v;
   exit:
     *val = (err ? 0 : v);
     return err;

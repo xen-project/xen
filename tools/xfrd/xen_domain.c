@@ -1,17 +1,18 @@
 #include <unistd.h>
 #include <stdlib.h>
 #include <stdio.h>
+#include <sys/socket.h>
+#include <sys/un.h>
 
-#ifdef _XEN_XFR_STUB_
-typedef unsigned long u32;
-#else
 #include "xc.h"
 #include "xc_io.h"
-#endif
+
+#include "sxpr.h"
+#include "sxpr_parser.h"
+#include "file_stream.h"
+#include "fd_stream.h"
 
 #include "xen_domain.h"
-#include "marshal.h"
-#include "xdr.h"
 #include "xfrd.h"
 
 #define MODULE_NAME "XFRD"
@@ -33,7 +34,6 @@ int domain_configure(void *data, u32 dom, char *vmconfig, int vmconfig_n){
     return xen_domain_configure(dom, vmconfig, vmconfig_n);
 }
 
-#ifndef _XEN_XFR_STUB_
 static int xc_handle = 0;
 
 int xcinit(void){
@@ -50,7 +50,6 @@ void xcfini(void){
         xc_handle = 0;
     }
 }
-#endif   
 
 /** Write domain state.
  *
@@ -62,31 +61,6 @@ int xen_domain_snd(Conn *xend, IOStream *io,
                    char *vmconfig, int vmconfig_n,
                    int live, int resource){
     int err = 0;
-#ifdef _XEN_XFR_STUB_
-    char buf[1024];
-    int n, k, d, buf_n;
-    dprintf("> dom=%d\n", dom);
-    err = marshal_uint32(io, dom);
-    if(err) goto exit;
-    err = marshal_string(io, vmconfig, vmconfig_n);
-    if(err) goto exit;
-    n = 32 * 1024 * 1024;
-    n = 32 * 1024;
-    buf_n = sizeof(buf);
-    err = marshal_uint32(io, n);
-    for(k = 0; k < n; k += d){
-        d = n - k;
-        if(d > buf_n) d = buf_n;
-        err = marshal_bytes(io, buf, d);
-        if(err) goto exit;
-        dprintf("> k=%d n=%d\n", k, n);
-    }
-    
-    dom = 99;
-    err = domain_suspend(xend, dom);
-    IOStream_close(io);
-  exit:
-#else 
     XcIOContext _ioctxt = {}, *ioctxt = &_ioctxt;
     ioctxt->domain = dom;
     ioctxt->io = io;
@@ -101,7 +75,6 @@ int xen_domain_snd(Conn *xend, IOStream *io,
     }
     ioctxt->resource = resource;
     err = xc_linux_save(xcinit(), ioctxt);
-#endif   
     dprintf("< err=%d\n", err);
     return err;
 }
@@ -114,25 +87,6 @@ int xen_domain_rcv(IOStream *io,
                    char **vmconfig, int *vmconfig_n,
                    int *configured){
     int err = 0;
-#ifdef _XEN_XFR_STUB_
-    char buf[1024];
-    int n, k, d, buf_n;
-    dprintf(">\n");
-    err = unmarshal_uint32(io, dom);
-    if(err) goto exit;
-    err = unmarshal_new_string(io, vmconfig, vmconfig_n);
-    if(err) goto exit;
-    err = unmarshal_uint32(io, &n);
-    buf_n = sizeof(buf);
-    for(k = 0; k < n; k += d){
-        d = n - k;
-        if(d > buf_n) d = buf_n;
-        err = unmarshal_bytes(io, buf, d);
-        if(err) goto exit;
-        dprintf("> k=%d n=%d\n", k, n);
-    }
-  exit:
-#else    
     XcIOContext _ioctxt = {}, *ioctxt = &_ioctxt;
     dprintf(">\n");
     ioctxt->io = io;
@@ -147,135 +101,180 @@ int xen_domain_rcv(IOStream *io,
     *vmconfig = ioctxt->vmconfig;
     *vmconfig_n = ioctxt->vmconfig_n;
     *configured = (ioctxt->flags & XCFLAGS_CONFIGURE);
-#endif   
     dprintf("< err=%d\n", err);
     return err;
 }
 
-#include <curl/curl.h>
-#include "http.h"
+typedef struct xend {
+    int fd;
+    IOStream *io;
+    Parser *parser;
+    int seeneof;
+} Xend;
 
-/** Flag indicating whether we need to initialize libcurl. 
- */
-static int do_curl_global_init = 1;
-
-/** Get a curl handle, initializing libcurl if needed.
- *
- * @return curl handle
- */
-static CURL *curlinit(void){
-    if(do_curl_global_init){
-        do_curl_global_init = 0;
-        // Stop libcurl using the proxy. There's a curl option to
-        // set the proxy - but no option to defeat it.
-        unsetenv("http_proxy");
-        curl_global_init(CURL_GLOBAL_ALL);
-    }
-    return curl_easy_init();
+char *xend_server_addr(void){
+    char * val = getenv("XEND_EVENT_ADDR");
+    return (val ? val : "/var/lib/xend/event-socket");
 }
 
-/** Curl debug function.
+/** Open a unix-domain socket to the xend server.
  */
-int curldebug(CURL *curl, curl_infotype ty, char *buf, int buf_n, void *data){
-    // printf("%*s\n", buf_n, buf); /* Does not compile correctly on non 32bit platforms */
-    fwrite(data, buf_n, 1, stdout);
-    printf("\n");
-    return 0;
-}
-
-/** Setup a curl handle with a url.
- * Creates the url by formatting 'fmt' and the remaining arguments.
- *
- * @param pcurl return parameter for the curl handle
- * @param url url buffer
- * @param url_n size of url
- * @param fmt url format string, followed by parameters
- * @return 0 on success, error code otherwise
- */
-static int curlsetup(CURL **pcurl, struct curl_slist **pheaders, char *url, int url_n, char *fmt, ...){
+int xend_open_fd(void){
+    struct sockaddr_un addr_un = { .sun_family = AF_UNIX };
+    struct sockaddr *addr = (struct sockaddr*)&addr_un;
+    int addr_n = sizeof(addr_un);
     int err = 0;
-    va_list args;
-    CURL *curl = NULL;
-    struct curl_slist *headers = NULL;
-    int n = 0;
 
-    curl = curlinit();
-    if(!curl){
-        eprintf("> Could not init libcurl\n");
-        err = -ENOMEM;
+    int fd = socket(AF_UNIX, SOCK_STREAM, 0);
+    if(fd < 0){
+        err = -errno;
+        perror("socket");
         goto exit;
     }
-    url_n -= 1;
-    va_start(args, fmt);
-    n = vsnprintf(url, url_n, fmt, args);
-    va_end(args);
-    if(n <= 0 || n >= url_n){
-        err = -ENOMEM;
-        eprintf("> Out of memory in url\n");
+    strcpy(addr_un.sun_path, xend_server_addr());
+    if(connect(fd, addr, addr_n) < 0){
+        err = -errno;
+        perror("connect");
         goto exit;
     }
-    dprintf("> url=%s\n", url);
-#if DEBUG
-    // Verbose.
-    curl_easy_setopt(curl, CURLOPT_VERBOSE, 1);
-    // Call the debug function on data received.
-    curl_easy_setopt(curl, CURLOPT_DEBUGFUNCTION, curldebug);
-#else
-    // No progress meter.
-    curl_easy_setopt(curl, CURLOPT_NOPROGRESS, 1);
-    // Completely quiet.
-    curl_easy_setopt(curl, CURLOPT_MUTE, 1);
-#endif
-    // Set the URL.
-    curl_easy_setopt(curl, CURLOPT_URL, url);
-
-    headers = curl_slist_append(headers, "Expect:");
-    curl_easy_setopt(curl, CURLOPT_HTTPHEADER, headers);
+  exit:
+    if(err && (fd >= 0)){
+        close(fd);
+    }
     
-  exit:
-    if(err && curl){
-        curl_easy_cleanup(curl);
-        curl = NULL;
-    }
-    *pcurl = curl;
-    if (pheaders)
-	*pheaders = headers;
-    return err;
+    return (err ? err : fd);
 }
 
-static void curlcleanup(CURL **pcurl, struct curl_slist **pheaders){
-    if (*pcurl)
-	curl_easy_cleanup(*pcurl);
-    if (*pheaders)
-	curl_slist_free_all(*pheaders);
-    *pcurl = NULL;
-    *pheaders = NULL;
-}
-/** Make the http request stored in the curl handle and get
- *  the result code from the curl code and the http return code.
+/** Close a connection to the server.
  *
- * @param curl curl handle
- * @return 0 for success, error code otherwise
- */
-int curlresult(CURL *curl){
-    int err = 0;
-    CURLcode curlcode = 0;
-    long httpcode = 0;
+  * @param xend connection
+*/
+void xend_close(Xend *xend){
+    if(!xend) return;
+    close(xend->fd);
+    Parser_free(xend->parser);
+}
 
-    curlcode = curl_easy_perform(curl);
-    if(curlcode){
-        eprintf("> curlcode=%d\n", curlcode);
-        err = -EINVAL;
+/** Open a connection to the server.
+ *
+ * @param xend result parameter for the connection
+ * @return 0 on success, negative error code otherwise
+ */
+int xend_open(Xend **xend){
+    int err = 0;
+    Xend *val = ALLOCATE(Xend);
+
+    val->fd = xend_open_fd();
+
+    if(val->fd < 0){
+        err = val->fd;
         goto exit;
     }
-    curl_easy_getinfo(curl, CURLINFO_HTTP_CODE, &httpcode);
-    if(httpcode != HTTP_OK){
-        eprintf("> httpcode=%d\n", (int)httpcode);
-        err = -EINVAL;
-        goto exit;
+    val->io = fd_stream_new(val->fd);
+    val->parser = Parser_new();
+  exit:
+    if(err) xend_close(val);
+    *xend = (err ? NULL : val);
+    return err;
+}
+
+/** Read a response from a server connection.
+ */
+int xend_read_resp(Xend *xend, Sxpr *resp){
+    int err = 0;
+    Sxpr val = ONONE;
+    char buf[1024];
+    int buf_n = sizeof(buf), n;
+
+    for( ; ; ){
+        if(Parser_ready(xend->parser)){
+            val = Parser_get_val(xend->parser);
+            goto exit;
+        }
+        if(xend->seeneof){
+            err = -EIO;
+            goto exit;
+        }
+        memset(buf, 0, buf_n);
+        n = IOStream_read(xend->io, buf, 100);
+        if(n <= 0){
+            xend->seeneof = 1;
+            err = Parser_input_eof(xend->parser);
+        } else {
+            err = Parser_input(xend->parser, buf, n);
+        }
     }
   exit:
+    *resp = (err < 0 ? ONONE : val);
     return err;
+}
+
+/** Read a response from a server connection and decode the value.
+ *
+ * @param xend server connection
+ * @param resp result parameter for the response value
+ * @return 0 on success, negative error code otherwise
+ */
+int xend_read(Xend *xend, Sxpr *resp){
+    int err = 0;
+    Sxpr val = ONONE;
+
+    dprintf(">\n");
+    for( ; ; ){
+        err = xend_read_resp(xend, &val);
+        if(err < 0) goto exit;
+        
+        if(sxpr_is(sxpr_name(val), "event")){
+            // We don't care about events, try again.
+            err = 0;
+            continue;
+        } else if(sxpr_is(sxpr_name(val), "err")){
+            eprintf("> "); objprint(iostderr, val, 0); fprintf(stderr, "\n");
+            err = -EINVAL;
+            break;
+        } else {
+            err = 0;
+            val = sxpr_child0(val, ONULL);
+            break;
+        }
+    }
+#ifdef DEBUG
+    dprintf("> OK ");
+    objprint(iostdout, val, 0);
+    printf("\n");
+#endif
+  exit:
+    if(resp){
+        *resp = (err < 0 ? ONONE : val);
+    }
+    dprintf("> err=%d\n", err);
+    return err;
+}
+
+/** Send a request to the server and return the result value in resp.
+ *
+ * @param xend server connection
+ * @param resp result parameter for the response value
+ * @param format request format followed by args to print
+ * @return 0 on success, negative error code otherwise
+ */
+int xend_call(Xend *xend, Sxpr *resp, char *format, ...){
+    va_list args;
+    int err;
+    
+    dprintf("> ");
+    va_start(args, format);
+#ifdef DEBUG
+    vprintf(format, args); printf("\n");
+#endif
+    err = IOStream_vprint(xend->io, format, args);
+    va_end(args);
+    if(err < 0) goto exit;
+    IOStream_flush(xend->io);
+    err = xend_read(xend, resp);
+  exit:
+    dprintf("> err=%d\n", err);
+    return (err < 0 ? err : 0);
 }
 
 /** Get xend to list domains.
@@ -285,18 +284,12 @@ int curlresult(CURL *curl){
  */
 int xen_domain_ls(void){
     int err = 0;
-    CURL *curl = NULL;
-    struct curl_slist *headers = NULL;
-    char url[128] = {};
-    int url_n = sizeof(url);
-
-    dprintf(">\n");
-    err = curlsetup(&curl, &headers, url, url_n, "http://localhost:%d/xend/domain", XEND_PORT);
+    Xend *xend = NULL;
+    err = xend_open(&xend);
     if(err) goto exit;
-    err = curlresult(curl);
+    err = xend_call(xend, NULL, "(domain.ls)");
   exit:
-    curlcleanup(&curl, &headers);
-    dprintf("< err=%d\n", err);
+    xend_close(xend);
     return err;
 }
 
@@ -309,49 +302,18 @@ int xen_domain_ls(void){
  */
 int xen_domain_configure(uint32_t dom, char *vmconfig, int vmconfig_n){
     int err = 0;
-    CURL *curl = NULL;
-    struct curl_slist *headers = NULL;
-    char url[128] = {};
-    int url_n = sizeof(url);
-    struct curl_httppost *form = NULL, *last = NULL;
-    CURLFORMcode formcode = 0;
-
+    Xend *xend = NULL;
     dprintf("> dom=%u\n", dom);
     // List domains so that xend will update its domain list and notice the new domain.
     xen_domain_ls();
-
-    err = curlsetup(&curl, &headers, url, url_n, "http://localhost:%d/xend/domain/%u", XEND_PORT, dom);
+    // Now configure it.
+    err = xend_open(&xend);
     if(err) goto exit;
-
-    // Config field - set from vmconfig.
-    formcode = curl_formadd(&form, &last,
-                            CURLFORM_COPYNAME,     "config",
-                            CURLFORM_BUFFER,       "config",
-                            CURLFORM_BUFFERPTR,    vmconfig,
-                            CURLFORM_BUFFERLENGTH, vmconfig_n,
-                            CURLFORM_CONTENTTYPE,  "application/octet-stream",
-                            CURLFORM_END);
-    if(formcode){
-        eprintf("> Error adding config field.\n");
-        goto exit;
-    }
-    // Op field.
-    formcode = curl_formadd(&form, &last,
-                            CURLFORM_COPYNAME,     "op",
-                            CURLFORM_COPYCONTENTS, "configure",
-                            CURLFORM_END);
-    if(formcode){
-        eprintf("> Error adding op field.\n");
-        err = -EINVAL;
-        goto exit;
-    }
-    // POST the form.
-    curl_easy_setopt(curl, CURLOPT_HTTPPOST, form);
-    err = curlresult(curl);
+    err = xend_call(xend, NULL, "(domain.configure (dom %d) (config %*s))",
+                    dom, vmconfig_n, vmconfig);
   exit:
-    curlcleanup(&curl, &headers);
-    if(form) curl_formfree(form);
     dprintf("< err=%d\n", err);
+    xend_close(xend);
     return err;
 }
 
@@ -362,34 +324,11 @@ int xen_domain_configure(uint32_t dom, char *vmconfig, int vmconfig_n){
  */
 int xen_domain_unpause(uint32_t dom){
     int err = 0;
-    CURL *curl = NULL;
-    struct curl_slist *headers = NULL;
-    char url[128] = {};
-    int url_n = sizeof(url);
-    struct curl_httppost *form = NULL, *last = NULL;
-    CURLFORMcode formcode = 0;
-
-    dprintf("> dom=%u\n", dom);
-
-    err = curlsetup(&curl, &headers, url, url_n, "http://localhost:%d/xend/domain/%u", XEND_PORT, dom);
+    Xend *xend = NULL;
+    err = xend_open(&xend);
     if(err) goto exit;
-
-    // Op field.
-    formcode = curl_formadd(&form, &last,
-                            CURLFORM_COPYNAME,     "op",
-                            CURLFORM_COPYCONTENTS, "unpause",
-                            CURLFORM_END);
-    if(formcode){
-        eprintf("> Error adding op field.\n");
-        err = -EINVAL;
-        goto exit;
-    }
-    // POST the form.
-    curl_easy_setopt(curl, CURLOPT_HTTPPOST, form);
-    err = curlresult(curl);
+    err = xend_call(xend, NULL, "(domain.unpause (dom %d))", dom);
   exit:
-    curlcleanup(&curl, &headers);
-    if(form) curl_formfree(form);
-    dprintf("< err=%d\n", err);
+    xend_close(xend);
     return err;
 }

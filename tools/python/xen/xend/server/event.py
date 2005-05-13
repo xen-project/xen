@@ -3,17 +3,13 @@ import StringIO
 
 from xen.web import reactor, protocol
 
-from xen.lowlevel import xu
-
 from xen.xend import sxp
 from xen.xend import PrettyPrint
-from xen.xend import EventServer
-eserver = EventServer.instance()
+from xen.xend import EventServer; eserver = EventServer.instance()
 from xen.xend.XendError import XendError
-
 from xen.xend import XendRoot; xroot = XendRoot.instance()
 
-DEBUG = 1
+DEBUG = 0
 
 class EventProtocol(protocol.Protocol):
     """Asynchronous handler for a connected event socket.
@@ -30,7 +26,7 @@ class EventProtocol(protocol.Protocol):
         self.pretty = 0
 
         # For debugging subscribe to everything and make output pretty.
-        self.subscribe(['*'])
+        #self.subscribe(['*'])
         self.pretty = 1
 
     def dataReceived(self, data):
@@ -45,10 +41,7 @@ class EventProtocol(protocol.Protocol):
         except SystemExit:
             raise
         except:
-            if DEBUG:
-                raise
-            else:
-                self.send_error()
+            self.send_error()
 
     def loseConnection(self):
         if self.transport:
@@ -73,7 +66,11 @@ class EventProtocol(protocol.Protocol):
             return 0
 
     def send_result(self, res):
-        return self.send_reply(['ok', res])
+        if res is None:
+            resp = ['ok']
+        else:
+            resp = ['ok', res]
+        return self.send_reply(resp)
 
     def send_error(self):
         (extype, exval) = sys.exc_info()[:2]
@@ -129,7 +126,6 @@ class EventProtocol(protocol.Protocol):
 
     def op_pretty(self, name, req):
         self.pretty = 1
-        return ['ok']
 
     def op_console_disconnect(self, name, req):
         id = sxp.child_value(req, 'id')
@@ -137,7 +133,6 @@ class EventProtocol(protocol.Protocol):
             raise XendError('Missing console id')
         id = int(id)
         self.daemon.console_disconnect(id)
-        return ['ok']
 
     def op_info(self, name, req):
         val = ['info']
@@ -151,13 +146,11 @@ class EventProtocol(protocol.Protocol):
         # (sys.subscribe event*)
         # Subscribe to the events:
         self.subscribe(v[1:])
-        return ['ok']
 
     def op_sys_inject(self, name, v):
         # (sys.inject event)
         event = v[1]
         eserver.inject(sxp.name(event), event)
-        return ['ok']
 
     def op_trace(self, name, v):
         mode = (v[1] == 'on')
@@ -180,6 +173,27 @@ class EventProtocol(protocol.Protocol):
         mode = v[1]
         import controller
         controller.DEBUG = (mode == 'on')
+
+    def op_domain_ls(self, name, v):
+        xd = xroot.get_component("xen.xend.XendDomain")
+        return xd.domain_ls()
+
+    def op_domain_configure(self, name, v):
+        domid = sxp.child_value(v, "dom")
+        config = sxp.child_value(v, "config")
+        if domid is None:
+            raise XendError("missing domain id")
+        if config is None:
+            raise XendError("missing domain config")
+        xd = xroot.get_component("xen.xend.XendDomain")
+        xd.domain_configure(domid, config)
+
+    def op_domain_unpause(self, name, v):
+        domid = sxp.child_value(v, "dom")
+        if domid is None:
+            raise XendError("missing domain id")
+        xd = xroot.get_component("xen.xend.XendDomain")
+        xd.domain_unpause(domid)
 
 class EventFactory(protocol.ServerFactory):
     """Asynchronous handler for the event server socket.

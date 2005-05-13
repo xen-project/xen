@@ -171,7 +171,7 @@ int Conn_sxpr(Conn *conn, Sxpr *sxpr){
     dprintf(">\n");
     if(!conn->parser){
         conn->parser = Parser_new();
-        set_error_stream(conn->parser, iostdout);
+        Parser_set_error_stream(conn->parser, iostdout);
     }
     while(!err && c >= 0 && !Parser_ready(conn->parser)){
         c = IOStream_getc(conn->in);

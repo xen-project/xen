@@ -86,6 +86,7 @@ static inline size_t strnlen(const char *s, size_t n){
 /*============================================================================*/
 
 extern int convert_atoul(const char *s, unsigned long *v);
+extern int convert_atol(const char *s, long *v);
 extern int path_concat(char *s, char *t, char **val);
 
 #endif /* !_XUTIL_SYS_STRING_H_ */

@@ -26,18 +26,11 @@ UTIL_LIB_OBJ = $(UTIL_LIB_SRC:.c=.o)
 XFRD_PROG_OBJ = $(XFRD_PROG_SRC:.c=.o)
 XFRD_PROG_OBJ += $(UTIL_LIB)
 
-# Flag controlling whether to use stubs.
-# Define to use stubs, undefine to use the real Xen functions.
-#CPPFLAGS += -D _XEN_XFR_STUB_
-
-ifeq ($(SXPR_DEBUG),1)
-CPPFLAGS += -D _XEN_XFR_STUB_ -D SXPR_PARSER_MAIN
-endif
-
 CC := gcc
 
 CFLAGS += -Wall -Werror -O3 -fno-strict-aliasing
 CFLAGS += $(INCLUDES)
+
 # Make gcc generate dependencies.
 CFLAGS += -Wp,-MD,.$(@F).d
 PROG_DEP = .*.d
@@ -54,12 +47,6 @@ XFRD_LIBS += -L $(XEN_LIBXUTIL) -lxutil
 
 # zlib library.
 XFRD_LIBS += -lz
-
-CURL_FLAGS = $(shell curl-config --cflags)
-CURL_LIBS  = $(shell curl-config --libs)
-CFLAGS     += $(CURL_FLAGS)
-# libcurl libraries.
-XFRD_LIBS += $(CURL_LIBS)
 
 #$(warning XFRD_LIBS = $(XFRD_LIBS))
 
