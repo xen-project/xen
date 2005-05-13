@@ -1085,15 +1085,12 @@
 40e9808eysqT4VNDlJFqsZB2rdg4Qw tools/xfrd/connection.c
 40e9808eyXfJUi4E0C3WSgrEXqQ1sQ tools/xfrd/connection.h
 40e9808eULGwffNOE4kBrAfZ9YAVMA tools/xfrd/debug.h
-411b5139tfKZfWs1LQHmwDR_wjKoxQ tools/xfrd/http.h
 40e9808ePADCSKL1YgGCt2TbYPnYkw tools/xfrd/lzi_stream.c
 40e9808eDNAdpF71o5teYb9DTT-PRw tools/xfrd/lzi_stream.h
 40e9808eQxi0EzTcPJtosrzxEIjA-Q tools/xfrd/marshal.c
 40e9808etg13xfRm0Lqd8vY-jHOoTg tools/xfrd/marshal.h
 40e9808eCsmywryb036TdtRMJHDMmQ tools/xfrd/select.c
 40e9808e99OcM547cKMTfmCVSoWVAw tools/xfrd/select.h
-40e9808eF3NVldqRNS5IHM8gbFAvpw tools/xfrd/xdr.c
-40e9808ezXzoRHm7pybXU69NtnjimA tools/xfrd/xdr.h
 40e9808edpUtf4bJ8IbqClPJj_OvbA tools/xfrd/xen_domain.c
 40e9808eHviFFIwdUKOA234uIeifjA tools/xfrd/xen_domain.h
 40e9808eIFeV-MDCNyVTNt5NfMPKeQ tools/xfrd/xfrd.c

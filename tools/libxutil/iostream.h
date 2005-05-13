@@ -33,7 +33,7 @@
 
 #include "allocate.h"
 
-/** End of input return value. */
+/** End of input return value (for getc). */
 #define IOSTREAM_EOF -1
 
 /** An input/output abstraction.
@@ -82,6 +82,8 @@ struct IOStream {
     int written;
     /** Number of bytes read. */
     int read;
+    /** Flag indicating whether not to free when closed. */
+    int nofree;
 };
 
 
@@ -107,7 +109,7 @@ extern int IOStream_vprint(IOStream *io, const char *format, va_list args);
 static inline int IOStream_read(IOStream *stream, void *buf, size_t n){
     int result;
     if(stream->closed){
-        result = IOSTREAM_EOF;
+        result = -EIO;
         goto exit;
     }
     if(!stream->methods || !stream->methods->read){
@@ -132,7 +134,7 @@ static inline int IOStream_read(IOStream *stream, void *buf, size_t n){
 static inline int IOStream_write(IOStream *stream, const void *buf, size_t n){
     int result;
     if(stream->closed){
-        result = IOSTREAM_EOF;
+        result = -EIO;
         goto exit;
     }
     if(!stream->methods || !stream->methods->write){
@@ -150,15 +152,14 @@ static inline int IOStream_write(IOStream *stream, const void *buf, size_t n){
 /** Flush the stream.
  *
  * @param stream stream
- * @return 0 on success, IOSTREAM_EOF otherwise
+ * @return 0 on success, negative error code otherwise
  */
 static inline int IOStream_flush(IOStream *stream){
     int result = 0;
     if(stream->closed){
-        result = IOSTREAM_EOF;
+        result = -EIO;
     } else if(stream->methods->flush){
         result = (stream->methods->flush)(stream);
-        if(result < 0) result = IOSTREAM_EOF;
     }
     return result;
 }
@@ -179,14 +180,25 @@ static inline int IOStream_error(IOStream *stream){
 /** Close the stream.
  *
  * @param stream to close
- * @return 1 for error, 0 otherwise
+ * @return 0 on success, negative error code otherwise
  */
 static inline int IOStream_close(IOStream *stream){
-    int err = 1;
+    int err = 0;
+    if(!stream || stream->closed){
+        err = -EIO;
+        goto exit;
+    }
     if(stream->methods && stream->methods->close){
         err = (stream->methods->close)(stream);
         stream->closed = 1;
     }
+    if(stream->nofree) goto exit;
+    if(stream->methods && stream->methods->free){
+        (stream->methods->free)(stream);
+    }
+    *stream = (IOStream){};
+    deallocate(stream);
+  exit:
     return err;
 }
 
@@ -198,22 +210,6 @@ static inline int IOStream_close(IOStream *stream){
 static inline int IOStream_is_closed(IOStream *stream){
     return stream->closed;
 }
-
-/** Free the memory used by the stream.
- *
- * @param stream to free
- */
-static inline void IOStream_free(IOStream *stream){
-    if(!stream->closed && stream->methods && stream->methods->close){
-        (stream->methods->close)(stream);
-    }
-    if(stream->methods && stream->methods->free){
-        (stream->methods->free)(stream);
-    }
-    *stream = (IOStream){};
-    deallocate(stream);
-}
-
 
 /** Print a character to a stream, like fputc().
  *

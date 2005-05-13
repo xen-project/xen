@@ -46,18 +46,21 @@ static const IOMethods file_methods = {
 static IOStream _iostdin = {
     methods: &file_methods,
     data: (void*)1,
+    nofree: 1,
 };
 
 /** IOStream for stdout. */
 static IOStream _iostdout = {
     methods: &file_methods,
     data: (void*)2,
+    nofree: 1,
 };
 
 /** IOStream for stderr. */
 static IOStream _iostderr = {
     methods: &file_methods,
     data: (void*)3,
+    nofree: 1,
 };
 
 /** IOStream for stdin. */
@@ -152,10 +155,7 @@ static int file_error(IOStream *s){
  */
 static int file_close(IOStream *s){
     int result = 0;
-    if (s->data){
-        result = fclose(get_file(s));
-        s->data = (void*)0;
-    }
+    result = fclose(get_file(s));
     return result;
 }
 
@@ -164,7 +164,7 @@ static int file_close(IOStream *s){
  * @param s file stream
  */
 static void file_free(IOStream *s){
-    file_close(s);
+    // Nothing extra to do - close did it all.
 }
 
 /** Create an IOStream for a stream.
@@ -175,8 +175,8 @@ static void file_free(IOStream *s){
 IOStream *file_stream_new(FILE *f){
     IOStream *io = ALLOCATE(IOStream);
     if(io){
-	io->methods = &file_methods;
-	io->data = (void*)f;
+        io->methods = &file_methods;
+        io->data = (void*)f;
     }
     return io;
 }
@@ -191,10 +191,10 @@ IOStream *file_stream_fopen(const char *file, const char *flags){
     IOStream *io = 0;
     FILE *fin = fopen(file, flags);
     if(fin){
-	io = file_stream_new(fin);
-	if(!io){
-	    fclose(fin);
-	}
+        io = file_stream_new(fin);
+        if(!io){
+            fclose(fin);
+        }
     }
     return io;
 }
@@ -211,8 +211,9 @@ IOStream *file_stream_fdopen(int fd, const char *flags){
     FILE *fin = fdopen(fd, flags);
     if(fin){
         io = file_stream_new(fin);
-        if(!io)
+        if(!io){
             fclose(fin);
+        }
     }
     return io;
 }

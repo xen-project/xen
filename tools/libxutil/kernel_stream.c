@@ -57,10 +57,10 @@ static void kernel_stream_unlock(IOStream *s);
 
 /** Methods for a kernel stream. Output only. */
 static const IOMethods kernel_methods = {
-  write:  kernel_write,
-  free:   kernel_free,
-  lock:   kernel_stream_lock,
-  unlock: kernel_stream_unlock,
+    write:  kernel_write,
+    free:   kernel_free,
+    lock:   kernel_stream_lock,
+    unlock: kernel_stream_unlock,
 };
 
 /** Shared state for kernel streams.
@@ -68,15 +68,16 @@ static const IOMethods kernel_methods = {
  * shared state and avoid allocating it.
  */
 static const KernelData kernel_data = {
-  lock: SPIN_LOCK_UNLOCKED,
-  flags: 0,
-  buf_n: BUF_N,
+    lock:  SPIN_LOCK_UNLOCKED,
+    flags: 0,
+    buf_n: BUF_N,
 };
 
 /** Stream for kernel printk. */
 static IOStream iokernel = {
     methods: &kernel_methods,
     data:    &kernel_data,
+    nofree:  1,
 };
 
 /** Stream for kernel printk. */
@@ -94,7 +95,7 @@ IOStream *iostderr = &iokernel;
  * @return kernel stream
  */
 IOStream get_stream_kernel(void){
-  return iokernel;
+    return iokernel;
 }
 
 /** Obtain the lock on the stream state.
@@ -102,7 +103,7 @@ IOStream get_stream_kernel(void){
  * @param kdata stream state
  */
 static inline void KernelData_lock(KernelData *kdata){
-  spin_lock_irqsave(&kdata->lock, kdata->flags);
+    spin_lock_irqsave(&kdata->lock, kdata->flags);
 }
 
 /** Release the lock on the stream state.
@@ -110,7 +111,7 @@ static inline void KernelData_lock(KernelData *kdata){
  * @param kdata stream state
  */
 static inline void KernelData_unlock(KernelData *kdata){
-  spin_unlock_irqrestore(&kdata->lock, kdata->flags);
+    spin_unlock_irqrestore(&kdata->lock, kdata->flags);
 }
 
 /** Get the stream state.
@@ -119,7 +120,7 @@ static inline void KernelData_unlock(KernelData *kdata){
  * @return stream state
  */
 static inline KernelData *get_kernel_data(IOStream *s){
-  return (KernelData*)s->data;
+    return (KernelData*)s->data;
 }
 
 /** Obtain the lock on the stream state.
@@ -146,14 +147,14 @@ void kernel_stream_unlock(IOStream *s){
  * @return result of the print
  */
 static int kernel_write(IOStream *stream, const void *buf, size_t n){
-  KernelData *kdata = get_kernel_data(stream);
-  int k;
-  k = kdata->buf_n - 1;
-  if(n < k) k = n;
-  memcpy(kdata->buf, buf, k);
-  kdata->buf[k] = '\0';
-  printk(kdata->buf);
-  return k;
+    KernelData *kdata = get_kernel_data(stream);
+    int k;
+    k = kdata->buf_n - 1;
+    if(n < k) k = n;
+    memcpy(kdata->buf, buf, k);
+    kdata->buf[k] = '\0';
+    printk(kdata->buf);
+    return k;
 }
 
 /** Free a kernel stream.
@@ -164,11 +165,11 @@ static int kernel_write(IOStream *stream, const void *buf, size_t n){
  * @param io stream to free
  */
 static void kernel_free(IOStream *io){
-  KernelData *kdata;
-  if(io == &iokernel) return;
-  kdata = get_kernel_data(io);
-  memset(kdata, 0, sizeof(*kdata));
-  deallocate(kdata);
+    KernelData *kdata;
+    if(io == &iokernel) return;
+    kdata = get_kernel_data(io);
+    memset(kdata, 0, sizeof(*kdata));
+    deallocate(kdata);
 }
 #endif /* __KERNEL__ */
 

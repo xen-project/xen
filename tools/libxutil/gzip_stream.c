@@ -39,7 +39,7 @@ static int gzip_flush(IOStream *s);
 
 /** Methods used by a gzFile* IOStream. */
 static const IOMethods gzip_methods = {
-    read: gzip_read,
+    read:  gzip_read,
     write: gzip_write,
     error: gzip_error,
     close: gzip_close,
@@ -108,10 +108,7 @@ static int gzip_error(IOStream *s){
  */
 static int gzip_close(IOStream *s){
     int result = 0;
-    if (s->data){
-        result = gzclose(get_gzfile(s));
-        s->data = (void*)0;
-    }
+    result = gzclose(get_gzfile(s));
     return result;
 }
 
@@ -120,7 +117,7 @@ static int gzip_close(IOStream *s){
  * @param s gzip stream
  */
 static void gzip_free(IOStream *s){
-    gzip_close(s);
+    // Nothing to do - close did it all.
 }
 
 /** Create an IOStream for a gzip stream.
@@ -131,8 +128,8 @@ static void gzip_free(IOStream *s){
 IOStream *gzip_stream_new(gzFile *f){
     IOStream *io = ALLOCATE(IOStream);
     if(io){
-	io->methods = &gzip_methods;
-	io->data = (void*)f;
+        io->methods = &gzip_methods;
+        io->data = (void*)f;
     }
     return io;
 }

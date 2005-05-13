@@ -28,11 +28,13 @@
 static int string_error(IOStream *io);
 static int string_close(IOStream *io);
 static void string_free(IOStream *io);
+static int string_write(IOStream *io, const void *msg, size_t n);
+static int string_read(IOStream *io, void *buf, size_t n);
 
 /** Methods for a string stream. */
 static IOMethods string_methods = {
-    //print: string_print,
-    //getc:  string_getc,
+    read:  string_read,
+    write: string_write,
     error: string_error,
     close: string_close,
     free:  string_free,
@@ -45,6 +47,28 @@ static IOMethods string_methods = {
  */
 static inline StringData *get_string_data(IOStream *io){
     return (StringData*)io->data;
+}
+
+static int string_write(IOStream *io, const void *msg, size_t n){
+    StringData *data = get_string_data(io);
+    int k;
+
+    k = data->end - data->out;
+    if(n > k) n = k;
+    memcpy(data->out, msg, n);
+    data->out += n;
+    return n;
+}
+
+static int string_read(IOStream *io, void *buf, size_t n){
+    StringData *data = get_string_data(io);
+    int k;
+
+    k = data->end - data->in;
+    if(n > k) n = k;
+    memcpy(buf, data->in, k);
+    data->in += n;
+    return n;
 }
 
 /** Test if a string stream has an error.
@@ -70,7 +94,6 @@ static int string_close(IOStream *io){
 }
 
 /** Free a string stream.
- * The stream must have been allocated, not statically created.
  * The stream state is freed, but the underlying string is not.
  *
  * @param io string stream
@@ -90,6 +113,9 @@ IOMethods *string_stream_get_methods(void){
 }
 
 /** Initialise a string stream, usually from static data.
+ * If the stream and StringData should be freed when
+ * the stream is closed, unset io->nofree.
+ * The string is not freed on close.
  *
  * @param io address of IOStream to fill in
  * @param data address of StringData to fill in
@@ -107,10 +133,12 @@ void string_stream_init(IOStream *io, StringData *data, char *s, int n){
         memzero(io, sizeof(*io));
         io->methods = &string_methods;
         io->data = data;
+        io->nofree = 1;
     }
 }
 
 /** Allocate and initialise a string stream.
+ * The stream is freed on close, but the string is not.
  *
  * @param s string to use
  * @param n length of the string
@@ -123,6 +151,7 @@ IOStream *string_stream_new(char *s, int n){
     if(data && io){
         ok = 1;
         string_stream_init(io, data, s, n);
+        io->nofree = 0;
     }
     if(!ok){
         deallocate(data);
