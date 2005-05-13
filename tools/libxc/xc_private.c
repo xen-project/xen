@@ -13,18 +13,18 @@ void *xc_map_foreign_batch(int xc_handle, u32 dom, int prot,
     privcmd_mmapbatch_t ioctlx; 
     void *addr;
     addr = mmap(NULL, num*PAGE_SIZE, prot, MAP_SHARED, xc_handle, 0);
-    if ( addr != NULL )
+    if ( addr == MAP_FAILED )
+	return NULL;
+
+    ioctlx.num=num;
+    ioctlx.dom=dom;
+    ioctlx.addr=(unsigned long)addr;
+    ioctlx.arr=arr;
+    if ( ioctl( xc_handle, IOCTL_PRIVCMD_MMAPBATCH, &ioctlx ) < 0 )
     {
-        ioctlx.num=num;
-        ioctlx.dom=dom;
-        ioctlx.addr=(unsigned long)addr;
-        ioctlx.arr=arr;
-        if ( ioctl( xc_handle, IOCTL_PRIVCMD_MMAPBATCH, &ioctlx ) < 0 )
-        {
-            perror("XXXXXXXX");
-            munmap(addr, num*PAGE_SIZE);
-            return 0;
-        }
+	perror("XXXXXXXX");
+	munmap(addr, num*PAGE_SIZE);
+	return NULL;
     }
     return addr;
 
@@ -40,19 +40,19 @@ void *xc_map_foreign_range(int xc_handle, u32 dom,
     privcmd_mmap_entry_t entry; 
     void *addr;
     addr = mmap(NULL, size, prot, MAP_SHARED, xc_handle, 0);
-    if ( addr != NULL )
+    if ( addr == MAP_FAILED )
+	return NULL;
+
+    ioctlx.num=1;
+    ioctlx.dom=dom;
+    ioctlx.entry=&entry;
+    entry.va=(unsigned long) addr;
+    entry.mfn=mfn;
+    entry.npages=(size+PAGE_SIZE-1)>>PAGE_SHIFT;
+    if ( ioctl( xc_handle, IOCTL_PRIVCMD_MMAP, &ioctlx ) < 0 )
     {
-        ioctlx.num=1;
-        ioctlx.dom=dom;
-        ioctlx.entry=&entry;
-        entry.va=(unsigned long) addr;
-        entry.mfn=mfn;
-        entry.npages=(size+PAGE_SIZE-1)>>PAGE_SHIFT;
-        if ( ioctl( xc_handle, IOCTL_PRIVCMD_MMAP, &ioctlx ) < 0 )
-        {
-            munmap(addr, size);
-            return 0;
-        }
+	munmap(addr, size);
+	return NULL;
     }
     return addr;
 }
@@ -173,17 +173,16 @@ long long xc_domain_get_cpu_usage( int xc_handle, domid_t domid, int vcpu )
 {
     dom0_op_t op;
 
-    op.cmd = DOM0_GETDOMAININFO;
-    op.u.getdomaininfo.domain = (domid_t)domid;
-    op.u.getdomaininfo.exec_domain = (u16)vcpu;
-    op.u.getdomaininfo.ctxt = NULL;
-    if ( (do_dom0_op(xc_handle, &op) < 0) || 
-         ((u16)op.u.getdomaininfo.domain != domid) )
+    op.cmd = DOM0_GETVCPUCONTEXT;
+    op.u.getvcpucontext.domain = (domid_t)domid;
+    op.u.getvcpucontext.vcpu   = (u16)vcpu;
+    op.u.getvcpucontext.ctxt   = NULL;
+    if ( (do_dom0_op(xc_handle, &op) < 0) )
     {
         PERROR("Could not get info on domain");
         return -1;
     }
-    return op.u.getdomaininfo.cpu_time;
+    return op.u.getvcpucontext.cpu_time;
 }
 
 
@@ -258,8 +257,6 @@ long xc_get_tot_pages(int xc_handle, u32 domid)
     dom0_op_t op;
     op.cmd = DOM0_GETDOMAININFO;
     op.u.getdomaininfo.domain = (domid_t)domid;
-    op.u.getdomaininfo.exec_domain = 0;
-    op.u.getdomaininfo.ctxt = NULL;
     return (do_dom0_op(xc_handle, &op) < 0) ? 
         -1 : op.u.getdomaininfo.tot_pages;
 }

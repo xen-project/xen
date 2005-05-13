@@ -441,6 +441,22 @@ s64 __moddi3(s64 a, s64 b)
 
 #endif /* BITS_PER_LONG == 32 */
 
+unsigned long long memparse(char *s)
+{
+	unsigned long long ret = simple_strtoull(s, &s, 0);
+
+	switch (*s) {
+	case 'G': case 'g':
+		ret <<= 10;
+	case 'M': case 'm':
+		ret <<= 10;
+	case 'K': case 'k':
+		ret <<= 10;
+	}
+
+	return ret;
+}
+
 /*
  * Local variables:
  * mode: C

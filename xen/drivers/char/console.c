@@ -303,7 +303,7 @@ long do_console_io(int cmd, int count, char *buffer)
 
 #ifndef VERBOSE
     /* Only domain-0 may access the emergency console. */
-    if ( current->domain->id != 0 )
+    if ( current->domain->domain_id != 0 )
         return -EPERM;
 #endif
 

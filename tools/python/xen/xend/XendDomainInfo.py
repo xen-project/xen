@@ -419,8 +419,12 @@ class XendDomainInfo:
             if self.info['shutdown']:
                 reason = shutdown_reason(self.info['shutdown_reason'])
                 sxpr.append(['shutdown_reason', reason])
-            sxpr.append(['cpu', self.info['cpu']])
+            sxpr.append(['cpu', self.info['vcpu_to_cpu'][0]])
             sxpr.append(['cpu_time', self.info['cpu_time']/1e9])    
+            sxpr.append(['vcpus', self.info['vcpus']])
+            sxpr.append(['cpumap', self.info['cpumap']])
+            sxpr.append(['vcpu_to_cpu', ''.join(map(lambda x: str(x),
+                        self.info['vcpu_to_cpu'][0:self.info['vcpus']]))])
             
         if self.start_time:
             up_time =  time.time() - self.start_time  
@@ -529,7 +533,8 @@ class XendDomainInfo:
             raise VmError('missing memory size')
         cpu = sxp.child_value(config, 'cpu')
         if self.recreate and self.dom and cpu is not None:
-            xc.domain_pincpu(self.dom, int(cpu))
+            #xc.domain_pincpu(self.dom, int(cpu))
+            xc.domain_pincpu(self.dom, 0, 1<<int(cpu))
         try:
             image = sxp.child_value(self.config, 'image')
             vcpus = sxp.child_value(image, 'vcpus')

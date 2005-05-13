@@ -19,7 +19,7 @@
  * This makes sure that old versions of dom0 tools will stop working in a
  * well-defined way (rather than crashing the machine, for instance).
  */
-#define DOM0_INTERFACE_VERSION   0xAAAA1004
+#define DOM0_INTERFACE_VERSION   0xAAAA1005
 
 /************************************************************************/
 
@@ -70,7 +70,6 @@ typedef struct {
 typedef struct {
     /* IN variables. */
     domid_t  domain;                  /* NB. IN/OUT variable. */
-    u16      exec_domain;
     /* OUT variables. */
 #define DOMFLAGS_DYING     (1<<0) /* Domain is scheduled to die.             */
 #define DOMFLAGS_CRASHED   (1<<1) /* Crashed domain; frozen for postmortem.  */
@@ -83,18 +82,20 @@ typedef struct {
 #define DOMFLAGS_SHUTDOWNMASK 255 /* DOMFLAGS_SHUTDOWN guest-supplied code.  */
 #define DOMFLAGS_SHUTDOWNSHIFT 16
     u32      flags;
-    vcpu_guest_context_t *ctxt;   /* NB. IN/OUT variable. */
     memory_t tot_pages;
     memory_t max_pages;
     memory_t shared_info_frame;       /* MFN of shared_info struct */
     u64      cpu_time;
+    u32      n_vcpu;
+    s32      vcpu_to_cpu[MAX_VIRT_CPUS];  /* current mapping   */
+    cpumap_t cpumap[MAX_VIRT_CPUS];       /* allowable mapping */
 } dom0_getdomaininfo_t;
 
 #define DOM0_SETDOMAININFO      13
 typedef struct {
     /* IN variables. */
     domid_t                   domain;
-    u16                       exec_domain;
+    u16                       vcpu;
     /* IN/OUT parameters */
     vcpu_guest_context_t *ctxt;
 } dom0_setdomaininfo_t;
@@ -170,14 +171,14 @@ typedef struct {
 } dom0_readconsole_t;
 
 /* 
- * Pin Domain to a particular CPU  (use -1 to unpin)
+ * Set which physical cpus a vcpu can execute on.
  */
 #define DOM0_PINCPUDOMAIN     20
 typedef struct {
     /* IN variables. */
     domid_t      domain;
-    u16          exec_domain;
-    s32          cpu;                 /*  -1 implies unpin */
+    u16          vcpu;
+    cpumap_t     *cpumap;
 } dom0_pincpudomain_t;
 
 /* Get trace buffers machine base address */
@@ -342,6 +343,14 @@ typedef struct {
     u16     allow_access;             /* allow or deny access to range? */
 } dom0_ioport_permission_t;
 
+#define DOM0_GETVCPUCONTEXT      37
+typedef struct {
+    domid_t domain;                   /* domain to be affected */
+    u16     vcpu;                     /* vcpu # */
+    vcpu_guest_context_t *ctxt;       /* NB. IN/OUT variable. */
+    u64     cpu_time;                 
+} dom0_getvcpucontext_t;
+
 typedef struct {
     u32 cmd;
     u32 interface_version; /* DOM0_INTERFACE_VERSION */
@@ -373,6 +382,7 @@ typedef struct {
         dom0_perfccontrol_t      perfccontrol;
         dom0_microcode_t         microcode;
         dom0_ioport_permission_t ioport_permission;
+        dom0_getvcpucontext_t    getvcpucontext;
     } u;
 } dom0_op_t;
 

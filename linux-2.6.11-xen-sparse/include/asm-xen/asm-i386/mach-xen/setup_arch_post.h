@@ -13,7 +13,12 @@ static char * __init machine_specific_memory_setup(void)
 
 	who = "Xen";
 
-	start_pfn = 0;
+	/* In dom0, we have to start the fake e820 map above the first
+	 * 1MB, in other domains, it can start at 0. */
+	if (xen_start_info.flags & SIF_INITDOMAIN)
+		start_pfn = 0x100;
+	else
+		start_pfn = 0;
 	max_pfn = xen_start_info.nr_pages;
 
 	e820.nr_map = 0;

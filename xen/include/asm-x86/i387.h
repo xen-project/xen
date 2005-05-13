@@ -19,7 +19,7 @@ extern void save_init_fpu(struct exec_domain *tsk);
 extern void restore_fpu(struct exec_domain *tsk);
 
 #define unlazy_fpu(_tsk) do { \
-    if ( test_bit(EDF_USEDFPU, &(_tsk)->flags) ) \
+    if ( test_bit(_VCPUF_fpu_dirtied, &(_tsk)->vcpu_flags) ) \
         save_init_fpu(_tsk); \
 } while ( 0 )
 
@@ -27,5 +27,17 @@ extern void restore_fpu(struct exec_domain *tsk);
     unsigned long __mxcsr = ((unsigned long)(val) & 0xffbf); \
     __asm__ __volatile__ ( "ldmxcsr %0" : : "m" (__mxcsr) ); \
 } while ( 0 )
+
+/* Make domain the FPU owner */
+static inline void setup_fpu(struct exec_domain *ed)
+{
+    if ( !test_and_set_bit(_VCPUF_fpu_dirtied, &ed->vcpu_flags) )
+    {
+        if ( test_bit(_VCPUF_fpu_initialised, &ed->vcpu_flags) )
+            restore_fpu(ed);
+        else
+            init_fpu();
+    }
+}
 
 #endif /* __ASM_I386_I387_H */

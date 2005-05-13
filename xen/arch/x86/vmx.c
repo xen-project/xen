@@ -154,6 +154,21 @@ static int vmx_do_page_fault(unsigned long va, struct cpu_user_regs *regs)
     return result;
 }
 
+static void vmx_do_no_device_fault() 
+{
+    unsigned long cr0;
+        
+    clts();
+    setup_fpu(current);
+    __vmread(CR0_READ_SHADOW, &cr0);
+    if (!(cr0 & X86_CR0_TS)) {
+        __vmread(GUEST_CR0, &cr0);
+        cr0 &= ~X86_CR0_TS;
+        __vmwrite(GUEST_CR0, cr0);
+    }
+    __vmwrite(EXCEPTION_BITMAP, MONITOR_DEFAULT_EXCEPTION_BITMAP);
+}
+
 static void vmx_do_general_protection_fault(struct cpu_user_regs *regs) 
 {
     unsigned long eip, error_code;
@@ -894,6 +909,9 @@ static int vmx_cr_access(unsigned long exit_qualification, struct cpu_user_regs 
         mov_from_cr(cr, gp, regs);
         break;
     case TYPE_CLTS:
+        clts();
+        setup_fpu(current);
+
         __vmread(GUEST_CR0, &value);
         value &= ~X86_CR0_TS; /* clear TS */
         __vmwrite(GUEST_CR0, value);
@@ -966,7 +984,7 @@ static void vmx_print_line(const char c, struct exec_domain *d)
             print_buf[index++] = c;
         }
         print_buf[index] = '\0';
-        printk("(GUEST: %u) %s\n", d->domain->id, (char *) &print_buf);
+        printk("(GUEST: %u) %s\n", d->domain->domain_id, (char *) &print_buf);
         index = 0;
     }
     else
@@ -1054,7 +1072,7 @@ asmlinkage void vmx_vmexit_handler(struct cpu_user_regs regs)
     }
 
     __vmread(GUEST_EIP, &eip);
-    TRACE_3D(TRC_VMX_VMEXIT, ed->domain->id, eip, exit_reason);
+    TRACE_3D(TRC_VMX_VMEXIT, ed->domain->domain_id, eip, exit_reason);
 
     switch (exit_reason) {
     case EXIT_REASON_EXCEPTION_NMI:
@@ -1075,7 +1093,7 @@ asmlinkage void vmx_vmexit_handler(struct cpu_user_regs regs)
 
         perfc_incra(cause_vector, vector);
 
-        TRACE_3D(TRC_VMX_VECTOR, ed->domain->id, eip, vector);
+        TRACE_3D(TRC_VMX_VECTOR, ed->domain->domain_id, eip, vector);
         switch (vector) {
 #ifdef XEN_DEBUGGER
         case TRAP_debug:
@@ -1093,6 +1111,11 @@ asmlinkage void vmx_vmexit_handler(struct cpu_user_regs regs)
             break;
         }
 #endif
+        case TRAP_no_device:
+        {
+            vmx_do_no_device_fault();
+            break;  
+        }
         case TRAP_gp_fault:
         {
             vmx_do_general_protection_fault(&regs);
@@ -1122,7 +1145,7 @@ asmlinkage void vmx_vmexit_handler(struct cpu_user_regs regs)
                 __vmwrite(VM_ENTRY_INTR_INFO_FIELD, intr_fields);
                 __vmwrite(VM_ENTRY_EXCEPTION_ERROR_CODE, regs.error_code);
                 ed->arch.arch_vmx.cpu_cr2 = va;
-                TRACE_3D(TRC_VMX_INT, ed->domain->id, TRAP_page_fault, va);
+                TRACE_3D(TRC_VMX_INT, ed->domain->domain_id, TRAP_page_fault, va);
             }
             break;
         }

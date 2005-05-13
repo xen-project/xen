@@ -7,6 +7,7 @@
 #include <xen/config.h>
 #include <xen/init.h>
 #include <xen/lib.h>
+#include <xen/ctype.h>
 #include <xen/sched.h>
 #include <xen/smp.h>
 #include <xen/delay.h>
@@ -21,9 +22,18 @@
 #include <asm/i387.h>
 #include <asm/shadow.h>
 
-/* opt_dom0_mem: Kilobytes of memory allocated to domain 0. */
-static unsigned int opt_dom0_mem = 0;
-integer_unit_param("dom0_mem", opt_dom0_mem);
+/* opt_dom0_mem: memory allocated to domain 0. */
+static unsigned int opt_dom0_mem;
+static void parse_dom0_mem(char *s)
+{
+    unsigned long long bytes = memparse(s);
+    /* If no unit is specified we default to kB units, not bytes. */
+    if ( isdigit(s[strlen(s)-1]) )
+        opt_dom0_mem = (unsigned int)bytes;
+    else
+        opt_dom0_mem = (unsigned int)(bytes >> 10);
+}
+custom_param("dom0_mem", parse_dom0_mem);
 
 static unsigned int opt_dom0_shadow = 0;
 boolean_param("dom0_shadow", opt_dom0_shadow);
@@ -112,9 +122,9 @@ int construct_dom0(struct domain *d,
     extern void translate_l2pgtable(struct domain *d, l1_pgentry_t *p2m, unsigned long l2mfn);
 
     /* Sanity! */
-    if ( d->id != 0 ) 
+    if ( d->domain_id != 0 ) 
         BUG();
-    if ( test_bit(DF_CONSTRUCTED, &d->flags) ) 
+    if ( test_bit(_DOMF_constructed, &d->domain_flags) ) 
         BUG();
 
     memset(&dsi, 0, sizeof(struct domain_setup_info));
@@ -540,7 +550,7 @@ int construct_dom0(struct domain *d,
     /* DOM0 gets access to everything. */
     physdev_init_dom0(d);
 
-    set_bit(DF_CONSTRUCTED, &d->flags);
+    set_bit(_DOMF_constructed, &d->domain_flags);
 
     new_thread(ed, dsi.v_kernentry, vstack_end, vstartinfo_start);
 

@@ -40,7 +40,7 @@ static int get_free_port(struct exec_domain *ed)
     max = d->max_event_channel;
     chn = d->event_channel;
 
-    for ( port = ed->id * EVENT_CHANNELS_SPREAD; port < max; port++ )
+    for ( port = ed->vcpu_id * EVENT_CHANNELS_SPREAD; port < max; port++ )
         if ( chn[port].state == ECS_FREE )
             break;
 
@@ -114,9 +114,9 @@ static long evtchn_bind_interdomain(evtchn_bind_interdomain_t *bind)
         return -EINVAL;
 
     if ( dom1 == DOMID_SELF )
-        dom1 = current->domain->id;
+        dom1 = current->domain->domain_id;
     if ( dom2 == DOMID_SELF )
-        dom2 = current->domain->id;
+        dom2 = current->domain->domain_id;
 
     if ( ((d1 = find_domain_by_id(dom1)) == NULL) ||
          ((d2 = find_domain_by_id(dom2)) == NULL) )
@@ -429,7 +429,7 @@ static long __evtchn_close(struct domain *d1, int port1)
             BUG();
 
         chn2[port2].state = ECS_UNBOUND;
-        chn2[port2].u.unbound.remote_domid = d1->id;
+        chn2[port2].u.unbound.remote_domid = d1->domain_id;
         break;
 
     default:
@@ -459,7 +459,7 @@ static long evtchn_close(evtchn_close_t *close)
     domid_t        dom = close->dom;
 
     if ( dom == DOMID_SELF )
-        dom = current->domain->id;
+        dom = current->domain->domain_id;
     else if ( !IS_PRIV(current->domain) )
         return -EPERM;
 
@@ -522,7 +522,7 @@ static long evtchn_status(evtchn_status_t *status)
     long             rc = 0;
 
     if ( dom == DOMID_SELF )
-        dom = current->domain->id;
+        dom = current->domain->domain_id;
     else if ( !IS_PRIV(current->domain) )
         return -EPERM;
 
@@ -552,7 +552,7 @@ static long evtchn_status(evtchn_status_t *status)
     case ECS_INTERDOMAIN:
         status->status = EVTCHNSTAT_interdomain;
         status->u.interdomain.dom  =
-            chn[port].u.interdomain.remote_dom->domain->id;
+            chn[port].u.interdomain.remote_dom->domain->domain_id;
         status->u.interdomain.port = chn[port].u.interdomain.remote_port;
         break;
     case ECS_PIRQ:

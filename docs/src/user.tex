@@ -484,7 +484,7 @@ distribution.  The entry should look something like the following:
 {\small
 \begin{verbatim}
 title Xen 2.0 / XenLinux 2.6.9
-  kernel /boot/xen.gz dom0_mem=131072
+  kernel /boot/xen.gz dom0_mem=128M
   module /boot/vmlinuz-2.6.9-xen0 root=/dev/sda4 ro console=tty0
 \end{verbatim}
 }
@@ -524,7 +524,7 @@ have problems.
 
 \subsection{Serial Console (optional)}
 
-%%   kernel /boot/xen.gz dom0_mem=131072 com1=115200,8n1
+%%   kernel /boot/xen.gz dom0_mem=128M com1=115200,8n1
 %%   module /boot/vmlinuz-2.6.9-xen0 root=/dev/sda4 ro 
 
 
@@ -534,9 +534,9 @@ with:
 \begin{quote}
 {\small
 \begin{verbatim}
-   kernel /boot/xen.gz dom0_mem=131072 com1=115200,8n1
+   kernel /boot/xen.gz dom0_mem=128M com1=115200,8n1
 \end{verbatim}}
-\end{quote} 
+\end{quote}
 
 This configures Xen to output on COM1 at 115,200 baud, 8 data bits, 
 1 stop bit and no parity. Modify these parameters for your set up. 
@@ -1680,12 +1680,6 @@ should be appended to Xen's command line, either manually or by
 editing \path{grub.conf}.
 
 \begin{description}
-\item [ignorebiostables ] 
- Disable parsing of BIOS-supplied tables. This may help with some
- chipsets that aren't fully supported by Xen. If you specify this
- option then ACPI tables are also ignored, and SMP support is
- disabled. 
-
 \item [noreboot ] 
  Don't reboot the machine automatically on errors.  This is
  useful to catch debug output if you aren't catching console messages
@@ -1693,10 +1687,6 @@ editing \path{grub.conf}.
 
 \item [nosmp ] 
  Disable SMP support.
- This option is implied by `ignorebiostables'. 
-
-\item [noacpi ] 
- Disable ACPI tables, which confuse Xen on some chipsets.
  This option is implied by `ignorebiostables'. 
 
 \item [watchdog ] 
@@ -1756,8 +1746,18 @@ editing \path{grub.conf}.
  `nmi=dom0':   Inform DOM0 of the NMI. \\
  `nmi=ignore': Ignore the NMI. 
 
+\item [mem=xxx ]
+ Set the physical RAM address limit. Any RAM appearing beyond this
+ physical address in the memory map will be ignored. This parameter
+ may be specified with a B, K, M or G suffix, representing bytes,
+ kilobytes, megabytes and gigabytes respectively. The
+ default unit, if no suffix is specified, is bytes.
+
 \item [dom0\_mem=xxx ] 
- Set the amount of memory (in kB) to be allocated to domain0.  
+ Set the amount of memory to be allocated to domain0. This parameter
+ may be specified with a B, K, M or G suffix, representing bytes,
+ kilobytes, megabytes and gigabytes respectively. The
+ default unit, if no suffix is specified, is kilobytes.
 
 \item [tbuf\_size=xxx ] 
  Set the size of the per-cpu trace buffers, in pages
@@ -1769,16 +1769,29 @@ editing \path{grub.conf}.
  Select the CPU scheduler Xen should use.  The current
  possibilities are `bvt' (default), `atropos' and `rrobin'. 
  For more information see Section~\ref{s:sched}. 
-
-\item [physdev\_dom0\_hide=(xx:xx.x)(yy:yy.y)\ldots ]
-Hide selected PCI devices from domain 0 (for instance, to stop it
-taking ownership of them so that they can be driven by another
-domain).  Device IDs should be given in hex format.  Bridge devices do
-not need to be hidden --- they are hidden implicitly, since guest OSes
-do not need to configure them.
 \end{description} 
 
+In addition, the following platform-specific options may be specified
+on the Xen command line. Since domain 0 shares responsibility for
+booting the platform, Xen will automatically propagate these options
+to its command line.
 
+These options are taken from Linux's command-line syntax with
+unchanged semantics.
+
+\begin{description}
+\item [acpi=off,force,strict,ht,noirq,\ldots ] 
+ Modify how Xen (and domain 0) parses the BIOS ACPI tables.
+
+\item [acpi\_skip\_timer\_override ]
+ Instruct Xen (and domain 0) to ignore timer-interrupt override
+ instructions specified by the BIOS ACPI tables.
+
+\item [noapic ]
+ Instruct Xen (and domain 0) to ignore any IOAPICs that are present in
+ the system, and instead continue to use the legacy PIC.
+
+\end{description} 
 
 \section{XenLinux Boot Options}
 

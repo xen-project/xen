@@ -152,7 +152,7 @@ static inline int do_trap(int trapnr, char *str,
 
 #ifndef NDEBUG
     if ( (ed->arch.guest_context.trap_ctxt[trapnr].address == 0) &&
-         (ed->domain->id == 0) )
+         (ed->domain->domain_id == 0) )
         goto xen_fault;
 #endif
 
@@ -326,7 +326,7 @@ asmlinkage int do_page_fault(struct cpu_user_regs *regs)
 
 #ifndef NDEBUG
     if ( (ed->arch.guest_context.trap_ctxt[TRAP_page_fault].address == 0) &&
-         (d->id == 0) )
+         (d->domain_id == 0) )
         goto xen_fault;
 #endif
 
@@ -361,13 +361,13 @@ long do_fpu_taskswitch(int set)
 
     if ( set )
     {
-        set_bit(EDF_GUEST_STTS, &ed->flags);
+        set_bit(_VCPUF_guest_stts, &ed->vcpu_flags);
         stts();
     }
     else
     {
-        clear_bit(EDF_GUEST_STTS, &ed->flags);
-        if ( test_bit(EDF_USEDFPU, &ed->flags) )
+        clear_bit(_VCPUF_guest_stts, &ed->vcpu_flags);
+        if ( test_bit(_VCPUF_fpu_dirtied, &ed->vcpu_flags) )
             clts();
     }
 
@@ -433,10 +433,19 @@ static inline int admin_io_okay(
 #define outl_user(_v, _p, _d, _r) \
     (admin_io_okay(_p, 4, _d, _r) ? outl(_v, _p) : ((void)0))
 
+/* Propagate a fault back to the guest kernel. */
+#define USER_READ_FAULT  4 /* user mode, read fault */
+#define USER_WRITE_FAULT 6 /* user mode, write fault */
+#define PAGE_FAULT(_faultaddr, _errcode)        \
+({  propagate_page_fault(_faultaddr, _errcode); \
+    return EXCRET_fault_fixed;                  \
+})
+
+/* Isntruction fetch with error handling. */
 #define insn_fetch(_type, _size, _ptr)          \
 ({  unsigned long _x;                           \
     if ( get_user(_x, (_type *)eip) )           \
-        goto read_fault;                        \
+        PAGE_FAULT(eip, USER_READ_FAULT);       \
     eip += _size; (_type)_x; })
 
 static int emulate_privileged_op(struct cpu_user_regs *regs)
@@ -502,17 +511,17 @@ static int emulate_privileged_op(struct cpu_user_regs *regs)
             case 1:
                 data = (u8)inb_user((u16)regs->edx, ed, regs);
                 if ( put_user((u8)data, (u8 *)regs->edi) )
-                    goto write_fault;
+                    PAGE_FAULT(regs->edi, USER_WRITE_FAULT);
                 break;
             case 2:
                 data = (u16)inw_user((u16)regs->edx, ed, regs);
                 if ( put_user((u16)data, (u16 *)regs->edi) )
-                    goto write_fault;
+                    PAGE_FAULT(regs->edi, USER_WRITE_FAULT);
                 break;
             case 4:
                 data = (u32)inl_user((u16)regs->edx, ed, regs);
                 if ( put_user((u32)data, (u32 *)regs->edi) )
-                    goto write_fault;
+                    PAGE_FAULT(regs->edi, USER_WRITE_FAULT);
                 break;
             }
             regs->edi += (regs->eflags & EF_DF) ? -op_bytes : op_bytes;
@@ -527,17 +536,17 @@ static int emulate_privileged_op(struct cpu_user_regs *regs)
             {
             case 1:
                 if ( get_user(data, (u8 *)regs->esi) )
-                    goto read_fault;
+                    PAGE_FAULT(regs->esi, USER_READ_FAULT);
                 outb_user((u8)data, (u16)regs->edx, ed, regs);
                 break;
             case 2:
                 if ( get_user(data, (u16 *)regs->esi) )
-                    goto read_fault;
+                    PAGE_FAULT(regs->esi, USER_READ_FAULT);
                 outw_user((u16)data, (u16)regs->edx, ed, regs);
                 break;
             case 4:
                 if ( get_user(data, (u32 *)regs->esi) )
-                    goto read_fault;
+                    PAGE_FAULT(regs->esi, USER_READ_FAULT);
                 outl_user((u32)data, (u16)regs->edx, ed, regs);
                 break;
             }
@@ -665,7 +674,7 @@ static int emulate_privileged_op(struct cpu_user_regs *regs)
         case 0: /* Read CR0 */
             *reg = 
                 (read_cr0() & ~X86_CR0_TS) | 
-                (test_bit(EDF_GUEST_STTS, &ed->flags) ? X86_CR0_TS : 0);
+                (test_bit(_VCPUF_guest_stts, &ed->vcpu_flags) ? X86_CR0_TS:0);
             break;
 
         case 2: /* Read CR2 */
@@ -736,14 +745,6 @@ static int emulate_privileged_op(struct cpu_user_regs *regs)
 
  fail:
     return 0;
-
- read_fault:
-    propagate_page_fault(eip, 4); /* user mode, read fault */
-    return EXCRET_fault_fixed;
-
- write_fault:
-    propagate_page_fault(eip, 6); /* user mode, write fault */
-    return EXCRET_fault_fixed;
 }
 
 asmlinkage int do_general_protection(struct cpu_user_regs *regs)
@@ -807,7 +808,7 @@ asmlinkage int do_general_protection(struct cpu_user_regs *regs)
 
 #ifndef NDEBUG
     if ( (ed->arch.guest_context.trap_ctxt[TRAP_gp_fault].address == 0) &&
-         (ed->domain->id == 0) )
+         (ed->domain->domain_id == 0) )
         goto gp_in_kernel;
 #endif
 
@@ -919,15 +920,9 @@ asmlinkage int math_state_restore(struct cpu_user_regs *regs)
     /* Prevent recursion. */
     clts();
 
-    if ( !test_and_set_bit(EDF_USEDFPU, &current->flags) )
-    {
-        if ( test_bit(EDF_DONEFPUINIT, &current->flags) )
-            restore_fpu(current);
-        else
-            init_fpu();
-    }
+    setup_fpu(current);
 
-    if ( test_and_clear_bit(EDF_GUEST_STTS, &current->flags) )
+    if ( test_and_clear_bit(_VCPUF_guest_stts, &current->vcpu_flags) )
     {
         struct trap_bounce *tb = &current->arch.trap_bounce;
         tb->flags = TBF_EXCEPTION;

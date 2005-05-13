@@ -52,15 +52,10 @@ unsigned char opt_com1[30] = "", opt_com2[30] = "";
 unsigned int opt_dom0_mem = 16000;
 /* opt_noht: If true, Hyperthreading is ignored. */
 int opt_noht=0;
-/* opt_noacpi: If true, ACPI tables are not parsed. */
-int opt_noacpi=0;
 /* opt_nosmp: If true, secondary processors are ignored. */
 int opt_nosmp=0;
 /* opt_noreboot: If true, machine will need manual reset on error. */
 int opt_noreboot=0;
-/* opt_ignorebiostables: If true, ACPI and MP tables are ignored. */
-/* NB. This flag implies 'nosmp' and 'noacpi'. */
-int opt_ignorebiostables=0;
 /* opt_watchdog: If true, run a watchdog NMI on each processor. */
 int opt_watchdog=0;
 /* opt_pdb: Name of serial port for Xen pervasive debugger (and enable pdb) */
@@ -267,7 +262,7 @@ printk("About to call init_idle_task()\n");
     if ( dom0 == NULL )
         panic("Error creating domain 0\n");
 
-    set_bit(DF_PRIVILEGED, &dom0->flags);
+    set_bit(_DOMF_privileged, &dom0->domain_flags);
 
     /*
      * We're going to setup domain0 using the module(s) that we stashed safely

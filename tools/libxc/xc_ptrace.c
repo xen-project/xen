@@ -71,7 +71,7 @@ struct gdb_regs {
 #define FETCH_REGS(cpu) \
     if (!regs_valid[cpu]) \
     {                \
-	int retval = xc_domain_getfullinfo(xc_handle, domid, cpu, NULL, &ctxt[cpu]); \
+	int retval = xc_domain_get_vcpu_context(xc_handle, domid, cpu, &ctxt[cpu]); \
 	if (retval) \
 	    goto error_out; \
 	cr3[cpu] = ctxt[cpu].pt_base; /* physical address */ \
@@ -221,7 +221,6 @@ xc_waitdomain(int domain, int *status, int options)
 {
     dom0_op_t op;
     int retval;
-    vcpu_guest_context_t ctxt;
     struct timespec ts;
     ts.tv_sec = 0;
     ts.tv_nsec = 10*1000*1000;
@@ -234,12 +233,10 @@ xc_waitdomain(int domain, int *status, int options)
 	}
     op.cmd = DOM0_GETDOMAININFO;
     op.u.getdomaininfo.domain = domain;
-    op.u.getdomaininfo.exec_domain = 0;
-    op.u.getdomaininfo.ctxt = &ctxt;
  retry:
 
     retval = do_dom0_op(xc_handle, &op);
-    if (retval) {
+    if (retval || op.u.getdomaininfo.domain != domain) {
 	printf("getdomaininfo failed\n");
 	goto done;
     }
@@ -314,8 +311,8 @@ xc_ptrace(enum __ptrace_request request, u32 domid, long eaddr, long edata)
 	op.cmd = DOM0_SETDOMAININFO;
 	SET_XC_REGS(((struct gdb_regs *)data), ctxt[VCPU].user_regs);
 	op.u.setdomaininfo.domain = domid;
-	/* XXX need to understand multiple exec_domains */
-	op.u.setdomaininfo.exec_domain = cpu;
+	/* XXX need to understand multiple vcpus */
+	op.u.setdomaininfo.vcpu = cpu;
 	op.u.setdomaininfo.ctxt = &ctxt[cpu];
 	retval = do_dom0_op(xc_handle, &op);
 	if (retval)
@@ -325,10 +322,8 @@ xc_ptrace(enum __ptrace_request request, u32 domid, long eaddr, long edata)
     case PTRACE_ATTACH:
 	op.cmd = DOM0_GETDOMAININFO;
 	op.u.getdomaininfo.domain = domid;
-	op.u.getdomaininfo.exec_domain = 0;
-	op.u.getdomaininfo.ctxt = NULL;
 	retval = do_dom0_op(xc_handle, &op);
-	if (retval) {
+	if (retval || op.u.getdomaininfo.domain != domid) {
 	    perror("dom0 op failed");
 	    goto error_out;
 	}
@@ -345,7 +340,7 @@ xc_ptrace(enum __ptrace_request request, u32 domid, long eaddr, long edata)
 	ctxt[VCPU].user_regs.eflags |= PSL_T;
 	op.cmd = DOM0_SETDOMAININFO;
 	op.u.setdomaininfo.domain = domid;
-	op.u.setdomaininfo.exec_domain = 0;
+	op.u.setdomaininfo.vcpu = 0;
 	op.u.setdomaininfo.ctxt = &ctxt[cpu];
 	retval = do_dom0_op(xc_handle, &op);	
 	if (retval) {
@@ -362,7 +357,7 @@ xc_ptrace(enum __ptrace_request request, u32 domid, long eaddr, long edata)
 		ctxt[cpu].user_regs.eflags &= ~PSL_T;
 		op.cmd = DOM0_SETDOMAININFO;
 		op.u.setdomaininfo.domain = domid;
-		op.u.setdomaininfo.exec_domain = cpu;
+		op.u.setdomaininfo.vcpu = cpu;
 		op.u.setdomaininfo.ctxt = &ctxt[cpu];
 		retval = do_dom0_op(xc_handle, &op);	
 		if (retval) {

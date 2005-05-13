@@ -1,11 +1,13 @@
 
+OS           = linux
+
 LINUX_SERIES = 2.4
 
 EXTRAVERSION = xen0
 
 FULLVERSION  = $(LINUX_VER)-$(EXTRAVERSION)
 
-LINUX_DIR    = linux-$(FULLVERSION)
+LINUX_DIR    = $(OS)-$(FULLVERSION)
 
 include buildconfigs/Rules.mk
 
@@ -24,7 +26,7 @@ patches/tmp/ebtables.diff:
 	wget http://www.cl.cam.ac.uk/netos/xen/downloads/ebtables-brnf-5_vs_2.4.27.diff.gz -O- | gunzip -c > $@
 
 $(LINUX_DIR)/include/linux/autoconf.h: patches/tmp/ebtables.diff
-$(LINUX_DIR)/include/linux/autoconf.h: pristine-linux-$(LINUX_VER)
+$(LINUX_DIR)/include/linux/autoconf.h: ref-$(OS)-$(LINUX_VER)
 	rm -rf $(LINUX_DIR)
 	cp -al $< $(LINUX_DIR)
 	# Apply arch-xen patches
@@ -53,4 +55,4 @@ clean:
 	$(MAKE) -C $(LINUX_DIR) ARCH=xen clean
 
 delete: 
-	rm -rf tmp-linux-$(LINUX_VER) $(LINUX_DIR) 
+	rm -rf tmp-$(OS)-$(LINUX_VER) $(LINUX_DIR) 

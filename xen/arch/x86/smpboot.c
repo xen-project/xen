@@ -51,8 +51,11 @@
 #include <mach_apic.h>
 #include <mach_wakecpu.h>
 
-/* Cconfigured maximum number of CPUs to activate. We name the parameter 
-"maxcpus" rather than max_cpus to be compatible with Linux */
+/* opt_nosmp: If true, secondary processors are ignored. */
+static int opt_nosmp = 0;
+boolean_param("nosmp", opt_nosmp);
+
+/* maxcpus: maximum number of CPUs to activate. */
 static int max_cpus = -1;
 integer_param("maxcpus", max_cpus); 
 
@@ -658,7 +661,7 @@ static void __init do_boot_cpu (int apicid)
 
     ed = idle->exec_domain[0];
 
-    set_bit(DF_IDLETASK, &idle->flags);
+    set_bit(_DOMF_idle_domain, &idle->domain_flags);
 
     ed->arch.monitor_table = mk_pagetable(__pa(idle_pg_table));
 
@@ -797,8 +800,7 @@ void __init smp_boot_cpus(void)
      * If we couldnt find an SMP configuration at boot time,
      * get out of here now!
      */
-    if (!smp_found_config) {
-        printk("SMP motherboard not detected.\n");
+    if (!smp_found_config || opt_nosmp) {
         io_apic_irqs = 0;
         phys_cpu_present_map = physid_mask_of_physid(0);
         cpu_online_map = 1;

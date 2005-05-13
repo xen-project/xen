@@ -289,6 +289,10 @@ static void __init probe_roms(void)
 	unsigned char *rom;
 	int	      i;
 
+	/* Nothing to do if not running in dom0. */
+	if (!(xen_start_info.flags & SIF_INITDOMAIN))
+		return;
+
 	/* video rom */
 	upper = adapter_rom_resources[0].start;
 	for (start = video_rom_resource.start; start < upper; start += 2048) {
@@ -1213,8 +1217,9 @@ static void __init register_memory(void)
 	else
 		legacy_init_iomem_resources(&code_resource, &data_resource);
 
-	/* EFI systems may still have VGA */
-	request_resource(&iomem_resource, &video_ram_resource);
+	if (xen_start_info.flags & SIF_INITDOMAIN)
+		/* EFI systems may still have VGA */
+		request_resource(&iomem_resource, &video_ram_resource);
 
 	/* request I/O space for devices used on all i[345]86 PCs */
 	for (i = 0; i < STANDARD_IO_RESOURCES; i++)
@@ -1570,6 +1575,14 @@ void __init setup_arch(char **cmdline_p)
 	op.cmd             = PHYSDEVOP_SET_IOPL;
 	op.u.set_iopl.iopl = current->thread.io_pl = 1;
 	HYPERVISOR_physdev_op(&op);
+
+#ifdef CONFIG_ACPI_BOOT
+	if (!(xen_start_info.flags & SIF_INITDOMAIN)) {
+		printk(KERN_INFO "ACPI in unprivileged domain disabled\n");
+		acpi_disabled = 1;
+		acpi_ht = 0;
+	}
+#endif
 
 	/*
 	 * Parse the ACPI tables for possible boot-time SMP configuration.

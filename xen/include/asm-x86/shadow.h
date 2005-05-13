@@ -60,9 +60,45 @@
 #define __linear_hl2_table ((l1_pgentry_t *)(LINEAR_PT_VIRT_START + \
      (PERDOMAIN_VIRT_START >> (L2_PAGETABLE_SHIFT - L1_PAGETABLE_SHIFT))))
 
-#define shadow_lock_init(_d) spin_lock_init(&(_d)->arch.shadow_lock)
-#define shadow_lock(_d)      do { ASSERT(!spin_is_locked(&(_d)->arch.shadow_lock)); spin_lock(&(_d)->arch.shadow_lock); } while (0)
-#define shadow_unlock(_d)    spin_unlock(&(_d)->arch.shadow_lock)
+/*
+ * For now we use the per-domain BIGLOCK rather than a shadow-specific lock.
+ * We usually have the BIGLOCK already acquired anyway, so this is unlikely
+ * to cause much unnecessary extra serialisation. Also it's a recursive
+ * lock, and there are some code paths containing nested shadow_lock().
+ * The #if0'ed code below is therefore broken until such nesting is removed.
+ */
+#if 0
+#define shadow_lock_init(_d)                    \
+    spin_lock_init(&(_d)->arch.shadow_lock)
+#define shadow_lock_is_acquired(_d)             \
+    spin_is_locked(&(_d)->arch.shadow_lock)
+#define shadow_lock(_d)                         \
+do {                                            \
+    ASSERT(!shadow_lock_is_acquired(_d));       \
+    spin_lock(&(_d)->arch.shadow_lock);         \
+} while (0)
+#define shadow_unlock(_d)                       \
+do {                                            \
+    ASSERT(!shadow_lock_is_acquired(_d));       \
+    spin_unlock(&(_d)->arch.shadow_lock);       \
+} while (0)
+#else
+#define shadow_lock_init(_d)                    \
+    ((_d)->arch.shadow_nest = 0)
+#define shadow_lock_is_acquired(_d)             \
+    (spin_is_locked(&(_d)->big_lock) && ((_d)->arch.shadow_nest != 0))
+#define shadow_lock(_d)                         \
+do {                                            \
+    LOCK_BIGLOCK(_d);                           \
+    (_d)->arch.shadow_nest++;                   \
+} while (0)
+#define shadow_unlock(_d)                       \
+do {                                            \
+    ASSERT(shadow_lock_is_acquired(_d));        \
+    (_d)->arch.shadow_nest--;                   \
+    UNLOCK_BIGLOCK(_d);                         \
+} while (0)
+#endif
 
 #define SHADOW_ENCODE_MIN_MAX(_min, _max) ((((L1_PAGETABLE_ENTRIES - 1) - (_max)) << 16) | (_min))
 #define SHADOW_MIN(_encoded) ((_encoded) & ((1u<<16) - 1))
@@ -281,7 +317,7 @@ extern int shadow_status_noswap;
 #ifdef VERBOSE
 #define SH_LOG(_f, _a...)                                               \
     printk("DOM%uP%u: SH_LOG(%d): " _f "\n",                            \
-       current->domain->id , current->processor, __LINE__ , ## _a )
+       current->domain->domain_id , current->processor, __LINE__ , ## _a )
 #else
 #define SH_LOG(_f, _a...) ((void)0)
 #endif
@@ -289,7 +325,7 @@ extern int shadow_status_noswap;
 #if SHADOW_VERBOSE_DEBUG
 #define SH_VLOG(_f, _a...)                                              \
     printk("DOM%uP%u: SH_VLOG(%d): " _f "\n",                           \
-           current->domain->id, current->processor, __LINE__ , ## _a )
+           current->domain->domain_id, current->processor, __LINE__ , ## _a )
 #else
 #define SH_VLOG(_f, _a...) ((void)0)
 #endif
@@ -297,7 +333,7 @@ extern int shadow_status_noswap;
 #if SHADOW_VVERBOSE_DEBUG
 #define SH_VVLOG(_f, _a...)                                             \
     printk("DOM%uP%u: SH_VVLOG(%d): " _f "\n",                          \
-           current->domain->id, current->processor, __LINE__ , ## _a )
+           current->domain->domain_id, current->processor, __LINE__ , ## _a )
 #else
 #define SH_VVLOG(_f, _a...) ((void)0)
 #endif
@@ -305,7 +341,7 @@ extern int shadow_status_noswap;
 #if SHADOW_VVVERBOSE_DEBUG
 #define SH_VVVLOG(_f, _a...)                                            \
     printk("DOM%uP%u: SH_VVVLOG(%d): " _f "\n",                         \
-           current->domain->id, current->processor, __LINE__ , ## _a )
+           current->domain->domain_id, current->processor, __LINE__ , ## _a )
 #else
 #define SH_VVVLOG(_f, _a...) ((void)0)
 #endif
@@ -313,7 +349,7 @@ extern int shadow_status_noswap;
 #if FULLSHADOW_DEBUG
 #define FSH_LOG(_f, _a...)                                              \
     printk("DOM%uP%u: FSH_LOG(%d): " _f "\n",                           \
-           current->domain->id, current->processor, __LINE__ , ## _a )
+           current->domain->domain_id, current->processor, __LINE__ , ## _a )
 #else
 #define FSH_LOG(_f, _a...) ((void)0)
 #endif
@@ -348,7 +384,8 @@ shadow_get_page_from_l1e(l1_pgentry_t l1e, struct domain *d)
         res = get_page_from_l1e(nl1e, owner);
         printk("tried to map mfn %lx from domain %d into shadow page tables "
                "of domain %d; %s\n",
-               mfn, owner->id, d->id, res ? "success" : "failed");
+               mfn, owner->domain_id, d->domain_id,
+               res ? "success" : "failed");
     }
 
     if ( unlikely(!res) )
@@ -403,7 +440,7 @@ static inline int __mark_dirty(struct domain *d, unsigned int mfn)
     unsigned long pfn;
     int           rc = 0;
 
-    ASSERT(spin_is_locked(&d->arch.shadow_lock));
+    ASSERT(shadow_lock_is_acquired(d));
     ASSERT(d->arch.shadow_dirty_bitmap != NULL);
 
     if ( !VALID_MFN(mfn) )
@@ -1137,7 +1174,7 @@ static inline unsigned long __shadow_status(
                           ? __gpfn_to_mfn(d, gpfn)
                           : INVALID_MFN);
 
-    ASSERT(spin_is_locked(&d->arch.shadow_lock));
+    ASSERT(shadow_lock_is_acquired(d));
     ASSERT(gpfn == (gpfn & PGT_mfn_mask));
     ASSERT(stype && !(stype & ~PGT_type_mask));
 
@@ -1153,7 +1190,7 @@ static inline unsigned long __shadow_status(
         {
             printk("d->id=%d gpfn=%lx gmfn=%lx stype=%lx c=%x t=%x "
                    "mfn_out_of_sync(gmfn)=%d mfn_is_page_table(gmfn)=%d\n",
-                   d->id, gpfn, gmfn, stype,
+                   d->domain_id, gpfn, gmfn, stype,
                    frame_table[gmfn].count_info,
                    frame_table[gmfn].u.inuse.type_info,
                    mfn_out_of_sync(gmfn), mfn_is_page_table(gmfn));
@@ -1186,7 +1223,7 @@ shadow_max_pgtable_type(struct domain *d, unsigned long gpfn,
     struct shadow_status *x;
     u32 pttype = PGT_none, type;
 
-    ASSERT(spin_is_locked(&d->arch.shadow_lock));
+    ASSERT(shadow_lock_is_acquired(d));
     ASSERT(gpfn == (gpfn & PGT_mfn_mask));
 
     perfc_incrc(shadow_max_type);
@@ -1280,7 +1317,7 @@ static inline void delete_shadow_status(
     struct shadow_status *p, *x, *n, *head;
     unsigned long key = gpfn | stype;
 
-    ASSERT(spin_is_locked(&d->arch.shadow_lock));
+    ASSERT(shadow_lock_is_acquired(d));
     ASSERT(!(gpfn & ~PGT_mfn_mask));
     ASSERT(stype && !(stype & ~PGT_type_mask));
 
@@ -1362,7 +1399,7 @@ static inline void set_shadow_status(
 
     SH_VVLOG("set gpfn=%lx gmfn=%lx smfn=%lx t=%lx", gpfn, gmfn, smfn, stype);
 
-    ASSERT(spin_is_locked(&d->arch.shadow_lock));
+    ASSERT(shadow_lock_is_acquired(d));
 
     ASSERT(shadow_mode_translate(d) || gpfn);
     ASSERT(!(gpfn & ~PGT_mfn_mask));

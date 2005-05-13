@@ -117,7 +117,7 @@ shadow_promote(struct domain *d, unsigned long gpfn, unsigned long gmfn,
     {
         printk("shadow_promote: get_page_type failed "
                "dom%d gpfn=%lx gmfn=%lx t=%08lx\n",
-               d->id, gpfn, gmfn, new_type);
+               d->domain_id, gpfn, gmfn, new_type);
         okay = 0;
     }
 
@@ -233,7 +233,7 @@ alloc_shadow_page(struct domain *d,
     if ( unlikely(page == NULL) )
     {
         printk("Couldn't alloc shadow page! dom%d count=%d\n",
-               d->id, d->arch.shadow_page_count);
+               d->domain_id, d->arch.shadow_page_count);
         printk("Shadow table counts: l1=%d l2=%d hl2=%d snapshot=%d\n",
                perfc_value(shadow_l1_pages), 
                perfc_value(shadow_l2_pages),
@@ -1179,7 +1179,8 @@ void __shadow_mode_disable(struct domain *d)
      * Currently this does not fix up page ref counts, so it is valid to call
      * only when a domain is being destroyed.
      */
-    BUG_ON(!test_bit(DF_DYING, &d->flags) && shadow_mode_refcounts(d));
+    BUG_ON(!test_bit(_DOMF_dying, &d->domain_flags) &&
+           shadow_mode_refcounts(d));
     d->arch.shadow_tainted_refcnts = shadow_mode_refcounts(d);
 
     free_shadow_pages(d);
@@ -1217,7 +1218,7 @@ static int shadow_mode_table_op(
     int               i, rc = 0;
     struct exec_domain *ed;
 
-    ASSERT(spin_is_locked(&d->arch.shadow_lock));
+    ASSERT(shadow_lock_is_acquired(d));
 
     SH_VLOG("shadow mode table op %lx %lx count %d",
             pagetable_val(d->exec_domain[0]->arch.guest_table),  /* XXX SMP */
@@ -1409,7 +1410,7 @@ gpfn_to_mfn_foreign(struct domain *d, unsigned long gpfn)
     if ( !(l2e_get_flags(l2e) & _PAGE_PRESENT) )
     {
         printk("gpfn_to_mfn_foreign(d->id=%d, gpfn=%lx) => 0 l2e=%lx\n",
-               d->id, gpfn, l2e_get_value(l2e));
+               d->domain_id, gpfn, l2e_get_value(l2e));
         return INVALID_MFN;
     }
     unsigned long l1tab = l2e_get_phys(l2e);
@@ -1419,13 +1420,13 @@ gpfn_to_mfn_foreign(struct domain *d, unsigned long gpfn)
 
 #if 0
     printk("gpfn_to_mfn_foreign(d->id=%d, gpfn=%lx) => %lx phystab=%lx l2e=%lx l1tab=%lx, l1e=%lx\n",
-           d->id, gpfn, l1_pgentry_val(l1e) >> PAGE_SHIFT, phystab, l2e, l1tab, l1e);
+           d->domain_id, gpfn, l1_pgentry_val(l1e) >> PAGE_SHIFT, phystab, l2e, l1tab, l1e);
 #endif
 
     if ( !(l1e_get_flags(l1e) & _PAGE_PRESENT) )
     {
         printk("gpfn_to_mfn_foreign(d->id=%d, gpfn=%lx) => 0 l1e=%lx\n",
-               d->id, gpfn, l1e_get_value(l1e));
+               d->domain_id, gpfn, l1e_get_value(l1e));
         return INVALID_MFN;
     }
 
@@ -1754,7 +1755,7 @@ shadow_make_snapshot(
     {
         printk("Couldn't alloc fullshadow snapshot for pfn=%lx mfn=%lx!\n"
                "Dom%d snapshot_count_count=%d\n",
-               gpfn, gmfn, d->id, d->arch.snapshot_page_count);
+               gpfn, gmfn, d->domain_id, d->arch.snapshot_page_count);
         BUG(); /* XXX FIXME: try a shadow flush to free up some memory. */
     }
 
@@ -1813,7 +1814,7 @@ shadow_mark_mfn_out_of_sync(struct exec_domain *ed, unsigned long gpfn,
     struct pfn_info *page = &frame_table[mfn];
     struct out_of_sync_entry *entry = shadow_alloc_oos_entry(d);
 
-    ASSERT(spin_is_locked(&d->arch.shadow_lock));
+    ASSERT(shadow_lock_is_acquired(d));
     ASSERT(pfn_valid(mfn));
 
 #ifndef NDEBUG
@@ -1943,7 +1944,7 @@ int __shadow_out_of_sync(struct exec_domain *ed, unsigned long va)
     l2_pgentry_t l2e;
     unsigned long l1pfn, l1mfn;
 
-    ASSERT(spin_is_locked(&d->arch.shadow_lock));
+    ASSERT(shadow_lock_is_acquired(d));
     ASSERT(VALID_M2P(l2pfn));
 
     perfc_incrc(shadow_out_of_sync_calls);
@@ -2127,7 +2128,7 @@ int shadow_remove_all_write_access(
     u32 found = 0, fixups, write_refs;
     unsigned long prediction, predicted_gpfn, predicted_smfn;
 
-    ASSERT(spin_is_locked(&d->arch.shadow_lock));
+    ASSERT(shadow_lock_is_acquired(d));
     ASSERT(VALID_MFN(readonly_gmfn));
 
     perfc_incrc(remove_write_access);
@@ -2245,7 +2246,7 @@ u32 shadow_remove_all_access(struct domain *d, unsigned long forbidden_gmfn)
     if ( unlikely(!shadow_mode_enabled(d)) )
         return 0;
 
-    ASSERT(spin_is_locked(&d->arch.shadow_lock));
+    ASSERT(shadow_lock_is_acquired(d));
     perfc_incrc(remove_all_access);
 
     for (i = 0; i < shadow_ht_buckets; i++)
@@ -2287,7 +2288,7 @@ static int resync_all(struct domain *d, u32 stype)
     int unshadow;
     int changed;
 
-    ASSERT(spin_is_locked(&d->arch.shadow_lock));
+    ASSERT(shadow_lock_is_acquired(d));
 
     for ( entry = d->arch.out_of_sync; entry; entry = entry->next)
     {
@@ -2485,7 +2486,7 @@ void __shadow_sync_all(struct domain *d)
 
     perfc_incrc(shadow_sync_all);
 
-    ASSERT(spin_is_locked(&d->arch.shadow_lock));
+    ASSERT(shadow_lock_is_acquired(d));
 
     // First, remove all write permissions to the page tables
     //
@@ -2645,7 +2646,7 @@ int shadow_fault(unsigned long va, struct cpu_user_regs *regs)
         {
             printk("%s() failed, crashing domain %d "
                    "due to a read-only L2 page table (gpde=%lx), va=%lx\n",
-                   __func__, d->id, l2e_get_value(gpde), va);
+                   __func__, d->domain_id, l2e_get_value(gpde), va);
             domain_crash_synchronous();
         }
 
@@ -3146,7 +3147,7 @@ int check_l2_table(
         FAILPT("bogus owner for snapshot page");
     if ( page_get_owner(pfn_to_page(smfn)) != NULL )
         FAILPT("shadow page mfn=0x%lx is owned by someone, domid=%d",
-               smfn, page_get_owner(pfn_to_page(smfn))->id);
+               smfn, page_get_owner(pfn_to_page(smfn))->domain_id);
 
 #if 0
     if ( memcmp(&spl2e[DOMAIN_ENTRIES_PER_L2_PAGETABLE],
@@ -3307,7 +3308,7 @@ int _check_all_pagetables(struct exec_domain *ed, char *s)
     shadow_status_noswap = 1;
 
     sh_check_name = s;
-    SH_VVLOG("%s-PT Audit domid=%d", s, d->id);
+    SH_VVLOG("%s-PT Audit domid=%d", s, d->domain_id);
     sh_l2_present = sh_l1_present = 0;
     perfc_incrc(check_all_pagetables);
 

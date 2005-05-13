@@ -440,17 +440,21 @@ xc_plan9_build(int xc_handle,
 
 	op.cmd = DOM0_GETDOMAININFO;
 	op.u.getdomaininfo.domain = (domid_t) domid;
-        op.u.getdomaininfo.exec_domain = 0;
-	op.u.getdomaininfo.ctxt = ctxt;
 	if ((do_dom0_op(xc_handle, &op) < 0) ||
 	    ((u32) op.u.getdomaininfo.domain != domid)) {
 		PERROR("Could not get info on domain");
 		goto error_out;
 	}
 	DPRINTF(("xc_get_tot_pages returns %ld pages\n", tot_pages));
+	
+	if ( xc_domain_get_vcpu_context(xc_handle, domid, 0, ctxt) )
+	{
+	    PERROR("Could not get vcpu context");
+	    goto error_out;
+	}
 
 	if (!(op.u.getdomaininfo.flags & DOMFLAGS_PAUSED)
-	    || (op.u.getdomaininfo.ctxt->pt_base != 0)) {
+	    || (ctxt->pt_base != 0)) {
 		ERROR("Domain is already constructed");
 		goto error_out;
 	}
@@ -495,7 +499,7 @@ xc_plan9_build(int xc_handle,
 
 	/* why is this set? */
 	ctxt->user_regs.esi = ctxt->user_regs.esp;
-	ctxt->user_regs.eflags = (1 << 9) | (1 << 2);
+	ctxt->user_regs.eflags = 1 << 9; /* Interrupt Enable */
 
 	/* FPU is set up to default initial state. */
 	memset(&ctxt->fpu_ctxt, 0, sizeof(ctxt->fpu_ctxt));
@@ -539,7 +543,7 @@ xc_plan9_build(int xc_handle,
 	memset(&launch_op, 0, sizeof (launch_op));
 
 	launch_op.u.setdomaininfo.domain = (domid_t) domid;
-	launch_op.u.setdomaininfo.exec_domain = 0;
+	launch_op.u.setdomaininfo.vcpu   = 0;
 	//  launch_op.u.setdomaininfo.num_vifs = 1;
 	launch_op.u.setdomaininfo.ctxt = ctxt;
 	launch_op.cmd = DOM0_SETDOMAININFO;

@@ -35,15 +35,15 @@ static inline void evtchn_set_pending(struct exec_domain *ed, int port)
         set_bit(0, &ed->vcpu_info->evtchn_upcall_pending);
 
         /*
-         * NB1. 'flags' and 'processor' must be checked /after/ update of
+         * NB1. 'vcpu_flags' and 'processor' must be checked /after/ update of
          * pending flag. These values may fluctuate (after all, we hold no
          * locks) but the key insight is that each change will cause
          * evtchn_upcall_pending to be polled.
          * 
-         * NB2. We save DF_RUNNING across the unblock to avoid a needless
+         * NB2. We save VCPUF_running across the unblock to avoid a needless
          * IPI for domains that we IPI'd to unblock.
          */
-        running = test_bit(EDF_RUNNING, &ed->flags);
+        running = test_bit(_VCPUF_running, &ed->vcpu_flags);
         exec_domain_unblock(ed);
         if ( running )
             smp_send_event_check_cpu(ed->processor);

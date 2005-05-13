@@ -675,15 +675,16 @@ class XendDomain:
         xmigrate = XendMigrate.instance()
         return xmigrate.save_begin(dominfo, dst)
     
-    def domain_pincpu(self, id, cpu):
-        """Pin a domain to a cpu.
+    def domain_pincpu(self, id, vcpu, cpumap):
+        """Set which cpus vcpu can use
 
-        @param id: domain
-        @param cpu: cpu number
+        @param id:   domain
+        @param vcpu: vcpu number
+        @param cpumap:  bitmap of usbale cpus
         """
         dominfo = self.domain_lookup(id)
         try:
-            return xc.domain_pincpu(int(dominfo.id), cpu)
+            return xc.domain_pincpu(int(dominfo.id), vcpu, cpumap)
         except Exception, ex:
             raise XendError(str(ex))
 

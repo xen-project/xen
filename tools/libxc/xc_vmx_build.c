@@ -447,7 +447,7 @@ static int setup_guest(int xc_handle,
     ctxt->user_regs.esi = vboot_params_start;
     ctxt->user_regs.edi = vboot_params_start + 0x2d0;
 
-    ctxt->user_regs.eflags = (1<<2);
+    ctxt->user_regs.eflags = 0;
 
     return 0;
 
@@ -543,14 +543,19 @@ int xc_vmx_build(int xc_handle,
 
     op.cmd = DOM0_GETDOMAININFO;
     op.u.getdomaininfo.domain = (domid_t)domid;
-    op.u.getdomaininfo.exec_domain = 0;
-    op.u.getdomaininfo.ctxt = ctxt;
     if ( (do_dom0_op(xc_handle, &op) < 0) || 
          ((u16)op.u.getdomaininfo.domain != domid) )
     {
         PERROR("Could not get info on domain");
         goto error_out;
     }
+
+    if ( xc_domain_get_vcpu_context(xc_handle, domid, 0, ctxt) )
+    {
+        PERROR("Could not get vcpu context");
+        goto error_out;
+    }
+
     if ( !(op.u.getdomaininfo.flags & DOMFLAGS_PAUSED) ||
          (ctxt->pt_base != 0) )
     {
@@ -618,9 +623,9 @@ int xc_vmx_build(int xc_handle,
 
     memset( &launch_op, 0, sizeof(launch_op) );
 
-    launch_op.u.setdomaininfo.domain   = (domid_t)domid;
-    launch_op.u.setdomaininfo.exec_domain = 0;
-    launch_op.u.setdomaininfo.ctxt = ctxt;
+    launch_op.u.setdomaininfo.domain = (domid_t)domid;
+    launch_op.u.setdomaininfo.vcpu   = 0;
+    launch_op.u.setdomaininfo.ctxt   = ctxt;
 
     launch_op.cmd = DOM0_SETDOMAININFO;
     rc = do_dom0_op(xc_handle, &launch_op);

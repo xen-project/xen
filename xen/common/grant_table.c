@@ -118,10 +118,10 @@ __gnttab_activate_grant_ref(
             u32 scombo, prev_scombo, new_scombo;
 
             if ( unlikely((sflags & GTF_type_mask) != GTF_permit_access) ||
-                 unlikely(sdom != mapping_d->id) )
+                 unlikely(sdom != mapping_d->domain_id) )
                 PIN_FAIL(unlock_out, GNTST_general_error,
                          "Bad flags (%x) or dom (%d). (NB. expected dom %d)\n",
-                        sflags, sdom, mapping_d->id);
+                        sflags, sdom, mapping_d->domain_id);
 
             /* Merge two 16-bit values into a 32-bit combined update. */
             /* NB. Endianness! */
@@ -674,7 +674,7 @@ gnttab_setup_table(
 
     if ( op.dom == DOMID_SELF )
     {
-        op.dom = current->domain->id;
+        op.dom = current->domain->domain_id;
     }
     else if ( unlikely(!IS_PRIV(current->domain)) )
     {
@@ -725,7 +725,7 @@ gnttab_dump_table(gnttab_dump_table_t *uop)
 
     if ( op.dom == DOMID_SELF )
     {
-        op.dom = current->domain->id;
+        op.dom = current->domain->domain_id;
     }
 
     if ( unlikely((d = find_domain_by_id(op.dom)) == NULL) )
@@ -866,10 +866,10 @@ gnttab_check_unmap(
     lgt = ld->grant_table;
 
 #if GRANT_DEBUG_VERBOSE
-    if ( ld->id != 0 )
+    if ( ld->domain_id != 0 )
     {
         DPRINTK("Foreign unref rd(%d) ld(%d) frm(%x) flgs(%x).\n",
-                rd->id, ld->id, frame, readonly);
+                rd->domain_id, ld->domain_id, frame, readonly);
     }
 #endif
 
@@ -879,7 +879,8 @@ gnttab_check_unmap(
 
     if ( get_domain(rd) == 0 )
     {
-        DPRINTK("gnttab_check_unmap: couldn't get_domain rd(%d)\n", rd->id);
+        DPRINTK("gnttab_check_unmap: couldn't get_domain rd(%d)\n",
+                rd->domain_id);
         return 0;
     }
 
@@ -913,7 +914,7 @@ gnttab_check_unmap(
 
             /* gotcha */
             DPRINTK("Grant unref rd(%d) ld(%d) frm(%lx) flgs(%x).\n",
-                    rd->id, ld->id, frame, readonly);
+                    rd->domain_id, ld->domain_id, frame, readonly);
 
             if ( readonly )
                 act->pin -= GNTPIN_hstr_inc;
@@ -963,12 +964,13 @@ gnttab_prepare_for_transfer(
     unsigned long  target_pfn;
 
     DPRINTK("gnttab_prepare_for_transfer rd(%hu) ld(%hu) ref(%hu).\n",
-            rd->id, ld->id, ref);
+            rd->domain_id, ld->domain_id, ref);
 
     if ( unlikely((rgt = rd->grant_table) == NULL) ||
          unlikely(ref >= NR_GRANT_ENTRIES) )
     {
-        DPRINTK("Dom %d has no g.t., or ref is bad (%d).\n", rd->id, ref);
+        DPRINTK("Dom %d has no g.t., or ref is bad (%d).\n",
+                rd->domain_id, ref);
         return 0;
     }
 
@@ -990,10 +992,10 @@ gnttab_prepare_for_transfer(
         }
 
         if ( unlikely(sflags != GTF_accept_transfer) ||
-             unlikely(sdom != ld->id) )
+             unlikely(sdom != ld->domain_id) )
         {
             DPRINTK("Bad flags (%x) or dom (%d). (NB. expected dom %d)\n",
-                    sflags, sdom, ld->id);
+                    sflags, sdom, ld->domain_id);
             goto fail;
         }
 
@@ -1041,7 +1043,7 @@ gnttab_notify_transfer(
     unsigned long   pfn;
 
     DPRINTK("gnttab_notify_transfer rd(%hu) ld(%hu) ref(%hu).\n",
-            rd->id, ld->id, ref);
+            rd->domain_id, ld->domain_id, ref);
 
     sha = &rd->grant_table->shared[ref];
 
@@ -1062,7 +1064,7 @@ gnttab_notify_transfer(
             __phys_to_machine_mapping[pfn] = frame;
     }
     sha->frame = __mfn_to_gpfn(rd, frame);
-    sha->domid = rd->id;
+    sha->domid = rd->domain_id;
     wmb();
     sha->flags = ( GTF_accept_transfer | GTF_transfer_completed );
 
