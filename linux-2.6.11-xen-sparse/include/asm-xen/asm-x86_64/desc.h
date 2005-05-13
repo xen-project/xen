@@ -65,9 +65,9 @@ struct desc_ptr {
 
 extern struct desc_ptr idt_descr, cpu_gdt_descr[NR_CPUS];
 
-extern struct desc_ptr cpu_gdt_table[NR_CPUS][GDT_ENTRIES];
+extern struct desc_struct cpu_gdt_table[NR_CPUS][GDT_ENTRIES];
 
-#define get_cpu_gdt_table(_cpu) ((struct desc_ptr *)(cpu_gdt_descr[(_cpu)].address))
+#define get_cpu_gdt_table(_cpu) ((struct desc_struct *)(cpu_gdt_descr[(_cpu)].address))
 
 #define load_TR_desc() asm volatile("ltr %w0"::"r" (GDT_ENTRY_TSS*8))
 #define load_LDT_desc() asm volatile("lldt %w0"::"r" (GDT_ENTRY_LDT*8))

@@ -247,6 +247,7 @@ static inline void set_32bit_tls(struct task_struct *t, int tls, u32 addr)
 	struct user_desc ud = { 
 		.base_addr = addr,
 		.limit = 0xfffff,
+		.contents = (3 << 3), /* user */
 		.seg_32bit = 1,
 		.limit_in_pages = 1,
 		.useable = 1,
@@ -401,8 +402,7 @@ struct task_struct *__switch_to(struct task_struct *prev_p, struct task_struct *
 		mcl->op      = __HYPERVISOR_update_descriptor;		\
 		mcl->args[0] = virt_to_machine(&get_cpu_gdt_table(cpu)	\
 					       [GDT_ENTRY_TLS_MIN + i]); \
-		mcl->args[1] = (unsigned long) ((u64 *) &next->tls_array[i]); \
-		mcl->args[2] = (unsigned long) ((u64 *) &next->tls_array[i]); \
+		mcl->args[1] = next->tls_array[i];			\
 		mcl++;							\
 	}								\
 } while (0)
