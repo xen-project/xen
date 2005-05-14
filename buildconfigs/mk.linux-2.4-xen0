@@ -32,7 +32,7 @@ $(LINUX_DIR)/include/linux/autoconf.h: ref-$(OS)-$(LINUX_VER)/.valid-ref
           ./mkbuildtree ../$(LINUX_DIR) )
 	# Patch kernel Makefile to set EXTRAVERSION
 	( cd $(LINUX_DIR) ; \
-	  sed -e 's/^EXTRAVERSION.*/&-$$(XENGUEST)\nXENGUEST = $(EXTRAVERSION)/' Makefile >Mk.tmp ; \
+	  sed -e 's/^EXTRAVERSION.*/&$$(XENGUEST)\nXENGUEST = -$(EXTRAVERSION)/' Makefile >Mk.tmp ; \
 	  rm -f Makefile ; mv Mk.tmp Makefile )
 	# add ebtables patch
 	( cd $(LINUX_DIR) ; patch -p1 -F3 < ../patches/tmp/ebtables.diff )
