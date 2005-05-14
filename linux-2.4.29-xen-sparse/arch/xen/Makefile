@@ -113,13 +113,13 @@ bzImage: vmlinux
 INSTALL_NAME ?= $(KERNELRELEASE)
 install: bzImage
 	mkdir -p $(INSTALL_PATH)/boot
-	ln -f -s vmlinuz-$(INSTALL_NAME)$(INSTALL_SUFFIX) $(INSTALL_PATH)/boot/vmlinuz-$(VERSION).$(PATCHLEVEL).$(SUBLEVEL)-$(XENGUEST)$(INSTALL_SUFFIX)
+	ln -f -s vmlinuz-$(INSTALL_NAME)$(INSTALL_SUFFIX) $(INSTALL_PATH)/boot/vmlinuz-$(VERSION).$(PATCHLEVEL).$(SUBLEVEL)$(XENGUEST)$(INSTALL_SUFFIX)
 	rm -f $(INSTALL_PATH)/boot/vmlinuz-$(INSTALL_NAME)$(INSTALL_SUFFIX)
 	install -m0644 arch/$(ARCH)/boot/bzImage $(INSTALL_PATH)/boot/vmlinuz-$(INSTALL_NAME)$(INSTALL_SUFFIX)
 	install -m0644 vmlinux $(INSTALL_PATH)/boot/vmlinux-syms-$(INSTALL_NAME)$(INSTALL_SUFFIX)
 	install -m0664 .config $(INSTALL_PATH)/boot/config-$(INSTALL_NAME)$(INSTALL_SUFFIX)
 	install -m0664 System.map $(INSTALL_PATH)/boot/System.map-$(INSTALL_NAME)$(INSTALL_SUFFIX)
-	ln -f -s vmlinuz-$(INSTALL_NAME)$(INSTALL_SUFFIX) $(INSTALL_PATH)/boot/vmlinuz-$(VERSION).$(PATCHLEVEL)-$(XENGUEST)$(INSTALL_SUFFIX)
+	ln -f -s vmlinuz-$(INSTALL_NAME)$(INSTALL_SUFFIX) $(INSTALL_PATH)/boot/vmlinuz-$(VERSION).$(PATCHLEVEL)$(XENGUEST)$(INSTALL_SUFFIX)
 
 %_config: arch/xen/defconfig-%
 	rm -f .config arch/xen/defconfig
