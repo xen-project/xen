@@ -27,7 +27,7 @@ $(LINUX_DIR)/include/linux/autoconf.h: ref-linux-$(LINUX_VER)/.valid-ref
           ./mkbuildtree ../$(LINUX_DIR) )
 	# Patch kernel Makefile to set EXTRAVERSION
 	( cd $(LINUX_DIR) ; \
-	  sed -e 's/^EXTRAVERSION.*/&-$(EXTRAVERSION)/' Makefile >Mk.tmp ; \
+	  sed -e 's/^EXTRAVERSION.*/&-$$(XENGUEST)\nXENGUEST = $(EXTRAVERSION)/' Makefile >Mk.tmp ; \
 	  rm -f Makefile ; mv Mk.tmp Makefile )
 	# Re-use config from install dir if one exits else use default config
 	CONFIG_VERSION=$$(sed -ne 's/^EXTRAVERSION = //p' $(LINUX_DIR)/Makefile); \
