@@ -82,8 +82,14 @@ then
  make -j4 world
  make -j4 linux24
  cd ../install/boot
- [ -r vmlinuz-2.6.*-xen0 ] && ln -s vmlinuz-2.6.*-xen0 xenolinux.gz
-  
+ if [ -r vmlinuz-2.6-xen0 ]
+ then
+  ln -s vmlinuz-2.6-xen0 xenolinux.gz
+ else
+  kern=`ls vmlinuz-2.6.*-xen0 | head -1`
+  [ -r "$kern" ] && ln -s "$kern" xenolinux.gz
+ fi  
+
 else
  # old style repository without 'make world'
 
