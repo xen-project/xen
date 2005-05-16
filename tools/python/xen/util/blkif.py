@@ -2,6 +2,8 @@ import os
 import re
 import string
 
+from xen.xend.XendLogging import log
+
 from xen.util.ip import _readline, _readlines
 
 def expand_dev_name(name):
