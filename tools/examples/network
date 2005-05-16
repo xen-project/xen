@@ -74,6 +74,16 @@ s/${src}/dev ${dst}/
 " | sh -e
 }
 
+# Usage: del_addrs src
+del_addrs () {
+    local src=$1
+    ip addr show dev ${src} | egrep '^ *inet ' | sed -e "
+s/inet/ip addr del/
+s@\([0-9]\+\.[0-9]\+\.[0-9]\+\.[0-9]\+\)/[0-9]\+@\1@
+s/${src}/dev ${src}/
+" | sh -e
+}
+
 # Usage: transfer_routes src dst
 # Get all IP routes to device $src, delete them, and
 # add the same routes to device $dst.
@@ -97,11 +107,9 @@ d
 " | sh -e
 }
 
-# Usage: create_bridge dev bridge
-# Create bridge $bridge and add device $dev to it.
+# Usage: create_bridge bridge
 create_bridge () {
-    local dev=$1
-    local bridge=$2
+    local bridge=$1
 
     # Don't create the bridge if it already exists.
     if ! brctl show | grep -q ${bridge} ; then
@@ -110,6 +118,16 @@ create_bridge () {
         brctl setfd ${bridge} 0
     fi
     ifconfig ${bridge} up
+}
+
+# Usage: add_to_bridge bridge dev
+add_to_bridge () {
+    local bridge=$1
+    local dev=$2
+    # Don't add $dev to $bridge if it's already on a bridge.
+    if ! brctl show | grep -q ${dev} ; then
+        brctl addif ${bridge} ${dev}
+    fi
 }
 
 # Usage: antispoofing dev bridge
@@ -143,15 +161,31 @@ op_start () {
     if [ "${bridge}" == "null" ] ; then
         return
     fi
-    # Create the bridge and give it the interface IP addresses.
-    # Move the interface routes onto the bridge.
-    create_bridge ${netdev} ${bridge}
-    transfer_addrs ${netdev} ${bridge}
-    transfer_routes ${netdev} ${bridge}
-    # Don't add $dev to $bridge if it's already on a bridge.
-    if ! brctl show | grep -q ${netdev} ; then
-        brctl addif ${bridge} ${netdev}
+
+    create_bridge ${bridge}
+
+    if ifconfig veth0 2>/dev/null | grep -q veth0 ; then
+        # Propagate MAC address and ARP responsibilities to virtual interface.
+        mac=`ifconfig ${netdev} | grep HWadd | sed -e 's/.*\(..:..:..:..:..:..\).*/\1/'`
+        ifconfig veth0 down
+        ifconfig veth0 hw ether ${mac}
+        ifconfig veth0 arp up
+        transfer_addrs ${netdev} veth0
+        transfer_routes ${netdev} veth0
+        del_addrs ${netdev}
+        ifconfig ${netdev} -arp down
+        ifconfig ${netdev} hw ether fe:ff:ff:ff:ff:ff up
+        # Bring up second half of virtual device and attach it to the bridge.
+        ifconfig vif0.0 up
+        add_to_bridge ${bridge} vif0.0
+    else
+        transfer_addrs ${netdev} ${bridge}
+        transfer_routes ${netdev} ${bridge}
+        del_addrs ${netdev}
     fi
+
+    # Attach the real interface to the bridge.
+    add_to_bridge ${bridge} ${netdev}
     
     if [ ${antispoof} == 'yes' ] ; then
         antispoofing ${netdev} ${bridge}
@@ -162,16 +196,30 @@ op_stop () {
     if [ "${bridge}" == "null" ] ; then
         return
     fi
-    # Remove the interface from the bridge.
-    # Move the routes back to the interface.
-    brctl delif ${bridge} ${netdev}
-    transfer_routes ${bridge} ${netdev}
 
-    # It's not our place to be enabling forwarding...
+    brctl delif ${bridge} ${netdev}
+
+    if ifconfig veth0 2>/dev/null | grep -q veth0 ; then
+        brctl delif ${bridge} vif0.0
+        ifconfig vif0.0 down
+        mac=`ifconfig veth0 | grep HWadd | sed -e 's/.*\(..:..:..:..:..:..\).*/\1/'`
+        ifconfig ${netdev} down
+        ifconfig ${netdev} hw ether ${mac}
+        ifconfig ${netdev} arp up
+        transfer_addrs veth0 ${netdev}
+        transfer_routes veth0 ${netdev}
+        del_addrs veth0
+        ifconfig veth0 -arp down
+        ifconfig veth0 hw ether 00:00:00:00:00:00
+    else
+        transfer_addrs ${bridge} ${netdev}
+        transfer_routes ${bridge} ${netdev}
+        del_addrs ${bridge}
+    fi
 }
 
 case ${OP} in
-    start)
+  start)
         op_start
         ;;
     
