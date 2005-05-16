@@ -249,6 +249,7 @@
 40f562392LBhwmOxVPsYdkYXMxI_ZQ linux-2.6.11-xen-sparse/arch/xen/kernel/reboot.c
 414c113396tK1HTVeUalm3u-1DF16g linux-2.6.11-xen-sparse/arch/xen/kernel/skbuff.c
 3f68905c5eiA-lBMQSvXLMWS1ikDEA linux-2.6.11-xen-sparse/arch/xen/kernel/xen_proc.c
+428868bbQust_FkSdkerMqYBWfrVKg linux-2.6.11-xen-sparse/arch/xen/x86_64/kernel/early_printk.c
 41261688yS8eAyy-7kzG4KBs0xbYCA linux-2.6.11-xen-sparse/drivers/Makefile
 4108f5c1WfTIrs0HZFeV39sttekCTw linux-2.6.11-xen-sparse/drivers/char/mem.c
 4111308bZAIzwf_Kzu6x1TZYZ3E0_Q linux-2.6.11-xen-sparse/drivers/char/tty_io.c
