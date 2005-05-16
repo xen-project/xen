@@ -31,6 +31,7 @@ from xen.web.httpserver import HttpServer, UnixHttpServer
 
 from xen.xend import XendRoot; xroot = XendRoot.instance()
 from xen.xend import Vifctl
+from xen.xend.XendLogging import log
 from xen.web.SrvDir import SrvDir
 
 from SrvRoot import SrvRoot
@@ -59,6 +60,6 @@ def create():
         servers.add(HttpServer(root=root, interface=interface, port=port))
     if xroot.get_xend_unix_server():
         path = xroot.get_xend_unix_path()
-        print 'unix path=', path
+        log.info('unix path=' + path)
         servers.add(UnixHttpServer(path=path, root=root))
     return servers
