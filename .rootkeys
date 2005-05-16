@@ -275,6 +275,7 @@
 4097ba831lpGeLlPg-bfV8XarVVuoQ linux-2.6.11-xen-sparse/drivers/xen/netback/common.h
 4097ba83wvv8yi5P5xugCUBAdb6O-A linux-2.6.11-xen-sparse/drivers/xen/netback/control.c
 4097ba83byY5bTSugJGZ1exTxIcMKw linux-2.6.11-xen-sparse/drivers/xen/netback/interface.c
+4288ce19CHtBLg600EZ8TNuSPLs5Ng linux-2.6.11-xen-sparse/drivers/xen/netback/loopback.c
 4087cf0dGmSbFhFZyIZBJzvqxY-qBw linux-2.6.11-xen-sparse/drivers/xen/netback/netback.c
 40f56239lrg_Ob0BJ8WBFS1zeg2CYw linux-2.6.11-xen-sparse/drivers/xen/netfront/Kconfig
 40f56239Wd4k_ycG_mFsSO1r5xKdtQ linux-2.6.11-xen-sparse/drivers/xen/netfront/Makefile
