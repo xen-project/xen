@@ -252,8 +252,9 @@ static void end_block_io_op(struct buffer_head *bh, int uptodate)
 #else
 static int end_block_io_op(struct bio *bio, unsigned int done, int error)
 {
-    if ( done || error )
-        __end_block_io_op(bio->bi_private, (done && !error));
+    if ( bio->bi_size != 0 )
+        return 1;
+    __end_block_io_op(bio->bi_private, !error);
     bio_put(bio);
     return error;
 }
