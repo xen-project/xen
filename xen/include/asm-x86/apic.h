@@ -104,14 +104,15 @@ extern void release_lapic_nmi(void);
 extern void disable_timer_nmi_watchdog(void);
 extern void enable_timer_nmi_watchdog(void);
 extern void nmi_watchdog_tick (struct cpu_user_regs *regs);
-extern void touch_nmi_watchdog(void);
 extern int APIC_init_uniprocessor (void);
 extern void disable_APIC_timer(void);
 extern void enable_APIC_timer(void);
 
-extern unsigned int watchdog_on;
 extern int check_nmi_watchdog (void);
 extern void enable_NMI_through_LVT0 (void * dummy);
+
+extern void watchdog_disable(void);
+extern void watchdog_enable(void);
 
 extern unsigned int nmi_watchdog;
 #define NMI_NONE	0

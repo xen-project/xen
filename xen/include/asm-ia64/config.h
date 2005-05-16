@@ -29,7 +29,8 @@ typedef int pid_t;
 #define FASTCALL(x) x	// see linux/include/linux/linkage.h
 #define fastcall	// " "
 
-#define touch_nmi_watchdog()
+#define watchdog_disable() ((void)0)
+#define watchdog_enable()  ((void)0)
 // from linux/include/linux/types.h
 #define CLEAR_BITMAP(name,bits) \
 	memset(name, 0, BITS_TO_LONGS(bits)*sizeof(unsigned long))
@@ -261,7 +262,6 @@ struct screen_info { };
 // these declarations got moved at some point, find a better place for them
 extern int opt_noht;
 extern int ht_per_core;
-extern unsigned int watchdog_on;
 
 // xen/include/asm/config.h
 /******************************************************************************

@@ -502,14 +502,12 @@ integer_param("debugtrace", debugtrace_kilobytes);
 
 void debugtrace_dump(void)
 {
-    int _watchdog_on = watchdog_on;
     unsigned long flags;
 
     if ( (debugtrace_bytes == 0) || !debugtrace_used )
         return;
 
-    /* Watchdog can trigger if we print a really large buffer. */
-    watchdog_on = 0;
+    watchdog_disable();
 
     spin_lock_irqsave(&debugtrace_lock, flags);
 
@@ -529,7 +527,7 @@ void debugtrace_dump(void)
 
     spin_unlock_irqrestore(&debugtrace_lock, flags);
 
-    watchdog_on = _watchdog_on;
+    watchdog_enable();
 }
 
 void debugtrace_printk(const char *fmt, ...)
@@ -635,7 +633,7 @@ void panic(const char *fmt, ...)
     __putstr("Reboot in five seconds...\n");
     spin_unlock_irqrestore(&console_lock, flags);
 
-    watchdog_on = 0;
+    watchdog_disable();
     mdelay(5000);
     machine_restart(0);
 }

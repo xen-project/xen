@@ -356,15 +356,13 @@ void scrub_heap_pages(void)
     unsigned long pfn, flags;
 
     printk("Scrubbing Free RAM: ");
+    watchdog_disable();
 
     for ( pfn = 0; pfn < (bitmap_size * 8); pfn++ )
     {
-        /* Every 100MB, print a progress dot and appease the watchdog. */
+        /* Every 100MB, print a progress dot. */
         if ( (pfn % ((100*1024*1024)/PAGE_SIZE)) == 0 )
-        {
             printk(".");
-            touch_nmi_watchdog();
-        }
 
         /* Quick lock-free check. */
         if ( allocated_in_map(pfn) )
@@ -383,6 +381,7 @@ void scrub_heap_pages(void)
         spin_unlock_irqrestore(&heap_lock, flags);
     }
 
+    watchdog_enable();
     printk("done.\n");
 }
 

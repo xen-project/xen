@@ -327,7 +327,6 @@ __trap_to_cdb(struct cpu_user_regs *regs)
 	static atomic_t xendbg_running = ATOMIC_INIT(1);
 	static char recv_buf[4096];
 	unsigned flags;
-	unsigned old_watchdog;
 
 	if (xdb_ctx.serhnd < 0) {
 		dbg_printk("Debugger not ready yet.\n");
@@ -358,8 +357,7 @@ __trap_to_cdb(struct cpu_user_regs *regs)
 	   interrupts while we're here. */
 	local_irq_save(flags);
 
-	old_watchdog = watchdog_on;
-	watchdog_on = 0;
+	watchdog_disable();
 
 	/* Shouldn't really do this, but otherwise we stop for no
 	   obvious reason, which is Bad */
@@ -385,7 +383,7 @@ __trap_to_cdb(struct cpu_user_regs *regs)
 			ASSERT(!local_irq_is_enabled());
 		}
 	}
-	watchdog_on = old_watchdog;
+	watchdog_enable();
 	atomic_inc(&xendbg_running);
 	local_irq_restore(flags);
 	return 0;

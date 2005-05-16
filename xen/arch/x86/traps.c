@@ -199,7 +199,7 @@ asmlinkage void fatal_trap(int trapnr, struct cpu_user_regs *regs)
         "machine check", "simd error"
     };
 
-    watchdog_on = 0;
+    watchdog_disable();
 
     show_registers(regs);
 

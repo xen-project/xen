@@ -111,8 +111,7 @@ asmlinkage void do_double_fault(void)
     struct tss_struct *tss = &doublefault_tss;
     unsigned int cpu = ((tss->back_link>>3)-__FIRST_TSS_ENTRY)>>1;
 
-    /* Disable the NMI watchdog. It's useless now. */
-    watchdog_on = 0;
+    watchdog_disable();
 
     console_force_unlock();
 

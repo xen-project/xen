@@ -450,7 +450,8 @@ static void __init start_of_day(void)
     while ( wait_init_idle != 0 )
         cpu_relax();
 
-    watchdog_on = 1;
+    watchdog_enable();
+
 #ifdef __x86_64__ /* x86_32 uses low mappings when building DOM0. */
     zap_low_mappings();
 #endif

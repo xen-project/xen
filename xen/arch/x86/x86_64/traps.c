@@ -60,8 +60,7 @@ void show_page_walk(unsigned long addr)
 asmlinkage void double_fault(void);
 asmlinkage void do_double_fault(struct cpu_user_regs *regs)
 {
-    /* Disable the NMI watchdog. It's useless now. */
-    watchdog_on = 0;
+    watchdog_disable();
 
     console_force_unlock();
 

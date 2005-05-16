@@ -23,8 +23,6 @@ unsigned long wait_init_idle;
 int phys_proc_id[NR_CPUS];
 unsigned long loops_per_jiffy = (1<<12);	// from linux/init/main.c
 
-unsigned int watchdog_on = 0;	// from arch/x86/nmi.c ?!?
-
 void unw_init(void) { printf("unw_init() skipped (NEED FOR KERNEL UNWIND)\n"); }
 void ia64_mca_init(void) { printf("ia64_mca_init() skipped (Machine check abort handling)\n"); }
 void ia64_mca_cpu_init(void *x) { }

@@ -186,7 +186,7 @@ void __attribute__((noreturn)) __machine_halt(void *unused)
 
 void machine_halt(void)
 {
-    watchdog_on = 0;
+    watchdog_disable();
     smp_call_function(__machine_halt, NULL, 1, 0);
     __machine_halt(NULL);
 }

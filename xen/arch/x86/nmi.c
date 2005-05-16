@@ -28,7 +28,6 @@
 #include <asm/debugger.h>
 
 unsigned int nmi_watchdog = NMI_NONE;
-unsigned int watchdog_on = 0;
 static unsigned int nmi_hz = HZ;
 unsigned int nmi_perfctr_msr;	/* the MSR to reset in NMI handler */
 
@@ -255,6 +254,28 @@ void __pminit setup_apic_nmi_watchdog(void)
 static unsigned int
 last_irq_sums [NR_CPUS],
     alert_counter [NR_CPUS];
+
+static spinlock_t   watchdog_lock = SPIN_LOCK_UNLOCKED;
+static unsigned int watchdog_disable_count = 1;
+static unsigned int watchdog_on;
+
+void watchdog_disable(void)
+{
+    unsigned long flags;
+    spin_lock_irqsave(&watchdog_lock, flags);
+    if ( watchdog_disable_count++ == 0 )
+        watchdog_on = 0;
+    spin_unlock_irqrestore(&watchdog_lock, flags);
+}
+
+void watchdog_enable(void)
+{
+    unsigned long flags;
+    spin_lock_irqsave(&watchdog_lock, flags);
+    if ( --watchdog_disable_count == 0 )
+        watchdog_on = 1;
+    spin_unlock_irqrestore(&watchdog_lock, flags);
+}
 
 void touch_nmi_watchdog (void)
 {
