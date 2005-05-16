@@ -3,6 +3,7 @@
 import os
 import os.path
 import sys
+import xen.util.process
 
 from xen.xend import XendRoot
 xroot = XendRoot.instance()
@@ -35,7 +36,7 @@ def network(op, script=None, bridge=None, antispoof=None):
     else:
         args.append("antispoof=no")
     args = ' '.join(args)
-    os.system(script + ' ' + args)
+    xen.util.process.system(script + ' ' + args)
 
 def set_vif_name(vif_old, vif_new):
     if vif_old == vif_new:

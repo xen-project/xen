@@ -908,6 +908,7 @@
 4055ee4dwy4l0MghZosxoiu6zmhc9Q tools/python/xen/util/console_client.py
 40c9c468IienauFHQ_xJIcqnPJ8giQ tools/python/xen/util/ip.py
 41dde8b0yuJX-S79w4xJKxBQ-Mhp1A tools/python/xen/util/memmap.py
+4288c6fcB1kUAqX0gzU85GGxmamS4Q tools/python/xen/util/process.py
 4059c6a0pnxhG8hwSOivXybbGOwuXw tools/python/xen/util/tempfile.py
 4267a9b16u4IEPhjRryesk6A17sobA tools/python/xen/web/SrvBase.py
 4267a9b1FfCUjW7m9anLERcx9lwhJg tools/python/xen/web/SrvDir.py
