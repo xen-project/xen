@@ -957,7 +957,6 @@ static trap_info_t trap_table[] = {
 void __init trap_init(void)
 {
 	HYPERVISOR_set_trap_table(trap_table);
-	HYPERVISOR_set_fast_trap(SYSCALL_VECTOR);
 
 	/*
 	 * default LDT is a single-entry callgate to lcall7 for iBCS
@@ -971,7 +970,7 @@ void __init trap_init(void)
 	cpu_init();
 }
 
-int smp_trap_init(trap_info_t *trap_ctxt)
+void smp_trap_init(trap_info_t *trap_ctxt)
 {
 	trap_info_t *t = trap_table;
 
@@ -980,5 +979,4 @@ int smp_trap_init(trap_info_t *trap_ctxt)
 		trap_ctxt[t->vector].cs = t->cs;
 		trap_ctxt[t->vector].address = t->address;
 	}
-	return SYSCALL_VECTOR;
 }

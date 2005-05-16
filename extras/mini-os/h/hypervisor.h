@@ -257,17 +257,6 @@ static __inline__ int HYPERVISOR_update_descriptor(
     return ret;
 }
 
-static __inline__ int HYPERVISOR_set_fast_trap(int idx)
-{
-    int ret;
-    __asm__ __volatile__ (
-        TRAP_INSTR
-        : "=a" (ret) : "0" (__HYPERVISOR_set_fast_trap), 
-        _a1 (idx) : "memory" );
-
-    return ret;
-}
-
 static __inline__ int HYPERVISOR_dom_mem_op(void *dom_mem_op)
 {
     int ret;

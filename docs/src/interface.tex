@@ -721,24 +721,6 @@ stack-frame layout is used.
 
 \end{quote} 
 
-Finally, as an optimization it is possible for each guest OS 
-to install one ``fast trap'': this is a trap gate which will 
-allow direct transfer of control from ring 3 into ring 1 without
-indirecting via Xen. In most cases this is suitable for use by 
-the guest OS system call mechanism, although it may be used for
-any purpose. 
-
-
-\begin{quote}
-\hypercall{set\_fast\_trap(int idx)}
-
-Install the handler for exception vector {\tt idx} as the ``fast
-trap'' for this domain. Note that this installs the current handler 
-(i.e. that which has been installed more recently via a call 
-to {\tt set\_trap\_table()}). 
-
-\end{quote}
-
 
 
 \section{Scheduling and Timer}

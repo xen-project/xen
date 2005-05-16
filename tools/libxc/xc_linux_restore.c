@@ -600,13 +600,12 @@ int xc_linux_restore(int xc_handle, XcIOContext *ioctxt)
      *  1. user_regs is fine, as Xen checks that on context switch.
      *  2. fpu_ctxt is fine, as it can't hurt Xen.
      *  3. trap_ctxt needs the code selectors checked.
-     *  4. fast_trap_idx is checked by Xen.
-     *  5. ldt base must be page-aligned, no more than 8192 ents, ...
-     *  6. gdt already done, and further checking is done by Xen.
-     *  7. check that kernel_ss is safe.
-     *  8. pt_base is already done.
-     *  9. debugregs are checked by Xen.
-     *  10. callback code selectors need checking.
+     *  4. ldt base must be page-aligned, no more than 8192 ents, ...
+     *  5. gdt already done, and further checking is done by Xen.
+     *  6. check that kernel_ss is safe.
+     *  7. pt_base is already done.
+     *  8. debugregs are checked by Xen.
+     *  9. callback code selectors need checking.
      */
     for ( i = 0; i < 256; i++ )
     {

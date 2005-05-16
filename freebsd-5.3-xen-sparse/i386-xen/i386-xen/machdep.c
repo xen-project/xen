@@ -1642,9 +1642,6 @@ init386(void)
 	if ((error = HYPERVISOR_set_trap_table(trap_table)) != 0) {
 		panic("set_trap_table failed - error %d\n", error);
 	}
-	if ((error = HYPERVISOR_set_fast_trap(0x80)) != 0) {
-	        panic("set_fast_trap failed - error %d\n", error);
-	}
         HYPERVISOR_set_callbacks(GSEL(GCODE_SEL, SEL_KPL), (unsigned long)Xhypervisor_callback,
 				 GSEL(GCODE_SEL, SEL_KPL), (unsigned long)failsafe_callback);
 

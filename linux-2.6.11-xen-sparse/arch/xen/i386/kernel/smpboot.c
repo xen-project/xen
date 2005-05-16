@@ -821,7 +821,7 @@ static int __init do_boot_cpu(int apicid)
 	extern void startup_32_smp(void);
 	extern void hypervisor_callback(void);
 	extern void failsafe_callback(void);
-	extern int smp_trap_init(trap_info_t *);
+	extern void smp_trap_init(trap_info_t *);
 	int i;
 
 	cpu = ++cpucount;
@@ -881,7 +881,7 @@ static int __init do_boot_cpu(int apicid)
 		ctxt.trap_ctxt[i].vector = i;
 		ctxt.trap_ctxt[i].cs     = FLAT_KERNEL_CS;
 	}
-	ctxt.fast_trap_idx = smp_trap_init(ctxt.trap_ctxt);
+	smp_trap_init(ctxt.trap_ctxt);
 
 	/* No LDT. */
 	ctxt.ldt_ents = 0;

@@ -885,10 +885,9 @@ install_ap_tramp(void)
 }
 #endif
 
-static int 
+static void
 cpu_mp_trap_init(trap_info_t *trap_ctxt)
 {
-
         trap_info_t *t = trap_table;
 
         for (t = trap_table; t->address; t++) {
@@ -896,7 +895,6 @@ cpu_mp_trap_init(trap_info_t *trap_ctxt)
                 trap_ctxt[t->vector].cs = t->cs;
                 trap_ctxt[t->vector].address = t->address;
         }
-        return 0x80 /*SYSCALL_VECTOR*/;
 }
 
 /*
@@ -961,7 +959,7 @@ start_ap(int apic_id)
 		ctxt.trap_ctxt[i].vector = i;
 		ctxt.trap_ctxt[i].cs     = FLAT_KERNEL_CS;
 	}
-	ctxt.fast_trap_idx = cpu_mp_trap_init(ctxt.trap_ctxt);
+	cpu_mp_trap_init(ctxt.trap_ctxt);
 
 	/* No LDT. */
 	ctxt.ldt_ents = 0;

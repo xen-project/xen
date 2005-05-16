@@ -133,7 +133,6 @@ typedef struct vcpu_guest_context {
     struct { char x[512]; } fpu_ctxt        /* User-level FPU registers     */
     __attribute__((__aligned__(16)));       /* (needs 16-byte alignment)    */
     trap_info_t   trap_ctxt[256];           /* Virtual IDT                  */
-    unsigned int  fast_trap_idx;            /* "Fast trap" vector offset    */
     unsigned long ldt_base, ldt_ents;       /* LDT (linear address, # ents) */
     unsigned long gdt_frames[16], gdt_ents; /* GDT (machine frames, # ents) */
     unsigned long kernel_ss, kernel_sp;     /* Virtual TSS (only SS1/SP1)   */
@@ -153,8 +152,6 @@ typedef struct {
 
 typedef struct {
 } arch_vcpu_info_t;
-
-#define ARCH_HAS_FAST_TRAP
 
 #endif
 

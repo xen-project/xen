@@ -729,7 +729,7 @@ ENTRY(hypercall_table)
         .long do_set_debugreg
         .long do_get_debugreg
         .long do_update_descriptor  /* 10 */
-        .long do_set_fast_trap
+        .long do_ni_hypercall
         .long do_dom_mem_op
         .long do_multicall
         .long do_update_va_mapping

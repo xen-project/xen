@@ -332,22 +332,6 @@ HYPERVISOR_update_descriptor(
 }
 
 static inline int
-HYPERVISOR_set_fast_trap(
-    int idx)
-{
-    int ret;
-    unsigned long ign;
-
-    __asm__ __volatile__ (
-        TRAP_INSTR
-        : "=a" (ret), "=b" (ign)
-	: "0" (__HYPERVISOR_set_fast_trap), "1" (idx)
-	: "memory" );
-
-    return ret;
-}
-
-static inline int
 HYPERVISOR_dom_mem_op(
     unsigned int op, unsigned long *extent_list,
     unsigned long nr_extents, unsigned int extent_order)

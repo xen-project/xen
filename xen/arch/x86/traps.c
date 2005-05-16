@@ -1176,7 +1176,11 @@ long do_set_trap_table(trap_info_t *traps)
             break;
         }
 
-        memcpy(dst+cur.vector, &cur, sizeof(cur));
+        memcpy(&dst[cur.vector], &cur, sizeof(cur));
+
+        if ( cur.vector == 0x80 )
+            init_int80_direct_trap(current);
+
         traps++;
     }
 

@@ -17,7 +17,7 @@ struct trap_bounce {
 struct arch_domain
 {
     l1_pgentry_t *mm_perdomain_pt;
-#ifdef __x86_64__
+#ifdef CONFIG_X86_64
     l2_pgentry_t *mm_perdomain_l2;
     l3_pgentry_t *mm_perdomain_l3;
 #endif
@@ -82,9 +82,8 @@ struct arch_exec_domain
     int iobmp_limit;  /* Number of ports represented in the bitmap.  */
     int iopl;         /* Current IOPL for this VCPU. */
 
-    /* Trap info. */
-#ifdef ARCH_HAS_FAST_TRAP
-    struct desc_struct fast_trap_desc;
+#ifdef CONFIG_X86_32
+    struct desc_struct int80_desc;
 #endif
 
     /* Virtual Machine Extensions */
@@ -106,7 +105,7 @@ struct arch_exec_domain
     l2_pgentry_t *monitor_vtable;		/* virtual address of monitor_table */
     l1_pgentry_t *hl2_vtable;			/* virtual address of hl2_table */
 
-#ifdef __x86_64__
+#ifdef CONFIG_X86_64
     l3_pgentry_t *guest_vl3table;
     l4_pgentry_t *guest_vl4table;
 #endif

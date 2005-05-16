@@ -42,7 +42,6 @@
 #define __HYPERVISOR_set_debugreg          8
 #define __HYPERVISOR_get_debugreg          9
 #define __HYPERVISOR_update_descriptor    10
-#define __HYPERVISOR_set_fast_trap        11 /* x86/32 only */
 #define __HYPERVISOR_dom_mem_op           12
 #define __HYPERVISOR_multicall            13
 #define __HYPERVISOR_update_va_mapping    14

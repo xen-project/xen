@@ -242,8 +242,6 @@ void arch_do_createdomain(struct exec_domain *ed)
 {
     struct domain *d = ed->domain;
 
-    SET_DEFAULT_FAST_TRAP(&ed->arch);
-
     ed->arch.flags = TF_kernel_mode;
 
     if ( d->domain_id != IDLE_DOMAIN_ID )
@@ -421,9 +419,6 @@ int arch_set_info_guest(
 
     if ( test_bit(_VCPUF_initialised, &ed->vcpu_flags) )
         return 0;
-
-    if ( (rc = (int)set_fast_trap(ed, c->fast_trap_idx)) != 0 )
-        return rc;
 
     memset(ed->arch.guest_context.debugreg, 0,
            sizeof(ed->arch.guest_context.debugreg));
@@ -726,7 +721,6 @@ static void __context_switch(void)
                stack_regs, 
                CTXT_SWITCH_STACK_BYTES);
         unlazy_fpu(p);
-        CLEAR_FAST_TRAP(&p->arch);
         save_segments(p);
     }
 
@@ -750,7 +744,7 @@ static void __context_switch(void)
 
         if ( !VMX_DOMAIN(n) )
         {
-            SET_FAST_TRAP(&n->arch);
+            set_int80_direct_trap(n);
             switch_kernel_stack(n, cpu);
         }
     }

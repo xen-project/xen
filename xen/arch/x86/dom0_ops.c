@@ -406,12 +406,6 @@ void arch_getdomaininfo_ctxt(
         c->flags |= VGCF_VMX_GUEST;
 #endif
 
-#ifdef ARCH_HAS_FAST_TRAP
-    if ( (ed->arch.fast_trap_desc.a == 0) &&
-         (ed->arch.fast_trap_desc.b == 0) )
-        c->fast_trap_idx = 0;
-#endif
-
     c->gdt_ents = 0;
     if ( GET_GDT_ADDRESS(ed) == GDT_VIRT_START(ed) )
     {
