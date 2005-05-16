@@ -55,7 +55,7 @@ static PyObject *
 ext2_file_read (Ext2File *file, PyObject *args)
 {
     int err, size = 0;
-    size_t n, total = 0;
+    unsigned int n, total = 0;
     PyObject * buffer = NULL;
 
     if (file->file == NULL) {
