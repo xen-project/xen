@@ -140,7 +140,7 @@ static int pit_read_io(struct vmx_virpit_t *vpit)
 /* vmx_io_assist light-weight version, specific to PIT DM */ 
 static void resume_pit_io(ioreq_t *p)
 {
-    struct cpu_user_regs *regs = get_cpu_user_regs();
+    struct cpu_user_regs *regs = guest_cpu_user_regs();
     unsigned long old_eax = regs->eax;
     p->state = STATE_INVALID;
 

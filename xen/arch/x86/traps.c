@@ -90,6 +90,97 @@ asmlinkage void alignment_check(void);
 asmlinkage void spurious_interrupt_bug(void);
 asmlinkage void machine_check(void);
 
+static int debug_stack_lines = 20;
+integer_param("debug_stack_lines", debug_stack_lines);
+
+static inline int kernel_text_address(unsigned long addr)
+{
+    if (addr >= (unsigned long) &_stext &&
+        addr <= (unsigned long) &_etext)
+        return 1;
+    return 0;
+
+}
+
+void show_guest_stack(void)
+{
+    int i;
+    struct cpu_user_regs *regs = guest_cpu_user_regs();
+    unsigned long *stack = (unsigned long *)regs->esp, addr;
+
+    printk("Guest stack trace from "__OP"sp=%p:\n   ", stack);
+
+    for ( i = 0; i < (debug_stack_lines*8); i++ )
+    {
+        if ( ((long)stack & (STACK_SIZE-1)) == 0 )
+            break;
+        if ( get_user(addr, stack) )
+        {
+            if ( i != 0 )
+                printk("\n    ");
+            printk("Fault while accessing guest memory.");
+            i = 1;
+            break;
+        }
+        if ( (i != 0) && ((i % 8) == 0) )
+            printk("\n   ");
+        printk("%p ", _p(addr));
+        stack++;
+    }
+    if ( i == 0 )
+        printk("Stack empty.");
+    printk("\n");
+}
+
+void show_trace(unsigned long *esp)
+{
+    unsigned long *stack = esp, addr;
+    int i = 0;
+
+    printk("Xen call trace from "__OP"sp=%p:\n   ", stack);
+
+    while ( ((long) stack & (STACK_SIZE-1)) != 0 )
+    {
+        addr = *stack++;
+        if ( kernel_text_address(addr) )
+        {
+            if ( (i != 0) && ((i % 6) == 0) )
+                printk("\n   ");
+            printk("[<%p>] ", _p(addr));
+            i++;
+        }
+    }
+    if ( i == 0 )
+        printk("Trace empty.");
+    printk("\n");
+}
+
+void show_stack(unsigned long *esp)
+{
+    unsigned long *stack = esp, addr;
+    int i;
+
+    printk("Xen stack trace from "__OP"sp=%p:\n   ", stack);
+
+    for ( i = 0; i < (debug_stack_lines*8); i++ )
+    {
+        if ( ((long)stack & (STACK_SIZE-1)) == 0 )
+            break;
+        if ( (i != 0) && ((i % 8) == 0) )
+            printk("\n   ");
+        addr = *stack++;
+        if ( kernel_text_address(addr) )
+            printk("[%p] ", _p(addr));
+        else
+            printk("%p ", _p(addr));
+    }
+    if ( i == 0 )
+        printk("Stack empty.");
+    printk("\n");
+
+    show_trace(esp);
+}
+
 /*
  * This is called for faults at very unexpected times (e.g., when interrupts
  * are disabled). In such situations we can't do much that is safe. We try to

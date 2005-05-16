@@ -2836,7 +2836,7 @@ int ptwr_do_page_fault(struct domain *d, unsigned long addr)
     return EXCRET_fault_fixed;
 
  emulate:
-    if ( x86_emulate_memop(get_cpu_user_regs(), addr,
+    if ( x86_emulate_memop(guest_cpu_user_regs(), addr,
                            &ptwr_mem_emulator, BITS_PER_LONG/8) )
         return 0;
     perfc_incrc(ptwr_emulations);

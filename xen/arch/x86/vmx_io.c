@@ -187,7 +187,7 @@ void vmx_io_assist(struct exec_domain *ed)
     vcpu_iodata_t *vio;
     ioreq_t *p;
     struct domain *d = ed->domain;
-    struct cpu_user_regs *regs = get_cpu_user_regs();
+    struct cpu_user_regs *regs = guest_cpu_user_regs();
     unsigned long old_eax;
     int sign;
     struct mi_per_cpu_info *mpci_p;

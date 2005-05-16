@@ -162,7 +162,7 @@ void vmx_do_launch(struct exec_domain *ed)
     struct Xgt_desc_struct desc;
     unsigned long pfn = 0;
     struct pfn_info *page;
-    struct cpu_user_regs *regs = get_cpu_user_regs();
+    struct cpu_user_regs *regs = guest_cpu_user_regs();
 
     vmx_stts();
     set_bit(_VCPUF_guest_stts, &ed->vcpu_flags);

@@ -10,81 +10,6 @@
 #include <xen/sched.h>
 #include <asm/msr.h>
 
-static int kstack_depth_to_print = 8*20;
-
-static inline int kernel_text_address(unsigned long addr)
-{
-    if (addr >= (unsigned long) &_stext &&
-        addr <= (unsigned long) &_etext)
-        return 1;
-    return 0;
-
-}
-
-void show_guest_stack(void)
-{
-    int i;
-    struct cpu_user_regs *regs = get_cpu_user_regs();
-    unsigned long *stack = (unsigned long *)regs->rsp;
-
-    printk("Guest RIP is %016lx\n   ", regs->rip);
-
-    for ( i = 0; i < kstack_depth_to_print; i++ )
-    {
-        if ( ((long)stack & (STACK_SIZE-1)) == 0 )
-            break;
-        if ( i && ((i % 8) == 0) )
-            printk("\n    ");
-            printk("%016lx ", *stack++);
-    }
-    printk("\n");
-    
-}
-
-void show_trace(unsigned long *rsp)
-{
-    unsigned long *stack, addr;
-    int i;
-
-    printk("Call Trace from RSP=%p:\n   ", rsp);
-    stack = rsp;
-    i = 0;
-    while (((long) stack & (STACK_SIZE-1)) != 0) {
-        addr = *stack++;
-        if (kernel_text_address(addr)) {
-            if (i && ((i % 6) == 0))
-                printk("\n   ");
-            printk("[<%016lx>] ", addr);
-            i++;
-        }
-    }
-    printk("\n");
-}
-
-void show_stack(unsigned long *rsp)
-{
-    unsigned long *stack;
-    int i;
-
-    printk("Stack trace from RSP=%p:\n    ", rsp);
-
-    stack = rsp;
-    for ( i = 0; i < kstack_depth_to_print; i++ )
-    {
-        if ( ((long)stack & (STACK_SIZE-1)) == 0 )
-            break;
-        if ( i && ((i % 8) == 0) )
-            printk("\n    ");
-        if ( kernel_text_address(*stack) )
-            printk("[%016lx] ", *stack++);
-        else
-            printk("%016lx ", *stack++);            
-    }
-    printk("\n");
-
-    show_trace(rsp);
-}
-
 void show_registers(struct cpu_user_regs *regs)
 {
     printk("CPU:    %d\nEIP:    %04lx:[<%016lx>]      \nEFLAGS: %016lx\n",
@@ -99,6 +24,8 @@ void show_registers(struct cpu_user_regs *regs)
            regs->r12, regs->r13, regs->r14, regs->r15);
 
     show_stack((unsigned long *)regs->rsp);
+    if ( GUEST_MODE(regs) )
+        show_guest_stack();
 } 
 
 void show_page_walk(unsigned long addr)

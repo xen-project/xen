@@ -282,7 +282,6 @@ long do_sched_op(unsigned long op)
 
     switch ( op & SCHEDOP_cmdmask ) 
     {
-
     case SCHEDOP_yield:
     {
         ret = do_yield();
@@ -297,7 +296,8 @@ long do_sched_op(unsigned long op)
 
     case SCHEDOP_shutdown:
     {
-        TRACE_3D(TRC_SCHED_SHUTDOWN, current->domain->domain_id, current->vcpu_id,
+        TRACE_3D(TRC_SCHED_SHUTDOWN,
+                 current->domain->domain_id, current->vcpu_id,
                  (op >> SCHEDOP_reasonshift));
         domain_shutdown((u8)(op >> SCHEDOP_reasonshift));
         break;

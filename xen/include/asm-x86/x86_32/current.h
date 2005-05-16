@@ -23,7 +23,7 @@ static inline void set_current(struct exec_domain *ed)
               : : "r" (STACK_SIZE-4), "r" (ed) );    
 }
 
-static inline struct cpu_user_regs *get_cpu_user_regs(void)
+static inline struct cpu_user_regs *guest_cpu_user_regs(void)
 {
     struct cpu_user_regs *cpu_user_regs;
     __asm__ ( "andl %%esp,%0; addl %2,%0"
@@ -49,7 +49,7 @@ static inline unsigned long get_stack_bottom(void)
 #define reset_stack_and_jump(__fn)                                \
     __asm__ __volatile__ (                                        \
         "movl %0,%%esp; jmp "STR(__fn)                            \
-        : : "r" (get_cpu_user_regs()) )
+        : : "r" (guest_cpu_user_regs()) )
 
 #define schedule_tail(_ed) ((_ed)->arch.schedule_tail)(_ed)
 

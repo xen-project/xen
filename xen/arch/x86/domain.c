@@ -607,7 +607,7 @@ static void load_segments(struct exec_domain *p, struct exec_domain *n)
 
     if ( unlikely(!all_segs_okay) )
     {
-        struct cpu_user_regs *regs = get_cpu_user_regs();
+        struct cpu_user_regs *regs = guest_cpu_user_regs();
         unsigned long   *rsp =
             (n->arch.flags & TF_kernel_mode) ?
             (unsigned long *)regs->rsp : 
@@ -666,7 +666,7 @@ static void clear_segments(void)
 
 long do_switch_to_user(void)
 {
-    struct cpu_user_regs  *regs = get_cpu_user_regs();
+    struct cpu_user_regs  *regs = guest_cpu_user_regs();
     struct switch_to_user  stu;
     struct exec_domain    *ed = current;
 
@@ -715,7 +715,7 @@ static inline void switch_kernel_stack(struct exec_domain *n, unsigned int cpu)
 
 static void __context_switch(void)
 {
-    struct cpu_user_regs *stack_regs = get_cpu_user_regs();
+    struct cpu_user_regs *stack_regs = guest_cpu_user_regs();
     unsigned int         cpu = smp_processor_id();
     struct exec_domain  *p = percpu_ctxt[cpu].curr_ed;
     struct exec_domain  *n = current;
@@ -851,7 +851,7 @@ unsigned long __hypercall_create_continuation(
     }
     else
     {
-        regs       = get_cpu_user_regs();
+        regs       = guest_cpu_user_regs();
 #if defined(__i386__)
         regs->eax  = op;
         regs->eip -= 2;  /* re-execute 'int 0x82' */

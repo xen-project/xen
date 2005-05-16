@@ -496,6 +496,7 @@ int debugtrace_send_to_console;
 static char        *debugtrace_buf; /* Debug-trace buffer */
 static unsigned int debugtrace_prd; /* Producer index     */
 static unsigned int debugtrace_kilobytes = 128, debugtrace_bytes;
+static unsigned int debugtrace_used;
 static spinlock_t   debugtrace_lock = SPIN_LOCK_UNLOCKED;
 integer_param("debugtrace", debugtrace_kilobytes);
 
@@ -504,7 +505,7 @@ void debugtrace_dump(void)
     int _watchdog_on = watchdog_on;
     unsigned long flags;
 
-    if ( debugtrace_bytes == 0 )
+    if ( (debugtrace_bytes == 0) || !debugtrace_used )
         return;
 
     /* Watchdog can trigger if we print a really large buffer. */
@@ -541,6 +542,8 @@ void debugtrace_printk(const char *fmt, ...)
 
     if ( debugtrace_bytes == 0 )
         return;
+
+    debugtrace_used = 1;
 
     spin_lock_irqsave(&debugtrace_lock, flags);
 
@@ -608,7 +611,7 @@ __initcall(debugtrace_init);
 void panic(const char *fmt, ...)
 {
     va_list args;
-    char buf[128];
+    char buf[128], cpustr[10];
     unsigned long flags;
     extern void machine_restart(char *);
     
@@ -623,11 +626,11 @@ void panic(const char *fmt, ...)
     /* Spit out multiline message in one go. */
     spin_lock_irqsave(&console_lock, flags);
     __putstr("\n****************************************\n");
+    __putstr("Panic on CPU");
+    sprintf(cpustr, "%d", smp_processor_id());
+    __putstr(cpustr);
+    __putstr(":\n");
     __putstr(buf);
-    __putstr("Aieee! CPU");
-    sprintf(buf, "%d", smp_processor_id());
-    __putstr(buf);
-    __putstr(" is toast...\n");
     __putstr("****************************************\n\n");
     __putstr("Reboot in five seconds...\n");
     spin_unlock_irqrestore(&console_lock, flags);

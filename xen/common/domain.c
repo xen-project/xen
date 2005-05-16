@@ -122,7 +122,10 @@ void domain_crash(void)
     struct domain *d = current->domain;
 
     if ( d->domain_id == 0 )
-        BUG();
+    {
+        show_registers(guest_cpu_user_regs());
+        panic("Domain 0 crashed!\n");
+    }
 
     set_bit(_DOMF_crashed, &d->domain_flags);
 
