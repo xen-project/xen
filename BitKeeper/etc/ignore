@@ -106,6 +106,8 @@ tools/misc/miniterm/miniterm
 tools/misc/xc_shadow
 tools/misc/xen_cpuperf
 tools/misc/xenperf
+tools/pygrub/build/*
+tools/python/build/*
 tools/tests/test_x86_emulator
 tools/vnet/gc
 tools/vnet/gc*/*
