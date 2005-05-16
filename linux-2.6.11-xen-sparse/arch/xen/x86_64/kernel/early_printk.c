@@ -1,3 +1,4 @@
+#include <linux/config.h>
 #include <linux/console.h>
 #include <linux/kernel.h>
 #include <linux/init.h>
@@ -16,7 +17,6 @@
 #define MAX_YPOS	25
 #define MAX_XPOS	80
 
-#if 0
 static int current_ypos = 1, current_xpos = 0; 
 
 static void early_vga_write(struct console *con, const char *str, unsigned n)
@@ -58,8 +58,8 @@ static struct console early_vga_console = {
 	.flags =	CON_PRINTBUFFER,
 	.index =	-1,
 };
-#endif
 
+#ifndef CONFIG_XEN
 /* Serial functions loosely based on a similar package from Klaus P. Gerlicher */ 
 
 int early_serial_base = 0x3f8;  /* ttyS0 */ 
@@ -80,7 +80,6 @@ int early_serial_base = 0x3f8;  /* ttyS0 */
 #define DLL             0       /*  Divisor Latch Low         */
 #define DLH             1       /*  Divisor latch High        */
 
-#if 0
 static int early_serial_putc(unsigned char ch) 
 { 
 	unsigned timeout = 0xffff; 
@@ -99,11 +98,9 @@ static void early_serial_write(struct console *con, const char *s, unsigned n)
 		s++; 
 	} 
 } 
-#endif
 
 #define DEFAULT_BAUD 9600
 
-#if 0
 static __init void early_serial_init(char *s)
 {
 	unsigned char c; 
@@ -151,6 +148,26 @@ static __init void early_serial_init(char *s)
 	outb((divisor >> 8) & 0xff, early_serial_base + DLH); 
 	outb(c & ~DLAB, early_serial_base + LCR);
 }
+#else
+
+static void
+early_serial_write(struct console *con, const char *s, unsigned count)
+{
+	int n;
+
+	while (count > 0) {
+		n = HYPERVISOR_console_io(CONSOLEIO_write, count, (char *)s);
+		if (n <= 0)
+			break;
+		count -= n;
+		s += n;
+	}
+} 
+
+static __init void early_serial_init(char *s)
+{
+}
+#endif
 
 static struct console early_serial_console = {
 	.name =		"earlyser",
@@ -158,23 +175,9 @@ static struct console early_serial_console = {
 	.flags =	CON_PRINTBUFFER,
 	.index =	-1,
 };
-#endif
-
-static void xen_console_write(struct console *con, const char *s, unsigned n)
-{
-        HYPERVISOR_console_io(CONSOLEIO_write, n, (char *) s);
-}
-
-static struct console xen_console = {
-        .name =         "xen",
-        .write =        xen_console_write,
-        .flags =        CON_PRINTBUFFER,
-        .index =        -1,
-};
 
 /* Direct interface for emergencies */
-struct console *early_console = &xen_console;
-/* struct console *early_console = &early_vga_console; */
+struct console *early_console = &early_vga_console;
 static int early_console_initialized = 0;
 
 void early_printk(const char *fmt, ...)
@@ -193,9 +196,9 @@ static int keep_early;
 
 int __init setup_early_printk(char *opt) 
 {  
+	char *space;
+	char buf[256]; 
 
-        early_console = &xen_console; 
-#if 0
 	if (early_console_initialized)
 		return -1;
 
@@ -218,7 +221,6 @@ int __init setup_early_printk(char *opt)
 	} else if (!strncmp(buf, "vga", 3)) {
 		early_console = &early_vga_console; 
 	}
-#endif
 	early_console_initialized = 1;
 	register_console(early_console);       
 	return 0;
