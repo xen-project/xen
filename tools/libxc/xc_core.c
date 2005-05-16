@@ -32,7 +32,7 @@ xc_domain_dumpcore(int xc_handle,
 	unsigned long nr_pages;
 	unsigned long *page_array;
 	xc_dominfo_t info;
-	int i, dump_fd;
+	int i, j, vcpu_map_size, dump_fd;
 	char *dump_mem, *dump_mem_start = NULL;
 	struct xc_core_header header;
 	vcpu_guest_context_t     ctxt[MAX_VIRT_CPUS];
@@ -53,14 +53,17 @@ xc_domain_dumpcore(int xc_handle,
 		goto error_out;
 	}
 	
-	for (i = 0; i < sizeof(info.vcpu_to_cpu) / sizeof(info.vcpu_to_cpu[0]);
-	     i++) {
-		if (info.vcpu_to_cpu[i] == -1)
+	vcpu_map_size =  sizeof(info.vcpu_to_cpu) / sizeof(info.vcpu_to_cpu[0]);
+
+	for (i = 0, j = 0; i < vcpu_map_size; i++) {
+		if (info.vcpu_to_cpu[i] == -1) {
 			continue;
-		if (xc_domain_get_vcpu_context(xc_handle, domid, i, &ctxt[i])) {
+		}
+		if (xc_domain_get_vcpu_context(xc_handle, domid, i, &ctxt[j])) {
 			PERROR("Could not get all vcpu contexts for domain");
 			goto error_out;
 		}
+		j++;
 	}
 	
 	nr_pages = info.nr_pages;
@@ -70,9 +73,10 @@ xc_domain_dumpcore(int xc_handle,
 	header.xch_nr_pages = nr_pages;
 	header.xch_ctxt_offset = sizeof(struct xc_core_header);
 	header.xch_index_offset = sizeof(struct xc_core_header) +
-	    sizeof(vcpu_guest_context_t);
+	    sizeof(vcpu_guest_context_t)*info.vcpus;
 	header.xch_pages_offset = round_pgup(sizeof(struct xc_core_header) +
-	    sizeof(vcpu_guest_context_t) + nr_pages * sizeof(unsigned long));
+	    (sizeof(vcpu_guest_context_t) * info.vcpus) + 
+	    (nr_pages * sizeof(unsigned long)));
 
 	write(dump_fd, &header, sizeof(struct xc_core_header));
 	write(dump_fd, &ctxt, sizeof(ctxt[0]) * info.vcpus);
