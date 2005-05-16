@@ -1,20 +1,91 @@
+diff -Nru a/Documentation/SecurityBugs b/Documentation/SecurityBugs
+--- /dev/null	Wed Dec 31 16:00:00 196900
++++ b/Documentation/SecurityBugs	2005-05-11 15:43:53 -07:00
+@@ -0,0 +1,38 @@
++Linux kernel developers take security very seriously.  As such, we'd
++like to know when a security bug is found so that it can be fixed and
++disclosed as quickly as possible.  Please report security bugs to the
++Linux kernel security team.
++
++1) Contact
++
++The Linux kernel security team can be contacted by email at
++<security@kernel.org>.  This is a private list of security officers
++who will help verify the bug report and develop and release a fix.
++It is possible that the security team will bring in extra help from
++area maintainers to understand and fix the security vulnerability.
++
++As it is with any bug, the more information provided the easier it
++will be to diagnose and fix.  Please review the procedure outlined in
++REPORTING-BUGS if you are unclear about what information is helpful.
++Any exploit code is very helpful and will not be released without
++consent from the reporter unless it has already been made public.
++
++2) Disclosure
++
++The goal of the Linux kernel security team is to work with the
++bug submitter to bug resolution as well as disclosure.  We prefer
++to fully disclose the bug as soon as possible.  It is reasonable to
++delay disclosure when the bug or the fix is not yet fully understood,
++the solution is not well-tested or for vendor coordination.  However, we
++expect these delays to be short, measurable in days, not weeks or months.
++A disclosure date is negotiated by the security team working with the
++bug submitter as well as vendors.  However, the kernel security team
++holds the final say when setting a disclosure date.  The timeframe for
++disclosure is from immediate (esp. if it's already publically known)
++to a few weeks.  As a basic default policy, we expect report date to
++disclosure date to be on the order of 7 days.
++
++3) Non-disclosure agreements
++
++The Linux kernel security team is not a formal body and therefore unable
++to enter any non-disclosure agreements.
+diff -Nru a/MAINTAINERS b/MAINTAINERS
+--- a/MAINTAINERS	2005-05-11 15:43:53 -07:00
++++ b/MAINTAINERS	2005-05-11 15:43:53 -07:00
+@@ -1966,6 +1966,11 @@
+ W:	http://www.weinigel.se
+ S:	Supported
+ 
++SECURITY CONTACT
++P:	Security Officers
++M:	security@kernel.org
++S:	Supported
++
+ SELINUX SECURITY MODULE
+ P:	Stephen Smalley
+ M:	sds@epoch.ncsc.mil
 diff -Nru a/Makefile b/Makefile
---- a/Makefile	2005-04-29 18:34:28 -07:00
-+++ b/Makefile	2005-04-29 18:34:28 -07:00
+--- a/Makefile	2005-05-11 15:43:53 -07:00
++++ b/Makefile	2005-05-11 15:43:53 -07:00
 @@ -1,8 +1,8 @@
  VERSION = 2
  PATCHLEVEL = 6
  SUBLEVEL = 11
 -EXTRAVERSION =
 -NAME=Woozy Numbat
-+EXTRAVERSION = .8
++EXTRAVERSION = .9
 +NAME=Woozy Beaver
  
  # *DOCUMENTATION*
  # To see a list of typical targets execute "make help"
+diff -Nru a/REPORTING-BUGS b/REPORTING-BUGS
+--- a/REPORTING-BUGS	2005-05-11 15:43:53 -07:00
++++ b/REPORTING-BUGS	2005-05-11 15:43:53 -07:00
+@@ -16,6 +16,10 @@
+ describe how to recreate it. That is worth even more than the oops itself.
+ The list of maintainers is in the MAINTAINERS file in this directory.
+ 
++      If it is a security bug, please copy the Security Contact listed
++in the MAINTAINERS file.  They can help coordinate bugfix and disclosure.
++See Documentation/SecurityBugs for more infomation.
++
+       If you are totally stumped as to whom to send the report, send it to
+ linux-kernel@vger.kernel.org. (For more information on the linux-kernel
+ mailing list see http://www.tux.org/lkml/).
 diff -Nru a/arch/ia64/kernel/fsys.S b/arch/ia64/kernel/fsys.S
---- a/arch/ia64/kernel/fsys.S	2005-04-29 18:34:28 -07:00
-+++ b/arch/ia64/kernel/fsys.S	2005-04-29 18:34:28 -07:00
+--- a/arch/ia64/kernel/fsys.S	2005-05-11 15:43:53 -07:00
++++ b/arch/ia64/kernel/fsys.S	2005-05-11 15:43:53 -07:00
 @@ -611,8 +611,10 @@
  	movl r2=ia64_ret_from_syscall
  	;;
@@ -28,8 +99,8 @@ diff -Nru a/arch/ia64/kernel/fsys.S b/arch/ia64/kernel/fsys.S
  (p8)	br.call.sptk.many b6=b6		// ignore this return addr
  	br.cond.sptk ia64_trace_syscall
 diff -Nru a/arch/ia64/kernel/signal.c b/arch/ia64/kernel/signal.c
---- a/arch/ia64/kernel/signal.c	2005-04-29 18:34:28 -07:00
-+++ b/arch/ia64/kernel/signal.c	2005-04-29 18:34:28 -07:00
+--- a/arch/ia64/kernel/signal.c	2005-05-11 15:43:53 -07:00
++++ b/arch/ia64/kernel/signal.c	2005-05-11 15:43:53 -07:00
 @@ -224,7 +224,8 @@
  	 * could be corrupted.
  	 */
@@ -41,8 +112,8 @@ diff -Nru a/arch/ia64/kernel/signal.c b/arch/ia64/kernel/signal.c
  		 * strace expects to be notified after sigreturn returns even though the
  		 * context to which we return may not be in the middle of a syscall.
 diff -Nru a/arch/ppc/oprofile/op_model_fsl_booke.c b/arch/ppc/oprofile/op_model_fsl_booke.c
---- a/arch/ppc/oprofile/op_model_fsl_booke.c	2005-04-29 18:34:28 -07:00
-+++ b/arch/ppc/oprofile/op_model_fsl_booke.c	2005-04-29 18:34:28 -07:00
+--- a/arch/ppc/oprofile/op_model_fsl_booke.c	2005-05-11 15:43:53 -07:00
++++ b/arch/ppc/oprofile/op_model_fsl_booke.c	2005-05-11 15:43:53 -07:00
 @@ -150,7 +150,6 @@
  	int is_kernel;
  	int val;
@@ -61,8 +132,8 @@ diff -Nru a/arch/ppc/oprofile/op_model_fsl_booke.c b/arch/ppc/oprofile/op_model_
  			} else {
  				ctr_write(i, 0);
 diff -Nru a/arch/ppc/platforms/4xx/ebony.h b/arch/ppc/platforms/4xx/ebony.h
---- a/arch/ppc/platforms/4xx/ebony.h	2005-04-29 18:34:28 -07:00
-+++ b/arch/ppc/platforms/4xx/ebony.h	2005-04-29 18:34:28 -07:00
+--- a/arch/ppc/platforms/4xx/ebony.h	2005-05-11 15:43:53 -07:00
++++ b/arch/ppc/platforms/4xx/ebony.h	2005-05-11 15:43:53 -07:00
 @@ -61,8 +61,8 @@
   */
  
@@ -75,8 +146,8 @@ diff -Nru a/arch/ppc/platforms/4xx/ebony.h b/arch/ppc/platforms/4xx/ebony.h
  /* external Epson SG-615P */
  #define BASE_BAUD	691200
 diff -Nru a/arch/ppc/platforms/4xx/luan.h b/arch/ppc/platforms/4xx/luan.h
---- a/arch/ppc/platforms/4xx/luan.h	2005-04-29 18:34:28 -07:00
-+++ b/arch/ppc/platforms/4xx/luan.h	2005-04-29 18:34:28 -07:00
+--- a/arch/ppc/platforms/4xx/luan.h	2005-05-11 15:43:53 -07:00
++++ b/arch/ppc/platforms/4xx/luan.h	2005-05-11 15:43:53 -07:00
 @@ -47,9 +47,9 @@
  #define RS_TABLE_SIZE	3
  
@@ -91,8 +162,8 @@ diff -Nru a/arch/ppc/platforms/4xx/luan.h b/arch/ppc/platforms/4xx/luan.h
  #define BASE_BAUD	11059200
  #define STD_UART_OP(num)					\
 diff -Nru a/arch/ppc/platforms/4xx/ocotea.h b/arch/ppc/platforms/4xx/ocotea.h
---- a/arch/ppc/platforms/4xx/ocotea.h	2005-04-29 18:34:28 -07:00
-+++ b/arch/ppc/platforms/4xx/ocotea.h	2005-04-29 18:34:28 -07:00
+--- a/arch/ppc/platforms/4xx/ocotea.h	2005-05-11 15:43:53 -07:00
++++ b/arch/ppc/platforms/4xx/ocotea.h	2005-05-11 15:43:53 -07:00
 @@ -56,8 +56,8 @@
  #define RS_TABLE_SIZE	2
  
@@ -105,8 +176,8 @@ diff -Nru a/arch/ppc/platforms/4xx/ocotea.h b/arch/ppc/platforms/4xx/ocotea.h
  #define BASE_BAUD	11059200/16
  #define STD_UART_OP(num)					\
 diff -Nru a/arch/sparc/kernel/ptrace.c b/arch/sparc/kernel/ptrace.c
---- a/arch/sparc/kernel/ptrace.c	2005-04-29 18:34:28 -07:00
-+++ b/arch/sparc/kernel/ptrace.c	2005-04-29 18:34:28 -07:00
+--- a/arch/sparc/kernel/ptrace.c	2005-05-11 15:43:53 -07:00
++++ b/arch/sparc/kernel/ptrace.c	2005-05-11 15:43:53 -07:00
 @@ -531,18 +531,6 @@
  			pt_error_return(regs, EIO);
  			goto out_tsk;
@@ -127,8 +198,8 @@ diff -Nru a/arch/sparc/kernel/ptrace.c b/arch/sparc/kernel/ptrace.c
  		if (request == PTRACE_SYSCALL)
  			set_tsk_thread_flag(child, TIF_SYSCALL_TRACE);
 diff -Nru a/arch/sparc64/kernel/ptrace.c b/arch/sparc64/kernel/ptrace.c
---- a/arch/sparc64/kernel/ptrace.c	2005-04-29 18:34:28 -07:00
-+++ b/arch/sparc64/kernel/ptrace.c	2005-04-29 18:34:28 -07:00
+--- a/arch/sparc64/kernel/ptrace.c	2005-05-11 15:43:53 -07:00
++++ b/arch/sparc64/kernel/ptrace.c	2005-05-11 15:43:53 -07:00
 @@ -514,25 +514,6 @@
  			pt_error_return(regs, EIO);
  			goto out_tsk;
@@ -156,8 +227,8 @@ diff -Nru a/arch/sparc64/kernel/ptrace.c b/arch/sparc64/kernel/ptrace.c
  		if (request == PTRACE_SYSCALL) {
  			set_tsk_thread_flag(child, TIF_SYSCALL_TRACE);
 diff -Nru a/arch/sparc64/kernel/signal32.c b/arch/sparc64/kernel/signal32.c
---- a/arch/sparc64/kernel/signal32.c	2005-04-29 18:34:28 -07:00
-+++ b/arch/sparc64/kernel/signal32.c	2005-04-29 18:34:28 -07:00
+--- a/arch/sparc64/kernel/signal32.c	2005-05-11 15:43:53 -07:00
++++ b/arch/sparc64/kernel/signal32.c	2005-05-11 15:43:53 -07:00
 @@ -192,9 +192,12 @@
  			err |= __put_user(from->si_uid, &to->si_uid);
  			break;
@@ -173,8 +244,8 @@ diff -Nru a/arch/sparc64/kernel/signal32.c b/arch/sparc64/kernel/signal32.c
  		case __SI_RT >> 16: /* This is not generated by the kernel as of now.  */
  		case __SI_MESGQ >> 16:
 diff -Nru a/arch/sparc64/kernel/systbls.S b/arch/sparc64/kernel/systbls.S
---- a/arch/sparc64/kernel/systbls.S	2005-04-29 18:34:27 -07:00
-+++ b/arch/sparc64/kernel/systbls.S	2005-04-29 18:34:27 -07:00
+--- a/arch/sparc64/kernel/systbls.S	2005-05-11 15:43:53 -07:00
++++ b/arch/sparc64/kernel/systbls.S	2005-05-11 15:43:53 -07:00
 @@ -75,7 +75,7 @@
  /*260*/	.word compat_sys_sched_getaffinity, compat_sys_sched_setaffinity, sys32_timer_settime, compat_sys_timer_gettime, sys_timer_getoverrun
  	.word sys_timer_delete, sys32_timer_create, sys_ni_syscall, compat_sys_io_setup, sys_io_destroy
@@ -185,8 +256,8 @@ diff -Nru a/arch/sparc64/kernel/systbls.S b/arch/sparc64/kernel/systbls.S
  
  #endif /* CONFIG_COMPAT */
 diff -Nru a/arch/um/include/sysdep-i386/syscalls.h b/arch/um/include/sysdep-i386/syscalls.h
---- a/arch/um/include/sysdep-i386/syscalls.h	2005-04-29 18:34:27 -07:00
-+++ b/arch/um/include/sysdep-i386/syscalls.h	2005-04-29 18:34:27 -07:00
+--- a/arch/um/include/sysdep-i386/syscalls.h	2005-05-11 15:43:53 -07:00
++++ b/arch/um/include/sysdep-i386/syscalls.h	2005-05-11 15:43:53 -07:00
 @@ -23,6 +23,9 @@
  		      unsigned long prot, unsigned long flags,
  		      unsigned long fd, unsigned long pgoff);
@@ -217,8 +288,8 @@ diff -Nru a/arch/um/include/sysdep-i386/syscalls.h b/arch/um/include/sysdep-i386
  /*
   * Overrides for Emacs so that we follow Linus's tabbing style.
 diff -Nru a/arch/um/include/sysdep-x86_64/syscalls.h b/arch/um/include/sysdep-x86_64/syscalls.h
---- a/arch/um/include/sysdep-x86_64/syscalls.h	2005-04-29 18:34:28 -07:00
-+++ b/arch/um/include/sysdep-x86_64/syscalls.h	2005-04-29 18:34:28 -07:00
+--- a/arch/um/include/sysdep-x86_64/syscalls.h	2005-05-11 15:43:53 -07:00
++++ b/arch/um/include/sysdep-x86_64/syscalls.h	2005-05-11 15:43:53 -07:00
 @@ -71,12 +71,7 @@
  	[ __NR_iopl ] = (syscall_handler_t *) sys_ni_syscall, \
  	[ __NR_set_thread_area ] = (syscall_handler_t *) sys_ni_syscall, \
@@ -233,8 +304,8 @@ diff -Nru a/arch/um/include/sysdep-x86_64/syscalls.h b/arch/um/include/sysdep-x8
  
  #define LAST_ARCH_SYSCALL 251
 diff -Nru a/arch/um/kernel/skas/uaccess.c b/arch/um/kernel/skas/uaccess.c
---- a/arch/um/kernel/skas/uaccess.c	2005-04-29 18:34:28 -07:00
-+++ b/arch/um/kernel/skas/uaccess.c	2005-04-29 18:34:28 -07:00
+--- a/arch/um/kernel/skas/uaccess.c	2005-05-11 15:43:53 -07:00
++++ b/arch/um/kernel/skas/uaccess.c	2005-05-11 15:43:53 -07:00
 @@ -61,7 +61,8 @@
  	void *arg;
  	int *res;
@@ -246,8 +317,8 @@ diff -Nru a/arch/um/kernel/skas/uaccess.c b/arch/um/kernel/skas/uaccess.c
  	len = va_arg(args, int);
  	is_write = va_arg(args, int);
 diff -Nru a/arch/um/kernel/sys_call_table.c b/arch/um/kernel/sys_call_table.c
---- a/arch/um/kernel/sys_call_table.c	2005-04-29 18:34:28 -07:00
-+++ b/arch/um/kernel/sys_call_table.c	2005-04-29 18:34:28 -07:00
+--- a/arch/um/kernel/sys_call_table.c	2005-05-11 15:43:53 -07:00
++++ b/arch/um/kernel/sys_call_table.c	2005-05-11 15:43:53 -07:00
 @@ -48,7 +48,6 @@
  extern syscall_handler_t old_select;
  extern syscall_handler_t sys_modify_ldt;
@@ -291,8 +362,8 @@ diff -Nru a/arch/um/kernel/sys_call_table.c b/arch/um/kernel/sys_call_table.c
  	[ __NR_request_key ] = (syscall_handler_t *) sys_request_key,
  	[ __NR_keyctl ] = (syscall_handler_t *) sys_keyctl,
 diff -Nru a/drivers/char/drm/drm_ioctl.c b/drivers/char/drm/drm_ioctl.c
---- a/drivers/char/drm/drm_ioctl.c	2005-04-29 18:34:27 -07:00
-+++ b/drivers/char/drm/drm_ioctl.c	2005-04-29 18:34:27 -07:00
+--- a/drivers/char/drm/drm_ioctl.c	2005-05-11 15:43:53 -07:00
++++ b/drivers/char/drm/drm_ioctl.c	2005-05-11 15:43:53 -07:00
 @@ -326,6 +326,8 @@
  
  	DRM_COPY_FROM_USER_IOCTL(sv, argp, sizeof(sv));
@@ -303,8 +374,8 @@ diff -Nru a/drivers/char/drm/drm_ioctl.c b/drivers/char/drm/drm_ioctl.c
  	retv.drm_di_major = DRM_IF_MAJOR;
  	retv.drm_di_minor = DRM_IF_MINOR;
 diff -Nru a/drivers/i2c/chips/eeprom.c b/drivers/i2c/chips/eeprom.c
---- a/drivers/i2c/chips/eeprom.c	2005-04-29 18:34:27 -07:00
-+++ b/drivers/i2c/chips/eeprom.c	2005-04-29 18:34:27 -07:00
+--- a/drivers/i2c/chips/eeprom.c	2005-05-11 15:43:53 -07:00
++++ b/drivers/i2c/chips/eeprom.c	2005-05-11 15:43:53 -07:00
 @@ -130,7 +130,8 @@
  
  	/* Hide Vaio security settings to regular users (16 first bytes) */
@@ -316,8 +387,8 @@ diff -Nru a/drivers/i2c/chips/eeprom.c b/drivers/i2c/chips/eeprom.c
  		if (count - in_row1 > 0)
  			memcpy(buf + in_row1, &data->data[16], count - in_row1);
 diff -Nru a/drivers/i2c/chips/it87.c b/drivers/i2c/chips/it87.c
---- a/drivers/i2c/chips/it87.c	2005-04-29 18:34:28 -07:00
-+++ b/drivers/i2c/chips/it87.c	2005-04-29 18:34:28 -07:00
+--- a/drivers/i2c/chips/it87.c	2005-05-11 15:43:53 -07:00
++++ b/drivers/i2c/chips/it87.c	2005-05-11 15:43:53 -07:00
 @@ -631,7 +631,7 @@
  	struct it87_data *data = it87_update_device(dev);
  	return sprintf(buf,"%d\n", ALARMS_FROM_REG(data->alarms));
@@ -328,8 +399,8 @@ diff -Nru a/drivers/i2c/chips/it87.c b/drivers/i2c/chips/it87.c
  static ssize_t
  show_vrm_reg(struct device *dev, char *buf)
 diff -Nru a/drivers/i2c/chips/via686a.c b/drivers/i2c/chips/via686a.c
---- a/drivers/i2c/chips/via686a.c	2005-04-29 18:34:27 -07:00
-+++ b/drivers/i2c/chips/via686a.c	2005-04-29 18:34:27 -07:00
+--- a/drivers/i2c/chips/via686a.c	2005-05-11 15:43:53 -07:00
++++ b/drivers/i2c/chips/via686a.c	2005-05-11 15:43:53 -07:00
 @@ -554,7 +554,7 @@
  	struct via686a_data *data = via686a_update_device(dev);
  	return sprintf(buf,"%d\n", ALARMS_FROM_REG(data->alarms));
@@ -340,8 +411,8 @@ diff -Nru a/drivers/i2c/chips/via686a.c b/drivers/i2c/chips/via686a.c
  /* The driver. I choose to use type i2c_driver, as at is identical to both
     smbus_driver and isa_driver, and clients could be of either kind */
 diff -Nru a/drivers/input/serio/i8042-x86ia64io.h b/drivers/input/serio/i8042-x86ia64io.h
---- a/drivers/input/serio/i8042-x86ia64io.h	2005-04-29 18:34:28 -07:00
-+++ b/drivers/input/serio/i8042-x86ia64io.h	2005-04-29 18:34:28 -07:00
+--- a/drivers/input/serio/i8042-x86ia64io.h	2005-05-11 15:43:53 -07:00
++++ b/drivers/input/serio/i8042-x86ia64io.h	2005-05-11 15:43:53 -07:00
 @@ -88,7 +88,7 @@
  };
  #endif
@@ -370,8 +441,8 @@ diff -Nru a/drivers/input/serio/i8042-x86ia64io.h b/drivers/input/serio/i8042-x8
  #endif
  }
 diff -Nru a/drivers/md/raid6altivec.uc b/drivers/md/raid6altivec.uc
---- a/drivers/md/raid6altivec.uc	2005-04-29 18:34:28 -07:00
-+++ b/drivers/md/raid6altivec.uc	2005-04-29 18:34:28 -07:00
+--- a/drivers/md/raid6altivec.uc	2005-05-11 15:43:53 -07:00
++++ b/drivers/md/raid6altivec.uc	2005-05-11 15:43:53 -07:00
 @@ -108,7 +108,11 @@
  int raid6_have_altivec(void)
  {
@@ -385,8 +456,8 @@ diff -Nru a/drivers/md/raid6altivec.uc b/drivers/md/raid6altivec.uc
  #endif
  
 diff -Nru a/drivers/media/video/adv7170.c b/drivers/media/video/adv7170.c
---- a/drivers/media/video/adv7170.c	2005-04-29 18:34:28 -07:00
-+++ b/drivers/media/video/adv7170.c	2005-04-29 18:34:28 -07:00
+--- a/drivers/media/video/adv7170.c	2005-05-11 15:43:53 -07:00
++++ b/drivers/media/video/adv7170.c	2005-05-11 15:43:53 -07:00
 @@ -130,7 +130,7 @@
  		u8 block_data[32];
  
@@ -397,8 +468,8 @@ diff -Nru a/drivers/media/video/adv7170.c b/drivers/media/video/adv7170.c
  			msg.buf = (char *) block_data;
  			msg.len = 0;
 diff -Nru a/drivers/media/video/adv7175.c b/drivers/media/video/adv7175.c
---- a/drivers/media/video/adv7175.c	2005-04-29 18:34:28 -07:00
-+++ b/drivers/media/video/adv7175.c	2005-04-29 18:34:28 -07:00
+--- a/drivers/media/video/adv7175.c	2005-05-11 15:43:53 -07:00
++++ b/drivers/media/video/adv7175.c	2005-05-11 15:43:53 -07:00
 @@ -126,7 +126,7 @@
  		u8 block_data[32];
  
@@ -409,8 +480,8 @@ diff -Nru a/drivers/media/video/adv7175.c b/drivers/media/video/adv7175.c
  			msg.buf = (char *) block_data;
  			msg.len = 0;
 diff -Nru a/drivers/media/video/bt819.c b/drivers/media/video/bt819.c
---- a/drivers/media/video/bt819.c	2005-04-29 18:34:27 -07:00
-+++ b/drivers/media/video/bt819.c	2005-04-29 18:34:27 -07:00
+--- a/drivers/media/video/bt819.c	2005-05-11 15:43:53 -07:00
++++ b/drivers/media/video/bt819.c	2005-05-11 15:43:53 -07:00
 @@ -146,7 +146,7 @@
  		u8 block_data[32];
  
@@ -421,8 +492,8 @@ diff -Nru a/drivers/media/video/bt819.c b/drivers/media/video/bt819.c
  			msg.buf = (char *) block_data;
  			msg.len = 0;
 diff -Nru a/drivers/media/video/bttv-cards.c b/drivers/media/video/bttv-cards.c
---- a/drivers/media/video/bttv-cards.c	2005-04-29 18:34:28 -07:00
-+++ b/drivers/media/video/bttv-cards.c	2005-04-29 18:34:28 -07:00
+--- a/drivers/media/video/bttv-cards.c	2005-05-11 15:43:53 -07:00
++++ b/drivers/media/video/bttv-cards.c	2005-05-11 15:43:53 -07:00
 @@ -2718,8 +2718,6 @@
          }
  	btv->pll.pll_current = -1;
@@ -433,8 +504,8 @@ diff -Nru a/drivers/media/video/bttv-cards.c b/drivers/media/video/bttv-cards.c
   	if (UNSET != bttv_tvcards[btv->c.type].tuner_type)
  		if(UNSET == btv->tuner_type)
 diff -Nru a/drivers/media/video/saa7110.c b/drivers/media/video/saa7110.c
---- a/drivers/media/video/saa7110.c	2005-04-29 18:34:27 -07:00
-+++ b/drivers/media/video/saa7110.c	2005-04-29 18:34:27 -07:00
+--- a/drivers/media/video/saa7110.c	2005-05-11 15:43:53 -07:00
++++ b/drivers/media/video/saa7110.c	2005-05-11 15:43:53 -07:00
 @@ -60,8 +60,10 @@
  
  #define	I2C_SAA7110		0x9C	/* or 0x9E */
@@ -501,8 +572,8 @@ diff -Nru a/drivers/media/video/saa7110.c b/drivers/media/video/saa7110.c
  	/* 0x08 */ 0xF8, 0xF8, 0x60, 0x60, 0x00, 0x86, 0x18, 0x90,
  	/* 0x10 */ 0x00, 0x59, 0x40, 0x46, 0x42, 0x1A, 0xFF, 0xDA,
 diff -Nru a/drivers/media/video/saa7114.c b/drivers/media/video/saa7114.c
---- a/drivers/media/video/saa7114.c	2005-04-29 18:34:28 -07:00
-+++ b/drivers/media/video/saa7114.c	2005-04-29 18:34:28 -07:00
+--- a/drivers/media/video/saa7114.c	2005-05-11 15:43:53 -07:00
++++ b/drivers/media/video/saa7114.c	2005-05-11 15:43:53 -07:00
 @@ -163,7 +163,7 @@
  		u8 block_data[32];
  
@@ -513,8 +584,8 @@ diff -Nru a/drivers/media/video/saa7114.c b/drivers/media/video/saa7114.c
  			msg.buf = (char *) block_data;
  			msg.len = 0;
 diff -Nru a/drivers/media/video/saa7185.c b/drivers/media/video/saa7185.c
---- a/drivers/media/video/saa7185.c	2005-04-29 18:34:28 -07:00
-+++ b/drivers/media/video/saa7185.c	2005-04-29 18:34:28 -07:00
+--- a/drivers/media/video/saa7185.c	2005-05-11 15:43:53 -07:00
++++ b/drivers/media/video/saa7185.c	2005-05-11 15:43:53 -07:00
 @@ -118,7 +118,7 @@
  		u8 block_data[32];
  
@@ -525,8 +596,8 @@ diff -Nru a/drivers/media/video/saa7185.c b/drivers/media/video/saa7185.c
  			msg.buf = (char *) block_data;
  			msg.len = 0;
 diff -Nru a/drivers/net/amd8111e.c b/drivers/net/amd8111e.c
---- a/drivers/net/amd8111e.c	2005-04-29 18:34:28 -07:00
-+++ b/drivers/net/amd8111e.c	2005-04-29 18:34:28 -07:00
+--- a/drivers/net/amd8111e.c	2005-05-11 15:43:53 -07:00
++++ b/drivers/net/amd8111e.c	2005-05-11 15:43:53 -07:00
 @@ -1381,6 +1381,8 @@
  
  	if(amd8111e_restart(dev)){
@@ -537,8 +608,8 @@ diff -Nru a/drivers/net/amd8111e.c b/drivers/net/amd8111e.c
  	}
  	/* Start ipg timer */
 diff -Nru a/drivers/net/ppp_async.c b/drivers/net/ppp_async.c
---- a/drivers/net/ppp_async.c	2005-04-29 18:34:28 -07:00
-+++ b/drivers/net/ppp_async.c	2005-04-29 18:34:28 -07:00
+--- a/drivers/net/ppp_async.c	2005-05-11 15:43:53 -07:00
++++ b/drivers/net/ppp_async.c	2005-05-11 15:43:53 -07:00
 @@ -1000,7 +1000,7 @@
  	data += 4;
  	dlen -= 4;
@@ -549,8 +620,8 @@ diff -Nru a/drivers/net/ppp_async.c b/drivers/net/ppp_async.c
  		case LCP_MRU:
  			val = (data[2] << 8) + data[3];
 diff -Nru a/drivers/net/r8169.c b/drivers/net/r8169.c
---- a/drivers/net/r8169.c	2005-04-29 18:34:28 -07:00
-+++ b/drivers/net/r8169.c	2005-04-29 18:34:28 -07:00
+--- a/drivers/net/r8169.c	2005-05-11 15:43:53 -07:00
++++ b/drivers/net/r8169.c	2005-05-11 15:43:53 -07:00
 @@ -1683,16 +1683,19 @@
  	rtl8169_make_unusable_by_asic(desc);
  }
@@ -595,8 +666,8 @@ diff -Nru a/drivers/net/r8169.c b/drivers/net/r8169.c
  		}
  	}
 diff -Nru a/drivers/net/sis900.c b/drivers/net/sis900.c
---- a/drivers/net/sis900.c	2005-04-29 18:34:27 -07:00
-+++ b/drivers/net/sis900.c	2005-04-29 18:34:27 -07:00
+--- a/drivers/net/sis900.c	2005-05-11 15:43:53 -07:00
++++ b/drivers/net/sis900.c	2005-05-11 15:43:53 -07:00
 @@ -236,7 +236,7 @@
  	signature = (u16) read_eeprom(ioaddr, EEPROMSignature);    
  	if (signature == 0xffff || signature == 0x0000) {
@@ -716,8 +787,8 @@ diff -Nru a/drivers/net/sis900.c b/drivers/net/sis900.c
  	
  	status = mdio_read(net_dev, sis_priv->cur_phy, MII_CONTROL);
 diff -Nru a/drivers/net/tun.c b/drivers/net/tun.c
---- a/drivers/net/tun.c	2005-04-29 18:34:27 -07:00
-+++ b/drivers/net/tun.c	2005-04-29 18:34:27 -07:00
+--- a/drivers/net/tun.c	2005-05-11 15:43:53 -07:00
++++ b/drivers/net/tun.c	2005-05-11 15:43:53 -07:00
 @@ -229,7 +229,7 @@
  	size_t len = count;
  
@@ -728,8 +799,8 @@ diff -Nru a/drivers/net/tun.c b/drivers/net/tun.c
  
  		if(memcpy_fromiovec((void *)&pi, iv, sizeof(pi)))
 diff -Nru a/drivers/net/via-rhine.c b/drivers/net/via-rhine.c
---- a/drivers/net/via-rhine.c	2005-04-29 18:34:28 -07:00
-+++ b/drivers/net/via-rhine.c	2005-04-29 18:34:28 -07:00
+--- a/drivers/net/via-rhine.c	2005-05-11 15:43:53 -07:00
++++ b/drivers/net/via-rhine.c	2005-05-11 15:43:53 -07:00
 @@ -1197,8 +1197,10 @@
  		       dev->name, rp->pdev->irq);
  
@@ -753,8 +824,8 @@ diff -Nru a/drivers/net/via-rhine.c b/drivers/net/via-rhine.c
  	rhine_power_init(dev);
  
 diff -Nru a/drivers/net/wan/hd6457x.c b/drivers/net/wan/hd6457x.c
---- a/drivers/net/wan/hd6457x.c	2005-04-29 18:34:27 -07:00
-+++ b/drivers/net/wan/hd6457x.c	2005-04-29 18:34:27 -07:00
+--- a/drivers/net/wan/hd6457x.c	2005-05-11 15:43:53 -07:00
++++ b/drivers/net/wan/hd6457x.c	2005-05-11 15:43:53 -07:00
 @@ -315,7 +315,7 @@
  #endif
  	stats->rx_packets++;
@@ -765,8 +836,8 @@ diff -Nru a/drivers/net/wan/hd6457x.c b/drivers/net/wan/hd6457x.c
  	netif_rx(skb);
  }
 diff -Nru a/drivers/pci/hotplug/pciehp_ctrl.c b/drivers/pci/hotplug/pciehp_ctrl.c
---- a/drivers/pci/hotplug/pciehp_ctrl.c	2005-04-29 18:34:27 -07:00
-+++ b/drivers/pci/hotplug/pciehp_ctrl.c	2005-04-29 18:34:27 -07:00
+--- a/drivers/pci/hotplug/pciehp_ctrl.c	2005-05-11 15:43:53 -07:00
++++ b/drivers/pci/hotplug/pciehp_ctrl.c	2005-05-11 15:43:53 -07:00
 @@ -1354,10 +1354,11 @@
  				dbg("PCI Bridge Hot-Remove s:b:d:f(%02x:%02x:%02x:%02x)\n", 
  					ctrl->seg, func->bus, func->device, func->function);
@@ -781,8 +852,17 @@ diff -Nru a/drivers/pci/hotplug/pciehp_ctrl.c b/drivers/pci/hotplug/pciehp_ctrl.
  			func = pciehp_slot_find(ctrl->slot_bus, device, 0);
  		}
 diff -Nru a/fs/binfmt_elf.c b/fs/binfmt_elf.c
---- a/fs/binfmt_elf.c	2005-04-29 18:34:28 -07:00
-+++ b/fs/binfmt_elf.c	2005-04-29 18:34:28 -07:00
+--- a/fs/binfmt_elf.c	2005-05-11 15:43:53 -07:00
++++ b/fs/binfmt_elf.c	2005-05-11 15:43:53 -07:00
+@@ -257,7 +257,7 @@
+ 	}
+ 
+ 	/* Populate argv and envp */
+-	p = current->mm->arg_start;
++	p = current->mm->arg_end = current->mm->arg_start;
+ 	while (argc-- > 0) {
+ 		size_t len;
+ 		__put_user((elf_addr_t)p, argv++);
 @@ -1008,6 +1008,7 @@
  static int load_elf_library(struct file *file)
  {
@@ -852,9 +932,18 @@ diff -Nru a/fs/binfmt_elf.c b/fs/binfmt_elf.c
  	if (bss > len) {
  		down_write(&current->mm->mmap_sem);
  		do_brk(len, bss - len);
+@@ -1275,7 +1279,7 @@
+ static int fill_psinfo(struct elf_prpsinfo *psinfo, struct task_struct *p,
+ 		       struct mm_struct *mm)
+ {
+-	int i, len;
++	unsigned int i, len;
+ 	
+ 	/* first copy the parameters from user space */
+ 	memset(psinfo, 0, sizeof(struct elf_prpsinfo));
 diff -Nru a/fs/cramfs/inode.c b/fs/cramfs/inode.c
---- a/fs/cramfs/inode.c	2005-04-29 18:34:27 -07:00
-+++ b/fs/cramfs/inode.c	2005-04-29 18:34:27 -07:00
+--- a/fs/cramfs/inode.c	2005-05-11 15:43:53 -07:00
++++ b/fs/cramfs/inode.c	2005-05-11 15:43:53 -07:00
 @@ -70,6 +70,7 @@
  			inode->i_data.a_ops = &cramfs_aops;
  		} else {
@@ -864,8 +953,8 @@ diff -Nru a/fs/cramfs/inode.c b/fs/cramfs/inode.c
  				old_decode_dev(cramfs_inode->size));
  		}
 diff -Nru a/fs/eventpoll.c b/fs/eventpoll.c
---- a/fs/eventpoll.c	2005-04-29 18:34:27 -07:00
-+++ b/fs/eventpoll.c	2005-04-29 18:34:27 -07:00
+--- a/fs/eventpoll.c	2005-05-11 15:43:53 -07:00
++++ b/fs/eventpoll.c	2005-05-11 15:43:53 -07:00
 @@ -619,6 +619,7 @@
  	return error;
  }
@@ -884,8 +973,8 @@ diff -Nru a/fs/eventpoll.c b/fs/eventpoll.c
  
  	/* Verify that the area passed by the user is writeable */
 diff -Nru a/fs/exec.c b/fs/exec.c
---- a/fs/exec.c	2005-04-29 18:34:27 -07:00
-+++ b/fs/exec.c	2005-04-29 18:34:27 -07:00
+--- a/fs/exec.c	2005-05-11 15:43:53 -07:00
++++ b/fs/exec.c	2005-05-11 15:43:53 -07:00
 @@ -814,7 +814,7 @@
  {
  	/* buf must be at least sizeof(tsk->comm) in size */
@@ -896,8 +985,8 @@ diff -Nru a/fs/exec.c b/fs/exec.c
  }
  
 diff -Nru a/fs/ext2/dir.c b/fs/ext2/dir.c
---- a/fs/ext2/dir.c	2005-04-29 18:34:28 -07:00
-+++ b/fs/ext2/dir.c	2005-04-29 18:34:28 -07:00
+--- a/fs/ext2/dir.c	2005-05-11 15:43:53 -07:00
++++ b/fs/ext2/dir.c	2005-05-11 15:43:53 -07:00
 @@ -592,6 +592,7 @@
  		goto fail;
  	}
@@ -907,8 +996,8 @@ diff -Nru a/fs/ext2/dir.c b/fs/ext2/dir.c
  	de->name_len = 1;
  	de->rec_len = cpu_to_le16(EXT2_DIR_REC_LEN(1));
 diff -Nru a/fs/isofs/inode.c b/fs/isofs/inode.c
---- a/fs/isofs/inode.c	2005-04-29 18:34:28 -07:00
-+++ b/fs/isofs/inode.c	2005-04-29 18:34:28 -07:00
+--- a/fs/isofs/inode.c	2005-05-11 15:43:53 -07:00
++++ b/fs/isofs/inode.c	2005-05-11 15:43:53 -07:00
 @@ -685,6 +685,8 @@
  	  sbi->s_log_zone_size = isonum_723 (h_pri->logical_block_size);
  	  sbi->s_max_size = isonum_733(h_pri->volume_space_size);
@@ -929,8 +1018,8 @@ diff -Nru a/fs/isofs/inode.c b/fs/isofs/inode.c
  	data.block = block;
  	data.offset = offset;
 diff -Nru a/fs/isofs/rock.c b/fs/isofs/rock.c
---- a/fs/isofs/rock.c	2005-04-29 18:34:28 -07:00
-+++ b/fs/isofs/rock.c	2005-04-29 18:34:28 -07:00
+--- a/fs/isofs/rock.c	2005-05-11 15:43:53 -07:00
++++ b/fs/isofs/rock.c	2005-05-11 15:43:53 -07:00
 @@ -53,6 +53,7 @@
    if(LEN & 1) LEN++;						\
    CHR = ((unsigned char *) DE) + LEN;				\
@@ -1026,8 +1115,8 @@ diff -Nru a/fs/isofs/rock.c b/fs/isofs/rock.c
  	kunmap(page);
  	unlock_page(page);
 diff -Nru a/fs/jbd/transaction.c b/fs/jbd/transaction.c
---- a/fs/jbd/transaction.c	2005-04-29 18:34:27 -07:00
-+++ b/fs/jbd/transaction.c	2005-04-29 18:34:27 -07:00
+--- a/fs/jbd/transaction.c	2005-05-11 15:43:53 -07:00
++++ b/fs/jbd/transaction.c	2005-05-11 15:43:53 -07:00
 @@ -1775,10 +1775,10 @@
  			JBUFFER_TRACE(jh, "checkpointed: add to BJ_Forget");
  			ret = __dispose_buffer(jh,
@@ -1064,31 +1153,21 @@ diff -Nru a/fs/jbd/transaction.c b/fs/jbd/transaction.c
  		return 0;
  	} else {
  		/* Good, the buffer belongs to the running transaction.
-diff -Nru a/fs/partitions/msdos.c b/fs/partitions/msdos.c
---- a/fs/partitions/msdos.c	2005-04-29 18:34:28 -07:00
-+++ b/fs/partitions/msdos.c	2005-04-29 18:34:28 -07:00
-@@ -114,6 +114,9 @@
- 		 */
- 		for (i=0; i<4; i++, p++) {
- 			u32 offs, size, next;
-+
-+			if (SYS_IND(p) == 0)
-+				continue;
- 			if (!NR_SECTS(p) || is_extended_partition(p))
- 				continue;
+diff -Nru a/kernel/exit.c b/kernel/exit.c
+--- a/kernel/exit.c	2005-05-11 15:43:53 -07:00
++++ b/kernel/exit.c	2005-05-11 15:43:53 -07:00
+@@ -516,8 +516,6 @@
+ 	 */
+ 	BUG_ON(p == reaper || reaper->exit_state >= EXIT_ZOMBIE);
+ 	p->real_parent = reaper;
+-	if (p->parent == p->real_parent)
+-		BUG();
+ }
  
-@@ -430,6 +433,8 @@
- 	for (slot = 1 ; slot <= 4 ; slot++, p++) {
- 		u32 start = START_SECT(p)*sector_size;
- 		u32 size = NR_SECTS(p)*sector_size;
-+		if (SYS_IND(p) == 0)
-+			continue;
- 		if (!size)
- 			continue;
- 		if (is_extended_partition(p)) {
+ static inline void reparent_thread(task_t *p, task_t *father, int traced)
 diff -Nru a/kernel/signal.c b/kernel/signal.c
---- a/kernel/signal.c	2005-04-29 18:34:27 -07:00
-+++ b/kernel/signal.c	2005-04-29 18:34:27 -07:00
+--- a/kernel/signal.c	2005-05-11 15:43:53 -07:00
++++ b/kernel/signal.c	2005-05-11 15:43:53 -07:00
 @@ -1728,6 +1728,7 @@
  			 * with another processor delivering a stop signal,
  			 * then the SIGCONT that wakes us up should clear it.
@@ -1098,8 +1177,8 @@ diff -Nru a/kernel/signal.c b/kernel/signal.c
  		}
  
 diff -Nru a/lib/rwsem-spinlock.c b/lib/rwsem-spinlock.c
---- a/lib/rwsem-spinlock.c	2005-04-29 18:34:28 -07:00
-+++ b/lib/rwsem-spinlock.c	2005-04-29 18:34:28 -07:00
+--- a/lib/rwsem-spinlock.c	2005-05-11 15:43:53 -07:00
++++ b/lib/rwsem-spinlock.c	2005-05-11 15:43:53 -07:00
 @@ -140,12 +140,12 @@
  
  	rwsemtrace(sem, "Entering __down_read");
@@ -1254,8 +1333,8 @@ diff -Nru a/lib/rwsem-spinlock.c b/lib/rwsem-spinlock.c
  	rwsemtrace(sem, "Leaving __downgrade_write");
  }
 diff -Nru a/lib/rwsem.c b/lib/rwsem.c
---- a/lib/rwsem.c	2005-04-29 18:34:28 -07:00
-+++ b/lib/rwsem.c	2005-04-29 18:34:28 -07:00
+--- a/lib/rwsem.c	2005-05-11 15:43:53 -07:00
++++ b/lib/rwsem.c	2005-05-11 15:43:53 -07:00
 @@ -150,7 +150,7 @@
  	set_task_state(tsk, TASK_UNINTERRUPTIBLE);
  
@@ -1315,8 +1394,8 @@ diff -Nru a/lib/rwsem.c b/lib/rwsem.c
  	rwsemtrace(sem, "Leaving rwsem_downgrade_wake");
  	return sem;
 diff -Nru a/net/bluetooth/af_bluetooth.c b/net/bluetooth/af_bluetooth.c
---- a/net/bluetooth/af_bluetooth.c	2005-04-29 18:34:27 -07:00
-+++ b/net/bluetooth/af_bluetooth.c	2005-04-29 18:34:27 -07:00
+--- a/net/bluetooth/af_bluetooth.c	2005-05-11 15:43:53 -07:00
++++ b/net/bluetooth/af_bluetooth.c	2005-05-11 15:43:53 -07:00
 @@ -64,7 +64,7 @@
  
  int bt_sock_register(int proto, struct net_proto_family *ops)
@@ -1345,8 +1424,8 @@ diff -Nru a/net/bluetooth/af_bluetooth.c b/net/bluetooth/af_bluetooth.c
  
  #if defined(CONFIG_KMOD)
 diff -Nru a/net/ipv4/fib_hash.c b/net/ipv4/fib_hash.c
---- a/net/ipv4/fib_hash.c	2005-04-29 18:34:28 -07:00
-+++ b/net/ipv4/fib_hash.c	2005-04-29 18:34:28 -07:00
+--- a/net/ipv4/fib_hash.c	2005-05-11 15:43:53 -07:00
++++ b/net/ipv4/fib_hash.c	2005-05-11 15:43:53 -07:00
 @@ -919,13 +919,23 @@
  	return fa;
  }
@@ -1373,8 +1452,8 @@ diff -Nru a/net/ipv4/fib_hash.c b/net/ipv4/fib_hash.c
  }
  
 diff -Nru a/net/ipv4/tcp_input.c b/net/ipv4/tcp_input.c
---- a/net/ipv4/tcp_input.c	2005-04-29 18:34:28 -07:00
-+++ b/net/ipv4/tcp_input.c	2005-04-29 18:34:28 -07:00
+--- a/net/ipv4/tcp_input.c	2005-05-11 15:43:53 -07:00
++++ b/net/ipv4/tcp_input.c	2005-05-11 15:43:53 -07:00
 @@ -1653,7 +1653,10 @@
  static void tcp_undo_cwr(struct tcp_sock *tp, int undo)
  {
@@ -1388,8 +1467,8 @@ diff -Nru a/net/ipv4/tcp_input.c b/net/ipv4/tcp_input.c
  		if (undo && tp->prior_ssthresh > tp->snd_ssthresh) {
  			tp->snd_ssthresh = tp->prior_ssthresh;
 diff -Nru a/net/ipv4/tcp_timer.c b/net/ipv4/tcp_timer.c
---- a/net/ipv4/tcp_timer.c	2005-04-29 18:34:28 -07:00
-+++ b/net/ipv4/tcp_timer.c	2005-04-29 18:34:28 -07:00
+--- a/net/ipv4/tcp_timer.c	2005-05-11 15:43:53 -07:00
++++ b/net/ipv4/tcp_timer.c	2005-05-11 15:43:53 -07:00
 @@ -38,6 +38,7 @@
  
  #ifdef TCP_DEBUG
@@ -1399,8 +1478,8 @@ diff -Nru a/net/ipv4/tcp_timer.c b/net/ipv4/tcp_timer.c
  
  /*
 diff -Nru a/net/ipv4/xfrm4_output.c b/net/ipv4/xfrm4_output.c
---- a/net/ipv4/xfrm4_output.c	2005-04-29 18:34:27 -07:00
-+++ b/net/ipv4/xfrm4_output.c	2005-04-29 18:34:27 -07:00
+--- a/net/ipv4/xfrm4_output.c	2005-05-11 15:43:53 -07:00
++++ b/net/ipv4/xfrm4_output.c	2005-05-11 15:43:53 -07:00
 @@ -103,16 +103,16 @@
  			goto error_nolock;
  	}
@@ -1425,8 +1504,8 @@ diff -Nru a/net/ipv4/xfrm4_output.c b/net/ipv4/xfrm4_output.c
  	xfrm4_encap(skb);
  
 diff -Nru a/net/ipv6/xfrm6_output.c b/net/ipv6/xfrm6_output.c
---- a/net/ipv6/xfrm6_output.c	2005-04-29 18:34:28 -07:00
-+++ b/net/ipv6/xfrm6_output.c	2005-04-29 18:34:28 -07:00
+--- a/net/ipv6/xfrm6_output.c	2005-05-11 15:43:53 -07:00
++++ b/net/ipv6/xfrm6_output.c	2005-05-11 15:43:53 -07:00
 @@ -103,16 +103,16 @@
  			goto error_nolock;
  	}
@@ -1451,8 +1530,8 @@ diff -Nru a/net/ipv6/xfrm6_output.c b/net/ipv6/xfrm6_output.c
  	xfrm6_encap(skb);
  
 diff -Nru a/net/netrom/nr_in.c b/net/netrom/nr_in.c
---- a/net/netrom/nr_in.c	2005-04-29 18:34:27 -07:00
-+++ b/net/netrom/nr_in.c	2005-04-29 18:34:27 -07:00
+--- a/net/netrom/nr_in.c	2005-05-11 15:43:53 -07:00
++++ b/net/netrom/nr_in.c	2005-05-11 15:43:53 -07:00
 @@ -74,7 +74,6 @@
  static int nr_state1_machine(struct sock *sk, struct sk_buff *skb,
  	int frametype)
@@ -1505,8 +1584,8 @@ diff -Nru a/net/netrom/nr_in.c b/net/netrom/nr_in.c
  }
  
 diff -Nru a/net/xfrm/xfrm_state.c b/net/xfrm/xfrm_state.c
---- a/net/xfrm/xfrm_state.c	2005-04-29 18:34:28 -07:00
-+++ b/net/xfrm/xfrm_state.c	2005-04-29 18:34:28 -07:00
+--- a/net/xfrm/xfrm_state.c	2005-05-11 15:43:53 -07:00
++++ b/net/xfrm/xfrm_state.c	2005-05-11 15:43:53 -07:00
 @@ -609,7 +609,7 @@
  
  	for (i = 0; i < XFRM_DST_HSIZE; i++) {
@@ -1517,8 +1596,8 @@ diff -Nru a/net/xfrm/xfrm_state.c b/net/xfrm/xfrm_state.c
  				return x;
  			}
 diff -Nru a/security/keys/key.c b/security/keys/key.c
---- a/security/keys/key.c	2005-04-29 18:34:28 -07:00
-+++ b/security/keys/key.c	2005-04-29 18:34:28 -07:00
+--- a/security/keys/key.c	2005-05-11 15:43:53 -07:00
++++ b/security/keys/key.c	2005-05-11 15:43:53 -07:00
 @@ -57,9 +57,10 @@
  {
  	struct key_user *candidate = NULL, *user;
@@ -1532,8 +1611,8 @@ diff -Nru a/security/keys/key.c b/security/keys/key.c
  
  	/* search the tree for a user record with a matching UID */
 diff -Nru a/sound/core/timer.c b/sound/core/timer.c
---- a/sound/core/timer.c	2005-04-29 18:34:28 -07:00
-+++ b/sound/core/timer.c	2005-04-29 18:34:28 -07:00
+--- a/sound/core/timer.c	2005-05-11 15:43:53 -07:00
++++ b/sound/core/timer.c	2005-05-11 15:43:53 -07:00
 @@ -1117,7 +1117,8 @@
  	if (tu->qused >= tu->queue_size) {
  		tu->overrun++;
@@ -1554,8 +1633,8 @@ diff -Nru a/sound/core/timer.c b/sound/core/timer.c
  
  static void snd_timer_user_tinterrupt(snd_timer_instance_t *timeri,
 diff -Nru a/sound/pci/ac97/ac97_codec.c b/sound/pci/ac97/ac97_codec.c
---- a/sound/pci/ac97/ac97_codec.c	2005-04-29 18:34:28 -07:00
-+++ b/sound/pci/ac97/ac97_codec.c	2005-04-29 18:34:28 -07:00
+--- a/sound/pci/ac97/ac97_codec.c	2005-05-11 15:43:53 -07:00
++++ b/sound/pci/ac97/ac97_codec.c	2005-05-11 15:43:53 -07:00
 @@ -1185,7 +1185,7 @@
  /*
   * create mute switch(es) for normal stereo controls

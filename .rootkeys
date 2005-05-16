@@ -274,7 +274,7 @@
 424efaa6HSyuVodl6SxFGj39vlp6MA linux-2.6.11-xen-sparse/arch/xen/x86_64/kernel/Makefile
 424efaa7bVAw3Z_q0SdFivfNVavyIg linux-2.6.11-xen-sparse/arch/xen/x86_64/kernel/asm-offsets.c
 424efaa7ddTVabh547Opf0u9vKmUXw linux-2.6.11-xen-sparse/arch/xen/x86_64/kernel/e820.c
-424efaa72fQEHYQ-Sp2IW9X2xTA5zQ linux-2.6.11-xen-sparse/arch/xen/x86_64/kernel/early_printk.c
+428868bbQust_FkSdkerMqYBWfrVKg linux-2.6.11-xen-sparse/arch/xen/x86_64/kernel/early_printk.c
 424efaa7B_BWrAkLPJNoKk4EQY2a7w linux-2.6.11-xen-sparse/arch/xen/x86_64/kernel/entry.S
 424efaa7vhgi7th5QVICjfuHmEWOkw linux-2.6.11-xen-sparse/arch/xen/x86_64/kernel/head.S
 424efaa7tiMEZSAYepwyjaNWxyXF7Q linux-2.6.11-xen-sparse/arch/xen/x86_64/kernel/head64.c
@@ -469,7 +469,7 @@
 413aa1d0oNP8HXLvfPuMe6cSroUfSA patches/linux-2.6.11/agpgart.patch
 427261074Iy1MkbbqIV6zdZDWWx_Jg patches/linux-2.6.11/i386-cpu-hotplug-updated-for-mm.patch
 42372652KCUP-IOH9RN19YQmGhs4aA patches/linux-2.6.11/iomap.patch
-428359d4b3fDYtazwXi4UUmSWaOUew patches/linux-2.6.11/linux-2.6.11.8.patch
+428359d4b3fDYtazwXi4UUmSWaOUew patches/linux-2.6.11/linux-2.6.11.9.patch
 424f001e_M1Tnxc52rDrmCLelnDWMQ patches/linux-2.6.11/x86_64-linux.patch
 3f776bd1Hy9rn69ntXBhPReUFw9IEA tools/Makefile
 40e1b09db5mN69Ijj0X_Eol-S7dXiw tools/Rules.mk
