@@ -4,8 +4,6 @@ import string
 
 from xen.xend.XendLogging import log
 
-from xen.util.ip import _readline, _readlines
-
 def expand_dev_name(name):
     if not name:
         return name
@@ -71,7 +69,7 @@ def blkdev_uname_to_file(uname):
 def mount_mode(name):
     mode = None
     name = expand_dev_name(name)
-    lines = _readlines(os.popen('mount 2>/dev/null'))
+    lines = os.popen('mount 2>/dev/null').readlines()
     exp = re.compile('^' + name + ' .*[\(,]r(?P<mode>[ow])[,\)]')
     for line in lines:
         pm = exp.match(line)

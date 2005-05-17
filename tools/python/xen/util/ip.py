@@ -4,41 +4,11 @@ import socket
 import struct
 import errno
 
-def _readlines(fd):
-    """Version of readlines safe against EINTR.
-    """
-    import errno
-    
-    lines = []
-    while 1:
-        try:
-            line = fd.readline()
-        except IOError, ex:
-            if ex.errno == errno.EINTR:
-                continue
-            else:
-                raise
-        if line == '': break
-        lines.append(line)
-    return lines
-
-def _readline(fd):
-    """Version of readline safe against EINTR.
-    """
-    while 1:
-        try:
-            return fd.readline()
-        except IOError, ex:
-            if ex.errno == errno.EINTR:
-                continue
-            else:
-                raise
-
 ##### Networking-related functions
 
 def get_defaultroute():
     fd = os.popen('/sbin/ip route list 2>/dev/null')
-    for line in fd.xreadlines():
+    for line in fd.readlines():
         m = re.search('^default via ([0-9]+\.[0-9]+\.[0-9]+\.[0-9]+) dev ([^ ]*)',
                       line)
         if m:
@@ -57,7 +27,7 @@ def get_current_ipaddr(dev='defaultroute'):
     if not dev:
         return
     fd = os.popen( '/sbin/ifconfig ' + dev + ' 2>/dev/null' )
-    for line in fd.xreadlines():
+    for line in fd.readlines():
         m = re.search( '^\s+inet addr:([0-9]+\.[0-9]+\.[0-9]+\.[0-9]+).*',
                        line )
         if m:
@@ -76,7 +46,7 @@ def get_current_ipmask(dev='defaultroute'):
     if not dev:
         return
     fd = os.popen( '/sbin/ifconfig ' + dev + ' 2>/dev/null' )
-    for line in fd.xreadlines():
+    for line in fd.readlines():
         m = re.search( '^.+Mask:([0-9]+\.[0-9]+\.[0-9]+\.[0-9]+).*',
                        line )
         if m:
@@ -95,7 +65,7 @@ def get_current_ipgw(dev='defaultroute'):
     if not dev:
         return
     fd = os.popen( '/sbin/route -n' )
-    for line in fd.xreadlines():
+    for line in fd.readlines():
         m = re.search( '^\S+\s+([0-9]+\.[0-9]+\.[0-9]+\.[0-9]+)' +
                        '\s+\S+\s+\S*G.*' + dev + '.*', line )
         if m:

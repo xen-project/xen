@@ -8,8 +8,6 @@ import xen.util.process
 
 from xen.xend import XendRoot
 
-from xen.util.ip import _readline, _readlines
-
 xroot = XendRoot.instance()
 
 """Where network control scripts live."""

@@ -15,8 +15,6 @@ from xen.sv.params import *
 from twisted.internet import reactor
 from twisted.web import static, server, script
 
-from xen.util.ip import _readline, _readlines
-
 class Daemon:
     """The xend daemon.
     """
@@ -59,7 +57,7 @@ class Daemon:
             return 0
         # Read the pid of the previous invocation and search active process list.
         pid = open(PID_FILE, 'r').read()
-        lines = _readlines(os.popen('ps ' + pid + ' 2>/dev/null'))
+        lines = os.popen('ps ' + pid + ' 2>/dev/null').readlines()
         for line in lines:
             if re.search('^ *' + pid + '.+xensv', line):
                 if not kill:

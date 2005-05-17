@@ -27,8 +27,6 @@ from xen.xend.server import SrvServer
 from xen.xend import XendRoot
 from xen.xend.XendLogging import log
 
-from xen.util.ip import _readline, _readlines
-
 import channel
 import controller
 import event
@@ -99,7 +97,7 @@ class Daemon:
         """
         running = 0
         if pid:
-            lines = _readlines(os.popen('ps %d 2>/dev/null' % pid))
+            lines = os.popen('ps %d 2>/dev/null' % pid).readlines()
             exp = '^ *%d.+%s' % (pid, name)
             for line in lines:
                 if re.search(exp, line):
