@@ -285,6 +285,16 @@ def prettyprint(sxpr, out=sys.stdout, width=80):
         sxp.show(sxpr, out=out)
     print >> out
 
+def prettyprintstring(sxp):
+    class tmpstr:
+        def __init__(self):
+            self.str = ""
+        def write(self, str):
+            self.str = self.str + str
+    tmp = tmpstr()
+    prettyprint(sxp, out=tmp)
+    return tmp.str
+
 def main():
     pin = sxp.Parser()
     while 1:

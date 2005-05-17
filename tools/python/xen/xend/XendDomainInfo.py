@@ -28,7 +28,7 @@ from XendLogging import log
 from XendError import VmError
 from XendRoot import get_component
 
-from PrettyPrint import prettyprint
+from PrettyPrint import prettyprintstring
 
 """Flag for a block device backend domain."""
 SIF_BLK_BE_DOMAIN = (1<<4)
@@ -192,9 +192,8 @@ def vm_recreate(savedinfo, info):
     @param info:      domain info from xc
     @type  info:      xc domain dict
     """
-    print 'vm_recreate>'
-    print 'savedinfo=' ; prettyprint(savedinfo)
-    print 'info=', info
+    log.debug('savedinfo=' + prettyprintstring(savedinfo))
+    log.debug('info=' + str(info))
     vm = XendDomainInfo()
     vm.recreate = True
     vm.savedinfo = savedinfo
