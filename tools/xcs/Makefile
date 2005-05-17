@@ -40,6 +40,8 @@ xcsdump: xcsdump.c dump.c
 $(BIN): $(OBJS)
 	$(CC) $(CFLAGS) $^ -o $@ -L$(XEN_LIBXC) -L$(XEN_LIBXUTIL) -lxc -lxutil 
 
+$(OBJS): $(HDRS)
+
 install: xcs xcsdump
 	$(INSTALL_DIR) -p $(DESTDIR)/$(XCS_INSTALL_DIR)
 	$(INSTALL_DIR) -p $(DESTDIR)/usr/include

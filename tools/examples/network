@@ -164,6 +164,10 @@ op_start () {
 
     create_bridge ${bridge}
 
+    if ifconfig 2>/dev/null | grep -q veth0 ; then
+        return
+    fi
+
     if ifconfig veth0 2>/dev/null | grep -q veth0 ; then
         # Propagate MAC address and ARP responsibilities to virtual interface.
         mac=`ifconfig ${netdev} | grep HWadd | sed -e 's/.*\(..:..:..:..:..:..\).*/\1/'`
@@ -196,6 +200,8 @@ op_stop () {
     if [ "${bridge}" == "null" ] ; then
         return
     fi
+
+    return
 
     brctl delif ${bridge} ${netdev}
 
