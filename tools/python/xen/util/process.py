@@ -4,10 +4,11 @@
 
 import popen2
 import select
+import string
 
 from xen.xend.XendLogging import log
 
-def system(cmd):
+def runscript(cmd):
     # split after first space, then grab last component of path
     cmdname = "[%s] " % cmd.split()[0].split('/')[-1]
     # run command and grab stdin, stdout and stderr
@@ -18,14 +19,19 @@ def system(cmd):
     p = select.poll()
     p.register(cout)
     p.register(cerr)
+    stdout = ""
     while True:
         r = p.poll()
         for (fd, event) in r:
             if event == select.POLLHUP:
-                return
+                return stdout
             if fd == cout.fileno():
-                l = cout.readline()
-                log.info(cmdname + l.rstrip())
+                stdout = stdout + cout.readline()
             if fd == cerr.fileno():
                 l = cerr.readline()
-                log.error(cmdname + l.rstrip())
+                if l[0] == '-':
+                    log.debug(cmdname + l[1:].rstrip())
+                elif l[0] == '*':
+                    log.info(cmdname + l[1:].rstrip())
+                else:
+                    log.error(cmdname + l.rstrip())

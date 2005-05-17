@@ -53,7 +53,7 @@ bridge=${bridge:-xen-br0}
 netdev=${netdev:-eth0}
 antispoof=${antispoof:-yes}
 
-echo "network $OP bridge=$bridge netdev=$netdev antispoof=$antispoof"
+echo "*network $OP bridge=$bridge netdev=$netdev antispoof=$antispoof" >&2
 
 # Usage: transfer_addrs src dst
 # Copy all IP addresses (including aliases) from device $src to device $dst.
@@ -232,7 +232,7 @@ case ${OP} in
        ;;
 
     *)
-       echo 'Unknown command: ' ${OP}
-       echo 'Valid commands are: start, stop, status'
+       echo 'Unknown command: ' ${OP} >&2
+       echo 'Valid commands are: start, stop, status' >&2
        exit 1
 esac

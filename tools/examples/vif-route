@@ -24,7 +24,7 @@
 # Exit if anything goes wrong
 set -e 
 
-echo "vif-route $*"
+echo "*vif-route $*" >&2
 
 # Operation name.
 OP=$1
@@ -57,8 +57,8 @@ case $OP in
         ipcmd='d'
         ;;
     *)
-        echo 'Invalid command: ' $OP
-        echo 'Valid commands are: up, down'
+        echo 'Invalid command: ' $OP >&2
+        echo 'Valid commands are: up, down' >&2
         exit 1
         ;;
 esac

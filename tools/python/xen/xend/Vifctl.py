@@ -36,7 +36,9 @@ def network(op, script=None, bridge=None, antispoof=None):
     else:
         args.append("antispoof=no")
     args = ' '.join(args)
-    xen.util.process.system(script + ' ' + args)
+    ret = xen.util.process.runscript(script + ' ' + args)
+    if len(ret):
+        return ret.splitlines()[0]
 
 def set_vif_name(vif_old, vif_new):
     if vif_old == vif_new:
@@ -81,5 +83,6 @@ def vifctl(op, vif=None, script=None, domain=None, mac=None, bridge=None, ipaddr
         ips = ' '.join(ipaddr)
         args.append("ip='%s'" % ips)
     args = ' '.join(args)
-    os.system(script + ' ' + args)
-
+    ret = xen.util.process.runscript(script + ' ' + args)
+    if len(ret):
+        return ret.splitlines()[0]

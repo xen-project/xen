@@ -25,7 +25,7 @@ case $1 in
 	;;
 
 	*)
-		echo 'Unknown command: ' $1
-		echo 'Valid commands are: bind, unbind'
+		echo 'Unknown command: ' $1 >&2
+		echo 'Valid commands are: bind, unbind' >&2
 		exit 1
 esac
