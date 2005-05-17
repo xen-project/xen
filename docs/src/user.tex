@@ -483,15 +483,15 @@ distribution.  The entry should look something like the following:
 
 {\small
 \begin{verbatim}
-title Xen 2.0 / XenLinux 2.6.9
-  kernel /boot/xen.gz dom0_mem=128M
-  module /boot/vmlinuz-2.6.9-xen0 root=/dev/sda4 ro console=tty0
+title Xen 2.0 / XenLinux 2.6.11
+  kernel /boot/xen.gz dom0_mem=131072
+  module /boot/vmlinuz-2.6.11-xen0 root=/dev/sda4 ro console=tty0
 \end{verbatim}
 }
 
 The kernel line tells GRUB where to find Xen itself and what boot
 parameters should be passed to it (in this case, setting domain 0's
-memory allocation and the settings for the serial port). For more
+memory allocation in kilobytes and the settings for the serial port). For more
 details on the various Xen boot parameters see Section~\ref{s:xboot}. 
 
 The module line of the configuration describes the location of the
@@ -524,7 +524,7 @@ have problems.
 
 \subsection{Serial Console (optional)}
 
-%%   kernel /boot/xen.gz dom0_mem=128M com1=115200,8n1
+%%   kernel /boot/xen.gz dom0_mem=131072 com1=115200,8n1
 %%   module /boot/vmlinuz-2.6.9-xen0 root=/dev/sda4 ro 
 
 
@@ -534,7 +534,7 @@ with:
 \begin{quote}
 {\small
 \begin{verbatim}
-   kernel /boot/xen.gz dom0_mem=128M com1=115200,8n1
+   kernel /boot/xen.gz dom0_mem=131072 com1=115200,8n1
 \end{verbatim}}
 \end{quote}
 
@@ -1754,10 +1754,11 @@ editing \path{grub.conf}.
  default unit, if no suffix is specified, is bytes.
 
 \item [dom0\_mem=xxx ] 
- Set the amount of memory to be allocated to domain0. This parameter
+ Set the amount of memory to be allocated to domain0. In Xen 3.x the parameter
  may be specified with a B, K, M or G suffix, representing bytes,
- kilobytes, megabytes and gigabytes respectively. The
- default unit, if no suffix is specified, is kilobytes.
+ kilobytes, megabytes and gigabytes respectively; if no suffix is specified, 
+ the parameter defaults to kilobytes. In previous versions of Xen, suffixes
+ were not supported and the value is always interpreted as kilobytes. 
 
 \item [tbuf\_size=xxx ] 
  Set the size of the per-cpu trace buffers, in pages
