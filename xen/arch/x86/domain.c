@@ -364,7 +364,8 @@ static int vmx_final_setup_guest(
         /* Put the domain in shadow mode even though we're going to be using
          * the shared 1:1 page table initially. It shouldn't hurt */
         shadow_mode_enable(ed->domain,
-                           SHM_enable|SHM_refcounts|SHM_translate|SHM_external);
+                           SHM_enable|SHM_write_all|SHM_refcounts|
+                           SHM_translate|SHM_external);
     }
 
     return 0;

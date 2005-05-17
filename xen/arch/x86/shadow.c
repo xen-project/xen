@@ -2307,9 +2307,10 @@ static int resync_all(struct domain *d, u32 stype)
             // guest page.
             // This only applies when we have writable page tables.
             //
-            if ( (stype == PGT_l1_shadow) && !VM_ASSIST(d, VMASST_TYPE_writable_pagetables) )
-                continue;
-            if ( (stype != PGT_l1_shadow) && !shadow_mode_write_all(d) )
+            if ( !shadow_mode_write_all(d) &&
+                 !((stype == PGT_l1_shadow) &&
+                   VM_ASSIST(d, VMASST_TYPE_writable_pagetables)) )
+                // Page is not writable -- no resync necessary
                 continue;
         }
 
@@ -2336,7 +2337,8 @@ static int resync_all(struct domain *d, u32 stype)
             l1_pgentry_t *shadow1 = shadow;
             l1_pgentry_t *snapshot1 = snapshot;
 
-            ASSERT(VM_ASSIST(d, VMASST_TYPE_writable_pagetables));
+            ASSERT(VM_ASSIST(d, VMASST_TYPE_writable_pagetables) ||
+                   shadow_mode_write_all(d));
 
             if ( !shadow_mode_refcounts(d) )
                 revalidate_l1(d, guest1, snapshot1);
