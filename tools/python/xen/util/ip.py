@@ -36,64 +36,70 @@ def _readline(fd):
 
 ##### Networking-related functions
 
-"""Bridge for network backend.
-When bridging is used, eth0 may not have an IP address,
-as it may have been moved onto the bridge.
-"""
-NBE_BRIDGE = 'xen-br0'
+def get_defaultroute():
+    fd = os.popen('/sbin/ip route list 2>/dev/null')
+    for line in fd.xreadlines():
+        m = re.search('^default via ([0-9]+\.[0-9]+\.[0-9]+\.[0-9]+) dev ([^ ]*)',
+                      line)
+        if m:
+            return [m.group(1), m.group(2)]
+    return [None, None]
 
-def get_current_ipaddr(dev='eth0'):
+def get_current_ipaddr(dev='defaultroute'):
     """Get the primary IP address for the given network interface.
 
-    dev     network interface (default eth0)
+    dev     network interface (default: default route device)
 
     returns interface address as a string
     """
+    if dev == 'defaultroute':
+        dev = get_defaultroute()[1]
+    if not dev:
+        return
     fd = os.popen( '/sbin/ifconfig ' + dev + ' 2>/dev/null' )
-    lines = _readlines(fd)
-    for line in lines:
+    for line in fd.xreadlines():
         m = re.search( '^\s+inet addr:([0-9]+\.[0-9]+\.[0-9]+\.[0-9]+).*',
                        line )
         if m:
             return m.group(1)
-    if dev == 'eth0':
-        return get_current_ipaddr(NBE_BRIDGE)
     return None
 
-def get_current_ipmask(dev='eth0'):
+def get_current_ipmask(dev='defaultroute'):
     """Get the primary IP netmask for a network interface.
 
-    dev     network interface (default eth0)
+    dev     network interface (default: default route device)
 
     returns interface netmask as a string
     """
+    if dev == 'defaultroute':
+        dev = get_defaultroute()[1]
+    if not dev:
+        return
     fd = os.popen( '/sbin/ifconfig ' + dev + ' 2>/dev/null' )
-    lines = _readlines(fd)
-    for line in lines:
+    for line in fd.xreadlines():
         m = re.search( '^.+Mask:([0-9]+\.[0-9]+\.[0-9]+\.[0-9]+).*',
                        line )
         if m:
             return m.group(1)
-    if dev == 'eth0':
-        return get_current_ipmask(NBE_BRIDGE)
     return None
 
-def get_current_ipgw(dev='eth0'):
+def get_current_ipgw(dev='defaultroute'):
     """Get the IP gateway for a network interface.
 
-    dev     network interface (default eth0)
+    dev     network interface (default: default route device)
 
     returns gateway address as a string
     """
+    if dev == 'defaultroute':
+        return get_defaultroute()[0]
+    if not dev:
+        return
     fd = os.popen( '/sbin/route -n' )
-    lines = _readlines(fd)
-    for line in lines:
+    for line in fd.xreadlines():
         m = re.search( '^\S+\s+([0-9]+\.[0-9]+\.[0-9]+\.[0-9]+)' +
                        '\s+\S+\s+\S*G.*' + dev + '.*', line )
         if m:
             return m.group(1)
-    if dev == 'eth0':
-        return get_current_ipgw(NBE_BRIDGE)
     return None
 
 def inet_aton(addr):
