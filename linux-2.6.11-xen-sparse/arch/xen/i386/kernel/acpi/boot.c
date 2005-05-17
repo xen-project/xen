@@ -105,23 +105,7 @@ EXPORT_SYMBOL(x86_acpiid_to_apicid);
  */
 enum acpi_irq_model_id		acpi_irq_model = ACPI_IRQ_MODEL_PIC;
 
-#ifdef CONFIG_XEN
-
-char *__acpi_map_table(unsigned long phys_addr, unsigned long size)
-{
-	unsigned int i,j;
-
-	j = PAGE_ALIGN(size) >> PAGE_SHIFT;
-	for (i = 0; (i < FIX_ACPI_PAGES) && j ; i++, j--) {
-		set_fixmap(FIX_ACPI_END - i,
-			   (phys_addr & PAGE_MASK) + (i << PAGE_SHIFT));
-	}
-
-	return (char *) __fix_to_virt(FIX_ACPI_END) + (phys_addr & ~PAGE_MASK);
-}
-
-#else
-#ifdef	CONFIG_X86_64
+#if defined(CONFIG_X86_64) && !defined(CONFIG_XEN)
 
 /* rely on all ACPI tables being in the direct mapping */
 char *__acpi_map_table(unsigned long phys_addr, unsigned long size)
@@ -154,8 +138,10 @@ char *__acpi_map_table(unsigned long phys, unsigned long size)
 	unsigned long base, offset, mapped_size;
 	int idx;
 
+#ifndef CONFIG_XEN
 	if (phys + size < 8*1024*1024) 
 		return __va(phys); 
+#endif
 
 	offset = phys & (PAGE_SIZE - 1);
 	mapped_size = PAGE_SIZE - offset;
@@ -177,7 +163,6 @@ char *__acpi_map_table(unsigned long phys, unsigned long size)
 	return ((unsigned char *) base + offset);
 }
 #endif
-#endif /* CONFIG_XEN */
 
 #ifdef CONFIG_PCI_MMCONFIG
 static int __init acpi_parse_mcfg(unsigned long phys_addr, unsigned long size)
