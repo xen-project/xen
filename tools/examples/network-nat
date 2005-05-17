@@ -32,7 +32,7 @@ netdev=${netdev:-eth0}
 # antispoofing not yet implemented
 antispoof=${antispoof:-no}
 
-echo "network-nat $OP netdev=$netdev antispoof=$antispoof"
+echo "*network-nat $OP netdev=$netdev antispoof=$antispoof" >&2
 
 
 op_start() {
@@ -71,7 +71,7 @@ case ${OP} in
        ;;
 
     *)
-       echo 'Unknown command: ' ${OP}
-       echo 'Valid commands are: start, stop, status'
+       echo 'Unknown command: ' ${OP} >&2
+       echo 'Valid commands are: start, stop, status' >&2
        exit 1
 esac

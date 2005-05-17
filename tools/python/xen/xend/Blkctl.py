@@ -4,6 +4,7 @@ import os
 import os.path
 import sys
 import string
+import xen.util.process
 
 from xen.xend import XendRoot
 
@@ -38,8 +39,6 @@ def block(op, type, dets, script=None):
     script = os.path.join(SCRIPT_DIR, script)
     args = [op] + string.split(dets, ':')
     args = ' '.join(args)
-    out = os.popen(script + ' ' + args)
-
-    output = _readline(out)
-    out.close()
-    return string.rstrip(output)
+    ret = xen.util.process.runscript(script + ' ' + args)
+    if len(ret):
+        return ret.splitlines()[0]

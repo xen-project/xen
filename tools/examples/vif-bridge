@@ -34,7 +34,7 @@
 # Exit if anything goes wrong
 set -e 
 
-echo "vif-bridge $*"
+echo "*vif-bridge $*" >&2
 
 # Operation name.
 OP=$1
@@ -63,8 +63,8 @@ case $OP in
         iptcmd='-D'
         ;;
     *)
-        echo 'Invalid command: ' $OP
-        echo 'Valid commands are: up, down'
+        echo 'Invalid command: ' $OP >&2
+        echo 'Valid commands are: up, down' >&2
         exit 1
         ;;
 esac
