@@ -147,8 +147,6 @@ test_all_events:
         movq  %rax,TRAPBOUNCE_eip(%rdx)
         movw  $TBF_INTERRUPT,TRAPBOUNCE_flags(%rdx)
         call  create_bounce_frame
-        movq  EDOMAIN_vcpu_info(%rbx),%rax
-        movb  $1,VCPUINFO_upcall_mask(%rax) # Upcalls masked during delivery
         jmp   test_all_events
 
 #ifdef CONFIG_VMX
@@ -305,18 +303,24 @@ create_bounce_frame:
         movq  $HYPERVISOR_VIRT_END+60,%rax
         cmpq  %rax,%rsi
         jb    domain_crash_synchronous  # Above Xen private area? Then okay.
-1:      subq  $40,%rsi
+1:      movb  TRAPBOUNCE_flags(%rdx),%cl
+        subq  $40,%rsi
         movq  UREGS_ss+8(%rsp),%rax
 FLT2:   movq  %rax,32(%rsi)             # SS
         movq  UREGS_rsp+8(%rsp),%rax
 FLT3:   movq  %rax,24(%rsi)             # RSP
         movq  UREGS_eflags+8(%rsp),%rax
 FLT4:   movq  %rax,16(%rsi)             # RFLAGS
-        movq  UREGS_cs+8(%rsp),%rax
-FLT5:   movq  %rax,8(%rsi)              # CS
+        movq  EDOMAIN_vcpu_info(%rbx),%rax
+        pushq VCPUINFO_upcall_mask(%rax)
+        testb $TBF_INTERRUPT,%cl
+        setnz VCPUINFO_upcall_mask(%eax)# TBF_INTERRUPT -> clear upcall mask
+        popq  %rax
+        shll  $16,%eax                  # Bits 16-23: saved_upcall_mask
+        movw  UREGS_cs+8(%esp),%ax      # Bits  0-15: CS
+FLT5:   movq  %rax,8(%rsi)              # CS/saved_upcall_mask
         movq  UREGS_rip+8(%rsp),%rax
 FLT6:   movq  %rax,(%rsi)               # RIP
-        movb  TRAPBOUNCE_flags(%rdx),%cl
         testb $TBF_EXCEPTION_ERRCODE,%cl
         jz    1f
         subq  $8,%rsi

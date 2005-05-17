@@ -288,8 +288,6 @@ test_all_events:
         movw %ax,TRAPBOUNCE_cs(%edx)
         movw $TBF_INTERRUPT,TRAPBOUNCE_flags(%edx)
         call create_bounce_frame
-        movl EDOMAIN_vcpu_info(%ebx),%eax
-        movb $1,VCPUINFO_upcall_mask(%eax) # Upcalls are masked during delivery
         jmp  test_all_events
 
         ALIGN
@@ -330,14 +328,20 @@ ring1:  /* obtain ss/esp from oldss/oldesp -- a ring-1 activation exists */
         movl UREGS_esp+4(%esp),%esi
 FLT13:  movl UREGS_ss+4(%esp),%gs 
 1:      /* Construct a stack frame: EFLAGS, CS/EIP */
+        movb TRAPBOUNCE_flags(%edx),%cl
         subl $12,%esi
         movl UREGS_eip+4(%esp),%eax
 FLT14:  movl %eax,%gs:(%esi) 
-        movl UREGS_cs+4(%esp),%eax
+        movl EDOMAIN_vcpu_info(%ebx),%eax
+        pushl VCPUINFO_upcall_mask(%eax)
+        testb $TBF_INTERRUPT,%cl
+        setnz VCPUINFO_upcall_mask(%eax) # TBF_INTERRUPT -> clear upcall mask
+        popl %eax
+        shll $16,%eax                    # Bits 16-23: saved_upcall_mask
+        movw UREGS_cs+4(%esp),%ax        # Bits  0-15: CS
 FLT15:  movl %eax,%gs:4(%esi) 
         movl UREGS_eflags+4(%esp),%eax
 FLT16:  movl %eax,%gs:8(%esi)
-        movb TRAPBOUNCE_flags(%edx),%cl
         test $TBF_EXCEPTION_ERRCODE,%cl
         jz   1f
         subl $4,%esi                    # push error_code onto guest frame

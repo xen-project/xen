@@ -147,28 +147,30 @@ typedef struct cpu_user_regs {
     u64 r14;
     u64 r13;
     u64 r12;
-    union { u64 rbp, ebp; } PACKED;
-    union { u64 rbx, ebx; } PACKED;
+    union { u64 rbp, ebp; };
+    union { u64 rbx, ebx; };
     u64 r11;
     u64 r10;
     u64 r9;
     u64 r8;
-    union { u64 rax, eax; } PACKED;
-    union { u64 rcx, ecx; } PACKED;
-    union { u64 rdx, edx; } PACKED;
-    union { u64 rsi, esi; } PACKED;
-    union { u64 rdi, edi; } PACKED;
+    union { u64 rax, eax; };
+    union { u64 rcx, ecx; };
+    union { u64 rdx, edx; };
+    union { u64 rsi, esi; };
+    union { u64 rdi, edi; };
     u32 error_code;    /* private */
     u32 entry_vector;  /* private */
-    union { u64 rip, eip; } PACKED;
-    u64 cs;
-    union { u64 rflags, eflags; } PACKED;
-    union { u64 rsp, esp; } PACKED;
-    u64 ss;
-    u64 es;
-    u64 ds;
-    u64 fs;      /* Non-zero => takes precedence over fs_base.      */
-    u64 gs;      /* Non-zero => takes precedence over gs_base_user. */
+    union { u64 rip, eip; };
+    u16 cs;
+    u8  saved_upcall_mask;
+    u8  _pad0[5];
+    union { u64 rflags, eflags; };
+    union { u64 rsp, esp; };
+    u16 ss, _pad1[3];
+    u16 es, _pad2[3];
+    u16 ds, _pad3[3];
+    u16 fs, _pad4[3]; /* Non-zero => takes precedence over fs_base.      */
+    u16 gs, _pad5[3]; /* Non-zero => takes precedence over gs_base_user. */
 } cpu_user_regs_t;
 
 typedef u64 tsc_timestamp_t; /* RDTSC timestamp */

@@ -108,14 +108,16 @@ typedef struct cpu_user_regs {
     u16 error_code;    /* private */
     u16 entry_vector;  /* private */
     u32 eip;
-    u32 cs;
+    u16 cs;
+    u8  saved_upcall_mask;
+    u8  _pad0;
     u32 eflags;
     u32 esp;
-    u32 ss;
-    u32 es;
-    u32 ds;
-    u32 fs;
-    u32 gs;
+    u16 ss, _pad1;
+    u16 es, _pad2;
+    u16 ds, _pad3;
+    u16 fs, _pad4;
+    u16 gs, _pad5;
 } cpu_user_regs_t;
 
 typedef u64 tsc_timestamp_t; /* RDTSC timestamp */

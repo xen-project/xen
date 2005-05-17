@@ -257,7 +257,7 @@ static inline int do_trap(int trapnr, char *str,
         tb->error_code = regs->error_code;
     }
     if ( TI_GET_IF(ti) )
-        ed->vcpu_info->evtchn_upcall_mask = 1;
+        tb->flags |= TBF_INTERRUPT;
     return 0;
 
  xen_fault:
@@ -322,7 +322,7 @@ asmlinkage int do_int3(struct cpu_user_regs *regs)
     tb->cs    = ti->cs;
     tb->eip   = ti->address;
     if ( TI_GET_IF(ti) )
-        ed->vcpu_info->evtchn_upcall_mask = 1;
+        tb->flags |= TBF_INTERRUPT;
 
     return 0;
 }
@@ -345,7 +345,7 @@ void propagate_page_fault(unsigned long addr, u16 error_code)
     tb->cs         = ti->cs;
     tb->eip        = ti->address;
     if ( TI_GET_IF(ti) )
-        ed->vcpu_info->evtchn_upcall_mask = 1;
+        tb->flags |= TBF_INTERRUPT;
 
     ed->arch.guest_cr2 = addr;
 }
@@ -911,7 +911,7 @@ asmlinkage int do_general_protection(struct cpu_user_regs *regs)
     tb->cs         = ti->cs;
     tb->eip        = ti->address;
     if ( TI_GET_IF(ti) )
-        ed->vcpu_info->evtchn_upcall_mask = 1;
+        tb->flags |= TBF_INTERRUPT;
     return 0;
 
  gp_in_kernel:

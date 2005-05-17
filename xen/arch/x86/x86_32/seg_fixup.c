@@ -275,7 +275,7 @@ int gpf_emulate_4gb(struct cpu_user_regs *regs)
     u32           disp32 = 0;
     u8            *eip;         /* ptr to instruction start */
     u8            *pb, b;       /* ptr into instr. / current instr. byte */
-    u32           *pseg = NULL; /* segment for memory operand (NULL=default) */
+    u16           *pseg = NULL; /* segment for memory operand (NULL=default) */
 
     /* WARNING: We only work for ring-3 segments. */
     if ( unlikely(VM86_MODE(regs)) || unlikely(!RING_3(regs)) )
@@ -456,7 +456,7 @@ int gpf_emulate_4gb(struct cpu_user_regs *regs)
         tb->cs         = ti->cs;
         tb->eip        = ti->address;
         if ( TI_GET_IF(ti) )
-            d->vcpu_info->evtchn_upcall_mask = 1;
+            tb->flags |= TBF_INTERRUPT;
     }
 
     return EXCRET_fault_fixed;

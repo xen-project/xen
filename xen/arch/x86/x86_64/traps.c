@@ -12,7 +12,7 @@
 
 void show_registers(struct cpu_user_regs *regs)
 {
-    printk("CPU:    %d\nEIP:    %04lx:[<%016lx>]      \nEFLAGS: %016lx\n",
+    printk("CPU:    %d\nEIP:    %04x:[<%016lx>]      \nEFLAGS: %016lx\n",
            smp_processor_id(), 0xffff & regs->cs, regs->rip, regs->eflags);
     printk("rax: %016lx   rbx: %016lx   rcx: %016lx   rdx: %016lx\n",
            regs->rax, regs->rbx, regs->rcx, regs->rdx);
