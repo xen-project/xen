@@ -201,8 +201,6 @@ op_stop () {
         return
     fi
 
-    return
-
     brctl delif ${bridge} ${netdev}
 
     if ifconfig veth0 2>/dev/null | grep -q veth0 ; then
