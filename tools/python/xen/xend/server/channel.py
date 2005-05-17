@@ -10,12 +10,6 @@ from xen.xend.XendLogging import log
 
 from messages import *
 
-VIRQ_MISDIRECT  = 0  # Catch-all interrupt for unbound VIRQs.
-VIRQ_TIMER      = 1  # Timebase update, and/or requested timeout.
-VIRQ_DEBUG      = 2  # Request guest to dump debug info.
-VIRQ_CONSOLE    = 3  # (DOM0) bytes received on emergency console.
-VIRQ_DOM_EXC    = 4  # (DOM0) Exceptional event for some domain.
-
 DEBUG = 0
 
 RESPONSE_TIMEOUT = 20.0
@@ -66,13 +60,8 @@ class ChannelFactory:
     def __init__(self):
         """Constructor - do not use. Use the channelFactory function."""
         self.notifier = xu.notifier()
-        # Register interest in all virqs.
-        # Unfortunately virqs do not seem to be delivered.
-        self.bind_virq(VIRQ_MISDIRECT)
-        self.bind_virq(VIRQ_TIMER)
-        self.bind_virq(VIRQ_DEBUG)
-        self.bind_virq(VIRQ_CONSOLE)
-        self.bind_virq(VIRQ_DOM_EXC)
+        # Register interest in virqs.
+        self.bind_virq(xen.lowlevel.xc.VIRQ_DOM_EXC)
         self.virqHandler = None
 
     def bind_virq(self, virq):
@@ -81,6 +70,7 @@ class ChannelFactory:
         log.info("Virq %s on port %s", virq, port)
 
     def virq(self):
+        log.error("virq")
         self.notifier.virq_send(self.virqPort)
 
     def start(self):

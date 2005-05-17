@@ -1279,6 +1279,7 @@ PyMODINIT_FUNC initxc(void)
     d = PyModule_GetDict(m);
     xc_error = PyErr_NewException(XENPKG ".error", NULL, NULL);
     PyDict_SetItemString(d, "error", xc_error);
+    PyDict_SetItemString(d, "VIRQ_DOM_EXC", PyInt_FromLong(VIRQ_DOM_EXC));
 
     zero = PyInt_FromLong(0);
 

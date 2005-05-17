@@ -192,10 +192,21 @@ control_channel_t *add_virq(int virq)
     cc = (control_channel_t *)malloc(sizeof(control_channel_t));
     if ( cc == NULL ) return NULL;
 
+    memset(cc, 0, sizeof(control_channel_t));
     cc->type       = CC_TYPE_VIRQ;
     cc->local_port = virq_port;
     cc->virq       = virq;
+    cc->ref_count  = 1;
     
+    if (evtchn_bind(cc->local_port) != 0)
+    {
+        DPRINTF("Got control interface, but couldn't bind evtchan!\n");
+        free(cc);
+        return NULL;
+    }
+
+    cc_list[cc->local_port] = cc;
+
     return cc;
 }
 
