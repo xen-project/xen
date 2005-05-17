@@ -25,7 +25,7 @@
  * pfn_info table and allocation bitmap.
  */
 static unsigned int opt_xenheap_megabytes = XENHEAP_DEFAULT_MB;
-#if defined(__x86_64__)
+#if defined(CONFIG_X86_64)
 integer_param("xenheap_megabytes", opt_xenheap_megabytes);
 #endif
 
@@ -70,7 +70,7 @@ extern int do_timer_lists_from_pit;
 
 struct cpuinfo_x86 boot_cpu_data = { 0, 0, 0, 0, -1 };
 
-#if defined(__x86_64__)
+#if defined(CONFIG_X86_64)
 unsigned long mmu_cr4_features = X86_CR4_PSE | X86_CR4_PGE | X86_CR4_PAE;
 #else
 unsigned long mmu_cr4_features = X86_CR4_PSE | X86_CR4_PGE;
@@ -312,10 +312,10 @@ void __init cpu_init(void)
 
     /* Set up and load the per-CPU TSS and LDT. */
     t->bitmap = IOBMP_INVALID_OFFSET;
-#if defined(__i386__)
+#if defined(CONFIG_X86_32)
     t->ss0  = __HYPERVISOR_DS;
     t->esp0 = get_stack_bottom();
-#elif defined(__x86_64__)
+#elif defined(CONFIG_X86_64)
     t->rsp0 = get_stack_bottom();
 #endif
     set_tss_desc(nr,t);
@@ -452,7 +452,7 @@ static void __init start_of_day(void)
 
     watchdog_enable();
 
-#ifdef __x86_64__ /* x86_32 uses low mappings when building DOM0. */
+#ifdef CONFIG_X86_64 /* x86_32 uses low mappings when building DOM0. */
     zap_low_mappings();
 #endif
 }
@@ -519,7 +519,7 @@ void __init __start_xen(multiboot_info_t *mbi)
         for ( ; ; ) ;
     }
 
-    max_page = init_e820(e820_raw, e820_raw_nr);
+    max_page = init_e820(e820_raw, &e820_raw_nr);
 
     /* Find the first high-memory RAM hole. */
     for ( i = 0; i < e820.nr_map; i++ )
@@ -537,11 +537,11 @@ void __init __start_xen(multiboot_info_t *mbi)
         printk("Not enough memory to stash the DOM0 kernel image.\n");
         for ( ; ; ) ;
     }
-#if defined(__i386__)
+#if defined(CONFIG_X86_32)
     memmove((void *)initial_images_start,  /* use low mapping */
             (void *)mod[0].mod_start,      /* use low mapping */
             mod[mbi->mods_count-1].mod_end - mod[0].mod_start);
-#elif defined(__x86_64__)
+#elif defined(CONFIG_X86_64)
     memmove(__va(initial_images_start),
             __va(mod[0].mod_start),
             mod[mbi->mods_count-1].mod_end - mod[0].mod_start);
@@ -561,6 +561,21 @@ void __init __start_xen(multiboot_info_t *mbi)
                             initial_images_end : e820.map[i].addr,
                             e820.map[i].addr + e820.map[i].size);
     }
+
+#if defined (CONFIG_X86_64)
+    /* On x86/64 we can 1:1 map every registered memory area. */
+    /* We use the raw_e820 map because we sometimes truncate the cooked map. */
+    for ( i = 0; i < e820_raw_nr; i++ )
+    {
+        unsigned long min, sz;
+        min = (unsigned long)e820_raw[i].addr &
+            ~(((unsigned long)L1_PAGETABLE_ENTRIES << PAGE_SHIFT) - 1);
+        sz  = ((unsigned long)e820_raw[i].size +
+               ((unsigned long)L1_PAGETABLE_ENTRIES << PAGE_SHIFT) - 1) &
+            ~(((unsigned long)L1_PAGETABLE_ENTRIES << PAGE_SHIFT) - 1);
+        map_pages(idle_pg_table, PAGE_OFFSET + min, min, sz, PAGE_HYPERVISOR);
+    }
+#endif
 
     printk("System RAM: %luMB (%lukB)\n", 
            nr_pages >> (20 - PAGE_SHIFT),

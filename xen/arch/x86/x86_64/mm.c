@@ -128,17 +128,11 @@ void __set_fixmap(
     map_pages(idle_pg_table, fix_to_virt(idx), p, PAGE_SIZE, flags);
 }
 
-
 void __init paging_init(void)
 {
-    unsigned long i, p, max;
+    unsigned long i, p;
     l3_pgentry_t *l3rw, *l3ro;
     struct pfn_info *pg;
-
-    /* Map all of physical memory. */
-    max = ((max_page + L1_PAGETABLE_ENTRIES - 1) & 
-           ~(L1_PAGETABLE_ENTRIES - 1)) << PAGE_SHIFT;
-    map_pages(idle_pg_table, PAGE_OFFSET, 0, max, PAGE_HYPERVISOR);
 
     /*
      * Allocate and map the machine-to-phys table.

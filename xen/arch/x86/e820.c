@@ -372,16 +372,17 @@ static void __init clip_mem(void)
 }
 
 static void __init machine_specific_memory_setup(
-    struct e820entry *raw, int raw_nr)
+    struct e820entry *raw, int *raw_nr)
 {
-    char nr = (char)raw_nr;
+    char nr = (char)*raw_nr;
     sanitize_e820_map(raw, &nr);
+    *raw_nr = nr;
     (void)copy_e820_map(raw, nr);
     clip_4gb();
     clip_mem();
 }
 
-unsigned long __init init_e820(struct e820entry *raw, int raw_nr)
+unsigned long __init init_e820(struct e820entry *raw, int *raw_nr)
 {
     machine_specific_memory_setup(raw, raw_nr);
     printk(KERN_INFO "Physical RAM map:\n");

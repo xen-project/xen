@@ -1227,7 +1227,6 @@ grant_table_init(
     void)
 {
     /* Nothing. */
-    DPRINTK("Grant table init\n");
 }
 
 /*

@@ -40,7 +40,6 @@
 #include <mach_mpparse.h>
 
 int sbf_port;
-#define end_pfn_map max_page
 #define CONFIG_ACPI_PCI
 
 #define BAD_MADT_ENTRY(entry, end) (					    \
@@ -96,12 +95,9 @@ enum acpi_irq_model_id		acpi_irq_model = ACPI_IRQ_MODEL_PIC;
 char *__acpi_map_table(unsigned long phys_addr, unsigned long size)
 {
 	if (!phys_addr || !size)
-	return NULL;
-
-	if (phys_addr < (end_pfn_map << PAGE_SHIFT))
-		return __va(phys_addr);
-
-	return NULL;
+		return NULL;
+	/* XEN: We map all e820 areas which should include every ACPI table. */
+	return __va(phys_addr);
 }
 
 #else
