@@ -1,2 +1,2 @@
 
-obj-y	:= netback.o control.o interface.o loopback.o
+obj-y	:= netback.o control.o interface.o
