@@ -108,7 +108,8 @@ VM_MASK		= 0x00020000
 #define XEN_TEST_PENDING(reg)	testb $0xFF,evtchn_upcall_pending(reg)
 
 #ifdef CONFIG_PREEMPT
-#define preempt_stop		XEN_BLOCK_EVENTS(%esi)
+#define preempt_stop		GET_THREAD_INFO(%ebp)			; \
+				XEN_BLOCK_EVENTS(%esi)
 #else
 #define preempt_stop
 #define resume_kernel		restore_all
@@ -127,7 +128,7 @@ VM_MASK		= 0x00020000
 	pushl %ebx; \
 	movl $(__USER_DS), %edx; \
 	movl %edx, %ds; \
-	movl %edx, %es
+	movl %edx, %es;
 
 #define RESTORE_INT_REGS \
 	popl %ebx;	\
