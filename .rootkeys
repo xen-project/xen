@@ -1478,7 +1478,6 @@
 3ddb79c1gs2VbLbQlw0dcDUXYIepDA xen/include/xen/mm.h
 3ddb79c1ieLZfGSFwfvvSQ2NK1BMSg xen/include/xen/multiboot.h
 41a61536ii6j2lJ2rXwMOLaG1CHPvw xen/include/xen/multicall.h
-3ddb79c0MOVXq8qZDQRGb6z64_xAwg xen/include/xen/pci_ids.h
 3e54c38dlSCVdyVM4PKcrSfzLLxWUQ xen/include/xen/perfc.h
 3e54c38de9SUSYSAwxDf_DwkpAnQFA xen/include/xen/perfc_defn.h
 3ddb79c04nQVR3EYM5L4zxDV_MCo1g xen/include/xen/prefetch.h
