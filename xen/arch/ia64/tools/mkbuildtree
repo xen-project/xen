@@ -107,7 +107,7 @@ cp_patch arch/ia64/mm/tlb.c arch/ia64/tlb.c tlb.c
 #cp_patch arch/ia64/hp/sim/hpsim_irq.c arch/ia64/hpsim_irq.c hpsim_irq.c
 
 softlink arch/ia64/kernel/efi_stub.S arch/ia64/efi_stub.S
-softlink arch/ia64/kernel/entry.h arch/ia64/entry.h
+cp_patch arch/ia64/kernel/entry.h arch/ia64/entry.h entry.h
 softlink arch/ia64/kernel/ia64_ksyms.c arch/ia64/ia64_ksyms.c
 softlink arch/ia64/kernel/irq_lsapic.c arch/ia64/irq_lsapic.c
 softlink arch/ia64/kernel/machvec.c arch/ia64/machvec.c
@@ -172,8 +172,8 @@ cp_patch arch/ia64/hp/sim/hpsim_ssc.h include/asm-ia64/hpsim_ssc.h hpsim_ssc.h
 
 #cp_patch include/asm-ia64/current.h include/asm-ia64/current.h current.h
 softlink include/asm-ia64/current.h include/asm-ia64/current.h
-#cp_patch include/asm-ia64/gcc_intrin.h include/asm-ia64/gcc_intrin.h gcc_intrin.h
-softlink include/asm-ia64/gcc_intrin.h include/asm-ia64/gcc_intrin.h
+cp_patch include/asm-ia64/gcc_intrin.h include/asm-ia64/gcc_intrin.h gcc_intrin.h
+#softlink include/asm-ia64/gcc_intrin.h include/asm-ia64/gcc_intrin.h
 #cp_patch include/asm-ia64/hardirq.h include/asm-ia64/hardirq.h hardirq.h
 softlink include/asm-ia64/hardirq.h include/asm-ia64/hardirq.h
 #cp_patch include/asm-ia64/hw_irq.h include/asm-ia64/hw_irq.h hw_irq.h
@@ -217,7 +217,7 @@ softlink include/asm-ia64/errno.h include/asm-ia64/errno.h
 softlink include/asm-ia64/fpu.h include/asm-ia64/fpu.h
 softlink include/asm-ia64/hdreg.h include/asm-ia64/hdreg.h
 #softlink include/asm-ia64/ia32.h include/asm-ia64/ia32.h
-softlink include/asm-ia64/ia64regs.h include/asm-ia64/ia64regs.h
+cp_patch include/asm-ia64/ia64regs.h include/asm-ia64/ia64regs.h ia64regs.h
 softlink include/asm-ia64/intrinsics.h include/asm-ia64/intrinsics.h
 softlink include/asm-ia64/ioctl.h include/asm-ia64/ioctl.h
 softlink include/asm-ia64/linkage.h include/asm-ia64/linkage.h
@@ -229,7 +229,7 @@ softlink include/asm-ia64/mca.h include/asm-ia64/mca.h
 softlink include/asm-ia64/meminit.h include/asm-ia64/meminit.h
 softlink include/asm-ia64/mman.h include/asm-ia64/mman.h
 softlink include/asm-ia64/numa.h include/asm-ia64/numa.h
-softlink include/asm-ia64/pal.h include/asm-ia64/pal.h
+cp_patch include/asm-ia64/pal.h include/asm-ia64/pal.h pal.h
 softlink include/asm-ia64/param.h include/asm-ia64/param.h
 softlink include/asm-ia64/patch.h include/asm-ia64/patch.h
 softlink include/asm-ia64/pci.h include/asm-ia64/pci.h
@@ -237,7 +237,7 @@ softlink include/asm-ia64/percpu.h include/asm-ia64/percpu.h
 #softlink include/asm-ia64/pgalloc.h include/asm-ia64/pgalloc.h
 cp_patch include/asm-ia64/pgalloc.h include/asm-ia64/pgalloc.h pgalloc.h
 softlink include/asm-ia64/pgtable.h include/asm-ia64/pgtable.h
-softlink include/asm-ia64/ptrace.h include/asm-ia64/ptrace.h
+cp_patch include/asm-ia64/ptrace.h include/asm-ia64/ptrace.h ptrace.h
 softlink include/asm-ia64/ptrace_offsets.h include/asm-ia64/ptrace_offsets.h
 softlink include/asm-ia64/rse.h include/asm-ia64/rse.h
 softlink include/asm-ia64/rwsem.h include/asm-ia64/rwsem.h
