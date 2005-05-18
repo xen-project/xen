@@ -1430,7 +1430,7 @@ initgdt()
 	pmap_kenter_pa((vaddr_t)gdt, (uint32_t)gdt - KERNBASE,
 	    VM_PROT_READ);
 	XENPRINTK(("loading gdt %lx, %d entries\n", frames[0] << PAGE_SHIFT,
-	    NGDT);
+	    NGDT));
 	if (HYPERVISOR_set_gdt(frames, NGDT))
 		panic("HYPERVISOR_set_gdt failed!\n");
 	lgdt_finish();
