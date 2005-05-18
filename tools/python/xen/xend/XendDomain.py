@@ -469,7 +469,8 @@ class XendDomain:
         if reason == 'halt':
             reason = 'poweroff'
         val = dominfo.shutdown(reason, key=key)
-        self.add_shutdown(dominfo, reason, key)
+        if reason != 'sysrq':
+            self.add_shutdown(dominfo, reason, key)
         return val
 
     def add_shutdown(self, dominfo, reason, key):
