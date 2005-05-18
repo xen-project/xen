@@ -8,6 +8,7 @@
 #include <xen/config.h>
 #include <xen/kernel.h>
 #include <xen/cpumask.h>
+#include <asm/current.h>
 #endif
 
 #ifdef CONFIG_X86_LOCAL_APIC
@@ -48,7 +49,7 @@ extern u8 x86_cpu_to_apicid[];
  * from the initial startup. We map APIC_BASE very early in page_setup(),
  * so this is correct in the x86 case.
  */
-#define __smp_processor_id() (current->processor)
+#define __smp_processor_id() (get_processor_id())
 
 extern cpumask_t cpu_callout_map;
 extern cpumask_t cpu_callin_map;

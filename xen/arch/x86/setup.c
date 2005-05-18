@@ -317,6 +317,8 @@ void __init cpu_init(void)
     t->ss0  = __HYPERVISOR_DS;
     t->esp0 = get_stack_bottom();
 #elif defined(CONFIG_X86_64)
+    /* Bottom-of-stack must be 16-byte aligned or CPU will force it! :-o */
+    BUG_ON((get_stack_bottom() & 15) != 0);
     t->rsp0 = get_stack_bottom();
 #endif
     set_tss_desc(nr,t);
@@ -483,6 +485,7 @@ void __init __start_xen(multiboot_info_t *mbi)
 
     /* Must do this early -- e.g., spinlocks rely on get_current(). */
     set_current(&idle0_exec_domain);
+    set_processor_id(0);
 
     /* We initialise the serial devices very early so we can get debugging. */
     serial_init_stage1();
