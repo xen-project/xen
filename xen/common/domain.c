@@ -212,6 +212,8 @@ void domain_destruct(struct domain *d)
     free_xenheap_page((unsigned long)d->shared_info);
 
     free_domain_struct(d);
+
+    send_guest_virq(dom0->exec_domain[0], VIRQ_DOM_EXC);
 }
 
 

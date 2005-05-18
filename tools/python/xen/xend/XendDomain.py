@@ -109,7 +109,7 @@ class XendDomain:
         """Event handler for virq.
         """
         print 'onVirq>', val
-        self.refresh_schedule(delay=0)
+        self.refresh()
 
     def schedule_later(self, _delay, _name, _fn, *args):
         """Schedule a function to be called later (if not already scheduled).
@@ -127,18 +127,6 @@ class XendDomain:
         @param name: schedule name to cancel
         """
         self.scheduler.cancel(name)
-
-    def refresh_schedule(self, delay=1):
-        """Schedule refresh to be called later.
-        
-        @param delay: delay in seconds
-        """
-        self.schedule_later(delay, 'refresh', self.refresh)
-
-    def refresh_cancel(self):
-        """Cancel any scheduled refresh.
-        """
-        self.schedule_cancel('refresh')
 
     def domain_restarts_schedule(self, delay=1):
         """Schedule domain_restarts to be called later.
@@ -320,8 +308,6 @@ class XendDomain:
     def refresh(self):
         """Refresh domain list from Xen.
         """
-        self.refresh_cancel()
-        self.refresh_schedule(delay=10)
         self.reap()
         doms = self.xen_domains()
         # Add entries for any domains we don't know about.
@@ -373,7 +359,6 @@ class XendDomain:
 
         @return: domain names
         """
-        self.refresh()
         return self.domain_by_name.keys()
 
     def domain_ls_ids(self):
@@ -506,16 +491,12 @@ class XendDomain:
         @param reason: shutdown type: poweroff, reboot, suspend, halt
         """
         dominfo = self.domain_lookup(id)
-        if reason == 'halt':
-            self.domain_restart_cancel(dominfo.id)
-        else:
-            self.domain_restart_schedule(dominfo.id, reason, force=True)
+        self.domain_restart_schedule(dominfo.id, reason, force=True)
         eserver.inject('xend.domain.shutdown', [dominfo.name, dominfo.id, reason])
         if reason == 'halt':
             reason = 'poweroff'
         val = dominfo.shutdown(reason, key=key)
         self.add_shutdown(dominfo, reason, key)
-        self.refresh_schedule(delay=10)
         return val
 
     def add_shutdown(self, dominfo, reason, key):
@@ -566,12 +547,12 @@ class XendDomain:
         dominfo = self.domain_lookup(id)
         if not dominfo:
             return
-        if dominfo.id in self.restarts_by_id:
-            return
         restart = (force and reason == 'reboot') or dominfo.restart_needed(reason)
         if restart:
             dominfo.restarting()
             self.domain_restart_add(dominfo)
+        else:
+            self.domain_restart_cancel(dominfo.id)
 
     def domain_restart_add(self, dominfo):
         self.restarts_by_name[dominfo.name] = dominfo
@@ -615,7 +596,7 @@ class XendDomain:
             self.domain_restart(dominfo)
         if self.domain_restarts_exist():
             # Run again later if any restarts remain.
-            self.refresh_schedule(delay=10)
+            self.domain_restarts_schedule(delay=10)
 
     def domain_restarts_exist(self):
         return len(self.restarts_by_id)
@@ -645,12 +626,9 @@ class XendDomain:
 
         @param id: domain id
         """
-        if reason == 'halt':
-            self.domain_restart_cancel(id)
-        elif reason == 'reboot':
-            self.domain_restart_schedule(id, reason, force=True)
+        self.domain_restart_schedule(id, reason, force=True)
         val = self.final_domain_destroy(id)
-        self.refresh_schedule()
+        self.refresh()
         return val
 
     def domain_migrate(self, id, dst, live=False, resource=0):
@@ -735,7 +713,6 @@ class XendDomain:
         dominfo = self.domain_lookup(id)
         val = dominfo.device_create(devconfig)
         self.update_domain(dominfo.id)
-        self.refresh_schedule()
         return val
 
     def domain_device_configure(self, id, devconfig, idx):
@@ -749,7 +726,6 @@ class XendDomain:
         dominfo = self.domain_lookup(id)
         val = dominfo.device_configure(devconfig, idx)
         self.update_domain(dominfo.id)
-        self.refresh_schedule()
         return val
     
     def domain_device_refresh(self, id, type, idx):
@@ -762,7 +738,6 @@ class XendDomain:
         dominfo = self.domain_lookup(id)
         val = dominfo.device_refresh(type, idx)
         self.update_domain(dominfo.id)
-        self.refresh_schedule()
         return val
 
     def domain_device_destroy(self, id, type, idx):
@@ -775,7 +750,6 @@ class XendDomain:
         dominfo = self.domain_lookup(id)
         val = dominfo.device_destroy(type, idx)
         self.update_domain(dominfo.id)
-        self.refresh_schedule()
         return val
 
     def domain_devtype_ls(self, id, type):
