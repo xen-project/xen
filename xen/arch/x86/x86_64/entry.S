@@ -314,10 +314,10 @@ FLT4:   movq  %rax,16(%rsi)             # RFLAGS
         movq  EDOMAIN_vcpu_info(%rbx),%rax
         pushq VCPUINFO_upcall_mask(%rax)
         testb $TBF_INTERRUPT,%cl
-        setnz VCPUINFO_upcall_mask(%eax)# TBF_INTERRUPT -> clear upcall mask
+        setnz VCPUINFO_upcall_mask(%rax)# TBF_INTERRUPT -> clear upcall mask
         popq  %rax
         shll  $16,%eax                  # Bits 16-23: saved_upcall_mask
-        movw  UREGS_cs+8(%esp),%ax      # Bits  0-15: CS
+        movw  UREGS_cs+8(%rsp),%ax      # Bits  0-15: CS
 FLT5:   movq  %rax,8(%rsi)              # CS/saved_upcall_mask
         movq  UREGS_rip+8(%rsp),%rax
 FLT6:   movq  %rax,(%rsi)               # RIP

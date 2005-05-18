@@ -5,7 +5,7 @@
 struct domain;
 
 #define STACK_RESERVED \
-    (sizeof(struct cpu_user_regs) + sizeof(struct domain *))
+    (sizeof(struct cpu_user_regs) + sizeof(struct domain *) + 8)
 
 static inline struct exec_domain *get_current(void)
 {
@@ -34,15 +34,17 @@ static inline struct cpu_user_regs *guest_cpu_user_regs(void)
 
 /*
  * Get the bottom-of-stack, as stored in the per-CPU TSS. This is actually
- * 40 bytes before the real bottom of the stack to allow space for:
- *  domain pointer, DS, ES, FS, GS
+ * 48 bytes before the real bottom of the stack to allow space for:
+ * domain pointer, padding, DS, ES, FS, GS. The padding is required to
+ * have the stack pointer 16-byte aligned: the amount we subtract from
+ * STACK_SIZE *must* be a multiple of 16.
  */
 static inline unsigned long get_stack_bottom(void)
 {
     unsigned long p;
     __asm__( "andq %%rsp,%0; addq %2,%0"
 	    : "=r" (p)
-	    : "0" (~(STACK_SIZE-1)), "i" (STACK_SIZE-40) );
+	    : "0" (~(STACK_SIZE-1)), "i" (STACK_SIZE-48) );
     return p;
 }
 
