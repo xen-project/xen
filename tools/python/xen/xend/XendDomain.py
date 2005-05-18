@@ -109,7 +109,7 @@ class XendDomain:
         """Event handler for virq.
         """
         print 'onVirq>', val
-        self.refresh()
+        self.refresh(cleanup=True)
 
     def rm_all(self):
         """Remove all domain info. Used after reboot.
@@ -154,7 +154,7 @@ class XendDomain:
                     self._delete_domain(domid)
             else:
                 self._delete_domain(domid)
-        self.refresh()
+        self.refresh(cleanup=True)
 
     def sync(self):
         """Sync domain db to disk.
@@ -274,10 +274,11 @@ class XendDomain:
             destroyed += 1
             self.final_domain_destroy(id)
 
-    def refresh(self):
+    def refresh(self, cleanup=False):
         """Refresh domain list from Xen.
         """
-        self.reap()
+        if cleanup:
+            self.reap()
         doms = self.xen_domains()
         # Add entries for any domains we don't know about.
         for (id, d) in doms.items():
@@ -294,7 +295,7 @@ class XendDomain:
                 do_domain_restarts = True
             else:
                 self._delete_domain(d.id)
-        if do_domain_restarts:
+        if cleanup and do_domain_restarts:
             self.scheduler.now(self.domain_restarts)
 
     def update_domain(self, id):
@@ -325,6 +326,7 @@ class XendDomain:
 
         @return: domain names
         """
+        self.refresh()
         return self.domain_by_name.keys()
 
     def domain_ls_ids(self):
@@ -332,6 +334,7 @@ class XendDomain:
 
         @return: domain names
         """
+        self.refresh()
         return self.domain_by_id.keys()
 
     def domains(self):
@@ -339,6 +342,7 @@ class XendDomain:
 
         @return: domain objects
         """
+        self.refresh()
         return self.domain_by_id.values()
     
     def domain_create(self, config):
