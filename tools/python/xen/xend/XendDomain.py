@@ -19,7 +19,7 @@ import EventServer; eserver = EventServer.instance()
 from XendError import XendError
 from XendLogging import log
 
-from scheduler import Scheduler
+import scheduler
 
 from xen.xend.server import channel
 
@@ -83,9 +83,6 @@ class XendDomain:
     """Table of pending domain shutdowns, indexed by domain id."""
     shutdowns_by_id = {}
 
-    """Table of delayed calls."""
-    scheduler = Scheduler()
-    
     def __init__(self):
         # Hack alert. Python does not support mutual imports, but XendDomainInfo
         # needs access to the XendDomain instance to look up domains. Attempting
@@ -290,7 +287,7 @@ class XendDomain:
             else:
                 self._delete_domain(d.id)
         if cleanup and do_domain_restarts:
-            self.scheduler.now(self.domain_restarts)
+            scheduler.now(self.domain_restarts)
 
     def update_domain(self, id):
         """Update the saved info for a domain.
@@ -506,7 +503,7 @@ class XendDomain:
                 timeout = min(timeout, shutdown.getTimeout())
         if self.shutdowns_by_id:
             # Pending shutdowns remain - reschedule.
-            self.scheduler.later(timeout, self.domain_shutdowns)
+            scheduler.later(timeout, self.domain_shutdowns)
 
     def domain_restart_schedule(self, id, reason, force=False):
         """Schedule a restart for a domain if it needs one.
