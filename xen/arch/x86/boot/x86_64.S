@@ -46,13 +46,13 @@ print_err:
         mov     $7,%al
         stosb                  # Write an attribute to the VGA framebuffer
         jmp     1b
-        
+
 __start:
         cld
         cli
 
         /* Set up a few descriptors: on entry only CS is guaranteed good. */
-        lgdt    %cs:0x100400
+        lgdt    %cs:0x100306        # nopaging_gdt_descr
         mov     $(__HYPERVISOR_DS32),%ecx
         mov     %ecx,%ds
         mov     %ecx,%es
@@ -65,7 +65,7 @@ __start:
         jne     not_multiboot
         
         /* Save the Multiboot info structure for later use. */
-        mov     %ebx,0x100300
+        mov     %ebx,0x100300       # multiboot_ptr
 
         /* We begin by interrogating the CPU for the presence of long mode. */
         mov     $0x80000000,%eax
@@ -87,7 +87,7 @@ skip_boot_checks:
         mov     %ecx,%cr4
 
         /* Load pagetable base register. */
-        mov     $0x101000,%eax   /* idle_pg_table */
+        mov     $0x102000,%eax   /* idle_pg_table */
         mov     %eax,%cr3
 
         /* Set up EFER (Extended Feature Enable Register). */
@@ -168,9 +168,8 @@ __high_start:
         loop    1b
 
         /* Pass off the Multiboot info structure to C land. */
-        mov     0x100300,%edi
-        lea     start(%rip),%rax
-        sub     $0x100000,%rax
+        mov     multiboot_ptr(%rip),%edi
+        lea     start-0x100000(%rip),%rax
         add     %rax,%rdi
         call    __start_xen
         ud2     /* Force a panic (invalid opcode). */
@@ -184,26 +183,30 @@ ignore_int:
         call    printf
 1:      jmp     1b
 
-        .code32
 
-        .org    0x300
-                        
 /*** DESCRIPTOR TABLES ***/
 
 .globl idt
-.globl gdt
+.globl gdt        
 
-        .org    0x400
-        .word   LAST_RESERVED_GDT_BYTE
-        .long   0x101000 - FIRST_RESERVED_GDT_BYTE
-        
+        .org    0x300
+        .code32
+
+multiboot_ptr:        /* 0x300 */
+        .long   0
+
         .word   0
+nopaging_gdt_descr:   /* 0x306 */
+        .word   LAST_RESERVED_GDT_BYTE
+        .quad   gdt_table - FIRST_RESERVED_GDT_BYTE - __PAGE_OFFSET
+
+        .word   0,0,0
 gdt_descr:
         .word   LAST_RESERVED_GDT_BYTE
-gdt:       
+gdt:
         .quad   gdt_table - FIRST_RESERVED_GDT_BYTE
 
-        .word   0    
+        .word   0,0,0
 idt_descr:
         .word   256*16-1
 idt:
@@ -214,7 +217,7 @@ ENTRY(stack_start)
 
 high_start:
         .quad   __high_start
-                
+
         .org    0x1000
 ENTRY(gdt_table)
         .quad 0x0000000000000000     /* unused */
@@ -231,14 +234,14 @@ ENTRY(gdt_table)
         .org 0x2000
 ENTRY(idle_pg_table)
 ENTRY(idle_pg_table_4)
-        .quad 0x0000000000102007 # PML4[0]
+        .quad idle_pg_table_l3 - __PAGE_OFFSET + 7 # PML4[0]
         .fill 261,8,0
-        .quad 0x0000000000102007 # PML4[262]
+        .quad idle_pg_table_l3 - __PAGE_OFFSET + 7 # PML4[262]
 
 /* Initial PDP -- level-3 page table */
         .org 0x3000
 ENTRY(idle_pg_table_l3)
-        .quad 0x0000000000103007
+        .quad idle_pg_table_l2 - __PAGE_OFFSET + 7
 
 /* Initial PDE -- level-2 page table. */
         .org 0x4000
