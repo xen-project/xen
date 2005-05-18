@@ -80,10 +80,6 @@ class XendDomain:
     domain_by_id = {}
     domain_by_name = {}
     
-    """Table of domains to restart, indexed by domain id."""
-    restarts_by_id = {}
-    restarts_by_name = {}
-
     """Table of pending domain shutdowns, indexed by domain id."""
     shutdowns_by_id = {}
 
@@ -181,8 +177,6 @@ class XendDomain:
         dominfo = XendDomainInfo.vm_recreate(savedinfo, info)
         self.domain_by_id[dominfo.id] = dominfo
         self.domain_by_name[dominfo.name] = dominfo
-        if dominfo.restart_pending():
-            self.domain_restart_add(dominfo)
         return dominfo
 
     def _add_domain(self, info, notify=True):
@@ -526,38 +520,25 @@ class XendDomain:
             return
         restart = (force and reason == 'reboot') or dominfo.restart_needed(reason)
         if restart:
+            log.info('Scheduling restart for domain: name=%s id=%s',
+                     dominfo.name, dominfo.id)
+            eserver.inject("xend.domain.restart",
+                           [dominfo.name, dominfo.id, "schedule"])
             dominfo.restarting()
-            self.domain_restart_add(dominfo)
         else:
-            self.domain_restart_cancel(dominfo.id)
-
-    def domain_restart_add(self, dominfo):
-        self.restarts_by_name[dominfo.name] = dominfo
-        self.restarts_by_id[dominfo.id] = dominfo
-        log.info('Scheduling restart for domain: name=%s id=%s', dominfo.name, dominfo.id)
-        eserver.inject("xend.domain.restart",
-                       [dominfo.name, dominfo.id, "schedule"])
-            
-    def domain_restart_cancel(self, id):
-        """Cancel any restart scheduled for a domain.
-
-        @param id: domain id
-        """
-        dominfo = self.restarts_by_id.get(id) or self.restarts_by_name.get(id)
-        if dominfo:
             log.info('Cancelling restart for domain: name=%s id=%s',
                      dominfo.name, dominfo.id)
             eserver.inject("xend.domain.restart",
                            [dominfo.name, dominfo.id, "cancel"])
             dominfo.restart_cancel()
-            del self.restarts_by_id[dominfo.id]
-            del self.restarts_by_name[dominfo.name]
 
     def domain_restarts(self):
         """Execute any scheduled domain restarts for domains that have gone.
         """
         doms = self.xen_domains()
-        for dominfo in self.restarts_by_id.values():
+        for dominfo in self.domain_by_id.values():
+            if not dominfo.restart_pending():
+                continue
             print 'domain_restarts>', dominfo.name, dominfo.id
             info = doms.get(dominfo.id)
             if info:
@@ -565,8 +546,6 @@ class XendDomain:
                 print 'domain_restarts> still runnning: ', dominfo.name
                 continue
             # Remove it from the restarts.
-            del self.restarts_by_id[dominfo.id]
-            del self.restarts_by_name[dominfo.name]
             print 'domain_restarts> restarting: ', dominfo.name
             self.domain_restart(dominfo)
 
