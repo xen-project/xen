@@ -169,6 +169,11 @@ void start_kernel(void)
     printk("xen image pstart: 0x%lx, xenheap pend: 0x%lx\n",
 	    xen_pstart, xenheap_phys_end);
 
+#ifdef CONFIG_VTI
+    /* If we want to enable vhpt for all regions, related initialization
+     * for HV TLB must be done earlier before first TLB miss
+     */
+#endif // CONFIG_VTI
     /* Find next hole */
     firsthole_start = 0;
     efi_memmap_walk(xen_find_first_hole, &firsthole_start);
@@ -198,7 +203,13 @@ void start_kernel(void)
     efi_memmap_walk(find_max_pfn, &max_page);
     printf("find_memory: efi_memmap_walk returns max_page=%lx\n",max_page);
 
-    heap_start = memguard_init(&_end);
+#ifdef CONFIG_VTI
+    /* Only support up to 64G physical memory by far */
+    if (max_page > (0x1000000000UL / PAGE_SIZE))
+	panic("Not suppport memory larger than 16G\n");
+#endif // CONFIG_VTI
+
+    heap_start = memguard_init(ia64_imva(&_end));
     printf("Before heap_start: 0x%lx\n", heap_start);
     heap_start = __va(init_boot_allocator(__pa(heap_start)));
     printf("After heap_start: 0x%lx\n", heap_start);
@@ -235,6 +246,9 @@ printk("About to call scheduler_init()\n");
     local_irq_disable();
 printk("About to call xen_time_init()\n");
     xen_time_init();
+#ifdef CONFIG_VTI
+    init_xen_time(); /* initialise the time */
+#endif // CONFIG_VTI 
 printk("About to call ac_timer_init()\n");
     ac_timer_init();
 // init_xen_time(); ???
@@ -274,6 +288,8 @@ printk("About to call init_idle_task()\n");
      * above our heap. The second module, if present, is an initrd ramdisk.
      */
 printk("About to call construct_dom0()\n");
+    dom0_memory_start = __va(ia64_boot_param->initrd_start);
+    dom0_memory_end = ia64_boot_param->initrd_size;
     if ( construct_dom0(dom0, dom0_memory_start, dom0_memory_end,
 			0,
                         0,

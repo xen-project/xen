@@ -2,7 +2,11 @@
 #define __ASM_MMU_CONTEXT_H
 //dummy file to resolve non-arch-indep include
 #ifdef XEN
+#ifndef CONFIG_VTI
 #define IA64_REGION_ID_KERNEL 0
+#else // CONFIG_VTI
+#define IA64_REGION_ID_KERNEL 0x1e0000	/* Start from all 1 in highest 4 bits */
+#endif // CONFIG_VTI
 #define ia64_rid(ctx,addr)	(((ctx) << 3) | (addr >> 61))
 
 #ifndef __ASSEMBLY__

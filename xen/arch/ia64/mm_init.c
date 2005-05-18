@@ -301,6 +301,20 @@ ia64_mmu_init (void *my_cpu_data)
 		 pte_val(pfn_pte(__pa(my_cpu_data) >> PAGE_SHIFT, PAGE_KERNEL)),
 		 PERCPU_PAGE_SHIFT);
 
+#ifdef CONFIG_VTI
+	{
+		u64 base;
+		extern void vmx_switch_rr7(void);
+
+		base = (u64) &vmx_switch_rr7;
+		base = *((u64*)base);
+		ia64_itr(0x1, IA64_TR_RR7_SWITCH_STUB, XEN_RR7_SWITCH_STUB,
+			 pte_val(pfn_pte(__pa(base) >> PAGE_SHIFT, PAGE_KERNEL)),
+			 RR7_SWITCH_SHIFT);
+		printk("Add TR mapping for rr7 switch stub, with physical: 0x%lx\n", (u64)(__pa(base)));
+	}
+#endif // CONFIG_VTI
+
 	ia64_set_psr(psr);
 	ia64_srlz_i();
 

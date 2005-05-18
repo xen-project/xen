@@ -1,6 +1,7 @@
 ########################################
 # ia64-specific definitions
 
+CONFIG_VTI	?= y
 ifneq ($(COMPILE_ARCH),$(TARGET_ARCH))
 CROSS_COMPILE ?= /usr/local/sp_env/v2.2.5/i686/bin/ia64-unknown-linux-
 endif
@@ -17,4 +18,7 @@ CFLAGS  += -Wno-pointer-arith -Wredundant-decls
 CFLAGS  += -DIA64 -DXEN -DLINUX_2_6
 CFLAGS	+= -ffixed-r13 -mfixed-range=f12-f15,f32-f127
 CFLAGS	+= -w -g
+ifeq ($(CONFIG_VTI),y)
+CFLAGS  += -DCONFIG_VTI
+endif
 LDFLAGS := -g

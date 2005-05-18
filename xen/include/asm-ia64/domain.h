@@ -2,6 +2,11 @@
 #define __ASM_DOMAIN_H__
 
 #include <linux/thread_info.h>
+#ifdef CONFIG_VTI
+#include <asm/vmx_vpd.h>
+#include <asm/vmmu.h>
+#include <asm/regionreg.h>
+#endif // CONFIG_VTI
 
 extern void arch_do_createdomain(struct exec_domain *);
 
@@ -9,6 +14,14 @@ extern int arch_final_setup_guestos(
     struct exec_domain *, struct vcpu_guest_context *);
 
 extern void domain_relinquish_resources(struct domain *);
+
+#ifdef CONFIG_VTI
+struct trap_bounce {
+	// TO add, FIXME Eddie
+};
+
+#define	 PMT_SIZE	(32L*1024*1024)		// 32M for PMT
+#endif // CONFIG_VTI
 
 struct arch_domain {
     struct mm_struct *active_mm;
@@ -18,6 +31,12 @@ struct arch_domain {
     int ending_rid;		/* one beyond highest RID assigned to domain */
     int rid_bits;		/* number of virtual rid bits (default: 18) */
     int breakimm;
+#ifdef  CONFIG_VTI
+    int imp_va_msb;
+    ia64_rr emul_phy_rr0;
+    ia64_rr emul_phy_rr4;
+    u64 *pmt;	/* physical to machine table */
+#endif  //CONFIG_VTI
     u64 xen_vastart;
     u64 xen_vaend;
     u64 shared_info_va;
@@ -57,6 +76,16 @@ struct arch_exec_domain {
     void *regs;	/* temporary until find a better way to do privops */
     struct mm_struct *active_mm;
     struct thread_struct _thread;	// this must be last
+#ifdef CONFIG_VTI
+    void (*schedule_tail) (struct exec_domain *);
+    struct trap_bounce trap_bounce;
+    thash_cb_t *vtlb;
+    //for phycial  emulation
+    unsigned long old_rsc;
+    int mode_flags;
+
+    struct arch_vmx_struct arch_vmx; /* Virtual Machine Extensions */
+#endif	// CONFIG_VTI
 };
 
 #define active_mm arch.active_mm

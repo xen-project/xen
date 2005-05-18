@@ -359,4 +359,22 @@ extern unsigned long num_physpages;
 extern unsigned long totalram_pages;
 extern int nr_swap_pages;
 
+#ifdef CONFIG_VTI
+extern unsigned long *mpt_table;
+#undef machine_to_phys_mapping
+#define machine_to_phys_mapping	mpt_table
+
+/* If pmt table is provided by control pannel later, we need __get_user
+* here. However if it's allocated by HV, we should access it directly
+*/
+#define phys_to_machine_mapping(d, gpfn)	\
+    ((d) == dom0 ? gpfn : (d)->arch.pmt[(gpfn)])
+
+#define __mfn_to_gpfn(_d, mfn)			\
+    machine_to_phys_mapping[(mfn)]
+
+#define __gpfn_to_mfn(_d, gpfn)			\
+    phys_to_machine_mapping((_d), (gpfn))
+#endif // CONFIG_VTI
+
 #endif /* __ASM_IA64_MM_H__ */

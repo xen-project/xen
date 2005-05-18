@@ -1,4 +1,12 @@
+#ifndef		_REGIONREG_H_
+#define		_REGIONREG_H_
+#ifdef  CONFIG_VTI
+#define XEN_DEFAULT_RID     0xf00000
+#define DOMAIN_RID_SHIFT    20
+#define DOMAIN_RID_MASK     (~(1U<<DOMAIN_RID_SHIFT -1))
+#else //CONFIG_VTI
 #define XEN_DEFAULT_RID		7
+#endif // CONFIG_VTI
 #define	IA64_MIN_IMPL_RID_MSB	17
 #define _REGION_ID(x)   ({ia64_rr _v; _v.rrval = (long) (x); _v.rid;})
 #define _REGION_PAGE_SIZE(x)    ({ia64_rr _v; _v.rrval = (long) (x); _v.ps;})
@@ -8,10 +16,10 @@
 typedef union ia64_rr {
         struct {
                 unsigned long  ve :   1;        /* enable hw walker */
-                unsigned long     :   1;        /* reserved */
+                unsigned long  reserved0   :   1;        /* reserved */
                 unsigned long  ps :   6;        /* log page size */
                 unsigned long  rid:  24;        /* region id */
-                unsigned long     :  32;        /* reserved */
+                unsigned long  reserved1   :  32;        /* reserved */
         };
         unsigned long rrval;
 } ia64_rr;
@@ -31,3 +39,4 @@ typedef union ia64_rr {
 #define RR_RID(arg) (((arg) & 0x0000000000ffffff) << 8)
 #define RR_RID_MASK 0x00000000ffffff00L
 
+#endif		/* !_REGIONREG_H_ */

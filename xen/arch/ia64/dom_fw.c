@@ -17,6 +17,7 @@
 #include <asm/io.h>
 #include <asm/pal.h>
 #include <asm/sal.h>
+#include <xen/acpi.h>
 
 #include <asm/dom_fw.h>
 
@@ -301,6 +302,71 @@ void print_md(efi_memory_desc_t *md)
 #endif
 }
 
+#define LSAPIC_NUM 16	// TEMP
+static u32 lsapic_flag=1;
+
+/* Provide only one LP to guest */
+static int 
+acpi_update_lsapic (acpi_table_entry_header *header)
+{
+	struct acpi_table_lsapic *lsapic;
+
+	lsapic = (struct acpi_table_lsapic *) header;
+	if (!lsapic)
+		return -EINVAL;
+
+	if (lsapic->flags.enabled && lsapic_flag) {
+		printk("enable lsapic entry: 0x%lx\n", (u64)lsapic);
+		lsapic_flag = 0; /* disable all the following processros */
+	} else if (lsapic->flags.enabled) {
+		printk("DISABLE lsapic entry: 0x%lx\n", (u64)lsapic);
+		lsapic->flags.enabled = 0;
+	} else
+		printk("lsapic entry is already disabled: 0x%lx\n", (u64)lsapic);
+
+	return 0;
+}
+
+static int
+acpi_update_madt_checksum (unsigned long phys_addr, unsigned long size)
+{
+	u8 checksum=0;
+    	u8* ptr;
+	int len;
+	struct acpi_table_madt* acpi_madt;
+
+	if (!phys_addr || !size)
+		return -EINVAL;
+
+	acpi_madt = (struct acpi_table_madt *) __va(phys_addr);
+	acpi_madt->header.checksum=0;
+
+    	/* re-calculate MADT checksum */
+	ptr = (u8*)acpi_madt;
+    	len = acpi_madt->header.length;
+	while (len>0){
+		checksum = (u8)( checksum + (*ptr++) );
+		len--;
+	}
+    	acpi_madt->header.checksum = 0x0 - checksum;	
+	
+	return 0;
+}
+
+/* base is physical address of acpi table */
+void touch_acpi_table(void)
+{
+	u64 count = 0;
+	count = acpi_table_parse_madt(ACPI_MADT_LSAPIC, acpi_update_lsapic, NR_CPUS);
+	if ( count < 1)
+		printk("Error parsing MADT - no LAPIC entires\n");
+	printk("Total %d lsapic entry\n", count);
+	acpi_table_parse(ACPI_APIC, acpi_update_madt_checksum);
+
+	return;
+}
+
+
 struct ia64_boot_param *
 dom_fw_init (struct domain *d, char *args, int arglen, char *fw_mem, int fw_mem_size)
 {
@@ -418,6 +484,9 @@ dom_fw_init (struct domain *d, char *args, int arglen, char *fw_mem, int fw_mem_
 			printf(" MPS=%0xlx",efi_tables[i].table);
 			i++;
 		}
+
+		touch_acpi_table();
+
 		if (efi.acpi20) {
 			efi_tables[i].guid = ACPI_20_TABLE_GUID;
 			efi_tables[i].table = __pa(efi.acpi20);

@@ -10,6 +10,12 @@ OBJS = xensetup.o setup.o time.o irq.o ia64_ksyms.o process.o smp.o \
 	extable.o linuxextable.o xenirq.o xentime.o \
 	regionreg.o entry.o unaligned.o privop.o vcpu.o \
 	irq_ia64.o irq_lsapic.o vhpt.o xenasm.o dom_fw.o
+
+ifeq ($(CONFIG_VTI),y)
+OBJS += vmx_init.o vmx_virt.o vmx_vcpu.o vmx_process.o vmx_vsa.o vmx_ivt.o \
+	vmx_phy_mode.o vmx_utility.o vmx_interrupt.o vmx_entry.o vmmu.o \
+	vtlb.o mmio.o vlsapic.o
+endif
 # perfmon.o
 # unwind.o needed for kernel unwinding (rare)
 
@@ -38,6 +44,7 @@ ia64lib.o:
 clean:
 	rm -f *.o *~ core  xen.lds.s $(BASEDIR)/include/asm-ia64/.offsets.h.stamp
 	rm -f lib/*.o
+	$(MAKE) -C lib clean
 
 # setup.o contains bits of compile.h so it must be blown away
 delete-unfresh-files:

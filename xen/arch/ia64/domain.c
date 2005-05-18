@@ -3,6 +3,11 @@
  *
  *  Pentium III FXSR, SSE support
  *	Gareth Hughes <gareth@valinux.com>, May 2000
+ *
+ *  Copyright (C) 2005 Intel Co
+ *	Kun Tian (Kevin Tian) <kevin.tian@intel.com>
+ *
+ * 05/04/29 Kun Tian (Kevin Tian) <kevin.tian@intel.com> Add CONFIG_VTI domain support
  */
 
 #include <xen/config.h>
@@ -32,12 +37,22 @@
 #include <asm/asm-offsets.h>  /* for IA64_THREAD_INFO_SIZE */
 
 #include <asm/vcpu.h>   /* for function declarations */
+#ifdef CONFIG_VTI
+#include <asm/vmx.h>
+#include <asm/vmx_vcpu.h>
+#endif // CONFIG_VTI
 
 #define CONFIG_DOMAIN0_CONTIGUOUS
 unsigned long dom0_start = -1L;
+#ifdef CONFIG_VTI
 unsigned long dom0_size = 512*1024*1024; //FIXME: Should be configurable
 //FIXME: alignment should be 256MB, lest Linux use a 256MB page size
+unsigned long dom0_align = 256*1024*1024;
+#else // CONFIG_VTI
+unsigned long dom0_size = 256*1024*1024; //FIXME: Should be configurable
+//FIXME: alignment should be 256MB, lest Linux use a 256MB page size
 unsigned long dom0_align = 64*1024*1024;
+#endif // CONFIG_VTI
 #ifdef DOMU_BUILD_STAGING
 unsigned long domU_staging_size = 32*1024*1024; //FIXME: Should be configurable
 unsigned long domU_staging_start;
@@ -151,6 +166,58 @@ void arch_free_exec_domain_struct(struct exec_domain *ed)
 	free_xenheap_pages(ed, KERNEL_STACK_SIZE_ORDER);
 }
 
+#ifdef CONFIG_VTI
+void arch_do_createdomain(struct exec_domain *ed)
+{
+	struct domain *d = ed->domain;
+	struct thread_info *ti = alloc_thread_info(ed);
+
+	/* If domain is VMX domain, shared info area is created
+	 * by domain and then domain notifies HV by specific hypercall.
+	 * If domain is xenolinux, shared info area is created by
+	 * HV.
+	 * Since we have no idea about whether domain is VMX now,
+	 * (dom0 when parse and domN when build), postpone possible
+	 * allocation.
+	 */
+
+	/* FIXME: Because full virtual cpu info is placed in this area,
+	 * it's unlikely to put it into one shareinfo page. Later
+	 * need split vcpu context from vcpu_info and conforms to
+	 * normal xen convention.
+	 */
+	d->shared_info = NULL;
+	ed->vcpu_info = (void *)alloc_xenheap_page();
+	if (!ed->vcpu_info) {
+   		printk("ERROR/HALTING: CAN'T ALLOC PAGE\n");
+   		while (1);
+	}
+	memset(ed->vcpu_info, 0, PAGE_SIZE);
+
+	/* Clear thread_info to clear some important fields, like preempt_count */
+	memset(ti, 0, sizeof(struct thread_info));
+
+	/* Allocate per-domain vTLB and vhpt */
+	ed->arch.vtlb = init_domain_tlb(ed);
+
+	/* Physical->machine page table will be allocated when 
+	 * final setup, since we have no the maximum pfn number in 
+	 * this stage
+	 */
+
+	/* FIXME: This is identity mapped address for xenheap. 
+	 * Do we need it at all?
+	 */
+	d->xen_vastart = 0xf000000000000000;
+	d->xen_vaend = 0xf300000000000000;
+	d->breakimm = 0x1000;
+
+	// stay on kernel stack because may get interrupts!
+	// ia64_ret_from_clone (which b0 gets in new_thread) switches
+	// to user stack
+	ed->arch._thread.on_ustack = 0;
+}
+#else // CONFIG_VTI
 void arch_do_createdomain(struct exec_domain *ed)
 {
 	struct domain *d = ed->domain;
@@ -193,6 +260,7 @@ void arch_do_createdomain(struct exec_domain *ed)
 	// to user stack
 	ed->arch._thread.on_ustack = 0;
 }
+#endif // CONFIG_VTI
 
 void arch_do_boot_vcpu(struct exec_domain *p)
 {
@@ -215,6 +283,70 @@ void domain_relinquish_resources(struct domain *d)
 {
 	dummy();
 }
+
+#ifdef CONFIG_VTI
+void new_thread(struct exec_domain *ed,
+                unsigned long start_pc,
+                unsigned long start_stack,
+                unsigned long start_info)
+{
+	struct domain *d = ed->domain;
+	struct switch_stack *sw;
+	struct xen_regs *regs;
+	struct ia64_boot_param *bp;
+	extern char ia64_ret_from_clone;
+	extern char saved_command_line[];
+	//char *dom0_cmdline = "BOOT_IMAGE=scsi0:\EFI\redhat\xenlinux nomca root=/dev/sdb1 ro";
+
+
+#ifdef CONFIG_DOMAIN0_CONTIGUOUS
+	if (d == dom0) start_pc += dom0_start;
+#endif
+	regs = (struct xen_regs *) ((unsigned long) ed + IA64_STK_OFFSET) - 1;
+	sw = (struct switch_stack *) regs - 1;
+	/* Sanity Clear */
+	memset(sw, 0, sizeof(struct xen_regs) + sizeof(struct switch_stack));
+
+	if (VMX_DOMAIN(ed)) {
+		/* dt/rt/it:1;i/ic:1, si:1, vm/bn:1, ac:1 */
+		regs->cr_ipsr = 0x501008826008; /* Need to be expanded as macro */
+	} else {
+		regs->cr_ipsr = ia64_getreg(_IA64_REG_PSR)
+			| IA64_PSR_BITS_TO_SET | IA64_PSR_BN
+			& ~(IA64_PSR_BITS_TO_CLEAR | IA64_PSR_RI | IA64_PSR_IS);
+		regs->cr_ipsr |= 2UL << IA64_PSR_CPL0_BIT; // domain runs at PL2
+	}
+	regs->cr_iip = start_pc;
+	regs->ar_rsc = 0x0;
+	regs->cr_ifs = 0x0;
+	regs->ar_fpsr = sw->ar_fpsr = FPSR_DEFAULT;
+	sw->ar_bspstore = (unsigned long)ed + IA64_RBS_OFFSET;
+	printf("new_thread: ed=%p, regs=%p, sw=%p, new_rbs=%p, IA64_STK_OFFSET=%p, &r8=%p\n",
+		ed,regs,sw,sw->ar_bspstore,IA64_STK_OFFSET,&regs->r8);
+	printf("iip:0x%lx,ipsr:0x%lx\n", regs->cr_iip, regs->cr_ipsr);
+
+	sw->b0 = (unsigned long) &ia64_ret_from_clone;
+	ed->arch._thread.ksp = (unsigned long) sw - 16;
+	printk("new_thread, about to call init_all_rr\n");
+	if (VMX_DOMAIN(ed)) {
+		vmx_init_all_rr(ed);
+	} else
+		init_all_rr(ed);
+	// set up boot parameters (and fake firmware)
+	printk("new_thread, about to call dom_fw_setup\n");
+	VMX_VPD(ed,vgr[12]) = dom_fw_setup(d,saved_command_line,256L);  //FIXME
+	printk("new_thread, done with dom_fw_setup\n");
+
+	if (VMX_DOMAIN(ed)) {
+		/* Virtual processor context setup */
+		VMX_VPD(ed, vpsr) = IA64_PSR_BN;
+		VPD_CR(ed, dcr) = 0;
+	} else {
+		// don't forget to set this!
+		ed->vcpu_info->arch.banknum = 1;
+	}
+}
+#else // CONFIG_VTI
 
 // heavily leveraged from linux/arch/ia64/kernel/process.c:copy_thread()
 // and linux/arch/ia64/kernel/process.c:kernel_thread()
@@ -272,6 +404,7 @@ printk("new_thread, done with dom_fw_setup\n");
 	// don't forget to set this!
 	ed->vcpu_info->arch.banknum = 1;
 }
+#endif // CONFIG_VTI
 
 static struct page * map_new_domain0_page(unsigned long mpaddr)
 {
@@ -599,6 +732,214 @@ domU_staging_write_32(unsigned long at, unsigned long a, unsigned long b,
 }
 #endif
 
+#ifdef CONFIG_VTI
+/* Up to whether domain is vmx one, different context may be setup
+ * here.
+ */
+void
+post_arch_do_create_domain(struct exec_domain *ed, int vmx_domain)
+{
+    struct domain *d = ed->domain;
+
+    if (!vmx_domain) {
+	d->shared_info = (void*)alloc_xenheap_page();
+	if (!d->shared_info)
+		panic("Allocate share info for non-vmx domain failed.\n");
+	d->shared_info_va = 0xfffd000000000000;
+
+	printk("Build shared info for non-vmx domain\n");
+	build_shared_info(d);
+	/* Setup start info area */
+    }
+}
+
+/* For VMX domain, this is invoked when kernel model in domain
+ * request actively
+ */
+void build_shared_info(struct domain *d)
+{
+    int i;
+
+    /* Set up shared-info area. */
+    update_dom_time(d);
+    d->shared_info->domain_time = 0;
+
+    /* Mask all upcalls... */
+    for ( i = 0; i < MAX_VIRT_CPUS; i++ )
+        d->shared_info->vcpu_data[i].evtchn_upcall_mask = 1;
+
+    /* ... */
+}
+
+extern unsigned long running_on_sim;
+unsigned int vmx_dom0 = 0;
+int construct_dom0(struct domain *d, 
+	               unsigned long image_start, unsigned long image_len, 
+	               unsigned long initrd_start, unsigned long initrd_len,
+	               char *cmdline)
+{
+    char *dst;
+    int i, rc;
+    unsigned long pfn, mfn;
+    unsigned long nr_pt_pages;
+    unsigned long count;
+    unsigned long alloc_start, alloc_end;
+    struct pfn_info *page = NULL;
+    start_info_t *si;
+    struct exec_domain *ed = d->exec_domain[0];
+    struct domain_setup_info dsi;
+    unsigned long p_start;
+    unsigned long pkern_start;
+    unsigned long pkern_entry;
+    unsigned long pkern_end;
+
+//printf("construct_dom0: starting\n");
+    /* Sanity! */
+#ifndef CLONE_DOMAIN0
+    if ( d != dom0 ) 
+        BUG();
+    if ( test_bit(DF_CONSTRUCTED, &d->flags) ) 
+        BUG();
+#endif
+
+    printk("##Dom0: 0x%lx, domain: 0x%lx\n", (u64)dom0, (u64)d);
+    memset(&dsi, 0, sizeof(struct domain_setup_info));
+
+    printk("*** LOADING DOMAIN 0 ***\n");
+
+    alloc_start = dom0_start;
+    alloc_end = dom0_start + dom0_size;
+    d->tot_pages = d->max_pages = (alloc_end - alloc_start)/PAGE_SIZE;
+    image_start = __va(ia64_boot_param->initrd_start);
+    image_len = ia64_boot_param->initrd_size;
+
+    dsi.image_addr = (unsigned long)image_start;
+    dsi.image_len  = image_len;
+    rc = parseelfimage(&dsi);
+    if ( rc != 0 )
+        return rc;
+
+    /* Temp workaround */
+    if (running_on_sim)
+	dsi.xen_elf_image = 1;
+
+    if ((!vmx_enabled) && !dsi.xen_elf_image) {
+	printk("Lack of hardware support for unmodified vmx dom0\n");
+	panic("");
+    }
+
+    if (vmx_enabled && !dsi.xen_elf_image) {
+	printk("Dom0 is vmx domain!\n");
+	vmx_dom0 = 1;
+    }
+
+    p_start = dsi.v_start;
+    pkern_start = dsi.v_kernstart;
+    pkern_end = dsi.v_kernend;
+    pkern_entry = dsi.v_kernentry;
+
+    printk("p_start=%lx, pkern_start=%lx, pkern_end=%lx, pkern_entry=%lx\n",
+	p_start,pkern_start,pkern_end,pkern_entry);
+
+    if ( (p_start & (PAGE_SIZE-1)) != 0 )
+    {
+        printk("Initial guest OS must load to a page boundary.\n");
+        return -EINVAL;
+    }
+
+    printk("METAPHYSICAL MEMORY ARRANGEMENT:\n"
+           " Kernel image:  %lx->%lx\n"
+           " Entry address: %lx\n"
+           " Init. ramdisk:   (NOT IMPLEMENTED YET)\n",
+           pkern_start, pkern_end, pkern_entry);
+
+    if ( (pkern_end - pkern_start) > (d->max_pages * PAGE_SIZE) )
+    {
+        printk("Initial guest OS requires too much space\n"
+               "(%luMB is greater than %luMB limit)\n",
+               (pkern_end-pkern_start)>>20, (d->max_pages<<PAGE_SHIFT)>>20);
+        return -ENOMEM;
+    }
+
+    // Other sanity check about Dom0 image
+
+    /* Construct a frame-allocation list for the initial domain, since these
+     * pages are allocated by boot allocator and pfns are not set properly
+     */
+    for ( mfn = (alloc_start>>PAGE_SHIFT); 
+          mfn < (alloc_end>>PAGE_SHIFT); 
+          mfn++ )
+    {
+        page = &frame_table[mfn];
+        page_set_owner(page, d);
+        page->u.inuse.type_info = 0;
+        page->count_info        = PGC_allocated | 1;
+        list_add_tail(&page->list, &d->page_list);
+
+	/* Construct 1:1 mapping */
+	machine_to_phys_mapping[mfn] = mfn;
+    }
+
+    post_arch_do_create_domain(ed, vmx_dom0);
+
+    /* Load Dom0 image to its own memory */
+    loaddomainelfimage(d,image_start);
+
+    /* Copy the initial ramdisk. */
+
+    /* Sync d/i cache conservatively */
+    {
+        unsigned long ret;
+        unsigned long progress;
+        ret = ia64_pal_cache_flush(4, 0, &progress, NULL);
+        if (ret != PAL_STATUS_SUCCESS)
+                panic("PAL CACHE FLUSH failed for dom0.\n");
+        printk("Sync i/d cache for dom0 image SUCC\n");
+    }
+    /* Physical mode emulation initialization, including
+     * emulation ID allcation and related memory request
+     */
+    physical_mode_init(ed);
+    /* Dom0's pfn is equal to mfn, so there's no need to allocate pmt
+     * for dom0
+     */
+    d->arch.pmt = NULL;
+
+    /* Give up the VGA console if DOM0 is configured to grab it. */
+    if (cmdline != NULL)
+    	console_endboot(strstr(cmdline, "tty0") != NULL);
+
+    /* VMX specific construction for Dom0, if hardware supports VMX
+     * and Dom0 is unmodified image
+     */
+    printk("Dom0: 0x%lx, domain: 0x%lx\n", (u64)dom0, (u64)d);
+    if (vmx_dom0)
+	vmx_final_setup_domain(dom0);
+    
+    /* vpd is ready now */
+    vlsapic_reset(ed);
+    vtm_init(ed);
+    set_bit(DF_CONSTRUCTED, &d->flags);
+
+    new_thread(ed, pkern_entry, 0, 0);
+
+    // FIXME: Hack for keyboard input
+#ifdef CLONE_DOMAIN0
+if (d == dom0)
+#endif
+    serial_input_init();
+    if (d == dom0) {
+    	ed->vcpu_info->arch.delivery_mask[0] = -1L;
+    	ed->vcpu_info->arch.delivery_mask[1] = -1L;
+    	ed->vcpu_info->arch.delivery_mask[2] = -1L;
+    	ed->vcpu_info->arch.delivery_mask[3] = -1L;
+    }
+    else __set_bit(0x30,ed->vcpu_info->arch.delivery_mask);
+
+    return 0;
+}
+#else //CONFIG_VTI
+
 int construct_dom0(struct domain *d, 
 	               unsigned long image_start, unsigned long image_len, 
 	               unsigned long initrd_start, unsigned long initrd_len,
@@ -771,6 +1112,7 @@ if (d == dom0)
 
 	return 0;
 }
+#endif // CONFIG_VTI
 
 // FIXME: When dom0 can construct domains, this goes away (or is rewritten)
 int construct_domU(struct domain *d,

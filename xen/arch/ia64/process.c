@@ -64,11 +64,16 @@ long do_iopl(domid_t domain, unsigned int new_io_pl)
 void schedule_tail(struct exec_domain *next)
 {
 	unsigned long rr7;
-	printk("current=%lx,shared_info=%lx\n",current,current->vcpu_info);
-	printk("next=%lx,shared_info=%lx\n",next,next->vcpu_info);
+	//printk("current=%lx,shared_info=%lx\n",current,current->vcpu_info);
+	//printk("next=%lx,shared_info=%lx\n",next,next->vcpu_info);
+#ifdef CONFIG_VTI
+	/* rr7 will be postponed to last point when resuming back to guest */
+	vmx_load_all_rr(current);
+#else // CONFIG_VTI
 	if (rr7 = load_region_regs(current)) {
 		printk("schedule_tail: change to rr7 not yet implemented\n");
 	}
+#endif // CONFIG_VTI
 }
 
 extern TR_ENTRY *match_tr(struct exec_domain *ed, unsigned long ifa);
@@ -346,8 +351,8 @@ void ia64_do_page_fault (unsigned long address, unsigned long isr, struct pt_reg
 		// FIXME should validate mpaddr here
 		if (d == dom0) {
 			if (address < dom0_start || address >= dom0_start + dom0_size) {
-				printk("ia64_do_page_fault: out-of-bounds dom0 mpaddr %p, iip=%p! continuing...\n",address,iip);
-				printk("ia64_do_page_fault: out-of-bounds dom0 mpaddr %p, old iip=%p!\n",address,current->vcpu_info->arch.iip);
+				//printk("ia64_do_page_fault: out-of-bounds dom0 mpaddr %p, iip=%p! continuing...\n",address,iip);
+				//printk("ia64_do_page_fault: out-of-bounds dom0 mpaddr %p, old iip=%p!\n",address,current->vcpu_info->arch.iip);
 				tdpfoo();
 			}
 		}

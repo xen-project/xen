@@ -1,10 +1,5 @@
- hpsim_ssc.h |   19 +++++++++++++++++++
- 1 files changed, 19 insertions(+)
-
-Index: linux-2.6.11/arch/ia64/hp/sim/hpsim_ssc.h
-===================================================================
---- linux-2.6.11.orig/arch/ia64/hp/sim/hpsim_ssc.h	2005-03-02 01:38:17.000000000 -0600
-+++ linux-2.6.11/arch/ia64/hp/sim/hpsim_ssc.h	2005-03-19 13:34:01.705520375 -0600
+--- /home/adsharma/disk2/xen-ia64/xeno-unstable-rebase.bk/xen/../../linux-2.6.11/arch/ia64/hp/sim/hpsim_ssc.h	2005-03-01 23:38:17.000000000 -0800
++++ /home/adsharma/disk2/xen-ia64/xeno-unstable-rebase.bk/xen/include/asm-ia64/hpsim_ssc.h	2005-05-18 12:40:19.000000000 -0700
 @@ -33,4 +33,23 @@
   */
  extern long ia64_ssc (long arg0, long arg1, long arg2, long arg3, int nr);

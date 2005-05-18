@@ -1,6 +1,17 @@
---- ../../linux-2.6.11/include/asm-ia64/page.h	2005-03-02 00:37:48.000000000 -0700
-+++ include/asm-ia64/page.h	2005-05-02 11:25:33.000000000 -0600
-@@ -95,9 +95,15 @@
+--- /home/adsharma/disk2/xen-ia64/xeno-unstable-rebase.bk/xen/../../linux-2.6.11/include/asm-ia64/page.h	2005-03-01 23:37:48.000000000 -0800
++++ /home/adsharma/disk2/xen-ia64/xeno-unstable-rebase.bk/xen/include/asm-ia64/page.h	2005-05-18 12:40:50.000000000 -0700
+@@ -32,6 +32,10 @@
+ #define PAGE_ALIGN(addr)	(((addr) + PAGE_SIZE - 1) & PAGE_MASK)
+ 
+ #define PERCPU_PAGE_SHIFT	16	/* log2() of max. size of per-CPU area */
++#ifdef CONFIG_VTI
++#define RR7_SWITCH_SHIFT	12	/* 4k enough */
++#endif // CONFIG_VTI
++
+ #define PERCPU_PAGE_SIZE	(__IA64_UL_CONST(1) << PERCPU_PAGE_SHIFT)
+ 
+ #define RGN_MAP_LIMIT	((1UL << (4*PAGE_SHIFT - 12)) - PAGE_SIZE)	/* per region addr limit */
+@@ -95,9 +99,15 @@
  #endif
  
  #ifndef CONFIG_DISCONTIGMEM
@@ -16,7 +27,7 @@
  #else
  extern struct page *vmem_map;
  extern unsigned long max_low_pfn;
-@@ -109,6 +115,11 @@
+@@ -109,6 +119,11 @@
  #define page_to_phys(page)	(page_to_pfn(page) << PAGE_SHIFT)
  #define virt_to_page(kaddr)	pfn_to_page(__pa(kaddr) >> PAGE_SHIFT)
  
@@ -28,7 +39,7 @@
  typedef union ia64_va {
  	struct {
  		unsigned long off : 61;		/* intra-region offset */
-@@ -124,8 +135,23 @@
+@@ -124,8 +139,23 @@
   * expressed in this way to ensure they result in a single "dep"
   * instruction.
   */
@@ -52,7 +63,7 @@
  
  #define REGION_NUMBER(x)	({ia64_va _v; _v.l = (long) (x); _v.f.reg;})
  #define REGION_OFFSET(x)	({ia64_va _v; _v.l = (long) (x); _v.f.off;})
-@@ -197,7 +223,11 @@
+@@ -197,7 +227,11 @@
  # define __pgprot(x)	(x)
  #endif /* !STRICT_MM_TYPECHECKS */
  

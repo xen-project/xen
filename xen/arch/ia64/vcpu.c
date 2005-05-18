@@ -14,6 +14,9 @@
 #include <asm/tlb.h>
 #include <asm/processor.h>
 #include <asm/delay.h>
+#ifdef CONFIG_VTI
+#include <asm/vmx_vcpu.h>
+#endif // CONFIG_VTI
 
 typedef	union {
 	struct ia64_psr ia64_psr;
@@ -523,12 +526,19 @@ void vcpu_pend_interrupt(VCPU *vcpu, UINT64 vector)
 		printf("vcpu_pend_interrupt: bad vector\n");
 		return;
 	}
+#ifdef CONFIG_VTI
+    if ( VMX_DOMAIN(vcpu) ) {
+ 	    set_bit(vector,VPD_CR(vcpu,irr));
+    } else
+#endif // CONFIG_VTI
+    {
 	if (!test_bit(vector,PSCB(vcpu,delivery_mask))) return;
 	if (test_bit(vector,PSCBX(vcpu,irr))) {
 //printf("vcpu_pend_interrupt: overrun\n");
 	}
 	set_bit(vector,PSCBX(vcpu,irr));
 	PSCB(vcpu,pending_interruption) = 1;
+    }
 }
 
 void early_tick(VCPU *vcpu)
@@ -619,7 +629,8 @@ extern unsigned long privop_trace;
 //privop_trace=1;
 	//TODO: Implement this
 	printf("vcpu_get_lid: WARNING: Getting cr.lid always returns zero\n");
-	*pval = 0;
+	//*pval = 0;
+	*pval = ia64_getreg(_IA64_REG_CR_LID);
 	return IA64_NO_FAULT;
 }
 

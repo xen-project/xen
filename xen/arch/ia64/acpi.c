@@ -1,9 +1,16 @@
 /*
  *  acpi.c - Architecture-Specific Low-Level ACPI Support
  *
- *  Copyright (C) 2001, 2002 Paul Diefenbaugh <paul.s.diefenbaugh@intel.com>
- *  Copyright (C) 2001 Jun Nakajima <jun.nakajima@intel.com>
- *  Copyright (C) 2001 Patrick Mochel <mochel@osdl.org>
+ *  Copyright (C) 1999 VA Linux Systems
+ *  Copyright (C) 1999,2000 Walt Drummond <drummond@valinux.com>
+ *  Copyright (C) 2000, 2002-2003 Hewlett-Packard Co.
+ *	David Mosberger-Tang <davidm@hpl.hp.com>
+ *  Copyright (C) 2000 Intel Corp.
+ *  Copyright (C) 2000,2001 J.I. Lee <jung-ik.lee@intel.com>
+ *  Copyright (C) 2001 Paul Diefenbaugh <paul.s.diefenbaugh@intel.com>
+ *  Copyright (C) 2001 Jenna Hall <jenna.s.hall@intel.com>
+ *  Copyright (C) 2001 Takayoshi Kochi <t-kochi@bq.jp.nec.com>
+ *  Copyright (C) 2002 Erich Focht <efocht@ess.nec.de>
  *
  * ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
  *
@@ -19,667 +26,651 @@
  *
  *  You should have received a copy of the GNU General Public License
  *  along with this program; if not, write to the Free Software
- *  Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+ *  Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307 USA
  *
  * ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
  */
 
-#include <xen/config.h>
-#include <xen/kernel.h>
-#include <xen/init.h>
-#include <xen/types.h>
-/*#include <xen/stddef.h>*/
-#include <xen/slab.h>
-#include <xen/pci.h>
-/*#include <xen/bootmem.h>*/
-#include <xen/irq.h>
-#include <xen/acpi.h>
-//#include <asm/mpspec.h>
+#include <linux/config.h>
+#include <linux/module.h>
+#include <linux/init.h>
+#include <linux/kernel.h>
+#include <linux/sched.h>
+#include <linux/smp.h>
+#include <linux/string.h>
+#include <linux/types.h>
+#include <linux/irq.h>
+#include <linux/acpi.h>
+#include <linux/efi.h>
+#include <linux/mmzone.h>
 #include <asm/io.h>
-//#include <asm/apic.h>
-//#include <asm/apicdef.h>
+//#include <asm/iosapic.h>
+#include <asm/machvec.h>
 #include <asm/page.h>
-/*#include <asm/pgtable.h>*/
-#include <asm/pgalloc.h>
-//#include <asm/io_apic.h>
-#include <asm/acpi.h>
-/*#include <asm/save_state.h>*/
-//#include <asm/smpboot.h>
+#include <asm/system.h>
+#include <asm/numa.h>
+#include <asm/sal.h>
+//#include <asm/cyclone.h>
 
+#define BAD_MADT_ENTRY(entry, end) (                                        \
+		(!entry) || (unsigned long)entry + sizeof(*entry) > end ||  \
+		((acpi_table_entry_header *)entry)->length != sizeof(*entry))
 
 #define PREFIX			"ACPI: "
 
-int acpi_lapic = 0;
-int acpi_ioapic = 0;
+void (*pm_idle) (void);
+EXPORT_SYMBOL(pm_idle);
+void (*pm_power_off) (void);
 
-/* --------------------------------------------------------------------------
-                              Boot-time Configuration
-   -------------------------------------------------------------------------- */
+unsigned char acpi_kbd_controller_present = 1;
+unsigned char acpi_legacy_devices;
+
+const char *
+acpi_get_sysname (void)
+{
+#ifdef CONFIG_IA64_GENERIC
+	unsigned long rsdp_phys;
+	struct acpi20_table_rsdp *rsdp;
+	struct acpi_table_xsdt *xsdt;
+	struct acpi_table_header *hdr;
+
+	rsdp_phys = acpi_find_rsdp();
+	if (!rsdp_phys) {
+		printk(KERN_ERR "ACPI 2.0 RSDP not found, default to \"dig\"\n");
+		return "dig";
+	}
+
+	rsdp = (struct acpi20_table_rsdp *) __va(rsdp_phys);
+	if (strncmp(rsdp->signature, RSDP_SIG, sizeof(RSDP_SIG) - 1)) {
+		printk(KERN_ERR "ACPI 2.0 RSDP signature incorrect, default to \"dig\"\n");
+		return "dig";
+	}
+
+	xsdt = (struct acpi_table_xsdt *) __va(rsdp->xsdt_address);
+	hdr = &xsdt->header;
+	if (strncmp(hdr->signature, XSDT_SIG, sizeof(XSDT_SIG) - 1)) {
+		printk(KERN_ERR "ACPI 2.0 XSDT signature incorrect, default to \"dig\"\n");
+		return "dig";
+	}
+
+	if (!strcmp(hdr->oem_id, "HP")) {
+		return "hpzx1";
+	}
+	else if (!strcmp(hdr->oem_id, "SGI")) {
+		return "sn2";
+	}
+
+	return "dig";
+#else
+# if defined (CONFIG_IA64_HP_SIM)
+	return "hpsim";
+# elif defined (CONFIG_IA64_HP_ZX1)
+	return "hpzx1";
+# elif defined (CONFIG_IA64_SGI_SN2)
+	return "sn2";
+# elif defined (CONFIG_IA64_DIG)
+	return "dig";
+# else
+#	error Unknown platform.  Fix acpi.c.
+# endif
+#endif
+}
 
 #ifdef CONFIG_ACPI_BOOT
-//int acpi_noirq __initdata = 0;  /* skip ACPI IRQ initialization */
-int acpi_ht __initdata = 1;     /* enable HT */
 
-enum acpi_irq_model_id		acpi_irq_model;
+#define ACPI_MAX_PLATFORM_INTERRUPTS	256
 
+#if 0
+/* Array to record platform interrupt vectors for generic interrupt routing. */
+int platform_intr_list[ACPI_MAX_PLATFORM_INTERRUPTS] = {
+	[0 ... ACPI_MAX_PLATFORM_INTERRUPTS - 1] = -1
+};
+
+enum acpi_irq_model_id acpi_irq_model = ACPI_IRQ_MODEL_IOSAPIC;
 
 /*
- * Temporarily use the virtual area starting from FIX_IO_APIC_BASE_END,
- * to map the target physical address. The problem is that set_fixmap()
- * provides a single page, and it is possible that the page is not
- * sufficient.
- * By using this area, we can map up to MAX_IO_APICS pages temporarily,
- * i.e. until the next __va_range() call.
- *
- * Important Safety Note:  The fixed I/O APIC page numbers are *subtracted*
- * from the fixed base.  That's why we start at FIX_IO_APIC_BASE_END and
- * count idx down while incrementing the phys address.
+ * Interrupt routing API for device drivers.  Provides interrupt vector for
+ * a generic platform event.  Currently only CPEI is implemented.
  */
-char *__acpi_map_table(unsigned long phys, unsigned long size)
+int
+acpi_request_vector (u32 int_type)
 {
-	unsigned long base, offset, mapped_size;
-	int idx;
+	int vector = -1;
 
-	if (phys + size < 8*1024*1024) 
-		return __va(phys); 
-
-	offset = phys & (PAGE_SIZE - 1);
-	mapped_size = PAGE_SIZE - offset;
-#ifndef XEN
-// where is FIX_ACPI_*? hack for now, FIXME later
-	set_fixmap(FIX_ACPI_END, phys);
-	base = fix_to_virt(FIX_ACPI_END);
-
-	/*
-	 * Most cases can be covered by the below.
-	 */
-	idx = FIX_ACPI_END;
-	while (mapped_size < size) {
-		if (--idx < FIX_ACPI_BEGIN)
-			return 0;	/* cannot handle this */
-		phys += PAGE_SIZE;
-		set_fixmap(idx, phys);
-		mapped_size += PAGE_SIZE;
-	}
+	if (int_type < ACPI_MAX_PLATFORM_INTERRUPTS) {
+		/* corrected platform error interrupt */
+		vector = platform_intr_list[int_type];
+	} else
+		printk(KERN_ERR "acpi_request_vector(): invalid interrupt type\n");
+	return vector;
+}
 #endif
-
-	return ((unsigned char *) base + offset);
-}
-
-
-#ifdef CONFIG_X86_LOCAL_APIC
-
-static u64 acpi_lapic_addr __initdata = APIC_DEFAULT_PHYS_BASE;
-
-
-static int __init
-acpi_parse_madt (
-	unsigned long		phys_addr,
-	unsigned long		size)
+char *
+__acpi_map_table (unsigned long phys_addr, unsigned long size)
 {
-	struct acpi_table_madt	*madt = NULL;
-
-	if (!phys_addr || !size)
-		return -EINVAL;
-
-	madt = (struct acpi_table_madt *) __acpi_map_table(phys_addr, size);
-	if (!madt) {
-		printk(KERN_WARNING PREFIX "Unable to map MADT\n");
-		return -ENODEV;
-	}
-
-	if (madt->lapic_address)
-		acpi_lapic_addr = (u64) madt->lapic_address;
-
-	printk(KERN_INFO PREFIX "Local APIC address 0x%08x\n",
-		madt->lapic_address);
-
-	detect_clustered_apic(madt->header.oem_id, madt->header.oem_table_id);
-
-	return 0;
+	return __va(phys_addr);
 }
 
+/* --------------------------------------------------------------------------
+                            Boot-time Table Parsing
+   -------------------------------------------------------------------------- */
 
-static int __init
-acpi_parse_lapic (
-	acpi_table_entry_header *header)
-{
-	struct acpi_table_lapic	*processor = NULL;
+static int			total_cpus __initdata;
+static int			available_cpus __initdata;
+struct acpi_table_madt *	acpi_madt __initdata;
+static u8			has_8259;
 
-	processor = (struct acpi_table_lapic*) header;
-	if (!processor)
-		return -EINVAL;
-
-	acpi_table_print_madt_entry(header);
-
-	mp_register_lapic (
-		processor->id,					   /* APIC ID */
-		processor->flags.enabled);			  /* Enabled? */
-
-	return 0;
-}
-
-
+#if 0
 static int __init
 acpi_parse_lapic_addr_ovr (
-	acpi_table_entry_header *header)
+	acpi_table_entry_header *header, const unsigned long end)
 {
-	struct acpi_table_lapic_addr_ovr *lapic_addr_ovr = NULL;
+	struct acpi_table_lapic_addr_ovr *lapic;
 
-	lapic_addr_ovr = (struct acpi_table_lapic_addr_ovr*) header;
-	if (!lapic_addr_ovr)
-		return -EINVAL;
+	lapic = (struct acpi_table_lapic_addr_ovr *) header;
 
-	acpi_lapic_addr = lapic_addr_ovr->address;
-
-	return 0;
-}
-
-static int __init
-acpi_parse_lapic_nmi (
-	acpi_table_entry_header *header)
-{
-	struct acpi_table_lapic_nmi *lapic_nmi = NULL;
-
-	lapic_nmi = (struct acpi_table_lapic_nmi*) header;
-	if (!lapic_nmi)
+	if (BAD_MADT_ENTRY(lapic, end))
 		return -EINVAL;
 
 	acpi_table_print_madt_entry(header);
 
-	if (lapic_nmi->lint != 1)
-		printk(KERN_WARNING PREFIX "NMI not connected to LINT 1!\n");
+	if (lapic->address) {
+		iounmap((void *) ipi_base_addr);
+		ipi_base_addr = (unsigned long) ioremap(lapic->address, 0);
+	}
+	return 0;
+}
+
+
+static int __init
+acpi_parse_lsapic (acpi_table_entry_header *header, const unsigned long end)
+{
+	struct acpi_table_lsapic *lsapic;
+
+	lsapic = (struct acpi_table_lsapic *) header;
+
+	if (BAD_MADT_ENTRY(lsapic, end))
+		return -EINVAL;
+
+	acpi_table_print_madt_entry(header);
+
+	printk(KERN_INFO "CPU %d (0x%04x)", total_cpus, (lsapic->id << 8) | lsapic->eid);
+
+	if (!lsapic->flags.enabled)
+		printk(" disabled");
+	else {
+		printk(" enabled");
+#ifdef CONFIG_SMP
+		smp_boot_data.cpu_phys_id[available_cpus] = (lsapic->id << 8) | lsapic->eid;
+		if (hard_smp_processor_id()
+		    == (unsigned int) smp_boot_data.cpu_phys_id[available_cpus])
+			printk(" (BSP)");
+#endif
+		++available_cpus;
+	}
+
+	printk("\n");
+
+	total_cpus++;
+	return 0;
+}
+
+
+static int __init
+acpi_parse_lapic_nmi (acpi_table_entry_header *header, const unsigned long end)
+{
+	struct acpi_table_lapic_nmi *lacpi_nmi;
+
+	lacpi_nmi = (struct acpi_table_lapic_nmi*) header;
+
+	if (BAD_MADT_ENTRY(lacpi_nmi, end))
+		return -EINVAL;
+
+	acpi_table_print_madt_entry(header);
+
+	/* TBD: Support lapic_nmi entries */
+	return 0;
+}
+
+
+static int __init
+acpi_parse_iosapic (acpi_table_entry_header *header, const unsigned long end)
+{
+	struct acpi_table_iosapic *iosapic;
+
+	iosapic = (struct acpi_table_iosapic *) header;
+
+	if (BAD_MADT_ENTRY(iosapic, end))
+		return -EINVAL;
+
+	acpi_table_print_madt_entry(header);
+
+	iosapic_init(iosapic->address, iosapic->global_irq_base);
 
 	return 0;
 }
 
-#endif /*CONFIG_X86_LOCAL_APIC*/
-
-#if defined(CONFIG_X86_IO_APIC) && defined(CONFIG_ACPI_INTERPRETER)
 
 static int __init
-acpi_parse_ioapic (
-	acpi_table_entry_header *header)
+acpi_parse_plat_int_src (
+	acpi_table_entry_header *header, const unsigned long end)
 {
-	struct acpi_table_ioapic *ioapic = NULL;
+	struct acpi_table_plat_int_src *plintsrc;
+	int vector;
 
-	ioapic = (struct acpi_table_ioapic*) header;
-	if (!ioapic)
+	plintsrc = (struct acpi_table_plat_int_src *) header;
+
+	if (BAD_MADT_ENTRY(plintsrc, end))
 		return -EINVAL;
- 
+
 	acpi_table_print_madt_entry(header);
 
-	mp_register_ioapic (
-		ioapic->id,
-		ioapic->address,
-		ioapic->global_irq_base);
- 
+	/*
+	 * Get vector assignment for this interrupt, set attributes,
+	 * and program the IOSAPIC routing table.
+	 */
+	vector = iosapic_register_platform_intr(plintsrc->type,
+						plintsrc->global_irq,
+						plintsrc->iosapic_vector,
+						plintsrc->eid,
+						plintsrc->id,
+						(plintsrc->flags.polarity == 1) ? IOSAPIC_POL_HIGH : IOSAPIC_POL_LOW,
+						(plintsrc->flags.trigger == 1) ? IOSAPIC_EDGE : IOSAPIC_LEVEL);
+
+	platform_intr_list[plintsrc->type] = vector;
 	return 0;
 }
 
 
 static int __init
 acpi_parse_int_src_ovr (
-	acpi_table_entry_header *header)
+	acpi_table_entry_header *header, const unsigned long end)
 {
-	struct acpi_table_int_src_ovr *intsrc = NULL;
+	struct acpi_table_int_src_ovr *p;
 
-	intsrc = (struct acpi_table_int_src_ovr*) header;
-	if (!intsrc)
+	p = (struct acpi_table_int_src_ovr *) header;
+
+	if (BAD_MADT_ENTRY(p, end))
 		return -EINVAL;
 
 	acpi_table_print_madt_entry(header);
 
-	mp_override_legacy_irq (
-		intsrc->bus_irq,
-		intsrc->flags.polarity,
-		intsrc->flags.trigger,
-		intsrc->global_irq);
-
+	iosapic_override_isa_irq(p->bus_irq, p->global_irq,
+				 (p->flags.polarity == 1) ? IOSAPIC_POL_HIGH : IOSAPIC_POL_LOW,
+				 (p->flags.trigger == 1) ? IOSAPIC_EDGE : IOSAPIC_LEVEL);
 	return 0;
 }
 
 
 static int __init
-acpi_parse_nmi_src (
-	acpi_table_entry_header *header)
+acpi_parse_nmi_src (acpi_table_entry_header *header, const unsigned long end)
 {
-	struct acpi_table_nmi_src *nmi_src = NULL;
+	struct acpi_table_nmi_src *nmi_src;
 
 	nmi_src = (struct acpi_table_nmi_src*) header;
-	if (!nmi_src)
+
+	if (BAD_MADT_ENTRY(nmi_src, end))
 		return -EINVAL;
 
 	acpi_table_print_madt_entry(header);
 
-	/* TBD: Support nimsrc entries? */
+	/* TBD: Support nimsrc entries */
+	return 0;
+}
+/* Hook from generic ACPI tables.c */
+void __init acpi_madt_oem_check(char *oem_id, char *oem_table_id)
+{
+	if (!strncmp(oem_id, "IBM", 3) &&
+	    (!strncmp(oem_table_id, "SERMOW", 6))){
+
+		/* Unfortunatly ITC_DRIFT is not yet part of the
+		 * official SAL spec, so the ITC_DRIFT bit is not
+		 * set by the BIOS on this hardware.
+		 */
+		sal_platform_features |= IA64_SAL_PLATFORM_FEATURE_ITC_DRIFT;
+
+		/*Start cyclone clock*/
+		cyclone_setup(0);
+	}
+}
+
+static int __init
+acpi_parse_madt (unsigned long phys_addr, unsigned long size)
+{
+	if (!phys_addr || !size)
+		return -EINVAL;
+
+	acpi_madt = (struct acpi_table_madt *) __va(phys_addr);
+
+	/* remember the value for reference after free_initmem() */
+#ifdef CONFIG_ITANIUM
+	has_8259 = 1; /* Firmware on old Itanium systems is broken */
+#else
+	has_8259 = acpi_madt->flags.pcat_compat;
+#endif
+	iosapic_system_init(has_8259);
+
+	/* Get base address of IPI Message Block */
+
+	if (acpi_madt->lapic_address)
+		ipi_base_addr = (unsigned long) ioremap(acpi_madt->lapic_address, 0);
+
+	printk(KERN_INFO PREFIX "Local APIC address 0x%lx\n", ipi_base_addr);
+
+	acpi_madt_oem_check(acpi_madt->header.oem_id,
+		acpi_madt->header.oem_table_id);
 
 	return 0;
 }
+#endif
 
-#endif /*CONFIG_X86_IO_APIC && CONFIG_ACPI_INTERPRETER*/
+#ifdef CONFIG_ACPI_NUMA
 
+#undef SLIT_DEBUG
 
-static unsigned long __init
-acpi_scan_rsdp (
-	unsigned long		start,
-	unsigned long		length)
+#define PXM_FLAG_LEN ((MAX_PXM_DOMAINS + 1)/32)
+
+static int __initdata srat_num_cpus;			/* number of cpus */
+static u32 __initdata pxm_flag[PXM_FLAG_LEN];
+#define pxm_bit_set(bit)	(set_bit(bit,(void *)pxm_flag))
+#define pxm_bit_test(bit)	(test_bit(bit,(void *)pxm_flag))
+/* maps to convert between proximity domain and logical node ID */
+int __initdata pxm_to_nid_map[MAX_PXM_DOMAINS];
+int __initdata nid_to_pxm_map[MAX_NUMNODES];
+static struct acpi_table_slit __initdata *slit_table;
+
+/*
+ * ACPI 2.0 SLIT (System Locality Information Table)
+ * http://devresource.hp.com/devresource/Docs/TechPapers/IA64/slit.pdf
+ */
+void __init
+acpi_numa_slit_init (struct acpi_table_slit *slit)
 {
-	unsigned long		offset = 0;
-	unsigned long		sig_len = sizeof("RSD PTR ") - 1;
+	u32 len;
 
-	/*
-	 * Scan all 16-byte boundaries of the physical memory region for the
-	 * RSDP signature.
-	 */
-	for (offset = 0; offset < length; offset += 16) {
-		if (strncmp((char *) (start + offset), "RSD PTR ", sig_len))
-			continue;
-		return (start + offset);
+	len = sizeof(struct acpi_table_header) + 8
+		+ slit->localities * slit->localities;
+	if (slit->header.length != len) {
+		printk(KERN_ERR "ACPI 2.0 SLIT: size mismatch: %d expected, %d actual\n",
+		       len, slit->header.length);
+		memset(numa_slit, 10, sizeof(numa_slit));
+		return;
+	}
+	slit_table = slit;
+}
+
+void __init
+acpi_numa_processor_affinity_init (struct acpi_table_processor_affinity *pa)
+{
+	/* record this node in proximity bitmap */
+	pxm_bit_set(pa->proximity_domain);
+
+	node_cpuid[srat_num_cpus].phys_id = (pa->apic_id << 8) | (pa->lsapic_eid);
+	/* nid should be overridden as logical node id later */
+	node_cpuid[srat_num_cpus].nid = pa->proximity_domain;
+	srat_num_cpus++;
+}
+
+void __init
+acpi_numa_memory_affinity_init (struct acpi_table_memory_affinity *ma)
+{
+	unsigned long paddr, size;
+	u8 pxm;
+	struct node_memblk_s *p, *q, *pend;
+
+	pxm = ma->proximity_domain;
+
+	/* fill node memory chunk structure */
+	paddr = ma->base_addr_hi;
+	paddr = (paddr << 32) | ma->base_addr_lo;
+	size = ma->length_hi;
+	size = (size << 32) | ma->length_lo;
+
+	/* Ignore disabled entries */
+	if (!ma->flags.enabled)
+		return;
+
+	/* record this node in proximity bitmap */
+	pxm_bit_set(pxm);
+
+	/* Insertion sort based on base address */
+	pend = &node_memblk[num_node_memblks];
+	for (p = &node_memblk[0]; p < pend; p++) {
+		if (paddr < p->start_paddr)
+			break;
+	}
+	if (p < pend) {
+		for (q = pend - 1; q >= p; q--)
+			*(q + 1) = *q;
+	}
+	p->start_paddr = paddr;
+	p->size = size;
+	p->nid = pxm;
+	num_node_memblks++;
+}
+
+void __init
+acpi_numa_arch_fixup (void)
+{
+	int i, j, node_from, node_to;
+
+	/* If there's no SRAT, fix the phys_id */
+	if (srat_num_cpus == 0) {
+		node_cpuid[0].phys_id = hard_smp_processor_id();
+		return;
 	}
 
+	/* calculate total number of nodes in system from PXM bitmap */
+	numnodes = 0;		/* init total nodes in system */
+
+	memset(pxm_to_nid_map, -1, sizeof(pxm_to_nid_map));
+	memset(nid_to_pxm_map, -1, sizeof(nid_to_pxm_map));
+	for (i = 0; i < MAX_PXM_DOMAINS; i++) {
+		if (pxm_bit_test(i)) {
+			pxm_to_nid_map[i] = numnodes;
+			node_set_online(numnodes);
+			nid_to_pxm_map[numnodes++] = i;
+		}
+	}
+
+	/* set logical node id in memory chunk structure */
+	for (i = 0; i < num_node_memblks; i++)
+		node_memblk[i].nid = pxm_to_nid_map[node_memblk[i].nid];
+
+	/* assign memory bank numbers for each chunk on each node */
+	for (i = 0; i < numnodes; i++) {
+		int bank;
+
+		bank = 0;
+		for (j = 0; j < num_node_memblks; j++)
+			if (node_memblk[j].nid == i)
+				node_memblk[j].bank = bank++;
+	}
+
+	/* set logical node id in cpu structure */
+	for (i = 0; i < srat_num_cpus; i++)
+		node_cpuid[i].nid = pxm_to_nid_map[node_cpuid[i].nid];
+
+	printk(KERN_INFO "Number of logical nodes in system = %d\n", numnodes);
+	printk(KERN_INFO "Number of memory chunks in system = %d\n", num_node_memblks);
+
+	if (!slit_table) return;
+	memset(numa_slit, -1, sizeof(numa_slit));
+	for (i=0; i<slit_table->localities; i++) {
+		if (!pxm_bit_test(i))
+			continue;
+		node_from = pxm_to_nid_map[i];
+		for (j=0; j<slit_table->localities; j++) {
+			if (!pxm_bit_test(j))
+				continue;
+			node_to = pxm_to_nid_map[j];
+			node_distance(node_from, node_to) =
+				slit_table->entry[i*slit_table->localities + j];
+		}
+	}
+
+#ifdef SLIT_DEBUG
+	printk("ACPI 2.0 SLIT locality table:\n");
+	for (i = 0; i < numnodes; i++) {
+		for (j = 0; j < numnodes; j++)
+			printk("%03d ", node_distance(i,j));
+		printk("\n");
+	}
+#endif
+}
+#endif /* CONFIG_ACPI_NUMA */
+
+#if 0
+unsigned int
+acpi_register_gsi (u32 gsi, int polarity, int trigger)
+{
+	return acpi_register_irq(gsi, polarity, trigger);
+}
+EXPORT_SYMBOL(acpi_register_gsi);
+static int __init
+acpi_parse_fadt (unsigned long phys_addr, unsigned long size)
+{
+	struct acpi_table_header *fadt_header;
+	struct fadt_descriptor_rev2 *fadt;
+
+	if (!phys_addr || !size)
+		return -EINVAL;
+
+	fadt_header = (struct acpi_table_header *) __va(phys_addr);
+	if (fadt_header->revision != 3)
+		return -ENODEV;		/* Only deal with ACPI 2.0 FADT */
+
+	fadt = (struct fadt_descriptor_rev2 *) fadt_header;
+
+	if (!(fadt->iapc_boot_arch & BAF_8042_KEYBOARD_CONTROLLER))
+		acpi_kbd_controller_present = 0;
+
+	if (fadt->iapc_boot_arch & BAF_LEGACY_DEVICES)
+		acpi_legacy_devices = 1;
+
+	acpi_register_gsi(fadt->sci_int, ACPI_ACTIVE_LOW, ACPI_LEVEL_SENSITIVE);
 	return 0;
 }
-
+#endif
 
 unsigned long __init
 acpi_find_rsdp (void)
 {
-	unsigned long		rsdp_phys = 0;
+	unsigned long rsdp_phys = 0;
 
-	/*
-	 * Scan memory looking for the RSDP signature. First search EBDA (low
-	 * memory) paragraphs and then search upper memory (E0000-FFFFF).
-	 */
-	rsdp_phys = acpi_scan_rsdp (0, 0x400);
-	if (!rsdp_phys)
-		rsdp_phys = acpi_scan_rsdp (0xE0000, 0xFFFFF);
-
+	if (efi.acpi20)
+		rsdp_phys = __pa(efi.acpi20);
+	else if (efi.acpi)
+		printk(KERN_WARNING PREFIX "v1.0/r0.71 tables no longer supported\n");
 	return rsdp_phys;
 }
 
-
-/*
- * acpi_boot_init()
- *  called from setup_arch(), always.
- *	1. maps ACPI tables for later use
- *	2. enumerates lapics
- *	3. enumerates io-apics
- *
- * side effects:
- * 	acpi_lapic = 1 if LAPIC found
- *	acpi_ioapic = 1 if IOAPIC found
- *	if (acpi_lapic && acpi_ioapic) smp_found_config = 1;
- *	if acpi_blacklisted() acpi_disabled = 1;
- *	acpi_irq_model=...
- *	...
- *
- * return value: (currently ignored)
- *	0: success
- *	!0: failure
- */
+#if 0
 int __init
 acpi_boot_init (void)
 {
-	int			result = 0;
-
-	if (acpi_disabled && !acpi_ht)
-		return(1);
 
 	/*
-	 * The default interrupt routing model is PIC (8259).  This gets
-	 * overriden if IOAPICs are enumerated (below).
-	 */
-	acpi_irq_model = ACPI_IRQ_MODEL_PIC;
-
-	/* 
-	 * Initialize the ACPI boot-time table parser.
-	 */
-	result = acpi_table_init();
-	if (result) {
-#ifndef XEN
-// hack for now, FIXME later
-		acpi_disabled = 1;
-#endif
-		return result;
-	}
-
-	result = acpi_blacklisted();
-	if (result) {
-		printk(KERN_NOTICE PREFIX "BIOS listed in blacklist, disabling ACPI support\n");
-#ifndef XEN
-// hack for now, FIXME later
-		acpi_disabled = 1;
-#endif
-		return result;
-	}
-
-#ifdef CONFIG_X86_LOCAL_APIC
-
-	/* 
 	 * MADT
 	 * ----
 	 * Parse the Multiple APIC Description Table (MADT), if exists.
-	 * Note that this table provides platform SMP configuration 
+	 * Note that this table provides platform SMP configuration
 	 * information -- the successor to MPS tables.
 	 */
 
-	result = acpi_table_parse(ACPI_APIC, acpi_parse_madt);
-	if (!result) {
-		return 0;
+	if (acpi_table_parse(ACPI_APIC, acpi_parse_madt) < 1) {
+		printk(KERN_ERR PREFIX "Can't find MADT\n");
+		goto skip_madt;
 	}
-	else if (result < 0) {
-		printk(KERN_ERR PREFIX "Error parsing MADT\n");
-		return result;
-	}
-	else if (result > 1) 
-		printk(KERN_WARNING PREFIX "Multiple MADT tables exist\n");
 
-	/* 
-	 * Local APIC
-	 * ----------
-	 * Note that the LAPIC address is obtained from the MADT (32-bit value)
-	 * and (optionally) overriden by a LAPIC_ADDR_OVR entry (64-bit value).
-	 */
+	/* Local APIC */
 
-	result = acpi_table_parse_madt(ACPI_MADT_LAPIC_ADDR_OVR, acpi_parse_lapic_addr_ovr);
-	if (result < 0) {
+	if (acpi_table_parse_madt(ACPI_MADT_LAPIC_ADDR_OVR, acpi_parse_lapic_addr_ovr, 0) < 0)
 		printk(KERN_ERR PREFIX "Error parsing LAPIC address override entry\n");
-		return result;
-	}
 
-	mp_register_lapic_address(acpi_lapic_addr);
+	if (acpi_table_parse_madt(ACPI_MADT_LSAPIC, acpi_parse_lsapic, NR_CPUS) < 1)
+		printk(KERN_ERR PREFIX "Error parsing MADT - no LAPIC entries\n");
 
-	result = acpi_table_parse_madt(ACPI_MADT_LAPIC, acpi_parse_lapic);
-	if (!result) { 
-		printk(KERN_ERR PREFIX "No LAPIC entries present\n");
-		/* TBD: Cleanup to allow fallback to MPS */
-		return -ENODEV;
-	}
-	else if (result < 0) {
-		printk(KERN_ERR PREFIX "Error parsing LAPIC entry\n");
-		/* TBD: Cleanup to allow fallback to MPS */
-		return result;
-	}
-
-	result = acpi_table_parse_madt(ACPI_MADT_LAPIC_NMI, acpi_parse_lapic_nmi);
-	if (result < 0) {
+	if (acpi_table_parse_madt(ACPI_MADT_LAPIC_NMI, acpi_parse_lapic_nmi, 0) < 0)
 		printk(KERN_ERR PREFIX "Error parsing LAPIC NMI entry\n");
-		/* TBD: Cleanup to allow fallback to MPS */
-		return result;
-	}
 
-	acpi_lapic = 1;
+	/* I/O APIC */
 
-#endif /*CONFIG_X86_LOCAL_APIC*/
+	if (acpi_table_parse_madt(ACPI_MADT_IOSAPIC, acpi_parse_iosapic, NR_IOSAPICS) < 1)
+		printk(KERN_ERR PREFIX "Error parsing MADT - no IOSAPIC entries\n");
 
-#if defined(CONFIG_X86_IO_APIC) && defined(CONFIG_ACPI_INTERPRETER)
+	/* System-Level Interrupt Routing */
 
-	/* 
-	 * I/O APIC 
-	 * --------
-	 */
+	if (acpi_table_parse_madt(ACPI_MADT_PLAT_INT_SRC, acpi_parse_plat_int_src, ACPI_MAX_PLATFORM_INTERRUPTS) < 0)
+		printk(KERN_ERR PREFIX "Error parsing platform interrupt source entry\n");
 
-	/*
-	 * ACPI interpreter is required to complete interrupt setup,
-	 * so if it is off, don't enumerate the io-apics with ACPI.
-	 * If MPS is present, it will handle them,
-	 * otherwise the system will stay in PIC mode
-	 */
-	if (acpi_disabled || acpi_noirq) {
-		return 1;
-	}
-
-	/*
-	 * if "noapic" boot option, don't look for IO-APICs
-	 */
-	if (ioapic_setup_disabled()) {
-		printk(KERN_INFO PREFIX "Skipping IOAPIC probe "
-			"due to 'noapic' option.\n");
-		return 1;
-        }
-
-
-	result = acpi_table_parse_madt(ACPI_MADT_IOAPIC, acpi_parse_ioapic);
-	if (!result) { 
-		printk(KERN_ERR PREFIX "No IOAPIC entries present\n");
-		return -ENODEV;
-	}
-	else if (result < 0) {
-		printk(KERN_ERR PREFIX "Error parsing IOAPIC entry\n");
-		return result;
-	}
-
-	/* Build a default routing table for legacy (ISA) interrupts. */
-	mp_config_acpi_legacy_irqs();
-
-	result = acpi_table_parse_madt(ACPI_MADT_INT_SRC_OVR, acpi_parse_int_src_ovr);
-	if (result < 0) {
+	if (acpi_table_parse_madt(ACPI_MADT_INT_SRC_OVR, acpi_parse_int_src_ovr, 0) < 0)
 		printk(KERN_ERR PREFIX "Error parsing interrupt source overrides entry\n");
-		/* TBD: Cleanup to allow fallback to MPS */
-		return result;
-	}
 
-	result = acpi_table_parse_madt(ACPI_MADT_NMI_SRC, acpi_parse_nmi_src);
-	if (result < 0) {
+	if (acpi_table_parse_madt(ACPI_MADT_NMI_SRC, acpi_parse_nmi_src, 0) < 0)
 		printk(KERN_ERR PREFIX "Error parsing NMI SRC entry\n");
-		/* TBD: Cleanup to allow fallback to MPS */
-		return result;
+  skip_madt:
+
+	/*
+	 * FADT says whether a legacy keyboard controller is present.
+	 * The FADT also contains an SCI_INT line, by which the system
+	 * gets interrupts such as power and sleep buttons.  If it's not
+	 * on a Legacy interrupt, it needs to be setup.
+	 */
+	if (acpi_table_parse(ACPI_FADT, acpi_parse_fadt) < 1)
+		printk(KERN_ERR PREFIX "Can't find FADT\n");
+
+#ifdef CONFIG_SMP
+	if (available_cpus == 0) {
+		printk(KERN_INFO "ACPI: Found 0 CPUS; assuming 1\n");
+		printk(KERN_INFO "CPU 0 (0x%04x)", hard_smp_processor_id());
+		smp_boot_data.cpu_phys_id[available_cpus] = hard_smp_processor_id();
+		available_cpus = 1; /* We've got at least one of these, no? */
 	}
+	smp_boot_data.cpu_count = available_cpus;
 
-	acpi_irq_model = ACPI_IRQ_MODEL_IOAPIC;
-
-	acpi_irq_balance_set(NULL);
-
-	acpi_ioapic = 1;
-
-	if (acpi_lapic && acpi_ioapic)
-		smp_found_config = 1;
-
-#endif /*CONFIG_X86_IO_APIC && CONFIG_ACPI_INTERPRETER*/
-
-	return 0;
-}
-
-#endif /*CONFIG_ACPI_BOOT*/
-
-#ifdef	CONFIG_ACPI_BUS
-/*
- * "acpi_pic_sci=level" (current default)
- * programs the PIC-mode SCI to Level Trigger.
- * (NO-OP if the BIOS set Level Trigger already)
- *
- * If a PIC-mode SCI is not recogznied or gives spurious IRQ7's
- * it may require Edge Trigger -- use "acpi_pic_sci=edge"
- * (NO-OP if the BIOS set Edge Trigger already)
- *
- * Port 0x4d0-4d1 are ECLR1 and ECLR2, the Edge/Level Control Registers
- * for the 8259 PIC.  bit[n] = 1 means irq[n] is Level, otherwise Edge.
- * ECLR1 is IRQ's 0-7 (IRQ 0, 1, 2 must be 0)
- * ECLR2 is IRQ's 8-15 (IRQ 8, 13 must be 0)
- */
-
-static __initdata int	acpi_pic_sci_trigger;	/* 0: level, 1: edge */
-
-void __init
-acpi_pic_sci_set_trigger(unsigned int irq)
-{
-	unsigned char mask = 1 << (irq & 7);
-	unsigned int port = 0x4d0 + (irq >> 3);
-	unsigned char val = inb(port);
-
-	
-	printk(PREFIX "IRQ%d SCI:", irq);
-	if (!(val & mask)) {
-		printk(" Edge");
-
-		if (!acpi_pic_sci_trigger) {
-			printk(" set to Level");
-			outb(val | mask, port);
-		}
-	} else {
-		printk(" Level");
-
-		if (acpi_pic_sci_trigger) {
-			printk(" set to Edge");
-			outb(val | mask, port);
-		}
+	smp_build_cpu_map();
+# ifdef CONFIG_ACPI_NUMA
+	if (srat_num_cpus == 0) {
+		int cpu, i = 1;
+		for (cpu = 0; cpu < smp_boot_data.cpu_count; cpu++)
+			if (smp_boot_data.cpu_phys_id[cpu] != hard_smp_processor_id())
+				node_cpuid[i++].phys_id = smp_boot_data.cpu_phys_id[cpu];
 	}
-	printk(" Trigger.\n");
-}
-
-int __init
-acpi_pic_sci_setup(char *str)
-{
-	while (str && *str) {
-		if (strncmp(str, "level", 5) == 0)
-			acpi_pic_sci_trigger = 0;	/* force level trigger */
-		if (strncmp(str, "edge", 4) == 0)
-			acpi_pic_sci_trigger = 1;	/* force edge trigger */
-		str = strchr(str, ',');
-		if (str)
-			str += strspn(str, ", \t");
-	}
-	return 1;
-}
-
-__setup("acpi_pic_sci=", acpi_pic_sci_setup);
-
-#endif /* CONFIG_ACPI_BUS */
-
-
-
-/* --------------------------------------------------------------------------
-                              Low-Level Sleep Support
-   -------------------------------------------------------------------------- */
-
-#ifdef CONFIG_ACPI_SLEEP
-
-#define DEBUG
-
-#ifdef DEBUG
-#include <xen/serial.h>
+	build_cpu_to_node_map();
+# endif
 #endif
-
-/* address in low memory of the wakeup routine. */
-unsigned long acpi_wakeup_address = 0;
-
-/* new page directory that we will be using */
-static pmd_t *pmd;
-
-/* saved page directory */
-static pmd_t saved_pmd;
-
-/* page which we'll use for the new page directory */
-static pte_t *ptep;
-
-extern unsigned long FASTCALL(acpi_copy_wakeup_routine(unsigned long));
-
-/*
- * acpi_create_identity_pmd
- *
- * Create a new, identity mapped pmd.
- *
- * Do this by creating new page directory, and marking all the pages as R/W
- * Then set it as the new Page Middle Directory.
- * And, of course, flush the TLB so it takes effect.
- *
- * We save the address of the old one, for later restoration.
- */
-static void acpi_create_identity_pmd (void)
-{
-	pgd_t *pgd;
-	int i;
-
-	ptep = (pte_t*)__get_free_page(GFP_KERNEL);
-
-	/* fill page with low mapping */
-	for (i = 0; i < PTRS_PER_PTE; i++)
-		set_pte(ptep + i, mk_pte_phys(i << PAGE_SHIFT, PAGE_SHARED));
-
-	pgd = pgd_offset(current->active_mm, 0);
-	pmd = pmd_alloc(current->mm,pgd, 0);
-
-	/* save the old pmd */
-	saved_pmd = *pmd;
-
-	/* set the new one */
-	set_pmd(pmd, __pmd(_PAGE_TABLE + __pa(ptep)));
-
-	/* flush the TLB */
-	local_flush_tlb();
+	/* Make boot-up look pretty */
+	printk(KERN_INFO "%d CPUs available, %d CPUs total\n", available_cpus, total_cpus);
+	return 0;
 }
-
-/*
- * acpi_restore_pmd
- *
- * Restore the old pmd saved by acpi_create_identity_pmd and
- * free the page that said function alloc'd
- */
-static void acpi_restore_pmd (void)
+int
+acpi_gsi_to_irq (u32 gsi, unsigned int *irq)
 {
-	set_pmd(pmd, saved_pmd);
-	local_flush_tlb();
-	free_page((unsigned long)ptep);
-}
+	int vector;
 
-/**
- * acpi_save_state_mem - save kernel state
- *
- * Create an identity mapped page table and copy the wakeup routine to
- * low memory.
- */
-int acpi_save_state_mem (void)
-{
-	acpi_create_identity_pmd();
-	acpi_copy_wakeup_routine(acpi_wakeup_address);
+	if (has_8259 && gsi < 16)
+		*irq = isa_irq_to_vector(gsi);
+	else {
+		vector = gsi_to_vector(gsi);
+		if (vector == -1)
+			return -1;
 
+		*irq = vector;
+	}
 	return 0;
 }
 
-/**
- * acpi_save_state_disk - save kernel state to disk
- *
- */
-int acpi_save_state_disk (void)
+int
+acpi_register_irq (u32 gsi, u32 polarity, u32 trigger)
 {
-	return 1;
+	if (has_8259 && gsi < 16)
+		return isa_irq_to_vector(gsi);
+
+	return iosapic_register_intr(gsi,
+			(polarity == ACPI_ACTIVE_HIGH) ? IOSAPIC_POL_HIGH : IOSAPIC_POL_LOW,
+			(trigger == ACPI_EDGE_SENSITIVE) ? IOSAPIC_EDGE : IOSAPIC_LEVEL);
 }
-
-/*
- * acpi_restore_state
- */
-void acpi_restore_state_mem (void)
-{
-	acpi_restore_pmd();
-}
-
-/**
- * acpi_reserve_bootmem - do _very_ early ACPI initialisation
- *
- * We allocate a page in low memory for the wakeup
- * routine for when we come back from a sleep state. The
- * runtime allocator allows specification of <16M pages, but not
- * <1M pages.
- */
-void __init acpi_reserve_bootmem(void)
-{
-	acpi_wakeup_address = (unsigned long)alloc_bootmem_low(PAGE_SIZE);
-	printk(KERN_DEBUG "ACPI: have wakeup address 0x%8.8lx\n", acpi_wakeup_address);
-}
-
-void do_suspend_lowlevel_s4bios(int resume)
-{
-	if (!resume) {
-		save_processor_context();
-		acpi_save_register_state((unsigned long)&&acpi_sleep_done);
-		acpi_enter_sleep_state_s4bios();
-		return;
-	}
-acpi_sleep_done:
-	restore_processor_context();
-}
-
-
-#endif /*CONFIG_ACPI_SLEEP*/
-
+EXPORT_SYMBOL(acpi_register_irq);
+#endif
+#endif /* CONFIG_ACPI_BOOT */

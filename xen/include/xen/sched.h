@@ -159,6 +159,8 @@ struct domain_setup_info
     unsigned int  load_symtab;
     unsigned long symtab_addr;
     unsigned long symtab_len;
+    /* Indicate whether it's xen specific image */
+    unsigned int xen_elf_image;
 };
 
 #include <asm/uaccess.h> /* for KERNEL_DS */

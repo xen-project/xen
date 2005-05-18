@@ -1,5 +1,5 @@
---- ../../linux-2.6.11/arch/ia64/kernel/entry.S	2005-03-02 00:37:50.000000000 -0700
-+++ arch/ia64/entry.S	2005-04-29 14:54:13.000000000 -0600
+--- /home/adsharma/disk2/xen-ia64/xeno-unstable-rebase.bk/xen/../../linux-2.6.11/arch/ia64/kernel/entry.S	2005-03-01 23:37:50.000000000 -0800
++++ /home/adsharma/disk2/xen-ia64/xeno-unstable-rebase.bk/xen/arch/ia64/entry.S	2005-05-18 12:40:51.000000000 -0700
 @@ -46,6 +46,7 @@
  
  #include "minstate.h"
@@ -73,19 +73,23 @@
  
  GLOBAL_ENTRY(ia64_ret_from_clone)
  	PT_REGS_UNWIND_INFO(0)
-@@ -604,6 +626,11 @@
+@@ -604,6 +626,15 @@
  	 */
  	br.call.sptk.many rp=ia64_invoke_schedule_tail
  }
 +#ifdef XEN
 +	// new domains are cloned but not exec'ed so switch to user mode here
 +	cmp.ne pKStk,pUStk=r0,r0
++#ifdef CONFIG_VTI
++	br.cond.spnt ia64_leave_hypervisor
++#else // CONFIG_VTI
 +	br.cond.spnt ia64_leave_kernel
++#endif // CONFIG_VTI
 +#else
  .ret8:
  	adds r2=TI_FLAGS+IA64_TASK_SIZE,r13
  	;;
-@@ -614,6 +641,7 @@
+@@ -614,6 +645,7 @@
  	;;
  	cmp.ne p6,p0=r2,r0
  (p6)	br.cond.spnt .strace_check_retval
@@ -93,7 +97,7 @@
  	;;					// added stop bits to prevent r8 dependency
  END(ia64_ret_from_clone)
  	// fall through
-@@ -700,19 +728,25 @@
+@@ -700,19 +732,25 @@
  .work_processed_syscall:
  	adds r2=PT(LOADRS)+16,r12
  	adds r3=PT(AR_BSPSTORE)+16,r12
@@ -119,7 +123,7 @@
  	;;
  	// start restoring the state saved on the kernel stack (struct pt_regs):
  	ld8 r9=[r2],PT(CR_IPSR)-PT(R9)
-@@ -757,7 +791,11 @@
+@@ -757,7 +795,11 @@
  	;;
  	ld8.fill r12=[r2]	// restore r12 (sp)
  	ld8.fill r15=[r3]	// restore r15
@@ -131,7 +135,7 @@
  	;;
  (pUStk)	ld4 r3=[r3]		// r3 = cpu_data->phys_stacked_size_p8
  (pUStk) st1 [r14]=r17
-@@ -814,9 +852,18 @@
+@@ -814,9 +856,18 @@
  (pUStk)	cmp.eq.unc p6,p0=r0,r0		// p6 <- pUStk
  #endif
  .work_processed_kernel:
@@ -150,7 +154,19 @@
  	adds r21=PT(PR)+16,r12
  	;;
  
-@@ -838,7 +885,9 @@
+@@ -828,17 +879,20 @@
+ 	ld8 r28=[r2],8		// load b6
+ 	adds r29=PT(R24)+16,r12
+ 
+-	ld8.fill r16=[r3],PT(AR_CSD)-PT(R16)
++	ld8.fill r16=[r3]
+ 	adds r30=PT(AR_CCV)+16,r12
+ (p6)	and r19=TIF_WORK_MASK,r31		// any work other than TIF_SYSCALL_TRACE?
+ 	;;
++	adds r3=PT(AR_CSD)-PT(R16),r3
+ 	ld8.fill r24=[r29]
+ 	ld8 r15=[r30]		// load ar.ccv
+ (p6)	cmp4.ne.unc p6,p0=r19, r0		// any special work pending?
  	;;
  	ld8 r29=[r2],16		// load b7
  	ld8 r30=[r3],16		// load ar.csd
@@ -160,7 +176,7 @@
  	;;
  	ld8 r31=[r2],16		// load ar.ssd
  	ld8.fill r8=[r3],16
-@@ -934,7 +983,11 @@
+@@ -934,7 +988,11 @@
  	shr.u r18=r19,16	// get byte size of existing "dirty" partition
  	;;
  	mov r16=ar.bsp		// get existing backing store pointer
@@ -172,7 +188,7 @@
  	;;
  	ld4 r17=[r17]		// r17 = cpu_data->phys_stacked_size_p8
  (pKStk)	br.cond.dpnt skip_rbs_switch
-@@ -1069,6 +1122,7 @@
+@@ -1069,6 +1127,7 @@
  	mov pr=r31,-1		// I0
  	rfi			// B
  
@@ -180,7 +196,7 @@
  	/*
  	 * On entry:
  	 *	r20 = &current->thread_info->pre_count (if CONFIG_PREEMPT)
-@@ -1130,6 +1184,7 @@
+@@ -1130,6 +1189,7 @@
  	ld8 r8=[r2]
  	ld8 r10=[r3]
  	br.cond.sptk.many .work_processed_syscall	// re-check
@@ -188,7 +204,7 @@
  
  END(ia64_leave_kernel)
  
-@@ -1166,6 +1221,7 @@
+@@ -1166,6 +1226,7 @@
  	br.ret.sptk.many rp
  END(ia64_invoke_schedule_tail)
  
@@ -196,7 +212,7 @@
  	/*
  	 * Setup stack and call do_notify_resume_user().  Note that pSys and pNonSys need to
  	 * be set up by the caller.  We declare 8 input registers so the system call
-@@ -1264,6 +1320,7 @@
+@@ -1264,6 +1325,7 @@
  	mov ar.unat=r9
  	br.many b7
  END(sys_rt_sigreturn)
@@ -204,7 +220,7 @@
  
  GLOBAL_ENTRY(ia64_prepare_handle_unaligned)
  	.prologue
-@@ -1278,6 +1335,7 @@
+@@ -1278,6 +1340,7 @@
  	br.cond.sptk.many rp				// goes to ia64_leave_kernel
  END(ia64_prepare_handle_unaligned)
  
@@ -212,7 +228,7 @@
  	//
  	// unw_init_running(void (*callback)(info, arg), void *arg)
  	//
-@@ -1585,3 +1643,4 @@
+@@ -1585,3 +1648,4 @@
  	data8 sys_ni_syscall
  
  	.org sys_call_table + 8*NR_syscalls	// guard against failures to increase NR_syscalls

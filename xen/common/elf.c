@@ -88,9 +88,12 @@ int parseelfimage(struct domain_setup_info *dsi)
     if ( guestinfo == NULL )
     {
         printk("Not a Xen-ELF image: '__xen_guest' section not found.\n");
+	dsi->xen_elf_image = 0;
 #if FORCE_XENELF_IMAGE
         return -EINVAL;
 #endif
+    } else {
+	dsi->xen_elf_image = 1;
     }
 
     for ( h = 0; h < ehdr->e_phnum; h++ ) 
