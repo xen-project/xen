@@ -313,13 +313,7 @@ class XendDomain:
         # Add entries for any domains we don't know about.
         for (id, d) in doms.items():
             if id not in self.domain_by_id:
-                log.info("Creating entry for unknown domain: id=%s", id)
-                savedinfo = None
-                try:
-                    dominfo = XendDomainInfo.vm_recreate(savedinfo, d)
-                    self._add_domain(dominfo)
-                except Exception, ex:
-                    log.exception("Error creating domain info: id=%s", id)
+                self.domain_lookup(id)
         # Remove entries for domains that no longer exist.
         # Update entries for existing domains.
         for d in self.domain_by_id.values():
@@ -449,6 +443,15 @@ class XendDomain:
         dominfo = self.domain_by_name.get(name) or self.domain_by_id.get(name)
         if dominfo:
             return dominfo
+        try:
+            log.info("Creating entry for unknown domain: id=%s", name)
+            d = self.xen_domain(name)
+            if d:
+                dominfo = XendDomainInfo.vm_recreate(None, d)
+                self._add_domain(dominfo)
+                return dominfo
+        except Exception, ex:
+            log.exception("Error creating domain info: id=%s", name)
         raise XendError('invalid domain: ' + name)
 
     def domain_exists(self, name):
