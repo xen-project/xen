@@ -52,7 +52,6 @@ EXPORT_SYMBOL(machine_power_off);
 
 /* Ignore multiple shutdown requests. */
 static int shutting_down = -1;
-static int pending_sysrq = -1;
 
 static void __do_suspend(void)
 {
@@ -216,36 +215,29 @@ static void __shutdown_handler(void *unused)
     }
 }
 
-static void __sysrq_handler(void *unused)
-{
-#ifdef CONFIG_MAGIC_SYSRQ
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,0)
-    handle_sysrq(pending_sysrq, NULL, NULL);
-#else
-    handle_sysrq(pending_sysrq, NULL, NULL, NULL);
-#endif
-#endif
-    pending_sysrq = -1;
-}
-
 static void shutdown_handler(ctrl_msg_t *msg, unsigned long id)
 {
     static DECLARE_WORK(shutdown_work, __shutdown_handler, NULL);
-    static DECLARE_WORK(sysrq_work, __sysrq_handler, NULL);
 
-    if ( (shutting_down == -1) &&
+    if ( msg->subtype == CMSG_SHUTDOWN_SYSRQ )
+    {
+	int sysrq = ((shutdown_sysrq_t *)&msg->msg[0])->key;
+	
+#ifdef CONFIG_MAGIC_SYSRQ
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,0)
+	handle_sysrq(sysrq, NULL, NULL);
+#else
+	handle_sysrq(sysrq, NULL, NULL, NULL);
+#endif
+#endif
+    }
+    else if ( (shutting_down == -1) &&
          ((msg->subtype == CMSG_SHUTDOWN_POWEROFF) ||
           (msg->subtype == CMSG_SHUTDOWN_REBOOT) ||
           (msg->subtype == CMSG_SHUTDOWN_SUSPEND)) )
     {
         shutting_down = msg->subtype;
         schedule_work(&shutdown_work);
-    }
-    else if ( (pending_sysrq == -1) && 
-              (msg->subtype == CMSG_SHUTDOWN_SYSRQ) )
-    {
-        pending_sysrq = ((shutdown_sysrq_t *)&msg->msg[0])->key;
-        schedule_work(&sysrq_work);
     }
     else
     {
