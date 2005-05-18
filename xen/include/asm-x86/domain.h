@@ -117,8 +117,6 @@ struct arch_exec_domain
 
     /* Current LDT details. */
     unsigned long shadow_ldt_mapcnt;
-    /* Next entry is passed to LGDT on domain switch. */
-    char gdt[10]; /* NB. 10 bytes needed for x86_64. Use 6 bytes for x86_32. */
 } __cacheline_aligned;
 
 #define IDLE0_ARCH_EXEC_DOMAIN                                      \

@@ -70,25 +70,29 @@ string_param("nmi", opt_nmi);
 /* Master table, used by all CPUs on x86/64, and by CPU0 on x86/32.*/
 idt_entry_t idt_table[IDT_ENTRIES];
 
-asmlinkage void divide_error(void);
-asmlinkage void debug(void);
+#define DECLARE_TRAP_HANDLER(_name)                     \
+asmlinkage void _name(void);                            \
+asmlinkage int do_ ## _name(struct cpu_user_regs *regs)
+
 asmlinkage void nmi(void);
-asmlinkage void int3(void);
-asmlinkage void overflow(void);
-asmlinkage void bounds(void);
-asmlinkage void invalid_op(void);
-asmlinkage void device_not_available(void);
-asmlinkage void coprocessor_segment_overrun(void);
-asmlinkage void invalid_TSS(void);
-asmlinkage void segment_not_present(void);
-asmlinkage void stack_segment(void);
-asmlinkage void general_protection(void);
-asmlinkage void page_fault(void);
-asmlinkage void coprocessor_error(void);
-asmlinkage void simd_coprocessor_error(void);
-asmlinkage void alignment_check(void);
-asmlinkage void spurious_interrupt_bug(void);
-asmlinkage void machine_check(void);
+DECLARE_TRAP_HANDLER(divide_error);
+DECLARE_TRAP_HANDLER(debug);
+DECLARE_TRAP_HANDLER(int3);
+DECLARE_TRAP_HANDLER(overflow);
+DECLARE_TRAP_HANDLER(bounds);
+DECLARE_TRAP_HANDLER(invalid_op);
+DECLARE_TRAP_HANDLER(device_not_available);
+DECLARE_TRAP_HANDLER(coprocessor_segment_overrun);
+DECLARE_TRAP_HANDLER(invalid_TSS);
+DECLARE_TRAP_HANDLER(segment_not_present);
+DECLARE_TRAP_HANDLER(stack_segment);
+DECLARE_TRAP_HANDLER(general_protection);
+DECLARE_TRAP_HANDLER(page_fault);
+DECLARE_TRAP_HANDLER(coprocessor_error);
+DECLARE_TRAP_HANDLER(simd_coprocessor_error);
+DECLARE_TRAP_HANDLER(alignment_check);
+DECLARE_TRAP_HANDLER(spurious_interrupt_bug);
+DECLARE_TRAP_HANDLER(machine_check);
 
 static int debug_stack_lines = 20;
 integer_param("debug_stack_lines", debug_stack_lines);
@@ -327,9 +331,10 @@ asmlinkage int do_int3(struct cpu_user_regs *regs)
     return 0;
 }
 
-asmlinkage void do_machine_check(struct cpu_user_regs *regs)
+asmlinkage int do_machine_check(struct cpu_user_regs *regs)
 {
     fatal_trap(TRAP_machine_check, regs);
+    return 0;
 }
 
 void propagate_page_fault(unsigned long addr, u16 error_code)
@@ -350,12 +355,57 @@ void propagate_page_fault(unsigned long addr, u16 error_code)
     ed->arch.guest_cr2 = addr;
 }
 
+static int handle_perdomain_mapping_fault(
+    unsigned long offset, struct cpu_user_regs *regs)
+{
+    extern int map_ldt_shadow_page(unsigned int);
+
+    struct exec_domain *ed = current;
+    struct domain      *d  = ed->domain;
+    int ret;
+
+    /* Which vcpu's area did we fault in, and is it in the ldt sub-area? */
+    unsigned int is_ldt_area = (offset >> (PDPT_VCPU_VA_SHIFT-1)) & 1;
+    unsigned int vcpu_area   = (offset >> PDPT_VCPU_VA_SHIFT);
+
+    /* Should never fault in another vcpu's area. */
+    BUG_ON(vcpu_area != current->vcpu_id);
+
+    /* Byte offset within the gdt/ldt sub-area. */
+    offset &= (1UL << (PDPT_VCPU_VA_SHIFT-1)) - 1UL;
+
+    if ( likely(is_ldt_area) )
+    {
+        /* LDT fault: Copy a mapping from the guest's LDT, if it is valid. */
+        LOCK_BIGLOCK(d);
+        ret = map_ldt_shadow_page(offset >> PAGE_SHIFT);
+        UNLOCK_BIGLOCK(d);
+
+        if ( unlikely(ret == 0) )
+        {
+            /* In hypervisor mode? Leave it to the #PF handler to fix up. */
+            if ( !GUEST_MODE(regs) )
+                return 0;
+            /* In guest mode? Propagate #PF to guest, with adjusted %cr2. */
+            propagate_page_fault(
+                ed->arch.guest_context.ldt_base + offset, regs->error_code);
+        }
+    }
+    else
+    {
+        /* GDT fault: handle the fault as #GP(selector). */
+        regs->error_code = (u16)offset & ~7;
+        (void)do_general_protection(regs);
+    }
+
+    return EXCRET_fault_fixed;
+}
+
 asmlinkage int do_page_fault(struct cpu_user_regs *regs)
 {
-    unsigned long off, addr, fixup;
+    unsigned long addr, fixup;
     struct exec_domain *ed = current;
     struct domain *d = ed->domain;
-    int ret;
 
     __asm__ __volatile__ ("mov %%cr2,%0" : "=r" (addr) : );
 
@@ -390,27 +440,12 @@ asmlinkage int do_page_fault(struct cpu_user_regs *regs)
          ((addr < HYPERVISOR_VIRT_START) ||
           (shadow_mode_external(d) && GUEST_CONTEXT(ed, regs))) &&
          shadow_fault(addr, regs) )
-    {
         return EXCRET_fault_fixed;
-    }
 
-    if ( unlikely(addr >= LDT_VIRT_START(ed)) && 
-         (addr < (LDT_VIRT_START(ed) + 
-                  (ed->arch.guest_context.ldt_ents*LDT_ENTRY_SIZE))) )
-    {
-        /*
-         * Copy a mapping from the guest's LDT, if it is valid. Otherwise we
-         * send the fault up to the guest OS to be handled.
-         */
-        extern int map_ldt_shadow_page(unsigned int);
-        LOCK_BIGLOCK(d);
-        off  = addr - LDT_VIRT_START(ed);
-        addr = ed->arch.guest_context.ldt_base + off;
-        ret = map_ldt_shadow_page(off >> PAGE_SHIFT);
-        UNLOCK_BIGLOCK(d);
-        if ( likely(ret) )
-            return EXCRET_fault_fixed; /* successfully copied the mapping */
-    }
+    if ( unlikely(addr >= PERDOMAIN_VIRT_START) &&
+         unlikely(addr < PERDOMAIN_VIRT_END) &&
+         handle_perdomain_mapping_fault(addr - PERDOMAIN_VIRT_START, regs) )
+        return EXCRET_fault_fixed;
 
     if ( !GUEST_MODE(regs) )
         goto xen_fault;
@@ -1097,7 +1132,7 @@ void set_task_gate(unsigned int n, unsigned int sel)
 void set_tss_desc(unsigned int n, void *addr)
 {
     _set_tssldt_desc(
-        gdt_table + __TSS(n),
+        gdt_table + __TSS(n) - FIRST_RESERVED_GDT_ENTRY,
         (unsigned long)addr,
         offsetof(struct tss_struct, __cacheline_filler) - 1,
         9);

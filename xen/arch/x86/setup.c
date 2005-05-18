@@ -295,14 +295,15 @@ void __init cpu_init(void)
 {
     int nr = smp_processor_id();
     struct tss_struct *t = &init_tss[nr];
+    char gdt_load[10];
 
     if ( test_and_set_bit(nr, &cpu_initialized) )
         panic("CPU#%d already initialized!!!\n", nr);
     printk("Initializing CPU#%d\n", nr);
 
-    SET_GDT_ENTRIES(current, DEFAULT_GDT_ENTRIES);
-    SET_GDT_ADDRESS(current, DEFAULT_GDT_ADDRESS);
-    __asm__ __volatile__ ( "lgdt %0" : "=m" (*current->arch.gdt) );
+    *(unsigned short *)(&gdt_load[0]) = LAST_RESERVED_GDT_BYTE;
+    *(unsigned long  *)(&gdt_load[2]) = GDT_VIRT_START(current);
+    __asm__ __volatile__ ( "lgdt %0" : "=m" (gdt_load) );
 
     /* No nested task. */
     __asm__ __volatile__ ( "pushf ; andw $0xbfff,(%"__OP"sp) ; popf" );
@@ -391,10 +392,19 @@ static void __init start_of_day(void)
     sort_exception_tables();
 
     arch_do_createdomain(current);
+    
+    /* Map default GDT into their final position in the idle page table. */
+    map_pages(
+        idle_pg_table,
+        GDT_VIRT_START(current) + FIRST_RESERVED_GDT_BYTE,
+        virt_to_phys(gdt_table), PAGE_SIZE, __PAGE_HYPERVISOR);
 
-    identify_cpu(&boot_cpu_data); /* get CPU type info */
-    if ( cpu_has_fxsr ) set_in_cr4(X86_CR4_OSFXSR);
-    if ( cpu_has_xmm )  set_in_cr4(X86_CR4_OSXMMEXCPT);
+    /* Process CPU type information. */
+    identify_cpu(&boot_cpu_data);
+    if ( cpu_has_fxsr )
+        set_in_cr4(X86_CR4_OSFXSR);
+    if ( cpu_has_xmm )
+        set_in_cr4(X86_CR4_OSXMMEXCPT);
 
     find_smp_config();
 

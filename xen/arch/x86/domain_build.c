@@ -225,9 +225,6 @@ int construct_dom0(struct domain *d,
 
     mpt_alloc = (vpt_start - dsi.v_start) + alloc_start;
 
-    SET_GDT_ENTRIES(ed, DEFAULT_GDT_ENTRIES);
-    SET_GDT_ADDRESS(ed, DEFAULT_GDT_ADDRESS);
-
     /*
      * We're basically forcing default RPLs to 1, so that our "what privilege
      * level are we returning to?" logic works.

@@ -533,7 +533,7 @@ init_secondary(void)
 	myid = bootAP;
 
 	gdtmachpfn = vtomach(gdt) >> PAGE_SHIFT;
-	PANIC_IF(HYPERVISOR_set_gdt(&gdtmachpfn, LAST_RESERVED_GDT_ENTRY + 1) != 0); 
+	PANIC_IF(HYPERVISOR_set_gdt(&gdtmachpfn, 512) != 0); 
 
 	
 	lgdt_finish();

@@ -178,8 +178,9 @@ void __init percpu_traps_init(void)
     tss->eip    = (unsigned long)do_double_fault;
     tss->eflags = 2;
     tss->bitmap = IOBMP_INVALID_OFFSET;
-    _set_tssldt_desc(gdt_table+__DOUBLEFAULT_TSS_ENTRY,
-                     (unsigned long)tss, 235, 9);
+    _set_tssldt_desc(
+        gdt_table + __DOUBLEFAULT_TSS_ENTRY - FIRST_RESERVED_GDT_ENTRY,
+        (unsigned long)tss, 235, 9);
 
     set_task_gate(TRAP_double_fault, __DOUBLEFAULT_TSS_ENTRY<<3);
 }

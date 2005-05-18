@@ -17,6 +17,7 @@
 
 #include <xen/config.h>
 #include <public/xen.h>
+#include <asm/desc.h>
 #include <asm/page.h>
 
 #ifdef CONFIG_SMP
@@ -54,11 +55,11 @@ idt_48:
 	.word	0, 0			# idt base = 0L
 
 gdt_48:
-	.word	(LAST_RESERVED_GDT_ENTRY*8)+7
+	.word	LAST_RESERVED_GDT_BYTE
 #ifdef __i386__
-	.long	gdt_table-__PAGE_OFFSET
+	.long	gdt_table - FIRST_RESERVED_GDT_BYTE - __PAGE_OFFSET
 #else
-	.long   0x100200 # gdt_table
+	.long   0x101000 - FIRST_RESERVED_GDT_BYTE
 #endif
 
 ENTRY(trampoline_end)

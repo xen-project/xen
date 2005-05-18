@@ -1,5 +1,6 @@
 #include <xen/config.h>
 #include <public/xen.h>
+#include <asm/desc.h>
 #include <asm/page.h>
 
 #define  SECONDARY_CPU_FLAG 0xA5A5A5A5
@@ -181,40 +182,39 @@ ENTRY(stack_start)
         
         .word   0    
 idt_descr:
-	.word	256*8-1
+        .word	256*8-1
 idt:
         .long	idt_table
 
         .word   0
 gdt_descr:
-	.word	(LAST_RESERVED_GDT_ENTRY*8)+7
-gdt:       
-        .long   gdt_table	/* gdt base */
+        .word	LAST_RESERVED_GDT_BYTE
+gdt:
+        .long   gdt_table - FIRST_RESERVED_GDT_BYTE
 
         .word   0
 nopaging_gdt_descr:
-        .word   (LAST_RESERVED_GDT_ENTRY*8)+7
-        .long   gdt_table-__PAGE_OFFSET
+        .word	LAST_RESERVED_GDT_BYTE
+        .long   gdt_table - FIRST_RESERVED_GDT_BYTE - __PAGE_OFFSET
         
-        ALIGN
+        .org 0x1000
 /* NB. Rings != 0 get access up to 0xFC400000. This allows access to the */
 /*     machine->physical mapping table. Ring 0 can access all memory.    */
 ENTRY(gdt_table)
-        .fill FIRST_RESERVED_GDT_ENTRY,8,0
         .quad 0x0000000000000000     /* unused */
-        .quad 0x00cf9a000000ffff     /* 0x0808 ring 0 4.00GB code at 0x0 */
-        .quad 0x00cf92000000ffff     /* 0x0810 ring 0 4.00GB data at 0x0 */
-        .quad 0x00cfba000000c3ff     /* 0x0819 ring 1 3.95GB code at 0x0 */
-        .quad 0x00cfb2000000c3ff     /* 0x0821 ring 1 3.95GB data at 0x0 */
-        .quad 0x00cffa000000c3ff     /* 0x082b ring 3 3.95GB code at 0x0 */
-        .quad 0x00cff2000000c3ff     /* 0x0833 ring 3 3.95GB data at 0x0 */
+        .quad 0x00cf9a000000ffff     /* 0xe008 ring 0 4.00GB code at 0x0 */
+        .quad 0x00cf92000000ffff     /* 0xe010 ring 0 4.00GB data at 0x0 */
+        .quad 0x00cfba000000c3ff     /* 0xe019 ring 1 3.95GB code at 0x0 */
+        .quad 0x00cfb2000000c3ff     /* 0xe021 ring 1 3.95GB data at 0x0 */
+        .quad 0x00cffa000000c3ff     /* 0xe02b ring 3 3.95GB code at 0x0 */
+        .quad 0x00cff2000000c3ff     /* 0xe033 ring 3 3.95GB data at 0x0 */
         .quad 0x0000000000000000     /* unused                           */
         .fill 2*NR_CPUS,8,0          /* space for TSS and LDT per CPU    */
 
-        .org 0x1000
-ENTRY(idle_pg_table) # Initial page directory is 4kB
         .org 0x2000
+ENTRY(idle_pg_table) # Initial page directory is 4kB
+        .org 0x3000
 ENTRY(cpu0_stack)
-        .org 0x2000 + STACK_SIZE
+        .org 0x3000 + STACK_SIZE
 ENTRY(stext)
 ENTRY(_stext)

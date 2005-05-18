@@ -17,7 +17,7 @@ static inline void load_LDT(struct exec_domain *ed)
     else
     {
         cpu = smp_processor_id();
-        desc = (struct desc_struct *)GET_GDT_ADDRESS(ed) + __LDT(cpu);
+        desc = gdt_table + __LDT(cpu) - FIRST_RESERVED_GDT_ENTRY;
         desc->a = ((LDT_VIRT_START(ed)&0xffff)<<16) | (ents*8-1);
         desc->b = (LDT_VIRT_START(ed)&(0xff<<24)) | 0x8200 |
             ((LDT_VIRT_START(ed)&0xff0000)>>16);

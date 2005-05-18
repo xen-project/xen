@@ -856,9 +856,6 @@ static int __init do_boot_cpu(int apicid)
 	cpu_gdt_descr[cpu].size = cpu_gdt_descr[0].size;
 	memcpy((void *)cpu_gdt_descr[cpu].address,
 	       (void *)cpu_gdt_descr[0].address, cpu_gdt_descr[0].size);
-		memset((char *)cpu_gdt_descr[cpu].address +
-		       FIRST_RESERVED_GDT_ENTRY * 8, 0,
-		       NR_RESERVED_GDT_ENTRIES * 8);
 
 	memset(&ctxt, 0, sizeof(ctxt));
 

@@ -120,8 +120,8 @@ int get_baselimit(u16 seg, unsigned long *base, unsigned long *limit)
     }
     else /* gdt */
     {
-        table = (unsigned long *)GET_GDT_ADDRESS(d);
-        if ( idx >= GET_GDT_ENTRIES(d) )
+        table = (unsigned long *)GDT_VIRT_START(d);
+        if ( idx >= d->arch.guest_context.gdt_ents )
             goto fail;
     }
 
@@ -184,17 +184,17 @@ int fixup_seg(u16 seg, unsigned long offset)
         if ( idx >= d->arch.guest_context.ldt_ents )
         {
             DPRINTK("Segment %04x out of LDT range (%ld)\n",
-                    seg, d->arch.ldt_ents);
+                    seg, d->arch.guest_context.ldt_ents);
             goto fail;
         }
     }
     else /* gdt */
     {
-        table = (unsigned long *)GET_GDT_ADDRESS(d);
-        if ( idx >= GET_GDT_ENTRIES(d) )
+        table = (unsigned long *)GDT_VIRT_START(d);
+        if ( idx >= d->arch.guest_context.gdt_ents )
         {
-            DPRINTK("Segment %04x out of GDT range (%d)\n",
-                    seg, GET_GDT_ENTRIES(d));
+            DPRINTK("Segment %04x out of GDT range (%ld)\n",
+                    seg, d->arch.guest_context.gdt_ents);
             goto fail;
         }
     }

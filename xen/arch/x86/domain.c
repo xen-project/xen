@@ -244,57 +244,66 @@ void arch_do_createdomain(struct exec_domain *ed)
 
     ed->arch.flags = TF_kernel_mode;
 
-    if ( d->domain_id != IDLE_DOMAIN_ID )
-    {
-        ed->arch.schedule_tail = continue_nonidle_task;
+    if ( d->domain_id == IDLE_DOMAIN_ID )
+        return;
 
-        d->shared_info = (void *)alloc_xenheap_page();
-        memset(d->shared_info, 0, PAGE_SIZE);
-        ed->vcpu_info = &d->shared_info->vcpu_data[ed->vcpu_id];
-        ed->cpumap = CPUMAP_RUNANYWHERE;
-        SHARE_PFN_WITH_DOMAIN(virt_to_page(d->shared_info), d);
-        machine_to_phys_mapping[virt_to_phys(d->shared_info) >> 
-                               PAGE_SHIFT] = INVALID_M2P_ENTRY;
-
-        d->arch.mm_perdomain_pt = (l1_pgentry_t *)alloc_xenheap_page();
-        memset(d->arch.mm_perdomain_pt, 0, PAGE_SIZE);
-        machine_to_phys_mapping[virt_to_phys(d->arch.mm_perdomain_pt) >> 
-                               PAGE_SHIFT] = INVALID_M2P_ENTRY;
-        ed->arch.perdomain_ptes = d->arch.mm_perdomain_pt;
-
-        ed->arch.guest_vtable  = __linear_l2_table;
-        ed->arch.shadow_vtable = __shadow_linear_l2_table;
+    ed->arch.schedule_tail = continue_nonidle_task;
+    
+    d->shared_info = (void *)alloc_xenheap_page();
+    memset(d->shared_info, 0, PAGE_SIZE);
+    ed->vcpu_info = &d->shared_info->vcpu_data[ed->vcpu_id];
+    ed->cpumap = CPUMAP_RUNANYWHERE;
+    SHARE_PFN_WITH_DOMAIN(virt_to_page(d->shared_info), d);
+    machine_to_phys_mapping[virt_to_phys(d->shared_info) >> 
+                           PAGE_SHIFT] = INVALID_M2P_ENTRY;
+    
+    d->arch.mm_perdomain_pt = (l1_pgentry_t *)alloc_xenheap_page();
+    memset(d->arch.mm_perdomain_pt, 0, PAGE_SIZE);
+    machine_to_phys_mapping[virt_to_phys(d->arch.mm_perdomain_pt) >> 
+                           PAGE_SHIFT] = INVALID_M2P_ENTRY;
+    ed->arch.perdomain_ptes = d->arch.mm_perdomain_pt;
+    ed->arch.perdomain_ptes[FIRST_RESERVED_GDT_PAGE] =
+        l1e_create_pfn(page_to_pfn(virt_to_page(gdt_table)),
+                       __PAGE_HYPERVISOR);
+    
+    ed->arch.guest_vtable  = __linear_l2_table;
+    ed->arch.shadow_vtable = __shadow_linear_l2_table;
 
 #ifdef __x86_64__
-        ed->arch.guest_vl3table = __linear_l3_table;
-        ed->arch.guest_vl4table = __linear_l4_table;
-
-        d->arch.mm_perdomain_l2 = (l2_pgentry_t *)alloc_xenheap_page();
-        memset(d->arch.mm_perdomain_l2, 0, PAGE_SIZE);
-        d->arch.mm_perdomain_l2[l2_table_offset(PERDOMAIN_VIRT_START)] = 
-            l2e_create_phys(__pa(d->arch.mm_perdomain_pt),
-                            __PAGE_HYPERVISOR);
-        d->arch.mm_perdomain_l3 = (l3_pgentry_t *)alloc_xenheap_page();
-        memset(d->arch.mm_perdomain_l3, 0, PAGE_SIZE);
-        d->arch.mm_perdomain_l3[l3_table_offset(PERDOMAIN_VIRT_START)] = 
-            l3e_create_phys(__pa(d->arch.mm_perdomain_l2),
+    ed->arch.guest_vl3table = __linear_l3_table;
+    ed->arch.guest_vl4table = __linear_l4_table;
+    
+    d->arch.mm_perdomain_l2 = (l2_pgentry_t *)alloc_xenheap_page();
+    memset(d->arch.mm_perdomain_l2, 0, PAGE_SIZE);
+    d->arch.mm_perdomain_l2[l2_table_offset(PERDOMAIN_VIRT_START)] = 
+        l2e_create_phys(__pa(d->arch.mm_perdomain_pt),
+                        __PAGE_HYPERVISOR);
+    d->arch.mm_perdomain_l3 = (l3_pgentry_t *)alloc_xenheap_page();
+    memset(d->arch.mm_perdomain_l3, 0, PAGE_SIZE);
+    d->arch.mm_perdomain_l3[l3_table_offset(PERDOMAIN_VIRT_START)] = 
+        l3e_create_phys(__pa(d->arch.mm_perdomain_l2),
                             __PAGE_HYPERVISOR);
 #endif
-
-        (void)ptwr_init(d);
-
-        shadow_lock_init(d);        
-        INIT_LIST_HEAD(&d->arch.free_shadow_frames);
-    }
+    
+    (void)ptwr_init(d);
+    
+    shadow_lock_init(d);        
+    INIT_LIST_HEAD(&d->arch.free_shadow_frames);
 }
 
 void arch_do_boot_vcpu(struct exec_domain *ed)
 {
     struct domain *d = ed->domain;
-    ed->arch.schedule_tail = d->exec_domain[0]->arch.schedule_tail;
-    ed->arch.perdomain_ptes = 
-        d->arch.mm_perdomain_pt + (ed->vcpu_id << PDPT_VCPU_SHIFT);
+
     ed->arch.flags = TF_kernel_mode;
+
+    ed->arch.schedule_tail = d->exec_domain[0]->arch.schedule_tail;
+
+    ed->arch.perdomain_ptes =
+        d->arch.mm_perdomain_pt + (ed->vcpu_id << PDPT_VCPU_SHIFT);
+    ed->arch.perdomain_ptes[FIRST_RESERVED_GDT_PAGE] =
+        l1e_create_pfn(page_to_pfn(virt_to_page(gdt_table)),
+                       __PAGE_HYPERVISOR);
 }
 
 #ifdef CONFIG_VMX
@@ -444,16 +453,10 @@ int arch_set_info_guest(
             return -EINVAL;
     }
 
-    /* Failure to set GDT is harmless. */
-    SET_GDT_ENTRIES(ed, DEFAULT_GDT_ENTRIES);
-    SET_GDT_ADDRESS(ed, DEFAULT_GDT_ADDRESS);
-    if ( c->gdt_ents != 0 )
+    if ( (rc = (int)set_gdt(ed, c->gdt_frames, c->gdt_ents)) != 0 )
     {
-        if ( (rc = (int)set_gdt(ed, c->gdt_frames, c->gdt_ents)) != 0 )
-        {
-            put_page_and_type(&frame_table[phys_basetab>>PAGE_SHIFT]);
-            return rc;
-        }
+        put_page_and_type(&frame_table[phys_basetab>>PAGE_SHIFT]);
+        return rc;
     }
 
 #ifdef CONFIG_VMX
@@ -754,7 +757,14 @@ static void __context_switch(void)
         set_bit(cpu, &n->domain->cpuset);
 
     write_ptbase(n);
-    __asm__ __volatile__ ( "lgdt %0" : "=m" (*n->arch.gdt) );
+
+    if ( p->vcpu_id != n->vcpu_id )
+    {
+        char gdt_load[10];
+        *(unsigned short *)(&gdt_load[0]) = LAST_RESERVED_GDT_BYTE;
+        *(unsigned long  *)(&gdt_load[2]) = GDT_VIRT_START(n);
+        __asm__ __volatile__ ( "lgdt %0" : "=m" (gdt_load) );
+    }
 
     if ( p->domain != n->domain )
         clear_bit(cpu, &p->domain->cpuset);

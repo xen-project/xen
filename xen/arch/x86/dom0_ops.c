@@ -376,7 +376,6 @@ long arch_do_dom0_op(dom0_op_t *op, dom0_op_t *u_dom0_op)
 void arch_getdomaininfo_ctxt(
     struct exec_domain *ed, struct vcpu_guest_context *c)
 { 
-    int i;
 #ifdef __i386__  /* Remove when x86_64 VMX is implemented */
 #ifdef CONFIG_VMX
     extern void save_vmx_cpu_user_regs(struct cpu_user_regs *);
@@ -405,15 +404,6 @@ void arch_getdomaininfo_ctxt(
     if (VMX_DOMAIN(ed))
         c->flags |= VGCF_VMX_GUEST;
 #endif
-
-    c->gdt_ents = 0;
-    if ( GET_GDT_ADDRESS(ed) == GDT_VIRT_START(ed) )
-    {
-        for ( i = 0; i < 16; i++ )
-            c->gdt_frames[i] = 
-                l1e_get_pfn(ed->arch.perdomain_ptes[i]);
-        c->gdt_ents = GET_GDT_ENTRIES(ed);
-    }
 
     c->pt_base = pagetable_val(ed->arch.guest_table);
 

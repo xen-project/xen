@@ -392,15 +392,6 @@ extern int gpf_emulate_4gb(struct cpu_user_regs *regs);
 
 extern void write_ptbase(struct exec_domain *ed);
 
-#define SET_GDT_ENTRIES(_p, _e) \
-    ((*(u16 *)((_p)->arch.gdt + 0)) = (((_e)<<3)-1))
-#define SET_GDT_ADDRESS(_p, _a) \
-    ((*(unsigned long *)((_p)->arch.gdt + 2)) = (_a))
-#define GET_GDT_ENTRIES(_p)     \
-    (((*(u16 *)((_p)->arch.gdt + 0))+1)>>3)
-#define GET_GDT_ADDRESS(_p)     \
-    (*(unsigned long *)((_p)->arch.gdt + 2))
-
 void destroy_gdt(struct exec_domain *d);
 long set_gdt(struct exec_domain *d, 
              unsigned long *frames, 

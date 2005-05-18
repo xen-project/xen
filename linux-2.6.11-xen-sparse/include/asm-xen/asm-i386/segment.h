@@ -74,9 +74,9 @@
 #define GDT_ENTRY_DOUBLEFAULT_TSS	31
 
 /*
- * The GDT has LAST_RESERVED_GDT_ENTRY + 1 entries
+ * The GDT has 32 entries
  */
-#define GDT_ENTRIES (LAST_RESERVED_GDT_ENTRY + 1)
+#define GDT_ENTRIES 32
 
 #define GDT_SIZE (GDT_ENTRIES * 8)
 

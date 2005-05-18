@@ -1,5 +1,6 @@
 #include <xen/config.h>
 #include <public/xen.h>
+#include <asm/desc.h>
 #include <asm/page.h>
 #include <asm/msr.h>
 
@@ -51,7 +52,7 @@ __start:
         cli
 
         /* Set up a few descriptors: on entry only CS is guaranteed good. */
-        lgdt    %cs:0x1001f0
+        lgdt    %cs:0x100400
         mov     $(__HYPERVISOR_DS32),%ecx
         mov     %ecx,%ds
         mov     %ecx,%es
@@ -64,7 +65,7 @@ __start:
         jne     not_multiboot
         
         /* Save the Multiboot info structure for later use. */
-        mov     %ebx,0x1001e0
+        mov     %ebx,0x100300
 
         /* We begin by interrogating the CPU for the presence of long mode. */
         mov     $0x80000000,%eax
@@ -167,44 +168,40 @@ __high_start:
         loop    1b
 
         /* Pass off the Multiboot info structure to C land. */
-        mov     0x1001e0,%edi
+        mov     0x100300,%edi
         lea     start(%rip),%rax
         sub     $0x100000,%rax
         add     %rax,%rdi
         call    __start_xen
         ud2     /* Force a panic (invalid opcode). */
 
+/* This is the default interrupt handler. */
+int_msg:
+        .asciz "Unknown interrupt\n"
+ignore_int:
+        cld
+        leaq    int_msg(%rip),%rdi
+        call    printf
+1:      jmp     1b
+
         .code32
 
-        .org    0x1e0
+        .org    0x300
                         
 /*** DESCRIPTOR TABLES ***/
 
 .globl idt
-.globl gdt        
+.globl gdt
 
-        .org    0x1f0
-        .word   (LAST_RESERVED_GDT_ENTRY*8)+7
-        .long   0x100200 # gdt_table
+        .org    0x400
+        .word   LAST_RESERVED_GDT_BYTE
+        .long   0x101000 - FIRST_RESERVED_GDT_BYTE
         
-        .org    0x200
-ENTRY(gdt_table)
-        .fill FIRST_RESERVED_GDT_ENTRY,8,0
-        .quad 0x0000000000000000     /* unused */
-        .quad 0x00cf9a000000ffff     /* 0x0808 ring 0 code, compatibility */
-        .quad 0x00af9a000000ffff     /* 0x0810 ring 0 code, 64-bit mode   */
-        .quad 0x00cf92000000ffff     /* 0x0818 ring 0 data                */
-        .quad 0x00cffa000000ffff     /* 0x0823 ring 3 code, compatibility */
-        .quad 0x00cff2000000ffff     /* 0x082b ring 3 data                */
-        .quad 0x00affa000000ffff     /* 0x0833 ring 3 code, 64-bit mode   */
-        .quad 0x0000000000000000     /* unused                            */
-        .fill 4*NR_CPUS,8,0          /* space for TSS and LDT per CPU     */
-
         .word   0
 gdt_descr:
-        .word   (LAST_RESERVED_GDT_ENTRY*8)+7
+        .word   LAST_RESERVED_GDT_BYTE
 gdt:       
-        .quad   gdt_table
+        .quad   gdt_table - FIRST_RESERVED_GDT_BYTE
 
         .word   0    
 idt_descr:
@@ -218,8 +215,20 @@ ENTRY(stack_start)
 high_start:
         .quad   __high_start
                 
+        .org    0x1000
+ENTRY(gdt_table)
+        .quad 0x0000000000000000     /* unused */
+        .quad 0x00cf9a000000ffff     /* 0xe008 ring 0 code, compatibility */
+        .quad 0x00af9a000000ffff     /* 0xe010 ring 0 code, 64-bit mode   */
+        .quad 0x00cf92000000ffff     /* 0xe018 ring 0 data                */
+        .quad 0x00cffa000000ffff     /* 0xe023 ring 3 code, compatibility */
+        .quad 0x00cff2000000ffff     /* 0xe02b ring 3 data                */
+        .quad 0x00affa000000ffff     /* 0xe033 ring 3 code, 64-bit mode   */
+        .quad 0x0000000000000000     /* unused                            */
+        .fill 4*NR_CPUS,8,0          /* space for TSS and LDT per CPU     */
+
 /* Initial PML4 -- level-4 page table */
-        .org 0x1000
+        .org 0x2000
 ENTRY(idle_pg_table)
 ENTRY(idle_pg_table_4)
         .quad 0x0000000000102007 # PML4[0]
@@ -227,12 +236,12 @@ ENTRY(idle_pg_table_4)
         .quad 0x0000000000102007 # PML4[262]
 
 /* Initial PDP -- level-3 page table */
-        .org 0x2000
+        .org 0x3000
 ENTRY(idle_pg_table_l3)
         .quad 0x0000000000103007
 
 /* Initial PDE -- level-2 page table. */
-        .org 0x3000
+        .org 0x4000
 ENTRY(idle_pg_table_l2)
         .macro identmap from=0, count=512
         .if \count-1
@@ -244,20 +253,10 @@ ENTRY(idle_pg_table_l2)
         .endm
         identmap /* Too orangey for crows :-) */
 
-        .org 0x4000
+        .org 0x5000
 ENTRY(cpu0_stack)
 
-        .org 0x4000 + STACK_SIZE
+        .org 0x5000 + STACK_SIZE
         .code64
 ENTRY(stext)
 ENTRY(_stext)
-
-/* This is the default interrupt handler. */
-int_msg:
-        .asciz "Unknown interrupt\n"
-ignore_int:
-        cld
-        leaq    int_msg(%rip),%rdi
-        call    printf
-1:      jmp     1b
-

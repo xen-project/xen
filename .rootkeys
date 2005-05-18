@@ -1426,7 +1426,6 @@
 41bf1717bML6GxpclTWJabiaO5W5vg xen/include/asm-x86/x86_64/asm_defns.h
 404f1b9ceJeGVaPNIENm2FkK0AgEOQ xen/include/asm-x86/x86_64/current.h
 41febc4b1aCGLsm0Y0b_82h7lFtrEA xen/include/asm-x86/x86_64/domain_page.h
-404f1badfXZJZ2sU8sh9PS2EZvd19Q xen/include/asm-x86/x86_64/ldt.h
 4208e2a3Fktw4ZttKdDxbhvTQ6brfQ xen/include/asm-x86/x86_64/page.h
 404f1bb86rAXB3aLS1vYdcqpJiEcyg xen/include/asm-x86/x86_64/regs.h
 40e1966azOJZfNI6Ilthe6Q-T3Hewg xen/include/asm-x86/x86_64/string.h

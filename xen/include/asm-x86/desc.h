@@ -1,6 +1,20 @@
 #ifndef __ARCH_DESC_H
 #define __ARCH_DESC_H
-#ifndef __ASSEMBLY__
+
+/*
+ * Xen reserves a memory page of GDT entries.
+ * No guest GDT entries exist beyond the Xen reserved area.
+ */
+#define NR_RESERVED_GDT_PAGES   1
+#define NR_RESERVED_GDT_BYTES   (NR_RESERVED_GDT_PAGES * PAGE_SIZE)
+#define NR_RESERVED_GDT_ENTRIES (NR_RESERVED_GDT_BYTES / 8)
+
+#define LAST_RESERVED_GDT_PAGE  \
+    (FIRST_RESERVED_GDT_PAGE + NR_RESERVED_GDT_PAGES - 1)
+#define LAST_RESERVED_GDT_BYTE  \
+    (FIRST_RESERVED_GDT_BYTE + NR_RESERVED_GDT_BYTES - 1)
+#define LAST_RESERVED_GDT_ENTRY \
+    (FIRST_RESERVED_GDT_ENTRY + NR_RESERVED_GDT_ENTRIES - 1)
 
 #define LDT_ENTRY_SIZE 8
 
@@ -19,9 +33,7 @@
  * is ignored when the gate is accessed.
  */
 #define VALID_SEL(_s)                                                      \
-    (((((_s)>>3) < FIRST_RESERVED_GDT_ENTRY) ||                            \
-      (((_s)>>3) >  LAST_RESERVED_GDT_ENTRY) ||                            \
-      ((_s)&4)) &&                                                         \
+    (((((_s)>>3) < FIRST_RESERVED_GDT_ENTRY) || ((_s)&4)) &&               \
      (((_s)&3) == GUEST_KERNEL_RPL))
 #define VALID_CODESEL(_s) ((_s) == FLAT_KERNEL_CS || VALID_SEL(_s))
 
@@ -35,6 +47,8 @@
 #define _SEGMENT_P       ( 1<<15) /* Segment Present */
 #define _SEGMENT_DB      ( 1<<22) /* 16- or 32-bit segment */
 #define _SEGMENT_G       ( 1<<23) /* Granularity */
+
+#ifndef __ASSEMBLY__
 
 struct desc_struct {
     u32 a, b;
@@ -133,4 +147,5 @@ extern void set_task_gate(unsigned int n, unsigned int sel);
 extern void set_tss_desc(unsigned int n, void *addr);
 
 #endif /* !__ASSEMBLY__ */
+
 #endif /* __ARCH_DESC_H */

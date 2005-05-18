@@ -31,31 +31,23 @@
  * A number of GDT entries are reserved by Xen. These are not situated at the
  * start of the GDT because some stupid OSes export hard-coded selector values
  * in their ABI. These hard-coded values are always near the start of the GDT,
- * so Xen places itself out of the way.
- * 
- * NR_RESERVED_GDT_ENTRIES is (8 + 2 * NR_CPUS) Please update this value if 
- * you increase NR_CPUS or add another GDT entry to gdt_table in x86_32.S
- *
- * NB. The reserved range is inclusive (that is, both FIRST_RESERVED_GDT_ENTRY
- * and LAST_RESERVED_GDT_ENTRY are reserved).
+ * so Xen places itself out of the way, at the far end of the GDT.
  */
-#define NR_RESERVED_GDT_ENTRIES    72
-#define FIRST_RESERVED_GDT_ENTRY   256
-#define LAST_RESERVED_GDT_ENTRY    \
-  (FIRST_RESERVED_GDT_ENTRY + NR_RESERVED_GDT_ENTRIES - 1)
-
+#define FIRST_RESERVED_GDT_PAGE  14
+#define FIRST_RESERVED_GDT_BYTE  (FIRST_RESERVED_GDT_PAGE * 4096)
+#define FIRST_RESERVED_GDT_ENTRY (FIRST_RESERVED_GDT_BYTE / 8)
 
 /*
  * These flat segments are in the Xen-private section of every GDT. Since these
  * are also present in the initial GDT, many OSes will be able to avoid
  * installing their own GDT.
  */
-#define FLAT_RING1_CS 0x0819    /* GDT index 259 */
-#define FLAT_RING1_DS 0x0821    /* GDT index 260 */
-#define FLAT_RING1_SS 0x0821    /* GDT index 260 */
-#define FLAT_RING3_CS 0x082b    /* GDT index 261 */
-#define FLAT_RING3_DS 0x0833    /* GDT index 262 */
-#define FLAT_RING3_SS 0x0833    /* GDT index 262 */
+#define FLAT_RING1_CS 0xe019    /* GDT index 259 */
+#define FLAT_RING1_DS 0xe021    /* GDT index 260 */
+#define FLAT_RING1_SS 0xe021    /* GDT index 260 */
+#define FLAT_RING3_CS 0xe02b    /* GDT index 261 */
+#define FLAT_RING3_DS 0xe033    /* GDT index 262 */
+#define FLAT_RING3_SS 0xe033    /* GDT index 262 */
 
 #define FLAT_KERNEL_CS FLAT_RING1_CS
 #define FLAT_KERNEL_DS FLAT_RING1_DS

@@ -27,10 +27,6 @@
 
 #define OPT_CONSOLE_STR "com1,vga"
 
-/*
- * If you increase this value, please update NR_RESERVED_GDT_ENTRIES
- * in include/public/arch-x86_xx.h
- */
 #define NR_CPUS 32
 
 /* Linkage for x86 */
@@ -160,18 +156,18 @@ extern unsigned long _end; /* standard ELF symbol */
 
 #define PGT_base_page_table PGT_l4_page_table
 
-#define __HYPERVISOR_CS64 0x0810
-#define __HYPERVISOR_CS32 0x0808
+#define __HYPERVISOR_CS64 0xe010
+#define __HYPERVISOR_CS32 0xe008
 #define __HYPERVISOR_CS   __HYPERVISOR_CS64
 #define __HYPERVISOR_DS64 0x0000
-#define __HYPERVISOR_DS32 0x0818
+#define __HYPERVISOR_DS32 0xe018
 #define __HYPERVISOR_DS   __HYPERVISOR_DS64
 
-#define __GUEST_CS64      0x0833
-#define __GUEST_CS32      0x0823
+#define __GUEST_CS64      0xe033
+#define __GUEST_CS32      0xe023
 #define __GUEST_CS        __GUEST_CS64
 #define __GUEST_DS        0x0000
-#define __GUEST_SS        0x082b
+#define __GUEST_SS        0xe02b
 
 /* For generic assembly code: use macros to define operation/operand sizes. */
 #define __OS          "q"  /* Operation Suffix */
@@ -260,8 +256,8 @@ extern unsigned long _end; /* standard ELF symbol */
 
 #define PGT_base_page_table PGT_l2_page_table
 
-#define __HYPERVISOR_CS 0x0808
-#define __HYPERVISOR_DS 0x0810
+#define __HYPERVISOR_CS 0xe008
+#define __HYPERVISOR_DS 0xe010
 
 /* For generic assembly code: use macros to define operation/operand sizes. */
 #define __OS          "l"  /* Operation Suffix */
@@ -275,10 +271,10 @@ extern unsigned long _end; /* standard ELF symbol */
 extern unsigned long xenheap_phys_end; /* user-configurable */
 #endif
 
-#define GDT_VIRT_START(ed)    (PERDOMAIN_VIRT_START + ((ed)->vcpu_id << PDPT_VCPU_VA_SHIFT))
-#define GDT_VIRT_END(ed)      (GDT_VIRT_START(ed) + (64*1024))
-#define LDT_VIRT_START(ed)    (PERDOMAIN_VIRT_START + (64*1024) + ((ed)->vcpu_id << PDPT_VCPU_VA_SHIFT))
-#define LDT_VIRT_END(ed)      (LDT_VIRT_START(ed) + (64*1024))
+#define GDT_VIRT_START(ed)    \
+    (PERDOMAIN_VIRT_START + ((ed)->vcpu_id << PDPT_VCPU_VA_SHIFT))
+#define LDT_VIRT_START(ed)    \
+    (GDT_VIRT_START(ed) + (64*1024))
 
 #define PDPT_VCPU_SHIFT       5
 #define PDPT_VCPU_VA_SHIFT    (PDPT_VCPU_SHIFT + PAGE_SHIFT)

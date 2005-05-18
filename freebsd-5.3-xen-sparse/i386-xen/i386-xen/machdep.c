@@ -1599,11 +1599,7 @@ init386(void)
 	gdt_segs[GDATA_SEL].ssd_limit = atop(0 - ((1 << 26) - (1 << 22) + (1 << 16))); 
 #endif
 #ifdef SMP
-	/* XXX this will blow up if there are more than 512/NGDT vcpus - will never 
-	 * be an issue in the real world but should add an assert on general principles
-	 * we'll likely blow up when we hit LAST_RESERVED_GDT_ENTRY, at which point we
-	 * would need to start allocating more pages for the GDT
-	 */
+	/* XXX this will blow up if there are more than 512/NGDT vcpus */
 	pc = &SMP_prvspace[0].pcpu;
 	for (i = 0; i < ncpus; i++) {
 		cpu_add(i, (i == 0));
@@ -1633,7 +1629,7 @@ init386(void)
 
 	PT_SET_MA(gdt, *vtopte((unsigned long)gdt) & ~PG_RW);
 	gdtmachpfn = vtomach(gdt) >> PAGE_SHIFT;
-	PANIC_IF(HYPERVISOR_set_gdt(&gdtmachpfn, LAST_RESERVED_GDT_ENTRY + 1) != 0);
+	PANIC_IF(HYPERVISOR_set_gdt(&gdtmachpfn, 512) != 0);
 
 	
 	lgdt_finish();
