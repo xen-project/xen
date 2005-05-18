@@ -260,15 +260,13 @@ static void switch_serial_input(void)
 static void __serial_rx(unsigned char c, struct xen_regs *regs)
 {
     if ( xen_rx )
-    {
-        handle_keypress(c, regs);
-    }
-    else if ( (serial_rx_prod-serial_rx_cons) != SERIAL_RX_SIZE )
-    {
-        serial_rx_ring[SERIAL_RX_MASK(serial_rx_prod)] = c;
-        if ( serial_rx_prod++ == serial_rx_cons )
-            send_guest_virq(dom0, VIRQ_CONSOLE);
-    }
+        return handle_keypress(c, regs);
+
+    /* Deliver input to guest buffer, unless it is already full. */
+    if ( (serial_rx_prod-serial_rx_cons) != SERIAL_RX_SIZE )
+        serial_rx_ring[SERIAL_RX_MASK(serial_rx_prod++)] = c;
+    /* Always notify the guest: prevents receive path from getting stuck. */
+    send_guest_virq(dom0, VIRQ_CONSOLE);
 }
 
 static void serial_rx(unsigned char c, struct xen_regs *regs)
