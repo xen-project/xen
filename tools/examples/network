@@ -185,7 +185,6 @@ op_start () {
     else
         transfer_addrs ${netdev} ${bridge}
         transfer_routes ${netdev} ${bridge}
-        del_addrs ${netdev}
     fi
 
     # Attach the real interface to the bridge.
@@ -216,9 +215,7 @@ op_stop () {
         ifconfig veth0 -arp down
         ifconfig veth0 hw ether 00:00:00:00:00:00
     else
-        transfer_addrs ${bridge} ${netdev}
         transfer_routes ${bridge} ${netdev}
-        del_addrs ${bridge}
     fi
 }
 
