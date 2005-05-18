@@ -99,7 +99,7 @@ int xc_linux_restore(int xc_handle, XcIOContext *ioctxt)
     /* A temporary mapping of the guest's suspend record. */
     suspend_record_t *p_srec;
 
-    char *region_base, *p_gdt;
+    char *region_base;
 
     mmu_t *mmu = NULL;
 
