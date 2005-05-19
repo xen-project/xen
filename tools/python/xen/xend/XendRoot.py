@@ -167,7 +167,7 @@ class XendRoot:
         logfile = self.get_config_value("logfile", self.logfile_default)
         loglevel = self.get_config_value("loglevel", self.loglevel_default)
         self.logging = XendLogging(logfile, level=loglevel)
-        self.logging.addLogStderr()
+        #self.logging.addLogStderr()
 
     def get_logging(self):
         """Get the XendLogging instance.
