@@ -309,6 +309,7 @@ softlink include/linux/timex.h include/asm-ia64/linux/timex.h
 softlink include/linux/topology.h include/asm-ia64/linux/topology.h
 softlink include/linux/seqlock.h include/asm-ia64/linux/seqlock.h
 softlink include/linux/jiffies.h include/asm-ia64/linux/jiffies.h
+softlink include/linux/jiffies.h include/asm-ia64/linux/jiffies.h
 
 null include/asm-ia64/linux/file.h
 null include/asm-ia64/linux/module.h
@@ -329,6 +330,7 @@ null include/asm-ia64/linux/serial.h
 null include/asm-ia64/linux/serial_core.h
 null include/asm-ia64/linux/seq_file.h
 null include/asm-ia64/linux/cpu.h
+null include/asm-ia64/linux/ioport.h
 
 softlink include/linux/byteorder/generic.h include/asm-ia64/linux/byteorder/generic.h
 softlink include/linux/byteorder/little_endian.h include/asm-ia64/linux/byteorder/little_endian.h

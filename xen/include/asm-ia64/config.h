@@ -131,41 +131,6 @@ struct page;
 #define ____cacheline_maxaligned_in_smp
 
 #include "asm/types.h"	// for u64
-struct device {
-#if 0
-	struct list_head node;		/* node in sibling list */
-	struct list_head bus_list;	/* node in bus's list */
-	struct list_head driver_list;
-	struct list_head children;
-	struct device 	* parent;
-
-	struct kobject kobj;
-	char	bus_id[BUS_ID_SIZE];	/* position on parent bus */
-
-	struct bus_type	* bus;		/* type of bus device is on */
-	struct device_driver *driver;	/* which driver has allocated this
-					   device */
-	void		*driver_data;	/* data private to the driver */
-	void		*platform_data;	/* Platform specific data (e.g. ACPI,
-					   BIOS data relevant to device) */
-	struct dev_pm_info	power;
-	u32		power_state;	/* Current operating state. In
-					   ACPI-speak, this is D0-D3, D0
-					   being fully functional, and D3
-					   being off. */
-
-	unsigned char *saved_state;	/* saved device state */
-	u32		detach_state;	/* State to enter when device is
-					   detached from its driver. */
-
-#endif
-	u64		*dma_mask;	/* dma mask (if dma'able device) */
-#if 0
-	struct list_head	dma_pools;	/* dma pools (if dma'ble) */
-
-	void	(*release)(struct device * dev);
-#endif
-};
 
 // warning: unless search_extable is declared, the return value gets
 // truncated to 32-bits, causing a very strange error in privop handling
@@ -178,11 +143,6 @@ search_extable(const struct exception_table_entry *first,
 void sort_extable(struct exception_table_entry *start,
 		  struct exception_table_entry *finish);
 void sort_main_extable(void);
-
-// defined (why?) in include/asm-i386/processor.h
-// used in common/physdev.c
-#define IO_BITMAP_SIZE 32
-#define IO_BITMAP_BYTES (IO_BITMAP_SIZE * 4)
 
 #define printk printf
 
@@ -251,9 +211,6 @@ struct screen_info { };
 #define seq_printf(a,b...) printf(b)
 #define CONFIG_BLK_DEV_INITRD // needed to reserve memory for domain0
 
-//
-#define __smp_processor_id() (current->processor)
-
 // needed for newer ACPI code
 #define asmlinkage
 
@@ -262,6 +219,9 @@ struct screen_info { };
 // these declarations got moved at some point, find a better place for them
 extern int opt_noht;
 extern int ht_per_core;
+
+// needed for include/xen/smp.h
+#define __smp_processor_id()	0
 
 // xen/include/asm/config.h
 /******************************************************************************
@@ -312,3 +272,4 @@ extern int ht_per_core;
 #else
 # define __attribute_used__	__attribute__((__unused__))
 #endif
+
