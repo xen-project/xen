@@ -582,8 +582,8 @@ void __init __start_xen(multiboot_info_t *mbi)
         {
             /* Calculate page-frame range, discarding partial frames. */
             unsigned long start, end;
-            start = (e820.map[i].addr + PAGE_SIZE - 1) >> PAGE_SHIFT;
-            end   = (e820.map[i].addr + e820.map[i].size) >> PAGE_SHIFT;
+            start = PFN_UP(e820.map[i].addr);
+            end   = PFN_DOWN(e820.map[i].addr + e820.map[i].size);
             /* Clip the range to above 64MB. */
             if ( end < (64UL << (20-PAGE_SHIFT)) )
                 continue;

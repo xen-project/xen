@@ -174,7 +174,7 @@ void arch_init_memory(void)
 {
     extern void subarch_init_memory(struct domain *);
 
-    unsigned long i, j, pfn, nr_pfns;
+    unsigned long i, pfn, rstart_pfn, rend_pfn;
     struct pfn_info *page;
 
     memset(percpu_info, 0, sizeof(percpu_info));
@@ -206,25 +206,26 @@ void arch_init_memory(void)
         page_set_owner(page, dom_io);
     }
  
-    /* Any non-RAM areas in the e820 map are considered to be for I/O. */
-    for ( i = 0; i < e820.nr_map; i++ )
+    /* Any areas not specified as RAM by the e820 map are considered I/O. */
+    for ( i = 0, pfn = 0; i < e820.nr_map; i++ )
     {
-        if ( e820.map[i].type == E820_RAM )
+        if ( e820.map[i].type != E820_RAM )
             continue;
-        pfn = e820.map[i].addr >> PAGE_SHIFT;
-        nr_pfns = (e820.map[i].size +
-                   (e820.map[i].addr & ~PAGE_MASK) +
-                   ~PAGE_MASK) >> PAGE_SHIFT;
-        for ( j = 0; j < nr_pfns; j++ )
+        /* Every page from cursor to start of next RAM region is I/O. */
+        rstart_pfn = PFN_UP(e820.map[i].addr);
+        rend_pfn   = PFN_DOWN(e820.map[i].addr + e820.map[i].size);
+        while ( pfn < rstart_pfn )
         {
-            if ( !pfn_valid(pfn+j) )
-                continue;
-            page = &frame_table[pfn+j];
+            BUG_ON(!pfn_valid(pfn));
+            page = &frame_table[pfn++];
             page->count_info        = PGC_allocated | 1;
             page->u.inuse.type_info = PGT_writable_page | PGT_validated | 1;
             page_set_owner(page, dom_io);
         }
+        /* Skip the RAM region. */
+        pfn = rend_pfn;
     }
+    BUG_ON(pfn != max_page);
 
     subarch_init_memory(dom_xen);
 }
