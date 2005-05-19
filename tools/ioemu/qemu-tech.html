@@ -1,0 +1,1303 @@
+<HTML>
+<!DOCTYPE html PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<!-- Created on January, 25  2005 by texi2html 1.64 -->
+<!-- 
+Written by: Lionel Cons <Lionel.Cons@cern.ch> (original author)
+            Karl Berry  <karl@freefriends.org>
+            Olaf Bachmann <obachman@mathematik.uni-kl.de>
+            and many others.
+Maintained by: Olaf Bachmann <obachman@mathematik.uni-kl.de>
+Send bugs and suggestions to <texi2html@mathematik.uni-kl.de>
+ 
+-->
+<HEAD>
+<TITLE>Untitled Document: </TITLE>
+
+<META NAME="description" CONTENT="Untitled Document: ">
+<META NAME="keywords" CONTENT="Untitled Document: ">
+<META NAME="resource-type" CONTENT="document">
+<META NAME="distribution" CONTENT="global">
+<META NAME="Generator" CONTENT="texi2html 1.64">
+
+</HEAD>
+
+<BODY LANG="" BGCOLOR="#FFFFFF" TEXT="#000000" LINK="#0000FF" VLINK="#800080" ALINK="#FF0000">
+
+<A NAME="SEC1"></A>
+<TABLE CELLPADDING=1 CELLSPACING=1 BORDER=0>
+<TR><TD VALIGN="MIDDLE" ALIGN="LEFT">[<A HREF="qemu-tech.html#SEC1"> &lt; </A>]</TD>
+<TD VALIGN="MIDDLE" ALIGN="LEFT">[<A HREF="qemu-tech.html#SEC2"> &gt; </A>]</TD>
+<TD VALIGN="MIDDLE" ALIGN="LEFT"> &nbsp; <TD VALIGN="MIDDLE" ALIGN="LEFT">[ &lt;&lt; ]</TD>
+<TD VALIGN="MIDDLE" ALIGN="LEFT">[<A HREF="qemu-tech.html#SEC1"> Up </A>]</TD>
+<TD VALIGN="MIDDLE" ALIGN="LEFT">[ &gt;&gt; ]</TD>
+<TD VALIGN="MIDDLE" ALIGN="LEFT"> &nbsp; <TD VALIGN="MIDDLE" ALIGN="LEFT"> &nbsp; <TD VALIGN="MIDDLE" ALIGN="LEFT"> &nbsp; <TD VALIGN="MIDDLE" ALIGN="LEFT"> &nbsp; <TD VALIGN="MIDDLE" ALIGN="LEFT">[<A HREF="qemu-tech.html#SEC1">Top</A>]</TD>
+<TD VALIGN="MIDDLE" ALIGN="LEFT">[<A HREF="qemu-tech.html#SEC_Contents">Contents</A>]</TD>
+<TD VALIGN="MIDDLE" ALIGN="LEFT">[Index]</TD>
+<TD VALIGN="MIDDLE" ALIGN="LEFT">[<A HREF="qemu-tech.html#SEC_About"> ? </A>]</TD>
+</TR></TABLE>
+<P>
+
+<H1> 1. Introduction </H1>
+<!--docid::SEC1::-->
+<P>
+
+<HR SIZE="6">
+<A NAME="SEC2"></A>
+<TABLE CELLPADDING=1 CELLSPACING=1 BORDER=0>
+<TR><TD VALIGN="MIDDLE" ALIGN="LEFT">[<A HREF="qemu-tech.html#SEC1"> &lt; </A>]</TD>
+<TD VALIGN="MIDDLE" ALIGN="LEFT">[<A HREF="qemu-tech.html#SEC3"> &gt; </A>]</TD>
+<TD VALIGN="MIDDLE" ALIGN="LEFT"> &nbsp; <TD VALIGN="MIDDLE" ALIGN="LEFT">[ &lt;&lt; ]</TD>
+<TD VALIGN="MIDDLE" ALIGN="LEFT">[<A HREF="qemu-tech.html#SEC1"> Up </A>]</TD>
+<TD VALIGN="MIDDLE" ALIGN="LEFT">[ &gt;&gt; ]</TD>
+<TD VALIGN="MIDDLE" ALIGN="LEFT"> &nbsp; <TD VALIGN="MIDDLE" ALIGN="LEFT"> &nbsp; <TD VALIGN="MIDDLE" ALIGN="LEFT"> &nbsp; <TD VALIGN="MIDDLE" ALIGN="LEFT"> &nbsp; <TD VALIGN="MIDDLE" ALIGN="LEFT">[<A HREF="qemu-tech.html#SEC1">Top</A>]</TD>
+<TD VALIGN="MIDDLE" ALIGN="LEFT">[<A HREF="qemu-tech.html#SEC_Contents">Contents</A>]</TD>
+<TD VALIGN="MIDDLE" ALIGN="LEFT">[Index]</TD>
+<TD VALIGN="MIDDLE" ALIGN="LEFT">[<A HREF="qemu-tech.html#SEC_About"> ? </A>]</TD>
+</TR></TABLE>
+<H2> 1.1 Features </H2>
+<!--docid::SEC2::-->
+<P>
+
+QEMU is a FAST! processor emulator using a portable dynamic
+translator.
+</P><P>
+
+QEMU has two operating modes:
+</P><P>
+
+<UL>
+
+<LI>
+Full system emulation. In this mode, QEMU emulates a full system
+(usually a PC), including a processor and various peripherials. It can
+be used to launch an different Operating System without rebooting the
+PC or to debug system code.
+<P>
+
+<LI>
+User mode emulation (Linux host only). In this mode, QEMU can launch
+Linux processes compiled for one CPU on another CPU. It can be used to
+launch the Wine Windows API emulator (<A HREF="http://www.winehq.org">http://www.winehq.org</A>) or
+to ease cross-compilation and cross-debugging.
+<P>
+
+</UL>
+<P>
+
+As QEMU requires no host kernel driver to run, it is very safe and
+easy to use.
+</P><P>
+
+QEMU generic features:
+</P><P>
+
+<UL>
+
+<LI>User space only or full system emulation.
+<P>
+
+<LI>Using dynamic translation to native code for reasonnable speed.
+<P>
+
+<LI>Working on x86 and PowerPC hosts. Being tested on ARM, Sparc32, Alpha and S390.
+<P>
+
+<LI>Self-modifying code support.
+<P>
+
+<LI>Precise exceptions support.
+<P>
+
+<LI>The virtual CPU is a library (<CODE>libqemu</CODE>) which can be used
+in other projects (look at <TT>`qemu/tests/qruncom.c'</TT> to have an
+example of user mode <CODE>libqemu</CODE> usage).
+<P>
+
+</UL>
+<P>
+
+QEMU user mode emulation features:
+<UL>
+<LI>Generic Linux system call converter, including most ioctls.
+<P>
+
+<LI>clone() emulation using native CPU clone() to use Linux scheduler for threads.
+<P>
+
+<LI>Accurate signal handling by remapping host signals to target signals.
+</UL>
+</UL>
+
+QEMU full system emulation features:
+<UL>
+<LI>QEMU can either use a full software MMU for maximum portability or use the host system call mmap() to simulate the target MMU.
+</UL>
+
+<HR SIZE="6">
+<A NAME="SEC3"></A>
+<TABLE CELLPADDING=1 CELLSPACING=1 BORDER=0>
+<TR><TD VALIGN="MIDDLE" ALIGN="LEFT">[<A HREF="qemu-tech.html#SEC2"> &lt; </A>]</TD>
+<TD VALIGN="MIDDLE" ALIGN="LEFT">[<A HREF="qemu-tech.html#SEC4"> &gt; </A>]</TD>
+<TD VALIGN="MIDDLE" ALIGN="LEFT"> &nbsp; <TD VALIGN="MIDDLE" ALIGN="LEFT">[ &lt;&lt; ]</TD>
+<TD VALIGN="MIDDLE" ALIGN="LEFT">[<A HREF="qemu-tech.html#SEC1"> Up </A>]</TD>
+<TD VALIGN="MIDDLE" ALIGN="LEFT">[ &gt;&gt; ]</TD>
+<TD VALIGN="MIDDLE" ALIGN="LEFT"> &nbsp; <TD VALIGN="MIDDLE" ALIGN="LEFT"> &nbsp; <TD VALIGN="MIDDLE" ALIGN="LEFT"> &nbsp; <TD VALIGN="MIDDLE" ALIGN="LEFT"> &nbsp; <TD VALIGN="MIDDLE" ALIGN="LEFT">[<A HREF="qemu-tech.html#SEC1">Top</A>]</TD>
+<TD VALIGN="MIDDLE" ALIGN="LEFT">[<A HREF="qemu-tech.html#SEC_Contents">Contents</A>]</TD>
+<TD VALIGN="MIDDLE" ALIGN="LEFT">[Index]</TD>
+<TD VALIGN="MIDDLE" ALIGN="LEFT">[<A HREF="qemu-tech.html#SEC_About"> ? </A>]</TD>
+</TR></TABLE>
+<H2> 1.2 x86 emulation </H2>
+<!--docid::SEC3::-->
+<P>
+
+QEMU x86 target features:
+</P><P>
+
+<UL>
+
+<LI>The virtual x86 CPU supports 16 bit and 32 bit addressing with segmentation.
+LDT/GDT and IDT are emulated. VM86 mode is also supported to run DOSEMU.
+<P>
+
+<LI>Support of host page sizes bigger than 4KB in user mode emulation.
+<P>
+
+<LI>QEMU can emulate itself on x86.
+<P>
+
+<LI>An extensive Linux x86 CPU test program is included <TT>`tests/test-i386'</TT>.
+It can be used to test other x86 virtual CPUs.
+<P>
+
+</UL>
+<P>
+
+Current QEMU limitations:
+</P><P>
+
+<UL>
+
+<LI>No SSE/MMX support (yet).
+<P>
+
+<LI>No x86-64 support.
+<P>
+
+<LI>IPC syscalls are missing.
+<P>
+
+<LI>The x86 segment limits and access rights are not tested at every
+memory access (yet). Hopefully, very few OSes seem to rely on that for
+normal use.
+<P>
+
+<LI>On non x86 host CPUs, <CODE>double</CODE>s are used instead of the non standard
+10 byte <CODE>long double</CODE>s of x86 for floating point emulation to get
+maximum performances.
+<P>
+
+</UL>
+<P>
+
+<HR SIZE="6">
+<A NAME="SEC4"></A>
+<TABLE CELLPADDING=1 CELLSPACING=1 BORDER=0>
+<TR><TD VALIGN="MIDDLE" ALIGN="LEFT">[<A HREF="qemu-tech.html#SEC3"> &lt; </A>]</TD>
+<TD VALIGN="MIDDLE" ALIGN="LEFT">[<A HREF="qemu-tech.html#SEC5"> &gt; </A>]</TD>
+<TD VALIGN="MIDDLE" ALIGN="LEFT"> &nbsp; <TD VALIGN="MIDDLE" ALIGN="LEFT">[ &lt;&lt; ]</TD>
+<TD VALIGN="MIDDLE" ALIGN="LEFT">[<A HREF="qemu-tech.html#SEC1"> Up </A>]</TD>
+<TD VALIGN="MIDDLE" ALIGN="LEFT">[ &gt;&gt; ]</TD>
+<TD VALIGN="MIDDLE" ALIGN="LEFT"> &nbsp; <TD VALIGN="MIDDLE" ALIGN="LEFT"> &nbsp; <TD VALIGN="MIDDLE" ALIGN="LEFT"> &nbsp; <TD VALIGN="MIDDLE" ALIGN="LEFT"> &nbsp; <TD VALIGN="MIDDLE" ALIGN="LEFT">[<A HREF="qemu-tech.html#SEC1">Top</A>]</TD>
+<TD VALIGN="MIDDLE" ALIGN="LEFT">[<A HREF="qemu-tech.html#SEC_Contents">Contents</A>]</TD>
+<TD VALIGN="MIDDLE" ALIGN="LEFT">[Index]</TD>
+<TD VALIGN="MIDDLE" ALIGN="LEFT">[<A HREF="qemu-tech.html#SEC_About"> ? </A>]</TD>
+</TR></TABLE>
+<H2> 1.3 ARM emulation </H2>
+<!--docid::SEC4::-->
+<P>
+
+<UL>
+
+<LI>Full ARM 7 user emulation.
+<P>
+
+<LI>NWFPE FPU support included in user Linux emulation.
+<P>
+
+<LI>Can run most ARM Linux binaries.
+<P>
+
+</UL>
+<P>
+
+<HR SIZE="6">
+<A NAME="SEC5"></A>
+<TABLE CELLPADDING=1 CELLSPACING=1 BORDER=0>
+<TR><TD VALIGN="MIDDLE" ALIGN="LEFT">[<A HREF="qemu-tech.html#SEC4"> &lt; </A>]</TD>
+<TD VALIGN="MIDDLE" ALIGN="LEFT">[<A HREF="qemu-tech.html#SEC6"> &gt; </A>]</TD>
+<TD VALIGN="MIDDLE" ALIGN="LEFT"> &nbsp; <TD VALIGN="MIDDLE" ALIGN="LEFT">[ &lt;&lt; ]</TD>
+<TD VALIGN="MIDDLE" ALIGN="LEFT">[<A HREF="qemu-tech.html#SEC1"> Up </A>]</TD>
+<TD VALIGN="MIDDLE" ALIGN="LEFT">[ &gt;&gt; ]</TD>
+<TD VALIGN="MIDDLE" ALIGN="LEFT"> &nbsp; <TD VALIGN="MIDDLE" ALIGN="LEFT"> &nbsp; <TD VALIGN="MIDDLE" ALIGN="LEFT"> &nbsp; <TD VALIGN="MIDDLE" ALIGN="LEFT"> &nbsp; <TD VALIGN="MIDDLE" ALIGN="LEFT">[<A HREF="qemu-tech.html#SEC1">Top</A>]</TD>
+<TD VALIGN="MIDDLE" ALIGN="LEFT">[<A HREF="qemu-tech.html#SEC_Contents">Contents</A>]</TD>
+<TD VALIGN="MIDDLE" ALIGN="LEFT">[Index]</TD>
+<TD VALIGN="MIDDLE" ALIGN="LEFT">[<A HREF="qemu-tech.html#SEC_About"> ? </A>]</TD>
+</TR></TABLE>
+<H2> 1.4 PowerPC emulation </H2>
+<!--docid::SEC5::-->
+<P>
+
+<UL>
+
+<LI>Full PowerPC 32 bit emulation, including priviledged instructions,
+FPU and MMU.
+<P>
+
+<LI>Can run most PowerPC Linux binaries.
+<P>
+
+</UL>
+<P>
+
+<HR SIZE="6">
+<A NAME="SEC6"></A>
+<TABLE CELLPADDING=1 CELLSPACING=1 BORDER=0>
+<TR><TD VALIGN="MIDDLE" ALIGN="LEFT">[<A HREF="qemu-tech.html#SEC5"> &lt; </A>]</TD>
+<TD VALIGN="MIDDLE" ALIGN="LEFT">[<A HREF="qemu-tech.html#SEC7"> &gt; </A>]</TD>
+<TD VALIGN="MIDDLE" ALIGN="LEFT"> &nbsp; <TD VALIGN="MIDDLE" ALIGN="LEFT">[ &lt;&lt; ]</TD>
+<TD VALIGN="MIDDLE" ALIGN="LEFT">[<A HREF="qemu-tech.html#SEC1"> Up </A>]</TD>
+<TD VALIGN="MIDDLE" ALIGN="LEFT">[ &gt;&gt; ]</TD>
+<TD VALIGN="MIDDLE" ALIGN="LEFT"> &nbsp; <TD VALIGN="MIDDLE" ALIGN="LEFT"> &nbsp; <TD VALIGN="MIDDLE" ALIGN="LEFT"> &nbsp; <TD VALIGN="MIDDLE" ALIGN="LEFT"> &nbsp; <TD VALIGN="MIDDLE" ALIGN="LEFT">[<A HREF="qemu-tech.html#SEC1">Top</A>]</TD>
+<TD VALIGN="MIDDLE" ALIGN="LEFT">[<A HREF="qemu-tech.html#SEC_Contents">Contents</A>]</TD>
+<TD VALIGN="MIDDLE" ALIGN="LEFT">[Index]</TD>
+<TD VALIGN="MIDDLE" ALIGN="LEFT">[<A HREF="qemu-tech.html#SEC_About"> ? </A>]</TD>
+</TR></TABLE>
+<H2> 1.5 SPARC emulation </H2>
+<!--docid::SEC6::-->
+<P>
+
+<UL>
+
+<LI>SPARC V8 user support, except FPU instructions.
+<P>
+
+<LI>Can run some SPARC Linux binaries.
+<P>
+
+</UL>
+<P>
+
+<HR SIZE="6">
+<A NAME="SEC7"></A>
+<TABLE CELLPADDING=1 CELLSPACING=1 BORDER=0>
+<TR><TD VALIGN="MIDDLE" ALIGN="LEFT">[<A HREF="qemu-tech.html#SEC6"> &lt; </A>]</TD>
+<TD VALIGN="MIDDLE" ALIGN="LEFT">[<A HREF="qemu-tech.html#SEC8"> &gt; </A>]</TD>
+<TD VALIGN="MIDDLE" ALIGN="LEFT"> &nbsp; <TD VALIGN="MIDDLE" ALIGN="LEFT">[ &lt;&lt; ]</TD>
+<TD VALIGN="MIDDLE" ALIGN="LEFT">[<A HREF="qemu-tech.html#SEC1"> Up </A>]</TD>
+<TD VALIGN="MIDDLE" ALIGN="LEFT">[ &gt;&gt; ]</TD>
+<TD VALIGN="MIDDLE" ALIGN="LEFT"> &nbsp; <TD VALIGN="MIDDLE" ALIGN="LEFT"> &nbsp; <TD VALIGN="MIDDLE" ALIGN="LEFT"> &nbsp; <TD VALIGN="MIDDLE" ALIGN="LEFT"> &nbsp; <TD VALIGN="MIDDLE" ALIGN="LEFT">[<A HREF="qemu-tech.html#SEC1">Top</A>]</TD>
+<TD VALIGN="MIDDLE" ALIGN="LEFT">[<A HREF="qemu-tech.html#SEC_Contents">Contents</A>]</TD>
+<TD VALIGN="MIDDLE" ALIGN="LEFT">[Index]</TD>
+<TD VALIGN="MIDDLE" ALIGN="LEFT">[<A HREF="qemu-tech.html#SEC_About"> ? </A>]</TD>
+</TR></TABLE>
+<H1> 2. QEMU Internals </H1>
+<!--docid::SEC7::-->
+<P>
+
+<HR SIZE="6">
+<A NAME="SEC8"></A>
+<TABLE CELLPADDING=1 CELLSPACING=1 BORDER=0>
+<TR><TD VALIGN="MIDDLE" ALIGN="LEFT">[<A HREF="qemu-tech.html#SEC7"> &lt; </A>]</TD>
+<TD VALIGN="MIDDLE" ALIGN="LEFT">[<A HREF="qemu-tech.html#SEC9"> &gt; </A>]</TD>
+<TD VALIGN="MIDDLE" ALIGN="LEFT"> &nbsp; <TD VALIGN="MIDDLE" ALIGN="LEFT">[ &lt;&lt; ]</TD>
+<TD VALIGN="MIDDLE" ALIGN="LEFT">[<A HREF="qemu-tech.html#SEC1"> Up </A>]</TD>
+<TD VALIGN="MIDDLE" ALIGN="LEFT">[ &gt;&gt; ]</TD>
+<TD VALIGN="MIDDLE" ALIGN="LEFT"> &nbsp; <TD VALIGN="MIDDLE" ALIGN="LEFT"> &nbsp; <TD VALIGN="MIDDLE" ALIGN="LEFT"> &nbsp; <TD VALIGN="MIDDLE" ALIGN="LEFT"> &nbsp; <TD VALIGN="MIDDLE" ALIGN="LEFT">[<A HREF="qemu-tech.html#SEC1">Top</A>]</TD>
+<TD VALIGN="MIDDLE" ALIGN="LEFT">[<A HREF="qemu-tech.html#SEC_Contents">Contents</A>]</TD>
+<TD VALIGN="MIDDLE" ALIGN="LEFT">[Index]</TD>
+<TD VALIGN="MIDDLE" ALIGN="LEFT">[<A HREF="qemu-tech.html#SEC_About"> ? </A>]</TD>
+</TR></TABLE>
+<H2> 2.1 QEMU compared to other emulators </H2>
+<!--docid::SEC8::-->
+<P>
+
+Like bochs <A HREF="qemu-tech.html#BIB3">[3]</A>, QEMU emulates an x86 CPU. But QEMU is much faster than
+bochs as it uses dynamic compilation. Bochs is closely tied to x86 PC
+emulation while QEMU can emulate several processors.
+</P><P>
+
+Like Valgrind <A HREF="qemu-tech.html#BIB2">[2]</A>, QEMU does user space emulation and dynamic
+translation. Valgrind is mainly a memory debugger while QEMU has no
+support for it (QEMU could be used to detect out of bound memory
+accesses as Valgrind, but it has no support to track uninitialised data
+as Valgrind does). The Valgrind dynamic translator generates better code
+than QEMU (in particular it does register allocation) but it is closely
+tied to an x86 host and target and has no support for precise exceptions
+and system emulation.
+</P><P>
+
+EM86 <A HREF="qemu-tech.html#BIB4">[4]</A> is the closest project to user space QEMU (and QEMU still uses
+some of its code, in particular the ELF file loader). EM86 was limited
+to an alpha host and used a proprietary and slow interpreter (the
+interpreter part of the FX!32 Digital Win32 code translator <A HREF="qemu-tech.html#BIB5">[5]</A>).
+</P><P>
+
+TWIN <A HREF="qemu-tech.html#BIB6">[6]</A> is a Windows API emulator like Wine. It is less accurate than
+Wine but includes a protected mode x86 interpreter to launch x86 Windows
+executables. Such an approach has greater potential because most of the
+Windows API is executed natively but it is far more difficult to develop
+because all the data structures and function parameters exchanged
+between the API and the x86 code must be converted.
+</P><P>
+
+User mode Linux <A HREF="qemu-tech.html#BIB7">[7]</A> was the only solution before QEMU to launch a
+Linux kernel as a process while not needing any host kernel
+patches. However, user mode Linux requires heavy kernel patches while
+QEMU accepts unpatched Linux kernels. The price to pay is that QEMU is
+slower.
+</P><P>
+
+The new Plex86 <A HREF="qemu-tech.html#BIB8">[8]</A> PC virtualizer is done in the same spirit as the
+qemu-fast system emulator. It requires a patched Linux kernel to work
+(you cannot launch the same kernel on your PC), but the patches are
+really small. As it is a PC virtualizer (no emulation is done except
+for some priveledged instructions), it has the potential of being
+faster than QEMU. The downside is that a complicated (and potentially
+unsafe) host kernel patch is needed.
+</P><P>
+
+The commercial PC Virtualizers (VMWare <A HREF="qemu-tech.html#BIB9">[9]</A>, VirtualPC <A HREF="qemu-tech.html#BIB10">[10]</A>, TwoOStwo
+<A HREF="qemu-tech.html#BIB11">[11]</A>) are faster than QEMU, but they all need specific, proprietary
+and potentially unsafe host drivers. Moreover, they are unable to
+provide cycle exact simulation as an emulator can.
+</P><P>
+
+<HR SIZE="6">
+<A NAME="SEC9"></A>
+<TABLE CELLPADDING=1 CELLSPACING=1 BORDER=0>
+<TR><TD VALIGN="MIDDLE" ALIGN="LEFT">[<A HREF="qemu-tech.html#SEC8"> &lt; </A>]</TD>
+<TD VALIGN="MIDDLE" ALIGN="LEFT">[<A HREF="qemu-tech.html#SEC10"> &gt; </A>]</TD>
+<TD VALIGN="MIDDLE" ALIGN="LEFT"> &nbsp; <TD VALIGN="MIDDLE" ALIGN="LEFT">[ &lt;&lt; ]</TD>
+<TD VALIGN="MIDDLE" ALIGN="LEFT">[<A HREF="qemu-tech.html#SEC1"> Up </A>]</TD>
+<TD VALIGN="MIDDLE" ALIGN="LEFT">[ &gt;&gt; ]</TD>
+<TD VALIGN="MIDDLE" ALIGN="LEFT"> &nbsp; <TD VALIGN="MIDDLE" ALIGN="LEFT"> &nbsp; <TD VALIGN="MIDDLE" ALIGN="LEFT"> &nbsp; <TD VALIGN="MIDDLE" ALIGN="LEFT"> &nbsp; <TD VALIGN="MIDDLE" ALIGN="LEFT">[<A HREF="qemu-tech.html#SEC1">Top</A>]</TD>
+<TD VALIGN="MIDDLE" ALIGN="LEFT">[<A HREF="qemu-tech.html#SEC_Contents">Contents</A>]</TD>
+<TD VALIGN="MIDDLE" ALIGN="LEFT">[Index]</TD>
+<TD VALIGN="MIDDLE" ALIGN="LEFT">[<A HREF="qemu-tech.html#SEC_About"> ? </A>]</TD>
+</TR></TABLE>
+<H2> 2.2 Portable dynamic translation </H2>
+<!--docid::SEC9::-->
+<P>
+
+QEMU is a dynamic translator. When it first encounters a piece of code,
+it converts it to the host instruction set. Usually dynamic translators
+are very complicated and highly CPU dependent. QEMU uses some tricks
+which make it relatively easily portable and simple while achieving good
+performances.
+</P><P>
+
+The basic idea is to split every x86 instruction into fewer simpler
+instructions. Each simple instruction is implemented by a piece of C
+code (see <TT>`target-i386/op.c'</TT>). Then a compile time tool
+(<TT>`dyngen'</TT>) takes the corresponding object file (<TT>`op.o'</TT>)
+to generate a dynamic code generator which concatenates the simple
+instructions to build a function (see <TT>`op.h:dyngen_code()'</TT>).
+</P><P>
+
+In essence, the process is similar to <A HREF="qemu-tech.html#BIB1">[1]</A>, but more work is done at
+compile time. 
+</P><P>
+
+A key idea to get optimal performances is that constant parameters can
+be passed to the simple operations. For that purpose, dummy ELF
+relocations are generated with gcc for each constant parameter. Then,
+the tool (<TT>`dyngen'</TT>) can locate the relocations and generate the
+appriopriate C code to resolve them when building the dynamic code.
+</P><P>
+
+That way, QEMU is no more difficult to port than a dynamic linker.
+</P><P>
+
+To go even faster, GCC static register variables are used to keep the
+state of the virtual CPU.
+</P><P>
+
+<HR SIZE="6">
+<A NAME="SEC10"></A>
+<TABLE CELLPADDING=1 CELLSPACING=1 BORDER=0>
+<TR><TD VALIGN="MIDDLE" ALIGN="LEFT">[<A HREF="qemu-tech.html#SEC9"> &lt; </A>]</TD>
+<TD VALIGN="MIDDLE" ALIGN="LEFT">[<A HREF="qemu-tech.html#SEC11"> &gt; </A>]</TD>
+<TD VALIGN="MIDDLE" ALIGN="LEFT"> &nbsp; <TD VALIGN="MIDDLE" ALIGN="LEFT">[ &lt;&lt; ]</TD>
+<TD VALIGN="MIDDLE" ALIGN="LEFT">[<A HREF="qemu-tech.html#SEC1"> Up </A>]</TD>
+<TD VALIGN="MIDDLE" ALIGN="LEFT">[ &gt;&gt; ]</TD>
+<TD VALIGN="MIDDLE" ALIGN="LEFT"> &nbsp; <TD VALIGN="MIDDLE" ALIGN="LEFT"> &nbsp; <TD VALIGN="MIDDLE" ALIGN="LEFT"> &nbsp; <TD VALIGN="MIDDLE" ALIGN="LEFT"> &nbsp; <TD VALIGN="MIDDLE" ALIGN="LEFT">[<A HREF="qemu-tech.html#SEC1">Top</A>]</TD>
+<TD VALIGN="MIDDLE" ALIGN="LEFT">[<A HREF="qemu-tech.html#SEC_Contents">Contents</A>]</TD>
+<TD VALIGN="MIDDLE" ALIGN="LEFT">[Index]</TD>
+<TD VALIGN="MIDDLE" ALIGN="LEFT">[<A HREF="qemu-tech.html#SEC_About"> ? </A>]</TD>
+</TR></TABLE>
+<H2> 2.3 Register allocation </H2>
+<!--docid::SEC10::-->
+<P>
+
+Since QEMU uses fixed simple instructions, no efficient register
+allocation can be done. However, because RISC CPUs have a lot of
+register, most of the virtual CPU state can be put in registers without
+doing complicated register allocation.
+</P><P>
+
+<HR SIZE="6">
+<A NAME="SEC11"></A>
+<TABLE CELLPADDING=1 CELLSPACING=1 BORDER=0>
+<TR><TD VALIGN="MIDDLE" ALIGN="LEFT">[<A HREF="qemu-tech.html#SEC10"> &lt; </A>]</TD>
+<TD VALIGN="MIDDLE" ALIGN="LEFT">[<A HREF="qemu-tech.html#SEC12"> &gt; </A>]</TD>
+<TD VALIGN="MIDDLE" ALIGN="LEFT"> &nbsp; <TD VALIGN="MIDDLE" ALIGN="LEFT">[ &lt;&lt; ]</TD>
+<TD VALIGN="MIDDLE" ALIGN="LEFT">[<A HREF="qemu-tech.html#SEC1"> Up </A>]</TD>
+<TD VALIGN="MIDDLE" ALIGN="LEFT">[ &gt;&gt; ]</TD>
+<TD VALIGN="MIDDLE" ALIGN="LEFT"> &nbsp; <TD VALIGN="MIDDLE" ALIGN="LEFT"> &nbsp; <TD VALIGN="MIDDLE" ALIGN="LEFT"> &nbsp; <TD VALIGN="MIDDLE" ALIGN="LEFT"> &nbsp; <TD VALIGN="MIDDLE" ALIGN="LEFT">[<A HREF="qemu-tech.html#SEC1">Top</A>]</TD>
+<TD VALIGN="MIDDLE" ALIGN="LEFT">[<A HREF="qemu-tech.html#SEC_Contents">Contents</A>]</TD>
+<TD VALIGN="MIDDLE" ALIGN="LEFT">[Index]</TD>
+<TD VALIGN="MIDDLE" ALIGN="LEFT">[<A HREF="qemu-tech.html#SEC_About"> ? </A>]</TD>
+</TR></TABLE>
+<H2> 2.4 Condition code optimisations </H2>
+<!--docid::SEC11::-->
+<P>
+
+Good CPU condition codes emulation (<CODE>EFLAGS</CODE> register on x86) is a
+critical point to get good performances. QEMU uses lazy condition code
+evaluation: instead of computing the condition codes after each x86
+instruction, it just stores one operand (called <CODE>CC_SRC</CODE>), the
+result (called <CODE>CC_DST</CODE>) and the type of operation (called
+<CODE>CC_OP</CODE>).
+</P><P>
+
+<CODE>CC_OP</CODE> is almost never explicitely set in the generated code
+because it is known at translation time.
+</P><P>
+
+In order to increase performances, a backward pass is performed on the
+generated simple instructions (see
+<CODE>target-i386/translate.c:optimize_flags()</CODE>). When it can be proved that
+the condition codes are not needed by the next instructions, no
+condition codes are computed at all.
+</P><P>
+
+<HR SIZE="6">
+<A NAME="SEC12"></A>
+<TABLE CELLPADDING=1 CELLSPACING=1 BORDER=0>
+<TR><TD VALIGN="MIDDLE" ALIGN="LEFT">[<A HREF="qemu-tech.html#SEC11"> &lt; </A>]</TD>
+<TD VALIGN="MIDDLE" ALIGN="LEFT">[<A HREF="qemu-tech.html#SEC13"> &gt; </A>]</TD>
+<TD VALIGN="MIDDLE" ALIGN="LEFT"> &nbsp; <TD VALIGN="MIDDLE" ALIGN="LEFT">[ &lt;&lt; ]</TD>
+<TD VALIGN="MIDDLE" ALIGN="LEFT">[<A HREF="qemu-tech.html#SEC1"> Up </A>]</TD>
+<TD VALIGN="MIDDLE" ALIGN="LEFT">[ &gt;&gt; ]</TD>
+<TD VALIGN="MIDDLE" ALIGN="LEFT"> &nbsp; <TD VALIGN="MIDDLE" ALIGN="LEFT"> &nbsp; <TD VALIGN="MIDDLE" ALIGN="LEFT"> &nbsp; <TD VALIGN="MIDDLE" ALIGN="LEFT"> &nbsp; <TD VALIGN="MIDDLE" ALIGN="LEFT">[<A HREF="qemu-tech.html#SEC1">Top</A>]</TD>
+<TD VALIGN="MIDDLE" ALIGN="LEFT">[<A HREF="qemu-tech.html#SEC_Contents">Contents</A>]</TD>
+<TD VALIGN="MIDDLE" ALIGN="LEFT">[Index]</TD>
+<TD VALIGN="MIDDLE" ALIGN="LEFT">[<A HREF="qemu-tech.html#SEC_About"> ? </A>]</TD>
+</TR></TABLE>
+<H2> 2.5 CPU state optimisations </H2>
+<!--docid::SEC12::-->
+<P>
+
+The x86 CPU has many internal states which change the way it evaluates
+instructions. In order to achieve a good speed, the translation phase
+considers that some state information of the virtual x86 CPU cannot
+change in it. For example, if the SS, DS and ES segments have a zero
+base, then the translator does not even generate an addition for the
+segment base.
+</P><P>
+
+[The FPU stack pointer register is not handled that way yet].
+</P><P>
+
+<HR SIZE="6">
+<A NAME="SEC13"></A>
+<TABLE CELLPADDING=1 CELLSPACING=1 BORDER=0>
+<TR><TD VALIGN="MIDDLE" ALIGN="LEFT">[<A HREF="qemu-tech.html#SEC12"> &lt; </A>]</TD>
+<TD VALIGN="MIDDLE" ALIGN="LEFT">[<A HREF="qemu-tech.html#SEC14"> &gt; </A>]</TD>
+<TD VALIGN="MIDDLE" ALIGN="LEFT"> &nbsp; <TD VALIGN="MIDDLE" ALIGN="LEFT">[ &lt;&lt; ]</TD>
+<TD VALIGN="MIDDLE" ALIGN="LEFT">[<A HREF="qemu-tech.html#SEC1"> Up </A>]</TD>
+<TD VALIGN="MIDDLE" ALIGN="LEFT">[ &gt;&gt; ]</TD>
+<TD VALIGN="MIDDLE" ALIGN="LEFT"> &nbsp; <TD VALIGN="MIDDLE" ALIGN="LEFT"> &nbsp; <TD VALIGN="MIDDLE" ALIGN="LEFT"> &nbsp; <TD VALIGN="MIDDLE" ALIGN="LEFT"> &nbsp; <TD VALIGN="MIDDLE" ALIGN="LEFT">[<A HREF="qemu-tech.html#SEC1">Top</A>]</TD>
+<TD VALIGN="MIDDLE" ALIGN="LEFT">[<A HREF="qemu-tech.html#SEC_Contents">Contents</A>]</TD>
+<TD VALIGN="MIDDLE" ALIGN="LEFT">[Index]</TD>
+<TD VALIGN="MIDDLE" ALIGN="LEFT">[<A HREF="qemu-tech.html#SEC_About"> ? </A>]</TD>
+</TR></TABLE>
+<H2> 2.6 Translation cache </H2>
+<!--docid::SEC13::-->
+<P>
+
+A 16 MByte cache holds the most recently used translations. For
+simplicity, it is completely flushed when it is full. A translation unit
+contains just a single basic block (a block of x86 instructions
+terminated by a jump or by a virtual CPU state change which the
+translator cannot deduce statically).
+</P><P>
+
+<HR SIZE="6">
+<A NAME="SEC14"></A>
+<TABLE CELLPADDING=1 CELLSPACING=1 BORDER=0>
+<TR><TD VALIGN="MIDDLE" ALIGN="LEFT">[<A HREF="qemu-tech.html#SEC13"> &lt; </A>]</TD>
+<TD VALIGN="MIDDLE" ALIGN="LEFT">[<A HREF="qemu-tech.html#SEC15"> &gt; </A>]</TD>
+<TD VALIGN="MIDDLE" ALIGN="LEFT"> &nbsp; <TD VALIGN="MIDDLE" ALIGN="LEFT">[ &lt;&lt; ]</TD>
+<TD VALIGN="MIDDLE" ALIGN="LEFT">[<A HREF="qemu-tech.html#SEC1"> Up </A>]</TD>
+<TD VALIGN="MIDDLE" ALIGN="LEFT">[ &gt;&gt; ]</TD>
+<TD VALIGN="MIDDLE" ALIGN="LEFT"> &nbsp; <TD VALIGN="MIDDLE" ALIGN="LEFT"> &nbsp; <TD VALIGN="MIDDLE" ALIGN="LEFT"> &nbsp; <TD VALIGN="MIDDLE" ALIGN="LEFT"> &nbsp; <TD VALIGN="MIDDLE" ALIGN="LEFT">[<A HREF="qemu-tech.html#SEC1">Top</A>]</TD>
+<TD VALIGN="MIDDLE" ALIGN="LEFT">[<A HREF="qemu-tech.html#SEC_Contents">Contents</A>]</TD>
+<TD VALIGN="MIDDLE" ALIGN="LEFT">[Index]</TD>
+<TD VALIGN="MIDDLE" ALIGN="LEFT">[<A HREF="qemu-tech.html#SEC_About"> ? </A>]</TD>
+</TR></TABLE>
+<H2> 2.7 Direct block chaining </H2>
+<!--docid::SEC14::-->
+<P>
+
+After each translated basic block is executed, QEMU uses the simulated
+Program Counter (PC) and other cpu state informations (such as the CS
+segment base value) to find the next basic block.
+</P><P>
+
+In order to accelerate the most common cases where the new simulated PC
+is known, QEMU can patch a basic block so that it jumps directly to the
+next one.
+</P><P>
+
+The most portable code uses an indirect jump. An indirect jump makes
+it easier to make the jump target modification atomic. On some host
+architectures (such as x86 or PowerPC), the <CODE>JUMP</CODE> opcode is
+directly patched so that the block chaining has no overhead.
+</P><P>
+
+<HR SIZE="6">
+<A NAME="SEC15"></A>
+<TABLE CELLPADDING=1 CELLSPACING=1 BORDER=0>
+<TR><TD VALIGN="MIDDLE" ALIGN="LEFT">[<A HREF="qemu-tech.html#SEC14"> &lt; </A>]</TD>
+<TD VALIGN="MIDDLE" ALIGN="LEFT">[<A HREF="qemu-tech.html#SEC16"> &gt; </A>]</TD>
+<TD VALIGN="MIDDLE" ALIGN="LEFT"> &nbsp; <TD VALIGN="MIDDLE" ALIGN="LEFT">[ &lt;&lt; ]</TD>
+<TD VALIGN="MIDDLE" ALIGN="LEFT">[<A HREF="qemu-tech.html#SEC1"> Up </A>]</TD>
+<TD VALIGN="MIDDLE" ALIGN="LEFT">[ &gt;&gt; ]</TD>
+<TD VALIGN="MIDDLE" ALIGN="LEFT"> &nbsp; <TD VALIGN="MIDDLE" ALIGN="LEFT"> &nbsp; <TD VALIGN="MIDDLE" ALIGN="LEFT"> &nbsp; <TD VALIGN="MIDDLE" ALIGN="LEFT"> &nbsp; <TD VALIGN="MIDDLE" ALIGN="LEFT">[<A HREF="qemu-tech.html#SEC1">Top</A>]</TD>
+<TD VALIGN="MIDDLE" ALIGN="LEFT">[<A HREF="qemu-tech.html#SEC_Contents">Contents</A>]</TD>
+<TD VALIGN="MIDDLE" ALIGN="LEFT">[Index]</TD>
+<TD VALIGN="MIDDLE" ALIGN="LEFT">[<A HREF="qemu-tech.html#SEC_About"> ? </A>]</TD>
+</TR></TABLE>
+<H2> 2.8 Self-modifying code and translated code invalidation </H2>
+<!--docid::SEC15::-->
+<P>
+
+Self-modifying code is a special challenge in x86 emulation because no
+instruction cache invalidation is signaled by the application when code
+is modified.
+</P><P>
+
+When translated code is generated for a basic block, the corresponding
+host page is write protected if it is not already read-only (with the
+system call <CODE>mprotect()</CODE>). Then, if a write access is done to the
+page, Linux raises a SEGV signal. QEMU then invalidates all the
+translated code in the page and enables write accesses to the page.
+</P><P>
+
+Correct translated code invalidation is done efficiently by maintaining
+a linked list of every translated block contained in a given page. Other
+linked lists are also maintained to undo direct block chaining. 
+</P><P>
+
+Although the overhead of doing <CODE>mprotect()</CODE> calls is important,
+most MSDOS programs can be emulated at reasonnable speed with QEMU and
+DOSEMU.
+</P><P>
+
+Note that QEMU also invalidates pages of translated code when it detects
+that memory mappings are modified with <CODE>mmap()</CODE> or <CODE>munmap()</CODE>.
+</P><P>
+
+When using a software MMU, the code invalidation is more efficient: if
+a given code page is invalidated too often because of write accesses,
+then a bitmap representing all the code inside the page is
+built. Every store into that page checks the bitmap to see if the code
+really needs to be invalidated. It avoids invalidating the code when
+only data is modified in the page.
+</P><P>
+
+<HR SIZE="6">
+<A NAME="SEC16"></A>
+<TABLE CELLPADDING=1 CELLSPACING=1 BORDER=0>
+<TR><TD VALIGN="MIDDLE" ALIGN="LEFT">[<A HREF="qemu-tech.html#SEC15"> &lt; </A>]</TD>
+<TD VALIGN="MIDDLE" ALIGN="LEFT">[<A HREF="qemu-tech.html#SEC17"> &gt; </A>]</TD>
+<TD VALIGN="MIDDLE" ALIGN="LEFT"> &nbsp; <TD VALIGN="MIDDLE" ALIGN="LEFT">[ &lt;&lt; ]</TD>
+<TD VALIGN="MIDDLE" ALIGN="LEFT">[<A HREF="qemu-tech.html#SEC1"> Up </A>]</TD>
+<TD VALIGN="MIDDLE" ALIGN="LEFT">[ &gt;&gt; ]</TD>
+<TD VALIGN="MIDDLE" ALIGN="LEFT"> &nbsp; <TD VALIGN="MIDDLE" ALIGN="LEFT"> &nbsp; <TD VALIGN="MIDDLE" ALIGN="LEFT"> &nbsp; <TD VALIGN="MIDDLE" ALIGN="LEFT"> &nbsp; <TD VALIGN="MIDDLE" ALIGN="LEFT">[<A HREF="qemu-tech.html#SEC1">Top</A>]</TD>
+<TD VALIGN="MIDDLE" ALIGN="LEFT">[<A HREF="qemu-tech.html#SEC_Contents">Contents</A>]</TD>
+<TD VALIGN="MIDDLE" ALIGN="LEFT">[Index]</TD>
+<TD VALIGN="MIDDLE" ALIGN="LEFT">[<A HREF="qemu-tech.html#SEC_About"> ? </A>]</TD>
+</TR></TABLE>
+<H2> 2.9 Exception support </H2>
+<!--docid::SEC16::-->
+<P>
+
+longjmp() is used when an exception such as division by zero is
+encountered. 
+</P><P>
+
+The host SIGSEGV and SIGBUS signal handlers are used to get invalid
+memory accesses. The exact CPU state can be retrieved because all the
+x86 registers are stored in fixed host registers. The simulated program
+counter is found by retranslating the corresponding basic block and by
+looking where the host program counter was at the exception point.
+</P><P>
+
+The virtual CPU cannot retrieve the exact <CODE>EFLAGS</CODE> register because
+in some cases it is not computed because of condition code
+optimisations. It is not a big concern because the emulated code can
+still be restarted in any cases.
+</P><P>
+
+<HR SIZE="6">
+<A NAME="SEC17"></A>
+<TABLE CELLPADDING=1 CELLSPACING=1 BORDER=0>
+<TR><TD VALIGN="MIDDLE" ALIGN="LEFT">[<A HREF="qemu-tech.html#SEC16"> &lt; </A>]</TD>
+<TD VALIGN="MIDDLE" ALIGN="LEFT">[<A HREF="qemu-tech.html#SEC18"> &gt; </A>]</TD>
+<TD VALIGN="MIDDLE" ALIGN="LEFT"> &nbsp; <TD VALIGN="MIDDLE" ALIGN="LEFT">[ &lt;&lt; ]</TD>
+<TD VALIGN="MIDDLE" ALIGN="LEFT">[<A HREF="qemu-tech.html#SEC1"> Up </A>]</TD>
+<TD VALIGN="MIDDLE" ALIGN="LEFT">[ &gt;&gt; ]</TD>
+<TD VALIGN="MIDDLE" ALIGN="LEFT"> &nbsp; <TD VALIGN="MIDDLE" ALIGN="LEFT"> &nbsp; <TD VALIGN="MIDDLE" ALIGN="LEFT"> &nbsp; <TD VALIGN="MIDDLE" ALIGN="LEFT"> &nbsp; <TD VALIGN="MIDDLE" ALIGN="LEFT">[<A HREF="qemu-tech.html#SEC1">Top</A>]</TD>
+<TD VALIGN="MIDDLE" ALIGN="LEFT">[<A HREF="qemu-tech.html#SEC_Contents">Contents</A>]</TD>
+<TD VALIGN="MIDDLE" ALIGN="LEFT">[Index]</TD>
+<TD VALIGN="MIDDLE" ALIGN="LEFT">[<A HREF="qemu-tech.html#SEC_About"> ? </A>]</TD>
+</TR></TABLE>
+<H2> 2.10 MMU emulation </H2>
+<!--docid::SEC17::-->
+<P>
+
+For system emulation, QEMU uses the mmap() system call to emulate the
+target CPU MMU. It works as long the emulated OS does not use an area
+reserved by the host OS (such as the area above 0xc0000000 on x86
+Linux).
+</P><P>
+
+In order to be able to launch any OS, QEMU also supports a soft
+MMU. In that mode, the MMU virtual to physical address translation is
+done at every memory access. QEMU uses an address translation cache to
+speed up the translation.
+</P><P>
+
+In order to avoid flushing the translated code each time the MMU
+mappings change, QEMU uses a physically indexed translation cache. It
+means that each basic block is indexed with its physical address. 
+</P><P>
+
+When MMU mappings change, only the chaining of the basic blocks is
+reset (i.e. a basic block can no longer jump directly to another one).
+</P><P>
+
+<HR SIZE="6">
+<A NAME="SEC18"></A>
+<TABLE CELLPADDING=1 CELLSPACING=1 BORDER=0>
+<TR><TD VALIGN="MIDDLE" ALIGN="LEFT">[<A HREF="qemu-tech.html#SEC17"> &lt; </A>]</TD>
+<TD VALIGN="MIDDLE" ALIGN="LEFT">[<A HREF="qemu-tech.html#SEC19"> &gt; </A>]</TD>
+<TD VALIGN="MIDDLE" ALIGN="LEFT"> &nbsp; <TD VALIGN="MIDDLE" ALIGN="LEFT">[ &lt;&lt; ]</TD>
+<TD VALIGN="MIDDLE" ALIGN="LEFT">[<A HREF="qemu-tech.html#SEC1"> Up </A>]</TD>
+<TD VALIGN="MIDDLE" ALIGN="LEFT">[ &gt;&gt; ]</TD>
+<TD VALIGN="MIDDLE" ALIGN="LEFT"> &nbsp; <TD VALIGN="MIDDLE" ALIGN="LEFT"> &nbsp; <TD VALIGN="MIDDLE" ALIGN="LEFT"> &nbsp; <TD VALIGN="MIDDLE" ALIGN="LEFT"> &nbsp; <TD VALIGN="MIDDLE" ALIGN="LEFT">[<A HREF="qemu-tech.html#SEC1">Top</A>]</TD>
+<TD VALIGN="MIDDLE" ALIGN="LEFT">[<A HREF="qemu-tech.html#SEC_Contents">Contents</A>]</TD>
+<TD VALIGN="MIDDLE" ALIGN="LEFT">[Index]</TD>
+<TD VALIGN="MIDDLE" ALIGN="LEFT">[<A HREF="qemu-tech.html#SEC_About"> ? </A>]</TD>
+</TR></TABLE>
+<H2> 2.11 Hardware interrupts </H2>
+<!--docid::SEC18::-->
+<P>
+
+In order to be faster, QEMU does not check at every basic block if an
+hardware interrupt is pending. Instead, the user must asynchrously
+call a specific function to tell that an interrupt is pending. This
+function resets the chaining of the currently executing basic
+block. It ensures that the execution will return soon in the main loop
+of the CPU emulator. Then the main loop can test if the interrupt is
+pending and handle it.
+</P><P>
+
+<HR SIZE="6">
+<A NAME="SEC19"></A>
+<TABLE CELLPADDING=1 CELLSPACING=1 BORDER=0>
+<TR><TD VALIGN="MIDDLE" ALIGN="LEFT">[<A HREF="qemu-tech.html#SEC18"> &lt; </A>]</TD>
+<TD VALIGN="MIDDLE" ALIGN="LEFT">[<A HREF="qemu-tech.html#SEC20"> &gt; </A>]</TD>
+<TD VALIGN="MIDDLE" ALIGN="LEFT"> &nbsp; <TD VALIGN="MIDDLE" ALIGN="LEFT">[ &lt;&lt; ]</TD>
+<TD VALIGN="MIDDLE" ALIGN="LEFT">[<A HREF="qemu-tech.html#SEC1"> Up </A>]</TD>
+<TD VALIGN="MIDDLE" ALIGN="LEFT">[ &gt;&gt; ]</TD>
+<TD VALIGN="MIDDLE" ALIGN="LEFT"> &nbsp; <TD VALIGN="MIDDLE" ALIGN="LEFT"> &nbsp; <TD VALIGN="MIDDLE" ALIGN="LEFT"> &nbsp; <TD VALIGN="MIDDLE" ALIGN="LEFT"> &nbsp; <TD VALIGN="MIDDLE" ALIGN="LEFT">[<A HREF="qemu-tech.html#SEC1">Top</A>]</TD>
+<TD VALIGN="MIDDLE" ALIGN="LEFT">[<A HREF="qemu-tech.html#SEC_Contents">Contents</A>]</TD>
+<TD VALIGN="MIDDLE" ALIGN="LEFT">[Index]</TD>
+<TD VALIGN="MIDDLE" ALIGN="LEFT">[<A HREF="qemu-tech.html#SEC_About"> ? </A>]</TD>
+</TR></TABLE>
+<H2> 2.12 User emulation specific details </H2>
+<!--docid::SEC19::-->
+<P>
+
+<HR SIZE="6">
+<A NAME="SEC20"></A>
+<TABLE CELLPADDING=1 CELLSPACING=1 BORDER=0>
+<TR><TD VALIGN="MIDDLE" ALIGN="LEFT">[<A HREF="qemu-tech.html#SEC19"> &lt; </A>]</TD>
+<TD VALIGN="MIDDLE" ALIGN="LEFT">[<A HREF="qemu-tech.html#SEC21"> &gt; </A>]</TD>
+<TD VALIGN="MIDDLE" ALIGN="LEFT"> &nbsp; <TD VALIGN="MIDDLE" ALIGN="LEFT">[ &lt;&lt; ]</TD>
+<TD VALIGN="MIDDLE" ALIGN="LEFT">[<A HREF="qemu-tech.html#SEC1"> Up </A>]</TD>
+<TD VALIGN="MIDDLE" ALIGN="LEFT">[ &gt;&gt; ]</TD>
+<TD VALIGN="MIDDLE" ALIGN="LEFT"> &nbsp; <TD VALIGN="MIDDLE" ALIGN="LEFT"> &nbsp; <TD VALIGN="MIDDLE" ALIGN="LEFT"> &nbsp; <TD VALIGN="MIDDLE" ALIGN="LEFT"> &nbsp; <TD VALIGN="MIDDLE" ALIGN="LEFT">[<A HREF="qemu-tech.html#SEC1">Top</A>]</TD>
+<TD VALIGN="MIDDLE" ALIGN="LEFT">[<A HREF="qemu-tech.html#SEC_Contents">Contents</A>]</TD>
+<TD VALIGN="MIDDLE" ALIGN="LEFT">[Index]</TD>
+<TD VALIGN="MIDDLE" ALIGN="LEFT">[<A HREF="qemu-tech.html#SEC_About"> ? </A>]</TD>
+</TR></TABLE>
+<H3> 2.12.1 Linux system call translation </H3>
+<!--docid::SEC20::-->
+<P>
+
+QEMU includes a generic system call translator for Linux. It means that
+the parameters of the system calls can be converted to fix the
+endianness and 32/64 bit issues. The IOCTLs are converted with a generic
+type description system (see <TT>`ioctls.h'</TT> and <TT>`thunk.c'</TT>).
+</P><P>
+
+QEMU supports host CPUs which have pages bigger than 4KB. It records all
+the mappings the process does and try to emulated the <CODE>mmap()</CODE>
+system calls in cases where the host <CODE>mmap()</CODE> call would fail
+because of bad page alignment.
+</P><P>
+
+<HR SIZE="6">
+<A NAME="SEC21"></A>
+<TABLE CELLPADDING=1 CELLSPACING=1 BORDER=0>
+<TR><TD VALIGN="MIDDLE" ALIGN="LEFT">[<A HREF="qemu-tech.html#SEC20"> &lt; </A>]</TD>
+<TD VALIGN="MIDDLE" ALIGN="LEFT">[<A HREF="qemu-tech.html#SEC22"> &gt; </A>]</TD>
+<TD VALIGN="MIDDLE" ALIGN="LEFT"> &nbsp; <TD VALIGN="MIDDLE" ALIGN="LEFT">[ &lt;&lt; ]</TD>
+<TD VALIGN="MIDDLE" ALIGN="LEFT">[<A HREF="qemu-tech.html#SEC1"> Up </A>]</TD>
+<TD VALIGN="MIDDLE" ALIGN="LEFT">[ &gt;&gt; ]</TD>
+<TD VALIGN="MIDDLE" ALIGN="LEFT"> &nbsp; <TD VALIGN="MIDDLE" ALIGN="LEFT"> &nbsp; <TD VALIGN="MIDDLE" ALIGN="LEFT"> &nbsp; <TD VALIGN="MIDDLE" ALIGN="LEFT"> &nbsp; <TD VALIGN="MIDDLE" ALIGN="LEFT">[<A HREF="qemu-tech.html#SEC1">Top</A>]</TD>
+<TD VALIGN="MIDDLE" ALIGN="LEFT">[<A HREF="qemu-tech.html#SEC_Contents">Contents</A>]</TD>
+<TD VALIGN="MIDDLE" ALIGN="LEFT">[Index]</TD>
+<TD VALIGN="MIDDLE" ALIGN="LEFT">[<A HREF="qemu-tech.html#SEC_About"> ? </A>]</TD>
+</TR></TABLE>
+<H3> 2.12.2 Linux signals </H3>
+<!--docid::SEC21::-->
+<P>
+
+Normal and real-time signals are queued along with their information
+(<CODE>siginfo_t</CODE>) as it is done in the Linux kernel. Then an interrupt
+request is done to the virtual CPU. When it is interrupted, one queued
+signal is handled by generating a stack frame in the virtual CPU as the
+Linux kernel does. The <CODE>sigreturn()</CODE> system call is emulated to return
+from the virtual signal handler.
+</P><P>
+
+Some signals (such as SIGALRM) directly come from the host. Other
+signals are synthetized from the virtual CPU exceptions such as SIGFPE
+when a division by zero is done (see <CODE>main.c:cpu_loop()</CODE>).
+</P><P>
+
+The blocked signal mask is still handled by the host Linux kernel so
+that most signal system calls can be redirected directly to the host
+Linux kernel. Only the <CODE>sigaction()</CODE> and <CODE>sigreturn()</CODE> system
+calls need to be fully emulated (see <TT>`signal.c'</TT>).
+</P><P>
+
+<HR SIZE="6">
+<A NAME="SEC22"></A>
+<TABLE CELLPADDING=1 CELLSPACING=1 BORDER=0>
+<TR><TD VALIGN="MIDDLE" ALIGN="LEFT">[<A HREF="qemu-tech.html#SEC21"> &lt; </A>]</TD>
+<TD VALIGN="MIDDLE" ALIGN="LEFT">[<A HREF="qemu-tech.html#SEC23"> &gt; </A>]</TD>
+<TD VALIGN="MIDDLE" ALIGN="LEFT"> &nbsp; <TD VALIGN="MIDDLE" ALIGN="LEFT">[ &lt;&lt; ]</TD>
+<TD VALIGN="MIDDLE" ALIGN="LEFT">[<A HREF="qemu-tech.html#SEC1"> Up </A>]</TD>
+<TD VALIGN="MIDDLE" ALIGN="LEFT">[ &gt;&gt; ]</TD>
+<TD VALIGN="MIDDLE" ALIGN="LEFT"> &nbsp; <TD VALIGN="MIDDLE" ALIGN="LEFT"> &nbsp; <TD VALIGN="MIDDLE" ALIGN="LEFT"> &nbsp; <TD VALIGN="MIDDLE" ALIGN="LEFT"> &nbsp; <TD VALIGN="MIDDLE" ALIGN="LEFT">[<A HREF="qemu-tech.html#SEC1">Top</A>]</TD>
+<TD VALIGN="MIDDLE" ALIGN="LEFT">[<A HREF="qemu-tech.html#SEC_Contents">Contents</A>]</TD>
+<TD VALIGN="MIDDLE" ALIGN="LEFT">[Index]</TD>
+<TD VALIGN="MIDDLE" ALIGN="LEFT">[<A HREF="qemu-tech.html#SEC_About"> ? </A>]</TD>
+</TR></TABLE>
+<H3> 2.12.3 clone() system call and threads </H3>
+<!--docid::SEC22::-->
+<P>
+
+The Linux clone() system call is usually used to create a thread. QEMU
+uses the host clone() system call so that real host threads are created
+for each emulated thread. One virtual CPU instance is created for each
+thread.
+</P><P>
+
+The virtual x86 CPU atomic operations are emulated with a global lock so
+that their semantic is preserved.
+</P><P>
+
+Note that currently there are still some locking issues in QEMU. In
+particular, the translated cache flush is not protected yet against
+reentrancy.
+</P><P>
+
+<HR SIZE="6">
+<A NAME="SEC23"></A>
+<TABLE CELLPADDING=1 CELLSPACING=1 BORDER=0>
+<TR><TD VALIGN="MIDDLE" ALIGN="LEFT">[<A HREF="qemu-tech.html#SEC22"> &lt; </A>]</TD>
+<TD VALIGN="MIDDLE" ALIGN="LEFT">[<A HREF="qemu-tech.html#SEC24"> &gt; </A>]</TD>
+<TD VALIGN="MIDDLE" ALIGN="LEFT"> &nbsp; <TD VALIGN="MIDDLE" ALIGN="LEFT">[ &lt;&lt; ]</TD>
+<TD VALIGN="MIDDLE" ALIGN="LEFT">[<A HREF="qemu-tech.html#SEC1"> Up </A>]</TD>
+<TD VALIGN="MIDDLE" ALIGN="LEFT">[ &gt;&gt; ]</TD>
+<TD VALIGN="MIDDLE" ALIGN="LEFT"> &nbsp; <TD VALIGN="MIDDLE" ALIGN="LEFT"> &nbsp; <TD VALIGN="MIDDLE" ALIGN="LEFT"> &nbsp; <TD VALIGN="MIDDLE" ALIGN="LEFT"> &nbsp; <TD VALIGN="MIDDLE" ALIGN="LEFT">[<A HREF="qemu-tech.html#SEC1">Top</A>]</TD>
+<TD VALIGN="MIDDLE" ALIGN="LEFT">[<A HREF="qemu-tech.html#SEC_Contents">Contents</A>]</TD>
+<TD VALIGN="MIDDLE" ALIGN="LEFT">[Index]</TD>
+<TD VALIGN="MIDDLE" ALIGN="LEFT">[<A HREF="qemu-tech.html#SEC_About"> ? </A>]</TD>
+</TR></TABLE>
+<H3> 2.12.4 Self-virtualization </H3>
+<!--docid::SEC23::-->
+<P>
+
+QEMU was conceived so that ultimately it can emulate itself. Although
+it is not very useful, it is an important test to show the power of the
+emulator.
+</P><P>
+
+Achieving self-virtualization is not easy because there may be address
+space conflicts. QEMU solves this problem by being an executable ELF
+shared object as the ld-linux.so ELF interpreter. That way, it can be
+relocated at load time.
+</P><P>
+
+<HR SIZE="6">
+<A NAME="SEC24"></A>
+<TABLE CELLPADDING=1 CELLSPACING=1 BORDER=0>
+<TR><TD VALIGN="MIDDLE" ALIGN="LEFT">[<A HREF="qemu-tech.html#SEC23"> &lt; </A>]</TD>
+<TD VALIGN="MIDDLE" ALIGN="LEFT">[<A HREF="qemu-tech.html#SEC25"> &gt; </A>]</TD>
+<TD VALIGN="MIDDLE" ALIGN="LEFT"> &nbsp; <TD VALIGN="MIDDLE" ALIGN="LEFT">[ &lt;&lt; ]</TD>
+<TD VALIGN="MIDDLE" ALIGN="LEFT">[<A HREF="qemu-tech.html#SEC1"> Up </A>]</TD>
+<TD VALIGN="MIDDLE" ALIGN="LEFT">[ &gt;&gt; ]</TD>
+<TD VALIGN="MIDDLE" ALIGN="LEFT"> &nbsp; <TD VALIGN="MIDDLE" ALIGN="LEFT"> &nbsp; <TD VALIGN="MIDDLE" ALIGN="LEFT"> &nbsp; <TD VALIGN="MIDDLE" ALIGN="LEFT"> &nbsp; <TD VALIGN="MIDDLE" ALIGN="LEFT">[<A HREF="qemu-tech.html#SEC1">Top</A>]</TD>
+<TD VALIGN="MIDDLE" ALIGN="LEFT">[<A HREF="qemu-tech.html#SEC_Contents">Contents</A>]</TD>
+<TD VALIGN="MIDDLE" ALIGN="LEFT">[Index]</TD>
+<TD VALIGN="MIDDLE" ALIGN="LEFT">[<A HREF="qemu-tech.html#SEC_About"> ? </A>]</TD>
+</TR></TABLE>
+<H2> 2.13 Bibliography </H2>
+<!--docid::SEC24::-->
+<P>
+
+<DL COMPACT>
+
+<DT><A NAME="BIB1">[1]</A>
+<DD><A HREF="http://citeseer.nj.nec.com/piumarta98optimizing.html">http://citeseer.nj.nec.com/piumarta98optimizing.html</A>, Optimizing
+direct threaded code by selective inlining (1998) by Ian Piumarta, Fabio
+Riccardi.
+<P>
+
+<DT><A NAME="BIB2">[2]</A>
+<DD><A HREF="http://developer.kde.org/~sewardj/">http://developer.kde.org/~sewardj/</A>, Valgrind, an open-source
+memory debugger for x86-GNU/Linux, by Julian Seward.
+<P>
+
+<DT><A NAME="BIB3">[3]</A>
+<DD><A HREF="http://bochs.sourceforge.net/">http://bochs.sourceforge.net/</A>, the Bochs IA-32 Emulator Project,
+by Kevin Lawton et al.
+<P>
+
+<DT><A NAME="BIB4">[4]</A>
+<DD><A HREF="http://www.cs.rose-hulman.edu/~donaldlf/em86/index.html">http://www.cs.rose-hulman.edu/~donaldlf/em86/index.html</A>, the EM86
+x86 emulator on Alpha-Linux.
+<P>
+
+<DT><A NAME="BIB5">[5]</A>
+<DD><A HREF="http://www.usenix.org/publications/library/proceedings/usenix-nt97/full_papers/chernoff/chernoff.pdf">http://www.usenix.org/publications/library/proceedings/usenix-nt97/full_papers/chernoff/chernoff.pdf</A>,
+DIGITAL FX!32: Running 32-Bit x86 Applications on Alpha NT, by Anton
+Chernoff and Ray Hookway.
+<P>
+
+<DT><A NAME="BIB6">[6]</A>
+<DD><A HREF="http://www.willows.com/">http://www.willows.com/</A>, Windows API library emulation from
+Willows Software.
+<P>
+
+<DT><A NAME="BIB7">[7]</A>
+<DD><A HREF="http://user-mode-linux.sourceforge.net/">http://user-mode-linux.sourceforge.net/</A>, 
+The User-mode Linux Kernel.
+<P>
+
+<DT><A NAME="BIB8">[8]</A>
+<DD><A HREF="http://www.plex86.org/">http://www.plex86.org/</A>, 
+The new Plex86 project.
+<P>
+
+<DT><A NAME="BIB9">[9]</A>
+<DD><A HREF="http://www.vmware.com/">http://www.vmware.com/</A>, 
+The VMWare PC virtualizer.
+<P>
+
+<DT><A NAME="BIB10">[10]</A>
+<DD><A HREF="http://www.microsoft.com/windowsxp/virtualpc/">http://www.microsoft.com/windowsxp/virtualpc/</A>, 
+The VirtualPC PC virtualizer.
+<P>
+
+<DT><A NAME="BIB11">[11]</A>
+<DD><A HREF="http://www.twoostwo.org/">http://www.twoostwo.org/</A>, 
+The TwoOStwo PC virtualizer.
+<P>
+
+</DL>
+<P>
+
+<HR SIZE="6">
+<A NAME="SEC25"></A>
+<TABLE CELLPADDING=1 CELLSPACING=1 BORDER=0>
+<TR><TD VALIGN="MIDDLE" ALIGN="LEFT">[<A HREF="qemu-tech.html#SEC24"> &lt; </A>]</TD>
+<TD VALIGN="MIDDLE" ALIGN="LEFT">[<A HREF="qemu-tech.html#SEC26"> &gt; </A>]</TD>
+<TD VALIGN="MIDDLE" ALIGN="LEFT"> &nbsp; <TD VALIGN="MIDDLE" ALIGN="LEFT">[ &lt;&lt; ]</TD>
+<TD VALIGN="MIDDLE" ALIGN="LEFT">[<A HREF="qemu-tech.html#SEC1"> Up </A>]</TD>
+<TD VALIGN="MIDDLE" ALIGN="LEFT">[ &gt;&gt; ]</TD>
+<TD VALIGN="MIDDLE" ALIGN="LEFT"> &nbsp; <TD VALIGN="MIDDLE" ALIGN="LEFT"> &nbsp; <TD VALIGN="MIDDLE" ALIGN="LEFT"> &nbsp; <TD VALIGN="MIDDLE" ALIGN="LEFT"> &nbsp; <TD VALIGN="MIDDLE" ALIGN="LEFT">[<A HREF="qemu-tech.html#SEC1">Top</A>]</TD>
+<TD VALIGN="MIDDLE" ALIGN="LEFT">[<A HREF="qemu-tech.html#SEC_Contents">Contents</A>]</TD>
+<TD VALIGN="MIDDLE" ALIGN="LEFT">[Index]</TD>
+<TD VALIGN="MIDDLE" ALIGN="LEFT">[<A HREF="qemu-tech.html#SEC_About"> ? </A>]</TD>
+</TR></TABLE>
+<H1> 3. Regression Tests </H1>
+<!--docid::SEC25::-->
+<P>
+
+In the directory <TT>`tests/'</TT>, various interesting testing programs
+are available. There are used for regression testing.
+</P><P>
+
+<HR SIZE="6">
+<A NAME="SEC26"></A>
+<TABLE CELLPADDING=1 CELLSPACING=1 BORDER=0>
+<TR><TD VALIGN="MIDDLE" ALIGN="LEFT">[<A HREF="qemu-tech.html#SEC25"> &lt; </A>]</TD>
+<TD VALIGN="MIDDLE" ALIGN="LEFT">[<A HREF="qemu-tech.html#SEC27"> &gt; </A>]</TD>
+<TD VALIGN="MIDDLE" ALIGN="LEFT"> &nbsp; <TD VALIGN="MIDDLE" ALIGN="LEFT">[ &lt;&lt; ]</TD>
+<TD VALIGN="MIDDLE" ALIGN="LEFT">[<A HREF="qemu-tech.html#SEC1"> Up </A>]</TD>
+<TD VALIGN="MIDDLE" ALIGN="LEFT">[ &gt;&gt; ]</TD>
+<TD VALIGN="MIDDLE" ALIGN="LEFT"> &nbsp; <TD VALIGN="MIDDLE" ALIGN="LEFT"> &nbsp; <TD VALIGN="MIDDLE" ALIGN="LEFT"> &nbsp; <TD VALIGN="MIDDLE" ALIGN="LEFT"> &nbsp; <TD VALIGN="MIDDLE" ALIGN="LEFT">[<A HREF="qemu-tech.html#SEC1">Top</A>]</TD>
+<TD VALIGN="MIDDLE" ALIGN="LEFT">[<A HREF="qemu-tech.html#SEC_Contents">Contents</A>]</TD>
+<TD VALIGN="MIDDLE" ALIGN="LEFT">[Index]</TD>
+<TD VALIGN="MIDDLE" ALIGN="LEFT">[<A HREF="qemu-tech.html#SEC_About"> ? </A>]</TD>
+</TR></TABLE>
+<H2> 3.1 <TT>`test-i386'</TT> </H2>
+<!--docid::SEC26::-->
+<P>
+
+This program executes most of the 16 bit and 32 bit x86 instructions and
+generates a text output. It can be compared with the output obtained with
+a real CPU or another emulator. The target <CODE>make test</CODE> runs this
+program and a <CODE>diff</CODE> on the generated output.
+</P><P>
+
+The Linux system call <CODE>modify_ldt()</CODE> is used to create x86 selectors
+to test some 16 bit addressing and 32 bit with segmentation cases.
+</P><P>
+
+The Linux system call <CODE>vm86()</CODE> is used to test vm86 emulation.
+</P><P>
+
+Various exceptions are raised to test most of the x86 user space
+exception reporting.
+</P><P>
+
+<HR SIZE="6">
+<A NAME="SEC27"></A>
+<TABLE CELLPADDING=1 CELLSPACING=1 BORDER=0>
+<TR><TD VALIGN="MIDDLE" ALIGN="LEFT">[<A HREF="qemu-tech.html#SEC26"> &lt; </A>]</TD>
+<TD VALIGN="MIDDLE" ALIGN="LEFT">[<A HREF="qemu-tech.html#SEC28"> &gt; </A>]</TD>
+<TD VALIGN="MIDDLE" ALIGN="LEFT"> &nbsp; <TD VALIGN="MIDDLE" ALIGN="LEFT">[ &lt;&lt; ]</TD>
+<TD VALIGN="MIDDLE" ALIGN="LEFT">[<A HREF="qemu-tech.html#SEC1"> Up </A>]</TD>
+<TD VALIGN="MIDDLE" ALIGN="LEFT">[ &gt;&gt; ]</TD>
+<TD VALIGN="MIDDLE" ALIGN="LEFT"> &nbsp; <TD VALIGN="MIDDLE" ALIGN="LEFT"> &nbsp; <TD VALIGN="MIDDLE" ALIGN="LEFT"> &nbsp; <TD VALIGN="MIDDLE" ALIGN="LEFT"> &nbsp; <TD VALIGN="MIDDLE" ALIGN="LEFT">[<A HREF="qemu-tech.html#SEC1">Top</A>]</TD>
+<TD VALIGN="MIDDLE" ALIGN="LEFT">[<A HREF="qemu-tech.html#SEC_Contents">Contents</A>]</TD>
+<TD VALIGN="MIDDLE" ALIGN="LEFT">[Index]</TD>
+<TD VALIGN="MIDDLE" ALIGN="LEFT">[<A HREF="qemu-tech.html#SEC_About"> ? </A>]</TD>
+</TR></TABLE>
+<H2> 3.2 <TT>`linux-test'</TT> </H2>
+<!--docid::SEC27::-->
+<P>
+
+This program tests various Linux system calls. It is used to verify
+that the system call parameters are correctly converted between target
+and host CPUs.
+</P><P>
+
+<HR SIZE="6">
+<A NAME="SEC28"></A>
+<TABLE CELLPADDING=1 CELLSPACING=1 BORDER=0>
+<TR><TD VALIGN="MIDDLE" ALIGN="LEFT">[<A HREF="qemu-tech.html#SEC27"> &lt; </A>]</TD>
+<TD VALIGN="MIDDLE" ALIGN="LEFT">[ &gt; ]</TD>
+<TD VALIGN="MIDDLE" ALIGN="LEFT"> &nbsp; <TD VALIGN="MIDDLE" ALIGN="LEFT">[ &lt;&lt; ]</TD>
+<TD VALIGN="MIDDLE" ALIGN="LEFT">[<A HREF="qemu-tech.html#SEC1"> Up </A>]</TD>
+<TD VALIGN="MIDDLE" ALIGN="LEFT">[ &gt;&gt; ]</TD>
+<TD VALIGN="MIDDLE" ALIGN="LEFT"> &nbsp; <TD VALIGN="MIDDLE" ALIGN="LEFT"> &nbsp; <TD VALIGN="MIDDLE" ALIGN="LEFT"> &nbsp; <TD VALIGN="MIDDLE" ALIGN="LEFT"> &nbsp; <TD VALIGN="MIDDLE" ALIGN="LEFT">[<A HREF="qemu-tech.html#SEC1">Top</A>]</TD>
+<TD VALIGN="MIDDLE" ALIGN="LEFT">[<A HREF="qemu-tech.html#SEC_Contents">Contents</A>]</TD>
+<TD VALIGN="MIDDLE" ALIGN="LEFT">[Index]</TD>
+<TD VALIGN="MIDDLE" ALIGN="LEFT">[<A HREF="qemu-tech.html#SEC_About"> ? </A>]</TD>
+</TR></TABLE>
+<H2> 3.3 <TT>`qruncom.c'</TT> </H2>
+<!--docid::SEC28::-->
+<P>
+
+Example of usage of <CODE>libqemu</CODE> to emulate a user mode i386 CPU.
+<HR SIZE="6">
+<A NAME="SEC_Contents"></A>
+<TABLE CELLPADDING=1 CELLSPACING=1 BORDER=0>
+<TR><TD VALIGN="MIDDLE" ALIGN="LEFT">[<A HREF="qemu-tech.html#SEC1">Top</A>]</TD>
+<TD VALIGN="MIDDLE" ALIGN="LEFT">[<A HREF="qemu-tech.html#SEC_Contents">Contents</A>]</TD>
+<TD VALIGN="MIDDLE" ALIGN="LEFT">[Index]</TD>
+<TD VALIGN="MIDDLE" ALIGN="LEFT">[<A HREF="qemu-tech.html#SEC_About"> ? </A>]</TD>
+</TR></TABLE>
+<H1>Table of Contents</H1>
+<UL>
+<A NAME="TOC1" HREF="qemu-tech.html#SEC1">1. Introduction</A>
+<BR>
+<UL>
+<A NAME="TOC2" HREF="qemu-tech.html#SEC2">1.1 Features</A>
+<BR>
+<A NAME="TOC3" HREF="qemu-tech.html#SEC3">1.2 x86 emulation</A>
+<BR>
+<A NAME="TOC4" HREF="qemu-tech.html#SEC4">1.3 ARM emulation</A>
+<BR>
+<A NAME="TOC5" HREF="qemu-tech.html#SEC5">1.4 PowerPC emulation</A>
+<BR>
+<A NAME="TOC6" HREF="qemu-tech.html#SEC6">1.5 SPARC emulation</A>
+<BR>
+</UL>
+<A NAME="TOC7" HREF="qemu-tech.html#SEC7">2. QEMU Internals</A>
+<BR>
+<UL>
+<A NAME="TOC8" HREF="qemu-tech.html#SEC8">2.1 QEMU compared to other emulators</A>
+<BR>
+<A NAME="TOC9" HREF="qemu-tech.html#SEC9">2.2 Portable dynamic translation</A>
+<BR>
+<A NAME="TOC10" HREF="qemu-tech.html#SEC10">2.3 Register allocation</A>
+<BR>
+<A NAME="TOC11" HREF="qemu-tech.html#SEC11">2.4 Condition code optimisations</A>
+<BR>
+<A NAME="TOC12" HREF="qemu-tech.html#SEC12">2.5 CPU state optimisations</A>
+<BR>
+<A NAME="TOC13" HREF="qemu-tech.html#SEC13">2.6 Translation cache</A>
+<BR>
+<A NAME="TOC14" HREF="qemu-tech.html#SEC14">2.7 Direct block chaining</A>
+<BR>
+<A NAME="TOC15" HREF="qemu-tech.html#SEC15">2.8 Self-modifying code and translated code invalidation</A>
+<BR>
+<A NAME="TOC16" HREF="qemu-tech.html#SEC16">2.9 Exception support</A>
+<BR>
+<A NAME="TOC17" HREF="qemu-tech.html#SEC17">2.10 MMU emulation</A>
+<BR>
+<A NAME="TOC18" HREF="qemu-tech.html#SEC18">2.11 Hardware interrupts</A>
+<BR>
+<A NAME="TOC19" HREF="qemu-tech.html#SEC19">2.12 User emulation specific details</A>
+<BR>
+<UL>
+<A NAME="TOC20" HREF="qemu-tech.html#SEC20">2.12.1 Linux system call translation</A>
+<BR>
+<A NAME="TOC21" HREF="qemu-tech.html#SEC21">2.12.2 Linux signals</A>
+<BR>
+<A NAME="TOC22" HREF="qemu-tech.html#SEC22">2.12.3 clone() system call and threads</A>
+<BR>
+<A NAME="TOC23" HREF="qemu-tech.html#SEC23">2.12.4 Self-virtualization</A>
+<BR>
+</UL>
+<A NAME="TOC24" HREF="qemu-tech.html#SEC24">2.13 Bibliography</A>
+<BR>
+</UL>
+<A NAME="TOC25" HREF="qemu-tech.html#SEC25">3. Regression Tests</A>
+<BR>
+<UL>
+<A NAME="TOC26" HREF="qemu-tech.html#SEC26">3.1 <TT>`test-i386'</TT></A>
+<BR>
+<A NAME="TOC27" HREF="qemu-tech.html#SEC27">3.2 <TT>`linux-test'</TT></A>
+<BR>
+<A NAME="TOC28" HREF="qemu-tech.html#SEC28">3.3 <TT>`qruncom.c'</TT></A>
+<BR>
+</UL>
+</UL>
+<HR SIZE=1>
+<A NAME="SEC_OVERVIEW"></A>
+<TABLE CELLPADDING=1 CELLSPACING=1 BORDER=0>
+<TR><TD VALIGN="MIDDLE" ALIGN="LEFT">[<A HREF="qemu-tech.html#SEC1">Top</A>]</TD>
+<TD VALIGN="MIDDLE" ALIGN="LEFT">[<A HREF="qemu-tech.html#SEC_Contents">Contents</A>]</TD>
+<TD VALIGN="MIDDLE" ALIGN="LEFT">[Index]</TD>
+<TD VALIGN="MIDDLE" ALIGN="LEFT">[<A HREF="qemu-tech.html#SEC_About"> ? </A>]</TD>
+</TR></TABLE>
+<H1>Short Table of Contents</H1>
+<BLOCKQUOTE>
+<A NAME="TOC1" HREF="qemu-tech.html#SEC1">1. Introduction</A>
+<BR>
+<A NAME="TOC7" HREF="qemu-tech.html#SEC7">2. QEMU Internals</A>
+<BR>
+<A NAME="TOC25" HREF="qemu-tech.html#SEC25">3. Regression Tests</A>
+<BR>
+
+</BLOCKQUOTE>
+<HR SIZE=1>
+<A NAME="SEC_About"></A>
+<TABLE CELLPADDING=1 CELLSPACING=1 BORDER=0>
+<TR><TD VALIGN="MIDDLE" ALIGN="LEFT">[<A HREF="qemu-tech.html#SEC1">Top</A>]</TD>
+<TD VALIGN="MIDDLE" ALIGN="LEFT">[<A HREF="qemu-tech.html#SEC_Contents">Contents</A>]</TD>
+<TD VALIGN="MIDDLE" ALIGN="LEFT">[Index]</TD>
+<TD VALIGN="MIDDLE" ALIGN="LEFT">[<A HREF="qemu-tech.html#SEC_About"> ? </A>]</TD>
+</TR></TABLE>
+<H1>About this document</H1>
+This document was generated on <I>January, 25  2005</I>
+using <A HREF="http://www.mathematik.uni-kl.de/~obachman/Texi2html
+"><I>texi2html</I></A>
+<P></P>  
+The buttons in the navigation panels have the following meaning:
+<P></P>
+<table border = "1">
+<TR>
+<TH> Button </TH>
+<TH> Name </TH>
+<TH> Go to </TH>
+<TH> From 1.2.3 go to</TH>
+</TR>
+<TR>
+<TD ALIGN="CENTER">
+ [ &lt; ] </TD>
+<TD ALIGN="CENTER">
+Back
+</TD>
+<TD>
+previous section in reading order
+</TD>
+<TD>
+1.2.2
+</TD>
+</TR>
+<TR>
+<TD ALIGN="CENTER">
+ [ &gt; ] </TD>
+<TD ALIGN="CENTER">
+Forward
+</TD>
+<TD>
+next section in reading order
+</TD>
+<TD>
+1.2.4
+</TD>
+</TR>
+<TR>
+<TD ALIGN="CENTER">
+ [ &lt;&lt; ] </TD>
+<TD ALIGN="CENTER">
+FastBack
+</TD>
+<TD>
+previous or up-and-previous section 
+</TD>
+<TD>
+1.1
+</TD>
+</TR>
+<TR>
+<TD ALIGN="CENTER">
+ [ Up ] </TD>
+<TD ALIGN="CENTER">
+Up
+</TD>
+<TD>
+up section
+</TD>
+<TD>
+1.2
+</TD>
+</TR>
+<TR>
+<TD ALIGN="CENTER">
+ [ &gt;&gt; ] </TD>
+<TD ALIGN="CENTER">
+FastForward
+</TD>
+<TD>
+next or up-and-next section
+</TD>
+<TD>
+1.3
+</TD>
+</TR>
+<TR>
+<TD ALIGN="CENTER">
+ [Top] </TD>
+<TD ALIGN="CENTER">
+Top
+</TD>
+<TD>
+cover (top) of document
+</TD>
+<TD>
+ &nbsp; 
+</TD>
+</TR>
+<TR>
+<TD ALIGN="CENTER">
+ [Contents] </TD>
+<TD ALIGN="CENTER">
+Contents
+</TD>
+<TD>
+table of contents
+</TD>
+<TD>
+ &nbsp; 
+</TD>
+</TR>
+<TR>
+<TD ALIGN="CENTER">
+ [Index] </TD>
+<TD ALIGN="CENTER">
+Index
+</TD>
+<TD>
+concept index
+</TD>
+<TD>
+ &nbsp; 
+</TD>
+</TR>
+<TR>
+<TD ALIGN="CENTER">
+ [ ? ] </TD>
+<TD ALIGN="CENTER">
+About
+</TD>
+<TD>
+this page
+</TD>
+<TD>
+ &nbsp; 
+</TD>
+</TR>
+</TABLE>
+<P></P>
+where the <STRONG> Example </STRONG> assumes that the current position 
+is at <STRONG> Subsubsection One-Two-Three </STRONG> of a document of 
+the following structure:
+<UL>
+<LI> 1. Section One  </LI>
+<UL>
+<LI>1.1 Subsection One-One</LI>
+<UL>
+<LI> ... </LI>
+</UL>
+<LI>1.2 Subsection One-Two</LI>
+<UL>
+<LI>1.2.1 Subsubsection One-Two-One
+</LI><LI>1.2.2 Subsubsection One-Two-Two
+</LI><LI>1.2.3 Subsubsection One-Two-Three &nbsp; &nbsp; <STRONG>
+&lt;== Current Position </STRONG>
+</LI><LI>1.2.4 Subsubsection One-Two-Four
+</LI></UL>
+<LI>1.3 Subsection One-Three</LI>
+<UL>
+<LI> ... </LI>
+</UL>
+<LI>1.4 Subsection One-Four</LI>
+</UL>
+</UL>
+
+<HR SIZE=1>
+<BR>  
+<FONT SIZE="-1">
+This document was generated
+on <I>January, 25  2005</I>
+using <A HREF="http://www.mathematik.uni-kl.de/~obachman/Texi2html
+"><I>texi2html</I></A>
+
+</BODY>
+</HTML>

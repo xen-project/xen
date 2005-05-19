@@ -10,30 +10,36 @@ SUBDIRS += xentrace
 SUBDIRS += python
 SUBDIRS += xfrd
 SUBDIRS += xcs
-ifndef XEN_NO_IOEMU
-SUBDIRS += ioemu
-endif
 SUBDIRS += pygrub
 
-.PHONY: all install clean check check_clean
+.PHONY: all install clean check check_clean ioemu eioemuinstall ioemuclean
+
+ifndef XEN_NO_IOEMU
+ioemu ioemuinstall ioemuclean:
+	[ -f ioemu/config-host.h ] || \
+	(cd ioemu; ./configure --prefix=$(DESTDIR)/usr)
+	$(MAKE) -C ioemu $(patsubst ioemu%,%,$@)
+else
+ioemu ioemuinstall ioemuclean:
+endif
 
 all: check
 	@set -e; for subdir in $(SUBDIRS); do \
-                if [ -f $$subdir/configure ]; then \
-                        (cd $$subdir; ./configure --prefix=$(DESTDIR)/usr) \
-                fi; \
 		$(MAKE) -C $$subdir $@; \
 	done
+	$(MAKE) ioemu
 
 install: check
 	@set -e; for subdir in $(SUBDIRS); do \
 		$(MAKE) -C $$subdir $@; \
 	done
+	$(MAKE) ioemuinstall
 
 clean: check_clean
 	@set -e; for subdir in $(SUBDIRS); do \
 		$(MAKE) -C $$subdir $@; \
 	done
+	$(MAKE) ioemuclean
 
 check:
 	$(MAKE) -C check

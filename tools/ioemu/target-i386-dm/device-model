@@ -1,0 +1,69 @@
+#!/bin/sh
+
+. /etc/rc.d/init.d/functions
+
+qemubin=/usr/bin/qemu-dm
+
+ulimit -c unlimited
+
+# Use this for debugging:
+#gdb --args /usr/sbin/qemu-dm -hda /var/images/qemu-linux.img -nographic \
+#	-serial pty -l 'ioport,int' $*
+
+while getopts ":f:" opt;
+do
+    case $opt in
+      f) QEMUCONFIGFILE=$OPTARG;shift;shift;;
+      \?) echo;;
+    esac
+done
+
+echo $QEMUCONFIGFILE
+if [ ! -z $QEMUCONFIGFILE ];then
+    . $QEMUCONFIGFILE
+else
+    echo "no config file specified!" > /dev/tty
+    echo "no config file specified!" >> /tmp/qemustart.log
+    exit
+fi
+ 
+PARMETER=""
+
+if [ ! -z $hda ];then
+PARMETER="$PARMETER -hda $hda"
+fi
+
+if [ ! -z $hdb ];then
+PARMETER="$PARMETER -hdb $hdb"
+fi
+
+if [ ! -z $hdc ];then
+PARMETER="$PARMETER -hdc $hdc"
+fi
+
+if [ ! -z $hdd ];then
+PARMETER="$PARMETER -hdd $hdd"
+fi
+
+if [ ! -z $nographic ] && [ $nographic -eq 1 ];then
+PARMETER="$PARMETER -nographic"
+fi
+
+vnc=${vnc:=1}
+sdl=${sdl:=0}
+if qemu-dm 2>&1 |grep vnc > /dev/null;then
+	if [ $vnc -eq 1 ] && [ $sdl -eq 1 ];then
+		PARMETER="$PARMETER -vnc-and-sdl -k en-us"
+	elif [ $vnc -eq 1 ];then
+		PARMETER="$PARMETER -vnc -k en-us"
+	fi
+fi
+
+#optional cmdline for qemu        
+#       -nographic \
+#       -serial pty \
+
+
+PARMETER="$PARMETER -l int $*";
+echo "$qemubin $PARMETER" >>/tmp/qemustart.log
+$qemubin $PARMETER &
