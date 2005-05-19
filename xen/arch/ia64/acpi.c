@@ -30,7 +30,7 @@
 #include <xen/types.h>
 /*#include <xen/stddef.h>*/
 #include <xen/slab.h>
-#include <xen/pci.h>
+//#include <xen/pci.h>
 /*#include <xen/bootmem.h>*/
 #include <xen/irq.h>
 #include <xen/acpi.h>
