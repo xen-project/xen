@@ -19,6 +19,9 @@ SUBDIRS += pygrub
 
 all: check
 	@set -e; for subdir in $(SUBDIRS); do \
+                if [ -f $$subdir/configure ]; then \
+                        (cd $$subdir; ./configure --prefix=$(DESTDIR)/usr) \
+                fi; \
 		$(MAKE) -C $$subdir $@; \
 	done
 
