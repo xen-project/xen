@@ -79,7 +79,7 @@ STATE_VM_TERMINATED = "terminated"
 def domain_exists(name):
     # See comment in XendDomain constructor.
     xd = get_component('xen.xend.XendDomain')
-    return xd.domain_exists(name)
+    return xd.domain_lookup(name)
 
 def shutdown_reason(code):
     """Get a shutdown reason from a code.
