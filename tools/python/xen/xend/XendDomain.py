@@ -35,8 +35,15 @@ class XendDomain:
     """Path to domain database."""
     dbpath = "domain"
 
-    """Table of domain info indexed by domain id."""
-    domains = {}
+    class XendDomainDict(dict):
+        def get_by_name(self, name):
+            try:
+                return filter(lambda d: d.name == name, self.values())[0]
+            except IndexError, err:
+                return None
+
+    """Dict of domain info indexed by domain id."""
+    domains = XendDomainDict()
     
     def __init__(self):
         # Hack alert. Python does not support mutual imports, but XendDomainInfo
@@ -53,16 +60,13 @@ class XendDomain:
         eserver.subscribe('xend.virq', self.onVirq)
         self.initial_refresh()
 
-    def domain_lookup_by_name(self, name):
-        try:
-            return filter(lambda d: d.name == name,
-                          self.domains.values())[0]
-        except IndexError, err:
-            return None
+    def list(self):
+        """Get list of domain objects.
 
-    def domain_lookup_by_id(self, id):
-        return self.domains.get(id)
-
+        @return: domain objects
+        """
+        return self.domains.values()
+    
     def onVirq(self, event, val):
         """Event handler for virq.
         """
@@ -153,8 +157,6 @@ class XendDomain:
                 if i in self.domain_db:
                     del self.domain_db[i]
                 self.db.delete(i)
-        # But also need to make sure are indexed under correct name.
-        # What about entries under info.name ?
         if info.id in self.domains:
             notify = False
         self.domains[info.id] = info
@@ -285,14 +287,6 @@ class XendDomain:
         self.refresh()
         return self.domains.keys()
 
-    def list(self):
-        """Get list of domain objects.
-
-        @return: domain objects
-        """
-        self.refresh()
-        return self.domains.values()
-    
     def domain_create(self, config):
         """Create a domain from a configuration.
 
@@ -362,8 +356,7 @@ class XendDomain:
 
     def domain_lookup(self, name):
         name = str(name)
-        dominfo = (self.domain_lookup_by_name(name) or
-                   self.domain_lookup_by_id(name))
+        dominfo = self.domains.get_by_name(name) or self.domains.get(name)
         if dominfo:
             return dominfo
         try:
