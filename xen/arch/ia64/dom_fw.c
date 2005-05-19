@@ -9,10 +9,6 @@
 #include <asm/system.h>
 #include <asm/pgalloc.h>
 
-#ifdef CONFIG_PCI
-# include <linux/pci.h>
-#endif
-
 #include <linux/efi.h>
 #include <asm/io.h>
 #include <asm/pal.h>
