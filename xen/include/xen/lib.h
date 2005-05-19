@@ -66,6 +66,6 @@ long long simple_strtoll(
 unsigned long long simple_strtoull(
     const char *cp,char **endp, unsigned int base);
 
-unsigned long long memparse(char *s);
+unsigned long long parse_size_and_unit(char *s);
 
 #endif /* __LIB_H__ */

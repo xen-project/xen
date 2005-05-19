@@ -441,7 +441,7 @@ s64 __moddi3(s64 a, s64 b)
 
 #endif /* BITS_PER_LONG == 32 */
 
-unsigned long long memparse(char *s)
+unsigned long long parse_size_and_unit(char *s)
 {
 	unsigned long long ret = simple_strtoull(s, &s, 0);
 
