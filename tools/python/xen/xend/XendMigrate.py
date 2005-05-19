@@ -12,6 +12,7 @@ import types
 from xen.web import reactor
 from xen.web.protocol import Protocol, ClientFactory
 
+import scheduler
 import sxp
 import XendDB
 import EventServer; eserver = EventServer.instance()
@@ -120,7 +121,7 @@ class SuspendHandler:
 
     def start(self):
         self.subscribe(on=True)
-        timer = reactor.callLater(self.timeout, self.onTimeout)
+        timer = scheduler.later(self.timeout, self.onTimeout)
         try:
             self.readyCond.acquire()
             while not self.ready:
