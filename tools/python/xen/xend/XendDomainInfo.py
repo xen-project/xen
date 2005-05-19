@@ -281,6 +281,8 @@ class XendDomainInfo:
         self.netif_backend = False
         #todo: state: running, suspended
         self.state = STATE_VM_OK
+        self.shutdown_pending = None
+
         #todo: set to migrate info if migrating
         self.migrate = None
         
@@ -950,6 +952,7 @@ class XendDomainInfo:
         """
         try:
             self.state = STATE_VM_OK
+            self.shutdown_pending = None
             self.restart_check()
             self.restart_state = STATE_RESTART_BOOTING
             if self.bootloader:
@@ -1090,7 +1093,14 @@ class XendDomainInfo:
         if self.channel:
             msg = messages.packMsg(msgtype, extra)
             self.channel.writeRequest(msg)
+        if reason != 'sysrq':
+            self.shutdown_pending = {'start':time.time(), 'reason':reason,
+                                     'key':key}
 
+    def shutdown_time_left(self, timeout):
+        if not self.shutdown_pending:
+            return 0
+        return timeout - (time.time() - self.shutdown_pending['start'])
 
 def vm_image_linux(vm, image):
     """Create a VM for a linux image.

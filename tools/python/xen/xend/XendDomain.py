@@ -28,47 +28,6 @@ __all__ = [ "XendDomain" ]
 
 SHUTDOWN_TIMEOUT = 30
 
-class DomainShutdown:
-    """A pending domain shutdown. The domain is asked to shut down,
-    if it has not terminated or rebooted when the timeout expires it
-    is destroyed.
-    """
-
-    def __init__(self, dominfo, reason, key, timeout=None):
-        if timeout is None:
-            timeout = SHUTDOWN_TIMEOUT
-        self.start = time.time()
-        self.timeout = timeout
-        self.dominfo = dominfo
-        self.last_restart_time = dominfo.restart_time
-        self.last_restart_count = dominfo.restart_count
-        self.reason = reason
-        self.key = key
-
-    def getDomain(self):
-        return self.dominfo.id
-
-    def getDomainName(self):
-        return self.dominfo.name
-
-    def getReason(self):
-        return self.reason
-
-    def getTimeout(self):
-        return self.timeout
-
-    def isTerminated(self):
-        return self.dominfo.is_terminated()
-
-    def isRestarted(self):
-        return (self.dominfo.restart_count > self.last_restart_count)
-
-    def isShutdown(self):
-        return self.isTerminated() or self.isRestarted()
-
-    def isExpired(self):
-        return (time.time() - self.start) > self.timeout
-        
 class XendDomain:
     """Index of all domains. Singleton.
     """
@@ -80,9 +39,6 @@ class XendDomain:
     domain_by_id = {}
     domain_by_name = {}
     
-    """Table of pending domain shutdowns, indexed by domain id."""
-    shutdowns_by_id = {}
-
     def __init__(self):
         # Hack alert. Python does not support mutual imports, but XendDomainInfo
         # needs access to the XendDomain instance to look up domains. Attempting
@@ -465,43 +421,34 @@ class XendDomain:
             reason = 'poweroff'
         val = dominfo.shutdown(reason, key=key)
         if reason != 'sysrq':
-            self.add_shutdown(dominfo, reason, key)
+            self.domain_shutdowns()
         return val
-
-    def add_shutdown(self, dominfo, reason, key):
-        """Add a pending shutdown for a domain.
-        This will destroy the domain if the shutdown times out.
-        """
-        if dominfo.id in self.shutdowns_by_id:
-            return
-        self.shutdowns_by_id[dominfo.id] = DomainShutdown(dominfo, reason, key)
-        self.domain_shutdowns()
 
     def domain_shutdowns(self):
         """Process pending domain shutdowns.
         Destroys domains whose shutdowns have timed out.
         """
-        timeout = SHUTDOWN_TIMEOUT
-        for shutdown in self.shutdowns_by_id.values():
-            id = shutdown.getDomain()
-            if shutdown.isShutdown():
-                # Shutdown done - remove.
-                print 'domain_shutdowns> done: ', id
-                del self.shutdowns_by_id[id]
-            elif shutdown.isExpired():
-                # Shutdown expired - remove and destroy domain.
-                del self.shutdowns_by_id[id]
+        timeout = SHUTDOWN_TIMEOUT + 1
+        for dominfo in self.domain_by_id.values():
+            if not dominfo.shutdown_pending:
+                # domain doesn't need shutdown
+                continue
+            id = dominfo.id
+            left = dominfo.shutdown_time_left(SHUTDOWN_TIMEOUT)
+            if left <= 0:
+                # Shutdown expired - destroy domain.
                 try:
                     log.info("Domain shutdown timeout expired: name=%s id=%s",
-                             shutdown.getDomainName(), id)
-                    self.domain_destroy(id, reason=shutdown.getReason())
+                             dominfo.name, id)
+                    self.domain_destroy(id, reason=
+                                        dominfo.shutdown_pending['reason'])
                 except Exception:
                     pass
             else:
                 # Shutdown still pending.
                 print 'domain_shutdowns> pending: ', id
-                timeout = min(timeout, shutdown.getTimeout())
-        if self.shutdowns_by_id:
+                timeout = min(timeout, left)
+        if timeout <= SHUTDOWN_TIMEOUT:
             # Pending shutdowns remain - reschedule.
             scheduler.later(timeout, self.domain_shutdowns)
 
