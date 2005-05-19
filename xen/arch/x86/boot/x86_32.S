@@ -212,9 +212,13 @@ ENTRY(gdt_table)
         .fill 2*NR_CPUS,8,0          /* space for TSS and LDT per CPU    */
 
         .org 0x2000
-ENTRY(idle_pg_table) # Initial page directory is 4kB
-        .org 0x3000
+/* Maximum STACK_ORDER for x86/32 is 1. We must therefore ensure that the */
+/* CPU0 stack is aligned on an even page boundary!                        */
 ENTRY(cpu0_stack)
-        .org 0x3000 + STACK_SIZE
+
+        .org 0x2000 + STACK_SIZE
+ENTRY(idle_pg_table)
+
+        .org 0x2000 + STACK_SIZE + PAGE_SIZE
 ENTRY(stext)
 ENTRY(_stext)
