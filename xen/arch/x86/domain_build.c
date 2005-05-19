@@ -26,7 +26,7 @@
 static unsigned int opt_dom0_mem;
 static void parse_dom0_mem(char *s)
 {
-    unsigned long long bytes = memparse(s);
+    unsigned long long bytes = parse_size_and_unit(s);
     /* If no unit is specified we default to kB units, not bytes. */
     if ( isdigit(s[strlen(s)-1]) )
         opt_dom0_mem = (unsigned int)bytes;
