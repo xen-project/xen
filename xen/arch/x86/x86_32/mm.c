@@ -54,14 +54,6 @@ l2_pgentry_t *virt_to_xen_l2e(unsigned long v)
     return &idle_pg_table[l2_table_offset(v)];
 }
 
-void __set_fixmap(
-    enum fixed_addresses idx, unsigned long p, unsigned long flags)
-{
-    if ( unlikely(idx >= __end_of_fixed_addresses) )
-        BUG();
-    map_pages_to_xen(fix_to_virt(idx), p, PAGE_SIZE, flags);
-}
-
 void __init paging_init(void)
 {
     void *ioremap_pt;

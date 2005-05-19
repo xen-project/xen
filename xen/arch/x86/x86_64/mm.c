@@ -72,17 +72,9 @@ l2_pgentry_t *virt_to_xen_l2e(unsigned long v)
     return pl2e;
 }
 
-void __set_fixmap(
-    enum fixed_addresses idx, unsigned long p, unsigned long flags)
-{
-    if ( unlikely(idx >= __end_of_fixed_addresses) )
-        BUG();
-    map_pages_to_xen(fix_to_virt(idx), p, PAGE_SIZE, flags);
-}
-
 void __init paging_init(void)
 {
-    unsigned long i, p;
+    unsigned long i;
     l3_pgentry_t *l3rw, *l3ro;
     struct pfn_info *pg;
 
@@ -96,10 +88,10 @@ void __init paging_init(void)
             NULL, L2_PAGETABLE_SHIFT - L1_PAGETABLE_SHIFT);
         if ( pg == NULL )
             panic("Not enough memory for m2p table\n");
-        p = page_to_phys(pg);
         map_pages_to_xen(
-            RDWR_MPT_VIRT_START + i*8, p, 
-            1UL << L2_PAGETABLE_SHIFT, PAGE_HYPERVISOR | _PAGE_USER);
+            RDWR_MPT_VIRT_START + i*8, page_to_pfn(pg), 
+            1UL << (L2_PAGETABLE_SHIFT - L1_PAGETABLE_SHIFT),
+            PAGE_HYPERVISOR | _PAGE_USER);
         memset((void *)(RDWR_MPT_VIRT_START + i*8), 0x55,
                1UL << L2_PAGETABLE_SHIFT);
     }

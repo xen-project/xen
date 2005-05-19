@@ -399,7 +399,7 @@ static void __init start_of_day(void)
     /* Map default GDT into their final position in the idle page table. */
     map_pages_to_xen(
         GDT_VIRT_START(current) + FIRST_RESERVED_GDT_BYTE,
-        virt_to_phys(gdt_table), PAGE_SIZE, PAGE_HYPERVISOR);
+        virt_to_phys(gdt_table) >> PAGE_SHIFT, 1, PAGE_HYPERVISOR);
 
     /* Process CPU type information. */
     identify_cpu(&boot_cpu_data);
@@ -580,17 +580,19 @@ void __init __start_xen(multiboot_info_t *mbi)
          *     due to cache-attribute mismatches (e.g., AMD/AGP Linux bug).
          */
         {
-            unsigned long start = (unsigned long)e820.map[i].addr;
-            unsigned long size  = (unsigned long)e820.map[i].size;
-            size = (size + (start & ~PAGE_MASK) + PAGE_SIZE - 1) & PAGE_MASK;
-            if ( (start &= PAGE_MASK) < (64UL << 20) )
-            {
-                if ( (signed long)(size -= (64UL << 20) - start) <= 0 )
-                    continue;
-                start = 64UL << 20;
-            }
+            /* Calculate page-frame range, discarding partial frames. */
+            unsigned long start, end;
+            start = (e820.map[i].addr + PAGE_SIZE - 1) >> PAGE_SHIFT;
+            end   = (e820.map[i].addr + e820.map[i].size) >> PAGE_SHIFT;
+            /* Clip the range to above 64MB. */
+            if ( end < (64UL << (20-PAGE_SHIFT)) )
+                continue;
+            if ( start < (64UL << (20-PAGE_SHIFT)) )
+                start = 64UL << (20-PAGE_SHIFT);
+            /* Request the mapping. */
             map_pages_to_xen(
-                PAGE_OFFSET + start, start, size, PAGE_HYPERVISOR);
+                PAGE_OFFSET + (start << PAGE_SHIFT),
+                start, end-start, PAGE_HYPERVISOR);
         }
 #endif
     }

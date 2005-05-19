@@ -43,6 +43,11 @@ typedef struct { unsigned long pt_lo; } pagetable_t;
 #define l3e_get_page(_x)    (pfn_to_page(l3e_get_pfn(_x)))
 #define l4e_get_page(_x)    (pfn_to_page(l4e_get_pfn(_x)))
 
+#define l1e_create_page(_x,_y) (l1e_create_pfn(page_to_pfn(_x),(_y)))
+#define l2e_create_page(_x,_y) (l2e_create_pfn(page_to_pfn(_x),(_y)))
+#define l3e_create_page(_x,_y) (l3e_create_pfn(page_to_pfn(_x),(_y)))
+#define l4e_create_page(_x,_y) (l4e_create_pfn(page_to_pfn(_x),(_y)))
+
 /* High table entries are reserved by the hypervisor. */
 #define DOMAIN_ENTRIES_PER_L2_PAGETABLE     \
   (HYPERVISOR_VIRT_START >> L2_PAGETABLE_SHIFT)
@@ -141,13 +146,13 @@ struct pfn_info *alloc_xen_pagetable(void);
 void free_xen_pagetable(struct pfn_info *pg);
 l2_pgentry_t *virt_to_xen_l2e(unsigned long v);
 
-/* Map physical byte range (@p, @p+@s) at address @v in Xen address space. */
+/* Map physical page range in Xen virtual address space. */
 #define MAP_SMALL_PAGES (1UL<<16) /* don't use superpages for the mapping */
 int
 map_pages_to_xen(
-    unsigned long v,
-    unsigned long p,
-    unsigned long s,
+    unsigned long virt,
+    unsigned long pfn,
+    unsigned long nr_pfns,
     unsigned long flags);
 
 #endif /* !__ASSEMBLY__ */

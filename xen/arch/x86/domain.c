@@ -263,9 +263,8 @@ void arch_do_createdomain(struct exec_domain *ed)
                            PAGE_SHIFT] = INVALID_M2P_ENTRY;
     ed->arch.perdomain_ptes = d->arch.mm_perdomain_pt;
     ed->arch.perdomain_ptes[FIRST_RESERVED_GDT_PAGE] =
-        l1e_create_pfn(page_to_pfn(virt_to_page(gdt_table)),
-                       PAGE_HYPERVISOR);
-    
+        l1e_create_page(virt_to_page(gdt_table), PAGE_HYPERVISOR);
+
     ed->arch.guest_vtable  = __linear_l2_table;
     ed->arch.shadow_vtable = __shadow_linear_l2_table;
 
@@ -302,8 +301,7 @@ void arch_do_boot_vcpu(struct exec_domain *ed)
     ed->arch.perdomain_ptes =
         d->arch.mm_perdomain_pt + (ed->vcpu_id << PDPT_VCPU_SHIFT);
     ed->arch.perdomain_ptes[FIRST_RESERVED_GDT_PAGE] =
-        l1e_create_pfn(page_to_pfn(virt_to_page(gdt_table)),
-                       PAGE_HYPERVISOR);
+        l1e_create_page(virt_to_page(gdt_table), PAGE_HYPERVISOR);
 }
 
 #ifdef CONFIG_VMX

@@ -789,7 +789,7 @@ set_p2m_entry(struct domain *d, unsigned long pfn, unsigned long mfn,
         memset(l1, 0, PAGE_SIZE);
         unmap_domain_mem_with_cache(l1, l1cache);
 
-        l2e = l2e_create_pfn(page_to_pfn(l1page), __PAGE_HYPERVISOR);
+        l2e = l2e_create_page(l1page, __PAGE_HYPERVISOR);
         l2[l2_table_offset(va)] = l2e;
     }
     unmap_domain_mem_with_cache(l2, l2cache);

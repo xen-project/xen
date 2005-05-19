@@ -161,7 +161,10 @@ void __init init_frametable(void)
         if ( p == 0 )
             panic("Not enough memory for frame table\n");
         map_pages_to_xen(
-            FRAMETABLE_VIRT_START + i, p, 4UL << 20, PAGE_HYPERVISOR);
+            FRAMETABLE_VIRT_START + i,
+            p >> PAGE_SHIFT,
+            4UL << (20-PAGE_SHIFT),
+            PAGE_HYPERVISOR);
     }
 
     memset(frame_table, 0, frame_table_size);
@@ -2833,31 +2836,30 @@ void ptwr_destroy(struct domain *d)
     free_xenheap_page((unsigned long)d->arch.ptwr[PTWR_PT_INACTIVE].page);
 }
 
-/* Map physical byte range (@p, @p+@s) at virt address @v in pagetable @pt. */
 int map_pages_to_xen(
-    unsigned long v,
-    unsigned long p,
-    unsigned long s,
+    unsigned long virt,
+    unsigned long pfn,
+    unsigned long nr_pfns,
     unsigned long flags)
 {
     l2_pgentry_t *pl2e, ol2e;
-    l1_pgentry_t *pl1e;
+    l1_pgentry_t *pl1e, ol1e;
     unsigned int  i;
 
     unsigned int  map_small_pages = !!(flags & MAP_SMALL_PAGES);
     flags &= ~MAP_SMALL_PAGES;
 
-    while ( s != 0 )
+    while ( nr_pfns != 0 )
     {
-        pl2e = virt_to_xen_l2e(v);
+        pl2e = virt_to_xen_l2e(virt);
 
-        if ( (((v|p) & ((1 << L2_PAGETABLE_SHIFT) - 1)) == 0) &&
-             (s >= (1 << L2_PAGETABLE_SHIFT)) &&
+        if ( ((((virt>>PAGE_SHIFT) | pfn) & ((1<<PAGETABLE_ORDER)-1)) == 0) &&
+             (nr_pfns >= (1<<PAGETABLE_ORDER)) &&
              !map_small_pages )
         {
             /* Super-page mapping. */
             ol2e  = *pl2e;
-            *pl2e = l2e_create_phys(p, flags|_PAGE_PSE);
+            *pl2e = l2e_create_pfn(pfn, flags|_PAGE_PSE);
 
             if ( (l2e_get_flags(ol2e) & _PAGE_PRESENT) )
             {
@@ -2866,9 +2868,9 @@ int map_pages_to_xen(
                     free_xen_pagetable(l2e_get_page(*pl2e));
             }
 
-            v += 1 << L2_PAGETABLE_SHIFT;
-            p += 1 << L2_PAGETABLE_SHIFT;
-            s -= 1 << L2_PAGETABLE_SHIFT;
+            virt    += 1UL << L2_PAGETABLE_SHIFT;
+            pfn     += 1UL << PAGETABLE_ORDER;
+            nr_pfns -= 1UL << PAGETABLE_ORDER;
         }
         else
         {
@@ -2890,18 +2892,27 @@ int map_pages_to_xen(
                 local_flush_tlb_pge();
             }
 
-            pl1e = l2e_to_l1e(*pl2e) + l1_table_offset(v);
-            if ( (l1e_get_flags(*pl1e) & _PAGE_PRESENT) )
-                local_flush_tlb_one(v);
-            *pl1e = l1e_create_phys(p, flags);
+            pl1e  = l2e_to_l1e(*pl2e) + l1_table_offset(virt);
+            ol1e  = *pl1e;
+            *pl1e = l1e_create_pfn(pfn, flags);
+            if ( (l1e_get_flags(ol1e) & _PAGE_PRESENT) )
+                local_flush_tlb_one(virt);
 
-            v += 1 << L1_PAGETABLE_SHIFT;
-            p += 1 << L1_PAGETABLE_SHIFT;
-            s -= 1 << L1_PAGETABLE_SHIFT;       
+            virt    += 1UL << L1_PAGETABLE_SHIFT;
+            pfn     += 1UL;
+            nr_pfns -= 1UL;
         }
     }
 
     return 0;
+}
+
+void __set_fixmap(
+    enum fixed_addresses idx, unsigned long p, unsigned long flags)
+{
+    if ( unlikely(idx >= __end_of_fixed_addresses) )
+        BUG();
+    map_pages_to_xen(fix_to_virt(idx), p >> PAGE_SHIFT, 1, flags);
 }
 
 #ifdef MEMORY_GUARD
@@ -2909,7 +2920,8 @@ int map_pages_to_xen(
 void memguard_init(void)
 {
     map_pages_to_xen(
-        PAGE_OFFSET, 0, xenheap_phys_end, __PAGE_HYPERVISOR|MAP_SMALL_PAGES);
+        PAGE_OFFSET, 0, xenheap_phys_end >> PAGE_SHIFT,
+        __PAGE_HYPERVISOR|MAP_SMALL_PAGES);
 }
 
 static void __memguard_change_range(void *p, unsigned long l, int guard)
@@ -2927,7 +2939,8 @@ static void __memguard_change_range(void *p, unsigned long l, int guard)
     if ( guard )
         flags &= ~_PAGE_PRESENT;
 
-    map_pages_to_xen((unsigned long)(_p), __pa(_p), _l, flags);
+    map_pages_to_xen(
+        _p, virt_to_phys(p) >> PAGE_SHIFT, _l >> PAGE_SHIFT, flags);
 }
 
 void memguard_guard_range(void *p, unsigned long l)
