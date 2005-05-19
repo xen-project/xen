@@ -75,7 +75,7 @@ root = "/dev/hda1 ro"
 #nfs_root   = '/full/path/to/root/directory'
 
 # Sets runlevel 4.
-extra = "acpi=off 1"
+extra = "acpi=off console=ttyS0 console=tty0 1"
 
 #----------------------------------------------------------------------------
 # Set according to whether you want the domain restarted when it exits.
@@ -89,5 +89,60 @@ extra = "acpi=off 1"
 
 # New stuff
 memmap = '/etc/xen/mem-map.sxp'
-device_model = '/usr/sbin/device-model'
-device_config = '/etc/xen/bochsrc'
+device_model = '/usr/bin/device-model'
+device_config = '/etc/xen/xmexample.vmx'
+
+#============================================================================
+#
+# config item for qemu device model
+# Note: no space between =
+#-----------------------------------------------------------------------------
+# Qemu binary path
+qemubin='/usr/bin/qemu-dm'
+
+#-----------------------------------------------------------------------------
+# Disk image for 
+hda='/var/images/min-el3-i386.img'
+#hdb=
+#hdc=
+#hdd=
+#cdrom=
+
+#-----------------------------------------------------------------------------
+# boot on floppy (a), hard disk (c) or CD-ROM (d) 
+#boot=[a|c|d]
+#-----------------------------------------------------------------------------
+#  write to temporary files instead of disk image files
+#snapshot=1
+
+#----------------------------------------------------------------------------
+# enable SDL library for graphics, default = 0
+sdl=0
+
+#----------------------------------------------------------------------------
+# enable VNC library for graphics, default = 1
+vnc=1
+
+#----------------------------------------------------------------------------
+# no graphics, use serial port
+#nographic=0
+
+
+#-----------------------------------------------------------------------------
+#   enable audio support
+#enable-audio=1
+
+
+#-----------------------------------------------------------------------------
+#    set the real time clock to local time [default=utc]
+#localtime='utc'
+
+
+#-----------------------------------------------------------------------------
+#    start in full screen
+#full-screen=1   
+
+#-----------------------------------------------------------------------------
+#   set the mac address of the first interface
+#macaddr=  
+
