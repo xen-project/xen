@@ -227,7 +227,8 @@ static int blktap_ioctl(struct inode *inode, struct file *filp,
         }
     case BLKTAP_IOCTL_PRINT_IDXS:
         {
-            print_vm_ring_idxs();
+            print_be_ring_idxs();
+            print_fe_ring_idxs();
             WPRINTK("User Rings: \n-----------\n");
             WPRINTK("UF: rsp_cons: %2d, req_prod_prv: %2d "
                             "| req_prod: %2d, rsp_prod: %2d\n",

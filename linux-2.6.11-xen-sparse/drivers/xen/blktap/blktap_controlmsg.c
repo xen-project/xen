@@ -104,7 +104,7 @@ void blkif_ptfe_create(blkif_be_create_t *create)
 
     if ( (blkif = kmem_cache_alloc(blkif_cachep, GFP_KERNEL)) == NULL )
     {
-        DPRINTK("Could not create blkif: out of memory\n");
+        WPRINTK("Could not create blkif: out of memory\n");
         create->status = BLKIF_BE_STATUS_OUT_OF_MEMORY;
         return;
     }
@@ -122,7 +122,7 @@ void blkif_ptfe_create(blkif_be_create_t *create)
     {
         if ( ((*pblkif)->domid == domid) && ((*pblkif)->handle == handle) )
         {
-            DPRINTK("Could not create blkif: already exists\n");
+            WPRINTK("Could not create blkif: already exists\n");
             create->status = BLKIF_BE_STATUS_INTERFACE_EXISTS;
             kmem_cache_free(blkif_cachep, blkif);
             return;
@@ -189,7 +189,7 @@ void blkif_ptfe_connect(blkif_be_connect_t *connect)
     blkif = blkif_find_by_handle(domid, handle);
     if ( unlikely(blkif == NULL) )
     {
-        DPRINTK("blkif_connect attempted for non-existent blkif (%u,%u)\n", 
+        WPRINTK("blkif_connect attempted for non-existent blkif (%u,%u)\n", 
                 connect->domid, connect->blkif_handle); 
         connect->status = BLKIF_BE_STATUS_INTERFACE_NOT_FOUND;
         return;
@@ -253,7 +253,7 @@ int blkif_ptfe_disconnect(blkif_be_disconnect_t *disconnect, u8 rsp_id)
     blkif = blkif_find_by_handle(domid, handle);
     if ( unlikely(blkif == NULL) )
     {
-        DPRINTK("blkif_disconnect attempted for non-existent blkif"
+        WPRINTK("blkif_disconnect attempted for non-existent blkif"
                 " (%u,%u)\n", disconnect->domid, disconnect->blkif_handle); 
         disconnect->status = BLKIF_BE_STATUS_INTERFACE_NOT_FOUND;
         return 1; /* Caller will send response error message. */
@@ -499,3 +499,41 @@ void __init blkif_interface_init(void)
     
     blktap_be_ring.sring = NULL;
 }
+
+
+
+/* Debug : print the current ring indices. */
+
+void print_fe_ring_idxs(void)
+{
+    int i;
+    blkif_t *blkif;
+            
+    WPRINTK("FE Rings: \n---------\n");
+    for ( i = 0; i < BLKIF_HASHSZ; i++) { 
+        blkif = blkif_hash[i];
+        while (blkif != NULL) {
+            if (blkif->status == DISCONNECTED) {
+                WPRINTK("(%2d,%2d) DISCONNECTED\n", 
+                   blkif->domid, blkif->handle);
+            } else if (blkif->status == DISCONNECTING) {
+                WPRINTK("(%2d,%2d) DISCONNECTING\n", 
+                   blkif->domid, blkif->handle);
+            } else if (blkif->blk_ring.sring == NULL) {
+                WPRINTK("(%2d,%2d) CONNECTED, but null sring!\n", 
+                   blkif->domid, blkif->handle);
+            } else {
+                blkif_get(blkif);
+                WPRINTK("(%2d,%2d): req_cons: %2d, rsp_prod_prv: %2d "
+                    "| req_prod: %2d, rsp_prod: %2d\n",
+                    blkif->domid, blkif->handle,
+                    blkif->blk_ring.req_cons,
+                    blkif->blk_ring.rsp_prod_pvt,
+                    blkif->blk_ring.sring->req_prod,
+                    blkif->blk_ring.sring->rsp_prod);
+                blkif_put(blkif);
+            } 
+            blkif = blkif->hash_next;
+        }
+    }
+}        
