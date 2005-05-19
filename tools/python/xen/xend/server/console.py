@@ -114,7 +114,7 @@ class ConsoleDev(Dev, protocol.ServerFactory):
         """Check that a console port is not in use by another console.
         """
         xd = XendRoot.get_component('xen.xend.XendDomain')
-        for vm in xd.domains():
+        for vm in xd.list():
             ctrl = vm.getDeviceController(self.getType(), error=False)
             if (not ctrl): continue
             ctrl.checkConsolePort(console_port)

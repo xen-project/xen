@@ -134,7 +134,7 @@ class SrvDomainDir(SrvDir):
             domains = self.xd.domain_ls()
             sxp.show(domains, out=req)
         else:
-            domains = self.xd.domains()
+            domains = self.xd.list()
             domains.sort(lambda x, y: cmp(x.name, y.name))
             req.write('<ul>')
             for d in domains:

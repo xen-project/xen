@@ -17,7 +17,7 @@ class XendConsole:
     def consoles(self):
         l = []
         xd = XendRoot.get_component('xen.xend.XendDomain')
-        for vm in xd.domains():
+        for vm in xd.list():
             ctrl = vm.getDeviceController("console", error=False)
             if (not ctrl): continue
             console = ctrl.getDevice(0)

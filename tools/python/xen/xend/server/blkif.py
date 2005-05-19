@@ -262,7 +262,7 @@ class BlkDev(Dev):
     def check_mounted(self, name):
         mode = blkif.mount_mode(name)
         xd = XendRoot.get_component('xen.xend.XendDomain')
-        for vm in xd.domains():
+        for vm in xd.list():
             ctrl = vm.getDeviceController(self.getType(), error=False)
             if (not ctrl): continue
             for dev in ctrl.getDevices():
