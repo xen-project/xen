@@ -39,7 +39,7 @@
 #define DECODE_failure  0
 
 #if defined (__x86_64__)
-static void store_cpu_user_regs(struct cpu_user_regs *regs)
+void store_cpu_user_regs(struct cpu_user_regs *regs)
 {
 
 }
