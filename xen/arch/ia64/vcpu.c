@@ -1581,7 +1581,7 @@ IA64FAULT vcpu_itc_d(VCPU *vcpu, UINT64 pte, UINT64 itir, UINT64 ifa)
 	unsigned long pteval, logps = (itir >> 2) & 0x3f;
 	unsigned long translate_domain_pte(UINT64,UINT64,UINT64);
 
-	if (((itir & ~0xfc) >> 2) < PAGE_SHIFT) {
+	if (((itir & 0xfcL) >> 2) < PAGE_SHIFT) {
 		printf("vcpu_itc_d: domain trying to use smaller page size!\n");
 		//FIXME: kill domain here
 		while(1);
@@ -1599,7 +1599,7 @@ IA64FAULT vcpu_itc_i(VCPU *vcpu, UINT64 pte, UINT64 itir, UINT64 ifa)
 	unsigned long translate_domain_pte(UINT64,UINT64,UINT64);
 
 	// FIXME: validate ifa here (not in Xen space), COULD MACHINE CHECK!
-	if (((itir & ~0xfc) >> 2) < PAGE_SHIFT) {
+	if (((itir & 0xfcL) >> 2) < PAGE_SHIFT) {
 		printf("vcpu_itc_i: domain trying to use smaller page size!\n");
 		//FIXME: kill domain here
 		while(1);
