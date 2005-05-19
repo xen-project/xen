@@ -156,6 +156,8 @@ void init_boot_pages(unsigned long ps, unsigned long pe)
 
     ps = round_pgup(ps);
     pe = round_pgdown(pe);
+    if ( pe <= ps )
+        return;
 
     map_free(ps >> PAGE_SHIFT, (pe - ps) >> PAGE_SHIFT);
 
