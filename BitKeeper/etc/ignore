@@ -93,7 +93,12 @@ tools/cmdline/*
 tools/cmdline/xen/*
 tools/gdb/gdb-6.2.1-linux-i386-xen/*
 tools/gdb/gdb-6.2.1/*
-tools/ioemu/iodev/device-model
+tools/ioemu/config-host.*
+tools/ioemu/keysym_adapter_sdl.h
+tools/ioemu/target-*/Makefile
+tools/ioemu/target-*/config.*
+tools/ioemu/target-*/qemu-dm
+tools/ioemu/target-*/qemu-vgaram-bin
 tools/libxc/xen/*
 tools/misc/cpuperf/cpuperf-perfcntr
 tools/misc/cpuperf/cpuperf-xen
