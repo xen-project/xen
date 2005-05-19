@@ -220,6 +220,9 @@ struct screen_info { };
 extern int opt_noht;
 extern int ht_per_core;
 
+// needed for include/xen/smp.h
+#define __smp_processor_id()	0
+
 // xen/include/asm/config.h
 /******************************************************************************
  * config.h
