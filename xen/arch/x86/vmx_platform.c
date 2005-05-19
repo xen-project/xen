@@ -49,7 +49,7 @@ static long get_reg_value(int size, int index, int seg, struct cpu_user_regs *re
     return 0;
 }
 #elif defined (__i386__)
-static void store_cpu_user_regs(struct cpu_user_regs *regs)
+void store_cpu_user_regs(struct cpu_user_regs *regs)
 {
     __vmread(GUEST_SS_SELECTOR, &regs->ss);
     __vmread(GUEST_ESP, &regs->esp);

@@ -166,7 +166,7 @@ static void vmx_do_no_device_fault()
         cr0 &= ~X86_CR0_TS;
         __vmwrite(GUEST_CR0, cr0);
     }
-    __vmwrite(EXCEPTION_BITMAP, MONITOR_DEFAULT_EXCEPTION_BITMAP);
+    __vm_clear_bit(EXCEPTION_BITMAP, EXCEPTION_BITMAP_NM);
 }
 
 static void vmx_do_general_protection_fault(struct cpu_user_regs *regs) 
@@ -1108,6 +1108,21 @@ asmlinkage void vmx_vmexit_handler(struct cpu_user_regs regs)
             save_cpu_user_regs(&regs);
             pdb_handle_exception(3, &regs, 1);
             restore_cpu_user_regs(&regs);
+            break;
+        }
+#else
+        case TRAP_debug:
+        {
+            void store_cpu_user_regs(struct cpu_user_regs *regs);
+            long do_sched_op(unsigned long op);
+
+
+            store_cpu_user_regs(&regs);
+            __vm_clear_bit(GUEST_PENDING_DBG_EXCEPTIONS, PENDING_DEBUG_EXC_BS);
+
+            set_bit(_VCPUF_ctrl_pause, &current->vcpu_flags);
+            do_sched_op(SCHEDOP_yield);
+
             break;
         }
 #endif
