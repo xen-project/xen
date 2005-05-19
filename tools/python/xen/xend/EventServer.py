@@ -5,8 +5,7 @@
 import string
 from threading import Lock
 
-#from twisted.internet import reactor
-from xen.web import reactor
+import scheduler
 
 # subscribe a.b.c h: map a.b.c -> h
 # subscribe a.b.* h: map a.b.* -> h
@@ -130,7 +129,7 @@ class EventServer:
             self.lock.release()
             
         if async:
-            reactor.callLater(0, self.call_handlers, event, val)
+            scheduler.now(self.call_handlers, [event, val])
         else:
             self.call_handlers(event, val)
 

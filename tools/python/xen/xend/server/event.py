@@ -3,6 +3,7 @@ import StringIO
 
 from xen.web import reactor, protocol
 
+from xen.xend import scheduler
 from xen.xend import sxp
 from xen.xend import PrettyPrint
 from xen.xend import EventServer; eserver = EventServer.instance()
@@ -47,7 +48,7 @@ class EventProtocol(protocol.Protocol):
         if self.transport:
             self.transport.loseConnection()
         if self.connected:
-            reactor.callLater(0, self.connectionLost)
+            scheduler.now(self.connectionLost)
 
     def connectionLost(self, reason=None):
         self.unsubscribe()
