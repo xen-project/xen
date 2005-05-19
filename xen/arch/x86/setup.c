@@ -69,6 +69,8 @@ extern void ac_timer_init(void);
 extern void initialize_keytable();
 extern int do_timer_lists_from_pit;
 
+extern unsigned long cpu0_stack[];
+
 struct cpuinfo_x86 boot_cpu_data = { 0, 0, 0, 0, -1 };
 
 #if defined(CONFIG_X86_64)
@@ -381,11 +383,8 @@ static void __init do_initcalls(void)
 
 static void __init start_of_day(void)
 {
-#ifdef MEMORY_GUARD
     /* Unmap the first page of CPU0's stack. */
-    extern unsigned long cpu0_stack[];
     memguard_guard_stack(cpu0_stack);
-#endif
 
     open_softirq(NEW_TLBFLUSH_CLOCK_PERIOD_SOFTIRQ, new_tlbflush_clock_period);
 
@@ -469,6 +468,8 @@ static void __init start_of_day(void)
 #endif
 }
 
+#define EARLY_FAIL() for ( ; ; ) __asm__ __volatile__ ( "hlt" )
+
 void __init __start_xen(multiboot_info_t *mbi)
 {
     char *cmdline;
@@ -495,7 +496,13 @@ void __init __start_xen(multiboot_info_t *mbi)
     if ( !(mbi->flags & MBI_MODULES) || (mbi->mods_count == 0) )
     {
         printk("FATAL ERROR: Require at least one Multiboot module.\n");
-        for ( ; ; ) ;
+        EARLY_FAIL();
+    }
+
+    if ( ((unsigned long)cpu0_stack & (STACK_SIZE-1)) != 0 )
+    {
+        printk("FATAL ERROR: Misaligned CPU0 stack.\n");
+        EARLY_FAIL();
     }
 
     xenheap_phys_end = opt_xenheap_megabytes << 20;
