@@ -30,7 +30,8 @@ def block(op, type, dets, script=None):
         raise ValueError('Invalid operation:' + op)
 
     # Special case phy devices - they don't require any (un)binding
-    if type == 'phy':
+    # Parallax also doesn't need script-based binding.
+    if (type == 'phy') or (type == 'parallax'):
         return dets
     
     if script is None:

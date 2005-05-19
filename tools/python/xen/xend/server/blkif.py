@@ -166,6 +166,7 @@ class BlkDev(Dev):
         self.params = None
         self.node = None
         self.device = None
+        self.dev_handle = 0
         self.start_sector = None
         self.nr_sectors = None
         
@@ -232,12 +233,12 @@ class BlkDev(Dev):
         # NOTE: 
         # This clause is testing code for storage system experiments.
         # Add a new disk type that will just pass an opaque id in the
-        # start_sector and use an experimental device type.
+        # dev_handle and use an experimental device type.
         # Please contact andrew.warfield@cl.cam.ac.uk with any concerns.
         if self.type == 'parallax':
             self.node   = node
             self.device =  61440 # (240,0)
-            self.start_sector = long(self.params)
+            self.dev_handle = long(self.params)
             self.nr_sectors = long(0)
             return
         # done.
@@ -330,6 +331,7 @@ class BlkDev(Dev):
                       { 'domid'        : self.frontendDomain,
                         'blkif_handle' : self.backendId,
                         'pdevice'      : self.device,
+                        'dev_handle'   : self.dev_handle,
                         'vdevice'      : self.vdev,
                         'readonly'     : self.readonly() })
         msg = self.backendChannel.requestResponse(msg)

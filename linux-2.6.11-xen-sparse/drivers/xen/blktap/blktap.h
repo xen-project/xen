@@ -246,7 +246,8 @@ irqreturn_t blkif_ptfe_int(int irq, void *dev_id, struct pt_regs *regs);
 extern void blkif_ctrlif_rx(ctrl_msg_t *msg, unsigned long id);
 
 /* debug */
-void print_vm_ring_idxs(void);
+void print_fe_ring_idxs(void);
+void print_be_ring_idxs(void);
         
 #define __BLKINT_H__
 #endif

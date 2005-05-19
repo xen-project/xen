@@ -624,6 +624,7 @@ static PyObject *xu_message_get_payload(PyObject *self, PyObject *args)
         C2P(blkif_be_vbd_create_t, domid,        Int, Long);
         C2P(blkif_be_vbd_create_t, blkif_handle, Int, Long);
         C2P(blkif_be_vbd_create_t, pdevice,      Int, Long);
+        C2P(blkif_be_vbd_create_t, dev_handle,   Int, Long);
         C2P(blkif_be_vbd_create_t, vdevice,      Int, Long);
         C2P(blkif_be_vbd_create_t, readonly,     Int, Long);
         C2P(blkif_be_vbd_create_t, status,       Int, Long);
@@ -843,6 +844,7 @@ static PyObject *xu_message_new(PyObject *self, PyObject *args)
         P2C(blkif_be_vbd_create_t, domid,        u32);
         P2C(blkif_be_vbd_create_t, blkif_handle, u32);
         P2C(blkif_be_vbd_create_t, pdevice,      blkif_pdev_t);
+        P2C(blkif_be_vbd_create_t, dev_handle,   u32);
         P2C(blkif_be_vbd_create_t, vdevice,      blkif_vdev_t);
         P2C(blkif_be_vbd_create_t, readonly,     u16);
         break;
