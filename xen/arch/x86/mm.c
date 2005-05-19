@@ -160,8 +160,8 @@ void __init init_frametable(void)
         p = alloc_boot_pages(min(frame_table_size - i, 4UL << 20), 4UL << 20);
         if ( p == 0 )
             panic("Not enough memory for frame table\n");
-        map_pages(idle_pg_table, FRAMETABLE_VIRT_START + i, p, 
-                  4UL << 20, PAGE_HYPERVISOR);
+        map_pages_to_xen(
+            FRAMETABLE_VIRT_START + i, p, 4UL << 20, PAGE_HYPERVISOR);
     }
 
     memset(frame_table, 0, frame_table_size);
@@ -2833,101 +2833,113 @@ void ptwr_destroy(struct domain *d)
     free_xenheap_page((unsigned long)d->arch.ptwr[PTWR_PT_INACTIVE].page);
 }
 
+/* Map physical byte range (@p, @p+@s) at virt address @v in pagetable @pt. */
+int map_pages_to_xen(
+    unsigned long v,
+    unsigned long p,
+    unsigned long s,
+    unsigned long flags)
+{
+    l2_pgentry_t *pl2e, ol2e;
+    l1_pgentry_t *pl1e;
+    unsigned int  i;
 
+    unsigned int  map_small_pages = !!(flags & MAP_SMALL_PAGES);
+    flags &= ~MAP_SMALL_PAGES;
 
-/************************************************************************/
-/************************************************************************/
-/************************************************************************/
+    while ( s != 0 )
+    {
+        pl2e = virt_to_xen_l2e(v);
 
-/* Graveyard: stuff below may be useful in future. */
-#if 0
-    case MMUEXT_TRANSFER_PAGE:
-        domid  = (domid_t)(val >> 16);
-        gntref = (grant_ref_t)((val & 0xFF00) | ((ptr >> 2) & 0x00FF));
-        
-        if ( unlikely(IS_XEN_HEAP_FRAME(page)) ||
-             unlikely(!pfn_valid(pfn)) ||
-             unlikely((e = find_domain_by_id(domid)) == NULL) )
+        if ( (((v|p) & ((1 << L2_PAGETABLE_SHIFT) - 1)) == 0) &&
+             (s >= (1 << L2_PAGETABLE_SHIFT)) &&
+             !map_small_pages )
         {
-            MEM_LOG("Bad frame (%p) or bad domid (%d).\n", pfn, domid);
-            okay = 0;
-            break;
-        }
+            /* Super-page mapping. */
+            ol2e  = *pl2e;
+            *pl2e = l2e_create_phys(p, flags|_PAGE_PSE);
 
-        spin_lock(&d->page_alloc_lock);
-
-        /*
-         * The tricky bit: atomically release ownership while there is just one
-         * benign reference to the page (PGC_allocated). If that reference
-         * disappears then the deallocation routine will safely spin.
-         */
-        _d  = pickle_domptr(d);
-        _nd = page->u.inuse._domain;
-        y   = page->count_info;
-        do {
-            x = y;
-            if ( unlikely((x & (PGC_count_mask|PGC_allocated)) != 
-                          (1|PGC_allocated)) ||
-                 unlikely(_nd != _d) )
+            if ( (l2e_get_flags(ol2e) & _PAGE_PRESENT) )
             {
-                MEM_LOG("Bad page values %p: ed=%p(%u), sd=%p,"
-                        " caf=%08x, taf=%08x\n", page_to_pfn(page),
-                        d, d->domain_id, unpickle_domptr(_nd), x, 
-                        page->u.inuse.type_info);
-                spin_unlock(&d->page_alloc_lock);
-                put_domain(e);
-                return 0;
+                local_flush_tlb_pge();
+                if ( !(l2e_get_flags(ol2e) & _PAGE_PSE) )
+                    free_xen_pagetable(l2e_get_page(*pl2e));
             }
-            __asm__ __volatile__(
-                LOCK_PREFIX "cmpxchg8b %2"
-                : "=d" (_nd), "=a" (y),
-                "=m" (*(volatile u64 *)(&page->count_info))
-                : "0" (_d), "1" (x), "c" (NULL), "b" (x) );
-        } 
-        while ( unlikely(_nd != _d) || unlikely(y != x) );
 
-        /*
-         * Unlink from 'd'. At least one reference remains (now anonymous), so
-         * noone else is spinning to try to delete this page from 'd'.
-         */
-        d->tot_pages--;
-        list_del(&page->list);
-        
-        spin_unlock(&d->page_alloc_lock);
-
-        spin_lock(&e->page_alloc_lock);
-
-        /*
-         * Check that 'e' will accept the page and has reservation headroom.
-         * Also, a domain mustn't have PGC_allocated pages when it is dying.
-         */
-        ASSERT(e->tot_pages <= e->max_pages);
-        if ( unlikely(test_bit(_DOMF_dying, &e->domain_flags)) ||
-             unlikely(e->tot_pages == e->max_pages) ||
-             unlikely(!gnttab_prepare_for_transfer(e, d, gntref)) )
-        {
-            MEM_LOG("Transferee has no reservation headroom (%d,%d), or "
-                    "provided a bad grant ref, or is dying (%p).\n",
-                    e->tot_pages, e->max_pages, e->flags);
-            spin_unlock(&e->page_alloc_lock);
-            put_domain(e);
-            okay = 0;
-            break;
+            v += 1 << L2_PAGETABLE_SHIFT;
+            p += 1 << L2_PAGETABLE_SHIFT;
+            s -= 1 << L2_PAGETABLE_SHIFT;
         }
+        else
+        {
+            /* Normal page mapping. */
+            if ( !(l2e_get_flags(*pl2e) & _PAGE_PRESENT) )
+            {
+                pl1e = page_to_virt(alloc_xen_pagetable());
+                clear_page(pl1e);
+                *pl2e = l2e_create_phys(__pa(pl1e), __PAGE_HYPERVISOR);
+            }
+            else if ( l2e_get_flags(*pl2e) & _PAGE_PSE )
+            {
+                pl1e = page_to_virt(alloc_xen_pagetable());
+                for ( i = 0; i < L1_PAGETABLE_ENTRIES; i++ )
+                    pl1e[i] = l1e_create_pfn(
+                        l2e_get_pfn(*pl2e) + i,
+                        l2e_get_flags(*pl2e) & ~_PAGE_PSE);
+                *pl2e = l2e_create_phys(__pa(pl1e), __PAGE_HYPERVISOR);
+                local_flush_tlb_pge();
+            }
 
-        /* Okay, add the page to 'e'. */
-        if ( unlikely(e->tot_pages++ == 0) )
-            get_knownalive_domain(e);
-        list_add_tail(&page->list, &e->page_list);
-        page_set_owner(page, e);
+            pl1e = l2e_to_l1e(*pl2e) + l1_table_offset(v);
+            if ( (l1e_get_flags(*pl1e) & _PAGE_PRESENT) )
+                local_flush_tlb_one(v);
+            *pl1e = l1e_create_phys(p, flags);
 
-        spin_unlock(&e->page_alloc_lock);
+            v += 1 << L1_PAGETABLE_SHIFT;
+            p += 1 << L1_PAGETABLE_SHIFT;
+            s -= 1 << L1_PAGETABLE_SHIFT;       
+        }
+    }
 
-        /* Transfer is all done: tell the guest about its new page frame. */
-        gnttab_notify_transfer(e, d, gntref, pfn);
-        
-        put_domain(e);
-        break;
+    return 0;
+}
+
+#ifdef MEMORY_GUARD
+
+void memguard_init(void)
+{
+    map_pages_to_xen(
+        PAGE_OFFSET, 0, xenheap_phys_end, __PAGE_HYPERVISOR|MAP_SMALL_PAGES);
+}
+
+static void __memguard_change_range(void *p, unsigned long l, int guard)
+{
+    unsigned long _p = (unsigned long)p;
+    unsigned long _l = (unsigned long)l;
+    unsigned long flags = __PAGE_HYPERVISOR | MAP_SMALL_PAGES;
+
+    /* Ensure we are dealing with a page-aligned whole number of pages. */
+    ASSERT((_p&PAGE_MASK) != 0);
+    ASSERT((_l&PAGE_MASK) != 0);
+    ASSERT((_p&~PAGE_MASK) == 0);
+    ASSERT((_l&~PAGE_MASK) == 0);
+
+    if ( guard )
+        flags &= ~_PAGE_PRESENT;
+
+    map_pages_to_xen((unsigned long)(_p), __pa(_p), _l, flags);
+}
+
+void memguard_guard_range(void *p, unsigned long l)
+{
+    __memguard_change_range(p, l, 1);
+}
+
+void memguard_unguard_range(void *p, unsigned long l)
+{
+    __memguard_change_range(p, l, 0);
+}
+
 #endif
 
 /*

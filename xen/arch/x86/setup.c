@@ -58,7 +58,8 @@ boolean_param("noapic", skip_ioapic_setup);
 
 int early_boot = 1;
 
-unsigned long xenheap_phys_end;
+/* Limits of Xen heap, used to initialise the allocator. */
+unsigned long xenheap_phys_start, xenheap_phys_end;
 
 extern void arch_init_memory(void);
 extern void init_IRQ(void);
@@ -396,10 +397,9 @@ static void __init start_of_day(void)
     arch_do_createdomain(current);
     
     /* Map default GDT into their final position in the idle page table. */
-    map_pages(
-        idle_pg_table,
+    map_pages_to_xen(
         GDT_VIRT_START(current) + FIRST_RESERVED_GDT_BYTE,
-        virt_to_phys(gdt_table), PAGE_SIZE, __PAGE_HYPERVISOR);
+        virt_to_phys(gdt_table), PAGE_SIZE, PAGE_HYPERVISOR);
 
     /* Process CPU type information. */
     identify_cpu(&boot_cpu_data);
@@ -473,7 +473,6 @@ void __init __start_xen(multiboot_info_t *mbi)
 {
     char *cmdline;
     module_t *mod = (module_t *)__va(mbi->mods_addr);
-    void *heap_start;
     unsigned long firsthole_start, nr_pages;
     unsigned long initial_images_start, initial_images_end;
     struct e820entry e820_raw[E820MAX];
@@ -561,8 +560,7 @@ void __init __start_xen(multiboot_info_t *mbi)
 #endif
 
     /* Initialise boot-time allocator with all RAM situated after modules. */
-    heap_start = memguard_init(&_end);
-    heap_start = __va(init_boot_allocator(__pa(heap_start)));
+    xenheap_phys_start = init_boot_allocator(__pa(&_end));
     nr_pages   = 0;
     for ( i = 0; i < e820.nr_map; i++ )
     {
@@ -573,22 +571,31 @@ void __init __start_xen(multiboot_info_t *mbi)
             init_boot_pages((e820.map[i].addr < initial_images_end) ?
                             initial_images_end : e820.map[i].addr,
                             e820.map[i].addr + e820.map[i].size);
+#if defined (CONFIG_X86_64)
+        /*
+         * x86/64 maps all registered RAM. Points to note:
+         *  1. The initial pagetable already maps low 64MB, so skip that.
+         *  2. We must map *only* RAM areas, taking care to avoid I/O holes.
+         *     Failure to do this can cause coherency problems and deadlocks
+         *     due to cache-attribute mismatches (e.g., AMD/AGP Linux bug).
+         */
+        {
+            unsigned long start = (unsigned long)e820.map[i].addr;
+            unsigned long size  = (unsigned long)e820.map[i].size;
+            size = (size + (start & ~PAGE_MASK) + PAGE_SIZE - 1) & PAGE_MASK;
+            if ( (start &= PAGE_MASK) < (64UL << 20) )
+            {
+                if ( (signed long)(size -= (64UL << 20) - start) <= 0 )
+                    continue;
+                start = 64UL << 20;
+            }
+            map_pages_to_xen(
+                PAGE_OFFSET + start, start, size, PAGE_HYPERVISOR);
+        }
+#endif
     }
 
-#if defined (CONFIG_X86_64)
-    /* On x86/64 we can 1:1 map every registered memory area. */
-    /* We use the raw_e820 map because we sometimes truncate the cooked map. */
-    for ( i = 0; i < e820_raw_nr; i++ )
-    {
-        unsigned long min, sz;
-        min = (unsigned long)e820_raw[i].addr &
-            ~(((unsigned long)L1_PAGETABLE_ENTRIES << PAGE_SHIFT) - 1);
-        sz  = ((unsigned long)e820_raw[i].size +
-               ((unsigned long)L1_PAGETABLE_ENTRIES << PAGE_SHIFT) - 1) &
-            ~(((unsigned long)L1_PAGETABLE_ENTRIES << PAGE_SHIFT) - 1);
-        map_pages(idle_pg_table, PAGE_OFFSET + min, min, sz, PAGE_HYPERVISOR);
-    }
-#endif
+    memguard_init();
 
     printk("System RAM: %luMB (%lukB)\n", 
            nr_pages >> (20 - PAGE_SHIFT),
@@ -598,10 +605,10 @@ void __init __start_xen(multiboot_info_t *mbi)
 
     end_boot_allocator();
 
-    init_xenheap_pages(__pa(heap_start), xenheap_phys_end);
+    init_xenheap_pages(xenheap_phys_start, xenheap_phys_end);
     printk("Xen heap: %luMB (%lukB)\n",
-	   (xenheap_phys_end-__pa(heap_start)) >> 20,
-	   (xenheap_phys_end-__pa(heap_start)) >> 10);
+	   (xenheap_phys_end-xenheap_phys_start) >> 20,
+	   (xenheap_phys_end-xenheap_phys_start) >> 10);
 
     early_boot = 0;
 

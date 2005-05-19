@@ -27,55 +27,31 @@
 #include <asm/fixmap.h>
 #include <asm/domain_page.h>
 
-/* Map physical byte range (@p, @p+@s) at virt address @v in pagetable @pt. */
-#define __PTE_MASK (~(_PAGE_GLOBAL|_PAGE_DIRTY|_PAGE_PCD|_PAGE_PWT))
-int map_pages(
-    root_pgentry_t *pt,
-    unsigned long v,
-    unsigned long p,
-    unsigned long s,
-    unsigned long flags)
+struct pfn_info *alloc_xen_pagetable(void)
 {
-    l2_pgentry_t *pl2e;
-    l1_pgentry_t *pl1e;
-    void         *newpg;
+    extern int early_boot;
+    extern unsigned long xenheap_phys_start;
+    struct pfn_info *pg;
 
-    while ( s != 0 )
+    if ( !early_boot )
     {
-        pl2e = &pt[l2_table_offset(v)];
-
-        if ( ((s|v|p) & ((1<<L2_PAGETABLE_SHIFT)-1)) == 0 )
-        {
-            /* Super-page mapping. */
-            if ( (l2e_get_flags(*pl2e) & _PAGE_PRESENT) )
-                local_flush_tlb_pge();
-            *pl2e = l2e_create_phys(p, flags|_PAGE_PSE);
-
-            v += 1 << L2_PAGETABLE_SHIFT;
-            p += 1 << L2_PAGETABLE_SHIFT;
-            s -= 1 << L2_PAGETABLE_SHIFT;
-        }
-        else
-        {
-            /* Normal page mapping. */
-            if ( !(l2e_get_flags(*pl2e) & _PAGE_PRESENT) )
-            {
-                newpg = (void *)alloc_xenheap_page();
-                clear_page(newpg);
-                *pl2e = l2e_create_phys(__pa(newpg), flags & __PTE_MASK);
-            }
-            pl1e = l2e_to_l1e(*pl2e) + l1_table_offset(v);
-            if ( (l1e_get_flags(*pl1e) & _PAGE_PRESENT) )
-                local_flush_tlb_one(v);
-            *pl1e = l1e_create_phys(p, flags);
-
-            v += 1 << L1_PAGETABLE_SHIFT;
-            p += 1 << L1_PAGETABLE_SHIFT;
-            s -= 1 << L1_PAGETABLE_SHIFT;            
-        }
+        void *v = (void *)alloc_xenheap_page();
+        return ((v == NULL) ? NULL : virt_to_page(v));
     }
 
-    return 0;
+    pg = phys_to_page(xenheap_phys_start);
+    xenheap_phys_start += PAGE_SIZE;
+    return pg;
+}
+
+void free_xen_pagetable(struct pfn_info *pg)
+{
+    free_xenheap_page((unsigned long)page_to_virt(pg));
+}
+
+l2_pgentry_t *virt_to_xen_l2e(unsigned long v)
+{
+    return &idle_pg_table[l2_table_offset(v)];
 }
 
 void __set_fixmap(
@@ -83,9 +59,8 @@ void __set_fixmap(
 {
     if ( unlikely(idx >= __end_of_fixed_addresses) )
         BUG();
-    map_pages(idle_pg_table, fix_to_virt(idx), p, PAGE_SIZE, flags);
+    map_pages_to_xen(fix_to_virt(idx), p, PAGE_SIZE, flags);
 }
-
 
 void __init paging_init(void)
 {
@@ -122,9 +97,10 @@ void __init paging_init(void)
      *     can reused this address space for their phys-to-machine mapping.
      */
     idle_pg_table[l2_table_offset(RO_MPT_VIRT_START)] =
-        l2e_create_pfn(l2e_get_pfn(idle_pg_table[l2_table_offset(RDWR_MPT_VIRT_START)]),
-                       l2e_get_flags(idle_pg_table[l2_table_offset(RDWR_MPT_VIRT_START)])
-                       & ~(_PAGE_RW | _PAGE_GLOBAL));
+        l2e_create_pfn(
+            l2e_get_pfn(idle_pg_table[l2_table_offset(RDWR_MPT_VIRT_START)]),
+            l2e_get_flags(idle_pg_table[l2_table_offset(RDWR_MPT_VIRT_START)])
+            & ~(_PAGE_RW | _PAGE_GLOBAL));
 
     /* Set up mapping cache for domain pages. */
     mapcache = (l1_pgentry_t *)alloc_xenheap_page();
@@ -195,7 +171,6 @@ long do_stack_switch(unsigned long ss, unsigned long esp)
 
     return 0;
 }
-
 
 /* Returns TRUE if given descriptor is valid for GDT or LDT. */
 int check_descriptor(struct desc_struct *d)
@@ -299,77 +274,10 @@ int check_descriptor(struct desc_struct *d)
     return 0;
 }
 
-
-#ifdef MEMORY_GUARD
-
-void *memguard_init(void *heap_start)
-{
-    l1_pgentry_t *l1;
-    int i, j;
-
-    /* Round the allocation pointer up to a page boundary. */
-    heap_start = (void *)(((unsigned long)heap_start + (PAGE_SIZE-1)) & 
-                          PAGE_MASK);
-
-    /* Memory guarding is incompatible with super pages. */
-    for ( i = 0; i < (xenheap_phys_end >> L2_PAGETABLE_SHIFT); i++ )
-    {
-        l1 = (l1_pgentry_t *)heap_start;
-        heap_start = (void *)((unsigned long)heap_start + PAGE_SIZE);
-        for ( j = 0; j < L1_PAGETABLE_ENTRIES; j++ )
-            l1[j] = l1e_create_phys((i << L2_PAGETABLE_SHIFT) |
-                                    (j << L1_PAGETABLE_SHIFT),
-                                    __PAGE_HYPERVISOR);
-        idle_pg_table[i + l2_table_offset(PAGE_OFFSET)] =
-            l2e_create_phys(virt_to_phys(l1), __PAGE_HYPERVISOR);
-    }
-
-    return heap_start;
-}
-
-static void __memguard_change_range(void *p, unsigned long l, int guard)
-{
-    l1_pgentry_t *l1;
-    l2_pgentry_t *l2;
-    unsigned long _p = (unsigned long)p;
-    unsigned long _l = (unsigned long)l;
-
-    /* Ensure we are dealing with a page-aligned whole number of pages. */
-    ASSERT((_p&PAGE_MASK) != 0);
-    ASSERT((_l&PAGE_MASK) != 0);
-    ASSERT((_p&~PAGE_MASK) == 0);
-    ASSERT((_l&~PAGE_MASK) == 0);
-
-    while ( _l != 0 )
-    {
-        l2  = &idle_pg_table[l2_table_offset(_p)];
-        l1  = l2e_to_l1e(*l2) + l1_table_offset(_p);
-        if ( guard )
-            l1e_remove_flags(l1, _PAGE_PRESENT);
-        else
-            l1e_add_flags(l1, _PAGE_PRESENT);
-        _p += PAGE_SIZE;
-        _l -= PAGE_SIZE;
-    }
-}
-
 void memguard_guard_stack(void *p)
 {
     memguard_guard_range(p, PAGE_SIZE);
 }
-
-void memguard_guard_range(void *p, unsigned long l)
-{
-    __memguard_change_range(p, l, 1);
-    local_flush_tlb();
-}
-
-void memguard_unguard_range(void *p, unsigned long l)
-{
-    __memguard_change_range(p, l, 0);
-}
-
-#endif
 
 /*
  * Local variables:

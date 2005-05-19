@@ -230,7 +230,7 @@ ENTRY(gdt_table)
         .quad 0x0000000000000000     /* unused                            */
         .fill 4*NR_CPUS,8,0          /* space for TSS and LDT per CPU     */
 
-/* Initial PML4 -- level-4 page table */
+/* Initial PML4 -- level-4 page table. */
         .org 0x2000
 ENTRY(idle_pg_table)
 ENTRY(idle_pg_table_4)
@@ -238,15 +238,15 @@ ENTRY(idle_pg_table_4)
         .fill 261,8,0
         .quad idle_pg_table_l3 - __PAGE_OFFSET + 7 # PML4[262]
 
-/* Initial PDP -- level-3 page table */
+/* Initial PDP -- level-3 page table. */
         .org 0x3000
 ENTRY(idle_pg_table_l3)
         .quad idle_pg_table_l2 - __PAGE_OFFSET + 7
 
-/* Initial PDE -- level-2 page table. */
+/* Initial PDE -- level-2 page table. Maps first 64MB physical memory. */
         .org 0x4000
 ENTRY(idle_pg_table_l2)
-        .macro identmap from=0, count=512
+        .macro identmap from=0, count=32
         .if \count-1
         identmap "(\from+0)","(\count/2)"
         identmap "(\from+(0x200000*(\count/2)))","(\count/2)"

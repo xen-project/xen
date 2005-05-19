@@ -574,8 +574,8 @@ int construct_dom0(struct domain *d,
             //
             ASSERT( root_get_value(idle_pg_table[1]) == 0 );
             ASSERT( pagetable_val(d->arch.phys_table) );
-            idle_pg_table[1] = root_create_phys(pagetable_val(d->arch.phys_table),
-                                                __PAGE_HYPERVISOR);
+            idle_pg_table[1] = root_create_phys(
+                pagetable_val(d->arch.phys_table), __PAGE_HYPERVISOR);
             translate_l2pgtable(d, (l1_pgentry_t *)(1u << L2_PAGETABLE_SHIFT),
                                 pagetable_get_pfn(ed->arch.guest_table));
             idle_pg_table[1] = root_empty();

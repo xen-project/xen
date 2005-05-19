@@ -38,6 +38,11 @@ typedef struct { unsigned long pt_lo; } pagetable_t;
 #define virt_to_page(kaddr) (frame_table + (__pa(kaddr) >> PAGE_SHIFT))
 #define pfn_valid(_pfn)     ((_pfn) < max_page)
 
+#define l1e_get_page(_x)    (pfn_to_page(l1e_get_pfn(_x)))
+#define l2e_get_page(_x)    (pfn_to_page(l2e_get_pfn(_x)))
+#define l3e_get_page(_x)    (pfn_to_page(l3e_get_pfn(_x)))
+#define l4e_get_page(_x)    (pfn_to_page(l4e_get_pfn(_x)))
+
 /* High table entries are reserved by the hypervisor. */
 #define DOMAIN_ENTRIES_PER_L2_PAGETABLE     \
   (HYPERVISOR_VIRT_START >> L2_PAGETABLE_SHIFT)
@@ -131,10 +136,15 @@ static __inline__ int get_order(unsigned long size)
     return order;
 }
 
-/* Map physical byte range (@p, @p+@s) at virt address @v in pagetable @pt. */
-extern int
-map_pages(
-    root_pgentry_t *pt,
+/* Allocator functions for Xen pagetables. */
+struct pfn_info *alloc_xen_pagetable(void);
+void free_xen_pagetable(struct pfn_info *pg);
+l2_pgentry_t *virt_to_xen_l2e(unsigned long v);
+
+/* Map physical byte range (@p, @p+@s) at address @v in Xen address space. */
+#define MAP_SMALL_PAGES (1UL<<16) /* don't use superpages for the mapping */
+int
+map_pages_to_xen(
     unsigned long v,
     unsigned long p,
     unsigned long s,

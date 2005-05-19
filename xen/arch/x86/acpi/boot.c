@@ -89,15 +89,18 @@ EXPORT_SYMBOL(x86_acpiid_to_apicid);
  */
 enum acpi_irq_model_id		acpi_irq_model = ACPI_IRQ_MODEL_PIC;
 
-#ifdef	CONFIG_X86_64
+#if 0/*def	CONFIG_X86_64*/
 
 /* rely on all ACPI tables being in the direct mapping */
 char *__acpi_map_table(unsigned long phys_addr, unsigned long size)
 {
 	if (!phys_addr || !size)
-		return NULL;
-	/* XEN: We map all e820 areas which should include every ACPI table. */
-	return __va(phys_addr);
+	return NULL;
+
+	if (phys_addr < (end_pfn_map << PAGE_SHIFT))
+		return __va(phys_addr);
+
+	return NULL;
 }
 
 #else
