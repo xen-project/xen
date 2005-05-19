@@ -94,7 +94,15 @@ static void loopback_construct(struct net_device *dev, struct net_device *lo)
     dev->get_stats       = loopback_get_stats;
 
     dev->tx_queue_len    = 0;
-    dev->mtu             = 16*1024;
+
+    /*
+     * We do not set a jumbo MTU on the interface. Otherwise the network
+     * stack will try to send large packets that will get dropped by the
+     * Ethernet bridge (unless the physical Ethernet interface is configured
+     * to transfer jumbo packets). If a larger MTU is desired then the system
+     * administrator can specify it using the 'ifconfig' command.
+     */
+    /*dev->mtu             = 16*1024;*/
 }
 
 static int __init loopback_init(void)
