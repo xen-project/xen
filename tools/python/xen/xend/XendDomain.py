@@ -53,10 +53,6 @@ class XendDomain:
         xroot.add_component("xen.xend.XendDomain", self)
         # Table of domain info indexed by domain id.
         self.db = XendDB.XendDB(self.dbpath)
-        self.domain_db = self.db.fetchall("")
-        # XXXcl maybe check if there's only dom0 if we _really_ need
-        #       to remove the db 
-        # self.rm_all()
         eserver.subscribe('xend.virq', self.onVirq)
         self.initial_refresh()
 
@@ -72,12 +68,6 @@ class XendDomain:
         """
         print 'onVirq>', val
         self.refresh(cleanup=True)
-
-    def rm_all(self):
-        """Remove all domain info. Used after reboot.
-        """
-        for (k, v) in self.domain_db.items():
-            self._delete_domain(k, notify=False)
 
     def xen_domains(self):
         """Get table of domains indexed by id from xc.
@@ -102,10 +92,10 @@ class XendDomain:
         return dominfo
             
     def initial_refresh(self):
-        """Refresh initial domain info from domain_db.
+        """Refresh initial domain info from db.
         """
         doms = self.xen_domains()
-        for config in self.domain_db.values():
+        for config in self.db.fetchall("").values():
             domid = str(sxp.child_value(config, 'id'))
             if domid in doms:
                 try:
@@ -118,17 +108,12 @@ class XendDomain:
                 self._delete_domain(domid)
         self.refresh(cleanup=True)
 
-    def sync(self):
-        """Sync domain db to disk.
-        """
-        self.db.saveall("", self.domain_db)
-
-    def sync_domain(self, dom):
+    def sync_domain(self, info):
         """Sync info for a domain to disk.
 
-        dom	domain id (string)
+        info	domain info
         """
-        self.db.save(dom, self.domain_db[dom])
+        self.db.save(info.id, info.sxpr())
 
     def close(self):
         pass
@@ -154,14 +139,11 @@ class XendDomain:
         for i, d in self.domains.items():
             if i != d.id:
                 del self.domains[i]
-                if i in self.domain_db:
-                    del self.domain_db[i]
                 self.db.delete(i)
         if info.id in self.domains:
             notify = False
         self.domains[info.id] = info
-        self.domain_db[info.id] = info.sxpr()
-        self.sync_domain(info.id)
+        self.sync_domain(info)
         if notify:
             eserver.inject('xend.domain.create', [info.name, info.id])
 
@@ -176,8 +158,6 @@ class XendDomain:
             del self.domains[id]
             if notify:
                 eserver.inject('xend.domain.died', [info.name, info.id])
-        if id in self.domain_db:
-            del self.domain_db[id]
             self.db.delete(id)
 
     def reap(self):
@@ -253,8 +233,7 @@ class XendDomain:
         """
         dominfo = self.domains.get(id)
         if dominfo:
-            self.domain_db[id] = dominfo.sxpr()
-            self.sync_domain(id)
+            self.sync_domain(dominfo)
 
     def refresh_domain(self, id):
         """Refresh information for a single domain.
