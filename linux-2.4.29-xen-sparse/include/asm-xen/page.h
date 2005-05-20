@@ -77,6 +77,7 @@ static inline unsigned long pte_val(pte_t x)
     if ( (ret & 1) ) ret = machine_to_phys(ret);
     return ret;
 }
+#define pte_val_ma(x)   ((x).pte_low)
 #endif
 #define PTE_MASK	PAGE_MASK
 

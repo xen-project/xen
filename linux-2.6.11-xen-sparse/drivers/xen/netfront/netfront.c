@@ -45,6 +45,7 @@
 #include <net/arp.h>
 #include <net/route.h>
 #include <asm/io.h>
+#include <asm/uaccess.h>
 #include <asm-xen/evtchn.h>
 #include <asm-xen/ctrl_if.h>
 #include <asm-xen/xen-public/io/netif.h>
