@@ -14,7 +14,7 @@ TOOLS=qemu-img
 ifdef CONFIG_STATIC
 LDFLAGS+=-static
 endif
-DOCS=qemu-doc.html qemu-tech.html qemu.1
+#DOCS=qemu-doc.html qemu-tech.html qemu.1
 
 all: $(DOCS) HEADERS
 	for d in $(TARGET_DIRS); do \
@@ -31,7 +31,7 @@ clean:
 # avoid old build problems by removing potentially incorrect old files
 	rm -f config.mak config.h op-i386.h opc-i386.h gen-op-i386.h op-arm.h opc-arm.h gen-op-arm.h 
 	rm -f *.o *.a $(TOOLS) dyngen$(EXESUF) TAGS qemu.pod *~ */*~
-	$(MAKE) -C tests clean
+	#$(MAKE) -C tests clean
 	for d in $(TARGET_DIRS); do \
 	$(MAKE) -C $$d $@ || exit 1 ; \
         done
@@ -58,11 +58,11 @@ endif
                        pc-bios/ppc_rom.bin \
                        pc-bios/proll.bin \
                        pc-bios/linux_boot.bin "$(DESTDIR)/$(datadir)"
-	mkdir -p "$(DESTDIR)/$(docdir)"
-	install -m 644 qemu-doc.html  qemu-tech.html "$(DESTDIR)/$(docdir)"
+	#mkdir -p "$(DESTDIR)/$(docdir)"
+	#install -m 644 qemu-doc.html  qemu-tech.html "$(DESTDIR)/$(docdir)"
 ifndef CONFIG_WIN32
-	mkdir -p "$(DESTDIR)/$(mandir)/man1"
-	install qemu.1 qemu-mkcow.1 "$(DESTDIR)/$(mandir)/man1"
+	#mkdir -p "$(DESTDIR)/$(mandir)/man1"
+	#install qemu.1 qemu-mkcow.1 "$(DESTDIR)/$(mandir)/man1"
 	mkdir -p "$(DESTDIR)/$(datadir)/keymaps"
 	install -m 644 $(addprefix keymaps/,$(KEYMAPS)) "$(DESTDIR)/$(datadir)/keymaps"
 endif
