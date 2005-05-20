@@ -1,3 +1,5 @@
+#ifndef _VDI_H_
+#define _VDI_H_
 /**************************************************************************
  * 
  * vdi.h
@@ -12,10 +14,11 @@
 #include "blktaplib.h"
 #include "snaplog.h"
 
-#define VDI_HEIGHT     35
-#define VDI_REG_HEIGHT 35 /* why not? */
+#define VDI_HEIGHT     27 /* Note that these are now hard-coded */
+#define VDI_REG_HEIGHT 27 /* in the async lookup code           */
 
 #define VDI_NAME_SZ 256
+
 
 typedef struct vdi {
     u64         id;               /* unique vdi id -- used by the registry   */
@@ -24,6 +27,7 @@ typedef struct vdi {
     snap_id_t   snap;             /* next snapshot slot for this VDI         */
     struct vdi *next;             /* used to hash-chain in blkif.            */
     blkif_vdev_t vdevice;         /* currently mounted as...                 */
+    struct radix_lock *radix_lock;/* per-line L1 RW lock for parallel reqs   */ 
     char        name[VDI_NAME_SZ];/* human readable vdi name                 */
 } vdi_t;
 
@@ -46,3 +50,5 @@ void vdi_snapshot(vdi_t *vdi);
 
 
 #endif /* __VDI_H__ */
+
+#endif //_VDI_H_

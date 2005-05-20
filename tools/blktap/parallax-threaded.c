@@ -145,33 +145,33 @@ void blkif_destroy(blkif_be_destroy_t *destroy)
     destroy->status = BLKIF_BE_STATUS_OKAY;
 }
 
-void vbd_grow(blkif_be_vbd_grow_t *grow) 
+void vbd_create(blkif_be_vbd_create_t *create)
 {
     blkif_t            *blkif;
     vdi_t              *vdi, **vdip;
-    blkif_vdev_t        vdevice = grow->vdevice;
+    blkif_vdev_t        vdevice = create->vdevice;
 
-    DPRINTF("parallax (vbd_grow): grow=%p\n", grow); 
+    DPRINTF("parallax (vbd_create): create=%p\n", create); 
     
-    blkif = blkif_find_by_handle(grow->domid, grow->blkif_handle);
+    blkif = blkif_find_by_handle(create->domid, create->blkif_handle);
     if ( blkif == NULL )
     {
-        DPRINTF("vbd_grow attempted for non-existent blkif (%u,%u)\n", 
-                grow->domid, grow->blkif_handle); 
-        grow->status = BLKIF_BE_STATUS_INTERFACE_NOT_FOUND;
+        DPRINTF("vbd_create attempted for non-existent blkif (%u,%u)\n", 
+                create->domid, create->blkif_handle); 
+        create->status = BLKIF_BE_STATUS_INTERFACE_NOT_FOUND;
         return;
     }
 
     /* VDI identifier is in grow->extent.sector_start */
-    DPRINTF("vbd_grow: grow->extent.sector_start (id) is %llx\n", 
-            grow->extent.sector_start);
+    DPRINTF("vbd_create: create->dev_handle (id) is %lx\n", 
+            (unsigned long)create->dev_handle);
 
-    vdi = vdi_get(grow->extent.sector_start);
+    vdi = vdi_get(create->dev_handle);
     if (vdi == NULL)
     {
-        printf("parallax (vbd_grow): VDI %llx not found.\n",
-               grow->extent.sector_start);
-        grow->status = BLKIF_BE_STATUS_VBD_NOT_FOUND;
+        printf("parallax (vbd_create): VDI %lx not found.\n",
+               (unsigned long)create->dev_handle);
+        create->status = BLKIF_BE_STATUS_VBD_NOT_FOUND;
         return;
     }
     
@@ -183,7 +183,7 @@ void vbd_grow(blkif_be_vbd_grow_t *grow)
     *vdip = vdi;
     
     DPRINTF("vbd_grow: happy return!\n"); 
-    grow->status = BLKIF_BE_STATUS_OKAY;
+    create->status = BLKIF_BE_STATUS_OKAY;
 }
 
 int parallax_control(control_msg_t *msg)
@@ -213,10 +213,10 @@ int parallax_control(control_msg_t *msg)
         blkif_destroy((blkif_be_destroy_t *)msg->msg);
         break;  
         
-    case CMSG_BLKIF_BE_VBD_GROW:
-        if ( msg->length != sizeof(blkif_be_vbd_grow_t) )
+    case CMSG_BLKIF_BE_VBD_CREATE:
+        if ( msg->length != sizeof(blkif_be_vbd_create_t) )
             goto parse_error;
-        vbd_grow((blkif_be_vbd_grow_t *)msg->msg);
+        vbd_create((blkif_be_vbd_create_t *)msg->msg);
         break;
     }
     return 0;

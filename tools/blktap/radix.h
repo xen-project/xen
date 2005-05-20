@@ -16,6 +16,16 @@
 #define putid(x) ((x)<<1)
 #define writable(x) (((x)<<1)|1LL)
 #define iswritable(x) ((x)&1LL)
+#define ZERO 0LL
+#define ONE 1LL
+#define ONEMASK 0xffffffffffffffeLL
+
+#define RADIX_TREE_MAP_SHIFT 9
+#define RADIX_TREE_MAP_MASK 0x1ff
+#define RADIX_TREE_MAP_ENTRIES 512
+
+typedef u64 *radix_tree_node;
+
 
 /*
  * main api

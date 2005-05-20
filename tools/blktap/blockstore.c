@@ -19,7 +19,7 @@
 #include <pthread.h>
 #include "parallax-threaded.h"
 
-#define BLOCKSTORE_REMOTE
+//#define BLOCKSTORE_REMOTE
 //#define BSDEBUG
 
 #define RETRY_TIMEOUT 1000000 /* microseconds */
@@ -942,7 +942,8 @@ u64 allocblock_hint(void *block, u64 hint) {
 void *readblock(u64 id) {
     void *block;
     int block_fp;
-    
+   
+//printf("readblock(%llu)\n", id); 
     block_fp = open("blockstore.dat", O_RDONLY | O_CREAT | O_LARGEFILE, 0644);
 
     if (block_fp < 0) {
@@ -1336,6 +1337,7 @@ int __init_blockstore(void)
 void __exit_blockstore(void)
 {
     int i;
+#ifdef BLOCKSTORE_REMOTE
     pthread_mutex_destroy(&ptmutex_recv);
     pthread_mutex_destroy(&ptmutex_luid);
     pthread_mutex_destroy(&ptmutex_queue);
@@ -1345,4 +1347,5 @@ void __exit_blockstore(void)
         pthread_mutex_destroy(&(pool_thread[i].ptmutex));
         pthread_cond_destroy(&(pool_thread[i].ptcv));
     }
+#endif
 }

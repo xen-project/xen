@@ -11,14 +11,16 @@
 #include <fcntl.h>
 #include <string.h>
 #include <sys/time.h>
+#include <pthread.h>
 #include "blockstore.h"
+#include "block-async.h"
 #include "radix.h"
 #include "vdi.h"
                     
 #define VDI_REG_BLOCK   2LL
 #define VDI_RADIX_ROOT  writable(3)
                                                             
-#if 1
+#if 0
 #define DPRINTF(_f, _a...) printf ( _f , ## _a )
 #else
 #define DPRINTF(_f, _a...) ((void)0)
@@ -66,6 +68,7 @@ vdi_registry_t *get_vdi_registry(void)
     return vdi_reg;
 }
 
+
 vdi_t *vdi_create(snap_id_t *parent_snap, char *name)
 {
     int ret;
@@ -106,11 +109,21 @@ vdi_t *vdi_create(snap_id_t *parent_snap, char *name)
     vdi->id    = vdi_reg->nr_vdis++;
     strncpy(vdi->name, name, VDI_NAME_SZ);
     vdi->name[VDI_NAME_SZ] = '\0';
+    vdi->radix_lock = NULL; /* for tidiness */
     writeblock(vdi->block, (void *)vdi);
     
     update(VDI_REG_HEIGHT, VDI_RADIX_ROOT, vdi->id, vdi->block);
     writeblock(VDI_REG_BLOCK, (void *)vdi_reg);
     freeblock(vdi_reg);
+    
+    vdi->radix_lock = (struct radix_lock *)malloc(sizeof(struct radix_lock));
+    if (vdi->radix_lock == NULL) 
+    {
+    	perror("couldn't malloc radix_lock for new vdi!");
+    	freeblock(vdi);
+    	return NULL;
+    }
+    radix_lock_init(vdi->radix_lock);
     
     return vdi;
 }
@@ -126,6 +139,16 @@ vdi_t *vdi_get(u64 vdi_id)
         return NULL;
     
     vdi = (vdi_t *)readblock(vdi_blk);
+    
+    vdi->radix_lock = (struct radix_lock *)malloc(sizeof(struct radix_lock));
+    if (vdi->radix_lock == NULL) 
+    {
+    	perror("couldn't malloc radix_lock for new vdi!");
+    	freeblock(vdi);
+    	return NULL;
+    }
+    radix_lock_init(vdi->radix_lock);
+    
     return vdi;
 }
 
