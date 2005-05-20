@@ -9,15 +9,10 @@
 #include "xc_private.h"
 
 int xc_domain_create(int xc_handle,
-                     unsigned int mem_kb, 
-                     int cpu,
-                     float cpu_weight,
                      u32 *pdomid)
 {
-    int err, errno_saved;
+    int err;
     dom0_op_t op;
-    u32 vcpu = 0; /* FIXME, hard coded initial pin to vcpu 0 */
-    cpumap_t cpumap = 1 << cpu;
 
     op.cmd = DOM0_CREATEDOMAIN;
     op.u.createdomain.domain = (domid_t)*pdomid;
@@ -25,33 +20,7 @@ int xc_domain_create(int xc_handle,
         return err;
 
     *pdomid = (u16)op.u.createdomain.domain;
-
-    if ( (cpu != -1) &&
-         ((err = xc_domain_pincpu(xc_handle, *pdomid, vcpu, &cpumap)) != 0) )
-        goto fail;
-
-    if ( (err = xc_domain_setcpuweight(xc_handle, *pdomid, cpu_weight)) != 0 )
-        goto fail;
-
-    if ( (err = xc_domain_setmaxmem(xc_handle, *pdomid, mem_kb)) != 0 )
-        goto fail;
-
-    if ( (err = do_dom_mem_op(xc_handle, MEMOP_increase_reservation,
-                              NULL, mem_kb/4, 0, *pdomid)) != (mem_kb/4) )
-    {
-        if ( err > 0 )
-            errno = ENOMEM;
-        err = -1;
-        goto fail;
-    }
-
     return 0;
-
- fail:
-    errno_saved = errno;
-    (void)xc_domain_destroy(xc_handle, *pdomid);
-    errno = errno_saved;
-    return err;
 }    
 
 
@@ -255,4 +224,22 @@ int xc_domain_setmaxmem(int xc_handle,
     op.u.setdomainmaxmem.domain = (domid_t)domid;
     op.u.setdomainmaxmem.max_memkb = max_memkb;
     return do_dom0_op(xc_handle, &op);
+}
+
+int xc_domain_memory_increase_reservation(int xc_handle,
+                                          u32 domid, 
+                                          unsigned int mem_kb)
+{
+    int err;
+
+    err = do_dom_mem_op(xc_handle, MEMOP_increase_reservation, NULL,
+                        mem_kb / 4, 0, domid);
+    if (err == mem_kb / 4)
+        return 0;
+
+    if (err > 0) {
+        errno = ENOMEM;
+        err = -1;
+    }
+    return err;
 }

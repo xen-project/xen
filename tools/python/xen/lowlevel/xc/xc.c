@@ -69,20 +69,15 @@ static PyObject *pyxc_domain_create(PyObject *self,
 {
     XcObject *xc = (XcObject *)self;
 
-    unsigned int mem_kb = 0;
-    int          cpu = -1;
-    float        cpu_weight = 1;
     u32          dom = 0;
     int          ret;
 
-    static char *kwd_list[] = { "dom", "mem_kb", "cpu", "cpu_weight", NULL };
+    static char *kwd_list[] = { "dom", NULL };
 
-    if ( !PyArg_ParseTupleAndKeywords(args, kwds, "|iiif", kwd_list, 
-                                      &dom, &mem_kb, &cpu, &cpu_weight))
+    if ( !PyArg_ParseTupleAndKeywords(args, kwds, "|i", kwd_list, &dom))
         return NULL;
 
-    if ( (ret = xc_domain_create(
-                    xc->xc_handle, mem_kb, cpu, cpu_weight, &dom)) < 0 )
+    if ( (ret = xc_domain_create(xc->xc_handle, &dom)) < 0 )
         return PyErr_SetFromErrno(xc_error);
 
     return PyInt_FromLong(dom);
@@ -165,6 +160,28 @@ static PyObject *pyxc_domain_pincpu(PyObject *self,
         return NULL;
 
     if ( xc_domain_pincpu(xc->xc_handle, dom, vcpu, &cpumap) != 0 )
+        return PyErr_SetFromErrno(xc_error);
+    
+    Py_INCREF(zero);
+    return zero;
+}
+
+static PyObject *pyxc_domain_setcpuweight(PyObject *self,
+					  PyObject *args,
+					  PyObject *kwds)
+{
+    XcObject *xc = (XcObject *)self;
+
+    u32 dom;
+    float cpuweight = 1;
+
+    static char *kwd_list[] = { "dom", "cpuweight", NULL };
+
+    if ( !PyArg_ParseTupleAndKeywords(args, kwds, "i|f", kwd_list, 
+                                      &dom, &cpuweight) )
+        return NULL;
+
+    if ( xc_domain_setcpuweight(xc->xc_handle, dom, cpuweight) != 0 )
         return PyErr_SetFromErrno(xc_error);
     
     Py_INCREF(zero);
@@ -928,6 +945,28 @@ static PyObject *pyxc_domain_setmaxmem(PyObject *self,
     return zero;
 }
 
+static PyObject *pyxc_domain_memory_increase_reservation(PyObject *self,
+							 PyObject *args,
+							 PyObject *kwds)
+{
+    XcObject *xc = (XcObject *)self;
+
+    u32 dom;
+    unsigned long mem_kb;
+
+    static char *kwd_list[] = { "dom", "mem_kb", NULL };
+
+    if ( !PyArg_ParseTupleAndKeywords(args, kwds, "ii", kwd_list, 
+                                      &dom, &mem_kb) )
+        return NULL;
+
+    if ( xc_domain_memory_increase_reservation(xc->xc_handle, dom, mem_kb) )
+        return PyErr_SetFromErrno(xc_error);
+    
+    Py_INCREF(zero);
+    return zero;
+}
+
 
 static PyMethodDef pyxc_methods[] = {
     { "domain_create", 
@@ -935,7 +974,6 @@ static PyMethodDef pyxc_methods[] = {
       METH_VARARGS | METH_KEYWORDS, "\n"
       "Create a new domain.\n"
       " dom    [int, 0]:        Domain identifier to use (allocated if zero).\n"
-      " mem_kb [int, 0]:        Memory allocation, in kilobytes.\n"
       "Returns: [int] new domain identifier; -1 on error.\n" },
 
     { "domain_dumpcore", 
@@ -976,6 +1014,14 @@ static PyMethodDef pyxc_methods[] = {
       " cpumap [int, -1]: Bitmap of usable CPUs.\n\n"
       "Returns: [int] 0 on success; -1 on error.\n" },
 
+    { "domain_setcpuweight", 
+      (PyCFunction)pyxc_domain_setcpuweight, 
+      METH_VARARGS | METH_KEYWORDS, "\n"
+      "Set cpuweight scheduler parameter for domain.\n"
+      " dom [int]:            Identifier of domain to be changed.\n"
+      " cpuweight [float, 1]: VCPU being pinned.\n"
+      "Returns: [int] 0 on success; -1 on error.\n" },
+
     { "domain_getinfo", 
       (PyCFunction)pyxc_domain_getinfo, 
       METH_VARARGS | METH_KEYWORDS, "\n"
@@ -1010,14 +1056,6 @@ static PyMethodDef pyxc_methods[] = {
       " state_file [str]:    Name of state file. Must not currently exist.\n"
       " progress   [int, 1]: Bool - display a running progress indication?\n\n"
       "Returns: [int] 0 on success; -1 on error.\n" },
-    { "plan9_build",
-      (PyCFunction)pyxc_plan9_build,
-      METH_VARARGS | METH_KEYWORDS, "\n"
-      "Build a new Plan 9 guest OS.\n"
-      " dom     [long]:     Identifier of domain to build into.\n"
-      " image   [str]:      Name of kernel image file. May be gzipped.\n"
-      " cmdline [str, n/a]: Kernel parameters, if any.\n\n"
-      "Returns: [int] 0 on success; -1 on error.\n" },
 
     { "linux_restore", 
       (PyCFunction)pyxc_linux_restore, 
@@ -1036,6 +1074,15 @@ static PyMethodDef pyxc_methods[] = {
       " ramdisk [str, n/a]: Name of ramdisk file, if any.\n"
       " cmdline [str, n/a]: Kernel parameters, if any.\n\n"
       " vcpus   [int, 1]:   Number of Virtual CPUS in domain.\n\n"
+      "Returns: [int] 0 on success; -1 on error.\n" },
+
+    { "plan9_build",
+      (PyCFunction)pyxc_plan9_build,
+      METH_VARARGS | METH_KEYWORDS, "\n"
+      "Build a new Plan 9 guest OS.\n"
+      " dom     [long]:     Identifier of domain to build into.\n"
+      " image   [str]:      Name of kernel image file. May be gzipped.\n"
+      " cmdline [str, n/a]: Kernel parameters, if any.\n\n"
       "Returns: [int] 0 on success; -1 on error.\n" },
 
     { "vmx_build", 
@@ -1205,6 +1252,14 @@ static PyMethodDef pyxc_methods[] = {
       "Set a domain's memory limit\n"
       " dom [int]: Identifier of domain.\n"
       " maxmem_kb [long]: .\n"
+      "Returns: [int] 0 on success; -1 on error.\n" },
+
+    { "domain_memory_increase_reservation", 
+      (PyCFunction)pyxc_domain_memory_increase_reservation, 
+      METH_VARARGS | METH_KEYWORDS, "\n"
+      "Increase a domain's memory reservation\n"
+      " dom [int]: Identifier of domain.\n"
+      " mem_kb [long]: .\n"
       "Returns: [int] 0 on success; -1 on error.\n" },
 
     { NULL, NULL, 0, NULL }

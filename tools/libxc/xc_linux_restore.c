@@ -167,14 +167,31 @@ int xc_linux_restore(int xc_handle, XcIOContext *ioctxt)
     }
 
     /* Create domain on CPU -1 so that it may auto load-balance in future. */
-    if ( xc_domain_create(xc_handle, nr_pfns * (PAGE_SIZE / 1024),
-                          -1, 1, &dom) )
+    if ( xc_domain_create(xc_handle, &dom) )
     {
-	xcio_error(ioctxt, "Could not create domain. pfns=%ld, %ldKB",
-		   nr_pfns, nr_pfns * (PAGE_SIZE / 1024));
+        xcio_error(ioctxt, "Could not create domain.");
         goto out;
     }
-    
+    if ( xc_domain_setcpuweight(xc_handle, dom, 1) )
+    {
+        xcio_error(ioctxt, "Could not set domain cpuweight.");
+        goto out;
+    }
+    if ( xc_domain_setmaxmem(xc_handle, dom, nr_pfns * (PAGE_SIZE / 1024)) )
+    {
+        xcio_error(ioctxt, "Could not set domain maxmem. pfns=%ld, %ldKB",
+                   nr_pfns, nr_pfns * (PAGE_SIZE / 1024));
+        goto out;
+    }
+    if ( xc_domain_memory_increase_reservation(xc_handle, dom,
+                                               nr_pfns * (PAGE_SIZE / 1024)) )
+    {
+        xcio_error(ioctxt,
+                   "Could not increase domain memory reservation. pfns=%ld",
+                   nr_pfns);
+        goto out;
+    }
+
     ioctxt->domain = dom;
     xcio_info(ioctxt, "Created domain %u\n", dom);
 
