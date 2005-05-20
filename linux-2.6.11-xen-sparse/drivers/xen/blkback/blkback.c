@@ -47,6 +47,8 @@ typedef struct {
     atomic_t       pendcnt;
     unsigned short operation;
     int            status;
+    void          *bounce_page;
+    unsigned int   bounce_off, bounce_len;
 } pending_req_t;
 
 /*
@@ -232,6 +234,15 @@ static void __end_block_io_op(pending_req_t *pending_req, int uptodate)
     if ( atomic_dec_and_test(&pending_req->pendcnt) )
     {
         int pending_idx = pending_req - pending_reqs;
+        if ( unlikely(pending_req->bounce_page != NULL) )
+        {
+            memcpy((void *)(MMAP_VADDR(pending_idx, 0) +
+                            pending_req->bounce_off),
+                   (void *)((unsigned long)pending_req->bounce_page +
+                            pending_req->bounce_off),
+                   pending_req->bounce_len);
+            free_page((unsigned long)pending_req->bounce_page);
+        }
         fast_flush_area(pending_idx, pending_req->nr_pages);
         make_response(pending_req->blkif, pending_req->id,
                       pending_req->operation, pending_req->status);
@@ -452,6 +463,7 @@ static void dispatch_rw_block_io(blkif_t *blkif, blkif_request_t *req)
     pending_req->operation = operation;
     pending_req->status    = BLKIF_RSP_OKAY;
     pending_req->nr_pages  = nr_psegs;
+    pending_req->bounce_page = NULL;
     atomic_set(&pending_req->pendcnt, nr_psegs);
     pending_cons++;
 
@@ -511,11 +523,38 @@ static void dispatch_rw_block_io(blkif_t *blkif, blkif_request_t *req)
         bio->bi_end_io  = end_block_io_op;
         bio->bi_sector  = phys_seg[i].sector_number;
 
-        bio_add_page(
-            bio,
-            virt_to_page(MMAP_VADDR(pending_idx, i)),
-            phys_seg[i].nr_sects << 9,
-            phys_seg[i].buffer & ~PAGE_MASK);
+        /* Is the request misaligned with respect to hardware sector size? */
+        if ( ((bio->bi_sector | phys_seg[i].nr_sects) &
+              ((bdev_hardsect_size(bio->bi_bdev) >> 9) - 1)) )
+        {
+            /* We can't bounce scatter-gather requests. */
+            if ( (nr_psegs != 1) ||
+                 ((pending_req->bounce_page = (void *)
+                   __get_free_page(GFP_KERNEL)) == NULL) )
+            {
+                printk("xen_blk: Unaligned scatter-gather request!\n");
+                bio_put(bio);
+                __end_block_io_op(pending_req, 0);
+                continue;
+            }
+
+            /* Record offset and length within a bounce page. */
+            pending_req->bounce_off = (bio->bi_sector << 9) & ~PAGE_MASK;
+            pending_req->bounce_len = phys_seg[i].nr_sects << 9;
+
+            /* Submit a page-aligned I/O. */
+            bio->bi_sector &= ~((PAGE_SIZE >> 9) - 1);
+            bio_add_page(
+                bio, virt_to_page(pending_req->bounce_page), PAGE_SIZE, 0);
+        }
+        else
+        {
+            bio_add_page(
+                bio,
+                virt_to_page(MMAP_VADDR(pending_idx, i)),
+                phys_seg[i].nr_sects << 9,
+                phys_seg[i].buffer & ~PAGE_MASK);
+        }
 
         if ( (q = bdev_get_queue(bio->bi_bdev)) != plugged_queue )
         {
