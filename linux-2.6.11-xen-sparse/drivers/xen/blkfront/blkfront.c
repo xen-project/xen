@@ -247,9 +247,9 @@ int blkif_ioctl(struct inode *inode, struct file *filep,
         return 0;
 
     default:
-        printk(KERN_ALERT "ioctl %08x not supported by Xen blkdev\n",
-               command);
-        return -ENOSYS;
+        /*printk(KERN_ALERT "ioctl %08x not supported by Xen blkdev\n",
+          command);*/
+        return -EINVAL; /* same return as native Linux */
     }
 
     return 0;
