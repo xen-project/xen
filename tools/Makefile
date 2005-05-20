@@ -14,15 +14,6 @@ SUBDIRS += pygrub
 
 .PHONY: all install clean check check_clean ioemu eioemuinstall ioemuclean
 
-ifndef XEN_NO_IOEMU
-ioemu ioemuinstall ioemuclean:
-	[ -f ioemu/config-host.h ] || \
-	(cd ioemu; ./configure --prefix=$(DESTDIR)/usr)
-	$(MAKE) -C ioemu $(patsubst ioemu%,%,$@)
-else
-ioemu ioemuinstall ioemuclean:
-endif
-
 all: check
 	@set -e; for subdir in $(SUBDIRS); do \
 		$(MAKE) -C $$subdir $@; \
@@ -46,3 +37,13 @@ check:
 
 check_clean:
 	$(MAKE) -C check clean
+
+ifndef XEN_NO_IOEMU
+ioemu ioemuinstall ioemuclean:
+	[ -f ioemu/config-host.h ] || \
+	(cd ioemu; ./configure --prefix=$(DESTDIR)/usr)
+	$(MAKE) -C ioemu $(patsubst ioemu%,%,$@)
+else
+ioemu ioemuinstall ioemuclean:
+endif
+
