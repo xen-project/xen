@@ -739,8 +739,10 @@ asmlinkage long sys_swapoff(const char * specialfile)
 	for (type = swap_list.head; type >= 0; type = swap_info[type].next) {
 		p = swap_info + type;
 		if ((p->flags & SWP_WRITEOK) == SWP_WRITEOK) {
-			if (p->swap_file == nd.dentry)
-			  break;
+			if (p->swap_file == nd.dentry ||
+			    (S_ISBLK(nd.dentry->d_inode->i_mode) &&
+			    p->swap_device == nd.dentry->d_inode->i_rdev))
+				break;
 		}
 		prev = type;
 	}
