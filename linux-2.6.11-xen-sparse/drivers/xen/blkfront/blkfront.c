@@ -60,8 +60,6 @@ static void vbd_update(void){};
 #define BLKIF_STATE_DISCONNECTED 1
 #define BLKIF_STATE_CONNECTED    2
 
-#define WPRINTK(fmt, args...) printk(KERN_WARNING "xen_blk: " fmt, ##args)
-
 static int blkif_handle = 0;
 static unsigned int blkif_state = BLKIF_STATE_CLOSED;
 static unsigned int blkif_evtchn = 0;
@@ -694,7 +692,7 @@ int blkif_ioctl(struct inode *inode, struct file *filep,
         return -ENOSYS;
 
     default:
-        printk(KERN_ALERT "ioctl %08x not supported by XL blkif\n", command);
+        WPRINTK("ioctl %08x not supported by XL blkif\n", command);
         return -ENOSYS;
     }
     
@@ -1206,7 +1204,7 @@ static void blkif_connect(blkif_fe_interface_status_t *status)
     err = request_irq(blkif_irq, blkif_int, SA_SAMPLE_RANDOM, "blkif", NULL);
     if ( err )
     {
-        printk(KERN_ALERT "xen_blk: request_irq failed (err=%d)\n", err);
+        WPRINTK("request_irq failed (err=%d)\n", err);
         return;
     }
 
@@ -1353,7 +1351,7 @@ int wait_for_blkif(void)
 
     if ( blkif_state != BLKIF_STATE_CONNECTED )
     {
-        printk(KERN_INFO "xen_blk: Timeout connecting to device!\n");
+        WPRINTK("Timeout connecting to device!\n");
         err = -ENOSYS;
     }
     return err;
@@ -1367,7 +1365,7 @@ int __init xlblk_init(void)
          (xen_start_info.flags & SIF_BLK_BE_DOMAIN) )
         return 0;
 
-    printk(KERN_INFO "xen_blk: Initialising virtual block device driver\n");
+    IPRINTK("Initialising virtual block device driver\n");
 
     rec_ring_free = 0;
     for ( i = 0; i < BLKIF_RING_SIZE; i++ )
