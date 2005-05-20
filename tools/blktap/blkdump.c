@@ -62,18 +62,6 @@ int control_print(control_msg_t *msg)
                 ((blkif_be_vbd_destroy_t *)msg->msg)->blkif_handle,
                 ((blkif_be_vbd_destroy_t *)msg->msg)->vdevice);
         break;
-    case CMSG_BLKIF_BE_VBD_GROW:
-        if ( msg->length != sizeof(blkif_be_vbd_grow_t) )
-            goto parse_error;
-        printf("[CONTROL_MSG] CMSG_BLKIF_BE_VBD_GROW(d:%d,h:%d,v:%d)\n",
-                ((blkif_be_vbd_grow_t *)msg->msg)->domid,
-                ((blkif_be_vbd_grow_t *)msg->msg)->blkif_handle,
-                ((blkif_be_vbd_grow_t *)msg->msg)->vdevice);
-        printf("              Extent: sec_start: %llu sec_len: %llu, dev: %d\n",
-                ((blkif_be_vbd_grow_t *)msg->msg)->extent.sector_start,
-                ((blkif_be_vbd_grow_t *)msg->msg)->extent.sector_length,
-                ((blkif_be_vbd_grow_t *)msg->msg)->extent.device);
-        break;
     default:
         goto parse_error;
     }
