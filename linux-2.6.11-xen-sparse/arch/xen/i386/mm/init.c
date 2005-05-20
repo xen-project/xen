@@ -654,7 +654,10 @@ void __init mem_init(void)
 #else
 	high_memory = (void *) __va(max_low_pfn * PAGE_SIZE);
 #endif
-
+	printk("vmalloc area: %lx-%lx, maxmem %lx\n",
+	       VMALLOC_START,VMALLOC_END,MAXMEM);
+	BUG_ON(VMALLOC_START > VMALLOC_END);
+	
 	/* this will put all low memory onto the freelists */
 	totalram_pages += __free_all_bootmem();
 	/* XEN: init and count low-mem pages outside initial allocation. */
