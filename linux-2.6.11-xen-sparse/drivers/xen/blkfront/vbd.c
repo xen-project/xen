@@ -278,15 +278,15 @@ struct gendisk *xlvbd_alloc_gendisk(
     di->mi = mi;
     di->xd_device = disk->device;
 
-    /* Full disk rather than a single partition? */
-    if ((minor & ((1 << mi->type->partn_shift) - 1)) == 0)
+    if ((VDISK_TYPE(disk->info) == VDISK_TYPE_DISK) &&
+        ((minor & ((1 << mi->type->partn_shift) - 1)) == 0))
         nr_minors = 1 << mi->type->partn_shift;
 
     gd = alloc_disk(nr_minors);
     if ( !gd )
         goto out;
 
-    if ( nr_minors > 1 ) /* full disk? */
+    if ((VDISK_TYPE(disk->info) != VDISK_TYPE_DISK) || (nr_minors > 1))
         sprintf(gd->disk_name, "%s%c", mi->type->diskname,
                 'a' + mi->index * mi->type->disks_per_major +
                     (minor >> mi->type->partn_shift));
@@ -304,6 +304,12 @@ struct gendisk *xlvbd_alloc_gendisk(
 
     if ((xlbd_blk_queue == NULL) && xlvbd_blk_queue_alloc(mi->type))
             goto out_gendisk;
+
+    if (VDISK_READONLY(disk->info))
+        set_disk_ro(gd, 1);
+
+    if (VDISK_TYPE(disk->info) == VDISK_TYPE_CDROM)
+        gd->flags |= GENHD_FL_REMOVABLE | GENHD_FL_CD;
 
     gd->queue = xlbd_blk_queue;
     add_disk(gd);
@@ -346,24 +352,6 @@ static int xlvbd_device_add(struct list_head *list, vdisk_t *disk)
     gd = xlvbd_alloc_gendisk(mi, minor, disk);
     if (gd == NULL)
         goto out_bd;
-
-    if (VDISK_READONLY(disk->info))
-        set_disk_ro(gd, 1);
-
-    switch (VDISK_TYPE(disk->info)) {
-    case VDISK_TYPE_CDROM:
-        gd->flags |= GENHD_FL_REMOVABLE | GENHD_FL_CD;
-        break;
-    case VDISK_TYPE_FLOPPY: 
-    case VDISK_TYPE_TAPE:
-        gd->flags |= GENHD_FL_REMOVABLE;
-        break;
-    case VDISK_TYPE_DISK:
-        break;
-    default:
-        WPRINTK("unknown device type %d\n", VDISK_TYPE(disk->info));
-        break;
-    }    
 
     list_add(&new->list, list);
 out_bd:

@@ -65,7 +65,7 @@ void vbd_create(blkif_be_vbd_create_t *create)
 
     vbd->vdevice  = vdevice; 
     vbd->readonly = create->readonly;
-    vbd->type     = VDISK_TYPE_DISK | VDISK_FLAG_VIRT;
+    vbd->type     = VDISK_TYPE_DISK;
     vbd->extents  = NULL; 
 
     spin_lock(&blkif->vbd_lock);
@@ -162,6 +162,9 @@ void vbd_grow(blkif_be_vbd_grow_t *grow)
 	 sz = x->bdev->bd_part->nr_sects;
     else
 	 sz = x->bdev->bd_disk->capacity;
+
+    vbd->type = (x->bdev->bd_disk->flags & GENHD_FL_CD) ?
+        VDISK_TYPE_CDROM : VDISK_TYPE_DISK;
 
 #else
     if( !blk_size[MAJOR(x->extent.device)] )
