@@ -280,6 +280,7 @@ static void serial_rx(unsigned char c, struct xen_regs *regs)
         {
             switch_serial_input();
             switch_code_count = 0;
+            return;
         }
     }
     else
