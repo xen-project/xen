@@ -52,32 +52,6 @@
 #include "cpu.h"
 #include "exec-all.h"
 
-//#define DEBUG_MMU
-
-#ifdef USE_CODE_COPY
-#include <asm/ldt.h>
-#include <linux/unistd.h>
-#include <linux/version.h>
-
-#include <sys/ioctl.h>
-/* According to POSIX 1003.1-2001 */
-#include <sys/select.h>
-
-/* According to earlier standards */
-#include <sys/time.h>
-#include <sys/types.h>
-#include <sys/stat.h>
-#include <fcntl.h>
-#include <unistd.h>
-#include <values.h>
-
-_syscall3(int, modify_ldt, int, func, void *, ptr, unsigned long, bytecount)
-
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(2, 5, 66)
-#define modify_ldt_ldt_s user_desc
-#endif
-#endif /* USE_CODE_COPY */
-
 void *shared_page;
 
 CPUX86State *cpu_86_init(void)
@@ -321,7 +295,13 @@ cpu_timer_handler(CPUState *env)
 
 int xc_handle;
 
-#include <asm/bitops.h>
+static __inline__ void atomic_set_bit(long nr, volatile void *addr)
+{
+        __asm__ __volatile__(
+                "lock ; bts %1,%0"
+                :"=m" (*(volatile long *)addr)
+                :"dIr" (nr));
+}
 
 void
 do_interrupt(CPUState *env, int vector)
@@ -332,7 +312,7 @@ do_interrupt(CPUState *env, int vector)
 	// page.
 
 	intr = &(((vcpu_iodata_t *) shared_page)->vp_intr[0]);
-	set_bit(vector, intr);
+	atomic_set_bit(vector, intr);
         fprintf(logfile, "injecting vector: %x\n", vector);
 	env->send_event = 1;
 }

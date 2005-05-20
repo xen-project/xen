@@ -38,6 +38,10 @@ check:
 check_clean:
 	$(MAKE) -C check clean
 
+ifneq ($(XEN_TARGET_ARCH),x86_32)
+XEN_NO_IOEMU=1
+endif
+
 ifndef XEN_NO_IOEMU
 ioemu ioemuinstall ioemuclean:
 	[ -f ioemu/config-host.h ] || \
