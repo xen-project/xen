@@ -50,7 +50,6 @@
 423e7e86Fo2PxRS_37IwkpH-x5t5xQ freebsd-5.3-xen-sparse/conf/options.i386-xen
 423e7e868Yt0iZuEeccnczyToPPvow freebsd-5.3-xen-sparse/fbsdxensetup
 423e7e87szZMt1H0xhO5vzyXR6d7iQ freebsd-5.3-xen-sparse/i386-xen/Makefile
-423e7e8785O6DIEVghIvXD6tcNKonQ freebsd-5.3-xen-sparse/i386-xen/compile/.cvsignore
 423e7e87zkFCb_Z4sHQpbec6jk3MdA freebsd-5.3-xen-sparse/i386-xen/conf/GENERIC
 423e7e876sW2cYvlk0qy8YnBbPlklQ freebsd-5.3-xen-sparse/i386-xen/conf/GENERIC.hints
 423e7e87DGOWxuyrh3sr9TmUwddFuQ freebsd-5.3-xen-sparse/i386-xen/conf/Makefile
