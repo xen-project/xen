@@ -24,6 +24,9 @@ import scheduler
 from xen.xend.server import channel
 
 
+import errno
+from struct import pack, unpack, calcsize
+
 __all__ = [ "XendDomain" ]
 
 SHUTDOWN_TIMEOUT = 30
@@ -298,7 +301,7 @@ class XendDomain:
                            [dominfo.name, dominfo.id, "fail"])
         return dominfo
 
-    def domain_configure(self, id, vmconfig):
+    def domain_configure(self, vmconfig):
         """Configure an existing domain. This is intended for internal
         use by domain restore and migrate.
 
@@ -306,10 +309,7 @@ class XendDomain:
         @param vmconfig: vm configuration
         """
         config = sxp.child_value(vmconfig, 'config')
-        dominfo = self.domain_lookup(id)
-        log.debug('domain_configure> id=%s config=%s', str(id), str(config))
-        if dominfo.config:
-            raise XendError("Domain already configured: " + dominfo.id)
+        dominfo = XendDomainInfo.tmp_restore_create_domain()
         dominfo.dom_construct(dominfo.dom, config)
         self._add_domain(dominfo)
         return dominfo
@@ -320,8 +320,65 @@ class XendDomain:
         @param src:      source file
         @param progress: output progress if true
         """
-        xmigrate = XendMigrate.instance()
-        return xmigrate.restore_begin(src)
+
+        SIGNATURE = "LinuxGuestRecord"
+        sizeof_int = calcsize("L")
+        sizeof_unsigned_long = calcsize("i")
+        PAGE_SIZE = 4096
+
+        class XendFile(file):
+            def read_exact(self, size, error_msg):
+                buf = self.read(size)
+                if len(buf) != size:
+                    raise XendError(error_msg)
+                return buf
+        
+        try:
+            fd = XendFile(src, 'rb')
+
+            signature = fd.read_exact(len(SIGNATURE),
+                "not a valid guest state file: signature read")
+            if signature != SIGNATURE:
+                raise XendError("not a valid guest state file: found '%s'" %
+                                signature)
+
+            l = fd.read_exact(sizeof_unsigned_long,
+                              "not a valid guest state file: pfn count read")
+            nr_pfns = unpack("=L", l)[0]   # XXX endianess
+            if nr_pfns > 1024*1024:     # XXX
+                raise XendError(
+                    "not a valid guest state file: pfn count out of range")
+
+            pfn_to_mfn_frame_list = fd.read_exact(PAGE_SIZE,
+                "not a valid guest state file: pfn_to_mfn_frame_list read")
+
+            l = fd.read_exact(sizeof_int,
+                              "not a valid guest state file: config size read")
+            vmconfig_size = unpack("i", l)[0] # XXX endianess
+            vmconfig_buf = fd.read_exact(vmconfig_size,
+                "not a valid guest state file: config read")
+
+            p = sxp.Parser()
+            p.input(vmconfig_buf)
+            if not p.ready:
+                raise XendError("not a valid guest state file: config parse")
+
+            vmconfig = p.get_val()
+            dominfo = self.domain_configure(vmconfig)
+
+            # XXXcl hack: fd.tell will sync up the object and
+            #             underlying file descriptor
+            ignore = fd.tell()
+
+            xc.linux_restore(fd.fileno(), int(dominfo.id), nr_pfns,
+                             pfn_to_mfn_frame_list)
+            return dominfo
+
+        except IOError, ex:
+            if ex.errno == errno.ENOENT:
+                raise XendError("can't open guest state file %s" % src)
+            else:
+                raise
     
     def domain_get(self, id):
         """Get up-to-date info about a domain.

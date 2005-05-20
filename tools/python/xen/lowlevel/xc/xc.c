@@ -334,62 +334,41 @@ static PyObject *pyxc_linux_save(PyObject *self,
     return val;
 }
 
-
-static int file_restore(XcObject *xc, XcIOContext *ioctxt, char *state_file)
-{
-    int rc = -1;
-
-    ioctxt->io = gzip_stream_fopen(state_file, "rb");
-    if ( ioctxt->io == NULL )
-    {
-        xcio_perror(ioctxt, "Could not open file for reading");
-        return rc;
-    }
-
-    rc = xc_linux_restore(xc->xc_handle, ioctxt);
-
-    IOStream_close(ioctxt->io);
-    
-    return rc;
-}
-
 static PyObject *pyxc_linux_restore(PyObject *self,
                                     PyObject *args,
                                     PyObject *kwds)
 {
     XcObject *xc = (XcObject *)self;
-    char *state_file;
-    int progress = 1, debug = 0;
     PyObject *val = NULL;
-    XcIOContext ioctxt = { .info = iostdout, .err = iostderr };
     int rc =-1;
+    int io_fd, dom;
+    unsigned long nr_pfns;
+    char *pfn2mfn;
+    int pfn2mfn_len;
+    PyObject *pfn2mfn_object;
 
-    static char *kwd_list[] = { "state_file", "progress", "debug", NULL };
+    static char *kwd_list[] = { "fd", "dom", "pfns", "pfn2mfn", NULL };
 
-    if ( !PyArg_ParseTupleAndKeywords(args, kwds, "s|ii", kwd_list,
-                                      &state_file,
-                                      &progress,
-                                      &debug) )
+    if ( !PyArg_ParseTupleAndKeywords(args, kwds, "iilO", kwd_list,
+                                      &io_fd, &dom, &nr_pfns,
+				      &pfn2mfn_object) )
         goto exit;
 
-    if ( progress )
-        ioctxt.flags |= XCFLAGS_VERBOSE;
-    if ( debug )
-        ioctxt.flags |= XCFLAGS_DEBUG;
+    if (PyString_AsStringAndSize(pfn2mfn_object, &pfn2mfn, &pfn2mfn_len))
+	goto exit;
 
-    if ( (state_file == NULL) || (state_file[0] == '\0') )
-        goto exit;
+    if (pfn2mfn_len != PAGE_SIZE)
+	goto exit;
 
-    rc = file_restore(xc, &ioctxt, state_file);
+    rc = xc_linux_restore(xc->xc_handle, io_fd, dom, nr_pfns, pfn2mfn);
     if ( rc != 0 )
     {
         PyErr_SetFromErrno(xc_error);
         goto exit;
     }
 
-    val = Py_BuildValue("{s:i,s:s}",
-                        "dom", ioctxt.domain,
-                        "vmconfig", ioctxt.vmconfig);
+    Py_INCREF(zero);
+    val = zero;
 
   exit:
     return val;
@@ -1061,8 +1040,9 @@ static PyMethodDef pyxc_methods[] = {
       (PyCFunction)pyxc_linux_restore, 
       METH_VARARGS | METH_KEYWORDS, "\n"
       "Restore the CPU and memory state of a Linux guest OS.\n"
-      " state_file [str]:    Name of state file. Must not currently exist.\n"
-      " progress   [int, 1]: Bool - display a running progress indication?\n\n"
+      " dom        [int]:    Identifier of domain to be restored.\n"
+      " pfns       [int]:    Number of pages domain uses.\n"
+      " pfn2mfn    [str]:    String containing the pfn to mfn frame list.\n\n"
       "Returns: [int] new domain identifier on success; -1 on error.\n" },
 
     { "linux_build", 

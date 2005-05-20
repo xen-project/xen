@@ -183,6 +183,13 @@ def vm_create(config):
     vm.construct(config)
     return vm
 
+def tmp_restore_create_domain():
+    # dom input parameter is ignored
+    vm = XendDomainInfo()
+    dom = xc.domain_create()
+    vm.setdom(dom)
+    return vm
+
 def vm_recreate(savedinfo, info):
     """Create the VM object for an existing domain.
 
