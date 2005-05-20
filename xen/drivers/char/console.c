@@ -283,6 +283,7 @@ static void serial_rx(unsigned char c, struct cpu_user_regs *regs)
         {
             switch_serial_input();
             switch_code_count = 0;
+            return;
         }
     }
     else
