@@ -31,7 +31,6 @@ void vmx_enter_scheduler(void);
 
 #define VMX_CPU_STATE_PG_ENABLED        0       
 #define	VMX_CPU_STATE_ASSIST_ENABLED	1
-#define VMCS_SIZE                       0x1000
 
 struct vmcs_struct {
     u32 vmcs_revision_id;

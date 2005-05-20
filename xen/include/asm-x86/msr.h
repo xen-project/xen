@@ -79,6 +79,12 @@
 #define MSR_IA32_PLATFORM_ID		0x17
 #define MSR_IA32_EBL_CR_POWERON		0x2a
 
+/* MSRs & bits used for VMX enabling */
+#define MSR_IA32_VMX_BASIC_MSR                  0x480
+#define IA32_FEATURE_CONTROL_MSR                0x3a
+#define IA32_FEATURE_CONTROL_MSR_LOCK           0x1
+#define IA32_FEATURE_CONTROL_MSR_ENABLE_VMXON   0x4
+
 /* AMD/K8 specific MSRs */ 
 #define MSR_EFER 0xc0000080		/* extended feature register */
 #define MSR_STAR 0xc0000081		/* legacy mode SYSCALL target */

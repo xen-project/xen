@@ -51,10 +51,10 @@ void do_nmi(struct cpu_user_regs *, unsigned long);
 int start_vmx()
 {
     struct vmcs_struct *vmcs;
-    unsigned long ecx;
+    u32 ecx;
+    u32 eax, edx;
     u64 phys_vmcs;      /* debugging */
 
-    vmcs_size = VMCS_SIZE;
     /*
      * Xen does not fill x86_capability words except 0.
      */
@@ -63,6 +63,18 @@ int start_vmx()
 
     if (!(test_bit(X86_FEATURE_VMXE, &boot_cpu_data.x86_capability)))
         return 0;
+ 
+    rdmsr(IA32_FEATURE_CONTROL_MSR, eax, edx);
+
+    if (eax & IA32_FEATURE_CONTROL_MSR_LOCK) {
+        if ((eax & IA32_FEATURE_CONTROL_MSR_ENABLE_VMXON) == 0x0) {
+                printk("VMX disabled by Feature Control MSR.\n");
+		return 0;
+        }
+    }
+    else 
+        wrmsr(IA32_FEATURE_CONTROL_MSR, 
+              IA32_FEATURE_CONTROL_MSR_LOCK | IA32_FEATURE_CONTROL_MSR_ENABLE_VMXON, 0);
 
     set_in_cr4(X86_CR4_VMXE);   /* Enable VMXE */
 

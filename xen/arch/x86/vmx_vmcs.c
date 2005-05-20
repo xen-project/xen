@@ -37,12 +37,14 @@
 struct vmcs_struct *alloc_vmcs(void) 
 {
     struct vmcs_struct *vmcs;
-    unsigned int cpu_sig = cpuid_eax(0x00000001);
+    u32 vmx_msr_low, vmx_msr_high;
 
+    rdmsr(MSR_IA32_VMX_BASIC_MSR, vmx_msr_low, vmx_msr_high);
+    vmcs_size = vmx_msr_high & 0x1fff;
     vmcs = (struct vmcs_struct *) alloc_xenheap_pages(get_order(vmcs_size)); 
     memset((char *) vmcs, 0, vmcs_size); /* don't remove this */
 
-    vmcs->vmcs_revision_id = (cpu_sig > 0xf41)? 3 : 1;
+    vmcs->vmcs_revision_id = vmx_msr_low;
     return vmcs;
 } 
 
