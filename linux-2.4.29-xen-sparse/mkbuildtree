@@ -208,6 +208,7 @@ ln -sf ../asm-i386/vm86.h
 ln -sf ../../${LINUX_26}/include/asm-xen/balloon.h
 ln -sf ../../${LINUX_26}/include/asm-xen/ctrl_if.h
 ln -sf ../../${LINUX_26}/include/asm-xen/evtchn.h
+ln -sf ../../${LINUX_26}/include/asm-xen/gnttab.h
 ln -sf ../../${LINUX_26}/include/asm-xen/hypervisor.h
 ln -sf ../../${LINUX_26}/include/asm-xen/xen_proc.h
 ln -sf ../../${LINUX_26}/include/asm-xen/asm-i386/synch_bitops.h
@@ -228,6 +229,7 @@ ln -sf ../../i386/kernel/sys_i386.c
 ln -sf ../../../${LINUX_26}/arch/xen/kernel/ctrl_if.c
 ln -sf ../../../${LINUX_26}/arch/xen/kernel/evtchn.c
 ln -sf ../../../${LINUX_26}/arch/xen/kernel/fixup.c
+ln -sf ../../../${LINUX_26}/arch/xen/kernel/gnttab.c
 ln -sf ../../../${LINUX_26}/arch/xen/kernel/reboot.c
 ln -sf ../../../${LINUX_26}/arch/xen/kernel/skbuff.c
 
