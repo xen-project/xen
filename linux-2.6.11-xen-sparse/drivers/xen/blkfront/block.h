@@ -90,13 +90,16 @@ struct xlbd_major_info {
 struct xlbd_disk_info {
     int xd_device;
     struct xlbd_major_info *mi;
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,0)
+    struct xlbd_disk_info  *next_waiting;
+    request_queue_t        *rq;
+#endif
 };
 
 typedef struct xen_block {
     int usage;
 } xen_block_t;
 
-extern struct request_queue *xlbd_blk_queue;
 extern spinlock_t blkif_io_lock;
 
 extern int blkif_open(struct inode *inode, struct file *filep);

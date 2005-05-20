@@ -193,19 +193,20 @@ static void vbd_update(void)
 }
 #endif /* ENABLE_VBD_UPDATE */
 
+static struct xlbd_disk_info *head_waiting = NULL;
 static void kick_pending_request_queues(void)
 {
-    if ( (xlbd_blk_queue != NULL) &&
-         test_bit(QUEUE_FLAG_STOPPED, &xlbd_blk_queue->queue_flags) )
+    struct xlbd_disk_info *di;
+    while ( ((di = head_waiting) != NULL) && !RING_FULL(&blk_ring) )
     {
-        blk_start_queue(xlbd_blk_queue);
-        /* XXXcl call to request_fn should not be needed but
-         * we get stuck without...  needs investigating
-         */
-        xlbd_blk_queue->request_fn(xlbd_blk_queue);
+        head_waiting = di->next_waiting;
+        di->next_waiting = NULL;
+        /* Re-enable calldowns. */
+        blk_start_queue(di->rq);
+        /* Kick things off immediately. */
+        do_blkif_request(di->rq);
     }
 }
-
 
 int blkif_open(struct inode *inode, struct file *filep)
 {
@@ -277,8 +278,7 @@ int blkif_ioctl(struct inode *inode, struct file *filep,
  */
 static int blkif_queue_request(struct request *req)
 {
-    struct xlbd_disk_info *di =
-        (struct xlbd_disk_info *)req->rq_disk->private_data;
+    struct xlbd_disk_info *di = req->rq_disk->private_data;
     unsigned long buffer_ma;
     blkif_request_t *ring_req;
     struct bio *bio;
@@ -353,6 +353,7 @@ static int blkif_queue_request(struct request *req)
  */
 void do_blkif_request(request_queue_t *rq)
 {
+    struct xlbd_disk_info *di;
     struct request *req;
     int queued;
 
@@ -369,10 +370,7 @@ void do_blkif_request(request_queue_t *rq)
         }
 
         if ( RING_FULL(&blk_ring) )
-        {
-            blk_stop_queue(rq);
-            break;
-        }
+            goto wait;
 
         DPRINTK("do_blk_req %p: cmd %p, sec %lx, (%u/%li) buffer:%p [%s]\n",
                 req, req->cmd, req->sector, req->current_nr_sectors,
@@ -382,7 +380,15 @@ void do_blkif_request(request_queue_t *rq)
         blkdev_dequeue_request(req);
         if ( blkif_queue_request(req) )
         {
-            blk_stop_queue(rq);
+        wait:
+            di = req->rq_disk->private_data;
+            if ( di->next_waiting == NULL )
+            {
+                di->next_waiting = head_waiting;
+                head_waiting = di;
+                /* Avoid pointless unplugs. */
+                blk_stop_queue(rq);
+            }
             break;
         }
 
@@ -451,7 +457,7 @@ static irqreturn_t blkif_int(int irq, void *dev_id, struct pt_regs *ptregs)
     }
 
     blk_ring.rsp_cons = i;
-    
+
     kick_pending_request_queues();
 
     spin_unlock_irqrestore(&blkif_io_lock, flags);

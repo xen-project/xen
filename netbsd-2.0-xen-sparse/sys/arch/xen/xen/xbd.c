@@ -476,17 +476,11 @@ get_xbda(vdisk_t *xd)
 	case XEN_IDE7_MAJOR:
 	case XEN_IDE8_MAJOR:
 	case XEN_IDE9_MAJOR:
-		switch (VDISK_TYPE(xd->info)) {
-		case VDISK_TYPE_CDROM:
+		if (xd->info & VDISK_CDROM)
 			return &cd_ata;
-		case VDISK_TYPE_DISK:
-			if (xd->capacity == 0)
-				return NULL;
-			return &wd_ata;
-		default:
+		if (xd->capacity == 0)
 			return NULL;
-		}
-		break;
+		return &wd_ata;
 #endif
 	default:
 		if (xd->capacity == 0)

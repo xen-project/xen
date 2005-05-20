@@ -250,7 +250,7 @@ int parallax_probe(blkif_request_t *req, blkif_t *blkif)
         while (vdi) {
             img_info = (vdisk_t *)MMAP_VADDR(ID_TO_IDX(req->id), 0);
             img_info[nr_vdis].device   = vdi->vdevice;
-            img_info[nr_vdis].info     = VDISK_TYPE_DISK | VDISK_FLAG_VIRT;
+            img_info[nr_vdis].info     = 0;
             /* The -2 here accounts for the LSB in the radix tree */
             img_info[nr_vdis].capacity = 
                     ((1LL << (VDI_HEIGHT-2)) >> SECTOR_SHIFT);

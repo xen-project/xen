@@ -136,11 +136,6 @@ static int xlvbd_init_device(vdisk_t *xd)
 	major_name = XLSCSI_MAJOR_NAME;
 	max_part   = XLSCSI_MAX_PART;
 
-    } else if (VDISK_VIRTUAL(xd->info)) {
-
-	major_name = XLVBD_MAJOR_NAME;
-	max_part   = XLVBD_MAX_PART;
-
     } else { 
 
         /* SMH: hmm - probably a CCISS driver or sim; assume CCISS for now */
@@ -247,8 +242,8 @@ static int xlvbd_init_device(vdisk_t *xd)
         blk_size[major] = gd->sizes;
     }
 
-    if ( VDISK_READONLY(xd->info) )
-        set_device_ro(device, 1); 
+    if ( xd->info & VDISK_READONLY )
+        set_device_ro(device, 1);
 
     gd->flags[minor >> gd->minor_shift] |= GENHD_FL_XEN;
 
@@ -297,20 +292,16 @@ static int xlvbd_init_device(vdisk_t *xd)
         gd->sizes[minor] = capacity>>(BLOCK_SIZE_BITS-9);
         
         /* Some final fix-ups depending on the device type */
-        switch ( VDISK_TYPE(xd->info) )
+        if ( xd->info & VDISK_REMOVABLE )
         { 
-        case VDISK_TYPE_CDROM:
-        case VDISK_TYPE_FLOPPY: 
-        case VDISK_TYPE_TAPE:
             gd->flags[minor >> gd->minor_shift] |= GENHD_FL_REMOVABLE; 
             printk(KERN_ALERT 
                    "Skipping partition check on %s /dev/%s\n", 
-                   VDISK_TYPE(xd->info)==VDISK_TYPE_CDROM ? "cdrom" : 
-                   (VDISK_TYPE(xd->info)==VDISK_TYPE_TAPE ? "tape" : 
-                    "floppy"), disk_name(gd, MINOR(device), buf)); 
-            break; 
-
-        case VDISK_TYPE_DISK:
+                   (xd->info & VDISK_CDROM) ? "cdrom" : "removable",
+                   disk_name(gd, MINOR(device), buf)); 
+        }
+        else
+        {
             /* Only check partitions on real discs (not virtual!). */
             if ( gd->flags[minor>>gd->minor_shift] & GENHD_FL_VIRT_PARTNS )
             {
@@ -320,12 +311,6 @@ static int xlvbd_init_device(vdisk_t *xd)
                 break;
             }
             register_disk(gd, device, gd->max_p, &xlvbd_block_fops, capacity);
-            break; 
-
-        default:
-            printk(KERN_ALERT "XenoLinux: unknown device type %d\n", 
-                   VDISK_TYPE(xd->info)); 
-            break; 
         }
     }
 

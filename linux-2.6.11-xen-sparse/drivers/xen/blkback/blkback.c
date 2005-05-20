@@ -623,6 +623,13 @@ static void dispatch_rw_block_io(blkif_t *blkif, blkif_request_t *req)
 
     for ( i = 0; i < nseg; i++ )
     {
+        if ( ((int)preq.sector_number|(int)seg[i].nsec) &
+             ((bdev_hardsect_size(preq.bdev) >> 9) - 1) )
+        {
+            DPRINTK("Misaligned I/O request from domain %d", blkif->domid);
+            goto cleanup_and_fail;
+        }
+
         while ( (bio == NULL) ||
                 (bio_add_page(bio,
                               virt_to_page(MMAP_VADDR(pending_idx, i)),
@@ -632,6 +639,7 @@ static void dispatch_rw_block_io(blkif_t *blkif, blkif_request_t *req)
             bio = biolist[nbio++] = bio_alloc(GFP_KERNEL, nseg-i);
             if ( unlikely(bio == NULL) )
             {
+            cleanup_and_fail:
                 for ( i = 0; i < (nbio-1); i++ )
                     bio_put(biolist[i]);
                 fast_flush_area(pending_idx, nseg);

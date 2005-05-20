@@ -15,7 +15,7 @@
 struct vbd { 
     blkif_vdev_t   vdevice;     /* what the domain refers to this vbd as */
     unsigned char  readonly;    /* Non-zero -> read-only */
-    unsigned char  type;        /* VDISK_TYPE_xxx */
+    unsigned char  type;        /* VDISK_xxx */
     blkif_pdev_t   pdevice;     /* phys device that this vbd maps to */
     struct block_device *bdev;
     rb_node_t      rb;          /* for linking into R-B tree lookup struct */
@@ -30,6 +30,7 @@ static inline dev_t vbd_map_devnum(blkif_pdev_t cookie)
 #else
 #define vbd_sz(_v)   (blk_size[MAJOR((_v)->pdevice)][MINOR((_v)->pdevice)]*2)
 #define bdev_put(_b) ((void)0)
+#define bdev_hardsect_size(_b) 512
 #endif
 
 void vbd_create(blkif_be_vbd_create_t *create) 
@@ -78,6 +79,7 @@ void vbd_create(blkif_be_vbd_create_t *create)
 
     vbd->vdevice  = vdevice; 
     vbd->readonly = create->readonly;
+    vbd->type     = 0;
 
     /* Mask to 16-bit for compatibility with old tools */
     vbd->pdevice  = create->pdevice & 0xffff;
@@ -101,8 +103,11 @@ void vbd_create(blkif_be_vbd_create_t *create)
         return;
     }
 
-    vbd->type = (vbd->bdev->bd_disk->flags & GENHD_FL_CD) ?
-        VDISK_TYPE_CDROM : VDISK_TYPE_DISK;
+    if ( vbd->bdev->bd_disk->flags & GENHD_FL_CD )
+        vbd->type |= VDISK_CDROM;
+    if ( vbd->bdev->bd_disk->flags & GENHD_FL_REMOVABLE )
+        vbd->type |= VDISK_REMOVABLE;
+
 #else
     if ( (blk_size[MAJOR(vbd->pdevice)] == NULL) || (vbd_sz(vbd) == 0) )
     {
@@ -110,8 +115,6 @@ void vbd_create(blkif_be_vbd_create_t *create)
         create->status = BLKIF_BE_STATUS_PHYSDEV_NOT_FOUND;
         return;
     }
-
-    vbd->type = VDISK_TYPE_DISK;
 #endif
 
     spin_lock(&blkif->vbd_lock);
@@ -189,9 +192,10 @@ void destroy_all_vbds(blkif_t *blkif)
 static void vbd_probe_single(
     blkif_t *blkif, vdisk_t *vbd_info, struct vbd *vbd)
 {
-    vbd_info->device   = vbd->vdevice; 
-    vbd_info->info     = vbd->type | (vbd->readonly ? VDISK_FLAG_RO : 0);
-    vbd_info->capacity = vbd_sz(vbd);
+    vbd_info->device      = vbd->vdevice; 
+    vbd_info->info        = vbd->type | (vbd->readonly ? VDISK_READONLY : 0);
+    vbd_info->capacity    = vbd_sz(vbd);
+    vbd_info->sector_size = bdev_hardsect_size(vbd->bdev);
 }
 
 
