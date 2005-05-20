@@ -1176,7 +1176,6 @@ asmlinkage void vmx_vmexit_handler(struct cpu_user_regs regs)
     }
     case EXIT_REASON_EXTERNAL_INTERRUPT: 
     {
-        extern int vector_irq[];
         extern asmlinkage void do_IRQ(struct cpu_user_regs *);
         extern void smp_apic_timer_interrupt(struct cpu_user_regs *);
         extern void timer_interrupt(int, void *, struct cpu_user_regs *);

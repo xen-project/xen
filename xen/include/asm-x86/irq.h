@@ -12,6 +12,7 @@ extern void disable_irq(unsigned int);
 extern void disable_irq_nosync(unsigned int);
 extern void enable_irq(unsigned int);
 
+extern int vector_irq[NR_VECTORS];
 extern u8 irq_vector[NR_IRQ_VECTORS];
 #define IO_APIC_VECTOR(irq)     irq_vector[irq]
 #define AUTO_ASSIGN             -1

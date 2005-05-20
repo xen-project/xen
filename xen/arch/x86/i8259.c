@@ -391,18 +391,18 @@ void __init init_IRQ(void)
         set_intr_gate(FIRST_EXTERNAL_VECTOR+i, interrupt[i]);
     }
 
-#ifdef CONFIG_SMP
     /*
      * IRQ0 must be given a fixed assignment and initialized,
      * because it's used before the IO-APIC is set up.
      */
+    irq_vector[0] = FIRST_DEVICE_VECTOR;
+    vector_irq[FIRST_DEVICE_VECTOR] = 0;
     set_intr_gate(FIRST_DEVICE_VECTOR, interrupt[0]);
 
     /* Various IPI functions. */
     set_intr_gate(EVENT_CHECK_VECTOR, event_check_interrupt);
     set_intr_gate(INVALIDATE_TLB_VECTOR, invalidate_interrupt);
     set_intr_gate(CALL_FUNCTION_VECTOR, call_function_interrupt);
-#endif	
 
     /* Self-generated IPI for local APIC timer. */
     set_intr_gate(LOCAL_TIMER_VECTOR, apic_timer_interrupt);
