@@ -51,6 +51,11 @@
 #include <asm/atomic.h>
 #include <asm/uaccess.h>
 
+#define IPRINTK(fmt, args...) \
+    printk(KERN_INFO "xen_blk: " fmt, ##args)
+#define WPRINTK(fmt, args...) \
+    printk(KERN_WARNING "xen_blk: " fmt, ##args)
+
 #if 0
 #define DPRINTK(_f, _a...) printk ( KERN_ALERT _f , ## _a )
 #else
@@ -65,8 +70,7 @@
 
 struct xlbd_type_info {
     int partn_shift;
-    int partn_per_major;
-    int devs_per_major;
+    int disks_per_major;
     char *devname;
     char *diskname;
 };
