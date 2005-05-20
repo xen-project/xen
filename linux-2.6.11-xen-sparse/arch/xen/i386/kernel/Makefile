@@ -51,18 +51,21 @@ c-obj-$(CONFIG_SCx200)		+= scx200.o
 # Note: kbuild does not track this dependency due to usage of .incbin
 $(obj)/vsyscall.o: $(obj)/vsyscall-int80.so $(obj)/vsyscall-sysenter.so
 targets += $(foreach F,int80 sysenter,vsyscall-$F.o vsyscall-$F.so)
+targets += vsyscall.lds
 
 # The DSO images are built using a special linker script.
 quiet_cmd_syscall = SYSCALL $@
       cmd_syscall = $(CC) -nostdlib -m32 $(SYSCFLAGS_$(@F)) \
 		          -Wl,-T,$(filter-out FORCE,$^) -o $@
 
+export CPPFLAGS_vsyscall.lds += -P -C -U$(ARCH)
+
 vsyscall-flags = -shared -s -Wl,-soname=linux-gate.so.1
 SYSCFLAGS_vsyscall-sysenter.so	= $(vsyscall-flags)
 SYSCFLAGS_vsyscall-int80.so	= $(vsyscall-flags)
 
 $(obj)/vsyscall-int80.so $(obj)/vsyscall-sysenter.so: \
-$(obj)/vsyscall-%.so: $(obj)/vsyscall.lds $(obj)/vsyscall-%.o FORCE
+$(obj)/vsyscall-%.so: $(src)/vsyscall.lds $(obj)/vsyscall-%.o FORCE
 	$(call if_changed,syscall)
 
 # We also create a special relocatable object that should mirror the symbol
@@ -73,11 +76,11 @@ $(obj)/built-in.o: $(obj)/vsyscall-syms.o
 $(obj)/built-in.o: ld_flags += -R $(obj)/vsyscall-syms.o
 
 SYSCFLAGS_vsyscall-syms.o = -r
-$(obj)/vsyscall-syms.o: $(obj)/vsyscall.lds $(obj)/vsyscall-sysenter.o FORCE
+$(obj)/vsyscall-syms.o: $(src)/vsyscall.lds $(obj)/vsyscall-sysenter.o FORCE
 	$(call if_changed,syscall)
 
 c-link	:= init_task.o
-s-link	:= vsyscall-int80.o vsyscall-sysenter.o vsyscall-sigreturn.o
+s-link	:= vsyscall-int80.o vsyscall-sysenter.o vsyscall-sigreturn.o vsyscall.lds.o
 
 $(patsubst %.o,$(obj)/%.c,$(c-obj-y) $(c-link)) $(patsubst %.o,$(obj)/%.S,$(s-obj-y) $(s-link)):
 	@ln -fsn $(srctree)/arch/i386/kernel/$(notdir $@) $@
