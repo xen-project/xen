@@ -87,6 +87,7 @@ int xen_domain_rcv(IOStream *io,
                    char **vmconfig, int *vmconfig_n,
                    int *configured){
     int err = 0;
+#if 0
     XcIOContext _ioctxt = {}, *ioctxt = &_ioctxt;
     dprintf(">\n");
     ioctxt->io = io;
@@ -102,6 +103,7 @@ int xen_domain_rcv(IOStream *io,
     *vmconfig_n = ioctxt->vmconfig_n;
     *configured = (ioctxt->flags & XCFLAGS_CONFIGURE);
     dprintf("< err=%d\n", err);
+#endif
     return err;
 }
 
