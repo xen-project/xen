@@ -78,7 +78,6 @@ void vbd_create(blkif_be_vbd_create_t *create)
 
     vbd->vdevice  = vdevice; 
     vbd->readonly = create->readonly;
-    vbd->type     = VDISK_TYPE_DISK | VDISK_FLAG_VIRT;
 
     /* Mask to 16-bit for compatibility with old tools */
     vbd->pdevice  = create->pdevice & 0xffff;
@@ -101,6 +100,9 @@ void vbd_create(blkif_be_vbd_create_t *create)
         bdev_put(vbd->bdev);
         return;
     }
+
+    vbd->type = (vbd->bdev->bd_disk->flags & GENHD_FL_CD) ?
+        VDISK_TYPE_CDROM : VDISK_TYPE_DISK;
 #else
     if ( (blk_size[MAJOR(vbd->pdevice)] == NULL) || (vbd_sz(vbd) == 0) )
     {
@@ -108,6 +110,8 @@ void vbd_create(blkif_be_vbd_create_t *create)
         create->status = BLKIF_BE_STATUS_PHYSDEV_NOT_FOUND;
         return;
     }
+
+    vbd->type = VDISK_TYPE_DISK;
 #endif
 
     spin_lock(&blkif->vbd_lock);
