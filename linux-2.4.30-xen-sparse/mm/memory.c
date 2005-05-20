@@ -499,9 +499,11 @@ int get_user_pages(struct task_struct *tsk, struct mm_struct *mm, unsigned long 
 				/* FIXME: call the correct function,
 				 * depending on the type of the found page
 				 */
-				if (!pages[i])
-					goto bad_page;
-				page_cache_get(pages[i]);
+				if (!pages[i] || PageReserved(pages[i])) {
+					if (pages[i] != ZERO_PAGE(start))
+						goto bad_page;
+				} else
+					page_cache_get(pages[i]);
 			}
 			if (vmas)
 				vmas[i] = vma;

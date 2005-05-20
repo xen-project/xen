@@ -554,7 +554,7 @@ unsigned int nr_free_buffer_pages (void)
 		class_idx = zone_idx(zone);
 
 		sum += zone->nr_cache_pages;
-		for (zone = pgdat->node_zones; zone < pgdat->node_zones + MAX_NR_ZONES; zone++) {
+		for (; zone; zone = *zonep++) {
 			int free = zone->free_pages - zone->watermarks[class_idx].high;
 			if (free <= 0)
 				continue;
