@@ -228,7 +228,6 @@
 40f56238BMqG5PuSHufpjbvp_helBw linux-2.6.11-xen-sparse/arch/xen/i386/kernel/timers/timer_tsc.c
 40f562389xNa78YBZciUibQjyRU_Lg linux-2.6.11-xen-sparse/arch/xen/i386/kernel/traps.c
 40f56238JypKAUG01ZojFwH7qnZ5uA linux-2.6.11-xen-sparse/arch/xen/i386/kernel/vsyscall.S
-40f56238wi6AdNQjm0RT57bSkwb6hg linux-2.6.11-xen-sparse/arch/xen/i386/kernel/vsyscall.lds
 40f56238a3w6-byOzexIlMgni76Lcg linux-2.6.11-xen-sparse/arch/xen/i386/mm/Makefile
 40f56238ILx8xlbywNbzTdv5Zr4xXQ linux-2.6.11-xen-sparse/arch/xen/i386/mm/fault.c
 4118cc35CbY8rfGVspF5O-7EkXBEAA linux-2.6.11-xen-sparse/arch/xen/i386/mm/highmem.c

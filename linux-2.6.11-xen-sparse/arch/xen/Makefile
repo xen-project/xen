@@ -37,8 +37,14 @@ arch/xen/arch:
 	@rm -f $@
 	@ln -fsn $(XENARCH) $@
 
+arch/$(XENARCH)/kernel/asm-offsets.s: include/asm include/linux/version.h \
+				   include/config/MARKER
+
+include/asm-$(ARCH)/asm_offsets.h: arch/$(XENARCH)/kernel/asm-offsets.s
+	$(call filechk,gen-asm-offsets)
+
 prepare: include/.asm-ignore include/asm-xen/asm \
-	arch/xen/arch ;
+	arch/xen/arch include/asm-$(ARCH)/asm_offsets.h ;
 
 all: vmlinuz
 
