@@ -40,6 +40,7 @@
 #include <asm/vmmu.h>
 #include <public/arch-ia64.h>
 #include <asm/vmx_phy_mode.h>
+#include <asm/vmx.h>
 
 /* Global flag to identify whether Intel vmx feature is on */
 u32 vmx_enabled = 0;
@@ -122,6 +123,9 @@ vmx_init_env(void)
 		__vsa_base = tmp_base;
 	else
 		ASSERT(tmp_base != __vsa_base);
+
+	/* Init stub for rr7 switch */
+	vmx_init_double_mapping_stub();
 }
 
 typedef union {
@@ -182,6 +186,23 @@ vmx_create_vp(struct exec_domain *ed)
 	ret = ia64_pal_vp_create(vpd, ivt_base, 0);
 	if (ret != PAL_STATUS_SUCCESS)
 		panic("ia64_pal_vp_create failed. \n");
+}
+
+void vmx_init_double_mapping_stub(void)
+{
+	u64 base, psr;
+	extern void vmx_switch_rr7(void);
+
+	base = (u64) &vmx_switch_rr7;
+	base = *((u64*)base);
+
+	psr = ia64_clear_ic();
+	ia64_itr(0x1, IA64_TR_RR7_SWITCH_STUB, XEN_RR7_SWITCH_STUB,
+		 pte_val(pfn_pte(__pa(base) >> PAGE_SHIFT, PAGE_KERNEL)),
+		 RR7_SWITCH_SHIFT);
+	ia64_set_psr(psr);
+	ia64_srlz_i();
+	printk("Add TR mapping for rr7 switch stub, with physical: 0x%lx\n", (u64)(__pa(base)));
 }
 
 /* Other non-context related tasks can be done in context switch */

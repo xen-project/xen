@@ -203,12 +203,6 @@ void start_kernel(void)
     efi_memmap_walk(find_max_pfn, &max_page);
     printf("find_memory: efi_memmap_walk returns max_page=%lx\n",max_page);
 
-#ifdef CONFIG_VTI
-    /* Only support up to 64G physical memory by far */
-    if (max_page > (0x1000000000UL / PAGE_SIZE))
-	panic("Not suppport memory larger than 16G\n");
-#endif // CONFIG_VTI
-
     heap_start = memguard_init(ia64_imva(&_end));
     printf("Before heap_start: 0x%lx\n", heap_start);
     heap_start = __va(init_boot_allocator(__pa(heap_start)));

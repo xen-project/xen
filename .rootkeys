@@ -1354,7 +1354,9 @@
 428b9f38XgwHchZEpOzRtWfz0agFNQ xen/include/asm-ia64/vmx_vcpu.h
 428b9f38tDTTJbkoONcAB9ODP8CiVg xen/include/asm-ia64/vmx_vpd.h
 428b9f38_o0U5uJqmxZf_bqi6_PqVw xen/include/asm-ia64/vtm.h
+428e120a-H-bqn10zOlnhlzlVEuW8A xen/include/asm-ia64/xenprocessor.h
 421098b7LfwIHQ2lRYWhO4ruEXqIuQ xen/include/asm-ia64/xenserial.h
+428e120esS-Tp1mX5VoUrsGJDNY_ow xen/include/asm-ia64/xensystem.h
 40715b2dWe0tDhx9LkLXzTQkvD49RA xen/include/asm-x86/acpi.h
 3ddb79c3l4IiQtf6MS2jIzcd-hJS8g xen/include/asm-x86/apic.h
 3ddb79c3QJYWr8LLGdonLbWmNb9pQQ xen/include/asm-x86/apicdef.h
