@@ -93,6 +93,10 @@ int reprogram_ac_timer(s_time_t timeout)
 {
 	struct exec_domain *ed = current;
 
+#ifdef CONFIG_VTI
+	if(VMX_DOMAIN(ed))
+		return 1;
+#endif // CONFIG_VTI
 	local_cpu_data->itm_next = timeout;
 	if (is_idle_task(ed->domain)) vcpu_safe_set_itm(timeout);
 	else vcpu_set_next_timer(current);
@@ -236,7 +240,22 @@ void context_switch(struct exec_domain *prev, struct exec_domain *next)
 //if (prev->domain->domain_id == 1 && next->domain->domain_id == 0) cs10foo();
 //if (prev->domain->domain_id == 0 && next->domain->domain_id == 1) cs01foo();
 //printk("@@sw %d->%d\n",prev->domain->domain_id,next->domain->domain_id);
+#ifdef CONFIG_VTI
+	unsigned long psr;
+	/* Interrupt is enabled after next task is chosen.
+	 * So we have to disable it for stack switch.
+	 */
+	local_irq_save(psr);
+	vtm_domain_out(prev);
+	/* Housekeeping for prev domain */
+#endif // CONFIG_VTI
+
 	switch_to(prev,next,prev);
+#ifdef CONFIG_VTI
+	/* Post-setup for new domain */
+	 vtm_domain_in(current);
+	local_irq_restore(psr);
+#endif // CONFIG_VTI
 // leave this debug for now: it acts as a heartbeat when more than
 // one domain is active
 {
@@ -249,8 +268,14 @@ if (!i--) { printk("+",id); cnt[id] = 100; }
 	clear_bit(_VCPUF_running, &prev->vcpu_flags);
 	//if (!is_idle_task(next->domain) )
 		//send_guest_virq(next, VIRQ_TIMER);
+#ifdef CONFIG_VTI
+	if (VMX_DOMAIN(current))
+		vmx_load_all_rr(current);
+	return;
+#else // CONFIG_VTI
 	load_region_regs(current);
 	if (vcpu_timer_expired(current)) vcpu_pend_timer(current);
+#endif // CONFIG_VTI
 }
 
 void continue_running(struct exec_domain *same)
