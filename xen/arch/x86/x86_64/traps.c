@@ -23,10 +23,11 @@ void show_registers(struct cpu_user_regs *regs)
     printk("r12: %016lx   r13: %016lx   r14: %016lx   r15: %016lx\n",
            regs->r12, regs->r13, regs->r14, regs->r15);
 
-    show_stack((unsigned long *)regs->rsp);
     if ( GUEST_MODE(regs) )
         show_guest_stack();
-} 
+    else
+        show_stack((unsigned long *)regs->rsp);
+}
 
 void show_page_walk(unsigned long addr)
 {
