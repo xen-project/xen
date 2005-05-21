@@ -35,6 +35,8 @@ clean:
 	for d in $(TARGET_DIRS); do \
 	$(MAKE) -C $$d $@ || exit 1 ; \
         done
+	rm -f config-host.mak config-host.h
+	rm -f keysym_adapter_sdl.h keysym_adapter_vnc.h
 
 distclean: clean
 	rm -f config-host.mak config-host.h
