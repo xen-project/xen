@@ -375,9 +375,19 @@ void scrub_heap_pages(void)
         /* Re-check page status with lock held. */
         if ( !allocated_in_map(pfn) )
         {
-            p = map_domain_mem(pfn << PAGE_SHIFT);
-            clear_page(p);
-            unmap_domain_mem(p);
+            if ( IS_XEN_HEAP_FRAME(pfn_to_page(pfn)) )
+            {
+                p = page_to_virt(pfn_to_page(pfn));
+                memguard_unguard_range(p, PAGE_SIZE);
+                clear_page(p);
+                memguard_guard_range(p, PAGE_SIZE);
+            }
+            else
+            {
+                p = map_domain_mem(pfn << PAGE_SHIFT);
+                clear_page(p);
+                unmap_domain_mem(p);
+            }
         }
         
         spin_unlock_irqrestore(&heap_lock, flags);
