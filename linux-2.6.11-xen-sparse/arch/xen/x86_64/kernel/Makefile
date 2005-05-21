@@ -12,7 +12,7 @@ obj-y	:= process.o signal.o entry.o traps.o  \
 		x8664_ksyms.o vsyscall.o \
 		setup64.o e820.o irq.o early_printk.o
 c-obj-y	:= semaphore.o i387.o sys_x86_64.o \
-		ptrace.o quirks.o syscall.o
+		ptrace.o quirks.o syscall.o bootflag.o
 
 i386-obj-y			:= time.o
 obj-y				+= ../../i386/kernel/timers/
@@ -21,14 +21,15 @@ s-obj-y	:=
 
 #obj-$(CONFIG_X86_MCE)         += mce.o
 #obj-$(CONFIG_MTRR)		+= ../../i386/kernel/cpu/mtrr/
-#obj-$(CONFIG_ACPI_BOOT)		+= acpi/
+obj-$(CONFIG_ACPI_BOOT)		+= acpi/
 obj-$(CONFIG_X86_MSR)		+= msr.o
 obj-$(CONFIG_MICROCODE)		+= microcode.o
 obj-$(CONFIG_X86_CPUID)		+= cpuid.o
 #obj-$(CONFIG_SMP)		+= smp.o smpboot.o trampoline.o
-#obj-$(CONFIG_X86_LOCAL_APIC)	+= apic.o  nmi.o
-#obj-$(CONFIG_X86_IO_APIC)	+= io_apic.o mpparse.o \
-#		genapic.o genapic_cluster.o genapic_flat.o
+obj-$(CONFIG_X86_LOCAL_APIC)	+= apic.o
+c-obj-$(CONFIG_X86_LOCAL_APIC)	+= nmi.o
+obj-$(CONFIG_X86_IO_APIC)	+= io_apic.o mpparse.o
+c-obj-$(CONFIG_X86_IO_APIC)	+= genapic.o genapic_cluster.o genapic_flat.o
 #obj-$(CONFIG_PM)		+= suspend.o
 #obj-$(CONFIG_SOFTWARE_SUSPEND)	+= suspend_asm.o
 #obj-$(CONFIG_CPU_FREQ)		+= cpufreq/

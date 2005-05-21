@@ -270,6 +270,8 @@
 424efaa6xahU2q85_dT-SjUJEaivfg linux-2.6.11-xen-sparse/arch/xen/x86_64/Kconfig
 424efaa6kKleWe45IrqsG8gkejgEQA linux-2.6.11-xen-sparse/arch/xen/x86_64/Makefile
 424efaa6HSyuVodl6SxFGj39vlp6MA linux-2.6.11-xen-sparse/arch/xen/x86_64/kernel/Makefile
+428f0973_moB26LYt56xXKYCTqEdXw linux-2.6.11-xen-sparse/arch/xen/x86_64/kernel/acpi/Makefile
+428f0973NBdgINmWOEJjoIDL73SDbQ linux-2.6.11-xen-sparse/arch/xen/x86_64/kernel/apic.c
 424efaa7bVAw3Z_q0SdFivfNVavyIg linux-2.6.11-xen-sparse/arch/xen/x86_64/kernel/asm-offsets.c
 424efaa7ddTVabh547Opf0u9vKmUXw linux-2.6.11-xen-sparse/arch/xen/x86_64/kernel/e820.c
 428868bbQust_FkSdkerMqYBWfrVKg linux-2.6.11-xen-sparse/arch/xen/x86_64/kernel/early_printk.c
@@ -277,9 +279,11 @@
 424efaa7vhgi7th5QVICjfuHmEWOkw linux-2.6.11-xen-sparse/arch/xen/x86_64/kernel/head.S
 424efaa7tiMEZSAYepwyjaNWxyXF7Q linux-2.6.11-xen-sparse/arch/xen/x86_64/kernel/head64.c
 424efaa6M6AGf53TJa2y9cl6coos0g linux-2.6.11-xen-sparse/arch/xen/x86_64/kernel/init_task.c
+428f0973EY3nNGYatQn7IO61RHO0oQ linux-2.6.11-xen-sparse/arch/xen/x86_64/kernel/io_apic.c
 424efaa6wHXXaloZygAv6ywDb7u7nQ linux-2.6.11-xen-sparse/arch/xen/x86_64/kernel/ioport.c
 424efaa6gOkc9_uHCLgvY_DXPqh_sg linux-2.6.11-xen-sparse/arch/xen/x86_64/kernel/irq.c
 424efaa6ibN3xXEeXoxURmKfJF_CUA linux-2.6.11-xen-sparse/arch/xen/x86_64/kernel/ldt.c
+428f09737NE-9XTvvA58TXLP0j54Uw linux-2.6.11-xen-sparse/arch/xen/x86_64/kernel/mpparse.c
 424efaa6aX4JkXAzBf4nqxRmLUfhqQ linux-2.6.11-xen-sparse/arch/xen/x86_64/kernel/pci-dma.c
 424efaa7e8nVw04q-pK8XRFaHPVx_A linux-2.6.11-xen-sparse/arch/xen/x86_64/kernel/pci-nommu.c
 424efaa7CxY9cbhqapUfqVYnD7T9LQ linux-2.6.11-xen-sparse/arch/xen/x86_64/kernel/process.c

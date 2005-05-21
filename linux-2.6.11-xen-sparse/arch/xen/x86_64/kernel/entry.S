@@ -48,6 +48,7 @@
 #include <asm/errno.h>
 #include <asm-xen/xen-public/arch-x86_64.h>
 
+#include "irq_vectors.h"
 
 EVENT_MASK      = (CS+4)
 VGCF_IN_SYSCALL = (1<<8)
@@ -584,7 +585,7 @@ retint_kernel:
 	.macro apicinterrupt num,func
 	pushq $\num-256
 	interrupt \func
-	jmp ret_from_intr
+	jmp error_entry
 	CFI_ENDPROC
 	.endm
 

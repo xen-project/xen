@@ -18,6 +18,7 @@
 #include <asm/page.h>
 #include <asm/vsyscall.h>
 #include <asm/vsyscall32.h>
+#include <asm/acpi.h>
 
 /*
  * Here we define all the compile-time 'special' virtual
@@ -45,6 +46,11 @@ enum fixed_addresses {
 #ifdef CONFIG_X86_IO_APIC
 	FIX_IO_APIC_BASE_0,
 	FIX_IO_APIC_BASE_END = FIX_IO_APIC_BASE_0 + MAX_IO_APICS-1,
+#endif
+#ifdef CONFIG_ACPI_BOOT
+	FIX_ACPI_BEGIN,
+	FIX_ACPI_END = FIX_ACPI_BEGIN + FIX_ACPI_PAGES - 1,
+	FIX_ACPI_RSDP_PAGE,
 #endif
 	FIX_SHARED_INFO,
 	FIX_GNTTAB_BEGIN,

@@ -389,7 +389,6 @@ static inline void die_if_kernel(const char * str, struct pt_regs * regs, long e
 		die(str, regs, err);
 }
 
-#if 0
 void die_nmi(char *str, struct pt_regs *regs)
 {
 	oops_begin();
@@ -405,7 +404,6 @@ void die_nmi(char *str, struct pt_regs *regs)
 	oops_end();
 	do_exit(SIGSEGV);
 }
-#endif
 
 static void do_trap(int trapnr, int signr, char *str, 
 			   struct pt_regs * regs, long error_code, siginfo_t *info)
@@ -556,7 +554,6 @@ asmlinkage void do_general_protection(struct pt_regs * regs, long error_code)
 	}
 }
 
-#if 0
 static void mem_parity_error(unsigned char reason, struct pt_regs * regs)
 {
 	printk("Uhhuh. NMI received. Dazed and confused, but trying to continue\n");
@@ -630,7 +627,6 @@ asmlinkage void default_do_nmi(struct pt_regs *regs)
 	outb(0x0f, 0x70);
 	inb(0x71);		/* dummy */
 }
-#endif
 
 asmlinkage void do_int3(struct pt_regs * regs, long error_code)
 {

@@ -1,7 +1,7 @@
 #
 # Automatically generated make config: don't edit
-# Linux kernel version: 2.6.11-xen0
-# Thu Apr 14 19:45:44 2005
+# Linux kernel version: 2.6.11.1-xen0
+# Tue May 10 11:07:02 2005
 #
 CONFIG_XEN=y
 CONFIG_ARCH_XEN=y
@@ -88,8 +88,11 @@ CONFIG_X86_GOOD_APIC=y
 # CONFIG_X86_CPUID is not set
 # CONFIG_NUMA is not set
 # CONFIG_MTRR is not set
+CONFIG_X86_LOCAL_APIC=y
+CONFIG_X86_IO_APIC=y
 CONFIG_PCI=y
 CONFIG_PCI_DIRECT=y
+# CONFIG_PCI_MMCONFIG is not set
 CONFIG_EARLY_PRINTK=y
 CONFIG_GENERIC_HARDIRQS=y
 CONFIG_GENERIC_IRQ_PROBE=y
@@ -118,11 +121,6 @@ CONFIG_DUMMY_IOMMU=y
 # CONFIG_PM is not set
 
 #
-# ACPI (Advanced Configuration and Power Interface) Support
-#
-# CONFIG_ACPI is not set
-
-#
 # CPU Frequency scaling
 #
 # CONFIG_CPU_FREQ is not set
@@ -130,7 +128,6 @@ CONFIG_DUMMY_IOMMU=y
 #
 # Bus options (PCI etc.)
 #
-# CONFIG_PCI_MMCONFIG is not set
 # CONFIG_UNORDERED_IO is not set
 
 #
@@ -168,6 +165,7 @@ CONFIG_STANDALONE=y
 #
 # Plug and Play support
 #
+# CONFIG_PNP is not set
 
 #
 # Block devices
@@ -725,6 +723,7 @@ CONFIG_DRM_MGA=m
 CONFIG_DRM_SIS=m
 # CONFIG_MWAVE is not set
 # CONFIG_RAW_DRIVER is not set
+# CONFIG_HPET is not set
 # CONFIG_HANGCHECK_TIMER is not set
 
 #
@@ -794,6 +793,35 @@ CONFIG_USB_ARCH_HAS_OHCI=y
 # InfiniBand support
 #
 # CONFIG_INFINIBAND is not set
+
+#
+# Power management options
+#
+
+#
+# ACPI (Advanced Configuration and Power Interface) Support
+#
+CONFIG_ACPI=y
+CONFIG_ACPI_BOOT=y
+CONFIG_ACPI_INTERPRETER=y
+CONFIG_ACPI_AC=m
+CONFIG_ACPI_BATTERY=m
+CONFIG_ACPI_BUTTON=m
+CONFIG_ACPI_VIDEO=m
+CONFIG_ACPI_FAN=m
+CONFIG_ACPI_PROCESSOR=m
+CONFIG_ACPI_THERMAL=m
+CONFIG_ACPI_ASUS=m
+CONFIG_ACPI_IBM=m
+CONFIG_ACPI_TOSHIBA=m
+CONFIG_ACPI_BLACKLIST_YEAR=0
+# CONFIG_ACPI_DEBUG is not set
+CONFIG_ACPI_BUS=y
+CONFIG_ACPI_EC=y
+CONFIG_ACPI_POWER=y
+CONFIG_ACPI_PCI=y
+CONFIG_ACPI_SYSTEM=y
+# CONFIG_ACPI_CONTAINER is not set
 
 #
 # File systems

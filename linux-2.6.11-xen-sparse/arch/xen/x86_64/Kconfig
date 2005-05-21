@@ -188,13 +188,13 @@ config MCA
 config EISA
 	bool
 
-#config X86_IO_APIC
-#	bool
-#	default n
+config X86_LOCAL_APIC
+	bool
+	default y
 
-#config X86_LOCAL_APIC
-#	bool
-#	default n
+config X86_IO_APIC
+	bool
+	default y
 
 config MTRR
 	bool "MTRR (Memory Type Range Register) support"

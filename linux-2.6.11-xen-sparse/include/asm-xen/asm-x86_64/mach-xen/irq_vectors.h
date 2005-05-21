@@ -44,8 +44,6 @@
  *
  *  Vectors 0xf0-0xfa are free (reserved for future Linux use).
  */
-#define SPURIOUS_APIC_VECTOR	0xff
-#define ERROR_APIC_VECTOR	0xfe
 #define INVALIDATE_TLB_VECTOR	0xfd
 #define RESCHEDULE_VECTOR	0xfc
 #define CALL_FUNCTION_VECTOR	0xfb
@@ -58,6 +56,9 @@
  */
 #define LOCAL_TIMER_VECTOR	0xef
 #endif
+
+#define SPURIOUS_APIC_VECTOR	0xff
+#define ERROR_APIC_VECTOR	0xfe
 
 /*
  * First APIC vector available to drivers: (vectors 0x30-0xee)

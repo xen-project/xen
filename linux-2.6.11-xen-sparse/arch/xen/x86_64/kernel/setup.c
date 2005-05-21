@@ -675,14 +675,6 @@ void __init setup_arch(char **cmdline_p)
 
 	init_memory_mapping(0, (end_pfn << PAGE_SHIFT));
 
-#ifdef CONFIG_ACPI_BOOT
-	/*
-	 * Initialize the ACPI boot-time table parser (gets the RSDP and SDT).
-	 * Call this early for SRAT node setup.
-	 */
-	acpi_boot_table_init();
-#endif
-
 #ifdef CONFIG_ACPI_NUMA
 	/*
 	 * Parse SRAT to discover nodes.
@@ -733,12 +725,6 @@ void __init setup_arch(char **cmdline_p)
         */
        acpi_reserve_bootmem();
 #endif
-#ifdef CONFIG_X86_LOCAL_APIC
-	/*
-	 * Find and reserve possible boot-time SMP configuration:
-	 */
-	find_smp_config();
-#endif
 #ifdef CONFIG_BLK_DEV_INITRD
         if (xen_start_info.mod_start) {
                 if (LOADER_TYPE && INITRD_START) {
@@ -759,7 +745,12 @@ void __init setup_arch(char **cmdline_p)
         }
 #endif
 	paging_init();
-
+#ifdef CONFIG_X86_LOCAL_APIC
+	/*
+	 * Find and reserve possible boot-time SMP configuration:
+	 */
+	find_smp_config();
+#endif
 	/* Make sure we have a large enough P->M table. */
 	if (end_pfn > xen_start_info.nr_pages) {
 		phys_to_machine_mapping = alloc_bootmem(
@@ -789,18 +780,25 @@ void __init setup_arch(char **cmdline_p)
 
 #ifdef CONFIG_ACPI_BOOT
 	/*
+	 * Initialize the ACPI boot-time table parser (gets the RSDP and SDT).
+	 * Call this early for SRAT node setup.
+	 */
+	acpi_boot_table_init();
+
+	/*
 	 * Read APIC and some other early information from ACPI tables.
 	 */
 	acpi_boot_init();
 #endif
-
 #ifdef CONFIG_X86_LOCAL_APIC
 	/*
 	 * get boot-time SMP configuration:
 	 */
 	if (smp_found_config)
 		get_smp_config();
+#ifndef CONFIG_XEN
 	init_apic_mappings();
+#endif
 #endif
 
         /* XXX Disable irqdebug until we have a way to avoid interrupt
