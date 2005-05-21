@@ -300,9 +300,7 @@ VL_LDFLAGS=
 ifdef CONFIG_STATIC
 VL_LDFLAGS+=-static
 endif
-ifndef CONFIG_SOFTMMU
-VL_LDFLAGS+=-Wl,-T,$(SRC_PATH)/i386-vl.ld
-endif
+VL_LDFLAGS+=-Wl,-T,$(SRC_PATH)/$(HOST_ARCH).ld
 ifndef CONFIG_DARWIN
 ifndef CONFIG_WIN32
 VL_LIBS=-lutil

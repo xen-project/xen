@@ -515,6 +515,7 @@ echo "#include \"../config-host.h\"" >> $config_h
 
 if test "$target_cpu" = "i386" ; then
   echo "TARGET_ARCH=i386" >> $config_mak
+  echo "HOST_ARCH=`uname -i`" >> $config_mak
   echo "#define TARGET_ARCH \"i386\"" >> $config_h
   echo "#define TARGET_I386 1" >> $config_h
 fi

@@ -675,6 +675,7 @@
 428d0d8bgAojEQcAcTV2gj2E_eG4Lw tools/ioemu/vl.c
 428d0d8bXiCY4iTjoSPxGry8jXdAtg tools/ioemu/vl.h
 428d0d8bQVKedvN5EIPm39s33TXkpA tools/ioemu/vnc.c
+428f0763_67jCiHbdgfGlgAOJqfg9A tools/ioemu/x86_64.ld
 3fbba6dbDfYvJSsw9500b4SZyUhxjQ tools/libxc/Makefile
 41dde8afKYRKxS4XtLv1KUegGQy_bg tools/libxc/linux_boot_params.h
 41cc934abX-QLXJXW_clV_wRjM0zYg tools/libxc/plan9a.out.h
