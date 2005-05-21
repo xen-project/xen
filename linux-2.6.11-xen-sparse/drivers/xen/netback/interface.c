@@ -159,6 +159,7 @@ void netif_create(netif_be_create_t *create)
     dev->get_stats       = netif_be_get_stats;
     dev->open            = net_open;
     dev->stop            = net_close;
+    dev->features        = NETIF_F_NO_CSUM;
 
     /* Disable queuing. */
     dev->tx_queue_len = 0;

@@ -419,12 +419,15 @@
 419b4e93z2S0gR17XTy8wg09JEwAhg linux-2.6.11-xen-sparse/include/linux/gfp.h
 42305f545Vc5SLCUewZ2-n-P9JJhEQ linux-2.6.11-xen-sparse/include/linux/highmem.h
 419dfc609zbti8rqL60tL2dHXQ_rvQ linux-2.6.11-xen-sparse/include/linux/irq.h
+428f8747dtEZ4CfC5tb6Loe9h0Ivpg linux-2.6.11-xen-sparse/include/linux/skbuff.h
 419dfc6awx7w88wk6cG9P3mPidX6LQ linux-2.6.11-xen-sparse/kernel/irq/manage.c
 40f56a0ddHCSs3501MY4hRf22tctOw linux-2.6.11-xen-sparse/mkbuildtree
 42305f54Q6xJ1bXcQJlCQq1m-e2C8g linux-2.6.11-xen-sparse/mm/highmem.c
 412f46c0LJuKAgSPGoC0Z1DEkLfuLA linux-2.6.11-xen-sparse/mm/memory.c
 426fa4d7ooLYmFcFjJMF_ut4GFVh2Q linux-2.6.11-xen-sparse/mm/mmap.c
 410a94a4KT6I6X0LVc7djB39tRDp4g linux-2.6.11-xen-sparse/mm/page_alloc.c
+428f8747Gp_X2UtgwcL0-YeYkCXxvQ linux-2.6.11-xen-sparse/net/core/dev.c
+428f8747vBdkOrip6rhWK_eEvVc8dA linux-2.6.11-xen-sparse/net/core/skbuff.c
 413cb1e4zst25MDYjg63Y-NGC5_pLg netbsd-2.0-xen-sparse/Makefile
 413cb1e5c_Mkxf_X0zimEhTKI_l4DA netbsd-2.0-xen-sparse/mkbuildtree
 413cb1e5kY_Zil7-b0kI6hvCIxBEYg netbsd-2.0-xen-sparse/nbconfig-xen

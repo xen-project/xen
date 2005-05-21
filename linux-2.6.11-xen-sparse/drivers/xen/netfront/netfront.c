@@ -473,6 +473,7 @@ static int network_start_xmit(struct sk_buff *skb, struct net_device *dev)
     tx->id   = id;
     tx->addr = virt_to_machine(skb->data);
     tx->size = skb->len;
+    tx->csum_blank = (skb->ip_summed == CHECKSUM_HW);
 
     wmb(); /* Ensure that backend will see the request. */
     np->tx->req_prod = i + 1;
@@ -572,6 +573,9 @@ static int netif_poll(struct net_device *dev, int *pbudget)
         skb->data = skb->head + (rx->addr & ~PAGE_MASK);
         skb->len  = rx->status;
         skb->tail = skb->data + skb->len;
+
+        if ( rx->csum_valid )
+            skb->ip_summed = CHECKSUM_UNNECESSARY;
 
         np->stats.rx_packets++;
         np->stats.rx_bytes += rx->status;
@@ -967,7 +971,8 @@ static int create_netdev(int handle, struct net_device **val)
     dev->get_stats       = network_get_stats;
     dev->poll            = netif_poll;
     dev->weight          = 64;
-    
+    dev->features        = NETIF_F_IP_CSUM;
+
     if ((err = register_netdev(dev)) != 0) {
         printk(KERN_WARNING "%s> register_netdev err=%d\n", __FUNCTION__, err);
         goto exit;

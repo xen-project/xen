@@ -27,7 +27,8 @@ static int  make_rx_response(netif_t *netif,
                              u16      id, 
                              s8       st,
                              memory_t addr,
-                             u16      size);
+                             u16      size,
+                             u16      csum_valid);
 
 static void net_tx_action(unsigned long unused);
 static DECLARE_TASKLET(net_tx_tasklet, net_tx_action, 0);
@@ -154,6 +155,7 @@ int netif_be_start_xmit(struct sk_buff *skb, struct net_device *dev)
         __skb_put(nskb, skb->len);
         (void)skb_copy_bits(skb, -hlen, nskb->data - hlen, skb->len + hlen);
         nskb->dev = skb->dev;
+        nskb->proto_csum_valid = skb->proto_csum_valid;
         dev_kfree_skb(skb);
         skb = nskb;
     }
@@ -308,7 +310,8 @@ static void net_rx_action(unsigned long unused)
 
         evtchn = netif->evtchn;
         id = netif->rx->ring[MASK_NETIF_RX_IDX(netif->rx_resp_prod)].req.id;
-        if ( make_rx_response(netif, id, status, mdata, size) &&
+        if ( make_rx_response(netif, id, status, mdata,
+                              size, skb->proto_csum_valid) &&
              (rx_notify[evtchn] == 0) )
         {
             rx_notify[evtchn] = 1;
@@ -646,6 +649,11 @@ static void net_tx_action(unsigned long unused)
         skb->dev      = netif->dev;
         skb->protocol = eth_type_trans(skb, skb->dev);
 
+        /* No checking needed on localhost, but remember the field is blank. */
+        skb->ip_summed        = CHECKSUM_UNNECESSARY;
+        skb->proto_csum_valid = 1;
+        skb->proto_csum_blank = txreq.csum_blank;
+
         netif->stats.rx_bytes += txreq.size;
         netif->stats.rx_packets++;
 
@@ -711,15 +719,17 @@ static int make_rx_response(netif_t *netif,
                             u16      id, 
                             s8       st,
                             memory_t addr,
-                            u16      size)
+                            u16      size,
+                            u16      csum_valid)
 {
     NETIF_RING_IDX i = netif->rx_resp_prod;
     netif_rx_response_t *resp;
 
     resp = &netif->rx->ring[MASK_NETIF_RX_IDX(i)].resp;
-    resp->addr   = addr;
-    resp->id     = id;
-    resp->status = (s16)size;
+    resp->addr       = addr;
+    resp->csum_valid = csum_valid;
+    resp->id         = id;
+    resp->status     = (s16)size;
     if ( st < 0 )
         resp->status = (s16)st;
     wmb();

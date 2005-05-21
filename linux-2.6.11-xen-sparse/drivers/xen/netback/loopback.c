@@ -67,6 +67,11 @@ static int loopback_start_xmit(struct sk_buff *skb, struct net_device *dev)
     np->stats.rx_bytes += skb->len;
     np->stats.rx_packets++;
 
+    if ( skb->ip_summed == CHECKSUM_HW )
+        skb->proto_csum_blank = 1;
+    skb->ip_summed = skb->proto_csum_valid ?
+        CHECKSUM_UNNECESSARY : CHECKSUM_NONE;
+
     skb->pkt_type = PACKET_HOST; /* overridden by eth_type_trans() */
     skb->protocol = eth_type_trans(skb, dev);
     skb->dev      = dev;
@@ -95,6 +100,8 @@ static void loopback_construct(struct net_device *dev, struct net_device *lo)
 
     dev->tx_queue_len    = 0;
 
+    dev->features        = NETIF_F_HIGHDMA | NETIF_F_LLTX;
+
     /*
      * We do not set a jumbo MTU on the interface. Otherwise the network
      * stack will try to send large packets that will get dropped by the
@@ -117,6 +124,9 @@ static int __init loopback_init(void)
 
     loopback_construct(dev1, dev2);
     loopback_construct(dev2, dev1);
+
+    dev1->features |= NETIF_F_NO_CSUM;
+    dev2->features |= NETIF_F_IP_CSUM;
 
     /*
      * Initialise a dummy MAC address for the 'dummy backend' interface. We
