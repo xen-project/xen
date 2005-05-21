@@ -123,12 +123,6 @@
 423e7e8dVDL1WLfbmQWuXMbetYk4jA freebsd-5.3-xen-sparse/mkbuildtree
 423e7e8dBrOrAbydK6h49bY0VvDgPw freebsd-5.3-xen-sparse/xenfbsd_kernel_build
 4187ca95_eQN62ugV1zliQcfzXrHnw install.sh
-41ee5e8b_2rt-qHzbDXtIoBzOli0EA linux-2.4.29-xen-sparse/arch/xen/drivers/usbif/Makefile
-41ee5e8bUhF4tH7OoJaVbUxdXqneVw linux-2.4.29-xen-sparse/arch/xen/drivers/usbif/backend/Makefile
-41ee5e8bSPpxzhGO6TrY20TegW3cZg linux-2.4.29-xen-sparse/arch/xen/drivers/usbif/frontend/Makefile
-4241709bNBs1q4Ss32YW0CyFVOGhEg linux-2.4.29-xen-sparse/arch/xen/kernel/ioport.c
-4270e964iKFC24KiVm6jC5Eo7MxV6w linux-2.4.29-xen-sparse/arch/xen/kernel/pci-dma.c
-41f97f64nW0wmgLxhwzPTzkF4E5ERA linux-2.4.29-xen-sparse/drivers/usb/hcd.c
 3e5a4e6589G-U42lFKs43plskXoFxQ linux-2.4.30-xen-sparse/Makefile
 3e5a4e65IEPjnWPZ5w3TxS5scV8Ewg linux-2.4.30-xen-sparse/arch/xen/Makefile
 3e5a4e65n-KhsEAs-A4ULiStBp-r6w linux-2.4.30-xen-sparse/arch/xen/boot/Makefile
