@@ -692,7 +692,12 @@ void __init time_init(void)
 /* Convert jiffies to system time. Call with xtime_lock held for reading. */
 static inline u64 __jiffies_to_st(unsigned long j) 
 {
-	return processed_system_time + ((j - jiffies) * NS_PER_TICK);
+	long delta = j - jiffies;
+	/* NB. The next check can trigger in some wrap-around cases, but
+	 * that's ok -- we'll just end up with a shorter timeout. */
+	if (delta < 1)
+		delta = 1;
+	return processed_system_time + (delta * NS_PER_TICK);
 }
 
 /*
@@ -728,8 +733,6 @@ int set_timeout_timer(void)
 	} while (read_seqretry(&xtime_lock, seq));
 #else
 	j = next_timer_interrupt();
-	if (j < (jiffies + 1))
-		j = jiffies + 1;
 	alarm = __jiffies_to_st(j);
 #endif
 
