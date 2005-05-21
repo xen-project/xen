@@ -58,13 +58,13 @@ void __init paging_init(void)
 {
     void *ioremap_pt;
     unsigned long v;
-    struct pfn_info *pg;
+    struct pfn_info *m2p_pg;
 
     /* Allocate and map the machine-to-phys table. */
-    if ( (pg = alloc_domheap_pages(NULL, 10)) == NULL )
+    if ( (m2p_pg = alloc_domheap_pages(NULL, 10)) == NULL )
         panic("Not enough memory to bootstrap Xen.\n");
     idle_pg_table[l2_table_offset(RDWR_MPT_VIRT_START)] =
-        l2e_create_phys(page_to_phys(pg), __PAGE_HYPERVISOR | _PAGE_PSE);
+        l2e_create_page(m2p_pg, __PAGE_HYPERVISOR | _PAGE_PSE);
     memset((void *)RDWR_MPT_VIRT_START, 0x55, 4UL << 20);
 
     /* Xen 4MB mappings can all be GLOBAL. */
@@ -82,27 +82,25 @@ void __init paging_init(void)
     ioremap_pt = (void *)alloc_xenheap_page();
     clear_page(ioremap_pt);
     idle_pg_table[l2_table_offset(IOREMAP_VIRT_START)] =
-        l2e_create_phys(__pa(ioremap_pt), __PAGE_HYPERVISOR);
+        l2e_create_page(virt_to_page(ioremap_pt), __PAGE_HYPERVISOR);
 
-    /* Create read-only mapping of MPT for guest-OS use.
+    /*
+     * Create read-only mapping of MPT for guest-OS use.
      * NB. Remove the global bit so that shadow_mode_translate()==true domains
      *     can reused this address space for their phys-to-machine mapping.
      */
     idle_pg_table[l2_table_offset(RO_MPT_VIRT_START)] =
-        l2e_create_pfn(
-            l2e_get_pfn(idle_pg_table[l2_table_offset(RDWR_MPT_VIRT_START)]),
-            l2e_get_flags(idle_pg_table[l2_table_offset(RDWR_MPT_VIRT_START)])
-            & ~(_PAGE_RW | _PAGE_GLOBAL));
+        l2e_create_page(m2p_pg, (__PAGE_HYPERVISOR | _PAGE_PSE) & ~_PAGE_RW);
 
     /* Set up mapping cache for domain pages. */
     mapcache = (l1_pgentry_t *)alloc_xenheap_page();
     clear_page(mapcache);
     idle_pg_table[l2_table_offset(MAPCACHE_VIRT_START)] =
-        l2e_create_phys(__pa(mapcache), __PAGE_HYPERVISOR);
+        l2e_create_page(virt_to_page(mapcache), __PAGE_HYPERVISOR);
 
     /* Set up linear page table mapping. */
     idle_pg_table[l2_table_offset(LINEAR_PT_VIRT_START)] =
-        l2e_create_phys(__pa(idle_pg_table), __PAGE_HYPERVISOR);
+        l2e_create_page(virt_to_page(idle_pg_table), __PAGE_HYPERVISOR);
 }
 
 void __init zap_low_mappings(void)

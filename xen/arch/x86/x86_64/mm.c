@@ -75,48 +75,42 @@ l2_pgentry_t *virt_to_xen_l2e(unsigned long v)
 void __init paging_init(void)
 {
     unsigned long i;
-    l3_pgentry_t *l3rw, *l3ro;
+    l3_pgentry_t *l3_ro_mpt;
+    l2_pgentry_t *l2_ro_mpt;
     struct pfn_info *pg;
+
+    /* Create user-accessible L2 directory to map the MPT for guests. */
+    l3_ro_mpt = (l3_pgentry_t *)alloc_xenheap_page();
+    clear_page(l3_ro_mpt);
+    idle_pg_table[l4_table_offset(RO_MPT_VIRT_START)] =
+        l4e_create_page(
+            virt_to_page(l3_ro_mpt), __PAGE_HYPERVISOR | _PAGE_USER);
+    l2_ro_mpt = (l2_pgentry_t *)alloc_xenheap_page();
+    clear_page(l2_ro_mpt);
+    l3_ro_mpt[l3_table_offset(RO_MPT_VIRT_START)] =
+        l3e_create_page(
+            virt_to_page(l2_ro_mpt), __PAGE_HYPERVISOR | _PAGE_USER);
+    l2_ro_mpt += l2_table_offset(RO_MPT_VIRT_START);
 
     /*
      * Allocate and map the machine-to-phys table.
-     * This also ensures L3 is present for ioremap().
+     * This also ensures L3 is present for fixmaps.
      */
     for ( i = 0; i < max_page; i += ((1UL << L2_PAGETABLE_SHIFT) / 8) )
     {
-        pg = alloc_domheap_pages(
-            NULL, L2_PAGETABLE_SHIFT - L1_PAGETABLE_SHIFT);
+        pg = alloc_domheap_pages(NULL, PAGETABLE_ORDER);
         if ( pg == NULL )
             panic("Not enough memory for m2p table\n");
         map_pages_to_xen(
             RDWR_MPT_VIRT_START + i*8, page_to_pfn(pg), 
-            1UL << (L2_PAGETABLE_SHIFT - L1_PAGETABLE_SHIFT),
-            PAGE_HYPERVISOR | _PAGE_USER);
+            1UL << PAGETABLE_ORDER,
+            PAGE_HYPERVISOR);
         memset((void *)(RDWR_MPT_VIRT_START + i*8), 0x55,
                1UL << L2_PAGETABLE_SHIFT);
+        *l2_ro_mpt++ = l2e_create_page(
+            pg, _PAGE_GLOBAL|_PAGE_PSE|_PAGE_USER|_PAGE_PRESENT);
+        BUG_ON(((unsigned long)l2_ro_mpt & ~PAGE_MASK) == 0);
     }
-
-    /*
-     * Above we mapped the M2P table as user-accessible and read-writable.
-     * Fix security by denying user access at the top level of the page table.
-     */
-    l4e_remove_flags(&idle_pg_table[l4_table_offset(RDWR_MPT_VIRT_START)],
-                     _PAGE_USER);
-
-    /* Create read-only mapping of MPT for guest-OS use. */
-    l3ro = (l3_pgentry_t *)alloc_xenheap_page();
-    clear_page(l3ro);
-    idle_pg_table[l4_table_offset(RO_MPT_VIRT_START)] =
-        l4e_create_phys(__pa(l3ro),
-                        (__PAGE_HYPERVISOR | _PAGE_USER) & ~_PAGE_RW);
-
-    /* Copy the L3 mappings from the RDWR_MPT area. */
-    l3rw = l4e_to_l3e(
-        idle_pg_table[l4_table_offset(RDWR_MPT_VIRT_START)]);
-    l3rw += l3_table_offset(RDWR_MPT_VIRT_START);
-    l3ro += l3_table_offset(RO_MPT_VIRT_START);
-    memcpy(l3ro, l3rw,
-           (RDWR_MPT_VIRT_END - RDWR_MPT_VIRT_START) >> L3_PAGETABLE_SHIFT);
 
     /* Set up linear page table mapping. */
     idle_pg_table[l4_table_offset(LINEAR_PT_VIRT_START)] =

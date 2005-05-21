@@ -700,8 +700,9 @@ static int alloc_l2_table(struct pfn_info *page)
     pl2e[l2_table_offset(LINEAR_PT_VIRT_START)] =
         l2e_create_pfn(pfn, __PAGE_HYPERVISOR);
     pl2e[l2_table_offset(PERDOMAIN_VIRT_START)] =
-        l2e_create_phys(__pa(page_get_owner(page)->arch.mm_perdomain_pt),
-                        __PAGE_HYPERVISOR);
+        l2e_create_page(
+            virt_to_page(page_get_owner(page)->arch.mm_perdomain_pt),
+            __PAGE_HYPERVISOR);
 #endif
 
     unmap_domain_mem(pl2e);
@@ -770,8 +771,9 @@ static int alloc_l4_table(struct pfn_info *page)
     pl4e[l4_table_offset(LINEAR_PT_VIRT_START)] =
         l4e_create_pfn(pfn, __PAGE_HYPERVISOR);
     pl4e[l4_table_offset(PERDOMAIN_VIRT_START)] =
-        l4e_create_phys(__pa(page_get_owner(page)->arch.mm_perdomain_l3),
-                        __PAGE_HYPERVISOR);
+        l4e_create_page(
+            virt_to_page(page_get_owner(page)->arch.mm_perdomain_l3),
+            __PAGE_HYPERVISOR);
 
     return 1;
 
@@ -2880,7 +2882,7 @@ int map_pages_to_xen(
             {
                 pl1e = page_to_virt(alloc_xen_pagetable());
                 clear_page(pl1e);
-                *pl2e = l2e_create_phys(__pa(pl1e), __PAGE_HYPERVISOR);
+                *pl2e = l2e_create_page(virt_to_page(pl1e), __PAGE_HYPERVISOR);
             }
             else if ( l2e_get_flags(*pl2e) & _PAGE_PSE )
             {
@@ -2889,7 +2891,7 @@ int map_pages_to_xen(
                     pl1e[i] = l1e_create_pfn(
                         l2e_get_pfn(*pl2e) + i,
                         l2e_get_flags(*pl2e) & ~_PAGE_PSE);
-                *pl2e = l2e_create_phys(__pa(pl1e), __PAGE_HYPERVISOR);
+                *pl2e = l2e_create_page(virt_to_page(pl1e), __PAGE_HYPERVISOR);
                 local_flush_tlb_pge();
             }
 
