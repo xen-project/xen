@@ -255,10 +255,6 @@ extern int ht_per_core;
 #define CONFIG_ACPI_BOOT 1
 //#endif
 
-#define CONFIG_PCI 1
-#define CONFIG_PCI_BIOS 1
-#define CONFIG_PCI_DIRECT 1
-
 #define CONFIG_XEN_ATTENTION_KEY 1
 #endif /* __ASSEMBLY__ */
 #endif /* __XEN_IA64_CONFIG_H__ */
