@@ -68,19 +68,19 @@ static void __make_page_readonly(unsigned long va)
 {
         unsigned long addr;
         pte_t *pte;
-        unsigned long *page = (unsigned long *) init_level4_pgt;
+	unsigned long *page = (unsigned long *) init_level4_pgt;
 
-        addr = (unsigned long) page[pgd_index(va)];
-        addr_to_page(addr, page);
+	addr = (unsigned long) page[pgd_index(va)];
+	addr_to_page(addr, page);
 
-        addr = page[pud_index(va)];
-        addr_to_page(addr, page);
+	addr = page[pud_index(va)];
+	addr_to_page(addr, page);
 
-        addr = page[pmd_index(va)];
-        addr_to_page(addr, page);
+	addr = page[pmd_index(va)];
+	addr_to_page(addr, page);
 
-        pte = (pte_t *) &page[pte_index(va)];
-        xen_l1_entry_update(pte, (*(unsigned long*)pte) & ~_PAGE_RW);
+	pte = (pte_t *) &page[pte_index(va)];
+	xen_l1_entry_update(pte, (*(unsigned long*)pte) & ~_PAGE_RW);
 	__flush_tlb_one(addr);
 }
 
@@ -106,7 +106,7 @@ static void __make_page_writable(unsigned long va)
 
 
 /*
- * Assume the tranlation is already established.
+ * Assume the translation is already established.
  */
 void make_page_readonly(void *va)
 {
@@ -385,72 +385,9 @@ void __set_fixmap_user (enum fixed_addresses idx, unsigned long phys, pgprot_t p
 	}
 
         set_pte_phys(address, phys, prot, SET_FIXMAP_USER); 
-
-#if 0
-        page = (unsigned long *) user_level3_pgt;
-        pud = page[pud_index(address)];
-
-        printk("pud = %p\n", pud);
-
-        pmd = (pmd_t *) spp_getpage(); 
-        printk("alloc pmd = %p\n", pmd);
-
-        make_page_readonly((unsigned long)pmd);
-
-        xen_pmd_pin(__pa(pmd));
-
-        set_pud(pud, __pud(__pa(pmd) | _KERNPG_TABLE | _PAGE_USER));
-
-        printk("after set_pud\n");
-
-        pte = (pte_t *) spp_getpage();
-        printk("pte = %p\n");
-
-        make_page_readonly((unsigned long)pte);
-
-        xen_pte_pin(__pa(pte));
-
-        page = (unsigned long *) pud;
-        pud = page[pud_index(address)];
-        
-
-        pmd = pmd_offset(pud, vaddr);
-
-        set_pmd(pmd, __pmd(__pa(pte) | _KERNPG_TABLE | _PAGE_USER));
-#endif
-
 }
 
-unsigned long __initdata table_start, table_end, tables_reserved; 
-
-#if 0
-/*
- * Get the machine PFN given va
- */
-static unsigned long get_machine_pfn(unsigned long va)
-{
-        unsigned long addr;
-        pte_t *pte;
-
-        unsigned long *page = (unsigned long *) init_level4_pgt;
-
-        addr = (unsigned long) page[pgd_index(va)];
-        addr &= PHYSICAL_PAGE_MASK;
-        page = (unsigned long *) ((unsigned long)(((mfn_to_pfn(addr >> PAGE_SHIFT)) << PAGE_SHIFT) + __START_KERNEL_map)); 
-
-        addr = page[pud_index(va)];
-        addr &= PHYSICAL_PAGE_MASK;
-        page = (unsigned long *) ((unsigned long)(((mfn_to_pfn(addr >> PAGE_SHIFT)) << PAGE_SHIFT) + __START_KERNEL_map));
-
-        addr = page[pmd_index(va)];
-        addr &= PHYSICAL_PAGE_MASK; 
-        page = (unsigned long *) ((unsigned long)(((mfn_to_pfn(addr >> PAGE_SHIFT)) << PAGE_SHIFT)+ __START_KERNEL_map));
-
-        pte = (pte_t *) &page[pte_index(va)];
-
-        return (unsigned long) (pte->pte >> PAGE_SHIFT);
-}
-#endif
+unsigned long __initdata table_start, table_end, tables_space; 
 
 unsigned long get_machine_pfn(unsigned long addr)
 {
@@ -461,17 +398,37 @@ unsigned long get_machine_pfn(unsigned long addr)
         return (pte->pte >> PAGE_SHIFT);
 } 
 
+#define ALIGN_TO_4K __attribute__((section(".data.page_aligned")))
+#define MAX_LOW_PAGES	0x20
+static unsigned long __init_pgt[MAX_LOW_PAGES][512]  ALIGN_TO_4K;
+static int __init_pgt_index;
 
 /*
  * We start using from start_pfn
  */
-static __init void *alloc_low_page(unsigned long *phys)
+static __init void *alloc_static_page(unsigned long *phys)
+{
+	int i = __init_pgt_index++;
+
+	if (__init_pgt_index >= MAX_LOW_PAGES) {
+		printk("Need to increase MAX_LOW_PAGES");
+		BUG();
+	}
+		
+	*phys = __pa(__init_pgt[i]);
+
+	return (void *) __init_pgt[i];
+} 
+
+/*
+ * Get RO page
+ */
+static void __init *alloc_low_page(unsigned long *phys)
 { 
         unsigned long pfn = table_end++;
     
         *phys = (pfn << PAGE_SHIFT);
         memset((void *) ((pfn << PAGE_SHIFT) + __START_KERNEL_map), 0, PAGE_SIZE);
-
         return (void *)((pfn << PAGE_SHIFT) + __START_KERNEL_map);
 } 
 
@@ -519,7 +476,7 @@ void __init phys_pud_init(pud_t *pud, unsigned long address, unsigned long end)
                         pte_save = pte;
                         for (k = 0; k < PTRS_PER_PTE; pte++, k++, paddr += PTE_SIZE) {
                                 if (paddr < (table_start << PAGE_SHIFT) 
-                                    + tables_reserved)
+                                    + tables_space)
                                 {
                                         __set_pte(pte, 
                                                 __pte(paddr | (_KERNPG_TABLE & ~_PAGE_RW)));
@@ -549,11 +506,82 @@ static void __init find_early_table_space(unsigned long end)
 	pmds = (end + PMD_SIZE - 1) >> PMD_SHIFT;
         ptes = (end + PTE_SIZE - 1) >> PAGE_SHIFT;
 
-        tables_reserved = round_up(puds*8, PAGE_SIZE) + round_up(pmds * 8, PAGE_SIZE) 
-                + round_up(ptes * 8, PAGE_SIZE); 
-	table_start = start_pfn;
-	table_end = table_start;
+        tables_space = round_up(puds * 8, PAGE_SIZE) + 
+	    		  round_up(pmds * 8, PAGE_SIZE) + 
+	    		  round_up(ptes * 8, PAGE_SIZE); 
 }
+
+
+/*
+ * Extend kernel mapping to access pages for page tables.  The initial
+ * mapping done by Xen is minimal (e.g. 8MB) and we need to extend the
+ * mapping for early initialization.
+ */
+
+#define MIN_INIT_SIZE	0x800000
+static unsigned long current_size, extended_size;
+
+void __init extend_init_mapping(void) 
+{
+	unsigned long va = __START_KERNEL_map;
+	unsigned long addr, *pte_page;
+
+	unsigned long phys;
+        pmd_t *pmd;
+	pte_t *pte, new_pte;
+	unsigned long *page = (unsigned long *) init_level4_pgt;
+	int i;
+
+	addr = (unsigned long) page[pgd_index(va)];
+	addr_to_page(addr, page);
+
+	addr = page[pud_index(va)];
+	addr_to_page(addr, page);
+
+	for (;;) {
+		pmd = (pmd_t *) &page[pmd_index(va)];
+		if (pmd_present(*pmd)) {
+			/*
+			 * if pmd is valid, check pte.
+			 */
+			addr = page[pmd_index(va)];
+			addr_to_page(addr, pte_page);
+			
+			for (i = 0; i < PTRS_PER_PTE; i++) {
+				pte = (pte_t *) &pte_page[pte_index(va)];
+				
+				if (pte_present(*pte)) {
+					va += PAGE_SIZE;
+					current_size += PAGE_SIZE;
+				} else
+				    break;
+			}
+
+		} else
+		    break;
+	}
+
+	for (; va < __START_KERNEL_map + current_size + tables_space; ) {
+		pmd = (pmd_t *) &page[pmd_index(va)];
+
+		if (pmd_none(*pmd)) {
+			pte_page = (unsigned long *) alloc_static_page(&phys);
+			make_page_readonly(pte_page);
+			xen_pte_pin(phys);
+			set_pmd(pmd, __pmd(phys | _KERNPG_TABLE | _PAGE_USER));
+
+			for (i = 0; i < PTRS_PER_PTE; i++, va += PAGE_SIZE) {
+				new_pte = pfn_pte((va -  __START_KERNEL_map) >> PAGE_SHIFT, 
+						  __pgprot(_KERNPG_TABLE | _PAGE_USER));
+
+				pte = (pte_t *) &pte_page[pte_index(va)];
+				xen_l1_entry_update(pte, new_pte.pte);
+				extended_size += PAGE_SIZE;
+			}
+		} 
+	}
+}
+
 
 /* Setup the direct mapping of the physical memory at PAGE_OFFSET.
    This runs before bootmem is initialized and gets pages directly from the 
@@ -562,10 +590,14 @@ void __init init_memory_mapping(unsigned long start, unsigned long end)
 { 
 	unsigned long next; 
 
-
 	Dprintk("init_memory_mapping\n");
 
 	find_early_table_space(end);
+	extend_init_mapping();
+	start_pfn = current_size >> PAGE_SHIFT;
+
+	table_start = start_pfn;
+	table_end = table_start;
 
 	start = (unsigned long)__va(start);
 	end = (unsigned long)__va(end);
@@ -582,16 +614,15 @@ void __init init_memory_mapping(unsigned long start, unsigned long end)
 		set_pgd(pgd_offset_k(start), mk_kernel_pgd(pud_phys));
 	} 
 
-	early_printk("kernel direct mapping tables upto %lx @ %lx-%lx\n", end, 
+	printk("kernel direct mapping tables upto %lx @ %lx-%lx\n", end, 
 	       table_start<<PAGE_SHIFT, 
 	       table_end<<PAGE_SHIFT);
 
-//        start_pfn = table_end;
+        start_pfn = ((current_size + extended_size) >> PAGE_SHIFT);
 
         /*
          * TBD: Need to calculate at runtime
          */
-	start_pfn = (8*0x100000) >> PAGE_SHIFT;
 
 	__flush_tlb_all();
         init_mapping_done = 1;
