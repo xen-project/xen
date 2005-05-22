@@ -23,7 +23,8 @@ if ! [ -d $dst ]; then
 fi
 
 echo "Installing Xen from '$src' to '$dst'..."
-cp -fdRL $src/* $dst
+(cd $src; tar -cf - --exclude etc/init.d * ) | tar -C $dst -xf -
+cp -fdRL $src/etc/init.d/* $dst/etc/init.d/
 echo "All done."
 
 echo "Checking to see whether prerequisite tools are installed..."
