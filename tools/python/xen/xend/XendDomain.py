@@ -322,8 +322,8 @@ class XendDomain:
         """
 
         SIGNATURE = "LinuxGuestRecord"
-        sizeof_int = calcsize("L")
-        sizeof_unsigned_long = calcsize("i")
+        sizeof_int = calcsize("i")
+        sizeof_unsigned_long = calcsize("L")
         PAGE_SIZE = 4096
 
         class XendFile(file):
