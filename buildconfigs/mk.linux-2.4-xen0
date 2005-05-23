@@ -30,18 +30,18 @@ $(LINUX_DIR)/include/linux/autoconf.h: ref-$(OS)-$(LINUX_VER)/.valid-ref
 	# Apply arch-xen patches
 	( cd linux-$(LINUX_VER)-xen-sparse ; \
           ./mkbuildtree ../$(LINUX_DIR) )
-	# Patch kernel Makefile to set EXTRAVERSION
-	( cd $(LINUX_DIR) ; \
-	  sed -e 's/^EXTRAVERSION.*/&$$(XENGUEST)\nXENGUEST = -$(EXTRAVERSION)/' Makefile >Mk.tmp ; \
-	  rm -f Makefile ; mv Mk.tmp Makefile )
 	# add ebtables patch
 	( cd $(LINUX_DIR) ; patch -p1 -F3 < ../patches/tmp/ebtables.diff )
 	# Re-use config from install dir if one exits else use default config
 	CONFIG_VERSION=$$(sed -ne 's/^EXTRAVERSION = //p' $(LINUX_DIR)/Makefile); \
-	[ -r $(DESTDIR)/boot/config-$(LINUX_VER)$$CONFIG_VERSION ] && \
-	  cp $(DESTDIR)/boot/config-$(LINUX_VER)$$CONFIG_VERSION $(LINUX_DIR)/.config \
+	[ -r $(DESTDIR)/boot/config-$(LINUX_VER)$$CONFIG_VERSION-$(EXTRAVERSION) ] && \
+	  cp $(DESTDIR)/boot/config-$(LINUX_VER)$$CONFIG_VERSION-$(EXTRAVERSION) $(LINUX_DIR)/.config \
 	  || cp $(LINUX_DIR)/arch/xen/defconfig-$(EXTRAVERSION) \
 		$(LINUX_DIR)/.config
+	# Patch kernel Makefile to set EXTRAVERSION
+	( cd $(LINUX_DIR) ; \
+	  sed -e 's/^EXTRAVERSION.*/&$$(XENGUEST)\nXENGUEST = -$(EXTRAVERSION)/' Makefile >Mk.tmp ; \
+	  rm -f Makefile ; mv Mk.tmp Makefile )
 	make -C $(LINUX_DIR) ARCH=xen oldconfig
 	make -C $(LINUX_DIR) ARCH=xen dep
 
