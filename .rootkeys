@@ -863,6 +863,7 @@
 41dde8b0yuJX-S79w4xJKxBQ-Mhp1A tools/python/xen/util/memmap.py
 4288c6fcB1kUAqX0gzU85GGxmamS4Q tools/python/xen/util/process.py
 4059c6a0pnxhG8hwSOivXybbGOwuXw tools/python/xen/util/tempfile.py
+4292565fDy2PaatawinIckKB0cKusg tools/python/xen/util/xpopen.py
 4267a9b16u4IEPhjRryesk6A17sobA tools/python/xen/web/SrvBase.py
 4267a9b1FfCUjW7m9anLERcx9lwhJg tools/python/xen/web/SrvDir.py
 4267a9b1uMXIfzB6-81ZLqMCyTgJmw tools/python/xen/web/__init__.py
@@ -1029,6 +1030,8 @@
 41d58ba6R6foSMtSFEcu-yxWFrT8VQ tools/xcs/xcs.h
 41d58ba6qyr2BkTcH2WlNBYLRyl2Yw tools/xcs/xcs_proto.h
 41d58ba6ijEF6fedqRO5vFu7uCirZg tools/xcs/xcsdump.c
+4292540couq-V0TPwyQ6bspNEWNcvw tools/xcutils/Makefile
+42925407VysDb9O06OK_RUzTZxfLoA tools/xcutils/xc_restore.c
 403a3edbrr8RE34gkbR40zep98SXbg tools/xentrace/Makefile
 40a107afN60pFdURgBv9KwEzgRl5mQ tools/xentrace/formats
 420d52d2_znVbT4JAPIU36vQOme83g tools/xentrace/xenctx.c

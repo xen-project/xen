@@ -125,6 +125,7 @@ tools/web-shutdown.tap
 tools/x2d2/minixend
 tools/xcs/xcs
 tools/xcs/xcsdump
+tools/xcutils/xc_restore
 tools/xentrace/xentrace
 tools/xfrd/xfrd
 xen/BLOG

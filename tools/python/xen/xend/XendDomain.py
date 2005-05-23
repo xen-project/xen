@@ -25,7 +25,11 @@ from xen.xend.server import channel
 
 
 import errno
+import os
+import select
+from string import join
 from struct import pack, unpack, calcsize
+from xen.util.xpopen import xPopen3
 
 __all__ = [ "XendDomain" ]
 
@@ -325,6 +329,7 @@ class XendDomain:
         sizeof_int = calcsize("i")
         sizeof_unsigned_long = calcsize("L")
         PAGE_SIZE = 4096
+        PATH_XC_RESTORE = "/usr/libexec/xen/xc_restore"
 
         class XendFile(file):
             def read_exact(self, size, error_msg):
@@ -367,7 +372,29 @@ class XendDomain:
             #             underlying file descriptor
             ignore = fd.tell()
 
-            xc.linux_restore(fd.fileno(), int(dominfo.id), nr_pfns)
+            cmd = [PATH_XC_RESTORE, str(xc.handle()), str(fd.fileno()),
+                   dominfo.id, str(nr_pfns)]
+            log.info("[xc_restore] " + join(cmd))
+            child = xPopen3(cmd, True, -1, [fd.fileno(), xc.handle()])
+            child.tochild.close()
+
+            lasterr = ""
+            p = select.poll()
+            p.register(child.fromchild.fileno())
+            p.register(child.childerr.fileno())
+            while True:
+                r = p.poll()
+                for l in child.childerr.readlines():
+                    log.error(l.rstrip())
+                    lasterr = l.rstrip()
+                for l in child.fromchild.readlines():
+                    log.info(l.rstrip())
+                if filter(lambda (fd, event): event & select.POLLHUP, r):
+                    break
+
+            if child.wait() != 0:
+                raise XendError("xc_restore failed: %s" % lasterr)
+            
             return dominfo
 
         except IOError, ex:

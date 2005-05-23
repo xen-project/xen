@@ -63,6 +63,13 @@ static PyObject *pyxc_domain_dumpcore(PyObject *self,
     return NULL;
 }
 
+static PyObject *pyxc_handle(PyObject *self)
+{
+    XcObject *xc = (XcObject *)self;
+
+    return PyInt_FromLong(xc->xc_handle);
+}
+
 static PyObject *pyxc_domain_create(PyObject *self,
                                     PyObject *args,
                                     PyObject *kwds)
@@ -326,36 +333,6 @@ static PyObject *pyxc_linux_save(PyObject *self,
         PyErr_SetFromErrno(xc_error);
         goto exit;
     } 
-
-    Py_INCREF(zero);
-    val = zero;
-
-  exit:
-    return val;
-}
-
-static PyObject *pyxc_linux_restore(PyObject *self,
-                                    PyObject *args,
-                                    PyObject *kwds)
-{
-    XcObject *xc = (XcObject *)self;
-    PyObject *val = NULL;
-    int rc =-1;
-    int io_fd, dom;
-    unsigned long nr_pfns;
-
-    static char *kwd_list[] = { "fd", "dom", "pfns", NULL };
-
-    if ( !PyArg_ParseTupleAndKeywords(args, kwds, "iil", kwd_list,
-                                      &io_fd, &dom, &nr_pfns) )
-        goto exit;
-
-    rc = xc_linux_restore(xc->xc_handle, io_fd, dom, nr_pfns);
-    if ( rc != 0 )
-    {
-        PyErr_SetFromErrno(xc_error);
-        goto exit;
-    }
 
     Py_INCREF(zero);
     val = zero;
@@ -938,6 +915,11 @@ static PyObject *pyxc_domain_memory_increase_reservation(PyObject *self,
 
 
 static PyMethodDef pyxc_methods[] = {
+    { "handle",
+      (PyCFunction)pyxc_handle,
+      0, "\n"
+      "Query the xc control interface file descriptor.\n\n"
+      "Returns: [int] file descriptor\n" },
     { "domain_create", 
       (PyCFunction)pyxc_domain_create, 
       METH_VARARGS | METH_KEYWORDS, "\n"
@@ -1025,14 +1007,6 @@ static PyMethodDef pyxc_methods[] = {
       " state_file [str]:    Name of state file. Must not currently exist.\n"
       " progress   [int, 1]: Bool - display a running progress indication?\n\n"
       "Returns: [int] 0 on success; -1 on error.\n" },
-
-    { "linux_restore", 
-      (PyCFunction)pyxc_linux_restore, 
-      METH_VARARGS | METH_KEYWORDS, "\n"
-      "Restore the CPU and memory state of a Linux guest OS.\n"
-      " dom        [int]:    Identifier of domain to be restored.\n"
-      " pfns       [int]:    Number of pages domain uses.\n"
-      "Returns: [int] new domain identifier on success; -1 on error.\n" },
 
     { "linux_build", 
       (PyCFunction)pyxc_linux_build, 

@@ -11,7 +11,7 @@
 
 #define MAX_BATCH_SIZE 1024
 
-#define DEBUG 0
+#define DEBUG 01
 
 #if 1
 #define ERR(_f, _a...) fprintf ( stderr, _f , ## _a )
@@ -20,7 +20,7 @@
 #endif
 
 #if DEBUG
-#define DPRINTF(_f, _a...) fprintf ( stderr, _f , ## _a )
+#define DPRINTF(_f, _a...) fprintf ( stdout, _f , ## _a )
 #else
 #define DPRINTF(_f, _a...) ((void)0)
 #endif
