@@ -244,8 +244,7 @@ int xc_linux_save(int xc_handle, struct XcIOContext *ioctxt);
  * @parm ioctxt the IO context to restore a domain from
  * @return 0 on success, -1 on failure
  */
-int xc_linux_restore(int xc_handle, int io_fd, u32 dom, unsigned long nr_pfns,
-		     unsigned char *pfn2mfn);
+int xc_linux_restore(int xc_handle, int io_fd, u32 dom, unsigned long nr_pfns);
 
 int xc_linux_build(int xc_handle,
                    u32 domid,

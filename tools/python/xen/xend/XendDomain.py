@@ -363,15 +363,11 @@ class XendDomain:
                 raise XendError(
                     "not a valid guest state file: pfn count out of range")
 
-            pfn_to_mfn_frame_list = fd.read_exact(PAGE_SIZE,
-                "not a valid guest state file: pfn_to_mfn_frame_list read")
-
             # XXXcl hack: fd.tell will sync up the object and
             #             underlying file descriptor
             ignore = fd.tell()
 
-            xc.linux_restore(fd.fileno(), int(dominfo.id), nr_pfns,
-                             pfn_to_mfn_frame_list)
+            xc.linux_restore(fd.fileno(), int(dominfo.id), nr_pfns)
             return dominfo
 
         except IOError, ex:

@@ -32,8 +32,7 @@
 #define PPRINTF(_f, _a...)
 #endif
 
-int xc_linux_restore(int xc_handle, int io_fd, u32 dom, unsigned long nr_pfns,
-                     unsigned char *pfn2mfn)
+int xc_linux_restore(int xc_handle, int io_fd, u32 dom, unsigned long nr_pfns)
 {
     dom0_op_t op;
     int rc = 1, i, n, k;
@@ -60,7 +59,7 @@ int xc_linux_restore(int xc_handle, int io_fd, u32 dom, unsigned long nr_pfns,
     unsigned long *ppage = NULL;
 
     /* A copy of the pfn-to-mfn table frame list. */
-    unsigned long *pfn_to_mfn_frame_list = (void *)pfn2mfn; // [1024];
+    unsigned long pfn_to_mfn_frame_list[1024];
 
     /* A table mapping each PFN to its new MFN. */
     unsigned long *pfn_to_mfn_table = NULL;
@@ -89,6 +88,11 @@ int xc_linux_restore(int xc_handle, int io_fd, u32 dom, unsigned long nr_pfns,
            but might as well do early */
         ERR("Unable to mlock ctxt");
         return 1;
+    }
+
+    if (read(io_fd, pfn_to_mfn_frame_list, PAGE_SIZE) != PAGE_SIZE) {
+	ERR("read pfn_to_mfn_frame_list failed");
+	goto out;
     }
 
     /* We want zeroed memory so use calloc rather than malloc. */

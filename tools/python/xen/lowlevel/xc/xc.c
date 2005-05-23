@@ -343,24 +343,14 @@ static PyObject *pyxc_linux_restore(PyObject *self,
     int rc =-1;
     int io_fd, dom;
     unsigned long nr_pfns;
-    char *pfn2mfn;
-    int pfn2mfn_len;
-    PyObject *pfn2mfn_object;
 
-    static char *kwd_list[] = { "fd", "dom", "pfns", "pfn2mfn", NULL };
+    static char *kwd_list[] = { "fd", "dom", "pfns", NULL };
 
-    if ( !PyArg_ParseTupleAndKeywords(args, kwds, "iilO", kwd_list,
-                                      &io_fd, &dom, &nr_pfns,
-				      &pfn2mfn_object) )
+    if ( !PyArg_ParseTupleAndKeywords(args, kwds, "iil", kwd_list,
+                                      &io_fd, &dom, &nr_pfns) )
         goto exit;
 
-    if (PyString_AsStringAndSize(pfn2mfn_object, &pfn2mfn, &pfn2mfn_len))
-	goto exit;
-
-    if (pfn2mfn_len != PAGE_SIZE)
-	goto exit;
-
-    rc = xc_linux_restore(xc->xc_handle, io_fd, dom, nr_pfns, pfn2mfn);
+    rc = xc_linux_restore(xc->xc_handle, io_fd, dom, nr_pfns);
     if ( rc != 0 )
     {
         PyErr_SetFromErrno(xc_error);
@@ -1042,7 +1032,6 @@ static PyMethodDef pyxc_methods[] = {
       "Restore the CPU and memory state of a Linux guest OS.\n"
       " dom        [int]:    Identifier of domain to be restored.\n"
       " pfns       [int]:    Number of pages domain uses.\n"
-      " pfn2mfn    [str]:    String containing the pfn to mfn frame list.\n\n"
       "Returns: [int] new domain identifier on success; -1 on error.\n" },
 
     { "linux_build", 
