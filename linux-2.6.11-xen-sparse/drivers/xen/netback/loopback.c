@@ -68,7 +68,13 @@ static int loopback_start_xmit(struct sk_buff *skb, struct net_device *dev)
     np->stats.rx_packets++;
 
     if ( skb->ip_summed == CHECKSUM_HW )
+    {
+        /* Defer checksum calculation. */
         skb->proto_csum_blank = 1;
+        /* Must be a local packet: assert its integrity. */
+        skb->proto_csum_valid = 1;
+    }
+
     skb->ip_summed = skb->proto_csum_valid ?
         CHECKSUM_UNNECESSARY : CHECKSUM_NONE;
 
