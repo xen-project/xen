@@ -104,7 +104,7 @@ physical_mode_init(VCPU *vcpu)
     UINT64 psr;
     struct domain * d = vcpu->domain;
 
-    vcpu->domain->arch.emul_phy_rr0.rid = XEN_RR7_RID+((d->id)<<3);
+    vcpu->domain->arch.emul_phy_rr0.rid = XEN_RR7_RID+((d->domain_id)<<3);
     /* FIXME */
 #if 0
     vcpu->domain->arch.emul_phy_rr0.ps = 28;  /* set page size to 256M */
@@ -112,7 +112,7 @@ physical_mode_init(VCPU *vcpu)
 	vcpu->domain->arch.emul_phy_rr0.ps = EMUL_PHY_PAGE_SHIFT;  /* set page size to 4k */
     vcpu->domain->arch.emul_phy_rr0.ve = 1; /* enable VHPT walker on this region */
 
-    vcpu->domain->arch.emul_phy_rr4.rid = XEN_RR7_RID + ((d->id)<<3) + 4;
+    vcpu->domain->arch.emul_phy_rr4.rid = XEN_RR7_RID + ((d->domain_id)<<3) + 4;
     vcpu->domain->arch.emul_phy_rr4.ps = EMUL_PHY_PAGE_SHIFT;  /* set page size to 4k */
     vcpu->domain->arch.emul_phy_rr4.ve = 1; /* enable VHPT walker on this region */
 

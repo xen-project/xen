@@ -54,7 +54,7 @@
 #define VMM_RR_SHIFT    20
 #define VMM_RR_MASK     ((1UL<<VMM_RR_SHIFT)-1)
 #define VRID_2_MRID(vcpu,rid)  ((rid) & VMM_RR_MASK) | \
-                ((vcpu->domain->id) << VMM_RR_SHIFT)
+                ((vcpu->domain->domain_id) << VMM_RR_SHIFT)
 extern u64 indirect_reg_igfld_MASK ( int type, int index, u64 value);
 extern u64 cr_igfld_mask (int index, u64 value);
 extern int check_indirect_reg_rsv_fields ( int type, int index, u64 value );
@@ -590,7 +590,7 @@ vmx_vrrtomrr(VCPU *vcpu,unsigned long val)
     ia64_rr rr;
     u64	  rid;
     rr.rrval=val;
-    rid=(((u64)vcpu->domain->id)<<DOMAIN_RID_SHIFT) + rr.rid;
+    rid=(((u64)vcpu->domain->domain_id)<<DOMAIN_RID_SHIFT) + rr.rid;
     rr.rid = redistribute_rid(rid);
     rr.ve=1;
     return rr.rrval;

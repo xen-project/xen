@@ -40,6 +40,7 @@
 #ifdef CONFIG_VTI
 #include <asm/vmx.h>
 #include <asm/vmx_vcpu.h>
+#include <asm/pal.h>
 #endif // CONFIG_VTI
 
 #define CONFIG_DOMAIN0_CONTIGUOUS
@@ -792,13 +793,15 @@ int construct_dom0(struct domain *d,
     unsigned long pkern_start;
     unsigned long pkern_entry;
     unsigned long pkern_end;
+    unsigned long ret;
+    unsigned long progress = 0;
 
 //printf("construct_dom0: starting\n");
     /* Sanity! */
 #ifndef CLONE_DOMAIN0
     if ( d != dom0 ) 
         BUG();
-    if ( test_bit(DF_CONSTRUCTED, &d->flags) ) 
+    if ( test_bit(_DOMF_constructed, &d->domain_flags) ) 
         BUG();
 #endif
 
@@ -888,14 +891,11 @@ int construct_dom0(struct domain *d,
     /* Copy the initial ramdisk. */
 
     /* Sync d/i cache conservatively */
-    {
-        unsigned long ret;
-        unsigned long progress;
-        ret = ia64_pal_cache_flush(4, 0, &progress, NULL);
-        if (ret != PAL_STATUS_SUCCESS)
-                panic("PAL CACHE FLUSH failed for dom0.\n");
-        printk("Sync i/d cache for dom0 image SUCC\n");
-    }
+    ret = ia64_pal_cache_flush(4, 0, &progress, NULL);
+    if (ret != PAL_STATUS_SUCCESS)
+            panic("PAL CACHE FLUSH failed for dom0.\n");
+    printk("Sync i/d cache for dom0 image SUCC\n");
+
     /* Physical mode emulation initialization, including
      * emulation ID allcation and related memory request
      */
@@ -919,8 +919,8 @@ int construct_dom0(struct domain *d,
     /* vpd is ready now */
     vlsapic_reset(ed);
     vtm_init(ed);
-    set_bit(DF_CONSTRUCTED, &d->flags);
 
+    set_bit(_DOMF_constructed, &d->domain_flags);
     new_thread(ed, pkern_entry, 0, 0);
 
     // FIXME: Hack for keyboard input
