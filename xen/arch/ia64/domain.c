@@ -116,6 +116,7 @@ void continue_cpu_idle_loop(void)
 #endif
 	    while ( !softirq_pending(cpu) )
 	        default_idle();
+	    raise_softirq(SCHEDULE_SOFTIRQ);
 	    do_softirq();
 	}
 }
