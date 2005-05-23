@@ -40,6 +40,7 @@
 #include <linux/init.h>
 #include <linux/bitops.h>
 #include <linux/proc_fs.h>
+#include <linux/ethtool.h>
 #include <net/sock.h>
 #include <net/pkt_sched.h>
 #include <net/arp.h>
@@ -928,6 +929,11 @@ vif_connect(struct net_private *np, netif_fe_interface_status_t *status)
     vif_show(np);
 }
 
+static struct ethtool_ops network_ethtool_ops =
+{
+    .get_tx_csum = ethtool_op_get_tx_csum,
+    .set_tx_csum = ethtool_op_set_tx_csum,
+};
 
 /** Create a network device.
  * @param handle device handle
@@ -972,6 +978,8 @@ static int create_netdev(int handle, struct net_device **val)
     dev->poll            = netif_poll;
     dev->weight          = 64;
     dev->features        = NETIF_F_IP_CSUM;
+
+    SET_ETHTOOL_OPS(dev, &network_ethtool_ops);
 
     if ((err = register_netdev(dev)) != 0) {
         printk(KERN_WARNING "%s> register_netdev err=%d\n", __FUNCTION__, err);
