@@ -638,14 +638,17 @@ int xc_linux_save(int xc_handle, XcIOContext *ioctxt)
 
     /* Start writing out the saved-domain record. */
 
-    if ( xcio_write(ioctxt, "LinuxGuestRecord",    16) ||
-         xcio_write(ioctxt, &nr_pfns,              sizeof(unsigned long)) ||
-         xcio_write(ioctxt, pfn_to_mfn_frame_list, PAGE_SIZE) ){
+    if ( xcio_write(ioctxt, "LinuxGuestRecord",    16) ){
         xcio_error(ioctxt, "Error writing header");
         goto out;
     }
     if(write_vmconfig(ioctxt)){
         xcio_error(ioctxt, "Error writing vmconfig");
+        goto out;
+    }
+    if ( xcio_write(ioctxt, &nr_pfns,              sizeof(unsigned long)) ||
+         xcio_write(ioctxt, pfn_to_mfn_frame_list, PAGE_SIZE) ){
+        xcio_error(ioctxt, "Error writing header");
         goto out;
     }
 

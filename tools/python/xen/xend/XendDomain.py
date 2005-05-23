@@ -342,16 +342,6 @@ class XendDomain:
                 raise XendError("not a valid guest state file: found '%s'" %
                                 signature)
 
-            l = fd.read_exact(sizeof_unsigned_long,
-                              "not a valid guest state file: pfn count read")
-            nr_pfns = unpack("=L", l)[0]   # XXX endianess
-            if nr_pfns > 1024*1024:     # XXX
-                raise XendError(
-                    "not a valid guest state file: pfn count out of range")
-
-            pfn_to_mfn_frame_list = fd.read_exact(PAGE_SIZE,
-                "not a valid guest state file: pfn_to_mfn_frame_list read")
-
             l = fd.read_exact(sizeof_int,
                               "not a valid guest state file: config size read")
             vmconfig_size = unpack("i", l)[0] # XXX endianess
@@ -365,6 +355,16 @@ class XendDomain:
 
             vmconfig = p.get_val()
             dominfo = self.domain_configure(vmconfig)
+
+            l = fd.read_exact(sizeof_unsigned_long,
+                              "not a valid guest state file: pfn count read")
+            nr_pfns = unpack("=L", l)[0]   # XXX endianess
+            if nr_pfns > 1024*1024:     # XXX
+                raise XendError(
+                    "not a valid guest state file: pfn count out of range")
+
+            pfn_to_mfn_frame_list = fd.read_exact(PAGE_SIZE,
+                "not a valid guest state file: pfn_to_mfn_frame_list read")
 
             # XXXcl hack: fd.tell will sync up the object and
             #             underlying file descriptor
