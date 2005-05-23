@@ -10,6 +10,7 @@
 *~
 BLOG
 BitKeeper/*/*
+Makefile.rej
 PENDING/*
 TAGS
 Twisted-1.3.0.tar.gz
@@ -125,6 +126,7 @@ tools/web-shutdown.tap
 tools/x2d2/minixend
 tools/xcs/xcs
 tools/xcs/xcsdump
+tools/xcutils/xc_restore
 tools/xentrace/xentrace
 tools/xfrd/xfrd
 xen/BLOG
@@ -149,4 +151,3 @@ xen/tools/figlet/figlet
 xen/xen
 xen/xen-syms
 xen/xen.*
-Makefile.rej
