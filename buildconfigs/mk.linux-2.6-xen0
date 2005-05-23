@@ -33,7 +33,7 @@ $(LINUX_DIR)/include/linux/autoconf.h: ref-$(OS)-$(LINUX_VER)/.valid-ref
 	CONFIG_VERSION=$$(sed -ne 's/^EXTRAVERSION = //p' $(LINUX_DIR)/Makefile); \
 	[ -r $(DESTDIR)/boot/config-$(LINUX_VER)$$CONFIG_VERSION ] && \
 	  cp $(DESTDIR)/boot/config-$(LINUX_VER)$$CONFIG_VERSION $(LINUX_DIR)/.config \
-	  || cp $(LINUX_DIR)/arch/xen/configs/$(EXTRAVERSION)_defconfig_$(TARGET_SUBARCH) \
+	  || cp $(LINUX_DIR)/arch/xen/configs/$(EXTRAVERSION)_defconfig_$(XEN_TARGET_ARCH) \
 		$(LINUX_DIR)/.config
 	$(MAKE) -C $(LINUX_DIR) ARCH=xen oldconfig
 
