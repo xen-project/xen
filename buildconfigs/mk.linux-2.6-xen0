@@ -25,16 +25,16 @@ $(LINUX_DIR)/include/linux/autoconf.h: ref-$(OS)-$(LINUX_VER)/.valid-ref
 	# Apply arch-xen patches
 	( cd linux-$(LINUX_VER)-xen-sparse ; \
           ./mkbuildtree ../$(LINUX_DIR) )
+	# Re-use config from install dir if one exits else use default config
+	CONFIG_VERSION=$$(sed -ne 's/^EXTRAVERSION = //p' $(LINUX_DIR)/Makefile); \
+	[ -r $(DESTDIR)/boot/config-$(LINUX_VER)$$CONFIG_VERSION-$(EXTRAVERSION) ] && \
+	  cp $(DESTDIR)/boot/config-$(LINUX_VER)$$CONFIG_VERSION-$(EXTRAVERSION) $(LINUX_DIR)/.config \
+	  || cp $(LINUX_DIR)/arch/xen/configs/$(EXTRAVERSION)_defconfig \
+		$(LINUX_DIR)/.config
 	# Patch kernel Makefile to set EXTRAVERSION
 	( cd $(LINUX_DIR) ; \
 	  sed -e 's/^EXTRAVERSION.*/&$$(XENGUEST)\nXENGUEST = -$(EXTRAVERSION)/' Makefile >Mk.tmp ; \
 	  rm -f Makefile ; mv Mk.tmp Makefile )
-	# Re-use config from install dir if one exits else use default config
-	CONFIG_VERSION=$$(sed -ne 's/^EXTRAVERSION = //p' $(LINUX_DIR)/Makefile); \
-	[ -r $(DESTDIR)/boot/config-$(LINUX_VER)$$CONFIG_VERSION ] && \
-	  cp $(DESTDIR)/boot/config-$(LINUX_VER)$$CONFIG_VERSION $(LINUX_DIR)/.config \
-	  || cp $(LINUX_DIR)/arch/xen/configs/$(EXTRAVERSION)_defconfig \
-		$(LINUX_DIR)/.config
 	$(MAKE) -C $(LINUX_DIR) ARCH=xen oldconfig
 
 clean::
