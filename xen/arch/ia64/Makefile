@@ -10,6 +10,12 @@ OBJS = xensetup.o setup.o time.o irq.o ia64_ksyms.o process.o smp.o \
 	extable.o linuxextable.o xenirq.o xentime.o \
 	regionreg.o entry.o unaligned.o privop.o vcpu.o \
 	irq_ia64.o irq_lsapic.o vhpt.o xenasm.o dom_fw.o
+
+ifeq ($(CONFIG_VTI),y)
+OBJS += vmx_init.o vmx_virt.o vmx_vcpu.o vmx_process.o vmx_vsa.o vmx_ivt.o \
+	vmx_phy_mode.o vmx_utility.o vmx_interrupt.o vmx_entry.o vmmu.o \
+	vtlb.o mmio.o vlsapic.o
+endif
 # perfmon.o
 # unwind.o needed for kernel unwinding (rare)
 
@@ -24,8 +30,21 @@ default: $(OBJS) head.o ia64lib.o xen.lds.s
 		-Map map.out head.o $(ALL_OBJS) -o $(TARGET)-syms
 	$(OBJCOPY) -R .note -R .comment -S $(TARGET)-syms $(TARGET)
 
-asm-offsets.s: asm-offsets.c
+asm-offsets.s: asm-offsets.c $(BASEDIR)/include/asm-ia64/.offsets.h.stamp
 	$(CC) $(CFLAGS) -S -o $@ $<
+
+$(BASEDIR)/include/asm-ia64/.offsets.h.stamp:
+# Need such symbol link to make linux headers available
+	[ -e $(BASEDIR)/include/linux ] \
+	 || ln -s $(BASEDIR)/include/xen $(BASEDIR)/include/linux
+	[ -e $(BASEDIR)/include/asm-ia64/xen ] \
+	 || ln -s $(BASEDIR)/include/asm-ia64/linux $(BASEDIR)/include/asm-ia64/xen
+# Solve circular reference on asm-offsets.h
+	[ -f $(BASEDIR)/include/asm-ia64/asm-offsets.h ] \
+	 || echo "#define IA64_TASK_SIZE 0" > $(BASEDIR)/include/asm-ia64/asm-offsets.h
+#Bad hack. Force asm-offsets.h out-of-date
+	 sleep 1
+	 touch $@
 
 # I'm sure a Makefile wizard would know a better way to do this
 xen.lds.s: xen.lds.S
@@ -36,7 +55,7 @@ ia64lib.o:
 	$(MAKE) -C lib && cp lib/ia64lib.o .
 
 clean:
-	rm -f *.o *~ core  xen.lds.s $(BASEDIR)/include/asm-ia64/.offsets.h.stamp
+	rm -f *.o *~ core  xen.lds.s $(BASEDIR)/include/asm-ia64/.offsets.h.stamp asm-offsets.s
 	rm -f lib/*.o
 
 # setup.o contains bits of compile.h so it must be blown away

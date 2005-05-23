@@ -1,3 +1,6 @@
+#ifndef	_IA64_CONFIG_H_
+#define _IA64_CONFIG_H_
+
 // control flags for turning on/off features under test
 #undef CLONE_DOMAIN0
 //#define CLONE_DOMAIN0 1
@@ -41,6 +44,8 @@ typedef int pid_t;
 extern unsigned long xenheap_phys_end;
 extern unsigned long xen_pstart;
 extern unsigned long xenheap_size;
+extern unsigned long dom0_start;
+extern unsigned long dom0_size;
 
 // from linux/include/linux/mm.h
 extern struct page *mem_map;
@@ -159,7 +164,11 @@ void sort_main_extable(void);
 #define NO_UART_CONFIG_OK
 
 // see drivers/char/console.c
+#ifndef CONFIG_VTI
 #define	OPT_CONSOLE_STR "com1"
+#else // CONFIG_VTI
+#define	OPT_CONSOLE_STR "com2"
+#endif // CONFIG_VTI
 
 #define __attribute_used__	__attribute__ ((unused))
 
@@ -255,10 +264,6 @@ extern int ht_per_core;
 #define CONFIG_ACPI_BOOT 1
 //#endif
 
-#define CONFIG_PCI 1
-#define CONFIG_PCI_BIOS 1
-#define CONFIG_PCI_DIRECT 1
-
 #define CONFIG_XEN_ATTENTION_KEY 1
 #endif /* __ASSEMBLY__ */
 #endif /* __XEN_IA64_CONFIG_H__ */
@@ -272,4 +277,4 @@ extern int ht_per_core;
 #else
 # define __attribute_used__	__attribute__((__unused__))
 #endif
-
+#endif	/* _IA64_CONFIG_H_ */

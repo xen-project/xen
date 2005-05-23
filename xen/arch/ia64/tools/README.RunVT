@@ -1,0 +1,59 @@
+INSTRUCTIONS FOR Running IPF/Xen with VT-enabled Tiger4 pltform
+
+Note: the Domain0 must be an unmodified Linux
+
+1) Perform operations in README.xenia64 to get a flattened Xen IPF source tree
+
+2) Build an unmodified Linux 2.6 kernel
+	a) tar xvfz  linux-2.6.11.tar.gz
+        b) cp arch/ia64/configs/tiger_defconfig .config
+	c) Build linux.
+   		1) yes "" | make oldconfig
+   		2) make
+
+3) Build IPF VT-enabled Xen image
+	edit xen/arch/ia64/Rules.mk for
+		CONFIG_VTI	?= y 	to enable VT-enable build
+4) Setup ELILO.CONF
+	image=xen
+        	label=xen
+        	initrd=vmlinux2.6.11		// unmodified Linux kernel image
+        	read-only
+        	append="nomca root=/dev/sda3"
+
+STATUS as 4/28/05 - Features implemented for Domain0
+
+0. Runs unmodified Linux kernel as Domain0
+    Validated with Linux 2.6.11 to run Xwindow and NIC on UP logical processor
+
+1. Take advantage of VT-enabled processor
+   a. Processor intercepts guest privileged instruction and deliver Opcode/Cause to Hypervisor
+   b. One VPD (Virtual Processor Descriptor) per Virtual Processor
+   c. Domains are in a different virtual address space from hypervisor. Domains have one less VA bit than hypervisor, where hypervisor runs in 0xF00000... address protected by the processor from Domains.
+
+2. vTLB and guest_VHPT
+   a. vTLB extending machine TLB entries through hypervisor internal data structure
+      vTLB caches Domains installed TR's and TC's, and then installs TC's for Domains instead.
+      vTLB implements collision chains
+   b. Processor walks hypervisor internal VHPT, not the domain VHPT.  On TLB miss, vTLB is consulted first to put hypervisor cached entry into VHPT without inject TLB miss to domain.
+
+3. Region ID fix-partitioning
+   a. currently hard partition 24bits of RIDs into 16 partitions by using top 4bit.
+   b. Hypervisor uses the very last partition RIDs, i.e., 0xFxxxxx RIDs
+   c. Effectively supports Domain0 and 14 other DomainN
+
+4. HyperVisor is mapped with 2 sets of RIDs during runtime, its own RIDs and the active Domain RIDs
+   a. Domain RIDs are used by processor to access guest_VHPT during Domain runtime
+   b. Hypervisor RIDs are used when Hypervisor is running
+   c. Implies there are some Region registers transition on entering/exiting hypervisor
+
+5. Linux styled pt_regs with minor modification for VT and instruction emulation
+   a. Part of Domain registers are saved/restored from VPD
+   b. Extended pt_regs to include r4~r7 and Domain's iipa & isr for possible instruction emulation, so no need to save a complete set of switch_stack on IVT entry
+
+6. Linux styled per virtual processor memory/RSE stacks, which is the same as non-VT domain0
+
+7. Handles splitted I/DCache design
+   Newer IPF processors has split I/Dcaches.  The design takes this into consideration when Xen recopy Domain0 to target address for execution
+
+

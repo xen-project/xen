@@ -34,4 +34,18 @@ typedef struct {
     unsigned long vadr;
     unsigned long rid;
 } TR_ENTRY;
+
+#ifdef CONFIG_VTI
+typedef union {
+        unsigned long   value;
+        struct {
+                uint64_t ve : 1;
+                uint64_t rv1 : 1;
+                uint64_t ps  : 6;
+                uint64_t rid : 24;
+                uint64_t rv2 : 32;
+        };
+} rr_t;
+#endif // CONFIG_VTI
+
 #endif

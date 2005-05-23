@@ -9,6 +9,9 @@
 #include <asm/processor.h>
 #include <asm/ptrace.h>
 #include <public/xen.h>
+#ifdef CONFIG_VTI
+#include <asm/tlb.h>
+#endif // CONFIG_VTI
 
 #define task_struct exec_domain
 
@@ -93,6 +96,24 @@ void foo(void)
 	DEFINE(IA64_PT_REGS_R14_OFFSET, offsetof (struct pt_regs, r14));
 	DEFINE(IA64_PT_REGS_R2_OFFSET, offsetof (struct pt_regs, r2));
 	DEFINE(IA64_PT_REGS_R3_OFFSET, offsetof (struct pt_regs, r3));
+#ifdef CONFIG_VTI
+	DEFINE(IA64_PT_REGS_R4_OFFSET, offsetof (struct xen_regs, r4));
+	DEFINE(IA64_PT_REGS_R5_OFFSET, offsetof (struct xen_regs, r5));
+	DEFINE(IA64_PT_REGS_R6_OFFSET, offsetof (struct xen_regs, r6));
+	DEFINE(IA64_PT_REGS_R7_OFFSET, offsetof (struct xen_regs, r7));
+	DEFINE(IA64_PT_REGS_CR_IIPA_OFFSET, offsetof (struct xen_regs, cr_iipa));
+	DEFINE(IA64_PT_REGS_CR_ISR_OFFSET, offsetof (struct xen_regs, cr_isr));
+	DEFINE(IA64_PT_REGS_EML_UNAT_OFFSET, offsetof (struct xen_regs, eml_unat));
+	DEFINE(IA64_PT_REGS_RFI_PFS_OFFSET, offsetof (struct xen_regs, rfi_pfs));
+	DEFINE(RFI_IIP_OFFSET, offsetof(struct exec_domain, arch.arch_vmx.rfi_iip));
+	DEFINE(RFI_IPSR_OFFSET, offsetof(struct exec_domain, arch.arch_vmx.rfi_ipsr));
+	DEFINE(RFI_IFS_OFFSET,offsetof(struct exec_domain ,arch.arch_vmx.rfi_ifs));
+	DEFINE(RFI_PFS_OFFSET,offsetof(struct exec_domain ,arch.arch_vmx.rfi_pfs));
+	DEFINE(SWITCH_MRR5_OFFSET,offsetof(struct exec_domain ,arch.arch_vmx.mrr5));
+	DEFINE(SWITCH_MRR6_OFFSET,offsetof(struct exec_domain ,arch.arch_vmx.mrr6));
+	DEFINE(SWITCH_MRR7_OFFSET,offsetof(struct exec_domain ,arch.arch_vmx.mrr7));
+	DEFINE(SWITCH_MPTA_OFFSET,offsetof(struct exec_domain ,arch.arch_vmx.mpta));
+#endif  //CONFIG_VTI
 	DEFINE(IA64_PT_REGS_R16_OFFSET, offsetof (struct pt_regs, r16));
 	DEFINE(IA64_PT_REGS_R17_OFFSET, offsetof (struct pt_regs, r17));
 	DEFINE(IA64_PT_REGS_R18_OFFSET, offsetof (struct pt_regs, r18));
@@ -164,6 +185,13 @@ void foo(void)
 
 	BLANK();
 
+#ifdef  CONFIG_VTI
+	DEFINE(IA64_VPD_BASE_OFFSET, offsetof (struct exec_domain, arch.arch_vmx.vpd));
+	DEFINE(IA64_VPD_CR_VPTA_OFFSET, offsetof (cr_t, pta));
+	DEFINE(XXX_THASH_SIZE, sizeof (thash_data_t));
+
+	BLANK();
+#endif  //CONFIG_VTI
 	//DEFINE(IA64_SIGCONTEXT_IP_OFFSET, offsetof (struct sigcontext, sc_ip));
 	//DEFINE(IA64_SIGCONTEXT_AR_BSP_OFFSET, offsetof (struct sigcontext, sc_ar_bsp));
 	//DEFINE(IA64_SIGCONTEXT_AR_FPSR_OFFSET, offsetof (struct sigcontext, sc_ar_fpsr));
