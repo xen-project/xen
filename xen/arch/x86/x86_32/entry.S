@@ -331,6 +331,8 @@ FLT13:  movl UREGS_ss+4(%esp),%gs
         movb TRAPBOUNCE_flags(%edx),%cl
         subl $12,%esi
         movl UREGS_eip+4(%esp),%eax
+        test %eax,%eax
+        jz   domain_crash_synchronous
 FLT14:  movl %eax,%gs:(%esi) 
         movl EDOMAIN_vcpu_info(%ebx),%eax
         pushl VCPUINFO_upcall_mask(%eax)
