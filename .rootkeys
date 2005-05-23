@@ -606,8 +606,6 @@
 428d0d85hp-zgN40hVYXWRjhInkUkg tools/ioemu/hw/vga.c
 428d0d85G_4S-hpRyrhV4yGjSrS-cQ tools/ioemu/hw/vga_int.h
 428d0d85oWl1ONX_gIZWS1fXjeXGlA tools/ioemu/hw/vga_template.h
-428d0d85-wAtLF5FYFHCUAxXKNbEkA tools/ioemu/i386-vl.ld
-428d0d85d831iQvvCD3LcaOD9rYGkg tools/ioemu/i386.ld
 428d0d85_mNnFPE8hnoC3VvBD9CCuA tools/ioemu/keyboard_rdesktop.c
 428d0d85SyOIeDg3SoxH2BiBpXWWkA tools/ioemu/keymaps/ar
 428d0d85ToGTVvPrl8hKAi2QxCzp2w tools/ioemu/keymaps/common
@@ -676,6 +674,7 @@
 428d0d8bgAojEQcAcTV2gj2E_eG4Lw tools/ioemu/vl.c
 428d0d8bXiCY4iTjoSPxGry8jXdAtg tools/ioemu/vl.h
 428d0d8bQVKedvN5EIPm39s33TXkpA tools/ioemu/vnc.c
+428d0d85d831iQvvCD3LcaOD9rYGkg tools/ioemu/x86_32.ld
 428f0763_67jCiHbdgfGlgAOJqfg9A tools/ioemu/x86_64.ld
 3fbba6dbDfYvJSsw9500b4SZyUhxjQ tools/libxc/Makefile
 41dde8afKYRKxS4XtLv1KUegGQy_bg tools/libxc/linux_boot_params.h

@@ -1,4 +1,7 @@
+XEN_ROOT=../../..
+include $(XEN_ROOT)/tools/Rules.mk
 include config.mak
+override TARGET_ARCH=i386
 
 #assume we directly put qemu code in tools/, same level as bochs dm(ioemu)
 XEN_PATH=../../..
@@ -186,7 +189,7 @@ endif
 #########################################################
 
 DEFINES+=-D_GNU_SOURCE -D_FILE_OFFSET_BITS=64 -D_LARGEFILE_SOURCE
-LIBS+=-lm -L$(XEN_PATH)/dist/install/usr/$(LIBDIR) -lxc -lxutil
+LIBS+=-lm -L../../libxc -L../../libxutil -lxc -lxutil
 ifndef CONFIG_USER_ONLY
 LIBS+=-lz
 endif
@@ -300,7 +303,7 @@ VL_LDFLAGS=
 ifdef CONFIG_STATIC
 VL_LDFLAGS+=-static
 endif
-VL_LDFLAGS+=-Wl,-T,$(SRC_PATH)/$(HOST_ARCH).ld
+VL_LDFLAGS+=-Wl,-T,$(SRC_PATH)/$(XEN_TARGET_ARCH).ld
 ifndef CONFIG_DARWIN
 ifndef CONFIG_WIN32
 VL_LIBS=-lutil
