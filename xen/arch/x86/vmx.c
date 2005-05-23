@@ -366,18 +366,17 @@ static void vmx_io_instruction(struct cpu_user_regs *regs,
             if (p->dir == IOREQ_WRITE) {
                 __vmread(GUEST_DS_SELECTOR, &seg);
                 p->u.pdata = (void *)
-                        ((seg << 4) | (regs->esi & 0xFFFF));
+                        ((seg << 4) + (regs->esi & 0xFFFF));
             } else {
                 __vmread(GUEST_ES_SELECTOR, &seg);
                 p->u.pdata = (void *)
-                        ((seg << 4) | (regs->edi & 0xFFFF));
+                        ((seg << 4) + (regs->edi & 0xFFFF));
             }
         } else {
                p->u.pdata = (void *) ((p->dir == IOREQ_WRITE) ?
                    regs->esi : regs->edi);
         }
         p->u.pdata = (void *) gva_to_gpa(p->u.data);
-
 
         if (test_bit(5, &exit_qualification))
 	    p->count = vm86 ? regs->ecx & 0xFFFF : regs->ecx;

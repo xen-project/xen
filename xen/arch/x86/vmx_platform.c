@@ -544,7 +544,7 @@ void handle_mmio(unsigned long va, unsigned long gpa)
 
     if (vm86) {
         __vmread(GUEST_CS_SELECTOR, &cs);
-        inst_addr = (cs << 4) | eip;
+        inst_addr = (cs << 4) + eip;
     } else
         inst_addr = eip; /* XXX should really look at GDT[cs].base too */
 
@@ -592,13 +592,13 @@ void handle_mmio(unsigned long va, unsigned long gpa)
 	    unsigned long seg;
 
 	    __vmread(GUEST_ES_SELECTOR, &seg);
-	    if (((seg << 4) | (inst_decoder_regs->edi & 0xFFFF)) == va) {
+	    if (((seg << 4) + (inst_decoder_regs->edi & 0xFFFF)) == va) {
 		dir = IOREQ_WRITE;
 		__vmread(GUEST_DS_SELECTOR, &seg);
-		addr = (seg << 4) | (inst_decoder_regs->esi & 0xFFFF);
+		addr = (seg << 4) + (inst_decoder_regs->esi & 0xFFFF);
 	    } else {
 		dir = IOREQ_READ;
-		addr = (seg << 4) | (inst_decoder_regs->edi & 0xFFFF);
+		addr = (seg << 4) + (inst_decoder_regs->edi & 0xFFFF);
 	    }
 	} else { /* XXX should really look at GDT[ds/es].base too */
 	    if (va == inst_decoder_regs->edi) {
