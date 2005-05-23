@@ -110,6 +110,8 @@ int bios_size;
 static DisplayState display_state;
 int nographic;
 int usevnc; /* 1=vnc only, 2=vnc and sdl */
+long vncport; /* server port */
+const char* vncconnect; /* do a reverse connect to this host*/
 const char* keyboard_layout = 0;
 int64_t ticks_per_sec;
 int boot_device = 'c';
@@ -2098,7 +2100,9 @@ void help(void)
            "-m megs         set virtual RAM size to megs MB [default=%d]\n"
            "-nographic      disable graphical output and redirect serial I/Os to console\n"
 #ifdef CONFIG_VNC
-	   "-vnc            use vnc instead of sdl\n"
+	   "-vnc port             use vnc instead of sdl\n"
+	   "-vncport port         use a different port\n"
+	   "-vncconnect host:port do a reverse connect\n"
 #ifdef CONFIG_SDL
 	   "-vnc-and-sdl    use vnc and sdl simultaneously\n"
 #endif
@@ -2194,6 +2198,8 @@ enum {
     QEMU_OPTION_nographic,
 #ifdef CONFIG_VNC
     QEMU_OPTION_vnc,
+    QEMU_OPTION_vncport,
+    QEMU_OPTION_vncconnect,
 #ifdef CONFIG_SDL
     QEMU_OPTION_vnc_and_sdl,
 #endif
@@ -2258,6 +2264,8 @@ const QEMUOption qemu_options[] = {
     { "nographic", 0, QEMU_OPTION_nographic },
 #ifdef CONFIG_VNC
     { "vnc", 0, QEMU_OPTION_vnc },
+    { "vncport", HAS_ARG, QEMU_OPTION_vncport },
+    { "vncconnect", HAS_ARG, QEMU_OPTION_vncconnect },
 #ifdef CONFIG_SDL
     { "vnc-and-sdl", 0, QEMU_OPTION_vnc_and_sdl },
 #endif
@@ -2370,6 +2378,8 @@ int main(int argc, char **argv)
     snapshot = 0;
     nographic = 0;
     usevnc = 0;
+    vncport=0;
+    vncconnect=NULL;
     kernel_filename = NULL;
     kernel_cmdline = "";
     has_cdrom = 1;
@@ -2464,8 +2474,20 @@ int main(int argc, char **argv)
                 break;
 #ifdef CONFIG_VNC
 	    case QEMU_OPTION_vnc:
-		usevnc = 1;
-		break;
+            usevnc = 1;
+            break;  
+	    case QEMU_OPTION_vncport:
+        {
+            const char *p;
+            p = optarg;
+            vncport= strtol(optarg, (char **)&p, 0);
+        }
+        break;
+	    case QEMU_OPTION_vncconnect:
+        {
+            vncconnect=optarg;
+        }
+        break;
 #ifdef CONFIG_SDL
 	    case QEMU_OPTION_vnc_and_sdl:
 		usevnc = 2;
@@ -2852,7 +2874,7 @@ int main(int argc, char **argv)
     } else {
 	if (usevnc) {
 #ifdef CONFIG_VNC
-	    vnc_display_init(ds, (usevnc==2));
+	    vnc_display_init(ds, (usevnc==2), vncport, vncconnect);
 #else
 	    perror("qemu not configured with vnc support");
 #endif

@@ -21,6 +21,15 @@
  * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
  * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
  * THE SOFTWARE.
+ *
+ *
+ * reverse connection setup copied from x11vnc.c
+ * Copyright (c) 2002-2005 Karl J. Runge <runge@karlrunge.com>
+ * All rights reserved.
+ * based on:
+ *       the originial x11vnc.c in libvncserver (Johannes E. Schindelin)
+ *       x0rfbserver, the original native X vnc server (Jens Wagner)
+ *       krfb, the KDE desktopsharing project (Tim Jansen)
  */
 #include "vl.h"
 
@@ -447,8 +456,15 @@ static void vnc_cleanup(void)
 	rfbScreenCleanup(screen);
 }
 
-void vnc_display_init(DisplayState *ds, int useAlsoSDL)
+
+void vnc_display_init(DisplayState *ds, int useAlsoSDL,
+                      long port, const char* connect)
 {
+    int   len, rport = 5500;
+    char  host[1024];
+    char *p;
+    rfbClientPtr cl;
+    
 	if(!keyboard_layout) {
 		fprintf(stderr, "No keyboard language specified\n");
 		exit(1);
@@ -460,6 +476,7 @@ void vnc_display_init(DisplayState *ds, int useAlsoSDL)
 		exit(1);
 	}
 
+
 	mouse_magic=init_mouse_magic();
 	register_savevm("vnc", 0, 1, vnc_save, vnc_load, mouse_magic);
 
@@ -470,12 +487,18 @@ void vnc_display_init(DisplayState *ds, int useAlsoSDL)
 		exit(1);
 	}
 
+
 	screen->serverFormat.redShift = 11;
 	screen->serverFormat.greenShift = 5;
 	screen->serverFormat.blueShift = 0;
 	screen->serverFormat.redMax = 31;
 	screen->serverFormat.greenMax = 63;
 	screen->serverFormat.blueMax = 31;
+
+    if (port != 0) 
+        screen->port = port;
+    else
+        screen->autoPort = TRUE;
 
 	if(useAlsoSDL) {
 		ds_sdl=(DisplayState*)malloc(sizeof(DisplayState));
@@ -496,6 +519,31 @@ void vnc_display_init(DisplayState *ds, int useAlsoSDL)
 	ds->dpy_resize = vnc_resize;
 	ds->dpy_refresh = vnc_refresh;
 
+    /* deal with reverse connections */
+    if ( connect == NULL || (len = strlen(connect)) < 1) {
+        return;
+    }
+    if ( len > 1024 ) {
+        fprintf(stderr, "vnc reverse connect name too long\n");
+		exit(1);
+    }
+    strncpy(host, connect, len);
+    host[len] = '\0';
+    /* extract port, if any */
+    if ((p = strchr(host, ':')) != NULL) {
+        rport = atoi(p+1);
+        *p = '\0';
+    }
+    cl = rfbReverseConnection(screen, host, rport);
+    if (cl == NULL) {
+        fprintf(stderr, "reverse_connect: %s failed\n", connect);
+    } else {
+        fprintf(stderr, "reverse_connect: %s/%s OK\n", connect, cl->host);
+    }
+
 	atexit(vnc_cleanup);
+
+
+
 }
 

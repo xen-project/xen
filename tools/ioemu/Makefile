@@ -42,7 +42,7 @@ distclean: clean
 	rm -f config-host.mak config-host.h
 	rm -f keysym_adapter_sdl.h keysym_adapter_vnc.h
 	for d in $(TARGET_DIRS); do \
-	rm -rf $$d || exit 1 ; \
+	$(MAKE) -C $$d $@ || exit 1 ; \
         done
 
 KEYMAPS=da     en-gb  et  fr     fr-ch  is  lt  modifiers  no  pt-br  sv \

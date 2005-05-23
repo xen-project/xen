@@ -537,7 +537,8 @@ void vga_invalidate_display(void);
 void vga_screen_dump(const char *filename);
 
 /* vnc.c */
-void vnc_display_init(DisplayState *ds, int useAlsoSDL);
+void vnc_display_init(DisplayState *ds, int useAlsoSDL,
+                      long port, const char* connect);
 
 /* cirrus_vga.c */
 void pci_cirrus_vga_init(PCIBus *bus, DisplayState *ds, uint8_t *vga_ram_base, 

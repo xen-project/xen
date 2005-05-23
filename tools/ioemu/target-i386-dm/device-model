@@ -10,13 +10,22 @@ ulimit -c unlimited
 #gdb --args /usr/sbin/qemu-dm -hda /var/images/qemu-linux.img -nographic \
 #	-serial pty -l 'ioport,int' $*
 
-while getopts ":f:" opt;
+# XXX this is a bit skanky. we assume an order of arguments here.
+# namely to have configfile and vncconnect argument as the first 
+# two arguments.
+
+while getopts ":f:v:d:" opt;
 do
     case $opt in
-      f) QEMUCONFIGFILE=$OPTARG;shift;shift;;
+      f) QEMUCONFIGFILE=$OPTARG;;
+      v) VNCCONNECT=$OPTARG;;
+      d) DOMAIN=$OPTARG;;
       \?) echo;;
     esac
 done
+if [ "x$QEMUCONFIGFILE" != "x" ]; then shift; shift; fi
+if [ "x$VNCCONNECT" != "x" ]; then shift; shift; fi
+
 
 echo $QEMUCONFIGFILE
 if [ ! -z $QEMUCONFIGFILE ];then
@@ -57,6 +66,11 @@ if qemu-dm 2>&1 |grep vnc > /dev/null;then
 	elif [ $vnc -eq 1 ];then
 		PARMETER="$PARMETER -vnc -k en-us"
 	fi
+    VNCPORT=`expr 5900 + $DOMAIN`
+    PARMETER="$PARMETER -vncport $VNCPORT"
+    if [ "x$VNCCONNECT" != "x" ]; then
+        PARMETER="$PARMETER -vncconnect $VNCCONNECT"
+    fi
 fi
 
 #optional cmdline for qemu        

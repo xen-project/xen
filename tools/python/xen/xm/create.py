@@ -532,7 +532,8 @@ def choose_vnc_display():
     return None
 
 def spawn_vnc(display):
-    os.system("vncviewer -listen %d &" % display)
+    os.system("vncviewer -log *:stdout:0 -listen %d &" %
+              (VNC_BASE_PORT + display))
     return VNC_BASE_PORT + display
     
 def preprocess_vnc(opts, vals):

@@ -724,6 +724,7 @@ class XendDomainInfo:
         if self.blkif_backend: flags |= SIF_BLK_BE_DOMAIN
         #todo generalise this
         if ostype == "vmx":
+            log.debug('building vmx domain')            
             err = buildfn(dom            = dom,
                           image          = kernel,
                           control_evtchn = 0,
@@ -733,7 +734,7 @@ class XendDomainInfo:
                           ramdisk        = ramdisk,
                           flags          = flags)
         else:
-            log.warning('building dom with %d vcpus', self.vcpus)
+            log.debug('building dom with %d vcpus', self.vcpus)
             err = buildfn(dom            = dom,
                           image          = kernel,
                           control_evtchn = self.channel.getRemotePort(),
@@ -819,10 +820,25 @@ class XendDomainInfo:
         memory = sxp.child_value(self.config, "memory")
         # Create an event channel
         device_channel = channel.eventChannel(0, self.dom)
+        # see if a vncviewer was specified
+        # XXX RN: bit of a hack. should unify this, maybe stick in config space
+        vncconnect=""
+        image = sxp.child_value(self.config, "image")
+        args = sxp.child_value(image, "args")
+        if args:
+            arg_list = string.split(args)
+            for arg in arg_list:
+                al = string.split(arg, '=')
+                if al[0] == "VNC_VIEWER":
+                    vncconnect=" -v %s" % al[1]
+                    break
+
         # Execute device model.
         #todo: Error handling
+        # XXX RN: note that the order of args matter!
         os.system(device_model
                   + " -f %s" % device_config
+                  + vncconnect
                   + " -d %d" % self.dom
                   + " -p %d" % device_channel['port1']
                   + " -m %s" % memory)
@@ -1158,6 +1174,7 @@ def vm_image_plan9(vm, image):
     if args:
         cmdline += " " + args
     ramdisk = sxp.child_value(image, "ramdisk", '')
+    log.debug("creating plan9 domain with cmdline: %s" %(cmdline,))
     vm.create_domain("plan9", kernel, ramdisk, cmdline)
     return vm
     
@@ -1185,6 +1202,7 @@ def vm_image_vmx(vm, image):
     memmap = sxp.parse(open(memmap))[0]
     from xen.util.memmap import memmap_parse
     memmap = memmap_parse(memmap)
+    log.debug("creating vmx domain with cmdline: %s" %(cmdline,))
     vm.create_domain("vmx", kernel, ramdisk, cmdline, memmap)
     return vm
 
