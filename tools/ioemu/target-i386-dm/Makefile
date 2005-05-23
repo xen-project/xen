@@ -378,6 +378,9 @@ mixeng.o: mixeng.c mixeng.h mixeng_template.h
 clean:
 	rm -rf *.o  *.a *~ $(PROGS) gen-op.h opc.h op.h nwfpe slirp qemu-vgaram-bin
 
+distclean:
+	rm -rf *.o  *.a *~ $(PROGS) gen-op.h opc.h op.h nwfpe slirp qemu-vgaram-bin
+
 install: all 
 	if [ ! -d $(DESTDIR)$(bindir) ];then mkdir -p $(DESTDIR)$(bindir);fi
 	if [ ! -d $(DESTDIR)$(configdir) ];then mkdir -p $(DESTDIR)$(configdir);fi
