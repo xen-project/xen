@@ -141,8 +141,6 @@ softlink arch/ia64/lib/strlen.S arch/ia64/lib/strlen.S
 softlink arch/ia64/lib/strlen_user.S arch/ia64/lib/strlen_user.S
 softlink arch/ia64/lib/strncpy_from_user.S arch/ia64/lib/strncpy_from_user.S
 softlink arch/ia64/lib/strnlen_user.S arch/ia64/lib/strnlen_user.S
-#softlink arch/ia64/lib/swiotlb.c arch/ia64/lib/swiotlb.c
-cp_patch arch/ia64/lib/swiotlb.c arch/ia64/lib/swiotlb.c swiotlb.c
 softlink arch/ia64/lib/xor.S arch/ia64/lib/xor.S
 
 softlink lib/cmdline.c arch/ia64/cmdline.c
