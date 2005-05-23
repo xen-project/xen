@@ -1,17 +1,30 @@
- processor.h |    4 ++++
- 1 files changed, 4 insertions(+)
-
-Index: linux-2.6.11/include/asm-ia64/processor.h
-===================================================================
---- linux-2.6.11.orig/include/asm-ia64/processor.h	2005-03-02 01:37:58.000000000 -0600
-+++ linux-2.6.11/include/asm-ia64/processor.h	2005-03-19 14:26:01.062135543 -0600
-@@ -408,12 +408,16 @@ extern void ia64_setreg_unknown_kr (void
+--- /home/adsharma/xeno-unstable-ia64-staging.bk/xen/../../linux-2.6.11/include/asm-ia64/processor.h	2005-03-01 23:37:58.000000000 -0800
++++ /home/adsharma/xeno-unstable-ia64-staging.bk/xen/include/asm-ia64/processor.h	2005-05-20 09:36:02.000000000 -0700
+@@ -94,7 +94,11 @@
+ #ifdef CONFIG_NUMA
+ #include <asm/nodedata.h>
+ #endif
++#ifdef XEN
++#include <asm/xenprocessor.h>
++#endif
+ 
++#ifndef XEN
+ /* like above but expressed as bitfields for more efficient access: */
+ struct ia64_psr {
+ 	__u64 reserved0 : 1;
+@@ -133,6 +137,7 @@
+ 	__u64 bn : 1;
+ 	__u64 reserved4 : 19;
+ };
++#endif
+ 
+ /*
+  * CPU type, hardware bug flags, and per-CPU state.  Frequently used
+@@ -408,12 +413,14 @@
   */
  
  /* Return TRUE if task T owns the fph partition of the CPU we're running on. */
-+#ifdef XEN
-+#define ia64_is_local_fpu_owner(t) 0
-+#else
++#ifndef XEN
  #define ia64_is_local_fpu_owner(t)								\
  ({												\
  	struct task_struct *__ia64_islfo_task = (t);						\

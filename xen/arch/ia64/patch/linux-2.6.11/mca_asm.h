@@ -1,10 +1,5 @@
- mca_asm.h |   11 +++++++++++
- 1 files changed, 11 insertions(+)
-
-Index: linux-2.6.11-xendiffs/include/asm-ia64/mca_asm.h
-===================================================================
---- linux-2.6.11-xendiffs.orig/include/asm-ia64/mca_asm.h	2005-03-02 01:38:38.000000000 -0600
-+++ linux-2.6.11-xendiffs/include/asm-ia64/mca_asm.h	2005-04-06 22:41:57.392411032 -0500
+--- /home/adsharma/disk2/xen-ia64/xeno-unstable-rebase.bk/xen/../../linux-2.6.11/include/asm-ia64/mca_asm.h	2005-03-01 23:38:38.000000000 -0800
++++ /home/adsharma/disk2/xen-ia64/xeno-unstable-rebase.bk/xen/include/asm-ia64/mca_asm.h	2005-05-18 12:40:19.000000000 -0700
 @@ -26,8 +26,13 @@
   * direct mapped to physical addresses.
   *	1. Lop off bits 61 thru 63 in the virtual address

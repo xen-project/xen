@@ -2,7 +2,11 @@
 #define _XEN_IA64_PRIVOP_H
 
 #include <asm/ia64_int.h>
+#ifdef CONFIG_VTI
+#include <asm/vmx_vcpu.h>
+#else //CONFIG_VTI
 #include <asm/vcpu.h>
+#endif //CONFIG_VTI
 
 typedef unsigned long IA64_INST;
 
@@ -129,6 +133,13 @@ typedef union U_INST64_M46 {
     struct { unsigned long qp:6, r1:7, un7:7, r3:7, x6:6, x3:3, un1:1, major:4; };
 } INST64_M46;
 
+#ifdef CONFIG_VTI
+typedef union U_INST64_M47 {
+    IA64_INST inst;
+    struct { unsigned long qp:6, un14:14, r3:7, x6:6, x3:3, un1:1, major:4; };
+} INST64_M47;
+#endif // CONFIG_VTI
+
 typedef union U_INST64 {
     IA64_INST inst;
     struct { unsigned long :37, major:4; } generic;
@@ -154,6 +165,9 @@ typedef union U_INST64 {
     INST64_M44 M44;	// set/reset system mask
     INST64_M45 M45;	// translation purge
     INST64_M46 M46;	// translation access (tpa,tak)
+#ifdef CONFIG_VTI
+    INST64_M47 M47;	// purge translation entry
+#endif // CONFIG_VTI
 } INST64;
 
 #define MASK_41 ((UINT64)0x1ffffffffff)
