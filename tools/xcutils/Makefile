@@ -30,21 +30,14 @@ PROG_DEP = .*.d
 
 PROGRAMS		= xc_restore
 
-xc_restore_OBJS		= xc_restore.o
-
-LDLIBS			= -L$(XEN_LIBXC) -L$(XEN_LIBXUTIL) -lxc -lxutil
+LDLIBS			= -L$(XEN_LIBXC) -lxc -L$(XEN_LIBXUTIL) -lxutil
 
 .PHONY: all
 all: build
 build: $(PROGRAMS)
 
-define PROGRAM_template
-$(1): $$($(1)_OBJS)
-	$$(LINK.o) $$^ $$(LDLIBS) -o $$@
-ALL_OBJS	+= $$($(1)_OBJS)
-endef
-
-$(foreach prog,$(PROGRAMS),$(eval $(call PROGRAM_template,$(prog))))
+$(PROGRAMS): %: %.o
+	$(LINK.o) $^ $(LDLIBS) -o $@
 
 .PHONY: install
 install: build
@@ -54,7 +47,7 @@ install: build
 
 
 clean:
-	$(RM) $(ALL_OBJS) $(PROGRAMS)
+	$(RM) *.o $(PROGRAMS)
 	$(RM) $(PROG_DEP)
 
 -include $(PROG_DEP)
