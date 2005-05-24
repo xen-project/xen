@@ -17,19 +17,25 @@
 
 #define MAX_MBIT_RATE 500
 
-#define DEBUG  0
-#define DDEBUG 0
+#define DEBUG 0
+
+#if 1
+#define ERR(_f, _a...) fprintf ( stderr, _f , ## _a )
+#else
+#define ERR(_f, _a...) ((void)0)
+#endif
 
 #if DEBUG
-#define DPRINTF(_f, _a...) printf ( _f , ## _a )
+#define DPRINTF(_f, _a...) fprintf ( stderr, _f , ## _a )
 #else
 #define DPRINTF(_f, _a...) ((void)0)
 #endif
 
-#if DDEBUG
-#define DDPRINTF(_f, _a...) printf ( _f , ## _a )
+#define PROGRESS 0
+#if PROGRESS
+#define PPRINTF(_f, _a...) fprintf ( stderr, _f , ## _a )
 #else
-#define DDPRINTF(_f, _a...) ((void)0)
+#define PPRINTF(_f, _a...)
 #endif
 
 /*
@@ -144,7 +150,7 @@ static long long tv_delta( struct timeval *new, struct timeval *old )
 }
 
 
-#define START_MBIT_RATE ioctxt->resource
+#define START_MBIT_RATE 0 //ioctxt->resource
 
 static int mbit_rate, ombit_rate = 0;
 static int burst_time_us = -1;
@@ -167,7 +173,8 @@ static int burst_time_us = -1;
 #define RATE_TO_BTU 781250
 #define BURST_TIME_US burst_time_us
 
-static int xcio_ratewrite(XcIOContext *ioctxt, void *buf, int n)
+static int
+ratewrite(int io_fd, void *buf, int n)
 {
     static int budget = 0;
     static struct timeval last_put = { 0 };
@@ -176,16 +183,15 @@ static int xcio_ratewrite(XcIOContext *ioctxt, void *buf, int n)
     long long delta;
 
     if (START_MBIT_RATE == 0)
-	return xcio_write(ioctxt, buf, n);
+	return write(io_fd, buf, n);
     
     budget -= n;
     if (budget < 0) {
 	if (MBIT_RATE != ombit_rate) {
 	    BURST_TIME_US = RATE_TO_BTU / MBIT_RATE;
 	    ombit_rate = MBIT_RATE;
-	    xcio_info(ioctxt,
-		      "rate limit: %d mbit/s burst budget %d slot time %d\n",
-		      MBIT_RATE, BURST_BUDGET, BURST_TIME_US);
+	    DPRINTF("rate limit: %d mbit/s burst budget %d slot time %d\n",
+		    MBIT_RATE, BURST_BUDGET, BURST_TIME_US);
 	}
 	if (last_put.tv_sec == 0) {
 	    budget += BURST_BUDGET;
@@ -213,7 +219,7 @@ static int xcio_ratewrite(XcIOContext *ioctxt, void *buf, int n)
 	    }
 	}
     }
-    return xcio_write(ioctxt, buf, n);
+    return write(io_fd, buf, n);
 }
 
 static int print_stats( int xc_handle, u32 domid, 
@@ -235,7 +241,7 @@ static int print_stats( int xc_handle, u32 domid,
     d1_cpu_now = xc_domain_get_cpu_usage(xc_handle, domid, /* FIXME */ 0)/1000;
 
     if ( (d0_cpu_now == -1) || (d1_cpu_now == -1) ) 
-        printf("ARRHHH!!\n");
+        fprintf(stderr, "ARRHHH!!\n");
 
     wall_delta = tv_delta(&wall_now,&wall_last)/1000;
 
@@ -245,14 +251,15 @@ static int print_stats( int xc_handle, u32 domid,
     d1_cpu_delta  = (d1_cpu_now - d1_cpu_last)/1000;
 
     if ( print )
-        printf("delta %lldms, dom0 %d%%, target %d%%, sent %dMb/s, "
-               "dirtied %dMb/s %" PRId32 " pages\n",
-               wall_delta, 
-               (int)((d0_cpu_delta*100)/wall_delta),
-               (int)((d1_cpu_delta*100)/wall_delta),
-               (int)((pages_sent*PAGE_SIZE)/(wall_delta*(1000/8))),
-               (int)((stats->dirty_count*PAGE_SIZE)/(wall_delta*(1000/8))),
-               stats->dirty_count);
+        fprintf(stderr,
+		"delta %lldms, dom0 %d%%, target %d%%, sent %dMb/s, "
+		"dirtied %dMb/s %" PRId32 " pages\n",
+		wall_delta, 
+		(int)((d0_cpu_delta*100)/wall_delta),
+		(int)((d1_cpu_delta*100)/wall_delta),
+		(int)((pages_sent*PAGE_SIZE)/(wall_delta*(1000/8))),
+		(int)((stats->dirty_count*PAGE_SIZE)/(wall_delta*(1000/8))),
+		stats->dirty_count);
 
     if (((stats->dirty_count*PAGE_SIZE)/(wall_delta*(1000/8))) > mbit_rate) {
 	mbit_rate = (int)((stats->dirty_count*PAGE_SIZE)/(wall_delta*(1000/8)))
@@ -266,24 +273,6 @@ static int print_stats( int xc_handle, u32 domid,
     wall_last = wall_now; 
 
     return 0;
-}
-
-/** Write the vmconfig string.
- * It is stored as a 4-byte count 'n' followed by n bytes.
- *
- * @param ioctxt i/o context
- * @return 0 on success, non-zero on error.
- */
-static int write_vmconfig(XcIOContext *ioctxt)
-{
-    int err = -1;
-    if(xcio_write(ioctxt, &ioctxt->vmconfig_n, sizeof(ioctxt->vmconfig_n))) 
-        goto exit;
-    if(xcio_write(ioctxt, ioctxt->vmconfig, ioctxt->vmconfig_n)) 
-        goto exit;
-    err = 0;
-  exit:
-    return err;
 }
 
 static int analysis_phase( int xc_handle, u32 domid, 
@@ -302,7 +291,7 @@ static int analysis_phase( int xc_handle, u32 domid,
         xc_shadow_control( xc_handle, domid, 
                            DOM0_SHADOW_CONTROL_OP_CLEAN,
                            arr, nr_pfns, NULL);
-        printf("#Flush\n");
+        fprintf(stderr, "#Flush\n");
         for ( i = 0; i < 40; i++ )
         {     
             usleep(50000);     
@@ -311,11 +300,11 @@ static int analysis_phase( int xc_handle, u32 domid,
                                DOM0_SHADOW_CONTROL_OP_PEEK,
                                NULL, 0, &stats);
 
-            printf("now= %lld faults= %" PRId32 " dirty= %" PRId32
-                   " dirty_net= %" PRId32 " dirty_block= %" PRId32"\n", 
-                   ((now-start)+500)/1000, 
-                   stats.fault_count, stats.dirty_count,
-                   stats.dirty_net_count, stats.dirty_block_count);
+            fprintf(stderr, "now= %lld faults= %" PRId32 " dirty= %" PRId32
+		    " dirty_net= %" PRId32 " dirty_block= %" PRId32"\n", 
+		    ((now-start)+500)/1000, 
+		    stats.fault_count, stats.dirty_count,
+		    stats.dirty_net_count, stats.dirty_block_count);
         }
     }
 
@@ -323,26 +312,36 @@ static int analysis_phase( int xc_handle, u32 domid,
 }
 
 
-int suspend_and_state(int xc_handle, XcIOContext *ioctxt,		      
+int suspend_and_state(int xc_handle, int io_fd,	int dom,	      
                       xc_dominfo_t *info,
                       vcpu_guest_context_t *ctxt)
 {
     int i=0;
-    
-    xcio_suspend_domain(ioctxt);
+    char ans[30];
 
-retry:
-
-    if ( xc_domain_getinfo(xc_handle, ioctxt->domain, 1, info) != 1)
-    {
-	xcio_error(ioctxt, "Could not get domain info");
+    printf("suspend\n");
+    fflush(stdout);
+    if (fgets(ans, sizeof(ans), stdin) == NULL) {
+	ERR("failed reading suspend reply");
+	return -1;
+    }
+    if (strncmp(ans, "done\n", 5)) {
+	ERR("suspend reply incorrect: %s", ans);
 	return -1;
     }
 
-    if ( xc_domain_get_vcpu_context(xc_handle, ioctxt->domain, 0 /* XXX */, 
+retry:
+
+    if ( xc_domain_getinfo(xc_handle, dom, 1, info) != 1)
+    {
+	ERR("Could not get domain info");
+	return -1;
+    }
+
+    if ( xc_domain_get_vcpu_context(xc_handle, dom, 0 /* XXX */, 
 				    ctxt) )
     {
-        xcio_error(ioctxt, "Could not get vcpu context");
+        ERR("Could not get vcpu context");
     }
 
     if ( info->shutdown && info->shutdown_reason == SHUTDOWN_suspend )
@@ -353,9 +352,9 @@ retry:
     if ( info->paused )
     {
 	// try unpausing domain, wait, and retest	
-	xc_domain_unpause( xc_handle, ioctxt->domain );
+	xc_domain_unpause( xc_handle, dom );
 
-	xcio_error(ioctxt, "Domain was paused. Wait and re-test.");
+	ERR("Domain was paused. Wait and re-test.");
 	usleep(10000);  // 10ms
 
 	goto retry;
@@ -364,25 +363,24 @@ retry:
 
     if( ++i < 100 )
     {
-	xcio_error(ioctxt, "Retry suspend domain.");
+	ERR("Retry suspend domain.");
 	usleep(10000);  // 10ms	
 	goto retry;
     }
 
-    xcio_error(ioctxt, "Unable to suspend domain.");
+    ERR("Unable to suspend domain.");
 
     return -1;
 }
 
-int xc_linux_save(int xc_handle, XcIOContext *ioctxt)
+int xc_linux_save(int xc_handle, int io_fd, u32 dom)
 {
     xc_dominfo_t info;
 
     int rc = 1, i, j, k, last_iter, iter = 0;
     unsigned long mfn;
-    u32 domid = ioctxt->domain;
-    int live =  (ioctxt->flags & XCFLAGS_LIVE);
-    int debug = (ioctxt->flags & XCFLAGS_DEBUG);
+    int live =  0; // (ioctxt->flags & XCFLAGS_LIVE);
+    int debug = 0; // (ioctxt->flags & XCFLAGS_DEBUG);
     int sent_last_iter, skip_this_iter;
 
     /* Important tuning parameters */
@@ -440,29 +438,29 @@ int xc_linux_save(int xc_handle, XcIOContext *ioctxt)
 
     MBIT_RATE = START_MBIT_RATE;
 
-    xcio_info(ioctxt, "xc_linux_save start %d\n", domid);
+    DPRINTF("xc_linux_save start %d\n", dom);
     
     if (mlock(&ctxt, sizeof(ctxt))) {
-        xcio_perror(ioctxt, "Unable to mlock ctxt");
+        ERR("Unable to mlock ctxt");
         return 1;
     }
     
-    if ( xc_domain_getinfo(xc_handle, domid, 1, &info) != 1)
+    if ( xc_domain_getinfo(xc_handle, dom, 1, &info) != 1)
     {
-        xcio_error(ioctxt, "Could not get domain info");
+        ERR("Could not get domain info");
         goto out;
     }
-    if ( xc_domain_get_vcpu_context( xc_handle, domid, /* FIXME */ 0, 
+    if ( xc_domain_get_vcpu_context( xc_handle, dom, /* FIXME */ 0, 
                                 &ctxt) )
     {
-        xcio_error(ioctxt, "Could not get vcpu context");
+        ERR("Could not get vcpu context");
         goto out;
     }
     shared_info_frame = info.shared_info_frame;
 
     /* A cheesy test to see whether the domain contains valid state. */
     if ( ctxt.pt_base == 0 ){
-        xcio_error(ioctxt, "Domain is not in a valid Linux guest OS state");
+        ERR("Domain is not in a valid Linux guest OS state");
         goto out;
     }
     
@@ -470,31 +468,29 @@ int xc_linux_save(int xc_handle, XcIOContext *ioctxt)
 
     /* cheesy sanity check */
     if ( nr_pfns > 1024*1024 ){
-        xcio_error(ioctxt, 
-                   "Invalid state record -- pfn count out of range: %lu", 
-                   nr_pfns);
+        ERR("Invalid state record -- pfn count out of range: %lu", nr_pfns);
         goto out;
     }
 
 
     /* Map the shared info frame */
-    live_shinfo = xc_map_foreign_range(xc_handle, domid,
+    live_shinfo = xc_map_foreign_range(xc_handle, dom,
                                         PAGE_SIZE, PROT_READ,
                                         shared_info_frame);
 
     if (!live_shinfo){
-        xcio_error(ioctxt, "Couldn't map live_shinfo");
+        ERR("Couldn't map live_shinfo");
         goto out;
     }
 
     /* the pfn_to_mfn_frame_list fits in a single page */
     live_pfn_to_mfn_frame_list = 
-        xc_map_foreign_range(xc_handle, domid, 
+        xc_map_foreign_range(xc_handle, dom, 
                               PAGE_SIZE, PROT_READ, 
                               live_shinfo->arch.pfn_to_mfn_frame_list );
 
     if (!live_pfn_to_mfn_frame_list){
-        xcio_error(ioctxt, "Couldn't map pfn_to_mfn_frame_list");
+        ERR("Couldn't map pfn_to_mfn_frame_list");
         goto out;
     }
 
@@ -504,12 +500,12 @@ int xc_linux_save(int xc_handle, XcIOContext *ioctxt)
        (its not clear why it would want to change them, and we'll be OK
        from a safety POV anyhow. */
 
-    live_pfn_to_mfn_table = xc_map_foreign_batch(xc_handle, domid, 
+    live_pfn_to_mfn_table = xc_map_foreign_batch(xc_handle, dom, 
                                                  PROT_READ,
                                                  live_pfn_to_mfn_frame_list,
                                                  (nr_pfns+1023)/1024 );  
     if( !live_pfn_to_mfn_table ){
-        xcio_perror(ioctxt, "Couldn't map pfn_to_mfn table");
+        ERR("Couldn't map pfn_to_mfn table");
         goto out;
     }
 
@@ -526,8 +522,7 @@ int xc_linux_save(int xc_handle, XcIOContext *ioctxt)
 
     for ( i = 0; i < nr_pfns; i += 1024 ){
         if ( !translate_mfn_to_pfn(&pfn_to_mfn_frame_list[i/1024]) ){
-            xcio_error(ioctxt, 
-                       "Frame# in pfn-to-mfn frame list is not in pseudophys");
+            ERR("Frame# in pfn-to-mfn frame list is not in pseudophys");
             goto out;
         }
     }
@@ -537,10 +532,10 @@ int xc_linux_save(int xc_handle, XcIOContext *ioctxt)
 
     if( live )
     {
-        if ( xc_shadow_control( xc_handle, domid, 
+        if ( xc_shadow_control( xc_handle, dom, 
                                 DOM0_SHADOW_CONTROL_OP_ENABLE_LOGDIRTY,
                                 NULL, 0, NULL ) < 0 ) {
-            xcio_error(ioctxt, "Couldn't enable shadow mode");
+            ERR("Couldn't enable shadow mode");
             goto out;
         }
 
@@ -551,9 +546,9 @@ int xc_linux_save(int xc_handle, XcIOContext *ioctxt)
 
         last_iter = 1;
 
-	if ( suspend_and_state( xc_handle, ioctxt, &info, &ctxt) )
+	if ( suspend_and_state( xc_handle, io_fd, dom, &info, &ctxt) )
 	{
-	    xcio_error(ioctxt, "Domain appears not to have suspended");
+	    ERR("Domain appears not to have suspended");
 	    goto out;
 	}
 
@@ -577,27 +572,27 @@ int xc_linux_save(int xc_handle, XcIOContext *ioctxt)
         to_skip = malloc( sz );
 
         if (!to_send || !to_fix || !to_skip){
-            xcio_error(ioctxt, "Couldn't allocate to_send array");
+            ERR("Couldn't allocate to_send array");
             goto out;
         }
 
         memset( to_send, 0xff, sz );
 
         if ( mlock( to_send, sz ) ){
-            xcio_perror(ioctxt, "Unable to mlock to_send");
+            ERR("Unable to mlock to_send");
             return 1;
         }
 
         /* (to fix is local only) */
 
         if ( mlock( to_skip, sz ) ){
-            xcio_perror(ioctxt, "Unable to mlock to_skip");
+            ERR("Unable to mlock to_skip");
             return 1;
         }
 
     }
 
-    analysis_phase( xc_handle, domid, nr_pfns, to_skip, 0 );
+    analysis_phase( xc_handle, dom, nr_pfns, to_skip, 0 );
 
     /* We want zeroed memory so use calloc rather than malloc. */
     pfn_type = calloc(BATCH_SIZE, sizeof(unsigned long));
@@ -609,7 +604,7 @@ int xc_linux_save(int xc_handle, XcIOContext *ioctxt)
     }
 
     if ( mlock( pfn_type, BATCH_SIZE * sizeof(unsigned long) ) ){
-        xcio_error(ioctxt, "Unable to mlock");
+        ERR("Unable to mlock");
         goto out;
     }
 
@@ -626,33 +621,29 @@ int xc_linux_save(int xc_handle, XcIOContext *ioctxt)
 	    
 	    if( (live_mfn_to_pfn_table[mfn] != i) && (mfn != 0xffffffffUL) )
 	    {
-		printf("i=0x%x mfn=%lx live_mfn_to_pfn_table=%lx\n",
-		       i,mfn,live_mfn_to_pfn_table[mfn]);
+		fprintf(stderr, "i=0x%x mfn=%lx live_mfn_to_pfn_table=%lx\n",
+			i,mfn,live_mfn_to_pfn_table[mfn]);
 		err++;
 	    }
 	}
-	printf("Had %d unexplained entries in p2m table\n",err);
+	fprintf(stderr, "Had %d unexplained entries in p2m table\n",err);
     }
 #endif
 
 
     /* Start writing out the saved-domain record. */
 
-    if ( xcio_write(ioctxt, "LinuxGuestRecord",    16) ){
-        xcio_error(ioctxt, "Error writing header");
-        goto out;
+    if (write(io_fd, &nr_pfns, sizeof(unsigned long)) !=
+	sizeof(unsigned long)) {
+	ERR("write: nr_pfns");
+	goto out;
     }
-    if(write_vmconfig(ioctxt)){
-        xcio_error(ioctxt, "Error writing vmconfig");
-        goto out;
-    }
-    if ( xcio_write(ioctxt, &nr_pfns,              sizeof(unsigned long)) ||
-         xcio_write(ioctxt, pfn_to_mfn_frame_list, PAGE_SIZE) ){
-        xcio_error(ioctxt, "Error writing header");
+    if (write(io_fd, pfn_to_mfn_frame_list, PAGE_SIZE) != PAGE_SIZE) {
+        ERR("write: pfn_to_mfn_frame_list");
         goto out;
     }
 
-    print_stats( xc_handle, domid, 0, &stats, 0 );
+    print_stats( xc_handle, dom, 0, &stats, 0 );
 
     /* Now write out each data page, canonicalising page tables as we go... */
     
@@ -665,13 +656,13 @@ int xc_linux_save(int xc_handle, XcIOContext *ioctxt)
         prev_pc = 0;
         N=0;
 
-        xcio_info(ioctxt, "Saving memory pages: iter %d   0%%", iter);
+        DPRINTF("Saving memory pages: iter %d   0%%", iter);
 
         while( N < nr_pfns ){
             unsigned int this_pc = (N * 100) / nr_pfns;
 
             if ( (this_pc - prev_pc) >= 5 ){
-                xcio_info(ioctxt, "\b\b\b\b%3d%%", this_pc);
+                DPRINTF("\b\b\b\b%3d%%", this_pc);
                 prev_pc = this_pc;
             }
 
@@ -679,11 +670,11 @@ int xc_linux_save(int xc_handle, XcIOContext *ioctxt)
                but this is fast enough for the moment. */
 
             if ( !last_iter && 
-		 xc_shadow_control(xc_handle, domid, 
+		 xc_shadow_control(xc_handle, dom, 
                                    DOM0_SHADOW_CONTROL_OP_PEEK,
                                    to_skip, nr_pfns, NULL) != nr_pfns )
 	    {
-                xcio_error(ioctxt, "Error peeking shadow bitmap");
+                ERR("Error peeking shadow bitmap");
                 goto out;
             }
      
@@ -733,8 +724,8 @@ int xc_linux_save(int xc_handle, XcIOContext *ioctxt)
 
                     set_bit( n, to_fix );
                     if( iter>1 )
-                        DDPRINTF("netbuf race: iter %d, pfn %x. mfn %lx\n",
-                                 iter,n,pfn_type[batch]);
+                        DPRINTF("netbuf race: iter %d, pfn %x. mfn %lx\n",
+				iter,n,pfn_type[batch]);
                     continue;
                 }
 
@@ -752,27 +743,27 @@ int xc_linux_save(int xc_handle, XcIOContext *ioctxt)
                 batch++;
             }
      
-//            DDPRINTF("batch %d:%d (n=%d)\n", iter, batch, n);
+//            DPRINTF("batch %d:%d (n=%d)\n", iter, batch, n);
 
             if ( batch == 0 )
                 goto skip; /* vanishingly unlikely... */
       
-            if ( (region_base = xc_map_foreign_batch(xc_handle, domid, 
+            if ( (region_base = xc_map_foreign_batch(xc_handle, dom, 
                                                      PROT_READ,
                                                      pfn_type,
                                                      batch)) == 0 ){
-                xcio_perror(ioctxt, "map batch failed");
+                ERR("map batch failed");
                 goto out;
             }
      
-            if ( get_pfn_type_batch(xc_handle, domid, batch, pfn_type) ){
-                xcio_error(ioctxt, "get_pfn_type_batch failed");
+            if ( get_pfn_type_batch(xc_handle, dom, batch, pfn_type) ){
+                ERR("get_pfn_type_batch failed");
                 goto out;
             }
      
             for ( j = 0; j < batch; j++ ){
                 if ( (pfn_type[j] & LTAB_MASK) == XTAB ){
-                    DDPRINTF("type fail: page %i mfn %08lx\n",j,pfn_type[j]);
+                    DPRINTF("type fail: page %i mfn %08lx\n",j,pfn_type[j]);
                     continue;
                 }
   
@@ -789,13 +780,14 @@ int xc_linux_save(int xc_handle, XcIOContext *ioctxt)
                 pfn_type[j] = (pfn_type[j] & LTAB_MASK) | pfn_batch[j];
             }
 
-            if ( xcio_write(ioctxt, &batch, sizeof(int) ) ){
-                xcio_error(ioctxt, "Error when writing to state file (2)");
+            if (write(io_fd, &batch, sizeof(int)) != sizeof(int)) {
+                ERR("Error when writing to state file (2)");
                 goto out;
             }
 
-            if ( xcio_write(ioctxt, pfn_type, sizeof(unsigned long)*j ) ){
-                xcio_error(ioctxt, "Error when writing to state file (3)");
+            if (write(io_fd, pfn_type, sizeof(unsigned long)*j) !=
+		sizeof(unsigned long)*j) {
+                ERR("Error when writing to state file (3)");
                 goto out;
             }
      
@@ -803,7 +795,7 @@ int xc_linux_save(int xc_handle, XcIOContext *ioctxt)
             for( j = 0; j < batch; j++ ){
                 /* write out pages in batch */
                 if( (pfn_type[j] & LTAB_MASK) == XTAB){
-                    DDPRINTF("SKIP BOGUS page %i mfn %08lx\n",j,pfn_type[j]);
+                    DPRINTF("SKIP BOGUS page %i mfn %08lx\n",j,pfn_type[j]);
                     continue;
                 }
   
@@ -827,14 +819,14 @@ int xc_linux_save(int xc_handle, XcIOContext *ioctxt)
                         if ( !MFN_IS_IN_PSEUDOPHYS_MAP(mfn) )
                         {
                             /* I don't think this should ever happen */
-                            printf("FNI %d : [%08lx,%d] pte=%08lx, "
-                                   "mfn=%08lx, pfn=%08lx [mfn]=%08lx\n",
-                                   j, pfn_type[j], k,
-                                   page[k], mfn, live_mfn_to_pfn_table[mfn],
-                                   (live_mfn_to_pfn_table[mfn]<nr_pfns)? 
-                                   live_pfn_to_mfn_table[
-                                       live_mfn_to_pfn_table[mfn]] : 
-                                   0xdeadbeef);
+                            fprintf(stderr, "FNI %d : [%08lx,%d] pte=%08lx, "
+				    "mfn=%08lx, pfn=%08lx [mfn]=%08lx\n",
+				    j, pfn_type[j], k,
+				    page[k], mfn, live_mfn_to_pfn_table[mfn],
+				    (live_mfn_to_pfn_table[mfn]<nr_pfns)? 
+				    live_pfn_to_mfn_table[
+					live_mfn_to_pfn_table[mfn]] : 
+				    0xdeadbeef);
 
                             pfn = 0; /* be suspicious */
                         }
@@ -843,26 +835,25 @@ int xc_linux_save(int xc_handle, XcIOContext *ioctxt)
                         page[k] |= pfn << PAGE_SHIFT;
    
 #if 0
-                        printf("L%d i=%d pfn=%d mfn=%d k=%d pte=%08lx "
-                               "xpfn=%d\n",
-                               pfn_type[j]>>28,
-                               j,i,mfn,k,page[k],page[k]>>PAGE_SHIFT);
+                        fprintf(stderr,
+				"L%d i=%d pfn=%d mfn=%d k=%d pte=%08lx "
+				"xpfn=%d\n",
+				pfn_type[j]>>28,
+				j,i,mfn,k,page[k],page[k]>>PAGE_SHIFT);
 #endif     
-   
+			
                     } /* end of page table rewrite for loop */
       
-                    if ( xcio_ratewrite(ioctxt, page, PAGE_SIZE) ){
-                        xcio_error(ioctxt, 
-                                   "Error when writing to state file (4)");
+                    if (ratewrite(io_fd, page, PAGE_SIZE) != PAGE_SIZE) {
+                        ERR("Error when writing to state file (4)");
                         goto out;
                     }
       
                 }  /* end of it's a PT page */ else {  /* normal page */
 
-                    if ( xcio_ratewrite(ioctxt, region_base + (PAGE_SIZE*j), 
-                                     PAGE_SIZE) ){
-                        xcio_error(ioctxt, 
-                                   "Error when writing to state file (5)");
+                    if (ratewrite(io_fd, region_base + (PAGE_SIZE*j), 
+				  PAGE_SIZE) != PAGE_SIZE) {
+                        ERR("Error when writing to state file (5)");
                         goto out;
                     }
                 }
@@ -878,27 +869,26 @@ int xc_linux_save(int xc_handle, XcIOContext *ioctxt)
 
         total_sent += sent_this_iter;
 
-        xcio_info(ioctxt, "\r %d: sent %d, skipped %d, ", 
+        DPRINTF("\r %d: sent %d, skipped %d, ", 
                        iter, sent_this_iter, skip_this_iter );
 
         if ( last_iter ) {
-            print_stats( xc_handle, domid, sent_this_iter, &stats, 1);
+            print_stats( xc_handle, dom, sent_this_iter, &stats, 1);
 
-            xcio_info(ioctxt, "Total pages sent= %d (%.2fx)\n", 
+            DPRINTF("Total pages sent= %d (%.2fx)\n", 
                            total_sent, ((float)total_sent)/nr_pfns );
-            xcio_info(ioctxt, "(of which %d were fixups)\n", needed_to_fix  );
+            DPRINTF("(of which %d were fixups)\n", needed_to_fix  );
         }       
 
         if (last_iter && debug){
             int minusone = -1;
             memset( to_send, 0xff, (nr_pfns+8)/8 );
             debug = 0;
-            printf("Entering debug resend-all mode\n");
+            fprintf(stderr, "Entering debug resend-all mode\n");
     
             /* send "-1" to put receiver into debug mode */
-            if ( xcio_write(ioctxt, &minusone, sizeof(int)) )
-            {
-                xcio_error(ioctxt, "Error when writing to state file (6)");
+            if (write(io_fd, &minusone, sizeof(int)) != sizeof(int)) {
+                ERR("Error when writing to state file (6)");
                 goto out;
             }
 
@@ -919,30 +909,28 @@ int xc_linux_save(int xc_handle, XcIOContext *ioctxt)
                 DPRINTF("Start last iteration\n");
                 last_iter = 1;
 
-		if ( suspend_and_state( xc_handle, ioctxt, &info, &ctxt) )
+		if ( suspend_and_state( xc_handle, io_fd, dom, &info, &ctxt) )
 		{
-		    xcio_error(ioctxt, 
-                               "Domain appears not to have suspended");
+		    ERR("Domain appears not to have suspended");
 		    goto out;
 		}
 
-		xcio_info(ioctxt,
-                          "SUSPEND shinfo %08lx eip %08u esi %08u\n",
-                          info.shared_info_frame,
-                          ctxt.user_regs.eip, ctxt.user_regs.esi );
+		DPRINTF("SUSPEND shinfo %08lx eip %08u esi %08u\n",
+			info.shared_info_frame,
+			ctxt.user_regs.eip, ctxt.user_regs.esi);
             } 
 
-            if ( xc_shadow_control( xc_handle, domid, 
+            if ( xc_shadow_control( xc_handle, dom, 
                                     DOM0_SHADOW_CONTROL_OP_CLEAN,
                                     to_send, nr_pfns, &stats ) != nr_pfns ) 
             {
-                xcio_error(ioctxt, "Error flushing shadow PT");
+                ERR("Error flushing shadow PT");
                 goto out;
             }
 
             sent_last_iter = sent_this_iter;
 
-            print_stats( xc_handle, domid, sent_this_iter, &stats, 1);
+            print_stats( xc_handle, dom, sent_this_iter, &stats, 1);
      
         }
 
@@ -955,9 +943,8 @@ int xc_linux_save(int xc_handle, XcIOContext *ioctxt)
     rc = 0;
     
     /* Zero terminate */
-    if ( xcio_write(ioctxt, &rc, sizeof(int)) )
-    {
-        xcio_error(ioctxt, "Error when writing to state file (6)");
+    if (write(io_fd, &rc, sizeof(int)) != sizeof(int)) {
+        ERR("Error when writing to state file (6)");
         goto out;
     }
 
@@ -972,9 +959,8 @@ int xc_linux_save(int xc_handle, XcIOContext *ioctxt)
 		j++;
 	}
 
-	if ( xcio_write(ioctxt, &j, sizeof(unsigned int)) )
-	{
-	    xcio_error(ioctxt, "Error when writing to state file (6a)");
+	if (write(io_fd, &j, sizeof(unsigned int)) != sizeof(unsigned int)) {
+	    ERR("Error when writing to state file (6a)");
 	    goto out;
 	}	
 
@@ -987,10 +973,9 @@ int xc_linux_save(int xc_handle, XcIOContext *ioctxt)
 	    i++;
 	    if ( j == 1024 || i == nr_pfns )
 	    {
-		if ( xcio_write(ioctxt, &pfntab, sizeof(unsigned long)*j) )
-		{
-		    xcio_error(ioctxt, 
-                               "Error when writing to state file (6b)");
+		if (write(io_fd, &pfntab, sizeof(unsigned long)*j) !=
+		    sizeof(unsigned long)*j) {
+		    ERR("Error when writing to state file (6b)");
 		    goto out;
 		}	
 		j = 0;
@@ -999,47 +984,47 @@ int xc_linux_save(int xc_handle, XcIOContext *ioctxt)
     }
 
     /* Map the suspend-record MFN to pin it. The page must be owned by 
-       domid for this to succeed. */
-    p_srec = xc_map_foreign_range(xc_handle, domid,
+       dom for this to succeed. */
+    p_srec = xc_map_foreign_range(xc_handle, dom,
                                    sizeof(*p_srec), PROT_READ, 
                                    ctxt.user_regs.esi);
     if (!p_srec){
-        xcio_error(ioctxt, "Couldn't map suspend record");
+        ERR("Couldn't map suspend record");
         goto out;
     }
 
     if (nr_pfns != p_srec->nr_pfns )
     {
-	xcio_error(ioctxt, "Suspend record nr_pfns unexpected (%ld != %ld)",
+	ERR("Suspend record nr_pfns unexpected (%ld != %ld)",
 		   p_srec->nr_pfns, nr_pfns);
         goto out;
     }
 
     /* Canonicalise the suspend-record frame number. */
     if ( !translate_mfn_to_pfn(&ctxt.user_regs.esi) ){
-        xcio_error(ioctxt, "Suspend record is not in range of pseudophys map");
+        ERR("Suspend record is not in range of pseudophys map");
         goto out;
     }
 
     /* Canonicalise each GDT frame number. */
     for ( i = 0; i < ctxt.gdt_ents; i += 512 ) {
         if ( !translate_mfn_to_pfn(&ctxt.gdt_frames[i]) ) {
-            xcio_error(ioctxt, "GDT frame is not in range of pseudophys map");
+            ERR("GDT frame is not in range of pseudophys map");
             goto out;
         }
     }
 
     /* Canonicalise the page table base pointer. */
     if ( !MFN_IS_IN_PSEUDOPHYS_MAP(ctxt.pt_base >> PAGE_SHIFT) ) {
-        xcio_error(ioctxt, "PT base is not in range of pseudophys map");
+        ERR("PT base is not in range of pseudophys map");
         goto out;
     }
     ctxt.pt_base = live_mfn_to_pfn_table[ctxt.pt_base >> PAGE_SHIFT] <<
         PAGE_SHIFT;
 
-    if ( xcio_write(ioctxt, &ctxt,       sizeof(ctxt)) ||
-         xcio_write(ioctxt, live_shinfo, PAGE_SIZE) ) {
-        xcio_error(ioctxt, "Error when writing to state file (1)");
+    if (write(io_fd, &ctxt, sizeof(ctxt)) != sizeof(ctxt) ||
+	write(io_fd, live_shinfo, PAGE_SIZE) != PAGE_SIZE) {
+        ERR("Error when writing to state file (1)");
         goto out;
     }
 

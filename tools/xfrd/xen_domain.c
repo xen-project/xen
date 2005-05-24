@@ -61,6 +61,7 @@ int xen_domain_snd(Conn *xend, IOStream *io,
                    char *vmconfig, int vmconfig_n,
                    int live, int resource){
     int err = 0;
+#if 0
     XcIOContext _ioctxt = {}, *ioctxt = &_ioctxt;
     ioctxt->domain = dom;
     ioctxt->io = io;
@@ -76,6 +77,7 @@ int xen_domain_snd(Conn *xend, IOStream *io,
     ioctxt->resource = resource;
     err = xc_linux_save(xcinit(), ioctxt);
     dprintf("< err=%d\n", err);
+#endif
     return err;
 }
 
