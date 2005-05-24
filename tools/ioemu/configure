@@ -230,7 +230,7 @@ fi
 
 if test -z "$vnc"; then
 
-if libvncserver-config --version > /dev/null; then
+if libvncserver-config --version >& /dev/null; then
     vnc=yes
 else
     vnc=no
