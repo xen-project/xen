@@ -213,7 +213,6 @@ class BlkDev(Dev):
     def attach(self, recreate=False, change=False):
         if recreate:
             node = sxp.child_value(recreate, 'node')
-            print 'BlkDev>attach>', 'recreate=', recreate, 'node=', node
             self.setNode(node)
         else:
             node = Blkctl.block('bind', self.type, self.params)
