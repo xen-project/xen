@@ -510,7 +510,6 @@ class XendDomain:
                     pass
             else:
                 # Shutdown still pending.
-                print 'domain_shutdowns> pending: ', id
                 timeout = min(timeout, left)
         if timeout <= SHUTDOWN_TIMEOUT:
             # Pending shutdowns remain - reschedule.
