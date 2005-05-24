@@ -17,7 +17,6 @@ include $(XEN_ROOT)/tools/Rules.mk
 
 PROGRAMS_INSTALL_DIR	= /usr/libexec/xen
 
-vpath %.h      $(XEN_LIBXC)
 INCLUDES += -I $(XEN_LIBXC)
 
 CC := gcc
@@ -33,7 +32,7 @@ PROGRAMS		= xc_restore
 
 xc_restore_OBJS		= xc_restore.o
 
-LDLIBS			+= -L$(XEN_LIBXC) -lxc
+LDLIBS			= -L$(XEN_LIBXC) -L$(XEN_LIBXUTIL) -lxc -lxutil
 
 .PHONY: all
 all: build
