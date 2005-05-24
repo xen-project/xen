@@ -39,14 +39,12 @@ all: build
 build: $(PROGRAMS)
 
 define PROGRAM_template
- $(1): $$($(1)_OBJS)
- ALL_OBJS	+= $$($(1)_OBJS)
+$(1): $$($(1)_OBJS)
+	$$(LINK.o) $$^ $$(LDLIBS) -o $$@
+ALL_OBJS	+= $$($(1)_OBJS)
 endef
 
 $(foreach prog,$(PROGRAMS),$(eval $(call PROGRAM_template,$(prog))))
-
-$(PROGRAMS):
-	$(LINK.o) $^ $(LDLIBS) -o $@
 
 .PHONY: install
 install: build
