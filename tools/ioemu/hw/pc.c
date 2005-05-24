@@ -419,11 +419,11 @@ void pc_init(int ram_size, int vga_ram_size, int boot_device,
     ret = load_image(buf, phys_ram_base + vga_bios_offset);
 #endif 
 
+#ifndef NOBIOS
     /* setup basic memory access */
     cpu_register_physical_memory(0xc0000, 0x10000, 
                                  vga_bios_offset | IO_MEM_ROM);
 
-#ifndef NOBIOS
     /* map the last 128KB of the BIOS in ISA space */
     isa_bios_size = bios_size;
     if (isa_bios_size > (128 * 1024))

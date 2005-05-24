@@ -313,7 +313,8 @@ do_interrupt(CPUState *env, int vector)
 
 	intr = &(((vcpu_iodata_t *) shared_page)->vp_intr[0]);
 	atomic_set_bit(vector, intr);
-        fprintf(logfile, "injecting vector: %x\n", vector);
+        if (loglevel & CPU_LOG_INT)
+                fprintf(logfile, "injecting vector: %x\n", vector);
 	env->send_event = 1;
 }
 
