@@ -389,6 +389,7 @@ static inline void die_if_kernel(const char * str, struct pt_regs * regs, long e
 		die(str, regs, err);
 }
 
+#ifdef CONFIG_X86_LOCAL_APIC
 void die_nmi(char *str, struct pt_regs *regs)
 {
 	oops_begin();
@@ -404,6 +405,7 @@ void die_nmi(char *str, struct pt_regs *regs)
 	oops_end();
 	do_exit(SIGSEGV);
 }
+#endif
 
 static void do_trap(int trapnr, int signr, char *str, 
 			   struct pt_regs * regs, long error_code, siginfo_t *info)

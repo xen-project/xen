@@ -139,6 +139,14 @@ config X86_GOOD_APIC
 	bool
 	default y
 
+config X86_IO_APIC
+	bool
+	default XEN_PRIVILEGED_GUEST
+
+config X86_LOCAL_APIC
+	bool
+	default XEN_PRIVILEGED_GUEST
+
 config MICROCODE
 	tristate "/dev/cpu/microcode - Intel CPU microcode support"
 	---help---
@@ -187,14 +195,6 @@ config MCA
 
 config EISA
 	bool
-
-config X86_LOCAL_APIC
-	bool
-	default y
-
-config X86_IO_APIC
-	bool
-	default y
 
 config MTRR
 	bool "MTRR (Memory Type Range Register) support"
@@ -453,4 +453,3 @@ endmenu
 # source "lib/Kconfig"
 
 endmenu
-
