@@ -225,23 +225,22 @@ int xc_shadow_control(int xc_handle,
 struct XcIOContext;
 
 /**
- * This function will save a domain running Linux to an IO context.  This
- * IO context is currently a private interface making this function difficult
- * to call.  It's interface will likely change in the future.
+ * This function will save a domain running Linux.
  *
  * @parm xc_handle a handle to an open hypervisor interface
- * @parm ioctxt the IO context to save a domain to
+ * @parm fd the file descriptor to save a domain to
+ * @parm dom the id of the domain
  * @return 0 on success, -1 on failure
  */
-int xc_linux_save(int xc_handle, struct XcIOContext *ioctxt);
+int xc_linux_save(int xc_handle, int fd, u32 dom);
 
 /**
- * This function will restore a saved domain running Linux to an IO context.
- * Like xc_linux_save(), this function uses a parameter who's structure is
- * privately defined.  It's interface will also likely change.
+ * This function will restore a saved domain running Linux.
  *
  * @parm xc_handle a handle to an open hypervisor interface
- * @parm ioctxt the IO context to restore a domain from
+ * @parm fd the file descriptor to restore a domain from
+ * @parm dom the id of the domain
+ * @parm nr_pfns the number of pages
  * @return 0 on success, -1 on failure
  */
 int xc_linux_restore(int xc_handle, int io_fd, u32 dom, unsigned long nr_pfns);

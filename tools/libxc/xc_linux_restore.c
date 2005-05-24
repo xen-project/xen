@@ -11,23 +11,23 @@
 
 #define MAX_BATCH_SIZE 1024
 
-#define DEBUG 01
+#define DEBUG 0
 
 #if 1
-#define ERR(_f, _a...) fprintf ( stderr, _f , ## _a )
+#define ERR(_f, _a...) fprintf ( stderr, _f , ## _a ); fflush(stderr)
 #else
 #define ERR(_f, _a...) ((void)0)
 #endif
 
 #if DEBUG
-#define DPRINTF(_f, _a...) fprintf ( stdout, _f , ## _a )
+#define DPRINTF(_f, _a...) fprintf ( stdout, _f , ## _a ); fflush(stdout)
 #else
 #define DPRINTF(_f, _a...) ((void)0)
 #endif
 
 #define PROGRESS 0
 #if PROGRESS
-#define PPRINTF(_f, _a...) fprintf ( stderr, _f , ## _a )
+#define PPRINTF(_f, _a...) fprintf ( stderr, _f , ## _a ); fflush(stderr)
 #else
 #define PPRINTF(_f, _a...)
 #endif
