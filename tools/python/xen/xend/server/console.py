@@ -174,7 +174,6 @@ class ConsoleDev(Dev, protocol.ServerFactory):
     def destroy(self, change=False, reboot=False):
         """Close the console.
         """
-        print 'ConsoleDev>destroy>', self, reboot
         if reboot:
             return
         try:
@@ -357,7 +356,6 @@ class ConsoleController(DevController):
             self.rebootDevices()
 
     def destroyController(self, reboot=False):
-        print 'ConsoleController>destroyController>', self, reboot
         self.destroyed = True
         self.destroyDevices(reboot=reboot)
         self.rcvr.deregisterChannel()

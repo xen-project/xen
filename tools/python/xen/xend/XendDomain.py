@@ -1,4 +1,5 @@
 # Copyright (C) 2004 Mike Wray <mike.wray@hp.com>
+# Copyright (C) 2005 Christian Limpach <Christian.Limpach@cl.cam.ac.uk>
 
 """Handler for domain operations.
  Nothing here is persistent (across reboots).
@@ -73,7 +74,6 @@ class XendDomain:
     def onVirq(self, event, val):
         """Event handler for virq.
         """
-        print 'onVirq>', val
         self.refresh(cleanup=True)
 
     def xen_domains(self):

@@ -37,7 +37,8 @@ def eventChannelClose(evtchn):
             pass
         
     if not evtchn: return
-    print 'eventChannelClose>', evtchn
+    if DEBUG:
+        print 'eventChannelClose>', evtchn
     evtchn_close(evtchn.get('dom1'), evtchn.get('port1'))
     evtchn_close(evtchn.get('dom2'), evtchn.get('port2'))
     
@@ -133,7 +134,7 @@ class ChannelFactory:
         self.virqHandler = virqHandler
 
     def virqReceived(self, virq):
-        if 1 or DEBUG:
+        if DEBUG:
             print 'virqReceived>', virq
         if not self.virqHandler: return
         self.runInThread(lambda virq=virq: self.virqHandler(virq))
