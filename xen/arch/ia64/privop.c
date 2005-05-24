@@ -569,7 +569,7 @@ priv_handle_op(VCPU *vcpu, REGS *regs, int privlvl)
 #endif
 	{
 //printf("*** priv_handle_op: privop bundle @%p not mapped, retrying\n",iip);
-		return IA64_RETRY;
+		return vcpu_force_data_miss(vcpu,regs->cr_iip);
 	}
 #if 0
 	if (iip==0xa000000100001820) {
@@ -732,30 +732,10 @@ priv_emulate(VCPU *vcpu, REGS *regs, UINT64 isr)
 	privlvl = (ipsr & IA64_PSR_CPL) >> IA64_PSR_CPL0_BIT;
 	// its OK for a privified-cover to be executed in user-land
 	fault = priv_handle_op(vcpu,regs,privlvl);
-	if (fault == IA64_NO_FAULT) { // success!!
+	if ((fault == IA64_NO_FAULT) || (fault == IA64_EXTINT_VECTOR)) { // success!!
 		// update iip/ipsr to point to the next instruction
 		(void)vcpu_increment_iip(vcpu);
 	}
-	else if (fault == IA64_EXTINT_VECTOR) {
-		// update iip/ipsr before delivering interrupt
-		(void)vcpu_increment_iip(vcpu);
-	}
-	else if (fault == IA64_RFI_IN_PROGRESS) return fault;
-		// success but don't update to next instruction
-        else if (fault == IA64_RETRY) {
-            //printf("Priv emulate gets IA64_RETRY\n");
-	    //printf("priv_emulate: returning RETRY, not implemented!\n");
-	    //while (1);
-	    // don't update iip/ipsr, deliver 
-	
-            vcpu_force_data_miss(vcpu,regs->cr_iip);
-	    return IA64_RETRY;
-        }
-	else if (priv_verbose) printf("unhandled operation from handle_op\n");
-//	if (fault == IA64_ILLOP_FAULT) {
-//		printf("priv_emulate: returning ILLOP, not implemented!\n");
-//		while (1);
-//	}
 	return fault;
 }
 

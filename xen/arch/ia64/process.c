@@ -170,16 +170,11 @@ panic_domain(regs,"psr.ic off, delivering fault=%lx,iip=%p,ifa=%p,isr=%p,PSCB.ii
 	if ((vector & 0xf) != IA64_FORCED_IFA) PSCB(ed,ifa) = ifa;
 	else ifa = PSCB(ed,ifa);
 	vector &= ~0xf;
-//	always deliver on ALT vector (for now?) because no VHPT
-//	if (!vcpu_get_rr_ve(ed,ifa)) {
-		if (vector == IA64_DATA_TLB_VECTOR)
-			vector = IA64_ALT_DATA_TLB_VECTOR;
-		else if (vector == IA64_INST_TLB_VECTOR)
-			vector = IA64_ALT_INST_TLB_VECTOR;
-//	}
-	if (vector == IA64_ALT_DATA_TLB_VECTOR ||
-	    vector == IA64_ALT_INST_TLB_VECTOR) {
-		vcpu_thash(ed,ifa,&PSCB(ed,iha));
+	if (vector == IA64_DATA_TLB_VECTOR
+		|| vector == IA64_ALT_DATA_TLB_VECTOR
+		|| vector == IA64_INST_TLB_VECTOR
+		|| vector == IA64_ALT_INST_TLB_VECTOR) {
+		vcpu_thash(ed,ifa,&PSCB(current,iha));
 	}
 	PSCB(ed,unat) = regs->ar_unat;  // not sure if this is really needed?
 	PSCB(ed,precover_ifs) = regs->cr_ifs;
@@ -367,7 +362,7 @@ void ia64_do_page_fault (unsigned long address, unsigned long isr, struct pt_reg
 		vcpu_itc_no_srlz(current,is_data?2:1,address,pteval,-1UL,(trp->itir>>2)&0x3f);
 		return;
 	}
-	vector = is_data ? IA64_DATA_TLB_VECTOR : IA64_INST_TLB_VECTOR;
+
 	if (handle_lazy_cover(current, isr, regs)) return;
 if (!(address>>61)) {
 panic_domain(0,"ia64_do_page_fault: @%p???, iip=%p, itc=%p (spinning...)\n",address,iip,ia64_get_itc());
@@ -383,6 +378,9 @@ panic_domain(0,"ia64_do_page_fault: @%p???, iip=%p, itc=%p (spinning...)\n",addr
 		ia64_psr(regs)->ed = 1;
 		return;
 	}
+	vector = vcpu_get_rr_ve(current, address) ? 
+			(is_data ? IA64_DATA_TLB_VECTOR : IA64_INST_TLB_VECTOR)
+			: (is_data ? IA64_ALT_DATA_TLB_VECTOR : IA64_ALT_INST_TLB_VECTOR);
 	reflect_interruption(address, isr, itir, regs, vector);
 }
 
