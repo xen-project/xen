@@ -45,7 +45,8 @@ PIC_OBJS := $(patsubst %.c,%.opic,$(SRCS))
 LIB      := libxc.a libxc.so libxc.so.$(MAJOR) libxc.so.$(MAJOR).$(MINOR)
 
 all: build
-build: check-for-zlib mk-symlinks $(LIB)
+build: check-for-zlib mk-symlinks
+	$(MAKE) $(LIB)
 
 check-for-zlib:
 	@if [ ! -e /usr/include/zlib.h ]; then \
