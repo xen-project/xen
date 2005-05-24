@@ -45,8 +45,7 @@ PIC_OBJS := $(patsubst %.c,%.opic,$(SRCS))
 LIB      := libxc.a libxc.so libxc.so.$(MAJOR) libxc.so.$(MAJOR).$(MINOR)
 
 all: build
-build: check-for-zlib mk-symlinks
-	$(MAKE) $(LIB)
+build: check-for-zlib mk-symlinks $(LIB)
 
 check-for-zlib:
 	@if [ ! -e /usr/include/zlib.h ]; then \
@@ -93,7 +92,7 @@ rpm: build
 	mv staging/i386/*.rpm .
 	rm -rf staging
 
-libxc.a: $(OBJS)
+libxc.a: $(LIB_OBJS)
 	$(AR) rc $@ $^
 
 libxc.so: libxc.so.$(MAJOR)
