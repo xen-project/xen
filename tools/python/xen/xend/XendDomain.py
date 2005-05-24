@@ -392,6 +392,8 @@ class XendDomain:
                 if filter(lambda (fd, event): event & select.POLLHUP, r):
                     break
 
+            if child.wait() >> 8 == 127:
+                lasterr = "popen %s failed" % PATH_XC_RESTORE
             if child.wait() != 0:
                 raise XendError("xc_restore failed: %s" % lasterr)
             

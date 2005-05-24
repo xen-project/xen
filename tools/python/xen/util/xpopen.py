@@ -129,7 +129,7 @@ class xPopen3:
         try:
             os.execvp(cmd[0], cmd)
         finally:
-            os._exit(1)
+            os._exit(127)
 
     def poll(self):
         """Return the exit status of the child process if it has finished,
