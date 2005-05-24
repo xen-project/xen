@@ -246,7 +246,6 @@ class ConsoleDev(Dev, protocol.ServerFactory):
     def disconnect(self, conn=None):
         """Disconnect the TCP connection to the console.
         """
-        print 'ConsoleDev>disconnect>', conn
         try:
             self.lock.acquire()
             if conn and conn != self.conn: return

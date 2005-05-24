@@ -8,7 +8,6 @@ SUBDIRS += misc
 SUBDIRS += examples
 SUBDIRS += xentrace
 SUBDIRS += python
-SUBDIRS += xfrd
 SUBDIRS += xcs
 SUBDIRS += xcutils
 SUBDIRS += pygrub

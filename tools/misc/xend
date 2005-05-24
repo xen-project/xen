@@ -60,36 +60,6 @@ def check_logging():
         hline()
         raise CheckError("logging is not installed")
 
-def check_twisted_version():
-    """Check twisted is installed with a supported version and print a warning if not.
-    Raises an error if twisted is not installed.
-    """
-    # Supported twisted release and major version.
-    RELEASE = 1
-    MAJOR   = 3
-    try:
-        from twisted.copyright import version
-    except ImportError:
-        hline()
-        msg("The Twisted framework is not installed.")
-        msg("Use 'make install-twisted' at the xen root to install.")
-        msg("")
-        msg("Alternatively download and install version %d.%d or higher" % (RELEASE, MAJOR))
-        msg("from http://www.twistedmatrix.com/products")
-        hline()
-        raise CheckError("twisted is not installed")
-        
-    
-    (release, major, minor) = version.split('.')
-    release = int(release)
-    major = int(major)
-    if release > RELEASE: return
-    if release == RELEASE and major >= MAJOR: return
-    hline()
-    msg("Warning: Twisted version not supported: %s" % version)
-    msg("Use Twisted version %d.%d.0 or higher" % (RELEASE, MAJOR))
-    hline()
-
 def check_user():
     """Check that the effective user id is 0 (root).
     """
@@ -146,7 +116,6 @@ def stop_xcs():
 def main():
     try:
         check_logging()
-        check_twisted_version()
         check_user()
     except CheckError:
         sys.exit(1)

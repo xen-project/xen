@@ -14,8 +14,7 @@ DOM0_ID = '0'
 gopts = Opts(use="""[options] DOM HOST
 
 Migrate domain DOM to host HOST.
-The transfer daemon xfrd must be running on the
-local host and on HOST.
+Xend must be running on the local host and on HOST.
 """)
 
 gopts.opt('help', short='h',

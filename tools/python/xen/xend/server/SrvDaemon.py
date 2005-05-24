@@ -128,21 +128,16 @@ class Daemon:
     def cleanup_xend(self, kill=False):
         return self.cleanup_process(XEND_PID_FILE, "xend", kill)
 
-    def cleanup_xfrd(self, kill=False):
-        return self.cleanup_process(XFRD_PID_FILE, "xfrd", kill)
-
     def cleanup(self, kill=False):
         self.cleanup_xend(kill=kill)
-        self.cleanup_xfrd(kill=kill)
             
     def status(self):
-        """Returns the status of the xend and xfrd daemons.
+        """Returns the status of the xend daemon.
         The return value is defined by the LSB:
         0  Running
         3  Not running
         """
-        if (self.cleanup_process(XEND_PID_FILE, "xend", False) == 0 or
-            self.cleanup_process(XFRD_PID_FILE, "xfrd", False) == 0):
+        if self.cleanup_process(XEND_PID_FILE, "xend", False) == 0:
             return 3
         else:
             return 0
@@ -170,17 +165,6 @@ class Daemon:
             pidfile.write(str(pid))
             pidfile.close()
         return pid
-
-    def start_xfrd(self):
-        """Fork and exec xfrd, writing its pid to XFRD_PID_FILE.
-        """
-        if self.fork_pid(XFRD_PID_FILE):
-            # Parent
-            pass
-        else:
-            # Child
-            self.daemonize()
-            os.execl("/usr/sbin/xfrd", "xfrd")
 
     def daemonize(self):
         if not DAEMONIZE: return
@@ -212,15 +196,11 @@ class Daemon:
         4  Insufficient privileges
         """
         xend_pid = self.cleanup_xend()
-        xfrd_pid = self.cleanup_xfrd()
-
 
         if self.set_user():
             return 4
         os.chdir("/")
 
-        if xfrd_pid == 0:
-            self.start_xfrd()
         if xend_pid > 0:
             # Trying to run an already-running service is a success.
             return 0
