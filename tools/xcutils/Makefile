@@ -30,7 +30,7 @@ PROG_DEP = .*.d
 
 PROGRAMS		= xc_restore xc_save
 
-LDLIBS			= -L$(XEN_LIBXC) -lxc -L$(XEN_LIBXUTIL) -lxutil
+LDLIBS			= -L$(XEN_LIBXC) -lxc
 
 .PHONY: all
 all: build

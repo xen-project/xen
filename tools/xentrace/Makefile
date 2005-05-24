@@ -10,7 +10,6 @@ CFLAGS  += -Wall -Werror -O3
 
 CFLAGS  += -I $(XEN_XC)
 CFLAGS  += -I $(XEN_LIBXC)
-CFLAGS  += -I $(XEN_LIBXUTIL)
 
 HDRS     = $(wildcard *.h)
 OBJS     = $(patsubst %.c,%.o,$(wildcard *.c))
@@ -37,4 +36,4 @@ clean:
 	$(RM) *.a *.so *.o *.rpm $(BIN)
 
 %: %.c $(HDRS) Makefile
-	$(CC) $(CFLAGS) -o $@ $< -L$(XEN_LIBXC) -L$(XEN_LIBXUTIL) -lxc -lxutil
+	$(CC) $(CFLAGS) -o $@ $< -L$(XEN_LIBXC) -lxc

@@ -12,9 +12,6 @@ CC       = gcc
 XEN_ROOT = ../..
 include $(XEN_ROOT)/tools/Rules.mk
 
-vpath %c       $(XEN_LIBXUTIL)
-INCLUDES += -I $(XEN_LIBXUTIL)
-
 SRCS     :=
 SRCS     += xc_sedf.c
 SRCS     += xc_bvtsched.c
@@ -105,6 +102,6 @@ libxc.so.$(MAJOR): libxc.so.$(MAJOR).$(MINOR)
 	ln -sf $< $@
 
 libxc.so.$(MAJOR).$(MINOR): $(PIC_OBJS)
-	$(CC) $(CFLAGS) $(LDFLAGS) -Wl,-soname -Wl,libxc.so.$(MAJOR) -shared -o $@ $^ -L../libxutil -lxutil -lz
+	$(CC) $(CFLAGS) $(LDFLAGS) -Wl,-soname -Wl,libxc.so.$(MAJOR) -shared -o $@ $^ -lz
 
 -include $(DEPS)

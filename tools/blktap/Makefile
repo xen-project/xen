@@ -47,7 +47,6 @@ CFLAGS   += -Wno-unused
 CFLAGS   += -g3
 CFLAGS   += -fno-strict-aliasing
 CFLAGS   += -I $(XEN_LIBXC)
-CFLAGS   += -I $(XEN_LIBXUTIL)
 CFLAGS   += $(INCLUDES) -I.
 CFLAGS   += -D_FILE_OFFSET_BITS=64 -D_LARGEFILE_SOURCE -D_LARGEFILE64_SOURCE
 # Get gcc to generate the dependencies for us.
@@ -97,16 +96,16 @@ libblktap.so:
 libblktap.so.$(MAJOR):
 	ln -sf libblktap.so.$(MAJOR).$(MINOR) $@
 libblktap.so.$(MAJOR).$(MINOR): $(OBJS)
-	$(CC) -Wl,-soname -Wl,$(SONAME) -shared -o $@ $^ -lpthread -L../libxutil -lxutil -lz
+	$(CC) -Wl,-soname -Wl,$(SONAME) -shared -o $@ $^ -lpthread -lz
 
 blkdump: $(LIB)
-	$(CC) $(CFLAGS) -o blkdump -L$(XEN_LIBXC) -L$(XEN_LIBXUTIL) -L. -l blktap blkdump.c
+	$(CC) $(CFLAGS) -o blkdump -L$(XEN_LIBXC) -L. -l blktap blkdump.c
 
 parallax: $(LIB) $(PLX_SRCS)
-	$(CC) $(CFLAGS) -o parallax -L$(XEN_LIBXC) -L$(XEN_LIBXUTIL) -L. -lblktap -lpthread $(PLX_SRCS) 
+	$(CC) $(CFLAGS) -o parallax -L$(XEN_LIBXC) -L. -lblktap -lpthread $(PLX_SRCS) 
 
 parallax-threaded: $(LIB) $(PLXT_SRCS)
-	$(CC) $(CFLAGS) -o parallax-threaded -L$(XEN_LIBXC) -L$(XEN_LIBXUTIL) -L. -lpthread -lblktap $(PLXT_SRCS)
+	$(CC) $(CFLAGS) -o parallax-threaded -L$(XEN_LIBXC) -L. -lpthread -lblktap $(PLXT_SRCS)
 
 vdi_list: $(LIB) vdi_list.c $(VDI_SRCS)
 	$(CC) $(CFLAGS) -g3 -o vdi_list vdi_list.c -lpthread $(VDI_SRCS)

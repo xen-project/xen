@@ -7,11 +7,11 @@ export prefix?=$(shell cd ../../dist/install && pwd)
 
 .PHONY: all compile
 .PHONY: gc-install gc-clean gc-prstine
-.PHONY: vnetd vnet-module install dist clean pristine
+.PHONY: libxutil vnetd vnet-module install dist clean pristine
 
 all: compile
 
-compile: vnetd vnet-module
+compile: libxutil vnetd vnet-module
 #compile: vnet-module
 
 gc.tar.gz:
@@ -32,6 +32,9 @@ gc-clean:
 gc-pristine:
 	-rm -rf gc?.? gc
 
+libxutil:
+	$(MAKE) -C libxutil
+
 vnetd: gc-install
 	$(MAKE) -C vnetd
 
@@ -39,13 +42,15 @@ vnet-module:
 	$(MAKE) -C vnet-module
 
 install: compile
+	$(MAKE) -C libxutil install
 	$(MAKE) -C vnetd install
 	$(MAKE) -C vnet-module install
 	$(MAKE) -C examples install
 
 clean:
+	-$(MAKE) -C libxutil clean
 	-$(MAKE) -C vnetd clean
 	-$(MAKE) -C vnet-module clean
 	-rm -rf gc?.? gc
-	
+
 pristine: clean gc-pristine

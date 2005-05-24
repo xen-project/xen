@@ -15,7 +15,6 @@ CFLAGS   = -Wall -Werror -g3 -D _XOPEN_SOURCE=600
 
 CFLAGS  += -I $(XEN_XC)
 CFLAGS  += -I $(XEN_LIBXC)
-CFLAGS  += -I $(XEN_LIBXUTIL)
 
 SRCS    :=
 SRCS    += ctrl_interface.c
@@ -34,11 +33,11 @@ clean:
 	$(RM) *.a *.so *.o *.rpm $(BIN) xcsdump
 
 xcsdump: xcsdump.c dump.c
-	$(CC) $(CFLAGS) -o xcsdump xcsdump.c -L$(XEN_LIBXC) -L$(XEN_LIBXUTIL) \
-              ctrl_interface.c evtchn.c dump.c -lxc -lxutil
+	$(CC) $(CFLAGS) -o xcsdump xcsdump.c -L$(XEN_LIBXC) \
+              ctrl_interface.c evtchn.c dump.c -lxc
 
 $(BIN): $(OBJS)
-	$(CC) $(CFLAGS) $^ -o $@ -L$(XEN_LIBXC) -L$(XEN_LIBXUTIL) -lxc -lxutil 
+	$(CC) $(CFLAGS) $^ -o $@ -L$(XEN_LIBXC) -lxc 
 
 $(OBJS): $(HDRS)
 

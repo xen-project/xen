@@ -15,7 +15,6 @@
 #include <netdb.h>
 #include <arpa/inet.h>
 #include "xc_private.h"
-#include "gzip_stream.h"
 #include "linux_boot_params.h"
 
 /* Needed for Python versions earlier than 2.3. */

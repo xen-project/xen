@@ -24,7 +24,7 @@ else
 SRC_DIR=$(src)/
 endif
 
-LIB_DIR := $(SRC_DIR)../../libxutil
+LIB_DIR := $(SRC_DIR)../libxutil
 
 VNET_SRC :=
 VNET_SRC += esp.c
