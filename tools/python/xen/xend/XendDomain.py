@@ -90,7 +90,10 @@ class XendDomain:
         """Get info about a single domain from xc.
         Returns None if not found.
         """
-        dom = int(dom)
+        try:
+            dom = int(dom)
+        except ValueError:
+            return None
         dominfo = xc.domain_getinfo(dom, 1)
         if dominfo == [] or dominfo[0]['dom'] != dom:
             dominfo = None
@@ -198,6 +201,8 @@ class XendDomain:
                         log.debug('XendDomain>reap> Suspended domain died id=%s', id)
                     else:
                         eserver.inject('xend.domain.suspended', [name, id])
+                        if dominfo:
+                            dominfo.state_set("suspended")
                         continue
                 if reason in ['poweroff', 'reboot']:
                     eserver.inject('xend.domain.exit', [name, id, reason])
@@ -349,7 +354,7 @@ class XendDomain:
 
             l = fd.read_exact(sizeof_int,
                               "not a valid guest state file: config size read")
-            vmconfig_size = unpack("i", l)[0] # XXX endianess
+            vmconfig_size = unpack("!i", l)[0]
             vmconfig_buf = fd.read_exact(vmconfig_size,
                 "not a valid guest state file: config read")
 
@@ -384,17 +389,22 @@ class XendDomain:
             p.register(child.childerr.fileno())
             while True:
                 r = p.poll()
-                for l in child.childerr.readlines():
-                    log.error(l.rstrip())
-                    lasterr = l.rstrip()
-                for l in child.fromchild.readlines():
-                    log.info(l.rstrip())
+                for (fd, event) in r:
+                    if not event & select.POLLIN:
+                        continue
+                    if fd == child.childerr.fileno():
+                        l = child.childerr.readline()
+                        log.error(l.rstrip())
+                        lasterr = l.rstrip()
+                    if fd == child.fromchild.fileno():
+                        l = child.fromchild.readline()
+                        log.info(l.rstrip())
                 if filter(lambda (fd, event): event & select.POLLHUP, r):
                     break
 
             if child.wait() != 0:
                 raise XendError("xc_restore failed: %s" % lasterr)
-            
+
             return dominfo
 
         except IOError, ex:
@@ -592,10 +602,66 @@ class XendDomain:
         @param dst:      destination file
         @param progress: output progress if true
         """
-        dominfo = self.domain_lookup(id)
-        xmigrate = XendMigrate.instance()
-        return xmigrate.save_begin(dominfo, dst)
-    
+
+        SIGNATURE = "LinuxGuestRecord"
+        sizeof_int = calcsize("i")
+        PATH_XC_SAVE = "/usr/libexec/xen/xc_save"
+
+        try:
+            dominfo = self.domain_lookup(id)
+
+            fd = os.open(dst, os.O_WRONLY | os.O_CREAT | os.O_TRUNC)
+
+            if os.write(fd, SIGNATURE) != len(SIGNATURE):
+                raise XendError("could not write guest state file: signature")
+
+            config = sxp.to_string(dominfo.sxpr())
+            if os.write(fd, pack("!i", len(config))) != sizeof_int:
+                raise XendError("could not write guest state file: config len")
+            if os.write(fd, config) != len(config):
+                raise XendError("could not write guest state file: config")
+
+            cmd = [PATH_XC_SAVE, str(xc.handle()), str(fd),
+                   dominfo.id]
+            log.info("[xc_save] " + join(cmd))
+            child = xPopen3(cmd, True, -1, [fd, xc.handle()])
+            
+            lasterr = ""
+            p = select.poll()
+            p.register(child.fromchild.fileno())
+            p.register(child.childerr.fileno())
+            while True:
+                r = p.poll()
+                for (fd, event) in r:
+                    if not event & select.POLLIN:
+                        continue
+                    if fd == child.childerr.fileno():
+                        l = child.childerr.readline()
+                        log.error(l.rstrip())
+                        lasterr = l.rstrip()
+                    if fd == child.fromchild.fileno():
+                        l = child.fromchild.readline()
+                        if l.rstrip() == "suspend":
+                            log.info("suspending %s" % dominfo.id)
+                            self.domain_shutdown(dominfo.id, reason='suspend')
+                            dominfo.state_wait("suspended")
+                            log.info("suspend %s done" % dominfo.id)
+                            child.tochild.write("done\n")
+                            child.tochild.flush()
+                if filter(lambda (fd, event): event & select.POLLHUP, r):
+                    break
+
+            if child.wait() >> 8 == 127:
+                lasterr = "popen %s failed" % PATH_XC_SAVE
+            if child.wait() != 0:
+                raise XendError("xc_save failed: %s" % lasterr)
+
+            self.domain_destroy(dominfo.id)
+            return None
+
+        except:
+            raise
+
     def domain_pincpu(self, id, vcpu, cpumap):
         """Set which cpus vcpu can use
 

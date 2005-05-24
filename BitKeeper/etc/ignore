@@ -127,6 +127,7 @@ tools/x2d2/minixend
 tools/xcs/xcs
 tools/xcs/xcsdump
 tools/xcutils/xc_restore
+tools/xcutils/xc_save
 tools/xentrace/xentrace
 tools/xfrd/xfrd
 xen/BLOG

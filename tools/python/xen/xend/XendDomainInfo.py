@@ -11,6 +11,7 @@ Author: Mike Wray <mike.wray@hp.com>
 import string
 import os
 import time
+import threading
 
 import xen.lowlevel.xc; xc = xen.lowlevel.xc.new()
 import xen.util.ip
@@ -74,6 +75,7 @@ STATE_RESTART_BOOTING = 'booting'
 
 STATE_VM_OK         = "ok"
 STATE_VM_TERMINATED = "terminated"
+STATE_VM_SUSPENDED  = "suspended"
 
 
 def domain_exists(name):
@@ -288,6 +290,7 @@ class XendDomainInfo:
         self.netif_backend = False
         #todo: state: running, suspended
         self.state = STATE_VM_OK
+        self.state_updated = threading.Condition()
         self.shutdown_pending = None
 
         #todo: set to migrate info if migrating
@@ -327,6 +330,19 @@ class XendDomainInfo:
         """
         self.info = info
         self.memory = self.info['mem_kb'] / 1024
+
+    def state_set(self, state):
+        self.state_updated.acquire()
+        if self.state != state:
+            self.state = state
+            self.state_updated.notifyAll()
+        self.state_updated.release()
+
+    def state_wait(self, state):
+        self.state_updated.acquire()
+        while self.state != state:
+            self.state_updated.wait()
+        self.state_updated.release()
 
     def __str__(self):
         s = "domain"
