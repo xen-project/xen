@@ -2,7 +2,6 @@ XEN_ROOT = ../
 include $(XEN_ROOT)/tools/Rules.mk
 
 SUBDIRS :=
-SUBDIRS += libxutil
 SUBDIRS += libxc
 SUBDIRS += misc
 SUBDIRS += examples

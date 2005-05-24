@@ -9,15 +9,13 @@ extra_compile_args  = [ "-fno-strict-aliasing", "-Wall", "-Werror" ]
 
 include_dirs = [ XEN_ROOT + "/tools/python/xen/lowlevel/xu",
                  XEN_ROOT + "/tools/libxc",
-                 XEN_ROOT + "/tools/libxutil",
                  XEN_ROOT + "/tools/xcs",
                  ]
 
 library_dirs = [ XEN_ROOT + "/tools/libxc",
-                 XEN_ROOT + "/tools/libxutil",
                  ]
 
-libraries = [ "xc", "xutil" ]
+libraries = [ "xc" ]
 
 xc = Extension("xc",
                extra_compile_args = extra_compile_args,

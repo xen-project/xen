@@ -1,5 +1,5 @@
 
-XEN_ROOT = ../..
+XEN_ROOT = ../../..
 INSTALL		= install
 INSTALL_DATA	= $(INSTALL) -m0644
 INSTALL_PROG	= $(INSTALL) -m0755

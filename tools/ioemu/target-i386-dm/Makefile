@@ -189,7 +189,7 @@ endif
 #########################################################
 
 DEFINES+=-D_GNU_SOURCE -D_FILE_OFFSET_BITS=64 -D_LARGEFILE_SOURCE
-LIBS+=-lm -L../../libxc -L../../libxutil -lxc -lxutil
+LIBS+=-lm -L../../libxc -lxc
 ifndef CONFIG_USER_ONLY
 LIBS+=-lz
 endif

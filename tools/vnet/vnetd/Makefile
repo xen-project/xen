@@ -25,7 +25,7 @@ include $(XEN_ROOT)/tools/Rules.mk
 
 VNETD_INSTALL_DIR = /usr/sbin
 
-LIB_DIR = $(XEN_LIBXUTIL)
+LIB_DIR = ../libxutil
 VNET_DIR = ../vnet-module
 
 INCLUDES += -I$(LIB_DIR)
