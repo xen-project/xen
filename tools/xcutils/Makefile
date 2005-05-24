@@ -32,14 +32,15 @@ PROG_DEP = .*.d
 PROGRAMS		= xc_restore
 
 xc_restore_OBJS		= xc_restore.o
-xc_restore_LIBS		= xc
+
+LDLIBS			+= -L$(XEN_LIBXC) -lxc
 
 .PHONY: all
 all: build
 build: $(PROGRAMS)
 
 define PROGRAM_template
- $(1): $$($(1)_OBJS) $$($(1)_LIBS:%=-l%)
+ $(1): $$($(1)_OBJS)
  ALL_OBJS	+= $$($(1)_OBJS)
 endef
 
