@@ -1099,7 +1099,7 @@ asmlinkage void vmx_vmexit_handler(struct cpu_user_regs regs)
         unsigned long va;
 
         if ((error = __vmread(VM_EXIT_INTR_INFO, &vector))
-            && !(vector & INTR_INFO_VALID_MASK))
+            || !(vector & INTR_INFO_VALID_MASK))
             __vmx_bug(&regs);
         vector &= 0xff;
 
