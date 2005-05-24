@@ -2,6 +2,7 @@
  * xc_vmx_build.c
  */
 
+#include <stddef.h>
 #include "xc_private.h"
 #define ELFSIZE 32
 #include "xc_elf.h"
