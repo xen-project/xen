@@ -1,6 +1,6 @@
 #
 # Copyright 2005 Red Hat, Inc.
-# Jeremy Katz <katzj@xxxxxxxxxx>
+# Jeremy Katz <katzj@redhat.com>
 #
 # This software may be freely redistributed under the terms of the GNU
 # general public license.
