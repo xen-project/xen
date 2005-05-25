@@ -54,12 +54,6 @@ typedef struct { unsigned long pt_lo; } pagetable_t;
 #define HYPERVISOR_ENTRIES_PER_L2_PAGETABLE \
   (L2_PAGETABLE_ENTRIES - DOMAIN_ENTRIES_PER_L2_PAGETABLE)
 
-#ifndef __ASSEMBLY__
-#include <asm/processor.h>
-#include <asm/fixmap.h>
-#include <asm/bitops.h>
-#include <asm/flushtlb.h>
-
 #define linear_l1_table                                                 \
     ((l1_pgentry_t *)(LINEAR_PT_VIRT_START))
 #define __linear_l2_table                                                 \
@@ -83,9 +77,10 @@ typedef struct { unsigned long pt_lo; } pagetable_t;
 #define va_to_l1mfn(_ed, _va) \
     (l2e_get_pfn(linear_l2_table(_ed)[_va>>L2_PAGETABLE_SHIFT]))
 
+#ifndef __ASSEMBLY__
 extern root_pgentry_t idle_pg_table[ROOT_PAGETABLE_ENTRIES];
-
 extern void paging_init(void);
+#endif
 
 #define __pge_off()                                                     \
     do {                                                                \
@@ -100,9 +95,6 @@ extern void paging_init(void);
             "mov %0, %%cr4;  # turn off PGE     "                       \
             : : "r" (mmu_cr4_features) );                               \
     } while ( 0 )
-
-#endif /* !__ASSEMBLY__ */
-
 
 #define _PAGE_PRESENT  0x001UL
 #define _PAGE_RW       0x002UL

@@ -20,6 +20,9 @@
 #include <asm/shadow.h>
 #include <asm/e820.h>
 
+extern void dmi_scan_machine(void);
+extern void generic_apic_probe(char *);
+
 /*
  * opt_xenheap_megabytes: Size of Xen heap in megabytes, excluding the
  * pfn_info table and allocation bitmap.
@@ -63,6 +66,8 @@ boolean_param("acpi_skip_timer_override", acpi_skip_timer_override);
 /* noapic: Disable IOAPIC setup. */
 extern int skip_ioapic_setup;
 boolean_param("noapic", skip_ioapic_setup);
+
+static char *xen_cmdline;
 
 int early_boot = 1;
 
@@ -422,6 +427,11 @@ static void __init start_of_day(void)
 
     paging_init();
 
+    dmi_scan_machine();
+
+    if ( xen_cmdline != NULL )
+        generic_apic_probe(xen_cmdline);
+
     acpi_boot_table_init();
     acpi_boot_init();
 
@@ -488,7 +498,10 @@ void __init __start_xen(multiboot_info_t *mbi)
 
     /* Parse the command-line options. */
     if ( (mbi->flags & MBI_CMDLINE) && (mbi->cmdline != 0) )
-        cmdline_parse(__va(mbi->cmdline));
+    {
+        xen_cmdline = __va(mbi->cmdline);
+        cmdline_parse(xen_cmdline);
+    }
 
     /* Must do this early -- e.g., spinlocks rely on get_current(). */
     set_current(&idle0_exec_domain);

@@ -5,6 +5,7 @@ OBJS += $(patsubst %.S,%.o,$(wildcard $(TARGET_SUBARCH)/*.S))
 OBJS += $(patsubst %.c,%.o,$(wildcard $(TARGET_SUBARCH)/*.c))
 OBJS += $(patsubst %.c,%.o,$(wildcard acpi/*.c))
 OBJS += $(patsubst %.c,%.o,$(wildcard mtrr/*.c))
+OBJS += $(patsubst %.c,%.o,$(wildcard genapic/*.c))
 
 OBJS := $(subst $(TARGET_SUBARCH)/asm-offsets.o,,$(OBJS))
 
@@ -36,6 +37,7 @@ clean:
 	rm -f x86_64/*.o x86_64/*~ x86_64/core
 	rm -f mtrr/*.o mtrr/*~ mtrr/core
 	rm -f acpi/*.o acpi/*~ acpi/core
+	rm -f genapic/*.o genapic/*~ genapic/core
 
 delete-unfresh-files:
 	# nothing

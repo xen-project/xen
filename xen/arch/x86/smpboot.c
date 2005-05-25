@@ -43,6 +43,7 @@
 #include <asm/mc146818rtc.h>
 #include <asm/desc.h>
 #include <asm/div64.h>
+#include <asm/flushtlb.h>
 #include <asm/msr.h>
 #include <mach_apic.h>
 #include <mach_wakecpu.h>

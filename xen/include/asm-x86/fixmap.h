@@ -13,9 +13,8 @@
 #define _ASM_FIXMAP_H
 
 #include <xen/config.h>
-#include <xen/lib.h>
-#include <asm/acpi.h>
 #include <asm/apicdef.h>
+#include <asm/acpi.h>
 #include <asm/page.h>
 
 /*
@@ -26,17 +25,11 @@
  * from the end of virtual memory backwards.
  */
 enum fixed_addresses {
-#ifdef CONFIG_X86_LOCAL_APIC
-    FIX_APIC_BASE,	/* local (CPU) APIC -- required for SMP or not */
-#endif
-#ifdef CONFIG_X86_IO_APIC
+    FIX_APIC_BASE,
     FIX_IO_APIC_BASE_0,
     FIX_IO_APIC_BASE_END = FIX_IO_APIC_BASE_0 + MAX_IO_APICS-1,
-#endif
-#ifdef CONFIG_ACPI_BOOT
     FIX_ACPI_BEGIN,
     FIX_ACPI_END = FIX_ACPI_BEGIN + FIX_ACPI_PAGES - 1,
-#endif
     __end_of_fixed_addresses
 };
 

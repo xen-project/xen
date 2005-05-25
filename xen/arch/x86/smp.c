@@ -19,6 +19,7 @@
 #include <asm/flushtlb.h>
 #include <asm/smpboot.h>
 #include <asm/hardirq.h>
+#include <mach_apic.h>
 
 /*
  *	Some notes on x86 processor bugs affecting SMP operation:
@@ -72,7 +73,7 @@ static inline int __prepare_ICR2 (unsigned int mask)
     return SET_APIC_DEST_FIELD(mask);
 }
 
-static inline void __send_IPI_shortcut(unsigned int shortcut, int vector)
+void __send_IPI_shortcut(unsigned int shortcut, int vector)
 {
     /*
      * Subtle. In the case of the 'never do double writes' workaround
@@ -104,8 +105,12 @@ void send_IPI_self(int vector)
     __send_IPI_shortcut(APIC_DEST_SELF, vector);
 }
 
-static inline void send_IPI_mask(int mask, int vector)
+/*
+ * This is only used on smaller machines.
+ */
+void send_IPI_mask_bitmask(cpumask_t cpumask, int vector)
 {
+    unsigned long mask = cpus_addr(cpumask)[0];
     unsigned long cfg;
     unsigned long flags;
 
@@ -115,37 +120,68 @@ static inline void send_IPI_mask(int mask, int vector)
      * Wait for idle.
      */
     apic_wait_icr_idle();
-
+		
     /*
      * prepare target chip field
      */
     cfg = __prepare_ICR2(mask);
     apic_write_around(APIC_ICR2, cfg);
-
+		
     /*
-     * program the ICR 
+     * program the ICR
      */
     cfg = __prepare_ICR(0, vector);
-
+			
     /*
      * Send the IPI. The write to APIC_ICR fires this off.
      */
     apic_write_around(APIC_ICR, cfg);
-
+    
     local_irq_restore(flags);
 }
 
-static inline void send_IPI_allbutself(int vector)
+inline void send_IPI_mask_sequence(cpumask_t mask, int vector)
 {
-    /*
-     * If there are no other CPUs in the system then we get an APIC send error 
-     * if we try to broadcast. thus we have to avoid sending IPIs in this case.
-     */
-    if ( num_online_cpus() <= 1 )
-        return;
+    unsigned long cfg, flags;
+    unsigned int query_cpu;
 
-    __send_IPI_shortcut(APIC_DEST_ALLBUT, vector);
+    /*
+     * Hack. The clustered APIC addressing mode doesn't allow us to send 
+     * to an arbitrary mask, so I do a unicasts to each CPU instead. This 
+     * should be modified to do 1 message per cluster ID - mbligh
+     */ 
+
+    local_irq_save(flags);
+
+    for (query_cpu = 0; query_cpu < NR_CPUS; ++query_cpu) {
+        if (cpu_isset(query_cpu, mask)) {
+		
+            /*
+             * Wait for idle.
+             */
+            apic_wait_icr_idle();
+		
+            /*
+             * prepare target chip field
+             */
+            cfg = __prepare_ICR2(cpu_to_logical_apicid(query_cpu));
+            apic_write_around(APIC_ICR2, cfg);
+		
+            /*
+             * program the ICR
+             */
+            cfg = __prepare_ICR(0, vector);
+			
+            /*
+             * Send the IPI. The write to APIC_ICR fires this off.
+             */
+            apic_write_around(APIC_ICR, cfg);
+        }
+    }
+    local_irq_restore(flags);
 }
+
+#include <mach_ipi.h>
 
 static spinlock_t flush_lock = SPIN_LOCK_UNLOCKED;
 static unsigned long flush_cpumask, flush_va;
@@ -179,7 +215,11 @@ void __flush_tlb_mask(unsigned long mask, unsigned long va)
         spin_lock(&flush_lock);
         flush_cpumask = mask;
         flush_va      = va;
-        send_IPI_mask(mask, INVALIDATE_TLB_VECTOR);
+        {
+            cpumask_t _mask;
+            cpus_addr(_mask)[0] = mask;
+            send_IPI_mask(_mask, INVALIDATE_TLB_VECTOR);
+        }
         while ( flush_cpumask != 0 )
             cpu_relax();
         spin_unlock(&flush_lock);
@@ -222,9 +262,11 @@ void flush_tlb_all_pge(void)
 
 void smp_send_event_check_mask(unsigned long cpu_mask)
 {
+    cpumask_t mask;
     cpu_mask &= ~(1UL << smp_processor_id());
+    cpus_addr(mask)[0] = cpu_mask;
     if ( cpu_mask != 0 )
-        send_IPI_mask(cpu_mask, EVENT_CHECK_VECTOR);
+        send_IPI_mask(mask, EVENT_CHECK_VECTOR);
 }
 
 /*

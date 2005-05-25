@@ -3,6 +3,7 @@
 #include <xen/init.h>
 #include <xen/mm.h>
 #include <xen/slab.h>
+#include <asm/flushtlb.h>
 #include <asm/io.h>
 #include <asm/mtrr.h>
 #include <asm/msr.h>

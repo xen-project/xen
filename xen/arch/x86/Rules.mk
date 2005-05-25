@@ -3,7 +3,9 @@
 
 CFLAGS  += -nostdinc -fno-builtin -fno-common -fno-strict-aliasing
 CFLAGS  += -iwithprefix include -Wall -Werror -Wno-pointer-arith -pipe
-CFLAGS  += -I$(BASEDIR)/include -I$(BASEDIR)/include/asm-x86/mach-default
+CFLAGS  += -I$(BASEDIR)/include 
+CFLAGS  += -I$(BASEDIR)/include/asm-x86/mach-generic
+CFLAGS  += -I$(BASEDIR)/include/asm-x86/mach-default
 
 ifeq ($(optimize),y)
 CFLAGS  += -O3 -fomit-frame-pointer

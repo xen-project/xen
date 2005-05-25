@@ -33,8 +33,6 @@
 #include <mach_mpparse.h>
 #include <bios_ebda.h>
 
-#define es7000_plat 0 /* XXX XEN */
-
 /* Have we found an MP table */
 int smp_found_config;
 unsigned int __initdata maxcpus = NR_CPUS;
