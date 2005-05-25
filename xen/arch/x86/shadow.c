@@ -2525,7 +2525,7 @@ void __shadow_sync_all(struct domain *d)
     // page table page needs to be vcpu private).
     //
 #if 0 // this should be enabled for SMP guests...
-    flush_tlb_mask(((1 << smp_num_cpus) - 1) & ~(1 << smp_processor_id()));
+    flush_tlb_mask(((1<<num_online_cpus()) - 1) & ~(1<<smp_processor_id()));
 #endif
     need_flush = 1;
 

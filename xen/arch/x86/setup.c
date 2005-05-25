@@ -33,6 +33,14 @@ integer_param("xenheap_megabytes", opt_xenheap_megabytes);
 int opt_noht = 0;
 boolean_param("noht", opt_noht);
 
+/* opt_nosmp: If true, secondary processors are ignored. */
+static int opt_nosmp = 0;
+boolean_param("nosmp", opt_nosmp);
+
+/* maxcpus: maximum number of CPUs to activate. */
+static unsigned int max_cpus = NR_CPUS;
+integer_param("maxcpus", max_cpus); 
+
 /* opt_watchdog: If true, run a watchdog NMI on each processor. */
 static int opt_watchdog = 0;
 boolean_param("watchdog", opt_watchdog);
@@ -58,6 +66,9 @@ boolean_param("noapic", skip_ioapic_setup);
 
 int early_boot = 1;
 
+int ht_per_core = 1;
+cpumask_t cpu_present_map;
+
 /* Limits of Xen heap, used to initialise the allocator. */
 unsigned long xenheap_phys_start, xenheap_phys_end;
 
@@ -67,7 +78,6 @@ extern void trap_init(void);
 extern void time_init(void);
 extern void ac_timer_init(void);
 extern void initialize_keytable();
-extern int do_timer_lists_from_pit;
 
 extern unsigned long cpu0_stack[];
 
@@ -80,13 +90,10 @@ unsigned long mmu_cr4_features = X86_CR4_PSE | X86_CR4_PGE;
 #endif
 EXPORT_SYMBOL(mmu_cr4_features);
 
-unsigned long wait_init_idle;
-
 struct exec_domain *idle_task[NR_CPUS] = { &idle0_exec_domain };
 
 int acpi_disabled;
 
-int phys_proc_id[NR_CPUS];
 int logical_proc_id[NR_CPUS];
 
 /* Standard macro to see if a specific flag is changeable. */
@@ -147,12 +154,11 @@ static void __init init_intel(struct cpuinfo_x86 *c)
     if ( c->x86 == 6 && c->x86_model < 3 && c->x86_mask < 3 )
         clear_bit(X86_FEATURE_SEP, &c->x86_capability);
 
-#ifdef CONFIG_SMP
     if ( test_bit(X86_FEATURE_HT, &c->x86_capability) )
     {
         u32     eax, ebx, ecx, edx;
         int     initial_apic_id, siblings, cpu = smp_processor_id();
-        
+
         cpuid(1, &eax, &ebx, &ecx, &edx);
         ht_per_core = siblings = (ebx & 0xff0000) >> 16;
 
@@ -176,7 +182,6 @@ static void __init init_intel(struct cpuinfo_x86 *c)
                    cpu, phys_proc_id[cpu], logical_proc_id[cpu]);
         }
     }
-#endif
 
 #ifdef CONFIG_VMX
     start_vmx();
@@ -292,6 +297,10 @@ void __init identify_cpu(struct cpuinfo_x86 *c)
     }
 }
 
+void __init print_cpu_info(struct cpuinfo_x86 *c)
+{
+    printk("booted.\n");
+}
 
 unsigned long cpu_initialized;
 void __init cpu_init(void)
@@ -335,8 +344,6 @@ void __init cpu_init(void)
 
     /* Install correct page table. */
     write_ptbase(current);
-
-    init_idle_task();
 }
 
 int acpi_force;
@@ -383,6 +390,8 @@ static void __init do_initcalls(void)
 
 static void __init start_of_day(void)
 {
+    int i;
+
     /* Unmap the first page of CPU0's stack. */
     memguard_guard_stack(cpu0_stack);
 
@@ -421,8 +430,6 @@ static void __init start_of_day(void)
 
     init_apic_mappings();
 
-    scheduler_init();	
-
     init_IRQ();
 
     trap_init();
@@ -431,41 +438,41 @@ static void __init start_of_day(void)
 
     arch_init_memory();
 
-    smp_boot_cpus();
+    scheduler_init();	
 
-    __sti();
+    if ( opt_nosmp )
+        max_cpus = 0;
+    smp_prepare_cpus(max_cpus);
+
+    /* We aren't hotplug-capable yet. */
+    BUG_ON(!cpus_empty(cpu_present_map));
+    for_each_cpu ( i )
+        cpu_set(i, cpu_present_map);
 
     initialize_keytable();
 
     serial_init_stage2();
 
-    if ( !cpu_has_apic )
+    ac_timer_init();
+
+    init_xen_time();
+
+    for_each_present_cpu ( i )
     {
-        do_timer_lists_from_pit = 1;
-        if ( smp_num_cpus != 1 )
-            panic("We need local APICs on SMP machines!");
+        if ( num_online_cpus() >= max_cpus )
+            break;
+        if ( !cpu_online(i) )
+            __cpu_up(i);
     }
 
-    ac_timer_init();    /* init accurate timers */
-    init_xen_time();	/* initialise the time */
-    schedulers_start(); /* start scheduler for each CPU */
-
-    check_nmi_watchdog();
+    printk("Brought up %ld CPUs\n", (long)num_online_cpus());
+    smp_cpus_done(max_cpus);
 
     do_initcalls();
 
-    wait_init_idle = cpu_online_map;
-    clear_bit(smp_processor_id(), &wait_init_idle);
-    smp_threads_ready = 1;
-    smp_commence(); /* Tell other CPUs that state of the world is stable. */
-    while ( wait_init_idle != 0 )
-        cpu_relax();
+    schedulers_start();
 
     watchdog_enable();
-
-#ifdef CONFIG_X86_64 /* x86_32 uses low mappings when building DOM0. */
-    zap_low_mappings();
-#endif
 }
 
 #define EARLY_FAIL() for ( ; ; ) __asm__ __volatile__ ( "hlt" )
@@ -486,6 +493,8 @@ void __init __start_xen(multiboot_info_t *mbi)
     /* Must do this early -- e.g., spinlocks rely on get_current(). */
     set_current(&idle0_exec_domain);
     set_processor_id(0);
+
+    smp_prepare_boot_cpu();
 
     /* We initialise the serial devices very early so we can get debugging. */
     serial_init_stage1();
@@ -695,8 +704,8 @@ void __init __start_xen(multiboot_info_t *mbi)
     /* Hide UART from DOM0 if we're using it */
     serial_endboot();
 
-    domain_unpause_by_systemcontroller(current->domain);
     domain_unpause_by_systemcontroller(dom0);
+
     startup_cpu_idle_loop();
 }
 

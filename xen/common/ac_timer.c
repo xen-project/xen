@@ -125,7 +125,7 @@ static int add_entry(struct ac_timer **heap, struct ac_timer *t)
         struct ac_timer **new_heap = xmalloc_array(struct ac_timer *, limit);
         if ( new_heap == NULL ) BUG();
         memcpy(new_heap, heap, (limit>>1)*sizeof(struct ac_timer *));
-        for ( i = 0; i < smp_num_cpus; i++ )
+        for ( i = 0; i < NR_CPUS; i++ )
             if ( ac_timers[i].heap == heap )
                 ac_timers[i].heap = new_heap;
         xfree(heap);
@@ -248,7 +248,7 @@ static void dump_timerq(unsigned char key)
     printk("Dumping ac_timer queues: NOW=0x%08X%08X\n",
            (u32)(now>>32), (u32)now); 
 
-    for ( i = 0; i < smp_num_cpus; i++ )
+    for_each_online_cpu( i )
     {
         printk("CPU[%02d] ", i);
         spin_lock_irqsave(&ac_timers[i].lock, flags);
@@ -270,7 +270,7 @@ void __init ac_timer_init(void)
 
     open_softirq(AC_TIMER_SOFTIRQ, ac_timer_softirq_action);
 
-    for ( i = 0; i < smp_num_cpus; i++ )
+    for ( i = 0; i < NR_CPUS; i++ )
     {
         ac_timers[i].heap = xmalloc_array(
             struct ac_timer *, DEFAULT_HEAP_LIMIT+1);

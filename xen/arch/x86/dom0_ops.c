@@ -176,8 +176,8 @@ long arch_do_dom0_op(dom0_op_t *op, dom0_op_t *u_dom0_op)
     {
         dom0_physinfo_t *pi = &op->u.physinfo;
 
-        pi->ht_per_core = opt_noht ? 1 : ht_per_core;
-        pi->cores       = smp_num_cpus / pi->ht_per_core;
+        pi->ht_per_core = ht_per_core;
+        pi->cores       = num_online_cpus() / ht_per_core;
         pi->total_pages = max_page;
         pi->free_pages  = avail_domheap_pages();
         pi->cpu_khz     = cpu_khz;

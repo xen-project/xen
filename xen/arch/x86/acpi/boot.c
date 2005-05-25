@@ -34,7 +34,6 @@
 #include <asm/io_apic.h>
 #include <asm/apic.h>
 #include <asm/io.h>
-#include <asm/irq.h>
 #include <asm/mpspec.h>
 #include <mach_apic.h>
 #include <mach_mpparse.h>

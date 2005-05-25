@@ -179,6 +179,7 @@ extern struct cpuinfo_x86 cpu_data[];
 #define current_cpu_data boot_cpu_data
 #endif
 
+extern  int phys_proc_id[NR_CPUS];
 extern char ignore_irq13;
 
 extern void identify_cpu(struct cpuinfo_x86 *);

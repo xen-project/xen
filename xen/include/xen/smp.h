@@ -26,19 +26,19 @@ extern void smp_send_event_check_mask(unsigned long cpu_mask);
 #define smp_send_event_check_cpu(_cpu) smp_send_event_check_mask(1<<(_cpu))
 
 /*
- * Boot processor call to load the other CPU's
+ * Prepare machine for booting other CPUs.
  */
-extern void smp_boot_cpus(void);
+extern void smp_prepare_cpus(unsigned int max_cpus);
 
 /*
- * Processor call in. Must hold processors until ..
+ * Bring a CPU up
  */
-extern void smp_callin(void);
+extern int __cpu_up(unsigned int cpunum);
 
 /*
- * Multiprocessors may now schedule
+ * Final polishing of CPUs
  */
-extern void smp_commence(void);
+extern void smp_cpus_done(unsigned int max_cpus);
 
 /*
  * Call a function on all other processors
@@ -57,12 +57,6 @@ static inline int on_each_cpu(void (*func) (void *info), void *info,
     return ret;
 }
 
-/*
- * True once the per process idle is forked
- */
-extern int smp_threads_ready;
-
-extern int smp_num_cpus;
 extern int ht_per_core;
 extern int opt_noht;
 
@@ -80,6 +74,12 @@ extern volatile int smp_msg_id;
 #define MSG_RESCHEDULE		0x0003	/* Reschedule request from master CPU*/
 #define MSG_CALL_FUNCTION       0x0004  /* Call function on all other CPUs */
 
+/*
+ * Mark the boot cpu "online" so that it can call console drivers in
+ * printk() and can access its per-cpu storage.
+ */
+void smp_prepare_boot_cpu(void);
+
 #else
 
 /*
@@ -88,16 +88,14 @@ extern volatile int smp_msg_id;
 
 #define smp_send_event_check_mask(_m)           ((void)0)
 #define smp_send_event_check_cpu(_p)            ((void)0) 
-#define smp_num_cpus				1
+#ifndef __smp_processor_id
 #define smp_processor_id()			0
+#endif
 #define hard_smp_processor_id()			0
-#define smp_threads_ready			1
-#define kernel_lock()
-#define cpu_logical_map(cpu)			0
-#define cpu_number_map(cpu)			0
 #define smp_call_function(func,info,retry,wait)	0
 #define on_each_cpu(func,info,retry,wait)	({ func(info); 0; })
-#define cpu_online_map				1
+#define num_booting_cpus()			1
+#define smp_prepare_boot_cpu()			do {} while (0)
 
 #endif
 

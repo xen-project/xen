@@ -124,7 +124,6 @@ void startup_cpu_idle_loop(void)
 {
 	/* Just some sanity to ensure that the scheduler is set up okay. */
 	ASSERT(current->domain == IDLE_DOMAIN_ID);
-	domain_unpause_by_systemcontroller(current->domain);
 	raise_softirq(SCHEDULE_SOFTIRQ);
 	do_softirq();
 

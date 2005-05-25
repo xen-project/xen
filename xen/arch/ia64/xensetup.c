@@ -249,13 +249,11 @@ printk("About to call sort_main_extable()\n");
     /* Create initial domain 0. */
 printk("About to call do_createdomain()\n");
     dom0 = do_createdomain(0, 0);
-printk("About to call init_idle_task()\n");
     init_task.domain = &idle0_domain;
     init_task.processor = 0;
 //    init_task.mm = &init_mm;
     init_task.domain->arch.mm = &init_mm;
 //    init_task.thread = INIT_THREAD;
-    init_idle_task();
     //arch_do_createdomain(current);
 #ifdef CLONE_DOMAIN0
     {
@@ -314,7 +312,6 @@ printk("About to call init_trace_bufs()\n");
     console_endboot(cmdline && strstr(cmdline, "tty0"));
 #endif
 
-    domain_unpause_by_systemcontroller(current->domain);
 #ifdef CLONE_DOMAIN0
     {
     int i;

@@ -8,7 +8,6 @@
 #ifndef __XEN_SCHED_IF_H__
 #define __XEN_SCHED_IF_H__
 
-//#define ADV_SCHED_HISTO
 #define BUCKETS  10
 /*300*/
 
@@ -19,11 +18,6 @@ struct schedule_data {
     void               *sched_priv;
     struct ac_timer     s_timer;        /* scheduling timer                */
     unsigned long       tick;           /* current periodic 'tick'         */
-#ifdef ADV_SCHED_HISTO
-    u32			to_hist[BUCKETS];
-    u32			from_hist[BUCKETS];
-    u64			save_tsc;
-#endif
 #ifdef BUCKETS
     u32                 hist[BUCKETS];  /* for scheduler latency histogram */
 #endif
@@ -39,8 +33,6 @@ struct scheduler {
     char *opt_name;         /* option name for this scheduler    */
     unsigned int sched_id;  /* ID for this scheduler             */
 
-    int          (*init_scheduler) (void);
-    int          (*init_idle_task) (struct exec_domain *);
     int          (*alloc_task)     (struct exec_domain *);
     void         (*add_task)       (struct exec_domain *);
     void         (*free_task)      (struct domain *);

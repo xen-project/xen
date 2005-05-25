@@ -50,7 +50,10 @@ struct domain *do_createdomain(domid_t dom_id, unsigned int cpu)
     INIT_LIST_HEAD(&d->page_list);
     INIT_LIST_HEAD(&d->xenpage_list);
 
-    if ( (d->domain_id != IDLE_DOMAIN_ID) &&
+    if ( d->domain_id == IDLE_DOMAIN_ID )
+        set_bit(_DOMF_idle_domain, &d->domain_flags);
+
+    if ( !is_idle_task(d) &&
          ((init_event_channels(d) != 0) || (grant_table_create(d) != 0)) )
     {
         destroy_event_channels(d);
@@ -62,7 +65,7 @@ struct domain *do_createdomain(domid_t dom_id, unsigned int cpu)
     
     sched_add_domain(ed);
 
-    if ( d->domain_id != IDLE_DOMAIN_ID )
+    if ( !is_idle_task(d) )
     {
         write_lock(&domlist_lock);
         pd = &domain_list; /* NB. domain_list maintained in order of dom_id. */

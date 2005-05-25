@@ -9,7 +9,7 @@
 #include <xen/lib.h>
 #include <asm/uaccess.h>
 #include <xen/serial.h>
-#include <asm/irq.h>
+#include <xen/irq.h>
 #include <xen/spinlock.h>
 #include <asm/debugger.h>
 #include <xen/init.h>

@@ -6,6 +6,7 @@
 #include <xen/config.h>
 #include <xen/lib.h>
 #include <xen/types.h>
+#include <xen/bitops.h>
 
 /*
  * bitmaps provide bit arrays that consume one or more unsigned

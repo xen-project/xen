@@ -2259,7 +2259,7 @@ int ioapic_guest_write(int apicid, int address, u32 val)
     
     pin = (address - 0x10) >> 1;
 
-    rte.dest.logical.logical_dest = target_cpus();
+    rte.dest.logical.logical_dest = cpu_mask_to_apicid(TARGET_CPUS);
     *(int *)&rte = val;
 
     if ( rte.vector >= FIRST_DEVICE_VECTOR )

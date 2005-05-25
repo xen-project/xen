@@ -73,44 +73,31 @@ static void default_idle(void)
 void idle_loop(void)
 {
     int cpu = smp_processor_id();
+
     for ( ; ; )
     {
         irq_stat[cpu].idle_timestamp = jiffies;
+
         while ( !softirq_pending(cpu) )
         {
             page_scrub_schedule_work();
             default_idle();
         }
+
         do_softirq();
     }
-}
-
-static void __startup_cpu_idle_loop(struct exec_domain *ed)
-{
-    /* Signal to boot CPU that we are done. */
-    init_idle();
-
-    /* Start normal idle loop. */
-    ed->arch.schedule_tail = continue_idle_task;
-    continue_idle_task(ed);
 }
 
 void startup_cpu_idle_loop(void)
 {
     struct exec_domain *ed = current;
 
-    /* Just some sanity to ensure that the scheduler is set up okay. */
-    ASSERT(ed->domain->domain_id == IDLE_DOMAIN_ID);
+    ASSERT(is_idle_task(ed->domain));
     percpu_ctxt[smp_processor_id()].curr_ed = ed;
     set_bit(smp_processor_id(), &ed->domain->cpuset);
-    domain_unpause_by_systemcontroller(ed->domain);
+    ed->arch.schedule_tail = continue_idle_task;
 
-    ed->arch.schedule_tail = __startup_cpu_idle_loop;
-    raise_softirq(SCHEDULE_SOFTIRQ);
-    do_softirq();
-
-    /* End up in __startup_cpu_idle_loop, not here. */
-    BUG();
+    idle_loop();
 }
 
 static long no_idt[2];
@@ -244,7 +231,7 @@ void arch_do_createdomain(struct exec_domain *ed)
 
     ed->arch.flags = TF_kernel_mode;
 
-    if ( d->domain_id == IDLE_DOMAIN_ID )
+    if ( is_idle_task(d) )
         return;
 
     ed->arch.schedule_tail = continue_nonidle_task;

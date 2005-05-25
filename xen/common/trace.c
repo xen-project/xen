@@ -66,7 +66,7 @@ void init_trace_bufs(void)
         return;
     }
 
-    nr_pages = smp_num_cpus * opt_tbuf_size;
+    nr_pages = num_online_cpus() * opt_tbuf_size;
     order    = get_order(nr_pages * PAGE_SIZE);
     
     if ( (rawbuf = (char *)alloc_xenheap_pages(order)) == NULL )
@@ -79,7 +79,7 @@ void init_trace_bufs(void)
     for ( i = 0; i < nr_pages; i++ )
         SHARE_PFN_WITH_DOMAIN(virt_to_page(rawbuf + i * PAGE_SIZE), dom0);
     
-    for ( i = 0; i < smp_num_cpus; i++ )
+    for_each_online_cpu ( i )
     {
         buf = t_bufs[i] = (struct t_buf *)&rawbuf[i*opt_tbuf_size*PAGE_SIZE];
         

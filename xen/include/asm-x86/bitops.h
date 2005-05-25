@@ -7,6 +7,11 @@
 
 #include <xen/config.h>
 
+#ifndef STR
+#define __STR(x) #x
+#define STR(x) __STR(x)
+#endif
+
 /*
  * These have to be done with inline assembly: that way the bit-setting
  * is guaranteed to be atomic. All bit operations return 0 if the bit
@@ -246,29 +251,28 @@ static __inline__ int variable_test_bit(long nr, volatile void * addr)
 /**
  * find_first_zero_bit - find the first zero bit in a memory region
  * @addr: The address to start the search at
- * @size: The maximum bitnumber to search
+ * @size: The maximum size to search
  *
  * Returns the bit-number of the first zero bit, not the number of the byte
- * containing a bit. -1 when none found.
+ * containing a bit.
  */
-static __inline__ int find_first_zero_bit(void * addr, unsigned size)
+static inline long find_first_zero_bit(
+    const unsigned long *addr, unsigned size)
 {
-	int d0, d1, d2;
-	int res;
+	long d0, d1, d2;
+	long res;
 
-	if (!size)
-		return 0;
 	__asm__ __volatile__(
-		"movl $-1,%%eax\n\t"
-		"xorl %%edx,%%edx\n\t"
-		"repe; scasl\n\t"
+		"mov $-1,%%"__OP"ax\n\t"
+		"xor %%edx,%%edx\n\t"
+		"repe; scas"__OS"\n\t"
 		"je 1f\n\t"
-		"xorl -4(%%"__OP"di),%%eax\n\t"
-		"sub"__OS" $4,%%"__OP"di\n\t"
-		"bsfl %%eax,%%edx\n"
-		"1:\tsub"__OS" %%"__OP"bx,%%"__OP"di\n\t"
-		"shl"__OS" $3,%%"__OP"di\n\t"
-		"add"__OS" %%"__OP"di,%%"__OP"dx"
+		"lea -"STR(BITS_PER_LONG/8)"(%%"__OP"di),%%"__OP"di\n\t"
+		"xor (%%"__OP"di),%%"__OP"ax\n\t"
+		"bsf %%"__OP"ax,%%"__OP"dx\n"
+		"1:\tsub %%"__OP"bx,%%"__OP"di\n\t"
+		"shl $3,%%"__OP"di\n\t"
+		"add %%"__OP"di,%%"__OP"dx"
 		:"=d" (res), "=&c" (d0), "=&D" (d1), "=&a" (d2)
 		:"1" ((size + 31) >> 5), "2" (addr), "b" (addr) : "memory");
 	return res;
@@ -280,65 +284,71 @@ static __inline__ int find_first_zero_bit(void * addr, unsigned size)
  * @offset: The bitnumber to start searching at
  * @size: The maximum size to search
  */
-static __inline__ int find_next_zero_bit (void * addr, int size, int offset)
+long find_next_zero_bit(const unsigned long *addr, int size, int offset);
+
+/**
+ * find_first_bit - find the first set bit in a memory region
+ * @addr: The address to start the search at
+ * @size: The maximum size to search
+ *
+ * Returns the bit-number of the first set bit, not the number of the byte
+ * containing a bit.
+ */
+static inline long find_first_bit(
+    const unsigned long *addr, unsigned size)
 {
-	unsigned int * p = ((unsigned int *) addr) + (offset >> 5);
-	int set = 0, bit = offset & 31, res;
-	
-	if (bit) {
-		/*
-		 * Look for zero in first byte
-		 */
-		__asm__("bsfl %1,%0\n\t"
-			"jne 1f\n\t"
-			"movl $32, %0\n"
-			"1:"
-			: "=r" (set)
-			: "r" (~(*p >> bit)));
-		if (set < (32 - bit))
-			return set + offset;
-		set = 32 - bit;
-		p++;
-	}
-	/*
-	 * No zero yet, search remaining full bytes for a zero
-	 */
-	res = find_first_zero_bit (p, size - 32 * (p - (unsigned int *) addr));
-	return (offset + set + res);
+	long d0, d1;
+	long res;
+
+	__asm__ __volatile__(
+		"xor %%eax,%%eax\n\t"
+		"repe; scas"__OS"\n\t"
+		"je 1f\n\t"
+		"lea -"STR(BITS_PER_LONG/8)"(%%"__OP"di),%%"__OP"di\n\t"
+		"bsf (%%"__OP"di),%%"__OP"ax\n"
+		"1:\tsub %%"__OP"bx,%%"__OP"di\n\t"
+		"shl $3,%%"__OP"di\n\t"
+		"add %%"__OP"di,%%"__OP"ax"
+		:"=a" (res), "=&c" (d0), "=&D" (d1)
+		:"1" ((size + 31) >> 5), "2" (addr), "b" (addr) : "memory");
+	return res;
 }
 
 /**
- * ffz - find first zero in word.
- * @word: The word to search
- *
- * Undefined if no zero exists, so code should check against ~0UL first.
+ * find_next_bit - find the first set bit in a memory region
+ * @addr: The address to base the search on
+ * @offset: The bitnumber to start searching at
+ * @size: The maximum size to search
  */
-static __inline__ unsigned long ffz(unsigned long word)
+long find_next_bit(const unsigned long *addr, int size, int offset);
+
+/* return index of first bet set in val or max when no bit is set */
+static inline unsigned long __scanbit(unsigned long val, unsigned long max)
 {
-	__asm__("bsf"__OS" %1,%0"
-		:"=r" (word)
-		:"r" (~word));
-	return word;
+	asm("bsf %1,%0 ; cmovz %2,%0" : "=&r" (val) : "r" (val), "r" (max));
+	return val;
 }
 
-/**
- * ffs - find first bit set
- * @x: the word to search
- *
- * This is defined the same way as
- * the libc and compiler builtin ffs routines, therefore
- * differs in spirit from the above ffz (man ffs).
- */
-static __inline__ int ffs(int x)
-{
-	int r;
+#define find_first_bit(addr,size) \
+((__builtin_constant_p(size) && (size) <= BITS_PER_LONG ? \
+  (__scanbit(*(unsigned long *)addr,(size))) : \
+  find_first_bit(addr,size)))
 
-	__asm__("bsfl %1,%0\n\t"
-		"jnz 1f\n\t"
-		"movl $-1,%0\n"
-		"1:" : "=r" (r) : "g" (x));
-	return r+1;
-}
+#define find_next_bit(addr,size,off) \
+((__builtin_constant_p(size) && (size) <= BITS_PER_LONG ?         \
+  ((off) + (__scanbit((*(unsigned long *)addr) >> (off),(size)-(off)))) : \
+  find_next_bit(addr,size,off)))
+
+#define find_first_zero_bit(addr,size) \
+((__builtin_constant_p(size) && (size) <= BITS_PER_LONG ? \
+  (__scanbit(~*(unsigned long *)addr,(size))) : \
+  find_first_zero_bit(addr,size)))
+        
+#define find_next_zero_bit(addr,size,off) \
+((__builtin_constant_p(size) && (size) <= BITS_PER_LONG ?         \
+  ((off)+(__scanbit(~(((*(unsigned long *)addr)) >> (off)),(size)-(off)))) : \
+  find_next_zero_bit(addr,size,off)))
+
 
 /*
  * These are the preferred 'find first' functions in Xen.

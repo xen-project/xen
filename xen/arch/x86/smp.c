@@ -141,7 +141,7 @@ static inline void send_IPI_allbutself(int vector)
      * If there are no other CPUs in the system then we get an APIC send error 
      * if we try to broadcast. thus we have to avoid sending IPIs in this case.
      */
-    if ( smp_num_cpus <= 1 )
+    if ( num_online_cpus() <= 1 )
         return;
 
     __send_IPI_shortcut(APIC_DEST_ALLBUT, vector);
@@ -192,10 +192,10 @@ void new_tlbflush_clock_period(void)
     ASSERT(local_irq_is_enabled());
     
     /* Flush everyone else. We definitely flushed just before entry. */
-    if ( smp_num_cpus > 1 )
+    if ( num_online_cpus() > 1 )
     {
         spin_lock(&flush_lock);
-        flush_cpumask  = (1UL << smp_num_cpus) - 1;
+        flush_cpumask  = (1UL << num_online_cpus()) - 1;
         flush_cpumask &= ~(1UL << smp_processor_id());
         flush_va       = FLUSHVA_ALL;
         send_IPI_allbutself(INVALIDATE_TLB_VECTOR);
@@ -257,7 +257,7 @@ int smp_call_function(
 
     ASSERT(local_irq_is_enabled());
 
-    cpuset = ((1UL << smp_num_cpus) - 1) & ~(1UL << smp_processor_id());
+    cpuset = ((1UL << num_online_cpus()) - 1) & ~(1UL << smp_processor_id());
     if ( cpuset == 0 )
         return 0;
 
@@ -295,7 +295,6 @@ void smp_send_stop(void)
 {
     /* Stop all other CPUs in the system. */
     smp_call_function(stop_this_cpu, NULL, 1, 0);
-    smp_num_cpus = 1;
 
     local_irq_disable();
     disable_local_APIC();

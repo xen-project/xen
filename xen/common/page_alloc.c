@@ -45,8 +45,8 @@ string_param("badpage", opt_badpage);
 #define round_pgdown(_p)  ((_p)&PAGE_MASK)
 #define round_pgup(_p)    (((_p)+(PAGE_SIZE-1))&PAGE_MASK)
 
-static spinlock_t page_scrub_lock;
-struct list_head page_scrub_list;
+static spinlock_t page_scrub_lock = SPIN_LOCK_UNLOCKED;
+LIST_HEAD(page_scrub_list);
 
 /*********************
  * ALLOCATION BITMAP
@@ -675,8 +675,6 @@ static void page_scrub_softirq(void)
 
 static __init int page_scrub_init(void)
 {
-    spin_lock_init(&page_scrub_lock);
-    INIT_LIST_HEAD(&page_scrub_list);
     open_softirq(PAGE_SCRUB_SOFTIRQ, page_scrub_softirq);
     return 0;
 }

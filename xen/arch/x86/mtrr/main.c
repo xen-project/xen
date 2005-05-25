@@ -49,8 +49,6 @@
 #define down(_m) spin_lock(_m)
 #define up(_m) spin_unlock(_m)
 
-#define num_booting_cpus() smp_num_cpus
-
 u32 num_var_ranges = 0;
 
 unsigned int *usage_table;

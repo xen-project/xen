@@ -237,6 +237,7 @@ int pirq_guest_bind(struct exec_domain *ed, int irq, int will_share)
     irq_guest_action_t *action;
     unsigned long       flags;
     int                 rc = 0;
+    cpumask_t           cpumask = CPU_MASK_NONE;
 
     if ( !IS_CAPABLE_PHYSDEV(d) )
         return -EPERM;
@@ -273,9 +274,9 @@ int pirq_guest_bind(struct exec_domain *ed, int irq, int will_share)
         desc->handler->startup(irq);
 
         /* Attempt to bind the interrupt target to the correct CPU. */
+        cpu_set(ed->processor, cpumask);
         if ( desc->handler->set_affinity != NULL )
-            desc->handler->set_affinity(
-                irq, apicid_to_phys_cpu_present(ed->processor));
+            desc->handler->set_affinity(irq, cpumask);
     }
     else if ( !will_share || !action->shareable )
     {

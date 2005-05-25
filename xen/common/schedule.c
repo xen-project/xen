@@ -41,11 +41,6 @@
 static char opt_sched[10] = "bvt";
 string_param("sched", opt_sched);
 
-/*#define WAKE_HISTO*/
-/*#define BLOCKTIME_HISTO*/
-/*#define ADV_SCHED_HISTO*/
-//#include <xen/adv_sched_hist.h>
-
 #if defined(WAKE_HISTO)
 #define BUCKETS 31
 #elif defined(BLOCKTIME_HISTO)
@@ -93,8 +88,8 @@ void free_domain_struct(struct domain *d)
     xfree(d);
 }
 
-struct exec_domain *alloc_exec_domain_struct(struct domain *d,
-                                             unsigned long vcpu)
+struct exec_domain *alloc_exec_domain_struct(
+    struct domain *d, unsigned long vcpu)
 {
     struct exec_domain *ed, *edc;
 
@@ -126,10 +121,10 @@ struct exec_domain *alloc_exec_domain_struct(struct domain *d,
         edc->next_in_list = ed;
 
         if (test_bit(_VCPUF_cpu_pinned, &edc->vcpu_flags)) {
-            ed->processor = (edc->processor + 1) % smp_num_cpus;
+            ed->processor = (edc->processor + 1) % num_online_cpus();
             set_bit(_VCPUF_cpu_pinned, &ed->vcpu_flags);
         } else {
-            ed->processor = (edc->processor + 1) % smp_num_cpus;  /* XXX */
+            ed->processor = (edc->processor + 1) % num_online_cpus();
         }
     }
 
@@ -168,20 +163,22 @@ void sched_add_domain(struct exec_domain *ed)
 {
     struct domain *d = ed->domain;
 
-    /* Must be unpaused by control software to start execution. */
-    set_bit(_VCPUF_ctrl_pause, &ed->vcpu_flags);
+    /* Initialise the per-domain timer. */
+    init_ac_timer(&ed->timer);
+    ed->timer.cpu      = ed->processor;
+    ed->timer.data     = (unsigned long)ed;
+    ed->timer.function = &dom_timer_fn;
 
-    if ( d->domain_id != IDLE_DOMAIN_ID )
+    if ( is_idle_task(d) )
     {
-        /* Initialise the per-domain timer. */
-        init_ac_timer(&ed->timer);
-        ed->timer.cpu      = ed->processor;
-        ed->timer.data     = (unsigned long)ed;
-        ed->timer.function = &dom_timer_fn;
+        schedule_data[ed->processor].curr = ed;
+        schedule_data[ed->processor].idle = ed;
+        set_bit(_VCPUF_running, &ed->vcpu_flags);
     }
     else
     {
-        schedule_data[ed->processor].idle = ed;
+        /* Must be unpaused by control software to start execution. */
+        set_bit(_VCPUF_ctrl_pause, &ed->vcpu_flags);
     }
 
     SCHED_OP(add_task, ed);
@@ -193,12 +190,6 @@ void sched_rem_domain(struct exec_domain *ed)
     rem_ac_timer(&ed->timer);
     SCHED_OP(rem_task, ed);
     TRACE_2D(TRC_SCHED_DOM_REM, ed->domain->domain_id, ed->vcpu_id);
-}
-
-void init_idle_task(void)
-{
-    if ( SCHED_OP(init_idle_task, current) < 0 )
-        BUG();
 }
 
 void domain_sleep(struct exec_domain *ed)
@@ -240,10 +231,6 @@ long do_block(void)
 {
     struct exec_domain *ed = current;
 
-#ifdef ADV_SCHED_HISTO
-    adv_sched_hist_start(current->processor);
-#endif
-
     ed->vcpu_info->evtchn_upcall_mask = 0;
     set_bit(_VCPUF_blocked, &ed->vcpu_flags);
 
@@ -264,10 +251,6 @@ long do_block(void)
 /* Voluntarily yield the processor for this allocation. */
 static long do_yield(void)
 {
-#ifdef ADV_SCHED_HISTO
-    adv_sched_hist_start(current->processor);
-#endif
-    
     TRACE_2D(TRC_SCHED_YIELD, current->domain->domain_id, current->vcpu_id);
     __enter_scheduler();
     return 0;
@@ -422,13 +405,7 @@ static void __enter_scheduler(void)
     
     spin_lock_irq(&schedule_data[cpu].schedule_lock);
 
-#ifdef ADV_SCHED_HISTO
-    adv_sched_hist_from_stop(cpu);
-#endif
     now = NOW();
-#ifdef ADV_SCHED_HISTO
-    adv_sched_hist_start(cpu);
-#endif
 
     rem_ac_timer(&schedule_data[cpu].s_timer);
     
@@ -447,7 +424,7 @@ static void __enter_scheduler(void)
     next->lastschd = now;
 
     /* reprogramm the timer */
-    schedule_data[cpu].s_timer.expires  = now + r_time;
+    schedule_data[cpu].s_timer.expires = now + r_time;
     add_ac_timer(&schedule_data[cpu].s_timer);
 
     /* Must be protected by the schedule_lock! */
@@ -455,12 +432,9 @@ static void __enter_scheduler(void)
 
     spin_unlock_irq(&schedule_data[cpu].schedule_lock);
 
-    if ( unlikely(prev == next) ) {
-#ifdef ADV_SCHED_HISTO
-        adv_sched_hist_to_stop(cpu);
-#endif
+    if ( unlikely(prev == next) )
         return continue_running(prev);
-    }
+
     perfc_incrc(sched_ctx);
 
 #if defined(WAKE_HISTO)
@@ -495,10 +469,6 @@ static void __enter_scheduler(void)
              prev->domain->domain_id, prev->vcpu_id,
              next->domain->domain_id, next->vcpu_id);
 
-#ifdef ADV_SCHED_HISTO
-    adv_sched_hist_to_stop(cpu);
-#endif
-
     context_switch(prev, next);
 }
 
@@ -520,10 +490,6 @@ int idle_cpu(int cpu)
 /* The scheduler timer: force a run through the scheduler */
 static void s_timer_fn(unsigned long unused)
 {
-#ifdef ADV_SCHED_HISTO
-    adv_sched_hist_start(current->processor);
-#endif
-
     raise_softirq(SCHEDULE_SOFTIRQ);
     perfc_incrc(sched_irq);
 }
@@ -567,8 +533,7 @@ void __init scheduler_init(void)
     for ( i = 0; i < NR_CPUS; i++ )
     {
         spin_lock_init(&schedule_data[i].schedule_lock);
-        schedule_data[i].curr = &idle0_exec_domain;
-        
+
         init_ac_timer(&schedule_data[i].s_timer);
         schedule_data[i].s_timer.cpu      = i;
         schedule_data[i].s_timer.data     = 2;
@@ -580,7 +545,8 @@ void __init scheduler_init(void)
         t_timer[i].function = &t_timer_fn;
     }
 
-    schedule_data[0].idle = &idle0_exec_domain;
+    schedule_data[0].curr = idle_task[0];
+    schedule_data[0].idle = idle_task[0];
 
     for ( i = 0; schedulers[i] != NULL; i++ )
     {
@@ -594,8 +560,8 @@ void __init scheduler_init(void)
 
     printk("Using scheduler: %s (%s)\n", ops.name, ops.opt_name);
 
-    if ( SCHED_OP(init_scheduler) < 0 )
-        panic("Initialising scheduler failed!");
+    BUG_ON(SCHED_OP(alloc_task, idle_task[0]) < 0);
+    sched_add_domain(idle_task[0]);
 }
 
 /*
@@ -604,13 +570,9 @@ void __init scheduler_init(void)
  */
 void schedulers_start(void) 
 {   
-    s_timer_fn(0);
-    smp_call_function((void *)s_timer_fn, NULL, 1, 1);
-
     t_timer_fn(0);
     smp_call_function((void *)t_timer_fn, NULL, 1, 1);
 }
-
 
 void dump_runq(unsigned char key)
 {
@@ -624,7 +586,7 @@ void dump_runq(unsigned char key)
     SCHED_OP(dump_settings);
     printk("NOW=0x%08X%08X\n",  (u32)(now>>32), (u32)now); 
 
-    for ( i = 0; i < smp_num_cpus; i++ )
+    for_each_online_cpu ( i )
     {
         spin_lock(&schedule_data[i].schedule_lock);
         printk("CPU[%02d] ", i);
@@ -636,10 +598,11 @@ void dump_runq(unsigned char key)
 }
 
 #if defined(WAKE_HISTO) || defined(BLOCKTIME_HISTO)
+
 void print_sched_histo(unsigned char key)
 {
     int i, j, k;
-    for ( k = 0; k < smp_num_cpus; k++ )
+    for_each_online_cpu ( k )
     {
         j = 0;
         printf ("CPU[%02d]: scheduler latency histogram (ms:[count])\n", k);
@@ -659,73 +622,20 @@ void print_sched_histo(unsigned char key)
     }
       
 }
+
 void reset_sched_histo(unsigned char key)
 {
     int i, j;
-    for ( j = 0; j < smp_num_cpus; j++ )
+    for ( j = 0; j < NR_CPUS; j++ )
         for ( i=0; i < BUCKETS; i++ ) 
             schedule_data[j].hist[i] = 0;
 }
+
 #else
-#if defined(ADV_SCHED_HISTO)
-void print_sched_histo(unsigned char key)
-{
-    int i, j, k,t;
-    printf("Hello!\n");
-    for ( k = 0; k < smp_num_cpus; k++ )
-    {
-        j = 0;
-	t = 0;
-        printf ("CPU[%02d]: scheduler latency histogram FROM (ms:[count])\n", k);
-        for ( i = 0; i < BUCKETS; i++ )
-        {
-            //if ( schedule_data[k].hist[i] != 0 )
-            {
-	        t += schedule_data[k].from_hist[i];
-                if ( i < BUCKETS-1 )
-                    printk("%3d:[%7u]    ", i, schedule_data[k].from_hist[i]);
-                else
-                    printk(" >:[%7u]    ", schedule_data[k].from_hist[i]);
-                //if ( !(++j % 5) )
-                    printk("\n");
-            }
-        }
-        printk("\nTotal: %i\n",t);
-    }
-    for ( k = 0; k < smp_num_cpus; k++ )
-    {
-        j = 0; t = 0;
-        printf ("CPU[%02d]: scheduler latency histogram TO (ms:[count])\n", k);
-        for ( i = 0; i < BUCKETS; i++ )
-        {
-            //if ( schedule_data[k].hist[i] != 0 )
-            {
-	    	t += schedule_data[k].from_hist[i];
-                if ( i < BUCKETS-1 )
-                    printk("%3d:[%7u]    ", i, schedule_data[k].to_hist[i]);
-                else
-                    printk(" >:[%7u]    ", schedule_data[k].to_hist[i]);
-                //if ( !(++j % 5) )
-                    printk("\n");
-            }
-        }
-	printk("\nTotal: %i\n",t);
-    }
-      
-}
-void reset_sched_histo(unsigned char key)
-{
-    int i, j;
-    for ( j = 0; j < smp_num_cpus; j++ ) {
-        for ( i=0; i < BUCKETS; i++ ) 
-            schedule_data[j].to_hist[i] = schedule_data[j].from_hist[i] = 0;
-        schedule_data[j].save_tsc = 0;
-    }
-}
-#else
+
 void print_sched_histo(unsigned char key) { }
 void reset_sched_histo(unsigned char key) { }
-#endif
+
 #endif
 
 /*

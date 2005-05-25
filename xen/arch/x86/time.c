@@ -37,7 +37,6 @@ unsigned long cpu_khz;  /* Detected as we calibrate the TSC */
 unsigned long ticks_per_usec; /* TSC ticks per microsecond. */
 spinlock_t rtc_lock = SPIN_LOCK_UNLOCKED;
 int timer_ack = 0;
-int do_timer_lists_from_pit = 0;
 unsigned long volatile jiffies;
 
 /* PRIVATE */
@@ -91,7 +90,7 @@ void timer_interrupt(int irq, void *dev_id, struct cpu_user_regs *regs)
     write_unlock_irq(&time_lock);
 
     /* Rough hack to allow accurate timers to sort-of-work with no APIC. */
-    if ( do_timer_lists_from_pit )
+    if ( !cpu_has_apic )
         raise_softirq(AC_TIMER_SOFTIRQ);
 }
 

@@ -169,14 +169,19 @@ static inline u32 calc_evt(struct exec_domain *d, u32 avt)
 static int bvt_alloc_task(struct exec_domain *ed)
 {
     struct domain *d = ed->domain;
-    if ( (d->sched_priv == NULL) ) {
+
+    if ( (d->sched_priv == NULL) )
+    {
         if ( (d->sched_priv = xmalloc(struct bvt_dom_info)) == NULL )
             return -1;
         memset(d->sched_priv, 0, sizeof(struct bvt_dom_info));
     }
+
     ed->sched_priv = &BVT_INFO(d)->ed_inf[ed->vcpu_id];
+
     BVT_INFO(d)->ed_inf[ed->vcpu_id].inf = BVT_INFO(d);
     BVT_INFO(d)->ed_inf[ed->vcpu_id].exec_domain = ed;
+
     return 0;
 }
 
@@ -189,6 +194,15 @@ static void bvt_add_task(struct exec_domain *d)
     struct bvt_edom_info *einf = EBVT_INFO(d);
     ASSERT(inf != NULL);
     ASSERT(d   != NULL);
+
+    /* Allocate per-CPU context if this is the first domain to be added. */
+    if ( CPU_INFO(d->processor) == NULL )
+    {
+        schedule_data[d->processor].sched_priv = xmalloc(struct bvt_cpu_info);
+        BUG_ON(CPU_INFO(d->processor) == NULL);
+        INIT_LIST_HEAD(RUNQUEUE(d->processor));
+        CPU_SVT(d->processor) = 0;
+    }
 
     if ( d->vcpu_id == 0 )
     {
@@ -213,9 +227,11 @@ static void bvt_add_task(struct exec_domain *d)
 
     einf->exec_domain = d;
 
-    if ( d->domain->domain_id == IDLE_DOMAIN_ID )
+    if ( is_idle_task(d->domain) )
     {
         einf->avt = einf->evt = ~0U;
+        BUG_ON(__task_on_runqueue(d));
+        __add_to_runqueue_head(d);
     } 
     else 
     {
@@ -223,20 +239,6 @@ static void bvt_add_task(struct exec_domain *d)
         einf->avt = CPU_SVT(d->processor);
         einf->evt = CPU_SVT(d->processor);
     }
-}
-
-static int bvt_init_idle_task(struct exec_domain *ed)
-{
-    if ( bvt_alloc_task(ed) < 0 )
-        return -1;
-
-    bvt_add_task(ed);
-
-    set_bit(_VCPUF_running, &ed->vcpu_flags);
-    if ( !__task_on_runqueue(ed) )
-        __add_to_runqueue_head(ed);
-
-    return 0;
 }
 
 static void bvt_wake(struct exec_domain *ed)
@@ -548,36 +550,11 @@ static void bvt_dump_cpu_state(int i)
     }
 }
 
-/* Initialise the data structures. */
-static int bvt_init_scheduler(void)
-{
-    int i;
-
-    for ( i = 0; i < NR_CPUS; i++ )
-    {
-        schedule_data[i].sched_priv = xmalloc(struct bvt_cpu_info);
-       
-        if ( schedule_data[i].sched_priv == NULL )
-        {
-            printk("Failed to allocate BVT scheduler per-CPU memory!\n");
-            return -1;
-        }
-
-        INIT_LIST_HEAD(RUNQUEUE(i));
-        
-        CPU_SVT(i) = 0; /* XXX do I really need to do this? */
-    }
-
-    return 0;
-}
-
 struct scheduler sched_bvt_def = {
     .name     = "Borrowed Virtual Time",
     .opt_name = "bvt",
     .sched_id = SCHED_BVT,
     
-    .init_scheduler = bvt_init_scheduler,
-    .init_idle_task = bvt_init_idle_task,
     .alloc_task     = bvt_alloc_task,
     .add_task       = bvt_add_task,
     .free_task      = bvt_free_task,

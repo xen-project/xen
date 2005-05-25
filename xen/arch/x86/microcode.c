@@ -86,7 +86,6 @@
 #define up(_m) spin_unlock(_m)
 #define vmalloc(_s) xmalloc_bytes(_s)
 #define vfree(_p) xfree(_p)
-#define num_online_cpus() smp_num_cpus
 
 #if 0
 MODULE_DESCRIPTION("Intel CPU (IA-32) Microcode Update Driver");

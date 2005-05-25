@@ -246,9 +246,6 @@ void new_thread(struct exec_domain *d,
                 unsigned long start_stack,
                 unsigned long start_info);
 
-extern unsigned long wait_init_idle;
-#define init_idle() clear_bit(smp_processor_id(), &wait_init_idle);
-
 #define set_current_state(_s) do { current->state = (_s); } while (0)
 void scheduler_init(void);
 void schedulers_start(void);
@@ -257,7 +254,6 @@ void sched_rem_domain(struct exec_domain *);
 long sched_ctl(struct sched_ctl_cmd *);
 long sched_adjdom(struct sched_adjdom_cmd *);
 int  sched_id();
-void init_idle_task(void);
 void domain_wake(struct exec_domain *d);
 void domain_sleep(struct exec_domain *d);
 

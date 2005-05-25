@@ -99,6 +99,7 @@ integer_param("debug_stack_lines", debug_stack_lines);
 
 static inline int kernel_text_address(unsigned long addr)
 {
+    extern char _stext, _etext;
     if (addr >= (unsigned long) &_stext &&
         addr <= (unsigned long) &_etext)
         return 1;

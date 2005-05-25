@@ -93,7 +93,7 @@ extern void write_cr3(unsigned long cr3);
 #define local_flush_tlb_one(__addr) \
     __asm__ __volatile__("invlpg %0": :"m" (*(char *) (__addr)))
 
-#define flush_tlb_all()     flush_tlb_mask((1 << smp_num_cpus) - 1)
+#define flush_tlb_all()     flush_tlb_mask((1 << num_online_cpus()) - 1)
 
 #ifndef CONFIG_SMP
 #define flush_tlb_all_pge()          local_flush_tlb_pge()

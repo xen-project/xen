@@ -92,13 +92,16 @@ int __init check_nmi_watchdog (void)
 
     printk("Testing NMI watchdog --- ");
 
-    for ( cpu = 0; cpu < smp_num_cpus; cpu++ ) 
+    for ( cpu = 0; cpu < NR_CPUS; cpu++ ) 
         prev_nmi_count[cpu] = nmi_count(cpu);
-    __sti();
+    local_irq_enable();
     mdelay((10*1000)/nmi_hz); /* wait 10 ticks */
 
-    for ( cpu = 0; cpu < smp_num_cpus; cpu++ ) 
+    for ( cpu = 0; cpu < NR_CPUS; cpu++ ) 
     {
+        if ( !cpu_isset(cpu, cpu_callin_map) && 
+             !cpu_isset(cpu, cpu_online_map) )
+            continue;
         if ( nmi_count(cpu) - prev_nmi_count[cpu] <= 5 )
             printk("CPU#%d stuck. ", cpu);
         else
@@ -275,13 +278,6 @@ void watchdog_enable(void)
     if ( --watchdog_disable_count == 0 )
         watchdog_on = 1;
     spin_unlock_irqrestore(&watchdog_lock, flags);
-}
-
-void touch_nmi_watchdog (void)
-{
-    int i;
-    for (i = 0; i < smp_num_cpus; i++)
-        alert_counter[i] = 0;
 }
 
 void nmi_watchdog_tick (struct cpu_user_regs * regs)

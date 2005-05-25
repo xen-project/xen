@@ -438,7 +438,7 @@ int construct_dom0(struct domain *d,
     /* Mask all upcalls... */
     for ( i = 0; i < MAX_VIRT_CPUS; i++ )
         d->shared_info->vcpu_data[i].evtchn_upcall_mask = 1;
-    d->shared_info->n_vcpu = smp_num_cpus;
+    d->shared_info->n_vcpu = num_online_cpus();
 
     /* Set up monitor table */
     update_pagetables(ed);

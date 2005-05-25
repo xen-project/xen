@@ -55,10 +55,11 @@ void perfc_printall(unsigned char key)
             break;
         case TYPE_CPU:
         case TYPE_S_CPU:
-            for ( j = sum = 0; j < smp_num_cpus; j++ )
+            sum = 0;
+            for_each_online_cpu ( j )
                 sum += atomic_read(&counters[j]);
             printk("TOTAL[%10d]  ", sum);
-            for ( j = 0; j < smp_num_cpus; j++ )
+            for_each_online_cpu ( j )
                 printk("CPU%02d[%10d]  ", j, atomic_read(&counters[j]));
             counters += NR_CPUS;
             break;
@@ -84,7 +85,7 @@ void perfc_printall(unsigned char key)
 
 void perfc_reset(unsigned char key)
 {
-    int i, j, sum;
+    int i, j;
     s_time_t now = NOW();
     atomic_t *counters = (atomic_t *)&perfcounters;
 
@@ -104,13 +105,13 @@ void perfc_reset(unsigned char key)
             counters += 1;
             break;
         case TYPE_CPU:
-            for ( j = sum = 0; j < smp_num_cpus; j++ )
+            for ( j = 0; j < NR_CPUS; j++ )
                 atomic_set(&counters[j],0);
         case TYPE_S_CPU:
             counters += NR_CPUS;
             break;
         case TYPE_ARRAY:
-            for ( j = sum = 0; j < perfc_info[i].nr_elements; j++ )
+            for ( j = 0; j < NR_CPUS; j++ )
                 atomic_set(&counters[j],0);
         case TYPE_S_ARRAY:
             counters += perfc_info[i].nr_elements;
@@ -146,7 +147,7 @@ static int perfc_copy_info(dom0_perfc_desc_t *desc)
                 break;
             case TYPE_CPU:
             case TYPE_S_CPU:
-                perfc_d[i].nr_vals = smp_num_cpus;
+                perfc_d[i].nr_vals = num_online_cpus();
                 break;
             case TYPE_ARRAY:
             case TYPE_S_ARRAY:

@@ -663,7 +663,7 @@ void (*wait_timer_tick)(void) __initdata = wait_8254_wraparound;
 
 #define APIC_DIVISOR 1
 
-static void __setup_APIC_LVTT(unsigned int clocks)
+void __setup_APIC_LVTT(unsigned int clocks)
 {
     unsigned int lvtt_value, tmp_value, ver;
 
@@ -680,30 +680,33 @@ static void __setup_APIC_LVTT(unsigned int clocks)
     apic_write_around(APIC_TMICT, clocks/APIC_DIVISOR);
 }
 
-/*
- * this is done for every CPU from setup_APIC_clocks() below.
- * We setup each local APIC with a zero timeout value for now.
- * Unlike Linux, we don't have to wait for slices etc.
- */
-void setup_APIC_timer(void * data)
+static void __init setup_APIC_timer(unsigned int clocks)
 {
     unsigned long flags;
-    __save_flags(flags);
-    __sti();
-    __setup_APIC_LVTT(0);
-    __restore_flags(flags);
+    
+    local_irq_save(flags);
+
+    /*
+     * Wait for IRQ0's slice:
+     */
+    wait_timer_tick();
+
+    __setup_APIC_LVTT(clocks);
+
+    local_irq_restore(flags);
 }
 
 /*
- * In this function we calibrate APIC bus clocks to the external timer.
+ * In this function we calibrate APIC bus clocks to the external
+ * timer. Unfortunately we cannot use jiffies and the timer irq
+ * to calibrate, since some later bootup code depends on getting
+ * the first irq? Ugh.
  *
- * As a result we have the Bus Speed and CPU speed in Hz.
- * 
- * We want to do the calibration only once (for CPU0).  CPUs connected by the
- * same APIC bus have the very same bus frequency.
- *
- * This bit is a bit shoddy since we use the very same periodic timer interrupt
- * we try to eliminate to calibrate the APIC. 
+ * We want to do the calibration only once since we
+ * want to have local timer irqs syncron. CPUs connected
+ * by the same APIC bus have the very same bus frequency.
+ * And we want to have irqs off anyways, no accidental
+ * APIC irq that way.
  */
 
 int __init calibrate_APIC_clock(void)
@@ -780,21 +783,48 @@ int __init calibrate_APIC_clock(void)
     return result;
 }
 
-/*
- * initialise the APIC timers for all CPUs
- * we start with the first and find out processor frequency and bus speed
- */
-void __init setup_APIC_clocks (void)
+
+static unsigned int calibration_result;
+
+void __init setup_boot_APIC_clock(void)
 {
+    apic_printk(APIC_VERBOSE, "Using local APIC timer interrupts.\n");
     using_apic_timer = 1;
-    __cli();
-    /* calibrate CPU0 for CPU speed and BUS speed */
-    bus_freq = calibrate_APIC_clock();
-    /* Now set up the timer for real. */
-    setup_APIC_timer((void *)bus_freq);
-    __sti();
-    /* and update all other cpus */
-    smp_call_function(setup_APIC_timer, (void *)bus_freq, 1, 1);
+
+    local_irq_disable();
+    
+    calibration_result = calibrate_APIC_clock();
+    /*
+     * Now set up the timer for real.
+     */
+    setup_APIC_timer(calibration_result);
+    
+    local_irq_enable();
+}
+
+void __init setup_secondary_APIC_clock(void)
+{
+    setup_APIC_timer(calibration_result);
+}
+
+void __init disable_APIC_timer(void)
+{
+    if (using_apic_timer) {
+        unsigned long v;
+        
+        v = apic_read(APIC_LVTT);
+        apic_write_around(APIC_LVTT, v | APIC_LVT_MASKED);
+    }
+}
+
+void enable_APIC_timer(void)
+{
+    if (using_apic_timer) {
+        unsigned long v;
+        
+        v = apic_read(APIC_LVTT);
+        apic_write_around(APIC_LVTT, v & ~APIC_LVT_MASKED);
+    }
 }
 
 #undef APIC_DIVISOR
@@ -885,7 +915,7 @@ asmlinkage void smp_spurious_interrupt(struct cpu_user_regs *regs)
         ack_APIC_irq();
 
     /* see sw-dev-man vol 3, chapter 7.4.13.5 */
-    printk("spurious APIC interrupt on CPU#%d, should never happen.\n",
+    printk(KERN_INFO "spurious APIC interrupt on CPU#%d, should never happen.\n",
            smp_processor_id());
 }
 
@@ -914,8 +944,8 @@ asmlinkage void smp_error_interrupt(struct cpu_user_regs *regs)
        6: Received illegal vector
        7: Illegal register address
     */
-    printk("APIC error on CPU%d: %02lx(%02lx)\n",
-            smp_processor_id(), v, v1);
+    printk (KERN_DEBUG "APIC error on CPU%d: %02lx(%02lx)\n",
+            smp_processor_id(), v , v1);
 }
 
 /*
@@ -940,20 +970,18 @@ int __init APIC_init_uniprocessor (void)
 
     connect_bsp_APIC();
 
-#ifdef CONFIG_SMP
-    cpu_online_map = 1;
-#endif
     phys_cpu_present_map = physid_mask_of_physid(boot_cpu_physical_apicid);
-    apic_write_around(APIC_ID, boot_cpu_physical_apicid);
 
     setup_local_APIC();
 
+    if (nmi_watchdog == NMI_LOCAL_APIC)
+        check_nmi_watchdog();
 #ifdef CONFIG_X86_IO_APIC
     if (smp_found_config)
         if (!skip_ioapic_setup && nr_ioapics)
             setup_IO_APIC();
 #endif
-    setup_APIC_clocks();
+    setup_boot_APIC_clock();
 
     return 0;
 }

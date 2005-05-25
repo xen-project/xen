@@ -155,7 +155,7 @@ long do_dom0_op(dom0_op_t *u_dom0_op)
         unsigned int        pro;
         domid_t             dom;
         struct exec_domain *ed;
-        unsigned int        i, ht, cnt[NR_CPUS] = { 0 };
+        unsigned int        i, cnt[NR_CPUS] = { 0 };
 
 
         dom = op->u.createdomain.domain;
@@ -182,9 +182,8 @@ long do_dom0_op(dom0_op_t *u_dom0_op)
          * domains will all share the second HT of each CPU. Since dom0 is on 
 	     * CPU 0, we favour high numbered CPUs in the event of a tie.
          */
-        ht = opt_noht ? 1 : ht_per_core;
-        pro = ht-1;
-        for ( i = pro; i < smp_num_cpus; i += ht )
+        pro = ht_per_core - 1;
+        for ( i = pro; i < num_online_cpus(); i += ht_per_core )
             if ( cnt[i] <= cnt[pro] )
                 pro = i;
 
@@ -269,7 +268,7 @@ long do_dom0_op(dom0_op_t *u_dom0_op)
         else
         {
             /* pick a new cpu from the usable map */
-            int new_cpu = (int)find_first_set_bit(cpumap) % smp_num_cpus;
+            int new_cpu = (int)find_first_set_bit(cpumap) % num_online_cpus();
 
             exec_domain_pause(ed);
             if ( ed->processor != new_cpu )
