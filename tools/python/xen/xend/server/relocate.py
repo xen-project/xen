@@ -1,3 +1,5 @@
+
+import socket
 import sys
 import StringIO
 
@@ -123,3 +125,15 @@ def listenRelocation():
         port = xroot.get_xend_relocation_port()
         interface = xroot.get_xend_relocation_address()
         reactor.listenTCP(port, factory, interface=interface)
+
+def setupRelocation(dst, port):
+    try:
+        sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        sock.connect((dst, port))
+    except socket.error, err:
+        raise XendError("can't connect: %s" % err[1])
+
+    sock.send("receive\n")
+    print sock.recv(80)
+
+    return sock

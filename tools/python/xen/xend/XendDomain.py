@@ -14,6 +14,7 @@ import time
 
 import xen.lowlevel.xc; xc = xen.lowlevel.xc.new()
 
+from xen.xend.server import relocate
 import sxp
 import XendRoot; xroot = XendRoot.instance()
 import XendCheckpoint
@@ -510,6 +511,11 @@ class XendDomain:
         # Need a cancel too?
         # Don't forget to cancel restart for it.
         dominfo = self.domain_lookup(id)
+
+        port = xroot.get_xend_relocation_port()
+        sock = relocate.setupRelocation(dst, port)
+
+        XendCheckpoint.save(self, sock.fileno(), dominfo)
         return None
 
     def domain_save(self, id, dst, progress=False):

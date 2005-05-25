@@ -75,15 +75,7 @@ class SrvDomain(SrvDir):
                      ['destination', 'str'],
                      ['live',        'int'],
                      ['resource',    'int']])
-        info = fn(req.args, {'dom': self.dom.id})
-        #req.setResponseCode(http.ACCEPTED)
-        host = info.dst_host
-        port = info.dst_port
-        dom  = info.dst_dom
-        url = "http://%s:%d/xend/domain/%d" % (host, port, dom)
-        req.setHeader("Location", url)
-        print 'do_migrate> url=', url
-        return url
+        return fn(req.args, {'dom': self.dom.id})
 
     def op_pincpu(self, op, req):
         fn = FormFn(self.xd.domain_pincpu,
