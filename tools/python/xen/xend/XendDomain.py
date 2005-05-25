@@ -402,7 +402,7 @@ class XendDomain:
         if reason == 'halt':
             reason = 'poweroff'
         val = dominfo.shutdown(reason, key=key)
-        if reason != 'sysrq':
+        if not reason in ['suspend', 'sysrq']:
             self.domain_shutdowns()
         return val
 

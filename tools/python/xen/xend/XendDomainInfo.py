@@ -1136,7 +1136,7 @@ class XendDomainInfo:
         if self.channel:
             msg = messages.packMsg(msgtype, extra)
             self.channel.writeRequest(msg)
-        if reason != 'sysrq':
+        if not reason in ['suspend', 'sysrq']:
             self.shutdown_pending = {'start':time.time(), 'reason':reason,
                                      'key':key}
 
