@@ -20,7 +20,7 @@ static inline int mps_oem_check(struct mp_config_table *mpc, char *oem,
 {
 	if (mpc->mpc_oemptr) {
 		struct mp_config_oemtable *oem_table = 
-			(struct mp_config_oemtable *)mpc->mpc_oemptr;
+			(struct mp_config_oemtable *)(long)mpc->mpc_oemptr;
 		if (!strncmp(oem, "UNISYS", 6))
 			return parse_unisys_oem((char *)oem_table, oem_table->oem_length);
 	}

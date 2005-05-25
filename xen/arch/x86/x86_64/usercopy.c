@@ -5,6 +5,8 @@
  * Copyright 1997 Linus Torvalds
  * Copyright 2002 Andi Kleen <ak@suse.de>
  */
+
+#include <xen/string.h>
 #include <asm/uaccess.h>
 
 /*

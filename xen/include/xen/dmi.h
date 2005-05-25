@@ -32,16 +32,7 @@ struct dmi_system_id {
 
 #define DMI_MATCH(a,b)	{ a, b }
 
-#if defined(CONFIG_X86) && !defined(CONFIG_X86_64)
-
 extern int dmi_check_system(struct dmi_system_id *list);
 extern char * dmi_get_system_info(int field);
-
-#else
-
-static inline int dmi_check_system(struct dmi_system_id *list) { return 0; }
-static inline char * dmi_get_system_info(int field) { return NULL; }
-
-#endif
 
 #endif	/* __DMI_H__ */
