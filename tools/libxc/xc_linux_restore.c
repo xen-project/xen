@@ -32,6 +32,22 @@
 #define PPRINTF(_f, _a...)
 #endif
 
+ssize_t
+read_exact(int fd, void *buf, size_t count)
+{
+    int r = 0, s;
+    unsigned char *b = buf;
+
+    while (r < count) {
+	s = read(fd, &b[r], count - r);
+	if (s <= 0)
+	    break;
+	r += s;
+    }
+
+    return r;
+}
+
 int xc_linux_restore(int xc_handle, int io_fd, u32 dom, unsigned long nr_pfns)
 {
     dom0_op_t op;
@@ -90,7 +106,7 @@ int xc_linux_restore(int xc_handle, int io_fd, u32 dom, unsigned long nr_pfns)
         return 1;
     }
 
-    if (read(io_fd, pfn_to_mfn_frame_list, PAGE_SIZE) != PAGE_SIZE) {
+    if (read_exact(io_fd, pfn_to_mfn_frame_list, PAGE_SIZE) != PAGE_SIZE) {
 	ERR("read pfn_to_mfn_frame_list failed");
 	goto out;
     }
@@ -168,9 +184,9 @@ int xc_linux_restore(int xc_handle, int io_fd, u32 dom, unsigned long nr_pfns)
             prev_pc = this_pc;
         }
 
-        if ( read(io_fd, &j, sizeof(int)) != sizeof(int) )
+        if ( read_exact(io_fd, &j, sizeof(int)) != sizeof(int) )
         {
-            ERR("Error when reading from state file");
+            ERR("Error when reading batch size");
             goto out;
         }
 
@@ -192,9 +208,9 @@ int xc_linux_restore(int xc_handle, int io_fd, u32 dom, unsigned long nr_pfns)
             goto out;
         }
  
-        if ( read(io_fd, region_pfn_type, j*sizeof(unsigned long)) !=
+        if ( read_exact(io_fd, region_pfn_type, j*sizeof(unsigned long)) !=
              j*sizeof(unsigned long) ) {
-            ERR("Error when reading from state file");
+            ERR("Error when reading region pfn types");
             goto out;
         }
 
@@ -245,9 +261,9 @@ int xc_linux_restore(int xc_handle, int io_fd, u32 dom, unsigned long nr_pfns)
             else
                 ppage = (unsigned long*) (region_base + i*PAGE_SIZE);
 
-            if ( read(io_fd, ppage, PAGE_SIZE) != PAGE_SIZE )
+            if ( read_exact(io_fd, ppage, PAGE_SIZE) != PAGE_SIZE )
             {
-                ERR("Error when reading from state file");
+                ERR("Error when reading pagetable page");
                 goto out;
             }
 
@@ -389,9 +405,9 @@ int xc_linux_restore(int xc_handle, int io_fd, u32 dom, unsigned long nr_pfns)
 	unsigned int count, *pfntab;
 	int rc;
 
-	if ( read(io_fd, &count, sizeof(count)) != sizeof(count) )
+	if ( read_exact(io_fd, &count, sizeof(count)) != sizeof(count) )
 	{
-	    ERR("Error when reading from state file");
+	    ERR("Error when reading pfn count");
 	    goto out;
 	}
 
@@ -402,10 +418,10 @@ int xc_linux_restore(int xc_handle, int io_fd, u32 dom, unsigned long nr_pfns)
 	    goto out;
 	}
 
-	if ( read(io_fd, pfntab, sizeof(unsigned int)*count) !=
+	if ( read_exact(io_fd, pfntab, sizeof(unsigned int)*count) !=
              sizeof(unsigned int)*count )
 	{
-	    ERR("Error when reading pfntab from state file");
+	    ERR("Error when reading pfntab");
 	    goto out;
 	}
 
@@ -432,10 +448,10 @@ int xc_linux_restore(int xc_handle, int io_fd, u32 dom, unsigned long nr_pfns)
 	}	
     }
 
-    if ( read(io_fd, &ctxt,            sizeof(ctxt)) != sizeof(ctxt) ||
-         read(io_fd, shared_info_page, PAGE_SIZE) != PAGE_SIZE )
+    if ( read_exact(io_fd, &ctxt,            sizeof(ctxt)) != sizeof(ctxt) ||
+         read_exact(io_fd, shared_info_page, PAGE_SIZE) != PAGE_SIZE )
     {
-        ERR("Error when reading from state file");
+        ERR("Error when reading ctxt or shared info page");
         goto out;
     }
 
