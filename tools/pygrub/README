@@ -1,1 +1,15 @@
-Compiling this needs RPM e2fsprogs-devel installed.
+pygrub is a grub-like bootloader for xen. This tool is to use to boot domU images.
+
+To compile pygrub, you will need the following packages installed:
+
+1) Libraries of ext2fs, which is the following package (depend on your Linux distribution):
+	- e2fslibs-dev on Debian based distributions (Debian, Ubuntu, Linspire, Libranet, Xandros, etc...)
+	- e2fsprogs-devel on RedHat, Fedora Core
+	- libext2fs2-devel on Mandriva/Mandrake
+	- e2fsprogs on Gentoo
+
+2) Libraries of reiserfs, which is the following package (depend on your Linux distribution):
+	- libreiserfs-dev on Debian based distributions (Debian, Ubuntu, Xandros, Libranet, Xandros, etc...)
+	- progsreiserfs-devel on RedHat
+	- progreiserfs on Gentoo
+

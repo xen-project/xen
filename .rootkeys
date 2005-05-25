@@ -743,6 +743,8 @@
 4270cc81RTIiq9si0dI4YRTRE4KRMw tools/pygrub/src/fsys/ext2/__init__.py
 4270cc81YCYa4pexivBD2NdLE2F_Pg tools/pygrub/src/fsys/ext2/ext2module.c
 4270cc81o4BL5e8Cs87aSi8EXA5NtQ tools/pygrub/src/fsys/ext2/test.py
+4294fab3_A8gB1E3T-8fDt0x0eGRqw tools/pygrub/src/fsys/reiser/__init__.py
+4294fab3On_kRmhm1lwm4SDteFP_7Q tools/pygrub/src/fsys/reiser/reisermodule.c
 4270cc81TS6L_tEO6wSp5wcURcpldQ tools/pygrub/src/pygrub
 40c9c468icGyC5RAF1bRKsCXPDCvsA tools/python/Makefile
 40ffc44dOwe1CcYXGCkYHdG_NxcccA tools/python/logging/logging-0.4.9.2/PKG-INFO
