@@ -1117,7 +1117,7 @@ Privileged operation emulation routines
 
 IA64FAULT vcpu_force_data_miss(VCPU *vcpu, UINT64 ifa)
 {
-	PSCB(vcpu,ifa) = ifa;	// privop traps don't set ifa so do it here
+	PSCB(vcpu,tmp[0]) = ifa;	// save ifa in vcpu structure, then specify IA64_FORCED_IFA
 	return (vcpu_get_rr_ve(vcpu,ifa) ? IA64_DATA_TLB_VECTOR : IA64_ALT_DATA_TLB_VECTOR) | IA64_FORCED_IFA;
 }
 
@@ -1206,7 +1206,7 @@ IA64FAULT vcpu_thash(VCPU *vcpu, UINT64 vadr, UINT64 *pval)
 		((pta_base >> 15) & 0x3fffffffffff) & compMask_60_15;
 	UINT64 VHPT_addr2b =
 		((VHPT_offset >> 15) & 0x3fffffffffff) & Mask_60_15;;
-	UINT64 VHPT_addr3 = VHPT_offset & 0x3fff;
+	UINT64 VHPT_addr3 = VHPT_offset & 0x7fff;
 	UINT64 VHPT_addr = VHPT_addr1 | ((VHPT_addr2a | VHPT_addr2b) << 15) |
 			VHPT_addr3;
 

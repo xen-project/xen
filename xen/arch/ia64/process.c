@@ -153,7 +153,8 @@ void reflect_interruption(unsigned long ifa, unsigned long isr, unsigned long it
 		}
 		vector &= ~0xf;
 		if (vector != IA64_DATA_TLB_VECTOR &&
-		    vector != IA64_ALT_DATA_TLB_VECTOR) {
+		    vector != IA64_ALT_DATA_TLB_VECTOR &&
+		    vector != IA64_VHPT_TRANS_VECTOR) {
 panic_domain(regs,"psr.ic off, delivering fault=%lx,iip=%p,ifa=%p,isr=%p,PSCB.iip=%p\n",
 	vector,regs->cr_iip,ifa,isr,PSCB(ed,iip));
 			
@@ -167,15 +168,12 @@ panic_domain(regs,"psr.ic off, delivering fault=%lx,iip=%p,ifa=%p,isr=%p,PSCB.ii
 		return;
 
 	}
-	if ((vector & 0xf) != IA64_FORCED_IFA) PSCB(ed,ifa) = ifa;
-	else ifa = PSCB(ed,ifa);
+	if ((vector & 0xf) == IA64_FORCED_IFA)
+		ifa = PSCB(ed,tmp[0]);
 	vector &= ~0xf;
-	if (vector == IA64_DATA_TLB_VECTOR
-		|| vector == IA64_ALT_DATA_TLB_VECTOR
-		|| vector == IA64_INST_TLB_VECTOR
-		|| vector == IA64_ALT_INST_TLB_VECTOR) {
+	PSCB(ed,ifa) = ifa;
+	if (vector < IA64_DATA_NESTED_TLB_VECTOR) /* VHPT miss, TLB miss, Alt TLB miss */
 		vcpu_thash(ed,ifa,&PSCB(current,iha));
-	}
 	PSCB(ed,unat) = regs->ar_unat;  // not sure if this is really needed?
 	PSCB(ed,precover_ifs) = regs->cr_ifs;
 	vcpu_bsw0(ed);
@@ -320,7 +318,7 @@ void ia64_do_page_fault (unsigned long address, unsigned long isr, struct pt_reg
 	unsigned long psr = regs->cr_ipsr, mask, flags;
 	unsigned long iip = regs->cr_iip;
 	// FIXME should validate address here
-	unsigned long pteval, mpaddr;
+	unsigned long iha, pteval, mpaddr;
 	unsigned long lookup_domain_mpa(struct domain *,unsigned long);
 	unsigned long is_data = !((isr >> IA64_ISR_X_BIT) & 1UL);
 	unsigned long vector;
@@ -346,8 +344,8 @@ void ia64_do_page_fault (unsigned long address, unsigned long isr, struct pt_reg
 		// FIXME should validate mpaddr here
 		if (d == dom0) {
 			if (address < dom0_start || address >= dom0_start + dom0_size) {
-				//printk("ia64_do_page_fault: out-of-bounds dom0 mpaddr %p, iip=%p! continuing...\n",address,iip);
-				//printk("ia64_do_page_fault: out-of-bounds dom0 mpaddr %p, old iip=%p!\n",address,current->vcpu_info->arch.iip);
+				printk("ia64_do_page_fault: out-of-bounds dom0 mpaddr %p, iip=%p! continuing...\n",address,iip);
+				printk("ia64_do_page_fault: out-of-bounds dom0 mpaddr %p, old iip=%p!\n",address,current->vcpu_info->arch.iip);
 				tdpfoo();
 			}
 		}
@@ -365,7 +363,7 @@ void ia64_do_page_fault (unsigned long address, unsigned long isr, struct pt_reg
 
 	if (handle_lazy_cover(current, isr, regs)) return;
 if (!(address>>61)) {
-panic_domain(0,"ia64_do_page_fault: @%p???, iip=%p, itc=%p (spinning...)\n",address,iip,ia64_get_itc());
+panic_domain(0,"ia64_do_page_fault: @%p???, iip=%p, b0=%p, itc=%p (spinning...)\n",address,iip,regs->b0,ia64_get_itc());
 }
 	if ((isr & IA64_ISR_SP)
 	    || ((isr & IA64_ISR_NA) && (isr & IA64_ISR_CODE_MASK) == IA64_ISR_CODE_LFETCH))
@@ -378,9 +376,37 @@ panic_domain(0,"ia64_do_page_fault: @%p???, iip=%p, itc=%p (spinning...)\n",addr
 		ia64_psr(regs)->ed = 1;
 		return;
 	}
-	vector = vcpu_get_rr_ve(current, address) ? 
-			(is_data ? IA64_DATA_TLB_VECTOR : IA64_INST_TLB_VECTOR)
-			: (is_data ? IA64_ALT_DATA_TLB_VECTOR : IA64_ALT_INST_TLB_VECTOR);
+
+	if (vcpu_get_rr_ve(current, address) && (PSCB(current,pta) & IA64_PTA_VE))
+	{
+		if (PSCB(current,pta) & IA64_PTA_VF)
+		{
+			/* long format VHPT - not implemented */
+			vector = is_data ? IA64_DATA_TLB_VECTOR : IA64_INST_TLB_VECTOR;
+		}
+		else
+		{
+			/* short format VHPT */
+			vcpu_thash(current, address, &iha);
+			if (__copy_from_user(&pteval, iha, sizeof(pteval)) == 0)
+			{
+				/* 
+				 * Optimisation: this VHPT walker aborts on not-present pages
+				 * instead of inserting a not-present translation, this allows
+				 * vectoring directly to the miss handler.
+	\			 */
+				if (pteval & _PAGE_P)
+				{
+					pteval = translate_domain_pte(pteval,address,itir);
+					vcpu_itc_no_srlz(current,is_data?2:1,address,pteval,-1UL,(itir>>2)&0x3f);
+					return;
+				}
+				else vector = is_data ? IA64_DATA_TLB_VECTOR : IA64_INST_TLB_VECTOR;
+			}
+			else vector = IA64_VHPT_TRANS_VECTOR;
+		}
+	}
+	else vector = is_data ? IA64_ALT_DATA_TLB_VECTOR : IA64_ALT_INST_TLB_VECTOR;
 	reflect_interruption(address, isr, itir, regs, vector);
 }
 
@@ -744,11 +770,7 @@ ia64_handle_privop (unsigned long ifa, struct pt_regs *regs, unsigned long isr, 
 	// AND ACTUALLY reflect_interruption doesn't use it anyway!
 	itir = vcpu_get_itir_on_fault(ed,ifa);
 	vector = priv_emulate(current,regs,isr);
-	if (vector == IA64_RETRY) {
-		reflect_interruption(ifa,isr,itir,regs,
-			IA64_ALT_DATA_TLB_VECTOR | IA64_FORCED_IFA);
-	}
-	else if (vector != IA64_NO_FAULT && vector != IA64_RFI_IN_PROGRESS) {
+	if (vector != IA64_NO_FAULT && vector != IA64_RFI_IN_PROGRESS) {
 		reflect_interruption(ifa,isr,itir,regs,vector);
 	}
 }
