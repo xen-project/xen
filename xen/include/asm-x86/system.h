@@ -2,6 +2,7 @@
 #define __ASM_SYSTEM_H
 
 #include <xen/config.h>
+#include <xen/types.h>
 #include <asm/bitops.h>
 
 /* Clear and set 'TS' bit respectively */
@@ -70,8 +71,8 @@ static always_inline unsigned long __xchg(unsigned long x, volatile void * ptr, 
  * indicated by comparing RETURN with OLD.
  */
 
-static always_inline unsigned long __cmpxchg(volatile void *ptr, unsigned long old,
-				      unsigned long new, int size)
+static always_inline unsigned long __cmpxchg(
+    volatile void *ptr, unsigned long old, unsigned long new, int size)
 {
 	unsigned long prev;
 	switch (size) {
@@ -113,9 +114,49 @@ static always_inline unsigned long __cmpxchg(volatile void *ptr, unsigned long o
 }
 
 #define __HAVE_ARCH_CMPXCHG
-#define cmpxchg(ptr,o,n)\
-	((__typeof__(*(ptr)))__cmpxchg((ptr),(unsigned long)(o),\
-					(unsigned long)(n),sizeof(*(ptr))))
+
+#if BITS_PER_LONG == 64
+
+#define cmpxchg(ptr,o,n)                                                \
+    ((__typeof__(*(ptr)))__cmpxchg((ptr),(unsigned long)(o),            \
+                                   (unsigned long)(n),sizeof(*(ptr))))
+#else
+
+static always_inline unsigned long long __cmpxchg8b(
+    volatile void *ptr, unsigned long long old, unsigned long long new)
+{
+    unsigned long long prev;
+    __asm__ __volatile__ (
+        LOCK_PREFIX "cmpxchg8b %3"
+        : "=A" (prev)
+        : "c" ((u32)(new>>32)), "b" ((u32)new),
+          "m" (*__xg((volatile void *)ptr)), "0" (old)
+        : "memory" );
+    return prev;
+}
+
+#define cmpxchg(ptr,o,n)                                \
+({                                                      \
+    __typeof__(*(ptr)) __prev;                          \
+    switch ( sizeof(*(ptr)) ) {                         \
+    case 8:                                             \
+        __prev = ((__typeof__(*(ptr)))__cmpxchg8b(      \
+            (ptr),                                      \
+            (unsigned long long)(o),                    \
+            (unsigned long long)(n)));                  \
+        break;                                          \
+    default:                                            \
+        __prev = ((__typeof__(*(ptr)))__cmpxchg(        \
+            (ptr),                                      \
+            (unsigned long)(o),                         \
+            (unsigned long)(n),                         \
+            sizeof(*(ptr))));                           \
+        break;                                          \
+    }                                                   \
+    __prev;                                             \
+})
+
+#endif
 
 
 /*
