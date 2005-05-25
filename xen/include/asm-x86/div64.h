@@ -1,6 +1,20 @@
 #ifndef __I386_DIV64
 #define __I386_DIV64
 
+#include <xen/types.h>
+
+#if BITS_PER_LONG == 64
+
+# define do_div(n,base) ({					\
+	uint32_t __base = (base);				\
+	uint32_t __rem;						\
+	__rem = ((uint64_t)(n)) % __base;			\
+	(n) = ((uint64_t)(n)) / __base;				\
+	__rem;							\
+ })
+
+#else
+
 /*
  * do_div() is NOT a C function. It wants to return
  * two values (the quotient and the remainder), but
@@ -27,22 +41,6 @@
 	__mod; \
 })
 
-/*
- * (long)X = ((long long)divs) / (long)div
- * (long)rem = ((long long)divs) % (long)div
- *
- * Warning, this will do an exception if X overflows.
- */
-#define div_long_long_rem(a,b,c) div_ll_X_l_rem(a,b,c)
+#endif
 
-extern inline long
-div_ll_X_l_rem(long long divs, long div, long *rem)
-{
-	long dum2;
-      __asm__("divl %2":"=a"(dum2), "=d"(*rem)
-      :	"rm"(div), "A"(divs));
-
-	return dum2;
-
-}
 #endif
