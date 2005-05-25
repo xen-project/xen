@@ -866,6 +866,7 @@
 40c9c46925x-Rjb0Cv2f1-l2jZrPYg tools/python/xen/xend/server/netif.py
 40c9c469ZqILEQ8x6yWy0_51jopiCg tools/python/xen/xend/server/params.py
 4266169eI_oX3YBjwaeC0V-THBRnjg tools/python/xen/xend/server/pciif.py
+4294a1bf8rMUcddot-B2-pOxORimOg tools/python/xen/xend/server/relocate.py
 41ee5e8dq9NtihbL4nWKjuSLOhXPUg tools/python/xen/xend/server/usbif.py
 40c9c469LNxLVizOUpOjEaTKKCm8Aw tools/python/xen/xend/sxp.py
 40d05079aFRp6NQdo5wIh5Ly31c0cg tools/python/xen/xm/__init__.py

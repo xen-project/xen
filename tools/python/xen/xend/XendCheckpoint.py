@@ -13,6 +13,7 @@ from struct import pack, unpack, calcsize
 from xen.util.xpopen import xPopen3
 import xen.lowlevel.xc; xc = xen.lowlevel.xc.new()
 
+from XendError import XendError
 from XendLogging import log
 
 SIGNATURE = "LinuxGuestRecord"
