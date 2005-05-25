@@ -593,6 +593,7 @@
 428d0d84lyG0XDg5MxLMSee3MWgq3g tools/ioemu/hw/pc.c
 428d0d84HWR3Q7dEESycfJ7hSWdGig tools/ioemu/hw/pci.c
 428d0d84Noyn4ik0UX1E7OdfuFdrIw tools/ioemu/hw/pckbd.c
+4294307e0KIA9jaU_1OMIGCcNeLdeQ tools/ioemu/hw/port-e9.c
 428d0d840SMURRjsz9V96rwt-naynw tools/ioemu/hw/ppc.c
 428d0d84MI7kZftH_c0FK1qiiyQBZg tools/ioemu/hw/ppc_chrp.c
 428d0d859-xwA89jmzFk6x9UyXjAeA tools/ioemu/hw/ppc_prep.c

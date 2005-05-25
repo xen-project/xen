@@ -572,4 +572,5 @@ void pc_init(int ram_size, int vga_ram_size, int boot_device,
     if (pci_enabled) {
         pci_bios_init();
     }
+    port_e9_init();
 }
