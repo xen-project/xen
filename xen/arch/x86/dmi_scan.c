@@ -9,7 +9,7 @@
 #include <asm/system.h>
 #include <xen/dmi.h>
 
-#define bt_ioremap(b,l)  __acpi_map_table(b,l)
+#define bt_ioremap(b,l)  ((u8 *)__acpi_map_table(b,l))
 #define bt_iounmap(b,l)  ((void)0)
 #define ioremap(b,l)     (__va(b))
 #define memcpy_fromio    memcpy
@@ -34,7 +34,7 @@ struct dmi_header
 
 static char * __init dmi_string(struct dmi_header *dm, u8 s)
 {
-	u8 *bp=(u8 *)dm;
+	char *bp=(char *)dm;
 	bp+=dm->length;
 	if(!s)
 		return "";
