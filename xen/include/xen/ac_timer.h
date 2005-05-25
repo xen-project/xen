@@ -1,19 +1,8 @@
-/****************************************************************************
- * (C) 2002 - Rolf Neugebauer - Intel Research Cambridge
- ****************************************************************************
- *
- *        File: ac_timer.h
- *      Author: Rolf Neugebauer (neugebar@dcs.gla.ac.uk)
- *     Changes: 
- *              
- *        Date: Nov 2002
+/******************************************************************************
+ * ac_timer.h
  * 
- * Environment: Xen Hypervisor
- * Description: Accurate timer for the Hypervisor
- * 
- ****************************************************************************
- * $Id: h-insert.h,v 1.4 2002/11/08 16:03:55 rn Exp $
- ****************************************************************************
+ * Copyright (c) 2002-2003 Rolf Neugebauer
+ * Copyright (c) 2002-2005 K A Fraser
  */
 
 #ifndef _AC_TIMER_H_
@@ -23,53 +12,53 @@
 #include <xen/time.h>
 
 struct ac_timer {
-    /*
-     * PUBLIC FIELDS
-     */
     /* System time expiry value (nanoseconds since boot). */
-    s_time_t         expires;
+    s_time_t      expires;
     /* CPU on which this timer will be installed and executed. */
-    unsigned int     cpu;
+    unsigned int  cpu;
     /* On expiry, '(*function)(data)' will be executed in softirq context. */
-    unsigned long    data;
-    void             (*function)(unsigned long);
-
-    /*
-     * PRIVATE FIELDS
-     */
-    unsigned int     heap_offset;
+    void        (*function)(void *);
+    void         *data;
+    /* Timer-heap offset. */
+    unsigned int  heap_offset;
 };
 
 /*
- * This function can be called for any CPU from any CPU in any context.
- * It initialises the private fields of the ac_timer structure.
+ * All functions below can be called for any CPU from any CPU in any context.
  */
-static __inline__ void init_ac_timer(struct ac_timer *timer)
-{
-    timer->heap_offset = 0;
-}
 
-/*
- * This function can be called for any CPU from any CPU in any context.
- * It returns TRUE if the given timer is on a timer list.
- */
+/* Returns TRUE if the given timer is on a timer list. */
 static __inline__ int active_ac_timer(struct ac_timer *timer)
 {
     return (timer->heap_offset != 0);
 }
 
 /*
- * This function can be called for any CPU from any CPU in any context, BUT:
- *  -- The private fields must have been initialised (ac_timer_init).
- *  -- All public fields must be initialised.
+ * It initialises the static fields of the ac_timer structure.
+ * It can be called multiple times to reinitialise a single (inactive) timer.
+ */
+static __inline__ void init_ac_timer(
+    struct ac_timer *timer,
+    void           (*function)(void *),
+    void            *data,
+    unsigned int     cpu)
+{
+    memset(timer, 0, sizeof(*timer));
+    timer->function = function;
+    timer->data     = data;
+    timer->cpu      = cpu;
+}
+
+/*
+ * Set the expiry time and activate a timer (which must previously have been
+ * initialised by init_ac_timer).
  */
 extern void set_ac_timer(struct ac_timer *timer, s_time_t expires);
 
 /*
- * This function can be called for any CPU from any CPU in any context, BUT:
- *  -- The private fields must have been initialised (ac_timer_init).
- *  -- All public fields must be initialised.
- *  -- The timer must currently be on a timer list.
+ * Deactivate a timer (which must previously have been initialised by
+ * init_ac_timer). This function has no effect if the timer is not currently
+ * active.
  */
 extern void rem_ac_timer(struct ac_timer *timer);
 

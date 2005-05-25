@@ -116,6 +116,7 @@ struct sedf_cpu_info {
     struct list_head runnableq;
     struct list_head waitq;
     struct list_head extraq[2];
+    s_time_t         current_slice_expires;
 };
 
 #define EDOM_INFO(d)  ((struct sedf_edom_info *)((d)->sched_priv))
@@ -350,11 +351,12 @@ static void sedf_add_task(struct exec_domain *d)
           d->vcpu_id);
 
     /* Allocate per-CPU context if this is the first domain to be added. */
-    if ( schedule_data[d->processor].sched_priv == NULL )
+    if ( unlikely(schedule_data[d->processor].sched_priv == NULL) )
     {
         schedule_data[d->processor].sched_priv = 
             xmalloc(struct sedf_cpu_info);
         BUG_ON(schedule_data[d->processor].sched_priv == NULL);
+        memset(CPU_INFO(d->processor), 0, sizeof(*CPU_INFO(d->processor)));
         INIT_LIST_HEAD(WAITQ(d->processor));
         INIT_LIST_HEAD(RUNQ(d->processor));
         INIT_LIST_HEAD(EXTRAQ(d->processor,EXTRA_PEN_Q));
@@ -783,6 +785,7 @@ static struct task_slice sedf_do_schedule(s_time_t now)
     EDOM_INFO(ret.task)->sched_start_abs = now;
     CHECK(ret.time > 0);
     ASSERT(sedf_runnable(ret.task));
+    CPU_INFO(cpu)->current_slice_expires = now + ret.time;
     return ret;
 }
 
@@ -1085,8 +1088,8 @@ static inline int should_switch(struct exec_domain* cur,
     other_inf = EDOM_INFO(other);
  
  /*check whether we need to make an earlier sched-decision*/
-    if ((PERIOD_BEGIN(other_inf) < 
-         schedule_data[other->processor].s_timer.expires))
+    if (PERIOD_BEGIN(other_inf) < 
+        CPU_INFO(other->processor)->current_slice_expires)
         return 1;
     /*no timing-based switches need to be taken into account here*/
     switch (get_run_type(cur)) {

@@ -88,10 +88,10 @@ static void vtm_reset(VCPU *vcpu)
 }
 
 /* callback function when vtm_timer expires */
-static void vtm_timer_fn(unsigned long data)
+static void vtm_timer_fn(void *data)
 {
     vtime_t *vtm;
-    VCPU    *vcpu = (VCPU*)data;
+    VCPU    *vcpu = data;
     u64	    cur_itc,vitm;
 
     UINT64  vec;
@@ -105,7 +105,6 @@ static void vtm_timer_fn(unsigned long data)
  //fire_itc2 = cur_itc;
  //fire_itm2 = vitm;
     update_last_itc(vtm,cur_itc);  // pseudo read to update vITC
-    vtm->timer_hooked = 0;
 }
 
 void vtm_init(VCPU *vcpu)
@@ -118,12 +117,7 @@ void vtm_init(VCPU *vcpu)
     itc_freq = local_cpu_data->itc_freq;
     vtm->cfg_max_jump=itc_freq*MAX_JUMP_STEP/1000;
     vtm->cfg_min_grun=itc_freq*MIN_GUEST_RUNNING_TIME/1000;
-    /* set up the actimer */
-    init_ac_timer(&(vtm->vtm_timer));
-    vtm->timer_hooked = 0;
-    vtm->vtm_timer.cpu = 0;     /* Init value for SMP case */
-    vtm->vtm_timer.data = (unsigned long)vcpu;
-    vtm->vtm_timer.function = vtm_timer_fn;
+    init_ac_timer(&vtm->vtm_timer, vtm_timer_fn, vcpu, 0);
     vtm_reset(vcpu);
 }
 
@@ -166,10 +160,8 @@ void vtm_set_itv(VCPU *vcpu)
     vtm=&(vcpu->arch.arch_vmx.vtm);
     local_irq_save(spsr);
     itv = VPD_CR(vcpu, itv);
-    if ( ITV_IRQ_MASK(itv) && vtm->timer_hooked ) {
-        rem_ac_timer(&(vtm->vtm_timer));
-        vtm->timer_hooked = 0;
-    }
+    if ( ITV_IRQ_MASK(itv) )
+        rem_ac_timer(&vtm->vtm_timer);
     vtm_interruption_update(vcpu, vtm);
     local_irq_restore(spsr);
 }
@@ -204,25 +196,16 @@ void vtm_interruption_update(VCPU *vcpu, vtime_t* vtm)
     
     if ( diff_last >= 0 ) {
         // interrupt already fired.
-        if ( vtm->timer_hooked ) {
-            rem_ac_timer(&(vtm->vtm_timer));
-            vtm->timer_hooked = 0;          
-        }
+        rem_ac_timer(&vtm->vtm_timer);
     }
     else if ( diff_now >= 0 ) {
         // ITV is fired.
         vmx_vcpu_pend_interrupt(vcpu, vitv&0xff);
     }
     /* Both last_itc & cur_itc < itm, wait for fire condition */
-    else if ( vtm->timer_hooked ) {
-        expires = NOW() + tick_to_ns(0-diff_now) + TIMER_SLOP;
-        set_ac_timer(&vtm->vtm_timer, expires);
-    }
     else {
         expires = NOW() + tick_to_ns(0-diff_now) + TIMER_SLOP;
-        vtm->vtm_timer.cpu = vcpu->processor;
         set_ac_timer(&vtm->vtm_timer, expires);
-        vtm->timer_hooked = 1;
     }
     local_irq_restore(spsr);
 }
@@ -233,16 +216,7 @@ void vtm_interruption_update(VCPU *vcpu, vtime_t* vtm)
  */
 void vtm_domain_out(VCPU *vcpu)
 {
-    vtime_t     *vtm;
-    uint64_t    spsr;
-    
-    vtm=&(vcpu->arch.arch_vmx.vtm);
-    local_irq_save(spsr);
-    if ( vtm->timer_hooked ) {
-        rem_ac_timer(&(vtm->vtm_timer));
-        vtm->timer_hooked = 0;
-    }
-    local_irq_restore(spsr);
+    rem_ac_timer(&vcpu->arch.arch_vmx.vtm.vtm_timer);
 }
 
 /*
@@ -256,8 +230,6 @@ void vtm_domain_in(VCPU *vcpu)
     vtm=&(vcpu->arch.arch_vmx.vtm);
     vtm_interruption_update(vcpu, vtm);
 }
-
-
 
 /*
  * Next for vLSapic

@@ -94,9 +94,9 @@ static inline int __task_on_runqueue(struct exec_domain *d)
 
 
 /* Warp/unwarp timer functions */
-static void warp_timer_fn(unsigned long pointer)
+static void warp_timer_fn(void *data)
 {
-    struct bvt_dom_info *inf = (struct bvt_dom_info *)pointer;
+    struct bvt_dom_info *inf = data;
     unsigned int cpu = inf->domain->exec_domain[0]->processor;
     
     spin_lock_irq(&schedule_data[cpu].schedule_lock);
@@ -115,9 +115,9 @@ static void warp_timer_fn(unsigned long pointer)
     spin_unlock_irq(&schedule_data[cpu].schedule_lock);
 }
 
-static void unwarp_timer_fn(unsigned long pointer)
+static void unwarp_timer_fn(void *data)
 {
-    struct bvt_dom_info *inf = (struct bvt_dom_info *)pointer;
+    struct bvt_dom_info *inf = data;
     unsigned int cpu = inf->domain->exec_domain[0]->processor;
 
     spin_lock_irq(&schedule_data[cpu].schedule_lock);
@@ -212,15 +212,9 @@ static void bvt_add_task(struct exec_domain *d)
         inf->warp_value  = 0;
         inf->warpl       = MILLISECS(2000);
         inf->warpu       = MILLISECS(1000);
-        /* initialise the timers */
-        init_ac_timer(&inf->warp_timer);
-        inf->warp_timer.cpu = d->processor;
-        inf->warp_timer.data = (unsigned long)inf;
-        inf->warp_timer.function = &warp_timer_fn;
-        init_ac_timer(&inf->unwarp_timer);
-        inf->unwarp_timer.cpu = d->processor;
-        inf->unwarp_timer.data = (unsigned long)inf;
-        inf->unwarp_timer.function = &unwarp_timer_fn;
+        /* Initialise the warp timers. */
+        init_ac_timer(&inf->warp_timer, warp_timer_fn, inf, d->processor);
+        init_ac_timer(&inf->unwarp_timer, unwarp_timer_fn, inf, d->processor);
     }
 
     einf->exec_domain = d;

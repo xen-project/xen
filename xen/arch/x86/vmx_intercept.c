@@ -189,13 +189,13 @@ int intercept_pit_io(ioreq_t *p)
 }
 
 /* hooks function for the PIT initialization response iopacket */
-static void pit_timer_fn(unsigned long data)
+static void pit_timer_fn(void *data)
 {
-    struct vmx_virpit_t *vpit = (struct vmx_virpit_t*)data;
+    struct vmx_virpit_t *vpit = data;
 
-    /*set the pending intr bit in shared page, send evtchn notification to myself*/
+    /* Set the pending intr bit, and send evtchn notification to myself. */
     if (test_and_set_bit(vpit->vector, vpit->intr_bitmap))
-        vpit->pending_intr_nr++; /* if originaly set, then count the pending intr */
+        vpit->pending_intr_nr++; /* already set, then count the pending intr */
 
     set_ac_timer(&vpit->pit_timer, NOW() + MILLISECS(vpit->period));
 }
@@ -249,11 +249,8 @@ void vmx_hooks_assist(struct exec_domain *d)
         vpit->intr_bitmap = intr;
 
         /* set up the actimer */
-        init_ac_timer(&(vpit->pit_timer));
-        vpit->pit_timer.cpu = 0; /*FIXME: change for SMP */
-        vpit->pit_timer.data = (unsigned long)vpit;
-        vpit->pit_timer.function = pit_timer_fn;
-        pit_timer_fn((unsigned long)vpit); /* timer seed */
+        init_ac_timer(&vpit->pit_timer, pit_timer_fn, vpit, 0);
+        pit_timer_fn(vpit); /* timer seed */
 
         /*restore the state*/
         p->state = STATE_IORESP_READY;

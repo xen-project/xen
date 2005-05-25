@@ -47,7 +47,6 @@ typedef struct vtime {
     	uint64_t    cfg_min_grun;   // min guest running time since last jump
 //    	uint64_t    latest_read_itc;    // latest guest read ITC
     	struct ac_timer	vtm_timer;
-	int        timer_hooked;	// vtm_timer is hooked
 //	int        triggered;
     	
 

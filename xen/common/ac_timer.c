@@ -1,14 +1,8 @@
-/****************************************************************************
- * (C) 2002-2003 - Rolf Neugebauer - Intel Research Cambridge
- * (C) 2002-2003 University of Cambridge
- ****************************************************************************
- *
- *        File: ac_timer.c
- *      Author: Rolf Neugebauer (neugebar@dcs.gla.ac.uk)
- *              Keir Fraser (kaf24@cl.cam.ac.uk)
- *              
- * Environment: Xen Hypervisor
- * Description: Accurate timer for the Hypervisor
+/******************************************************************************
+ * ac_timer.c
+ * 
+ * Copyright (c) 2002-2003 Rolf Neugebauer
+ * Copyright (c) 2002-2005 K A Fraser
  */
 
 #include <xen/config.h>
@@ -202,7 +196,7 @@ static void ac_timer_softirq_action(void)
     int              cpu = smp_processor_id();
     struct ac_timer *t, **heap;
     s_time_t         now;
-    void             (*fn)(unsigned long);
+    void             (*fn)(void *);
 
     ac_timers[cpu].softirqs++;
 
@@ -219,7 +213,7 @@ static void ac_timer_softirq_action(void)
 
             if ( (fn = t->function) != NULL )
             {
-                unsigned long data = t->data;
+                void *data = t->data;
                 spin_unlock_irq(&ac_timers[cpu].lock);
                 (*fn)(data);
                 spin_lock_irq(&ac_timers[cpu].lock);
@@ -252,7 +246,7 @@ static void dump_timerq(unsigned char key)
         for ( j = 1; j <= GET_HEAP_SIZE(ac_timers[i].heap); j++ )
         {
             t = ac_timers[i].heap[j];
-            printk ("  %d : %p ex=0x%08X%08X %lu\n",
+            printk ("  %d : %p ex=0x%08X%08X %p\n",
                     j, t, (u32)(t->expires>>32), (u32)t->expires, t->data);
         }
         spin_unlock_irqrestore(&ac_timers[i].lock, flags);

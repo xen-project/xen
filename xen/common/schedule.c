@@ -50,9 +50,9 @@ string_param("sched", opt_sched);
 #define TIME_SLOP      (s32)MICROSECS(50)     /* allow time to slip a bit */
 
 /* Various timer handlers. */
-static void s_timer_fn(unsigned long unused);
-static void t_timer_fn(unsigned long unused);
-static void dom_timer_fn(unsigned long data);
+static void s_timer_fn(void *unused);
+static void t_timer_fn(void *unused);
+static void dom_timer_fn(void *data);
 
 /* This is global for now so that private implementations can reach it */
 struct schedule_data schedule_data[NR_CPUS];
@@ -164,10 +164,7 @@ void sched_add_domain(struct exec_domain *ed)
     struct domain *d = ed->domain;
 
     /* Initialise the per-domain timer. */
-    init_ac_timer(&ed->timer);
-    ed->timer.cpu      = ed->processor;
-    ed->timer.data     = (unsigned long)ed;
-    ed->timer.function = &dom_timer_fn;
+    init_ac_timer(&ed->timer, dom_timer_fn, ed, ed->processor);
 
     if ( is_idle_task(d) )
     {
@@ -486,14 +483,14 @@ int idle_cpu(int cpu)
  ****************************************************************************/
 
 /* The scheduler timer: force a run through the scheduler */
-static void s_timer_fn(unsigned long unused)
+static void s_timer_fn(void *unused)
 {
     raise_softirq(SCHEDULE_SOFTIRQ);
     perfc_incrc(sched_irq);
 }
 
 /* Periodic tick timer: send timer event to current domain */
-static void t_timer_fn(unsigned long unused)
+static void t_timer_fn(void *unused)
 {
     struct exec_domain *ed  = current;
     unsigned int        cpu = ed->processor;
@@ -512,9 +509,9 @@ static void t_timer_fn(unsigned long unused)
 }
 
 /* Domain timer function, sends a virtual timer interrupt to domain */
-static void dom_timer_fn(unsigned long data)
+static void dom_timer_fn(void *data)
 {
-    struct exec_domain *ed = (struct exec_domain *)data;
+    struct exec_domain *ed = data;
 
     update_dom_time(ed);
     send_guest_virq(ed, VIRQ_TIMER);
@@ -530,16 +527,8 @@ void __init scheduler_init(void)
     for ( i = 0; i < NR_CPUS; i++ )
     {
         spin_lock_init(&schedule_data[i].schedule_lock);
-
-        init_ac_timer(&schedule_data[i].s_timer);
-        schedule_data[i].s_timer.cpu      = i;
-        schedule_data[i].s_timer.data     = 2;
-        schedule_data[i].s_timer.function = &s_timer_fn;
-
-        init_ac_timer(&t_timer[i]);
-        t_timer[i].cpu      = i;
-        t_timer[i].data     = 3;
-        t_timer[i].function = &t_timer_fn;
+        init_ac_timer(&schedule_data[i].s_timer, s_timer_fn, NULL, i);
+        init_ac_timer(&t_timer[i], t_timer_fn, NULL, i);
     }
 
     schedule_data[0].curr = idle_task[0];
