@@ -2,7 +2,7 @@
 # XendBootloader.py - Framework to run a boot loader for picking the kernel
 #
 # Copyright 2005 Red Hat, Inc.
-# Jeremy Katz <katzj@xxxxxxxxxx>
+# Jeremy Katz <katzj@redhat.com>
 #
 # This software may be freely redistributed under the terms of the GNU
 # general public license.
@@ -12,7 +12,7 @@
 # Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
 #
 
-import os, sys, select
+import os, sys, select, errno
 import sxp
 
 from XendLogging import log
@@ -61,7 +61,7 @@ def bootloader(blexec, disk, quiet = 0, vcpus = None, entry = None):
         try:
             r = os.open(BL_FIFO, os.O_RDONLY)
         except OSError, e:
-            if e.errno == 4:
+            if e.errno == errno.EINTR:
                 continue
         break
     ret = ""
