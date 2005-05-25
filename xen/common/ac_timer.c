@@ -114,23 +114,31 @@ static int remove_entry(struct ac_timer **heap, struct ac_timer *t)
 
 
 /* Add new entry @t to @heap. Return TRUE if new top of heap. */
-static int add_entry(struct ac_timer **heap, struct ac_timer *t)
+static int add_entry(struct ac_timer ***pheap, struct ac_timer *t)
 {
-    int sz = GET_HEAP_SIZE(heap);
+    int sz, limit;
+    struct ac_timer **heap;
+
+    /* Create initial heap if not already initialised. */
+    if ( unlikely((heap = *pheap) == NULL) )
+    {
+        heap = xmalloc_array(struct ac_timer *, DEFAULT_HEAP_LIMIT + 1);
+        BUG_ON(heap == NULL);
+        SET_HEAP_SIZE(heap, 0);
+        SET_HEAP_LIMIT(heap, DEFAULT_HEAP_LIMIT);
+        *pheap = heap;
+    }
 
     /* Copy the heap if it is full. */
-    if ( unlikely(sz == GET_HEAP_LIMIT(heap)) )
+    if ( unlikely((sz = GET_HEAP_SIZE(heap)) == GET_HEAP_LIMIT(heap)) )
     {
-        int i, limit = (GET_HEAP_LIMIT(heap)+1) << 1;
-        struct ac_timer **new_heap = xmalloc_array(struct ac_timer *, limit);
-        if ( new_heap == NULL ) BUG();
-        memcpy(new_heap, heap, (limit>>1)*sizeof(struct ac_timer *));
-        for ( i = 0; i < NR_CPUS; i++ )
-            if ( ac_timers[i].heap == heap )
-                ac_timers[i].heap = new_heap;
-        xfree(heap);
-        heap = new_heap;
-        SET_HEAP_LIMIT(heap, limit-1);
+        limit = (GET_HEAP_LIMIT(heap) << 1) + 1; /* 2^(n+1) - 1 */
+        heap = xmalloc_array(struct ac_timer *, limit + 1);
+        BUG_ON(heap == NULL);
+        memcpy(heap, *pheap, ((limit >> 1) + 1) * sizeof(struct ac_timer *));
+        SET_HEAP_LIMIT(heap, limit);
+        xfree(*pheap);
+        *pheap = heap;
     }
 
     SET_HEAP_SIZE(heap, ++sz);
@@ -148,20 +156,8 @@ static int add_entry(struct ac_timer **heap, struct ac_timer *t)
 static inline void __add_ac_timer(struct ac_timer *timer)
 {
     int cpu = timer->cpu;
-    if ( add_entry(ac_timers[cpu].heap, timer) )
+    if ( add_entry(&ac_timers[cpu].heap, timer) )
         cpu_raise_softirq(cpu, AC_TIMER_SOFTIRQ);
-}
-
-void add_ac_timer(struct ac_timer *timer) 
-{
-    int           cpu = timer->cpu;
-    unsigned long flags;
-
-    spin_lock_irqsave(&ac_timers[cpu].lock, flags);
-    ASSERT(timer != NULL);
-    ASSERT(!active_ac_timer(timer));
-    __add_ac_timer(timer);
-    spin_unlock_irqrestore(&ac_timers[cpu].lock, flags);
 }
 
 
@@ -172,6 +168,22 @@ static inline void __rem_ac_timer(struct ac_timer *timer)
         cpu_raise_softirq(cpu, AC_TIMER_SOFTIRQ);
 }
 
+
+void set_ac_timer(struct ac_timer *timer, s_time_t expires)
+{
+    int           cpu = timer->cpu;
+    unsigned long flags;
+
+    spin_lock_irqsave(&ac_timers[cpu].lock, flags);
+    ASSERT(timer != NULL);
+    if ( active_ac_timer(timer) )
+        __rem_ac_timer(timer);
+    timer->expires = expires;
+    __add_ac_timer(timer);
+    spin_unlock_irqrestore(&ac_timers[cpu].lock, flags);
+}
+
+
 void rem_ac_timer(struct ac_timer *timer)
 {
     int           cpu = timer->cpu;
@@ -181,21 +193,6 @@ void rem_ac_timer(struct ac_timer *timer)
     ASSERT(timer != NULL);
     if ( active_ac_timer(timer) )
         __rem_ac_timer(timer);
-    spin_unlock_irqrestore(&ac_timers[cpu].lock, flags);
-}
-
-
-void mod_ac_timer(struct ac_timer *timer, s_time_t new_time)
-{
-    int           cpu = timer->cpu;
-    unsigned long flags;
-
-    spin_lock_irqsave(&ac_timers[cpu].lock, flags);
-    ASSERT(timer != NULL);
-    if ( active_ac_timer(timer) )
-        __rem_ac_timer(timer);
-    timer->expires = new_time;
-    __add_ac_timer(timer);
     spin_unlock_irqrestore(&ac_timers[cpu].lock, flags);
 }
 
@@ -271,15 +268,7 @@ void __init ac_timer_init(void)
     open_softirq(AC_TIMER_SOFTIRQ, ac_timer_softirq_action);
 
     for ( i = 0; i < NR_CPUS; i++ )
-    {
-        ac_timers[i].heap = xmalloc_array(
-            struct ac_timer *, DEFAULT_HEAP_LIMIT+1);
-        BUG_ON(ac_timers[i].heap == NULL);
-
-        SET_HEAP_SIZE(ac_timers[i].heap, 0);
-        SET_HEAP_LIMIT(ac_timers[i].heap, DEFAULT_HEAP_LIMIT);
         spin_lock_init(&ac_timers[i].lock);
-    }
 
     register_keyhandler('a', dump_timerq, "dump ac_timer queues");
 }

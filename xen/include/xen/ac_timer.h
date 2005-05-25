@@ -62,9 +62,8 @@ static __inline__ int active_ac_timer(struct ac_timer *timer)
  * This function can be called for any CPU from any CPU in any context, BUT:
  *  -- The private fields must have been initialised (ac_timer_init).
  *  -- All public fields must be initialised.
- *  -- The timer must not currently be on a timer list.
  */
-extern void add_ac_timer(struct ac_timer *timer);
+extern void set_ac_timer(struct ac_timer *timer, s_time_t expires);
 
 /*
  * This function can be called for any CPU from any CPU in any context, BUT:
@@ -73,13 +72,6 @@ extern void add_ac_timer(struct ac_timer *timer);
  *  -- The timer must currently be on a timer list.
  */
 extern void rem_ac_timer(struct ac_timer *timer);
-
-/*
- * This function can be called for any CPU from any CPU in any context, BUT:
- *  -- The private fields must have been initialised (ac_timer_init).
- *  -- All public fields must be initialised.
- */
-extern void mod_ac_timer(struct ac_timer *timer, s_time_t new_time);
 
 
 /*

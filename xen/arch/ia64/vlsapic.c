@@ -216,18 +216,13 @@ void vtm_interruption_update(VCPU *vcpu, vtime_t* vtm)
     /* Both last_itc & cur_itc < itm, wait for fire condition */
     else if ( vtm->timer_hooked ) {
         expires = NOW() + tick_to_ns(0-diff_now) + TIMER_SLOP;
-        mod_ac_timer (&(vtm->vtm_timer), expires);
-	printf("mod vtm_timer\n");
-//fire_itc = cur_itc;
-//fire_itm = vitm;
+        set_ac_timer(&vtm->vtm_timer, expires);
     }
     else {
-        vtm->vtm_timer.expires = NOW() + tick_to_ns(0-diff_now) + TIMER_SLOP;
+        expires = NOW() + tick_to_ns(0-diff_now) + TIMER_SLOP;
         vtm->vtm_timer.cpu = vcpu->processor;
-            add_ac_timer(&(vtm->vtm_timer));
-            vtm->timer_hooked = 1;
-//fire_itc = cur_itc;
-//fire_itm = vitm;
+        set_ac_timer(&vtm->vtm_timer, expires);
+        vtm->timer_hooked = 1;
     }
     local_irq_restore(spsr);
 }

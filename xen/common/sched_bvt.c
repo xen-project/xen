@@ -110,9 +110,7 @@ static void warp_timer_fn(unsigned long pointer)
         cpu_raise_softirq(cpu, SCHEDULE_SOFTIRQ);   
     }
     
-    /* set unwarp timer */
-    inf->unwarp_timer.expires = NOW() + inf->warpu;
-    add_ac_timer(&inf->unwarp_timer);
+    set_ac_timer(&inf->unwarp_timer, NOW() + inf->warpu);
 
     spin_unlock_irq(&schedule_data[cpu].schedule_lock);
 }
@@ -276,7 +274,7 @@ static void bvt_wake(struct exec_domain *ed)
     if ( is_idle_task(curr->domain) || (einf->evt <= curr_evt) )
         cpu_raise_softirq(cpu, SCHEDULE_SOFTIRQ);
     else if ( schedule_data[cpu].s_timer.expires > r_time )
-        mod_ac_timer(&schedule_data[cpu].s_timer, r_time);
+        set_ac_timer(&schedule_data[cpu].s_timer, r_time);
 }
 
 
@@ -439,13 +437,8 @@ static struct task_slice bvt_do_schedule(s_time_t now)
             min_avt = p_einf->avt;
     }
     
-    if(next_einf->inf->warp && next_einf->inf->warpl > 0)
-    {
-        /* Set the timer up */ 
-        next_einf->inf->warp_timer.expires = now + next_einf->inf->warpl;
-        /* Add it to the heap */
-        add_ac_timer(&next_einf->inf->warp_timer);
-    }
+    if ( next_einf->inf->warp && next_einf->inf->warpl > 0 )
+        set_ac_timer(&next_einf->inf->warp_timer, now + next_einf->inf->warpl);
    
     /* Extract the domain pointers from the dom infos */
     next        = next_einf->exec_domain;

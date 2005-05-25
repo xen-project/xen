@@ -193,14 +193,11 @@ static void pit_timer_fn(unsigned long data)
 {
     struct vmx_virpit_t *vpit = (struct vmx_virpit_t*)data;
 
-    /* rearm itself */
-    vpit->pit_timer.expires = NOW() + MILLISECS(vpit->period);
-
     /*set the pending intr bit in shared page, send evtchn notification to myself*/
     if (test_and_set_bit(vpit->vector, vpit->intr_bitmap))
         vpit->pending_intr_nr++; /* if originaly set, then count the pending intr */
 
-    add_ac_timer(&(vpit->pit_timer));
+    set_ac_timer(&vpit->pit_timer, NOW() + MILLISECS(vpit->period));
 }
 
 

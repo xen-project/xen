@@ -298,10 +298,10 @@ long do_set_timer_op(s_time_t timeout)
 {
     struct exec_domain *ed = current;
 
-    rem_ac_timer(&ed->timer);
-    
-    if ( (ed->timer.expires = timeout) != 0 )
-        add_ac_timer(&ed->timer);
+    if ( timeout == 0 )
+        rem_ac_timer(&ed->timer);
+    else
+        set_ac_timer(&ed->timer, timeout);
 
     return 0;
 }
@@ -423,9 +423,7 @@ static void __enter_scheduler(void)
     
     next->lastschd = now;
 
-    /* reprogramm the timer */
-    schedule_data[cpu].s_timer.expires = now + r_time;
-    add_ac_timer(&schedule_data[cpu].s_timer);
+    set_ac_timer(&schedule_data[cpu].s_timer, now + r_time);
 
     /* Must be protected by the schedule_lock! */
     set_bit(_VCPUF_running, &next->vcpu_flags);
@@ -510,8 +508,7 @@ static void t_timer_fn(unsigned long unused)
 
     page_scrub_schedule_work();
 
-    t_timer[cpu].expires = NOW() + MILLISECS(10);
-    add_ac_timer(&t_timer[cpu]);
+    set_ac_timer(&t_timer[cpu], NOW() + MILLISECS(10));
 }
 
 /* Domain timer function, sends a virtual timer interrupt to domain */
