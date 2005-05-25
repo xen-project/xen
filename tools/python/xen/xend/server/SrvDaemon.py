@@ -30,6 +30,7 @@ from xen.xend.XendLogging import log
 import channel
 import controller
 import event
+import relocate
 from params import *
 
 DAEMONIZE = 0
@@ -302,6 +303,7 @@ class Daemon:
             log.info("Xend Daemon started")
             self.createFactories()
             event.listenEvent(self)
+            relocate.listenRelocation()
             self.listenChannels()
             servers = SrvServer.create()
             self.daemonize()

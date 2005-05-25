@@ -51,11 +51,20 @@ class XendRoot:
     """Default interface address xend listens at. """
     xend_address_default      = ''
 
+    """Default for the flag indicating whether xend should run a relocation server."""
+    xend_relocation_server_default = 'yes'
+
+    """Default interface address the xend relocation server listens at. """
+    xend_relocation_address_default = ''
+
     """Default port xend serves HTTP at. """
     xend_port_default         = '8000'
 
     """Default port xend serves events at. """
     xend_event_port_default   = '8001'
+
+    """Default port xend serves relocation at. """
+    xend_relocation_port_default = '8002'
 
     """Default for the flag indicating whether xend should run a unix-domain server."""
     xend_unix_server_default = 'yes'
@@ -249,6 +258,11 @@ class XendRoot:
         """
         return self.get_config_bool("xend-http-server", self.xend_http_server_default)
 
+    def get_xend_relocation_server(self):
+        """Get the flag indicating whether xend should run a relocation server.
+        """
+        return self.get_config_bool("xend-relocation-server", self.xend_relocation_server_default)
+
     def get_xend_port(self):
         """Get the port xend listens at for its HTTP interface.
         """
@@ -259,6 +273,11 @@ class XendRoot:
         """
         return self.get_config_int('xend-event-port', self.xend_event_port_default)
 
+    def get_xend_relocation_port(self):
+        """Get the port xend listens at for connection to its relocation server.
+        """
+        return self.get_config_int('xend-relocation-port', self.xend_relocation_port_default)
+
     def get_xend_address(self):
         """Get the address xend listens at for its HTTP and event ports.
         This defaults to the empty string which allows all hosts to connect.
@@ -266,6 +285,14 @@ class XendRoot:
         to the HTTP and event ports.
         """
         return self.get_config_value('xend-address', self.xend_address_default)
+
+    def get_xend_relocation_address(self):
+        """Get the address xend listens at for its HTTP and event ports.
+        This defaults to the empty string which allows all hosts to connect.
+        If this is set to 'localhost' only the localhost will be able to connect
+        to the HTTP and event ports.
+        """
+        return self.get_config_value('xend-relocation-address', self.xend_relocation_address_default)
 
     def get_xend_unix_server(self):
         """Get the flag indicating whether xend should run a unix-domain server.

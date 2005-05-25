@@ -14,12 +14,12 @@ import time
 
 import xen.lowlevel.xc; xc = xen.lowlevel.xc.new()
 
+from xen.xend.server import relocate
 import sxp
 import XendRoot; xroot = XendRoot.instance()
 import XendCheckpoint
 import XendDB
 import XendDomainInfo
-import XendMigrate
 import EventServer; eserver = EventServer.instance()
 from XendError import XendError
 from XendLogging import log
@@ -511,8 +511,12 @@ class XendDomain:
         # Need a cancel too?
         # Don't forget to cancel restart for it.
         dominfo = self.domain_lookup(id)
-        xmigrate = XendMigrate.instance()
-        return xmigrate.migrate_begin(dominfo, dst, live=live, resource=resource)
+
+        port = xroot.get_xend_relocation_port()
+        sock = relocate.setupRelocation(dst, port)
+
+        XendCheckpoint.save(self, sock.fileno(), dominfo)
+        return None
 
     def domain_save(self, id, dst, progress=False):
         """Start saving a domain to file.
