@@ -829,6 +829,7 @@
 40c9c468QJTEuk9g4qHxGpmIi70PEQ tools/python/xen/xend/PrettyPrint.py
 40e15b7eeQxWE_hUPB2YTgM9fsZ1PQ tools/python/xen/xend/Vifctl.py
 4270cc81xbweGYhsM4326N3dX1bGHQ tools/python/xen/xend/XendBootloader.py
+42944ee8FQaAdZMF56O_WkWyBdCalA tools/python/xen/xend/XendCheckpoint.py
 40c9c4688m3eqnC8fhLu1APm36VOVA tools/python/xen/xend/XendClient.py
 40c9c468t6iIKTjwuYoe-UMCikDcOQ tools/python/xen/xend/XendConsole.py
 40c9c468WnXs6eOUSff23IIGI4kMfQ tools/python/xen/xend/XendDB.py

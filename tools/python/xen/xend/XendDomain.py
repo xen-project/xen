@@ -5,6 +5,8 @@
  Nothing here is persistent (across reboots).
  Needs to be persistent for one uptime.
 """
+import os
+import scheduler
 import sys
 import traceback
 import time
@@ -13,6 +15,7 @@ import xen.lowlevel.xc; xc = xen.lowlevel.xc.new()
 
 import sxp
 import XendRoot; xroot = XendRoot.instance()
+import XendCheckpoint
 import XendDB
 import XendDomainInfo
 import XendMigrate
@@ -20,17 +23,7 @@ import EventServer; eserver = EventServer.instance()
 from XendError import XendError
 from XendLogging import log
 
-import scheduler
-
 from xen.xend.server import channel
-
-
-import errno
-import os
-import select
-from string import join
-from struct import pack, unpack, calcsize
-from xen.util.xpopen import xPopen3
 
 __all__ = [ "XendDomain" ]
 
@@ -330,91 +323,17 @@ class XendDomain:
         @param progress: output progress if true
         """
 
-        SIGNATURE = "LinuxGuestRecord"
-        sizeof_int = calcsize("i")
-        sizeof_unsigned_long = calcsize("L")
-        PAGE_SIZE = 4096
-        PATH_XC_RESTORE = "/usr/libexec/xen/xc_restore"
-
         class XendFile(file):
             def read_exact(self, size, error_msg):
                 buf = self.read(size)
                 if len(buf) != size:
                     raise XendError(error_msg)
                 return buf
-        
-        try:
-            fd = XendFile(src, 'rb')
 
-            signature = fd.read_exact(len(SIGNATURE),
-                "not a valid guest state file: signature read")
-            if signature != SIGNATURE:
-                raise XendError("not a valid guest state file: found '%s'" %
-                                signature)
+        fd = XendFile(src, 'rb')
 
-            l = fd.read_exact(sizeof_int,
-                              "not a valid guest state file: config size read")
-            vmconfig_size = unpack("!i", l)[0]
-            vmconfig_buf = fd.read_exact(vmconfig_size,
-                "not a valid guest state file: config read")
+        return XendCheckpoint.restore(self, fd)
 
-            p = sxp.Parser()
-            p.input(vmconfig_buf)
-            if not p.ready:
-                raise XendError("not a valid guest state file: config parse")
-
-            vmconfig = p.get_val()
-            dominfo = self.domain_configure(vmconfig)
-
-            l = fd.read_exact(sizeof_unsigned_long,
-                              "not a valid guest state file: pfn count read")
-            nr_pfns = unpack("=L", l)[0]   # XXX endianess
-            if nr_pfns > 1024*1024:     # XXX
-                raise XendError(
-                    "not a valid guest state file: pfn count out of range")
-
-            # XXXcl hack: fd.tell will sync up the object and
-            #             underlying file descriptor
-            ignore = fd.tell()
-
-            cmd = [PATH_XC_RESTORE, str(xc.handle()), str(fd.fileno()),
-                   dominfo.id, str(nr_pfns)]
-            log.info("[xc_restore] " + join(cmd))
-            child = xPopen3(cmd, True, -1, [fd.fileno(), xc.handle()])
-            child.tochild.close()
-
-            lasterr = ""
-            p = select.poll()
-            p.register(child.fromchild.fileno())
-            p.register(child.childerr.fileno())
-            while True:
-                r = p.poll()
-                for (fd, event) in r:
-                    if not event & select.POLLIN:
-                        continue
-                    if fd == child.childerr.fileno():
-                        l = child.childerr.readline()
-                        log.error(l.rstrip())
-                        lasterr = l.rstrip()
-                    if fd == child.fromchild.fileno():
-                        l = child.fromchild.readline()
-                        log.info(l.rstrip())
-                if filter(lambda (fd, event): event & select.POLLHUP, r):
-                    break
-
-            if child.wait() >> 8 == 127:
-                lasterr = "popen %s failed" % PATH_XC_RESTORE
-            if child.wait() != 0:
-                raise XendError("xc_restore failed: %s" % lasterr)
-
-            return dominfo
-
-        except IOError, ex:
-            if ex.errno == errno.ENOENT:
-                raise XendError("can't open guest state file %s" % src)
-            else:
-                raise
-    
     def domain_get(self, id):
         """Get up-to-date info about a domain.
 
@@ -604,61 +523,12 @@ class XendDomain:
         @param progress: output progress if true
         """
 
-        SIGNATURE = "LinuxGuestRecord"
-        sizeof_int = calcsize("i")
-        PATH_XC_SAVE = "/usr/libexec/xen/xc_save"
-
         try:
             dominfo = self.domain_lookup(id)
 
             fd = os.open(dst, os.O_WRONLY | os.O_CREAT | os.O_TRUNC)
 
-            if os.write(fd, SIGNATURE) != len(SIGNATURE):
-                raise XendError("could not write guest state file: signature")
-
-            config = sxp.to_string(dominfo.sxpr())
-            if os.write(fd, pack("!i", len(config))) != sizeof_int:
-                raise XendError("could not write guest state file: config len")
-            if os.write(fd, config) != len(config):
-                raise XendError("could not write guest state file: config")
-
-            cmd = [PATH_XC_SAVE, str(xc.handle()), str(fd),
-                   dominfo.id]
-            log.info("[xc_save] " + join(cmd))
-            child = xPopen3(cmd, True, -1, [fd, xc.handle()])
-            
-            lasterr = ""
-            p = select.poll()
-            p.register(child.fromchild.fileno())
-            p.register(child.childerr.fileno())
-            while True:
-                r = p.poll()
-                for (fd, event) in r:
-                    if not event & select.POLLIN:
-                        continue
-                    if fd == child.childerr.fileno():
-                        l = child.childerr.readline()
-                        log.error(l.rstrip())
-                        lasterr = l.rstrip()
-                    if fd == child.fromchild.fileno():
-                        l = child.fromchild.readline()
-                        if l.rstrip() == "suspend":
-                            log.info("suspending %s" % dominfo.id)
-                            self.domain_shutdown(dominfo.id, reason='suspend')
-                            dominfo.state_wait("suspended")
-                            log.info("suspend %s done" % dominfo.id)
-                            child.tochild.write("done\n")
-                            child.tochild.flush()
-                if filter(lambda (fd, event): event & select.POLLHUP, r):
-                    break
-
-            if child.wait() >> 8 == 127:
-                lasterr = "popen %s failed" % PATH_XC_SAVE
-            if child.wait() != 0:
-                raise XendError("xc_save failed: %s" % lasterr)
-
-            self.domain_destroy(dominfo.id)
-            return None
+            return XendCheckpoint.save(self, fd, dominfo)
 
         except:
             raise
