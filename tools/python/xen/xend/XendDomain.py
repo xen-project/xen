@@ -5,6 +5,7 @@
  Nothing here is persistent (across reboots).
  Needs to be persistent for one uptime.
 """
+import errno
 import os
 import scheduler
 import sys
@@ -323,16 +324,14 @@ class XendDomain:
         @param progress: output progress if true
         """
 
-        class XendFile(file):
-            def read_exact(self, size, error_msg):
-                buf = self.read(size)
-                if len(buf) != size:
-                    raise XendError(error_msg)
-                return buf
+        try:
+            fd = os.open(src, os.O_RDONLY)
 
-        fd = XendFile(src, 'rb')
+            return XendCheckpoint.restore(self, fd)
 
-        return XendCheckpoint.restore(self, fd)
+        except OSError, ex:
+            raise XendError("can't read guest state file %s: %s" %
+                            (src, ex[1]))
 
     def domain_get(self, id):
         """Get up-to-date info about a domain.
@@ -530,8 +529,9 @@ class XendDomain:
 
             return XendCheckpoint.save(self, fd, dominfo)
 
-        except:
-            raise
+        except OSError, ex:
+            raise XendError("can't write guest state file %s: %s" %
+                            (dst, ex[1]))
 
     def domain_pincpu(self, id, vcpu, cpumap):
         """Set which cpus vcpu can use
