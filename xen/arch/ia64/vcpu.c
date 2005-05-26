@@ -638,7 +638,15 @@ IA64FAULT vcpu_get_ivr(VCPU *vcpu, UINT64 *pval)
 {
 	int i;
 	UINT64 vector, mask;
-#if 1
+
+#define HEARTBEAT_FREQ 16	// period in seconds
+#ifdef HEARTBEAT_FREQ
+#define N_DOMS 16	// period in seconds
+	static long count[N_DOMS] = { 0 };
+	REGS *regs = vcpu_regs(vcpu);
+	unsigned domid = vcpu->domain->domain_id;
+#endif
+#ifdef IRQ_DEBUG
 	static char firstivr = 1;
 	static char firsttime[256];
 	if (firstivr) {
@@ -654,9 +662,21 @@ IA64FAULT vcpu_get_ivr(VCPU *vcpu, UINT64 *pval)
 		*pval = vector;
 		return IA64_NO_FAULT;
 	}
+#ifdef HEARTBEAT_FREQ
+	if (domid >= N_DOMS) domid = N_DOMS-1;
+	if (vector == (PSCB(vcpu,itv) & 0xff) &&
+	    !(++count[domid] & ((HEARTBEAT_FREQ*1024)-1))) {
+		printf("Dom%d heartbeat... iip=%p,psr.i=%d,pend=%d\n",
+			domid, regs->cr_iip,
+			current->vcpu_info->arch.interrupt_delivery_enabled,
+			current->vcpu_info->arch.pending_interruption);
+		count[domid] = 0;
+		dump_runq();
+	}
+#endif
 	// now have an unmasked, pending, deliverable vector!
 	// getting ivr has "side effects"
-#if 0
+#ifdef IRQ_DEBUG
 	if (firsttime[vector]) {
 		printf("*** First get_ivr on vector=%d,itc=%lx\n",
 			vector,ia64_get_itc());
@@ -989,6 +1009,10 @@ IA64FAULT vcpu_set_itc(VCPU *vcpu, UINT64 val)
 
 	UINT64 newnow = val, min_delta;
 
+#define DISALLOW_SETTING_ITC_FOR_NOW
+#ifdef DISALLOW_SETTING_ITC_FOR_NOW
+printf("vcpu_set_itc: Setting ar.itc is currently disabled\n");
+#else
 	local_irq_disable();
 	if (olditm) {
 printf("**** vcpu_set_itc(%lx): vitm changed to %lx\n",val,newnow+d);
@@ -1008,6 +1032,7 @@ printf("**** vcpu_set_itc(%lx): vitm changed to %lx\n",val,newnow+d);
 		//using_xen_as_itm++;
 	}
 	local_irq_enable();
+#endif
 	return (IA64_NO_FAULT);
 }
 
@@ -1092,8 +1117,8 @@ Privileged operation emulation routines
 
 IA64FAULT vcpu_force_data_miss(VCPU *vcpu, UINT64 ifa)
 {
-	PSCB(vcpu,ifa) = ifa;	// privop traps don't set ifa so do it here
-	return (IA64_DATA_TLB_VECTOR | IA64_FORCED_IFA);
+	PSCB(vcpu,tmp[0]) = ifa;	// save ifa in vcpu structure, then specify IA64_FORCED_IFA
+	return (vcpu_get_rr_ve(vcpu,ifa) ? IA64_DATA_TLB_VECTOR : IA64_ALT_DATA_TLB_VECTOR) | IA64_FORCED_IFA;
 }
 
 
@@ -1181,7 +1206,7 @@ IA64FAULT vcpu_thash(VCPU *vcpu, UINT64 vadr, UINT64 *pval)
 		((pta_base >> 15) & 0x3fffffffffff) & compMask_60_15;
 	UINT64 VHPT_addr2b =
 		((VHPT_offset >> 15) & 0x3fffffffffff) & Mask_60_15;;
-	UINT64 VHPT_addr3 = VHPT_offset & 0x3fff;
+	UINT64 VHPT_addr3 = VHPT_offset & 0x7fff;
 	UINT64 VHPT_addr = VHPT_addr1 | ((VHPT_addr2a | VHPT_addr2b) << 15) |
 			VHPT_addr3;
 
@@ -1592,7 +1617,7 @@ IA64FAULT vcpu_itc_d(VCPU *vcpu, UINT64 pte, UINT64 itir, UINT64 ifa)
 	unsigned long pteval, logps = (itir >> 2) & 0x3f;
 	unsigned long translate_domain_pte(UINT64,UINT64,UINT64);
 
-	if (((itir & 0xfcL) >> 2) < PAGE_SHIFT) {
+	if (logps < PAGE_SHIFT) {
 		printf("vcpu_itc_d: domain trying to use smaller page size!\n");
 		//FIXME: kill domain here
 		while(1);
@@ -1610,7 +1635,7 @@ IA64FAULT vcpu_itc_i(VCPU *vcpu, UINT64 pte, UINT64 itir, UINT64 ifa)
 	unsigned long translate_domain_pte(UINT64,UINT64,UINT64);
 
 	// FIXME: validate ifa here (not in Xen space), COULD MACHINE CHECK!
-	if (((itir & 0xfcL) >> 2) < PAGE_SHIFT) {
+	if (logps < PAGE_SHIFT) {
 		printf("vcpu_itc_i: domain trying to use smaller page size!\n");
 		//FIXME: kill domain here
 		while(1);

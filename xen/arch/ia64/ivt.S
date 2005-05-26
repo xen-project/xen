@@ -785,14 +785,19 @@ ENTRY(break_fault)
 	cmp.eq p7,p0=r0,r17			// is this a psuedo-cover?
 (p7)	br.sptk.many dispatch_privop_fault
 	;;
-	cmp.ne p7,p0=r0,r19
+	cmp4.ne p7,p0=r0,r19
 (p7)	br.sptk.many dispatch_break_fault
 	// If we get to here, we have a hyperprivop
 	// For now, hyperprivops are handled through the break mechanism
 	// Later, they will be fast hand-coded assembly with psr.ic off
 	// which means no calls, no use of r1-r15 and no memory accesses
 	// except to pinned addresses!
+#define FAST_HYPERPRIVOPS
+#ifdef FAST_HYPERPRIVOPS
+	br.sptk.many fast_hyperprivop
+#else
 	br.sptk.many dispatch_break_fault
+#endif
 	;;
 #endif
 	mov r16=IA64_KR(CURRENT)		// r16 = current task; 12 cycle read lat.
@@ -913,9 +918,10 @@ END(interrupt)
 	// fault ever gets "unreserved", simply moved the following code to a more
 	// suitable spot...
 
-ENTRY(dispatch_break_fault)
+GLOBAL_ENTRY(dispatch_break_fault)
 	SAVE_MIN_WITH_COVER
 	;;
+dispatch_break_fault_post_save:
 	alloc r14=ar.pfs,0,0,4,0 // now it's safe (must be first in insn group!)
 	mov out0=cr.ifa
 	adds out1=16,sp
@@ -1792,6 +1798,15 @@ ENTRY(dispatch_reflection)
 	mov rp=r14
 	br.sptk.many ia64_prepare_handle_reflection
 END(dispatch_reflection)
+
+#define SAVE_MIN_COVER_DONE	DO_SAVE_MIN(,mov r30=cr.ifs,)
+
+// same as dispatch_break_fault except cover has already been done
+GLOBAL_ENTRY(dispatch_slow_hyperprivop)
+	SAVE_MIN_COVER_DONE
+	;;
+	br.sptk.many dispatch_break_fault_post_save
+END(dispatch_slow_hyperprivop)
 #endif
 
 #ifdef CONFIG_IA32_SUPPORT

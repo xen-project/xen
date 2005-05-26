@@ -6,18 +6,16 @@
 
 # unpack linux-2.6.11 in the xenXXX.bk/.. directory
 tar xzf linux-2.6.11.tar.gz
-cd linux-2.6.11
 
 # go back to the xen subdirectory of xenXXX.bk
 cd xenXXX.bk/xen
 
 # create and patch the linux/ia64 files
-bash arch/ia64/tools/mkbuildtree
 # this should print out many patch messages but no errors
 bash arch/ia64/tools/mkbuildtree
 
 # build xen/ia64
 # if using cross-compiler
-make TARGET_ARCH=ia64
+make XEN_TARGET_ARCH=ia64
 # else if native
 make

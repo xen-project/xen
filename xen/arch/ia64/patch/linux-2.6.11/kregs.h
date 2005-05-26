@@ -45,7 +45,7 @@
  #define IA64_ISR_CODE_LFETCH	4
  #define IA64_ISR_CODE_PROBEF	5
  
-+#ifdef CONFIG_VTI
++#ifdef XEN
 +/* Interruption Function State */
 +#define IA64_IFS_V_BIT		63
 +#define IA64_IFS_V	(__IA64_UL(1) << IA64_IFS_V_BIT)
@@ -60,6 +60,6 @@
 +#define IA64_PTA_SIZE   (__IA64_UL(0x3f) << IA64_PTA_SIZE_BIT)
 +#define IA64_PTA_VF     (__IA64_UL(1) << IA64_PTA_VF_BIT)
 +#define IA64_PTA_BASE   (__IA64_UL(0) - ((__IA64_UL(1) << IA64_PTA_BASE_BIT)))
-+#endif // CONFIG_VTI
++#endif
 +
  #endif /* _ASM_IA64_kREGS_H */

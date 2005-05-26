@@ -14,10 +14,10 @@
 #include <linux/kernel.h>
 
 /* Define HV space hierarchy */
-#ifdef CONFIG_VTI
 #define XEN_VIRT_SPACE_LOW	 0xe800000000000000
 #define XEN_VIRT_SPACE_HIGH	 0xf800000000000000	
 /* This is address to mapping rr7 switch stub, in region 5 */
+#ifdef CONFIG_VTI
 #define XEN_RR7_SWITCH_STUB	 0xb700000000000000
 #endif // CONFIG_VTI
 

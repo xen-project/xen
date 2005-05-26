@@ -9,7 +9,7 @@ OBJS = xensetup.o setup.o time.o irq.o ia64_ksyms.o process.o smp.o \
 	xenmem.o sal.o cmdline.o mm_init.o tlb.o smpboot.o \
 	extable.o linuxextable.o xenirq.o xentime.o \
 	regionreg.o entry.o unaligned.o privop.o vcpu.o \
-	irq_ia64.o irq_lsapic.o vhpt.o xenasm.o dom_fw.o
+	irq_ia64.o irq_lsapic.o vhpt.o xenasm.o hyperprivop.o dom_fw.o
 
 ifeq ($(CONFIG_VTI),y)
 OBJS += vmx_init.o vmx_virt.o vmx_vcpu.o vmx_process.o vmx_vsa.o vmx_ivt.o \
@@ -29,6 +29,9 @@ default: $(OBJS) head.o ia64lib.o xen.lds.s
 	$(LD) $(LDFLAGS) -T $(BASEDIR)/arch/$(TARGET_ARCH)/xen.lds.s -N \
 		-Map map.out head.o $(ALL_OBJS) -o $(TARGET)-syms
 	$(OBJCOPY) -R .note -R .comment -S $(TARGET)-syms $(TARGET)
+	$(NM) -n $(TARGET)-syms | grep -v '\( [aUw] \)\|\(__crc_\)\|\( \$[adt]\)'\
+		 > $(BASEDIR)/System.map
+
 
 asm-offsets.s: asm-offsets.c $(BASEDIR)/include/asm-ia64/.offsets.h.stamp
 	$(CC) $(CFLAGS) -S -o $@ $<
