@@ -981,7 +981,7 @@ int dump_hyperprivop_counts(char *buf)
 {
 	int i;
 	char *s = buf;
-	s += sprintf(s,"Hyperprivops:\n");
+	s += sprintf(s,"Slow hyperprivops:\n");
 	for (i = 1; i <= HYPERPRIVOP_MAX; i++)
 		if (hyperpriv_cnt[i])
 			s += sprintf(s,"%10d %s\n",
