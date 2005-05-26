@@ -81,4 +81,11 @@ typedef struct vcpu_guest_context {
 
 #endif /* !__ASSEMBLY__ */
 
+#define	XEN_HYPER_RFI			1
+#define	XEN_HYPER_RSM_PSR_DT		2
+#define	XEN_HYPER_SSM_PSR_DT		3
+#define	XEN_HYPER_COVER			4
+#define	XEN_HYPER_ITC_D			5
+#define	XEN_HYPER_ITC_I			6
+
 #endif /* __HYPERVISOR_IF_IA64_H__ */
