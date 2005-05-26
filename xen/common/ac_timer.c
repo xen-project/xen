@@ -26,8 +26,6 @@
  */
 #define TIMER_SLOP (50*1000) /* ns */
 
-#define DEFAULT_HEAP_LIMIT 127
-
 struct ac_timers ac_timers[NR_CPUS];
 
 /****************************************************************************
@@ -110,28 +108,21 @@ static int remove_entry(struct ac_timer **heap, struct ac_timer *t)
 /* Add new entry @t to @heap. Return TRUE if new top of heap. */
 static int add_entry(struct ac_timer ***pheap, struct ac_timer *t)
 {
-    int sz, limit;
-    struct ac_timer **heap;
-
-    /* Create initial heap if not already initialised. */
-    if ( unlikely((heap = *pheap) == NULL) )
-    {
-        heap = xmalloc_array(struct ac_timer *, DEFAULT_HEAP_LIMIT + 1);
-        BUG_ON(heap == NULL);
-        SET_HEAP_SIZE(heap, 0);
-        SET_HEAP_LIMIT(heap, DEFAULT_HEAP_LIMIT);
-        *pheap = heap;
-    }
+    struct ac_timer **heap = *pheap;
+    int sz = GET_HEAP_SIZE(heap);
 
     /* Copy the heap if it is full. */
-    if ( unlikely((sz = GET_HEAP_SIZE(heap)) == GET_HEAP_LIMIT(heap)) )
+    if ( unlikely(sz == GET_HEAP_LIMIT(heap)) )
     {
-        limit = (GET_HEAP_LIMIT(heap) << 1) + 1; /* 2^(n+1) - 1 */
-        heap = xmalloc_array(struct ac_timer *, limit + 1);
+        /* old_limit == (2^n)-1; new_limit == (2^(n+4))-1 */
+        int old_limit = GET_HEAP_LIMIT(heap);
+        int new_limit = ((old_limit + 1) << 4) - 1;
+        heap = xmalloc_array(struct ac_timer *, new_limit + 1);
         BUG_ON(heap == NULL);
-        memcpy(heap, *pheap, ((limit >> 1) + 1) * sizeof(struct ac_timer *));
-        SET_HEAP_LIMIT(heap, limit);
-        xfree(*pheap);
+        memcpy(heap, *pheap, (old_limit + 1) * sizeof(*heap));
+        SET_HEAP_LIMIT(heap, new_limit);
+        if ( old_limit != 0 )
+            xfree(*pheap);
         *pheap = heap;
     }
 
@@ -257,12 +248,23 @@ static void dump_timerq(unsigned char key)
 
 void __init ac_timer_init(void)
 {
+    static struct ac_timer *dummy_heap;
     int i;
 
     open_softirq(AC_TIMER_SOFTIRQ, ac_timer_softirq_action);
 
+    /*
+     * All CPUs initially share an empty dummy heap. Only those CPUs that
+     * are brought online will be dynamically allocated their own heap.
+     */
+    SET_HEAP_SIZE(&dummy_heap, 0);
+    SET_HEAP_LIMIT(&dummy_heap, 0);
+
     for ( i = 0; i < NR_CPUS; i++ )
+    {
         spin_lock_init(&ac_timers[i].lock);
+        ac_timers[i].heap = &dummy_heap;
+    }
 
     register_keyhandler('a', dump_timerq, "dump ac_timer queues");
 }
