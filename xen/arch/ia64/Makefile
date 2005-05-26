@@ -29,6 +29,9 @@ default: $(OBJS) head.o ia64lib.o xen.lds.s
 	$(LD) $(LDFLAGS) -T $(BASEDIR)/arch/$(TARGET_ARCH)/xen.lds.s -N \
 		-Map map.out head.o $(ALL_OBJS) -o $(TARGET)-syms
 	$(OBJCOPY) -R .note -R .comment -S $(TARGET)-syms $(TARGET)
+	$(NM) -n $(TARGET)-syms | grep -v '\( [aUw] \)\|\(__crc_\)\|\( \$[adt]\)'\
+		 > $(BASEDIR)/System.map
+
 
 asm-offsets.s: asm-offsets.c $(BASEDIR)/include/asm-ia64/.offsets.h.stamp
 	$(CC) $(CFLAGS) -S -o $@ $<

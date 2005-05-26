@@ -41,6 +41,10 @@ ia64_hypercall (struct pt_regs *regs)
 		ed->vcpu_info->arch.pending_interruption = 1;
 #endif
 		x = pal_emulator_static(regs->r28);
+		if (regs->r28 == PAL_HALT_LIGHT) {
+			do_sched_op(SCHEDOP_yield);
+			//break;
+		}
 		regs->r8 = x.status; regs->r9 = x.v0;
 		regs->r10 = x.v1; regs->r11 = x.v2;
 		break;

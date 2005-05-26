@@ -262,8 +262,8 @@ void context_switch(struct exec_domain *prev, struct exec_domain *next)
 static long cnt[16] = { 50,50,50,50,50,50,50,50,50,50,50,50,50,50,50,50};
 static int i = 100;
 int id = ((struct exec_domain *)current)->domain->domain_id & 0xf;
-if (!cnt[id]--) { printk("%x",id); cnt[id] = 50; }
-if (!i--) { printk("+",id); cnt[id] = 100; }
+if (!cnt[id]--) { printk("%x",id); cnt[id] = 500; }
+if (!i--) { printk("+",id); cnt[id] = 1000; }
 }
 	clear_bit(_VCPUF_running, &prev->vcpu_flags);
 	//if (!is_idle_task(next->domain) )
@@ -273,7 +273,10 @@ if (!i--) { printk("+",id); cnt[id] = 100; }
 		vmx_load_all_rr(current);
 	return;
 #else // CONFIG_VTI
-	load_region_regs(current);
+	if (!is_idle_task(current->domain)) {
+		load_region_regs(current);
+		if (vcpu_timer_expired(current)) vcpu_pend_timer(current);
+	}
 	if (vcpu_timer_expired(current)) vcpu_pend_timer(current);
 #endif // CONFIG_VTI
 }

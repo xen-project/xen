@@ -6,7 +6,6 @@ INSTRUCTIONS FOR BUILDING XENLINUX/IA64
 	unset CONFIG_IA32_SUPPORT
 	unset CONFIG_IDE [for now, need to fix later]
 	unset CONFIG_VIRTUAL_MEM_MAP [for now, need to fix later]
-	set CONFIG_DISABLE_VHPT
 3) if running on ski, it is useful to make the following change:
    a) at the beginning of drivers/acpi/motherboard.c:acpi_reserve_resources()
       add the line:
@@ -46,5 +45,6 @@ INSTRUCTIONS FOR BUILDING XENLINUX/IA64
            (It may be necessary also to un-inline the routine, not sure.)
    c) It can be useful to modify linux/init/main.c to add a printf before
       or after a lot of the init calls
-6) NOTE: mca currently has a problem with binary translation,
+6) Start Xen from elilo, passing the Linux kernel as an initrd.
+   NOTE: mca currently has a problem with binary translation,
    must run with "nomca" as a kernel argument

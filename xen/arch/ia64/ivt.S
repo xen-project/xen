@@ -785,14 +785,18 @@ ENTRY(break_fault)
 	cmp.eq p7,p0=r0,r17			// is this a psuedo-cover?
 (p7)	br.sptk.many dispatch_privop_fault
 	;;
-	cmp.ne p7,p0=r0,r19
+	cmp4.ne p7,p0=r0,r19
 (p7)	br.sptk.many dispatch_break_fault
 	// If we get to here, we have a hyperprivop
 	// For now, hyperprivops are handled through the break mechanism
 	// Later, they will be fast hand-coded assembly with psr.ic off
 	// which means no calls, no use of r1-r15 and no memory accesses
 	// except to pinned addresses!
+#ifdef FAST_HYPERPRIVOPS
+	br.sptk.many fast_hyperprivop
+#else
 	br.sptk.many dispatch_break_fault
+#endif
 	;;
 #endif
 	mov r16=IA64_KR(CURRENT)		// r16 = current task; 12 cycle read lat.
