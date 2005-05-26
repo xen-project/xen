@@ -35,6 +35,7 @@
 #include <linux/delay.h>
 #include <linux/version.h>
 
+#define DA(_f, args...) printk(KERN_ALERT "  " _f "\n", args)
 #define DP(_f) printk(KERN_ALERT "  " _f "\n")
 
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,0)
@@ -56,6 +57,7 @@ __LINKAGE void do_fixup_4gb_segment(struct pt_regs *regs, long error_code)
         DP("");
         DP("***************************************************************");
         DP("***************************************************************");
+        DA("** process using TLS: %16s (pid: %5d)          **", current->comm, current->tgid);
         DP("** WARNING: Currently emulating unsupported memory accesses  **");
         DP("**          in /lib/tls libraries. The emulation is very     **");
         DP("**          slow. To ensure full performance you should      **");
