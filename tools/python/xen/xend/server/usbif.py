@@ -89,13 +89,14 @@ class UsbBackend:
         log.debug('>UsbifBackendController>send_be_disconnect> %s', str(self))
         msg = packMsg('usbif_be_disconnect_t',
                       { 'domid'        : self.frontendDomain })
-        self.backendChannel.writeRequest(msg)
+        self.backendChannel.requestResponse(msg)
 
     def send_be_destroy(self, response=None):
         log.debug('>UsbifBackendController>send_be_destroy> %s', str(self))
         msg = packMsg('usbif_be_destroy_t',
                       { 'domid'        : self.frontendDomain })
-        self.backendChannel.writeRequest(msg, response=response)
+        self.backendChannel.requestResponse(msg)
+        #todo: check return status
 
     
     def connectInterface(self, val):

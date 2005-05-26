@@ -313,13 +313,15 @@ class NetDev(Dev):
         msg = packMsg('netif_be_disconnect_t',
                       { 'domid'        : self.frontendDomain,
                         'netif_handle' : self.vif })
-        return self.backendChannel.writeRequest(msg)
+        self.backendChannel.requestResponse(msg)
+        #todo: check return status
 
     def send_be_destroy(self, response=None):
         msg = packMsg('netif_be_destroy_t',
                       { 'domid'        : self.frontendDomain,
                         'netif_handle' : self.vif })
-        return self.backendChannel.writeRequest(msg)
+        self.backendChannel.requestResponse(msg)
+        #todo: check return status
     
     def recv_fe_interface_connect(self, val):
         self.openEvtchn()
