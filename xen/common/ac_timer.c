@@ -26,7 +26,15 @@
  */
 #define TIMER_SLOP (50*1000) /* ns */
 
+struct ac_timers {
+    spinlock_t        lock;
+    struct ac_timer **heap;
+    unsigned int      softirqs;
+} __cacheline_aligned;
+
 struct ac_timers ac_timers[NR_CPUS];
+
+extern int reprogram_ac_timer(s_time_t timeout);
 
 /****************************************************************************
  * HEAP OPERATIONS.
@@ -188,8 +196,6 @@ static void ac_timer_softirq_action(void)
     struct ac_timer *t, **heap;
     s_time_t         now;
     void             (*fn)(void *);
-
-    ac_timers[cpu].softirqs++;
 
     spin_lock_irq(&ac_timers[cpu].lock);
     

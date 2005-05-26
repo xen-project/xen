@@ -62,20 +62,6 @@ extern void set_ac_timer(struct ac_timer *timer, s_time_t expires);
  */
 extern void rem_ac_timer(struct ac_timer *timer);
 
-
-/*
- * PRIVATE DEFINITIONS
- */
-
-extern int reprogram_ac_timer(s_time_t timeout);
-
-struct ac_timers {
-    spinlock_t        lock;
-    struct ac_timer **heap;
-    unsigned int      softirqs;
-} __cacheline_aligned;
-extern struct ac_timers ac_timers[];
-
 #endif /* _AC_TIMER_H_ */
 
 /*

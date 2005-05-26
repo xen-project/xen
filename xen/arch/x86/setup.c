@@ -100,8 +100,6 @@ struct exec_domain *idle_task[NR_CPUS] = { &idle0_exec_domain };
 
 int acpi_disabled;
 
-int logical_proc_id[NR_CPUS];
-
 int acpi_force;
 char acpi_param[10] = "";
 static void parse_acpi_param(char *s)
@@ -196,6 +194,8 @@ static void __init start_of_day(void)
 
     trap_init();
 
+    ac_timer_init();
+
     time_init();
 
     arch_init_memory();
@@ -214,8 +214,6 @@ static void __init start_of_day(void)
     initialize_keytable();
 
     serial_init_stage2();
-
-    ac_timer_init();
 
     init_xen_time();
 

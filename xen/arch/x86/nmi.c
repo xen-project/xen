@@ -29,9 +29,10 @@
 
 unsigned int nmi_watchdog = NMI_NONE;
 static unsigned int nmi_hz = HZ;
-unsigned int nmi_perfctr_msr;	/* the MSR to reset in NMI handler */
-
-extern int logical_proc_id[];
+static unsigned int nmi_perfctr_msr;	/* the MSR to reset in NMI handler */
+static unsigned int nmi_p4_cccr_val;
+static struct ac_timer nmi_timer[NR_CPUS];
+static unsigned int nmi_timer_ticks[NR_CPUS];
 
 #define K7_EVNTSEL_ENABLE	(1 << 22)
 #define K7_EVNTSEL_INT		(1 << 20)
@@ -50,10 +51,6 @@ extern int logical_proc_id[];
 #define MSR_P4_PERFCTR0		0x300
 #define MSR_P4_CCCR0		0x360
 #define P4_ESCR_EVENT_SELECT(N)	((N)<<25)
-#define P4_ESCR_OS0		(1<<3)
-#define P4_ESCR_USR0		(1<<2)
-#define P4_ESCR_OS1		(1<<1)
-#define P4_ESCR_USR1		(1<<0)
 #define P4_CCCR_OVF_PMI0	(1<<26)
 #define P4_CCCR_OVF_PMI1	(1<<27)
 #define P4_CCCR_THRESHOLD(N)	((N)<<20)
@@ -63,23 +60,16 @@ extern int logical_proc_id[];
 #define P4_CCCR_ESCR_SELECT(N)	((N)<<13)
 #define P4_CCCR_ENABLE		(1<<12)
 /* 
- * Set up IQ_COUNTER{0,1} to behave like a clock, by having IQ_CCCR{0,1} filter
+ * Set up IQ_COUNTER0 to behave like a clock, by having IQ_CCCR0 filter
  * CRU_ESCR0 (with any non-null event selector) through a complemented
  * max threshold. [IA32-Vol3, Section 14.9.9] 
  */
 #define MSR_P4_IQ_COUNTER0	0x30C
-#define MSR_P4_IQ_COUNTER1	0x30D
 #define MSR_P4_IQ_CCCR0		0x36C
-#define MSR_P4_IQ_CCCR1		0x36D
 #define MSR_P4_CRU_ESCR0	0x3B8 /* ESCR no. 4 */
-#define P4_NMI_CRU_ESCR0 \
-    (P4_ESCR_EVENT_SELECT(0x3F)|P4_ESCR_OS0|P4_ESCR_USR0| \
-     P4_ESCR_OS1|P4_ESCR_USR1)
+#define P4_NMI_CRU_ESCR0	P4_ESCR_EVENT_SELECT(0x3F)
 #define P4_NMI_IQ_CCCR0	\
     (P4_CCCR_OVF_PMI0|P4_CCCR_THRESHOLD(15)|P4_CCCR_COMPLEMENT| \
-     P4_CCCR_COMPARE|P4_CCCR_REQUIRED|P4_CCCR_ESCR_SELECT(4)|P4_CCCR_ENABLE)
-#define P4_NMI_IQ_CCCR1	\
-    (P4_CCCR_OVF_PMI1|P4_CCCR_THRESHOLD(15)|P4_CCCR_COMPLEMENT|	\
      P4_CCCR_COMPARE|P4_CCCR_REQUIRED|P4_CCCR_ESCR_SELECT(4)|P4_CCCR_ENABLE)
 
 int __init check_nmi_watchdog (void)
@@ -116,6 +106,13 @@ int __init check_nmi_watchdog (void)
         nmi_hz = 1;
 
     return 0;
+}
+
+static void nmi_timer_fn(void *unused)
+{
+    int cpu = smp_processor_id();
+    nmi_timer_ticks[cpu]++;
+    set_ac_timer(&nmi_timer[cpu], NOW() + MILLISECS(1000));
 }
 
 static inline void nmi_pm_init(void) { }
@@ -186,45 +183,35 @@ static int __pminit setup_p4_watchdog(void)
         return 0;
 
     nmi_perfctr_msr = MSR_P4_IQ_COUNTER0;
+    nmi_p4_cccr_val = P4_NMI_IQ_CCCR0;
+    if ( smp_num_siblings == 2 )
+        nmi_p4_cccr_val |= P4_CCCR_OVF_PMI1;
 
-    if ( logical_proc_id[smp_processor_id()] == 0 )
-    {
-        if (!(misc_enable & MSR_IA32_MISC_ENABLE_PEBS_UNAVAIL))
-            clear_msr_range(0x3F1, 2);
-        /* MSR 0x3F0 seems to have a default value of 0xFC00, but current
-           docs doesn't fully define it, so leave it alone for now. */
-        clear_msr_range(0x3A0, 31);
-        clear_msr_range(0x3C0, 6);
-        clear_msr_range(0x3C8, 6);
-        clear_msr_range(0x3E0, 2);
-        clear_msr_range(MSR_P4_CCCR0, 18);
-        clear_msr_range(MSR_P4_PERFCTR0, 18);
+    if (!(misc_enable & MSR_IA32_MISC_ENABLE_PEBS_UNAVAIL))
+        clear_msr_range(0x3F1, 2);
+    /* MSR 0x3F0 seems to have a default value of 0xFC00, but current
+       docs doesn't fully define it, so leave it alone for now. */
+    clear_msr_range(0x3A0, 31);
+    clear_msr_range(0x3C0, 6);
+    clear_msr_range(0x3C8, 6);
+    clear_msr_range(0x3E0, 2);
+    clear_msr_range(MSR_P4_CCCR0, 18);
+    clear_msr_range(MSR_P4_PERFCTR0, 18);
         
-        wrmsr(MSR_P4_CRU_ESCR0, P4_NMI_CRU_ESCR0, 0);
-        wrmsr(MSR_P4_IQ_CCCR0, P4_NMI_IQ_CCCR0 & ~P4_CCCR_ENABLE, 0);
-        Dprintk("setting P4_IQ_COUNTER0 to 0x%08lx\n", -(cpu_khz/nmi_hz*1000));
-        wrmsr(MSR_P4_IQ_COUNTER0, -(cpu_khz/nmi_hz*1000), -1);
-        apic_write(APIC_LVTPC, APIC_DM_NMI);
-        wrmsr(MSR_P4_IQ_CCCR0, P4_NMI_IQ_CCCR0, 0);
-    }
-    else if ( logical_proc_id[smp_processor_id()] == 1 )
-    {
-        wrmsr(MSR_P4_IQ_CCCR1, P4_NMI_IQ_CCCR1 & ~P4_CCCR_ENABLE, 0);
-        Dprintk("setting P4_IQ_COUNTER2 to 0x%08lx\n", -(cpu_khz/nmi_hz*1000));
-        wrmsr(MSR_P4_IQ_COUNTER1, -(cpu_khz/nmi_hz*1000), -1);
-        apic_write(APIC_LVTPC, APIC_DM_NMI);
-        wrmsr(MSR_P4_IQ_CCCR1, P4_NMI_IQ_CCCR1, 0);        
-    }
-    else
-    {
-        return 0;
-    }
+    wrmsr(MSR_P4_CRU_ESCR0, P4_NMI_CRU_ESCR0, 0);
+    wrmsr(MSR_P4_IQ_CCCR0, P4_NMI_IQ_CCCR0 & ~P4_CCCR_ENABLE, 0);
+    Dprintk("setting P4_IQ_COUNTER0 to 0x%08lx\n", -(cpu_khz/nmi_hz*1000));
+    wrmsr(MSR_P4_IQ_COUNTER0, -(cpu_khz/nmi_hz*1000), -1);
+    apic_write(APIC_LVTPC, APIC_DM_NMI);
+    wrmsr(MSR_P4_IQ_CCCR0, nmi_p4_cccr_val, 0);
 
     return 1;
 }
 
 void __pminit setup_apic_nmi_watchdog(void)
 {
+    int cpu = smp_processor_id();
+
     if (!nmi_watchdog)
         return;
 
@@ -250,6 +237,10 @@ void __pminit setup_apic_nmi_watchdog(void)
     default:
         return;
     }
+
+    init_ac_timer(&nmi_timer[cpu], nmi_timer_fn, NULL, cpu);
+    nmi_timer_fn(NULL);
+
     nmi_pm_init();
 }
 
@@ -280,11 +271,11 @@ void watchdog_enable(void)
     spin_unlock_irqrestore(&watchdog_lock, flags);
 }
 
-void nmi_watchdog_tick (struct cpu_user_regs * regs)
+void nmi_watchdog_tick(struct cpu_user_regs * regs)
 {
     int sum, cpu = smp_processor_id();
 
-    sum = ac_timers[cpu].softirqs;
+    sum = nmi_timer_ticks[cpu];
 
     if ( (last_irq_sums[cpu] == sum) && watchdog_on )
     {
@@ -310,22 +301,24 @@ void nmi_watchdog_tick (struct cpu_user_regs * regs)
     {
         if ( nmi_perfctr_msr == MSR_P4_IQ_COUNTER0 )
         {
-            if ( logical_proc_id[cpu] == 0 )
-            {
-                wrmsr(MSR_P4_IQ_CCCR0, P4_NMI_IQ_CCCR0, 0);
-                apic_write(APIC_LVTPC, APIC_DM_NMI);
-                wrmsr(MSR_P4_IQ_COUNTER0, -(cpu_khz/nmi_hz*1000), -1);
-            }
-            else
-            {
-                wrmsr(MSR_P4_IQ_CCCR1, P4_NMI_IQ_CCCR1, 0);
-                apic_write(APIC_LVTPC, APIC_DM_NMI);
-                wrmsr(MSR_P4_IQ_COUNTER1, -(cpu_khz/nmi_hz*1000), -1);
-            }
+            /*
+             * P4 quirks:
+             * - An overflown perfctr will assert its interrupt
+             *   until the OVF flag in its CCCR is cleared.
+             * - LVTPC is masked on interrupt and must be
+             *   unmasked by the LVTPC handler.
+             */
+            wrmsr(MSR_P4_IQ_CCCR0, nmi_p4_cccr_val, 0);
+            apic_write(APIC_LVTPC, APIC_DM_NMI);
         }
-        else
+        else if ( nmi_perfctr_msr == MSR_P6_PERFCTR0 )
         {
-            wrmsr(nmi_perfctr_msr, -(cpu_khz/nmi_hz*1000), -1);
+            /*
+             * Only P6 based Pentium M need to re-unmask the apic vector but
+             * it doesn't hurt other P6 variants.
+             */
+            apic_write(APIC_LVTPC, APIC_DM_NMI);
         }
+        wrmsr(nmi_perfctr_msr, -(cpu_khz/nmi_hz*1000), -1);
     }
 }
