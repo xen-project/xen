@@ -47,7 +47,6 @@
 #include <asm/msr.h>
 #include <mach_apic.h>
 #include <mach_wakecpu.h>
-#include <smpboot_hooks.h>
 
 static int _foo;
 #define set_kernel_exec(x,y) (_foo=0)
@@ -803,7 +802,13 @@ static int __init do_boot_cpu(int apicid)
 
 	store_NMI_vector(&nmi_high, &nmi_low);
 
-	smpboot_setup_warm_reset_vector(start_eip);
+	CMOS_WRITE(0xa, 0xf);
+	local_flush_tlb();
+	Dprintk("1.\n");
+	*((volatile unsigned short *) TRAMPOLINE_HIGH) = start_eip >> 4;
+	Dprintk("2.\n");
+	*((volatile unsigned short *) TRAMPOLINE_LOW) = start_eip & 0xf;
+	Dprintk("3.\n");
 
 	/*
 	 * Starting actual IPI sequence...
@@ -947,7 +952,7 @@ static void __init smp_boot_cpus(unsigned int max_cpus)
 	 */
 	if (!smp_found_config && !acpi_lapic) {
 		printk(KERN_NOTICE "SMP motherboard not detected.\n");
-		smpboot_clear_io_apic_irqs();
+	init_uniprocessor:
 		phys_cpu_present_map = physid_mask_of_physid(0);
 		if (APIC_init_uniprocessor())
 			printk(KERN_NOTICE "Local APIC not detected."
@@ -973,10 +978,7 @@ static void __init smp_boot_cpus(unsigned int max_cpus)
 	if (APIC_INTEGRATED(apic_version[boot_cpu_physical_apicid]) && !cpu_has_apic) {
 		printk(KERN_ERR "BIOS bug, local APIC #%d not detected!...\n",
 			boot_cpu_physical_apicid);
-		printk(KERN_ERR "... forcing use of dummy APIC emulation. (tell your hw vendor)\n");
-		smpboot_clear_io_apic_irqs();
-		phys_cpu_present_map = physid_mask_of_physid(0);
-		return;
+		goto init_uniprocessor;
 	}
 
 	verify_local_APIC();
@@ -984,13 +986,8 @@ static void __init smp_boot_cpus(unsigned int max_cpus)
 	/*
 	 * If SMP should be disabled, then really disable it!
 	 */
-	if (!max_cpus) {
-		smp_found_config = 0;
-		printk(KERN_INFO "SMP mode deactivated, forcing use of dummy APIC emulation.\n");
-		smpboot_clear_io_apic_irqs();
-		phys_cpu_present_map = physid_mask_of_physid(0);
-		return;
-	}
+	if (!max_cpus)
+		goto init_uniprocessor;
 
 	connect_bsp_APIC();
 	setup_local_APIC();
@@ -1030,9 +1027,17 @@ static void __init smp_boot_cpus(unsigned int max_cpus)
 	}
 
 	/*
-	 * Cleanup possible dangling ends...
+	 * Install writable page 0 entry to set BIOS data area.
 	 */
-	smpboot_restore_warm_reset_vector();
+	local_flush_tlb();
+
+	/*
+	 * Paranoid:  Set warm reset code and vector here back
+	 * to default values.
+	 */
+	CMOS_WRITE(0, 0xf);
+
+	*((volatile long *) phys_to_virt(0x467)) = 0;
 
 #ifdef BOGOMIPS
 	/*
@@ -1103,7 +1108,12 @@ static void __init smp_boot_cpus(unsigned int max_cpus)
 	if (nmi_watchdog == NMI_LOCAL_APIC)
 		check_nmi_watchdog();
 
-	smpboot_setup_io_apic();
+	/*
+	 * Here we can be sure that there is an IO-APIC in the system. Let's
+	 * go and set it up:
+	 */
+	if (!skip_ioapic_setup && nr_ioapics)
+		setup_IO_APIC();
 
 	setup_boot_APIC_clock();
 

@@ -211,6 +211,9 @@ static void __init start_of_day(void)
     for_each_cpu ( i )
         cpu_set(i, cpu_present_map);
 
+    /* Sanity: We ought to be taking interrupts by now. */
+    local_irq_enable();
+
     initialize_keytable();
 
     serial_init_stage2();

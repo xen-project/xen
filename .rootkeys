@@ -1329,7 +1329,6 @@
 427fa2d093fDS2gOBLcl7Yndzl7HmA xen/include/asm-x86/mach-default/mach_ipi.h
 427fa2d0Y7bD35d-FvDAeiJDIdRw2A xen/include/asm-x86/mach-default/mach_mpparse.h
 427fa2d0OfglYyfpDTD5DII4M0uZRw xen/include/asm-x86/mach-default/mach_wakecpu.h
-427fa2d1EKnA8zCq2QLHiGOUqOgszg xen/include/asm-x86/mach-default/smpboot_hooks.h
 4294b5eeTwL8TeEI5pEzxvGD5obZsA xen/include/asm-x86/mach-es7000/mach_apic.h
 4294b5efhhBHJ81dsuLfJxWuN9PcDQ xen/include/asm-x86/mach-es7000/mach_apicdef.h
 4294b5efvb29X4mFAhUBdeGUPTFoBw xen/include/asm-x86/mach-es7000/mach_ipi.h
