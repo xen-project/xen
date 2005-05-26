@@ -244,9 +244,11 @@ void arch_do_createdomain(struct exec_domain *ed)
 	}
 #endif
 	d->max_pages = (128*1024*1024)/PAGE_SIZE; // 128MB default // FIXME
-	if ((d->metaphysical_rid = allocate_metaphysical_rid()) == -1UL)
+	if ((d->arch.metaphysical_rr0 = allocate_metaphysical_rr0()) == -1UL)
 		BUG();
 	ed->vcpu_info->arch.metaphysical_mode = 1;
+	ed->arch.metaphysical_rr0 = d->arch.metaphysical_rr0;
+	ed->arch.metaphysical_saved_rr0 = d->arch.metaphysical_rr0;
 #define DOMAIN_RID_BITS_DEFAULT 18
 	if (!allocate_rid_range(d,DOMAIN_RID_BITS_DEFAULT)) // FIXME
 		BUG();

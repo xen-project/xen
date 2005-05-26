@@ -117,7 +117,7 @@ void vcpu_set_metaphysical_mode(VCPU *vcpu, BOOLEAN newmode)
 {
 	/* only do something if mode changes */
 	if (!!newmode ^ !!PSCB(vcpu,metaphysical_mode)) {
-		if (newmode) set_metaphysical_rr(0,vcpu->domain->metaphysical_rid);
+		if (newmode) set_metaphysical_rr0();
 		else if (PSCB(vcpu,rrs[0]) != -1)
 			set_one_rr(0, PSCB(vcpu,rrs[0]));
 		PSCB(vcpu,metaphysical_mode) = newmode;
@@ -167,6 +167,12 @@ extern UINT64 vcpu_check_pending_interrupts(VCPU *vcpu);
 IA64FAULT vcpu_set_psr_dt(VCPU *vcpu)
 {
 	vcpu_set_metaphysical_mode(vcpu,FALSE);
+	return IA64_NO_FAULT;
+}
+
+IA64FAULT vcpu_set_psr_i(VCPU *vcpu)
+{
+	PSCB(vcpu,interrupt_delivery_enabled) = 1;
 	return IA64_NO_FAULT;
 }
 
