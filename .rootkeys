@@ -1132,6 +1132,15 @@
 3ddb79bcSC_LvnmFlX-T5iTgaR0SKg xen/arch/x86/boot/x86_32.S
 40e42bdbNu4MjI750THP_8J1S-Sa0g xen/arch/x86/boot/x86_64.S
 4107c15e-VmEcLsE-7JCXZaabI8C7A xen/arch/x86/cdb.c
+4295ecb1Ynez_TseZvDdjD7PzVMDiw xen/arch/x86/cpu/amd.c
+4295ecb1KPPNny26nBEJzK4pAG-KXQ xen/arch/x86/cpu/centaur.c
+4295ecb1QnJx9cbqCJQ1o4TTFQL5Vg xen/arch/x86/cpu/common.c
+4295ecb1ZIJLN5uklV1xompN7DN1WQ xen/arch/x86/cpu/cpu.h
+4295ecb1g6Ye-zy_oXVQQaKw4AtDmw xen/arch/x86/cpu/cyrix.c
+4295ecb1MOdQxXznHu3g-p5DzhMv8g xen/arch/x86/cpu/intel.c
+4295ecb1LsW7ov9JOtRP8euvJKbgbQ xen/arch/x86/cpu/intel_cacheinfo.c
+4295ecb1AeClyruqwLz-xDthMZ5eoA xen/arch/x86/cpu/rise.c
+4295ecb1GO92quFeyoVz2LsPQcFuHg xen/arch/x86/cpu/transmeta.c
 3ddb79bcUrk2EIaM5VsT6wUudH1kkg xen/arch/x86/delay.c
 4294b5ee34eGSh5YNDKMSxBIOycluw xen/arch/x86/dmi_scan.c
 40e34414WiQO4h2m3tcpaCPn7SyYyg xen/arch/x86/dom0_ops.c

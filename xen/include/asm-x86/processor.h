@@ -26,8 +26,7 @@
 #define X86_VENDOR_RISE 6
 #define X86_VENDOR_TRANSMETA 7
 #define X86_VENDOR_NSC 8
-#define X86_VENDOR_SIS 9
-#define X86_VENDOR_NUM 10
+#define X86_VENDOR_NUM 9
 #define X86_VENDOR_UNKNOWN 0xff
 
 /*
@@ -146,23 +145,26 @@ struct exec_domain;
   ({ void *pc; __asm__("movl $1f,%0\n1:":"=g" (pc)); pc; })
 #endif
 
-/*
- *  CPU type and hardware bug flags. Kept separately for each CPU.
- *  Members of this structure are referenced in head.S, so think twice
- *  before touching them. [mj]
- */
-
 struct cpuinfo_x86 {
-    __u8    x86;            /* CPU family */
-    __u8    x86_vendor;     /* CPU vendor */
-    __u8    x86_model;
-    __u8    x86_mask;
-    int     cpuid_level;    /* Maximum supported CPUID level, -1=no CPUID */
-    __u32   x86_capability[NCAPINTS];
-    char    x86_vendor_id[16];
-    int     x86_cache_size;  /* in KB - for CPUS that support this call  */
-    int	    x86_clflush_size;
-    int	    x86_tlbsize;     /* number of 4K pages in DTLB/ITLB combined */
+	__u8	x86;		/* CPU family */
+	__u8	x86_vendor;	/* CPU vendor */
+	__u8	x86_model;
+	__u8	x86_mask;
+	char	wp_works_ok;	/* It doesn't on 386's */
+	char	hlt_works_ok;	/* Problems on some 486Dx4's and old 386's */
+	char	hard_math;
+	char	rfu;
+       	int	cpuid_level;	/* Maximum supported CPUID level, -1=no CPUID */
+	unsigned long	x86_capability[NCAPINTS];
+	char	x86_vendor_id[16];
+	char	x86_model_id[64];
+	int 	x86_cache_size;  /* in KB - valid for CPUS which support this
+				    call  */
+	int 	x86_cache_alignment;	/* In bytes */
+	int	fdiv_bug;
+	int	f00f_bug;
+	int	coma_bug;
+	unsigned char x86_num_cores;
 } __cacheline_aligned;
 
 /*
@@ -179,15 +181,23 @@ extern struct cpuinfo_x86 cpu_data[];
 #define current_cpu_data boot_cpu_data
 #endif
 
-extern  int phys_proc_id[NR_CPUS];
-extern char ignore_irq13;
+extern int phys_proc_id[NR_CPUS];
 
 extern void identify_cpu(struct cpuinfo_x86 *);
 extern void print_cpu_info(struct cpuinfo_x86 *);
+extern unsigned int init_intel_cacheinfo(struct cpuinfo_x86 *c);
 extern void dodgy_tsc(void);
+
+#ifdef CONFIG_X86_HT
+extern void detect_ht(struct cpuinfo_x86 *c);
+#else
+static inline void detect_ht(struct cpuinfo_x86 *c) {}
+#endif
 
 /*
  * Generic CPUID function
+ * clear %ecx since some cpus (Cyrix MII) do not set or clear %ecx
+ * resulting in stale register contents being returned.
  */
 static inline void cpuid(
     int op, unsigned int *eax, unsigned int *ebx,
@@ -195,10 +205,10 @@ static inline void cpuid(
 {
     __asm__("cpuid"
             : "=a" (*eax),
-            "=b" (*ebx),
-            "=c" (*ecx),
-            "=d" (*edx)
-            : "0" (op));
+              "=b" (*ebx),
+              "=c" (*ecx),
+              "=d" (*edx)
+            : "0" (op), "2" (0));
 }
 
 /*
@@ -326,6 +336,23 @@ static inline void clear_in_cr4 (unsigned long mask)
 	outb((reg), 0x22); \
 	outb((data), 0x23); \
 } while (0)
+
+static inline void __monitor(const void *eax, unsigned long ecx,
+		unsigned long edx)
+{
+	/* "monitor %eax,%ecx,%edx;" */
+	asm volatile(
+		".byte 0x0f,0x01,0xc8;"
+		: :"a" (eax), "c" (ecx), "d"(edx));
+}
+
+static inline void __mwait(unsigned long eax, unsigned long ecx)
+{
+	/* "mwait %eax,%ecx;" */
+	asm volatile(
+		".byte 0x0f,0x01,0xc9;"
+		: :"a" (eax), "c" (ecx));
+}
 
 #define IOBMP_BYTES             8192
 #define IOBMP_INVALID_OFFSET    0x8000

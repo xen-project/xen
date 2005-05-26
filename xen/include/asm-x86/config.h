@@ -7,11 +7,10 @@
 #ifndef __X86_CONFIG_H__
 #define __X86_CONFIG_H__
 
-#define CONFIG_VMX 1
-
 #define CONFIG_X86 1
+#define CONFIG_X86_HT 1
 #define CONFIG_SHADOW 1
-
+#define CONFIG_VMX 1
 #define CONFIG_SMP 1
 #define CONFIG_X86_LOCAL_APIC 1
 #define CONFIG_X86_GOOD_APIC 1

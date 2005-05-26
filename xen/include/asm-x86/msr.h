@@ -79,6 +79,17 @@
 #define MSR_IA32_PLATFORM_ID		0x17
 #define MSR_IA32_EBL_CR_POWERON		0x2a
 
+#define MSR_IA32_APICBASE		0x1b
+#define MSR_IA32_APICBASE_BSP		(1<<8)
+#define MSR_IA32_APICBASE_ENABLE	(1<<11)
+#define MSR_IA32_APICBASE_BASE		(0xfffff<<12)
+
+#define MSR_IA32_UCODE_WRITE		0x79
+#define MSR_IA32_UCODE_REV		0x8b
+
+#define MSR_P6_PERFCTR0      0xc1
+#define MSR_P6_PERFCTR1      0xc2
+
 /* MSRs & bits used for VMX enabling */
 #define MSR_IA32_VMX_BASIC_MSR                  0x480
 #define IA32_FEATURE_CONTROL_MSR                0x3a
@@ -108,9 +119,6 @@
 /* Intel MSRs. Some also available on other CPUs */
 #define MSR_IA32_PLATFORM_ID	0x17
 
-#define MSR_IA32_PERFCTR0      0xc1
-#define MSR_IA32_PERFCTR1      0xc2
-
 #define MSR_MTRRcap		0x0fe
 #define MSR_IA32_BBL_CR_CTL        0x119
 
@@ -121,9 +129,6 @@
 #define MSR_IA32_MCG_CAP       0x179
 #define MSR_IA32_MCG_STATUS        0x17a
 #define MSR_IA32_MCG_CTL       0x17b
-
-#define MSR_IA32_EVNTSEL0      0x186
-#define MSR_IA32_EVNTSEL1      0x187
 
 #define MSR_MTRRfix64K_00000	0x250
 #define MSR_MTRRfix16K_80000	0x258
@@ -144,14 +149,6 @@
 #define MSR_IA32_MC0_MISC      0x403
 
 #define MSR_IA32_DS_AREA	0x600
-
-#define MSR_IA32_APICBASE		0x1b
-#define MSR_IA32_APICBASE_BSP		(1<<8)
-#define MSR_IA32_APICBASE_ENABLE	(1<<11)
-#define MSR_IA32_APICBASE_BASE		(0xfffff<<12)
-
-#define MSR_IA32_UCODE_WRITE		0x79
-#define MSR_IA32_UCODE_REV		0x8b
 
 #define MSR_IA32_BBL_CR_CTL		0x119
 
@@ -237,6 +234,7 @@
 /* VIA Cyrix defined MSRs*/
 #define MSR_VIA_FCR			0x1107
 #define MSR_VIA_LONGHAUL		0x110a
+#define MSR_VIA_RNG			0x110b
 #define MSR_VIA_BCR2			0x1147
 
 /* Transmeta defined MSRs */
