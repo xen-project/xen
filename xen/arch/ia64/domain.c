@@ -133,7 +133,6 @@ void startup_cpu_idle_loop(void)
 	 * Therefore memory barrier to ensure state is visible.
 	 */
 	smp_mb();
-	init_idle();
 #if 0
 //do we have to ensure the idle task has a shared page so that, for example,
 //region registers can be loaded from it.  Apparently not...
