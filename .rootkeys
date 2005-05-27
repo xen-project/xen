@@ -470,6 +470,7 @@
 427261074Iy1MkbbqIV6zdZDWWx_Jg patches/linux-2.6.11/i386-cpu-hotplug-updated-for-mm.patch
 42372652KCUP-IOH9RN19YQmGhs4aA patches/linux-2.6.11/iomap.patch
 428359d4b3fDYtazwXi4UUmSWaOUew patches/linux-2.6.11/linux-2.6.11.10.patch
+4296fb998LGSWCcljGKbOCUv3h9uRQ patches/linux-2.6.11/net-csum.patch
 424f001e_M1Tnxc52rDrmCLelnDWMQ patches/linux-2.6.11/x86_64-linux.patch
 3f776bd1Hy9rn69ntXBhPReUFw9IEA tools/Makefile
 40e1b09db5mN69Ijj0X_Eol-S7dXiw tools/Rules.mk
