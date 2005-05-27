@@ -318,6 +318,55 @@ static void vmx_vmexit_do_invlpg(unsigned long va)
     shadow_invlpg(ed, va);
 }
 
+static int check_for_null_selector(unsigned long eip)
+{
+    unsigned char inst[MAX_INST_LEN];
+    unsigned long sel;
+    int i, inst_len;
+    int inst_copy_from_guest(unsigned char *, unsigned long, int);
+
+    __vmread(INSTRUCTION_LEN, &inst_len);
+    memset(inst, 0, MAX_INST_LEN);
+    if (inst_copy_from_guest(inst, eip, inst_len) != inst_len) {
+        printf("check_for_null_selector: get guest instruction failed\n");
+        domain_crash_synchronous();
+    }
+
+    for (i = 0; i < inst_len; i++) {
+        switch (inst[i]) {
+        case 0xf3: /* REPZ */
+        case 0xf2: /* REPNZ */
+        case 0xf0: /* LOCK */
+        case 0x66: /* data32 */
+        case 0x67: /* addr32 */
+            continue;
+        case 0x2e: /* CS */
+            __vmread(GUEST_CS_SELECTOR, &sel);
+            break;
+        case 0x36: /* SS */
+            __vmread(GUEST_SS_SELECTOR, &sel);
+            break;
+        case 0x26: /* ES */
+            __vmread(GUEST_ES_SELECTOR, &sel);
+            break;
+        case 0x64: /* FS */
+            __vmread(GUEST_FS_SELECTOR, &sel);
+            break;
+        case 0x65: /* GS */
+            __vmread(GUEST_GS_SELECTOR, &sel);
+            break;
+        case 0x3e: /* DS */
+            /* FALLTHROUGH */
+        default:
+            /* DS is the default */
+            __vmread(GUEST_DS_SELECTOR, &sel);
+        }
+        return sel == 0 ? 1 : 0;
+    }
+
+    return 0;
+}
+
 static void vmx_io_instruction(struct cpu_user_regs *regs, 
                    unsigned long exit_qualification, unsigned long inst_len) 
 {
@@ -354,40 +403,44 @@ static void vmx_io_instruction(struct cpu_user_regs *regs,
         domain_crash_synchronous(); 
     }
     p = &vio->vp_ioreq;
-    p->dir = test_bit(3, &exit_qualification);  
+    p->dir = test_bit(3, &exit_qualification); /* direction */
 
     p->pdata_valid = 0;
     p->count = 1;
     p->size = (exit_qualification & 7) + 1;
 
-    if (test_bit(4, &exit_qualification)) {
-        p->df = (eflags & X86_EFLAGS_DF) ? 1 : 0;
-        p->pdata_valid = 1;
+    if (test_bit(4, &exit_qualification)) { /* string instruction */
+	unsigned long laddr;
 
-        if (vm86) {
-            unsigned long seg;
-            if (p->dir == IOREQ_WRITE) {
-                __vmread(GUEST_DS_SELECTOR, &seg);
-                p->u.pdata = (void *)
-                        ((seg << 4) + (regs->esi & 0xFFFF));
-            } else {
-                __vmread(GUEST_ES_SELECTOR, &seg);
-                p->u.pdata = (void *)
-                        ((seg << 4) + (regs->edi & 0xFFFF));
-            }
-        } else {
-               p->u.pdata = (void *) ((p->dir == IOREQ_WRITE) ?
-                   regs->esi : regs->edi);
+	__vmread(GUEST_LINEAR_ADDRESS, &laddr);
+        /*
+         * In protected mode, guest linear address is invalid if the
+         * selector is null.
+         */
+        if (!vm86 && check_for_null_selector(eip)) {
+            printf("String I/O with null selector (cs:eip=0x%lx:0x%lx)\n",
+                cs, eip);
+            laddr = (p->dir == IOREQ_WRITE) ? regs->esi : regs->edi;
         }
-        p->u.pdata = (void *) gva_to_gpa(p->u.data);
+        p->pdata_valid = 1;
+        p->u.pdata = (void *) gva_to_gpa(laddr);
+        p->df = (eflags & X86_EFLAGS_DF) ? 1 : 0;
 
-        if (test_bit(5, &exit_qualification))
+        if (test_bit(5, &exit_qualification)) /* "rep" prefix */
 	    p->count = vm86 ? regs->ecx & 0xFFFF : regs->ecx;
+
+        /*
+         * Split up string I/O operations that cross page boundaries. Don't
+         * advance %eip so that "rep insb" will restart at the next page.
+         */
         if ((p->u.data & PAGE_MASK) != 
-            ((p->u.data + p->count * p->size - 1) & PAGE_MASK)) {
-            printk("stringio crosses page boundary!\n");
+		((p->u.data + p->count * p->size - 1) & PAGE_MASK)) {
+	    VMX_DBG_LOG(DBG_LEVEL_2,
+		"String I/O crosses page boundary (cs:eip=0x%lx:0x%lx)\n",
+		cs, eip);
             if (p->u.data & (p->size - 1)) {
-                printk("Not aligned I/O!\n");
+		printf("Unaligned string I/O operation (cs:eip=0x%lx:0x%lx)\n",
+			cs, eip);
                 domain_crash_synchronous();     
             }
             p->count = (PAGE_SIZE - (p->u.data & ~PAGE_MASK)) / p->size;
@@ -885,7 +938,6 @@ static void mov_from_cr(int cr, int gp, struct cpu_user_regs *regs)
         __vmx_bug(regs);
 
     value = (unsigned long) d->arch.arch_vmx.cpu_cr3;
-    ASSERT(value);
 
     switch (gp) {
         CASE_SET_REG(EAX, eax);
