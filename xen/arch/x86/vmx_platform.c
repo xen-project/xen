@@ -406,7 +406,7 @@ static int vmx_decode(const unsigned char *inst, struct instruction *thread_inst
     return DECODE_failure;
 }
 
-static int inst_copy_from_guest(unsigned char *buf, unsigned long guest_eip, int inst_len)
+int inst_copy_from_guest(unsigned char *buf, unsigned long guest_eip, int inst_len)
 {
     l1_pgentry_t gpte;
     unsigned long mfn;

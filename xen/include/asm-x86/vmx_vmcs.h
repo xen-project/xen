@@ -146,6 +146,7 @@ enum vmcs_field {
     CR3_TARGET_VALUES               = 0x00006008, 
     CR3_GUEST_HOST_MASK             = 0x00006208,
     EXIT_QUALIFICATION              = 0x00006400,
+    GUEST_LINEAR_ADDRESS	    = 0x0000640A,
     GUEST_CR0                       = 0x00006800,
     GUEST_CR3                       = 0x00006802,
     GUEST_CR4                       = 0x00006804,
