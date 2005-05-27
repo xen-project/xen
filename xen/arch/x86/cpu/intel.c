@@ -10,6 +10,7 @@
 #include <asm/mpspec.h>
 #include <asm/apic.h>
 #include <mach_apic.h>
+#include <asm/vmx_vmcs.h>
 
 #include "cpu.h"
 
@@ -162,6 +163,10 @@ static void __init init_intel(struct cpuinfo_x86 *c)
 		set_bit(X86_FEATURE_P4, c->x86_capability);
 	if (c->x86 == 6) 
 		set_bit(X86_FEATURE_P3, c->x86_capability);
+
+#ifdef CONFIG_VMX
+	start_vmx();
+#endif
 }
 
 
