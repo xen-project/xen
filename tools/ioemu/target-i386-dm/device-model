@@ -54,6 +54,14 @@ if [ ! -z $hdd ];then
 PARMETER="$PARMETER -hdd $hdd"
 fi
 
+if [ ! -z $cdrom ];then
+PARMETER="$PARMETER -cdrom $cdrom"
+fi
+
+if [ ! -z $boot ];then
+PARMETER="$PARMETER -boot $boot"
+fi
+
 if [ ! -z $nographic ] && [ $nographic -eq 1 ];then
 PARMETER="$PARMETER -nographic"
 fi
