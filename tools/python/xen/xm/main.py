@@ -512,7 +512,7 @@ class ProgPincpu(Prog):
         cpus = []
         cpumap = 0
         for c in cpulist.split(','):
-            if len(c) > 1:
+            if c.find('-') != -1:
                 (x,y) = c.split('-')
                 for i in range(int(x),int(y)+1):
                     cpus.append(int(i))
