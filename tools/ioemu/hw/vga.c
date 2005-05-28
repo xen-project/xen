@@ -1877,7 +1877,7 @@ void vga_common_init(VGAState *s, DisplayState *ds, uint8_t *vga_ram_base,
 
     /* qemu's vga mem is not detached from phys_ram_base and can cause DM abort
      * when guest write vga mem, so allocate a new one */
-    s->vram_ptr = qemu_mallocz(256 * 1024);
+    s->vram_ptr = qemu_mallocz(vga_ram_size);
 
     s->vram_offset = vga_ram_offset;
     s->vram_size = vga_ram_size;

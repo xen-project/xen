@@ -389,7 +389,7 @@ void pc_init(int ram_size, int vga_ram_size, int boot_device,
     linux_boot = (kernel_filename != NULL);
 
     /* allocate RAM */
-//    cpu_register_physical_memory(0, ram_size, 0);
+//  cpu_register_physical_memory(0, ram_size, 0);
 
 #ifndef NOBIOS
     /* BIOS load */
@@ -436,9 +436,9 @@ void pc_init(int ram_size, int vga_ram_size, int boot_device,
     /* map all the bios at the top of memory */
     cpu_register_physical_memory((uint32_t)(-bios_size), 
                                  bios_size, bios_offset | IO_MEM_ROM);
+#endif
     
     bochs_bios_init();
-#endif
 
     if (linux_boot) {
         uint8_t bootsect[512];
@@ -508,9 +508,6 @@ void pc_init(int ram_size, int vga_ram_size, int boot_device,
 
     register_ioport_write(0xf0, 1, 1, ioportF0_write, NULL);
 
-#ifdef NOBIOS
-    cirrus_vga_enabled = 0;
-#endif
     if (cirrus_vga_enabled) {
         if (pci_enabled) {
             pci_cirrus_vga_init(pci_bus, 
