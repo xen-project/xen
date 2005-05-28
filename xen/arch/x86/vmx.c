@@ -744,8 +744,8 @@ static int vmx_set_cr0(unsigned long value)
     __vmwrite(CR0_READ_SHADOW, value);
 
     VMX_DBG_LOG(DBG_LEVEL_VMMU, "Update CR0 value = %lx\n", value);
-    if ((value & X86_CR0_PE) && (value & X86_CR0_PG) 
-        && !paging_enabled) {
+
+    if ((value & X86_CR0_PE) && (value & X86_CR0_PG) && !paging_enabled) {
         /*
          * The guest CR3 must be pointing to the guest physical.
          */
@@ -775,33 +775,39 @@ static int vmx_set_cr0(unsigned long value)
          */
         VMX_DBG_LOG(DBG_LEVEL_VMMU, "Update CR3 value = %lx, mfn = %lx", 
                 d->arch.arch_vmx.cpu_cr3, mfn);
-    } else {
-        if ((value & X86_CR0_PE) == 0) {
-            __vmread(GUEST_EIP, &eip);
-            VMX_DBG_LOG(DBG_LEVEL_1, "Disabling CR0.PE at %%eip 0x%lx\n", eip);
-	    if (vmx_assist(d, VMX_ASSIST_INVOKE)) {
-		set_bit(VMX_CPU_STATE_ASSIST_ENABLED,
-					&d->arch.arch_vmx.cpu_state);
-		__vmread(GUEST_EIP, &eip);
-		VMX_DBG_LOG(DBG_LEVEL_1,
-		    "Transfering control to vmxassist %%eip 0x%lx", eip);
-		return 0; /* do not update eip! */
-	    }
-	} else if (test_bit(VMX_CPU_STATE_ASSIST_ENABLED,
-					&d->arch.arch_vmx.cpu_state)) {
+    }
+
+    /*
+     * VMX does not implement real-mode virtualization. We emulate
+     * real-mode by performing a world switch to VMXAssist whenever
+     * a partition disables the CR0.PE bit.
+     */
+    if ((value & X86_CR0_PE) == 0) {
+	__vmread(GUEST_EIP, &eip);
+	VMX_DBG_LOG(DBG_LEVEL_1,
+	    "Disabling CR0.PE at %%eip 0x%lx\n", eip);
+	if (vmx_assist(d, VMX_ASSIST_INVOKE)) {
+	    set_bit(VMX_CPU_STATE_ASSIST_ENABLED, &d->arch.arch_vmx.cpu_state);
 	    __vmread(GUEST_EIP, &eip);
 	    VMX_DBG_LOG(DBG_LEVEL_1,
-		"Enabling CR0.PE at %%eip 0x%lx", eip);
-	    if (vmx_assist(d, VMX_ASSIST_RESTORE)) {
-		clear_bit(VMX_CPU_STATE_ASSIST_ENABLED,
+		"Transfering control to vmxassist %%eip 0x%lx\n", eip);
+	    return 0; /* do not update eip! */
+	}
+    } else if (test_bit(VMX_CPU_STATE_ASSIST_ENABLED,
+					&d->arch.arch_vmx.cpu_state)) {
+	__vmread(GUEST_EIP, &eip);
+	VMX_DBG_LOG(DBG_LEVEL_1,
+	    "Enabling CR0.PE at %%eip 0x%lx\n", eip);
+	if (vmx_assist(d, VMX_ASSIST_RESTORE)) {
+	    clear_bit(VMX_CPU_STATE_ASSIST_ENABLED,
 					&d->arch.arch_vmx.cpu_state);
-		__vmread(GUEST_EIP, &eip);
-		VMX_DBG_LOG(DBG_LEVEL_1,
-		    "Restoring to %%eip 0x%lx", eip);
-		return 0; /* do not update eip! */
-	    }
+	    __vmread(GUEST_EIP, &eip);
+	    VMX_DBG_LOG(DBG_LEVEL_1,
+		"Restoring to %%eip 0x%lx\n", eip);
+	    return 0; /* do not update eip! */
 	}
     }
+
     return 1;
 }
 
