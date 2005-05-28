@@ -66,7 +66,6 @@ extern unsigned long empty_zero_page[PAGE_SIZE/sizeof(unsigned long)];
 	printk("%s:%d: bad pmd %p(%016lx).\n", __FILE__, __LINE__, &(e), pmd_val(e))
 #define pud_ERROR(e) \
 	printk("%s:%d: bad pud %p(%016lx).\n", __FILE__, __LINE__, &(e), pud_val(e))
-
 #define pgd_ERROR(e) \
         printk("%s:%d: bad pgd %p(%016lx).\n", __FILE__, __LINE__, &(e), pgd_val(e))
 
@@ -299,7 +298,7 @@ static inline pte_t pfn_pte(unsigned long page_nr, pgprot_t pgprot)
 	return pte;
 }
 
-#define pfn_pte_ma(pfn, prot)	__pte_ma(((pfn) << PAGE_SHIFT) | pgprot_val(prot))
+#define pfn_pte_ma(pfn, prot)	__pte_ma((((pfn) << PAGE_SHIFT) | pgprot_val(prot)) & __supported_pte_mask)
 /*
  * The following only work if pte_present() is true.
  * Undefined behaviour if not..

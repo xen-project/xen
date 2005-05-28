@@ -511,7 +511,15 @@ retint_check:
 	movl threadinfo_flags(%rcx),%edx
 	andl %edi,%edx
 	jnz  retint_careful
-retint_restore_args:				
+retint_restore_args:
+        movb EVENT_MASK-REST_SKIP(%rsp), %al
+        notb %al			# %al == ~saved_mask
+        XEN_LOCK_VCPU_INFO_SMP(%rsi)
+        andb evtchn_upcall_mask(%rsi),%al
+	andb $1,%al			# %al == mask & ~saved_mask
+	jnz restore_all_enable_events	# != 0 => reenable event delivery      
+        XEN_UNLOCK_VCPU_INFO_SMP(%rsi)
+		
 	RESTORE_ARGS 0,8,0						
 	testb $3,8(%rsp)                # check CS
 	jnz  user_mode
@@ -627,7 +635,7 @@ ENTRY(spurious_interrupt)
 	.macro errorentry sym
         movq (%rsp),%rcx
         movq 8(%rsp),%r11
-        addq $0x18,%rsp /* rsp points to the error code */
+        addq $0x10,%rsp /* rsp points to the error code */
 	pushq %rax
 	leaq  \sym(%rip),%rax
 	jmp error_entry
@@ -712,27 +720,19 @@ error_call_handler:
         XEN_SAVE_UPCALL_MASK(%r11,%cl,EVENT_MASK)
 0:              
 	call *%rax
-error_check_event:
-        movb EVENT_MASK(%rsp), %al
-        notb %al			# %al == ~saved_mask
-        XEN_LOCK_VCPU_INFO_SMP(%rsi)
-        andb evtchn_upcall_mask(%rsi),%al
-	andb $1,%al			# %al == mask & ~saved_mask
-	jnz restore_all_enable_events	# != 0 => reenable event delivery      
-        XEN_UNLOCK_VCPU_INFO_SMP(%rsi)
 error_exit:		
 	RESTORE_REST
 /*	cli */
+	XEN_GET_VCPU_INFO(%rsi)        
+	XEN_BLOCK_EVENTS(%rsi)		
 	GET_THREAD_INFO(%rcx)	
-	testb $3,CS-REST_SKIP(%rsp)
+	testb $3,CS-ARGOFFSET(%rsp)
 	jz retint_kernel
 	movl  threadinfo_flags(%rcx),%edx
-	movl  $_TIF_WORK_MASK,%edi
+	movl  $_TIF_WORK_MASK,%edi	
 	andl  %edi,%edx
-	jnz  retint_careful
-	RESTORE_ARGS 0,8,0						
-        SWITCH_TO_USER 0
-	CFI_ENDPROC
+	jnz   retint_careful
+	jmp   retint_restore_args
 
 error_kernelspace:
          /*
@@ -777,132 +777,52 @@ ENTRY(hypervisor_callback)
 # So, on entry to the handler we detect whether we interrupted an
 # existing activation in its critical region -- if so, we pop the current
 # activation and restart the handler using the previous one.
-
 ENTRY(do_hypervisor_callback)   # do_hyperviosr_callback(struct *pt_regs)
 # Since we don't modify %rdi, evtchn_do_upall(struct *pt_regs) will
 # see the correct pointer to the pt_regs
         addq $8, %rsp            # we don't return, adjust the stack frame
-        movq RIP(%rsp),%rax
-	cmpq $scrit,%rax
-	jb   11f
-	cmpq $ecrit,%rax
-	jb   critical_region_fixup
 11:	movb $0, EVENT_MASK(%rsp)         
 	call evtchn_do_upcall
-        jmp  error_check_event
+        jmp  error_exit
 
         ALIGN
 restore_all_enable_events:  
 	XEN_UNBLOCK_EVENTS(%rsi)        # %rsi is already set up...
+
 scrit:	/**** START OF CRITICAL REGION ****/
 	XEN_TEST_PENDING(%rsi)
 	jnz  14f			# process more events if necessary...
 	XEN_UNLOCK_VCPU_INFO_SMP(%rsi)
-        RESTORE_REST
         RESTORE_ARGS 0,8,0
         testb $3,8(%rsp)                # check CS
         jnz  crit_user_mode
         orb   $3,1*8(%rsp)
         iretq
 crit_user_mode:
-        SWITCH_TO_USER 0 
+        SWITCH_TO_USER 0
         
 14:	XEN_LOCKED_BLOCK_EVENTS(%rsi)
 	XEN_UNLOCK_VCPU_INFO_SMP(%rsi)
+	SAVE_REST
         movq %rsp,%rdi                  # set the argument again
 	jmp  11b
 ecrit:  /**** END OF CRITICAL REGION ****/
-# [How we do the fixup]. We want to merge the current stack frame with the
-# just-interrupted frame. How we do this depends on where in the critical
-# region the interrupted handler was executing, and so how many saved
-# registers are in each frame. We do this quickly using the lookup table
-# 'critical_fixup_table'. For each byte offset in the critical region, it
-# provides the number of bytes which have already been popped from the
-# interrupted stack frame. 
-critical_region_fixup:
-     	subq $scrit,%rax
-	shlq $1,%rax
-	addq $critical_fixup_table,%rax
-	movzwq (%rax),%rcx
-	xorq  %rax,%rax
-	movb  %ch,%al
-	movb  $0,%ch
-#ifdef CONFIG_SMP
-	cmpb $0xff,%al
-	jne  15f
-	add  $1,%al
-	GET_THREAD_INFO(%rbp)
-	XEN_UNLOCK_VCPU_INFO_SMP(%r11)
-15:
-#endif
-    	movq  %rsp,%rsi
-	movq  %rsi,%rdi
-	addq  $0xa8,%rax
-	addq  %rax,%rdi
-	addq  %rcx,%rsi
-	shrq  $3,%rcx			# convert words to bytes
-	je    17f			# skip loop if nothing to copy
-16:	subq  $8,%rsi			# pre-decrementing copy loop
-	subq  $8,%rdi
-	movq  (%rsi),%rax
-	movq  %rax,(%rdi)
-	loop  16b
-17:	movq  %rdi,%rsp			# final %edi is top of merged stack
-	jmp   11b
-
-critical_fixup_table:
-        .byte 0x00,0x00,0x00,0x00                 # testb  $0xff,0x0(%rsi)
-        .byte 0x00,0x00,0x00,0x00,0x00,0x00       # jne    <crit_user_mode+0x42>
-        .byte 0x00,0x00,0x00,0x00                 # mov    (%rsp),%r15
-        .byte 0x00,0x00,0x00,0x00,0x00            # mov    0x8(%rsp),%r14
-        .byte 0x00,0x00,0x00,0x00,0x00            # mov    0x10(%rsp),%r13
-        .byte 0x00,0x00,0x00,0x00,0x00            # mov    0x18(%rsp),%r12
-        .byte 0x00,0x00,0x00,0x00,0x00            # mov    0x20(%rsp),%rbp
-        .byte 0x00,0x00,0x00,0x00,0x00            # mov    0x28(%rsp),%rbx
-        .byte 0x00,0x00,0x00,0x00                 # add    $0x30,%rsp
-        .byte 0x30,0x30,0x30,0x30                 # mov    (%rsp),%r11
-        .byte 0x30,0x30,0x30,0x30,0x30            # mov    0x8(%rsp),%r10
-        .byte 0x30,0x30,0x30,0x30,0x30            # mov    0x10(%rsp),%r9
-        .byte 0x30,0x30,0x30,0x30,0x30            # mov    0x18(%rsp),%r8
-        .byte 0x30,0x30,0x30,0x30,0x30            # mov    0x20(%rsp),%rax
-        .byte 0x30,0x30,0x30,0x30,0x30            # mov    0x28(%rsp),%rcx
-        .byte 0x30,0x30,0x30,0x30,0x30            # mov    0x30(%rsp),%rdx
-        .byte 0x30,0x30,0x30,0x30,0x30            # mov    0x38(%rsp),%rsi
-        .byte 0x30,0x30,0x30,0x30,0x30            # mov    0x40(%rsp),%rdi
-        .byte 0x30,0x30,0x30,0x30                 # add    $0x50,%rsp
-        .byte 0x80,0x80,0x80,0x80,0x80            # testb  $0x3,0x8(%rsp)
-        .byte 0x80,0x80                           # jne    ffffffff8010dc25 <crit_user_mode>
-        .byte 0x80,0x80,0x80,0x80                 # orb    $0x3,0x8(%rsp)
-        .byte 0x80,0x80                           # iretq
-                                                  # <crit_user_mode>:
-        .byte 0x80,0x80,0x80,0x80,0x80,0x80,0x80  # movq   $0x0,%gs:0x60
-        .byte 0x80,0x80,0x80,0x80,0x80
-        .byte 0x80,0x80,0x80,0x80                 # sub    $0x20,%rsp
-        .byte 0x60,0x60,0x60,0x60                 # mov    %rax,(%rsp)
-        .byte 0x60,0x60,0x60,0x60,0x60            # mov    %r11,0x8(%rsp)
-        .byte 0x60,0x60,0x60,0x60,0x60            # mov    %rcx,0x10(%rsp)
-        .byte 0x60,0x60,0x60,0x60,0x60,0x60,0x60  # movq   $0x0,0x18(%rsp)
-        .byte 0x60,0x60
-        .byte 0x60,0x60,0x60,0x60,0x60,0x60,0x60  # movq   $0x33,0x28(%rsp)
-        .byte 0x60,0x60
-        .byte 0x60,0x60,0x60,0x60,0x60,0x60,0x60  # movq   $0x2b,0x40(%rsp)
-        .byte 0x60,0x60        
-        .byte 0x60,0x60,0x60,0x60,0x60,0x60,0x60  # mov    $0x17,%rax
-        .byte 0x60,0x60                           # syscall
-        .byte 0x60,0x60,0x60,0x60,0x60            # movb   $0x1,0x1(%rsi)
-        .byte 0x60,0x60,0x60                      # mov    %rsp,%rdi
-        .byte 0x60,0x60,0x60,0x60,0x60            # jmpq   <do_hypervisor_callback+0x20>
+# At this point, unlike on x86-32, we don't do the fixup to simplify the 
+# code and the stack frame is more complex on x86-64.
+# When the kernel is interrupted in the critical section, the kernel 
+# will do IRET in that case, and everything will be restored at that point, 
+# i.e. it just resumes from the next instruction interrupted with the same context. 
+	
 # Hypervisor uses this for application faults while it executes.
 ENTRY(failsafe_callback)
-        hlt         
-#if 0        
+	addq $0x10,%rsp /* skip rcx and r11 */	
 1:	movl (%rsp),%ds
 2:	movl 8(%rsp),%es
 3:	movl 16(%rsp),%fs
 4:	movl 24(%rsp),%gs
-        subq $14,%rsp
+	addq $0x20,%rsp /* skip the above selectors */		
 	SAVE_ALL
-	jmp  ret_from_exception
+	jmp  error_exit
 .section .fixup,"ax";	\
 6:	movq $0,(%rsp);	\
 	jmp 1b;		\
@@ -914,13 +834,14 @@ ENTRY(failsafe_callback)
 	jmp 4b;		\
 .previous;		\
 .section __ex_table,"a";\
-	.align 8;	\
-	.long 1b,6b;	\
-	.long 2b,7b;	\
-	.long 3b,8b;	\
-	.long 4b,9b;	\
+	.align 16;	\
+	.quad 1b,6b;	\
+	.quad 2b,7b;	\
+	.quad 3b,8b;	\
+	.quad 4b,9b;	\
 .previous
-       
+ 
+#if 0	      
         .section __ex_table,"a"
         .align 8
         .quad gs_change,bad_gs
@@ -933,7 +854,8 @@ bad_gs:
         movl %eax,%gs
         jmp  2b
         .previous       
-#endif	
+#endif
+	
 /*
  * Create a kernel thread.
  *
