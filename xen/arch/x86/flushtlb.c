@@ -57,7 +57,7 @@ void write_cr3(unsigned long cr3)
      */
 
  skip_clocktick:
-    __asm__ __volatile__ ( "mov"__OS" %0, %%cr3" : : "r" (cr3) : "memory" );
+    __asm__ __volatile__ ( "mov %0, %%cr3" : : "r" (cr3) : "memory" );
 
     /*
      * STEP 3. Update this CPU's timestamp. Note that this happens *after*

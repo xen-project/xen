@@ -316,11 +316,7 @@ construct_init_vmcs_guest(struct cpu_user_regs *regs,
     error |= __vmwrite(GUEST_EFLAGS, eflags);
 
     error |= __vmwrite(GUEST_INTERRUPTIBILITY_INFO, 0);
-#ifdef __i386__
     __asm__ __volatile__ ("mov %%dr7, %0\n" : "=r" (dr7));
-#else
-    __asm__ __volatile__ ("movq %%dr7, %0\n" : "=r" (dr7));
-#endif
     error |= __vmwrite(GUEST_DR7, dr7);
     error |= __vmwrite(GUEST_VMCS0, 0xffffffff);
     error |= __vmwrite(GUEST_VMCS1, 0xffffffff);
@@ -356,21 +352,13 @@ static inline int construct_vmcs_host(struct host_execution_env *host_env)
     host_env->idtr_base = desc.address;
     error |= __vmwrite(HOST_IDTR_BASE, host_env->idtr_base);
 
-#ifdef __i386__
-    __asm__ __volatile__ ("movl %%cr0,%0" : "=r" (crn) : );
-#else
-    __asm__ __volatile__ ("movq %%cr0,%0" : "=r" (crn) : );
-#endif
+    __asm__ __volatile__ ("mov %%cr0,%0" : "=r" (crn) : );
 
     host_env->cr0 = crn;
     error |= __vmwrite(HOST_CR0, crn); /* same CR0 */
 
     /* CR3 is set in vmx_final_setup_hostos */
-#ifdef __i386__
-    __asm__ __volatile__ ("movl %%cr4,%0" : "=r" (crn) : ); 
-#else
-    __asm__ __volatile__ ("movq %%cr4,%0" : "=r" (crn) : ); 
-#endif
+    __asm__ __volatile__ ("mov %%cr4,%0" : "=r" (crn) : ); 
     host_env->cr4 = crn;
     error |= __vmwrite(HOST_CR4, crn);
     error |= __vmwrite(HOST_EIP, (unsigned long) vmx_asm_vmexit_handler);

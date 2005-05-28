@@ -255,24 +255,24 @@ static inline unsigned int cpuid_edx(unsigned int op)
 #define read_cr0() ({ \
 	unsigned long __dummy; \
 	__asm__( \
-		"mov"__OS" %%cr0,%0\n\t" \
+		"mov %%cr0,%0\n\t" \
 		:"=r" (__dummy)); \
 	__dummy; \
 })
 
 #define write_cr0(x) \
-	__asm__("mov"__OS" %0,%%cr0": :"r" ((unsigned long)x));
+	__asm__("mov %0,%%cr0": :"r" ((unsigned long)x));
 
 #define read_cr4() ({ \
 	unsigned long __dummy; \
 	__asm__( \
-		"mov"__OS" %%cr4,%0\n\t" \
+		"mov %%cr4,%0\n\t" \
 		:"=r" (__dummy)); \
 	__dummy; \
 })
 
 #define write_cr4(x) \
-	__asm__("mov"__OS" %0,%%cr4": :"r" ((unsigned long)x));
+	__asm__("mov %0,%%cr4": :"r" ((unsigned long)x));
 
 /*
  * Save the cr4 feature set we're using (ie
@@ -284,22 +284,24 @@ extern unsigned long mmu_cr4_features;
 
 static inline void set_in_cr4 (unsigned long mask)
 {
+    unsigned long dummy;
     mmu_cr4_features |= mask;
-    __asm__("mov"__OS" %%cr4,%%"__OP"ax\n\t"
-            "or"__OS" %0,%%"__OP"ax\n\t"
-            "mov"__OS" %%"__OP"ax,%%cr4\n"
-            : : "irg" (mask)
-            :"ax");
+    __asm__ __volatile__ (
+        "mov %%cr4,%0\n\t"
+        "or %1,%0\n\t"
+        "mov %0,%%cr4\n"
+        : "=&r" (dummy) : "irg" (mask) );
 }
 
 static inline void clear_in_cr4 (unsigned long mask)
 {
+    unsigned long dummy;
     mmu_cr4_features &= ~mask;
-    __asm__("mov"__OS" %%cr4,%%"__OP"ax\n\t"
-            "and"__OS" %0,%%"__OP"ax\n\t"
-            "mov"__OS" %%"__OP"ax,%%cr4\n"
-            : : "irg" (~mask)
-            :"ax");
+    __asm__ __volatile__ (
+        "mov %%cr4,%0\n\t"
+        "and %1,%0\n\t"
+        "mov %0,%%cr4\n"
+        : "=&r" (dummy) : "irg" (~mask) );
 }
 
 /*

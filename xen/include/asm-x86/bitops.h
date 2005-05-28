@@ -357,7 +357,7 @@ static inline unsigned long __scanbit(unsigned long val, unsigned long max)
  */
 static __inline__ unsigned long find_first_clear_bit(unsigned long word)
 {
-	__asm__("bsf"__OS" %1,%0"
+	__asm__("bsf %1,%0"
 		:"=r" (word)
 		:"r" (~word));
 	return word;
@@ -365,7 +365,7 @@ static __inline__ unsigned long find_first_clear_bit(unsigned long word)
 
 static __inline__ unsigned long find_first_set_bit(unsigned long word)
 {
-	__asm__("bsf"__OS" %1,%0"
+	__asm__("bsf %1,%0"
 		:"=r" (word)
 		:"r" (word));
 	return word;

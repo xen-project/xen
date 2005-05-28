@@ -70,7 +70,7 @@ static inline unsigned long read_cr3(void)
 {
     unsigned long cr3;
     __asm__ __volatile__ (
-        "mov"__OS" %%cr3, %0" : "=r" (cr3) : );
+        "mov %%cr3, %0" : "=r" (cr3) : );
     return cr3;
 }
 

@@ -35,10 +35,10 @@
 		     "js 2f\n" \
 		     "1:\n" \
 		     ".section .text.lock,\"ax\"\n" \
-		     "2:\tpush"__OS" %%"__OP"ax\n\t" \
-		     "lea"__OS" %0,%%"__OP"ax\n\t" \
+		     "2:\tpush %%"__OP"ax\n\t" \
+		     "lea %0,%%"__OP"ax\n\t" \
 		     "call " helper "\n\t" \
-		     "pop"__OS" %%"__OP"ax\n\t" \
+		     "pop %%"__OP"ax\n\t" \
 		     "jmp 1b\n" \
 		     ".previous" \
 		     :"=m" (*(volatile int *)rw) : : "memory")
@@ -65,10 +65,10 @@
 		     "jnz 2f\n" \
 		     "1:\n" \
 		     ".section .text.lock,\"ax\"\n" \
-		     "2:\tpush"__OS" %%"__OP"ax\n\t" \
-		     "lea"__OS" %0,%%"__OP"ax\n\t" \
+		     "2:\tpush %%"__OP"ax\n\t" \
+		     "lea %0,%%"__OP"ax\n\t" \
 		     "call " helper "\n\t" \
-		     "pop"__OS" %%"__OP"ax\n\t" \
+		     "pop %%"__OP"ax\n\t" \
 		     "jmp 1b\n" \
 		     ".previous" \
 		     :"=m" (*(volatile int *)rw) : : "memory")
