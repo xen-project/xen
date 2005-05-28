@@ -986,10 +986,9 @@ static int vmx_cr_access(unsigned long exit_qualification, struct cpu_user_regs 
         __vmwrite(CR0_READ_SHADOW, value);
         break;
     case TYPE_LMSW:
-        __vmwrite(CR0_READ_SHADOW, value);
+        __vmread(CR0_READ_SHADOW, &value);
 	value = (value & ~0xF) |
-		(((exit_qualification & LMSW_SOURCE_DATA) >> 16) & 0xF) |
-		1 /* CR0.PE == 1 */;
+		(((exit_qualification & LMSW_SOURCE_DATA) >> 16) & 0xF);
 	return vmx_set_cr0(value);
         break;
     default:
