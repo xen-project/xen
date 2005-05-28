@@ -1232,6 +1232,7 @@
 40715b2cNVOegtvyft_AHFKJYRprfA xen/drivers/acpi/tables.c
 3e4a8cb7alzQCDKS7MlioPoHBKYkdQ xen/drivers/char/Makefile
 4049e6bfNSIq7s7OV-Bd69QD0RpR2Q xen/drivers/char/console.c
+4298e018XQtZkCdufpyFimOGZqqsFA xen/drivers/char/ns16550.c
 3e4a8cb7nMChlro4wvOBo76n__iCFA xen/drivers/char/serial.c
 40715b2cFpte_UNWnBZW0Du7z9AhTQ xen/include/acpi/acconfig.h
 40715b2ctNvVZ058w8eM8DR9hOat_A xen/include/acpi/acexcep.h
@@ -1356,7 +1357,6 @@
 3ddb79c2QF5-pZGzuX4QukPCDAl59A xen/include/asm-x86/processor.h
 40cf1596bim9F9DNdV75klgRSZ6Y2A xen/include/asm-x86/regs.h
 3ddb79c2plf7ciNgoNjU-RsbUzawsw xen/include/asm-x86/rwlock.h
-42136b49h6MkeayfuOaTPcJQWKga2g xen/include/asm-x86/serial.h
 405b8599BsDsDwKEJLS0XipaiQW3TA xen/include/asm-x86/shadow.h
 3ddb79c3Hgbb2g8CyWLMCK-6_ZVQSQ xen/include/asm-x86/smp.h
 3ddb79c3jn8ALV_S9W5aeTYUQRKBpg xen/include/asm-x86/smpboot.h

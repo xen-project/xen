@@ -260,7 +260,7 @@ static void switch_serial_input(void)
     }
 }
 
-static void __serial_rx(unsigned char c, struct cpu_user_regs *regs)
+static void __serial_rx(char c, struct cpu_user_regs *regs)
 {
     if ( xen_rx )
         return handle_keypress(c, regs);
@@ -272,7 +272,7 @@ static void __serial_rx(unsigned char c, struct cpu_user_regs *regs)
     send_guest_virq(dom0->exec_domain[0], VIRQ_CONSOLE);
 }
 
-static void serial_rx(unsigned char c, struct cpu_user_regs *regs)
+static void serial_rx(char c, struct cpu_user_regs *regs)
 {
     static int switch_code_count = 0;
 
@@ -416,7 +416,7 @@ void init_console(void)
         if ( *p == ',' )
             p++;
         if ( strncmp(p, "com", 3) == 0 )
-            sercon_handle = parse_serial_handle(p);
+            sercon_handle = serial_parse_handle(p);
         else if ( strncmp(p, "vga", 3) == 0 )
             vgacon_enabled = 1;
     }
@@ -463,21 +463,6 @@ void console_force_unlock(void)
 void console_force_lock(void)
 {
     spin_lock(&console_lock);
-}
-
-void console_putc(char c)
-{
-    serial_putc(sercon_handle, c);
-}
-
-int console_getc(void)
-{
-    return serial_getc(sercon_handle);
-}
-
-int irq_console_getc(void)
-{
-    return irq_serial_getc(sercon_handle);
 }
 
 

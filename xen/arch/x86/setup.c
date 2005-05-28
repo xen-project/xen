@@ -216,7 +216,7 @@ static void __init start_of_day(void)
 
     initialize_keytable();
 
-    serial_init_stage2();
+    serial_init_postirq();
 
     init_xen_time();
 
@@ -263,7 +263,8 @@ void __init __start_xen(multiboot_info_t *mbi)
     smp_prepare_boot_cpu();
 
     /* We initialise the serial devices very early so we can get debugging. */
-    serial_init_stage1();
+    ns16550_init();
+    serial_init_preirq();
 
     init_console();
 

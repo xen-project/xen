@@ -91,11 +91,11 @@ attempt_receive_packet(char *recv_buf, struct xendbg_context *ctx)
 	u8 ch;
 
 	/* Skip over everything up to the first '$' */
-	while ((ch = irq_serial_getc(ctx->serhnd)) != '$')
+	while ((ch = serial_getc(ctx->serhnd)) != '$')
 		;
 	csum = 0;
 	for (count = 0; count < 4096; count++) {
-		ch = irq_serial_getc(ctx->serhnd);
+		ch = serial_getc(ctx->serhnd);
 		if (ch == '#')
 			break;
 		recv_buf[count] = ch;
@@ -106,8 +106,8 @@ attempt_receive_packet(char *recv_buf, struct xendbg_context *ctx)
 		return -1;
 	}
 	recv_buf[count] = 0;
-	received_csum = hex_char_val(irq_serial_getc(ctx->serhnd)) * 16 +
-		hex_char_val(irq_serial_getc(ctx->serhnd));
+	received_csum = hex_char_val(serial_getc(ctx->serhnd)) * 16 +
+		hex_char_val(serial_getc(ctx->serhnd));
 	if (received_csum == csum) {
 		return 0;
 	} else {
@@ -163,7 +163,7 @@ xendbg_finish_reply(struct xendbg_context *ctx)
 	xendbg_put_char('#', ctx);
 	xendbg_send(buf, 2, ctx);
 
-	ch = irq_serial_getc(ctx->serhnd);
+	ch = serial_getc(ctx->serhnd);
 	if (ch == '+')
 		return 0;
 	else
@@ -394,7 +394,7 @@ initialize_xendbg(void)
 {
 	if (!strcmp(opt_cdb, "none"))
 		return 0;
-	xdb_ctx.serhnd = parse_serial_handle(opt_cdb);
+	xdb_ctx.serhnd = serial_parse_handle(opt_cdb);
 	if (xdb_ctx.serhnd == -1)
 		panic("Can't parse %s as CDB serial info.\n", opt_cdb);
 

@@ -154,7 +154,8 @@ void start_kernel(void)
     early_setup_arch(&cmdline);
 
     /* We initialise the serial devices very early so we can get debugging. */
-    serial_init_stage1();
+    ns16550_init();
+    serial_init_preirq();
 
     init_console();
     set_printk_prefix("(XEN) ");

@@ -160,9 +160,6 @@ void sort_main_extable(void);
     (likely(sizeof(count) <= 4) /* disallow 64-bit counts */ &&  \
      access_ok(type,addr,count*size))
 
-// without this, uart_config_stageX does outb's which are non-portable
-#define NO_UART_CONFIG_OK
-
 // see drivers/char/console.c
 #ifndef CONFIG_VTI
 #define	OPT_CONSOLE_STR "com1"
