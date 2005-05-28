@@ -38,10 +38,10 @@
  * Note that @nr may be almost arbitrarily large; this function is not
  * restricted to acting on a single-word quantity.
  */
-static __inline__ void set_bit(long nr, volatile void * addr)
+static __inline__ void set_bit(int nr, volatile void * addr)
 {
 	__asm__ __volatile__( LOCK_PREFIX
-		"bts"__OS" %1,%0"
+		"btsl %1,%0"
 		:"=m" (ADDR)
 		:"dIr" (nr));
 }
@@ -55,10 +55,10 @@ static __inline__ void set_bit(long nr, volatile void * addr)
  * If it's called on the same region of memory simultaneously, the effect
  * may be that only one operation succeeds.
  */
-static __inline__ void __set_bit(long nr, volatile void * addr)
+static __inline__ void __set_bit(int nr, volatile void * addr)
 {
 	__asm__(
-		"bts"__OS" %1,%0"
+		"btsl %1,%0"
 		:"=m" (ADDR)
 		:"dIr" (nr));
 }
@@ -73,10 +73,10 @@ static __inline__ void __set_bit(long nr, volatile void * addr)
  * you should call smp_mb__before_clear_bit() and/or smp_mb__after_clear_bit()
  * in order to ensure changes are visible on other processors.
  */
-static __inline__ void clear_bit(long nr, volatile void * addr)
+static __inline__ void clear_bit(int nr, volatile void * addr)
 {
 	__asm__ __volatile__( LOCK_PREFIX
-		"btr"__OS" %1,%0"
+		"btrl %1,%0"
 		:"=m" (ADDR)
 		:"dIr" (nr));
 }
@@ -92,10 +92,10 @@ static __inline__ void clear_bit(long nr, volatile void * addr)
  * If it's called on the same region of memory simultaneously, the effect
  * may be that only one operation succeeds.
  */
-static __inline__ void __change_bit(long nr, volatile void * addr)
+static __inline__ void __change_bit(int nr, volatile void * addr)
 {
 	__asm__ __volatile__(
-		"btc"__OS" %1,%0"
+		"btcl %1,%0"
 		:"=m" (ADDR)
 		:"dIr" (nr));
 }
@@ -109,10 +109,10 @@ static __inline__ void __change_bit(long nr, volatile void * addr)
  * Note that @nr may be almost arbitrarily large; this function is not
  * restricted to acting on a single-word quantity.
  */
-static __inline__ void change_bit(long nr, volatile void * addr)
+static __inline__ void change_bit(int nr, volatile void * addr)
 {
 	__asm__ __volatile__( LOCK_PREFIX
-		"btc"__OS" %1,%0"
+		"btcl %1,%0"
 		:"=m" (ADDR)
 		:"dIr" (nr));
 }
@@ -125,12 +125,12 @@ static __inline__ void change_bit(long nr, volatile void * addr)
  * This operation is atomic and cannot be reordered.  
  * It also implies a memory barrier.
  */
-static __inline__ int test_and_set_bit(long nr, volatile void * addr)
+static __inline__ int test_and_set_bit(int nr, volatile void * addr)
 {
-	long oldbit;
+	int oldbit;
 
 	__asm__ __volatile__( LOCK_PREFIX
-		"bts"__OS" %2,%1\n\tsbb"__OS" %0,%0"
+		"btsl %2,%1\n\tsbbl %0,%0"
 		:"=r" (oldbit),"=m" (ADDR)
 		:"dIr" (nr) : "memory");
 	return oldbit;
@@ -145,12 +145,12 @@ static __inline__ int test_and_set_bit(long nr, volatile void * addr)
  * If two examples of this operation race, one can appear to succeed
  * but actually fail.  You must protect multiple accesses with a lock.
  */
-static __inline__ int __test_and_set_bit(long nr, volatile void * addr)
+static __inline__ int __test_and_set_bit(int nr, volatile void * addr)
 {
-	long oldbit;
+	int oldbit;
 
 	__asm__(
-		"bts"__OS" %2,%1\n\tsbb"__OS" %0,%0"
+		"btsl %2,%1\n\tsbbl %0,%0"
 		:"=r" (oldbit),"=m" (ADDR)
 		:"dIr" (nr));
 	return oldbit;
@@ -164,12 +164,12 @@ static __inline__ int __test_and_set_bit(long nr, volatile void * addr)
  * This operation is atomic and cannot be reordered.  
  * It also implies a memory barrier.
  */
-static __inline__ int test_and_clear_bit(long nr, volatile void * addr)
+static __inline__ int test_and_clear_bit(int nr, volatile void * addr)
 {
-	long oldbit;
+	int oldbit;
 
 	__asm__ __volatile__( LOCK_PREFIX
-		"btr"__OS" %2,%1\n\tsbb"__OS" %0,%0"
+		"btrl %2,%1\n\tsbbl %0,%0"
 		:"=r" (oldbit),"=m" (ADDR)
 		:"dIr" (nr) : "memory");
 	return oldbit;
@@ -184,24 +184,24 @@ static __inline__ int test_and_clear_bit(long nr, volatile void * addr)
  * If two examples of this operation race, one can appear to succeed
  * but actually fail.  You must protect multiple accesses with a lock.
  */
-static __inline__ int __test_and_clear_bit(long nr, volatile void * addr)
+static __inline__ int __test_and_clear_bit(int nr, volatile void * addr)
 {
-	long oldbit;
+	int oldbit;
 
 	__asm__(
-		"btr"__OS" %2,%1\n\tsbb"__OS" %0,%0"
+		"btrl %2,%1\n\tsbbl %0,%0"
 		:"=r" (oldbit),"=m" (ADDR)
 		:"dIr" (nr));
 	return oldbit;
 }
 
 /* WARNING: non atomic and it can be reordered! */
-static __inline__ int __test_and_change_bit(long nr, volatile void * addr)
+static __inline__ int __test_and_change_bit(int nr, volatile void * addr)
 {
-	long oldbit;
+	int oldbit;
 
 	__asm__ __volatile__(
-		"btc"__OS" %2,%1\n\tsbb"__OS" %0,%0"
+		"btcl %2,%1\n\tsbbl %0,%0"
 		:"=r" (oldbit),"=m" (ADDR)
 		:"dIr" (nr) : "memory");
 	return oldbit;
@@ -215,29 +215,29 @@ static __inline__ int __test_and_change_bit(long nr, volatile void * addr)
  * This operation is atomic and cannot be reordered.  
  * It also implies a memory barrier.
  */
-static __inline__ int test_and_change_bit(long nr, volatile void * addr)
+static __inline__ int test_and_change_bit(int nr, volatile void * addr)
 {
-	long oldbit;
+	int oldbit;
 
 	__asm__ __volatile__( LOCK_PREFIX
-		"btc"__OS" %2,%1\n\tsbb"__OS" %0,%0"
+		"btcl %2,%1\n\tsbbl %0,%0"
 		:"=r" (oldbit),"=m" (ADDR)
 		:"dIr" (nr) : "memory");
 	return oldbit;
 }
 
 
-static __inline__ int constant_test_bit(long nr, const volatile void * addr)
+static __inline__ int constant_test_bit(int nr, const volatile void * addr)
 {
 	return ((1UL << (nr & 31)) & (((const volatile unsigned int *) addr)[nr >> 5])) != 0;
 }
 
-static __inline__ int variable_test_bit(long nr, volatile void * addr)
+static __inline__ int variable_test_bit(int nr, volatile void * addr)
 {
-	long oldbit;
+	int oldbit;
 
 	__asm__ __volatile__(
-		"bt"__OS" %2,%1\n\tsbb"__OS" %0,%0"
+		"btl %2,%1\n\tsbbl %0,%0"
 		:"=r" (oldbit)
 		:"m" (ADDR),"dIr" (nr));
 	return oldbit;
