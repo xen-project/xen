@@ -34,9 +34,6 @@
 #include <asm/vmx_virpit.h>
 
 #ifdef CONFIG_VMX
-
-extern long do_block();
-  
 #if defined (__i386__)
 static void load_cpu_user_regs(struct cpu_user_regs *regs)
 { 
@@ -186,7 +183,6 @@ void vmx_io_assist(struct exec_domain *ed)
 {
     vcpu_iodata_t *vio;
     ioreq_t *p;
-    struct domain *d = ed->domain;
     struct cpu_user_regs *regs = guest_cpu_user_regs();
     unsigned long old_eax;
     int sign;
@@ -195,12 +191,6 @@ void vmx_io_assist(struct exec_domain *ed)
 
     mpci_p = &ed->arch.arch_vmx.vmx_platform.mpci;
     inst_decoder_regs = mpci_p->inst_decoder_regs;
-
-    /* clear the pending event */
-    ed->vcpu_info->evtchn_upcall_pending = 0;
-    /* clear the pending bit for port 2 */
-    clear_bit(IOPACKET_PORT>>5, &ed->vcpu_info->evtchn_pending_sel);
-    clear_bit(IOPACKET_PORT, &d->shared_info->evtchn_pending[0]);
 
     vio = (vcpu_iodata_t *) ed->arch.arch_vmx.vmx_platform.shared_page_va;
     if (vio == 0) {
@@ -217,8 +207,8 @@ void vmx_io_assist(struct exec_domain *ed)
     /* clear IO wait VMX flag */
     if (test_bit(ARCH_VMX_IO_WAIT, &ed->arch.arch_vmx.flags)) {
         if (p->state != STATE_IORESP_READY) {
-            printk("got a false I/O reponse\n");
-            do_block();
+                /* An interrupt send event raced us */
+                return;
         } else {
             p->state = STATE_INVALID;
         }
@@ -280,6 +270,51 @@ void vmx_io_assist(struct exec_domain *ed)
     default:
         BUG();
     }
+}
+
+int vmx_clear_pending_io_event(struct exec_domain *ed) 
+{
+    struct domain *d = ed->domain;
+
+    /* evtchn_pending is shared by other event channels in 0-31 range */
+    if (!d->shared_info->evtchn_pending[IOPACKET_PORT>>5])
+        clear_bit(IOPACKET_PORT>>5, &ed->vcpu_info->evtchn_pending_sel);
+
+    /* Note: VMX domains may need upcalls as well */
+    if (!ed->vcpu_info->evtchn_pending_sel) 
+        ed->vcpu_info->evtchn_upcall_pending = 0;
+
+    /* clear the pending bit for IOPACKET_PORT */
+    return test_and_clear_bit(IOPACKET_PORT, 
+                              &d->shared_info->evtchn_pending[0]);
+}
+
+/* Because we've cleared the pending events first, we need to guarantee that
+ * all events to be handled by xen for VMX domains are taken care of here.
+ *
+ * interrupts are guaranteed to be checked before resuming guest. 
+ * VMX upcalls have been already arranged for if necessary. 
+ */
+void vmx_check_events(struct exec_domain *d) 
+{
+    /* clear the event *before* checking for work. This should avoid 
+       the set-and-check races */
+    if (vmx_clear_pending_io_event(current))
+        vmx_io_assist(d);
+}
+
+/* On exit from vmx_wait_io, we're guaranteed to have a I/O response from 
+   the device model */
+void vmx_wait_io()
+{
+    extern void do_block();
+
+    do {
+        do_block();
+        vmx_check_events(current);
+        if (!test_bit(ARCH_VMX_IO_WAIT, &current->arch.arch_vmx.flags))
+            break;
+    } while(1);
 }
 
 #if defined(__i386__) || defined(__x86_64__)
@@ -440,22 +475,17 @@ void vmx_do_resume(struct exec_domain *d)
     __vmwrite(HOST_ESP, (unsigned long)get_stack_bottom());
 
     if (event_pending(d)) {
-        if (test_bit(IOPACKET_PORT, &d->domain->shared_info->evtchn_pending[0])) 
-            vmx_io_assist(d);
+        vmx_check_events(d);
 
-        else if (test_bit(ARCH_VMX_IO_WAIT, &d->arch.arch_vmx.flags)) {
-            printk("got an event while blocked on I/O\n");
-            do_block();
-        }
-                
-        /* Assumption: device model will not inject an interrupt
-         * while an ioreq_t is pending i.e. the response and 
-         * interrupt can come together. But an interrupt without 
-         * a response to ioreq_t is not ok.
-         */
+        if (test_bit(ARCH_VMX_IO_WAIT, &d->arch.arch_vmx.flags))
+            vmx_wait_io();
     }
-    if (!test_bit(ARCH_VMX_IO_WAIT, &d->arch.arch_vmx.flags))
-        vmx_intr_assist(d);
+
+    /* We can't resume the guest if we're waiting on I/O */
+    ASSERT(!test_bit(ARCH_VMX_IO_WAIT, &d->arch.arch_vmx.flags));
+
+    /* We always check for interrupts before resuming guest */
+    vmx_intr_assist(d);
 }
 
 #endif /* CONFIG_VMX */

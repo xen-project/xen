@@ -85,6 +85,7 @@ struct virutal_platform_def {
 };
 
 extern void handle_mmio(unsigned long, unsigned long);
+extern void vmx_wait_io(void);
 extern int vmx_setup_platform(struct exec_domain *, struct cpu_user_regs *);
 
 // XXX - think about this -- maybe use bit 30 of the mfn to signify an MMIO frame.

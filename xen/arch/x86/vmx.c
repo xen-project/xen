@@ -465,7 +465,7 @@ static void vmx_io_instruction(struct cpu_user_regs *regs,
     set_bit(ARCH_VMX_IO_WAIT, &d->arch.arch_vmx.flags);
     p->state = STATE_IOREQ_READY;
     evtchn_send(IOPACKET_PORT);
-    do_block();
+    vmx_wait_io();
 }
 
 enum { COPY_IN = 0, COPY_OUT };
@@ -1266,7 +1266,6 @@ asmlinkage void vmx_vmexit_handler(struct cpu_user_regs regs)
     case EXIT_REASON_PENDING_INTERRUPT:
         __vmwrite(CPU_BASED_VM_EXEC_CONTROL, 
               MONITOR_CPU_BASED_EXEC_CONTROLS);
-        vmx_intr_assist(ed);
         break;
     case EXIT_REASON_TASK_SWITCH:
         __vmx_bug(&regs);

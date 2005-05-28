@@ -470,7 +470,6 @@ static void send_mmio_req(unsigned long gpa,
     struct mi_per_cpu_info *mpci_p;
     struct cpu_user_regs *inst_decoder_regs;
     extern long evtchn_send(int lport);
-    extern long do_block(void);
 
     mpci_p = &current->arch.arch_vmx.vmx_platform.mpci;
     inst_decoder_regs = mpci_p->inst_decoder_regs;
@@ -520,7 +519,7 @@ static void send_mmio_req(unsigned long gpa,
 #endif
 
     evtchn_send(IOPACKET_PORT);
-    do_block(); 
+    vmx_wait_io();
 }
 
 void handle_mmio(unsigned long va, unsigned long gpa)
