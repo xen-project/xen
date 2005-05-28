@@ -130,6 +130,10 @@ void domain_crash(void)
         panic("Domain 0 crashed!\n");
     }
 
+#ifndef NDEBUG
+    show_registers(guest_cpu_user_regs());
+#endif
+
     set_bit(_DOMF_crashed, &d->domain_flags);
 
     send_guest_virq(dom0->exec_domain[0], VIRQ_DOM_EXC);
