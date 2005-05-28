@@ -291,7 +291,7 @@ construct_init_vmcs_guest(struct cpu_user_regs *regs,
 
     /* Initally PG, PE are not set*/
     shadow_cr = host_env->cr0;
-    shadow_cr &= ~(X86_CR0_PE | X86_CR0_PG);
+    shadow_cr &= ~X86_CR0_PG;
     error |= __vmwrite(CR0_READ_SHADOW, shadow_cr);
     /* CR3 is set in vmx_final_setup_guest */
     error |= __vmwrite(GUEST_CR4, host_env->cr4);

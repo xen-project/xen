@@ -294,5 +294,14 @@ static inline void vmx_stts()
     if (!(cr0 & X86_CR0_TS))
        __vm_set_bit(EXCEPTION_BITMAP, EXCEPTION_BITMAP_NM);
 }
- 
+
+/* Works only for ed == current */
+static inline int vmx_paging_enabled(struct exec_domain *ed)
+{
+    unsigned long cr0;
+
+    __vmread(CR0_READ_SHADOW, &cr0);
+    return (cr0 & X86_CR0_PE) && (cr0 & X86_CR0_PG);
+}
+
 #endif /* __ASM_X86_VMX_H__ */

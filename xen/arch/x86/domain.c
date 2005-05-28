@@ -339,7 +339,6 @@ static int vmx_final_setup_guest(
     }
 
     ed->arch.schedule_tail = arch_vmx_do_launch;
-    clear_bit(VMX_CPU_STATE_PG_ENABLED, &ed->arch.arch_vmx.cpu_state);
 
 #if defined (__i386)
     ed->arch.arch_vmx.vmx_platform.real_mode_data = 

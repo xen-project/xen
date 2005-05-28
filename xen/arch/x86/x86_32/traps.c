@@ -20,8 +20,9 @@ void show_registers(struct cpu_user_regs *regs)
     unsigned long ss, ds, es, fs, gs, cs;
     unsigned long eip, esp, eflags;
     const char *context;
-
 #ifdef CONFIG_VMX
+    unsigned long cr0, cr3;
+
     if ( VMX_DOMAIN(current) && (regs->eflags == 0) )
     {
         __vmread(GUEST_EIP, &eip);
@@ -33,6 +34,8 @@ void show_registers(struct cpu_user_regs *regs)
         __vmread(GUEST_FS_SELECTOR, &fs);
         __vmread(GUEST_GS_SELECTOR, &gs);
         __vmread(GUEST_CS_SELECTOR, &cs);
+        __vmread(CR0_READ_SHADOW, &cr0);
+        __vmread(GUEST_CR3, &cr3);
         context = "vmx guest";
     }
     else
@@ -77,6 +80,9 @@ void show_registers(struct cpu_user_regs *regs)
     printk("ds: %04lx   es: %04lx   fs: %04lx   gs: %04lx   "
            "ss: %04lx   cs: %04lx\n",
            ds, es, fs, gs, ss, cs);
+#ifdef CONFIG_VMX
+    printk("cr0: %08lx   cr3: %08lx\n", cr0, cr3);
+#endif
 
     if ( GUEST_MODE(regs) )
         show_guest_stack();

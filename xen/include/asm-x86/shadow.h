@@ -31,6 +31,9 @@
 #include <asm/processor.h>
 #include <asm/domain_page.h>
 #include <public/dom0_ops.h>
+#ifdef CONFIG_VMX
+#include <asm/vmx.h>
+#endif
 
 /* Shadow PT operation mode : shadow-mode variable in arch_domain. */
 
@@ -1672,8 +1675,8 @@ static inline void update_pagetables(struct exec_domain *ed)
 
 #ifdef CONFIG_VMX
     if ( VMX_DOMAIN(ed) )
-        paging_enabled =
-            test_bit(VMX_CPU_STATE_PG_ENABLED, &ed->arch.arch_vmx.cpu_state);
+        paging_enabled = vmx_paging_enabled(ed);
+            
     else
 #endif
         // HACK ALERT: there's currently no easy way to figure out if a domU

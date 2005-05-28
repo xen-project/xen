@@ -29,7 +29,6 @@ extern void stop_vmx(void);
 
 void vmx_enter_scheduler(void);
 
-#define VMX_CPU_STATE_PG_ENABLED        0       
 #define	VMX_CPU_STATE_ASSIST_ENABLED	1
 
 struct vmcs_struct {

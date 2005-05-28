@@ -418,8 +418,12 @@ int inst_copy_from_guest(unsigned char *buf, unsigned long guest_eip, int inst_l
     }
 
     if ((guest_eip & PAGE_MASK) == ((guest_eip + inst_len) & PAGE_MASK)) {
-        gpte = gva_to_gpte(guest_eip);
-        mfn = phys_to_machine_mapping(l1e_get_pfn(gpte));
+        if (vmx_paging_enabled(current)) {
+                gpte = gva_to_gpte(guest_eip);
+                mfn = phys_to_machine_mapping(l1e_get_pfn(gpte));
+        } else {
+                mfn = phys_to_machine_mapping(guest_eip >> PAGE_SHIFT);
+        }
         ma = (mfn << PAGE_SHIFT) | (guest_eip & (PAGE_SIZE - 1));
         inst_start = (unsigned char *)map_domain_mem(ma);
                 
@@ -508,7 +512,7 @@ static void send_mmio_req(unsigned long gpa,
     } else
         p->count = 1;
 
-    if (pvalid)
+    if ((pvalid) && vmx_paging_enabled(current))
         p->u.pdata = (void *) gva_to_gpa(p->u.data);
 
 #if 0
