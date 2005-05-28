@@ -199,17 +199,13 @@ static inline void detect_ht(struct cpuinfo_x86 *c) {}
  * clear %ecx since some cpus (Cyrix MII) do not set or clear %ecx
  * resulting in stale register contents being returned.
  */
-static inline void cpuid(
-    int op, unsigned int *eax, unsigned int *ebx,
-    unsigned int *ecx, unsigned int *edx)
-{
-    __asm__("cpuid"
-            : "=a" (*eax),
-              "=b" (*ebx),
-              "=c" (*ecx),
-              "=d" (*edx)
-            : "0" (op), "2" (0));
-}
+#define cpuid(_op,_eax,_ebx,_ecx,_edx)          \
+    __asm__("cpuid"                             \
+            : "=a" (*(int *)(_eax)),            \
+              "=b" (*(int *)(_ebx)),            \
+              "=c" (*(int *)(_ecx)),            \
+              "=d" (*(int *)(_edx))             \
+            : "0" (_op), "2" (0))
 
 /*
  * CPUID functions returning a single datum
