@@ -25,13 +25,14 @@ SUBARCH := $(subst x86_32,i386,$(XEN_TARGET_ARCH))
 export XEN_TARGET_ARCH SUBARCH
 endif
 
+# Default target must appear before any include lines
+all: dist
+
 include Config.mk
 include buildconfigs/Rules.mk
 
 .PHONY:	all dist install xen tools kernels docs world clean mkpatches mrproper
 .PHONY:	kbuild kdelete kclean
-
-all: dist
 
 # build and install everything into the standard system directories
 install: install-xen install-tools install-kernels install-docs
