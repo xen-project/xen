@@ -248,44 +248,21 @@ static __inline__ int variable_test_bit(int nr, volatile void * addr)
  constant_test_bit((nr),(addr)) : \
  variable_test_bit((nr),(addr)))
 
-/**
- * find_first_zero_bit - find the first zero bit in a memory region
- * @addr: The address to start the search at
- * @size: The maximum size to search
- *
- * Returns the bit-number of the first zero bit, not the number of the byte
- * containing a bit.
- */
-static inline long find_first_zero_bit(
-    const unsigned long *addr, unsigned size)
+extern unsigned long __find_first_bit(
+    const unsigned long *addr, unsigned long size);
+extern unsigned long __find_next_bit(
+    const unsigned long *addr, unsigned long size, unsigned long offset);
+extern unsigned long __find_first_zero_bit(
+    const unsigned long *addr, unsigned long size);
+extern unsigned long __find_next_zero_bit(
+    const unsigned long *addr, unsigned long size, unsigned long offset);
+
+/* return index of first bit set in val or BITS_PER_LONG when no bit is set */
+static inline unsigned long __scanbit(unsigned long val)
 {
-	long d0, d1, d2;
-	long res;
-
-	__asm__ __volatile__(
-		"mov $-1,%%"__OP"ax\n\t"
-		"xor %%edx,%%edx\n\t"
-		"repe; scas"__OS"\n\t"
-		"je 1f\n\t"
-		"lea -"STR(BITS_PER_LONG/8)"(%%"__OP"di),%%"__OP"di\n\t"
-		"xor (%%"__OP"di),%%"__OP"ax\n\t"
-		"bsf %%"__OP"ax,%%"__OP"dx\n"
-		"1:\tsub %%"__OP"bx,%%"__OP"di\n\t"
-		"shl $3,%%"__OP"di\n\t"
-		"add %%"__OP"di,%%"__OP"dx"
-		:"=d" (res), "=&c" (d0), "=&D" (d1), "=&a" (d2)
-		:"1" ((size + BITS_PER_LONG - 1) / BITS_PER_LONG),
-		 "2" (addr), "b" (addr) : "memory");
-	return res;
+	__asm__ ( "bsf %1,%0" : "=r" (val) : "r" (val), "0" (BITS_PER_LONG) );
+	return val;
 }
-
-/**
- * find_next_zero_bit - find the first zero bit in a memory region
- * @addr: The address to base the search on
- * @offset: The bitnumber to start searching at
- * @size: The maximum size to search
- */
-long find_next_zero_bit(const unsigned long *addr, int size, int offset);
 
 /**
  * find_first_bit - find the first set bit in a memory region
@@ -295,26 +272,10 @@ long find_next_zero_bit(const unsigned long *addr, int size, int offset);
  * Returns the bit-number of the first set bit, not the number of the byte
  * containing a bit.
  */
-static inline long find_first_bit(
-    const unsigned long *addr, unsigned size)
-{
-	long d0, d1;
-	long res;
-
-	__asm__ __volatile__(
-		"xor %%eax,%%eax\n\t"
-		"repe; scas"__OS"\n\t"
-		"je 1f\n\t"
-		"lea -"STR(BITS_PER_LONG/8)"(%%"__OP"di),%%"__OP"di\n\t"
-		"bsf (%%"__OP"di),%%"__OP"ax\n"
-		"1:\tsub %%"__OP"bx,%%"__OP"di\n\t"
-		"shl $3,%%"__OP"di\n\t"
-		"add %%"__OP"di,%%"__OP"ax"
-		:"=a" (res), "=&c" (d0), "=&D" (d1)
-		:"1" ((size + BITS_PER_LONG - 1) / BITS_PER_LONG),
-		 "2" (addr), "b" (addr) : "memory");
-	return res;
-}
+#define find_first_bit(addr,size) \
+((__builtin_constant_p(size) && (size) <= BITS_PER_LONG ? \
+  (__scanbit(*(unsigned long *)addr)) : \
+  __find_first_bit(addr,size)))
 
 /**
  * find_next_bit - find the first set bit in a memory region
@@ -322,45 +283,46 @@ static inline long find_first_bit(
  * @offset: The bitnumber to start searching at
  * @size: The maximum size to search
  */
-long find_next_bit(const unsigned long *addr, int size, int offset);
-
-/* return index of first bet set in val or BITS_PER_LONG when no bit is set */
-static inline unsigned long __scanbit(unsigned long val)
-{
-	asm("bsf %1,%0" : "=&r" (val) : "r" (val), "0" (BITS_PER_LONG));
-	return val;
-}
-
-#define find_first_bit(addr,size) \
-((__builtin_constant_p(size) && (size) <= BITS_PER_LONG ? \
-  (__scanbit(*(unsigned long *)addr)) : \
-  find_first_bit(addr,size)))
-
 #define find_next_bit(addr,size,off) \
 ((__builtin_constant_p(size) && (size) <= BITS_PER_LONG ? \
   ((off) + (__scanbit((*(unsigned long *)addr) >> (off)))) : \
-  find_next_bit(addr,size,off)))
+  __find_next_bit(addr,size,off)))
 
+/**
+ * find_first_zero_bit - find the first zero bit in a memory region
+ * @addr: The address to start the search at
+ * @size: The maximum size to search
+ *
+ * Returns the bit-number of the first zero bit, not the number of the byte
+ * containing a bit.
+ */
 #define find_first_zero_bit(addr,size) \
 ((__builtin_constant_p(size) && (size) <= BITS_PER_LONG ? \
   (__scanbit(~*(unsigned long *)addr)) : \
-  find_first_zero_bit(addr,size)))
+  __find_first_zero_bit(addr,size)))
 
+/**
+ * find_next_zero_bit - find the first zero bit in a memory region
+ * @addr: The address to base the search on
+ * @offset: The bitnumber to start searching at
+ * @size: The maximum size to search
+ */
 #define find_next_zero_bit(addr,size,off) \
 ((__builtin_constant_p(size) && (size) <= BITS_PER_LONG ? \
   ((off)+(__scanbit(~(((*(unsigned long *)addr)) >> (off))))) : \
-  find_next_zero_bit(addr,size,off)))
+  __find_next_zero_bit(addr,size,off)))
 
 
-/*
- * Return index of first non-zero bit in @word (counting l.s.b. as 0).
- * If no bits are set (@word == 0) then the result is undefined.
+/**
+ * find_first_set_bit - find the first set bit in @word
+ * @word: the word to search
+ * 
+ * Returns the bit-number of the first set bit. If no bits are set then the
+ * result is undefined.
  */
 static __inline__ unsigned long find_first_set_bit(unsigned long word)
 {
-	__asm__("bsf %1,%0"
-		:"=r" (word)
-		:"r" (word));
+	__asm__ ( "bsf %1,%0" : "=r" (word) : "r" (word) );
 	return word;
 }
 
@@ -370,23 +332,9 @@ static __inline__ unsigned long find_first_set_bit(unsigned long word)
  *
  * The Hamming Weight of a number is the total number of bits set in it.
  */
-
 #define hweight64(x) generic_hweight64(x)
 #define hweight32(x) generic_hweight32(x)
 #define hweight16(x) generic_hweight16(x)
 #define hweight8(x) generic_hweight8(x)
-
-#define ext2_set_bit                 __test_and_set_bit
-#define ext2_clear_bit               __test_and_clear_bit
-#define ext2_test_bit                test_bit
-#define ext2_find_first_zero_bit     find_first_zero_bit
-#define ext2_find_next_zero_bit      find_next_zero_bit
-
-/* Bitmap functions for the minix filesystem.  */
-#define minix_test_and_set_bit(nr,addr) __test_and_set_bit(nr,addr)
-#define minix_set_bit(nr,addr) __set_bit(nr,addr)
-#define minix_test_and_clear_bit(nr,addr) __test_and_clear_bit(nr,addr)
-#define minix_test_bit(nr,addr) test_bit(nr,addr)
-#define minix_find_first_zero_bit(addr,size) find_first_zero_bit(addr,size)
 
 #endif /* _X86_BITOPS_H */
