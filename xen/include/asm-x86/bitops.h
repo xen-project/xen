@@ -248,20 +248,20 @@ static __inline__ int variable_test_bit(int nr, volatile void * addr)
  constant_test_bit((nr),(addr)) : \
  variable_test_bit((nr),(addr)))
 
-extern unsigned long __find_first_bit(
-    const unsigned long *addr, unsigned long size);
-extern unsigned long __find_next_bit(
-    const unsigned long *addr, unsigned long size, unsigned long offset);
-extern unsigned long __find_first_zero_bit(
-    const unsigned long *addr, unsigned long size);
-extern unsigned long __find_next_zero_bit(
-    const unsigned long *addr, unsigned long size, unsigned long offset);
+extern unsigned int __find_first_bit(
+    const unsigned long *addr, unsigned int size);
+extern unsigned int __find_next_bit(
+    const unsigned long *addr, unsigned int size, unsigned int offset);
+extern unsigned int __find_first_zero_bit(
+    const unsigned long *addr, unsigned int size);
+extern unsigned int __find_next_zero_bit(
+    const unsigned long *addr, unsigned int size, unsigned int offset);
 
 /* return index of first bit set in val or BITS_PER_LONG when no bit is set */
-static inline unsigned long __scanbit(unsigned long val)
+static inline unsigned int __scanbit(unsigned long val)
 {
 	__asm__ ( "bsf %1,%0" : "=r" (val) : "r" (val), "0" (BITS_PER_LONG) );
-	return val;
+	return (unsigned int)val;
 }
 
 /**
@@ -320,10 +320,10 @@ static inline unsigned long __scanbit(unsigned long val)
  * Returns the bit-number of the first set bit. If no bits are set then the
  * result is undefined.
  */
-static __inline__ unsigned long find_first_set_bit(unsigned long word)
+static __inline__ unsigned int find_first_set_bit(unsigned long word)
 {
 	__asm__ ( "bsf %1,%0" : "=r" (word) : "r" (word) );
-	return word;
+	return (unsigned int)word;
 }
 
 /**
