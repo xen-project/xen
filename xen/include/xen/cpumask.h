@@ -36,8 +36,8 @@
  * void cpus_shift_right(dst, src, n)	Shift right
  * void cpus_shift_left(dst, src, n)	Shift left
  *
- * int first_cpu(mask)			Number lowest set bit, or NR_CPUS
- * int next_cpu(cpu, mask)		Next cpu past 'cpu', or NR_CPUS
+ * int first_cpu(mask)			Number lowest set bit, or >= NR_CPUS
+ * int next_cpu(cpu, mask)		Next cpu past 'cpu', or >= NR_CPUS
  *
  * cpumask_t cpumask_of_cpu(cpu)	Return cpumask with bit 'cpu' set
  * CPU_MASK_ALL				Initializer - all bits set
@@ -57,7 +57,7 @@
  * int cpu_possible(cpu)		Is some cpu possible?
  * int cpu_present(cpu)			Is some cpu present (can schedule)?
  *
- * int any_online_cpu(mask)		First online cpu in mask
+ * int any_online_cpu(mask)		First online cpu in mask, or NR_CPUS
  *
  * for_each_cpu(cpu)			for-loop cpu over cpu_possible_map
  * for_each_online_cpu(cpu)		for-loop cpu over cpu_online_map
@@ -207,13 +207,13 @@ static inline void __cpus_shift_left(cpumask_t *dstp,
 #define first_cpu(src) __first_cpu(&(src), NR_CPUS)
 static inline int __first_cpu(const cpumask_t *srcp, int nbits)
 {
-	return min_t(int, nbits, find_first_bit(srcp->bits, nbits));
+	return find_first_bit(srcp->bits, nbits);
 }
 
 #define next_cpu(n, src) __next_cpu((n), &(src), NR_CPUS)
 static inline int __next_cpu(int n, const cpumask_t *srcp, int nbits)
 {
-	return min_t(int, nbits, find_next_bit(srcp->bits, nbits, n+1));
+	return find_next_bit(srcp->bits, nbits, n+1);
 }
 
 #define cpumask_of_cpu(cpu)						\
@@ -368,7 +368,7 @@ extern cpumask_t cpu_present_map;
 	for_each_cpu_mask(cpu, (mask))		\
 		if (cpu_online(cpu))		\
 			break;			\
-	cpu;					\
+	min_t(int, NR_CPUS, cpu);		\
 })
 
 #define for_each_cpu(cpu)	  for_each_cpu_mask((cpu), cpu_possible_map)

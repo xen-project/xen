@@ -274,7 +274,8 @@ static inline long find_first_zero_bit(
 		"shl $3,%%"__OP"di\n\t"
 		"add %%"__OP"di,%%"__OP"dx"
 		:"=d" (res), "=&c" (d0), "=&D" (d1), "=&a" (d2)
-		:"1" ((size + 31) >> 5), "2" (addr), "b" (addr) : "memory");
+		:"1" ((size + BITS_PER_LONG - 1) / BITS_PER_LONG),
+		 "2" (addr), "b" (addr) : "memory");
 	return res;
 }
 
@@ -310,7 +311,8 @@ static inline long find_first_bit(
 		"shl $3,%%"__OP"di\n\t"
 		"add %%"__OP"di,%%"__OP"ax"
 		:"=a" (res), "=&c" (d0), "=&D" (d1)
-		:"1" ((size + 31) >> 5), "2" (addr), "b" (addr) : "memory");
+		:"1" ((size + BITS_PER_LONG - 1) / BITS_PER_LONG),
+		 "2" (addr), "b" (addr) : "memory");
 	return res;
 }
 
@@ -322,47 +324,38 @@ static inline long find_first_bit(
  */
 long find_next_bit(const unsigned long *addr, int size, int offset);
 
-/* return index of first bet set in val or max when no bit is set */
-static inline unsigned long __scanbit(unsigned long val, unsigned long max)
+/* return index of first bet set in val or BITS_PER_LONG when no bit is set */
+static inline unsigned long __scanbit(unsigned long val)
 {
-	asm("bsf %1,%0 ; cmovz %2,%0" : "=&r" (val) : "r" (val), "r" (max));
+	asm("bsf %1,%0" : "=&r" (val) : "r" (val), "0" (BITS_PER_LONG));
 	return val;
 }
 
 #define find_first_bit(addr,size) \
 ((__builtin_constant_p(size) && (size) <= BITS_PER_LONG ? \
-  (__scanbit(*(unsigned long *)addr,(size))) : \
+  (__scanbit(*(unsigned long *)addr)) : \
   find_first_bit(addr,size)))
 
 #define find_next_bit(addr,size,off) \
-((__builtin_constant_p(size) && (size) <= BITS_PER_LONG ?         \
-  ((off) + (__scanbit((*(unsigned long *)addr) >> (off),(size)-(off)))) : \
+((__builtin_constant_p(size) && (size) <= BITS_PER_LONG ? \
+  ((off) + (__scanbit((*(unsigned long *)addr) >> (off)))) : \
   find_next_bit(addr,size,off)))
 
 #define find_first_zero_bit(addr,size) \
 ((__builtin_constant_p(size) && (size) <= BITS_PER_LONG ? \
-  (__scanbit(~*(unsigned long *)addr,(size))) : \
+  (__scanbit(~*(unsigned long *)addr)) : \
   find_first_zero_bit(addr,size)))
-        
+
 #define find_next_zero_bit(addr,size,off) \
-((__builtin_constant_p(size) && (size) <= BITS_PER_LONG ?         \
-  ((off)+(__scanbit(~(((*(unsigned long *)addr)) >> (off)),(size)-(off)))) : \
+((__builtin_constant_p(size) && (size) <= BITS_PER_LONG ? \
+  ((off)+(__scanbit(~(((*(unsigned long *)addr)) >> (off))))) : \
   find_next_zero_bit(addr,size,off)))
 
 
 /*
- * These are the preferred 'find first' functions in Xen.
- * Both return the appropriate bit index, with the l.s.b. having index 0.
- * If an appropriate bit is not found then the result is undefined.
+ * Return index of first non-zero bit in @word (counting l.s.b. as 0).
+ * If no bits are set (@word == 0) then the result is undefined.
  */
-static __inline__ unsigned long find_first_clear_bit(unsigned long word)
-{
-	__asm__("bsf %1,%0"
-		:"=r" (word)
-		:"r" (~word));
-	return word;
-}
-
 static __inline__ unsigned long find_first_set_bit(unsigned long word)
 {
 	__asm__("bsf %1,%0"
