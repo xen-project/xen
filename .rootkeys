@@ -370,6 +370,7 @@
 428359d4b3fDYtazwXi4UUmSWaOUew patches/linux-2.6.11/linux-2.6.11.11.patch
 418abc69J3F638vPO9MYoDGeYilxoQ patches/linux-2.6.11/nettel.patch
 429ae875I9ZrqrRDjGD34IC2kzDREw patches/linux-2.6.11/rcu-nohz.patch
+429ba3007184K-y6WHQ6KgY65-lEIQ patches/linux-2.6.11/udp-frag.patch
 3f776bd1Hy9rn69ntXBhPReUFw9IEA tools/Makefile
 40e1b09db5mN69Ijj0X_Eol-S7dXiw tools/Rules.mk
 4124b307nRyK3dhn1hAsvrY76NuV3g tools/check/Makefile
