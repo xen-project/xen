@@ -28,12 +28,14 @@ void serial_rx_interrupt(struct serial_port *port, struct cpu_user_regs *regs)
     BUG_ON(!port->driver);
     BUG_ON(!port->driver->getc);
 
-    spin_lock_irqsave(&port->lock, flags);
-
-    while ( port->driver->getc(port, &c) )
+    for ( ; ; )
     {
-        fn = NULL;
+        spin_lock_irqsave(&port->lock, flags);
 
+        if ( !port->driver->getc(port, &c) )
+            break;
+
+        fn = NULL;
         if ( port->rx != NULL )
             fn = port->rx;
         else if ( (c & 0x80) && (port->rx_hi != NULL) )
@@ -43,12 +45,12 @@ void serial_rx_interrupt(struct serial_port *port, struct cpu_user_regs *regs)
         else if ( (port->rxbufp - port->rxbufc) != RXBUFSZ )
             port->rxbuf[MASK_RXBUF_IDX(port->rxbufp++)] = c;            
 
+        spin_unlock_irqrestore(&port->lock, flags);
+
         if ( fn != NULL )
-        {
-            spin_unlock_irqrestore(&port->lock, flags);
             (*fn)(c & 0x7f, regs);
-            spin_lock_irqsave(&port->lock, flags);
-        }
+
+        cpu_relax();
     }
 
     spin_unlock_irqrestore(&port->lock, flags);
@@ -83,22 +85,6 @@ void serial_puts(int handle, const char *s)
         serial_putc(handle, *s++);
 }
 
-/* Returns TRUE if given character (*pc) matches the serial handle. */
-static int byte_matches(int handle, unsigned char *pc)
-{
-    if ( !(handle & SERHND_HI) )
-    {
-        if ( !(handle & SERHND_LO) || !(*pc & 0x80) )
-            return 1;
-    }
-    else if ( *pc & 0x80 )
-    {
-        *pc &= 0x7f;
-        return 1;
-    }
-    return 0;
-}
-
 char serial_getc(int handle)
 {
     struct serial_port *port = &com[handle & SERHND_IDX];
@@ -108,21 +94,28 @@ char serial_getc(int handle)
     if ( (handle == -1) || !port->driver || !port->driver->getc )
         return '\0';
 
-    spin_lock_irqsave(&port->lock, flags);
+    do {        
+        for ( ; ; )
+        {
+            spin_lock_irqsave(&port->lock, flags);
+            
+            if ( port->rxbufp != port->rxbufc )
+            {
+                c = port->rxbuf[MASK_RXBUF_IDX(port->rxbufc++)];
+                break;
+            }
+            
+            if ( port->driver->getc(port, &c) )
+                break;
 
-    while ( port->rxbufp != port->rxbufc )
-    {
-        c = port->rxbuf[MASK_RXBUF_IDX(port->rxbufc++)];
-        if ( byte_matches(handle, &c) )
-            goto out;
-    }
+            spin_unlock_irqrestore(&port->lock, flags);
+
+            cpu_relax();
+        }
+    } while ( ((handle & SERHND_LO) &&  (c & 0x80)) ||
+              ((handle & SERHND_HI) && !(c & 0x80)) );
     
-    while ( !port->driver->getc(port, &c) && !byte_matches(handle, &c) )
-        continue;
-
- out:
-    spin_unlock_irqrestore(&port->lock, flags);
-    return c;
+    return c & 0x7f;
 }
 
 int serial_parse_handle(char *conf)
