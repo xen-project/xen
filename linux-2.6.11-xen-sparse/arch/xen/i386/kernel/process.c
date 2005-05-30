@@ -91,25 +91,18 @@ void enable_hlt(void)
 EXPORT_SYMBOL(enable_hlt);
 
 /* XXX XEN doesn't use default_idle(), poll_idle(). Use xen_idle() instead. */
-extern int set_timeout_timer(void);
+extern void stop_hz_timer(void);
+extern void start_hz_timer(void);
 void xen_idle(void)
 {
-	int cpu;
-
 	local_irq_disable();
-
-	cpu = smp_processor_id();
-	if (rcu_pending(cpu))
-		rcu_check_callbacks(cpu, 0);
 
 	if (need_resched()) {
 		local_irq_enable();
-	} else if (set_timeout_timer() == 0) {
-		/* NB. Blocking reenable events in a race-free manner. */
-		HYPERVISOR_block();
 	} else {
-		local_irq_enable();
-		HYPERVISOR_yield();
+		stop_hz_timer();
+		HYPERVISOR_block(); /* implicit local_irq_enable() */
+		start_hz_timer();
 	}
 }
 
