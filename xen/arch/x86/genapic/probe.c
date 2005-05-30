@@ -19,7 +19,7 @@ extern struct genapic apic_bigsmp;
 extern struct genapic apic_es7000;
 extern struct genapic apic_default;
 
-struct genapic *genapic = &apic_default;
+struct genapic *genapic;
 
 struct genapic *apic_probe[] __initdata = { 
 	&apic_summit,
@@ -29,38 +29,28 @@ struct genapic *apic_probe[] __initdata = {
 	NULL,
 };
 
-void __init generic_apic_probe(char *command_line) 
-{ 
-	char *s;
+static void __init genapic_apic_force(char *str)
+{
 	int i;
-	int changed = 0;
+	for (i = 0; apic_probe[i]; i++)
+		if (!strcmp(apic_probe[i]->name, str))
+			genapic = apic_probe[i];
+}
+custom_param("apic", genapic_apic_force);
 
-	s = strstr(command_line, "apic=");
-	if (s && (s == command_line || isspace(s[-1]))) { 
-		char *p = strchr(s, ' '), old; 
-		if (!p)
-			p = strchr(s, '\0'); 
-		old = *p; 
-		*p = 0; 
-		for (i = 0; !changed && apic_probe[i]; i++) {
-			if (!strcmp(apic_probe[i]->name, s+5)) { 
-				changed = 1;
-				genapic = apic_probe[i];
-			}
-		}
-		if (!changed)
-			printk(KERN_ERR "Unknown genapic `%s' specified.\n", s);
-		*p = old;
-	} 
+void __init generic_apic_probe(void) 
+{ 
+	int i;
+	int changed = (genapic != NULL);
+
 	for (i = 0; !changed && apic_probe[i]; i++) { 
 		if (apic_probe[i]->probe()) {
 			changed = 1;
 			genapic = apic_probe[i]; 
 		} 
 	}
-	/* Not visible without early console */ 
 	if (!changed) 
-		panic("Didn't find an APIC driver"); 
+		genapic = &apic_default;
 
 	printk(KERN_INFO "Using APIC driver %s\n", genapic->name);
 } 

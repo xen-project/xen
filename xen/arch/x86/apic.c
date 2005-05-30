@@ -99,6 +99,13 @@ void clear_local_APIC(void)
         apic_write_around(APIC_LVTPC, v | APIC_LVT_MASKED);
     }
 
+/* lets not touch this if we didn't frob it */
+#ifdef CONFIG_X86_MCE_P4THERMAL
+    if (maxlvt >= 5) {
+        v = apic_read(APIC_LVTTHMR);
+        apic_write_around(APIC_LVTTHMR, v | APIC_LVT_MASKED);
+    }
+#endif
     /*
      * Clean APIC state for other OSs:
      */
@@ -110,6 +117,10 @@ void clear_local_APIC(void)
     if (maxlvt >= 4)
         apic_write_around(APIC_LVTPC, APIC_LVT_MASKED);
 
+#ifdef CONFIG_X86_MCE_P4THERMAL
+    if (maxlvt >= 5)
+        apic_write_around(APIC_LVTTHMR, APIC_LVT_MASKED);
+#endif
     v = GET_APIC_VERSION(apic_read(APIC_LVR));
     if (APIC_INTEGRATED(v)) {	/* !82489DX */
         if (maxlvt > 3)        /* Due to Pentium errata 3AP and 11AP. */
@@ -134,6 +145,7 @@ void __init connect_bsp_APIC(void)
         outb(0x70, 0x22);
         outb(0x01, 0x23);
     }
+    enable_apic_mode();
 }
 
 void disconnect_bsp_APIC(void)
@@ -448,19 +460,44 @@ void __init setup_local_APIC (void)
  * Original code written by Keir Fraser.
  */
 
+/*
+ * Knob to control our willingness to enable the local APIC.
+ */
+int enable_local_apic __initdata = 0; /* -1=force-disable, +1=force-enable */
+
+static void __init lapic_disable(char *str)
+{
+    enable_local_apic = -1;
+    clear_bit(X86_FEATURE_APIC, boot_cpu_data.x86_capability);
+}
+custom_param("nolapic", lapic_disable);
+
+static void __init lapic_enable(char *str)
+{
+    enable_local_apic = 1;
+}
+custom_param("lapic", lapic_enable);
+
 static void __init apic_set_verbosity(char *str)
 {
     if (strcmp("debug", str) == 0)
         apic_verbosity = APIC_DEBUG;
     else if (strcmp("verbose", str) == 0)
         apic_verbosity = APIC_VERBOSE;
+    else
+        printk(KERN_WARNING "APIC Verbosity level %s not recognised"
+               " use apic_verbosity=verbose or apic_verbosity=debug", str);
 }
-custom_param("apic", apic_set_verbosity);
+custom_param("apic_verbosity", apic_set_verbosity);
 
 static int __init detect_init_APIC (void)
 {
     u32 h, l, features;
     extern void get_cpu_vendor(struct cpuinfo_x86*);
+
+    /* Disabled by kernel option? */
+    if (enable_local_apic < 0)
+        return -1;
 
     /* Workaround for us being called before identify_cpu(). */
     get_cpu_vendor(&boot_cpu_data);
@@ -481,6 +518,15 @@ static int __init detect_init_APIC (void)
     }
 
     if (!cpu_has_apic) {
+        /*
+         * Over-ride BIOS and try to enable the local
+         * APIC only if "lapic" specified.
+         */
+        if (enable_local_apic <= 0) {
+            printk("Local APIC disabled by BIOS -- "
+                   "you can enable it with \"lapic\"\n");
+            return -1;
+        }
         /*
          * Some BIOSes disable the local APIC in the
          * APIC_BASE MSR. This can only be done in
@@ -951,6 +997,9 @@ asmlinkage void smp_error_interrupt(struct cpu_user_regs *regs)
  */
 int __init APIC_init_uniprocessor (void)
 {
+    if (enable_local_apic < 0)
+        clear_bit(X86_FEATURE_APIC, boot_cpu_data.x86_capability);
+
     if (!smp_found_config && !cpu_has_apic)
         return -1;
 

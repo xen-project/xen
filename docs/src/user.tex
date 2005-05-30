@@ -1770,14 +1770,25 @@ editing \path{grub.conf}.
  Select the CPU scheduler Xen should use.  The current
  possibilities are `bvt' (default), `atropos' and `rrobin'. 
  For more information see Section~\ref{s:sched}. 
+
+\item [apic\_verbosity=debug,verbose ]
+ Print more detailed information about local APIC and IOAPIC configuration.
+
+\item [lapic ]
+ Force use of local APIC even when left disabled by uniprocessor BIOS.
+
+\item [nolapic ]
+ Ignore local APIC in a uniprocessor system, even if enabled by the BIOS.
+
+\item [apic=bigsmp,default,es7000,summit ]
+ Specify NUMA platform. This can usually be probed automatically.
+
 \end{description} 
 
-In addition, the following platform-specific options may be specified
-on the Xen command line. Since domain 0 shares responsibility for
-booting the platform, Xen will automatically propagate these options
-to its command line.
-
-These options are taken from Linux's command-line syntax with
+In addition, the following options may be specified on the Xen command
+line. Since domain 0 shares responsibility for booting the platform,
+Xen will automatically propagate these options to its command
+line. These options are taken from Linux's command-line syntax with
 unchanged semantics.
 
 \begin{description}
@@ -1791,9 +1802,6 @@ unchanged semantics.
 \item [noapic ]
  Instruct Xen (and domain 0) to ignore any IOAPICs that are present in
  the system, and instead continue to use the legacy PIC.
-
-\item [apic=debug,verbose ]
- Print more detailed information about local APIC and IOAPIC configuration.
 
 \end{description} 
 

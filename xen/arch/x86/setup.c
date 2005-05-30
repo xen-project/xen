@@ -21,7 +21,7 @@
 #include <asm/e820.h>
 
 extern void dmi_scan_machine(void);
-extern void generic_apic_probe(char *);
+extern void generic_apic_probe(void);
 
 /*
  * opt_xenheap_megabytes: Size of Xen heap in megabytes, excluding the
@@ -66,8 +66,6 @@ boolean_param("acpi_skip_timer_override", acpi_skip_timer_override);
 /* noapic: Disable IOAPIC setup. */
 extern int skip_ioapic_setup;
 boolean_param("noapic", skip_ioapic_setup);
-
-static char *xen_cmdline;
 
 int early_boot = 1;
 
@@ -179,8 +177,7 @@ static void __init start_of_day(void)
 
     dmi_scan_machine();
 
-    if ( xen_cmdline != NULL )
-        generic_apic_probe(xen_cmdline);
+    generic_apic_probe();
 
     acpi_boot_table_init();
     acpi_boot_init();
@@ -251,10 +248,7 @@ void __init __start_xen(multiboot_info_t *mbi)
 
     /* Parse the command-line options. */
     if ( (mbi->flags & MBI_CMDLINE) && (mbi->cmdline != 0) )
-    {
-        xen_cmdline = __va(mbi->cmdline);
-        cmdline_parse(xen_cmdline);
-    }
+        cmdline_parse(__va(mbi->cmdline));
 
     /* Must do this early -- e.g., spinlocks rely on get_current(). */
     set_current(&idle0_exec_domain);
@@ -435,13 +429,6 @@ void __init __start_xen(multiboot_info_t *mbi)
         {
             strcat(cmdline, " acpi=");
             strcat(cmdline, acpi_param);
-        }
-        if ( !strstr(cmdline, "apic=") )
-        {
-            if ( apic_verbosity == APIC_VERBOSE )
-                strcat(cmdline, " apic=verbose");
-            else if ( apic_verbosity == APIC_DEBUG )
-                strcat(cmdline, " apic=debug");
         }
     }
 
