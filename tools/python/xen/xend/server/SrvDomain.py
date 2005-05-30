@@ -185,8 +185,13 @@ class SrvDomain(SrvDir):
         
     def render_GET(self, req):
         op = req.args.get('op')
-        if op and op[0] in ['vifs', 'vif', 'vbds', 'vbd', 'mem_target_set']:
-            return self.perform(req)
+        #
+        # XXX SMH: below may be useful once again if we ever try to get
+        # the raw 'web' interface to xend working once more. But for now
+        # is useless and out of date (i.e. no ops called 'v???' anymore).
+        #
+        # if op and op[0] in ['vifs', 'vif', 'vbds', 'vbd', 'mem_target_set']:
+        #    return self.perform(req)
         if self.use_sxp(req):
             req.setHeader("Content-Type", sxp.mime_type)
             sxp.show(self.dom.sxpr(), out=req)

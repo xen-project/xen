@@ -637,14 +637,14 @@ class XendDomain:
         return val
 
     def domain_devtype_ls(self, id, type):
-        """Get list of device indexes for a domain.
+        """Get list of device sxprs for a domain.
 
         @param id:  domain
         @param type: device type
-        @return: device indexes
+        @return: device sxprs
         """
         dominfo = self.domain_lookup(id)
-        return dominfo.getDeviceIndexes(type)
+        return dominfo.getDeviceSxprs(type)
 
     def domain_devtype_get(self, id, type, idx):
         """Get a device from a domain.

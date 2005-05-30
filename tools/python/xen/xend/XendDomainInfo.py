@@ -25,7 +25,7 @@ from server import messages
 from xen.xend.XendBootloader import bootloader
 import sxp
 from XendLogging import log
-from XendError import VmError
+from XendError import XendError, VmError
 from XendRoot import get_component
 
 from PrettyPrint import prettyprintstring
@@ -555,8 +555,7 @@ class XendDomainInfo:
         if self.memory is None:
             raise VmError('missing memory size')
         cpu = sxp.child_value(config, 'cpu')
-        if self.recreate and self.dom and cpu is not None:
-            #xc.domain_pincpu(self.dom, int(cpu))
+        if self.recreate and self.dom and cpu is not None and cpu > 0:
             xc.domain_pincpu(self.dom, 0, 1<<int(cpu))
         try:
             image = sxp.child_value(self.config, 'image')

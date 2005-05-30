@@ -279,12 +279,12 @@ class Xend:
                               'period'  : period })
 
     def xend_domain_devices(self, id, type):
-        return self.xendGet(self.domainurl(id),
+        return self.xendPost(self.domainurl(id),
                              {'op'      : 'devices',
                               'type'    : type })
 
     def xend_domain_device(self, id, type, idx):
-        return self.xendGet(self.domainurl(id),
+        return self.xendPost(self.domainurl(id),
                              {'op'      : 'device',
                               'type'    : type,
                               'idx'     : idx })
