@@ -689,58 +689,52 @@ void __init time_init(void)
 	(void)setup_irq(per_cpu(timer_irq, 0), &irq_timer);
 }
 
-/* Convert jiffies to system time. Call with xtime_lock held for reading. */
-static inline u64 __jiffies_to_st(unsigned long j) 
+/* Convert jiffies to system time. */
+static inline u64 jiffies_to_st(unsigned long j) 
 {
-	long delta = j - jiffies;
-	/* NB. The next check can trigger in some wrap-around cases, but
-	 * that's ok -- we'll just end up with a shorter timeout. */
-	if (delta < 1)
-		delta = 1;
-	return processed_system_time + (delta * NS_PER_TICK);
+	unsigned long seq;
+	long delta;
+	u64 st;
+
+	do {
+		seq = read_seqbegin(&xtime_lock);
+		delta = j - jiffies;
+		/* NB. The next check can trigger in some wrap-around cases,
+		 * but that's ok: we'll just end up with a shorter timeout. */
+		if (delta < 1)
+			delta = 1;
+		st = processed_system_time + (delta * NS_PER_TICK);
+	} while (read_seqretry(&xtime_lock, seq));
+
+	return st;
 }
 
 /*
- * This function works out when the the next timer function has to be
- * executed (by looking at the timer list) and sets the Xen one-shot
- * domain timer to the appropriate value. This is typically called in
- * cpu_idle() before the domain blocks.
- * 
- * The function returns a non-0 value on error conditions.
- * 
- * It must be called with interrupts disabled.
+ * stop_hz_timer / start_hz_timer - enter/exit 'tickless mode' on an idle cpu
+ * These functions are based on implementations from arch/s390/kernel/time.c
  */
-int set_timeout_timer(void)
+void stop_hz_timer(void)
 {
-	u64 alarm = 0;
-	int ret = 0;
+	unsigned int cpu = smp_processor_id();
 	unsigned long j;
-#ifdef CONFIG_SMP
-	unsigned long seq;
-#endif
 
-	/*
-	 * This is safe against long blocking (since calculations are
-	 * not based on TSC deltas). It is also safe against warped
-	 * system time since suspend-resume is cooperative and we
-	 * would first get locked out.
-	 */
-#ifdef CONFIG_SMP
-	do {
-		seq = read_seqbegin(&xtime_lock);
+	/* s390 does this /before/ checking rcu_pending(). We copy them. */
+	cpu_set(cpu, nohz_cpu_mask);
+
+	/* Leave ourselves in 'tick mode' if rcu or softirq pending. */
+	if (rcu_pending(cpu) || local_softirq_pending()) {
+		cpu_clear(cpu, nohz_cpu_mask);
 		j = jiffies + 1;
-		alarm = __jiffies_to_st(j);
-	} while (read_seqretry(&xtime_lock, seq));
-#else
-	j = next_timer_interrupt();
-	alarm = __jiffies_to_st(j);
-#endif
+	} else {
+		j = next_timer_interrupt();
+	}
 
-	/* Failure is pretty bad, but we'd best soldier on. */
-	if ( HYPERVISOR_set_timer_op(alarm) != 0 )
-		ret = -1;
+	BUG_ON(HYPERVISOR_set_timer_op(jiffies_to_st(j)) != 0);
+}
 
-	return ret;
+void start_hz_timer(void)
+{
+	cpu_clear(smp_processor_id(), nohz_cpu_mask);
 }
 
 void time_suspend(void)
