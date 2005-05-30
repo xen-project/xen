@@ -800,7 +800,7 @@ class ProgVifList(Prog):
     def main(self, args):
         if len(args) != 2: self.err("%s: Invalid argument(s)" % args[0])
         dom = args[1]
-        for x in server.xend_domain_vifs(dom):
+        for x in server.xend_domain_devices(dom, 'vif'):
             sxp.show(x)
             print
 
@@ -818,7 +818,7 @@ class ProgVbdList(Prog):
     def main(self, args):
         if len(args) != 2: self.err("%s: Invalid argument(s)" % args[0])
         dom = args[1]
-        for x in server.xend_domain_vbds(dom):
+        for x in server.xend_domain_devices(dom, 'vbd'):
             sxp.show(x)
             print
 
@@ -893,7 +893,7 @@ information. This is visible in 'xm vbd-list'."""
         if len(args) != 3: self.err("%s: Invalid argument(s)" % args[0])
         dom = args[1]
         dev = args[2]
-        server.xend_domain_device_destroy(dom, "vbd", dev)
+        server.xend_domain_device_destroy(dom, 'vbd', dev)
 
 xm.prog(ProgVbdDestroy)
 
