@@ -43,6 +43,7 @@ class XendRoot:
     """Default path to the log file. """
     logfile_default = "/var/log/xend.log"
 
+    """Default level of information to be logged."""
     loglevel_default = 'DEBUG'
 
     """Default for the flag indicating whether xend should run an http server."""
@@ -73,7 +74,7 @@ class XendRoot:
     xend_unix_path_default = '/var/lib/xend/xend-socket'
 
     """Default interface address xend listens at for consoles."""
-    console_address_default   = ''
+    console_address_default   = 'localhost'
 
     """Default port xend serves consoles at. """
     console_port_base_default = '9600'
@@ -306,9 +307,9 @@ class XendRoot:
 
     def get_console_address(self):
         """Get the address xend listens at for its console ports.
-        This defaults to the empty string which allows all hosts to connect.
-        If this is set to 'localhost' only the localhost will be able to connect
-        to the console ports.
+        This defaults to 'localhost', allowing only the localhost to connect
+        to the console ports.  Setting this to the empty string, allows all
+        hosts to connect.
         """
         return self.get_config_value('console-address', self.console_address_default)
 
