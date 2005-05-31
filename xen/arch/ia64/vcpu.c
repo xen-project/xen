@@ -173,6 +173,7 @@ IA64FAULT vcpu_set_psr_dt(VCPU *vcpu)
 IA64FAULT vcpu_set_psr_i(VCPU *vcpu)
 {
 	PSCB(vcpu,interrupt_delivery_enabled) = 1;
+	PSCB(vcpu,interrupt_collection_enabled) = 1;
 	return IA64_NO_FAULT;
 }
 
@@ -649,6 +650,7 @@ IA64FAULT vcpu_get_ivr(VCPU *vcpu, UINT64 *pval)
 #ifdef HEARTBEAT_FREQ
 #define N_DOMS 16	// period in seconds
 	static long count[N_DOMS] = { 0 };
+	static long nonclockcount[N_DOMS] = { 0 };
 	REGS *regs = vcpu_regs(vcpu);
 	unsigned domid = vcpu->domain->domain_id;
 #endif
@@ -670,15 +672,15 @@ IA64FAULT vcpu_get_ivr(VCPU *vcpu, UINT64 *pval)
 	}
 #ifdef HEARTBEAT_FREQ
 	if (domid >= N_DOMS) domid = N_DOMS-1;
-	if (vector == (PSCB(vcpu,itv) & 0xff) &&
-	    !(++count[domid] & ((HEARTBEAT_FREQ*1024)-1))) {
-		printf("Dom%d heartbeat... iip=%p,psr.i=%d,pend=%d\n",
-			domid, regs->cr_iip,
-			current->vcpu_info->arch.interrupt_delivery_enabled,
-			current->vcpu_info->arch.pending_interruption);
-		count[domid] = 0;
-		dump_runq();
+	if (vector == (PSCB(vcpu,itv) & 0xff)) {
+	    if (!(++count[domid] & ((HEARTBEAT_FREQ*1024)-1))) {
+		printf("Dom%d heartbeat... ticks=%lx,nonticks=%lx\n",
+			domid, count[domid], nonclockcount[domid]);
+		//count[domid] = 0;
+		//dump_runq();
+	    }
 	}
+	else nonclockcount[domid]++;
 #endif
 	// now have an unmasked, pending, deliverable vector!
 	// getting ivr has "side effects"
