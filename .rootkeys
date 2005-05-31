@@ -1377,6 +1377,8 @@
 41c0c412lQ0NVVN9PsOSznQ-qhOiPA xen/include/asm-x86/vmx_vmcs.h
 418fbcfe_WliJPToeVM-9VStvym-hw xen/include/asm-x86/x86_32/asm_defns.h
 3e20b82fl1jmQiKdLy7fxMcutfpjWA xen/include/asm-x86/x86_32/domain_page.h
+429c852fi3pvfa9kIjryYK5AGBmXAg xen/include/asm-x86/x86_32/page-2level.h
+429c852fskvSOgcD5EC25_m9um9t4g xen/include/asm-x86/x86_32/page-3level.h
 4208e2a3ZNFroNXbX9OYaOB-xtUyDQ xen/include/asm-x86/x86_32/page.h
 3ddb79c3mbqEM7QQr3zVq7NiBNhouA xen/include/asm-x86/x86_32/regs.h
 3e7f358aG11EvMI9VJ4_9hD4LUO7rQ xen/include/asm-x86/x86_32/string.h

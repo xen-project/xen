@@ -8,12 +8,112 @@
 #define PAGE_SIZE           (1 << PAGE_SHIFT)
 #endif
 #define PAGE_MASK           (~(PAGE_SIZE-1))
+#define PAGE_FLAG_MASK      (~0U)
+
+#ifndef __ASSEMBLY__
+# include <asm/types.h>
+#endif
 
 #if defined(__i386__)
-#include <asm/x86_32/page.h>
+# include <asm/x86_32/page.h>
 #elif defined(__x86_64__)
-#include <asm/x86_64/page.h>
+# include <asm/x86_64/page.h>
 #endif
+
+/* Get pte contents as an integer (intpte_t). */
+#define l1e_get_value(x)           ((x).l1)
+#define l2e_get_value(x)           ((x).l2)
+#define l3e_get_value(x)           ((x).l3)
+#define l4e_get_value(x)           ((x).l4)
+
+/* Get pfn mapped by pte (unsigned long). */
+#define l1e_get_pfn(x)             \
+    ((unsigned long)(((x).l1 & (PADDR_MASK&PAGE_MASK)) >> PAGE_SHIFT))
+#define l2e_get_pfn(x)             \
+    ((unsigned long)(((x).l2 & (PADDR_MASK&PAGE_MASK)) >> PAGE_SHIFT))
+#define l3e_get_pfn(x)             \
+    ((unsigned long)(((x).l3 & (PADDR_MASK&PAGE_MASK)) >> PAGE_SHIFT))
+#define l4e_get_pfn(x)             \
+    ((unsigned long)(((x).l4 & (PADDR_MASK&PAGE_MASK)) >> PAGE_SHIFT))
+
+/* Get physical address of page mapped by pte (physaddr_t). */
+#define l1e_get_phys(x)            \
+    ((physaddr_t)(((x).l1 & (PADDR_MASK&PAGE_MASK))))
+#define l2e_get_phys(x)            \
+    ((physaddr_t)(((x).l2 & (PADDR_MASK&PAGE_MASK))))
+#define l3e_get_phys(x)            \
+    ((physaddr_t)(((x).l3 & (PADDR_MASK&PAGE_MASK))))
+#define l4e_get_phys(x)            \
+    ((physaddr_t)(((x).l4 & (PADDR_MASK&PAGE_MASK))))
+
+/* Get pte access flags (unsigned int). */
+#define l1e_get_flags(x)           (get_pte_flags((x).l1))
+#define l2e_get_flags(x)           (get_pte_flags((x).l2))
+#define l3e_get_flags(x)           (get_pte_flags((x).l3))
+#define l4e_get_flags(x)           (get_pte_flags((x).l4))
+
+/* Construct an empty pte. */
+#define l1e_empty()                ((l1_pgentry_t) { 0 })
+#define l2e_empty()                ((l2_pgentry_t) { 0 })
+#define l3e_empty()                ((l3_pgentry_t) { 0 })
+#define l4e_empty()                ((l4_pgentry_t) { 0 })
+
+/* Construct a pte from a pfn and access flags. */
+#define l1e_create_pfn(pfn, flags) \
+    ((l1_pgentry_t) { ((intpte_t)(pfn) << PAGE_SHIFT) | put_pte_flags(flags) })
+#define l2e_create_pfn(pfn, flags) \
+    ((l2_pgentry_t) { ((intpte_t)(pfn) << PAGE_SHIFT) | put_pte_flags(flags) })
+#define l3e_create_pfn(pfn, flags) \
+    ((l3_pgentry_t) { ((intpte_t)(pfn) << PAGE_SHIFT) | put_pte_flags(flags) })
+#define l4e_create_pfn(pfn, flags) \
+    ((l4_pgentry_t) { ((intpte_t)(pfn) << PAGE_SHIFT) | put_pte_flags(flags) })
+
+/* Construct a pte from a physical address and access flags. */
+#define l1e_create_phys(pa, flags) \
+    ((l1_pgentry_t) { (pa) | put_pte_flags(flags) })
+#define l2e_create_phys(pa, flags) \
+    ((l2_pgentry_t) { (pa) | put_pte_flags(flags) })
+#define l3e_create_phys(pa, flags) \
+    ((l3_pgentry_t) { (pa) | put_pte_flags(flags) })
+#define l4e_create_phys(pa, flags) \
+    ((l4_pgentry_t) { (pa) | put_pte_flags(flags) })
+
+/* Add extra flags to an existing pte. */
+#define l1e_add_flags(x, flags)    ((x)->l1 |= put_pte_flags(flags))
+#define l2e_add_flags(x, flags)    ((x)->l2 |= put_pte_flags(flags))
+#define l3e_add_flags(x, flags)    ((x)->l3 |= put_pte_flags(flags))
+#define l4e_add_flags(x, flags)    ((x)->l4 |= put_pte_flags(flags))
+
+/* Remove flags from an existing pte. */
+#define l1e_remove_flags(x, flags) ((x)->l1 &= ~put_pte_flags(flags))
+#define l2e_remove_flags(x, flags) ((x)->l2 &= ~put_pte_flags(flags))
+#define l3e_remove_flags(x, flags) ((x)->l3 &= ~put_pte_flags(flags))
+#define l4e_remove_flags(x, flags) ((x)->l4 &= ~put_pte_flags(flags))
+
+/* Check if a pte's page mapping or significant access flags have changed. */
+#define l1e_has_changed(x,y,flags) \
+    ( !!(((x)->l1 ^ (y)->l1) & ((PADDR_MASK&PAGE_MASK)|put_pte_flags(flags))) )
+#define l2e_has_changed(x,y,flags) \
+    ( !!(((x)->l2 ^ (y)->l2) & ((PADDR_MASK&PAGE_MASK)|put_pte_flags(flags))) )
+#define l3e_has_changed(x,y,flags) \
+    ( !!(((x)->l3 ^ (y)->l3) & ((PADDR_MASK&PAGE_MASK)|put_pte_flags(flags))) )
+#define l4e_has_changed(x,y,flags) \
+    ( !!(((x)->l4 ^ (y)->l4) & ((PADDR_MASK&PAGE_MASK)|put_pte_flags(flags))) )
+
+/* Pagetable walking. */
+#define l2e_to_l1e(x)              ((l1_pgentry_t *)__va(l2e_get_phys(x)))
+#define l3e_to_l2e(x)              ((l2_pgentry_t *)__va(l3e_get_phys(x)))
+#define l4e_to_l3e(x)              ((l3_pgentry_t *)__va(l4e_get_phys(x)))
+
+/* Given a virtual address, get an entry offset into a page table. */
+#define l1_table_offset(a)         \
+    (((a) >> L1_PAGETABLE_SHIFT) & (L1_PAGETABLE_ENTRIES - 1))
+#define l2_table_offset(a)         \
+    (((a) >> L2_PAGETABLE_SHIFT) & (L2_PAGETABLE_ENTRIES - 1))
+#define l3_table_offset(a)         \
+    (((a) >> L3_PAGETABLE_SHIFT) & (L3_PAGETABLE_ENTRIES - 1))
+#define l4_table_offset(a)         \
+    (((a) >> L4_PAGETABLE_SHIFT) & (L4_PAGETABLE_ENTRIES - 1))
 
 /* Convert a pointer to a page-table entry into pagetable slot index. */
 #define pgentry_ptr_to_slot(_p) \
@@ -21,10 +121,19 @@
 
 /* Page-table type. */
 #ifndef __ASSEMBLY__
-typedef struct { unsigned long pt_lo; } pagetable_t;
-#define pagetable_val(_x)   ((_x).pt_lo)
-#define pagetable_get_pfn(_x) ((_x).pt_lo >> PAGE_SHIFT)
-#define mk_pagetable(_x)    ( (pagetable_t) { (_x) } )
+#if CONFIG_PAGING_LEVELS == 2
+/* x86_32 default */
+typedef struct { u32 pfn; } pagetable_t;
+#elif CONFIG_PAGING_LEVELS == 3
+/* x86_32 PAE */
+typedef struct { u32 pfn; } pagetable_t;
+#elif CONFIG_PAGING_LEVELS == 4
+/* x86_64 */
+typedef struct { u64 pfn; } pagetable_t;
+#endif
+#define pagetable_get_phys(_x) ((physaddr_t)(_x).pfn << PAGE_SHIFT)
+#define pagetable_get_pfn(_x)  ((_x).pfn)
+#define mk_pagetable(_phys)    ({ pagetable_t __p; __p.pfn = _phys >> PAGE_SHIFT; __p; })
 #endif
 
 #define clear_page(_p)      memset((void *)(_p), 0, PAGE_SIZE)
@@ -49,6 +158,7 @@ typedef struct { unsigned long pt_lo; } pagetable_t;
 #define l4e_create_page(_x,_y) (l4e_create_pfn(page_to_pfn(_x),(_y)))
 
 /* High table entries are reserved by the hypervisor. */
+/* FIXME: this breaks with PAE -- kraxel */
 #define DOMAIN_ENTRIES_PER_L2_PAGETABLE     \
   (HYPERVISOR_VIRT_START >> L2_PAGETABLE_SHIFT)
 #define HYPERVISOR_ENTRIES_PER_L2_PAGETABLE \
@@ -78,7 +188,14 @@ typedef struct { unsigned long pt_lo; } pagetable_t;
     (l2e_get_pfn(linear_l2_table(_ed)[_va>>L2_PAGETABLE_SHIFT]))
 
 #ifndef __ASSEMBLY__
+#if CONFIG_PAGING_LEVELS == 3
 extern root_pgentry_t idle_pg_table[ROOT_PAGETABLE_ENTRIES];
+extern l3_pgentry_t   idle_pg_table_l3[ROOT_PAGETABLE_ENTRIES];
+extern l2_pgentry_t   idle_pg_table_l2[ROOT_PAGETABLE_ENTRIES*L2_PAGETABLE_ENTRIES];
+#else
+extern root_pgentry_t idle_pg_table[ROOT_PAGETABLE_ENTRIES];
+extern l2_pgentry_t   idle_pg_table_l2[ROOT_PAGETABLE_ENTRIES];
+#endif
 extern void paging_init(void);
 #endif
 
@@ -96,17 +213,17 @@ extern void paging_init(void);
             : : "r" (mmu_cr4_features) );                               \
     } while ( 0 )
 
-#define _PAGE_PRESENT  0x001UL
-#define _PAGE_RW       0x002UL
-#define _PAGE_USER     0x004UL
-#define _PAGE_PWT      0x008UL
-#define _PAGE_PCD      0x010UL
-#define _PAGE_ACCESSED 0x020UL
-#define _PAGE_DIRTY    0x040UL
-#define _PAGE_PAT      0x080UL
-#define _PAGE_PSE      0x080UL
-#define _PAGE_GLOBAL   0x100UL
-#define _PAGE_AVAIL    0xe00UL
+#define _PAGE_PRESENT  0x001U
+#define _PAGE_RW       0x002U
+#define _PAGE_USER     0x004U
+#define _PAGE_PWT      0x008U
+#define _PAGE_PCD      0x010U
+#define _PAGE_ACCESSED 0x020U
+#define _PAGE_DIRTY    0x040U
+#define _PAGE_PAT      0x080U
+#define _PAGE_PSE      0x080U
+#define _PAGE_GLOBAL   0x100U
+#define _PAGE_AVAIL    0xE00U
 
 #define __PAGE_HYPERVISOR \
     (_PAGE_PRESENT | _PAGE_RW | _PAGE_DIRTY | _PAGE_ACCESSED)

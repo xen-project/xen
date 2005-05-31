@@ -44,15 +44,15 @@ boolean_param("dom0_translate", opt_dom0_translate);
 #if defined(__i386__)
 /* No ring-3 access in initial leaf page tables. */
 #define L1_PROT (_PAGE_PRESENT|_PAGE_RW|_PAGE_ACCESSED)
+#define L2_PROT (_PAGE_PRESENT|_PAGE_RW|_PAGE_ACCESSED|_PAGE_DIRTY|_PAGE_USER)
+#define L3_PROT (_PAGE_PRESENT)
 #elif defined(__x86_64__)
 /* Allow ring-3 access in long mode as guest cannot use ring 1. */
 #define L1_PROT (_PAGE_PRESENT|_PAGE_RW|_PAGE_ACCESSED|_PAGE_USER)
-#endif
-/* Don't change these: Linux expects just these bits to be set. */
-/* (And that includes the bogus _PAGE_DIRTY!) */
 #define L2_PROT (_PAGE_PRESENT|_PAGE_RW|_PAGE_ACCESSED|_PAGE_DIRTY|_PAGE_USER)
 #define L3_PROT (_PAGE_PRESENT|_PAGE_RW|_PAGE_ACCESSED|_PAGE_DIRTY|_PAGE_USER)
 #define L4_PROT (_PAGE_PRESENT|_PAGE_RW|_PAGE_ACCESSED|_PAGE_DIRTY|_PAGE_USER)
+#endif
 
 #define round_pgup(_p)    (((_p)+(PAGE_SIZE-1))&PAGE_MASK)
 #define round_pgdown(_p)  ((_p)&PAGE_MASK)
@@ -91,7 +91,11 @@ int construct_dom0(struct domain *d,
 #elif defined(__x86_64__)
     char *image_start  = __va(_image_start);
     char *initrd_start = __va(_initrd_start);
+#endif
+#if CONFIG_PAGING_LEVELS >= 4
     l4_pgentry_t *l4tab = NULL, *l4start = NULL;
+#endif
+#if CONFIG_PAGING_LEVELS >= 3
     l3_pgentry_t *l3tab = NULL, *l3start = NULL;
 #endif
     l2_pgentry_t *l2tab = NULL, *l2start = NULL;
@@ -143,7 +147,7 @@ int construct_dom0(struct domain *d,
         panic("Not enough RAM for DOM0 reservation.\n");
     alloc_start = page_to_phys(page);
     alloc_end   = alloc_start + (d->tot_pages << PAGE_SHIFT);
-    
+
     if ( (rc = parseelfimage(&dsi)) != 0 )
         return rc;
 
@@ -172,9 +176,14 @@ int construct_dom0(struct domain *d,
         v_end            = (vstack_end + (1UL<<22)-1) & ~((1UL<<22)-1);
         if ( (v_end - vstack_end) < (512UL << 10) )
             v_end += 1UL << 22; /* Add extra 4MB to get >= 512kB padding. */
-#if defined(__i386__)
+#if defined(__i386__) && !defined(CONFIG_X86_PAE)
         if ( (((v_end - dsi.v_start + ((1UL<<L2_PAGETABLE_SHIFT)-1)) >> 
                L2_PAGETABLE_SHIFT) + 1) <= nr_pt_pages )
+            break;
+#elif defined(__i386__) && defined(CONFIG_X86_PAE)
+        /* 5 pages: 1x 3rd + 4x 2nd level */
+        if ( (((v_end - dsi.v_start + ((1UL<<L2_PAGETABLE_SHIFT)-1)) >> 
+               L2_PAGETABLE_SHIFT) + 5) <= nr_pt_pages )
             break;
 #elif defined(__x86_64__)
 #define NR(_l,_h,_s) \
@@ -249,6 +258,24 @@ int construct_dom0(struct domain *d,
     }
 
     /* WARNING: The new domain must have its 'processor' field filled in! */
+#if CONFIG_PAGING_LEVELS == 3
+    l3start = l3tab = (l3_pgentry_t *)mpt_alloc; mpt_alloc += PAGE_SIZE;
+    l2start = l2tab = (l2_pgentry_t *)mpt_alloc; mpt_alloc += 4*PAGE_SIZE;
+    memcpy(l2tab, idle_pg_table_l2, 4*PAGE_SIZE);
+    for (i = 0; i < 4; i++) {
+        l3tab[i] = l3e_create_phys((u32)l2tab + i*PAGE_SIZE, L3_PROT);
+        l2tab[(LINEAR_PT_VIRT_START >> L2_PAGETABLE_SHIFT)+i] =
+            l2e_create_phys((u32)l2tab + i*PAGE_SIZE, __PAGE_HYPERVISOR);
+    }
+    unsigned long v;
+    for (v = PERDOMAIN_VIRT_START; v < PERDOMAIN_VIRT_END;
+         v += (1 << L2_PAGETABLE_SHIFT)) {
+        l2tab[v >> L2_PAGETABLE_SHIFT] =
+            l2e_create_phys(__pa(d->arch.mm_perdomain_pt) + (v-PERDOMAIN_VIRT_START),
+                            __PAGE_HYPERVISOR);
+    }
+    ed->arch.guest_table = mk_pagetable((unsigned long)l3start);
+#else
     l2start = l2tab = (l2_pgentry_t *)mpt_alloc; mpt_alloc += PAGE_SIZE;
     memcpy(l2tab, &idle_pg_table[0], PAGE_SIZE);
     l2tab[LINEAR_PT_VIRT_START >> L2_PAGETABLE_SHIFT] =
@@ -256,8 +283,9 @@ int construct_dom0(struct domain *d,
     l2tab[PERDOMAIN_VIRT_START >> L2_PAGETABLE_SHIFT] =
         l2e_create_phys(__pa(d->arch.mm_perdomain_pt), __PAGE_HYPERVISOR);
     ed->arch.guest_table = mk_pagetable((unsigned long)l2start);
+#endif
 
-    l2tab += l2_table_offset(dsi.v_start);
+    l2tab += l2_linear_offset(dsi.v_start);
     mfn = alloc_start >> PAGE_SHIFT;
     for ( count = 0; count < ((v_end-dsi.v_start)>>PAGE_SHIFT); count++ )
     {
@@ -282,8 +310,8 @@ int construct_dom0(struct domain *d,
     }
 
     /* Pages that are part of page tables must be read only. */
-    l2tab = l2start + l2_table_offset(vpt_start);
-    l1start = l1tab = (l1_pgentry_t *)l2e_get_phys(*l2tab);
+    l2tab = l2start + l2_linear_offset(vpt_start);
+    l1start = l1tab = (l1_pgentry_t *)(u32)l2e_get_phys(*l2tab);
     l1tab += l1_table_offset(vpt_start);
     for ( count = 0; count < nr_pt_pages; count++ ) 
     {
@@ -294,6 +322,34 @@ int construct_dom0(struct domain *d,
             if ( !get_page_type(page, PGT_writable_page) )
                 BUG();
 
+#if CONFIG_PAGING_LEVELS == 3
+        switch (count) {
+        case 0:
+            page->u.inuse.type_info &= ~PGT_type_mask;
+            page->u.inuse.type_info |= PGT_l3_page_table;
+            get_page(page, d); /* an extra ref because of readable mapping */
+
+            /* Get another ref to L3 page so that it can be pinned. */
+            if ( !get_page_and_type(page, d, PGT_l3_page_table) )
+                BUG();
+            set_bit(_PGT_pinned, &page->u.inuse.type_info);
+            break;
+        case 1 ... 4:
+            page->u.inuse.type_info &= ~PGT_type_mask;
+            page->u.inuse.type_info |= PGT_l2_page_table;
+            page->u.inuse.type_info |=
+                (count-1) << PGT_va_shift;
+            get_page(page, d); /* an extra ref because of readable mapping */
+            break;
+        default:
+            page->u.inuse.type_info &= ~PGT_type_mask;
+            page->u.inuse.type_info |= PGT_l1_page_table;
+            page->u.inuse.type_info |= 
+                ((dsi.v_start>>L2_PAGETABLE_SHIFT)+(count-5))<<PGT_va_shift;
+            get_page(page, d); /* an extra ref because of readable mapping */
+            break;
+        }
+#else
         if ( count == 0 )
         {
             page->u.inuse.type_info &= ~PGT_type_mask;
@@ -326,8 +382,9 @@ int construct_dom0(struct domain *d,
              */
             get_page(page, d); /* an extra ref because of readable mapping */
         }
+#endif
         if ( !((unsigned long)++l1tab & (PAGE_SIZE - 1)) )
-            l1start = l1tab = (l1_pgentry_t *)l2e_get_phys(*++l2tab);
+            l1start = l1tab = (l1_pgentry_t *)(u32)l2e_get_phys(*++l2tab);
     }
 
 #elif defined(__x86_64__)
@@ -538,10 +595,8 @@ int construct_dom0(struct domain *d,
 
 #if defined(__i386__)
     /* Destroy low mappings - they were only for our convenience. */
-    for ( i = 0; i < DOMAIN_ENTRIES_PER_L2_PAGETABLE; i++ )
-        if ( l2e_get_flags(l2start[i]) & _PAGE_PSE )
-            l2start[i] = l2e_empty();
-    zap_low_mappings(); /* Do the same for the idle page tables. */
+    zap_low_mappings(l2start);
+    zap_low_mappings(idle_pg_table_l2);
 #endif
     
     /* DOM0 gets access to everything. */
@@ -558,6 +613,12 @@ int construct_dom0(struct domain *d,
                                : SHM_enable));
         if ( opt_dom0_translate )
         {
+#if defined(__i386__) && defined(CONFIG_X86_PAE)
+            printk("FIXME: PAE code needed here: %s:%d (%s)\n",
+                   __FILE__, __LINE__, __FUNCTION__);
+            for ( ; ; )
+                __asm__ __volatile__ ( "hlt" );
+#else
             /* Hmm, what does this?
                Looks like isn't portable across 32/64 bit and pae/non-pae ...
                -- kraxel */
@@ -573,13 +634,14 @@ int construct_dom0(struct domain *d,
             // so that we can easily access it.
             //
             ASSERT( root_get_value(idle_pg_table[1]) == 0 );
-            ASSERT( pagetable_val(d->arch.phys_table) );
+            ASSERT( pagetable_get_phys(d->arch.phys_table) );
             idle_pg_table[1] = root_create_phys(
-                pagetable_val(d->arch.phys_table), __PAGE_HYPERVISOR);
+                pagetable_get_phys(d->arch.phys_table), __PAGE_HYPERVISOR);
             translate_l2pgtable(d, (l1_pgentry_t *)(1u << L2_PAGETABLE_SHIFT),
                                 pagetable_get_pfn(ed->arch.guest_table));
             idle_pg_table[1] = root_empty();
             local_flush_tlb();
+#endif
         }
 
         update_pagetables(ed); /* XXX SMP */

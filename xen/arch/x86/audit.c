@@ -408,9 +408,9 @@ int audit_adjust_pgtables(struct domain *d, int dir, int noisy)
 
         for_each_exec_domain(d, ed)
         {
-            if ( pagetable_val(ed->arch.guest_table) )
+            if ( pagetable_get_phys(ed->arch.guest_table) )
                 adjust(&frame_table[pagetable_get_pfn(ed->arch.guest_table)], 1);
-            if ( pagetable_val(ed->arch.shadow_table) )
+            if ( pagetable_get_phys(ed->arch.shadow_table) )
                 adjust(&frame_table[pagetable_get_pfn(ed->arch.shadow_table)], 0);
             if ( ed->arch.monitor_shadow_ref )
                 adjust(&frame_table[ed->arch.monitor_shadow_ref], 0);

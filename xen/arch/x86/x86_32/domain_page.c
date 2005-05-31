@@ -72,7 +72,7 @@ void *map_domain_mem(unsigned long pa)
             shadow_epoch[cpu] = ++epoch;
         }
     }
-    while ( l1e_get_value(cache[idx]) != 0 );
+    while ( l1e_get_flags(cache[idx]) & _PAGE_PRESENT );
 
     cache[idx] = l1e_create_phys(pa, __PAGE_HYPERVISOR);
 

@@ -87,7 +87,7 @@ extern unsigned long cpu0_stack[];
 
 struct cpuinfo_x86 boot_cpu_data = { 0, 0, 0, 0, -1, 1, 0, 0, -1 };
 
-#if defined(CONFIG_X86_64)
+#if CONFIG_PAGING_LEVELS > 2
 unsigned long mmu_cr4_features = X86_CR4_PSE | X86_CR4_PGE | X86_CR4_PAE;
 #else
 unsigned long mmu_cr4_features = X86_CR4_PSE | X86_CR4_PGE;

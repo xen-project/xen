@@ -119,12 +119,6 @@ struct arch_exec_domain
     unsigned long shadow_ldt_mapcnt;
 } __cacheline_aligned;
 
-#define IDLE0_ARCH_EXEC_DOMAIN                                      \
-{                                                                   \
-    perdomain_ptes: 0,                                              \
-    monitor_table:  mk_pagetable(__pa(idle_pg_table))               \
-}
-
 #endif /* __ASM_DOMAIN_H__ */
 
 /*

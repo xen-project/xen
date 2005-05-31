@@ -76,15 +76,15 @@ struct pfn_info
  /* Owning guest has pinned this page to its current type? */
 #define _PGT_pinned         27
 #define PGT_pinned          (1U<<_PGT_pinned)
- /* The 10 most significant bits of virt address if this is a page table. */
-#define PGT_va_shift        17
-#define PGT_va_mask         (((1U<<10)-1)<<PGT_va_shift)
+ /* The 11 most significant bits of virt address if this is a page table. */
+#define PGT_va_shift        16
+#define PGT_va_mask         (((1U<<11)-1)<<PGT_va_shift)
  /* Is the back pointer still mutable (i.e. not fixed yet)? */
-#define PGT_va_mutable      (((1U<<10)-1)<<PGT_va_shift)
+#define PGT_va_mutable      (((1U<<11)-1)<<PGT_va_shift)
  /* Is the back pointer unknown (e.g., p.t. is mapped at multiple VAs)? */
-#define PGT_va_unknown      (((1U<<10)-2)<<PGT_va_shift)
- /* 17-bit count of uses of this frame as its current type. */
-#define PGT_count_mask      ((1U<<17)-1)
+#define PGT_va_unknown      (((1U<<11)-2)<<PGT_va_shift)
+ /* 16-bit count of uses of this frame as its current type. */
+#define PGT_count_mask      ((1U<<16)-1)
 
 #define PGT_mfn_mask        ((1U<<20)-1) /* mfn mask for shadow types */
 

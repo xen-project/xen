@@ -7,6 +7,19 @@
 #ifndef __X86_CONFIG_H__
 #define __X86_CONFIG_H__
 
+#if defined(__i386__)
+// # define CONFIG_X86_PAE 1   /* yes */
+ # undef CONFIG_X86_PAE      /* no  */
+#endif
+
+#if defined(__x86_64__)
+# define CONFIG_PAGING_LEVELS 4
+#elif defined(CONFIG_X86_PAE)
+# define CONFIG_PAGING_LEVELS 3
+#else
+# define CONFIG_PAGING_LEVELS 2
+#endif
+
 #define CONFIG_X86 1
 #define CONFIG_X86_HT 1
 #define CONFIG_SHADOW 1
@@ -189,7 +202,7 @@ extern unsigned long _end; /* standard ELF symbol */
  *  Per-domain mappings                                  ( 4MB)
  *  Shadow linear pagetable                              ( 4MB) ( 8MB)
  *  Guest linear pagetable                               ( 4MB) ( 8MB)
- *  Machine-to-physical translation table [writable]     ( 4MB)
+ *  Machine-to-physical translation table [writable]     ( 4MB) (16MB)
  *  Frame-info table                                     (24MB) (96MB)
  *   * Start of guest inaccessible area
  *  Machine-to-physical translation table [read-only]    ( 4MB)
@@ -203,8 +216,8 @@ extern unsigned long _end; /* standard ELF symbol */
 
 #ifdef CONFIG_X86_PAE
 # define LINEARPT_MBYTES         8
-# define MACHPHYS_MBYTES         4 /* KAF: This needs to be bigger */
-# define FRAMETABLE_MBYTES	96 /* 16 GB mem limit (total)      */
+# define MACHPHYS_MBYTES        16 /* 1 MB needed per 1 GB memory */
+# define FRAMETABLE_MBYTES (MACHPHYS_MBYTES * 6)
 #else
 # define LINEARPT_MBYTES         4
 # define MACHPHYS_MBYTES         4
@@ -237,21 +250,21 @@ extern unsigned long _end; /* standard ELF symbol */
 #define GUEST_SEGMENT_MAX_ADDR  RO_MPT_VIRT_END
 
 #ifdef CONFIG_X86_PAE
-/* Hypervisor owns top 144MB of virtual address space. */
-# define __HYPERVISOR_VIRT_START  0xF7000000
-# define HYPERVISOR_VIRT_START   (0xF7000000UL)
+/* Hypervisor owns top 168MB of virtual address space. */
+# define __HYPERVISOR_VIRT_START  0xF5800000
+# define HYPERVISOR_VIRT_START   (0xF5800000UL)
 #else
 /* Hypervisor owns top 64MB of virtual address space. */
 # define __HYPERVISOR_VIRT_START  0xFC000000
 # define HYPERVISOR_VIRT_START   (0xFC000000UL)
 #endif
 
-#define ROOT_PAGETABLE_FIRST_XEN_SLOT \
+#define L2_PAGETABLE_FIRST_XEN_SLOT \
     (HYPERVISOR_VIRT_START >> L2_PAGETABLE_SHIFT)
-#define ROOT_PAGETABLE_LAST_XEN_SLOT  \
+#define L2_PAGETABLE_LAST_XEN_SLOT  \
     (~0UL >> L2_PAGETABLE_SHIFT)
-#define ROOT_PAGETABLE_XEN_SLOTS \
-    (ROOT_PAGETABLE_LAST_XEN_SLOT - ROOT_PAGETABLE_FIRST_XEN_SLOT + 1)
+#define L2_PAGETABLE_XEN_SLOTS \
+    (L2_PAGETABLE_LAST_XEN_SLOT - L2_PAGETABLE_FIRST_XEN_SLOT + 1)
 
 #define PGT_base_page_table PGT_l2_page_table
 
