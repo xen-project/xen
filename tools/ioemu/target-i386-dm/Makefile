@@ -304,7 +304,9 @@ VL_LDFLAGS=
 ifdef CONFIG_STATIC
 VL_LDFLAGS+=-static
 endif
+ifeq ($(XEN_TARGET_ARCH),x86_32)
 VL_LDFLAGS+=-Wl,-T,$(SRC_PATH)/$(XEN_TARGET_ARCH).ld
+endif
 ifndef CONFIG_DARWIN
 ifndef CONFIG_WIN32
 VL_LIBS=-lutil

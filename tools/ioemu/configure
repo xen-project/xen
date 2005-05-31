@@ -338,7 +338,7 @@ if test -z "$prefix" ; then
     prefix="usr/local"
 fi
 mandir="$installroot/$prefix/share/man"
-datadir="$installroot/$prefix/share/qemu"
+datadir="$installroot/$prefix/share/xen/qemu"
 docdir="$installroot/$prefix/share/doc/qemu"
 bindir="$installroot/$prefix/bin"
 configdir="$installroot/etc/xen"
