@@ -192,28 +192,6 @@ def vm_recreate(savedinfo, info):
     vm.savedinfo = None
     return vm
 
-def vm_restore(src, progress=False):
-    """Restore a VM from a disk image.
-
-    src      saved state to restore
-    progress progress reporting flag
-    raises   VmError for invalid configuration
-    """
-    vm = XendDomainInfo()
-    ostype = "linux" #todo Set from somewhere (store in the src?).
-    restorefn = getattr(xc, "%s_restore" % ostype)
-    d = restorefn(state_file=src, progress=progress)
-    dom = int(d['dom'])
-    if dom < 0:
-        raise VmError('restore failed')
-    try:
-        vmconfig = sxp.from_string(d['vmconfig'])
-        config = sxp.child_value(vmconfig, 'config')
-    except Exception, ex:
-        raise VmError('config error: ' + str(ex))
-    vm.dom_construct(dom, config)
-    return vm
-    
 def dom_get(dom):
     """Get info from xen for an existing domain.
 
