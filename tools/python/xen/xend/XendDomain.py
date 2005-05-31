@@ -312,8 +312,7 @@ class XendDomain:
         @param vmconfig: vm configuration
         """
         config = sxp.child_value(vmconfig, 'config')
-        dominfo = XendDomainInfo.tmp_restore_create_domain()
-        dominfo.dom_construct(dominfo.dom, config)
+        dominfo = XendDomainInfo.vm_restore(config)
         self._add_domain(dominfo)
         return dominfo
     

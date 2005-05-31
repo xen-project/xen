@@ -153,11 +153,14 @@ def vm_create(config):
     vm.construct(config)
     return vm
 
-def tmp_restore_create_domain():
-    # dom input parameter is ignored
+def vm_restore(config):
+    """Create a domain and a VM object to do a restore.
+
+    @param config:    domain configuration
+    """
     vm = XendDomainInfo()
     dom = xc.domain_create()
-    vm.setdom(dom)
+    vm.dom_construct(dom, config)
     return vm
 
 def vm_recreate(savedinfo, info):
