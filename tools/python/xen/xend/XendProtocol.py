@@ -7,6 +7,8 @@ import types
 from encode import *
 import sxp
 
+from xen.xend import XendRoot; xroot = XendRoot.instance()
+
 DEBUG = 0
 
 HTTP_OK                              = 200
@@ -179,11 +181,9 @@ class UnixXendClientProtocol(HttpXendClientProtocol):
     """A synchronous xend client using a unix-domain socket.
     """
 
-    XEND_PATH_DEFAULT = '/var/lib/xend/xend-socket'
-    
     def __init__(self, path=None):
         if path is None:
-            path = self.XEND_PATH_DEFAULT
+            path = xroot.get_xend_unix_path()
         self.path = path
 
     def makeConnection(self, url):
