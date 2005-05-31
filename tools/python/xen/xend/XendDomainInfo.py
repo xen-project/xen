@@ -230,7 +230,6 @@ class XendDomainInfo:
         self.configs = []
         
         self.info = None
-        self.ipaddrs = []
         self.blkif_backend = False
         self.netif_backend = False
         #todo: state: running, suspended
@@ -616,7 +615,6 @@ class XendDomainInfo:
             ctrl.destroyController(reboot=reboot)
         if not reboot:
             self.configs = []
-            self.ipaddrs = []
 
     def show(self):
         """Print virtual machine info.
