@@ -26,6 +26,7 @@
 #define GRANT_DEBUG_VERBOSE 0
 
 #include <xen/config.h>
+#include <xen/lib.h>
 #include <xen/sched.h>
 #include <xen/shadow.h>
 #include <xen/mm.h>

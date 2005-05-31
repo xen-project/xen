@@ -5,6 +5,7 @@
 #include <stdarg.h>
 #include <xen/config.h>
 #include <xen/types.h>
+#include <xen/slab.h>
 #include <xen/string.h>
 
 #define BUG() do {					\

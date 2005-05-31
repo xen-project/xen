@@ -3,6 +3,7 @@
 #include <xen/kernel.h>
 #include <xen/string.h>
 #include <xen/init.h>
+#include <xen/cache.h>
 #include <xen/slab.h>
 #include <xen/acpi.h>
 #include <asm/io.h>

@@ -10,6 +10,7 @@
 #include <xen/sched.h>
 #include <xen/errno.h>
 #include <xen/sched.h>
+#include <xen/domain.h>
 #include <xen/mm.h>
 #include <xen/event.h>
 #include <xen/time.h>
@@ -221,6 +222,68 @@ void domain_destruct(struct domain *d)
     free_domain_struct(d);
 
     send_guest_virq(dom0->exec_domain[0], VIRQ_DOM_EXC);
+}
+
+void exec_domain_pause(struct exec_domain *ed)
+{
+    ASSERT(ed != current);
+    atomic_inc(&ed->pausecnt);
+    domain_sleep(ed);
+    sync_lazy_execstate_cpuset(ed->domain->cpuset & (1UL << ed->processor));
+}
+
+void domain_pause(struct domain *d)
+{
+    struct exec_domain *ed;
+
+    for_each_exec_domain( d, ed )
+    {
+        ASSERT(ed != current);
+        atomic_inc(&ed->pausecnt);
+        domain_sleep(ed);
+    }
+
+    sync_lazy_execstate_cpuset(d->cpuset);
+}
+
+void exec_domain_unpause(struct exec_domain *ed)
+{
+    ASSERT(ed != current);
+    if ( atomic_dec_and_test(&ed->pausecnt) )
+        domain_wake(ed);
+}
+
+void domain_unpause(struct domain *d)
+{
+    struct exec_domain *ed;
+
+    for_each_exec_domain( d, ed )
+        exec_domain_unpause(ed);
+}
+
+void domain_pause_by_systemcontroller(struct domain *d)
+{
+    struct exec_domain *ed;
+
+    for_each_exec_domain ( d, ed )
+    {
+        ASSERT(ed != current);
+        if ( !test_and_set_bit(_VCPUF_ctrl_pause, &ed->vcpu_flags) )
+            domain_sleep(ed);
+    }
+
+    sync_lazy_execstate_cpuset(d->cpuset);
+}
+
+void domain_unpause_by_systemcontroller(struct domain *d)
+{
+    struct exec_domain *ed;
+
+    for_each_exec_domain ( d, ed )
+    {
+        if ( test_and_clear_bit(_VCPUF_ctrl_pause, &ed->vcpu_flags) )
+            domain_wake(ed);
+    }
 }
 
 

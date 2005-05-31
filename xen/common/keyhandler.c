@@ -10,6 +10,7 @@
 #include <xen/serial.h>
 #include <xen/sched.h>
 #include <xen/softirq.h>
+#include <xen/domain.h>
 #include <asm/debugger.h>
 
 #define KEY_MAX 256
