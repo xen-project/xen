@@ -24,7 +24,6 @@ from xen.xend import PrettyPrint
 from xen.xend import EventServer; eserver = EventServer.instance()
 from xen.xend.XendError import XendError
 from xen.xend.server import SrvServer
-from xen.xend import XendRoot
 from xen.xend.XendLogging import log
 
 import channel
@@ -299,7 +298,6 @@ class Daemon:
 
     def run(self):
         try:
-            xroot = XendRoot.instance()
             log.info("Xend Daemon started")
             self.createFactories()
             event.listenEvent(self)
