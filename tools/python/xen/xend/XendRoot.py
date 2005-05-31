@@ -138,7 +138,7 @@ class XendRoot:
         @param fmt: message format
         @param args: arguments
         """
-        self._log('info', fmt, args)
+        self._log('debug', fmt, args)
         
     def logInfo(self, fmt, *args):
         """Log an info message.
