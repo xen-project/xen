@@ -288,7 +288,7 @@ class XendRoot:
         return self.get_config_value('xend-address', self.xend_address_default)
 
     def get_xend_relocation_address(self):
-        """Get the address xend listens at for its HTTP and event ports.
+        """Get the address xend listens at for its relocation server port.
         This defaults to the empty string which allows all hosts to connect.
         If this is set to 'localhost' only the localhost will be able to connect
         to the HTTP and event ports.
