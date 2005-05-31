@@ -21,6 +21,7 @@
 
 #include <stdarg.h>
 
+#include <linux/cpu.h>
 #include <linux/errno.h>
 #include <linux/sched.h>
 #include <linux/kernel.h>
@@ -84,27 +85,47 @@ void enable_hlt(void)
 EXPORT_SYMBOL(enable_hlt);
 
 /* XXX XEN doesn't use default_idle(), poll_idle(). Use xen_idle() instead. */
-extern int set_timeout_timer(void);
+extern void stop_hz_timer(void);
+extern void start_hz_timer(void);
 void xen_idle(void)
 {
-	int cpu;	
-
 	local_irq_disable();
-
-	cpu = smp_processor_id();
-	if (rcu_pending(cpu))
-		rcu_check_callbacks(cpu, 0);
 
 	if (need_resched()) {
 		local_irq_enable();
-	} else if (set_timeout_timer() == 0) {
-		/* NB. Blocking reenable events in a race-free manner. */
-		HYPERVISOR_block();
 	} else {
-		local_irq_enable();
-		HYPERVISOR_yield();
+		stop_hz_timer();
+		HYPERVISOR_block(); /* implicit local_irq_enable() */
+		start_hz_timer();
 	}
 }
+
+#ifdef CONFIG_HOTPLUG_CPU
+#include <asm/nmi.h>
+/* We don't actually take CPU down, just spin without interrupts. */
+static inline void play_dead(void)
+{
+	/* Ack it */
+	__get_cpu_var(cpu_state) = CPU_DEAD;
+
+	/* We shouldn't have to disable interrupts while dead, but
+	 * some interrupts just don't seem to go away, and this makes
+	 * it "work" for testing purposes. */
+	/* Death loop */
+	while (__get_cpu_var(cpu_state) != CPU_UP_PREPARE)
+		HYPERVISOR_yield();
+
+	local_irq_disable();
+	__flush_tlb_all();
+	cpu_set(smp_processor_id(), cpu_online_map);
+	local_irq_enable();
+}
+#else
+static inline void play_dead(void)
+{
+	BUG();
+}
+#endif /* CONFIG_HOTPLUG_CPU */
 
 /*
  * The idle thread. There's no useful work to be
@@ -122,6 +143,9 @@ void cpu_idle (void)
 			if (cpu_isset(cpu, cpu_idle_map))
 				cpu_clear(cpu, cpu_idle_map);
 			rmb();
+			
+			if (cpu_is_offline(cpu))
+				play_dead();
 
                         __IRQ_STAT(cpu,idle_timestamp) = jiffies;
 			xen_idle();
@@ -129,6 +153,22 @@ void cpu_idle (void)
 		schedule();
 	}
 }
+
+void cpu_idle_wait(void)
+{
+	int cpu;
+	cpumask_t map;
+
+	for_each_online_cpu(cpu)
+		cpu_set(cpu, cpu_idle_map);
+
+	wmb();
+	do {
+		ssleep(1);
+		cpus_and(map, cpu_idle_map, cpu_online_map);
+	} while (!cpus_empty(map));
+}
+EXPORT_SYMBOL_GPL(cpu_idle_wait);
 
 /* XXX XEN doesn't use mwait_idle(), select_idle_routine(), idle_setup(). */
 /* Always use xen_idle() instead. */
