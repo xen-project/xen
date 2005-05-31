@@ -376,7 +376,7 @@ kernel containing only virtual device drivers.
 %% it will then add the Xen architecture files.  You can tell the
 %% makefile the location of the appropriate Linux compressed tar file by
 %% setting the LINUX\_SRC environment variable, e.g. \\
-%% \verb!# LINUX_SRC=/tmp/linux-2.6.9.tar.bz2 make world! \\ or by
+%% \verb!# LINUX_SRC=/tmp/linux-2.6.11.tar.bz2 make world! \\ or by
 %% placing the tar file somewhere in the search path of {\tt
 %% LINUX\_SRC\_PATH} which defaults to `{\tt .:..}'.  If the makefile
 %% can't find a suitable kernel tar file it attempts to download it from
@@ -407,7 +407,7 @@ use the standard Linux configuration mechanisms, specifying that the
 architecture being built for is \path{xen}, e.g:
 \begin{quote}
 \begin{verbatim} 
-# cd linux-2.6.9-xen0 
+# cd linux-2.6.11-xen0 
 # make ARCH=xen xconfig 
 # cd ..
 # make
@@ -415,7 +415,7 @@ architecture being built for is \path{xen}, e.g:
 \end{quote} 
 
 You can also copy an existing Linux configuration (\path{.config}) 
-into \path{linux-2.6.9-xen0} and execute:  
+into \path{linux-2.6.11-xen0} and execute:  
 \begin{quote}
 \begin{verbatim} 
 # make ARCH=xen oldconfig 
@@ -453,15 +453,15 @@ destinations.
 
 %% Files in \path{install/boot/} include:
 %% \begin{itemize}
-%% \item \path{install/boot/xen.gz} The Xen 'kernel'
-%% \item \path{install/boot/vmlinuz-2.6.9-xen0}  Domain 0 XenLinux kernel
-%% \item \path{install/boot/vmlinuz-2.6.9-xenU}  Unprivileged XenLinux kernel
+%% \item \path{install/boot/xen-2.0.gz} Link to the Xen 'kernel'
+%% \item \path{install/boot/vmlinuz-2.6-xen0}  Link to domain 0 XenLinux kernel
+%% \item \path{install/boot/vmlinuz-2.6-xenU}  Link to unprivileged XenLinux kernel
 %% \end{itemize}
 
 The \path{dist/install/boot} directory will also contain the config files
 used for building the XenLinux kernels, and also versions of Xen and
-XenLinux kernels that contain debug symbols (\path{xen-syms} and
-\path{vmlinux-syms-2.6.9-xen0}) which are essential for interpreting crash
+XenLinux kernels that contain debug symbols (\path{xen-syms-2.0.6} and
+\path{vmlinux-syms-2.6.11.11-xen0}) which are essential for interpreting crash
 dumps.  Retain these files as the developers may wish to see them if
 you post on the mailing list.
 
@@ -483,9 +483,9 @@ distribution.  The entry should look something like the following:
 
 {\small
 \begin{verbatim}
-title Xen 2.0 / XenLinux 2.6.9
-  kernel /boot/xen.gz dom0_mem=131072
-  module /boot/vmlinuz-2.6.9-xen0 root=/dev/sda4 ro console=tty0
+title Xen 2.0 / XenLinux 2.6
+  kernel /boot/xen-2.0.gz dom0_mem=131072
+  module /boot/vmlinuz-2.6-xen0 root=/dev/sda4 ro console=tty0
 \end{verbatim}
 }
 
@@ -524,8 +524,8 @@ have problems.
 
 \subsection{Serial Console (optional)}
 
-%%   kernel /boot/xen.gz dom0_mem=131072 com1=115200,8n1
-%%   module /boot/vmlinuz-2.6.9-xen0 root=/dev/sda4 ro 
+%%   kernel /boot/xen-2.0.gz dom0_mem=131072 com1=115200,8n1
+%%   module /boot/vmlinuz-2.6-xen0 root=/dev/sda4 ro 
 
 
 In order to configure Xen serial console output, it is necessary to add 
@@ -654,7 +654,7 @@ Typical values you may wish to edit include:
 \begin{quote}
 \begin{description}
 \item[kernel] Set this to the path of the kernel you compiled for use
-              with Xen (e.g.\  \path{kernel = '/boot/vmlinuz-2.6.9-xenU'})
+              with Xen (e.g.\  \path{kernel = '/boot/vmlinuz-2.6-xenU'})
 \item[memory] Set this to the size of the domain's memory in
 megabytes (e.g.\ \path{memory = 64})
 \item[disk] Set the first entry in this list to calculate the offset
@@ -717,7 +717,7 @@ section of the project's SourceForge site (see
 \path{http://sf.net/projects/xen/}).
 \item Create a configuration file like the following:
 \begin{verbatim}
-kernel = "/boot/vmlinuz-2.6.9-xenU"
+kernel = "/boot/vmlinuz-2.6-xenU"
 memory = 64
 name = "ttylinux"
 nics = 1

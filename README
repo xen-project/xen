@@ -50,16 +50,16 @@ performed with root privileges.]
    alternatives such as LILO are *not* supported. You can most likely
    find your GRUB menu file at /boot/grub/menu.lst: edit this file to
    include an entry like the following:
-    # title Xen 2.0 / XenLinux 2.6.9
-    #   kernel /boot/xen.gz dom0_mem=<mem-kb> console=vga
-    #   module /boot/vmlinuz-2.6.9-xen0 root=<root-dev> ro console=tty0
+    # title Xen 2.0 / XenLinux 2.6
+    #   kernel /boot/xen-2.0.gz dom0_mem=<mem-kb> console=vga
+    #   module /boot/vmlinuz-2.6-xen0 root=<root-dev> ro console=tty0
    For <mem-kb> you should specify the amount of memory, in kilobytes,
    to allocate for use by your initial XenLinux virtual machine. Note
    that Xen itself reserves about 32MB memory for internal use, which
    is not available for allocation to virtual machines.
    For <root-dev>, specify your usual root partition (e.g., /dev/hda1).
 
-3. Reboot your system and select the "Xen 2.0 / XenLinux 2.6.9" menu
+3. Reboot your system and select the "Xen 2.0 / XenLinux 2.6" menu
    option. After booting Xen, XenLinux will start and your
    initialisation scripts should execute in the usual way.
 
