@@ -8,6 +8,7 @@
 import errno
 import os
 import scheduler
+import string
 import sys
 import traceback
 import time
@@ -357,9 +358,6 @@ class XendDomain:
         except Exception, ex:
             log.exception("Error creating domain info: id=%s", name)
 
-    def domain_exists(self, name):
-        return self.domain_lookup(name) != None
-
     def domain_unpause(self, id):
         """Unpause domain execution.
 
@@ -514,7 +512,17 @@ class XendDomain:
         port = xroot.get_xend_relocation_port()
         sock = relocate.setupRelocation(dst, port)
 
-        XendCheckpoint.save(self, sock.fileno(), dominfo)
+        # temporarily rename domain for localhost migration
+        if dst == "localhost":
+            dominfo.name = "tmp-" + dominfo.name
+
+        try:
+            XendCheckpoint.save(self, sock.fileno(), dominfo)
+        except:
+            if dst == "localhost":
+                dominfo.name = string.replace(dominfo.name, "tmp-", "", 1)
+            raise
+        
         return None
 
     def domain_save(self, id, dst, progress=False):
