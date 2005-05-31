@@ -223,6 +223,7 @@ void __init early_cpu_detect(void)
 		c->x86_mask = tfms & 15;
 		if (cap0 & (1<<19))
 			c->x86_cache_alignment = ((misc >> 8) & 0xff) * 8;
+		c->x86_capability[0] = cap0; /* Added for Xen bootstrap */
 	}
 
 	early_intel_workaround(c);

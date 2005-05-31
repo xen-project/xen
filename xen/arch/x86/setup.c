@@ -85,7 +85,7 @@ extern void early_cpu_init(void);
 
 extern unsigned long cpu0_stack[];
 
-struct cpuinfo_x86 boot_cpu_data = { 0, 0, 0, 0, -1 };
+struct cpuinfo_x86 boot_cpu_data = { 0, 0, 0, 0, -1, 1, 0, 0, -1 };
 
 #if defined(CONFIG_X86_64)
 unsigned long mmu_cr4_features = X86_CR4_PSE | X86_CR4_PGE | X86_CR4_PAE;
@@ -144,6 +144,8 @@ static void __init start_of_day(void)
 {
     int i;
 
+    early_cpu_init();
+
     /* Unmap the first page of CPU0's stack. */
     memguard_guard_stack(cpu0_stack);
 
@@ -160,14 +162,6 @@ static void __init start_of_day(void)
     map_pages_to_xen(
         GDT_VIRT_START(current) + FIRST_RESERVED_GDT_BYTE,
         virt_to_phys(gdt_table) >> PAGE_SHIFT, 1, PAGE_HYPERVISOR);
-
-    /* Process CPU type information. */
-    early_cpu_init();
-    identify_cpu(&boot_cpu_data);
-    if ( cpu_has_fxsr )
-        set_in_cr4(X86_CR4_OSFXSR);
-    if ( cpu_has_xmm )
-        set_in_cr4(X86_CR4_OSXMMEXCPT);
 
     find_smp_config();
 
@@ -198,6 +192,12 @@ static void __init start_of_day(void)
     arch_init_memory();
 
     scheduler_init();	
+
+    identify_cpu(&boot_cpu_data);
+    if ( cpu_has_fxsr )
+        set_in_cr4(X86_CR4_OSFXSR);
+    if ( cpu_has_xmm )
+        set_in_cr4(X86_CR4_OSXMMEXCPT);
 
     if ( opt_nosmp )
         max_cpus = 0;
