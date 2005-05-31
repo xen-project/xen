@@ -88,7 +88,7 @@ void serial_puts(int handle, const char *s)
 char serial_getc(int handle)
 {
     struct serial_port *port = &com[handle & SERHND_IDX];
-    unsigned char c;
+    char c;
     unsigned long flags;
 
     if ( (handle == -1) || !port->driver || !port->driver->getc )
