@@ -102,7 +102,7 @@ Here's the full config for a vm on vnet 97, using ip addr 10.0.0.12:
  (console '8502')
  (image
   (linux
-   (kernel /boot/vmlinuz-2.6.9-xenU)
+   (kernel /boot/vmlinuz-2.6-xenU)
    (ip 10.0.0.12:1.2.3.4::::eth0:off)
    (root /dev/hda1)
    (args 'rw fastboot 4')
@@ -121,7 +121,7 @@ If you run another vm on the same vnet:
  (console '8501')
  (image
   (linux
-   (kernel /boot/vmlinuz-2.6.9-xenU)
+   (kernel /boot/vmlinuz-2.6-xenU)
    (ip 10.0.0.11:1.2.3.4::::eth0:off)
    (root /dev/hda1)
    (args 'rw fastboot 4')
