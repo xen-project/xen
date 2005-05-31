@@ -93,38 +93,6 @@ def shutdown_reason(code):
     """
     return shutdown_reasons.get(code, "?")
 
-def vif_up(iplist):
-    """send an unsolicited ARP reply for all non link-local IP addresses.
-
-    @param iplist: IP addresses
-    """
-
-    IP_NONLOCAL_BIND = '/proc/sys/net/ipv4/ip_nonlocal_bind'
-    
-    def get_ip_nonlocal_bind():
-        return int(open(IP_NONLOCAL_BIND, 'r').read()[0])
-
-    def set_ip_nonlocal_bind(v):
-        print >> open(IP_NONLOCAL_BIND, 'w'), str(v)
-
-    def link_local(ip):
-        return xen.util.ip.check_subnet(ip, '169.254.0.0', '255.255.0.0')
-
-    def arping(ip, gw):
-        cmd = '/usr/sbin/arping -A -b -I eth0 -c 1 -s %s %s' % (ip, gw)
-        log.debug(cmd)
-        os.system(cmd)
-        
-    gateway = xen.util.ip.get_current_ipgw() or '255.255.255.255'
-    nlb = get_ip_nonlocal_bind()
-    if not nlb: set_ip_nonlocal_bind(1)
-    try:
-        for ip in iplist:
-            if not link_local(ip):
-                arping(ip, gateway)
-    finally:
-        if not nlb: set_ip_nonlocal_bind(0)
-
 config_handlers = {}
 
 def add_config_handler(name, h):
@@ -244,7 +212,6 @@ def vm_restore(src, progress=False):
     except Exception, ex:
         raise VmError('config error: ' + str(ex))
     vm.dom_construct(dom, config)
-    vif_up(vm.ipaddrs)
     return vm
     
 def dom_get(dom):
