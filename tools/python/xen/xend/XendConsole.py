@@ -1,13 +1,5 @@
 # Copyright (C) 2004 Mike Wray <mike.wray@hp.com>
 
-import socket
-import xen.lowlevel.xc
-xc = xen.lowlevel.xc.new()
-
-import sxp
-import XendRoot
-xroot = XendRoot.instance()
-import XendDB
 from XendError import XendError
 
 import EventServer
