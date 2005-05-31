@@ -40,6 +40,13 @@ typedef l2_pgentry_t root_pgentry_t;
 #define is_guest_l1_slot(_s)    (1)
 #define is_guest_l2_slot(_t,_s) ((_s) < L2_PAGETABLE_FIRST_XEN_SLOT)
 
+/*
+ * PTE pfn and flags:
+ *  20-bit pfn   = (pte[31:12])
+ *  12-bit flags = (pte[11:0])
+ */
+
+/* Extract flags into 12-bit integer, or turn 12-bit flags into a pte mask. */
 #define get_pte_flags(x) ((int)(x) & 0xFFF)
 #define put_pte_flags(x) ((intpte_t)(x))
 

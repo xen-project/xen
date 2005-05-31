@@ -18,7 +18,7 @@
 
 #define __PAGE_OFFSET           (0xFFFF830000000000)
 
-/* These are page-table limitations. Current CPUs support only 40-bit phys. */
+/* These are architectural limits. Current CPUs support only 40-bit phys. */
 #define PADDR_BITS              52
 #define VADDR_BITS              48
 #define PADDR_MASK              ((1UL << PADDR_BITS)-1)
@@ -58,10 +58,18 @@ typedef l4_pgentry_t root_pgentry_t;
 #define root_create_phys          l4e_create_phys
 #define PGT_root_page_table PGT_l4_page_table
 
-#define get_pte_flags(x) ((int)((x) >> 40) | ((int)(x) & 0xFFF))
-#define put_pte_flags(x) ((((intpte_t)((x) & ~0xFFF)) << 40) | ((x) & 0xFFF))
+/*
+ * PTE pfn and flags:
+ *  40-bit pfn   = (pte[51:12])
+ *  24-bit flags = (pte[63:52],pte[11:0])
+ */
 
-#define _PAGE_NX                (cpu_has_nx ? (1U<<23) : 0U)
+/* Extract flags into 24-bit integer, or turn 24-bit flags into a pte mask. */
+#define get_pte_flags(x) (((int)((x) >> 40) & ~0xFFF) | ((int)(x) & 0xFFF))
+#define put_pte_flags(x) (((intpte_t)((x) & ~0xFFF) << 40) | ((x) & 0xFFF))
+
+/* Bit 23 of a 24-bit flag mask. This corresponds to bit 63 of a pte.*/
+#define _PAGE_NX (cpu_has_nx ? (1U<<23) : 0U)
 
 #define L1_DISALLOW_MASK (0xFFFFF180U & ~_PAGE_NX) /* PAT/GLOBAL */
 #define L2_DISALLOW_MASK (0xFFFFF180U & ~_PAGE_NX) /* PSE/GLOBAL */

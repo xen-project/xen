@@ -13,7 +13,14 @@
 #define L3_PAGETABLE_ENTRIES    4
 #define ROOT_PAGETABLE_ENTRIES  L3_PAGETABLE_ENTRIES
 
-#define PADDR_BITS              52
+/*
+ * Architecturally, physical addresses may be up to 52 bits. However, the
+ * page-frame number (pfn) of a 52-bit address will not fit into a 32-bit
+ * word. Instead we treat bits 44-51 of a pte as flag bits which are never
+ * allowed to be set by a guest kernel. This 'limits' us to addressing 16TB
+ * of physical memory on a 32-bit PAE system.
+ */
+#define PADDR_BITS              44
 #define PADDR_MASK              ((1ULL << PADDR_BITS)-1)
 
 #ifndef __ASSEMBLY__
@@ -46,8 +53,15 @@ typedef l3_pgentry_t root_pgentry_t;
      ((_s) < (L2_PAGETABLE_FIRST_XEN_SLOT & (L2_PAGETABLE_ENTRIES-1))))
 #define is_guest_l3_slot(_s)    (1)
 
-#define get_pte_flags(x) ((int)((x) >> 40) | ((int)(x) & 0xFFF))
-#define put_pte_flags(x) ((((intpte_t)((x) & ~0xFFF)) << 40) | ((x) & 0xFFF))
+/*
+ * PTE pfn and flags:
+ *  32-bit pfn   = (pte[43:12])
+ *  32-bit flags = (pte[63:44],pte[11:0])
+ */
+
+/* Extract flags into 32-bit integer, or turn 32-bit flags into a pte mask. */
+#define get_pte_flags(x) (((int)((x) >> 32) & ~0xFFF) | ((int)(x) & 0xFFF))
+#define put_pte_flags(x) (((intpte_t)((x) & ~0xFFF) << 40) | ((x) & 0xFFF))
 
 #define L1_DISALLOW_MASK (0xFFFFF180U & ~_PAGE_NX) /* PAT/GLOBAL */
 #define L2_DISALLOW_MASK (0xFFFFF180U & ~_PAGE_NX) /* PSE/GLOBAL */
