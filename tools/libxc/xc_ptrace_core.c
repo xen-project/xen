@@ -1,7 +1,6 @@
 #include <sys/ptrace.h>
 #include <sys/wait.h>
 #include "xc_private.h"
-#include <asm/elf.h>
 #include <time.h>
 
 
@@ -258,7 +257,7 @@ xc_ptrace_core(enum __ptrace_request request, u32 domfd, long eaddr, long edata)
     case PTRACE_GETFPXREGS:
 	if (request == PTRACE_GETREGS) {
 		SET_PT_REGS(pt, ctxt[cpu].user_regs); 
-		memcpy(data, &pt, sizeof(elf_gregset_t));
+		memcpy(data, &pt, sizeof(struct gdb_regs));
 	} else if (request == PTRACE_GETFPREGS)
 	    memcpy(data, &ctxt[cpu].fpu_ctxt, sizeof(ctxt[cpu].fpu_ctxt));
 	else /*if (request == PTRACE_GETFPXREGS)*/
