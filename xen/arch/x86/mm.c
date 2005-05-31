@@ -962,7 +962,8 @@ static inline int update_l1e(l1_pgentry_t *pl1e,
     if ( unlikely(cmpxchg_user(pl1e, o, n) != 0) ||
          unlikely(o != l1e_get_value(ol1e)) )
     {
-        MEM_LOG("Failed to update %" PRIpte " -> %" PRIpte ": saw %" PRIpte "\n",
+        MEM_LOG("Failed to update %" PRIpte " -> %" PRIpte
+                ": saw %" PRIpte "\n",
                 l1e_get_value(ol1e),
                 l1e_get_value(nl1e),
                 o);
@@ -988,8 +989,8 @@ static int mod_l1_entry(l1_pgentry_t *pl1e, l1_pgentry_t nl1e)
     {
         if ( unlikely(l1e_get_flags(nl1e) & L1_DISALLOW_MASK) )
         {
-            MEM_LOG("Bad L1 type settings %" PRIpte "\n", 
-                    (l1e_get_value(nl1e) & L1_DISALLOW_MASK));
+            MEM_LOG("Bad L1 flags %x\n",
+                    l1e_get_flags(nl1e) & L1_DISALLOW_MASK);
             return 0;
         }
 
@@ -1049,8 +1050,8 @@ static int mod_l2_entry(l2_pgentry_t *pl2e,
     {
         if ( unlikely(l2e_get_flags(nl2e) & L2_DISALLOW_MASK) )
         {
-            MEM_LOG("Bad L2 type settings %" PRIpte "\n", 
-                    (l2e_get_value(nl2e) & L2_DISALLOW_MASK));
+            MEM_LOG("Bad L2 flags %x\n",
+                    l2e_get_flags(nl2e) & L2_DISALLOW_MASK);
             return 0;
         }
 
@@ -1104,8 +1105,8 @@ static int mod_l3_entry(l3_pgentry_t *pl3e,
     {
         if ( unlikely(l3e_get_flags(nl3e) & L3_DISALLOW_MASK) )
         {
-            MEM_LOG("Bad L3 type settings %" PRIpte "", 
-                    (u64)(l3e_get_value(nl3e) & L3_DISALLOW_MASK));
+            MEM_LOG("Bad L3 flags %x\n",
+                    l3e_get_flags(nl3e) & L3_DISALLOW_MASK);
             return 0;
         }
 
@@ -1161,8 +1162,8 @@ static int mod_l4_entry(l4_pgentry_t *pl4e,
     {
         if ( unlikely(l4e_get_flags(nl4e) & L4_DISALLOW_MASK) )
         {
-            MEM_LOG("Bad L4 type settings %lx", 
-                    l4e_get_value(nl4e) & L4_DISALLOW_MASK);
+            MEM_LOG("Bad L4 flags %x\n",
+                    l4e_get_flags(nl4e) & L4_DISALLOW_MASK);
             return 0;
         }
 
