@@ -196,8 +196,8 @@ void vmx_do_launch(struct exec_domain *ed)
     error |= __vmwrite(GUEST_TR_BASE, 0);
     error |= __vmwrite(GUEST_TR_LIMIT, 0xff);
 
-    __vmwrite(GUEST_CR3, pagetable_val(ed->arch.guest_table));
-    __vmwrite(HOST_CR3, pagetable_val(ed->arch.monitor_table));
+    __vmwrite(GUEST_CR3, pagetable_get_phys(ed->arch.guest_table));
+    __vmwrite(HOST_CR3, pagetable_get_phys(ed->arch.monitor_table));
     __vmwrite(HOST_ESP, (unsigned long)get_stack_bottom());
 
     ed->arch.schedule_tail = arch_vmx_do_resume;

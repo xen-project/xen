@@ -460,7 +460,7 @@ int arch_set_info_guest(
         //      trust the VMX domain builder.  Xen should validate this
         //      page table, and/or build the table itself, or ???
         //
-        if ( !pagetable_val(d->arch.phys_table) )
+        if ( !pagetable_get_phys(d->arch.phys_table) )
             d->arch.phys_table = ed->arch.guest_table;
 
         if ( (error = vmx_final_setup_guest(ed, c)) )
@@ -660,7 +660,7 @@ long do_switch_to_user(void)
     struct exec_domain    *ed = current;
 
     if ( unlikely(copy_from_user(&stu, (void *)regs->rsp, sizeof(stu))) ||
-         unlikely(pagetable_val(ed->arch.guest_table_user) == 0) )
+         unlikely(pagetable_get_phys(ed->arch.guest_table_user) == 0) )
         return -EFAULT;
 
     toggle_guest_mode(ed);
@@ -978,7 +978,7 @@ void domain_relinquish_resources(struct domain *d)
     /* Drop the in-use references to page-table bases. */
     for_each_exec_domain ( d, ed )
     {
-        if ( pagetable_val(ed->arch.guest_table) != 0 )
+        if ( pagetable_get_phys(ed->arch.guest_table) != 0 )
         {
             if ( shadow_mode_refcounts(d) )
                 put_page(&frame_table[pagetable_get_pfn(ed->arch.guest_table)]);
@@ -988,7 +988,7 @@ void domain_relinquish_resources(struct domain *d)
             ed->arch.guest_table = mk_pagetable(0);
         }
 
-        if ( pagetable_val(ed->arch.guest_table_user) != 0 )
+        if ( pagetable_get_phys(ed->arch.guest_table_user) != 0 )
         {
             if ( shadow_mode_refcounts(d) )
                 put_page(&frame_table[pagetable_get_pfn(ed->arch.guest_table_user)]);

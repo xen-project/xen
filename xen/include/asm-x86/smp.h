@@ -39,7 +39,12 @@ extern cpumask_t cpu_sibling_map[];
 extern void smp_flush_tlb(void);
 extern void smp_invalidate_rcv(void);		/* Process an NMI */
 extern void (*mtrr_hook) (void);
-extern void zap_low_mappings (void);
+
+#ifdef CONFIG_X86_64
+extern void zap_low_mappings(void);
+#else
+extern void zap_low_mappings(l2_pgentry_t *base);
+#endif
 
 #define MAX_APICID 256
 extern u8 x86_cpu_to_apicid[];

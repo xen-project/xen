@@ -358,13 +358,13 @@ free_shadow_hl2_table(struct domain *d, unsigned long smfn)
 }
 
 static void inline
-free_shadow_l2_table(struct domain *d, unsigned long smfn)
+free_shadow_l2_table(struct domain *d, unsigned long smfn, unsigned int type)
 {
     l2_pgentry_t *pl2e = map_domain_mem(smfn << PAGE_SHIFT);
     int i, external = shadow_mode_external(d);
 
     for ( i = 0; i < L2_PAGETABLE_ENTRIES; i++ )
-        if ( external || is_guest_l2_slot(i) )
+        if ( external || is_guest_l2_slot(type, i) )
             if ( l2e_get_flags(pl2e[i]) & _PAGE_PRESENT )
                 put_shadow_ref(l2e_get_pfn(pl2e[i]));
 
@@ -404,7 +404,7 @@ void free_shadow_page(unsigned long smfn)
     case PGT_l2_shadow:
         perfc_decr(shadow_l2_pages);
         shadow_demote(d, gpfn, gmfn);
-        free_shadow_l2_table(d, smfn);
+        free_shadow_l2_table(d, smfn, page->u.inuse.type_info);
         break;
 
     case PGT_hl2_shadow:
@@ -573,7 +573,7 @@ static void free_shadow_pages(struct domain *d)
     //
     for_each_exec_domain(d, ed)
     {
-        if ( pagetable_val(ed->arch.shadow_table) )
+        if ( pagetable_get_phys(ed->arch.shadow_table) )
         {
             put_shadow_ref(pagetable_get_pfn(ed->arch.shadow_table));
             ed->arch.shadow_table = mk_pagetable(0);
@@ -684,7 +684,7 @@ static void alloc_monitor_pagetable(struct exec_domain *ed)
     struct pfn_info *mmfn_info;
     struct domain *d = ed->domain;
 
-    ASSERT(pagetable_val(ed->arch.monitor_table) == 0);
+    ASSERT(pagetable_get_phys(ed->arch.monitor_table) == 0);
 
     mmfn_info = alloc_domheap_page(NULL);
     ASSERT(mmfn_info != NULL);
@@ -705,7 +705,7 @@ static void alloc_monitor_pagetable(struct exec_domain *ed)
 
     // map the phys_to_machine map into the Read-Only MPT space for this domain
     mpl2e[l2_table_offset(RO_MPT_VIRT_START)] =
-        l2e_create_phys(pagetable_val(d->arch.phys_table),
+        l2e_create_phys(pagetable_get_phys(d->arch.phys_table),
                         __PAGE_HYPERVISOR);
 
     // Don't (yet) have mappings for these...
@@ -726,7 +726,7 @@ void free_monitor_pagetable(struct exec_domain *ed)
     l2_pgentry_t *mpl2e, hl2e, sl2e;
     unsigned long mfn;
 
-    ASSERT( pagetable_val(ed->arch.monitor_table) );
+    ASSERT( pagetable_get_phys(ed->arch.monitor_table) );
     
     mpl2e = ed->arch.monitor_vtable;
 
@@ -766,7 +766,7 @@ set_p2m_entry(struct domain *d, unsigned long pfn, unsigned long mfn,
               struct map_dom_mem_cache *l2cache,
               struct map_dom_mem_cache *l1cache)
 {
-    unsigned long phystab = pagetable_val(d->arch.phys_table);
+    unsigned long phystab = pagetable_get_phys(d->arch.phys_table);
     l2_pgentry_t *l2, l2e;
     l1_pgentry_t *l1;
     struct pfn_info *l1page;
@@ -965,7 +965,7 @@ int __shadow_mode_enable(struct domain *d, unsigned int mode)
     {
         if ( !(new_modes & SHM_external) )
         {
-            ASSERT( !pagetable_val(d->arch.phys_table) );
+            ASSERT( !pagetable_get_phys(d->arch.phys_table) );
             if ( !alloc_p2m_table(d) )
             {
                 printk("alloc_p2m_table failed (out-of-memory?)\n");
@@ -1051,7 +1051,7 @@ int __shadow_mode_enable(struct domain *d, unsigned int mode)
         d->arch.shadow_dirty_bitmap = NULL;
     }
     if ( (new_modes & SHM_translate) && !(new_modes & SHM_external) &&
-         pagetable_val(d->arch.phys_table) )
+         pagetable_get_phys(d->arch.phys_table) )
     {
         free_p2m_table(d);
     }
@@ -1093,7 +1093,8 @@ translate_l1pgtable(struct domain *d, l1_pgentry_t *p2m, unsigned long l1mfn)
 // up dom0.
 //
 void
-translate_l2pgtable(struct domain *d, l1_pgentry_t *p2m, unsigned long l2mfn)
+translate_l2pgtable(struct domain *d, l1_pgentry_t *p2m, unsigned long l2mfn,
+                    unsigned int type)
 {
     int i;
     l2_pgentry_t *l2;
@@ -1103,7 +1104,7 @@ translate_l2pgtable(struct domain *d, l1_pgentry_t *p2m, unsigned long l2mfn)
     l2 = map_domain_mem(l2mfn << PAGE_SHIFT);
     for (i = 0; i < L2_PAGETABLE_ENTRIES; i++)
     {
-        if ( is_guest_l2_slot(i) &&
+        if ( is_guest_l2_slot(type, i) &&
              (l2e_get_flags(l2[i]) & _PAGE_PRESENT) )
         {
             unsigned long mfn = l2e_get_pfn(l2[i]);
@@ -1403,13 +1404,13 @@ gpfn_to_mfn_foreign(struct domain *d, unsigned long gpfn)
     perfc_incrc(gpfn_to_mfn_foreign);
 
     unsigned long va = gpfn << PAGE_SHIFT;
-    unsigned long phystab = pagetable_val(d->arch.phys_table);
+    unsigned long phystab = pagetable_get_phys(d->arch.phys_table);
     l2_pgentry_t *l2 = map_domain_mem(phystab);
     l2_pgentry_t l2e = l2[l2_table_offset(va)];
     unmap_domain_mem(l2);
     if ( !(l2e_get_flags(l2e) & _PAGE_PRESENT) )
     {
-        printk("gpfn_to_mfn_foreign(d->id=%d, gpfn=%lx) => 0 l2e=%lx\n",
+        printk("gpfn_to_mfn_foreign(d->id=%d, gpfn=%lx) => 0 l2e=%" PRIpte "\n",
                d->domain_id, gpfn, l2e_get_value(l2e));
         return INVALID_MFN;
     }
@@ -1425,7 +1426,7 @@ gpfn_to_mfn_foreign(struct domain *d, unsigned long gpfn)
 
     if ( !(l1e_get_flags(l1e) & _PAGE_PRESENT) )
     {
-        printk("gpfn_to_mfn_foreign(d->id=%d, gpfn=%lx) => 0 l1e=%lx\n",
+        printk("gpfn_to_mfn_foreign(d->id=%d, gpfn=%lx) => 0 l1e=%" PRIpte "\n",
                d->domain_id, gpfn, l1e_get_value(l1e));
         return INVALID_MFN;
     }
@@ -1540,7 +1541,7 @@ static unsigned long shadow_l2_table(
             unsigned long hl2mfn;
 
             spl2e[l2_table_offset(RO_MPT_VIRT_START)] =
-                l2e_create_phys(pagetable_val(d->arch.phys_table),
+                l2e_create_phys(pagetable_get_phys(d->arch.phys_table),
                                 __PAGE_HYPERVISOR);
 
             if ( unlikely(!(hl2mfn = __shadow_status(d, gpfn, PGT_hl2_shadow))) )
@@ -2391,7 +2392,10 @@ static int resync_all(struct domain *d, u32 stype)
             changed = 0;
             for ( i = 0; i < L2_PAGETABLE_ENTRIES; i++ )
             {
-                if ( !is_guest_l2_slot(i) && !external )
+#if CONFIG_X86_PAE
+                BUG();  /* FIXME: need type_info */
+#endif
+                if ( !is_guest_l2_slot(0,i) && !external )
                     continue;
 
                 l2_pgentry_t new_pde = guest2[i];
@@ -2434,7 +2438,10 @@ static int resync_all(struct domain *d, u32 stype)
             changed = 0;
             for ( i = 0; i < L2_PAGETABLE_ENTRIES; i++ )
             {
-                if ( !is_guest_l2_slot(i) && !external )
+#if CONFIG_X86_PAE
+                BUG();  /* FIXME: need type_info */
+#endif
+                if ( !is_guest_l2_slot(0, i) && !external )
                     continue;
 
                 l2_pgentry_t new_pde = guest2[i];
@@ -2647,8 +2654,8 @@ int shadow_fault(unsigned long va, struct cpu_user_regs *regs)
                                      &gpte, sizeof(gpte))) )
         {
             printk("%s() failed, crashing domain %d "
-                   "due to a read-only L2 page table (gpde=%lx), va=%lx\n",
-                   __func__, d->domain_id, l2e_get_value(gpde), va);
+                   "due to a read-only L2 page table (gpde=%" PRIpte "), va=%lx\n",
+                   __func__,d->domain_id, l2e_get_value(gpde), va);
             domain_crash_synchronous();
         }
 
@@ -2721,7 +2728,7 @@ void shadow_l2_normal_pt_update(
     shadow_unlock(d);
 }
 
-#ifdef __x86_64__
+#if CONFIG_PAGING_LEVELS >= 3
 void shadow_l3_normal_pt_update(
     struct domain *d,
     unsigned long pa, l3_pgentry_t gpde,
@@ -2729,7 +2736,9 @@ void shadow_l3_normal_pt_update(
 {
     BUG(); // not yet implemented
 }
+#endif
 
+#if CONFIG_PAGING_LEVELS >= 4
 void shadow_l4_normal_pt_update(
     struct domain *d,
     unsigned long pa, l4_pgentry_t gpde,

@@ -11,8 +11,7 @@ struct domain idle0_domain = {
 
 struct exec_domain idle0_exec_domain = {
     processor:   0,
-    domain:      &idle0_domain,
-    arch:        IDLE0_ARCH_EXEC_DOMAIN
+    domain:      &idle0_domain
 };
 
 struct tss_struct init_tss[NR_CPUS];

@@ -567,7 +567,7 @@ vmx_world_restore(struct exec_domain *d, struct vmx_assist_context *c)
 
     if (!vmx_paging_enabled(d)) {
 	VMX_DBG_LOG(DBG_LEVEL_VMMU, "switching to vmxassist. use phys table");
-	__vmwrite(GUEST_CR3, pagetable_val(d->domain->arch.phys_table));
+	__vmwrite(GUEST_CR3, pagetable_get_phys(d->domain->arch.phys_table));
         goto skip_cr3;
     }
 
@@ -578,7 +578,7 @@ vmx_world_restore(struct exec_domain *d, struct vmx_assist_context *c)
 	 * We simply invalidate the shadow.
 	 */
 	mfn = phys_to_machine_mapping(c->cr3 >> PAGE_SHIFT);
-	if ((mfn << PAGE_SHIFT) != pagetable_val(d->arch.guest_table)) {
+	if (mfn != pagetable_get_pfn(d->arch.guest_table)) {
 	    printk("Invalid CR3 value=%lx", c->cr3);
 	    domain_crash_synchronous();
 	    return 0;
@@ -603,7 +603,7 @@ vmx_world_restore(struct exec_domain *d, struct vmx_assist_context *c)
 	 */
 	d->arch.arch_vmx.cpu_cr3 = c->cr3;
 	VMX_DBG_LOG(DBG_LEVEL_VMMU, "Update CR3 value = %lx", c->cr3);
-	__vmwrite(GUEST_CR3, pagetable_val(d->arch.shadow_table));
+	__vmwrite(GUEST_CR3, pagetable_get_phys(d->arch.shadow_table));
     }
 
 skip_cr3:
@@ -769,7 +769,7 @@ static int vmx_set_cr0(unsigned long value)
         VMX_DBG_LOG(DBG_LEVEL_VMMU, "New arch.guest_table = %lx", 
                 (unsigned long) (mfn << PAGE_SHIFT));
 
-        __vmwrite(GUEST_CR3, pagetable_val(d->arch.shadow_table));
+        __vmwrite(GUEST_CR3, pagetable_get_phys(d->arch.shadow_table));
         /* 
          * arch->shadow_table should hold the next CR3 for shadow
          */
@@ -869,7 +869,7 @@ static int mov_to_cr(int gp, int cr, struct cpu_user_regs *regs)
              * We simply invalidate the shadow.
              */
             mfn = phys_to_machine_mapping(value >> PAGE_SHIFT);
-            if ((mfn << PAGE_SHIFT) != pagetable_val(d->arch.guest_table))
+            if (mfn != pagetable_get_pfn(d->arch.guest_table))
                 __vmx_bug(regs);
             shadow_sync_all(d->domain);
         } else {
@@ -896,7 +896,7 @@ static int mov_to_cr(int gp, int cr, struct cpu_user_regs *regs)
             d->arch.arch_vmx.cpu_cr3 = value;
             VMX_DBG_LOG(DBG_LEVEL_VMMU, "Update CR3 value = %lx",
                     value);
-            __vmwrite(GUEST_CR3, pagetable_val(d->arch.shadow_table));
+            __vmwrite(GUEST_CR3, pagetable_get_phys(d->arch.shadow_table));
         }
         break;
     }

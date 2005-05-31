@@ -130,10 +130,12 @@ extern void shadow_l1_normal_pt_update(struct domain *d,
 extern void shadow_l2_normal_pt_update(struct domain *d,
                                        unsigned long pa, l2_pgentry_t l2e,
                                        struct map_dom_mem_cache *cache);
-#ifdef __x86_64__
+#if CONFIG_PAGING_LEVELS >= 3
 extern void shadow_l3_normal_pt_update(struct domain *d,
                                        unsigned long pa, l3_pgentry_t l3e,
                                        struct map_dom_mem_cache *cache);
+#endif
+#if CONFIG_PAGING_LEVELS >= 4
 extern void shadow_l4_normal_pt_update(struct domain *d,
                                        unsigned long pa, l4_pgentry_t l4e,
                                        struct map_dom_mem_cache *cache);
@@ -1682,7 +1684,7 @@ static inline void update_pagetables(struct exec_domain *ed)
         // HACK ALERT: there's currently no easy way to figure out if a domU
         // has set its arch.guest_table to zero, vs not yet initialized it.
         //
-        paging_enabled = !!pagetable_val(ed->arch.guest_table);
+        paging_enabled = !!pagetable_get_phys(ed->arch.guest_table);
 
     /*
      * We don't call __update_pagetables() when vmx guest paging is

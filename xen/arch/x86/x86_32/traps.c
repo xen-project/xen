@@ -92,21 +92,24 @@ void show_registers(struct cpu_user_regs *regs)
 
 void show_page_walk(unsigned long addr)
 {
-    unsigned long page;
+    l2_pgentry_t pmd;
+    l1_pgentry_t *pte;
 
     if ( addr < PAGE_OFFSET )
         return;
 
     printk("Pagetable walk from %08lx:\n", addr);
     
-    page = l2e_get_value(idle_pg_table[l2_table_offset(addr)]);
-    printk(" L2 = %08lx %s\n", page, (page & _PAGE_PSE) ? "(4MB)" : "");
-    if ( !(page & _PAGE_PRESENT) || (page & _PAGE_PSE) )
+    pmd = idle_pg_table_l2[l2_linear_offset(addr)];
+    printk(" L2 = %08llx %s\n", (u64)l2e_get_value(pmd),
+           (l2e_get_flags(pmd) & _PAGE_PSE) ? "(2/4MB)" : "");
+    if ( !(l2e_get_flags(pmd) & _PAGE_PRESENT) ||
+         (l2e_get_flags(pmd) & _PAGE_PSE) )
         return;
 
-    page &= PAGE_MASK;
-    page = ((unsigned long *) __va(page))[l1_table_offset(addr)];
-    printk("  L1 = %08lx\n", page);
+    pte  = __va(l2e_get_phys(pmd));
+    pte += l1_table_offset(addr);
+    printk("  L1 = %08llx\n", (u64)l1e_get_value(*pte));
 }
 
 #define DOUBLEFAULT_STACK_SIZE 1024

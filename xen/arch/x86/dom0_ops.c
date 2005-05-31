@@ -405,7 +405,7 @@ void arch_getdomaininfo_ctxt(
         c->flags |= VGCF_VMX_GUEST;
 #endif
 
-    c->pt_base = pagetable_val(ed->arch.guest_table);
+    c->pt_base = pagetable_get_phys(ed->arch.guest_table);
 
     c->vm_assist = ed->domain->vm_assist;
 }

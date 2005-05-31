@@ -64,7 +64,11 @@
  * Virtual addresses beyond this are not modifiable by guest OSes. The 
  * machine->physical mapping table starts at this address, read-only.
  */
-#define HYPERVISOR_VIRT_START (0xFC000000UL)
+#ifdef CONFIG_X86_PAE
+# define HYPERVISOR_VIRT_START (0xF5800000UL)
+#else
+# define HYPERVISOR_VIRT_START (0xFC000000UL)
+#endif
 #ifndef machine_to_phys_mapping
 #define machine_to_phys_mapping ((u32 *)HYPERVISOR_VIRT_START)
 #endif
