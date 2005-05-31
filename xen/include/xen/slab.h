@@ -2,9 +2,6 @@
 #ifndef __SLAB_H__
 #define __SLAB_H__
 
-#include <xen/config.h>
-#include <xen/mm.h>
-
 /* Allocate space for typed object. */
 #define xmalloc(_type) ((_type *)_xmalloc(sizeof(_type), __alignof__(_type)))
 

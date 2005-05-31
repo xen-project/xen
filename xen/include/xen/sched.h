@@ -409,9 +409,6 @@ static inline void exec_domain_unblock(struct exec_domain *ed)
 
 #define VM_ASSIST(_d,_t) (test_bit((_t), &(_d)->vm_assist))
 
-#include <xen/slab.h>
-#include <xen/domain.h>
-
 #endif /* __SCHED_H__ */
 
 /*

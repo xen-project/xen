@@ -10,6 +10,7 @@
 #include <xen/sched.h>
 #include <xen/errno.h>
 #include <xen/sched.h>
+#include <xen/domain.h>
 #include <xen/mm.h>
 #include <xen/event.h>
 #include <xen/time.h>

@@ -12,6 +12,7 @@
 #include <xen/mm.h>
 #include <public/dom0_ops.h>
 #include <xen/sched.h>
+#include <xen/domain.h>
 #include <xen/event.h>
 #include <asm/domain_page.h>
 #include <xen/trace.h>
