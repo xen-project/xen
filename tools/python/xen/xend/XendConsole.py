@@ -1,8 +1,5 @@
 # Copyright (C) 2004 Mike Wray <mike.wray@hp.com>
 
-import xen.lowlevel.xc
-xc = xen.lowlevel.xc.new()
-
 import XendRoot; xroot = XendRoot.instance()
 from XendError import XendError
 
