@@ -389,72 +389,17 @@ static inline int domain_runnable(struct exec_domain *ed)
              !(ed->domain->domain_flags & (DOMF_shutdown|DOMF_crashed)) );
 }
 
-static inline void exec_domain_pause(struct exec_domain *ed)
-{
-    ASSERT(ed != current);
-    atomic_inc(&ed->pausecnt);
-    domain_sleep(ed);
-    sync_lazy_execstate_cpuset(ed->domain->cpuset & (1UL << ed->processor));
-}
-
-static inline void domain_pause(struct domain *d)
-{
-    struct exec_domain *ed;
-
-    for_each_exec_domain( d, ed )
-    {
-        ASSERT(ed != current);
-        atomic_inc(&ed->pausecnt);
-        domain_sleep(ed);
-    }
-
-    sync_lazy_execstate_cpuset(d->cpuset);
-}
-
-static inline void exec_domain_unpause(struct exec_domain *ed)
-{
-    ASSERT(ed != current);
-    if ( atomic_dec_and_test(&ed->pausecnt) )
-        domain_wake(ed);
-}
-
-static inline void domain_unpause(struct domain *d)
-{
-    struct exec_domain *ed;
-
-    for_each_exec_domain( d, ed )
-        exec_domain_unpause(ed);
-}
+void exec_domain_pause(struct exec_domain *ed);
+void domain_pause(struct domain *d);
+void exec_domain_unpause(struct exec_domain *ed);
+void domain_unpause(struct domain *d);
+void domain_pause_by_systemcontroller(struct domain *d);
+void domain_unpause_by_systemcontroller(struct domain *d);
 
 static inline void exec_domain_unblock(struct exec_domain *ed)
 {
     if ( test_and_clear_bit(_VCPUF_blocked, &ed->vcpu_flags) )
         domain_wake(ed);
-}
-
-static inline void domain_pause_by_systemcontroller(struct domain *d)
-{
-    struct exec_domain *ed;
-
-    for_each_exec_domain ( d, ed )
-    {
-        ASSERT(ed != current);
-        if ( !test_and_set_bit(_VCPUF_ctrl_pause, &ed->vcpu_flags) )
-            domain_sleep(ed);
-    }
-
-    sync_lazy_execstate_cpuset(d->cpuset);
-}
-
-static inline void domain_unpause_by_systemcontroller(struct domain *d)
-{
-    struct exec_domain *ed;
-
-    for_each_exec_domain ( d, ed )
-    {
-        if ( test_and_clear_bit(_VCPUF_ctrl_pause, &ed->vcpu_flags) )
-            domain_wake(ed);
-    }
 }
 
 #define IS_PRIV(_d)                                         \
