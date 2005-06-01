@@ -2971,6 +2971,24 @@ void ptwr_destroy(struct domain *d)
     free_xenheap_page((unsigned long)d->arch.ptwr[PTWR_PT_INACTIVE].page);
 }
 
+void cleanup_writable_pagetable(struct domain *d)
+{
+    if ( unlikely(!VM_ASSIST(d, VMASST_TYPE_writable_pagetables)) )
+        return;
+
+    if ( unlikely(shadow_mode_enabled(d)) )
+    {
+        shadow_sync_all(d);
+    }
+    else
+    {
+        if ( d->arch.ptwr[PTWR_PT_ACTIVE].l1va )
+            ptwr_flush(d, PTWR_PT_ACTIVE);
+        if ( d->arch.ptwr[PTWR_PT_INACTIVE].l1va )
+            ptwr_flush(d, PTWR_PT_INACTIVE);
+    }
+}
+
 int map_pages_to_xen(
     unsigned long virt,
     unsigned long pfn,

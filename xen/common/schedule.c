@@ -190,7 +190,7 @@ void sched_rem_domain(struct exec_domain *ed)
     TRACE_2D(TRC_SCHED_DOM_REM, ed->domain->domain_id, ed->vcpu_id);
 }
 
-void domain_sleep(struct exec_domain *ed)
+void domain_sleep_nosync(struct exec_domain *ed)
 {
     unsigned long flags;
 
@@ -200,10 +200,16 @@ void domain_sleep(struct exec_domain *ed)
     spin_unlock_irqrestore(&schedule_data[ed->processor].schedule_lock, flags);
 
     TRACE_2D(TRC_SCHED_SLEEP, ed->domain->domain_id, ed->vcpu_id);
- 
-    /* Synchronous. */
+} 
+
+void domain_sleep_sync(struct exec_domain *ed)
+{
+    domain_sleep_nosync(ed);
+
     while ( test_bit(_VCPUF_running, &ed->vcpu_flags) && !domain_runnable(ed) )
         cpu_relax();
+
+    sync_lazy_execstate_cpuset(ed->domain->cpuset & (1UL << ed->processor));
 }
 
 void domain_wake(struct exec_domain *ed)

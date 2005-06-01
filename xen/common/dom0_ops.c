@@ -353,7 +353,6 @@ long do_dom0_op(dom0_op_t *u_dom0_op)
 
         op->u.getdomaininfo.flags = flags |
             ((d->domain_flags & DOMF_dying)    ? DOMFLAGS_DYING    : 0) |
-            ((d->domain_flags & DOMF_crashed)  ? DOMFLAGS_CRASHED  : 0) |
             ((d->domain_flags & DOMF_shutdown) ? DOMFLAGS_SHUTDOWN : 0) |
             d->shutdown_code << DOMFLAGS_SHUTDOWNSHIFT;
 

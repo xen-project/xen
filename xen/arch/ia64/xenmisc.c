@@ -304,7 +304,8 @@ loop:
 	printf(buf);
 	if (regs) show_registers(regs);
 	domain_pause_by_systemcontroller(current->domain);
-	set_bit(_DOMF_crashed, ed->domain->domain_flags);
+	ed->domain->shutdown_code = SHUTDOWN_crash;
+	set_bit(_DOMF_shutdown, ed->domain->domain_flags);
 	if (ed->domain->domain_id == 0) {
 		int i = 1000000000L;
 		// if domain0 crashes, just periodically print out panic

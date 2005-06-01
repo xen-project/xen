@@ -86,7 +86,6 @@ int xc_domain_getinfo(int xc_handle,
         info->domid      = (u16)op.u.getdomaininfo.domain;
 
         info->dying    = !!(op.u.getdomaininfo.flags & DOMFLAGS_DYING);
-        info->crashed  = !!(op.u.getdomaininfo.flags & DOMFLAGS_CRASHED);
         info->shutdown = !!(op.u.getdomaininfo.flags & DOMFLAGS_SHUTDOWN);
         info->paused   = !!(op.u.getdomaininfo.flags & DOMFLAGS_PAUSED);
         info->blocked  = !!(op.u.getdomaininfo.flags & DOMFLAGS_BLOCKED);
@@ -95,6 +94,12 @@ int xc_domain_getinfo(int xc_handle,
         info->shutdown_reason = 
             (op.u.getdomaininfo.flags>>DOMFLAGS_SHUTDOWNSHIFT) & 
             DOMFLAGS_SHUTDOWNMASK;
+
+        if ( info->shutdown && (info->shutdown_reason == SHUTDOWN_crash) )
+        {
+            info->shutdown = 0;
+            info->crashed  = 1;
+        }
 
         info->nr_pages = op.u.getdomaininfo.tot_pages;
         info->max_memkb = op.u.getdomaininfo.max_pages<<(PAGE_SHIFT);

@@ -134,11 +134,7 @@ void domain_crash(void)
     show_registers(guest_cpu_user_regs());
 #endif
 
-    set_bit(_DOMF_crashed, &d->domain_flags);
-
-    send_guest_virq(dom0->exec_domain[0], VIRQ_DOM_EXC);
-
-    raise_softirq(SCHEDULE_SOFTIRQ);
+    domain_shutdown(SHUTDOWN_crash);
 }
 
 
@@ -150,9 +146,49 @@ void domain_crash_synchronous(void)
 }
 
 
+static struct domain *domain_shuttingdown[NR_CPUS];
+
+static void domain_shutdown_finalise(void)
+{
+    struct domain *d;
+    struct exec_domain *ed;
+
+    d = domain_shuttingdown[smp_processor_id()];
+    domain_shuttingdown[smp_processor_id()] = NULL;
+
+    BUG_ON(d == NULL);
+    BUG_ON(d == current->domain);
+    BUG_ON(!test_bit(_DOMF_shuttingdown, &d->domain_flags));
+    BUG_ON(test_bit(_DOMF_shutdown, &d->domain_flags));
+
+    /* Make sure that every vcpu is descheduled before we finalise. */
+    for_each_exec_domain ( d, ed )
+        while ( test_bit(_VCPUF_running, &ed->vcpu_flags) )
+            cpu_relax();
+
+    sync_lazy_execstate_cpuset(d->cpuset);
+    BUG_ON(d->cpuset != 0);
+
+    sync_pagetable_state(d);
+
+    set_bit(_DOMF_shutdown, &d->domain_flags);
+    clear_bit(_DOMF_shuttingdown, &d->domain_flags);
+
+    send_guest_virq(dom0->exec_domain[0], VIRQ_DOM_EXC);
+}
+
+static __init int domain_shutdown_finaliser_init(void)
+{
+    open_softirq(DOMAIN_SHUTDOWN_FINALISE_SOFTIRQ, domain_shutdown_finalise);
+    return 0;
+}
+__initcall(domain_shutdown_finaliser_init);
+
+
 void domain_shutdown(u8 reason)
 {
     struct domain *d = current->domain;
+    struct exec_domain *ed;
 
     if ( d->domain_id == 0 )
     {
@@ -173,14 +209,18 @@ void domain_shutdown(u8 reason)
         }
     }
 
-    if ( (d->shutdown_code = reason) == SHUTDOWN_crash )
-        set_bit(_DOMF_crashed, &d->domain_flags);
-    else
-        set_bit(_DOMF_shutdown, &d->domain_flags);
+    /* Mark the domain as shutting down. */
+    d->shutdown_code = reason;
+    if ( !test_and_set_bit(_DOMF_shuttingdown, &d->domain_flags) )
+    {
+        /* This vcpu won the race to finalise the shutdown. */
+        domain_shuttingdown[smp_processor_id()] = d;
+        raise_softirq(DOMAIN_SHUTDOWN_FINALISE_SOFTIRQ);
+    }
 
-    send_guest_virq(dom0->exec_domain[0], VIRQ_DOM_EXC);
-
-    raise_softirq(SCHEDULE_SOFTIRQ);
+    /* Put every vcpu to sleep, but don't wait (avoids inter-vcpu deadlock). */
+    for_each_exec_domain ( d, ed )
+        domain_sleep_nosync(ed);
 }
 
 
@@ -190,8 +230,7 @@ void domain_destruct(struct domain *d)
     struct domain **pd;
     atomic_t      old, new;
 
-    if ( !test_bit(_DOMF_dying, &d->domain_flags) )
-        BUG();
+    BUG_ON(!test_bit(_DOMF_dying, &d->domain_flags));
 
     /* May be already destructed, or get_domain() can race us. */
     _atomic_set(old, 0);
@@ -225,10 +264,9 @@ void domain_destruct(struct domain *d)
 
 void exec_domain_pause(struct exec_domain *ed)
 {
-    ASSERT(ed != current);
+    BUG_ON(ed == current);
     atomic_inc(&ed->pausecnt);
-    domain_sleep(ed);
-    sync_lazy_execstate_cpuset(ed->domain->cpuset & (1UL << ed->processor));
+    domain_sleep_sync(ed);
 }
 
 void domain_pause(struct domain *d)
@@ -237,17 +275,15 @@ void domain_pause(struct domain *d)
 
     for_each_exec_domain( d, ed )
     {
-        ASSERT(ed != current);
+        BUG_ON(ed == current);
         atomic_inc(&ed->pausecnt);
-        domain_sleep(ed);
+        domain_sleep_sync(ed);
     }
-
-    sync_lazy_execstate_cpuset(d->cpuset);
 }
 
 void exec_domain_unpause(struct exec_domain *ed)
 {
-    ASSERT(ed != current);
+    BUG_ON(ed == current);
     if ( atomic_dec_and_test(&ed->pausecnt) )
         domain_wake(ed);
 }
@@ -266,12 +302,10 @@ void domain_pause_by_systemcontroller(struct domain *d)
 
     for_each_exec_domain ( d, ed )
     {
-        ASSERT(ed != current);
+        BUG_ON(ed == current);
         if ( !test_and_set_bit(_VCPUF_ctrl_pause, &ed->vcpu_flags) )
-            domain_sleep(ed);
+            domain_sleep_sync(ed);
     }
-
-    sync_lazy_execstate_cpuset(d->cpuset);
 }
 
 void domain_unpause_by_systemcontroller(struct domain *d)

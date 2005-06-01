@@ -48,4 +48,8 @@ extern struct list_head page_scrub_list;
 
 #include <asm/mm.h>
 
+#ifndef sync_pagetable_state
+#define sync_pagetable_state(d) ((void)0)
+#endif
+
 #endif /* __XEN_MM_H__ */

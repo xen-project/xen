@@ -42,8 +42,7 @@ int (*myxcwait)(int domain, int *status, int options) ;
 
 
 #define DOMFLAGS_DYING     (1<<0) /* Domain is scheduled to die.             */
-#define DOMFLAGS_CRASHED   (1<<1) /* Crashed domain; frozen for postmortem.  */
-#define DOMFLAGS_SHUTDOWN  (1<<2) /* The guest OS has shut itself down.      */
+#define DOMFLAGS_SHUTDOWN  (1<<2) /* The guest OS has shut down.             */
 #define DOMFLAGS_PAUSED    (1<<3) /* Currently paused by control software.   */
 #define DOMFLAGS_BLOCKED   (1<<4) /* Currently blocked pending an event.     */
 #define DOMFLAGS_RUNNING   (1<<5) /* Domain is currently running.            */
@@ -220,7 +219,7 @@ linux_wait (char *status)
   if (myxcwait(current_domain, &w, 0))
       return -1;
   
-  if (w & (DOMFLAGS_CRASHED|DOMFLAGS_DYING)) {
+  if (w & (DOMFLAGS_SHUTDOWN|DOMFLAGS_DYING)) {
       *status = 'W';
       return 0;
   }

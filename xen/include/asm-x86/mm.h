@@ -314,21 +314,8 @@ void ptwr_flush(struct domain *, const int);
 int  ptwr_do_page_fault(struct domain *, unsigned long);
 int  revalidate_l1(struct domain *, l1_pgentry_t *, l1_pgentry_t *);
 
-#define cleanup_writable_pagetable(_d)                                      \
-    do {                                                                    \
-        if ( likely(VM_ASSIST((_d), VMASST_TYPE_writable_pagetables)) )     \
-        {                                                                   \
-            if ( likely(!shadow_mode_enabled(_d)) )                         \
-            {                                                               \
-                if ( (_d)->arch.ptwr[PTWR_PT_ACTIVE].l1va )                 \
-                    ptwr_flush((_d), PTWR_PT_ACTIVE);                       \
-                if ( (_d)->arch.ptwr[PTWR_PT_INACTIVE].l1va )               \
-                    ptwr_flush((_d), PTWR_PT_INACTIVE);                     \
-            }                                                               \
-            else                                                            \
-                shadow_sync_all(_d);                                        \
-        }                                                                   \
-    } while ( 0 )
+void cleanup_writable_pagetable(struct domain *d);
+#define sync_pagetable_state(d) cleanup_writable_pagetable(d)
 
 int audit_adjust_pgtables(struct domain *d, int dir, int noisy);
 

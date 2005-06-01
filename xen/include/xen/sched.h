@@ -255,7 +255,8 @@ long sched_ctl(struct sched_ctl_cmd *);
 long sched_adjdom(struct sched_adjdom_cmd *);
 int  sched_id();
 void domain_wake(struct exec_domain *d);
-void domain_sleep(struct exec_domain *d);
+void domain_sleep_nosync(struct exec_domain *d);
+void domain_sleep_sync(struct exec_domain *d);
 
 /*
  * Force loading of currently-executing domain state on the specified set
@@ -375,9 +376,9 @@ extern struct domain *domain_list;
  /* Guest shut itself down for some reason. */
 #define _DOMF_shutdown         4
 #define DOMF_shutdown          (1UL<<_DOMF_shutdown)
- /* Domain has crashed and cannot continue to execute. */
-#define _DOMF_crashed          5
-#define DOMF_crashed           (1UL<<_DOMF_crashed)
+ /* Guest is in process of shutting itself down (becomes DOMF_shutdown). */
+#define _DOMF_shuttingdown     5
+#define DOMF_shuttingdown      (1UL<<_DOMF_shuttingdown)
  /* Death rattle. */
 #define _DOMF_dying            6
 #define DOMF_dying             (1UL<<_DOMF_dying)
@@ -386,7 +387,7 @@ static inline int domain_runnable(struct exec_domain *ed)
 {
     return ( (atomic_read(&ed->pausecnt) == 0) &&
              !(ed->vcpu_flags & (VCPUF_blocked|VCPUF_ctrl_pause)) &&
-             !(ed->domain->domain_flags & (DOMF_shutdown|DOMF_crashed)) );
+             !(ed->domain->domain_flags & (DOMF_shutdown|DOMF_shuttingdown)) );
 }
 
 void exec_domain_pause(struct exec_domain *ed);
