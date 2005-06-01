@@ -408,6 +408,9 @@ void make_pages_writable(void *va, unsigned int nr)
 }
 #endif /* CONFIG_XEN_SHADOW_MODE */
 
+LIST_HEAD(mm_unpinned);
+DEFINE_SPINLOCK(mm_unpinned_lock);
+
 static inline void mm_walk_set_prot(void *pt, pgprot_t flags)
 {
 	struct page *page = virt_to_page(pt);
@@ -461,6 +464,9 @@ void mm_pin(struct mm_struct *mm)
         pfn_pte(virt_to_phys(mm->pgd)>>PAGE_SHIFT, PAGE_KERNEL_RO), 0);
     xen_pgd_pin(__pa(mm->pgd));
     mm->context.pinned = 1;
+    spin_lock(&mm_unpinned_lock);
+    list_del(&mm->context.unpinned);
+    spin_unlock(&mm_unpinned_lock);
 
     spin_unlock(&mm->page_table_lock);
 }
@@ -475,8 +481,18 @@ void mm_unpin(struct mm_struct *mm)
         pfn_pte(virt_to_phys(mm->pgd)>>PAGE_SHIFT, PAGE_KERNEL), 0);
     mm_walk(mm, PAGE_KERNEL);
     mm->context.pinned = 0;
+    spin_lock(&mm_unpinned_lock);
+    list_add(&mm->context.unpinned, &mm_unpinned);
+    spin_unlock(&mm_unpinned_lock);
 
     spin_unlock(&mm->page_table_lock);
+}
+
+void mm_pin_all(void)
+{
+    while (!list_empty(&mm_unpinned))	
+	mm_pin(list_entry(mm_unpinned.next, struct mm_struct,
+			  context.unpinned));
 }
 
 void _arch_exit_mmap(struct mm_struct *mm)

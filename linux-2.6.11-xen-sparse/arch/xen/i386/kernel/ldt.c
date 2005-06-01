@@ -18,6 +18,7 @@
 #include <asm/system.h>
 #include <asm/ldt.h>
 #include <asm/desc.h>
+#include <asm/mmu_context.h>
 
 #ifdef CONFIG_SMP /* avoids "defined but not used" warnig */
 static void flush_ldt(void *null)
@@ -108,6 +109,11 @@ int init_new_context(struct task_struct *tsk, struct mm_struct *mm)
 		retval = copy_ldt(&mm->context, &old_mm->context);
 		up(&old_mm->context.sem);
 	}
+	if (retval == 0) {
+		spin_lock(&mm_unpinned_lock);
+		list_add(&mm->context.unpinned, &mm_unpinned);
+		spin_unlock(&mm_unpinned_lock);
+	}
 	return retval;
 }
 
@@ -128,6 +134,9 @@ void destroy_context(struct mm_struct *mm)
 			kfree(mm->context.ldt);
 		mm->context.size = 0;
 	}
+	spin_lock(&mm_unpinned_lock);
+	list_del(&mm->context.unpinned);
+	spin_unlock(&mm_unpinned_lock);
 }
 
 static int read_ldt(void __user * ptr, unsigned long bytecount)
