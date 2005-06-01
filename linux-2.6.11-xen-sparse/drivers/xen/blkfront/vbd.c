@@ -278,15 +278,14 @@ struct gendisk *xlvbd_alloc_gendisk(
     di->mi = mi;
     di->xd_device = disk->device;
 
-    if ((VDISK_TYPE(disk->info) == VDISK_TYPE_DISK) &&
-        ((minor & ((1 << mi->type->partn_shift) - 1)) == 0))
+    if ((minor & ((1 << mi->type->partn_shift) - 1)) == 0)
         nr_minors = 1 << mi->type->partn_shift;
 
     gd = alloc_disk(nr_minors);
     if ( !gd )
         goto out;
 
-    if ((VDISK_TYPE(disk->info) != VDISK_TYPE_DISK) || (nr_minors > 1))
+    if (nr_minors > 1)
         sprintf(gd->disk_name, "%s%c", mi->type->diskname,
                 'a' + mi->index * mi->type->disks_per_major +
                     (minor >> mi->type->partn_shift));
