@@ -234,7 +234,7 @@ void arch_init_memory(void)
 
 void write_ptbase(struct exec_domain *ed)
 {
-    write_cr3(pagetable_get_phys(ed->arch.monitor_table));
+    write_cr3(pagetable_get_paddr(ed->arch.monitor_table));
 }
 
 void invalidate_shadow_ldt(struct exec_domain *d)
@@ -333,7 +333,7 @@ int map_ldt_shadow_page(unsigned int off)
     if ( unlikely(!res) )
         return 0;
 
-    nl1e = l1e_create_pfn(gmfn, l1e_get_flags(l1e) | _PAGE_RW);
+    nl1e = l1e_from_pfn(gmfn, l1e_get_flags(l1e) | _PAGE_RW);
 
     ed->arch.perdomain_ptes[off + 16] = nl1e;
     ed->arch.shadow_ldt_mapcnt++;
@@ -699,13 +699,13 @@ static inline int fixup_pae_linear_mappings(l3_pgentry_t *pl3e)
         return 0;
     }
 
-    pl2e = map_domain_mem(l3e_get_phys(pl3e[3]));
+    pl2e = map_domain_mem(l3e_get_paddr(pl3e[3]));
     for (i = 0; i < 4; i++) {
         vaddr = LINEAR_PT_VIRT_START + (i << L2_PAGETABLE_SHIFT);
         idx = (vaddr >> L2_PAGETABLE_SHIFT) & (L2_PAGETABLE_ENTRIES-1);
         if (l3e_get_flags(pl3e[i]) & _PAGE_PRESENT) {
-            pl2e[idx] = l2e_create_phys(l3e_get_phys(pl3e[i]),
-                                        __PAGE_HYPERVISOR);
+            pl2e[idx] = l2e_from_paddr(l3e_get_paddr(pl3e[i]),
+                                       __PAGE_HYPERVISOR);
         } else
             pl2e[idx] = l2e_empty();
     }
@@ -765,9 +765,9 @@ static int alloc_l2_table(struct pfn_info *page, unsigned int type)
            &idle_pg_table[L2_PAGETABLE_FIRST_XEN_SLOT],
            L2_PAGETABLE_XEN_SLOTS * sizeof(l2_pgentry_t));
     pl2e[l2_table_offset(LINEAR_PT_VIRT_START)] =
-        l2e_create_pfn(pfn, __PAGE_HYPERVISOR);
+        l2e_from_pfn(pfn, __PAGE_HYPERVISOR);
     pl2e[l2_table_offset(PERDOMAIN_VIRT_START)] =
-        l2e_create_page(
+        l2e_from_page(
             virt_to_page(page_get_owner(page)->arch.mm_perdomain_pt),
             __PAGE_HYPERVISOR);
 #endif
@@ -784,7 +784,7 @@ static int alloc_l2_table(struct pfn_info *page, unsigned int type)
              v += (1 << L2_PAGETABLE_SHIFT)) {
             dst = (v >> L2_PAGETABLE_SHIFT) & (L2_PAGETABLE_ENTRIES-1);
             virt = page_get_owner(page)->arch.mm_perdomain_pt + (v-PERDOMAIN_VIRT_START);
-            pl2e[dst] = l2e_create_page(virt_to_page(virt), __PAGE_HYPERVISOR);
+            pl2e[dst] = l2e_from_page(virt_to_page(virt), __PAGE_HYPERVISOR);
         }
         /* see fixup_pae_linear_mappings() for linear pagetables */
     }
@@ -865,9 +865,9 @@ static int alloc_l4_table(struct pfn_info *page)
            &idle_pg_table[ROOT_PAGETABLE_FIRST_XEN_SLOT],
            ROOT_PAGETABLE_XEN_SLOTS * sizeof(l4_pgentry_t));
     pl4e[l4_table_offset(LINEAR_PT_VIRT_START)] =
-        l4e_create_pfn(pfn, __PAGE_HYPERVISOR);
+        l4e_from_pfn(pfn, __PAGE_HYPERVISOR);
     pl4e[l4_table_offset(PERDOMAIN_VIRT_START)] =
-        l4e_create_page(
+        l4e_from_page(
             virt_to_page(page_get_owner(page)->arch.mm_perdomain_l3),
             __PAGE_HYPERVISOR);
 
@@ -956,16 +956,16 @@ static inline int update_l1e(l1_pgentry_t *pl1e,
                              l1_pgentry_t  ol1e, 
                              l1_pgentry_t  nl1e)
 {
-    intpte_t o = l1e_get_value(ol1e);
-    intpte_t n = l1e_get_value(nl1e);
+    intpte_t o = l1e_get_intpte(ol1e);
+    intpte_t n = l1e_get_intpte(nl1e);
 
     if ( unlikely(cmpxchg_user(pl1e, o, n) != 0) ||
-         unlikely(o != l1e_get_value(ol1e)) )
+         unlikely(o != l1e_get_intpte(ol1e)) )
     {
         MEM_LOG("Failed to update %" PRIpte " -> %" PRIpte
                 ": saw %" PRIpte "\n",
-                l1e_get_value(ol1e),
-                l1e_get_value(nl1e),
+                l1e_get_intpte(ol1e),
+                l1e_get_intpte(nl1e),
                 o);
         return 0;
     }
@@ -995,7 +995,7 @@ static int mod_l1_entry(l1_pgentry_t *pl1e, l1_pgentry_t nl1e)
         }
 
         /* Fast path for identical mapping, r/w and presence. */
-        if ( !l1e_has_changed(&ol1e, &nl1e, _PAGE_RW | _PAGE_PRESENT))
+        if ( !l1e_has_changed(ol1e, nl1e, _PAGE_RW | _PAGE_PRESENT))
             return update_l1e(pl1e, ol1e, nl1e);
 
         if ( unlikely(!get_page_from_l1e(nl1e, FOREIGNDOM)) )
@@ -1019,14 +1019,15 @@ static int mod_l1_entry(l1_pgentry_t *pl1e, l1_pgentry_t nl1e)
 
 #define UPDATE_ENTRY(_t,_p,_o,_n) ({                                    \
     intpte_t __o = cmpxchg((intpte_t *)(_p),                            \
-                           _t ## e_get_value(_o),                       \
-                           _t ## e_get_value(_n));                      \
-    if ( __o != _t ## e_get_value(_o) )                                 \
-        MEM_LOG("Failed to update %" PRIpte " -> %" PRIpte ": saw %" PRIpte "", \
-                (_t ## e_get_value(_o)),                                \
-                (_t ## e_get_value(_n)),                                \
+                           _t ## e_get_intpte(_o),                      \
+                           _t ## e_get_intpte(_n));                     \
+    if ( __o != _t ## e_get_intpte(_o) )                                \
+        MEM_LOG("Failed to update %" PRIpte " -> %" PRIpte              \
+                ": saw %" PRIpte "",                                    \
+                (_t ## e_get_intpte(_o)),                               \
+                (_t ## e_get_intpte(_n)),                               \
                 (__o));                                                 \
-    (__o == _t ## e_get_value(_o)); })
+    (__o == _t ## e_get_intpte(_o)); })
 
 /* Update the L2 entry at pl2e to new value nl2e. pl2e is within frame pfn. */
 static int mod_l2_entry(l2_pgentry_t *pl2e, 
@@ -1056,7 +1057,7 @@ static int mod_l2_entry(l2_pgentry_t *pl2e,
         }
 
         /* Fast path for identical mapping and presence. */
-        if ( !l2e_has_changed(&ol2e, &nl2e, _PAGE_PRESENT))
+        if ( !l2e_has_changed(ol2e, nl2e, _PAGE_PRESENT))
             return UPDATE_ENTRY(l2, pl2e, ol2e, nl2e);
 
         vaddr = (((unsigned long)pl2e & ~PAGE_MASK) / sizeof(l2_pgentry_t))
@@ -1111,7 +1112,7 @@ static int mod_l3_entry(l3_pgentry_t *pl3e,
         }
 
         /* Fast path for identical mapping and presence. */
-        if (!l3e_has_changed(&ol3e, &nl3e, _PAGE_PRESENT))
+        if (!l3e_has_changed(ol3e, nl3e, _PAGE_PRESENT))
             return UPDATE_ENTRY(l3, pl3e, ol3e, nl3e);
 
         vaddr = (((unsigned long)pl3e & ~PAGE_MASK) / sizeof(l3_pgentry_t))
@@ -1168,7 +1169,7 @@ static int mod_l4_entry(l4_pgentry_t *pl4e,
         }
 
         /* Fast path for identical mapping and presence. */
-        if (!l4e_has_changed(&ol4e, &nl4e, _PAGE_PRESENT))
+        if (!l4e_has_changed(ol4e, nl4e, _PAGE_PRESENT))
             return UPDATE_ENTRY(l4, pl4e, ol4e, nl4e);
 
         if ( unlikely(!get_page_from_l4e(nl4e, pfn, current->domain)) )
@@ -2029,7 +2030,7 @@ int do_mmu_update(
                     l1_pgentry_t l1e;
 
                     /* FIXME: doesn't work with PAE */
-                    l1e = l1e_create_phys(req.val, req.val);
+                    l1e = l1e_from_intpte(req.val);
                     okay = mod_l1_entry(va, l1e);
                     if ( okay && unlikely(shadow_mode_enabled(d)) )
                         shadow_l1_normal_pt_update(d, req.ptr, l1e, &sh_mapcache);
@@ -2044,7 +2045,7 @@ int do_mmu_update(
                     l2_pgentry_t l2e;
 
                     /* FIXME: doesn't work with PAE */
-                    l2e = l2e_create_phys(req.val, req.val);
+                    l2e = l2e_from_intpte(req.val);
                     okay = mod_l2_entry((l2_pgentry_t *)va, l2e, mfn, type_info);
                     if ( okay && unlikely(shadow_mode_enabled(d)) )
                         shadow_l2_normal_pt_update(d, req.ptr, l2e, &sh_mapcache);
@@ -2059,7 +2060,7 @@ int do_mmu_update(
                     l3_pgentry_t l3e;
 
                     /* FIXME: doesn't work with PAE */
-                    l3e = l3e_create_phys(req.val,req.val);
+                    l3e = l3e_from_intpte(req.val);
                     okay = mod_l3_entry(va, l3e, mfn);
                     if ( okay && unlikely(shadow_mode_enabled(d)) )
                         shadow_l3_normal_pt_update(d, req.ptr, l3e, &sh_mapcache);
@@ -2074,7 +2075,7 @@ int do_mmu_update(
                 {
                     l4_pgentry_t l4e;
 
-                    l4e = l4e_create_phys(req.val,req.val);
+                    l4e = l4e_from_intpte(req.val);
                     okay = mod_l4_entry(va, l4e, mfn);
                     if ( okay && unlikely(shadow_mode_enabled(d)) )
                         shadow_l4_normal_pt_update(d, req.ptr, l4e, &sh_mapcache);
@@ -2251,7 +2252,7 @@ int do_update_va_mapping(unsigned long va,
                          unsigned long val32,
                          unsigned long flags)
 {
-    l1_pgentry_t       val  = l1e_create_phys(val32,val32);
+    l1_pgentry_t       val  = l1e_from_intpte(val32);
     struct exec_domain *ed  = current;
     struct domain      *d   = ed->domain;
     unsigned int        cpu = ed->processor;
@@ -2420,7 +2421,7 @@ long set_gdt(struct exec_domain *ed,
     {
         ed->arch.guest_context.gdt_frames[i] = frames[i];
         ed->arch.perdomain_ptes[i] =
-            l1e_create_pfn(frames[i], __PAGE_HYPERVISOR);
+            l1e_from_pfn(frames[i], __PAGE_HYPERVISOR);
     }
 
     return 0;
@@ -2562,7 +2563,7 @@ int revalidate_l1(struct domain *d, l1_pgentry_t *l1page, l1_pgentry_t *snapshot
         ol1e = snapshot[i];
         nl1e = l1page[i];
 
-        if ( likely(l1e_get_value(ol1e) == l1e_get_value(nl1e)) )
+        if ( likely(l1e_get_intpte(ol1e) == l1e_get_intpte(nl1e)) )
             continue;
 
         /* Update number of entries modified. */
@@ -2572,7 +2573,7 @@ int revalidate_l1(struct domain *d, l1_pgentry_t *l1page, l1_pgentry_t *snapshot
          * Fast path for PTEs that have merely been write-protected
          * (e.g., during a Unix fork()). A strict reduction in privilege.
          */
-        if ( likely(l1e_get_value(ol1e) == (l1e_get_value(nl1e)|_PAGE_RW)) )
+        if ( likely(l1e_get_intpte(ol1e) == (l1e_get_intpte(nl1e)|_PAGE_RW)) )
         {
             if ( likely(l1e_get_flags(nl1e) & _PAGE_PRESENT) )
                 put_page_type(&frame_table[l1e_get_pfn(nl1e)]);
@@ -2666,7 +2667,7 @@ void ptwr_flush(struct domain *d, const int which)
     if ( which == PTWR_PT_ACTIVE )
     {
         pl2e = &__linear_l2_table[d->arch.ptwr[which].l2_idx];
-        l2e_add_flags(pl2e, _PAGE_PRESENT); 
+        l2e_add_flags(*pl2e, _PAGE_PRESENT); 
     }
 
     /*
@@ -2741,7 +2742,7 @@ static int ptwr_emulated_update(
     }
 
     /* Check the new PTE. */
-    nl1e = l1e_create_phys(val, val & ~PAGE_MASK);
+    nl1e = l1e_from_intpte(val);
     if ( unlikely(!get_page_from_l1e(nl1e, d)) )
         return X86EMUL_UNHANDLEABLE;
 
@@ -2749,7 +2750,7 @@ static int ptwr_emulated_update(
     pl1e = map_domain_mem(page_to_phys(page) + (addr & ~PAGE_MASK));
     if ( do_cmpxchg )
     {
-        ol1e = l1e_create_phys(old, old & ~PAGE_MASK);
+        ol1e = l1e_from_intpte(old);
         if ( cmpxchg((unsigned long *)pl1e, old, val) != old )
         {
             unmap_domain_mem(pl1e);
@@ -2909,7 +2910,7 @@ int ptwr_do_page_fault(struct domain *d, unsigned long addr)
     /* For safety, disconnect the L1 p.t. page from current space. */
     if ( which == PTWR_PT_ACTIVE )
     {
-        l2e_remove_flags(pl2e, _PAGE_PRESENT);
+        l2e_remove_flags(*pl2e, _PAGE_PRESENT);
         flush_tlb_mask(d->cpuset);
     }
     
@@ -2920,7 +2921,7 @@ int ptwr_do_page_fault(struct domain *d, unsigned long addr)
            L1_PAGETABLE_ENTRIES * sizeof(l1_pgentry_t));
     
     /* Finally, make the p.t. page writable by the guest OS. */
-    l1e_add_flags(&pte, _PAGE_RW);
+    l1e_add_flags(pte, _PAGE_RW);
     if ( unlikely(__copy_to_user(&linear_pg_table[addr>>PAGE_SHIFT],
                                  &pte, sizeof(pte))) )
     {
@@ -2993,7 +2994,7 @@ int map_pages_to_xen(
         {
             /* Super-page mapping. */
             ol2e  = *pl2e;
-            *pl2e = l2e_create_pfn(pfn, flags|_PAGE_PSE);
+            *pl2e = l2e_from_pfn(pfn, flags|_PAGE_PSE);
 
             if ( (l2e_get_flags(ol2e) & _PAGE_PRESENT) )
             {
@@ -3013,22 +3014,22 @@ int map_pages_to_xen(
             {
                 pl1e = page_to_virt(alloc_xen_pagetable());
                 clear_page(pl1e);
-                *pl2e = l2e_create_page(virt_to_page(pl1e), __PAGE_HYPERVISOR);
+                *pl2e = l2e_from_page(virt_to_page(pl1e), __PAGE_HYPERVISOR);
             }
             else if ( l2e_get_flags(*pl2e) & _PAGE_PSE )
             {
                 pl1e = page_to_virt(alloc_xen_pagetable());
                 for ( i = 0; i < L1_PAGETABLE_ENTRIES; i++ )
-                    pl1e[i] = l1e_create_pfn(
+                    pl1e[i] = l1e_from_pfn(
                         l2e_get_pfn(*pl2e) + i,
                         l2e_get_flags(*pl2e) & ~_PAGE_PSE);
-                *pl2e = l2e_create_page(virt_to_page(pl1e), __PAGE_HYPERVISOR);
+                *pl2e = l2e_from_page(virt_to_page(pl1e), __PAGE_HYPERVISOR);
                 local_flush_tlb_pge();
             }
 
             pl1e  = l2e_to_l1e(*pl2e) + l1_table_offset(virt);
             ol1e  = *pl1e;
-            *pl1e = l1e_create_pfn(pfn, flags);
+            *pl1e = l1e_from_pfn(pfn, flags);
             if ( (l1e_get_flags(ol1e) & _PAGE_PRESENT) )
                 local_flush_tlb_one(virt);
 

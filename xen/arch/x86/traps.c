@@ -797,7 +797,7 @@ static int emulate_privileged_op(struct cpu_user_regs *regs)
             break;
             
         case 3: /* Read CR3 */
-            *reg = pagetable_get_phys(ed->arch.guest_table);
+            *reg = pagetable_get_paddr(ed->arch.guest_table);
             break;
 
         default:

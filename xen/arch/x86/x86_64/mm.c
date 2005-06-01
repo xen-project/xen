@@ -1,21 +1,20 @@
 /******************************************************************************
  * arch/x86/x86_64/mm.c
  * 
- * Modifications to Linux original are copyright (c) 2004, K A Fraser
+ * Modifications to Linux original are copyright (c) 2004, K A Fraser tr This 
+ * program is free software; you can redistribute it and/or modify it under 
+ * the terms of the GNU General Public License as published by the Free 
+ * Software Foundation; either version 2 of the License, or (at your option) 
+ * any later version.
  * 
- * This program is free software; you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation; either version 2 of the License, or
- * (at your option) any later version.
+ * This program is distributed in the hope that it will be useful, but WITHOUT 
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or 
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for 
+ * more details.
  * 
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- * 
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+ * You should have received a copy of the GNU General Public License along 
+ * with this program; if not, write to the Free Software Foundation, Inc., 59 
+ * Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
 
 #include <xen/config.h>
@@ -57,7 +56,7 @@ l2_pgentry_t *virt_to_xen_l2e(unsigned long v)
     {
         pl3e = page_to_virt(alloc_xen_pagetable());
         clear_page(pl3e);
-        *pl4e = l4e_create_phys(__pa(pl3e), __PAGE_HYPERVISOR);
+        *pl4e = l4e_from_paddr(__pa(pl3e), __PAGE_HYPERVISOR);
     }
     
     pl3e = l4e_to_l3e(*pl4e) + l3_table_offset(v);
@@ -65,7 +64,7 @@ l2_pgentry_t *virt_to_xen_l2e(unsigned long v)
     {
         pl2e = page_to_virt(alloc_xen_pagetable());
         clear_page(pl2e);
-        *pl3e = l3e_create_phys(__pa(pl2e), __PAGE_HYPERVISOR);
+        *pl3e = l3e_from_paddr(__pa(pl2e), __PAGE_HYPERVISOR);
     }
     
     pl2e = l3e_to_l2e(*pl3e) + l2_table_offset(v);
@@ -85,12 +84,12 @@ void __init paging_init(void)
     l3_ro_mpt = (l3_pgentry_t *)alloc_xenheap_page();
     clear_page(l3_ro_mpt);
     idle_pg_table[l4_table_offset(RO_MPT_VIRT_START)] =
-        l4e_create_page(
+        l4e_from_page(
             virt_to_page(l3_ro_mpt), __PAGE_HYPERVISOR | _PAGE_USER);
     l2_ro_mpt = (l2_pgentry_t *)alloc_xenheap_page();
     clear_page(l2_ro_mpt);
     l3_ro_mpt[l3_table_offset(RO_MPT_VIRT_START)] =
-        l3e_create_page(
+        l3e_from_page(
             virt_to_page(l2_ro_mpt), __PAGE_HYPERVISOR | _PAGE_USER);
     l2_ro_mpt += l2_table_offset(RO_MPT_VIRT_START);
 
@@ -109,14 +108,14 @@ void __init paging_init(void)
             PAGE_HYPERVISOR);
         memset((void *)(RDWR_MPT_VIRT_START + i*8), 0x55,
                1UL << L2_PAGETABLE_SHIFT);
-        *l2_ro_mpt++ = l2e_create_page(
+        *l2_ro_mpt++ = l2e_from_page(
             pg, _PAGE_GLOBAL|_PAGE_PSE|_PAGE_USER|_PAGE_PRESENT);
         BUG_ON(((unsigned long)l2_ro_mpt & ~PAGE_MASK) == 0);
     }
 
     /* Set up linear page table mapping. */
     idle_pg_table[l4_table_offset(LINEAR_PT_VIRT_START)] =
-        l4e_create_phys(__pa(idle_pg_table), __PAGE_HYPERVISOR);
+        l4e_from_paddr(__pa(idle_pg_table), __PAGE_HYPERVISOR);
 }
 
 void __init zap_low_mappings(void)

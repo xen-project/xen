@@ -377,7 +377,7 @@ shadow_get_page_from_l1e(l1_pgentry_t l1e, struct domain *d)
         return 1;
 
     nl1e = l1e;
-    l1e_remove_flags(&nl1e, _PAGE_GLOBAL);
+    l1e_remove_flags(nl1e, _PAGE_GLOBAL);
     res = get_page_from_l1e(nl1e, d);
 
     if ( unlikely(!res) && IS_PRIV(d) && !shadow_mode_translate(d) &&
@@ -398,7 +398,7 @@ shadow_get_page_from_l1e(l1_pgentry_t l1e, struct domain *d)
     {
         perfc_incrc(shadow_get_page_fail);
         FSH_LOG("%s failed to get ref l1e=%lx\n",
-                __func__, l1e_get_value(l1e));
+                __func__, l1e_get_intpte(l1e));
     }
 
     return res;
@@ -558,13 +558,13 @@ update_hl2e(struct exec_domain *ed, unsigned long va)
 
     if ( (l2e_get_flags(gl2e) & _PAGE_PRESENT) &&
          VALID_MFN(mfn = phys_to_machine_mapping(l2e_get_pfn(gl2e))) )
-        new_hl2e = l1e_create_pfn(mfn, __PAGE_HYPERVISOR);
+        new_hl2e = l1e_from_pfn(mfn, __PAGE_HYPERVISOR);
     else
         new_hl2e = l1e_empty();
 
     // only do the ref counting if something has changed.
     //
-    if ( (l1e_has_changed(&old_hl2e, &new_hl2e, PAGE_FLAG_MASK)) )
+    if ( (l1e_has_changed(old_hl2e, new_hl2e, PAGE_FLAG_MASK)) )
     {
         if ( (l1e_get_flags(new_hl2e) & _PAGE_PRESENT) &&
              !shadow_get_page(ed->domain, pfn_to_page(l1e_get_pfn(new_hl2e)),
@@ -735,11 +735,11 @@ static inline int l1pte_write_fault(
     }
 
     ASSERT(l1e_get_flags(gpte) & _PAGE_RW);
-    l1e_add_flags(&gpte, _PAGE_DIRTY | _PAGE_ACCESSED);
-    spte = l1e_create_pfn(gmfn, l1e_get_flags(gpte) & ~_PAGE_GLOBAL);
+    l1e_add_flags(gpte, _PAGE_DIRTY | _PAGE_ACCESSED);
+    spte = l1e_from_pfn(gmfn, l1e_get_flags(gpte) & ~_PAGE_GLOBAL);
 
     SH_VVLOG("l1pte_write_fault: updating spte=0x%lx gpte=0x%lx",
-             l1e_get_value(spte), l1e_get_value(gpte));
+             l1e_get_intpte(spte), l1e_get_intpte(gpte));
 
     if ( shadow_mode_log_dirty(d) )
         __mark_dirty(d, gmfn);
@@ -768,17 +768,17 @@ static inline int l1pte_read_fault(
         return 0;
     }
 
-    l1e_add_flags(&gpte, _PAGE_ACCESSED);
-    spte = l1e_create_pfn(mfn, l1e_get_flags(gpte) & ~_PAGE_GLOBAL);
+    l1e_add_flags(gpte, _PAGE_ACCESSED);
+    spte = l1e_from_pfn(mfn, l1e_get_flags(gpte) & ~_PAGE_GLOBAL);
 
     if ( shadow_mode_log_dirty(d) || !(l1e_get_flags(gpte) & _PAGE_DIRTY) ||
          mfn_is_page_table(mfn) )
     {
-        l1e_remove_flags(&spte, _PAGE_RW);
+        l1e_remove_flags(spte, _PAGE_RW);
     }
 
     SH_VVLOG("l1pte_read_fault: updating spte=0x%lx gpte=0x%lx",
-             l1e_get_value(spte), l1e_get_value(gpte));
+             l1e_get_intpte(spte), l1e_get_intpte(gpte));
     *gpte_p = gpte;
     *spte_p = spte;
 
@@ -797,21 +797,20 @@ static inline void l1pte_propagate_from_guest(
           (_PAGE_PRESENT|_PAGE_ACCESSED)) &&
          VALID_MFN(mfn = __gpfn_to_mfn(d, l1e_get_pfn(gpte))) )
     {
-        spte = l1e_create_pfn(mfn,
-                              l1e_get_flags(gpte) &
-                              ~(_PAGE_GLOBAL | _PAGE_AVAIL));
+        spte = l1e_from_pfn(
+            mfn, l1e_get_flags(gpte) & ~(_PAGE_GLOBAL | _PAGE_AVAIL));
 
         if ( shadow_mode_log_dirty(d) ||
              !(l1e_get_flags(gpte) & _PAGE_DIRTY) ||
              mfn_is_page_table(mfn) )
         {
-            l1e_remove_flags(&spte, _PAGE_RW);
+            l1e_remove_flags(spte, _PAGE_RW);
         }
     }
 
-    if ( l1e_get_value(spte) || l1e_get_value(gpte) )
+    if ( l1e_get_intpte(spte) || l1e_get_intpte(gpte) )
         SH_VVVLOG("%s: gpte=%lx, new spte=%lx",
-                  __func__, l1e_get_value(gpte), l1e_get_value(spte));
+                  __func__, l1e_get_intpte(gpte), l1e_get_intpte(spte));
 
     *spte_p = spte;
 }
@@ -840,12 +839,12 @@ static inline void hl2e_propagate_from_guest(
             mfn = __gpfn_to_mfn(d, pfn);
 
         if ( VALID_MFN(mfn) && (mfn < max_page) )
-            hl2e = l1e_create_pfn(mfn, __PAGE_HYPERVISOR);
+            hl2e = l1e_from_pfn(mfn, __PAGE_HYPERVISOR);
     }
 
-    if ( l1e_get_value(hl2e) || l2e_get_value(gpde) )
+    if ( l1e_get_intpte(hl2e) || l2e_get_intpte(gpde) )
         SH_VVLOG("%s: gpde=%lx hl2e=%lx", __func__,
-                 l2e_get_value(gpde), l1e_get_value(hl2e));
+                 l2e_get_intpte(gpde), l1e_get_intpte(hl2e));
 
     *hl2e_p = hl2e;
 }
@@ -862,19 +861,19 @@ static inline void l2pde_general(
     spde = l2e_empty();
     if ( (l2e_get_flags(gpde) & _PAGE_PRESENT) && (sl1mfn != 0) )
     {
-        spde = l2e_create_pfn(sl1mfn,
-                              (l2e_get_flags(gpde) | _PAGE_RW | _PAGE_ACCESSED)
-                              & ~(_PAGE_AVAIL));
+        spde = l2e_from_pfn(
+            sl1mfn, 
+            (l2e_get_flags(gpde) | _PAGE_RW | _PAGE_ACCESSED) & ~_PAGE_AVAIL);
 
         /* N.B. PDEs do not have a dirty bit. */
-        l2e_add_flags(&gpde, _PAGE_ACCESSED);
+        l2e_add_flags(gpde, _PAGE_ACCESSED);
 
         *gpde_p = gpde;
     }
 
-    if ( l2e_get_value(spde) || l2e_get_value(gpde) )
+    if ( l2e_get_intpte(spde) || l2e_get_intpte(gpde) )
         SH_VVLOG("%s: gpde=%lx, new spde=%lx", __func__,
-                 l2e_get_value(gpde), l2e_get_value(spde));
+                 l2e_get_intpte(gpde), l2e_get_intpte(spde));
 
     *spde_p = spde;
 }
@@ -911,13 +910,13 @@ validate_pte_change(
     {
         old_spte = *shadow_pte_p;
 
-        if ( l1e_get_value(old_spte) == l1e_get_value(new_spte) )
+        if ( l1e_get_intpte(old_spte) == l1e_get_intpte(new_spte) )
         {
             // No accounting required...
             //
             perfc_incrc(validate_pte_changes1);
         }
-        else if ( l1e_get_value(old_spte) == (l1e_get_value(new_spte)|_PAGE_RW) )
+        else if ( l1e_get_intpte(old_spte) == (l1e_get_intpte(new_spte)|_PAGE_RW) )
         {
             // Fast path for PTEs that have merely been write-protected
             // (e.g., during a Unix fork()). A strict reduction in privilege.
@@ -928,7 +927,7 @@ validate_pte_change(
         }
         else if ( ((l1e_get_flags(old_spte) | l1e_get_flags(new_spte)) &
                    _PAGE_PRESENT ) &&
-                  l1e_has_changed(&old_spte, &new_spte, _PAGE_RW | _PAGE_PRESENT) )
+                  l1e_has_changed(old_spte, new_spte, _PAGE_RW | _PAGE_PRESENT) )
         {
             // only do the ref counting if something important changed.
             //
@@ -973,7 +972,7 @@ validate_hl2e_change(
     // Only do the ref counting if something important changed.
     //
     if ( ((l1e_get_flags(old_hl2e) | l1e_get_flags(new_hl2e)) & _PAGE_PRESENT) &&
-         l1e_has_changed(&old_hl2e, &new_hl2e, _PAGE_PRESENT) )
+         l1e_has_changed(old_hl2e, new_hl2e, _PAGE_PRESENT) )
     {
         perfc_incrc(validate_hl2e_changes);
 
@@ -1010,8 +1009,8 @@ validate_pde_change(
 
     // Only do the ref counting if something important changed.
     //
-    if ( ((l2e_get_value(old_spde) | l2e_get_value(new_spde)) & _PAGE_PRESENT) &&
-         l2e_has_changed(&old_spde, &new_spde, _PAGE_PRESENT) )
+    if ( ((l2e_get_intpte(old_spde) | l2e_get_intpte(new_spde)) & _PAGE_PRESENT) &&
+         l2e_has_changed(old_spde, new_spde, _PAGE_PRESENT) )
     {
         perfc_incrc(validate_pde_changes);
 
@@ -1590,7 +1589,7 @@ shadow_set_l1e(unsigned long va, l1_pgentry_t new_spte, int create_l1_shadow)
 
         // only do the ref counting if something important changed.
         //
-        if ( l1e_has_changed(&old_spte, &new_spte, _PAGE_RW | _PAGE_PRESENT) )
+        if ( l1e_has_changed(old_spte, new_spte, _PAGE_RW | _PAGE_PRESENT) )
         {
             if ( (l1e_get_flags(new_spte) & _PAGE_PRESENT) &&
                  !shadow_get_page_from_l1e(new_spte, d) )
@@ -1664,7 +1663,7 @@ static inline unsigned long gva_to_gpa(unsigned long gva)
     if ( !(l1e_get_flags(gpte) & _PAGE_PRESENT) )
         return 0;
 
-    return l1e_get_phys(gpte) + (gva & ~PAGE_MASK); 
+    return l1e_get_paddr(gpte) + (gva & ~PAGE_MASK); 
 }
 
 /************************************************************************/
@@ -1684,7 +1683,7 @@ static inline void update_pagetables(struct exec_domain *ed)
         // HACK ALERT: there's currently no easy way to figure out if a domU
         // has set its arch.guest_table to zero, vs not yet initialized it.
         //
-        paging_enabled = !!pagetable_get_phys(ed->arch.guest_table);
+        paging_enabled = !!pagetable_get_paddr(ed->arch.guest_table);
 
     /*
      * We don't call __update_pagetables() when vmx guest paging is

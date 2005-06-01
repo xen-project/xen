@@ -263,15 +263,15 @@ int construct_dom0(struct domain *d,
     l2start = l2tab = (l2_pgentry_t *)mpt_alloc; mpt_alloc += 4*PAGE_SIZE;
     memcpy(l2tab, idle_pg_table_l2, 4*PAGE_SIZE);
     for (i = 0; i < 4; i++) {
-        l3tab[i] = l3e_create_phys((u32)l2tab + i*PAGE_SIZE, L3_PROT);
+        l3tab[i] = l3e_from_paddr((u32)l2tab + i*PAGE_SIZE, L3_PROT);
         l2tab[(LINEAR_PT_VIRT_START >> L2_PAGETABLE_SHIFT)+i] =
-            l2e_create_phys((u32)l2tab + i*PAGE_SIZE, __PAGE_HYPERVISOR);
+            l2e_from_paddr((u32)l2tab + i*PAGE_SIZE, __PAGE_HYPERVISOR);
     }
     unsigned long v;
     for (v = PERDOMAIN_VIRT_START; v < PERDOMAIN_VIRT_END;
          v += (1 << L2_PAGETABLE_SHIFT)) {
         l2tab[v >> L2_PAGETABLE_SHIFT] =
-            l2e_create_phys(__pa(d->arch.mm_perdomain_pt) + (v-PERDOMAIN_VIRT_START),
+            l2e_from_paddr(__pa(d->arch.mm_perdomain_pt) + (v-PERDOMAIN_VIRT_START),
                             __PAGE_HYPERVISOR);
     }
     ed->arch.guest_table = mk_pagetable((unsigned long)l3start);
@@ -279,9 +279,9 @@ int construct_dom0(struct domain *d,
     l2start = l2tab = (l2_pgentry_t *)mpt_alloc; mpt_alloc += PAGE_SIZE;
     memcpy(l2tab, &idle_pg_table[0], PAGE_SIZE);
     l2tab[LINEAR_PT_VIRT_START >> L2_PAGETABLE_SHIFT] =
-        l2e_create_phys((unsigned long)l2start, __PAGE_HYPERVISOR);
+        l2e_from_paddr((unsigned long)l2start, __PAGE_HYPERVISOR);
     l2tab[PERDOMAIN_VIRT_START >> L2_PAGETABLE_SHIFT] =
-        l2e_create_phys(__pa(d->arch.mm_perdomain_pt), __PAGE_HYPERVISOR);
+        l2e_from_paddr(__pa(d->arch.mm_perdomain_pt), __PAGE_HYPERVISOR);
     ed->arch.guest_table = mk_pagetable((unsigned long)l2start);
 #endif
 
@@ -293,13 +293,13 @@ int construct_dom0(struct domain *d,
         {
             l1start = l1tab = (l1_pgentry_t *)mpt_alloc; 
             mpt_alloc += PAGE_SIZE;
-            *l2tab = l2e_create_phys((unsigned long)l1start, L2_PROT);
+            *l2tab = l2e_from_paddr((unsigned long)l1start, L2_PROT);
             l2tab++;
             clear_page(l1tab);
             if ( count == 0 )
                 l1tab += l1_table_offset(dsi.v_start);
         }
-        *l1tab = l1e_create_pfn(mfn, L1_PROT);
+        *l1tab = l1e_from_pfn(mfn, L1_PROT);
         l1tab++;
         
         page = &frame_table[mfn];
@@ -311,13 +311,13 @@ int construct_dom0(struct domain *d,
 
     /* Pages that are part of page tables must be read only. */
     l2tab = l2start + l2_linear_offset(vpt_start);
-    l1start = l1tab = (l1_pgentry_t *)(u32)l2e_get_phys(*l2tab);
+    l1start = l1tab = (l1_pgentry_t *)(u32)l2e_get_paddr(*l2tab);
     l1tab += l1_table_offset(vpt_start);
     for ( count = 0; count < nr_pt_pages; count++ ) 
     {
         page = &frame_table[l1e_get_pfn(*l1tab)];
         if ( !opt_dom0_shadow )
-            l1e_remove_flags(l1tab, _PAGE_RW);
+            l1e_remove_flags(*l1tab, _PAGE_RW);
         else
             if ( !get_page_type(page, PGT_writable_page) )
                 BUG();
@@ -384,7 +384,7 @@ int construct_dom0(struct domain *d,
         }
 #endif
         if ( !((unsigned long)++l1tab & (PAGE_SIZE - 1)) )
-            l1start = l1tab = (l1_pgentry_t *)(u32)l2e_get_phys(*++l2tab);
+            l1start = l1tab = (l1_pgentry_t *)(u32)l2e_get_paddr(*++l2tab);
     }
 
 #elif defined(__x86_64__)
@@ -402,9 +402,9 @@ int construct_dom0(struct domain *d,
     l4start = l4tab = __va(mpt_alloc); mpt_alloc += PAGE_SIZE;
     memcpy(l4tab, &idle_pg_table[0], PAGE_SIZE);
     l4tab[l4_table_offset(LINEAR_PT_VIRT_START)] =
-        l4e_create_phys(__pa(l4start), __PAGE_HYPERVISOR);
+        l4e_from_paddr(__pa(l4start), __PAGE_HYPERVISOR);
     l4tab[l4_table_offset(PERDOMAIN_VIRT_START)] =
-        l4e_create_phys(__pa(d->arch.mm_perdomain_l3), __PAGE_HYPERVISOR);
+        l4e_from_paddr(__pa(d->arch.mm_perdomain_l3), __PAGE_HYPERVISOR);
     ed->arch.guest_table = mk_pagetable(__pa(l4start));
 
     l4tab += l4_table_offset(dsi.v_start);
@@ -433,16 +433,16 @@ int construct_dom0(struct domain *d,
                     clear_page(l3tab);
                     if ( count == 0 )
                         l3tab += l3_table_offset(dsi.v_start);
-                    *l4tab = l4e_create_phys(__pa(l3start), L4_PROT);
+                    *l4tab = l4e_from_paddr(__pa(l3start), L4_PROT);
                     l4tab++;
                 }
-                *l3tab = l3e_create_phys(__pa(l2start), L3_PROT);
+                *l3tab = l3e_from_paddr(__pa(l2start), L3_PROT);
                 l3tab++;
             }
-            *l2tab = l2e_create_phys(__pa(l1start), L2_PROT);
+            *l2tab = l2e_from_paddr(__pa(l1start), L2_PROT);
             l2tab++;
         }
-        *l1tab = l1e_create_pfn(mfn, L1_PROT);
+        *l1tab = l1e_from_pfn(mfn, L1_PROT);
         l1tab++;
 
         page = &frame_table[mfn];
@@ -463,7 +463,7 @@ int construct_dom0(struct domain *d,
     l1tab += l1_table_offset(vpt_start);
     for ( count = 0; count < nr_pt_pages; count++ ) 
     {
-        l1e_remove_flags(l1tab, _PAGE_RW);
+        l1e_remove_flags(*l1tab, _PAGE_RW);
         page = &frame_table[l1e_get_pfn(*l1tab)];
 
         /* Read-only mapping + PGC_allocated + page-table page. */
@@ -633,10 +633,10 @@ int construct_dom0(struct domain *d,
             // map this domain's p2m table into current page table,
             // so that we can easily access it.
             //
-            ASSERT( root_get_value(idle_pg_table[1]) == 0 );
-            ASSERT( pagetable_get_phys(d->arch.phys_table) );
-            idle_pg_table[1] = root_create_phys(
-                pagetable_get_phys(d->arch.phys_table), __PAGE_HYPERVISOR);
+            ASSERT( root_get_intpte(idle_pg_table[1]) == 0 );
+            ASSERT( pagetable_get_paddr(d->arch.phys_table) );
+            idle_pg_table[1] = root_from_paddr(
+                pagetable_get_paddr(d->arch.phys_table), __PAGE_HYPERVISOR);
             translate_l2pgtable(d, (l1_pgentry_t *)(1u << L2_PAGETABLE_SHIFT),
                                 pagetable_get_pfn(ed->arch.guest_table));
             idle_pg_table[1] = root_empty();

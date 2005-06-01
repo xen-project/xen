@@ -250,7 +250,7 @@ void arch_do_createdomain(struct exec_domain *ed)
                            PAGE_SHIFT] = INVALID_M2P_ENTRY;
     ed->arch.perdomain_ptes = d->arch.mm_perdomain_pt;
     ed->arch.perdomain_ptes[FIRST_RESERVED_GDT_PAGE] =
-        l1e_create_page(virt_to_page(gdt_table), PAGE_HYPERVISOR);
+        l1e_from_page(virt_to_page(gdt_table), PAGE_HYPERVISOR);
 
     ed->arch.guest_vtable  = __linear_l2_table;
     ed->arch.shadow_vtable = __shadow_linear_l2_table;
@@ -262,12 +262,12 @@ void arch_do_createdomain(struct exec_domain *ed)
     d->arch.mm_perdomain_l2 = (l2_pgentry_t *)alloc_xenheap_page();
     memset(d->arch.mm_perdomain_l2, 0, PAGE_SIZE);
     d->arch.mm_perdomain_l2[l2_table_offset(PERDOMAIN_VIRT_START)] = 
-        l2e_create_page(virt_to_page(d->arch.mm_perdomain_pt),
+        l2e_from_page(virt_to_page(d->arch.mm_perdomain_pt),
                         __PAGE_HYPERVISOR);
     d->arch.mm_perdomain_l3 = (l3_pgentry_t *)alloc_xenheap_page();
     memset(d->arch.mm_perdomain_l3, 0, PAGE_SIZE);
     d->arch.mm_perdomain_l3[l3_table_offset(PERDOMAIN_VIRT_START)] = 
-        l3e_create_page(virt_to_page(d->arch.mm_perdomain_l2),
+        l3e_from_page(virt_to_page(d->arch.mm_perdomain_l2),
                             __PAGE_HYPERVISOR);
 #endif
     
@@ -288,7 +288,7 @@ void arch_do_boot_vcpu(struct exec_domain *ed)
     ed->arch.perdomain_ptes =
         d->arch.mm_perdomain_pt + (ed->vcpu_id << PDPT_VCPU_SHIFT);
     ed->arch.perdomain_ptes[FIRST_RESERVED_GDT_PAGE] =
-        l1e_create_page(virt_to_page(gdt_table), PAGE_HYPERVISOR);
+        l1e_from_page(virt_to_page(gdt_table), PAGE_HYPERVISOR);
 }
 
 #ifdef CONFIG_VMX
@@ -460,7 +460,7 @@ int arch_set_info_guest(
         //      trust the VMX domain builder.  Xen should validate this
         //      page table, and/or build the table itself, or ???
         //
-        if ( !pagetable_get_phys(d->arch.phys_table) )
+        if ( !pagetable_get_paddr(d->arch.phys_table) )
             d->arch.phys_table = ed->arch.guest_table;
 
         if ( (error = vmx_final_setup_guest(ed, c)) )
@@ -660,7 +660,7 @@ long do_switch_to_user(void)
     struct exec_domain    *ed = current;
 
     if ( unlikely(copy_from_user(&stu, (void *)regs->rsp, sizeof(stu))) ||
-         unlikely(pagetable_get_phys(ed->arch.guest_table_user) == 0) )
+         unlikely(pagetable_get_paddr(ed->arch.guest_table_user) == 0) )
         return -EFAULT;
 
     toggle_guest_mode(ed);
@@ -978,7 +978,7 @@ void domain_relinquish_resources(struct domain *d)
     /* Drop the in-use references to page-table bases. */
     for_each_exec_domain ( d, ed )
     {
-        if ( pagetable_get_phys(ed->arch.guest_table) != 0 )
+        if ( pagetable_get_paddr(ed->arch.guest_table) != 0 )
         {
             if ( shadow_mode_refcounts(d) )
                 put_page(&frame_table[pagetable_get_pfn(ed->arch.guest_table)]);
@@ -988,7 +988,7 @@ void domain_relinquish_resources(struct domain *d)
             ed->arch.guest_table = mk_pagetable(0);
         }
 
-        if ( pagetable_get_phys(ed->arch.guest_table_user) != 0 )
+        if ( pagetable_get_paddr(ed->arch.guest_table_user) != 0 )
         {
             if ( shadow_mode_refcounts(d) )
                 put_page(&frame_table[pagetable_get_pfn(ed->arch.guest_table_user)]);

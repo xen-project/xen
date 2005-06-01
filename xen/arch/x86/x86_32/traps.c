@@ -101,15 +101,15 @@ void show_page_walk(unsigned long addr)
     printk("Pagetable walk from %08lx:\n", addr);
     
     pmd = idle_pg_table_l2[l2_linear_offset(addr)];
-    printk(" L2 = %08llx %s\n", (u64)l2e_get_value(pmd),
+    printk(" L2 = %"PRIpte" %s\n", l2e_get_intpte(pmd),
            (l2e_get_flags(pmd) & _PAGE_PSE) ? "(2/4MB)" : "");
     if ( !(l2e_get_flags(pmd) & _PAGE_PRESENT) ||
          (l2e_get_flags(pmd) & _PAGE_PSE) )
         return;
 
-    pte  = __va(l2e_get_phys(pmd));
+    pte  = __va(l2e_get_paddr(pmd));
     pte += l1_table_offset(addr);
-    printk("  L1 = %08llx\n", (u64)l1e_get_value(*pte));
+    printk("  L1 = %"PRIpte"\n", l1e_get_intpte(*pte));
 }
 
 #define DOUBLEFAULT_STACK_SIZE 1024

@@ -41,9 +41,9 @@ typedef l3_pgentry_t root_pgentry_t;
 /* root table */
 #define root_get_pfn              l3e_get_pfn
 #define root_get_flags            l3e_get_flags
-#define root_get_value            l3e_get_value
+#define root_get_intpte           l3e_get_intpte
 #define root_empty                l3e_empty
-#define root_init_phys            l3e_create_phys
+#define root_from_paddr           l3e_from_paddr
 #define PGT_root_page_table       PGT_l3_page_table
 
 /* misc */

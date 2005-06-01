@@ -74,7 +74,7 @@ void *map_domain_mem(unsigned long pa)
     }
     while ( l1e_get_flags(cache[idx]) & _PAGE_PRESENT );
 
-    cache[idx] = l1e_create_phys(pa, __PAGE_HYPERVISOR);
+    cache[idx] = l1e_from_paddr(pa, __PAGE_HYPERVISOR);
 
     spin_unlock(&map_lock);
 
@@ -88,5 +88,5 @@ void unmap_domain_mem(void *va)
     ASSERT((void *)MAPCACHE_VIRT_START <= va);
     ASSERT(va < (void *)MAPCACHE_VIRT_END);
     idx = ((unsigned long)va - MAPCACHE_VIRT_START) >> PAGE_SHIFT;
-    l1e_add_flags(&mapcache[idx], READY_FOR_TLB_FLUSH);
+    l1e_add_flags(mapcache[idx], READY_FOR_TLB_FLUSH);
 }

@@ -466,12 +466,12 @@ void vmx_do_resume(struct exec_domain *d)
 {
     vmx_stts();
     if ( vmx_paging_enabled(d) )
-        __vmwrite(GUEST_CR3, pagetable_get_phys(d->arch.shadow_table));
+        __vmwrite(GUEST_CR3, pagetable_get_paddr(d->arch.shadow_table));
     else
         // paging is not enabled in the guest
-        __vmwrite(GUEST_CR3, pagetable_get_phys(d->domain->arch.phys_table));
+        __vmwrite(GUEST_CR3, pagetable_get_paddr(d->domain->arch.phys_table));
 
-    __vmwrite(HOST_CR3, pagetable_get_phys(d->arch.monitor_table));
+    __vmwrite(HOST_CR3, pagetable_get_paddr(d->arch.monitor_table));
     __vmwrite(HOST_ESP, (unsigned long)get_stack_bottom());
 
     if (event_pending(d)) {

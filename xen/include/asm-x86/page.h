@@ -20,11 +20,11 @@
 # include <asm/x86_64/page.h>
 #endif
 
-/* Get pte contents as an integer (intpte_t). */
-#define l1e_get_value(x)           ((x).l1)
-#define l2e_get_value(x)           ((x).l2)
-#define l3e_get_value(x)           ((x).l3)
-#define l4e_get_value(x)           ((x).l4)
+/* Get direct integer representation of a pte's contents (intpte_t). */
+#define l1e_get_intpte(x)          ((x).l1)
+#define l2e_get_intpte(x)          ((x).l2)
+#define l3e_get_intpte(x)          ((x).l3)
+#define l4e_get_intpte(x)          ((x).l4)
 
 /* Get pfn mapped by pte (unsigned long). */
 #define l1e_get_pfn(x)             \
@@ -37,14 +37,20 @@
     ((unsigned long)(((x).l4 & (PADDR_MASK&PAGE_MASK)) >> PAGE_SHIFT))
 
 /* Get physical address of page mapped by pte (physaddr_t). */
-#define l1e_get_phys(x)            \
+#define l1e_get_paddr(x)           \
     ((physaddr_t)(((x).l1 & (PADDR_MASK&PAGE_MASK))))
-#define l2e_get_phys(x)            \
+#define l2e_get_paddr(x)           \
     ((physaddr_t)(((x).l2 & (PADDR_MASK&PAGE_MASK))))
-#define l3e_get_phys(x)            \
+#define l3e_get_paddr(x)           \
     ((physaddr_t)(((x).l3 & (PADDR_MASK&PAGE_MASK))))
-#define l4e_get_phys(x)            \
+#define l4e_get_paddr(x)           \
     ((physaddr_t)(((x).l4 & (PADDR_MASK&PAGE_MASK))))
+
+/* Get pointer to info structure of page mapped by pte (struct pfn_info *). */
+#define l1e_get_page(x)           (pfn_to_page(l1e_get_pfn(x)))
+#define l2e_get_page(x)           (pfn_to_page(l2e_get_pfn(x)))
+#define l3e_get_page(x)           (pfn_to_page(l3e_get_pfn(x)))
+#define l4e_get_page(x)           (pfn_to_page(l4e_get_pfn(x)))
 
 /* Get pte access flags (unsigned int). */
 #define l1e_get_flags(x)           (get_pte_flags((x).l1))
@@ -59,51 +65,63 @@
 #define l4e_empty()                ((l4_pgentry_t) { 0 })
 
 /* Construct a pte from a pfn and access flags. */
-#define l1e_create_pfn(pfn, flags) \
+#define l1e_from_pfn(pfn, flags)   \
     ((l1_pgentry_t) { ((intpte_t)(pfn) << PAGE_SHIFT) | put_pte_flags(flags) })
-#define l2e_create_pfn(pfn, flags) \
+#define l2e_from_pfn(pfn, flags)   \
     ((l2_pgentry_t) { ((intpte_t)(pfn) << PAGE_SHIFT) | put_pte_flags(flags) })
-#define l3e_create_pfn(pfn, flags) \
+#define l3e_from_pfn(pfn, flags)   \
     ((l3_pgentry_t) { ((intpte_t)(pfn) << PAGE_SHIFT) | put_pte_flags(flags) })
-#define l4e_create_pfn(pfn, flags) \
+#define l4e_from_pfn(pfn, flags)   \
     ((l4_pgentry_t) { ((intpte_t)(pfn) << PAGE_SHIFT) | put_pte_flags(flags) })
 
 /* Construct a pte from a physical address and access flags. */
-#define l1e_create_phys(pa, flags) \
+#define l1e_from_paddr(pa, flags)  \
     ((l1_pgentry_t) { (pa) | put_pte_flags(flags) })
-#define l2e_create_phys(pa, flags) \
+#define l2e_from_paddr(pa, flags)  \
     ((l2_pgentry_t) { (pa) | put_pte_flags(flags) })
-#define l3e_create_phys(pa, flags) \
+#define l3e_from_paddr(pa, flags)  \
     ((l3_pgentry_t) { (pa) | put_pte_flags(flags) })
-#define l4e_create_phys(pa, flags) \
+#define l4e_from_paddr(pa, flags)  \
     ((l4_pgentry_t) { (pa) | put_pte_flags(flags) })
 
+/* Construct a pte from its direct integer representation. */
+#define l1e_from_intpte(intpte)    ((l1_pgentry_t) { (intpte_t)(intpte) })
+#define l2e_from_intpte(intpte)    ((l2_pgentry_t) { (intpte_t)(intpte) })
+#define l3e_from_intpte(intpte)    ((l3_pgentry_t) { (intpte_t)(intpte) })
+#define l4e_from_intpte(intpte)    ((l4_pgentry_t) { (intpte_t)(intpte) })
+
+/* Construct a pte from a page pointer and access flags. */
+#define l1e_from_page(page, flags) (l1e_from_pfn(page_to_pfn(page),(flags)))
+#define l2e_from_page(page, flags) (l2e_from_pfn(page_to_pfn(page),(flags)))
+#define l3e_from_page(page, flags) (l3e_from_pfn(page_to_pfn(page),(flags)))
+#define l4e_from_page(page, flags) (l4e_from_pfn(page_to_pfn(page),(flags)))
+
 /* Add extra flags to an existing pte. */
-#define l1e_add_flags(x, flags)    ((x)->l1 |= put_pte_flags(flags))
-#define l2e_add_flags(x, flags)    ((x)->l2 |= put_pte_flags(flags))
-#define l3e_add_flags(x, flags)    ((x)->l3 |= put_pte_flags(flags))
-#define l4e_add_flags(x, flags)    ((x)->l4 |= put_pte_flags(flags))
+#define l1e_add_flags(x, flags)    ((x).l1 |= put_pte_flags(flags))
+#define l2e_add_flags(x, flags)    ((x).l2 |= put_pte_flags(flags))
+#define l3e_add_flags(x, flags)    ((x).l3 |= put_pte_flags(flags))
+#define l4e_add_flags(x, flags)    ((x).l4 |= put_pte_flags(flags))
 
 /* Remove flags from an existing pte. */
-#define l1e_remove_flags(x, flags) ((x)->l1 &= ~put_pte_flags(flags))
-#define l2e_remove_flags(x, flags) ((x)->l2 &= ~put_pte_flags(flags))
-#define l3e_remove_flags(x, flags) ((x)->l3 &= ~put_pte_flags(flags))
-#define l4e_remove_flags(x, flags) ((x)->l4 &= ~put_pte_flags(flags))
+#define l1e_remove_flags(x, flags) ((x).l1 &= ~put_pte_flags(flags))
+#define l2e_remove_flags(x, flags) ((x).l2 &= ~put_pte_flags(flags))
+#define l3e_remove_flags(x, flags) ((x).l3 &= ~put_pte_flags(flags))
+#define l4e_remove_flags(x, flags) ((x).l4 &= ~put_pte_flags(flags))
 
 /* Check if a pte's page mapping or significant access flags have changed. */
 #define l1e_has_changed(x,y,flags) \
-    ( !!(((x)->l1 ^ (y)->l1) & ((PADDR_MASK&PAGE_MASK)|put_pte_flags(flags))) )
+    ( !!(((x).l1 ^ (y).l1) & ((PADDR_MASK&PAGE_MASK)|put_pte_flags(flags))) )
 #define l2e_has_changed(x,y,flags) \
-    ( !!(((x)->l2 ^ (y)->l2) & ((PADDR_MASK&PAGE_MASK)|put_pte_flags(flags))) )
+    ( !!(((x).l2 ^ (y).l2) & ((PADDR_MASK&PAGE_MASK)|put_pte_flags(flags))) )
 #define l3e_has_changed(x,y,flags) \
-    ( !!(((x)->l3 ^ (y)->l3) & ((PADDR_MASK&PAGE_MASK)|put_pte_flags(flags))) )
+    ( !!(((x).l3 ^ (y).l3) & ((PADDR_MASK&PAGE_MASK)|put_pte_flags(flags))) )
 #define l4e_has_changed(x,y,flags) \
-    ( !!(((x)->l4 ^ (y)->l4) & ((PADDR_MASK&PAGE_MASK)|put_pte_flags(flags))) )
+    ( !!(((x).l4 ^ (y).l4) & ((PADDR_MASK&PAGE_MASK)|put_pte_flags(flags))) )
 
 /* Pagetable walking. */
-#define l2e_to_l1e(x)              ((l1_pgentry_t *)__va(l2e_get_phys(x)))
-#define l3e_to_l2e(x)              ((l2_pgentry_t *)__va(l3e_get_phys(x)))
-#define l4e_to_l3e(x)              ((l3_pgentry_t *)__va(l4e_get_phys(x)))
+#define l2e_to_l1e(x)              ((l1_pgentry_t *)__va(l2e_get_paddr(x)))
+#define l3e_to_l2e(x)              ((l2_pgentry_t *)__va(l3e_get_paddr(x)))
+#define l4e_to_l3e(x)              ((l3_pgentry_t *)__va(l4e_get_paddr(x)))
 
 /* Given a virtual address, get an entry offset into a page table. */
 #define l1_table_offset(a)         \
@@ -116,7 +134,7 @@
     (((a) >> L4_PAGETABLE_SHIFT) & (L4_PAGETABLE_ENTRIES - 1))
 
 /* Convert a pointer to a page-table entry into pagetable slot index. */
-#define pgentry_ptr_to_slot(_p) \
+#define pgentry_ptr_to_slot(_p)    \
     (((unsigned long)(_p) & ~PAGE_MASK) / sizeof(*(_p)))
 
 /* Page-table type. */
@@ -131,9 +149,10 @@ typedef struct { u32 pfn; } pagetable_t;
 /* x86_64 */
 typedef struct { u64 pfn; } pagetable_t;
 #endif
-#define pagetable_get_phys(_x) ((physaddr_t)(_x).pfn << PAGE_SHIFT)
-#define pagetable_get_pfn(_x)  ((_x).pfn)
-#define mk_pagetable(_phys)    ({ pagetable_t __p; __p.pfn = _phys >> PAGE_SHIFT; __p; })
+#define pagetable_get_paddr(x) ((physaddr_t)(x).pfn << PAGE_SHIFT)
+#define pagetable_get_pfn(x)   ((x).pfn)
+#define mk_pagetable(pa)       \
+    ({ pagetable_t __p; __p.pfn = (pa) >> PAGE_SHIFT; __p; })
 #endif
 
 #define clear_page(_p)      memset((void *)(_p), 0, PAGE_SIZE)
@@ -146,16 +165,6 @@ typedef struct { u64 pfn; } pagetable_t;
 #define phys_to_page(kaddr) (frame_table + ((kaddr) >> PAGE_SHIFT))
 #define virt_to_page(kaddr) (frame_table + (__pa(kaddr) >> PAGE_SHIFT))
 #define pfn_valid(_pfn)     ((_pfn) < max_page)
-
-#define l1e_get_page(_x)    (pfn_to_page(l1e_get_pfn(_x)))
-#define l2e_get_page(_x)    (pfn_to_page(l2e_get_pfn(_x)))
-#define l3e_get_page(_x)    (pfn_to_page(l3e_get_pfn(_x)))
-#define l4e_get_page(_x)    (pfn_to_page(l4e_get_pfn(_x)))
-
-#define l1e_create_page(_x,_y) (l1e_create_pfn(page_to_pfn(_x),(_y)))
-#define l2e_create_page(_x,_y) (l2e_create_pfn(page_to_pfn(_x),(_y)))
-#define l3e_create_page(_x,_y) (l3e_create_pfn(page_to_pfn(_x),(_y)))
-#define l4e_create_page(_x,_y) (l4e_create_pfn(page_to_pfn(_x),(_y)))
 
 /* High table entries are reserved by the hypervisor. */
 /* FIXME: this breaks with PAE -- kraxel */

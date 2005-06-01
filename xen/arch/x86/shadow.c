@@ -573,7 +573,7 @@ static void free_shadow_pages(struct domain *d)
     //
     for_each_exec_domain(d, ed)
     {
-        if ( pagetable_get_phys(ed->arch.shadow_table) )
+        if ( pagetable_get_paddr(ed->arch.shadow_table) )
         {
             put_shadow_ref(pagetable_get_pfn(ed->arch.shadow_table));
             ed->arch.shadow_table = mk_pagetable(0);
@@ -684,7 +684,7 @@ static void alloc_monitor_pagetable(struct exec_domain *ed)
     struct pfn_info *mmfn_info;
     struct domain *d = ed->domain;
 
-    ASSERT(pagetable_get_phys(ed->arch.monitor_table) == 0);
+    ASSERT(pagetable_get_paddr(ed->arch.monitor_table) == 0);
 
     mmfn_info = alloc_domheap_page(NULL);
     ASSERT(mmfn_info != NULL);
@@ -700,12 +700,12 @@ static void alloc_monitor_pagetable(struct exec_domain *ed)
 #endif
 
     mpl2e[l2_table_offset(PERDOMAIN_VIRT_START)] =
-        l2e_create_phys(__pa(d->arch.mm_perdomain_pt),
+        l2e_from_paddr(__pa(d->arch.mm_perdomain_pt),
                         __PAGE_HYPERVISOR);
 
     // map the phys_to_machine map into the Read-Only MPT space for this domain
     mpl2e[l2_table_offset(RO_MPT_VIRT_START)] =
-        l2e_create_phys(pagetable_get_phys(d->arch.phys_table),
+        l2e_from_paddr(pagetable_get_paddr(d->arch.phys_table),
                         __PAGE_HYPERVISOR);
 
     // Don't (yet) have mappings for these...
@@ -726,7 +726,7 @@ void free_monitor_pagetable(struct exec_domain *ed)
     l2_pgentry_t *mpl2e, hl2e, sl2e;
     unsigned long mfn;
 
-    ASSERT( pagetable_get_phys(ed->arch.monitor_table) );
+    ASSERT( pagetable_get_paddr(ed->arch.monitor_table) );
     
     mpl2e = ed->arch.monitor_vtable;
 
@@ -766,7 +766,7 @@ set_p2m_entry(struct domain *d, unsigned long pfn, unsigned long mfn,
               struct map_dom_mem_cache *l2cache,
               struct map_dom_mem_cache *l1cache)
 {
-    unsigned long phystab = pagetable_get_phys(d->arch.phys_table);
+    unsigned long phystab = pagetable_get_paddr(d->arch.phys_table);
     l2_pgentry_t *l2, l2e;
     l1_pgentry_t *l1;
     struct pfn_info *l1page;
@@ -789,13 +789,13 @@ set_p2m_entry(struct domain *d, unsigned long pfn, unsigned long mfn,
         memset(l1, 0, PAGE_SIZE);
         unmap_domain_mem_with_cache(l1, l1cache);
 
-        l2e = l2e_create_page(l1page, __PAGE_HYPERVISOR);
+        l2e = l2e_from_page(l1page, __PAGE_HYPERVISOR);
         l2[l2_table_offset(va)] = l2e;
     }
     unmap_domain_mem_with_cache(l2, l2cache);
 
-    l1 = map_domain_mem_with_cache(l2e_get_phys(l2e), l1cache);
-    l1[l1_table_offset(va)] = l1e_create_pfn(mfn, __PAGE_HYPERVISOR);
+    l1 = map_domain_mem_with_cache(l2e_get_paddr(l2e), l1cache);
+    l1[l1_table_offset(va)] = l1e_from_pfn(mfn, __PAGE_HYPERVISOR);
     unmap_domain_mem_with_cache(l1, l1cache);
 
     return 1;
@@ -965,7 +965,7 @@ int __shadow_mode_enable(struct domain *d, unsigned int mode)
     {
         if ( !(new_modes & SHM_external) )
         {
-            ASSERT( !pagetable_get_phys(d->arch.phys_table) );
+            ASSERT( !pagetable_get_paddr(d->arch.phys_table) );
             if ( !alloc_p2m_table(d) )
             {
                 printk("alloc_p2m_table failed (out-of-memory?)\n");
@@ -1051,7 +1051,7 @@ int __shadow_mode_enable(struct domain *d, unsigned int mode)
         d->arch.shadow_dirty_bitmap = NULL;
     }
     if ( (new_modes & SHM_translate) && !(new_modes & SHM_external) &&
-         pagetable_get_phys(d->arch.phys_table) )
+         pagetable_get_paddr(d->arch.phys_table) )
     {
         free_p2m_table(d);
     }
@@ -1082,7 +1082,7 @@ translate_l1pgtable(struct domain *d, l1_pgentry_t *p2m, unsigned long l1mfn)
             unsigned long mfn = l1e_get_pfn(l1[i]);
             unsigned long gpfn = __mfn_to_gpfn(d, mfn);
             ASSERT(l1e_get_pfn(p2m[gpfn]) == mfn);
-            l1[i] = l1e_create_pfn(gpfn, l1e_get_flags(l1[i]));
+            l1[i] = l1e_from_pfn(gpfn, l1e_get_flags(l1[i]));
         }
     }
     unmap_domain_mem(l1);
@@ -1110,7 +1110,7 @@ translate_l2pgtable(struct domain *d, l1_pgentry_t *p2m, unsigned long l2mfn,
             unsigned long mfn = l2e_get_pfn(l2[i]);
             unsigned long gpfn = __mfn_to_gpfn(d, mfn);
             ASSERT(l1e_get_pfn(p2m[gpfn]) == mfn);
-            l2[i] = l2e_create_pfn(gpfn, l2e_get_flags(l2[i]));
+            l2[i] = l2e_from_pfn(gpfn, l2e_get_flags(l2[i]));
             translate_l1pgtable(d, p2m, mfn);
         }
     }
@@ -1404,17 +1404,17 @@ gpfn_to_mfn_foreign(struct domain *d, unsigned long gpfn)
     perfc_incrc(gpfn_to_mfn_foreign);
 
     unsigned long va = gpfn << PAGE_SHIFT;
-    unsigned long phystab = pagetable_get_phys(d->arch.phys_table);
+    unsigned long phystab = pagetable_get_paddr(d->arch.phys_table);
     l2_pgentry_t *l2 = map_domain_mem(phystab);
     l2_pgentry_t l2e = l2[l2_table_offset(va)];
     unmap_domain_mem(l2);
     if ( !(l2e_get_flags(l2e) & _PAGE_PRESENT) )
     {
         printk("gpfn_to_mfn_foreign(d->id=%d, gpfn=%lx) => 0 l2e=%" PRIpte "\n",
-               d->domain_id, gpfn, l2e_get_value(l2e));
+               d->domain_id, gpfn, l2e_get_intpte(l2e));
         return INVALID_MFN;
     }
-    unsigned long l1tab = l2e_get_phys(l2e);
+    unsigned long l1tab = l2e_get_paddr(l2e);
     l1_pgentry_t *l1 = map_domain_mem(l1tab);
     l1_pgentry_t l1e = l1[l1_table_offset(va)];
     unmap_domain_mem(l1);
@@ -1427,7 +1427,7 @@ gpfn_to_mfn_foreign(struct domain *d, unsigned long gpfn)
     if ( !(l1e_get_flags(l1e) & _PAGE_PRESENT) )
     {
         printk("gpfn_to_mfn_foreign(d->id=%d, gpfn=%lx) => 0 l1e=%" PRIpte "\n",
-               d->domain_id, gpfn, l1e_get_value(l1e));
+               d->domain_id, gpfn, l1e_get_intpte(l1e));
         return INVALID_MFN;
     }
 
@@ -1476,11 +1476,11 @@ shadow_hl2_table(struct domain *d, unsigned long gpfn, unsigned long gmfn,
         // Setup easy access to the GL2, SL2, and HL2 frames.
         //
         hl2[l2_table_offset(LINEAR_PT_VIRT_START)] =
-            l1e_create_pfn(gmfn, __PAGE_HYPERVISOR);
+            l1e_from_pfn(gmfn, __PAGE_HYPERVISOR);
         hl2[l2_table_offset(SH_LINEAR_PT_VIRT_START)] =
-            l1e_create_pfn(smfn, __PAGE_HYPERVISOR);
+            l1e_from_pfn(smfn, __PAGE_HYPERVISOR);
         hl2[l2_table_offset(PERDOMAIN_VIRT_START)] =
-            l1e_create_pfn(hl2mfn, __PAGE_HYPERVISOR);
+            l1e_from_pfn(hl2mfn, __PAGE_HYPERVISOR);
     }
 
     unmap_domain_mem(hl2);
@@ -1530,10 +1530,10 @@ static unsigned long shadow_l2_table(
                HYPERVISOR_ENTRIES_PER_L2_PAGETABLE * sizeof(l2_pgentry_t));
 
         spl2e[l2_table_offset(SH_LINEAR_PT_VIRT_START)] =
-            l2e_create_pfn(smfn, __PAGE_HYPERVISOR);
+            l2e_from_pfn(smfn, __PAGE_HYPERVISOR);
 
         spl2e[l2_table_offset(PERDOMAIN_VIRT_START)] =
-            l2e_create_phys(__pa(page_get_owner(&frame_table[gmfn])->arch.mm_perdomain_pt),
+            l2e_from_paddr(__pa(page_get_owner(&frame_table[gmfn])->arch.mm_perdomain_pt),
                             __PAGE_HYPERVISOR);
 
         if ( shadow_mode_translate(d) ) // NB: not external
@@ -1541,7 +1541,7 @@ static unsigned long shadow_l2_table(
             unsigned long hl2mfn;
 
             spl2e[l2_table_offset(RO_MPT_VIRT_START)] =
-                l2e_create_phys(pagetable_get_phys(d->arch.phys_table),
+                l2e_from_paddr(pagetable_get_paddr(d->arch.phys_table),
                                 __PAGE_HYPERVISOR);
 
             if ( unlikely(!(hl2mfn = __shadow_status(d, gpfn, PGT_hl2_shadow))) )
@@ -1554,11 +1554,11 @@ static unsigned long shadow_l2_table(
                 BUG();
             
             spl2e[l2_table_offset(LINEAR_PT_VIRT_START)] =
-                l2e_create_pfn(hl2mfn, __PAGE_HYPERVISOR);
+                l2e_from_pfn(hl2mfn, __PAGE_HYPERVISOR);
         }
         else
             spl2e[l2_table_offset(LINEAR_PT_VIRT_START)] =
-                l2e_create_pfn(gmfn, __PAGE_HYPERVISOR);
+                l2e_from_pfn(gmfn, __PAGE_HYPERVISOR);
     }
     else
     {
@@ -1885,7 +1885,7 @@ void shadow_mark_va_out_of_sync(
 
     // NB: this is stored as a machine address.
     entry->writable_pl1e =
-        l2e_get_phys(sl2e) | (sizeof(l1_pgentry_t) * l1_table_offset(va));
+        l2e_get_paddr(sl2e) | (sizeof(l1_pgentry_t) * l1_table_offset(va));
     ASSERT( !(entry->writable_pl1e & (sizeof(l1_pgentry_t)-1)) );
 
     // Increment shadow's page count to represent the reference
@@ -1920,7 +1920,7 @@ static int snapshot_entry_matches(
     // This could probably be smarter, but this is sufficent for
     // our current needs.
     //
-    entries_match = !l1e_has_changed(&guest_pt[index], &snapshot[index],
+    entries_match = !l1e_has_changed(guest_pt[index], snapshot[index],
                                      PAGE_FLAG_MASK);
 
     unmap_domain_mem(snapshot);
@@ -2074,7 +2074,7 @@ static u32 remove_all_write_access_in_ptpage(
         ((frame_table[pt_mfn].u.inuse.type_info & PGT_type_mask) ==
          PGT_l1_shadow);
 
-    match = l1e_create_pfn(readonly_gmfn, flags);
+    match = l1e_from_pfn(readonly_gmfn, flags);
 
     // returns true if all refs have been found and fixed.
     //
@@ -2083,7 +2083,7 @@ static u32 remove_all_write_access_in_ptpage(
         l1_pgentry_t old = pt[i];
         l1_pgentry_t new = old;
 
-        l1e_remove_flags(&new,_PAGE_RW);
+        l1e_remove_flags(new,_PAGE_RW);
         if ( is_l1_shadow && !shadow_get_page_from_l1e(new, d) )
             BUG();
         found++;
@@ -2101,7 +2101,7 @@ static u32 remove_all_write_access_in_ptpage(
     }
 
     i = readonly_gpfn & (L1_PAGETABLE_ENTRIES - 1);
-    if ( !l1e_has_changed(&pt[i], &match, flags) && fix_entry(i) )
+    if ( !l1e_has_changed(pt[i], match, flags) && fix_entry(i) )
     {
         perfc_incrc(remove_write_fast_exit);
         increase_writable_pte_prediction(d, readonly_gpfn, prediction);
@@ -2111,7 +2111,7 @@ static u32 remove_all_write_access_in_ptpage(
  
     for (i = 0; i < L1_PAGETABLE_ENTRIES; i++)
     {
-        if ( unlikely(!l1e_has_changed(&pt[i], &match, flags)) && fix_entry(i) )
+        if ( unlikely(!l1e_has_changed(pt[i], match, flags)) && fix_entry(i) )
             break;
     }
 
@@ -2216,11 +2216,11 @@ static u32 remove_all_access_in_page(
         ((frame_table[l1mfn].u.inuse.type_info & PGT_type_mask) ==
          PGT_l1_shadow);
 
-    match = l1e_create_pfn(forbidden_gmfn, flags);
+    match = l1e_from_pfn(forbidden_gmfn, flags);
     
     for (i = 0; i < L1_PAGETABLE_ENTRIES; i++)
     {
-        if ( unlikely(!l1e_has_changed(&pl1e[i], &match, flags) == 0) )
+        if ( unlikely(!l1e_has_changed(pl1e[i], match, flags) == 0) )
         {
             l1_pgentry_t ol2e = pl1e[i];
             pl1e[i] = l1e_empty();
@@ -2361,7 +2361,7 @@ static int resync_all(struct domain *d, u32 stype)
             for ( i = min_shadow; i <= max_shadow; i++ )
             {
                 if ( (i < min_snapshot) || (i > max_snapshot) ||
-                     l1e_has_changed(&guest1[i], &snapshot1[i], PAGE_FLAG_MASK) )
+                     l1e_has_changed(guest1[i], snapshot1[i], PAGE_FLAG_MASK) )
                 {
                     need_flush |= validate_pte_change(d, guest1[i], &shadow1[i]);
 
@@ -2399,7 +2399,7 @@ static int resync_all(struct domain *d, u32 stype)
                     continue;
 
                 l2_pgentry_t new_pde = guest2[i];
-                if ( l2e_has_changed(&new_pde, &snapshot2[i], PAGE_FLAG_MASK))
+                if ( l2e_has_changed(new_pde, snapshot2[i], PAGE_FLAG_MASK))
                 {
                     need_flush |= validate_pde_change(d, new_pde, &shadow2[i]);
 
@@ -2410,13 +2410,13 @@ static int resync_all(struct domain *d, u32 stype)
 
                     changed++;
                 }
-                if ( l2e_get_value(new_pde) != 0 ) /* FIXME: check flags? */
+                if ( l2e_get_intpte(new_pde) != 0 ) /* FIXME: check flags? */
                     max = i;
 
                 // XXX - This hack works for linux guests.
                 //       Need a better solution long term.
                 if ( !(l2e_get_flags(new_pde) & _PAGE_PRESENT) &&
-                     unlikely(l2e_get_value(new_pde) != 0) &&
+                     unlikely(l2e_get_intpte(new_pde) != 0) &&
                      !unshadow && MFN_PINNED(smfn) )
                     unshadow = 1;
             }
@@ -2445,7 +2445,7 @@ static int resync_all(struct domain *d, u32 stype)
                     continue;
 
                 l2_pgentry_t new_pde = guest2[i];
-                if ( l2e_has_changed(&new_pde, &snapshot2[i], PAGE_FLAG_MASK) )
+                if ( l2e_has_changed(new_pde, snapshot2[i], PAGE_FLAG_MASK) )
                 {
                     need_flush |= validate_hl2e_change(d, new_pde, &shadow2[i]);
 
@@ -2510,7 +2510,7 @@ void __shadow_sync_all(struct domain *d)
         l1_pgentry_t *ppte = map_domain_mem(entry->writable_pl1e);
         l1_pgentry_t opte = *ppte;
         l1_pgentry_t npte = opte;
-        l1e_remove_flags(&npte, _PAGE_RW);
+        l1e_remove_flags(npte, _PAGE_RW);
 
         if ( (l1e_get_flags(npte) & _PAGE_PRESENT) &&
              !shadow_get_page_from_l1e(npte, d) )
@@ -2595,7 +2595,7 @@ int shadow_fault(unsigned long va, struct cpu_user_regs *regs)
     if ( unlikely(!(l1e_get_flags(gpte) & _PAGE_PRESENT)) )
     {
         SH_VVLOG("shadow_fault - EXIT: gpte not present (%lx)",
-                 l1e_get_value(gpte));
+                 l1e_get_intpte(gpte));
         perfc_incrc(shadow_fault_bail_pte_not_present);
         goto fail;
     }
@@ -2610,13 +2610,13 @@ int shadow_fault(unsigned long va, struct cpu_user_regs *regs)
             if ( shadow_mode_page_writable(d, l1e_get_pfn(gpte)) )
             {
                 allow_writes = 1;
-                l1e_add_flags(&gpte, _PAGE_RW);
+                l1e_add_flags(gpte, _PAGE_RW);
             }
             else
             {
                 /* Write fault on a read-only mapping. */
                 SH_VVLOG("shadow_fault - EXIT: wr fault on RO page (%lx)", 
-                         l1e_get_value(gpte));
+                         l1e_get_intpte(gpte));
                 perfc_incrc(shadow_fault_bail_ro_mapping);
                 goto fail;
             }
@@ -2631,7 +2631,7 @@ int shadow_fault(unsigned long va, struct cpu_user_regs *regs)
         }
 
         if ( allow_writes )
-            l1e_remove_flags(&gpte, _PAGE_RW);
+            l1e_remove_flags(gpte, _PAGE_RW);
     }
     else
     {
@@ -2647,7 +2647,7 @@ int shadow_fault(unsigned long va, struct cpu_user_regs *regs)
     /*
      * STEP 3. Write the modified shadow PTE and guest PTE back to the tables.
      */
-    if ( l1e_has_changed(&orig_gpte, &gpte, PAGE_FLAG_MASK) )
+    if ( l1e_has_changed(orig_gpte, gpte, PAGE_FLAG_MASK) )
     {
         /* XXX Watch out for read-only L2 entries! (not used in Linux). */
         if ( unlikely(__copy_to_user(&linear_pg_table[l1_linear_offset(va)],
@@ -2655,7 +2655,7 @@ int shadow_fault(unsigned long va, struct cpu_user_regs *regs)
         {
             printk("%s() failed, crashing domain %d "
                    "due to a read-only L2 page table (gpde=%" PRIpte "), va=%lx\n",
-                   __func__,d->domain_id, l2e_get_value(gpde), va);
+                   __func__,d->domain_id, l2e_get_intpte(gpde), va);
             domain_crash_synchronous();
         }
 
@@ -2693,7 +2693,7 @@ void shadow_l1_normal_pt_update(
     if ( sl1mfn )
     {
         SH_VVLOG("shadow_l1_normal_pt_update pa=%p, gpte=%08lx",
-                 (void *)pa, l1e_get_value(gpte));
+                 (void *)pa, l1e_get_intpte(gpte));
         l1pte_propagate_from_guest(current->domain, gpte, &spte);
 
         spl1e = map_domain_mem_with_cache(sl1mfn << PAGE_SHIFT, cache);
@@ -2718,7 +2718,7 @@ void shadow_l2_normal_pt_update(
     if ( sl2mfn )
     {
         SH_VVLOG("shadow_l2_normal_pt_update pa=%p, gpde=%08lx",
-                 (void *)pa, l2e_get_value(gpde));
+                 (void *)pa, l2e_get_intpte(gpde));
         spl2e = map_domain_mem_with_cache(sl2mfn << PAGE_SHIFT, cache);
         validate_pde_change(d, gpde,
                             &spl2e[(pa & ~PAGE_MASK) / sizeof(l2_pgentry_t)]);
@@ -2758,7 +2758,7 @@ int shadow_do_update_va_mapping(unsigned long va,
 
     shadow_lock(d);
 
-    //printk("%s(va=%p, val=%p)\n", __func__, (void *)va, (void *)l1e_get_value(val));
+    //printk("%s(va=%p, val=%p)\n", __func__, (void *)va, (void *)l1e_get_intpte(val));
         
     // This is actually overkill - we don't need to sync the L1 itself,
     // just everything involved in getting to this L1 (i.e. we need
@@ -2889,14 +2889,14 @@ void __update_pagetables(struct exec_domain *ed)
         if ( !get_shadow_ref(hl2mfn) )
             BUG();
         mpl2e[l2_table_offset(LINEAR_PT_VIRT_START)] =
-            l2e_create_pfn(hl2mfn, __PAGE_HYPERVISOR);
+            l2e_from_pfn(hl2mfn, __PAGE_HYPERVISOR);
         if ( l2e_get_flags(old_hl2e) & _PAGE_PRESENT )
             put_shadow_ref(l2e_get_pfn(old_hl2e));
 
         if ( !get_shadow_ref(smfn) )
             BUG();
         mpl2e[l2_table_offset(SH_LINEAR_PT_VIRT_START)] =
-            l2e_create_pfn(smfn, __PAGE_HYPERVISOR);
+            l2e_from_pfn(smfn, __PAGE_HYPERVISOR);
         if ( l2e_get_flags(old_sl2e) & _PAGE_PRESENT )
             put_shadow_ref(l2e_get_pfn(old_sl2e));
 
@@ -2938,7 +2938,7 @@ mark_shadows_as_reflecting_snapshot(struct domain *d, unsigned long gpfn)
         for ( i = 0; i < L1_PAGETABLE_ENTRIES; i++ )
             if ( is_guest_l1_slot(i) &&
                  (l1e_get_flags(l1e[i]) & _PAGE_PRESENT) )
-                l1e_add_flags(&l1e[i], SHADOW_REFLECTS_SNAPSHOT);
+                l1e_add_flags(l1e[i], SHADOW_REFLECTS_SNAPSHOT);
         unmap_domain_mem(l1e);
     }
 
@@ -2948,7 +2948,7 @@ mark_shadows_as_reflecting_snapshot(struct domain *d, unsigned long gpfn)
         for ( i = 0; i < L2_PAGETABLE_ENTRIES; i++ )
             if ( is_guest_l2_slot(i) &&
                  (l2e_get_flags(l2e[i]) & _PAGE_PRESENT) )
-                l2e_add_flags(&l2e[i], SHADOW_REFLECTS_SNAPSHOT);
+                l2e_add_flags(l2e[i], SHADOW_REFLECTS_SNAPSHOT);
         unmap_domain_mem(l2e);
     }
 }
@@ -2968,7 +2968,7 @@ int shadow_status_noswap;
         l1_pgentry_t _pte;                                                   \
         _pte = shadow_linear_pg_table[l1_linear_offset(_a)];                 \
         if ( l1e_get_flags(_pte) & _PAGE_PRESENT )                           \
-            _pa = l1e_get_phys(_pte);                                        \
+            _pa = l1e_get_paddr(_pte);                                       \
     }                                                                        \
     _pa | (_a & ~PAGE_MASK);                                                 \
 })
@@ -2981,8 +2981,8 @@ int shadow_status_noswap;
         printk("guest_pte=%lx eff_guest_pte=%lx shadow_pte=%lx "             \
                "snapshot_pte=%lx &guest=%p &shadow=%p &snap=%p "             \
                "v2m(&guest)=%p v2m(&shadow)=%p v2m(&snap)=%p ea=%08x\n",     \
-               l1e_get_value(guest_pte), l1e_get_value(eff_guest_pte),       \
-               l1e_get_value(shadow_pte), l1e_get_value(snapshot_pte),       \
+               l1e_get_intpte(guest_pte), l1e_get_intpte(eff_guest_pte),     \
+               l1e_get_intpte(shadow_pte), l1e_get_intpte(snapshot_pte),     \
                p_guest_pte, p_shadow_pte, p_snapshot_pte,                    \
                (void *)v2m(ed, p_guest_pte), (void *)v2m(ed, p_shadow_pte),  \
                (void *)v2m(ed, p_snapshot_pte),                              \
@@ -3007,9 +3007,9 @@ static int check_pte(
     int errors = 0, guest_writable;
     int page_table_page;
 
-    if ( (l1e_get_value(shadow_pte) == 0) ||
-         (l1e_get_value(shadow_pte) == 0xdeadface) ||
-         (l1e_get_value(shadow_pte) == 0x00000E00) )
+    if ( (l1e_get_intpte(shadow_pte) == 0) ||
+         (l1e_get_intpte(shadow_pte) == 0xdeadface) ||
+         (l1e_get_intpte(shadow_pte) == 0x00000E00) )
         return errors;  /* always safe */
 
     if ( !(l1e_get_flags(shadow_pte) & _PAGE_PRESENT) )
@@ -3028,7 +3028,7 @@ static int check_pte(
 
     mask = ~(_PAGE_GLOBAL|_PAGE_DIRTY|_PAGE_ACCESSED|_PAGE_RW|_PAGE_AVAIL|PAGE_MASK);
 
-    if ( ((l1e_get_value(shadow_pte) & mask) != (l1e_get_value(eff_guest_pte) & mask)) )
+    if ( ((l1e_get_intpte(shadow_pte) & mask) != (l1e_get_intpte(eff_guest_pte) & mask)) )
         FAIL("Corrupt?");
 
     if ( (level == 1) &&
@@ -3049,7 +3049,7 @@ static int check_pte(
 
     if ( !VALID_MFN(eff_guest_mfn) && !shadow_mode_refcounts(d) )
         FAIL("%s: invalid eff_guest_pfn=%lx eff_guest_pte=%lx\n", __func__, eff_guest_pfn,
-             l1e_get_value(eff_guest_pte));
+             l1e_get_intpte(eff_guest_pte));
 
     page_table_page = mfn_is_page_table(eff_guest_mfn);
 
@@ -3179,26 +3179,26 @@ int check_l2_table(
         FAILPT("hypervisor linear map inconsistent");
 #endif
 
-    match = l2e_create_pfn(smfn, __PAGE_HYPERVISOR);
+    match = l2e_from_pfn(smfn, __PAGE_HYPERVISOR);
     if ( !shadow_mode_external(d) &&
-         l2e_has_changed(&spl2e[SH_LINEAR_PT_VIRT_START >> L2_PAGETABLE_SHIFT],
-                         &match, PAGE_FLAG_MASK))
+         l2e_has_changed(spl2e[SH_LINEAR_PT_VIRT_START >> L2_PAGETABLE_SHIFT],
+                         match, PAGE_FLAG_MASK))
     {
         FAILPT("hypervisor shadow linear map inconsistent %lx %lx",
-               l2e_get_value(spl2e[SH_LINEAR_PT_VIRT_START >>
+               l2e_get_intpte(spl2e[SH_LINEAR_PT_VIRT_START >>
                                    L2_PAGETABLE_SHIFT]),
-               l2e_get_value(match));
+               l2e_get_intpte(match));
     }
 
-    match = l2e_create_phys(__pa(d->arch.mm_perdomain_pt), __PAGE_HYPERVISOR);
+    match = l2e_from_paddr(__pa(d->arch.mm_perdomain_pt), __PAGE_HYPERVISOR);
     if ( !shadow_mode_external(d) &&
-         l2e_has_changed(&spl2e[PERDOMAIN_VIRT_START >> L2_PAGETABLE_SHIFT],
-                         &match, PAGE_FLAG_MASK))
+         l2e_has_changed(spl2e[PERDOMAIN_VIRT_START >> L2_PAGETABLE_SHIFT],
+                         match, PAGE_FLAG_MASK))
     {
         FAILPT("hypervisor per-domain map inconsistent saw %lx, expected (va=%p) %lx",
-               l2e_get_value(spl2e[PERDOMAIN_VIRT_START >> L2_PAGETABLE_SHIFT]),
+               l2e_get_intpte(spl2e[PERDOMAIN_VIRT_START >> L2_PAGETABLE_SHIFT]),
                d->arch.mm_perdomain_pt,
-               l2e_get_value(match));
+               l2e_get_intpte(match));
     }
 
 #ifdef __i386__
@@ -3285,7 +3285,7 @@ int _check_pagetable(struct exec_domain *ed, char *s)
         unsigned long gl1mfn = __gpfn_to_mfn(d, gl1pfn);
         unsigned long sl1mfn = l2e_get_pfn(spl2e[i]);
 
-        if ( l2e_get_value(spl2e[i]) != 0 )  /* FIXME: check flags? */
+        if ( l2e_get_intpte(spl2e[i]) != 0 )  /* FIXME: check flags? */
         {
             errors += check_l1_table(ed, gl1pfn, gl1mfn, sl1mfn, i);
         }

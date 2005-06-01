@@ -85,9 +85,9 @@ void __init paging_init(void)
         if ( (pg = alloc_domheap_pages(NULL, PAGETABLE_ORDER)) == NULL )
             panic("Not enough memory to bootstrap Xen.\n");
         idle_pg_table_l2[l2_linear_offset(v)] =
-            l2e_create_page(pg, __PAGE_HYPERVISOR | _PAGE_PSE);
+            l2e_from_page(pg, __PAGE_HYPERVISOR | _PAGE_PSE);
         idle_pg_table_l2[l2_linear_offset(v2)] =
-            l2e_create_page(pg, (__PAGE_HYPERVISOR | _PAGE_PSE) & ~_PAGE_RW);
+            l2e_from_page(pg, (__PAGE_HYPERVISOR | _PAGE_PSE) & ~_PAGE_RW);
     }
     memset((void *)RDWR_MPT_VIRT_START, 0x55, mpt_size);
 
@@ -99,7 +99,7 @@ void __init paging_init(void)
                 continue;
             if (v >= RO_MPT_VIRT_START && v < RO_MPT_VIRT_END)
                 continue;
-            l2e_add_flags(&idle_pg_table_l2[l2_linear_offset(v)],
+            l2e_add_flags(idle_pg_table_l2[l2_linear_offset(v)],
                           _PAGE_GLOBAL);
         }
     }
@@ -109,7 +109,7 @@ void __init paging_init(void)
         ioremap_pt = (void *)alloc_xenheap_page();
         clear_page(ioremap_pt);
         idle_pg_table_l2[l2_linear_offset(v)] =
-            l2e_create_page(virt_to_page(ioremap_pt), __PAGE_HYPERVISOR);
+            l2e_from_page(virt_to_page(ioremap_pt), __PAGE_HYPERVISOR);
     }
 
     /* Set up mapping cache for domain pages. */
@@ -119,13 +119,13 @@ void __init paging_init(void)
          v += (1 << L2_PAGETABLE_SHIFT), i++) {
         clear_page(mapcache + i*L1_PAGETABLE_ENTRIES);
         idle_pg_table_l2[l2_linear_offset(v)] =
-            l2e_create_page(virt_to_page(mapcache + i*L1_PAGETABLE_ENTRIES),
+            l2e_from_page(virt_to_page(mapcache + i*L1_PAGETABLE_ENTRIES),
                             __PAGE_HYPERVISOR);
     }
 
     for (v = LINEAR_PT_VIRT_START; v != LINEAR_PT_VIRT_END; v += (1 << L2_PAGETABLE_SHIFT)) {
         idle_pg_table_l2[l2_linear_offset(v)] =
-            l2e_create_page(virt_to_page(idle_pg_table_l2 + ((v-RDWR_MPT_VIRT_START) >> PAGETABLE_ORDER)),
+            l2e_from_page(virt_to_page(idle_pg_table_l2 + ((v-RDWR_MPT_VIRT_START) >> PAGETABLE_ORDER)),
                             __PAGE_HYPERVISOR);
     }
 }
@@ -139,7 +139,7 @@ void __init zap_low_mappings(l2_pgentry_t *base)
         addr = (i << L2_PAGETABLE_SHIFT);
         if (addr >= HYPERVISOR_VIRT_START)
             break;
-        if (l2e_get_phys(base[i]) != addr)
+        if (l2e_get_paddr(base[i]) != addr)
             continue;
         base[i] = l2e_empty();
     }

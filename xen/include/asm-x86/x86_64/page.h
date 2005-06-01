@@ -53,10 +53,10 @@ typedef l4_pgentry_t root_pgentry_t;
 
 #define root_get_pfn              l4e_get_pfn
 #define root_get_flags            l4e_get_flags
-#define root_get_value            l4e_get_value
+#define root_get_intpte           l4e_get_intpte
 #define root_empty                l4e_empty
-#define root_create_phys          l4e_create_phys
-#define PGT_root_page_table PGT_l4_page_table
+#define root_from_paddr           l4e_from_paddr
+#define PGT_root_page_table       PGT_l4_page_table
 
 /*
  * PTE pfn and flags:
