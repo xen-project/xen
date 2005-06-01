@@ -43,7 +43,7 @@ long do_multicall(multicall_entry_t *call_list, unsigned int nr_calls)
 
         do_multicall_call(&mcs->call);
 
-        if ( unlikely(__put_user(mcs->call.args[5], &call_list[i].args[5])) )
+        if ( unlikely(__put_user(mcs->call.result, &call_list[i].result)) )
         {
             DPRINTK("Error writing result back to multicall block.\n");
             goto fault;
