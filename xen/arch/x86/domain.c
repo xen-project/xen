@@ -819,12 +819,17 @@ int __sync_lazy_execstate(void)
 
 void sync_lazy_execstate_cpuset(unsigned long cpuset)
 {
-    flush_tlb_mask(cpuset);
+    if ( cpuset & (1 << smp_processor_id()) )
+        (void)__sync_lazy_execstate();
+    /* Other cpus call __sync_lazy_execstate from flush ipi handler. */
+    flush_tlb_mask(cpuset & ~(1 << smp_processor_id()));
 }
 
 void sync_lazy_execstate_all(void)
 {
-    flush_tlb_all();
+    __sync_lazy_execstate();
+    /* Other cpus call __sync_lazy_execstate from flush ipi handler. */
+    flush_tlb_mask(((1<<num_online_cpus())-1) & ~(1 << smp_processor_id()));
 }
 
 unsigned long __hypercall_create_continuation(
