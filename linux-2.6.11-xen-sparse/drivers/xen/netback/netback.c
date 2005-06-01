@@ -296,12 +296,12 @@ static void net_rx_action(unsigned long unused)
         netif->stats.tx_packets++;
 
         /* The update_va_mapping() must not fail. */
-        if ( unlikely(mcl[0].args[5] != 0) )
+        if ( unlikely(mcl[0].result != 0) )
             BUG();
 
         /* Check the reassignment error code. */
         status = NETIF_RSP_OKAY;
-        if ( unlikely(mcl[1].args[5] != 0) )
+        if ( unlikely(mcl[1].result != 0) )
         {
             DPRINTK("Failed MMU update transferring to DOM%u\n", netif->domid);
             free_mfn(mdata >> PAGE_SHIFT);
@@ -440,7 +440,7 @@ static void net_tx_action(unsigned long unused)
     while ( dealloc_cons != dp )
     {
         /* The update_va_mapping() must not fail. */
-        if ( unlikely(mcl[0].args[5] != 0) )
+        if ( unlikely(mcl[0].result != 0) )
             BUG();
 
         pending_idx = dealloc_ring[MASK_PEND_IDX(dealloc_cons++)];
@@ -606,7 +606,7 @@ static void net_tx_action(unsigned long unused)
         memcpy(&txreq, &pending_tx_info[pending_idx].req, sizeof(txreq));
 
         /* Check the remap error code. */
-        if ( unlikely(mcl[0].args[5] != 0) )
+        if ( unlikely(mcl[0].result != 0) )
         {
             DPRINTK("Bad page frame\n");
             make_tx_response(netif, txreq.id, NETIF_RSP_ERROR);

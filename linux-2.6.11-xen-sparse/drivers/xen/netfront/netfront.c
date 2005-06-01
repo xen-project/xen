@@ -419,7 +419,7 @@ static void network_alloc_rx_buffers(struct net_device *dev)
     (void)HYPERVISOR_multicall(rx_mcl, i+1);
 
     /* Check return status of HYPERVISOR_dom_mem_op(). */
-    if (unlikely(rx_mcl[i].args[5] != i))
+    if (unlikely(rx_mcl[i].result != i))
         panic("Unable to reduce memory reservation\n");
 
     /* Above is a suitable barrier to ensure backend will see requests. */

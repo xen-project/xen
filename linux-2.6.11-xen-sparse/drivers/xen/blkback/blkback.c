@@ -562,7 +562,7 @@ static void dispatch_rw_block_io(blkif_t *blkif, blkif_request_t *req)
 
     for ( i = 0; i < nseg; i++ )
     {
-        if ( unlikely(mcl[i].args[5] != 0) )
+        if ( unlikely(mcl[i].result != 0) )
         {
             DPRINTK("invalid buffer -- could not remap it\n");
             fast_flush_area(pending_idx, nseg);

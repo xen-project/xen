@@ -612,7 +612,7 @@ xennet_rx_push_buffer(struct xennet_softc *sc, int id)
 	(void)HYPERVISOR_multicall(rx_mcl, nr_pfns+1);
 
 	/* Check return status of HYPERVISOR_dom_mem_op(). */
-	if ( rx_mcl[nr_pfns].args[5] != nr_pfns )
+	if ( rx_mcl[nr_pfns].result != nr_pfns )
 		panic("Unable to reduce memory reservation\n");
 
 	/* Above is a suitable barrier to ensure backend will see requests. */
@@ -912,7 +912,7 @@ network_alloc_rx_buffers(struct xennet_softc *sc)
 	(void)HYPERVISOR_multicall(rx_mcl, nr_pfns+1);
 
 	/* Check return status of HYPERVISOR_dom_mem_op(). */
-	if (rx_mcl[nr_pfns].args[5] != nr_pfns)
+	if (rx_mcl[nr_pfns].result != nr_pfns)
 		panic("Unable to reduce memory reservation\n");
 
 	/* Above is a suitable barrier to ensure backend will see requests. */

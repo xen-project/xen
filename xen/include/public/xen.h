@@ -59,16 +59,6 @@
 #define __HYPERVISOR_set_segment_base     25 /* x86/64 only */
 #define __HYPERVISOR_mmuext_op            26
 
-/*
- * MULTICALLS
- * 
- * Multicalls are listed in an array, with each element being a fixed size 
- * (BYTES_PER_MULTICALL_ENTRY). Each is of the form (op, arg1, ..., argN)
- * where each element of the tuple is a machine word. 
- */
-#define ARGS_PER_MULTICALL_ENTRY 8
-
-
 /* 
  * VIRTUAL INTERRUPTS
  * 
@@ -281,7 +271,7 @@ typedef struct
 {
     memory_t ptr;       /* Machine address of PTE. */
     memory_t val;       /* New contents of PTE.    */
-} PACKED mmu_update_t;
+} mmu_update_t;
 
 /*
  * Send an array of these to HYPERVISOR_multicall().
@@ -289,9 +279,9 @@ typedef struct
  */
 typedef struct
 {
-    cpureg_t op;
-    cpureg_t args[7];
-} PACKED multicall_entry_t;
+    unsigned long op, result;
+    unsigned long args[6];
+} multicall_entry_t;
 
 /* Event channel endpoints per domain. */
 #define NR_EVENT_CHANNELS 1024

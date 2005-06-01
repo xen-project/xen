@@ -88,7 +88,9 @@ void __dummy__(void)
     OFFSET(MULTICALL_arg2, multicall_entry_t, args[2]);
     OFFSET(MULTICALL_arg3, multicall_entry_t, args[3]);
     OFFSET(MULTICALL_arg4, multicall_entry_t, args[4]);
-    OFFSET(MULTICALL_result, multicall_entry_t, args[5]);
+    OFFSET(MULTICALL_arg5, multicall_entry_t, args[5]);
+    OFFSET(MULTICALL_arg6, multicall_entry_t, args[6]);
+    OFFSET(MULTICALL_result, multicall_entry_t, result);
     BLANK();
 
     DEFINE(IRQSTAT_shift, LOG_2(sizeof(irq_cpustat_t)));

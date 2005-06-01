@@ -18,7 +18,6 @@
 
 /* NB. Both the following are 64 bits each. */
 typedef unsigned long memory_t;   /* Full-sized pointer/address/memory-size. */
-typedef unsigned long cpureg_t;   /* Full-sized register.                    */
 
 typedef struct
 {

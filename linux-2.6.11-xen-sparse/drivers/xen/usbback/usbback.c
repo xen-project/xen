@@ -686,7 +686,7 @@ static void dispatch_usb_io(usbif_priv_t *up, usbif_request_t *req)
         int j;
         for ( j = 0; j < i; j++ )
         {
-            if ( unlikely(mcl[j].args[5] != 0) )
+            if ( unlikely(mcl[j].result != 0) )
             {
                 printk(KERN_WARNING
 		       "invalid buffer %d -- could not remap it\n", j);
