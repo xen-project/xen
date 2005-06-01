@@ -562,7 +562,6 @@
 40c9c468WnXs6eOUSff23IIGI4kMfQ tools/python/xen/xend/XendDB.py
 40eee3a0sPO-WUu34uHUXOC7HliDGw tools/python/xen/xend/XendDmesg.py
 40c9c468fSl3H3IypyT0ppkbb0ZT9A tools/python/xen/xend/XendDomain.py
-40c9c468bbKq3uC7_fuNUkiMMjArdw tools/python/xen/xend/XendDomainConfig.py
 40c9c4685ykq87_n1kVUbMr9flx9fg tools/python/xen/xend/XendDomainInfo.py
 40f50d99YiiaMI1fZBh1VCDFLD57qg tools/python/xen/xend/XendError.py
 40ffc44eGsgTEY355E3nN4mPLZHhMQ tools/python/xen/xend/XendLogging.py
