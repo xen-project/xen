@@ -62,6 +62,92 @@ GLOBAL_ENTRY(fast_hyperprivop)
 	// if not one of the above, give up for now and do it the slow way
 	br.sptk.many dispatch_break_fault ;;
 
+// reflect domain breaks directly to domain
+// FIXME: DOES NOT WORK YET
+//	r16 == cr.isr
+//	r17 == cr.iim
+//	r18 == XSI_PSR_IC
+//	r19 == vpsr.ic (low 32 bits) | vpsr.i (high 32 bits)
+//	r22 == IA64_KR(CURRENT)+IA64_VCPU_BREAKIMM_OFFSET
+//	r31 == pr
+GLOBAL_ENTRY(fast_break_reflect)
+	mov r20=cr.ipsr;;
+	// if big-endian domain or privileged-perfmon bits set, do slow way
+	extr.u r21=r20,IA64_PSR_BE_BIT,1 ;;
+	cmp.ne p7,p0=r21,r0
+(p7)	br.sptk.many dispatch_break_fault ;;
+	extr.u r21=r20,IA64_PSR_PP_BIT,1 ;;
+	cmp.ne p7,p0=r21,r0
+(p7)	br.sptk.many dispatch_break_fault ;;
+	// ensure ipsr.cpl==2, ipsr.ri==0
+	// FIXME: any other psr bits need to be properly set/validated?
+	//   ...see process.c: DELIVER_PSR_CLR/SET
+	extr.u r21=r20,IA64_PSR_CPL0_BIT,2;;
+	extr.u r23=r20,IA64_PSR_RI_BIT,2;;
+	dep r20=-1,r20,IA64_PSR_CPL1_BIT,1 ;;
+	dep r20=0,r20,IA64_PSR_CPL0_BIT,1 ;;
+	dep r20=0,r20,IA64_PSR_RI_BIT,2 ;;
+	mov cr.ipsr=r20;;
+	// save ipsr in shared_info, vipsr.cpl==(ipsr.cpl==3)?3:0
+	cmp.ne p7,p0=3,r21;;
+(p7)	mov r21=r0
+	dep r20=r21,r20,IA64_PSR_CPL0_BIT,2 ;;
+	dep r20=r23,r20,IA64_PSR_RI_BIT,2 ;;
+	// vipsr.i=vpsr.i
+	adds r21=XSI_PSR_I_OFS-XSI_PSR_IC_OFS,r18 ;;
+	ld4 r21=[r21];;
+	dep r20=r21,r20,IA64_PSR_I_BIT,1 ;;
+	adds r21=XSI_IPSR_OFS-XSI_PSR_IC_OFS,r18 ;;
+	// FIXME: any other vpsr bits need to be properly set/validated?
+	st8 [r21]=r20;;
+	// save iim in shared_info
+	adds r21=XSI_IIM_OFS-XSI_PSR_IC_OFS,r18 ;;
+	st8 [r21]=r17;;
+	// save iip in shared_info
+	mov r20=cr.iip;;
+	adds r21=XSI_IIP_OFS-XSI_PSR_IC_OFS,r18 ;;
+	st8 [r21]=r20;;
+	// save ifs in shared_info
+	adds r21=XSI_INCOMPL_REG_OFS-XSI_PSR_IC_OFS,r18 ;;
+	st4 [r21]=r0 ;;
+	adds r21=XSI_IFS_OFS-XSI_PSR_IC_OFS,r18
+	st8 [r21]=r0 ;;
+	cover ;;
+	mov r20=cr.ifs;;
+	adds r21=XSI_PRECOVER_IFS_OFS-XSI_PSR_IC_OFS,r18 ;;
+	st8 [r21]=r20;;
+	// vpsr.i = vpsr.ic = 0 on delivery of interruption
+	st8 [r18]=r0;;
+	// FIXME: need to save iipa and isr to be arch-compliant
+	// set iip to go to domain IVA break instruction vector
+	adds r22=IA64_VCPU_IVA_OFFSET-IA64_VCPU_BREAKIMM_OFFSET,r22;;
+	ld8 r23=[r22];;
+	movl r24=0x2c00;;
+	add r24=r24,r23;;
+	mov cr.iip=r24;;
+	// OK, now all set to go except for switch to virtual bank0
+	mov r30=r2; mov r29=r3;;
+	adds r2=XSI_BANK1_OFS-XSI_PSR_IC_OFS,r18;
+	adds r3=(XSI_BANK1_OFS+8)-XSI_PSR_IC_OFS,r18;;
+	bsw.1;;
+	st8 [r2]=r16,16; st8 [r3]=r17,16 ;;
+	st8 [r2]=r18,16; st8 [r3]=r19,16 ;;
+	st8 [r2]=r20,16; st8 [r3]=r21,16 ;;
+	st8 [r2]=r22,16; st8 [r3]=r23,16 ;;
+	st8 [r2]=r24,16; st8 [r3]=r25,16 ;;
+	st8 [r2]=r26,16; st8 [r3]=r27,16 ;;
+	st8 [r2]=r28,16; st8 [r3]=r29,16 ;;
+	st8 [r2]=r30,16; st8 [r3]=r31,16 ;;
+	movl r31=XSI_IPSR;;
+	bsw.0 ;;
+	mov r2=r30; mov r3=r29;;
+	adds r20=XSI_BANKNUM_OFS-XSI_PSR_IC_OFS,r18 ;;
+	st4 [r20]=r0 ;;
+	mov pr=r31,-1 ;;
+	rfi
+	;;
+
+
 // ensure that, if giving up, registers at entry to fast_hyperprivop unchanged
 ENTRY(hyper_rfi)
 #define FAST_HYPERPRIVOP_CNT
@@ -112,8 +198,6 @@ ENTRY(hyper_rfi)
 	ld8 r20=[r20];;
 	dep r20=0,r20,38,25;; // ensure ifs has no reserved bits set
 	mov cr.ifs=r20 ;;
-// TODO: increment a counter so we can count how many rfi's go the fast way
-//    but where?  counter must be pinned
 	// ipsr.cpl == (vcr.ipsr.cpl == 0) 2 : 3;
 	dep r21=-1,r21,IA64_PSR_CPL1_BIT,1 ;;
 	// vpsr.i = vcr.ipsr.i; vpsr.ic = vcr.ipsr.ic

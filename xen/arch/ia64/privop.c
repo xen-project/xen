@@ -987,14 +987,14 @@ int dump_hyperprivop_counts(char *buf)
 	char *s = buf;
 	unsigned long total = 0;
 	for (i = 1; i <= HYPERPRIVOP_MAX; i++) total += slow_hyperpriv_cnt[i];
-	s += sprintf(s,"Slow hyperprivops (total %d:\n",total);
+	s += sprintf(s,"Slow hyperprivops (total %d):\n",total);
 	for (i = 1; i <= HYPERPRIVOP_MAX; i++)
 		if (slow_hyperpriv_cnt[i])
 			s += sprintf(s,"%10d %s\n",
 				slow_hyperpriv_cnt[i], hyperpriv_str[i]);
 	total = 0;
 	for (i = 1; i <= HYPERPRIVOP_MAX; i++) total += fast_hyperpriv_cnt[i];
-	s += sprintf(s,"Fast hyperprivops (total %d:\n",total);
+	s += sprintf(s,"Fast hyperprivops (total %d):\n",total);
 	for (i = 1; i <= HYPERPRIVOP_MAX; i++)
 		if (fast_hyperpriv_cnt[i])
 			s += sprintf(s,"%10d %s\n",
@@ -1016,6 +1016,7 @@ int dump_privop_counts_to_user(char __user *ubuf, int len)
 	int n = dump_privop_counts(buf);
 
 	n += dump_hyperprivop_counts(buf + n);
+	n += dump_reflect_counts(buf + n);
 #ifdef PRIVOP_ADDR_COUNT
 	n += dump_privop_addrs(buf + n);
 #endif
@@ -1033,6 +1034,7 @@ int zero_privop_counts_to_user(char __user *ubuf, int len)
 #ifdef PRIVOP_ADDR_COUNT
 	zero_privop_addrs();
 #endif
+	zero_reflect_counts();
 	if (len < TMPBUFLEN) return -1;
 	if (__copy_to_user(ubuf,buf,n)) return -1;
 	return n;

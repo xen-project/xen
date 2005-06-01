@@ -50,7 +50,7 @@ void dom_efi_hypercall_patch(struct domain *d, unsigned long paddr, unsigned lon
 
 	if (d == dom0) paddr += dom0_start;
 	imva = domain_mpa_to_imva(d,paddr);
-	build_hypercall_bundle(imva,d->breakimm,hypercall,1);
+	build_hypercall_bundle(imva,d->arch.breakimm,hypercall,1);
 }
 
 
@@ -61,7 +61,7 @@ void dom_fw_hypercall_patch(struct domain *d, unsigned long paddr, unsigned long
 
 	if (d == dom0) paddr += dom0_start;
 	imva = domain_mpa_to_imva(d,paddr);
-	build_hypercall_bundle(imva,d->breakimm,hypercall,ret);
+	build_hypercall_bundle(imva,d->arch.breakimm,hypercall,ret);
 }
 
 

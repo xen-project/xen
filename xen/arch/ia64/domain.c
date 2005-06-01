@@ -210,7 +210,7 @@ void arch_do_createdomain(struct exec_domain *ed)
 	 */
 	d->xen_vastart = 0xf000000000000000;
 	d->xen_vaend = 0xf300000000000000;
-	d->breakimm = 0x1000;
+	d->arch.breakimm = 0x1000;
 
 	// stay on kernel stack because may get interrupts!
 	// ia64_ret_from_clone (which b0 gets in new_thread) switches
@@ -256,7 +256,8 @@ void arch_do_createdomain(struct exec_domain *ed)
 	d->xen_vastart = 0xf000000000000000;
 	d->xen_vaend = 0xf300000000000000;
 	d->shared_info_va = 0xf100000000000000;
-	d->breakimm = 0x1000;
+	d->arch.breakimm = 0x1000;
+	ed->arch.breakimm = d->arch.breakimm;
 	// stay on kernel stack because may get interrupts!
 	// ia64_ret_from_clone (which b0 gets in new_thread) switches
 	// to user stack

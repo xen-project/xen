@@ -783,20 +783,26 @@ ENTRY(break_fault)
 	ld8 r19=[r18]
 	;;
 	cmp.eq p7,p0=r0,r17			// is this a psuedo-cover?
-(p7)	br.sptk.many dispatch_privop_fault
+(p7)	br.spnt.many dispatch_privop_fault
 	;;
-	cmp4.ne p7,p0=r0,r19
-(p7)	br.sptk.many dispatch_break_fault
-	// If we get to here, we have a hyperprivop
-	// For now, hyperprivops are handled through the break mechanism
-	// Later, they will be fast hand-coded assembly with psr.ic off
+	// if vpsr.ic is off, we have a hyperprivop
+	// A hyperprivop is hand-coded assembly with psr.ic off
 	// which means no calls, no use of r1-r15 and no memory accesses
 	// except to pinned addresses!
-#define FAST_HYPERPRIVOPS
-#ifdef FAST_HYPERPRIVOPS
-	br.sptk.many fast_hyperprivop
+	cmp4.eq p7,p0=r0,r19
+(p7)	br.sptk.many fast_hyperprivop
+	;;
+	mov r22=IA64_KR(CURRENT);;
+	adds r22=IA64_VCPU_BREAKIMM_OFFSET,r22;;
+	ld4 r23=[r22];;
+	cmp4.eq p6,p7=r23,r17			// Xen-reserved breakimm?
+(p6)	br.spnt.many dispatch_break_fault
+	;;
+//#define FAST_BREAK
+#ifdef FAST_BREAK
+	br.sptk.many fast_break_reflect
 #else
-	br.sptk.many dispatch_break_fault
+	br.spnt.many dispatch_break_fault
 #endif
 	;;
 #endif
