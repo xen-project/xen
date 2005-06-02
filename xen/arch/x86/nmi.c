@@ -21,8 +21,8 @@
 #include <xen/time.h>
 #include <xen/sched.h>
 #include <xen/console.h>
+#include <xen/smp.h>
 #include <asm/mc146818rtc.h>
-#include <asm/smp.h>
 #include <asm/msr.h>
 #include <asm/mpspec.h>
 #include <asm/debugger.h>

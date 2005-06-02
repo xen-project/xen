@@ -13,6 +13,7 @@
 #include <xen/errno.h>
 #include <xen/compile.h>
 #include <xen/sched.h>
+#include <asm/current.h>
 
 void cmdline_parse(char *cmdline)
 {

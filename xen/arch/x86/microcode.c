@@ -74,6 +74,7 @@
 #include <xen/kernel.h>
 #include <xen/init.h>
 #include <xen/sched.h>
+#include <xen/smp.h>
 #include <xen/spinlock.h>
 
 #include <asm/msr.h>

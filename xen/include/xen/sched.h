@@ -9,8 +9,6 @@
 #include <xen/smp.h>
 #include <public/xen.h>
 #include <public/dom0_ops.h>
-#include <xen/list.h>
-#include <xen/spinlock.h>
 #include <xen/grant_table.h>
 #include <asm/domain.h>
 

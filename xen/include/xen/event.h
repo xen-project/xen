@@ -11,6 +11,7 @@
 
 #include <xen/config.h>
 #include <xen/sched.h>
+#include <xen/smp.h>
 #include <asm/bitops.h>
 
 /*

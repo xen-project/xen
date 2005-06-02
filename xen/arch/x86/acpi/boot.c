@@ -28,7 +28,7 @@
 #include <xen/init.h>
 #include <xen/acpi.h>
 #include <xen/irq.h>
-#include <xen/sched.h>
+#include <asm/fixmap.h>
 #include <asm/page.h>
 #include <asm/apic.h>
 #include <asm/io_apic.h>

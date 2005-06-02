@@ -10,6 +10,7 @@
 
 #include <xen/config.h>
 #include <xen/sched.h>
+#include <asm/current.h>
 #include <asm/processor.h>
 #include <asm/i387.h>
 
