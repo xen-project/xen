@@ -23,7 +23,6 @@
 #include <xen/ac_timer.h>
 #include <xen/perfc.h>
 #include <xen/sched-if.h>
-#include <xen/slab.h>
 #include <xen/softirq.h>
 
 /* all per-domain BVT-specific scheduling info is stored here */

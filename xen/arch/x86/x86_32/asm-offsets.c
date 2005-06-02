@@ -7,6 +7,7 @@
 #include <xen/config.h>
 #include <xen/perfc.h>
 #include <xen/sched.h>
+#include <asm/hardirq.h>
 
 #define DEFINE(_sym, _val) \
     __asm__ __volatile__ ( "\n->" #_sym " %0 " #_val : : "i" (_val) )

@@ -23,7 +23,6 @@
 #include <asm/io.h>
 #include <xen/lib.h>
 #include <xen/sched.h>
-#include <xen/slab.h>
 #include <xen/smp.h>
 #include <xen/trace.h>
 #include <xen/errno.h>

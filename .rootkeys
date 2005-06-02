@@ -1445,7 +1445,6 @@
 3ddb79c0LzqqS0LhAQ50ekgj4oGl7Q xen/include/xen/sched.h
 403a06a7H0hpHcKpAiDe5BPnaXWTlA xen/include/xen/serial.h
 4252c315hw0xXYMKIfFzhomi1M1yNA xen/include/xen/shadow.h
-3ddb79c14dXIhP7C2ahnoD08K90G_w xen/include/xen/slab.h
 3ddb79c09xbS-xxfKxuV3JETIhBzmg xen/include/xen/smp.h
 3ddb79c1Vi5VleJAOKHAlY0G2zAsgw xen/include/xen/softirq.h
 3ddb79c2iIcESrDAB8samy_yAh6olQ xen/include/xen/spinlock.h
@@ -1453,6 +1452,7 @@
 3ddb79c0BnA20PbgmuMPSGIBljNRQw xen/include/xen/time.h
 403a3edbG9K5uZjuY19_LORbQGmFbA xen/include/xen/trace.h
 3ddb79c1-kVvF8cVa0k3ZHDdBMj01Q xen/include/xen/types.h
+3ddb79c14dXIhP7C2ahnoD08K90G_w xen/include/xen/xmalloc.h
 41d291f5u3J3HYViXLs3cNuFGTvzNg xen/tools/Makefile
 3eb3c87fc79FXLA6R9TvdBJNTvQDwA xen/tools/figlet/LICENSE
 3eb3c87fPL2T_zBb0bHlbZY-ACEKRw xen/tools/figlet/Makefile

@@ -1,10 +1,10 @@
 #include <xen/config.h>
 #include <xen/types.h>
+#include <xen/lib.h>
 #include <xen/kernel.h>
 #include <xen/string.h>
 #include <xen/init.h>
 #include <xen/cache.h>
-#include <xen/slab.h>
 #include <xen/acpi.h>
 #include <asm/io.h>
 #include <asm/system.h>

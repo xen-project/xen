@@ -5,13 +5,13 @@
  * based on code by Mark Williamson (C) 2004 Intel Research Cambridge
  */
 
+#include <xen/lib.h>
 #include <xen/sched.h>
 #include <xen/sched-if.h>
 #include <public/sched_ctl.h>
 #include <xen/ac_timer.h>
 #include <xen/softirq.h>
 #include <xen/time.h>
-#include <xen/slab.h>
 
 /*verbosity settings*/
 #define SEDFLEVEL 0

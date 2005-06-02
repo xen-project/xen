@@ -27,7 +27,6 @@
 #include <xen/perfc.h>
 #include <xen/sched.h>
 #include <xen/spinlock.h>
-#include <xen/slab.h>
 #include <xen/mm.h>
 #include <xen/irq.h>
 #include <xen/softirq.h>

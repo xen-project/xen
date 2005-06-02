@@ -10,6 +10,7 @@
 #include <xen/sched.h>
 #include <xen/event.h>
 #include <xen/multicall.h>
+#include <asm/hardirq.h>
 
 struct mc_state mc_state[NR_CPUS];
 

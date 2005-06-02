@@ -21,6 +21,7 @@
  */
 
 #include <xen/config.h>
+#include <xen/lib.h>
 #include <xen/init.h>
 #include <xen/irq.h>
 #include <xen/delay.h>
@@ -234,7 +235,7 @@ static void set_ioapic_affinity_irq(unsigned int irq, cpumask_t cpumask)
 #if defined(CONFIG_IRQBALANCE)
 # include <asm/processor.h>	/* kernel_thread() */
 # include <xen/kernel_stat.h>	/* kstat */
-# include <xen/slab.h>		/* kmalloc() */
+# include <xen/xmalloc.h>	/* kmalloc() */
 # include <xen/timer.h>	/* time_after() */
  
 # ifdef CONFIG_BALANCED_IRQ_DEBUG

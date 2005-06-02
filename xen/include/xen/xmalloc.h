@@ -1,6 +1,6 @@
 
-#ifndef __SLAB_H__
-#define __SLAB_H__
+#ifndef __XMALLOC_H__
+#define __XMALLOC_H__
 
 /* Allocate space for typed object. */
 #define xmalloc(_type) ((_type *)_xmalloc(sizeof(_type), __alignof__(_type)))
@@ -24,4 +24,4 @@ static inline void *_xmalloc_array(size_t size, size_t align, size_t num)
  	return _xmalloc(size * num, align);
 }
 
-#endif /* __SLAB_H__ */
+#endif /* __XMALLOC_H__ */

@@ -7,21 +7,15 @@
 #include <xen/spinlock.h>
 #include <xen/cache.h>
 #include <xen/smp.h>
-#include <asm/page.h>
-#include <asm/processor.h>
 #include <public/xen.h>
 #include <public/dom0_ops.h>
 #include <xen/list.h>
 #include <xen/time.h>
 #include <xen/ac_timer.h>
 #include <xen/delay.h>
-#include <asm/atomic.h>
-#include <asm/current.h>
 #include <xen/spinlock.h>
 #include <xen/grant_table.h>
-#include <asm/hardirq.h>
 #include <asm/domain.h>
-#include <asm/bitops.h>
 
 extern unsigned long volatile jiffies;
 extern rwlock_t domlist_lock;
