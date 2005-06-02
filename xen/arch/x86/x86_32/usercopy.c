@@ -5,8 +5,9 @@
  * Copyright 1997 Andi Kleen <ak@muc.de>
  * Copyright 1997 Linus Torvalds
  */
+
 #include <xen/config.h>
-#include <xen/mm.h>
+#include <xen/lib.h>
 #include <asm/uaccess.h>
 
 static inline int __movsl_is_ok(unsigned long a1, unsigned long a2, unsigned long n)

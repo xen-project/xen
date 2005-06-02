@@ -6,7 +6,8 @@
  * Copyright 2002 Andi Kleen <ak@suse.de>
  */
 
-#include <xen/string.h>
+#include <xen/config.h>
+#include <xen/lib.h>
 #include <asm/uaccess.h>
 
 /*
