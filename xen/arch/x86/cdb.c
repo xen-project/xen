@@ -8,9 +8,9 @@
    than any actual intention.  It doesn't at the moment. */
 #include <xen/lib.h>
 #include <asm/uaccess.h>
+#include <xen/spinlock.h>
 #include <xen/serial.h>
 #include <xen/irq.h>
-#include <xen/spinlock.h>
 #include <asm/debugger.h>
 #include <xen/init.h>
 #include <xen/smp.h>
