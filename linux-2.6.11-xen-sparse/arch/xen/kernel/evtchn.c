@@ -215,7 +215,7 @@ int bind_ipi_on_cpu_to_irq(int cpu, int ipi)
     if ( (evtchn = per_cpu(ipi_to_evtchn, cpu)[ipi]) == 0 )
     {
         op.cmd                 = EVTCHNOP_bind_ipi;
-        op.u.bind_ipi.ipi_edom = cpu;
+        op.u.bind_ipi.ipi_vcpu = cpu;
         if ( HYPERVISOR_event_channel_op(&op) != 0 )
             panic("Failed to bind virtual IPI %d on cpu %d\n", ipi, cpu);
         evtchn = op.u.bind_ipi.port;
