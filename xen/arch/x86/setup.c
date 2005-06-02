@@ -95,7 +95,7 @@ unsigned long mmu_cr4_features = X86_CR4_PSE | X86_CR4_PGE;
 #endif
 EXPORT_SYMBOL(mmu_cr4_features);
 
-struct exec_domain *idle_task[NR_CPUS] = { &idle0_exec_domain };
+struct vcpu *idle_task[NR_CPUS] = { &idle0_vcpu };
 
 int acpi_disabled;
 
@@ -252,7 +252,7 @@ void __init __start_xen(multiboot_info_t *mbi)
         cmdline_parse(__va(mbi->cmdline));
 
     /* Must do this early -- e.g., spinlocks rely on get_current(). */
-    set_current(&idle0_exec_domain);
+    set_current(&idle0_vcpu);
     set_processor_id(0);
 
     smp_prepare_boot_cpu();

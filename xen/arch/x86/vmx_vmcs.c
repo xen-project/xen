@@ -102,7 +102,7 @@ struct host_execution_env {
 
 #define round_pgdown(_p) ((_p)&PAGE_MASK) /* coped from domain.c */
 
-int vmx_setup_platform(struct exec_domain *d, struct cpu_user_regs *regs)
+int vmx_setup_platform(struct vcpu *d, struct cpu_user_regs *regs)
 {
     int i;
     unsigned int n;
@@ -156,7 +156,7 @@ int vmx_setup_platform(struct exec_domain *d, struct cpu_user_regs *regs)
     return 0;
 }
 
-void vmx_do_launch(struct exec_domain *ed) 
+void vmx_do_launch(struct vcpu *v) 
 {
 /* Update CR3, GDT, LDT, TR */
     unsigned int tr, cpu, error = 0;
@@ -167,14 +167,14 @@ void vmx_do_launch(struct exec_domain *ed)
     struct cpu_user_regs *regs = guest_cpu_user_regs();
 
     vmx_stts();
-    set_bit(_VCPUF_guest_stts, &ed->vcpu_flags);
+    set_bit(_VCPUF_guest_stts, &v->vcpu_flags);
 
     cpu = smp_processor_id();
 
     page = (struct pfn_info *) alloc_domheap_page(NULL);
     pfn = (unsigned long) (page - frame_table);
 
-    vmx_setup_platform(ed, regs);
+    vmx_setup_platform(v, regs);
 
     __asm__ __volatile__ ("sgdt  (%0) \n" :: "a"(&desc) : "memory");
     host_env.gdtr_limit = desc.size;
@@ -196,11 +196,11 @@ void vmx_do_launch(struct exec_domain *ed)
     error |= __vmwrite(GUEST_TR_BASE, 0);
     error |= __vmwrite(GUEST_TR_LIMIT, 0xff);
 
-    __vmwrite(GUEST_CR3, pagetable_get_paddr(ed->arch.guest_table));
-    __vmwrite(HOST_CR3, pagetable_get_paddr(ed->arch.monitor_table));
+    __vmwrite(GUEST_CR3, pagetable_get_paddr(v->arch.guest_table));
+    __vmwrite(HOST_CR3, pagetable_get_paddr(v->arch.monitor_table));
     __vmwrite(HOST_ESP, (unsigned long)get_stack_bottom());
 
-    ed->arch.schedule_tail = arch_vmx_do_resume;
+    v->arch.schedule_tail = arch_vmx_do_resume;
 }
 
 /*

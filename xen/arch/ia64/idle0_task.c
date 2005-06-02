@@ -31,7 +31,7 @@ EXPORT_SYMBOL(init_mm);
 
 struct domain idle0_domain = IDLE0_DOMAIN(idle0_domain);
 #if 0
-struct exec_domain idle0_exec_domain = IDLE0_EXEC_DOMAIN(idle0_exec_domain,
+struct vcpu idle0_vcpu = IDLE0_EXEC_DOMAIN(idle0_vcpu,
                                                          &idle0_domain);
 #endif
 

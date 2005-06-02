@@ -59,7 +59,7 @@ vmx_ia64_handle_break (unsigned long ifa, struct pt_regs *regs, unsigned long is
 {
 	static int first_time = 1;
 	struct domain *d = (struct domain *) current->domain;
-	struct exec_domain *ed = (struct domain *) current;
+	struct vcpu *v = (struct domain *) current;
 	extern unsigned long running_on_sim;
 	unsigned long i, sal_param[8];
 
@@ -80,18 +80,18 @@ vmx_ia64_handle_break (unsigned long ifa, struct pt_regs *regs, unsigned long is
 		    case FW_HYPERCALL_PAL_CALL:
 			//printf("*** PAL hypercall: index=%d\n",regs->r28);
 			//FIXME: This should call a C routine
-			x = pal_emulator_static(VMX_VPD(ed, vgr[12]));
+			x = pal_emulator_static(VMX_VPD(v, vgr[12]));
 			regs->r8 = x.status; regs->r9 = x.v0;
 			regs->r10 = x.v1; regs->r11 = x.v2;
 #if 0
 			if (regs->r8)
 				printk("Failed vpal emulation, with index:0x%lx\n",
-					VMX_VPD(ed, vgr[12]));
+					VMX_VPD(v, vgr[12]));
 #endif
 			break;
 		    case FW_HYPERCALL_SAL_CALL:
 			for (i = 0; i < 8; i++)
-				vmx_vcpu_get_gr(ed, 32+i, &sal_param[i]);
+				vmx_vcpu_get_gr(v, 32+i, &sal_param[i]);
 			x = sal_emulator(sal_param[0], sal_param[1],
 					 sal_param[2], sal_param[3],
 					 sal_param[4], sal_param[5],
@@ -117,8 +117,8 @@ vmx_ia64_handle_break (unsigned long ifa, struct pt_regs *regs, unsigned long is
 			{
 			unsigned long *tv, *tc;
 			fooefi();
-			vmx_vcpu_get_gr(ed, 32, &tv);
-			vmx_vcpu_get_gr(ed, 33, &tc);
+			vmx_vcpu_get_gr(v, 32, &tv);
+			vmx_vcpu_get_gr(v, 33, &tc);
 			printf("efi_get_time(%p,%p) called...",tv,tc);
 			tv = __va(translate_domain_mpaddr(tv));
 			if (tc) tc = __va(translate_domain_mpaddr(tc));
@@ -191,11 +191,11 @@ void vmx_reflect_interruption(UINT64 ifa,UINT64 isr,UINT64 iim,
 void vmx_deliver_pending_interrupt(struct pt_regs *regs)
 {
 	struct domain *d = current->domain;
-	struct exec_domain *ed = current;
+	struct vcpu *v = current;
 	// FIXME: Will this work properly if doing an RFI???
 	if (!is_idle_task(d) ) {	// always comes from guest
-		//vcpu_poke_timer(ed);
-		//if (vcpu_deliverable_interrupts(ed)) {
+		//vcpu_poke_timer(v);
+		//if (vcpu_deliverable_interrupts(v)) {
 		//	unsigned long isr = regs->cr_ipsr & IA64_PSR_RI;
 		//	foodpi();
 		//	reflect_interruption(0,isr,0,regs,IA64_EXTINT_VECTOR);
@@ -207,7 +207,7 @@ void vmx_deliver_pending_interrupt(struct pt_regs *regs)
 			printk("WARNING: checking pending interrupt in nested interrupt!!!\n");
 		if (regs->cr_iip == *(unsigned long *)vmx_dorfirfi)
 			return;
-		vmx_check_pending_irq(ed);
+		vmx_check_pending_irq(v);
 	}
 }
 

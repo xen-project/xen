@@ -69,7 +69,7 @@ void __init paging_init(void)
     printk("PAE disabled.\n");
 #endif
 
-    idle0_exec_domain.arch.monitor_table = mk_pagetable(__pa(idle_pg_table));
+    idle0_vcpu.arch.monitor_table = mk_pagetable(__pa(idle_pg_table));
 
     /*
      * Allocate and map the machine-to-phys table and create read-only mapping 

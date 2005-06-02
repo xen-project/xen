@@ -13,7 +13,7 @@
 #include <asm/tlb.h>
 #endif // CONFIG_VTI
 
-#define task_struct exec_domain
+#define task_struct vcpu
 
 #define DEFINE(sym, val) \
         asm volatile("\n->" #sym " %0 " #val : : "i" (val))
@@ -60,8 +60,8 @@ void foo(void)
 	//DEFINE(IA64_TASK_SIGHAND_OFFSET,offsetof (struct task_struct, sighand));
 	//DEFINE(IA64_TASK_SIGNAL_OFFSET,offsetof (struct task_struct, signal));
 	//DEFINE(IA64_TASK_TGID_OFFSET, offsetof (struct task_struct, tgid));
-	DEFINE(IA64_TASK_THREAD_KSP_OFFSET, offsetof (struct exec_domain, arch._thread.ksp));
-	DEFINE(IA64_TASK_THREAD_ON_USTACK_OFFSET, offsetof (struct exec_domain, arch._thread.on_ustack));
+	DEFINE(IA64_TASK_THREAD_KSP_OFFSET, offsetof (struct vcpu, arch._thread.ksp));
+	DEFINE(IA64_TASK_THREAD_ON_USTACK_OFFSET, offsetof (struct vcpu, arch._thread.on_ustack));
 
 	BLANK();
 
@@ -112,14 +112,14 @@ void foo(void)
 	DEFINE(IA64_PT_REGS_CR_ISR_OFFSET, offsetof (struct xen_regs, cr_isr));
 	DEFINE(IA64_PT_REGS_EML_UNAT_OFFSET, offsetof (struct xen_regs, eml_unat));
 	DEFINE(IA64_PT_REGS_RFI_PFS_OFFSET, offsetof (struct xen_regs, rfi_pfs));
-	DEFINE(RFI_IIP_OFFSET, offsetof(struct exec_domain, arch.arch_vmx.rfi_iip));
-	DEFINE(RFI_IPSR_OFFSET, offsetof(struct exec_domain, arch.arch_vmx.rfi_ipsr));
-	DEFINE(RFI_IFS_OFFSET,offsetof(struct exec_domain ,arch.arch_vmx.rfi_ifs));
-	DEFINE(RFI_PFS_OFFSET,offsetof(struct exec_domain ,arch.arch_vmx.rfi_pfs));
-	DEFINE(SWITCH_MRR5_OFFSET,offsetof(struct exec_domain ,arch.arch_vmx.mrr5));
-	DEFINE(SWITCH_MRR6_OFFSET,offsetof(struct exec_domain ,arch.arch_vmx.mrr6));
-	DEFINE(SWITCH_MRR7_OFFSET,offsetof(struct exec_domain ,arch.arch_vmx.mrr7));
-	DEFINE(SWITCH_MPTA_OFFSET,offsetof(struct exec_domain ,arch.arch_vmx.mpta));
+	DEFINE(RFI_IIP_OFFSET, offsetof(struct vcpu, arch.arch_vmx.rfi_iip));
+	DEFINE(RFI_IPSR_OFFSET, offsetof(struct vcpu, arch.arch_vmx.rfi_ipsr));
+	DEFINE(RFI_IFS_OFFSET,offsetof(struct vcpu ,arch.arch_vmx.rfi_ifs));
+	DEFINE(RFI_PFS_OFFSET,offsetof(struct vcpu ,arch.arch_vmx.rfi_pfs));
+	DEFINE(SWITCH_MRR5_OFFSET,offsetof(struct vcpu ,arch.arch_vmx.mrr5));
+	DEFINE(SWITCH_MRR6_OFFSET,offsetof(struct vcpu ,arch.arch_vmx.mrr6));
+	DEFINE(SWITCH_MRR7_OFFSET,offsetof(struct vcpu ,arch.arch_vmx.mrr7));
+	DEFINE(SWITCH_MPTA_OFFSET,offsetof(struct vcpu ,arch.arch_vmx.mpta));
 #endif  //CONFIG_VTI
 	DEFINE(IA64_PT_REGS_R16_OFFSET, offsetof (struct pt_regs, r16));
 	DEFINE(IA64_PT_REGS_R17_OFFSET, offsetof (struct pt_regs, r17));
@@ -193,7 +193,7 @@ void foo(void)
 	BLANK();
 
 #ifdef  CONFIG_VTI
-	DEFINE(IA64_VPD_BASE_OFFSET, offsetof (struct exec_domain, arch.arch_vmx.vpd));
+	DEFINE(IA64_VPD_BASE_OFFSET, offsetof (struct vcpu, arch.arch_vmx.vpd));
 	DEFINE(IA64_VPD_CR_VPTA_OFFSET, offsetof (cr_t, pta));
 	DEFINE(XXX_THASH_SIZE, sizeof (thash_data_t));
 

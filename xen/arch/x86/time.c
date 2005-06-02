@@ -273,9 +273,9 @@ s_time_t get_s_time(void)
     return now; 
 }
 
-static inline void __update_dom_time(struct exec_domain *ed)
+static inline void __update_dom_time(struct vcpu *v)
 {
-    struct domain *d  = ed->domain;
+    struct domain *d  = v->domain;
     shared_info_t *si = d->shared_info;
 
     spin_lock(&d->time_lock);
@@ -295,14 +295,14 @@ static inline void __update_dom_time(struct exec_domain *ed)
     spin_unlock(&d->time_lock);
 }
 
-void update_dom_time(struct exec_domain *ed)
+void update_dom_time(struct vcpu *v)
 {
     unsigned long flags;
 
-    if ( ed->domain->shared_info->tsc_timestamp != full_tsc_irq )
+    if ( v->domain->shared_info->tsc_timestamp != full_tsc_irq )
     {
         read_lock_irqsave(&time_lock, flags);
-        __update_dom_time(ed);
+        __update_dom_time(v);
         read_unlock_irqrestore(&time_lock, flags);
     }
 }

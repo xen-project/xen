@@ -236,8 +236,8 @@ static inline int do_trap(int trapnr, char *str,
                           struct cpu_user_regs *regs, 
                           int use_error_code)
 {
-    struct exec_domain *ed = current;
-    struct trap_bounce *tb = &ed->arch.trap_bounce;
+    struct vcpu *v = current;
+    struct trap_bounce *tb = &v->arch.trap_bounce;
     trap_info_t *ti;
     unsigned long fixup;
 
@@ -303,8 +303,8 @@ DO_ERROR_NOCODE(19, "simd error", simd_coprocessor_error)
 
 asmlinkage int do_int3(struct cpu_user_regs *regs)
 {
-    struct exec_domain *ed = current;
-    struct trap_bounce *tb = &ed->arch.trap_bounce;
+    struct vcpu *v = current;
+    struct trap_bounce *tb = &v->arch.trap_bounce;
     trap_info_t *ti;
 
     DEBUGGER_trap_entry(TRAP_int3, regs);
@@ -335,10 +335,10 @@ asmlinkage int do_machine_check(struct cpu_user_regs *regs)
 void propagate_page_fault(unsigned long addr, u16 error_code)
 {
     trap_info_t *ti;
-    struct exec_domain *ed = current;
-    struct trap_bounce *tb = &ed->arch.trap_bounce;
+    struct vcpu *v = current;
+    struct trap_bounce *tb = &v->arch.trap_bounce;
 
-    ti = &ed->arch.guest_context.trap_ctxt[TRAP_page_fault];
+    ti = &v->arch.guest_context.trap_ctxt[TRAP_page_fault];
     tb->flags = TBF_EXCEPTION | TBF_EXCEPTION_ERRCODE | TBF_EXCEPTION_CR2;
     tb->cr2        = addr;
     tb->error_code = error_code;
@@ -347,7 +347,7 @@ void propagate_page_fault(unsigned long addr, u16 error_code)
     if ( TI_GET_IF(ti) )
         tb->flags |= TBF_INTERRUPT;
 
-    ed->arch.guest_cr2 = addr;
+    v->arch.guest_cr2 = addr;
 }
 
 static int handle_perdomain_mapping_fault(
@@ -355,8 +355,8 @@ static int handle_perdomain_mapping_fault(
 {
     extern int map_ldt_shadow_page(unsigned int);
 
-    struct exec_domain *ed = current;
-    struct domain      *d  = ed->domain;
+    struct vcpu *v = current;
+    struct domain *d  = v->domain;
     int ret;
 
     /* Which vcpu's area did we fault in, and is it in the ldt sub-area? */
@@ -383,7 +383,7 @@ static int handle_perdomain_mapping_fault(
                 return 0;
             /* In guest mode? Propagate #PF to guest, with adjusted %cr2. */
             propagate_page_fault(
-                ed->arch.guest_context.ldt_base + offset, regs->error_code);
+                v->arch.guest_context.ldt_base + offset, regs->error_code);
         }
     }
     else
@@ -399,8 +399,8 @@ static int handle_perdomain_mapping_fault(
 asmlinkage int do_page_fault(struct cpu_user_regs *regs)
 {
     unsigned long addr, fixup;
-    struct exec_domain *ed = current;
-    struct domain *d = ed->domain;
+    struct vcpu *v = current;
+    struct domain *d = v->domain;
 
     __asm__ __volatile__ ("mov %%cr2,%0" : "=r" (addr) : );
 
@@ -433,7 +433,7 @@ asmlinkage int do_page_fault(struct cpu_user_regs *regs)
 
     if ( unlikely(shadow_mode_enabled(d)) &&
          ((addr < HYPERVISOR_VIRT_START) ||
-          (shadow_mode_external(d) && GUEST_CONTEXT(ed, regs))) &&
+          (shadow_mode_external(d) && GUEST_CONTEXT(v, regs))) &&
          shadow_fault(addr, regs) )
         return EXCRET_fault_fixed;
 
@@ -472,17 +472,17 @@ asmlinkage int do_page_fault(struct cpu_user_regs *regs)
 
 long do_fpu_taskswitch(int set)
 {
-    struct exec_domain *ed = current;
+    struct vcpu *v = current;
 
     if ( set )
     {
-        set_bit(_VCPUF_guest_stts, &ed->vcpu_flags);
+        set_bit(_VCPUF_guest_stts, &v->vcpu_flags);
         stts();
     }
     else
     {
-        clear_bit(_VCPUF_guest_stts, &ed->vcpu_flags);
-        if ( test_bit(_VCPUF_fpu_dirtied, &ed->vcpu_flags) )
+        clear_bit(_VCPUF_guest_stts, &v->vcpu_flags);
+        if ( test_bit(_VCPUF_fpu_dirtied, &v->vcpu_flags) )
             clts();
     }
 
@@ -492,25 +492,25 @@ long do_fpu_taskswitch(int set)
 /* Has the guest requested sufficient permission for this I/O access? */
 static inline int guest_io_okay(
     unsigned int port, unsigned int bytes,
-    struct exec_domain *ed, struct cpu_user_regs *regs)
+    struct vcpu *v, struct cpu_user_regs *regs)
 {
     u16 x;
 #if defined(__x86_64__)
     /* If in user mode, switch to kernel mode just to read I/O bitmap. */
-    extern void toggle_guest_mode(struct exec_domain *);
-    int user_mode = !(ed->arch.flags & TF_kernel_mode);
-#define TOGGLE_MODE() if ( user_mode ) toggle_guest_mode(ed)
+    extern void toggle_guest_mode(struct vcpu *);
+    int user_mode = !(v->arch.flags & TF_kernel_mode);
+#define TOGGLE_MODE() if ( user_mode ) toggle_guest_mode(v)
 #elif defined(__i386__)
 #define TOGGLE_MODE() ((void)0)
 #endif
 
-    if ( ed->arch.iopl >= (KERNEL_MODE(ed, regs) ? 1 : 3) )
+    if ( v->arch.iopl >= (KERNEL_MODE(v, regs) ? 1 : 3) )
         return 1;
 
-    if ( ed->arch.iobmp_limit > (port + bytes) )
+    if ( v->arch.iobmp_limit > (port + bytes) )
     {
         TOGGLE_MODE();
-        __get_user(x, (u16 *)(ed->arch.iobmp+(port>>3)));
+        __get_user(x, (u16 *)(v->arch.iobmp+(port>>3)));
         TOGGLE_MODE();
         if ( (x & (((1<<bytes)-1) << (port&7))) == 0 )
             return 1;
@@ -522,9 +522,9 @@ static inline int guest_io_okay(
 /* Has the administrator granted sufficient permission for this I/O access? */
 static inline int admin_io_okay(
     unsigned int port, unsigned int bytes,
-    struct exec_domain *ed, struct cpu_user_regs *regs)
+    struct vcpu *v, struct cpu_user_regs *regs)
 {
-    struct domain *d = ed->domain;
+    struct domain *d = v->domain;
     u16 x;
 
     if ( d->arch.iobmp_mask != NULL )
@@ -565,7 +565,7 @@ static inline int admin_io_okay(
 
 static int emulate_privileged_op(struct cpu_user_regs *regs)
 {
-    struct exec_domain *ed = current;
+    struct vcpu *v = current;
     unsigned long *reg, eip = regs->eip;
     u8 opcode, modrm_reg = 0, rep_prefix = 0;
     unsigned int port, i, op_bytes = 4, data;
@@ -619,22 +619,22 @@ static int emulate_privileged_op(struct cpu_user_regs *regs)
         case 0x6c: /* INSB */
             op_bytes = 1;
         case 0x6d: /* INSW/INSL */
-            if ( !guest_io_okay((u16)regs->edx, op_bytes, ed, regs) )
+            if ( !guest_io_okay((u16)regs->edx, op_bytes, v, regs) )
                 goto fail;
             switch ( op_bytes )
             {
             case 1:
-                data = (u8)inb_user((u16)regs->edx, ed, regs);
+                data = (u8)inb_user((u16)regs->edx, v, regs);
                 if ( put_user((u8)data, (u8 *)regs->edi) )
                     PAGE_FAULT(regs->edi, USER_WRITE_FAULT);
                 break;
             case 2:
-                data = (u16)inw_user((u16)regs->edx, ed, regs);
+                data = (u16)inw_user((u16)regs->edx, v, regs);
                 if ( put_user((u16)data, (u16 *)regs->edi) )
                     PAGE_FAULT(regs->edi, USER_WRITE_FAULT);
                 break;
             case 4:
-                data = (u32)inl_user((u16)regs->edx, ed, regs);
+                data = (u32)inl_user((u16)regs->edx, v, regs);
                 if ( put_user((u32)data, (u32 *)regs->edi) )
                     PAGE_FAULT(regs->edi, USER_WRITE_FAULT);
                 break;
@@ -645,24 +645,24 @@ static int emulate_privileged_op(struct cpu_user_regs *regs)
         case 0x6e: /* OUTSB */
             op_bytes = 1;
         case 0x6f: /* OUTSW/OUTSL */
-            if ( !guest_io_okay((u16)regs->edx, op_bytes, ed, regs) )
+            if ( !guest_io_okay((u16)regs->edx, op_bytes, v, regs) )
                 goto fail;
             switch ( op_bytes )
             {
             case 1:
                 if ( get_user(data, (u8 *)regs->esi) )
                     PAGE_FAULT(regs->esi, USER_READ_FAULT);
-                outb_user((u8)data, (u16)regs->edx, ed, regs);
+                outb_user((u8)data, (u16)regs->edx, v, regs);
                 break;
             case 2:
                 if ( get_user(data, (u16 *)regs->esi) )
                     PAGE_FAULT(regs->esi, USER_READ_FAULT);
-                outw_user((u16)data, (u16)regs->edx, ed, regs);
+                outw_user((u16)data, (u16)regs->edx, v, regs);
                 break;
             case 4:
                 if ( get_user(data, (u32 *)regs->esi) )
                     PAGE_FAULT(regs->esi, USER_READ_FAULT);
-                outl_user((u32)data, (u16)regs->edx, ed, regs);
+                outl_user((u32)data, (u16)regs->edx, v, regs);
                 break;
             }
             regs->esi += (regs->eflags & EF_DF) ? -op_bytes : op_bytes;
@@ -687,20 +687,20 @@ static int emulate_privileged_op(struct cpu_user_regs *regs)
     case 0xe5: /* IN imm8,%eax */
         port = insn_fetch(u8, 1, eip);
     exec_in:
-        if ( !guest_io_okay(port, op_bytes, ed, regs) )
+        if ( !guest_io_okay(port, op_bytes, v, regs) )
             goto fail;
         switch ( op_bytes )
         {
         case 1:
             regs->eax &= ~0xffUL;
-            regs->eax |= (u8)inb_user(port, ed, regs);
+            regs->eax |= (u8)inb_user(port, v, regs);
             break;
         case 2:
             regs->eax &= ~0xffffUL;
-            regs->eax |= (u16)inw_user(port, ed, regs);
+            regs->eax |= (u16)inw_user(port, v, regs);
             break;
         case 4:
-            regs->eax = (u32)inl_user(port, ed, regs);
+            regs->eax = (u32)inl_user(port, v, regs);
             break;
         }
         goto done;
@@ -716,18 +716,18 @@ static int emulate_privileged_op(struct cpu_user_regs *regs)
     case 0xe7: /* OUT %eax,imm8 */
         port = insn_fetch(u8, 1, eip);
     exec_out:
-        if ( !guest_io_okay(port, op_bytes, ed, regs) )
+        if ( !guest_io_okay(port, op_bytes, v, regs) )
             goto fail;
         switch ( op_bytes )
         {
         case 1:
-            outb_user((u8)regs->eax, port, ed, regs);
+            outb_user((u8)regs->eax, port, v, regs);
             break;
         case 2:
-            outw_user((u16)regs->eax, port, ed, regs);
+            outw_user((u16)regs->eax, port, v, regs);
             break;
         case 4:
-            outl_user((u32)regs->eax, port, ed, regs);
+            outl_user((u32)regs->eax, port, v, regs);
             break;
         }
         goto done;
@@ -740,7 +740,7 @@ static int emulate_privileged_op(struct cpu_user_regs *regs)
 
     case 0xfa: /* CLI */
     case 0xfb: /* STI */
-        if ( ed->arch.iopl < (KERNEL_MODE(ed, regs) ? 1 : 3) )
+        if ( v->arch.iopl < (KERNEL_MODE(v, regs) ? 1 : 3) )
             goto fail;
         /*
          * This is just too dangerous to allow, in my opinion. Consider if the
@@ -748,7 +748,7 @@ static int emulate_privileged_op(struct cpu_user_regs *regs)
          * that and we'll end up with hard-to-debug lockups. Fast & loose will
          * do for us. :-)
          */
-        /*ed->vcpu_info->evtchn_upcall_mask = (opcode == 0xfa);*/
+        /*v->vcpu_info->evtchn_upcall_mask = (opcode == 0xfa);*/
         goto done;
 
     case 0x0f: /* Two-byte opcode */
@@ -759,7 +759,7 @@ static int emulate_privileged_op(struct cpu_user_regs *regs)
     }
 
     /* Remaining instructions only emulated from guest kernel. */
-    if ( !KERNEL_MODE(ed, regs) )
+    if ( !KERNEL_MODE(v, regs) )
         goto fail;
 
     /* Privileged (ring 0) instructions. */
@@ -772,7 +772,7 @@ static int emulate_privileged_op(struct cpu_user_regs *regs)
 
     case 0x09: /* WBINVD */
         /* Ignore the instruction if unprivileged. */
-        if ( !IS_CAPABLE_PHYSDEV(ed->domain) )
+        if ( !IS_CAPABLE_PHYSDEV(v->domain) )
             DPRINTK("Non-physdev domain attempted WBINVD.\n");
         else
             wbinvd();
@@ -789,15 +789,15 @@ static int emulate_privileged_op(struct cpu_user_regs *regs)
         case 0: /* Read CR0 */
             *reg = 
                 (read_cr0() & ~X86_CR0_TS) | 
-                (test_bit(_VCPUF_guest_stts, &ed->vcpu_flags) ? X86_CR0_TS:0);
+                (test_bit(_VCPUF_guest_stts, &v->vcpu_flags) ? X86_CR0_TS:0);
             break;
 
         case 2: /* Read CR2 */
-            *reg = ed->arch.guest_cr2;
+            *reg = v->arch.guest_cr2;
             break;
             
         case 3: /* Read CR3 */
-            *reg = pagetable_get_paddr(ed->arch.guest_table);
+            *reg = pagetable_get_paddr(v->arch.guest_table);
             break;
 
         default:
@@ -818,13 +818,13 @@ static int emulate_privileged_op(struct cpu_user_regs *regs)
             break;
 
         case 2: /* Write CR2 */
-            ed->arch.guest_cr2 = *reg;
+            v->arch.guest_cr2 = *reg;
             break;
             
         case 3: /* Write CR3 */
-            LOCK_BIGLOCK(ed->domain);
+            LOCK_BIGLOCK(v->domain);
             (void)new_guest_cr3(*reg);
-            UNLOCK_BIGLOCK(ed->domain);
+            UNLOCK_BIGLOCK(v->domain);
             break;
 
         default:
@@ -834,7 +834,7 @@ static int emulate_privileged_op(struct cpu_user_regs *regs)
 
     case 0x30: /* WRMSR */
         /* Ignore the instruction if unprivileged. */
-        if ( !IS_PRIV(ed->domain) )
+        if ( !IS_PRIV(v->domain) )
             DPRINTK("Non-priv domain attempted WRMSR(%p,%08lx,%08lx).\n",
                     _p(regs->ecx), (long)regs->eax, (long)regs->edx);
         else if ( wrmsr_user(regs->ecx, regs->eax, regs->edx) )
@@ -842,7 +842,7 @@ static int emulate_privileged_op(struct cpu_user_regs *regs)
         break;
 
     case 0x32: /* RDMSR */
-        if ( !IS_PRIV(ed->domain) )
+        if ( !IS_PRIV(v->domain) )
             DPRINTK("Non-priv domain attempted RDMSR(%p,%08lx,%08lx).\n",
                     _p(regs->ecx), (long)regs->eax, (long)regs->edx);
         /* Everyone can read the MSR space. */
@@ -864,8 +864,8 @@ static int emulate_privileged_op(struct cpu_user_regs *regs)
 
 asmlinkage int do_general_protection(struct cpu_user_regs *regs)
 {
-    struct exec_domain *ed = current;
-    struct trap_bounce *tb = &ed->arch.trap_bounce;
+    struct vcpu *v = current;
+    struct trap_bounce *tb = &v->arch.trap_bounce;
     trap_info_t *ti;
     unsigned long fixup;
 
@@ -901,7 +901,7 @@ asmlinkage int do_general_protection(struct cpu_user_regs *regs)
     {
         /* This fault must be due to <INT n> instruction. */
         ti = &current->arch.guest_context.trap_ctxt[regs->error_code>>3];
-        if ( PERMIT_SOFTINT(TI_GET_DPL(ti), ed, regs) )
+        if ( PERMIT_SOFTINT(TI_GET_DPL(ti), v, regs) )
         {
             tb->flags = TBF_EXCEPTION;
             regs->eip += 2;
@@ -915,7 +915,7 @@ asmlinkage int do_general_protection(struct cpu_user_regs *regs)
         return 0;
 
 #if defined(__i386__)
-    if ( VM_ASSIST(ed->domain, VMASST_TYPE_4gb_segments) && 
+    if ( VM_ASSIST(v->domain, VMASST_TYPE_4gb_segments) && 
          (regs->error_code == 0) && 
          gpf_emulate_4gb(regs) )
         return 0;
@@ -958,10 +958,10 @@ static void nmi_softirq(void)
         return;
 
     if ( test_and_clear_bit(0, &nmi_softirq_reason) )
-        send_guest_virq(dom0->exec_domain[0], VIRQ_PARITY_ERR);
+        send_guest_virq(dom0->vcpu[0], VIRQ_PARITY_ERR);
 
     if ( test_and_clear_bit(1, &nmi_softirq_reason) )
-        send_guest_virq(dom0->exec_domain[0], VIRQ_IO_ERR);
+        send_guest_virq(dom0->vcpu[0], VIRQ_IO_ERR);
 }
 
 asmlinkage void mem_parity_error(struct cpu_user_regs *regs)
@@ -1045,14 +1045,14 @@ asmlinkage int math_state_restore(struct cpu_user_regs *regs)
 asmlinkage int do_debug(struct cpu_user_regs *regs)
 {
     unsigned long condition;
-    struct exec_domain *ed = current;
-    struct trap_bounce *tb = &ed->arch.trap_bounce;
+    struct vcpu *v = current;
+    struct trap_bounce *tb = &v->arch.trap_bounce;
 
     __asm__ __volatile__("mov %%db6,%0" : "=r" (condition));
 
     /* Mask out spurious debug traps due to lazy DR7 setting */
     if ( (condition & (DR_TRAP0|DR_TRAP1|DR_TRAP2|DR_TRAP3)) &&
-         (ed->arch.guest_context.debugreg[7] == 0) )
+         (v->arch.guest_context.debugreg[7] == 0) )
     {
         __asm__("mov %0,%%db7" : : "r" (0UL));
         goto out;
@@ -1074,11 +1074,11 @@ asmlinkage int do_debug(struct cpu_user_regs *regs)
     } 
 
     /* Save debug status register where guest OS can peek at it */
-    ed->arch.guest_context.debugreg[6] = condition;
+    v->arch.guest_context.debugreg[6] = condition;
 
     tb->flags = TBF_EXCEPTION;
-    tb->cs    = ed->arch.guest_context.trap_ctxt[TRAP_debug].cs;
-    tb->eip   = ed->arch.guest_context.trap_ctxt[TRAP_debug].address;
+    tb->cs    = v->arch.guest_context.trap_ctxt[TRAP_debug].cs;
+    tb->eip   = v->arch.guest_context.trap_ctxt[TRAP_debug].address;
 
  out:
     return EXCRET_not_a_fault;
@@ -1208,7 +1208,7 @@ long do_set_trap_table(trap_info_t *traps)
 }
 
 
-long set_debugreg(struct exec_domain *p, int reg, unsigned long value)
+long set_debugreg(struct vcpu *p, int reg, unsigned long value)
 {
     int i;
 

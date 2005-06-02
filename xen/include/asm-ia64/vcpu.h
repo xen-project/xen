@@ -10,8 +10,8 @@
 typedef	unsigned long UINT64;
 typedef	unsigned int UINT;
 typedef	int BOOLEAN;
-struct exec_domain;
-typedef	struct exec_domain VCPU;
+struct vcpu;
+typedef	struct vcpu VCPU;
 
 // NOTE: The actual VCPU structure (struct virtualcpu) is defined in
 // thread.h.  Moving it to here caused a lot of files to change, so

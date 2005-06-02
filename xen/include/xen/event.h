@@ -20,19 +20,19 @@
  * may require explicit memory barriers.
  */
 
-static inline void evtchn_set_pending(struct exec_domain *ed, int port)
+static inline void evtchn_set_pending(struct vcpu *v, int port)
 {
-    struct domain *d = ed->domain;
+    struct domain *d = v->domain;
     shared_info_t *s = d->shared_info;
     int            running;
 
     /* These three operations must happen in strict order. */
     if ( !test_and_set_bit(port,    &s->evtchn_pending[0]) &&
          !test_bit        (port,    &s->evtchn_mask[0])    &&
-         !test_and_set_bit(port>>5, &ed->vcpu_info->evtchn_pending_sel) )
+         !test_and_set_bit(port>>5, &v->vcpu_info->evtchn_pending_sel) )
     {
         /* The VCPU pending flag must be set /after/ update to evtchn-pend. */
-        set_bit(0, &ed->vcpu_info->evtchn_upcall_pending);
+        set_bit(0, &v->vcpu_info->evtchn_upcall_pending);
 
         /*
          * NB1. 'vcpu_flags' and 'processor' must be checked /after/ update of
@@ -43,10 +43,10 @@ static inline void evtchn_set_pending(struct exec_domain *ed, int port)
          * NB2. We save VCPUF_running across the unblock to avoid a needless
          * IPI for domains that we IPI'd to unblock.
          */
-        running = test_bit(_VCPUF_running, &ed->vcpu_flags);
-        exec_domain_unblock(ed);
+        running = test_bit(_VCPUF_running, &v->vcpu_flags);
+        vcpu_unblock(v);
         if ( running )
-            smp_send_event_check_cpu(ed->processor);
+            smp_send_event_check_cpu(v->processor);
     }
 }
 
@@ -55,12 +55,12 @@ static inline void evtchn_set_pending(struct exec_domain *ed, int port)
  *  @d:        Domain to which virtual IRQ should be sent
  *  @virq:     Virtual IRQ number (VIRQ_*)
  */
-static inline void send_guest_virq(struct exec_domain *ed, int virq)
+static inline void send_guest_virq(struct vcpu *v, int virq)
 {
-    int port = ed->virq_to_evtchn[virq];
+    int port = v->virq_to_evtchn[virq];
 
     if ( likely(port != 0) )
-        evtchn_set_pending(ed, port);
+        evtchn_set_pending(v, port);
 }
 
 /*
@@ -68,9 +68,9 @@ static inline void send_guest_virq(struct exec_domain *ed, int virq)
  *  @d:        Domain to which physical IRQ should be sent
  *  @pirq:     Physical IRQ number
  */
-static inline void send_guest_pirq(struct exec_domain *ed, int pirq)
+static inline void send_guest_pirq(struct vcpu *v, int pirq)
 {
-    evtchn_set_pending(ed, ed->domain->pirq_to_evtchn[pirq]);
+    evtchn_set_pending(v, v->domain->pirq_to_evtchn[pirq]);
 }
 
 #define event_pending(_d)                                     \

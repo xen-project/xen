@@ -24,7 +24,7 @@ void fooefi(void) {}
 int
 ia64_hypercall (struct pt_regs *regs)
 {
-	struct exec_domain *ed = (struct domain *) current;
+	struct vcpu *v = (struct domain *) current;
 	struct ia64_sal_retval x;
 	unsigned long *tv, *tc;
 
@@ -38,7 +38,7 @@ ia64_hypercall (struct pt_regs *regs)
 		// to a yet-to-be-found bug where pending_interruption
 		// is zero when it shouldn't be. Since PAL is called
 		// in the idle loop, this should resolve it
-		ed->vcpu_info->arch.pending_interruption = 1;
+		v->vcpu_info->arch.pending_interruption = 1;
 #endif
 		x = pal_emulator_static(regs->r28);
 		if (regs->r28 == PAL_HALT_LIGHT) {
@@ -49,10 +49,10 @@ ia64_hypercall (struct pt_regs *regs)
 		regs->r10 = x.v1; regs->r11 = x.v2;
 		break;
 	    case FW_HYPERCALL_SAL_CALL:
-		x = sal_emulator(vcpu_get_gr(ed,32),vcpu_get_gr(ed,33),
-			vcpu_get_gr(ed,34),vcpu_get_gr(ed,35),
-			vcpu_get_gr(ed,36),vcpu_get_gr(ed,37),
-			vcpu_get_gr(ed,38),vcpu_get_gr(ed,39));
+		x = sal_emulator(vcpu_get_gr(v,32),vcpu_get_gr(v,33),
+			vcpu_get_gr(v,34),vcpu_get_gr(v,35),
+			vcpu_get_gr(v,36),vcpu_get_gr(v,37),
+			vcpu_get_gr(v,38),vcpu_get_gr(v,39));
 		regs->r8 = x.status; regs->r9 = x.v0;
 		regs->r10 = x.v1; regs->r11 = x.v2;
 		break;
@@ -73,8 +73,8 @@ ia64_hypercall (struct pt_regs *regs)
 #endif
 		break;
 	    case FW_HYPERCALL_EFI_GET_TIME:
-		tv = vcpu_get_gr(ed,32);
-		tc = vcpu_get_gr(ed,33);
+		tv = vcpu_get_gr(v,32);
+		tc = vcpu_get_gr(v,33);
 		//printf("efi_get_time(%p,%p) called...",tv,tc);
 		tv = __va(translate_domain_mpaddr(tv));
 		if (tc) tc = __va(translate_domain_mpaddr(tc));
@@ -99,28 +99,28 @@ ia64_hypercall (struct pt_regs *regs)
 		break;
 	    case 0xffff: // test dummy hypercall
 		regs->r8 = dump_privop_counts_to_user(
-			vcpu_get_gr(ed,32),
-			vcpu_get_gr(ed,33));
+			vcpu_get_gr(v,32),
+			vcpu_get_gr(v,33));
 		break;
 	    case 0xfffe: // test dummy hypercall
 		regs->r8 = zero_privop_counts_to_user(
-			vcpu_get_gr(ed,32),
-			vcpu_get_gr(ed,33));
+			vcpu_get_gr(v,32),
+			vcpu_get_gr(v,33));
 		break;
 	    case 0xfffd: // test dummy hypercall
 		regs->r8 = launch_domainU(
-			vcpu_get_gr(ed,32));
+			vcpu_get_gr(v,32));
 		break;
 	    case 0xfffc: // test dummy hypercall
 		regs->r8 = domU_staging_write_32(
-			vcpu_get_gr(ed,32),
-			vcpu_get_gr(ed,33),
-			vcpu_get_gr(ed,34),
-			vcpu_get_gr(ed,35),
-			vcpu_get_gr(ed,36));
+			vcpu_get_gr(v,32),
+			vcpu_get_gr(v,33),
+			vcpu_get_gr(v,34),
+			vcpu_get_gr(v,35),
+			vcpu_get_gr(v,36));
 		break;
 	    case 0xfffb: // test dummy hypercall
-		regs->r8 = domU_staging_read_8(vcpu_get_gr(ed,32));
+		regs->r8 = domU_staging_read_8(vcpu_get_gr(v,32));
 		break;
 	}
 	return 1;

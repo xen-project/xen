@@ -141,7 +141,7 @@ typedef struct {
         } PACKED interdomain; /* EVTCHNSTAT_interdomain */
         u32 pirq;      /* EVTCHNSTAT_pirq        */   /* 12 */
         u32 virq;      /* EVTCHNSTAT_virq        */   /* 12 */
-        u32 ipi_edom;  /* EVTCHNSTAT_ipi         */   /* 12 */
+        u32 ipi_vcpu;  /* EVTCHNSTAT_ipi         */   /* 12 */
     } PACKED u;
 } PACKED evtchn_status_t; /* 20 bytes */
 
@@ -151,7 +151,7 @@ typedef struct {
 #define EVTCHNOP_bind_ipi         7
 typedef struct {
     /* IN parameters. */
-    u32 ipi_edom;                     /*  0 */
+    u32 ipi_vcpu;                     /*  0 */
     /* OUT parameters. */
     u32 port;                         /*  4 */
 } PACKED evtchn_bind_ipi_t; /* 8 bytes */

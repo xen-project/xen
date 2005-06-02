@@ -179,7 +179,7 @@ static void set_reg_value (int size, int index, int seg, struct cpu_user_regs *r
 }
 #endif
 
-void vmx_io_assist(struct exec_domain *ed) 
+void vmx_io_assist(struct vcpu *v) 
 {
     vcpu_iodata_t *vio;
     ioreq_t *p;
@@ -189,10 +189,10 @@ void vmx_io_assist(struct exec_domain *ed)
     struct mi_per_cpu_info *mpci_p;
     struct cpu_user_regs *inst_decoder_regs;
 
-    mpci_p = &ed->arch.arch_vmx.vmx_platform.mpci;
+    mpci_p = &v->arch.arch_vmx.vmx_platform.mpci;
     inst_decoder_regs = mpci_p->inst_decoder_regs;
 
-    vio = (vcpu_iodata_t *) ed->arch.arch_vmx.vmx_platform.shared_page_va;
+    vio = (vcpu_iodata_t *) v->arch.arch_vmx.vmx_platform.shared_page_va;
     if (vio == 0) {
         VMX_DBG_LOG(DBG_LEVEL_1, 
                     "bad shared page: %lx", (unsigned long) vio);
@@ -201,18 +201,18 @@ void vmx_io_assist(struct exec_domain *ed)
     p = &vio->vp_ioreq;
 
     if (p->state == STATE_IORESP_HOOK){
-        vmx_hooks_assist(ed);
+        vmx_hooks_assist(v);
     }
 
     /* clear IO wait VMX flag */
-    if (test_bit(ARCH_VMX_IO_WAIT, &ed->arch.arch_vmx.flags)) {
+    if (test_bit(ARCH_VMX_IO_WAIT, &v->arch.arch_vmx.flags)) {
         if (p->state != STATE_IORESP_READY) {
                 /* An interrupt send event raced us */
                 return;
         } else {
             p->state = STATE_INVALID;
         }
-        clear_bit(ARCH_VMX_IO_WAIT, &ed->arch.arch_vmx.flags);
+        clear_bit(ARCH_VMX_IO_WAIT, &v->arch.arch_vmx.flags);
     } else {
         return;
     }
@@ -228,10 +228,10 @@ void vmx_io_assist(struct exec_domain *ed)
             }
             int size = -1, index = -1;
 
-            size = operand_size(ed->arch.arch_vmx.vmx_platform.mpci.mmio_target);
-            index = operand_index(ed->arch.arch_vmx.vmx_platform.mpci.mmio_target);
+            size = operand_size(v->arch.arch_vmx.vmx_platform.mpci.mmio_target);
+            index = operand_index(v->arch.arch_vmx.vmx_platform.mpci.mmio_target);
 
-            if (ed->arch.arch_vmx.vmx_platform.mpci.mmio_target & WZEROEXTEND) {
+            if (v->arch.arch_vmx.vmx_platform.mpci.mmio_target & WZEROEXTEND) {
                 p->u.data = p->u.data & 0xffff;
             }        
             set_reg_value(size, index, 0, regs, p->u.data);
@@ -272,17 +272,17 @@ void vmx_io_assist(struct exec_domain *ed)
     }
 }
 
-int vmx_clear_pending_io_event(struct exec_domain *ed) 
+int vmx_clear_pending_io_event(struct vcpu *v) 
 {
-    struct domain *d = ed->domain;
+    struct domain *d = v->domain;
 
     /* evtchn_pending is shared by other event channels in 0-31 range */
     if (!d->shared_info->evtchn_pending[IOPACKET_PORT>>5])
-        clear_bit(IOPACKET_PORT>>5, &ed->vcpu_info->evtchn_pending_sel);
+        clear_bit(IOPACKET_PORT>>5, &v->vcpu_info->evtchn_pending_sel);
 
     /* Note: VMX domains may need upcalls as well */
-    if (!ed->vcpu_info->evtchn_pending_sel) 
-        ed->vcpu_info->evtchn_upcall_pending = 0;
+    if (!v->vcpu_info->evtchn_pending_sel) 
+        v->vcpu_info->evtchn_upcall_pending = 0;
 
     /* clear the pending bit for IOPACKET_PORT */
     return test_and_clear_bit(IOPACKET_PORT, 
@@ -295,7 +295,7 @@ int vmx_clear_pending_io_event(struct exec_domain *ed)
  * interrupts are guaranteed to be checked before resuming guest. 
  * VMX upcalls have been already arranged for if necessary. 
  */
-void vmx_check_events(struct exec_domain *d) 
+void vmx_check_events(struct vcpu *d) 
 {
     /* clear the event *before* checking for work. This should avoid 
        the set-and-check races */
@@ -383,7 +383,7 @@ static __inline__ int find_highest_irq(u32 *pintr)
  * Return 0-255 for pending irq.
  *        -1 when no pending.
  */
-static inline int find_highest_pending_irq(struct exec_domain *d)
+static inline int find_highest_pending_irq(struct vcpu *d)
 {
     vcpu_iodata_t *vio;
 
@@ -397,7 +397,7 @@ static inline int find_highest_pending_irq(struct exec_domain *d)
     return find_highest_irq((unsigned int *)&vio->vp_intr[0]);
 }
 
-static inline void clear_highest_bit(struct exec_domain *d, int vector)
+static inline void clear_highest_bit(struct vcpu *d, int vector)
 {
     vcpu_iodata_t *vio;
 
@@ -416,7 +416,7 @@ static inline int irq_masked(unsigned long eflags)
     return ((eflags & X86_EFLAGS_IF) == 0);
 }
 
-void vmx_intr_assist(struct exec_domain *d) 
+void vmx_intr_assist(struct vcpu *d) 
 {
     int highest_vector = find_highest_pending_irq(d);
     unsigned long intr_fields, eflags;
@@ -462,7 +462,7 @@ void vmx_intr_assist(struct exec_domain *d)
     return;
 }
 
-void vmx_do_resume(struct exec_domain *d) 
+void vmx_do_resume(struct vcpu *d) 
 {
     vmx_stts();
     if ( vmx_paging_enabled(d) )

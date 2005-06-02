@@ -481,7 +481,7 @@ static int read_from_mmio(struct instruction *inst_p)
 static void send_mmio_req(unsigned long gpa, 
                    struct instruction *inst_p, long value, int dir, int pvalid)
 {
-    struct exec_domain *d = current;
+    struct vcpu *d = current;
     vcpu_iodata_t *vio;
     ioreq_t *p;
     int vm86;

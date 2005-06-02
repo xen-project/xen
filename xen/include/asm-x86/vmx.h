@@ -29,10 +29,10 @@
 extern void vmx_asm_vmexit_handler(struct cpu_user_regs);
 extern void vmx_asm_do_resume(void);
 extern void vmx_asm_do_launch(void);
-extern void vmx_intr_assist(struct exec_domain *d);
+extern void vmx_intr_assist(struct vcpu *d);
 
-extern void arch_vmx_do_launch(struct exec_domain *);
-extern void arch_vmx_do_resume(struct exec_domain *);
+extern void arch_vmx_do_launch(struct vcpu *);
+extern void arch_vmx_do_resume(struct vcpu *);
 
 extern int vmcs_size;
 extern unsigned int cpu_rev;
@@ -296,7 +296,7 @@ static inline void vmx_stts()
 }
 
 /* Works only for ed == current */
-static inline int vmx_paging_enabled(struct exec_domain *ed)
+static inline int vmx_paging_enabled(struct vcpu *v)
 {
     unsigned long cr0;
 

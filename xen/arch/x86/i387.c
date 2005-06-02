@@ -21,7 +21,7 @@ void init_fpu(void)
     set_bit(_VCPUF_fpu_initialised, &current->vcpu_flags);
 }
 
-void save_init_fpu(struct exec_domain *tsk)
+void save_init_fpu(struct vcpu *tsk)
 {
     /*
      * The guest OS may have set the 'virtual STTS' flag.
@@ -44,7 +44,7 @@ void save_init_fpu(struct exec_domain *tsk)
     stts();
 }
 
-void restore_fpu(struct exec_domain *tsk)
+void restore_fpu(struct vcpu *tsk)
 {
     /*
      * FXRSTOR can fault if passed a corrupted data block. We handle this

@@ -11,12 +11,12 @@
 #include <public/xen.h>
 #include <asm/page.h>
 
-struct exec_domain;
+struct vcpu;
 
 struct cpu_info {
     struct cpu_user_regs guest_cpu_user_regs;
     unsigned int         processor_id;
-    struct exec_domain  *current_ed;
+    struct vcpu  *current_ed;
 };
 
 static inline struct cpu_info *get_cpu_info(void)

@@ -374,7 +374,7 @@ long arch_do_dom0_op(dom0_op_t *op, dom0_op_t *u_dom0_op)
 }
 
 void arch_getdomaininfo_ctxt(
-    struct exec_domain *ed, struct vcpu_guest_context *c)
+    struct vcpu *v, struct vcpu_guest_context *c)
 { 
 #ifdef __i386__  /* Remove when x86_64 VMX is implemented */
 #ifdef CONFIG_VMX
@@ -382,30 +382,30 @@ void arch_getdomaininfo_ctxt(
 #endif
 #endif
 
-    memcpy(c, &ed->arch.guest_context, sizeof(*c));
+    memcpy(c, &v->arch.guest_context, sizeof(*c));
 
     /* IOPL privileges are virtualised -- merge back into returned eflags. */
     BUG_ON((c->user_regs.eflags & EF_IOPL) != 0);
-    c->user_regs.eflags |= ed->arch.iopl << 12;
+    c->user_regs.eflags |= v->arch.iopl << 12;
 
 #ifdef __i386__
 #ifdef CONFIG_VMX
-    if ( VMX_DOMAIN(ed) )
+    if ( VMX_DOMAIN(v) )
         save_vmx_cpu_user_regs(&c->user_regs);
 #endif
 #endif
 
     c->flags = 0;
-    if ( test_bit(_VCPUF_fpu_initialised, &ed->vcpu_flags) )
+    if ( test_bit(_VCPUF_fpu_initialised, &v->vcpu_flags) )
         c->flags |= VGCF_I387_VALID;
-    if ( KERNEL_MODE(ed, &ed->arch.guest_context.user_regs) )
+    if ( KERNEL_MODE(v, &v->arch.guest_context.user_regs) )
         c->flags |= VGCF_IN_KERNEL;
 #ifdef CONFIG_VMX
-    if (VMX_DOMAIN(ed))
+    if (VMX_DOMAIN(v))
         c->flags |= VGCF_VMX_GUEST;
 #endif
 
-    c->pt_base = pagetable_get_paddr(ed->arch.guest_table);
+    c->pt_base = pagetable_get_paddr(v->arch.guest_table);
 
-    c->vm_assist = ed->domain->vm_assist;
+    c->vm_assist = v->domain->vm_assist;
 }

@@ -8,10 +8,10 @@
 #include <asm/regionreg.h>
 #endif // CONFIG_VTI
 
-extern void arch_do_createdomain(struct exec_domain *);
+extern void arch_do_createdomain(struct vcpu *);
 
 extern int arch_final_setup_guestos(
-    struct exec_domain *, struct vcpu_guest_context *);
+    struct vcpu *, struct vcpu_guest_context *);
 
 extern void domain_relinquish_resources(struct domain *);
 
@@ -55,7 +55,7 @@ struct arch_domain {
 #define xen_vaend arch.xen_vaend
 #define shared_info_va arch.shared_info_va
 
-struct arch_exec_domain {
+struct arch_vcpu {
 #if 1
 	TR_ENTRY itrs[NITRS];
 	TR_ENTRY dtrs[NDTRS];
@@ -77,7 +77,7 @@ struct arch_exec_domain {
     struct mm_struct *active_mm;
     struct thread_struct _thread;	// this must be last
 #ifdef CONFIG_VTI
-    void (*schedule_tail) (struct exec_domain *);
+    void (*schedule_tail) (struct vcpu *);
     struct trap_bounce trap_bounce;
     thash_cb_t *vtlb;
     //for phycial  emulation

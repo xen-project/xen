@@ -70,7 +70,7 @@
 +    return now; 
 +}
 +
-+void update_dom_time(struct exec_domain *ed)
++void update_dom_time(struct vcpu *v)
 +{
 +// FIXME: implement this?
 +//	printf("update_dom_time: called, not implemented, skipping\n");
@@ -206,10 +206,10 @@
 +		// call vcpu_timer_expired on it
 +		//domain0_ready = 1; // moved to xensetup.c
 +	}
-+	if (domain0_ready && vcpu_timer_expired(dom0->exec_domain[0])) {
-+		vcpu_pend_timer(dom0->exec_domain[0]);
-+		//vcpu_set_next_timer(dom0->exec_domain[0]);
-+		domain_wake(dom0->exec_domain[0]);
++	if (domain0_ready && vcpu_timer_expired(dom0->vcpu[0])) {
++		vcpu_pend_timer(dom0->vcpu[0]);
++		//vcpu_set_next_timer(dom0->vcpu[0]);
++		domain_wake(dom0->vcpu[0]);
 +	}
 +	if (!is_idle_task(current->domain) && current->domain != dom0) {
 +		if (vcpu_timer_expired(current)) {

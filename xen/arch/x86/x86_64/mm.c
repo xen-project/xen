@@ -78,7 +78,7 @@ void __init paging_init(void)
     l2_pgentry_t *l2_ro_mpt;
     struct pfn_info *pg;
 
-    idle0_exec_domain.arch.monitor_table = mk_pagetable(__pa(idle_pg_table));
+    idle0_vcpu.arch.monitor_table = mk_pagetable(__pa(idle_pg_table));
 
     /* Create user-accessible L2 directory to map the MPT for guests. */
     l3_ro_mpt = (l3_pgentry_t *)alloc_xenheap_page();
@@ -181,7 +181,7 @@ long do_stack_switch(unsigned long ss, unsigned long esp)
 
 long do_set_segment_base(unsigned int which, unsigned long base)
 {
-    struct exec_domain *ed = current;
+    struct vcpu *v = current;
     long ret = 0;
 
     switch ( which )
@@ -190,21 +190,21 @@ long do_set_segment_base(unsigned int which, unsigned long base)
         if ( wrmsr_user(MSR_FS_BASE, base, base>>32) )
             ret = -EFAULT;
         else
-            ed->arch.guest_context.fs_base = base;
+            v->arch.guest_context.fs_base = base;
         break;
 
     case SEGBASE_GS_USER:
         if ( wrmsr_user(MSR_SHADOW_GS_BASE, base, base>>32) )
             ret = -EFAULT;
         else
-            ed->arch.guest_context.gs_base_user = base;
+            v->arch.guest_context.gs_base_user = base;
         break;
 
     case SEGBASE_GS_KERNEL:
         if ( wrmsr_user(MSR_GS_BASE, base, base>>32) )
             ret = -EFAULT;
         else
-            ed->arch.guest_context.gs_base_kernel = base;
+            v->arch.guest_context.gs_base_kernel = base;
         break;
 
     case SEGBASE_GS_USER_SEL:

@@ -9,7 +9,7 @@ struct domain idle0_domain = {
     refcnt:      ATOMIC_INIT(1)
 };
 
-struct exec_domain idle0_exec_domain = {
+struct vcpu idle0_vcpu = {
     processor:   0,
     domain:      &idle0_domain
 };

@@ -27,12 +27,12 @@
 #include <xen/softirq.h>
 
 /* all per-domain BVT-specific scheduling info is stored here */
-struct bvt_edom_info
+struct bvt_vcpu_info
 {
     struct list_head    run_list;         /* runqueue list pointers */
     u32                 avt;              /* actual virtual time */
     u32                 evt;              /* effective virtual time */
-    struct exec_domain  *exec_domain;
+    struct vcpu  *vcpu;
     struct bvt_dom_info *inf;
 };
 
@@ -49,7 +49,7 @@ struct bvt_dom_info
     s_time_t            warpu;            /* unwarp time requirement */
     struct ac_timer     unwarp_timer;     /* deals with warpu */
 
-    struct bvt_edom_info ed_inf[MAX_VIRT_CPUS];
+    struct bvt_vcpu_info vcpu_inf[MAX_VIRT_CPUS];
 };
 
 struct bvt_cpu_info
@@ -59,7 +59,7 @@ struct bvt_cpu_info
 };
 
 #define BVT_INFO(p)   ((struct bvt_dom_info *)(p)->sched_priv)
-#define EBVT_INFO(p)  ((struct bvt_edom_info *)(p)->sched_priv)
+#define EBVT_INFO(p)  ((struct bvt_vcpu_info *)(p)->sched_priv)
 #define CPU_INFO(cpu) ((struct bvt_cpu_info *)(schedule_data[cpu]).sched_priv)
 #define RUNLIST(p)    ((struct list_head *)&(EBVT_INFO(p)->run_list))
 #define RUNQUEUE(cpu) ((struct list_head *)&(CPU_INFO(cpu)->runqueue))
@@ -70,24 +70,24 @@ struct bvt_cpu_info
 #define TIME_SLOP      (s32)MICROSECS(50)     /* allow time to slip a bit */
 static s32 ctx_allow = (s32)MILLISECS(5);     /* context switch allowance */
 
-static inline void __add_to_runqueue_head(struct exec_domain *d)
+static inline void __add_to_runqueue_head(struct vcpu *d)
 {
     list_add(RUNLIST(d), RUNQUEUE(d->processor));
 }
 
-static inline void __add_to_runqueue_tail(struct exec_domain *d)
+static inline void __add_to_runqueue_tail(struct vcpu *d)
 {
     list_add_tail(RUNLIST(d), RUNQUEUE(d->processor));
 }
 
-static inline void __del_from_runqueue(struct exec_domain *d)
+static inline void __del_from_runqueue(struct vcpu *d)
 {
     struct list_head *runlist = RUNLIST(d);
     list_del(runlist);
     runlist->next = NULL;
 }
 
-static inline int __task_on_runqueue(struct exec_domain *d)
+static inline int __task_on_runqueue(struct vcpu *d)
 {
     return (RUNLIST(d))->next != NULL;
 }
@@ -97,7 +97,7 @@ static inline int __task_on_runqueue(struct exec_domain *d)
 static void warp_timer_fn(void *data)
 {
     struct bvt_dom_info *inf = data;
-    unsigned int cpu = inf->domain->exec_domain[0]->processor;
+    unsigned int cpu = inf->domain->vcpu[0]->processor;
     
     spin_lock_irq(&schedule_data[cpu].schedule_lock);
 
@@ -118,7 +118,7 @@ static void warp_timer_fn(void *data)
 static void unwarp_timer_fn(void *data)
 {
     struct bvt_dom_info *inf = data;
-    unsigned int cpu = inf->domain->exec_domain[0]->processor;
+    unsigned int cpu = inf->domain->vcpu[0]->processor;
 
     spin_lock_irq(&schedule_data[cpu].schedule_lock);
 
@@ -131,11 +131,11 @@ static void unwarp_timer_fn(void *data)
     spin_unlock_irq(&schedule_data[cpu].schedule_lock);
 }
 
-static inline u32 calc_avt(struct exec_domain *d, s_time_t now)
+static inline u32 calc_avt(struct vcpu *d, s_time_t now)
 {
     u32 ranfor, mcus;
     struct bvt_dom_info *inf = BVT_INFO(d->domain);
-    struct bvt_edom_info *einf = EBVT_INFO(d);
+    struct bvt_vcpu_info *einf = EBVT_INFO(d);
     
     ranfor = (u32)(now - d->lastschd);
     mcus = (ranfor + MCU - 1)/MCU;
@@ -147,7 +147,7 @@ static inline u32 calc_avt(struct exec_domain *d, s_time_t now)
  * Calculate the effective virtual time for a domain. Take into account 
  * warping limits
  */
-static inline u32 calc_evt(struct exec_domain *d, u32 avt)
+static inline u32 calc_evt(struct vcpu *d, u32 avt)
 {
     struct bvt_dom_info *inf = BVT_INFO(d->domain);
     /* TODO The warp routines need to be rewritten GM */
@@ -164,9 +164,9 @@ static inline u32 calc_evt(struct exec_domain *d, u32 avt)
  *
  * Returns non-zero on failure.
  */
-static int bvt_alloc_task(struct exec_domain *ed)
+static int bvt_alloc_task(struct vcpu *v)
 {
-    struct domain *d = ed->domain;
+    struct domain *d = v->domain;
 
     if ( (d->sched_priv == NULL) )
     {
@@ -175,10 +175,10 @@ static int bvt_alloc_task(struct exec_domain *ed)
         memset(d->sched_priv, 0, sizeof(struct bvt_dom_info));
     }
 
-    ed->sched_priv = &BVT_INFO(d)->ed_inf[ed->vcpu_id];
+    v->sched_priv = &BVT_INFO(d)->vcpu_inf[v->vcpu_id];
 
-    BVT_INFO(d)->ed_inf[ed->vcpu_id].inf = BVT_INFO(d);
-    BVT_INFO(d)->ed_inf[ed->vcpu_id].exec_domain = ed;
+    BVT_INFO(d)->vcpu_inf[v->vcpu_id].inf = BVT_INFO(d);
+    BVT_INFO(d)->vcpu_inf[v->vcpu_id].vcpu = v;
 
     return 0;
 }
@@ -186,26 +186,26 @@ static int bvt_alloc_task(struct exec_domain *ed)
 /*
  * Add and remove a domain
  */
-static void bvt_add_task(struct exec_domain *d) 
+static void bvt_add_task(struct vcpu *v) 
 {
-    struct bvt_dom_info *inf = BVT_INFO(d->domain);
-    struct bvt_edom_info *einf = EBVT_INFO(d);
+    struct bvt_dom_info *inf = BVT_INFO(v->domain);
+    struct bvt_vcpu_info *einf = EBVT_INFO(v);
     ASSERT(inf != NULL);
-    ASSERT(d   != NULL);
+    ASSERT(v   != NULL);
 
     /* Allocate per-CPU context if this is the first domain to be added. */
-    if ( CPU_INFO(d->processor) == NULL )
+    if ( CPU_INFO(v->processor) == NULL )
     {
-        schedule_data[d->processor].sched_priv = xmalloc(struct bvt_cpu_info);
-        BUG_ON(CPU_INFO(d->processor) == NULL);
-        INIT_LIST_HEAD(RUNQUEUE(d->processor));
-        CPU_SVT(d->processor) = 0;
+        schedule_data[v->processor].sched_priv = xmalloc(struct bvt_cpu_info);
+        BUG_ON(CPU_INFO(v->processor) == NULL);
+        INIT_LIST_HEAD(RUNQUEUE(v->processor));
+        CPU_SVT(v->processor) = 0;
     }
 
-    if ( d->vcpu_id == 0 )
+    if ( v->vcpu_id == 0 )
     {
         inf->mcu_advance = MCU_ADVANCE;
-        inf->domain      = d->domain;
+        inf->domain      = v->domain;
         inf->warpback    = 0;
         /* Set some default values here. */
         inf->warp        = 0;
@@ -213,49 +213,49 @@ static void bvt_add_task(struct exec_domain *d)
         inf->warpl       = MILLISECS(2000);
         inf->warpu       = MILLISECS(1000);
         /* Initialise the warp timers. */
-        init_ac_timer(&inf->warp_timer, warp_timer_fn, inf, d->processor);
-        init_ac_timer(&inf->unwarp_timer, unwarp_timer_fn, inf, d->processor);
+        init_ac_timer(&inf->warp_timer, warp_timer_fn, inf, v->processor);
+        init_ac_timer(&inf->unwarp_timer, unwarp_timer_fn, inf, v->processor);
     }
 
-    einf->exec_domain = d;
+    einf->vcpu = v;
 
-    if ( is_idle_task(d->domain) )
+    if ( is_idle_task(v->domain) )
     {
         einf->avt = einf->evt = ~0U;
-        BUG_ON(__task_on_runqueue(d));
-        __add_to_runqueue_head(d);
+        BUG_ON(__task_on_runqueue(v));
+        __add_to_runqueue_head(v);
     } 
     else 
     {
         /* Set avt and evt to system virtual time. */
-        einf->avt = CPU_SVT(d->processor);
-        einf->evt = CPU_SVT(d->processor);
+        einf->avt = CPU_SVT(v->processor);
+        einf->evt = CPU_SVT(v->processor);
     }
 }
 
-static void bvt_wake(struct exec_domain *ed)
+static void bvt_wake(struct vcpu *v)
 {
-    struct bvt_edom_info *einf = EBVT_INFO(ed);
-    struct exec_domain  *curr;
+    struct bvt_vcpu_info *einf = EBVT_INFO(v);
+    struct vcpu  *curr;
     s_time_t            now, r_time;
-    int                 cpu = ed->processor;
+    int                 cpu = v->processor;
     u32                 curr_evt;
 
-    if ( unlikely(__task_on_runqueue(ed)) )
+    if ( unlikely(__task_on_runqueue(v)) )
         return;
 
-    __add_to_runqueue_head(ed);
+    __add_to_runqueue_head(v);
 
     now = NOW();
 
     /* Set the BVT parameters. AVT should always be updated 
        if CPU migration ocurred.*/
     if ( einf->avt < CPU_SVT(cpu) || 
-         unlikely(test_bit(_VCPUF_cpu_migrated, &ed->vcpu_flags)) )
+         unlikely(test_bit(_VCPUF_cpu_migrated, &v->vcpu_flags)) )
         einf->avt = CPU_SVT(cpu);
 
     /* Deal with warping here. */
-    einf->evt = calc_evt(ed, einf->avt);
+    einf->evt = calc_evt(v, einf->avt);
     
     curr = schedule_data[cpu].curr;
     curr_evt = calc_evt(curr, calc_avt(curr, now));
@@ -272,12 +272,12 @@ static void bvt_wake(struct exec_domain *ed)
 }
 
 
-static void bvt_sleep(struct exec_domain *ed)
+static void bvt_sleep(struct vcpu *v)
 {
-    if ( test_bit(_VCPUF_running, &ed->vcpu_flags) )
-        cpu_raise_softirq(ed->processor, SCHEDULE_SOFTIRQ);
-    else  if ( __task_on_runqueue(ed) )
-        __del_from_runqueue(ed);
+    if ( test_bit(_VCPUF_running, &v->vcpu_flags) )
+        cpu_raise_softirq(v->processor, SCHEDULE_SOFTIRQ);
+    else  if ( __task_on_runqueue(v) )
+        __del_from_runqueue(v);
 }
 
 /**
@@ -361,15 +361,15 @@ static int bvt_adjdom(
 static struct task_slice bvt_do_schedule(s_time_t now)
 {
     struct domain *d;
-    struct exec_domain      *prev = current, *next = NULL, *next_prime, *ed; 
+    struct vcpu      *prev = current, *next = NULL, *next_prime, *ed; 
     int                 cpu = prev->processor;
     s32                 r_time;     /* time for new dom to run */
     u32                 next_evt, next_prime_evt, min_avt;
     struct bvt_dom_info *prev_inf       = BVT_INFO(prev->domain);
-    struct bvt_edom_info *prev_einf       = EBVT_INFO(prev);
-    struct bvt_edom_info *p_einf          = NULL;
-    struct bvt_edom_info *next_einf       = NULL;
-    struct bvt_edom_info *next_prime_einf = NULL;
+    struct bvt_vcpu_info *prev_einf       = EBVT_INFO(prev);
+    struct bvt_vcpu_info *p_einf          = NULL;
+    struct bvt_vcpu_info *next_einf       = NULL;
+    struct bvt_vcpu_info *next_prime_einf = NULL;
     struct task_slice     ret;
 
     ASSERT(prev->sched_priv != NULL);
@@ -435,8 +435,8 @@ static struct task_slice bvt_do_schedule(s_time_t now)
         set_ac_timer(&next_einf->inf->warp_timer, now + next_einf->inf->warpl);
    
     /* Extract the domain pointers from the dom infos */
-    next        = next_einf->exec_domain;
-    next_prime  = next_prime_einf->exec_domain;
+    next        = next_einf->vcpu;
+    next_prime  = next_prime_einf->vcpu;
     
     /* Update system virtual time. */
     if ( min_avt != ~0U )
@@ -451,7 +451,7 @@ static struct task_slice bvt_do_schedule(s_time_t now)
         
         for_each_domain ( d )
         {
-            for_each_exec_domain (d, ed) {
+            for_each_vcpu (d, ed) {
                 if ( ed->processor == cpu )
                 {
                     p_einf = EBVT_INFO(ed);
@@ -499,9 +499,9 @@ static struct task_slice bvt_do_schedule(s_time_t now)
 }
 
 
-static void bvt_dump_runq_el(struct exec_domain *p)
+static void bvt_dump_runq_el(struct vcpu *p)
 {
-    struct bvt_edom_info *inf = EBVT_INFO(p);
+    struct bvt_vcpu_info *inf = EBVT_INFO(p);
     
     printk("mcua=%d ev=0x%08X av=0x%08X ",
            inf->inf->mcu_advance, inf->evt, inf->avt);
@@ -516,8 +516,8 @@ static void bvt_dump_cpu_state(int i)
 {
     struct list_head *queue;
     int loop = 0;
-    struct bvt_edom_info *ed_inf;
-    struct exec_domain *ed;
+    struct bvt_vcpu_info *vcpu_inf;
+    struct vcpu *v;
     
     printk("svt=0x%08lX ", CPU_SVT(i));
 
@@ -525,15 +525,16 @@ static void bvt_dump_cpu_state(int i)
     printk("QUEUE rq %lx   n: %lx, p: %lx\n",  (unsigned long)queue,
            (unsigned long) queue->next, (unsigned long) queue->prev);
 
-    list_for_each_entry ( ed_inf, queue, run_list )
+    list_for_each_entry ( vcpu_inf, queue, run_list )
     {
-        ed = ed_inf->exec_domain;
-        printk("%3d: %u has=%c ", loop++, ed->domain->domain_id,
-               test_bit(_VCPUF_running, &ed->vcpu_flags) ? 'T':'F');
-        bvt_dump_runq_el(ed);
-        printk("c=0x%X%08X\n", (u32)(ed->cpu_time>>32), (u32)ed->cpu_time);
+        v = vcpu_inf->vcpu;
+        printk("%3d: %u has=%c ", loop++, v->domain->domain_id,
+               test_bit(_VCPUF_running, &v->vcpu_flags) ? 'T':'F');
+        bvt_dump_runq_el(v);
+        printk("c=0x%X%08X\n", (u32)(v->cpu_time>>32), (u32)v->cpu_time);
         printk("         l: %p n: %p  p: %p\n",
-               &ed_inf->run_list, ed_inf->run_list.next, ed_inf->run_list.prev);
+               &vcpu_inf->run_list, vcpu_inf->run_list.next,
+               vcpu_inf->run_list.prev);
     }
 }
 

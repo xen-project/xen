@@ -72,8 +72,8 @@
 +		}
 +#endif
 +		//FIXME: TEMPORARY HACK!!!!
-+		vcpu_pend_interrupt(dom0->exec_domain[0],vector);
-+		domain_wake(dom0->exec_domain[0]);
++		vcpu_pend_interrupt(dom0->vcpu[0],vector);
++		domain_wake(dom0->vcpu[0]);
 +	}
 +	else
 +#endif
