@@ -43,6 +43,7 @@ static inline void __prepare_arch_switch(void)
 
 extern void mm_pin(struct mm_struct *mm);
 extern void mm_unpin(struct mm_struct *mm);
+void mm_pin_all(void);
 
 static inline void switch_mm(struct mm_struct *prev,
 			     struct mm_struct *next,

@@ -103,6 +103,9 @@ static void __do_suspend(void)
 
     __cli();
 
+    mm_pin_all();
+    kmem_cache_shrink(pgd_cache);
+
     netif_suspend();
 
     blkdev_suspend();
