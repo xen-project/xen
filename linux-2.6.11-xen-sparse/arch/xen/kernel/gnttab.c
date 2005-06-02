@@ -189,9 +189,11 @@ gnttab_free_grant_references( u16 count, grant_ref_t head )
     int i;
 
     for ( i = 0; i < count; i++ )
+    {
         to_die = next;
         next = gnttab_free_list[next];
         put_free_entry( to_die );
+    }
 }
 
 int
