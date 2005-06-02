@@ -12,7 +12,6 @@
 
 #ifndef __ASSEMBLY__
 # include <asm/types.h>
-# include <xen/lib.h>
 #endif
 
 #if defined(__i386__)
