@@ -66,10 +66,10 @@ transfer_addrs () {
     fi
     # Address lines start with 'inet' and have the device in them.
     # Replace 'inet' with 'ip addr add' and change the device name $src
-    # to 'dev $src'. Remove netmask as we'll add routes later.
+    # to 'dev $src'.
     ip addr show dev ${src} | egrep '^ *inet ' | sed -e "
 s/inet/ip addr add/
-s@\([0-9]\+\.[0-9]\+\.[0-9]\+\.[0-9]\+\)/[0-9]\+@\1@
+s@\([0-9]\+\.[0-9]\+\.[0-9]\+\.[0-9]\+/[0-9]\+\)@\1@
 s/${src}/dev ${dst}/
 " | sh -e
 }
