@@ -75,14 +75,32 @@
     ((l4_pgentry_t) { ((intpte_t)(pfn) << PAGE_SHIFT) | put_pte_flags(flags) })
 
 /* Construct a pte from a physical address and access flags. */
-#define l1e_from_paddr(pa, flags)  \
-    ((l1_pgentry_t) { (pa) | put_pte_flags(flags) })
-#define l2e_from_paddr(pa, flags)  \
-    ((l2_pgentry_t) { (pa) | put_pte_flags(flags) })
-#define l3e_from_paddr(pa, flags)  \
-    ((l3_pgentry_t) { (pa) | put_pte_flags(flags) })
-#define l4e_from_paddr(pa, flags)  \
-    ((l4_pgentry_t) { (pa) | put_pte_flags(flags) })
+#ifndef __ASSEMBLY__
+static inline l1_pgentry_t l1e_from_paddr(physaddr_t pa, unsigned int flags)
+{
+    ASSERT((pa & ~(PADDR_MASK & PAGE_MASK)) == 0);
+    return (l1_pgentry_t) { pa | put_pte_flags(flags) };
+}
+static inline l2_pgentry_t l2e_from_paddr(physaddr_t pa, unsigned int flags)
+{
+    ASSERT((pa & ~(PADDR_MASK & PAGE_MASK)) == 0);
+    return (l2_pgentry_t) { pa | put_pte_flags(flags) };
+}
+#if CONFIG_PAGING_LEVELS >= 3
+static inline l3_pgentry_t l3e_from_paddr(physaddr_t pa, unsigned int flags)
+{
+    ASSERT((pa & ~(PADDR_MASK & PAGE_MASK)) == 0);
+    return (l3_pgentry_t) { pa | put_pte_flags(flags) };
+}
+#endif
+#if CONFIG_PAGING_LEVELS >= 4
+static inline l4_pgentry_t l4e_from_paddr(physaddr_t pa, unsigned int flags)
+{
+    ASSERT((pa & ~(PADDR_MASK & PAGE_MASK)) == 0);
+    return (l4_pgentry_t) { pa | put_pte_flags(flags) };
+}
+#endif
+#endif /* !__ASSEMBLY__ */
 
 /* Construct a pte from its direct integer representation. */
 #define l1e_from_intpte(intpte)    ((l1_pgentry_t) { (intpte_t)(intpte) })

@@ -72,7 +72,7 @@ void *map_domain_mem(unsigned long pa)
     }
     while ( l1e_get_flags(cache[idx]) & _PAGE_PRESENT );
 
-    cache[idx] = l1e_from_paddr(pa, __PAGE_HYPERVISOR);
+    cache[idx] = l1e_from_paddr(pa & PAGE_MASK, __PAGE_HYPERVISOR);
 
     spin_unlock(&map_lock);
 
