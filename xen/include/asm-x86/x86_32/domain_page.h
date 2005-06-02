@@ -11,7 +11,8 @@
 #include <xen/sched.h>
 
 extern l1_pgentry_t *mapcache;
-#define MAPCACHE_ENTRIES        1024
+#define MAPCACHE_ORDER    10
+#define MAPCACHE_ENTRIES  (1 << MAPCACHE_ORDER)
 
 /*
  * Maps a given physical address, returning corresponding virtual address.

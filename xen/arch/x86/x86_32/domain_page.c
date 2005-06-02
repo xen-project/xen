@@ -29,13 +29,11 @@ static spinlock_t map_lock = SPIN_LOCK_UNLOCKED;
 static void flush_all_ready_maps(void)
 {
     l1_pgentry_t *cache = mapcache;
+    unsigned int i;
 
-    /* A bit skanky -- depends on having an aligned PAGE_SIZE set of PTEs. */
-    do {
-        if ( (l1e_get_flags(*cache) & READY_FOR_TLB_FLUSH) )
-            *cache = l1e_empty();
-    }
-    while ( ((unsigned long)(++cache) & ~PAGE_MASK) != 0 );
+    for ( i = 0; i < MAPCACHE_ENTRIES; i++ )
+        if ( (l1e_get_flags(cache[i]) & READY_FOR_TLB_FLUSH) )
+            cache[i] = l1e_empty();
 }
 
 

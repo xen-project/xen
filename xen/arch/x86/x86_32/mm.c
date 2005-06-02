@@ -59,8 +59,9 @@ l2_pgentry_t *virt_to_xen_l2e(unsigned long v)
 void __init paging_init(void)
 {
     void *ioremap_pt;
-    unsigned long v,v2,i;
+    unsigned long v;
     struct pfn_info *pg;
+    int i, mapcache_order;
 
 #ifdef CONFIG_X86_PAE
     printk("PAE enabled, limit: %d GB\n", MACHPHYS_MBYTES);
@@ -70,64 +71,56 @@ void __init paging_init(void)
 
     idle0_exec_domain.arch.monitor_table = mk_pagetable(__pa(idle_pg_table));
 
-    /* Allocate and map the machine-to-phys table and create read-only
-     * mapping of MPT for guest-OS use.  Without PAE we'll end up with
-     * one 4MB page, with PAE we'll allocate 2MB pages depending on
-     * the amout of memory installed, but at least 4MB to cover 4GB
-     * address space.  This is needed to make PCI I/O memory address
-     * lookups work in guests. -- kraxel */
-    mpt_size = max_page * 4;
-    if (mpt_size < 4*1024*1024)
+    /*
+     * Allocate and map the machine-to-phys table and create read-only mapping 
+     * of MPT for guest-OS use.  Without PAE we'll end up with one 4MB page, 
+     * with PAE we'll allocate 2MB pages depending on the amount of memory 
+     * installed, but at least 4MB to cover 4GB address space.  This is needed 
+     * to make PCI I/O memory address lookups work in guests.
+     */
+    if ( (mpt_size = max_page * 4) < (4*1024*1024) )
         mpt_size = 4*1024*1024;
-    for (v  = RDWR_MPT_VIRT_START, v2 = RO_MPT_VIRT_START;
-         v != RDWR_MPT_VIRT_END && mpt_size > (v - RDWR_MPT_VIRT_START);
-         v += (1 << L2_PAGETABLE_SHIFT), v2 += (1 << L2_PAGETABLE_SHIFT)) {
+    for ( i = 0; i < (mpt_size >> L2_PAGETABLE_SHIFT); i++ )
+    {
         if ( (pg = alloc_domheap_pages(NULL, PAGETABLE_ORDER)) == NULL )
             panic("Not enough memory to bootstrap Xen.\n");
-        idle_pg_table_l2[l2_linear_offset(v)] =
+        idle_pg_table_l2[l2_linear_offset(RDWR_MPT_VIRT_START) + i] =
             l2e_from_page(pg, __PAGE_HYPERVISOR | _PAGE_PSE);
-        idle_pg_table_l2[l2_linear_offset(v2)] =
+        idle_pg_table_l2[l2_linear_offset(RO_MPT_VIRT_START) + i] =
             l2e_from_page(pg, (__PAGE_HYPERVISOR | _PAGE_PSE) & ~_PAGE_RW);
     }
     memset((void *)RDWR_MPT_VIRT_START, 0x55, mpt_size);
 
-    /* Xen 2/4MB mappings can all be GLOBAL. */
+    /* Xen PSE mappings can all be GLOBAL. */
     if ( cpu_has_pge )
     {
-        for ( v = HYPERVISOR_VIRT_START; v; v += (1 << L2_PAGETABLE_SHIFT) ) {
-            if (!l2e_get_flags(idle_pg_table_l2[l2_linear_offset(v)]) & _PAGE_PSE)
+        for ( v = HYPERVISOR_VIRT_START; v; v += (1 << L2_PAGETABLE_SHIFT) )
+        {
+            if ( (l2e_get_flags(idle_pg_table_l2[l2_linear_offset(v)]) &
+                  (_PAGE_PSE|_PAGE_PRESENT)) != (_PAGE_PSE|_PAGE_PRESENT) )
                 continue;
-            if (v >= RO_MPT_VIRT_START && v < RO_MPT_VIRT_END)
+            if ( (v >= RO_MPT_VIRT_START) && (v < RO_MPT_VIRT_END) )
                 continue;
-            l2e_add_flags(idle_pg_table_l2[l2_linear_offset(v)],
-                          _PAGE_GLOBAL);
+            l2e_add_flags(idle_pg_table_l2[l2_linear_offset(v)], _PAGE_GLOBAL);
         }
     }
 
-    /* Create page table(s) for ioremap(). */
-    for (v = IOREMAP_VIRT_START; v != IOREMAP_VIRT_END; v += (1 << L2_PAGETABLE_SHIFT)) {
+    /* Create page tables for ioremap(). */
+    for ( i = 0; i < (IOREMAP_MBYTES >> (L2_PAGETABLE_SHIFT - 20)); i++ )
+    {
         ioremap_pt = (void *)alloc_xenheap_page();
         clear_page(ioremap_pt);
-        idle_pg_table_l2[l2_linear_offset(v)] =
+        idle_pg_table_l2[l2_linear_offset(IOREMAP_VIRT_START) + i] =
             l2e_from_page(virt_to_page(ioremap_pt), __PAGE_HYPERVISOR);
     }
 
     /* Set up mapping cache for domain pages. */
-    mapcache = (l1_pgentry_t*)alloc_xenheap_pages(10-PAGETABLE_ORDER);
-    for (v = MAPCACHE_VIRT_START, i = 0;
-         v != MAPCACHE_VIRT_END;
-         v += (1 << L2_PAGETABLE_SHIFT), i++) {
-        clear_page(mapcache + i*L1_PAGETABLE_ENTRIES);
-        idle_pg_table_l2[l2_linear_offset(v)] =
-            l2e_from_page(virt_to_page(mapcache + i*L1_PAGETABLE_ENTRIES),
-                            __PAGE_HYPERVISOR);
-    }
-
-    for (v = LINEAR_PT_VIRT_START; v != LINEAR_PT_VIRT_END; v += (1 << L2_PAGETABLE_SHIFT)) {
-        idle_pg_table_l2[l2_linear_offset(v)] =
-            l2e_from_page(virt_to_page(idle_pg_table_l2 + ((v-RDWR_MPT_VIRT_START) >> PAGETABLE_ORDER)),
-                            __PAGE_HYPERVISOR);
-    }
+    mapcache_order = get_order(MAPCACHE_MBYTES << (20 - PAGETABLE_ORDER));
+    mapcache = (l1_pgentry_t *)alloc_xenheap_pages(mapcache_order);
+    memset(mapcache, 0, PAGE_SIZE << mapcache_order);
+    for ( i = 0; i < (MAPCACHE_MBYTES >> (L2_PAGETABLE_SHIFT - 20)); i++ )
+        idle_pg_table_l2[l2_linear_offset(MAPCACHE_VIRT_START) + i] =
+            l2e_from_page(virt_to_page(mapcache) + i, __PAGE_HYPERVISOR);
 }
 
 void __init zap_low_mappings(l2_pgentry_t *base)
@@ -148,7 +141,8 @@ void __init zap_low_mappings(l2_pgentry_t *base)
 
 void subarch_init_memory(struct domain *dom_xen)
 {
-    unsigned long i, v, m2p_start_mfn;
+    unsigned long m2p_start_mfn;
+    int i;
 
     /*
      * We are rather picky about the layout of 'struct pfn_info'. The
@@ -164,21 +158,18 @@ void subarch_init_memory(struct domain *dom_xen)
                offsetof(struct pfn_info, count_info),
                offsetof(struct pfn_info, u.inuse._domain),
                sizeof(struct pfn_info));
-        for ( ; ; )
-            __asm__ __volatile__ ( "hlt" );
+        BUG();
     }
 
     /* M2P table is mappable read-only by privileged domains. */
-    for (v  = RDWR_MPT_VIRT_START;
-         v != RDWR_MPT_VIRT_END && mpt_size > (v - RDWR_MPT_VIRT_START);
-         v += (1 << L2_PAGETABLE_SHIFT)) {
+    for ( i = 0; i < (mpt_size >> L2_PAGETABLE_SHIFT); i++ )
+    {
         m2p_start_mfn = l2e_get_pfn(
-            idle_pg_table_l2[l2_linear_offset(v)]);
+            idle_pg_table_l2[l2_linear_offset(RDWR_MPT_VIRT_START) + i]);
         for ( i = 0; i < L2_PAGETABLE_ENTRIES; i++ )
         {
             frame_table[m2p_start_mfn+i].count_info = PGC_allocated | 1;
-            /* gdt to make sure it's only mapped read-only by non-privileged
-               domains. */
+            /* Ensure it's only mapped read-only by domains. */
             frame_table[m2p_start_mfn+i].u.inuse.type_info = PGT_gdt_page | 1;
             page_set_owner(&frame_table[m2p_start_mfn+i], dom_xen);
         }
