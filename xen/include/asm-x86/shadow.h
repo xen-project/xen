@@ -397,7 +397,7 @@ shadow_get_page_from_l1e(l1_pgentry_t l1e, struct domain *d)
     if ( unlikely(!res) )
     {
         perfc_incrc(shadow_get_page_fail);
-        FSH_LOG("%s failed to get ref l1e=%lx\n",
+        FSH_LOG("%s failed to get ref l1e=%" PRIpte "\n",
                 __func__, l1e_get_intpte(l1e));
     }
 
@@ -738,7 +738,7 @@ static inline int l1pte_write_fault(
     l1e_add_flags(gpte, _PAGE_DIRTY | _PAGE_ACCESSED);
     spte = l1e_from_pfn(gmfn, l1e_get_flags(gpte) & ~_PAGE_GLOBAL);
 
-    SH_VVLOG("l1pte_write_fault: updating spte=0x%lx gpte=0x%lx",
+    SH_VVLOG("l1pte_write_fault: updating spte=0x%" PRIpte " gpte=0x%" PRIpte,
              l1e_get_intpte(spte), l1e_get_intpte(gpte));
 
     if ( shadow_mode_log_dirty(d) )
@@ -777,7 +777,7 @@ static inline int l1pte_read_fault(
         l1e_remove_flags(spte, _PAGE_RW);
     }
 
-    SH_VVLOG("l1pte_read_fault: updating spte=0x%lx gpte=0x%lx",
+    SH_VVLOG("l1pte_read_fault: updating spte=0x%" PRIpte " gpte=0x%" PRIpte,
              l1e_get_intpte(spte), l1e_get_intpte(gpte));
     *gpte_p = gpte;
     *spte_p = spte;
@@ -809,7 +809,7 @@ static inline void l1pte_propagate_from_guest(
     }
 
     if ( l1e_get_intpte(spte) || l1e_get_intpte(gpte) )
-        SH_VVVLOG("%s: gpte=%lx, new spte=%lx",
+        SH_VVVLOG("%s: gpte=%" PRIpte ", new spte=%" PRIpte,
                   __func__, l1e_get_intpte(gpte), l1e_get_intpte(spte));
 
     *spte_p = spte;
@@ -843,7 +843,7 @@ static inline void hl2e_propagate_from_guest(
     }
 
     if ( l1e_get_intpte(hl2e) || l2e_get_intpte(gpde) )
-        SH_VVLOG("%s: gpde=%lx hl2e=%lx", __func__,
+        SH_VVLOG("%s: gpde=%" PRIpte " hl2e=%" PRIpte, __func__,
                  l2e_get_intpte(gpde), l1e_get_intpte(hl2e));
 
     *hl2e_p = hl2e;
@@ -872,7 +872,7 @@ static inline void l2pde_general(
     }
 
     if ( l2e_get_intpte(spde) || l2e_get_intpte(gpde) )
-        SH_VVLOG("%s: gpde=%lx, new spde=%lx", __func__,
+        SH_VVLOG("%s: gpde=%" PRIpte ", new spde=%" PRIpte, __func__,
                  l2e_get_intpte(gpde), l2e_get_intpte(spde));
 
     *spde_p = spde;

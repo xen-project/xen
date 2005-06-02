@@ -1222,8 +1222,8 @@ static int shadow_mode_table_op(
     ASSERT(shadow_lock_is_acquired(d));
 
     SH_VLOG("shadow mode table op %lx %lx count %d",
-            pagetable_val(d->exec_domain[0]->arch.guest_table),  /* XXX SMP */
-            pagetable_val(d->exec_domain[0]->arch.shadow_table), /* XXX SMP */
+            (unsigned long)pagetable_get_pfn(d->exec_domain[0]->arch.guest_table),  /* XXX SMP */
+            (unsigned long)pagetable_get_pfn(d->exec_domain[0]->arch.shadow_table), /* XXX SMP */
             d->arch.shadow_page_count);
 
     shadow_audit(d, 1);
@@ -2594,7 +2594,7 @@ int shadow_fault(unsigned long va, struct cpu_user_regs *regs)
     orig_gpte = gpte = linear_pg_table[l1_linear_offset(va)];
     if ( unlikely(!(l1e_get_flags(gpte) & _PAGE_PRESENT)) )
     {
-        SH_VVLOG("shadow_fault - EXIT: gpte not present (%lx)",
+        SH_VVLOG("shadow_fault - EXIT: gpte not present (%" PRIpte ")",
                  l1e_get_intpte(gpte));
         perfc_incrc(shadow_fault_bail_pte_not_present);
         goto fail;
@@ -2615,7 +2615,7 @@ int shadow_fault(unsigned long va, struct cpu_user_regs *regs)
             else
             {
                 /* Write fault on a read-only mapping. */
-                SH_VVLOG("shadow_fault - EXIT: wr fault on RO page (%lx)", 
+                SH_VVLOG("shadow_fault - EXIT: wr fault on RO page (%" PRIpte ")", 
                          l1e_get_intpte(gpte));
                 perfc_incrc(shadow_fault_bail_ro_mapping);
                 goto fail;
@@ -2692,7 +2692,7 @@ void shadow_l1_normal_pt_update(
     sl1mfn = __shadow_status(current->domain, pa >> PAGE_SHIFT, PGT_l1_shadow);
     if ( sl1mfn )
     {
-        SH_VVLOG("shadow_l1_normal_pt_update pa=%p, gpte=%08lx",
+        SH_VVLOG("shadow_l1_normal_pt_update pa=%p, gpte=%" PRIpte,
                  (void *)pa, l1e_get_intpte(gpte));
         l1pte_propagate_from_guest(current->domain, gpte, &spte);
 
@@ -2717,7 +2717,7 @@ void shadow_l2_normal_pt_update(
     sl2mfn = __shadow_status(current->domain, pa >> PAGE_SHIFT, PGT_l2_shadow);
     if ( sl2mfn )
     {
-        SH_VVLOG("shadow_l2_normal_pt_update pa=%p, gpde=%08lx",
+        SH_VVLOG("shadow_l2_normal_pt_update pa=%p, gpde=%" PRIpte,
                  (void *)pa, l2e_get_intpte(gpde));
         spl2e = map_domain_mem_with_cache(sl2mfn << PAGE_SHIFT, cache);
         validate_pde_change(d, gpde,
@@ -2946,7 +2946,7 @@ mark_shadows_as_reflecting_snapshot(struct domain *d, unsigned long gpfn)
     {
         l2e = map_domain_mem(smfn << PAGE_SHIFT);
         for ( i = 0; i < L2_PAGETABLE_ENTRIES; i++ )
-            if ( is_guest_l2_slot(i) &&
+            if ( is_guest_l2_slot(0, i) &&
                  (l2e_get_flags(l2e[i]) & _PAGE_PRESENT) )
                 l2e_add_flags(l2e[i], SHADOW_REFLECTS_SNAPSHOT);
         unmap_domain_mem(l2e);
@@ -2978,9 +2978,10 @@ int shadow_status_noswap;
         printk("XXX %s-FAIL (%d,%d,%d) " _f " at %s(%d)\n",                  \
                sh_check_name, level, l2_idx, l1_idx, ## _a,                  \
                __FILE__, __LINE__);                                          \
-        printk("guest_pte=%lx eff_guest_pte=%lx shadow_pte=%lx "             \
-               "snapshot_pte=%lx &guest=%p &shadow=%p &snap=%p "             \
-               "v2m(&guest)=%p v2m(&shadow)=%p v2m(&snap)=%p ea=%08x\n",     \
+        printk("guest_pte=%" PRIpte " eff_guest_pte=%" PRIpte                \
+               " shadow_pte=%" PRIpte " snapshot_pte=%" PRIpte               \
+               " &guest=%p &shadow=%p &snap=%p v2m(&guest)=%p"               \
+               " v2m(&shadow)=%p v2m(&snap)=%p ea=%08x\n",                   \
                l1e_get_intpte(guest_pte), l1e_get_intpte(eff_guest_pte),     \
                l1e_get_intpte(shadow_pte), l1e_get_intpte(snapshot_pte),     \
                p_guest_pte, p_shadow_pte, p_snapshot_pte,                    \
@@ -3048,8 +3049,8 @@ static int check_pte(
     shadow_mfn = l1e_get_pfn(shadow_pte);
 
     if ( !VALID_MFN(eff_guest_mfn) && !shadow_mode_refcounts(d) )
-        FAIL("%s: invalid eff_guest_pfn=%lx eff_guest_pte=%lx\n", __func__, eff_guest_pfn,
-             l1e_get_intpte(eff_guest_pte));
+        FAIL("%s: invalid eff_guest_pfn=%lx eff_guest_pte=%" PRIpte "\n",
+             __func__, eff_guest_pfn, l1e_get_intpte(eff_guest_pte));
 
     page_table_page = mfn_is_page_table(eff_guest_mfn);
 
@@ -3184,7 +3185,7 @@ int check_l2_table(
          l2e_has_changed(spl2e[SH_LINEAR_PT_VIRT_START >> L2_PAGETABLE_SHIFT],
                          match, PAGE_FLAG_MASK))
     {
-        FAILPT("hypervisor shadow linear map inconsistent %lx %lx",
+        FAILPT("hypervisor shadow linear map inconsistent %" PRIpte " %" PRIpte,
                l2e_get_intpte(spl2e[SH_LINEAR_PT_VIRT_START >>
                                    L2_PAGETABLE_SHIFT]),
                l2e_get_intpte(match));
@@ -3195,7 +3196,7 @@ int check_l2_table(
          l2e_has_changed(spl2e[PERDOMAIN_VIRT_START >> L2_PAGETABLE_SHIFT],
                          match, PAGE_FLAG_MASK))
     {
-        FAILPT("hypervisor per-domain map inconsistent saw %lx, expected (va=%p) %lx",
+        FAILPT("hypervisor per-domain map inconsistent saw %" PRIpte ", expected (va=%p) %" PRIpte,
                l2e_get_intpte(spl2e[PERDOMAIN_VIRT_START >> L2_PAGETABLE_SHIFT]),
                d->arch.mm_perdomain_pt,
                l2e_get_intpte(match));
@@ -3234,7 +3235,7 @@ int _check_pagetable(struct exec_domain *ed, char *s)
 {
     struct domain *d = ed->domain;
     pagetable_t pt = ed->arch.guest_table;
-    unsigned long gptbase = pagetable_val(pt);
+    unsigned long gptbase = pagetable_get_paddr(pt);
     unsigned long ptbase_pfn, smfn;
     unsigned long i;
     l2_pgentry_t *gpl2e, *spl2e;
