@@ -6,16 +6,16 @@
  * Arch-specifics.
  */
 
-struct exec_domain *arch_alloc_exec_domain_struct(void);
+struct vcpu *arch_alloc_vcpu_struct(void);
 
-extern void arch_free_exec_domain_struct(struct exec_domain *ed);
+extern void arch_free_vcpu_struct(struct vcpu *v);
 
-extern void arch_do_createdomain(struct exec_domain *ed);
+extern void arch_do_createdomain(struct vcpu *v);
 
-extern void arch_do_boot_vcpu(struct exec_domain *ed);
+extern void arch_do_boot_vcpu(struct vcpu *v);
 
 extern int  arch_set_info_guest(
-    struct exec_domain *d, struct vcpu_guest_context *c);
+    struct vcpu *d, struct vcpu_guest_context *c);
 
 extern void free_perdomain_pt(struct domain *d);
 

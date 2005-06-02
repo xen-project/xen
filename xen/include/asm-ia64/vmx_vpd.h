@@ -113,9 +113,9 @@ typedef struct vpd {
 
 void vmx_enter_scheduler(void);
 
-//FIXME: Map for LID to exec_domain, Eddie
+//FIXME: Map for LID to vcpu, Eddie
 #define	MAX_NUM_LPS		(1UL<<16)
-extern struct exec_domain	*lid_edt[MAX_NUM_LPS];
+extern struct vcpu	*lid_edt[MAX_NUM_LPS];
 
 struct arch_vmx_struct {
 //    struct virutal_platform_def     vmx_platform;

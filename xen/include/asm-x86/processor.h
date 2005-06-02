@@ -125,14 +125,14 @@
 #define TBF_INTERRUPT          8
 #define TBF_FAILSAFE          16
 
-/* 'arch_exec_domain' flags values */
+/* 'arch_vcpu' flags values */
 #define _TF_kernel_mode        0
 #define TF_kernel_mode         (1<<_TF_kernel_mode)
 
 #ifndef __ASSEMBLY__
 
 struct domain;
-struct exec_domain;
+struct vcpu;
 
 /*
  * Default implementation of macro that returns current
@@ -401,7 +401,7 @@ extern struct tss_struct init_tss[NR_CPUS];
 
 #ifdef CONFIG_X86_32
 
-extern void init_int80_direct_trap(struct exec_domain *ed);
+extern void init_int80_direct_trap(struct vcpu *v);
 #define set_int80_direct_trap(_ed)                  \
     (memcpy(idt_tables[(_ed)->processor] + 0x80,    \
             &((_ed)->arch.int80_desc), 8))
@@ -415,14 +415,14 @@ extern void init_int80_direct_trap(struct exec_domain *ed);
 
 extern int gpf_emulate_4gb(struct cpu_user_regs *regs);
 
-extern void write_ptbase(struct exec_domain *ed);
+extern void write_ptbase(struct vcpu *v);
 
-void destroy_gdt(struct exec_domain *d);
-long set_gdt(struct exec_domain *d, 
+void destroy_gdt(struct vcpu *d);
+long set_gdt(struct vcpu *d, 
              unsigned long *frames, 
              unsigned int entries);
 
-long set_debugreg(struct exec_domain *p, int reg, unsigned long value);
+long set_debugreg(struct vcpu *p, int reg, unsigned long value);
 
 struct microcode_header {
     unsigned int hdrver;

@@ -136,7 +136,7 @@ purge_machine_tc_by_domid(domid_t domid)
 #endif
 }
 
-static thash_cb_t *init_domain_vhpt(struct exec_domain *d)
+static thash_cb_t *init_domain_vhpt(struct vcpu *d)
 {
     struct pfn_info *page;
     void   *vbase,*vcur;
@@ -179,7 +179,7 @@ static thash_cb_t *init_domain_vhpt(struct exec_domain *d)
 }
 
 
-thash_cb_t *init_domain_tlb(struct exec_domain *d)
+thash_cb_t *init_domain_tlb(struct vcpu *d)
 {
     struct pfn_info *page;
     void    *vbase,*vcur;
@@ -234,7 +234,7 @@ alloc_pmt(struct domain *d)
  * Insert guest TLB to machine TLB.
  *  data:   In TLB format
  */
-void machine_tlb_insert(struct exec_domain *d, thash_data_t *tlb)
+void machine_tlb_insert(struct vcpu *d, thash_data_t *tlb)
 {
     u64     saved_itir, saved_ifa, saved_rr;
     u64     pages;
@@ -285,7 +285,7 @@ u64 machine_thash(PTA pta, u64 va, u64 rid, u64 ps)
     u64     saved_pta, saved_rr0;
     u64     hash_addr, tag;
     unsigned long psr;
-    struct exec_domain *ed = current;
+    struct vcpu *v = current;
     rr_t    vrr;
 
     
@@ -299,7 +299,7 @@ u64 machine_thash(PTA pta, u64 va, u64 rid, u64 ps)
     // TODO: Set to enforce lazy mode
     local_irq_save(psr);
     ia64_setreg(_IA64_REG_CR_PTA, pta.val);
-    ia64_set_rr(0, vmx_vrrtomrr(ed, vrr.value));
+    ia64_set_rr(0, vmx_vrrtomrr(v, vrr.value));
     ia64_srlz_d();
 
     hash_addr = ia64_thash(va);
@@ -316,7 +316,7 @@ u64 machine_ttag(PTA pta, u64 va, u64 rid, u64 ps)
     u64     saved_pta, saved_rr0;
     u64     hash_addr, tag;
     u64     psr;
-    struct exec_domain *ed = current;
+    struct vcpu *v = current;
     rr_t    vrr;
 
     // TODO: Set to enforce lazy mode    
@@ -329,7 +329,7 @@ u64 machine_ttag(PTA pta, u64 va, u64 rid, u64 ps)
     va = (va << 3) >> 3;    // set VRN to 0.
     local_irq_save(psr);
     ia64_setreg(_IA64_REG_CR_PTA, pta.val);
-    ia64_set_rr(0, vmx_vrrtomrr(ed, vrr.value));
+    ia64_set_rr(0, vmx_vrrtomrr(v, vrr.value));
     ia64_srlz_d();
 
     tag = ia64_ttag(va);

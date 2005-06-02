@@ -106,7 +106,7 @@ static unsigned char insn_decode[256] = {
  */
 int get_baselimit(u16 seg, unsigned long *base, unsigned long *limit)
 {
-    struct exec_domain *d = current;
+    struct vcpu *d = current;
     unsigned long *table, a, b;
     int            ldt = !!(seg & 4);
     int            idx = (seg >> 3) & 8191;
@@ -172,7 +172,7 @@ int linearise_address(u16 seg, unsigned long off, unsigned long *linear)
 
 int fixup_seg(u16 seg, unsigned long offset)
 {
-    struct exec_domain *d = current;
+    struct vcpu *d = current;
     unsigned long *table, a, b, base, limit;
     int            ldt = !!(seg & 4);
     int            idx = (seg >> 3) & 8191;
@@ -265,7 +265,7 @@ int fixup_seg(u16 seg, unsigned long offset)
  */
 int gpf_emulate_4gb(struct cpu_user_regs *regs)
 {
-    struct exec_domain *d = current;
+    struct vcpu *d = current;
     trap_info_t   *ti;
     struct trap_bounce *tb;
     u8            modrm, mod, reg, rm, decode;

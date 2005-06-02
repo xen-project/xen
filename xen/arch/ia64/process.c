@@ -31,7 +31,7 @@
 #include <asm/hpsim_ssc.h>
 #include <asm/dom_fw.h>
 
-extern unsigned long vcpu_get_itir_on_fault(struct exec_domain *, UINT64);
+extern unsigned long vcpu_get_itir_on_fault(struct vcpu *, UINT64);
 extern struct ia64_sal_retval pal_emulator_static(UINT64);
 extern struct ia64_sal_retval sal_emulator(UINT64,UINT64,UINT64,UINT64,UINT64,UINT64,UINT64,UINT64);
 
@@ -61,7 +61,7 @@ long do_iopl(domid_t domain, unsigned int new_io_pl)
 	return 0;
 }
 
-void schedule_tail(struct exec_domain *next)
+void schedule_tail(struct vcpu *next)
 {
 	unsigned long rr7;
 	//printk("current=%lx,shared_info=%lx\n",current,current->vcpu_info);
@@ -76,7 +76,7 @@ void schedule_tail(struct exec_domain *next)
 #endif // CONFIG_VTI
 }
 
-extern TR_ENTRY *match_tr(struct exec_domain *ed, unsigned long ifa);
+extern TR_ENTRY *match_tr(struct vcpu *v, unsigned long ifa);
 
 void tdpfoo(void) { }
 
@@ -132,10 +132,10 @@ unsigned long translate_domain_mpaddr(unsigned long mpaddr)
 
 void reflect_interruption(unsigned long ifa, unsigned long isr, unsigned long itiriim, struct pt_regs *regs, unsigned long vector)
 {
-	unsigned long vcpu_get_ipsr_int_state(struct exec_domain *,unsigned long);
-	unsigned long vcpu_get_rr_ve(struct exec_domain *,unsigned long);
+	unsigned long vcpu_get_ipsr_int_state(struct vcpu *,unsigned long);
+	unsigned long vcpu_get_rr_ve(struct vcpu *,unsigned long);
 	struct domain *d = current->domain;
-	struct exec_domain *ed = current;
+	struct vcpu *v = current;
 
 	if (vector == IA64_EXTINT_VECTOR) {
 		
@@ -147,8 +147,8 @@ void reflect_interruption(unsigned long ifa, unsigned long isr, unsigned long it
 			first_extint = 0;
 		}
 	}
-	if (!PSCB(ed,interrupt_collection_enabled)) {
-		if (!(PSCB(ed,ipsr) & IA64_PSR_DT)) {
+	if (!PSCB(v,interrupt_collection_enabled)) {
+		if (!(PSCB(v,ipsr) & IA64_PSR_DT)) {
 			panic_domain(regs,"psr.dt off, trying to deliver nested dtlb!\n");
 		}
 		vector &= ~0xf;
@@ -156,45 +156,45 @@ void reflect_interruption(unsigned long ifa, unsigned long isr, unsigned long it
 		    vector != IA64_ALT_DATA_TLB_VECTOR &&
 		    vector != IA64_VHPT_TRANS_VECTOR) {
 panic_domain(regs,"psr.ic off, delivering fault=%lx,iip=%p,ifa=%p,isr=%p,PSCB.iip=%p\n",
-	vector,regs->cr_iip,ifa,isr,PSCB(ed,iip));
+	vector,regs->cr_iip,ifa,isr,PSCB(v,iip));
 			
 		}
 //printf("Delivering NESTED DATA TLB fault\n");
 		vector = IA64_DATA_NESTED_TLB_VECTOR;
-		regs->cr_iip = ((unsigned long) PSCBX(ed,iva) + vector) & ~0xffUL;
+		regs->cr_iip = ((unsigned long) PSCBX(v,iva) + vector) & ~0xffUL;
 		regs->cr_ipsr = (regs->cr_ipsr & ~DELIVER_PSR_CLR) | DELIVER_PSR_SET;
 // NOTE: nested trap must NOT pass PSCB address
-		//regs->r31 = (unsigned long) &PSCB(ed);
+		//regs->r31 = (unsigned long) &PSCB(v);
 		return;
 
 	}
 	if ((vector & 0xf) == IA64_FORCED_IFA)
-		ifa = PSCB(ed,tmp[0]);
+		ifa = PSCB(v,tmp[0]);
 	vector &= ~0xf;
-	PSCB(ed,ifa) = ifa;
+	PSCB(v,ifa) = ifa;
 	if (vector < IA64_DATA_NESTED_TLB_VECTOR) /* VHPT miss, TLB miss, Alt TLB miss */
-		vcpu_thash(ed,ifa,&PSCB(current,iha));
-	PSCB(ed,unat) = regs->ar_unat;  // not sure if this is really needed?
-	PSCB(ed,precover_ifs) = regs->cr_ifs;
-	vcpu_bsw0(ed);
-	PSCB(ed,ipsr) = vcpu_get_ipsr_int_state(ed,regs->cr_ipsr);
+		vcpu_thash(v,ifa,&PSCB(current,iha));
+	PSCB(v,unat) = regs->ar_unat;  // not sure if this is really needed?
+	PSCB(v,precover_ifs) = regs->cr_ifs;
+	vcpu_bsw0(v);
+	PSCB(v,ipsr) = vcpu_get_ipsr_int_state(v,regs->cr_ipsr);
 	if (vector == IA64_BREAK_VECTOR || vector == IA64_SPECULATION_VECTOR)
-		PSCB(ed,iim) = itiriim;
-	else PSCB(ed,itir) = vcpu_get_itir_on_fault(ed,ifa);
-	PSCB(ed,isr) = isr; // this is unnecessary except for interrupts!
-	PSCB(ed,iip) = regs->cr_iip;
-	PSCB(ed,ifs) = 0;
-	PSCB(ed,incomplete_regframe) = 0;
+		PSCB(v,iim) = itiriim;
+	else PSCB(v,itir) = vcpu_get_itir_on_fault(v,ifa);
+	PSCB(v,isr) = isr; // this is unnecessary except for interrupts!
+	PSCB(v,iip) = regs->cr_iip;
+	PSCB(v,ifs) = 0;
+	PSCB(v,incomplete_regframe) = 0;
 
-	regs->cr_iip = ((unsigned long) PSCBX(ed,iva) + vector) & ~0xffUL;
+	regs->cr_iip = ((unsigned long) PSCBX(v,iva) + vector) & ~0xffUL;
 	regs->cr_ipsr = (regs->cr_ipsr & ~DELIVER_PSR_CLR) | DELIVER_PSR_SET;
 #ifdef CONFIG_SMP
 #error "sharedinfo doesn't handle smp yet"
 #endif
 	regs->r31 = &((shared_info_t *)SHAREDINFO_ADDR)->vcpu_data[0].arch;
 
-	PSCB(ed,interrupt_delivery_enabled) = 0;
-	PSCB(ed,interrupt_collection_enabled) = 0;
+	PSCB(v,interrupt_delivery_enabled) = 0;
+	PSCB(v,interrupt_collection_enabled) = 0;
 }
 
 void foodpi(void) {}
@@ -205,26 +205,26 @@ void foodpi(void) {}
 void deliver_pending_interrupt(struct pt_regs *regs)
 {
 	struct domain *d = current->domain;
-	struct exec_domain *ed = current;
+	struct vcpu *v = current;
 	// FIXME: Will this work properly if doing an RFI???
 	if (!is_idle_task(d) && user_mode(regs)) {
-		//vcpu_poke_timer(ed);
-		if (vcpu_deliverable_interrupts(ed)) {
+		//vcpu_poke_timer(v);
+		if (vcpu_deliverable_interrupts(v)) {
 			unsigned long isr = regs->cr_ipsr & IA64_PSR_RI;
-			if (vcpu_timer_pending_early(ed))
-printf("*#*#*#* about to deliver early timer to domain %d!!!\n",ed->domain->domain_id);
+			if (vcpu_timer_pending_early(v))
+printf("*#*#*#* about to deliver early timer to domain %d!!!\n",v->domain->domain_id);
 			reflect_interruption(0,isr,0,regs,IA64_EXTINT_VECTOR);
 		}
 	}
 }
 
-int handle_lazy_cover(struct exec_domain *ed, unsigned long isr, struct pt_regs *regs)
+int handle_lazy_cover(struct vcpu *v, unsigned long isr, struct pt_regs *regs)
 {
-	if (!PSCB(ed,interrupt_collection_enabled)) {
+	if (!PSCB(v,interrupt_collection_enabled)) {
 		if (isr & IA64_ISR_IR) {
 //			printf("Handling lazy cover\n");
-			PSCB(ed,ifs) = regs->cr_ifs;
-			PSCB(ed,incomplete_regframe) = 1;
+			PSCB(v,ifs) = regs->cr_ifs;
+			PSCB(v,incomplete_regframe) = 1;
 			regs->cr_ifs = 0;
 			return(1); // retry same instruction with cr.ifs off
 		}
@@ -237,14 +237,14 @@ int handle_lazy_cover(struct exec_domain *ed, unsigned long isr, struct pt_regs 
 void xen_handle_domain_access(unsigned long address, unsigned long isr, struct pt_regs *regs, unsigned long itir)
 {
 	struct domain *d = (struct domain *) current->domain;
-	struct domain *ed = (struct exec_domain *) current;
+	struct domain *ed = (struct vcpu *) current;
 	TR_ENTRY *trp;
 	unsigned long psr = regs->cr_ipsr, mask, flags;
 	unsigned long iip = regs->cr_iip;
 	// FIXME should validate address here
 	unsigned long pteval, mpaddr, ps;
 	unsigned long lookup_domain_mpa(struct domain *,unsigned long);
-	unsigned long match_dtlb(struct exec_domain *,unsigned long, unsigned long *, unsigned long *);
+	unsigned long match_dtlb(struct vcpu *,unsigned long, unsigned long *, unsigned long *);
 	IA64FAULT fault;
 
 // NEED TO HANDLE THREE CASES:
@@ -736,7 +736,7 @@ ia64_handle_break (unsigned long ifa, struct pt_regs *regs, unsigned long isr, u
 {
 	static int first_time = 1;
 	struct domain *d = (struct domain *) current->domain;
-	struct exec_domain *ed = (struct domain *) current;
+	struct vcpu *v = (struct domain *) current;
 	extern unsigned long running_on_sim;
 
 	if (first_time) {
@@ -752,7 +752,7 @@ ia64_handle_break (unsigned long ifa, struct pt_regs *regs, unsigned long isr, u
 		if (ia64_hypercall(regs))
 			vcpu_increment_iip(current);
 	}
-	else if (!PSCB(ed,interrupt_collection_enabled)) {
+	else if (!PSCB(v,interrupt_collection_enabled)) {
 		if (ia64_hyperprivop(iim,regs))
 			vcpu_increment_iip(current);
 	}
@@ -764,11 +764,11 @@ ia64_handle_privop (unsigned long ifa, struct pt_regs *regs, unsigned long isr, 
 {
 	IA64FAULT vector;
 	struct domain *d = current->domain;
-	struct exec_domain *ed = current;
+	struct vcpu *v = current;
 	// FIXME: no need to pass itir in to this routine as we need to
 	// compute the virtual itir anyway (based on domain's RR.ps)
 	// AND ACTUALLY reflect_interruption doesn't use it anyway!
-	itir = vcpu_get_itir_on_fault(ed,ifa);
+	itir = vcpu_get_itir_on_fault(v,ifa);
 	vector = priv_emulate(current,regs,isr);
 	if (vector != IA64_NO_FAULT && vector != IA64_RFI_IN_PROGRESS) {
 		reflect_interruption(ifa,isr,itir,regs,vector);
@@ -782,10 +782,10 @@ void
 ia64_handle_reflection (unsigned long ifa, struct pt_regs *regs, unsigned long isr, unsigned long iim, unsigned long vector)
 {
 	struct domain *d = (struct domain *) current->domain;
-	struct exec_domain *ed = (struct domain *) current;
+	struct vcpu *v = (struct domain *) current;
 	unsigned long check_lazy_cover = 0;
 	unsigned long psr = regs->cr_ipsr;
-	unsigned long itir = vcpu_get_itir_on_fault(ed,ifa);
+	unsigned long itir = vcpu_get_itir_on_fault(v,ifa);
 
 	if (!(psr & IA64_PSR_CPL)) {
 		printk("ia64_handle_reflection: reflecting with priv=0!!\n");
@@ -793,7 +793,7 @@ ia64_handle_reflection (unsigned long ifa, struct pt_regs *regs, unsigned long i
 	// FIXME: no need to pass itir in to this routine as we need to
 	// compute the virtual itir anyway (based on domain's RR.ps)
 	// AND ACTUALLY reflect_interruption doesn't use it anyway!
-	itir = vcpu_get_itir_on_fault(ed,ifa);
+	itir = vcpu_get_itir_on_fault(v,ifa);
 	switch(vector) {
 	    case 8:
 		vector = IA64_DIRTY_BIT_VECTOR; break;
@@ -814,7 +814,7 @@ ia64_handle_reflection (unsigned long ifa, struct pt_regs *regs, unsigned long i
 		vector = IA64_DISABLED_FPREG_VECTOR; break;
 	    case 26:
 printf("*** NaT fault... attempting to handle as privop\n");
-		vector = priv_emulate(ed,regs,isr);
+		vector = priv_emulate(v,regs,isr);
 		if (vector == IA64_NO_FAULT) {
 printf("*** Handled privop masquerading as NaT fault\n");
 			return;
@@ -832,6 +832,6 @@ printf("*** Handled privop masquerading as NaT fault\n");
 		while(vector);
 		return;
 	}
-	if (check_lazy_cover && handle_lazy_cover(ed, isr, regs)) return;
+	if (check_lazy_cover && handle_lazy_cover(v, isr, regs)) return;
 	reflect_interruption(ifa,isr,itir,regs,vector);
 }

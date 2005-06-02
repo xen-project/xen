@@ -24,7 +24,7 @@ unsigned long xenheap_phys_end;
 
 char saved_command_line[COMMAND_LINE_SIZE];
 
-struct exec_domain *idle_task[NR_CPUS] = { &idle0_exec_domain };
+struct vcpu *idle_task[NR_CPUS] = { &idle0_vcpu };
 
 #ifdef CLONE_DOMAIN0
 struct domain *clones[CLONE_DOMAIN0];
@@ -147,9 +147,9 @@ void start_kernel(void)
     xen_pstart = ia64_tpa(KERNEL_START);
 
     /* Must do this early -- e.g., spinlocks rely on get_current(). */
-    //set_current(&idle0_exec_domain);
-    ia64_r13 = (void *)&idle0_exec_domain;
-    idle0_exec_domain.domain = &idle0_domain;
+    //set_current(&idle0_vcpu);
+    ia64_r13 = (void *)&idle0_vcpu;
+    idle0_vcpu.domain = &idle0_domain;
 
     early_setup_arch(&cmdline);
 

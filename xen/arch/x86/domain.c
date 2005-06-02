@@ -47,16 +47,16 @@ static int opt_noreboot = 0;
 boolean_param("noreboot", opt_noreboot);
 
 struct percpu_ctxt {
-    struct exec_domain *curr_ed;
+    struct vcpu *curr_vcpu;
 } __cacheline_aligned;
 static struct percpu_ctxt percpu_ctxt[NR_CPUS];
 
-static void continue_idle_task(struct exec_domain *ed)
+static void continue_idle_task(struct vcpu *v)
 {
     reset_stack_and_jump(idle_loop);
 }
 
-static void continue_nonidle_task(struct exec_domain *ed)
+static void continue_nonidle_task(struct vcpu *v)
 {
     reset_stack_and_jump(ret_from_intr);
 }
@@ -90,12 +90,12 @@ void idle_loop(void)
 
 void startup_cpu_idle_loop(void)
 {
-    struct exec_domain *ed = current;
+    struct vcpu *v = current;
 
-    ASSERT(is_idle_task(ed->domain));
-    percpu_ctxt[smp_processor_id()].curr_ed = ed;
-    set_bit(smp_processor_id(), &ed->domain->cpuset);
-    ed->arch.schedule_tail = continue_idle_task;
+    ASSERT(is_idle_task(v->domain));
+    percpu_ctxt[smp_processor_id()].curr_vcpu = v;
+    set_bit(smp_processor_id(), &v->domain->cpuset);
+    v->arch.schedule_tail = continue_idle_task;
 
     idle_loop();
 }
@@ -206,14 +206,14 @@ void dump_pageframe_info(struct domain *d)
            page->u.inuse.type_info);
 }
 
-struct exec_domain *arch_alloc_exec_domain_struct(void)
+struct vcpu *arch_alloc_vcpu_struct(void)
 {
-    return xmalloc(struct exec_domain);
+    return xmalloc(struct vcpu);
 }
 
-void arch_free_exec_domain_struct(struct exec_domain *ed)
+void arch_free_vcpu_struct(struct vcpu *v)
 {
-    xfree(ed);
+    xfree(v);
 }
 
 void free_perdomain_pt(struct domain *d)
@@ -225,21 +225,21 @@ void free_perdomain_pt(struct domain *d)
 #endif
 }
 
-void arch_do_createdomain(struct exec_domain *ed)
+void arch_do_createdomain(struct vcpu *v)
 {
-    struct domain *d = ed->domain;
+    struct domain *d = v->domain;
 
-    ed->arch.flags = TF_kernel_mode;
+    v->arch.flags = TF_kernel_mode;
 
     if ( is_idle_task(d) )
         return;
 
-    ed->arch.schedule_tail = continue_nonidle_task;
+    v->arch.schedule_tail = continue_nonidle_task;
     
     d->shared_info = (void *)alloc_xenheap_page();
     memset(d->shared_info, 0, PAGE_SIZE);
-    ed->vcpu_info = &d->shared_info->vcpu_data[ed->vcpu_id];
-    ed->cpumap = CPUMAP_RUNANYWHERE;
+    v->vcpu_info = &d->shared_info->vcpu_data[v->vcpu_id];
+    v->cpumap = CPUMAP_RUNANYWHERE;
     SHARE_PFN_WITH_DOMAIN(virt_to_page(d->shared_info), d);
     machine_to_phys_mapping[virt_to_phys(d->shared_info) >> 
                            PAGE_SHIFT] = INVALID_M2P_ENTRY;
@@ -248,16 +248,16 @@ void arch_do_createdomain(struct exec_domain *ed)
     memset(d->arch.mm_perdomain_pt, 0, PAGE_SIZE);
     machine_to_phys_mapping[virt_to_phys(d->arch.mm_perdomain_pt) >> 
                            PAGE_SHIFT] = INVALID_M2P_ENTRY;
-    ed->arch.perdomain_ptes = d->arch.mm_perdomain_pt;
-    ed->arch.perdomain_ptes[FIRST_RESERVED_GDT_PAGE] =
+    v->arch.perdomain_ptes = d->arch.mm_perdomain_pt;
+    v->arch.perdomain_ptes[FIRST_RESERVED_GDT_PAGE] =
         l1e_from_page(virt_to_page(gdt_table), PAGE_HYPERVISOR);
 
-    ed->arch.guest_vtable  = __linear_l2_table;
-    ed->arch.shadow_vtable = __shadow_linear_l2_table;
+    v->arch.guest_vtable  = __linear_l2_table;
+    v->arch.shadow_vtable = __shadow_linear_l2_table;
 
 #ifdef __x86_64__
-    ed->arch.guest_vl3table = __linear_l3_table;
-    ed->arch.guest_vl4table = __linear_l4_table;
+    v->arch.guest_vl3table = __linear_l3_table;
+    v->arch.guest_vl4table = __linear_l4_table;
     
     d->arch.mm_perdomain_l2 = (l2_pgentry_t *)alloc_xenheap_page();
     memset(d->arch.mm_perdomain_l2, 0, PAGE_SIZE);
@@ -277,41 +277,41 @@ void arch_do_createdomain(struct exec_domain *ed)
     INIT_LIST_HEAD(&d->arch.free_shadow_frames);
 }
 
-void arch_do_boot_vcpu(struct exec_domain *ed)
+void arch_do_boot_vcpu(struct vcpu *v)
 {
-    struct domain *d = ed->domain;
+    struct domain *d = v->domain;
 
-    ed->arch.flags = TF_kernel_mode;
+    v->arch.flags = TF_kernel_mode;
 
-    ed->arch.schedule_tail = d->exec_domain[0]->arch.schedule_tail;
+    v->arch.schedule_tail = d->vcpu[0]->arch.schedule_tail;
 
-    ed->arch.perdomain_ptes =
-        d->arch.mm_perdomain_pt + (ed->vcpu_id << PDPT_VCPU_SHIFT);
-    ed->arch.perdomain_ptes[FIRST_RESERVED_GDT_PAGE] =
+    v->arch.perdomain_ptes =
+        d->arch.mm_perdomain_pt + (v->vcpu_id << PDPT_VCPU_SHIFT);
+    v->arch.perdomain_ptes[FIRST_RESERVED_GDT_PAGE] =
         l1e_from_page(virt_to_page(gdt_table), PAGE_HYPERVISOR);
 }
 
 #ifdef CONFIG_VMX
-void arch_vmx_do_resume(struct exec_domain *ed) 
+void arch_vmx_do_resume(struct vcpu *v) 
 {
-    u64 vmcs_phys_ptr = (u64) virt_to_phys(ed->arch.arch_vmx.vmcs);
+    u64 vmcs_phys_ptr = (u64) virt_to_phys(v->arch.arch_vmx.vmcs);
 
-    load_vmcs(&ed->arch.arch_vmx, vmcs_phys_ptr);
-    vmx_do_resume(ed);
+    load_vmcs(&v->arch.arch_vmx, vmcs_phys_ptr);
+    vmx_do_resume(v);
     reset_stack_and_jump(vmx_asm_do_resume);
 }
 
-void arch_vmx_do_launch(struct exec_domain *ed) 
+void arch_vmx_do_launch(struct vcpu *v) 
 {
-    u64 vmcs_phys_ptr = (u64) virt_to_phys(ed->arch.arch_vmx.vmcs);
+    u64 vmcs_phys_ptr = (u64) virt_to_phys(v->arch.arch_vmx.vmcs);
 
-    load_vmcs(&ed->arch.arch_vmx, vmcs_phys_ptr);
-    vmx_do_launch(ed);
+    load_vmcs(&v->arch.arch_vmx, vmcs_phys_ptr);
+    vmx_do_launch(v);
     reset_stack_and_jump(vmx_asm_do_launch);
 }
 
 static int vmx_final_setup_guest(
-    struct exec_domain *ed, struct vcpu_guest_context *ctxt)
+    struct vcpu *v, struct vcpu_guest_context *ctxt)
 {
     int error;
     struct cpu_user_regs *regs;
@@ -327,36 +327,36 @@ static int vmx_final_setup_guest(
         return -ENOMEM;
     }
 
-    memset(&ed->arch.arch_vmx, 0, sizeof (struct arch_vmx_struct));
+    memset(&v->arch.arch_vmx, 0, sizeof (struct arch_vmx_struct));
 
-    ed->arch.arch_vmx.vmcs = vmcs;
+    v->arch.arch_vmx.vmcs = vmcs;
     error = construct_vmcs(
-        &ed->arch.arch_vmx, regs, ctxt, VMCS_USE_HOST_ENV);
+        &v->arch.arch_vmx, regs, ctxt, VMCS_USE_HOST_ENV);
     if ( error < 0 )
     {
         printk("Failed to construct a new VMCS\n");
         goto out;
     }
 
-    ed->arch.schedule_tail = arch_vmx_do_launch;
+    v->arch.schedule_tail = arch_vmx_do_launch;
 
 #if defined (__i386)
-    ed->arch.arch_vmx.vmx_platform.real_mode_data = 
+    v->arch.arch_vmx.vmx_platform.real_mode_data = 
         (unsigned long *) regs->esi;
 #endif
 
-    if (ed == ed->domain->exec_domain[0]) {
+    if (v == v->domain->vcpu[0]) {
         /* 
          * Required to do this once per domain
          * XXX todo: add a seperate function to do these.
          */
-        memset(&ed->domain->shared_info->evtchn_mask[0], 0xff, 
-               sizeof(ed->domain->shared_info->evtchn_mask));
-        clear_bit(IOPACKET_PORT, &ed->domain->shared_info->evtchn_mask[0]);
+        memset(&v->domain->shared_info->evtchn_mask[0], 0xff, 
+               sizeof(v->domain->shared_info->evtchn_mask));
+        clear_bit(IOPACKET_PORT, &v->domain->shared_info->evtchn_mask[0]);
 
         /* Put the domain in shadow mode even though we're going to be using
          * the shared 1:1 page table initially. It shouldn't hurt */
-        shadow_mode_enable(ed->domain,
+        shadow_mode_enable(v->domain,
                            SHM_enable|SHM_refcounts|
                            SHM_translate|SHM_external);
     }
@@ -365,7 +365,7 @@ static int vmx_final_setup_guest(
 
 out:
     free_vmcs(vmcs);
-    ed->arch.arch_vmx.vmcs = 0;
+    v->arch.arch_vmx.vmcs = 0;
     return error;
 }
 #endif
@@ -373,9 +373,9 @@ out:
 
 /* This is called by arch_final_setup_guest and do_boot_vcpu */
 int arch_set_info_guest(
-    struct exec_domain *ed, struct vcpu_guest_context *c)
+    struct vcpu *v, struct vcpu_guest_context *c)
 {
-    struct domain *d = ed->domain;
+    struct domain *d = v->domain;
     unsigned long phys_basetab;
     int i, rc;
 
@@ -391,45 +391,45 @@ int arch_set_info_guest(
                 return -EINVAL;
     }
 
-    clear_bit(_VCPUF_fpu_initialised, &ed->vcpu_flags);
+    clear_bit(_VCPUF_fpu_initialised, &v->vcpu_flags);
     if ( c->flags & VGCF_I387_VALID )
-        set_bit(_VCPUF_fpu_initialised, &ed->vcpu_flags);
+        set_bit(_VCPUF_fpu_initialised, &v->vcpu_flags);
 
-    ed->arch.flags &= ~TF_kernel_mode;
+    v->arch.flags &= ~TF_kernel_mode;
     if ( c->flags & VGCF_IN_KERNEL )
-        ed->arch.flags |= TF_kernel_mode;
+        v->arch.flags |= TF_kernel_mode;
 
-    memcpy(&ed->arch.guest_context, c, sizeof(*c));
+    memcpy(&v->arch.guest_context, c, sizeof(*c));
 
     if ( !(c->flags & VGCF_VMX_GUEST) )
     {
         /* IOPL privileges are virtualised. */
-        ed->arch.iopl = (ed->arch.guest_context.user_regs.eflags >> 12) & 3;
-        ed->arch.guest_context.user_regs.eflags &= ~EF_IOPL;
+        v->arch.iopl = (v->arch.guest_context.user_regs.eflags >> 12) & 3;
+        v->arch.guest_context.user_regs.eflags &= ~EF_IOPL;
 
         /* Ensure real hardware interrupts are enabled. */
-        ed->arch.guest_context.user_regs.eflags |= EF_IE;
+        v->arch.guest_context.user_regs.eflags |= EF_IE;
     } else {
-        __vmwrite(GUEST_EFLAGS, ed->arch.guest_context.user_regs.eflags);
-        if (ed->arch.guest_context.user_regs.eflags & EF_TF)
+        __vmwrite(GUEST_EFLAGS, v->arch.guest_context.user_regs.eflags);
+        if (v->arch.guest_context.user_regs.eflags & EF_TF)
                 __vm_set_bit(EXCEPTION_BITMAP, EXCEPTION_BITMAP_DB);
         else 
                 __vm_clear_bit(EXCEPTION_BITMAP, EXCEPTION_BITMAP_DB);
     }
 
-    if ( test_bit(_VCPUF_initialised, &ed->vcpu_flags) )
+    if ( test_bit(_VCPUF_initialised, &v->vcpu_flags) )
         return 0;
 
-    memset(ed->arch.guest_context.debugreg, 0,
-           sizeof(ed->arch.guest_context.debugreg));
+    memset(v->arch.guest_context.debugreg, 0,
+           sizeof(v->arch.guest_context.debugreg));
     for ( i = 0; i < 8; i++ )
-        (void)set_debugreg(ed, i, c->debugreg[i]);
+        (void)set_debugreg(v, i, c->debugreg[i]);
 
-    if ( ed->vcpu_id == 0 )
+    if ( v->vcpu_id == 0 )
         d->vm_assist = c->vm_assist;
 
     phys_basetab = c->pt_base;
-    ed->arch.guest_table = mk_pagetable(phys_basetab);
+    v->arch.guest_table = mk_pagetable(phys_basetab);
 
     if ( shadow_mode_refcounts(d) )
     {
@@ -443,7 +443,7 @@ int arch_set_info_guest(
             return -EINVAL;
     }
 
-    if ( (rc = (int)set_gdt(ed, c->gdt_frames, c->gdt_ents)) != 0 )
+    if ( (rc = (int)set_gdt(v, c->gdt_frames, c->gdt_ents)) != 0 )
     {
         put_page_and_type(&frame_table[phys_basetab>>PAGE_SHIFT]);
         return rc;
@@ -461,23 +461,23 @@ int arch_set_info_guest(
         //      page table, and/or build the table itself, or ???
         //
         if ( !pagetable_get_paddr(d->arch.phys_table) )
-            d->arch.phys_table = ed->arch.guest_table;
+            d->arch.phys_table = v->arch.guest_table;
 
-        if ( (error = vmx_final_setup_guest(ed, c)) )
+        if ( (error = vmx_final_setup_guest(v, c)) )
             return error;
     }
 #endif
 
-    update_pagetables(ed);
+    update_pagetables(v);
     
     /* Don't redo final setup */
-    set_bit(_VCPUF_initialised, &ed->vcpu_flags);
+    set_bit(_VCPUF_initialised, &v->vcpu_flags);
 
     return 0;
 }
 
 
-void new_thread(struct exec_domain *d,
+void new_thread(struct vcpu *d,
                 unsigned long start_pc,
                 unsigned long start_stack,
                 unsigned long start_info)
@@ -506,12 +506,12 @@ void new_thread(struct exec_domain *d,
 
 #ifdef __x86_64__
 
-void toggle_guest_mode(struct exec_domain *ed)
+void toggle_guest_mode(struct vcpu *v)
 {
-    ed->arch.flags ^= TF_kernel_mode;
+    v->arch.flags ^= TF_kernel_mode;
     __asm__ __volatile__ ( "swapgs" );
-    update_pagetables(ed);
-    write_ptbase(ed);
+    update_pagetables(v);
+    write_ptbase(v);
 }
 
 #define loadsegment(seg,value) ({               \
@@ -530,7 +530,7 @@ void toggle_guest_mode(struct exec_domain *ed)
         : "=r" (__r) : "r" (value), "0" (__r) );\
     __r; })
 
-static void load_segments(struct exec_domain *p, struct exec_domain *n)
+static void load_segments(struct vcpu *p, struct vcpu *n)
 {
     struct vcpu_guest_context *pctxt = &p->arch.guest_context;
     struct vcpu_guest_context *nctxt = &n->arch.guest_context;
@@ -632,9 +632,9 @@ static void load_segments(struct exec_domain *p, struct exec_domain *n)
     }
 }
 
-static void save_segments(struct exec_domain *ed)
+static void save_segments(struct vcpu *v)
 {
-    struct cpu_user_regs *regs = &ed->arch.guest_context.user_regs;
+    struct cpu_user_regs *regs = &v->arch.guest_context.user_regs;
     __asm__ __volatile__ ( "movl %%ds,%0" : "=m" (regs->ds) );
     __asm__ __volatile__ ( "movl %%es,%0" : "=m" (regs->es) );
     __asm__ __volatile__ ( "movl %%fs,%0" : "=m" (regs->fs) );
@@ -657,13 +657,13 @@ long do_switch_to_user(void)
 {
     struct cpu_user_regs  *regs = guest_cpu_user_regs();
     struct switch_to_user  stu;
-    struct exec_domain    *ed = current;
+    struct vcpu    *v = current;
 
     if ( unlikely(copy_from_user(&stu, (void *)regs->rsp, sizeof(stu))) ||
-         unlikely(pagetable_get_paddr(ed->arch.guest_table_user) == 0) )
+         unlikely(pagetable_get_paddr(v->arch.guest_table_user) == 0) )
         return -EFAULT;
 
-    toggle_guest_mode(ed);
+    toggle_guest_mode(v);
 
     regs->rip    = stu.rip;
     regs->cs     = stu.cs | 3; /* force guest privilege */
@@ -690,7 +690,7 @@ long do_switch_to_user(void)
 #define save_segments(_p)     ((void)0)
 #define clear_segments()      ((void)0)
 
-static inline void switch_kernel_stack(struct exec_domain *n, unsigned int cpu)
+static inline void switch_kernel_stack(struct vcpu *n, unsigned int cpu)
 {
     struct tss_struct *tss = &init_tss[cpu];
     tss->esp1 = n->arch.guest_context.kernel_sp;
@@ -699,15 +699,15 @@ static inline void switch_kernel_stack(struct exec_domain *n, unsigned int cpu)
 
 #endif
 
-#define loaddebug(_ed,_reg) \
-	__asm__ __volatile__ ("mov %0,%%db" #_reg : : "r" ((_ed)->debugreg[_reg]))
+#define loaddebug(_v,_reg) \
+	__asm__ __volatile__ ("mov %0,%%db" #_reg : : "r" ((_v)->debugreg[_reg]))
 
 static void __context_switch(void)
 {
     struct cpu_user_regs *stack_regs = guest_cpu_user_regs();
     unsigned int         cpu = smp_processor_id();
-    struct exec_domain  *p = percpu_ctxt[cpu].curr_ed;
-    struct exec_domain  *n = current;
+    struct vcpu  *p = percpu_ctxt[cpu].curr_vcpu;
+    struct vcpu  *n = current;
 
     if ( !is_idle_task(p->domain) )
     {
@@ -759,19 +759,19 @@ static void __context_switch(void)
     if ( p->domain != n->domain )
         clear_bit(cpu, &p->domain->cpuset);
 
-    percpu_ctxt[cpu].curr_ed = n;
+    percpu_ctxt[cpu].curr_vcpu = n;
 }
 
 
-void context_switch(struct exec_domain *prev, struct exec_domain *next)
+void context_switch(struct vcpu *prev, struct vcpu *next)
 {
-    struct exec_domain *realprev;
+    struct vcpu *realprev;
 
     local_irq_disable();
 
     set_current(next);
 
-    if ( ((realprev = percpu_ctxt[smp_processor_id()].curr_ed) == next) || 
+    if ( ((realprev = percpu_ctxt[smp_processor_id()].curr_vcpu) == next) || 
          is_idle_task(next->domain) )
     {
         local_irq_enable();
@@ -801,7 +801,7 @@ void context_switch(struct exec_domain *prev, struct exec_domain *next)
     BUG();
 }
 
-void continue_running(struct exec_domain *same)
+void continue_running(struct vcpu *same)
 {
     schedule_tail(same);
     BUG();
@@ -809,7 +809,7 @@ void continue_running(struct exec_domain *same)
 
 int __sync_lazy_execstate(void)
 {
-    if ( percpu_ctxt[smp_processor_id()].curr_ed == current )
+    if ( percpu_ctxt[smp_processor_id()].curr_vcpu == current )
         return 0;
     __context_switch();
     load_LDT(current);
@@ -893,20 +893,20 @@ unsigned long __hypercall_create_continuation(
 }
 
 #ifdef CONFIG_VMX
-static void vmx_relinquish_resources(struct exec_domain *ed)
+static void vmx_relinquish_resources(struct vcpu *v)
 {
-    if ( !VMX_DOMAIN(ed) )
+    if ( !VMX_DOMAIN(v) )
         return;
 
-    BUG_ON(ed->arch.arch_vmx.vmcs == NULL);
-    free_vmcs(ed->arch.arch_vmx.vmcs);
-    ed->arch.arch_vmx.vmcs = 0;
+    BUG_ON(v->arch.arch_vmx.vmcs == NULL);
+    free_vmcs(v->arch.arch_vmx.vmcs);
+    v->arch.arch_vmx.vmcs = 0;
     
-    free_monitor_pagetable(ed);
-    rem_ac_timer(&ed->arch.arch_vmx.vmx_platform.vmx_pit.pit_timer);
+    free_monitor_pagetable(v);
+    rem_ac_timer(&v->arch.arch_vmx.vmx_platform.vmx_pit.pit_timer);
 }
 #else
-#define vmx_relinquish_resources(_ed) ((void)0)
+#define vmx_relinquish_resources(_v) ((void)0)
 #endif
 
 static void relinquish_memory(struct domain *d, struct list_head *list)
@@ -969,7 +969,7 @@ static void relinquish_memory(struct domain *d, struct list_head *list)
 
 void domain_relinquish_resources(struct domain *d)
 {
-    struct exec_domain *ed;
+    struct vcpu *v;
 
     BUG_ON(d->cpuset != 0);
 
@@ -981,29 +981,29 @@ void domain_relinquish_resources(struct domain *d)
     gnttab_release_dev_mappings(d->grant_table);
 
     /* Drop the in-use references to page-table bases. */
-    for_each_exec_domain ( d, ed )
+    for_each_vcpu ( d, v )
     {
-        if ( pagetable_get_paddr(ed->arch.guest_table) != 0 )
+        if ( pagetable_get_paddr(v->arch.guest_table) != 0 )
         {
             if ( shadow_mode_refcounts(d) )
-                put_page(&frame_table[pagetable_get_pfn(ed->arch.guest_table)]);
+                put_page(&frame_table[pagetable_get_pfn(v->arch.guest_table)]);
             else
-                put_page_and_type(&frame_table[pagetable_get_pfn(ed->arch.guest_table)]);
+                put_page_and_type(&frame_table[pagetable_get_pfn(v->arch.guest_table)]);
 
-            ed->arch.guest_table = mk_pagetable(0);
+            v->arch.guest_table = mk_pagetable(0);
         }
 
-        if ( pagetable_get_paddr(ed->arch.guest_table_user) != 0 )
+        if ( pagetable_get_paddr(v->arch.guest_table_user) != 0 )
         {
             if ( shadow_mode_refcounts(d) )
-                put_page(&frame_table[pagetable_get_pfn(ed->arch.guest_table_user)]);
+                put_page(&frame_table[pagetable_get_pfn(v->arch.guest_table_user)]);
             else
-                put_page_and_type(&frame_table[pagetable_get_pfn(ed->arch.guest_table_user)]);
+                put_page_and_type(&frame_table[pagetable_get_pfn(v->arch.guest_table_user)]);
 
-            ed->arch.guest_table_user = mk_pagetable(0);
+            v->arch.guest_table_user = mk_pagetable(0);
         }
 
-        vmx_relinquish_resources(ed);
+        vmx_relinquish_resources(v);
     }
 
     shadow_mode_disable(d);
@@ -1012,8 +1012,8 @@ void domain_relinquish_resources(struct domain *d)
      * Relinquish GDT mappings. No need for explicit unmapping of the LDT as 
      * it automatically gets squashed when the guest's mappings go away.
      */
-    for_each_exec_domain(d, ed)
-        destroy_gdt(ed);
+    for_each_vcpu(d, v)
+        destroy_gdt(v);
 
     /* Relinquish every page of memory. */
     relinquish_memory(d, &d->xenpage_list);

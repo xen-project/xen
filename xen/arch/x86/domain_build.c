@@ -84,7 +84,7 @@ int construct_dom0(struct domain *d,
     unsigned long count;
     struct pfn_info *page = NULL;
     start_info_t *si;
-    struct exec_domain *ed = d->exec_domain[0];
+    struct vcpu *v = d->vcpu[0];
 #if defined(__i386__)
     char *image_start  = (char *)_image_start;  /* use lowmem mappings */
     char *initrd_start = (char *)_initrd_start; /* use lowmem mappings */
@@ -238,14 +238,14 @@ int construct_dom0(struct domain *d,
      * We're basically forcing default RPLs to 1, so that our "what privilege
      * level are we returning to?" logic works.
      */
-    ed->arch.guest_context.kernel_ss = FLAT_KERNEL_SS;
+    v->arch.guest_context.kernel_ss = FLAT_KERNEL_SS;
     for ( i = 0; i < 256; i++ ) 
-        ed->arch.guest_context.trap_ctxt[i].cs = FLAT_KERNEL_CS;
+        v->arch.guest_context.trap_ctxt[i].cs = FLAT_KERNEL_CS;
 
 #if defined(__i386__)
 
-    ed->arch.guest_context.failsafe_callback_cs = FLAT_KERNEL_CS;
-    ed->arch.guest_context.event_callback_cs    = FLAT_KERNEL_CS;
+    v->arch.guest_context.failsafe_callback_cs = FLAT_KERNEL_CS;
+    v->arch.guest_context.event_callback_cs    = FLAT_KERNEL_CS;
 
     /*
      * Protect the lowest 1GB of memory. We use a temporary mapping there
@@ -267,14 +267,17 @@ int construct_dom0(struct domain *d,
         l2tab[(LINEAR_PT_VIRT_START >> L2_PAGETABLE_SHIFT)+i] =
             l2e_from_paddr((u32)l2tab + i*PAGE_SIZE, __PAGE_HYPERVISOR);
     }
-    unsigned long v;
-    for (v = PERDOMAIN_VIRT_START; v < PERDOMAIN_VIRT_END;
-         v += (1 << L2_PAGETABLE_SHIFT)) {
-        l2tab[v >> L2_PAGETABLE_SHIFT] =
-            l2e_from_paddr(__pa(d->arch.mm_perdomain_pt) + (v-PERDOMAIN_VIRT_START),
-                            __PAGE_HYPERVISOR);
+    {
+        unsigned long va;
+        for (va = PERDOMAIN_VIRT_START; va < PERDOMAIN_VIRT_END;
+             va += (1 << L2_PAGETABLE_SHIFT)) {
+            l2tab[va >> L2_PAGETABLE_SHIFT] =
+                l2e_from_paddr(__pa(d->arch.mm_perdomain_pt) +
+                               (va-PERDOMAIN_VIRT_START),
+                               __PAGE_HYPERVISOR);
+        }
     }
-    ed->arch.guest_table = mk_pagetable((unsigned long)l3start);
+    v->arch.guest_table = mk_pagetable((unsigned long)l3start);
 #else
     l2start = l2tab = (l2_pgentry_t *)mpt_alloc; mpt_alloc += PAGE_SIZE;
     memcpy(l2tab, &idle_pg_table[0], PAGE_SIZE);
@@ -282,7 +285,7 @@ int construct_dom0(struct domain *d,
         l2e_from_paddr((unsigned long)l2start, __PAGE_HYPERVISOR);
     l2tab[PERDOMAIN_VIRT_START >> L2_PAGETABLE_SHIFT] =
         l2e_from_paddr(__pa(d->arch.mm_perdomain_pt), __PAGE_HYPERVISOR);
-    ed->arch.guest_table = mk_pagetable((unsigned long)l2start);
+    v->arch.guest_table = mk_pagetable((unsigned long)l2start);
 #endif
 
     l2tab += l2_linear_offset(dsi.v_start);
@@ -405,7 +408,7 @@ int construct_dom0(struct domain *d,
         l4e_from_paddr(__pa(l4start), __PAGE_HYPERVISOR);
     l4tab[l4_table_offset(PERDOMAIN_VIRT_START)] =
         l4e_from_paddr(__pa(d->arch.mm_perdomain_l3), __PAGE_HYPERVISOR);
-    ed->arch.guest_table = mk_pagetable(__pa(l4start));
+    v->arch.guest_table = mk_pagetable(__pa(l4start));
 
     l4tab += l4_table_offset(dsi.v_start);
     mfn = alloc_start >> PAGE_SHIFT;
@@ -498,11 +501,11 @@ int construct_dom0(struct domain *d,
     d->shared_info->n_vcpu = num_online_cpus();
 
     /* Set up monitor table */
-    update_pagetables(ed);
+    update_pagetables(v);
 
     /* Install the new page tables. */
     local_irq_disable();
-    write_ptbase(ed);
+    write_ptbase(v);
 
     /* Copy the OS image and free temporary buffer. */
     (void)loadelfimage(&dsi);
@@ -604,7 +607,7 @@ int construct_dom0(struct domain *d,
 
     set_bit(_DOMF_constructed, &d->domain_flags);
 
-    new_thread(ed, dsi.v_kernentry, vstack_end, vstartinfo_start);
+    new_thread(v, dsi.v_kernentry, vstack_end, vstartinfo_start);
 
     if ( opt_dom0_shadow || opt_dom0_translate )
     {
@@ -638,13 +641,13 @@ int construct_dom0(struct domain *d,
             idle_pg_table[1] = root_from_paddr(
                 pagetable_get_paddr(d->arch.phys_table), __PAGE_HYPERVISOR);
             translate_l2pgtable(d, (l1_pgentry_t *)(1u << L2_PAGETABLE_SHIFT),
-                                pagetable_get_pfn(ed->arch.guest_table));
+                                pagetable_get_pfn(v->arch.guest_table));
             idle_pg_table[1] = root_empty();
             local_flush_tlb();
 #endif
         }
 
-        update_pagetables(ed); /* XXX SMP */
+        update_pagetables(v); /* XXX SMP */
     }
 
     return 0;

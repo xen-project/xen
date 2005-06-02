@@ -46,21 +46,21 @@ typedef struct event_channel_st
         } __attribute__ ((packed)) unbound; /* state == ECS_UNBOUND */
         struct {
             u16                 remote_port;
-            struct exec_domain *remote_dom;
+            struct vcpu *remote_dom;
         } __attribute__ ((packed)) interdomain; /* state == ECS_INTERDOMAIN */
         u16 pirq; /* state == ECS_PIRQ */
         u16 virq; /* state == ECS_VIRQ */
-        u32 ipi_edom; /* state == ECS_IPI */
+        u32 ipi_vcpu; /* state == ECS_IPI */
     } u;
 } event_channel_t;
 
 int  init_event_channels(struct domain *d);
 void destroy_event_channels(struct domain *d);
-int  init_exec_domain_event_channels(struct exec_domain *ed);
+int  init_vcpu_event_channels(struct vcpu *v);
 
 #define CPUMAP_RUNANYWHERE 0xFFFFFFFF
 
-struct exec_domain 
+struct vcpu 
 {
     int              vcpu_id;
 
@@ -69,7 +69,7 @@ struct exec_domain
     vcpu_info_t     *vcpu_info;
 
     struct domain   *domain;
-    struct exec_domain *next_in_list;
+    struct vcpu *next_in_list;
 
     struct ac_timer  timer;         /* one-shot timer for timeout values */
     unsigned long    sleep_tick;    /* tick at which this vcpu started sleep */
@@ -88,7 +88,7 @@ struct exec_domain
 
     cpumap_t         cpumap;        /* which cpus this domain can run on */
 
-    struct arch_exec_domain arch;
+    struct arch_vcpu arch;
 };
 
 /* Per-domain lock can be recursively acquired in fault handlers. */
@@ -140,7 +140,7 @@ struct domain
 
     atomic_t         refcnt;
 
-    struct exec_domain *exec_domain[MAX_VIRT_CPUS];
+    struct vcpu *vcpu[MAX_VIRT_CPUS];
 
     /* Bitmask of CPUs on which this domain is running. */
     unsigned long cpuset;
@@ -170,13 +170,13 @@ struct domain_setup_info
 #include <asm/uaccess.h> /* for KERNEL_DS */
 
 extern struct domain idle0_domain;
-extern struct exec_domain idle0_exec_domain;
+extern struct vcpu idle0_vcpu;
 
-extern struct exec_domain *idle_task[NR_CPUS];
+extern struct vcpu *idle_task[NR_CPUS];
 #define IDLE_DOMAIN_ID   (0x7FFFU)
 #define is_idle_task(_d) (test_bit(_DOMF_idle_domain, &(_d)->domain_flags))
 
-struct exec_domain *alloc_exec_domain_struct(struct domain *d,
+struct vcpu *alloc_vcpu_struct(struct domain *d,
                                              unsigned long vcpu);
 
 void free_domain_struct(struct domain *d);
@@ -241,7 +241,7 @@ extern void domain_crash(void);
  */
 extern void domain_crash_synchronous(void) __attribute__((noreturn));
 
-void new_thread(struct exec_domain *d,
+void new_thread(struct vcpu *d,
                 unsigned long start_pc,
                 unsigned long start_stack,
                 unsigned long start_info);
@@ -249,14 +249,14 @@ void new_thread(struct exec_domain *d,
 #define set_current_state(_s) do { current->state = (_s); } while (0)
 void scheduler_init(void);
 void schedulers_start(void);
-void sched_add_domain(struct exec_domain *);
-void sched_rem_domain(struct exec_domain *);
+void sched_add_domain(struct vcpu *);
+void sched_rem_domain(struct vcpu *);
 long sched_ctl(struct sched_ctl_cmd *);
 long sched_adjdom(struct sched_adjdom_cmd *);
 int  sched_id();
-void domain_wake(struct exec_domain *d);
-void domain_sleep_nosync(struct exec_domain *d);
-void domain_sleep_sync(struct exec_domain *d);
+void domain_wake(struct vcpu *d);
+void domain_sleep_nosync(struct vcpu *d);
+void domain_sleep_sync(struct vcpu *d);
 
 /*
  * Force loading of currently-executing domain state on the specified set
@@ -266,14 +266,14 @@ extern void sync_lazy_execstate_cpuset(unsigned long cpuset);
 extern void sync_lazy_execstate_all(void);
 extern int __sync_lazy_execstate(void);
 
-/* Called by the scheduler to switch to another exec_domain. */
+/* Called by the scheduler to switch to another vcpu. */
 extern void context_switch(
-    struct exec_domain *prev, 
-    struct exec_domain *next);
+    struct vcpu *prev, 
+    struct vcpu *next);
 
-/* Called by the scheduler to continue running the current exec_domain. */
+/* Called by the scheduler to continue running the current vcpu. */
 extern void continue_running(
-    struct exec_domain *same);
+    struct vcpu *same);
 
 void domain_init(void);
 
@@ -322,8 +322,8 @@ extern struct domain *domain_list;
 #define for_each_domain(_d) \
  for ( (_d) = domain_list; (_d) != NULL; (_d) = (_d)->next_in_list )
 
-#define for_each_exec_domain(_d,_ed) \
- for ( (_ed) = (_d)->exec_domain[0]; \
+#define for_each_vcpu(_d,_ed) \
+ for ( (_ed) = (_d)->vcpu[0]; \
        (_ed) != NULL;                \
        (_ed) = (_ed)->next_in_list )
 
@@ -383,24 +383,24 @@ extern struct domain *domain_list;
 #define _DOMF_dying            6
 #define DOMF_dying             (1UL<<_DOMF_dying)
 
-static inline int domain_runnable(struct exec_domain *ed)
+static inline int domain_runnable(struct vcpu *v)
 {
-    return ( (atomic_read(&ed->pausecnt) == 0) &&
-             !(ed->vcpu_flags & (VCPUF_blocked|VCPUF_ctrl_pause)) &&
-             !(ed->domain->domain_flags & (DOMF_shutdown|DOMF_shuttingdown)) );
+    return ( (atomic_read(&v->pausecnt) == 0) &&
+             !(v->vcpu_flags & (VCPUF_blocked|VCPUF_ctrl_pause)) &&
+             !(v->domain->domain_flags & (DOMF_shutdown|DOMF_shuttingdown)) );
 }
 
-void exec_domain_pause(struct exec_domain *ed);
+void vcpu_pause(struct vcpu *v);
 void domain_pause(struct domain *d);
-void exec_domain_unpause(struct exec_domain *ed);
+void vcpu_unpause(struct vcpu *v);
 void domain_unpause(struct domain *d);
 void domain_pause_by_systemcontroller(struct domain *d);
 void domain_unpause_by_systemcontroller(struct domain *d);
 
-static inline void exec_domain_unblock(struct exec_domain *ed)
+static inline void vcpu_unblock(struct vcpu *v)
 {
-    if ( test_and_clear_bit(_VCPUF_blocked, &ed->vcpu_flags) )
-        domain_wake(ed);
+    if ( test_and_clear_bit(_VCPUF_blocked, &v->vcpu_flags) )
+        domain_wake(v);
 }
 
 #define IS_PRIV(_d)                                         \

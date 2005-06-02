@@ -47,21 +47,21 @@ void __dummy__(void)
     DEFINE(UREGS_user_sizeof, sizeof(struct cpu_user_regs));
     BLANK();
 
-    OFFSET(EDOMAIN_processor, struct exec_domain, processor);
-    OFFSET(EDOMAIN_vcpu_info, struct exec_domain, vcpu_info);
-    OFFSET(EDOMAIN_trap_bounce, struct exec_domain, arch.trap_bounce);
-    OFFSET(EDOMAIN_thread_flags, struct exec_domain, arch.flags);
-    OFFSET(EDOMAIN_event_sel, struct exec_domain,
+    OFFSET(VCPU_processor, struct vcpu, processor);
+    OFFSET(VCPU_vcpu_info, struct vcpu, vcpu_info);
+    OFFSET(VCPU_trap_bounce, struct vcpu, arch.trap_bounce);
+    OFFSET(VCPU_thread_flags, struct vcpu, arch.flags);
+    OFFSET(VCPU_event_sel, struct vcpu,
            arch.guest_context.event_callback_cs);
-    OFFSET(EDOMAIN_event_addr, struct exec_domain, 
+    OFFSET(VCPU_event_addr, struct vcpu, 
            arch.guest_context.event_callback_eip);
-    OFFSET(EDOMAIN_failsafe_sel, struct exec_domain,
+    OFFSET(VCPU_failsafe_sel, struct vcpu,
            arch.guest_context.failsafe_callback_cs);
-    OFFSET(EDOMAIN_failsafe_addr, struct exec_domain,
+    OFFSET(VCPU_failsafe_addr, struct vcpu,
            arch.guest_context.failsafe_callback_eip);
-    OFFSET(EDOMAIN_kernel_ss, struct exec_domain,
+    OFFSET(VCPU_kernel_ss, struct vcpu,
            arch.guest_context.kernel_ss);
-    OFFSET(EDOMAIN_kernel_sp, struct exec_domain,
+    OFFSET(VCPU_kernel_sp, struct vcpu,
            arch.guest_context.kernel_sp);
     BLANK();
 

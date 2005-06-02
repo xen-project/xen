@@ -181,7 +181,7 @@ long do_set_callbacks(unsigned long event_address,
                       unsigned long failsafe_address,
                       unsigned long syscall_address)
 {
-    struct exec_domain *d = current;
+    struct vcpu *d = current;
 
     d->arch.guest_context.event_callback_eip    = event_address;
     d->arch.guest_context.failsafe_callback_eip = failsafe_address;

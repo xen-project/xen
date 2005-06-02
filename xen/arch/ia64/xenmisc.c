@@ -91,14 +91,14 @@ unsigned long __hypercall_create_continuation(
 
 int reprogram_ac_timer(s_time_t timeout)
 {
-	struct exec_domain *ed = current;
+	struct vcpu *v = current;
 
 #ifdef CONFIG_VTI
-	if(VMX_DOMAIN(ed))
+	if(VMX_DOMAIN(v))
 		return 1;
 #endif // CONFIG_VTI
 	local_cpu_data->itm_next = timeout;
-	if (is_idle_task(ed->domain)) vcpu_safe_set_itm(timeout);
+	if (is_idle_task(v->domain)) vcpu_safe_set_itm(timeout);
 	else vcpu_set_next_timer(current);
 	return 1;
 }
@@ -232,7 +232,7 @@ void cs10foo(void) {}
 void cs01foo(void) {}
 
 // context_switch
-void context_switch(struct exec_domain *prev, struct exec_domain *next)
+void context_switch(struct vcpu *prev, struct vcpu *next)
 {
 //printk("@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@\n");
 //printk("@@@@@@ context switch from domain %d (%x) to domain %d (%x)\n",
@@ -261,7 +261,7 @@ void context_switch(struct exec_domain *prev, struct exec_domain *next)
 {
 static long cnt[16] = { 50,50,50,50,50,50,50,50,50,50,50,50,50,50,50,50};
 static int i = 100;
-int id = ((struct exec_domain *)current)->domain->domain_id & 0xf;
+int id = ((struct vcpu *)current)->domain->domain_id & 0xf;
 if (!cnt[id]--) { printk("%x",id); cnt[id] = 500; }
 if (!i--) { printk("+",id); cnt[id] = 1000; }
 }
@@ -281,7 +281,7 @@ if (!i--) { printk("+",id); cnt[id] = 1000; }
 #endif // CONFIG_VTI
 }
 
-void continue_running(struct exec_domain *same)
+void continue_running(struct vcpu *same)
 {
     /* nothing to do */
 }
@@ -290,23 +290,23 @@ void panic_domain(struct pt_regs *regs, const char *fmt, ...)
 {
 	va_list args;
 	char buf[128];
-	struct exec_domain *ed = current;
+	struct vcpu *v = current;
 	static volatile int test = 1;	// so can continue easily in debug
 	extern spinlock_t console_lock;
 	unsigned long flags;
     
 loop:
 	printf("$$$$$ PANIC in domain %d (k6=%p): ",
-		ed->domain->domain_id, ia64_get_kr(IA64_KR_CURRENT));
+		v->domain->domain_id, ia64_get_kr(IA64_KR_CURRENT));
 	va_start(args, fmt);
 	(void)vsnprintf(buf, sizeof(buf), fmt, args);
 	va_end(args);
 	printf(buf);
 	if (regs) show_registers(regs);
 	domain_pause_by_systemcontroller(current->domain);
-	ed->domain->shutdown_code = SHUTDOWN_crash;
-	set_bit(_DOMF_shutdown, ed->domain->domain_flags);
-	if (ed->domain->domain_id == 0) {
+	v->domain->shutdown_code = SHUTDOWN_crash;
+	set_bit(_DOMF_shutdown, v->domain->domain_flags);
+	if (v->domain->domain_id == 0) {
 		int i = 1000000000L;
 		// if domain0 crashes, just periodically print out panic
 		// message to make post-mortem easier

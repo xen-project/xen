@@ -58,7 +58,7 @@
 #define shadow_linear_pg_table ((l1_pgentry_t *)SH_LINEAR_PT_VIRT_START)
 #define __shadow_linear_l2_table ((l2_pgentry_t *)(SH_LINEAR_PT_VIRT_START + \
      (SH_LINEAR_PT_VIRT_START >> (L2_PAGETABLE_SHIFT - L1_PAGETABLE_SHIFT))))
-#define shadow_linear_l2_table(_ed) ((_ed)->arch.shadow_vtable)
+#define shadow_linear_l2_table(_v) ((_v)->arch.shadow_vtable)
 
 // easy access to the hl2 table (for translated but not external modes only)
 #define __linear_hl2_table ((l1_pgentry_t *)(LINEAR_PT_VIRT_START + \
@@ -112,12 +112,12 @@ extern void shadow_mode_init(void);
 extern int shadow_mode_control(struct domain *p, dom0_shadow_control_t *sc);
 extern int shadow_fault(unsigned long va, struct cpu_user_regs *regs);
 extern int shadow_mode_enable(struct domain *p, unsigned int mode);
-extern void shadow_invlpg(struct exec_domain *, unsigned long);
+extern void shadow_invlpg(struct vcpu *, unsigned long);
 extern struct out_of_sync_entry *shadow_mark_mfn_out_of_sync(
-    struct exec_domain *ed, unsigned long gpfn, unsigned long mfn);
-extern void free_monitor_pagetable(struct exec_domain *ed);
+    struct vcpu *v, unsigned long gpfn, unsigned long mfn);
+extern void free_monitor_pagetable(struct vcpu *v);
 extern void __shadow_sync_all(struct domain *d);
-extern int __shadow_out_of_sync(struct exec_domain *ed, unsigned long va);
+extern int __shadow_out_of_sync(struct vcpu *v, unsigned long va);
 extern int set_p2m_entry(
     struct domain *d, unsigned long pfn, unsigned long mfn,
     struct map_dom_mem_cache *l2cache,
@@ -142,12 +142,12 @@ extern void shadow_l4_normal_pt_update(struct domain *d,
 #endif
 extern int shadow_do_update_va_mapping(unsigned long va,
                                        l1_pgentry_t val,
-                                       struct exec_domain *ed);
+                                       struct vcpu *v);
 
 
 static inline unsigned long __shadow_status(
     struct domain *d, unsigned long gpfn, unsigned long stype);
-static inline void update_hl2e(struct exec_domain *ed, unsigned long va);
+static inline void update_hl2e(struct vcpu *v, unsigned long va);
 
 extern void vmx_shadow_clear_state(struct domain *);
 
@@ -198,23 +198,23 @@ __shadow_sync_mfn(struct domain *d, unsigned long mfn)
 }
 
 static void inline
-__shadow_sync_va(struct exec_domain *ed, unsigned long va)
+__shadow_sync_va(struct vcpu *v, unsigned long va)
 {
-    struct domain *d = ed->domain;
+    struct domain *d = v->domain;
 
-    if ( d->arch.out_of_sync && __shadow_out_of_sync(ed, va) )
+    if ( d->arch.out_of_sync && __shadow_out_of_sync(v, va) )
     {
         perfc_incrc(shadow_sync_va);
 
         // XXX - could be smarter
         //
-        __shadow_sync_all(ed->domain);
+        __shadow_sync_all(v->domain);
     }
 
     // Also make sure the HL2 is up-to-date for this address.
     //
-    if ( unlikely(shadow_mode_translate(ed->domain)) )
-        update_hl2e(ed, va);
+    if ( unlikely(shadow_mode_translate(v->domain)) )
+        update_hl2e(v, va);
 }
 
 static void inline
@@ -238,13 +238,13 @@ shadow_sync_all(struct domain *d)
 //          This probably shouldn't exist.
 //
 static void inline
-shadow_sync_va(struct exec_domain *ed, unsigned long gva)
+shadow_sync_va(struct vcpu *v, unsigned long gva)
 {
-    struct domain *d = ed->domain;
+    struct domain *d = v->domain;
     if ( unlikely(shadow_mode_enabled(d)) )
     {
         shadow_lock(d);
-        __shadow_sync_va(ed, gva);
+        __shadow_sync_va(v, gva);
         shadow_unlock(d);
     }
 }
@@ -505,56 +505,56 @@ static inline int mark_dirty(struct domain *d, unsigned int mfn)
 
 static inline void
 __shadow_get_l2e(
-    struct exec_domain *ed, unsigned long va, l2_pgentry_t *psl2e)
+    struct vcpu *v, unsigned long va, l2_pgentry_t *psl2e)
 {
-    ASSERT(shadow_mode_enabled(ed->domain));
+    ASSERT(shadow_mode_enabled(v->domain));
 
-    *psl2e = ed->arch.shadow_vtable[l2_table_offset(va)];
+    *psl2e = v->arch.shadow_vtable[l2_table_offset(va)];
 }
 
 static inline void
 __shadow_set_l2e(
-    struct exec_domain *ed, unsigned long va, l2_pgentry_t value)
+    struct vcpu *v, unsigned long va, l2_pgentry_t value)
 {
-    ASSERT(shadow_mode_enabled(ed->domain));
+    ASSERT(shadow_mode_enabled(v->domain));
 
-    ed->arch.shadow_vtable[l2_table_offset(va)] = value;
+    v->arch.shadow_vtable[l2_table_offset(va)] = value;
 }
 
 static inline void
 __guest_get_l2e(
-    struct exec_domain *ed, unsigned long va, l2_pgentry_t *pl2e)
+    struct vcpu *v, unsigned long va, l2_pgentry_t *pl2e)
 {
-    *pl2e = ed->arch.guest_vtable[l2_table_offset(va)];
+    *pl2e = v->arch.guest_vtable[l2_table_offset(va)];
 }
 
 static inline void
 __guest_set_l2e(
-    struct exec_domain *ed, unsigned long va, l2_pgentry_t value)
+    struct vcpu *v, unsigned long va, l2_pgentry_t value)
 {
-    struct domain *d = ed->domain;
+    struct domain *d = v->domain;
 
-    ed->arch.guest_vtable[l2_table_offset(va)] = value;
+    v->arch.guest_vtable[l2_table_offset(va)] = value;
 
     if ( unlikely(shadow_mode_translate(d)) )
-        update_hl2e(ed, va);
+        update_hl2e(v, va);
 
     if ( unlikely(shadow_mode_log_dirty(d)) )
-        __mark_dirty(d, pagetable_get_pfn(ed->arch.guest_table));
+        __mark_dirty(d, pagetable_get_pfn(v->arch.guest_table));
 }
 
 static inline void
-update_hl2e(struct exec_domain *ed, unsigned long va)
+update_hl2e(struct vcpu *v, unsigned long va)
 {
     int index = l2_table_offset(va);
     unsigned long mfn;
-    l2_pgentry_t gl2e = ed->arch.guest_vtable[index];
+    l2_pgentry_t gl2e = v->arch.guest_vtable[index];
     l1_pgentry_t old_hl2e, new_hl2e;
     int need_flush = 0;
 
-    ASSERT(shadow_mode_translate(ed->domain));
+    ASSERT(shadow_mode_translate(v->domain));
 
-    old_hl2e = ed->arch.hl2_vtable[index];
+    old_hl2e = v->arch.hl2_vtable[index];
 
     if ( (l2e_get_flags(gl2e) & _PAGE_PRESENT) &&
          VALID_MFN(mfn = phys_to_machine_mapping(l2e_get_pfn(gl2e))) )
@@ -567,16 +567,16 @@ update_hl2e(struct exec_domain *ed, unsigned long va)
     if ( (l1e_has_changed(old_hl2e, new_hl2e, PAGE_FLAG_MASK)) )
     {
         if ( (l1e_get_flags(new_hl2e) & _PAGE_PRESENT) &&
-             !shadow_get_page(ed->domain, pfn_to_page(l1e_get_pfn(new_hl2e)),
-                              ed->domain) )
+             !shadow_get_page(v->domain, pfn_to_page(l1e_get_pfn(new_hl2e)),
+                              v->domain) )
             new_hl2e = l1e_empty();
         if ( l1e_get_flags(old_hl2e) & _PAGE_PRESENT )
         {
-            shadow_put_page(ed->domain, pfn_to_page(l1e_get_pfn(old_hl2e)));
+            shadow_put_page(v->domain, pfn_to_page(l1e_get_pfn(old_hl2e)));
             need_flush = 1;
         }
 
-        ed->arch.hl2_vtable[l2_table_offset(va)] = new_hl2e;
+        v->arch.hl2_vtable[l2_table_offset(va)] = new_hl2e;
 
         if ( need_flush )
         {
@@ -712,14 +712,14 @@ shadow_unpin(unsigned long smfn)
 /************************************************************************/
 
 extern void shadow_mark_va_out_of_sync(
-    struct exec_domain *ed, unsigned long gpfn, unsigned long mfn,
+    struct vcpu *v, unsigned long gpfn, unsigned long mfn,
     unsigned long va);
 
 static inline int l1pte_write_fault(
-    struct exec_domain *ed, l1_pgentry_t *gpte_p, l1_pgentry_t *spte_p,
+    struct vcpu *v, l1_pgentry_t *gpte_p, l1_pgentry_t *spte_p,
     unsigned long va)
 {
-    struct domain *d = ed->domain;
+    struct domain *d = v->domain;
     l1_pgentry_t gpte = *gpte_p;
     l1_pgentry_t spte;
     unsigned long gpfn = l1e_get_pfn(gpte);
@@ -745,7 +745,7 @@ static inline int l1pte_write_fault(
         __mark_dirty(d, gmfn);
 
     if ( mfn_is_page_table(gmfn) )
-        shadow_mark_va_out_of_sync(ed, gpfn, gmfn, va);
+        shadow_mark_va_out_of_sync(v, gpfn, gmfn, va);
 
     *gpte_p = gpte;
     *spte_p = spte;
@@ -1541,11 +1541,11 @@ extern void shadow_map_l1_into_current_l2(unsigned long va);
 void static inline
 shadow_set_l1e(unsigned long va, l1_pgentry_t new_spte, int create_l1_shadow)
 {
-    struct exec_domain *ed = current;
-    struct domain *d = ed->domain;
+    struct vcpu *v = current;
+    struct domain *d = v->domain;
     l2_pgentry_t sl2e;
 
-    __shadow_get_l2e(ed, va, &sl2e);
+    __shadow_get_l2e(v, va, &sl2e);
     if ( !(l2e_get_flags(sl2e) & _PAGE_PRESENT) )
     {
         /*
@@ -1559,7 +1559,7 @@ shadow_set_l1e(unsigned long va, l1_pgentry_t new_spte, int create_l1_shadow)
         }
         else /* check to see if it exists; if so, link it in */
         {
-            l2_pgentry_t gpde = linear_l2_table(ed)[l2_table_offset(va)];
+            l2_pgentry_t gpde = linear_l2_table(v)[l2_table_offset(va)];
             unsigned long gl1pfn = l2e_get_pfn(gpde);
             unsigned long sl1mfn = __shadow_status(d, gl1pfn, PGT_l1_shadow);
 
@@ -1571,8 +1571,8 @@ shadow_set_l1e(unsigned long va, l1_pgentry_t new_spte, int create_l1_shadow)
                 if ( !get_shadow_ref(sl1mfn) )
                     BUG();
                 l2pde_general(d, &gpde, &sl2e, sl1mfn);
-                __guest_set_l2e(ed, va, gpde);
-                __shadow_set_l2e(ed, va, sl2e);
+                __guest_set_l2e(v, va, gpde);
+                __shadow_set_l2e(v, va, sl2e);
             }
             else
             {
@@ -1631,18 +1631,18 @@ static inline l1_pgentry_t gva_to_gpte(unsigned long gva)
 {
     l2_pgentry_t gpde;
     l1_pgentry_t gpte;
-    struct exec_domain *ed = current;
+    struct vcpu *v = current;
 
     ASSERT( shadow_mode_translate(current->domain) );
 
-    __guest_get_l2e(ed, gva, &gpde);
+    __guest_get_l2e(v, gva, &gpde);
     if ( unlikely(!(l2e_get_flags(gpde) & _PAGE_PRESENT)) )
         return l1e_empty();;
 
     // This is actually overkill - we only need to make sure the hl2
     // is in-sync.
     //
-    shadow_sync_va(ed, gva);
+    shadow_sync_va(v, gva);
 
     if ( unlikely(__copy_from_user(&gpte,
                                    &linear_pg_table[gva >> PAGE_SHIFT],
@@ -1668,22 +1668,22 @@ static inline unsigned long gva_to_gpa(unsigned long gva)
 
 /************************************************************************/
 
-extern void __update_pagetables(struct exec_domain *ed);
-static inline void update_pagetables(struct exec_domain *ed)
+extern void __update_pagetables(struct vcpu *v);
+static inline void update_pagetables(struct vcpu *v)
 {
-    struct domain *d = ed->domain;
+    struct domain *d = v->domain;
     int paging_enabled;
 
 #ifdef CONFIG_VMX
-    if ( VMX_DOMAIN(ed) )
-        paging_enabled = vmx_paging_enabled(ed);
+    if ( VMX_DOMAIN(v) )
+        paging_enabled = vmx_paging_enabled(v);
             
     else
 #endif
         // HACK ALERT: there's currently no easy way to figure out if a domU
         // has set its arch.guest_table to zero, vs not yet initialized it.
         //
-        paging_enabled = !!pagetable_get_paddr(ed->arch.guest_table);
+        paging_enabled = !!pagetable_get_paddr(v->arch.guest_table);
 
     /*
      * We don't call __update_pagetables() when vmx guest paging is
@@ -1694,33 +1694,33 @@ static inline void update_pagetables(struct exec_domain *ed)
     if ( unlikely(shadow_mode_enabled(d)) && paging_enabled )
     {
         shadow_lock(d);
-        __update_pagetables(ed);
+        __update_pagetables(v);
         shadow_unlock(d);
     }
 
     if ( likely(!shadow_mode_external(d)) )
     {
 #ifdef __x86_64__
-        if ( !(ed->arch.flags & TF_kernel_mode) )
-            ed->arch.monitor_table = ed->arch.guest_table_user;
+        if ( !(v->arch.flags & TF_kernel_mode) )
+            v->arch.monitor_table = v->arch.guest_table_user;
         else
 #endif
         if ( shadow_mode_enabled(d) )
-            ed->arch.monitor_table = ed->arch.shadow_table;
+            v->arch.monitor_table = v->arch.shadow_table;
         else
-            ed->arch.monitor_table = ed->arch.guest_table;
+            v->arch.monitor_table = v->arch.guest_table;
     }
 }
 
 #if SHADOW_DEBUG
-extern int _check_pagetable(struct exec_domain *ed, char *s);
-extern int _check_all_pagetables(struct exec_domain *ed, char *s);
+extern int _check_pagetable(struct vcpu *v, char *s);
+extern int _check_all_pagetables(struct vcpu *v, char *s);
 
-#define check_pagetable(_ed, _s) _check_pagetable(_ed, _s)
-//#define check_pagetable(_ed, _s) _check_all_pagetables(_ed, _s)
+#define check_pagetable(_v, _s) _check_pagetable(_v, _s)
+//#define check_pagetable(_v, _s) _check_all_pagetables(_v, _s)
 
 #else
-#define check_pagetable(_ed, _s) ((void)0)
+#define check_pagetable(_v, _s) ((void)0)
 #endif
 
 #endif /* XEN_SHADOW_H */

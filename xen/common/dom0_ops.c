@@ -21,7 +21,7 @@
 
 extern long arch_do_dom0_op(dom0_op_t *op, dom0_op_t *u_dom0_op);
 extern void arch_getdomaininfo_ctxt(
-    struct exec_domain *, struct vcpu_guest_context *);
+    struct vcpu *, struct vcpu_guest_context *);
 
 static inline int is_free_domid(domid_t dom)
 {
@@ -152,11 +152,11 @@ long do_dom0_op(dom0_op_t *u_dom0_op)
 
     case DOM0_CREATEDOMAIN:
     {
-        struct domain      *d;
-        unsigned int        pro;
-        domid_t             dom;
-        struct exec_domain *ed;
-        unsigned int        i, cnt[NR_CPUS] = { 0 };
+        struct domain *d;
+        unsigned int   pro;
+        domid_t        dom;
+        struct vcpu   *v;
+        unsigned int   i, cnt[NR_CPUS] = { 0 };
 
 
         dom = op->u.createdomain.domain;
@@ -174,8 +174,8 @@ long do_dom0_op(dom0_op_t *u_dom0_op)
         /* Do an initial CPU placement. Pick the least-populated CPU. */
         read_lock(&domlist_lock);
         for_each_domain ( d )
-            for_each_exec_domain ( d, ed )
-                cnt[ed->processor]++;
+            for_each_vcpu ( d, v )
+                cnt[v->processor]++;
         read_unlock(&domlist_lock);
         
         /*
@@ -220,7 +220,7 @@ long do_dom0_op(dom0_op_t *u_dom0_op)
     {
         domid_t dom = op->u.pincpudomain.domain;
         struct domain *d = find_domain_by_id(dom);
-        struct exec_domain *ed;
+        struct vcpu *v;
         cpumap_t cpumap;
 
 
@@ -231,22 +231,22 @@ long do_dom0_op(dom0_op_t *u_dom0_op)
         }
         
         if ( (op->u.pincpudomain.vcpu >= MAX_VIRT_CPUS) ||
-             !d->exec_domain[op->u.pincpudomain.vcpu] )
+             !d->vcpu[op->u.pincpudomain.vcpu] )
         {
             ret = -EINVAL;
             put_domain(d);
             break;
         }
 
-        ed = d->exec_domain[op->u.pincpudomain.vcpu];
-        if ( ed == NULL )
+        v = d->vcpu[op->u.pincpudomain.vcpu];
+        if ( v == NULL )
         {
             ret = -ESRCH;
             put_domain(d);
             break;
         }
 
-        if ( ed == current )
+        if ( v == current )
         {
             ret = -EINVAL;
             put_domain(d);
@@ -261,22 +261,22 @@ long do_dom0_op(dom0_op_t *u_dom0_op)
             break;
         }
 
-        /* update cpumap for this ed */
-        ed->cpumap = cpumap;
+        /* update cpumap for this vcpu */
+        v->cpumap = cpumap;
 
         if ( cpumap == CPUMAP_RUNANYWHERE )
-            clear_bit(_VCPUF_cpu_pinned, &ed->vcpu_flags);
+            clear_bit(_VCPUF_cpu_pinned, &v->vcpu_flags);
         else
         {
             /* pick a new cpu from the usable map */
             int new_cpu = (int)find_first_set_bit(cpumap) % num_online_cpus();
 
-            exec_domain_pause(ed);
-            if ( ed->processor != new_cpu )
-                set_bit(_VCPUF_cpu_migrated, &ed->vcpu_flags);
-            set_bit(_VCPUF_cpu_pinned, &ed->vcpu_flags);
-            ed->processor = new_cpu;
-            exec_domain_unpause(ed);
+            vcpu_pause(v);
+            if ( v->processor != new_cpu )
+                set_bit(_VCPUF_cpu_migrated, &v->vcpu_flags);
+            set_bit(_VCPUF_cpu_pinned, &v->vcpu_flags);
+            v->processor = new_cpu;
+            vcpu_unpause(v);
         }
 
         put_domain(d);
@@ -299,8 +299,8 @@ long do_dom0_op(dom0_op_t *u_dom0_op)
 
     case DOM0_GETDOMAININFO:
     { 
-        struct domain             *d;
-        struct exec_domain        *ed;
+        struct domain *d;
+        struct vcpu   *v;
         u64 cpu_time = 0;
         int vcpu_count = 0;
         int flags = DOMFLAGS_PAUSED | DOMFLAGS_BLOCKED;
@@ -334,17 +334,17 @@ long do_dom0_op(dom0_op_t *u_dom0_op)
          *   are paused or blocked 
          * - domain is marked as running if any of its vcpus is running
          */
-        for_each_exec_domain ( d, ed ) {
-            op->u.getdomaininfo.vcpu_to_cpu[ed->vcpu_id] = ed->processor;
-            op->u.getdomaininfo.cpumap[ed->vcpu_id]      = ed->cpumap;
-            if ( !(ed->vcpu_flags & VCPUF_ctrl_pause) )
+        for_each_vcpu ( d, v ) {
+            op->u.getdomaininfo.vcpu_to_cpu[v->vcpu_id] = v->processor;
+            op->u.getdomaininfo.cpumap[v->vcpu_id]      = v->cpumap;
+            if ( !(v->vcpu_flags & VCPUF_ctrl_pause) )
                 flags &= ~DOMFLAGS_PAUSED;
-            if ( !(ed->vcpu_flags & VCPUF_blocked) )
+            if ( !(v->vcpu_flags & VCPUF_blocked) )
                 flags &= ~DOMFLAGS_BLOCKED;
-            if ( ed->vcpu_flags & VCPUF_running )
+            if ( v->vcpu_flags & VCPUF_running )
                 flags |= DOMFLAGS_RUNNING;
-            if ( ed->cpu_time > cpu_time )
-                cpu_time += ed->cpu_time;
+            if ( v->cpu_time > cpu_time )
+                cpu_time += v->cpu_time;
             vcpu_count++;
         }
 
@@ -372,7 +372,7 @@ long do_dom0_op(dom0_op_t *u_dom0_op)
     { 
         struct vcpu_guest_context *c;
         struct domain             *d;
-        struct exec_domain        *ed;
+        struct vcpu               *v;
 
         d = find_domain_by_id(op->u.getvcpucontext.domain);
         if ( d == NULL )
@@ -388,15 +388,15 @@ long do_dom0_op(dom0_op_t *u_dom0_op)
             break;
         }
         
-        ed = d->exec_domain[op->u.getvcpucontext.vcpu];
-        if ( ed == NULL )
+        v = d->vcpu[op->u.getvcpucontext.vcpu];
+        if ( v == NULL )
         {
             ret = -ESRCH;
             put_domain(d);
             break;
         }
 
-        op->u.getvcpucontext.cpu_time = ed->cpu_time;
+        op->u.getvcpucontext.cpu_time = v->cpu_time;
 
         if ( op->u.getvcpucontext.ctxt != NULL )
         {
@@ -407,13 +407,13 @@ long do_dom0_op(dom0_op_t *u_dom0_op)
                 break;
             }
 
-            if ( ed != current )
-                exec_domain_pause(ed);
+            if ( v != current )
+                vcpu_pause(v);
 
-            arch_getdomaininfo_ctxt(ed,c);
+            arch_getdomaininfo_ctxt(v,c);
 
-            if ( ed != current )
-                exec_domain_unpause(ed);
+            if ( v != current )
+                vcpu_unpause(v);
 
             if ( copy_to_user(op->u.getvcpucontext.ctxt, c, sizeof(*c)) )
                 ret = -EINVAL;

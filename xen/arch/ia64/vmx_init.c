@@ -174,10 +174,10 @@ static vpd_t *alloc_vpd(void)
  * Create a VP on intialized VMX environment.
  */
 static void
-vmx_create_vp(struct exec_domain *ed)
+vmx_create_vp(struct vcpu *v)
 {
 	u64 ret;
-	vpd_t *vpd = ed->arch.arch_vmx.vpd;
+	vpd_t *vpd = v->arch.arch_vmx.vpd;
 	u64 ivt_base;
     extern char vmx_ia64_ivt;
 	/* ia64_ivt is function pointer, so need this tranlation */
@@ -207,55 +207,55 @@ void vmx_init_double_mapping_stub(void)
 
 /* Other non-context related tasks can be done in context switch */
 void
-vmx_save_state(struct exec_domain *ed)
+vmx_save_state(struct vcpu *v)
 {
 	u64 status, psr;
 	u64 old_rr0, dom_rr7, rr0_xen_start, rr0_vhpt;
 
 	/* FIXME: about setting of pal_proc_vector... time consuming */
-	status = ia64_pal_vp_save(ed->arch.arch_vmx.vpd, 0);
+	status = ia64_pal_vp_save(v->arch.arch_vmx.vpd, 0);
 	if (status != PAL_STATUS_SUCCESS)
 		panic("Save vp status failed\n");
 
-	/* FIXME: Do we really need purge double mapping for old ed?
+	/* FIXME: Do we really need purge double mapping for old vcpu?
 	 * Since rid is completely different between prev and next,
 	 * it's not overlap and thus no MCA possible... */
-	dom_rr7 = vmx_vrrtomrr(ed, VMX(ed, vrr[7]));
+	dom_rr7 = vmx_vrrtomrr(v, VMX(v, vrr[7]));
         vmx_purge_double_mapping(dom_rr7, KERNEL_START,
-				 (u64)ed->arch.vtlb->ts->vhpt->hash);
+				 (u64)v->arch.vtlb->ts->vhpt->hash);
 
 }
 
 /* Even guest is in physical mode, we still need such double mapping */
 void
-vmx_load_state(struct exec_domain *ed)
+vmx_load_state(struct vcpu *v)
 {
 	u64 status, psr;
 	u64 old_rr0, dom_rr7, rr0_xen_start, rr0_vhpt;
 	u64 pte_xen, pte_vhpt;
 
-	status = ia64_pal_vp_restore(ed->arch.arch_vmx.vpd, 0);
+	status = ia64_pal_vp_restore(v->arch.arch_vmx.vpd, 0);
 	if (status != PAL_STATUS_SUCCESS)
 		panic("Restore vp status failed\n");
 
-	dom_rr7 = vmx_vrrtomrr(ed, VMX(ed, vrr[7]));
+	dom_rr7 = vmx_vrrtomrr(v, VMX(v, vrr[7]));
 	pte_xen = pte_val(pfn_pte((xen_pstart >> PAGE_SHIFT), PAGE_KERNEL));
-	pte_vhpt = pte_val(pfn_pte((__pa(ed->arch.vtlb->ts->vhpt->hash) >> PAGE_SHIFT), PAGE_KERNEL));
+	pte_vhpt = pte_val(pfn_pte((__pa(v->arch.vtlb->ts->vhpt->hash) >> PAGE_SHIFT), PAGE_KERNEL));
 	vmx_insert_double_mapping(dom_rr7, KERNEL_START,
-				  (u64)ed->arch.vtlb->ts->vhpt->hash,
+				  (u64)v->arch.vtlb->ts->vhpt->hash,
 				  pte_xen, pte_vhpt);
 
 	/* Guest vTLB is not required to be switched explicitly, since
-	 * anchored in exec_domain */
+	 * anchored in vcpu */
 }
 
 /* Purge old double mapping and insert new one, due to rr7 change */
 void
-vmx_change_double_mapping(struct exec_domain *ed, u64 oldrr7, u64 newrr7)
+vmx_change_double_mapping(struct vcpu *v, u64 oldrr7, u64 newrr7)
 {
 	u64 pte_xen, pte_vhpt, vhpt_base;
 
-    vhpt_base = (u64)ed->arch.vtlb->ts->vhpt->hash;
+    vhpt_base = (u64)v->arch.vtlb->ts->vhpt->hash;
     vmx_purge_double_mapping(oldrr7, KERNEL_START,
 				 vhpt_base);
 
@@ -267,29 +267,29 @@ vmx_change_double_mapping(struct exec_domain *ed, u64 oldrr7, u64 newrr7)
 }
 
 /*
- * Initialize VMX envirenment for guest. Only the 1st vp/exec_domain
+ * Initialize VMX envirenment for guest. Only the 1st vp/vcpu
  * is registered here.
  */
 void
 vmx_final_setup_domain(struct domain *d)
 {
-	struct exec_domain *ed = d->exec_domain[0];
+	struct vcpu *v = d->vcpu[0];
 	vpd_t *vpd;
 
-	/* Allocate resources for exec_domain 0 */
-	//memset(&ed->arch.arch_vmx, 0, sizeof(struct arch_vmx_struct));
+	/* Allocate resources for vcpu 0 */
+	//memset(&v->arch.arch_vmx, 0, sizeof(struct arch_vmx_struct));
 
 	vpd = alloc_vpd();
 	ASSERT(vpd);
 
-	ed->arch.arch_vmx.vpd = vpd;
+	v->arch.arch_vmx.vpd = vpd;
 	vpd->virt_env_vaddr = vm_buffer;
 
-	/* ed->arch.schedule_tail = arch_vmx_do_launch; */
-	vmx_create_vp(ed);
+	/* v->arch.schedule_tail = arch_vmx_do_launch; */
+	vmx_create_vp(v);
 
 	/* Set this ed to be vmx */
-	ed->arch.arch_vmx.flags = 1;
+	v->arch.arch_vmx.flags = 1;
 
 	/* Other vmx specific initialization work */
 }

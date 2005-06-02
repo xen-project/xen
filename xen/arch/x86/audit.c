@@ -404,16 +404,16 @@ int audit_adjust_pgtables(struct domain *d, int dir, int noisy)
 
     void adjust_for_pgtbase()
     {
-        struct exec_domain *ed;
+        struct vcpu *v;
 
-        for_each_exec_domain(d, ed)
+        for_each_vcpu(d, v)
         {
-            if ( pagetable_get_paddr(ed->arch.guest_table) )
-                adjust(&frame_table[pagetable_get_pfn(ed->arch.guest_table)], 1);
-            if ( pagetable_get_paddr(ed->arch.shadow_table) )
-                adjust(&frame_table[pagetable_get_pfn(ed->arch.shadow_table)], 0);
-            if ( ed->arch.monitor_shadow_ref )
-                adjust(&frame_table[ed->arch.monitor_shadow_ref], 0);
+            if ( pagetable_get_paddr(v->arch.guest_table) )
+                adjust(&frame_table[pagetable_get_pfn(v->arch.guest_table)], 1);
+            if ( pagetable_get_paddr(v->arch.shadow_table) )
+                adjust(&frame_table[pagetable_get_pfn(v->arch.shadow_table)], 0);
+            if ( v->arch.monitor_shadow_ref )
+                adjust(&frame_table[v->arch.monitor_shadow_ref], 0);
         }
     }
 

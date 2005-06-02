@@ -761,7 +761,7 @@ unsigned long hyperpriv_cnt[HYPERPRIVOP_MAX+1] = { 0 };
 int
 ia64_hyperprivop(unsigned long iim, REGS *regs)
 {
-	struct exec_domain *ed = (struct domain *) current;
+	struct vcpu *v = (struct domain *) current;
 	INST64 inst;
 	UINT64 val;
 
@@ -774,24 +774,24 @@ ia64_hyperprivop(unsigned long iim, REGS *regs)
 	hyperpriv_cnt[iim]++;
 	switch(iim) {
 	    case HYPERPRIVOP_RFI:
-		(void)vcpu_rfi(ed);
+		(void)vcpu_rfi(v);
 		return 0;	// don't update iip
 	    case HYPERPRIVOP_RSM_DT:
-		(void)vcpu_reset_psr_dt(ed);
+		(void)vcpu_reset_psr_dt(v);
 		return 1;
 	    case HYPERPRIVOP_SSM_DT:
-		(void)vcpu_set_psr_dt(ed);
+		(void)vcpu_set_psr_dt(v);
 		return 1;
 	    case HYPERPRIVOP_COVER:
-		(void)vcpu_cover(ed);
+		(void)vcpu_cover(v);
 		return 1;
 	    case HYPERPRIVOP_ITC_D:
 		inst.inst = 0;
-		(void)priv_itc_d(ed,inst);
+		(void)priv_itc_d(v,inst);
 		return 1;
 	    case HYPERPRIVOP_ITC_I:
 		inst.inst = 0;
-		(void)priv_itc_i(ed,inst);
+		(void)priv_itc_i(v,inst);
 		return 1;
 	}
 	return 0;

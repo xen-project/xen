@@ -195,9 +195,9 @@ void __init percpu_traps_init(void)
     set_task_gate(TRAP_double_fault, __DOUBLEFAULT_TSS_ENTRY<<3);
 }
 
-void init_int80_direct_trap(struct exec_domain *ed)
+void init_int80_direct_trap(struct vcpu *v)
 {
-    trap_info_t *ti = &ed->arch.guest_context.trap_ctxt[0x80];
+    trap_info_t *ti = &v->arch.guest_context.trap_ctxt[0x80];
 
     /*
      * We can't virtualise interrupt gates, as there's no way to get
@@ -206,12 +206,12 @@ void init_int80_direct_trap(struct exec_domain *ed)
     if ( TI_GET_IF(ti) )
         return;
 
-    ed->arch.int80_desc.a = (ti->cs << 16) | (ti->address & 0xffff);
-    ed->arch.int80_desc.b =
+    v->arch.int80_desc.a = (ti->cs << 16) | (ti->address & 0xffff);
+    v->arch.int80_desc.b =
         (ti->address & 0xffff0000) | 0x8f00 | ((TI_GET_DPL(ti) & 3) << 13);
 
-    if ( ed == current )
-        set_int80_direct_trap(ed);
+    if ( v == current )
+        set_int80_direct_trap(v);
 }
 
 long do_set_callbacks(unsigned long event_selector,
@@ -219,7 +219,7 @@ long do_set_callbacks(unsigned long event_selector,
                       unsigned long failsafe_selector,
                       unsigned long failsafe_address)
 {
-    struct exec_domain *d = current;
+    struct vcpu *d = current;
 
     if ( !VALID_CODESEL(event_selector) || !VALID_CODESEL(failsafe_selector) )
         return -EPERM;

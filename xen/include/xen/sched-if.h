@@ -13,8 +13,8 @@
 
 struct schedule_data {
     spinlock_t          schedule_lock;  /* spinlock protecting curr        */
-    struct exec_domain *curr;           /* current task                    */
-    struct exec_domain *idle;           /* idle task for this cpu          */
+    struct vcpu *curr;           /* current task                    */
+    struct vcpu *idle;           /* idle task for this cpu          */
     void               *sched_priv;
     struct ac_timer     s_timer;        /* scheduling timer                */
     unsigned long       tick;           /* current periodic 'tick'         */
@@ -24,7 +24,7 @@ struct schedule_data {
 } __cacheline_aligned;
 
 struct task_slice {
-    struct exec_domain *task;
+    struct vcpu *task;
     s_time_t            time;
 };
 
@@ -33,12 +33,12 @@ struct scheduler {
     char *opt_name;         /* option name for this scheduler    */
     unsigned int sched_id;  /* ID for this scheduler             */
 
-    int          (*alloc_task)     (struct exec_domain *);
-    void         (*add_task)       (struct exec_domain *);
+    int          (*alloc_task)     (struct vcpu *);
+    void         (*add_task)       (struct vcpu *);
     void         (*free_task)      (struct domain *);
-    void         (*rem_task)       (struct exec_domain *);
-    void         (*sleep)          (struct exec_domain *);
-    void         (*wake)           (struct exec_domain *);
+    void         (*rem_task)       (struct vcpu *);
+    void         (*sleep)          (struct vcpu *);
+    void         (*wake)           (struct vcpu *);
     struct task_slice (*do_schedule) (s_time_t);
     int          (*control)        (struct sched_ctl_cmd *);
     int          (*adjdom)         (struct domain *,

@@ -29,18 +29,18 @@ struct domain *dom0;
 struct domain *do_createdomain(domid_t dom_id, unsigned int cpu)
 {
     struct domain *d, **pd;
-    struct exec_domain *ed;
+    struct vcpu *v;
 
     if ( (d = alloc_domain_struct()) == NULL )
         return NULL;
 
-    ed = d->exec_domain[0];
+    v = d->vcpu[0];
 
     atomic_set(&d->refcnt, 1);
-    atomic_set(&ed->pausecnt, 0);
+    atomic_set(&v->pausecnt, 0);
 
     d->domain_id   = dom_id;
-    ed->processor  = cpu;
+    v->processor  = cpu;
  
     spin_lock_init(&d->time_lock);
 
@@ -61,9 +61,9 @@ struct domain *do_createdomain(domid_t dom_id, unsigned int cpu)
         return NULL;
     }
     
-    arch_do_createdomain(ed);
+    arch_do_createdomain(v);
     
-    sched_add_domain(ed);
+    sched_add_domain(v);
 
     if ( !is_idle_task(d) )
     {
@@ -107,13 +107,13 @@ struct domain *find_domain_by_id(domid_t dom)
 
 void domain_kill(struct domain *d)
 {
-    struct exec_domain *ed;
+    struct vcpu *v;
 
     domain_pause(d);
     if ( !test_and_set_bit(_DOMF_dying, &d->domain_flags) )
     {
-        for_each_exec_domain(d, ed)
-            sched_rem_domain(ed);
+        for_each_vcpu(d, v)
+            sched_rem_domain(v);
         domain_relinquish_resources(d);
         put_domain(d);
     }
@@ -151,7 +151,7 @@ static struct domain *domain_shuttingdown[NR_CPUS];
 static void domain_shutdown_finalise(void)
 {
     struct domain *d;
-    struct exec_domain *ed;
+    struct vcpu *v;
 
     d = domain_shuttingdown[smp_processor_id()];
     domain_shuttingdown[smp_processor_id()] = NULL;
@@ -162,8 +162,8 @@ static void domain_shutdown_finalise(void)
     BUG_ON(test_bit(_DOMF_shutdown, &d->domain_flags));
 
     /* Make sure that every vcpu is descheduled before we finalise. */
-    for_each_exec_domain ( d, ed )
-        while ( test_bit(_VCPUF_running, &ed->vcpu_flags) )
+    for_each_vcpu ( d, v )
+        while ( test_bit(_VCPUF_running, &v->vcpu_flags) )
             cpu_relax();
 
     sync_lazy_execstate_cpuset(d->cpuset);
@@ -174,7 +174,7 @@ static void domain_shutdown_finalise(void)
     set_bit(_DOMF_shutdown, &d->domain_flags);
     clear_bit(_DOMF_shuttingdown, &d->domain_flags);
 
-    send_guest_virq(dom0->exec_domain[0], VIRQ_DOM_EXC);
+    send_guest_virq(dom0->vcpu[0], VIRQ_DOM_EXC);
 }
 
 static __init int domain_shutdown_finaliser_init(void)
@@ -188,7 +188,7 @@ __initcall(domain_shutdown_finaliser_init);
 void domain_shutdown(u8 reason)
 {
     struct domain *d = current->domain;
-    struct exec_domain *ed;
+    struct vcpu *v;
 
     if ( d->domain_id == 0 )
     {
@@ -219,8 +219,8 @@ void domain_shutdown(u8 reason)
     }
 
     /* Put every vcpu to sleep, but don't wait (avoids inter-vcpu deadlock). */
-    for_each_exec_domain ( d, ed )
-        domain_sleep_nosync(ed);
+    for_each_vcpu ( d, v )
+        domain_sleep_nosync(v);
 }
 
 
@@ -259,63 +259,63 @@ void domain_destruct(struct domain *d)
 
     free_domain_struct(d);
 
-    send_guest_virq(dom0->exec_domain[0], VIRQ_DOM_EXC);
+    send_guest_virq(dom0->vcpu[0], VIRQ_DOM_EXC);
 }
 
-void exec_domain_pause(struct exec_domain *ed)
+void vcpu_pause(struct vcpu *v)
 {
-    BUG_ON(ed == current);
-    atomic_inc(&ed->pausecnt);
-    domain_sleep_sync(ed);
+    BUG_ON(v == current);
+    atomic_inc(&v->pausecnt);
+    domain_sleep_sync(v);
 }
 
 void domain_pause(struct domain *d)
 {
-    struct exec_domain *ed;
+    struct vcpu *v;
 
-    for_each_exec_domain( d, ed )
+    for_each_vcpu( d, v )
     {
-        BUG_ON(ed == current);
-        atomic_inc(&ed->pausecnt);
-        domain_sleep_sync(ed);
+        BUG_ON(v == current);
+        atomic_inc(&v->pausecnt);
+        domain_sleep_sync(v);
     }
 }
 
-void exec_domain_unpause(struct exec_domain *ed)
+void vcpu_unpause(struct vcpu *v)
 {
-    BUG_ON(ed == current);
-    if ( atomic_dec_and_test(&ed->pausecnt) )
-        domain_wake(ed);
+    BUG_ON(v == current);
+    if ( atomic_dec_and_test(&v->pausecnt) )
+        domain_wake(v);
 }
 
 void domain_unpause(struct domain *d)
 {
-    struct exec_domain *ed;
+    struct vcpu *v;
 
-    for_each_exec_domain( d, ed )
-        exec_domain_unpause(ed);
+    for_each_vcpu( d, v )
+        vcpu_unpause(v);
 }
 
 void domain_pause_by_systemcontroller(struct domain *d)
 {
-    struct exec_domain *ed;
+    struct vcpu *v;
 
-    for_each_exec_domain ( d, ed )
+    for_each_vcpu ( d, v )
     {
-        BUG_ON(ed == current);
-        if ( !test_and_set_bit(_VCPUF_ctrl_pause, &ed->vcpu_flags) )
-            domain_sleep_sync(ed);
+        BUG_ON(v == current);
+        if ( !test_and_set_bit(_VCPUF_ctrl_pause, &v->vcpu_flags) )
+            domain_sleep_sync(v);
     }
 }
 
 void domain_unpause_by_systemcontroller(struct domain *d)
 {
-    struct exec_domain *ed;
+    struct vcpu *v;
 
-    for_each_exec_domain ( d, ed )
+    for_each_vcpu ( d, v )
     {
-        if ( test_and_clear_bit(_VCPUF_ctrl_pause, &ed->vcpu_flags) )
-            domain_wake(ed);
+        if ( test_and_clear_bit(_VCPUF_ctrl_pause, &v->vcpu_flags) )
+            domain_wake(v);
     }
 }
 
@@ -330,13 +330,13 @@ int set_info_guest(struct domain *d, dom0_setdomaininfo_t *setdomaininfo)
     int rc = 0;
     struct vcpu_guest_context *c = NULL;
     unsigned long vcpu = setdomaininfo->vcpu;
-    struct exec_domain *ed; 
+    struct vcpu *v; 
 
-    if ( (vcpu >= MAX_VIRT_CPUS) || ((ed = d->exec_domain[vcpu]) == NULL) )
+    if ( (vcpu >= MAX_VIRT_CPUS) || ((v = d->vcpu[vcpu]) == NULL) )
         return -EINVAL;
     
     if (test_bit(_DOMF_constructed, &d->domain_flags) && 
-        !test_bit(_VCPUF_ctrl_pause, &ed->vcpu_flags))
+        !test_bit(_VCPUF_ctrl_pause, &v->vcpu_flags))
         return -EINVAL;
 
     if ( (c = xmalloc(struct vcpu_guest_context)) == NULL )
@@ -348,7 +348,7 @@ int set_info_guest(struct domain *d, dom0_setdomaininfo_t *setdomaininfo)
         goto out;
     }
     
-    if ( (rc = arch_set_info_guest(ed, c)) != 0 )
+    if ( (rc = arch_set_info_guest(v, c)) != 0 )
         goto out;
 
     set_bit(_DOMF_constructed, &d->domain_flags);
@@ -366,14 +366,14 @@ int set_info_guest(struct domain *d, dom0_setdomaininfo_t *setdomaininfo)
 long do_boot_vcpu(unsigned long vcpu, struct vcpu_guest_context *ctxt) 
 {
     struct domain *d = current->domain;
-    struct exec_domain *ed;
+    struct vcpu *v;
     int rc = 0;
     struct vcpu_guest_context *c;
 
-    if ( (vcpu >= MAX_VIRT_CPUS) || (d->exec_domain[vcpu] != NULL) )
+    if ( (vcpu >= MAX_VIRT_CPUS) || (d->vcpu[vcpu] != NULL) )
         return -EINVAL;
 
-    if ( alloc_exec_domain_struct(d, vcpu) == NULL )
+    if ( alloc_vcpu_struct(d, vcpu) == NULL )
         return -ENOMEM;
 
     if ( (c = xmalloc(struct vcpu_guest_context)) == NULL )
@@ -388,31 +388,31 @@ long do_boot_vcpu(unsigned long vcpu, struct vcpu_guest_context *ctxt)
         goto out;
     }
 
-    ed = d->exec_domain[vcpu];
+    v = d->vcpu[vcpu];
 
-    atomic_set(&ed->pausecnt, 0);
-    ed->cpumap = CPUMAP_RUNANYWHERE;
+    atomic_set(&v->pausecnt, 0);
+    v->cpumap = CPUMAP_RUNANYWHERE;
 
-    memcpy(&ed->arch, &idle0_exec_domain.arch, sizeof(ed->arch));
+    memcpy(&v->arch, &idle0_vcpu.arch, sizeof(v->arch));
 
-    arch_do_boot_vcpu(ed);
+    arch_do_boot_vcpu(v);
 
-    if ( (rc = arch_set_info_guest(ed, c)) != 0 )
+    if ( (rc = arch_set_info_guest(v, c)) != 0 )
         goto out;
 
-    sched_add_domain(ed);
+    sched_add_domain(v);
 
     /* domain_unpause_by_systemcontroller */
-    if ( test_and_clear_bit(_VCPUF_ctrl_pause, &ed->vcpu_flags) )
-        domain_wake(ed);
+    if ( test_and_clear_bit(_VCPUF_ctrl_pause, &v->vcpu_flags) )
+        domain_wake(v);
 
     xfree(c);
     return 0;
 
  out:
     xfree(c);
-    arch_free_exec_domain_struct(d->exec_domain[vcpu]);
-    d->exec_domain[vcpu] = NULL;
+    arch_free_vcpu_struct(d->vcpu[vcpu]);
+    d->vcpu[vcpu] = NULL;
     return rc;
 }
 

@@ -183,22 +183,22 @@ typedef struct {
     u8 nr_guests;
     u8 in_flight;
     u8 shareable;
-    struct exec_domain *guest[IRQ_MAX_GUESTS];
+    struct vcpu *guest[IRQ_MAX_GUESTS];
 } irq_guest_action_t;
 
 static void __do_IRQ_guest(int irq)
 {
     irq_desc_t         *desc = &irq_desc[irq];
     irq_guest_action_t *action = (irq_guest_action_t *)desc->action;
-    struct exec_domain *ed;
+    struct vcpu        *v;
     int                 i;
 
     for ( i = 0; i < action->nr_guests; i++ )
     {
-        ed = action->guest[i];
-        if ( !test_and_set_bit(irq, &ed->domain->pirq_mask) )
+        v = action->guest[i];
+        if ( !test_and_set_bit(irq, &v->domain->pirq_mask) )
             action->in_flight++;
-        send_guest_pirq(ed, irq);
+        send_guest_pirq(v, irq);
     }
 }
 
@@ -230,9 +230,9 @@ int pirq_guest_unmask(struct domain *d)
     return 0;
 }
 
-int pirq_guest_bind(struct exec_domain *ed, int irq, int will_share)
+int pirq_guest_bind(struct vcpu *v, int irq, int will_share)
 {
-    struct domain      *d = ed->domain;
+    struct domain      *d = v->domain;
     irq_desc_t         *desc = &irq_desc[irq];
     irq_guest_action_t *action;
     unsigned long       flags;
@@ -274,7 +274,7 @@ int pirq_guest_bind(struct exec_domain *ed, int irq, int will_share)
         desc->handler->startup(irq);
 
         /* Attempt to bind the interrupt target to the correct CPU. */
-        cpu_set(ed->processor, cpumask);
+        cpu_set(v->processor, cpumask);
         if ( desc->handler->set_affinity != NULL )
             desc->handler->set_affinity(irq, cpumask);
     }
@@ -293,7 +293,7 @@ int pirq_guest_bind(struct exec_domain *ed, int irq, int will_share)
         goto out;
     }
 
-    action->guest[action->nr_guests++] = ed;
+    action->guest[action->nr_guests++] = v;
 
  out:
     spin_unlock_irqrestore(&desc->lock, flags);

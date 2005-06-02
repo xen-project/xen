@@ -37,6 +37,6 @@ struct vmx_virpit_t {
 } ;
 
 /* to hook the ioreq packet to get the PIT initializaiton info */
-extern void vmx_hooks_assist(struct exec_domain *d);
+extern void vmx_hooks_assist(struct vcpu *d);
 
 #endif /* _VMX_VIRPIT_H_ */

@@ -1364,7 +1364,7 @@ int pirq_guest_unmask(struct domain *d)
     return 0;
 }
 
-int pirq_guest_bind(struct exec_domain *d, int irq, int will_share)
+int pirq_guest_bind(struct vcpu *d, int irq, int will_share)
 {
     irq_desc_t         *desc = &irq_desc[irq];
     irq_guest_action_t *action;

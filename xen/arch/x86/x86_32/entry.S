@@ -139,7 +139,7 @@ vmx_test_all_events:
         notl %ecx
         cli                             # tests must not race interrupts
 /*test_softirqs:*/  
-        movl EDOMAIN_processor(%ebx),%eax
+        movl VCPU_processor(%ebx),%eax
         shl  $IRQSTAT_shift,%eax
         test %ecx,irq_stat(%eax,1)
         jnz  vmx_process_softirqs
@@ -216,10 +216,10 @@ DBLFLT1:GET_CURRENT(%ebx)
         jmp   test_all_events
 failsafe_callback:
         GET_CURRENT(%ebx)
-        leal  EDOMAIN_trap_bounce(%ebx),%edx
-        movl  EDOMAIN_failsafe_addr(%ebx),%eax
+        leal  VCPU_trap_bounce(%ebx),%edx
+        movl  VCPU_failsafe_addr(%ebx),%eax
         movl  %eax,TRAPBOUNCE_eip(%edx)
-        movl  EDOMAIN_failsafe_sel(%ebx),%eax
+        movl  VCPU_failsafe_sel(%ebx),%eax
         movw  %ax,TRAPBOUNCE_cs(%edx)
         movw  $TBF_FAILSAFE,TRAPBOUNCE_flags(%edx)
         call  create_bounce_frame
@@ -269,22 +269,22 @@ test_all_events:
         notl %ecx
         cli                             # tests must not race interrupts
 /*test_softirqs:*/  
-        movl EDOMAIN_processor(%ebx),%eax
+        movl VCPU_processor(%ebx),%eax
         shl  $IRQSTAT_shift,%eax
         test %ecx,irq_stat(%eax,1)
         jnz  process_softirqs
 /*test_guest_events:*/
-        movl EDOMAIN_vcpu_info(%ebx),%eax
+        movl VCPU_vcpu_info(%ebx),%eax
         testb $0xFF,VCPUINFO_upcall_mask(%eax)
         jnz  restore_all_guest
         testb $0xFF,VCPUINFO_upcall_pending(%eax)
         jz   restore_all_guest
 /*process_guest_events:*/
         sti
-        leal EDOMAIN_trap_bounce(%ebx),%edx
-        movl EDOMAIN_event_addr(%ebx),%eax
+        leal VCPU_trap_bounce(%ebx),%edx
+        movl VCPU_event_addr(%ebx),%eax
         movl %eax,TRAPBOUNCE_eip(%edx)
-        movl EDOMAIN_event_sel(%ebx),%eax
+        movl VCPU_event_sel(%ebx),%eax
         movw %ax,TRAPBOUNCE_cs(%edx)
         movw $TBF_INTERRUPT,TRAPBOUNCE_flags(%edx)
         call create_bounce_frame
@@ -298,15 +298,15 @@ process_softirqs:
                 
 /* CREATE A BASIC EXCEPTION FRAME ON GUEST OS (RING-1) STACK:            */
 /*   {EIP, CS, EFLAGS, [ESP, SS]}                                        */
-/* %edx == trap_bounce, %ebx == struct exec_domain                       */
+/* %edx == trap_bounce, %ebx == struct vcpu                       */
 /* %eax,%ecx are clobbered. %gs:%esi contain new UREGS_ss/UREGS_esp. */
 create_bounce_frame:
         movl UREGS_eflags+4(%esp),%ecx
         movb UREGS_cs+4(%esp),%cl
         testl $(2|X86_EFLAGS_VM),%ecx
         jz   ring1 /* jump if returning to an existing ring-1 activation */
-        movl EDOMAIN_kernel_sp(%ebx),%esi
-FLT6:   movl EDOMAIN_kernel_ss(%ebx),%gs
+        movl VCPU_kernel_sp(%ebx),%esi
+FLT6:   movl VCPU_kernel_ss(%ebx),%gs
         testl $X86_EFLAGS_VM,UREGS_eflags+4(%esp)
         jz   nvm86_1
         subl $16,%esi       /* push ES/DS/FS/GS (VM86 stack frame) */
@@ -334,7 +334,7 @@ FLT13:  movl UREGS_ss+4(%esp),%gs
         test %eax,%eax
         jz   domain_crash_synchronous
 FLT14:  movl %eax,%gs:(%esi) 
-        movl EDOMAIN_vcpu_info(%ebx),%eax
+        movl VCPU_vcpu_info(%ebx),%eax
         pushl VCPUINFO_upcall_mask(%eax)
         testb $TBF_INTERRUPT,%cl
         setnz VCPUINFO_upcall_mask(%eax) # TBF_INTERRUPT -> clear upcall mask
@@ -407,7 +407,7 @@ nvm86_3:/* Rewrite our stack frame and return to ring 1. */
 
         ALIGN
 process_guest_exception_and_events:
-        leal EDOMAIN_trap_bounce(%ebx),%edx
+        leal VCPU_trap_bounce(%ebx),%edx
         testb $TBF_EXCEPTION,TRAPBOUNCE_flags(%edx)
         jz   test_all_events
         call create_bounce_frame
