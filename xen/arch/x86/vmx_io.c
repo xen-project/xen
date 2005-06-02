@@ -455,7 +455,7 @@ void vmx_intr_assist(struct exec_domain *d)
 
     __vmwrite(GUEST_INTERRUPTIBILITY_INFO, 0);
 
-    TRACE_2D(TRC_VMX_INT, d, highest_vector);
+    TRACE_3D(TRC_VMX_INT, d->domain->domain_id, highest_vector, 0);
     if (highest_vector == vpit->vector)
         vpit->inject_point = NOW();
 
