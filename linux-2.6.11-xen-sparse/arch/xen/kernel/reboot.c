@@ -103,8 +103,10 @@ static void __do_suspend(void)
 
     __cli();
 
+#ifdef __i386__
     mm_pin_all();
     kmem_cache_shrink(pgd_cache);
+#endif
 
     netif_suspend();
 
